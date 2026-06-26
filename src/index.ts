@@ -27,3 +27,4 @@ export {
   interpolateColor,
   resolveToken,
 } from './tokens.js';
+export { MotionValue } from './motion-value.js';

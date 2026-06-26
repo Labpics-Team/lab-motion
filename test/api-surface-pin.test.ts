@@ -36,6 +36,7 @@ const EXPECTED_EXPORTS = new Set([
   'parseColor',
   'interpolateColor',
   'resolveToken',
+  'MotionValue',
 ]);
 
 describe('public API surface pin (invariant 6)', () => {

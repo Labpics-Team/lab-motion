@@ -32,13 +32,17 @@ import { type SpringParams, springUnchecked, validateSpringParams } from './spri
 import { resolveToken, parseColor, interpolateColor, type RGBA } from './tokens.js';
 
 /** Internal type to represent an active animation controller. */
-interface DriveController {
+export interface DriveController {
   readonly stop: () => void;
   readonly current: () => { value: number; velocity: number; color?: RGBA };
 }
 
 /** Tracks active animations by target to enable re-targeting. */
 const activeDrivers = new WeakMap<Element, DriveController>();
+
+export function getActiveDriver(target: Element): DriveController | undefined {
+  return activeDrivers.get(target);
+}
 
 /** Options for drive(). All platform seams are injectable for testing. */
 export interface DriveOptions {
