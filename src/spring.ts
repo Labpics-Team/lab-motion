@@ -25,6 +25,8 @@ export interface SpringParams {
   readonly stiffness: number;
   /** Non-negative finite damping coefficient (N·s/m). Zero = undamped. */
   readonly damping: number;
+  /** Optional initial velocity (normalized unit/s). */
+  readonly initialVelocity?: number;
 }
 
 /** Output of the spring solver at a given time. */
@@ -73,6 +75,11 @@ export function validateSpringParams(p: SpringParams): void {
       `spring: damping must be a non-negative finite number, got ${p.damping}`,
     );
   }
+  if (p.initialVelocity !== undefined && !Number.isFinite(p.initialVelocity)) {
+    throw new MotionParamError(
+      `spring: initialVelocity must be a finite number, got ${p.initialVelocity}`,
+    );
+  }
   // Guard against extreme overdamping. Compute the damping ratio ζ and reject
   // configs that would cause the animation to run to MAX_FRAMES (CPU stall +
   // abrupt snap to `to`). This closes the class: no valid spring config can
@@ -115,11 +122,11 @@ function clampFinite(x: number): number {
  * @internal
  */
 export function springUnchecked(params: SpringParams, t: number): SpringResult {
-  const { mass: m, stiffness: k, damping: c } = params;
+  const { mass: m, stiffness: k, damping: c, initialVelocity: v0 = 0 } = params;
 
-  // At t=0 the spring is at rest at the start position.
+  // At t=0 the spring starts with value 0 and initial velocity v0.
   if (t <= 0) {
-    return { value: 0, velocity: 0 };
+    return { value: 0, velocity: v0 };
   }
 
   const omega0 = Math.sqrt(k / m); // natural frequency
@@ -132,31 +139,43 @@ export function springUnchecked(params: SpringParams, t: number): SpringResult {
     // Underdamped: oscillates, decays toward 1.
     const omegaD = omega0 * Math.sqrt(1 - zeta * zeta); // damped frequency
     const decay = Math.exp(-zeta * omega0 * t);
-    // x(t) = 1 - e^{-zeta*omega0*t} * (cos(omegaD*t) + (zeta*omega0/omegaD)*sin(omegaD*t))
     const cosD = Math.cos(omegaD * t);
     const sinD = Math.sin(omegaD * t);
-    const A = (zeta * omega0) / omegaD;
-    value = 1 - decay * (cosD + A * sinD);
+    
+    // Boundary conditions: x_h(0) = A = -1
+    // B = (v0 - zeta * omega0 * A) / omegaD = (v0 + zeta * omega0) / omegaD
+    const B = (v0 + zeta * omega0) / omegaD;
+    
+    value = 1 + decay * (-cosD + B * sinD);
+    
     // x'(t) — derivative:
     velocity =
-      zeta * omega0 * decay * (cosD + A * sinD) - decay * (-omegaD * sinD + A * omegaD * cosD);
+      -zeta * omega0 * decay * (-cosD + B * sinD) + decay * (omegaD * sinD + B * omegaD * cosD);
   } else if (zeta === 1) {
     // Critically damped: fastest non-oscillatory approach.
     const decay = Math.exp(-omega0 * t);
-    value = 1 - decay * (1 + omega0 * t);
-    velocity = decay * omega0 * omega0 * t;
+    
+    // Boundary conditions: x_h(0) = A = -1
+    // B = v0 - omega0 * A = v0 + omega0
+    const B = v0 + omega0;
+    
+    value = 1 + decay * (-1 + B * t);
+    velocity = -omega0 * decay * (-1 + B * t) + decay * B;
   } else {
     // Overdamped: two real exponentials, no oscillation.
     const sqrtTerm = Math.sqrt(zeta * zeta - 1);
     const r1 = -omega0 * (zeta - sqrtTerm);
     const r2 = -omega0 * (zeta + sqrtTerm);
-    // x(t) = 1 + A1*e^{r1*t} + A2*e^{r2*t}
-    // Boundary conditions: x(0)=0, x'(0)=0 → A1 + A2 = -1, r1*A1 + r2*A2 = 0
-    // Solving: A1 = r2/(r1-r2), A2 = -r1/(r1-r2)  (sum = -1 ✓, x(0) = 1+(-1) = 0 ✓)
-    const A1 = r2 / (r1 - r2);
-    const A2 = -r1 / (r1 - r2);
+    
+    // Boundary conditions: A1 + A2 = -1, r1*A1 + r2*A2 = v0
+    // A1 = (v0 + r2) / (r1 - r2)
+    // A2 = -(v0 + r1) / (r1 - r2)
+    const A1 = (v0 + r2) / (r1 - r2);
+    const A2 = -(v0 + r1) / (r1 - r2);
+    
     const e1 = Math.exp(r1 * t);
     const e2 = Math.exp(r2 * t);
+    
     value = 1 + A1 * e1 + A2 * e2;
     velocity = A1 * r1 * e1 + A2 * r2 * e2;
   }

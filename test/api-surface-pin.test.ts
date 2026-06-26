@@ -31,9 +31,11 @@ const EXPECTED_EXPORTS = new Set([
   'tween',
   'MotionParamError',
   'drive',
-  // Exported so callers can validate spring params eagerly before calling drive().
-  // Also closes Finding 1: boundary validation is now the single canonical site.
   'validateSpringParams',
+  'hslToRgb',
+  'parseColor',
+  'interpolateColor',
+  'resolveToken',
 ]);
 
 describe('public API surface pin (invariant 6)', () => {

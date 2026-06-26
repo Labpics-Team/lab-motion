@@ -20,3 +20,10 @@ export {
 } from './spring.js';
 export { tween } from './tween.js';
 export { type DriveOptions, drive } from './drive.js';
+export {
+  type RGBA,
+  hslToRgb,
+  parseColor,
+  interpolateColor,
+  resolveToken,
+} from './tokens.js';

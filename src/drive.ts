@@ -29,20 +29,32 @@
 
 import { MotionParamError } from './errors.js';
 import { type SpringParams, springUnchecked, validateSpringParams } from './spring.js';
+import { resolveToken, parseColor, interpolateColor, type RGBA } from './tokens.js';
+
+/** Internal type to represent an active animation controller. */
+interface DriveController {
+  readonly stop: () => void;
+  readonly current: () => { value: number; velocity: number; color?: RGBA };
+}
+
+/** Tracks active animations by target to enable re-targeting. */
+const activeDrivers = new WeakMap<Element, DriveController>();
 
 /** Options for drive(). All platform seams are injectable for testing. */
 export interface DriveOptions {
-  /** Start value (e.g. CSS pixel offset at animation start). */
-  readonly from: number;
-  /** End value (e.g. CSS pixel offset at animation end). */
-  readonly to: number;
+  /** Start value (e.g. CSS pixel offset or color token at animation start). */
+  readonly from: number | string;
+  /** End value (e.g. CSS pixel offset or color token at animation end). */
+  readonly to: number | string;
   /** Spring physics parameters. */
   readonly spring: SpringParams;
   /**
    * Callback invoked on every animation step with the current interpolated value.
    * Called at most once when reduce=true (with the final `to` value).
    */
-  readonly onStep: (value: number) => void;
+  readonly onStep: (value: any) => void;
+  /** Optional DOM element target to enable automatic transition interruption and seamless re-targeting. */
+  readonly target?: Element | undefined;
   /**
    * Injectable matchMedia factory. Pass `window.matchMedia.bind(window)` in a
    * browser context. Pass a stub in tests. Pass `undefined` for SSR/Node —
@@ -59,6 +71,8 @@ export interface DriveOptions {
    * so the Promise always resolves (not deadlocked).
    */
   readonly requestFrame?: ((cb: (ts?: number) => void) => number) | undefined;
+  /** Optional design tokens dictionary for resolving token values. */
+  readonly tokens?: Record<string, string | number> | undefined;
 }
 
 /**
@@ -112,18 +126,7 @@ function clamp(v: number, lo: number, hi: number): number {
  * @returns A Promise that resolves when the animation reaches `to`.
  */
 export function drive(opts: DriveOptions): Promise<void> {
-  const { from, to, onStep, matchMedia, requestFrame } = opts;
-
-  // Validate from/to — non-finite inputs (NaN, Infinity) would propagate
-  // verbatim into onStep (consumer CSS) and cause isConverged() to return
-  // false forever (NaN comparisons), running the loop to MAX_FRAMES = 2000.
-  // Mirror the validation pattern in spring.ts validate().
-  if (!Number.isFinite(from)) {
-    throw new MotionParamError(`drive: 'from' must be a finite number, got ${from}`);
-  }
-  if (!Number.isFinite(to)) {
-    throw new MotionParamError(`drive: 'to' must be a finite number, got ${to}`);
-  }
+  const { from, to, onStep, matchMedia, requestFrame, target, tokens } = opts;
 
   // Validate spring params synchronously at the drive() boundary — before any
   // Promise is constructed or frame scheduled. This makes invalid spring config
@@ -133,8 +136,66 @@ export function drive(opts: DriveOptions): Promise<void> {
   // MAX_FRAMES (CPU stall + abrupt snap).
   validateSpringParams(opts.spring);
 
-  // Fast path: from === to, nothing to animate.
-  if (from === to) {
+  // Resolve design tokens
+  const resolvedFrom = resolveToken(from, target, tokens);
+  const resolvedTo = resolveToken(to, target, tokens);
+
+  // Parse colors if applicable
+  let fromColor = typeof resolvedFrom === 'string' ? parseColor(resolvedFrom) : null;
+  let toColor = typeof resolvedTo === 'string' ? parseColor(resolvedTo) : null;
+
+  const isColorTransition = fromColor !== null && toColor !== null;
+
+  let startValue = 0;
+  let endValue = 0;
+  let range = 0;
+
+  if (isColorTransition) {
+    // Color transition uses normalized progress 0 -> 1
+    startValue = 0;
+    endValue = 1;
+    range = 1;
+  } else {
+    // Numeric transition
+    const numFrom = typeof resolvedFrom === 'number' ? resolvedFrom : parseFloat(resolvedFrom as string);
+    const numTo = typeof resolvedTo === 'number' ? resolvedTo : parseFloat(resolvedTo as string);
+
+    if (!Number.isFinite(numFrom)) {
+      throw new MotionParamError(`drive: 'from' must be a finite number or valid color, got ${from}`);
+    }
+    if (!Number.isFinite(numTo)) {
+      throw new MotionParamError(`drive: 'to' must be a finite number or valid color, got ${to}`);
+    }
+
+    startValue = numFrom;
+    endValue = numTo;
+    range = endValue - startValue;
+  }
+
+  // Retargeting logic: if a target is provided and already animating, stop the old
+  // animation and seamlessly transition from its current state.
+  let initialVelocity = opts.spring.initialVelocity ?? 0;
+
+  if (target) {
+    const active = activeDrivers.get(target);
+    if (active) {
+      active.stop();
+      const { value, velocity, color } = active.current();
+      if (isColorTransition && color) {
+        fromColor = color;
+        initialVelocity = velocity;
+      } else if (!isColorTransition && !color) {
+        startValue = value;
+        initialVelocity = velocity;
+        range = endValue - startValue;
+      }
+    }
+  }
+
+  // Fast path: startValue === endValue, nothing to animate.
+  if (startValue === endValue) {
+    onStep(to); // Ensure the final value is emitted
+    if (target) activeDrivers.delete(target);
     return Promise.resolve();
   }
 
@@ -144,13 +205,13 @@ export function drive(opts: DriveOptions): Promise<void> {
   if (reduce) {
     // Short-circuit: emit the final value in a single step, no rAF.
     onStep(to);
+    if (target) activeDrivers.delete(target);
     return Promise.resolve();
   }
 
   // Clamping bounds (swapped for negative range).
-  const range = to - from;
-  const lo = range >= 0 ? from : to;
-  const hi = range >= 0 ? to : from;
+  const lo = range >= 0 ? startValue : endValue;
+  const hi = range >= 0 ? endValue : startValue;
 
   // L4: platform driver — injected or fallback to the global rAF.
   const scheduleFrame: (cb: (ts?: number) => void) => number =
@@ -160,33 +221,73 @@ export function drive(opts: DriveOptions): Promise<void> {
         ? requestAnimationFrame(cb)
         : (setTimeout(cb, FIXED_DT_S * 1000) as unknown as number));
 
-  return new Promise<void>((resolve) => {
+  let stopAnimation = () => {}; // Placeholder for the stop function
+  let getCurrentState: () => { value: number; velocity: number; color?: RGBA } = () => ({
+    value: startValue,
+    velocity: initialVelocity,
+    color: fromColor || undefined,
+  });
+
+  const promise = new Promise<void>((resolve) => {
     let settled = false;
     let frameCount = 0;
     let elapsedSeconds = 0;
     let startTs: number | undefined;
-    // Track the highest emitted value (for from < to) so the sequence is
-    // monotonically non-decreasing even when an underdamped spring oscillates
-    // back after overshooting the clamped ceiling.
-    let maxEmittedToward = from;
+    let maxEmittedToward = startValue;
+
+    const effectiveSpringParams = {
+      ...opts.spring,
+      initialVelocity: initialVelocity / Math.abs(range || 1), // Normalize initial velocity
+    };
 
     function computeValue(): number {
       // spring params already validated synchronously at drive() entry above.
-      const result = springUnchecked(opts.spring, elapsedSeconds);
-      const raw = from + result.value * range;
+      const result = springUnchecked(effectiveSpringParams, elapsedSeconds);
+      const raw = startValue + result.value * range;
       return clamp(raw, lo, hi);
     }
 
     function computeVelocity(): number {
       // spring params already validated synchronously at drive() entry above.
-      const result = springUnchecked(opts.spring, elapsedSeconds);
-      return Math.abs(result.velocity) * Math.abs(range);
+      const result = springUnchecked(effectiveSpringParams, elapsedSeconds);
+      return result.velocity * range;
     }
+
+    function emitValue(p: number): void {
+      if (isColorTransition) {
+        onStep(interpolateColor(fromColor!, toColor!, p));
+      } else {
+        onStep(p);
+      }
+    }
+
+    getCurrentState = () => {
+      const p = computeValue();
+      const vel = computeVelocity();
+      if (isColorTransition) {
+        const currentRGBA = {
+          r: Math.round(fromColor!.r + (toColor!.r - fromColor!.r) * p),
+          g: Math.round(fromColor!.g + (toColor!.g - fromColor!.g) * p),
+          b: Math.round(fromColor!.b + (toColor!.b - fromColor!.b) * p),
+          a: fromColor!.a + (toColor!.a - fromColor!.a) * p,
+        };
+        return {
+          value: p,
+          velocity: vel,
+          color: currentRGBA,
+        };
+      }
+      return {
+        value: p,
+        velocity: vel,
+      };
+    };
 
     function settle(): void {
       if (settled) return;
       settled = true;
       onStep(to);
+      if (target) activeDrivers.delete(target);
       resolve();
     }
 
@@ -201,29 +302,16 @@ export function drive(opts: DriveOptions): Promise<void> {
 
     function isConverged(): boolean {
       const absRange = Math.abs(range);
-      // Normalize both terms by range so the threshold is range-independent.
-      // computeValue() is in absolute output units → divide by absRange.
-      // computeVelocity() = abs(springVelocity) * absRange → divide by absRange
-      //   restores the normalized spring velocity (unitless, in [0..1]/s).
-      // Guard absRange>0 is guaranteed by the from===to early-exit above.
       const v = computeValue();
       const vel = computeVelocity();
       return (
-        Math.abs(v - to) / absRange < CONVERGENCE_THRESHOLD &&
-        vel / absRange < CONVERGENCE_THRESHOLD
+        Math.abs(v - endValue) / absRange < CONVERGENCE_THRESHOLD &&
+        Math.abs(vel) / absRange < CONVERGENCE_THRESHOLD
       );
     }
 
     // Single-flight guard: prevents two concurrent tick chains from mutating shared
     // state (frameCount, elapsedSeconds, maxEmittedToward) simultaneously.
-    // Root cause of Finding 3: when handle===0 both scheduleFrame(tick) and
-    // setTimeout(tick,0) fire — if the injected clock returns 0 AND later delivers
-    // its callback (e.g. a draining clock whose scheduler happens to return 0 as a
-    // valid handle), two independent tick loops run, double-emitting and double-
-    // advancing the clock. The `settled` guard only blocks AFTER convergence, not
-    // concurrent in-flight ticks. tickActive makes the tick body re-entrant-safe:
-    // whichever invocation arrives second yields immediately and the active chain
-    // reschedules itself normally.
     let tickActive = false;
 
     // tick() is the single frame body for both the rAF path and the setTimeout
@@ -249,7 +337,7 @@ export function drive(opts: DriveOptions): Promise<void> {
       const monotoneValue =
         range >= 0 ? Math.max(cv, maxEmittedToward) : Math.min(cv, maxEmittedToward);
       maxEmittedToward = monotoneValue;
-      onStep(monotoneValue);
+      emitValue(monotoneValue);
 
       // Release the single-flight lock before rescheduling so the next tick
       // invocation (from either path) is not immediately dropped.
@@ -269,16 +357,27 @@ export function drive(opts: DriveOptions): Promise<void> {
     // If the injected clock returns 0 without invoking its callback (the
     // documented non-draining step-clock convention), install a setTimeout(0)
     // fallback NOW — before tick() has ever run — so the Promise always resolves.
-    // This is the fix for the deadlock: the bootstrap handle was previously
-    // discarded, so the handle=0 detection inside tick() was never reached.
-    //
-    // useTimeoutFallback is set before setTimeout fires, so tick() always reads
-    // the correct scheduler on its first (and every subsequent) invocation.
     let useTimeoutFallback = false;
     const bootstrapHandle = scheduleFrame(tick);
     if (bootstrapHandle === 0) {
       useTimeoutFallback = true;
       setTimeout(tick, 0);
     }
+
+    stopAnimation = () => {
+      settle(); // Ensure resolution if stopped externally
+      if (typeof cancelAnimationFrame !== 'undefined' && bootstrapHandle) {
+        cancelAnimationFrame(bootstrapHandle);
+      }
+    };
   });
+
+  if (target) {
+    activeDrivers.set(target, {
+      stop: stopAnimation,
+      current: getCurrentState,
+    });
+  }
+
+  return promise;
 }
