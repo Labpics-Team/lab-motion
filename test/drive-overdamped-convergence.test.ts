@@ -58,13 +58,15 @@ describe('overdamped spring rejected at drive() boundary — no MAX_FRAMES stall
       ).toThrow(MotionParamError);
     });
 
-    it('error message references damping ratio', () => {
+    it('error message references damping ratio for a high-zeta config (ω₀ valid, ζ > 4)', () => {
+      // Use a config where ω₀ is above the floor (ω₀=10, stiffness=100, mass=1) but ζ > 4.
+      // c = 4.01 * 2 * sqrt(100*1) = 4.01*20 = 80.2 → zeta ≈ 4.01 > 4 — hits the zeta guard.
       let msg = '';
       try {
         drive({
           from: 0,
           to: 200,
-          spring: { mass: 1, stiffness: 1, damping: 10 },
+          spring: { mass: 1, stiffness: 100, damping: 80.2 },
           onStep: () => {},
           matchMedia: noReduceMedia(),
         });
