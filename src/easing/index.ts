@@ -113,7 +113,13 @@ function endpointOrUndefined(t: number): number | undefined {
  *
  * Invariants:
  *   NE2: linear(0) === 0 and linear(1) === 1 bit-exact (endpoint short-circuit)
- *   NE1: finite for all IEEE-754 inputs (t<0→0, t>1→1, NaN→0, ±Infinity→0 or 1)
+ *   NE1: finite for ALL IEEE-754 inputs — handled inline (not via clampFinite):
+ *        NaN     → 0  (clamped to start; NaN is neither ≤0 nor ≥1)
+ *        -Infinity → 0  (before start)
+ *        +Infinity → 1  (after end)
+ *        t < 0   → 0  (clamp to start)
+ *        t > 1   → 1  (clamp to end)
+ *        interior: t (identity, always finite because t is finite here)
  *   NE4: pure, deterministic, no side effects
  */
 export function linear(t: number): number {

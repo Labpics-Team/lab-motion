@@ -148,19 +148,38 @@ describe('easing finiteness fuzz — NE1 (CSS-safe invariant)', () => {
     const normalized = normalizeEasing(hostile);
     assertFiniteOverDomain('normalizeEasing(t=>t/0)', normalized);
   });
-  it('normalizeEasing of hostile fn (t=>NaN) produces ONLY finite output — NaN hardened to 0 (NE1)', () => {
+  it('normalizeEasing of hostile fn (t=>NaN) clamps EXACTLY to 0 — mutation-pins NaN→0 contract (NE1)', () => {
     const hostile = (_t: number): number => Number.NaN;
     const normalized = normalizeEasing(hostile);
+    // EXACT clamp target: NaN → 0 (not just "finite") — pins clampFinite NaN branch
+    expect(normalized(0), 'NaN output must clamp to exactly 0').toBe(0);
+    expect(normalized(0.5), 'NaN output must clamp to exactly 0').toBe(0);
+    expect(normalized(1), 'NaN output must clamp to exactly 0').toBe(0);
     assertFiniteOverDomain('normalizeEasing(t=>NaN)', normalized);
   });
-  it('normalizeEasing of hostile fn (t=>-Infinity) produces ONLY finite output — Infinity clamped (NE1)', () => {
+  it('normalizeEasing of hostile fn (t=>+Infinity) clamps EXACTLY to Number.MAX_VALUE — mutation-pins +Inf contract (NE1)', () => {
+    const hostile = (_t: number): number => Number.POSITIVE_INFINITY;
+    const normalized = normalizeEasing(hostile);
+    // EXACT clamp target: +Infinity → Number.MAX_VALUE — pins clampFinite +Inf branch
+    expect(normalized(0), '+Infinity output must clamp to exactly Number.MAX_VALUE').toBe(Number.MAX_VALUE);
+    expect(normalized(0.5), '+Infinity output must clamp to exactly Number.MAX_VALUE').toBe(Number.MAX_VALUE);
+    expect(normalized(1), '+Infinity output must clamp to exactly Number.MAX_VALUE').toBe(Number.MAX_VALUE);
+    assertFiniteOverDomain('normalizeEasing(t=>+Infinity)', normalized);
+  });
+  it('normalizeEasing of hostile fn (t=>-Infinity) clamps EXACTLY to -Number.MAX_VALUE — mutation-pins -Inf contract (NE1)', () => {
     const hostile = (_t: number): number => Number.NEGATIVE_INFINITY;
     const normalized = normalizeEasing(hostile);
+    // EXACT clamp target: -Infinity → -Number.MAX_VALUE — pins clampFinite -Inf branch
+    expect(normalized(0), '-Infinity output must clamp to exactly -Number.MAX_VALUE').toBe(-Number.MAX_VALUE);
+    expect(normalized(0.5), '-Infinity output must clamp to exactly -Number.MAX_VALUE').toBe(-Number.MAX_VALUE);
+    expect(normalized(1), '-Infinity output must clamp to exactly -Number.MAX_VALUE').toBe(-Number.MAX_VALUE);
     assertFiniteOverDomain('normalizeEasing(t=>-Infinity)', normalized);
   });
-  it('normalizeEasing of hostile fn (t=>Number.MAX_VALUE*2) produces ONLY finite output (NE1)', () => {
-    const hostile = (_t: number): number => Number.MAX_VALUE * 2;
+  it('normalizeEasing of hostile fn (t=>Number.MAX_VALUE*2) clamps EXACTLY to Number.MAX_VALUE — mutation-pins overflow contract (NE1)', () => {
+    const hostile = (_t: number): number => Number.MAX_VALUE * 2; // overflows to +Infinity in IEEE-754
     const normalized = normalizeEasing(hostile);
+    // MAX_VALUE*2 = +Infinity in IEEE-754, so clamps to Number.MAX_VALUE
+    expect(normalized(0.5), 'overflow to +Infinity must clamp to exactly Number.MAX_VALUE').toBe(Number.MAX_VALUE);
     assertFiniteOverDomain('normalizeEasing(t=>MAX_VALUE*2)', normalized);
   });
   it('linear alone (without normalizer) produces ONLY finite output over >=10k samples + IEEE-754 edges (NE1)', () => {
