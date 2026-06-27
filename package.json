@@ -13,6 +13,11 @@
       "types": "./dist/index.d.ts",
       "import": "./dist/index.js",
       "require": "./dist/index.cjs"
+    },
+    "./easing": {
+      "types": "./dist/easing/index.d.ts",
+      "import": "./dist/easing/index.js",
+      "require": "./dist/easing/index.cjs"
     }
   },
   "files": ["dist"],
