@@ -413,15 +413,18 @@ export function backInOut(t: number): number {
 export function anticipate(t: number): number {
   const ep = endpointOrUndefined(t);
   if (ep !== undefined) return ep;
-  // Scale t to [0,1] for each half, then blend
-  // Formula from Framer Motion source: uses the back easing constant
+  // Scale t to [0,1] for each half, then blend.
+  // Recoil half (t<0.5): scaled backIn (uses the back constants).
+  // Launch half (t>=0.5): scaled easeOut cubic (no back overshoot).
   if (t < 0.5) {
     const t2 = 2 * t;
     return clampFinite((BACK_C3 * t2 * t2 * t2 - BACK_C1 * t2 * t2) / 2);
   }
-  // easeOut in the second half — maps [0.5,1] → [0,1] output
-  const u = 2 * t - 2;
-  return clampFinite((1 + BACK_C3 * u * u * u + BACK_C1 * u * u + 1) / 2);
+  // easeOut (cubic) in the second half — maps [0.5,1] → [0,1] output.
+  // Canonical: 0.5*easeOut(2t-1)+0.5 with easeOut(x)=1-(1-x)^3.
+  const x = 2 * t - 1;
+  const inv = 1 - x;
+  return clampFinite(0.5 * (1 - inv * inv * inv) + 0.5);
 }
 
 // ---------------------------------------------------------------------------
