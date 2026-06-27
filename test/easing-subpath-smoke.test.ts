@@ -2,41 +2,40 @@
  * easing-subpath-smoke.test.ts — package-boundary smoke
  * Class: smoke (A)
  * Invariant NE5 — tree-shakeable subpath isolation:
- *   The ./easing subpath must exist in dist (dist/easing/index.js, index.cjs, index.d.ts),
- *   and importing from it via the resolved path must yield all required exports.
+ *   The ./easing subpath must exist in dist and the actual exports["./easing"].import
+ *   target must load successfully, yielding all required exports.
  *
  * WHY this test and not just ../src/easing:
  *   All other easing tests import from '../src/easing/index.js' (source-level).
- *   This test imports from the PUBLISHED artifact path (dist/easing/index.js)
- *   — exactly as a consumer would after `npm install @labpics/motion`.
- *   If the exports map changes, tsup entry is removed, or dist filename drifts,
- *   the source-level tests stay green but THIS test goes RED — catching the drift.
+ *   This test imports from the PUBLISHED artifact path — the path declared in
+ *   exports["./easing"].import — exactly as a consumer would after installing
+ *   @labpics/motion. If the exports map changes, tsup entry is removed, or dist
+ *   filename drifts, the source-level tests stay green but THIS test goes RED.
  *
  * RED proof:
- *   Rename dist/easing/index.js → dist/easing/easing.js without updating
- *   package.json exports → import below throws ERR_PACKAGE_PATH_NOT_EXPORTED → RED.
- *   Comment out the "./easing" key in package.json exports → same → RED.
+ *   Comment out the "./easing" key in package.json exports → exports field is
+ *   undefined → all assertions below fail → RED.
+ *   Change exports["./easing"].import to a non-existent path → dynamic import
+ *   throws ENOENT/ERR_MODULE_NOT_FOUND → RED.
  *
  * Mutation proof:
- *   Removing any required export name from tsup entry causes the last assertion
- *   (exported-names check) to fail; the dist file either omits the name or
- *   tsup strips it as dead export.
+ *   Removing any required export name from tsup entry causes the named-exports
+ *   check to fail — the dynamically loaded module omits the name → RED.
  *
- * Subpath boundary (NE5): importing from './easing' alone must NOT pull the
- * core spring/tween/drive exports into the bundle. We verify this by checking
- * that the dist/easing/index.js file contains NONE of the core-only symbols.
+ * Subpath boundary (NE5): the easing dist must NOT re-export core-only symbols
+ * (spring/tween/drive) — verified by inspecting the dist file content.
  */
 
 import { readFileSync, existsSync } from 'node:fs';
 import { resolve, dirname } from 'node:path';
-import { fileURLToPath } from 'node:url';
+import { fileURLToPath, pathToFileURL } from 'node:url';
 import { describe, expect, it } from 'vitest';
 
 const here = dirname(fileURLToPath(import.meta.url));
 const pkgRoot = resolve(here, '..');
 
 // ---------------------------------------------------------------------------
-// Resolve the ./easing subpath via package.json exports (mirrors Node.js resolution)
+// Read the package.json exports map — this is the source of truth for resolution
 // ---------------------------------------------------------------------------
 const pkg = JSON.parse(readFileSync(resolve(pkgRoot, 'package.json'), 'utf8')) as {
   exports?: Record<string, { types?: string; import?: string; require?: string }>;
@@ -44,7 +43,16 @@ const pkg = JSON.parse(readFileSync(resolve(pkgRoot, 'package.json'), 'utf8')) a
 
 const easingExports = pkg.exports?.['./easing'];
 
+// Resolve the actual dist path declared in exports["./easing"].import (strip leading ./)
+const declaredImportPath = easingExports?.import; // e.g. "./dist/easing/index.js"
+const resolvedImportPath = declaredImportPath
+  ? resolve(pkgRoot, declaredImportPath.replace(/^\.\//, ''))
+  : null;
+
 describe('easing ./easing subpath — package-boundary smoke (NE5)', () => {
+  // ---------------------------------------------------------------------------
+  // Gate 1: exports map declares the subpath correctly
+  // ---------------------------------------------------------------------------
   it('package.json exports map contains the ./easing subpath key', () => {
     expect(
       easingExports,
@@ -58,52 +66,53 @@ describe('easing ./easing subpath — package-boundary smoke (NE5)', () => {
     expect(easingExports?.require, './easing "require" (CJS) field must be declared').toBeTruthy();
   });
 
-  it('dist/easing/index.js exists on disk (ESM artifact)', () => {
-    const esmPath = resolve(pkgRoot, 'dist/easing/index.js');
+  // ---------------------------------------------------------------------------
+  // Gate 2: the declared import target exists on disk
+  // ---------------------------------------------------------------------------
+  it('exports["./easing"].import target exists on disk (primary path verification)', () => {
+    expect(resolvedImportPath, 'exports["./easing"].import path must resolve').not.toBeNull();
     expect(
-      existsSync(esmPath),
-      `dist/easing/index.js does not exist — pnpm build must emit it (NE5)`,
+      existsSync(resolvedImportPath!),
+      `exports["./easing"].import → "${declaredImportPath}" → "${resolvedImportPath}" does not exist on disk — pnpm build must emit it (NE5)`,
     ).toBe(true);
   });
 
-  it('dist/easing/index.cjs exists on disk (CJS artifact)', () => {
-    const cjsPath = resolve(pkgRoot, 'dist/easing/index.cjs');
+  it('exports["./easing"].require target exists on disk', () => {
+    const cjsPath = easingExports?.require
+      ? resolve(pkgRoot, easingExports.require.replace(/^\.\//, ''))
+      : null;
+    expect(cjsPath).not.toBeNull();
     expect(
-      existsSync(cjsPath),
-      `dist/easing/index.cjs does not exist — pnpm build must emit it (NE5)`,
+      existsSync(cjsPath!),
+      `exports["./easing"].require → "${easingExports?.require}" does not exist on disk (NE5)`,
     ).toBe(true);
   });
 
-  it('dist/easing/index.d.ts exists on disk (type declarations artifact)', () => {
-    const dtsPath = resolve(pkgRoot, 'dist/easing/index.d.ts');
+  it('exports["./easing"].types target exists on disk', () => {
+    const dtsPath = easingExports?.types
+      ? resolve(pkgRoot, easingExports.types.replace(/^\.\//, ''))
+      : null;
+    expect(dtsPath).not.toBeNull();
     expect(
-      existsSync(dtsPath),
-      `dist/easing/index.d.ts does not exist — pnpm build must emit it (NE5)`,
+      existsSync(dtsPath!),
+      `exports["./easing"].types → "${easingExports?.types}" does not exist on disk (NE5)`,
     ).toBe(true);
   });
 
-  it('dist/easing/index.js exports all required easing names (NE6 api-surface via dist)', () => {
-    const esmPath = resolve(pkgRoot, 'dist/easing/index.js');
-    const distJs = readFileSync(esmPath, 'utf8');
+  // ---------------------------------------------------------------------------
+  // Gate 3: the resolved import target ACTUALLY LOADS and exports all NE6 names
+  // (this is the key gate CodeRabbit flagged — dynamic import proves the module
+  // resolves and runs, not just that a file exists at a hard-coded path)
+  // ---------------------------------------------------------------------------
+  it('exports["./easing"].import target loads via dynamic import and exports all NE6 names (NE5+NE6)', async () => {
+    expect(resolvedImportPath, 'resolved import path must exist before dynamic import').not.toBeNull();
 
-    // Parse exported names from the ESM dist (export { ... } and export function/const/var)
-    const bracketExports = [...distJs.matchAll(/export\s*\{([^}]+)\}/g)].flatMap((m) =>
-      (m[1] ?? '').split(',').map(
-        (s) =>
-          s
-            .trim()
-            .split(/\s+as\s+/)
-            .pop()
-            ?.trim() ?? '',
-      ),
-    );
-    const namedExports = [
-      ...distJs.matchAll(/export\s+(?:function|const|let|var)\s+(\w+)/g),
-    ].map((m) => m[1]?.trim() ?? '');
+    // Dynamic import from the exact path declared in exports["./easing"].import
+    // This is the same resolution path Node.js uses for "import ... from '@labpics/motion/easing'"
+    const fileUrl = pathToFileURL(resolvedImportPath!).href;
+    const mod = await import(fileUrl) as Record<string, unknown>;
 
-    const allExported = new Set([...bracketExports, ...namedExports].filter(Boolean));
-
-    // All NE6-required names (api-surface-pin at the dist layer)
+    // All NE6-required names (api-surface-pin at the dist/published layer)
     const REQUIRED_NAMES = [
       'linear',
       'easeIn', 'easeOut', 'easeInOut',
@@ -116,19 +125,21 @@ describe('easing ./easing subpath — package-boundary smoke (NE5)', () => {
       'normalizeEasing',
     ];
 
-    const missing = REQUIRED_NAMES.filter((name) => !allExported.has(name));
+    const missing = REQUIRED_NAMES.filter((name) => typeof mod[name] !== 'function');
     expect(
       missing,
-      `dist/easing/index.js is missing exports: ${missing.join(', ')} — tsup entry or tree-shake is broken`,
+      `exports["./easing"].import module is missing callable exports: ${missing.join(', ')} — tsup entry or tree-shake is broken`,
     ).toHaveLength(0);
   });
 
-  it('dist/easing/index.js does NOT contain core-only symbols (NE5 subpath isolation)', () => {
-    const esmPath = resolve(pkgRoot, 'dist/easing/index.js');
-    const distJs = readFileSync(esmPath, 'utf8');
+  // ---------------------------------------------------------------------------
+  // Gate 4: the easing dist does NOT contain core-only symbols (NE5 boundary)
+  // ---------------------------------------------------------------------------
+  it('exports["./easing"].import target does NOT contain core-only symbol exports (NE5 subpath isolation)', () => {
+    expect(resolvedImportPath).not.toBeNull();
+    const distJs = readFileSync(resolvedImportPath!, 'utf8');
 
     // Core-only symbols that must NOT appear as exports in the ./easing subpath
-    // (they live in dist/index.js, not in the easing subpath)
     const CORE_ONLY_EXPORTS = ['spring', 'tween', 'drive'];
 
     const leaking = CORE_ONLY_EXPORTS.filter((name) => {
@@ -139,7 +150,7 @@ describe('easing ./easing subpath — package-boundary smoke (NE5)', () => {
 
     expect(
       leaking,
-      `dist/easing/index.js leaks core-only exports: ${leaking.join(', ')} — subpath boundary violated (NE5)`,
+      `exports["./easing"].import leaks core-only exports: ${leaking.join(', ')} — subpath boundary violated (NE5)`,
     ).toHaveLength(0);
   });
 });

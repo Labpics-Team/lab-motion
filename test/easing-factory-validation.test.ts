@@ -153,6 +153,31 @@ describe('steps() factory validation — NE7', () => {
       expect(Number.isFinite(fn(t))).toBe(true);
     }
   });
+
+  // NE7: invalid position string (runtime guard — pins the position validation)
+  it('steps(4, "middle") throws MotionParamError — invalid position string (NE7)', () => {
+    // TypeScript prevents this at compile time, but JS callers can pass any string.
+    // The runtime guard must reject it rather than silently using "end" behavior.
+    expect(() => steps(4, 'middle' as never)).toThrow(MotionParamError);
+  });
+  it('steps(4, "") throws MotionParamError — empty string position (NE7)', () => {
+    expect(() => steps(4, '' as never)).toThrow(MotionParamError);
+  });
+  it('steps(1, "start") does NOT throw — valid position (control group)', () => {
+    expect(() => steps(1, 'start')).not.toThrow();
+  });
+  it('steps(1, "end") does NOT throw — valid position (control group)', () => {
+    expect(() => steps(1, 'end')).not.toThrow();
+  });
+  it('steps() invalid-position error message mentions "start" or "end"', () => {
+    try {
+      steps(4, 'middle' as never);
+      expect.fail('Expected MotionParamError');
+    } catch (e) {
+      expect(e).toBeInstanceOf(MotionParamError);
+      expect((e as MotionParamError).message).toMatch(/start.*end|end.*start/i);
+    }
+  });
 });
 
 // ---------------------------------------------------------------------------

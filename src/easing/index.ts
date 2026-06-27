@@ -716,21 +716,30 @@ export type StepPosition = 'start' | 'end';
  * NE2: endpoint behavior is documented below (steps is discontinuous).
  * NE4: deterministic — same (n, position, t) → same output bit-identical.
  *
- * Endpoint behavior (NE2 exemption for stepped — it's discontinuous):
- *   'end':   steps(n,'end')(0)=0 exact; steps(n,'end')(1)=1 exact
- *   'start': steps(n,'start')(0)=1/n (first step at 0); steps(n,'start')(1)=1 exact
+ * Endpoint behavior (NE2 — endpoint short-circuit applies to all positions):
+ *   'end':   steps(n,'end')(0)=0 exact (t<=0 short-circuit); steps(n,'end')(1)=1 exact
+ *   'start': steps(n,'start')(0)=0 exact (t<=0 short-circuit, NOT 1/n);
+ *            steps(n,'start')(1)=1 exact
+ *   Both positions: t<=0→0 and t>=1→1 by the hostile-t guard, regardless of
+ *   CSS jump-start semantics. The first visible step for 'start' occurs at the
+ *   first interior t > 0.
  *
  * Canonical: W3C CSS Transitions Level 1 §2.3 step-timing-function.
  *
  * @param n - number of steps; must be a positive integer (n >= 1)
  * @param position - where steps occur: 'start' or 'end' (default 'end')
  * @returns stepped easing function, NE1-safe for all t
- * @throws MotionParamError if n is not a positive finite integer
+ * @throws MotionParamError if n is not a positive finite integer or position is invalid
  */
 export function steps(n: number, position: StepPosition = 'end'): (t: number) => number {
   if (!Number.isFinite(n) || n <= 0 || Math.floor(n) !== n) {
     throw new MotionParamError(
       `steps(n, position): n must be a positive integer, got ${n}`,
+    );
+  }
+  if (position !== 'start' && position !== 'end') {
+    throw new MotionParamError(
+      `steps(n, position): position must be "start" or "end", got "${String(position)}"`,
     );
   }
 
