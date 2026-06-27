@@ -677,6 +677,15 @@ export function cubicBezier(
       `cubicBezier(x1,y1,x2,y2): all control points must be finite numbers, got (${x1},${y1},${x2},${y2})`,
     );
   }
+  // x1 and x2 must be in [0,1] — the Bezier x-component is only monotonic
+  // (and thus invertible by the solver) when both x control points are in [0,1].
+  // CSS cubic-bezier() rejects out-of-range x values for the same reason.
+  // y1/y2 are unconstrained (allow overshoot).
+  if (x1 < 0 || x1 > 1 || x2 < 0 || x2 > 1) {
+    throw new MotionParamError(
+      `cubicBezier(x1,y1,x2,y2): x1 and x2 must be in [0,1], got x1=${x1} x2=${x2}`,
+    );
+  }
 
   // Linear fast path (x1===y1 && x2===y2 === the control points lie on diagonal)
   if (x1 === y1 && x2 === y2) {

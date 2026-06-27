@@ -66,13 +66,44 @@ describe('cubicBezier() factory validation — NE7', () => {
     }
   });
 
+  // NE7: x1/x2 out of [0,1] — the Bezier x-component is non-monotonic
+  // outside [0,1], making the solver's root-finding undefined.
+  // CSS cubic-bezier() rejects these for the same reason.
+  it('cubicBezier(-0.5,0,1,1) throws MotionParamError (x1 < 0)', () => {
+    expect(() => cubicBezier(-0.5, 0, 1, 1)).toThrow(MotionParamError);
+  });
+  it('cubicBezier(1.5,0,1,1) throws MotionParamError (x1 > 1)', () => {
+    expect(() => cubicBezier(1.5, 0, 1, 1)).toThrow(MotionParamError);
+  });
+  it('cubicBezier(0,0,-0.1,1) throws MotionParamError (x2 < 0)', () => {
+    expect(() => cubicBezier(0, 0, -0.1, 1)).toThrow(MotionParamError);
+  });
+  it('cubicBezier(0,0,1.1,1) throws MotionParamError (x2 > 1)', () => {
+    expect(() => cubicBezier(0, 0, 1.1, 1)).toThrow(MotionParamError);
+  });
+  it('cubicBezier x-out-of-range error message mentions x1/x2 and [0,1]', () => {
+    try {
+      cubicBezier(1.5, 0, 0.5, 1);
+      expect.fail('Expected MotionParamError');
+    } catch (e) {
+      expect(e).toBeInstanceOf(MotionParamError);
+      expect((e as MotionParamError).message).toMatch(/x1.*x2|x2.*x1|\[0,1\]|0.*1/i);
+    }
+  });
+
   // Valid: all finite — must NOT throw
   it('cubicBezier(0.25,0.1,0.25,1) with all-finite params does NOT throw', () => {
     expect(() => cubicBezier(0.25, 0.1, 0.25, 1)).not.toThrow();
   });
-  it('cubicBezier with y outside [0,1] (overshooting) does NOT throw', () => {
-    // y control points may be outside [0,1]; only non-finite is rejected
+  it('cubicBezier with y outside [0,1] (overshooting) does NOT throw — y unconstrained', () => {
+    // y control points may be outside [0,1] — overshoot is valid; x must be in [0,1]
     expect(() => cubicBezier(0, 1.5, 1, -0.5)).not.toThrow();
+  });
+  it('cubicBezier with x at boundary (x1=0, x2=1) does NOT throw', () => {
+    expect(() => cubicBezier(0, 0, 1, 1)).not.toThrow();
+  });
+  it('cubicBezier with x at boundary (x1=1, x2=0) does NOT throw', () => {
+    expect(() => cubicBezier(1, 0, 0, 1)).not.toThrow();
   });
   it('cubicBezier return value is a function (callable)', () => {
     const fn = cubicBezier(0.25, 0.1, 0.25, 1);
