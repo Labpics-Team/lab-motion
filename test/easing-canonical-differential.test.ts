@@ -19,21 +19,24 @@
  *   itself".
  *   Plus each curve's documented SHAPE INVARIANT (where overshoot is allowed).
  *
- * THE BUG (anticipate, launch phase t >= 0.5):
+ * HISTORICAL BUG CLOSED (anticipate, launch phase t >= 0.5, fixed in 7c24a96):
  *   Canonical (Framer Motion / Motion One):
  *     C1=1.70158, C3=C1+1
  *     backIn(t)  = C3*t^3 - C1*t^2
  *     easeOut(t) = 1 - (1-t)^3
  *     anticipate(t) = t < 0.5 ? 0.5*backIn(2t) : 0.5*easeOut(2t-1) + 0.5
- *   src uses a scaled backOut TAIL for t>=0.5 instead of easeOut, so it
- *   overshoots to ~1.05 @ t=0.79 (a SECOND overshoot a true easeOut never
- *   produces) and deviates ~0.126 @ t=0.667. The file's OWN docstring
- *   (lines ~399/406) states the t>=0.5 half is "scaled easeOut" — the code
- *   contradicts its own contract. These assertions BITE that contradiction.
+ *   The pre-fix src used a scaled backOut TAIL for t>=0.5 instead of easeOut,
+ *   overshooting to ~1.05 @ t=0.79 (a second overshoot that easeOut never
+ *   produces) and deviating ~0.126 @ t=0.667 from the Framer reference.
+ *   The file's own docstring stated the t>=0.5 half was "scaled easeOut" —
+ *   the old code contradicted its own contract. These assertions bit that
+ *   contradiction and pinned the fix (they were RED on the pre-fix code).
  *
- * RED-PROOF: on the CURRENT (unfixed) anticipate the interior-value checks at
- * t=0.667 and t=0.79 and the launch-phase no-overshoot invariant MUST fail.
- * A green-from-birth run here would mean the test does not bite (theater).
+ * RED-PROOF (historical, verified before the fix landed):
+ *   On the pre-fix anticipate the interior-value checks at t=0.667 and t=0.79
+ *   and the launch-phase no-overshoot invariant failed as expected. The current
+ *   fixed implementation passes all assertions. A re-run on the pre-fix commit
+ *   would reproduce the RED state confirming these tests bite the class.
  */
 
 import { describe, expect, it } from 'vitest';
@@ -119,15 +122,16 @@ describe('easing canonical differential (Class C) — interior values vs publish
       }
     });
 
-    // Launch phase (t >= 0.5) MUST be scaled easeOut per the docstring.
-    // CURRENT src uses a scaled backOut tail → these BITE.
+    // Launch phase (t >= 0.5) must be scaled easeOut per the docstring.
+    // The pre-fix code used a scaled backOut tail — these tests bit that bug
+    // and were RED before the fix (7c24a96); they pin the correct behavior.
     it('launch phase value @ t=0.667 matches canonical scaled easeOut', () => {
-      // canonical ≈ 0.852296 ; current buggy ≈ 0.978338 (deviation ~0.126)
+      // canonical ≈ 0.852296 ; pre-fix buggy ≈ 0.978338 (deviation ~0.126)
       expect(anticipate(0.667)).toBeCloseTo(refAnticipate(0.667), 6);
     });
 
     it('launch phase value @ t=0.79 matches canonical scaled easeOut', () => {
-      // canonical ≈ 0.962956 ; current buggy ≈ 1.050002 (deviation ~0.087)
+      // canonical ≈ 0.962956 ; pre-fix buggy ≈ 1.050002 (deviation ~0.087)
       expect(anticipate(0.79)).toBeCloseTo(refAnticipate(0.79), 6);
     });
 
@@ -137,9 +141,10 @@ describe('easing canonical differential (Class C) — interior values vs publish
       }
     });
 
-    // SHAPE INVARIANT: a true easeOut launch NEVER exceeds 1. The only
-    // overshoot anticipate is allowed is the NEGATIVE recoil dip at the start.
-    // CURRENT src overshoots to ~1.05 in the launch phase → BITES.
+    // SHAPE INVARIANT: a true easeOut launch never exceeds 1. The only
+    // overshoot anticipate allows is the NEGATIVE recoil dip at the start.
+    // The pre-fix src overshot to ~1.05 in the launch phase; this pin
+    // ensures the regression cannot recur.
     it('launch phase never exceeds 1 (no second overshoot)', () => {
       let peak = -Infinity;
       let at = 0;
