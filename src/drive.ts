@@ -201,11 +201,24 @@ export function drive(opts: DriveOptions): Promise<void> {
 
     function isConverged(): boolean {
       const absRange = Math.abs(range);
+      // Guard absRange>0 is guaranteed by the from===to early-exit above.
+
+      // Visual-saturation early-exit: once the monotone emitter has committed to `to`
+      // (maxEmittedToward === to), no new value distinct from `to` can ever be emitted
+      // regardless of the raw spring velocity. The velocity tail beyond the clamp boundary
+      // is invisible — holding the Promise for it breaks the resolution contract.
+      // Root cause of High bug (convergence velocity gate reads unclamped tail): the position
+      // term used the CLAMPED computeValue() (frozen at `to` once overshoot is absorbed)
+      // while the velocity term read the UNCLAMPED springUnchecked() velocity, which for an
+      // accepted underdamped spring at the documented floor (zeta=0.2, omega0=2.0) keeps the
+      // Promise pending ~3.9s after visual completion. This early-exit makes the class
+      // impossible: once the visual is at `to` and locked by the monotone gate, resolve.
+      if (maxEmittedToward === to) return true;
+
       // Normalize both terms by range so the threshold is range-independent.
       // computeValue() is in absolute output units → divide by absRange.
       // computeVelocity() = abs(springVelocity) * absRange → divide by absRange
       //   restores the normalized spring velocity (unitless, in [0..1]/s).
-      // Guard absRange>0 is guaranteed by the from===to early-exit above.
       const v = computeValue();
       const vel = computeVelocity();
       return (
