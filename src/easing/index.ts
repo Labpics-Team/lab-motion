@@ -712,8 +712,10 @@ export function cubicBezier(
 
 /**
  * Step positions for steps() easing — mirrors CSS step-timing-function.
- * "start" = jump-start: first jump at t=0 (step forward immediately)
- * "end"   = jump-end:   last jump at t=1 (default CSS behavior)
+ * "start" = jump-start: first jump fires at the first interior t > 0
+ *            (the endpoint t=0 is clamped to 0 by the NE2 hostile-t guard;
+ *            CSS jump-start fires at t=0, but our guard fires first)
+ * "end"   = jump-end: last jump at t=1 (default CSS behavior)
  */
 export type StepPosition = 'start' | 'end';
 
