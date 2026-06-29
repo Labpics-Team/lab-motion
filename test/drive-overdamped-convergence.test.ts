@@ -64,7 +64,8 @@ describe('overdamped spring rejected at drive() boundary — no MAX_FRAMES stall
         drive({
           from: 0,
           to: 200,
-          spring: { mass: 1, stiffness: 1, damping: 10 },
+          // Use omega0=10 (valid), zeta=100/(2*10)=5 > 4 — hits the damping-ratio guard, not omega0 guard.
+          spring: { mass: 1, stiffness: 100, damping: 100 },
           onStep: () => {},
           matchMedia: noReduceMedia(),
         });

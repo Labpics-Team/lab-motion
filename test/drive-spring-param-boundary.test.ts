@@ -243,12 +243,11 @@ describe('drive() spring-param validation is at the boundary — scheduler-indep
       expect(values[values.length - 1]).toBe(100);
     }, 2000);
 
-    it('does not throw for damping=0 (undamped — valid at boundary)', () => {
-      // damping=0 passes validateSpringParams (zeta=0 ≤ MAX_DAMPING_RATIO=4).
-      // We verify it does NOT throw synchronously. We do NOT await the returned
-      // Promise: an undamped spring oscillates indefinitely and needs MAX_FRAMES
-      // iterations via 2000 chained setTimeout(0) calls, well beyond the 2 s limit.
-      // The invariant tested here is purely about the synchronous throw contract.
+    it('throws for damping=0 (undamped — ζ=0 < MIN_DAMPING_RATIO=0.2, now correctly rejected)', () => {
+      // damping=0 → zeta=0 < 0.2 → MotionParamError (near-undamped stall class).
+      // Prior behaviour (accepted, oscillated to MAX_FRAMES) was a latent CPU-stall bug:
+      // an undamped spring never satisfies isConverged() and always hits MAX_FRAMES→snap.
+      // The MIN_DAMPING_RATIO guard closes this class; damping=0 must now throw.
       expect(() => {
         drive({
           from: 0,
@@ -258,7 +257,7 @@ describe('drive() spring-param validation is at the boundary — scheduler-indep
           matchMedia: noReduceMedia(),
           requestFrame: nonDrainingClock,
         });
-      }).not.toThrow();
+      }).toThrow(MotionParamError);
     });
   });
 });

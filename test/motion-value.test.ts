@@ -292,11 +292,11 @@ describe('MotionValue finiteness fuzz (class C property test, 10k+ inputs)', () 
     const randVal = (): number => (rng() - 0.5) * 2000;
 
     const springVariants = [
-      { mass: 1, stiffness: 200, damping: 20 },    // underdamped
-      { mass: 1, stiffness: 100, damping: 20 },    // near-critically damped
-      { mass: 1, stiffness: 50, damping: 30 },     // overdamped
-      { mass: 2, stiffness: 400, damping: 0.1 },   // near-undamped
-      { mass: 0.5, stiffness: 1000, damping: 40 }, // stiff
+      { mass: 1, stiffness: 200, damping: 20 },   // underdamped (omega0≈14.1, zeta≈0.71)
+      { mass: 1, stiffness: 100, damping: 20 },   // near-critically damped (omega0=10, zeta=1.0)
+      { mass: 1, stiffness: 50, damping: 30 },    // overdamped (omega0≈7.1, zeta≈2.12)
+      { mass: 1, stiffness: 4, damping: 0.8 },    // floor underdamped (omega0=2.0, zeta=0.2 — documented floor)
+      { mass: 0.5, stiffness: 1000, damping: 40 }, // stiff (omega0≈44.7, zeta≈0.45)
     ];
 
     let totalChecked = 0;
