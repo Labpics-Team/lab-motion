@@ -328,7 +328,7 @@ describe('MotionValue finiteness fuzz (class C property test, 10k+ inputs)', () 
     expect(totalChecked).toBeGreaterThan(10_000);
   }, 60_000);
 
-  it('handles degenerate ranges without NaN/Infinity (initial===target, tiny, huge)', () => {
+  it('handles degenerate AND overflow ranges without NaN/Infinity (tiny, huge, MAX_VALUE span)', () => {
     const cases: Array<{ initial: number; target: number }> = [
       { initial: 0, target: 0 },
       { initial: 1e-12, target: 2e-12 },
@@ -336,6 +336,14 @@ describe('MotionValue finiteness fuzz (class C property test, 10k+ inputs)', () 
       { initial: 0, target: 1e-15 },
       { initial: 1000, target: 1000 },
       { initial: -0, target: 0 },
+      // Overflow class: |from| + |target| > MAX_VALUE → range = target − from is
+      // ±Infinity, and from + normPos*range yields NaN (0*Inf). Each arg is finite
+      // and passes the public validate gate; the overflow is in the subtraction.
+      // The finiteness guard must snap to the (finite) target instead of emitting NaN.
+      { initial: Number.MAX_VALUE, target: -Number.MAX_VALUE },
+      { initial: -Number.MAX_VALUE, target: Number.MAX_VALUE },
+      { initial: 8.9e307, target: -8.9e307 },
+      { initial: Number.MAX_VALUE, target: Number.MAX_VALUE },
     ];
     for (const { initial, target } of cases) {
       const clock = makeVirtualClock();

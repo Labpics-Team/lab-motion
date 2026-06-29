@@ -347,6 +347,7 @@ export class MotionValue {
     const absVelocity = Math.abs(rawVelocity);
     const converged =
       this._frameCount >= MotionValue.MAX_FRAMES ||
+      !Number.isFinite(range) || // unrepresentable span: |from|+|target| overflowed past MAX_VALUE
       (absRange < 1e-10) || // degenerate range
       (distToTarget / Math.max(absRange, 1e-10) < MotionValue.CONVERGENCE_THRESHOLD &&
         absVelocity / Math.max(absRange, 1e-10) < MotionValue.CONVERGENCE_THRESHOLD);
@@ -364,6 +365,19 @@ export class MotionValue {
     const lo = range >= 0 ? this._from : this._target;
     const hi = range >= 0 ? this._target : this._from;
     const clampedValue = Math.max(lo, Math.min(hi, rawValue));
+
+    // Final CSS-safety net (invariant 2): even a finite range can overflow the
+    // denormalized product to Inf/NaN at extreme magnitudes. Never emit a
+    // non-finite value — the only contract-safe outcome is to snap to the
+    // (validated-finite) target. Closes the overflow-NaN class, not one input.
+    if (!Number.isFinite(clampedValue) || !Number.isFinite(rawVelocity)) {
+      this._value = this._target;
+      this._velocity = 0;
+      this._running = false;
+      this._tickActive = false;
+      this._emit(this._target);
+      return;
+    }
 
     this._value = clampedValue;
     this._velocity = rawVelocity;
