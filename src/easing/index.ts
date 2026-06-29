@@ -413,15 +413,18 @@ export function backInOut(t: number): number {
 export function anticipate(t: number): number {
   const ep = endpointOrUndefined(t);
   if (ep !== undefined) return ep;
-  // Scale t to [0,1] for each half, then blend
-  // Formula from Framer Motion source: uses the back easing constant
+  // Scale t to [0,1] for each half, then blend.
+  // Recoil half (t<0.5): scaled backIn (uses the back constants).
+  // Launch half (t>=0.5): scaled easeOut cubic (no back overshoot).
   if (t < 0.5) {
     const t2 = 2 * t;
     return clampFinite((BACK_C3 * t2 * t2 * t2 - BACK_C1 * t2 * t2) / 2);
   }
-  // easeOut in the second half — maps [0.5,1] → [0,1] output
-  const u = 2 * t - 2;
-  return clampFinite((1 + BACK_C3 * u * u * u + BACK_C1 * u * u + 1) / 2);
+  // easeOut (cubic) in the second half — maps [0.5,1] → [0,1] output.
+  // Canonical: 0.5*easeOut(2t-1)+0.5 with easeOut(x)=1-(1-x)^3.
+  const x = 2 * t - 1;
+  const inv = 1 - x;
+  return clampFinite(0.5 * (1 - inv * inv * inv) + 0.5);
 }
 
 // ---------------------------------------------------------------------------
@@ -674,6 +677,15 @@ export function cubicBezier(
       `cubicBezier(x1,y1,x2,y2): all control points must be finite numbers, got (${x1},${y1},${x2},${y2})`,
     );
   }
+  // x1 and x2 must be in [0,1] — the Bezier x-component is only monotonic
+  // (and thus invertible by the solver) when both x control points are in [0,1].
+  // CSS cubic-bezier() rejects out-of-range x values for the same reason.
+  // y1/y2 are unconstrained (allow overshoot).
+  if (x1 < 0 || x1 > 1 || x2 < 0 || x2 > 1) {
+    throw new MotionParamError(
+      `cubicBezier(x1,y1,x2,y2): x1 and x2 must be in [0,1], got x1=${x1} x2=${x2}`,
+    );
+  }
 
   // Linear fast path (x1===y1 && x2===y2 === the control points lie on diagonal)
   if (x1 === y1 && x2 === y2) {
@@ -700,8 +712,10 @@ export function cubicBezier(
 
 /**
  * Step positions for steps() easing — mirrors CSS step-timing-function.
- * "start" = jump-start: first jump at t=0 (step forward immediately)
- * "end"   = jump-end:   last jump at t=1 (default CSS behavior)
+ * "start" = jump-start: first jump fires at the first interior t > 0
+ *            (the endpoint t=0 is clamped to 0 by the NE2 hostile-t guard;
+ *            CSS jump-start fires at t=0, but our guard fires first)
+ * "end"   = jump-end: last jump at t=1 (default CSS behavior)
  */
 export type StepPosition = 'start' | 'end';
 
