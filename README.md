@@ -1,36 +1,33 @@
 # @labpics/motion
 
-A production-ready, dependency-free, and highly optimized spring physics and transition engine.
+Движок пружинной физики и переходов без runtime-зависимостей. Часть дизайн-системы Labpics.
 
-Part of the Labpics design system ecosystem, built for incredible speed and accessibility.
-
-## Features
-
-- **Zero Runtime Dependencies**: Tiny footprint (~1.9 KB gzipped).
-- **CSS-Safe**: Strictly guards against NaN and Infinity values (using robust finite clamp guards and fuzzing).
-- **Reduced-Motion Aware**: Employs `prefers-reduced-motion` at the core level to automatically short-circuit transitions.
-- **Deterministic Solver**: Pure mathematical solvers that are independent of DOM, clock, or window.
-- **API Pinning**: Strictly maintained API signatures.
-
-## Installation
+## Как собрать
 
 ```bash
-pnpm add @labpics/motion
+pnpm install --frozen-lockfile
+pnpm typecheck
+pnpm build      # → dist/index.js + dist/index.d.ts
+pnpm test
 ```
 
-## Usage
+## Как потреблять
 
-### Spring Simulation
+```typescript
+import { spring, tween, drive, MotionParamError } from '@labpics/motion';
+```
+
+### Пружина (spring)
 
 ```typescript
 import { spring } from '@labpics/motion';
 
-const result = spring({ mass: 1, stiffness: 100, damping: 10 }, 0.5); // t is in seconds
-console.log(result.value); // Position value
-console.log(result.velocity); // Velocity value
+const result = spring({ mass: 1, stiffness: 100, damping: 10 }, 0.5); // t в секундах
+console.log(result.value);    // позиция
+console.log(result.velocity); // скорость
 ```
 
-### Animating Elements (drive API)
+### Анимация элемента (drive)
 
 ```typescript
 import { drive } from '@labpics/motion';
@@ -42,10 +39,30 @@ drive({
   onStep: (value) => {
     element.style.transform = `translateX(${value}px)`;
   },
-  matchMedia: window.matchMedia.bind(window), // Inject window seams for accessibility/reduced motion
+  matchMedia: window.matchMedia.bind(window), // инъекция для prefers-reduced-motion
 });
 ```
 
-## License
+### Интерполяция (tween)
+
+```typescript
+import { tween } from '@labpics/motion';
+
+const value = tween({ from: 0, to: 1, duration: 300, easing: 'ease-in-out' }, 150);
+```
+
+### Ошибки
+
+```typescript
+import { MotionParamError } from '@labpics/motion';
+
+try {
+  spring({ mass: -1, stiffness: 100, damping: 10 }, 0);
+} catch (e) {
+  if (e instanceof MotionParamError) console.error(e.message);
+}
+```
+
+## Лицензия
 
 MIT

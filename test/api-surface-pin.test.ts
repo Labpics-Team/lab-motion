@@ -34,6 +34,9 @@ const EXPECTED_EXPORTS = new Set([
   // Exported so callers can validate spring params eagerly before calling drive().
   // Also closes Finding 1: boundary validation is now the single canonical site.
   'validateSpringParams',
+  // ch02-s1: headless reactive value (spring + smooth velocity pickup on retarget).
+  // RequestFrameFn and MotionValueOptions are type-only exports (erased at runtime).
+  'MotionValue',
 ]);
 
 describe('public API surface pin (invariant 6)', () => {

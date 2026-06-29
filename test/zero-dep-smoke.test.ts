@@ -42,7 +42,12 @@ const pkg = JSON.parse(readFileSync(resolve(pkgRoot, 'package.json'), 'utf8')) a
   dependencies?: Record<string, string>;
   name: string;
 };
-const distJs = readFileSync(resolve(pkgRoot, 'dist/index.js'), 'utf8');
+
+/** Lazily read dist/index.js inside each test body that needs it.
+ *  Top-level readFileSync would throw ENOENT on a clean checkout before `pnpm build`. */
+function readDist(): string {
+  return readFileSync(resolve(pkgRoot, 'dist/index.js'), 'utf8');
+}
 
 /** Gzip a string and return the compressed byte count. */
 async function gzipSize(content: string): Promise<number> {
@@ -69,6 +74,7 @@ describe('zero-dep + bundle-size smoke (invariant 1)', () => {
   });
 
   it('built dist/index.js contains no external imports', () => {
+    const distJs = readDist();
     // Match any `import ... from "something"` where "something" is not a
     // relative path (starts with . or /) — i.e. an external package.
     const externalImports = [...distJs.matchAll(/from\s+["']([^./"'][^"']*)/g)].map(
@@ -81,6 +87,7 @@ describe('zero-dep + bundle-size smoke (invariant 1)', () => {
   });
 
   it('gzip size of dist/index.js is measured and under 10KB budget', async () => {
+    const distJs = readDist();
     const gz = await gzipSize(distJs);
     // Record the size for observability.
     console.info(`[@labpics/ui-motion] dist/index.js gzip size: ${gz} bytes`);
@@ -89,6 +96,7 @@ describe('zero-dep + bundle-size smoke (invariant 1)', () => {
   });
 
   it('dist/index.js exports the contracted engine names (gate: fails until engine ships)', () => {
+    const distJs = readDist();
     // Parse exported names from the ESM dist.
     // The placeholder exports only PACKAGE_NAME; the engine must export all four.
     const exportMatches = [...distJs.matchAll(/export\s*\{([^}]+)\}/g)];
