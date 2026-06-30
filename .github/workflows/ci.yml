@@ -34,3 +34,6 @@ jobs:
 
       - name: Test
         run: pnpm test
+
+      - name: Fuzz · overflow finiteness gate (virtual-time, seeded LCG, zero-dep)
+        run: pnpm vitest run --reporter=verbose test/animate-overflow-finiteness-fuzz.test.ts test/solver-finiteness-fuzz.test.ts test/easing-finiteness-fuzz.test.ts

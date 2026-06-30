@@ -149,6 +149,16 @@ export function drive(opts: DriveOptions): Promise<void> {
 
   // Clamping bounds (swapped for negative range).
   const range = to - from;
+
+  // CSS-safety guard: when |from|+|to|>Number.MAX_VALUE, (to-from) overflows to ±Infinity.
+  // A spring trajectory denormalized by an infinite range produces NaN (0*∞ at t=0)
+  // or clamps to ±MAX_VALUE — no smooth animation is representable. Snap to `to`
+  // immediately, consistent with MotionValue._tick() which also snaps when !isFinite(range).
+  if (!Number.isFinite(range)) {
+    onStep(to);
+    return Promise.resolve();
+  }
+
   const lo = range >= 0 ? from : to;
   const hi = range >= 0 ? to : from;
 
