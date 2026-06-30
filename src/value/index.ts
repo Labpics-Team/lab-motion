@@ -33,7 +33,7 @@ export { buildTransform, interpolateTransform } from './transform.js';
 
 // ── Unified parse / interpolate ──────────────────────────────────────────────
 
-import { type ParsedUnit, type ParsedRelative, type ParsedVar, parseUnit, interpolateUnit } from './units.js';
+import { type ParsedUnit, type ParsedRelative, type ParsedVar, parseUnit, interpolateUnit, clampFinite } from './units.js';
 import { type ParsedColor, parseColor, interpolateColor } from './color.js';
 
 /**
@@ -117,15 +117,22 @@ export function interpolate(from: ValueAST, to: ValueAST, t: number): string | n
   return valueAstToString(to);
 }
 
-/** Сериализует ValueAST обратно в строку (для дискретного свапа). */
+/** Сериализует ValueAST обратно в строку (для дискретного свапа).
+ *
+ * FINITENESS GUARD: все числовые поля (.value, .amount, .r/.g/.b) прогоняются через
+ * clampFinite перед вставкой в строку/возвратом числа, гарантируя отсутствие
+ * 'Infinity'/'NaN' в выводе при любых hand-constructed non-finite AST-компонентах.
+ */
 function valueAstToString(v: ValueAST): string | number {
   if (v.kind === 'unit') {
-    return v.unit ? `${v.value}${v.unit}` : v.value;
+    const safe = clampFinite(v.value);
+    return v.unit ? `${safe}${v.unit}` : safe;
   }
-  if (v.kind === 'relative') return `${v.op}=${v.amount}${v.unit}`;
+  if (v.kind === 'relative') return `${v.op}=${clampFinite(v.amount)}${v.unit}`;
   if (v.kind === 'var') {
     return v.fallback !== undefined ? `var(${v.name}, ${v.fallback})` : `var(${v.name})`;
   }
-  // color — сериализуем как rgb
-  return `rgb(${Math.round(v.r)}, ${Math.round(v.g)}, ${Math.round(v.b)})`;
+  // color — сериализуем как rgb; каналы зажимаем в [0,255] через clampFinite
+  const clampCh = (x: number) => Math.max(0, Math.min(255, clampFinite(x)));
+  return `rgb(${Math.round(clampCh(v.r))}, ${Math.round(clampCh(v.g))}, ${Math.round(clampCh(v.b))})`;
 }

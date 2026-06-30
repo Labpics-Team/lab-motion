@@ -312,3 +312,120 @@ describe('FUZZ unified interpolate: 3 000 смешанных входов', () =
     }
   });
 });
+
+// ── Дискретный свап с hand-constructed non-finite AST-компонентами ─────────────
+//
+// Этот блок покрывает КЛАСС: valueAstToString(v) с non-finite .value/.amount/.r/.g/.b.
+// Существующий FUZZ выше санитизировал non-finite ДО построения AST — поэтому
+// discrete-swap ветка никогда не получала Infinity/NaN в полях. Этот блок закрывает пробел.
+//
+// RED-доказательство (до фикса):
+//   unit{Infinity,'px'} × color → valueAstToString → "Infinitypx" (содержит 'Infinity')
+//   relative{NaN amount} × color → "+=NaN" (содержит 'NaN')
+//   color{r:Infinity} × unit → "rgb(Infinity, 0, 0)" (содержит 'Infinity')
+//
+// Mutation proof (после фикса):
+//   Убрать clampFinite() из valueAstToString → кейсы вернут 'Infinity'/'NaN' → RED.
+
+describe('Discrete-swap finiteness: non-finite AST-компоненты → никогда NaN/Infinity', () => {
+  // Вспомогательная цветовая AST (конечная, используется как парный тип)
+  const colorPair = { kind: 'color' as const, r: 100, g: 200, b: 50, a: 1, format: 'rgb' as const };
+  // Конечная unit-AST (используется как парный тип для color)
+  const unitPair = { kind: 'unit' as const, value: 42, unit: 'px' };
+
+  // ── unit × color: non-finite value в unit ──────────────────────────────────
+  it('unit{Infinity} × color при t=0.25 → конечная строка (valueAstToString guard)', () => {
+    const from = { kind: 'unit' as const, value: Infinity, unit: 'px' };
+    const result = interpolate(from, colorPair, 0.25);
+    assertFiniteOutput(result as string, 'unit{Infinity} × color t=0.25');
+  });
+
+  it('unit{-Infinity} × color при t=0.25 → конечная строка', () => {
+    const from = { kind: 'unit' as const, value: -Infinity, unit: 'px' };
+    const result = interpolate(from, colorPair, 0.25);
+    assertFiniteOutput(result as string, 'unit{-Infinity} × color t=0.25');
+  });
+
+  it('unit{NaN} × color при t=0.25 → конечная строка', () => {
+    const from = { kind: 'unit' as const, value: NaN, unit: 'px' };
+    const result = interpolate(from, colorPair, 0.25);
+    assertFiniteOutput(result as string, 'unit{NaN} × color t=0.25');
+  });
+
+  it('color × unit{Infinity} при t=0.75 → конечная строка (to-ветка свапа)', () => {
+    const to = { kind: 'unit' as const, value: Infinity, unit: '%' };
+    const result = interpolate(colorPair, to, 0.75);
+    assertFiniteOutput(result as string, 'color × unit{Infinity} t=0.75');
+  });
+
+  it('unit{Infinity, unitless} × color при t=0.25 → конечное число или строка', () => {
+    const from = { kind: 'unit' as const, value: Infinity, unit: '' };
+    const result = interpolate(from, colorPair, 0.25);
+    assertFiniteOutput(result as string | number, 'unit{Infinity, unitless} × color t=0.25');
+  });
+
+  // ── relative × color: non-finite amount ────────────────────────────────────
+  it('relative{+=Infinity} × color при t=0.25 → конечная строка', () => {
+    const from = { kind: 'relative' as const, op: '+' as const, amount: Infinity, unit: 'px' };
+    const result = interpolate(from, colorPair, 0.25);
+    assertFiniteOutput(result as string, 'relative{+=Infinity} × color t=0.25');
+  });
+
+  it('relative{+=NaN} × color при t=0.25 → конечная строка', () => {
+    const from = { kind: 'relative' as const, op: '+' as const, amount: NaN, unit: '' };
+    const result = interpolate(from, colorPair, 0.25);
+    assertFiniteOutput(result as string, 'relative{+=NaN} × color t=0.25');
+  });
+
+  it('color × relative{-=Infinity} при t=0.75 → конечная строка (to-ветка)', () => {
+    const to = { kind: 'relative' as const, op: '-' as const, amount: Infinity, unit: 'rem' };
+    const result = interpolate(colorPair, to, 0.75);
+    assertFiniteOutput(result as string, 'color × relative{-=Infinity} t=0.75');
+  });
+
+  // ── color × unit: non-finite r/g/b в color ─────────────────────────────────
+  it('color{r:Infinity} × unit при t=0.25 → конечная строка (from-ветка)', () => {
+    const from = { kind: 'color' as const, r: Infinity, g: 0, b: 0, a: 1, format: 'rgb' as const };
+    const result = interpolate(from, unitPair, 0.25);
+    assertFiniteOutput(result as string, 'color{r:Infinity} × unit t=0.25');
+  });
+
+  it('color{g:NaN} × unit при t=0.25 → конечная строка', () => {
+    const from = { kind: 'color' as const, r: 0, g: NaN, b: 0, a: 1, format: 'rgb' as const };
+    const result = interpolate(from, unitPair, 0.25);
+    assertFiniteOutput(result as string, 'color{g:NaN} × unit t=0.25');
+  });
+
+  it('color{b:-Infinity} × unit при t=0.25 → конечная строка', () => {
+    const from = { kind: 'color' as const, r: 0, g: 0, b: -Infinity, a: 1, format: 'rgb' as const };
+    const result = interpolate(from, unitPair, 0.25);
+    assertFiniteOutput(result as string, 'color{b:-Infinity} × unit t=0.25');
+  });
+
+  it('unit × color{r:NaN,g:Infinity,b:-Infinity} при t=0.75 → конечная строка (to-ветка)', () => {
+    const to = { kind: 'color' as const, r: NaN, g: Infinity, b: -Infinity, a: 1, format: 'rgb' as const };
+    const result = interpolate(unitPair, to, 0.75);
+    assertFiniteOutput(result as string, 'unit × color{r:NaN,g:Infinity,b:-Infinity} t=0.75');
+  });
+
+  // ── Регрессионный гард: конкретные пары, обнаруженные при анализе ──────────
+  it('regression: unit{∞,px} × color t=0.25 возвращает ровно finite-строку без Infinity', () => {
+    const result = interpolate(
+      { kind: 'unit', value: Infinity, unit: 'px' },
+      { kind: 'color', r: 255, g: 128, b: 0, a: 1, format: 'rgb' },
+      0.25,
+    ) as string;
+    expect(result.includes('Infinity')).toBe(false);
+    expect(result.includes('NaN')).toBe(false);
+  });
+
+  it('regression: relative{+=NaN} × color t=0.1 возвращает строку без NaN', () => {
+    const result = interpolate(
+      { kind: 'relative', op: '+', amount: NaN, unit: 'px' },
+      { kind: 'color', r: 0, g: 0, b: 255, a: 1, format: 'rgb' },
+      0.1,
+    ) as string;
+    expect(result.includes('NaN')).toBe(false);
+    expect(result.includes('Infinity')).toBe(false);
+  });
+});
