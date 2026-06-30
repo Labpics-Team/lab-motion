@@ -38,6 +38,11 @@
       "types": "./dist/value/index.d.ts",
       "import": "./dist/value/index.js",
       "require": "./dist/value/index.cjs"
+    },
+    "./driver": {
+      "types": "./dist/driver/index.d.ts",
+      "import": "./dist/driver/index.js",
+      "require": "./dist/driver/index.cjs"
     }
   },
   "files": ["dist"],
