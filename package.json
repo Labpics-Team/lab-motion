@@ -33,6 +33,11 @@
       "types": "./dist/vue/index.d.ts",
       "import": "./dist/vue/index.js",
       "require": "./dist/vue/index.cjs"
+    },
+    "./value": {
+      "types": "./dist/value/index.d.ts",
+      "import": "./dist/value/index.js",
+      "require": "./dist/value/index.cjs"
     }
   },
   "files": ["dist"],
