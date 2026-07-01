@@ -64,7 +64,18 @@ const UNIT = '(?:px|%|deg|rem|vh|vw|em|rad|turn|ms|s|fr|)';
 
 const UNIT_RE = new RegExp(`^(${NUM})(${UNIT})$`, 'i');
 const RELATIVE_RE = new RegExp(`^([+-])=(${NUM})(${UNIT})$`, 'i');
-const VAR_RE = /^var\(\s*(--[\w-]+)\s*(?:,\s*([\s\S]*?)\s*)?\)$/i;
+// ЛИНЕЙНЫЙ (не catastrophic-backtracking) var()-регекс: ровно ОДИН
+// неограниченный квантификатор на fallback-хвост (`[\s\S]*`), захваченный
+// "сырым" (пробелы вокруг триммятся в коде через .trim(), не в самой
+// регулярке). Прежняя форма `\s*([\s\S]*?)\s*` перед `\)` даёт ДВА
+// квантификатора над пересекающимися классами символов (whitespace ⊂
+// [\s\S]) — экспоненциальный backtracking на pathological-входе без
+// закрывающей скобки (см. test/value-var-redos.test.ts).
+const VAR_RE = /^var\(\s*(--[\w-]+)\s*(?:,([\s\S]*))?\)$/i;
+// Defense-in-depth: разумный потолок длины входа до .exec любой из
+// регулярок выше (ни одна легитимная CSS-переменная/fallback не
+// приближается к этому размеру).
+const MAX_PARSE_LENGTH = 4096;
 
 // ── Парсинг ───────────────────────────────────────────────────────────────────
 
@@ -86,13 +97,19 @@ export function parseUnit(value: string | number): ParsedUnit | ParsedRelative |
 
   const s = value.trim();
 
+  if (s.length > MAX_PARSE_LENGTH) {
+    throw new RangeError(
+      `@labpics/motion value: CSS-значение слишком длинное (${s.length} символов, максимум ${MAX_PARSE_LENGTH})`,
+    );
+  }
+
   // CSS var()
   const varMatch = VAR_RE.exec(s);
   if (varMatch) {
     return {
       kind: 'var',
       name: varMatch[1],
-      fallback: varMatch[2] !== undefined ? varMatch[2] : undefined,
+      fallback: varMatch[2] !== undefined ? varMatch[2].trim() : undefined,
     };
   }
 
