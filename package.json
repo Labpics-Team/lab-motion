@@ -83,6 +83,11 @@
       "types": "./dist/presence/index.d.ts",
       "import": "./dist/presence/index.js",
       "require": "./dist/presence/index.cjs"
+    },
+    "./flip": {
+      "types": "./dist/flip/index.d.ts",
+      "import": "./dist/flip/index.js",
+      "require": "./dist/flip/index.cjs"
     }
   },
   "files": [
