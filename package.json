@@ -78,6 +78,11 @@
       "types": "./dist/scroll/index.d.ts",
       "import": "./dist/scroll/index.js",
       "require": "./dist/scroll/index.cjs"
+    },
+    "./presence": {
+      "types": "./dist/presence/index.d.ts",
+      "import": "./dist/presence/index.js",
+      "require": "./dist/presence/index.cjs"
     }
   },
   "files": [
