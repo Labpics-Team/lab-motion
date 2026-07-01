@@ -114,10 +114,14 @@ fl.play(first, el.getBoundingClientRect()); // элемент «доезжает
 ### Появление/уход (presence)
 
 ```typescript
+import { drive } from '@labpics/motion';
 import { createPresence } from '@labpics/motion/presence';
 
+const spring = { mass: 1, stiffness: 200, damping: 24 };
 const p = createPresence({
-  onExitStart: (done) => { drive({ from: 1, to: 0, spring, onStep: setOpacity }).then(done); },
+  onExitStart: (done) => {
+    drive({ from: 1, to: 0, spring, onStep: (v) => { el.style.opacity = String(v); } }).then(done);
+  },
   onGone: () => el.remove(), // убрать из DOM только после exit-анимации
 });
 p.exit();
@@ -126,11 +130,16 @@ p.exit();
 ## Инварианты (гарантии потребителю)
 
 - **Zero-deps**: `dependencies: {}` — фреймворки только как optional peer.
-- **CSS-safe**: движок никогда не отдаёт `NaN`/`Infinity` (fuzz-тесты 10k+ входов на каждом слое).
+- **CSS-safe**: движок никогда не отдаёт `NaN`/`Infinity` — ключевые математические
+  слои (easing, value, driver, keyframes, timeline, stagger, decay, MotionValue)
+  прогоняются fuzz-тестами на 10 000 входов; spring-солвер добивается косвенно
+  через все слои поверх него.
 - **Детерминизм**: время только через инжектируемый `requestFrame` — бит-в-бит воспроизводимые прогоны.
 - **SSR-safe**: импорт любого subpath не трогает `window`/`document`.
 - **A11y**: `prefers-reduced-motion` переключает характер (снап/фейд), не отключает движение грубо.
-- **Запинённый контракт**: публичная поверхность каждого subpath зафиксирована api-surface-pin тестами.
+- **Запинённый контракт**: публичная поверхность математических субпутей и `lit`
+  зафиксирована api-surface-pin тестами (в обе стороны: пропавший И лишний
+  экспорт — красный тест).
 
 ## Ошибки
 
