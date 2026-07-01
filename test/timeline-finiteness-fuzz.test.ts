@@ -106,12 +106,9 @@ describe('timeline-finiteness-fuzz: экстремальные seek значен
         requestFrame: noRaf(),
       });
 
-      try {
-        tl.seek(seekT);
-      } catch {
-        // seek может бросать исключение только для NaN/Infinity, но не бросает
-        // (NaN/Infinity тихо обрабатываются согласно спецификации)
-      }
+      // seek никогда не бросает исключение (NaN/Infinity обрабатываются тихо
+      // согласно спецификации) — вызываем напрямую, без defensive try/catch.
+      tl.seek(seekT);
       tl.cancel();
 
       for (const vs of collected) {

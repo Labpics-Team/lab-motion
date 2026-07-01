@@ -181,17 +181,27 @@ describe('timeline-reduced-motion: matchMedia throws → fallback false', () => 
       matchMedia: throwingMedia,
       requestFrame: noRaf(),
     });
+    // reduce=false → НЕ синхронный snap: до complete() ни одного emit нет
+    // (иначе это был бы reduce=true CHARACTER-switch, а не fallback).
+    expect(steps.length, 'reduce=false: нет sync snap-emit').toBe(0);
     tl.complete();
-    // Не должно крашить; отработало как reduce=false (async) → complete()
+    // complete() снапает к `to` — подтверждает нормальный (не hard-off) путь.
+    expect(steps.length, 'complete() эмитит финальное состояние').toBe(1);
+    expect(steps[0]![0]!.value).toBe(100);
   });
 
   it('matchMedia=undefined → reduce=false (нет краша)', () => {
+    const steps: SegmentValue[][] = [];
     const tl = createTimeline({
       segments: [{ from: 0, to: 100, duration: 0.1 }],
+      onStep: (vs) => steps.push([...vs]),
       matchMedia: undefined,
       requestFrame: noRaf(),
     });
-    tl.complete(); // должно работать без краша
+    expect(steps.length, 'reduce=false: нет sync snap-emit').toBe(0);
+    tl.complete();
+    expect(steps.length, 'complete() эмитит финальное состояние').toBe(1);
+    expect(steps[0]![0]!.value).toBe(100);
   });
 });
 

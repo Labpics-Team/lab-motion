@@ -20,8 +20,12 @@ import { MotionParamError } from '../errors.js';
 
 /** Фиксированный dt (с) при отсутствии DOMHighResTimeStamp. */
 const FIXED_DT_S = 1 / 60;
-/** Жёсткий cap кадров (safety escape от бесконечного цикла). */
-const MAX_FRAMES = 10_000;
+/**
+ * Жёсткий cap кадров (safety escape от патологически огромного totalDuration).
+ * 100_000 кадров ≈ 1666 с (~27 мин) при 60fps — заведомо больше любой
+ * практической анимации, но всё ещё конечен как fail-safe от зависания.
+ */
+const MAX_FRAMES = 100_000;
 
 // ─── Вспомогательные функции ─────────────────────────────────────────────────
 
@@ -37,9 +41,18 @@ function clampFinite(x: number): number {
   return x > 0 ? Number.MAX_VALUE : -Number.MAX_VALUE;
 }
 
+/**
+ * Структурный подвид MediaQueryList — только то, что нужно timeline.
+ * Используется вместо DOM-типа MediaQueryList, чтобы не протаскивать
+ * lib.dom.d.ts в публичный API headless zero-DOM subpath'а (Invariant 5).
+ */
+export interface MatchMediaResult {
+  readonly matches: boolean;
+}
+
 /** Считать prefers-reduced-motion из инжектируемого matchMedia. */
 function prefersReducedMotion(
-  matchMedia: ((query: string) => MediaQueryList) | undefined,
+  matchMedia: ((query: string) => MatchMediaResult) | undefined,
 ): boolean {
   if (typeof matchMedia !== 'function') return false;
   try {
@@ -121,8 +134,10 @@ export interface TimelineOptions {
   /**
    * Injectable matchMedia. В браузере: `window.matchMedia.bind(window)`.
    * undefined = SSR / нет предпочтений (reduce=false).
+   * Тип структурный (`{ matches: boolean }`), не DOM `MediaQueryList` —
+   * headless zero-DOM subpath не должен требовать lib.dom.d.ts (Invariant 5).
    */
-  readonly matchMedia?: ((query: string) => MediaQueryList) | undefined;
+  readonly matchMedia?: ((query: string) => MatchMediaResult) | undefined;
 }
 
 /** Управляемый хендл таймлайна. Возвращается createTimeline(). Thenable. */
@@ -223,9 +238,15 @@ function buildSegments(configs: readonly SegmentConfig[]): ComputedSegment[] {
       startTime = prevEndTime + offset;
     }
 
-    const endTime = startTime + cfg.duration;
+    const rawEndTime = startTime + cfg.duration;
     const range = cfg.to - cfg.from;
-    const hasOverflowRange = !Number.isFinite(range);
+    // endTime может переполниться в Infinity, даже когда startTime и duration
+    // по отдельности конечны (накопленный offset через много сегментов).
+    // Не пропускаем Infinity дальше: клампим и трактуем сегмент как overflow
+    // (snap к `to`), иначе Infinity протекает в prevEndTime → totalDuration.
+    const endTimeOverflowed = !Number.isFinite(rawEndTime);
+    const endTime = endTimeOverflowed ? Number.MAX_VALUE : rawEndTime;
+    const hasOverflowRange = !Number.isFinite(range) || endTimeOverflowed;
 
     result.push({
       from: cfg.from,
@@ -395,11 +416,21 @@ export function createTimeline(opts: TimelineOptions): TimelineControls {
     _settled = true;
     _loopRunning = false;
 
+    // API-контракт: после settle(true) (complete/natural/reduced-motion)
+    // .time и .progress должны читаться как totalDuration/1, а не как
+    // застрявшее предыдущее _vt (напр. explicit complete() до первого тика).
+    if (snapToEnd) _vt = _totalDuration;
+
     // t = Infinity → computeSegmentAt вернёт `to` для всех сегментов,
     // так как Infinity >= endTime для любого конечного endTime.
     const emitT = snapToEnd ? Infinity : _vt;
-    emit(emitT);
-    _resolve();
+    // _resolve() ОБЯЗАН выполниться, даже если пользовательский onStep
+    // бросает исключение — иначе `await timeline` зависает навсегда.
+    try {
+      emit(emitT);
+    } finally {
+      _resolve();
+    }
   }
 
   // ── Frame loop ────────────────────────────────────────────────────────────
@@ -415,41 +446,47 @@ export function createTimeline(opts: TimelineOptions): TimelineControls {
     }
 
     _tickActive = true;
-    _frameCount++;
+    // _tickActive ОБЯЗАН сброситься даже если emit()/settle() ниже бросят
+    // исключение (пользовательский onStep) — иначе tick() навсегда
+    // ре-энтрантно блокируется (анимация тихо замирает).
+    try {
+      _frameCount++;
 
-    // Safety cap: предотвращает бесконечный цикл
-    if (_frameCount >= MAX_FRAMES) {
+      // Safety cap: предотвращает бесконечный цикл при патологическом
+      // totalDuration. Это ИСКЛЮЧИТЕЛЬНО fail-safe, НЕ признак настоящего
+      // завершения — settle(false) эмитит ТЕКУЩЕЕ _vt (как cancel), а не
+      // snap к `to`, чтобы не выдавать бейлаут за реальный natural-complete.
+      if (_frameCount >= MAX_FRAMES) {
+        settle(false);
+        return;
+      }
+
+      // Вычислить dt
+      let dt: number;
+      if (ts !== undefined) {
+        dt = _lastRealTs !== undefined ? (ts - _lastRealTs) / 1000 : FIXED_DT_S;
+        _lastRealTs = ts;
+      } else {
+        dt = FIXED_DT_S;
+      }
+      // Защита от отрицательного/нулевого dt (повторный ts, браузерная вкладка)
+      if (dt <= 0) dt = FIXED_DT_S;
+
+      // Продвинуть виртуальное время
+      _vt += dt;
+
+      // Проверить завершение
+      if (_vt >= _totalDuration) {
+        _vt = _totalDuration;
+        settle(true);
+        return;
+      }
+
+      // Эмитировать текущее состояние
+      emit(_vt);
+    } finally {
       _tickActive = false;
-      settle(true);
-      return;
     }
-
-    // Вычислить dt
-    let dt: number;
-    if (ts !== undefined) {
-      dt = _lastRealTs !== undefined ? (ts - _lastRealTs) / 1000 : FIXED_DT_S;
-      _lastRealTs = ts;
-    } else {
-      dt = FIXED_DT_S;
-    }
-    // Защита от отрицательного/нулевого dt (повторный ts, браузерная вкладка)
-    if (dt <= 0) dt = FIXED_DT_S;
-
-    // Продвинуть виртуальное время
-    _vt += dt;
-
-    // Проверить завершение
-    if (_vt >= _totalDuration) {
-      _vt = _totalDuration;
-      _tickActive = false;
-      settle(true);
-      return;
-    }
-
-    // Эмитировать текущее состояние
-    emit(_vt);
-
-    _tickActive = false;
 
     // Перепланировать следующий кадр
     if (_useTimeoutFallback) {
