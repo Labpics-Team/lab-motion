@@ -4,9 +4,10 @@
  *
  * ── RED PROOF ────────────────────────────────────────────────────────────────
  * Написаны до реализации — на стабе падают поведенческие блоки.
- * Mutation-proof: убрать guard нулевого диапазона в scrollProgress → fuzz
- * ловит NaN (0/0); поменять анкер 'center' на 'start' в resolveAnchor →
- * offset-тесты RED.
+ * Mutation-proof: убрать guard нулевого диапазона в scrollProgress → тест
+ * «нескроллируемый контент» ловит -0 (Object.is(-0,0)=false у toBe);
+ * поменять анкер 'center' на 'start' в resolveAnchor → незажатый
+ * center-прогресс (0.625) в тесте ниже расходится → RED.
  */
 
 import { describe, expect, it } from 'vitest';
@@ -76,6 +77,20 @@ describe('scroll/math: resolveTargetProgress — офсеты target/viewport', 
     ] as const;
     expect(resolveTargetProgress(metrics(900), target, offsets)).toBe(0);
     expect(resolveTargetProgress(metrics(1300), target, offsets)).toBe(1);
+  });
+
+  it("'center' даёт НЕзажатый прогресс между краями (пин против мутации center→start)", () => {
+    // Диапазон ['start end','end start'] = [500,1300]. Центр target (1150)
+    // у центра viewport (pos+250) → pos=900... нам нужна точка ВНУТРИ (0,1):
+    // прогресс при pos=1000 = (1000-500)/800 = 0.625 — а вот сам center-анкер
+    // пиним диапазоном ['center center','end start'] = [900,1300]:
+    const offsets = [
+      { target: 'center', viewport: 'center' },
+      { target: 'end', viewport: 'start' },
+    ] as const;
+    // При pos=1000: (1000-900)/400 = 0.25 — незажатое значение, чувствительное
+    // к формуле center (мутация center→start сдвинула бы обе границы и итог).
+    expect(resolveTargetProgress(metrics(1000), target, offsets)).toBeCloseTo(0.25);
   });
 
   it('числовые анкеры: доля 0..1 и px', () => {

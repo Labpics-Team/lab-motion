@@ -25,6 +25,8 @@
  *   SC4. Zero runtime deps.
  */
 
+import { trimSlidingWindow } from '../internal/sliding-window.js';
+
 // ─── Общие утилиты ───────────────────────────────────────────────────────────
 
 /** Страж конечности (семантика clampFinite из spring.ts). */
@@ -141,14 +143,7 @@ export function createScrollVelocity(windowSec?: number): ScrollVelocityTracker 
     push(s: ScrollSample): void {
       const p = { pos: finite(s.pos), t: finite(s.t) };
       samples.push(p);
-      const cutoff = p.t - win;
-      // ≥2 сэмплов внутри окна → мерим строго по окну; <2 (события реже
-      // окна) → держим последнюю пару: скорость через разрыв = честная
-      // средняя, а не ложный 0.
-      let k = 0;
-      while (k < samples.length && samples[k].t < cutoff) k++;
-      const from = samples.length - k >= 2 ? k : Math.max(0, samples.length - 2);
-      if (from > 0) samples = samples.slice(from);
+      samples = trimSlidingWindow(samples, win);
     },
     velocity(): number {
       if (samples.length < 2) return 0;
@@ -267,7 +262,12 @@ export interface ScrollObserverOptions {
 export interface ScrollObserverUpdate extends ScrollMetrics {
   /** Время кадра (секунды, напр. e.timeStamp/1000) — для скорости. */
   readonly t?: number | undefined;
-  /** Позиция target в координатах вьюпорта (rect.top / rect.left). */
+  /**
+   * Позиция target в координатах ВЬЮПОРТА СКРОЛЛЕРА. Для скролла окна —
+   * rect.top / rect.left; для контейнерного скроллера — разность:
+   * targetRect.top − containerRect.top (rect.top сам по себе даёт координаты
+   * вьюпорта БРАУЗЕРА и для контейнера будет неверен).
+   */
   readonly targetStart?: number | undefined;
   /** Размер target по оси (rect.height / rect.width). */
   readonly targetSize?: number | undefined;
