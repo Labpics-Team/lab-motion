@@ -73,6 +73,11 @@
       "types": "./dist/gestures/index.d.ts",
       "import": "./dist/gestures/index.js",
       "require": "./dist/gestures/index.cjs"
+    },
+    "./presets": {
+      "types": "./dist/presets/index.d.ts",
+      "import": "./dist/presets/index.js",
+      "require": "./dist/presets/index.cjs"
     }
   },
   "files": [
