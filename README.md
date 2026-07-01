@@ -63,6 +63,35 @@ try {
 }
 ```
 
+### Keyframes (`@labpics/motion/keyframes`)
+
+Интерполяция значения через несколько опорных точек (не только from→to), с
+явными или авто-распределёнными долями, per-сегментным easing и повтором
+(loop / reverse-yoyo). Headless — сам не трогает DOM, эмитит через `onStep`.
+
+```typescript
+import { keyframes } from '@labpics/motion/keyframes';
+import { easeOut } from '@labpics/motion/easing';
+
+const controls = keyframes({
+  values: [0, 100, 50, 100],   // опорные точки
+  times: [0, 0.3, 0.6, 1],     // доли [0,1]; необязательно — иначе авто-равномерно
+  duration: 1.2,               // секунды на один цикл
+  easing: easeOut,              // один на все сегменты, либо массив per-segment
+  repeat: 2,                    // 2 доп. повтора (Infinity — бесконечно)
+  repeatType: 'reverse',        // 'loop' | 'reverse' | 'mirror' (yoyo)
+  matchMedia: window.matchMedia.bind(window), // prefers-reduced-motion
+  onStep: (value) => { element.style.transform = `translateX(${value}px)`; },
+});
+
+controls.pause();
+controls.seek(0.5);
+await controls; // резолвится при complete()/cancel()/естественном завершении
+```
+
+При `prefers-reduced-motion: reduce` анимация мгновенно снэпается к
+последнему keyframe (не hard-off) — repeat/direction игнорируются.
+
 ## Лицензия
 
 MIT

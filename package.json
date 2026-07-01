@@ -53,6 +53,11 @@
       "types": "./dist/timeline/index.d.ts",
       "import": "./dist/timeline/index.js",
       "require": "./dist/timeline/index.cjs"
+    },
+    "./keyframes": {
+      "types": "./dist/keyframes/index.d.ts",
+      "import": "./dist/keyframes/index.js",
+      "require": "./dist/keyframes/index.cjs"
     }
   },
   "files": ["dist"],
