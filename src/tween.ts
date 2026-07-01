@@ -18,9 +18,19 @@
  * Uses the numerically stable form:  from + (to - from) * t
  * At t=0: from + 0 = from (exact integer path when to-from is integer)
  * At t=1: from + (to - from) = to (exact by IEEE 754 for representable values)
+ *
+ * CSS-safety guard: when |from|+|to|>Number.MAX_VALUE the subtraction
+ * (to-from) overflows to ±Infinity, making raw ±Infinity or NaN (0*∞=NaN at t≈0).
+ * Fall back to the two-point form `from*(1-t)+to*t` which avoids the subtraction
+ * and remains finite for all t∈(0,1) even when the range would overflow.
  */
 export function tween(from: number, to: number, t: number): number {
   if (t <= 0) return from;
   if (t >= 1) return to;
-  return from + (to - from) * t;
+  const raw = from + (to - from) * t;
+  if (!Number.isFinite(raw)) {
+    const twoPoint = from * (1 - t) + to * t;
+    return Number.isFinite(twoPoint) ? twoPoint : to;
+  }
+  return raw;
 }
