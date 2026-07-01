@@ -49,11 +49,16 @@ const HEX6_RE = /^#([0-9a-f]{2})([0-9a-f]{2})([0-9a-f]{2})$/i;
 const HEX8_RE = /^#([0-9a-f]{2})([0-9a-f]{2})([0-9a-f]{2})([0-9a-f]{2})$/i;
 
 const NUM_PCT = '(\\d+(?:\\.\\d+)?%?)';
+// Hue по W3C CSS Color (legacy comma-синтаксис) — <number> СО знаком и БЕЗ
+// процента: «hsl(50%,…)» невалиден и отклоняется целиком, «hsl(-120,…)» ≡
+// hsl(240,…). Angle-единицы (deg/turn) живут только в modern space-синтаксисе,
+// который этот парсер сознательно не поддерживает (как и RGB_RE рядом).
+const HUE = '(-?\\d+(?:\\.\\d+)?)';
 const ALPHA = '(\\d+(?:\\.\\d+)?)';
 const SEP = '\\s*,\\s*';
 
 const RGB_RE = new RegExp(`^rgba?\\(\\s*(\\d+(?:\\.\\d+)?)${SEP}(\\d+(?:\\.\\d+)?)${SEP}(\\d+(?:\\.\\d+)?)(?:${SEP}${ALPHA})?\\s*\\)$`, 'i');
-const HSL_RE = new RegExp(`^hsla?\\(\\s*${NUM_PCT}${SEP}${NUM_PCT}${SEP}${NUM_PCT}(?:${SEP}${ALPHA})?\\s*\\)$`, 'i');
+const HSL_RE = new RegExp(`^hsla?\\(\\s*${HUE}${SEP}${NUM_PCT}${SEP}${NUM_PCT}(?:${SEP}${ALPHA})?\\s*\\)$`, 'i');
 
 /**
  * Парсит строку CSS-цвета в типизированный AST.
@@ -200,8 +205,7 @@ function interpolateHsl(from: ParsedColor, to: ParsedColor, t: number): string {
   const l = clamp01(clampFinite(fh.l + (th.l - fh.l) * t));
   const a = clamp01(clampFinite(from.a + (to.a - from.a) * t));
 
-  // Нормализуем hue в [0,360)
-  const hNorm = ((h % 360) + 360) % 360;
+  const hNorm = normalizeHue(h);
   const sp = +(s * 100).toFixed(4);
   const lp = +(l * 100).toFixed(4);
 
@@ -226,7 +230,7 @@ export function hslToRgb(h: number, s: number, l: number): { r: number; g: numbe
   }
   const q = l < 0.5 ? l * (1 + s) : l + s - l * s;
   const p = 2 * l - q;
-  const hk = ((h % 360) + 360) % 360 / 360;
+  const hk = normalizeHue(h) / 360;
   return {
     r: clamp255(hueToRgb(p, q, hk + 1 / 3) * 255),
     g: clamp255(hueToRgb(p, q, hk) * 255),
@@ -290,9 +294,15 @@ function clamp01(x: number): number {
   return f < 0 ? 0 : f > 1 ? 1 : f;
 }
 
+/** Канон hue: [0, 360). Один хелпер на все места (parse/interpolate/hslToRgb). */
+function normalizeHue(h: number): number {
+  return ((h % 360) + 360) % 360;
+}
+
 function parseHue(s: string): number {
-  // Hue может быть в deg (без единицы) или с единицей; для HSL обычно без
-  return clampFinite(parseFloat(s));
+  // Знак и >360 валидны по W3C — нормализуем в канон [0, 360), чтобы AST
+  // хранил один hue на цвет и интерполяция не делала лишний оборот.
+  return normalizeHue(clampFinite(parseFloat(s)));
 }
 
 function parsePct(s: string): number {
