@@ -116,6 +116,21 @@ describe('presets — wiggle: покачивание (колокольчик)', 
     expect(sawPositive).toBe(true);
     expect(sawNegative).toBe(true);
   });
+
+  it('А: первый свинг — в ПЛЮС (контракт направления, finding верификации PR#24)', () => {
+    // Mutation proof: глобальная инверсия знака (amp⇄-amp) → первый пик
+    // отрицательный → RED. До этого пина инверсия выживала весь сьют.
+    const c = compilePreset(wiggle({ degrees: 10, duration: 1 }));
+    let firstPeak = 0;
+    for (let i = 0; i <= 200; i++) {
+      const r = samplePreset(c, (i / 200) * 1).rotate!;
+      if (Math.abs(r) > 5) {
+        firstPeak = r;
+        break;
+      }
+    }
+    expect(firstPeak).toBeGreaterThan(0);
+  });
 });
 
 describe('presets — spin: оборот', () => {

@@ -1,26 +1,27 @@
-﻿/**
- * presets/index.ts вЂ” generic-РїСЂРµСЃРµС‚С‹ Р°РЅРёРјР°С†РёР№: headless СЃР»РѕРІР°СЂСЊ РґРІРёР¶РµРЅРёР№.
+/**
+ * presets/index.ts — generic-пресеты анимаций: headless словарь движений.
  *
- * Р—Р°С‡РµРј: РїРѕС‚СЂРµР±РёС‚РµР»Рё СѓСЂРѕРІРЅСЏ РёРєРѕРЅРѕРє/РјРёРєСЂРѕ-UI (lab-icons Рё РґСЂ.) СЃРѕР±РёСЂР°СЋС‚
- * СЃРµРјР°РЅС‚РёС‡РµСЃРєРёРµ С…РѕСЂРµРѕРіСЂР°С„РёРё (В«Р·СЂР°С‡РѕРє РїСѓР»СЊСЃРёСЂСѓРµС‚В», В«РєСѓСЂСЃРѕСЂ РјРёРіР°РµС‚В», В«РёСЃРєСЂС‹
- * СЂР°Р·Р»РµС‚Р°СЋС‚СЃСЏ РєР°СЃРєР°РґРѕРјВ») РёР· РЅРµР±РѕР»СЊС€РѕРіРѕ СЃР»РѕРІР°СЂСЏ generic-РґРІРёР¶РµРЅРёР№. РџСЂРµСЃРµС‚ вЂ”
- * СЌС‚Рѕ Р§РРЎРўРђРЇ РїР°СЂР°РјРµС‚СЂРёР·РѕРІР°РЅРЅР°СЏ СЃРїРµС†РёС„РёРєР°С†РёСЏ РјСѓР»СЊС‚РёС‚СЂРµРєРѕРІС‹С… РєРµР№С„СЂРµР№РјРѕРІ
- * (PresetSpec), Р° РЅРµ РїСЂРёРІСЏР·РєР° Рє DOM: РѕРґРёРЅ РјРѕРјРµРЅС‚ РІСЂРµРјРµРЅРё t в†’ Р·РЅР°С‡РµРЅРёРµ РєР°Р¶РґРѕРіРѕ
- * С‚СЂРµРєР° (scale/rotate/x/y/opacity/progress). РљР°РЅР°Р» `progress` вЂ” generic 0в†’1
- * (РїРѕС‚СЂРµР±РёС‚РµР»СЊ РјР°РїРёС‚ РµРіРѕ РЅР° draw-on clip-reveal Рё С‚.Рї.).
+ * Зачем: потребители уровня иконок/микро-UI (lab-icons и др.) собирают
+ * семантические хореографии («зрачок пульсирует», «курсор мигает», «искры
+ * разлетаются каскадом») из небольшого словаря generic-движений. Пресет —
+ * это ЧИСТАЯ параметризованная спецификация мультитрековых кейфреймов
+ * (PresetSpec), а не привязка к DOM: один момент времени t → значение каждого
+ * трека (scale/rotate/x/y/opacity/progress). Канал `progress` — generic 0→1
+ * (потребитель мапит его на draw-on clip-reveal и т.п.).
  *
- * РРЅРІР°СЂРёР°РЅС‚С‹ (North, РЅР°СЃР»РµРґСѓСЋС‚ keyframes/stagger):
- *   1. Zero runtime deps вЂ” РЅРµС‚ РІРЅРµС€РЅРёС… npm-Р·Р°РІРёСЃРёРјРѕСЃС‚РµР№.
- *   2. CSS-safe вЂ” СЃСЌРјРїР»С‹ Р’РЎР•Р“Р”Рђ РєРѕРЅРµС‡РЅС‹ (NaN/Infinity Р·Р°РїСЂРµС‰РµРЅС‹), РІРєР»СЋС‡Р°СЏ
- *      overflow-РєСЂР°СЏ Рё С…РѕСЃС‚РёР»СЊРЅРѕРµ t (NaN/В±Infinity/1e308).
- *   3. Р”РµС‚РµСЂРјРёРЅРёР·Рј вЂ” samplePreset С‡РёСЃС‚; runPreset РёСЃРїРѕР»СЊР·СѓРµС‚ injectable clock
- *      (requestFrame seam); РѕРґРёРЅР°РєРѕРІС‹Рµ РІС…РѕРґС‹ в†’ Р±РёС‚-РёРґРµРЅС‚РёС‡РЅС‹Р№ РІС‹РІРѕРґ.
- *   4. Reduced-motion вЂ” CHARACTER-switch РІ runPreset: РєРѕРЅРµС‡РЅС‹Р№ repeat в†’
- *      РјРіРЅРѕРІРµРЅРЅС‹Р№ СЃРЅСЌРї Рє С„РёРЅР°Р»СЊРЅРѕР№ РїРѕР·Рµ; repeat=Infinity (ambient-Р»СѓРї) в†’
- *      РЅРµР№С‚СЂР°Р»СЊРЅР°СЏ РїРѕР·Р° t=0. РќР• hard-off: РїРѕР·Р° СЌРјРёС‚РёСЂСѓРµС‚СЃСЏ СЂРѕРІРЅРѕ РѕРґРёРЅ СЂР°Р·.
- *   5. Domain purity / SSR-safe вЂ” РЅРё DOM, РЅРё window/document РЅР° РІРµСЂС…РЅРµРј СѓСЂРѕРІРЅРµ.
- *   6. Р’Р°Р»РёРґР°С†РёСЏ РўРћР›Р¬РљРћ РІ compilePreset (MotionParamError, РїРѕ-СЂСѓСЃСЃРєРё,
- *      РїСЂРµС„РёРєСЃ "presets:"); samplePreset вЂ” РіРѕСЂСЏС‡РёР№ РїСѓС‚СЊ Р±РµР· РїСЂРѕРІРµСЂРѕРє.
+ * Инварианты (North, наследуют keyframes/stagger):
+ *   1. Zero runtime deps — нет внешних npm-зависимостей.
+ *   2. CSS-safe — сэмплы ВСЕГДА конечны: values валидированы compilePreset,
+ *      нормализацию хостильного времени делает samplePreset, конечность
+ *      значений гарантируют внутренние guards sampleKeyframes.
+ *   3. Детерминизм — samplePreset чист; runPreset использует injectable clock
+ *      (requestFrame seam); одинаковые входы → бит-идентичный вывод.
+ *   4. Reduced-motion — CHARACTER-switch в runPreset: конечный repeat →
+ *      мгновенный снэп к финальной позе; repeat=Infinity (ambient-луп) →
+ *      нейтральная поза t=0. НЕ hard-off: поза эмитируется ровно один раз.
+ *   5. Domain purity / SSR-safe — ни DOM, ни window/document на верхнем уровне.
+ *   6. Валидация ТОЛЬКО в compilePreset (MotionParamError, по-русски,
+ *      префикс "presets:"); samplePreset — горячий путь без проверок.
  */
 
 import { easeOut, sineInOut } from '../easing/index.js';
@@ -33,12 +34,12 @@ import {
 
 export type { EasingFn, MatchMediaResult };
 
-// в”Ђв”Ђв”Ђ РџСѓР±Р»РёС‡РЅС‹Рµ С‚РёРїС‹ в”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђ
+// ─── Публичные типы ──────────────────────────────────────────────────────────
 
 /**
- * РђРЅРёРјРёСЂСѓРµРјРѕРµ СЃРІРѕР№СЃС‚РІРѕ С‚СЂРµРєР°. Р—Р°РєСЂС‹С‚С‹Р№ РїРµСЂРµС‡РµРЅСЊ:
- * С‚СЂР°РЅСЃС„РѕСЂРјС‹ (scale/scaleX/scaleY/rotate/x/y), opacity Рё generic-РєР°РЅР°Р»
- * progress (0в†’1, РїРѕС‚СЂРµР±РёС‚РµР»СЊ РёРЅС‚РµСЂРїСЂРµС‚РёСЂСѓРµС‚: draw-on, variable-color-РїРѕСЂРѕРівЂ¦).
+ * Анимируемое свойство трека. Закрытый перечень:
+ * трансформы (scale/scaleX/scaleY/rotate/x/y), opacity и generic-канал
+ * progress (0→1, потребитель интерпретирует: draw-on, variable-color-порог…).
  */
 export type PresetProperty =
   | 'scale'
@@ -50,53 +51,53 @@ export type PresetProperty =
   | 'opacity'
   | 'progress';
 
-/** РџРѕР»РёС‚РёРєР° РїРѕРІС‚РѕСЂРѕРІ вЂ” СЃРµРјР°РЅС‚РёРєР° РёРґРµРЅС‚РёС‡РЅР° keyframes ('mirror' = Р°Р»РёР°СЃ 'reverse'). */
+/** Политика повторов — семантика идентична keyframes ('mirror' = алиас 'reverse'). */
 export type PresetRepeatType = 'loop' | 'reverse' | 'mirror';
 
-/** РћРґРёРЅ С‚СЂРµРє РїСЂРµСЃРµС‚Р°: РѕРїРѕСЂРЅС‹Рµ Р·РЅР°С‡РµРЅРёСЏ РѕРґРЅРѕРіРѕ СЃРІРѕР№СЃС‚РІР° РІРѕ РІСЂРµРјРµРЅРё С†РёРєР»Р°. */
+/** Один трек пресета: опорные значения одного свойства во времени цикла. */
 export interface PresetTrack {
-  /** РЎРІРѕР№СЃС‚РІРѕ РёР· Р·Р°РєСЂС‹С‚РѕРіРѕ РїРµСЂРµС‡РЅСЏ PresetProperty. РЈРЅРёРєР°Р»СЊРЅРѕ РІ СЂР°РјРєР°С… СЃРїРµРєРё. */
+  /** Свойство из закрытого перечня PresetProperty. Уникально в рамках спеки. */
   readonly property: PresetProperty;
-  /** РћРїРѕСЂРЅС‹Рµ Р·РЅР°С‡РµРЅРёСЏ. Р”Р»РёРЅР° >= 2, РєР°Р¶РґРѕРµ РєРѕРЅРµС‡РЅРѕ. */
+  /** Опорные значения. Длина >= 2, каждое конечно. */
   readonly values: readonly number[];
   /**
-   * Р”РѕР»Рё [0,1] РЅР° РєР°Р¶РґРѕРµ Р·РЅР°С‡РµРЅРёРµ (РєР°Рє РІ keyframes): РЅРµСѓР±С‹РІР°СЋС‰РёРµ,
-   * times[0]=0, times[last]=1. РќРµ Р·Р°РґР°РЅРѕ в†’ СЂР°РІРЅРѕРјРµСЂРЅРѕРµ Р°РІС‚Рѕ-СЂР°СЃРїСЂРµРґРµР»РµРЅРёРµ.
+   * Доли [0,1] на каждое значение (как в keyframes): неубывающие,
+   * times[0]=0, times[last]=1. Не задано → равномерное авто-распределение.
    */
   readonly times?: readonly number[];
-  /** Easing РЅР° СЃРµРіРјРµРЅС‚: РѕРґРёРЅ РѕР±С‰РёР№ РёР»Рё РјР°СЃСЃРёРІ РґР»РёРЅРѕР№ values.length-1. */
+  /** Easing на сегмент: один общий или массив длиной values.length-1. */
   readonly easing?: EasingFn | readonly EasingFn[];
 }
 
-/** РЎРїРµС†РёС„РёРєР°С†РёСЏ РїСЂРµСЃРµС‚Р°: РјСѓР»СЊС‚РёС‚СЂРµРєРѕРІС‹Рµ РєРµР№С„СЂРµР№РјС‹ РѕРґРЅРѕРіРѕ С†РёРєР»Р° + РїРѕРІС‚РѕСЂС‹. */
+/** Спецификация пресета: мультитрековые кейфреймы одного цикла + повторы. */
 export interface PresetSpec {
-  /** Р”Р»РёС‚РµР»СЊРЅРѕСЃС‚СЊ РћР”РќРћР“Рћ С†РёРєР»Р° (СЃРµРєСѓРЅРґС‹). > 0, РєРѕРЅРµС‡РЅР°. */
+  /** Длительность ОДНОГО цикла (секунды). > 0, конечна. */
   readonly duration: number;
-  /** РўСЂРµРєРё. РњРёРЅРёРјСѓРј РѕРґРёРЅ; property СѓРЅРёРєР°Р»СЊРЅС‹. */
+  /** Треки. Минимум один; property уникальны. */
   readonly tracks: readonly PresetTrack[];
   /**
-   * Р—Р°РґРµСЂР¶РєР° СЃС‚Р°СЂС‚Р° (СЃРµРєСѓРЅРґС‹, >= 0). Р”Рѕ РёСЃС‚РµС‡РµРЅРёСЏ delay СЃСЌРјРїР»РµСЂ РґРµСЂР¶РёС‚
-   * РїРѕР·Сѓ t=0 (РїРµСЂРІС‹Рµ Р·РЅР°С‡РµРЅРёСЏ С‚СЂРµРєРѕРІ) вЂ” СЃР»РѕР№ РІРёРґРёРј Рё СЃС‚Р°С‚РёС‡РµРЅ, РЅРµ В«РїСѓСЃС‚В».
+   * Задержка старта (секунды, >= 0). До истечения delay сэмплер держит
+   * позу t=0 (первые значения треков) — слой видим и статичен, не «пуст».
    */
   readonly delay?: number;
-  /** Р§РёСЃР»Рѕ Р”РћРџРћР›РќРРўР•Р›Р¬РќР«РҐ С†РёРєР»РѕРІ: С†РµР»РѕРµ >= 0 РёР»Рё Infinity. РџРѕ СѓРјРѕР»С‡Р°РЅРёСЋ 0. */
+  /** Число ДОПОЛНИТЕЛЬНЫХ циклов: целое >= 0 или Infinity. По умолчанию 0. */
   readonly repeat?: number;
-  /** РџРѕР»РёС‚РёРєР° РЅР°РїСЂР°РІР»РµРЅРёСЏ РїРѕРІС‚РѕСЂРѕРІ. РџРѕ СѓРјРѕР»С‡Р°РЅРёСЋ 'loop'. */
+  /** Политика направления повторов. По умолчанию 'loop'. */
   readonly repeatType?: PresetRepeatType;
-  /** РџР°СѓР·Р° РјРµР¶РґСѓ С†РёРєР»Р°РјРё (СЃРµРєСѓРЅРґС‹, >= 0), РґРµСЂР¶РёС‚ РєРѕРЅРµС† С†РёРєР»Р°. РџРѕ СѓРјРѕР»С‡Р°РЅРёСЋ 0. */
+  /** Пауза между циклами (секунды, >= 0), держит конец цикла. По умолчанию 0. */
   readonly repeatDelay?: number;
 }
 
-/** РЎСЌРјРїР» РїСЂРµСЃРµС‚Р°: Р·РЅР°С‡РµРЅРёСЏ РўРћР›Р¬РљРћ С‚РµС… СЃРІРѕР№СЃС‚РІ, С‡С‚Рѕ РµСЃС‚СЊ РІ С‚СЂРµРєР°С… СЃРїРµРєРё. */
+/** Сэмпл пресета: значения ТОЛЬКО тех свойств, что есть в треках спеки. */
 export type PresetValues = Partial<Record<PresetProperty, number>>;
 
 /**
- * РЎРєРѕРјРїРёР»РёСЂРѕРІР°РЅРЅС‹Р№ РїСЂРµСЃРµС‚ вЂ” РЅРѕСЂРјР°Р»РёР·РѕРІР°РЅРЅР°СЏ РІР°Р»РёРґРЅР°СЏ С„РѕСЂРјР° РґР»СЏ РіРѕСЂСЏС‡РµРіРѕ
- * СЃСЌРјРїР»РёСЂРѕРІР°РЅРёСЏ. РџРѕР»СѓС‡Р°РµС‚СЃСЏ РўРћР›Р¬РљРћ С‡РµСЂРµР· compilePreset(); РїРѕР»СЏ readonly,
- * СЃС‚СЂСѓРєС‚СѓСЂР° РЅРµРїСЂРѕР·СЂР°С‡РЅР° РґР»СЏ РїРѕС‚СЂРµР±РёС‚РµР»СЏ (Р±СЂРµРЅРґРёСЂРѕРІР°РЅР°).
+ * Скомпилированный пресет — нормализованная валидная форма для горячего
+ * сэмплирования. Получается ТОЛЬКО через compilePreset(); поля readonly,
+ * структура брендирована маркером от подсовывания сырой PresetSpec.
  */
 export interface CompiledPreset {
-  /** Р‘СЂРµРЅРґРёСЂСѓСЋС‰РёР№ РјР°СЂРєРµСЂ вЂ” Р·Р°С‰РёС‚Р° РѕС‚ РїРѕРґСЃРѕРІС‹РІР°РЅРёСЏ СЃС‹СЂРѕР№ PresetSpec. */
+  /** Брендирующий маркер — защита от подсовывания сырой PresetSpec. */
   readonly __compiledPreset: true;
   readonly duration: number;
   readonly delay: number;
@@ -113,7 +114,7 @@ interface CompiledTrack {
   readonly easings: readonly EasingFn[];
 }
 
-// в”Ђв”Ђв”Ђ Р’РЅСѓС‚СЂРµРЅРЅРёРµ РєРѕРЅСЃС‚Р°РЅС‚С‹/С…РµР»РїРµСЂС‹ в”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђ
+// ─── Внутренние константы/хелперы ────────────────────────────────────────────
 
 const PRESET_PROPERTIES: readonly PresetProperty[] = [
   'scale',
@@ -126,42 +127,35 @@ const PRESET_PROPERTIES: readonly PresetProperty[] = [
   'progress',
 ];
 
-/** Finiteness guard вЂ” РґРёСЃС†РёРїР»РёРЅР° keyframes/timeline clampFinite. */
-function clampFinite(x: number): number {
-  if (Number.isFinite(x)) return x;
-  if (Number.isNaN(x)) return 0;
-  return x > 0 ? Number.MAX_VALUE : -Number.MAX_VALUE;
-}
-
 function linearEasing(t: number): number {
   return t;
 }
 
-// в”Ђв”Ђв”Ђ compilePreset: РІР°Р»РёРґР°С†РёСЏ Рё РЅРѕСЂРјР°Р»РёР·Р°С†РёСЏ в”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђ
+// ─── compilePreset: валидация и нормализация ─────────────────────────────────
 
 /**
- * Р’Р°Р»РёРґРёСЂСѓРµС‚ Рё РЅРѕСЂРјР°Р»РёР·СѓРµС‚ PresetSpec. Р•РґРёРЅСЃС‚РІРµРЅРЅР°СЏ С‚РѕС‡РєР° РІР°Р»РёРґР°С†РёРё subpath:
- * РІСЃС‘ СЃС‚СЂСѓРєС‚СѓСЂРЅРѕ РЅРµРІР°Р»РёРґРЅРѕРµ РїР°РґР°РµС‚ Р·РґРµСЃСЊ MotionParamError (РїРѕ-СЂСѓСЃСЃРєРё),
- * Р° РЅРµ РїСЂРµРІСЂР°С‰Р°РµС‚СЃСЏ С‚РёС…Рѕ РІ NaN РЅР° РєР°РґСЂРµ.
+ * Валидирует и нормализует PresetSpec. Единственная точка валидации subpath:
+ * всё структурно невалидное падает здесь MotionParamError (по-русски),
+ * а не превращается тихо в NaN на кадре.
  *
- * @throws MotionParamError РїСЂРё РЅРµРІР°Р»РёРґРЅРѕР№ СЃРїРµРєРµ.
+ * @throws MotionParamError при невалидной спеке.
  */
 export function compilePreset(spec: PresetSpec): CompiledPreset {
   if (!spec || typeof spec !== 'object') {
-    throw new MotionParamError('presets: spec РґРѕР»Р¶РµРЅ Р±С‹С‚СЊ РѕР±СЉРµРєС‚РѕРј PresetSpec');
+    throw new MotionParamError('presets: spec должен быть объектом PresetSpec');
   }
 
   const duration = spec.duration;
   if (!Number.isFinite(duration) || duration <= 0) {
     throw new MotionParamError(
-      `presets: duration РґРѕР»Р¶РµРЅ Р±С‹С‚СЊ РїРѕР»РѕР¶РёС‚РµР»СЊРЅС‹Рј РєРѕРЅРµС‡РЅС‹Рј С‡РёСЃР»РѕРј, РїРѕР»СѓС‡РµРЅРѕ ${duration}`,
+      `presets: duration должен быть положительным конечным числом, получено ${duration}`,
     );
   }
 
   const rawTracks = spec.tracks;
   if (!rawTracks || rawTracks.length < 1) {
     throw new MotionParamError(
-      `presets: tracks РґРѕР»Р¶РµРЅ СЃРѕРґРµСЂР¶Р°С‚СЊ РјРёРЅРёРјСѓРј 1 С‚СЂРµРє, РїРѕР»СѓС‡РµРЅРѕ ${rawTracks?.length ?? 0}`,
+      `presets: tracks должен содержать минимум 1 трек, получено ${rawTracks?.length ?? 0}`,
     );
   }
 
@@ -172,12 +166,12 @@ export function compilePreset(spec: PresetSpec): CompiledPreset {
     const property = track.property;
     if (!PRESET_PROPERTIES.includes(property)) {
       throw new MotionParamError(
-        `presets: tracks[${ti}].property "${String(property)}" РІРЅРµ РїРµСЂРµС‡РЅСЏ ${PRESET_PROPERTIES.join('|')}`,
+        `presets: tracks[${ti}].property "${String(property)}" вне перечня ${PRESET_PROPERTIES.join('|')}`,
       );
     }
     if (seen.has(property)) {
       throw new MotionParamError(
-        `presets: СЃРІРѕР№СЃС‚РІРѕ "${property}" РІСЃС‚СЂРµС‡Р°РµС‚СЃСЏ РІ tracks Р±РѕР»РµРµ РѕРґРЅРѕРіРѕ СЂР°Р·Р°`,
+        `presets: свойство "${property}" встречается в tracks более одного раза`,
       );
     }
     seen.add(property);
@@ -185,13 +179,13 @@ export function compilePreset(spec: PresetSpec): CompiledPreset {
     const values = track.values;
     if (!values || values.length < 2) {
       throw new MotionParamError(
-        `presets: tracks[${ti}].values РґРѕР»Р¶РµРЅ СЃРѕРґРµСЂР¶Р°С‚СЊ РјРёРЅРёРјСѓРј 2 СЌР»РµРјРµРЅС‚Р°, РїРѕР»СѓС‡РµРЅРѕ ${values?.length ?? 0}`,
+        `presets: tracks[${ti}].values должен содержать минимум 2 элемента, получено ${values?.length ?? 0}`,
       );
     }
     for (let i = 0; i < values.length; i++) {
       if (!Number.isFinite(values[i])) {
         throw new MotionParamError(
-          `presets: tracks[${ti}].values[${i}] РґРѕР»Р¶РµРЅ Р±С‹С‚СЊ РєРѕРЅРµС‡РЅС‹Рј С‡РёСЃР»РѕРј, РїРѕР»СѓС‡РµРЅРѕ ${values[i]}`,
+          `presets: tracks[${ti}].values[${i}] должен быть конечным числом, получено ${values[i]}`,
         );
       }
     }
@@ -201,28 +195,28 @@ export function compilePreset(spec: PresetSpec): CompiledPreset {
     if (track.times !== undefined) {
       if (track.times.length !== n) {
         throw new MotionParamError(
-          `presets: tracks[${ti}].times.length (${track.times.length}) РґРѕР»Р¶РµРЅ СЃРѕРІРїР°РґР°С‚СЊ СЃ values.length (${n})`,
+          `presets: tracks[${ti}].times.length (${track.times.length}) должен совпадать с values.length (${n})`,
         );
       }
       for (let i = 0; i < n; i++) {
         const t = track.times[i]!;
         if (!Number.isFinite(t)) {
           throw new MotionParamError(
-            `presets: tracks[${ti}].times[${i}] РґРѕР»Р¶РµРЅ Р±С‹С‚СЊ РєРѕРЅРµС‡РЅС‹Рј С‡РёСЃР»РѕРј, РїРѕР»СѓС‡РµРЅРѕ ${t}`,
+            `presets: tracks[${ti}].times[${i}] должен быть конечным числом, получено ${t}`,
           );
         }
         if (i > 0 && t < track.times[i - 1]!) {
-          throw new MotionParamError(`presets: tracks[${ti}].times РґРѕР»Р¶РЅС‹ Р±С‹С‚СЊ РЅРµСѓР±С‹РІР°СЋС‰РёРјРё`);
+          throw new MotionParamError(`presets: tracks[${ti}].times должны быть неубывающими`);
         }
       }
       if (track.times[0] !== 0) {
         throw new MotionParamError(
-          `presets: tracks[${ti}].times[0] РґРѕР»Р¶РµРЅ Р±С‹С‚СЊ 0, РїРѕР»СѓС‡РµРЅРѕ ${track.times[0]}`,
+          `presets: tracks[${ti}].times[0] должен быть 0, получено ${track.times[0]}`,
         );
       }
       if (track.times[n - 1] !== 1) {
         throw new MotionParamError(
-          `presets: tracks[${ti}].times[last] РґРѕР»Р¶РµРЅ Р±С‹С‚СЊ 1, РїРѕР»СѓС‡РµРЅРѕ ${track.times[n - 1]}`,
+          `presets: tracks[${ti}].times[last] должен быть 1, получено ${track.times[n - 1]}`,
         );
       }
       times = track.times;
@@ -237,7 +231,7 @@ export function compilePreset(spec: PresetSpec): CompiledPreset {
     if (Array.isArray(track.easing)) {
       if (track.easing.length !== segCount) {
         throw new MotionParamError(
-          `presets: tracks[${ti}].easing[].length (${track.easing.length}) РґРѕР»Р¶РµРЅ СЃРѕРІРїР°РґР°С‚СЊ СЃ С‡РёСЃР»РѕРј СЃРµРіРјРµРЅС‚РѕРІ (${segCount})`,
+          `presets: tracks[${ti}].easing[].length (${track.easing.length}) должен совпадать с числом сегментов (${segCount})`,
         );
       }
       easings = track.easing;
@@ -253,7 +247,7 @@ export function compilePreset(spec: PresetSpec): CompiledPreset {
   const delay = spec.delay ?? 0;
   if (!Number.isFinite(delay) || delay < 0) {
     throw new MotionParamError(
-      `presets: delay РґРѕР»Р¶РµРЅ Р±С‹С‚СЊ >= 0 Рё РєРѕРЅРµС‡РЅС‹Рј, РїРѕР»СѓС‡РµРЅРѕ ${delay}`,
+      `presets: delay должен быть >= 0 и конечным, получено ${delay}`,
     );
   }
 
@@ -263,14 +257,14 @@ export function compilePreset(spec: PresetSpec): CompiledPreset {
     (!Number.isFinite(repeatRaw) || repeatRaw < 0 || Math.floor(repeatRaw) !== repeatRaw)
   ) {
     throw new MotionParamError(
-      `presets: repeat РґРѕР»Р¶РµРЅ Р±С‹С‚СЊ РЅРµРѕС‚СЂРёС†Р°С‚РµР»СЊРЅС‹Рј С†РµР»С‹Рј С‡РёСЃР»РѕРј РёР»Рё Infinity, РїРѕР»СѓС‡РµРЅРѕ ${repeatRaw}`,
+      `presets: repeat должен быть неотрицательным целым числом или Infinity, получено ${repeatRaw}`,
     );
   }
 
   const repeatTypeRaw = spec.repeatType ?? 'loop';
   if (repeatTypeRaw !== 'loop' && repeatTypeRaw !== 'reverse' && repeatTypeRaw !== 'mirror') {
     throw new MotionParamError(
-      `presets: repeatType РґРѕР»Р¶РµРЅ Р±С‹С‚СЊ 'loop'|'reverse'|'mirror', РїРѕР»СѓС‡РµРЅРѕ ${String(repeatTypeRaw)}`,
+      `presets: repeatType должен быть 'loop'|'reverse'|'mirror', получено ${String(repeatTypeRaw)}`,
     );
   }
   const repeatType: 'loop' | 'reverse' = repeatTypeRaw === 'mirror' ? 'reverse' : repeatTypeRaw;
@@ -278,7 +272,7 @@ export function compilePreset(spec: PresetSpec): CompiledPreset {
   const repeatDelay = spec.repeatDelay ?? 0;
   if (!Number.isFinite(repeatDelay) || repeatDelay < 0) {
     throw new MotionParamError(
-      `presets: repeatDelay РґРѕР»Р¶РµРЅ Р±С‹С‚СЊ >= 0 Рё РєРѕРЅРµС‡РЅС‹Рј, РїРѕР»СѓС‡РµРЅРѕ ${repeatDelay}`,
+      `presets: repeatDelay должен быть >= 0 и конечным, получено ${repeatDelay}`,
     );
   }
 
@@ -293,11 +287,11 @@ export function compilePreset(spec: PresetSpec): CompiledPreset {
   };
 }
 
-// в”Ђв”Ђв”Ђ Р”Р»РёС‚РµР»СЊРЅРѕСЃС‚СЊ в”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђ
+// ─── Длительность ────────────────────────────────────────────────────────────
 
 /**
- * РЎСѓРјРјР°СЂРЅР°СЏ РґР»РёС‚РµР»СЊРЅРѕСЃС‚СЊ РїСЂРµСЃРµС‚Р° СЃ СѓС‡С‘С‚РѕРј delay/repeat/repeatDelay (СЃРµРєСѓРЅРґС‹).
- * Infinity РїСЂРё repeat=Infinity вЂ” РјРµС‚Р°РґР°РЅРЅС‹Рµ, РЅРµ СЌРјРёС‚РёСЂСѓРµРјРѕРµ Р·РЅР°С‡РµРЅРёРµ.
+ * Суммарная длительность пресета с учётом delay/repeat/repeatDelay (секунды).
+ * Infinity при repeat=Infinity — метаданные, не эмитируемое значение.
  */
 export function presetTotalDuration(compiled: CompiledPreset): number {
   const cycles = compiled.repeat === Infinity ? Infinity : compiled.repeat + 1;
@@ -305,19 +299,22 @@ export function presetTotalDuration(compiled: CompiledPreset): number {
   return compiled.delay + compiled.duration * cycles + compiled.repeatDelay * compiled.repeat;
 }
 
-// в”Ђв”Ђв”Ђ samplePreset: С‡РёСЃС‚С‹Р№ РіРѕСЂСЏС‡РёР№ СЃСЌРјРїР»РµСЂ в”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђ
+// ─── samplePreset: чистый горячий сэмплер ────────────────────────────────────
 
 /**
- * Р—РЅР°С‡РµРЅРёСЏ РІСЃРµС… С‚СЂРµРєРѕРІ РїСЂРµСЃРµС‚Р° РІ РјРѕРјРµРЅС‚ tSeconds (РѕС‚ РЅСѓР»СЏ РѕР±С‰РµР№ С€РєР°Р»С‹,
- * delay РІС…РѕРґРёС‚ РІ С€РєР°Р»Сѓ). Р§РёСЃС‚Р°СЏ С„СѓРЅРєС†РёСЏ Р±РµР· СЃРѕСЃС‚РѕСЏРЅРёСЏ Рё РІР°Р»РёРґР°С†РёРё
- * (РєРѕРЅС‚СЂР°РєС‚: compiled РїРѕР»СѓС‡РµРЅ РёР· compilePreset).
+ * Значения всех треков пресета в момент tSeconds (от нуля общей шкалы,
+ * delay входит в шкалу). Чистая функция без состояния и валидации
+ * (контракт: compiled получен из compilePreset).
  *
- * РҐРѕСЃС‚РёР»СЊРЅРѕРµ t: NaN в†’ РїРѕР·Р° t=0; -Infinity/РѕС‚СЂРёС†Р°С‚РµР»СЊРЅРѕРµ в†’ РїРѕР·Р° t=0;
- * +Infinity/Р·Р° totalDuration в†’ РєРѕРЅРµС† РїРѕСЃР»РµРґРЅРµРіРѕ С†РёРєР»Р° (yoyo-aware).
- * Р’С‹С…РѕРґ Р’РЎР•Р“Р”Рђ РєРѕРЅРµС‡РµРЅ (invariant 2).
+ * Хостильное t: NaN → поза t=0; -Infinity/отрицательное → поза t=0;
+ * +Infinity/за totalDuration → конец последнего цикла (yoyo-aware).
+ * Конечность значений гарантируют guards sampleKeyframes (инвариант 2);
+ * NaN, дошедший до фазы, нормализуется там же (pClamped → 0).
  */
 export function samplePreset(compiled: CompiledPreset, tSeconds: number): PresetValues {
-  // РҐРѕСЃС‚РёР»СЊРЅРѕРµ РІСЂРµРјСЏ в†’ РґРµС‚РµСЂРјРёРЅРёСЂРѕРІР°РЅРЅС‹Рµ РєСЂР°СЏ (mirror keyframes computeAt).
+  // Хостильное время → детерминированные края. Ветка NaN load-bearing для
+  // reverse-режима: без неё NaN доплывает до cycleIndex, NaN%2===0 даёт
+  // false → forward=false → финал вместо позы t=0 (запинено тестом).
   let t: number;
   if (Number.isNaN(tSeconds)) {
     t = 0;
@@ -329,7 +326,7 @@ export function samplePreset(compiled: CompiledPreset, tSeconds: number): Preset
     t = tSeconds;
   }
 
-  // Delay-РѕРєРЅРѕ: РґРµСЂР¶РёРј РїРѕР·Сѓ t=0 (РїРµСЂРІС‹Рµ Р·РЅР°С‡РµРЅРёСЏ С‚СЂРµРєРѕРІ).
+  // Delay-окно: держим позу t=0 (первые значения треков).
   let vt = t - compiled.delay;
   if (vt < 0) vt = 0;
 
@@ -339,7 +336,7 @@ export function samplePreset(compiled: CompiledPreset, tSeconds: number): Preset
   const activeTotal =
     totalCycles === Infinity ? Infinity : duration * totalCycles + repeatDelay * repeat;
 
-  // Р—Р° РїСЂРµРґРµР»Р°РјРё Р°РєС‚РёРІРЅРѕР№ РґР»РёС‚РµР»СЊРЅРѕСЃС‚Рё в†’ РєРѕРЅРµС† РџРћРЎР›Р•Р”РќР•Р“Рћ С†РёРєР»Р° (yoyo-aware).
+  // За пределами активной длительности → конец ПОСЛЕДНЕГО цикла (yoyo-aware).
   let cycleIndex: number;
   let phaseP: number;
   if (activeTotal !== Infinity && vt >= activeTotal) {
@@ -350,8 +347,11 @@ export function samplePreset(compiled: CompiledPreset, tSeconds: number): Preset
     if (cycleIndex < 0) cycleIndex = 0;
     if (totalCycles !== Infinity && cycleIndex >= totalCycles) cycleIndex = totalCycles - 1;
     const local = vt - cycleIndex * cycleLen;
-    // РћРєРЅРѕ repeatDelay (local > duration) РґРµСЂР¶РёС‚ РєРѕРЅРµС† С†РёРєР»Р°: p=1.
-    phaseP = local <= duration ? clampFinite(local / duration) : 1;
+    // Окно repeatDelay (local > duration) держит конец цикла: p=1.
+    // Не-конечная фаза здесь не нормализуется намеренно: <0/>1 режут края,
+    // а NaN нормализует pClamped внутри sampleKeyframes (внешний clamp был
+    // бы мёртвым кодом — урок верификации s07).
+    phaseP = local <= duration ? local / duration : 1;
     if (phaseP < 0) phaseP = 0;
     else if (phaseP > 1) phaseP = 1;
   }
@@ -362,48 +362,44 @@ export function samplePreset(compiled: CompiledPreset, tSeconds: number): Preset
   const out: PresetValues = {};
   for (let i = 0; i < tracks.length; i++) {
     const track = tracks[i]!;
-    // РљРѕРЅРµС‡РЅРѕСЃС‚СЊ РіР°СЂР°РЅС‚РёСЂСѓРµС‚ sampleKeyframes: values РІР°Р»РёРґРёСЂРѕРІР°РЅС‹ compilePreset,
-    // РІРЅСѓС‚СЂРµРЅРЅРёРµ guards (eased/overflow) СЂРµР¶СѓС‚ NaN/в€ћ РґРѕ РІРѕР·РІСЂР°С‚Р°. Р’РЅРµС€РЅРёР№ clamp
-    // Р·РґРµСЃСЊ Р±С‹Р» Р±С‹ РјС‘СЂС‚РІС‹Рј РєРѕРґРѕРј (СѓСЂРѕРє РІРµСЂРёС„РёРєР°С†РёРё s07 вЂ” РЅРµ РґРµРєР»Р°СЂРёРѕРІР°С‚СЊ
-    // Р·Р°С‰РёС‚Сѓ С‚Р°Рј, РіРґРµ РѕРЅР° РЅРµ СЃСЂР°Р±Р°С‚С‹РІР°РµС‚).
     out[track.property] = sampleKeyframes(track.values, track.times, track.easings, effectiveP);
   }
   return out;
 }
 
-// в”Ђв”Ђв”Ђ Р¤Р°Р±СЂРёРєРё РїСЂРµСЃРµС‚РѕРІ в”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђ
+// ─── Фабрики пресетов ────────────────────────────────────────────────────────
 //
-// Р”РµС„РѕР»С‚С‹ РєР°Р»РёР±СЂРѕРІР°РЅС‹ РїРѕ РІРєСѓСЃРѕРІРѕРјСѓ СЌС‚Р°Р»РѕРЅСѓ РІР»Р°РґРµР»СЊС†Р° (4 Lottie СЃ lab.pics,
-// СЂР°Р·Р±РѕСЂ: .agents/research/animated-icons-domain/lab-pics-lottie/REFS-LABPICS.md):
-// РјСЏРіРєРёРµ Р°РјРїР»РёС‚СѓРґС‹ (scale-РїСѓР»СЊСЃ ~0.12, wiggle ~8В°), 3-7 РѕРїРѕСЂРЅС‹С… С‚РѕС‡РµРє,
-// identity-РєСЂР°РµРІС‹Рµ РїРѕР·С‹ (РїРѕСЃР»Рµ Р°РЅРёРјР°С†РёРё РёРєРѕРЅРєР° РІС‹РіР»СЏРґРёС‚ РєР°Рє СЃС‚Р°С‚РёС‡РµСЃРєР°СЏ),
-// С‚Р°Р№РјРёРЅРіРё: ~0.5-1СЃ Р°РєС†РµРЅС‚ / 2-3СЃ СЃСЋР¶РµС‚ / ~5СЃ ambient-Р»СѓРї.
+// Дефолты калиброваны по вкусовому эталону владельца (4 Lottie с lab.pics,
+// разбор: .agents/research/animated-icons-domain/lab-pics-lottie/REFS-LABPICS.md):
+// мягкие амплитуды (scale-пульс ~0.12, wiggle ~8°), 3-7 опорных точек,
+// identity-краевые позы (после анимации иконка выглядит как статическая),
+// тайминги: ~0.5-1с акцент / 2-3с сюжет / ~5с ambient-луп.
 //
-// Р¤Р°Р±СЂРёРєР° РІРѕР·РІСЂР°С‰Р°РµС‚ РќР•РєРѕРјРїРёР»РёСЂРѕРІР°РЅРЅСѓСЋ PresetSpec вЂ” РїРѕС‚СЂРµР±РёС‚РµР»СЊ РјРѕР¶РµС‚
-// СЂР°СЃС€РёСЂРёС‚СЊ СЃРїСЂРµРґРѕРј ({...pulse(), repeat: 2}) Рё РєРѕРјРїРёР»РёСЂСѓРµС‚ РїСЂРё РёСЃРїРѕР»СЊР·РѕРІР°РЅРёРё.
+// Фабрика возвращает НЕкомпилированную PresetSpec — потребитель может
+// расширить спредом ({...pulse(), repeat: 2}) и компилирует при использовании.
 
 function assertFinite(name: string, value: number): void {
   if (!Number.isFinite(value)) {
-    throw new MotionParamError(`presets: ${name} РґРѕР»Р¶РµРЅ Р±С‹С‚СЊ РєРѕРЅРµС‡РЅС‹Рј С‡РёСЃР»РѕРј, РїРѕР»СѓС‡РµРЅРѕ ${value}`);
+    throw new MotionParamError(`presets: ${name} должен быть конечным числом, получено ${value}`);
   }
 }
 
 function assertDuration(name: string, value: number): void {
   if (!Number.isFinite(value) || value <= 0) {
     throw new MotionParamError(
-      `presets: ${name}.duration РґРѕР»Р¶РµРЅ Р±С‹С‚СЊ РїРѕР»РѕР¶РёС‚РµР»СЊРЅС‹Рј РєРѕРЅРµС‡РЅС‹Рј С‡РёСЃР»РѕРј, РїРѕР»СѓС‡РµРЅРѕ ${value}`,
+      `presets: ${name}.duration должен быть положительным конечным числом, получено ${value}`,
     );
   }
 }
 
 export interface PulseOptions {
-  /** РђРјРїР»РёС‚СѓРґР° РїСЂРёСЂРѕСЃС‚Р° РјР°СЃС€С‚Р°Р±Р° РІ РїРёРєРµ. РџРѕ СѓРјРѕР»С‡Р°РЅРёСЋ 0.12 (РјСЏРіРєРёР№ РїСѓР»СЊСЃ). */
+  /** Амплитуда прироста масштаба в пике. По умолчанию 0.12 (мягкий пульс). */
   readonly amount?: number;
-  /** Р”Р»РёС‚РµР»СЊРЅРѕСЃС‚СЊ С†РёРєР»Р°, СЃ. РџРѕ СѓРјРѕР»С‡Р°РЅРёСЋ 0.9. */
+  /** Длительность цикла, с. По умолчанию 0.9. */
   readonly duration?: number;
 }
 
-/** РџСѓР»СЊСЃ РјР°СЃС€С‚Р°Р±Р°: 1 в†’ 1+amount в†’ 1 (Р·СЂР°С‡РѕРє РёР· СЌС‚Р°Р»РѕРЅР° ref-1). */
+/** Пульс масштаба: 1 → 1+amount → 1 (зрачок из эталона ref-1). */
 export function pulse(opts: PulseOptions = {}): PresetSpec {
   const amount = opts.amount ?? 0.12;
   const duration = opts.duration ?? 0.9;
@@ -411,7 +407,7 @@ export function pulse(opts: PulseOptions = {}): PresetSpec {
   assertDuration('pulse', duration);
   if (amount <= -1) {
     throw new MotionParamError(
-      `presets: pulse.amount РґРѕР»Р¶РµРЅ Р±С‹С‚СЊ > -1 (РјР°СЃС€С‚Р°Р± РІ РїРёРєРµ 1+amount > 0), РїРѕР»СѓС‡РµРЅРѕ ${amount}`,
+      `presets: pulse.amount должен быть > -1 (масштаб в пике 1+amount > 0), получено ${amount}`,
     );
   }
   return {
@@ -421,20 +417,20 @@ export function pulse(opts: PulseOptions = {}): PresetSpec {
 }
 
 export interface BlinkOptions {
-  /** РњРёРЅРёРјР°Р»СЊРЅР°СЏ РЅРµРїСЂРѕР·СЂР°С‡РЅРѕСЃС‚СЊ РІ РїСЂРѕРІР°Р»Рµ, [0,1]. РџРѕ СѓРјРѕР»С‡Р°РЅРёСЋ 0. */
+  /** Минимальная непрозрачность в провале, [0,1]. По умолчанию 0. */
   readonly min?: number;
-  /** Р”Р»РёС‚РµР»СЊРЅРѕСЃС‚СЊ С†РёРєР»Р°, СЃ. РџРѕ СѓРјРѕР»С‡Р°РЅРёСЋ 1 (РєСѓСЂСЃРѕСЂ РёР· СЌС‚Р°Р»РѕРЅР° ref-2). */
+  /** Длительность цикла, с. По умолчанию 1 (курсор из эталона ref-2). */
   readonly duration?: number;
 }
 
-/** РњРёРіР°РЅРёРµ РЅРµРїСЂРѕР·СЂР°С‡РЅРѕСЃС‚Рё: 1 в†’ min в†’ 1, Р±РµСЃРєРѕРЅРµС‡РЅС‹Р№ Р»СѓРї (РєСѓСЂСЃРѕСЂ С‚РµСЂРјРёРЅР°Р»Р°). */
+/** Мигание непрозрачности: 1 → min → 1, бесконечный луп (курсор терминала). */
 export function blink(opts: BlinkOptions = {}): PresetSpec {
   const min = opts.min ?? 0;
   const duration = opts.duration ?? 1;
   assertFinite('blink.min', min);
   assertDuration('blink', duration);
   if (min < 0 || min > 1) {
-    throw new MotionParamError(`presets: blink.min РґРѕР»Р¶РµРЅ Р±С‹С‚СЊ РІ [0,1], РїРѕР»СѓС‡РµРЅРѕ ${min}`);
+    throw new MotionParamError(`presets: blink.min должен быть в [0,1], получено ${min}`);
   }
   return {
     duration,
@@ -444,17 +440,19 @@ export function blink(opts: BlinkOptions = {}): PresetSpec {
 }
 
 export interface WiggleOptions {
-  /** РњР°РєСЃРёРјР°Р»СЊРЅС‹Р№ СѓРіРѕР» РѕС‚РєР»РѕРЅРµРЅРёСЏ, РіСЂР°РґСѓСЃС‹. РџРѕ СѓРјРѕР»С‡Р°РЅРёСЋ 8 (РјСЏРіРєРѕРµ РїРѕРєР°С‡РёРІР°РЅРёРµ). */
+  /** Максимальный угол отклонения, градусы. По умолчанию 8 (мягкое покачивание). */
   readonly degrees?: number;
-  /** Р§РёСЃР»Рѕ СЃРІРёРЅРіРѕРІ (СЃРјРµРЅ РЅР°РїСЂР°РІР»РµРЅРёСЏ). Р¦РµР»РѕРµ >= 1. РџРѕ СѓРјРѕР»С‡Р°РЅРёСЋ 3. */
+  /** Число свингов (смен направления). Целое >= 1. По умолчанию 3. */
   readonly cycles?: number;
-  /** Р”Р»РёС‚РµР»СЊРЅРѕСЃС‚СЊ, СЃ. РџРѕ СѓРјРѕР»С‡Р°РЅРёСЋ 0.8. */
+  /** Длительность, с. По умолчанию 0.8. */
   readonly duration?: number;
 }
 
 /**
- * РџРѕРєР°С‡РёРІР°РЅРёРµ РІРѕРєСЂСѓРі СЏРєРѕСЂСЏ СЃ Р·Р°С‚СѓС…Р°СЋС‰РµР№ Р°РјРїР»РёС‚СѓРґРѕР№: 0 в†’ +d в†’ в€’dВ·k в†’ вЂ¦ в†’ 0
- * (РєРѕР»РѕРєРѕР»СЊС‡РёРє СѓРІРµРґРѕРјР»РµРЅРёР№). Р—Р°С‚СѓС…Р°РЅРёРµ Р»РёРЅРµР№РЅРѕРµ вЂ” РґРІРёР¶РµРЅРёРµ С‡РёС‚Р°РµРјРѕРµ, РЅРµ РґС‘СЂРіР°РЅРѕРµ.
+ * Покачивание вокруг якоря с затухающей амплитудой: 0 → +d → −d·k → … → 0
+ * (колокольчик уведомлений). Первый свинг — в ПЛЮС (по часовой), затухание
+ * линейное: движение читаемое, не дёрганое. Направление первого свинга —
+ * часть контракта (запинено тестом).
  */
 export function wiggle(opts: WiggleOptions = {}): PresetSpec {
   const degrees = opts.degrees ?? 8;
@@ -464,7 +462,7 @@ export function wiggle(opts: WiggleOptions = {}): PresetSpec {
   assertDuration('wiggle', duration);
   if (!Number.isFinite(cycles) || cycles < 1 || Math.floor(cycles) !== cycles) {
     throw new MotionParamError(
-      `presets: wiggle.cycles РґРѕР»Р¶РµРЅ Р±С‹С‚СЊ С†РµР»С‹Рј С‡РёСЃР»РѕРј >= 1, РїРѕР»СѓС‡РµРЅРѕ ${cycles}`,
+      `presets: wiggle.cycles должен быть целым числом >= 1, получено ${cycles}`,
     );
   }
   const values: number[] = [0];
@@ -480,13 +478,13 @@ export function wiggle(opts: WiggleOptions = {}): PresetSpec {
 }
 
 export interface SpinOptions {
-  /** Р§РёСЃР»Рѕ РѕР±РѕСЂРѕС‚РѕРІ (РѕС‚СЂРёС†Р°С‚РµР»СЊРЅРѕРµ вЂ” РїСЂРѕС‚РёРІ С‡Р°СЃРѕРІРѕР№). РџРѕ СѓРјРѕР»С‡Р°РЅРёСЋ 1. */
+  /** Число оборотов (отрицательное — против часовой). По умолчанию 1. */
   readonly turns?: number;
-  /** Р”Р»РёС‚РµР»СЊРЅРѕСЃС‚СЊ, СЃ. РџРѕ СѓРјРѕР»С‡Р°РЅРёСЋ 1. */
+  /** Длительность, с. По умолчанию 1. */
   readonly duration?: number;
 }
 
-/** РћР±РѕСЂРѕС‚: rotate 0 в†’ 360Г—turns (РѕР±РЅРѕРІР»РµРЅРёРµ/Р·Р°РіСЂСѓР·РєР°). */
+/** Оборот: rotate 0 → 360×turns (обновление/загрузка). */
 export function spin(opts: SpinOptions = {}): PresetSpec {
   const turns = opts.turns ?? 1;
   const duration = opts.duration ?? 1;
@@ -499,13 +497,13 @@ export function spin(opts: SpinOptions = {}): PresetSpec {
 }
 
 export interface BreatheOptions {
-  /** РђРјРїР»РёС‚СѓРґР° РїСЂРёСЂРѕСЃС‚Р° РјР°СЃС€С‚Р°Р±Р°. РџРѕ СѓРјРѕР»С‡Р°РЅРёСЋ 0.05 (Р·Р°РјРµС‚РЅРѕ РјСЏРіС‡Рµ pulse). */
+  /** Амплитуда прироста масштаба. По умолчанию 0.05 (заметно мягче pulse). */
   readonly amount?: number;
-  /** Р”Р»РёС‚РµР»СЊРЅРѕСЃС‚СЊ С†РёРєР»Р°, СЃ. РџРѕ СѓРјРѕР»С‡Р°РЅРёСЋ 2.6 (ambient). */
+  /** Длительность цикла, с. По умолчанию 2.6 (ambient). */
   readonly duration?: number;
 }
 
-/** Р”С‹С…Р°РЅРёРµ: РјРµРґР»РµРЅРЅС‹Р№ РјСЏРіРєРёР№ РїСѓР»СЊСЃ РјР°СЃС€С‚Р°Р±Р°, Р±РµСЃРєРѕРЅРµС‡РЅС‹Р№ ambient-Р»СѓРї. */
+/** Дыхание: медленный мягкий пульс масштаба, бесконечный ambient-луп. */
 export function breathe(opts: BreatheOptions = {}): PresetSpec {
   const amount = opts.amount ?? 0.05;
   const duration = opts.duration ?? 2.6;
@@ -513,7 +511,7 @@ export function breathe(opts: BreatheOptions = {}): PresetSpec {
   assertDuration('breathe', duration);
   if (amount <= -1) {
     throw new MotionParamError(
-      `presets: breathe.amount РґРѕР»Р¶РµРЅ Р±С‹С‚СЊ > -1, РїРѕР»СѓС‡РµРЅРѕ ${amount}`,
+      `presets: breathe.amount должен быть > -1, получено ${amount}`,
     );
   }
   return {
@@ -524,13 +522,13 @@ export function breathe(opts: BreatheOptions = {}): PresetSpec {
 }
 
 export interface PopOptions {
-  /** РџРёРє РїРµСЂРµР»С‘С‚Р° РјР°СЃС€С‚Р°Р±Р° РїРµСЂРµРґ РѕСЃРµРґР°РЅРёРµРј РІ 1. РџРѕ СѓРјРѕР»С‡Р°РЅРёСЋ 1.18. */
+  /** Пик перелёта масштаба перед оседанием в 1. По умолчанию 1.18. */
   readonly overshoot?: number;
-  /** Р”Р»РёС‚РµР»СЊРЅРѕСЃС‚СЊ, СЃ. РџРѕ СѓРјРѕР»С‡Р°РЅРёСЋ 0.5. */
+  /** Длительность, с. По умолчанию 0.5. */
   readonly duration?: number;
 }
 
-/** РџРѕСЏРІР»РµРЅРёРµ СЃ РїРµСЂРµР»С‘С‚РѕРј: scale 0 в†’ overshoot в†’ 1 (Appear-РєР»Р°СЃСЃ). */
+/** Появление с перелётом: scale 0 → overshoot → 1 (Appear-класс). */
 export function pop(opts: PopOptions = {}): PresetSpec {
   const overshoot = opts.overshoot ?? 1.18;
   const duration = opts.duration ?? 0.5;
@@ -538,7 +536,7 @@ export function pop(opts: PopOptions = {}): PresetSpec {
   assertDuration('pop', duration);
   if (overshoot <= 0) {
     throw new MotionParamError(
-      `presets: pop.overshoot РґРѕР»Р¶РµРЅ Р±С‹С‚СЊ > 0, РїРѕР»СѓС‡РµРЅРѕ ${overshoot}`,
+      `presets: pop.overshoot должен быть > 0, получено ${overshoot}`,
     );
   }
   return {
@@ -555,13 +553,13 @@ export function pop(opts: PopOptions = {}): PresetSpec {
 }
 
 export interface BounceYOptions {
-  /** Р’С‹СЃРѕС‚Р° РїРѕРґСЃРєРѕРєР°, РµРґРёРЅРёС†С‹ РєРѕРѕСЂРґРёРЅР°С‚ (РґР»СЏ 24px-РёРєРѕРЅРєРё ~2-4). РџРѕ СѓРјРѕР»С‡Р°РЅРёСЋ 2.5. */
+  /** Высота подскока, единицы координат (для 24px-иконки ~2-4). По умолчанию 2.5. */
   readonly height?: number;
-  /** Р”Р»РёС‚РµР»СЊРЅРѕСЃС‚СЊ, СЃ. РџРѕ СѓРјРѕР»С‡Р°РЅРёСЋ 0.6. */
+  /** Длительность, с. По умолчанию 0.6. */
   readonly duration?: number;
 }
 
-/** РџРѕРґСЃРєРѕРє: y 0 в†’ в€’height в†’ 0 в†’ в€’heightВ·0.35 в†’ 0 (РІС‚РѕСЂРѕР№ РѕС‚СЃРєРѕРє РЅРёР¶Рµ). */
+/** Подскок: y 0 → −height → 0 → −height·0.35 → 0 (второй отскок ниже). */
 export function bounceY(opts: BounceYOptions = {}): PresetSpec {
   const height = opts.height ?? 2.5;
   const duration = opts.duration ?? 0.6;
@@ -581,15 +579,15 @@ export function bounceY(opts: BounceYOptions = {}): PresetSpec {
 }
 
 export interface DriftOptions {
-  /** Р”СЂРµР№С„ РїРѕ x (РµРґРёРЅРёС†С‹ РєРѕРѕСЂРґРёРЅР°С‚). РџРѕ СѓРјРѕР»С‡Р°РЅРёСЋ 0 вЂ” С‚СЂРµРє РЅРµ СЃРѕР·РґР°С‘С‚СЃСЏ. */
+  /** Дрейф по x (единицы координат). По умолчанию 0 — трек не создаётся. */
   readonly dx?: number;
-  /** Р”СЂРµР№С„ РїРѕ y. РџРѕ СѓРјРѕР»С‡Р°РЅРёСЋ в€’1.5 (Р»С‘РіРєРёР№ РїРѕРґСЉС‘Рј, Р·РІС‘Р·РґС‹ РёР· СЌС‚Р°Р»РѕРЅР° ref-3). */
+  /** Дрейф по y. По умолчанию −1.5 (лёгкий подъём, звёзды из эталона ref-3). */
   readonly dy?: number;
-  /** Р”Р»РёС‚РµР»СЊРЅРѕСЃС‚СЊ С†РёРєР»Р°, СЃ. РџРѕ СѓРјРѕР»С‡Р°РЅРёСЋ 5 (ambient). */
+  /** Длительность цикла, с. По умолчанию 5 (ambient). */
   readonly duration?: number;
 }
 
-/** Ambient-РґСЂРµР№С„: РїР»Р°РІРЅС‹Р№ СѓС…РѕРґ Рє (dx,dy) Рё РІРѕР·РІСЂР°С‚, Р±РµСЃРєРѕРЅРµС‡РЅС‹Р№ Р»СѓРї. */
+/** Ambient-дрейф: плавный уход к (dx,dy) и возврат, бесконечный луп. */
 export function drift(opts: DriftOptions = {}): PresetSpec {
   const dx = opts.dx ?? 0;
   const dy = opts.dy ?? -1.5;
@@ -598,7 +596,7 @@ export function drift(opts: DriftOptions = {}): PresetSpec {
   assertFinite('drift.dy', dy);
   assertDuration('drift', duration);
   if (dx === 0 && dy === 0) {
-    throw new MotionParamError('presets: drift вЂ” dx Рё dy РѕРґРЅРѕРІСЂРµРјРµРЅРЅРѕ РЅСѓР»РµРІС‹Рµ, РґСЂРµР№С„Р° РЅРµС‚');
+    throw new MotionParamError('presets: drift — dx и dy одновременно нулевые, дрейфа нет');
   }
   const tracks: PresetTrack[] = [];
   if (dx !== 0) tracks.push({ property: 'x', values: [0, dx, 0], easing: sineInOut });
@@ -607,15 +605,15 @@ export function drift(opts: DriftOptions = {}): PresetSpec {
 }
 
 export interface FadeSlideOptions {
-  /** РќР°С‡Р°Р»СЊРЅРѕРµ СЃРјРµС‰РµРЅРёРµ РїРѕ x (РґРІРёР¶РµРЅРёРµ Рє 0). РџРѕ СѓРјРѕР»С‡Р°РЅРёСЋ 0 вЂ” С‚СЂРµРє РЅРµ СЃРѕР·РґР°С‘С‚СЃСЏ. */
+  /** Начальное смещение по x (движение к 0). По умолчанию 0 — трек не создаётся. */
   readonly dx?: number;
-  /** РќР°С‡Р°Р»СЊРЅРѕРµ СЃРјРµС‰РµРЅРёРµ РїРѕ y. РџРѕ СѓРјРѕР»С‡Р°РЅРёСЋ 4. */
+  /** Начальное смещение по y. По умолчанию 4. */
   readonly dy?: number;
-  /** Р”Р»РёС‚РµР»СЊРЅРѕСЃС‚СЊ, СЃ. РџРѕ СѓРјРѕР»С‡Р°РЅРёСЋ 0.35. */
+  /** Длительность, с. По умолчанию 0.35. */
   readonly duration?: number;
 }
 
-/** РџРѕСЏРІР»РµРЅРёРµ СЃРѕ СЃРґРІРёРіРѕРј: opacity 0в†’1, СЃРјРµС‰РµРЅРёРµ (dx,dy)в†’0 (Appear-РєР»Р°СЃСЃ). */
+/** Появление со сдвигом: opacity 0→1, смещение (dx,dy)→0 (Appear-класс). */
 export function fadeSlide(opts: FadeSlideOptions = {}): PresetSpec {
   const dx = opts.dx ?? 0;
   const dy = opts.dy ?? 4;
@@ -632,14 +630,14 @@ export function fadeSlide(opts: FadeSlideOptions = {}): PresetSpec {
 }
 
 export interface DrawOnOptions {
-  /** Р”Р»РёС‚РµР»СЊРЅРѕСЃС‚СЊ СЂРёСЃРѕРІР°РЅРёСЏ, СЃ. РџРѕ СѓРјРѕР»С‡Р°РЅРёСЋ 1.2. */
+  /** Длительность рисования, с. По умолчанию 1.2. */
   readonly duration?: number;
 }
 
 /**
- * РљР°РЅР°Р» РїСЂРѕРіСЂРµСЃСЃР° СЂРёСЃРѕРІР°РЅРёСЏ: progress 0в†’1 РјРѕРЅРѕС‚РѕРЅРЅРѕ (BL-002 В«РєРёСЃС‚РѕС‡РєР° СЂРёСЃСѓРµС‚В»).
- * РџРѕС‚СЂРµР±РёС‚РµР»СЊ РјР°РїРёС‚ progress РЅР° С‚РµС…РЅРёРєСѓ СЂР°СЃРєСЂС‹С‚РёСЏ (clip-path РІРґРѕР»СЊ guide-РїСѓС‚Рё,
- * variable-draw РїРѕСЂРѕРі Рё С‚.Рї.) вЂ” СЃР°Рј РїСЂРµСЃРµС‚ РѕСЃС‚Р°С‘С‚СЃСЏ headless-С‡РёСЃР»РѕРј.
+ * Канал прогресса рисования: progress 0→1 монотонно (BL-002 «кисточка рисует»).
+ * Потребитель мапит progress на технику раскрытия (clip-path вдоль guide-пути,
+ * variable-draw порог и т.п.) — сам пресет остаётся headless-числом.
  */
 export function drawOn(opts: DrawOnOptions = {}): PresetSpec {
   const duration = opts.duration ?? 1.2;
@@ -650,39 +648,39 @@ export function drawOn(opts: DrawOnOptions = {}): PresetSpec {
   };
 }
 
-// в”Ђв”Ђв”Ђ runPreset: СѓРїСЂР°РІР»СЏРµРјС‹Р№ frame-loop в”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђ
+// ─── runPreset: управляемый frame-loop ───────────────────────────────────────
 
 const FIXED_DT_S = 1 / 60;
-/** Safety-cap РєР°РґСЂРѕРІ вЂ” РёРґРµРЅС‚РёС‡РµРЅ keyframes/timeline MAX_FRAMES. */
+/** Safety-cap кадров — идентичен keyframes/timeline MAX_FRAMES. */
 const MAX_FRAMES = 100_000;
 
-/** РћРїС†РёРё runPreset вЂ” injectable seams РІ РґРёСЃС†РёРїР»РёРЅРµ keyframes(). */
+/** Опции runPreset — injectable seams в дисциплине keyframes(). */
 export interface RunPresetOptions {
-  /** РљРѕР»Р±СЌРє РЅР° РєР°Р¶РґС‹Р№ С€Р°Рі: Р·РЅР°С‡РµРЅРёСЏ Р’РЎР•РҐ С‚СЂРµРєРѕРІ РІ С‚РµРєСѓС‰РёР№ РјРѕРјРµРЅС‚. */
+  /** Колбэк на каждый шаг: значения ВСЕХ треков в текущий момент. */
   readonly onUpdate?: (values: PresetValues) => void;
-  /** Injectable requestAnimationFrame-Р·Р°РјРµРЅРёС‚РµР»СЊ. Р’РѕР·РІСЂР°С‚ 0 = timeout-fallback. */
+  /** Injectable requestAnimationFrame-заменитель. Возврат 0 = timeout-fallback. */
   readonly requestFrame?: ((cb: (ts?: number) => void) => number) | undefined;
-  /** Injectable matchMedia. undefined = SSR / РЅРµС‚ РїСЂРµРґРїРѕС‡С‚РµРЅРёР№ (reduce=false). */
+  /** Injectable matchMedia. undefined = SSR / нет предпочтений (reduce=false). */
   readonly matchMedia?: ((query: string) => MatchMediaResult) | undefined;
 }
 
-/** РЈРїСЂР°РІР»СЏРµРјС‹Р№ С…РµРЅРґР» РїСЂРµСЃРµС‚Р°. Thenable вЂ” `await runPreset(...)`. */
+/** Управляемый хендл пресета. Thenable — `await runPreset(...)`. */
 export interface PresetControls {
-  /** РЎСѓРјРјР°СЂРЅР°СЏ РґР»РёС‚РµР»СЊРЅРѕСЃС‚СЊ c delay/repeat (СЃРµРєСѓРЅРґС‹); Infinity РїСЂРё repeat=в€ћ. */
+  /** Суммарная длительность c delay/repeat (секунды); Infinity при repeat=∞. */
   readonly totalDuration: number;
-  /** РўРµРєСѓС‰РµРµ РІРёСЂС‚СѓР°Р»СЊРЅРѕРµ РІСЂРµРјСЏ (СЃРµРєСѓРЅРґС‹) РѕС‚ СЃС‚Р°СЂС‚Р° (delay РІС…РѕРґРёС‚ РІ С€РєР°Р»Сѓ). */
+  /** Текущее виртуальное время (секунды) от старта (delay входит в шкалу). */
   readonly time: number;
-  /** РџСЂРѕРіСЂРµСЃСЃ РўР•РљРЈР©Р•Р“Рћ С†РёРєР»Р° [0,1]. */
+  /** Прогресс ТЕКУЩЕГО цикла [0,1]. */
   readonly progress: number;
-  /** Р’РѕР·РѕР±РЅРѕРІРёС‚СЊ (no-op РµСЃР»Рё РёРіСЂР°РµС‚ РёР»Рё Р·Р°РІРµСЂС€С‘РЅ). */
+  /** Возобновить (no-op если играет или завершён). */
   play(): void;
-  /** РџР°СѓР·Р° (Р·Р°РјРѕСЂР°Р¶РёРІР°РµС‚ РІРёСЂС‚СѓР°Р»СЊРЅРѕРµ РІСЂРµРјСЏ). */
+  /** Пауза (замораживает виртуальное время). */
   pause(): void;
-  /** РџРµСЂРµРјРѕС‚РєР° Рє t СЃРµРєСѓРЅРґ. NaN в†’ no-op, +Infinity в†’ complete(). */
+  /** Перемотка к t секунд. NaN → no-op, +Infinity → complete(). */
   seek(t: number): void;
-  /** РЎРЅСЌРї Рє С„РёРЅР°Р»СЊРЅРѕР№ РїРѕР·Рµ (repeat=в€ћ в†’ РЅРµР№С‚СЂР°Р»СЊРЅР°СЏ РїРѕР·Р° t=0) Рё СЂРµР·РѕР»РІ. */
+  /** Снэп к финальной позе (repeat=∞ → нейтральная поза t=0) и резолв. */
   complete(): void;
-  /** РћСЃС‚Р°РЅРѕРІРёС‚СЊСЃСЏ РІ С‚РµРєСѓС‰РµР№ РїРѕР·РёС†РёРё Рё СЂРµР·РѕР»РІРёС‚СЊ. */
+  /** Остановиться в текущей позиции и резолвить. */
   cancel(): void;
   then<TResult1 = void, TResult2 = never>(
     onfulfilled?: ((value: void) => TResult1 | PromiseLike<TResult1>) | null | undefined,
@@ -706,15 +704,15 @@ function isCompiled(spec: PresetSpec | CompiledPreset): spec is CompiledPreset {
 }
 
 /**
- * РџСЂРѕРёРіСЂС‹РІР°РµС‚ РїСЂРµСЃРµС‚ РћР”РќРРњ frame-loop'РѕРј РЅР° РІСЃРµ С‚СЂРµРєРё (РґРµС‚РµСЂРјРёРЅРёР·Рј: РѕРґРёРЅ clock,
- * РѕРґРёРЅ СЃСЌРјРїР» РЅР° РєР°РґСЂ). РќР°С‡РёРЅР°РµС‚ РЅРµРјРµРґР»РµРЅРЅРѕ (РµСЃР»Рё РЅРµ reduced-motion).
+ * Проигрывает пресет ОДНИМ frame-loop'ом на все треки (детерминизм: один clock,
+ * один сэмпл на кадр). Начинает немедленно (если не reduced-motion).
  *
- * Reduced-motion CHARACTER-switch (РёРЅРІР°СЂРёР°РЅС‚ 4): РєРѕРЅРµС‡РЅС‹Р№ repeat в†’ СЃРёРЅС…СЂРѕРЅРЅС‹Р№
- * СЃРЅСЌРї Рє С„РёРЅР°Р»СЊРЅРѕР№ РїРѕР·Рµ; repeat=Infinity (ambient-Р»СѓРї Р±РµР· С„РёРЅР°Р»Р°) в†’ РЅРµР№С‚СЂР°Р»СЊРЅР°СЏ
- * РїРѕР·Р° t=0. РџРѕР·Р° СЌРјРёС‚РёСЂСѓРµС‚СЃСЏ СЂРѕРІРЅРѕ РѕРґРёРЅ СЂР°Р· вЂ” РїРѕС‚СЂРµР±РёС‚РµР»СЊ РџРћР›РЈР§РђР•Рў СЃС‚Р°С‚РёС‡РЅСѓСЋ
- * РІР°Р»РёРґРЅСѓСЋ РїРѕР·Сѓ, Р° РЅРµ В«РЅРёС‡РµРіРѕВ» (РќР• hard-off).
+ * Reduced-motion CHARACTER-switch (инвариант 4): конечный repeat → синхронный
+ * снэп к финальной позе; repeat=Infinity (ambient-луп без финала) → нейтральная
+ * поза t=0. Поза эмитируется ровно один раз — потребитель ПОЛУЧАЕТ статичную
+ * валидную позу, а не «ничего» (НЕ hard-off).
  *
- * @throws MotionParamError РїСЂРё РЅРµРІР°Р»РёРґРЅРѕР№ СЃРїРµРєРµ (С‡РµСЂРµР· compilePreset).
+ * @throws MotionParamError при невалидной спеке (через compilePreset).
  */
 export function runPreset(
   spec: PresetSpec | CompiledPreset,
@@ -733,7 +731,7 @@ export function runPreset(
         ? requestAnimationFrame(cb)
         : (setTimeout(cb, FIXED_DT_S * 1000) as unknown as number));
 
-  // в”Ђв”Ђ РР·РјРµРЅСЏРµРјРѕРµ СЃРѕСЃС‚РѕСЏРЅРёРµ в”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђ
+  // ── Изменяемое состояние ──────────────────────────────────────────────────
   let _vt = 0;
   let _lastRealTs: number | undefined;
   let _paused = false;
@@ -753,7 +751,7 @@ export function runPreset(
     try {
       onUpdate(values);
     } catch {
-      // РР·РѕР»СЏС†РёСЏ РѕС€РёР±РѕРє РїРѕР»СЊР·РѕРІР°С‚РµР»СЊСЃРєРѕРіРѕ РєРѕР»Р±СЌРєР° вЂ” Р»СѓРї/РїСЂРѕРјРёСЃ Р¶РёРІСѓС‚ РґР°Р»СЊС€Рµ.
+      // Изоляция ошибок пользовательского колбэка — луп/промис живут дальше.
     }
   }
 
@@ -785,7 +783,7 @@ export function runPreset(
     try {
       _frameCount++;
       if (_frameCount >= MAX_FRAMES) {
-        // Safety cap вЂ” РІС‹С…РѕРґРёРј РІ РўР•РљРЈР©Р•Р™ РїРѕР·РёС†РёРё (РЅРµ В«РµСЃС‚РµСЃС‚РІРµРЅРЅС‹Р№В» С„РёРЅР°Р»).
+        // Safety cap — выходим в ТЕКУЩЕЙ позиции (не «естественный» финал).
         settle(samplePreset(compiled, _vt));
         return;
       }
@@ -833,13 +831,13 @@ export function runPreset(
     }
   }
 
-  // в”Ђв”Ђ Reduced-motion CHARACTER-switch вЂ” СЃРёРЅС…СЂРѕРЅРЅРѕ, РґРѕ СЃС‚Р°СЂС‚Р° Р»СѓРїР° в”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђ
+  // ── Reduced-motion CHARACTER-switch — синхронно, до старта лупа ───────────
   if (reduce) {
     if (compiled.repeat === Infinity) {
-      settle(samplePreset(compiled, 0)); // РЅРµР№С‚СЂР°Р»СЊРЅР°СЏ РїРѕР·Р° ambient-Р»СѓРїР°
+      settle(samplePreset(compiled, 0)); // нейтральная поза ambient-лупа
     } else {
       _vt = totalDuration;
-      settle(samplePreset(compiled, totalDuration)); // С„РёРЅР°Р»СЊРЅР°СЏ РїРѕР·Р°
+      settle(samplePreset(compiled, totalDuration)); // финальная поза
     }
   } else {
     ensureLoop();
@@ -892,7 +890,7 @@ export function runPreset(
     complete(): void {
       if (_settled) return;
       if (compiled.repeat === Infinity) {
-        settle(samplePreset(compiled, 0)); // РЅРµР№С‚СЂР°Р»СЊРЅР°СЏ РїРѕР·Р° вЂ” Сѓ Р»СѓРїР° РЅРµС‚ С„РёРЅР°Р»Р°
+        settle(samplePreset(compiled, 0)); // нейтральная поза — у лупа нет финала
         return;
       }
       _vt = totalDuration;
@@ -915,16 +913,16 @@ export function runPreset(
   return controls;
 }
 
-// в”Ђв”Ђв”Ђ presetToWaapi: С‡РёСЃС‚С‹Р№ РєРѕРЅРІРµСЂС‚РµСЂ РІ РґР°РЅРЅС‹Рµ element.animate() в”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђ
+// ─── presetToWaapi: чистый конвертер в данные element.animate() ─────────────
 
-/** РћРґРёРЅ WAAPI-РєРµР№С„СЂРµР№Рј: offset + СЃРѕР±СЂР°РЅРЅС‹Рµ CSS-СЃРІРѕР№СЃС‚РІР°. */
+/** Один WAAPI-кейфрейм: offset + собранные CSS-свойства. */
 export interface WaapiKeyframe {
   readonly offset: number;
   readonly transform?: string;
   readonly opacity?: number;
 }
 
-/** РўР°Р№РјРёРЅРі РґР»СЏ element.animate(): РґР»РёС‚РµР»СЊРЅРѕСЃС‚Рё РІ РњРР›Р›РРЎР•РљРЈРќР”РђРҐ. */
+/** Тайминг для element.animate(): длительности в МИЛЛИСЕКУНДАХ. */
 export interface WaapiTiming {
   readonly duration: number;
   readonly delay: number;
@@ -934,7 +932,7 @@ export interface WaapiTiming {
   readonly easing: 'linear';
 }
 
-/** РљР°РЅР°Р» progress: РЅРµ РІС‹СЂР°Р¶Р°РµС‚СЃСЏ CSS-СЃРІРѕР№СЃС‚РІРѕРј, РїРѕС‚СЂРµР±РёС‚РµР»СЊ РІРµРґС‘С‚ РµРіРѕ СЃР°Рј. */
+/** Канал progress: не выражается CSS-свойством, потребитель ведёт его сам. */
 export interface WaapiProgressTrack {
   readonly offsets: readonly number[];
   readonly values: readonly number[];
@@ -946,33 +944,33 @@ export interface WaapiConversion {
   readonly progressTrack?: WaapiProgressTrack;
 }
 
-/** РџР»РѕС‚РЅРѕСЃС‚СЊ СЂР°РІРЅРѕРјРµСЂРЅРѕР№ СЃРµС‚РєРё offset'РѕРІ (РёРЅС‚РµСЂРІР°Р»РѕРІ) РїРѕРІРµСЂС… С‚РѕС‡РµРє times. */
+/** Плотность равномерной сетки offset'ов (интервалов) поверх точек times. */
 const WAAPI_GRID_INTERVALS = 24;
 
 /**
- * РљРѕРЅРІРµСЂС‚РёСЂСѓРµС‚ РїСЂРµСЃРµС‚ РІ РґР°РЅРЅС‹Рµ РґР»СЏ element.animate() вЂ” headless: РїСЂРѕРёР·РІРѕРґРёС‚
- * РўРћР›Р¬РљРћ РґР°РЅРЅС‹Рµ (keyframes + timing), DOM-РІС‹Р·РѕРІ РґРµР»Р°РµС‚ РїРѕС‚СЂРµР±РёС‚РµР»СЊ.
+ * Конвертирует пресет в данные для element.animate() — headless: производит
+ * ТОЛЬКО данные (keyframes + timing), DOM-вызов делает потребитель.
  *
- * РЎРµРјР°РЅС‚РёРєР° easing СЃРѕС…СЂР°РЅСЏРµС‚СЃСЏ РїР»РѕС‚РЅРѕР№ СЃРµС‚РєРѕР№ offset'РѕРІ: РІ РєР°Р¶РґРѕР№ С‚РѕС‡РєРµ
- * Р·РЅР°С‡РµРЅРёРµ РІС‹С‡РёСЃР»РµРЅРѕ С‚РѕС‡РЅРѕ (sampleKeyframes), РјРµР¶РґСѓ С‚РѕС‡РєР°РјРё WAAPI
- * РёРЅС‚РµСЂРїРѕР»РёСЂСѓРµС‚ Р»РёРЅРµР№РЅРѕ (timing.easing='linear').
+ * Семантика easing сохраняется плотной сеткой offset'ов: в каждой точке
+ * значение вычислено точно (sampleKeyframes), между точками WAAPI
+ * интерполирует линейно (timing.easing='linear').
  *
- * transform СЃРѕР±РёСЂР°РµС‚СЃСЏ РІ С„РёРєСЃ-РїРѕСЂСЏРґРєРµ translate в†’ rotate в†’ scale;
- * РѕСЃРё РјР°СЃС€С‚Р°Р±Р° РїРµСЂРµРјРЅРѕР¶Р°СЋС‚СЃСЏ: sx = scaleВ·scaleX, sy = scaleВ·scaleY.
+ * transform собирается в фикс-порядке translate → rotate → scale;
+ * оси масштаба перемножаются: sx = scale·scaleX, sy = scale·scaleY.
  *
- * @throws MotionParamError РїСЂРё РЅРµРІР°Р»РёРґРЅРѕР№ СЃРїРµРєРµ Рё РїСЂРё repeatDelay > 0
- *   (РІ WAAPI РЅРµС‚ РЅР°С‚РёРІРЅРѕРіРѕ repeatDelay; С‡РµСЃС‚РЅС‹Р№ РѕС‚РєР°Р· РІРјРµСЃС‚Рѕ С‚РёС…Рѕ-РЅРµРІРµСЂРЅРѕР№
- *   СЃРµРјР°РЅС‚РёРєРё вЂ” РґР»СЏ repeatDelay РёСЃРїРѕР»СЊР·СѓР№С‚Рµ runPreset).
+ * @throws MotionParamError при невалидной спеке и при repeatDelay > 0
+ *   (в WAAPI нет нативного repeatDelay; честный отказ вместо тихо-неверной
+ *   семантики — для repeatDelay используйте runPreset).
  */
 export function presetToWaapi(spec: PresetSpec | CompiledPreset): WaapiConversion {
   const compiled = isCompiled(spec) ? spec : compilePreset(spec);
   if (compiled.repeatDelay > 0) {
     throw new MotionParamError(
-      'presets: presetToWaapi РЅРµ РїРѕРґРґРµСЂР¶РёРІР°РµС‚ repeatDelay > 0 (РІ WAAPI РЅРµС‚ РїР°СѓР·С‹ РјРµР¶РґСѓ РёС‚РµСЂР°С†РёСЏРјРё) вЂ” РёСЃРїРѕР»СЊР·СѓР№С‚Рµ runPreset',
+      'presets: presetToWaapi не поддерживает repeatDelay > 0 (в WAAPI нет паузы между итерациями) — используйте runPreset',
     );
   }
 
-  // Offsets: С‚РѕС‡РєРё times РІСЃРµС… С‚СЂРµРєРѕРІ в€Є СЂР°РІРЅРѕРјРµСЂРЅР°СЏ СЃРµС‚РєР° (РґРµРґСѓРї С‡РµСЂРµР· Set).
+  // Offsets: точки times всех треков ∪ равномерная сетка (дедуп через Set).
   const offsetSet = new Set<number>();
   for (let i = 0; i <= WAAPI_GRID_INTERVALS; i++) offsetSet.add(i / WAAPI_GRID_INTERVALS);
   for (const track of compiled.tracks) {
@@ -989,10 +987,11 @@ export function presetToWaapi(spec: PresetSpec | CompiledPreset): WaapiConversio
   const hasProgress = has('progress');
   const hasCss = hasTranslate || hasRotate || hasScale || hasOpacity;
 
+  // Конечность значений гарантирует sampleKeyframes (см. инвариант 2).
   const sampleTrackAt = (p: PresetProperty, offset: number): number | undefined => {
     const track = compiled.tracks.find((t) => t.property === p);
     if (!track) return undefined;
-    return clampFinite(sampleKeyframes(track.values, track.times, track.easings, offset));
+    return sampleKeyframes(track.values, track.times, track.easings, offset);
   };
 
   const keyframes: WaapiKeyframe[] = [];
