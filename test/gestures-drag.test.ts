@@ -194,6 +194,75 @@ describe('gestures/drag: инерция отпускания', () => {
 
 // ─── Reduced motion: CHARACTER-switch ─────────────────────────────────────────
 
+describe('gestures/drag: семантика cancel/stop (ноты арх-ревью PR #20)', () => {
+  function flick2(clock: ReturnType<typeof virtualClock>, opts: Parameters<typeof createDrag>[0] = {}) {
+    const d = createDrag({ requestFrame: clock.requestFrame, ...opts });
+    d.pointerDown({ x: 0, y: 0, t: 0 });
+    for (let i = 1; i <= 5; i++) d.pointerMove({ x: i * 20, y: 0, t: i * 0.016 });
+    d.pointerUp({ x: 100, y: 0, t: 0.08 });
+    return d;
+  }
+
+  it('pointerCancel во время ГЛАЙДА — осесть где стоишь (единая семантика с cancel при drag)', () => {
+    const clock = virtualClock();
+    const rests: number[] = [];
+    const d = flick2(clock, { onRest: (x) => rests.push(x) });
+    clock.pump(16);
+    expect(d.gliding).toBe(true);
+    const xAtCancel = d.x;
+    d.pointerCancel(); // системный перехват указателя — глайд обязан осесть немедленно
+    expect(d.gliding).toBe(false);
+    expect(d.x).toBe(xAtCancel);
+    expect(rests).toEqual([xAtCancel]);
+    clock.pump(32); // stale-кадр глайда инертен
+    expect(d.x).toBe(xAtCancel);
+    expect(rests.length).toBe(1);
+  });
+
+  it('stop() во время АКТИВНОГО drag — no-op по контракту (скоуп stop = только глайд)', () => {
+    const d = createDrag({ inertia: false });
+    d.pointerDown({ x: 0, y: 0, t: 0 });
+    d.pointerMove({ x: 30, y: 0, t: 0.02 });
+    d.stop(); // палец ещё на элементе: drag продолжает жить
+    expect(d.dragging).toBe(true);
+    d.pointerMove({ x: 50, y: 0, t: 0.04 });
+    expect(d.x).toBeCloseTo(50);
+  });
+
+  it('повторный pointerDown во время dragging перехватывает якорь (не ломает состояние)', () => {
+    const d = createDrag({ inertia: false });
+    d.pointerDown({ x: 0, y: 0, t: 0 });
+    d.pointerMove({ x: 30, y: 0, t: 0.02 });
+    expect(d.x).toBeCloseTo(30);
+    d.pointerDown({ x: 100, y: 0, t: 0.04 }); // новый захват с текущей позиции
+    d.pointerMove({ x: 110, y: 0, t: 0.06 });
+    expect(d.x).toBeCloseTo(40); // 30 + 10, без скачка
+    expect(d.dragging).toBe(true);
+  });
+
+  it('axis="x" + bounds совместно: y заморожен, x клампится', () => {
+    const d = createDrag({ axis: 'x', bounds: { x: { min: 0, max: 50 } }, rubberBand: 0 });
+    d.pointerDown({ x: 0, y: 0, t: 0 });
+    d.pointerMove({ x: 200, y: 99, t: 0.02 });
+    expect(d.x).toBe(50);
+    expect(d.y).toBe(0);
+  });
+
+  it('non-draining шов (handle=0): глайд едет через setTimeout-фоллбек и оседает', async () => {
+    const d = createDrag({ requestFrame: () => 0 }); // конвенция repo: 0 = non-draining
+    d.pointerDown({ x: 0, y: 0, t: 0 });
+    for (let i = 1; i <= 5; i++) d.pointerMove({ x: i * 20, y: 0, t: i * 0.016 });
+    d.pointerUp({ x: 100, y: 0, t: 0.08 });
+    expect(d.gliding).toBe(true);
+    // Фоллбек тикает фиксированным шагом 1/60s: decay (timeConstant 0.35s,
+    // restDelta 0.5) оседает за ~2-3s виртуального времени → < 200 тиков.
+    for (let i = 0; i < 400 && d.gliding; i++) await new Promise((r) => setTimeout(r, 0));
+    expect(d.gliding).toBe(false);
+    expect(d.x).toBeGreaterThan(100);
+    expect(Number.isFinite(d.x)).toBe(true);
+  });
+});
+
 describe('gestures/drag: prefers-reduced-motion', () => {
   it('release при reduce: снап в точку покоя БЕЗ кадров (ноль rAF)', () => {
     const clock = virtualClock();

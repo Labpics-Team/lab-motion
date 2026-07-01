@@ -603,6 +603,16 @@ export function createDrag(options?: DragOptions): DragControls {
       startGlide(v.vx, v.vy);
     },
     pointerCancel(): void {
+      // Единая семантика «системный перехват указателя»: осесть где стоишь
+      // (клампнуто) — и при активном drag, и при инерционном глайде.
+      if (gliding) {
+        generation++; // инвалидировать уже запланированный кадр глайда
+        rawX = dispX = hardClamp('x', dispX);
+        rawY = dispY = hardClamp('y', dispY);
+        emit();
+        settle();
+        return;
+      }
       if (!dragging) return;
       dragging = false;
       rawX = dispX = hardClamp('x', dispX);
@@ -610,6 +620,12 @@ export function createDrag(options?: DragOptions): DragControls {
       emit();
       settle();
     },
+    /**
+     * Заглушить активный ГЛАЙД без onRest (тихая отмена инерции).
+     * Скоуп: только глайд. Во время активного drag (палец на элементе) —
+     * сознательный no-op: жест владеет позицией, обрывать его силой нельзя
+     * (поведение запинено тестом «stop() во время АКТИВНОГО drag»).
+     */
     stop(): void {
       generation++;
       gliding = false;
