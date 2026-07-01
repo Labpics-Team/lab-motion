@@ -93,17 +93,50 @@ describe('spring-ergonomics: fromVisualDuration', () => {
     return Infinity;
   }
 
-  it('bounce=0.3: первое касание цели ≈ visualDuration (±7%)', () => {
+  it('bounce=0.3: первое касание цели ≈ visualDuration (±1%, допуск = замер 0.01% + запас)', () => {
     for (const Tv of [0.3, 0.6, 1.2]) {
       const p = fromVisualDuration({ visualDuration: Tv, bounce: 0.3 });
       const t1 = firstCrossing(p, Tv * 3);
-      expect(Math.abs(t1 - Tv) / Tv).toBeLessThan(0.07);
+      expect(Math.abs(t1 - Tv) / Tv).toBeLessThan(0.01);
     }
   });
 
-  it('bounce<=0 (нет пересечения): к visualDuration значение >= 0.9 (визуально у цели)', () => {
-    const p = fromVisualDuration({ visualDuration: 0.5, bounce: 0 });
-    expect(spring(p, 0.5).value).toBeGreaterThanOrEqual(0.9);
+  // Полный публичный домен ζ<1, включая зону клампа ω0 (класс, слепой для
+  // точечных тестов: длинный Tv + малый ζ → ω0 упирается в пол и пружина
+  // быстрее запрошенной).
+  it('property ζ<1: вне клампа t1≈Tv (±1%); в клампе t1<Tv; всегда t1 ≈ аналитике финальных параметров', () => {
+    const MIN_OMEGA0 = 2.0; // зеркало пола движка (дрейф ловит гард ниже)
+    for (const bounce of [0.1, 0.3, 0.5, 0.8, 1]) {
+      for (const Tv of [0.05, 0.5, 1.2, 1.5, 10]) {
+        const zeta = Math.min(4, Math.max(0.2, 1 - bounce));
+        if (zeta >= 1) continue;
+        const s = Math.sqrt(1 - zeta * zeta);
+        const omega0Raw = (Math.PI - Math.atan(s / zeta)) / (s * Tv);
+        const p = fromVisualDuration({ visualDuration: Tv, bounce });
+        const omega0Fin = Math.sqrt(p.stiffness / p.mass);
+        // инвариант: первое касание = точное решение для ФИНАЛЬНЫХ параметров
+        const tStar = (Math.PI - Math.atan(s / zeta)) / (s * omega0Fin);
+        const t1 = firstCrossing(p, tStar * 2 + 0.1);
+        expect(Math.abs(t1 - tStar) / tStar).toBeLessThan(0.01);
+        if (omega0Raw >= MIN_OMEGA0) {
+          expect(Math.abs(t1 - Tv) / Tv).toBeLessThan(0.01); // контракт точен
+        } else {
+          expect(t1).toBeLessThan(Tv); // деградация только в раннюю сторону
+        }
+      }
+    }
+  });
+
+  it('ζ>=1 (bounce<=0): пересечения x=1 нет, к visualDuration значение в [0.9, 1)', () => {
+    for (const bounce of [0, -0.5, -1]) {
+      for (const Tv of [0.1, 0.5, 2]) {
+        const p = fromVisualDuration({ visualDuration: Tv, bounce });
+        expect(firstCrossing(p, Tv * 4)).toBe(Infinity); // монотонный подход снизу
+        const x = spring(p, Tv).value;
+        expect(x).toBeGreaterThanOrEqual(0.9);
+        expect(x).toBeLessThan(1);
+      }
+    }
   });
 
   it('результат проходит validateSpringParams на краях', () => {
@@ -189,6 +222,28 @@ describe('spring-ergonomics: springAsEasing', () => {
     const a = springAsEasing(springPresets.gentle);
     const b = springAsEasing(springPresets.gentle);
     for (let i = 0; i <= 20; i++) expect(a(i / 20)).toBe(b(i / 20));
+  });
+});
+
+// ─── Дрейф-гард зеркальных констант ──────────────────────────────────────────
+// src/spring/index.ts держит копии полов движка (MIN_OMEGA0/MIN_ZETA/MAX_ZETA),
+// потому что ядро их не экспортирует (поверхность запинена). Этот тест пинит
+// полы по ФАКТИЧЕСКОМУ поведению валидатора: сдвиг полов в ядре без обновления
+// зеркала делает его RED.
+
+describe('spring-ergonomics: полы движка = зеркало констант субпутя', () => {
+  const params = (omega0: number, zeta: number) =>
+    ({ mass: 1, stiffness: omega0 * omega0, damping: 2 * zeta * omega0 });
+
+  it('границы принимаются: ω0=2.0 (пол), ζ=0.2 (пол), ζ=4 (потолок)', () => {
+    expect(() => validateSpringParams(params(2.0, 0.2))).not.toThrow();
+    expect(() => validateSpringParams(params(2.0, 4))).not.toThrow();
+  });
+
+  it('за границами отвергается: ω0=1.99, ζ=0.19, ζ=4.01', () => {
+    expect(() => validateSpringParams(params(1.99, 1))).toThrow(MotionParamError);
+    expect(() => validateSpringParams(params(2.0, 0.19))).toThrow(MotionParamError);
+    expect(() => validateSpringParams(params(2.0, 4.01))).toThrow(MotionParamError);
   });
 });
 

@@ -98,7 +98,16 @@ export interface FromVisualDurationOptions {
   readonly mass?: number | undefined;
 }
 
-/** Пружина, ПЕРВОЕ касание цели у которой ≈ visualDuration (класс Motion). */
+/**
+ * Пружина, ПЕРВОЕ касание цели у которой ≈ visualDuration (класс Motion).
+ *
+ * Граница гарантии: если решённая ω0 ниже пола движка (MIN_OMEGA0 — длинные
+ * visualDuration при малом ζ), она клампится ВВЕРХ → пружина быстрее
+ * запрошенной и первое касание наступает РАНЬШЕ visualDuration (деградация
+ * в предсказуемую сторону, до −25% на краю публичного домена). Точное
+ * равенство гарантируется только вне зоны клампа; инвариант «t1 совпадает
+ * с аналитическим решением для ФИНАЛЬНЫХ параметров» держится всегда.
+ */
 export function fromVisualDuration(options: FromVisualDurationOptions): SpringParams {
   checkPositive(options.visualDuration, 'fromVisualDuration', 'visualDuration');
   checkBounce(options.bounce, 'fromVisualDuration');
