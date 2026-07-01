@@ -21,6 +21,7 @@
  */
 
 import { createDecay } from '../decay.js';
+import { trimSlidingWindow } from '../internal/sliding-window.js';
 import type { RequestFrameFn } from '../motion-value.js';
 
 // ─── Общие типы и утилиты ────────────────────────────────────────────────────
@@ -81,11 +82,7 @@ export function createVelocityTracker(windowSec?: number): VelocityTracker {
     push(p: GesturePoint): void {
       const s = { x: finite(p.x), y: finite(p.y), t: finite(p.t) };
       samples.push(s);
-      // Обрезаем всё старше окна относительно новейшего сэмпла.
-      const cutoff = s.t - win;
-      let firstKept = 0;
-      while (firstKept < samples.length - 1 && samples[firstKept].t < cutoff) firstKept++;
-      if (firstKept > 0) samples = samples.slice(firstKept);
+      samples = trimSlidingWindow(samples, win);
     },
     velocity(): { vx: number; vy: number } {
       if (samples.length < 2) return { vx: 0, vy: 0 };
