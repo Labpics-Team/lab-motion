@@ -422,11 +422,16 @@ function samplePath(cubics: readonly Cubic[]): SampledPath {
   let py: number | undefined;
 
   for (const c of cubics) {
-    for (let k = px === undefined ? 0 : 1; k <= SAMPLES_PER_CUBIC; k++) {
+    // Разрыв (новый субпуть после M): предыдущий конец ≠ старт кубика.
+    // Скачок БЕЗ длины: точка старта пушится с той же кумулятивной длиной —
+    // фантомного сегмента нет, а нулевой отрезок не ловится бинарным
+    // поиском изнутри (segLen=0 → интерполяция не «проезжает» разрыв).
+    const jump = px !== undefined && (finite(c.x0) !== px || finite(c.y0) !== py);
+    for (let k = px === undefined || jump ? 0 : 1; k <= SAMPLES_PER_CUBIC; k++) {
       const { x, y } = cubicPoint(c, k / SAMPLES_PER_CUBIC);
       const fx = finite(x);
       const fy = finite(y);
-      if (px !== undefined) {
+      if (px !== undefined && !(jump && k === 0)) {
         const dx = fx - (px as number);
         const dy = fy - (py as number);
         total = finite(total + Math.sqrt(dx * dx + dy * dy));

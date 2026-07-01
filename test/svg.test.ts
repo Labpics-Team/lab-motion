@@ -83,6 +83,16 @@ describe('svg/length', () => {
     expect(Math.abs(L - Math.PI * 50) / (Math.PI * 50)).toBeLessThan(0.01);
   });
 
+  // Класс: мультисубпуть — второй M это ПЕРЕМЕЩЕНИЕ, не сегмент.
+  it('два субпутя: длина = сумма субпутей БЕЗ фантомного перехода', () => {
+    expect(pathLength('M0 0L10 0M100 100L110 100')).toBeCloseTo(20, 3);
+  });
+
+  it('Z затем новый M: тоже без фантома', () => {
+    // Квадрат 10×10 (периметр 40) + отрезок длиной 5 в другом месте.
+    expect(pathLength('M0 0H10V10H0ZM100 100L103 104')).toBeCloseTo(45, 3);
+  });
+
   it('квадратичная Q: эндпоинты точны, длина ≥ хорды', () => {
     const L = pathLength('M0 0Q50 100 100 0');
     expect(L).toBeGreaterThan(100); // длиннее хорды
@@ -162,6 +172,18 @@ describe('svg/motion-path: точка и угол вдоль пути', () => {
 
   it('length — полная длина пути', () => {
     expect(createMotionPath('M0 0 L3 4').length).toBeCloseTo(5, 4);
+  });
+
+  it('мультисубпуть: at() НЕ интерполирует через разрыв (скачок, не проезд)', () => {
+    const mp = createMotionPath('M0 0L10 0M100 100L110 100');
+    // t=0.5 — ровно граница субпутей (длина 20, разрыв на 10).
+    // Чуть до границы — конец первого субпутя, чуть после — начало второго.
+    const before = mp.at(0.49);
+    const after = mp.at(0.51);
+    expect(before.y).toBeCloseTo(0, 3);
+    expect(before.x).toBeLessThanOrEqual(10.001);
+    expect(after.y).toBeCloseTo(100, 3);
+    expect(after.x).toBeGreaterThanOrEqual(99.999);
   });
 
   it('fuzz: случайные валидные кубики → at(t) всегда конечен', () => {
