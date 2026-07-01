@@ -4,8 +4,13 @@
  *
  * ── RED PROOF ────────────────────────────────────────────────────────────────
  * Написаны до реализации — на стабе падают поведенческие блоки.
- * Mutation-proof: убрать generation-инвалидацию done → тест «stale done
- * после прерывания» RED; убрать reduced-ветку → «reduce: мгновенно» RED.
+ * Mutation-proof (точно по несущему гарду):
+ *   - одиночное прерывание ловит со-гард `state !== expect` (тесты
+ *     «прерывания»);
+ *   - generation несёт ДВОЙНОЕ прерывание (enter→exit→enter: state снова
+ *     'entering', гард по state молчит) — убрать `gen !== generation` →
+ *     тест «двойное прерывание» RED;
+ *   - убрать reduced-ветку → «reduce: мгновенно» RED.
  */
 
 import { describe, expect, it } from 'vitest';
@@ -108,6 +113,22 @@ describe('presence: прерывания (interruption)', () => {
     expect(log).toEqual(['exitStart', 'enterStart', 'present']);
   });
 
+  it('ДВОЙНОЕ прерывание: enter→exit→enter, stale done ПЕРВОГО входа инертен (несёт generation)', () => {
+    // state снова 'entering' — гард по state молчит, ловит ТОЛЬКО generation.
+    const { p, log, dones } = rig();
+    p.enter(); // done#0
+    p.exit(); // done#1
+    p.enter(); // done#2
+    expect(p.state).toBe('entering');
+    dones[0](); // stale done первого входа — НЕ должен дать present
+    expect(p.state).toBe('entering');
+    dones[1](); // stale done выхода — тоже инертен
+    expect(p.state).toBe('entering');
+    dones[2](); // живой done
+    expect(p.state).toBe('present');
+    expect(log.filter((e) => e === 'present')).toEqual(['present']);
+  });
+
   it('онGone не вызывается, если exit был прерван (нет ложного размонтирования)', () => {
     const { p, log, dones } = rig({ initiallyPresent: true });
     p.exit();
@@ -138,26 +159,37 @@ describe('presence: prefers-reduced-motion (CHARACTER-switch)', () => {
 // ─── Property: случайные последовательности не ломают машину ─────────────────
 
 describe('presence: property — валидность при любых последовательностях', () => {
-  it('2000 случайных операций: состояние всегда валидно, gone ≤ 1 на exit-фазу', () => {
+  it('2000 случайных операций: машину двигает ТОЛЬКО живой done (stale всегда инертен)', () => {
     let s = 20260702;
     const rnd = () => {
       s = (Math.imul(48271, s) + 0) & 0x7fffffff;
       return s / 0x7fffffff;
     };
     const valid = ['gone', 'entering', 'present', 'exiting'];
-    const dones: Array<() => void> = [];
+    // Каждому done присваиваем номер фазы; живой = выданный ПОСЛЕДНЕЙ фазой.
+    let phase = 0;
+    const dones: Array<{ phase: number; fn: () => void; used: boolean }> = [];
     const p = createPresence({
-      onEnterStart: (d) => dones.push(d),
-      onExitStart: (d) => dones.push(d),
+      onEnterStart: (d) => dones.push({ phase: ++phase, fn: d, used: false }),
+      onExitStart: (d) => dones.push({ phase: ++phase, fn: d, used: false }),
     });
     for (let i = 0; i < 2000; i++) {
       const op = rnd();
-      if (op < 0.35) p.enter();
-      else if (op < 0.7) p.exit();
-      else if (dones.length > 0) {
-        // случайный (возможно stale) done
-        const idx = Math.floor(rnd() * dones.length);
-        dones[idx]();
+      const before = p.state;
+      if (op < 0.35) {
+        p.enter();
+        // enter() из gone/exiting открывает новую фазу — done прежних фаз stale.
+      } else if (op < 0.7) {
+        p.exit();
+      } else if (dones.length > 0) {
+        const d = dones[Math.floor(rnd() * dones.length)];
+        d.fn();
+        const live = d.phase === phase && !d.used;
+        if (live) d.used = true;
+        else {
+          // ИНВАРИАНТ: stale/повторный done НЕ двигает машину.
+          expect(p.state).toBe(before);
+        }
       }
       expect(valid).toContain(p.state);
     }
