@@ -1,57 +1,147 @@
 # @labpics/motion
 
-Движок пружинной физики и переходов без runtime-зависимостей. Часть дизайн-системы Labpics.
+Headless-движок анимаций без runtime-зависимостей. Часть дизайн-системы Labpics.
+
+Ядро — чистая математика (пружины, кадры, тайминги): ноль DOM, детерминизм
+через инжектируемое виртуальное время, SSR-безопасность, гарантия конечности
+(NaN/Infinity никогда не попадают в CSS), `prefers-reduced-motion` меняет
+ХАРАКТЕР анимации, а не выключает её грубо. Каждая фича — изолированный
+subpath: в бандл попадает только то, что импортировано.
 
 ## Как собрать
 
 ```bash
 pnpm install --frozen-lockfile
 pnpm typecheck
-pnpm build      # → dist/index.js + dist/index.d.ts
+pnpm build      # → dist/*
 pnpm test
+pnpm size       # замер gz всех субпутей
 ```
 
-## Как потреблять
+## Карта субпутей
+
+| Импорт | Что даёт |
+|---|---|
+| `@labpics/motion` | Ядро: `spring` (аналитический солвер), `tween`, `drive` (декларативный запуск), `MotionValue` (реактивное значение со smooth-pickup), `MotionParamError` |
+| `…/easing` | Каталог кривых: named-кривые, `cubicBezier`, `steps`, кастомные функции |
+| `…/value` | CSS-значения: парсинг/интерполяция единиц (px/%/deg/rem/vh), цветов (hex/rgb/hsl), transform-компонент, `var()`, относительных значений |
+| `…/driver` | Scrubbable-контроллер: `play/pause/reverse/seek/timeScale/progress` + thenable |
+| `…/keyframes` | Ключевые кадры: массивы, offsets, per-keyframe easing, repeat/reverse/yoyo |
+| `…/timeline` | Оркестрация: `createTimeline` — сегменты, `seek/progress/totalDuration`, thenable |
+| `…/stagger` | Каскадные задержки: списки и 2D-сетки, from/направления/easing |
+| `…/decay` | Инерция: аналитическое затухание (для drag-momentum и инерционного скролла) |
+| `…/gestures` | Интеракция: `createPress` (tap + клавиатурный путь Enter/Space), `createHover`, `createPan`, `createDrag` (границы + rubber-band + инерция + reduced-motion) |
+| `…/scroll` | Скролл: прогресс страницы/target-с-офсетами (семантика Motion), in-view машина, скорость, scrub-клей к timeline |
+| `…/presence` | Enter/exit lifecycle: «доиграй exit-анимацию → потом убирай из DOM», прерывания, `swapPresence` (wait/sync) |
+| `…/flip` | Layout-анимация FLIP: инверсия first→last, пружинный «доезд», коррекция scale-искажений (`correctRadius`, `counterScale`) |
+| `…/react` | React: `useSpring`, `useMotionValue` |
+| `…/svelte` | Svelte: `springStore` |
+| `…/vue` | Vue: директива `v-motion` |
+| `…/lit` | Lit / web-components: `MotionController` (ReactiveController), `LabMotionSpringElement` |
+
+## Быстрый старт
+
+### Пружина к значению (ядро)
 
 ```typescript
-import { spring, tween, drive, MotionParamError } from '@labpics/motion';
+import { MotionValue } from '@labpics/motion';
+
+const x = new MotionValue({ initial: 0, spring: { mass: 1, stiffness: 200, damping: 20 } });
+x.onChange((v) => { el.style.transform = `translateX(${v}px)`; });
+x.setTarget(240);   // плавно едем; повторный setTarget подхватит скорость без рывка
 ```
 
-### Пружина (spring)
+### Управляемая анимация (scrub)
 
 ```typescript
-import { spring } from '@labpics/motion';
+import { createDriver } from '@labpics/motion/driver';
 
-const result = spring({ mass: 1, stiffness: 100, damping: 10 }, 0.5); // t в секундах
-console.log(result.value);    // позиция
-console.log(result.velocity); // скорость
+const anim = createDriver({ from: 0, to: 1, spring: { mass: 1, stiffness: 200, damping: 24 },
+  onStep: (v) => { el.style.opacity = String(v); } });
+anim.pause();
+anim.seek(0.5);
+await anim; // thenable
 ```
 
-### Анимация элемента (drive)
+### Скролл-прогресс → таймлайн
+
+```typescript
+import { createScrollObserver, scrubBinding } from '@labpics/motion/scroll';
+import { createTimeline } from '@labpics/motion/timeline';
+
+const tl = createTimeline({ segments: [{ from: 0, to: 1, duration: 2 }] });
+const observer = createScrollObserver({ onProgress: scrubBinding(tl) });
+window.addEventListener('scroll', (e) => observer.update({
+  pos: scrollY, contentLength: document.body.scrollHeight,
+  viewportLength: innerHeight, t: e.timeStamp / 1000,
+}));
+```
+
+### Drag с инерцией
+
+```typescript
+import { createDrag } from '@labpics/motion/gestures';
+
+const drag = createDrag({
+  bounds: { x: { min: 0, max: 300 } },
+  matchMedia: window.matchMedia.bind(window),
+  requestFrame: requestAnimationFrame.bind(window),
+  onStep: (x, y) => { el.style.transform = `translate(${x}px, ${y}px)`; },
+});
+el.addEventListener('pointerdown', (e) => {
+  el.setPointerCapture(e.pointerId);
+  drag.pointerDown({ x: e.clientX, y: e.clientY, t: e.timeStamp / 1000 });
+});
+el.addEventListener('pointermove', (e) => drag.pointerMove({ x: e.clientX, y: e.clientY, t: e.timeStamp / 1000 }));
+el.addEventListener('pointerup', (e) => drag.pointerUp({ x: e.clientX, y: e.clientY, t: e.timeStamp / 1000 }));
+```
+
+### FLIP (layout-анимация)
+
+```typescript
+import { createFlip } from '@labpics/motion/flip';
+
+const fl = createFlip({
+  requestFrame: requestAnimationFrame.bind(window),
+  onStep: (t) => { el.style.transform = `translate(${t.tx}px, ${t.ty}px) scale(${t.sx}, ${t.sy})`; },
+  onRest: () => { el.style.transform = ''; },
+});
+const first = el.getBoundingClientRect();
+// ... DOM переставлен (порядок/размер/класс изменился) ...
+fl.play(first, el.getBoundingClientRect()); // элемент «доезжает» пружиной
+```
+
+### Появление/уход (presence)
 
 ```typescript
 import { drive } from '@labpics/motion';
+import { createPresence } from '@labpics/motion/presence';
 
-drive({
-  from: 0,
-  to: 100,
-  spring: { mass: 1, stiffness: 100, damping: 10 },
-  onStep: (value) => {
-    element.style.transform = `translateX(${value}px)`;
+const spring = { mass: 1, stiffness: 200, damping: 24 };
+const p = createPresence({
+  onExitStart: (done) => {
+    drive({ from: 1, to: 0, spring, onStep: (v) => { el.style.opacity = String(v); } }).then(done);
   },
-  matchMedia: window.matchMedia.bind(window), // инъекция для prefers-reduced-motion
+  onGone: () => el.remove(), // убрать из DOM только после exit-анимации
 });
+p.exit();
 ```
 
-### Интерполяция (tween)
+## Инварианты (гарантии потребителю)
 
-```typescript
-import { tween } from '@labpics/motion';
+- **Zero-deps**: `dependencies: {}` — фреймворки только как optional peer.
+- **CSS-safe**: движок никогда не отдаёт `NaN`/`Infinity` — ключевые математические
+  слои (easing, value, driver, keyframes, timeline, stagger, decay, MotionValue)
+  прогоняются fuzz-тестами на 10 000 входов; spring-солвер добивается косвенно
+  через все слои поверх него.
+- **Детерминизм**: время только через инжектируемый `requestFrame` — бит-в-бит воспроизводимые прогоны.
+- **SSR-safe**: импорт любого subpath не трогает `window`/`document`.
+- **A11y**: `prefers-reduced-motion` переключает характер (снап/фейд), не отключает движение грубо.
+- **Запинённый контракт**: публичная поверхность математических субпутей и `lit`
+  зафиксирована api-surface-pin тестами (в обе стороны: пропавший И лишний
+  экспорт — красный тест).
 
-const value = tween({ from: 0, to: 1, duration: 300, easing: 'ease-in-out' }, 150);
-```
-
-### Ошибки
+## Ошибки
 
 ```typescript
 import { MotionParamError } from '@labpics/motion';
@@ -62,35 +152,6 @@ try {
   if (e instanceof MotionParamError) console.error(e.message);
 }
 ```
-
-### Keyframes (`@labpics/motion/keyframes`)
-
-Интерполяция значения через несколько опорных точек (не только from→to), с
-явными или авто-распределёнными долями, per-сегментным easing и повтором
-(loop / reverse-yoyo). Headless — сам не трогает DOM, эмитит через `onStep`.
-
-```typescript
-import { keyframes } from '@labpics/motion/keyframes';
-import { easeOut } from '@labpics/motion/easing';
-
-const controls = keyframes({
-  values: [0, 100, 50, 100],   // опорные точки
-  times: [0, 0.3, 0.6, 1],     // доли [0,1]; необязательно — иначе авто-равномерно
-  duration: 1.2,               // секунды на один цикл
-  easing: easeOut,              // один на все сегменты, либо массив per-segment
-  repeat: 2,                    // 2 доп. повтора (Infinity — бесконечно)
-  repeatType: 'reverse',        // 'loop' | 'reverse' | 'mirror' (yoyo)
-  matchMedia: window.matchMedia.bind(window), // prefers-reduced-motion
-  onStep: (value) => { element.style.transform = `translateX(${value}px)`; },
-});
-
-controls.pause();
-controls.seek(0.5);
-await controls; // резолвится при complete()/cancel()/естественном завершении
-```
-
-При `prefers-reduced-motion: reduce` анимация мгновенно снэпается к
-последнему keyframe (не hard-off) — repeat/direction игнорируются.
 
 ## Лицензия
 
