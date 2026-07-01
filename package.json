@@ -98,6 +98,11 @@
       "types": "./dist/a11y/index.d.ts",
       "import": "./dist/a11y/index.js",
       "require": "./dist/a11y/index.cjs"
+    },
+    "./spring": {
+      "types": "./dist/spring/index.d.ts",
+      "import": "./dist/spring/index.js",
+      "require": "./dist/spring/index.cjs"
     }
   },
   "files": [
