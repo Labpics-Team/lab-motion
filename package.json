@@ -48,6 +48,11 @@
       "types": "./dist/stagger/index.d.ts",
       "import": "./dist/stagger/index.js",
       "require": "./dist/stagger/index.cjs"
+    },
+    "./timeline": {
+      "types": "./dist/timeline/index.d.ts",
+      "import": "./dist/timeline/index.js",
+      "require": "./dist/timeline/index.cjs"
     }
   },
   "files": ["dist"],
