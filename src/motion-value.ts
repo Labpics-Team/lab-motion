@@ -337,6 +337,11 @@ export class MotionValue {
    * mid-flight state. Backs the reduced-motion CHARACTER-switch in framework
    * bindings (e.g. lit/controller.ts) — the value still reaches its target
    * (not hard-off), it just skips the spring frames. A no-op after destroy().
+   *
+   * КОНТРАКТ идемпотентности: snapTo(target) в покое ровно на target —
+   * no-op БЕЗ emit (паритет с setTarget, который в покое на target тоже не
+   * эмитит). Биндингам нельзя опираться на snapTo(sameTarget) как на
+   * форсированный re-render — штатный путь для этого host.requestUpdate().
    */
   snapTo(target: number): void {
     if (this._destroyed) return;
@@ -345,6 +350,10 @@ export class MotionValue {
         `MotionValue.snapTo: target must be a finite number, got ${target}`,
       );
     }
+    // Идемпотентность: уже покоимся ровно в target → нечего менять и незачем
+    // эмитить (лишний requestUpdate у Lit-хоста). Живой ран в тот же target —
+    // НЕ no-op: его надо прервать и снапнуть.
+    if (!this._running && this._value === target && this._target === target) return;
     this._generation++; // invalidate any frame scheduled by the run being replaced
     this._running = false;
     this._startTs = undefined;
@@ -442,6 +451,11 @@ export class MotionValue {
     this._emit(clampedValue);
 
     this._tickActive = false;
+
+    // Re-entrancy: слушатель мог вызвать stop()/snapTo()/destroy() ИЗ emit —
+    // ран уже мёртв, перепланировать его кадр нельзя (иначе в очередь встаёт
+    // гарантированно-инертный callback на каждый такой вызов).
+    if (gen !== this._generation || !this._running || this._destroyed) return;
 
     // Reschedule (same generation — this run is still live).
     if (this._useTimeoutFallback) {
