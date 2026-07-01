@@ -337,6 +337,11 @@ export class MotionValue {
    * mid-flight state. Backs the reduced-motion CHARACTER-switch in framework
    * bindings (e.g. lit/controller.ts) — the value still reaches its target
    * (not hard-off), it just skips the spring frames. A no-op after destroy().
+   *
+   * КОНТРАКТ идемпотентности: snapTo(target) в покое ровно на target —
+   * no-op БЕЗ emit (паритет с setTarget, который в покое на target тоже не
+   * эмитит). Биндингам нельзя опираться на snapTo(sameTarget) как на
+   * форсированный re-render — штатный путь для этого host.requestUpdate().
    */
   snapTo(target: number): void {
     if (this._destroyed) return;
