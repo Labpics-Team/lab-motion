@@ -58,6 +58,11 @@
       "types": "./dist/keyframes/index.d.ts",
       "import": "./dist/keyframes/index.js",
       "require": "./dist/keyframes/index.cjs"
+    },
+    "./decay": {
+      "types": "./dist/decay/index.d.ts",
+      "import": "./dist/decay/index.js",
+      "require": "./dist/decay/index.cjs"
     }
   },
   "files": ["dist"],
