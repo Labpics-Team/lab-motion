@@ -1,23 +1,34 @@
 /**
  * test/driver-reduced-motion.test.ts
- * Class: А (unit — где находится фича)
+ * Классы: А (unit CHARACTER-switch) + differential (reduce vs normal vs hard-off)
+ *         + Д (mutation RED-proof обеих мутаций).
  *
  * Invariant 4 — reduced-motion: CHARACTER-switch.
  *
  * Требование: при prefers-reduced-motion: reduce driver переключает
- * ХАРАКТЕР анимации (мгновенный snap-to-target), а НЕ hard-off
- * (контрол всё равно создаётся, all methods callable, Promise резолвится).
+ * ХАРАКТЕР анимации — РОВНО ОДИН СИНХРОННЫЙ snap-to-target (до rAF/setTimeout),
+ * а НЕ hard-off (steps.length===0) и НЕ нормальная multi-frame (steps.length>=2).
  *
- * ── RED PROOF ────────────────────────────────────────────────────────────────
- * Убрать `if (reduce) { onStep(to); settled; resolve() }` из driver.ts:
- *   → snap-to-target не происходит → `steps[steps.length-1] !== to` → RED.
+ * ── RED PROOF (mutation 1) ─────────────────────────────────────────────────────
+ * Убрать ветку `else if (reduce) { settle(to); }` из driver.ts (нет reduce-snap):
+ *   → нормальный multi-frame путь → scheduleFrame вызывается → steps.length===0
+ *     до await (async, не sync) → тест `steps.length===1` НЕМЕДЛЕННО = RED.
+ *   → steps.length>=2 после await → тест `===1` после await тоже RED.
  *
- * Изменить на hard-off (вообще не вызывать onStep при reduce):
- *   → `steps.length === 0` → RED (CHARACTER-switch требует хотя бы 1 вызова).
+ * ── RED PROOF (mutation 2) ────────────────────────────────────────────────────
+ * Изменить на hard-off (вообще не вызывать onStep при reduce: settle без onStep):
+ *   → steps.length===0 ДО и ПОСЛЕ await → тест `===1` = RED.
  *
- * ── MUTATION PROOF ────────────────────────────────────────────────────────────
- * Swap `onStep(to)` на `onStep(from)`:
- *   → `steps[steps.length-1] === 100` fails → RED.
+ * ── RED PROOF (mutation 3) ────────────────────────────────────────────────────
+ * Swap `onStep(to)` на `onStep(from)` (snap к неверному значению):
+ *   → steps[0]===0 (from) → тест `steps[0]===100` = RED.
+ *
+ * Почему `===1` (не `>=1`) различает reduce от normal:
+ *   reduce path: settle() вызывается СИНХРОННО в теле конструктора →
+ *     steps.length===1 немедленно, requestFrame НЕ вызывается (_settled=true
+ *     не даёт ensureLoop() стартовать).
+ *   normal path: ensureLoop() → scheduleFrame() → setTimeout(tick,0) async →
+ *     steps.length===0 в момент синхронной проверки ДО await.
  */
 
 import { describe, expect, it } from 'vitest';
@@ -56,7 +67,12 @@ const STD_SPRING = { mass: 1, stiffness: 100, damping: 20 };
 // ─── 1. CHARACTER-switch (reduce=true) ────────────────────────────────────────
 
 describe('driver-reduced-motion: CHARACTER-switch (reduce=true)', () => {
-  it('snap-to-target: onStep вызывается минимум 1 раз с финальным to', async () => {
+  /**
+   * Mutation 1 RED: убрать reduce-snap → normal multi-frame → steps.length!==1.
+   * Mutation 2 RED: hard-off → steps.length===0 → ===1 fails.
+   * Mutation 3 RED: onStep(from) → steps[0]===0 → ===100 fails.
+   */
+  it('snap-to-target: onStep вызывается РОВНО 1 раз с финальным to', async () => {
     const steps: number[] = [];
     const c = createDriver({
       from: 0,
@@ -68,9 +84,47 @@ describe('driver-reduced-motion: CHARACTER-switch (reduce=true)', () => {
     });
     await c;
 
-    // CHARACTER-switch: хотя бы один вызов, последний = to.
-    expect(steps.length, 'onStep должен быть вызван хотя бы раз').toBeGreaterThanOrEqual(1);
-    expect(steps[steps.length - 1], 'последний шаг = to').toBe(100);
+    // CHARACTER-switch: ровно один вызов (отличает от нормального multi-frame).
+    expect(steps.length, 'snap: ровно 1 шаг').toBe(1);
+    expect(steps[0], 'snap значение = to').toBe(100);
+  });
+
+  /**
+   * Mutation 1 RED: убрать reduce-snap → scheduleFrame ВЫЗЫВАЕТСЯ (ensureLoop) →
+   *   rafCalled.length>=1 → тест `===0` fails.
+   *   steps.length===0 до await → тест `===1` fails.
+   * Mutation 2 RED: hard-off → steps.length===0 до await → fails.
+   * Mutation 3 RED: onStep(from) → steps[0]===0 → fails.
+   *
+   * Это самый сильный RED-proof: проверяется ДО первого await —
+   * синхронность гарантируется тем, что проверка выполнена до любой
+   * микрозадачи/макрозадачи (setTimeout(tick,0) ещё не сработал).
+   */
+  it('snap-to-target СИНХРОНЕН: steps.length===1 ДО await, rAF не вызывается', async () => {
+    const steps: number[] = [];
+    const rafCalled: number[] = []; // сколько раз requestFrame вызван до await
+    const c = createDriver({
+      from: 0,
+      to: 100,
+      spring: STD_SPRING,
+      matchMedia: makeReduceMedia(),
+      onStep: (v) => steps.push(v),
+      requestFrame: (_cb) => { rafCalled.push(1); return 0; },
+    });
+
+    // ─── Синхронная проверка (ДО любого await/rAF/setTimeout) ───────────────
+    // reduce-snap вызывает settle() синхронно в конструкторе → onStep(to) уже вызван.
+    // Если бы это был normal-path: scheduleFrame вызван, steps пуст, rafCalled.length>=1.
+    expect(steps.length, 'snap до await: ровно 1 шаг').toBe(1);
+    expect(steps[0], 'snap до await: значение = to (100)').toBe(100);
+    expect(rafCalled.length, 'при reduce rAF не вызывается').toBe(0);
+
+    await c;
+
+    // ─── После await: состояние не изменилось ────────────────────────────────
+    expect(steps.length, 'после await: всё ещё ровно 1 шаг').toBe(1);
+    expect(steps[0], 'после await: значение = to').toBe(100);
+    expect(rafCalled.length, 'rAF не вызывался и после await').toBe(0);
   });
 
   it('не является hard-off: контрол всё равно создаётся', async () => {
@@ -207,23 +261,51 @@ describe('driver-reduced-motion: нормальная анимация (reduce=f
   }, 10_000);
 });
 
-// ─── 3. Дифференциальный тест CHARACTER-switch vs. hard-off ──────────────────
+// ─── 3. Дифференциальный тест CHARACTER-switch vs. hard-off vs. normal ────────
 
-describe('driver-reduced-motion: differential CHARACTER-switch vs hard-off', () => {
-  it('reduce: хотя бы 1 onStep (не hard-off) — нет vs. 0 шагов', () => {
-    // Если бы это было hard-off, steps.length === 0.
+describe('driver-reduced-motion: differential CHARACTER-switch vs hard-off vs normal', () => {
+  /**
+   * Доказывает, что reduce-path ОТЛИЧИМ от:
+   *   (a) hard-off:   steps.length===0 (не вызывает onStep)
+   *   (b) normal:     steps.length>=2, rAF вызван, не синхронно
+   *
+   * Все проверки — СИНХРОННЫЕ (до await), это единственное место, где
+   * три режима строго различимы без зависимости от timing.
+   */
+  it('reduce: ровно 1 синхронный snap — не hard-off (0) и не normal (async/>=2)', () => {
     const steps: number[] = [];
-    const c = createDriver({
+    const rafCalled: number[] = [];
+    createDriver({
       from: 0, to: 100,
       spring: STD_SPRING,
       matchMedia: makeReduceMedia(),
       onStep: (v) => steps.push(v),
-      requestFrame: (_cb) => 0,
+      requestFrame: (_cb) => { rafCalled.push(1); return 0; },
     });
-    // Немедленно settle (Promise синхронно resolved через then-микрозадачу).
-    c.cancel(); // даже cancel не добавит шагов если уже settled.
 
-    // CHARACTER-switch: onStep(to) вызван при создании driver.
-    expect(steps.length).toBeGreaterThanOrEqual(1);
+    // CHARACTER-switch: ровно 1 шаг, синхронно, rAF не вызван.
+    // Mutation 1 (нет reduce-snap): steps===0, rafCalled===1 → оба ассерта RED.
+    // Mutation 2 (hard-off):        steps===0 → RED.
+    // Mutation 3 (onStep(from)):     steps[0]===0 → RED.
+    expect(steps.length, 'reduce: ровно 1 шаг (не 0, не >=2)').toBe(1);
+    expect(steps[0], 'reduce snap: значение === to').toBe(100);
+    expect(rafCalled.length, 'reduce: rAF не вызывается (синхронный snap)').toBe(0);
+  });
+
+  it('normal (no-preference): rAF вызывается, steps пуст ДО первого tick', () => {
+    const steps: number[] = [];
+    const rafCalled: number[] = [];
+    createDriver({
+      from: 0, to: 100,
+      spring: STD_SPRING,
+      matchMedia: makeNoReduceMedia(),
+      onStep: (v) => steps.push(v),
+      requestFrame: (_cb) => { rafCalled.push(1); return 0; },
+    });
+
+    // Normal path: ensureLoop() → scheduleFrame вызван ДО любого тика.
+    // В момент синхронной проверки steps пуст (tick ещё не вызван).
+    expect(steps.length, 'normal: 0 шагов до первого tick').toBe(0);
+    expect(rafCalled.length, 'normal: rAF вызван ровно 1 раз для старта цикла').toBe(1);
   });
 });
