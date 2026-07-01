@@ -63,7 +63,9 @@ function checkPositive(v: number, name: string, field: string): void {
 }
 
 function toParams(omega0Raw: number, zetaRaw: number, mass: number): SpringParams {
-  // Честные клампы к полам движка (см. шапку).
+  // Честные клампы к полам движка (см. шапку). Потолок MAX_ZETA текущими
+  // маппингами недостижим (bounce ∈ [−1,1] → ζraw ≤ 2) — он инвариант воронки
+  // для будущих параметризаций, идущих через toParams.
   const omega0 = Math.max(MIN_OMEGA0, omega0Raw);
   const zeta = Math.min(MAX_ZETA, Math.max(MIN_ZETA, zetaRaw));
   const stiffness = mass * omega0 * omega0;
