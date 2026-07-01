@@ -93,6 +93,11 @@
       "types": "./dist/svg/index.d.ts",
       "import": "./dist/svg/index.js",
       "require": "./dist/svg/index.cjs"
+    },
+    "./a11y": {
+      "types": "./dist/a11y/index.d.ts",
+      "import": "./dist/a11y/index.js",
+      "require": "./dist/a11y/index.cjs"
     }
   },
   "files": [
