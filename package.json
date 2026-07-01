@@ -68,6 +68,11 @@
       "types": "./dist/lit/index.d.ts",
       "import": "./dist/lit/index.js",
       "require": "./dist/lit/index.cjs"
+    },
+    "./gestures": {
+      "types": "./dist/gestures/index.d.ts",
+      "import": "./dist/gestures/index.js",
+      "require": "./dist/gestures/index.cjs"
     }
   },
   "files": [
