@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { deriveEntriesFromExports, isFullBundleReady, measureEntries, PLANNED_PLUGIN_SUBPATHS } from '../scripts/size-gate.mjs';
+import { CORE_GATE_BYTES, deriveEntriesFromExports, getMissingPlannedSubpaths, isFullBundleReady, measureEntries, PLANNED_PLUGIN_SUBPATHS } from '../scripts/size-gate.mjs';
 import { readFileSync } from 'node:fs';
 import { resolve, dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -62,8 +62,25 @@ describe('size-gate: auto-derive subpath entries from package.json exports', () 
 
     const entries = deriveEntriesFromExports(pkg);
 
-    expect(entries.find(e => e.key === '.')?.gate).toBe(2048);
+    expect(entries.find(e => e.key === '.')?.gate).toBe(CORE_GATE_BYTES);
     expect(entries.find(e => e.key === './react')?.gate).toBeNull();
+  });
+
+  it('resolves a NESTED conditional-exports value (e.g. { import: { types, default } }) instead of throwing', () => {
+    // Реальный package.json bundler-инструментов часто вкладывает условия
+    // ("import"/"require" → {types, default}) — плоский `value.import` тут
+    // был бы объектом, а не строкой, и .replace() уронил бы скрипт.
+    const pkg = {
+      exports: {
+        '.': { import: { types: './dist/index.d.ts', default: './dist/index.js' } },
+        './no-string-leaf': { import: { types: './dist/x.d.ts' } }, // нет default/строки → должен быть отфильтрован, не бросать
+      },
+    };
+
+    const entries = deriveEntriesFromExports(pkg);
+
+    expect(entries).toHaveLength(1);
+    expect(entries[0].importPath).toBe('dist/index.js');
   });
 
   it('throws a clear error when package.json has no "exports" field (fails loud, not silent-empty)', () => {
@@ -81,6 +98,12 @@ describe('size-gate: auto-derive subpath entries from package.json exports', () 
       ]),
     };
     expect(isFullBundleReady(full)).toBe(true);
+  });
+
+  it('isFullBundleReady and getMissingPlannedSubpaths stay consistent (single source of truth, no drift)', () => {
+    const partial = { exports: { '.': { import: './dist/index.js' }, './timeline': { import: './dist/timeline/index.js' } } };
+    expect(isFullBundleReady(partial)).toBe(getMissingPlannedSubpaths(partial).length === 0);
+    expect(getMissingPlannedSubpaths(partial)).toEqual(['./stagger', './svg', './layout']);
   });
 
   it('measureEntries flags MISSING for a dist file that does not exist, without throwing', () => {

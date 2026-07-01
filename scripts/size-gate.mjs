@@ -30,10 +30,27 @@ export const CORE_GATE_BYTES = 2048;
 export const PLANNED_PLUGIN_SUBPATHS = ['./timeline', './stagger', './svg', './layout'];
 
 /**
+ * Рекурсивно достаёт СТРОКОВЫЙ путь из conditional-exports значения.
+ * package.json "exports" допускает произвольную вложенность условий
+ * (например `{ import: { types, default } }`), поэтому просто `value.import`
+ * не гарантированно строка — нужно спускаться, пока не найдётся строка.
+ * Возвращает null, если строкового пути нет (вместо падения с TypeError).
+ */
+function resolveImportString(value) {
+  if (typeof value === 'string') return value;
+  if (value && typeof value === 'object') {
+    const nested = value.import ?? value.default;
+    if (nested !== undefined) return resolveImportString(nested);
+  }
+  return null;
+}
+
+/**
  * Выводит список { key, label, importPath, gate } из package.json → exports.
- * Работает с любой формой exports-значения: строка ИЛИ conditional-объект
- * с полем "import". Чистая функция — без чтения диска и без побочных эффектов,
- * что делает её напрямую юнит-тестируемой без сборки dist/.
+ * Работает с любой формой exports-значения: строка, conditional-объект с
+ * полем "import"/"default", включая произвольно вложенные условия. Чистая
+ * функция — без чтения диска и без побочных эффектов, что делает её
+ * напрямую юнит-тестируемой без сборки dist/.
  */
 export function deriveEntriesFromExports(pkg) {
   const exportsField = pkg.exports;
@@ -43,7 +60,7 @@ export function deriveEntriesFromExports(pkg) {
 
   return Object.entries(exportsField)
     .map(([key, value]) => {
-      const importPath = typeof value === 'string' ? value : value?.import;
+      const importPath = resolveImportString(value);
       if (!importPath) return null;
       const label = key === '.' ? 'core (index)' : key.replace(/^\.\//, '');
       return {
@@ -56,11 +73,17 @@ export function deriveEntriesFromExports(pkg) {
     .filter(Boolean);
 }
 
+/** Ключи exports из PLANNED_PLUGIN_SUBPATHS, которых ещё нет в package.json. */
+export function getMissingPlannedSubpaths(pkg) {
+  const exportsField = pkg.exports ?? {};
+  return PLANNED_PLUGIN_SUBPATHS.filter(
+    subpath => !Object.prototype.hasOwnProperty.call(exportsField, subpath)
+  );
+}
+
 /** true когда ВСЕ запланированные subpath-плагины уже присутствуют в exports. */
 export function isFullBundleReady(pkg) {
-  return PLANNED_PLUGIN_SUBPATHS.every(subpath =>
-    Object.prototype.hasOwnProperty.call(pkg.exports ?? {}, subpath)
-  );
+  return getMissingPlannedSubpaths(pkg).length === 0;
 }
 
 /**
@@ -77,9 +100,13 @@ export function measureEntries(entries, root) {
     try {
       raw = readFileSync(fullPath);
       gz = gzipSync(raw, { level: 9 });
-    } catch {
+    } catch (err) {
       hasWarnings = true;
-      return { label: entry.label, error: `MISSING: ${entry.importPath}` };
+      // Различаем "файла нет" (ожидаемо до сборки/для ещё-не-смерженных
+      // subpath) от прочих ошибок (EACCES и т.п.), которые маскировать
+      // нельзя — это реальный сбой окружения, не отсутствующий dist/.
+      const reason = err?.code === 'ENOENT' ? 'MISSING' : `ERROR(${err?.code ?? err?.message ?? 'unknown'})`;
+      return { label: entry.label, error: `${reason}: ${entry.importPath}` };
     }
 
     totalGzBytes += gz.length;
@@ -163,9 +190,7 @@ core (index) gz = ${(core.gzBytes / 1024).toFixed(2)} KB
   }
 
   if (!fullBundleReady) {
-    const missing = PLANNED_PLUGIN_SUBPATHS.filter(
-      subpath => !Object.prototype.hasOwnProperty.call(pkg.exports, subpath)
-    );
+    const missing = getMissingPlannedSubpaths(pkg);
     console.log(`PLACEHOLDER: full-bundle gate <8.0 KB gz (${missing.join(', ')} ещё не реализованы)
   Активировать когда все subpath-плагины смержены в main.
 `);
