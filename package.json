@@ -73,6 +73,11 @@
       "types": "./dist/gestures/index.d.ts",
       "import": "./dist/gestures/index.js",
       "require": "./dist/gestures/index.cjs"
+    },
+    "./scroll": {
+      "types": "./dist/scroll/index.d.ts",
+      "import": "./dist/scroll/index.js",
+      "require": "./dist/scroll/index.cjs"
     }
   },
   "files": [

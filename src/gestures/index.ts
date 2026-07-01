@@ -81,11 +81,14 @@ export function createVelocityTracker(windowSec?: number): VelocityTracker {
     push(p: GesturePoint): void {
       const s = { x: finite(p.x), y: finite(p.y), t: finite(p.t) };
       samples.push(s);
-      // Обрезаем всё старше окна относительно новейшего сэмпла.
+      // ≥2 сэмплов внутри окна → мерим строго по окну (старый якорь долой);
+      // <2 (события реже окна) → держим последнюю пару, чтобы скорость через
+      // разрыв была честной средней, а не ложным нулём.
       const cutoff = s.t - win;
-      let firstKept = 0;
-      while (firstKept < samples.length - 1 && samples[firstKept].t < cutoff) firstKept++;
-      if (firstKept > 0) samples = samples.slice(firstKept);
+      let k = 0;
+      while (k < samples.length && samples[k].t < cutoff) k++;
+      const from = samples.length - k >= 2 ? k : Math.max(0, samples.length - 2);
+      if (from > 0) samples = samples.slice(from);
     },
     velocity(): { vx: number; vy: number } {
       if (samples.length < 2) return { vx: 0, vy: 0 };

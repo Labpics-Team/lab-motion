@@ -46,6 +46,15 @@ describe('gestures/velocity: линейный поток', () => {
     expect(vt.velocity()).toEqual({ vx: 0, vy: 0 });
   });
 
+  // Класс: разреженные события (реже окна) НЕ схлопываются в один сэмпл —
+  // скорость через разрыв = честная средняя, а не ложный 0.
+  it('сэмплы реже окна → скорость по разрыву, не 0', () => {
+    const vt = createVelocityTracker(0.1);
+    vt.push({ x: 0, y: 0, t: 0 });
+    vt.push({ x: 750, y: 0, t: 0.5 }); // разрыв 0.5s > окна 0.1s
+    expect(vt.velocity().vx).toBeCloseTo(1500, 0);
+  });
+
   it('reset() → нулевая скорость', () => {
     const vt = createVelocityTracker();
     vt.push({ x: 0, y: 0, t: 0 });
