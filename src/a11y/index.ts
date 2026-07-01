@@ -48,16 +48,26 @@ export interface MotionConfig {
   /** Подписка на смену ЭФФЕКТИВНОГО значения; возвращает отписку. */
   onChange(cb: (reduced: boolean) => void): () => void;
   /**
-   * Синтезированный matchMedia: reduce-запросы отражают ПОЛИТИКУ, прочие
-   * прозрачно идут в системный шов (A2). Передавайте в любой API движка.
+   * Синтезированный matchMedia: ВСЁ семейство prefers-reduced-motion
+   * (reduce / no-preference / голая форма) отражает ПОЛИТИКУ согласованно,
+   * прочие запросы прозрачно идут в системный шов (A2). Возвращаемый
+   * MQL для reduce-семейства — СНИМОК на момент вызова (не реактивен);
+   * для реактивности используйте onChange(). Передавайте в любой API движка.
    */
   matchMedia(query: string): MediaQueryList;
+  /**
+   * Отпустить системного слушателя и всех подписчиков. Обязателен для
+   * короткоживущих конфигов — иначе системный MediaQueryList удерживает
+   * слушателя навсегда (утечка).
+   */
+  destroy(): void;
   readonly mode: ReducedMotionMode;
 }
 
 // ─── Внутреннее ──────────────────────────────────────────────────────────────
 
-const REDUCE_QUERY_RE = /prefers-reduced-motion\s*:\s*reduce/;
+const RM_FAMILY_RE = /prefers-reduced-motion/;
+const RM_NO_PREF_RE = /prefers-reduced-motion\s*:\s*no-preference/;
 
 function systemPrefersReduced(mm: ((q: string) => MediaQueryList) | undefined): boolean {
   if (typeof mm !== 'function') return false;
@@ -106,13 +116,21 @@ export function createMotionConfig(options?: MotionConfigOptions): MotionConfig 
   };
 
   // Слушаем системное предпочтение (актуально только в режиме 'system').
+  let releaseSystem: (() => void) | undefined;
   if (typeof systemMM === 'function') {
     try {
       const mql = systemMM('(prefers-reduced-motion: reduce)');
       const handler = (): void => notifyIfChanged();
-      if (typeof mql.addEventListener === 'function') mql.addEventListener('change', handler);
-      else if (typeof (mql as { addListener?: (cb: () => void) => void }).addListener === 'function') {
-        (mql as unknown as { addListener: (cb: () => void) => void }).addListener(handler);
+      if (typeof mql.addEventListener === 'function') {
+        mql.addEventListener('change', handler);
+        releaseSystem = () => mql.removeEventListener('change', handler);
+      } else if (typeof (mql as { addListener?: (cb: () => void) => void }).addListener === 'function') {
+        const legacy = mql as unknown as {
+          addListener: (cb: () => void) => void;
+          removeListener?: (cb: () => void) => void;
+        };
+        legacy.addListener(handler);
+        releaseSystem = () => legacy.removeListener?.(handler);
       }
     } catch {
       // Системный шов без подписки — политика остаётся опрашиваемой.
@@ -135,7 +153,11 @@ export function createMotionConfig(options?: MotionConfigOptions): MotionConfig 
       };
     },
     matchMedia(query: string): MediaQueryList {
-      if (REDUCE_QUERY_RE.test(query)) return staticMql(query, effective());
+      // Всё семейство prefers-reduced-motion — из политики, согласованно:
+      // reduce и голая форма → effective(), no-preference → !effective().
+      if (RM_FAMILY_RE.test(query)) {
+        return staticMql(query, RM_NO_PREF_RE.test(query) ? !effective() : effective());
+      }
       if (typeof systemMM === 'function') {
         try {
           return systemMM(query);
@@ -144,6 +166,11 @@ export function createMotionConfig(options?: MotionConfigOptions): MotionConfig 
         }
       }
       return staticMql(query, false);
+    },
+    destroy(): void {
+      releaseSystem?.();
+      releaseSystem = undefined;
+      listeners.clear();
     },
     get mode(): ReducedMotionMode {
       return mode;
