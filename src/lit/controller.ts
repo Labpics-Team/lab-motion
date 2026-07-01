@@ -137,10 +137,16 @@ export class MotionController implements ReactiveController {
     });
   }
 
-  /** Lit lifecycle: отписаться и остановить пружину при отключении host. */
+  /**
+   * Lit lifecycle: отписаться и остановить пружину при отключении host.
+   *
+   * `stop()`, НЕ `destroy()` — hostDisconnected не терминален в Lit (host
+   * может вернуться: keyed-список, ре-рендер родителя). `destroy()` взводит
+   * `_destroyed` навсегда → setTarget() после reconnect был бы no-op.
+   */
   hostDisconnected(): void {
     this._unsub?.();
     this._unsub = undefined;
-    this._mv.destroy();
+    this._mv.stop();
   }
 }

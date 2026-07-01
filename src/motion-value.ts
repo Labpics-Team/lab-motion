@@ -303,6 +303,19 @@ export class MotionValue {
     this._listeners.clear();
   }
 
+  /**
+   * Halt the running frame loop without destroying the instance: no further
+   * ticks fire, but `_destroyed` stays false and listeners are kept — unlike
+   * destroy(), a later setTarget() resumes animating normally. For consumers
+   * whose host can disconnect and reconnect (e.g. Lit hostDisconnected/
+   * hostConnected) without permanently killing the value.
+   */
+  stop(): void {
+    this._running = false;
+    this._startTs = undefined;
+    this._elapsed = 0;
+  }
+
   // ── Private: animation loop ──────────────────────────────────────────────
 
   private _scheduleFirstFrame(): void {

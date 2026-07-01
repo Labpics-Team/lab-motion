@@ -213,6 +213,89 @@ describe('MotionValue destroy', () => {
   });
 });
 
+// ─── Suite A: stop (s18 — Lit reconnect fix) ─────────────────────────────────
+//
+// stop() is the non-terminal counterpart to destroy(): it halts the running
+// frame loop (same observable effect as destroy() — no further ticks fire)
+// but leaves the instance alive — setTarget() afterwards resumes animating,
+// and onChange listeners are NOT cleared. destroy() remains the only terminal
+// operation.
+
+describe('MotionValue stop', () => {
+  it('halts the frame loop: no further onChange emissions after stop()', () => {
+    const clock = makeVirtualClock();
+    const mv = new MotionValue({ initial: 0, spring: STD_SPRING, requestFrame: clock.requestFrame });
+    const received: number[] = [];
+    mv.onChange((v) => received.push(v));
+    mv.setTarget(100);
+    clock.drain(5);
+    const countAtStop = received.length;
+
+    mv.stop();
+    // Injected virtual-time seam: drain any frame that may already have been
+    // scheduled before stop() — it must be a guarded no-op, and no further
+    // frame may be scheduled afterwards (the queue must stay empty).
+    clock.drainAll();
+
+    expect(received.length).toBe(countAtStop);
+    expect(mv.value).not.toBe(100); // did not snap/converge — merely paused mid-flight
+  });
+
+  it('setTarget() after stop() resumes animating to the new target (non-terminal)', () => {
+    const clock = makeVirtualClock();
+    const mv = new MotionValue({ initial: 0, spring: STD_SPRING, requestFrame: clock.requestFrame });
+    mv.onChange(() => {});
+    mv.setTarget(100);
+    clock.drain(5);
+
+    mv.stop();
+    clock.drainAll(); // pending frame (if any) is a guarded no-op
+
+    mv.setTarget(50);
+    clock.drainAll();
+
+    expect(mv.value).toBeCloseTo(50, 5);
+  });
+
+  it('onChange listeners survive stop() (not cleared, unlike destroy())', () => {
+    const clock = makeVirtualClock();
+    const mv = new MotionValue({ initial: 0, spring: STD_SPRING, requestFrame: clock.requestFrame });
+    const received: number[] = [];
+    mv.onChange((v) => received.push(v));
+    mv.setTarget(100);
+    clock.drain(3);
+
+    mv.stop();
+    clock.drainAll();
+
+    const countAfterStop = received.length;
+    mv.setTarget(10);
+    clock.drainAll();
+
+    // The pre-existing listener keeps receiving emissions post-stop+resume.
+    expect(received.length).toBeGreaterThan(countAfterStop);
+  });
+
+  it('destroy() remains terminal even after a prior stop() (setTarget stays a no-op)', () => {
+    const clock = makeVirtualClock();
+    const mv = new MotionValue({ initial: 0, spring: STD_SPRING, requestFrame: clock.requestFrame });
+    mv.setTarget(100);
+    clock.drain(3);
+    mv.stop();
+    mv.destroy();
+
+    expect(() => mv.setTarget(50)).not.toThrow();
+    clock.drainAll();
+    expect(mv.value).not.toBeCloseTo(50, 0);
+  });
+
+  it('stop() on an idle (never-started) instance is a safe no-op', () => {
+    const mv = new MotionValue({ initial: 0, spring: STD_SPRING });
+    expect(() => mv.stop()).not.toThrow();
+    expect(mv.value).toBe(0);
+  });
+});
+
 // ─── Suite A: Animation correctness ──────────────────────────────────────────
 
 describe('MotionValue animation correctness', () => {
