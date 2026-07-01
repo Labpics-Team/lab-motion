@@ -51,7 +51,8 @@
     "build": "tsup",
     "typecheck": "tsc --noEmit",
     "test": "vitest run",
-    "test:watch": "vitest"
+    "test:watch": "vitest",
+    "size": "node scripts/size-gate.mjs"
   },
   "peerDependencies": {
     "react": ">=18.0.0",
