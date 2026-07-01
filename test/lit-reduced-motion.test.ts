@@ -33,15 +33,19 @@ function makeVirtualClock() {
     queue.push(cb);
     return queue.length; // ненулевой handle → без setTimeout-fallback
   };
-  const drainAll = (max = 3000): void => {
-    let i = 0;
-    while (queue.length > 0 && i++ < max) {
-      const cb = queue.shift()!;
+  const drain = (n = 1): void => {
+    for (let i = 0; i < n; i++) {
+      const cb = queue.shift();
+      if (!cb) break;
       clock += 1000 / 60;
       cb(clock);
     }
   };
-  return { requestFrame, drainAll };
+  const drainAll = (max = 3000): void => {
+    let i = 0;
+    while (queue.length > 0 && i++ < max) drain(1);
+  };
+  return { requestFrame, drain, drainAll };
 }
 
 function makeReduceMedia(): (query: string) => MediaQueryList {
@@ -70,6 +74,28 @@ function makeNoReduceMedia(): (query: string) => MediaQueryList {
       removeEventListener: () => {},
       dispatchEvent: () => false,
     }) as MediaQueryList;
+}
+
+/** matchMedia whose `.matches` can be flipped mid-test (simulates the OS
+ * preference toggling, or a component that re-derives it, while a spring is
+ * already mid-flight). */
+function makeToggleableMedia(): {
+  fn: (query: string) => MediaQueryList;
+  setReduce: (v: boolean) => void;
+} {
+  let reduce = false;
+  const fn = (): MediaQueryList =>
+    ({
+      matches: reduce,
+      media: '',
+      onchange: null,
+      addListener: () => {},
+      removeListener: () => {},
+      addEventListener: () => {},
+      removeEventListener: () => {},
+      dispatchEvent: () => false,
+    }) as MediaQueryList;
+  return { fn, setReduce: (v: boolean) => { reduce = v; } };
 }
 
 function makeFakeHost() {
@@ -205,6 +231,50 @@ describe('MotionController: differential reduce vs normal (синхронная 
 
     expect(reduceHost.getCalls() - reduceBefore, 'reduce: +1 синхронно').toBe(1);
     expect(normalHost.getCalls() - normalBefore, 'normal: +0 синхронно').toBe(0);
+  });
+});
+
+describe('MotionController: reduce включается СРЕДИ полёта пружины (stale-frame race)', () => {
+  /**
+   * ── RED PROOF ──────────────────────────────────────────────────────────
+   * Убрать `this._mv.snapTo(target)` из reduce-ветки setTarget() и вернуть
+   * `this._value = target; this._host.requestUpdate();` (старое поведение,
+   * не трогающее this._mv) → this._mv остаётся running с прежним target=100
+   * mid-flight и уже запланированным кадром → clock.drainAll() дренирует
+   * этот застрявший кадр → onChange эмитит интерполированное (не 50)
+   * значение → controller.value перезаписывается обратно на пружинное
+   * значение → assertion `toBe(50)` после drainAll падает.
+   */
+  it('снэп к reduced-target не переписывается зависшим кадром пружины, начатой ДО reduce', () => {
+    const clock = makeVirtualClock();
+    const { host } = makeFakeHost();
+    const media = makeToggleableMedia();
+    const controller = new MotionController(host, 0, {
+      spring: STD_SPRING,
+      requestFrame: clock.requestFrame,
+      matchMedia: media.fn,
+    });
+    controller.hostConnected();
+
+    // Normal path: spring starts toward 100, mid-flight (not converged).
+    controller.setTarget(100);
+    clock.drain(1);
+    expect(controller.value, 'нормальная пружина ещё не сошлась').not.toBe(100);
+
+    // OS preference flips ON while the spring above is still in flight —
+    // its frame loop already has a pending frame scheduled.
+    media.setReduce(true);
+    controller.setTarget(50);
+
+    expect(controller.value, 'reduce: синхронный снэп к новому target').toBe(50);
+
+    // Drain whatever the mid-flight spring run had queued.
+    clock.drainAll();
+
+    expect(
+      controller.value,
+      'снэп survives: зависший кадр СТАРОЙ пружины не имеет права переписать value',
+    ).toBe(50);
   });
 });
 

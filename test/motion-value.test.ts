@@ -70,7 +70,7 @@ function makeVirtualClock(dtMs = 1000 / 60) {
     while (queue.length > 0 && i++ < max) drain(1);
   };
 
-  return { requestFrame, drain, drainAll, getTime: () => clock };
+  return { requestFrame, drain, drainAll, getTime: () => clock, queueLength: () => queue.length };
 }
 
 // ─── Suite A: Constructor validation ────────────────────────────────────────
@@ -293,6 +293,41 @@ describe('MotionValue stop', () => {
     const mv = new MotionValue({ initial: 0, spring: STD_SPRING });
     expect(() => mv.stop()).not.toThrow();
     expect(mv.value).toBe(0);
+  });
+
+  // ── RED PROOF (stale-frame double-tick race) ───────────────────────────────
+  // The requestFrame seam (RequestFrameFn) has no cancel handle, so a frame
+  // scheduled BEFORE stop() cannot be pulled back out of the queue — it is
+  // still sitting there when a subsequent setTarget() schedules a second,
+  // fresh frame. Without a generation guard, that stale frame is
+  // indistinguishable from a live one: when it fires, `_running` is already
+  // true again (from the resuming setTarget()), so it proceeds as a REAL
+  // tick — emits AND reschedules itself — permanently doubling the tick rate
+  // (2 emissions/frame, queue length pinned at 2 forever instead of 1).
+  // Revert the `gen !== this._generation` guard in MotionValue._tick() (or
+  // stop `stop()`/`_scheduleFirstFrame()` from threading `gen` through) to
+  // reproduce: both assertions below fail (2 emissions, queue length 2).
+  it('setTarget() right after stop() (stale pending frame still queued) does not double-tick', () => {
+    const clock = makeVirtualClock();
+    const mv = new MotionValue({ initial: 0, spring: STD_SPRING, requestFrame: clock.requestFrame });
+    let emitCount = 0;
+    mv.onChange(() => {
+      emitCount++;
+    });
+    mv.setTarget(100);
+    clock.drain(3); // 3 real ticks fire; each reschedules → 1 frame left pending (the 4th)
+    emitCount = 0; // reset: only care about what happens from here on
+
+    mv.stop(); // does NOT (cannot) cancel the already-queued 4th frame
+    mv.setTarget(50); // resumes: schedules a fresh frame → queue now holds [stale, fresh]
+
+    clock.drain(2); // drain exactly those two queued callbacks
+
+    // A correct implementation treats the stale (pre-stop) frame as inert:
+    // exactly one real tick (the fresh one) fires, and exactly one frame
+    // remains queued afterwards (steady-state single loop).
+    expect(emitCount).toBe(1);
+    expect(clock.queueLength()).toBe(1);
   });
 });
 

@@ -30,7 +30,17 @@ import { type RequestFrameFn } from '../motion-value.js';
 /** Тег custom element'а. */
 export const LAB_MOTION_SPRING_TAG = 'lab-motion-spring';
 
-const DEFAULT_SPRING: SpringParams = { mass: 1, stiffness: 200, damping: 20 };
+/**
+ * Pure template substitution — extracted from `_applyStyle()` so the
+ * placeholder logic is unit-testable without a DOM (LitElement requires one;
+ * this function does not). Replaces EVERY `{v}` occurrence, not just the
+ * first — composite templates like `'translate({v}px, {v}px)'` repeat the
+ * placeholder, and a single `.replace()` would leave the second one literal
+ * in the emitted CSS value.
+ */
+export function renderTemplateValue(template: string, value: number): string {
+  return template.includes('{v}') ? template.replaceAll('{v}', String(value)) : String(value);
+}
 
 /**
  * `<lab-motion-spring>` — фреймворк-независимая обёртка над MotionController.
@@ -57,8 +67,13 @@ export class LabMotionSpringElement extends LitElement {
   declare property: string;
   declare template: string;
 
-  /** JS-only: параметры пружины. Применяются один раз при первом connectedCallback. */
-  spring: SpringParams = DEFAULT_SPRING;
+  /**
+   * JS-only: параметры пружины. Применяются один раз при первом connectedCallback.
+   * undefined ⇒ MotionController применяет свой собственный DEFAULT_SPRING —
+   * единственный источник дефолта (не дублируем константу здесь, иначе два
+   * значения могут разъехаться при тюнинге одного без другого).
+   */
+  spring: SpringParams | undefined;
   /** JS-only: инъектируемый rAF-seam. */
   requestFrame: RequestFrameFn | undefined;
   /** JS-only: инъектируемый matchMedia-seam (SSR/тесты). */
@@ -110,10 +125,7 @@ export class LabMotionSpringElement extends LitElement {
    */
   private _applyStyle(): void {
     if (!this._motion) return;
-    const v = this._motion.value;
-    const cssValue = this.template.includes('{v}')
-      ? this.template.replace('{v}', String(v))
-      : String(v);
+    const cssValue = renderTemplateValue(this.template, this._motion.value);
     // Прямой bracket-доступ к CSSStyleDeclaration — тот же паттерн, что и в
     // vue-биндинге (_applyValue): работает с camelCase и составными именами.
     (this.style as unknown as Record<string, string>)[this.property] = cssValue;

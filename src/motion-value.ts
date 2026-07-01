@@ -197,6 +197,19 @@ export class MotionValue {
   private static readonly MAX_FRAMES = 2000;
   /** Frame counter for the current run. */
   private _frameCount: number = 0;
+  /**
+   * Bumped by stop()/snapTo() to invalidate any frame already handed to the
+   * injected requestFrame seam. The seam contract (RequestFrameFn) has no
+   * cancel handle, so a frame scheduled before a stop()/snapTo() cannot be
+   * pulled back out of the queue — instead each scheduled tick closure
+   * captures the generation it was born into, and _tick() no-ops (does not
+   * emit, does not reschedule) if that generation is stale. Without this,
+   * stop() followed by a resuming setTarget() (or snapTo()) leaves the old
+   * frame alive alongside the new one: both re-schedule themselves forever,
+   * doubling the effective tick rate every frame (Lit hostDisconnected/
+   * hostConnected churn, and reduced-motion mid-flight snaps, both do this).
+   */
+  private _generation: number = 0;
 
   // ── Constructor ──────────────────────────────────────────────────────────
 
@@ -314,19 +327,51 @@ export class MotionValue {
     this._running = false;
     this._startTs = undefined;
     this._elapsed = 0;
+    this._generation++; // invalidate any frame already scheduled by this run
+  }
+
+  /**
+   * Instantly set the value to `target`, bypassing spring physics: halts any
+   * in-flight run and resyncs `_from`/`_target`/`_velocity` so a later
+   * setTarget() starts a fresh, correct run instead of resuming from stale
+   * mid-flight state. Backs the reduced-motion CHARACTER-switch in framework
+   * bindings (e.g. lit/controller.ts) — the value still reaches its target
+   * (not hard-off), it just skips the spring frames. A no-op after destroy().
+   */
+  snapTo(target: number): void {
+    if (this._destroyed) return;
+    if (!Number.isFinite(target)) {
+      throw new MotionParamError(
+        `MotionValue.snapTo: target must be a finite number, got ${target}`,
+      );
+    }
+    this._generation++; // invalidate any frame scheduled by the run being replaced
+    this._running = false;
+    this._startTs = undefined;
+    this._elapsed = 0;
+    this._frameCount = 0;
+    this._value = target;
+    this._from = target;
+    this._target = target;
+    this._velocity = 0;
+    this._emit(target);
   }
 
   // ── Private: animation loop ──────────────────────────────────────────────
 
   private _scheduleFirstFrame(): void {
-    const handle = this._requestFrame((ts) => this._tick(ts));
+    const gen = this._generation;
+    const handle = this._requestFrame((ts) => this._tick(ts, gen));
     if (handle === 0) {
       this._useTimeoutFallback = true;
-      setTimeout(() => this._tick(undefined), 0);
+      setTimeout(() => this._tick(undefined, gen), 0);
     }
   }
 
-  private _tick(ts: number | undefined): void {
+  private _tick(ts: number | undefined, gen: number): void {
+    // A frame scheduled by a run that was since stop()/snapTo()-ed away is
+    // stale: it must not emit and must not reschedule (see _generation doc).
+    if (gen !== this._generation) return;
     if (!this._running || this._destroyed) return;
     if (this._tickActive) return;
     this._tickActive = true;
@@ -398,11 +443,11 @@ export class MotionValue {
 
     this._tickActive = false;
 
-    // Reschedule.
+    // Reschedule (same generation — this run is still live).
     if (this._useTimeoutFallback) {
-      setTimeout(() => this._tick(undefined), 0);
+      setTimeout(() => this._tick(undefined, gen), 0);
     } else {
-      this._requestFrame((t) => this._tick(t));
+      this._requestFrame((t) => this._tick(t, gen));
     }
   }
 

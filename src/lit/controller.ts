@@ -122,8 +122,13 @@ export class MotionController implements ReactiveController {
    */
   setTarget(target: number): void {
     if (prefersReducedMotion(this._matchMedia)) {
-      this._value = target;
-      this._host.requestUpdate();
+      // snapTo() halts any in-flight spring run AND resyncs the MotionValue's
+      // internal from/target/velocity (not just this._value) — otherwise a
+      // stale pending frame from a run that was mid-flight when reduced-motion
+      // engaged would fire later and overwrite the snap via the onChange
+      // subscriber in hostConnected(). snapTo() emits synchronously, which
+      // that same subscriber turns into exactly one requestUpdate() call.
+      this._mv.snapTo(target);
       return;
     }
     this._mv.setTarget(target);
