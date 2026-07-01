@@ -207,17 +207,33 @@ describe('flip/driver: createFlip', () => {
     expect(rests).toBe(1);
   });
 
-  it('повторный play во время полёта — перехват без старых кадров', () => {
+  it('повторный play во время полёта — перехват: кадры СТАРОГО полёта инертны (несёт generation)', () => {
+    // Старый полёт: tx ← −200 (инверсия FIRST→LAST, отрицательный).
+    // Новый полёт: LAST→FIRST, dx = 200 − 0 = +200 → все tx нового ≥ 0.
+    // Если stale-кадр старого полёта эмитит после перехвата — в потоке
+    // появится отрицательный tx → RED. Убийца мутанта «убрать gen-гард».
     const clock = virtualClock();
-    const fl = createFlip({ requestFrame: clock.requestFrame, onStep: () => {} });
+    const txs: number[] = [];
+    const fl = createFlip({ requestFrame: clock.requestFrame, onStep: (t) => txs.push(t.tx) });
     fl.play(FIRST, LAST);
-    clock.pump(16);
-    fl.play(LAST, FIRST); // новый полёт
-    const before = fl.progress;
-    clock.pump(32); // кадр старого полёта инертен для прогресса нового
-    // (прогресс мог сдвинуться только новым полётом, запланированным на 32)
-    expect(Number.isFinite(fl.progress)).toBe(true);
-    expect(fl.progress).toBeGreaterThanOrEqual(before);
+    clock.pump(16); // старый полёт запланировал следующий кадр
+    fl.play(LAST, FIRST); // перехват: с этого момента только tx ≥ 0
+    const marker = txs.length; // всё до — старый полёт
+    clock.pump(32); // в очереди И stale-кадр старого, И первый кадр нового
+    clock.pump(48);
+    const afterIntercept = txs.slice(marker);
+    expect(afterIntercept.length).toBeGreaterThan(0);
+    for (const tx of afterIntercept) expect(tx).toBeGreaterThanOrEqual(0);
+  });
+
+  it('невалидная пружина бросает MotionParamError РАНО (createFlip), конвенция движка', async () => {
+    const { MotionParamError } = await import('../src/index.js');
+    expect(() => createFlip({ spring: { mass: -1, stiffness: 100, damping: 10 } }))
+      .toThrow(MotionParamError);
+    // И под reduced-motion невалидная пружина НЕ проглатывается молча.
+    expect(() =>
+      createFlip({ spring: { mass: 1, stiffness: NaN, damping: 10 }, matchMedia: reduceMedia() }),
+    ).toThrow(MotionParamError);
   });
 
   it('cancel(): глушит полёт без onRest', () => {

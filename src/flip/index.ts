@@ -35,7 +35,7 @@
  *       (формулы dx/sx выведены для верхнего-левого origin).
  */
 
-import { spring, type SpringParams } from '../spring.js';
+import { spring, validateSpringParams, type SpringParams } from '../spring.js';
 import type { RequestFrameFn } from '../motion-value.js';
 
 // ─── Типы и стражи ───────────────────────────────────────────────────────────
@@ -187,6 +187,10 @@ function prefersReducedMotion(matchMedia: ((q: string) => MediaQueryList) | unde
 /** Создать контроллер FLIP: пружина 0→1 поверх инверсии, синхронные колбэки. */
 export function createFlip(options?: FlipOptions): FlipControls {
   const params = options?.spring ?? DEFAULT_FLIP_SPRING;
+  // Конвенция движка (drive/driver/MotionValue): невалидная пружина бросает
+  // РАНО и детерминированно — не поздним исключением из кадра планировщика
+  // (и не молча под reduced-motion).
+  validateSpringParams(params);
   const requestFrame = options?.requestFrame;
   const onStep = options?.onStep;
   const onRest = options?.onRest;
