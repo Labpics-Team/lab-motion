@@ -758,6 +758,89 @@ describe('MotionValue API surface pin (class B)', () => {
     expect(typeof mv.onChange).toBe('function');
     expect(typeof mv.setTarget).toBe('function');
     expect(typeof mv.destroy).toBe('function');
+    // stop/snapTo — часть контракта lifecycle-биндингов (Lit hostDisconnected /
+    // reduced-motion snap). RED PROOF: переименовать snapTo → snap → RED.
+    expect(typeof mv.stop).toBe('function');
+    expect(typeof mv.snapTo).toBe('function');
     mv.destroy();
+  });
+});
+
+// ─── Suite: stop()/snapTo() hardening (ноты арх-ревью PR #18) ────────────────
+
+describe('MotionValue snapTo: валидация и идемпотентность', () => {
+  it('snapTo(NaN/±Infinity) → MotionParamError (страж конечности)', () => {
+    const mv = new MotionValue({ initial: 0, spring: STD_SPRING, requestFrame: () => 1 });
+    // Mutation-proof: убрать Number.isFinite-guard из snapTo → RED здесь.
+    expect(() => mv.snapTo(NaN)).toThrow(MotionParamError);
+    expect(() => mv.snapTo(Infinity)).toThrow(MotionParamError);
+    expect(() => mv.snapTo(-Infinity)).toThrow(MotionParamError);
+    mv.destroy();
+  });
+
+  // Примечание: onChange эмитит текущее значение сразу при подписке — все
+  // счётчики ниже считают ДЕЛЬТЫ после этого начального вызова.
+  it('повторный snapTo в тот же target — ровно один emit (идемпотентность)', () => {
+    const clock = makeVirtualClock();
+    const mv = new MotionValue({ initial: 0, spring: STD_SPRING, requestFrame: clock.requestFrame });
+    let emits = 0;
+    mv.onChange(() => emits++);
+    const base = emits; // 1 — начальный вызов подписки
+    mv.snapTo(5);
+    expect(emits).toBe(base + 1);
+    mv.snapTo(5); // уже покоится ровно в 5 — лишний requestUpdate потребителю не нужен
+    expect(emits).toBe(base + 1);
+    mv.snapTo(6); // другой target — обязан эмитить
+    expect(emits).toBe(base + 2);
+    mv.destroy();
+  });
+
+  it('snapTo ПРЕРЫВАЕТ живой ран в тот же target (не путать с идемпотентным no-op)', () => {
+    const clock = makeVirtualClock();
+    const mv = new MotionValue({ initial: 0, spring: STD_SPRING, requestFrame: clock.requestFrame });
+    mv.setTarget(10);
+    clock.drain(3); // пружина в полёте, value ещё не 10
+    let emits = 0;
+    mv.onChange(() => emits++);
+    const base = emits;
+    mv.snapTo(10); // target совпадает, но ран ЖИВОЙ → снап обязан сработать и эмитить
+    expect(emits).toBe(base + 1);
+    expect(mv.value).toBe(10);
+    clock.drainAll(); // stale-кадры прежнего рана инертны: не эмитят и не двигают
+    expect(mv.value).toBe(10);
+    expect(emits).toBe(base + 1);
+    mv.destroy();
+  });
+});
+
+describe('MotionValue re-entrancy: stop()/destroy() из onChange-колбэка', () => {
+  it('stop() изнутри emit → мёртвый ран НЕ перепланируется (ноль лишних кадров)', () => {
+    const clock = makeVirtualClock();
+    const mv = new MotionValue({ initial: 0, spring: STD_SPRING, requestFrame: clock.requestFrame });
+    let initial = true;
+    mv.onChange(() => {
+      if (initial) { initial = false; return; } // пропустить вызов-при-подписке
+      mv.stop();
+    });
+    mv.setTarget(100); // планирует первый кадр
+    const before = clock.queueLength();
+    expect(before).toBe(1);
+    clock.drain(1); // кадр эмитит → слушатель зовёт stop() → перепланирования быть не должно
+    expect(clock.queueLength()).toBe(0);
+    mv.destroy();
+  });
+
+  it('destroy() изнутри emit → не перепланируется и не бросает', () => {
+    const clock = makeVirtualClock();
+    const mv = new MotionValue({ initial: 0, spring: STD_SPRING, requestFrame: clock.requestFrame });
+    let initial = true;
+    mv.onChange(() => {
+      if (initial) { initial = false; return; }
+      mv.destroy();
+    });
+    mv.setTarget(100);
+    expect(clock.queueLength()).toBe(1);
+    expect(() => clock.drain(1)).not.toThrow();
+    expect(clock.queueLength()).toBe(0);
   });
 });
