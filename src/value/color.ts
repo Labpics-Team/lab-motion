@@ -49,11 +49,14 @@ const HEX6_RE = /^#([0-9a-f]{2})([0-9a-f]{2})([0-9a-f]{2})$/i;
 const HEX8_RE = /^#([0-9a-f]{2})([0-9a-f]{2})([0-9a-f]{2})([0-9a-f]{2})$/i;
 
 const NUM_PCT = '(\\d+(?:\\.\\d+)?%?)';
+// Hue по W3C CSS Color — <number>|<angle> СО знаком и БЕЗ процента:
+// «hsl(50%,…)» невалиден и отклоняется целиком, «hsl(-120,…)» ≡ hsl(240,…).
+const HUE = '(-?\\d+(?:\\.\\d+)?)';
 const ALPHA = '(\\d+(?:\\.\\d+)?)';
 const SEP = '\\s*,\\s*';
 
 const RGB_RE = new RegExp(`^rgba?\\(\\s*(\\d+(?:\\.\\d+)?)${SEP}(\\d+(?:\\.\\d+)?)${SEP}(\\d+(?:\\.\\d+)?)(?:${SEP}${ALPHA})?\\s*\\)$`, 'i');
-const HSL_RE = new RegExp(`^hsla?\\(\\s*${NUM_PCT}${SEP}${NUM_PCT}${SEP}${NUM_PCT}(?:${SEP}${ALPHA})?\\s*\\)$`, 'i');
+const HSL_RE = new RegExp(`^hsla?\\(\\s*${HUE}${SEP}${NUM_PCT}${SEP}${NUM_PCT}(?:${SEP}${ALPHA})?\\s*\\)$`, 'i');
 
 /**
  * Парсит строку CSS-цвета в типизированный AST.
@@ -291,8 +294,10 @@ function clamp01(x: number): number {
 }
 
 function parseHue(s: string): number {
-  // Hue может быть в deg (без единицы) или с единицей; для HSL обычно без
-  return clampFinite(parseFloat(s));
+  // Знак и >360 валидны по W3C — нормализуем в канон [0, 360), чтобы AST
+  // хранил один hue на цвет и интерполяция не делала лишний оборот.
+  const v = clampFinite(parseFloat(s));
+  return ((v % 360) + 360) % 360;
 }
 
 function parsePct(s: string): number {

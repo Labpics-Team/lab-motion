@@ -83,6 +83,19 @@ describe('timeline-api-surface-pin: TimelineControls методы', () => {
   }
 });
 
+describe('timeline-api-surface-pin: исчерпывающий пин (ловит и ЛИШНИЕ члены)', () => {
+  // Пин в обе стороны: пропавший член ловят тесты выше, ДОБАВЛЕННЫЙ член —
+  // этот. RED PROOF: добавить в возвращаемый объект createTimeline любой новый
+  // ключ (напр. `reverse`) → массив ключей разойдётся с эталоном → RED.
+  it('Object.keys(controls) — ровно запиненный набор, без лишних', () => {
+    const tl = createTimeline({ segments: ONE_SEGMENT, requestFrame: noRaf() });
+    tl.cancel();
+    expect(Object.keys(tl).sort()).toEqual(
+      ['cancel', 'complete', 'pause', 'play', 'progress', 'seek', 'then', 'time', 'totalDuration'],
+    );
+  });
+});
+
 describe('timeline-api-surface-pin: thenable контракт', () => {
   it('createTimeline(...).then(cb) — вызывает cb при complete()', async () => {
     let called = false;

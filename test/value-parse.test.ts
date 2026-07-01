@@ -265,6 +265,39 @@ describe('parseColor: hsl()', () => {
   });
 });
 
+describe('parseColor: hsl() hue-токен (класс: W3C CSS Color — hue = number|angle, БЕЗ %)', () => {
+  // W3C: процент в hue невалиден — цвет отклоняется целиком, не «50% ≈ 50».
+  it('hsl(50%, 50%, 50%) — % у hue → null (невалидный CSS)', () => {
+    expect(parseColor('hsl(50%, 50%, 50%)')).toBeNull();
+  });
+
+  it('hsla(120%, 100%, 50%, 1) — % у hue → null', () => {
+    expect(parseColor('hsla(120%, 100%, 50%, 1)')).toBeNull();
+  });
+
+  // W3C: hue — <number> со знаком; отрицательный оборачивается: -120 ≡ 240.
+  it('hsl(-120, 100%, 50%) — отрицательный hue валиден и равен hsl(240,…) (синий)', () => {
+    const c = parseColor('hsl(-120, 100%, 50%)');
+    expect(c).not.toBeNull();
+    expect(c!.r).toBeCloseTo(0, 0);
+    expect(c!.g).toBeCloseTo(0, 0);
+    expect(c!.b).toBeCloseTo(255, 0);
+  });
+
+  it('hsl(720, 100%, 50%) — hue > 360 оборачивается: ≡ hsl(0,…) (красный)', () => {
+    const c = parseColor('hsl(720, 100%, 50%)');
+    expect(c).not.toBeNull();
+    expect(c!.r).toBeCloseTo(255, 0);
+    expect(c!.g).toBeCloseTo(0, 0);
+    expect(c!.b).toBeCloseTo(0, 0);
+  });
+
+  // Регрессия: % у S/L обязателен к поддержке — фикс hue не должен их задеть.
+  it('регрессия: hsl(0, 100%, 50%) продолжает парситься', () => {
+    expect(parseColor('hsl(0, 100%, 50%)')).not.toBeNull();
+  });
+});
+
 // ── parse (unified) ───────────────────────────────────────────────────────────
 
 describe('parse: unified dispatcher', () => {
