@@ -16,9 +16,30 @@
  *        This is a CHARACTER change (instant snap-to-start), NOT hard-off.
  *   ST4. Deterministic: same inputs → same outputs, bit-identical across platforms.
  *   ST5. count=0 → []. count=1 → [0]. Negative/non-finite → [].
+ *   ST6. Availability: count is capped at MAX_STAGGER_COUNT. A hostile or
+ *        accidental extreme count (Number.MAX_SAFE_INTEGER, 1e9, ...) is
+ *        CLAMPED, not zeroed — the caller still gets a usable bounded array
+ *        instead of an OOM/hang from an unbounded Array allocation.
  *
  * @labpics/motion/stagger (subpath-only, tree-shakeable from core bundle)
  */
+
+// ---------------------------------------------------------------------------
+// Internal availability guard — bounds `count` against extreme/hostile input
+// ---------------------------------------------------------------------------
+
+/**
+ * Hard upper bound on the number of elements stagger() will materialize.
+ *
+ * Chosen generously above any realistic DOM stagger group (tens to low
+ * thousands of elements) while preventing an unbounded `new Array(n)`
+ * allocation — e.g. `stagger(Number.MAX_SAFE_INTEGER)` or `stagger(1e9)` —
+ * from hanging the event loop or exhausting memory (invariant ST6).
+ *
+ * Private — not exported. Changing this value is a behavioural change to
+ * ST6, not part of the public contract.
+ */
+const MAX_STAGGER_COUNT = 100_000;
 
 // ---------------------------------------------------------------------------
 // Internal finiteness guard — mirrors easing/index.ts clampFinite discipline
@@ -157,8 +178,10 @@ export interface StaggerOptions {
 export function stagger(count: number, options?: StaggerOptions): number[] {
   // ── count validation ────────────────────────────────────────────────────
   // Non-finite, zero, or negative → empty (ST5)
-  const n =
+  const nRaw =
     Number.isFinite(count) && count > 0 ? Math.floor(Math.abs(count)) : 0;
+  // Extreme finite count → clamp to MAX_STAGGER_COUNT, not zeroed (ST6).
+  const n = nRaw > MAX_STAGGER_COUNT ? MAX_STAGGER_COUNT : nRaw;
   if (n === 0) return [];
   if (n === 1) return [0];
 
