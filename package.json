@@ -88,6 +88,11 @@
       "types": "./dist/flip/index.d.ts",
       "import": "./dist/flip/index.js",
       "require": "./dist/flip/index.cjs"
+    },
+    "./svg": {
+      "types": "./dist/svg/index.d.ts",
+      "import": "./dist/svg/index.js",
+      "require": "./dist/svg/index.cjs"
     }
   },
   "files": [
