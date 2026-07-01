@@ -96,5 +96,29 @@ describe('keyframes — reduced-motion CHARACTER-switch', () => {
         onStep: (v) => steps.push(v),
       }),
     ).not.toThrow();
+    // Non-reduced path: no synchronous emission before any frame fires.
+    expect(steps.length).toBe(0);
+  });
+
+  it('onStep throwing does not hang the loop or leave the promise unresolved', async () => {
+    let resolved = false;
+    const c = keyframes({
+      values: [0, 100],
+      duration: 1e-9,
+      matchMedia: makeNoReduceMedia(),
+      requestFrame: (cb) => {
+        // Drain synchronously so settle() runs within this test's microtask turn.
+        cb(0);
+        return 1;
+      },
+      onStep: () => {
+        throw new Error('boom from user callback');
+      },
+    });
+    await c.then(() => {
+      resolved = true;
+    });
+    expect(resolved).toBe(true);
+    c.cancel();
   });
 });

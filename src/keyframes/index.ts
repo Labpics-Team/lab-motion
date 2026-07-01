@@ -378,7 +378,12 @@ export function keyframes(opts: KeyframesOptions): KeyframesControls {
   }
 
   function emit(value: number): void {
-    if (globalOnStep) globalOnStep(value);
+    if (!globalOnStep) return;
+    try {
+      globalOnStep(value);
+    } catch {
+      // Isolate user-callback errors so the frame loop / promise stay resilient.
+    }
   }
 
   function settle(finalValue: number): void {
