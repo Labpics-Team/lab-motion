@@ -43,6 +43,11 @@
       "types": "./dist/driver/index.d.ts",
       "import": "./dist/driver/index.js",
       "require": "./dist/driver/index.cjs"
+    },
+    "./stagger": {
+      "types": "./dist/stagger/index.d.ts",
+      "import": "./dist/stagger/index.js",
+      "require": "./dist/stagger/index.cjs"
     }
   },
   "files": ["dist"],
