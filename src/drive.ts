@@ -235,14 +235,13 @@ export function drive(opts: DriveOptions): Promise<void> {
       //    (holding the Promise for it broke the resolution contract: an accepted
       //    underdamped spring at the floor zeta=0.2, omega0=2.0 kept it pending
       //    ~3.9s after visual completion).
-      // 2) Both terms normalized by range so the threshold is range-independent.
-      //    The velocity expression keeps the historical shape abs(vel)*absRange
-      //    then /absRange — NOT algebraically simplified (float semantics pinned
-      //    by characterization tests).
+      // 2) The threshold is range-independent: the position term is divided by
+      //    absRange; velocity from springUnchecked is already in normalized
+      //    progress-space, so it is compared to the threshold directly.
       const converged =
         maxEmittedToward === to ||
         (Math.abs(cv - to) / absRange < CONVERGENCE_THRESHOLD &&
-          (Math.abs(result.velocity) * absRange) / absRange < CONVERGENCE_THRESHOLD);
+          Math.abs(result.velocity) < CONVERGENCE_THRESHOLD);
 
       if (converged || frameCount >= MAX_FRAMES) {
         settle();

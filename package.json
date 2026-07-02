@@ -143,6 +143,11 @@
       "types": "./dist/qwik/index.d.ts",
       "import": "./dist/qwik/index.js",
       "require": "./dist/qwik/index.cjs"
+    },
+    "./frame": {
+      "types": "./dist/frame/index.d.ts",
+      "import": "./dist/frame/index.js",
+      "require": "./dist/frame/index.cjs"
     }
   },
   "files": [
