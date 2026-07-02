@@ -20,6 +20,8 @@
  *   - internal/sliding-window 87.50% (S42: 70.83%→87.50%, закалка трима окна оценщика
  *     скорости — пустой вход, граница cutoff строгая, sparse→последняя пара; прямые
  *     оракулы на выходной массив).
+ *   - tween 85.00% (S43: 75.00%→85.00%, закалка линейной интерполяции — клампинг
+ *     эндпоинтов t<0→from / t>1→to без экстраполяции; прямые оракулы).
  *   - минимум по файлам = keyframes 78.1% (на границе) → взвешенный агрегат ≥78%,
  *     break=76 — безопасный пол (эрозию ловит; точный агрегат считает scheduled-прогон).
  *     ВНИМАНИЕ: при эрозии keyframes ниже 78% фраза «агрегат ≥78%» станет ложной
@@ -45,7 +47,7 @@
 export default {
   plugins: ['@stryker-mutator/vitest-runner'],
   testRunner: 'vitest',
-  mutate: ['src/spring.ts', 'src/internal/solver.ts', 'src/keyframes/index.ts', 'src/motion-value.ts', 'src/decay.ts', 'src/value/color.ts', 'src/internal/sliding-window.ts'],
+  mutate: ['src/spring.ts', 'src/internal/solver.ts', 'src/keyframes/index.ts', 'src/motion-value.ts', 'src/decay.ts', 'src/value/color.ts', 'src/internal/sliding-window.ts', 'src/tween.ts'],
   coverageAnalysis: 'perTest',
   reporters: ['clear-text', 'progress', 'html'],
   htmlReporter: { fileName: 'reports/mutation/index.html' },
