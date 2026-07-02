@@ -128,6 +128,16 @@
       "types": "./dist/preact/index.d.ts",
       "import": "./dist/preact/index.js",
       "require": "./dist/preact/index.cjs"
+    },
+    "./angular": {
+      "types": "./dist/angular/index.d.ts",
+      "import": "./dist/angular/index.js",
+      "require": "./dist/angular/index.cjs"
+    },
+    "./wc": {
+      "types": "./dist/wc/index.d.ts",
+      "import": "./dist/wc/index.js",
+      "require": "./dist/wc/index.cjs"
     }
   },
   "files": [
@@ -143,11 +153,12 @@
   },
   "peerDependencies": {
     "lit": ">=3.0.0",
+    "preact": ">=10.0.0",
     "react": ">=18.0.0",
+    "solid-js": ">=1.8.0",
     "svelte": ">=4.0.0",
     "vue": ">=3.0.0",
-    "solid-js": ">=1.8.0",
-    "preact": ">=10.0.0"
+    "@angular/core": ">=16.0.0"
   },
   "peerDependenciesMeta": {
     "lit": {
@@ -167,9 +178,13 @@
     },
     "preact": {
       "optional": true
+    },
+    "@angular/core": {
+      "optional": true
     }
   },
   "devDependencies": {
+    "@angular/core": "18.2.13",
     "@types/node": "22.10.5",
     "@types/react": "18.3.12",
     "lit": "3.3.3",

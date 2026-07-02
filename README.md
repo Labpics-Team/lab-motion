@@ -43,6 +43,8 @@ pnpm size       # замер gz всех субпутей
 | `…/react` | React: `useSpring`, `useMotionValue` |
 | `…/preact` | Preact: `useSpring`, `useMotionValue` (зеркало react-биндинга поверх `preact/hooks`) |
 | `…/solid` | Solid: `createSpring`, `createMotionValue` (сигналы, авто-уборка через `onCleanup`) |
+| `…/angular` | Angular (v16+): `injectSpring`, `injectMotionValue` (Signals + DestroyRef, injection context) |
+| `…/wc` | Vanilla web-component `<lab-spring>` без зависимостей — путь для Astro/Stencil/HTML-first стеков |
 | `…/svelte` | Svelte: `springStore` |
 | `…/vue` | Vue: директива `v-motion` |
 | `…/lit` | Lit / web-components: `MotionController` (ReactiveController), `LabMotionSpringElement` |
