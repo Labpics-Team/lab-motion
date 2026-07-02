@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { CORE_GATE_BYTES, deriveEntriesFromExports, IMPORT_COST_SCENARIOS, measureEntries, measureScenario } from '../scripts/size-gate.mjs';
+import { CORE_GATE_BYTES, SUBPATH_GATE_BYTES, deriveEntriesFromExports, IMPORT_COST_SCENARIOS, measureEntries, measureScenario } from '../scripts/size-gate.mjs';
 import { readFileSync } from 'node:fs';
 import { resolve, dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -52,7 +52,9 @@ describe('size-gate: auto-derive subpath entries from package.json exports', () 
     expect(labels).toContain('fake-new-plugin');
   });
 
-  it('only the core (".") entry carries a byte gate; every other subpath is measure-only', () => {
+  it('ядро несёт свой порог, каждый прочий субпуть — общий SUBPATH_GATE_BYTES (drift-класс)', () => {
+    // Раньше субпути были measure-only: новый раздутый субпуть проходил
+    // зелёным без порога. Теперь безлимитных строк в отчёте не существует.
     const pkg = {
       exports: {
         '.': { import: './dist/index.js' },
@@ -63,7 +65,8 @@ describe('size-gate: auto-derive subpath entries from package.json exports', () 
     const entries = deriveEntriesFromExports(pkg);
 
     expect(entries.find(e => e.key === '.')?.gate).toBe(CORE_GATE_BYTES);
-    expect(entries.find(e => e.key === './react')?.gate).toBeNull();
+    expect(entries.find(e => e.key === './react')?.gate).toBe(SUBPATH_GATE_BYTES);
+    expect(entries.every(e => Number.isFinite(e.gate) && e.gate > 0)).toBe(true);
   });
 
   it('resolves a NESTED conditional-exports value (e.g. { import: { types, default } }) instead of throwing', () => {

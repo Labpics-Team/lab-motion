@@ -37,6 +37,12 @@ import { build } from 'esbuild';
 // не ради добивания круглой цифры.
 export const CORE_GATE_BYTES = 2150;
 
+// Потолок для КАЖДОГО прочего субпутя (drift-класс: новый/раздутый субпуть
+// не должен молча проходить без порога). Максимальный факт 2026-07-02 —
+// ./presets 4004 gz; люфт ~15%. Точечные пороги при нужде задаются в
+// deriveEntriesFromExports, этот — общая страховка от грубого раздувания.
+export const SUBPATH_GATE_BYTES = 4608;
+
 /**
  * Потребительские сценарии: код — то, что реально пишет потребитель;
  * gate — потолок от замера 2026-07-02 (+~4% люфт). `%DIST%` подставляется
@@ -123,7 +129,7 @@ export function deriveEntriesFromExports(pkg) {
         key,
         label,
         importPath: importPath.replace(/^\.\//, ''),
-        gate: key === '.' ? CORE_GATE_BYTES : null,
+        gate: key === '.' ? CORE_GATE_BYTES : SUBPATH_GATE_BYTES,
       };
     })
     .filter(Boolean);

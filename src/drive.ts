@@ -70,12 +70,11 @@ export interface DriveOptions {
  *   - large ranges are not held to needless sub-pixel absolute precision
  * 0.005 = 0.5% of range (≈ 0.5px on a 100px animation; tighter than the
  * former 0.05 absolute for range=1, looser for range>10).
+ *
+ * Единые значения контура ядра — internal/constants.ts (drive/driver/
+ * motion-value обязаны сходиться по одинаковым порогам).
  */
-const CONVERGENCE_THRESHOLD = 0.005;
-/** MAX_FRAMES hard limit — resolves (snapping to `to`) after this many frames. */
-const MAX_FRAMES = 2000;
-/** Fixed simulation timestep in seconds (60fps). Used when ts is unavailable. */
-const FIXED_DT_S = 1 / 60;
+import { CONVERGENCE_THRESHOLD, MAX_FRAMES, FIXED_DT_S } from './internal/constants.js';
 
 /**
  * Read the reduced-motion preference from an injected matchMedia.
