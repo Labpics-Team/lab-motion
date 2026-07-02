@@ -41,6 +41,8 @@ pnpm size       # замер gz всех субпутей
 | `…/auto` | Zero-config FLIP: `autoAnimate(parent)` — add/remove/move детей анимируются сами (класс AutoAnimate); reduced-motion меняет характер (move→снап), не выключает |
 | `…/svg-morph` | Морфинг путей: `interpolatePath(dFrom, dTo)` — точный режим при совпадающей структуре, ресэмплинг с выравниванием старта/обхода замкнутых при разной |
 | `…/react` | React: `useSpring`, `useMotionValue` |
+| `…/preact` | Preact: `useSpring`, `useMotionValue` (зеркало react-биндинга поверх `preact/hooks`) |
+| `…/solid` | Solid: `createSpring`, `createMotionValue` (сигналы, авто-уборка через `onCleanup`) |
 | `…/svelte` | Svelte: `springStore` |
 | `…/vue` | Vue: директива `v-motion` |
 | `…/lit` | Lit / web-components: `MotionController` (ReactiveController), `LabMotionSpringElement` |
