@@ -50,8 +50,8 @@ describe('tween общая корректность', () => {
     expect(tween(3, 7, 1)).toBe(7); // t=1 → to точно
   });
   it('overflow: |from|+|to|>MAX_VALUE → two-point фоллбек, конечно (строки 31-33)', () => {
-    // raw = 1e308 + (−1e308 − 1e308)·0.5 переполняется? (to−from)=−2e308=−Inf → raw=NaN →
-    // фоллбек from·(1−t)+to·t = 5e307−5e307 = 0. Оракул: результат конечен.
+    // (to−from) = −1e308−1e308 = −2e308 → −Inf; raw = 1e308 + (−Inf)·0.5 = −Inf → не finite →
+    // фоллбек from·(1−t)+to·t = 5e307−5e307 = 0. (При t→0 raw был бы NaN: 0·∞; здесь −Inf.)
     const r = tween(1e308, -1e308, 0.5);
     expect(Number.isFinite(r)).toBe(true);
     expect(r).toBeCloseTo(0, 0);
