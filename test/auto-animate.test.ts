@@ -61,6 +61,22 @@ describe('auto: planAuto — известные числа', () => {
     expect(planAuto(prev, [['a', R(0, 0, 100.6, 50)]]).moves).toHaveLength(1);
   });
 
+  it('property: детекция move симметрична по всем 4 осям rect', () => {
+    // Класс «выпавшая ось» (аккордеон = только height): каждая ось отдельно
+    // обязана и триггерить сверх epsilon, и молчать ниже него.
+    const base = R(10, 20, 100, 50);
+    const axes: [string, ReturnType<typeof R>, ReturnType<typeof R>][] = [
+      ['x', { ...base, x: base.x + 1 }, { ...base, x: base.x + 0.4 }],
+      ['y', { ...base, y: base.y + 1 }, { ...base, y: base.y + 0.4 }],
+      ['width', { ...base, width: base.width + 1 }, { ...base, width: base.width + 0.4 }],
+      ['height', { ...base, height: base.height + 1 }, { ...base, height: base.height + 0.4 }],
+    ];
+    for (const [axis, movedRect, jitterRect] of axes) {
+      expect(planAuto([['a', base]], [['a', movedRect]]).moves, `ось ${axis}`).toHaveLength(1);
+      expect(planAuto([['a', base]], [['a', jitterRect]]).moves, `дрожь ${axis}`).toEqual([]);
+    }
+  });
+
   it('кастомный epsilon прокидывается; невалидный → MotionParamError', () => {
     const prev: [string, ReturnType<typeof R>][] = [['a', R(0, 0)]];
     expect(planAuto(prev, [['a', R(2, 0)]], 3).moves).toEqual([]);
@@ -373,6 +389,76 @@ describe('auto: autoAnimate — адаптер (duck-typed DOM)', () => {
     const timing = child.animateCalls[0]!.timing;
     expect(timing['duration']).toBe(400);
     expect(String(timing['easing'])).toMatch(/^linear\(/);
+    expect(timing['fill']).toBe('both');
+  });
+
+  it('дефолтный timing запинен целиком: 250ms / ease-in-out / fill both', () => {
+    // fill:'both' — семантика FLIP: без backwards-fill инвертированный transform
+    // не держится до старта (скачок первого кадра), без forwards — конец.
+    const seam = fakeObserverSeam();
+    const parent = fakeParent([]);
+    autoAnimate(parent as never, { MutationObserverCtor: seam.Ctor as never });
+    const child = fakeEl(R(0, 0));
+    parent.children.push(child);
+    seam.state.callback!([{ addedNodes: [child], removedNodes: [] }]);
+    expect(child.animateCalls[0]!.timing).toEqual({
+      duration: 250,
+      easing: 'ease-in-out',
+      fill: 'both',
+    });
+  });
+
+  it('регрессия: несколько exits в одной записи — оба реинсертятся и удаляются', () => {
+    const seam = fakeObserverSeam();
+    const d1 = fakeEl(R(0, 0), 'd1');
+    const d2 = fakeEl(R(0, 60), 'd2');
+    const parent = fakeParent([d1, d2]);
+    autoAnimate(parent as never, { MutationObserverCtor: seam.Ctor as never });
+    parent.children = [];
+    seam.state.callback!([{ addedNodes: [], removedNodes: [d1, d2] }]);
+    expect(parent.appended).toEqual(expect.arrayContaining([d1, d2]));
+    d1.animations[0]!.onfinish!();
+    d2.animations[0]!.onfinish!();
+    expect(parent.removed).toEqual(expect.arrayContaining([d1, d2]));
+  });
+
+  it('регрессия: move и exit в одной записи — сосед едет FLIP, удаляемый уходит exit', () => {
+    const seam = fakeObserverSeam();
+    const doomed = fakeEl(R(0, 0), 'doomed');
+    const stays = fakeEl(R(0, 60), 'stays');
+    const parent = fakeParent([doomed, stays]);
+    autoAnimate(parent as never, { MutationObserverCtor: seam.Ctor as never });
+    parent.children = [stays];
+    stays.rect = R(0, 0); // сосед поднялся на место удалённого
+    seam.state.callback!([{ addedNodes: [], removedNodes: [doomed] }]);
+    const stayKf = stays.animateCalls[0]!.keyframes as Record<string, unknown>[];
+    expect(stayKf[0]!['transform']).toBe('translate(0px, 60px) scale(1, 1)');
+    const doomKf = doomed.animateCalls[0]!.keyframes as Record<string, unknown>[];
+    expect(doomKf.map((k) => k['opacity'])).toEqual([1, 0]);
+  });
+
+  it('регрессия: disable() во время живого exit — onfinish всё равно удаляет узел (владение адаптера)', () => {
+    const seam = fakeObserverSeam();
+    const doomed = fakeEl(R(0, 0), 'doomed');
+    const parent = fakeParent([doomed]);
+    const ctl = autoAnimate(parent as never, { MutationObserverCtor: seam.Ctor as never });
+    parent.children = [];
+    seam.state.callback!([{ addedNodes: [], removedNodes: [doomed] }]);
+    ctl.disable();
+    doomed.animations[0]!.onfinish!();
+    expect(parent.removed).toContain(doomed);
+  });
+
+  it('регрессия: disconnect() во время живого exit — exit доигрывает и удаляет узел (нет утечки)', () => {
+    const seam = fakeObserverSeam();
+    const doomed = fakeEl(R(0, 0), 'doomed');
+    const parent = fakeParent([doomed]);
+    const ctl = autoAnimate(parent as never, { MutationObserverCtor: seam.Ctor as never });
+    parent.children = [];
+    seam.state.callback!([{ addedNodes: [], removedNodes: [doomed] }]);
+    ctl.disconnect();
+    doomed.animations[0]!.onfinish!();
+    expect(parent.removed).toContain(doomed);
   });
 
   it('без MutationObserver в среде → инертный контроллер, не бросает (SSR/legacy)', () => {
