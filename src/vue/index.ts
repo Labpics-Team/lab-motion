@@ -26,7 +26,8 @@
  */
 
 import { ref, watch, onUnmounted, type Ref, type ObjectDirective } from 'vue';
-import { MotionValue, type MotionValueOptions, type RequestFrameFn } from '../motion-value.js';
+import type { MotionValue, MotionValueOptions, RequestFrameFn } from '../motion-value.js';
+import { createBoundValue } from '../internal/binding-value.js';
 import { type SpringParams } from '../spring.js';
 
 // ─── Reduced-motion detection ─────────────────────────────────────────────
@@ -56,7 +57,7 @@ export function useMotionValue(
   spring: SpringParams = { mass: 1, stiffness: 200, damping: 20 },
   requestFrame?: MotionValueOptions['requestFrame'],
 ): MotionValue {
-  const mv = new MotionValue({ initial, spring, requestFrame });
+  const mv = createBoundValue({ initial, spring, requestFrame });
 
   try {
     onUnmounted(() => {
@@ -264,7 +265,7 @@ export const vMotion: ObjectDirective<Element, MotionDirectiveValue> = {
       initial = opts.target; // Start at target if no `from` provided (no-op until first retarget)
     }
 
-    const mv = new MotionValue({
+    const mv = createBoundValue({
       initial,
       spring: springParams,
       requestFrame: opts.requestFrame,

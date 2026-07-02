@@ -17,7 +17,8 @@
  */
 
 import { createSignal, getOwner, onCleanup } from 'solid-js';
-import { MotionValue, type MotionValueOptions } from '../motion-value.js';
+import type { MotionValue, MotionValueOptions } from '../motion-value.js';
+import { createBoundValue } from '../internal/binding-value.js';
 import { MotionParamError } from '../errors.js';
 import { type SpringParams } from '../spring.js';
 
@@ -37,7 +38,7 @@ export function createMotionValue(
   spring: SpringParams = DEFAULT_SPRING,
   requestFrame?: MotionValueOptions['requestFrame'],
 ): [MotionValue, () => void] {
-  const mv = new MotionValue({ initial, spring, requestFrame });
+  const mv = createBoundValue({ initial, spring, requestFrame });
   const dispose = (): void => {
     mv.destroy();
   };

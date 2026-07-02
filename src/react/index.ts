@@ -17,7 +17,8 @@
  */
 
 import { useState, useEffect, useRef } from 'react';
-import { MotionValue, type MotionValueOptions } from '../motion-value.js';
+import type { MotionValue, MotionValueOptions } from '../motion-value.js';
+import { createBoundValue } from '../internal/binding-value.js';
 import { type SpringParams } from '../spring.js';
 
 // ─── Reduced-motion detection ─────────────────────────────────────────────
@@ -57,7 +58,7 @@ export function useMotionValue(
   const mvRef = useRef<MotionValue | null>(null);
 
   if (mvRef.current === null) {
-    mvRef.current = new MotionValue({ initial, spring, requestFrame });
+    mvRef.current = createBoundValue({ initial, spring, requestFrame });
   }
 
   useEffect(() => {

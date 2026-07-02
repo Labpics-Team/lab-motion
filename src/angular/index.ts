@@ -14,7 +14,8 @@
  */
 
 import { assertInInjectionContext, DestroyRef, inject, signal, type Signal } from '@angular/core';
-import { MotionValue, type MotionValueOptions } from '../motion-value.js';
+import type { MotionValue, MotionValueOptions } from '../motion-value.js';
+import { createBoundValue } from '../internal/binding-value.js';
 import { MotionParamError } from '../errors.js';
 import { type SpringParams } from '../spring.js';
 
@@ -35,7 +36,7 @@ export function injectMotionValue(
   requestFrame?: MotionValueOptions['requestFrame'],
 ): MotionValue {
   assertInInjectionContext(injectMotionValue);
-  const mv = new MotionValue({ initial, spring, requestFrame });
+  const mv = createBoundValue({ initial, spring, requestFrame });
   inject(DestroyRef).onDestroy(() => {
     mv.destroy();
   });

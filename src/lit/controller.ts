@@ -22,7 +22,8 @@
  */
 
 import type { ReactiveController, ReactiveControllerHost } from 'lit';
-import { MotionValue, type MotionValueOptions, type RequestFrameFn } from '../motion-value.js';
+import type { MotionValue, MotionValueOptions, RequestFrameFn } from '../motion-value.js';
+import { createBoundValue } from '../internal/binding-value.js';
 import { type SpringParams } from '../spring.js';
 
 /** Injectable matchMedia seam — тот же контракт, что и DriverOptions['matchMedia']. */
@@ -105,7 +106,7 @@ export class MotionController implements ReactiveController {
       spring: options.spring ?? DEFAULT_SPRING,
       requestFrame: options.requestFrame,
     };
-    this._mv = new MotionValue(mvOptions);
+    this._mv = createBoundValue(mvOptions);
 
     host.addController(this);
   }
