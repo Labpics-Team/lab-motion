@@ -78,9 +78,25 @@ describe('spring-ergonomics: fromBounce — известные числа', () =
     expect(() => fromBounce({ duration: 1, bounce: 2 })).toThrow(MotionParamError);
     expect(() => fromBounce({ duration: 1, bounce: -2 })).toThrow(MotionParamError);
   });
+
+  it('граница валидации bounce точная: ±1 принимается, ±(1+ε) отвергается', () => {
+    for (const make of [
+      (b: number) => fromBounce({ duration: 1, bounce: b }),
+      (b: number) => fromVisualDuration({ visualDuration: 1, bounce: b }),
+    ]) {
+      expect(() => make(1)).not.toThrow();
+      expect(() => make(-1)).not.toThrow();
+      expect(() => make(1 + 1e-9)).toThrow(MotionParamError);
+      expect(() => make(-1 - 1e-9)).toThrow(MotionParamError);
+    }
+  });
 });
 
 // ─── fromVisualDuration (первое касание цели ≈ visualDuration) ───────────────
+// Оракул — замкнутое аналитическое решение первого пересечения x(t)=1, не
+// differential против реализации Motion: вендорить их солвер в zero-dep репо
+// ради теста дороже, чем даёт; семантика «первого визуального касания»
+// заземлена цитатой доки Motion (см. шапку src/spring/index.ts).
 
 describe('spring-ergonomics: fromVisualDuration', () => {
   /** Численно найти первое t, где x(t) >= 1. */
@@ -193,14 +209,16 @@ describe('spring-ergonomics: springAsEasing', () => {
     expect(e(2)).toBe(1);
   });
 
-  it('критически демпфированная — монотонна и без овершута', () => {
-    const e = springAsEasing(fromBounce({ duration: 1, bounce: 0 }));
-    let prev = 0;
-    for (let i = 1; i <= 100; i++) {
-      const v = e(i / 100);
-      expect(v).toBeGreaterThanOrEqual(prev - 1e-9);
-      expect(v).toBeLessThanOrEqual(1.001);
-      prev = v;
+  it('property ζ>=1: монотонна и без овершута на плотной сетке (1000 точек)', () => {
+    for (const bounce of [0, -0.5, -1]) {
+      const e = springAsEasing(fromBounce({ duration: 1, bounce }));
+      let prev = 0;
+      for (let i = 1; i <= 1000; i++) {
+        const v = e(i / 1000);
+        expect(v).toBeGreaterThanOrEqual(prev - 1e-9);
+        expect(v).toBeLessThanOrEqual(1.0001);
+        prev = v;
+      }
     }
   });
 

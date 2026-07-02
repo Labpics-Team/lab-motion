@@ -36,7 +36,7 @@ pnpm size       # замер gz всех субпутей
 | `…/flip` | Layout-анимация FLIP: инверсия first→last, пружинный «доезд», коррекция scale-искажений (`correctRadius`, `counterScale`) |
 | `…/svg` | SVG: `parsePath`/`pathLength`, draw-математика штриха (`drawPath`), движение вдоль пути (`createMotionPath`) |
 | `…/a11y` | Доступность: `createMotionConfig` — политика reduced-motion (`system`/`always`/`never`), меняет характер анимации, не выключает |
-| `…/spring` | Эргономика пружин: `fromBounce` (duration+bounce, канон SwiftUI/Motion), `fromVisualDuration`, `springPresets` (канон react-spring), `springAsEasing` |
+| `…/spring` | Эргономика пружин: `fromBounce` (duration+bounce ∈ [−1,1], канон SwiftUI ⊇ Motion [0,1]), `fromVisualDuration`, `springPresets` (канон react-spring), `springAsEasing` |
 | `…/react` | React: `useSpring`, `useMotionValue` |
 | `…/svelte` | Svelte: `springStore` |
 | `…/vue` | Vue: директива `v-motion` |
