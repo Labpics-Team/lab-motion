@@ -11,7 +11,7 @@
  *     range, degenerate-сходимость, velocity-критерий, clamp-границы, snapTo-
  *     конъюнкты, post-emit re-entrancy, finite-net overflow-recovery, v0-нормализация,
  *     default-rAF; bounded-оракулы ≪ MAX_FRAMES + оракулы на счётчик эмиссий).
- *   - decay 86.92% (S40: 63.55%→86.92%, закалка — overflow amplitude/rest ±MAX_VALUE,
+ *   - decay 88.79% (S40: 63.55%→88.79%, закалка — overflow amplitude/rest ±MAX_VALUE,
  *     accept-пути knobs power/timeConstant/restDelta, сообщения ошибок, matchMedia
  *     query + throwing-graceful; прямые оракулы, closed-form без cap-маскировки).
  *   - минимум по файлам = keyframes 78.1% (на границе) → взвешенный агрегат ≥78%,
