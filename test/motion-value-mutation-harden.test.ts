@@ -427,6 +427,67 @@ describe('T14 default requestFrame: глобальный rAF ↔ setTimeout-фо
   });
 });
 
+// ─── T15 — finite-net RV-ветка: overflow не рождает осцилляцию эмиссий (356, 359, 360) ──
+
+describe('T15 finite-net: overflow rawVelocity → чистая сходимость, не осцилляция (356)', () => {
+  it('range=1e308: сходится за единицы эмиссий (не 175-кадровая осцилляция вокруг цели)', () => {
+    // Замер диверсии: здоровый код ловит overflow rawVelocity сетью (356) → снап в
+    // target за 4 эмиссии. Мутанты сети (356 `if(false)` / `||→&&` / пустой блок 356:74;
+    // 359/360 не-стоп в теле) → сеть не срабатывает → 175 эмиссий (rawValue осциллирует
+    // вокруг 1e308, пока не поймает другой критерий). Оракул на СЧЁТЧИК эмиссий: per-
+    // emission finiteness не кусает (clampedValue всегда конечен), а число эмиссий — да.
+    const clock = makeClock();
+    const mv = new MotionValue({ initial: 0, spring: OSC_SPRING, requestFrame: clock.requestFrame });
+    let emits = 0;
+    mv.onChange((v) => { emits += 1; expect(Number.isFinite(v)).toBe(true); });
+    mv.setTarget(1e308);
+    clock.drainAll();
+    expect(mv.value).toBe(1e308);
+    expect(emits).toBeLessThan(20); // здоровый 4; мутант сети ~175
+  });
+});
+
+// ─── T16 — v0-нормализация: деление на range, не умножение (строка 206:52) ──────
+
+describe('T16 smooth-pickup: v0 = velocity / range, не * range (строка 206:52)', () => {
+  it('ретаргет в полёте не раздувает число кадров сходимости (замер: 44 vs мутант 105)', () => {
+    // Мутант `currentVelocity * range` (206:52): нормализованная v0 раздута на range² →
+    // огромная скорость в солвер → лишняя осцилляция/перелёт → сходимость за БОЛЬШЕ
+    // кадров. Замер эмиссий: здоровый 44, мутант 105. Оракул: < 70 (первая пост-ретаргет
+    // эмиссия у обоих = 38.6, т.к. первый тик elapsed=0 → дискриминатор = число эмиссий).
+    const clock = makeClock();
+    const mv = new MotionValue({ initial: 0, spring: STD_SPRING, requestFrame: clock.requestFrame });
+    let emits = 0;
+    mv.onChange(() => { emits += 1; });
+    mv.setTarget(100);
+    clock.drain(6); // набрали скорость
+    mv.setTarget(200); // ретаргет с переносом скорости
+    clock.drainAll();
+    expect(mv.value).toBeCloseTo(200, 2);
+    expect(emits).toBeLessThan(70); // здоровый 44; мутант * дал бы 105
+  });
+});
+
+// ─── T17 — recovery после overflow-снапа: MotionValue не кирпичится (359, 360) ──
+
+describe('T17 overflow-снап оставляет MotionValue возобновляемым (359, 360)', () => {
+  it('после снапа сети (1e308) setTarget(0) возобновляет анимацию к новой цели', () => {
+    // Сеть (356) при overflow снапает в target и ставит _running=false, _tickActive=false —
+    // чтобы последующий setTarget возобновил цикл. Мутанты тела сети (359 `_running=true`,
+    // 360 `_tickActive=true`) оставляют флаг взведённым → возобновлённый цикл мёртв
+    // (setTarget не стартует по 218 / первый тик глохнет на _tickActive-guard 302). Замер
+    // диверсии: здоровый afterResume=0, оба мутанта = 1e308 (застряли).
+    const clock = makeClock();
+    const mv = new MotionValue({ initial: 0, spring: OSC_SPRING, requestFrame: clock.requestFrame });
+    mv.setTarget(1e308); // сеть срабатывает (overflow rawVelocity) → снап в 1e308
+    clock.drainAll();
+    expect(mv.value).toBe(1e308);
+    mv.setTarget(0); // возобновление
+    clock.drainAll();
+    expect(mv.value).toBeLessThan(1e307); // ушёл к 0 (мутанты 359/360 застряли бы на 1e308)
+  });
+});
+
 // ─── Документированные ЭКВИВАЛЕНТНЫЕ / НЕДОСТИЖИМЫЕ / ЗАМАСКИРОВАННЫЕ мутанты ────
 //
 // Выжившие, НЕ убиваемые поведенчески — не меняют наблюдаемого поведения (Goodhart:
@@ -437,20 +498,24 @@ describe('T14 default requestFrame: глобальный rAF ↔ setTimeout-фо
 //   • 195:35 (velocity-конъюнкт снап-guard): value===target достижимо ТОЛЬКО в
 //     сходимости (clamp не даёт value достичь target раньше), где скорость уже ~0 →
 //     ветка `|velocity|<1e-10` неотличима. Недостижимая комбинация.
-//   • 202:19 / 206:26 / 206:52 (smooth-pickup нормализация v0): влияют лишь на
-//     нормализованную v0, впрыснутую в солвер на ретаргете; в пределах clamp +
-//     сходимости различие — суб-пороговый транзиент ≤1 кадра, недетерминируемый к
-//     пину. ПЕРВИЧНЫЙ инвариант (скорость переносится, не обнуляется) закрыт
-//     существующим smooth-pickup-тестом (motion-value.test.ts, убил 7 мутантов).
+//   • 202:19 (setTarget: range=target−value для v0) / 206:26 (guard Math.abs(range)>1e-10):
+//     202 влияет лишь на нормализованную v0 в setTarget (не на тик-range 315, что убит T1);
+//     206:26 — защита от деления на ~0 при ретаргете ровно в текущее значение с ненулевой
+//     скоростью (снап-guard 195 требует |v|<1e-10, так что этот угол реален, но мутант
+//     даёт v0=±Inf → normPos=1 по стражу 321 → снап в цель, наблюдаемого различия нет).
+//     (206:52 `/`→`*` — УБИТ T16 по счётчику эмиссий; не эквивалент.)
 //   • 247:5 / 274:5 (_generation ++ ↔ --): generation сравнивается ТОЛЬКО через
 //     `!==` (строки 300, 374), не на порядок → любое изменение инвалидирует кадр.
-//   • 232:21 / 359:23 (_running=false→true в destroy/finite-net): замаскированы —
-//     тик-барьер глохнет по _destroyed (301) либо путь возвращается без reschedule.
+//   • 232:21 (_running=false→true в destroy): замаскирован — destroy ставит и
+//     _destroyed=true, тик-барьер 301 глохнет по _destroyed независимо от _running.
+//     (359/360 в теле finite-net — УБИТЫ T17 по recovery-после-overflow; не эквиваленты.)
 //   • 113:42 (_useTimeoutFallback=false→true): перезаписывается в setTarget (215)
 //     до первого чтения.
-//   • 301:9 / 302:9 / 303:24 (tick-guard/_tickActive): избыточно-защитные —
-//     stop/snapTo бампят generation (ловится строкой 300), destroy чистит слушателей;
-//     single-flight _tickActive не достижим в requestFrame-пути (нет ре-энтранси).
+//   • 301:9 / 302:9 / 303:24 (tick-guard/_tickActive): избыточно-защитные. stop/snapTo
+//     бампят generation → устаревший кадр ловится стражем 300 (не 301). destroy НЕ бампит
+//     generation — его кадр глохнет через _listeners.clear() (пустой _emit) + reschedule-
+//     guard 374 (`!_running`), а не через 301. single-flight _tickActive недостижим в
+//     requestFrame-пути (нет синхронной ре-энтранси; клок сливает по одному кадру).
 //   • 313:5 / 332:7 (frameCount++ / MAX_FRAMES-терм): MAX_FRAMES=2000 — предохранитель,
 //     недостижимый для ВАЛИДНЫХ пружин (валидатор ω0≥2, ζ∈[0.2,4] гарантирует
 //     сходимость по порогу задолго до 2000; замер: ζ=0.2 сходится за 174).
@@ -487,15 +552,5 @@ describe('документированные эквиваленты/недост
     mv.destroy();
     clock.drainAll();
     expect(emits).toBe(before);
-  });
-
-  it('finite-net (356): даже range=1e308 → все эмиссии конечны (эффект clamp, не ветки)', () => {
-    const clock = makeClock();
-    const mv = new MotionValue({ initial: 0, spring: OSC_SPRING, requestFrame: clock.requestFrame });
-    const seen = collect(mv);
-    mv.setTarget(1e308);
-    clock.drainAll();
-    for (const v of seen) expect(Number.isFinite(v)).toBe(true);
-    expect(mv.value).toBe(1e308);
   });
 });

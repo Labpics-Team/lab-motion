@@ -7,9 +7,10 @@
  *   - solver 86.5%, spring 79.7%, keyframes 78.1% (S34: 49.5%→78.1%, закалка
  *     mutation-тестами — валидация accept-путей, yoyo-направление ≥3 циклов,
  *     CSS-safety при патологичном easing, setTimeout-фоллбек, pause/play).
- *   - motion-value 83.62% (S39: 64.97%→83.62%, закалка тик-цикла — направление
+ *   - motion-value 87.01% (S39: 64.97%→87.01%, закалка тик-цикла — направление
  *     range, degenerate-сходимость, velocity-критерий, clamp-границы, snapTo-
- *     конъюнкты, post-emit re-entrancy, default-rAF; bounded-оракулы ≪ MAX_FRAMES).
+ *     конъюнкты, post-emit re-entrancy, finite-net overflow-recovery, v0-нормализация,
+ *     default-rAF; bounded-оракулы ≪ MAX_FRAMES + оракулы на счётчик эмиссий).
  *   - каждый файл индивидуально ≥78% → взвешенный агрегат ≥78%, break=76 —
  *     безопасный пол (эрозию ловит; точный агрегат считает scheduled-прогон).
  * Остаток выживших keyframes/motion-value — задокументированные ЭКВИВАЛЕНТНЫЕ
