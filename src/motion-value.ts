@@ -31,19 +31,6 @@ import { type SpringParams, validateSpringParams } from './spring.js';
 import { MotionParamError } from './errors.js';
 import { solveSpring } from './internal/solver.js';
 
-// ─── Physics: spring with arbitrary initial velocity ────────────────────────
-
-// Решение ODE с произвольной v0 живёт в internal/solver.ts (общий солвер с
-// spring.ts — дубль стоил ~четверть веса ядра). Сырые числа оборачиваются
-// прежними стражами этого модуля (value→1, velocity→0) прямо здесь.
-function springWithV0(params: SpringParams, t: number, v0: number): { value: number; velocity: number } {
-  let { value, velocity } = solveSpring(params, t, v0);
-  // Guard against floating-point edge cases (e.g. t=Infinity, critical damping limit)
-  if (!Number.isFinite(value)) value = 1;
-  if (!Number.isFinite(velocity)) velocity = 0;
-  return { value, velocity };
-}
-
 // ─── Public types ────────────────────────────────────────────────────────────
 
 /** Injectable frame scheduler seam — same contract as in drive.ts. */
@@ -333,12 +320,11 @@ export class MotionValue {
     const range = this._target - this._from;
     const absRange = Math.abs(range);
 
-    // Compute new position + velocity from spring solver.
-    const { value: normPos, velocity: normVel } = springWithV0(
-      this._spring,
-      this._elapsed,
-      this._v0Normalized,
-    );
+    // Общий солвер (internal/solver.ts) + стражи этого модуля инлайн
+    // (value→1, velocity→0 — политика отличается от clampFinite spring.ts).
+    const raw = solveSpring(this._spring, this._elapsed, this._v0Normalized);
+    const normPos = Number.isFinite(raw.value) ? raw.value : 1;
+    const normVel = Number.isFinite(raw.velocity) ? raw.velocity : 0;
 
     // Denormalize: absolute value and velocity.
     const rawValue = this._from + normPos * range;
