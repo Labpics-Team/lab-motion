@@ -44,6 +44,7 @@ pnpm size       # замер gz всех субпутей
 | `…/preact` | Preact: `useSpring`, `useMotionValue` (зеркало react-биндинга поверх `preact/hooks`) |
 | `…/solid` | Solid: `createSpring`, `createMotionValue` (сигналы, авто-уборка через `onCleanup`) |
 | `…/angular` | Angular (v16+): `injectSpring`, `injectMotionValue` (Signals + DestroyRef, injection context) |
+| `…/qwik` | Qwik: `useSpring` — управление сигналом `target` (резюм-safe), MotionValue = noSerialize, пересоздаётся на клиенте |
 | `…/wc` | Vanilla web-component `<lab-spring>` без зависимостей — путь для Astro/Stencil/HTML-first стеков |
 | `…/svelte` | Svelte: `springStore` |
 | `…/vue` | Vue: директива `v-motion` |
