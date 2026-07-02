@@ -95,10 +95,14 @@ describe('Angular-биндинг в реальном injection-context', () => {
     off();
   });
 
-  it('вне injection-context injectSpring бросает (assertInInjectionContext, NG0203)', () => {
-    // Честный контракт: вызов вне контекста — явная ошибка, не тихая утечка.
-    expect(() => injectSpring(0, SPRING)).toThrow();
-    expect(() => injectMotionValue(0, SPRING)).toThrow();
+  it('вне injection-context бросает РАНО через assertInInjectionContext (NG0203 с именем)', () => {
+    // Оракул матчит ИМЯ функции в сообщении (нота QA): assertInInjectionContext
+    // бросает «injectSpring() can only be used...» ДО создания ресурса. Без
+    // assert вызов дошёл бы до inject(DestroyRef) и бросил generic NG0203 БЕЗ
+    // имени функции (и уже создав MotionValue = утечка) — регекс по имени это
+    // отличает, диверсия «убрать assert» краснеет.
+    expect(() => injectSpring(0, SPRING)).toThrow(/injectSpring\(\)/);
+    expect(() => injectMotionValue(0, SPRING)).toThrow(/injectMotionValue\(\)/);
   });
 
   it('injectSpring: не-конечный target бросает MotionParamError-контракт ядра', () => {
