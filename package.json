@@ -191,6 +191,7 @@
     "test:watch": "vitest",
     "size": "node scripts/size-gate.mjs",
     "pack:smoke": "node scripts/pack-smoke.mjs",
+    "mutation": "stryker run",
     "prepublishOnly": "pnpm typecheck && pnpm build && pnpm test && pnpm size"
   },
   "peerDependencies": {
@@ -232,6 +233,8 @@
   "devDependencies": {
     "@angular/core": "22.0.5",
     "@builder.io/qwik": "1.19.1",
+    "@stryker-mutator/core": "9.6.1",
+    "@stryker-mutator/vitest-runner": "9.6.1",
     "@types/node": "^22.20.0",
     "@types/react": "18.3.12",
     "esbuild": "0.28.1",
