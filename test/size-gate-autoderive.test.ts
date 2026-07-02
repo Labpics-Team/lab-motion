@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { CORE_GATE_BYTES, deriveEntriesFromExports, getMissingPlannedSubpaths, isFullBundleReady, measureEntries, PLANNED_PLUGIN_SUBPATHS } from '../scripts/size-gate.mjs';
+import { CORE_GATE_BYTES, deriveEntriesFromExports, IMPORT_COST_SCENARIOS, measureEntries, measureScenario } from '../scripts/size-gate.mjs';
 import { readFileSync } from 'node:fs';
 import { resolve, dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -87,23 +87,37 @@ describe('size-gate: auto-derive subpath entries from package.json exports', () 
     expect(() => deriveEntriesFromExports({})).toThrow(/exports/);
   });
 
-  it('isFullBundleReady is false until ALL planned plugin subpaths (timeline/stagger/svg/layout) exist in exports', () => {
-    const partial = { exports: { '.': { import: './dist/index.js' }, './timeline': { import: './dist/timeline/index.js' } } };
-    expect(isFullBundleReady(partial)).toBe(false);
-
-    const full = {
-      exports: Object.fromEntries([
-        ['.', { import: './dist/index.js' }],
-        ...PLANNED_PLUGIN_SUBPATHS.map(p => [p, { import: `./dist${p}/index.js` }]),
-      ]),
-    };
-    expect(isFullBundleReady(full)).toBe(true);
+  it('сценарии import-cost: непустой список, у каждого name/код с %DIST%/конечный порог > 0', () => {
+    // Замена мёртвого full-bundle-гейта (./layout никогда не мержился →
+    // совокупный гейт вечно был PLACEHOLDER): сценарные бюджеты — то, что
+    // реально платит потребитель, и они не могут «не активироваться».
+    expect(IMPORT_COST_SCENARIOS.length).toBeGreaterThanOrEqual(3);
+    for (const s of IMPORT_COST_SCENARIOS) {
+      expect(typeof s.name).toBe('string');
+      expect(s.code).toContain('%DIST%');
+      expect(Number.isFinite(s.gate)).toBe(true);
+      expect(s.gate).toBeGreaterThan(0);
+    }
   });
 
-  it('isFullBundleReady and getMissingPlannedSubpaths stay consistent (single source of truth, no drift)', () => {
-    const partial = { exports: { '.': { import: './dist/index.js' }, './timeline': { import: './dist/timeline/index.js' } } };
-    expect(isFullBundleReady(partial)).toBe(getMissingPlannedSubpaths(partial).length === 0);
-    expect(getMissingPlannedSubpaths(partial)).toEqual(['./stagger', './svg', './layout']);
+  it('measureScenario: пропавший экспорт даёт error (громкий FAIL), а не тихий ноль', async () => {
+    const distIndex = resolve(ROOT, 'dist/index.js');
+    const broken = { name: 'broken', code: `import { noSuchExport } from '%DIST%'; console.log(noSuchExport);`, gate: 1 };
+    const m = await measureScenario(broken, distIndex);
+    expect(m.error, 'ошибка сборки обязана всплыть').toBeTruthy();
+    expect(m.gzBytes).toBeUndefined();
+  });
+
+  it('measureScenario: реальный сценарий возвращает конечный gz > 0 и меньше шипнутого полного ядра', async () => {
+    const distIndex = resolve(ROOT, 'dist/index.js');
+    const onlySpring = IMPORT_COST_SCENARIOS.find(s => s.name === 'only-spring');
+    expect(onlySpring).toBeDefined();
+    const m = await measureScenario(onlySpring, distIndex);
+    expect(m.error).toBeUndefined();
+    expect(m.gzBytes).toBeGreaterThan(0);
+    // Класс tree-shakeability: частичный импорт обязан быть ДЕШЕВЛЕ полного ядра.
+    const full = await measureScenario(IMPORT_COST_SCENARIOS.find(s => s.name === 'full-core'), distIndex);
+    expect(m.gzBytes).toBeLessThan(full.gzBytes);
   });
 
   it('measureEntries flags MISSING for a dist file that does not exist, without throwing', () => {

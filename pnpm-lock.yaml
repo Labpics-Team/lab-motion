@@ -20,6 +20,9 @@ importers:
       '@types/react':
         specifier: 18.3.12
         version: 18.3.12
+      esbuild:
+        specifier: 0.21.5
+        version: 0.21.5
       lit:
         specifier: 3.3.3
         version: 3.3.3

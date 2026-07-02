@@ -239,6 +239,30 @@ describe('./frame asRequestFrame — класс D11 и жизненный цик
     loop.cancelAll();
   });
 
+  it('фазовая дисциплина: onChange-эмит (update) фиксируется ДО render-подписки того же кадра', () => {
+    // Пин задокументированного контракта адаптера: тики значений — фаза
+    // update. Мутант loop.update→loop.render в asRequestFrame инвертирует
+    // порядок (render-проба подписана раньше) — тест красный.
+    const clock = makeStepClock();
+    const loop = createFrameLoop({ requestFrame: clock.requestFrame });
+    const order: string[] = [];
+    loop.render(() => order.push('render'));
+    const mv = new MotionValue({ initial: 0, spring: SPRING, requestFrame: asRequestFrame(loop) });
+    mv.onChange(() => order.push('emit'));
+    order.length = 0; // onChange по контракту эмитит текущее значение сразу при подписке — кадровому порядку не принадлежит
+    mv.setTarget(1);
+
+    for (let f = 0; f < 5; f++) clock.step();
+
+    // Пять кадров живой анимации: каждый кадр строго ['emit','render'] —
+    // render-проба подписана РАНЬШЕ значения, поэтому только фазовый порядок
+    // (update перед render) может поставить emit первым.
+    expect(order).toEqual(['emit', 'render', 'emit', 'render', 'emit', 'render', 'emit', 'render', 'emit', 'render']);
+
+    mv.destroy();
+    loop.cancelAll();
+  });
+
   it('re-entrancy: setTarget соседа из onChange не срывает кадр и детерминирован', () => {
     const run = (makeRequestFrame: () => RequestFrameFn, step: () => void): number[] => {
       const journal: number[] = [];

@@ -202,6 +202,7 @@
     "@builder.io/qwik": "1.19.1",
     "@types/node": "22.10.5",
     "@types/react": "18.3.12",
+    "esbuild": "0.21.5",
     "lit": "3.3.3",
     "preact": "10.28.2",
     "react": "18.3.1",
