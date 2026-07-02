@@ -156,13 +156,14 @@ describe('svg-morph: ресэмплинг — разные структуры', 
 // ─── Скоуп-пределы (характеризация — контракт, не дефект) ────────────────────
 
 describe('svg-morph: характеризация скоуп-пределов', () => {
-  it('составной путь (M…Z M…Z) при ресэмплинге склеивается в один контур', () => {
-    // Пер-подконтурный морф (дырки) вне скоупа — задокументировано в шапке.
+  it('составной путь (M…Z M…Z) морфится пер-подконтурно (контракт s30)', () => {
+    // Прежний скоуп-предел «склейка в один контур» снят: подконтуры
+    // сопоставляются по порядку, лишний исчезает через центроид партнёра.
     const compound = 'M 0 0 L 10 0 L 10 10 Z M 20 20 L 30 20 L 30 30 Z';
     const square = 'M 0 0 L 10 0 L 10 10 L 0 10 Z';
     const cmds = parsePath(interpolatePath(compound, square, { samples: 16 })(0.5));
-    expect(cmds.filter((c) => c.type.toUpperCase() === 'M')).toHaveLength(1);
-    expect(cmds.filter((c) => c.type.toUpperCase() === 'Z')).toHaveLength(1);
+    expect(cmds.filter((c) => c.type.toUpperCase() === 'M')).toHaveLength(2);
+    expect(cmds.filter((c) => c.type.toUpperCase() === 'Z')).toHaveLength(2);
   });
 
   it('относительные команды (l) в точном режиме lerp\'аются посегментно как есть', () => {
