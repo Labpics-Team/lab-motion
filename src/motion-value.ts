@@ -64,6 +64,17 @@ export interface MotionValueOptions {
   readonly requestFrame?: RequestFrameFn | undefined;
 }
 
+// ─── Frame-loop constants ────────────────────────────────────────────────────
+// Модульные const (не private static): статики не матчат mangle-регэксп /^_/ и
+// переживали минификацию дословно; модульный const терсер инлайнит/сжимает.
+
+/** Fixed timestep fallback (seconds) when no DOMHighResTimeStamp available. */
+const FIXED_DT_S = 1 / 60;
+/** Convergence threshold (normalized, same as drive.ts). */
+const CONVERGENCE_THRESHOLD = 0.005;
+/** Hard frame cap per run (prevents infinite loops on pathological params). */
+const MAX_FRAMES = 2000;
+
 // ─── MotionValue ─────────────────────────────────────────────────────────────
 
 /**
@@ -119,12 +130,6 @@ export class MotionValue {
   /** Whether to use setTimeout fallback (handle=0 path). */
   private _useTimeoutFallback: boolean = false;
 
-  /** Fixed timestep fallback (seconds) when no DOMHighResTimeStamp available. */
-  private static readonly FIXED_DT_S = 1 / 60;
-  /** Convergence threshold (normalized, same as drive.ts). */
-  private static readonly CONVERGENCE_THRESHOLD = 0.005;
-  /** Hard frame cap per run (prevents infinite loops on pathological params). */
-  private static readonly MAX_FRAMES = 2000;
   /** Frame counter for the current run. */
   private _frameCount: number = 0;
   /**
@@ -163,7 +168,7 @@ export class MotionValue {
     if (typeof requestAnimationFrame !== 'undefined') {
       return requestAnimationFrame(cb);
     }
-    return setTimeout(cb, MotionValue.FIXED_DT_S * 1000) as unknown as number;
+    return setTimeout(cb, FIXED_DT_S * 1000) as unknown as number;
   }
 
   // ── Public API ───────────────────────────────────────────────────────────
@@ -320,7 +325,7 @@ export class MotionValue {
       if (this._startTs === undefined) this._startTs = ts;
       this._elapsed = (ts - this._startTs) / 1000;
     } else {
-      this._elapsed += MotionValue.FIXED_DT_S;
+      this._elapsed += FIXED_DT_S;
     }
 
     this._frameCount++;
@@ -343,11 +348,11 @@ export class MotionValue {
     const distToTarget = Math.abs(rawValue - this._target);
     const absVelocity = Math.abs(rawVelocity);
     const converged =
-      this._frameCount >= MotionValue.MAX_FRAMES ||
+      this._frameCount >= MAX_FRAMES ||
       !Number.isFinite(range) || // unrepresentable span: |from|+|target| overflowed past MAX_VALUE
       (absRange < 1e-10) || // degenerate range
-      (distToTarget / Math.max(absRange, 1e-10) < MotionValue.CONVERGENCE_THRESHOLD &&
-        absVelocity / Math.max(absRange, 1e-10) < MotionValue.CONVERGENCE_THRESHOLD);
+      (distToTarget / Math.max(absRange, 1e-10) < CONVERGENCE_THRESHOLD &&
+        absVelocity / Math.max(absRange, 1e-10) < CONVERGENCE_THRESHOLD);
 
     if (converged) {
       this._value = this._target;
