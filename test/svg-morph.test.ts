@@ -153,6 +153,46 @@ describe('svg-morph: ресэмплинг — разные структуры', 
   });
 });
 
+// ─── Скоуп-пределы (характеризация — контракт, не дефект) ────────────────────
+
+describe('svg-morph: характеризация скоуп-пределов', () => {
+  it('составной путь (M…Z M…Z) при ресэмплинге склеивается в один контур', () => {
+    // Пер-подконтурный морф (дырки) вне скоупа — задокументировано в шапке.
+    const compound = 'M 0 0 L 10 0 L 10 10 Z M 20 20 L 30 20 L 30 30 Z';
+    const square = 'M 0 0 L 10 0 L 10 10 L 0 10 Z';
+    const cmds = parsePath(interpolatePath(compound, square, { samples: 16 })(0.5));
+    expect(cmds.filter((c) => c.type.toUpperCase() === 'M')).toHaveLength(1);
+    expect(cmds.filter((c) => c.type.toUpperCase() === 'Z')).toHaveLength(1);
+  });
+
+  it('относительные команды (l) в точном режиме lerp\'аются посегментно как есть', () => {
+    const f = interpolatePath('M 0 0 l 10 0 l 0 10', 'M 5 5 l 20 0 l 0 20');
+    const mid = parsePath(f(0.5));
+    expect(mid[0]!.values).toEqual([2.5, 2.5]);
+    expect(mid[1]!.type).toBe('l'); // регистр сохранён
+    expect(mid[1]!.values).toEqual([15, 0]);
+    expect(f(0)).toBe('M 0 0 l 10 0 l 0 10'); // эндпоинт-оригинал
+  });
+
+  it('точность формата: дробные значения не округляются до целых', () => {
+    const mid = parsePath(interpolatePath('M 0 0 L 1 0', 'M 0 0 L 2 0')(0.5));
+    expect(mid[1]!.values).toEqual([1.5, 0]);
+  });
+
+  it('открытый ресэмплинг достигает эндпоинтов форм (первая/последняя точки сетки)', () => {
+    // Разные структуры двух ОТКРЫТЫХ путей → ресэмплинг; сетка i/(K−1) обязана
+    // включать t=0 и t=1, иначе выход обрезан с конца.
+    const f = interpolatePath('M 0 0 L 10 0', 'M 0 10 L 5 10 L 10 10', { samples: 64 });
+    const cmds = parsePath(f(0.5));
+    const first = cmds[0]!.values;
+    const last = cmds[cmds.length - 1]!.values;
+    expect(first[0]).toBeCloseTo(0, 6);
+    expect(first[1]).toBeCloseTo(5, 6);
+    expect(last[0]).toBeCloseTo(10, 6); // середина концов (10,0) и (10,10)
+    expect(last[1]).toBeCloseTo(5, 6);
+  });
+});
+
 // ─── Валидация и злые входы ──────────────────────────────────────────────────
 
 describe('svg-morph: валидация', () => {
