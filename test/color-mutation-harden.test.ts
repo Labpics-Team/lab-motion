@@ -69,6 +69,16 @@ describe('C1-4 hex-парсинг: doubling, parseInt base16, alpha/255, trim', 
     expect(parseColor('notacolor')).toBeNull();
     expect(parseColor('#gggggg')).toBeNull();
   });
+  it('case-insensitivity: UPPERCASE hex/rgb/hsl распознаются (флаг `i` регексов)', () => {
+    // CSS-цвета регистронезависимы. Мутант, снявший флаг `i` у HEX/RGB/HSL_RE,
+    // не распознал бы uppercase → null. Нота QA-ревью: тесты покрывали лишь HEX6.
+    expect(parseColor('#FFF')).toEqual(parseColor('#fff'));
+    expect(parseColor('#FFFF')).toEqual(parseColor('#ffff'));
+    expect(parseColor('#AABBCC')).toEqual(parseColor('#aabbcc'));
+    expect(parseColor('#FF000080')).toEqual(parseColor('#ff000080'));
+    expect(parseColor('RGB(10, 20, 30)')).not.toBeNull(); // uppercase RGB → флаг i
+    expect(parseColor('HSL(120, 50%, 50%)')).not.toBeNull(); // uppercase HSL → флаг i
+  });
 });
 
 // ─── C5-C7 — rgb/hsl-парсинг + clamp (118-135, 287-311) ─────────────────────────
