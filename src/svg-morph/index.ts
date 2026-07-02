@@ -42,7 +42,7 @@
  * zero-deps, MotionParamError рано (мусор/невалидный samples).
  */
 
-import { createMotionPath, parsePath, type SVGCommand } from '../svg/index.js';
+import { createMotionPath, parsePath, type MotionPath, type SVGCommand } from '../svg/index.js';
 import { MotionParamError } from '../errors.js';
 
 export interface InterpolatePathOptions {
@@ -207,17 +207,34 @@ function cmdsToD(cmds: readonly SVGCommand[]): string {
     .join(' ');
 }
 
+/**
+ * K равномерных точек контура — единый источник для обоих режимов и центроида.
+ * Замкнутый: без дублирующей точки t=1 (шаг K). Открытый: включая оба конца
+ * (шаг K−1). K<2 (недостижимо из interpolatePath — samples>=2 валидируется,
+ * но хелпер самодостаточен): одна точка t=0, деления на ноль нет.
+ */
+function sampleContour(mp: MotionPath, samples: number, closed: boolean): Pt[] {
+  if (samples < 2) {
+    const { x, y } = mp.at(0);
+    return [{ x, y }];
+  }
+  return Array.from({ length: samples }, (_, i) => {
+    const t = closed ? i / samples : i / (samples - 1);
+    const { x, y } = mp.at(t);
+    return { x, y };
+  });
+}
+
 /** Центроид формы по K равномерным сэмплам (точка появления/исчезновения). */
 function centroidOf(d: string, K: number): Pt {
-  const mp = createMotionPath(d);
+  const pts = sampleContour(createMotionPath(d), K, false);
   let x = 0;
   let y = 0;
-  for (let i = 0; i < K; i++) {
-    const q = mp.at(i / (K - 1));
+  for (const q of pts) {
     x += q.x;
     y += q.y;
   }
-  return { x: x / K, y: y / K };
+  return { x: x / pts.length, y: y / pts.length };
 }
 
 /**
@@ -248,13 +265,8 @@ function compoundFn(
     // рождается из неё.
     const partner = gF ? toGroups[toGroups.length - 1]! : fromGroups[fromGroups.length - 1]!;
     const c = centroidOf(cmdsToD(partner), samples);
-    const mp = createMotionPath(realD);
     const closedSub = isClosed(real);
-    const realPts: Pt[] = Array.from({ length: samples }, (_, k) => {
-      const t = closedSub ? k / samples : k / (samples - 1);
-      const { x, y } = mp.at(t);
-      return { x, y };
-    });
+    const realPts = sampleContour(createMotionPath(realD), samples, closedSub);
     const growing = gT !== undefined; // нет во from → рождается
     parts.push((p: number): string => {
       const w = growing ? p : 1 - p; // вес реальной формы
@@ -321,17 +333,8 @@ export function interpolatePath(
   if (exactCandidate && !closed) return exactFn();
 
   // Ресэмплинг: равномерная по длине полилиния обеих форм.
-  const mpFrom = createMotionPath(dFrom);
-  const mpTo = createMotionPath(dTo);
-  const K = samples;
-  const at = (mp: typeof mpFrom, i: number): Pt => {
-    // замкнутый контур сэмплируется без дублирующей точки t=1
-    const t = closed ? i / K : i / (K - 1);
-    const { x, y } = mp.at(t);
-    return { x, y };
-  };
-  let fromPts: Pt[] = Array.from({ length: K }, (_, i) => at(mpFrom, i));
-  const toPts: Pt[] = Array.from({ length: K }, (_, i) => at(mpTo, i));
+  let fromPts: Pt[] = sampleContour(createMotionPath(dFrom), samples, closed);
+  const toPts: Pt[] = sampleContour(createMotionPath(dTo), samples, closed);
   if (closed) {
     const aligned = alignClosed(fromPts, toPts);
     // Точный режим допустим лишь при ТОЖДЕСТВЕННОМ соответствии вершин:
