@@ -16,6 +16,7 @@
  */
 
 import { MotionParamError } from './errors.js';
+import { solveSpring } from './internal/solver.js';
 
 /** Physics parameters for a spring. */
 export interface SpringParams {
@@ -95,16 +96,16 @@ const MIN_DAMPING_RATIO = 0.2; // ζ floor — closes near-undamped stall class
  */
 export function validateSpringParams(p: SpringParams): void {
   if (!Number.isFinite(p.mass) || p.mass <= 0) {
-    throw new MotionParamError(`spring: mass must be a positive finite number, got ${p.mass}`);
+    throw new MotionParamError(`spring: mass must be positive finite, got ${p.mass}`);
   }
   if (!Number.isFinite(p.stiffness) || p.stiffness <= 0) {
     throw new MotionParamError(
-      `spring: stiffness must be a positive finite number, got ${p.stiffness}`,
+      `spring: stiffness must be positive finite, got ${p.stiffness}`,
     );
   }
   if (!Number.isFinite(p.damping) || p.damping < 0) {
     throw new MotionParamError(
-      `spring: damping must be a non-negative finite number, got ${p.damping}`,
+      `spring: damping must be non-negative finite, got ${p.damping}`,
     );
   }
   // Guard 1: natural frequency floor — closes the slow-overdamped stall class.
@@ -113,12 +114,13 @@ export function validateSpringParams(p: SpringParams): void {
   // {m:1, k:0.25, c:4} has ω₀=0.5 exactly (accepts the guard) but converges at
   // frame 5021 (83.7 s), producing a 12.2% visible snap. Correct floor is 2.0 rad/s
   // (verified: worst-case ω₀=2.0, ζ=4 converges at frame 1256).
+  // Тексты ошибок намеренно плотные (вес ядра): значение, порог, входы и
+  // рекомендация сохранены; формулы/пояснения живут в доке и комментариях.
   const omega0 = Math.sqrt(p.stiffness / p.mass);
+  const inputs = `(mass:${p.mass}, stiffness:${p.stiffness}, damping:${p.damping})`;
   if (omega0 < MIN_NATURAL_FREQUENCY) {
     throw new MotionParamError(
-      `spring: natural frequency ω₀=sqrt(stiffness/mass)=${omega0.toFixed(4)} rad/s is below the minimum of ${MIN_NATURAL_FREQUENCY} rad/s. ` +
-        `Increase stiffness or reduce mass to avoid a CPU-bound animation stall. ` +
-        `Current: {mass:${p.mass}, stiffness:${p.stiffness}, damping:${p.damping}}.`,
+      `spring: natural frequency ω₀=${omega0.toFixed(4)} rad/s < min ${MIN_NATURAL_FREQUENCY} ${inputs} — increase stiffness or reduce mass.`,
     );
   }
   // Guard 2: damping ratio bounds — closes BOTH the extreme-overdamping and near-undamped classes.
@@ -127,17 +129,12 @@ export function validateSpringParams(p: SpringParams): void {
   const zeta = p.damping / (2 * Math.sqrt(p.stiffness * p.mass));
   if (zeta > MAX_DAMPING_RATIO) {
     throw new MotionParamError(
-      `spring: damping ratio ζ=${zeta.toFixed(2)} exceeds the maximum of ${MAX_DAMPING_RATIO}. ` +
-        `Reduce damping or increase stiffness/mass to avoid a CPU-bound animation stall. ` +
-        `Current: {mass:${p.mass}, stiffness:${p.stiffness}, damping:${p.damping}}.`,
+      `spring: damping ratio ζ=${zeta.toFixed(2)} > max ${MAX_DAMPING_RATIO} ${inputs} — reduce damping or increase stiffness/mass.`,
     );
   }
   if (zeta < MIN_DAMPING_RATIO) {
     throw new MotionParamError(
-      `spring: damping ratio ζ=${zeta.toFixed(4)} is below the minimum of ${MIN_DAMPING_RATIO}. ` +
-        `A near-undamped spring (ζ < ${MIN_DAMPING_RATIO}) oscillates too many cycles and never settles within MAX_FRAMES. ` +
-        `Increase damping to avoid a CPU-bound animation stall. ` +
-        `Current: {mass:${p.mass}, stiffness:${p.stiffness}, damping:${p.damping}}.`,
+      `spring: damping ratio ζ=${zeta.toFixed(4)} < min ${MIN_DAMPING_RATIO} ${inputs} — near-undamped spring never settles; increase damping.`,
     );
   }
 }
@@ -172,52 +169,10 @@ function clampFinite(x: number): number {
  * @internal
  */
 export function springUnchecked(params: SpringParams, t: number): SpringResult {
-  const { mass: m, stiffness: k, damping: c } = params;
-
-  // At t=0 the spring is at rest at the start position.
-  if (t <= 0) {
-    return { value: 0, velocity: 0 };
-  }
-
-  const omega0 = Math.sqrt(k / m); // natural frequency
-  const zeta = c / (2 * Math.sqrt(k * m)); // damping ratio
-
-  let value: number;
-  let velocity: number;
-
-  if (zeta < 1) {
-    // Underdamped: oscillates, decays toward 1.
-    const omegaD = omega0 * Math.sqrt(1 - zeta * zeta); // damped frequency
-    const decay = Math.exp(-zeta * omega0 * t);
-    // x(t) = 1 - e^{-zeta*omega0*t} * (cos(omegaD*t) + (zeta*omega0/omegaD)*sin(omegaD*t))
-    const cosD = Math.cos(omegaD * t);
-    const sinD = Math.sin(omegaD * t);
-    const A = (zeta * omega0) / omegaD;
-    value = 1 - decay * (cosD + A * sinD);
-    // x'(t) — derivative:
-    velocity =
-      zeta * omega0 * decay * (cosD + A * sinD) - decay * (-omegaD * sinD + A * omegaD * cosD);
-  } else if (zeta === 1) {
-    // Critically damped: fastest non-oscillatory approach.
-    const decay = Math.exp(-omega0 * t);
-    value = 1 - decay * (1 + omega0 * t);
-    velocity = decay * omega0 * omega0 * t;
-  } else {
-    // Overdamped: two real exponentials, no oscillation.
-    const sqrtTerm = Math.sqrt(zeta * zeta - 1);
-    const r1 = -omega0 * (zeta - sqrtTerm);
-    const r2 = -omega0 * (zeta + sqrtTerm);
-    // x(t) = 1 + A1*e^{r1*t} + A2*e^{r2*t}
-    // Boundary conditions: x(0)=0, x'(0)=0 → A1 + A2 = -1, r1*A1 + r2*A2 = 0
-    // Solving: A1 = r2/(r1-r2), A2 = -r1/(r1-r2)  (sum = -1 ✓, x(0) = 1+(-1) = 0 ✓)
-    const A1 = r2 / (r1 - r2);
-    const A2 = -r1 / (r1 - r2);
-    const e1 = Math.exp(r1 * t);
-    const e2 = Math.exp(r2 * t);
-    value = 1 + A1 * e1 + A2 * e2;
-    velocity = A1 * r1 * e1 + A2 * r2 * e2;
-  }
-
+  // Делегат к общему солверу (internal/solver.ts, v0=0 — частный случай):
+  // формы решений символьно идентичны прежним построчным. Страж прежний
+  // (clampFinite) — политика этого модуля, у motion-value своя.
+  const { value, velocity } = solveSpring(params, t, 0);
   return {
     value: clampFinite(value),
     velocity: clampFinite(velocity),

@@ -119,10 +119,10 @@ export function drive(opts: DriveOptions): Promise<void> {
   // false forever (NaN comparisons), running the loop to MAX_FRAMES = 2000.
   // Mirror the validation pattern in spring.ts validate().
   if (!Number.isFinite(from)) {
-    throw new MotionParamError(`drive: 'from' must be a finite number, got ${from}`);
+    throw new MotionParamError(`drive: 'from' must be finite, got ${from}`);
   }
   if (!Number.isFinite(to)) {
-    throw new MotionParamError(`drive: 'to' must be a finite number, got ${to}`);
+    throw new MotionParamError(`drive: 'to' must be finite, got ${to}`);
   }
 
   // Validate spring params synchronously at the drive() boundary — before any
