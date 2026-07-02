@@ -356,11 +356,9 @@ describe('frame: cancelAll и синглтон', () => {
   });
 });
 
-describe('frame-api-surface-pin', () => {
-  it('ровно запиненный набор runtime-экспортов', () => {
-    expect(Object.keys(frameModule).sort()).toEqual(['createFrameLoop', 'frame']);
-  });
-
+// Пин набора runtime-экспортов живёт ТОЛЬКО в frame-api-surface-pin.test.ts
+// (один источник истины: два пина одного контракта = coupled-дубль).
+describe('frame SSR-safety', () => {
   it('SSR: import + фабрика в node не бросают; дефолтный синглтон ленив', () => {
     expect(() => {
       const loop = createFrameLoop({ requestFrame: () => 1 });

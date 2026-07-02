@@ -20,7 +20,7 @@
 import { describe, expect, it } from 'vitest';
 import * as frameModule from '../src/frame/index.js';
 
-const EXPECTED_EXPORTS = new Set(['createFrameLoop', 'frame']);
+const EXPECTED_EXPORTS = new Set(['createFrameLoop', 'frame', 'asRequestFrame']);
 
 describe('./frame public API surface pin (North invariant #6)', () => {
   it('экспортирует ровно контрактные имена — ни больше, ни меньше', () => {
@@ -35,6 +35,14 @@ describe('./frame public API surface pin (North invariant #6)', () => {
 
   it('createFrameLoop — функция', () => {
     expect(typeof frameModule.createFrameLoop).toBe('function');
+  });
+
+  it('asRequestFrame — функция, возвращающая RequestFrameFn с ненулевым handle', () => {
+    const loop = frameModule.createFrameLoop({ requestFrame: () => 1 });
+    const rf = frameModule.asRequestFrame(loop);
+    expect(typeof rf).toBe('function');
+    expect(rf(() => {})).not.toBe(0);
+    loop.cancelAll();
   });
 });
 
