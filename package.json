@@ -113,6 +113,11 @@
       "types": "./dist/auto/index.d.ts",
       "import": "./dist/auto/index.js",
       "require": "./dist/auto/index.cjs"
+    },
+    "./svg-morph": {
+      "types": "./dist/svg-morph/index.d.ts",
+      "import": "./dist/svg-morph/index.js",
+      "require": "./dist/svg-morph/index.cjs"
     }
   },
   "files": [
