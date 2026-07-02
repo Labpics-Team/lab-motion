@@ -8,6 +8,20 @@ Headless-движок анимаций без runtime-зависимостей. 
 ХАРАКТЕР анимации, а не выключает её грубо. Каждая фича — изолированный
 subpath: в бандл попадает только то, что импортировано.
 
+## Установка
+
+Пакет пока не опубликован в npm (публикация — отдельное решение). До этого —
+установка из тарбола (git-install не поддержан: `dist/` собирается, в гите его нет):
+
+```bash
+cd lab-motion && pnpm build && pnpm pack   # → labpics-motion-1.0.0.tgz
+cd ваш-проект && pnpm add /путь/к/labpics-motion-1.0.0.tgz
+```
+
+Требования: Node ≥18. Рантайм-зависимостей нет; фреймворк для биндингов —
+peer (ставится у потребителя). Целостность артефакта проверяется
+`pnpm pack:smoke` (тарбол → чистый проект → импорт всех субпутей).
+
 ## Как собрать
 
 ```bash
@@ -41,6 +55,7 @@ pnpm size       # замер gz всех субпутей
 | `…/auto` | Zero-config FLIP: `autoAnimate(parent)` — add/remove/move детей анимируются сами (класс AutoAnimate); reduced-motion меняет характер (move→снап), не выключает |
 | `…/svg-morph` | Морфинг путей: `interpolatePath(dFrom, dTo)` — точный режим при совпадающей структуре, ресэмплинг с выравниванием старта/обхода замкнутых при разной |
 | `…/frame` | Единый frame-шедулер: `createFrameLoop` / синглтон `frame` — один rAF на кадр, фазы read→update→render против layout-thrash, ленивый старт/стоп, SSR-safe; `asRequestFrame(loop)` сажает MotionValue/drive на общий кадр через `opts.requestFrame` (N значений = один rAF) |
+| `…/presets` | Словарь generic-движений «от смысла» (иконки): 10 фабрик (pulse, blink, wiggle…), мультитрековые кейфреймы (scale/rotate/x/y/opacity/progress), `runPreset` с виртуальным временем, `presetToWaapi` |
 | `…/react` | React: `useSpring`, `useMotionValue` |
 | `…/preact` | Preact: `useSpring`, `useMotionValue` (зеркало react-биндинга поверх `preact/hooks`) |
 | `…/solid` | Solid: `createSpring`, `createMotionValue` (сигналы, авто-уборка через `onCleanup`) |

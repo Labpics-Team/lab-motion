@@ -2,8 +2,29 @@
   "name": "@labpics/motion",
   "version": "1.0.0",
   "private": false,
-  "description": "Dependency-free motion engine (spring solver + declarative API).",
+  "description": "Headless zero-dependency motion engine: analytic spring solver, keyframes, timeline, FLIP, gestures, WAAPI compositor path, 9 framework bindings.",
   "license": "MIT",
+  "author": "Labpics",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/Labpics-Team/lab-motion.git"
+  },
+  "keywords": [
+    "animation",
+    "motion",
+    "spring",
+    "physics",
+    "keyframes",
+    "timeline",
+    "flip",
+    "waapi",
+    "headless",
+    "zero-dependency"
+  ],
+  "engines": {
+    "node": ">=18"
+  },
+  "packageManager": "pnpm@10.34.4",
   "type": "module",
   "main": "./dist/index.cjs",
   "module": "./dist/index.js",
@@ -164,7 +185,9 @@
     "typecheck": "tsc --noEmit",
     "test": "vitest run",
     "test:watch": "vitest",
-    "size": "node scripts/size-gate.mjs"
+    "size": "node scripts/size-gate.mjs",
+    "pack:smoke": "node scripts/pack-smoke.mjs",
+    "prepublishOnly": "pnpm typecheck && pnpm build && pnpm test && pnpm size"
   },
   "peerDependencies": {
     "@angular/core": ">=16.0.0",

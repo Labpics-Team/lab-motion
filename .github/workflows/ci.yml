@@ -40,3 +40,6 @@ jobs:
 
       - name: Size gate
         run: pnpm size
+
+      - name: Pack smoke (артефакт потребителя — exports/files из тарбола)
+        run: pnpm pack:smoke
