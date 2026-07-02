@@ -1,18 +1,24 @@
 /**
  * size-gate.mjs — размерный гейт @labpics/motion
  *
- * Измеряет gz-вес каждого ESM-subpath в dist/ после tsup-сборки.
- * Использует только встроенные модули Node.js (>=18) — нет внешних зависимостей.
+ * Две метрики, обе жёсткие (превышение или отсутствующий dist-файл → exit 1):
  *
- * Список subpath-точек ВЫВОДИТСЯ АВТОМАТИЧЕСКИ из package.json → "exports":
- * каждый ключ exports с полем "import" становится строкой отчёта. Добавление
- * нового subpath-экспорта в package.json подхватывается без правки этого файла.
+ * 1. ШИПНУТЫЙ вес: gz каждого ESM-subpath в dist/ (что качает CDN/raw-потребитель).
+ *    Список subpath-точек выводится АВТОМАТИЧЕСКИ из package.json → "exports".
+ *    Порог несёт только ядро (".").
  *
- * Гейт ЖЁСТКИЙ: превышение порога ядра, отсутствующий dist-файл экспорта или
- * превышение full-bundle-гейта → exit 1 (CI красный). Регрессия размера —
- * ровно тот класс, ради которого существовал срез s09 (5283→2092 gz);
- * advisory-режим пропускал её зелёной (QA-нота PR #38: мутант мангла +6.6%
- * прошёл CI).
+ * 2. СЦЕНАРНЫЙ import-cost: сколько gz реально платит npm-потребитель за
+ *    типовой импорт — esbuild bundle+minify против dist (ровно то, что сделает
+ *    его бандлер). Это главный потребительский гейт: он ловит и регрессию
+ *    tree-shakeability (раздутый сценарий при неизменном шипнутом весе), и
+ *    совокупное раздувание — поэтому отдельного «full-bundle»-гейта нет.
+ *    Заземление 2026-07-02: шипнутый terser-минифицированный dist трясётся
+ *    esbuild'ом ЛУЧШЕ неминифицированного во всех сценариях (856 vs 873 /
+ *    1536 vs 1701 / 2173 vs 2350 gz) — mangle /^_/ даёт выигрыш, который
+ *    бандлер потребителя сам не получит; двойной dist не нужен.
+ *
+ * Пороги — РЕГРЕССИОННЫЕ потолки (факт + люфт на шум минификаторов), не цели;
+ * не поднимать без явного решения Даниила.
  *
  * Использование:
  *   node scripts/size-gate.mjs
@@ -22,17 +28,61 @@
 import { readFileSync } from 'node:fs';
 import { gzipSync } from 'node:zlib';
 import { resolve, dirname } from 'node:path';
-import { fileURLToPath } from 'node:url';
+import { pathToFileURL, fileURLToPath } from 'node:url';
+import { build } from 'esbuild';
 
-// Порог (в байтах) для ядра пакета (".") — РЕГРЕССИОННЫЙ потолок, не цель:
-// фактический вес после s09 = ~2090 gz + небольшой люфт на шум терсера.
-// PRD-цель <2048 остаётся open item (хвост −44 gz — следующий спринт);
+// Порог (в байтах) для ядра пакета (".") — фактический вес после s09 = ~2090 gz
+// + небольшой люфт. PRD-цель <2048 остаётся open item (хвост −44 gz);
 // после её достижения порог опустить до 2048.
 export const CORE_GATE_BYTES = 2150;
 
-// Планируемые subpath-плагины, из которых складывается "полный бандл".
-// Пока не ВСЕ смержены в exports — совокупный гейт <8 KB остаётся PLACEHOLDER.
-export const PLANNED_PLUGIN_SUBPATHS = ['./timeline', './stagger', './svg', './layout'];
+/**
+ * Потребительские сценарии: код — то, что реально пишет потребитель;
+ * gate — потолок от замера 2026-07-02 (+~4% люфт). `%DIST%` подставляется
+ * абсолютным путём dist/index.js.
+ */
+export const IMPORT_COST_SCENARIOS = [
+  {
+    name: 'only-spring',
+    code: `import { spring } from '%DIST%'; console.log(spring({mass:1,stiffness:200,damping:20}, 0.1).value);`,
+    gate: 900, // факт 856
+  },
+  {
+    name: 'only-MotionValue',
+    code: `import { MotionValue } from '%DIST%'; const m = new MotionValue({initial:0, spring:{mass:1,stiffness:200,damping:20}}); m.onChange(v=>console.log(v)); m.setTarget(1);`,
+    gate: 1600, // факт 1536
+  },
+  {
+    name: 'full-core',
+    code: `import * as M from '%DIST%'; console.log(Object.keys(M).length, M.spring({mass:1,stiffness:200,damping:20},0.1).value);`,
+    gate: 2250, // факт 2173
+  },
+];
+
+/**
+ * Меряет один сценарий: esbuild stdin (без временных файлов) → minify ESM →
+ * gz level-9. Ошибка сборки (пропавший экспорт, битый dist) НЕ маскируется —
+ * возвращается error, гейт падает громко.
+ */
+export async function measureScenario(scenario, distIndexPath) {
+  // Прямые слэши: esbuild принимает абсолютный путь как спецификатор,
+  // но не file://-URL; бэкслэши Windows ломают парсинг строки-импорта.
+  const code = scenario.code.replaceAll('%DIST%', distIndexPath.replace(/\\/g, '/'));
+  try {
+    const result = await build({
+      stdin: { contents: code, resolveDir: dirname(distIndexPath), loader: 'js' },
+      bundle: true,
+      minify: true,
+      format: 'esm',
+      write: false,
+      logLevel: 'silent',
+    });
+    const out = result.outputFiles[0].contents;
+    return { name: scenario.name, gzBytes: gzipSync(out, { level: 9 }).length, rawBytes: out.length, gate: scenario.gate };
+  } catch (err) {
+    return { name: scenario.name, error: String(err?.message ?? err).split('\n')[0], gate: scenario.gate };
+  }
+}
 
 /**
  * Рекурсивно достаёт СТРОКОВЫЙ путь из conditional-exports значения.
@@ -78,19 +128,6 @@ export function deriveEntriesFromExports(pkg) {
     .filter(Boolean);
 }
 
-/** Ключи exports из PLANNED_PLUGIN_SUBPATHS, которых ещё нет в package.json. */
-export function getMissingPlannedSubpaths(pkg) {
-  const exportsField = pkg.exports ?? {};
-  return PLANNED_PLUGIN_SUBPATHS.filter(
-    subpath => !Object.prototype.hasOwnProperty.call(exportsField, subpath)
-  );
-}
-
-/** true когда ВСЕ запланированные subpath-плагины уже присутствуют в exports. */
-export function isFullBundleReady(pkg) {
-  return getMissingPlannedSubpaths(pkg).length === 0;
-}
-
 /**
  * Измеряет gz-вес каждой entry относительно ROOT. Чистая функция ввода/вывода
  * данных (без console.log) — тестируема отдельно от CLI-форматирования.
@@ -130,13 +167,12 @@ export function measureEntries(entries, root) {
   return { rows, totalGzBytes, hasWarnings };
 }
 
-function runCli() {
+async function runCli() {
   const __dirname = dirname(fileURLToPath(import.meta.url));
   const ROOT = resolve(__dirname, '..');
 
   const pkg = JSON.parse(readFileSync(resolve(ROOT, 'package.json'), 'utf8'));
   const entries = deriveEntriesFromExports(pkg);
-  const fullBundleReady = isFullBundleReady(pkg);
   const { rows, totalGzBytes, hasWarnings: measuredWarnings } = measureEntries(entries, ROOT);
   let hasWarnings = measuredWarnings;
 
@@ -193,18 +229,23 @@ core (index) gz = ${(core.gzBytes / 1024).toFixed(2)} KB > порог ${(core.ga
     }
   }
 
-  if (!fullBundleReady) {
-    const missing = getMissingPlannedSubpaths(pkg);
-    console.log(`PLACEHOLDER: full-bundle gate <8.0 KB gz (${missing.join(', ')} ещё не реализованы)
-  Активировать когда все subpath-плагины смержены в main.
-`);
-  } else {
-    const FULL_BUNDLE_GATE_BYTES = 8192;
-    const exceeded = totalGzBytes > FULL_BUNDLE_GATE_BYTES;
+  // ─── сценарный import-cost (главный потребительский гейт) ───────────────
+
+  console.log('\nimport-cost потребителя (esbuild bundle+minify+gz против dist)\n');
+  const distIndexPath = resolve(ROOT, 'dist/index.js');
+  for (const scenario of IMPORT_COST_SCENARIOS) {
+    const m = await measureScenario(scenario, distIndexPath);
+    if (m.error) {
+      hasWarnings = true;
+      console.log(pad(m.name, COL.label) + `  FAIL: ${m.error}`);
+      continue;
+    }
+    const exceeded = m.gzBytes > m.gate;
     if (exceeded) hasWarnings = true;
     console.log(
-      `full bundle (${rows.length} subpaths) = ${totalFmt} KB gz` +
-      (exceeded ? ` — WARN > ${(FULL_BUNDLE_GATE_BYTES / 1024).toFixed(1)} KB gz [OPEN ITEM]` : ' — OK')
+      pad(m.name, COL.label) +
+      lpad(`${m.gzBytes} B gz`, COL.gz) +
+      `  ${exceeded ? `РЕГРЕССИЯ > ${m.gate} B (найди раздувший коммит; порог не поднимать без решения Даниила)` : `OK (порог ${m.gate})`}`
     );
   }
 
@@ -222,5 +263,9 @@ core (index) gz = ${(core.gzBytes / 1024).toFixed(2)} KB > порог ${(core.ga
 // не при импорте функций в тестах.
 const isDirectRun = process.argv[1] && resolve(process.argv[1]) === fileURLToPath(import.meta.url);
 if (isDirectRun) {
-  runCli();
+  runCli().catch((err) => {
+    // Сломанный замер не имеет права выглядеть зелёным.
+    console.error('size-gate: внутренняя ошибка —', err);
+    process.exit(1);
+  });
 }
