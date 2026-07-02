@@ -123,6 +123,25 @@ describe('wc: <lab-spring> — жизненный цикл и анимация',
 });
 
 describe('wc: враждебные входы и reduced-motion', () => {
+  it('observedAttributes запинен: контракт с платформой (браузер диспетчит только их)', () => {
+    const Ctor = createLabSpringElementClass(FakeBase) as unknown as {
+      observedAttributes: string[];
+    };
+    expect(Ctor.observedAttributes).toEqual(['target', 'property', 'template']);
+  });
+
+  it('бросающий matchMedia не роняет колбэк: catch → full-motion', () => {
+    const { el, vc } = makeEl({
+      matchMedia: () => {
+        throw new Error('legacy среда');
+      },
+    });
+    el.connectedCallback();
+    expect(() => el.attributeChangedCallback('target', null, '1')).not.toThrow();
+    vc.drainAll(); // пошёл обычный пружинный путь
+    expect(Math.abs(Number(el.style['opacity']) - 1)).toBeLessThan(0.01);
+  });
+
   it('невалидный target-атрибут игнорируется (HTML-конвенция, без броска)', () => {
     const { el, vc } = makeEl();
     el.connectedCallback();

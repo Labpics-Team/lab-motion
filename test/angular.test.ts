@@ -155,6 +155,25 @@ describe('angular: injectSpring', () => {
     expect(x()).toBe(100); // не загрязнён
   });
 
+  it('reduced + разрушенный скоуп: setTarget не трогает сигнал (destroyed — единственный барьер в обход ядра)', async () => {
+    (globalThis as { window?: unknown }).window = {
+      matchMedia: () => ({ matches: true }),
+    };
+    const { injectSpring } = await import('../src/angular/index.js');
+    const vc = makeVirtualClock();
+    const [x, setX] = runInContext(() => injectSpring(7, SPRING, 'instant', vc.requestFrame));
+    destroyScope();
+    setX(50); // reduced-путь пишет в сигнал напрямую — обязан уважать destroy
+    expect(x()).toBe(7);
+  });
+
+  it('наружу отдаётся readonly-сигнал: set недоступен потребителю', async () => {
+    const { injectSpring } = await import('../src/angular/index.js');
+    const vc = makeVirtualClock();
+    const [x] = runInContext(() => injectSpring(0, SPRING, 'instant', vc.requestFrame));
+    expect(typeof (x as unknown as { set?: unknown }).set).not.toBe('function');
+  });
+
   it('дефолтный spring исполняется: доезжает без явных параметров', async () => {
     const { injectSpring } = await import('../src/angular/index.js');
     const vc = makeVirtualClock();
