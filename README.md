@@ -14,8 +14,8 @@ subpath: в бандл попадает только то, что импорти
 установка из тарбола (git-install не поддержан: `dist/` собирается, в гите его нет):
 
 ```bash
-cd lab-motion && pnpm build && pnpm pack   # → labpics-motion-1.0.0.tgz
-cd ваш-проект && pnpm add /путь/к/labpics-motion-1.0.0.tgz
+cd lab-motion && pnpm build && pnpm pack   # → labpics-motion-<версия>.tgz
+cd ваш-проект && pnpm add /путь/к/labpics-motion-<версия>.tgz
 ```
 
 Требования: Node ≥18. Рантайм-зависимостей нет; фреймворк для биндингов —

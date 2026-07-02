@@ -96,6 +96,19 @@ try {
   for (const f of ['LICENSE', 'README.md', 'package.json']) {
     if (!existsSync(join(installedRoot, f))) { failed = true; log(`FAIL: ${f} не в артефакте`); }
   }
+
+  // 5. Sourcemaps НЕ имеют права попасть в артефакт: sourcesContent раскрывает
+  //    полные исходники приватного репо (прецедент @labpics/colors — без карт).
+  const walk = (dir) => readdirSync(dir, { withFileTypes: true }).flatMap((e) =>
+    e.isDirectory() ? walk(join(dir, e.name)) : [join(dir, e.name)]
+  );
+  const maps = walk(installedRoot).filter((f) => f.endsWith('.map'));
+  if (maps.length > 0) {
+    failed = true;
+    log(`FAIL: sourcemaps в артефакте (${maps.length} шт.): ${maps[0]}`);
+  } else {
+    log('sourcemaps: отсутствуют в артефакте ✓');
+  }
 } catch (err) {
   failed = true;
   console.error('pack-smoke: сбой —', err?.stderr?.toString?.() || err?.message || err);
