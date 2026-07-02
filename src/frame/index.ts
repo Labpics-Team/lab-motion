@@ -165,3 +165,22 @@ export function createFrameLoop(options?: { requestFrame?: RequestFrameFn }): Fr
  * импорт SSR-safe; rAF затрагивается только первой подпиской.
  */
 export const frame: FrameLoop = createFrameLoop();
+
+/**
+ * Адаптер к шву инъекции ядра: превращает цикл в RequestFrameFn, сажая
+ * MotionValue/drive/driver на ОДИН общий кадр (закрывает D11: N живых
+ * значений = один rAF, не N). Зависимость инвертирована: ядро про ./frame
+ * не знает — адаптер входит через существующий opts.requestFrame.
+ *
+ * Заявка = once-подписка фазы update: ядро перезаявляется из собственного
+ * тика, и батч-семантика цикла (заявка из тика → следующий кадр)
+ * воспроизводит семантику нативного rAF один-в-один. Handle всегда
+ * ненулевой: 0 по контракту ядра означает non-draining тест-клок и включил
+ * бы параллельный setTimeout-путь (класс двойного цикла — Finding 3).
+ */
+export function asRequestFrame(loop: FrameLoop = frame): RequestFrameFn {
+  return (cb) => {
+    loop.update(cb, { once: true });
+    return 1;
+  };
+}
