@@ -112,6 +112,7 @@ describe('auto: строители кейфреймов', () => {
 interface FakeAnimation {
   onfinish: (() => void) | null;
   cancelled: boolean;
+  cancel(): void;
 }
 
 function fakeEl(rect: { x: number; y: number; width: number; height: number }, name = '') {
@@ -128,7 +129,13 @@ function fakeEl(rect: { x: number; y: number; width: number; height: number }, n
     },
     animate(keyframes: unknown, timing: Record<string, unknown>) {
       animateCalls.push({ keyframes, timing });
-      const a: FakeAnimation = { onfinish: null, cancelled: false };
+      const a: FakeAnimation = {
+        onfinish: null,
+        cancelled: false,
+        cancel() {
+          this.cancelled = true;
+        },
+      };
       animations.push(a);
       return a;
     },
@@ -136,7 +143,7 @@ function fakeEl(rect: { x: number; y: number; width: number; height: number }, n
 }
 type FakeEl = ReturnType<typeof fakeEl>;
 
-function fakeParent(children: FakeEl[]) {
+function fakeParent(children: FakeEl[], border = { left: 0, top: 0 }) {
   const appended: FakeEl[] = [];
   const removed: FakeEl[] = [];
   const parent = {
@@ -144,6 +151,8 @@ function fakeParent(children: FakeEl[]) {
     appended,
     removed,
     style: {} as Record<string, string>,
+    clientLeft: border.left,
+    clientTop: border.top,
     getBoundingClientRect() {
       return { x: 0, y: 0, width: 500, height: 500 };
     },
@@ -251,6 +260,43 @@ describe('auto: autoAnimate — адаптер (duck-typed DOM)', () => {
     expect(parent.removed).not.toContain(doomed);
     doomed.animations[0]!.onfinish!();
     expect(parent.removed).toContain(doomed);
+  });
+
+  it('border родителя учитывается: absolute считается от padding-box (минус clientLeft/clientTop)', () => {
+    const seam = fakeObserverSeam();
+    const doomed = fakeEl(R(20, 40), 'doomed');
+    const parent = fakeParent([doomed], { left: 5, top: 3 });
+    autoAnimate(parent as never, { MutationObserverCtor: seam.Ctor as never });
+    parent.children = parent.children.filter((c) => c !== doomed);
+    seam.state.callback!([{ addedNodes: [], removedNodes: [doomed] }]);
+    expect(doomed.style['left']).toBe('15px'); // 20 − 0 − 5
+    expect(doomed.style['top']).toBe('37px'); // 40 − 0 − 3
+  });
+
+  it('реинкарнация во время exit: эхо своего re-append не путается с возвратом потребителя', () => {
+    const seam = fakeObserverSeam();
+    const phoenix = fakeEl(R(10, 10), 'phoenix');
+    const parent = fakeParent([phoenix]);
+    autoAnimate(parent as never, { MutationObserverCtor: seam.Ctor as never });
+    // удаление → exit пошёл (адаптер сам re-append'ит узел absolute)
+    parent.children = parent.children.filter((c) => c !== phoenix);
+    seam.state.callback!([{ addedNodes: [], removedNodes: [phoenix] }]);
+    const exitAnim = phoenix.animations[0]!;
+    expect(phoenix.style['position']).toBe('absolute');
+    // эхо-запись нашего же re-append (реальный MutationObserver её принесёт)
+    seam.state.callback!([{ addedNodes: [phoenix], removedNodes: [] }]);
+    expect(exitAnim.cancelled).toBe(false); // эхо потреблено, exit живёт
+    expect(phoenix.style['position']).toBe('absolute');
+    // а теперь ПОТРЕБИТЕЛЬ вернул тот же узел до onfinish
+    seam.state.callback!([{ addedNodes: [phoenix], removedNodes: [] }]);
+    expect(exitAnim.cancelled).toBe(true); // exit отменён
+    expect(phoenix.style['position']).toBe(''); // наши инлайны сняты
+    expect(phoenix.style['left']).toBe('');
+    expect(phoenix.style['top']).toBe('');
+    expect(phoenix.animateCalls).toHaveLength(2); // exit + enter
+    const enterKf = phoenix.animateCalls[1]!.keyframes as Record<string, unknown>[];
+    expect(enterKf.map((k) => k['opacity'])).toEqual([0, 1]);
+    expect(parent.removed).not.toContain(phoenix); // onfinish отменённого не удалит
   });
 
   it('reduced-motion (по умолчанию уважается): move НЕ анимируется (снап), exit — opacity', () => {

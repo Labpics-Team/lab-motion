@@ -125,19 +125,26 @@ export function exitKeyframes(): Record<string, string | number>[] {
 
 // ─── DOM-адаптер ─────────────────────────────────────────────────────────────
 
+/** Хендл нативной Animation в объёме, нужном адаптеру. */
+interface AnimationLike {
+  /** Владение onfinish exit-анимации — у адаптера (физическое удаление узла). */
+  onfinish: (() => void) | null;
+  cancel?(): void;
+}
+
 /** Duck-typed минимум ребёнка: замер + WAAPI + инлайн-стили. */
 interface AutoChild {
   getBoundingClientRect(): FlipRect;
-  animate?(
-    keyframes: Record<string, string | number>[],
-    timing: object,
-  ): { onfinish: (() => void) | null };
+  animate?(keyframes: Record<string, string | number>[], timing: object): AnimationLike;
   style: Record<string, string>;
 }
 
 /** Duck-typed минимум родителя (реальный Element соответствует). */
 export interface AutoParent {
   readonly children: ArrayLike<AutoChild> & Iterable<AutoChild>;
+  /** Ширина бордера (absolute-дети позиционируются от padding-box). */
+  readonly clientLeft?: number;
+  readonly clientTop?: number;
   getBoundingClientRect(): FlipRect;
   appendChild(child: AutoChild): unknown;
   removeChild(child: AutoChild): unknown;
@@ -230,8 +237,10 @@ export function autoAnimate(
   const reduce = resolveReduce(options);
 
   let disabled = false;
-  /** Узлы, доигрывающие exit: вне планирования до физического удаления. */
-  const exiting = new Set<AutoChild>();
+  /** Узлы, доигрывающие exit (и их анимации): вне планирования до удаления. */
+  const exiting = new Map<AutoChild, AnimationLike>();
+  /** Эхо наших собственных re-append'ов: observer увидит их как addedNodes. */
+  const selfEcho = new Set<AutoChild>();
 
   const snapshot = (): [AutoChild, FlipRect][] => {
     const entries: [AutoChild, FlipRect][] = [];
@@ -243,7 +252,30 @@ export function autoAnimate(
 
   let cache = snapshot();
 
-  const onRecords = (): void => {
+  const onRecords = (records: readonly unknown[]): void => {
+    // Пре-пасс реинкарнаций: узел в addedNodes, доигрывающий exit, — либо эхо
+    // нашего же re-append (потребляется один раз), либо потребитель вернул
+    // узел до onfinish → exit отменяется (onfinish отменённого не сработает),
+    // наши инлайны снимаются, дальше узел планируется как обычный enter.
+    for (const record of records) {
+      const added = (record as { addedNodes?: ArrayLike<AutoChild> }).addedNodes;
+      if (added === undefined) continue;
+      for (const node of Array.from(added)) {
+        const exitAnim = exiting.get(node);
+        if (exitAnim === undefined) continue;
+        if (selfEcho.has(node)) {
+          selfEcho.delete(node);
+          continue;
+        }
+        exitAnim.onfinish = null;
+        exitAnim.cancel?.();
+        exiting.delete(node);
+        node.style['position'] = '';
+        node.style['left'] = '';
+        node.style['top'] = '';
+      }
+    }
+
     const current = snapshot();
     if (disabled) {
       cache = current;
@@ -252,15 +284,18 @@ export function autoAnimate(
     const plan = planAuto(cache, current, epsilon);
 
     // Уходящие: реинсерт absolute на прежнем месте, exit, удаление на onfinish.
+    // left/top отсчитываются от padding-box родителя — border вычитается
+    // через clientLeft/clientTop (иначе узел уезжает вглубь на его ширину).
     const parentRect = parent.getBoundingClientRect();
     for (const [node, rect] of plan.exits) {
       if (typeof node.animate !== 'function') continue;
       node.style['position'] = 'absolute';
-      node.style['left'] = `${num(rect.x - parentRect.x)}px`;
-      node.style['top'] = `${num(rect.y - parentRect.y)}px`;
-      exiting.add(node);
+      node.style['left'] = `${num(rect.x - parentRect.x - (parent.clientLeft ?? 0))}px`;
+      node.style['top'] = `${num(rect.y - parentRect.y - (parent.clientTop ?? 0))}px`;
+      selfEcho.add(node);
       parent.appendChild(node);
       const anim = node.animate(exitKeyframes(), timing);
+      exiting.set(node, anim);
       anim.onfinish = (): void => {
         exiting.delete(node);
         parent.removeChild(node);
