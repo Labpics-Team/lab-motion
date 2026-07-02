@@ -30,10 +30,10 @@ import { type RequestFrameFn } from '../motion-value.js';
 /** Тег custom element'а. */
 export const LAB_MOTION_SPRING_TAG = 'lab-motion-spring';
 
-// Вынесено в internal/template.ts (общий источник с ./wc); реэкспорт
-// сохраняет запиненную поверхность субпутя.
+// Вынесено в internal/template.ts (общий источник с ./wc). Публичная
+// поверхность ./lit определяется lit/index.ts и символ не содержит;
+// глубокие импорты element.js заблокированы exports-картой package.json.
 import { renderTemplateValue } from '../internal/template.js';
-export { renderTemplateValue };
 
 /**
  * `<lab-motion-spring>` — фреймворк-независимая обёртка над MotionController.
