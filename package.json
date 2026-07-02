@@ -138,6 +138,11 @@
       "types": "./dist/wc/index.d.ts",
       "import": "./dist/wc/index.js",
       "require": "./dist/wc/index.cjs"
+    },
+    "./qwik": {
+      "types": "./dist/qwik/index.d.ts",
+      "import": "./dist/qwik/index.js",
+      "require": "./dist/qwik/index.cjs"
     }
   },
   "files": [
@@ -152,13 +157,14 @@
     "size": "node scripts/size-gate.mjs"
   },
   "peerDependencies": {
+    "@angular/core": ">=16.0.0",
     "lit": ">=3.0.0",
     "preact": ">=10.0.0",
     "react": ">=18.0.0",
     "solid-js": ">=1.8.0",
     "svelte": ">=4.0.0",
     "vue": ">=3.0.0",
-    "@angular/core": ">=16.0.0"
+    "@builder.io/qwik": ">=1.4.0"
   },
   "peerDependenciesMeta": {
     "lit": {
@@ -181,10 +187,14 @@
     },
     "@angular/core": {
       "optional": true
+    },
+    "@builder.io/qwik": {
+      "optional": true
     }
   },
   "devDependencies": {
     "@angular/core": "18.2.13",
+    "@builder.io/qwik": "1.19.1",
     "@types/node": "22.10.5",
     "@types/react": "18.3.12",
     "lit": "3.3.3",
