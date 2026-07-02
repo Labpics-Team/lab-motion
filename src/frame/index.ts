@@ -103,7 +103,11 @@ export function createFrameLoop(options?: { requestFrame?: RequestFrameFn }): Fr
   };
 
   const tick = (myToken: number, ts?: number): void => {
-    if (myToken !== token || !scheduled) return; // дубль/устаревший путь
+    // Токен-гард покрывает и поздний дрейн, и двойной вызов одного колбэка:
+    // каждый schedule инкрементит токен, чужой/повторный тик гаснет здесь.
+    // Отдельная scheduled-защёлка была бы мёртвым дублем (эквивалентный
+    // мутант) — scheduled остаётся только флагом «не планируй дважды».
+    if (myToken !== token) return;
     scheduled = false;
 
     // Батч кадра: снимки всех фаз ДО исполнения — add в тике ждёт следующего.

@@ -9,3 +9,4 @@ out
 .env
 .env.*
 coverage
+peer_b.json
