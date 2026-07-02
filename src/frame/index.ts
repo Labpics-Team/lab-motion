@@ -79,7 +79,10 @@ export function createFrameLoop(options?: { requestFrame?: RequestFrameFn }): Fr
       : (setTimeout(cb, FIXED_DT_S * 1000) as unknown as number);
   const requestFrame = options?.requestFrame ?? defaultRequestFrame;
 
-  const hasLive = (): boolean => phases.some((list) => list.some((e) => e.alive));
+  // После ленивой чистки в конце тика «есть живые» ≡ «списки непусты»:
+  // одна механика вместо двух дублирующих (alive-скан пинался бы только в
+  // связке с чисткой — coupled-мутант), и чистка становится несущей.
+  const hasLive = (): boolean => phases.some((list) => list.length > 0);
 
   const schedule = (): void => {
     if (scheduled) return;

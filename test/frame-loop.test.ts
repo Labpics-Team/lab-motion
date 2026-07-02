@@ -224,6 +224,102 @@ describe('frame: гонка позднего дрейна (класс Finding 3 
   });
 });
 
+describe('frame: lifecycle-классы (ноты QA-ревью)', () => {
+  it('клок-нарушитель, зовущий колбэк дважды, не даёт двойного кадра (!scheduled-защёлка)', () => {
+    let n = 0;
+    const loop = createFrameLoop({
+      requestFrame: (cb) => {
+        cb(1);
+        cb(1); // нарушение контракта клока — второй вызов обязан погаснуть
+        return 1;
+      },
+    });
+    loop.update(
+      () => {
+        n++;
+      },
+      { once: true },
+    );
+    expect(n).toBe(1);
+  });
+
+  it('cancelAll ВНУТРИ тика: соседи этого кадра не вызываются, цикл встаёт', () => {
+    const vc = makeVirtualClock();
+    const loop = createFrameLoop({ requestFrame: vc.requestFrame });
+    const calls: string[] = [];
+    loop.update(() => {
+      calls.push('a');
+      loop.cancelAll();
+    });
+    loop.update(() => calls.push('b'));
+    vc.step();
+    expect(calls).toEqual(['a']);
+    expect(vc.pending).toBe(0);
+  });
+
+  it('resubscribe после cancelAll: цикл возобновляется', () => {
+    const vc = makeVirtualClock();
+    const loop = createFrameLoop({ requestFrame: vc.requestFrame });
+    loop.update(() => {});
+    loop.cancelAll();
+    vc.step();
+    expect(vc.pending).toBe(0);
+    let n = 0;
+    loop.update(() => {
+      n++;
+    });
+    vc.step();
+    expect(n).toBe(1);
+  });
+
+  it('исключение в read-фазе не срывает update/render ТОГО ЖЕ кадра', () => {
+    const vc = makeVirtualClock();
+    const loop = createFrameLoop({ requestFrame: vc.requestFrame });
+    const calls: string[] = [];
+    loop.read(() => {
+      throw new Error('плохой read');
+    });
+    loop.update(() => calls.push('u'));
+    loop.render(() => calls.push('r'));
+    vc.step();
+    expect(calls).toEqual(['u', 'r']);
+  });
+
+  it('once, отписанный ДО первого кадра, не вызывается', () => {
+    const vc = makeVirtualClock();
+    const loop = createFrameLoop({ requestFrame: vc.requestFrame });
+    let n = 0;
+    const off = loop.update(
+      () => {
+        n++;
+      },
+      { once: true },
+    );
+    off();
+    vc.step();
+    expect(n).toBe(0);
+  });
+
+  it('два независимых createFrameLoop не мешают друг другу', () => {
+    const vcA = makeVirtualClock();
+    const vcB = makeVirtualClock();
+    const a = createFrameLoop({ requestFrame: vcA.requestFrame });
+    const b = createFrameLoop({ requestFrame: vcB.requestFrame });
+    let nA = 0;
+    let nB = 0;
+    a.update(() => {
+      nA++;
+    });
+    b.update(() => {
+      nB++;
+    });
+    vcA.step();
+    vcA.step();
+    expect(nA).toBe(2);
+    expect(nB).toBe(0);
+  });
+});
+
 describe('frame: cancelAll и синглтон', () => {
   it('cancelAll снимает все подписки всех фаз', () => {
     const vc = makeVirtualClock();
