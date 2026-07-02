@@ -26,7 +26,7 @@
  * lit-reconnect-семантики) и разрушается вместе с ним сборщиком мусора.
  */
 
-import { MotionValue, type MotionValueOptions, type RequestFrameFn } from '../motion-value.js';
+import type { MotionValue, MotionValueOptions, RequestFrameFn } from '../motion-value.js';
 import { createBoundValue } from '../internal/binding-value.js';
 import { renderTemplateValue } from '../internal/template.js';
 import { type SpringParams } from '../spring.js';

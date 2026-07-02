@@ -17,7 +17,7 @@
  */
 
 import { createSignal, getOwner, onCleanup } from 'solid-js';
-import { MotionValue, type MotionValueOptions } from '../motion-value.js';
+import type { MotionValue, MotionValueOptions } from '../motion-value.js';
 import { createBoundValue } from '../internal/binding-value.js';
 import { MotionParamError } from '../errors.js';
 import { type SpringParams } from '../spring.js';

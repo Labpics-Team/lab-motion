@@ -17,7 +17,7 @@
  *   target; only the interpolation style changes.
  */
 
-import { MotionValue, type MotionValueOptions } from '../motion-value.js';
+import type { MotionValue, MotionValueOptions } from '../motion-value.js';
 import { createBoundValue } from '../internal/binding-value.js';
 import { type SpringParams } from '../spring.js';
 

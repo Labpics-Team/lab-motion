@@ -26,7 +26,7 @@
  */
 
 import { ref, watch, onUnmounted, type Ref, type ObjectDirective } from 'vue';
-import { MotionValue, type MotionValueOptions, type RequestFrameFn } from '../motion-value.js';
+import type { MotionValue, MotionValueOptions, RequestFrameFn } from '../motion-value.js';
 import { createBoundValue } from '../internal/binding-value.js';
 import { type SpringParams } from '../spring.js';
 
