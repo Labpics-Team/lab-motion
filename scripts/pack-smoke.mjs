@@ -22,8 +22,11 @@ import { pathToFileURL, fileURLToPath } from 'node:url';
 const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '..');
 const pkg = JSON.parse(readFileSync(join(ROOT, 'package.json'), 'utf8'));
 
-// Субпути без peer-зависимостей — импортируются и исполняются в голом node.
-const RUNNABLE_SUBPATHS = ['.', './easing', './value', './driver', './keyframes', './timeline', './stagger', './decay', './svg', './svg-morph', './a11y', './spring', './frame', './presets'];
+// Биндинги требуют peer-фреймворк — исполняемо их не проверить в голом node
+// (для них остаётся структурная проверка триад ниже). ВСЁ ОСТАЛЬНОЕ из exports
+// выводится автоматически и ОБЯЗАНО импортироваться: новый субпуть попадает
+// в исполняемую проверку сам, drift-точки ручного списка не существует.
+const BINDING_SUBPATHS = new Set(['./react', './svelte', './vue', './lit', './solid', './preact', './angular', './wc', './qwik']);
 
 const work = mkdtempSync(join(tmpdir(), 'labmotion-pack-smoke-'));
 let failed = false;
@@ -46,8 +49,9 @@ try {
   });
 
   // 1. Исполняемые субпути: ESM-import + базовый вызов ядра.
+  const runnable = Object.keys(pkg.exports).filter((k) => !BINDING_SUBPATHS.has(k));
   const esmProbe = `
-    const names = ${JSON.stringify(RUNNABLE_SUBPATHS)};
+    const names = ${JSON.stringify(runnable)};
     for (const sub of names) {
       const spec = sub === '.' ? '${pkg.name}' : '${pkg.name}/' + sub.slice(2);
       const m = await import(spec);
