@@ -177,6 +177,11 @@ export const frame: FrameLoop = createFrameLoop();
  * воспроизводит семантику нативного rAF один-в-один. Handle всегда
  * ненулевой: 0 по контракту ядра означает non-draining тест-клок и включил
  * бы параллельный setTimeout-путь (класс двойного цикла — Finding 3).
+ *
+ * Дисциплина фаз: тики значений (и, значит, onChange-эмиты) исполняются в
+ * фазе update — потребитель, пишущий DOM синхронно из onChange, пишет в
+ * update, не в render. Нужна строгая read→update→render запись — буферизуй
+ * значение в onChange и пиши из своей render-подписки этого же цикла.
  */
 export function asRequestFrame(loop: FrameLoop = frame): RequestFrameFn {
   return (cb) => {

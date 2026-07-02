@@ -99,6 +99,38 @@ describe('./frame asRequestFrame — differential own-rAF vs shared-loop (Кла
     });
   }
 
+  it('журналы бит-в-бит: stop()/snapTo() в полёте + resume (orphan-заявка no-op)', () => {
+    // Пиннит cancel-free путь: заявка, уже отданная циклу до stop()/snapTo(),
+    // прилетает на следующем кадре со СТАРЫМ generation и обязана
+    // no-op'нуться (не эмитить, не перезаявляться) бит-в-бит как в own-rAF.
+    const run = (requestFrame: RequestFrameFn, step: () => void): number[] => {
+      const journal: number[] = [];
+      const mv = new MotionValue({ initial: 0, spring: UNDERDAMPED, requestFrame });
+      mv.onChange((v) => journal.push(v));
+      mv.setTarget(1);
+      for (let f = 1; f <= 15; f++) step();
+      mv.stop(); // orphan-заявка уже в очереди кадра
+      for (let f = 16; f <= 25; f++) step(); // прогон покоя: эмиссий быть не должно
+      mv.setTarget(2); // resume после stop
+      for (let f = 26; f <= 80; f++) step();
+      mv.snapTo(-1); // мгновенный снап в полёте (вторая orphan-заявка)
+      for (let f = 81; f <= 100; f++) step();
+      mv.destroy();
+      return journal;
+    };
+
+    const clockA = makeStepClock();
+    const journalOwn = run(clockA.requestFrame, clockA.step);
+
+    const clockB = makeStepClock();
+    const loop = createFrameLoop({ requestFrame: clockB.requestFrame });
+    const journalShared = run(asRequestFrame(loop), clockB.step);
+    loop.cancelAll();
+
+    expect(journalOwn.length).toBeGreaterThan(0);
+    expectJournalsBitIdentical(journalOwn, journalShared, 'stop/snapTo/resume');
+  });
+
   it('журналы бит-в-бит: два значения interleaved на одном цикле', () => {
     const run = (
       makeRequestFrame: () => RequestFrameFn,
