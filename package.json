@@ -108,6 +108,11 @@
       "types": "./dist/waapi/index.d.ts",
       "import": "./dist/waapi/index.js",
       "require": "./dist/waapi/index.cjs"
+    },
+    "./auto": {
+      "types": "./dist/auto/index.d.ts",
+      "import": "./dist/auto/index.js",
+      "require": "./dist/auto/index.cjs"
     }
   },
   "files": [
