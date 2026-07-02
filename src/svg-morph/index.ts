@@ -17,14 +17,19 @@
  *   противоположным winding), минимизируется Σd² — иначе морф
  *   «проворачивается» или схлопывается через центр.
  *
+ * СОСТАВНЫЕ пути (несколько M/m — дырки, буква «O»): морф ПЕР-ПОДКОНТУРНЫЙ
+ * (класс GSAP MorphSVG segments / flubber separate-combine). Подконтуры
+ * сопоставляются ПО ПОРЯДКУ определения (детерминизм; авторы иконок управляют
+ * соответствием порядком в d); каждая пара морфится своим режимом
+ * (точный/ресэмплинг). При разном числе лишние подконтуры появляются/исчезают
+ * через точку-центроид последнего реального партнёра противоположной стороны
+ * (enter/exit). Ведущий относительный m абсолютизируется при разбиении.
+ *
  * Скоуп-пределы:
  * - ОТКРЫТЫЕ пути с совпадающей структурой морфятся покомпонентно как есть,
  *   без пере-выравнивания — у открытого пути нет winding'а, а реверс менял бы
  *   семантику «какая точка стартует анимацию»; направление соответствия
  *   задаёт потребитель порядком точек.
- * - СОСТАВНЫЕ пути (несколько M) при ресэмплинге склеиваются в ОДИН контур:
- *   пер-подконтурный морф (дырки, буква «O» — класс GSAP MorphSVG segments)
- *   вне скоупа — разбейте составной путь на отдельные path-элементы.
  * - ОТНОСИТЕЛЬНЫЕ команды (l/c/…) в точном режиме lerp'аются посегментно как
  *   есть (дельты линейны — геометрия корректна); смешанная нотация (L vs l)
  *   считается РАЗНОЙ структурой и уходит в ресэмплинг.
@@ -132,6 +137,143 @@ function emitPolyline(points: readonly Pt[], closed: boolean): string {
 }
 
 /**
+ * Разбивает команды на подконтуры (границы — M/m); ведущий относительный m
+ * каждой группы абсолютизируется по текущей точке, поэтому каждая группа —
+ * самостоятельный d-фрагмент. Прочие команды группы не трогаются (их база —
+ * точки внутри группы).
+ */
+function splitSubpaths(cmds: readonly SVGCommand[]): SVGCommand[][] {
+  const groups: SVGCommand[][] = [];
+  let cur: SVGCommand[] = [];
+  let cx = 0;
+  let cy = 0;
+  let sx = 0;
+  let sy = 0;
+  for (const c of cmds) {
+    const upper = c.type.toUpperCase();
+    const rel = c.type !== upper;
+    const v = c.values;
+    if (upper === 'M') {
+      if (cur.length > 0) groups.push(cur);
+      const mx = rel ? cx + v[0]! : v[0]!;
+      const my = rel ? cy + v[1]! : v[1]!;
+      cur = [{ type: 'M', values: [mx, my] }];
+      cx = mx;
+      cy = my;
+      sx = mx;
+      sy = my;
+      continue;
+    }
+    cur.push(c);
+    switch (upper) {
+      case 'L':
+      case 'T':
+        cx = rel ? cx + v[0]! : v[0]!;
+        cy = rel ? cy + v[1]! : v[1]!;
+        break;
+      case 'H':
+        cx = rel ? cx + v[0]! : v[0]!;
+        break;
+      case 'V':
+        cy = rel ? cy + v[0]! : v[0]!;
+        break;
+      case 'C':
+        cx = rel ? cx + v[4]! : v[4]!;
+        cy = rel ? cy + v[5]! : v[5]!;
+        break;
+      case 'S':
+      case 'Q':
+        cx = rel ? cx + v[2]! : v[2]!;
+        cy = rel ? cy + v[3]! : v[3]!;
+        break;
+      case 'A':
+        cx = rel ? cx + v[5]! : v[5]!;
+        cy = rel ? cy + v[6]! : v[6]!;
+        break;
+      case 'Z':
+        cx = sx;
+        cy = sy;
+        break;
+    }
+  }
+  if (cur.length > 0) groups.push(cur);
+  return groups;
+}
+
+/** Полная точность (не fmt): фрагмент идёт в parsePath повторно, не в эмит. */
+function cmdsToD(cmds: readonly SVGCommand[]): string {
+  return cmds
+    .map((c) => (c.values.length > 0 ? `${c.type} ${c.values.map(String).join(' ')}` : c.type))
+    .join(' ');
+}
+
+/** Центроид формы по K равномерным сэмплам (точка появления/исчезновения). */
+function centroidOf(d: string, K: number): Pt {
+  const mp = createMotionPath(d);
+  let x = 0;
+  let y = 0;
+  for (let i = 0; i < K; i++) {
+    const q = mp.at(i / (K - 1));
+    x += q.x;
+    y += q.y;
+  }
+  return { x: x / K, y: y / K };
+}
+
+/**
+ * Составной морф: пары по порядку → рекурсивный interpolatePath на каждой;
+ * непарные подконтуры растут из / стягиваются в центроид последнего реального
+ * партнёра противоположной стороны. Эндпоинты отдают оригинальные строки.
+ */
+function compoundFn(
+  dFrom: string,
+  dTo: string,
+  fromGroups: readonly SVGCommand[][],
+  toGroups: readonly SVGCommand[][],
+  samples: number,
+): (p: number) => string {
+  const P = Math.max(fromGroups.length, toGroups.length);
+  const parts: Array<(p: number) => string> = [];
+  for (let i = 0; i < P; i++) {
+    const gF = fromGroups[i];
+    const gT = toGroups[i];
+    if (gF && gT) {
+      parts.push(interpolatePath(cmdsToD(gF), cmdsToD(gT), { samples }));
+      continue;
+    }
+    const real = (gF ?? gT)!;
+    const realD = cmdsToD(real);
+    // Точка enter/exit — центроид последнего подконтура ПРОТИВОПОЛОЖНОЙ
+    // стороны: исчезающий стягивается в систему координат цели, появляющийся
+    // рождается из неё.
+    const partner = gF ? toGroups[toGroups.length - 1]! : fromGroups[fromGroups.length - 1]!;
+    const c = centroidOf(cmdsToD(partner), samples);
+    const mp = createMotionPath(realD);
+    const closedSub = isClosed(real);
+    const realPts: Pt[] = Array.from({ length: samples }, (_, k) => {
+      const t = closedSub ? k / samples : k / (samples - 1);
+      const { x, y } = mp.at(t);
+      return { x, y };
+    });
+    const growing = gT !== undefined; // нет во from → рождается
+    parts.push((p: number): string => {
+      const w = growing ? p : 1 - p; // вес реальной формы
+      const pts = realPts.map((q) => ({
+        x: c.x + (q.x - c.x) * w,
+        y: c.y + (q.y - c.y) * w,
+      }));
+      return emitPolyline(pts, closedSub);
+    });
+  }
+  return (p: number): string => {
+    const t = clamp01(p);
+    if (t <= 0) return dFrom;
+    if (t >= 1) return dTo;
+    return parts.map((f) => f(t)).join(' ');
+  };
+}
+
+/**
  * Морф dFrom → dTo. Возвращает чистую функцию p∈[0,1] → d-строка
  * (p клампится, NaN→0; p<=0/p>=1 отдают оригинальные строки).
  */
@@ -148,6 +290,13 @@ export function interpolatePath(
   }
   const cmdsFrom = parsePath(dFrom);
   const cmdsTo = parsePath(dTo);
+
+  // Составной путь с любой стороны → пер-подконтурный морф.
+  const fromGroups = splitSubpaths(cmdsFrom);
+  const toGroups = splitSubpaths(cmdsTo);
+  if (fromGroups.length > 1 || toGroups.length > 1) {
+    return compoundFn(dFrom, dTo, fromGroups, toGroups, samples);
+  }
 
   const closed = isClosed(cmdsFrom) && isClosed(cmdsTo);
   const exactCandidate = sameStructure(cmdsFrom, cmdsTo) && !hasArcs(cmdsFrom);
