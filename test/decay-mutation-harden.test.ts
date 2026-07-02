@@ -129,6 +129,14 @@ describe('D2 accept-путь restDelta (строки 173, 175)', () => {
     const d = createDecay({ from: 0, velocity: 100, restDelta: NaN });
     expect(d.isSettledAt(100)).toBe(true);
   });
+  it('restDelta=Infinity → дефолт (кусает 173 Logical &&→||: пропустил бы isFinite)', () => {
+    // Мутант 173 первый `&&`→`||`: `restDelta!==undefined || isFinite && >=0` = A||(B&&C).
+    // restDelta=Inf: A=true → закорачивает → принимает Infinity → isSettledAt всегда true.
+    // Здоровый: isFinite(Inf)=false → дефолт 0.5 → при velocity=80 isSettledAt(0)=false.
+    // Замер диверсии: мутант isSettledAt(0)=true, здоровый=false.
+    const d = createDecay({ from: 0, velocity: 100, restDelta: Infinity });
+    expect(d.isSettledAt(0)).toBe(false); // velocity=80 > дефолт 0.5 (мутант дал бы true)
+  });
 });
 
 // ─── D3 — сообщения ошибок называют параметр (строки 153, 157) ──────────────────
@@ -219,9 +227,9 @@ describe('D4 matchMedia reduced-motion (строки 110, 112)', () => {
 //   • 163:5 / 167:5 / 173:5 (`options.knob !== undefined` в accept-guard): ИЗБЫТОЧЕН с
 //     `Number.isFinite(knob)` — isFinite(undefined)=false и так дефолтит. `!==undefined`→
 //     true даёт тот же результат (isFinite ловит undefined). Эквивалент.
-//   • 173:5 LogicalOperator `(A&&B)` → `(A||B)` (A=!==undefined, B=isFinite): при A=false
-//     (undefined) B=isFinite(undefined)=false тоже → `A||B`=false, как `A&&B`. Различия нет
-//     (A false ⟹ B false). Эквивалент. (Второй Logical `||C` — УБИТ D2 restDelta=-1.)
+//   (173:5 LogicalOperator оба `&&`→`||` — НЕ эквиваленты, УБИТЫ D2: первый
+//    `A||( B&&C )` принимает Infinity/невалид через закорачивание A → restDelta=Infinity/
+//    NaN/-1 тесты краснеют; второй `(A&&B)||C` принимает -1 → restDelta=-1 тест краснеет.)
 describe('документированные эквиваленты decay (обоснование, не театр)', () => {
   it('clampT/Infinity-short-circuit: valueAt(∞)=rest, velocityAt(∞)=0 без спец-ветки (205,213)', () => {
     // Характеризация: результат в пределе t→∞ совпадает со short-circuit.

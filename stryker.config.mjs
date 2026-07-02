@@ -14,8 +14,10 @@
  *   - decay 86.92% (S40: 63.55%→86.92%, закалка — overflow amplitude/rest ±MAX_VALUE,
  *     accept-пути knobs power/timeConstant/restDelta, сообщения ошибок, matchMedia
  *     query + throwing-graceful; прямые оракулы, closed-form без cap-маскировки).
- *   - каждый файл индивидуально ≥78% → взвешенный агрегат ≥78%, break=76 —
- *     безопасный пол (эрозию ловит; точный агрегат считает scheduled-прогон).
+ *   - минимум по файлам = keyframes 78.1% (на границе) → взвешенный агрегат ≥78%,
+ *     break=76 — безопасный пол (эрозию ловит; точный агрегат считает scheduled-прогон).
+ *     ВНИМАНИЕ: при эрозии keyframes ниже 78% фраза «агрегат ≥78%» станет ложной
+ *     раньше, чем сработает глобальный break=76 (нет per-file break в Stryker).
  * Остаток выживших keyframes/motion-value/decay — задокументированные ЭКВИВАЛЕНТНЫЕ
  * ('mirror' yoyo'ит и без нормализации; границы `<`↔`<=`; gen ++/--; `!==undefined`
  * избыточен с isFinite) и НЕДОСТИЖИМЫЕ defensive-ветки (MAX_FRAMES-cap для валидных
