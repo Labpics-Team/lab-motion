@@ -15,9 +15,13 @@
  * - repeatType 'loop' → direction 'normal'; 'reverse'/'mirror' → 'alternate';
  * - repeatDelay: у WAAPI нет per-iteration delay (только delay/endDelay) —
  *   пауза ЗАПЕКАЕТСЯ hold-сегментом: цикл растягивается до duration+repeatDelay,
- *   offsets сжимаются, хвост держит последнее значение. Для 'reverse'/'mirror'
- *   запекание исказило бы чётные циклы (hold оказался бы в начале обратного
- *   прохода) — комбинация отвергается рано, MotionParamError.
+ *   offsets сжимаются, хвост держит последнее значение. Пауза у движка только
+ *   МЕЖДУ циклами (totalDuration = d·(repeat+1) + r·repeat, см. keyframes), а
+ *   цикл WAAPI несёт hold всегда — поэтому последняя итерация обрезается
+ *   ДРОБНЫМИ iterations = repeat + d/(d+r): активная длительность совпадает с
+ *   движком точно, Animation.finished не запаздывает на хвостовой hold. Для
+ *   'reverse'/'mirror' запекание исказило бы чётные циклы (hold оказался бы в
+ *   начале обратного прохода) — комбинация отвергается рано, MotionParamError.
  * - fill по умолчанию 'both': WAAPI-дефолт 'none' снэпает элемент обратно после
  *   finish — для анимационной библиотеки это сюрприз, не поведение.
  *
@@ -105,6 +109,14 @@ function validateOptions(o: WaapiCompileOptions): {
   if (typeof o.property !== 'string' || o.property.length === 0) {
     throw new MotionParamError(`compileWaapi: property должен быть непустой строкой`);
   }
+  // Эти имена — метаданные WAAPI-кейфрейма: значение перезаписало бы offset/easing
+  // кадра. CSS-свойство offset в WAAPI пишется как cssOffset (MDN Keyframe Formats).
+  if (o.property === 'offset' || o.property === 'easing' || o.property === 'composite') {
+    throw new MotionParamError(
+      `compileWaapi: property '${o.property}' конфликтует с полем WAAPI-кейфрейма` +
+        (o.property === 'offset' ? `; CSS-свойство offset задаётся как 'cssOffset'` : ''),
+    );
+  }
   const n = o.values.length;
   if (n < 2) {
     throw new MotionParamError(`compileWaapi: values должен содержать >= 2 значений, получено ${n}`);
@@ -156,6 +168,11 @@ function validateOptions(o: WaapiCompileOptions): {
   }
 
   const repeatType = o.repeatType ?? 'loop';
+  if (repeatType !== 'loop' && repeatType !== 'reverse' && repeatType !== 'mirror') {
+    throw new MotionParamError(
+      `compileWaapi: repeatType должен быть 'loop', 'reverse' или 'mirror', получено ${String(repeatType)}`,
+    );
+  }
   if (repeatDelay > 0 && repeat > 0 && repeatType !== 'loop') {
     throw new MotionParamError(
       `compileWaapi: repeatDelay с repeatType '${repeatType}' не поддерживается WAAPI-путём — ` +
@@ -168,10 +185,22 @@ function validateOptions(o: WaapiCompileOptions): {
     if (typeof o.easing === 'function') {
       segmentEasings = Array.from({ length: n - 1 }, () => o.easing as WaapiEasingFn);
     } else {
+      if (!Array.isArray(o.easing)) {
+        throw new MotionParamError(
+          `compileWaapi: easing должен быть функцией или массивом функций, получено ${typeof o.easing}`,
+        );
+      }
       if (o.easing.length !== n - 1) {
         throw new MotionParamError(
           `compileWaapi: массив easing (${o.easing.length}) должен иметь length = values.length − 1 (${n - 1})`,
         );
+      }
+      for (const e of o.easing) {
+        if (typeof e !== 'function') {
+          throw new MotionParamError(
+            `compileWaapi: каждый easing должен быть функцией, получено ${typeof e}`,
+          );
+        }
       }
       segmentEasings = o.easing;
     }
@@ -216,7 +245,10 @@ export function compileWaapi(options: WaapiCompileOptions): WaapiCompiled {
     keyframes,
     timing: {
       duration: total * 1000,
-      iterations: repeat === Infinity ? Infinity : repeat + 1,
+      // Пауза движка — только между циклами: при запекании последняя итерация
+      // дробная, хвостовой hold обрезается (активная длительность = движковой).
+      iterations:
+        repeat === Infinity ? Infinity : bakeHold ? repeat + duration / total : repeat + 1,
       direction: repeatType === 'loop' ? 'normal' : 'alternate',
       fill: 'both',
     },

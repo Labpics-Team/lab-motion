@@ -23,7 +23,7 @@ import { describe, expect, it } from 'vitest';
 import * as waapi from '../src/waapi/index.js';
 import { animateWaapi, compileWaapi, easingToLinear, supportsWaapi } from '../src/waapi/index.js';
 import { MotionParamError } from '../src/index.js';
-import { sampleKeyframes } from '../src/keyframes/index.js';
+import { keyframes, sampleKeyframes } from '../src/keyframes/index.js';
 import { easeOut } from '../src/easing/index.js';
 
 // ─── easingToLinear ──────────────────────────────────────────────────────────
@@ -162,6 +162,55 @@ describe('waapi: repeatDelay → hold-сегмент (у WAAPI нет per-iterat
     expect(r.keyframes[2]!['opacity']).toBe(1); // hold той же величины
   });
 
+  it('пауза только МЕЖДУ циклами: дробные iterations обрезают хвостовой hold', () => {
+    // Семантика движка (keyframes/index.ts): totalDuration = d·(repeat+1) + r·repeat —
+    // у N циклов N−1 пауз. Цикл WAAPI включает hold, поэтому последняя итерация
+    // дробная: iterations = repeat + d/(d+r).
+    const r = compileWaapi({
+      property: 'o',
+      values: [0, 1],
+      duration: 1,
+      repeat: 1,
+      repeatDelay: 1,
+    });
+    expect(r.timing.iterations).toBeCloseTo(1.5, 12); // 1 + 1/(1+1)
+    // активная длительность = 2s·1.5 = 3s = движок: 1·2 + 1·1
+    expect((r.timing.duration / 1000) * r.timing.iterations).toBeCloseTo(3, 12);
+  });
+
+  it('differential: активная длительность WAAPI ≡ totalDuration движка (сетка repeat×repeatDelay)', () => {
+    for (const repeat of [0, 1, 3]) {
+      for (const repeatDelay of [0, 0.25, 2]) {
+        for (const duration of [0.5, 1.7]) {
+          const r = compileWaapi({ property: 'o', values: [0, 1], duration, repeat, repeatDelay });
+          const engine = keyframes({
+            values: [0, 1],
+            duration,
+            repeat,
+            repeatDelay,
+            requestFrame: () => 0,
+          });
+          expect((r.timing.duration / 1000) * r.timing.iterations).toBeCloseTo(
+            engine.totalDuration,
+            10,
+          );
+        }
+      }
+    }
+  });
+
+  it('repeat=Infinity с repeatDelay: iterations=Infinity, цикл несёт hold', () => {
+    const r = compileWaapi({
+      property: 'o',
+      values: [0, 1],
+      duration: 1,
+      repeat: Infinity,
+      repeatDelay: 0.5,
+    });
+    expect(r.timing.iterations).toBe(Infinity);
+    expect(r.timing.duration).toBe(1500);
+  });
+
   it('repeatDelay без repeat не запекается (нет следующего цикла — нечего ждать)', () => {
     const r = compileWaapi({ property: 'o', values: [0, 1], duration: 1, repeatDelay: 1 });
     expect(r.timing.duration).toBe(1000);
@@ -231,6 +280,28 @@ describe('waapi: compileWaapi — невалидные входы → MotionPara
     expect(() =>
       compileWaapi({ ...base, values: [0, 1, 2], easing: [(t: number) => t] }),
     ).toThrow(MotionParamError); // 1 easing на 2 сегмента
+  });
+
+  it("property, конфликтующее с полями WAAPI-кейфрейма ('offset'/'easing'/'composite') → MotionParamError", () => {
+    // CSS-свойство offset в WAAPI пишется как cssOffset (MDN Keyframe Formats) —
+    // ошибка должна направить к алиасу, а не молча перезаписать метаданные кадра.
+    for (const property of ['offset', 'easing', 'composite']) {
+      expect(() => compileWaapi({ ...base, property })).toThrow(MotionParamError);
+    }
+    expect(() => compileWaapi({ ...base, property: 'cssOffset' })).not.toThrow();
+  });
+
+  it('repeatType вне словаря → MotionParamError (JS-вызовы без TS)', () => {
+    expect(() =>
+      compileWaapi({ ...base, repeat: 1, repeatType: 'bounce' as never }),
+    ).toThrow(MotionParamError);
+  });
+
+  it('невызываемые easing → MotionParamError, не сырой TypeError', () => {
+    expect(() =>
+      compileWaapi({ ...base, values: [0, 1, 2], easing: [(t: number) => t, 42 as never] }),
+    ).toThrow(MotionParamError);
+    expect(() => compileWaapi({ ...base, easing: 'ease-out' as never })).toThrow(MotionParamError);
   });
 });
 
@@ -380,7 +451,7 @@ describe('waapi: детерминизм', () => {
       repeat: 2,
       repeatDelay: 0.3,
     };
-    expect(JSON.stringify(compileWaapi(opts))).toBe(JSON.stringify(compileWaapi(opts)));
+    expect(compileWaapi(opts)).toEqual(compileWaapi(opts));
   });
 });
 
