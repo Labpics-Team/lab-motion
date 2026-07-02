@@ -18,6 +18,7 @@
  */
 
 import { MotionValue, type MotionValueOptions } from '../motion-value.js';
+import { createBoundValue } from '../internal/binding-value.js';
 import { type SpringParams } from '../spring.js';
 
 // ─── Reduced-motion detection ─────────────────────────────────────────────
@@ -93,7 +94,7 @@ export function springStore(
   reducedMotionMode: 'instant' | 'fade' = 'instant',
   requestFrame?: MotionValueOptions['requestFrame'],
 ): SpringStore {
-  const mv = new MotionValue({ initial, spring, requestFrame });
+  const mv = createBoundValue({ initial, spring, requestFrame });
 
   // Maintain a snapshot of current value for immediate emission on subscribe.
   let currentValue: number = initial;

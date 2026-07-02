@@ -27,6 +27,7 @@
  */
 
 import { MotionValue, type MotionValueOptions, type RequestFrameFn } from '../motion-value.js';
+import { createBoundValue } from '../internal/binding-value.js';
 import { renderTemplateValue } from '../internal/template.js';
 import { type SpringParams } from '../spring.js';
 
@@ -99,7 +100,7 @@ export function createLabSpringElementClass(
       // Ленивое создание ровно один раз: MotionValue переживает
       // disconnect/reconnect (зеркало lit-семантики).
       if (this._mv === undefined) {
-        this._mv = new MotionValue({
+        this._mv = createBoundValue({
           initial: this.target,
           spring: this.spring ?? DEFAULT_SPRING,
           requestFrame: this.requestFrame,

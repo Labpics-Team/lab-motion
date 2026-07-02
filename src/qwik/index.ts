@@ -32,6 +32,7 @@ import {
   type Signal,
 } from '@builder.io/qwik';
 import { MotionValue, type MotionValueOptions } from '../motion-value.js';
+import { createBoundValue } from '../internal/binding-value.js';
 import { MotionParamError } from '../errors.js';
 import { type SpringParams } from '../spring.js';
 
@@ -78,7 +79,7 @@ export function useSpring(
     // ветке (эквивалентный мутант) — оставлен как защита от неопределённого
     // re-visible поведения стратегий intersection-observer.
     if (mvRef.value === undefined) {
-      const mv = new MotionValue({
+      const mv = createBoundValue({
         initial: value.value,
         spring,
         requestFrame,
