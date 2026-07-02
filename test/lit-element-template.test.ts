@@ -17,7 +17,7 @@
  */
 
 import { describe, expect, it } from 'vitest';
-import { renderTemplateValue } from '../src/lit/element.js';
+import { renderTemplateValue } from '../src/internal/template.js';
 
 describe('renderTemplateValue (LabMotionSpringElement template substitution)', () => {
   it('substitutes a single {v} placeholder', () => {
