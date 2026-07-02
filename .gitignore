@@ -9,4 +9,6 @@ out
 .env
 .env.*
 coverage
+reports
+.stryker-tmp
 peer_b.json
