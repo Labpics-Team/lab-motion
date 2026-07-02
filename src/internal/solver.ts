@@ -10,7 +10,7 @@
  * РАЗНАЯ (spring.ts: clampFinite NaN→0; motion-value: value→1, velocity→0)
  * и сохранена на их сторонах бит-в-бит.
  */
-import { type SpringParams } from '../spring.js';
+import { type SpringParams } from './types.js';
 
 export function solveSpring(
   params: SpringParams,

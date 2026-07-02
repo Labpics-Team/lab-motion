@@ -54,13 +54,8 @@ export interface MotionValueOptions {
 // ─── Frame-loop constants ────────────────────────────────────────────────────
 // Модульные const (не private static): статики не матчат mangle-регэксп /^_/ и
 // переживали минификацию дословно; модульный const терсер инлайнит/сжимает.
-
-/** Fixed timestep fallback (seconds) when no DOMHighResTimeStamp available. */
-const FIXED_DT_S = 1 / 60;
-/** Convergence threshold (normalized, same as drive.ts). */
-const CONVERGENCE_THRESHOLD = 0.005;
-/** Hard frame cap per run (prevents infinite loops on pathological params). */
-const MAX_FRAMES = 2000;
+// Единый контур ядра: те же пороги, что drive/driver (internal/constants).
+import { CONVERGENCE_THRESHOLD, MAX_FRAMES, FIXED_DT_S } from './internal/constants.js';
 
 // ─── MotionValue ─────────────────────────────────────────────────────────────
 

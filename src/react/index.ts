@@ -16,7 +16,7 @@
  *   value visually; only the motion style changes (spring vs instant).
  */
 
-import { useState, useEffect, useRef, useCallback } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { MotionValue, type MotionValueOptions } from '../motion-value.js';
 import { type SpringParams } from '../spring.js';
 

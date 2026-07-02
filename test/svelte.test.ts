@@ -237,6 +237,29 @@ describe('springStore — reduced-motion CHARACTER (northInvariant #5)', () => {
     store.destroy();
   });
 
+  it("reduced-motion: 'fade' ≡ 'instant' по значению (мягкость — CSS потребителя)", () => {
+    // Б: пин документированного контракта всех биндингов — 'fade' не меняет
+    // числовую последовательность, отличие только в ожидаемом CSS-переходе
+    // на стороне потребителя. Mutation proof: заставить ветку 'fade'
+    // анимировать пружиной или эмитить иное значение → последовательности
+    // разойдутся → красный.
+    installMatchMedia(true);
+
+    const run = (mode: 'instant' | 'fade'): number[] => {
+      const clock = makeVirtualClock();
+      const store = springStore(0, { mass: 1, stiffness: 200, damping: 20 }, mode, clock.requestFrame);
+      const received: number[] = [];
+      store.subscribe((v) => received.push(v));
+      store.set(100);
+      store.set(-40);
+      clock.drainAll();
+      store.destroy();
+      return received;
+    };
+
+    expect(run('fade')).toEqual(run('instant'));
+  });
+
   it('full motion: uses spring (frames ARE scheduled when reduced-motion is off)', () => {
     // C: Negative case — without reduced-motion, spring runs and frames are scheduled
     installMatchMedia(false);

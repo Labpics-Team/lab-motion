@@ -17,16 +17,11 @@
 
 import { MotionParamError } from './errors.js';
 import { solveSpring } from './internal/solver.js';
+import { type SpringParams } from './internal/types.js';
 
-/** Physics parameters for a spring. */
-export interface SpringParams {
-  /** Positive finite mass (kg). */
-  readonly mass: number;
-  /** Positive finite stiffness (N/m). */
-  readonly stiffness: number;
-  /** Non-negative finite damping coefficient (N·s/m). Zero = undamped. */
-  readonly damping: number;
-}
+// Публичная точка типа — определение в internal/types.ts (разрыв модульного
+// цикла spring ↔ solver), потребители продолжают импортировать отсюда.
+export { type SpringParams };
 
 /** Output of the spring solver at a given time. */
 export interface SpringResult {

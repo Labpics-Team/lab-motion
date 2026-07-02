@@ -25,12 +25,8 @@ import { type SpringParams, springUnchecked, validateSpringParams } from './spri
 
 // ─── Константы ────────────────────────────────────────────────────────────────
 
-/** Порог сходимости (нормированный) — то же значение, что в drive.ts. */
-const CONVERGENCE_THRESHOLD = 0.005;
-/** Максимум кадров при forward-воспроизведении (жёсткий safety cap). */
-const MAX_FRAMES = 2000;
-/** Фиксированный dt (с) при отсутствии DOMHighResTimeStamp. */
-const FIXED_DT_S = 1 / 60;
+// Единый контур ядра: те же пороги, что drive/motion-value (internal/constants).
+import { CONVERGENCE_THRESHOLD, MAX_FRAMES, FIXED_DT_S } from './internal/constants.js';
 
 // ─── Типы ────────────────────────────────────────────────────────────────────
 
