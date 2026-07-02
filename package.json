@@ -220,6 +220,9 @@
       "allowedVersions": {
         "@builder.io/qwik>vite": "8"
       }
+    },
+    "overrides": {
+      "esbuild": "^0.28.1"
     }
   }
 }
