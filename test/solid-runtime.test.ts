@@ -97,11 +97,12 @@ describe('Solid-биндинг в реальном solid-js рантайме', (
     expect(value()).toBe(settled); // значение не сдвинулось после destroy
   });
 
-  it('createSpring валидирует конечность target даже на reduced-снапе пути', () => {
-    // Прямой контракт: не-конечный target бросает (CSS-safe инвариант).
+  it('createSpring: не-конечный target бросает MotionParamError (CSS-safe контракт)', () => {
+    // В node (нет window.matchMedia) reduced=false → активен обычный путь
+    // mv.setTarget, который валидирует конечность в ядре. Reduced-снап-путь
+    // (setValue в обход ядра со своей валидацией) здесь НЕ достигается — он
+    // покрыт отдельно в test/solid.test.ts (там matchMedia замокан matches:true).
     const [, setTarget, destroy] = createSpring(0, SPRING, 'instant', makeClock().requestFrame);
-    // В node (нет window.matchMedia) reduced=false → идёт mv.setTarget, который
-    // сам валидирует; проверяем публичный контракт ошибки.
     expect(() => setTarget(Infinity)).toThrow(MotionParamError);
     expect(() => setTarget(NaN)).toThrow(MotionParamError);
     destroy();
