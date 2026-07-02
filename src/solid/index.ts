@@ -18,6 +18,7 @@
 
 import { createSignal, getOwner, onCleanup } from 'solid-js';
 import { MotionValue, type MotionValueOptions } from '../motion-value.js';
+import { MotionParamError } from '../errors.js';
 import { type SpringParams } from '../spring.js';
 
 const DEFAULT_SPRING: SpringParams = { mass: 1, stiffness: 200, damping: 20 };
@@ -65,28 +66,34 @@ export function createSpring(
   const [value, setValue] = createSignal(initial);
   const [mv, disposeMv] = createMotionValue(initial, spring, requestFrame);
 
-  const unsubscribe = mv.onChange((v) => {
+  mv.onChange((v) => {
     setValue(v);
   });
 
   let destroyed = false;
+  // Слушателей чистит mv.destroy() (listeners.clear в ядре) — отдельная
+  // отписка была бы эквивалентным мутантом. Флаг закрывает reduced-путь,
+  // пишущий в сигнал в обход ядра. Двойной destroy безопасен (ядро идемпотентно).
   const destroy = (): void => {
     destroyed = true;
-    unsubscribe();
     disposeMv();
   };
-  // createMotionValue уже зарегистрировал disposeMv в onCleanup; здесь
-  // добавляется только отписка и флаг (двойной destroy MotionValue безопасен).
   if (getOwner() !== null) {
     onCleanup(() => {
       destroyed = true;
-      unsubscribe();
     });
   }
 
   const setTarget = (target: number): void => {
     if (destroyed) return;
     if (prefersReducedMotion()) {
+      // Снап пишет в сигнал в обход ядра — валидация зеркалит mv.setTarget,
+      // иначе NaN/Infinity пролезли бы в наблюдаемое значение (инвариант CSS-safe).
+      if (!Number.isFinite(target)) {
+        throw new MotionParamError(
+          `createSpring: target должен быть конечным, получено ${target}`,
+        );
+      }
       setValue(target); // характер: снап, без кадров ('fade' — CSS потребителя)
       void reducedMotionMode;
     } else {

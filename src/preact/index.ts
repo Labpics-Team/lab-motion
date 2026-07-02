@@ -13,6 +13,7 @@
 
 import { useEffect, useRef, useState } from 'preact/hooks';
 import { MotionValue, type MotionValueOptions } from '../motion-value.js';
+import { MotionParamError } from '../errors.js';
 import { type SpringParams } from '../spring.js';
 
 const DEFAULT_SPRING: SpringParams = { mass: 1, stiffness: 200, damping: 20 };
@@ -74,6 +75,11 @@ export function useSpring(
 
   useEffect(() => {
     if (prefersReducedMotion()) {
+      // Снап пишет в стейт в обход ядра — валидация зеркалит mv.setTarget,
+      // иначе NaN/Infinity пролезли бы в наблюдаемое значение (инвариант CSS-safe).
+      if (!Number.isFinite(target)) {
+        throw new MotionParamError(`useSpring: target должен быть конечным, получено ${target}`);
+      }
       setValue(target); // характер: снап ('fade' — CSS потребителя)
     } else {
       mv.setTarget(target);

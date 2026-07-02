@@ -118,6 +118,39 @@ describe('preact: useSpring — анимация через мок хуков', 
     expect(Math.abs(v - 100)).toBeLessThan(0.5);
   });
 
+  it('full-motion: значение проходит через полёт (не мгновенный снап — пружина реально крутится)', async () => {
+    // Класс «биндинг стал no-op на motion-пути»: без window (reduce=false)
+    // после ЧАСТИЧНОГО дренажа значение обязано быть строго между 0 и 100.
+    const { useSpring } = await import('../src/preact/index.js');
+    const vc = makeVirtualClock();
+    render(() => useSpring(0, SPRING, 'instant', vc.requestFrame));
+    render(() => useSpring(100, SPRING, 'instant', vc.requestFrame));
+    vc.drainAll(5); // всего 5 кадров — до цели далеко
+    const v = render(() => useSpring(100, SPRING, 'instant', vc.requestFrame));
+    expect(v).toBeGreaterThan(0);
+    expect(v).toBeLessThan(99);
+  });
+
+  it('дефолтный spring исполняется: доезжает без явных параметров', async () => {
+    const { useSpring } = await import('../src/preact/index.js');
+    const vc = makeVirtualClock();
+    render(() => useSpring(0, undefined, 'instant', vc.requestFrame));
+    render(() => useSpring(100, undefined, 'instant', vc.requestFrame));
+    vc.drainAll();
+    const v = render(() => useSpring(100, undefined, 'instant', vc.requestFrame));
+    expect(Math.abs(v - 100)).toBeLessThan(0.5);
+  });
+
+  it('reduced-путь не пропускает non-finite в стейт (MotionParamError, зеркало ядра)', async () => {
+    (globalThis as { window?: unknown }).window = {
+      matchMedia: () => ({ matches: true }),
+    };
+    const { useSpring } = await import('../src/preact/index.js');
+    const vc = makeVirtualClock();
+    render(() => useSpring(0, SPRING, 'instant', vc.requestFrame));
+    expect(() => render(() => useSpring(NaN, SPRING, 'instant', vc.requestFrame))).toThrow();
+  });
+
   it('reduced-motion: снап к цели немедленно (характер, не выключение)', async () => {
     (globalThis as { window?: unknown }).window = {
       matchMedia: () => ({ matches: true }),
