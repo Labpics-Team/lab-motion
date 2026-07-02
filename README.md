@@ -54,7 +54,7 @@ pnpm size       # замер gz всех субпутей
 | `…/waapi` | Compositor-путь: `compileWaapi`/`animateWaapi` (кейфреймы движка → нативный `Element.animate`, hw-accel), `easingToLinear` (любой easing → CSS `linear()`), `supportsWaapi` |
 | `…/auto` | Zero-config FLIP: `autoAnimate(parent)` — add/remove/move детей анимируются сами (класс AutoAnimate); reduced-motion меняет характер (move→снап), не выключает |
 | `…/svg-morph` | Морфинг путей: `interpolatePath(dFrom, dTo)` — точный режим при совпадающей структуре, ресэмплинг с выравниванием старта/обхода замкнутых при разной |
-| `…/frame` | Единый frame-шедулер: `createFrameLoop` / синглтон `frame` — один rAF на кадр, фазы read→update→render против layout-thrash, ленивый старт/стоп, SSR-safe; `asRequestFrame(loop)` сажает MotionValue/drive на общий кадр через `opts.requestFrame` (N значений = один rAF) |
+| `…/frame` | Единый frame-шедулер: `createFrameLoop` / синглтон `frame` — один rAF на кадр, фазы read→update→render против layout-thrash, ленивый старт/стоп, SSR-safe; `asRequestFrame(loop)` сажает MotionValue/drive на общий кадр через `opts.requestFrame` (N значений = один rAF). **Биндинги используют его ПО УМОЛЧАНИЮ** — все значения приложения делят один rAF без ручной настройки (как shared-ticker у Framer Motion/GSAP); инжекция своего `requestFrame` переопределяет. |
 | `…/presets` | Словарь generic-движений «от смысла» (иконки): 10 фабрик (pulse, blink, wiggle…), мультитрековые кейфреймы (scale/rotate/x/y/opacity/progress), `runPreset` с виртуальным временем, `presetToWaapi` |
 | `…/react` | React: `useSpring`, `useMotionValue` |
 | `…/preact` | Preact: `useSpring`, `useMotionValue` (зеркало react-биндинга поверх `preact/hooks`) |
