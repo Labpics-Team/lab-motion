@@ -1,7 +1,7 @@
 import { defineConfig } from 'tsup';
 
 export default defineConfig({
-  entry: ['src/index.ts', 'src/easing/index.ts', 'src/react/index.ts', 'src/svelte/index.ts', 'src/vue/index.ts', 'src/value/index.ts', 'src/driver/index.ts', 'src/stagger/index.ts', 'src/timeline/index.ts', 'src/keyframes/index.ts', 'src/decay/index.ts', 'src/lit/index.ts', 'src/gestures/index.ts', 'src/scroll/index.ts', 'src/presence/index.ts', 'src/flip/index.ts', 'src/svg/index.ts', 'src/a11y/index.ts', 'src/spring/index.ts', 'src/waapi/index.ts'],
+  entry: ['src/index.ts', 'src/easing/index.ts', 'src/react/index.ts', 'src/svelte/index.ts', 'src/vue/index.ts', 'src/value/index.ts', 'src/driver/index.ts', 'src/stagger/index.ts', 'src/timeline/index.ts', 'src/keyframes/index.ts', 'src/decay/index.ts', 'src/lit/index.ts', 'src/gestures/index.ts', 'src/scroll/index.ts', 'src/presence/index.ts', 'src/flip/index.ts', 'src/svg/index.ts', 'src/a11y/index.ts', 'src/spring/index.ts', 'src/waapi/index.ts', 'src/auto/index.ts'],
   format: ['cjs', 'esm'],
   dts: true,
   splitting: false,
