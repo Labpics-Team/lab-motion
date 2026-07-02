@@ -33,7 +33,12 @@ import { type RequestFrameFn } from '../motion-value.js';
 const FIXED_DT_S = 1 / 60;
 
 export interface FrameCallbackOptions {
-  /** Вызваться один раз и самоотписаться. */
+  /**
+   * Вызваться один раз и самоотписаться. Внимание пришедшим из Motion: там
+   * инверсный дефолт (однократно, повтор через keepAlive) — здесь дефолт
+   * ПОВТОРЯЕТСЯ каждый кадр, потому что главный потребитель — тикающие
+   * значения ядра, и repeat-по-умолчанию снимает шум с каждой подписки.
+   */
   readonly once?: boolean;
 }
 
@@ -45,7 +50,12 @@ export interface FrameLoop {
   update(cb: (ts?: number) => void, options?: FrameCallbackOptions): () => void;
   /** Фаза 3: записи в DOM. */
   render(cb: (ts?: number) => void, options?: FrameCallbackOptions): () => void;
-  /** Снять все подписки всех фаз и остановить цикл. */
+  /**
+   * Снять все подписки всех фаз и остановить цикл. Это TEARDOWN владельца
+   * цикла, не отписка одного потребителя: на разделяемом синглтоне `frame`
+   * гасит подписки ВСЕХ субпутей — для точечной отписки держите off()-хендл
+   * своей подписки.
+   */
   cancelAll(): void;
 }
 
