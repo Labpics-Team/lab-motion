@@ -14,6 +14,9 @@
  *   - decay 88.79% (S40: 63.55%→88.79%, закалка — overflow amplitude/rest ±MAX_VALUE,
  *     accept-пути knobs power/timeConstant/restDelta, сообщения ошибок, matchMedia
  *     query + throwing-graceful; прямые оракулы, closed-form без cap-маскировки).
+ *   - value/color 87.96% (S41: 73.77%→87.96%, закалка — hex/rgb/hsl-парсинг, HSL↔RGB
+ *     канонические цвета, interpolate-каналы через EXACT-string, hue-wraparound на t≠0.5,
+ *     clamp/parsePct; прямые known-value оракулы, probe-заземление точных значений).
  *   - минимум по файлам = keyframes 78.1% (на границе) → взвешенный агрегат ≥78%,
  *     break=76 — безопасный пол (эрозию ловит; точный агрегат считает scheduled-прогон).
  *     ВНИМАНИЕ: при эрозии keyframes ниже 78% фраза «агрегат ≥78%» станет ложной
@@ -39,7 +42,7 @@
 export default {
   plugins: ['@stryker-mutator/vitest-runner'],
   testRunner: 'vitest',
-  mutate: ['src/spring.ts', 'src/internal/solver.ts', 'src/keyframes/index.ts', 'src/motion-value.ts', 'src/decay.ts'],
+  mutate: ['src/spring.ts', 'src/internal/solver.ts', 'src/keyframes/index.ts', 'src/motion-value.ts', 'src/decay.ts', 'src/value/color.ts'],
   coverageAnalysis: 'perTest',
   reporters: ['clear-text', 'progress', 'html'],
   htmlReporter: { fileName: 'reports/mutation/index.html' },
