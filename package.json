@@ -118,6 +118,16 @@
       "types": "./dist/svg-morph/index.d.ts",
       "import": "./dist/svg-morph/index.js",
       "require": "./dist/svg-morph/index.cjs"
+    },
+    "./solid": {
+      "types": "./dist/solid/index.d.ts",
+      "import": "./dist/solid/index.js",
+      "require": "./dist/solid/index.cjs"
+    },
+    "./preact": {
+      "types": "./dist/preact/index.d.ts",
+      "import": "./dist/preact/index.js",
+      "require": "./dist/preact/index.cjs"
     }
   },
   "files": [
@@ -135,7 +145,9 @@
     "lit": ">=3.0.0",
     "react": ">=18.0.0",
     "svelte": ">=4.0.0",
-    "vue": ">=3.0.0"
+    "vue": ">=3.0.0",
+    "solid-js": ">=1.8.0",
+    "preact": ">=10.0.0"
   },
   "peerDependenciesMeta": {
     "lit": {
@@ -149,13 +161,21 @@
     },
     "vue": {
       "optional": true
+    },
+    "solid-js": {
+      "optional": true
+    },
+    "preact": {
+      "optional": true
     }
   },
   "devDependencies": {
     "@types/node": "22.10.5",
     "@types/react": "18.3.12",
     "lit": "3.3.3",
+    "preact": "10.28.2",
     "react": "18.3.1",
+    "solid-js": "1.9.9",
     "svelte": "4.2.19",
     "tsup": "8.3.6",
     "typescript": "5.7.3",
