@@ -103,6 +103,11 @@
       "types": "./dist/spring/index.d.ts",
       "import": "./dist/spring/index.js",
       "require": "./dist/spring/index.cjs"
+    },
+    "./waapi": {
+      "types": "./dist/waapi/index.d.ts",
+      "import": "./dist/waapi/index.js",
+      "require": "./dist/waapi/index.cjs"
     }
   },
   "files": [
