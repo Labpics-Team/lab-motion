@@ -24,10 +24,14 @@ import { spring } from '../src/index.js';
  *   - Restore the original two-branch clampFinite → spring({...}, t=Infinity).value
  *     returns -1.8e308 → the "not -MAX_VALUE" assertion fails.
  *   - Return NaN from clampFinite → the isFinite assertion fails.
+ *   - Change the NaN fallback to any value other than 0 (e.g. 1 "at target") →
+ *     the exact-value pin below fails. The CHOICE of 0 is contract, not accident:
+ *     a silent switch to 1 would change the visual fallback at degenerate t.
  *
  * Mutation proof:
  *   Any regression to the NaN→-MAX_VALUE mapping will cause the wrong-sign test
- *   to turn RED immediately.
+ *   to turn RED immediately; any drift of the fallback constant turns the
+ *   exact-value pin RED.
  */
 
 describe('spring() clampFinite NaN — no wrong-sign -MAX_VALUE (regression lock)', () => {
@@ -57,6 +61,24 @@ describe('spring() clampFinite NaN — no wrong-sign -MAX_VALUE (regression lock
     // Either way, the value must not be negative-MAX_VALUE.
     const result = spring({ mass: 1, stiffness: 100, damping: 5 }, Number.POSITIVE_INFINITY);
     expect(result.value).toBeGreaterThanOrEqual(0);
+  });
+
+  it('NaN-fallback pinned to EXACTLY 0 (at rest at start) — underdamped t=Infinity', () => {
+    // Пин самого ЗНАЧЕНИЯ, не только его свойств: fallback 1 ("at target"),
+    // 0.5 и т.п. тоже finite/неотрицательны и прошли бы остальные ассерты,
+    // но молча сменили бы визуальный фоллбек. Контракт: NaN → 0.
+    const result = spring({ mass: 1, stiffness: 100, damping: 5 }, Number.POSITIVE_INFINITY);
+    expect(result.value).toBe(0);
+    expect(result.velocity).toBe(0);
+  });
+
+  it('NaN-fallback pinned to EXACTLY 0 — critically damped t=Infinity', () => {
+    const criticalDamping = 2 * Math.sqrt(100 * 1); // 2*sqrt(k*m) = 20
+    const result = spring(
+      { mass: 1, stiffness: 100, damping: criticalDamping },
+      Number.POSITIVE_INFINITY,
+    );
+    expect(result.value).toBe(0);
   });
 
   it('spring({...}, Infinity) for overdamped params returns finite correct-sign value', () => {

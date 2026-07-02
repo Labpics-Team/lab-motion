@@ -40,6 +40,7 @@ pnpm size       # замер gz всех субпутей
 | `…/waapi` | Compositor-путь: `compileWaapi`/`animateWaapi` (кейфреймы движка → нативный `Element.animate`, hw-accel), `easingToLinear` (любой easing → CSS `linear()`), `supportsWaapi` |
 | `…/auto` | Zero-config FLIP: `autoAnimate(parent)` — add/remove/move детей анимируются сами (класс AutoAnimate); reduced-motion меняет характер (move→снап), не выключает |
 | `…/svg-morph` | Морфинг путей: `interpolatePath(dFrom, dTo)` — точный режим при совпадающей структуре, ресэмплинг с выравниванием старта/обхода замкнутых при разной |
+| `…/frame` | Единый frame-шедулер: `createFrameLoop` / синглтон `frame` — один rAF на кадр, фазы read→update→render против layout-thrash, ленивый старт/стоп, SSR-safe |
 | `…/react` | React: `useSpring`, `useMotionValue` |
 | `…/preact` | Preact: `useSpring`, `useMotionValue` (зеркало react-биндинга поверх `preact/hooks`) |
 | `…/solid` | Solid: `createSpring`, `createMotionValue` (сигналы, авто-уборка через `onCleanup`) |

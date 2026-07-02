@@ -8,9 +8,11 @@
  * каждый ключ exports с полем "import" становится строкой отчёта. Добавление
  * нового subpath-экспорта в package.json подхватывается без правки этого файла.
  *
- * Выход 0 (CI-green) всегда: гейт фиксирует базовые числа и ПРЕДУПРЕЖДАЕТ
- * при превышении порога, но не ломает CI пока не принято решение о минификации.
- * Если нужен жёсткий провал — раскомментируй `process.exit(1)` в конце.
+ * Гейт ЖЁСТКИЙ: превышение порога ядра, отсутствующий dist-файл экспорта или
+ * превышение full-bundle-гейта → exit 1 (CI красный). Регрессия размера —
+ * ровно тот класс, ради которого существовал срез s09 (5283→2092 gz);
+ * advisory-режим пропускал её зелёной (QA-нота PR #38: мутант мангла +6.6%
+ * прошёл CI).
  *
  * Использование:
  *   node scripts/size-gate.mjs
@@ -22,8 +24,11 @@ import { gzipSync } from 'node:zlib';
 import { resolve, dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
-// Порог (в байтах) для ядра пакета ("."); null = только замер, нет порога.
-export const CORE_GATE_BYTES = 2048;
+// Порог (в байтах) для ядра пакета (".") — РЕГРЕССИОННЫЙ потолок, не цель:
+// фактический вес после s09 = ~2090 gz + небольшой люфт на шум терсера.
+// PRD-цель <2048 остаётся open item (хвост −44 gz — следующий спринт);
+// после её достижения порог опустить до 2048.
+export const CORE_GATE_BYTES = 2150;
 
 // Планируемые subpath-плагины, из которых складывается "полный бандл".
 // Пока не ВСЕ смержены в exports — совокупный гейт <8 KB остаётся PLACEHOLDER.
@@ -178,13 +183,12 @@ function runCli() {
     const core = rows.find(r => r.label === 'core (index)');
     if (core && !core.error && core.exceeded) {
       console.log(`
-OPEN ITEMS
-----------
-core (index) gz = ${(core.gzBytes / 1024).toFixed(2)} KB
-  Порог PRD <2.0 KB gz пока НЕ достигнут.
-  Причина: ядро включает полный стек (spring/tween/drive/motion-value/errors).
-  Путь к цели: minify:true в tsup.config.ts + tree-shaking через ESM-разбиение
-  на micro-subpaths. Решение — отдельный срез (s09-core-size-reduction).
+РЕГРЕССИЯ РАЗМЕРА
+-----------------
+core (index) gz = ${(core.gzBytes / 1024).toFixed(2)} KB > порог ${(core.gate / 1024).toFixed(2)} KB.
+  Ядро выросло относительно зафиксированного после s09 веса (~2.04 KB gz).
+  Найди раздувший коммит/правку и убери причину — порог не поднимать
+  без явного решения Даниила (это и есть класс, который гейт ловит).
 `);
     }
   }
@@ -207,9 +211,8 @@ core (index) gz = ${(core.gzBytes / 1024).toFixed(2)} KB
   // ─── итог ─────────────────────────────────────────────────────────────
 
   if (hasWarnings) {
-    console.log('size-gate: WARN (см. OPEN ITEMS выше) — CI продолжается');
-    // Раскомментировать для жёсткого провала после оптимизации:
-    // process.exit(1);
+    console.log('size-gate: FAIL (см. детали выше) — CI останавливается');
+    process.exit(1);
   } else {
     console.log('size-gate: PASS');
   }
