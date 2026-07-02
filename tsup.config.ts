@@ -7,6 +7,7 @@ export default defineConfig({
   splitting: false,
   sourcemap: true,
   clean: true,
-  minify: false,
+  minify: 'terser',
+  terserOptions: { compress: { passes: 3, pure_getters: true }, mangle: { properties: { regex: /^_/ } } },
   treeshake: true,
 });

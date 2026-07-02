@@ -29,90 +29,7 @@
 
 import { type SpringParams, validateSpringParams } from './spring.js';
 import { MotionParamError } from './errors.js';
-
-// ─── Physics: spring with arbitrary initial velocity ────────────────────────
-
-/**
- * Evaluate the spring ODE at time t with initial conditions:
- *   x(0) = 0  (normalized: start = 0, target = 1)
- *   x'(0) = v0  (normalized velocity in units of range/s)
- *
- * Returns { value, velocity } in normalized space.
- *
- * Derivation sketch (standard second-order ODE):
- *   m*x'' + c*x' + k*x = k
- *   Let u = x - 1  (shift so equilibrium is 0):
- *   m*u'' + c*u' + k*u = 0,  u(0)=-1, u'(0)=v0
- *   Standard general solution per damping regime.
- */
-function springWithV0(params: SpringParams, t: number, v0: number): { value: number; velocity: number } {
-  const { mass: m, stiffness: k, damping: c } = params;
-
-  if (t <= 0) {
-    return { value: 0, velocity: v0 };
-  }
-
-  const omega0 = Math.sqrt(k / m);
-  const zeta = c / (2 * Math.sqrt(k * m));
-
-  let value: number;
-  let velocity: number;
-
-  if (zeta < 1) {
-    // Underdamped
-    const omegaD = omega0 * Math.sqrt(1 - zeta * zeta);
-    const decay = Math.exp(-zeta * omega0 * t);
-    // u(0)=-1, u'(0)=v0
-    // u(t) = e^{-zeta*omega0*t} * (A*cos(omegaD*t) + B*sin(omegaD*t))
-    // A = u(0) = -1
-    // B = (u'(0) + zeta*omega0*A) / omegaD = (v0 + zeta*omega0*(-1)) / omegaD
-    const A = -1;
-    const B = (v0 - zeta * omega0) / omegaD;
-    const cosD = Math.cos(omegaD * t);
-    const sinD = Math.sin(omegaD * t);
-    const u = decay * (A * cosD + B * sinD);
-    // x = 1 + u
-    value = 1 + u;
-    // x' = u' = decay * [(-zeta*omega0)*(A*cosD+B*sinD) + omegaD*(-A*sinD+B*cosD)]
-    const uPrime =
-      decay * ((-zeta * omega0) * (A * cosD + B * sinD) + omegaD * (-A * sinD + B * cosD));
-    velocity = uPrime;
-  } else if (zeta === 1) {
-    // Critically damped
-    // u(t) = (A + B*t)*e^{-omega0*t}, u(0)=-1, u'(0)=v0
-    // A = -1, B = u'(0) + omega0*A = v0 - omega0
-    const A = -1;
-    const B = v0 - omega0;
-    const decay = Math.exp(-omega0 * t);
-    const u = (A + B * t) * decay;
-    value = 1 + u;
-    // u' = B*e + (A+B*t)*(-omega0)*e = e*[B - omega0*(A+B*t)]
-    velocity = decay * (B - omega0 * (A + B * t));
-  } else {
-    // Overdamped
-    const sqrtTerm = Math.sqrt(zeta * zeta - 1);
-    const r1 = -omega0 * (zeta - sqrtTerm);
-    const r2 = -omega0 * (zeta + sqrtTerm);
-    // u(t) = A1*e^{r1*t} + A2*e^{r2*t}
-    // A1 + A2 = u(0) = -1
-    // r1*A1 + r2*A2 = u'(0) = v0
-    // Solving: A1 = (v0 - r2*(-1)) / (r1 - r2) = (v0 + r2) / (r1 - r2)
-    //          A2 = -1 - A1
-    const A1 = (v0 + r2) / (r1 - r2);
-    const A2 = -1 - A1;
-    const e1 = Math.exp(r1 * t);
-    const e2 = Math.exp(r2 * t);
-    const u = A1 * e1 + A2 * e2;
-    value = 1 + u;
-    velocity = A1 * r1 * e1 + A2 * r2 * e2;
-  }
-
-  // Guard against floating-point edge cases (e.g. t=Infinity, critical damping limit)
-  if (!Number.isFinite(value)) value = 1;
-  if (!Number.isFinite(velocity)) velocity = 0;
-
-  return { value, velocity };
-}
+import { solveSpring } from './internal/solver.js';
 
 // ─── Public types ────────────────────────────────────────────────────────────
 
@@ -133,6 +50,17 @@ export interface MotionValueOptions {
    */
   readonly requestFrame?: RequestFrameFn | undefined;
 }
+
+// ─── Frame-loop constants ────────────────────────────────────────────────────
+// Модульные const (не private static): статики не матчат mangle-регэксп /^_/ и
+// переживали минификацию дословно; модульный const терсер инлайнит/сжимает.
+
+/** Fixed timestep fallback (seconds) when no DOMHighResTimeStamp available. */
+const FIXED_DT_S = 1 / 60;
+/** Convergence threshold (normalized, same as drive.ts). */
+const CONVERGENCE_THRESHOLD = 0.005;
+/** Hard frame cap per run (prevents infinite loops on pathological params). */
+const MAX_FRAMES = 2000;
 
 // ─── MotionValue ─────────────────────────────────────────────────────────────
 
@@ -189,12 +117,6 @@ export class MotionValue {
   /** Whether to use setTimeout fallback (handle=0 path). */
   private _useTimeoutFallback: boolean = false;
 
-  /** Fixed timestep fallback (seconds) when no DOMHighResTimeStamp available. */
-  private static readonly FIXED_DT_S = 1 / 60;
-  /** Convergence threshold (normalized, same as drive.ts). */
-  private static readonly CONVERGENCE_THRESHOLD = 0.005;
-  /** Hard frame cap per run (prevents infinite loops on pathological params). */
-  private static readonly MAX_FRAMES = 2000;
   /** Frame counter for the current run. */
   private _frameCount: number = 0;
   /**
@@ -216,7 +138,7 @@ export class MotionValue {
   constructor(opts: MotionValueOptions) {
     if (!Number.isFinite(opts.initial)) {
       throw new MotionParamError(
-        `MotionValue: 'initial' must be a finite number, got ${opts.initial}`,
+        `MotionValue: 'initial' must be finite, got ${opts.initial}`,
       );
     }
     validateSpringParams(opts.spring);
@@ -233,7 +155,7 @@ export class MotionValue {
     if (typeof requestAnimationFrame !== 'undefined') {
       return requestAnimationFrame(cb);
     }
-    return setTimeout(cb, MotionValue.FIXED_DT_S * 1000) as unknown as number;
+    return setTimeout(cb, FIXED_DT_S * 1000) as unknown as number;
   }
 
   // ── Public API ───────────────────────────────────────────────────────────
@@ -270,7 +192,7 @@ export class MotionValue {
     if (this._destroyed) return;
     if (!Number.isFinite(target)) {
       throw new MotionParamError(
-        `MotionValue.setTarget: target must be a finite number, got ${target}`,
+        `MotionValue.setTarget: target must be finite, got ${target}`,
       );
     }
 
@@ -347,7 +269,7 @@ export class MotionValue {
     if (this._destroyed) return;
     if (!Number.isFinite(target)) {
       throw new MotionParamError(
-        `MotionValue.snapTo: target must be a finite number, got ${target}`,
+        `MotionValue.snapTo: target must be finite, got ${target}`,
       );
     }
     // Идемпотентность: уже покоимся ровно в target → нечего менять и незачем
@@ -390,7 +312,7 @@ export class MotionValue {
       if (this._startTs === undefined) this._startTs = ts;
       this._elapsed = (ts - this._startTs) / 1000;
     } else {
-      this._elapsed += MotionValue.FIXED_DT_S;
+      this._elapsed += FIXED_DT_S;
     }
 
     this._frameCount++;
@@ -398,12 +320,11 @@ export class MotionValue {
     const range = this._target - this._from;
     const absRange = Math.abs(range);
 
-    // Compute new position + velocity from spring solver.
-    const { value: normPos, velocity: normVel } = springWithV0(
-      this._spring,
-      this._elapsed,
-      this._v0Normalized,
-    );
+    // Общий солвер (internal/solver.ts) + стражи этого модуля инлайн
+    // (value→1, velocity→0 — политика отличается от clampFinite spring.ts).
+    const raw = solveSpring(this._spring, this._elapsed, this._v0Normalized);
+    const normPos = Number.isFinite(raw.value) ? raw.value : 1;
+    const normVel = Number.isFinite(raw.velocity) ? raw.velocity : 0;
 
     // Denormalize: absolute value and velocity.
     const rawValue = this._from + normPos * range;
@@ -413,11 +334,11 @@ export class MotionValue {
     const distToTarget = Math.abs(rawValue - this._target);
     const absVelocity = Math.abs(rawVelocity);
     const converged =
-      this._frameCount >= MotionValue.MAX_FRAMES ||
+      this._frameCount >= MAX_FRAMES ||
       !Number.isFinite(range) || // unrepresentable span: |from|+|target| overflowed past MAX_VALUE
       (absRange < 1e-10) || // degenerate range
-      (distToTarget / Math.max(absRange, 1e-10) < MotionValue.CONVERGENCE_THRESHOLD &&
-        absVelocity / Math.max(absRange, 1e-10) < MotionValue.CONVERGENCE_THRESHOLD);
+      (distToTarget / Math.max(absRange, 1e-10) < CONVERGENCE_THRESHOLD &&
+        absVelocity / Math.max(absRange, 1e-10) < CONVERGENCE_THRESHOLD);
 
     if (converged) {
       this._value = this._target;
