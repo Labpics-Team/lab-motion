@@ -148,6 +148,11 @@
       "types": "./dist/frame/index.d.ts",
       "import": "./dist/frame/index.js",
       "require": "./dist/frame/index.cjs"
+    },
+    "./presets": {
+      "types": "./dist/presets/index.d.ts",
+      "import": "./dist/presets/index.js",
+      "require": "./dist/presets/index.cjs"
     }
   },
   "files": [
