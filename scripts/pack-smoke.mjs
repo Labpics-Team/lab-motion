@@ -14,7 +14,7 @@
  */
 
 import { execSync } from 'node:child_process';
-import { mkdtempSync, rmSync, writeFileSync, readFileSync, existsSync } from 'node:fs';
+import { mkdtempSync, mkdirSync, readdirSync, rmSync, writeFileSync, readFileSync, existsSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join, resolve, dirname } from 'node:path';
 import { pathToFileURL, fileURLToPath } from 'node:url';
@@ -32,11 +32,12 @@ const log = (line) => console.log(line);
 try {
   log(`pack-smoke: рабочая директория ${work}`);
   execSync(`pnpm pack --pack-destination "${work}"`, { cwd: ROOT, stdio: 'pipe' });
-  const tarball = execSync('ls *.tgz', { cwd: work, encoding: 'utf8' }).trim();
+  const tarball = readdirSync(work).find((f) => f.endsWith('.tgz'));
+  if (!tarball) throw new Error('pnpm pack не создал тарбол');
   log(`pack-smoke: тарбол ${tarball}`);
 
   const app = join(work, 'app');
-  execSync(`mkdir "${app}"`, { cwd: work });
+  mkdirSync(app);
   writeFileSync(join(app, 'package.json'), JSON.stringify({ name: 'smoke', private: true, type: 'module' }));
   // npm устанавливает из файла оффлайн; --ignore-scripts — least privilege.
   execSync(`npm install --ignore-scripts --no-audit --no-fund "${join(work, tarball)}"`, {
