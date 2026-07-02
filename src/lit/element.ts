@@ -30,17 +30,10 @@ import { type RequestFrameFn } from '../motion-value.js';
 /** Тег custom element'а. */
 export const LAB_MOTION_SPRING_TAG = 'lab-motion-spring';
 
-/**
- * Pure template substitution — extracted from `_applyStyle()` so the
- * placeholder logic is unit-testable without a DOM (LitElement requires one;
- * this function does not). Replaces EVERY `{v}` occurrence, not just the
- * first — composite templates like `'translate({v}px, {v}px)'` repeat the
- * placeholder, and a single `.replace()` would leave the second one literal
- * in the emitted CSS value.
- */
-export function renderTemplateValue(template: string, value: number): string {
-  return template.includes('{v}') ? template.replaceAll('{v}', String(value)) : String(value);
-}
+// Вынесено в internal/template.ts (общий источник с ./wc). Публичная
+// поверхность ./lit определяется lit/index.ts и символ не содержит;
+// глубокие импорты element.js заблокированы exports-картой package.json.
+import { renderTemplateValue } from '../internal/template.js';
 
 /**
  * `<lab-motion-spring>` — фреймворк-независимая обёртка над MotionController.

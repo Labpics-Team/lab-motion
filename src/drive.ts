@@ -119,10 +119,10 @@ export function drive(opts: DriveOptions): Promise<void> {
   // false forever (NaN comparisons), running the loop to MAX_FRAMES = 2000.
   // Mirror the validation pattern in spring.ts validate().
   if (!Number.isFinite(from)) {
-    throw new MotionParamError(`drive: 'from' must be a finite number, got ${from}`);
+    throw new MotionParamError(`drive: 'from' must be finite, got ${from}`);
   }
   if (!Number.isFinite(to)) {
-    throw new MotionParamError(`drive: 'to' must be a finite number, got ${to}`);
+    throw new MotionParamError(`drive: 'to' must be finite, got ${to}`);
   }
 
   // Validate spring params synchronously at the drive() boundary — before any
@@ -180,19 +180,6 @@ export function drive(opts: DriveOptions): Promise<void> {
     // back after overshooting the clamped ceiling.
     let maxEmittedToward = from;
 
-    function computeValue(): number {
-      // spring params already validated synchronously at drive() entry above.
-      const result = springUnchecked(opts.spring, elapsedSeconds);
-      const raw = from + result.value * range;
-      return clamp(raw, lo, hi);
-    }
-
-    function computeVelocity(): number {
-      // spring params already validated synchronously at drive() entry above.
-      const result = springUnchecked(opts.spring, elapsedSeconds);
-      return Math.abs(result.velocity) * Math.abs(range);
-    }
-
     function settle(): void {
       if (settled) return;
       settled = true;
@@ -207,34 +194,6 @@ export function drive(opts: DriveOptions): Promise<void> {
       } else {
         elapsedSeconds += FIXED_DT_S;
       }
-    }
-
-    function isConverged(): boolean {
-      const absRange = Math.abs(range);
-      // Guard absRange>0 is guaranteed by the from===to early-exit above.
-
-      // Visual-saturation early-exit: once the monotone emitter has committed to `to`
-      // (maxEmittedToward === to), no new value distinct from `to` can ever be emitted
-      // regardless of the raw spring velocity. The velocity tail beyond the clamp boundary
-      // is invisible — holding the Promise for it breaks the resolution contract.
-      // Root cause of High bug (convergence velocity gate reads unclamped tail): the position
-      // term used the CLAMPED computeValue() (frozen at `to` once overshoot is absorbed)
-      // while the velocity term read the UNCLAMPED springUnchecked() velocity, which for an
-      // accepted underdamped spring at the documented floor (zeta=0.2, omega0=2.0) keeps the
-      // Promise pending ~3.9s after visual completion. This early-exit makes the class
-      // impossible: once the visual is at `to` and locked by the monotone gate, resolve.
-      if (maxEmittedToward === to) return true;
-
-      // Normalize both terms by range so the threshold is range-independent.
-      // computeValue() is in absolute output units → divide by absRange.
-      // computeVelocity() = abs(springVelocity) * absRange → divide by absRange
-      //   restores the normalized spring velocity (unitless, in [0..1]/s).
-      const v = computeValue();
-      const vel = computeVelocity();
-      return (
-        Math.abs(v - to) / absRange < CONVERGENCE_THRESHOLD &&
-        vel / absRange < CONVERGENCE_THRESHOLD
-      );
     }
 
     // Single-flight guard: prevents two concurrent tick chains from mutating shared
@@ -260,7 +219,31 @@ export function drive(opts: DriveOptions): Promise<void> {
       frameCount++;
       advanceClock(ts);
 
-      if (isConverged() || frameCount >= MAX_FRAMES) {
+      // ОДИН вызов солвера на кадр: прежние computeValue/computeVelocity/
+      // isConverged делали до трёх идентичных вызовов чистой детерминированной
+      // функции — значения бит-в-бит те же, машинерия втрое легче.
+      // spring params already validated synchronously at drive() entry above.
+      const result = springUnchecked(opts.spring, elapsedSeconds);
+      const cv = clamp(from + result.value * range, lo, hi);
+      // absRange > 0 guaranteed by the from===to early-exit above.
+      const absRange = Math.abs(range);
+
+      // Convergence:
+      // 1) Visual-saturation early-exit — once the monotone emitter has committed
+      //    to `to` (maxEmittedToward === to), no value distinct from `to` can ever
+      //    be emitted; the raw velocity tail beyond the clamp boundary is invisible
+      //    (holding the Promise for it broke the resolution contract: an accepted
+      //    underdamped spring at the floor zeta=0.2, omega0=2.0 kept it pending
+      //    ~3.9s after visual completion).
+      // 2) The threshold is range-independent: the position term is divided by
+      //    absRange; velocity from springUnchecked is already in normalized
+      //    progress-space, so it is compared to the threshold directly.
+      const converged =
+        maxEmittedToward === to ||
+        (Math.abs(cv - to) / absRange < CONVERGENCE_THRESHOLD &&
+          Math.abs(result.velocity) < CONVERGENCE_THRESHOLD);
+
+      if (converged || frameCount >= MAX_FRAMES) {
         settle();
         return;
       }
@@ -268,7 +251,6 @@ export function drive(opts: DriveOptions): Promise<void> {
       // Monotonize: for positive range, never emit below the running maximum.
       // For negative range, never emit above the running minimum.
       // This absorbs underdamped oscillation after the spring passes `to`.
-      const cv = computeValue();
       const monotoneValue =
         range >= 0 ? Math.max(cv, maxEmittedToward) : Math.min(cv, maxEmittedToward);
       maxEmittedToward = monotoneValue;

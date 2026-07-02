@@ -89,6 +89,66 @@
       "import": "./dist/flip/index.js",
       "require": "./dist/flip/index.cjs"
     },
+    "./svg": {
+      "types": "./dist/svg/index.d.ts",
+      "import": "./dist/svg/index.js",
+      "require": "./dist/svg/index.cjs"
+    },
+    "./a11y": {
+      "types": "./dist/a11y/index.d.ts",
+      "import": "./dist/a11y/index.js",
+      "require": "./dist/a11y/index.cjs"
+    },
+    "./spring": {
+      "types": "./dist/spring/index.d.ts",
+      "import": "./dist/spring/index.js",
+      "require": "./dist/spring/index.cjs"
+    },
+    "./waapi": {
+      "types": "./dist/waapi/index.d.ts",
+      "import": "./dist/waapi/index.js",
+      "require": "./dist/waapi/index.cjs"
+    },
+    "./auto": {
+      "types": "./dist/auto/index.d.ts",
+      "import": "./dist/auto/index.js",
+      "require": "./dist/auto/index.cjs"
+    },
+    "./svg-morph": {
+      "types": "./dist/svg-morph/index.d.ts",
+      "import": "./dist/svg-morph/index.js",
+      "require": "./dist/svg-morph/index.cjs"
+    },
+    "./solid": {
+      "types": "./dist/solid/index.d.ts",
+      "import": "./dist/solid/index.js",
+      "require": "./dist/solid/index.cjs"
+    },
+    "./preact": {
+      "types": "./dist/preact/index.d.ts",
+      "import": "./dist/preact/index.js",
+      "require": "./dist/preact/index.cjs"
+    },
+    "./angular": {
+      "types": "./dist/angular/index.d.ts",
+      "import": "./dist/angular/index.js",
+      "require": "./dist/angular/index.cjs"
+    },
+    "./wc": {
+      "types": "./dist/wc/index.d.ts",
+      "import": "./dist/wc/index.js",
+      "require": "./dist/wc/index.cjs"
+    },
+    "./qwik": {
+      "types": "./dist/qwik/index.d.ts",
+      "import": "./dist/qwik/index.js",
+      "require": "./dist/qwik/index.cjs"
+    },
+    "./frame": {
+      "types": "./dist/frame/index.d.ts",
+      "import": "./dist/frame/index.js",
+      "require": "./dist/frame/index.cjs"
+    },
     "./presets": {
       "types": "./dist/presets/index.d.ts",
       "import": "./dist/presets/index.js",
@@ -107,8 +167,12 @@
     "size": "node scripts/size-gate.mjs"
   },
   "peerDependencies": {
+    "@angular/core": ">=16.0.0",
+    "@builder.io/qwik": ">=1.4.0",
     "lit": ">=3.0.0",
+    "preact": ">=10.0.0",
     "react": ">=18.0.0",
+    "solid-js": ">=1.8.0",
     "svelte": ">=4.0.0",
     "vue": ">=3.0.0"
   },
@@ -124,17 +188,46 @@
     },
     "vue": {
       "optional": true
+    },
+    "solid-js": {
+      "optional": true
+    },
+    "preact": {
+      "optional": true
+    },
+    "@angular/core": {
+      "optional": true
+    },
+    "@builder.io/qwik": {
+      "optional": true
     }
   },
   "devDependencies": {
-    "@types/node": "22.10.5",
+    "@angular/core": "22.0.5",
+    "@builder.io/qwik": "1.19.1",
+    "@types/node": "^22.20.0",
     "@types/react": "18.3.12",
+    "esbuild": "0.28.1",
     "lit": "3.3.3",
+    "preact": "10.28.2",
     "react": "18.3.1",
-    "svelte": "4.2.19",
-    "tsup": "8.3.6",
-    "typescript": "5.7.3",
-    "vitest": "2.1.8",
+    "solid-js": "1.9.14",
+    "svelte": "5.56.4",
+    "terser": "^5.48.0",
+    "tsup": "8.5.1",
+    "typescript": "5.9.3",
+    "vite": "^8.1.3",
+    "vitest": "4.1.9",
     "vue": "3.4.38"
+  },
+  "pnpm": {
+    "peerDependencyRules": {
+      "allowedVersions": {
+        "@builder.io/qwik>vite": "8"
+      }
+    },
+    "overrides": {
+      "esbuild": "^0.28.1"
+    }
   }
 }
