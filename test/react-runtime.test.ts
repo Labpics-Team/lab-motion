@@ -93,27 +93,35 @@ describe('react-биндинг в реальном React-рантайме', () =
     expect(Number(c.querySelector('#box')!.textContent)).toBeCloseTo(50, 1);
   });
 
-  it('unmount останавливает цикл — нет setState на размонтированном (cleanup-эффект)', () => {
+  it('unmount вызывает destroy: цикл MotionValue остановлен, эмиссий после нет', () => {
+    // Сильный оракул (нота QA): не «не бросает», а ПРЯМОЕ негативное покрытие
+    // класса «утечка ресурса» — свой onChange-счётчик на инстансе; после unmount
+    // destroy() очищает listeners и глушит цикл → повторный setTarget+прогон НЕ
+    // даёт новых эмиссий. Диверсия «убрать destroy» → листенер жив, цикл гоняет
+    // → эмиссии есть → тест краснеет.
     const clock = makeClock();
-    let setTarget!: Dispatch<SetStateAction<number>>;
+    let mv!: ReturnType<typeof useMotionValue>;
     function Box(): ReturnType<typeof createElement> {
-      const [t, setT] = useState(0);
-      setTarget = setT;
-      const x = useSpring(t, SPRING, 'instant', clock.requestFrame);
-      return createElement('div', { id: 'box' }, String(x));
+      mv = useMotionValue(0, SPRING, clock.requestFrame);
+      return createElement('div', { id: 'box' }, 'x');
     }
     const container = document.createElement('div');
     document.body.appendChild(container);
     const root = createRoot(container);
     act(() => root.render(createElement(Box)));
-    act(() => setTarget(100)); // запустили анимацию (цикл активен, кадры в очереди)
-    expect(clock.pending()).toBeGreaterThan(0);
 
-    act(() => root.unmount()); // teardown: useEffect-cleanup → MotionValue.destroy
+    let emits = 0;
+    const off = mv.onChange(() => { emits += 1; }); // immediate-emit → emits=1
+    act(() => { mv.setTarget(100); clock.drain(); }); // живая анимация
+    const before = emits;
+    expect(before).toBeGreaterThan(1); // эмиссии реально шли
 
-    // Прогон оставшихся кадров ПОСЛЕ unmount не должен бросать / варнить
-    // (setState на размонтированном компоненте) — цикл погашен destroy.
-    expect(() => act(() => clock.drain())).not.toThrow();
+    act(() => root.unmount()); // teardown → cleanup-эффект → mv.destroy()
+
+    act(() => { mv.setTarget(0); clock.drain(); }); // проба: жив ли цикл?
+    expect(emits).toBe(before); // destroy погасил — ноль новых эмиссий к листенеру
+    expect(() => act(() => clock.drain())).not.toThrow(); // и не бросает
+    off();
     container.remove();
   });
 

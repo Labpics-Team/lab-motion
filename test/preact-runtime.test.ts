@@ -85,23 +85,32 @@ describe('preact-биндинг в реальном Preact-рантайме', ()
     expect(Number(c.querySelector('#box')!.textContent)).toBeCloseTo(50, 1);
   });
 
-  it('unmount (render null) гасит цикл — прогон кадров после не бросает', () => {
+  it('unmount (render null) вызывает destroy: цикл остановлен, эмиссий после нет', () => {
+    // Сильный оракул (нота QA): свой onChange-счётчик; после teardown destroy()
+    // очищает listeners → повторный setTarget+прогон не даёт эмиссий. Диверсия
+    // «убрать destroy» → цикл жив → эмиссии → краснеет.
     const clock = makeClock();
-    let setTarget!: (n: number) => void;
+    let mv!: ReturnType<typeof useMotionValue>;
     function Box() {
-      const [t, setT] = useState(0);
-      setTarget = setT;
-      const x = useSpring(t, SPRING, 'instant', clock.requestFrame);
-      return h('div', { id: 'box' }, String(x));
+      mv = useMotionValue(0, SPRING, clock.requestFrame);
+      return h('div', { id: 'box' }, 'x');
     }
     const container = document.createElement('div');
     document.body.appendChild(container);
     act(() => render(h(Box, {}), container));
-    act(() => setTarget(100));
-    expect(clock.pending()).toBeGreaterThan(0);
 
-    act(() => render(null, container)); // teardown → cleanup-эффект → destroy
+    let emits = 0;
+    const off = mv.onChange(() => { emits += 1; });
+    act(() => { mv.setTarget(100); clock.drain(); });
+    const before = emits;
+    expect(before).toBeGreaterThan(1);
+
+    act(() => render(null, container)); // teardown → cleanup → mv.destroy()
+
+    act(() => { mv.setTarget(0); clock.drain(); });
+    expect(emits).toBe(before); // destroy погасил цикл
     expect(() => act(() => clock.drain())).not.toThrow();
+    off();
     container.remove();
   });
 
