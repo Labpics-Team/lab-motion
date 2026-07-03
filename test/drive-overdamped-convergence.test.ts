@@ -44,7 +44,7 @@ function noReduceMedia(): (query: string) => MediaQueryList {
 }
 
 describe('overdamped spring rejected at drive() boundary — no MAX_FRAMES stall (regression lock)', () => {
-  describe('zeta > MAX_DAMPING_RATIO (4) — synchronous MotionParamError', () => {
+  describe('genuinely stalling spring — synchronous MotionParamError (derived settle budget)', () => {
     it('throws for {mass:1, stiffness:1, damping:10} — the exact failing case (zeta=5)', () => {
       // zeta = 10 / (2*sqrt(1*1)) = 5 > 4 → must throw at boundary
       expect(() =>
@@ -58,22 +58,23 @@ describe('overdamped spring rejected at drive() boundary — no MAX_FRAMES stall
       ).toThrow(MotionParamError);
     });
 
-    it('error message references damping ratio', () => {
+    it('error message references the settle budget (derived law, 2026-07-03)', () => {
       let msg = '';
       try {
         drive({
           from: 0,
           to: 200,
-          // Use omega0=10 (valid), zeta=100/(2*10)=5 > 4 — hits the damping-ratio guard, not omega0 guard.
-          spring: { mass: 1, stiffness: 100, damping: 100 },
+          // ω₀=1, ζ=5: медленная мода 1·(5−√24)≈0.101 rad/s → t≈52s > бюджета 33.3s.
+          spring: { mass: 1, stiffness: 1, damping: 10 },
           onStep: () => {},
           matchMedia: noReduceMedia(),
         });
       } catch (e) {
         msg = (e as Error).message;
       }
-      // The message should name the damping ratio so the caller understands the constraint.
-      expect(msg).toMatch(/damping ratio/i);
+      // Сообщение обязано называть время оседания и бюджет — новый закон валидатора.
+      expect(msg).toMatch(/settle time/i);
+      expect(msg).toMatch(/budget/i);
     });
 
     it('throws for extreme damping zeta >> 4 (damping=100, stiffness=1, mass=1)', () => {
@@ -166,13 +167,27 @@ describe('overdamped spring rejected at drive() boundary — no MAX_FRAMES stall
       ).not.toThrow();
     });
 
-    it('zeta just above boundary (ζ≈4.01) — rejected', () => {
-      // c = 80.2, zeta ≈ 4.01 > 4 → throws
+    it('ζ≈4.01 при ω₀=10 — ПРИНИМАЕТСЯ (демаскировка коробочного пола, 2026-07-03)', () => {
+      // Прежний пол ζ≤4 отвергал этот вход, хотя медленная мода
+      // 10·(4.01−√15.08)≈1.27 rad/s оседает за ~6s — далеко в бюджете.
+      // Коробка была маскировкой MAX_FRAMES; выведенный закон принимает.
       expect(() =>
         drive({
           from: 0,
           to: 100,
           spring: { mass: 1, stiffness: 100, damping: 80.2 },
+          onStep: () => {},
+          matchMedia: noReduceMedia(),
+        }),
+      ).not.toThrow();
+    });
+
+    it('за бюджетом отвергается: ζ=0.1 при ω₀=1 (rate 0.1 → t≈53s)', () => {
+      expect(() =>
+        drive({
+          from: 0,
+          to: 100,
+          spring: { mass: 1, stiffness: 1, damping: 0.2 },
           onStep: () => {},
           matchMedia: noReduceMedia(),
         }),

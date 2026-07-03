@@ -165,11 +165,19 @@ describe('interpolateColor: sRGB (hex/rgb)', () => {
     expect(r).toBe('rgb(0, 0, 255)');
   });
 
-  it('t=0.5 → середина (красный+синий = фиолетовый 128,0,128)', () => {
+  it('t=0.5 → линейно-световая середина (красный+синий = светлый пурпур 180,0,180)', () => {
+    // default 'linear' (2026-07-03): √(255²·0.5) = 180.31 → 180. Гамма-lerp
+    // давал грязный тёмный #800080 — физически свет складывается линейно.
     const from = parseColor('#ff0000')!;
     const to = parseColor('#0000ff')!;
     const r = interpolateColor(from, to, 0.5);
-    expect(r).toBe('rgb(128, 0, 128)');
+    expect(r).toBe('rgb(180, 0, 180)');
+  });
+
+  it("t=0.5 легаси {space:'srgb'} → гамма-середина 128,0,128", () => {
+    const from = parseColor('#ff0000')!;
+    const to = parseColor('#0000ff')!;
+    expect(interpolateColor(from, to, 0.5, { space: 'srgb' })).toBe('rgb(128, 0, 128)');
   });
 
   it('с alpha: rgba(255,0,0,1) → rgba(0,0,255,0) при t=0.5', () => {

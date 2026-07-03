@@ -163,24 +163,25 @@ describe('Round-trip hslToRgb → rgbToHsl', () => {
 
 // ── sRGB-интерполяция vs канонической формулы ─────────────────────────────────
 
-describe('interpolateColor sRGB: соответствие CSS Color 4', () => {
-  const cases: Array<{
-    from: string; to: string; t: number; name: string;
-  }> = [
-    { from: '#ff0000', to: '#0000ff', t: 0.5,  name: 'красный→синий 0.5' },
-    { from: '#ff0000', to: '#0000ff', t: 0.0,  name: 'красный→синий 0.0' },
-    { from: '#ff0000', to: '#0000ff', t: 1.0,  name: 'красный→синий 1.0' },
-    { from: '#000000', to: '#ffffff', t: 0.5,  name: 'чёрный→белый 0.5' },
-    { from: '#ff8800', to: '#00ff88', t: 0.25, name: 'оранжевый→mint 0.25' },
-    { from: '#010101', to: '#fefefe', t: 0.75, name: 'тёмный→светлый 0.75' },
-  ];
+// Общая сетка кейсов для обоих RGB-пространств смешения.
+const RGB_MIX_CASES: Array<{
+  from: string; to: string; t: number; name: string;
+}> = [
+  { from: '#ff0000', to: '#0000ff', t: 0.5,  name: 'красный→синий 0.5' },
+  { from: '#ff0000', to: '#0000ff', t: 0.0,  name: 'красный→синий 0.0' },
+  { from: '#ff0000', to: '#0000ff', t: 1.0,  name: 'красный→синий 1.0' },
+  { from: '#000000', to: '#ffffff', t: 0.5,  name: 'чёрный→белый 0.5' },
+  { from: '#ff8800', to: '#00ff88', t: 0.25, name: 'оранжевый→mint 0.25' },
+  { from: '#010101', to: '#fefefe', t: 0.75, name: 'тёмный→светлый 0.75' },
+];
 
-  for (const { from, to, t, name } of cases) {
+describe("interpolateColor {space:'srgb'} (легаси): соответствие CSS Color 4", () => {
+  for (const { from, to, t, name } of RGB_MIX_CASES) {
     it(`sRGB lerp ${name}`, () => {
       const fc = parseColor(from)!;
       const tc = parseColor(to)!;
 
-      const result = interpolateColor(fc, tc, t);
+      const result = interpolateColor(fc, tc, t, { space: 'srgb' });
 
       // Канонический результат
       const [cr, cg, cb] = canonicalSrgbLerp(fc.r, fc.g, fc.b, tc.r, tc.g, tc.b, t);
@@ -189,6 +190,43 @@ describe('interpolateColor sRGB: соответствие CSS Color 4', () => {
       expect(result).toBe(expected);
     });
   }
+});
+
+// ── Linear-light default vs независимой формулы √(a²(1−t)+b²t) ───────────────
+// Канон: mixLinearColor popmotion/framer-motion (γ=2-аппроксимация sRGB EOTF).
+// Дыра C аудита 2026-07-03: гамма-lerp кодированных каналов темнил середину.
+
+function canonicalLinearLightMix(
+  fr: number, fg: number, fb: number,
+  tr: number, tg: number, tb: number,
+  t: number,
+): [number, number, number] {
+  const ch = (a: number, b: number): number =>
+    Math.round(Math.sqrt(a * a * (1 - t) + b * b * t));
+  return [ch(fr, tr), ch(fg, tg), ch(fb, tb)];
+}
+
+describe('interpolateColor default (linear): соответствие √(a²(1−t)+b²t)', () => {
+  for (const { from, to, t, name } of RGB_MIX_CASES) {
+    it(`linear-light mix ${name}`, () => {
+      const fc = parseColor(from)!;
+      const tc = parseColor(to)!;
+
+      const result = interpolateColor(fc, tc, t);
+
+      const [cr, cg, cb] = canonicalLinearLightMix(fc.r, fc.g, fc.b, tc.r, tc.g, tc.b, t);
+      expect(result).toBe(`rgb(${cr}, ${cg}, ${cb})`);
+    });
+  }
+
+  it('пример дыры C: red→blue @0.5 светлее гамма-середины (180 vs 128)', () => {
+    // Смысловой пин класса: linear-light midpoint НЕ совпадает с legacy и
+    // строго светлее — «грязный тёмный фиолетовый» невозможен по построению.
+    const fc = parseColor('#ff0000')!;
+    const tc = parseColor('#0000ff')!;
+    expect(interpolateColor(fc, tc, 0.5)).toBe('rgb(180, 0, 180)');
+    expect(interpolateColor(fc, tc, 0.5, { space: 'srgb' })).toBe('rgb(128, 0, 128)');
+  });
 });
 
 // ── Hue wraparound: канонический кратчайший путь ──────────────────────────────

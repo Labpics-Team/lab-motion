@@ -24,7 +24,9 @@ export function solveSpring(
   }
 
   const omega0 = Math.sqrt(k / m);
-  const zeta = c / (2 * Math.sqrt(k * m));
+  // ζ = c/(2√(km)) = c/(2m·ω₀) — тождество √(km) = m·√(k/m) снимает второй
+  // sqrt с горячего пути (солвер зовётся на каждый кадр каждого значения).
+  const zeta = c / (2 * m * omega0);
 
   let value: number;
   let velocity: number;

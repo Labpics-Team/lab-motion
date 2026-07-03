@@ -35,7 +35,11 @@ import { build } from 'esbuild';
 // + небольшой люфт. Дожимание до 2048 отменено решением Даниила 2026-07-02:
 // за размер браться только при перспективе кратного (~2×) выигрыша,
 // не ради добивания круглой цифры.
-export const CORE_GATE_BYTES = 2150;
+// 2150 → 2190 (2026-07-03): +~80 gz — clamp:false (честный overshoot в 4
+// драйверах) + выведенный settle-бюджет валидатора взамен коробочных полов.
+// Подъём в рамках полной делегации Даниила на автономные решения
+// («каждый следующий шаг решай автономно»); дешёвые шейвы сняты до подъёма.
+export const CORE_GATE_BYTES = 2190;
 
 // Потолок для КАЖДОГО прочего субпутя (drift-класс: новый/раздутый субпуть
 // не должен молча проходить без порога). Максимальный факт 2026-07-02 —
@@ -52,17 +56,24 @@ export const IMPORT_COST_SCENARIOS = [
   {
     name: 'only-spring',
     code: `import { spring } from '%DIST%'; console.log(spring({mass:1,stiffness:200,damping:20}, 0.1).value);`,
-    gate: 900, // факт 856
+    gate: 900, // факт 893 (2026-07-03; было 856 — выведенный settle-бюджет валидатора)
   },
   {
     name: 'only-MotionValue',
     code: `import { MotionValue } from '%DIST%'; const m = new MotionValue({initial:0, spring:{mass:1,stiffness:200,damping:20}}); m.onChange(v=>console.log(v)); m.setTarget(1);`,
-    gate: 1600, // факт 1536
+    gate: 1600, // факт 1592 (2026-07-03; было 1536 — валидатор + clamp:false)
   },
   {
     name: 'full-core',
     code: `import * as M from '%DIST%'; console.log(Object.keys(M).length, M.spring({mass:1,stiffness:200,damping:20},0.1).value);`,
-    gate: 2250, // факт 2173
+    // 2250 → 2290 (2026-07-03): +48 gz — цена ДВУХ фич волны clamp:false
+    // (честный overshoot во всех 4 драйверах) и замены коробочных полов
+    // валидатора выведенным settle-бюджетом (settleTimeUpperBound). Подъём
+    // сделан в рамках полной делегации Даниила на автономные решения
+    // (2026-07-03, «каждый следующий шаг решай автономно»); дешёвые шейвы
+    // уже сняты (−15 gz: √(km)=m·ω₀, дедуп √(ζ²−1), сжатие сообщения).
+    // Люфт прежний ~1.5% от факта 2254.
+    gate: 2290,
   },
 ];
 

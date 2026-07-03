@@ -21,21 +21,30 @@
  *   параметров; эндпоинты точны (дисциплина NE2), форма OVERSHOOTING
  *   при ζ<1.
  *
- * Все результаты уважают полы движка (validateSpringParams: ω0 ≥ 2 rad/s,
- * ζ ∈ [0.2, 4]) — публичные краевые bounce/duration ЧЕСТНО клампятся к ним
- * (иначе пружина не сходится за MAX_FRAMES и ядро её отвергнет).
+ * Все результаты уважают выведенный бюджет валидатора (settleTimeUpperBound
+ * ≤ бюджета кадра-капа): краевые bounce/duration ЧЕСТНО клампятся к
+ * минимальному оседающему ζ, а не к коробочному полу 0.2 (2026-07-03).
  *
  * Инварианты: zero-DOM, zero-deps, детерминизм, MotionParamError рано.
  */
 
-import { spring, type SpringParams } from '../spring.js';
+import { settleTimeUpperBound, spring, type SpringParams } from '../spring.js';
 import { MotionParamError } from '../errors.js';
 
-// ─── Полы движка (зеркалят константы валидатора spring.ts) ───────────────────
-
-const MIN_OMEGA0 = 2.0;
-const MIN_ZETA = 0.2;
-const MAX_ZETA = 4;
+// ─── Бюджет валидатора (зеркалит выведенный закон spring.ts, 2026-07-03) ─────
+//
+// Коробочные полы (ω₀ ≥ 2, ζ ∈ [0.2, 4]) удалены вместе с валидатором: теперь
+// принимается любая пружина, чьё аналитическое время оседания помещается в
+// бюджет кадра-капа (settleTimeUpperBound ≤ ~33.3 c). Клампы воронки ниже —
+// минимальные, только против физически неоседающих краёв (ζ → 0 при малой ω₀):
+// ζ_min выводится из того же бюджета: rate = ζ·ω₀ ≥ LN_BUDGET/бюджет.
+const SETTLE_BUDGET_S = 2000 / 60; // = MAX_FRAMES·FIXED_DT_S валидатора
+/**
+ * ln-потребность оседания как у валидатора: ln(1/ε) + max(0, ln ω₀)
+ * (скоростной критерий |v| < ε растёт с ω₀) + запас на амплитудный член.
+ */
+const lnBudget = (omega0: number): number =>
+  Math.log(1 / 0.005) + Math.max(0, Math.log(omega0)) + 2;
 /** ln(100): множитель времени затухания огибающей до 1%. */
 const LN_100 = Math.log(100);
 
@@ -64,11 +73,35 @@ function checkPositive(v: number, name: string, field: string): void {
 }
 
 function toParams(omega0Raw: number, zetaRaw: number, mass: number): SpringParams {
-  // Честные клампы к полам движка (см. шапку). Потолок MAX_ZETA текущими
-  // маппингами недостижим (bounce ∈ [−1,1] → ζraw ≤ 2) — он инвариант воронки
-  // для будущих параметризаций, идущих через toParams.
-  const omega0 = Math.max(MIN_OMEGA0, omega0Raw);
-  const zeta = Math.min(MAX_ZETA, Math.max(MIN_ZETA, zetaRaw));
+  // Честные клампы к ВЫВЕДЕННОМУ бюджету (не к коробочным полам, 2026-07-03):
+  // оба пола выводятся из одного условия «медленная мода оседает в бюджет
+  // кадра-капа» (rate·budget ≥ LN_BUDGET, rate = ζω₀ | ω₀(ζ−√(ζ²−1))).
+  // - bounce=1 (ζraw=0) больше не срезается до 0.2: при типичной ω₀ ζ_min —
+  //   доли процента, «полностью упругая» пружина реально достижима;
+  // - запрошенная длительность за бюджетом коэрсится К БЮДЖЕТУ (прежняя
+  //   коробка ω₀≥2 молча превращала 100-секундный запрос в ~2.3-секундный —
+  //   худшая из возможных подмен намерения).
+  const zetaSeed = Math.max(1e-4, zetaRaw);
+  const slowOf = (z: number) => (z < 1 ? z : z - Math.sqrt(z * z - 1));
+  let omega0 = Math.max(
+    omega0Raw,
+    lnBudget(omega0Raw) / (slowOf(zetaSeed) * SETTLE_BUDGET_S),
+  );
+  const zetaMin = Math.min(1, lnBudget(omega0) / (omega0 * SETTLE_BUDGET_S));
+  const zeta = Math.max(zetaMin, zetaRaw);
+  // Точная досадка под бюджет ЕДИНЫМ источником истины (settleTimeUpperBound
+  // валидатора): аналитические полы выше — сид; амплитудный член у ζ≈1 они
+  // не учитывают. t ∝ 1/ω₀ при фиксированной ζ — 3 итераций достаточно.
+  for (let i = 0; i < 3; i++) {
+    const params = {
+      mass,
+      stiffness: mass * omega0 * omega0,
+      damping: 2 * mass * zeta * omega0,
+    };
+    const t = settleTimeUpperBound(params);
+    if (t <= SETTLE_BUDGET_S) break;
+    omega0 *= (t / SETTLE_BUDGET_S) * 1.02;
+  }
   const stiffness = mass * omega0 * omega0;
   const damping = 2 * mass * zeta * omega0;
   return { mass, stiffness, damping };
@@ -102,12 +135,15 @@ export interface FromVisualDurationOptions {
 /**
  * Пружина, ПЕРВОЕ касание цели у которой ≈ visualDuration (класс Motion).
  *
- * Граница гарантии: если решённая ω0 ниже пола движка (MIN_OMEGA0 — длинные
- * visualDuration при малом ζ), она клампится ВВЕРХ → пружина быстрее
- * запрошенной и первое касание наступает РАНЬШЕ visualDuration (деградация
- * в предсказуемую сторону, до −25% на краю публичного домена). Точное
- * равенство гарантируется только вне зоны клампа; инвариант «t1 совпадает
- * с аналитическим решением для ФИНАЛЬНЫХ параметров» держится всегда.
+ * Именованный контракт API — Tv, упругость — характер. Если запрошенная
+ * пара (Tv, bounce) не помещается в бюджет оседания валидатора, коэрсия
+ * жертвует bounce (ζ поднимается, ω₀ пересчитывается из формулы первого
+ * пересечения) — КАСАНИЕ ОСТАЁТСЯ ровно в Tv. Прежний путь через общий
+ * toParams поднимал ω₀ и молча ускорял касание — подмена намерения
+ * (аудит 2026-07-03). Только когда Tv само не помещается в бюджет даже
+ * у почти-критической пружины, длительность деградирует К БЮДЖЕТУ
+ * (касание раньше — предсказуемая сторона). Инвариант «t1 совпадает с
+ * аналитическим решением для ФИНАЛЬНЫХ параметров» держится всегда.
  */
 export function fromVisualDuration(options: FromVisualDurationOptions): SpringParams {
   checkPositive(options.visualDuration, 'fromVisualDuration', 'visualDuration');
@@ -117,21 +153,43 @@ export function fromVisualDuration(options: FromVisualDurationOptions): SpringPa
       ? options.mass
       : 1;
   const Tv = options.visualDuration;
-  const zeta = Math.min(MAX_ZETA, Math.max(MIN_ZETA, 1 - options.bounce));
+  // ζ из bounce; нижний кламп — только против деления на ноль в формуле
+  // первого пересечения (atan(s/ζ)); бюджет оседания добирает коэрсия ниже.
+  const zeta = Math.max(1e-6, 1 - options.bounce);
 
-  let omega0: number;
   if (zeta < 1) {
-    // Точное решение первого пересечения x(t)=1 (вывод в шапке).
+    // Точное решение первого пересечения x(t)=1 (вывод в шапке) при данном ζ:
+    // вдоль кривой Tv=const ω₀ — функция ζ, а rate = ζ·ω₀(ζ) растёт с ζ
+    // (у ζ→1 ω₀ → ∞), поэтому бюджет достижим бисекцией по ζ без сдвига Tv.
+    const paramsAt = (z: number): SpringParams => {
+      const s = Math.sqrt(1 - z * z);
+      const w = (Math.PI - Math.atan(s / z)) / (s * Tv);
+      return { mass, stiffness: mass * w * w, damping: 2 * mass * z * w };
+    };
+    const fits = (z: number): boolean =>
+      settleTimeUpperBound(paramsAt(z)) <= SETTLE_BUDGET_S;
+    if (fits(zeta)) return paramsAt(zeta);
+    const Z_HI = 0.995; // почти-критическая; ближе к 1 касание вырождается численно
+    if (fits(Z_HI)) {
+      let lo = zeta;
+      let hi = Z_HI; // инвариант бисекции: fits(hi) всегда истинно
+      for (let i = 0; i < 48; i++) {
+        const mid = (lo + hi) / 2;
+        if (fits(mid)) hi = mid;
+        else lo = mid;
+      }
+      return paramsAt(hi);
+    }
+    // Tv не помещается в бюджет даже у ζ=Z_HI: честная деградация
+    // длительности к бюджету (toParams), касание наступает раньше.
     const s = Math.sqrt(1 - zeta * zeta);
-    omega0 = (Math.PI - Math.atan(s / zeta)) / (s * Tv);
-  } else {
-    // Пересечения нет: Tv = выход на ~99% цели по медленнейшей моде.
-    // Для ζ=1 огибающая ~e^{−ω0 t}; для ζ>1 медленнейший корень
-    // r = ω0(ζ − √(ζ²−1)) → ω0 = ln(100) / (Tv · (ζ − √(ζ²−1))).
-    const slow = zeta - Math.sqrt(Math.max(0, zeta * zeta - 1));
-    omega0 = LN_100 / (Tv * Math.max(slow, 1e-6));
+    return toParams((Math.PI - Math.atan(s / zeta)) / (s * Tv), zeta, mass);
   }
-  return toParams(omega0, zeta, mass);
+  // Пересечения нет: Tv = выход на ~99% цели по медленнейшей моде.
+  // Для ζ=1 огибающая ~e^{−ω0 t}; для ζ>1 медленнейший корень
+  // r = ω0(ζ − √(ζ²−1)) → ω0 = ln(100) / (Tv · (ζ − √(ζ²−1))).
+  const slow = zeta - Math.sqrt(Math.max(0, zeta * zeta - 1));
+  return toParams(LN_100 / (Tv * Math.max(slow, 1e-6)), zeta, mass);
 }
 
 // ─── Пресеты (канон react-spring: tension/friction при mass=1) ───────────────

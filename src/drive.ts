@@ -59,6 +59,21 @@ export interface DriveOptions {
    * so the Promise always resolves (not deadlocked).
    */
   readonly requestFrame?: ((cb: (ts?: number) => void) => number) | undefined;
+  /**
+   * Clamp emitted values to [from, to] and monotonize toward `to`.
+   *
+   * Default `true` (legacy CSS-safe behaviour: never leaves the range —
+   * required for physically bounded properties like opacity).
+   *
+   * `false` — honest spring: underdamped overshoot/bounce is EMITTED, not
+   * absorbed. An underdamped spring (zeta < 1) physically overshoots the
+   * target and oscillates — that is its visual identity; the default clamp
+   * turns it into a monotone ease-out. With `clamp: false` values follow the
+   * analytic trajectory exactly (still finite: the solver is closed-form),
+   * convergence is decided by the raw distance-and-velocity threshold, and
+   * the final emitted value is exactly `to`.
+   */
+  readonly clamp?: boolean | undefined;
 }
 
 /**
@@ -148,6 +163,8 @@ export function drive(opts: DriveOptions): Promise<void> {
 
   // Clamping bounds (swapped for negative range).
   const range = to - from;
+  // Clamp mode: default true (CSS-safe legacy); explicit false = honest spring.
+  const bounded = opts.clamp !== false;
 
   // CSS-safety guard: when |from|+|to|>Number.MAX_VALUE, (to-from) overflows to ±Infinity.
   // A spring trajectory denormalized by an infinite range produces NaN (0*∞ at t=0)
@@ -223,7 +240,10 @@ export function drive(opts: DriveOptions): Promise<void> {
       // функции — значения бит-в-бит те же, машинерия втрое легче.
       // spring params already validated synchronously at drive() entry above.
       const result = springUnchecked(opts.spring, elapsedSeconds);
-      const cv = clamp(from + result.value * range, lo, hi);
+      const rawValue = from + result.value * range;
+      // bounded=true (default): CSS-safe clamp to [from, to]. bounded=false:
+      // honest trajectory — overshoot is the point, no clamp.
+      const cv = bounded ? clamp(rawValue, lo, hi) : rawValue;
       // absRange > 0 guaranteed by the from===to early-exit above.
       const absRange = Math.abs(range);
 
@@ -237,8 +257,12 @@ export function drive(opts: DriveOptions): Promise<void> {
       // 2) The threshold is range-independent: the position term is divided by
       //    absRange; velocity from springUnchecked is already in normalized
       //    progress-space, so it is compared to the threshold directly.
+      // The visual-saturation early-exit (maxEmittedToward === to) is a property
+      // of the MONOTONE emitter only: with the clamp off, values legitimately
+      // pass through `to` while the spring still carries velocity, so the
+      // threshold test is the sole convergence criterion there.
       const converged =
-        maxEmittedToward === to ||
+        (bounded && maxEmittedToward === to) ||
         (Math.abs(cv - to) / absRange < CONVERGENCE_THRESHOLD &&
           Math.abs(result.velocity) < CONVERGENCE_THRESHOLD);
 
@@ -247,13 +271,18 @@ export function drive(opts: DriveOptions): Promise<void> {
         return;
       }
 
-      // Monotonize: for positive range, never emit below the running maximum.
-      // For negative range, never emit above the running minimum.
-      // This absorbs underdamped oscillation after the spring passes `to`.
-      const monotoneValue =
-        range >= 0 ? Math.max(cv, maxEmittedToward) : Math.min(cv, maxEmittedToward);
-      maxEmittedToward = monotoneValue;
-      onStep(monotoneValue);
+      if (bounded) {
+        // Monotonize: for positive range, never emit below the running maximum.
+        // For negative range, never emit above the running minimum.
+        // This absorbs underdamped oscillation after the spring passes `to`.
+        const monotoneValue =
+          range >= 0 ? Math.max(cv, maxEmittedToward) : Math.min(cv, maxEmittedToward);
+        maxEmittedToward = monotoneValue;
+        onStep(monotoneValue);
+      } else {
+        // Honest spring: emit the trajectory as solved, bounce included.
+        onStep(cv);
+      }
 
       // Release the single-flight lock before rescheduling so the next tick
       // invocation (from either path) is not immediately dropped.
