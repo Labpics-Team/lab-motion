@@ -270,11 +270,13 @@ describe('D8 dt-guards / GLOBAL_CAP / валидация', () => {
   it('невалидная пружина → MotionParamError (validateSpringParams)', () => {
     expect(() => mk({ spring: { mass: 0, stiffness: 100, damping: 20 } })).toThrow(MotionParamError);
   });
-  it('timeScale=0 (заморожено) → GLOBAL_CAP=MAX_FRAMES*5 в итоге сеттлит (не бесконечный цикл)', async () => {
+  it('timeScale=0 (заморожено) → крутит МНОГО кадров до GLOBAL_CAP (не ранний settle)', async () => {
     const { c, clock, emitted } = mk({ initialTimeScale: 0 });
-    // _vt += dt*0 = 0 → computeAt(0)=from=0, эмитится повторно; GLOBAL_CAP=10000 → settle.
-    clock.drainAll(10500); // достаточно, чтобы достичь cap
-    expect(emitted.length).toBeGreaterThan(0);
+    // _vt += dt*0 = 0 → computeAt(0)=from=0, эмитится ПОВТОРНО ~GLOBAL_CAP(=10000) раз → settle.
+    // Мутант 349 `else if(true)`: timeScale=0 попал бы в reverse (_vt=0<=0) → settle(from)
+    // на 1-м кадре. Оракул emitted.length>1000 доказывает, что крутилось много (не ранний settle).
+    clock.drainAll(10500); // 10500 > GLOBAL_CAP=MAX_FRAMES*5=10000 → достигает cap
+    expect(emitted.length).toBeGreaterThan(1000); // много кадров (мутант 349→true дал бы ~1)
     expect(clock.pending()).toBe(0); // loop остановлен cap-ом (не бесконечный)
     await c; // промис резолвится (cap-settle) — без cap-а await висел бы
   }, 20000);
@@ -344,14 +346,26 @@ describe('E3 timeScale ±Infinity: forward/reverse (строки 341, 349)', () 
     expect(emitted.at(-1)).toBe(100);
     expect(c.progress).toBe(1);
   });
-  it('-Infinity timeScale → reverse-сходимость к from (~1 кадр)', () => {
-    // Мутант 349 `else if(false)` не взял бы reverse-путь → не сеттлит в from.
+  it('-Infinity timeScale → reverse-путь СЕТТЛИТ в from (pending=0, не только значение)', () => {
+    // Значение 0 совпадает с computeAt(-Inf)=from СЛУЧАЙНО (нота QA) — потому оракул
+    // на pending()===0 ДОКАЗЫВАЕТ факт settle через reverse-путь. Мутант 349 `else if(false)`:
+    // ни forward, ни reverse → падает в emit+reschedule → НЕ сеттлит → pending>0 → краснеет.
     const { c, clock, emitted } = mk({ initialTimeScale: 1 });
     clock.drain(3); // вперёд
     c.timeScale = -Infinity;
     clock.drain(2);
-    expect(emitted.at(-1)).toBe(0); // settle(from) через reverse-путь
+    expect(emitted.at(-1)).toBe(0);
     expect(c.progress).toBe(0);
+    expect(clock.pending()).toBe(0); // ДОКАЗАТЕЛЬСТВО settle (мутант 349→false не сеттлил бы)
+  });
+  it('ФИНИТНЫЙ отрицательный timeScale (-2) → reverse СЕТТЛИТ в from (349 Logical/false||)', () => {
+    // Ключ: −2 конечно, потому под-условие `(!isFinite(-2) && -2<0)` = false → ветвление
+    // держится ТОЛЬКО на первом дизъюнкте `_timeScale<0`. Мутанты 349:16 `A&&B` и `false||B`
+    // для finite −2 дают false → НЕ reverse → не сеттлит в from. Оракул pending=0 + value=from.
+    const { c, clock, emitted } = mk({ initialTimeScale: -2 });
+    clock.drain(5); // reverse от _vt=0 → _vt<0 → settle(from)
+    expect(emitted.at(-1)).toBe(0); // from
+    expect(clock.pending()).toBe(0); // сеттлилось (мутант A&&B/false|| крутился бы форвардно)
   });
 });
 
@@ -400,16 +414,19 @@ describe('E5 dt-guards: ts-based dt и dt<=0 защита (326, 334)', () => {
     clock.step(1000);   // ещё 0.5s → пружина уже сошлась
     expect(emitted.at(-1)).toBeCloseTo(100, 1); // сошлась быстро (fixed-dt дал бы ~2 кадра прогресса)
   });
-  it('повторный ts (dt=0) → guard подставляет FIXED_DT, прогресс идёт (334)', () => {
-    // Мутант 334 `if(false)`: dt=0 не защищён → _vt += 0 → не двигается. Здоровый: dt<=0→FIXED_DT.
+  it('повторный ts (dt=0) → guard FIXED_DT: прогресс ПОСЛЕ первого кадра (334)', () => {
+    // Первый кадр даёт value>0 через ветку `_lastRealTs===undefined→FIXED_DT` (не guard 334).
+    // Дискриминатор 334: кадры 2+ с dt=0. Здоровый: guard→FIXED_DT→_vt растёт→value растёт.
+    // Мутант 334 `if(false)`: dt=0 → _vt+=0 → застывает на value кадра 1. Оракул: последний
+    // эмит СТРОГО БОЛЬШЕ первого (прогресс за пределами кадра 1).
     const clock = tsClock();
     const emitted: number[] = [];
     createDriver({ from: 0, to: 100, spring: STD_SPRING, matchMedia: media(false),
       onStep: (v) => emitted.push(v), requestFrame: clock.requestFrame });
-    clock.step(100); // startTs
-    clock.step(100); // тот же ts → dt=0 → guard → FIXED_DT → прогресс
-    clock.step(100); // снова dt=0
-    expect(emitted.at(-1)).toBeGreaterThan(0); // сдвинулось (мутант застрял бы на 0)
+    clock.step(100); // кадр 1: _lastRealTs=undefined → FIXED_DT → value=v1>0
+    clock.step(100); // кадр 2: dt=0 → guard → FIXED_DT → value>v1
+    clock.step(100); // кадр 3: dt=0 → guard → value ещё больше
+    expect(emitted.at(-1)).toBeGreaterThan(emitted[0]); // прогресс через guard (мутант 334 застыл бы на v1)
   });
 });
 
