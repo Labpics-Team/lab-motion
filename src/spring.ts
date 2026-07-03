@@ -5,7 +5,8 @@
  * Invariants:
  *   2. CSS-safe: output is always finite (never NaN, never Infinity).
  *   3. Deterministic: identical (params, t) → identical output.
- *   5. Domain purity: no external imports, no side effects.
+ *   5. Domain purity: no side effects; единственный импорт — внутренние
+ *      константы контура кадра (бюджет валидатора выводится из них).
  *
  * Physics model:
  *   Underdamped / critically-damped / overdamped spring from rest (x=0)
@@ -16,6 +17,7 @@
  */
 
 import { MotionParamError } from './errors.js';
+import { CONVERGENCE_THRESHOLD, FIXED_DT_S, MAX_FRAMES } from './internal/constants.js';
 import { solveSpring } from './internal/solver.js';
 import { type SpringParams } from './internal/types.js';
 
@@ -35,51 +37,45 @@ export interface SpringResult {
 }
 
 /**
- * Maximum allowed damping ratio (ζ). Above this the spring is so overdamped
- * it takes very long to converge and the animation stalls or snaps at MAX_FRAMES.
+ * Бюджет времени оседания (аудит 2026-07-03, дыра B): прежние КОРОБОЧНЫЕ полы
+ * (ω₀ ≥ 2.0, 0.2 ≤ ζ ≤ 4) были маскировкой лимита MAX_FRAMES под «валидацию» —
+ * они отвергали физически валидные пружины ({m:1,k:1,c:1}: ω₀=1, сходится за
+ * ~11 с) и запрещали упругие ζ < 0.2 даже при большой ω₀ (rate = ζ·ω₀ высокая,
+ * сходимость быстрая). Заменены ОДНИМ выведенным критерием: аналитическая
+ * верхняя граница времени оседания медленной моды обязана помещаться в бюджет
+ * кадра-капа.
  *
- * Physics: zeta = c / (2*sqrt(k*m)).
+ *   rate  = ζ·ω₀ (underdamped) | ω₀·(ζ − √(ζ²−1)) (overdamped, медленный корень)
+ *   amp   = 1/√(1−ζ²) | (ζ+√(ζ²−1))/(2√(ζ²−1))   (пик коэффициентов разложения;
+ *           у ζ→1 факторизация вырождается — ζ_eff отводится на ±1e-3, истинный
+ *           пик критической ветки ограничен)
+ *   t_settle ≤ [ln(1/ε) + max(0, ln ω₀) + ln(max(1, amp))]/rate
+ *           (ε — CONVERGENCE_THRESHOLD; ln ω₀ — скоростной критерий |v| < ε·range)
  *
- * Empirically verified (closed-form solver + drive() convergence loop):
- * at ω₀ ≥ MIN_NATURAL_FREQUENCY=2.0, ζ=4.0 converges at frame 1256 / 20.9 s < MAX_FRAMES=2000.
+ * Требование: t_settle ≤ MAX_FRAMES·FIXED_DT_S (≈33.3 с). Ноль коробочных
+ * констант: бюджет выведен из уже существующих порогов контура кадра.
  */
-const MAX_DAMPING_RATIO = 4;
+const SETTLE_BUDGET_S = MAX_FRAMES * FIXED_DT_S;
 
-/**
- * Minimum allowed natural frequency ω₀ = sqrt(k/m) in rad/s.
- *
- * Wall-clock convergence time for overdamped springs is dominated by the SLOW mode:
- *   τ_slow = 1 / (ω₀·(ζ − √(ζ²−1)))
- * At worst case ζ=MAX_DAMPING_RATIO=4: ζ−√15 ≈ 0.2679, so τ_slow = 1/(ω₀·0.2679).
- *
- * drive() uses CONVERGENCE_THRESHOLD=0.5% relative and MAX_FRAMES=2000 (t≈33.3 s).
- * Binary-search over the closed-form solver shows the critical ω₀ (exactly at MAX_FRAMES)
- * is ≈ 1.2552 rad/s. A spring with ω₀ = 0.5 (the prior floor) converges at frame 5021
- * (83.7 s) — it ALWAYS snaps at MAX_FRAMES with a 12.2% visible jump.
- *
- * We raise the floor to 2.0 rad/s, verified to converge at ≤ 1256 frames for ALL
- * accepted (ω₀, ζ) pairs (see test/spring-low-omega0-wall-clock.test.ts worst-case probe).
- *
- * Physical meaning: ω₀ = 2.0 rad/s corresponds to period 2π/2 ≈ 3.1 s — still far
- * outside any reasonable UI animation intent.
- */
-const MIN_NATURAL_FREQUENCY = 2.0; // rad/s — empirically verified floor
-
-/**
- * Minimum allowed damping ratio (ζ). Below this the spring is near-undamped:
- * the decay envelope exp(-ζ·ω₀·t) is nearly flat and the 0.5% convergence threshold
- * is never reached within MAX_FRAMES regardless of ω₀.
- *
- * For underdamped decay, convergence requires:
- *   exp(-ζ·ω₀·t) < THRESHOLD  →  ζ·ω₀ > -ln(0.005)/33.33 ≈ 0.159 rad/s
- * At ω₀ = MIN_NATURAL_FREQUENCY = 2.0: ζ > 0.159/2.0 = 0.0795.
- *
- * We set MIN_DAMPING_RATIO = 0.2 (a practical UI lower bound verified to converge at
- * ≤ 1050 frames at ω₀=1.5; at ω₀=2.0 it converges at frame 844).
- * Practical meaning: ζ < 0.2 produces more than 10 underdamped oscillations — not a
- * useful UI motion.
- */
-const MIN_DAMPING_RATIO = 0.2; // ζ floor — closes near-undamped stall class
+/** Аналитическая верхняя граница времени оседания (сек) для валидных m/k/c. */
+export function settleTimeUpperBound(p: SpringParams): number {
+  const omega0 = Math.sqrt(p.stiffness / p.mass);
+  // ζ = c/(2√(km)) = c/(2m·ω₀) — без второго sqrt (тождество √(km) = m·√(k/m)).
+  const zetaRaw = p.damping / (2 * p.mass * omega0);
+  // У ζ = 1 разложение на моды вырождено (см. solver) — отводим на ±1e-3.
+  const zeta =
+    Math.abs(zetaRaw - 1) < 1e-3 ? (zetaRaw < 1 ? 0.999 : 1.001) : zetaRaw;
+  const under = zeta < 1;
+  const d = Math.sqrt(Math.abs(zeta * zeta - 1)); // √|ζ²−1|: ωd/ω₀ | расщепление корней
+  const rate = under ? zeta * omega0 : omega0 * (zeta - d);
+  if (!(rate > 0)) return Infinity; // ζ=0: незатухающая — не оседает никогда
+  const amp = under ? 1 / d : (zeta + d) / (2 * d);
+  const needLn =
+    Math.log(1 / CONVERGENCE_THRESHOLD) +
+    Math.max(0, Math.log(omega0)) +
+    Math.log(Math.max(1, amp));
+  return needLn / rate;
+}
 
 /**
  * Validate spring params. Throws MotionParamError for invalid inputs.
@@ -103,33 +99,12 @@ export function validateSpringParams(p: SpringParams): void {
       `spring: damping must be non-negative finite, got ${p.damping}`,
     );
   }
-  // Guard 1: natural frequency floor — closes the slow-overdamped stall class.
-  // Wall-clock convergence time ∝ 1/ω₀; a very soft/heavy spring (ω₀→0) hits
-  // MAX_FRAMES (~33 s) and snaps. The prior floor of 0.5 rad/s was WRONG:
-  // {m:1, k:0.25, c:4} has ω₀=0.5 exactly (accepts the guard) but converges at
-  // frame 5021 (83.7 s), producing a 12.2% visible snap. Correct floor is 2.0 rad/s
-  // (verified: worst-case ω₀=2.0, ζ=4 converges at frame 1256).
-  // Тексты ошибок намеренно плотные (вес ядра): значение, порог, входы и
-  // рекомендация сохранены; формулы/пояснения живут в доке и комментариях.
-  const omega0 = Math.sqrt(p.stiffness / p.mass);
-  const inputs = `(mass:${p.mass}, stiffness:${p.stiffness}, damping:${p.damping})`;
-  if (omega0 < MIN_NATURAL_FREQUENCY) {
+  // Единый выведенный гард (взамен коробочных ω₀/ζ-полов, см. SETTLE_BUDGET_S):
+  // аналитическое время оседания обязано помещаться в бюджет кадра-капа.
+  const tSettle = settleTimeUpperBound(p);
+  if (!(tSettle <= SETTLE_BUDGET_S)) {
     throw new MotionParamError(
-      `spring: natural frequency ω₀=${omega0.toFixed(4)} rad/s < min ${MIN_NATURAL_FREQUENCY} ${inputs} — increase stiffness or reduce mass.`,
-    );
-  }
-  // Guard 2: damping ratio bounds — closes BOTH the extreme-overdamping and near-undamped classes.
-  // High ζ (>MAX_DAMPING_RATIO): slow overdamped modes extend settling time.
-  // Low ζ (<MIN_DAMPING_RATIO): near-undamped decay envelope almost flat; never converges within MAX_FRAMES.
-  const zeta = p.damping / (2 * Math.sqrt(p.stiffness * p.mass));
-  if (zeta > MAX_DAMPING_RATIO) {
-    throw new MotionParamError(
-      `spring: damping ratio ζ=${zeta.toFixed(2)} > max ${MAX_DAMPING_RATIO} ${inputs} — reduce damping or increase stiffness/mass.`,
-    );
-  }
-  if (zeta < MIN_DAMPING_RATIO) {
-    throw new MotionParamError(
-      `spring: damping ratio ζ=${zeta.toFixed(4)} < min ${MIN_DAMPING_RATIO} ${inputs} — near-undamped spring never settles; increase damping.`,
+      `spring: settle time ${Number.isFinite(tSettle) ? tSettle.toFixed(1) : '∞'}s > budget ${SETTLE_BUDGET_S.toFixed(1)}s (m:${p.mass} k:${p.stiffness} c:${p.damping}) — increase damping·ω₀`,
     );
   }
 }

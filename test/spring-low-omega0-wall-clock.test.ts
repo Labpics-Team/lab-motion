@@ -6,28 +6,25 @@ import { springUnchecked } from '../src/spring.js';
  * Test: convergence-class guard — closes the wall-clock-stall class
  * Class: regression (correctness + performance)
  *
- * The wall-clock-stall class has TWO independent failure modes:
+ * История закона (2026-07-03): коробочные полы (MIN_NATURAL_FREQUENCY=2.0,
+ * MIN_DAMPING_RATIO=0.2, MAX_DAMPING_RATIO=4) заменены ОДНИМ выведенным
+ * критерием — аналитическая верхняя граница времени оседания медленной моды
+ * (settleTimeUpperBound) обязана помещаться в бюджет кадра-капа
+ * MAX_FRAMES·FIXED_DT_S ≈ 33.3s. Полы были маскировкой MAX_FRAMES:
+ * отвергали сходящиеся входы (ω₀=2, ζ=0.125 — оседает за ~24s). Все
+ * reject-кейсы ниже — входы, чья
+ * медленная мода НЕ оседает в бюджет (rate = ζω₀ | ω₀(ζ−√(ζ²−1)) слишком
+ * мал); accept-кейсы — оседающие, с пруфом сходимости замкнутой формой.
  *
- * MODE A — slow overdamped (prior bug, root cause of Finding #3):
- *   High ζ extends slow-mode settling time τ_slow = 1/(ω₀·(ζ−√(ζ²−1))).
- *   The PRIOR floor of ω₀ ≥ 0.5 rad/s was empirically wrong:
- *     {m:1, k:0.25, c:4}: ω₀=0.5 (AT floor, passes guard), ζ=4 (at cap, passes guard)
- *     → closes at frame 5021 (83.7 s), snaps at MAX_FRAMES=2000 with a 12.2% jump.
- *   Fix: raise MIN_NATURAL_FREQUENCY to 2.0 rad/s (critical ≈ 1.2552 rad/s, safe headroom).
- *   Worst-case accepted (ω₀=2.0, ζ=4) now converges at frame 1256 < MAX_FRAMES.
- *
- * MODE B — near-undamped (new class guard, closes Finding #3 remainder):
- *   Very low ζ: decay envelope exp(−ζ·ω₀·t) is nearly flat → oscillates to MAX_FRAMES.
- *   Fix: add MIN_DAMPING_RATIO = 0.2 floor (ζ=0.2 at ω₀=2.0 converges at frame 844).
+ * MODE A (slow overdamped): высокий ζ растягивает τ_slow = 1/(ω₀(ζ−√(ζ²−1))).
+ *   Прежний корень Finding #3: {m:1,k:0.25,c:4} закрывался на кадре 5021
+ *   (83.7s) и снапался на MAX_FRAMES=2000 со скачком 12.2%.
+ * MODE B (near-undamped): ζ→0 делает огибающую exp(−ζω₀t) почти плоской.
  *
  * Mutation targets:
- *   - Remove `omega0 < MIN_NATURAL_FREQUENCY` guard → "throws for low-ω₀" tests FAIL.
- *   - Lower MIN_NATURAL_FREQUENCY to 0.5 → worst-case-accepted-pair test FAILS (would stall).
- *   - Remove `zeta < MIN_DAMPING_RATIO` guard → "throws for low-ζ" tests FAIL.
- *   - Lower MIN_DAMPING_RATIO to 0.01 → near-undamped worst-case test would stall.
- *
- * The worst-case-accepted-pair tests (MODE A worst case + MODE B worst case) are the KEY
- * regression locks: they bite if the floor is lowered even slightly.
+ *   - Убрать бюджет-гард из validateSpringParams → все reject-тесты FAIL.
+ *   - Поднять SETTLE_BUDGET_S вдвое → reject-кейсы у границы (36–84s) FAIL.
+ *   - Worst-case-accepted-локи ловят сдвиг бюджета вверх по кадру-капу.
  */
 
 /** Stub matchMedia: no reduced-motion preference. */
@@ -44,8 +41,10 @@ function noReduceMedia(): (query: string) => MediaQueryList {
   });
 }
 
-// ─── Constants mirrored from src/spring.ts for test assertions ──────────────
-// If these change, update the guard AND the tests together.
+// ─── Опорные точки принятой зоны (бывшие полы — теперь якоря регрессии) ─────
+// Полов в валидаторе больше нет; эти значения остаются как ХУДШИЕ ПРИНЯТЫЕ
+// пары для локов сходимости (они лежали на границе прежней коробки и обязаны
+// сходиться до MAX_FRAMES при любом законе).
 const MIN_NATURAL_FREQUENCY = 2.0; // rad/s
 const MIN_DAMPING_RATIO = 0.2;
 const MAX_DAMPING_RATIO = 4;
@@ -228,16 +227,30 @@ describe('convergence-class guard — wall-clock-stall class (regression lock)',
       ).toThrow(MotionParamError);
     });
 
-    it('throws for {mass:1, stiffness:4, damping:0.5} — ω₀=2.0, ζ=0.125 (at ω₀ floor, near-undamped)', () => {
-      // omega0=sqrt(4/1)=2.0 (passes omega0 guard). zeta=0.5/(2*sqrt(4))=0.125 < 0.2 → throws.
+    it('ПРИНИМАЕТСЯ {mass:1, stiffness:4, damping:0.5} — ω₀=2.0, ζ=0.125 (демаскировка ζ-пола, 2026-07-03)', () => {
+      // Прежний коробочный пол ζ ≥ 0.2 отвергал этот вход, хотя его медленная
+      // мода затухает с rate = ζ·ω₀ = 0.25 rad/s → t_settle ≈ 24s ≤ 33.3s
+      // бюджета. Выведенный закон принимает — и вход реально сходится.
+      const p = { mass: 1, stiffness: 4, damping: 0.5 };
       expect(() =>
         drive({
           from: 0, to: 100,
-          spring: { mass: 1, stiffness: 4, damping: 0.5 },
+          spring: p,
           onStep: () => {},
           matchMedia: noReduceMedia(),
+          requestFrame: () => 1, // кадры не гоняем: тест — про границу
         }),
-      ).toThrow(MotionParamError);
+      ).not.toThrow();
+      // Пруф сходимости замкнутой формой (не маскировка MAX_FRAMES):
+      let frame = Infinity;
+      for (let f = 0; f <= MAX_FRAMES * 3; f++) {
+        const { value, velocity } = springUnchecked(p, f * FIXED_DT_S);
+        if (Math.abs(value - 1) < 0.005 && Math.abs(velocity) < 0.005) {
+          frame = f;
+          break;
+        }
+      }
+      expect(frame).toBeLessThan(MAX_FRAMES);
     });
 
     it('error message names damping to guide the caller', () => {

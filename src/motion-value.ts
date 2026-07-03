@@ -49,6 +49,16 @@ export interface MotionValueOptions {
    * or a setTimeout(~16ms) shim for Node environments.
    */
   readonly requestFrame?: RequestFrameFn | undefined;
+  /**
+   * Clamp emitted values to [from, target].
+   *
+   * Default `true` (legacy CSS-safe behaviour — required for physically
+   * bounded properties like opacity). `false` — honest spring: underdamped
+   * overshoot/bounce is EMITTED (the analytic trajectory is followed
+   * exactly); the final settle still emits exactly the target, and the
+   * non-finite safety net stays in force.
+   */
+  readonly clamp?: boolean | undefined;
 }
 
 // ─── Frame-loop constants ────────────────────────────────────────────────────
@@ -83,6 +93,9 @@ export class MotionValue {
 
   /** Active spring params. */
   private readonly _spring: SpringParams;
+
+  /** Клэмп-режим: true = легаси CSS-safe; false — честная пружина (overshoot эмитится). */
+  private readonly _clamp: boolean;
 
   /** Injected frame scheduler. */
   private readonly _requestFrame: RequestFrameFn;
@@ -142,6 +155,7 @@ export class MotionValue {
     this._from = opts.initial;
     this._target = opts.initial;
     this._spring = opts.spring;
+    this._clamp = opts.clamp !== false;
     this._requestFrame = opts.requestFrame ?? MotionValue._defaultRequestFrame;
   }
 
@@ -344,10 +358,11 @@ export class MotionValue {
       return;
     }
 
-    // Emit clamped value (CSS-safe: clamp to [from, target] or [target, from]).
+    // Emit value. bounded=true (default): CSS-safe clamp to [from, target].
+    // bounded=false: honest trajectory — underdamped overshoot is emitted.
     const lo = range >= 0 ? this._from : this._target;
     const hi = range >= 0 ? this._target : this._from;
-    const clampedValue = Math.max(lo, Math.min(hi, rawValue));
+    const clampedValue = this._clamp ? Math.max(lo, Math.min(hi, rawValue)) : rawValue;
 
     // Final CSS-safety net (invariant 2): even a finite range can overflow the
     // denormalized product to Inf/NaN at extreme magnitudes. Never emit a

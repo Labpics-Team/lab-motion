@@ -35,7 +35,7 @@
  *       (формулы dx/sx выведены для верхнего-левого origin).
  */
 
-import { spring, validateSpringParams, type SpringParams } from '../spring.js';
+import { springUnchecked, validateSpringParams, type SpringParams } from '../spring.js';
 import type { RequestFrameFn } from '../motion-value.js';
 
 // ─── Типы и стражи ───────────────────────────────────────────────────────────
@@ -101,11 +101,12 @@ export function computeFlip(first: FlipRect, last: FlipRect): FlipInversion {
 }
 
 /**
- * Transform на прогрессе p ∈ [0,1]: p=0 — полная инверсия (визуально first),
- * p=1 — identity (элемент на своём новом месте). p клампится; NaN → 0.
+ * Transform на «сыром» прогрессе (без клампа): путь clamp:false драйвера —
+ * overshoot доезда (p > 1) честно доходит до transform'а. NaN → 0.
+ * @internal
  */
-export function flipAt(inv: FlipInversion, p: number): FlipTransform {
-  const t = clamp01(p);
+function flipAtRaw(inv: FlipInversion, p: number): FlipTransform {
+  const t = Number.isNaN(p) ? 0 : p;
   const inv1 = 1 - t;
   // «+ 0» схлопывает -0 → +0 (IEEE): в CSS «-0px» валиден, но грязен.
   return {
@@ -114,6 +115,14 @@ export function flipAt(inv: FlipInversion, p: number): FlipTransform {
     sx: finite(inv.sx + (1 - inv.sx) * t) + 0,
     sy: finite(inv.sy + (1 - inv.sy) * t) + 0,
   };
+}
+
+/**
+ * Transform на прогрессе p ∈ [0,1]: p=0 — полная инверсия (визуально first),
+ * p=1 — identity (элемент на своём новом месте). p клампится; NaN → 0.
+ */
+export function flipAt(inv: FlipInversion, p: number): FlipTransform {
+  return flipAtRaw(inv, clamp01(p));
 }
 
 /**
@@ -154,6 +163,11 @@ export interface FlipOptions {
   readonly onStep?: ((t: FlipTransform) => void) | undefined;
   /** Полёт завершён (identity достигнута). Ровно один раз на play. */
   readonly onRest?: (() => void) | undefined;
+  /**
+   * Клэмп прогресса к [0, 1]. Default true (легаси). false — честная
+   * пружина: overshoot доезда эмитится в transform (упругий FLIP).
+   */
+  readonly clamp?: boolean | undefined;
 }
 
 /** Контроллер FLIP-полётов. */
@@ -191,6 +205,8 @@ export function createFlip(options?: FlipOptions): FlipControls {
   // РАНО и детерминированно — не поздним исключением из кадра планировщика
   // (и не молча под reduced-motion).
   validateSpringParams(params);
+  // Клэмп-режим: default true; явный false = честный упругий доезд.
+  const bounded = options?.clamp !== false;
   const requestFrame = options?.requestFrame;
   const onStep = options?.onStep;
   const onRest = options?.onRest;
@@ -201,8 +217,9 @@ export function createFlip(options?: FlipOptions): FlipControls {
   let generation = 0;
 
   const emit = (inv: FlipInversion, p: number): void => {
-    progress = p;
-    onStep?.(flipAt(inv, p));
+    progress = clamp01(p); // публичный контракт прогресса — [0,1] всегда
+    // bounded=false: overshoot идёт в transform сырым (flipAt клампит сам).
+    onStep?.(bounded ? flipAt(inv, p) : flipAtRaw(inv, p));
   };
 
   return {
@@ -251,8 +268,10 @@ export function createFlip(options?: FlipOptions): FlipControls {
         }
         frames++;
 
-        const s = spring(params, elapsed);
-        const p = clamp01(s.value);
+        // Параметры провалидированы один раз в createFlip — тик зовёт
+        // unchecked-солвер (перф-фикс аудита: валидация на каждом кадре).
+        const s = springUnchecked(params, elapsed);
+        const p = bounded ? clamp01(s.value) : s.value;
         const converged =
           (Math.abs(1 - s.value) < FLIP_REST && Math.abs(s.velocity) < FLIP_REST) ||
           frames >= FLIP_MAX_FRAMES;

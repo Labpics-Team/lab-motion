@@ -59,6 +59,14 @@ export interface DriverOptions {
    * По умолчанию: 1.0.
    */
   readonly initialTimeScale?: number | undefined;
+  /**
+   * Clamp emitted values to [from, to].
+   *
+   * Default `true` (легаси CSS-safe). `false` — честная пружина: underdamped
+   * overshoot/bounce эмитится (аналитическая траектория без среза); финальный
+   * settle — ровно `to`, non-finite защита остаётся в силе.
+   */
+  readonly clamp?: boolean | undefined;
 }
 
 /**
@@ -161,6 +169,8 @@ export function createDriver(opts: DriverOptions): AnimationControls {
   const absRange = Math.abs(range);
   const lo = range >= 0 ? from : to;
   const hi = range >= 0 ? to : from;
+  // Клэмп-режим: default true; явный false = честная пружина (overshoot эмитится).
+  const bounded = opts.clamp !== false;
 
   // Флаг overflow: |from| + |to| > MAX_VALUE → range = ±Infinity.
   const overflowRange = !Number.isFinite(range);
@@ -237,7 +247,8 @@ export function createDriver(opts: DriverOptions): AnimationControls {
 
     // CSS-safety guard: overflow, NaN или ∞ → snap to to.
     if (!Number.isFinite(raw)) return to;
-    return clamp(raw, lo, hi);
+    // bounded=true (default): CSS-safe клэмп; false — честная траектория.
+    return bounded ? clamp(raw, lo, hi) : raw;
   }
 
   /**
@@ -269,9 +280,11 @@ export function createDriver(opts: DriverOptions): AnimationControls {
     const v = from + r.value * range;
     const vel = Math.abs(r.velocity) * absRange;
 
-    // Visual-saturation gate: если кламп уже на to — визуально готово.
-    const cv = clamp(v, lo, hi);
-    if (cv === to) return true;
+    // Visual-saturation gate — ТОЛЬКО в клэмп-режиме: клампованный вывод
+    // насыщен на to → визуально готово. При clamp:false первый же контакт
+    // с to (первое пересечение underdamped) — НЕ завершение: честная
+    // траектория продолжает overshoot/bounce до истинной сходимости.
+    if (bounded && clamp(v, lo, hi) === to) return true;
 
     // Нормированный порог (range-independent, как в drive.ts).
     return (

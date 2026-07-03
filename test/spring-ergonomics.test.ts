@@ -120,25 +120,31 @@ describe('spring-ergonomics: fromVisualDuration', () => {
   // Полный публичный домен ζ<1, включая зону клампа ω0 (класс, слепой для
   // точечных тестов: длинный Tv + малый ζ → ω0 упирается в пол и пружина
   // быстрее запрошенной).
-  it('property ζ<1: вне клампа t1≈Tv (±1%); в клампе t1<Tv; всегда t1 ≈ аналитике финальных параметров', () => {
-    const MIN_OMEGA0 = 2.0; // зеркало пола движка (дрейф ловит гард ниже)
+  it('property ζ<1: t1≈Tv (±1%) на ВСЁМ домене — бюджетная коэрсия жертвует bounce, не Tv', () => {
+    // Выведенный закон (2026-07-03): коробочного пола ω₀=2 больше нет. Если
+    // запрос за бюджетом оседания, fromVisualDuration поднимает ζ вдоль кривой
+    // Tv=const (ω₀ пересчитывается из формулы пересечения) — именованный
+    // контракт API (время первого касания) сохраняется ТОЧНО, деградирует
+    // только упругость. Прежняя коэрсия через ω₀-подъём ускоряла касание
+    // до −45% (bounce=0.5, Tv=10) — подмена намерения.
     for (const bounce of [0.1, 0.3, 0.5, 0.8, 1]) {
       for (const Tv of [0.05, 0.5, 1.2, 1.5, 10]) {
-        const zeta = Math.min(4, Math.max(0.2, 1 - bounce));
-        if (zeta >= 1) continue;
-        const s = Math.sqrt(1 - zeta * zeta);
-        const omega0Raw = (Math.PI - Math.atan(s / zeta)) / (s * Tv);
+        const zetaRaw = Math.max(1e-6, 1 - bounce);
+        if (zetaRaw >= 1) continue;
         const p = fromVisualDuration({ visualDuration: Tv, bounce });
         const omega0Fin = Math.sqrt(p.stiffness / p.mass);
+        const zetaFin = p.damping / (2 * Math.sqrt(p.stiffness * p.mass));
+        // ζ мог только подняться (коэрсия к бюджету), упасть — никогда
+        expect(zetaFin).toBeGreaterThanOrEqual(zetaRaw - 1e-9);
+        expect(zetaFin).toBeLessThan(1);
         // инвариант: первое касание = точное решение для ФИНАЛЬНЫХ параметров
-        const tStar = (Math.PI - Math.atan(s / zeta)) / (s * omega0Fin);
+        const sFin = Math.sqrt(1 - zetaFin * zetaFin);
+        const tStar = (Math.PI - Math.atan(sFin / zetaFin)) / (sFin * omega0Fin);
         const t1 = firstCrossing(p, tStar * 2 + 0.1);
         expect(Math.abs(t1 - tStar) / tStar).toBeLessThan(0.01);
-        if (omega0Raw >= MIN_OMEGA0) {
-          expect(Math.abs(t1 - Tv) / Tv).toBeLessThan(0.01); // контракт точен
-        } else {
-          expect(t1).toBeLessThan(Tv); // деградация только в раннюю сторону
-        }
+        // Контракт длительности: держится и в зоне коэрсии (допуск — шаг
+        // численной сетки firstCrossing + запас).
+        expect(Math.abs(t1 - Tv) / Tv).toBeLessThan(0.01);
       }
     }
   });
@@ -258,10 +264,15 @@ describe('spring-ergonomics: полы движка = зеркало конста
     expect(() => validateSpringParams(params(2.0, 4))).not.toThrow();
   });
 
-  it('за границами отвергается: ω0=1.99, ζ=0.19, ζ=4.01', () => {
-    expect(() => validateSpringParams(params(1.99, 1))).toThrow(MotionParamError);
-    expect(() => validateSpringParams(params(2.0, 0.19))).toThrow(MotionParamError);
-    expect(() => validateSpringParams(params(2.0, 4.01))).toThrow(MotionParamError);
+  it('выведенный закон (2026-07-03): бывшие коробочные края принимаются, за бюджетом — отказ', () => {
+    // Демаскировка полов: эти входы отвергались коробкой (ω₀≥2, ζ∈[0.2,4]),
+    // хотя их медленная мода оседает в бюджет кадра-капа.
+    expect(() => validateSpringParams(params(1.99, 1))).not.toThrow();
+    expect(() => validateSpringParams(params(2.0, 0.19))).not.toThrow();
+    expect(() => validateSpringParams(params(2.0, 4.01))).not.toThrow();
+    // Честные отказы: физически неоседающие в бюджет (rate → 0).
+    expect(() => validateSpringParams(params(1.0, 0.1))).toThrow(MotionParamError);
+    expect(() => validateSpringParams(params(0.1, 1.0))).toThrow(MotionParamError);
   });
 });
 
