@@ -11,7 +11,18 @@
  *   VC3. Zero runtime deps.
  *
  * Канонические формулы:
- *   sRGB-интерполяция: линейное смешение R,G,B каналов (CSS Color 4 §13.1)
+ *   RGB-смешение (default 'linear'): приближённо-линейный свет
+ *     ch(t) = √(a²·(1−t) + b²·t) — γ=2-аппроксимация sRGB EOTF, класс
+ *     mixLinearColor (popmotion/framer-motion). Кодированные каналы sRGB —
+ *     НЕ свет: их lerp темнит середину (red→blue @0.5 = грязный #800080);
+ *     физически свет складывается в линейном пространстве (дыра C аудита
+ *     2026-07-03). Точная EOTF — кусочная (γ≈2.4 + линейный хвост); γ=2
+ *     выбрана сознательно: sqrt — одна FPU-операция на канал на кадр, а
+ *     отличие от точной кривой на midpoint ≤ 3/255 — под порогом различимости
+ *     в движении. Это ДЕКЛАРИРОВАННЫЙ размен, не «точный linear-light».
+ *   RGB-смешение ('srgb', легаси): линейный lerp кодированных каналов
+ *     (CSS Color 4 §13.1, legacy-поведение srgb-интерполяции).
+ *   Alpha: ВСЕГДА линейный lerp — альфа есть покрытие, не свет.
  *   HSL-интерполяция: линейное смешение H,S,L с wraparound для hue
  *   HSL↔RGB: W3C CSS Color 3 §4.2.4 / MDN
  */
@@ -140,18 +151,37 @@ export function parseColor(value: string): ParsedColor | null {
 
 // ── Интерполяция ─────────────────────────────────────────────────────────────
 
+/** Пространство RGB-смешения. Только для RGB-пути; HSL×HSL — своё. */
+export type ColorMixSpace = 'linear' | 'srgb';
+
+/** Опции интерполяции цвета. */
+export interface ColorMixOptions {
+  /**
+   * 'linear' (default) — приближённо-линейный свет: √(a²(1−t)+b²t) по
+   * каналам (провенанс в шапке модуля). 'srgb' — легаси lerp кодированных
+   * каналов (CSS Color 4 §13.1) для потребителей, пиннивших старый вывод.
+   */
+  readonly space?: ColorMixSpace | undefined;
+}
+
 /**
  * Интерполирует между двумя ParsedColor.
  *
  * - Если оба format='hsl': интерполяция в пространстве HSL (с hue-wraparound).
- * - Иначе: интерполяция в sRGB (линейное смешение R,G,B,A каналов).
+ * - Иначе: смешение R,G,B в приближённо-линейном свете (default) или
+ *   легаси-lerp кодированных каналов ({space:'srgb'}); alpha всегда линейно.
  *
  * Возвращает css-строку: rgb(...) или hsl(...) с alpha если a < 1.
  *
  * FINITENESS GUARD (VC1): все результаты зажимаются через clampFinite /
  * clamp255 / clamp01 → вывод ВСЕГДА конечен.
  */
-export function interpolateColor(from: ParsedColor, to: ParsedColor, t: number): string {
+export function interpolateColor(
+  from: ParsedColor,
+  to: ParsedColor,
+  t: number,
+  options?: ColorMixOptions,
+): string {
   const progress = Number.isFinite(t)
     ? t <= 0 ? 0 : t >= 1 ? 1 : t
     : Number.isNaN(t) ? 0
@@ -160,26 +190,37 @@ export function interpolateColor(from: ParsedColor, to: ParsedColor, t: number):
   if (from.format === 'hsl' && to.format === 'hsl' && from.hsl && to.hsl) {
     return interpolateHsl(from, to, progress);
   }
-  return interpolateRgb(from, to, progress);
+  return interpolateRgb(from, to, progress, options?.space !== 'srgb');
 }
 
 /**
  * Удобная обёртка: смешать два CSS-цвета (строки) при прогрессе t.
  * Возвращает `from` строку если парсинг провалился (безопасный фоллбек).
  */
-export function mixColor(fromStr: string, toStr: string, t: number): string {
+export function mixColor(
+  fromStr: string,
+  toStr: string,
+  t: number,
+  options?: ColorMixOptions,
+): string {
   const from = parseColor(fromStr);
   const to = parseColor(toStr);
   if (!from || !to) return t < 0.5 ? fromStr : toStr;
-  return interpolateColor(from, to, t);
+  return interpolateColor(from, to, t, options);
 }
 
 // ── Внутренние утилиты ────────────────────────────────────────────────────────
 
-function interpolateRgb(from: ParsedColor, to: ParsedColor, t: number): string {
-  const r = clamp255(clampFinite(from.r + (to.r - from.r) * t));
-  const g = clamp255(clampFinite(from.g + (to.g - from.g) * t));
-  const b = clamp255(clampFinite(from.b + (to.b - from.b) * t));
+function interpolateRgb(from: ParsedColor, to: ParsedColor, t: number, linear: boolean): string {
+  // linear: √(a²(1−t)+b²t) — подкоренное ≥ 0 для конечных каналов и t∈[0,1];
+  // hostile-AST (Inf/NaN каналы) даёт NaN → clampFinite → 0 (VC1 держится).
+  const mix = linear
+    ? (a: number, b: number) => Math.sqrt(a * a * (1 - t) + b * b * t)
+    : (a: number, b: number) => a + (b - a) * t;
+  const r = clamp255(clampFinite(mix(from.r, to.r)));
+  const g = clamp255(clampFinite(mix(from.g, to.g)));
+  const b = clamp255(clampFinite(mix(from.b, to.b)));
+  // Alpha — покрытие, не свет: всегда линейный lerp.
   const a = clamp01(clampFinite(from.a + (to.a - from.a) * t));
   const ri = Math.round(r);
   const gi = Math.round(g);

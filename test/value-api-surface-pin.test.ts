@@ -113,9 +113,9 @@ describe('./value smoke: функции работают', () => {
     expect(r).toBe('50px');
   });
 
-  it('mixColor("#ff0000", "#0000ff", 0.5) → rgb(128, 0, 128)', () => {
+  it('mixColor("#ff0000", "#0000ff", 0.5) → rgb(180, 0, 180) (linear-light default, 2026-07-03)', () => {
     const r = valueModule.mixColor('#ff0000', '#0000ff', 0.5);
-    expect(r).toBe('rgb(128, 0, 128)');
+    expect(r).toBe('rgb(180, 0, 180)');
   });
 
   it('buildTransform({}) → "none"', () => {

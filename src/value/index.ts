@@ -23,7 +23,7 @@
 
 // ── Re-exports: типы ─────────────────────────────────────────────────────────
 export type { ParsedUnit, ParsedRelative, ParsedVar } from './units.js';
-export type { ParsedColor } from './color.js';
+export type { ParsedColor, ColorMixSpace, ColorMixOptions } from './color.js';
 export type { TransformState } from './transform.js';
 
 // ── Re-exports: функции ──────────────────────────────────────────────────────
