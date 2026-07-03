@@ -110,6 +110,45 @@ describe('settleTimeUpperBound: дифференциал против незав
   });
 });
 
+describe('validateSpringParams: КАКАЯ ошибка стреляет (пины гардов m/k/c)', () => {
+  // Stryker-находка: mass=0/NaN, stiffness=0, damping=NaN/0 все ПАДАЮТ, но ни
+  // один тест не различал, каким гардом — мутанты границ (<=→<) и веток
+  // (isFinite||…→false) переключали вход на бюджет-ошибку и выживали.
+  // Пины сообщения делают каждый гард наблюдаемым.
+  const msgOf = (p: { mass: number; stiffness: number; damping: number }): string => {
+    try {
+      validateSpringParams(p);
+    } catch (e) {
+      return (e as Error).message;
+    }
+    return '';
+  };
+
+  it('mass=0 → именно mass-гард (не бюджет через ω₀=∞)', () => {
+    expect(msgOf({ mass: 0, stiffness: 100, damping: 10 })).toMatch(/mass must be positive/);
+  });
+  it('mass=NaN и mass=∞ → mass-гард', () => {
+    expect(msgOf({ mass: NaN, stiffness: 100, damping: 10 })).toMatch(/mass must be positive/);
+    expect(msgOf({ mass: Infinity, stiffness: 100, damping: 10 })).toMatch(/mass must be positive/);
+  });
+  it('stiffness=0 → именно stiffness-гард (не бюджет через rate=0)', () => {
+    expect(msgOf({ mass: 1, stiffness: 0, damping: 10 })).toMatch(/stiffness must be positive/);
+  });
+  it('damping=NaN → damping-гард', () => {
+    expect(msgOf({ mass: 1, stiffness: 100, damping: NaN })).toMatch(/damping must be non-negative/);
+  });
+  it('damping=0 — ВАЛИДНОЕ значение гарда, падает дальше по бюджету с t=∞', () => {
+    // Гард damping строго < 0 (ноль разрешён): ζ=0 → t_settle=∞ → бюджет.
+    // Мутант `damping <= 0` перевёл бы ноль на damping-сообщение — пин кусает.
+    const msg = msgOf({ mass: 1, stiffness: 100, damping: 0 });
+    expect(msg).toMatch(/settle time/);
+    expect(msg).toContain('∞');
+  });
+  it('damping=-1 → damping-гард', () => {
+    expect(msgOf({ mass: 1, stiffness: 100, damping: -1 })).toMatch(/damping must be non-negative/);
+  });
+});
+
 describe('validateSpringParams: вердикт при mass ≠ 1', () => {
   it('принимает {mass:4, stiffness:400, damping:40} — ω₀=10, ζ=0.5', () => {
     expect(() => validateSpringParams({ mass: 4, stiffness: 400, damping: 40 })).not.toThrow();
