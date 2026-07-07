@@ -47,6 +47,15 @@ export const CORE_GATE_BYTES = 2190;
 // deriveEntriesFromExports, этот — общая страховка от грубого раздувания.
 export const SUBPATH_GATE_BYTES = 4608;
 
+// Точечные (bespoke) пороги субпутей — жёстче общего SUBPATH_GATE_BYTES там, где
+// это осмысленно. ./utils — семь чистых скалярных примитивов + сегментный движок;
+// факт после первой сборки 1197 gz, люфт ~15%. Отдельный порог не даёт будущему
+// раздуванию прятаться под щедрым общим зонтом 4608 (тот же класс, что ловит
+// CORE_GATE_BYTES для ядра). Поднимать только осознанно.
+export const BESPOKE_SUBPATH_GATES = {
+  './utils': 1400,
+};
+
 /**
  * Потребительские сценарии: код — то, что реально пишет потребитель;
  * gate — потолок от замера 2026-07-02 (+~4% люфт). `%DIST%` подставляется
@@ -74,6 +83,17 @@ export const IMPORT_COST_SCENARIOS = [
     // уже сняты (−15 gz: √(km)=m·ω₀, дедуп √(ζ²−1), сжатие сообщения).
     // Люфт прежний ~1.5% от факта 2254.
     gate: 2290,
+  },
+  {
+    // Один скалярный примитив из ./utils обязан трястись до горстки байт — это
+    // страж tree-shakeability субпутя: если clamp случайно потянет сегментный
+    // движок interpolate или соседей, сценарий скакнёт с ~300 до ~1200 gz.
+    // Путь до субпутя выводится из %DIST% (dist/index.js) через sibling-нормализацию
+    // index.js/../utils/index.js → dist/utils/index.js — инвариант «%DIST% в каждом
+    // сценарии» сохранён.
+    name: 'only-clamp (utils tree-shake)',
+    code: `import { clamp } from '%DIST%/../utils/index.js'; console.log(clamp(0,1,2));`,
+    gate: 340, // факт 308 (2026-07-07, первая сборка ./utils); люфт ~10%
   },
 ];
 
@@ -140,7 +160,10 @@ export function deriveEntriesFromExports(pkg) {
         key,
         label,
         importPath: importPath.replace(/^\.\//, ''),
-        gate: key === '.' ? CORE_GATE_BYTES : SUBPATH_GATE_BYTES,
+        gate:
+          key === '.'
+            ? CORE_GATE_BYTES
+            : (BESPOKE_SUBPATH_GATES[key] ?? SUBPATH_GATE_BYTES),
       };
     })
     .filter(Boolean);
