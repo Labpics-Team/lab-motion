@@ -54,11 +54,15 @@ function clampFinite(x: number): number {
 
 /**
  * Linear interpolation with an overflow guard — the default numeric Mixer and
- * the interior of `mix`. `lerp(a, b, 0) === a` bit-exact for finite a (interior-
- * breakpoint exactness). Shared by `mix` and `interpolate` so neither import
- * retains the other's public symbol (U5).
+ * the interior of `mix`. The `t===0`/`t===1` short-circuits guarantee bit-exact
+ * endpoints (`lerp(a,b,0)===a`, `lerp(a,b,1)===b`) even when `b - a` overflows to
+ * ±Infinity — otherwise `∞*0 = NaN → 0` would break interior-breakpoint
+ * exactness and terminal exactness under `clamp:false`. Shared by `mix` and
+ * `interpolate` so neither import retains the other's public symbol (U5).
  */
 function lerp(a: number, b: number, t: number): number {
+  if (t === 0) return clampFinite(a);
+  if (t === 1) return clampFinite(b);
   return clampFinite(a + (b - a) * t);
 }
 
@@ -228,7 +232,9 @@ export function snap(
   let mapper: (v: number) => number;
 
   if (Array.isArray(target)) {
-    const targets = target as readonly number[];
+    // Snapshot before validating: the eager assertFinite loop then guards the
+    // frozen copy, and the mapper is immune to post-build caller mutation (U3).
+    const targets = (target as readonly number[]).slice();
     if (targets.length === 0) {
       throw new MotionParamError('utils: snap targets array must not be empty');
     }
@@ -307,7 +313,8 @@ export function mapRange(
  * increasing with `input.length === output.length >= 2`. On a query `v`:
  *   1. `v` is clampFinite'd to `x`.
  *   2. If `clamp` (default true) and `x` is at/beyond an end, the endpoint's
- *      output is returned bit-exact (no ease/mixer call).
+ *      output is returned directly with no ease/mixer call (numeric endpoints
+ *      are clampFinite'd for U1; non-numeric `T` endpoints pass through verbatim).
  *   3. The containing segment `k` is located; local progress
  *      `p = (x - input[k]) / (input[k+1] - input[k])` (with `clamp:false`, `p`
  *      may be <0 or >1 → extrapolation).
@@ -318,12 +325,21 @@ export function mapRange(
  *
  * Interior breakpoints resolve as `p = 0` of the right-hand segment → bit-exact
  * `output[k]` when `ease(0) === 0` and `mixer(a,b,0) === a` (holds for house
- * easings and the default). Equivalent to Framer `transform(input, output, opts)`.
+ * easings and the default). Equivalent to Framer `transform(input, output, opts)`
+ * whenever the ease/mixer ANCHORS its endpoints (`ease(0)=0`, `ease(1)=1`,
+ * `mixer(a,b,0)=a`, `mixer(a,b,1)=b`) — true for every house easing and the
+ * default identity/lerp. A non-anchoring custom ease/mixer diverges only at the
+ * two clamped OUTER endpoints, which short-circuit without applying it (the price
+ * of the U4 bit-exact-endpoint guarantee); interior breakpoints still apply it.
+ *
+ * `input`/`output` are snapshotted at factory time, so the returned mapper is
+ * pure with respect to later mutation of the caller's arrays (U3).
  *
  * @throws MotionParamError (eager, at factory time) on: length mismatch;
  *   fewer than 2 stops; a non-finite input; input not strictly increasing; an
- *   `ease` array whose length ≠ segment count; or (numeric path only, no mixer)
- *   a non-finite output. The returned mapper never throws.
+ *   `ease` array whose length ≠ segment count or containing a non-function
+ *   element; or (numeric path only, no mixer) a non-finite output. The returned
+ *   mapper never throws.
  */
 export function interpolate(
   input: readonly number[],
@@ -340,23 +356,28 @@ export function interpolate<T>(
   output: readonly T[],
   options: InterpolateOptions<T> = {},
 ): (v: number) => T {
-  const last = input.length - 1;
+  // Snapshot input/output once so the returned mapper is pure w.r.t. later
+  // caller mutation (U3): endpoints AND interior read the same frozen copies,
+  // and the eager validation below guards exactly what the mapper will use.
+  const inp = input.slice();
+  const outp = output.slice();
+  const last = inp.length - 1;
 
-  if (input.length !== output.length) {
+  if (inp.length !== outp.length) {
     throw new MotionParamError(
-      `utils: interpolate input/output length mismatch (${input.length} vs ${output.length})`,
+      `utils: interpolate input/output length mismatch (${inp.length} vs ${outp.length})`,
     );
   }
-  if (input.length < 2) {
+  if (inp.length < 2) {
     throw new MotionParamError(
-      `utils: interpolate needs at least 2 stops, got length ${input.length}`,
+      `utils: interpolate needs at least 2 stops, got length ${inp.length}`,
     );
   }
-  for (let i = 0; i < input.length; i++) {
-    assertFinite(input[i]!, `interpolate input[${i}]`);
+  for (let i = 0; i < inp.length; i++) {
+    assertFinite(inp[i]!, `interpolate input[${i}]`);
   }
   for (let i = 0; i < last; i++) {
-    if (input[i]! >= input[i + 1]!) {
+    if (inp[i]! >= inp[i + 1]!) {
       throw new MotionParamError(
         `utils: interpolate input must be strictly increasing (ascending) at index ${i}`,
       );
@@ -367,44 +388,56 @@ export function interpolate<T>(
 
   const easeArr = Array.isArray(ease) ? (ease as readonly EasingFunction[]) : undefined;
   const easeFn = easeArr ? undefined : (ease as EasingFunction | undefined);
-  if (easeArr && easeArr.length !== last) {
-    throw new MotionParamError(
-      `utils: interpolate ease array length ${easeArr.length} must equal segment count ${last}`,
-    );
+  if (easeArr) {
+    if (easeArr.length !== last) {
+      throw new MotionParamError(
+        `utils: interpolate ease array length ${easeArr.length} must equal segment count ${last}`,
+      );
+    }
+    // Eager U2: every ease element must be callable — otherwise a non-function
+    // defers to a raw TypeError on the value path instead of a boundary error.
+    for (let i = 0; i < easeArr.length; i++) {
+      if (typeof easeArr[i] !== 'function') {
+        throw new MotionParamError(`utils: interpolate ease[${i}] must be a function`);
+      }
+    }
   }
 
   // Numeric path only (no custom mixer): pin output finiteness eagerly.
   if (mixer === undefined) {
-    for (let i = 0; i < output.length; i++) {
-      assertFinite(output[i] as unknown as number, `interpolate output[${i}]`);
+    for (let i = 0; i < outp.length; i++) {
+      assertFinite(outp[i] as unknown as number, `interpolate output[${i}]`);
     }
   }
 
-  const in0 = input[0]!;
-  const inLast = input[last]!;
-  const out0 = output[0]!;
-  const outLast = output[last]!;
+  const in0 = inp[0]!;
+  const inLast = inp[last]!;
+  const out0 = outp[0]!;
+  const outLast = outp[last]!;
 
   return (v: number): T => {
     const x = clampFinite(v);
 
     if (doClamp) {
-      if (x <= in0) return out0;
-      if (x >= inLast) return outLast;
+      // Numeric endpoints are clampFinite'd (U1): a custom mixer skips the eager
+      // output validation, so a non-finite numeric endpoint must be sanitized
+      // here too — consistent with the interior path. Non-numeric T: verbatim.
+      if (x <= in0) return typeof out0 === 'number' ? (clampFinite(out0 as unknown as number) as unknown as T) : out0;
+      if (x >= inLast) return typeof outLast === 'number' ? (clampFinite(outLast as unknown as number) as unknown as T) : outLast;
     }
 
-    // Locate segment k such that input[k] <= x < input[k+1] (below-range → k=0,
+    // Locate segment k such that inp[k] <= x < inp[k+1] (below-range → k=0,
     // above-range → k=last-1, both giving out-of-[0,1] progress for clamp:false).
     let k = 0;
-    while (k < last - 1 && x >= input[k + 1]!) k++;
+    while (k < last - 1 && x >= inp[k + 1]!) k++;
 
-    const denom = input[k + 1]! - input[k]!; // > 0 by strictly-increasing check
-    const p = (x - input[k]!) / denom;
+    const denom = inp[k + 1]! - inp[k]!; // > 0 by strictly-increasing check
+    const p = (x - inp[k]!) / denom;
     const e = easeArr ? easeArr[k] : easeFn;
     const pe = e ? e(p) : p;
     const m = mixer
-      ? mixer(output[k]!, output[k + 1]!, pe)
-      : (lerp(output[k] as unknown as number, output[k + 1] as unknown as number, pe) as unknown as T);
+      ? mixer(outp[k]!, outp[k + 1]!, pe)
+      : (lerp(outp[k] as unknown as number, outp[k + 1] as unknown as number, pe) as unknown as T);
     return typeof m === 'number' ? (clampFinite(m) as unknown as T) : m;
   };
 }

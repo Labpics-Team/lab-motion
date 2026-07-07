@@ -83,10 +83,8 @@ describe('utils ./utils subpath — package-boundary smoke (U5)', () => {
     expect(mod.interpolate([0, 1], [0, 100])(0.5)).toBe(50);
   });
 
-  it('does NOT leak core-only symbols spring/tween/drive (U5 boundary)', () => {
-    const distJs = readFileSync(resolvedImportPath!, 'utf8');
-    const CORE_ONLY = ['spring', 'tween', 'drive'];
-    const leaking = CORE_ONLY.filter((name) => new RegExp(`\\bexport\\b[^;{]*\\b${name}\\b`).test(distJs));
-    expect(leaking, `./utils leaks core-only exports: ${leaking.join(', ')}`).toHaveLength(0);
-  });
+  // NB: the exact-surface `extra`-check in the dynamic-import test above already
+  // catches any leaked core symbol (spring/tween/drive) as an uncontracted
+  // export — format-independently. A raw-source regex scan would be redundant
+  // and sensitive to the bundler's `export { ... }` shape, so it is omitted.
 });
