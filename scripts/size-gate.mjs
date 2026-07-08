@@ -55,7 +55,7 @@ export const SUBPATH_GATE_BYTES = 4608;
 export const BESPOKE_SUBPATH_GATES = {
   './utils': 1400,
   // ./compositor — компилятор пружина→linear() (сегментер + LRU-кэш + контроллер)
-  // + C¹-хендофф compositor→live (M2) + COMPOSITED STAGGER (M3).
+  // + C¹-хендофф compositor→live (M2) + COMPOSITED STAGGER (M3) + FALLBACK-МАТРИЦА (M4).
   // Хронология факта/порога:
   //   M1: 4408 / 4600 — компилятор + сегментер + LRU + CompositorSpring.
   //   M2: 4672 / 4800 — живой мост в rAF-пружину (handoffToLive).
@@ -66,8 +66,16 @@ export const BESPOKE_SUBPATH_GATES = {
   //       (в) delay + setTimer в CompositorSpring (нативный WAAPI-delay на compositor-
   //           пути, отложенный старт на fallback). Рост +1247 gz на весь слой каскада.
   //       Порог 6100 = факт 5919 + ~3% люфт (дисциплина M1/M2 сохранена; ./stagger
-  //       переиспользуется, не дублируется). Жёстче общего 4608. Поднимать только решением Даниила.
-  './compositor': 6100,
+  //       переиспользуется, не дублируется). Жёстче общего 4608.
+  //   M4: 6193 / 6380 — fallback-матрица (detect.ts: резолвер 5 тиров
+  //       compositor / waapi-no-linear / raf / reduced / ssr; мемо-проба
+  //       CSS.supports('linear()') на реалм, reduced-motion снап-политика,
+  //       диагностический `tier` + телеметрия-резолвер resolveCompositorTier/
+  //       supportsLinearEasing). Вклад M4 на объединённом с M3 коде: 6193 − 5919 =
+  //       +274 gz (на изолированном M2-базисе был +245 / порог 5040; +29 gz —
+  //       интеграция detect с stagger-контроллером). Порог 6380 = факт 6193 + ~3%
+  //       люфт — выведен ОТ ФАКТА, не суммой порогов. Поднимать только решением Даниила.
+  './compositor': 6380,
   // ./tokens — motion-токены (M3): duration/easing/spring/staggerGap + distanceScale.
   // Чистые данные + 4 cubic-bezier (тянут ../easing.cubicBezier) + одна функция.
   // Факт 1117 gz (весь субпуть). Порог 1250 (~12% люфт, как у ./utils). Гарантия —
