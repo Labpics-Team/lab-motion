@@ -70,8 +70,10 @@ export const BESPOKE_SUBPATH_GATES = {
   './compositor': 6100,
   // ./tokens — motion-токены (M3): duration/easing/spring/staggerGap + distanceScale.
   // Чистые данные + 4 cubic-bezier (тянут ../easing.cubicBezier) + одна функция.
-  // Факт 1117 gz (весь субпуть). Порог 1250 (~12% люфт, как у ./utils). Субпуть tree-
-  // shakeable по семействам (sideEffects:false); целиком дёшев. Поднимать осознанно.
+  // Факт 1117 gz (весь субпуть). Порог 1250 (~12% люфт, как у ./utils). Гарантия —
+  // СУБПУТЬ-изоляция (sideEffects:false): не импортишь ./tokens = ноль, ядро не
+  // растёт (full-core сценарий это и стережёт). Внутри субпутя семейства в
+  // минифициров. dist по отдельности не шейкаются; целиком дёшев. Поднимать осознанно.
   './tokens': 1250,
 };
 

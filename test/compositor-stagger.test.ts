@@ -186,6 +186,25 @@ describe('compositor stagger: группа compositor-путь', () => {
     expect(el.calls[1]!.keyframes[0]!['x']).toBe(0);
   });
 
+  it('delay-aware ПОСЛЕ окна: снимок читает пружину в правильный физический t (числовой пин)', () => {
+    let now = 1000;
+    const el = recordingEl();
+    const g = new CompositorStaggerGroup({
+      spring: SPRING, property: 'x', from: 0, to: 100, targets: [el, recordingEl()],
+      gap: 100, staggerFrom: 'last', now: () => now,
+    });
+    expect(g.delays[0]).toBe(100); // элемент 0 стартует последним (delay=100)
+    g.start();
+    const elapsedPastDelay = 0.05; // 50 мс ПОСЛЕ окна задержки 100 мс
+    now += 100 + elapsedPastDelay * 1000; // wall = delay + физическое время пружины
+    g.retarget(0, 300);
+    // Ожидаемое from пере-эмиссии = пружина в t=0.05с (физическое время ПОСЛЕ делея,
+    // НЕ wall-время 0.15с). Числовой пин против ошибки вычитания/знака _startDelay.
+    const expected = readCompositorSpring(SPRING, { from: 0, to: 100, v0: 0, t: elapsedPastDelay }).value;
+    expect(el.calls[1]!.keyframes[0]!['x']).toBeCloseTo(expected, 9);
+    expect(expected).toBeGreaterThan(0); // реально уехала (граница не вырождена)
+  });
+
   it('retargetAll: fan-out во ВСЕ элементы, одновременно (каскад НЕ переигран)', () => {
     let now = 1000;
     const els = [recordingEl(), recordingEl(), recordingEl()];
@@ -237,6 +256,17 @@ describe('compositor stagger: группа compositor-путь', () => {
     // После destroy start()/retarget — no-op (не бросают).
     expect(() => { g.start(); g.retargetAll(1); }).not.toThrow();
   });
+
+  it('handoffToLive после destroy() → ИНЕРТНАЯ MotionValue (нет зомби rAF-петли)', () => {
+    const g = new CompositorStaggerGroup({ spring: SPRING, property: 'x', from: 5, to: 100, targets: [recordingEl()], requestFrame: inertRF });
+    g.start();
+    g.destroy();
+    const mv = g.handoffToLive(0); // не должен поднять новую live-петлю на мёртвом элементе
+    expect(typeof mv.setTarget).toBe('function');
+    const before = mv.value;
+    mv.setTarget(999); // на уничтоженной MotionValue — no-op
+    expect(mv.value).toBe(before); // значение НЕ поехало → петля не стартовала (инертна)
+  });
 });
 
 // ─── CompositorStaggerGroup: fallback-путь (SSR / нет WAAPI) ──────────────────
@@ -264,6 +294,24 @@ describe('compositor stagger: группа fallback-путь (нет WAAPI)', ()
     // flush не должен бросать (setTarget отложенных элементов).
     expect(() => timers.flush()).not.toThrow();
     g.destroy();
+  });
+
+  it('fallback: destroy ДО срабатывания таймера отменяет его → setTarget НЕ зван (нет утечки)', () => {
+    const timers = manualTimers();
+    const applied: [number, number | string][] = [];
+    const g = new CompositorStaggerGroup({
+      spring: SPRING, property: 'opacity', from: 0, to: 1,
+      targets: [undefined, undefined], gap: 100, staggerFrom: 'last', // элемент 0 → delay 100
+      apply: (i, v) => applied.push([i, v]),
+      setTimer: timers.setTimer, requestFrame: inertRF,
+    });
+    g.start();
+    expect(timers.scheduled).toHaveLength(1); // элемент 0 (delay 100) поставил таймер
+    g.destroy();
+    expect(timers.scheduled[0]!.cancelled).toBe(true); // destroy → _clearTimer отменил (первичная защита)
+    const beforeCount = applied.length;
+    timers.flush(); // cancelled → колбэк не зван; плюс guard _destroyed внутри — двойная защита
+    expect(applied.length).toBe(beforeCount); // никаких новых драйв-эмиссий после destroy
   });
 
   it('fallback retarget в окне задержки: снимает отложенный таймер (старт «сейчас»)', () => {

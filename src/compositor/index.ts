@@ -650,6 +650,16 @@ export class CompositorSpring {
   handoffToLive(newTarget?: number): MotionValue {
     if (newTarget !== undefined) validateFinite(newTarget, 'newTarget');
 
+    // После destroy() контроллер мёртв: НЕ поднимаем новую live-петлю (иначе
+    // зомби-rAF на уничтоженном элементе — утечка). Возвращаем инертное значение
+    // (сконструировано и сразу destroy'нуто → цикл не стартует), сохраняя контракт
+    // «всегда возвращает MotionValue». Зеркалит destroyed-инвариант start/retarget.
+    if (this._destroyed) {
+      const inert = new MotionValue({ initial: this._value, spring: this._spring });
+      inert.destroy();
+      return inert;
+    }
+
     if (this._mode === 'fallback') {
       // Уже на main-потоке: тот же MotionValue, при новой цели — retarget.
       this._ensureFallback();
