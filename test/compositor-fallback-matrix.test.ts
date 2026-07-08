@@ -26,6 +26,7 @@
 
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { CompositorSpring, resolveCompositorTier, supportsLinearEasing } from '../src/compositor/index.js';
+import { MotionValue } from '../src/index.js';
 import { __resetDetectionCache } from '../src/compositor/detect.js';
 import type { SpringParams } from '../src/spring.js';
 
@@ -171,6 +172,27 @@ describe('compositor: fallback-матрица', () => {
       });
       expect(cs.tier).toBe('raf');
     });
+
+    it('raf handoffToLive → отдаёт живой MotionValue, сходится к цели (fallback-ветка хендоффа)', () => {
+      const clock = makeClock();
+      const seen: number[] = [];
+      const cs = new CompositorSpring({
+        spring: STIFF,
+        property: 'x',
+        from: 0,
+        to: 100,
+        apply: (v) => seen.push(v as number),
+        requestFrame: clock.requestFrame,
+      });
+      expect(cs.tier).toBe('raf');
+      cs.start();
+      clock.drain(5); // несколько кадров в полёте
+      const mv = cs.handoffToLive(250);
+      expect(mv).toBeInstanceOf(MotionValue);
+      clock.drain();
+      expect(mv.value).toBe(250); // живой путь ретаргетнул к новой цели
+      cs.destroy();
+    });
   });
 
   // ─── Ряд: reduced ─────────────────────────────────────────────────────────────
@@ -215,6 +237,32 @@ describe('compositor: fallback-матрица', () => {
       cs.retarget(42);
       expect(cs.value).toBe(42);
       expect(seen).toEqual([10, 42]);
+    });
+
+    it('reduced с WAAPI-целью НЕ анимирует даже через retarget (снап при живой цели)', () => {
+      const restore = mockLinearSupport(true);
+      try {
+        const f = fakeElement();
+        const seen: number[] = [];
+        const cs = new CompositorSpring({
+          spring: STIFF,
+          property: 'x',
+          from: 0,
+          to: 10,
+          target: f.el, // цель поддержала бы compositor — но reduce её перекрывает
+          apply: (v) => seen.push(v as number),
+          matchMedia: stubMatchMedia(true),
+        });
+        expect(cs.tier).toBe('reduced');
+        cs.start();
+        cs.retarget(50);
+        // Ни start, ни retarget не тронули Element.animate — только снапы.
+        expect(f.calls.length).toBe(0);
+        expect(seen).toEqual([10, 50]);
+        expect(cs.value).toBe(50);
+      } finally {
+        restore();
+      }
     });
 
     it('reduced handoffToLive → MotionValue уже на цели (без движения)', () => {
@@ -267,6 +315,19 @@ describe('compositor: fallback-матрица', () => {
         cs.destroy();
       }).not.toThrow();
     });
+
+    it('ssr handoffToLive → отдаёт живой MotionValue под node-шимом (fallback-ветка), destroy чист', () => {
+      const cs = new CompositorSpring({ spring: STIFF, property: 'x', from: 0, to: 1 });
+      expect(cs.tier).toBe('ssr');
+      // Ветка живого хендоффа (не reduced, не compositor) отрабатывает и в ssr:
+      // MotionValue строится на node-шиме (setTimeout), значение НЕ трогает DOM.
+      const mv = cs.handoffToLive(0.7);
+      expect(mv).toBeInstanceOf(MotionValue);
+      expect(() => {
+        mv.destroy();
+        cs.destroy();
+      }).not.toThrow();
+    });
   });
 
   // ─── Прямой резолвер (телеметрия) ─────────────────────────────────────────────
@@ -303,6 +364,30 @@ describe('compositor: fallback-матрица', () => {
       expect(resolveCompositorTier({ requestFrame: () => 0 })).toBe('raf');
       expect(resolveCompositorTier({})).toBe('ssr');
     });
+
+    it('matchMedia БРОСАЕТ → guard ловит, reduce НЕ активен (падаем в WAAPI-ветку)', () => {
+      const restore = mockLinearSupport(true);
+      try {
+        const f = fakeElement();
+        const throwing = () => {
+          throw new Error('matchMedia недоступен');
+        };
+        // Резолвер не роняется, reduce не активируется → compositor (есть target+linear).
+        expect(resolveCompositorTier({ target: f.el, matchMedia: throwing })).toBe('compositor');
+        // Тот же guard в конструкторе контроллера.
+        const cs = new CompositorSpring({
+          spring: STIFF,
+          property: 'x',
+          from: 0,
+          to: 1,
+          target: f.el,
+          matchMedia: throwing,
+        });
+        expect(cs.tier).toBe('compositor');
+      } finally {
+        restore();
+      }
+    });
   });
 
   // ─── Кэш детекции (детекция один раз, дёшево) ─────────────────────────────────
@@ -333,6 +418,26 @@ describe('compositor: fallback-матрица', () => {
         expect(supportsLinearEasing()).toBe(false);
       } finally {
         r();
+      }
+    });
+
+    it('сто контроллеров делят одну пробу: CSS.supports вызван один раз на N инстансов', () => {
+      const prev = (globalThis as { CSS?: unknown }).CSS;
+      const spy = vi.fn(() => true);
+      (globalThis as { CSS?: unknown }).CSS = { supports: spy };
+      __resetDetectionCache();
+      try {
+        const f = fakeElement();
+        for (let i = 0; i < 25; i++) {
+          const cs = new CompositorSpring({ spring: STIFF, property: 'x', from: 0, to: 1, target: f.el });
+          expect(cs.tier).toBe('compositor');
+        }
+        // Заявленный инвариант: парс CSS-строки амортизирован по всем контроллерам.
+        expect(spy).toHaveBeenCalledTimes(1);
+      } finally {
+        if (prev === undefined) delete (globalThis as { CSS?: unknown }).CSS;
+        else (globalThis as { CSS?: unknown }).CSS = prev;
+        __resetDetectionCache();
       }
     });
 

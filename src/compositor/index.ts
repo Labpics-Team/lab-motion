@@ -531,6 +531,18 @@ export class CompositorSpring {
   private _started = false;
   private _destroyed = false;
 
+  /**
+   * Единый мост «кадр живой пружины → внутреннее значение + apply». Один экземпляр
+   * на контроллер, переиспользуется всеми живыми путями (_ensureFallback,
+   * compositor→live хендофф, reduced-хендофф) — DRY: правило распространения
+   * значения живёт в ОДНОМ месте (иначе тройной дубль тихо расходится). Читает
+   * _apply/_format в момент ВЫЗОВА (после конструктора), поэтому bound-поле безопасно.
+   */
+  private readonly _onLiveFrame = (v: number): void => {
+    this._value = v;
+    if (this._apply !== undefined) this._apply(this._format(v));
+  };
+
   constructor(opts: CompositorSpringOptions) {
     validateSpringParams(opts.spring);
     if (typeof opts.property !== 'string' || opts.property.length === 0) {
@@ -722,11 +734,9 @@ export class CompositorSpring {
         clamp: false,
         requestFrame: this._requestFrame,
       });
-      mv.onChange((v: number) => {
-        this._value = v;
-        if (this._apply !== undefined) this._apply(this._format(v));
-      });
-      if (this._apply !== undefined) this._apply(this._format(target));
+      // onChange эмитит текущее значение сразу при подписке (motion-value: «Emit
+      // current value immediately») → apply(target) вызывается один раз, снап-семантика.
+      mv.onChange(this._onLiveFrame);
       this._mv = mv;
       this._started = true;
       return mv;
@@ -768,10 +778,7 @@ export class CompositorSpring {
       target,
       requestFrame: this._requestFrame,
       clamp: false,
-      onChange: (v: number) => {
-        this._value = v;
-        if (this._apply !== undefined) this._apply(this._format(v));
-      },
+      onChange: this._onLiveFrame,
     });
     this._to = target;
     this._mv = mv;
@@ -873,10 +880,7 @@ export class CompositorSpring {
       clamp: false,
       requestFrame: this._requestFrame,
     });
-    this._mv.onChange((v: number) => {
-      this._value = v;
-      if (this._apply !== undefined) this._apply(this._format(v));
-    });
+    this._mv.onChange(this._onLiveFrame);
   }
 }
 
