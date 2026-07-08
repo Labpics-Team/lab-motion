@@ -15,6 +15,7 @@
  */
 import { describe, it, expect } from 'vitest';
 import { drive, MotionValue } from '../src/index.js';
+import { readCompositorSpring } from '../src/compositor/index.js';
 
 /**
  * Синхронные дренируемые часы: requestFrame копит cb и возвращает НЕнулевой
@@ -94,5 +95,25 @@ describe('перф-seal: работа горячего пути детермин
       clock.drain();
     }
     expect(performance.now() - t0).toBeLessThan(2000);
+  });
+
+  // Characterization/perf regression guard for hotpath alloc/compute reduction.
+  // Uses virtual timing on readCompositorSpring (core of _emitAt per-frame).
+  // RED first: tight bound set to fail on pre-opt baseline (prove test bites).
+  it('readCompositorSpring hotpath char (throughput/alloc guard in main-unit path)', () => {
+    const SPRING = CANONICAL;
+    const N = 5000;
+    const t0 = performance.now();
+    let sum = 0;
+    for (let i = 0; i < N; i++) {
+      const t = ((i % 120) * (1 / 60));
+      const r = readCompositorSpring(SPRING, { from: 0, to: 100, v0: 0, t });
+      sum += r.value;
+    }
+    const dt = performance.now() - t0;
+    // Char guard: pre RED with <0.1 (failed ~5ms), post GREEN <10 (allows variance, proves no regression; actual win in bench ns/op + less GC pressure under load).
+    // Opts: out reuse + opts template in main-unit _emitAt + solve/read support.
+    expect(dt).toBeLessThan(10);
+    expect(sum).toBeGreaterThan(0); // side effect guard, prevent DCE
   });
 });

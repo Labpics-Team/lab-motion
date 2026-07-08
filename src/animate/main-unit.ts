@@ -80,6 +80,9 @@ export class MainUnit implements GroupOwner {
   /** Reused map for transform channels to reduce allocations in hot path (_write every frame). */
   private readonly _liveTransform = new Map<string, number>();
 
+  /** Reused snap for readCompositorSpring to eliminate return alloc per frame in _emitAt hot path. */
+  private readonly _springSnap = { value: 0, velocity: 0 };
+
   constructor(opts: MainUnitOptions) {
     this._o = opts;
     this.finished = new Promise<void>((res) => {
@@ -218,33 +221,29 @@ export class MainUnit implements GroupOwner {
     // Spring: замкнутая форма на канал — та же аналитика, что compositor-путь.
     const t = tMs / 1000;
     let converged = true;
+    const snap = this._springSnap;
     for (const ch of o.numeric) {
-      const r = readCompositorSpring(o.mode.spring, {
-        from: ch.from,
-        to: ch.to,
-        v0: ch.v0,
-        t,
-      });
-      ch.value = r.value;
-      ch.velocity = r.velocity;
+      readCompositorSpring(o.mode.spring, { from: ch.from, to: ch.to, v0: ch.v0, t }, snap);
+      ch.value = snap.value;
+      ch.velocity = snap.velocity;
       const range = ch.to - ch.from;
       if (Number.isFinite(range)) {
         const ar = Math.max(Math.abs(range), RANGE_EPSILON);
         converged =
           converged &&
-          Math.abs(r.value - ch.to) / ar < CONVERGENCE_THRESHOLD &&
-          Math.abs(r.velocity) / ar < CONVERGENCE_THRESHOLD;
+          Math.abs(snap.value - ch.to) / ar < CONVERGENCE_THRESHOLD &&
+          Math.abs(snap.velocity) / ar < CONVERGENCE_THRESHOLD;
       } // непредставимый спан: канал считается сошедшимся (снап-политика ядра)
     }
     const css = o.css;
     if (css !== undefined) {
-      const r = readCompositorSpring(o.mode.spring, { from: 0, to: 1, v0: css.v0, t });
-      css.p = r.value;
-      css.css = cssAt(css, r.value);
+      readCompositorSpring(o.mode.spring, { from: 0, to: 1, v0: css.v0, t }, snap);
+      css.p = snap.value;
+      css.css = cssAt(css, snap.value);
       converged =
         converged &&
-        Math.abs(r.value - 1) < CONVERGENCE_THRESHOLD &&
-        Math.abs(r.velocity) < CONVERGENCE_THRESHOLD;
+        Math.abs(snap.value - 1) < CONVERGENCE_THRESHOLD &&
+        Math.abs(snap.velocity) < CONVERGENCE_THRESHOLD;
     }
     if (converged) return true;
     this._write();

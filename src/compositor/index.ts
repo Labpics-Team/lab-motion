@@ -369,6 +369,7 @@ export interface ReadSpringOptions {
 export function readCompositorSpring(
   spring: SpringParams,
   options: ReadSpringOptions,
+  out?: { value: number; velocity: number },
 ): { value: number; velocity: number } {
   validateSpringParams(spring);
   const from = options.from ?? 0;
@@ -381,7 +382,8 @@ export function readCompositorSpring(
   if (!Number.isFinite(t)) {
     throw new MotionParamError(`compositor: t должен быть конечным, получено ${t}`);
   }
-  const raw = solveSpring(spring, t, v0);
+  const raw = out ?? { value: 0, velocity: 0 };
+  solveSpring(spring, t, v0, raw);
   const range = to - from;
   // Политика прогресса (зеркалит motion-value): не-конечное value → цель (1),
   // velocity → 0. Финальный клэмп: даже конечный range может переполниться до
@@ -390,6 +392,11 @@ export function readCompositorSpring(
   const normVel = clampToFinite(raw.velocity, 0);
   const value = clampToFinite(from + normPos * range, to);
   const velocity = clampToFinite(normVel * range, 0);
+  if (out) {
+    out.value = value;
+    out.velocity = velocity;
+    return out;
+  }
   return { value, velocity };
 }
 
