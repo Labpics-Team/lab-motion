@@ -34,14 +34,11 @@ import { MotionParamError } from '../errors.js';
 import { FIXED_DT_S } from '../internal/constants.js';
 import { type SpringParams, validateSpringParams } from '../spring.js';
 import { stagger, type StaggerOptions } from '../stagger/index.js';
-import {
-  duration as durationTokens,
-  easing as easingTokens,
-  spring as springTokens,
-} from '../tokens/index.js';
-import { interpolate } from '../value/index.js';
+// tokens import removed (hardcoded defaults) → deadcode/tree-shake tokens subpath in ./animate facade for numeric/common paths (size win)
+import { cubicBezier } from '../easing/index.js';
 import {
   bindGroup,
+  cssAt,
   formatTransform,
   groupRecord,
   parseProps,
@@ -167,19 +164,19 @@ function resolveMode(options: AnimateOptions): MotionMode {
     );
   }
   if (hasTween) {
-    const durationMs = options.duration ?? durationTokens.normal;
+    const durationMs = options.duration ?? 250; // tokens.normal (deadcode tokens)
     if (!Number.isFinite(durationMs) || durationMs <= 0) {
       throw new MotionParamError(
         `animate: duration должен быть конечным и > 0 (мс), получено ${String(options.duration)}`,
       );
     }
-    const ease = options.ease ?? easingTokens.standard.fn;
+    const ease = options.ease ?? cubicBezier(0.33, 0, 0.67, 1); // tokens.standard (deadcode tokens)
     if (typeof ease !== 'function') {
       throw new MotionParamError(`animate: ease должен быть функцией t∈[0,1]→число`);
     }
     return { type: 'tween', durationMs, ease };
   }
-  const spring = options.spring ?? springTokens.default;
+  const spring = options.spring ?? { mass: 1, stiffness: 170, damping: 26 }; // tokens.default (deadcode tokens)
   validateSpringParams(spring);
   return { type: 'spring', spring };
 }
@@ -278,7 +275,8 @@ function snapGroup(el: AnimatableElement, group: GroupKey, bound: BoundGroup): v
     for (const ch of bound.numeric) live.set(ch.key, ch.to);
     el.style.setProperty('transform', formatTransform(bound.residuals, live));
   } else if (bound.css !== undefined) {
-    rec.cssValue = interpolate(bound.css.fromAst, bound.css.toAst, 1);
+    // use cssAt (wraps interpolate at t=1) to avoid direct value import in facade for better tree-shake potential on numeric paths
+    rec.cssValue = cssAt({ kind: 'css', key: group, fromAst: bound.css.fromAst, toAst: bound.css.toAst, v0: 0, p: 0, css: 0 }, 1);
     el.style.setProperty(group, String(rec.cssValue));
   } else {
     el.style.setProperty(group, String(bound.numeric[0]!.to));

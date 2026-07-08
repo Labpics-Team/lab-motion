@@ -261,7 +261,7 @@ describe('timeline-finiteness-fuzz: guard критичен (структурна
     const collected: SegmentValue[] = [];
     const tl = createTimeline({
       segments: [{ from, to, duration: 1 }],
-      onStep: (vs) => collected.push(...vs),
+      onStep: (vs) => collected.push(...vs.map(v => ({ index: v.index, value: v.value }))), // copy values (prealloc buffer objects are mutated across emits; consumer must not retain refs)
       requestFrame: noRaf(),
     });
     tl.seek(0.5);
@@ -282,7 +282,7 @@ describe('timeline-finiteness-fuzz: guard критичен (структурна
     const collected: SegmentValue[] = [];
     const tl = createTimeline({
       segments: [{ from, to, duration: 1 }],
-      onStep: (vs) => collected.push(...vs),
+      onStep: (vs) => collected.push(...vs.map(v => ({ index: v.index, value: v.value }))), // copy values (prealloc buffer objects are mutated across emits; consumer must not retain refs)
       requestFrame: noRaf(),
     });
     tl.seek(0.5);
