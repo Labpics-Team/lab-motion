@@ -58,7 +58,7 @@ pnpm bench      # ns/операцию горячих путей против dis
 | `…/a11y` | Доступность: `createMotionConfig` — политика reduced-motion (`system`/`always`/`never`), меняет характер анимации, не выключает |
 | `…/spring` | Эргономика пружин: `fromBounce` (duration+bounce ∈ [−1,1], канон SwiftUI ⊇ Motion [0,1]), `fromVisualDuration`, `springPresets` (канон react-spring), `springAsEasing` |
 | `…/waapi` | Compositor-путь (низкоуровневый): `compileWaapi`/`animateWaapi` (кейфреймы движка → нативный `Element.animate`, hw-accel), `easingToLinear` (любой easing → CSS `linear()`), `supportsWaapi` |
-| `…/compositor` | Compositor-компилятор ПРУЖИН: `compileSpringLinear` (пружина → адаптивный CSS `linear()`, число стопов ВЫВОДИТСЯ из бюджета ошибки), `compileSpringPlan`, `readCompositorSpring` (O(1) closed-form чтение value+velocity), `CompositorSpring` (one-shot хендофф с сохранением скорости C¹ + байт-паритетный main-thread fallback), `createSpringLinearCache` (LRU), `supportsCompositor`. См. «Границы применимости» ниже |
+| `…/compositor` | Compositor-компилятор ПРУЖИН: `compileSpringLinear` (пружина → адаптивный CSS `linear()`, число стопов ВЫВОДИТСЯ из бюджета ошибки), `compileSpringPlan`, `readCompositorSpring` (O(1) closed-form чтение value+velocity), `CompositorSpring` (one-shot хендофф с сохранением скорости C¹ + байт-паритетный main-thread fallback; `retarget` — смена цели в полёте, `handoffToLive` — переход на живую rAF-пружину), `handoffToLive` (снимок → live `MotionValue` с сохранением скорости), `createSpringLinearCache` (LRU), `supportsCompositor`. См. «Границы применимости» ниже |
 | `…/auto` | Zero-config FLIP: `autoAnimate(parent)` — add/remove/move детей анимируются сами (класс AutoAnimate); reduced-motion меняет характер (move→снап), не выключает |
 | `…/svg-morph` | Морфинг путей: `interpolatePath(dFrom, dTo)` — точный режим при совпадающей структуре, ресэмплинг с выравниванием старта/обхода замкнутых при разной |
 | `…/frame` | Единый frame-шедулер: `createFrameLoop` / синглтон `frame` — один rAF на кадр, фазы read→update→render против layout-thrash, ленивый старт/стоп, SSR-safe; `asRequestFrame(loop)` сажает MotionValue/drive на общий кадр через `opts.requestFrame` (N значений = один rAF). **Биндинги используют его ПО УМОЛЧАНИЮ** — все значения приложения делят один rAF без ручной настройки (как shared-ticker у Framer Motion/GSAP); инжекция своего `requestFrame` переопределяет. |
@@ -197,7 +197,48 @@ panel.start();
 // ДИСКРЕТНОЕ прерывание (смена цели), НЕ покадрово: O(1) чтение value+velocity → новая
 // кривая с непрерывной скоростью (C¹). Стоит ~один commit-кадр хендоффа.
 panel.retarget(120);
+
+// ХЕНДОФФ compositor→live: будущая траектория перестала быть автономной (палец
+// перехватил значение — follow-фаза). Снимок (value, velocity) ЗАМКНУТОЙ формой
+// (без getComputedStyle) → живая rAF-пружина продолжает БЕЗ разрыва позиции и
+// скорости (C¹). Дальше значением управляет вызывающий (setTarget/stop/destroy).
+const live = panel.handoffToLive();          // продолжить к текущей цели, ИЛИ
+const live2 = panel.handoffToLive(300);      // сразу к новой цели с сохранённой скоростью
 ```
+
+Латентность горячих путей (`pnpm bench:latency`, main-thread, Node v24, справочно —
+машинозависимо, гейтом НЕ является; распределение ОДНОЙ операции, p50/p95/p99):
+
+| путь | p50 | p95 | p99 |
+|---|---|---|---|
+| `readCompositorSpring` (аналитический снимок) | ~100 ns | ~200 ns | ~300 ns |
+| `CompositorSpring.retarget` (read+cancel+рекомпиляция+re-emit) | ~20 µs | ~30 µs | ~54 µs |
+| `handoffToLive` (снимок → live `MotionValue`) | ~200 ns | ~200 ns | ~200 ns |
+| `CompositorSpring.handoffToLive` (полный) | ~300 ns | ~400 ns | ~700 ns |
+
+Хендофф-p99 ≈ 0.02% кадра при 240 Hz — стоимость на main-потоке пренебрежимо мала;
+доминанта ретаргета — перекомпиляция кривой (промах кэша при новой скорости).
+
+**Границы замера.** Стенд меряет ТОЛЬКО main-thread cost (Node, против `dist`).
+Compositor-резидентность (осталась ли анимация на compositor-потоке после
+`Element.animate`/мутации) и input→photon **НЕ наблюдаемы из JS** — достоверно
+только реальным Chrome + tracing (`cc.animation` в DevTools Performance), вне
+CI-скоупа (ручная валидация). Браузерный слой (PerformanceObserver LoAF / Event
+Timing) — по той же причине не в этом стенде.
+
+**Мутации `playbackRate`/`currentTime` для ретаргета — вердикт (опровергнуто как
+механизм ретаргета).** Гипотеза research (помечена «непроверено»): их мутация
+compositor-safe и годится как дешёвая замена cancel+re-emit. Проверка по W3C Web
+Animations L1 (§4.4.4 «set current time», §4.4.15 «set/seamlessly update playback
+rate») и MDN: обе операции живут в **timing model** и НЕ трогают `KeyframeEffect`
+(кривую/конечную точку) — `playbackRate` лишь единый скаляр скорости вдоль уже
+запечённой кривой, `currentTime` — seek по ней. Ретаргет пружины требует НОВОЙ
+точки равновесия И нового профиля скорости из текущих (pos, vel) — это **новый**
+`KeyframeEffect`, а не тайминг-твик. Поэтому cancel + рекомпиляция `linear()` через
+кэш + re-emit — НЕОБХОДИМЫ, а не упущенная оптимизация. (Под-утверждение «мутация
+остаётся на compositor-потоке» правдоподобно по спеке/MDN — `updatePlaybackRate`
+спроектирован под off-main-thread анимации — но из JS не верифицируемо; см.
+«Границы замера».)
 
 ## Границы применимости (compositor-путь vs main-поток)
 
