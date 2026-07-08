@@ -13,7 +13,7 @@
  * - Снять валидацию count/index → негативные контроли RED.
  */
 
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 import {
   compileStaggerPlan,
   CompositorStaggerGroup,
@@ -266,6 +266,34 @@ describe('compositor stagger: группа compositor-путь', () => {
     const before = mv.value;
     mv.setTarget(999); // на уничтоженной MotionValue — no-op
     expect(mv.value).toBe(before); // значение НЕ поехало → петля не стартовала (инертна)
+  });
+
+  it('handoffToLive после destroy(): _destroyed-гард согласован с соседями (requestFrame НЕ зван; out-of-range — no-op, не throw)', () => {
+    // Регресс #70: handoffToLive был ЕДИНСТВЕННЫМ публичным мутатором без
+    // `if (this._destroyed) return` — соседи (start/retarget/retargetAll) после
+    // destroy рано выходят, а он валидировал индекс (бросал на out-of-range
+    // мёртвой группы) и для in-range тянулся к мёртвому ребёнку. Гард строит
+    // ИНЕРТНЫЙ MotionValue на СВОИХ _spring/_from → петля не стартует.
+    const rf = vi.fn((): number => 1); // шпион: инертное значение не должно его звать
+    const g = new CompositorStaggerGroup({
+      spring: SPRING, property: 'x', from: 5, to: 100, targets: [recordingEl()], requestFrame: rf,
+    });
+    g.start();
+    g.destroy();
+
+    // (1) in-range: инертный MotionValue, инъектированный requestFrame НЕ зван.
+    const mv = g.handoffToLive(0);
+    expect(typeof mv.setTarget).toBe('function'); // контракт: всегда MotionValue
+    expect(rf).not.toHaveBeenCalled();            // инертность → нет rAF-петли
+
+    // (2) СОГЛАСОВАНО с guard-соседями: out-of-range на мёртвой группе — тихий
+    //     no-op (как start/retarget после destroy), а НЕ MotionParamError. Без
+    //     гарда этот путь бросает → рассогласование post-destroy контракта (RED).
+    expect(() => g.handoffToLive(5)).not.toThrow();
+    expect(() => g.retarget(5, 10)).not.toThrow(); // сосед-эталон: молча no-op после destroy
+    const oob = g.handoffToLive(99);
+    expect(typeof oob.setTarget).toBe('function'); // и он вернул MotionValue (контракт)
+    expect(rf).not.toHaveBeenCalled();             // по-прежнему инертно на всех путях
   });
 });
 

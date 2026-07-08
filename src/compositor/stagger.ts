@@ -39,7 +39,7 @@
 import { MotionParamError } from '../errors.js';
 import { type SpringParams } from '../spring.js';
 import { type WaapiAnimatable } from '../waapi/index.js';
-import { type MotionValue, type RequestFrameFn } from '../motion-value.js';
+import { MotionValue, type RequestFrameFn } from '../motion-value.js';
 import { stagger, type StaggerFrom, type StaggerGridOptions } from '../stagger/index.js';
 import { type SpringNode } from './segmenter.js';
 import {
@@ -212,6 +212,10 @@ export interface CompositorStaggerGroupOptions extends StaggerPlanBase {
 export class CompositorStaggerGroup {
   private readonly _plan: CompositorStaggerPlan;
   private readonly _springs: CompositorSpring[];
+  // Пружина + начальное значение группы — SSOT для инертного post-destroy
+  // MotionValue (см. handoffToLive): строим ЕГО, а не тянемся к мёртвому ребёнку.
+  private readonly _spring: SpringParams;
+  private readonly _from: number;
   private _destroyed = false;
 
   constructor(opts: CompositorStaggerGroupOptions) {
@@ -221,6 +225,9 @@ export class CompositorStaggerGroup {
     const count = opts.targets.length;
     // Компиляция общего плана + задержек (валидация spring/свойств/границ внутри).
     this._plan = compileStaggerPlan({ ...opts, count });
+    // Захват для инертного post-destroy MotionValue (см. handoffToLive-гард).
+    this._spring = opts.spring;
+    this._from = opts.from;
 
     const delays = this._plan.delays;
     const apply = opts.apply;
@@ -312,6 +319,18 @@ export class CompositorStaggerGroup {
    * диапазона → MotionParamError.
    */
   handoffToLive(index: number, newTarget?: number): MotionValue {
+    // После destroy() группа мертва: рано выходим — как guard-соседи (start/
+    // retarget/retargetAll), но контракт метода обязывает вернуть MotionValue.
+    // Отдаём инертное значение (сконструировано на СВОИХ _spring/_from и сразу
+    // destroy'нуто → петля не стартует, инъектированный requestFrame не зовётся),
+    // зеркаля inert-паттерн ребёнка (index.ts) и НЕ тянемся к мёртвому ребёнку.
+    // Так поведение уничтоженной группы согласовано: любой индекс — тихий no-op,
+    // а не «in-range действует / out-of-range бросает».
+    if (this._destroyed) {
+      const inert = new MotionValue({ initial: this._from, spring: this._spring });
+      inert.destroy();
+      return inert;
+    }
     const s = this._springs[index];
     if (s === undefined) {
       throw new MotionParamError(
