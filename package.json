@@ -189,6 +189,11 @@
       "types": "./dist/tokens/index.d.ts",
       "import": "./dist/tokens/index.js",
       "require": "./dist/tokens/index.cjs"
+    },
+    "./animate": {
+      "types": "./dist/animate/index.d.ts",
+      "import": "./dist/animate/index.js",
+      "require": "./dist/animate/index.cjs"
     }
   },
   "files": [
