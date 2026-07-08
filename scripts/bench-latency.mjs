@@ -29,9 +29,13 @@ const __dirname = dirname(fileURLToPath(import.meta.url));
 const pkgRoot = resolve(__dirname, '..');
 const distUrl = (p) => pathToFileURL(resolve(pkgRoot, p)).href;
 
-const { CompositorSpring, handoffToLive, readCompositorSpring } = await import(
-  distUrl('dist/compositor/index.js')
-);
+const {
+  CompositorSpring,
+  handoffToLive,
+  readCompositorSpring,
+  compileStaggerPlan,
+  CompositorStaggerGroup,
+} = await import(distUrl('dist/compositor/index.js'));
 
 const SPRING = { mass: 1, stiffness: 170, damping: 26 };
 
@@ -145,6 +149,38 @@ const results = [];
       teardown: (mv) => mv.destroy(),
     }),
   );
+}
+
+// ── E. compileStaggerPlan — расписание stagger N элементов (компиляция+планирование) ──
+// M3: чистый планировщик caskад'а. Пружина компилируется ОДИН раз (общий кэш), далее
+// per-element задержки из ./stagger. Меряем ПОЛНУЮ стоимость планирования группы —
+// это main-thread cost построения каскада; per-frame cost = НОЛЬ (каскад гоняет браузер).
+for (const N of [10, 50, 200]) {
+  results.push(
+    measureLatency(`compileStaggerPlan N=${N} (компиляция+планирование)`, {
+      op: () => compileStaggerPlan({ spring: SPRING, property: 'transform', from: 0, to: 100, count: N, gap: 40 }),
+      iters: 3000,
+      warmup: 1000,
+    }),
+  );
+}
+
+// ── F. CompositorStaggerGroup.start() — коммит N Element.animate с per-element delay ──
+// Полный запуск каскада: планирование + N нативных Element.animate (fake-цели, ничего
+// не удерживают). Свежая группа на итерацию (setup вне тайминга), таймится start().
+{
+  const fakeEls = (n) => Array.from({ length: n }, () => ({ animate: () => ({ cancel() {} }) }));
+  for (const N of [10, 50]) {
+    results.push(
+      measureLatency(`CompositorStaggerGroup.start N=${N} (план+коммит)`, {
+        setup: () => new CompositorStaggerGroup({ spring: SPRING, property: 'transform', from: 0, to: 100, targets: fakeEls(N), gap: 40 }),
+        op: (g) => g.start(),
+        teardown: (_r) => {},
+        iters: 2000,
+        warmup: 500,
+      }),
+    );
+  }
 }
 
 // ── Печать ──
