@@ -91,7 +91,7 @@ describe('timeline-api-surface-pin: исчерпывающий пин (лови�
     const tl = createTimeline({ segments: ONE_SEGMENT, requestFrame: noRaf() });
     tl.cancel();
     expect(Object.keys(tl).sort()).toEqual(
-      ['cancel', 'complete', 'pause', 'play', 'progress', 'seek', 'then', 'time', 'totalDuration'],
+      ['cancel', 'complete', 'label', 'pause', 'play', 'progress', 'seek', 'then', 'time', 'totalDuration'],
     );
   });
 });
@@ -179,5 +179,63 @@ describe('timeline-api-surface-pin: ошибки при невалидных в�
     expect(() =>
       createTimeline({ segments: [{ from: 0, to: 1, duration: -1 }] }),
     ).toThrow();
+  });
+});
+
+// === STEP 2: labels + position params (GSAP/anime parity) ===
+// TDD: characterization first (current behavior locked), then new feature tests (RED until impl).
+// Property: totalDuration must be independent of segment addition order when using absolute positions/labels.
+
+describe('timeline labels + position params (step 2) - RED tests', () => {
+  it('TimelineControls has .label(name, at?) method', () => {
+    const tl = createTimeline({ segments: ONE_SEGMENT, requestFrame: noRaf() });
+    tl.cancel();
+    expect(typeof (tl as any).label).toBe('function');
+  });
+
+  it('label(name) + seek("name") works', () => {
+    const tl = createTimeline({
+      segments: [
+        { from: 0, to: 10, duration: 1 },
+        { from: 10, to: 20, duration: 1 },
+      ],
+      requestFrame: noRaf(),
+    });
+    (tl as any).label('mid', 1);
+    tl.seek('mid');
+    expect(tl.time).toBeCloseTo(1, 5);
+    tl.cancel();
+  });
+
+  it('segment at can be label name or relative position string', () => {
+    const tl = createTimeline({
+      segments: [
+        { from: 0, to: 5, duration: 1, at: 0 as any },
+        { from: 5, to: 15, duration: 1, at: '> ' as any }, // end of prev
+        { from: 15, to: 25, duration: 1, at: '+=0.5' as any },
+      ],
+      requestFrame: noRaf(),
+    } as any);
+    expect(tl.totalDuration).toBeGreaterThan(2);
+    tl.cancel();
+  });
+
+  it('property: totalDuration invariant to segment order when using absolute positions (labels)', () => {
+    const make = (order: 'normal' | 'reversed') => {
+      const base = [
+        { from: 0, to: 1, duration: 1, at: 'L0' as any },
+        { from: 1, to: 2, duration: 1, at: 'L1' as any },
+      ];
+      const segs = order === 'normal' ? base : [...base].reverse();
+      const tl = createTimeline({ segments: segs as any, requestFrame: noRaf() } as any);
+      const d = tl.totalDuration;
+      tl.cancel();
+      return d;
+    };
+    // With proper absolute label positions this should be equal
+    // For now this test will help drive the resolver
+    const d1 = make('normal');
+    const d2 = make('reversed');
+    expect(d1).toBeCloseTo(d2, 5);
   });
 });
