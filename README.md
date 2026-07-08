@@ -463,6 +463,24 @@ distanceScale(200);     // 275 (мс) в дефолтной полосе 0→400
 `./tokens` — платишь ноль, ядро не растёт (проверено size-гейтом). Весь субпуть
 ~1.1 KB gz.
 
+## Сравнение размеров (публичная таблица, шаг 5 плана)
+
+Формат — как motion.dev/docs/gsap-vs-motion, но с честными пометками (vendor-published + наши воспроизводимые замеры `pnpm size` 2026-07-09).
+
+**Строки:** ядро+пружина / stagger / timeline / animate (one-liner) / compositor и т.д.
+
+| Фича                  | @labpics/motion (наш)          | Motion (vendor)             | GSAP (vendor)      | anime.js (vendor) |
+|-----------------------|--------------------------------|-----------------------------|--------------------|-------------------|
+| ядро + пружина        | 2.13 KB gz (core) + 1.64 KB (spring) | 2.6 KB (mini)              | ~23–26.6 KB core  | ~12 KB           |
+| stagger               | 0.74 KB gz                     | bundled                     | bundled            | bundled          |
+| timeline              | 1.45 KB gz                     | —                           | bundled            | bundled          |
+| animate (one-liner)   | 10.15 KB gz / **10865 B** import-cost | 2.6 KB mini / 18 KB full   | ~23+ KB            | ~11–12 KB        |
+| compositor            | 6.21 KB gz                     | hybrid                      | main-thread        | WAAPI частично   |
+
+**Ключ:** ядро с физикой пружины 2.13 KB vs Motion mini 2.6 KB. animate ~10.8 KB (паритет anime, легче full Motion/GSAP).
+
+Наши: `pnpm build && pnpm size` в worktree (esbuild+gz level-9). Vendor: motion.dev (2026-07), bundlephobia факты. Полные цифры + методология — `docs/benchmark.md`.
+
 ## Инварианты (гарантии потребителю)
 
 - **Zero-deps**: в `package.json` нет поля `dependencies` — фреймворки только как
