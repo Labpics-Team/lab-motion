@@ -56,6 +56,7 @@ pnpm size       # замер gz всех субпутей
 | `…/svg-morph` | Морфинг путей: `interpolatePath(dFrom, dTo)` — точный режим при совпадающей структуре, ресэмплинг с выравниванием старта/обхода замкнутых при разной |
 | `…/frame` | Единый frame-шедулер: `createFrameLoop` / синглтон `frame` — один rAF на кадр, фазы read→update→render против layout-thrash, ленивый старт/стоп, SSR-safe; `asRequestFrame(loop)` сажает MotionValue/drive на общий кадр через `opts.requestFrame` (N значений = один rAF). **Биндинги используют его ПО УМОЛЧАНИЮ** — все значения приложения делят один rAF без ручной настройки (как shared-ticker у Framer Motion/GSAP); инжекция своего `requestFrame` переопределяет. |
 | `…/presets` | Словарь generic-движений «от смысла» (иконки): 10 фабрик (pulse, blink, wiggle…), мультитрековые кейфреймы (scale/rotate/x/y/opacity/progress), `runPreset` с виртуальным временем, `presetToWaapi` |
+| `…/utils` | Value-mapping примитивы (ядро Framer Motion / GSAP, headless): `mapRange`, `interpolate` (N-стоповый маппер: клампинг, per-segment easing, кастомный `mixer` для не-числовых значений), `clamp`, `wrap`, `snap` (сетка/набор), `mix`, `pipe`. Каррируемые config-first, финитность-гарантированы (никаких NaN/∞), tree-shakeable (один символ ≈ 0.3 KB gz) |
 | `…/react` | React: `useSpring`, `useMotionValue` |
 | `…/preact` | Preact: `useSpring`, `useMotionValue` (зеркало react-биндинга поверх `preact/hooks`) |
 | `…/solid` | Solid: `createSpring`, `createMotionValue` (сигналы, авто-уборка через `onCleanup`) |
@@ -152,6 +153,19 @@ const p = createPresence({
   onGone: () => el.remove(), // убрать из DOM только после exit-анимации
 });
 p.exit();
+```
+
+### Value-mapping (utils)
+
+```typescript
+import { mapRange, interpolate, clamp, wrap, pipe } from '@labpics/motion/utils';
+
+mapRange(0, 100, 0, 1, 50);              // 0.5 — ремап диапазона (канон GSAP mapRange)
+const fade = interpolate([0, 100, 200], [0, 1, 0]); // N-стоповый маппер (канон Framer transform)
+fade(50);                                // 0.5 — кусочно-линейно между стопами
+const hue = wrap(0, 360);                // циклический wrap в полуинтервал [0, 360)
+hue(370);                                // 10
+const toProgress = pipe(clamp(0, 300), (x) => x / 300); // композиция слева-направо
 ```
 
 ## Инварианты (гарантии потребителю)
