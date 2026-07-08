@@ -1,0 +1,45 @@
+{
+  "description": "Headless TypeScript ORM with a head 🐲",
+  "__qwik__": {
+    "displayName": "Integration: Drizzle (Database ORM)",
+    "priority": -10,
+    "viteConfig": {},
+    "docs": [
+      "https://qwik.dev/integrations/drizzle/",
+      "https://orm.drizzle.team/docs/overview"
+    ],
+    "nextSteps": {
+      "title": "Next Steps",
+      "lines": [
+        " Drizzle was installed with a simple DB schema and some demo routes,",
+        " now you need to run `npm run drizzle:migrate` to setup the database.",
+        "",
+        " better-sqlite3 was configured by default, but in production",
+        " you'll want to use Postgres or MySQL.",
+        "",
+        "",
+        " Drizzle studio was also added which you can access by running `npm run drizzle:studio`,",
+        "",
+        " Check out the Drizzle docs for more info:",
+        "   - https://orm.drizzle.team/docs/overview"
+      ]
+    },
+    "alwaysInRoot": []
+  },
+  "devDependencies": {
+    "@types/better-sqlite3": "^7.6.12",
+    "drizzle-kit": "^0.30.3",
+    "better-sqlite3": "^11.8.1",
+    "drizzle-orm": "^0.39.0"
+  },
+  "scripts": {
+    "drizzle:generate": "drizzle-kit generate",
+    "drizzle:migrate": "drizzle-kit migrate",
+    "drizzle:push": "drizzle-kit push",
+    "drizzle:pull": "drizzle-kit pull",
+    "drizzle:check": "drizzle-kit check",
+    "drizzle:up": "drizzle-kit up",
+    "drizzle:studio": "drizzle-kit studio",
+    "postinstall": "drizzle-kit generate"
+  }
+}

@@ -1,0 +1,1 @@
+{"version":3,"file":"logging-sink.d.ts","sourceRoot":"","sources":["../../../src/logging/logging-sink.ts"],"names":[],"mappings":"AAAA,OAAO,EAAE,QAAQ,EAAE,MAAM,2BAA2B,CAAC;AACrD,OAAO,EAAE,YAAY,EAAE,MAAM,oBAAoB,CAAC;AAElD,MAAM,WAAW,WAAW;IAC1B,GAAG,CAAC,KAAK,EAAE,YAAY,GAAG,IAAI,CAAC;IAC/B,SAAS,CAAC,KAAK,EAAE,QAAQ,GAAG,OAAO,CAAC;CACrC"}

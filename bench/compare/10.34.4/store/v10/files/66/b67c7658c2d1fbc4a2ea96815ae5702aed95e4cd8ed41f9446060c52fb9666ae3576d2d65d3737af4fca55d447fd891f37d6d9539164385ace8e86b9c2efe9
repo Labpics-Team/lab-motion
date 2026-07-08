@@ -1,0 +1,1 @@
+{"version":3,"file":"vitest-runner-options.d.ts","sourceRoot":"","sources":["../../src-generated/vitest-runner-options.ts"],"names":[],"mappings":"AAAA;;;;GAIG;AAEH,MAAM,WAAW,0BAA0B;IACzC,MAAM,EAAE,mBAAmB,CAAC;CAC7B;AACD;;GAEG;AACH,MAAM,WAAW,mBAAmB;IAClC;;OAEG;IACH,GAAG,CAAC,EAAE,MAAM,CAAC;IACb;;OAEG;IACH,OAAO,EAAE,OAAO,CAAC;IACjB;;OAEG;IACH,UAAU,CAAC,EAAE,MAAM,CAAC;CACrB"}

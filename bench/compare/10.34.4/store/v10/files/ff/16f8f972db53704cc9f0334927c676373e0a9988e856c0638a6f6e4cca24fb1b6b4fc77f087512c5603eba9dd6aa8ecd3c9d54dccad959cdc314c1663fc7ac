@@ -1,0 +1,50 @@
+//#region ../compiler/src/ml_parser/tokens.ts
+let TokenType = /* @__PURE__ */ function(TokenType) {
+	TokenType[TokenType["TAG_OPEN_START"] = 0] = "TAG_OPEN_START";
+	TokenType[TokenType["TAG_OPEN_END"] = 1] = "TAG_OPEN_END";
+	TokenType[TokenType["TAG_OPEN_END_VOID"] = 2] = "TAG_OPEN_END_VOID";
+	TokenType[TokenType["TAG_CLOSE"] = 3] = "TAG_CLOSE";
+	TokenType[TokenType["INCOMPLETE_TAG_OPEN"] = 4] = "INCOMPLETE_TAG_OPEN";
+	TokenType[TokenType["TEXT"] = 5] = "TEXT";
+	TokenType[TokenType["ESCAPABLE_RAW_TEXT"] = 6] = "ESCAPABLE_RAW_TEXT";
+	TokenType[TokenType["RAW_TEXT"] = 7] = "RAW_TEXT";
+	TokenType[TokenType["INTERPOLATION"] = 8] = "INTERPOLATION";
+	TokenType[TokenType["ENCODED_ENTITY"] = 9] = "ENCODED_ENTITY";
+	TokenType[TokenType["COMMENT_START"] = 10] = "COMMENT_START";
+	TokenType[TokenType["COMMENT_END"] = 11] = "COMMENT_END";
+	TokenType[TokenType["CDATA_START"] = 12] = "CDATA_START";
+	TokenType[TokenType["CDATA_END"] = 13] = "CDATA_END";
+	TokenType[TokenType["ATTR_NAME"] = 14] = "ATTR_NAME";
+	TokenType[TokenType["ATTR_QUOTE"] = 15] = "ATTR_QUOTE";
+	TokenType[TokenType["ATTR_VALUE_TEXT"] = 16] = "ATTR_VALUE_TEXT";
+	TokenType[TokenType["ATTR_VALUE_INTERPOLATION"] = 17] = "ATTR_VALUE_INTERPOLATION";
+	TokenType[TokenType["DOC_TYPE_START"] = 18] = "DOC_TYPE_START";
+	TokenType[TokenType["DOC_TYPE_END"] = 19] = "DOC_TYPE_END";
+	TokenType[TokenType["EXPANSION_FORM_START"] = 20] = "EXPANSION_FORM_START";
+	TokenType[TokenType["EXPANSION_CASE_VALUE"] = 21] = "EXPANSION_CASE_VALUE";
+	TokenType[TokenType["EXPANSION_CASE_EXP_START"] = 22] = "EXPANSION_CASE_EXP_START";
+	TokenType[TokenType["EXPANSION_CASE_EXP_END"] = 23] = "EXPANSION_CASE_EXP_END";
+	TokenType[TokenType["EXPANSION_FORM_END"] = 24] = "EXPANSION_FORM_END";
+	TokenType[TokenType["BLOCK_OPEN_START"] = 25] = "BLOCK_OPEN_START";
+	TokenType[TokenType["BLOCK_OPEN_END"] = 26] = "BLOCK_OPEN_END";
+	TokenType[TokenType["BLOCK_CLOSE"] = 27] = "BLOCK_CLOSE";
+	TokenType[TokenType["BLOCK_PARAMETER"] = 28] = "BLOCK_PARAMETER";
+	TokenType[TokenType["INCOMPLETE_BLOCK_OPEN"] = 29] = "INCOMPLETE_BLOCK_OPEN";
+	TokenType[TokenType["LET_START"] = 30] = "LET_START";
+	TokenType[TokenType["LET_VALUE"] = 31] = "LET_VALUE";
+	TokenType[TokenType["LET_END"] = 32] = "LET_END";
+	TokenType[TokenType["INCOMPLETE_LET"] = 33] = "INCOMPLETE_LET";
+	TokenType[TokenType["COMPONENT_OPEN_START"] = 34] = "COMPONENT_OPEN_START";
+	TokenType[TokenType["COMPONENT_OPEN_END"] = 35] = "COMPONENT_OPEN_END";
+	TokenType[TokenType["COMPONENT_OPEN_END_VOID"] = 36] = "COMPONENT_OPEN_END_VOID";
+	TokenType[TokenType["COMPONENT_CLOSE"] = 37] = "COMPONENT_CLOSE";
+	TokenType[TokenType["INCOMPLETE_COMPONENT_OPEN"] = 38] = "INCOMPLETE_COMPONENT_OPEN";
+	TokenType[TokenType["DIRECTIVE_NAME"] = 39] = "DIRECTIVE_NAME";
+	TokenType[TokenType["DIRECTIVE_OPEN"] = 40] = "DIRECTIVE_OPEN";
+	TokenType[TokenType["DIRECTIVE_CLOSE"] = 41] = "DIRECTIVE_CLOSE";
+	TokenType[TokenType["EOF"] = 42] = "EOF";
+	return TokenType;
+}({});
+
+//#endregion
+export { TokenType };

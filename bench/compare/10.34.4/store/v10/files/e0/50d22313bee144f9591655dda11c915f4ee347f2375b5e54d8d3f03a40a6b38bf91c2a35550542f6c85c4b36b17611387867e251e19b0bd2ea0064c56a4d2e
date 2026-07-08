@@ -1,0 +1,26 @@
+import { EOL } from 'os';
+// 8kB
+const DEFAULT_MAX_SIZE = 8192;
+export class StringBuilder {
+    currentLength = 0;
+    strings = [];
+    maxSize = DEFAULT_MAX_SIZE;
+    append(str) {
+        this.strings.push(str);
+        this.currentLength += str.length;
+        while (this.currentLength > this.maxSize && this.strings.length > 1) {
+            const shifted = this.strings.shift();
+            this.currentLength -= shifted.length;
+        }
+    }
+    toString() {
+        return this.strings.join('');
+    }
+    static concat(...builders) {
+        return builders
+            .map((b) => b.toString())
+            .filter(Boolean)
+            .join(EOL);
+    }
+}
+//# sourceMappingURL=string-builder.js.map

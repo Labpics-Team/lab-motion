@@ -1,11 +1,16 @@
 ﻿{
-    "private":  true,
-    "devDependencies":  {
-                            "playwright":  "^1.45.0",
-                            "gsap":  "^3.15.0",
-                            "animejs":  "^4.5.0",
-                            "motion":  "^12.0.0"
-                        },
-    "name":  "lab-motion-bench-compare",
-    "type":  "module"
+  "private": true,
+  "name": "lab-motion-bench-compare",
+  "type": "module",
+  "devDependencies": {
+    "playwright": "^1.45.0",
+    "gsap": "^3.15.0",
+    "animejs": "^4.5.0",
+    "motion": "^12.0.0",
+    "esbuild": "^0.23.0"
+  },
+  "scripts": {
+    "bench": "node bench.mjs",
+    "postinstall": "npx playwright install chromium --with-deps || echo 'Playwright install note: run manually if needed'"
+  }
 }

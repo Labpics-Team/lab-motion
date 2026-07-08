@@ -1,0 +1,7 @@
+export function isDisposable(maybeDisposable) {
+    const asDisposable = maybeDisposable;
+    return (asDisposable &&
+        asDisposable.dispose &&
+        typeof asDisposable.dispose === 'function');
+}
+//# sourceMappingURL=utils.js.map

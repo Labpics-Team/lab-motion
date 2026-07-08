@@ -1,0 +1,41 @@
+{
+  "description": "Use Partytown in your Qwik app",
+  "__qwik__": {
+    "displayName": "Integration: Partytown (3rd-party scripts)",
+    "priority": -10,
+    "viteConfig": {
+      "imports": [
+        {
+          "namedImports": [
+            "partytownVite"
+          ],
+          "importPath": "@qwik.dev/partytown/utils"
+        },
+        {
+          "namedImports": [
+            "join"
+          ],
+          "importPath": "path"
+        }
+      ],
+      "vitePlugins": [
+        "partytownVite({dest: join(__dirname, 'dist', '~partytown')})"
+      ]
+    },
+    "docs": [
+      "https://partytown.qwik.dev/",
+      "https://qwik.dev/integrations/partytown/"
+    ],
+    "nextSteps": {
+      "lines": [
+        " Please add the <QwikPartytown/> component",
+        " to your root.tsx file.",
+        " Have a look at the docs for more info: ",
+        " https://partytown.qwik.dev/configuration"
+      ]
+    }
+  },
+  "devDependencies": {
+    "@qwik.dev/partytown": "^0.11.1"
+  }
+}

@@ -1,0 +1,136 @@
+import { SecurityContext } from "../core.mjs";
+
+//#region ../compiler/src/schema/dom_security_schema.ts
+/**
+* @license
+* Copyright Google LLC All Rights Reserved.
+*
+* Use of this source code is governed by an MIT-style license that can be
+* found in the LICENSE file at https://angular.dev/license
+*/
+/** Map from tagName|propertyName to SecurityContext. Properties applying to all tags use '*'. */
+let _SECURITY_SCHEMA;
+function SECURITY_SCHEMA() {
+	if (!_SECURITY_SCHEMA) {
+		_SECURITY_SCHEMA = {};
+		registerContext(SecurityContext.HTML, [
+			"iframe|srcdoc",
+			"*|innerHTML",
+			"*|outerHTML"
+		]);
+		registerContext(SecurityContext.STYLE, ["*|style"]);
+		registerContext(SecurityContext.URL, [
+			"*|formAction",
+			"area|href",
+			"a|href",
+			"a|xlink:href",
+			"form|action",
+			"annotation|href",
+			"annotation|xlink:href",
+			"annotation-xml|href",
+			"annotation-xml|xlink:href",
+			"maction|href",
+			"maction|xlink:href",
+			"malignmark|href",
+			"malignmark|xlink:href",
+			"math|href",
+			"math|xlink:href",
+			"mroot|href",
+			"mroot|xlink:href",
+			"msqrt|href",
+			"msqrt|xlink:href",
+			"merror|href",
+			"merror|xlink:href",
+			"mfrac|href",
+			"mfrac|xlink:href",
+			"mglyph|href",
+			"mglyph|xlink:href",
+			"msub|href",
+			"msub|xlink:href",
+			"msup|href",
+			"msup|xlink:href",
+			"msubsup|href",
+			"msubsup|xlink:href",
+			"mmultiscripts|href",
+			"mmultiscripts|xlink:href",
+			"mprescripts|href",
+			"mprescripts|xlink:href",
+			"mi|href",
+			"mi|xlink:href",
+			"mn|href",
+			"mn|xlink:href",
+			"mo|href",
+			"mo|xlink:href",
+			"mpadded|href",
+			"mpadded|xlink:href",
+			"mphantom|href",
+			"mphantom|xlink:href",
+			"mrow|href",
+			"mrow|xlink:href",
+			"ms|href",
+			"ms|xlink:href",
+			"mspace|href",
+			"mspace|xlink:href",
+			"mstyle|href",
+			"mstyle|xlink:href",
+			"mtable|href",
+			"mtable|xlink:href",
+			"mtd|href",
+			"mtd|xlink:href",
+			"mtr|href",
+			"mtr|xlink:href",
+			"mtext|href",
+			"mtext|xlink:href",
+			"mover|href",
+			"mover|xlink:href",
+			"munder|href",
+			"munder|xlink:href",
+			"munderover|href",
+			"munderover|xlink:href",
+			"semantics|href",
+			"semantics|xlink:href",
+			"none|href",
+			"none|xlink:href",
+			"img|src",
+			"video|src"
+		]);
+		registerContext(SecurityContext.RESOURCE_URL, [
+			"base|href",
+			"embed|src",
+			"frame|src",
+			"iframe|src",
+			"link|href",
+			"object|codebase",
+			"object|data",
+			"script|src",
+			"script|href",
+			"script|xlink:href"
+		]);
+		registerContext(SecurityContext.ATTRIBUTE_NO_BINDING, [
+			"animate|attributeName",
+			"set|attributeName",
+			"animateMotion|attributeName",
+			"animateTransform|attributeName",
+			"unknown|attributeName",
+			"iframe|sandbox",
+			"iframe|allow",
+			"iframe|allowFullscreen",
+			"iframe|referrerPolicy",
+			"iframe|csp",
+			"iframe|fetchPriority",
+			"unknown|sandbox",
+			"unknown|allow",
+			"unknown|allowFullscreen",
+			"unknown|referrerPolicy",
+			"unknown|csp",
+			"unknown|fetchPriority"
+		]);
+	}
+	return _SECURITY_SCHEMA;
+}
+function registerContext(ctx, specs) {
+	for (const spec of specs) _SECURITY_SCHEMA[spec.toLowerCase()] = ctx;
+}
+
+//#endregion
+export { SECURITY_SCHEMA };
