@@ -1,0 +1,98 @@
+/**
+ * perf-hot-path.test.ts — перф-seal горячих путей (drive / MotionValue).
+ *
+ * Печать точных ns/операцию — забота scripts/bench.mjs (wall-clock машинозависим,
+ * per-PR такой гейт флакует; там же зафиксирован ВЕРДИКТ: precompute-инвариантов
+ * замерен как −24.6% регрессия и отвергнут — движок в физическом оптимуме,
+ * аналитический O(1), монопоморфный солвер V8-инлайнится, sqrt near-free).
+ *
+ * Здесь — ДЕТЕРМИНИРОВАННЫЙ seal (машинонезависим): число кадров до сходимости =
+ * число вызовов солвера = потраченный CPU. Порог сверху ловит РАЗДУВАНИЕ работы
+ * (регрессия порога сходимости, слом монотон-ранней-выходной, лишний вызов
+ * солвера на кадр — «3→1» схлопывание) — класс, который не виден в size-gate.
+ * Плюс liveness-смоук: пачка прогонов не зависает (страховка от бесконечного
+ * цикла / катастрофической регрессии стоимости кадра).
+ */
+import { describe, it, expect } from 'vitest';
+import { drive, MotionValue } from '../src/index.js';
+
+/**
+ * Синхронные дренируемые часы: requestFrame копит cb и возвращает НЕнулевой
+ * handle (→ drive/MotionValue не ставят setTimeout-фоллбек, прогон синхронный).
+ * Дренаж без ts → солвер идёт фикс-шагом FIXED_DT_S → число кадров детерминировано.
+ * Возвращаемое drain() = число исполненных тиков = вызовов солвера за прогон.
+ */
+function makeStepClock(): {
+  requestFrame: (cb: (ts?: number) => void) => number;
+  drain: (cap?: number) => number;
+} {
+  const q: Array<(ts?: number) => void> = [];
+  const requestFrame = (cb: (ts?: number) => void): number => {
+    q.push(cb);
+    return q.length; // ненулевой handle
+  };
+  const drain = (cap = 100000): number => {
+    let n = 0;
+    while (q.length && n < cap) {
+      q.shift()!();
+      n++;
+    }
+    return n;
+  };
+  return { requestFrame, drain };
+}
+
+/** Типовая Framer-подобная пружина (недодемпфированная, лёгкий overshoot). */
+const CANONICAL = { mass: 1, stiffness: 170, damping: 26 };
+
+// Измерено на baseline: все три сценария сходятся за 47 кадров. Полог 55 ловит
+// раздувание (>~1.2× работы), терпит тривиальный FP-сдвиг границы сегмента.
+const CONVERGENCE_FRAME_CAP = 55;
+
+describe('перф-seal: работа горячего пути детерминирована и ограничена', () => {
+  it('drive() (clamp=default) сходится за ограниченное число кадров', () => {
+    const clock = makeStepClock();
+    drive({ from: 0, to: 100, spring: CANONICAL, onStep: () => {}, requestFrame: clock.requestFrame });
+    const frames = clock.drain();
+    expect(frames).toBeGreaterThan(10); // реальная анимация, не мгновенный снап
+    expect(frames).toBeLessThanOrEqual(CONVERGENCE_FRAME_CAP);
+  });
+
+  it('drive() (clamp:false, честная пружина) сходится за ограниченное число кадров', () => {
+    const clock = makeStepClock();
+    drive({
+      from: 0,
+      to: 100,
+      spring: CANONICAL,
+      clamp: false,
+      onStep: () => {},
+      requestFrame: clock.requestFrame,
+    });
+    const frames = clock.drain();
+    expect(frames).toBeGreaterThan(10);
+    expect(frames).toBeLessThanOrEqual(CONVERGENCE_FRAME_CAP);
+  });
+
+  it('MotionValue прогон сходится за ограниченное число кадров', () => {
+    const clock = makeStepClock();
+    const mv = new MotionValue({ initial: 0, spring: CANONICAL, requestFrame: clock.requestFrame });
+    mv.setTarget(100);
+    const frames = clock.drain();
+    mv.destroy();
+    expect(frames).toBeGreaterThan(10);
+    expect(frames).toBeLessThanOrEqual(CONVERGENCE_FRAME_CAP);
+  });
+
+  it('liveness: пачка прогонов не зависает (страховка от бесконечного цикла)', () => {
+    // Щедрый потолок (замер ~4.2µs/прогон → ~8ms на 2000; порог 2000ms ≈ 240×
+    // запаса): не флакует на нагруженном CI, но ловит зависание/катастрофу
+    // (напр. случайный синхронный блок или обмен O(1)-солвера на итеративный).
+    const t0 = performance.now();
+    for (let i = 0; i < 2000; i++) {
+      const clock = makeStepClock();
+      drive({ from: 0, to: 100, spring: CANONICAL, onStep: () => {}, requestFrame: clock.requestFrame });
+      clock.drain();
+    }
+    expect(performance.now() - t0).toBeLessThan(2000);
+  });
+});
