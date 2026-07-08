@@ -1,0 +1,122 @@
+﻿
+ RUN  v4.1.9 C:/Users/Daniel/.agents/work/lab-motion-wt-timeline
+
+ тЭп test/timeline-api-surface-pin.test.ts (27 tests | 4 failed) 12ms
+     тЬУ createTimeline ╤П╨▓╨╗╤П╨╡╤В╤Б╤П ╤Д╤Г╨╜╨║╤Ж╨╕╨╡╨╣ 1ms
+     тЬУ createTimeline(...) ╨▓╨╛╨╖╨▓╤А╨░╤Й╨░╨╡╤В ╨╛╨▒╤К╨╡╨║╤В (╨╜╨╡ null, ╨╜╨╡ ╨┐╤А╨╕╨╝╨╕╤В╨╕╨▓) 1ms
+     тЬУ totalDuration тАФ ╨║╨╛╨╜╨╡╤З╨╜╨╛╨╡ ╤З╨╕╤Б╨╗╨╛ >= 0 0ms
+     тЬУ time тАФ ╨║╨╛╨╜╨╡╤З╨╜╨╛╨╡ ╤З╨╕╤Б╨╗╨╛ 0ms
+     тЬУ progress тАФ ╤З╨╕╤Б╨╗╨╛ ╨▓ [0, 1] 0ms
+     тЬУ ╨╝╨╡╤В╨╛╨┤ 'play' тАФ ╤Д╤Г╨╜╨║╤Ж╨╕╤П 0ms
+     тЬУ ╨╝╨╡╤В╨╛╨┤ 'pause' тАФ ╤Д╤Г╨╜╨║╤Ж╨╕╤П 0ms
+     тЬУ ╨╝╨╡╤В╨╛╨┤ 'seek' тАФ ╤Д╤Г╨╜╨║╤Ж╨╕╤П 0ms
+     тЬУ ╨╝╨╡╤В╨╛╨┤ 'complete' тАФ ╤Д╤Г╨╜╨║╤Ж╨╕╤П 0ms
+     тЬУ ╨╝╨╡╤В╨╛╨┤ 'cancel' тАФ ╤Д╤Г╨╜╨║╤Ж╨╕╤П 0ms
+     тЬУ ╨╝╨╡╤В╨╛╨┤ 'then' тАФ ╤Д╤Г╨╜╨║╤Ж╨╕╤П 0ms
+     ├Ч ╨╝╨╡╤В╨╛╨┤ 'label' тАФ ╤Д╤Г╨╜╨║╤Ж╨╕╤П 4ms
+     ├Ч Object.keys(controls) тАФ ╤А╨╛╨▓╨╜╨╛ ╨╖╨░╨┐╨╕╨╜╨╡╨╜╨╜╤Л╨╣ ╨╜╨░╨▒╨╛╤А, ╨▒╨╡╨╖ ╨╗╨╕╤И╨╜╨╕╤Е 2ms
+     тЬУ createTimeline(...).then(cb) тАФ ╨▓╤Л╨╖╤Л╨▓╨░╨╡╤В cb ╨┐╤А╨╕ complete() 0ms
+     тЬУ await createTimeline(...) ╤Б immediate complete 0ms
+     тЬУ ╨╛╨┤╨╕╨╜ ╤Б╨╡╨│╨╝╨╡╨╜╤В duration=2 тЖТ totalDuration=2 0ms
+     тЬУ ╨┤╨▓╨░ ╨┐╨╛╤Б╨╗╨╡╨┤╨╛╨▓╨░╤В╨╡╨╗╤М╨╜╤Л╤Е ╤Б╨╡╨│╨╝╨╡╨╜╤В╨░ ╨┐╨╛ 1╤Б тЖТ totalDuration=2 0ms
+     тЬУ ╤Б╨╡╨│╨╝╨╡╨╜╤В ╤Б offset=0.5 ╤Б╨╝╨╡╤Й╨░╨╡╤В ╨╜╨░╤З╨░╨╗╨╛ тЖТ totalDuration ╤А╨░╤Б╤В╤С╤В 0ms
+     тЬУ ╤Б╨╡╨│╨╝╨╡╨╜╤В ╤Б at=3 тЖТ totalDuration >= 3 + duration 0ms
+     тЬУ ╨┐╤Г╤Б╤В╨╛╨╣ ╨╝╨░╤Б╤Б╨╕╨▓ segments тЖТ MotionParamError 0ms
+     тЬУ segment.from = NaN тЖТ MotionParamError 0ms
+     тЬУ segment.duration <= 0 тЖТ MotionParamError 0ms
+     тЬУ segment.duration = -1 тЖТ MotionParamError 0ms
+     ├Ч TimelineControls has .label(name, at?) method 0ms
+     ├Ч label(name) + seek("name") works 0ms
+     тЬУ segment at can be label name or relative position string 0ms
+     тЬУ property: totalDuration invariant to segment order when using absolute positions (labels) 0ms
+node.exe : 
+C:\nvm4w\nodejs\pnpm.ps1:16 знак:5
++     & "$basedir/node$exe"  "$basedir/node_modules/pnpm/bin/pnpm.cjs"  ...
++     ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+    + CategoryInfo          : NotSpecified: (:String) [], RemoteException
+    + FullyQualifiedErrorId : NativeCommandError
+ 
+тОптОптОптОптОптОптОп Failed Tests 4 тОптОптОптОптОптОптОп
+
+ FAIL  test/timeline-api-surface-pin.test.ts > timeline-api-surface-pin: TimelineControls ╨╝╨╡╤В╨╛╨┤╤Л > ╨╝╨╡╤В╨╛╨┤ 'la
+bel' тАФ ╤Д╤Г╨╜╨║╤Ж╨╕╤П
+AssertionError: expected 'undefined' to be 'function' // Object.is equality
+
+Expected: "function"
+Received: "undefined"
+
+ тЭп test/timeline-api-surface-pin.test.ts:81:60
+     79|       const tl = createTimeline({ segments: ONE_SEGMENT, requestFrame:тАж
+     80|       tl.cancel();
+     81|       expect(typeof (tl as Record<string, unknown>)[name]).toBe('functтАж
+       |                                                            ^
+     82|     });
+     83|   }
+
+тОптОптОптОптОптОптОптОптОптОптОптОптОптОптОптОптОптОптОптОптОптОптОптОп[1/4]тОп
+
+ FAIL  test/timeline-api-surface-pin.test.ts > timeline-api-surface-pin: ╨╕╤Б╤З╨╡╤А╨┐╤Л╨▓╨░╤О╤Й╨╕╨╣ ╨┐╨╕╨╜ (╨╗╨╛╨▓╨╕╤В 
+╨╕ ╨Ы╨Ш╨и╨Э╨Ш╨Х ╤З╨╗╨╡╨╜╤Л) > Object.keys(controls) тАФ ╤А╨╛╨▓╨╜╨╛ ╨╖╨░╨┐╨╕╨╜╨╡╨╜╨╜╤Л╨╣ ╨╜╨░╨▒╨╛╤А, ╨▒╨╡╨╖ ╨╗╨╕╤И╨╜╨╕╤Е
+AssertionError: expected [ 'cancel', 'complete', 'pause', тАж(6) ] to deeply equal [ 'cancel', 'complete', 'label', тАж
+(7) ]
+
+- Expected
++ Received
+
+@@ -1,9 +1,8 @@
+  [
+    "cancel",
+    "complete",
+-   "label",
+    "pause",
+    "play",
+    "progress",
+    "seek",
+    "then",
+
+ тЭп test/timeline-api-surface-pin.test.ts:93:36
+     91|     const tl = createTimeline({ segments: ONE_SEGMENT, requestFrame: nтАж
+     92|     tl.cancel();
+     93|     expect(Object.keys(tl).sort()).toEqual(
+       |                                    ^
+     94|       ['cancel', 'complete', 'label', 'pause', 'play', 'progress', 'seтАж
+     95|     );
+
+тОптОптОптОптОптОптОптОптОптОптОптОптОптОптОптОптОптОптОптОптОптОптОптОп[2/4]тОп
+
+ FAIL  test/timeline-api-surface-pin.test.ts > timeline labels + position params (step 2) - RED tests > TimelineControl
+s has .label(name, at?) method
+AssertionError: expected 'undefined' to be 'function' // Object.is equality
+
+Expected: "function"
+Received: "undefined"
+
+ тЭп test/timeline-api-surface-pin.test.ts:193:38
+    191|     const tl = createTimeline({ segments: ONE_SEGMENT, requestFrame: nтАж
+    192|     tl.cancel();
+    193|     expect(typeof (tl as any).label).toBe('function');
+       |                                      ^
+    194|   });
+    195|
+
+тОптОптОптОптОптОптОптОптОптОптОптОптОптОптОптОптОптОптОптОптОптОптОптОп[3/4]тОп
+
+ FAIL  test/timeline-api-surface-pin.test.ts > timeline labels + position params (step 2) - RED tests > label(name) + s
+eek("name") works
+TypeError: tl.label is not a function
+ тЭп test/timeline-api-surface-pin.test.ts:204:17
+    202|       requestFrame: noRaf(),
+    203|     });
+    204|     (tl as any).label('mid', 1);
+       |                 ^
+    205|     tl.seek('mid');
+    206|     expect(tl.time).toBeCloseTo(1, 5);
+
+тОптОптОптОптОптОптОптОптОптОптОптОптОптОптОптОптОптОптОптОптОптОптОптОп[4/4]тОп
+
+
+ Test Files  1 failed (1)
+      Tests  4 failed | 23 passed (27)
+   Start at  02:31:23
+   Duration  268ms (transform 34ms, setup 0ms, import 47ms, tests 12ms, environment 0ms)
+
