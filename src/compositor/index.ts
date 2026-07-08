@@ -51,6 +51,13 @@ import { handoffToLive } from './handoff.js';
 
 export { type SpringNode } from './segmenter.js';
 export { handoffToLive, type HandoffToLiveOptions } from './handoff.js';
+export {
+  compileStaggerPlan,
+  CompositorStaggerGroup,
+  type CompositorStaggerOptions,
+  type CompositorStaggerPlan,
+  type CompositorStaggerGroupOptions,
+} from './stagger.js';
 
 // ─── Толерантность по умолчанию (перцептивный бюджет) ────────────────────────
 //
@@ -403,6 +410,14 @@ export function supportsCompositor(target?: unknown): boolean {
 
 // ─── CompositorSpring (контроллер: ретаргет + байт-паритетный fallback) ──────
 
+/**
+ * Инжектируемый таймер отложенного старта для FALLBACK-пути. Контракт:
+ * (cb, ms) → cancel-функция (идемпотентна). По умолчанию setTimeout/clearTimeout.
+ * Возврат cancel-функции (а не handle) — чтобы seam не завязывался на clearTimeout
+ * конкретной среды (тот же принцип, что RequestFrameFn: платформа за seam'ом).
+ */
+export type SetTimerFn = (cb: () => void, ms: number) => () => void;
+
 /** Опции контроллера CompositorSpring. */
 export interface CompositorSpringOptions {
   readonly spring: SpringParams;
@@ -431,6 +446,20 @@ export interface CompositorSpringOptions {
   readonly now?: (() => number) | undefined;
   /** Инжектируемый requestFrame для fallback-драйвера. */
   readonly requestFrame?: RequestFrameFn | undefined;
+  /**
+   * Задержка старта (мс, >= 0). По умолчанию 0. На COMPOSITOR-пути — нативный
+   * WAAPI-delay (браузер планирует старт off-main-thread, ноль работы main-потока
+   * в окне задержки); на FALLBACK-пути — отложенный первый setTarget через
+   * setTimer-seam. Применяется ТОЛЬКО к первичному start(); retarget/handoff —
+   * события «сейчас» (delay НЕ переигрывается). Основа composited stagger.
+   */
+  readonly delay?: number | undefined;
+  /**
+   * Инжектируемый таймер для FALLBACK-задержки старта (см. SetTimerFn). По
+   * умолчанию setTimeout/clearTimeout (SSR-safe). На compositor-пути НЕ нужен
+   * (delay нативный); инъекция — для детерминизма тестов.
+   */
+  readonly setTimer?: SetTimerFn | undefined;
 }
 
 /**
@@ -469,6 +498,8 @@ export class CompositorSpring {
   private readonly _apply: ((value: string | number) => void) | undefined;
   private readonly _now: () => number;
   private readonly _requestFrame: RequestFrameFn | undefined;
+  private readonly _delay: number;
+  private readonly _setTimer: SetTimerFn;
   private readonly _mode: 'compositor' | 'fallback';
 
   private _from: number;
@@ -476,8 +507,12 @@ export class CompositorSpring {
   private _v0Norm = 0;
   private _value: number;
   private _startTime = 0;
+  /** Задержка ТЕКУЩЕГО прогона (мс): _delay на первичном start, 0 на retarget/handoff. */
+  private _startDelay = 0;
   private _anim: { cancel?: () => void } | undefined;
   private _mv: MotionValue | undefined;
+  /** Cancel-функция отложенного fallback-старта (пока задержка не истекла). */
+  private _timerCancel: (() => void) | undefined;
   private _started = false;
   private _destroyed = false;
 
@@ -489,6 +524,10 @@ export class CompositorSpring {
     validateFinite(opts.from, 'from');
     validateFinite(opts.to, 'to');
     if (opts.tolerance !== undefined) validateTolerance(opts.tolerance);
+    const delay = opts.delay ?? 0;
+    if (!Number.isFinite(delay) || delay < 0) {
+      throw new MotionParamError(`CompositorSpring: delay должен быть >= 0 и конечным, получено ${delay}`);
+    }
 
     this._spring = opts.spring;
     this._property = opts.property;
@@ -499,6 +538,8 @@ export class CompositorSpring {
     this._target = opts.target;
     this._apply = opts.apply;
     this._requestFrame = opts.requestFrame;
+    this._delay = delay;
+    this._setTimer = opts.setTimer ?? defaultSetTimer;
     this._now = opts.now ?? defaultNow;
     this._from = opts.from;
     this._to = opts.to;
@@ -517,15 +558,35 @@ export class CompositorSpring {
     return this._value;
   }
 
-  /** Запускает анимацию from → to. */
+  /** Запускает анимацию from → to (с учётом стартовой задержки delay, если задана). */
   start(): void {
     if (this._destroyed) return;
     this._started = true;
     if (this._mode === 'compositor') {
-      this._emitCompositor(this._from, this._to, this._v0Norm);
+      // Первичный старт несёт задержку (нативный WAAPI-delay, off-main-thread);
+      // retarget/handoff вызывают _emitCompositor с delay=0 (события «сейчас»).
+      this._emitCompositor(this._from, this._to, this._v0Norm, this._delay);
     } else {
       this._ensureFallback();
-      this._mv!.setTarget(this._to);
+      this._clearTimer();
+      if (this._delay > 0) {
+        // Fallback-каскад: отложенный первый setTarget через setTimer-seam,
+        // чтобы задержка stagger сохранялась и на main-thread пути.
+        this._timerCancel = this._setTimer(() => {
+          this._timerCancel = undefined;
+          if (!this._destroyed) this._mv!.setTarget(this._to);
+        }, this._delay);
+      } else {
+        this._mv!.setTarget(this._to);
+      }
+    }
+  }
+
+  /** Отменяет отложенный fallback-старт, если задержка ещё не истекла. */
+  private _clearTimer(): void {
+    if (this._timerCancel !== undefined) {
+      this._timerCancel();
+      this._timerCancel = undefined;
     }
   }
 
@@ -542,6 +603,7 @@ export class CompositorSpring {
 
     if (this._mode === 'fallback') {
       this._ensureFallback();
+      this._clearTimer(); // retarget = «сейчас»: снимаем отложенный старт, если ждёт delay
       this._to = newTarget;
       this._mv!.setTarget(newTarget);
       this._started = true;
@@ -587,6 +649,16 @@ export class CompositorSpring {
    */
   handoffToLive(newTarget?: number): MotionValue {
     if (newTarget !== undefined) validateFinite(newTarget, 'newTarget');
+
+    // После destroy() контроллер мёртв: НЕ поднимаем новую live-петлю (иначе
+    // зомби-rAF на уничтоженном элементе — утечка). Возвращаем инертное значение
+    // (сконструировано и сразу destroy'нуто → цикл не стартует), сохраняя контракт
+    // «всегда возвращает MotionValue». Зеркалит destroyed-инвариант start/retarget.
+    if (this._destroyed) {
+      const inert = new MotionValue({ initial: this._value, spring: this._spring });
+      inert.destroy();
+      return inert;
+    }
 
     if (this._mode === 'fallback') {
       // Уже на main-потоке: тот же MotionValue, при новой цели — retarget.
@@ -636,6 +708,7 @@ export class CompositorSpring {
 
   /** Останавливает прогон (без разрушения; повторный start()/retarget() возобновит). */
   stop(): void {
+    this._clearTimer(); // снять отложенный fallback-старт, если задержка не истекла
     if (this._mode === 'compositor') {
       if (this._anim !== undefined && typeof this._anim.cancel === 'function') {
         try {
@@ -667,7 +740,9 @@ export class CompositorSpring {
    * (замкнутая форма, БЕЗ чтения DOM) — общий механизм retarget и handoffToLive.
    */
   private _snapshot(): { value: number; velocity: number } {
-    const tSec = (this._now() - this._startTime) / 1000;
+    // Физический t=0 пружины наступает ПОСЛЕ окна задержки (WAAPI держит `from` в
+    // delay-фазе): вычитаем _startDelay. До старта (t<0) читаем from, скорость 0.
+    const tSec = (this._now() - this._startTime - this._startDelay) / 1000;
     return readCompositorSpring(this._spring, {
       from: this._from,
       to: this._to,
@@ -676,7 +751,7 @@ export class CompositorSpring {
     });
   }
 
-  private _emitCompositor(from: number, to: number, v0Norm: number): void {
+  private _emitCompositor(from: number, to: number, v0Norm: number, delayMs = 0): void {
     const plan = compileSpringPlan({
       spring: this._spring,
       property: this._property,
@@ -692,6 +767,7 @@ export class CompositorSpring {
     this._to = to;
     this._v0Norm = v0Norm;
     this._value = from;
+    this._startDelay = delayMs;
     this._startTime = this._now();
     this._anim = this._target!.animate(plan.keyframes, {
       duration: plan.duration,
@@ -699,6 +775,9 @@ export class CompositorSpring {
       iterations: plan.iterations,
       fill: plan.fill,
       composite: plan.composite,
+      // Нативный WAAPI-delay только на первичном старте (delayMs>0); браузер
+      // планирует старт off-main-thread — каскад stagger без работы main-потока.
+      ...(delayMs > 0 ? { delay: delayMs } : {}),
     }) as { cancel?: () => void };
   }
 
@@ -724,4 +803,10 @@ function defaultNow(): number {
   const perf = (globalThis as { performance?: { now?: () => number } }).performance;
   if (perf !== undefined && typeof perf.now === 'function') return perf.now();
   return Date.now();
+}
+
+/** Таймер по умолчанию: setTimeout → cancel через clearTimeout (SSR-safe). */
+function defaultSetTimer(cb: () => void, ms: number): () => void {
+  const h = setTimeout(cb, ms);
+  return () => clearTimeout(h);
 }

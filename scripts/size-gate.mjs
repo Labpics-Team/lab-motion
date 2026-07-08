@@ -55,12 +55,26 @@ export const SUBPATH_GATE_BYTES = 4608;
 export const BESPOKE_SUBPATH_GATES = {
   './utils': 1400,
   // ./compositor — компилятор пружина→linear() (сегментер + LRU-кэш + контроллер)
-  // + C¹-хендофф compositor→live (M2: handoffToLive + CompositorSpring.handoffToLive).
-  // M1 факт 4408 / порог 4600. M2 добавил живой мост в rAF-пружину (снимок замкнутой
-  // формой → MotionValue с засеянной скоростью) — НЕИЗБЕЖНЫЙ рост на новую
-  // capability: факт 4672 gz. Порог 4800 (~2.7% люфт, дисциплина M1 сохранена),
-  // жёстче общего 4608→ здесь поднят осознанно под M2. Поднимать только решением Даниила.
-  './compositor': 4800,
+  // + C¹-хендофф compositor→live (M2) + COMPOSITED STAGGER (M3).
+  // Хронология факта/порога:
+  //   M1: 4408 / 4600 — компилятор + сегментер + LRU + CompositorSpring.
+  //   M2: 4672 / 4800 — живой мост в rAF-пружину (handoffToLive).
+  //   M3: 5919 / 6100 — composited stagger. НЕИЗБЕЖНЫЙ рост на новую capability:
+  //       (а) compileStaggerPlan — чистый планировщик (общий план + per-element
+  //           задержки из ./stagger); (б) CompositorStaggerGroup — контроллер группы
+  //           (N CompositorSpring, per-group каскад, per-element retarget/handoff);
+  //       (в) delay + setTimer в CompositorSpring (нативный WAAPI-delay на compositor-
+  //           пути, отложенный старт на fallback). Рост +1247 gz на весь слой каскада.
+  //       Порог 6100 = факт 5919 + ~3% люфт (дисциплина M1/M2 сохранена; ./stagger
+  //       переиспользуется, не дублируется). Жёстче общего 4608. Поднимать только решением Даниила.
+  './compositor': 6100,
+  // ./tokens — motion-токены (M3): duration/easing/spring/staggerGap + distanceScale.
+  // Чистые данные + 4 cubic-bezier (тянут ../easing.cubicBezier) + одна функция.
+  // Факт 1117 gz (весь субпуть). Порог 1250 (~12% люфт, как у ./utils). Гарантия —
+  // СУБПУТЬ-изоляция (sideEffects:false): не импортишь ./tokens = ноль, ядро не
+  // растёт (full-core сценарий это и стережёт). Внутри субпутя семейства в
+  // минифициров. dist по отдельности не шейкаются; целиком дёшев. Поднимать осознанно.
+  './tokens': 1250,
 };
 
 /**

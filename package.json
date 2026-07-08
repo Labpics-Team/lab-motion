@@ -184,6 +184,11 @@
       "types": "./dist/compositor/index.d.ts",
       "import": "./dist/compositor/index.js",
       "require": "./dist/compositor/index.cjs"
+    },
+    "./tokens": {
+      "types": "./dist/tokens/index.d.ts",
+      "import": "./dist/tokens/index.js",
+      "require": "./dist/tokens/index.cjs"
     }
   },
   "files": [
