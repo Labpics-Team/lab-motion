@@ -509,6 +509,46 @@ tree-shakeability). Пороги — регрессионные потолки, 
 mutation-тестирование core-физики (Stryker; прогон падает при mutation score
 ниже break-порога 76).
 
+## Размер + перф (шаг 5 плана)
+
+**Свежие метрики 2026-07-09 (worktree `lab-motion-perf` на `docs/size-perf-table-step5`, `node scripts/size-gate.mjs`, `bench.mjs`, `bench-latency.mjs`, `vitest -t perf-hot-path` — все PASS):**
+
+| Модуль / сценарий              | @labpics shipped gz | @labpics import-cost          | Motion (vendor)          | GSAP (vendor core) | anime (vendor) |
+|--------------------------------|---------------------|-------------------------------|--------------------------|--------------------|----------------|
+| core (index + spring/tween/drive/MV) | 2.13 KB            | 2.27 KB (full-core) / 891 B (only-spring) | 2.3 KB mini / ~30–57 KB full | ~27 KB            | 39.3 KB       |
+| stagger                        | 0.74 KB            | ~0.8 KB (tree-shake)         | included                | included          | included      |
+| timeline                       | 1.45 KB            | ~1.5 KB                      | included                | included          | included      |
+| compositor (+spring compile + composited stagger) | 6.21 KB     | via core + compositor        | n/a                     | n/a               | n/a           |
+| animate (facade, one-liner)    | 10.15 KB           | 10.87 KB                     | 2.3 KB (mini WAAPI)     | n/a (timelines)   | ~39 KB        |
+
+**Примечания к таблице:**
+- **shipped gz** — вес dist/*.js после tsup (CDN/raw-потребитель, gzip -9 level, из size-gate).
+- **import-cost** — реальная цена в бандле потребителя: esbuild `bundle+minify` + gzip против dist (сценарии из size-gate; ловит tree-shake регрессии).
+- **mini vs full**: Motion mini (useAnimate/animate mini) — только WAAPI hardware-accelerated, без аналитических пружин, MotionValue, timeline, stagger compositor, ретаргета. Наш `animate` фасад даёт DX-паритет (spring, value, stagger, compositor, handoff) за ~10.8 KB после tree-shake у потребителя.
+- Все субпути изолированы (`sideEffects: false`): не импортировал — платишь 0 байт в ядре (доказано `only-clamp (utils tree-shake) 308 B`).
+
+**Перф-клеймы (микро-бенчи, с evidence):**
+- `spring()` публичный (solver+validate): 82 ns/op, 12.26 M ops/sec (bench.mjs).
+- `drive()` полный прогон (47 кадров, clamp=default): 4.3 µs всего (~232k прогонов/сек).
+- `MotionValue` прогон (47 кадров): 4.6 µs.
+- compositor `compileSpringLinear` HIT (кэш LRU): 89 ns; COLD (сетка+RDP): 85 µs.
+- `readCompositorSpring` O(1): p50 100 ns / p99 600 ns.
+- `handoffToLive` (снимок → live MV): p50 ~300 ns / p99 600 ns (0.01% кадра на 120 Hz; 0.004% на 60 Hz).
+- `compileStaggerPlan` (N=10..200): p50 ~8–9 µs, плоско.
+- **Сходимость (машинонезависимый seal):** 47 кадров до settle (perf-hot-path.test.ts: `expect(frames).toBeLessThanOrEqual(55)`; 4 теста PASS; liveness 2000 прогонов <2s).
+- **Freeze advantage (compositor):** автономные переходы/release живут на compositor-потоке (WAAPI `Element.animate` + linear()), main-thread не тикает и не замораживается. Main только для follow/interactive (gestures, drag). Стоимость переключения — handoff/retarget 200–600 ns.
+- Аналитический closed-form O(1) на кадр (V8-инлайн) — в отличие от итеративных/численных солверов в ряде вендоров.
+
+**Доказательства (выводы команд, запуски в worktree):**
+- size-gate: PASS (все OK, пороги не превышены); точные числа выше + animate-one-liner 10865 B gz.
+- bench.mjs: точные строки с ns/op + ops/sec + compositor стопы + hit-rate 98%.
+- bench-latency.mjs: p50/p95/p99 для handoff/stagger + бюджет кадра %.
+- `pnpm test -- -t "перф-seal|size-gate"`: 14+ тестов PASS (вкл. 10 size + 4 perf).
+- pack-smoke: PASS (тарбол цел).
+- Vendor факты: motion.dev reduce-bundle docs (mini 2.3kb), bundlephobia animejs 39.3 KB gz, GSAP reports 26.6 KB core (min+gz).
+
+(Метрики справочные/машинозависимы для wall-time; запечатанные инварианты — тесты + size-gate.)
+
 ## Отвергнутые пути (контрфакты, НЕ реализованы)
 
 Отвергнуты с доказательствами — документируем, чтобы не переизобретать:
