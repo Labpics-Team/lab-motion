@@ -179,6 +179,11 @@
       "types": "./dist/utils/index.d.ts",
       "import": "./dist/utils/index.js",
       "require": "./dist/utils/index.cjs"
+    },
+    "./compositor": {
+      "types": "./dist/compositor/index.d.ts",
+      "import": "./dist/compositor/index.js",
+      "require": "./dist/compositor/index.cjs"
     }
   },
   "files": [

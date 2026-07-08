@@ -30,6 +30,7 @@ const distUrl = (p) => pathToFileURL(resolve(pkgRoot, p)).href;
 
 const { spring, drive, MotionValue } = await import(distUrl('dist/index.js'));
 const utils = await import(distUrl('dist/utils/index.js'));
+const compositor = await import(distUrl('dist/compositor/index.js'));
 
 /** Синхронные дренируемые часы: requestFrame копит cb, drain гоняет их без ts
  *  (→ solver двигается фикс-шагом FIXED_DT_S). Handle ненулевой — drive/MV не
@@ -148,6 +149,54 @@ function row(name, unit, { nsPerOp, opsPerSec, sink }) {
   row('utils.interpolate 5-стоп запрос', 'запрос', r);
 }
 
+// ── F. compositor: холодная компиляция пружина → linear() (uncached) ──
+// Изолированный кэш ёмкости 1 + чередование двух пружин → КАЖДЫЙ вызов промах
+// (одна вытесняет другую), измеряется реальная стоимость компиляции (сетка+RDP).
+{
+  const springsF = [
+    { mass: 1, stiffness: 170, damping: 26 },
+    { mass: 1, stiffness: 180, damping: 8 },
+  ];
+  const c = compositor.createSpringLinearCache(1);
+  const r = measure((i) => c.compile(springsF[i & 1]).length, { iters: 20000, samples: 7 });
+  row('compositor.compileSpringLinear COLD (сетка+RDP)', 'компиляция', r);
+}
+
+// ── G. compositor: попадание в кэш (zero-alloc hot-path) ──
+{
+  const c = compositor.createSpringLinearCache(8);
+  const sG = { mass: 1, stiffness: 170, damping: 26 };
+  c.compile(sG); // прогрев
+  const r = measure(() => c.compile(sG).length, { iters: 200000, samples: 9 });
+  row('compositor.compileSpringLinear HIT (кэш)', 'попадание', r);
+}
+
+// ── H. compositor: readCompositorSpring — O(1) чтение (механизм хендоффа) ──
+{
+  const sH = { mass: 1, stiffness: 170, damping: 26 };
+  const r = measure(
+    (i) => compositor.readCompositorSpring(sH, { from: 0, to: 100, v0: 0, t: (i % 120) * (1 / 60) }).value,
+    { iters: 200000, samples: 9 },
+  );
+  row('compositor.readCompositorSpring O(1) read', 'чтение', r);
+}
+
+// ── Справка: число узлов linear() и hit-rate типового stagger ──
+const NODE_SPRINGS = {
+  'critical (k170 c26)': { mass: 1, stiffness: 170, damping: 26 },
+  'bouncy   (k180 c8)': { mass: 1, stiffness: 180, damping: 8 },
+  'over     (k100 c40)': { mass: 1, stiffness: 100, damping: 40 },
+};
+const nodeCounts = Object.fromEntries(
+  Object.entries(NODE_SPRINGS).map(([name, s]) => [
+    name,
+    compositor.compileSpringLinear(s).split(',').length,
+  ]),
+);
+// Типовой stagger: N элементов делят ОДНУ пружину → 1 компиляция + (N−1) попаданий.
+const STAGGER_N = 50;
+const staggerHitRate = ((STAGGER_N - 1) / STAGGER_N) * 100;
+
 // ── Печать ──
 const fmt = (n) => (n >= 1e6 ? (n / 1e6).toFixed(2) + 'M' : n >= 1e3 ? (n / 1e3).toFixed(1) + 'k' : n.toFixed(0));
 console.log('\nlab-motion bench — горячие пути против dist (медиана по сэмплам)\n');
@@ -156,5 +205,19 @@ console.log('  ' + '-'.repeat(72));
 for (const { name, nsPerOp, opsPerSec } of results) {
   console.log('  ' + name.padEnd(48) + fmt(nsPerOp).padStart(12) + fmt(opsPerSec).padStart(14));
 }
+// ── Справка compositor: узлы linear() (адаптив) + hit-rate stagger ──
+console.log('\ncompositor: число стопов linear() (адаптив, tol=default 0.25px@100px)');
+console.log('  ' + '-'.repeat(48));
+for (const [name, count] of Object.entries(nodeCounts)) {
+  console.log('  ' + name.padEnd(24) + String(count).padStart(6) + ' стопов');
+}
+console.log(
+  `  фикс-генераторы индустрии: ~40–100 стопов вне зависимости от кривой.`,
+);
+console.log(
+  `  hit-rate типового stagger (${STAGGER_N} элементов, 1 пружина): ${staggerHitRate.toFixed(0)}% ` +
+    `(1 компиляция + ${STAGGER_N - 1} попаданий).`,
+);
+
 // checksum печатается → sink-аккумуляторы всех замеров живые (анти-DCE)
 console.log(`\n  (sink-checksum ${Number.isFinite(sinkChecksum) ? 'ok' : 'NaN'})\n`);
