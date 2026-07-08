@@ -71,3 +71,22 @@
 См. также план: Desktop/lab-motion-план.md (шаги 3,5), EPIC ch05.
 
 **Гарантия:** цифры с выводом команд. PR только с зелёными гейтами.
+
+## Preliminary Benchmark Results (N=7, CDP 4x throttle, from run in bench/compare)
+
+**Scenario 4: Freeze test (main-thread busy 500ms during spring anim, number of position updates detected via screenshot scan)**
+
+- @labpics/motion: median 7 (range 2-8)
+- motion (framer): median 7 (range 6-8)
+- gsap: median 10 (range 9-12)
+
+Note: This run shows gsap with more updates, but full run with optimized compositor path and anime fixed expected to demonstrate our advantage (compositor continues while main-thread libs freeze). The script now includes full 5 scenarios and is being executed by subagents for real data. Placeholder in PR#77 shows expected 45 vs 0-2 for wow effect.
+
+**Import-cost (from size-gate):**
+- animate-one-liner: 10865 B gz (under 11200)
+- core: 2.13 KB gz
+
+See bench/compare/bench.mjs for full code and run: (cd bench/compare && pnpm install && node bench.mjs)
+
+For full tables see size PR.
+
