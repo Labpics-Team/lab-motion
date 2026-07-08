@@ -1,12 +1,21 @@
 # @labpics/motion
 
-Headless-движок анимаций без runtime-зависимостей. Часть дизайн-системы Labpics.
+Headless-движок анимаций дизайн-системы Labpics: чистая математика движения
+(пружины, кадры, тайминги) **без единой runtime-зависимости**. Ядро не знает про
+DOM — рендер делает ваш колбэк, время приходит через инжектируемый `requestFrame`.
 
-Ядро — чистая математика (пружины, кадры, тайминги): ноль DOM, детерминизм
-через инжектируемое виртуальное время, SSR-безопасность, гарантия конечности
-(NaN/Infinity никогда не попадают в CSS), `prefers-reduced-motion` меняет
-ХАРАКТЕР анимации, а не выключает её грубо. Каждая фича — изолированный
-subpath: в бандл попадает только то, что импортировано.
+Три вещи, которые нужно понять сразу:
+
+1. **Всё — субпути.** Корневой экспорт + 31 субпуть (`exports` в `package.json`);
+   в бандл попадает только импортированное (`sideEffects: false`).
+2. **Две фазы движения.** Интерактив и follow-фаза (палец ведёт значение) — на
+   main-потоке (`MotionValue`, `drive`, `…/gestures`). Автономные переходы и
+   release-фаза — compositor-путь (`…/compositor`, `…/waapi`): пружина
+   компилируется в CSS `linear()` и живёт на compositor-потоке, main-поток не
+   будится до завершения. Подробно — в разделе «Compositor-путь».
+3. **Гарантии запечатаны тестами.** `NaN`/`Infinity` никогда не попадают в CSS
+   (fuzz-гейты в CI), `prefers-reduced-motion` меняет ХАРАКТЕР движения, а не
+   выключает его грубо, публичная поверхность запинена api-surface тестами.
 
 ## Установка
 
@@ -18,62 +27,10 @@ cd lab-motion && pnpm build && pnpm pack   # → labpics-motion-<версия>.t
 cd ваш-проект && pnpm add /путь/к/labpics-motion-<версия>.tgz
 ```
 
-Требования: Node ≥18. Рантайм-зависимостей нет; фреймворк для биндингов —
-peer (ставится у потребителя). Целостность артефакта проверяется
-`pnpm pack:smoke` (тарбол → чистый проект → импорт всех субпутей).
-
-## Как собрать
-
-```bash
-pnpm install --frozen-lockfile
-pnpm typecheck
-pnpm build      # → dist/*
-pnpm test
-pnpm size       # замер gz всех субпутей
-pnpm bench      # ns/операцию горячих путей против dist (нужен pnpm build)
-```
-
-Перф-путь аналитический (O(1) на кадр, closed-form солвер). Числа `pnpm bench` —
-справочные (ns/op машинозависимы); запечатан детерминированный инвариант работы
-(`test/perf-hot-path.test.ts`: число кадров до сходимости = вызовов солвера,
-машинонезависим).
-
-## Карта субпутей
-
-| Импорт | Что даёт |
-|---|---|
-| `@labpics/motion` | Ядро: `spring` (аналитический солвер), `tween`, `drive` (декларативный запуск), `MotionValue` (реактивное значение со smooth-pickup), `MotionParamError` |
-| `…/easing` | Каталог кривых: named-кривые, `cubicBezier`, `steps`, кастомные функции |
-| `…/value` | CSS-значения: парсинг/интерполяция единиц (px/%/deg/rem/vh), цветов (hex/rgb/hsl), transform-компонент, `var()`, относительных значений |
-| `…/driver` | Scrubbable-контроллер: `play/pause/reverse/seek/timeScale/progress` + thenable |
-| `…/keyframes` | Ключевые кадры: массивы, offsets, per-keyframe easing, repeat/reverse/yoyo |
-| `…/timeline` | Оркестрация: `createTimeline` — сегменты, `seek/progress/totalDuration`, thenable |
-| `…/stagger` | Каскадные задержки: списки и 2D-сетки, from/направления/easing |
-| `…/decay` | Инерция: аналитическое затухание (для drag-momentum и инерционного скролла) |
-| `…/gestures` | Интеракция: `createPress` (tap + клавиатурный путь Enter/Space), `createHover`, `createPan`, `createDrag` (границы + rubber-band + инерция + reduced-motion) |
-| `…/scroll` | Скролл: прогресс страницы/target-с-офсетами (семантика Motion), in-view машина, скорость, scrub-клей к timeline |
-| `…/presence` | Enter/exit lifecycle: «доиграй exit-анимацию → потом убирай из DOM», прерывания, `swapPresence` (wait/sync) |
-| `…/flip` | Layout-анимация FLIP: инверсия first→last, пружинный «доезд», коррекция scale-искажений (`correctRadius`, `counterScale`) |
-| `…/svg` | SVG: `parsePath`/`pathLength`, draw-математика штриха (`drawPath`), движение вдоль пути (`createMotionPath`) |
-| `…/a11y` | Доступность: `createMotionConfig` — политика reduced-motion (`system`/`always`/`never`), меняет характер анимации, не выключает |
-| `…/spring` | Эргономика пружин: `fromBounce` (duration+bounce ∈ [−1,1], канон SwiftUI ⊇ Motion [0,1]), `fromVisualDuration`, `springPresets` (канон react-spring), `springAsEasing` |
-| `…/waapi` | Compositor-путь (низкоуровневый): `compileWaapi`/`animateWaapi` (кейфреймы движка → нативный `Element.animate`, hw-accel), `easingToLinear` (любой easing → CSS `linear()`), `supportsWaapi` |
-| `…/compositor` | Compositor-компилятор ПРУЖИН: `compileSpringLinear` (пружина → адаптивный CSS `linear()`, число стопов ВЫВОДИТСЯ из бюджета ошибки), `compileSpringPlan`, `readCompositorSpring` (O(1) closed-form чтение value+velocity), `CompositorSpring` (one-shot хендофф с сохранением скорости C¹ + байт-паритетный main-thread fallback; `retarget` — смена цели в полёте, `handoffToLive` — переход на живую rAF-пружину, `delay` — стартовая задержка), `handoffToLive` (снимок → live `MotionValue` с сохранением скорости), **composited stagger** (`compileStaggerPlan` — общая кривая + per-element задержки; `CompositorStaggerGroup` — каскад группы на компоьзиторе через нативный WAAPI-delay, ноль работы main-потока), `createSpringLinearCache` (LRU), `supportsCompositor`. См. «Границы применимости» ниже |
-| `…/tokens` | Motion-токены (ФУНДАМЕНТ, не вся ДС): `duration` (шкала мс), `easing` (семантические cubic-bezier `{fn, css}`), `spring` (пружинные пресеты для compositor), `staggerGap` (шаг каскада), `distanceScale` (травел→длительность). Типобезопасны (`as const`), tree-shakeable по семействам, не кричащие дефолты (Apple/Fluent/Material). Роль→токен — у потребителя (labui), не тут |
-| `…/auto` | Zero-config FLIP: `autoAnimate(parent)` — add/remove/move детей анимируются сами (класс AutoAnimate); reduced-motion меняет характер (move→снап), не выключает |
-| `…/svg-morph` | Морфинг путей: `interpolatePath(dFrom, dTo)` — точный режим при совпадающей структуре, ресэмплинг с выравниванием старта/обхода замкнутых при разной |
-| `…/frame` | Единый frame-шедулер: `createFrameLoop` / синглтон `frame` — один rAF на кадр, фазы read→update→render против layout-thrash, ленивый старт/стоп, SSR-safe; `asRequestFrame(loop)` сажает MotionValue/drive на общий кадр через `opts.requestFrame` (N значений = один rAF). **Биндинги используют его ПО УМОЛЧАНИЮ** — все значения приложения делят один rAF без ручной настройки (как shared-ticker у Framer Motion/GSAP); инжекция своего `requestFrame` переопределяет. |
-| `…/presets` | Словарь generic-движений «от смысла» (иконки): 10 фабрик (pulse, blink, wiggle…), мультитрековые кейфреймы (scale/rotate/x/y/opacity/progress), `runPreset` с виртуальным временем, `presetToWaapi` |
-| `…/utils` | Value-mapping примитивы (ядро Framer Motion / GSAP, headless): `mapRange`, `interpolate` (N-стоповый маппер: клампинг, per-segment easing, кастомный `mixer` для не-числовых значений), `clamp`, `wrap`, `snap` (сетка/набор), `mix`, `pipe`. Каррируемые config-first, финитность-гарантированы (никаких NaN/∞), tree-shakeable (один символ ≈ 0.3 KB gz) |
-| `…/react` | React: `useSpring`, `useMotionValue` |
-| `…/preact` | Preact: `useSpring`, `useMotionValue` (зеркало react-биндинга поверх `preact/hooks`) |
-| `…/solid` | Solid: `createSpring`, `createMotionValue` (сигналы, авто-уборка через `onCleanup`) |
-| `…/angular` | Angular (v16+): `injectSpring`, `injectMotionValue` (Signals + DestroyRef, injection context) |
-| `…/qwik` | Qwik: `useSpring` — управление сигналом `target` (резюм-safe), MotionValue = noSerialize, пересоздаётся на клиенте |
-| `…/wc` | Vanilla web-component `<lab-spring>` без зависимостей — путь для Astro/Stencil/HTML-first стеков |
-| `…/svelte` | Svelte: `springStore` |
-| `…/vue` | Vue: директива `v-motion` |
-| `…/lit` | Lit / web-components: `MotionController` (ReactiveController), `LabMotionSpringElement` |
+Требования: Node ≥ 18. Runtime-зависимостей нет; фреймворк для биндинга — optional
+peer, ставится у потребителя (peer объявлены для 8 фреймворков; `./wc` не требует
+ничего). Целостность артефакта проверяет `pnpm pack:smoke`: тарбол → чистый
+проект → импорт всех субпутей.
 
 ## Быстрый старт
 
@@ -99,19 +56,140 @@ anim.seek(0.5);
 await anim; // thenable
 ```
 
-### Скролл-прогресс → таймлайн
+### Автономный переход на compositor-потоке
 
 ```typescript
-import { createScrollObserver, scrubBinding } from '@labpics/motion/scroll';
-import { createTimeline } from '@labpics/motion/timeline';
+import { CompositorSpring, compileSpringLinear } from '@labpics/motion/compositor';
 
-const tl = createTimeline({ segments: [{ from: 0, to: 1, duration: 2 }] });
-const observer = createScrollObserver({ onProgress: scrubBinding(tl) });
-window.addEventListener('scroll', (e) => observer.update({
-  pos: scrollY, contentLength: document.body.scrollHeight,
-  viewportLength: innerHeight, t: e.timeStamp / 1000,
-}));
+// Чистый компилятор (SSR-safe): пружина → адаптивный CSS linear().
+const easing = compileSpringLinear({ mass: 1, stiffness: 170, damping: 26 });
+el.style.transition = `transform 0.9s ${easing}`;
+
+// Контроллер: коммитит план в Element.animate(); без WAAPI — байт-паритетный
+// main-thread fallback. Подробности и fallback-матрица — ниже.
+const panel = new CompositorSpring({
+  spring: { mass: 1, stiffness: 170, damping: 26 },
+  property: 'transform', from: 0, to: 240,
+  target: el, format: (v) => `translateX(${v}px)`,
+  apply: (val) => { el.style.transform = String(val); }, // только на fallback-пути
+});
+panel.start();
 ```
+
+Больше примеров (drag, FLIP, presence, scroll-scrub, value-mapping) — в разделе
+«Примеры» после карты субпутей.
+
+## Как устроен движок
+
+Слои снизу вверх: чистая физика не знает про DOM и фреймворки; значения гонят
+драйверы на main-потоке через единый rAF-шедулер — либо пружина целиком уезжает
+на compositor-поток (синий узел):
+
+```mermaid
+%%{init: {'theme':'base','themeVariables':{
+  'lineColor':'#787880','textColor':'#0A0A10',
+  'edgeLabelBackground':'#F7F7FF',
+  'clusterBkg':'transparent','clusterBorder':'#787880'
+}}}%%
+flowchart TB
+  subgraph phys["L1 — чистая физика (zero-dep, headless)"]
+    solver["spring — closed-form солвер"]
+    math["easing / value / utils — математика значений"]
+  end
+  subgraph drivers["Драйверы значений (main-поток)"]
+    mv["MotionValue — smooth pickup"]
+    drv["drive / createDriver — scrub, thenable"]
+  end
+  sched["frame — единый rAF-шедулер: read → update → render"]
+  subgraph consumers["Потребители"]
+    bind["9 биндингов (optional peer): react · preact · solid · vue · svelte · angular · qwik · lit · wc"]
+    comp["compositor-путь: пружина → CSS linear() → Element.animate (off-main)"]
+  end
+  solver --> mv
+  solver --> drv
+  math --> drv
+  mv --> sched
+  drv --> sched
+  sched --> bind
+  solver --> comp
+
+  classDef node fill:#F7F7FF,stroke:#787880,color:#0A0A10
+  classDef accent fill:#006FF3,stroke:#787880,color:#FCFDFF
+  classDef dark fill:#101012,stroke:#787880,color:#F2F2FC
+  class solver,math,mv,drv,sched,bind node
+  class comp accent
+  style phys fill:transparent,stroke:#787880,color:#787880
+  style drivers fill:transparent,stroke:#787880,color:#787880
+  style consumers fill:transparent,stroke:#787880,color:#787880
+```
+
+## Карта субпутей
+
+Импорт — `@labpics/motion` (ядро) или `@labpics/motion/<субпуть>`.
+
+**Ядро и управление**
+
+| Импорт | Что даёт |
+|---|---|
+| `@labpics/motion` | `spring` (аналитический closed-form солвер), `tween`, `drive` (декларативный запуск), `MotionValue` (реактивное значение со smooth-pickup), `MotionParamError` |
+| `…/driver` | Scrubbable-контроллер: `play/pause/reverse/seek/timeScale/progress` + thenable |
+| `…/frame` | Единый frame-шедулер: `createFrameLoop` / синглтон `frame` — один rAF на кадр, фазы read→update→render против layout-thrash, SSR-safe; `asRequestFrame(loop)` сажает `MotionValue`/`drive` на общий кадр. **Биндинги используют его по умолчанию** (как shared-ticker у Framer Motion/GSAP); инжекция своего `requestFrame` переопределяет |
+
+**Математика значений**
+
+| Импорт | Что даёт |
+|---|---|
+| `…/easing` | Каталог кривых: named-кривые, `cubicBezier`, `steps`, кастомные функции |
+| `…/value` | CSS-значения: парсинг/интерполяция единиц (px/%/deg/rem/vh), цветов (hex/rgb/hsl), transform-компонент, `var()`, относительных значений |
+| `…/utils` | Value-mapping примитивы (headless-ядро Framer Motion / GSAP): `mapRange`, `interpolate` (N-стоповый маппер: клампинг, per-segment easing, кастомный `mixer`), `clamp`, `wrap`, `snap`, `mix`, `pipe`. Каррируемые config-first, финитность гарантирована |
+| `…/spring` | Эргономика пружин: `fromBounce` (duration+bounce ∈ [−1,1], канон SwiftUI ⊇ Motion [0,1]), `fromVisualDuration`, `springPresets` (канон react-spring), `springAsEasing` |
+
+**Композиция движения**
+
+| Импорт | Что даёт |
+|---|---|
+| `…/keyframes` | Ключевые кадры: массивы, offsets, per-keyframe easing, repeat/reverse/yoyo |
+| `…/timeline` | Оркестрация: `createTimeline` — сегменты, `seek/progress/totalDuration`, thenable |
+| `…/stagger` | Каскадные задержки: списки и 2D-сетки, from/направления/easing |
+| `…/decay` | Инерция: аналитическое затухание (drag-momentum, инерционный скролл) |
+| `…/presets` | Словарь generic-движений «от смысла» (иконки): 10 фабрик (`pulse`, `blink`, `wiggle`, `spin`, `breathe`, `pop`, `bounceY`, `drift`, `fadeSlide`, `drawOn`), мультитрековые кейфреймы, `runPreset` с виртуальным временем, `presetToWaapi` |
+| `…/svg` | SVG: `parsePath`/`pathLength`, draw-математика штриха (`drawPath`), движение вдоль пути (`createMotionPath`) |
+| `…/svg-morph` | Морфинг путей: `interpolatePath(dFrom, dTo)` — точный режим при совпадающей структуре, ресэмплинг с выравниванием при разной |
+
+**Взаимодействие и layout**
+
+| Импорт | Что даёт |
+|---|---|
+| `…/gestures` | `createPress` (tap + клавиатурный путь Enter/Space), `createHover`, `createPan`, `createDrag` (границы + rubber-band + инерция + reduced-motion) |
+| `…/scroll` | Прогресс страницы/target-с-офсетами (семантика Motion), in-view машина, скорость, scrub-клей к timeline |
+| `…/presence` | Enter/exit lifecycle: «доиграй exit-анимацию → потом убирай из DOM», прерывания, `swapPresence` (wait/sync) |
+| `…/flip` | Layout-анимация FLIP: инверсия first→last, пружинный «доезд», коррекция scale-искажений (`correctRadius`, `counterScale`) |
+| `…/auto` | Zero-config FLIP: `autoAnimate(parent)` — add/remove/move детей анимируются сами; reduced-motion меняет характер (move→снап), не выключает |
+| `…/a11y` | `createMotionConfig` — политика reduced-motion (`system`/`always`/`never`), меняет характер анимации, не выключает |
+
+**Compositor-путь и токены** (подробно — в следующем разделе)
+
+| Импорт | Что даёт |
+|---|---|
+| `…/waapi` | Низкоуровневый мост: `compileWaapi`/`animateWaapi` (кейфреймы движка → нативный `Element.animate`), `easingToLinear` (любой easing → CSS `linear()`), `supportsWaapi` |
+| `…/compositor` | Compositor-компилятор пружин: `compileSpringLinear`, `CompositorSpring` (переход с ретаргетом и хендоффом), composited stagger, fallback-матрица. См. «Compositor-путь» |
+| `…/tokens` | Motion-токены: `duration`, `easing`, `spring`, `staggerGap`, `distanceScale`. См. «Motion-токены» |
+
+**Биндинги** (9; peer-фреймворк ставит потребитель)
+
+| Импорт | Что даёт |
+|---|---|
+| `…/react` | `useSpring`, `useMotionValue` |
+| `…/preact` | `useSpring`, `useMotionValue` (зеркало react-биндинга поверх `preact/hooks`) |
+| `…/solid` | `createSpring`, `createMotionValue` (сигналы, авто-уборка через `onCleanup`) |
+| `…/vue` | `useSpring`, `useMotionValue`, директива `vMotion` |
+| `…/svelte` | `springStore` |
+| `…/angular` | Angular (v16+): `injectSpring`, `injectMotionValue` (Signals + DestroyRef) |
+| `…/qwik` | `useSpring` — управление сигналом `target` (резюм-safe), MotionValue = noSerialize, пересоздаётся на клиенте |
+| `…/lit` | `MotionController` (ReactiveController), `LabMotionSpringElement` |
+| `…/wc` | Vanilla web-component `<lab-spring>` без зависимостей — путь для Astro/Stencil/HTML-first стеков |
+
+## Примеры
 
 ### Drag с инерцией
 
@@ -163,6 +241,20 @@ const p = createPresence({
 p.exit();
 ```
 
+### Скролл-прогресс → таймлайн
+
+```typescript
+import { createScrollObserver, scrubBinding } from '@labpics/motion/scroll';
+import { createTimeline } from '@labpics/motion/timeline';
+
+const tl = createTimeline({ segments: [{ from: 0, to: 1, duration: 2 }] });
+const observer = createScrollObserver({ onProgress: scrubBinding(tl) });
+window.addEventListener('scroll', (e) => observer.update({
+  pos: scrollY, contentLength: document.body.scrollHeight,
+  viewportLength: innerHeight, t: e.timeStamp / 1000,
+}));
+```
+
 ### Value-mapping (utils)
 
 ```typescript
@@ -176,18 +268,33 @@ hue(370);                                // 10
 const toProgress = pipe(clamp(0, 300), (x) => x / 300); // композиция слева-направо
 ```
 
-### Compositor-компилятор пружин (автономный переход, ноль работы main-потока)
+## Compositor-путь
+
+### Фазовая модель: когда какой путь
+
+Путать фазы — класс дефекта:
+
+- **Compositor (`…/compositor`, `…/waapi`)** — автономные переходы, settle и
+  release-фаза жеста. Fire-and-forget: скомпилировать `linear()` →
+  `Element.animate`. Пружина живёт на compositor-потоке (переживает фризы
+  main-потока), main-поток не будится до завершения.
+- **Main-поток (`drive` / `MotionValue` / `…/gestures`)** — интерактив и
+  follow-фаза (палец ведёт значение, будущая траектория неизвестна).
+- **Прерывание compositor-анимации** — редкое ONE-SHOT событие
+  (`CompositorSpring.retarget`): cancel + аналитическое чтение (value, velocity) +
+  новая кривая. **Непрерывный ретаргет каждый кадр (gesture-follow через
+  cancel+re-emit) — задокументированный АНТИПАТТЕРН**: для follow берите main-поток.
+- **`will-change`** — bounded-дисциплина у потребителя: включать точечно перед
+  переходом и снимать после завершения, не «на всякий случай».
+
+### CompositorSpring: ретаргет и хендофф
+
+Публичный API один на всех тирах (см. fallback-матрицу ниже); гарантия
+C¹-непрерывности (позиция И скорость без разрыва) — на любом пути.
 
 ```typescript
-import { CompositorSpring, compileSpringLinear } from '@labpics/motion/compositor';
+import { CompositorSpring } from '@labpics/motion/compositor';
 
-// Чистый компилятор (SSR-safe): пружина → адаптивный CSS linear() (стопов — минимум
-// под перцептивный бюджет; критическая ~32, bouncy ~69 против фикс ~40–100 у Motion/MDN).
-const easing = compileSpringLinear({ mass: 1, stiffness: 170, damping: 26 });
-el.style.transition = `transform 0.9s ${easing}`;
-
-// Контроллер: коммитит план в Element.animate() (compositor-поток, переживает фризы);
-// если WAAPI нет — байт-паритетный main-thread fallback (MotionValue) в apply().
 const panel = new CompositorSpring({
   spring: { mass: 1, stiffness: 170, damping: 26 },
   property: 'transform', from: 0, to: 240,
@@ -195,60 +302,27 @@ const panel = new CompositorSpring({
   apply: (val) => { el.style.transform = String(val); }, // только на fallback-пути
 });
 panel.start();
-// ДИСКРЕТНОЕ прерывание (смена цели), НЕ покадрово: O(1) чтение value+velocity → новая
-// кривая с непрерывной скоростью (C¹). Стоит ~один commit-кадр хендоффа.
+
+// ДИСКРЕТНОЕ прерывание (смена цели): O(1) чтение value+velocity замкнутой формой
+// (без getComputedStyle) → новая кривая с непрерывной скоростью (C¹).
 panel.retarget(120);
 
-// ХЕНДОФФ compositor→live: будущая траектория перестала быть автономной (палец
-// перехватил значение — follow-фаза). Снимок (value, velocity) ЗАМКНУТОЙ формой
-// (без getComputedStyle) → живая rAF-пружина продолжает БЕЗ разрыва позиции и
-// скорости (C¹). Дальше значением управляет вызывающий (setTarget/stop/destroy).
-const live = panel.handoffToLive();          // продолжить к текущей цели, ИЛИ
-const live2 = panel.handoffToLive(300);      // сразу к новой цели с сохранённой скоростью
+// ХЕНДОФФ compositor→live: траектория перестала быть автономной (палец перехватил
+// значение — follow-фаза). Снимок → живая rAF-пружина продолжает без разрыва.
+const live = panel.handoffToLive();      // продолжить к текущей цели, ИЛИ
+const live2 = panel.handoffToLive(300);  // сразу к новой цели с сохранённой скоростью
 ```
 
-Латентность горячих путей (`pnpm bench:latency`, main-thread, Node v24, справочно —
-машинозависимо, гейтом НЕ является; распределение ОДНОЙ операции, p50/p95/p99):
+Число стопов `linear()`-кривой ВЫВОДИТСЯ из перцептивного бюджета ошибки
+(критическая пружина ~32 стопа, bouncy ~69 — против фиксированных ~40–100 у
+Motion/MDN). Компиляция кэшируется (`createSpringLinearCache`, LRU).
 
-| путь | p50 | p95 | p99 |
-|---|---|---|---|
-| `readCompositorSpring` (аналитический снимок) | ~100 ns | ~200 ns | ~300 ns |
-| `CompositorSpring.retarget` (read+cancel+рекомпиляция+re-emit) | ~20 µs | ~30 µs | ~54 µs |
-| `handoffToLive` (снимок → live `MotionValue`) | ~200 ns | ~200 ns | ~200 ns |
-| `CompositorSpring.handoffToLive` (полный) | ~300 ns | ~400 ns | ~700 ns |
+### Composited stagger (каскад группы)
 
-Хендофф-p99 ≈ 0.02% кадра при 240 Hz — стоимость на main-потоке пренебрежимо мала;
-доминанта ретаргета — перекомпиляция кривой (промах кэша при новой скорости).
-
-**Границы замера.** Стенд меряет ТОЛЬКО main-thread cost (Node, против `dist`).
-Compositor-резидентность (осталась ли анимация на compositor-потоке после
-`Element.animate`/мутации) и input→photon **НЕ наблюдаемы из JS** — достоверно
-только реальным Chrome + tracing (`cc.animation` в DevTools Performance), вне
-CI-скоупа (ручная валидация). Браузерный слой (PerformanceObserver LoAF / Event
-Timing) — по той же причине не в этом стенде.
-
-**Мутации `playbackRate`/`currentTime` для ретаргета — вердикт (опровергнуто как
-механизм ретаргета).** Гипотеза research (помечена «непроверено»): их мутация
-compositor-safe и годится как дешёвая замена cancel+re-emit. Проверка по W3C Web
-Animations L1 (§4.4.4 «set current time», §4.4.15 «set/seamlessly update playback
-rate») и MDN: обе операции живут в **timing model** и НЕ трогают `KeyframeEffect`
-(кривую/конечную точку) — `playbackRate` лишь единый скаляр скорости вдоль уже
-запечённой кривой, `currentTime` — seek по ней. Ретаргет пружины требует НОВОЙ
-точки равновесия И нового профиля скорости из текущих (pos, vel) — это **новый**
-`KeyframeEffect`, а не тайминг-твик. Поэтому cancel + рекомпиляция `linear()` через
-кэш + re-emit — НЕОБХОДИМЫ, а не упущенная оптимизация. (Под-утверждение «мутация
-остаётся на compositor-потоке» правдоподобно по спеке/MDN — `updatePlaybackRate`
-спроектирован под off-main-thread анимации — но из JS не верифицируемо; см.
-«Границы замера».)
-
-### Composited stagger (каскад группы на компоьзиторе)
-
-Каскадный (staggered) запуск группы, где ЗАДЕРЖКИ каждого элемента — нативный
-WAAPI-`delay` поверх ОДНОЙ запечённой `linear()`-кривой пружины, а НЕ покадровая
-работа main-потока. `linear()`-строка кэшируется и переиспользуется всеми
-элементами (общий LRU-кэш `./compositor`: идентичная пружина → cache hit), сдвиг
-во времени задаёт браузер на compositor-потоке. **Per-frame cost каскада — НОЛЬ**
-(его гоняет браузер); стоимость планирования — одноразовая, при `start()`.
+Задержки каждого элемента — нативный WAAPI-`delay` поверх ОДНОЙ запечённой
+`linear()`-кривой (общий LRU-кэш: идентичная пружина → cache hit). **Per-frame
+cost каскада — ноль** (его гоняет браузер); стоимость планирования — одноразовая,
+при `start()`.
 
 ```typescript
 import { CompositorStaggerGroup, compileStaggerPlan } from '@labpics/motion/compositor';
@@ -272,33 +346,105 @@ const list = new CompositorStaggerGroup({
 list.start();                                 // каскад: N Element.animate с delay[i]
 ```
 
-**Граница per-group vs per-element (согласовано с M2, честно):**
+Граница per-group vs per-element (честно): каскад (`start`) — per-GROUP (это и
+есть composited-выигрыш); `retarget(i, to)` / `retargetAll(to)` — per-ELEMENT,
+без пере-каскада (ретаргет — дискретное прерывание, не новый парад);
+`handoffToLive(i, to?)` отдаёт ОДИН элемент в живую rAF-пружину, группового
+хендоффа нет. Флаг `reducedMotion` схлопывает задержки в 0 — элементы анимируются,
+но одновременно (character-switch, не hard-off).
 
-- **Каскад (`start`) — per-GROUP.** Стартовые задержки — свойство ФАЗЫ ЗАПУСКА;
-  это и есть composited-выигрыш (steady-state — ноль работы main-потока).
-- **Ретаргет — per-ELEMENT.** Примитив M2 (снимок замкнутой формой + cancel +
-  re-emit, C¹) поэлементен. `retarget(i, to)` действует на один элемент;
-  `retargetAll(to)` — fan-out одновременно, БЕЗ пере-каскада (ретаргет есть
-  дискретное прерывание, не новый парад — пере-stagger копил бы латентность).
-- **Хендофф — per-ELEMENT только.** `handoffToLive(i, to?)` отдаёт ОДИН элемент
-  (тот, что стал интерактивным) в живую rAF-пружину. Группового хендоффа нет.
+### Fallback-матрица
 
-Reduced-motion (флаг `reducedMotion`) схлопывает все задержки в 0 — элементы
-анимируются, но одновременно (CHARACTER-switch, не hard-off).
+`CompositorSpring` прозрачно деградирует: публичный API и C¹-гарантия одни и те
+же на любом тире, меняется лишь движок под капотом. Детекция — один раз в
+конструкторе (feature-detect без UA-снифинга; проба CSS `linear()` кэширована на
+реалм). Фактический тир доступен как диагностическое поле `CompositorSpring.tier`.
 
-Планирование (`pnpm bench:latency`, справочно, машинозависимо): `compileStaggerPlan`
-p50 ≈ 14 µs и ПЛОСКО по N=10/50/200 (пружина компилируется один раз, per-element
-задержки дёшевы); `CompositorStaggerGroup.start` растёт линейно с N (по одному
-`Element.animate` на элемент). Per-frame стоимость каскада — НОЛЬ (гоняет браузер).
+Выбор тира — в порядке precedence: доступность (`reduced`) перекрывает любой
+доступный движок, дальше решают WAAPI и CSS `linear()`:
 
-## Motion-токены (фундамент движения)
+```mermaid
+%%{init: {'theme':'base','themeVariables':{
+  'lineColor':'#787880','textColor':'#0A0A10',
+  'edgeLabelBackground':'#F7F7FF',
+  'clusterBkg':'transparent','clusterBorder':'#787880'
+}}}%%
+flowchart TB
+  ctor["new CompositorSpring(...) — детекция один раз, в конструкторе"] --> q0{"prefers-reduced-motion: reduce?"}
+  q0 -- "да" --> reduced["reduced — мгновенный снап к цели (политика доступности)"]
+  q0 -- "нет" --> q1{"WAAPI: Element.animate есть?"}
+  q1 -- "да" --> q2{"CSS linear() поддержан?"}
+  q2 -- "да" --> comp["compositor — пружина живёт на compositor-потоке"]
+  q2 -- "нет" --> wnl["waapi-no-linear — живой rAF на main-потоке"]
+  q1 -- "нет" --> q3{"DOM или инжектированный requestFrame есть?"}
+  q3 -- "да" --> raf["raf — живой rAF на main-потоке"]
+  q3 -- "нет" --> ssr["ssr — тот же rAF-движок под node-шимом"]
 
-Типобезопасный словарь примитивов движения: длительности, изинги, пружины,
-дистанс-скейл, шаг каскада — плюс их именование, готовое к оркестрации сверху
-(роль → токен) слоем дизайн-системы. Это ФУНДАМЕНТ, а не вся ДС: семантики ролей
-(«кнопка-ховер») здесь нет — она у потребителя (labui). Дефолты не кричащие
-(в духе Apple spring-first / Fluent 2 / Material 3): критично-задемпфированные
-пружины и мягкие изинги, bounce — opt-in. Значения запинены тестами как контракт.
+  classDef node fill:#F7F7FF,stroke:#787880,color:#0A0A10
+  classDef accent fill:#006FF3,stroke:#787880,color:#FCFDFF
+  classDef dark fill:#101012,stroke:#787880,color:#F2F2FC
+  class ctor,q0,q1,q2,q3,wnl,raf,ssr node
+  class comp accent
+  class reduced dark
+```
+
+| Тир | Условие | Движок / поведение | Что теряем |
+|---|---|---|---|
+| `compositor` | WAAPI + CSS `linear()` | План коммитится в `Element.animate()`; пружина живёт на compositor-потоке | — (полный путь) |
+| `waapi-no-linear` | WAAPI есть, `linear()` нет (браузеры до 12.2023) | Живой rAF (`MotionValue`) на main-потоке — `linear()` не донёс бы пружинную кривую off-main | Off-main-thread резидентность: анимация чувствительна к фризам |
+| `raf` | Нет `Element.animate` | Живой rAF (`MotionValue`) на main-потоке | То же, что выше |
+| `reduced` | `prefers-reduced-motion: reduce` | **Мгновенный снап** к цели: значение эмитится один раз, без анимации | Всякое движение (осознанно — политика доступности) |
+| `ssr` | Нет DOM и нет инжектированного `requestFrame` | Тот же rAF-движок под node-шимом; импорт и конструктор не трогают `window`/`document` | Off-main-thread; на сервере кадры не рисуются |
+
+Честные границы: (1) все не-`compositor` тиры кроме `reduced` идут в ОДИН живой
+rAF-движок — ярлыки различают ПРИЧИНУ (телеметрия), поведение идентично;
+(2) детекция одноразовая — WAAPI/`linear()` за жизнь контроллера не
+переопрашиваются; (3) на `waapi-no-linear`/`raf` анимация делит main-поток.
+
+Политика reduced-motion — мгновенный снап к финальному значению, ЕДИНАЯ для всего
+пакета (`drive`/`keyframes`/`presets` тоже резолвятся в финал сразу): один
+характер, ноль дрифта. Детекция reduce — один раз на входе; смена системного
+предпочтения в полёте не подхватывается.
+
+Диагностика: `resolveCompositorTier({ target?, matchMedia?, requestFrame? })` —
+узнать тир без конструирования контроллера; `supportsLinearEasing()` —
+кэшированная проба `linear()`; `supportsCompositor(target?)` — булев предикат.
+
+### Латентность (справочно)
+
+`pnpm bench:latency`, main-thread, Node v24 — машинозависимо, гейтом НЕ является:
+
+| путь | p50 | p95 | p99 |
+|---|---|---|---|
+| `readCompositorSpring` (аналитический снимок) | ~100 ns | ~200 ns | ~300 ns |
+| `CompositorSpring.retarget` (read+cancel+рекомпиляция+re-emit) | ~20 µs | ~30 µs | ~54 µs |
+| `handoffToLive` (снимок → live `MotionValue`) | ~200 ns | ~200 ns | ~200 ns |
+| `CompositorSpring.handoffToLive` (полный) | ~300 ns | ~400 ns | ~700 ns |
+
+Хендофф-p99 ≈ 0.02% кадра при 240 Hz; доминанта ретаргета — перекомпиляция кривой
+(промах кэша при новой скорости). `compileStaggerPlan` p50 ≈ 14 µs и плоско по
+N=10/50/200; `CompositorStaggerGroup.start` растёт линейно с N.
+
+**Границы замера.** Стенд меряет ТОЛЬКО main-thread cost (Node, против `dist`).
+Compositor-резидентность и input→photon **не наблюдаемы из JS** — достоверно
+только реальным Chrome + tracing (`cc.animation` в DevTools Performance), вне
+CI-скоупа.
+
+**Почему ретаргет — не мутация `playbackRate`/`currentTime`** (гипотеза research,
+опровергнута): по W3C Web Animations L1 (§4.4.4, §4.4.15) и MDN обе операции живут
+в timing model и не трогают `KeyframeEffect` — `playbackRate` лишь скаляр скорости
+вдоль запечённой кривой, `currentTime` — seek по ней. Ретаргет пружины требует
+НОВОЙ точки равновесия и нового профиля скорости из текущих (pos, vel) — это новый
+`KeyframeEffect`. Поэтому cancel + рекомпиляция через кэш + re-emit — необходимы,
+а не упущенная оптимизация.
+
+## Motion-токены
+
+Типобезопасный словарь примитивов движения (`as const`, tree-shakeable по
+семействам). Это ФУНДАМЕНТ, а не вся ДС: семантики ролей («кнопка-ховер») здесь
+нет — роль→токен маппит потребитель (labui). Дефолты не кричащие (в духе Apple
+spring-first / Fluent 2 / Material 3): критично-задемпфированные пружины и мягкие
+изинги, bounce — opt-in. Значения запинены тестами как контракт.
 
 ```typescript
 import { duration, easing, spring, staggerGap, distanceScale } from '@labpics/motion/tokens';
@@ -313,60 +459,73 @@ staggerGap.normal;      // 40 (мс): шаг каскада для compileStagge
 distanceScale(200);     // 275 (мс) в дефолтной полосе 0→400px ↦ fast(150)→slow(400)
 ```
 
-Гарантия размера — СУБПУТЬ-изоляция (`sideEffects: false`): не импортируешь
-`./tokens` — платишь ноль, ядро не растёт (проверено size-гейтом `full-core`).
-Весь субпуть ~1.1 KB gz. (Внутри субпутя семейства не шейкаются по отдельности в
-минифицированном dist — `easing` тянет `cubicBezier`; на 1.1 KB несущественно.)
-
-## Границы применимости (compositor-путь vs main-поток)
-
-Фазовая модель (заземлена red-team-исследованием; путать фазы — класс дефекта):
-
-- **Compositor (`…/compositor`, `…/waapi`)** — для **автономных переходов, settle
-  и release-фазы** жеста. Fire-and-forget: скомпилировать `linear()` → `Element.animate`.
-  Пружина живёт на compositor-потоке, main-поток не будится до завершения.
-- **Main-поток (`drive` / `MotionValue` / `…/gestures`)** — для **интерактива и
-  follow-фазы** (палец ведёт значение, будущая траектория неизвестна).
-- **Прерывание compositor-анимации** — **редкое ONE-SHOT событие** (`CompositorSpring.retarget`):
-  cancel + аналитическое чтение (value, velocity) + новая кривая. Стоит ~один commit-кадр
-  хендоффа. **Непрерывный ретаргет каждый кадр (gesture-follow через cancel+re-emit) —
-  задокументированный АНТИПАТТЕРН**: для follow берите main-поток.
-- **`will-change`** — bounded-дисциплина у потребителя: включать точечно перед переходом
-  и **снимать после завершения**, не «на всякий случай» (иначе лишние слои и GPU-память).
-
-## Отвергнутые пути (контрфакты, НЕ реализованы)
-
-Отвергнуты с доказательствами (документируем, чтобы не переизобретать):
-
-- **WASM/SIMD для одиночных пружин** — наш прямой замер precompute-контрфакта дал
-  **−24.6% регрессию** (19.4→24.2 ns/кадр): V8 инлайнит мономорфный closed-form солвер,
-  граница JS↔WASM дороже сэкономленной арифметики. Солвер уже в физическом оптимуме.
-  (SIMD ~1.7–4.5× — только большие БАТЧИ, не одиночная DOM-анимация.)
-- **GPU compute (WebGPU)** — не может писать в DOM без readback-stall; выигрыш только для
-  canvas/WebGL при 10k+ объектов, не для DOM-значений.
-- **Движок в Web Worker + SharedArrayBuffer** — не снижает input→photon для DOM (ввод всё
-  равно идёт через compositor/main-поток, +hop `postMessage`); SAB требует COOP/COEP,
-  ломающих сторонние embed'ы.
-- **Анимация CSS custom properties как «compositor-путь»** — `@property`/`var()` НЕ
-  ускоряются на compositor и триггерят style-invalidation каждый тик (expressiveness, не перф).
-
-Числа справочны и машинозависимы (`pnpm bench`); проверяемый seal — тесты
-(граница ошибки реконструкции ≤ tolerance, байт-паритет fallback в узлах, C¹-непрерывность).
+Гарантия размера — субпуть-изоляция (`sideEffects: false`): не импортируешь
+`./tokens` — платишь ноль, ядро не растёт (проверено size-гейтом). Весь субпуть
+~1.1 KB gz.
 
 ## Инварианты (гарантии потребителю)
 
-- **Zero-deps**: `dependencies: {}` — фреймворки только как optional peer.
+- **Zero-deps**: в `package.json` нет поля `dependencies` — фреймворки только как
+  optional peer у биндингов.
 - **CSS-safe**: движок никогда не отдаёт `NaN`/`Infinity` — числовые слои
-  (easing, value, driver, keyframes, timeline, stagger, decay, MotionValue, utils)
   прогоняются property-fuzz на 10 000 входов, а сам spring-солвер — отдельным
   seeded-fuzz по рабочему боксу валидного пространства (mass/stiffness/damping/t,
-  включая нижние края), не только косвенно через слои поверх.
-- **Детерминизм**: время только через инжектируемый `requestFrame` — бит-в-бит воспроизводимые прогоны.
-- **SSR-safe**: импорт любого subpath не трогает `window`/`document`.
-- **A11y**: `prefers-reduced-motion` переключает характер (снап/фейд), не отключает движение грубо.
+  включая нижние края).
+- **Детерминизм**: время только через инжектируемый `requestFrame` — бит-в-бит
+  воспроизводимые прогоны.
+- **SSR-safe**: импорт любого субпутя не трогает `window`/`document`.
+- **A11y**: `prefers-reduced-motion` переключает характер (снап/фейд), не
+  отключает движение грубо.
 - **Запинённый контракт**: публичная поверхность математических субпутей и `lit`
   зафиксирована api-surface-pin тестами (в обе стороны: пропавший И лишний
   экспорт — красный тест).
+
+## Разработка и гейты качества
+
+```bash
+pnpm install --frozen-lockfile
+pnpm typecheck
+pnpm build      # → dist/* (tsup)
+pnpm test       # vitest
+pnpm size       # размерный гейт (gz всех субпутей + сценарный import-cost)
+pnpm pack:smoke # целостность тарбола у потребителя
+pnpm bench      # ns/операцию горячих путей против dist (нужен pnpm build)
+```
+
+Перф-путь аналитический (O(1) на кадр, closed-form солвер). Числа `pnpm bench` —
+справочные (машинозависимы); запечатан детерминированный инвариант работы
+(`test/perf-hot-path.test.ts`: число кадров до сходимости = вызовов солвера,
+машинонезависим).
+
+**Размерный гейт** (`scripts/size-gate.mjs`) — две метрики, обе жёсткие:
+шипнутый gz каждого субпутя (список выводится из `exports` автоматически) и
+сценарный import-cost (esbuild bundle+minify против dist — ловит регрессию
+tree-shakeability). Пороги — регрессионные потолки, не цели: ядро 2190 байт gz,
+любой прочий субпуть 4608, точечные — `./utils` 1400, `./tokens` 1250,
+`./compositor` 6380.
+
+**CI на каждый PR**: typecheck → build → test → fuzz-гейт финитности
+(overflow/солвер/easing) → size → pack-smoke. **Еженедельно** (или вручную) —
+mutation-тестирование core-физики (Stryker; прогон падает при mutation score
+ниже break-порога 76).
+
+## Отвергнутые пути (контрфакты, НЕ реализованы)
+
+Отвергнуты с доказательствами — документируем, чтобы не переизобретать:
+
+- **WASM/SIMD для одиночных пружин** — прямой замер precompute-контрфакта дал
+  −24.6% регрессию (19.4→24.2 ns/кадр): V8 инлайнит мономорфный closed-form
+  солвер, граница JS↔WASM дороже сэкономленной арифметики. (SIMD ~1.7–4.5× —
+  только большие батчи, не одиночная DOM-анимация.)
+- **GPU compute (WebGPU)** — не может писать в DOM без readback-stall; выигрыш
+  только для canvas/WebGL при 10k+ объектов.
+- **Движок в Web Worker + SharedArrayBuffer** — не снижает input→photon для DOM
+  (+hop `postMessage`); SAB требует COOP/COEP, ломающих сторонние embed'ы.
+- **Анимация CSS custom properties как «compositor-путь»** — `@property`/`var()`
+  не ускоряются на compositor и триггерят style-invalidation каждый тик.
+
+Числа справочны и машинозависимы (`pnpm bench`); проверяемый seal — тесты
+(граница ошибки реконструкции ≤ tolerance, байт-паритет fallback, C¹-непрерывность).
 
 ## Ошибки
 
@@ -383,44 +542,3 @@ try {
 ## Лицензия
 
 MIT
-
-## Fallback-матрица (compositor-путь)
-
-`CompositorSpring` (subpath `./compositor`) прозрачно деградирует: публичный API
-и гарантия C¹-непрерывности одни и те же на любом тире, меняется лишь ДВИЖОК под
-капотом. Детекция — один раз в конструкторе, дёшево (feature-detect, без
-UA-снифинга; проба CSS `linear()` кэширована на реалм). Фактический тир доступен
-как диагностическое поле `CompositorSpring.tier` (для тестов/телеметрии).
-
-| Тир | Условие | Движок / поведение | Что теряем |
-|---|---|---|---|
-| `compositor` | WAAPI + CSS `linear()` | План коммитится в `Element.animate()`; пружина живёт на compositor-потоке, main-поток не будится до завершения | — (полный путь) |
-| `waapi-no-linear` | WAAPI есть, `linear()` нет (браузеры до 12.2023) | Живой rAF (`MotionValue`) на main-потоке — `linear()` не донёс бы пружинную кривую off-main | Off-main-thread резидентность: анимация делит main-поток, чувствительна к фризам |
-| `raf` | Нет `Element.animate` | Живой rAF (`MotionValue`) на main-потоке | То же, что выше |
-| `reduced` | `prefers-reduced-motion: reduce` | **Мгновенный снап** к цели: значение эмитится один раз, без анимации/цикла | Всякое движение (осознанно — политика доступности) |
-| `ssr` | Нет DOM и нет инжектированного `requestFrame` | Тот же rAF-движок под node-шимом; помечен `ssr`. Импорт и конструктор не трогают `window`/`document` | Off-main-thread; на сервере кадры не рисуются |
-
-Порядок precedence: `reduced` проверяется ПЕРВЫМ — политика доступности
-перекрывает любой доступный движок. Далее WAAPI → `linear()`; при отсутствии
-WAAPI различаются `raf` и `ssr` по наличию площадки анимации.
-
-**Политика reduced-motion** — мгновенный снап к финальному значению (не
-укороченная длительность). Выбор осознанный: это ЕДИНАЯ снап-политика всего
-пакета (`drive` / `keyframes` / `presets` тоже резолвятся в финал сразу) — один
-характер, ноль дрифта. Кросс-фейд, если он нужен, потребитель делает на CSS-слое.
-Инвариант пакета «reduce переключает характер (снап), не отключает движение
-грубо» соблюдён. Детекция reduce — один раз на входе (как в `drive`); смена
-системного предпочтения в полёте не подхватывается.
-
-**Диагностика / телеметрия.** Помимо `CompositorSpring.tier`, субпуть
-экспортирует `resolveCompositorTier({ target?, matchMedia?, requestFrame? })`
-(узнать тир БЕЗ конструирования контроллера) и `supportsLinearEasing()`
-(кэшированная проба CSS `linear()`). `supportsCompositor(target?)` остаётся как
-булев предикат compositor-тира.
-
-**Честные границы.** (1) Все не-`compositor` тиры кроме `reduced` идут в ОДИН
-живой rAF-движок — ярлыки `waapi-no-linear` / `raf` / `ssr` различают ПРИЧИНУ
-(телеметрия), поведение идентично. (2) Детекция тира одноразовая: WAAPI/`linear()`
-за время жизни контроллера не переопрашиваются (реалм их не меняет без
-перезагрузки). (3) На `waapi-no-linear` / `raf` анимация делит main-поток —
-границы применимости (compositor vs main-поток) те же, что описаны выше.
