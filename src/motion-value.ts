@@ -59,6 +59,16 @@ export interface MotionValueOptions {
    * non-finite safety net stays in force.
    */
   readonly clamp?: boolean | undefined;
+  /**
+   * Начальная скорость (units/s) при рождении значения. По умолчанию 0.
+   *
+   * Нужна для C¹-хендоффа compositor→live (compositor/handoff.ts): live-пружина
+   * рождается НЕ в покое, а в точке (value, velocity), снятой замкнутой формой с
+   * compositor-трека — первый setTarget() подхватывает эту скорость через штатный
+   * smooth-pickup (тот же solveSpring с произвольным v0), поэтому позиция И
+   * скорость непрерывны. 0 = штатное рождение в покое (поведение без изменений).
+   */
+  readonly initialVelocity?: number | undefined;
 }
 
 // ─── Frame-loop constants ────────────────────────────────────────────────────
@@ -167,6 +177,11 @@ export class MotionValue {
     this._target = opts.initial;
     this._spring = opts.spring;
     this._clamp = opts.clamp !== false;
+    // Скорость рождения (units/s): подхватывается первым setTarget() через
+    // smooth-pickup (C¹-хендофф compositor→live). Поле по умолчанию 0 (штатное
+    // рождение в покое); засеваем лишь при конечном значении — non-finite-щит
+    // как у выходов ядра (публичный вход handoffToLive валидирует velocity до этого).
+    if (Number.isFinite(opts.initialVelocity)) this._velocity = opts.initialVelocity as number;
     this._requestFrame = opts.requestFrame ?? MotionValue._defaultRequestFrame;
   }
 

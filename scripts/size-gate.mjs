@@ -54,11 +54,13 @@ export const SUBPATH_GATE_BYTES = 4608;
 // CORE_GATE_BYTES для ядра). Поднимать только осознанно.
 export const BESPOKE_SUBPATH_GATES = {
   './utils': 1400,
-  // ./compositor — компилятор пружина→linear() (адаптивный сегментер + LRU-кэш +
-  // one-shot контроллер хендоффа). Факт первой сборки 4408 gz; порог 4600 (~4.4%
-  // люфт), жёстче общего 4608 — фича завершена (M1), любой рост узла обязан быть
-  // осознанным. Поднимать только решением Даниила.
-  './compositor': 4600,
+  // ./compositor — компилятор пружина→linear() (сегментер + LRU-кэш + контроллер)
+  // + C¹-хендофф compositor→live (M2: handoffToLive + CompositorSpring.handoffToLive).
+  // M1 факт 4408 / порог 4600. M2 добавил живой мост в rAF-пружину (снимок замкнутой
+  // формой → MotionValue с засеянной скоростью) — НЕИЗБЕЖНЫЙ рост на новую
+  // capability: факт 4672 gz. Порог 4800 (~2.7% люфт, дисциплина M1 сохранена),
+  // жёстче общего 4608→ здесь поднят осознанно под M2. Поднимать только решением Даниила.
+  './compositor': 4800,
 };
 
 /**
@@ -75,7 +77,10 @@ export const IMPORT_COST_SCENARIOS = [
   {
     name: 'only-MotionValue',
     code: `import { MotionValue } from '%DIST%'; const m = new MotionValue({initial:0, spring:{mass:1,stiffness:200,damping:20}}); m.onChange(v=>console.log(v)); m.setTarget(1);`,
-    gate: 1600, // факт 1592 (2026-07-03; было 1536 — валидатор + clamp:false)
+    // 1600→1620 (M2): +~14 gz за opts.initialVelocity — засев скорости рождения,
+    // НЕОБХОДИМЫЙ для C¹-хендоффа compositor→live (нет иного публичного seam'а;
+    // дублировать rAF-цикл MotionValue в handoff = запрещённый coupled-дубль). Факт 1606.
+    gate: 1620, // факт 1592 (2026-07-03) → 1606 (2026-07-08, initialVelocity)
   },
   {
     name: 'full-core',

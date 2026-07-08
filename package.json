@@ -201,6 +201,7 @@
     "test:watch": "vitest",
     "size": "node scripts/size-gate.mjs",
     "bench": "node scripts/bench.mjs",
+    "bench:latency": "node scripts/bench-latency.mjs",
     "pack:smoke": "node scripts/pack-smoke.mjs",
     "mutation": "stryker run",
     "prepublishOnly": "pnpm typecheck && pnpm build && pnpm test && pnpm size"

@@ -47,8 +47,10 @@ import { supportsWaapi, type WaapiAnimatable } from '../waapi/index.js';
 import { MotionValue, type RequestFrameFn } from '../motion-value.js';
 import { buildSpringNodes, type SpringNode } from './segmenter.js';
 import { SpringLinearCache, DEFAULT_CACHE_CAPACITY } from './cache.js';
+import { handoffToLive } from './handoff.js';
 
 export { type SpringNode } from './segmenter.js';
+export { handoffToLive, type HandoffToLiveOptions } from './handoff.js';
 
 // ─── Толерантность по умолчанию (перцептивный бюджет) ────────────────────────
 //
@@ -555,13 +557,7 @@ export class CompositorSpring {
     }
 
     // В полёте: читаем аналитическое состояние в момент прерывания (без DOM).
-    const tSec = (this._now() - this._startTime) / 1000;
-    const read = readCompositorSpring(this._spring, {
-      from: this._from,
-      to: this._to,
-      v0: this._v0Norm,
-      t: tSec >= 0 ? tSec : 0,
-    });
+    const read = this._snapshot();
     // Отменяем текущую Animation (compositor запускает новую).
     if (typeof this._anim.cancel === 'function') {
       try {
@@ -575,6 +571,69 @@ export class CompositorSpring {
     this._emitCompositor(read.value, newTarget, v0Norm);
   }
 
+  /**
+   * ХЕНДОФФ compositor→live: снимает текущее (value, velocity) ЗАМКНУТОЙ ФОРМОЙ
+   * (readCompositorSpring по elapsed, без чтения DOM), отменяет compositor-
+   * Animation и продолжает движение ЖИВОЙ rAF-пружиной (MotionValue),
+   * рождённой в этой точке — позиция И скорость непрерывны (C¹). Для перехода
+   * в follow-фазу жеста (будущая траектория стала интерактивной).
+   *
+   * newTarget — цель live-пружины: не задан → продолжаем к текущему `to` (хвост
+   * воспроизводится точно); задан → сразу едем к новой цели с сохранённой
+   * скоростью. Возвращает MotionValue: ПОСЛЕ хендоффа значением управляет
+   * вызывающий (setTarget/stop/destroy у него), контроллер отдал владение.
+   * stop()/destroy() контроллера всё же остановят/освободят и этот MotionValue
+   * (страховка от утечки). SSR-safe: fallback-путь уже живой — вернёт свой mv.
+   */
+  handoffToLive(newTarget?: number): MotionValue {
+    if (newTarget !== undefined) validateFinite(newTarget, 'newTarget');
+
+    if (this._mode === 'fallback') {
+      // Уже на main-потоке: тот же MotionValue, при новой цели — retarget.
+      this._ensureFallback();
+      if (newTarget !== undefined) {
+        this._to = newTarget;
+        this._mv!.setTarget(newTarget);
+      }
+      this._started = true;
+      return this._mv!;
+    }
+
+    // Compositor-путь: аналитический снимок состояния в момент хендоффа.
+    let value = this._from;
+    let velocity = 0;
+    if (this._started && this._anim !== undefined) {
+      const read = this._snapshot();
+      value = read.value;
+      velocity = read.velocity;
+      if (typeof this._anim.cancel === 'function') {
+        try {
+          this._anim.cancel();
+        } catch {
+          /* см. retarget */
+        }
+      }
+      this._anim = undefined;
+    }
+    const target = newTarget ?? this._to;
+    const mv = handoffToLive({
+      spring: this._spring,
+      value,
+      velocity,
+      target,
+      requestFrame: this._requestFrame,
+      clamp: false,
+      onChange: (v: number) => {
+        this._value = v;
+        if (this._apply !== undefined) this._apply(this._format(v));
+      },
+    });
+    this._to = target;
+    this._mv = mv;
+    this._started = true;
+    return mv;
+  }
+
   /** Останавливает прогон (без разрушения; повторный start()/retarget() возобновит). */
   stop(): void {
     if (this._mode === 'compositor') {
@@ -586,6 +645,8 @@ export class CompositorSpring {
         }
       }
       this._anim = undefined;
+      // Мог быть отдан live-mv через handoffToLive() — остановить и его (анти-утечка).
+      if (this._mv !== undefined) this._mv.stop();
     } else if (this._mv !== undefined) {
       this._mv.stop();
     }
@@ -600,6 +661,20 @@ export class CompositorSpring {
   }
 
   // ─── Приватное ──────────────────────────────────────────────────────────────
+
+  /**
+   * Аналитический снимок (value, velocity) текущего compositor-прогона по elapsed
+   * (замкнутая форма, БЕЗ чтения DOM) — общий механизм retarget и handoffToLive.
+   */
+  private _snapshot(): { value: number; velocity: number } {
+    const tSec = (this._now() - this._startTime) / 1000;
+    return readCompositorSpring(this._spring, {
+      from: this._from,
+      to: this._to,
+      v0: this._v0Norm,
+      t: tSec >= 0 ? tSec : 0,
+    });
+  }
 
   private _emitCompositor(from: number, to: number, v0Norm: number): void {
     const plan = compileSpringPlan({
