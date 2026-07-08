@@ -195,6 +195,7 @@
     "test": "vitest run",
     "test:watch": "vitest",
     "size": "node scripts/size-gate.mjs",
+    "bench": "node scripts/bench.mjs",
     "pack:smoke": "node scripts/pack-smoke.mjs",
     "mutation": "stryker run",
     "prepublishOnly": "pnpm typecheck && pnpm build && pnpm test && pnpm size"

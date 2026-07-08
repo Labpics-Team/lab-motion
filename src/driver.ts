@@ -327,6 +327,10 @@ export function createDriver(opts: DriverOptions): AnimationControls {
 
     // ── Глобальный safety cap (любой timeScale, в т.ч. NaN/0) ─────────────
     // Предотвращает бесконечный цикл при timeScale=0/NaN/замороженном состоянии.
+    // ×5 к MAX_FRAMES (одно forward-воспроизведение): скраб-драйвер легитимно
+    // живёт дольше одного прогона — реверс, повторные проходы на медленном
+    // timeScale, качание туда-обратно. Полог = 5 полных длин воспроизведения
+    // суммарного скраба до принудительного settle (не привязан к одному прогону).
     const GLOBAL_CAP = MAX_FRAMES * 5;
     if (_totalFrameCount >= GLOBAL_CAP) {
       _tickActive = false;

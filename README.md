@@ -30,7 +30,13 @@ pnpm typecheck
 pnpm build      # → dist/*
 pnpm test
 pnpm size       # замер gz всех субпутей
+pnpm bench      # ns/операцию горячих путей против dist (нужен pnpm build)
 ```
+
+Перф-путь аналитический (O(1) на кадр, closed-form солвер). Числа `pnpm bench` —
+справочные (ns/op машинозависимы); запечатан детерминированный инвариант работы
+(`test/perf-hot-path.test.ts`: число кадров до сходимости = вызовов солвера,
+машинонезависим).
 
 ## Карта субпутей
 
@@ -171,10 +177,11 @@ const toProgress = pipe(clamp(0, 300), (x) => x / 300); // композиция 
 ## Инварианты (гарантии потребителю)
 
 - **Zero-deps**: `dependencies: {}` — фреймворки только как optional peer.
-- **CSS-safe**: движок никогда не отдаёт `NaN`/`Infinity` — ключевые математические
-  слои (easing, value, driver, keyframes, timeline, stagger, decay, MotionValue)
-  прогоняются fuzz-тестами на 10 000 входов; spring-солвер добивается косвенно
-  через все слои поверх него.
+- **CSS-safe**: движок никогда не отдаёт `NaN`/`Infinity` — числовые слои
+  (easing, value, driver, keyframes, timeline, stagger, decay, MotionValue, utils)
+  прогоняются property-fuzz на 10 000 входов, а сам spring-солвер — отдельным
+  seeded-fuzz по рабочему боксу валидного пространства (mass/stiffness/damping/t,
+  включая нижние края), не только косвенно через слои поверх.
 - **Детерминизм**: время только через инжектируемый `requestFrame` — бит-в-бит воспроизводимые прогоны.
 - **SSR-safe**: импорт любого subpath не трогает `window`/`document`.
 - **A11y**: `prefers-reduced-motion` переключает характер (снап/фейд), не отключает движение грубо.

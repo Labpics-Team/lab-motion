@@ -67,6 +67,17 @@ export interface MotionValueOptions {
 // Единый контур ядра: те же пороги, что drive/driver (internal/constants).
 import { CONVERGENCE_THRESHOLD, MAX_FRAMES, FIXED_DT_S } from './internal/constants.js';
 
+/**
+ * Порог численной стабильности: величины меньше него трактуются как ноль.
+ * Две роли (обе — защита от вырождения, значение общее): (1) «покой» — скорость
+ * ниже EPSILON считается нулевой (snap-if-at-rest в setTarget); (2) знаменатель —
+ * |range| ниже EPSILON вырожден, деление на него дало бы ±∞/NaN, поэтому диапазон
+ * либо снапается, либо floor'ится к EPSILON. Локален модулю: деления на range в
+ * drive/driver защищены early-exit `from === to` (absRange > 0 гарантирован
+ * статически), им epsilon-пол не нужен — потому в общий internal/constants не вынесен.
+ */
+const EPSILON = 1e-10;
+
 // ─── MotionValue ─────────────────────────────────────────────────────────────
 
 /**
@@ -206,7 +217,7 @@ export class MotionValue {
     }
 
     // Snap instantly if already at target with negligible velocity.
-    if (target === this._value && Math.abs(this._velocity) < 1e-10) {
+    if (target === this._value && Math.abs(this._velocity) < EPSILON) {
       this._target = target;
       return;
     }
@@ -217,7 +228,7 @@ export class MotionValue {
 
     // Normalize velocity by range for the spring solver (which works in
     // normalized [0→1] space). Guard division by zero when range ≈ 0.
-    const v0Normalized = Math.abs(range) > 1e-10 ? currentVelocity / range : 0;
+    const v0Normalized = Math.abs(range) > EPSILON ? currentVelocity / range : 0;
 
     // ── Reset run state ──────────────────────────────────────────────────
     this._from = this._value;
@@ -345,9 +356,9 @@ export class MotionValue {
     const converged =
       this._frameCount >= MAX_FRAMES ||
       !Number.isFinite(range) || // unrepresentable span: |from|+|target| overflowed past MAX_VALUE
-      (absRange < 1e-10) || // degenerate range
-      (distToTarget / Math.max(absRange, 1e-10) < CONVERGENCE_THRESHOLD &&
-        absVelocity / Math.max(absRange, 1e-10) < CONVERGENCE_THRESHOLD);
+      (absRange < EPSILON) || // degenerate range
+      (distToTarget / Math.max(absRange, EPSILON) < CONVERGENCE_THRESHOLD &&
+        absVelocity / Math.max(absRange, EPSILON) < CONVERGENCE_THRESHOLD);
 
     if (converged) {
       this._value = this._target;
