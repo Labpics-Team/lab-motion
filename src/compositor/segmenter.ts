@@ -91,6 +91,7 @@ export function baseGridSize(
  * `dx===0?yi:` снят как мёртвая ветка (см. ниже). При нарушении (невозрастающие
  * xs, dx≤0) наклон хорды даст NaN/∞ и результат не определён — контракт узкий
  * намеренно, страж не восстанавливается ради несуществующего вызова.
+ * @internal — экспорт для тестов, не часть публичного API ./compositor.
  */
 export function douglasPeuckerVertical(
   xs: readonly number[],

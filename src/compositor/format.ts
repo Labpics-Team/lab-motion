@@ -17,6 +17,11 @@
  * (крошечный минус, округлённый в ноль: Number('-0.0000')=-0, String(-0)='0').
  * Тождество roundShortest(x,d) === String(Number(x.toFixed(d))) зафиксировано
  * дифф-тестом (фазз по x, обе точности d): compositor-cold-compile-differential.
+ *
+ * ПРЕДУСЛОВИЕ: d ≥ 1 (эмиссия зовёт d=4 и d=3). При d=0 у toFixed нет точки, и
+ * regex `\.?0+$` съел бы ЦЕЛЫЕ хвостовые нули (roundShortest(100,0)→«1»), что с
+ * String(Number) не совпадает — но такой вызов не существует и не нужен.
+ * @internal — экспорт только для дифф-теста, не часть публичного API ./compositor.
  */
 export function roundShortest(x: number, d: number): string {
   const s = x.toFixed(d).replace(/\.?0+$/, '');
