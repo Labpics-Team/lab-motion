@@ -37,6 +37,7 @@ const EXPECTED_EXPORTS = new Set([
   'interpolateColor',
   'resolveToken',
   'MotionValue',
+  'animate',
 ]);
 
 describe('public API surface pin (invariant 6)', () => {
@@ -76,5 +77,9 @@ describe('public API surface pin (invariant 6)', () => {
 
   it('validateSpringParams is a function', () => {
     expect(typeof motionModule.validateSpringParams).toBe('function');
+  });
+
+  it('animate is a function', () => {
+    expect(typeof motionModule.animate).toBe('function');
   });
 });

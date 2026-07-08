@@ -28,6 +28,21 @@
       "types": "./dist/vue/index.d.ts",
       "import": "./dist/vue/index.js",
       "require": "./dist/vue/index.cjs"
+    },
+    "./text": {
+      "types": "./dist/text/index.d.ts",
+      "import": "./dist/text/index.js",
+      "require": "./dist/text/index.cjs"
+    },
+    "./number": {
+      "types": "./dist/number/index.d.ts",
+      "import": "./dist/number/index.js",
+      "require": "./dist/number/index.cjs"
+    },
+    "./ticker": {
+      "types": "./dist/ticker/index.d.ts",
+      "import": "./dist/ticker/index.js",
+      "require": "./dist/ticker/index.cjs"
     }
   },
   "files": ["dist"],

@@ -28,3 +28,4 @@ export {
   resolveToken,
 } from './tokens.js';
 export { MotionValue } from './motion-value.js';
+export { animate, type AnimateOptions } from './animate.js';
