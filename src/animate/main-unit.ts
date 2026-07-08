@@ -77,6 +77,9 @@ export class MainUnit implements GroupOwner {
   private _frames = 0;
   private _useTimeoutFallback = false;
 
+  /** Reused map for transform channels to reduce allocations in hot path (_write every frame). */
+  private readonly _liveTransform = new Map<string, number>();
+
   constructor(opts: MainUnitOptions) {
     this._o = opts;
     this.finished = new Promise<void>((res) => {
@@ -252,9 +255,9 @@ export class MainUnit implements GroupOwner {
   private _write(): void {
     const o = this._o;
     if (o.group === 'transform') {
-      const live = new Map<string, number>();
-      for (const ch of o.numeric) live.set(ch.key, ch.value);
-      o.el.style.setProperty('transform', formatTransform(o.residuals, live));
+      this._liveTransform.clear();
+      for (const ch of o.numeric) this._liveTransform.set(ch.key, ch.value);
+      o.el.style.setProperty('transform', formatTransform(o.residuals, this._liveTransform));
     } else if (o.css !== undefined) {
       o.el.style.setProperty(o.group, String(o.css.css));
     } else {
