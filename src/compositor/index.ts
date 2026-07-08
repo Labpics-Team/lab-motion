@@ -46,6 +46,7 @@ import {
 import { supportsWaapi, type WaapiAnimatable } from '../waapi/index.js';
 import { MotionValue, type RequestFrameFn } from '../motion-value.js';
 import { buildSpringNodes, type SpringNode } from './segmenter.js';
+import { roundShortest } from './format.js';
 import { SpringLinearCache, DEFAULT_CACHE_CAPACITY } from './cache.js';
 import { handoffToLive } from './handoff.js';
 import {
@@ -111,9 +112,7 @@ function emitLinear(params: SpringParams, v0: number, tolerance: number): string
   let out = 'linear(';
   for (let i = 0; i < nodes.length; i++) {
     const n = nodes[i]!;
-    const p = Number(n.progress.toFixed(4));
-    const pct = Number(n.percent.toFixed(3));
-    out += `${p} ${pct}%`;
+    out += roundShortest(n.progress, 4) + ' ' + roundShortest(n.percent, 3) + '%';
     if (i < nodes.length - 1) out += ', ';
   }
   return out + ')';

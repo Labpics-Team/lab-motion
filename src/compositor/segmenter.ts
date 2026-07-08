@@ -31,7 +31,7 @@
  * вовсе, путь попадания в кэш — без аллокаций (см. cache.ts).
  */
 
-import { solveSpring } from '../internal/solver.js';
+import { makeSpringValueSampler } from '../internal/solver.js';
 import { settleTimeUpperBound, type SpringParams } from '../spring.js';
 
 /** Один узел linear(): нормализованный прогресс + доля времени в процентах. */
@@ -65,15 +65,6 @@ const BASE_GRID_MIN = 32;
 const BASE_GRID_MAX = 4096;
 
 /**
- * Финитный страж выхода солвера (политика прогресса: не-конечное → цель 1,
- * зеркалит motion-value; для валидных параметров не срабатывает — покрыто
- * finiteness-fuzz). Держит инвариант «в CSS никогда не попадает NaN/∞».
- */
-function safeProgress(x: number): number {
-  return Number.isFinite(x) ? x : 1;
-}
-
-/**
  * Размер базовой сетки (число ИНТЕРВАЛОВ), выведенный из бонда кривизны так, что
  * дискретизация сетки ≤ tolerance/2 (вторую половину бюджета несёт eps RDP).
  */
@@ -90,10 +81,17 @@ export function baseGridSize(
 }
 
 /**
- * Вертикальный Дуглас–Пекер по полилинии (xs монотонны). Возвращает
- * отсортированные индексы оставленных точек (включая концы). eps — порог
- * вертикального отклонения. Итеративный (явный стек) — без рекурсивного
- * переполнения на больших сетках.
+ * Вертикальный Дуглас–Пекер по полилинии. Возвращает отсортированные индексы
+ * оставленных точек (включая концы). eps — порог вертикального отклонения.
+ * Итеративный (явный стек) — без рекурсивного переполнения на больших сетках.
+ *
+ * ПРЕДУСЛОВИЕ: xs СТРОГО ВОЗРАСТАЮТ (dx = xs[j]−xs[i] > 0 для всех пар стека).
+ * Единственный вызывающий — buildSpringNodes — подаёт равномерную сетку tau=i/N,
+ * так что предусловие держится по построению. Прежний per-точечный страж
+ * `dx===0?yi:` снят как мёртвая ветка (см. ниже). При нарушении (невозрастающие
+ * xs, dx≤0) наклон хорды даст NaN/∞ и результат не определён — контракт узкий
+ * намеренно, страж не восстанавливается ради несуществующего вызова.
+ * @internal — экспорт для тестов, не часть публичного API ./compositor.
  */
 export function douglasPeuckerVertical(
   xs: readonly number[],
@@ -115,11 +113,20 @@ export function douglasPeuckerVertical(
     const yi = ys[i]!;
     const dx = xs[j]! - xi;
     const dy = ys[j]! - yi;
+    // dx>0 гарантирован предусловием (xs строго возрастают) ⇒ прежний per-точечный
+    // страж `dx===0?yi:` — мёртвая ветка. Снят: минус ветвление на КАЖДОЙ точке
+    // скана (RDP — ~15% cold-compile). Наклон хорды slope=dy/dx петле-инвариантен →
+    // считаем ОДИН раз, снимая деление с каждой точки (деление → умножение).
+    // NB: lineY = yi+slope·Δx НЕ бит-идентичен прежнему yi+(dy·Δx)/dx (порядок
+    // деления/умножения меняет последний ULP), но НАБОР оставленных индексов —
+    // идентичен: сравнение argmax/порога устойчиво к суб-ULP сдвигу отклонения.
+    // Зафиксировано дифф-тестом (kept-индексы new≡old на всех режимах × сетках):
+    // test/compositor-cold-compile-differential.test.ts.
+    const slope = dy / dx;
     let maxDev = -1;
     let idx = -1;
     for (let k = i + 1; k < j; k++) {
-      // Значение хорды в xs[k]; dx>0 гарантирован (xs строго возрастают на сетке).
-      const lineY = dx === 0 ? yi : yi + (dy * (xs[k]! - xi)) / dx;
+      const lineY = yi + slope * (xs[k]! - xi);
       const dev = Math.abs(ys[k]! - lineY);
       if (dev > maxDev) {
         maxDev = dev;
@@ -162,10 +169,19 @@ export function buildSpringNodes(
   const count = intervals + 1;
   const xs = new Array<number>(count);
   const ys = new Array<number>(count);
+  // Инварианты пружины (omega0/zeta/omegaD/A/B) петле-инвариантны на всей сетке
+  // (params/v0 фиксированы) → считаем их ОДИН раз фабрикой, а не на каждый узел.
+  // Значение бит-в-бит равно solveSpring(...).value (см. makeSpringValueSampler).
+  const sampleValue = makeSpringValueSampler(params, v0);
   for (let i = 0; i < count; i++) {
     const tau = i / intervals; // ∈ [0, 1]
     xs[i] = tau;
-    ys[i] = safeProgress(solveSpring(params, tau * T, v0).value);
+    // Финитный страж (не-конечное → цель 1, зеркалит motion-value; для валидных
+    // params не срабатывает — покрыто finiteness-fuzz; инвариант «в CSS никогда
+    // не NaN/∞») заинлайнен в цикл — минус кадр вызова на КАЖДЫЙ узел сетки
+    // (доминирующий путь cold-compile). Тот же Number.isFinite(v)?v:1, бит-в-бит.
+    const v = sampleValue(tau * T);
+    ys[i] = Number.isFinite(v) ? v : 1;
   }
 
   // eps = tolerance/2: вторая половина бюджета — под дискретизацию базовой сетки
