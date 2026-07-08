@@ -1,0 +1,11 @@
+﻿{
+    "private":  true,
+    "devDependencies":  {
+                            "playwright":  "^1.45.0",
+                            "gsap":  "^3.15.0",
+                            "animejs":  "^4.5.0",
+                            "motion":  "^12.0.0"
+                        },
+    "name":  "lab-motion-bench-compare",
+    "type":  "module"
+}
