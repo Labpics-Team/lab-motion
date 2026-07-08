@@ -46,6 +46,7 @@ import {
 import { supportsWaapi, type WaapiAnimatable } from '../waapi/index.js';
 import { MotionValue, type RequestFrameFn } from '../motion-value.js';
 import { buildSpringNodes, type SpringNode } from './segmenter.js';
+import { roundShortest } from './format.js';
 import { SpringLinearCache, DEFAULT_CACHE_CAPACITY } from './cache.js';
 import { handoffToLive } from './handoff.js';
 import {
@@ -104,22 +105,6 @@ function clampToFinite(x: number, snap: number): number {
 }
 
 // ─── Эмиссия linear()-строки ─────────────────────────────────────────────────
-
-/**
- * Округляет x до d знаков и печатает КРАТЧАЙШУЮ десятичную запись — бит-в-бит как
- * String(Number(x.toFixed(d))), но без промежуточного Number()-парса и повторной
- * стрингификации (эмиссия — ~38% cold-compile, а `Number(toFixed)` делал по ДВЕ
- * конверсии строка↔число на КАЖДЫЙ стоп). Тождество: toFixed(d) уже даёт корректно
- * округлённую фикс-строку; снять хвостовые нули (и висячую точку) = та же
- * кратчайшая запись, что печатает Number→String. Единственная поправка — «-0»→«0»
- * (крошечный минус, округлённый в ноль: Number('-0.0000')=-0, String(-0)='0').
- * Байт-идентичность проверена дифференциально: 1.8M синт-значений + 4860 реальных
- * наборов узлов (все режимы солвера, v0<0/большой, tol 0.001…0.01) — 0 расхождений.
- */
-function roundShortest(x: number, d: number): string {
-  const s = x.toFixed(d).replace(/\.?0+$/, '');
-  return s === '-0' ? '0' : s;
-}
 
 /** Строит linear()-строку из узлов (округление: прогресс 4 знака, процент 3). */
 function emitLinear(params: SpringParams, v0: number, tolerance: number): string {
