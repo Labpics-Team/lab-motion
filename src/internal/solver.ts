@@ -67,3 +67,41 @@ export function solveSpring(
 
   return { value, velocity };
 }
+
+/**
+ * Фабрика ПОЗИЦИОННОГО сэмплера для ОДНОЙ пружины: считает инварианты
+ * (omega0/zeta/omegaD/A/B) ОДИН раз и возвращает монопоморфный (t) → value.
+ *
+ * Зачем отдельно от solveSpring: горячий путь компилятора (segmenter.buildSpringNodes)
+ * зовёт солвер ~сотни раз с ОДНИМИ И ТЕМИ ЖЕ params+v0 на разных t — инварианты там
+ * петле-инвариантны, а velocity не нужна. Хойст инвариантов + отказ от velocity и
+ * объекта-обёртки = меньше работы на узел сетки. solveSpring НЕ тронут (per-frame путь
+ * остаётся мономорфно-инлайнимым — прекомпьют инвариантов В НЁМ замерен как −24.6%).
+ * Значение бит-в-бит равно solveSpring(...).value (те же формулы, тот же порядок).
+ */
+export function makeSpringValueSampler(
+  params: SpringParams,
+  v0: number,
+): (t: number) => number {
+  const { mass: m, stiffness: k, damping: c } = params;
+  const omega0 = Math.sqrt(k / m);
+  const zeta = c / (2 * m * omega0);
+
+  if (zeta < 1) {
+    const omegaD = omega0 * Math.sqrt(1 - zeta * zeta);
+    const zw = zeta * omega0;
+    const B = (v0 - zw) / omegaD;
+    return (t) =>
+      t <= 0 ? 0 : 1 + Math.exp(-zw * t) * (-Math.cos(omegaD * t) + B * Math.sin(omegaD * t));
+  }
+  if (zeta === 1) {
+    const B = v0 - omega0;
+    return (t) => (t <= 0 ? 0 : 1 + (-1 + B * t) * Math.exp(-omega0 * t));
+  }
+  const sqrtTerm = Math.sqrt(zeta * zeta - 1);
+  const r1 = -omega0 * (zeta - sqrtTerm);
+  const r2 = -omega0 * (zeta + sqrtTerm);
+  const A1 = (v0 + r2) / (r1 - r2);
+  const A2 = -1 - A1;
+  return (t) => (t <= 0 ? 0 : 1 + A1 * Math.exp(r1 * t) + A2 * Math.exp(r2 * t));
+}

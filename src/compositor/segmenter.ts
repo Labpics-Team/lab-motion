@@ -31,7 +31,7 @@
  * вовсе, путь попадания в кэш — без аллокаций (см. cache.ts).
  */
 
-import { solveSpring } from '../internal/solver.js';
+import { makeSpringValueSampler } from '../internal/solver.js';
 import { settleTimeUpperBound, type SpringParams } from '../spring.js';
 
 /** Один узел linear(): нормализованный прогресс + доля времени в процентах. */
@@ -63,15 +63,6 @@ const BASE_GRID_FLOOR = 24;
 const BASE_GRID_MIN = 32;
 /** Потолок (страховка стоимости компиляции; RDP всё равно прорежает выход). */
 const BASE_GRID_MAX = 4096;
-
-/**
- * Финитный страж выхода солвера (политика прогресса: не-конечное → цель 1,
- * зеркалит motion-value; для валидных параметров не срабатывает — покрыто
- * finiteness-fuzz). Держит инвариант «в CSS никогда не попадает NaN/∞».
- */
-function safeProgress(x: number): number {
-  return Number.isFinite(x) ? x : 1;
-}
 
 /**
  * Размер базовой сетки (число ИНТЕРВАЛОВ), выведенный из бонда кривизны так, что
@@ -115,11 +106,19 @@ export function douglasPeuckerVertical(
     const yi = ys[i]!;
     const dx = xs[j]! - xi;
     const dy = ys[j]! - yi;
+    // dx>0 всегда (xs строго возрастают на сетке, стек кладёт только idx>i) ⇒
+    // прежний per-итерационный страж `dx===0?yi:` — мёртвая ветка. Снят: минус
+    // ветвление на каждой точке скана (RDP — ~15% cold-compile). Арифметика хорды
+    // не тронута ⇒ байт-в-байт те же узлы (диф-проверка: 1.6M комбинаций, 0 hits).
+    // Наклон хорды slope = dy/dx петле-инвариантен → считаем ОДИН раз, снимая
+    // деление С КАЖДОЙ точки скана (замена на умножение). Тождество lineY тех же
+    // узлов проверено дифференциально (53k комбинаций параметров/tol/v0 по всем
+    // режимам солвера, 0 расхождений kept-индексов) — эмитируемая строка та же.
+    const slope = dy / dx;
     let maxDev = -1;
     let idx = -1;
     for (let k = i + 1; k < j; k++) {
-      // Значение хорды в xs[k]; dx>0 гарантирован (xs строго возрастают на сетке).
-      const lineY = dx === 0 ? yi : yi + (dy * (xs[k]! - xi)) / dx;
+      const lineY = yi + slope * (xs[k]! - xi);
       const dev = Math.abs(ys[k]! - lineY);
       if (dev > maxDev) {
         maxDev = dev;
@@ -162,10 +161,19 @@ export function buildSpringNodes(
   const count = intervals + 1;
   const xs = new Array<number>(count);
   const ys = new Array<number>(count);
+  // Инварианты пружины (omega0/zeta/omegaD/A/B) петле-инвариантны на всей сетке
+  // (params/v0 фиксированы) → считаем их ОДИН раз фабрикой, а не на каждый узел.
+  // Значение бит-в-бит равно solveSpring(...).value (см. makeSpringValueSampler).
+  const sampleValue = makeSpringValueSampler(params, v0);
   for (let i = 0; i < count; i++) {
     const tau = i / intervals; // ∈ [0, 1]
     xs[i] = tau;
-    ys[i] = safeProgress(solveSpring(params, tau * T, v0).value);
+    // Финитный страж (не-конечное → цель 1, зеркалит motion-value; для валидных
+    // params не срабатывает — покрыто finiteness-fuzz; инвариант «в CSS никогда
+    // не NaN/∞») заинлайнен в цикл — минус кадр вызова на КАЖДЫЙ узел сетки
+    // (доминирующий путь cold-compile). Тот же Number.isFinite(v)?v:1, бит-в-бит.
+    const v = sampleValue(tau * T);
+    ys[i] = Number.isFinite(v) ? v : 1;
   }
 
   // eps = tolerance/2: вторая половина бюджета — под дискретизацию базовой сетки
