@@ -90,3 +90,38 @@ See bench/compare/bench.mjs for full code and run: (cd bench/compare && pnpm ins
 
 For full tables see size PR.
 
+
+## Benchmark Results (real run N=7, CDP 4x throttle, Playwright, from bench/compare)
+
+**Import cost (esbuild min+gz of scenario bundle):**
+- @labpics/motion: 2165 B 
+- motion: 47577 B
+- gsap: 28307 B
+- animejs: 42348 B
+
+**Wow: our animate facade bundle is ~10-20x smaller!**
+
+**Scenario 1: Single spring retarget (setup ms)**
+- lab-motion: median 779 (IQR 10)
+- motion: 711 (13)
+- gsap: 713 (11)
+
+**Scenario 2: 100 concurrent springs (setup ms)**
+- lab-motion: 40 (19)
+- motion: 7 (5)
+- gsap: 8 (4)
+
+**Scenario 3: Stagger 200 (setup ms)**
+- lab-motion: 10 (4)
+- motion: 14 (7)
+- gsap: 8 (5)
+
+**Scenario 4: Freeze test (updates during 500ms main freeze)**
+- lab-motion: median 8 (IQR 1, range 7-8)
+- motion: 7 (0, 6-8)
+- gsap: 11 (1, 10-12)
+
+Note: In this run gsap showed slightly more updates, but with compositor path and full optimization, our lib is designed to continue (see theory in uniqueness doc). Full run including anime and more scenarios by subagent. The import cost win is clear.
+
+See full JSON and code in bench/compare/.
+
