@@ -21,7 +21,9 @@ describe('compositor: api-surface-pin', () => {
       'createSpringLinearCache',
       'handoffToLive',
       'readCompositorSpring',
+      'resolveCompositorTier',
       'supportsCompositor',
+      'supportsLinearEasing',
     ]);
   });
 
@@ -31,6 +33,8 @@ describe('compositor: api-surface-pin', () => {
       compositor.compileSpringPlan({ spring: { mass: 1, stiffness: 170, damping: 26 }, property: 'opacity', from: 0, to: 1 });
       compositor.readCompositorSpring({ mass: 1, stiffness: 170, damping: 26 }, { t: 0.1 });
       compositor.supportsCompositor();
+      compositor.supportsLinearEasing();
+      compositor.resolveCompositorTier({});
       compositor.createSpringLinearCache(4).compile({ mass: 1, stiffness: 170, damping: 26 });
       // handoffToLive без requestFrame использует node-фоллбек (setTimeout-шим) —
       // импорт и построение значения не трогают window/document.
@@ -51,6 +55,8 @@ describe('compositor: api-surface-pin', () => {
     expect(typeof compositor.handoffToLive).toBe('function');
     expect(typeof compositor.compileStaggerPlan).toBe('function');
     expect(typeof compositor.CompositorStaggerGroup).toBe('function');
+    expect(typeof compositor.resolveCompositorTier).toBe('function');
+    expect(typeof compositor.supportsLinearEasing).toBe('function');
     expect(typeof compositor.DEFAULT_TOLERANCE).toBe('number');
   });
 });

@@ -48,6 +48,12 @@ import { MotionValue, type RequestFrameFn } from '../motion-value.js';
 import { buildSpringNodes, type SpringNode } from './segmenter.js';
 import { SpringLinearCache, DEFAULT_CACHE_CAPACITY } from './cache.js';
 import { handoffToLive } from './handoff.js';
+import {
+  type CompositorTier,
+  type MatchMediaLike,
+  resolveCompositorTier,
+  supportsLinearEasing,
+} from './detect.js';
 
 export { type SpringNode } from './segmenter.js';
 export { handoffToLive, type HandoffToLiveOptions } from './handoff.js';
@@ -58,6 +64,11 @@ export {
   type CompositorStaggerPlan,
   type CompositorStaggerGroupOptions,
 } from './stagger.js';
+export {
+  type CompositorTier,
+  resolveCompositorTier,
+  supportsLinearEasing,
+} from './detect.js';
 
 // ─── Толерантность по умолчанию (перцептивный бюджет) ────────────────────────
 //
@@ -385,27 +396,13 @@ export function readCompositorSpring(
 
 // ─── supportsCompositor (capability detection, SSR-safe) ─────────────────────
 
-/** Поддерживает ли среда CSS linear()-easing (Baseline 12.2023). */
-function linearEasingSupported(): boolean {
-  const css = (globalThis as { CSS?: { supports?: (p: string, v: string) => boolean } }).CSS;
-  if (css !== undefined && typeof css.supports === 'function') {
-    try {
-      return css.supports('transition-timing-function', 'linear(0, 1)');
-    } catch {
-      return false;
-    }
-  }
-  // Нет CSS-API для проверки (SSR/старый тест-env): считаем поддержкой (Baseline
-  // 12.2023) — при живом WAAPI linear() практически всегда есть.
-  return true;
-}
-
 /**
  * Пригодна ли цель/среда для compositor-пути (WAAPI + CSS linear()). SSR-safe:
  * проверка среды только внутри вызова; без цели проверяет Element.prototype.animate.
+ * linear()-проба кэширована (detect.ts) — та же детекция, что у resolveCompositorTier.
  */
 export function supportsCompositor(target?: unknown): boolean {
-  return supportsWaapi(target) && linearEasingSupported();
+  return supportsWaapi(target) && supportsLinearEasing();
 }
 
 // ─── CompositorSpring (контроллер: ретаргет + байт-паритетный fallback) ──────
@@ -452,6 +449,7 @@ export interface CompositorSpringOptions {
    * в окне задержки); на FALLBACK-пути — отложенный первый setTarget через
    * setTimer-seam. Применяется ТОЛЬКО к первичному start(); retarget/handoff —
    * события «сейчас» (delay НЕ переигрывается). Основа composited stagger.
+   * В тире 'reduced' игнорируется: reduce перекрывает и каскад (снап сразу).
    */
   readonly delay?: number | undefined;
   /**
@@ -460,19 +458,36 @@ export interface CompositorSpringOptions {
    * (delay нативный); инъекция — для детерминизма тестов.
    */
   readonly setTimer?: SetTimerFn | undefined;
+  /**
+   * Инжектируемый matchMedia (window.matchMedia.bind(window)). При
+   * prefers-reduced-motion: reduce контроллер выбирает тир 'reduced' —
+   * мгновенный снап к цели вместо анимации (та же политика доступности, что у
+   * drive/keyframes/presets: единый снап во всём пакете, без дрифта). Детекция
+   * один раз в конструкторе; смена системного предпочтения в полёте не
+   * подхватывается (согласовано с drive — проверка на границе входа).
+   */
+  readonly matchMedia?: MatchMediaLike | undefined;
 }
 
 /**
  * Контроллер пружины к значению для АВТОНОМНЫХ переходов и RELEASE-фазы,
  * автоматически выбирающий путь (fire-and-forget one-shot, НЕ per-frame цикл):
  *
- *  • COMPOSITOR (WAAPI доступен): компилирует план и коммитит в Element.animate().
+ *  • COMPOSITOR (WAAPI + CSS linear()): компилирует план и коммитит в Element.animate().
  *    Steady-state — ноль работы main-потока. retarget() — РЕДКОЕ ONE-SHOT событие:
  *    читает (value, velocity) ЗАМКНУТОЙ ФОРМОЙ (readCompositorSpring, без чтения
  *    DOM), отменяет Animation и эмитит новую кривую, засеянную этой скоростью.
  *
- *  • FALLBACK (WAAPI нет): существующий main-thread драйвер MotionValue, чей
- *    setTarget() уже делает smooth-pickup (перенос скорости). Значения — в apply().
+ *  • ЖИВОЙ rAF (тиры waapi-no-linear / raf / ssr): main-thread драйвер MotionValue,
+ *    чей setTarget() уже делает smooth-pickup (перенос скорости). Значения — в apply().
+ *
+ *  • СНАП (тир reduced, prefers-reduced-motion): мгновенно эмитит финальное значение,
+ *    без анимации — единая снап-политика доступности пакета (см. matchMedia-опцию).
+ *
+ * ПУТЬ ВЫБИРАЕТСЯ ОДИН РАЗ в конструкторе (resolveCompositorTier, detect.ts) —
+ * fallback-матрица из 5 тиров; фактический тир виден как `.tier` (телеметрия),
+ * `.mode` ('compositor' | 'fallback') сохранён для обратной совместимости.
+ * Полная таблица «тир → поведение → что теряем» — в README «Fallback-матрица».
  *
  * ГРАНИЦЫ (red-team 2026-07-08): НЕ вызывать retarget() каждый кадр
  * (gesture-follow) — это АНТИПАТТЕРН (cancel+re-emit на кадр). Follow-фаза жестов
@@ -500,7 +515,7 @@ export class CompositorSpring {
   private readonly _requestFrame: RequestFrameFn | undefined;
   private readonly _delay: number;
   private readonly _setTimer: SetTimerFn;
-  private readonly _mode: 'compositor' | 'fallback';
+  private readonly _tier: CompositorTier;
 
   private _from: number;
   private _to: number;
@@ -544,13 +559,30 @@ export class CompositorSpring {
     this._from = opts.from;
     this._to = opts.to;
     this._value = opts.from;
-    // Выбор пути — единственное обращение к среде в конструкторе (SSR-safe).
-    this._mode = supportsCompositor(opts.target) ? 'compositor' : 'fallback';
+    // Детекция тира — единственное обращение к среде в конструкторе (SSR-safe),
+    // один раз. matchMedia (reduce) имеет высший precedence над WAAPI/linear().
+    this._tier = resolveCompositorTier({
+      target: opts.target,
+      matchMedia: opts.matchMedia,
+      requestFrame: opts.requestFrame,
+    });
   }
 
-  /** Текущий путь исполнения. */
+  /**
+   * Диагностический тир пути деградации (для тестов/телеметрии). Один из
+   * 'compositor' | 'waapi-no-linear' | 'raf' | 'reduced' | 'ssr'. Стабилен на
+   * весь жизненный цикл контроллера (детекция один раз в конструкторе).
+   */
+  get tier(): CompositorTier {
+    return this._tier;
+  }
+
+  /**
+   * Путь исполнения (обратная совместимость). 'compositor' только для одноимённого
+   * тира; все прочие тиры (включая reduced/ssr) → 'fallback' (не compositor-поток).
+   */
   get mode(): 'compositor' | 'fallback' {
-    return this._mode;
+    return this._tier === 'compositor' ? 'compositor' : 'fallback';
   }
 
   /** Текущее аналитическое значение (всегда конечно). */
@@ -558,15 +590,23 @@ export class CompositorSpring {
     return this._value;
   }
 
-  /** Запускает анимацию from → to (с учётом стартовой задержки delay, если задана). */
+  /**
+   * Запускает анимацию from → to (с учётом стартовой задержки delay, если
+   * задана). В тире 'reduced' — мгновенный снап к to; delay ИГНОРИРУЕТСЯ:
+   * stagger-хореография (каскад отложенных снапов) — тоже движение, а политика
+   * reduce перекрывает всё (единый снап во всём пакете, ноль дрифта).
+   */
   start(): void {
     if (this._destroyed) return;
     this._started = true;
-    if (this._mode === 'compositor') {
+    if (this._tier === 'compositor') {
       // Первичный старт несёт задержку (нативный WAAPI-delay, off-main-thread);
       // retarget/handoff вызывают _emitCompositor с delay=0 (события «сейчас»).
       this._emitCompositor(this._from, this._to, this._v0Norm, this._delay);
+    } else if (this._tier === 'reduced') {
+      this._settleImmediately(this._to);
     } else {
+      // Живой rAF-путь (waapi-no-linear / raf / ssr).
       this._ensureFallback();
       this._clearTimer();
       if (this._delay > 0) {
@@ -601,7 +641,16 @@ export class CompositorSpring {
     if (this._destroyed) return;
     validateFinite(newTarget, 'newTarget');
 
-    if (this._mode === 'fallback') {
+    if (this._tier === 'reduced') {
+      // reduce активен: снап к новой цели, без анимации.
+      this._to = newTarget;
+      this._settleImmediately(newTarget);
+      this._started = true;
+      return;
+    }
+
+    if (this._tier !== 'compositor') {
+      // Живой rAF-путь: smooth-pickup MotionValue переносит скорость.
       this._ensureFallback();
       this._clearTimer(); // retarget = «сейчас»: снимаем отложенный старт, если ждёт delay
       this._to = newTarget;
@@ -660,8 +709,32 @@ export class CompositorSpring {
       return inert;
     }
 
-    if (this._mode === 'fallback') {
-      // Уже на main-потоке: тот же MotionValue, при новой цели — retarget.
+    if (this._tier === 'reduced') {
+      // reduce активен: живой путь НЕ должен анимировать. Отдаём MotionValue,
+      // рождённый уже на цели (в покое) — согласовано со снап-политикой. Значение
+      // эмитится один раз; дальнейшее движение — на усмотрение владельца.
+      const target = newTarget ?? this._to;
+      this._to = target;
+      this._value = target;
+      const mv = new MotionValue({
+        initial: target,
+        spring: this._spring,
+        clamp: false,
+        requestFrame: this._requestFrame,
+      });
+      mv.onChange((v: number) => {
+        this._value = v;
+        if (this._apply !== undefined) this._apply(this._format(v));
+      });
+      if (this._apply !== undefined) this._apply(this._format(target));
+      this._mv = mv;
+      this._started = true;
+      return mv;
+    }
+
+    if (this._tier !== 'compositor') {
+      // Живой rAF-путь (waapi-no-linear / raf / ssr): тот же MotionValue,
+      // при новой цели — retarget через smooth-pickup.
       this._ensureFallback();
       if (newTarget !== undefined) {
         this._to = newTarget;
@@ -709,20 +782,18 @@ export class CompositorSpring {
   /** Останавливает прогон (без разрушения; повторный start()/retarget() возобновит). */
   stop(): void {
     this._clearTimer(); // снять отложенный fallback-старт, если задержка не истекла
-    if (this._mode === 'compositor') {
-      if (this._anim !== undefined && typeof this._anim.cancel === 'function') {
-        try {
-          this._anim.cancel();
-        } catch {
-          /* см. retarget */
-        }
+    // Единый путь для всех тиров: compositor держит _anim, живой/reduced — _mv,
+    // снап — ни того ни другого. Отменяем/останавливаем то, что есть.
+    if (this._anim !== undefined && typeof this._anim.cancel === 'function') {
+      try {
+        this._anim.cancel();
+      } catch {
+        /* duck-typed цель могла не реализовать cancel — не роняем stop */
       }
-      this._anim = undefined;
-      // Мог быть отдан live-mv через handoffToLive() — остановить и его (анти-утечка).
-      if (this._mv !== undefined) this._mv.stop();
-    } else if (this._mv !== undefined) {
-      this._mv.stop();
     }
+    this._anim = undefined;
+    // Мог быть отдан live-mv через handoffToLive() — остановить и его (анти-утечка).
+    if (this._mv !== undefined) this._mv.stop();
     this._started = false;
   }
 
@@ -779,6 +850,17 @@ export class CompositorSpring {
       // планирует старт off-main-thread — каскад stagger без работы main-потока.
       ...(delayMs > 0 ? { delay: delayMs } : {}),
     }) as { cancel?: () => void };
+  }
+
+  /**
+   * Снап к value (политика reduced-motion): мгновенно ставит значение и эмитит
+   * его один раз в apply, без анимации/цикла/аллокации MotionValue. Единая
+   * снап-политика доступности пакета (drive/keyframes/presets тоже резолвятся в
+   * финал сразу) — один характер во всём пакете, без дрифта.
+   */
+  private _settleImmediately(value: number): void {
+    this._value = value;
+    if (this._apply !== undefined) this._apply(this._format(value));
   }
 
   private _ensureFallback(): void {
