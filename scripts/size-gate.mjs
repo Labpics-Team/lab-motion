@@ -146,6 +146,24 @@ export const IMPORT_COST_SCENARIOS = [
     code: `import { clamp } from '%DIST%/../utils/index.js'; console.log(clamp(0,1,2));`,
     gate: 340, // факт 308 (2026-07-07, первая сборка ./utils); люфт ~10%
   },
+  {
+    // ПРАВДА потребительской цены фасада. Отгрузочный gz субпутя ./animate
+    // (~10.4 KB, bespoke-порог выше) — двойной счёт: при splitting:false субпуть
+    // несёт копии value/compositor/tokens/stagger. Реальная цена в бандле
+    // потребителя ПОСЛЕ его tree-shake — вот этот сценарий; именно ЕГО число
+    // публикуется в сравнениях размеров (vs Motion mini animate 2.6 KB
+    // vendor-published). Скачок сценария = регрессия tree-shakeability фасада.
+    name: 'animate-one-liner (фасад)',
+    code: `import { animate } from '%DIST%/../animate/index.js'; console.log(typeof animate('.hero', { x: 240, opacity: 1 }).pause);`,
+    // Факт 10865 (2026-07-09, первая сборка фасада) + ~3% люфт. ЧЕСТНАЯ находка:
+    // tree-shake почти не снижает цену — фасад статически тянет весь граф
+    // (value+compositor+tokens+stagger) из-за рантайм-диспетчеризации props.
+    // Позиция рынка: ≈ anime.js full (~10 KB), < Motion full (18 KB vendor),
+    // НО > Motion mini 2.6+1 KB. Следующий шаг эпика — слоистый animate/mini
+    // (transform/opacity + compositor-пружина БЕЗ движка значений) с целью
+    // ≤5 KB; этот порог тогда останется стражем полного фасада.
+    gate: 11200,
+  },
 ];
 
 /**
