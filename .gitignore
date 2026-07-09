@@ -13,3 +13,4 @@ reports
 .stryker-tmp
 peer_b.json
 scratchpad
+bench/compare/results/.*.iife.js
