@@ -77,11 +77,8 @@ export class MainUnit implements GroupOwner {
   private _frames = 0;
   private _useTimeoutFallback = false;
 
-  /** Reused map for transform channels to reduce allocations in hot path (_write every frame). */
-  private readonly _liveTransform = new Map<string, number>();
-
-  /** Reused snap for readCompositorSpring to eliminate return alloc per frame in _emitAt hot path. */
-  private readonly _springSnap = { value: 0, velocity: 0 };
+  private readonly _lt: Record<string, number> = {};
+  private readonly _ss = {v:0,vel:0};
 
   constructor(opts: MainUnitOptions) {
     this._o = opts;
@@ -221,7 +218,7 @@ export class MainUnit implements GroupOwner {
     // Spring: замкнутая форма на канал — та же аналитика, что compositor-путь.
     const t = tMs / 1000;
     let converged = true;
-    const snap = this._springSnap;
+    const snap = this._ss;
     for (const ch of o.numeric) {
       readCompositorSpring(o.mode.spring, { from: ch.from, to: ch.to, v0: ch.v0, t }, snap);
       ch.value = snap.value;
@@ -254,9 +251,9 @@ export class MainUnit implements GroupOwner {
   private _write(): void {
     const o = this._o;
     if (o.group === 'transform') {
-      this._liveTransform.clear();
-      for (const ch of o.numeric) this._liveTransform.set(ch.key, ch.value);
-      o.el.style.setProperty('transform', formatTransform(o.residuals, this._liveTransform));
+      this._lt = {};
+      for (const ch of o.numeric) this._lt[ch.key] = ch.value;
+      o.el.style.setProperty('transform', formatTransform(o.residuals, this._lt));
     } else if (o.css !== undefined) {
       o.el.style.setProperty(o.group, String(o.css.css));
     } else {
