@@ -283,37 +283,19 @@ function buildSegments(configs: readonly SegmentConfig[], initialLabels: Map<str
   return result;
 }
 
-function resolvePosition(pos: string, labels: Map<string, number>, prevEnd: number, prevStart: number): number {
-  const s = pos.trim();
-  if (labels.has(s)) {
-    return labels.get(s)!;
+function resolvePosition(p: string, l: Map<string, number>, e: number, s: number): number {
+  const t = p.trim();
+  if (l.has(t)) return l.get(t)!;
+  if (t === '<') return s;
+  if (t === '>') return e;
+  if (t[0] === '+') { const d = +t.slice(2); return e + (Number.isFinite(d) ? d : 0); }
+  if (t[0] === '-') { const d = +t.slice(2); return e - (Number.isFinite(d) ? d : 0); }
+  const m = t.match(/^([A-Za-z0-9_-]+)([+-]=)(.+)$/);
+  if (m) {
+    const b = l.has(m[1]!) ? l.get(m[1]!)! : 0;
+    const d = +m[3]!; const delta = Number.isFinite(d) ? d : 0;
+    return m[2] === '+=' ? b + delta : b - delta;
   }
-  if (s === '<') return prevStart;
-  if (s === '>') return prevEnd;
-  if (s.startsWith('+=')) {
-    const d = parseFloat(s.slice(2));
-    return prevEnd + (Number.isFinite(d) ? d : 0);
-  }
-  if (s.startsWith('-=')) {
-    const d = parseFloat(s.slice(2));
-    return prevEnd - (Number.isFinite(d) ? d : 0);
-  }
-
-  // Full position params: support "labelname+=N", "labelname-=N", "labelname" already checked.
-  // Also "labelname" with no delta.
-  const relMatch = s.match(/^([A-Za-z0-9_-]+)([+-]=)(.+)$/);
-  if (relMatch) {
-    const baseName = relMatch[1]!;
-    const op = relMatch[2]!;
-    const deltaStr = relMatch[3]!;
-    const base = labels.has(baseName) ? labels.get(baseName)! : 0;
-    const d = parseFloat(deltaStr);
-    const delta = Number.isFinite(d) ? d : 0;
-    return op === '+=' ? base + delta : base - delta;
-  } 
-
-  // Unknown label at this point — fall back to 0 (will be updated if label registered later via .label)
-  // For strictness we could throw, but for DX we allow forward refs via runtime .label + seek.
   return 0;
 }
 
