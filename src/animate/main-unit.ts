@@ -78,7 +78,7 @@ export class MainUnit implements GroupOwner {
   private _useTimeoutFallback = false;
 
   private readonly _lt: Record<string, number> = {};
-  private readonly _ss = {v:0,vel:0};
+  private readonly _ss = { value: 0, velocity: 0 };
 
   constructor(opts: MainUnitOptions) {
     this._o = opts;
