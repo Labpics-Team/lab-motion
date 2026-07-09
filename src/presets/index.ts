@@ -31,6 +31,7 @@ import {
   type EasingFn,
   type MatchMediaResult,
 } from '../keyframes/index.js';
+import { duration as durationTokens, staggerGap } from '../tokens/index.js';
 
 export type { EasingFn, MatchMediaResult };
 
@@ -1045,4 +1046,247 @@ export function presetToWaapi(spec: PresetSpec | CompiledPreset): WaapiConversio
     conversion.progressTrack = { offsets: progressOffsets, values: progressValues };
   }
   return conversion;
+}
+
+// ─── Текстовые/числовые сахара (перенос ценного из PR#79 языком дома) ───────
+//
+// Почему здесь, а не в субпутях ./text ./number ./ticker (как в PR#79):
+// субпуть-зоопарк дробит словарь движений и плодит параллельные конвенции.
+// Сахара — те же headless-пресеты: чистые мапперы «прогресс 0→1 → строка»
+// (дисциплина samplePreset: горячий путь без валидации) + тонкие раннеры
+// поверх runPreset — один clock, reduced-motion CHARACTER-switch и
+// детерминизм наследуются, а не реализуются заново. Дефолты длительностей —
+// из ./tokens (единый источник правды темпа).
+
+export type SplitMode = 'chars' | 'words';
+
+/**
+ * Разбивает текст для пошагового раскрытия.
+ * 'chars' — Unicode-safe посимвольно (Array.from: суррогатные пары эмодзи не
+ * рвутся на половинки); 'words' — слова ВМЕСТЕ с пробельными токенами, чтобы
+ * join('') восстанавливал исходную строку бит-в-бит.
+ * @throws MotionParamError при не-строке или неизвестном режиме.
+ */
+export function splitText(text: string, mode: SplitMode = 'chars'): readonly string[] {
+  if (typeof text !== 'string') {
+    throw new MotionParamError(
+      `presets: splitText.text должен быть строкой, получено ${typeof text}`,
+    );
+  }
+  if (mode !== 'chars' && mode !== 'words') {
+    throw new MotionParamError(
+      `presets: splitText.mode должен быть 'chars' | 'words', получено ${String(mode)}`,
+    );
+  }
+  if (text.length === 0) return [];
+  if (mode === 'words') return text.split(/(\s+)/).filter(Boolean);
+  return Array.from(text);
+}
+
+/** Клэмп прогресса в [0,1]; NaN → 0. CSS-safe: эмитим только валидные кадры. */
+function clampProgress(progress: number): number {
+  return progress > 0 ? (progress < 1 ? progress : 1) : 0;
+}
+
+/**
+ * Кадр печатной машинки: префикс parts при прогрессе p.
+ * Горячий путь — без валидации (дисциплина samplePreset, инвариант 6).
+ */
+export function typewriterAt(parts: readonly string[], progress: number): string {
+  const k = Math.floor(clampProgress(progress) * parts.length);
+  return k <= 0 ? '' : parts.slice(0, k).join('');
+}
+
+/** mulberry32 — крошечный seeded RNG: детерминизм скрэмбла без зависимостей. */
+function mulberry32(seed: number): () => number {
+  let t = seed >>> 0;
+  return () => {
+    t += 0x6d2b79f5;
+    let r = Math.imul(t ^ (t >>> 15), t | 1);
+    r ^= r + Math.imul(r ^ (r >>> 7), r | 61);
+    return ((r ^ (r >>> 14)) >>> 0) / 4294967296;
+  };
+}
+
+const SCRAMBLE_ALPHABET = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789';
+const SCRAMBLE_DEFAULT_SEED = 0xdeadbeef;
+
+export interface ScrambleAtOptions {
+  /** Seed шума: один (text, p, seed) → бит-идентичный кадр (реплеи, тесты). */
+  readonly seed?: number;
+  /** Алфавит шума. По умолчанию латиница+цифры. Unicode-safe (Array.from). */
+  readonly alphabet?: string;
+}
+
+/**
+ * Скрэмбл-кадр: раскрытые глифы цели + seeded-шум в хвосте. ЧИСТАЯ функция
+ * (text, p, seed) → строка: RNG пересоздаётся на каждый вызов, поэтому кадр
+ * НЕ зависит от частоты кадров. В PR#79 rng тёк сквозь кадры — вывод зависел
+ * от fps, реплей ломался; здесь это исправлено по инварианту 3 (детерминизм).
+ * p=1 → точный text. Горячий путь — без валидации.
+ */
+export function scrambleAt(
+  text: string,
+  progress: number,
+  opts: ScrambleAtOptions = {},
+): string {
+  const target = Array.from(text);
+  const len = target.length;
+  if (len === 0) return '';
+  const glyphs = Array.from(opts.alphabet ?? SCRAMBLE_ALPHABET);
+  const rng = mulberry32(opts.seed ?? SCRAMBLE_DEFAULT_SEED);
+  const reveal = Math.floor(clampProgress(progress) * len);
+  let out = '';
+  for (let i = 0; i < len; i++) {
+    out += i < reveal ? target[i]! : glyphs[Math.floor(rng() * glyphs.length)]!;
+  }
+  return out;
+}
+
+export interface NumberFormatOptions {
+  /** BCP-47 локали Intl. undefined → локаль хоста (en-US не навязываем). */
+  readonly locales?: string | string[];
+  /** Опции Intl.NumberFormat: currency/unit/notation и т.д. */
+  readonly format?: Intl.NumberFormatOptions;
+}
+
+/**
+ * Одноразовое Intl-форматирование КОНЕЧНОГО числа.
+ * @throws MotionParamError при неконечном value — строку "NaN"/"∞" в UI не
+ * эмитим (тот же класс гарантий, что CSS-safe инвариант 2).
+ */
+export function formatNumber(value: number, opts: NumberFormatOptions = {}): string {
+  assertFinite('formatNumber.value', value);
+  return new Intl.NumberFormat(opts.locales, opts.format).format(value);
+}
+
+/**
+ * Ячейки тикера/одометра: ВСЕ глифы отформатированной строки (Unicode-safe).
+ * Почему НЕ фильтруем «нецифровое» регэкспом (как в PR#79): фильтр ломает
+ * локали — арабо-индийские цифры, валютные символы и группировочные пробелы
+ * исчезали бы. Что рендерить по ячейкам — решает потребитель.
+ * Отдельного runTicker нет намеренно: тикер = runNumber + tickerCells.
+ */
+export function tickerCells(formatted: string): readonly string[] {
+  return Array.from(formatted);
+}
+
+/** Общие опции раннеров-сахаров (прогресс-трек поверх runPreset). */
+export interface SugarRunOptions {
+  /** Длительность, с. Дефолт — у каждого раннера свой, из ./tokens. */
+  readonly duration?: number;
+  /** Изинг прогресса. По умолчанию линейный (равномерное раскрытие). */
+  readonly easing?: EasingFn;
+  /** Injectable matchMedia (reduced-motion), как в RunPresetOptions. */
+  readonly matchMedia?: ((query: string) => MatchMediaResult) | undefined;
+  /** Injectable requestFrame (virtual-time тесты), как в RunPresetOptions. */
+  readonly requestFrame?: ((cb: (ts?: number) => void) => number) | undefined;
+}
+
+function assertCallback(name: string, fn: unknown): void {
+  if (typeof fn !== 'function') {
+    throw new MotionParamError(`presets: ${name} должен быть функцией, получено ${typeof fn}`);
+  }
+}
+
+/** Единый прогресс-раннер сахаров: спека с одним progress-треком 0→1. */
+function runProgressTrack(
+  durationSeconds: number,
+  opts: SugarRunOptions,
+  onProgress: (p: number) => void,
+): PresetControls {
+  const track: PresetTrack = opts.easing
+    ? { property: 'progress', values: [0, 1], easing: opts.easing }
+    : { property: 'progress', values: [0, 1] };
+  return runPreset(
+    { duration: durationSeconds, tracks: [track] },
+    {
+      onUpdate: (values) => onProgress(values.progress ?? 1),
+      matchMedia: opts.matchMedia,
+      requestFrame: opts.requestFrame,
+    },
+  );
+}
+
+export interface TypewriterRunOptions extends SugarRunOptions {
+  /** Режим разбиения текста. По умолчанию 'chars'. */
+  readonly mode?: SplitMode;
+}
+
+/**
+ * Печатная машинка поверх runPreset: onUpdate получает растущий префикс.
+ * Дефолт длительности — staggerGap.normal (40 мс) НА ГЛИФ: машинка и есть
+ * стаггер по глифам, темп печати не должен зависеть от длины текста.
+ * Reduced-motion: ровно один эмит полного текста (CHARACTER-switch).
+ * @throws MotionParamError при невалидных text/mode/duration/onUpdate.
+ */
+export function runTypewriter(
+  text: string,
+  onUpdate: (partial: string) => void,
+  opts: TypewriterRunOptions = {},
+): PresetControls {
+  assertCallback('runTypewriter.onUpdate', onUpdate);
+  const parts = splitText(text, opts.mode ?? 'chars');
+  const duration =
+    opts.duration ?? Math.max((parts.length * staggerGap.normal) / 1000, FIXED_DT_S);
+  assertDuration('runTypewriter', duration);
+  return runProgressTrack(duration, opts, (p) => onUpdate(typewriterAt(parts, p)));
+}
+
+export interface ScrambleRunOptions extends SugarRunOptions, ScrambleAtOptions {}
+
+/**
+ * Скрэмбл: расшифровка к цели с seeded-шумом. Дефолт — duration.slower
+ * (600 мс из ./tokens): при 60 fps это ~36 кадров шума — эффект читается,
+ * не мельтешит. Фиксированный seed делает реплеи бит-идентичными.
+ * @throws MotionParamError при невалидных text/seed/alphabet/duration/onUpdate.
+ */
+export function runScramble(
+  text: string,
+  onUpdate: (scrambled: string) => void,
+  opts: ScrambleRunOptions = {},
+): PresetControls {
+  assertCallback('runScramble.onUpdate', onUpdate);
+  if (typeof text !== 'string') {
+    throw new MotionParamError(
+      `presets: runScramble.text должен быть строкой, получено ${typeof text}`,
+    );
+  }
+  const seed = opts.seed ?? SCRAMBLE_DEFAULT_SEED;
+  assertFinite('runScramble.seed', seed);
+  const alphabet = opts.alphabet ?? SCRAMBLE_ALPHABET;
+  if (typeof alphabet !== 'string' || alphabet.length === 0) {
+    throw new MotionParamError('presets: runScramble.alphabet должен быть непустой строкой');
+  }
+  const duration = opts.duration ?? durationTokens.slower / 1000;
+  assertDuration('runScramble', duration);
+  const frameOpts: ScrambleAtOptions = { seed, alphabet };
+  return runProgressTrack(duration, opts, (p) => onUpdate(scrambleAt(text, p, frameOpts)));
+}
+
+export interface NumberRunOptions extends SugarRunOptions, NumberFormatOptions {}
+
+/**
+ * Счётчик: ведёт число from→to, эмитит Intl-строку + сырое значение.
+ * Форматтер создаётся ОДИН раз — конструкция Intl.NumberFormat дорогая,
+ * в кадровом цикле ей не место. Дефолт — duration.slow (400 мс из ./tokens).
+ * Значения гарантированно конечны: from/to валидированы, p ∈ [0,1].
+ * @throws MotionParamError при неконечных from/to, невалидных duration/onUpdate.
+ */
+export function runNumber(
+  from: number,
+  to: number,
+  onUpdate: (formatted: string, value: number) => void,
+  opts: NumberRunOptions = {},
+): PresetControls {
+  assertCallback('runNumber.onUpdate', onUpdate);
+  assertFinite('runNumber.from', from);
+  assertFinite('runNumber.to', to);
+  const duration = opts.duration ?? durationTokens.slow / 1000;
+  assertDuration('runNumber', duration);
+  const fmt = new Intl.NumberFormat(opts.locales, opts.format);
+  return runProgressTrack(duration, opts, (p) => {
+    const value = from + (to - from) * p;
+    onUpdate(fmt.format(value), value);
+  });
 }
