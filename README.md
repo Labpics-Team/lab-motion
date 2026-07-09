@@ -471,15 +471,15 @@ distanceScale(200);     // 275 (мс) в дефолтной полосе 0→400
 
 | Фича                  | @labpics/motion (наш)          | Motion (vendor)             | GSAP (vendor)      | anime.js (vendor) |
 |-----------------------|--------------------------------|-----------------------------|--------------------|-------------------|
-| ядро + пружина        | 2.13 KB gz (core) + 1.64 KB (spring) | 2.6 KB (mini)              | ~23–26.6 KB core  | ~12 KB           |
+| ядро + пружина        | 2.16 KB gz (core) + 1.66 KB (spring) | 2.6 KB (mini)              | ~23–26.6 KB core  | ~12 KB           |
 | stagger               | 0.74 KB gz                     | bundled                     | bundled            | bundled          |
-| timeline              | 1.45 KB gz                     | —                           | bundled            | bundled          |
-| animate (one-liner)   | 10.15 KB gz / **10865 B** import-cost | 2.6 KB mini / 18 KB full   | ~23+ KB            | ~11–12 KB        |
-| compositor            | 6.21 KB gz                     | hybrid                      | main-thread        | WAAPI частично   |
+| timeline              | 1.84 KB gz                     | —                           | bundled            | bundled          |
+| animate (one-liner)   | 10.24 KB gz / **10968 B** import-cost | 2.6 KB mini / 18 KB full   | ~23+ KB            | ~11–12 KB        |
+| compositor            | 6.27 KB gz                     | hybrid                      | main-thread        | WAAPI частично   |
 
-**Ключ:** ядро с физикой пружины 2.13 KB vs Motion mini 2.6 KB. animate ~10.8 KB (паритет anime, легче full Motion/GSAP).
+**Ключ:** ядро с физикой пружины 2.16 KB vs Motion mini 2.6 KB. animate ~10.7 KB (паритет anime, легче full Motion/GSAP).
 
-Наши: `pnpm build && pnpm size` в worktree (esbuild+gz level-9). Vendor: motion.dev (2026-07), bundlephobia факты. Полные цифры + методология — `docs/benchmark.md`.
+Наши: `pnpm build && pnpm size` в worktree (esbuild+gz level-9). Vendor-числа: заявлены vendor’ом (motion.dev 2026-07, bundlephobia), нами не измерены. Полные цифры + методология — `docs/бенчмарк.md`.
 
 ## Инварианты (гарантии потребителю)
 
