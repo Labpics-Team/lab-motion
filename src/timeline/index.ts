@@ -89,10 +89,10 @@ export interface SegmentConfig {
    */
   readonly offset?: number;
   /**
-   * Абсолютное начальное время (секунды). Если задан — игнорирует `offset`.
-   * Должен быть >= 0 и конечным.
+   * Абсолютное время (число) или позиция: имя-метки | '<' (старт пред.) | '>' (конец пред.) | '+=N' | '-=N'.
+   * Поддержка для паритета с GSAP/anime (шаг 2 плейбука).
    */
-  readonly at?: number;
+  readonly at?: number | string;
   /**
    * Функция easing (нормализованное время 0..1 → 0..1).
    * По умолчанию: линейная идентичность.
@@ -138,6 +138,10 @@ export interface TimelineOptions {
    * headless zero-DOM subpath не должен требовать lib.dom.d.ts (Invariant 5).
    */
   readonly matchMedia?: ((query: string) => MatchMediaResult) | undefined;
+  /**
+   * Предварительные метки (имя -> время или позиция). Полезно для at в segments.
+   */
+  readonly labels?: Record<string, number | string> | undefined;
 }
 
 /** Управляемый хендл таймлайна. Возвращается createTimeline(). Thenable. */
@@ -154,11 +158,11 @@ export interface TimelineControls {
   /** Остановить воспроизведение (no-op если уже завершён). */
   pause(): void;
   /**
-   * Перемотать к виртуальному времени t (секунды).
+   * Перемотать к виртуальному времени (число) или к метке (строка имени label).
    * t < 0 → 0, NaN → no-op, +Infinity → complete().
    * Эмитирует значения всех сегментов при новом времени.
    */
-  seek(t: number): void;
+  seek(t: number | string): void;
   /**
    * Немедленно снэпнуть к финальным значениям всех сегментов (to) и
    * разрешить Promise.
@@ -169,6 +173,12 @@ export interface TimelineControls {
    * Эмитирует текущие значения.
    */
   cancel(): void;
+
+  /**
+   * Зарегистрировать или обновить метку (label). at может быть числом или позицией.
+   * Используется для seek('name') и позиционирования сегментов.
+   */
+  label(name: string, at?: number | string): void;
 
   /**
    * Thenable — позволяет `await timeline` или `timeline.then(cb)`.
@@ -191,13 +201,20 @@ interface ComputedSegment {
   readonly onStep: ((value: number) => void) | undefined;
   /** true если range = to − from переполняется (→ ±Infinity). */
   readonly hasOverflowRange: boolean;
+  /** Кэшированная длительность (end-start) для hot path, только если конечна. */
+  readonly _dur: number;
 }
 
 // ─── Построение скомпилированных сегментов ───────────────────────────────────
 
-function buildSegments(configs: readonly SegmentConfig[]): ComputedSegment[] {
+function buildSegments(configs: readonly SegmentConfig[], initialLabels: Map<string, number> = new Map()): ComputedSegment[] {
   const result: ComputedSegment[] = [];
   let prevEndTime = 0;
+  let prevStartTime = 0;
+  const labels = new Map(initialLabels); // copy for this build
+
+  // First pass: collect numeric labels from segments if they define at as pure number with label intent (simple: we resolve later)
+  // For creation labels we support via initialLabels.
 
   for (let i = 0; i < configs.length; i++) {
     const cfg = configs[i]!;
@@ -219,15 +236,18 @@ function buildSegments(configs: readonly SegmentConfig[]): ComputedSegment[] {
       );
     }
 
-    // Позиционирование
+    // Позиционирование с поддержкой строк (label, < > += -= )
     let startTime: number;
     if (cfg.at !== undefined) {
-      if (!Number.isFinite(cfg.at) || cfg.at < 0) {
+      if (typeof cfg.at === 'string') {
+        startTime = resolvePosition(cfg.at, labels, prevEndTime, prevStartTime);
+      } else if (!Number.isFinite(cfg.at) || cfg.at < 0) {
         throw new MotionParamError(
           `timeline: segment[${i}].at должен быть >= 0 и конечным, получено ${cfg.at}`,
         );
+      } else {
+        startTime = cfg.at;
       }
-      startTime = cfg.at;
     } else {
       const offset = cfg.offset ?? 0;
       if (!Number.isFinite(offset) || offset < 0) {
@@ -240,14 +260,11 @@ function buildSegments(configs: readonly SegmentConfig[]): ComputedSegment[] {
 
     const rawEndTime = startTime + cfg.duration;
     const range = cfg.to - cfg.from;
-    // endTime может переполниться в Infinity, даже когда startTime и duration
-    // по отдельности конечны (накопленный offset через много сегментов).
-    // Не пропускаем Infinity дальше: клампим и трактуем сегмент как overflow
-    // (snap к `to`), иначе Infinity протекает в prevEndTime → totalDuration.
     const endTimeOverflowed = !Number.isFinite(rawEndTime);
     const endTime = endTimeOverflowed ? Number.MAX_VALUE : rawEndTime;
     const hasOverflowRange = !Number.isFinite(range) || endTimeOverflowed;
 
+    const _dur = (endTimeOverflowed || !Number.isFinite(startTime)) ? 0 : (endTime - startTime);
     result.push({
       from: cfg.from,
       to: cfg.to,
@@ -256,12 +273,30 @@ function buildSegments(configs: readonly SegmentConfig[]): ComputedSegment[] {
       easing: cfg.easing ?? linearEasing,
       onStep: cfg.onStep,
       hasOverflowRange,
+      _dur,
     });
 
+    prevStartTime = startTime;
     prevEndTime = endTime;
   }
 
   return result;
+}
+
+function resolvePosition(p: string, l: Map<string, number>, e: number, s: number): number {
+  const t = p.trim();
+  if (l.has(t)) return l.get(t)!;
+  if (t === '<') return s;
+  if (t === '>') return e;
+  if (t[0] === '+') { const d = +t.slice(2); return e + (Number.isFinite(d) ? d : 0); }
+  if (t[0] === '-') { const d = +t.slice(2); return e - (Number.isFinite(d) ? d : 0); }
+  const m = t.match(/^([A-Za-z0-9_-]+)([+-]=)(.+)$/);
+  if (m) {
+    const b = l.has(m[1]!) ? l.get(m[1]!)! : 0;
+    const d = +m[3]!; const delta = Number.isFinite(d) ? d : 0;
+    return m[2] === '+=' ? b + delta : b - delta;
+  }
+  return 0;
 }
 
 /** Линейное easing (идентичность) — эталонное значение по умолчанию. */
@@ -288,7 +323,7 @@ function computeSegmentAt(seg: ComputedSegment, t: number): number {
   // Overflow guard: диапазон = ±Infinity → snap to `to`
   if (seg.hasOverflowRange) return seg.to;
 
-  const duration = seg.endTime - seg.startTime;
+  const duration = seg._dur > 0 ? seg._dur : (seg.endTime - seg.startTime);
   const localT = (t - seg.startTime) / duration;
 
   // Easing с guard на выход (NaN→0, ±Infinity→±MAX_VALUE)
@@ -317,7 +352,7 @@ function computeSegmentAt(seg: ComputedSegment, t: number): number {
  * @throws MotionParamError если segments пустой или содержит невалидные значения.
  */
 export function createTimeline(opts: TimelineOptions): TimelineControls {
-  const { segments: segConfigs, onStep: globalOnStep, matchMedia } = opts;
+  const { segments: segConfigs, onStep: globalOnStep, matchMedia, labels: initialLabelsRaw } = opts;
 
   // ── Валидация массива сегментов ───────────────────────────────────────────
   if (!segConfigs || segConfigs.length === 0) {
@@ -326,8 +361,18 @@ export function createTimeline(opts: TimelineOptions): TimelineControls {
     );
   }
 
-  // ── Компиляция сегментов (с валидацией полей) ─────────────────────────────
-  const segments = buildSegments(segConfigs);
+  // Подготовка начальных меток
+  const initialLabels = new Map<string, number>();
+  if (initialLabelsRaw) {
+    for (const [k, v] of Object.entries(initialLabelsRaw)) {
+      if (typeof v === 'number' && Number.isFinite(v) && v >= 0) {
+        initialLabels.set(k, v);
+      }
+    }
+  }
+
+  // ── Компиляция сегментов (с валидацией полей + позиций) ────────────────────
+  const segments = buildSegments(segConfigs, initialLabels);
 
   // ── Суммарная длительность = max(segment.endTime) ────────────────────────
   let _totalDuration = 0;
@@ -338,10 +383,6 @@ export function createTimeline(opts: TimelineOptions): TimelineControls {
   if (!Number.isFinite(_totalDuration) || _totalDuration < 0) {
     _totalDuration = 0;
   }
-
-  // Perf hotpath: pre-allocated buffer (no per-frame map/object alloc in computeAll/emit for timeline)
-  // Use mutable shape internally; cast on return (shape identical, readonly is API contract)
-  const _valuesBuffer: { index: number; value: number }[] = segments.map((_, index) => ({ index, value: 0 }));
 
   // ── Reduced-motion policy ─────────────────────────────────────────────────
   const reduce = prefersReducedMotion(matchMedia);
@@ -373,23 +414,33 @@ export function createTimeline(opts: TimelineOptions): TimelineControls {
   /** Счётчик кадров (safety cap). */
   let _frameCount = 0;
 
+  /** Метки (имя -> время). Поддержка label() + seek('name') + позиций в at (шаг 2). */
+  const _labels = new Map<string, number>(initialLabels);
+
   // ── Promise ───────────────────────────────────────────────────────────────
   let _resolve!: () => void;
   const _promise = new Promise<void>((res) => {
     _resolve = res;
   });
 
-  // ── Вычисление и эмит ─────────────────────────────────────────────────────
+  // ── Вычисление и эмит (оптимизированный hot path: zero-alloc per frame) ────
+
+  // Pre-allocated buffer: reuse objects across frames to eliminate per-tick
+  // array + N object allocations (major GC/ perf win in hot loop).
+  type MutableSegmentValue = { index: number; value: number };
+  const _values: MutableSegmentValue[] = segments.map((_, index) => ({ index, value: 0 }));
 
   /**
    * Вычислить значения всех сегментов при времени t.
+   * Mutates prealloc buffer in place. No new allocs.
    * Все значения гарантированно конечны (clampFinite).
    */
   function computeAll(t: number): SegmentValue[] {
     for (let i = 0; i < segments.length; i++) {
-      _valuesBuffer[i]!.value = clampFinite(computeSegmentAt(segments[i]!, t));
+      const seg = segments[i]!;
+      _values[i]!.value = clampFinite(computeSegmentAt(seg, t));
     }
-    return _valuesBuffer as SegmentValue[];
+    return _values as SegmentValue[];
   }
 
   /**
@@ -435,6 +486,21 @@ export function createTimeline(opts: TimelineOptions): TimelineControls {
     } finally {
       _resolve();
     }
+  }
+
+  function label(name: string, at?: number | string): void {
+    if (!name || typeof name !== 'string') return;
+    let t: number;
+    if (at === undefined) {
+      t = _vt;
+    } else if (typeof at === 'number') {
+      t = Number.isFinite(at) ? Math.max(0, at) : _vt;
+    } else if (typeof at === 'string') {
+      t = _labels.has(at) ? _labels.get(at)! : _vt;
+    } else {
+      t = _vt;
+    }
+    _labels.set(name, t);
   }
 
   // ── Frame loop ────────────────────────────────────────────────────────────
@@ -560,17 +626,42 @@ export function createTimeline(opts: TimelineOptions): TimelineControls {
       // tick() проверит _paused и остановит loop на следующей итерации
     },
 
-    seek(t: number): void {
+    seek(t: number | string): void {
       if (_settled) return;
-      if (Number.isNaN(t)) return; // NaN: тихо проигнорировать
-      if (t === Infinity) {
-        controls.complete();
-        return;
+      let target: number;
+      if (typeof t === 'string') {
+        if (_labels.has(t)) {
+          target = _labels.get(t)!;
+        } else {
+          return; // unknown label - no-op
+        }
+      } else {
+        if (Number.isNaN(t)) return; // NaN: тихо проигнорировать
+        if (t === Infinity) {
+          controls.complete();
+          return;
+        }
+        target = t;
       }
-      // Зажать t в [0, totalDuration]
-      _vt = Math.max(0, Math.min(_totalDuration, t));
+      // Зажать target в [0, totalDuration]
+      _vt = Math.max(0, Math.min(_totalDuration, target));
       _lastRealTs = undefined; // сброс, чтобы следующий dt не прыгнул
       emit(_vt);
+    },
+
+    label(name: string, at?: number | string): void {
+      if (!name || typeof name !== 'string') return;
+      let t: number;
+      if (at === undefined) {
+        t = _vt;
+      } else if (typeof at === 'number') {
+        t = Number.isFinite(at) ? Math.max(0, at) : _vt;
+      } else if (typeof at === 'string') {
+        t = _labels.has(at) ? _labels.get(at)! : _vt;
+      } else {
+        t = _vt;
+      }
+      _labels.set(name, t);
     },
 
     complete(): void {
