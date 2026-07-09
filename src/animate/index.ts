@@ -12,7 +12,7 @@
  *   ./compositor — readCompositorSpring (аналитика кадра и C¹-ретаргета),
  *                  compileSpringPlan (WAAPI-план), resolveCompositorTier (авто-tier);
  *   ./value      — parse/interpolate (цвета/юниты), buildTransform (шортхенды);
- *   ./tokens     — дефолты: spring.default | duration.normal + easing.standard;
+ *   ./tokens     — дефолты: spring.default | duration.base + easing.standard;
  *   ./stagger    — каскад задержек (число = gap, конфиг — как есть).
  *
  * Маршрутизация (авто-tier, решение на вызов):
@@ -79,7 +79,7 @@ export interface AnimateOptions {
   readonly spring?: SpringParams | undefined;
   /** Длительность tween (мс). Задана → режим tween (дефолт ease: standard). */
   readonly duration?: number | undefined;
-  /** Изинг tween t∈[0,1]→прогресс. Задан без duration → duration.normal. */
+  /** Изинг tween t∈[0,1]→прогресс. Задан без duration → duration.base. */
   readonly ease?: ((t: number) => number) | undefined;
   /** Задержка старта (мс, ≥ 0) — всем целям. */
   readonly delay?: number | undefined;
@@ -167,7 +167,7 @@ function resolveMode(options: AnimateOptions): MotionMode {
     );
   }
   if (hasTween) {
-    const durationMs = options.duration ?? durationTokens.normal;
+    const durationMs = options.duration ?? durationTokens.base;
     if (!Number.isFinite(durationMs) || durationMs <= 0) {
       throw new MotionParamError(
         `animate: duration должен быть конечным и > 0 (мс), получено ${String(options.duration)}`,

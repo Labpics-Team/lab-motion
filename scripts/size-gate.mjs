@@ -77,13 +77,20 @@ export const BESPOKE_SUBPATH_GATES = {
   //       интеграция detect с stagger-контроллером). Порог 6380 = факт 6193 + ~3%
   //       люфт — выведен ОТ ФАКТА, не суммой порогов. Поднимать только решением Даниила.
   './compositor': 6450,
-  // ./tokens — motion-токены (M3): duration/easing/spring/staggerGap + distanceScale.
-  // Чистые данные + 4 cubic-bezier (тянут ../easing.cubicBezier) + одна функция.
-  // Факт 1117 gz (весь субпуть). Порог 1250 (~12% люфт, как у ./utils). Гарантия —
-  // СУБПУТЬ-изоляция (sideEffects:false): не импортишь ./tokens = ноль, ядро не
-  // растёт (full-core сценарий это и стережёт). Внутри субпутя семейства в
+  // ./tokens — motion-токены (SSOT labui): duration/easing/spring/staggerGap +
+  // distanceScale + springFromDurationBounce (каноническая пара ДС (duration,bounce)
+  // → SpringParams; тянет validateSpringParams ядра, чтобы выход ГАРАНТИРОВАННО
+  // оседал). Чистые данные + 4 cubic-bezier (тянут ../easing.cubicBezier).
+  // Хронология факта/порога (дисциплина ./compositor: порог ОТ ФАКТА):
+  //   1117 gz / 1250 — до канонической пары;
+  //   2026-07-09: 1552 gz / 1650 (~6% люфт) — конвертер + валидатор ядра
+  //   (settle-гарантия) + ДС-пресеты smooth/expressive. Вызовы пресетов
+  //   PURE-аннотированы: соседние субпути (presets, animate-пути без spring)
+  //   конвертер не платят — проверено фактами presets/animate-one-liner.
+  // Гарантия — СУБПУТЬ-изоляция (sideEffects:false): не импортишь ./tokens = ноль,
+  // ядро не растёт (full-core сценарий это и стережёт). Внутри субпутя семейства в
   // минифициров. dist по отдельности не шейкаются; целиком дёшев. Поднимать осознанно.
-  './tokens': 1250,
+  './tokens': 1650,
   // ./presets — headless-словарь движений + текстовые/числовые сахара
   // (порт ценного из PR#79: splitText/typewriterAt/scrambleAt/tickerCells/
   // formatNumber + раннеры runTypewriter/runScramble/runNumber поверх runPreset).
