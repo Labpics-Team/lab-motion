@@ -2,14 +2,22 @@ name: CI
 
 on:
   push:
-    branches: ["ch02-s1-motionvalue-headless-core", "main"]
+    branches: ["main"]
   pull_request:
     branches: ["main"]
 
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
 jobs:
-  ci:
-    name: typecheck · test · build
-    runs-on: [self-hosted, Linux, X64]
+  verify:
+    name: typecheck · build · test · size · package
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
 
     steps:
       - name: Checkout
@@ -20,8 +28,10 @@ jobs:
         with:
           node-version: "20"
 
-      - name: Setup pnpm
-        run: npm install -g pnpm@10
+      - name: Activate pinned pnpm
+        run: |
+          corepack enable
+          corepack prepare pnpm@10.34.4 --activate
 
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
@@ -35,11 +45,14 @@ jobs:
       - name: Test
         run: pnpm test
 
-      - name: Fuzz · overflow finiteness gate (virtual-time, seeded LCG, zero-dep)
-        run: pnpm vitest run --reporter=verbose test/animate-overflow-finiteness-fuzz.test.ts test/solver-finiteness-fuzz.test.ts test/easing-finiteness-fuzz.test.ts test/projection-finiteness-fuzz.test.ts
+      # Глоб вместо ручного списка: новый test/*-finiteness-fuzz.test.ts попадает в
+      # гейт автоматически (класс дрейфа «забытый файл в трёх копиях списка» закрыт;
+      # находка ревью #101 — потеря projection-fuzz при наивном разрешении конфликта).
+      - name: Fuzz · finiteness gate (virtual-time, seeded LCG, zero-dep)
+        run: pnpm vitest run --reporter=verbose test/*finiteness-fuzz.test.ts
 
       - name: Size gate
         run: pnpm size
 
-      - name: Pack smoke (артефакт потребителя — exports/files из тарбола)
+      - name: Pack smoke
         run: pnpm pack:smoke

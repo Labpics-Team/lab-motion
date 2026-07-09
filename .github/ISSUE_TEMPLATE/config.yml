@@ -1,0 +1,5 @@
+blank_issues_enabled: false
+contact_links:
+  - name: Приватное сообщение об уязвимости
+    url: https://github.com/Labpics-Team/lab-motion/security/advisories/new
+    about: Не публикуйте уязвимости в открытых issues.

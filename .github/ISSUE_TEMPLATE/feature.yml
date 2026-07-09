@@ -1,0 +1,52 @@
+name: Возможность
+about: Новый пользовательский сценарий или расширение публичного контракта
+title: "feat: "
+labels: ["enhancement"]
+body:
+  - type: textarea
+    id: outcome
+    attributes:
+      label: Пользовательский результат
+      description: Что сможет сделать потребитель после реализации?
+    validations:
+      required: true
+  - type: textarea
+    id: contract
+    attributes:
+      label: Предлагаемый контракт
+      description: Минимальная форма API, lifecycle и наблюдаемого поведения.
+    validations:
+      required: true
+  - type: textarea
+    id: evidence
+    attributes:
+      label: Основание
+      description: Реальный сценарий, индустриальный контракт, стандарт или сравнительное исследование.
+    validations:
+      required: true
+  - type: textarea
+    id: invariants
+    attributes:
+      label: Инварианты
+      description: Финитность, непрерывность, SSR, cleanup, a11y, размер и другие обязательные свойства.
+    validations:
+      required: true
+  - type: textarea
+    id: alternatives
+    attributes:
+      label: Рассмотренные альтернативы
+      description: Почему существующие примитивы или композиция недостаточны?
+  - type: textarea
+    id: non_goals
+    attributes:
+      label: Не-цели
+      description: Что намеренно не входит в первую версию?
+    validations:
+      required: true
+  - type: textarea
+    id: acceptance
+    attributes:
+      label: Критерии приёмки
+      description: Проверяемые условия, включая тесты, документацию и размер.
+    validations:
+      required: true

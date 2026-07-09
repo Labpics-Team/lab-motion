@@ -1,0 +1,44 @@
+name: Закалка качества
+about: Тесты, производительность, размер, CI, поставка или архитектурный долг
+title: "hardening: "
+labels: []
+body:
+  - type: textarea
+    id: risk
+    attributes:
+      label: Риск
+      description: Какой класс дефектов или деградации сейчас не защищён?
+    validations:
+      required: true
+  - type: textarea
+    id: evidence
+    attributes:
+      label: Доказательство
+      description: Файл/строка, измерение, мутант, воспроизведение или пробел в матрице.
+    validations:
+      required: true
+  - type: textarea
+    id: contract
+    attributes:
+      label: Требуемый гейт
+      description: Какое автоматическое условие должно предотвращать повторение?
+    validations:
+      required: true
+  - type: textarea
+    id: red
+    attributes:
+      label: RED-сценарий
+      description: Как доказать, что новый тест падает без исправления?
+    validations:
+      required: true
+  - type: textarea
+    id: acceptance
+    attributes:
+      label: Критерии приёмки
+      description: Измеримые условия завершения без планов и оценок времени.
+    validations:
+      required: true
+  - type: textarea
+    id: non_goals
+    attributes:
+      label: Не-цели

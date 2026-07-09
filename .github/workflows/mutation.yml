@@ -1,17 +1,22 @@
-name: Mutation (scheduled)
+name: Mutation
 
-# Mutation-тестирование ДОРОГОЕ → по расписанию (еженедельно) + вручную,
-# НЕ на каждый PR. Валидирует силу сьюта на core-физике; break-порог в
-# stryker.config.mjs валит прогон при эрозии mutation score.
 on:
   schedule:
-    - cron: "0 3 * * 1" # понедельник 03:00 UTC
-  workflow_dispatch: {}
+    - cron: "17 3 * * 1"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: mutation-${{ github.ref }}
+  cancel-in-progress: true
 
 jobs:
-  mutation:
-    name: stryker · core physics
-    runs-on: [self-hosted, Linux, X64]
+  core:
+    name: critical numerical core
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
 
     steps:
       - name: Checkout
@@ -22,19 +27,16 @@ jobs:
         with:
           node-version: "20"
 
-      - name: Setup pnpm
-        run: npm install -g pnpm@10
+      - name: Activate pinned pnpm
+        run: |
+          corepack enable
+          corepack prepare pnpm@10.34.4 --activate
 
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
 
-      - name: Mutation test (core)
-        run: pnpm mutation
+      - name: Build
+        run: pnpm build
 
-      - name: Upload HTML report
-        if: always()
-        uses: actions/upload-artifact@v4
-        with:
-          name: mutation-report
-          path: reports/mutation/
-          retention-days: 30
+      - name: Mutation gate
+        run: pnpm mutation
