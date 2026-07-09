@@ -77,7 +77,13 @@ export class MainUnit implements GroupOwner {
   private _frames = 0;
   private _useTimeoutFallback = false;
 
-  private readonly _lt: Record<string, number> = {};
+  /**
+   * Переиспользуемый буфер live-каналов transform: заводится один раз на юнит,
+   * чтобы не аллоцировать Map на каждый кадр в _write (цель этой оптимизации).
+   * Именно Map, а не Record: formatTransform принимает ReadonlyMap, и очистка
+   * через clear() сохраняет ссылку — переприсваивание readonly-поля не нужно.
+   */
+  private readonly _lt = new Map<string, number>();
   private readonly _ss = { value: 0, velocity: 0 };
 
   constructor(opts: MainUnitOptions) {
@@ -251,8 +257,8 @@ export class MainUnit implements GroupOwner {
   private _write(): void {
     const o = this._o;
     if (o.group === 'transform') {
-      this._lt = {};
-      for (const ch of o.numeric) this._lt[ch.key] = ch.value;
+      this._lt.clear();
+      for (const ch of o.numeric) this._lt.set(ch.key, ch.value);
       o.el.style.setProperty('transform', formatTransform(o.residuals, this._lt));
     } else if (o.css !== undefined) {
       o.el.style.setProperty(o.group, String(o.css.css));
