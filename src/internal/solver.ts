@@ -16,11 +16,15 @@ export function solveSpring(
   params: SpringParams,
   t: number,
   v0: number,
+  out?: { value: number; velocity: number },
 ): { value: number; velocity: number } {
   const { mass: m, stiffness: k, damping: c } = params;
 
   if (t <= 0) {
-    return { value: 0, velocity: v0 };
+    const res = out ?? { value: 0, velocity: v0 };
+    res.value = 0;
+    res.velocity = v0;
+    return res;
   }
 
   const omega0 = Math.sqrt(k / m);
@@ -65,7 +69,10 @@ export function solveSpring(
     velocity = A1 * r1 * e1 + A2 * r2 * e2;
   }
 
-  return { value, velocity };
+  const res = out ?? { value, velocity };
+  res.value = value;
+  res.velocity = velocity;
+  return res;
 }
 
 /**

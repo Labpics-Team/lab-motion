@@ -77,6 +77,15 @@ export class MainUnit implements GroupOwner {
   private _frames = 0;
   private _useTimeoutFallback = false;
 
+  /**
+   * Переиспользуемый буфер live-каналов transform: заводится один раз на юнит,
+   * чтобы не аллоцировать Map на каждый кадр в _write (цель этой оптимизации).
+   * Именно Map, а не Record: formatTransform принимает ReadonlyMap, и очистка
+   * через clear() сохраняет ссылку — переприсваивание readonly-поля не нужно.
+   */
+  private readonly _lt = new Map<string, number>();
+  private readonly _ss = { value: 0, velocity: 0 };
+
   constructor(opts: MainUnitOptions) {
     this._o = opts;
     this.finished = new Promise<void>((res) => {
@@ -215,33 +224,29 @@ export class MainUnit implements GroupOwner {
     // Spring: замкнутая форма на канал — та же аналитика, что compositor-путь.
     const t = tMs / 1000;
     let converged = true;
+    const snap = this._ss;
     for (const ch of o.numeric) {
-      const r = readCompositorSpring(o.mode.spring, {
-        from: ch.from,
-        to: ch.to,
-        v0: ch.v0,
-        t,
-      });
-      ch.value = r.value;
-      ch.velocity = r.velocity;
+      readCompositorSpring(o.mode.spring, { from: ch.from, to: ch.to, v0: ch.v0, t }, snap);
+      ch.value = snap.value;
+      ch.velocity = snap.velocity;
       const range = ch.to - ch.from;
       if (Number.isFinite(range)) {
         const ar = Math.max(Math.abs(range), RANGE_EPSILON);
         converged =
           converged &&
-          Math.abs(r.value - ch.to) / ar < CONVERGENCE_THRESHOLD &&
-          Math.abs(r.velocity) / ar < CONVERGENCE_THRESHOLD;
+          Math.abs(snap.value - ch.to) / ar < CONVERGENCE_THRESHOLD &&
+          Math.abs(snap.velocity) / ar < CONVERGENCE_THRESHOLD;
       } // непредставимый спан: канал считается сошедшимся (снап-политика ядра)
     }
     const css = o.css;
     if (css !== undefined) {
-      const r = readCompositorSpring(o.mode.spring, { from: 0, to: 1, v0: css.v0, t });
-      css.p = r.value;
-      css.css = cssAt(css, r.value);
+      readCompositorSpring(o.mode.spring, { from: 0, to: 1, v0: css.v0, t }, snap);
+      css.p = snap.value;
+      css.css = cssAt(css, snap.value);
       converged =
         converged &&
-        Math.abs(r.value - 1) < CONVERGENCE_THRESHOLD &&
-        Math.abs(r.velocity) < CONVERGENCE_THRESHOLD;
+        Math.abs(snap.value - 1) < CONVERGENCE_THRESHOLD &&
+        Math.abs(snap.velocity) < CONVERGENCE_THRESHOLD;
     }
     if (converged) return true;
     this._write();
@@ -252,9 +257,9 @@ export class MainUnit implements GroupOwner {
   private _write(): void {
     const o = this._o;
     if (o.group === 'transform') {
-      const live = new Map<string, number>();
-      for (const ch of o.numeric) live.set(ch.key, ch.value);
-      o.el.style.setProperty('transform', formatTransform(o.residuals, live));
+      this._lt.clear();
+      for (const ch of o.numeric) this._lt.set(ch.key, ch.value);
+      o.el.style.setProperty('transform', formatTransform(o.residuals, this._lt));
     } else if (o.css !== undefined) {
       o.el.style.setProperty(o.group, String(o.css.css));
     } else {

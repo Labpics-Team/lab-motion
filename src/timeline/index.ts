@@ -339,6 +339,10 @@ export function createTimeline(opts: TimelineOptions): TimelineControls {
     _totalDuration = 0;
   }
 
+  // Perf hotpath: pre-allocated buffer (no per-frame map/object alloc in computeAll/emit for timeline)
+  // Use mutable shape internally; cast on return (shape identical, readonly is API contract)
+  const _valuesBuffer: { index: number; value: number }[] = segments.map((_, index) => ({ index, value: 0 }));
+
   // ── Reduced-motion policy ─────────────────────────────────────────────────
   const reduce = prefersReducedMotion(matchMedia);
 
@@ -382,10 +386,10 @@ export function createTimeline(opts: TimelineOptions): TimelineControls {
    * Все значения гарантированно конечны (clampFinite).
    */
   function computeAll(t: number): SegmentValue[] {
-    return segments.map((seg, index) => ({
-      index,
-      value: clampFinite(computeSegmentAt(seg, t)),
-    }));
+    for (let i = 0; i < segments.length; i++) {
+      _valuesBuffer[i]!.value = clampFinite(computeSegmentAt(segments[i]!, t));
+    }
+    return _valuesBuffer as SegmentValue[];
   }
 
   /**
