@@ -207,8 +207,10 @@
   "scripts": {
     "build": "tsup",
     "typecheck": "tsc --noEmit",
-    "test": "vitest run",
+    "test": "node scripts/check-docs-drift.mjs && vitest run",
     "test:watch": "vitest",
+    "naming:inventory": "node scripts/naming-inventory.mjs",
+    "check:docs-drift": "node scripts/check-docs-drift.mjs",
     "size": "node scripts/size-gate.mjs",
     "bench": "node scripts/bench.mjs",
     "bench:latency": "node scripts/bench-latency.mjs",
