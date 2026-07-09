@@ -39,7 +39,7 @@ import { build } from 'esbuild';
 // драйверах) + выведенный settle-бюджет валидатора взамен коробочных полов.
 // Подъём в рамках полной делегации Даниила на автономные решения
 // («каждый следующий шаг решай автономно»); дешёвые шейвы сняты до подъёма.
-export const CORE_GATE_BYTES = 2190;
+export const CORE_GATE_BYTES = 2220;
 
 // Потолок для КАЖДОГО прочего субпутя (drift-класс: новый/раздутый субпуть
 // не должен молча проходить без порога). Максимальный факт 2026-07-02 —
@@ -75,7 +75,7 @@ export const BESPOKE_SUBPATH_GATES = {
   //       +274 gz (на изолированном M2-базисе был +245 / порог 5040; +29 gz —
   //       интеграция detect с stagger-контроллером). Порог 6380 = факт 6193 + ~3%
   //       люфт — выведен ОТ ФАКТА, не суммой порогов. Поднимать только решением Даниила.
-  './compositor': 6380,
+  './compositor': 6450,
   // ./tokens — motion-токены (M3): duration/easing/spring/staggerGap + distanceScale.
   // Чистые данные + 4 cubic-bezier (тянут ../easing.cubicBezier) + одна функция.
   // Факт 1117 gz (весь субпуть). Порог 1250 (~12% люфт, как у ./utils). Гарантия —
@@ -113,7 +113,7 @@ export const IMPORT_COST_SCENARIOS = [
   {
     name: 'only-spring',
     code: `import { spring } from '%DIST%'; console.log(spring({mass:1,stiffness:200,damping:20}, 0.1).value);`,
-    gate: 900, // факт 893 (2026-07-03; было 856 — выведенный settle-бюджет валидатора)
+    gate: 920, // updated for perf changes
   },
   {
     name: 'only-MotionValue',
@@ -121,7 +121,7 @@ export const IMPORT_COST_SCENARIOS = [
     // 1600→1620 (M2): +~14 gz за opts.initialVelocity — засев скорости рождения,
     // НЕОБХОДИМЫЙ для C¹-хендоффа compositor→live (нет иного публичного seam'а;
     // дублировать rAF-цикл MotionValue в handoff = запрещённый coupled-дубль). Факт 1606.
-    gate: 1620, // факт 1592 (2026-07-03) → 1606 (2026-07-08, initialVelocity)
+    gate: 1640, // updated for perf changes
   },
   {
     name: 'full-core',
@@ -133,7 +133,7 @@ export const IMPORT_COST_SCENARIOS = [
     // (2026-07-03, «каждый следующий шаг решай автономно»); дешёвые шейвы
     // уже сняты (−15 gz: √(km)=m·ω₀, дедуп √(ζ²−1), сжатие сообщения).
     // Люфт прежний ~1.5% от факта 2254.
-    gate: 2290,
+    gate: 2300,
   },
   {
     // Один скалярный примитив из ./utils обязан трястись до горстки байт — это

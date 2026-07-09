@@ -261,7 +261,8 @@ describe('timeline-finiteness-fuzz: guard критичен (структурна
     const collected: SegmentValue[] = [];
     const tl = createTimeline({
       segments: [{ from, to, duration: 1 }],
-      onStep: (vs) => collected.push(...vs),
+      // Snapshot values (not refs to internal mutable buffer) to keep hotpath zero-alloc
+      onStep: (vs) => collected.push(...vs.map((s) => ({ index: s.index, value: s.value }))),
       requestFrame: noRaf(),
     });
     tl.seek(0.5);

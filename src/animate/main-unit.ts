@@ -77,10 +77,7 @@ export class MainUnit implements GroupOwner {
   private _frames = 0;
   private _useTimeoutFallback = false;
 
-  /** Reused map for transform channels to reduce allocations in hot path (_write every frame). */
   private readonly _liveTransform = new Map<string, number>();
-
-  /** Reused snap for readCompositorSpring to eliminate return alloc per frame in _emitAt hot path. */
   private readonly _springSnap = { value: 0, velocity: 0 };
 
   constructor(opts: MainUnitOptions) {
