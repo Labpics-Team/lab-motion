@@ -442,26 +442,37 @@ CI-скоупа.
 
 Типобезопасный словарь примитивов движения (`as const`, tree-shakeable по
 семействам). Это ФУНДАМЕНТ, а не вся ДС: семантики ролей («кнопка-ховер») здесь
-нет — роль→токен маппит потребитель (labui). Дефолты не кричащие (в духе Apple
-spring-first / Fluent 2 / Material 3): критично-задемпфированные пружины и мягкие
-изинги, bounce — opt-in. Значения запинены тестами как контракт.
+нет — роль→токен маппит потребитель (labui). Физический словарь (длительности,
+изинги, ДС-пружины `smooth`/`expressive`) зеркалирует SSOT motion-токенов labui
+(`--lab-motion-*`, labui/docs/motion-tokens.md) — при пересечении имён значения
+совпадают байт-в-байт. Дефолты не кричащие (в духе Apple spring-first / Fluent 2
+/ Material 3): критично-задемпфированные пружины и мягкие изинги; overshoot —
+ровно в двух opt-in токенах (`easing.emphasized`, `spring.expressive`/`bounce`).
+Значения запинены тестами как контракт.
 
 ```typescript
-import { duration, easing, spring, staggerGap, distanceScale } from '@labpics/motion/tokens';
+import {
+  duration, easing, spring, staggerGap, distanceScale, springFromDurationBounce,
+} from '@labpics/motion/tokens';
 
-duration.normal;        // 250 (мс): дефолтный UI-переход
-easing.entrance.css;    // 'cubic-bezier(0, 0, 0.2, 1)' — для CSS/WAAPI/compositor
-easing.entrance.fn;     // EasingFn — для ./keyframes / ./stagger
+duration.base;          // 200 (мс): дефолтный UI-переход
+easing.decelerate.css;  // 'cubic-bezier(0, 0, 0, 1)' — для CSS/WAAPI/compositor
+easing.decelerate.fn;   // EasingFn — для ./keyframes / ./stagger
 spring.default;         // { mass: 1, stiffness: 170, damping: 26 } — для ./compositor
+spring.expressive;      // ДС-пружина (0.5s, bounce 0.3): сдержанный overshoot ~4.6%
 staggerGap.normal;      // 40 (мс): шаг каскада для compileStaggerPlan({ gap })
 
+// Каноническая пара восприятия (SwiftUI-модель, SSOT ДС): (duration, bounce) →
+// физпараметры; выход гарантированно принимается всеми путями движка.
+springFromDurationBounce(0.35, 0); // { mass: 1, stiffness: ~322.3, damping: ~35.9 }
+
 // Дистанс-скейл: чем дальше путь, тем дольше движение (единообразная скорость).
-distanceScale(200);     // 275 (мс) в дефолтной полосе 0→400px ↦ fast(150)→slow(400)
+distanceScale(200);     // 200 (мс) в дефолтной полосе 0→400px ↦ fast(100)→slow(300)
 ```
 
 Гарантия размера — субпуть-изоляция (`sideEffects: false`): не импортируешь
 `./tokens` — платишь ноль, ядро не растёт (проверено size-гейтом). Весь субпуть
-~1.1 KB gz.
+~1.5 KB gz.
 
 ## Сравнение размеров (публичная таблица, шаг 5 плана)
 
@@ -519,7 +530,7 @@ pnpm bench      # ns/операцию горячих путей против dis
 шипнутый gz каждого субпутя (список выводится из `exports` автоматически) и
 сценарный import-cost (esbuild bundle+minify против dist — ловит регрессию
 tree-shakeability). Пороги — регрессионные потолки, не цели: ядро 2190 байт gz,
-любой прочий субпуть 4608, точечные — `./utils` 1400, `./tokens` 1250,
+любой прочий субпуть 4608, точечные — `./utils` 1400, `./tokens` 1650,
 `./compositor` 6380.
 
 **CI на каждый PR**: typecheck → build → test → fuzz-гейт финитности

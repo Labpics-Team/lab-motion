@@ -1237,7 +1237,7 @@ export interface ScrambleRunOptions extends SugarRunOptions, ScrambleAtOptions {
 
 /**
  * Скрэмбл: расшифровка к цели с seeded-шумом. Дефолт — duration.slower
- * (600 мс из ./tokens): при 60 fps это ~36 кадров шума — эффект читается,
+ * (500 мс из ./tokens): при 60 fps это ~30 кадров шума — эффект читается,
  * не мельтешит. Фиксированный seed делает реплеи бит-идентичными.
  * @throws MotionParamError при невалидных text/seed/alphabet/duration/onUpdate.
  */
@@ -1269,7 +1269,7 @@ export interface NumberRunOptions extends SugarRunOptions, NumberFormatOptions {
 /**
  * Счётчик: ведёт число from→to, эмитит Intl-строку + сырое значение.
  * Форматтер создаётся ОДИН раз — конструкция Intl.NumberFormat дорогая,
- * в кадровом цикле ей не место. Дефолт — duration.slow (400 мс из ./tokens).
+ * в кадровом цикле ей не место. Дефолт — duration.slow (300 мс из ./tokens).
  * Значения гарантированно конечны: from/to валидированы, p ∈ [0,1].
  * @throws MotionParamError при неконечных from/to, невалидных duration/onUpdate.
  */
