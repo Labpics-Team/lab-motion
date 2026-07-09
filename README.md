@@ -6,7 +6,7 @@ DOM — рендер делает ваш колбэк, время приходи
 
 Три вещи, которые нужно понять сразу:
 
-1. **Всё — субпути.** Корневой экспорт + 31 субпуть (`exports` в `package.json`);
+1. **Всё — субпути.** Корневой экспорт + 32 субпутя (`exports` в `package.json`);
    в бандл попадает только импортированное (`sideEffects: false`).
 2. **Две фазы движения.** Интерактив и follow-фаза (палец ведёт значение) — на
    main-потоке (`MotionValue`, `drive`, `…/gestures`). Автономные переходы и
@@ -19,13 +19,15 @@ DOM — рендер делает ваш колбэк, время приходи
 
 ## Установка
 
-Пакет пока не опубликован в npm (публикация — отдельное решение). До этого —
-установка из тарбола (git-install не поддержан: `dist/` собирается, в гите его нет):
+Пакет опубликован в npm (`@labpics/motion@0.1.0`, 2026-07-09):
 
 ```bash
-cd lab-motion && pnpm build && pnpm pack   # → labpics-motion-<версия>.tgz
-cd ваш-проект && pnpm add /путь/к/labpics-motion-<версия>.tgz
+pnpm add @labpics/motion   # npm install / yarn add — аналогично
 ```
+
+Для разработки из исходников — тарбол: `pnpm build && pnpm pack` →
+`pnpm add /путь/к/labpics-motion-<версия>.tgz` (git-install не поддержан:
+`dist/` собирается, в гите его нет).
 
 Требования: Node ≥ 18. Runtime-зависимостей нет; фреймворк для биндинга — optional
 peer, ставится у потребителя (peer объявлены для 8 фреймворков; `./wc` не требует
@@ -134,6 +136,7 @@ flowchart TB
 | `@labpics/motion` | `spring` (аналитический closed-form солвер), `tween`, `drive` (декларативный запуск), `MotionValue` (реактивное значение со smooth-pickup), `MotionParamError` |
 | `…/driver` | Scrubbable-контроллер: `play/pause/reverse/seek/timeScale/progress` + thenable |
 | `…/frame` | Единый frame-шедулер: `createFrameLoop` / синглтон `frame` — один rAF на кадр, фазы read→update→render против layout-thrash, SSR-safe; `asRequestFrame(loop)` сажает `MotionValue`/`drive` на общий кадр. **Биндинги используют его по умолчанию** (как shared-ticker у Framer Motion/GSAP); инжекция своего `requestFrame` переопределяет |
+| `…/animate` | Одно-строчный DOM-фасад (паритет DX Motion/anime): `animate(цель, { x, opacity, … }, opts)` — элемент/список/CSS-селектор, `{ spring }` ИЛИ `{ duration, ease }`, delay/stagger, контролы + `finished`; авто-маршрут по тирам (reduced-снап / compositor / rAF), повторный вызов прерывает с C¹-подхватом скорости. Физики не добавляет — склейка `./value` + `./compositor` + `./tokens` + `./stagger` |
 
 **Математика значений**
 
@@ -474,23 +477,32 @@ distanceScale(200);     // 200 (мс) в дефолтной полосе 0→400
 `./tokens` — платишь ноль, ядро не растёт (проверено size-гейтом). Весь субпуть
 ~1.5 KB gz.
 
-## Сравнение размеров (публичная таблица, шаг 5 плана)
+## Сравнение размеров
 
-Формат — как motion.dev/docs/gsap-vs-motion, но с честными пометками (vendor-published + наши воспроизводимые замеры `pnpm size` 2026-07-09).
+Наши числа — воспроизводимый прогон `pnpm build && pnpm size` (esbuild
+bundle+minify, gzip level-9) от 2026-07-09 на этой ревизии. Vendor-числа —
+**заявлены vendor'ом, нами не измерены** (motion.dev 2026-07, bundlephobia):
+сравнение честно по порядку величины.
 
-**Строки:** ядро+пружина / stagger / timeline / animate (one-liner) / compositor и т.д.
+| Фича | @labpics/motion (измерено) | Motion (vendor) | GSAP (vendor) | anime.js (vendor) |
+|---|---|---|---|---|
+| ядро + пружина | 2.16 KB gz (core) + 1.66 KB (`./spring`) | 2.6 KB (mini) | ~23–26.6 KB core | ~12 KB |
+| stagger | 0.74 KB gz | bundled | bundled | bundled |
+| timeline | 1.84 KB gz | — | bundled | bundled |
+| animate (one-liner) | 10.25 KB gz шипнутый / **10 969 B** import-cost | 2.6 KB mini / 18 KB full | ~23+ KB | ~11–12 KB |
+| compositor | 6.27 KB gz | hybrid | main-thread | WAAPI частично |
 
-| Фича                  | @labpics/motion (наш)          | Motion (vendor)             | GSAP (vendor)      | anime.js (vendor) |
-|-----------------------|--------------------------------|-----------------------------|--------------------|-------------------|
-| ядро + пружина        | 2.16 KB gz (core) + 1.66 KB (spring) | 2.6 KB (mini)              | ~23–26.6 KB core  | ~12 KB           |
-| stagger               | 0.74 KB gz                     | bundled                     | bundled            | bundled          |
-| timeline              | 1.84 KB gz                     | —                           | bundled            | bundled          |
-| animate (one-liner)   | 10.24 KB gz / **10968 B** import-cost | 2.6 KB mini / 18 KB full   | ~23+ KB            | ~11–12 KB        |
-| compositor            | 6.27 KB gz                     | hybrid                      | main-thread        | WAAPI частично   |
-
-**Ключ:** ядро с физикой пружины 2.16 KB vs Motion mini 2.6 KB. animate ~10.7 KB (паритет anime, легче full Motion/GSAP).
-
-Наши: `pnpm build && pnpm size` в worktree (esbuild+gz level-9). Vendor-числа: заявлены vendor’ом (motion.dev 2026-07, bundlephobia), нами не измерены. Полные цифры + методология — `docs/бенчмарк.md`.
+Две метрики (обе — из size-гейта, см. «Разработка и гейты качества»):
+**шипнутый gz** — вес dist-файла субпутя как есть (CDN/raw-потребитель);
+**import-cost** — esbuild bundle+minify+gz против dist, реальная цена в бандле
+потребителя после его tree-shake. Ключевые import-cost этого прогона:
+only-spring 918 B, full-core 2296 B, only-clamp 308 B (доказательство
+субпуть-изоляции: один примитив из `./utils` — горстка байт), animate-one-liner
+10 969 B. Позиция `./animate` честно: ≈ anime.js full, легче Motion full и GSAP,
+но тяжелее Motion mini — mini даёт только WAAPI-обёртку, без аналитических
+пружин, ретаргета, MotionValue и stagger-compositor. Суммарный шипнутый вес
+всех 32 субпутей на этом прогоне — 76.40 KB gz. По-субпутевая таблица,
+методология и сравнительный runtime-прогон — `docs/бенчмарк.md`.
 
 ## Инварианты (гарантии потребителю)
 
@@ -529,54 +541,14 @@ pnpm bench      # ns/операцию горячих путей против dis
 **Размерный гейт** (`scripts/size-gate.mjs`) — две метрики, обе жёсткие:
 шипнутый gz каждого субпутя (список выводится из `exports` автоматически) и
 сценарный import-cost (esbuild bundle+minify против dist — ловит регрессию
-tree-shakeability). Пороги — регрессионные потолки, не цели: ядро 2190 байт gz,
+tree-shakeability). Пороги — регрессионные потолки, не цели: ядро 2220 байт gz,
 любой прочий субпуть 4608, точечные — `./utils` 1400, `./tokens` 1650,
-`./compositor` 6380.
+`./presets` 5600, `./compositor` 6450, `./animate` 10700.
 
 **CI на каждый PR**: typecheck → build → test → fuzz-гейт финитности
 (overflow/солвер/easing) → size → pack-smoke. **Еженедельно** (или вручную) —
 mutation-тестирование core-физики (Stryker; прогон падает при mutation score
 ниже break-порога 76).
-
-## Размер + перф (шаг 5 плана)
-
-**Свежие метрики 2026-07-09 (worktree `lab-motion-perf` на `docs/size-perf-table-step5`, `node scripts/size-gate.mjs`, `bench.mjs`, `bench-latency.mjs`, `vitest -t perf-hot-path` — все PASS):**
-
-| Модуль / сценарий              | @labpics shipped gz | @labpics import-cost          | Motion (vendor)          | GSAP (vendor core) | anime (vendor) |
-|--------------------------------|---------------------|-------------------------------|--------------------------|--------------------|----------------|
-| core (index + spring/tween/drive/MV) | 2.13 KB            | 2.27 KB (full-core) / 891 B (only-spring) | 2.3 KB mini / ~30–57 KB full | ~27 KB            | 39.3 KB       |
-| stagger                        | 0.74 KB            | ~0.8 KB (tree-shake)         | included                | included          | included      |
-| timeline                       | 1.45 KB            | ~1.5 KB                      | included                | included          | included      |
-| compositor (+spring compile + composited stagger) | 6.21 KB     | via core + compositor        | n/a                     | n/a               | n/a           |
-| animate (facade, one-liner)    | 10.15 KB           | 10.87 KB                     | 2.3 KB (mini WAAPI)     | n/a (timelines)   | ~39 KB        |
-
-**Примечания к таблице:**
-- **shipped gz** — вес dist/*.js после tsup (CDN/raw-потребитель, gzip -9 level, из size-gate).
-- **import-cost** — реальная цена в бандле потребителя: esbuild `bundle+minify` + gzip против dist (сценарии из size-gate; ловит tree-shake регрессии).
-- **mini vs full**: Motion mini (useAnimate/animate mini) — только WAAPI hardware-accelerated, без аналитических пружин, MotionValue, timeline, stagger compositor, ретаргета. Наш `animate` фасад даёт DX-паритет (spring, value, stagger, compositor, handoff) за ~10.8 KB после tree-shake у потребителя.
-- Все субпути изолированы (`sideEffects: false`): не импортировал — платишь 0 байт в ядре (доказано `only-clamp (utils tree-shake) 308 B`).
-
-**Перф-клеймы (микро-бенчи, с evidence):**
-- `spring()` публичный (solver+validate): 82 ns/op, 12.26 M ops/sec (bench.mjs).
-- `drive()` полный прогон (47 кадров, clamp=default): 4.3 µs всего (~232k прогонов/сек).
-- `MotionValue` прогон (47 кадров): 4.6 µs.
-- compositor `compileSpringLinear` HIT (кэш LRU): 89 ns; COLD (сетка+RDP): 85 µs.
-- `readCompositorSpring` O(1): p50 100 ns / p99 600 ns.
-- `handoffToLive` (снимок → live MV): p50 ~300 ns / p99 600 ns (0.01% кадра на 120 Hz; 0.004% на 60 Hz).
-- `compileStaggerPlan` (N=10..200): p50 ~8–9 µs, плоско.
-- **Сходимость (машинонезависимый seal):** 47 кадров до settle (perf-hot-path.test.ts: `expect(frames).toBeLessThanOrEqual(55)`; 4 теста PASS; liveness 2000 прогонов <2s).
-- **Freeze advantage (compositor):** автономные переходы/release живут на compositor-потоке (WAAPI `Element.animate` + linear()), main-thread не тикает и не замораживается. Main только для follow/interactive (gestures, drag). Стоимость переключения — handoff/retarget 200–600 ns.
-- Аналитический closed-form O(1) на кадр (V8-инлайн) — в отличие от итеративных/численных солверов в ряде вендоров.
-
-**Доказательства (выводы команд, запуски в worktree):**
-- size-gate: PASS (все OK, пороги не превышены); точные числа выше + animate-one-liner 10865 B gz.
-- bench.mjs: точные строки с ns/op + ops/sec + compositor стопы + hit-rate 98%.
-- bench-latency.mjs: p50/p95/p99 для handoff/stagger + бюджет кадра %.
-- `pnpm test -- -t "перф-seal|size-gate"`: 14+ тестов PASS (вкл. 10 size + 4 perf).
-- pack-smoke: PASS (тарбол цел).
-- Vendor факты: motion.dev reduce-bundle docs (mini 2.3kb), bundlephobia animejs 39.3 KB gz, GSAP reports 26.6 KB core (min+gz).
-
-(Метрики справочные/машинозависимы для wall-time; запечатанные инварианты — тесты + size-gate.)
 
 ## Отвергнутые пути (контрфакты, НЕ реализованы)
 
