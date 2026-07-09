@@ -279,23 +279,13 @@ function buildSegments(configs: readonly SegmentConfig[], initialLabels: Map<str
   return result;
 }
 
-function resolvePosition(pos: string, labels: Map<string, number>, prevEnd: number, prevStart: number): number {
-  const s = pos.trim();
-  if (labels.has(s)) {
-    return labels.get(s)!;
-  }
-  if (s === '<') return prevStart;
-  if (s === '>') return prevEnd;
-  if (s.startsWith('+=')) {
-    const d = parseFloat(s.slice(2));
-    return prevEnd + (Number.isFinite(d) ? d : 0);
-  }
-  if (s.startsWith('-=')) {
-    const d = parseFloat(s.slice(2));
-    return prevEnd - (Number.isFinite(d) ? d : 0);
-  }
-  // Unknown label at this point — fall back to 0 (will be updated if label registered later via .label)
-  // For strictness we could throw, but for DX we allow forward refs via runtime .label + seek.
+function resolvePosition(p: string, l: Map<string, number>, e: number, s: number): number {
+  const t = p.trim();
+  if (l.has(t)) return l.get(t)!;
+  if (t === '<') return s;
+  if (t === '>') return e;
+  if (t[0] === '+') { const d = +t.slice(2); return e + (Number.isFinite(d) ? d : 0); }
+  if (t[0] === '-') { const d = +t.slice(2); return e - (Number.isFinite(d) ? d : 0); }
   return 0;
 }
 
