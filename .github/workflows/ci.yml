@@ -2,14 +2,27 @@ name: CI
 
 on:
   push:
-    branches: ["ch02-s1-motionvalue-headless-core", "main"]
+    branches: [main]
   pull_request:
-    branches: ["main"]
+    branches: [main]
+  merge_group:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  CI: "true"
 
 jobs:
-  ci:
-    name: typecheck · test · build
-    runs-on: [self-hosted, Linux, X64]
+  quality:
+    name: typecheck · build · test · fuzz · size · pack
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
 
     steps:
       - name: Checkout
@@ -21,7 +34,7 @@ jobs:
           node-version: "20"
 
       - name: Setup pnpm
-        run: npm install -g pnpm@10
+        run: npm install --global pnpm@10.34.4
 
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
@@ -35,11 +48,15 @@ jobs:
       - name: Test
         run: pnpm test
 
-      - name: Fuzz · overflow finiteness gate (virtual-time, seeded LCG, zero-dep)
-        run: pnpm vitest run --reporter=verbose test/animate-overflow-finiteness-fuzz.test.ts test/solver-finiteness-fuzz.test.ts test/easing-finiteness-fuzz.test.ts
+      - name: Fuzz · overflow finiteness gate
+        run: >-
+          pnpm vitest run --reporter=verbose
+          test/animate-overflow-finiteness-fuzz.test.ts
+          test/solver-finiteness-fuzz.test.ts
+          test/easing-finiteness-fuzz.test.ts
 
       - name: Size gate
         run: pnpm size
 
-      - name: Pack smoke (артефакт потребителя — exports/files из тарбола)
+      - name: Pack smoke · consumer artifact
         run: pnpm pack:smoke
