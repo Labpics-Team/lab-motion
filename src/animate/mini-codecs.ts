@@ -34,9 +34,13 @@ const TRANSFORM_IDENTITY: Readonly<Record<string, number>> = {
   skewY: 0,
 };
 
-/** transform-шортхенд ли ключ. */
+/**
+ * transform-шортхенд ли ключ. `typeof ...==='number'` (не `key in`) отсекает
+ * УНАСЛЕДОВАННЫЕ constructor/toString/__proto__ (они функции/объект, не число) —
+ * иначе классифицировались бы как transform-канал (prototype-pollution).
+ */
 export function isTransformKey(key: string): boolean {
-  return key in TRANSFORM_IDENTITY;
+  return typeof TRANSFORM_IDENTITY[key] === 'number';
 }
 
 /** Identity transform-канала (0, для scale-семейства 1). */
@@ -46,10 +50,26 @@ export function transformIdentity(key: string): number {
 
 // ─── Числовой кодек (transform-компоненты + opacity) ─────────────────────────
 
-/** Проверяет и возвращает конечное число (fail-fast). */
+/** Полно-строчный разбор «число[юнит]»: группа 1 — число, группа 2 — юнит. */
+const _UNIT_RE = /^([+-]?(?:\d+\.?\d*|\.\d+)(?:[eE][+-]?\d+)?)([a-z%]*)$/;
+
+/**
+ * Проверяет и возвращает конечное число (fail-fast). Строка проходит СТРОГУЮ
+ * полно-строчную числовую валидацию (без юнита): '1rad'/'12oops' — бросок, а не
+ * тихий parseFloat-обрез до 1/12 (иначе `rotate: "1rad"` → rotate(1deg)).
+ */
 function _finite(property: string, v: unknown): number {
-  const n = typeof v === 'string' ? parseFloat(v) : (v as number);
-  if (typeof n !== 'number' || !Number.isFinite(n)) {
+  let n: number;
+  if (typeof v === 'string') {
+    // Строгий гейт: полная числовая строка БЕЗ юнита; иначе NaN → бросок ниже
+    // ('1rad'/'12oops' не должны тихо усечься parseFloat'ом до 1/12).
+    const m = _UNIT_RE.exec(v.trim());
+    n = m?.[2] === '' ? parseFloat(m[1]!) : NaN;
+  } else {
+    n = v as number;
+  }
+  // Number.isFinite сам отвергает не-числа (boolean/object/NaN/±∞) — доп. typeof не нужен.
+  if (!Number.isFinite(n)) {
     throw new MotionParamError(`animate: '${property}' — не конечное число: ${String(v)}`);
   }
   return n;
@@ -77,12 +97,11 @@ interface VarValue {
   readonly unit: string;
 }
 
-const _UNIT_RE = /^([+-]?(?:\d+\.?\d*|\.\d+)(?:[eE][+-]?\d+)?)([a-z%]*)$/;
-
 /**
  * Кодек CSS-переменной: '10px'→{10,'px'}, 0.5→{0.5,''}, '50%'→{50,'%'}.
- * Интерполирует число, юнит несёт цель (несовпадение юнитов — цель побеждает,
- * C⁰). canComposite=false — переменные не идут на compositor-путь (linear()-
+ * Интерполирует число, юнит несёт ЦЕЛЬ (to.unit — включая явно-безюнитную цель
+ * '' → результат-число; несовпадение юнитов — цель побеждает, C⁰). canComposite=
+ * false — переменные не идут на compositor-путь (linear()-
  * кейфрейм по custom-property ненадёжен кроссбраузерно; mini держит их на main).
  * range=undefined → C⁰-подхват (velocity 0), канон css-каналов фасада.
  */
@@ -103,7 +122,7 @@ export const cssVarCodec: PropertyCodec<VarValue> = {
     }
     return { n: parseFloat(m[1]!), unit: m[2]! };
   },
-  interpolate: (from, to) => (p) => ({ n: from.n + (to.n - from.n) * p, unit: to.unit || from.unit }),
+  interpolate: (from, to) => (p) => ({ n: from.n + (to.n - from.n) * p, unit: to.unit }),
   // Финитность-страж: non-finite n → 0 (враждебный p не течёт в CSS-значение).
   serialize: (value) => {
     const n = Number.isFinite(value.n) ? value.n + 0 : 0;
@@ -114,6 +133,7 @@ export const cssVarCodec: PropertyCodec<VarValue> = {
 
 // ─── DOM-адаптер элемента (surface-композиция transform) ─────────────────────
 
+/** DOM-подобная цель: объект со style.setProperty/getPropertyValue (Element подходит). */
 interface StyleTarget {
   readonly style: {
     setProperty(name: string, value: string): void;
@@ -133,6 +153,7 @@ export function isStyleTarget(t: unknown): t is StyleTarget {
   );
 }
 
+/** camelCase-имя свойства → kebab-case CSS-имя (backgroundColor → background-color). */
 function _camelToKebab(key: string): string {
   return key.replace(/[A-Z]/g, (c) => '-' + c.toLowerCase());
 }

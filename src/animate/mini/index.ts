@@ -5,7 +5,10 @@
  *
  * ПОТОЛОК: ≤ 5 KB gz. Покрывает контракт mini:
  *   transform-шортхенды (x/y/scale/scaleX/scaleY/rotate/skewX/skewY), opacity,
- *   CSS-переменные, spring/tween, delay/stagger, контролы, авто compositor-tier.
+ *   CSS-переменные, spring/tween, delay/stagger, контролы, reduced-motion снап.
+ *
+ * mini исполняет transform/opacity на MAIN-потоке аналитической замкнутой формой
+ * (БЕЗ WAAPI/compositor-offload — тот не помещается под 5 KB, живёт в ./animate).
  *
  * mini регистрирует МИНИМАЛЬНЫЙ набор кодеков/адаптеров (mini-codecs.ts) и НЕ
  * импортирует full-набор (цвет/SVG-атрибут/plain-object) — граф mini не тянет

@@ -102,6 +102,7 @@ interface SurfaceRecord {
 
 const _registry = new WeakMap<object, Map<string, SurfaceRecord>>();
 
+/** Запись поверхности цели (владелец + последнее значение каналов), лениво. */
 function _surfaceRecord(target: object, surface: string): SurfaceRecord {
   let map = _registry.get(target);
   if (map === undefined) {
@@ -118,6 +119,7 @@ function _surfaceRecord(target: object, surface: string): SurfaceRecord {
 
 // ─── Разбор опций ─────────────────────────────────────────────────────────────
 
+/** Режим движения из опций: spring ИЛИ tween (взаимоисключающи — fail-fast). */
 function _resolveMode(o: EngineOptions): MotionMode {
   const hasSpring = o.spring !== undefined;
   const hasTween = o.duration !== undefined || o.ease !== undefined;
@@ -138,6 +140,7 @@ function _resolveMode(o: EngineOptions): MotionMode {
   return { type: 'spring', spring: o.spring ?? DEFAULT_SPRING };
 }
 
+/** Неотрицательное конечное число или дефолт; иначе fail-fast MotionParamError. */
 function _nonNeg(name: string, v: number | undefined, dflt: number): number {
   const x = v ?? dflt;
   if (!Number.isFinite(x) || x < 0) {
@@ -281,8 +284,16 @@ function _bindSurface(
     const animated = new Set(specs.map((s) => s.property));
     const known = new Set<string>(rec.last.keys());
     if (owner !== undefined) for (const k of owner.knownChannels()) known.add(k);
+    // scale выигрывает у scaleX/scaleY в _buildTransform: остаточный uniform-scale
+    // при анимации ОСЕВОГО канала «съел» бы новый рендер (scaleX не виден). НЕ
+    // несём конфликтующий residual 'scale' — тогда осевой канал реально рендерится.
     for (const key of known) {
-      if (animated.has(key)) continue;
+      if (
+        animated.has(key) ||
+        (key === 'scale' && (animated.has('scaleX') || animated.has('scaleY')))
+      ) {
+        continue;
+      }
       const snap = owner?.captureChannel(key) ?? rec.last.get(key);
       if (snap !== undefined) residuals.set(key, snap.value);
     }
@@ -322,6 +333,7 @@ class Unit implements SurfaceOwner {
   private _converged = false;
   private _off: (() => void) | undefined;
 
+  /** Стартует прогон: reduced → мгновенный снап, иначе планирует первый кадр. */
   constructor(o: UnitOptions) {
     this._o = o;
     this._v0 = o.bound.v0;
@@ -335,6 +347,7 @@ class Unit implements SurfaceOwner {
 
   // ── SurfaceOwner (подхват при повторном animate) ──────────────────────────
 
+  /** Снимок канала для C¹-подхвата: живой канал (value+velocity) или остаток. */
   captureChannel(property: string): ChannelSnapshot | undefined {
     const ch = this._o.bound.channels.find((c) => c.property === property);
     if (ch !== undefined) return { value: ch.value, velocity: ch.velocity };
@@ -342,10 +355,12 @@ class Unit implements SurfaceOwner {
     return frozen === undefined ? undefined : { value: frozen, velocity: 0 };
   }
 
+  /** Все ключи прогона: живые каналы + остаточные (для residual-проекции). */
   knownChannels(): readonly string[] {
     return [...this._o.bound.channels.map((c) => c.property), ...this._o.bound.residuals.keys()];
   }
 
+  /** Прерывание прогона повторным animate: стоп без записи, finished (не natural). */
   supersede(): void {
     if (this._done) return;
     this._teardown();
@@ -354,12 +369,14 @@ class Unit implements SurfaceOwner {
 
   // ── Контролы ──────────────────────────────────────────────────────────────
 
+  /** Пауза: замораживает прогон, уже запланированный кадр становится инертен. */
   pause(): void {
     if (this._done || this._paused) return;
     this._paused = true;
     this._gen++; // уже запланированный кадр инертен
   }
 
+  /** Возобновление после паузы: сбрасывает ts-базу и планирует новый кадр. */
   play(): void {
     if (this._done || !this._paused) return;
     this._paused = false;
@@ -367,8 +384,11 @@ class Unit implements SurfaceOwner {
     this._schedule();
   }
 
+  /** Перемотка к виртуальному времени tMs: синхронный эмит (вычисление+запись). */
   seek(tMs: number): void {
-    if (this._done || Number.isNaN(tMs)) return;
+    // !isFinite отсекает и NaN, и ±Infinity: Infinity утекал бы в _compute/spring
+    // (tMs/1000 → ∞ → бросок изнутри). Нефинитная перемотка — no-op, как NaN.
+    if (this._done || !Number.isFinite(tMs)) return;
     this._active = true;
     this._tMs = Math.max(0, tMs);
     this._lastTs = undefined;
@@ -377,6 +397,7 @@ class Unit implements SurfaceOwner {
     else this._write();
   }
 
+  /** Отмена: стоп на текущем значении, фиксация в реестр, finished (не natural). */
   cancel(): void {
     if (this._done) return;
     this._teardown();
@@ -392,6 +413,7 @@ class Unit implements SurfaceOwner {
   // (сделано один раз в _bindSurface) и записи разведены по фазам — layout-
   // thrash исключён. render перепланирует кадр (batch-семантика ./frame).
 
+  /** Планирует один кадр: update (вычисление) + render (запись) как once-подписки. */
   private _schedule(): void {
     const gen = this._gen;
     this._off?.();
@@ -464,6 +486,7 @@ class Unit implements SurfaceOwner {
     return false;
   }
 
+  /** Запись поверхности: остаточные + живые каналы → compose → apply в цель. */
   private _write(): void {
     const o = this._o;
     const map = new Map<string, string | number>();
@@ -472,6 +495,7 @@ class Unit implements SurfaceOwner {
     o.adapter.apply(o.target, o.surface, o.adapter.compose(o.surface, map));
   }
 
+  /** Оседание: точный финал (interp(1)) записан, зафиксирован, finished (natural). */
   private _settle(): void {
     if (this._done) return;
     for (const ch of this._o.bound.channels) {
@@ -485,12 +509,14 @@ class Unit implements SurfaceOwner {
 
   // ── Общее ─────────────────────────────────────────────────────────────────
 
+  /** Снятие подписок кадра и инвалидация поколения (запланированный кадр инертен). */
   private _teardown(): void {
     this._gen++;
     this._off?.();
     this._off = undefined;
   }
 
+  /** Фиксация последних значений каналов/остатков в реестр (для будущего from). */
   private _writeBack(): void {
     const rec = this._o.record;
     for (const ch of this._o.bound.channels) {
@@ -501,6 +527,7 @@ class Unit implements SurfaceOwner {
     });
   }
 
+  /** Терминализация: снимает владение записью, резолвит finished, зовёт onDone. */
   private _finish(natural: boolean): void {
     if (this._done) return;
     this._done = true;
@@ -513,15 +540,18 @@ class Unit implements SurfaceOwner {
 
 // ─── Резолв целей (в момент вызова — SSR-safe) ───────────────────────────────
 
+/** Похоже ли на список элементов (массив/NodeList): number-length + object-элемент. */
 function _isArrayLike(t: unknown): boolean {
   if (Array.isArray(t)) return true;
   const len = (t as { length?: unknown } | null)?.length;
-  if (typeof len !== 'number' || !Number.isFinite(len)) return false;
+  // Number.isFinite сам отвергает не-числовой length (доп. typeof-гейт не нужен).
+  if (!Number.isFinite(len as number)) return false;
   // Список элементов (NodeList/массив), не plain-object со случайным length.
   return len === 0 || typeof (t as ArrayLike<unknown>)[0] === 'object';
 }
 
-function _resolveTargets(target: unknown): object[] {
+/** Резолв цели(ей) в момент вызова (SSR-safe): селектор → NodeList, список, объект. */
+function _resolveTargets(target: unknown, registry: CodecRegistry): object[] {
   if (typeof target === 'string') {
     const doc = (globalThis as { document?: { querySelectorAll?: (s: string) => ArrayLike<object> } }).document;
     if (doc === undefined || typeof doc.querySelectorAll !== 'function') {
@@ -531,20 +561,31 @@ function _resolveTargets(target: unknown): object[] {
     }
     return _collect(doc.querySelectorAll(target));
   }
-  if (target !== null && typeof target === 'object' && _isArrayLike(target)) {
-    return _collect(target as ArrayLike<object>);
+  if (target !== null && typeof target === 'object') {
+    // Прямая adapter-цель ПЕРВЫМ: объект с полем length:0 (напр. style-цель)
+    // иначе трактуется как пустой список → тихий no-op (цель не анимируется).
+    // Валидная прямая цель (resolveAdapter не бросает) — ОДНА цель, не список.
+    try {
+      registry.resolveAdapter(target);
+      return [target as object];
+    } catch {
+      /* не прямая цель — пробуем как список */
+    }
+    if (_isArrayLike(target)) return _collect(target as ArrayLike<object>);
+    return [target as object];
   }
-  if (target !== null && typeof target === 'object') return [target as object];
   throw new MotionParamError(`animate: цель — объект/список/селектор`);
 }
 
 function _collect(list: ArrayLike<object>): object[] {
-  const n = typeof list.length === 'number' && Number.isFinite(list.length) ? list.length : 0;
+  // Number.isFinite сам отвергает не-числовой length (доп. typeof не нужен).
+  const n = Number.isFinite(list.length) ? list.length : 0;
   const out: object[] = [];
   for (let i = 0; i < n; i++) out.push(list[i]!);
   return out;
 }
 
+/** Дефолтный matchMedia-шов: globalThis.matchMedia, если среда его предоставляет. */
 function _defaultMatchMedia(): ((q: string) => { matches: boolean }) | undefined {
   const mm = (globalThis as { matchMedia?: (q: string) => { matches: boolean } }).matchMedia;
   return typeof mm === 'function' ? mm.bind(globalThis) : undefined;
@@ -567,7 +608,7 @@ export function runAnimate(
   const baseDelay = _nonNeg('delay', options.delay, 0);
   const staggerStep = _nonNeg('stagger', options.stagger, 0);
   const specs = _parseSpecs(props, registry);
-  const targets = _resolveTargets(target);
+  const targets = _resolveTargets(target, registry);
 
   const reduced = _prefersReduced(options.matchMedia ?? _defaultMatchMedia());
   // Единый ./frame-шедулер: инжектированный requestFrame → выделенный цикл
@@ -596,6 +637,16 @@ export function runAnimate(
     maybeComplete();
   };
 
+  // ── Фаза 1: собрать и провалидировать ВЕСЬ план ДО любой мутации ──────────
+  // Резолв адаптера + surfaceOf + _bindSurface (все могут бросить) выполняются
+  // для ВСЕХ целей/поверхностей ПЕРЕД supersede/instantiate/write. Иначе бросок
+  // на ПОЗДНЕЙ цели оставил бы ранние юниты запущенными (под reduced — с уже
+  // записанным финалом): частичная анимация при fail-fast. _bindSurface без
+  // побочных эффектов (только read/parse/capture — НЕ прерывает владельца).
+  // Кортеж плана [target, surface, adapter, record, bound, delayMs] (без имён
+  // полей — экономия байт под потолком mini; порядок = деструктуризация ниже).
+  type PlanEntry = readonly [object, string, TargetAdapter, SurfaceRecord, BoundSurface, number];
+  const plan: PlanEntry[] = [];
   for (let i = 0; i < targets.length; i++) {
     const tgt = targets[i]!;
     const adapter = registry.resolveAdapter(tgt);
@@ -612,26 +663,31 @@ export function runAnimate(
     for (const [surface, list] of bySurface) {
       const rec = _surfaceRecord(tgt, surface);
       const bound = _bindSurface(tgt, surface, list, adapter, rec);
-      rec.owner?.supersede();
-      total++;
-      const unit = new Unit({
-        target: tgt,
-        surface,
-        adapter,
-        record: rec,
-        bound,
-        mode,
-        delayMs,
-        frame: frameLoop,
-        reduced,
-        onDone: report,
-      });
-      // reduced-снап оседает в конструкторе синхронно (пишет rec.last, finished
-      // резолвится) — владельцем НЕ становится (прогон завершён). Живой прогон —
-      // становится: повторный animate подхватит value+velocity через него.
-      if (!reduced) rec.owner = unit;
-      units.push(unit);
+      plan.push([tgt, surface, adapter, rec, bound, delayMs]);
     }
+  }
+
+  // ── Фаза 2: мутации (supersede + instantiate) — только после полной валидации ─
+  for (const [tgt, surface, adapter, rec, bound, delayMs] of plan) {
+    rec.owner?.supersede();
+    total++;
+    const unit = new Unit({
+      target: tgt,
+      surface,
+      adapter,
+      record: rec,
+      bound,
+      mode,
+      delayMs,
+      frame: frameLoop,
+      reduced,
+      onDone: report,
+    });
+    // reduced-снап оседает в конструкторе синхронно (пишет rec.last, finished
+    // резолвится) — владельцем НЕ становится (прогон завершён). Живой прогон —
+    // становится: повторный animate подхватит value+velocity через него.
+    if (!reduced) rec.owner = unit;
+    units.push(unit);
   }
   setupDone = true;
   maybeComplete();

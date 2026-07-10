@@ -691,7 +691,7 @@ level-9); vendor-колонки — **заявлено vendor'ом, нами н�
 | stagger               | 0.74 KB gz                     | bundled                     | bundled            | bundled          |
 | timeline              | 1.84 KB gz                     | —                           | bundled            | bundled          |
 | animate (one-liner)   | 10.25 KB gz / **10969 B** import-cost | 2.6 KB mini / 18 KB full   | ~23+ KB            | ~11–12 KB        |
-| animate/mini          | **4.95 KB gz** shipped / ~5.2 KB import-cost | 2.6 KB mini (+WAAPI)       | ~23+ KB            | ~11–12 KB        |
+| animate/mini          | **5113 B gz** shipped (порог 5120) / 5287 B gz import-cost | 2.6 KB mini (+WAAPI)       | ~23+ KB            | ~11–12 KB        |
 | compositor            | 6.27 KB gz                     | hybrid                      | main-thread        | WAAPI частично   |
 
 Сравнительного runtime-бенчмарка с достоверными числами нет — статус и план

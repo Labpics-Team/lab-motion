@@ -8,8 +8,8 @@
 
 ### Added
 
-- `./animate/mini`: новый субпуть — ЛЁГКИЙ срез animate (потолок **≤ 5 KB gz**,
-  факт 4.95 KB shipped / ~5.2 KB import-cost) поверх **адаптерной архитектуры**
+- `./animate/mini`: новый субпуть — ЛЁГКИЙ срез animate (потолок **≤ 5 KB gz** =
+  5120 B; факт 5113 B gz shipped / 5287 B gz import-cost) поверх **адаптерной архитектуры**
   целей/свойств. Внутренняя граница — `PropertyCodec` (parse/interpolate/
   serialize/canComposite) и `TargetAdapter` (read/surfaceOf/compose/apply) в общем
   реестре (`createRegistry`): движок дергает кодек/адаптер и НИКОГДА не ветвится по
@@ -17,8 +17,9 @@
   регистрирует минимум (числовой transform/opacity + CSS-переменная + DOM-адаптер)
   и НЕ тянет full-набор/`./value`/compositor-компилятор (граф проверяется
   import-cost сценарием). Покрытие: transform-шортхенды, `opacity`, CSS-переменные,
-  spring/tween в ЕДИНОМ прогресс-клоке (keyframe-массивы и per-property наследуют
-  тот же клок), `delay`/`stagger`, контролы `{ finished, play, pause, seek, cancel,
+  spring/tween в ЕДИНОМ прогресс-клоке (значение канала — скаляр/строка/`[from, to]`;
+  keyframe-массивы и per-property переходы — субпуть `./animate`, НЕ mini),
+  `delay`/`stagger`, контролы `{ finished, play, pause, seek, cancel,
   stop }`, C¹-подхват value+velocity при повторном запуске (dominant-канал),
   фазы кадра update→render единого `./frame` (чтение once при привязке, запись —
   в render), reduced-motion снап, SSR-safe импорт, fail-fast `MotionParamError`

@@ -62,6 +62,23 @@ describe('fuzz — cssVarCodec.interpolate финитность (12k)', () => {
       expect(isFiniteSerialized(out), `p=${p} → ${out}`).toBe(true);
     }
   });
+
+  // Зеркало numberCodec-регресса: вырожденное from==to (|range|=0) на ЛЮБОМ p
+  // (включая враждебный) сериализуется конечно — 0-дельта не течёт NaN/∞ в CSS.
+  it('вырожденное from==to на hostile p сериализуется конечно', () => {
+    const rnd = lcg(202406);
+    const units = ['px', '%', 'em', 'rem', ''];
+    for (let i = 0; i < 2000; i++) {
+      const u = units[Math.floor(rnd() * units.length)]!;
+      const v = cssVarCodec.parse(`${((rnd() - 0.5) * 1e4).toFixed(2)}${u}`, '--v');
+      const interp = cssVarCodec.interpolate(v, v);
+      const p = i % 10 === 0 ? HOSTILE_P[(i / 10) % HOSTILE_P.length]! : rnd() * 3 - 1;
+      const out = cssVarCodec.serialize(interp(p));
+      expect(isFiniteSerialized(out), `u=${u} p=${p} → ${out}`).toBe(true);
+      // Конечный p → ровно исходное значение (0-дельта, без дрейфа юнита/числа).
+      if (Number.isFinite(p)) expect(out).toBe(cssVarCodec.serialize(v));
+    }
+  });
 });
 
 describe('fuzz — colorCodec.interpolate финитность (12k)', () => {
@@ -76,6 +93,23 @@ describe('fuzz — colorCodec.interpolate финитность (12k)', () => {
       const to = colorCodec.parse(hx(), 'color');
       const interp = colorCodec.interpolate(from, to);
       const p = i % 40 === 0 ? HOSTILE_P[(i / 40) % HOSTILE_P.length]! : (rnd() - 0.5) * 2 + 0.5;
+      const out = colorCodec.serialize(interp(p));
+      expect(isFiniteSerialized(out), `p=${p} → ${out}`).toBe(true);
+    }
+  });
+
+  // Зеркало numberCodec-регресса: вырожденное from==to на ЛЮБОМ p (включая
+  // враждебный) даёт конечную css-строку — 0-дельта цвета не эмитит NaN.
+  it('вырожденное from==to на hostile p сериализуется конечно', () => {
+    const rnd = lcg(778899);
+    const hx = (): string => {
+      const c = (): string => Math.floor(rnd() * 256).toString(16).padStart(2, '0');
+      return `#${c()}${c()}${c()}`;
+    };
+    for (let i = 0; i < 2000; i++) {
+      const v = colorCodec.parse(hx(), 'color');
+      const interp = colorCodec.interpolate(v, v);
+      const p = i % 10 === 0 ? HOSTILE_P[(i / 10) % HOSTILE_P.length]! : rnd() * 3 - 1;
       const out = colorCodec.serialize(interp(p));
       expect(isFiniteSerialized(out), `p=${p} → ${out}`).toBe(true);
     }

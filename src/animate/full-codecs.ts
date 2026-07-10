@@ -74,15 +74,31 @@ export function isSvgTarget(t: unknown): t is SvgTarget {
   return el.ownerSVGElement != null || (el.namespaceURI ?? '').includes('svg');
 }
 
+/** Белый список анимируемых SVG-презентационных атрибутов (surfaceOf-гейт). */
+const _SVG_ATTRS = new Set([
+  'opacity', 'fill', 'fill-opacity', 'stroke', 'stroke-opacity', 'stroke-width',
+  'stroke-dashoffset', 'stroke-dasharray', 'r', 'rx', 'ry', 'cx', 'cy', 'x', 'y',
+  'x1', 'y1', 'x2', 'y2', 'width', 'height', 'd', 'points', 'transform', 'viewBox',
+  'offset-distance',
+]);
+
 /**
  * Адаптер SVG-элемента: числовые атрибуты (cx/cy/r/width/x1/…) читаются/пишутся
  * через get/setAttribute (НЕ через style — presentation-атрибуты живут в
  * атрибутном пространстве). Каждый атрибут — своя поверхность (без композиции).
- * SSR-safe: атрибуты трогаются только в read/apply.
+ * surfaceOf ГЕЙТИТ имя по белому списку: transform-шортхенды (scale/x-как-сдвиг
+ * резолвятся target-независимо) и CSS-vars (--*) отклоняются fail-fast — иначе
+ * writeAttribute('scale',…)/('--foo',…) был бы тихий no-op. SSR-safe: атрибуты
+ * трогаются только в read/apply.
  */
 export const svgAttrAdapter: TargetAdapter = {
   read: (target, property) => (target as SvgTarget).getAttribute(property) ?? '',
-  surfaceOf: (property) => property,
+  surfaceOf: (property) => {
+    if (!_SVG_ATTRS.has(property)) {
+      throw new MotionParamError(`animate: SVG-атрибут '${property}' не поддержан`);
+    }
+    return property;
+  },
   compose: (_surface, channels) => {
     for (const v of channels.values()) return v;
     return '';
