@@ -5,10 +5,6 @@ on:
     tags:
       - "v*.*.*"
 
-permissions:
-  contents: write
-  id-token: write
-
 concurrency:
   group: release-${{ github.ref }}
   cancel-in-progress: false
@@ -23,6 +19,9 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 30
     environment: npm
+    permissions:
+      contents: read
+      id-token: write
 
     steps:
       - name: Checkout
@@ -89,9 +88,23 @@ jobs:
       - name: Publish through npm trusted publishing
         run: npm publish --access public --ignore-scripts
 
-      - name: Create GitHub Release
+  github-release:
+    name: GitHub Release
+    if: github.repository == 'Labpics-Team/lab-motion'
+    needs: publish
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      contents: write
+
+    steps:
+      - name: Create immutable release record
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
-          gh release view "$GITHUB_REF_NAME" >/dev/null 2>&1 || \
-            gh release create "$GITHUB_REF_NAME" --verify-tag --generate-notes --title "$GITHUB_REF_NAME"
+          gh release view "$GITHUB_REF_NAME" --repo "$GITHUB_REPOSITORY" >/dev/null 2>&1 || \
+            gh release create "$GITHUB_REF_NAME" \
+              --repo "$GITHUB_REPOSITORY" \
+              --verify-tag \
+              --generate-notes \
+              --title "$GITHUB_REF_NAME"
