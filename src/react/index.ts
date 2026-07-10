@@ -330,6 +330,10 @@ const _REDUCE_QUERY = '(prefers-reduced-motion: reduce)';
  * physics/tokens/scheduler.
  *
  * @param matchMedia - Injectable matchMedia seam (default: `window.matchMedia`).
+ *   Pass a STABLE reference (or omit it): a freshly-allocated function each render
+ *   makes `useSyncExternalStore` tear down and re-create the subscription every
+ *   render (wasteful churn — not a leak or loop). Omitting it uses the stable
+ *   browser seam.
  * @returns `true` when reduced motion is preferred, else `false`.
  *
  * @example
