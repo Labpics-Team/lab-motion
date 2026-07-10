@@ -912,7 +912,13 @@ const P4_TESTS: Partial<Record<CheckId, () => void | Promise<void>>> = {
     const secBefore = (glide[k]! - glide[k - 1]!) / dt; // decay-производная у касания
     const secAfter = (glide[k + 1]! - glide[k]!) / dt; // первый чисто пружинный шаг
     expect(secBefore).toBeGreaterThan(0);
-    expect(secAfter).toBeGreaterThan(0.5 * secBefore); // скорость унаследована, не 0
+    // C¹ — ДВУСТОРОННЕЕ окно [0.65, 1.05]·secBefore (факт: ratio≈0.815): пружина
+    // рождается со скоростью decay у касания и за один 16 мс кадр слегка тормозит
+    // восстанавливающей силой. Только нижний порог (>0.5·) пропускал бы мутанта,
+    // РАЗДУВШЕГО скорость подхвата (secAfter ≫ secBefore) — верхняя граница ловит
+    // его; это же окно — обоснование N/A клеток P4×UNITS (сдвиг единиц ×1000).
+    expect(secAfter).toBeGreaterThan(0.65 * secBefore);
+    expect(secAfter).toBeLessThan(1.05 * secBefore);
   },
   SIGN() {
     // Флик влево на min-границе: импульс сохраняет знак — провал НИЖЕ min.
@@ -1011,11 +1017,7 @@ const P4_TESTS: Partial<Record<CheckId, () => void | Promise<void>>> = {
     expect(restXs).toEqual([150]); // onRest один раз
   },
   FINITE() {
-    let s = 0x5eed_0604;
-    const rnd = () => {
-      s = (Math.imul(1664525, s) + 1013904223) & 0x7fffffff;
-      return s / 0x7fffffff;
-    };
+    const rnd = lcg(0x5eed_0604); // общий канон fuzz-PRNG (дедуп локального LCG)
     const springs = [SNAP, CRIT, OVER];
     for (let run = 0; run < 120; run++) {
       const clock = pumpClock();
@@ -1296,11 +1298,7 @@ const P6_TESTS: Partial<Record<CheckId, () => void | Promise<void>>> = {
     expect(Number.isFinite(d.x)).toBe(true);
   },
   FINITE() {
-    let s = 0x5eed_0606;
-    const rnd = () => {
-      s = (Math.imul(1664525, s) + 1013904223) & 0x7fffffff;
-      return s / 0x7fffffff;
-    };
+    const rnd = lcg(0x5eed_0606); // общий канон fuzz-PRNG (дедуп локального LCG)
     const evil = [Number.NaN, Number.POSITIVE_INFINITY, Number.NEGATIVE_INFINITY, 1e308, -0];
     const pick = (): number =>
       rnd() < 0.3 ? evil[Math.floor(rnd() * evil.length)]! : (rnd() - 0.5) * 2e4;
