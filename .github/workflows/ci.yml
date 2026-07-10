@@ -76,7 +76,7 @@ jobs:
 
       - name: Upload Vitest diagnostics
         if: steps.vitest.outcome == 'failure'
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: vitest-diagnostics-${{ github.run_id }}
           path: vitest.log
