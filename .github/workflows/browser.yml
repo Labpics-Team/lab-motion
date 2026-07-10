@@ -1,0 +1,123 @@
+name: Browser conformance
+
+# Browser matrix (issue #102, фаза D): сверка СОБРАННОГО dist с реальным
+# поведением трёх движков (Chromium/Firefox/WebKit). Обязателен для PR,
+# затрагивающих platform adapters — поэтому paths-фильтр на соответствующие
+# субпути + сам browser-слой. Артефакты (trace/video) — только on-failure.
+
+on:
+  push:
+    branches: ["main"]
+    paths:
+      - "src/compositor/**"
+      - "src/gestures/**"
+      - "src/waapi/**"
+      - "src/projection/**"
+      - "src/animate/**"
+      - "src/presence/**"
+      - "src/flip/**"
+      - "src/a11y/**"
+      - "src/scroll/**"
+      - "src/smart/**"
+      - "src/wc/**"
+      - "src/svg/**"
+      - "src/svg-morph/**"
+      - "browser/**"
+      - "playwright.config.ts"
+      - "package.json"
+      - "tsup.config.ts"
+      - ".github/workflows/browser.yml"
+  pull_request:
+    branches: ["main"]
+    paths:
+      - "src/compositor/**"
+      - "src/gestures/**"
+      - "src/waapi/**"
+      - "src/projection/**"
+      - "src/animate/**"
+      - "src/presence/**"
+      - "src/flip/**"
+      - "src/a11y/**"
+      - "src/scroll/**"
+      - "src/smart/**"
+      - "src/wc/**"
+      - "src/svg/**"
+      - "src/svg-morph/**"
+      - "browser/**"
+      - "playwright.config.ts"
+      - "package.json"
+      - "tsup.config.ts"
+      - ".github/workflows/browser.yml"
+  merge_group:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: browser-${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: ${{ github.ref != 'refs/heads/main' }}
+
+env:
+  COREPACK_ENABLE_DOWNLOAD_PROMPT: "0"
+  COREPACK_DEFAULT_TO_LATEST: "0"
+
+jobs:
+  conformance:
+    name: ${{ matrix.browser }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    strategy:
+      fail-fast: false
+      matrix:
+        browser: [chromium, firefox, webkit]
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v6
+        with:
+          # Токен не нужен после checkout (пуша нет) — не оставляем его на диске
+          # перед pnpm install (postinstall-скрипты третьих сторон). SAST: artipacked.
+          persist-credentials: false
+
+      - name: Setup Node
+        uses: actions/setup-node@v6
+        with:
+          node-version: "20"
+
+      - name: Activate pinned pnpm
+        run: |
+          corepack enable
+          corepack install --global pnpm@10.34.4
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      # Устанавливаем ТОЛЬКО нужный движок матрицы (+ системные зависимости).
+      - name: Install Playwright browser
+        run: pnpm exec playwright install --with-deps ${{ matrix.browser }}
+
+      # Типопроверка browser-спеков (отдельный tsconfig: DOM lib + /dist/*→src/*
+      # path-mapping) — специфичный tsc не входит в основной `pnpm typecheck`.
+      - name: Typecheck browser specs
+        run: pnpm typecheck:browser
+
+      # Спеки грузят СОБРАННЫЙ dist — билд обязателен до прогона.
+      - name: Build
+        run: pnpm build
+
+      - name: Run conformance (${{ matrix.browser }})
+        run: pnpm exec playwright test --project=${{ matrix.browser }}
+
+      # Trace/video/screenshot пишутся только on-failure (playwright.config) —
+      # выгружаем их лишь когда шаг упал.
+      - name: Upload failure artifacts
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: browser-conformance-${{ matrix.browser }}-${{ github.run_id }}
+          path: |
+            test-results/
+            playwright-report/
+          if-no-files-found: ignore
+          retention-days: 7
