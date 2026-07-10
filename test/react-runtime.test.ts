@@ -266,6 +266,82 @@ describe('useMotionStyle — effect binding без render на кадр (#104)',
     expect(box.style.transform).toBe(settled); // без изменений после unmount
   });
 
+  it('reduced-снап через snapTo синхронизирует MotionValue — не-reduced retarget не прыгает от stale', () => {
+    // Регрессия (adversarial/CodeRabbit): reduced-ветка обязана звать snapTo, а не
+    // голую запись в style. snapTo гасит живой ран и ресинхронит value/velocity,
+    // поэтому следующий НЕ-reduced retarget стартует пружину от снапнутого значения,
+    // а не от stale _value. Диверсия «write(target) вместо snapTo(target)» → MV.value
+    // остаётся stale (0) → пружина прыгает к ~0 первым кадром → тест краснеет.
+    const w = window as unknown as { matchMedia?: (q: string) => { matches: boolean } };
+    const prev = w.matchMedia;
+    const mm = { matches: true };
+    w.matchMedia = (q: string) => ({ matches: mm.matches, media: q } as MediaQueryList);
+    try {
+      const clock = makeClock();
+      let setPos!: Dispatch<SetStateAction<number>>;
+      function Box(): ReturnType<typeof createElement> {
+        const [pos, setP] = useState(0);
+        setPos = setP;
+        const ref = useMotionStyle({
+          target: pos,
+          property: 'transform',
+          template: 'translateX({v}px)',
+          from: 0,
+          spring: SPRING,
+          requestFrame: clock.requestFrame,
+        });
+        return createElement('div', { id: 'box', ref });
+      }
+      const c = mount(createElement(Box));
+      const xOf = (): number =>
+        Number(
+          /translateX\(([-\d.]+)px\)/.exec((c.querySelector('#box') as HTMLElement).style.transform)![1],
+        );
+
+      // reduced ON: снап на 300 (DOM + MV синхронны через snapTo).
+      act(() => setPos(300));
+      expect(xOf()).toBe(300);
+
+      // reduced OFF: retarget на 350 → пружина обязана стартовать от 300, не от stale 0.
+      mm.matches = false;
+      act(() => setPos(350));
+      act(() => clock.drain(1)); // один кадр
+      expect(xOf()).toBeGreaterThan(280); // с багом было бы ~0 (старт от stale)
+      act(() => clock.drain());
+      expect(xOf()).toBeCloseTo(350, 0); // и оседает на новую цель
+    } finally {
+      w.matchMedia = prev;
+    }
+  });
+
+  it('поздний/условный attach элемента применяет текущее значение (from) сразу', () => {
+    // Регрессия (adversarial): при `{shown && <div ref={ref}/>}` элемент монтируется
+    // ПОСЛЕ layout-эффекта, чей начальный write ушёл в null. ref-callback обязан
+    // записать текущее значение на attach, иначе элемент появляется без стиля (без
+    // from) до первого retarget/кадра. Диверсия «ref-callback только пишет elRef» →
+    // opacity пустой после появления → тест краснеет.
+    const clock = makeClock();
+    let setShown!: Dispatch<SetStateAction<boolean>>;
+    function Box(): ReturnType<typeof createElement> {
+      const [shown, setS] = useState(false);
+      setShown = setS;
+      const ref = useMotionStyle({
+        target: 0.42,
+        property: 'opacity',
+        from: 0.42, // статично (target==from): нет анимации, проверяем именно attach-write
+        spring: SPRING,
+        requestFrame: clock.requestFrame,
+      });
+      return shown ? createElement('div', { id: 'box', ref }) : null;
+    }
+    const c = mount(createElement(Box));
+    expect(c.querySelector('#box')).toBeNull(); // ещё не смонтирован
+
+    act(() => setShown(true)); // элемент появляется сейчас
+    const box = c.querySelector('#box') as HTMLElement;
+    expect(Number(box.style.opacity)).toBeCloseTo(0.42, 5); // from применён на attach
+  });
+
   it('StrictMode mount→cleanup→remount: без краша, один цикл, анимация работает', () => {
     // #104 инвариант: StrictMode гоняет setup→cleanup→setup БЕЗ ре-рендера.
     // cleanup рушит+нулит MotionValue, поэтому второй setup обязан пересоздать его,

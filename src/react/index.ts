@@ -16,10 +16,18 @@
  *   value visually; only the motion style changes (spring vs instant).
  */
 
-import { useState, useEffect, useRef, useCallback } from 'react';
+import { useState, useEffect, useLayoutEffect, useRef, useCallback } from 'react';
 import type { MotionValue, MotionValueOptions, RequestFrameFn } from '../motion-value.js';
 import { createBoundValue } from '../internal/binding-value.js';
 import { type SpringParams } from '../spring.js';
+
+/**
+ * useLayoutEffect on the client, useEffect on the server. Effect-binding must
+ * write the controlled style SYNCHRONOUSLY before paint (no entrance flash), but
+ * useLayoutEffect warns during SSR — so degrade to useEffect where there is no
+ * DOM (effects don't run during renderToString anyway).
+ */
+const useIsoLayoutEffect = typeof document !== 'undefined' ? useLayoutEffect : useEffect;
 
 // ─── Reduced-motion detection ─────────────────────────────────────────────
 
@@ -237,10 +245,11 @@ export function useMotionStyle(options: MotionStyleOptions): (el: HTMLElement | 
   // First-frame stability: create eagerly on the initial render.
   ensureMv();
 
-  // Subscribe after mount (refs attach during commit, before passive effects, so
-  // elRef.current is set). Cleanup unsubscribes + destroys + nulls; ensureMv above
-  // makes a StrictMode remount recreate cleanly.
-  useEffect(() => {
+  // Subscribe before paint (layout effect: initial `from` write lands
+  // synchronously, no entrance flash). Refs attach during commit, before effects,
+  // so elRef.current is set. Cleanup unsubscribes + destroys + nulls; ensureMv
+  // above makes a StrictMode remount recreate cleanly.
+  useIsoLayoutEffect(() => {
     const mv = ensureMv();
     write(mv.value);
     const unsub = mv.onChange(write);
@@ -251,20 +260,31 @@ export function useMotionStyle(options: MotionStyleOptions): (el: HTMLElement | 
     };
   }, [ensureMv, write]);
 
-  // Drive animation on target change (velocity preserved). reduced-motion snaps.
-  useEffect(() => {
+  // Drive animation on target change (velocity preserved). reduced-motion snaps
+  // via snapTo — NOT a bare DOM write: snapTo stops any live run and resyncs the
+  // MotionValue's value/velocity, so a still-running spring can't clobber the snap
+  // and a later non-reduced retarget springs from the snapped value, not stale
+  // state. snapTo emits → subscription writes the DOM. Parity with lit/vue.
+  useIsoLayoutEffect(() => {
     if (prefersReducedMotion()) {
-      write(target);
+      ensureMv().snapTo(target);
       void reducedMotionMode; // mode changes caller CSS, not binding behaviour
     } else {
       ensureMv().setTarget(target);
     }
-  }, [target, reducedMotionMode, ensureMv, write]);
+  }, [target, reducedMotionMode, ensureMv]);
 
-  // Stable ref callback: only records the element; subscription lifecycle lives
-  // in the effects above. Stable identity → React invokes it on mount/unmount
-  // only, never on re-render.
-  return useCallback((el: HTMLElement | null) => {
-    elRef.current = el;
-  }, []);
+  // Stable ref callback: records the element and, on attach, writes the CURRENT
+  // value immediately. The write matters for late/conditional attach (e.g.
+  // `{shown && <div ref={ref} />}`): the layout effect's initial write no-ops
+  // when no element is mounted yet, so without this the element would appear
+  // unstyled (missing its `from`/current value) until the next retarget/frame.
+  // Idempotent with the layout-effect write; still no setState → zero renders.
+  return useCallback(
+    (el: HTMLElement | null) => {
+      elRef.current = el;
+      if (el !== null) write(ensureMv().value);
+    },
+    [ensureMv, write],
+  );
 }
