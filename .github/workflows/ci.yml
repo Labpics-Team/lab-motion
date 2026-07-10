@@ -54,6 +54,9 @@ jobs:
       - name: Structural documentation drift
         run: node scripts/check-docs-drift.mjs
 
+      - name: Repository issue forms contract
+        run: node scripts/check-issue-forms.mjs
+
       - name: Release contract smoke
         shell: bash
         run: |
