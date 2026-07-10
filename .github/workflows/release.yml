@@ -17,7 +17,9 @@ on:
         type: string
 
 concurrency:
-  group: release-${{ github.event_name == 'workflow_dispatch' && format('v{0}', inputs.version) || github.ref }}
+  # Обе формы одного релиза (tag-push и dispatch) сериализуются одной группой
+  # (находка ревью #120: разные группы = гонка двойного publish).
+  group: release-${{ github.event_name == 'workflow_dispatch' && format('refs/tags/v{0}', inputs.version) || github.ref }}
   cancel-in-progress: false
 
 env:
