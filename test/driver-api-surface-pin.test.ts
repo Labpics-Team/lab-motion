@@ -70,6 +70,14 @@ describe('driver: AnimationControls interface shape', () => {
     expect(c.progress).toBeLessThanOrEqual(1);
   });
 
+  // #93 срез 3: аналитическое чтение скорости live-рана (поведение —
+  // test/driver-velocity-read.test.ts; здесь только форма поверхности).
+  it('velocity: читаемое числовое свойство (units/s), read-only', () => {
+    const c = makeControls();
+    expect(typeof c.velocity).toBe('number');
+    expect(Object.getOwnPropertyDescriptor(c, 'velocity')?.set).toBeUndefined();
+  });
+
   it('timeScale: читаемо и записываемо', () => {
     const c = createDriver({ ...BASE_OPTS });
     expect(typeof c.timeScale).toBe('number');

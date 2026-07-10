@@ -60,6 +60,15 @@ export interface MainUnitOptions {
 
 const FIXED_DT_MS = FIXED_DT_S * 1000;
 
+/**
+ * Фиксированный шаг центральной разности производной изинга (в прогресс-
+ * пространстве k∈[0,1]). Фиксированный — детерминизм (инвариант 3); численный,
+ * а не аналитический — ease в контракте opaque `(t)=>number` (cubicBezier —
+ * небрендированное замыкание, дешёвого аналитического пути без смены
+ * публичного контракта фабрик изинга нет). Ошибка на гладких кривых O(h²).
+ */
+const EASE_DERIV_H = 1e-3;
+
 /** Main-thread прогон группы: rAF-цикл с pause/play/seek/cancel и подхватом. */
 export class MainUnit implements GroupOwner {
   readonly finished: Promise<void>;
@@ -207,11 +216,23 @@ export class MainUnit implements GroupOwner {
       const k = tMs / o.mode.durationMs;
       const eased = o.mode.ease(k);
       const p = Number.isFinite(eased) ? eased : k; // враждебный ease → линейный кадр
+      // Аналитическая скорость tween (C¹-контракт #93): v = range·ease′(k)/duration —
+      // captureNum отдаёт её при прерывании, и spring-ран наследует импульс
+      // (перехват tween→spring стал C¹, как spring→spring). Окно разности
+      // поджимается в [0,1]: изинги клампят снаружи диапазона (endpoint-
+      // дисциплина ядра), сэмпл за краем дал бы ложный слом производной.
+      const k0 = k > EASE_DERIV_H ? k - EASE_DERIV_H : 0;
+      const k1 = k + EASE_DERIV_H < 1 ? k + EASE_DERIV_H : 1;
+      const slope = (o.mode.ease(k1) - o.mode.ease(k0)) / (k1 - k0);
+      // Прогресс/с; non-finite (враждебный ease) → 0: NaN не сеется в подхват.
+      const dpdt = Number.isFinite(slope) ? (slope * 1000) / o.mode.durationMs : 0;
       for (const ch of o.numeric) {
-        const v = ch.from + (ch.to - ch.from) * p;
+        const range = ch.to - ch.from;
+        const v = ch.from + range * p;
         if (!Number.isFinite(v)) return true; // непредставимый спан → снап к цели
         ch.value = v;
-        ch.velocity = 0; // tween: скорость не переносится (нет аналитической модели)
+        const vel = range * dpdt;
+        ch.velocity = Number.isFinite(vel) ? vel : 0;
       }
       if (o.css !== undefined) {
         o.css.p = p;

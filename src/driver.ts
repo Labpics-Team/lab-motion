@@ -91,6 +91,15 @@ export interface AnimationControls {
    * Зажата в [0, 1]. 0 = at from, 1 = at to.
    */
   readonly progress: number;
+  /**
+   * Аналитическая скорость (units value/s) при текущем виртуальном времени —
+   * чтение live-рана в произвольный момент (#93): приёмник хендоффа наследует
+   * пару (эмитнутое value, velocity) как начальные условия. Это hidden-state
+   * скорость траектории солвера, НЕ производная клампованного выхода (канон
+   * MotionValue.velocity — clamp-режим не влияет). В покое ровно 0: до старта,
+   * после сходимости/complete/cancel, вырожденный from === to. Всегда конечна.
+   */
+  readonly velocity: number;
 
   /** Возобновить воспроизведение (no-op, если уже играет). */
   play(): void;
@@ -449,6 +458,19 @@ export function createDriver(opts: DriverOptions): AnimationControls {
         // cancel/stop в промежуточной точке — вычислить из _vt.
       }
       return computeProgress(_vt);
+    },
+
+    get velocity(): number {
+      // Покой → ровно 0: settled (сходимость/complete/cancel = ран заморожен),
+      // вырожденный/overflow range (кадров не было). Симметрия computeAt.
+      if (_settled || from === to || overflowRange) return 0;
+      const clamped = Number.isFinite(_vt) ? Math.max(0, _vt) : _vt > 0 ? Infinity : 0;
+      if (clamped === Infinity || clamped === 0) return 0; // сошлась / ещё не стартовала
+      // springUnchecked отдаёт нормированную (progress/s) скорость с конечными
+      // стражами; денормализация в units/s — умножение на range (границы
+      // солвера — единственное место нормировки, инвариант #93).
+      const vel = springUnchecked(opts.spring, clamped).velocity * range;
+      return Number.isFinite(vel) ? vel : 0;
     },
 
     play(): void {
