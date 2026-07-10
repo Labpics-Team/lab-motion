@@ -1,0 +1,80 @@
+name: Регрессия или дефект
+description: Наблюдаемое нарушение существующего контракта
+title: "[Bug] "
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Опишите воспроизводимое поведение. Для уязвимостей используйте приватный отчёт из SECURITY.md.
+  - type: textarea
+    id: result
+    attributes:
+      label: Пользовательский результат
+      description: Какой сценарий потребителя нарушен и почему это важно.
+    validations:
+      required: true
+  - type: textarea
+    id: observed
+    attributes:
+      label: Наблюдаемое поведение
+      description: Фактический результат без предположений о причине.
+    validations:
+      required: true
+  - type: textarea
+    id: expected
+    attributes:
+      label: Ожидаемый контракт
+      description: Какой результат должен наблюдать потребитель.
+    validations:
+      required: true
+  - type: textarea
+    id: reproduction
+    attributes:
+      label: Минимальное воспроизведение
+      description: Код, repository, test или точная последовательность действий.
+      render: typescript
+    validations:
+      required: true
+  - type: textarea
+    id: environment
+    attributes:
+      label: Среда
+      description: Версия пакета, runtime, браузер, framework и режим сборки.
+      placeholder: |
+        @labpics/motion:
+        Node:
+        Браузер:
+        Framework:
+    validations:
+      required: true
+  - type: dropdown
+    id: impact
+    attributes:
+      label: Влияние
+      options:
+        - P0 — потеря данных, безопасность или непригодность релиза
+        - P1 — критический пользовательский сценарий заблокирован
+        - P2 — существенная регрессия с обходным путём
+        - P3 — локальный дефект или несогласованность
+    validations:
+      required: true
+  - type: checkboxes
+    id: invariant
+    attributes:
+      label: Затронутые гарантии
+      options:
+        - label: Финитность значений
+        - label: Детерминизм времени
+        - label: C¹-непрерывность
+        - label: SSR-safe импорт
+        - label: Lifecycle и очистка ресурсов
+        - label: Reduced motion
+        - label: Tree-shaking или размер
+        - label: Публичный API или упаковка
+  - type: textarea
+    id: acceptance
+    attributes:
+      label: Критерии приёмки
+      description: Наблюдаемые условия закрытия, включая регрессионный тест.
+    validations:
+      required: true
