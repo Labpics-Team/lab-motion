@@ -1,0 +1,53 @@
+name: Hardening, качество или производительность
+description: Усиление существующего контракта без новой пользовательской поверхности
+title: "[Hardening] "
+body:
+  - type: textarea
+    id: risk
+    attributes:
+      label: Риск
+      description: Какой класс отказа, дрейфа или деградации остаётся возможным.
+    validations:
+      required: true
+  - type: textarea
+    id: evidence
+    attributes:
+      label: Доказательство
+      description: Ссылка на код, измерение, surviving mutant, трассу или воспроизведение.
+    validations:
+      required: true
+  - type: textarea
+    id: invariant
+    attributes:
+      label: Усиливаемый инвариант
+      description: Формулировка закона, который должен стать проверяемым.
+    validations:
+      required: true
+  - type: textarea
+    id: solution
+    attributes:
+      label: Граница решения
+      description: Где должен находиться фикс и какие соседние слои не должны дублировать его.
+    validations:
+      required: true
+  - type: textarea
+    id: proof
+    attributes:
+      label: Проверка
+      description: RED, mutation, fuzz, differential, browser, size или benchmark.
+    validations:
+      required: true
+  - type: textarea
+    id: acceptance
+    attributes:
+      label: Критерии приёмки
+      description: Наблюдаемые условия закрытия и регрессионные гейты.
+    validations:
+      required: true
+  - type: textarea
+    id: review
+    attributes:
+      label: Независимое ревью
+      description: Какой профиль ревьюера нужен — математика, архитектура, браузеры, безопасность или измерения.
+    validations:
+      required: true
