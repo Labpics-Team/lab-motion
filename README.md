@@ -214,6 +214,21 @@ el.addEventListener('pointermove', (e) => drag.pointerMove({ x: e.clientX, y: e.
 el.addEventListener('pointerup', (e) => drag.pointerUp({ x: e.clientX, y: e.clientY, t: e.timeStamp / 1000 }));
 ```
 
+Захват элемента, летящего compositor-анимацией (C¹, #93): скорость рана
+снимается замкнутой формой (`readCompositorSpring`, без чтения DOM) и
+передаётся вторым аргументом `pointerDown` — жест наследует живой импульс,
+немедленный release продолжает движение, а не обнуляет его:
+
+```typescript
+import { readCompositorSpring } from '@labpics/motion/compositor';
+
+el.addEventListener('pointerdown', (e) => {
+  const read = readCompositorSpring(spring, { from, to, t: (e.timeStamp - startMs) / 1000 });
+  controller.stop(); // владение переходит жесту (compositor-Animation отменяется)
+  drag.pointerDown({ x: e.clientX, y: e.clientY, t: e.timeStamp / 1000 }, { vx: read.velocity });
+});
+```
+
 ### FLIP (layout-анимация)
 
 ```typescript
@@ -243,6 +258,29 @@ const p = createPresence({
   onGone: () => el.remove(), // убрать из DOM только после exit-анимации
 });
 p.exit();
+```
+
+Прерывание с наследованием импульса (C¹, #93): `capture` регистрирует живой
+снимок текущего рана, `interrupted` отдаёт его новой фазе — enter во время
+exit продолжает движение из текущих (value, velocity), а не телепортом:
+
+```typescript
+import { MotionValue } from '@labpics/motion';
+
+const p = createPresence({
+  onExitStart: (done, from, capture) => {
+    const mv = new MotionValue({
+      initial: from?.value ?? 1, initialVelocity: from?.velocity ?? 0,
+      spring, clamp: false, // честный довыбег на стыке
+    });
+    mv.onChange((v) => { el.style.opacity = String(v); });
+    mv.setTarget(0);
+    capture(() => ({ value: mv.value, velocity: mv.velocity }));
+  },
+  onEnterStart: (done, from, capture) => { /* тот же паттерн, цель 1 */ },
+});
+p.exit();
+p.enter(); // передумали: reversed continuation из точки и скорости exit-рана
 ```
 
 ### Скролл-прогресс → таймлайн
