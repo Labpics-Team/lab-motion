@@ -199,52 +199,67 @@ function _applyValue(el: unknown, value: number, property: string, template: str
  * ```
  */
 export function useMotionStyle(options: MotionStyleOptions): (el: HTMLElement | null) => void {
-  const { target, property = 'opacity', template = '{v}', from, spring, reducedMotionMode } = options;
+  const { target, reducedMotionMode } = options;
 
-  // Latest property/template read by the subscription and retarget paths.
-  const propRef = useRef(property);
-  propRef.current = property;
-  const tplRef = useRef(template);
-  tplRef.current = template;
+  // Latest options read by the (stable) helpers below — property/template/spring
+  // are always current without re-subscribing.
+  const optsRef = useRef(options);
+  optsRef.current = options;
 
-  // Stable MotionValue (owns the frame loop) + the bound element + unsubscribe.
+  // MotionValue owns the frame loop; the bound element lives in a ref.
   const mvRef = useRef<MotionValue | null>(null);
-  if (mvRef.current === null) {
-    mvRef.current = createBoundValue({
-      initial: from ?? target,
-      spring: spring ?? { mass: 1, stiffness: 200, damping: 20 },
-      requestFrame: options.requestFrame,
-    });
-  }
   const elRef = useRef<HTMLElement | null>(null);
 
-  // Subscribe once after mount: refs are attached during commit, before passive
-  // effects, so elRef.current is already set. onChange re-reads elRef each frame
-  // so it survives ref reassignment. NO setState → zero component renders.
+  // Lazily (re)create the MotionValue. StrictMode runs effect setup→cleanup→setup
+  // WITHOUT re-rendering, so the cleanup that destroys+nulls the MV must be
+  // recoverable here — otherwise the second setup would deref a destroyed value.
+  // One live MV at a time (the previous is destroyed before this creates a new).
+  const ensureMv = useCallback((): MotionValue => {
+    if (mvRef.current === null) {
+      const o = optsRef.current;
+      mvRef.current = createBoundValue({
+        initial: o.from ?? o.target,
+        spring: o.spring ?? { mass: 1, stiffness: 200, damping: 20 },
+        requestFrame: o.requestFrame,
+      });
+    }
+    return mvRef.current;
+  }, []);
+
+  // Delegation boundary: write the animated number into the bound element's style
+  // using the CURRENT property/template. Re-reads elRef each frame so it survives
+  // ref reassignment. NO setState → zero component renders.
+  const write = useCallback((v: number): void => {
+    const o = optsRef.current;
+    _applyValue(elRef.current, v, o.property ?? 'opacity', o.template ?? '{v}');
+  }, []);
+
+  // First-frame stability: create eagerly on the initial render.
+  ensureMv();
+
+  // Subscribe after mount (refs attach during commit, before passive effects, so
+  // elRef.current is set). Cleanup unsubscribes + destroys + nulls; ensureMv above
+  // makes a StrictMode remount recreate cleanly.
   useEffect(() => {
-    const mv = mvRef.current!;
-    _applyValue(elRef.current, mv.value, propRef.current, tplRef.current);
-    const unsub = mv.onChange((v) => {
-      _applyValue(elRef.current, v, propRef.current, tplRef.current);
-    });
+    const mv = ensureMv();
+    write(mv.value);
+    const unsub = mv.onChange(write);
     return () => {
       unsub();
       mv.destroy();
       mvRef.current = null;
     };
-  }, []);
+  }, [ensureMv, write]);
 
   // Drive animation on target change (velocity preserved). reduced-motion snaps.
   useEffect(() => {
-    const mv = mvRef.current;
-    if (mv === null) return;
     if (prefersReducedMotion()) {
-      _applyValue(elRef.current, target, propRef.current, tplRef.current);
+      write(target);
       void reducedMotionMode; // mode changes caller CSS, not binding behaviour
     } else {
-      mv.setTarget(target);
+      ensureMv().setTarget(target);
     }
-  }, [target, reducedMotionMode]);
+  }, [target, reducedMotionMode, ensureMv, write]);
 
   // Stable ref callback: only records the element; subscription lifecycle lives
   // in the effects above. Stable identity → React invokes it on mount/unmount

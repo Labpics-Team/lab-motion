@@ -12,7 +12,7 @@
  */
 
 import { afterEach, describe, expect, it } from 'vitest';
-import { act, createElement, useState, type Dispatch, type SetStateAction } from 'react';
+import { act, createElement, useState, StrictMode, type Dispatch, type SetStateAction } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
 import { useSpring, useMotionValue, useMotionStyle } from '../src/react/index.js';
 
@@ -264,5 +264,37 @@ describe('useMotionStyle — effect binding без render на кадр (#104)',
     // Цикл погашен: повторный прогон часов ничего не пишет и не бросает.
     expect(() => act(() => clock.drain())).not.toThrow();
     expect(box.style.transform).toBe(settled); // без изменений после unmount
+  });
+
+  it('StrictMode mount→cleanup→remount: без краша, один цикл, анимация работает', () => {
+    // #104 инвариант: StrictMode гоняет setup→cleanup→setup БЕЗ ре-рендера.
+    // cleanup рушит+нулит MotionValue, поэтому второй setup обязан пересоздать его,
+    // иначе разыменование уничтоженного значения бросает TypeError (RED до фикса:
+    // прямое `mvRef.current!` после null → краш на remount). Один живой цикл:
+    // прошлый MV уничтожается до создания нового, двойной скорости нет.
+    const clock = makeClock();
+    let setOpen!: Dispatch<SetStateAction<boolean>>;
+    function Box(): ReturnType<typeof createElement> {
+      const [open, setO] = useState(false);
+      setOpen = setO;
+      const ref = useMotionStyle({
+        target: open ? 100 : 0,
+        property: 'opacity',
+        from: 0,
+        spring: SPRING,
+        requestFrame: clock.requestFrame,
+      });
+      return createElement('div', { id: 'box', ref });
+    }
+    // Монтирование под StrictMode не должно бросать (двойной setup эффектов).
+    let c!: HTMLElement;
+    expect(() => {
+      c = mount(createElement(StrictMode, null, createElement(Box)));
+    }).not.toThrow();
+
+    act(() => setOpen(true));
+    act(() => clock.drain());
+    // Анимация корректна после StrictMode-ремоунта (живой единственный цикл).
+    expect(Number((c.querySelector('#box') as HTMLElement).style.opacity)).toBeCloseTo(100, 1);
   });
 });
