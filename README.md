@@ -186,7 +186,7 @@ flowchart TB
 
 | Импорт | Что даёт |
 |---|---|
-| `…/react` | `useSpring`, `useMotionValue` |
+| `…/react` | `useSpring`, `useMotionValue`, `useMotionStyle` (effect-binding: пишет в `style` через ref без render на кадр — аналог `vMotion`) |
 | `…/preact` | `useSpring`, `useMotionValue` (зеркало react-биндинга поверх `preact/hooks`) |
 | `…/solid` | `createSpring`, `createMotionValue` (сигналы, авто-уборка через `onCleanup`) |
 | `…/vue` | `useSpring`, `useMotionValue`, директива `vMotion` |

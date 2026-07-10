@@ -18,12 +18,13 @@ import * as vue from '../src/vue/index.js';
 
 describe('bindings-api-surface-pin: react', () => {
   it('ровно запиненный набор runtime-экспортов', () => {
-    expect(Object.keys(react).sort()).toEqual(['useMotionValue', 'useSpring']);
+    expect(Object.keys(react).sort()).toEqual(['useMotionStyle', 'useMotionValue', 'useSpring']);
   });
 
-  it('оба хука — функции', () => {
+  it('все хуки — функции', () => {
     expect(typeof react.useSpring).toBe('function');
     expect(typeof react.useMotionValue).toBe('function');
+    expect(typeof react.useMotionStyle).toBe('function');
   });
 });
 

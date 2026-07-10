@@ -8,6 +8,18 @@
 
 ### Added
 
+- `./react`: `useMotionStyle` — **effect-binding** хук (фаза I, #104): гонит CSS-
+  свойство от пружины БЕЗ ре-рендера компонента на каждом кадре. В отличие от
+  `useSpring` (*render value* — компонент рендерится на кадр, чтобы отразить
+  число), `useMotionStyle` владеет `MotionValue` и пишет прямо в `element.style`
+  внутри подписки `onChange`; компонент рендерится только при смене `target`.
+  Возвращает стабильный ref-callback; опции зеркалят Vue-директиву `vMotion`
+  (`target`/`property`/`template`/`from`/`spring`/`reducedMotionMode`/
+  `requestFrame`) для паритета тонких адаптеров. Retarget сохраняет скорость (C¹),
+  reduced-motion = мгновенный CHARACTER-снап без кадров, unmount гасит цикл
+  (`unsub`+`destroy`). Доказано в реальном React-рантайме (jsdom + `createRoot`/
+  `act`): счётчик render не растёт за 200-кадровую анимацию, а `style` реально
+  анимируется (RED при подмене прямой записи на no-op).
 - `./behaviors`: новый субпуть — headless state machines типовых мобильных
   взаимодействий поверх ПЕРЕИСПОЛЬЗУЕМЫХ примитивов (ничего не дублировано):
   трекер скорости `./gestures`, проекция момента `./decay` (`.rest`), пружинный
