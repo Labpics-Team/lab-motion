@@ -1,0 +1,56 @@
+name: Release
+
+on:
+  release:
+    types: [published]
+
+permissions:
+  contents: read
+  id-token: write
+
+concurrency:
+  group: release-${{ github.event.release.tag_name }}
+  cancel-in-progress: false
+
+jobs:
+  publish:
+    name: verify · pack · publish
+    if: startsWith(github.event.release.tag_name, 'v')
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    environment: npm
+
+    steps:
+      - name: Checkout release tag
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.release.tag_name }}
+          fetch-depth: 0
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+          registry-url: https://registry.npmjs.org
+
+      - name: Setup pnpm
+        run: npm install --global pnpm@10.34.4
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Verify release identity
+        run: node scripts/check-release.mjs "${{ github.event.release.tag_name }}"
+
+      - name: Run publish gates
+        run: pnpm run prepublishOnly
+
+      - name: Verify consumer artifact
+        run: pnpm pack:smoke
+
+      # publish повторяет prepublishOnly намеренно: npm lifecycle остаётся последним
+      # барьером даже при ручном воспроизведении команды вне workflow.
+      - name: Publish with provenance
+        run: pnpm publish --access public --provenance --no-git-checks
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
