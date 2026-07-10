@@ -22,6 +22,15 @@ function range(unit: number, min: number, max: number): number {
   return min + unit * (max - min);
 }
 
+type Regime = 'under' | 'critical' | 'over';
+
+function regimeOf(sample: { mass: number; stiffness: number; damping: number }): Regime {
+  const criticalDamping = 2 * Math.sqrt(sample.mass * sample.stiffness);
+  const tolerance = Number.EPSILON * Math.max(1, criticalDamping) * 4;
+  if (Math.abs(sample.damping - criticalDamping) <= tolerance) return 'critical';
+  return sample.damping < criticalDamping ? 'under' : 'over';
+}
+
 describe('solver finiteness property fuzz', () => {
   it('produces finite value and velocity over 10 000 seeded samples', () => {
     const seed = 0xdeadbeef;
@@ -33,9 +42,16 @@ describe('solver finiteness property fuzz', () => {
       { mass: 1, stiffness: 1, damping: 0, t: 0.5 },
       { mass: 50, stiffness: 1000, damping: 100, t: 0 },
       { mass: 0.001, stiffness: 0.001, damping: 0.001, t: 1 },
+      { mass: 1, stiffness: 100, damping: 20, t: 0.25 },
+      { mass: 1, stiffness: 100, damping: 40, t: 0.25 },
     ];
 
     const failures: string[] = [];
+    const acceptedByRegime: Record<Regime, number> = {
+      under: 0,
+      critical: 0,
+      over: 0,
+    };
     let accepted = 0;
 
     for (let index = 0; index < samples; index++) {
@@ -58,6 +74,7 @@ describe('solver finiteness property fuzz', () => {
       }
 
       accepted++;
+      acceptedByRegime[regimeOf(sample)]++;
       if (!Number.isFinite(result.value)) {
         failures.push(
           `seed=${seed} sample=${index}: value=${result.value}, input=${JSON.stringify(sample)}`,
@@ -70,7 +87,13 @@ describe('solver finiteness property fuzz', () => {
       }
     }
 
-    expect(accepted, 'fuzz-домен не должен целиком отбрасываться валидатором').toBeGreaterThan(0);
+    expect(
+      accepted,
+      'валидатор не должен превращать property-fuzz в почти пустой набор',
+    ).toBeGreaterThan(samples / 2);
+    expect(acceptedByRegime.under, 'нет принятого underdamped-сценария').toBeGreaterThan(0);
+    expect(acceptedByRegime.critical, 'нет принятого critical-сценария').toBeGreaterThan(0);
+    expect(acceptedByRegime.over, 'нет принятого overdamped-сценария').toBeGreaterThan(0);
     expect(failures, `Найдены не-конечные выходы:\n${failures.join('\n')}`).toHaveLength(0);
   });
 });
