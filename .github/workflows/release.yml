@@ -88,7 +88,10 @@ jobs:
           VERSION: ${{ steps.resolve.outputs.version }}
         run: |
           TAG="v$VERSION"
-          EXISTING=$(gh api "repos/$GITHUB_REPOSITORY/git/ref/tags/$TAG" --jq .object.sha 2>/dev/null || true)
+          # При 404 gh api печатает JSON-тело ошибки в STDOUT (боевой прогон
+          # 29075510677): захват без сброса при провале давал ложное «тег
+          # существует». Сбрасываем EXISTING при любом неуспехе запроса.
+          EXISTING=$(gh api "repos/$GITHUB_REPOSITORY/git/ref/tags/$TAG" --jq .object.sha 2>/dev/null) || EXISTING=""
           if [[ -n "$EXISTING" ]]; then
             [[ "$EXISTING" == "$GITHUB_SHA" ]] \
               || { echo "::error::тег $TAG уже существует на $EXISTING ≠ $GITHUB_SHA — опубликованная версия не перезаписывается"; exit 1; }
