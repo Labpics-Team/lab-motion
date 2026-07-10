@@ -43,8 +43,17 @@ const server = createServer((req, res) => {
       return;
     }
     const type = MIME[extname(filePath)] ?? 'application/octet-stream';
-    res.writeHead(200, { 'Content-Type': type, 'Cache-Control': 'no-store' });
-    createReadStream(filePath).pipe(res);
+    const stream = createReadStream(filePath);
+    // Файл мог исчезнуть/стать нечитаемым между statSync и открытием: ловим
+    // error ДО pipe, иначе непойманный 'error' уронил бы весь сервер.
+    stream.on('error', () => {
+      if (!res.headersSent) res.writeHead(500);
+      res.end('read error');
+    });
+    stream.once('open', () => {
+      res.writeHead(200, { 'Content-Type': type, 'Cache-Control': 'no-store' });
+      stream.pipe(res);
+    });
   } catch (error) {
     res.writeHead(500).end(String(error?.message ?? error));
   }

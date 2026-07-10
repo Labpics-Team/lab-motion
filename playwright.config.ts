@@ -17,30 +17,19 @@
  *
  * Артефакты (критерий приёмки): trace/video/screenshot ТОЛЬКО при падении.
  *
- * Матрица движков: три проекта. Chromium доступен локально (executablePath —
- * env PW_CHROMIUM_BIN с дефолтом на предустановленный бинарь, если он на диске;
- * иначе — штатный бинарь Playwright, как на CI). Firefox/WebKit исполняются на CI
- * (`pnpm exec playwright install --with-deps <browser>`); локально гоняется только
- * `--project=chromium` (см. README «Browser support» и .github/workflows/browser.yml).
+ * Матрица движков: три проекта. `@playwright/test` пинится к версии, чей штатный
+ * Chromium-ревизион СОВПАДАЕТ с предустановленным в dev-среде (PLAYWRIGHT_BROWSERS_PATH),
+ * поэтому дефолтная резолюция Playwright находит один и тот же бинарь и локально,
+ * и на CI — без executablePath-хака и без риска расхождения ревизий. При нужде
+ * бинарь переопределяется штатным env `PLAYWRIGHT_BROWSERS_PATH`/`PLAYWRIGHT_CHROMIUM_EXECUTABLE_PATH`.
+ * Firefox/WebKit исполняются на CI (`pnpm exec playwright install --with-deps <browser>`);
+ * локально гоняется только `--project=chromium` (см. README «Browser support»).
  *
  * testDir = 'browser' — ОТДЕЛЬНО от vitest ('test/'), чтобы vitest не подхватил
  * .spec.ts (и playwright не подхватил vitest .test.ts).
  */
 
 import { defineConfig, devices } from '@playwright/test';
-import { existsSync } from 'node:fs';
-
-/** Предустановленный локально Chromium (проверено овнер-сессией). */
-const LOCAL_CHROMIUM = '/opt/pw-browsers/chromium-1194/chrome-linux/chrome';
-
-/**
- * Путь к бинарю Chromium: приоритет env-переключателю PW_CHROMIUM_BIN, затем —
- * локальный предустановленный бинарь, если он на диске (dev-среда без права
- * скачивать браузеры). На CI ни того ни другого нет → undefined → Playwright
- * берёт свой штатный бинарь после `playwright install`.
- */
-const chromiumBin =
-  process.env.PW_CHROMIUM_BIN ?? (existsSync(LOCAL_CHROMIUM) ? LOCAL_CHROMIUM : undefined);
 
 const isCI = !!process.env.CI;
 const PORT = Number(process.env.PW_PORT ?? 6180);
@@ -76,17 +65,17 @@ export default defineConfig({
   webServer: {
     command: `node browser/fixtures/server.mjs ${PORT}`,
     url: `${BASE_URL}/browser/fixtures/harness.html`,
-    reuseExistingServer: !isCI,
+    // Не переиспользуем уже поднятый сервер по умолчанию: чужой checkout мог бы
+    // отдавать ДРУГОЙ dist по тому же URL и молча исказить результат. Опт-ин
+    // PW_REUSE_SERVER=1 для локального итеративного цикла.
+    reuseExistingServer: process.env.PW_REUSE_SERVER === '1',
     timeout: 20_000,
   },
 
   projects: [
     {
       name: 'chromium',
-      use: {
-        ...devices['Desktop Chrome'],
-        ...(chromiumBin ? { launchOptions: { executablePath: chromiumBin } } : {}),
-      },
+      use: { ...devices['Desktop Chrome'] },
     },
     {
       name: 'firefox',

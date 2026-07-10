@@ -36,7 +36,9 @@ test('FLIP: уехавший в layout элемент визуально не п
 
     const firstX = el.getBoundingClientRect().x;
 
-    proj.capture([el]);
+    // Реальный HTMLElement структурно шире DomProjectionElement (вариантность
+    // getRootNode) — рантайм совместим, каст фиксирует границу браузер↔тип.
+    proj.capture([el] as unknown as Parameters<typeof proj.capture>[0]);
 
     // Потребитель меняет layout.
     el.style.left = '200px';

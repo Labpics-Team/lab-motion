@@ -18,8 +18,14 @@ on:
       - "src/flip/**"
       - "src/a11y/**"
       - "src/scroll/**"
+      - "src/smart/**"
+      - "src/wc/**"
+      - "src/svg/**"
+      - "src/svg-morph/**"
       - "browser/**"
       - "playwright.config.ts"
+      - "package.json"
+      - "tsup.config.ts"
       - ".github/workflows/browser.yml"
   pull_request:
     branches: ["main"]
@@ -33,8 +39,14 @@ on:
       - "src/flip/**"
       - "src/a11y/**"
       - "src/scroll/**"
+      - "src/smart/**"
+      - "src/wc/**"
+      - "src/svg/**"
+      - "src/svg-morph/**"
       - "browser/**"
       - "playwright.config.ts"
+      - "package.json"
+      - "tsup.config.ts"
       - ".github/workflows/browser.yml"
   merge_group:
   workflow_dispatch:
@@ -63,6 +75,10 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@v6
+        with:
+          # Токен не нужен после checkout (пуша нет) — не оставляем его на диске
+          # перед pnpm install (postinstall-скрипты третьих сторон). SAST: artipacked.
+          persist-credentials: false
 
       - name: Setup Node
         uses: actions/setup-node@v6
@@ -80,6 +96,11 @@ jobs:
       # Устанавливаем ТОЛЬКО нужный движок матрицы (+ системные зависимости).
       - name: Install Playwright browser
         run: pnpm exec playwright install --with-deps ${{ matrix.browser }}
+
+      # Типопроверка browser-спеков (отдельный tsconfig: DOM lib + /dist/*→src/*
+      # path-mapping) — специфичный tsc не входит в основной `pnpm typecheck`.
+      - name: Typecheck browser specs
+        run: pnpm typecheck:browser
 
       # Спеки грузят СОБРАННЫЙ dist — билд обязателен до прогона.
       - name: Build

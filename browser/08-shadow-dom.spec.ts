@@ -41,7 +41,8 @@ test('composed traversal: ребёнок в open shadow не искажаетс�
     const innerFirstX = inner.getBoundingClientRect().x; // page-space до сдвига
 
     // Захватываем host и ребёнка (ребёнок — проецирующий потомок host).
-    proj.capture([host, inner]);
+    // Реальные HTMLElement структурно шире DomProjectionElement — каст границы.
+    proj.capture([host, inner] as unknown as Parameters<typeof proj.capture>[0]);
 
     // Сдвигаем ТОЛЬКО host в layout: ребёнок как статический потомок едет с ним.
     host.style.left = '200px';
