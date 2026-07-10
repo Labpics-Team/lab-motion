@@ -4,9 +4,20 @@ on:
   push:
     tags:
       - "v*.*.*"
+  # Диспатч с main — второй равноправный путь релиза: git-транспорт овнер-сессий
+  # не пропускает пуш тегов (факт 2026-07-10: push отвечает «up-to-date», ls-remote
+  # тегов пуст). Workflow сам создаёт тег и публикует В ОДНОМ прогоне: тег от
+  # GITHUB_TOKEN не эмитит push-событие (анти-рекурсия GitHub), поэтому цепочка
+  # не полагается на него. Все гейты publish-job идентичны для обоих путей.
+  workflow_dispatch:
+    inputs:
+      version:
+        description: "Версия x.y.z — тег v<version> будет создан из HEAD main"
+        required: true
+        type: string
 
 concurrency:
-  group: release-${{ github.ref }}
+  group: release-${{ github.event_name == 'workflow_dispatch' && format('v{0}', inputs.version) || github.ref }}
   cancel-in-progress: false
 
 env:
@@ -14,14 +25,54 @@ env:
   COREPACK_DEFAULT_TO_LATEST: "0"
 
 jobs:
+  # Создание тега вынесено в отдельный job: contents:write не смешивается с
+  # id-token:write publish-job'а (least-privilege, дисциплина ревью #101).
+  tag:
+    if: github.event_name == 'workflow_dispatch' && github.repository == 'Labpics-Team/lab-motion'
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    permissions:
+      contents: write
+    steps:
+      - name: Validate dispatch inputs
+        env:
+          VERSION: ${{ inputs.version }}
+        run: |
+          [[ "$VERSION" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]] \
+            || { echo "::error::version обязана быть x.y.z, получено: $VERSION"; exit 1; }
+          [[ "$GITHUB_REF" == "refs/heads/main" ]] \
+            || { echo "::error::диспатч релиза разрешён только с main, получено: $GITHUB_REF"; exit 1; }
+
+      - name: Create tag at main HEAD (идемпотентно)
+        env:
+          GH_TOKEN: ${{ github.token }}
+          VERSION: ${{ inputs.version }}
+        run: |
+          TAG="v$VERSION"
+          EXISTING=$(gh api "repos/$GITHUB_REPOSITORY/git/ref/tags/$TAG" --jq .object.sha 2>/dev/null || true)
+          if [[ -n "$EXISTING" ]]; then
+            [[ "$EXISTING" == "$GITHUB_SHA" ]] \
+              || { echo "::error::тег $TAG уже существует на $EXISTING ≠ $GITHUB_SHA — опубликованная версия не перезаписывается"; exit 1; }
+            echo "тег $TAG уже на $GITHUB_SHA — идемпотентный повтор"
+          else
+            gh api "repos/$GITHUB_REPOSITORY/git/refs" -f ref="refs/tags/$TAG" -f sha="$GITHUB_SHA"
+            echo "создан тег $TAG → $GITHUB_SHA"
+          fi
+
   publish:
-    if: github.repository == 'Labpics-Team/lab-motion'
+    # На push tag-job скипается (result=skipped), на диспатче обязан быть success.
+    needs: [tag]
+    if: >-
+      github.repository == 'Labpics-Team/lab-motion' && !cancelled() &&
+      (needs.tag.result == 'success' || needs.tag.result == 'skipped')
     runs-on: ubuntu-latest
     timeout-minutes: 30
     environment: npm
     permissions:
       contents: read
       id-token: write
+    env:
+      RELEASE_TAG: ${{ github.event_name == 'workflow_dispatch' && format('v{0}', inputs.version) || github.ref_name }}
 
     steps:
       - name: Checkout
@@ -69,7 +120,7 @@ jobs:
         run: pnpm install --frozen-lockfile
 
       - name: Verify release identity
-        run: node scripts/check-release.mjs
+        run: node scripts/check-release.mjs "$RELEASE_TAG"
 
       - name: Issue forms schema
         run: node scripts/check-issue-forms.mjs
@@ -110,15 +161,17 @@ jobs:
     timeout-minutes: 10
     permissions:
       contents: write
+    env:
+      RELEASE_TAG: ${{ github.event_name == 'workflow_dispatch' && format('v{0}', inputs.version) || github.ref_name }}
 
     steps:
       - name: Create immutable release record
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
-          gh release view "$GITHUB_REF_NAME" --repo "$GITHUB_REPOSITORY" >/dev/null 2>&1 || \
-            gh release create "$GITHUB_REF_NAME" \
+          gh release view "$RELEASE_TAG" --repo "$GITHUB_REPOSITORY" >/dev/null 2>&1 || \
+            gh release create "$RELEASE_TAG" \
               --repo "$GITHUB_REPOSITORY" \
               --verify-tag \
               --generate-notes \
-              --title "$GITHUB_REF_NAME"
+              --title "$RELEASE_TAG"
