@@ -6,7 +6,7 @@ DOM — рендер делает ваш колбэк, время приходи
 
 Три вещи, которые нужно понять сразу:
 
-1. **Всё — субпути.** Корневой экспорт + 33 субпутя (34 входа `exports` в
+1. **Всё — субпути.** Корневой экспорт + 34 субпутя (35 входов `exports` в
    `package.json`); в бандл попадает только импортированное (`sideEffects: false`).
 2. **Две фазы движения.** Интерактив и follow-фаза (палец ведёт значение) — на
    main-потоке (`MotionValue`, `drive`, `…/gestures`). Автономные переходы и
@@ -168,6 +168,7 @@ flowchart TB
 | `…/presence` | Enter/exit lifecycle: «доиграй exit-анимацию → потом убирай из DOM», прерывания, `swapPresence` (wait/sync) |
 | `…/flip` | Layout-анимация FLIP: инверсия first→last, пружинный «доезд», коррекция scale-искажений (`correctRadius`, `counterScale`) |
 | `…/projection` | Вложенный FLIP-движок (жанр Framer projection): дерево узлов — transform родителя НЕ искажает детей и border-radius; `projectAt` (чистая математика), `createProjection` (headless-драйвер: одна пружина, velocity continuity при перехвате, `seek`/`release` под жест), `createDomProjection` (capture → мутация DOM → play). Подробно — раздел «Projection-путь» |
+| `…/smart` | Smart-animate поверх `./projection` (жанр Figma smart-animate / shared-element): диф двух снимков дерева по строке-ключу `data-motion-key` → matched/entered/exited/skipped; `captureSmart`/`smartTransition` (capture → мутация → animate), `resolveSmartTier`. matched едут FLIP'ом (continuity переживает пересоздание узла), entered — fade-in, exited — ghost-протокол; reduced = смена характера. Подробно — раздел «Smart-путь» |
 | `…/auto` | Zero-config FLIP: `autoAnimate(parent)` — add/remove/move детей анимируются сами; reduced-motion меняет характер (move→снап), не выключает |
 | `…/a11y` | `createMotionConfig` — политика reduced-motion (`system`/`always`/`never`), меняет характер анимации, не выключает |
 
@@ -540,7 +541,59 @@ proj.play();                         // card едет FLIP'ом; avatar/badge и
 (только window-scroll page-space), пер-узловые пружины, WAAPI/compositor-эмиссия
 дерева (пер-кадровая коррекция `1/k(t)` нелинейна — v1 main-thread), интеграция
 с реестром каналов `./animate`. Диф двух DOM-состояний по identity-ключу,
-shared-element и View Transitions — субпуть `./smart` (следующий этап, #99).
+shared-element и ghost-протокол — субпуть `./smart` (раздел ниже).
+
+## Smart-путь
+
+Figma-подобный **smart-animate** поверх `./projection`
+(`@labpics/motion/smart`). Projection даёт FLIP набора элементов, но требует
+собрать этот набор вручную и знать «что во что превратилось». Smart закрывает
+ровно это: ДВА снимка дерева по строковому identity-ключу (`data-motion-key`),
+диф → `matched` / `entered` / `exited` / `skipped`, и оркестрация поверх ОДНОГО
+projection-движка.
+
+```ts
+import { smartTransition } from '@labpics/motion/smart';
+
+// пометьте узлы: <div data-motion-key="card-3">…</div>
+const handle = smartTransition(container, () => {
+  reorderAndSwapLayout(); // мутируйте DOM как угодно (sync или async)
+});
+await handle.finished;
+```
+
+Либо разнесённо: `const cap = captureSmart(container); mutate(); cap.animate()`.
+
+Ключевые свойства (все запинены тестами):
+
+- **Диф по строке-ключу**: перемещённый ключ → `matched` (едет FLIP'ом),
+  новый → `entered` (fade-in без transform), ушедший из DOM → `exited`
+  (ghost-протокол), уехавший в чужой контейнер или вырожденный → `skipped`.
+  Дубликат ключа → ранний `MotionParamError`.
+- **Continuity переживает ПЕРЕСОЗДАНИЕ узла**: id проекции = строка-ключ, а не
+  ссылка на элемент. Повторный `captureSmart`/`animate` в полёте берёт
+  аналитический `V(p̂)` (ноль чтений DOM под нашим transform) и пересеивает
+  скорость — C¹ у драйвера `./projection`. Ре-рендер (тот же ключ, новый объект)
+  не рвёт жест.
+- **Единый clock**: matched-FLIP, enter- и exit-фейды едут одной нормированной
+  пружиной — дерево движется как один жест.
+- **Ghost-протокол exit**: узел реинсертится в root `absolute` на прежних
+  page-координатах (padding-box), фейд 1→0, `removeChild` ДО резолва `finished`
+  (терминальное действие раньше уведомлений). Реинкарнация ключа при живом ghost
+  — ghost снимается, узел продолжает от его состояния без прыжка.
+- **Reduced-motion = смена характера**: matched снапаются (ноль transform-записей),
+  а enter/exit-фейды остаются ЖИВЫМИ; `tier` = `reduced`. `respectReducedMotion:
+  false` игнорирует reduce. `resolveSmartTier` резолвит `reduced`/`projection`/`ssr`.
+- **SSR-инертность**: на не-элементе `size` 0, `tier` `ssr`, `finished` резолвлен
+  сразу — без чтения DOM на уровне модуля.
+- **Деградации без NaN**: злые снапшоты (NaN/∞-ректы, битые радиусы, пересоздания,
+  скролл, перехваты) — ни одного броска, ни одного нефинитного числа и ни одного
+  `-0` в записях (fuzz-гейт ≥10 000 дифов в CI).
+
+Не-цели v1 (честно): нативный View Transitions API (отдельная фаза; здесь
+projection-путь + reduced + ssr), авто-детект мутаций (`MutationObserver`),
+live-подписка на смену reduce в полёте, closed shadow roots, вложенные
+scroll-контейнеры (наследуется от `./projection`).
 
 ## Motion-токены
 
@@ -636,7 +689,8 @@ pnpm bench      # ns/операцию горячих путей против dis
 сценарный import-cost (esbuild bundle+minify против dist — ловит регрессию
 tree-shakeability). Пороги — регрессионные потолки, не цели: ядро 2220 байт gz,
 любой прочий субпуть 4608, точечные — `./utils` 1400, `./tokens` 1650,
-`./projection` 5750, `./presets` 5600, `./compositor` 6450, `./animate` 10700.
+`./projection` 5750, `./smart` 7450, `./presets` 5600, `./compositor` 6450,
+`./animate` 10700.
 
 **CI на каждый PR**: typecheck → build → test → fuzz-гейт финитности
 (overflow/солвер/easing/projection) → size → pack-smoke. **Еженедельно** (или вручную) —
