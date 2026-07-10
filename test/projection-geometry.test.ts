@@ -465,6 +465,23 @@ describe('projection/geometry: floor размеров при overshoot', () => {
     expect(Number.isFinite(t.tx)).toBe(true);
     expect(Number.isFinite(t.ty)).toBe(true);
   });
+
+  it('враждебный отрицательный anchor: scale флорится в 0 на ВСЕХ путях (без зеркала)', () => {
+    // Паритет rootFlipInto ↔ rootAnchorInto ↔ childInto: отрицательный размер
+    // anchor/ancestorAnchor не эмитит sx/sy < 0 (мутация floor → RED).
+    const box = { x: 0, y: 0, width: 100, height: 100 };
+    const evilAnchor = { x: 0, y: 0, width: -50, height: -50 };
+    const viaAnchor = projectAt({ first: box, last: box, anchor: evilAnchor }, null, 0.5);
+    expect(viaAnchor.sx).toBeGreaterThanOrEqual(0);
+    expect(viaAnchor.sy).toBeGreaterThanOrEqual(0);
+    const viaChild = projectAt(
+      { first: box, last: box, anchor: evilAnchor },
+      { first: box, last: { x: 0, y: 0, width: 200, height: 200 } },
+      0.5,
+    );
+    expect(viaChild.sx).toBeGreaterThanOrEqual(0);
+    expect(viaChild.sy).toBeGreaterThanOrEqual(0);
+  });
 });
 
 // ─── Радиусы: морф + коррекция кумулятивным k при sx ≠ sy ────────────────────

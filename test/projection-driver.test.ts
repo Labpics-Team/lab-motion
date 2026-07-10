@@ -132,6 +132,25 @@ describe('projection/driver: детерминизм', () => {
 });
 
 describe('projection/driver: перехват (velocity continuity, §2.3.2 + §4.1)', () => {
+  it('полёт ТОЛЬКО по opacity/radii: перехват не теряет скорость (radii/opacity — полноправные каналы скана)', () => {
+    // Боксы неподвижны — живой диапазон только у opacity. Мутация «скан без
+    // radii/opacity» → v0'=0 → RED (velocity после перехвата обнуляется).
+    const clock = makeClock();
+    const controls = createProjection({ requestFrame: clock.requestFrame, onFrame: () => {} });
+    const BOX = { x: 0, y: 0, width: 100, height: 100 };
+    const node = { id: 'a', first: BOX, last: BOX, opacity: { from: 0, to: 1 } };
+    controls.play([node]);
+    clock.step(16);
+    clock.step(16);
+    clock.step(16);
+    const vBefore = controls.velocity;
+    expect(Math.abs(vBefore)).toBeGreaterThan(0);
+    // Перехват с теми же целями: теорема → v0' = v̂/(1−p̂), скорость живёт.
+    controls.play([{ id: 'a', last: BOX, opacity: { from: 0, to: 1 } }]);
+    const vAfter = controls.velocity;
+    expect(Math.abs(vAfter)).toBeGreaterThan(0.65 * Math.abs(vBefore));
+  });
+
   it('bite-test: |v_after| > 0.65·|v_before| (канон motion-value smooth pickup)', () => {
     const dtMs = 1000 / 120;
     const dtS = dtMs / 1000;

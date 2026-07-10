@@ -133,6 +133,12 @@ describe('projection: finiteness fuzz — 10k злых деревьев (P1)', (
           checkNumber(violations, `${tag} sy`, f.sy);
           checkNumber(violations, `${tag} kx`, f.kx);
           checkNumber(violations, `${tag} ky`, f.ky);
+          // Зеркалирование запрещено: floor масштаба ≥ 0 (rootFlipInto/rootAnchorInto/
+          // childInto паритетны) — враждебный отрицательный anchor не даёт sx/sy < 0.
+          if (f.sx < 0) violations.push(`${tag} sx < 0 (зеркало)`);
+          if (f.sy < 0) violations.push(`${tag} sy < 0 (зеркало)`);
+          if (f.kx < 0) violations.push(`${tag} kx < 0`);
+          if (f.ky < 0) violations.push(`${tag} ky < 0`);
           if (f.radii !== undefined) {
             for (let c = 0; c < 4; c++) {
               checkNumber(violations, `${tag} radii[${c}].x`, f.radii[c].x);
@@ -222,6 +228,26 @@ describe('projection: finiteness fuzz — чистые функции (mixBox/pr
 const OK: RectLike = { x: 0, y: 0, width: 100, height: 100 };
 
 describe('projection: валидация createProjector — MotionParamError, тексты §2.1.5', () => {
+  it('мальформный radii-кортеж (as-any): ранний MotionParamError, не TypeError из at()', () => {
+    const bad = [
+      { first: [{ x: 0, y: 0 }], last: [{ x: 0, y: 0 }] }, // длина 1
+      { first: null, last: null }, // не массив
+      { first: [null, null, null, null], last: [null, null, null, null] }, // null-углы
+    ];
+    for (const radii of bad) {
+      expect(() =>
+        createProjector([
+          { id: 'a', first: OK, last: OK, radii: radii as never },
+        ]),
+      ).toThrow(MotionParamError);
+      expect(() =>
+        createProjector([
+          { id: 'a', first: OK, last: OK, radii: radii as never },
+        ]),
+      ).toThrow('projection: node "a" radii must be two tuples of exactly 4 corners');
+    }
+  });
+
   it('пустой id', () => {
     expect(() => createProjector([{ id: '', first: OK, last: OK }])).toThrow(MotionParamError);
     expect(() => createProjector([{ id: '', first: OK, last: OK }])).toThrow(

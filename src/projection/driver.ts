@@ -395,6 +395,17 @@ export function createProjection(options?: ProjectionOptions): ProjectionControl
           consider(old.last.y - old.first.y, node.last.y - node.first.y);
           consider(old.last.width - old.first.width, node.last.width - node.first.width);
           consider(old.last.height - old.first.height, node.last.height - node.first.height);
+          // Radii/opacity — полноправные каналы C¹ («всех каналов» — буквально):
+          // полёт только по радиусам/фейду не должен терять скорость на перехвате.
+          if (old.radii !== undefined && node.radii !== undefined) {
+            for (let c = 0; c < 4; c++) {
+              consider(old.radii.last[c].x - old.radii.first[c].x, node.radii.last[c].x - node.radii.first[c].x);
+              consider(old.radii.last[c].y - old.radii.first[c].y, node.radii.last[c].y - node.radii.first[c].y);
+            }
+          }
+          if (old.opacity !== undefined && node.opacity !== undefined) {
+            consider(old.opacity.to - old.opacity.from, node.opacity.to - node.opacity.from);
+          }
         }
         if (bestAbs > RANGE_EPSILON) {
           v0 = clampMagnitude(finite((vPrev * bestR) / bestRp), V0_CAP);

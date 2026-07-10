@@ -100,8 +100,16 @@ export const BESPOKE_SUBPATH_GATES = {
   // двойной счёт, честная цена — import-cost сценарии ниже. Хронология:
   //   2026-07-10: факт 4890 gz первой сборки → порог 5350 (~9% люфт, дисциплина
   //   «порог ОТ ФАКТА»). Выше общего 4608 законно: класс animate — самодостаточный
-  //   субпуть с копиями подсистем. Поднимать только решением Даниила.
-  './projection': 5350,
+  //   субпуть с копиями подсистем.
+  //   2026-07-10 (позже): факт 5530 gz → порог 5750 (~4%). Рост НЕ раздувание,
+  //   а две волны корректности одного дня: (1) phase-машина + continuity-ребейз
+  //   radii/opacity (адверсариальное ревью, PR #109); (2) фиксы ревью CodeRabbit —
+  //   доминантный C¹-скан по radii/opacity-каналам, floor отрицательного масштаба
+  //   на всех путях (анти-зеркало), ранняя валидация radii-кортежей
+  //   (MotionParamError вместо TypeError из горячего at()). Ужим выполнен ДО
+  //   подъёма (дедуп rebaseNode/lerp1, −100 gz); подъём — в рамках делегации
+  //   Даниила на автономные решения (прецедент CORE 2150→2190 выше).
+  './projection': 5750,
   // ./presets — headless-словарь движений + текстовые/числовые сахара
   // (порт ценного из PR#79: splitText/typewriterAt/scrambleAt/tickerCells/
   // formatNumber + раннеры runTypewriter/runScramble/runNumber поверх runPreset).
@@ -159,7 +167,9 @@ export const IMPORT_COST_SCENARIOS = [
     name: 'projection-dom-one-liner',
     code: `import { createDomProjection } from '%DIST%/../projection/index.js'; const p = createDomProjection(); p.capture([]); p.play(); p.cancel(); console.log(p.playing);`,
     // 2026-07-10: факт первой сборки 4899 gz → порог 5350 (~9%, ОТ ФАКТА).
-    gate: 5350,
+    // 2026-07-10 (позже): факт 5536 gz → порог 5750 (~4%) — хронология и
+    // обоснование в комментарии './projection' в BESPOKE_SUBPATH_GATES.
+    gate: 5750,
   },
   {
     name: 'only-MotionValue',

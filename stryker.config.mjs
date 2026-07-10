@@ -49,6 +49,9 @@
 export default {
   plugins: ['@stryker-mutator/vitest-runner'],
   testRunner: 'vitest',
+  // src/projection/geometry.ts — добавлен 2026-07-10 (чистая математика вложенного
+  // FLIP, критерий дома); базлайн mutation score — PENDING до первого планового
+  // прогона: агрегат/минимум из шапки до тех пор НЕ покрывает этот файл.
   mutate: ['src/spring.ts', 'src/internal/solver.ts', 'src/keyframes/index.ts', 'src/motion-value.ts', 'src/decay.ts', 'src/value/color.ts', 'src/internal/sliding-window.ts', 'src/tween.ts', 'src/projection/geometry.ts'],
   coverageAnalysis: 'perTest',
   reporters: ['clear-text', 'progress', 'html'],

@@ -178,12 +178,18 @@ function rootFlipInto(first: FlipRect, last: FlipRect, t: number, out: MutableTr
   out.sy = sy < 0 ? 0 : sy;
 }
 
-/** Корень с явным anchor ≠ last (кроссфейд-ghost): k_A = (1,1), общая форма. */
+/**
+ * Корень с явным anchor ≠ last (кроссфейд-ghost): k_A = (1,1), общая форма.
+ * Floor масштаба ≥ 0 (паритет rootFlipInto): V ≥ 0 по mixInto, минус может дать
+ * только враждебный отрицательный anchor — зеркалирование не эмитим.
+ */
 function rootAnchorInto(v: MutableRect, anchor: FlipRect, out: MutableTransform): void {
   out.tx = finite(v.x - finite(anchor.x)) + 0;
   out.ty = finite(v.y - finite(anchor.y)) + 0;
-  out.sx = finite(finiteDiv(v.width, anchor.width, 1)) + 0;
-  out.sy = finite(finiteDiv(v.height, anchor.height, 1)) + 0;
+  const sx = finite(finiteDiv(v.width, anchor.width, 1)) + 0;
+  const sy = finite(finiteDiv(v.height, anchor.height, 1)) + 0;
+  out.sx = sx < 0 ? 0 : sx;
+  out.sy = sy < 0 ? 0 : sy;
 }
 
 /**
@@ -201,8 +207,12 @@ function childInto(
   kAy: number,
   out: MutableTransform,
 ): void {
-  const ownX = finiteDiv(v.width, anchor.width, 1);
-  const ownY = finiteDiv(v.height, anchor.height, 1);
+  // Floor собственного масштаба ≥ 0 (паритет rootFlipInto): враждебный
+  // отрицательный anchor не должен зеркалить ребёнка.
+  const rawOwnX = finiteDiv(v.width, anchor.width, 1);
+  const rawOwnY = finiteDiv(v.height, anchor.height, 1);
+  const ownX = rawOwnX < 0 ? 0 : rawOwnX;
+  const ownY = rawOwnY < 0 ? 0 : rawOwnY;
   const cs = counterScale(kAx, kAy); // живой вызов ./flip
   out.sx = finite(ownX * cs.sx) + 0;
   out.sy = finite(ownY * cs.sy) + 0;
@@ -335,6 +345,24 @@ export function createProjector(nodes: readonly ProjectionNodeInit[]): Projector
       throw new MotionParamError(`projection: duplicate node id "${id}"`);
     }
     indexById.set(id, i);
+    // Radii-кортежи: ровно 4 угла с обеих сторон (мальформный as-any вход —
+    // ранний MotionParamError, не поздний TypeError из горячего at()).
+    const r = nodes[i].radii;
+    if (
+      r !== undefined &&
+      !(
+        Array.isArray(r.first) &&
+        r.first.length === 4 &&
+        Array.isArray(r.last) &&
+        r.last.length === 4 &&
+        r.first.every((c) => c !== null && typeof c === 'object') &&
+        r.last.every((c) => c !== null && typeof c === 'object')
+      )
+    ) {
+      throw new MotionParamError(
+        `projection: node "${id}" radii must be two tuples of exactly 4 corners`,
+      );
+    }
   }
 
   // Parent-ссылки (лес: у узла не больше одного родителя).
@@ -429,14 +457,8 @@ export function createProjector(nodes: readonly ProjectionNodeInit[]): Projector
   const ky = new Float64Array(count);
   const vx = new Float64Array(count);
   const vy = new Float64Array(count);
-  // k degenerate-узлов = 1 один раз (в at() они пропускаются; их vx/vy никем
-  // не читаются — дети переякорены к невырожденному предку через liveAncestor).
-  for (let i = 0; i < count; i++) {
-    if (degenerate[i]) {
-      kx[i] = 1;
-      ky[i] = 1;
-    }
-  }
+  // vx/vy/kx/ky degenerate-узлов никем не читаются: liveAncestor по построению
+  // пропускает вырожденных предков, а их кадры заполнены на precompute (§2.1.4).
   const v: MutableRect = { x: 0, y: 0, width: 0, height: 0 };
   const order: readonly string[] = orderIdx.map((i) => nodes[i].id);
 
@@ -467,8 +489,10 @@ export function createProjector(nodes: readonly ProjectionNodeInit[]): Projector
         }
       } else {
         childInto(v, anchors[i], vx[a], vy[a], anchors[a], kx[a], ky[a], frame);
-        kx[i] = finiteDiv(v.width, anchors[i].width, 1);
-        ky[i] = finiteDiv(v.height, anchors[i].height, 1);
+        const kxi = finiteDiv(v.width, anchors[i].width, 1);
+        const kyi = finiteDiv(v.height, anchors[i].height, 1);
+        kx[i] = kxi < 0 ? 0 : kxi; // floor ≥ 0 — питает correctRadius и детей
+        ky[i] = kyi < 0 ? 0 : kyi;
       }
       vx[i] = v.x;
       vy[i] = v.y;
