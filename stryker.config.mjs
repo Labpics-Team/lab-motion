@@ -49,7 +49,7 @@
 export default {
   plugins: ['@stryker-mutator/vitest-runner'],
   testRunner: 'vitest',
-  mutate: ['src/spring.ts', 'src/internal/solver.ts', 'src/keyframes/index.ts', 'src/motion-value.ts', 'src/decay.ts', 'src/value/color.ts', 'src/internal/sliding-window.ts', 'src/tween.ts'],
+  mutate: ['src/spring.ts', 'src/internal/solver.ts', 'src/keyframes/index.ts', 'src/motion-value.ts', 'src/decay.ts', 'src/value/color.ts', 'src/internal/sliding-window.ts', 'src/tween.ts', 'src/projection/geometry.ts'],
   coverageAnalysis: 'perTest',
   reporters: ['clear-text', 'progress', 'html'],
   htmlReporter: { fileName: 'reports/mutation/index.html' },
