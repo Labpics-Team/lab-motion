@@ -1,6 +1,6 @@
 {
   "name": "@labpics/motion",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "private": false,
   "description": "Headless zero-dependency motion engine: analytic spring solver, keyframes, timeline, FLIP, gestures, WAAPI compositor path, 9 framework bindings.",
   "license": "MIT",
