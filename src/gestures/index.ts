@@ -403,9 +403,38 @@ export interface DragOptions {
   readonly onRest?: ((x: number, y: number) => void) | undefined;
 }
 
+/**
+ * Внешний прайор скорости захвата (px/s) — шов «compositor → gesture» (#93):
+ * элемент летит НЕ нашим глайдом (WAAPI/compositor-ран, чужой аниматор), и
+ * потребитель в pointerdown сообщает жесту его живую скорость. Рецепт для
+ * compositor-рана (./compositor, БЕЗ чтения DOM):
+ *
+ *   const read = readCompositorSpring(spring, { from, to, t: elapsedSec });
+ *   controller.stop(); // владение переходит жесту
+ *   drag.pointerDown(point, { vx: read.velocity });
+ *
+ * Прямого импорта gestures→compositor нет — субпути ядра независимы; связка
+ * живёт у потребителя. Вырожденные компоненты (NaN/±∞/не-число) → ровно 0.
+ */
+export interface DragPickup {
+  readonly vx?: number | undefined;
+  readonly vy?: number | undefined;
+}
+
+/** Вырожденный внешний прайор → ровно 0 (нет прайора); −0 схлопывается. */
+function pickupV(v: number | undefined): number {
+  return typeof v === 'number' && Number.isFinite(v) ? v + 0 : 0;
+}
+
 /** Контроллер перетаскивания. */
 export interface DragControls {
-  pointerDown(p: GesturePoint): void;
+  /**
+   * Захват. `pickup` — внешний прайор скорости летящего элемента (#93,
+   * compositor→gesture): явная передача АВТОРИТЕТНА и замещает внутренний
+   * glide-прайор (потребитель знает живую скорость лучше); отсутствие
+   * аргумента — прежнее поведение (наследуется скорость активного глайда).
+   */
+  pointerDown(p: GesturePoint, pickup?: DragPickup): void;
   pointerMove(p: GesturePoint): void;
   pointerUp(p: GesturePoint): void;
   pointerCancel(): void;
@@ -645,9 +674,11 @@ export function createDrag(options?: DragOptions): DragControls {
   };
 
   return {
-    pointerDown(p: GesturePoint): void {
-      const pickupVx = gliding ? glideVx : 0;
-      const pickupVy = gliding ? glideVy : 0;
+    pointerDown(p: GesturePoint, pickup?: DragPickup): void {
+      // Прайор скорости нового жеста: явный внешний (compositor→gesture, #93)
+      // авторитетен и замещает внутренний целиком; иначе — скорость глайда.
+      const pickupVx = pickup !== undefined ? pickupV(pickup.vx) : gliding ? glideVx : 0;
+      const pickupVy = pickup !== undefined ? pickupV(pickup.vy) : gliding ? glideVy : 0;
       generation++; // перехват: гасим возможный глайд
       gliding = false;
       dragging = true;
