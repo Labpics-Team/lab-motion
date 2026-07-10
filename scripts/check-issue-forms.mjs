@@ -7,6 +7,11 @@ const files = readdirSync(directory)
 
 const errors = [];
 const allowedTypes = new Set(['checkboxes', 'dropdown', 'input', 'markdown', 'textarea']);
+const expectedTypeLabel = new Map([
+  ['bug.yml', 'type:bug'],
+  ['feature.yml', 'type:feature'],
+  ['hardening.yml', 'type:hardening'],
+]);
 
 for (const file of files) {
   const source = readFileSync(new URL(file, directory), 'utf8');
@@ -21,6 +26,20 @@ for (const file of files) {
     errors.push(`${file}: отсутствует description`);
   }
   if (!/^body\s*:/mu.test(source)) errors.push(`${file}: отсутствует body`);
+
+  const labelsLine = source.match(/^labels\s*:\s*\[(.*)\]\s*$/mu);
+  if (!labelsLine) {
+    errors.push(`${file}: labels должны быть заданы inline-массивом`);
+  } else {
+    const labels = [...labelsLine[1].matchAll(/["']([^"']+)["']/gu)].map((match) => match[1]);
+    const typeLabels = labels.filter((label) => label.startsWith('type:'));
+    const expected = expectedTypeLabel.get(file);
+    if (typeLabels.length !== 1) {
+      errors.push(`${file}: требуется ровно один label из taxonomy type:*`);
+    } else if (expected && typeLabels[0] !== expected) {
+      errors.push(`${file}: ожидается ${expected}, получено ${typeLabels[0]}`);
+    }
+  }
 
   const ids = [...source.matchAll(/^\s+id\s*:\s*([^\s#]+)\s*$/gmu)].map((match) => match[1]);
   const seen = new Set();
