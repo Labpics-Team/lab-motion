@@ -45,20 +45,27 @@ jobs:
       - name: Factual documentation drift
         run: node scripts/check-docs-facts.mjs
 
-      - name: Test
+      - name: Structural documentation drift
+        run: node scripts/check-docs-drift.mjs
+
+      - name: Release contract smoke
+        shell: bash
+        run: node scripts/check-release.mjs "v$(node -p "require('./package.json').version")"
+
+      - name: Vitest
         shell: bash
         run: |
           set +e
-          pnpm test 2>&1 | tee test.log
+          pnpm vitest run 2>&1 | tee vitest.log
           status=${PIPESTATUS[0]}
           exit "$status"
 
-      - name: Upload test diagnostics
+      - name: Upload Vitest diagnostics
         if: failure()
         uses: actions/upload-artifact@v4
         with:
-          name: test-diagnostics-${{ github.run_id }}
-          path: test.log
+          name: vitest-diagnostics-${{ github.run_id }}
+          path: vitest.log
           if-no-files-found: ignore
           retention-days: 7
 
