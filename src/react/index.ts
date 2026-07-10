@@ -16,10 +16,18 @@
  *   value visually; only the motion style changes (spring vs instant).
  */
 
-import { useState, useEffect, useLayoutEffect, useRef, useCallback } from 'react';
+import {
+  useState,
+  useEffect,
+  useLayoutEffect,
+  useRef,
+  useCallback,
+  useSyncExternalStore,
+} from 'react';
 import type { MotionValue, MotionValueOptions, RequestFrameFn } from '../motion-value.js';
 import { createBoundValue } from '../internal/binding-value.js';
 import { type SpringParams } from '../spring.js';
+import { createMotionConfig } from '../a11y/index.js';
 
 /**
  * useLayoutEffect on the client, useEffect on the server. Effect-binding must
@@ -287,4 +295,82 @@ export function useMotionStyle(options: MotionStyleOptions): (el: HTMLElement | 
     },
     [ensureMv, write],
   );
+}
+
+// ─── useReducedMotion (#104) ───────────────────────────────────────────────
+
+/**
+ * Resolve the matchMedia seam: explicit arg, else the browser's, else undefined
+ * (SSR/Node — no window). Injectable for deterministic tests (repo law: no jsdom
+ * for unit-level determinism).
+ */
+function _resolveMatchMedia(
+  mm: ((q: string) => MediaQueryList) | undefined,
+): ((q: string) => MediaQueryList) | undefined {
+  if (typeof mm === 'function') return mm;
+  if (typeof window !== 'undefined' && typeof window.matchMedia === 'function') {
+    return window.matchMedia.bind(window);
+  }
+  return undefined;
+}
+
+const _REDUCE_QUERY = '(prefers-reduced-motion: reduce)';
+
+/**
+ * Reactively reflect the system `prefers-reduced-motion: reduce` preference,
+ * re-rendering the component when the user toggles it mid-session.
+ *
+ * Built on `useSyncExternalStore`, so it is hydration-safe: the server snapshot
+ * is always `false` (matching SSR markup — no media query on the server), and
+ * the real client value is read after commit. The reactive subscription REUSES
+ * `../a11y` `createMotionConfig` (system matchMedia 'change' listener + legacy
+ * `addListener` fallback + leak-safe `destroy()`) — no duplicated listener wiring.
+ *
+ * SSR/Node-safe: returns `false` when there is no `matchMedia`. Thin: owns no
+ * physics/tokens/scheduler.
+ *
+ * @param matchMedia - Injectable matchMedia seam (default: `window.matchMedia`).
+ * @returns `true` when reduced motion is preferred, else `false`.
+ *
+ * @example
+ * ```tsx
+ * function Fade({ show }: { show: boolean }) {
+ *   const reduced = useReducedMotion();
+ *   const ref = useMotionStyle({ target: show ? 1 : 0, property: 'opacity', from: 0 });
+ *   return <div ref={ref} />; // reduced ? мгновенно : пружиной (см. useMotionStyle)
+ * }
+ * ```
+ */
+export function useReducedMotion(matchMedia?: (q: string) => MediaQueryList): boolean {
+  // Subscribe via a11y config (reuses the change-listener machinery + destroy).
+  const subscribe = useCallback(
+    (onStoreChange: () => void): (() => void) => {
+      const mm = _resolveMatchMedia(matchMedia);
+      if (mm === undefined) return () => {};
+      const cfg = createMotionConfig({ reducedMotion: 'system', matchMedia: mm });
+      const unsub = cfg.onChange(() => onStoreChange());
+      return () => {
+        unsub();
+        cfg.destroy();
+      };
+    },
+    [matchMedia],
+  );
+
+  // Snapshot is a PURE read (no listener added) so it is safe during render.
+  const getSnapshot = useCallback((): boolean => {
+    const mm = _resolveMatchMedia(matchMedia);
+    if (mm === undefined) return false;
+    try {
+      return mm(_REDUCE_QUERY).matches === true;
+    } catch {
+      return false;
+    }
+  }, [matchMedia]);
+
+  // Hydration: server (and the initial hydrating client render) sees `false`,
+  // matching the server markup; the real value lands after commit.
+  const getServerSnapshot = (): boolean => false;
+
+  return useSyncExternalStore(subscribe, getSnapshot, getServerSnapshot);
 }

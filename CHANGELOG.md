@@ -8,6 +8,16 @@
 
 ### Added
 
+- `./react`: `useReducedMotion(): boolean` — реактивно отражает системное
+  `prefers-reduced-motion` (фаза I, срез 2, #104): перерендеривает компонент при
+  переключении предпочтения на лету. Построен на `useSyncExternalStore` —
+  **hydration-safe** (серверный снапшот `false`, совпадает с SSR-разметкой;
+  реальное значение читается после commit). Реактивная подписка ПЕРЕИСПОЛЬЗУЕТ
+  `./a11y` `createMotionConfig` (системный `matchMedia`-'change' слушатель +
+  legacy `addListener`-fallback + leak-safe `destroy()`) — без дублирования логики
+  подписки. SSR/Node-safe (`false` без `matchMedia`); matchMedia-шов инжектируется
+  для детерминизма тестов. Закрывает пробел «нет подписки на смену matchMedia»,
+  отмеченный adversarial-ревью среза 1.
 - `./react`: `useMotionStyle` — **effect-binding** хук (фаза I, #104): гонит CSS-
   свойство от пружины БЕЗ ре-рендера компонента на каждом кадре. В отличие от
   `useSpring` (*render value* — компонент рендерится на кадр, чтобы отразить
