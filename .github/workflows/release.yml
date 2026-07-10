@@ -4,6 +4,12 @@ on:
   push:
     tags:
       - "v*.*.*"
+    # Третий равноправный путь: пуш ветки release-request/v<version>. Нужен,
+    # потому что у интеграционного токена овнер-сессий нет actions:write
+    # (dispatch → 403), а пуш тегов транспорт не пропускает; пуш ВЕТОК — есть.
+    # Гард строже dispatch: SHA обязан РАВНЯТЬСЯ HEAD main (не ancestor).
+    branches:
+      - "release-request/v*.*.*"
   # Диспатч с main — второй равноправный путь релиза: git-транспорт овнер-сессий
   # не пропускает пуш тегов (факт 2026-07-10: push отвечает «up-to-date», ls-remote
   # тегов пуст). Workflow сам создаёт тег и публикует В ОДНОМ прогоне: тег от
@@ -29,26 +35,57 @@ env:
 jobs:
   # Создание тега вынесено в отдельный job: contents:write не смешивается с
   # id-token:write publish-job'а (least-privilege, дисциплина ревью #101).
+  # Работает для двух путей: workflow_dispatch(version) и пуш ветки
+  # release-request/v<version>; путь тег-пуша этот job скипает.
   tag:
-    if: github.event_name == 'workflow_dispatch' && github.repository == 'Labpics-Team/lab-motion'
+    if: >-
+      github.repository == 'Labpics-Team/lab-motion' &&
+      (github.event_name == 'workflow_dispatch' ||
+       startsWith(github.ref, 'refs/heads/release-request/v'))
     runs-on: ubuntu-latest
     timeout-minutes: 5
     permissions:
       contents: write
+    outputs:
+      release_tag: ${{ steps.resolve.outputs.release_tag }}
     steps:
-      - name: Validate dispatch inputs
+      - name: Resolve and validate version
+        id: resolve
         env:
-          VERSION: ${{ inputs.version }}
+          INPUT_VERSION: ${{ inputs.version }}
         run: |
+          if [[ "$GITHUB_EVENT_NAME" == "workflow_dispatch" ]]; then
+            VERSION="$INPUT_VERSION"
+            [[ "$GITHUB_REF" == "refs/heads/main" ]] \
+              || { echo "::error::диспатч релиза разрешён только с main, получено: $GITHUB_REF"; exit 1; }
+          else
+            VERSION="${GITHUB_REF_NAME#release-request/v}"
+          fi
           [[ "$VERSION" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]] \
             || { echo "::error::version обязана быть x.y.z, получено: $VERSION"; exit 1; }
-          [[ "$GITHUB_REF" == "refs/heads/main" ]] \
-            || { echo "::error::диспатч релиза разрешён только с main, получено: $GITHUB_REF"; exit 1; }
+          echo "release_tag=v$VERSION" >> "$GITHUB_OUTPUT"
+          echo "version=$VERSION" >> "$GITHUB_OUTPUT"
+
+      # Для request-ветки: релиз только с ТЕКУЩЕГО HEAD main (равенство, не
+      # ancestry). ЧЕСТНАЯ ГРАНИЦА этого гарда (ревью #121): push-событие
+      # исполняет workflow ИЗ ПУШНУТОГО КОММИТА — от ветки с подменённым файлом
+      # этот шаг не защищает (как и любой in-file гард любого workflow с
+      # environment: npm). Настоящий замок — deployment branch policy на
+      # environment npm (внешний контракт, #107, КРИТИЧЕСКОЕ предусловие).
+      # Этот шаг ловит честные ошибки: устаревший request, не-main источник.
+      - name: Verify release-request SHA equals main HEAD
+        if: github.event_name == 'push'
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          MAIN_SHA=$(gh api "repos/$GITHUB_REPOSITORY/git/ref/heads/main" --jq .object.sha)
+          [[ "$MAIN_SHA" == "$GITHUB_SHA" ]] \
+            || { echo "::error::release-request указывает на $GITHUB_SHA ≠ HEAD main $MAIN_SHA — релиз только с текущего main"; exit 1; }
 
       - name: Create tag at main HEAD (идемпотентно)
         env:
           GH_TOKEN: ${{ github.token }}
-          VERSION: ${{ inputs.version }}
+          VERSION: ${{ steps.resolve.outputs.version }}
         run: |
           TAG="v$VERSION"
           EXISTING=$(gh api "repos/$GITHUB_REPOSITORY/git/ref/tags/$TAG" --jq .object.sha 2>/dev/null || true)
@@ -62,7 +99,12 @@ jobs:
           fi
 
   publish:
-    # На push tag-job скипается (result=skipped), на диспатче обязан быть success.
+    # На тег-пуше tag-job скипается (result=skipped), иначе обязан быть success.
+    # Job-level concurrency сериализует ВСЕ ТРИ пути одного релиза в точке
+    # публикации (ревью #121: workflow-level группы путей различаются).
+    concurrency:
+      group: npm-publish-${{ startsWith(github.ref, 'refs/tags/') && github.ref_name || needs.tag.outputs.release_tag }}
+      cancel-in-progress: false
     needs: [tag]
     if: >-
       github.repository == 'Labpics-Team/lab-motion' && !cancelled() &&
@@ -74,7 +116,8 @@ jobs:
       contents: read
       id-token: write
     env:
-      RELEASE_TAG: ${{ github.event_name == 'workflow_dispatch' && format('v{0}', inputs.version) || github.ref_name }}
+      # Тег-пуш → ref_name; dispatch/request-ветка → выход tag-job'а.
+      RELEASE_TAG: ${{ startsWith(github.ref, 'refs/tags/') && github.ref_name || needs.tag.outputs.release_tag }}
 
     steps:
       - name: Checkout
@@ -157,14 +200,15 @@ jobs:
 
   github-release:
     name: GitHub Release
-    if: github.repository == 'Labpics-Team/lab-motion'
-    needs: publish
+    if: github.repository == 'Labpics-Team/lab-motion' && !cancelled() && needs.publish.result == 'success'
+    needs: [tag, publish]
     runs-on: ubuntu-latest
     timeout-minutes: 10
     permissions:
       contents: write
     env:
-      RELEASE_TAG: ${{ github.event_name == 'workflow_dispatch' && format('v{0}', inputs.version) || github.ref_name }}
+      # Тег-пуш → ref_name; dispatch/request-ветка → выход tag-job'а.
+      RELEASE_TAG: ${{ startsWith(github.ref, 'refs/tags/') && github.ref_name || needs.tag.outputs.release_tag }}
 
     steps:
       - name: Create immutable release record
@@ -177,3 +221,11 @@ jobs:
               --verify-tag \
               --generate-notes \
               --title "$RELEASE_TAG"
+
+      - name: Cleanup release-request branch (best-effort)
+        if: startsWith(github.ref, 'refs/heads/release-request/')
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh api -X DELETE "repos/$GITHUB_REPOSITORY/git/refs/heads/$GITHUB_REF_NAME" \
+            || echo "::warning::request-ветка не удалена — удалите вручную"
