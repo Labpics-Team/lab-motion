@@ -1,7 +1,7 @@
 name: Закалка качества
 description: Тесты, производительность, размер, CI, поставка или архитектурный долг
 title: "hardening: "
-labels: []
+labels: ["type:hardening"]
 body:
   - type: textarea
     id: risk
