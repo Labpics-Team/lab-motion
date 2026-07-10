@@ -1,0 +1,90 @@
+name: Дефект
+description: Воспроизводимое нарушение действующего контракта
+title: "bug: "
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Не публикуйте эксплуатационные детали уязвимостей. Используйте Security Advisories.
+
+  - type: textarea
+    id: user-impact
+    attributes:
+      label: Пользовательский эффект
+      description: Как дефект проявляется у потребителя.
+    validations:
+      required: true
+
+  - type: textarea
+    id: reproduction
+    attributes:
+      label: Минимальное воспроизведение
+      description: Код, входы, порядок действий и наблюдаемый результат.
+      placeholder: |
+        1. ...
+        2. ...
+        Фактически: ...
+    validations:
+      required: true
+
+  - type: textarea
+    id: expected
+    attributes:
+      label: Ожидаемый контракт
+      description: Что должно происходить и какой инвариант нарушен.
+    validations:
+      required: true
+
+  - type: input
+    id: version
+    attributes:
+      label: Версия или commit
+      placeholder: "@labpics/motion@0.1.0 или SHA"
+    validations:
+      required: true
+
+  - type: textarea
+    id: environment
+    attributes:
+      label: Среда
+      description: Браузер, Node, фреймворк, режим ESM/CJS/SSR и важные настройки.
+    validations:
+      required: true
+
+  - type: textarea
+    id: evidence
+    attributes:
+      label: Доказательства
+      description: Логи, trace, профиль, тест или ссылка на минимальный репозиторий.
+
+  - type: textarea
+    id: acceptance
+    attributes:
+      label: Критерии приёмки
+      description: Какой регрессионный тест обязан падать до исправления и проходить после него.
+    validations:
+      required: true
+
+  - type: dropdown
+    id: severity
+    attributes:
+      label: Влияние
+      options:
+        - P0 — потеря данных, уязвимость или массовая поломка
+        - P1 — основной сценарий неработоспособен
+        - P2 — ограниченный сценарий или обходной путь существует
+        - P3 — низкий риск, диагностика или согласованность контракта
+    validations:
+      required: true
+
+  - type: checkboxes
+    id: checks
+    attributes:
+      label: Проверка перед отправкой
+      options:
+        - label: Дубликат среди открытых issues не найден
+          required: true
+        - label: Воспроизведение не зависит от незакоммиченного локального состояния
+          required: true
+        - label: Секреты и персональные данные удалены
+          required: true
