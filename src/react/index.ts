@@ -378,3 +378,54 @@ export function useReducedMotion(matchMedia?: (q: string) => MediaQueryList): bo
 
   return useSyncExternalStore(subscribe, getSnapshot, getServerSnapshot);
 }
+
+// ─── useVelocity / useTransform (render-value derivations, #104) ────────────
+
+/**
+ * Read the live **velocity** (units·s⁻¹) of a {@link MotionValue} as a render
+ * value: re-renders each frame the value moves, and settles at exactly `0` at
+ * rest (analytic velocity from the solver — the same seam that powers C¹
+ * handoff, #93). Pair with {@link useMotionValue}.
+ *
+ * This is a *render value* (like {@link useSpring}) — use it when the number
+ * participates in render. For zero-render style writes, drive a second
+ * {@link useMotionStyle} instead. Thin: subscribes to `onChange`, owns nothing.
+ *
+ * @example
+ * ```tsx
+ * const mv = useMotionValue(0);
+ * const v = useVelocity(mv); // e.g. skew by velocity: `skewX(${v * 0.02}deg)`
+ * ```
+ */
+export function useVelocity(value: MotionValue): number {
+  const [v, setV] = useState<number>(() => value.velocity);
+  useEffect(() => {
+    // onChange emits the current value immediately, then on every frame; read
+    // the live velocity each time. Cleanup unsubscribes (StrictMode-safe: one
+    // live subscription after setup→cleanup→setup).
+    return value.onChange(() => setV(value.velocity));
+  }, [value]);
+  return v;
+}
+
+/**
+ * Map a {@link MotionValue}'s value through `transform` and read the result as
+ * a render value, re-rendering when the mapped output changes. The classic
+ * derive-one-channel-from-another primitive (e.g. opacity from x). `transform`
+ * may change between renders without re-subscribing (read from a ref).
+ *
+ * @example
+ * ```tsx
+ * const x = useMotionValue(0);
+ * const opacity = useTransform(x, (px) => Math.max(0, 1 - Math.abs(px) / 200));
+ * ```
+ */
+export function useTransform(value: MotionValue, transform: (v: number) => number): number {
+  const fnRef = useRef(transform);
+  fnRef.current = transform;
+  const [out, setOut] = useState<number>(() => transform(value.value));
+  useEffect(() => {
+    return value.onChange((v) => setOut(fnRef.current(v)));
+  }, [value]);
+  return out;
+}

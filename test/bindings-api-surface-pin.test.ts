@@ -23,6 +23,8 @@ describe('bindings-api-surface-pin: react', () => {
       'useMotionValue',
       'useReducedMotion',
       'useSpring',
+      'useTransform',
+      'useVelocity',
     ]);
   });
 
@@ -31,6 +33,8 @@ describe('bindings-api-surface-pin: react', () => {
     expect(typeof react.useMotionValue).toBe('function');
     expect(typeof react.useMotionStyle).toBe('function');
     expect(typeof react.useReducedMotion).toBe('function');
+    expect(typeof react.useVelocity).toBe('function');
+    expect(typeof react.useTransform).toBe('function');
   });
 });
 

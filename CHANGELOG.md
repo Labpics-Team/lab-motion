@@ -8,6 +8,15 @@
 
 ### Added
 
+- `./react`: `useVelocity(mv)` и `useTransform(mv, fn)` — **render-value** деривации
+  поверх `MotionValue` (фаза I, срез 3, #104). `useVelocity` отдаёт живую скорость
+  (units·s⁻¹, аналитическая из солвера — тот же шов C¹-хендоффа #93; ровно 0 в
+  покое); `useTransform` прогоняет значение через `fn` (классический вывод одного
+  канала из другого, напр. opacity из x). Оба — render-value (перерендер по кадрам,
+  как `useSpring`; для zero-render записи в стиль — `useMotionStyle`). Тонкие:
+  подписка на `MotionValue.onChange`, ничем не владеют; SSR-safe; StrictMode-safe
+  (одна живая подписка после setup→cleanup→setup); `fn` в `useTransform` может
+  меняться между рендерами без переподписки.
 - `./react`: `useReducedMotion(): boolean` — реактивно отражает системное
   `prefers-reduced-motion` (фаза I, срез 2, #104): перерендеривает компонент при
   переключении предпочтения на лету. Построен на `useSyncExternalStore` —
