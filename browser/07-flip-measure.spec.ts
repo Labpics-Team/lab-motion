@@ -87,9 +87,10 @@ test('FLIP: уехавший в layout элемент визуально не п
   expect(Math.abs(r.shiftedX - r.firstX - 200)).toBeLessThanOrEqual(0.5);
   // (б) единственный принудительный reflow за play — батч не разорван (нет thrash).
   expect(r.gbcrCalls).toBe(1);
-  // (в) контракт формул: origin в верхнем-левом углу (движок нормализует
-  // инлайн-геттер '0 0' → '0px 0px' — принимаем обе формы).
-  expect(r.originAfter).toMatch(/^0(px)? 0(px)?$/);
+  // (в) контракт формул: origin в верхнем-левом углу. Форма строки браузеро-
+  // зависима (Chromium/WebKit '0px 0px'; Firefox добавляет z: '0px 0px 0px';
+  // инлайн-геттер до нормализации '0 0') — проверяем СМЫСЛ: все компоненты = 0.
+  expect(r.originAfter.trim().split(/\s+/).every((c) => parseFloat(c) === 0)).toBe(true);
   // (а) FLIP держит элемент визуально на первом месте (нет прыжка на кадре 0).
   expect(r.frame0Transform).toMatch(/translate/);
   expect(Math.abs(r.visualFrame0X - r.firstX)).toBeLessThanOrEqual(1);
