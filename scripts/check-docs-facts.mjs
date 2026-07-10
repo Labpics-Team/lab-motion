@@ -1,8 +1,9 @@
-import { readFileSync, writeFileSync } from 'node:fs';
+import { readdirSync, readFileSync, writeFileSync } from 'node:fs';
 
 const write = process.argv.includes('--write');
 const readmePath = new URL('../README.md', import.meta.url);
 const benchmarkPath = new URL('../docs/бенчмарк.md', import.meta.url);
+const benchmarkResultsDirectory = new URL('../bench/compare/results/', import.meta.url);
 
 const staleInstall = `Пакет пока не опубликован в npm (публикация — отдельное решение). До этого —
 установка из тарбола (git-install не поддержан: \`dist/\` собирается, в гите его нет):
@@ -27,6 +28,29 @@ function fail(message) {
   process.exitCode = 1;
 }
 
+function latestBenchmarkReport() {
+  const reports = readdirSync(benchmarkResultsDirectory)
+    .filter((name) => name.endsWith('.md'))
+    .map((name) => {
+      const content = readFileSync(new URL(name, benchmarkResultsDirectory), 'utf8');
+      const dateMatch = content.match(/^- Дата:\s*(\S+)\s*$/mu);
+      const timestamp = dateMatch ? Date.parse(dateMatch[1]) : Number.NaN;
+      return { name, timestamp };
+    });
+
+  if (reports.length === 0) {
+    fail('bench/compare/results не содержит сгенерированных Markdown-отчётов');
+    return undefined;
+  }
+
+  const malformed = reports.filter(({ timestamp }) => !Number.isFinite(timestamp));
+  for (const { name } of malformed) fail(`${name}: отсутствует корректная строка «- Дата: ISO»`);
+
+  return reports
+    .filter(({ timestamp }) => Number.isFinite(timestamp))
+    .sort((left, right) => right.timestamp - left.timestamp || right.name.localeCompare(left.name))[0];
+}
+
 let readme = readFileSync(readmePath, 'utf8');
 
 if (write && readme.includes(staleInstall)) {
@@ -35,6 +59,7 @@ if (write && readme.includes(staleInstall)) {
 }
 
 const benchmark = readFileSync(benchmarkPath, 'utf8');
+const latestReport = latestBenchmarkReport();
 
 if (readme.includes('Пакет пока не опубликован')) {
   fail('README утверждает, что опубликованный пакет не опубликован');
@@ -42,8 +67,11 @@ if (readme.includes('Пакет пока не опубликован')) {
 if (!readme.includes('pnpm add @labpics/motion')) {
   fail('README не содержит каноническую npm-установку');
 }
-if (!benchmark.includes('bench/compare/results/2026-07-09-dda628e.md')) {
-  fail('документ бенчмарка не ссылается на воспроизводимый отчёт');
+if (latestReport) {
+  const expectedPath = `bench/compare/results/${latestReport.name}`;
+  if (!benchmark.includes(expectedPath)) {
+    fail(`документ бенчмарка не ссылается на актуальный отчёт ${expectedPath}`);
+  }
 }
 if (benchmark.includes('Достоверных сравнительных чисел пока нет')) {
   fail('документ бенчмарка содержит устаревший статус runtime-измерений');
