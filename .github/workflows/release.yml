@@ -1,0 +1,74 @@
+name: Release npm
+
+on:
+  release:
+    types: [published]
+
+permissions:
+  contents: read
+  id-token: write
+
+concurrency:
+  group: npm-release
+  cancel-in-progress: false
+
+jobs:
+  publish:
+    name: verify · pack · publish
+    if: startsWith(github.event.release.tag_name, 'v')
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    environment: npm
+    env:
+      CI: true
+      RELEASE_TAG: ${{ github.event.release.tag_name }}
+
+    steps:
+      - name: Checkout release tag
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.release.tag_name }}
+          fetch-depth: 0
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v4
+        with:
+          version: 10.34.4
+          run_install: false
+
+      - name: Setup Node and npm registry
+        uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+          cache: pnpm
+          registry-url: https://registry.npmjs.org
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Verify tag, package version and changelog
+        run: |
+          node --input-type=module <<'NODE'
+          import fs from 'node:fs';
+
+          const pkg = JSON.parse(fs.readFileSync('package.json', 'utf8'));
+          const tag = process.env.RELEASE_TAG;
+          const expected = `v${pkg.version}`;
+
+          if (tag !== expected) {
+            throw new Error(`Release tag ${tag} does not match package version ${expected}`);
+          }
+
+          const changelog = fs.readFileSync('CHANGELOG.md', 'utf8');
+          if (!changelog.includes(`## [${pkg.version}]`)) {
+            throw new Error(`CHANGELOG.md has no section for ${pkg.version}`);
+          }
+          NODE
+
+      - name: Run publication gates
+        run: pnpm run prepublishOnly
+
+      - name: Publish with provenance
+        run: pnpm publish --access public --provenance --no-git-checks --ignore-scripts
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
