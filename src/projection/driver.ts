@@ -62,8 +62,10 @@ import {
   clamp01,
   createProjector,
   finite,
+  lerp1,
   mixBox,
   type BoxRadii,
+  type CornerRadius,
   type ProjectionFrame,
   type ProjectionNodeInit,
   type Projector,
@@ -135,73 +137,68 @@ function clampMagnitude(x: number, cap: number): number {
   return x > cap ? cap : x < -cap ? -cap : x;
 }
 
-/** Конечный lerp со схлопом −0 (P1) — ребейз radii/opacity при pickup/release. */
-function lerp1(a: number, b: number, t: number): number {
-  return finite(finite(a) + (finite(b) - finite(a)) * t) + 0;
-}
-
 /** Аналитические радиусы на клампленном t: визуальный радиус СЕЙЧАС = lerp(rF, rL, t). */
 function lerpRadii(a: BoxRadii, b: BoxRadii, t: number): BoxRadii {
-  return [
-    { x: lerp1(a[0].x, b[0].x, t), y: lerp1(a[0].y, b[0].y, t) },
-    { x: lerp1(a[1].x, b[1].x, t), y: lerp1(a[1].y, b[1].y, t) },
-    { x: lerp1(a[2].x, b[2].x, t), y: lerp1(a[2].y, b[2].y, t) },
-    { x: lerp1(a[3].x, b[3].x, t), y: lerp1(a[3].y, b[3].y, t) },
-  ];
+  const out = [] as unknown as [CornerRadius, CornerRadius, CornerRadius, CornerRadius];
+  for (let c = 0; c < 4; c++) {
+    out[c] = { x: lerp1(a[c].x, b[c].x, t), y: lerp1(a[c].y, b[c].y, t) };
+  }
+  return out;
 }
 
 /**
- * Ребейз узла на p̂ по данным prev-узла: first' = V(p̂), radii.first'/opacity.from'
- * — тем же lerp'ом (C⁰ всех каналов); цели (.last/.to) не трогаются.
- * Prev без radii/opacity → переданные каналы берутся как есть.
+ * Ребейз узла на p̂ по данным src-узла: first' = V(p̂), radii.first'/opacity.from'
+ * — тем же lerp'ом (C⁰ всех каналов); цели (.last/.to) — из target.
+ * Единая механика pickup (src = prev-узел старого полёта) и release (src = сам
+ * узел: скраб зафиксировал p_seek). Src без radii/opacity → канал target как есть.
  */
-function pickupNode(
+function rebaseNode(
   id: string,
-  n: Omit<ProjectionPlayNode, 'id'>,
-  prev: ProjectionNodeInit,
+  target: Omit<ProjectionPlayNode, 'id'>,
+  src: ProjectionNodeInit,
   pHat: number,
 ): ProjectionNodeInit {
   const tc = clamp01(pHat);
   return {
     id,
-    parent: n.parent,
-    first: mixBox(prev.first, prev.last, pHat),
-    last: n.last,
-    anchor: n.anchor,
+    parent: target.parent,
+    first: mixBox(src.first, src.last, pHat),
+    last: target.last,
+    anchor: target.anchor,
     radii:
-      n.radii !== undefined && prev.radii !== undefined
-        ? { first: lerpRadii(prev.radii.first, prev.radii.last, tc), last: n.radii.last }
-        : n.radii,
+      target.radii !== undefined && src.radii !== undefined
+        ? { first: lerpRadii(src.radii.first, src.radii.last, tc), last: target.radii.last }
+        : target.radii,
     opacity:
-      n.opacity !== undefined && prev.opacity !== undefined
-        ? { from: lerp1(prev.opacity.from, prev.opacity.to, tc), to: n.opacity.to }
-        : n.opacity,
+      target.opacity !== undefined && src.opacity !== undefined
+        ? { from: lerp1(src.opacity.from, src.opacity.to, tc), to: target.opacity.to }
+        : target.opacity,
   };
+}
+
+/** |a − b| > RANGE_EPSILON — канал жив. */
+function chDiff(a: number, b: number): boolean {
+  return Math.abs(a - b) > RANGE_EPSILON;
 }
 
 /** true, если хоть один канал узла (бокс, radii, opacity) имеет живой диапазон. */
 function hasLiveRange(n: ProjectionNodeInit): boolean {
   if (
-    Math.abs(n.last.x - n.first.x) > RANGE_EPSILON ||
-    Math.abs(n.last.y - n.first.y) > RANGE_EPSILON ||
-    Math.abs(n.last.width - n.first.width) > RANGE_EPSILON ||
-    Math.abs(n.last.height - n.first.height) > RANGE_EPSILON
+    chDiff(n.last.x, n.first.x) ||
+    chDiff(n.last.y, n.first.y) ||
+    chDiff(n.last.width, n.first.width) ||
+    chDiff(n.last.height, n.first.height)
   ) {
     return true;
   }
   const r = n.radii;
   if (r !== undefined) {
     for (let c = 0; c < 4; c++) {
-      if (
-        Math.abs(r.last[c].x - r.first[c].x) > RANGE_EPSILON ||
-        Math.abs(r.last[c].y - r.first[c].y) > RANGE_EPSILON
-      ) {
-        return true;
-      }
+      if (chDiff(r.last[c].x, r.first[c].x) || chDiff(r.last[c].y, r.first[c].y)) return true;
     }
   }
   const o = n.opacity;
-  return o !== undefined && Math.abs(o.to - o.from) > RANGE_EPSILON;
+  return o !== undefined && chDiff(o.to, o.from);
 }
 
 /** Локальная копия паттерна flip :192-199 (duck-typed matchMedia). */
@@ -369,17 +366,11 @@ export function createProjection(options?: ProjectionOptions): ProjectionControl
               `projection.play: node "${n.id}" has no "first" and no active flight to pick up from`,
             );
           }
-          return pickupNode(n.id, n, old, pPrev);
+          return rebaseNode(n.id, n, old, pPrev);
         }
-        return {
-          id: n.id,
-          parent: n.parent,
-          first: n.first,
-          last: n.last,
-          anchor: n.anchor,
-          radii: n.radii,
-          opacity: n.opacity,
-        };
+        // first задан: узел структурно уже ProjectionNodeInit; геометрия читает
+        // поля по ссылкам в обоих вариантах — копия объекта ничего не защищала.
+        return n as ProjectionNodeInit;
       });
 
       // C¹: v0' по доминантному каналу ВСЕХ продолжающихся узлов (новые не участвуют —
@@ -465,25 +456,11 @@ export function createProjection(options?: ProjectionOptions): ProjectionControl
         return;
       }
 
-      const tc = clamp01(p0);
-      // Ребейз как перехват: first' = V(p_seek), radii.first'/opacity.from' —
-      // тем же lerp'ом (C⁰ всех каналов; цели не менялись — теорема §2.3.2
-      // даёт точный C¹ всех каналов при v0 = v/(1−p_seek)).
+      // Ребейз как перехват (единая механика rebaseNode, src = сам узел):
+      // first' = V(p_seek), radii/opacity — тем же lerp'ом (C⁰ всех каналов;
+      // цели не менялись — теорема §2.3.2 даёт точный C¹ при v0 = v/(1−p_seek)).
       const rebased: ProjectionNodeInit[] = [];
-      for (const n of flight.byId.values()) {
-        rebased.push({
-          ...n,
-          first: mixBox(n.first, n.last, p0),
-          radii:
-            n.radii === undefined
-              ? undefined
-              : { first: lerpRadii(n.radii.first, n.radii.last, tc), last: n.radii.last },
-          opacity:
-            n.opacity === undefined
-              ? undefined
-              : { from: lerp1(n.opacity.from, n.opacity.to, tc), to: n.opacity.to },
-        });
-      }
+      for (const n of flight.byId.values()) rebased.push(rebaseNode(n.id, n, n, p0));
       const projector = createProjector(rebased);
       const byId = new Map<string, ProjectionNodeInit>();
       for (const node of rebased) byId.set(node.id, node);

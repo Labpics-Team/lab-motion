@@ -119,6 +119,11 @@ export function finiteDiv(num: number, den: number, fallback: number): number {
   return finite(finite(num) / d);
 }
 
+/** Конечный lerp со схлопом −0 (P1). @internal — переиспользует driver (ребейз). */
+export function lerp1(a: number, b: number, t: number): number {
+  return finite(finite(a) + (finite(b) - finite(a)) * t) + 0;
+}
+
 /** @internal */
 export function clamp01(x: number): number {
   const f = Number.isNaN(x) ? 0 : x;
