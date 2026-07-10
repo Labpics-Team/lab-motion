@@ -298,6 +298,11 @@ function _createBase<S extends BehaviorState<number>>(
   const subs = new Set<(s: S) => void>();
   let state = initial;
   let destroyed = false;
+  // Хук прерывания активного жеста: cancel()/destroy() живут на базе и не видят
+  // контроллер-локального `dragging`, поэтому контроллер регистрирует сброс —
+  // иначе после destroy/cancel уцелевший `dragging` воскрешает движение
+  // следующим pointerMove (инертность destroy и phase-idle cancel ломались).
+  let onAbort: (() => void) | undefined;
 
   const emit = (next: Partial<S>): void => {
     state = { ...state, ...next };
@@ -321,6 +326,10 @@ function _createBase<S extends BehaviorState<number>>(
       return destroyed;
     },
     emit,
+    /** Контроллер регистрирует сброс своего `dragging`, вызываемый из cancel/destroy. */
+    setAbort(fn: () => void): void {
+      onAbort = fn;
+    },
     subscribe(fn: (s: S) => void): () => void {
       if (destroyed) return () => {};
       subs.add(fn);
@@ -335,6 +344,7 @@ function _createBase<S extends BehaviorState<number>>(
      */
     cancel(): void {
       if (destroyed) return;
+      onAbort?.(); // оборвать активный жест, иначе phase уедет в idle при живом dragging
       if (!runner.running && state.phase === 'idle') return; // уже в покое
       runner.invalidate();
       tracker.reset();
@@ -342,6 +352,7 @@ function _createBase<S extends BehaviorState<number>>(
     },
     destroy(): void {
       if (destroyed) return;
+      onAbort?.(); // сделать вход инертным: снять dragging до пометки destroyed
       runner.invalidate();
       tracker.reset();
       subs.clear();
@@ -460,6 +471,9 @@ export function createBottomSheet(options: SheetOptions): SheetController {
   let dragging = false;
   let grabPointer = 0;
   let grabValue = 0;
+  base.setAbort(() => {
+    dragging = false;
+  });
 
   /** Применить rubber-band за крайними snap к сырой позиции под пальцем. */
   const clampFollow = (raw: number): number => {
@@ -613,6 +627,9 @@ export function createDragDismiss(options: DismissOptions): DismissController {
   let dragging = false;
   let grabPointer = 0;
   let grabValue = 0;
+  base.setAbort(() => {
+    dragging = false;
+  });
 
   const returnHome = (velocity: number): void => {
     base.emit({ phase: 'release' });
@@ -774,6 +791,9 @@ export function createCarousel(options: CarouselOptions): CarouselController {
   let grabPointer = 0;
   let grabValue = 0;
   let swipeStartIndex = startIndex;
+  base.setAbort(() => {
+    dragging = false;
+  });
 
   // Знак перевода pointer-смещения в position-пространство:
   // горизонталь LTR → влево = следующая (position растёт) → −d; RTL → +d;
@@ -936,6 +956,9 @@ export function createPullToRefresh(options: PullOptions): PullController {
 
   let dragging = false;
   let grabPointer = 0;
+  base.setAbort(() => {
+    dragging = false;
+  });
 
   const springTo = (
     target: number,

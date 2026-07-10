@@ -133,6 +133,36 @@ describe('./behaviors bottom sheet — cancel/destroy идемпотентны (
     expect(sheet.state.value).toBe(before); // инертен
     expect(sheet.state.phase).toBe('idle');
   });
+
+  // Регрессия: destroy()/cancel() ВО ВРЕМЯ живого жеста обязаны его оборвать.
+  // Раньше cancel/destroy жили на базе и не видели контроллер-локальный
+  // `dragging`, поэтому следующий pointerMove воскрешал движение (инертность
+  // destroy и phase-idle cancel ломались). Прежний тест звал destroy() ДО
+  // pointerDown (dragging уже false) и дыру не ловил.
+  it('destroy() посреди жеста делает последующий pointerMove инертным', () => {
+    const sheet = createBottomSheet({ snapPoints: SNAPS });
+    sheet.pointerDown(pt(0, 0, 0)); // dragging = true
+    const before = sheet.state.value;
+    sheet.destroy();
+    sheet.pointerMove(pt(0, 200, 0.1)); // не должен воскресить машину
+    expect(sheet.state.value).toBe(before);
+  });
+
+  it('cancel() посреди жеста: pointerMove не двигает value при phase idle, pointerUp не запускает settle', () => {
+    const clock = makeClock();
+    const sheet = createBottomSheet({ snapPoints: SNAPS, requestFrame: clock.requestFrame });
+    sheet.pointerDown(pt(0, 0, 0));
+    sheet.pointerMove(pt(0, 100, 0.05));
+    sheet.cancel();
+    expect(sheet.state.phase).toBe('idle');
+    const resting = sheet.state.value;
+    sheet.pointerMove(pt(0, 250, 0.1)); // оборванный жест — no-op
+    expect(sheet.state.value).toBe(resting);
+    expect(sheet.state.phase).toBe('idle');
+    sheet.pointerUp(pt(0, 250, 0.15)); // не должен запустить свежий settle
+    expect(sheet.state.phase).toBe('idle');
+    expect(clock.rafCalls()).toBe(0);
+  });
 });
 
 describe('./behaviors bottom sheet — reduced-motion character-switch (мутант #5)', () => {

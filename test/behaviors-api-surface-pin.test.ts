@@ -12,6 +12,7 @@
 import { describe, expect, it } from 'vitest';
 import * as behaviors from '../src/behaviors/index.js';
 import { MotionParamError } from '../src/errors.js';
+import { pt } from './behaviors-helpers.js';
 
 const EXPECTED_EXPORTS = [
   'createBottomSheet',
@@ -58,6 +59,50 @@ describe('./behaviors: единый контракт BehaviorState { value, velo
     expect(typeof carousel.index).toBe('number');
     expect(typeof pull.pending).toBe('boolean');
   });
+});
+
+describe('./behaviors: cancel()/destroy() обрывают ЖИВОЙ жест во всех четырёх машинах (B3)', () => {
+  // cancel/destroy живут на общей базе и не видят контроллер-локальный `dragging`;
+  // каждая фабрика ОБЯЗАНА зарегистрировать сброс через base.setAbort. Забытая
+  // регистрация в любой из четырёх = воскрешение движения следующим pointerMove.
+  // Параметризуем по всем машинам, чтобы дыра ловилась независимо от фабрики.
+  type Point = ReturnType<typeof pt>;
+  interface Draggable {
+    pointerDown(p: Point): void;
+    pointerMove(p: Point): void;
+    cancel(): void;
+    destroy(): void;
+    readonly state: { readonly value: number; readonly phase: string };
+  }
+  const makers: ReadonlyArray<readonly [string, () => Draggable]> = [
+    ['bottomSheet', () => behaviors.createBottomSheet({ snapPoints: [0, 300, 600] })],
+    ['dragDismiss', () => behaviors.createDragDismiss({ distanceThreshold: 120 })],
+    ['carousel', () => behaviors.createCarousel({ pageCount: 3, pageSize: 200 })],
+    ['pullToRefresh', () => behaviors.createPullToRefresh({ threshold: 60 })],
+  ];
+
+  for (const [name, make] of makers) {
+    it(`${name}: destroy() посреди жеста делает pointerMove инертным`, () => {
+      const c = make();
+      c.pointerDown(pt(0, 0, 0));
+      const before = c.state.value;
+      c.destroy();
+      c.pointerMove(pt(0, 200, 0.1));
+      expect(c.state.value).toBe(before);
+    });
+
+    it(`${name}: cancel() посреди жеста оставляет phase idle, pointerMove — no-op`, () => {
+      const c = make();
+      c.pointerDown(pt(0, 0, 0));
+      c.pointerMove(pt(0, 80, 0.05));
+      c.cancel();
+      expect(c.state.phase).toBe('idle');
+      const resting = c.state.value;
+      c.pointerMove(pt(0, 240, 0.1));
+      expect(c.state.value).toBe(resting);
+      expect(c.state.phase).toBe('idle');
+    });
+  }
 });
 
 describe('./behaviors: fail-fast валидация параметров (MotionParamError в фабрике)', () => {
