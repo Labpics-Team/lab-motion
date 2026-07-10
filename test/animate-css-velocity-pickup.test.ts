@@ -268,6 +268,35 @@ describe('animate css-канал: проекция скорости точна (
     expect(Math.abs(vInherited)).toBeGreaterThan(0.6 * Math.abs(vAnalytic));
     expect(allWritesFinite(f.writes)).toBe(true);
   });
+
+  it('неколлинеарный ретаргет: доминанта по НОВОМУ спану — без взрывного усиления', () => {
+    // Adversarial-находка ревью PR #126: доминанта по СТАРОМУ спану (r: 255)
+    // при новом спане, доминантном по b (Δb=250, Δr≈1), давала
+    // v0 = ṗ̂·a[r]/b[r] ≈ 1224 прогресс/с — синий канал прыгал 5→255 за один
+    // кадр и висел на клампе («violent flash»). Канон dominantV0 (waapi-unit,
+    // projection/driver) — доминанта всегда по ЦЕЛЕВОМУ диапазону.
+    // RED-факт до фикса: blue уже на первом шаге = 255 (кламп).
+    const f = fakeEl({ 'background-color': 'rgb(0, 0, 0)' });
+    const clock = makeClock();
+    const first = animate(
+      f.el,
+      { backgroundColor: 'rgb(255, 0, 10)' },
+      { spring: SPRING, requestFrame: clock.requestFrame },
+    );
+    first.seek(80); // захват ≈ rgb(135, 0, 5), ṗ̂ ≈ 4.8/с
+    animate(
+      f.el,
+      { backgroundColor: 'rgb(136, 0, 255)' },
+      { spring: SPRING, requestFrame: clock.requestFrame },
+    );
+    clock.step(16);
+    clock.step(16);
+    const blues = rgbSeries(f.writes, 'background-color').map((c) => c[2]!);
+    // Проекция по доминанте нового спана: v0 = ṗ̂·Δb_old/Δb_new ≈ 0.19/с —
+    // за два кадра синий уходит от захвата (≈5) не дальше четверти пути.
+    expect(blues.at(-1)!).toBeLessThan(100);
+    expect(allWritesFinite(f.writes)).toBe(true);
+  });
 });
 
 // ─── Класс В: seeded property/fuzz — проекция на масштабе диапазона/времени ──

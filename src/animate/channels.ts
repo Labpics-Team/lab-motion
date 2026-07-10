@@ -179,11 +179,14 @@ export interface CssChannel {
 /** Порог вырожденного диапазона (зеркалит RANGE_EPSILON compositor-пути). */
 export const RANGE_EPSILON = 1e-10;
 
-/** Нормализация скорости подхвата: v0 = velocity / range (канон MotionValue). */
+/**
+ * Нормализация скорости подхвата: v0 = velocity / range (канон MotionValue).
+ * `+ 0` схлопывает −0 (velocity 0 при range<0 и наоборот) для всех вызовов.
+ */
 export function normalizeV0(velocity: number, range: number): number {
   if (!(Math.abs(range) > RANGE_EPSILON)) return 0;
   const v0 = velocity / range;
-  return Number.isFinite(v0) ? v0 : 0;
+  return Number.isFinite(v0) ? v0 + 0 : 0;
 }
 
 /**
@@ -204,18 +207,21 @@ function spanVec(from: ValueAST, to: ValueAST): number[] | undefined {
  * Проекция скорости css-канала между прогресс-пространствами при перехвате
  * (C¹-контракт #93): скорость значения по компоненту i равна ṗ̂·Δold_i, новая
  * скорость прогресса — её нормировка на новый спан. i — ДОМИНАНТНЫЙ компонент
- * старого спана (канон dominantV0 WaapiUnit): для юнитных значений (1
- * компонент) и коллинеарных цветовых ретаргетов проекция точна. Несовместимые
- * виды AST (var(), unit×color) → 0; длины определённых спанов совпадают по
- * построению (оба цветовые либо оба юнитные — иначе undefined выше).
+ * НОВОГО спана (канон dominantV0 WaapiUnit и projection/driver: доминанта
+ * всегда по целевому диапазону — иначе малый b[i] при большом a[i] взрывает
+ * усиление на неколлинеарном цветовом ретаргете). Для юнитных значений (1
+ * компонент) и коллинеарных ретаргетов проекция точна. Несовместимые виды AST
+ * (var(), unit×color) → 0; длины определённых спанов совпадают по построению:
+ * fromAst нового спана bindGroup реконструирует из live.css (оба цветовые либо
+ * оба юнитные — иначе undefined выше); −0 схлопывает normalizeV0.
  */
 function projectCssV0(live: CssChannel, fromAst: ValueAST, toAst: ValueAST): number {
   const a = spanVec(live.fromAst, live.toAst);
   const b = spanVec(fromAst, toAst);
-  if (a === undefined || b === undefined) return 0;
+  if (!a || !b) return 0; // undefined-гейт: определённый спан — непустой массив (truthy)
   let i = 0;
-  for (let k = 1; k < a.length; k++) {
-    if (Math.abs(a[k]!) > Math.abs(a[i]!)) i = k;
+  for (let k = 1; k < b.length; k++) {
+    if (Math.abs(b[k]!) > Math.abs(b[i]!)) i = k;
   }
   return normalizeV0(live.dpdt * a[i]!, b[i]!);
 }
@@ -398,8 +404,9 @@ export function bindGroup(
         // live.css не бывает nullish (string | number) — ?? безопасно каскадит.
         const source = live?.css ?? rec.cssValue ?? readStyleValue(el, group);
         fromAst = tryParse(source) ?? spec.to; // нечитаемо → дискретный старт с цели
-        // Живой прогон отдаёт ṗ̂ — проекция в новое прогресс-пространство (C¹).
-        if (live !== undefined) v0 = projectCssV0(live, fromAst, spec.to);
+        // Живой прогон отдаёт ṗ̂ — проекция в новое прогресс-пространство (C¹);
+        // live — объект канала (truthy) либо undefined.
+        if (live) v0 = projectCssV0(live, fromAst, spec.to);
       }
       css = {
         kind: 'css',

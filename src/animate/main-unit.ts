@@ -226,8 +226,10 @@ export class MainUnit implements GroupOwner {
       const k0 = k > EASE_DERIV_H ? k - EASE_DERIV_H : 0;
       const k1 = k + EASE_DERIV_H < 1 ? k + EASE_DERIV_H : 1;
       const slope = (o.mode.ease(k1) - o.mode.ease(k0)) / (k1 - k0);
-      // Прогресс/с; non-finite (враждебный ease) → 0: NaN не сеется в подхват.
-      const dpdt = Number.isFinite(slope) ? (slope * 1000) / o.mode.durationMs : 0;
+      // Прогресс/с; non-finite (враждебный ease) → 0: NaN не сеется в подхват;
+      // `+ 0` схлопывает −0 (враждебный ease, отдающий −0 на сэмплах).
+      const raw = (slope * 1000) / o.mode.durationMs;
+      const dpdt = Number.isFinite(raw) ? raw + 0 : 0;
       for (const ch of o.numeric) {
         const range = ch.to - ch.from;
         const v = ch.from + range * p;
