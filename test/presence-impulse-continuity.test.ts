@@ -17,7 +17,11 @@
  *     синхронно зовёт снимок и передаёт его новой фазе вторым аргументом —
  *     enter стартует спрингом с (value, velocity) exit-рана (reversed
  *     continuation через MotionValue.initialVelocity / drive.initialVelocity);
- *   — терминальный done гасит снимок (после доигранной фазы наследовать нечего);
+ *   — после доигранной фазы наследовать нечего: state-гард takeInterrupted
+ *     делает чтение стейл-снимка недостижимым (явного гашения в done нет —
+ *     мёртвый код, см. «Примечание минимальности» в src/presence/index.ts);
+ *   — done/register фиксируют генерацию ДО transition: ре-энтрантный слушатель
+ *     onStateChange не даёт зомби-фазе подменить живой снимок;
  *   — reduced-motion: CHARACTER-switch — фаз нет, снимок не течёт (без импульса).
  * Машина остаётся headless: снимок — непрозрачный S, никакой математики внутри.
  *
@@ -30,16 +34,22 @@
  * (тривиален без канала). RED по правильной причине: отсутствие канала
  * переноса, не поломка машины.
  *
- * ── MUTATION PROOF (мутанты руками, каждый кусался, откачены) ────────────────
- *   [capture-loss]  при прерывании передавать undefined вместо capture() →
- *                   вертикаль и «двойное прерывание» RED (interrupted undefined).
- *   [reduced-leak]  не гасить снимок в reduce-ветке enter()/exit() →
- *                   «reduce: снимок не переживает…» RED (стейл-снимок утёк
- *                   в следующую не-reduce фазу).
- *   [terminal-stale] убрать гашение снимка в живом done → «после доигранной
- *                   фазы…» RED (exit после present получил снимок).
- *   [register-guard] снять `gen === generation` в регистраторе → «регистратор
- *                   прерванной фазы инертен» RED (стейл-чтение утекло).
+ * ── MUTATION PROOF (мутанты руками, каждый кусался, откачены; канонический
+ *    список — в шапке src/presence/index.ts) ───────────────────────────────────
+ *   [capture-loss]   при прерывании передавать undefined вместо capture() →
+ *                    вертикаль и «двойное прерывание» RED (interrupted undefined).
+ *   [reduced-leak]   читать снимок и в reduce-ветке (takeInterrupted до снапа) →
+ *                    «reduce: …снимок НЕ читается» RED (reads=1 вместо 0).
+ *   [stale-clear]    убрать безусловное гашение в takeInterrupted → «регистратор
+ *                    прерванной фазы инертен» RED (стейл-снимок утёк).
+ *   [state-guard]    снять `state === running` в takeInterrupted → «после
+ *                    доигранной фазы снимок погашен» RED.
+ *   [register-guard] снять gen-гард регистратора → «регистратор прерванной
+ *                    фазы инертен» RED (стейл-регистрация подменила снимок).
+ *   [register-late]  создать register ПОСЛЕ transition (ревью PR #128) →
+ *                    «ре-энтрантность…» RED ('zombie-exit' вместо 'live-enter').
+ *   [no-finally]     гасить capture без finally → «бросающий read…» RED
+ *                    (ретрай exit() бросает повторно).
  */
 
 import { describe, expect, it } from 'vitest';
@@ -353,5 +363,58 @@ describe('presence impulse: prefers-reduced-motion (без импульса)', (
     state.reduce = false;
     p.exit(); // обычная фаза: прерывать нечего
     expect(exitSeen).toEqual([undefined, undefined]);
+  });
+});
+
+// ─── Adversarial-находки ревью PR #128 ────────────────────────────────────────
+
+describe('presence: ре-энтрантность и бросающий read (ревью PR #128)', () => {
+  it('ре-энтрантность onStateChange: регистратор зомби-фазы инертен, живой снимок цел', () => {
+    // Находка major: до фикса done/register создавались ПОСЛЕ transition —
+    // слушатель, синхронно зовущий enter() при 'exiting', бампал generation,
+    // и регистратор зомби-exit снимал ЧУЖУЮ (живую) генерацию: capture зомби
+    // перезаписывал живой enter-снимок, следующий exit() получал 'zombie-exit'.
+    // RED-факт до фикса: expected 'zombie-exit' to be 'live-enter'.
+    const exitFroms: Array<string | undefined> = [];
+    let reentered = false;
+    const p = createPresence<string>({
+      onEnterStart: (_done, _from, capture) => {
+        capture(() => 'live-enter');
+      },
+      onExitStart: (_done, from, capture) => {
+        exitFroms.push(from);
+        capture(() => 'zombie-exit');
+      },
+    });
+    p.enter(); // живой enter-ран с зарегистрированным снимком
+    p.onStateChange((s) => {
+      if (s === 'exiting' && !reentered) {
+        reentered = true;
+        p.enter(); // пользователь передумал синхронно в слушателе
+      }
+    });
+    p.exit(); // прерван ре-энтрантно ИЗ transition('exiting')
+    expect(p.state).toBe('entering'); // живой — enter из слушателя
+    p.exit(); // прерываем живой enter: снимок обязан быть его, не зомби-exit'а
+    expect(exitFroms.at(-1)).toBe('live-enter');
+  });
+
+  it('бросающий read: capture гасится (finally), ретрай перехода не бросает повторно', () => {
+    // Находка minor: без finally бросок из read оставлял машину полу-мёртвой —
+    // state не сменился, capture не погашен, каждый следующий exit() бросал
+    // снова. RED-факт до фикса: второй p.exit() бросал 'boom' повторно.
+    const p = createPresence<number>({
+      onEnterStart: (_done, _from, capture) => {
+        capture(() => {
+          throw new Error('boom');
+        });
+      },
+      onExitStart: () => {},
+    });
+    p.enter();
+    expect(() => p.exit()).toThrow('boom'); // первый бросок честно пропагируется
+    expect(p.state).toBe('entering'); // переход не состоялся (бросок до transition)
+    expect(() => p.exit()).not.toThrow(); // снимок погашен — ретрай работает
+    expect(p.state).toBe('exiting');
   });
 });

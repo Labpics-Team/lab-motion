@@ -72,10 +72,16 @@
  *                    → «после доигранной фазы снимок погашен» RED;
  *   [register-guard] снять gen-гард регистратора → «регистратор прерванной
  *                    фазы инертен» RED (стейл-регистрация подменила снимок).
+ *   [register-late]  создать register ПОСЛЕ transition → «ре-энтрантность…»
+ *                    RED (зомби-фаза подменяет живой снимок, ревью PR #128);
+ *   [no-finally]     гасить capture без finally → «бросающий read…» RED.
  *   Примечание минимальности: явные гашения capture в reduce-ветках и в живом
  *   done были мёртвым кодом (мутанты не кусались — state-гард takeInterrupted
  *   уже делает чтение стейл-снимка недостижимым, а его безусловное гашение
- *   чистит на первом же переходе) и удалены.
+ *   чистит на первом же переходе) и удалены. НО state-гард сам по себе
+ *   НЕдостаточен под ре-энтрантностью (слушатель onStateChange синхронно
+ *   меняет фазу): done/register обязаны фиксировать генерацию ДО transition —
+ *   иначе регистратор зомби-фазы снимает чужую генерацию (ревью PR #128).
  */
 
 // ─── Типы ────────────────────────────────────────────────────────────────────
@@ -201,9 +207,13 @@ export function createPresence<S = PresenceSnapshot>(
    * снимка нет по построению — done его погасил). Всегда гасит capture.
    */
   const takeInterrupted = (running: PresenceState): S | undefined => {
-    const snap = state === running && capture !== undefined ? capture() : undefined;
-    capture = undefined;
-    return snap;
+    // finally: capture гасится даже если read бросил — иначе машина остаётся
+    // полу-мёртвой (state не сменился, снимок не погашен, ретрай бросает снова).
+    try {
+      return state === running && capture !== undefined ? capture() : undefined;
+    } finally {
+      capture = undefined;
+    }
   };
 
   return {
@@ -221,9 +231,14 @@ export function createPresence<S = PresenceSnapshot>(
       // Reversed continuation (#93): снимок exit-рана — ДО перехода.
       const interrupted = takeInterrupted('exiting');
       generation++; // инертит done прерванного exit'а
-      transition('entering');
+      // done/register фиксируют СВОЮ генерацию ДО transition: слушатель
+      // onStateChange может ре-энтрантно сменить фазу (generation++), и
+      // регистратор, созданный после, снял бы ЧУЖУЮ генерацию — зомби-фаза
+      // перезаписала бы живой снимок (пробой state-гарда takeInterrupted).
       const done = makeDone('entering', 'present', options?.onPresent);
-      if (options?.onEnterStart) options.onEnterStart(done, interrupted, makeRegister());
+      const register = makeRegister();
+      transition('entering');
+      if (options?.onEnterStart) options.onEnterStart(done, interrupted, register);
       else done(); // аниматор не задан — вход мгновенен
     },
     exit(): void {
@@ -235,9 +250,11 @@ export function createPresence<S = PresenceSnapshot>(
       }
       const interrupted = takeInterrupted('entering'); // симметрия наследования
       generation++; // инертит done прерванного enter'а
-      transition('exiting');
+      // Симметрично enter(): done/register — ДО transition (ре-энтрантность).
       const done = makeDone('exiting', 'gone', options?.onGone);
-      if (options?.onExitStart) options.onExitStart(done, interrupted, makeRegister());
+      const register = makeRegister();
+      transition('exiting');
+      if (options?.onExitStart) options.onExitStart(done, interrupted, register);
       else done();
     },
     onStateChange(cb: (s: PresenceState) => void): () => void {
