@@ -411,8 +411,13 @@ export function useVelocity(value: MotionValue): number {
 /**
  * Map a {@link MotionValue}'s value through `transform` and read the result as
  * a render value, re-rendering when the mapped output changes. The classic
- * derive-one-channel-from-another primitive (e.g. opacity from x). `transform`
- * may change between renders without re-subscribing (read from a ref).
+ * derive-one-channel-from-another primitive (e.g. opacity from x).
+ *
+ * Output always reflects `transform(value)`: the effect re-subscribes when
+ * `value` OR `transform` identity changes, and `onChange`'s immediate-emit
+ * recomputes with the current fn — so swapping `transform` while the value is at
+ * rest updates the result (no staleness). Pass a stable `transform` (e.g.
+ * `useCallback`) to avoid a cheap per-render re-subscribe when it's an inline fn.
  *
  * @example
  * ```tsx
@@ -421,11 +426,9 @@ export function useVelocity(value: MotionValue): number {
  * ```
  */
 export function useTransform(value: MotionValue, transform: (v: number) => number): number {
-  const fnRef = useRef(transform);
-  fnRef.current = transform;
   const [out, setOut] = useState<number>(() => transform(value.value));
   useEffect(() => {
-    return value.onChange((v) => setOut(fnRef.current(v)));
-  }, [value]);
+    return value.onChange((v) => setOut(transform(v)));
+  }, [value, transform]);
   return out;
 }

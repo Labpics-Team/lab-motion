@@ -497,6 +497,26 @@ describe('useVelocity / useTransform — render-value деривации (#104)'
     expect(txt()).toBeCloseTo(100, 1); // fn(50) = 100 после оседания
   });
 
+  it('useTransform: смена fn в ПОКОЕ немедленно пересчитывает вывод (нет staleness)', () => {
+    // Регрессия (adversarial): out писался только в onChange (по смене значения).
+    // Если fn меняется, пока MV в покое, вывод застревал на старом fn. Контракт —
+    // out === transform(value) всегда. Диверсия «deps [value] вместо [value, transform]»
+    // → после setScale вывод остаётся 20 (старый fn) → тест краснеет.
+    let setScale!: Dispatch<SetStateAction<number>>;
+    function Probe(): ReturnType<typeof createElement> {
+      const [scale, setS] = useState(2);
+      setScale = setS;
+      const mv = useMotionValue(10); // в покое на 10 (без анимации)
+      const y = useTransform(mv, (px) => px * scale);
+      return createElement('div', { id: 'p' }, y.toFixed(0));
+    }
+    const c = mount(createElement(Probe));
+    const txt = (): number => Number((c.querySelector('#p') as HTMLElement).textContent);
+    expect(txt()).toBe(20); // 10 * 2
+    act(() => setScale(3)); // fn изменилась, MV не двигался
+    expect(txt()).toBe(30); // 10 * 3 — со staleness-багом осталось бы 20
+  });
+
   it('useVelocity: >0 в полёте, ~0 в покое', () => {
     const clock = makeClock();
     let mv!: ReturnType<typeof useMotionValue>;
