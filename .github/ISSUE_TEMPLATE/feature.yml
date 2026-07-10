@@ -1,0 +1,67 @@
+name: Возможность или публичный API
+description: Новый пользовательский сценарий с измеримым контрактом
+title: "[Feature] "
+body:
+  - type: textarea
+    id: outcome
+    attributes:
+      label: Пользовательский результат
+      description: Что потребитель сможет сделать проще, надёжнее или быстрее.
+    validations:
+      required: true
+  - type: textarea
+    id: scenarios
+    attributes:
+      label: Канонические сценарии
+      description: Минимальный набор реальных примеров, ради которых нужна возможность.
+    validations:
+      required: true
+  - type: textarea
+    id: current
+    attributes:
+      label: Текущее ограничение
+      description: Почему существующие API и композиция примитивов недостаточны.
+    validations:
+      required: true
+  - type: textarea
+    id: contract
+    attributes:
+      label: Предлагаемый контракт
+      description: Наблюдаемое поведение, входы, выходы, ошибки и lifecycle. Синтаксис вторичен.
+    validations:
+      required: true
+  - type: textarea
+    id: boundaries
+    attributes:
+      label: Архитектурные границы
+      description: Домен, адаптеры, SSOT, зависимости и переиспользуемые примитивы.
+    validations:
+      required: true
+  - type: textarea
+    id: nongoals
+    attributes:
+      label: Не-цели
+      description: Что намеренно не входит в первую поставку.
+    validations:
+      required: true
+  - type: textarea
+    id: tests
+    attributes:
+      label: Стратегия доказательства
+      description: RED-тест, property/fuzz, differential, browser и mutation-классы.
+    validations:
+      required: true
+  - type: textarea
+    id: budgets
+    attributes:
+      label: Бюджеты
+      description: Размер, main-thread work, аллокации, browser support и совместимость.
+    validations:
+      required: true
+  - type: textarea
+    id: acceptance
+    attributes:
+      label: Критерии приёмки
+      description: Проверяемые условия, после которых issue закрывается.
+    validations:
+      required: true
