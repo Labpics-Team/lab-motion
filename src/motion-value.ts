@@ -67,6 +67,7 @@ export interface MotionValueOptions {
    * compositor-трека — первый setTarget() подхватывает эту скорость через штатный
    * smooth-pickup (тот же solveSpring с произвольным v0), поэтому позиция И
    * скорость непрерывны. 0 = штатное рождение в покое (поведение без изменений).
+   * NaN/±Infinity → MotionParamError синхронно (fail-fast, как initial/spring).
    */
   readonly initialVelocity?: number | undefined;
 }
@@ -87,6 +88,19 @@ import { CONVERGENCE_THRESHOLD, MAX_FRAMES, FIXED_DT_S } from './internal/consta
  * статически), им epsilon-пол не нужен — потому в общий internal/constants не вынесен.
  */
 const EPSILON = 1e-10;
+
+/**
+ * Единый fail-fast страж конечности публичных числовых входов MotionValue:
+ * NaN/±Infinity → MotionParamError синхронно (до Promise и до единого кадра).
+ * Один throw-сайт вместо четырёх (initial/initialVelocity/setTarget/snapTo) —
+ * заодно размерный шейв под гейт ядра (2220 gz ровно, без люфта).
+ */
+function assertFinite(v: number, label: string): number {
+  if (!Number.isFinite(v)) {
+    throw new MotionParamError(`MotionValue${label} must be finite, got ${v}`);
+  }
+  return v;
+}
 
 // ─── MotionValue ─────────────────────────────────────────────────────────────
 
@@ -165,23 +179,18 @@ export class MotionValue {
   // ── Constructor ──────────────────────────────────────────────────────────
 
   constructor(opts: MotionValueOptions) {
-    if (!Number.isFinite(opts.initial)) {
-      throw new MotionParamError(
-        `MotionValue: 'initial' must be finite, got ${opts.initial}`,
-      );
-    }
+    // Цепочка присваиваний: value/from/target рождаются одним (проверенным)
+    // числом — и это дешевле трёх чтений opts.initial под гейтом ядра.
+    this._value = this._from = this._target = assertFinite(opts.initial, `: 'initial'`);
     validateSpringParams(opts.spring);
-
-    this._value = opts.initial;
-    this._from = opts.initial;
-    this._target = opts.initial;
     this._spring = opts.spring;
     this._clamp = opts.clamp !== false;
     // Скорость рождения (units/s): подхватывается первым setTarget() через
-    // smooth-pickup (C¹-хендофф compositor→live). Поле по умолчанию 0 (штатное
-    // рождение в покое); засеваем лишь при конечном значении — non-finite-щит
-    // как у выходов ядра (публичный вход handoffToLive валидирует velocity до этого).
-    if (Number.isFinite(opts.initialVelocity)) this._velocity = opts.initialVelocity as number;
+    // smooth-pickup (C¹-хендофф compositor→live). Fail-fast (#93 срез 2, нота
+    // CodeRabbit #112): NaN/±Infinity — не «нет сида», а ошибка вызова, как
+    // initial/spring; молчаливое проглатывание маскировало бы битый донор
+    // скорости (жест/decay/compositor-хендофф). Отсутствие опции = 0 (покой).
+    this._velocity = assertFinite(opts.initialVelocity ?? 0, `: 'initialVelocity'`);
     this._requestFrame = opts.requestFrame ?? MotionValue._defaultRequestFrame;
   }
 
@@ -240,11 +249,7 @@ export class MotionValue {
    */
   setTarget(target: number): void {
     if (this._destroyed) return;
-    if (!Number.isFinite(target)) {
-      throw new MotionParamError(
-        `MotionValue.setTarget: target must be finite, got ${target}`,
-      );
-    }
+    assertFinite(target, '.setTarget: target');
 
     // Snap instantly if already at target with negligible velocity.
     if (target === this._value && Math.abs(this._velocity) < EPSILON) {
@@ -270,15 +275,9 @@ export class MotionValue {
     this._useTimeoutFallback = false;
 
     // ── Start frame loop (idempotent: only one loop runs at a time) ──────
-    // Первый кадр планируется инлайн (бывший _scheduleFirstFrame, единственный
-    // вызов — ужим): handle=0 = non-draining step-clock → setTimeout-fallback.
     if (!this._running) {
       this._running = true;
-      const gen = this._generation;
-      if (this._requestFrame((ts) => this._tick(ts, gen)) === 0) {
-        this._useTimeoutFallback = true;
-        setTimeout(() => this._tick(undefined, gen), 0);
-      }
+      this._schedule(this._generation);
     }
     // If already running, the active loop will pick up the new _target/_from/_v0Normalized
     // on its next tick (because it re-reads these fields). The loop is already scheduled.
@@ -323,11 +322,7 @@ export class MotionValue {
    */
   snapTo(target: number): void {
     if (this._destroyed) return;
-    if (!Number.isFinite(target)) {
-      throw new MotionParamError(
-        `MotionValue.snapTo: target must be finite, got ${target}`,
-      );
-    }
+    assertFinite(target, '.snapTo: target');
     // Идемпотентность: уже покоимся ровно в target → нечего менять и незачем
     // эмитить (лишний requestUpdate у Lit-хоста). Живой ран в тот же target —
     // НЕ no-op: его надо прервать и снапнуть.
@@ -345,6 +340,18 @@ export class MotionValue {
   }
 
   // ── Private: animation loop ──────────────────────────────────────────────
+
+  /**
+   * Единственный планировщик кадра (первый кадр setTarget и re-schedule _tick —
+   * бывшие две копии, ужим под гейт ядра): handle=0 = non-draining step-clock
+   * (конвенция repo) → setTimeout(0)-fallback, дальше цикл живёт на нём.
+   */
+  private _schedule(gen: number): void {
+    if (this._useTimeoutFallback || this._requestFrame((ts) => this._tick(ts, gen)) === 0) {
+      this._useTimeoutFallback = true;
+      setTimeout(() => this._tick(undefined, gen), 0);
+    }
+  }
 
   private _tick(ts: number | undefined, gen: number): void {
     // A frame scheduled by a run that was since stop()/snapTo()-ed away is
@@ -420,11 +427,7 @@ export class MotionValue {
     if (gen !== this._generation || !this._running || this._destroyed) return;
 
     // Reschedule (same generation — this run is still live).
-    if (this._useTimeoutFallback) {
-      setTimeout(() => this._tick(undefined, gen), 0);
-    } else {
-      this._requestFrame((t) => this._tick(t, gen));
-    }
+    this._schedule(gen);
   }
 
   private _emit(value: number): void {

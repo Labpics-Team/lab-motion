@@ -17,11 +17,15 @@
  *   G3. Детерминизм: время только из входных точек и requestFrame-шва.
  *   G4. Reduced-motion (drag): CHARACTER-switch — release снапает в точку
  *       покоя физики немедленно (без глайд-кадров), а не отключает движение.
- *   G5. Zero runtime deps: только внутренние примитивы (./decay, errors).
+ *   G5. Zero runtime deps: только внутренние примитивы (./decay, канонический
+ *       solveSpring/validateSpringParams ядра, errors).
  */
 
-import { createDecay } from '../decay.js';
+import { createDecay, type DecayModel } from '../decay.js';
 import { trimSlidingWindow } from '../internal/sliding-window.js';
+import { solveSpring } from '../internal/solver.js';
+import { CONVERGENCE_THRESHOLD } from '../internal/constants.js';
+import { type SpringParams, validateSpringParams } from '../spring.js';
 import type { RequestFrameFn } from '../motion-value.js';
 
 // ─── Общие типы и утилиты ────────────────────────────────────────────────────
@@ -380,6 +384,15 @@ export interface DragOptions {
   readonly rubberBand?: number | undefined;
   /** Инерция отпускания; false = остановиться сразу. По умолчанию включена. */
   readonly inertia?: DragInertiaOptions | false | undefined;
+  /**
+   * Пружина snap-back на границе глайда (iOS-манера, #93 C2a): при касании
+   * bounds инерционным глайдом остаточная скорость НЕ выбрасывается, а
+   * наследуется пружиной к границе — C¹ на стыке decay|spring (короткий
+   * overshoot за границу и упругий возврат на неё). Отсутствие опции =
+   * прежнее поведение: жёсткий clamp, скорость касания гасится.
+   * Невалидные параметры → MotionParamError синхронно из createDrag.
+   */
+  readonly snapBackSpring?: SpringParams | undefined;
   /** Инжектируемый matchMedia для prefers-reduced-motion (G4). */
   readonly matchMedia?: ((query: string) => MediaQueryList) | undefined;
   /** Инжектируемый кадровый шов для глайда (ts в мс). */
@@ -410,6 +423,12 @@ const DEFAULT_RUBBER_BAND = 0.5;
 const GLIDE_FIXED_DT_S = 1 / 60;
 /** Потолок кадров глайда — страховка от вечного цикла (конвенция MAX_FRAMES). */
 const GLIDE_MAX_FRAMES = 2000;
+/**
+ * Смещение синтетического прайор-сэмпла при pickup летящего объекта (#93 C2b):
+ * половина окна трекера — немедленный release наследует скорость глайда почти
+ * целиком, а удержание пальца естественно вытесняет прайор из окна (v → 0).
+ */
+const GLIDE_PICKUP_SEED_DT_S = DEFAULT_VELOCITY_WINDOW_S / 2;
 
 function prefersReducedMotion(matchMedia: ((q: string) => MediaQueryList) | undefined): boolean {
   if (typeof matchMedia !== 'function') return false;
@@ -433,6 +452,10 @@ export function createDrag(options?: DragOptions): DragControls {
       ? Math.min(1, Math.max(0, rubberBandRaw))
       : DEFAULT_RUBBER_BAND;
   const inertia = options?.inertia;
+  const snapBack = options?.snapBackSpring;
+  // Fail-fast как у всех пружинных входов ядра: невалидная пружина не должна
+  // дожить до первого касания границы (там она молча зациклила бы глайд).
+  if (snapBack !== undefined) validateSpringParams(snapBack);
   const requestFrame: RequestFrameFn | undefined = options?.requestFrame;
   const onStep = options?.onStep;
   const onRest = options?.onRest;
@@ -447,6 +470,9 @@ export function createDrag(options?: DragOptions): DragControls {
   let gliding = false;
   /** Инвалидация кадров глайда при перехвате (класс stale-frame, как в MotionValue). */
   let generation = 0;
+  /** Текущая скорость активного глайда (px/s) — прайор для pickup (#93 C2b). */
+  let glideVx = 0;
+  let glideVy = 0;
 
   // Точка pointerDown и позиция на момент захвата.
   let grabPointerX = 0;
@@ -513,9 +539,66 @@ export function createDrag(options?: DragOptions): DragControls {
       return;
     }
 
+    /**
+     * Per-axis траектория глайда: фаза decay → (опционально) фаза spring.
+     * Без snapBackSpring поведение прежнее БИТ-В-БИТ (characterization-пин):
+     * hard-clamp на границе и оседание оси в кадре касания.
+     * Со snapBackSpring: в кадре первого выхода decay за границу ось
+     * переключается на пружину к границе через канонический
+     * solveSpring(params, t, v0) (тот же, что smooth-pickup MotionValue):
+     * from = сырое значение decay за границей, target = граница,
+     * v0n = velocityAt(касания) / range — нормировка даёт знак «к границе»
+     * автоматически. Стык C¹: значение стыка лежит на той же decay-траектории,
+     * v0 пружины — её же аналитическая производная.
+     */
+    const makeAxis = (a: GestureAxis, model: DecayModel) => {
+      let t0 = -1; // <0 — фаза decay; иначе elapsed старта пружины
+      let from = 0;
+      let target = 0;
+      let v0n = 0;
+      return (elapsed: number): { v: number; vel: number; done: boolean } => {
+        if (t0 >= 0) {
+          const range = target - from;
+          const s = solveSpring(snapBack as SpringParams, elapsed - t0, v0n);
+          const val = from + s.value * range;
+          const vel = s.velocity * range;
+          const denom = Math.abs(range); // > 0 по построению (raw строго за границей)
+          // Сходимость как в ядре (относительный CONVERGENCE_THRESHOLD) либо
+          // non-finite-страж: единственный безопасный исход — снап на границу.
+          if (
+            !Number.isFinite(val) ||
+            !Number.isFinite(vel) ||
+            (Math.abs(val - target) / denom < CONVERGENCE_THRESHOLD &&
+              Math.abs(vel) / denom < CONVERGENCE_THRESHOLD)
+          ) {
+            return { v: target, vel: 0, done: true };
+          }
+          return { v: finite(val), vel: finite(vel), done: false };
+        }
+        const raw = model.valueAt(elapsed);
+        const clamped = hardClamp(a, raw);
+        if (snapBack !== undefined && clamped !== raw) {
+          t0 = elapsed;
+          from = raw;
+          target = clamped;
+          v0n = model.velocityAt(elapsed) / (clamped - raw);
+          return { v: finite(raw), vel: finite(model.velocityAt(elapsed)), done: false };
+        }
+        return {
+          v: clamped,
+          vel: clamped === raw ? finite(model.velocityAt(elapsed)) : 0,
+          done: model.isSettledAt(elapsed) || clamped !== raw,
+        };
+      };
+    };
+    const axX = makeAxis('x', dx);
+    const axY = makeAxis('y', dy);
+
     gliding = true;
     generation++;
     const gen = generation;
+    glideVx = dx.velocityAt(0);
+    glideVy = dy.velocityAt(0);
     let elapsed = 0;
     let lastTs: number | undefined;
     let frames = 0;
@@ -543,17 +626,15 @@ export function createDrag(options?: DragOptions): DragControls {
       }
       frames++;
 
-      const nx = hardClamp('x', dx.valueAt(elapsed));
-      const ny = hardClamp('y', dy.valueAt(elapsed));
-      const clampedX = nx !== dx.valueAt(elapsed);
-      const clampedY = ny !== dy.valueAt(elapsed);
-      rawX = dispX = nx;
-      rawY = dispY = ny;
+      const rx = axX(elapsed);
+      const ry = axY(elapsed);
+      rawX = dispX = rx.v;
+      rawY = dispY = ry.v;
+      glideVx = rx.vel;
+      glideVy = ry.vel;
       emit();
 
-      const settled =
-        (dx.isSettledAt(elapsed) || clampedX) && (dy.isSettledAt(elapsed) || clampedY);
-      if (settled || frames >= GLIDE_MAX_FRAMES) {
+      if ((rx.done && ry.done) || frames >= GLIDE_MAX_FRAMES) {
         settle();
         return;
       }
@@ -565,6 +646,8 @@ export function createDrag(options?: DragOptions): DragControls {
 
   return {
     pointerDown(p: GesturePoint): void {
+      const pickupVx = gliding ? glideVx : 0;
+      const pickupVy = gliding ? glideVy : 0;
       generation++; // перехват: гасим возможный глайд
       gliding = false;
       dragging = true;
@@ -573,6 +656,18 @@ export function createDrag(options?: DragOptions): DragControls {
       grabRawX = rawX;
       grabRawY = rawY;
       tracker.reset();
+      // C¹-pickup летящего объекта (#93 C2b): скорость активного глайда —
+      // прайор нового жеста. Засев через штатную sliding-window механику
+      // трекера: синтетический сэмпл на полокна назад вдоль скорости глайда.
+      // Немедленный release без движения продолжает движение (не убивает его);
+      // сэмплы реального движения вытесняют прайор из окна как обычно.
+      if (pickupVx !== 0 || pickupVy !== 0) {
+        tracker.push({
+          x: finite(p.x) - pickupVx * GLIDE_PICKUP_SEED_DT_S,
+          y: finite(p.y) - pickupVy * GLIDE_PICKUP_SEED_DT_S,
+          t: finite(p.t) - GLIDE_PICKUP_SEED_DT_S,
+        });
+      }
       tracker.push(p);
     },
     pointerMove(p: GesturePoint): void {
