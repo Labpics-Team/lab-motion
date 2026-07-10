@@ -14,7 +14,7 @@
 import { afterEach, describe, expect, it } from 'vitest';
 import { act, createElement, useState, StrictMode, type Dispatch, type SetStateAction } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
-import { useSpring, useMotionValue, useMotionStyle } from '../src/react/index.js';
+import { useSpring, useMotionValue, useMotionStyle, useReducedMotion } from '../src/react/index.js';
 
 // React 18 требует этот флаг для act() вне test-renderer.
 (globalThis as unknown as { IS_REACT_ACT_ENVIRONMENT: boolean }).IS_REACT_ACT_ENVIRONMENT = true;
@@ -372,5 +372,101 @@ describe('useMotionStyle — effect binding без render на кадр (#104)',
     act(() => clock.drain());
     // Анимация корректна после StrictMode-ремоунта (живой единственный цикл).
     expect(Number((c.querySelector('#box') as HTMLElement).style.opacity)).toBeCloseTo(100, 1);
+  });
+});
+
+// ─── useReducedMotion (#104 срез 2) ────────────────────────────────────────
+
+/**
+ * Управляемый matchMedia-шов: MediaQueryList с живым `matches` (геттер) и общим
+ * реестром слушателей; `set(v)` флипает предпочтение и будит слушателей (как
+ * системный 'change'). Инжектируется в хук — детерминизм без реального OS-события.
+ */
+function makeFakeMedia(initial = false): {
+  matchMedia: (q: string) => MediaQueryList;
+  set(v: boolean): void;
+  listenerCount(): number;
+} {
+  let matches = initial;
+  const listeners = new Set<() => void>();
+  const matchMedia = (q: string): MediaQueryList =>
+    ({
+      get matches() {
+        return matches;
+      },
+      media: q,
+      onchange: null,
+      addEventListener: (_e: string, cb: () => void) => listeners.add(cb),
+      removeEventListener: (_e: string, cb: () => void) => listeners.delete(cb),
+      addListener: (cb: () => void) => listeners.add(cb),
+      removeListener: (cb: () => void) => listeners.delete(cb),
+      dispatchEvent: () => true,
+    }) as unknown as MediaQueryList;
+  return {
+    matchMedia,
+    set(v: boolean): void {
+      matches = v;
+      for (const cb of [...listeners]) cb();
+    },
+    listenerCount: () => listeners.size,
+  };
+}
+
+describe('useReducedMotion — реактивное системное предпочтение (#104)', () => {
+  it('реактивно отражает смену prefers-reduced-motion (change → re-render)', () => {
+    // Ядро: смена системного предпочтения обязана перерендерить и вернуть новый
+    // boolean. Диверсия «getSnapshot всегда false» ИЛИ «subscribe = no-op» →
+    // значение не меняется после set(true) → тест краснеет.
+    const fake = makeFakeMedia(false);
+    function Probe(): ReturnType<typeof createElement> {
+      const reduced = useReducedMotion(fake.matchMedia);
+      return createElement('div', { id: 'p' }, String(reduced));
+    }
+    const c = mount(createElement(Probe));
+    const txt = (): string => (c.querySelector('#p') as HTMLElement).textContent!;
+
+    expect(txt()).toBe('false'); // начальное (matches=false, клиентский снапшот)
+    act(() => fake.set(true)); // система включила reduce
+    expect(txt()).toBe('true'); // реактивно обновилось
+    act(() => fake.set(false)); // и обратно
+    expect(txt()).toBe('false');
+  });
+
+  it('начальное значение читается из matchMedia синхронно (matches=true → true)', () => {
+    const fake = makeFakeMedia(true);
+    function Probe(): ReturnType<typeof createElement> {
+      return createElement('div', { id: 'p' }, String(useReducedMotion(fake.matchMedia)));
+    }
+    const c = mount(createElement(Probe));
+    expect((c.querySelector('#p') as HTMLElement).textContent).toBe('true');
+  });
+
+  it('SSR/без matchMedia → false и не бросает', () => {
+    function Probe(): ReturnType<typeof createElement> {
+      // Явно undefined-шов: имитируем окружение без matchMedia.
+      return createElement('div', { id: 'p' }, String(useReducedMotion(undefined)));
+    }
+    // window.matchMedia в jsdom отсутствует → _resolveMatchMedia вернёт undefined.
+    let c!: HTMLElement;
+    expect(() => {
+      c = mount(createElement(Probe));
+    }).not.toThrow();
+    expect((c.querySelector('#p') as HTMLElement).textContent).toBe('false');
+  });
+
+  it('unmount снимает системного слушателя (нет утечки)', () => {
+    const fake = makeFakeMedia(false);
+    function Probe(): ReturnType<typeof createElement> {
+      useReducedMotion(fake.matchMedia);
+      return createElement('div', null, 'x');
+    }
+    const container = document.createElement('div');
+    document.body.appendChild(container);
+    const root = createRoot(container);
+    act(() => root.render(createElement(Probe)));
+    expect(fake.listenerCount()).toBeGreaterThan(0); // подписан
+    act(() => root.unmount());
+    expect(fake.listenerCount()).toBe(0); // destroy() снял слушателя
+    container.remove();
   });
 });
