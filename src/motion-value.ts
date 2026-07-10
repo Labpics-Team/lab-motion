@@ -201,6 +201,21 @@ export class MotionValue {
   }
 
   /**
+   * Текущая скорость (units/s). Всегда конечна (стражи _tick); в покое —
+   * ровно 0 (рождение без initialVelocity, сходимость, snapTo).
+   *
+   * Зачем публично (#93, единый C¹-контракт): приёмник хендоффа (жест/decay/
+   * другая пружина) читает пару (value, velocity) и наследует её как начальные
+   * условия — без этого seam'а перехват в полёте стартовал бы из покоя
+   * (видимый разрыв первой производной). Это АНАЛИТИЧЕСКАЯ скорость траектории
+   * из солвера, не производная клампованного выхода (при clamp:true честный
+   * hidden-state пружины — именно его и должен наследовать приёмник).
+   */
+  get velocity(): number {
+    return this._velocity;
+  }
+
+  /**
    * Register a listener that receives every emitted value (including the
    * current value immediately on subscription).
    * Returns an unsubscribe function.
@@ -255,9 +270,15 @@ export class MotionValue {
     this._useTimeoutFallback = false;
 
     // ── Start frame loop (idempotent: only one loop runs at a time) ──────
+    // Первый кадр планируется инлайн (бывший _scheduleFirstFrame, единственный
+    // вызов — ужим): handle=0 = non-draining step-clock → setTimeout-fallback.
     if (!this._running) {
       this._running = true;
-      this._scheduleFirstFrame();
+      const gen = this._generation;
+      if (this._requestFrame((ts) => this._tick(ts, gen)) === 0) {
+        this._useTimeoutFallback = true;
+        setTimeout(() => this._tick(undefined, gen), 0);
+      }
     }
     // If already running, the active loop will pick up the new _target/_from/_v0Normalized
     // on its next tick (because it re-reads these fields). The loop is already scheduled.
@@ -325,15 +346,6 @@ export class MotionValue {
 
   // ── Private: animation loop ──────────────────────────────────────────────
 
-  private _scheduleFirstFrame(): void {
-    const gen = this._generation;
-    const handle = this._requestFrame((ts) => this._tick(ts, gen));
-    if (handle === 0) {
-      this._useTimeoutFallback = true;
-      setTimeout(() => this._tick(undefined, gen), 0);
-    }
-  }
-
   private _tick(ts: number | undefined, gen: number): void {
     // A frame scheduled by a run that was since stop()/snapTo()-ed away is
     // stale: it must not emit and must not reschedule (see _generation doc).
@@ -366,23 +378,14 @@ export class MotionValue {
     const rawVelocity = normVel * range; // units/s
 
     // Check convergence or hard cap.
-    const distToTarget = Math.abs(rawValue - this._target);
-    const absVelocity = Math.abs(rawVelocity);
+    // Единый epsilon-пол знаменателя (двойной Math.max свёрнут в const — ужим).
+    const denom = Math.max(absRange, EPSILON);
     const converged =
       this._frameCount >= MAX_FRAMES ||
       !Number.isFinite(range) || // unrepresentable span: |from|+|target| overflowed past MAX_VALUE
       (absRange < EPSILON) || // degenerate range
-      (distToTarget / Math.max(absRange, EPSILON) < CONVERGENCE_THRESHOLD &&
-        absVelocity / Math.max(absRange, EPSILON) < CONVERGENCE_THRESHOLD);
-
-    if (converged) {
-      this._value = this._target;
-      this._velocity = 0;
-      this._running = false;
-      this._tickActive = false;
-      this._emit(this._target);
-      return;
-    }
+      (Math.abs(rawValue - this._target) / denom < CONVERGENCE_THRESHOLD &&
+        Math.abs(rawVelocity) / denom < CONVERGENCE_THRESHOLD);
 
     // Emit value. bounded=true (default): CSS-safe clamp to [from, target].
     // bounded=false: honest trajectory — underdamped overshoot is emitted.
@@ -390,11 +393,13 @@ export class MotionValue {
     const hi = range >= 0 ? this._target : this._from;
     const clampedValue = this._clamp ? Math.max(lo, Math.min(hi, rawValue)) : rawValue;
 
-    // Final CSS-safety net (invariant 2): even a finite range can overflow the
-    // denormalized product to Inf/NaN at extreme magnitudes. Never emit a
-    // non-finite value — the only contract-safe outcome is to snap to the
-    // (validated-finite) target. Closes the overflow-NaN class, not one input.
-    if (!Number.isFinite(clampedValue) || !Number.isFinite(rawVelocity)) {
+    // Единый снап-в-target: сходимость ИЛИ финальный CSS-страж (инвариант 2) —
+    // даже конечный range может переполнить денормализацию в Inf/NaN на
+    // экстремальных величинах; non-finite не эмитится НИКОГДА, единственный
+    // контрактно-безопасный исход — снап в (валидированно-конечный) target.
+    // Одно тело вместо двух идентичных (converged / non-finite) — семантика
+    // бит-в-бит прежняя, ужим под размерный гейт ядра (срез #93).
+    if (converged || !Number.isFinite(clampedValue) || !Number.isFinite(rawVelocity)) {
       this._value = this._target;
       this._velocity = 0;
       this._running = false;
