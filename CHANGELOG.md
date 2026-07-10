@@ -8,6 +8,31 @@
 
 ### Added
 
+- `./behaviors`: новый субпуть — headless state machines типовых мобильных
+  взаимодействий поверх ПЕРЕИСПОЛЬЗУЕМЫХ примитивов (ничего не дублировано):
+  трекер скорости `./gestures`, проекция момента `./decay` (`.rest`), пружинный
+  солвер ядра (доводка value→target с наследованием velocity, C¹), темп-токены
+  `./tokens` (дефолтные пружины; роль задаёт потребитель, labui НЕ импортируется).
+  Общий контракт `BehaviorState { value, velocity, phase }`
+  (`phase ∈ idle|follow|release|settle`); события ввода (`pointerDown`/`Move`/`Up`/
+  `Cancel`), `state`-геттер + `subscribe`, программные переходы, идемпотентные
+  `cancel()`/`destroy()`. Четыре поведения: **`createBottomSheet`** (snap-точки +
+  выбор цели по положению+скорости, follow→доводка без потери velocity, rubber-band
+  за крайними snap, `snapTo`, перехват pointer-down); **`createDragDismiss`** (порог
+  по смещению/скорости, настраиваемое направление, возврат с унаследованной
+  скоростью, детерминизм при pointer-cancel); **`createCarousel`** (ЕДИНЫЙ clock
+  позиции+индекса, inertia с доводкой к странице, направление+velocity в выборе,
+  RTL и вертикаль, `goTo`/`next`/`prev`); **`createPullToRefresh`** (резистентный
+  overscroll, порог активации, `pending` без второго владельца позиции, возврат
+  пружиной после async-действия). Инварианты: ОДНА state machine владеет фазой
+  (единый generation-токен, ноль параллельных loops); value/velocity конечны (+0);
+  reduced-motion = смена характера (мгновенный снап, состояние и результат
+  сохранены); SSR-safe (инжектируемый `requestFrame`). Покрытие: example/contract/
+  interruption/cancel-destroy/reduced на каждое поведение, property-тесты выбора
+  snap/страницы (seeded-LCG, оракул `./decay`), fuzz финитности (≥12 000 злых
+  жестов), 2 browser-conformance спеки (pointer capture/cancel на реальном движке).
+  Runnable DOM-адаптер и раздел «Behaviors-путь» — в README (#92).
+
 - `./animate/mini`: новый субпуть — ЛЁГКИЙ срез animate (потолок **≤ 5 KB gz** =
   5120 B; факт 5113 B gz shipped / 5287 B gz import-cost) поверх **адаптерной архитектуры**
   целей/свойств. Внутренняя граница — `PropertyCodec` (parse/interpolate/

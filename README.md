@@ -165,6 +165,7 @@ flowchart TB
 | Импорт | Что даёт |
 |---|---|
 | `…/gestures` | `createPress` (tap + клавиатурный путь Enter/Space), `createHover`, `createPan`, `createDrag` (границы + rubber-band + инерция + reduced-motion) |
+| `…/behaviors` | Headless state machines типовых мобильных взаимодействий поверх `./gestures`/`./decay`/пружины ядра: `createBottomSheet` (snap-точки + выбор по положению+скорости), `createDragDismiss` (порог по смещению/скорости + направление), `createCarousel` (единый clock позиции+индекса, RTL/вертикаль), `createPullToRefresh` (резистентный overscroll + pending). Единый контракт `BehaviorState { value, velocity, phase }`; `cancel`/`destroy`, reduced-motion меняет характер. Подробно — раздел «Behaviors-путь» |
 | `…/scroll` | Прогресс страницы/target-с-офсетами (семантика Motion), in-view машина, скорость, scrub-клей к timeline |
 | `…/presence` | Enter/exit lifecycle: «доиграй exit-анимацию → потом убирай из DOM», прерывания, `swapPresence` (wait/sync) |
 | `…/flip` | Layout-анимация FLIP: инверсия first→last, пружинный «доезд», коррекция scale-искажений (`correctRadius`, `counterScale`) |
@@ -640,6 +641,81 @@ await handle.finished;
 projection-путь + reduced + ssr), авто-детект мутаций (`MutationObserver`),
 live-подписка на смену reduce в полёте, closed shadow roots, вложенные
 scroll-контейнеры (наследуется от `./projection`).
+
+## Behaviors-путь
+
+Headless **state machines типовых мобильных взаимодействий**
+(`@labpics/motion/behaviors`) поверх переиспользуемых примитивов: трекер скорости
+из `./gestures`, проекция момента из `./decay`, пружинный солвер ядра, темп-токены
+`./tokens`. Ничего из этого НЕ дублируется — субпуть только оркестрирует. Поведение
+не знает про фреймворк/компонентную библиотеку: DOM-обвязка ниже — тонкий адаптер.
+
+Общий контракт: `BehaviorState { value, velocity, phase }`, где
+`phase ∈ 'idle' | 'follow' | 'release' | 'settle'`. Каждое поведение принимает
+события ввода (`pointerDown`/`Move`/`Up`/`Cancel` с точкой `{ x, y, t }`, где `t` —
+секунды, напр. `e.timeStamp / 1000`), отдаёт текущее состояние (`state`-геттер +
+`subscribe`), поддерживает программные переходы и идемпотентные `cancel()` / `destroy()`.
+
+Четыре поведения:
+
+- **`createBottomSheet`** — snap-точки + выбор цели по положению И скорости
+  (проекция момента через `./decay`), доводка пружиной без потери velocity (C¹),
+  rubber-band за крайними snap, программный `snapTo(index)`, перехват новым
+  pointer-down.
+- **`createDragDismiss`** — порог по смещению ИЛИ скорости, настраиваемое
+  направление, возврат с унаследованной скоростью при недостигнутом пороге,
+  детерминизм при `pointerCancel` (всегда домой, без закрытия).
+- **`createCarousel`** — ЕДИНЫЙ clock для позиции и индекса (index выводится из
+  position каждый кадр), inertia с доводкой к странице, направление+velocity в
+  выборе страницы, RTL и вертикаль, `goTo`/`next`/`prev`.
+- **`createPullToRefresh`** — резистентный overscroll, порог активации, `pending`
+  БЕЗ второго владельца позиции (удержание — тот же единственный runner), возврат
+  пружиной после async-действия.
+
+Runnable DOM-адаптер (bottom sheet — transform из headless-состояния):
+
+```ts
+import { createBottomSheet } from '@labpics/motion/behaviors';
+
+const el = document.querySelector('.sheet') as HTMLElement;
+const sheet = createBottomSheet({
+  snapPoints: [0, 320, 640],       // px оффсеты закрыт/полу/раскрыт
+  matchMedia: window.matchMedia.bind(window), // reduced-motion = снап
+  onChange: (s) => {               // единственный канал вывода
+    el.style.transform = `translateY(${s.value}px)`;
+  },
+});
+
+el.addEventListener('pointerdown', (e) => {
+  el.setPointerCapture(e.pointerId);
+  sheet.pointerDown({ x: e.clientX, y: e.clientY, t: e.timeStamp / 1000 });
+});
+el.addEventListener('pointermove', (e) =>
+  sheet.pointerMove({ x: e.clientX, y: e.clientY, t: e.timeStamp / 1000 }));
+el.addEventListener('pointerup', (e) =>
+  sheet.pointerUp({ x: e.clientX, y: e.clientY, t: e.timeStamp / 1000 }));
+el.addEventListener('pointercancel', () => sheet.pointerCancel());
+
+// программно раскрыть до верхнего snap (единый clock, C¹ из текущей скорости):
+document.querySelector('.expand')?.addEventListener('click', () => sheet.snapTo(2));
+```
+
+Ключевые свойства (все запинены тестами):
+
+- **Один clock (одна state machine)**: pointer / programmatic control не плодят
+  параллельных loops — единый generation-токен гасит stale-кадры, активен максимум
+  один runner. Перехват pointer-down во время доводки → `follow` без утечки цикла.
+- **C¹ на стыке follow→release**: скорость момента отпускания наследуется доводкой
+  (`v0n = velocity / range` в пружинном солвере) — как smooth-pickup у `MotionValue`.
+- **Выбор цели по положению+скорости**: snap/страница выбираются по проекции момента
+  через `./decay` (`.rest`) — быстрый флик перепрыгивает snap; property-тесты
+  (seeded-LCG) пинят «ближайший к decay-landing» на диапазоне value+velocity.
+- **Reduced-motion = смена характера**: пространственная доводка снапает в цель
+  МГНОВЕННО (ни одного кадра), состояние и результат сохранены — не «выключение».
+- **Финитность и SSR-safe**: `value`/`velocity` всегда конечны (никогда NaN/∞, `-0`
+  схлопнут — fuzz-гейт злого ввода), импорт не трогает window/document; единственный
+  платформенный шов — инжектируемый `requestFrame` (детерминизм тестов).
+- **`cancel()`/`destroy()` идемпотентны**: `destroy` делает вход инертным.
 
 ## Motion-токены
 

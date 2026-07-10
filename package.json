@@ -209,6 +209,11 @@
       "types": "./dist/animate/mini/index.d.ts",
       "import": "./dist/animate/mini/index.js",
       "require": "./dist/animate/mini/index.cjs"
+    },
+    "./behaviors": {
+      "types": "./dist/behaviors/index.d.ts",
+      "import": "./dist/behaviors/index.js",
+      "require": "./dist/behaviors/index.cjs"
     }
   },
   "files": [
