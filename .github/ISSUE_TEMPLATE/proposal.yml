@@ -1,0 +1,91 @@
+name: Продуктовое изменение
+description: Новая возможность, улучшение API или архитектурное изменение
+title: "feat: "
+body:
+  - type: textarea
+    id: outcome
+    attributes:
+      label: Пользовательский результат
+      description: Какую задачу потребитель сможет решить проще, надёжнее или быстрее.
+    validations:
+      required: true
+
+  - type: textarea
+    id: current
+    attributes:
+      label: Текущее состояние
+      description: Существующий API, ограничения и подтверждённый пробел.
+    validations:
+      required: true
+
+  - type: textarea
+    id: contract
+    attributes:
+      label: Предлагаемый контракт
+      description: Наблюдаемое поведение, входы, выходы, ошибки и lifecycle.
+    validations:
+      required: true
+
+  - type: textarea
+    id: invariants
+    attributes:
+      label: Инварианты
+      description: Финитность, детерминизм, C¹ continuity, SSR, reduced motion, cleanup и другие обязательные свойства.
+    validations:
+      required: true
+
+  - type: textarea
+    id: boundaries
+    attributes:
+      label: Архитектурная граница
+      description: Домен-владелец, platform seams, переиспользуемые примитивы и SSOT.
+    validations:
+      required: true
+
+  - type: textarea
+    id: alternatives
+    attributes:
+      label: Рассмотренные варианты
+      description: Не менее двух реалистичных вариантов и причина выбора.
+    validations:
+      required: true
+
+  - type: textarea
+    id: acceptance
+    attributes:
+      label: Критерии приёмки
+      description: Проверяемые сценарии и обязательные классы тестов.
+    validations:
+      required: true
+
+  - type: textarea
+    id: non-goals
+    attributes:
+      label: Не-цели
+      description: Что сознательно не входит в изменение.
+    validations:
+      required: true
+
+  - type: textarea
+    id: compatibility
+    attributes:
+      label: Совместимость и миграция
+      description: Breaking change, semver, browser/runtime support и путь миграции.
+
+  - type: textarea
+    id: measurements
+    attributes:
+      label: Размер и производительность
+      description: Измеримый бюджет, baseline и способ воспроизведения, если затронут runtime.
+
+  - type: checkboxes
+    id: checks
+    attributes:
+      label: Проверка перед отправкой
+      options:
+        - label: Решение не дублирует существующий доменный примитив
+          required: true
+        - label: Динамический статус и план остаются в issue, а не в документации
+          required: true
+        - label: Незакоммиченное локальное состояние не считается выполненной работой
+          required: true
