@@ -3,7 +3,7 @@ name: Release
 on:
   push:
     tags:
-      - "v[0-9]+.[0-9]+.[0-9]+*"
+      - "v*.*.*"
 
 permissions:
   contents: write
@@ -22,15 +22,31 @@ jobs:
 
     steps:
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@v6
         with:
           fetch-depth: 0
 
-      - name: Setup Node
-        uses: actions/setup-node@v4
+      - name: Setup Node for npm trusted publishing
+        uses: actions/setup-node@v6
         with:
-          node-version: "20"
+          node-version: "24"
           registry-url: https://registry.npmjs.org
+          package-manager-cache: false
+
+      - name: Verify npm supports trusted publishing
+        shell: bash
+        run: |
+          node --input-type=module <<'NODE'
+          import { execFileSync } from 'node:child_process';
+          const raw = execFileSync('npm', ['--version'], { encoding: 'utf8' }).trim();
+          const [major, minor, patch] = raw.split('.').map(Number);
+          const supported = major > 11 || (major === 11 && (minor > 5 || (minor === 5 && patch >= 1)));
+          if (!supported) {
+            console.error(`npm ${raw} не поддерживает trusted publishing; требуется >= 11.5.1`);
+            process.exit(1);
+          }
+          console.log(`npm ${raw}: trusted publishing поддержан`);
+          NODE
 
       - name: Activate pinned pnpm
         run: |
@@ -49,6 +65,9 @@ jobs:
       - name: Build
         run: pnpm build
 
+      - name: Factual documentation drift
+        run: node scripts/check-docs-facts.mjs
+
       - name: Test
         run: pnpm test
 
@@ -61,10 +80,8 @@ jobs:
       - name: Pack smoke
         run: pnpm pack:smoke
 
-      - name: Publish with provenance
-        run: pnpm publish --access public --provenance --no-git-checks --ignore-scripts
-        env:
-          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
+      - name: Publish through npm trusted publishing
+        run: npm publish --access public --ignore-scripts
 
       - name: Create GitHub Release
         env:
