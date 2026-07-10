@@ -43,7 +43,28 @@
  * (время из инжектируемого requestFrame).
  *
  * ─── MUTATION PROOF (ручная проба, 2026-07-10; каждый мутант откачен) ─────────
- * (заполняется после зелёного прогона — см. отчёт эпика)
+ * 10 мутантов в РАЗНЫЕ места, каждый кусается (RED на зафиксированной спеке;
+ * прогон test/smart-{diff,lifecycle,api-surface-pin}.test.ts = 43 теста, + fuzz):
+ *   1. Слом матчинга по id (snapshot.get(key)→undefined ⇒ matched становятся
+ *      entered) → 15 RED («пересозданный узел = matched», «перемещение = matched»…).
+ *   2. Потеря exited (exit-ветка классификации → skipped) → 5 RED (ghost-протокол,
+ *      «exited=[b]», cancel-ghost).
+ *   3. Потеря continuity на перехвате (continue-exit узел first: box вместо
+ *      undefined ⇒ нет visual pickup) → 1 RED («фейд продолжается без прыжка», 12
+ *      знаков).
+ *   4. Reduced-leak (убран `if (!reduced)` вокруг matched-узлов ⇒ matched едут
+ *      transform-ом под reduce) → 1 RED («matched без transform», writes(a)=0).
+ *   5. Слом fail-fast (epsilon-валидация удалена) → 1 RED («epsilon … got NaN»).
+ *   6. Слом границы capture (полётные узлы МЕРЯЮТСЯ под transform вместо boxAt) →
+ *      1 RED («capture mid-flight не меряет узлы полёта» + C⁰ after[0]).
+ *   7. Убран finite()-страж координат ghost'а (_px без _finite) → fuzz 1 RED
+ *      («NaNpx» в left/top/width/height при злом ректе).
+ *   8. Слом валидации дубликата ключа (throw убран) → 2 RED (buffered-текст обоих
+ *      keyAttr) + fuzz negative RED (дубликат ОБЯЗАН бросать).
+ *   9. Слом degenerate-классификации (NaN-last не → skipped) → 1 RED («NaN-rect →
+ *      skipped», writes(bad)=0).
+ *  10. Reduced снапает фейды (matchMedia передан драйверу ⇒ фейды не живые) →
+ *      1 RED («enter/exit-фейды ЖИВЫЕ», нет промежуточных opacity ∈ (0,1)).
  */
 
 import { MotionParamError } from '../errors.js';
