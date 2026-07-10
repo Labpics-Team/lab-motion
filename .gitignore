@@ -14,3 +14,8 @@ reports
 peer_b.json
 scratchpad
 bench/compare/results/.*.iife.js
+test-results
+playwright-report
+blob-report
+.playwright
+browser/.artifacts

@@ -225,6 +225,9 @@
     "bench": "node scripts/bench.mjs",
     "bench:latency": "node scripts/bench-latency.mjs",
     "pack:smoke": "node scripts/pack-smoke.mjs",
+    "pack:compat": "node scripts/pack-compat.mjs",
+    "test:browser": "playwright test --project=chromium",
+    "test:browser:all": "playwright test",
     "mutation": "stryker run",
     "prepublishOnly": "pnpm typecheck && pnpm build && pnpm test && pnpm size"
   },
@@ -267,6 +270,7 @@
   "devDependencies": {
     "@angular/core": "22.0.5",
     "@builder.io/qwik": "1.19.1",
+    "@playwright/test": "1.49.1",
     "@stryker-mutator/core": "9.6.1",
     "@stryker-mutator/vitest-runner": "9.6.1",
     "@types/node": "^22.20.0",
