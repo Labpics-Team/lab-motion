@@ -112,9 +112,9 @@ export class MainUnit implements GroupOwner {
     return frozen === undefined ? undefined : { value: frozen, velocity: 0 };
   }
 
-  captureCss(key: string): string | number | undefined {
+  captureCss(key: string): CssChannel | undefined {
     const ch = this._o.css;
-    return ch !== undefined && ch.key === key ? ch.css : undefined;
+    return ch !== undefined && ch.key === key ? ch : undefined;
   }
 
   numericKeys(): readonly string[] {
@@ -221,16 +221,13 @@ export class MainUnit implements GroupOwner {
       // (перехват tween→spring стал C¹, как spring→spring). Окно разности
       // поджимается в [0,1]: изинги клампят снаружи диапазона (endpoint-
       // дисциплина ядра), сэмпл за краем дал бы ложный слом производной.
-      let dpdt = 0;
-      if (o.numeric.length > 0) {
-        // Скорость нужна только числовым каналам — css-only группа не платит
-        // двумя лишними вызовами ease на кадр (и не расширяет его домен).
-        const k0 = k > EASE_DERIV_H ? k - EASE_DERIV_H : 0;
-        const k1 = k + EASE_DERIV_H < 1 ? k + EASE_DERIV_H : 1;
-        const slope = (o.mode.ease(k1) - o.mode.ease(k0)) / (k1 - k0);
-        // Прогресс/с; non-finite (враждебный ease) → 0: NaN не сеется в подхват.
-        dpdt = Number.isFinite(slope) ? (slope * 1000) / o.mode.durationMs : 0;
-      }
+      // Производная нужна ОБОИМ видам каналов: числовым — v = range·ṗ, css —
+      // сам ṗ (C¹-подхват css, #93 срез 4); группа всегда несёт хотя бы один.
+      const k0 = k > EASE_DERIV_H ? k - EASE_DERIV_H : 0;
+      const k1 = k + EASE_DERIV_H < 1 ? k + EASE_DERIV_H : 1;
+      const slope = (o.mode.ease(k1) - o.mode.ease(k0)) / (k1 - k0);
+      // Прогресс/с; non-finite (враждебный ease) → 0: NaN не сеется в подхват.
+      const dpdt = Number.isFinite(slope) ? (slope * 1000) / o.mode.durationMs : 0;
       for (const ch of o.numeric) {
         const range = ch.to - ch.from;
         const v = ch.from + range * p;
@@ -242,6 +239,7 @@ export class MainUnit implements GroupOwner {
       }
       if (o.css !== undefined) {
         o.css.p = p;
+        o.css.dpdt = dpdt;
         o.css.css = cssAt(o.css, p);
       }
       this._write();
@@ -269,6 +267,7 @@ export class MainUnit implements GroupOwner {
     if (css !== undefined) {
       readCompositorSpring(o.mode.spring, { from: 0, to: 1, v0: css.v0, t }, snap);
       css.p = snap.value;
+      css.dpdt = snap.velocity;
       css.css = cssAt(css, snap.value);
       converged =
         converged &&
