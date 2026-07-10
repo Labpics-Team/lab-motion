@@ -14,7 +14,7 @@
 import { afterEach, describe, expect, it } from 'vitest';
 import { act, createElement, useState, type Dispatch, type SetStateAction } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
-import { useSpring, useMotionValue } from '../src/react/index.js';
+import { useSpring, useMotionValue, useMotionStyle } from '../src/react/index.js';
 
 // React 18 требует этот флаг для act() вне test-renderer.
 (globalThis as unknown as { IS_REACT_ACT_ENVIRONMENT: boolean }).IS_REACT_ACT_ENVIRONMENT = true;
@@ -142,5 +142,127 @@ describe('react-биндинг в реальном React-рантайме', () =
     // MotionValue создаётся ОДИН раз и переживает ре-рендеры (не пересоздаётся).
     expect(instances.length).toBeGreaterThanOrEqual(3);
     expect(instances.every((i) => i === instances[0])).toBe(true);
+  });
+});
+
+describe('useMotionStyle — effect binding без render на кадр (#104)', () => {
+  it('анимирует style.transform в DOM, но НЕ ре-рендерит компонент на кадр', () => {
+    // Ядро контракта #104: effect-binding пишет в DOM через ref/onChange, а не
+    // через setState. Диверсия «заменить прямую запись в style на setState» →
+    // renders растёт по кадрам → тест краснеет. useSpring (render value) сознательно
+    // рендерит на кадр; useMotionStyle — нет.
+    const clock = makeClock();
+    let renders = 0;
+    let setOpen!: Dispatch<SetStateAction<boolean>>;
+    function Box(): ReturnType<typeof createElement> {
+      renders += 1;
+      const [open, setO] = useState(false);
+      setOpen = setO;
+      const ref = useMotionStyle({
+        target: open ? 200 : 0,
+        property: 'transform',
+        template: 'translateX({v}px)',
+        from: 0,
+        spring: SPRING,
+        requestFrame: clock.requestFrame,
+      });
+      return createElement('div', { id: 'box', ref });
+    }
+    const c = mount(createElement(Box));
+    const box = (): HTMLElement => c.querySelector('#box') as HTMLElement;
+
+    expect(renders).toBe(1); // только первичный render
+    expect(box().style.transform).toBe('translateX(0px)'); // initial (from=0) записан
+
+    act(() => setOpen(true)); // смена цели родителем → РОВНО один доп. render
+    expect(renders).toBe(2);
+
+    act(() => clock.drain()); // прогон кадров анимации
+    expect(renders).toBe(2); // ← НИ ОДНОГО render на кадр (записи шли прямо в style)
+
+    const m = /translateX\(([-\d.]+)px\)/.exec(box().style.transform);
+    const x = Number(m![1]);
+    expect(x).toBeGreaterThan(0); // DOM реально анимировался к 200
+    expect(x).toBeLessThanOrEqual(200);
+    expect(Number.isFinite(x)).toBe(true); // CSS-safe
+  });
+
+  it('оседает точно на цель после полного прогона', () => {
+    const clock = makeClock();
+    let setOpen!: Dispatch<SetStateAction<boolean>>;
+    function Box(): ReturnType<typeof createElement> {
+      const [open, setO] = useState(false);
+      setOpen = setO;
+      const ref = useMotionStyle({
+        target: open ? 100 : 0,
+        property: 'opacity',
+        from: 0,
+        spring: SPRING,
+        requestFrame: clock.requestFrame,
+      });
+      return createElement('div', { id: 'box', ref });
+    }
+    const c = mount(createElement(Box));
+    act(() => setOpen(true));
+    act(() => clock.drain());
+    expect(Number((c.querySelector('#box') as HTMLElement).style.opacity)).toBeCloseTo(100, 1);
+  });
+
+  it('reduced-motion: CHARACTER-снап без единого кадра (rAF не планируется)', () => {
+    // northInvariant #5: reduced меняет ХАРАКТЕР (мгновенный снап), не hard-off.
+    const w = window as unknown as { matchMedia?: (q: string) => { matches: boolean } };
+    const prev = w.matchMedia;
+    w.matchMedia = (q: string) => ({ matches: true, media: q } as MediaQueryList);
+    try {
+      const clock = makeClock();
+      let setOpen!: Dispatch<SetStateAction<boolean>>;
+      function Box(): ReturnType<typeof createElement> {
+        const [open, setO] = useState(false);
+        setOpen = setO;
+        const ref = useMotionStyle({
+          target: open ? 300 : 0,
+          property: 'transform',
+          template: 'translateX({v}px)',
+          from: 0,
+          spring: SPRING,
+          requestFrame: clock.requestFrame,
+        });
+        return createElement('div', { id: 'box', ref });
+      }
+      const c = mount(createElement(Box));
+      act(() => setOpen(true));
+      // Снап сразу на цель, без запланированных кадров.
+      expect((c.querySelector('#box') as HTMLElement).style.transform).toBe('translateX(300px)');
+      expect(clock.pending()).toBe(0);
+    } finally {
+      w.matchMedia = prev;
+    }
+  });
+
+  it('unmount: destroy гасит цикл — после размонтирования style не меняется и нет throw', () => {
+    const clock = makeClock();
+    function Box(): ReturnType<typeof createElement> {
+      const ref = useMotionStyle({
+        target: 200,
+        property: 'transform',
+        template: 'translateX({v}px)',
+        from: 0,
+        spring: SPRING,
+        requestFrame: clock.requestFrame,
+      });
+      return createElement('div', { id: 'box', ref });
+    }
+    const container = document.createElement('div');
+    document.body.appendChild(container);
+    const root = createRoot(container);
+    act(() => root.render(createElement(Box)));
+    act(() => clock.drain()); // анимация шла
+    const box = container.querySelector('#box') as HTMLElement;
+    const settled = box.style.transform;
+
+    act(() => root.unmount()); // teardown → cleanup-эффект → unsub + destroy
+    // Цикл погашен: повторный прогон часов ничего не пишет и не бросает.
+    expect(() => act(() => clock.drain())).not.toThrow();
+    expect(box.style.transform).toBe(settled); // без изменений после unmount
   });
 });
