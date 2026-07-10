@@ -110,6 +110,11 @@
       "import": "./dist/flip/index.js",
       "require": "./dist/flip/index.cjs"
     },
+    "./projection": {
+      "types": "./dist/projection/index.d.ts",
+      "import": "./dist/projection/index.js",
+      "require": "./dist/projection/index.cjs"
+    },
     "./svg": {
       "types": "./dist/svg/index.d.ts",
       "import": "./dist/svg/index.js",

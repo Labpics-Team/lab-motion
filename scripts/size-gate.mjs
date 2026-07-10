@@ -91,6 +91,25 @@ export const BESPOKE_SUBPATH_GATES = {
   // ядро не растёт (full-core сценарий это и стережёт). Внутри субпутя семейства в
   // минифициров. dist по отдельности не шейкаются; целиком дёшев. Поднимать осознанно.
   './tokens': 1650,
+  // ./projection — вложенный FLIP (жанр Framer projection): geometry (замкнутая
+  // форма child-local transform через visual box ближайшего проецирующего предка,
+  // per-corner radius-коррекция) + driver (одна нормированная пружина
+  // solveSpring(v0) — velocity continuity при перехвате) + DOM-адаптер (composed
+  // shadow-обход, batch clear→measure→start граница). splitting:false ⇒ несёт
+  // копии среза flip (correctRadius/counterScale) и solver/validate — шипнутый gz
+  // двойной счёт, честная цена — import-cost сценарии ниже. Хронология:
+  //   2026-07-10: факт 4890 gz первой сборки → порог 5350 (~9% люфт, дисциплина
+  //   «порог ОТ ФАКТА»). Выше общего 4608 законно: класс animate — самодостаточный
+  //   субпуть с копиями подсистем.
+  //   2026-07-10 (позже): факт 5530 gz → порог 5750 (~4%). Рост НЕ раздувание,
+  //   а две волны корректности одного дня: (1) phase-машина + continuity-ребейз
+  //   radii/opacity (адверсариальное ревью, PR #109); (2) фиксы ревью CodeRabbit —
+  //   доминантный C¹-скан по radii/opacity-каналам, floor отрицательного масштаба
+  //   на всех путях (анти-зеркало), ранняя валидация radii-кортежей
+  //   (MotionParamError вместо TypeError из горячего at()). Ужим выполнен ДО
+  //   подъёма (дедуп rebaseNode/lerp1, −100 gz); подъём — в рамках делегации
+  //   Даниила на автономные решения (прецедент CORE 2150→2190 выше).
+  './projection': 5750,
   // ./presets — headless-словарь движений + текстовые/числовые сахара
   // (порт ценного из PR#79: splitText/typewriterAt/scrambleAt/tickerCells/
   // formatNumber + раннеры runTypewriter/runScramble/runNumber поверх runPreset).
@@ -134,6 +153,23 @@ export const IMPORT_COST_SCENARIOS = [
     name: 'only-spring',
     code: `import { spring } from '%DIST%'; console.log(spring({mass:1,stiffness:200,damping:20}, 0.1).value);`,
     gate: 920, // updated for perf changes
+  },
+  {
+    // Страж tree-shake геометрии от драйвера/DOM: чистая функция projectAt не
+    // должна тянуть солвер и адаптер. Скачок числа = геометрия потянула драйвер.
+    name: 'projection-core-only',
+    code: `import { projectAt } from '%DIST%/../projection/index.js'; console.log(projectAt({first:{x:0,y:0,width:1,height:1},last:{x:0,y:0,width:1,height:1}}, null, 0.5).sx);`,
+    // 2026-07-10: факт первой сборки 655 gz → порог 720 (~10%, ОТ ФАКТА).
+    gate: 720,
+  },
+  {
+    // Правда потребительской цены DOM-однострочника (капчур → мутация → play).
+    name: 'projection-dom-one-liner',
+    code: `import { createDomProjection } from '%DIST%/../projection/index.js'; const p = createDomProjection(); p.capture([]); p.play(); p.cancel(); console.log(p.playing);`,
+    // 2026-07-10: факт первой сборки 4899 gz → порог 5350 (~9%, ОТ ФАКТА).
+    // 2026-07-10 (позже): факт 5536 gz → порог 5750 (~4%) — хронология и
+    // обоснование в комментарии './projection' в BESPOKE_SUBPATH_GATES.
+    gate: 5750,
   },
   {
     name: 'only-MotionValue',

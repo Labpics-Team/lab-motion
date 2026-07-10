@@ -6,7 +6,7 @@ DOM — рендер делает ваш колбэк, время приходи
 
 Три вещи, которые нужно понять сразу:
 
-1. **Всё — субпути.** Корневой экспорт + 32 субпутя (33 входа `exports` в
+1. **Всё — субпути.** Корневой экспорт + 33 субпутя (34 входа `exports` в
    `package.json`); в бандл попадает только импортированное (`sideEffects: false`).
 2. **Две фазы движения.** Интерактив и follow-фаза (палец ведёт значение) — на
    main-потоке (`MotionValue`, `drive`, `…/gestures`). Автономные переходы и
@@ -165,6 +165,7 @@ flowchart TB
 | `…/scroll` | Прогресс страницы/target-с-офсетами (семантика Motion), in-view машина, скорость, scrub-клей к timeline |
 | `…/presence` | Enter/exit lifecycle: «доиграй exit-анимацию → потом убирай из DOM», прерывания, `swapPresence` (wait/sync) |
 | `…/flip` | Layout-анимация FLIP: инверсия first→last, пружинный «доезд», коррекция scale-искажений (`correctRadius`, `counterScale`) |
+| `…/projection` | Вложенный FLIP-движок (жанр Framer projection): дерево узлов — transform родителя НЕ искажает детей и border-radius; `projectAt` (чистая математика), `createProjection` (headless-драйвер: одна пружина, velocity continuity при перехвате, `seek`/`release` под жест), `createDomProjection` (capture → мутация DOM → play). Подробно — раздел «Projection-путь» |
 | `…/auto` | Zero-config FLIP: `autoAnimate(parent)` — add/remove/move детей анимируются сами; reduced-motion меняет характер (move→снап), не выключает |
 | `…/a11y` | `createMotionConfig` — политика reduced-motion (`system`/`always`/`never`), меняет характер анимации, не выключает |
 
@@ -440,6 +441,58 @@ CI-скоупа.
 `KeyframeEffect`. Поэтому cancel + рекомпиляция через кэш + re-emit — необходимы,
 а не упущенная оптимизация.
 
+## Projection-путь
+
+Честный **вложенный** FLIP (`@labpics/motion/projection`). Обычный FLIP вешает
+`translate+scale` на один элемент — вложенные потомки и border-radius на время
+полёта искажаются. Projection-движок ведёт ДЕРЕВО узлов: каждый кадр локальный
+transform ребёнка вычисляется замкнутой формой через визуальный бокс ближайшего
+проецирующего предка, так что каждый узел рендерится ровно в свой
+интерполированный бокс, а радиусы корректируются под кумулятивный масштаб
+(`correctRadius` из `./flip` — живой вызов, не дубль).
+
+```ts
+import { createDomProjection } from '@labpics/motion/projection';
+
+const proj = createDomProjection();
+proj.capture([card, avatar, badge]); // avatar/badge — потомки card: дерево выводится само
+moveCardToSidebar();                 // мутируйте DOM как угодно
+proj.play();                         // card едет FLIP'ом; avatar/badge и радиусы НЕ искажаются
+```
+
+Ключевые свойства (все запинены тестами):
+
+- **Слои**: `geometry` (чистая математика, SSR-safe, кандидат mutation-гейта) →
+  `driver` (headless: инжектируемые `requestFrame`/`matchMedia`) → `dom`
+  (тонкий адаптер: page-space замеры, composed-обход открытых shadow root'ов).
+  Клятва «ядро не знает про DOM» сохранена: DOM трогает только адаптер.
+- **Одна нормированная пружина на переход** — дерево едет «одним жестом»,
+  tearing родитель/ребёнок исключён по построению; каждый кадр — замкнутая
+  форма `solveSpring(params, t, v0)` с ЖИВЫМ v0.
+- **Velocity continuity при перехвате**: повторный `play()`/`capture()` в полёте
+  берёт текущие боксы аналитически (`V(p̂)`, ноль чтений DOM под transform) и
+  пересеивает скорость `v0' = v̂/(1−p̂)` (точный C¹ всех каналов при неизменных
+  целях — теорема, differential-тест; при изменённых — C¹ доминантного канала,
+  потолок `V0_CAP`). Жест ведёт через `seek(p)`, отпускание — `release(v)`.
+- **Граница переизмерения**: batch **clear → measure → start** — элемент никогда
+  не меряется под нашим активным transform (класс бага «смешение layout и
+  transform» закрыт по построению; журнал-тест).
+- **`clamp: false` по умолчанию** — честный overshoot пружины уходит в кадры
+  (осознанное отличие от легаси-дефолта `./flip`); размеры флорятся ≥ 0,
+  публичный `progress` всегда в [0, 1].
+- **Reduced-motion = смена характера**: снап в конечный layout одним кадром,
+  ноль rAF; невалидная пружина бросает `MotionParamError` даже под reduce.
+- **Деградации без NaN**: вырожденные боксы (display:none, 0×0), NaN/∞ в
+  ректах, k→0 при overshoot — каждый кадр конечен (fuzz-гейт ≥10 000 деревьев
+  в CI), `-0` схлопнут.
+
+Не-цели v1 (честно): rotate/skew и не-`'0 0'` transform-origin (модель строго
+осевая), `position: fixed/sticky`, компенсация вложенных scroll-контейнеров
+(только window-scroll page-space), пер-узловые пружины, WAAPI/compositor-эмиссия
+дерева (пер-кадровая коррекция `1/k(t)` нелинейна — v1 main-thread), интеграция
+с реестром каналов `./animate`. Диф двух DOM-состояний по identity-ключу,
+shared-element и View Transitions — субпуть `./smart` (следующий этап, #99).
+
 ## Motion-токены
 
 Типобезопасный словарь примитивов движения (`as const`, tree-shakeable по
@@ -534,10 +587,10 @@ pnpm bench      # ns/операцию горячих путей против dis
 сценарный import-cost (esbuild bundle+minify против dist — ловит регрессию
 tree-shakeability). Пороги — регрессионные потолки, не цели: ядро 2220 байт gz,
 любой прочий субпуть 4608, точечные — `./utils` 1400, `./tokens` 1650,
-`./presets` 5600, `./compositor` 6450.
+`./projection` 5350, `./presets` 5600, `./compositor` 6450, `./animate` 10700.
 
 **CI на каждый PR**: typecheck → build → test → fuzz-гейт финитности
-(overflow/солвер/easing) → size → pack-smoke. **Еженедельно** (или вручную) —
+(overflow/солвер/easing/projection) → size → pack-smoke. **Еженедельно** (или вручную) —
 mutation-тестирование core-физики (Stryker; прогон падает при mutation score
 ниже break-порога 76).
 
