@@ -6,27 +6,39 @@
  * ровно то, что получит npm-потребитель: `pnpm pack` → установка тарбола в
  * чистый временный проект → ESM-import и CJS-require реальных субпутей.
  *
- * Беззависимые субпути проверяются исполнением; биндинги (react/svelte/...)
- * требуют peer-рантаймов — для них проверяется наличие файлов exports-триады
- * в распакованном тарболе (структурная гарантия без установки 9 фреймворков).
- *
- * Выход 0 = артефакт цел; любой сбой = exit 1 (громко, в CI).
+ * Субпути с обязательным peer-фреймворком проверяются структурно. Все остальные,
+ * включая zero-dependency Web Component binding, обязаны исполняться в ESM и CJS.
  */
 
 import { execSync } from 'node:child_process';
-import { mkdtempSync, mkdirSync, readdirSync, rmSync, writeFileSync, readFileSync, existsSync } from 'node:fs';
+import {
+  existsSync,
+  mkdtempSync,
+  mkdirSync,
+  readFileSync,
+  readdirSync,
+  rmSync,
+  writeFileSync,
+} from 'node:fs';
 import { tmpdir } from 'node:os';
-import { join, resolve, dirname } from 'node:path';
-import { pathToFileURL, fileURLToPath } from 'node:url';
+import { dirname, join, resolve } from 'node:path';
+import { fileURLToPath } from 'node:url';
 
 const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '..');
 const pkg = JSON.parse(readFileSync(join(ROOT, 'package.json'), 'utf8'));
 
-// Биндинги требуют peer-фреймворк — исполняемо их не проверить в голом node
-// (для них остаётся структурная проверка триад ниже). ВСЁ ОСТАЛЬНОЕ из exports
-// выводится автоматически и ОБЯЗАНО импортироваться: новый субпуть попадает
-// в исполняемую проверку сам, drift-точки ручного списка не существует.
-const BINDING_SUBPATHS = new Set(['./react', './svelte', './vue', './lit', './solid', './preact', './angular', './wc', './qwik']);
+// Только entries, которые действительно требуют внешний peer во время импорта.
+// `./wc` zero-dependency и обязан проходить исполняемый consumer-smoke.
+const PEER_BINDING_SUBPATHS = new Set([
+  './react',
+  './svelte',
+  './vue',
+  './lit',
+  './solid',
+  './preact',
+  './angular',
+  './qwik',
+]);
 
 const work = mkdtempSync(join(tmpdir(), 'labmotion-pack-smoke-'));
 let failed = false;
@@ -35,83 +47,106 @@ const log = (line) => console.log(line);
 try {
   log(`pack-smoke: рабочая директория ${work}`);
   execSync(`pnpm pack --pack-destination "${work}"`, { cwd: ROOT, stdio: 'pipe' });
-  const tarball = readdirSync(work).find((f) => f.endsWith('.tgz'));
+  const tarball = readdirSync(work).find((file) => file.endsWith('.tgz'));
   if (!tarball) throw new Error('pnpm pack не создал тарбол');
   log(`pack-smoke: тарбол ${tarball}`);
 
   const app = join(work, 'app');
   mkdirSync(app);
-  writeFileSync(join(app, 'package.json'), JSON.stringify({ name: 'smoke', private: true, type: 'module' }));
-  // npm устанавливает из файла оффлайн; --ignore-scripts — least privilege.
+  writeFileSync(
+    join(app, 'package.json'),
+    JSON.stringify({ name: 'smoke', private: true, type: 'module' }),
+  );
+
+  // npm устанавливает из локального файла; lifecycle пакета не нужен для проверки
+  // уже собранного артефакта и не должен исполнять произвольные scripts.
   execSync(`npm install --ignore-scripts --no-audit --no-fund "${join(work, tarball)}"`, {
     cwd: app,
     stdio: 'pipe',
   });
 
-  // 1. Исполняемые субпути: ESM-import + базовый вызов ядра.
-  const runnable = Object.keys(pkg.exports).filter((k) => !BINDING_SUBPATHS.has(k));
+  const runnable = Object.keys(pkg.exports).filter((key) => !PEER_BINDING_SUBPATHS.has(key));
+
+  // 1. Все независимые entries через ESM import.
   const esmProbe = `
     const names = ${JSON.stringify(runnable)};
     for (const sub of names) {
       const spec = sub === '.' ? '${pkg.name}' : '${pkg.name}/' + sub.slice(2);
-      const m = await import(spec);
-      if (Object.keys(m).length === 0) throw new Error('пустой модуль: ' + spec);
+      const module = await import(spec);
+      if (Object.keys(module).length === 0) throw new Error('пустой ESM-модуль: ' + spec);
     }
     const { spring } = await import('${pkg.name}');
-    const r = spring({ mass: 1, stiffness: 200, damping: 20 }, 0.1);
-    if (!Number.isFinite(r.value)) throw new Error('spring вернул не-конечное');
-    console.log('ESM OK: ' + names.length + ' субпутей, spring(0.1)=' + r.value.toFixed(4));
+    const result = spring({ mass: 1, stiffness: 200, damping: 20 }, 0.1);
+    if (!Number.isFinite(result.value)) throw new Error('ESM spring вернул не-конечное');
+    console.log('ESM OK: ' + names.length + ' entries');
   `;
   writeFileSync(join(app, 'esm.mjs'), esmProbe);
   log(execSync('node esm.mjs', { cwd: app, encoding: 'utf8' }).trim());
 
-  // 2. CJS-require ядра (условие require в exports).
+  // 2. Те же независимые entries через CJS require. Наличие файла недостаточно:
+  // неверная interop-обёртка или транзитивный ESM-only import ломаются только здесь.
   const cjsProbe = `
+    const names = ${JSON.stringify(runnable)};
+    for (const sub of names) {
+      const spec = sub === '.' ? '${pkg.name}' : '${pkg.name}/' + sub.slice(2);
+      const module = require(spec);
+      if (Object.keys(module).length === 0) throw new Error('пустой CJS-модуль: ' + spec);
+    }
     const { spring } = require('${pkg.name}');
-    const r = spring({ mass: 1, stiffness: 200, damping: 20 }, 0.1);
-    if (!Number.isFinite(r.value)) throw new Error('CJS spring вернул не-конечное');
-    console.log('CJS OK: spring(0.1)=' + r.value.toFixed(4));
+    const result = spring({ mass: 1, stiffness: 200, damping: 20 }, 0.1);
+    if (!Number.isFinite(result.value)) throw new Error('CJS spring вернул не-конечное');
+    console.log('CJS OK: ' + names.length + ' entries');
   `;
   writeFileSync(join(app, 'cjs.cjs'), cjsProbe);
   log(execSync('node cjs.cjs', { cwd: app, encoding: 'utf8' }).trim());
 
-  // 3. Структурная проверка ВСЕХ exports-субпутей (включая биндинги):
-  //    каждая объявленная триада types/import/require существует в артефакте.
+  // 3. Каждая объявленная exports-триада обязана существовать в артефакте.
   const installedRoot = join(app, 'node_modules', ...pkg.name.split('/'));
   let checked = 0;
   for (const [key, value] of Object.entries(pkg.exports)) {
-    for (const cond of ['types', 'import', 'require']) {
-      const rel = value[cond];
-      if (!rel) { failed = true; log(`FAIL: exports['${key}'].${cond} отсутствует`); continue; }
-      if (!existsSync(join(installedRoot, rel))) {
+    for (const condition of ['types', 'import', 'require']) {
+      const relativePath = value[condition];
+      if (!relativePath) {
         failed = true;
-        log(`FAIL: файл артефакта отсутствует: ${key} → ${rel}`);
+        log(`FAIL: exports['${key}'].${condition} отсутствует`);
+        continue;
+      }
+      if (!existsSync(join(installedRoot, relativePath))) {
+        failed = true;
+        log(`FAIL: файл артефакта отсутствует: ${key} → ${relativePath}`);
       }
       checked++;
     }
   }
   log(`структура OK: ${checked} файлов exports-триад на месте`);
 
-  // 4. LICENSE и README обязаны попасть в артефакт.
-  for (const f of ['LICENSE', 'README.md', 'package.json']) {
-    if (!existsSync(join(installedRoot, f))) { failed = true; log(`FAIL: ${f} не в артефакте`); }
+  // 4. Package metadata, license и README входят в npm-артефакт.
+  for (const file of ['LICENSE', 'README.md', 'package.json']) {
+    if (!existsSync(join(installedRoot, file))) {
+      failed = true;
+      log(`FAIL: ${file} не в артефакте`);
+    }
   }
 
-  // 5. Sourcemaps НЕ имеют права попасть в артефакт: sourcesContent раскрывает
-  //    полные исходники приватного репо (прецедент @labpics/colors — без карт).
-  const walk = (dir) => readdirSync(dir, { withFileTypes: true }).flatMap((e) =>
-    e.isDirectory() ? walk(join(dir, e.name)) : [join(dir, e.name)]
-  );
-  const maps = walk(installedRoot).filter((f) => f.endsWith('.map'));
+  // 5. Sourcemaps исключены package#files-контрактом: потребитель получает только
+  // исполняемый dist и declarations, без лишнего веса и второго набора исходников.
+  const walk = (directory) =>
+    readdirSync(directory, { withFileTypes: true }).flatMap((entry) =>
+      entry.isDirectory() ? walk(join(directory, entry.name)) : [join(directory, entry.name)],
+    );
+  const maps = walk(installedRoot).filter((file) => file.endsWith('.map'));
   if (maps.length > 0) {
     failed = true;
     log(`FAIL: sourcemaps в артефакте (${maps.length} шт.): ${maps[0]}`);
   } else {
     log('sourcemaps: отсутствуют в артефакте ✓');
   }
-} catch (err) {
+} catch (error) {
   failed = true;
-  console.error('pack-smoke: сбой —', err?.stderr?.toString?.() || err?.message || err);
+  console.error(
+    'pack-smoke: сбой —',
+    error?.stderr?.toString?.() || error?.message || error,
+  );
 } finally {
   rmSync(work, { recursive: true, force: true });
 }
