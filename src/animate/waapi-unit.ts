@@ -33,6 +33,7 @@ import {
   normalizeV0,
   type AnimatableElement,
   type ChannelSnapshot,
+  type CssChannel,
   type GroupKey,
   type GroupOwner,
   type GroupRecord,
@@ -98,7 +99,7 @@ export class WaapiUnit implements GroupOwner {
     return frozen === undefined ? undefined : { value: frozen, velocity: 0 };
   }
 
-  captureCss(): string | number | undefined {
+  captureCss(): CssChannel | undefined {
     return undefined; // css-каналы на compositor-путь не маршрутизируются
   }
 

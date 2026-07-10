@@ -164,20 +164,66 @@ export interface CssChannel {
   readonly key: string;
   readonly fromAst: ValueAST;
   readonly toAst: ValueAST;
-  /** Стартовая скорость прогресса (подхват C⁰: всегда 0 — см. карту решений). */
+  /**
+   * Стартовая скорость прогресса (прогресс/с). Явная пара [from, to] — 0
+   * (покой, канон числовых каналов); перехват живого рана — проекция ṗ̂
+   * источника между прогресс-пространствами (projectCssV0, C¹-контракт #93).
+   */
   readonly v0: number;
   p: number;
+  /** Текущая производная прогресса ṗ (прогресс/с) — сырьё C¹-подхвата. */
+  dpdt: number;
   css: string | number;
 }
 
 /** Порог вырожденного диапазона (зеркалит RANGE_EPSILON compositor-пути). */
 export const RANGE_EPSILON = 1e-10;
 
-/** Нормализация скорости подхвата: v0 = velocity / range (канон MotionValue). */
+/**
+ * Нормализация скорости подхвата: v0 = velocity / range (канон MotionValue).
+ * `+ 0` схлопывает −0 (velocity 0 при range<0 и наоборот) для всех вызовов.
+ */
 export function normalizeV0(velocity: number, range: number): number {
   if (!(Math.abs(range) > RANGE_EPSILON)) return 0;
   const v0 = velocity / range;
-  return Number.isFinite(v0) ? v0 : 0;
+  return Number.isFinite(v0) ? v0 + 0 : 0;
+}
+
+/**
+ * Покомпонентный вектор спана from→to; undefined — скорость не определена:
+ * var()/relative/смешанные виды остаются C⁰ (дискретная или базо-зависимая
+ * интерполяция). Цвет — r/g/b; альфа не участвует в выборе доминанты (её спан
+ * ≤ 1 против 255 — недоминантна), её подхват C⁰.
+ */
+function spanVec(from: ValueAST, to: ValueAST): number[] | undefined {
+  if (from.kind === 'color' && to.kind === 'color') {
+    return [to.r - from.r, to.g - from.g, to.b - from.b];
+  }
+  if (from.kind === 'unit' && to.kind === 'unit') return [to.value - from.value];
+  return undefined;
+}
+
+/**
+ * Проекция скорости css-канала между прогресс-пространствами при перехвате
+ * (C¹-контракт #93): скорость значения по компоненту i равна ṗ̂·Δold_i, новая
+ * скорость прогресса — её нормировка на новый спан. i — ДОМИНАНТНЫЙ компонент
+ * НОВОГО спана (канон dominantV0 WaapiUnit и projection/driver: доминанта
+ * всегда по целевому диапазону — иначе малый b[i] при большом a[i] взрывает
+ * усиление на неколлинеарном цветовом ретаргете). Для юнитных значений (1
+ * компонент) и коллинеарных ретаргетов проекция точна. Несовместимые виды AST
+ * (var(), unit×color) → 0; длины определённых спанов совпадают по построению:
+ * fromAst нового спана bindGroup реконструирует из live.css (оба цветовые либо
+ * оба юнитные — иначе undefined выше); −0 схлопывает normalizeV0.
+ */
+function projectCssV0(live: CssChannel, fromAst: ValueAST, toAst: ValueAST): number {
+  const a = spanVec(live.fromAst, live.toAst);
+  const b = spanVec(fromAst, toAst);
+  if (!a || !b) return 0; // undefined-гейт: определённый спан — непустой массив (truthy)
+  let i = 0;
+  for (let k = 1; k < b.length; k++) {
+    if (Math.abs(b[k]!) > Math.abs(b[i]!)) i = k;
+  }
+  return normalizeV0(live.dpdt * a[i]!, b[i]!);
 }
 
 // ─── Реестр состояния по элементам ───────────────────────────────────────────
@@ -195,8 +241,8 @@ export interface ChannelSnapshot {
 export interface GroupOwner {
   /** Аналитический снимок числового канала в момент прерывания. */
   captureNum(key: string): ChannelSnapshot | undefined;
-  /** Последняя эмитнутая строка CSS-канала (C⁰-подхват). */
-  captureCss(key: string): string | number | undefined;
+  /** Живой CSS-канал в момент прерывания (значение + ṗ для C¹-проекции). */
+  captureCss(key: string): CssChannel | undefined;
   /** Ключи числовых каналов прогона (для остаточного transform-состояния). */
   numericKeys(): readonly string[];
   /** Прервать прогон: стоп без записи, finished резолвится (не natural). */
@@ -350,19 +396,26 @@ export function bindGroup(
       });
     } else {
       let fromAst: ValueAST;
+      let v0 = 0;
       if (spec.explicitFrom !== undefined) {
         fromAst = spec.explicitFrom;
       } else {
-        const source = owner?.captureCss(spec.key) ?? rec.cssValue ?? readStyleValue(el, group);
+        const live = owner?.captureCss(spec.key);
+        // live.css не бывает nullish (string | number) — ?? безопасно каскадит.
+        const source = live?.css ?? rec.cssValue ?? readStyleValue(el, group);
         fromAst = tryParse(source) ?? spec.to; // нечитаемо → дискретный старт с цели
+        // Живой прогон отдаёт ṗ̂ — проекция в новое прогресс-пространство (C¹);
+        // live — объект канала (truthy) либо undefined.
+        if (live) v0 = projectCssV0(live, fromAst, spec.to);
       }
       css = {
         kind: 'css',
         key: spec.key,
         fromAst,
         toAst: spec.to,
-        v0: 0, // C⁰-подхват css-каналов: скорость между пространствами не проецируется
+        v0,
         p: 0,
+        dpdt: v0, // производная на старте = засеянная (перехват до кадров — C¹)
         css: interpolate(fromAst, spec.to, 0),
       };
     }
