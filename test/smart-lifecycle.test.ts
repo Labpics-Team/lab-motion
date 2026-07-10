@@ -540,3 +540,83 @@ describe('швы ./projection (характеризация фактическо
     controls.cancel();
   });
 });
+
+// ─── Регрессии ревью PR #130 ──────────────────────────────────────────────────
+
+describe('./smart: реконсиляция опций на одном root (ревью #130)', () => {
+  it('второй ПОСЛЕДОВАТЕЛЬНЫЙ переход использует свои часы, не первого', async () => {
+    const world = makeSmartWorld();
+    const el1 = world.el('c', { x: 0, y: 0, width: 100, height: 100 }, { key: 'card' });
+    const root = world.root('root', { x: 0, y: 0, width: 600, height: 600 }, { children: [el1] });
+
+    // Переход 1 на clock1 — доигрываем до покоя.
+    const clock1 = makeClock();
+    const cap1 = captureSmart(root, {
+      requestFrame: clock1.requestFrame,
+      getScroll: world.getScroll,
+      getComputedStyle: world.getComputedStyle,
+    });
+    el1.rect = { x: 200, y: 0, width: 100, height: 100 };
+    const h1 = cap1.animate();
+    clock1.drain();
+    await h1.finished;
+    expect(el1.inline.has('transform')).toBe(false); // осел, restore
+
+    // Переход 2 на ДРУГИХ часах clock2. До фикта движок был заморожен на clock1
+    // (кэш контроллера по root игнорировал опции второго вызова) → clock2 не
+    // получал кадров. RED-факт: clock2.pending() === 0.
+    const clock2 = makeClock();
+    const cap2 = captureSmart(root, {
+      requestFrame: clock2.requestFrame,
+      getScroll: world.getScroll,
+      getComputedStyle: world.getComputedStyle,
+    });
+    el1.rect = { x: 400, y: 0, width: 100, height: 100 };
+    const h2 = cap2.animate();
+
+    expect(clock2.pending()).toBeGreaterThan(0); // именно clock2 запланировал кадры
+    clock2.drain();
+    await h2.finished;
+    expect(el1.inline.has('transform')).toBe(false);
+  });
+});
+
+describe('./smart: ghost восстанавливает инлайн-стили потребителя (ревью #130)', () => {
+  it('переприкреплённый ghost не теряет свои инлайны; root-position восстановлен', async () => {
+    const world = makeSmartWorld();
+    // b уходит; у него СВОИ инлайны на свойствах, которые перекрывает закрепление.
+    const b = world.el(
+      'b',
+      { x: 40, y: 30, width: 10, height: 20 },
+      { key: 'b', inline: { position: 'relative', left: '5px', opacity: '0.7' } },
+    );
+    const root = world.root(
+      'root',
+      { x: 0, y: 0, width: 100, height: 100 },
+      { children: [b], computed: { position: 'static' } },
+    );
+    root.inline.set('position', 'static'); // у root свой инлайн-position
+
+    const clock = makeClock();
+    const cap = captureSmart(root, {
+      requestFrame: clock.requestFrame,
+      getScroll: world.getScroll,
+      getComputedStyle: world.getComputedStyle,
+    });
+    detach(root, b);
+    const h = cap.animate();
+    clock.drain();
+    await h.finished;
+
+    // Пред-существовавшие инлайны b ВОССТАНОВЛЕНЫ (а не слепо сняты).
+    expect(b.inline.get('position')).toBe('relative');
+    expect(b.inline.get('left')).toBe('5px');
+    expect(b.inline.get('opacity')).toBe('0.7');
+    // Свойства, которых у потребителя НЕ было (введены закреплением) — сняты.
+    expect(b.inline.has('top')).toBe(false);
+    expect(b.inline.has('width')).toBe(false);
+    expect(b.inline.has('height')).toBe(false);
+    // root: исходный инлайн-position восстановлен (не удалён).
+    expect(root.inline.get('position')).toBe('static');
+  });
+});

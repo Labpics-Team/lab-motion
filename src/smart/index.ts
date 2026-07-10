@@ -196,14 +196,18 @@ interface _ActiveRun {
 
 interface _Controller {
   readonly controls: ProjectionControls;
-  readonly getScroll: () => { x: number; y: number };
-  readonly getCS: ((el: unknown) => { getPropertyValue(n: string): string }) | undefined;
-  readonly radius: boolean;
+  // getScroll/getCS/radius — per-capture, читаются в момент замера: реконсилируются
+  // каждым вызовом _getController (не заморожены на первом капчуре). Мутабельны.
+  getScroll: () => { x: number; y: number };
+  getCS: ((el: unknown) => { getPropertyValue(n: string): string }) | undefined;
+  radius: boolean;
   readonly root: SmartRoot;
   flight: Map<string, _FlightNode>;
   ghosts: Map<string, _GhostEntry>;
   ghostEls: Set<SmartElement>;
   rootPositionAdded: boolean;
+  /** Инлайн-position root'а ДО того, как ghost-протокол сделал его relative. */
+  savedRootPosition: string;
   active: _ActiveRun | null;
   cancelActive(): void;
 }
@@ -269,6 +273,7 @@ const _RADIUS_LONGHANDS = [
   'border-bottom-left-radius',
 ] as const;
 
+/** Парсит один CSS-радиус-токен в px (px/%, вырожденное → 0). */
 function _parseRadiusToken(token: string, base: number): number | null {
   if (token.endsWith('px')) {
     const n = Number(token.slice(0, -2));
@@ -281,6 +286,7 @@ function _parseRadiusToken(token: string, base: number): number | null {
   return null;
 }
 
+/** Читает 4 угла border-radius элемента (x/y на угол) через computed-style. */
 function _readRadii(
   getCS: ((el: unknown) => { getPropertyValue(n: string): string }) | undefined,
   el: SmartElement,
@@ -311,6 +317,7 @@ function _readRadii(
 
 // ─── DOM-швы (duck-typed, тотальные к враждебному состоянию) ──────────────────
 
+/** Duck-проверка: объект похож на DOM-элемент (getAttribute/getBoundingClientRect/style). */
 function _isElementLike(root: unknown): root is SmartRoot {
   return (
     root !== null &&
@@ -319,6 +326,7 @@ function _isElementLike(root: unknown): root is SmartRoot {
   );
 }
 
+/** Прямые дети элемента (пустой массив, если недоступны). */
 function _childrenOf(node: unknown): SmartElement[] {
   const ch = (node as { children?: unknown }).children;
   if (Array.isArray(ch)) return ch as SmartElement[];
@@ -328,6 +336,7 @@ function _childrenOf(node: unknown): SmartElement[] {
   return [];
 }
 
+/** Дети открытого shadowRoot (для composed-обхода; closed → пусто). */
 function _shadowChildrenOf(node: unknown): SmartElement[] {
   const sr = (node as { shadowRoot?: { children?: unknown } | null }).shadowRoot;
   if (sr === null || sr === undefined) return [];
@@ -339,6 +348,7 @@ function _shadowChildrenOf(node: unknown): SmartElement[] {
   return [];
 }
 
+/** Безопасное чтение атрибута (null при отсутствии/ошибке). */
 function _getAttr(el: SmartElement, name: string): string | null {
   try {
     return typeof el.getAttribute === 'function' ? el.getAttribute(name) : null;
@@ -347,6 +357,7 @@ function _getAttr(el: SmartElement, name: string): string | null {
   }
 }
 
+/** Текущее инлайн-значение CSS-свойства (пустая строка при отсутствии/ошибке). */
 function _inl(el: SmartElement, name: string): string {
   try {
     return el.style.getPropertyValue(name);
@@ -355,11 +366,39 @@ function _inl(el: SmartElement, name: string): string {
   }
 }
 
+/** Восстанавливает инлайн-свойство: снимает при пустом снимке, иначе ставит. */
 function _restoreProp(el: SmartElement, name: string, saved: string): void {
   if (saved === '') el.style.removeProperty(name);
   else el.style.setProperty(name, saved);
 }
 
+/** Инлайн-стили ghost'а, которые закрепление (_appendAndPinGhost) перезаписывает. */
+const _GHOST_PINNED_PROPS = ['position', 'left', 'top', 'width', 'height', 'opacity'] as const;
+
+/**
+ * Снимок инлайн-стилей ghost'а ДО закрепления — чтобы на терминале ВОССТАНОВИТЬ
+ * их (а не слепо снять): удержанный потребителем и переприкреплённый узел не
+ * теряет свои стили. Первый снимок выигрывает (continue-exit через прогоны
+ * сохраняет исходные значения потребителя, не наши закреплённые).
+ */
+const _savedGhostStyle = new WeakMap<SmartElement, Record<string, string>>();
+
+/** Записать снимок инлайн-стилей ghost'а, если ещё не записан (first-pin-wins). */
+function _snapshotGhostStyle(el: SmartElement): void {
+  if (_savedGhostStyle.has(el)) return;
+  const saved: Record<string, string> = {};
+  for (const p of _GHOST_PINNED_PROPS) saved[p] = _inl(el, p);
+  _savedGhostStyle.set(el, saved);
+}
+
+/** Восстановить исходные инлайн-стили ghost'а (или снять, если их не было). */
+function _restoreGhostStyle(el: SmartElement): void {
+  const saved = _savedGhostStyle.get(el);
+  for (const p of _GHOST_PINNED_PROPS) _restoreProp(el, p, saved?.[p] ?? '');
+  _savedGhostStyle.delete(el);
+}
+
+/** Санитайзнутый скролл page-пространства (нефинит/не-число → 0). */
 function _scroll(getScroll: () => { x: number; y: number }): { x: number; y: number } {
   try {
     const s = getScroll();
@@ -425,6 +464,7 @@ function _structure(
 
 // ─── resolveSmartTier (precedence reduced → projection → ssr) ─────────────────
 
+/** true, если matchMedia сообщает prefers-reduced-motion: reduce. */
 function _prefersReduced(
   matchMedia: ((q: string) => { matches: boolean }) | undefined,
 ): boolean {
@@ -436,6 +476,11 @@ function _prefersReduced(
   }
 }
 
+/**
+ * Резолвит tier перехода по среде: `reduced` (prefers-reduced-motion),
+ * `ssr` (нет document-подобной среды), иначе `projection` (полный FLIP-путь).
+ * Чистая функция — путь можно выбрать заранее, без побочных эффектов.
+ */
 export function resolveSmartTier(inputs?: Record<string, unknown>): SmartTier {
   const i = inputs ?? {};
   if (_prefersReduced(i['matchMedia'] as never)) return 'reduced';
@@ -450,6 +495,7 @@ export function resolveSmartTier(inputs?: Record<string, unknown>): SmartTier {
 
 // ─── Валидация параметров (fail-fast, рано, даже под reduce) ──────────────────
 
+/** Fail-fast валидация опций (keyAttr/epsilon/spring) — рано, ещё до среды. */
 function _validateOptions(opt: SmartOptions): void {
   if (opt.keyAttr !== undefined) {
     if (typeof opt.keyAttr !== 'string' || opt.keyAttr === '') {
@@ -470,6 +516,7 @@ function _validateOptions(opt: SmartOptions): void {
 
 // ─── Эффективный tier капчура ────────────────────────────────────────────────
 
+/** Эффективный tier капчура: reduced (если reduce и respect≠false) либо projection. */
 function _effectiveTier(opt: SmartOptions): 'reduced' | 'projection' {
   const reduced = _prefersReduced(opt.matchMedia) && opt.respectReducedMotion !== false;
   return reduced ? 'reduced' : 'projection';
@@ -479,6 +526,7 @@ function _effectiveTier(opt: SmartOptions): 'reduced' | 'projection' {
 
 const _EMPTY_PLAN: SmartPlan = { matched: [], entered: [], exited: [], skipped: [] };
 
+/** Инертный handle (SSR/пустой план): finished уже разрешён, no-op контролы. */
 function _inertHandle(tier: SmartTier, plan: SmartPlan): SmartHandle {
   return {
     finished: Promise.resolve(),
@@ -500,6 +548,7 @@ function _inertHandle(tier: SmartTier, plan: SmartPlan): SmartHandle {
   };
 }
 
+/** Инертный capture (не-элемент/SSR): animate → инертный ssr-handle. */
 function _inertCapture(): SmartCapture {
   return {
     animate(): SmartHandle {
@@ -513,9 +562,24 @@ function _inertCapture(): SmartCapture {
 
 const _controllers = new WeakMap<object, _Controller>();
 
+/** Контроллер по root (реестр continuity): переиспользуется mid-flight, пересобирается в покое с опциями текущего вызова. */
 function _getController(root: SmartRoot, opt: SmartOptions): _Controller {
   const existing = _controllers.get(root);
-  if (existing !== undefined) return existing;
+  // Перехват (движок mid-flight): пересобрать его нельзя — spring/clamp/requestFrame
+  // принадлежат живому прогону (часы работающего движка не переключить, иначе
+  // рвётся continuity). Но per-capture опции (getScroll/getCS/radius) читаются в
+  // момент замера — реконсилируем их, чтобы не терять молча options второго вызова.
+  if (existing !== undefined && existing.controls.playing) {
+    if (opt.getScroll !== undefined) existing.getScroll = opt.getScroll;
+    if (opt.getComputedStyle !== undefined) existing.getCS = opt.getComputedStyle;
+    existing.radius = opt.radius !== false;
+    return existing;
+  }
+  // Покой / первый вызов: свежий контроллер — ВСЕ опции этого вызова в силе
+  // (включая spring/clamp/requestFrame). Прежний (если был) на rest/cancel уже
+  // прошёл _cleanup: DOM восстановлен, ghosts сняты — его можно отбросить, движок
+  // покоится (v0=0), терять нечего. Так второй последовательный переход честно
+  // получает свои часы/пружину (главный дефект из ревью #130).
 
   const getScroll = opt.getScroll ?? ((): { x: number; y: number } => ({ x: 0, y: 0 }));
   const getCS = opt.getComputedStyle;
@@ -570,6 +634,7 @@ function _getController(root: SmartRoot, opt: SmartOptions): _Controller {
     ghosts: new Map(),
     ghostEls: new Set(),
     rootPositionAdded: false,
+    savedRootPosition: '',
     active: null,
     cancelActive(): void {
       _cancelRun(ctrl);
@@ -579,12 +644,14 @@ function _getController(root: SmartRoot, opt: SmartOptions): _Controller {
   return ctrl;
 }
 
+/** true, если узел ключа в активном полёте контроллера (playing). */
 function _inFlight(ctrl: _Controller, key: string): boolean {
   return ctrl.flight.has(key) && ctrl.controls.playing;
 }
 
 // ─── Терминальная уборка (natural rest / cancel — одна форма) ─────────────────
 
+/** Терминальная уборка: снять transform/ghost-инлайны, восстановить стили, очистить полёт. */
 function _cleanup(ctrl: _Controller): void {
   for (const node of ctrl.flight.values()) {
     if (node.kind === 'exit') {
@@ -594,10 +661,8 @@ function _cleanup(ctrl: _Controller): void {
       } catch {
         /* уже отсоединён */
       }
-      const st = node.el.style;
-      for (const p of ['position', 'left', 'top', 'width', 'height', 'opacity']) {
-        st.removeProperty(p);
-      }
+      // Восстановить исходные инлайн-стили (переприкреплённый узел не теряет их).
+      _restoreGhostStyle(node.el);
     } else {
       _restoreProp(node.el, 'transform', node.savedTransform);
       _restoreProp(node.el, 'transform-origin', node.savedOrigin);
@@ -608,14 +673,18 @@ function _cleanup(ctrl: _Controller): void {
     }
   }
   if (ctrl.rootPositionAdded) {
-    ctrl.root.style.removeProperty('position');
+    // Восстановить исходный инлайн-position root'а (не слепо снять — потребитель
+    // мог иметь свой inline position, который мы перекрыли на relative).
+    _restoreProp(ctrl.root, 'position', ctrl.savedRootPosition);
     ctrl.rootPositionAdded = false;
+    ctrl.savedRootPosition = '';
   }
   ctrl.flight = new Map();
   ctrl.ghosts = new Map();
   ctrl.ghostEls = new Set();
 }
 
+/** Терминал по natural rest: уборка + резолв active-прогона как settled. */
 function _onNaturalRest(ctrl: _Controller): void {
   _cleanup(ctrl);
   const active = ctrl.active;
@@ -626,6 +695,7 @@ function _onNaturalRest(ctrl: _Controller): void {
   }
 }
 
+/** Отмена прогона: cancel движка + уборка + резолв active как canceled. */
 function _cancelRun(ctrl: _Controller): void {
   ctrl.controls.cancel();
   _cleanup(ctrl);
@@ -650,6 +720,7 @@ function _appendAndPinGhost(ctrl: _Controller, el: SmartElement, box: _Rect): vo
   const clientLeft = typeof ctrl.root.clientLeft === 'number' ? ctrl.root.clientLeft : 0;
   const clientTop = typeof ctrl.root.clientTop === 'number' ? ctrl.root.clientTop : 0;
   const st = el.style;
+  _snapshotGhostStyle(el); // до перезаписи — восстановим на терминале
   st.setProperty('position', 'absolute');
   st.setProperty('left', _px(box.x - rootBox.x - clientLeft));
   st.setProperty('top', _px(box.y - rootBox.y - clientTop));
@@ -659,6 +730,7 @@ function _appendAndPinGhost(ctrl: _Controller, el: SmartElement, box: _Rect): vo
   if (!ctrl.rootPositionAdded && ctrl.getCS !== undefined) {
     try {
       if (ctrl.getCS(ctrl.root).getPropertyValue('position') === 'static') {
+        ctrl.savedRootPosition = _inl(ctrl.root, 'position'); // до перезаписи
         ctrl.root.style.setProperty('position', 'relative');
         ctrl.rootPositionAdded = true;
       }
@@ -677,14 +749,14 @@ function _removeGhost(ctrl: _Controller, key: string): void {
   } catch {
     /* уже отсоединён */
   }
-  const st = g.el.style;
-  for (const p of ['position', 'left', 'top', 'width', 'height', 'opacity']) st.removeProperty(p);
+  _restoreGhostStyle(g.el); // восстановить исходные инлайн-стили, не слепо снять
   ctrl.ghosts.delete(key);
   ctrl.ghostEls.delete(g.el);
 }
 
 // ─── Handle реального прогона ─────────────────────────────────────────────────
 
+/** SmartHandle реального прогона: finished/cancel/playing/progress/tier/plan. */
 function _makeRunHandle(ctrl: _Controller, plan: SmartPlan, tier: SmartTier): SmartHandle {
   let state: 'playing' | 'settled' | 'canceled' | 'superseded' = 'playing';
   let resolveFinished!: () => void;
@@ -723,6 +795,7 @@ function _makeRunHandle(ctrl: _Controller, plan: SmartPlan, tier: SmartTier): Sm
 
 // ─── Ядро: диф двух снимков → оркестрация ────────────────────────────────────
 
+/** Второй снимок + диф + оркестрация полёта (matched/enter/exit) через projection. */
 function _animate(
   ctrl: _Controller,
   snapshot: Map<string, _SnapEntry>,
@@ -993,6 +1066,7 @@ function _animate(
   return _startRun(ctrl, nodes, newFlight, plan, tier);
 }
 
+/** Стартует projection-полёт собранных узлов и возвращает handle прогона. */
 function _startRun(
   ctrl: _Controller,
   nodes: readonly ProjectionPlayNode[],
@@ -1026,6 +1100,11 @@ function _startRun(
 
 // ─── Публичный API: captureSmart ──────────────────────────────────────────────
 
+/**
+ * FIRST-снимок дерева по строковому ключу (`data-motion-key`): структура +
+ * геометрия/радиусы. Возвращает `SmartCapture`, чей `animate()` строит второй
+ * снимок и проигрывает переход. Не-элемент/SSR → инертный capture.
+ */
 export function captureSmart(root: unknown, options?: SmartOptions): SmartCapture {
   const opt = options ?? {};
   _validateOptions(opt); // fail-fast — до проверки среды, даже под reduce
@@ -1066,6 +1145,10 @@ export function captureSmart(root: unknown, options?: SmartOptions): SmartCaptur
 
 // ─── Публичный API: smartTransition (capture → mutate → animate) ──────────────
 
+/**
+ * Полный цикл: capture → `mutate()` → animate. Синхронный `mutate` анимируется
+ * сразу; Promise-`mutate` — после разрешения (переход подвязывается по await).
+ */
 export function smartTransition(
   root: unknown,
   mutate: () => void | Promise<void>,
