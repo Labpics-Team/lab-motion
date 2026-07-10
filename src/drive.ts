@@ -28,7 +28,8 @@
  */
 
 import { MotionParamError } from './errors.js';
-import { type SpringParams, springUnchecked, validateSpringParams } from './spring.js';
+import { solveSpring } from './internal/solver.js';
+import { type SpringParams, validateSpringParams } from './spring.js';
 
 /** Options for drive(). All platform seams are injectable for testing. */
 export interface DriveOptions {
@@ -74,6 +75,18 @@ export interface DriveOptions {
    * the final emitted value is exactly `to`.
    */
   readonly clamp?: boolean | undefined;
+  /**
+   * Начальная скорость v0 (units value/s) на старте прогона. Default 0 —
+   * рождение из покоя (прежнее поведение бит-в-бит).
+   *
+   * Опция — вход единого C¹-контракта (#93): приёмная пружина наследует
+   * скорость источника (жест/decay/прерванный полёт) вместо жёсткого v0=0,
+   * так что первая производная непрерывна на стыке. NaN/±Infinity →
+   * MotionParamError рано (до создания Promise и планирования кадров).
+   * Влияет ТОЛЬКО на начальное условие солвера — семантика clamp/сходимости/
+   * settle и одноразовость прогона (drive не ретаргетится) не меняются.
+   */
+  readonly initialVelocity?: number | undefined;
 }
 
 /**
@@ -98,21 +111,11 @@ import { CONVERGENCE_THRESHOLD, MAX_FRAMES, FIXED_DT_S } from './internal/consta
 function prefersReducedMotion(
   matchMedia: ((query: string) => MediaQueryList) | undefined,
 ): boolean {
-  if (typeof matchMedia !== 'function') return false;
   try {
-    return matchMedia('(prefers-reduced-motion: reduce)').matches;
+    return typeof matchMedia === 'function' && matchMedia('(prefers-reduced-motion: reduce)').matches;
   } catch {
     return false;
   }
-}
-
-/**
- * Clamp a value to the range [lo, hi] (inclusive).
- * Used to bound spring output to [from, to] so that underdamped overshoot
- * is absorbed and values are monotonically non-decreasing toward `to`.
- */
-function clamp(v: number, lo: number, hi: number): number {
-  return Math.max(lo, Math.min(hi, v));
 }
 
 /**
@@ -139,6 +142,14 @@ export function drive(opts: DriveOptions): Promise<void> {
     throw new MotionParamError(`drive: 'to' must be finite, got ${to}`);
   }
 
+  // v0 (C¹-хендофф, #93): валидируется так же рано, как from/to — non-finite
+  // не должен дожить до нормировки v0/range (NaN молча расползся бы по солверу
+  // и гонял бы цикл до MAX_FRAMES, тот же класс, что дыра from/to выше).
+  const v0 = opts.initialVelocity ?? 0;
+  if (!Number.isFinite(v0)) {
+    throw new MotionParamError(`drive: 'initialVelocity' must be finite, got ${v0}`);
+  }
+
   // Validate spring params synchronously at the drive() boundary — before any
   // Promise is constructed or frame scheduled. This makes invalid spring config
   // throw eagerly and deterministically regardless of the injected scheduler,
@@ -152,31 +163,28 @@ export function drive(opts: DriveOptions): Promise<void> {
     return Promise.resolve();
   }
 
-  // L2: reduced-motion policy check — once, at the boundary.
-  const reduce = prefersReducedMotion(matchMedia);
-
-  if (reduce) {
-    // Short-circuit: emit the final value in a single step, no rAF.
-    onStep(to);
-    return Promise.resolve();
-  }
-
   // Clamping bounds (swapped for negative range).
   const range = to - from;
   // Clamp mode: default true (CSS-safe legacy); explicit false = honest spring.
   const bounded = opts.clamp !== false;
 
-  // CSS-safety guard: when |from|+|to|>Number.MAX_VALUE, (to-from) overflows to ±Infinity.
-  // A spring trajectory denormalized by an infinite range produces NaN (0*∞ at t=0)
-  // or clamps to ±MAX_VALUE — no smooth animation is representable. Snap to `to`
-  // immediately, consistent with MotionValue._tick() which also snaps when !isFinite(range).
-  if (!Number.isFinite(range)) {
+  // Один short-circuit на ДВЕ политики (одно тело вместо двух идентичных —
+  // ужим под размерный гейт ядра, семантика бит-в-бит прежняя):
+  // (1) L2 reduced-motion — проверяется однажды, на границе; (2) CSS-safety
+  // guard overflow-диапазона: |from|+|to| > Number.MAX_VALUE → range = ±∞ —
+  // плавная анимация непредставима (0*∞ = NaN при t=0). В обоих случаях —
+  // единственный шаг onStep(to), ноль кадров (консистентно с MotionValue._tick).
+  if (prefersReducedMotion(matchMedia) || !Number.isFinite(range)) {
     onStep(to);
     return Promise.resolve();
   }
 
   const lo = range >= 0 ? from : to;
   const hi = range >= 0 ? to : from;
+
+  // Нормировка v0 в progress-пространство солвера (он решает 0→1): units/s ÷
+  // range. range конечен и ненулевой (early-exit from===to и overflow-гард выше).
+  const v0Normalized = v0 / range;
 
   // L4: platform driver — injected or fallback to the global rAF.
   const scheduleFrame: (cb: (ts?: number) => void) => number =
@@ -203,15 +211,6 @@ export function drive(opts: DriveOptions): Promise<void> {
       resolve();
     }
 
-    function advanceClock(ts?: number): void {
-      if (ts !== undefined) {
-        if (startTs === undefined) startTs = ts;
-        elapsedSeconds = (ts - startTs) / 1000;
-      } else {
-        elapsedSeconds += FIXED_DT_S;
-      }
-    }
-
     // Single-flight guard: prevents two concurrent tick chains from mutating shared
     // state (frameCount, elapsedSeconds, maxEmittedToward) simultaneously.
     // Root cause of Finding 3: when handle===0 both scheduleFrame(tick) and
@@ -233,17 +232,27 @@ export function drive(opts: DriveOptions): Promise<void> {
       if (tickActive) return;
       tickActive = true;
       frameCount++;
-      advanceClock(ts);
+      // Продвинуть часы (бывший advanceClock, единственный вызов — инлайн).
+      if (ts !== undefined) {
+        if (startTs === undefined) startTs = ts;
+        elapsedSeconds = (ts - startTs) / 1000;
+      } else {
+        elapsedSeconds += FIXED_DT_S;
+      }
 
       // ОДИН вызов солвера на кадр: прежние computeValue/computeVelocity/
       // isConverged делали до трёх идентичных вызовов чистой детерминированной
       // функции — значения бит-в-бит те же, машинерия втрое легче.
+      // Канон солвера — solveSpring(params, t, v0) (internal/solver.ts, как в
+      // projection/driver): при v0Normalized=0 формы бит-в-бит равны прежнему
+      // springUnchecked-пути. Стражи конечности — на cv ниже (политика этого
+      // модуля: снап в `to`, как MotionValue._tick).
       // spring params already validated synchronously at drive() entry above.
-      const result = springUnchecked(opts.spring, elapsedSeconds);
+      const result = solveSpring(opts.spring, elapsedSeconds, v0Normalized);
       const rawValue = from + result.value * range;
       // bounded=true (default): CSS-safe clamp to [from, to]. bounded=false:
       // honest trajectory — overshoot is the point, no clamp.
-      const cv = bounded ? clamp(rawValue, lo, hi) : rawValue;
+      const cv = bounded ? Math.max(lo, Math.min(hi, rawValue)) : rawValue;
       // absRange > 0 guaranteed by the from===to early-exit above.
       const absRange = Math.abs(range);
 
@@ -255,7 +264,7 @@ export function drive(opts: DriveOptions): Promise<void> {
       //    underdamped spring at the floor zeta=0.2, omega0=2.0 kept it pending
       //    ~3.9s after visual completion).
       // 2) The threshold is range-independent: the position term is divided by
-      //    absRange; velocity from springUnchecked is already in normalized
+      //    absRange; velocity from solveSpring is already in normalized
       //    progress-space, so it is compared to the threshold directly.
       // The visual-saturation early-exit (maxEmittedToward === to) is a property
       // of the MONOTONE emitter only: with the clamp off, values legitimately
@@ -266,7 +275,11 @@ export function drive(opts: DriveOptions): Promise<void> {
         (Math.abs(cv - to) / absRange < CONVERGENCE_THRESHOLD &&
           Math.abs(result.velocity) < CONVERGENCE_THRESHOLD);
 
-      if (converged || frameCount >= MAX_FRAMES) {
+      // CSS-страж (инвариант 2) в том же снапе: сырой солвер с произвольным v0
+      // может дать NaN/±∞ на экстремумах (переполнение денормализации при
+      // clamp:false, вырожденный v0/range). Non-finite НЕ эмитится никогда —
+      // единственный контрактно-безопасный исход — settle в (конечный) `to`.
+      if (converged || frameCount >= MAX_FRAMES || !Number.isFinite(cv)) {
         settle();
         return;
       }
@@ -308,8 +321,7 @@ export function drive(opts: DriveOptions): Promise<void> {
     // useTimeoutFallback is set before setTimeout fires, so tick() always reads
     // the correct scheduler on its first (and every subsequent) invocation.
     let useTimeoutFallback = false;
-    const bootstrapHandle = scheduleFrame(tick);
-    if (bootstrapHandle === 0) {
+    if (scheduleFrame(tick) === 0) {
       useTimeoutFallback = true;
       setTimeout(tick, 0);
     }

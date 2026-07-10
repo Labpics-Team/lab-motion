@@ -755,6 +755,9 @@ describe('MotionValue API surface pin (class B)', () => {
   it('MotionValue exposes expected instance interface', () => {
     const mv = new MotionValue({ initial: 0, spring: STD_SPRING });
     expect(typeof mv.value).toBe('number');
+    // velocity — публичная точка C¹-контракта (#93); детальные пины (getter
+    // без сеттера, оракул солвера) — test/motion-value-velocity-read.test.ts.
+    expect(typeof mv.velocity).toBe('number');
     expect(typeof mv.onChange).toBe('function');
     expect(typeof mv.setTarget).toBe('function');
     expect(typeof mv.destroy).toBe('function');
