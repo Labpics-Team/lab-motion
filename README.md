@@ -222,6 +222,10 @@ el.addEventListener('pointerup', (e) => drag.pointerUp({ x: e.clientX, y: e.clie
 ```typescript
 import { readCompositorSpring } from '@labpics/motion/compositor';
 
+// Продолжение примера drag выше (el, drag определены там). spring/from/to/startMs —
+// параметры запущенного compositor-рана по оси x, controller — его хендл.
+// Пример одноосевой: для 2D снимите второй readCompositorSpring по y и
+// передайте { vx, vy } — оба ключа независимы.
 el.addEventListener('pointerdown', (e) => {
   const read = readCompositorSpring(spring, { from, to, t: (e.timeStamp - startMs) / 1000 });
   controller.stop(); // владение переходит жесту (compositor-Animation отменяется)
@@ -273,11 +277,16 @@ const p = createPresence({
       initial: from?.value ?? 1, initialVelocity: from?.velocity ?? 0,
       spring, clamp: false, // честный довыбег на стыке
     });
-    mv.onChange((v) => { el.style.opacity = String(v); });
+    mv.onChange((v) => {
+      el.style.opacity = String(v);
+      // Оседание: финальный эмит — ровно цель (settle-снап), скорость в покое 0.
+      // Без done() фаза не завершится и onGone не сработает.
+      if (v === 0 && mv.velocity === 0) done();
+    });
     mv.setTarget(0);
     capture(() => ({ value: mv.value, velocity: mv.velocity }));
   },
-  onEnterStart: (done, from, capture) => { /* тот же паттерн, цель 1 */ },
+  onEnterStart: (done, from, capture) => { /* тот же паттерн: цель 1, done при v === 1 */ },
 });
 p.exit();
 p.enter(); // передумали: reversed continuation из точки и скорости exit-рана
