@@ -7,10 +7,10 @@
  * ProjectionControls, …) стираются в рантайме и в Object.keys не попадают.
  *
  * ── RED PROOF ────────────────────────────────────────────────────────────────
- * Написан до реализации: на пустой заглушке src/projection «missing»-ассерт
- * первого блока падает СВОИМ сообщением (перечень отсутствующих имён);
- * shape/SSR-блоки падают «… is not a function» через pick-хелперы
- * (namespace-import + pick, канон test/animate-facade-helpers.ts:9-31).
+ * На заглушке src/projection «missing»-ассерт первого блока падал бы СВОИМ
+ * сообщением (перечень отсутствующих имён); shape/SSR-блоки — «… is not a
+ * function» через pick-хелперы (namespace-import + pick, канон
+ * test/animate-facade-helpers.ts:9-31): RED for the right reason.
  *
  * Mutation proof:
  *   - Переименовать/удалить любой из 6 экспортов → «missing» красный.

@@ -13,11 +13,21 @@
  *       ЧТЕНИЙ (один принудительный reflow — неизбежная цена FLIP-границы);
  *   (в) построить дерево (composed-подъём) и стартовать полёт.
  * first-концы при этом НЕ меряются: capture() mid-flight берёт аналитический
- * V(p̂) через controls.boxAt (§4.2) — ноль DOM-чтений под нашим transform.
+ * V(p̂) через controls.boxAt (§4.2) — ноль DOM-чтений под нашим transform, а
+ * play() для узлов ВСЁ ЕЩЁ активного полёта шлёт драйверу first: undefined —
+ * visual pickup V(p̂)/radii/opacity считается в драйвере на момент play
+ * (C⁰ и при отложенном play: пружина между capture и play успела уехать).
+ *
+ * capture потребляется ОДНОКРАТНО: успешный play() (и cancel()) очищает снимок —
+ * повторный play без нового capture бросает ранний MotionParamError (снимок
+ * протух: телепорт по нему хуже ошибки), а detached-поддеревья не пинятся
+ * ссылками из забытого снимка (retention).
  *
  * Дерево: ближайший проецирующий предок ищется composed-подъёмом
  * assignedSlot → parentElement → getRootNode().host (границы ОТКРЫТЫХ shadow
- * root прозрачны; closed — невидимы, документировано).
+ * root прозрачны; closed — невидимы, документировано). Подъём тотален к
+ * враждебным parent-циклам: Set посещённых + пер-play мемо (амортизация O(N+D)
+ * вместо O(N·D)); цикл → узел честно считается корнем, НИКОГДА не бросаем.
  *
  * Риски (спека §10): getComputedStyle 8×N — синхронный style recalc (смягчение:
  * шорт-чек border-radius, radius:false, батч чтений до первой записи); чужой
@@ -30,7 +40,7 @@ import type { FlipRect } from '../flip/index.js';
 import type { RequestFrameFn } from '../motion-value.js';
 import type { SpringParams } from '../spring.js';
 import { createProjection, type ProjectionPlayNode } from './driver.js';
-import { finite, type BoxRadii, type CornerRadius, type ProjectionFrame } from './geometry.js';
+import type { BoxRadii, CornerRadius, ProjectionFrame } from './geometry.js';
 
 // ─── Публичные типы ──────────────────────────────────────────────────────────
 
@@ -141,18 +151,6 @@ function readRadii(
   }
 }
 
-/** Аналитические first-радиусы mid-flight: визуальный радиус СЕЙЧАС = lerp(rF, rL, p̂). */
-function lerpRadii(a: BoxRadii, b: BoxRadii, t: number): BoxRadii {
-  const corners: CornerRadius[] = [];
-  for (let c = 0; c < 4; c++) {
-    corners.push({
-      x: finite(a[c].x + (b[c].x - a[c].x) * t) + 0,
-      y: finite(a[c].y + (b[c].y - a[c].y) * t) + 0,
-    });
-  }
-  return corners as unknown as BoxRadii;
-}
-
 // ─── Адаптер ─────────────────────────────────────────────────────────────────
 
 interface CapturedEntry {
@@ -172,6 +170,8 @@ interface FlightEntry {
   readonly savedRadius: string;
   readonly radiiFirst: BoxRadii | undefined;
   readonly radiiLast: BoxRadii | undefined;
+  /** Degenerate-узел: transform восстановлен ОДИН раз на полёт, не каждый кадр. */
+  degenerateRestored: boolean;
 }
 
 function restoreProp(
@@ -191,7 +191,8 @@ function safeInline(el: DomProjectionElement, name: string): string {
   }
 }
 
-/** Потолок composed-подъёма — страж от враждебных циклических «деревьев». */
+/** Потолок composed-подъёма — второй эшелон за Set посещённых (циклы ловит Set;
+ *  потолок глушит враждебные getter'ы, плодящие свежие «родители» бесконечно). */
 const MAX_ANCESTOR_HOPS = 4096;
 
 function composedParent(el: DomProjectionElement): DomProjectionElement | null {
@@ -259,7 +260,11 @@ export function createDomProjection(options?: DomProjectionOptions): DomProjecti
       const style = entry.el.style;
       if (frame.degenerate) {
         // Вырожденный anchor: transform не применять — вернуть прежний инлайн.
-        restoreProp(style, 'transform', entry.savedTransform);
+        // Degenerate — константа полёта: restore один раз, не каждый кадр.
+        if (!entry.degenerateRestored) {
+          restoreProp(style, 'transform', entry.savedTransform);
+          entry.degenerateRestored = true;
+        }
       } else {
         style.setProperty(
           'transform',
@@ -277,14 +282,17 @@ export function createDomProjection(options?: DomProjectionOptions): DomProjecti
     }
   };
 
+  /** Один проход restore наших инлайнов узла (rest/cancel и batch-clear play). */
+  const restoreEntry = (entry: FlightEntry): void => {
+    restoreProp(entry.el.style, 'transform', entry.savedTransform);
+    restoreProp(entry.el.style, 'transform-origin', entry.savedOrigin);
+    restoreProp(entry.el.style, 'border-radius', entry.savedRadius);
+  };
+
   /** Restore сохранённых инлайнов + очистка состояния полёта (rest и cancel). */
   const restoreAll = (): void => {
     if (flightEls === null) return;
-    for (const entry of flightEls.values()) {
-      restoreProp(entry.el.style, 'transform', entry.savedTransform);
-      restoreProp(entry.el.style, 'transform-origin', entry.savedOrigin);
-      restoreProp(entry.el.style, 'border-radius', entry.savedRadius);
-    }
+    for (const entry of flightEls.values()) restoreEntry(entry);
     flightEls = null;
   };
 
@@ -319,10 +327,12 @@ export function createDomProjection(options?: DomProjectionOptions): DomProjecti
         if (flightEntry !== undefined) {
           // §4.2: узел активного полёта — аналитический V(p̂), DOM под нашим
           // transform НЕ меряется; прежние инлайны — из состояния полёта.
+          // radiiFirst — инертный маркер канала: если полёт доживёт до play(),
+          // драйвер сам ребейзит radii.first на СВОЁ p̂ (first: undefined ниже).
           first = controls.boxAt(id);
           radiiFirst =
             flightEntry.radiiFirst !== undefined && flightEntry.radiiLast !== undefined
-              ? lerpRadii(flightEntry.radiiFirst, flightEntry.radiiLast, controls.progress)
+              ? flightEntry.radiiFirst
               : undefined;
           savedTransform = flightEntry.savedTransform;
           savedOrigin = flightEntry.savedOrigin;
@@ -362,11 +372,7 @@ export function createDomProjection(options?: DomProjectionOptions): DomProjecti
       // (а) batch-CLEAR: наши инлайны узлов активного полёта — одним проходом записей
       // (восстановление инлайнов = замер ниже видит чистый layout и чистые радиусы).
       if (flightEls !== null) {
-        for (const entry of flightEls.values()) {
-          restoreProp(entry.el.style, 'transform', entry.savedTransform);
-          restoreProp(entry.el.style, 'transform-origin', entry.savedOrigin);
-          restoreProp(entry.el.style, 'border-radius', entry.savedRadius);
-        }
+        for (const entry of flightEls.values()) restoreEntry(entry);
       }
 
       // (б) batch-MEASURE: только чтения (один принудительный reflow).
@@ -399,23 +405,63 @@ export function createDomProjection(options?: DomProjectionOptions): DomProjecti
       }
 
       // (в) дерево по composed-предкам + старт полёта.
+      // Подъём тотален и амортизирован: пер-play мемо (element → ответ подъёма
+      // из него) + Set посещённых в текущем подъёме. Враждебный parent-цикл
+      // (повторное посещение / возврат к стартовому элементу) → ВЕСЬ путь
+      // подъёма честно корневой (null) — createProjector ниже никогда не
+      // получит parent-цикла, из враждебного DOM-состояния не бросаем.
       const byEl = captured;
+      const ancestorMemo = new Map<DomProjectionElement, string | null>();
       const findAncestorId = (el: DomProjectionElement): string | null => {
+        const known = ancestorMemo.get(el);
+        if (known !== undefined) return known;
+        // path[i] — узлы подъёма; ответ каждого = ближайший замеренный СТРОГО
+        // выше него, поэтому мимо кандидатов идём до терминала (мемо/корень/цикл).
+        const path: DomProjectionElement[] = [el];
+        const seen = new Set<DomProjectionElement>([el]);
+        let terminal: string | null = null;
+        let cycle = false;
         let cursor = composedParent(el);
         let hops = 0;
         while (cursor !== null && hops < MAX_ANCESTOR_HOPS) {
-          const entry = byEl.get(cursor);
-          if (entry !== undefined && measuredIds.has(entry.id)) return entry.id;
+          const memo = ancestorMemo.get(cursor);
+          if (memo !== undefined) {
+            // Мемо узла = ответ подъёма ИЗ него (ближайший замеренный СТРОГО
+            // выше); пришедшему СНИЗУ замеренный узел-носитель мемо — сам ответ.
+            const entry = byEl.get(cursor);
+            terminal = entry !== undefined && measuredIds.has(entry.id) ? entry.id : memo;
+            break;
+          }
+          if (seen.has(cursor)) {
+            cycle = true; // цикл → корень: кандидаты внутри цикла не считаются
+            break;
+          }
+          seen.add(cursor);
+          path.push(cursor);
           cursor = composedParent(cursor);
           hops++;
         }
-        return null;
+        // Ответы назад по пути: терминал, поверх — ближайший замеренный кандидат.
+        let answer: string | null = terminal;
+        for (let i = path.length - 1; i >= 0; i--) {
+          const node = path[i];
+          ancestorMemo.set(node, cycle ? null : answer);
+          const entry = byEl.get(node);
+          if (entry !== undefined && measuredIds.has(entry.id)) answer = entry.id;
+        }
+        return ancestorMemo.get(el) ?? null;
       };
 
       const nodes: ProjectionPlayNode[] = measured.map((m) => ({
         id: m.cap.id,
         parent: findAncestorId(m.cap.el),
-        first: m.cap.first,
+        // Узел ВСЁ ЕЩЁ активного полёта → first: undefined: visual pickup
+        // V(p̂)/radii/opacity считает драйвер на момент play — C⁰ и при
+        // отложенном play (пружина уехала после capture). Новый узел — снимок.
+        first:
+          controls.playing && flightEls !== null && flightEls.has(m.cap.id)
+            ? undefined
+            : m.cap.first,
         last: m.last,
         radii:
           m.cap.radiiFirst !== undefined && m.radiiLast !== undefined
@@ -433,21 +479,34 @@ export function createDomProjection(options?: DomProjectionOptions): DomProjecti
           savedRadius: m.cap.savedRadius,
           radiiFirst: m.cap.radiiFirst,
           radiiLast: m.radiiLast,
+          degenerateRestored: false,
         });
       }
       flightEls = newFlight;
 
-      // Записи ПОСЛЕ всех чтений: transform-origin '0 0' — жёсткий контракт формул (P5).
-      for (const m of measured) {
-        m.cap.el.style.setProperty('transform-origin', '0 0');
+      controls.play(nodes);
+
+      // Записи transform-origin '0 0' (жёсткий контракт формул, P5) — ПОСЛЕ
+      // успешного controls.play (createProjector внутри): любой будущий бросок
+      // валидации не оставит наших инлайнов. Paint между шагами не случается
+      // (синхронный JS). Синхронный finish (нет rAF / reduce) уже восстановил
+      // инлайны и обнулил flightEls — origin тогда не пишем.
+      if (flightEls !== null) {
+        for (const m of measured) {
+          m.cap.el.style.setProperty('transform-origin', '0 0');
+        }
       }
 
-      controls.play(nodes);
+      // Снимок потреблён ОДНОКРАТНО: повторный play без нового capture —
+      // ранний MotionParamError выше (телепорт по протухшему снимку хуже
+      // ошибки), detached-поддеревья не пинятся ссылками из снимка.
+      captured = null;
     },
 
     cancel(): void {
       controls.cancel();
       restoreAll(); // снап в конечный layout; идемпотентен (flightEls → null)
+      captured = null; // снимок недействителен: следующий play требует capture
     },
 
     get playing(): boolean {

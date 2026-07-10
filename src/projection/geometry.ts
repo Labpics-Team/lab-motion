@@ -389,9 +389,14 @@ export function createProjector(nodes: readonly ProjectionNodeInit[]): Projector
   }
 
   // Переиспользуемые кадры (мутируются между вызовами at) + скретчи резолва.
+  // Degenerate-кадр не зависит от p — заполняется ЦЕЛИКОМ один раз здесь
+  // (transform-нейтраль, opacity снапнут к to, radii undefined); в at() для
+  // таких узлов ранний continue. degenerate — константа полёта: флаг кадра
+  // тоже выставляется один раз.
   const frames: MutableFrame[] = new Array(orderIdx.length);
   for (let oi = 0; oi < orderIdx.length; oi++) {
     const i = orderIdx[oi];
+    const op = nodes[i].opacity;
     frames[oi] = {
       id: nodes[i].id,
       tx: 0,
@@ -401,7 +406,7 @@ export function createProjector(nodes: readonly ProjectionNodeInit[]): Projector
       kx: 1,
       ky: 1,
       radii:
-        nodes[i].radii === undefined
+        nodes[i].radii === undefined || degenerate[i]
           ? undefined
           : [
               { x: 0, y: 0 },
@@ -409,17 +414,24 @@ export function createProjector(nodes: readonly ProjectionNodeInit[]): Projector
               { x: 0, y: 0 },
               { x: 0, y: 0 },
             ],
-      opacity: undefined,
-      degenerate: false,
+      // «+ 0» — схлоп −0 (P1: каждый выход кадра, включая opacity).
+      opacity: degenerate[i] && op !== undefined ? clamp01(op.to) + 0 : undefined,
+      degenerate: degenerate[i],
     };
   }
-  const frameByIndex: MutableFrame[] = new Array(count);
-  for (let oi = 0; oi < orderIdx.length; oi++) frameByIndex[orderIdx[oi]] = frames[oi];
 
   const kx = new Float64Array(count);
   const ky = new Float64Array(count);
   const vx = new Float64Array(count);
   const vy = new Float64Array(count);
+  // k degenerate-узлов = 1 один раз (в at() они пропускаются; их vx/vy никем
+  // не читаются — дети переякорены к невырожденному предку через liveAncestor).
+  for (let i = 0; i < count; i++) {
+    if (degenerate[i]) {
+      kx[i] = 1;
+      ky[i] = 1;
+    }
+  }
   const v: MutableRect = { x: 0, y: 0, width: 0, height: 0 };
   const order: readonly string[] = orderIdx.map((i) => nodes[i].id);
 
@@ -428,28 +440,12 @@ export function createProjector(nodes: readonly ProjectionNodeInit[]): Projector
     const tc = clamp01(t);
     for (let oi = 0; oi < orderIdx.length; oi++) {
       const i = orderIdx[oi];
+      // Degenerate: кадр заполнен целиком на precompute (p в него не входит);
+      // vx/vy/kx/ky узла никем не читаются — дети переякорены через liveAncestor.
+      if (degenerate[i]) continue;
       const node = nodes[i];
       const frame = frames[oi];
       mixInto(node.first, node.last, t, v);
-
-      if (degenerate[i]) {
-        // Transform не вычисляется; opacity снапается к to; дети переякорены выше.
-        frame.tx = 0;
-        frame.ty = 0;
-        frame.sx = 1;
-        frame.sy = 1;
-        frame.kx = 1;
-        frame.ky = 1;
-        frame.radii = undefined;
-        // «+ 0» — схлоп −0 (P1: каждый выход кадра, включая opacity).
-        frame.opacity = node.opacity === undefined ? undefined : clamp01(node.opacity.to) + 0;
-        frame.degenerate = true;
-        kx[i] = 1;
-        ky[i] = 1;
-        vx[i] = v.x;
-        vy[i] = v.y;
-        continue;
-      }
 
       const a = liveAncestor[i];
       if (a === null) {
@@ -471,24 +467,31 @@ export function createProjector(nodes: readonly ProjectionNodeInit[]): Projector
       }
       vx[i] = v.x;
       vy[i] = v.y;
-      frame.degenerate = false;
       frame.kx = kx[i];
       frame.ky = ky[i];
 
       const radii = node.radii;
       if (radii !== undefined) {
-        const target = frameByIndex[i].radii;
-        // target предвыделен на precompute для узлов с radii (см. выше).
-        if (target !== undefined) {
-          for (let c = 0; c < 4; c++) {
-            const corner = cornerRadiusAt(radii.first[c], radii.last[c], kx[i], ky[i], t);
-            target[c].x = corner.x;
-            target[c].y = corner.y;
-          }
-          frame.radii = target;
+        // Инлайн семантики cornerRadiusAt в переиспользуемый target (ноль
+        // промежуточных объектов лерпа): lerp по tc → floor 0 → живой
+        // correctRadius пер-оси (эллиптический угол). target предвыделен на
+        // precompute для каждого невырожденного узла с radii.
+        const target = frame.radii as [
+          MutableCorner,
+          MutableCorner,
+          MutableCorner,
+          MutableCorner,
+        ];
+        for (let c = 0; c < 4; c++) {
+          const rf = radii.first[c];
+          const rl = radii.last[c];
+          let rx = finite(finite(rf.x) + (finite(rl.x) - finite(rf.x)) * tc);
+          let ry = finite(finite(rf.y) + (finite(rl.y) - finite(rf.y)) * tc);
+          if (rx < 0) rx = 0;
+          if (ry < 0) ry = 0;
+          target[c].x = finite(correctRadius(rx, kx[i], ky[i]).x) + 0;
+          target[c].y = finite(correctRadius(ry, kx[i], ky[i]).y) + 0;
         }
-      } else {
-        frame.radii = undefined;
       }
 
       const opacity = node.opacity;

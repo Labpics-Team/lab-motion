@@ -5,10 +5,10 @@
  * стражи/деградации §2.1.4, резолв §2.1.5), §2.2 (сигнатуры), §7.2.
  *
  * ── RED PROOF ────────────────────────────────────────────────────────────────
- * Написан до реализации: namespace-import + pick-хелперы (канон
- * test/animate-facade-helpers.ts:9-31) — на пустой заглушке src/projection
- * каждый it падает СВОИМ ассертом класса «mixBox is not a function»,
- * а не link-ошибкой всего файла.
+ * Namespace-import + pick-хелперы (канон test/animate-facade-helpers.ts:9-31) —
+ * на заглушке src/projection каждый it падал бы СВОИМ ассертом класса
+ * «mixBox is not a function», а не link-ошибкой всего файла: RED for the
+ * right reason.
  *
  * Mutation proof:
  *   - Перепутать знак anchor-разности (B_A.pos − B_c.pos вместо B_c.pos − B_A.pos)

@@ -590,7 +590,7 @@ tree-shakeability). Пороги — регрессионные потолки, 
 `./projection` 5350, `./presets` 5600, `./compositor` 6450, `./animate` 10700.
 
 **CI на каждый PR**: typecheck → build → test → fuzz-гейт финитности
-(overflow/солвер/easing) → size → pack-smoke. **Еженедельно** (или вручную) —
+(overflow/солвер/easing/projection) → size → pack-smoke. **Еженедельно** (или вручную) —
 mutation-тестирование core-физики (Stryker; прогон падает при mutation score
 ниже break-порога 76).
 

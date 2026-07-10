@@ -5,9 +5,9 @@
  * §2.3.2, V0_CAP), §4 (interruption-матрица 4.1/4.3/4.6/4.8), §7.4.
  *
  * ── RED PROOF ────────────────────────────────────────────────────────────────
- * Написан до реализации: namespace-import + pick-хелпер (канон
- * test/animate-facade-helpers.ts:9-31) — на пустой заглушке src/projection
- * каждый it падает СВОИМ ассертом «createProjection is not a function».
+ * Namespace-import + pick-хелпер (канон test/animate-facade-helpers.ts:9-31) —
+ * на заглушке src/projection каждый it падал бы СВОИМ ассертом
+ * «createProjection is not a function»: RED for the right reason.
  *
  * Mutation proof:
  *   - v0' := 0 при перехвате (сброс скорости) → bite-test |v_after| >
@@ -17,10 +17,17 @@
  *   - Убрать clampMagnitude(V0_CAP) → пин release у p̂→1 (velocity === 1e4) красный.
  *   - Убрать generation-гард → stale-кадр старого полёта эмитит отрицательный tx
  *     после перехвата → «stale-кадры инертны» красный.
- *   - finish() эмитит последний p вместо ровно 1 → «точный identity» красный.
+ *   - settle() эмитит последний p вместо ровно 1 → «точный identity» красный.
  *   - onRest в cancel() → «cancel без onRest» красный.
  *   - clamp default true → пин «overshoot эмитится в кадры» красный.
  *   - Снап reduce через кадры rAF → «ноль rAF» красный.
+ *   - Убрать ребейз radii.first/opacity.from в release()/pickup → C⁰-пины
+ *     «первый кадр release: radius 12px, opacity 0.5» красные.
+ *   - Убрать мгновенный settle нулевого диапазона в release() → пин «release
+ *     после rest: один синхронный кадр, ноль rAF» красный (пружина прогналась бы).
+ *   - Не сбрасывать lastTs на кадре без ts (двойной счёт времени) → пин
+ *     «чередование ts/без-ts ≡ прогону на FIXED_DT» красный.
+ *   - seek() на девственном контроллере переводит playing → пин no-op красный.
  */
 
 import { describe, expect, it } from 'vitest';
@@ -143,8 +150,8 @@ describe('projection/driver: перехват (velocity continuity, §2.3.2 + §
     // Перехват на НОВУЮ цель; first опущен → visual pickup (аналитический V(p̂)).
     controls.play([{ id: 'a', last: { x: 300, y: 0, width: 100, height: 100 } }]);
     const mark = txs.length; // txs[mark−1] — синхронный кадр нового полёта
-    clock.step(dtMs); // кадр с elapsed'=0 (ts-база, паритет flip :261-268)
-    clock.step(dtMs); // кадр с elapsed'=dt — фактическое движение
+    clock.step(dtMs); // первый ts-кадр без базы → elapsed' = FIXED_DT (один шаг)
+    clock.step(dtMs); // кадр с elapsed' = FIXED_DT + dt
     const velAfter = (txs[mark + 1] - txs[mark]) / dtS;
 
     expect(Number.isFinite(velAfter)).toBe(true);
@@ -172,6 +179,9 @@ describe('projection/driver: перехват (velocity continuity, §2.3.2 + §
 
   it('differential: перехват с неизменными целями ≡ непрерванной траектории (точный C¹, теорема §2.3.2)', () => {
     const INTERCEPT_PUMP = 8;
+    // Шаг часов = FIXED_DT: первый ts-кадр каждого прогона (без базы) даёт ровно
+    // FIXED_DT — сетки прерванного и непрерванного полёта совпадают по узлам.
+    const STEP = 1000 / 60;
     const run = (intercept: boolean): number[] => {
       const clock = makeClock();
       const txs: number[] = [];
@@ -181,7 +191,7 @@ describe('projection/driver: перехват (velocity continuity, §2.3.2 + §
       });
       controls.play([{ id: 'a', first: F, last: L }]);
       for (let pump = 1; pump <= 30; pump++) {
-        clock.step(16);
+        clock.step(STEP);
         if (intercept && pump === INTERCEPT_PUMP) {
           controls.play([{ id: 'a', last: L }]); // те же цели, first опущен
         }
@@ -191,12 +201,13 @@ describe('projection/driver: перехват (velocity continuity, §2.3.2 + §
     const plain = run(false);
     const picked = run(true);
 
-    // Индексация: plain[k] — кадр с elapsed (k−1)·16мс (e0 — синхронный).
-    // Перехват на pump 8: picked[9] — синхронный кадр pickup (C⁰ ≡ plain[8]),
-    // picked[9+j] (j≥1) — кадр нового полёта с elapsed' (j−1)·16мс ≡ plain[j+7].
+    // Индексация: plain[k] — кадр с elapsed k·STEP (e0 — синхронный, первый
+    // ts-кадр без базы = FIXED_DT = STEP). Перехват на pump 8: picked[9] —
+    // синхронный кадр pickup (C⁰ ≡ plain[8]), picked[9+j] (j≥1) — кадр нового
+    // полёта с elapsed' j·STEP ≡ plain[j+8].
     expect(picked[9]).toBeCloseTo(plain[8], 9); // C⁰: pickup без скачка
     for (let j = 1; j <= 15; j++) {
-      expect(picked[9 + j], `кадр j=${j} после перехвата`).toBeCloseTo(plain[j + 7], 7);
+      expect(picked[9 + j], `кадр j=${j} после перехвата`).toBeCloseTo(plain[j + 8], 7);
     }
   });
 
@@ -361,6 +372,184 @@ describe('projection/driver: seek/release (§4.6)', () => {
     controls.seek(0.5);
     controls.release(); // default 0
     expect(controls.velocity).toBe(0);
+  });
+});
+
+describe('projection/driver: C⁰ radii/opacity при release/pickup (ребейз каналов)', () => {
+  const flat = (v: number): BoxRadiiLike => [
+    { x: v, y: v },
+    { x: v, y: v },
+    { x: v, y: v },
+    { x: v, y: v },
+  ];
+  const RADII_0 = flat(0);
+  const RADII_24 = flat(24);
+  // Размер не меняется → кумулятивный k ≡ 1: коррекция радиуса нейтральна,
+  // пин читает чистый лерп канала.
+  const L_SAME: RectLike = { x: 200, y: 0, width: 100, height: 100 };
+  const NODE = {
+    id: 'a',
+    first: F,
+    last: L_SAME,
+    radii: { first: RADII_0, last: RADII_24 },
+    opacity: { from: 0, to: 1 },
+  };
+
+  interface Emitted {
+    r0x: number | undefined;
+    r0y: number | undefined;
+    opacity: number | undefined;
+  }
+  const collect = (clock: ReturnType<typeof makeClock>): {
+    emitted: Emitted[];
+    controls: ReturnType<typeof createProjection>;
+  } => {
+    const emitted: Emitted[] = [];
+    const controls = createProjection({
+      requestFrame: clock.requestFrame,
+      onFrame: (fr: readonly ProjectionFrameLike[]) =>
+        emitted.push({ r0x: fr[0].radii?.[0].x, r0y: fr[0].radii?.[0].y, opacity: fr[0].opacity }),
+    });
+    return { emitted, controls };
+  };
+
+  it('seek(0.5) при radii {0→24} / opacity {0→1} → release: первый кадр эмитит radius 12px и opacity 0.5 (не 0)', () => {
+    const clock = makeClock();
+    const { emitted, controls } = collect(clock);
+    controls.play([NODE]);
+    controls.seek(0.5);
+    const mark = emitted.length;
+    controls.release(0);
+    // Первый кадр release — синхронный (p=0 нового прогона): каналы ребейзнуты
+    // на p_seek, НЕ отброшены к исходному first (мутация «без ребейза» → 0px/0).
+    expect(emitted.length).toBe(mark + 1);
+    expect(emitted[mark].r0x).toBe(12);
+    expect(emitted[mark].r0y).toBe(12);
+    expect(emitted[mark].opacity).toBe(0.5);
+    // Цели не тронуты ребейзом: доезд ровно к last/to.
+    clock.drain(16);
+    expect(emitted[emitted.length - 1].r0x).toBe(24);
+    expect(emitted[emitted.length - 1].opacity).toBe(1);
+  });
+
+  it('mid-flight pickup (first опущен): radii/opacity стартуют с визуальных V(p̂), переданные .first/.from живого узла игнорируются', () => {
+    const clock = makeClock();
+    const { emitted, controls } = collect(clock);
+    controls.play([NODE]);
+    controls.seek(0.5);
+    const mark = emitted.length;
+    // Перехват: dom-адаптер шлёт «сырые» first-каналы — драйвер обязан заменить
+    // их аналитикой предыдущего полёта (C⁰ radii/opacity, спека §2.3.2).
+    controls.play([
+      {
+        id: 'a',
+        last: { x: 400, y: 0, width: 100, height: 100 },
+        radii: { first: RADII_0, last: RADII_24 },
+        opacity: { from: 0, to: 1 },
+      },
+    ]);
+    expect(emitted.length).toBe(mark + 1); // синхронный кадр нового полёта
+    expect(emitted[mark].r0x).toBe(12); // lerp(0, 24, p̂=0.5), не 0
+    expect(emitted[mark].opacity).toBe(0.5); // lerp(0, 1, p̂=0.5), не 0
+  });
+});
+
+describe('projection/driver: release в/у покоя — без фантомного полёта и дубля onRest', () => {
+  it('release после естественного rest — no-op (phase rest: жеста нет, глушить нечего)', () => {
+    const clock = makeClock();
+    let rests = 0;
+    const frames: ReturnType<typeof snap>[] = [];
+    const controls = createProjection({
+      requestFrame: clock.requestFrame,
+      onFrame: (fr: readonly ProjectionFrameLike[]) => frames.push(snap(fr[0])),
+      onRest: () => rests++,
+    });
+    controls.play([{ id: 'a', first: F, last: L }]);
+    clock.drain(16);
+    expect(rests).toBe(1); // естественный rest
+
+    const rafBefore = clock.rafCalls();
+    const before = frames.length;
+    controls.release(5);
+    // Контракт phase-машины: release валиден только для удержанного/живого
+    // полёта; в покое — no-op (ни эмитов, ни дубля onRest, ни velocity=V0_CAP).
+    expect(frames.length).toBe(before);
+    expect(rests).toBe(1);
+    expect(controls.playing).toBe(false);
+    expect(controls.velocity).toBe(0);
+    expect(controls.progress).toBe(1);
+    expect(clock.rafCalls()).toBe(rafBefore); // ноль rAF
+  });
+
+  it('seek(1) → release — мгновенный settle: один кадр-identity, один onRest, ноль rAF', () => {
+    const clock = makeClock();
+    let rests = 0;
+    const frames: ReturnType<typeof snap>[] = [];
+    const controls = createProjection({
+      requestFrame: clock.requestFrame,
+      onFrame: (fr: readonly ProjectionFrameLike[]) => frames.push(snap(fr[0])),
+      onRest: () => rests++,
+    });
+    controls.play([{ id: 'a', first: F, last: L }]);
+    clock.step(16);
+    controls.seek(1); // жест довёл ровно до цели и держит
+    const rafBefore = clock.rafCalls();
+    const before = frames.length;
+    controls.release(5);
+    // remaining = 0: нормализовать скорость не к чему — settle без пружинного
+    // прогона (мутация «убрать settle» → фантомный полёт с v0=V0_CAP).
+    expect(frames.length).toBe(before + 1);
+    expect(frames[frames.length - 1].tx).toBe(0);
+    expect(frames[frames.length - 1].sx).toBe(1);
+    expect(rests).toBe(1);
+    expect(controls.playing).toBe(false);
+    expect(controls.velocity).toBe(0);
+    expect(clock.rafCalls()).toBe(rafBefore); // ноль rAF
+    clock.step(16);
+    expect(frames.length).toBe(before + 1); // ничего не запланировано
+    expect(rests).toBe(1);
+  });
+});
+
+describe('projection/driver: стык кадров с ts и без — без двойного счёта времени', () => {
+  it('чередование ts/без-ts ≡ прогону целиком на FIXED_DT (каждый кадр — ровно один шаг)', () => {
+    const run = (alternate: boolean): number[] => {
+      let queue: Array<(ts?: number) => void> = [];
+      const txs: number[] = [];
+      const controls = createProjection({
+        requestFrame: (cb: (ts?: number) => void): number => {
+          queue.push(cb);
+          return queue.length;
+        },
+        onFrame: (fr: readonly ProjectionFrameLike[]) => txs.push(fr[0].tx),
+      });
+      controls.play([{ id: 'a', first: F, last: L }]);
+      let now = 0;
+      for (let i = 0; i < 40 && queue.length > 0; i++) {
+        const batch = queue;
+        queue = [];
+        now += 16;
+        // Кадр без ts сбрасывает ts-базу → следующий ts-кадр тоже шагает на
+        // FIXED_DT (без сброса он посчитал бы весь интервал, уже покрытый
+        // FIXED_DT-шагом, — двойной счёт, эталонная сумма разъехалась бы).
+        for (const cb of batch) cb(alternate && i % 2 === 0 ? now : undefined);
+      }
+      return txs;
+    };
+    expect(run(true)).toEqual(run(false)); // бит-в-бит: время не удваивается
+  });
+});
+
+describe('projection/driver: seek на покоящемся контроллере без полёта — no-op (§4.2 контракт)', () => {
+  it('play не звался: seek не эмитит, playing/progress/velocity не тронуты', () => {
+    let framesSeen = 0;
+    const controls = createProjection({ onFrame: () => framesSeen++ });
+    expect(() => controls.seek(0.5)).not.toThrow();
+    expect(framesSeen).toBe(0); // нечего скрабить — ноль эмитов
+    expect(controls.playing).toBe(false); // жест НЕ удерживает несуществующий полёт
+    expect(controls.progress).toBe(1);
+    expect(controls.velocity).toBe(0);
+    expect(controls.boxAt('a')).toBeUndefined();
   });
 });
 

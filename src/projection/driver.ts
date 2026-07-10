@@ -19,6 +19,11 @@
  * НЕ хранятся — восстанавливаются замкнутой формой (принцип readCompositorSpring,
  * src/compositor/index.ts:369: «состояние никогда не читается из DOM»).
  *   C⁰: first' = mixBox(first, last, p̂) — аналитический visual box, ноль DOM.
+ *       Каналы radii/opacity ребейзятся той же формой: radii.first' =
+ *       lerp(prev first, prev last, clamp01(p̂)) пер-угла/пер-оси, opacity.from' =
+ *       lerp(prev from, prev to, clamp01(p̂)) — визуальный радиус/прозрачность
+ *       СЕЙЧАС; переданные цели (.last/.to) не трогаются. Prev без radii/opacity →
+ *       переданные берутся как есть.
  *   C¹: v0'·R'_c = v̂·R_c ⇒ доминантный канал c* = argmax |R'_c| по ВСЕМ
  *       продолжающимся узлам × каналам; v0' = v̂·R_{c*}/R'_{c*} (|R'| ≤ ε → 0),
  *       потолок V0_CAP (при p̂→1 знаменатель (1−p̂) мал — без капа нефизичный рывок).
@@ -27,13 +32,24 @@
  *   отдельной ветки в коде нет. При изменённых целях — точный C¹ доминантного,
  *   C⁰ + пропорциональная скорость у остальных (честность WAAPI-групп).
  *
- * Паттерны-копии (НЕ импорты — импорт утянул бы чужой граф при splitting:false):
- * dominantV0 (src/animate/waapi-unit.ts:309-318), normalizeV0/RANGE_EPSILON
- * (src/animate/channels.ts:174-182), generation-инвалидация / handle=0-фоллбек /
- * FIXED_DT / REST / MAX_FRAMES / синхронный первый кадр / финал ровно identity
- * (src/flip/index.ts:217-293), prefersReducedMotion (flip :192-199).
+ * release() после ребейза с НУЛЕВЫМ диапазоном всех каналов всех узлов
+ * (|R'| ≤ RANGE_EPSILON, включая radii/opacity) — немедленный settle: один
+ * синхронный эмит p=1 + onRest, ноль кадров rAF (двигать нечего — пружинный
+ * прогон был бы 2000 пустых кадров).
  *
- * P3 детерминизм: время только из ts кадра либо FIXED_DT. P4 reduce =
+ * Паттерны-копии: dominantV0 (src/animate/waapi-unit.ts:309-318),
+ * normalizeV0/RANGE_EPSILON (channels.ts:174-182) — приватны в своих модулях;
+ * generation-инвалидация / handle=0-фоллбек / REST / синхронный первый кадр /
+ * финал ровно identity (src/flip/index.ts:217-293), prefersReducedMotion
+ * (flip :192-199). FIXED_DT_S/MAX_FRAMES — локальные копии по канону «субпути
+ * держат СВОИ бюджеты» (докблок src/internal/constants.ts, прецедент
+ * FLIP_-копий src/flip/index.ts:186-188): общая константа склеила бы
+ * независимые тюнинг-решения.
+ *
+ * P3 детерминизм: время только из ts кадра либо FIXED_DT; каждый кадр
+ * продвигает elapsed ровно на один шаг: ts при известной базе → (ts−lastTs),
+ * иначе (без ts ЛИБО без базы) → FIXED_DT; кадр без ts сбрасывает базу
+ * (lastTs = undefined) — стык кадров с ts и без не удваивает время. P4 reduce =
  * character-switch: один синхронный эмит identity (p=1) + onRest, ноль кадров rAF.
  */
 
@@ -47,6 +63,7 @@ import {
   createProjector,
   finite,
   mixBox,
+  type BoxRadii,
   type ProjectionFrame,
   type ProjectionNodeInit,
   type Projector,
@@ -84,7 +101,9 @@ export interface ProjectionControls {
    *  Повторный play может подхватить его с нулевой скоростью. Идемпотентен. */
   cancel(): void;
   /** Скраб (жест ведёт): гасит пружину (generation++), синхронно эмитит кадры на p
-   *  (сырой p при clamp:false; размеры флорятся). Валиден и после rest. */
+   *  (сырой p при clamp:false; размеры флорятся). Валиден и после rest. Скраб
+   *  ДЕРЖИТ полёт (playing = true) — жест обязан завершиться release()/cancel().
+   *  На покоящемся контроллере без полёта вовсе — no-op (playing не трогается). */
   seek(p: number): void;
   /** Продолжить пружиной из текущего p с начальной скоростью (progress/s; NaN→0, default 0). */
   release(velocity?: number): void;
@@ -116,6 +135,75 @@ function clampMagnitude(x: number, cap: number): number {
   return x > cap ? cap : x < -cap ? -cap : x;
 }
 
+/** Конечный lerp со схлопом −0 (P1) — ребейз radii/opacity при pickup/release. */
+function lerp1(a: number, b: number, t: number): number {
+  return finite(finite(a) + (finite(b) - finite(a)) * t) + 0;
+}
+
+/** Аналитические радиусы на клампленном t: визуальный радиус СЕЙЧАС = lerp(rF, rL, t). */
+function lerpRadii(a: BoxRadii, b: BoxRadii, t: number): BoxRadii {
+  return [
+    { x: lerp1(a[0].x, b[0].x, t), y: lerp1(a[0].y, b[0].y, t) },
+    { x: lerp1(a[1].x, b[1].x, t), y: lerp1(a[1].y, b[1].y, t) },
+    { x: lerp1(a[2].x, b[2].x, t), y: lerp1(a[2].y, b[2].y, t) },
+    { x: lerp1(a[3].x, b[3].x, t), y: lerp1(a[3].y, b[3].y, t) },
+  ];
+}
+
+/**
+ * Ребейз узла на p̂ по данным prev-узла: first' = V(p̂), radii.first'/opacity.from'
+ * — тем же lerp'ом (C⁰ всех каналов); цели (.last/.to) не трогаются.
+ * Prev без radii/opacity → переданные каналы берутся как есть.
+ */
+function pickupNode(
+  id: string,
+  n: Omit<ProjectionPlayNode, 'id'>,
+  prev: ProjectionNodeInit,
+  pHat: number,
+): ProjectionNodeInit {
+  const tc = clamp01(pHat);
+  return {
+    id,
+    parent: n.parent,
+    first: mixBox(prev.first, prev.last, pHat),
+    last: n.last,
+    anchor: n.anchor,
+    radii:
+      n.radii !== undefined && prev.radii !== undefined
+        ? { first: lerpRadii(prev.radii.first, prev.radii.last, tc), last: n.radii.last }
+        : n.radii,
+    opacity:
+      n.opacity !== undefined && prev.opacity !== undefined
+        ? { from: lerp1(prev.opacity.from, prev.opacity.to, tc), to: n.opacity.to }
+        : n.opacity,
+  };
+}
+
+/** true, если хоть один канал узла (бокс, radii, opacity) имеет живой диапазон. */
+function hasLiveRange(n: ProjectionNodeInit): boolean {
+  if (
+    Math.abs(n.last.x - n.first.x) > RANGE_EPSILON ||
+    Math.abs(n.last.y - n.first.y) > RANGE_EPSILON ||
+    Math.abs(n.last.width - n.first.width) > RANGE_EPSILON ||
+    Math.abs(n.last.height - n.first.height) > RANGE_EPSILON
+  ) {
+    return true;
+  }
+  const r = n.radii;
+  if (r !== undefined) {
+    for (let c = 0; c < 4; c++) {
+      if (
+        Math.abs(r.last[c].x - r.first[c].x) > RANGE_EPSILON ||
+        Math.abs(r.last[c].y - r.first[c].y) > RANGE_EPSILON
+      ) {
+        return true;
+      }
+    }
+  }
+  const o = n.opacity;
+  return o !== undefined && Math.abs(o.to - o.from) > RANGE_EPSILON;
+}
+
 /** Локальная копия паттерна flip :192-199 (duck-typed matchMedia). */
 function prefersReducedMotion(
   matchMedia: ((q: string) => { matches: boolean }) | undefined,
@@ -131,7 +219,7 @@ function prefersReducedMotion(
 // ─── Драйвер ─────────────────────────────────────────────────────────────────
 
 interface Flight {
-  readonly nodes: readonly ProjectionNodeInit[];
+  /** Узлы полёта; Map сохраняет порядок вставки (= порядок resolved-входа). */
   readonly byId: ReadonlyMap<string, ProjectionNodeInit>;
   readonly projector: Projector;
   /** Character-switch зафиксирован на play (§4.4: смена reduce в полёте не подхватывается). */
@@ -185,6 +273,24 @@ export function createProjection(options?: ProjectionOptions): ProjectionControl
     }
   };
 
+  /**
+   * Единый снап в покой (reduce/пустое дерево на play, сходимость полёта,
+   * мгновенный release без живого диапазона, отсутствие requestFrame):
+   * порядок «эмит → onRest» жёсткий, generation++ глушит stale-кадры.
+   * Финальный onFrame может синхронно запустить/отменить новый run —
+   * тогда старый onRest stale (гард по gen/phase).
+   */
+  const settle = (projector: Projector): void => {
+    generation++;
+    const gen = generation;
+    phase = 'rest';
+    pHat = 1;
+    vHat = 0;
+    progress = 1;
+    emit(projector, 1); // финал — РОВНО p = 1 (точный identity)
+    if (gen === generation && phase === 'rest') onRest?.();
+  };
+
   const startRun = (projector: Projector, v0: number): void => {
     generation++;
     const gen = generation;
@@ -196,21 +302,10 @@ export function createProjection(options?: ProjectionOptions): ProjectionControl
     let lastTs: number | undefined;
     let frames = 0;
 
-    const finish = (): void => {
-      if (gen !== generation || phase !== 'active') return;
-      phase = 'rest';
-      pHat = 1;
-      vHat = 0;
-      progress = 1;
-      emit(projector, 1); // финал — РОВНО p = 1 (точный identity)
-      // Финальный onFrame может синхронно запустить/отменить новый run: старый onRest stale.
-      if (gen === generation && phase === 'rest') onRest?.();
-    };
-
     const schedule = (cb: (ts?: number) => void): void => {
       if (requestFrame === undefined) {
         // Без шва и без rAF полёт невозможен честно — identity сразу (канон flip :251-256).
-        finish();
+        settle(projector);
         return;
       }
       const handle = requestFrame(cb);
@@ -219,11 +314,16 @@ export function createProjection(options?: ProjectionOptions): ProjectionControl
 
     const tick = (ts?: number): void => {
       if (gen !== generation || phase !== 'active') return; // stale/отменён/удержан
+      // Каждый кадр — ровно один шаг времени: (ts−lastTs) при известной базе,
+      // FIXED_DT без ts ЛИБО без базы. Кадр без ts сбрасывает базу — стык
+      // ts/без-ts не удваивает elapsed (без сброса следующий ts-кадр посчитал
+      // бы весь интервал, уже покрытый FIXED_DT).
       if (typeof ts === 'number' && Number.isFinite(ts)) {
-        elapsed = lastTs === undefined ? elapsed : elapsed + Math.max(0, (ts - lastTs) / 1000);
+        elapsed += lastTs === undefined ? FIXED_DT_S : Math.max(0, (ts - lastTs) / 1000);
         lastTs = ts;
       } else {
         elapsed += FIXED_DT_S;
+        lastTs = undefined;
       }
       frames++;
 
@@ -235,7 +335,7 @@ export function createProjection(options?: ProjectionOptions): ProjectionControl
       const converged =
         (Math.abs(1 - value) < REST && Math.abs(velocity) < REST) || frames >= MAX_FRAMES;
       if (converged) {
-        finish();
+        settle(projector);
         return;
       }
       const p = bounded ? clamp01(value) : value;
@@ -259,22 +359,22 @@ export function createProjection(options?: ProjectionOptions): ProjectionControl
       const pPrev = pHat;
       const vPrev = vHat;
 
-      // C⁰: visual pickup — first' = V(p̂) аналитически (ноль DOM-чтений).
+      // C⁰ всех каналов: visual pickup — first' = V(p̂) аналитически (ноль
+      // DOM-чтений), radii.first'/opacity.from' — тем же lerp'ом на clamp01(p̂).
       const resolved: ProjectionNodeInit[] = nodes.map((n) => {
-        let first = n.first;
-        if (first === undefined) {
+        if (n.first === undefined) {
           const old = prevById?.get(n.id);
           if (old === undefined) {
             throw new MotionParamError(
               `projection.play: node "${n.id}" has no "first" and no active flight to pick up from`,
             );
           }
-          first = mixBox(old.first, old.last, pPrev);
+          return pickupNode(n.id, n, old, pPrev);
         }
         return {
           id: n.id,
           parent: n.parent,
-          first,
+          first: n.first,
           last: n.last,
           anchor: n.anchor,
           radii: n.radii,
@@ -316,18 +416,12 @@ export function createProjection(options?: ProjectionOptions): ProjectionControl
 
       const byId = new Map<string, ProjectionNodeInit>();
       for (const node of resolved) byId.set(node.id, node);
-      flight = { nodes: resolved, byId, projector, reduced };
+      flight = { byId, projector, reduced };
 
       if (reduced || resolved.length === 0) {
-        // Reduce и пустое дерево не требуют автономного кадра: один точный финал.
-        generation++;
-        const gen = generation;
-        phase = 'rest';
-        pHat = 1;
-        vHat = 0;
-        progress = 1;
-        emit(projector, 1);
-        if (gen === generation && phase === 'rest') onRest?.();
+        // P4 character-switch и пустое дерево не требуют автономного кадра:
+        // один синхронный точный финал, ноль кадров rAF.
+        settle(projector);
         return;
       }
 
@@ -341,6 +435,12 @@ export function createProjection(options?: ProjectionOptions): ProjectionControl
       vHat = 0;
     },
 
+    /**
+     * Скраб: жест ВЕДЁТ полёт и обязан его завершить — release()/cancel().
+     * playing остаётся true (нужно boxAt/visual pickup, §4.2): полёт удержан
+     * жестом, а не брошен. На покоящемся контроллере БЕЗ полёта вовсе
+     * (byId пуст — play не звался) — no-op без перевода playing: скрабить нечего.
+     */
     seek(p: number): void {
       if (flight === null) return;
       generation++; // пружина погашена
@@ -361,39 +461,45 @@ export function createProjection(options?: ProjectionOptions): ProjectionControl
       // В точной цели диапазон ребейза нулевой: нормализовать физическую скорость не к чему.
       // Новый run ничего не может визуально сдвинуть, поэтому честный результат — rest сейчас.
       if (Math.abs(remaining) <= RANGE_EPSILON) {
-        generation++;
-        const gen = generation;
-        phase = 'rest';
-        pHat = 1;
-        vHat = 0;
-        progress = 1;
-        emit(flight.projector, 1);
-        if (gen === generation && phase === 'rest') onRest?.();
+        settle(flight.projector);
         return;
       }
 
-      // Ребейз как перехват: first' = V(p_seek) для всех узлов (цели не менялись —
-      // теорема §2.3.2 даёт точный C¹ всех каналов при v0 = v/(1−p_seek)).
-      const rebased: ProjectionNodeInit[] = flight.nodes.map((n) => ({
-        ...n,
-        first: mixBox(n.first, n.last, p0),
-      }));
+      const tc = clamp01(p0);
+      // Ребейз как перехват: first' = V(p_seek), radii.first'/opacity.from' —
+      // тем же lerp'ом (C⁰ всех каналов; цели не менялись — теорема §2.3.2
+      // даёт точный C¹ всех каналов при v0 = v/(1−p_seek)).
+      const rebased: ProjectionNodeInit[] = [];
+      for (const n of flight.byId.values()) {
+        rebased.push({
+          ...n,
+          first: mixBox(n.first, n.last, p0),
+          radii:
+            n.radii === undefined
+              ? undefined
+              : { first: lerpRadii(n.radii.first, n.radii.last, tc), last: n.radii.last },
+          opacity:
+            n.opacity === undefined
+              ? undefined
+              : { from: lerp1(n.opacity.from, n.opacity.to, tc), to: n.opacity.to },
+        });
+      }
       const projector = createProjector(rebased);
       const byId = new Map<string, ProjectionNodeInit>();
       for (const node of rebased) byId.set(node.id, node);
       const reduced = flight.reduced;
-      flight = { nodes: rebased, byId, projector, reduced };
+      flight = { byId, projector, reduced };
 
       if (reduced) {
         // Character-switch удержан: под reduce release снапает (без автономного полёта).
-        generation++;
-        const gen = generation;
-        phase = 'rest';
-        pHat = 1;
-        vHat = 0;
-        progress = 1;
-        emit(projector, 1);
-        if (gen === generation && phase === 'rest') onRest?.();
+        settle(projector);
+        return;
+      }
+
+      // Все каналы всех узлов после ребейза нулевые — двигать нечего:
+      // мгновенный settle, ноль rAF (фантомный полёт с v0=V0_CAP исключён).
+      if (!rebased.some(hasLiveRange)) {
+        settle(projector);
         return;
       }
 

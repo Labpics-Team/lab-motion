@@ -7,10 +7,10 @@
  * расширение — прецедентное решение спеки §7 «Новая фикстура»; seeded fuzz —
  * test/decay-finiteness-fuzz.test.ts; jsdom НЕ используется, node-env).
  *
- * RED-фаза (канон test/animate-facade-helpers.ts:9-31): типы публичной
- * поверхности — ЛОКАЛЬНЫЕ копии; тесты обращаются к модулю через
- * namespace-import + pick-хелперы, чтобы на пустой заглушке src/projection
- * каждый тест падал СВОИМ ассертом («… is not a function»), а не link-ошибкой.
+ * RED-канон (test/animate-facade-helpers.ts:9-31): типы публичной поверхности —
+ * ЛОКАЛЬНЫЕ копии; тесты обращаются к модулю через namespace-import +
+ * pick-хелперы — на заглушке src/projection каждый тест падал бы СВОИМ ассертом
+ * («… is not a function»), а не link-ошибкой: RED for the right reason.
  */
 
 // ─── Типы публичной поверхности (локальная копия для RED-фазы, спека §2.2) ───
@@ -355,14 +355,3 @@ export function parseTranslateScale(value: string): {
   return { tx: Number(m[1]), ty: Number(m[2]), sx: Number(m[3]), sy: Number(m[4]) };
 }
 
-/** true, если ни одна set-запись журнала не содержит NaN/Infinity (P1). */
-export function allWritesFinite(ops: readonly WorldOp[]): boolean {
-  for (const o of ops) {
-    if (o.kind !== 'set' || o.value === undefined) continue;
-    if (/NaN|Infinity/i.test(o.value)) return false;
-    for (const m of o.value.matchAll(/-?\d+(?:\.\d+)?(?:[eE][+-]?\d+)?/g)) {
-      if (!Number.isFinite(Number(m[0]))) return false;
-    }
-  }
-  return true;
-}

@@ -7,9 +7,9 @@
  * Файл добавляется в явный fuzz-список CI (ci.yml:39, шаг §8.6 спеки).
  *
  * ── RED PROOF ────────────────────────────────────────────────────────────────
- * Написан до реализации: namespace-import + pick-хелперы (канон
- * test/animate-facade-helpers.ts:9-31) — на заглушке src/projection каждый it
- * падает СВОИМ ассертом («createProjector is not a function»), не link-ошибкой.
+ * Namespace-import + pick-хелперы (канон test/animate-facade-helpers.ts:9-31) —
+ * на заглушке src/projection каждый it падал бы СВОИМ ассертом
+ * («createProjector is not a function»), не link-ошибкой: RED for the right reason.
  *
  * Mutation proof:
  *   - Убрать finite()-страж выхода кадра → NaN/±Inf в tx/sx при злых боксах →
