@@ -1,7 +1,7 @@
 name: Дефект
 description: Воспроизводимое нарушение действующего контракта
 title: "fix: "
-labels: ["bug"]
+labels: ["type:bug"]
 body:
   - type: markdown
     attributes:
