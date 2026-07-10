@@ -13,6 +13,10 @@ concurrency:
   group: release-${{ github.ref }}
   cancel-in-progress: false
 
+env:
+  COREPACK_ENABLE_DOWNLOAD_PROMPT: "0"
+  COREPACK_DEFAULT_TO_LATEST: "0"
+
 jobs:
   publish:
     if: github.repository == 'Labpics-Team/lab-motion'
@@ -51,7 +55,7 @@ jobs:
       - name: Activate pinned pnpm
         run: |
           corepack enable
-          corepack prepare pnpm@10.34.4 --activate
+          corepack install --global pnpm@10.34.4
 
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
@@ -80,6 +84,8 @@ jobs:
       - name: Pack smoke
         run: pnpm pack:smoke
 
+      # Все publish-гейты уже выполнены выше. ignore-scripts предотвращает их
+      # повторный запуск внутри npm lifecycle и не ослабляет проверенный артефакт.
       - name: Publish through npm trusted publishing
         run: npm publish --access public --ignore-scripts
 
