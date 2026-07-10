@@ -1,70 +1,33 @@
 import { describe, expect, it } from 'vitest';
-import { spring } from '../src/index.js';
+import { MotionParamError, spring } from '../src/index.js';
 
 /**
- * Test: solver finiteness property fuzz
- * Class: property
- * Invariant 2 — CSS-safe output: no path ever returns NaN/Infinity/-Infinity.
+ * Property-тест закона CSS-safety: валидный аналитический прогон не возвращает
+ * NaN или бесконечность. Seed фиксирован, поэтому любой сбой воспроизводим.
  *
- * Strategy: seeded LCG (linear congruential generator) — deterministic, zero deps,
- * fully reproducible without any external property-testing library.
- * 500 draws over the valid (mass, stiffness, damping, t) space, including edges.
- *
- * RED proof:
- *   `spring` is not exported from the placeholder (it is `undefined`). The test
- *   first asserts `typeof spring === 'function'` before the loop, which fails with:
- *   "expected 'undefined' to be 'function'" — RED for the right reason (behavior
- *   missing, not a compile error or test logic error).
- *
- *   Note: a naive fuzz loop that catches all errors would PASS on the placeholder
- *   (swallowing "spring is not a function" → no failures recorded → green). That
- *   is test theater and is explicitly rejected here. The function-type guard at the
- *   top of the test proves the engine is present before the fuzz loop runs.
- *
- * Mutation proof (for when implemented):
- *   Break the solver by returning `{ value: NaN, velocity: 0 }` for any input.
- *   The Number.isFinite(result.value) assertion fails on the very first sample.
- *   Or break by returning Infinity when damping approaches 0 — the boundary
- *   samples in the LCG sequence will trigger it.
- *   Only `MotionParamError` may be thrown for truly degenerate params (e.g.
- *   mass exactly 0); any other exception is a bug (assertion re-throws it).
+ * MotionParamError допустим только на входах вне безопасного settle-домена.
+ * Любое другое исключение является дефектом реализации и не проглатывается.
  */
 
-/** Park-Miller LCG — seeded, reproducible, zero dependencies. */
+/** Park–Miller LCG: детерминированный источник без runtime-зависимостей. */
 function lcg(seed: number): () => number {
-  let s = seed;
+  let state = seed;
   return () => {
-    s = (Math.imul(48271, s) + 0) & 0x7fffffff;
-    return s / 0x7fffffff; // [0, 1)
+    state = Math.imul(48271, state) & 0x7fffffff;
+    return state / 0x7fffffff;
   };
 }
 
-/** Map a uniform [0,1) value to the range [min, max]. */
-function range(u: number, min: number, max: number): number {
-  return min + u * (max - min);
+function range(unit: number, min: number, max: number): number {
+  return min + unit * (max - min);
 }
 
-describe('solver finiteness property fuzz (invariant 2)', () => {
-  it('spring is callable — prerequisite guard (RED if engine absent)', () => {
-    // This assertion is the RED hook for the placeholder:
-    // src/index.ts does not export `spring`, so it is `undefined`.
-    // If this fails, the fuzz loop below would silently pass (theater) — so we
-    // explicitly break here instead.
-    expect(typeof spring).toBe('function');
-  });
-
-  it('produces finite value and velocity for >=500 seeded samples over the valid domain', () => {
-    const rand = lcg(0xdeadbeef);
-    const SAMPLES = 500;
-
-    // Domain bounds:
-    //   mass:      (0, 100] — positive, bounded above
-    //   stiffness: (0, 2000] — positive, bounded above
-    //   damping:   [0, 200] — zero is undamped (valid, oscillatory)
-    //   t:         [0, 1] — normalized simulation time
-
-    // Edge values injected at fixed positions to guarantee boundary coverage:
-    const EDGES: Array<{ mass: number; stiffness: number; damping: number; t: number }> = [
+describe('solver finiteness property fuzz', () => {
+  it('produces finite value and velocity over 10 000 seeded samples', () => {
+    const seed = 0xdeadbeef;
+    const rand = lcg(seed);
+    const samples = 10_000;
+    const edges: Array<{ mass: number; stiffness: number; damping: number; t: number }> = [
       { mass: 1e-9, stiffness: 1e-9, damping: 0, t: 0 },
       { mass: 100, stiffness: 2000, damping: 200, t: 1 },
       { mass: 1, stiffness: 1, damping: 0, t: 0.5 },
@@ -73,12 +36,12 @@ describe('solver finiteness property fuzz (invariant 2)', () => {
     ];
 
     const failures: string[] = [];
+    let accepted = 0;
 
-    for (let i = 0; i < SAMPLES; i++) {
-      // Every ~100 samples inject an edge case instead of a random one.
+    for (let index = 0; index < samples; index++) {
       const sample =
-        i < EDGES.length
-          ? (EDGES[i] ?? { mass: 1, stiffness: 100, damping: 10, t: 0.5 })
+        index < edges.length
+          ? (edges[index] ?? { mass: 1, stiffness: 100, damping: 10, t: 0.5 })
           : {
               mass: range(rand(), 1e-9, 100),
               stiffness: range(rand(), 1e-9, 2000),
@@ -89,31 +52,28 @@ describe('solver finiteness property fuzz (invariant 2)', () => {
       let result: { value: number; velocity: number };
       try {
         result = spring(sample, sample.t);
-      } catch (err: unknown) {
-        // MotionParamError is allowed for truly degenerate params that the engine
-        // rejects (e.g. params near zero that exceed the safe domain). Re-throw
-        // anything that is NOT a MotionParamError — those are real bugs.
-        const isMotionParamError =
-          err instanceof Error && err.constructor.name === 'MotionParamError';
-        if (!isMotionParamError) {
-          throw err; // propagate unexpected errors — RED for the right reason
-        }
-        continue; // legitimate param rejection — skip this sample
+      } catch (error: unknown) {
+        if (error instanceof MotionParamError) continue;
+        throw error;
       }
 
+      accepted++;
       if (!Number.isFinite(result.value)) {
-        failures.push(`sample ${i}: value=${result.value} for params=${JSON.stringify(sample)}`);
+        failures.push(
+          `seed=${seed} sample=${index}: value=${result.value}, input=${JSON.stringify(sample)}`,
+        );
       }
       if (!Number.isFinite(result.velocity)) {
         failures.push(
-          `sample ${i}: velocity=${result.velocity} for params=${JSON.stringify(sample)}`,
+          `seed=${seed} sample=${index}: velocity=${result.velocity}, input=${JSON.stringify(sample)}`,
         );
       }
     }
 
+    expect(accepted, 'fuzz-домен не должен целиком отбрасываться валидатором').toBeGreaterThan(0);
     expect(
       failures,
-      `Non-finite outputs detected (CSS-safe invariant 2 violated):\n${failures.join('\n')}`,
+      `Найдены не-конечные выходы:\n${failures.join('\n')}`,
     ).toHaveLength(0);
   });
 });
