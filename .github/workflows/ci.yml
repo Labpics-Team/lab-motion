@@ -2,26 +2,44 @@ name: CI
 
 on:
   push:
-    branches: ["ch02-s1-motionvalue-headless-core", "main"]
+    branches: ["main"]
   pull_request:
     branches: ["main"]
+  merge_group:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
+  # push в main не отменяем: каждый merge-коммит обязан получить завершённый
+  # прогон (иначе красный промежуточный main живёт незамеченным, bisect ломается).
+  cancel-in-progress: ${{ github.ref != 'refs/heads/main' }}
+
+env:
+  COREPACK_ENABLE_DOWNLOAD_PROMPT: "0"
+  COREPACK_DEFAULT_TO_LATEST: "0"
 
 jobs:
-  ci:
-    name: typecheck · test · build
-    runs-on: [self-hosted, Linux, X64]
+  verify:
+    name: typecheck · build · test · fuzz · size · package
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
 
     steps:
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@v6
 
       - name: Setup Node
-        uses: actions/setup-node@v4
+        uses: actions/setup-node@v6
         with:
           node-version: "20"
 
-      - name: Setup pnpm
-        run: npm install -g pnpm@10
+      - name: Activate pinned pnpm
+        run: |
+          corepack enable
+          corepack install --global pnpm@10.34.4
 
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
@@ -32,14 +50,47 @@ jobs:
       - name: Build
         run: pnpm build
 
-      - name: Test
-        run: pnpm test
+      - name: Factual documentation drift
+        run: node scripts/check-docs-facts.mjs
 
-      - name: Fuzz · overflow finiteness gate (virtual-time, seeded LCG, zero-dep)
-        run: pnpm vitest run --reporter=verbose test/animate-overflow-finiteness-fuzz.test.ts test/solver-finiteness-fuzz.test.ts test/easing-finiteness-fuzz.test.ts test/projection-finiteness-fuzz.test.ts
+      - name: Structural documentation drift
+        run: node scripts/check-docs-drift.mjs
+
+      - name: Repository issue forms contract
+        run: node scripts/check-issue-forms.mjs
+
+      - name: Release contract smoke
+        shell: bash
+        run: |
+          version="$(node -p "require('./package.json').version")"
+          node scripts/check-release.mjs "v${version}"
+
+      - name: Vitest
+        id: vitest
+        shell: bash
+        run: |
+          set +e
+          pnpm vitest run 2>&1 | tee vitest.log
+          status=${PIPESTATUS[0]}
+          exit "$status"
+
+      - name: Upload Vitest diagnostics
+        if: steps.vitest.outcome == 'failure'
+        uses: actions/upload-artifact@v4
+        with:
+          name: vitest-diagnostics-${{ github.run_id }}
+          path: vitest.log
+          if-no-files-found: error
+          retention-days: 7
+
+      # Глоб вместо ручного списка: новый test/*-finiteness-fuzz.test.ts попадает в
+      # гейт автоматически (класс дрейфа «забытый файл в трёх копиях списка» закрыт;
+      # находка ревью #101 — потеря projection-fuzz при наивном разрешении конфликта).
+      - name: Fuzz · finiteness gate (virtual-time, seeded LCG, zero-dep)
+        run: pnpm vitest run --reporter=verbose test/*finiteness-fuzz.test.ts
 
       - name: Size gate
         run: pnpm size
 
-      - name: Pack smoke (артефакт потребителя — exports/files из тарбола)
+      - name: Pack smoke
         run: pnpm pack:smoke

@@ -1,40 +1,69 @@
-name: Mutation (scheduled)
+name: Mutation
 
-# Mutation-тестирование ДОРОГОЕ → по расписанию (еженедельно) + вручную,
-# НЕ на каждый PR. Валидирует силу сьюта на core-физике; break-порог в
-# stryker.config.mjs валит прогон при эрозии mutation score.
 on:
   schedule:
-    - cron: "0 3 * * 1" # понедельник 03:00 UTC
-  workflow_dispatch: {}
+    - cron: "17 3 * * 1"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  issues: write # эскалация провала ночного прогона (см. шаг ниже)
+
+concurrency:
+  group: mutation-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  COREPACK_ENABLE_DOWNLOAD_PROMPT: "0"
+  COREPACK_DEFAULT_TO_LATEST: "0"
 
 jobs:
-  mutation:
-    name: stryker · core physics
-    runs-on: [self-hosted, Linux, X64]
+  core:
+    name: critical numerical core
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
 
     steps:
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@v6
 
       - name: Setup Node
-        uses: actions/setup-node@v4
+        uses: actions/setup-node@v6
         with:
           node-version: "20"
 
-      - name: Setup pnpm
-        run: npm install -g pnpm@10
+      - name: Activate pinned pnpm
+        run: |
+          corepack enable
+          corepack install --global pnpm@10.34.4
 
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
 
-      - name: Mutation test (core)
+      - name: Build
+        run: pnpm build
+
+      - name: Mutation gate
         run: pnpm mutation
 
-      - name: Upload HTML report
+      # Провал schedule-прогона без эскалации живёт неделями незамеченным
+      # (находка ревью #101): открываем/дополняем issue от имени workflow.
+      - name: Escalate scheduled failure
+        if: failure() && github.event_name == 'schedule'
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          title="mutation: ночной прогон красный ($(date -u +%F))"
+          gh issue create --repo "$GITHUB_REPOSITORY" --title "$title" \
+            --label "type:hardening,priority:P1" \
+            --body "Scheduled mutation-прогон упал: $GITHUB_SERVER_URL/$GITHUB_REPOSITORY/actions/runs/$GITHUB_RUN_ID — разобрать до эрозии mutation-силы ядра." \
+            || echo "::warning::не удалось создать issue — проверьте права"
+
+      - name: Upload mutation report
         if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: mutation-report
+          name: mutation-report-${{ github.run_id }}
           path: reports/mutation/
-          retention-days: 30
+          if-no-files-found: ignore
+          retention-days: 14

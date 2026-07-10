@@ -1,0 +1,26 @@
+name: Документация
+description: Ошибка, пробел или дрейф в README, docs/ или примерах
+title: "docs: "
+labels: ["type:docs"]
+body:
+  - type: textarea
+    id: fact
+    attributes:
+      label: Что расходится с фактом
+      description: Файл/строка документации и фактическое состояние кода или поставки.
+    validations:
+      required: true
+  - type: textarea
+    id: expected
+    attributes:
+      label: Как должно быть
+      description: Правильное содержание и его источник правды (код, гейт, измерение).
+    validations:
+      required: true
+  - type: textarea
+    id: gate
+    attributes:
+      label: Гейт от повторения
+      description: Может ли drift-гейт (docs-drift/docs-facts) ловить этот класс? Если да — какой пин добавить.
+    validations:
+      required: false

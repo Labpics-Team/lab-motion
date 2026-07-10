@@ -19,13 +19,15 @@ DOM — рендер делает ваш колбэк, время приходи
 
 ## Установка
 
-Пакет пока не опубликован в npm (публикация — отдельное решение). До этого —
-установка из тарбола (git-install не поддержан: `dist/` собирается, в гите его нет):
+Пакет опубликован в npm:
 
 ```bash
-cd lab-motion && pnpm build && pnpm pack   # → labpics-motion-<версия>.tgz
-cd ваш-проект && pnpm add /путь/к/labpics-motion-<версия>.tgz
+pnpm add @labpics/motion
 ```
+
+Для разработки из исходников используйте тарбол: `pnpm build && pnpm pack`, затем
+`pnpm add /путь/к/labpics-motion-<версия>.tgz`. Git-установка не поддерживается:
+`dist/` собирается и не хранится в репозитории.
 
 Требования: Node ≥ 18. Runtime-зависимостей нет; фреймворк для биндинга — optional
 peer, ставится у потребителя (peer объявлены для 8 фреймворков; `./wc` не требует
@@ -587,7 +589,7 @@ pnpm bench      # ns/операцию горячих путей против dis
 сценарный import-cost (esbuild bundle+minify против dist — ловит регрессию
 tree-shakeability). Пороги — регрессионные потолки, не цели: ядро 2220 байт gz,
 любой прочий субпуть 4608, точечные — `./utils` 1400, `./tokens` 1650,
-`./projection` 5350, `./presets` 5600, `./compositor` 6450, `./animate` 10700.
+`./projection` 5750, `./presets` 5600, `./compositor` 6450, `./animate` 10700.
 
 **CI на каждый PR**: typecheck → build → test → fuzz-гейт финитности
 (overflow/солвер/easing/projection) → size → pack-smoke. **Еженедельно** (или вручную) —

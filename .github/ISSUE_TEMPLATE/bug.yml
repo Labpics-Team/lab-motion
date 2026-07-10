@@ -1,0 +1,69 @@
+name: Дефект
+description: Воспроизводимое нарушение действующего контракта
+title: "fix: "
+labels: ["type:bug"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Не публикуйте уязвимости безопасности здесь. Используйте GitHub Security Advisories.
+  - type: input
+    id: version
+    attributes:
+      label: Версия или commit
+      placeholder: "@labpics/motion@0.1.0 или SHA"
+    validations:
+      required: true
+  - type: textarea
+    id: result
+    attributes:
+      label: Наблюдаемое поведение
+      description: Что происходит и почему это нарушает контракт?
+    validations:
+      required: true
+  - type: textarea
+    id: reproduction
+    attributes:
+      label: Минимальное воспроизведение
+      description: Код, репозиторий или точная последовательность действий.
+    validations:
+      required: true
+  - type: textarea
+    id: expected
+    attributes:
+      label: Ожидаемое поведение
+    validations:
+      required: true
+  - type: textarea
+    id: environment
+    attributes:
+      label: Среда
+      description: Runtime, браузер, framework binding, bundler и режим SSR/client.
+    validations:
+      required: true
+  - type: dropdown
+    id: impact
+    attributes:
+      label: Воздействие
+      options:
+        - Блокирует использование
+        - Нарушает корректность
+        - Утечка ресурсов или lifecycle
+        - Регрессия производительности
+        - Документация или типы
+    validations:
+      required: true
+  - type: textarea
+    id: invariant
+    attributes:
+      label: Затронутый инвариант
+      description: Финитность, C¹-непрерывность, cleanup, SSR, a11y, размер или другой контракт.
+  - type: checkboxes
+    id: checks
+    attributes:
+      label: Проверки
+      options:
+        - label: Я убедился, что issue с таким воспроизведением ещё нет
+          required: true
+        - label: Воспроизведение не зависит от случайного wall-clock
+          required: true
