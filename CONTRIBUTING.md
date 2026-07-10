@@ -94,9 +94,11 @@
 ```bash
 pnpm typecheck
 pnpm build
-pnpm test
+pnpm test                          # включает docs-drift гейт
 pnpm size
 pnpm pack:smoke
+node scripts/check-docs-facts.mjs  # фактические доки (install, bench-отчёт)
+node scripts/check-issue-forms.mjs # схема issue forms и taxonomy
 ```
 
 Для изменений численного ядра дополнительно:

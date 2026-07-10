@@ -24,10 +24,7 @@ describe('public API surface pin', () => {
     const missing = [...EXPECTED_EXPORTS].filter((name) => !exported.has(name));
     expect(missing, `Missing exports: ${missing.join(', ')}`).toHaveLength(0);
 
-    // PACKAGE_NAME — легаси-метаданные пакета, а не часть motion API.
-    const extra = [...exported].filter(
-      (name) => !EXPECTED_EXPORTS.has(name) && name !== 'PACKAGE_NAME',
-    );
+    const extra = [...exported].filter((name) => !EXPECTED_EXPORTS.has(name));
     expect(extra, `Unexpected new exports: ${extra.join(', ')}`).toHaveLength(0);
   });
 

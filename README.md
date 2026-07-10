@@ -589,7 +589,7 @@ pnpm bench      # ns/операцию горячих путей против dis
 сценарный import-cost (esbuild bundle+minify против dist — ловит регрессию
 tree-shakeability). Пороги — регрессионные потолки, не цели: ядро 2220 байт gz,
 любой прочий субпуть 4608, точечные — `./utils` 1400, `./tokens` 1650,
-`./projection` 5350, `./presets` 5600, `./compositor` 6450, `./animate` 10700.
+`./projection` 5750, `./presets` 5600, `./compositor` 6450, `./animate` 10700.
 
 **CI на каждый PR**: typecheck → build → test → fuzz-гейт финитности
 (overflow/солвер/easing/projection) → size → pack-smoke. **Еженедельно** (или вручную) —

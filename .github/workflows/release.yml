@@ -56,11 +56,23 @@ jobs:
           corepack enable
           corepack install --global pnpm@10.34.4
 
+      # Тег обязан указывать на коммит, достижимый из main: публикуется только
+      # отревьюенная история (находка ревью #101 — иначе любой субъект с правом
+      # тегирования публикует произвольный коммит с валидным provenance).
+      - name: Verify tag commit is reachable from main
+        run: |
+          git fetch origin main --quiet
+          git merge-base --is-ancestor "$GITHUB_SHA" origin/main \
+            || { echo "::error::тег указывает на коммит вне main — публикация запрещена"; exit 1; }
+
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
 
       - name: Verify release identity
         run: node scripts/check-release.mjs
+
+      - name: Issue forms schema
+        run: node scripts/check-issue-forms.mjs
 
       - name: Typecheck
         run: pnpm typecheck
@@ -74,8 +86,10 @@ jobs:
       - name: Test
         run: pnpm test
 
+      # Глоб = паритет с PR-CI: релизная цепочка не может отстать от гейтов CI
+      # (находка ревью #101 — третья копия ручного списка уже дрейфовала).
       - name: Fuzz finiteness gate
-        run: pnpm vitest run --reporter=verbose test/animate-overflow-finiteness-fuzz.test.ts test/solver-finiteness-fuzz.test.ts test/easing-finiteness-fuzz.test.ts
+        run: pnpm vitest run --reporter=verbose test/*finiteness-fuzz.test.ts
 
       - name: Size gate
         run: pnpm size

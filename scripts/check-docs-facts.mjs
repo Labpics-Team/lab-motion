@@ -29,7 +29,14 @@ function fail(message) {
 }
 
 function latestBenchmarkReport() {
-  const reports = readdirSync(benchmarkResultsDirectory)
+  let entries;
+  try {
+    entries = readdirSync(benchmarkResultsDirectory);
+  } catch {
+    fail(`каталог результатов бенчмарка недоступен: ${benchmarkResultsDirectory}`);
+    return;
+  }
+  const reports = entries
     .filter((name) => name.endsWith('.md'))
     .map((name) => {
       const content = readFileSync(new URL(name, benchmarkResultsDirectory), 'utf8');

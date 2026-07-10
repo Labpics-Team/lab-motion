@@ -7,6 +7,7 @@ on:
 
 permissions:
   contents: read
+  issues: write # эскалация провала ночного прогона (см. шаг ниже)
 
 concurrency:
   group: mutation-${{ github.ref }}
@@ -44,6 +45,19 @@ jobs:
 
       - name: Mutation gate
         run: pnpm mutation
+
+      # Провал schedule-прогона без эскалации живёт неделями незамеченным
+      # (находка ревью #101): открываем/дополняем issue от имени workflow.
+      - name: Escalate scheduled failure
+        if: failure() && github.event_name == 'schedule'
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          title="mutation: ночной прогон красный ($(date -u +%F))"
+          gh issue create --repo "$GITHUB_REPOSITORY" --title "$title" \
+            --label "type:hardening,priority:P1" \
+            --body "Scheduled mutation-прогон упал: $GITHUB_SERVER_URL/$GITHUB_REPOSITORY/actions/runs/$GITHUB_RUN_ID — разобрать до эрозии mutation-силы ядра." \
+            || echo "::warning::не удалось создать issue — проверьте права"
 
       - name: Upload mutation report
         if: always()

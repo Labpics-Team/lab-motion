@@ -13,7 +13,9 @@ permissions:
 
 concurrency:
   group: ci-${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
-  cancel-in-progress: true
+  # push в main не отменяем: каждый merge-коммит обязан получить завершённый
+  # прогон (иначе красный промежуточный main живёт незамеченным, bisect ломается).
+  cancel-in-progress: ${{ github.ref != 'refs/heads/main' }}
 
 env:
   COREPACK_ENABLE_DOWNLOAD_PROMPT: "0"
