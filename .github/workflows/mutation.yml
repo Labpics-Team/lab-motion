@@ -12,6 +12,10 @@ concurrency:
   group: mutation-${{ github.ref }}
   cancel-in-progress: true
 
+env:
+  COREPACK_ENABLE_DOWNLOAD_PROMPT: "0"
+  COREPACK_DEFAULT_TO_LATEST: "0"
+
 jobs:
   core:
     name: critical numerical core
@@ -30,7 +34,7 @@ jobs:
       - name: Activate pinned pnpm
         run: |
           corepack enable
-          corepack prepare pnpm@10.34.4 --activate
+          corepack install --global pnpm@10.34.4
 
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
