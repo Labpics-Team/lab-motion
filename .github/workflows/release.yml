@@ -66,9 +66,13 @@ jobs:
           echo "release_tag=v$VERSION" >> "$GITHUB_OUTPUT"
           echo "version=$VERSION" >> "$GITHUB_OUTPUT"
 
-      # Для request-ветки гард строже dispatch: релиз только с ТЕКУЩЕГО HEAD main
-      # (равенство, не ancestry) — side-ветка с изменённым workflow бессильна:
-      # её SHA не равен HEAD main.
+      # Для request-ветки: релиз только с ТЕКУЩЕГО HEAD main (равенство, не
+      # ancestry). ЧЕСТНАЯ ГРАНИЦА этого гарда (ревью #121): push-событие
+      # исполняет workflow ИЗ ПУШНУТОГО КОММИТА — от ветки с подменённым файлом
+      # этот шаг не защищает (как и любой in-file гард любого workflow с
+      # environment: npm). Настоящий замок — deployment branch policy на
+      # environment npm (внешний контракт, #107, КРИТИЧЕСКОЕ предусловие).
+      # Этот шаг ловит честные ошибки: устаревший request, не-main источник.
       - name: Verify release-request SHA equals main HEAD
         if: github.event_name == 'push'
         env:
@@ -95,7 +99,12 @@ jobs:
           fi
 
   publish:
-    # На push tag-job скипается (result=skipped), на диспатче обязан быть success.
+    # На тег-пуше tag-job скипается (result=skipped), иначе обязан быть success.
+    # Job-level concurrency сериализует ВСЕ ТРИ пути одного релиза в точке
+    # публикации (ревью #121: workflow-level группы путей различаются).
+    concurrency:
+      group: npm-publish-${{ startsWith(github.ref, 'refs/tags/') && github.ref_name || needs.tag.outputs.release_tag }}
+      cancel-in-progress: false
     needs: [tag]
     if: >-
       github.repository == 'Labpics-Team/lab-motion' && !cancelled() &&
