@@ -70,7 +70,7 @@ export interface ProjectionOptions {
 }
 
 export interface ProjectionPlayNode extends Omit<ProjectionNodeInit, 'first'> {
-  /** Опционален для id ЖИВОГО полёта: first = аналитический V(p̂) (visual pickup).
+  /** Опционален для id незавершённого полёта: first = аналитический V(p̂) (visual pickup).
    *  Для нового id обязателен: MotionParamError
    *  `projection.play: node "${id}" has no "first" and no active flight to pick up from`. */
   readonly first?: FlipRect | undefined;
@@ -80,20 +80,21 @@ export interface ProjectionControls {
   /** Старт/перехват. Mid-flight: C⁰ по построению (first' = V(p̂) аналитически, ноль DOM),
    *  C¹ по формуле §2.3.2. Generation-инвалидация кадров старого полёта. */
   play(nodes: readonly ProjectionPlayNode[]): void;
-  /** Глушит без финального эмита и без onRest (канон flip :290-293). Идемпотентен. */
+  /** Замораживает текущее аналитическое состояние без финального эмита и onRest.
+   *  Повторный play может подхватить его с нулевой скоростью. Идемпотентен. */
   cancel(): void;
   /** Скраб (жест ведёт): гасит пружину (generation++), синхронно эмитит кадры на p
    *  (сырой p при clamp:false; размеры флорятся). Валиден и после rest. */
   seek(p: number): void;
   /** Продолжить пружиной из текущего p с начальной скоростью (progress/s; NaN→0, default 0). */
   release(velocity?: number): void;
-  /** Аналитический visual box узла СЕЙЧАС (на p последнего кадра) — без чтения DOM.
-   *  Покой/неизвестный id → last-бокс / undefined. */
+  /** Аналитический visual box узла СЕЙЧАС — без чтения DOM.
+   *  Rest → last; active/held/canceled → box на p последнего кадра; неизвестный id → undefined. */
   boxAt(id: string): FlipRect | undefined;
   readonly playing: boolean;
   /** Публично всегда [0,1] (канон flip :220), даже при clamp:false. */
   readonly progress: number;
-  /** ṗ последнего кадра (1/s, прогресс-пространство). Покой → 0. */
+  /** Производная ЭМИТИРУЕМОГО прогресса (1/s). На зажатой clamp-границе и в покое → 0. */
   readonly velocity: number;
 }
 
@@ -137,6 +138,8 @@ interface Flight {
   readonly reduced: boolean;
 }
 
+type ProjectionPhase = 'rest' | 'active' | 'held' | 'canceled';
+
 /** Создать headless-контроллер проекции: одна пружина 0→1, синхронные колбэки. */
 export function createProjection(options?: ProjectionOptions): ProjectionControls {
   const params = options?.spring ?? DEFAULT_PROJECTION_SPRING;
@@ -149,10 +152,10 @@ export function createProjection(options?: ProjectionOptions): ProjectionControl
   const onRest = options?.onRest;
 
   let flight: Flight | null = null;
-  let playing = false;
+  let phase: ProjectionPhase = 'rest';
   /** p последнего кадра (сырой при clamp:false) — сырьё continuity/boxAt. Покой = 1. */
   let pHat = 1;
-  /** ṗ последнего кадра. Покой = 0. */
+  /** Производная видимого p последнего кадра. Покой/cancel = 0. */
   let vHat = 0;
   /** Публичный прогресс — всегда [0,1]. */
   let progress = 1;
@@ -161,24 +164,47 @@ export function createProjection(options?: ProjectionOptions): ProjectionControl
   /** Переиспользуемый выход солвера (ноль аллокаций на кадр). */
   const solved = { value: 0, velocity: 0 };
 
+  /** Производная clamp(value): вне диапазона она нулевая, на границе зависит от направления. */
+  const visibleVelocity = (value: number, velocity: number): number => {
+    if (!bounded) return velocity + 0;
+    if (value < 0 || value > 1) return 0;
+    if (value === 0 && velocity < 0) return 0;
+    if (value === 1 && velocity > 0) return 0;
+    return velocity + 0;
+  };
+
+  /** Исключение пользовательского callback не должно оставлять «играющий» зомби-run. */
+  const emit = (projector: Projector, p: number): void => {
+    try {
+      onFrame?.(projector.at(p));
+    } catch (error) {
+      generation++;
+      phase = 'canceled';
+      vHat = 0;
+      throw error;
+    }
+  };
+
   const startRun = (projector: Projector, v0: number): void => {
     generation++;
     const gen = generation;
-    playing = true;
+    phase = 'active';
     pHat = 0;
-    vHat = v0;
+    vHat = visibleVelocity(0, v0);
     progress = 0;
     let elapsed = 0;
     let lastTs: number | undefined;
     let frames = 0;
 
     const finish = (): void => {
-      playing = false;
+      if (gen !== generation || phase !== 'active') return;
+      phase = 'rest';
       pHat = 1;
       vHat = 0;
       progress = 1;
-      onFrame?.(projector.at(1)); // финал — РОВНО p = 1 (точный identity)
-      onRest?.();
+      emit(projector, 1); // финал — РОВНО p = 1 (точный identity)
+      // Финальный onFrame может синхронно запустить/отменить новый run: старый onRest stale.
+      if (gen === generation && phase === 'rest') onRest?.();
     };
 
     const schedule = (cb: (ts?: number) => void): void => {
@@ -192,7 +218,7 @@ export function createProjection(options?: ProjectionOptions): ProjectionControl
     };
 
     const tick = (ts?: number): void => {
-      if (gen !== generation || !playing) return; // stale/отменён
+      if (gen !== generation || phase !== 'active') return; // stale/отменён/удержан
       if (typeof ts === 'number' && Number.isFinite(ts)) {
         elapsed = lastTs === undefined ? elapsed : elapsed + Math.max(0, (ts - lastTs) / 1000);
         lastTs = ts;
@@ -214,21 +240,22 @@ export function createProjection(options?: ProjectionOptions): ProjectionControl
       }
       const p = bounded ? clamp01(value) : value;
       pHat = p;
-      vHat = velocity;
+      vHat = visibleVelocity(value, velocity);
       progress = clamp01(p);
-      onFrame?.(projector.at(p));
-      schedule(tick);
+      emit(projector, p);
+      // Callback мог синхронно перехватить run — не оставляем даже один stale request.
+      if (gen === generation && phase === 'active') schedule(tick);
     };
 
     // Первый кадр — синхронно на p=0 (анти-мигание, flip :286-287).
-    onFrame?.(projector.at(0));
-    schedule(tick);
+    emit(projector, 0);
+    if (gen === generation && phase === 'active') schedule(tick);
   };
 
   return {
     play(nodes: readonly ProjectionPlayNode[]): void {
-      // Снимок прерываемого полёта ДО коммита (throw ниже не должен трогать состояние).
-      const prevById = playing && flight !== null ? flight.byId : undefined;
+      // Незавершённое состояние (active/held/canceled) остаётся аналитическим источником pickup.
+      const prevById = phase !== 'rest' && flight !== null ? flight.byId : undefined;
       const pPrev = pHat;
       const vPrev = vHat;
 
@@ -291,15 +318,16 @@ export function createProjection(options?: ProjectionOptions): ProjectionControl
       for (const node of resolved) byId.set(node.id, node);
       flight = { nodes: resolved, byId, projector, reduced };
 
-      if (reduced) {
-        // P4: character-switch — один синхронный эмит identity-кадров, ноль кадров rAF.
+      if (reduced || resolved.length === 0) {
+        // Reduce и пустое дерево не требуют автономного кадра: один точный финал.
         generation++;
-        playing = false;
+        const gen = generation;
+        phase = 'rest';
         pHat = 1;
         vHat = 0;
         progress = 1;
-        onFrame?.(projector.at(1));
-        onRest?.();
+        emit(projector, 1);
+        if (gen === generation && phase === 'rest') onRest?.();
         return;
       }
 
@@ -307,8 +335,9 @@ export function createProjection(options?: ProjectionOptions): ProjectionControl
     },
 
     cancel(): void {
+      if (flight === null || phase === 'rest' || phase === 'canceled') return;
       generation++;
-      playing = false;
+      phase = 'canceled';
       vHat = 0;
     },
 
@@ -317,16 +346,32 @@ export function createProjection(options?: ProjectionOptions): ProjectionControl
       generation++; // пружина погашена
       const raw = Number.isNaN(p) ? 0 : p;
       const pp = bounded ? clamp01(raw) : raw;
-      playing = true; // полёт удержан жестом: boxAt/pickup остаются аналитическими
+      phase = 'held'; // boxAt/pickup остаются аналитическими, автономных кадров нет
       pHat = pp;
       vHat = 0;
       progress = clamp01(pp);
-      onFrame?.(flight.projector.at(pp));
+      emit(flight.projector, pp);
     },
 
     release(velocity?: number): void {
-      if (flight === null) return;
+      if (flight === null || phase === 'rest') return;
       const p0 = pHat;
+      const remaining = finite(1 - p0);
+
+      // В точной цели диапазон ребейза нулевой: нормализовать физическую скорость не к чему.
+      // Новый run ничего не может визуально сдвинуть, поэтому честный результат — rest сейчас.
+      if (Math.abs(remaining) <= RANGE_EPSILON) {
+        generation++;
+        const gen = generation;
+        phase = 'rest';
+        pHat = 1;
+        vHat = 0;
+        progress = 1;
+        emit(flight.projector, 1);
+        if (gen === generation && phase === 'rest') onRest?.();
+        return;
+      }
+
       // Ребейз как перехват: first' = V(p_seek) для всех узлов (цели не менялись —
       // теорема §2.3.2 даёт точный C¹ всех каналов при v0 = v/(1−p_seek)).
       const rebased: ProjectionNodeInit[] = flight.nodes.map((n) => ({
@@ -342,28 +387,29 @@ export function createProjection(options?: ProjectionOptions): ProjectionControl
       if (reduced) {
         // Character-switch удержан: под reduce release снапает (без автономного полёта).
         generation++;
-        playing = false;
+        const gen = generation;
+        phase = 'rest';
         pHat = 1;
         vHat = 0;
         progress = 1;
-        onFrame?.(projector.at(1));
-        onRest?.();
+        emit(projector, 1);
+        if (gen === generation && phase === 'rest') onRest?.();
         return;
       }
 
       const v = finite(velocity ?? 0);
-      const v0 = clampMagnitude(finite(v / (1 - p0)), V0_CAP);
+      const v0 = clampMagnitude(finite(v / remaining), V0_CAP);
       startRun(projector, v0);
     },
 
     boxAt(id: string): FlipRect | undefined {
       const node = flight?.byId.get(id);
       if (node === undefined) return undefined;
-      return playing ? mixBox(node.first, node.last, pHat) : node.last;
+      return phase === 'rest' ? node.last : mixBox(node.first, node.last, pHat);
     },
 
     get playing(): boolean {
-      return playing;
+      return phase === 'active' || phase === 'held';
     },
     get progress(): number {
       return progress;
