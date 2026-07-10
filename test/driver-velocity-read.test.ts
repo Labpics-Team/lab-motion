@@ -236,4 +236,17 @@ describe('driver.velocity — финитность (Класс В, seeded fuzz)'
       expect(c.velocity).toBe(0);
     }
   }, 30_000);
+
+  it('сошедшийся-но-не-settled ран при range<0 отдаёт ровно 0, не −0', () => {
+    // Adversarial-находка ревью PR #124: при t далеко за сходимостью экспоненты
+    // солвера underflow-ятся в точный 0, seek НЕ выставляет settled, и
+    // 0 * range при range<0 давал −0 наружу — нарушение инварианта
+    // «вырожденное → ровно 0» (домовой канон `finite(...)+0`).
+    // RED-факт до фикса: Object.is(c.velocity, -0) === true.
+    const { c } = makeFrozen({ from: 100, to: 0, spring: CRIT });
+    c.seek(80); // ζω=10 → e^{-10·80} underflow → solver velocity === 0
+    expect(Object.is(c.velocity, 0)).toBe(true);
+    expect(Object.is(c.velocity, -0)).toBe(false);
+    c.cancel();
+  });
 });

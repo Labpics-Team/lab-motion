@@ -470,7 +470,8 @@ export function createDriver(opts: DriverOptions): AnimationControls {
       // стражами; денормализация в units/s — умножение на range (границы
       // солвера — единственное место нормировки, инвариант #93).
       const vel = springUnchecked(opts.spring, clamped).velocity * range;
-      return Number.isFinite(vel) ? vel : 0;
+      // `+ 0` схлопывает −0 (underflow экспонент при range<0 даёт 0·(−range)=−0).
+      return Number.isFinite(vel) ? vel + 0 : 0;
     },
 
     play(): void {

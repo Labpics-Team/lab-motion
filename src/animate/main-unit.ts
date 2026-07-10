@@ -221,18 +221,24 @@ export class MainUnit implements GroupOwner {
       // (перехват tween→spring стал C¹, как spring→spring). Окно разности
       // поджимается в [0,1]: изинги клампят снаружи диапазона (endpoint-
       // дисциплина ядра), сэмпл за краем дал бы ложный слом производной.
-      const k0 = k > EASE_DERIV_H ? k - EASE_DERIV_H : 0;
-      const k1 = k + EASE_DERIV_H < 1 ? k + EASE_DERIV_H : 1;
-      const slope = (o.mode.ease(k1) - o.mode.ease(k0)) / (k1 - k0);
-      // Прогресс/с; non-finite (враждебный ease) → 0: NaN не сеется в подхват.
-      const dpdt = Number.isFinite(slope) ? (slope * 1000) / o.mode.durationMs : 0;
+      let dpdt = 0;
+      if (o.numeric.length > 0) {
+        // Скорость нужна только числовым каналам — css-only группа не платит
+        // двумя лишними вызовами ease на кадр (и не расширяет его домен).
+        const k0 = k > EASE_DERIV_H ? k - EASE_DERIV_H : 0;
+        const k1 = k + EASE_DERIV_H < 1 ? k + EASE_DERIV_H : 1;
+        const slope = (o.mode.ease(k1) - o.mode.ease(k0)) / (k1 - k0);
+        // Прогресс/с; non-finite (враждебный ease) → 0: NaN не сеется в подхват.
+        dpdt = Number.isFinite(slope) ? (slope * 1000) / o.mode.durationMs : 0;
+      }
       for (const ch of o.numeric) {
         const range = ch.to - ch.from;
         const v = ch.from + range * p;
         if (!Number.isFinite(v)) return true; // непредставимый спан → снап к цели
         ch.value = v;
+        // `+ 0` схлопывает −0 (range<0 при нулевом наклоне ease).
         const vel = range * dpdt;
-        ch.velocity = Number.isFinite(vel) ? vel : 0;
+        ch.velocity = Number.isFinite(vel) ? vel + 0 : 0;
       }
       if (o.css !== undefined) {
         o.css.p = p;
