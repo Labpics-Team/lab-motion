@@ -1,0 +1,36 @@
+version: 2
+updates:
+  - package-ecosystem: npm
+    directory: /
+    schedule:
+      interval: weekly
+    open-pull-requests-limit: 5
+    groups:
+      toolchain:
+        patterns:
+          - typescript
+          - vite
+          - vitest
+          - tsup
+          - esbuild
+          - terser
+      frameworks:
+        patterns:
+          - react
+          - react-dom
+          - preact
+          - solid-js
+          - svelte
+          - vue
+          - lit
+          - "@angular/*"
+          - "@builder.io/qwik"
+      mutation:
+        patterns:
+          - "@stryker-mutator/*"
+
+  - package-ecosystem: github-actions
+    directory: /
+    schedule:
+      interval: weekly
+    open-pull-requests-limit: 3
