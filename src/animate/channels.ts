@@ -35,9 +35,13 @@ const TRANSFORM_IDENTITY: Readonly<Record<string, number>> = {
   skewY: 0,
 };
 
-/** Является ли ключ props transform-шортхендом. */
+/**
+ * Является ли ключ props transform-шортхендом. Проверка `typeof ...==='number'`
+ * (а не `key in`) отсекает УНАСЛЕДОВАННЫЕ constructor/toString/__proto__: они
+ * функции/объект, не число — иначе классифицировались бы как transform-канал.
+ */
 export function isTransformKey(key: string): boolean {
-  return key in TRANSFORM_IDENTITY;
+  return typeof TRANSFORM_IDENTITY[key] === 'number';
 }
 
 /** Identity-значение transform-канала (0, для scale-семейства 1). */

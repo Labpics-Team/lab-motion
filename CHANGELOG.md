@@ -8,6 +8,29 @@
 
 ### Added
 
+- `./animate/mini`: новый субпуть — ЛЁГКИЙ срез animate (потолок **≤ 5 KB gz** =
+  5120 B; факт 5113 B gz shipped / 5287 B gz import-cost) поверх **адаптерной архитектуры**
+  целей/свойств. Внутренняя граница — `PropertyCodec` (parse/interpolate/
+  serialize/canComposite) и `TargetAdapter` (read/surfaceOf/compose/apply) в общем
+  реестре (`createRegistry`): движок дергает кодек/адаптер и НИКОГДА не ветвится по
+  имени свойства — новый вид входит РЕГИСТРАЦИЕЙ, а не ростом switch. mini
+  регистрирует минимум (числовой transform/opacity + CSS-переменная + DOM-адаптер)
+  и НЕ тянет full-набор/`./value`/compositor-компилятор (граф проверяется
+  import-cost сценарием). Покрытие: transform-шортхенды, `opacity`, CSS-переменные,
+  spring/tween в ЕДИНОМ прогресс-клоке (значение канала — скаляр/строка/`[from, to]`;
+  keyframe-массивы и per-property переходы — субпуть `./animate`, НЕ mini),
+  `delay`/`stagger`, контролы `{ finished, play, pause, seek, cancel,
+  stop }`, C¹-подхват value+velocity при повторном запуске (dominant-канал),
+  фазы кадра update→render единого `./frame` (чтение once при привязке, запись —
+  в render), reduced-motion снап, SSR-safe импорт, fail-fast `MotionParamError`
+  ДО записи стиля. Расширенный набор (`createFullRegistry`): кодек цвета (reuse
+  `./value`), SVG-атрибут-адаптер, plain-object адаптер (**ноль DOM** — цель =
+  чистое JS-состояние) — contract-тесты на CSS-переменные, SVG-атрибуты и
+  plain-object. Финитность — seeded-LCG фаззинг `codec.interpolate` (≥12 000 на
+  кодек). ГРАНИЦА первой версии (потолок 5 KB): compositor-offload (WAAPI через
+  compileSpringPlan) в mini НЕ включён — floor «compositor+codecs+registry+frame»
+  = 5186 gz БЕЗ движка, физически не под 5120; полный WAAPI-путь — в `./animate`.
+  Таблица миграции с Motion JS / Anime.js — в README (#103).
 - `./smart`: новый субпуть — Figma-подобный smart-animate поверх `./projection`
   (жанр shared-element). Диф ДВУХ снимков дерева по строке-ключу `data-motion-key`
   → `matched`/`entered`/`exited`/`skipped`, оркестрация поверх ОДНОГО

@@ -204,6 +204,11 @@
       "types": "./dist/animate/index.d.ts",
       "import": "./dist/animate/index.js",
       "require": "./dist/animate/index.cjs"
+    },
+    "./animate/mini": {
+      "types": "./dist/animate/mini/index.d.ts",
+      "import": "./dist/animate/mini/index.js",
+      "require": "./dist/animate/mini/index.cjs"
     }
   },
   "files": [

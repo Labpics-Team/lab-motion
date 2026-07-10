@@ -153,6 +153,22 @@ export const BESPOKE_SUBPATH_GATES = {
   // Дедуп через splitting/shared chunks — отдельное архитектурное решение
   // Даниила на весь пакет, не этого субпутя. Поднимать только осознанно.
   './animate': 10700,
+  // ./animate/mini — ЛЁГКИЙ срез animate поверх адаптерного реестра кодеков/
+  // адаптеров (registry.ts): transform-компоненты + opacity + CSS-переменные,
+  // spring/tween в ЕДИНОМ прогресс-пространстве (readCompositorSpring), delay/
+  // stagger, контролы, reduced-motion снап. Расширение — РЕГИСТРАЦИЕЙ кодека, не
+  // ростом switch. Граница поставки: mini НЕ импортирует full-набор/compositor-
+  // компилятор — граф не тянет ./value (цвета) и compileSpringPlan (доказано
+  // import-cost сценарием 'mini-one-liner' ниже: ~5.2 KB против ~10.9 KB full).
+  // Потолок 5120 — headline эпика «≤ 5 KB» (первый потолок), НЕ от щедрого люфта.
+  // Хронология факта/порога:
+  //   2026-07-10: факт первой сборки 5050 gz (shipped, terser) → порог 5120.
+  //   ЧЕСТНАЯ ГРАНИЦА: compositor-offload (WAAPI через compileSpringPlan) в mini
+  //   НЕ включён — floor «compositor+codecs+registry+frame» = 5186 gz БЕЗ движка,
+  //   физически не под 5120. mini гонит transform/opacity аналитической замкнутой
+  //   формой на main-потоке + reduced-motion детект; полный WAAPI-путь — в ./animate.
+  //   Подъём порога — только решением владельца (это и есть класс, что гейт ловит).
+  './animate/mini': 5120,
 };
 
 /**
@@ -231,6 +247,19 @@ export const IMPORT_COST_SCENARIOS = [
     // (transform/opacity + compositor-пружина БЕЗ движка значений) с целью
     // ≤5 KB; этот порог тогда останется стражем полного фасада.
     gate: 11200,
+  },
+  {
+    // ПРАВДА потребительской цены лёгкого среза + СТРАЖ границы поставки: mini
+    // не тянет full. Если бы mini импортировал full-набор (./value цвета) или
+    // compileSpringPlan (компилятор пружина→linear()), число скакнуло бы к ~10 KB
+    // (порядок full-фасада). Держится ~5.2 KB ⇒ граф mini замкнут на минимум:
+    // readCompositorSpring (замкнутая форма) + числовой/var кодеки + DOM-адаптер +
+    // ./frame. Скачок сценария = регрессия границы (mini потянул full/compositor).
+    name: 'animate-mini-one-liner',
+    code: `import { animate } from '%DIST%/../animate/mini/index.js'; console.log(typeof animate('.hero', { x: 240, opacity: 1 }).pause);`,
+    // Факт 5200 (2026-07-10, первая сборка среза) + ~3% люфт. Заметно < full 11200 —
+    // это и есть машинное доказательство «граф mini не тянет full».
+    gate: 5360,
   },
 ];
 
