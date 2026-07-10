@@ -8,6 +8,19 @@
 
 ### Added
 
+- `./smart`: новый субпуть — Figma-подобный smart-animate поверх `./projection`
+  (жанр shared-element). Диф ДВУХ снимков дерева по строке-ключу `data-motion-key`
+  → `matched`/`entered`/`exited`/`skipped`, оркестрация поверх ОДНОГО
+  projection-движка: matched едут FLIP'ом (continuity по строке-ключу переживает
+  ПЕРЕСОЗДАНИЕ DOM-узла — перехват берёт аналитический `V(p̂)` и пересеивает
+  скорость, C¹), entered — fade-in без transform, exited — ghost-протокол
+  (реинсерт `absolute` на padding-box, `removeChild` до резолва `finished`,
+  реинкарнация ключа), единый clock. `reduced` = смена характера (matched снап,
+  фейды живые), `resolveSmartTier` (`reduced`/`projection`/`ssr`), SSR-инертность,
+  fail-fast `MotionParamError` на параметрах и дубликате ключа. API: `captureSmart`,
+  `smartTransition`, `resolveSmartTier`, `SMART_KEY_ATTR`. Финитность — fuzz-гейт
+  ≥10 000 злых дифов (ни броска, ни NaN/∞/`-0`). Минимальный скоуп #99: нативный
+  View Transitions API вырезан (отдельная фаза) (#99).
 - `./animate`: tween-режим вычисляет аналитическую скорость канала —
   v = range · ease′(k) / duration (производная изинга — детерминированная
   центральная разность с фиксированным шагом) вместо нуля каждый кадр:

@@ -115,6 +115,11 @@
       "import": "./dist/projection/index.js",
       "require": "./dist/projection/index.cjs"
     },
+    "./smart": {
+      "types": "./dist/smart/index.d.ts",
+      "import": "./dist/smart/index.js",
+      "require": "./dist/smart/index.cjs"
+    },
     "./svg": {
       "types": "./dist/svg/index.d.ts",
       "import": "./dist/svg/index.js",

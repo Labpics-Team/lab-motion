@@ -110,6 +110,18 @@ export const BESPOKE_SUBPATH_GATES = {
   //   подъёма (дедуп rebaseNode/lerp1, −100 gz); подъём — в рамках делегации
   //   Даниила на автономные решения (прецедент CORE 2150→2190 выше).
   './projection': 5750,
+  // ./smart — Figma-подобный smart-animate ПОВЕРХ ./projection (жанр shared-element
+  // / smart-animate): диф двух снимков дерева по строке-ключу data-motion-key →
+  // matched/entered/exited/skipped, оркестрация поверх ОДНОГО projection-движка
+  // (matched → FLIP с continuity по строке-ключу; entered → fade-in; exited →
+  // ghost-протокол; единый clock; reduced = character-switch). splitting:false ⇒
+  // субпуть несёт весь граф ./projection (geometry+driver+dom) + срез flip/solver/
+  // validate — шипнутый gz двойной счёт, честная цена самодостаточного субпутя
+  // (класс animate/projection). Хронология факта/порога:
+  //   2026-07-10: факт 7151 gz первой сборки → порог 7450 (~4% люфт, дисциплина
+  //   ./projection «порог ОТ ФАКТА»). Выше общего 4608 законно: тянет проекционное
+  //   ядро целиком. Поднимать только осознанно.
+  './smart': 7450,
   // ./presets — headless-словарь движений + текстовые/числовые сахара
   // (порт ценного из PR#79: splitText/typewriterAt/scrambleAt/tickerCells/
   // formatNumber + раннеры runTypewriter/runScramble/runNumber поверх runPreset).
