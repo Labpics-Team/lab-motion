@@ -6,7 +6,7 @@ const files = readdirSync(directory)
   .sort();
 
 const errors = [];
-const allowedTypes = new Set(['checkboxes', 'dropdown', 'input', 'markdown', 'textarea', 'upload']);
+const allowedTypes = new Set(['checkboxes', 'dropdown', 'input', 'markdown', 'textarea']);
 
 for (const file of files) {
   const source = readFileSync(new URL(file, directory), 'utf8');
