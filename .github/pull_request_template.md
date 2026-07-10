@@ -45,5 +45,7 @@
 - [ ] `pnpm size`
 - [ ] `pnpm pack:smoke`
 - [ ] `pnpm mutation` для затронутого критического численного ядра
+- [ ] Независимое adversarial review для нового доменного механизма, release chain или platform adapter
+- [ ] Все review threads разрешены
 
 Связано с #
