@@ -30,17 +30,21 @@
 | Environment | `npm` |
 | Allowed action | `npm publish` |
 
-В GitHub environment `npm` обязательны независимый required reviewer,
-`Prevent self-review`, запрет обхода правил администраторами и deployment policy,
-разрешающая только `main`. Теги отдельно защищаются repository ruleset.
+В GitHub environment `npm` обязателен required reviewer, запрет
+обхода правил администраторами и deployment policy, разрешающая только
+`main`. В команде из нескольких участников включается `Prevent self-review`;
+в одиночной организации reviewer подтверждает собственный запуск до
+появления независимого участника. Теги отдельно защищаются repository ruleset.
 В настройках репозитория нужно включить неизменяемость будущих GitHub Releases.
 После первого успешного OIDC-релиза нужно запретить token-based publishing в
-настройках npm и отозвать старые automation tokens.
+настройках npm и отозвать все ненужные токены с правом публикации, включая
+granular access tokens.
 
 Право `id-token: write` принадлежит только publish-job: в нём нет checkout,
-исходников и сборки. После публикации этот же job проверяет подписи и связывает
-SLSA statement с точным source SHA и workflow. Git-тег создаёт следующий job с
-`contents: write`, но без OIDC.
+исходников и сборки. После всех гейтов отдельный job с `contents: write`,
+но без OIDC, создаёт и повторно проверяет Git-тег. Затем publish-job
+ещё раз сверяет тег, публикует тот же tgz, проверяет подписи и связывает
+SLSA statement с точным source SHA и workflow.
 
 ## Подготовка версии
 
@@ -64,18 +68,25 @@ SLSA statement с точным source SHA и workflow. Git-тег создаёт
 3. один раз создаёт tgz, прогоняет на нём pack-smoke, consumer compatibility и
    точный Node 22.0 floor, затем фиксирует SHA-256 и передаёт тот же файл как
    immutable artifact;
-4. отдельный environment-защищённый job сверяет artifact digest, tgz digest,
-   package identity и source SHA, затем публикует или безопасно сверяет уже
-   опубликованные байты;
-5. криптографически проверяет npm-подписи и SLSA provenance, после чего создаёт
-   неизменяемый Git-тег и GitHub Release.
+4. без OIDC создаёт или переиспользует проверенный Git-тег;
+5. отдельный environment-защищённый job сверяет artifact digest, tgz digest,
+   package identity, source SHA и тег, затем публикует или безопасно сверяет
+   уже опубликованные байты. Единая очередь выпусков и сверка с текущим
+   npm `latest` не дают более старому кандидату откатить dist-tag;
+6. криптографически проверяет npm-подписи и SLSA provenance, после чего создаёт
+   неизменяемый GitHub Release.
 
 Если подписанный annotated tag уже существовал на том же коммите, workflow
 раскрывает его до commit и переиспользует. Конфликтующий тег останавливает релиз
 до публикации; тег не перемещается.
 
-Для release tags должен действовать ruleset: `v*.*.*` создаёт только доверенный
-release actor этого workflow, удаление и перемещение запрещены.
+Для release tags должен действовать ruleset без bypass: он запрещает удаление и
+перемещение `refs/tags/v*.*.*`. Workflow создаёт тег только после всех гейтов и
+повторно сверяет
+его SHA перед публикацией. Конфликтующий заранее созданный тег останавливает релиз.
+Тег фиксируется до ожидания environment approval: required reviewer разрешает
+только npm-публикацию. Отказ или отмена approval, как и сбой npm, оставляет
+проверенный тег. Rerun переиспользует тот же ref без его перемещения.
 
 ## Ошибка выпуска
 
