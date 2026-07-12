@@ -6,6 +6,8 @@
 
 ## [Unreleased]
 
+## [0.3.0] — 2026-07-12
+
 ### Added
 
 - `./react`: `useReducedMotion(): boolean` — реактивно отражает системное
@@ -55,8 +57,8 @@
   жестов), 2 browser-conformance спеки (pointer capture/cancel на реальном движке).
   Runnable DOM-адаптер и раздел «Behaviors-путь» — в README (#92).
 
-- `./animate/mini`: новый субпуть — ЛЁГКИЙ срез animate (потолок **≤ 5 KB gz** =
-  5120 B; факт 5113 B gz shipped / 5287 B gz import-cost) поверх **адаптерной архитектуры**
+- `./animate/mini`: новый субпуть — ЛЁГКИЙ срез animate с потолком **≤ 5 KB gz**
+  поверх **адаптерной архитектуры**
   целей/свойств. Внутренняя граница — `PropertyCodec` (parse/interpolate/
   serialize/canComposite) и `TargetAdapter` (read/surfaceOf/compose/apply) в общем
   реестре (`createRegistry`): движок дергает кодек/адаптер и НИКОГДА не ветвится по
@@ -140,6 +142,16 @@
 
 ### Changed
 
+- npm-артефакт получил раздельные ESM/CJS declaration-ветки для всех экспортов,
+  `typesVersions` для legacy TypeScript resolver, точный `sideEffects`-allowlist,
+  честный Preact floor `10.3.1` и consumer-гейты на реальные байты tarball.
+- Релиз собирает tgz один раз, публикует только опечатанный artifact через OIDC,
+  проверяет registry integrity и SLSA provenance, а тег создаёт после публикации.
+
+- Минимальный runtime-контракт поднят до Node.js 22: ветки 18 и 20 больше не
+  получают security-исправления, а CI и package-manager работают на поддерживаемой
+  LTS-линии. Это несовместимое изменение следующего minor-релиза.
+
 - **`./gestures`: захват летящего объекта наследует скорость глайда** (#93,
   осознанный фикс дефекта C¹-контракта). `pointerDown` во время инерционного
   глайда теперь засевает velocity tracker текущей скоростью глайда (прайор в
@@ -149,6 +161,14 @@
   трекера (0.1 s) по-прежнему естественно гасит скорость до нуля.
 
 ### Fixed
+
+- Framework bindings при reduced motion атомарно снэпают состояние без
+  отложенного stale-кадра; React-адаптер сохраняет владельца `MotionValue` при
+  StrictMode replay и уничтожает его только при настоящем unmount.
+- Удалён цикл `compositor ↔ stagger`; новый статический гейт запрещает возврат
+  циклических импортов.
+- Headless-типы больше не требуют `lib.dom`, а npm-runtime не содержит ссылок
+  на исключённые sourcemap-файлы.
 
 - `MotionValue`: `NaN`/`±Infinity` в `opts.initialVelocity` больше не
   трактуются молча как «нет сида» — конструктор бросает `MotionParamError`

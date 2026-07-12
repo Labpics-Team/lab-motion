@@ -16,12 +16,8 @@
  *   Mutation proof: remove synchronous emit in the reduced-motion branch of
  *   set() → the 'emits target immediately' assertion fails.
  *
- * TDD RED-proof:
- *   1. Comment out the synchronous subscriber loop in the reduced-motion
- *      branch of springStore.set().
- *   2. Run: pnpm test test/svelte.test.ts
- *   3. The 'reduced-motion: emits target immediately' test MUST fail.
- *   4. Restore → GREEN.
+ * TDD RED-proof: замена MotionValue.snapTo на ручную эмиссию
+ * роняет тест full→reduce: старый queued-кадр перезатирает снап.
  */
 
 import { describe, expect, it, beforeEach, afterEach } from 'vitest';
@@ -48,7 +44,7 @@ function makeVirtualClock(dtMs = 1000 / 60) {
     }
   };
 
-  return { requestFrame, drainAll };
+  return { requestFrame, drainAll, pending: () => queue.length };
 }
 
 // ─── matchMedia mock ──────────────────────────────────────────────────────
@@ -258,6 +254,35 @@ describe('springStore — reduced-motion CHARACTER (northInvariant #5)', () => {
     };
 
     expect(run('fade')).toEqual(run('instant'));
+  });
+
+  it('full→reduce инвалидирует уже поставленный кадр', () => {
+    const clock = makeVirtualClock();
+    const store = springStore(0, { mass: 1, stiffness: 200, damping: 20 }, 'instant', clock.requestFrame);
+    let latest = 0;
+    store.subscribe((value) => { latest = value; });
+
+    store.set(100);
+    expect(clock.pending()).toBeGreaterThan(0);
+    installMatchMedia(true);
+    store.set(200);
+    expect(latest).toBe(200);
+
+    clock.drainAll();
+    expect(latest).toBe(200);
+    store.destroy();
+  });
+
+  it('reduced-путь отклоняет NaN/Infinity до эмиссии', () => {
+    installMatchMedia(true);
+    const store = springStore(5);
+    let latest = 0;
+    store.subscribe((value) => { latest = value; });
+
+    expect(() => store.set(NaN)).toThrow();
+    expect(() => store.set(Infinity)).toThrow();
+    expect(latest).toBe(5);
+    store.destroy();
   });
 
   it('full motion: uses spring (frames ARE scheduled when reduced-motion is off)', () => {

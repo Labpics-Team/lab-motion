@@ -155,7 +155,27 @@ describe('angular: injectSpring', () => {
     expect(x()).toBe(100); // не загрязнён
   });
 
-  it('reduced + разрушенный скоуп: setTarget не трогает сигнал (destroyed — единственный барьер в обход ядра)', async () => {
+  it('full→reduce инвалидирует уже поставленный кадр', async () => {
+    let reduced = false;
+    (globalThis as { window?: unknown }).window = {
+      matchMedia: () => ({ get matches() { return reduced; } }),
+    };
+    const { injectSpring } = await import('../src/angular/index.js');
+    const vc = makeVirtualClock();
+    const [value, setTarget] = runInContext(() =>
+      injectSpring(0, SPRING, 'instant', vc.requestFrame),
+    );
+
+    setTarget(100);
+    reduced = true;
+    setTarget(200);
+    expect(value()).toBe(200);
+
+    vc.drainAll();
+    expect(value()).toBe(200);
+  });
+
+  it('reduced + разрушенный скоуп: setTarget не диспетчит snapTo', async () => {
     (globalThis as { window?: unknown }).window = {
       matchMedia: () => ({ matches: true }),
     };
@@ -163,7 +183,7 @@ describe('angular: injectSpring', () => {
     const vc = makeVirtualClock();
     const [x, setX] = runInContext(() => injectSpring(7, SPRING, 'instant', vc.requestFrame));
     destroyScope();
-    setX(50); // reduced-путь пишет в сигнал напрямую — обязан уважать destroy
+    setX(50); // destroyed-барьер срабатывает до опроса matchMedia и ядра
     expect(x()).toBe(7);
   });
 

@@ -149,6 +149,7 @@ describe('preact: useSpring — анимация через мок хуков', 
     const vc = makeVirtualClock();
     render(() => useSpring(0, SPRING, 'instant', vc.requestFrame));
     expect(() => render(() => useSpring(NaN, SPRING, 'instant', vc.requestFrame))).toThrow();
+    expect(() => render(() => useSpring(Infinity, SPRING, 'instant', vc.requestFrame))).toThrow();
   });
 
   it('reduced-motion: снап к цели немедленно (характер, не выключение)', async () => {
@@ -162,6 +163,24 @@ describe('preact: useSpring — анимация через мок хуков', 
     // ни одного vc.drainAll() — кадры не крутились; третий рендер читает снап
     const v = render(() => useSpring(100, SPRING, 'instant', vc.requestFrame));
     expect(v).toBe(100);
+  });
+
+  it('full→reduce инвалидирует уже поставленный кадр', async () => {
+    let reduced = false;
+    (globalThis as { window?: unknown }).window = {
+      matchMedia: () => ({ get matches() { return reduced; } }),
+    };
+    const { useSpring } = await import('../src/preact/index.js');
+    const vc = makeVirtualClock();
+
+    render(() => useSpring(0, SPRING, 'instant', vc.requestFrame));
+    render(() => useSpring(100, SPRING, 'instant', vc.requestFrame));
+    reduced = true;
+    render(() => useSpring(200, SPRING, 'instant', vc.requestFrame));
+    expect(render(() => useSpring(200, SPRING, 'instant', vc.requestFrame))).toBe(200);
+
+    vc.drainAll();
+    expect(render(() => useSpring(200, SPRING, 'instant', vc.requestFrame))).toBe(200);
   });
 });
 

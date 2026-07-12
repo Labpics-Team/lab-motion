@@ -30,6 +30,7 @@
  */
 
 import { MotionParamError } from './errors.js';
+import type { MatchMediaLike } from './internal/media-query.js';
 
 // ─── Константы ────────────────────────────────────────────────────────────────
 
@@ -70,7 +71,7 @@ export interface DecayOptions {
    * Injectable matchMedia. Pass `window.matchMedia.bind(window)` в браузере.
    * undefined = SSR / нет предпочтений (reduced=false).
    */
-  readonly matchMedia?: ((query: string) => MediaQueryList) | undefined;
+  readonly matchMedia?: MatchMediaLike | undefined;
 }
 
 /** Headless-модель затухания, возвращаемая createDecay(). */
@@ -104,9 +105,7 @@ export interface DecayModel {
 // ─── Вспомогательные функции ──────────────────────────────────────────────────
 
 /** Считать предпочтение reduced-motion из инжектируемого matchMedia. */
-function prefersReducedMotion(
-  matchMedia: ((query: string) => MediaQueryList) | undefined,
-): boolean {
+function prefersReducedMotion(matchMedia: MatchMediaLike | undefined): boolean {
   if (typeof matchMedia !== 'function') return false;
   try {
     return matchMedia('(prefers-reduced-motion: reduce)').matches;

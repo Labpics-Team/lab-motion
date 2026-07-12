@@ -24,8 +24,8 @@
  *   dominantV0 (waapi-unit.ts:309-318) и normalizeV0/RANGE_EPSILON
  *   (channels.ts:174-182); generation-инвалидация / handle=0 / FIXED_DT / REST /
  *   MAX_FRAMES / синхронный первый кадр / финал ровно identity (flip :217-293);
- *   prefersReducedMotion (flip :192-199); «состояние снимается замкнутой формой,
- *   не из DOM» (compositor/index.ts:369).
+ *   prefersReducedMotion (flip :192-199); принцип compositor: «состояние
+ *   снимается замкнутой формой, не из DOM».
  *   Сознательно НЕ используется: ./frame (инверсия зависимости, канон
  *   internal/binding-value.ts:10-13 — порядок родитель-раньше-ребёнка даёт
  *   собственный топосорт внутри ОДНОЙ requestFrame-заявки; потребителю в доках —

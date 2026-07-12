@@ -11,25 +11,10 @@
  * Vue's reactivity is mocked at the ref/watch/onUnmounted level.
  * The virtual clock ensures deterministic animation.
  *
- * Reduced-motion CHARACTER tests (northInvariant #5):
- *   When prefers-reduced-motion is active:
- *   - useSpring must snap the output ref to the new target value immediately.
- *   - vMotion directive must write the target value directly to el.style, no spring.
- *   Mutation proof: remove reduced-motion snap path → assertions fail.
- *
- * TDD RED-proof (useSpring):
- *   1. Comment out `value.value = newTarget` in the watch callback's
- *      reduced-motion branch of useSpring.
- *   2. Run: pnpm test test/vue.test.ts
- *   3. 'reduced-motion: snaps to target immediately' MUST fail.
- *   4. Restore → GREEN.
- *
- * TDD RED-proof (vMotion directive — reduced-motion):
- *   1. Comment out `_applyValue(el, newTarget, ...)` in the directive updated()
- *      reduced-motion branch AND the mounted() reduced-motion branch in src/vue/index.ts.
- *   2. Run: pnpm test test/vue.test.ts
- *   3. 'directive reduced-motion: updated() snaps to target immediately' MUST fail.
- *   4. Restore → GREEN.
+ * Reduced-motion CHARACTER: useSpring и vMotion идут через
+ * MotionValue.snapTo. Это синхронизирует ref/DOM с доменным состоянием,
+ * гасит прежний полёт и отклоняет non-finite до записи. Замена
+ * snapTo на прямую запись роняет full→reduce и finite-тесты.
  *
  * TDD RED-proof (vMotion directive — spring application):
  *   1. Comment out the `const unsub = mv.onChange(...)` block in mounted() of vMotion.
@@ -232,7 +217,7 @@ describe('useSpring', () => {
 describe('useSpring — reduced-motion CHARACTER (northInvariant #5)', () => {
   it('snaps to target immediately when prefers-reduced-motion: reduce', () => {
     // C: Property — CHARACTER = instant snap, not hard-off
-    // Mutation proof: remove `value.value = newTarget` in reduced-motion watch branch →
+    // Mutation proof: remove `mv.snapTo(newTarget)` in reduced-motion watch branch →
     //   result.value stays at 0 → toBe(100) fails
     installMatchMedia(true);
 
@@ -329,6 +314,40 @@ describe('useSpring — reduced-motion CHARACTER (northInvariant #5)', () => {
     clock.drainAll();
     expect(result.value).toBe(100);
   });
+
+  it('full→reduce инвалидирует уже поставленный кадр', () => {
+    const clock = makeVirtualClock();
+    let targetValue = 0;
+    const result = useSpring(
+      () => targetValue,
+      { mass: 1, stiffness: 200, damping: 20 },
+      'instant',
+      clock.requestFrame,
+    );
+
+    targetValue = 100;
+    triggerWatchers();
+    installMatchMedia(true);
+    targetValue = 200;
+    triggerWatchers();
+    expect(result.value).toBe(200);
+
+    clock.drainAll();
+    expect(result.value).toBe(200);
+  });
+
+  it('reduced-путь отклоняет NaN/Infinity до записи в ref', () => {
+    installMatchMedia(true);
+    const clock = makeVirtualClock();
+    let targetValue = 5;
+    const result = useSpring(() => targetValue, undefined, 'instant', clock.requestFrame);
+
+    targetValue = NaN;
+    expect(() => triggerWatchers()).toThrow();
+    targetValue = Infinity;
+    expect(() => triggerWatchers()).toThrow();
+    expect(result.value).toBe(5);
+  });
 });
 
 // ─── Minimal HTMLElement stub for directive tests ─────────────────────────
@@ -400,9 +419,8 @@ describe('vMotion directive — mounted lifecycle', () => {
     expect(Number(lastWrite.value)).toBeCloseTo(1, 2);
   });
 
-  it('A: template string formats the CSS value correctly', () => {
-    // A: Integration — template interpolation
-    // Mutation proof: remove template.replace('{v}', ...) → value written as-is, format fails
+  it('A: template string formats every placeholder through the shared renderer', () => {
+    // A: Integration — повторный placeholder не должен остаться литералом в CSS.
     installMatchMedia(false);
     const clock = makeVirtualClock();
     const { el, styleWrites } = makeElement();
@@ -411,7 +429,7 @@ describe('vMotion directive — mounted lifecycle', () => {
       value: {
         target: 200,
         property: 'transform',
-        template: 'translateX({v}px)',
+        template: 'translate({v}px, {v}px)',
         from: 0,
         spring: { mass: 1, stiffness: 200, damping: 20 },
         requestFrame: clock.requestFrame,
@@ -423,8 +441,7 @@ describe('vMotion directive — mounted lifecycle', () => {
     expect(styleWrites.length).toBeGreaterThan(0);
     const lastWrite = styleWrites.at(-1)!;
     expect(lastWrite.prop).toBe('transform');
-    expect(lastWrite.value).toContain('translateX(');
-    expect(lastWrite.value).toContain('px)');
+    expect(lastWrite.value).toBe('translate(200px, 200px)');
   });
 
   it('A: unmounted destroys MotionValue (no leak)', () => {
@@ -507,7 +524,7 @@ describe('vMotion directive — updated lifecycle', () => {
 describe('vMotion directive — reduced-motion CHARACTER (northInvariant #5)', () => {
   it('C: mounted() snaps to target immediately, no spring frames (reduced-motion)', () => {
     // C: Property — CHARACTER = instant snap on mount, not hard-off
-    // Mutation proof: remove `_applyValue(el, opts.target, ...)` in mounted() reduced-motion branch
+    // Mutation proof: remove `mv.snapTo(opts.target)` in mounted() reduced-motion branch
     //   → el.style not written synchronously → styleWrites stays empty → assertion fails
     installMatchMedia(true);
     const clock = makeVirtualClock();
@@ -530,13 +547,10 @@ describe('vMotion directive — reduced-motion CHARACTER (northInvariant #5)', (
 
   it('C: updated() snaps to target immediately, no spring frames (reduced-motion)', () => {
     // C: Property — CHARACTER = instant snap on update
-    // Mutation proof: remove `_applyValue(el, newTarget, ...)` in updated() reduced-motion branch
+    // Mutation proof: remove `state.mv.snapTo(newTarget)` in updated() reduced-motion branch
     //   → el.style stays at mounted value (0) → assertion fails
     //
-    // TDD RED-proof (documented above in file header):
-    //   Comment out `_applyValue(el, newTarget, property, template)` in updated()
-    //   reduced-motion branch → this test FAILS (el.style.opacity still = '0').
-    //   Restore → GREEN.
+    // Без state.mv.snapTo(newTarget) стиль остаётся на монтажном значении.
     installMatchMedia(true);
     const clock = makeVirtualClock();
     const { el, styleWrites } = makeElement();
@@ -639,6 +653,97 @@ describe('vMotion directive — reduced-motion CHARACTER (northInvariant #5)', (
 
     // In reduced-motion, no new frames should be scheduled beyond mount
     expect(framesScheduled.length).toBe(framesAfterMount);
+  });
+
+  it('full→reduce инвалидирует уже поставленный кадр', () => {
+    const clock = makeVirtualClock();
+    const { el } = makeElement();
+    vMotion.mounted!(el as Element, {
+      value: { target: 0, from: 0, property: 'opacity', requestFrame: clock.requestFrame },
+    } as any, null as any, null as any);
+
+    vMotion.updated!(el as Element, {
+      value: { target: 100, property: 'opacity' },
+    } as any, null as any, null as any);
+    installMatchMedia(true);
+    vMotion.updated!(el as Element, {
+      value: { target: 200, property: 'opacity' },
+    } as any, null as any, null as any);
+    expect(Number(el.style.opacity)).toBe(200);
+
+    clock.drainAll();
+    expect(Number(el.style.opacity)).toBe(200);
+  });
+
+  it('reduced-путь директивы отклоняет NaN/Infinity до DOM-записи', () => {
+    installMatchMedia(true);
+    const { el } = makeElement();
+    vMotion.mounted!(el as Element, {
+      value: { target: 5, from: 0, property: 'opacity' },
+    } as any, null as any, null as any);
+
+    expect(() => vMotion.updated!(el as Element, {
+      value: { target: NaN, property: 'opacity' },
+    } as any, null as any, null as any)).toThrow();
+    expect(() => vMotion.updated!(el as Element, {
+      value: { target: Infinity, property: 'opacity' },
+    } as any, null as any, null as any)).toThrow();
+    expect(Number(el.style.opacity)).toBe(5);
+  });
+
+  it('invalid reduced-update атомарно сохраняет presentation и прежний полёт', () => {
+    installMatchMedia(false);
+    const clock = makeVirtualClock();
+    const { el } = makeElement();
+    vMotion.mounted!(el as Element, {
+      value: { target: 0, from: 0, property: 'opacity', requestFrame: clock.requestFrame },
+    } as any, null as any, null as any);
+    vMotion.updated!(el as Element, {
+      value: { target: 100, property: 'opacity' },
+    } as any, null as any, null as any);
+
+    installMatchMedia(true);
+    expect(() => vMotion.updated!(el as Element, {
+      value: { target: NaN, property: 'transform', template: 'translateX({v}px)' },
+    } as any, null as any, null as any)).toThrow();
+    expect(el.style.transform).toBe('');
+
+    clock.drainAll();
+    expect(el.style.transform).toBe('');
+    expect(Number(el.style.opacity)).toBe(100);
+  });
+
+  it.each([NaN, Infinity])(
+    'mounted reduced отклоняет %s при finite from',
+    (invalid) => {
+      installMatchMedia(true);
+      const { el } = makeElement();
+
+      expect(() => vMotion.mounted!(el as Element, {
+        value: { target: invalid, from: 0, property: 'opacity' },
+      } as any, null as any, null as any)).toThrow();
+      expect(el.style.opacity).toBe('0');
+
+      vMotion.updated!(el as Element, {
+        value: { target: 10, property: 'opacity' },
+      } as any, null as any, null as any);
+      expect(el.style.opacity).toBe('0'); // неудачный mounted не оставил живого state
+    },
+  );
+
+  it('снап после updated применяет актуальные property/template', () => {
+    installMatchMedia(true);
+    const { el } = makeElement();
+    vMotion.mounted!(el as Element, {
+      value: { target: 0, from: 0, property: 'opacity' },
+    } as any, null as any, null as any);
+
+    vMotion.updated!(el as Element, {
+      value: { target: 0, property: 'transform', template: 'translate({v}px, {v}px)' },
+    } as any, null as any, null as any);
+
+    expect(el.style.transform).toBe('translate(0px, 0px)');
+    expect(el.style.opacity).toBe('');
   });
 });
 

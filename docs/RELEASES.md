@@ -17,7 +17,7 @@
 - изменение значений публичных motion-токенов — minor;
 - изменение только внутренней реализации без наблюдаемого эффекта — patch.
 
-## Однократная настройка npm
+## Однократная настройка выпуска
 
 В настройках пакета `@labpics/motion` создать Trusted Publisher:
 
@@ -30,12 +30,17 @@
 | Environment | `npm` |
 | Allowed action | `npm publish` |
 
-В GitHub environment `npm` рекомендуется включить ручное подтверждение выпуска.
+В GitHub environment `npm` обязательны независимый required reviewer,
+`Prevent self-review`, запрет обхода правил администраторами и deployment policy,
+разрешающая только `main`. Теги отдельно защищаются repository ruleset.
+В настройках репозитория нужно включить неизменяемость будущих GitHub Releases.
 После первого успешного OIDC-релиза нужно запретить token-based publishing в
 настройках npm и отозвать старые automation tokens.
 
-Workflow требует `id-token: write`, GitHub-hosted runner, Node 24 и npm с
-поддержкой Trusted Publishing. Версия npm проверяется до сборки.
+Право `id-token: write` принадлежит только publish-job: в нём нет checkout,
+исходников и сборки. После публикации этот же job проверяет подписи и связывает
+SLSA statement с точным source SHA и workflow. Git-тег создаёт следующий job с
+`contents: write`, но без OIDC.
 
 ## Подготовка версии
 
@@ -49,23 +54,28 @@ Workflow требует `id-token: write`, GitHub-hosted runner, Node 24 и npm 
 
 ## Публикация
 
-Создать подписанный тег, точно соответствующий версии:
-
-```bash
-git tag -s vX.Y.Z -m "vX.Y.Z"
-git push origin vX.Y.Z
-```
-
-Тег запускает `.github/workflows/release.yml`. Workflow:
+Запуск выполняется вручную из `main` с входом `version=X.Y.Z`. Push тега релиз
+не запускает: workflow всегда загружается из защищённого `main`, а не из
+произвольного Git-ref. Workflow:
 
 1. проверяет соответствие тега, `package.json` и changelog;
-2. выполняет typecheck, build, factual docs check, tests, fuzz, size и pack-smoke;
-3. публикует пакет через npm Trusted Publishing;
-4. получает автоматический provenance;
-5. создаёт GitHub Release.
+2. без OIDC выполняет audit, cycle-check, обе typecheck-конфигурации, build,
+   factual docs check, tests, fuzz, size и conformance трёх браузерных движков;
+3. один раз создаёт tgz, прогоняет на нём pack-smoke, consumer compatibility и
+   точный Node 22.0 floor, затем фиксирует SHA-256 и передаёт тот же файл как
+   immutable artifact;
+4. отдельный environment-защищённый job сверяет artifact digest, tgz digest,
+   package identity и source SHA, затем публикует или безопасно сверяет уже
+   опубликованные байты;
+5. криптографически проверяет npm-подписи и SLSA provenance, после чего создаёт
+   неизменяемый Git-тег и GitHub Release.
 
-Для release tags должны действовать ruleset/tag protection и ограничение на
-создание тега доверенными maintainers.
+Если подписанный annotated tag уже существовал на том же коммите, workflow
+раскрывает его до commit и переиспользует. Конфликтующий тег останавливает релиз
+до публикации; тег не перемещается.
+
+Для release tags должен действовать ruleset: `v*.*.*` создаёт только доверенный
+release actor этого workflow, удаление и перемещение запрещены.
 
 ## Ошибка выпуска
 

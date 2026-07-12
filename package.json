@@ -1,6 +1,6 @@
 {
   "name": "@labpics/motion",
-  "version": "0.2.0",
+  "version": "0.3.0",
   "private": false,
   "description": "Headless zero-dependency motion engine: analytic spring solver, keyframes, timeline, FLIP, gestures, WAAPI compositor path, 9 framework bindings.",
   "license": "MIT",
@@ -22,198 +22,393 @@
     "zero-dependency"
   ],
   "engines": {
-    "node": ">=18"
+    "node": ">=22"
   },
-  "packageManager": "pnpm@10.34.4",
+  "packageManager": "pnpm@11.11.0",
   "type": "module",
   "main": "./dist/index.cjs",
   "module": "./dist/index.js",
   "types": "./dist/index.d.ts",
+  "typesVersions": {
+    "*": {
+      "dist/index.d.ts": [
+        "dist/index.d.ts"
+      ],
+      "*": [
+        "dist/*/index.d.ts"
+      ]
+    }
+  },
   "exports": {
     ".": {
-      "types": "./dist/index.d.ts",
-      "import": "./dist/index.js",
-      "require": "./dist/index.cjs"
+      "import": {
+        "types": "./dist/index.d.ts",
+        "default": "./dist/index.js"
+      },
+      "require": {
+        "types": "./dist/index.d.cts",
+        "default": "./dist/index.cjs"
+      }
     },
     "./easing": {
-      "types": "./dist/easing/index.d.ts",
-      "import": "./dist/easing/index.js",
-      "require": "./dist/easing/index.cjs"
+      "import": {
+        "types": "./dist/easing/index.d.ts",
+        "default": "./dist/easing/index.js"
+      },
+      "require": {
+        "types": "./dist/easing/index.d.cts",
+        "default": "./dist/easing/index.cjs"
+      }
     },
     "./react": {
-      "types": "./dist/react/index.d.ts",
-      "import": "./dist/react/index.js",
-      "require": "./dist/react/index.cjs"
+      "import": {
+        "types": "./dist/react/index.d.ts",
+        "default": "./dist/react/index.js"
+      },
+      "require": {
+        "types": "./dist/react/index.d.cts",
+        "default": "./dist/react/index.cjs"
+      }
     },
     "./svelte": {
-      "types": "./dist/svelte/index.d.ts",
-      "import": "./dist/svelte/index.js",
-      "require": "./dist/svelte/index.cjs"
+      "import": {
+        "types": "./dist/svelte/index.d.ts",
+        "default": "./dist/svelte/index.js"
+      },
+      "require": {
+        "types": "./dist/svelte/index.d.cts",
+        "default": "./dist/svelte/index.cjs"
+      }
     },
     "./vue": {
-      "types": "./dist/vue/index.d.ts",
-      "import": "./dist/vue/index.js",
-      "require": "./dist/vue/index.cjs"
+      "import": {
+        "types": "./dist/vue/index.d.ts",
+        "default": "./dist/vue/index.js"
+      },
+      "require": {
+        "types": "./dist/vue/index.d.cts",
+        "default": "./dist/vue/index.cjs"
+      }
     },
     "./value": {
-      "types": "./dist/value/index.d.ts",
-      "import": "./dist/value/index.js",
-      "require": "./dist/value/index.cjs"
+      "import": {
+        "types": "./dist/value/index.d.ts",
+        "default": "./dist/value/index.js"
+      },
+      "require": {
+        "types": "./dist/value/index.d.cts",
+        "default": "./dist/value/index.cjs"
+      }
     },
     "./driver": {
-      "types": "./dist/driver/index.d.ts",
-      "import": "./dist/driver/index.js",
-      "require": "./dist/driver/index.cjs"
+      "import": {
+        "types": "./dist/driver/index.d.ts",
+        "default": "./dist/driver/index.js"
+      },
+      "require": {
+        "types": "./dist/driver/index.d.cts",
+        "default": "./dist/driver/index.cjs"
+      }
     },
     "./stagger": {
-      "types": "./dist/stagger/index.d.ts",
-      "import": "./dist/stagger/index.js",
-      "require": "./dist/stagger/index.cjs"
+      "import": {
+        "types": "./dist/stagger/index.d.ts",
+        "default": "./dist/stagger/index.js"
+      },
+      "require": {
+        "types": "./dist/stagger/index.d.cts",
+        "default": "./dist/stagger/index.cjs"
+      }
     },
     "./timeline": {
-      "types": "./dist/timeline/index.d.ts",
-      "import": "./dist/timeline/index.js",
-      "require": "./dist/timeline/index.cjs"
+      "import": {
+        "types": "./dist/timeline/index.d.ts",
+        "default": "./dist/timeline/index.js"
+      },
+      "require": {
+        "types": "./dist/timeline/index.d.cts",
+        "default": "./dist/timeline/index.cjs"
+      }
     },
     "./keyframes": {
-      "types": "./dist/keyframes/index.d.ts",
-      "import": "./dist/keyframes/index.js",
-      "require": "./dist/keyframes/index.cjs"
+      "import": {
+        "types": "./dist/keyframes/index.d.ts",
+        "default": "./dist/keyframes/index.js"
+      },
+      "require": {
+        "types": "./dist/keyframes/index.d.cts",
+        "default": "./dist/keyframes/index.cjs"
+      }
     },
     "./decay": {
-      "types": "./dist/decay/index.d.ts",
-      "import": "./dist/decay/index.js",
-      "require": "./dist/decay/index.cjs"
+      "import": {
+        "types": "./dist/decay/index.d.ts",
+        "default": "./dist/decay/index.js"
+      },
+      "require": {
+        "types": "./dist/decay/index.d.cts",
+        "default": "./dist/decay/index.cjs"
+      }
     },
     "./lit": {
-      "types": "./dist/lit/index.d.ts",
-      "import": "./dist/lit/index.js",
-      "require": "./dist/lit/index.cjs"
+      "import": {
+        "types": "./dist/lit/index.d.ts",
+        "default": "./dist/lit/index.js"
+      },
+      "require": {
+        "types": "./dist/lit/index.d.cts",
+        "default": "./dist/lit/index.cjs"
+      }
     },
     "./gestures": {
-      "types": "./dist/gestures/index.d.ts",
-      "import": "./dist/gestures/index.js",
-      "require": "./dist/gestures/index.cjs"
+      "import": {
+        "types": "./dist/gestures/index.d.ts",
+        "default": "./dist/gestures/index.js"
+      },
+      "require": {
+        "types": "./dist/gestures/index.d.cts",
+        "default": "./dist/gestures/index.cjs"
+      }
     },
     "./scroll": {
-      "types": "./dist/scroll/index.d.ts",
-      "import": "./dist/scroll/index.js",
-      "require": "./dist/scroll/index.cjs"
+      "import": {
+        "types": "./dist/scroll/index.d.ts",
+        "default": "./dist/scroll/index.js"
+      },
+      "require": {
+        "types": "./dist/scroll/index.d.cts",
+        "default": "./dist/scroll/index.cjs"
+      }
     },
     "./presence": {
-      "types": "./dist/presence/index.d.ts",
-      "import": "./dist/presence/index.js",
-      "require": "./dist/presence/index.cjs"
+      "import": {
+        "types": "./dist/presence/index.d.ts",
+        "default": "./dist/presence/index.js"
+      },
+      "require": {
+        "types": "./dist/presence/index.d.cts",
+        "default": "./dist/presence/index.cjs"
+      }
     },
     "./flip": {
-      "types": "./dist/flip/index.d.ts",
-      "import": "./dist/flip/index.js",
-      "require": "./dist/flip/index.cjs"
+      "import": {
+        "types": "./dist/flip/index.d.ts",
+        "default": "./dist/flip/index.js"
+      },
+      "require": {
+        "types": "./dist/flip/index.d.cts",
+        "default": "./dist/flip/index.cjs"
+      }
     },
     "./projection": {
-      "types": "./dist/projection/index.d.ts",
-      "import": "./dist/projection/index.js",
-      "require": "./dist/projection/index.cjs"
+      "import": {
+        "types": "./dist/projection/index.d.ts",
+        "default": "./dist/projection/index.js"
+      },
+      "require": {
+        "types": "./dist/projection/index.d.cts",
+        "default": "./dist/projection/index.cjs"
+      }
     },
     "./smart": {
-      "types": "./dist/smart/index.d.ts",
-      "import": "./dist/smart/index.js",
-      "require": "./dist/smart/index.cjs"
+      "import": {
+        "types": "./dist/smart/index.d.ts",
+        "default": "./dist/smart/index.js"
+      },
+      "require": {
+        "types": "./dist/smart/index.d.cts",
+        "default": "./dist/smart/index.cjs"
+      }
     },
     "./svg": {
-      "types": "./dist/svg/index.d.ts",
-      "import": "./dist/svg/index.js",
-      "require": "./dist/svg/index.cjs"
+      "import": {
+        "types": "./dist/svg/index.d.ts",
+        "default": "./dist/svg/index.js"
+      },
+      "require": {
+        "types": "./dist/svg/index.d.cts",
+        "default": "./dist/svg/index.cjs"
+      }
     },
     "./a11y": {
-      "types": "./dist/a11y/index.d.ts",
-      "import": "./dist/a11y/index.js",
-      "require": "./dist/a11y/index.cjs"
+      "import": {
+        "types": "./dist/a11y/index.d.ts",
+        "default": "./dist/a11y/index.js"
+      },
+      "require": {
+        "types": "./dist/a11y/index.d.cts",
+        "default": "./dist/a11y/index.cjs"
+      }
     },
     "./spring": {
-      "types": "./dist/spring/index.d.ts",
-      "import": "./dist/spring/index.js",
-      "require": "./dist/spring/index.cjs"
+      "import": {
+        "types": "./dist/spring/index.d.ts",
+        "default": "./dist/spring/index.js"
+      },
+      "require": {
+        "types": "./dist/spring/index.d.cts",
+        "default": "./dist/spring/index.cjs"
+      }
     },
     "./waapi": {
-      "types": "./dist/waapi/index.d.ts",
-      "import": "./dist/waapi/index.js",
-      "require": "./dist/waapi/index.cjs"
+      "import": {
+        "types": "./dist/waapi/index.d.ts",
+        "default": "./dist/waapi/index.js"
+      },
+      "require": {
+        "types": "./dist/waapi/index.d.cts",
+        "default": "./dist/waapi/index.cjs"
+      }
     },
     "./auto": {
-      "types": "./dist/auto/index.d.ts",
-      "import": "./dist/auto/index.js",
-      "require": "./dist/auto/index.cjs"
+      "import": {
+        "types": "./dist/auto/index.d.ts",
+        "default": "./dist/auto/index.js"
+      },
+      "require": {
+        "types": "./dist/auto/index.d.cts",
+        "default": "./dist/auto/index.cjs"
+      }
     },
     "./svg-morph": {
-      "types": "./dist/svg-morph/index.d.ts",
-      "import": "./dist/svg-morph/index.js",
-      "require": "./dist/svg-morph/index.cjs"
+      "import": {
+        "types": "./dist/svg-morph/index.d.ts",
+        "default": "./dist/svg-morph/index.js"
+      },
+      "require": {
+        "types": "./dist/svg-morph/index.d.cts",
+        "default": "./dist/svg-morph/index.cjs"
+      }
     },
     "./solid": {
-      "types": "./dist/solid/index.d.ts",
-      "import": "./dist/solid/index.js",
-      "require": "./dist/solid/index.cjs"
+      "import": {
+        "types": "./dist/solid/index.d.ts",
+        "default": "./dist/solid/index.js"
+      },
+      "require": {
+        "types": "./dist/solid/index.d.cts",
+        "default": "./dist/solid/index.cjs"
+      }
     },
     "./preact": {
-      "types": "./dist/preact/index.d.ts",
-      "import": "./dist/preact/index.js",
-      "require": "./dist/preact/index.cjs"
+      "import": {
+        "types": "./dist/preact/index.d.ts",
+        "default": "./dist/preact/index.js"
+      },
+      "require": {
+        "types": "./dist/preact/index.d.cts",
+        "default": "./dist/preact/index.cjs"
+      }
     },
     "./angular": {
-      "types": "./dist/angular/index.d.ts",
-      "import": "./dist/angular/index.js",
-      "require": "./dist/angular/index.cjs"
+      "import": {
+        "types": "./dist/angular/index.d.ts",
+        "default": "./dist/angular/index.js"
+      },
+      "require": {
+        "types": "./dist/angular/index.d.cts",
+        "default": "./dist/angular/index.cjs"
+      }
     },
     "./wc": {
-      "types": "./dist/wc/index.d.ts",
-      "import": "./dist/wc/index.js",
-      "require": "./dist/wc/index.cjs"
+      "import": {
+        "types": "./dist/wc/index.d.ts",
+        "default": "./dist/wc/index.js"
+      },
+      "require": {
+        "types": "./dist/wc/index.d.cts",
+        "default": "./dist/wc/index.cjs"
+      }
     },
     "./qwik": {
-      "types": "./dist/qwik/index.d.ts",
-      "import": "./dist/qwik/index.js",
-      "require": "./dist/qwik/index.cjs"
+      "import": {
+        "types": "./dist/qwik/index.d.ts",
+        "default": "./dist/qwik/index.js"
+      },
+      "require": {
+        "types": "./dist/qwik/index.d.cts",
+        "default": "./dist/qwik/index.cjs"
+      }
     },
     "./frame": {
-      "types": "./dist/frame/index.d.ts",
-      "import": "./dist/frame/index.js",
-      "require": "./dist/frame/index.cjs"
+      "import": {
+        "types": "./dist/frame/index.d.ts",
+        "default": "./dist/frame/index.js"
+      },
+      "require": {
+        "types": "./dist/frame/index.d.cts",
+        "default": "./dist/frame/index.cjs"
+      }
     },
     "./presets": {
-      "types": "./dist/presets/index.d.ts",
-      "import": "./dist/presets/index.js",
-      "require": "./dist/presets/index.cjs"
+      "import": {
+        "types": "./dist/presets/index.d.ts",
+        "default": "./dist/presets/index.js"
+      },
+      "require": {
+        "types": "./dist/presets/index.d.cts",
+        "default": "./dist/presets/index.cjs"
+      }
     },
     "./utils": {
-      "types": "./dist/utils/index.d.ts",
-      "import": "./dist/utils/index.js",
-      "require": "./dist/utils/index.cjs"
+      "import": {
+        "types": "./dist/utils/index.d.ts",
+        "default": "./dist/utils/index.js"
+      },
+      "require": {
+        "types": "./dist/utils/index.d.cts",
+        "default": "./dist/utils/index.cjs"
+      }
     },
     "./compositor": {
-      "types": "./dist/compositor/index.d.ts",
-      "import": "./dist/compositor/index.js",
-      "require": "./dist/compositor/index.cjs"
+      "import": {
+        "types": "./dist/compositor/index.d.ts",
+        "default": "./dist/compositor/index.js"
+      },
+      "require": {
+        "types": "./dist/compositor/index.d.cts",
+        "default": "./dist/compositor/index.cjs"
+      }
     },
     "./tokens": {
-      "types": "./dist/tokens/index.d.ts",
-      "import": "./dist/tokens/index.js",
-      "require": "./dist/tokens/index.cjs"
+      "import": {
+        "types": "./dist/tokens/index.d.ts",
+        "default": "./dist/tokens/index.js"
+      },
+      "require": {
+        "types": "./dist/tokens/index.d.cts",
+        "default": "./dist/tokens/index.cjs"
+      }
     },
     "./animate": {
-      "types": "./dist/animate/index.d.ts",
-      "import": "./dist/animate/index.js",
-      "require": "./dist/animate/index.cjs"
+      "import": {
+        "types": "./dist/animate/index.d.ts",
+        "default": "./dist/animate/index.js"
+      },
+      "require": {
+        "types": "./dist/animate/index.d.cts",
+        "default": "./dist/animate/index.cjs"
+      }
     },
     "./animate/mini": {
-      "types": "./dist/animate/mini/index.d.ts",
-      "import": "./dist/animate/mini/index.js",
-      "require": "./dist/animate/mini/index.cjs"
+      "import": {
+        "types": "./dist/animate/mini/index.d.ts",
+        "default": "./dist/animate/mini/index.js"
+      },
+      "require": {
+        "types": "./dist/animate/mini/index.d.cts",
+        "default": "./dist/animate/mini/index.cjs"
+      }
     },
     "./behaviors": {
-      "types": "./dist/behaviors/index.d.ts",
-      "import": "./dist/behaviors/index.js",
-      "require": "./dist/behaviors/index.cjs"
+      "import": {
+        "types": "./dist/behaviors/index.d.ts",
+        "default": "./dist/behaviors/index.js"
+      },
+      "require": {
+        "types": "./dist/behaviors/index.d.cts",
+        "default": "./dist/behaviors/index.cjs"
+      }
     }
   },
   "files": [
@@ -223,14 +418,22 @@
   "publishConfig": {
     "access": "public"
   },
-  "sideEffects": false,
+  "sideEffects": [
+    "./dist/lit/index.js",
+    "./dist/lit/index.cjs",
+    "./dist/wc/index.js",
+    "./dist/wc/index.cjs"
+  ],
   "scripts": {
     "build": "tsup",
+    "audit": "pnpm audit --audit-level moderate",
     "typecheck": "tsc --noEmit",
     "typecheck:browser": "tsc --noEmit -p tsconfig.browser.json",
     "test": "node scripts/check-docs-drift.mjs && vitest run",
     "test:watch": "vitest",
     "naming:inventory": "node scripts/naming-inventory.mjs",
+    "check:cycles": "node scripts/check-import-cycles.mjs",
+    "check:static": "pnpm audit --audit-level moderate && pnpm check:cycles && pnpm typecheck && pnpm typecheck:browser",
     "check:docs-drift": "node scripts/check-docs-drift.mjs",
     "size": "node scripts/size-gate.mjs",
     "bench": "node scripts/bench.mjs",
@@ -240,13 +443,13 @@
     "test:browser": "playwright test --project=chromium",
     "test:browser:all": "playwright test",
     "mutation": "stryker run",
-    "prepublishOnly": "pnpm typecheck && pnpm build && pnpm test && pnpm size"
+    "prepublishOnly": "pnpm check:static && pnpm build && node scripts/check-docs-facts.mjs && pnpm test && pnpm size && pnpm pack:smoke && pnpm pack:compat"
   },
   "peerDependencies": {
     "@angular/core": ">=16.0.0",
     "@builder.io/qwik": ">=1.4.0",
     "lit": ">=3.0.0",
-    "preact": ">=10.0.0",
+    "preact": ">=10.3.1",
     "react": ">=18.0.0",
     "solid-js": ">=1.8.0",
     "svelte": ">=4.0.0",
@@ -300,15 +503,5 @@
     "vite": "^8.1.3",
     "vitest": "4.1.9",
     "vue": "3.4.38"
-  },
-  "pnpm": {
-    "peerDependencyRules": {
-      "allowedVersions": {
-        "@builder.io/qwik>vite": "8"
-      }
-    },
-    "overrides": {
-      "esbuild": "^0.28.1"
-    }
   }
 }

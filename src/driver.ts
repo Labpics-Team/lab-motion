@@ -21,6 +21,7 @@
  */
 
 import { MotionParamError } from './errors.js';
+import type { MatchMediaLike } from './internal/media-query.js';
 import { type SpringParams, springUnchecked, validateSpringParams } from './spring.js';
 
 // ─── Константы ────────────────────────────────────────────────────────────────
@@ -47,7 +48,7 @@ export interface DriverOptions {
    * Injectable matchMedia. Pass `window.matchMedia.bind(window)` в браузере.
    * undefined = SSR / нет предпочтений (reduce=false).
    */
-  readonly matchMedia?: ((query: string) => MediaQueryList) | undefined;
+  readonly matchMedia?: MatchMediaLike | undefined;
   /**
    * Injectable requestAnimationFrame-заменитель.
    * handle=0 = non-draining step-clock (тест: не вызывает cb автоматически).
@@ -133,9 +134,7 @@ export interface AnimationControls {
 // ─── Вспомогательные функции ──────────────────────────────────────────────────
 
 /** Считать предпочтение reduced-motion из инжектируемого matchMedia. */
-function prefersReducedMotion(
-  matchMedia: ((query: string) => MediaQueryList) | undefined,
-): boolean {
+function prefersReducedMotion(matchMedia: MatchMediaLike | undefined): boolean {
   if (typeof matchMedia !== 'function') return false;
   try {
     return matchMedia('(prefers-reduced-motion: reduce)').matches;

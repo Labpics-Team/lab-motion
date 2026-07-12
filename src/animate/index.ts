@@ -29,7 +29,7 @@
  * скорости (канон MotionValue smooth-pickup, C¹ на обоих путях).
  */
 
-import { resolveCompositorTier, type SetTimerFn } from '../compositor/index.js';
+import { resolveCompositorTier, type SetTimerFn } from '../compositor/core.js';
 import { MotionParamError } from '../errors.js';
 import { FIXED_DT_S } from '../internal/constants.js';
 import { type SpringParams, validateSpringParams } from '../spring.js';

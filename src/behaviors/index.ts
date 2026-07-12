@@ -72,6 +72,7 @@ import { createDecay } from '../decay.js';
 import { MotionParamError } from '../errors.js';
 import { solveSpring } from '../internal/solver.js';
 import { CONVERGENCE_THRESHOLD, FIXED_DT_S, MAX_FRAMES } from '../internal/constants.js';
+import type { MatchMediaLike } from '../internal/media-query.js';
 import { validateSpringParams, type SpringParams } from '../spring.js';
 import { spring as springTokens } from '../tokens/index.js';
 import type { RequestFrameFn } from '../motion-value.js';
@@ -124,7 +125,7 @@ function _coord(p: BehaviorPoint, axis: BehaviorAxis): number {
 }
 
 /** Прочитать предпочтение reduced-motion из инжектируемого matchMedia (B4). */
-function _prefersReduced(matchMedia: ((q: string) => MediaQueryList) | undefined): boolean {
+function _prefersReduced(matchMedia: MatchMediaLike | undefined): boolean {
   if (typeof matchMedia !== 'function') return false;
   try {
     return matchMedia('(prefers-reduced-motion: reduce)').matches === true;
@@ -290,7 +291,7 @@ function _createRunner(
 function _createBase<S extends BehaviorState<number>>(
   initial: S,
   requestFrame: RequestFrameFn | undefined,
-  matchMedia: ((q: string) => MediaQueryList) | undefined,
+  matchMedia: MatchMediaLike | undefined,
 ) {
   const reduced = _prefersReduced(matchMedia);
   const runner = _createRunner(requestFrame, reduced);
@@ -403,7 +404,7 @@ export interface SheetOptions {
   /** Сопротивление за крайними snap ∈ [0,1]. По умолчанию 0.5. */
   readonly rubberBand?: number | undefined;
   readonly requestFrame?: RequestFrameFn | undefined;
-  readonly matchMedia?: ((q: string) => MediaQueryList) | undefined;
+  readonly matchMedia?: MatchMediaLike | undefined;
   readonly onChange?: ((s: SheetState) => void) | undefined;
 }
 
@@ -574,7 +575,7 @@ export interface DismissOptions {
   /** Пружина возврата/уезда. По умолчанию токен spring.default. */
   readonly spring?: SpringParams | undefined;
   readonly requestFrame?: RequestFrameFn | undefined;
-  readonly matchMedia?: ((q: string) => MediaQueryList) | undefined;
+  readonly matchMedia?: MatchMediaLike | undefined;
   readonly onChange?: ((s: DismissState) => void) | undefined;
   /** Вызывается один раз, когда элемент осел в dismissTarget. */
   readonly onDismiss?: (() => void) | undefined;
@@ -732,7 +733,7 @@ export interface CarouselOptions {
   /** Пружина доводки к странице. По умолчанию токен spring.snappy. */
   readonly spring?: SpringParams | undefined;
   readonly requestFrame?: RequestFrameFn | undefined;
-  readonly matchMedia?: ((q: string) => MediaQueryList) | undefined;
+  readonly matchMedia?: MatchMediaLike | undefined;
   readonly onChange?: ((s: CarouselState) => void) | undefined;
 }
 
@@ -913,7 +914,7 @@ export interface PullOptions {
   /** Асинхронное действие; возврат пружиной — после его резолва. */
   readonly onRefresh?: (() => void | Promise<void>) | undefined;
   readonly requestFrame?: RequestFrameFn | undefined;
-  readonly matchMedia?: ((q: string) => MediaQueryList) | undefined;
+  readonly matchMedia?: MatchMediaLike | undefined;
   readonly onChange?: ((s: PullState) => void) | undefined;
 }
 

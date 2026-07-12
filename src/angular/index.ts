@@ -8,15 +8,14 @@
  * DestroyRef.onDestroy; вне контекста assertInInjectionContext даёт честную
  * NG0203-ошибку вместо тихой утечки.
  *
- * Reduced-motion — смена ХАРАКТЕРА (инвариант пакета): снап значения в сигнал
- * синхронно; запись в обход ядра зеркалит его валидацию (не-finite target →
- * MotionParamError — NaN не загрязняет сигнал, CSS-safe).
+ * Reduced-motion — смена ХАРАКТЕРА (инвариант пакета): доменный
+ * MotionValue.snapTo синхронно эмитит в сигнал, гасит прежний полёт
+ * и централизует finite-валидацию (CSS-safe).
  */
 
 import { assertInInjectionContext, DestroyRef, inject, signal, type Signal } from '@angular/core';
 import type { MotionValue, MotionValueOptions } from '../motion-value.js';
 import { createBoundValue } from '../internal/binding-value.js';
-import { MotionParamError } from '../errors.js';
 import { type SpringParams } from '../spring.js';
 
 const DEFAULT_SPRING: SpringParams = { mass: 1, stiffness: 200, damping: 20 };
@@ -79,13 +78,9 @@ export function injectSpring(
   const setTarget = (target: number): void => {
     if (destroyed) return;
     if (prefersReducedMotion()) {
-      // Снап пишет в сигнал в обход ядра — валидация зеркалит mv.setTarget.
-      if (!Number.isFinite(target)) {
-        throw new MotionParamError(
-          `injectSpring: target должен быть конечным, получено ${target}`,
-        );
-      }
-      value.set(target); // характер: снап ('fade' — CSS потребителя)
+      // onChange уже пишет в Angular Signal; ядро централизует
+      // finite-валидацию и инвалидацию queued-кадра прежнего полёта.
+      mv.snapTo(target);
       void reducedMotionMode;
     } else {
       mv.setTarget(target);

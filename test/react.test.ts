@@ -10,17 +10,10 @@
  * React hooks are tested without a DOM by mocking React's hook primitives.
  * The virtual clock ensures deterministic, synchronous animation progress.
  *
- * Reduced-motion CHARACTER test (northInvariant #5):
- *   When prefers-reduced-motion is active, useSpring must snap to the target
- *   value immediately (instant CHARACTER), not simply skip the animation.
- *   Mutation proof: remove the `prefersReducedMotion()` branch in useSpring →
- *   the snap-to-target assertion fails (value stays at initial, not target).
- *
- * TDD RED-proof (how to confirm RED before implementation):
- *   1. Comment out the `setValue(target)` line in the reduced-motion branch.
- *   2. Run: pnpm test test/react.test.ts
- *   3. The 'reduced-motion: snaps to target immediately' test MUST fail.
- *   4. Restore → GREEN.
+ * Reduced-motion CHARACTER test (northInvariant #5): useSpring должен
+ * мгновенно снапнуть цель через MotionValue.snapTo, а не пропустить
+ * анимацию и не записать state в обход ядра. Гонка с уже поставленным
+ * кадром покрыта в реальном React-рантайме (react-runtime.test.ts).
  */
 
 import { describe, expect, it, vi, beforeEach, afterEach } from 'vitest';
@@ -51,7 +44,7 @@ function makeVirtualClock(dtMs = 1000 / 60) {
     while (queue.length > 0 && i++ < max) drain(1);
   };
 
-  return { requestFrame, drain, drainAll };
+  return { requestFrame, drain, drainAll, pending: () => queue.length };
 }
 
 // ─── React mock ──────────────────────────────────────────────────────────
@@ -70,6 +63,9 @@ let _refs: Array<{ current: unknown }> = [];
 let _refIdx = 0;
 
 vi.mock('react', () => {
+  const enqueueEffect = (fn: () => (() => void) | void): void => {
+    _effectsPending.push({ fn });
+  };
   return {
     useState: (init: unknown) => {
       const idx = _stateIdx++;
@@ -91,9 +87,8 @@ vi.mock('react', () => {
       }
       return _refs[idx];
     },
-    useEffect: (fn: () => (() => void) | void, _deps?: unknown[]) => {
-      _effectsPending.push({ fn });
-    },
+    useEffect: enqueueEffect,
+    useInsertionEffect: enqueueEffect,
     useCallback: (fn: unknown) => fn,
   };
 });
@@ -105,6 +100,13 @@ function resetReactMock() {
   _effectsRan = [];
   _refs = [];
   _refIdx = 0;
+}
+
+/** Рендер того же mock-компонента: state/ref живут, индексы хуков начинаются сначала. */
+function renderHook<T>(fn: () => T): T {
+  _stateIdx = 0;
+  _refIdx = 0;
+  return fn();
 }
 
 /** Run all pending effects; record cleanup functions for later teardown. */
@@ -162,6 +164,7 @@ afterEach(() => {
 
 import { useMotionValue, useSpring } from '../src/react/index.js';
 import { MotionValue } from '../src/motion-value.js';
+import { MotionParamError } from '../src/errors.js';
 
 describe('useMotionValue', () => {
   it('returns a MotionValue instance', () => {
@@ -231,23 +234,44 @@ describe('useSpring', () => {
 });
 
 describe('useSpring — reduced-motion CHARACTER', () => {
+  it.each([NaN, Infinity])(
+    'reduced-путь отклоняет %s до записи в React state',
+    (invalid) => {
+      installMatchMedia(true);
+      const clock = makeVirtualClock();
+
+      renderHook(() =>
+        useSpring(5, { mass: 1, stiffness: 200, damping: 20 }, 'instant', clock.requestFrame),
+      );
+      runAllEffects();
+
+      renderHook(() =>
+        useSpring(invalid, { mass: 1, stiffness: 200, damping: 20 }, 'instant', clock.requestFrame),
+      );
+      expect(() => runAllEffects()).toThrow(MotionParamError);
+      expect(_stateRegistry[0]?.val).toBe(5);
+    },
+  );
+
   it('snaps to target immediately when prefers-reduced-motion: reduce', () => {
     // C: Property — reduced-motion switches CHARACTER to instant snap
     // northInvariant #5: CHARACTER must change, not hard-off
-    // Mutation proof: remove setValue(target) in reduced-motion branch →
+    // Mutation proof: remove mv.snapTo(target) in reduced-motion branch →
     //   state registry not updated → valueState.val stays at initial
     installMatchMedia(true); // activate reduced-motion
 
     const clock = makeVirtualClock();
 
-    // Simulate: first render at initial=0, then re-render with target=100
-    // Each render creates a fresh mock state (simulating a re-render cycle)
-    resetReactMock();
-    useSpring(100, { mass: 1, stiffness: 200, damping: 20 }, 'instant', clock.requestFrame);
+    renderHook(() =>
+      useSpring(0, { mass: 1, stiffness: 200, damping: 20 }, 'instant', clock.requestFrame),
+    );
+    runAllEffects();
+    renderHook(() =>
+      useSpring(100, { mass: 1, stiffness: 200, damping: 20 }, 'instant', clock.requestFrame),
+    );
     runAllEffects();
 
-    // With reduced-motion, the setValue(target) in useEffect must fire during runAllEffects
-    // The value state (first entry) should now be 100
+    // snapTo эмитит через уже подписанный onChange.
     const valueState = _stateRegistry[0];
     expect(valueState?.val).toBe(100);
   });
@@ -258,8 +282,13 @@ describe('useSpring — reduced-motion CHARACTER', () => {
     installMatchMedia(true);
 
     const clock = makeVirtualClock();
-    resetReactMock();
-    useSpring(100, { mass: 1, stiffness: 200, damping: 20 }, 'instant', clock.requestFrame);
+    renderHook(() =>
+      useSpring(0, { mass: 1, stiffness: 200, damping: 20 }, 'instant', clock.requestFrame),
+    );
+    runAllEffects();
+    renderHook(() =>
+      useSpring(100, { mass: 1, stiffness: 200, damping: 20 }, 'instant', clock.requestFrame),
+    );
     runAllEffects();
 
     const valueState = _stateRegistry[0];
@@ -278,11 +307,14 @@ describe('useSpring — reduced-motion CHARACTER', () => {
       return framesScheduled.length;
     };
 
-    resetReactMock();
-    useSpring(0, { mass: 1, stiffness: 200, damping: 20 }, 'instant', trackingRequestFrame);
-
-    // Record how many frames were requested during init
+    renderHook(() =>
+      useSpring(0, { mass: 1, stiffness: 200, damping: 20 }, 'instant', trackingRequestFrame),
+    );
+    runAllEffects();
     const framesAtInit = framesScheduled.length;
+    renderHook(() =>
+      useSpring(100, { mass: 1, stiffness: 200, damping: 20 }, 'instant', trackingRequestFrame),
+    );
     runAllEffects();
 
     // After effects run, the reduced-motion path should NOT schedule new frames
@@ -297,26 +329,17 @@ describe('useSpring — reduced-motion CHARACTER', () => {
     installMatchMedia(false);
 
     const clock = makeVirtualClock();
-    resetReactMock();
-    useSpring(100, { mass: 1, stiffness: 200, damping: 20 }, 'instant', clock.requestFrame);
+    renderHook(() =>
+      useSpring(0, { mass: 1, stiffness: 200, damping: 20 }, 'instant', clock.requestFrame),
+    );
     runAllEffects();
-
-    // With full motion, at least one frame should be scheduled (spring loop started)
-    // because mv.setTarget(100) is called from the useEffect
-    // The MotionValue starts from 100 so it may not animate (from===to fast path)
-    // → test this via a more meaningful path: mv.setTarget on a different value
-    // Actually with initial=100 and target=100, no animation occurs (already at target)
-    // So test that the spring works for a different pair via the underlying MV
-    const mvClock = makeVirtualClock();
-    const mv = new MotionValue({ initial: 0, spring: { mass: 1, stiffness: 200, damping: 20 }, requestFrame: mvClock.requestFrame });
-    const values: number[] = [];
-    mv.onChange((v) => values.push(v));
-    mv.setTarget(100);
-    // Before drain, value should NOT be 100 yet (spring in flight)
-    expect(mv.value).not.toBe(100);
-    mvClock.drainAll();
-    expect(mv.value).toBe(100);
-    mv.destroy();
+    renderHook(() =>
+      useSpring(100, { mass: 1, stiffness: 200, damping: 20 }, 'instant', clock.requestFrame),
+    );
+    runAllEffects();
+    expect(clock.pending()).toBeGreaterThan(0);
+    clock.drainAll();
+    expect(_stateRegistry[0]?.val).toBe(100);
   });
 });
 

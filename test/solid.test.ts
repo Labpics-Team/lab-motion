@@ -106,7 +106,7 @@ describe('solid: createSpring — анимация на реальных сиг�
     const vc = makeVirtualClock();
     const [x, setX, destroy] = createSpring(7, SPRING, 'instant', vc.requestFrame);
     destroy();
-    setX(100); // reduced-путь пишет в сигнал напрямую — обязан уважать destroy
+    setX(100); // адаптер не должен диспетчить snapTo после destroy
     expect(x()).toBe(7);
   });
 
@@ -150,6 +150,24 @@ describe('solid: createSpring — анимация на реальных сиг�
       expect(x()).toBe(100); // синхронно, без кадров
       dispose();
     });
+  });
+
+  it('full→reduce инвалидирует уже поставленный кадр', () => {
+    let reduced = false;
+    (globalThis as { window?: unknown }).window = {
+      matchMedia: () => ({ get matches() { return reduced; } }),
+    };
+    const vc = makeVirtualClock();
+    const [value, setTarget, destroy] = createSpring(0, SPRING, 'instant', vc.requestFrame);
+
+    setTarget(100);
+    reduced = true;
+    setTarget(200);
+    expect(value()).toBe(200);
+
+    vc.drainAll();
+    expect(value()).toBe(200);
+    destroy();
   });
 });
 

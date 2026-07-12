@@ -18,7 +18,7 @@
  * не наблюдаем из rAF-шва и оценивается одним кадром FIXED_DT_S.
  */
 
-import { readCompositorSpring } from '../compositor/index.js';
+import { readCompositorSpring } from '../compositor/core.js';
 import { CONVERGENCE_THRESHOLD, FIXED_DT_S, MAX_FRAMES } from '../internal/constants.js';
 import type { SpringParams } from '../spring.js';
 import {
@@ -152,7 +152,7 @@ export class MainUnit implements GroupOwner {
   /** Стоп в текущей позиции: без записи, finished резолвится. */
   cancel(): void {
     if (this._done) return;
-    this._writeBack(false);
+    this._writeBack();
     this._finish(false);
   }
 
@@ -308,12 +308,12 @@ export class MainUnit implements GroupOwner {
       o.css.css = cssAt(o.css, 1);
     }
     this._write();
-    this._writeBack(true);
+    this._writeBack();
     this._finish(true);
   }
 
-  /** Фиксация состояния в реестре (natural: скорости обнулены — покой). */
-  private _writeBack(_natural: boolean): void {
+  /** Фиксация состояния в реестре; после cancel/settle публичная скорость — покой. */
+  private _writeBack(): void {
     const rec = this._o.record;
     for (const ch of this._o.numeric) {
       rec.numeric.set(ch.key, { value: ch.value, velocity: 0 });

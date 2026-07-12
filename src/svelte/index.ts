@@ -123,12 +123,9 @@ export function springStore(
     set(target, modeOverride) {
       const mode = modeOverride ?? reducedMotionMode;
       if (prefersReducedMotion()) {
-        // CHARACTER switch: skip spring, emit synchronously.
-        // 'instant': snap. 'fade': same from store side — caller applies CSS.
-        currentValue = target;
-        for (const run of subscribers) {
-          run(target);
-        }
+        // Подписка уже транслирует эмиссию в store; snapTo останавливает
+        // старый цикл и не даёт queued-кадру перезатереть reduced-снап.
+        mv.snapTo(target);
       } else {
         mv.setTarget(target);
       }

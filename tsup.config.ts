@@ -5,7 +5,9 @@ export default defineConfig({
   format: ['cjs', 'esm'],
   dts: true,
   splitting: false,
-  sourcemap: true,
+  // Карты не входят в npm-артефакт; их генерация оставляла в runtime-файлах
+  // ссылки на отсутствующие ресурсы и создавала ложные 404 в DevTools.
+  sourcemap: false,
   clean: true,
   minify: 'terser',
   terserOptions: { compress: { passes: 3, pure_getters: true }, mangle: { properties: { regex: /^_/ } } },

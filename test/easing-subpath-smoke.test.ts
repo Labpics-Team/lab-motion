@@ -38,7 +38,10 @@ const pkgRoot = resolve(here, '..');
 // Read the package.json exports map — this is the source of truth for resolution
 // ---------------------------------------------------------------------------
 const pkg = JSON.parse(readFileSync(resolve(pkgRoot, 'package.json'), 'utf8')) as {
-  exports?: Record<string, { types?: string; import?: string; require?: string }>;
+  exports?: Record<string, {
+    import?: { types?: string; default?: string };
+    require?: { types?: string; default?: string };
+  }>;
 };
 
 const easingExports = pkg.exports?.['./easing'];
@@ -46,9 +49,10 @@ const easingExports = pkg.exports?.['./easing'];
 // Validate and resolve the actual dist path declared in exports["./easing"].import.
 // All targets must be package-relative (start with "./") — absolute or parent-relative
 // ("../") paths are not valid package export targets and indicate a misconfigured build.
-const declaredImportPath = easingExports?.import; // e.g. "./dist/easing/index.js"
-const declaredRequirePath = easingExports?.require;
-const declaredTypesPath = easingExports?.types;
+const declaredImportPath = easingExports?.import?.default; // e.g. "./dist/easing/index.js"
+const declaredRequirePath = easingExports?.require?.default;
+const declaredImportTypesPath = easingExports?.import?.types;
+const declaredRequireTypesPath = easingExports?.require?.types;
 
 /** Assert a target is package-relative (starts with "./") and resolve it. */
 function resolvePackageRelative(declared: string | undefined): string | null {
@@ -74,22 +78,23 @@ describe('easing ./easing subpath — package-boundary smoke (NE5)', () => {
     ).toBeDefined();
   });
 
-  it('./easing export map declares types, import, and require fields — all package-relative (start with "./")', () => {
-    expect(easingExports?.types, './easing "types" field must be declared').toBeTruthy();
-    expect(easingExports?.import, './easing "import" (ESM) field must be declared').toBeTruthy();
-    expect(easingExports?.require, './easing "require" (CJS) field must be declared').toBeTruthy();
+  it('./easing export map declares format-specific types and runtime targets', () => {
+    expect(easingExports?.import?.types, './easing import.types must be declared').toBeTruthy();
+    expect(easingExports?.require?.types, './easing require.types must be declared').toBeTruthy();
+    expect(easingExports?.import?.default, './easing import.default must be declared').toBeTruthy();
+    expect(easingExports?.require?.default, './easing require.default must be declared').toBeTruthy();
     // All targets must start with "./" — pins resolvePackageRelative guard
     expect(
-      easingExports?.import?.startsWith('./'),
-      `exports["./easing"].import "${easingExports?.import}" must be package-relative (start with "./")`
+      easingExports?.import?.default?.startsWith('./'),
+      `exports["./easing"].import.default "${easingExports?.import?.default}" must be package-relative (start with "./")`
     ).toBe(true);
     expect(
-      easingExports?.require?.startsWith('./'),
-      `exports["./easing"].require "${easingExports?.require}" must be package-relative (start with "./")`
+      easingExports?.require?.default?.startsWith('./'),
+      `exports["./easing"].require.default "${easingExports?.require?.default}" must be package-relative (start with "./")`
     ).toBe(true);
     expect(
-      easingExports?.types?.startsWith('./'),
-      `exports["./easing"].types "${easingExports?.types}" must be package-relative (start with "./")`
+      easingExports?.import?.types?.startsWith('./') && easingExports?.require?.types?.startsWith('./'),
+      'exports["./easing"] type targets must be package-relative',
     ).toBe(true);
   });
 
@@ -114,14 +119,13 @@ describe('easing ./easing subpath — package-boundary smoke (NE5)', () => {
     ).toBe(true);
   });
 
-  it('exports["./easing"].types target is package-relative and exists on disk', () => {
-    // resolvePackageRelative throws if target is not package-relative (not starting with "./")
-    const dtsPath = resolvePackageRelative(declaredTypesPath);
-    expect(dtsPath, 'exports["./easing"].types must be declared').not.toBeNull();
-    expect(
-      existsSync(dtsPath!),
-      `exports["./easing"].types → "${declaredTypesPath}" → "${dtsPath}" does not exist on disk (NE5)`,
-    ).toBe(true);
+  it('format-specific declaration targets exist and differ by module kind', () => {
+    const esmTypes = resolvePackageRelative(declaredImportTypesPath);
+    const cjsTypes = resolvePackageRelative(declaredRequireTypesPath);
+    expect(existsSync(esmTypes!)).toBe(true);
+    expect(existsSync(cjsTypes!)).toBe(true);
+    expect(declaredImportTypesPath).toMatch(/\.d\.ts$/);
+    expect(declaredRequireTypesPath).toMatch(/\.d\.cts$/);
   });
 
   // ---------------------------------------------------------------------------

@@ -145,11 +145,15 @@ describe('wc: враждебные входы и reduced-motion', () => {
   it('невалидный target-атрибут игнорируется (HTML-конвенция, без броска)', () => {
     const { el, vc } = makeEl();
     el.connectedCallback();
-    for (const bad of ['мусор', 'NaN', 'Infinity', '']) {
+    el.attributeChangedCallback('target', null, '1');
+    vc.drainAll();
+
+    for (const bad of ['мусор', 'NaN', 'Infinity', '', '   ']) {
       expect(() => el.attributeChangedCallback('target', null, bad)).not.toThrow();
     }
     vc.drainAll();
-    expect(el.style['opacity']).toBe('0'); // стиль не тронут мусором
+    expect(el.style['opacity']).toBe('1');
+    expect(el.target).toBe(1); // пустая строка не превращается неявно в 0
   });
 
   it('reduced-motion: смена target снапает стиль синхронно, без кадров', () => {
@@ -157,6 +161,31 @@ describe('wc: враждебные входы и reduced-motion', () => {
     el.connectedCallback();
     el.attributeChangedCallback('target', null, '1');
     expect(el.style['opacity']).toBe('1'); // ни одного drainAll
+  });
+
+  it('full→reduce инвалидирует уже поставленный кадр', () => {
+    let reduced = false;
+    const { el, vc } = makeEl({ matchMedia: () => ({ get matches() { return reduced; } }) });
+    el.connectedCallback();
+
+    el.attributeChangedCallback('target', null, '1');
+    reduced = true;
+    el.attributeChangedCallback('target', null, '2');
+    expect(el.style['opacity']).toBe('2');
+
+    vc.drainAll();
+    expect(el.style['opacity']).toBe('2');
+  });
+
+  it('reduced-снап той же цели применяет обновлённые property/template', () => {
+    const { el } = makeEl({ matchMedia: () => ({ matches: true }) });
+    el.connectedCallback();
+    el.attributeChangedCallback('property', 'opacity', 'transform');
+    el.attributeChangedCallback('template', '{v}', 'translateX({v}px)');
+    el.attributeChangedCallback('target', null, '0');
+
+    expect(el.style['transform']).toBe('translateX(0px)');
+    expect(el.style['opacity']).toBe('');
   });
 });
 

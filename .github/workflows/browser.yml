@@ -1,55 +1,15 @@
 name: Browser conformance
 
 # Browser matrix (issue #102, фаза D): сверка СОБРАННОГО dist с реальным
-# поведением трёх движков (Chromium/Firefox/WebKit). Обязателен для PR,
-# затрагивающих platform adapters — поэтому paths-фильтр на соответствующие
-# субпути + сам browser-слой. Артефакты (trace/video) — только on-failure.
+# поведением трёх движков (Chromium/Firefox/WebKit). Гейт запускается для каждого
+# PR: required check не должен исчезать из-за paths-фильтра. Артефакты
+# (trace/video) выгружаются только при сбое.
 
 on:
   push:
     branches: ["main"]
-    paths:
-      - "src/compositor/**"
-      - "src/gestures/**"
-      - "src/waapi/**"
-      - "src/projection/**"
-      - "src/animate/**"
-      - "src/presence/**"
-      - "src/flip/**"
-      - "src/a11y/**"
-      - "src/scroll/**"
-      - "src/smart/**"
-      - "src/behaviors/**"
-      - "src/wc/**"
-      - "src/svg/**"
-      - "src/svg-morph/**"
-      - "browser/**"
-      - "playwright.config.ts"
-      - "package.json"
-      - "tsup.config.ts"
-      - ".github/workflows/browser.yml"
   pull_request:
     branches: ["main"]
-    paths:
-      - "src/compositor/**"
-      - "src/gestures/**"
-      - "src/waapi/**"
-      - "src/projection/**"
-      - "src/animate/**"
-      - "src/presence/**"
-      - "src/flip/**"
-      - "src/a11y/**"
-      - "src/scroll/**"
-      - "src/smart/**"
-      - "src/behaviors/**"
-      - "src/wc/**"
-      - "src/svg/**"
-      - "src/svg-morph/**"
-      - "browser/**"
-      - "playwright.config.ts"
-      - "package.json"
-      - "tsup.config.ts"
-      - ".github/workflows/browser.yml"
   merge_group:
   workflow_dispatch:
 
@@ -76,21 +36,21 @@ jobs:
 
     steps:
       - name: Checkout
-        uses: actions/checkout@v6
+        uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7
         with:
           # Токен не нужен после checkout (пуша нет) — не оставляем его на диске
           # перед pnpm install (postinstall-скрипты третьих сторон). SAST: artipacked.
           persist-credentials: false
 
       - name: Setup Node
-        uses: actions/setup-node@v6
+        uses: actions/setup-node@48b55a011bda9f5d6aeb4c2d9c7362e8dae4041e # v6
         with:
-          node-version: "20"
+          node-version: "24"
 
       - name: Activate pinned pnpm
         run: |
           corepack enable
-          corepack install --global pnpm@10.34.4
+          corepack install --global pnpm@11.11.0
 
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
@@ -115,7 +75,7 @@ jobs:
       # выгружаем их лишь когда шаг упал.
       - name: Upload failure artifacts
         if: failure()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
         with:
           name: browser-conformance-${{ matrix.browser }}-${{ github.run_id }}
           path: |
