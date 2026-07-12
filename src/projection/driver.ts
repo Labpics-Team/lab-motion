@@ -16,8 +16,8 @@
  *
  * Velocity continuity при перехвате (спека §2.3.2): скорость канала c ∈ {x,y,w,h}
  * узла аналитична каждый кадр: V̇_c = R_c · ṗ, R_c = L_c − F_c. Пер-боксовые px/s
- * НЕ хранятся — восстанавливаются замкнутой формой (принцип readCompositorSpring,
- * src/compositor/index.ts:369: «состояние никогда не читается из DOM»).
+ * НЕ хранятся — восстанавливаются замкнутой формой (принцип
+ * readCompositorSpring: «состояние никогда не читается из DOM»).
  *   C⁰: first' = mixBox(first, last, p̂) — аналитический visual box, ноль DOM.
  *       Каналы radii/opacity ребейзятся той же формой: radii.first' =
  *       lerp(prev first, prev last, clamp01(p̂)) пер-угла/пер-оси, opacity.from' =

@@ -4,26 +4,28 @@
  * Расширяет pack:smoke (ESM/CJS) до полной матрицы совместимости потребителя:
  * тарбол собирается ОДИН раз (pnpm pack) и ставится в чистые изолированные
  * фикстуры — ESM, CJS, TypeScript (nodenext-типы), Vite (bundler-резолв exports),
- * SSR (import без DOM). Плюс — контракт Node ≥ 18 проверяется отдельным фактом.
+ * SSR (import без DOM). Плюс — контракт Node ≥ 22 проверяется отдельным фактом.
  *
  * Зачем поверх pack:smoke: класс «tarball ставится, но у потребителя с ДРУГИМ
  * резолвером (tsc nodenext / vite) субпуть не находится / типы не подхватываются /
  * DOM-facing субпуть падает на сервере» — этого ESM/CJS-смоук не видит. Каждый
  * резолвер здесь — отдельная фикстура.
  *
- * Zero-config сеть: тарбол ставится `npm install` из локального файла (у пакета
- * нет runtime-зависимостей, peer'ы optional). tsc/vite берутся из root node_modules
- * (не тянутся из сети). Node ≥ 18 — раннер этого скрипта.
+ * Основные фикстуры ставят тарбол локально; tsc/vite берутся из root node_modules.
+ * Единственный сетевой шаг устанавливает точный минимальный Preact peer: так
+ * заявленный floor доказывается реальным импортом, а не строкой package.json.
  */
 
 import { execSync } from 'node:child_process';
 import { mkdirSync, mkdtempSync, readFileSync, readdirSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
-import { dirname, join, resolve } from 'node:path';
+import { basename, dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { build } from 'esbuild';
 
 const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '..');
 const pkg = JSON.parse(readFileSync(join(ROOT, 'package.json'), 'utf8'));
+const suppliedTarball = process.argv[2] === undefined ? undefined : resolve(process.argv[2]);
 
 /** Субпути с обязательным peer-фреймворком — вне consumer-контракта голого пакета. */
 const PEER_BINDING_SUBPATHS = new Set([
@@ -65,18 +67,33 @@ function installFixture(name, packageJson, tarball) {
 }
 
 try {
-  // ── Node ≥ 18 consumer contract (пункт 13) ────────────────────────────────
+  // ── Node ≥ 22 consumer contract (пункт 13) ────────────────────────────────
   const major = Number(process.versions.node.split('.')[0]);
-  if (major < 18) fail(`Node ${process.versions.node} < 18 — consumer contract нарушен`);
-  if (pkg.engines?.node !== '>=18') fail(`engines.node ожидался '>=18', получено '${pkg.engines?.node}'`);
+  if (major < 22) fail(`Node ${process.versions.node} < 22 — consumer contract нарушен`);
+  if (pkg.engines?.node !== '>=22') fail(`engines.node ожидался '>=22', получено '${pkg.engines?.node}'`);
   log(`Node contract: раннер ${process.versions.node}, engines '${pkg.engines?.node}' ✓`);
 
-  // ── Тарбол ОДИН раз (пункт 11) ─────────────────────────────────────────────
-  execSync(`pnpm pack --pack-destination "${work}"`, { cwd: ROOT, stdio: 'pipe' });
-  const tarballName = readdirSync(work).find((f) => f.endsWith('.tgz'));
-  if (!tarballName) throw new Error('pnpm pack не создал тарбол');
-  const tarball = join(work, tarballName);
-  log(`tarball: ${tarballName}`);
+  // В release-контуре путь передаётся явно: все consumer-гейты проверяют
+  // ровно те байты, которые затем получают artifact и npm publish.
+  let tarball;
+  let tarballName;
+  if (suppliedTarball !== undefined) {
+    if (!suppliedTarball.endsWith('.tgz')) throw new Error('переданный файл не является tgz');
+    try {
+      readFileSync(suppliedTarball);
+    } catch {
+      throw new Error(`переданный tgz не найден: ${suppliedTarball}`);
+    }
+    tarball = suppliedTarball;
+    tarballName = basename(suppliedTarball);
+    log(`готовый tarball: ${tarballName}`);
+  } else {
+    execSync(`pnpm pack --pack-destination "${work}"`, { cwd: ROOT, stdio: 'pipe' });
+    tarballName = readdirSync(work).find((f) => f.endsWith('.tgz'));
+    if (!tarballName) throw new Error('pnpm pack не создал тарбол');
+    tarball = join(work, tarballName);
+    log(`собран tarball: ${tarballName}`);
+  }
 
   // ── ESM-фикстура (пункт 12) ────────────────────────────────────────────────
   {
@@ -175,6 +192,173 @@ try {
     log('TS: nodenext-резолв exports + типы прошли tsc --noEmit ✓');
   }
 
+  // Headless API обязан типизироваться в чистом Node без lib.dom. Структурный
+  // matchMedia-контракт не должен снова протечь как глобальный MediaQueryList.
+  {
+    const dir = installFixture('ts-headless', { name: 'ts-headless-fx', private: true, type: 'module' }, tarball);
+    writeFileSync(
+      join(dir, 'tsconfig.json'),
+      JSON.stringify({
+        compilerOptions: {
+          module: 'nodenext',
+          moduleResolution: 'nodenext',
+          target: 'ES2022',
+          lib: ['ES2022'],
+          strict: true,
+          noEmit: true,
+          skipLibCheck: false,
+          types: [],
+        },
+        include: ['consumer.ts'],
+      }),
+    );
+    writeFileSync(
+      join(dir, 'consumer.ts'),
+      `import { drive, type DriveOptions } from '${pkg.name}';\n` +
+        `import { createDriver, type DriverOptions } from '${pkg.name}/driver';\n` +
+        `import { createDecay, type DecayOptions } from '${pkg.name}/decay';\n` +
+        `import type { DragOptions } from '${pkg.name}/gestures';\n` +
+        `import type { PresenceOptions } from '${pkg.name}/presence';\n` +
+        `import type { FlipOptions } from '${pkg.name}/flip';\n` +
+        `import type { SheetOptions } from '${pkg.name}/behaviors';\n` +
+        `const matchMedia = (_query: string) => ({ matches: false });\n` +
+        `const spring = { mass: 1, stiffness: 200, damping: 20 };\n` +
+        `const root: DriveOptions = { from: 0, to: 1, spring, onStep() {}, matchMedia };\n` +
+        `const driver: DriverOptions = { ...root };\n` +
+        `const decay: DecayOptions = { from: 0, velocity: 1, matchMedia };\n` +
+        `export const contracts: [DragOptions, PresenceOptions, FlipOptions, SheetOptions] | undefined = undefined;\n` +
+        `drive(root); createDriver(driver); createDecay(decay);\n`,
+    );
+    const tscBin = join(ROOT, 'node_modules', 'typescript', 'bin', 'tsc');
+    execSync(`node "${tscBin}" --project tsconfig.json`, { cwd: dir, stdio: 'pipe' });
+    log('TS headless: NodeNext без lib.dom и skipLibCheck прошёл ✓');
+  }
+
+  // Legacy Node10 resolver не читает package#exports. typesVersions обязан
+  // направлять каждый субпуть к той же декларации, что modern resolver.
+  {
+    const dir = installFixture('ts-legacy', { name: 'ts-legacy-fx', private: true }, tarball);
+    writeFileSync(
+      join(dir, 'tsconfig.json'),
+      JSON.stringify({
+        compilerOptions: {
+          module: 'commonjs',
+          moduleResolution: 'node10',
+          target: 'ES2022',
+          lib: ['ES2022', 'DOM'],
+          strict: true,
+          noEmit: true,
+          skipLibCheck: false,
+          types: [],
+        },
+        include: ['consumer.ts'],
+      }),
+    );
+    writeFileSync(
+      join(dir, 'consumer.ts'),
+      `import { spring } from '${pkg.name}';\n` +
+        `import { clamp } from '${pkg.name}/utils';\n` +
+        `import { animate } from '${pkg.name}/animate/mini';\n` +
+        `export const value: number = clamp(0, 1, spring({ mass: 1, stiffness: 200, damping: 20 }, 0.1).value);\n` +
+        `export const motion = animate;\n`,
+    );
+    const tscBin = join(ROOT, 'node_modules', 'typescript', 'bin', 'tsc');
+    const trace = execSync(`node "${tscBin}" --project tsconfig.json --traceResolution`, {
+      cwd: dir,
+      encoding: 'utf8',
+    }).replaceAll('\\', '/');
+    for (const declaration of ['dist/utils/index.d.ts', 'dist/animate/mini/index.d.ts']) {
+      if (!trace.includes(declaration)) fail(`TS Node10 не разрешил typesVersions: ${declaration}`);
+    }
+    log('TS legacy: Node10-resolver разрешил вложенные субпути через typesVersions ✓');
+  }
+
+  // Preact <=10.3.0 не экспортирует `preact/hooks` в поддерживаемой Node-форме.
+  // Импортируем binding на точном заявленном floor, чтобы диапазон peer не лгал.
+  {
+    const dir = installFixture('preact-floor', { name: 'preact-floor-fx', private: true, type: 'module' }, tarball);
+    execSync('npm install --ignore-scripts --no-audit --no-fund --save-exact preact@10.3.1', {
+      cwd: dir,
+      stdio: 'pipe',
+    });
+    const probe = `
+      const binding = await import('${pkg.name}/preact');
+      if (typeof binding.useSpring !== 'function' || typeof binding.useMotionValue !== 'function') {
+        throw new Error('Preact binding не экспортирует публичные хуки');
+      }
+      console.log('preact floor ok');
+    `;
+    writeFileSync(join(dir, 'preact-floor.mjs'), probe);
+    log(`Preact peer floor: ${execSync('node preact-floor.mjs', { cwd: dir, encoding: 'utf8' }).trim()} ✓`);
+  }
+
+  // CJS-потребитель выбирает require-ветку exports. Отдельная .cts-фикстура
+  // ловит класс, невидимый ESM-проверке: декларация обязана иметь тот же
+  // модульный формат, что и соответствующая runtime-ветка.
+  {
+    const dir = installFixture('ts-cjs', { name: 'ts-cjs-fx', private: true }, tarball);
+    writeFileSync(
+      join(dir, 'tsconfig.json'),
+      JSON.stringify({
+        compilerOptions: {
+          module: 'nodenext',
+          moduleResolution: 'nodenext',
+          target: 'ES2022',
+          lib: ['ES2022', 'DOM'],
+          strict: true,
+          noEmit: true,
+          skipLibCheck: true,
+          types: [],
+        },
+        include: ['consumer.cts'],
+      }),
+    );
+    writeFileSync(
+      join(dir, 'consumer.cts'),
+      `import { spring, type SpringResult } from '${pkg.name}';\n` +
+        `import { compileSpringPlan } from '${pkg.name}/compositor';\n` +
+        `const r: SpringResult = spring({ mass: 1, stiffness: 200, damping: 20 }, 0.1);\n` +
+        `export const duration: number = compileSpringPlan({ spring: { mass: 1, stiffness: 200, damping: 20 }, property: 'opacity', from: 0, to: 1 }).duration + r.value;\n`,
+    );
+    const tscBin = join(ROOT, 'node_modules', 'typescript', 'bin', 'tsc');
+    const trace = execSync(`node "${tscBin}" --project tsconfig.json --traceResolution`, {
+      cwd: dir,
+      encoding: 'utf8',
+    }).replaceAll('\\', '/');
+    for (const declaration of ['dist/index.d.cts', 'dist/compositor/index.d.cts']) {
+      if (!trace.includes(declaration)) {
+        fail(`TS CJS резолвит не CommonJS-декларацию: ${declaration} не найден в trace`);
+      }
+    }
+    log('TS CJS: nodenext require-резолв exports выбрал .d.cts ✓');
+  }
+
+  // Авто-регистрирующие subpath-entries обязаны переживать tree shaking при
+  // side-effect-only импорте. Иначе package#sideEffects превращает рабочий
+  // прямой import в пустой consumer-бандл.
+  {
+    const dir = installFixture('side-effects', { name: 'side-effects-fx', private: true, type: 'module' }, tarball);
+    for (const [subpath, tag] of [['wc', 'lab-spring'], ['lit', 'lab-motion-spring']]) {
+      const result = await build({
+        stdin: {
+          contents: `import '${pkg.name}/${subpath}';`,
+          resolveDir: dir,
+          sourcefile: `${subpath}-consumer.js`,
+        },
+        bundle: true,
+        format: 'esm',
+        platform: 'browser',
+        minify: true,
+        treeShaking: true,
+        external: subpath === 'lit' ? ['lit'] : [],
+        write: false,
+      });
+      const code = result.outputFiles[0]?.text ?? '';
+      if (!code.includes(tag)) fail(`side-effect import ${subpath} вырезан tree shaking`);
+    }
+    log('Tree shaking: авто-регистрация wc/lit сохранена ✓');
+  }
+
   // ── Vite-фикстура: bundler-резолв exports (пункт 12) ───────────────────────
   {
     const dir = installFixture('vite', { name: 'vite-fx', private: true, type: 'module' }, tarball);
@@ -196,10 +380,15 @@ try {
     const outDir = join(dir, 'dist');
     const built = readdirSync(outDir).find((f) => f.endsWith('.js') || f.endsWith('.mjs'));
     if (!built) fail('Vite не выдал ES-бандл');
-    else log('Vite: bundler-резолв всех субпутей + сборка ✓');
+    else log('Vite: bundler-резолв выбранных публичных субпутей + сборка ✓');
   }
 } catch (error) {
-  fail(error?.stderr?.toString?.() || error?.message || String(error));
+  fail(
+    error?.stdout?.toString?.() ||
+      error?.stderr?.toString?.() ||
+      error?.message ||
+      String(error),
+  );
 } finally {
   rmSync(work, { recursive: true, force: true });
 }

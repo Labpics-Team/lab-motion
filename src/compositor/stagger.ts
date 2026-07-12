@@ -46,7 +46,7 @@ import {
   compileSpringPlan,
   CompositorSpring,
   type SetTimerFn,
-} from './index.js';
+} from './core.js';
 
 // ─── Общие опции распределения (база планировщика и контроллера) ─────────────
 

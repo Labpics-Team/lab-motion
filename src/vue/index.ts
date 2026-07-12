@@ -28,6 +28,7 @@
 import { ref, watch, onUnmounted, type Ref, type ObjectDirective } from 'vue';
 import type { MotionValue, MotionValueOptions, RequestFrameFn } from '../motion-value.js';
 import { createBoundValue } from '../internal/binding-value.js';
+import { renderTemplateValue } from '../internal/template.js';
 import { type SpringParams } from '../spring.js';
 
 // ─── Reduced-motion detection ─────────────────────────────────────────────
@@ -135,11 +136,10 @@ export function useSpring(
 
   watch(targetGetter, (newTarget) => {
     if (prefersReducedMotion()) {
-      // CHARACTER switch: skip spring, snap to target immediately.
-      // 'instant': direct snap.
-      // 'fade': same from binding side — caller applies CSS opacity transition.
-      value.value = newTarget;
-      void reducedMotionMode; // acknowledged — mode changes caller CSS, not binding behavior
+      // onChange доставит снап в ref, а ядро одним переходом
+      // валидирует target и инвалидирует кадр прежнего полёта.
+      mv.snapTo(newTarget);
+      void reducedMotionMode; // режим меняет CSS потребителя, а не числовой путь
     } else {
       mv.setTarget(newTarget);
     }
@@ -217,21 +217,32 @@ const _directiveState = new WeakMap<Element, DirectiveState>();
  * The motion core (MotionValue / spring solver) remains zero-DOM.
  * SSR/Node-safe: checks for HTMLElement existence before accessing `.style`.
  */
-function _applyValue(el: Element, value: number, property: string, template: string): void {
+function _applyValue(
+  el: Element,
+  value: number,
+  property: string,
+  template: string,
+  previousProperty?: string,
+): void {
   // Guard: el must have a `.style` property (HTMLElement in browser, or stub in tests).
   // Avoids `instanceof HTMLElement` which throws ReferenceError in Node/SSR environments.
   const style = (el as unknown as { style?: Record<string, string> }).style;
   if (!style || typeof style !== 'object') return;
-  const cssValue = template.includes('{v}') ? template.replace('{v}', String(value)) : String(value);
   // Write via CSSStyleDeclaration key-access (handles camelCase and shorthand props).
-  style[property] = cssValue;
+  style[property] = renderTemplateValue(template, value);
+  // Presentation ownership moves only after the new value was accepted and
+  // written; rejected targets therefore leave the previous channel untouched.
+  if (previousProperty !== undefined && previousProperty !== property) {
+    style[previousProperty] = '';
+  }
 }
 
 /**
  * Vue 3 custom directive: `v-motion`
  *
  * Declaratively animates a CSS property on a DOM element using spring physics.
- * Writes to the DOM only via the `onChange` callback — the motion core is zero-DOM.
+ * Кадры пишутся через `onChange`; смена property/template переформатирует
+ * текущее значение через тот же `_applyValue`; motion-core остаётся zero-DOM.
  * SSR-safe: mounted/updated/unmounted hooks only run client-side (Vue skips them on SSR).
  * reduced-motion: switches CHARACTER to instant snap, never hard-off.
  *
@@ -271,19 +282,36 @@ export const vMotion: ObjectDirective<Element, MotionDirectiveValue> = {
       requestFrame: opts.requestFrame,
     });
 
-    // Delegate DOM write to onChange — the ONLY path that touches the DOM.
-    const unsub = mv.onChange((v) => {
-      _applyValue(el, v, property, template);
-    });
+    // Изменяемое состояние — SSOT для property/template после updated();
+    // иначе snapTo писал бы через устаревшее замыкание момента mounted.
+    const state: DirectiveState = {
+      mv,
+      unsub: () => {},
+      property,
+      template,
+      reducedMotionMode,
+    };
+    _directiveState.set(el, state);
+    try {
+      state.unsub = mv.onChange((v) => {
+        _applyValue(el, v, state.property, state.template);
+      });
 
-    _directiveState.set(el, { mv, unsub, property, template, reducedMotionMode });
-
-    // Start animating toward the initial target.
-    if (prefersReducedMotion()) {
-      // CHARACTER: instant snap — apply directly, no spring frames.
-      _applyValue(el, opts.target, property, template);
-    } else {
-      mv.setTarget(opts.target);
+      // Старт к исходной цели.
+      if (prefersReducedMotion()) {
+        // Единый путь через MotionValue сохраняет DOM и доменное
+        // состояние синхронными и не дублирует finite-политику.
+        mv.snapTo(opts.target);
+      } else {
+        mv.setTarget(opts.target);
+      }
+    } catch (error) {
+      // Vue не обязан вызвать unmounted после ошибки mounted,
+      // поэтому неудачная инициализация убирает ресурс сама.
+      state.unsub();
+      mv.destroy();
+      _directiveState.delete(el);
+      throw error;
     }
   },
 
@@ -295,17 +323,35 @@ export const vMotion: ObjectDirective<Element, MotionDirectiveValue> = {
     // Update property/template if they changed in the new binding value.
     const property = binding.value.property ?? 'opacity';
     const template = binding.value.template ?? '{v}';
+    const presentationChanged = property !== state.property || template !== state.template;
+    const previousProperty = state.property;
+    const previousTemplate = state.template;
+    const previousReducedMotionMode = state.reducedMotionMode;
     state.property = property;
     state.template = template;
     state.reducedMotionMode = binding.value.reducedMotionMode ?? 'instant';
 
-    if (prefersReducedMotion()) {
-      // CHARACTER switch: instant snap to new target.
-      // 'fade' mode: caller adds CSS `transition: opacity 0.2s` — this binding
-      // just writes the final value and lets the browser's CSS transition handle it.
-      _applyValue(el, newTarget, property, template);
-    } else {
-      state.mv.setTarget(newTarget);
+    try {
+      if (prefersReducedMotion()) {
+        // Подписка пишет актуальные property/template, а snapTo
+        // инвалидирует кадр, уже поставленный предыдущим full-motion полётом.
+        state.mv.snapTo(newTarget);
+      } else {
+        state.mv.setTarget(newTarget);
+      }
+    } catch (error) {
+      // Невалидная цель не меняе канал записи: queued-кадры
+      // прежнего полёта продолжат писать в прежнее presentation.
+      state.property = previousProperty;
+      state.template = previousTemplate;
+      state.reducedMotionMode = previousReducedMotionMode;
+      throw error;
+    }
+
+    // property/template меняют представление, даже если числовая цель
+    // идемпотентна и MotionValue законно не эмитит новое значение.
+    if (presentationChanged) {
+      _applyValue(el, state.mv.value, property, template, previousProperty);
     }
   },
 

@@ -28,6 +28,7 @@
  */
 
 import { MotionParamError } from './errors.js';
+import type { MatchMediaLike } from './internal/media-query.js';
 import { solveSpring } from './internal/solver.js';
 import { type SpringParams, validateSpringParams } from './spring.js';
 
@@ -50,7 +51,7 @@ export interface DriveOptions {
    * the driver treats absence as "no preference" (reduce=false) and continues
    * without throwing.
    */
-  readonly matchMedia?: ((query: string) => MediaQueryList) | undefined;
+  readonly matchMedia?: MatchMediaLike | undefined;
   /**
    * Injectable requestAnimationFrame substitute. Receives a callback and returns
    * a handle. Defaults to the global `requestAnimationFrame` when omitted.
@@ -108,9 +109,7 @@ import { CONVERGENCE_THRESHOLD, MAX_FRAMES, FIXED_DT_S } from './internal/consta
  * Read the reduced-motion preference from an injected matchMedia.
  * Returns false (= no preference) if matchMedia is absent or throws.
  */
-function prefersReducedMotion(
-  matchMedia: ((query: string) => MediaQueryList) | undefined,
-): boolean {
+function prefersReducedMotion(matchMedia: MatchMediaLike | undefined): boolean {
   try {
     return typeof matchMedia === 'function' && matchMedia('(prefers-reduced-motion: reduce)').matches;
   } catch {

@@ -26,7 +26,7 @@ import {
   compileSpringPlan,
   readCompositorSpring,
   type SetTimerFn,
-} from '../compositor/index.js';
+} from '../compositor/core.js';
 import type { SpringParams } from '../spring.js';
 import {
   formatTransform,

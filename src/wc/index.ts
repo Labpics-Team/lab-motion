@@ -118,28 +118,39 @@ export function createLabSpringElementClass(
     attributeChangedCallback(name: string, _old: string | null, value: string | null): void {
       if (value === null) return;
       if (name === 'property') {
+        const previousProperty = this.property;
         this.property = value;
+        if (this._mv !== undefined) this._applyStyle(this._mv.value, previousProperty);
         return;
       }
       if (name === 'template') {
         this.template = value;
+        if (this._mv !== undefined) this._applyStyle(this._mv.value);
         return;
       }
       // target: атрибут — враждебная строка; невалидное игнорируется.
+      if (value.trim() === '') return;
       const target = Number(value);
       if (!Number.isFinite(target)) return;
       this.target = target;
       if (this._mv === undefined) return; // применится в connectedCallback
       if (prefersReduced(this.matchMedia)) {
-        this._applyStyle(target); // характер: снап без кадров
+        // onChange пишет стиль, а доменный снап гасит прежний полёт
+        // и инвалидирует уже поставленный кадр.
+        this._mv.snapTo(target);
       } else {
         this._mv.setTarget(target);
       }
     }
 
     /** Единственное место записи в стиль хоста (зеркало lit-версии). */
-    private _applyStyle(value: number): void {
+    private _applyStyle(value: number, previousProperty?: string): void {
       this.style[this.property] = renderTemplateValue(this.template, value);
+      // Новая проекция уже записана; только после этого освобождаем прежний
+      // inline-канал, чтобы один биндинг не владел двумя CSS-свойствами.
+      if (previousProperty !== undefined && previousProperty !== this.property) {
+        this.style[previousProperty] = '';
+      }
     }
   }
   return LabSpringElement;

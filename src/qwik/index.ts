@@ -12,8 +12,8 @@
  * он выполняется перед КАЖДЫМ re-run по track и убил бы физику на первой же
  * смене цели. Драйвер-таска только трекает target и передаёт его ядру.
  *
- * Reduced-motion — смена ХАРАКТЕРА: снап значения в сигнал синхронно; запись
- * в обход ядра зеркалит его валидацию (не-finite → MotionParamError).
+ * Reduced-motion — смена ХАРАКТЕРА: MotionValue.snapTo синхронно эмитит
+ * в сигнал, гасит прежний полёт и централизует finite-валидацию.
  *
  * Шов requestFrame — client-only тестовая инъекция: функция не сериализуема,
  * через resume-границу не переносится (в SSR-приложении оставляйте дефолт).
@@ -33,7 +33,6 @@ import {
 } from '@builder.io/qwik';
 import type { MotionValue, MotionValueOptions } from '../motion-value.js';
 import { createBoundValue } from '../internal/binding-value.js';
-import { MotionParamError } from '../errors.js';
 import { type SpringParams } from '../spring.js';
 
 const DEFAULT_SPRING: SpringParams = { mass: 1, stiffness: 200, damping: 20 };
@@ -100,13 +99,10 @@ export function useSpring(
     const t = track(() => target.value);
     const mv = mvRef.value;
     if (mv === undefined) return; // до init/после unmount — запись не проходит
-    if (t === value.value) return; // первый прогон и эхо собственного снапа
     if (prefersReducedMotion()) {
-      // Снап пишет в сигнал в обход ядра — валидация зеркалит mv.setTarget.
-      if (!Number.isFinite(t)) {
-        throw new MotionParamError(`useSpring: target должен быть конечным, получено ${t}`);
-      }
-      value.value = t; // характер: снап ('fade' — CSS потребителя)
+      // Подписка транслирует снап в сигнал; ядро одновременно гасит
+      // полёт, инвалидирует stale-кадр и защищает CSS-safe контракт.
+      mv.snapTo(t);
       void reducedMotionMode;
     } else {
       mv.setTarget(t);

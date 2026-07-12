@@ -36,6 +36,7 @@
  */
 
 import { springUnchecked, validateSpringParams, type SpringParams } from '../spring.js';
+import type { MatchMediaLike } from '../internal/media-query.js';
 import type { RequestFrameFn } from '../motion-value.js';
 
 // ─── Типы и стражи ───────────────────────────────────────────────────────────
@@ -158,7 +159,7 @@ export interface FlipOptions {
   /** Инжектируемый кадровый шов (ts в мс). */
   readonly requestFrame?: RequestFrameFn | undefined;
   /** Инжектируемый matchMedia для prefers-reduced-motion (F4). */
-  readonly matchMedia?: ((query: string) => MediaQueryList) | undefined;
+  readonly matchMedia?: MatchMediaLike | undefined;
   /** Числа transform'а на каждом кадре (F1: всегда конечны). */
   readonly onStep?: ((t: FlipTransform) => void) | undefined;
   /** Полёт завершён (identity достигнута). Ровно один раз на play. */
@@ -189,7 +190,7 @@ const FLIP_MAX_FRAMES = 2000;
 /** Порог сходимости нормированной пружины (|1−value| и |velocity|). */
 const FLIP_REST = 1e-3;
 
-function prefersReducedMotion(matchMedia: ((q: string) => MediaQueryList) | undefined): boolean {
+function prefersReducedMotion(matchMedia: MatchMediaLike | undefined): boolean {
   if (typeof matchMedia !== 'function') return false;
   try {
     return matchMedia('(prefers-reduced-motion: reduce)').matches === true;

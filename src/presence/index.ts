@@ -84,6 +84,8 @@
  *   иначе регистратор зомби-фазы снимает чужую генерацию (ревью PR #128).
  */
 
+import type { MatchMediaLike } from '../internal/media-query.js';
+
 // ─── Типы ────────────────────────────────────────────────────────────────────
 
 /** Состояние присутствия элемента. */
@@ -129,7 +131,7 @@ export interface PresenceOptions<S = PresenceSnapshot> {
   /** Терминально ушли — безопасный момент убрать элемент из DOM. */
   readonly onGone?: (() => void) | undefined;
   /** Инжектируемый matchMedia для prefers-reduced-motion (P2). */
-  readonly matchMedia?: ((query: string) => MediaQueryList) | undefined;
+  readonly matchMedia?: MatchMediaLike | undefined;
 }
 
 /** Контроллер присутствия. */
@@ -150,7 +152,7 @@ export interface PresenceControls {
 
 // ─── Внутреннее ──────────────────────────────────────────────────────────────
 
-function prefersReducedMotion(matchMedia: ((q: string) => MediaQueryList) | undefined): boolean {
+function prefersReducedMotion(matchMedia: MatchMediaLike | undefined): boolean {
   if (typeof matchMedia !== 'function') return false;
   try {
     return matchMedia('(prefers-reduced-motion: reduce)').matches === true;

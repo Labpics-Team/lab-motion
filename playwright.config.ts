@@ -17,11 +17,9 @@
  *
  * Артефакты (критерий приёмки): trace/video/screenshot ТОЛЬКО при падении.
  *
- * Матрица движков: три проекта. `@playwright/test` пинится к версии, чей штатный
- * Chromium-ревизион СОВПАДАЕТ с предустановленным в dev-среде (PLAYWRIGHT_BROWSERS_PATH),
- * поэтому дефолтная резолюция Playwright находит один и тот же бинарь и локально,
- * и на CI — без executablePath-хака и без риска расхождения ревизий. При нужде
- * бинарь переопределяется штатным env `PLAYWRIGHT_BROWSERS_PATH`/`PLAYWRIGHT_CHROMIUM_EXECUTABLE_PATH`.
+ * Матрица движков: три проекта. `@playwright/test` пинится точно, поэтому
+ * `playwright install` локально и в CI ставит одну ревизию без executablePath-хака.
+ * При нужде каталог бинарей задаётся штатным `PLAYWRIGHT_BROWSERS_PATH`.
  * Firefox/WebKit исполняются на CI (`pnpm exec playwright install --with-deps <browser>`);
  * локально гоняется только `--project=chromium` (см. README «Browser support»).
  *
@@ -79,7 +77,13 @@ export default defineConfig({
     },
     {
       name: 'firefox',
-      use: { ...devices['Desktop Firefox'] },
+      use: {
+        ...devices['Desktop Firefox'],
+        // Матрица проверяет только локальный fixture-server. Системный proxy
+        // macOS может вернуть для loopback 502 и не дать запустить ни один
+        // сценарий, поэтому Firefox здесь всегда ходит напрямую.
+        launchOptions: { firefoxUserPrefs: { 'network.proxy.type': 0 } },
+      },
     },
     {
       name: 'webkit',

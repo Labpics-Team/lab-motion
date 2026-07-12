@@ -38,13 +38,19 @@ const PEER_BINDING_SUBPATHS = new Set([
 export function browserSubpathUrls(): { subpath: string; url: string }[] {
   const pkgUrl = new URL('../../package.json', import.meta.url);
   const pkg = JSON.parse(readFileSync(fileURLToPath(pkgUrl), 'utf8')) as {
-    exports: Record<string, { import: string }>;
+    exports: Record<string, { import: { default: string } }>;
   };
   const out: { subpath: string; url: string }[] = [];
   for (const [key, value] of Object.entries(pkg.exports)) {
     if (PEER_BINDING_SUBPATHS.has(key)) continue;
-    // exports[key].import = './dist/<x>/index.js' → http-путь '/dist/<x>/index.js'.
-    const rel = value.import.replace(/^\.\//, '/');
+    // `default` — исполняемая ESM-ветка; соседняя `types` нужна только tsc.
+    // Явная проверка оставляет ошибку контракта локальной, а не маскирует её
+    // поздним TypeError внутри browser-suite.
+    const target = value.import?.default;
+    if (typeof target !== 'string') {
+      throw new TypeError(`exports['${key}'].import.default обязан быть строкой`);
+    }
+    const rel = target.replace(/^\.\//, '/');
     out.push({ subpath: key, url: rel });
   }
   return out;

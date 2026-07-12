@@ -1,2 +1,10 @@
-onlyBuiltDependencies:
-  - esbuild
+allowBuilds:
+  esbuild: true
+minimumReleaseAge: 1440
+overrides:
+  esbuild: ^0.28.1
+  qs: ^6.15.2
+pmOnFail: error
+peerDependencyRules:
+  allowedVersions:
+    "@builder.io/qwik>vite": "8"

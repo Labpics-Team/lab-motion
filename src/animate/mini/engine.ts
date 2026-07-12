@@ -30,7 +30,7 @@
  * детерминизм (часы только через инжектируемый ./frame requestFrame).
  */
 
-import { readCompositorSpring } from '../../compositor/index.js';
+import { readCompositorSpring } from '../../compositor/core.js';
 import { MotionParamError } from '../../errors.js';
 import { createFrameLoop, frame as defaultFrame, type FrameLoop } from '../../frame/index.js';
 import type { SpringParams } from '../../spring.js';

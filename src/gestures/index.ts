@@ -25,6 +25,7 @@ import { createDecay, type DecayModel } from '../decay.js';
 import { trimSlidingWindow } from '../internal/sliding-window.js';
 import { solveSpring } from '../internal/solver.js';
 import { CONVERGENCE_THRESHOLD } from '../internal/constants.js';
+import type { MatchMediaLike } from '../internal/media-query.js';
 import { type SpringParams, validateSpringParams } from '../spring.js';
 import type { RequestFrameFn } from '../motion-value.js';
 
@@ -394,7 +395,7 @@ export interface DragOptions {
    */
   readonly snapBackSpring?: SpringParams | undefined;
   /** Инжектируемый matchMedia для prefers-reduced-motion (G4). */
-  readonly matchMedia?: ((query: string) => MediaQueryList) | undefined;
+  readonly matchMedia?: MatchMediaLike | undefined;
   /** Инжектируемый кадровый шов для глайда (ts в мс). */
   readonly requestFrame?: RequestFrameFn | undefined;
   /** Единственный канал вывода позиции. Значения всегда конечны (G1). */
@@ -459,7 +460,7 @@ const GLIDE_MAX_FRAMES = 2000;
  */
 const GLIDE_PICKUP_SEED_DT_S = DEFAULT_VELOCITY_WINDOW_S / 2;
 
-function prefersReducedMotion(matchMedia: ((q: string) => MediaQueryList) | undefined): boolean {
+function prefersReducedMotion(matchMedia: MatchMediaLike | undefined): boolean {
   if (typeof matchMedia !== 'function') return false;
   try {
     return matchMedia('(prefers-reduced-motion: reduce)').matches === true;

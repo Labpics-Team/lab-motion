@@ -11,10 +11,11 @@
  * Клок инжектируется → детерминизм (инвариант движка) сохранён в live-рантайме.
  */
 
-import { afterEach, describe, expect, it } from 'vitest';
+import { afterEach, describe, expect, it, vi } from 'vitest';
 import { act, createElement, useState, StrictMode, type Dispatch, type SetStateAction } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
 import { useSpring, useMotionValue, useMotionStyle, useReducedMotion } from '../src/react/index.js';
+import { MotionValue } from '../src/motion-value.js';
 
 // React 18 требует этот флаг для act() вне test-renderer.
 (globalThis as unknown as { IS_REACT_ACT_ENVIRONMENT: boolean }).IS_REACT_ACT_ENVIRONMENT = true;
@@ -93,6 +94,37 @@ describe('react-биндинг в реальном React-рантайме', () =
     expect(Number(c.querySelector('#box')!.textContent)).toBeCloseTo(50, 1);
   });
 
+  it('useSpring: full→reduce инвалидирует уже поставленный кадр', () => {
+    const w = window as unknown as { matchMedia?: (q: string) => MediaQueryList };
+    const previous = w.matchMedia;
+    let reduced = false;
+    w.matchMedia = (query: string) => ({ matches: reduced, media: query } as MediaQueryList);
+
+    try {
+      const clock = makeClock();
+      let setTarget!: Dispatch<SetStateAction<number>>;
+      function Box(): ReturnType<typeof createElement> {
+        const [target, setT] = useState(0);
+        setTarget = setT;
+        const value = useSpring(target, SPRING, 'instant', clock.requestFrame);
+        return createElement('div', { id: 'box' }, value);
+      }
+
+      const c = mount(createElement(Box));
+      act(() => setTarget(100));
+      expect(clock.pending()).toBeGreaterThan(0);
+
+      reduced = true;
+      act(() => setTarget(200));
+      expect(Number(c.querySelector('#box')!.textContent)).toBe(200);
+
+      act(() => clock.drain());
+      expect(Number(c.querySelector('#box')!.textContent)).toBe(200);
+    } finally {
+      w.matchMedia = previous;
+    }
+  });
+
   it('unmount вызывает destroy: цикл MotionValue остановлен, эмиссий после нет', () => {
     // Сильный оракул (нота QA): не «не бросает», а ПРЯМОЕ негативное покрытие
     // класса «утечка ресурса» — свой onChange-счётчик на инстансе; после unmount
@@ -142,6 +174,94 @@ describe('react-биндинг в реальном React-рантайме', () =
     // MotionValue создаётся ОДИН раз и переживает ре-рендеры (не пересоздаётся).
     expect(instances.length).toBeGreaterThanOrEqual(3);
     expect(instances.every((i) => i === instances[0])).toBe(true);
+  });
+
+  it('StrictMode replay сохраняет useMotionValue живым до реального unmount', () => {
+    const clock = makeClock();
+    let mv!: ReturnType<typeof useMotionValue>;
+    function Probe(): ReturnType<typeof createElement> {
+      mv = useMotionValue(0, SPRING, clock.requestFrame);
+      return createElement('div', null, 'probe');
+    }
+
+    const container = document.createElement('div');
+    document.body.appendChild(container);
+    const root = createRoot(container);
+    let unmounted = false;
+    try {
+      act(() => root.render(createElement(StrictMode, null, createElement(Probe))));
+
+      mv.setTarget(100);
+      expect(clock.pending()).toBeGreaterThan(0);
+      clock.drain();
+      expect(mv.value).toBeCloseTo(100, 1);
+
+      act(() => root.unmount());
+      unmounted = true;
+      const settled = mv.value;
+      mv.setTarget(0);
+      clock.drain();
+      expect(mv.value).toBe(settled);
+    } finally {
+      if (!unmounted) act(() => root.unmount());
+      container.remove();
+    }
+  });
+
+  it('StrictMode useSpring после replay планирует полёт и держит одну подписку', () => {
+    const originalOnChange = MotionValue.prototype.onChange;
+    let activeSubscriptions = 0;
+    let maxActiveSubscriptions = 0;
+    const onChangeSpy = vi
+      .spyOn(MotionValue.prototype, 'onChange')
+      .mockImplementation(function (this: MotionValue, cb: (value: number) => void) {
+        const off = originalOnChange.call(this, cb);
+        activeSubscriptions += 1;
+        maxActiveSubscriptions = Math.max(maxActiveSubscriptions, activeSubscriptions);
+        let closed = false;
+        return () => {
+          if (closed) return;
+          closed = true;
+          activeSubscriptions -= 1;
+          off();
+        };
+      });
+
+    const clock = makeClock();
+    let setTarget!: Dispatch<SetStateAction<number>>;
+    function Box(): ReturnType<typeof createElement> {
+      const [target, setT] = useState(0);
+      setTarget = setT;
+      const value = useSpring(target, SPRING, 'instant', clock.requestFrame);
+      return createElement('div', { id: 'strict-spring' }, value);
+    }
+
+    const container = document.createElement('div');
+    document.body.appendChild(container);
+    const root = createRoot(container);
+    let unmounted = false;
+    try {
+      act(() => root.render(createElement(StrictMode, null, createElement(Box))));
+      expect(activeSubscriptions).toBe(1);
+      expect(maxActiveSubscriptions).toBe(1);
+
+      act(() => setTarget(100));
+      expect(clock.pending()).toBeGreaterThan(0);
+      expect(Number(container.querySelector('#strict-spring')!.textContent)).toBeLessThan(100);
+
+      act(() => clock.drain());
+      expect(Number(container.querySelector('#strict-spring')!.textContent)).toBeCloseTo(100, 1);
+      expect(activeSubscriptions).toBe(1);
+      expect(maxActiveSubscriptions).toBe(1);
+
+      act(() => root.unmount());
+      unmounted = true;
+      expect(activeSubscriptions).toBe(0);
+    } finally {
+      if (!unmounted) act(() => root.unmount());
+      container.remove();
+      onChangeSpy.mockRestore();
+    }
   });
 });
 
@@ -206,6 +326,34 @@ describe('useMotionStyle — effect binding без render на кадр (#104)',
     act(() => setOpen(true));
     act(() => clock.drain());
     expect(Number((c.querySelector('#box') as HTMLElement).style.opacity)).toBeCloseTo(100, 1);
+  });
+
+  it('перепроецирует settled value при смене property/template без нового кадра', () => {
+    const clock = makeClock();
+    let setProjection!: Dispatch<
+      SetStateAction<{ property: string; template: string }>
+    >;
+    function Box(): ReturnType<typeof createElement> {
+      const [projection, setP] = useState({ property: 'opacity', template: '{v}' });
+      setProjection = setP;
+      const ref = useMotionStyle({
+        target: 0,
+        from: 0,
+        ...projection,
+        spring: SPRING,
+        requestFrame: clock.requestFrame,
+      });
+      return createElement('div', { id: 'box', ref });
+    }
+    const c = mount(createElement(Box));
+    const box = c.querySelector('#box') as HTMLElement;
+    expect(box.style.opacity).toBe('0');
+
+    act(() => setProjection({ property: 'transform', template: 'translate({v}px, {v}px)' }));
+
+    expect(box.style.opacity).toBe('');
+    expect(box.style.transform).toBe('translate(0px, 0px)');
+    expect(clock.pending()).toBe(0);
   });
 
   it('reduced-motion: CHARACTER-снап без единого кадра (rAF не планируется)', () => {

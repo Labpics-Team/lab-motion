@@ -19,6 +19,7 @@
 import {
   useState,
   useEffect,
+  useInsertionEffect,
   useLayoutEffect,
   useRef,
   useCallback,
@@ -26,6 +27,7 @@ import {
 } from 'react';
 import type { MotionValue, MotionValueOptions, RequestFrameFn } from '../motion-value.js';
 import { createBoundValue } from '../internal/binding-value.js';
+import { renderTemplateValue } from '../internal/template.js';
 import { type SpringParams } from '../spring.js';
 import { createMotionConfig } from '../a11y/index.js';
 
@@ -77,10 +79,15 @@ export function useMotionValue(
     mvRef.current = createBoundValue({ initial, spring, requestFrame });
   }
 
-  useEffect(() => {
+  // React StrictMode в dev повторяет setup→cleanup→setup для passive/layout
+  // effects без нового render. Разрушение оттуда оставляло хукам
+  // уничтоженный captured MV. Insertion lifecycle не участвует в этом replay
+  // и подходит для синхронного finalizer: здесь нет DOM/state-эффектов.
+  useInsertionEffect(() => {
+    const owned = mvRef.current;
     return () => {
-      mvRef.current?.destroy();
-      mvRef.current = null;
+      owned?.destroy();
+      if (mvRef.current === owned) mvRef.current = null;
     };
   }, []);
 
@@ -139,10 +146,10 @@ export function useSpring(
   // Drive animation on target change.
   useEffect(() => {
     if (prefersReducedMotion()) {
-      // CHARACTER switch: skip spring, emit target value immediately.
-      // 'instant': snap (no CSS transition expected from caller).
-      // 'fade': snap value but caller is expected to apply CSS opacity transition.
-      setValue(target);
+      // Единый доменный снап гасит полёт и инвалидирует уже
+      // поставленный кадр; эмиссия через onChange обновит React state.
+      mv.snapTo(target);
+      void reducedMotionMode; // mode меняет CSS потребителя, а не числовой путь
     } else {
       mv.setTarget(target);
     }
@@ -185,7 +192,7 @@ export interface MotionStyleOptions {
 function _applyValue(el: unknown, value: number, property: string, template: string): void {
   const style = (el as { style?: Record<string, string> } | null)?.style;
   if (!style || typeof style !== 'object') return;
-  style[property] = template.includes('{v}') ? template.replace('{v}', String(value)) : String(value);
+  style[property] = renderTemplateValue(template, value);
 }
 
 /**
@@ -225,6 +232,7 @@ export function useMotionStyle(options: MotionStyleOptions): (el: HTMLElement | 
   // MotionValue owns the frame loop; the bound element lives in a ref.
   const mvRef = useRef<MotionValue | null>(null);
   const elRef = useRef<HTMLElement | null>(null);
+  const appliedPropertyRef = useRef<string | null>(null);
 
   // Lazily (re)create the MotionValue. StrictMode runs effect setup→cleanup→setup
   // WITHOUT re-rendering, so the cleanup that destroys+nulls the MV must be
@@ -247,7 +255,15 @@ export function useMotionStyle(options: MotionStyleOptions): (el: HTMLElement | 
   // ref reassignment. NO setState → zero component renders.
   const write = useCallback((v: number): void => {
     const o = optsRef.current;
-    _applyValue(elRef.current, v, o.property ?? 'opacity', o.template ?? '{v}');
+    const el = elRef.current;
+    if (el === null) return;
+    const property = o.property ?? 'opacity';
+    const previousProperty = appliedPropertyRef.current;
+    if (previousProperty !== null && previousProperty !== property) {
+      (el.style as unknown as Record<string, string>)[previousProperty] = '';
+    }
+    _applyValue(el, v, property, o.template ?? '{v}');
+    appliedPropertyRef.current = property;
   }, []);
 
   // First-frame stability: create eagerly on the initial render.
@@ -282,6 +298,14 @@ export function useMotionStyle(options: MotionStyleOptions): (el: HTMLElement | 
     }
   }, [target, reducedMotionMode, ensureMv]);
 
+  // Смена только CSS-проекции не эмитит MotionValue и не должна ждать нового
+  // кадра. Переписываем settled/live значение и снимаем прежнее свойство.
+  const property = options.property ?? 'opacity';
+  const template = options.template ?? '{v}';
+  useIsoLayoutEffect(() => {
+    write(ensureMv().value);
+  }, [property, template, ensureMv, write]);
+
   // Stable ref callback: records the element and, on attach, writes the CURRENT
   // value immediately. The write matters for late/conditional attach (e.g.
   // `{shown && <div ref={ref} />}`): the layout effect's initial write no-ops
@@ -290,6 +314,7 @@ export function useMotionStyle(options: MotionStyleOptions): (el: HTMLElement | 
   // Idempotent with the layout-effect write; still no setState → zero renders.
   return useCallback(
     (el: HTMLElement | null) => {
+      if (el === null) appliedPropertyRef.current = null;
       elRef.current = el;
       if (el !== null) write(ensureMv().value);
     },

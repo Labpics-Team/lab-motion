@@ -13,7 +13,7 @@ cd lab-motion && pnpm build && pnpm pack   # → labpics-motion-<версия>.t
 cd ваш-проект && pnpm add /путь/к/labpics-motion-<версия>.tgz
 \`\`\``;
 
-const currentInstall = `Пакет опубликован в npm:
+const currentInstall = `Установите опубликованную версию из npm:
 
 \`\`\`bash
 pnpm add @labpics/motion

@@ -29,23 +29,25 @@ jobs:
 
     steps:
       - name: Checkout
-        uses: actions/checkout@v6
+        uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7
+        with:
+          persist-credentials: false
 
       - name: Setup Node
-        uses: actions/setup-node@v6
+        uses: actions/setup-node@48b55a011bda9f5d6aeb4c2d9c7362e8dae4041e # v6
         with:
-          node-version: "20"
+          node-version: "24"
 
       - name: Activate pinned pnpm
         run: |
           corepack enable
-          corepack install --global pnpm@10.34.4
+          corepack install --global pnpm@11.11.0
 
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
 
-      - name: Typecheck
-        run: pnpm typecheck
+      - name: Static contract
+        run: pnpm check:static
 
       - name: Build
         run: pnpm build
@@ -76,7 +78,7 @@ jobs:
 
       - name: Upload Vitest diagnostics
         if: steps.vitest.outcome == 'failure'
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
         with:
           name: vitest-diagnostics-${{ github.run_id }}
           path: vitest.log
@@ -94,3 +96,64 @@ jobs:
 
       - name: Pack smoke
         run: pnpm pack:smoke
+
+      - name: Consumer compatibility
+        run: pnpm pack:compat
+
+      # Exact Node-floor job не может запускать pnpm 11 (его собственный floor
+      # выше потребительского). Собираем кандидат на Node 24 и передаём байты.
+      - name: Pack Node-floor candidate
+        run: |
+          mkdir node-floor-artifact
+          pnpm pack --pack-destination node-floor-artifact
+
+      - name: Upload Node-floor candidate
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
+        with:
+          name: node-floor-package-${{ github.sha }}-${{ github.run_id }}
+          path: node-floor-artifact/*.tgz
+          if-no-files-found: error
+          retention-days: 1
+          compression-level: 0
+          overwrite: false
+
+  node-floor:
+    name: consumer contract · Node ${{ matrix.node }}
+    needs: [verify]
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    strategy:
+      fail-fast: false
+      matrix:
+        node: ["22.0.0", "24"]
+
+    permissions:
+      actions: read
+      contents: read
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7
+        with:
+          persist-credentials: false
+
+      - name: Setup Node
+        uses: actions/setup-node@48b55a011bda9f5d6aeb4c2d9c7362e8dae4041e # v6
+        with:
+          node-version: ${{ matrix.node }}
+
+      - name: Download Node-floor candidate
+        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8
+        with:
+          name: node-floor-package-${{ github.sha }}-${{ github.run_id }}
+          path: node-floor-artifact
+          digest-mismatch: error
+
+      - name: Exact runtime consumer smoke
+        shell: bash
+        run: |
+          shopt -s nullglob
+          archives=(node-floor-artifact/*.tgz)
+          [[ ${#archives[@]} -eq 1 ]] \
+            || { echo "::error::ожидался ровно один tgz, найдено: ${#archives[@]}"; exit 1; }
+          node scripts/pack-smoke.mjs "${archives[0]}"
