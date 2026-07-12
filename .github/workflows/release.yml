@@ -12,7 +12,8 @@ on:
 permissions: {}
 
 concurrency:
-  group: release-refs/tags/v${{ inputs.version }}
+  # Весь пакет имеет одну очередь: разные версии не должны гоняться за npm latest.
+  group: release-labpics-motion
   cancel-in-progress: false
 
 env:
@@ -40,9 +41,11 @@ jobs:
             || { echo "::error::релиз разрешён только ручным запуском с main, получено: $GITHUB_REF"; exit 1; }
           [[ "$VERSION" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]] \
             || { echo "::error::version обязана быть x.y.z, получено: $VERSION"; exit 1; }
-          echo "release_tag=v$VERSION" >> "$GITHUB_OUTPUT"
-          echo "version=$VERSION" >> "$GITHUB_OUTPUT"
-          echo "source_sha=$GITHUB_SHA" >> "$GITHUB_OUTPUT"
+          {
+            echo "release_tag=v$VERSION"
+            echo "version=$VERSION"
+            echo "source_sha=$GITHUB_SHA"
+          } >> "$GITHUB_OUTPUT"
 
   verify:
     name: Verify and seal npm package
@@ -197,10 +200,11 @@ jobs:
     concurrency:
       group: npm-publish-${{ needs.resolve.outputs.release_tag }}
       cancel-in-progress: false
-    needs: [resolve, verify]
+    needs: [resolve, verify, tag]
     if: >-
       github.repository == 'Labpics-Team/lab-motion' && !cancelled() &&
-      needs.verify.result == 'success' && needs.resolve.result == 'success'
+      needs.resolve.result == 'success' && needs.verify.result == 'success' &&
+      needs.tag.result == 'success'
     runs-on: ubuntu-latest
     timeout-minutes: 10
     environment: npm
@@ -298,9 +302,9 @@ jobs:
           console.log(`npm ${raw}: trusted publishing поддержан`);
           NODE
 
-      # Конфликтующий тег обнаруживаем до необратимой публикации. Сам ref пока
-      # не создаём: сбой npm/OIDC не должен оставлять частичный релиз.
-      - name: Verify release tag availability
+      # Tag-job уже зафиксировал ref без OIDC. Перед публикацией
+      # повторно читаем серверное состояние и принимаем только наш SHA.
+      - name: Verify locked release tag binding
         shell: bash
         env:
           GH_TOKEN: ${{ github.token }}
@@ -308,6 +312,8 @@ jobs:
           OWNER="${GITHUB_REPOSITORY%%/*}"
           REPOSITORY_NAME="${GITHUB_REPOSITORY#*/}"
           EXISTING_REF=$(
+            # $owner/$name/$qualifiedName ниже принадлежат GraphQL, а не shell.
+            # shellcheck disable=SC2016
             gh api graphql \
               -f query='query($owner: String!, $name: String!, $qualifiedName: String!) {
                 repository(owner: $owner, name: $name) {
@@ -320,8 +326,8 @@ jobs:
               --jq '(.data.repository.ref.target // empty) | [.__typename, .oid] | @tsv'
           )
           if [[ -z "$EXISTING_REF" ]]; then
-            echo "$RELEASE_TAG свободен"
-            exit 0
+            echo "::error::$RELEASE_TAG не создан tag-job"
+            exit 1
           fi
 
           read -r OBJECT_TYPE OBJECT_SHA <<< "$EXISTING_REF"
@@ -369,7 +375,38 @@ jobs:
             .update(readFileSync(process.env.TARBALL))
             .digest('base64')}`;
           const provenanceType = 'https://slsa.dev/provenance/v1';
-          const registryUrl = `https://registry.npmjs.org/${encodeURIComponent(name)}/${encodeURIComponent(version)}`;
+          const packageUrl = `https://registry.npmjs.org/${encodeURIComponent(name)}`;
+          const registryUrl = `${packageUrl}/${encodeURIComponent(version)}`;
+
+          function stableVersion(value, label) {
+            const match = /^(\d+)\.(\d+)\.(\d+)$/.exec(value);
+            if (!match) fail(`${label} не является стабильной версией x.y.z: ${String(value)}`);
+            return match.slice(1).map((part) => BigInt(part));
+          }
+
+          function compareVersions(left, right) {
+            for (let index = 0; index < left.length; index++) {
+              if (left[index] < right[index]) return -1;
+              if (left[index] > right[index]) return 1;
+            }
+            return 0;
+          }
+
+          async function assertMonotonicLatest() {
+            const response = await fetch(`${packageUrl}?latest=${Date.now()}`, {
+              cache: 'no-store',
+              headers: { accept: 'application/json' },
+            });
+            if (response.status === 404) return;
+            if (!response.ok) fail(`npm packument ответил ${response.status}`);
+            const packument = await response.json();
+            const latest = packument['dist-tags']?.latest;
+            if (typeof latest !== 'string') fail('npm packument не содержит dist-tags.latest');
+            if (compareVersions(stableVersion(version, 'кандидат'), stableVersion(latest, 'npm latest')) < 0) {
+              fail(`кандидат ${version} ниже npm latest ${latest} и не может его откатить`);
+            }
+            console.log(`npm latest ${latest}; кандидат ${version} не откатывает dist-tag`);
+          }
 
           async function lookup() {
             const response = await fetch(`${registryUrl}?reconcile=${Date.now()}`, {
@@ -405,6 +442,8 @@ jobs:
             console.log(`${identity} уже опубликован с проверенными байтами и provenance`);
             process.exit(0);
           }
+
+          await assertMonotonicLatest();
 
           let publishError;
           try {
@@ -507,28 +546,31 @@ jobs:
 
   tag:
     name: Create verified release tag
-    needs: [resolve, publish]
+    needs: [resolve, verify]
     if: >-
       github.repository == 'Labpics-Team/lab-motion' && !cancelled() &&
-      needs.publish.result == 'success'
+      needs.resolve.result == 'success' && needs.verify.result == 'success'
     runs-on: ubuntu-latest
     timeout-minutes: 5
     permissions:
       contents: write
     env:
       RELEASE_TAG: ${{ needs.resolve.outputs.release_tag }}
-      EXPECTED_SOURCE_SHA: ${{ needs.resolve.outputs.source_sha }}
+      EXPECTED_SOURCE_SHA: ${{ needs.verify.outputs.source_sha }}
 
     steps:
-      # OIDC уже завершён в upstream job. Этот job умеет только создать/прочитать
-      # Git-ref и повторно сверяет его после возможной гонки.
+      # После всех гейтов, но до выдачи OIDC, фиксируем точный ref.
+      # Сбой npm оставит проверенный тег, который безопасно переиспользует rerun.
       - name: Create or verify tag idempotently
+        shell: bash
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
           OWNER="${GITHUB_REPOSITORY%%/*}"
           REPOSITORY_NAME="${GITHUB_REPOSITORY#*/}"
           EXISTING_REF=$(
+            # $owner/$name/$qualifiedName ниже принадлежат GraphQL, а не shell.
+            # shellcheck disable=SC2016
             gh api graphql \
               -f query='query($owner: String!, $name: String!, $qualifiedName: String!) {
                 repository(owner: $owner, name: $name) {
@@ -612,6 +654,8 @@ jobs:
           OWNER="${GITHUB_REPOSITORY%%/*}"
           REPOSITORY_NAME="${GITHUB_REPOSITORY#*/}"
           lookup_release() {
+            # $owner/$name/$tagName ниже принадлежат GraphQL, а не shell.
+            # shellcheck disable=SC2016
             gh api graphql \
               -f query='query($owner: String!, $name: String!, $tagName: String!) {
                 repository(owner: $owner, name: $name) {
