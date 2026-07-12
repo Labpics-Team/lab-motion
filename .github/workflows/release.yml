@@ -41,9 +41,11 @@ jobs:
             || { echo "::error::релиз разрешён только ручным запуском с main, получено: $GITHUB_REF"; exit 1; }
           [[ "$VERSION" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]] \
             || { echo "::error::version обязана быть x.y.z, получено: $VERSION"; exit 1; }
-          echo "release_tag=v$VERSION" >> "$GITHUB_OUTPUT"
-          echo "version=$VERSION" >> "$GITHUB_OUTPUT"
-          echo "source_sha=$GITHUB_SHA" >> "$GITHUB_OUTPUT"
+          {
+            echo "release_tag=v$VERSION"
+            echo "version=$VERSION"
+            echo "source_sha=$GITHUB_SHA"
+          } >> "$GITHUB_OUTPUT"
 
   verify:
     name: Verify and seal npm package
@@ -310,6 +312,8 @@ jobs:
           OWNER="${GITHUB_REPOSITORY%%/*}"
           REPOSITORY_NAME="${GITHUB_REPOSITORY#*/}"
           EXISTING_REF=$(
+            # $owner/$name/$qualifiedName ниже принадлежат GraphQL, а не shell.
+            # shellcheck disable=SC2016
             gh api graphql \
               -f query='query($owner: String!, $name: String!, $qualifiedName: String!) {
                 repository(owner: $owner, name: $name) {
@@ -565,6 +569,8 @@ jobs:
           OWNER="${GITHUB_REPOSITORY%%/*}"
           REPOSITORY_NAME="${GITHUB_REPOSITORY#*/}"
           EXISTING_REF=$(
+            # $owner/$name/$qualifiedName ниже принадлежат GraphQL, а не shell.
+            # shellcheck disable=SC2016
             gh api graphql \
               -f query='query($owner: String!, $name: String!, $qualifiedName: String!) {
                 repository(owner: $owner, name: $name) {
@@ -648,6 +654,8 @@ jobs:
           OWNER="${GITHUB_REPOSITORY%%/*}"
           REPOSITORY_NAME="${GITHUB_REPOSITORY#*/}"
           lookup_release() {
+            # $owner/$name/$tagName ниже принадлежат GraphQL, а не shell.
+            # shellcheck disable=SC2016
             gh api graphql \
               -f query='query($owner: String!, $name: String!, $tagName: String!) {
                 repository(owner: $owner, name: $name) {
