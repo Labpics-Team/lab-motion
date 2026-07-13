@@ -661,6 +661,12 @@ describe('benchmark methodology fail-closed contracts', () => {
       score: 90,
       samples: 8,
       movement: { frames: 20, distinctPositions: 18, netAdvancement: 100, totalAdvancement: 100 },
+      baselineMovement: { frames: 20, distinctPositions: 18, netAdvancement: 100, totalAdvancement: 100 },
+      finalX: 600,
+      baselineFinalX: 600,
+      blockStart: 0.3,
+      blockEnd: 1.2,
+      rawFrames: { baseline: 24, blocked: 24 },
       ...overrides,
     });
     const matrix = {
@@ -669,7 +675,7 @@ describe('benchmark methodology fail-closed contracts', () => {
     };
     expect(() => assertFreezeMatrix(matrix, 'waapi-ctl')).not.toThrow();
     expect(() => assertFreezeMatrix({ ...matrix, lab: [valid(), valid({ valid: false })] }, 'waapi-ctl'))
-      .toThrow(/lab.*run 2/i);
+      .toThrow(/lab.*run 2.*valid=false.*score=90.*samples=8.*baselineDistinct=18.*baselineTotal=100/i);
     expect(() => assertFreezeMatrix({
       ...matrix,
       'waapi-ctl': [valid({ movement: movementStats([{ t: 0, x: 10 }]) })],

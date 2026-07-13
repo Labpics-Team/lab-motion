@@ -960,7 +960,24 @@ export function assertFreezeMatrix(matrix, controlId) {
     for (let i = 0; i < runs.length; i++) {
       const run = runs[i];
       if (!run?.valid || !Number.isFinite(run.score) || run.samples < 5) {
-        throw new Error(`${id}: run ${i + 1} невалиден`);
+        const diagnostic = [
+          `valid=${String(run?.valid)}`,
+          `score=${String(run?.score)}`,
+          `samples=${String(run?.samples)}`,
+          `finalX=${String(run?.finalX)}`,
+          `baselineFinalX=${String(run?.baselineFinalX)}`,
+          `blockStart=${String(run?.blockStart)}`,
+          `blockEnd=${String(run?.blockEnd)}`,
+          `movementFrames=${String(run?.movement?.frames)}`,
+          `movementDistinct=${String(run?.movement?.distinctPositions)}`,
+          `movementTotal=${String(run?.movement?.totalAdvancement)}`,
+          `baselineFrames=${String(run?.baselineMovement?.frames)}`,
+          `baselineDistinct=${String(run?.baselineMovement?.distinctPositions)}`,
+          `baselineTotal=${String(run?.baselineMovement?.totalAdvancement)}`,
+          `rawBaseline=${String(run?.rawFrames?.baseline)}`,
+          `rawBlocked=${String(run?.rawFrames?.blocked)}`,
+        ].join(', ');
+        throw new Error(`${id}: run ${i + 1} невалиден (${diagnostic})`);
       }
     }
   }
