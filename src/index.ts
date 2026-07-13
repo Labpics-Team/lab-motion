@@ -12,7 +12,7 @@
  * Deterministic. Reduced-motion honoured at every entry point.
  */
 
-export { MotionParamError } from './errors.js';
+export { MotionParamError, type MotionParamErrorCode } from './errors.js';
 export {
   type SpringParams,
   type SpringResult,

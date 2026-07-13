@@ -10,18 +10,18 @@
  * mini исполняет transform/opacity на MAIN-потоке аналитической замкнутой формой
  * (БЕЗ WAAPI/compositor-offload — тот не помещается под 5 KB, живёт в ./animate).
  *
- * mini регистрирует МИНИМАЛЬНЫЙ набор кодеков/адаптеров (mini-codecs.ts) и НЕ
- * импортирует full-набор (цвет/SVG-атрибут/plain-object) — граф mini не тянет
- * full (проверяемо import-cost тестом). Полная поверхность (keyframes,
- * per-property transitions, repeats, function values, sequences, доп. адаптеры)
- * — субпуть ./animate.
+ * mini регистрирует минимальный внутренний набор кодеков/адаптеров и не тянет
+ * ./value или compositor-компилятор. Публичного registry API у субпути нет.
+ * Цветовые CSS-значения и WAAPI-путь предоставляет ./animate; ключевые кадры и
+ * оркестрация живут в отдельных ./keyframes и ./timeline.
  *
  * Инварианты наследуют движок (engine.ts): один владелец target/поверхности,
  * C¹-подхват value+velocity при повторном запуске, разделение read/write фаз
  * единым ./frame, SSR-safe импорт, fail-fast MotionParamError ДО записи стиля.
  */
 
-import { createRegistry, type CodecRegistry } from '../registry.js';
+import { MotionParamError } from '../../errors.js';
+import type { CodecResolver } from '../registry.js';
 import { cssVarCodec, domAdapter, isStyleTarget, isTransformKey, numberCodec } from '../mini-codecs.js';
 import {
   runAnimate,
@@ -39,21 +39,22 @@ export type AnimateTarget = object | string | ArrayLike<object>;
 export type AnimateProps = Record<string, PropValue>;
 
 /**
- * Собирает mini-реестр: числовой кодек (transform-компоненты + opacity),
- * кодек CSS-переменной, DOM-адаптер элемента. Модульный синглтон — один реестр
- * на весь субпуть (расширение — регистрацией, но mini замкнут на минимум).
+ * Mini-поставка замкнута на двух кодеках и одном DOM-адаптере, поэтому
+ * компилированный resolver выбирает их за O(1) без массивов матчеров и init-аллокаций.
+ * Движок зависит от узкого внутреннего CodecResolver; публичный mini-контракт
+ * не выдаёт реестр и не допускает скрытого роста графа зависимостей.
  */
-function _buildMiniRegistry(): CodecRegistry {
-  const r = createRegistry();
-  // CSS-переменные (--*): число+юнит, main-thread.
-  r.registerCodec((p) => p.startsWith('--'), cssVarCodec);
-  // Числовые каналы: transform-шортхенды + opacity (compositor-eligible).
-  r.registerCodec((p) => isTransformKey(p) || p === 'opacity', numberCodec);
-  r.registerAdapter(isStyleTarget, domAdapter);
-  return r;
-}
-
-const _miniRegistry = _buildMiniRegistry();
+const _miniRegistry: CodecResolver = {
+  resolveCodec(property) {
+    if (property === 'opacity' || isTransformKey(property)) return numberCodec;
+    if (property.startsWith('--')) return cssVarCodec;
+    throw new MotionParamError('LM145');
+  },
+  resolveAdapter(target) {
+    if (isStyleTarget(target)) return domAdapter;
+    throw new MotionParamError('LM148');
+  },
+};
 
 /**
  * Анимирует DOM-цель(и) к props одной строкой (лёгкий срез).

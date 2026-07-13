@@ -202,6 +202,21 @@ export function lcg(seed: number): () => number {
 
 // ─── Разбор записанных значений ──────────────────────────────────────────────
 
+/** Читает конечный translateX без предположений о десятичной форме Number#toString. */
+export function readTranslateX(value: string): number | undefined {
+  const marker = 'translateX(';
+  const start = value.indexOf(marker);
+  if (start === -1) return undefined;
+  if (value.indexOf(marker, start + marker.length) !== -1) return Number.NaN;
+  const end = value.indexOf(')', start + marker.length);
+  if (end === -1) return Number.NaN;
+  const token = value.slice(start + marker.length, end);
+  const match = /^([+-]?(?:\d+|\d*\.\d+)(?:[eE][+-]?\d+)?)px$/.exec(token);
+  if (match === null) return Number.NaN;
+  const parsed = Number(match[1]);
+  return Number.isFinite(parsed) ? parsed : Number.NaN;
+}
+
 /** Достаёт из журнала все значения канала translateX (px) в порядке записи. */
 export function translateXSeries(writes: readonly StyleWrite[]): number[] {
   const out: number[] = [];
@@ -211,8 +226,8 @@ export function translateXSeries(writes: readonly StyleWrite[]): number[] {
       out.push(0);
       continue;
     }
-    const m = /translateX\((-?[\d.eE+]+)px\)/.exec(w.value);
-    if (m) out.push(Number(m[1]));
+    const value = readTranslateX(w.value);
+    if (value !== undefined) out.push(value);
   }
   return out;
 }

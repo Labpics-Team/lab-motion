@@ -66,10 +66,10 @@ function lerp(a: number, b: number, t: number): number {
   return clampFinite(a + (b - a) * t);
 }
 
-/** Config validator — throws MotionParamError with a /finite/i message. */
+/** Общий страж конечности с code-only ошибкой LM110. */
 function assertFinite(v: number, label: string): void {
   if (!Number.isFinite(v)) {
-    throw new MotionParamError(`utils: ${label} must be finite, got ${v}`);
+    throw new MotionParamError('LM110');
   }
 }
 
@@ -146,7 +146,7 @@ export function clamp(
   value?: number,
 ): number | ((value: number) => number) {
   if (Number.isNaN(min) || Number.isNaN(max)) {
-    throw new MotionParamError(`utils: clamp bounds must not be NaN, got min=${min} max=${max}`);
+    throw new MotionParamError('LM111');
   }
   const mapper = (v: number): number => clampFinite(Math.min(max, Math.max(min, clampFinite(v))));
   return value === undefined ? mapper : mapper(value);
@@ -236,7 +236,7 @@ export function snap(
     // frozen copy, and the mapper is immune to post-build caller mutation (U3).
     const targets = (target as readonly number[]).slice();
     if (targets.length === 0) {
-      throw new MotionParamError('utils: snap targets array must not be empty');
+      throw new MotionParamError('LM112');
     }
     for (let i = 0; i < targets.length; i++) {
       assertFinite(targets[i]!, `snap targets[${i}]`);
@@ -246,7 +246,7 @@ export function snap(
     const increment = target as number;
     assertFinite(increment, 'snap increment');
     if (increment === 0) {
-      throw new MotionParamError('utils: snap increment must be non-zero');
+      throw new MotionParamError('LM113');
     }
     mapper = (v: number): number =>
       clampFinite(Math.round(clampFinite(v) / increment) * increment);
@@ -364,23 +364,17 @@ export function interpolate<T>(
   const last = inp.length - 1;
 
   if (inp.length !== outp.length) {
-    throw new MotionParamError(
-      `utils: interpolate input/output length mismatch (${inp.length} vs ${outp.length})`,
-    );
+    throw new MotionParamError('LM114');
   }
   if (inp.length < 2) {
-    throw new MotionParamError(
-      `utils: interpolate needs at least 2 stops, got length ${inp.length}`,
-    );
+    throw new MotionParamError('LM115');
   }
   for (let i = 0; i < inp.length; i++) {
     assertFinite(inp[i]!, `interpolate input[${i}]`);
   }
   for (let i = 0; i < last; i++) {
     if (inp[i]! >= inp[i + 1]!) {
-      throw new MotionParamError(
-        `utils: interpolate input must be strictly increasing (ascending) at index ${i}`,
-      );
+      throw new MotionParamError('LM116');
     }
   }
 
@@ -390,15 +384,13 @@ export function interpolate<T>(
   const easeFn = easeArr ? undefined : (ease as EasingFunction | undefined);
   if (easeArr) {
     if (easeArr.length !== last) {
-      throw new MotionParamError(
-        `utils: interpolate ease array length ${easeArr.length} must equal segment count ${last}`,
-      );
+      throw new MotionParamError('LM117');
     }
     // Eager U2: every ease element must be callable — otherwise a non-function
     // defers to a raw TypeError on the value path instead of a boundary error.
     for (let i = 0; i < easeArr.length; i++) {
       if (typeof easeArr[i] !== 'function') {
-        throw new MotionParamError(`utils: interpolate ease[${i}] must be a function`);
+        throw new MotionParamError('LM118');
       }
     }
   }
@@ -429,7 +421,19 @@ export function interpolate<T>(
     // Locate segment k such that inp[k] <= x < inp[k+1] (below-range → k=0,
     // above-range → k=last-1, both giving out-of-[0,1] progress for clamp:false).
     let k = 0;
-    while (k < last - 1 && x >= inp[k + 1]!) k++;
+    if (last > 9) {
+      // Длинные шкалы ищем за O(log N); на коротких линейный цикл быстрее из-за ветвлений.
+      let lo = 0;
+      let hi = last;
+      while (hi - lo > 1) {
+        const mid = (lo + hi) >>> 1;
+        if (x < inp[mid]!) hi = mid;
+        else lo = mid;
+      }
+      k = lo;
+    } else {
+      while (k < last - 1 && x >= inp[k + 1]!) k++;
+    }
 
     const denom = inp[k + 1]! - inp[k]!; // > 0 by strictly-increasing check
     const p = (x - inp[k]!) / denom;

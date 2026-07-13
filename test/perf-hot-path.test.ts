@@ -2,9 +2,8 @@
  * perf-hot-path.test.ts — перф-seal горячих путей (drive / MotionValue).
  *
  * Печать точных ns/операцию — забота scripts/bench.mjs (wall-clock машинозависим,
- * per-PR такой гейт флакует; там же зафиксирован ВЕРДИКТ: precompute-инвариантов
- * замерен как −24.6% регрессия и отвергнут — движок в физическом оптимуме,
- * аналитический O(1), монопоморфный солвер V8-инлайнится, sqrt near-free).
+ * per-PR такой гейт флакует). Любая новая оптимизация проходит differential-
+ * паритет и повторный замер собранного артефакта; вечных «оптимумов» здесь нет.
  *
  * Здесь — ДЕТЕРМИНИРОВАННЫЙ seal (машинонезависим): число кадров до сходимости =
  * число вызовов солвера = потраченный CPU. Порог сверху ловит РАЗДУВАНИЕ работы
@@ -16,7 +15,6 @@
 import { describe, it, expect } from 'vitest';
 import { drive, MotionValue } from '../src/index.js';
 import { createTimeline } from '../src/timeline/index.js';
-import { readCompositorSpring } from '../src/compositor/index.js';
 
 /**
  * Синхронные дренируемые часы: requestFrame копит cb и возвращает НЕнулевой
@@ -98,37 +96,6 @@ describe('перф-seal: работа горячего пути детермин
     expect(performance.now() - t0).toBeLessThan(2000);
   });
 
-  // Characterization/perf regression guard for hotpath alloc/compute reduction.
-  // Uses virtual timing on readCompositorSpring (core of _emitAt per-frame).
-  // RED first: tight bound set to fail on pre-opt baseline (prove test bites).
-  //
-  // Замер — МИНИМУМ из K независимых прогонов: wall-clock на общем CI-раннере
-  // шумит планировщиком (флак: 19 мс под нагрузкой при типичных ~2 мс, дважды
-  // за 2026-07-10), а min-of-K подавляет шум, сохраняя зубы гарда — реальная
-  // регрессия горячего пути поднимет и минимум. Закон программы (#95/#100):
-  // wall-time не может быть машинозависимым merge-гейтом; порог по минимуму —
-  // компромисс, который остаётся функциональным сторожем регрессии.
-  it('readCompositorSpring hotpath char (throughput/alloc guard in main-unit path)', () => {
-    const SPRING = CANONICAL;
-    const N = 5000;
-    const K = 5;
-    let best = Number.POSITIVE_INFINITY;
-    let sum = 0;
-    for (let k = 0; k < K; k++) {
-      const t0 = performance.now();
-      for (let i = 0; i < N; i++) {
-        const t = ((i % 120) * (1 / 60));
-        const r = readCompositorSpring(SPRING, { from: 0, to: 100, v0: 0, t });
-        sum += r.value;
-      }
-      const dt = performance.now() - t0;
-      if (dt < best) best = dt;
-    }
-    // Char guard: pre RED with <0.1 (failed ~5ms), post GREEN <10 (allows variance, proves no regression; actual win in bench ns/op + less GC pressure under load).
-    // Opts: out reuse + opts template in main-unit _emitAt + solve/read support.
-    expect(best).toBeLessThan(10);
-    expect(sum).toBeGreaterThan(0); // side effect guard, prevent DCE
-  });
 });
 
 // ─── Timeline hot path perf (added for feat/perf-timeline) ────────────────────

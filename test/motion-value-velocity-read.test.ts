@@ -144,6 +144,53 @@ describe('MotionValue.velocity — в покое ровно 0 (class B character
 // ─── Suite A: в полёте — аналитический оракул ────────────────────────────────
 
 describe('MotionValue.velocity — в полёте совпадает с аналитической из солвера (class A)', () => {
+  it('v0-aware ран не обрывается frame-cap раньше физической сходимости на 144 Гц', () => {
+    const physics = { mass: 1, stiffness: 1, damping: 1 };
+    const donor = solveSpring(physics, 0.1, 0);
+    const initial = donor.value * 100_000;
+    const velocity = donor.velocity * 100_000;
+    const target = initial + 2e-10;
+    const clock = makeVirtualClock(1000 / 144);
+    const seen: number[] = [];
+    const mv = new MotionValue({
+      initial,
+      initialVelocity: velocity,
+      spring: physics,
+      clamp: false,
+      requestFrame: clock.requestFrame,
+    });
+    mv.onChange((value) => seen.push(value));
+    mv.setTarget(target);
+    clock.drainAll(20_000);
+
+    expect(clock.stamps.length).toBeGreaterThan(2_000);
+    expect(mv.value).toBe(target);
+    expect(Math.abs(seen.at(-2)! - target)).toBeLessThan(0.01);
+    mv.destroy();
+  });
+
+  it('target === current сохраняет абсолютную стартовую скорость через представимый solver-range', () => {
+    const clock = makeVirtualClock(0.1);
+    const seen: number[] = [];
+    const mv = new MotionValue({
+      initial: 10,
+      initialVelocity: 100,
+      spring: STD_SPRING,
+      clamp: false,
+      requestFrame: clock.requestFrame,
+    });
+    mv.onChange((value) => seen.push(value));
+    mv.setTarget(10);
+    clock.drain(1); // elapsed=0
+    expect(mv.velocity).toBe(100);
+    clock.drain(1); // 0.1 ms
+    expect((seen.at(-1)! - seen.at(-2)!) / 0.0001).toBeCloseTo(100, 0);
+    clock.drainAll(50_000);
+    expect(mv.value).toBe(10);
+    expect(mv.velocity).toBe(0);
+    mv.destroy();
+  });
+
   it('после setTarget: ненулевая и бит-в-бит равна solveSpring(...).velocity * range', () => {
     const clock = makeVirtualClock();
     const initial = 0;

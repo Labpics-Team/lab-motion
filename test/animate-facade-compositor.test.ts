@@ -24,6 +24,7 @@ import {
   makeNow,
   makeTimer,
   pickAnimate,
+  readTranslateX,
   translateXSeries,
 } from './animate-facade-helpers.js';
 
@@ -121,12 +122,11 @@ describe('animate: compositor-путь (Класс А + contract)', () => {
     expect(f.cancels).toBeGreaterThanOrEqual(1);
     expect(f.animateCalls.length).toBe(2);
     const kf = f.animateCalls[1]!.keyframes;
-    const m = /translateX\((-?[\d.eE+]+)px\)/.exec(String(kf[0]!['transform']));
-    expect(m).not.toBeNull();
-    const midFrom = Number(m![1]);
+    const midFrom = readTranslateX(String(kf[0]!['transform']));
+    expect(midFrom).toBeDefined();
     // from нового плана — аналитическое mid-flight значение (строго между 0 и 100).
-    expect(midFrom).toBeGreaterThan(0);
-    expect(midFrom).toBeLessThan(100);
+    expect(midFrom!).toBeGreaterThan(0);
+    expect(midFrom!).toBeLessThan(100);
     expect(kf[1]!['transform']).toBe('translateX(300px)');
   });
 

@@ -23,6 +23,7 @@ import {
 import { tmpdir } from 'node:os';
 import { basename, dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { parseBenchmarkDocumentationState } from '../bench/compare/report-contract.mjs';
 
 const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '..');
 const pkg = JSON.parse(readFileSync(join(ROOT, 'package.json'), 'utf8'));
@@ -47,12 +48,6 @@ const log = (line) => console.log(line);
 
 try {
   log(`pack-smoke: рабочая директория ${work}`);
-  const nodeMajor = Number(process.versions.node.split('.')[0]);
-  if (pkg.engines?.node !== '>=22' || nodeMajor < 22) {
-    throw new Error(
-      `Node-контракт нарушен: раннер ${process.versions.node}, engines ${String(pkg.engines?.node)}`,
-    );
-  }
   let tarballPath;
   let tarball;
   if (suppliedTarball !== undefined) {
@@ -103,7 +98,20 @@ try {
     stdio: 'pipe',
   });
 
-  const runnable = Object.keys(pkg.exports).filter((key) => !PEER_BINDING_SUBPATHS.has(key));
+  const installedRoot = join(app, 'node_modules', ...pkg.name.split('/'));
+  const installedPackage = JSON.parse(readFileSync(join(installedRoot, 'package.json'), 'utf8'));
+  const floorMatch = /^>=(\d+)$/.exec(installedPackage.engines?.node ?? '');
+  if (floorMatch === null) {
+    throw new Error(`архив содержит неканонический engines.node: ${String(installedPackage.engines?.node)}`);
+  }
+  const nodeMajor = Number(process.versions.node.split('.')[0]);
+  const floor = Number(floorMatch[1]);
+  if (!Number.isSafeInteger(nodeMajor) || nodeMajor < floor) {
+    throw new Error(`Node ${process.versions.node} ниже отгруженного floor ${installedPackage.engines.node}`);
+  }
+  log(`Node contract: архив ${installedPackage.engines.node}, раннер ${process.versions.node} ✓`);
+
+  const runnable = Object.keys(installedPackage.exports).filter((key) => !PEER_BINDING_SUBPATHS.has(key));
 
   // 1. Все независимые entries через ESM import.
   const esmProbe = `
@@ -138,11 +146,63 @@ try {
   writeFileSync(join(app, 'cjs.cjs'), cjsProbe);
   log(execSync('node cjs.cjs', { cwd: app, encoding: 'utf8' }).trim());
 
-  // 3. Обе runtime-ветки и соответствующие им декларации обязаны существовать.
+  // 3. Публичный frame, mini и zero-dependency binding обязаны разделять один
+  // scheduler ИМЕННО после pack/install. Source-тест не ловит дублирование,
+  // которое создаёт сборщик при `splitting: false`: три entry могли пройти все
+  // тесты, но поставить три native rAF на одном экране.
+  const sharedFrameProbe = (moduleKind) => `
+    const queue = [];
+    let requests = 0;
+    globalThis.requestAnimationFrame = (cb) => {
+      queue.push(cb);
+      requests++;
+      return requests;
+    };
+
+    ${moduleKind === 'esm'
+      ? `const { frame } = await import('${pkg.name}/frame');
+    const { animate } = await import('${pkg.name}/animate/mini');
+    const { createLabSpringElementClass } = await import('${pkg.name}/wc');`
+      : `const { frame } = require('${pkg.name}/frame');
+    const { animate } = require('${pkg.name}/animate/mini');
+    const { createLabSpringElementClass } = require('${pkg.name}/wc');`}
+
+    const values = new Map([['opacity', '0']]);
+    const target = {
+      style: {
+        getPropertyValue: (name) => values.get(name) ?? '',
+        setProperty: (name, value) => values.set(name, value),
+      },
+    };
+    class Base {
+      style = {};
+      getAttribute() { return null; }
+    }
+
+    frame.update(() => {});
+    animate(target, { opacity: 1 });
+    const Host = createLabSpringElementClass(Base);
+    const host = new Host();
+    host.connectedCallback();
+    host.attributeChangedCallback('target', '0', '1');
+
+    if (requests !== 1) {
+      throw new Error('frame singleton раздвоен: ожидался 1 rAF, получено ' + requests);
+    }
+    frame.cancelAll();
+    queue.shift()?.(0);
+    if (requests !== 1) throw new Error('cancelAll не погасил общий scheduler');
+    console.log('${moduleKind.toUpperCase()} shared frame OK: 3 consumers → 1 rAF');
+  `;
+  writeFileSync(join(app, 'shared-frame.mjs'), sharedFrameProbe('esm'));
+  log(execSync('node shared-frame.mjs', { cwd: app, encoding: 'utf8' }).trim());
+  writeFileSync(join(app, 'shared-frame.cjs'), sharedFrameProbe('cjs'));
+  log(execSync('node shared-frame.cjs', { cwd: app, encoding: 'utf8' }).trim());
+
+  // 4. Обе runtime-ветки и соответствующие им декларации обязаны существовать.
   // Плоский общий types-путь здесь запрещён: CJS и ESM имеют разные форматы.
-  const installedRoot = join(app, 'node_modules', ...pkg.name.split('/'));
   let checked = 0;
-  for (const [key, value] of Object.entries(pkg.exports)) {
+  for (const [key, value] of Object.entries(installedPackage.exports)) {
     const targets = {
       'import.types': value.import?.types,
       'import.default': value.import?.default,
@@ -164,15 +224,38 @@ try {
   }
   log(`структура OK: ${checked} условных export-целей на месте`);
 
-  // 4. Package metadata, license и README входят в npm-артефакт.
-  for (const file of ['LICENSE', 'README.md', 'package.json']) {
+  // 5. Метаданные и документы, на которые ссылается README, должны доехать
+  // до потребителя без отдельного источника истины вне npm-артефакта.
+  for (const file of ['LICENSE', 'README.md', 'package.json', 'docs/errors.md', 'docs/бенчмарк.md']) {
     if (!existsSync(join(installedRoot, file))) {
       failed = true;
       log(`FAIL: ${file} не в артефакте`);
     }
   }
+  const installedErrors = join(installedRoot, 'docs', 'errors.md');
+  if (existsSync(installedErrors)
+    && readFileSync(installedErrors, 'utf8') !== readFileSync(join(ROOT, 'docs', 'errors.md'), 'utf8')) {
+    failed = true;
+    log('FAIL: docs/errors.md в артефакте расходится с каталогом исходников');
+  }
+  const installedBenchmark = join(installedRoot, 'docs', 'бенчмарк.md');
+  if (existsSync(installedBenchmark)
+    && readFileSync(installedBenchmark, 'utf8') !== readFileSync(join(ROOT, 'docs', 'бенчмарк.md'), 'utf8')) {
+    failed = true;
+    log('FAIL: docs/бенчмарк.md в артефакте расходится с методологией исходников');
+  }
+  if (existsSync(installedBenchmark)) {
+    const benchmarkDocument = readFileSync(installedBenchmark, 'utf8');
+    try {
+      const evidence = parseBenchmarkDocumentationState(benchmarkDocument, installedPackage);
+      log(`benchmark evidence: ${evidence.kind === 'none' ? 'claims отсутствуют' : evidence.stem} ✓`);
+    } catch (error) {
+      failed = true;
+      log(`FAIL: пакетная методология: ${error?.message ?? String(error)}`);
+    }
+  }
 
-  // 5. Карты исключены package#files-контрактом. Runtime-файлы также не должны
+  // 6. Карты исключены package#files-контрактом. Runtime-файлы также не должны
   // ссылаться на отсутствующие карты: такая ссылка превращается в 404 в DevTools.
   const walk = (directory) =>
     readdirSync(directory, { withFileTypes: true }).flatMap((entry) =>
@@ -193,6 +276,19 @@ try {
   }
   if (maps.length === 0 && danglingReferences.length === 0) {
     log('sourcemaps: карты и битые ссылки отсутствуют ✓');
+  }
+
+  // package#imports работает в Node/bundler, но голый browser/CDN ESM не читает
+  // package.json при загрузке URL. Собранная ESM-ветка обязана ссылаться на
+  // общий scheduler относительным URL; иначе import('/dist/animate/mini') падает.
+  const browserBareFrame = runtimeFiles.filter(
+    (file) => file.endsWith('.js') && /["']#frame["']/.test(readFileSync(file, 'utf8')),
+  );
+  if (browserBareFrame.length > 0) {
+    failed = true;
+    log(`FAIL: ESM не импортируется напрямую из browser/CDN: ${browserBareFrame[0]}`);
+  } else {
+    log('browser/CDN ESM: общий frame использует относительные URL ✓');
   }
 } catch (error) {
   failed = true;

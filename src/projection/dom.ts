@@ -366,7 +366,7 @@ export function createDomProjection(options?: DomProjectionOptions): DomProjecti
 
     play(): void {
       if (captured === null) {
-        throw new MotionParamError('projection.play: call capture(elements) before mutating the DOM');
+        throw new MotionParamError('LM077');
       }
 
       // (а) batch-CLEAR: наши инлайны узлов активного полёта — одним проходом записей

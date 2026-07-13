@@ -115,7 +115,7 @@ describe('cove — U2 eager validation: interpolate ease-array element callabili
     expect(() =>
       // @ts-expect-error — intentional invalid element
       interpolate([0, 0.5, 1], [0, 10, 20], { ease: [(t: number) => t, null] }),
-    ).toThrow(/function/i);
+    ).toThrow(/^LM118$/);
   });
   it('a valid ease array still does not throw', () => {
     expect(() =>

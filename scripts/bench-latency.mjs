@@ -19,23 +19,36 @@
  * вне CI (нужен реальный Chrome + tracing для compositor-резидентности), ручная
  * валидация; см. README «Границы замера».
  *
- * Запуск: pnpm build && node scripts/bench-latency.mjs   (или pnpm bench:latency)
+ * Запуск: pnpm bench:latency (стенд пересобирает и fingerprint'ит checkout/dist)
  */
 import { pathToFileURL } from 'node:url';
 import { resolve, dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
+import {
+  assertCheckoutUnchanged,
+  prepareBenchmarkCheckout,
+} from '../bench/compare/provenance.mjs';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const pkgRoot = resolve(__dirname, '..');
 const distUrl = (p) => pathToFileURL(resolve(pkgRoot, p)).href;
 
+const provenance = prepareBenchmarkCheckout({
+  root: pkgRoot,
+  benchDirectory: pkgRoot,
+  requireClean: false,
+  requiredDist: ['dist/compositor/index.js', 'dist/compositor/stagger/index.js'],
+});
+
 const {
   CompositorSpring,
   handoffToLive,
   readCompositorSpring,
+} = await import(distUrl('dist/compositor/index.js'));
+const {
   compileStaggerPlan,
   CompositorStaggerGroup,
-} = await import(distUrl('dist/compositor/index.js'));
+} = await import(distUrl('dist/compositor/stagger/index.js'));
 
 const SPRING = { mass: 1, stiffness: 170, damping: 26 };
 
@@ -186,6 +199,7 @@ for (const N of [10, 50, 200]) {
 // ── Печать ──
 const fmtNs = (n) => (n >= 1e3 ? (n / 1e3).toFixed(2) + ' µs' : n.toFixed(0) + ' ns');
 console.log('\nlab-motion латентный стенд M2 — main-thread cost горячих путей (dist)\n');
+console.log(`  checkout ${provenance.revisionLabel}; worktree ${provenance.worktreeSha256}; dist ${provenance.distRuntime.sha256}\n`);
 console.log('  распределение ОДНОЙ операции: p50/p95/p99 (не средние), медиана по прогонам\n');
 console.log('  ' + 'путь'.padEnd(46) + 'p50'.padStart(11) + 'p95'.padStart(11) + 'p99'.padStart(11));
 console.log('  ' + '-'.repeat(79));
@@ -205,3 +219,5 @@ console.log(
   '\n  примечание: числа машинозависимы, гейтом НЕ являются; compositor-резидентность\n' +
     '  и input→photon НЕ наблюдаемы из Node — только реальный Chrome + tracing (см. README).\n',
 );
+
+assertCheckoutUnchanged(pkgRoot, provenance);

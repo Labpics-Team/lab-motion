@@ -20,6 +20,7 @@
 import { describe, expect, it } from 'vitest';
 import * as animateApi from '../src/animate/index.js';
 import { readCompositorSpring } from '../src/compositor/index.js';
+import { MotionParamError, type MotionParamErrorCode } from '../src/errors.js';
 import type { SpringParams } from '../src/spring.js';
 import {
   fakeEl,
@@ -32,7 +33,33 @@ import {
 const animate = pickAnimate(animateApi as Record<string, unknown>);
 const SPRING: SpringParams = { mass: 1, stiffness: 170, damping: 26 };
 
+function expectCode(run: () => unknown, code: MotionParamErrorCode): void {
+  try {
+    run();
+    expect.fail('ожидался MotionParamError');
+  } catch (error) {
+    expect(error).toBeInstanceOf(MotionParamError);
+    expect((error as MotionParamError).code).toBe(code);
+  }
+}
+
 describe('animate: базовые каналы (Класс А, unit)', () => {
+  it('физика живого рана изолирована от мутации caller-owned spring', () => {
+    const a = fakeEl();
+    const b = fakeEl();
+    const ca = makeClock();
+    const cb = makeClock();
+    const spring = { mass: 1, stiffness: 170, damping: 26 };
+    animate(a.el, { x: 120 }, { spring, requestFrame: ca.requestFrame });
+    animate(b.el, { x: 120 }, { spring: { ...spring }, requestFrame: cb.requestFrame });
+    spring.mass = 0;
+    for (let i = 0; i < 6; i++) {
+      ca.step(16);
+      cb.step(16);
+    }
+    expect(translateXSeries(a.writes)).toEqual(translateXSeries(b.writes));
+  });
+
   it('transform-шортхенд x: пружина едет к цели и оседает ровно на ней', async () => {
     const f = fakeEl();
     const clock = makeClock();
@@ -114,8 +141,9 @@ describe('animate: базовые каналы (Класс А, unit)', () => {
 describe('animate: ошибки границы (Класс А, unit)', () => {
   it('spring и duration одновременно → MotionParamError', () => {
     const f = fakeEl();
-    expect(() => animate(f.el, { x: 1 }, { spring: SPRING, duration: 300 })).toThrowError(
-      /MotionParamError|spring.*duration|duration.*spring/i,
+    expectCode(
+      () => animate(f.el, { x: 1 }, { spring: SPRING, duration: 300 }),
+      'LM136',
     );
   });
 
@@ -125,10 +153,11 @@ describe('animate: ошибки границы (Класс А, unit)', () => {
     expect(f.writes.length).toBe(0);
   });
 
-  it("prop 'transform' целиком не поддержан → понятная ошибка про шортхенды", () => {
+  it("prop 'transform' целиком не поддержан → LM140", () => {
     const f = fakeEl();
-    expect(() => animate(f.el, { transform: 'translateX(10px)' }, { spring: SPRING })).toThrowError(
-      /шортхенд/i,
+    expectCode(
+      () => animate(f.el, { transform: 'translateX(10px)' }, { spring: SPRING }),
+      'LM140',
     );
   });
 
@@ -191,7 +220,7 @@ describe('animate: цели (Класс А, integration)', () => {
 
   it('селектор без document (SSR-вызов) → MotionParamError, не ReferenceError', () => {
     expect(typeof (globalThis as { document?: unknown }).document).toBe('undefined');
-    expect(() => animate('.item', { x: 1 }, { spring: SPRING })).toThrowError(/document/i);
+    expectCode(() => animate('.item', { x: 1 }, { spring: SPRING }), 'LM149');
   });
 });
 

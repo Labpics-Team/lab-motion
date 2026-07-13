@@ -13,11 +13,10 @@
  *
  * Контракт:
  *   (1) NaN/±Infinity → MotionParamError синхронно, requestFrame не тронут;
- *   (2) сообщение называет параметр (initialVelocity) и значение;
+ *   (2) ошибка имеет стабильный code-only контракт LM045;
  *   (3) отсутствие опции ≡ 0: рождение в покое, velocity === 0 (прежнее);
  *   (4) конечный сид любых величин/знаков принимается и читается геттером;
- *   (5) сообщения соседних входов не сломаны рефакторингом единого стража:
- *       initial / setTarget / snapTo по-прежнему называют параметр и значение.
+ *   (5) соседние входы сохраняют единый код LM045.
  *
  * RED PROOF (вневременно — почему тесты были красными до реализации):
  *   конструктор засеивал скорость через `if (Number.isFinite(...))` — NaN и
@@ -28,11 +27,10 @@
  *
  * Mutation proofs (тест обязан падать на своей мутации):
  *   [validate] Вернуть молчаливый гард (не бросать) → (1) падает.
- *   [message]  Обезличить сообщение → (2) падает (нет 'initialVelocity'/значения).
+ *   [code]     Подменить смысловой код → (2) падает.
  *   [default]  Подменить дефолт `?? 0` на `?? 1` → (3) падает (velocity !== 0).
  *   [seed]     Не присваивать проверенное значение → (4) падает (velocity 0).
- *   [labels]   Перепутать label'ы стража → (5) падает (initial-ошибка не
- *              упоминает 'initial' и т.д.).
+ *   [guard]    Обойти общий страж соседнего входа → (5) падает.
  */
 
 import { describe, expect, it } from 'vitest';
@@ -63,7 +61,7 @@ describe('MotionValue initialVelocity — non-finite → MotionParamError син
     },
   );
 
-  it('сообщение называет параметр и значение; ошибка — MotionParamError и Error', () => {
+  it('ошибка имеет код LM045 и сохраняет классы MotionParamError/Error', () => {
     let caught: unknown;
     try {
       new MotionValue({ initial: 0, spring: STD_SPRING, initialVelocity: Number.NaN });
@@ -72,11 +70,10 @@ describe('MotionValue initialVelocity — non-finite → MotionParamError син
     }
     expect(caught).toBeInstanceOf(MotionParamError);
     expect(caught).toBeInstanceOf(Error);
-    expect((caught as Error).message).toMatch(/initialVelocity/);
-    expect((caught as Error).message).toMatch(/NaN/);
+    expect((caught as Error).message).toBe('LM045');
   });
 
-  it('валидация initial идёт раньше: при обоих битых входах ошибка называет initial', () => {
+  it('валидация initial идёт раньше и сохраняет LM045', () => {
     let caught: unknown;
     try {
       new MotionValue({ initial: Number.NaN, spring: STD_SPRING, initialVelocity: Number.NaN });
@@ -84,7 +81,7 @@ describe('MotionValue initialVelocity — non-finite → MotionParamError син
       caught = e;
     }
     expect(caught).toBeInstanceOf(MotionParamError);
-    expect((caught as Error).message).toMatch(/'initial'/);
+    expect((caught as Error).message).toBe('LM045');
   });
 });
 
@@ -109,7 +106,7 @@ describe('MotionValue initialVelocity — characterization валидных вх
     mv.destroy();
   });
 
-  it('сообщения соседних стражей не сломаны рефакторингом (mutation-proof [labels])', () => {
+  it('соседние входы сохраняют единый код общего стража', () => {
     const grab = (fn: () => void): string => {
       try {
         fn();
@@ -118,12 +115,11 @@ describe('MotionValue initialVelocity — characterization валидных вх
       }
       return '';
     };
-    expect(grab(() => new MotionValue({ initial: Number.NaN, spring: STD_SPRING }))).toMatch(
-      /'initial'.*NaN/,
-    );
+    expect(grab(() => new MotionValue({ initial: Number.NaN, spring: STD_SPRING })))
+      .toBe('LM045');
     const mv = new MotionValue({ initial: 0, spring: STD_SPRING });
-    expect(grab(() => mv.setTarget(Number.POSITIVE_INFINITY))).toMatch(/setTarget.*target.*Infinity/);
-    expect(grab(() => mv.snapTo(Number.NaN))).toMatch(/snapTo.*target.*NaN/);
+    expect(grab(() => mv.setTarget(Number.POSITIVE_INFINITY))).toBe('LM045');
+    expect(grab(() => mv.snapTo(Number.NaN))).toBe('LM045');
     mv.destroy();
   });
 });

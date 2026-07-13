@@ -1,5 +1,6 @@
 /**
- * compositor/stagger.ts — composited stagger: каскад групп на КОМПОЗИТОРЕ (subpath ./compositor).
+ * compositor/stagger.ts — composited stagger: каскад групп на КОМПОЗИТОРЕ
+ * (публичный subpath ./compositor/stagger).
  *
  * ТЕЗИС: каскадный (staggered) запуск группы элементов, где ЗАДЕРЖКИ каждого
  * элемента реализованы нативным WAAPI-delay поверх ОДНОЙ запечённой linear()-
@@ -21,8 +22,8 @@
  *     группы; это и есть composited-выигрыш. Планируется один раз, живёт на
  *     компоьзиторе.
  *   • РЕТАРГЕТ = per-ELEMENT. Примитив M2 ретаргета — ДИСКРЕТНОЕ one-shot событие
- *     на ОДНОМ элементе (снимок (value,velocity) замкнутой формой + cancel +
- *     пере-эмиссия кривой с сохранением скорости, C¹). Групповой retargetAll
+ *     на ОДНОМ элементе (serialized effect-снимок + cancel + пере-эмиссия с
+ *     сохранением правого slope). Групповой retargetAll
  *     раскладывается в N НЕЗАВИСИМЫХ per-element ретаргетов, но НЕ переигрывает
  *     каскад: ретаргет — редкое прерывание, а не новый парад. Пере-stagger'ить
  *     ретаргет = копить латентность и нарушить фазовую модель «ретаргет редок, не
@@ -40,7 +41,8 @@ import { MotionParamError } from '../errors.js';
 import { type SpringParams } from '../spring.js';
 import { type WaapiAnimatable } from '../waapi/index.js';
 import { MotionValue, type RequestFrameFn } from '../motion-value.js';
-import { stagger, type StaggerFrom, type StaggerGridOptions } from '../stagger/index.js';
+import { type StaggerFrom, type StaggerGridOptions } from '../stagger/index.js';
+import { MAX_STAGGER_COUNT, scheduleStagger } from '../stagger/scheduler.js';
 import { type SpringNode } from './segmenter.js';
 import {
   compileSpringPlan,
@@ -84,7 +86,7 @@ interface StaggerPlanBase {
 
 /** Опции чистого планировщика compileStaggerPlan (число элементов задаётся явно). */
 export interface CompositorStaggerOptions extends StaggerPlanBase {
-  /** Число элементов группы. Целое >= 0. */
+  /** Допустимое неотрицательное целое число элементов группы. */
   readonly count: number;
   /**
    * Нормализованная начальная скорость пружины (форма кривой). По умолчанию 0.
@@ -96,7 +98,7 @@ export interface CompositorStaggerOptions extends StaggerPlanBase {
 
 /** План composited stagger: ОБЩАЯ кривая + per-element задержки. */
 export interface CompositorStaggerPlan {
-  /** Общие кейфреймы [{prop: from}, {prop: to}] (одни на всю группу). */
+  /** Общие крайние кадры либо явные адаптивные кадры для WebKit. */
   readonly keyframes: Record<string, string | number>[];
   /** Общая linear()-строка (пружинная траектория) — одна на всю группу. */
   readonly easing: string;
@@ -112,8 +114,8 @@ export interface CompositorStaggerPlan {
   readonly nodes: readonly SpringNode[];
   /**
    * Per-element стартовые задержки (мс) из ./stagger. delays[i] — WAAPI-delay
-   * i-го элемента поверх ОБЩЕЙ кривой. Длина = count (для count>MAX клэмпится
-   * ./stagger). reduced-motion → все 0.
+   * i-го элемента поверх ОБЩЕЙ кривой. Длина всегда равна проверенному count;
+   * reduced-motion → все 0.
    */
   readonly delays: readonly number[];
   /** Число элементов, для которого посчитаны задержки. */
@@ -127,12 +129,12 @@ export interface CompositorStaggerPlan {
  *
  * @throws MotionParamError при невалидных count/spring/property/from/to (рано).
  */
-export function compileStaggerPlan(options: CompositorStaggerOptions): CompositorStaggerPlan {
-  const count = options.count;
-  if (!Number.isInteger(count) || count < 0) {
-    throw new MotionParamError(
-      `compositor stagger: count должен быть целым >= 0, получено ${count}`,
-    );
+function compileStaggerPlanForCount(
+  options: StaggerPlanBase & { readonly v0?: number },
+  count: number,
+): CompositorStaggerPlan {
+  if (!Number.isInteger(count) || count < 0 || count > MAX_STAGGER_COUNT) {
+    throw new MotionParamError('LM017');
   }
 
   // Общий план пружины — ОДНА компиляция на всю группу. Общий LRU-кэш ./compositor
@@ -150,27 +152,23 @@ export function compileStaggerPlan(options: CompositorStaggerOptions): Composito
     format: options.format,
   });
 
-  // Per-element задержки — headless-распределение ./stagger (детерминизм, финитность,
-  // reduced-motion CHARACTER-switch там же). 'staggerFrom' → 'from' распределения.
-  const delays = stagger(count, {
-    gap: options.gap,
-    from: options.staggerFrom,
-    easing: options.staggerEasing,
-    grid: options.grid,
-    reducedMotion: options.reducedMotion,
-  });
-
-  return {
-    keyframes: plan.keyframes,
-    easing: plan.easing,
-    duration: plan.duration,
-    iterations: plan.iterations,
-    fill: plan.fill,
-    composite: plan.composite,
-    nodes: plan.nodes,
-    delays,
+  // Оба публичных stagger-входа делят одно ядро, но compositor передаёт уже
+  // строго проверенный count и не создаёт промежуточный options-carrier.
+  const delays = scheduleStagger(
     count,
-  };
+    options.gap,
+    options.staggerFrom,
+    options.staggerEasing,
+    options.grid?.columns,
+    options.reducedMotion,
+  );
+
+  // Публичный value-object не делит мутабельную идентичность с базовым планом.
+  return { ...plan, delays, count };
+}
+
+export function compileStaggerPlan(options: CompositorStaggerOptions): CompositorStaggerPlan {
+  return compileStaggerPlanForCount(options, options.count);
 }
 
 // ─── CompositorStaggerGroup (контроллер группы) ──────────────────────────────
@@ -206,52 +204,53 @@ export interface CompositorStaggerGroupOptions extends StaggerPlanBase {
  *
  * РЕТАРГЕТ/ХЕНДОФФ — per-element (см. шапку файла: примитивы M2 поэлементны).
  * retarget(i)/handoffToLive(i) действуют на один элемент; retargetAll — fan-out
- * без пере-каскада. Гарантия C¹ ретаргета/хендоффа — та же, что у одиночного
- * CompositorSpring (снимок замкнутой формой + reseed скорости).
+ * без пере-каскада. Effect-space гарантия ретаргета/хендоффа — как у одиночного
+ * CompositorSpring (execution-snapshot + reseed скорости).
  */
 export class CompositorStaggerGroup {
   private readonly _plan: CompositorStaggerPlan;
   private readonly _springs: CompositorSpring[];
-  // Пружина + начальное значение группы — SSOT для инертного post-destroy
-  // MotionValue (см. handoffToLive): строим ЕГО, а не тянемся к мёртвому ребёнку.
-  private readonly _spring: SpringParams;
-  private readonly _from: number;
   private _destroyed = false;
 
   constructor(opts: CompositorStaggerGroupOptions) {
     if (!Array.isArray(opts.targets)) {
-      throw new MotionParamError(`CompositorStaggerGroup: targets должен быть массивом`);
+      throw new MotionParamError('LM018');
     }
     const count = opts.targets.length;
     // Компиляция общего плана + задержек (валидация spring/свойств/границ внутри).
-    this._plan = compileStaggerPlan({ ...opts, count });
-    // Захват для инертного post-destroy MotionValue (см. handoffToLive-гард).
-    this._spring = opts.spring;
-    this._from = opts.from;
+    this._plan = compileStaggerPlanForCount(opts, count);
+    // compileSpringPlan уже посеял единый artifact; N детей получают hit без
+    // отдельного WebKit-pool и без повторной сетки/RDP.
 
     const delays = this._plan.delays;
     const apply = opts.apply;
-    this._springs = opts.targets.map(
-      (target, i) =>
-        new CompositorSpring({
-          spring: opts.spring,
-          property: opts.property,
-          from: opts.from,
-          to: opts.to,
-          // delays[i] — стартовая задержка i-го элемента (может быть undefined при
-          // клэмпе экстремального count в ./stagger → трактуем как 0).
-          delay: delays[i] ?? 0,
-          target,
-          apply: apply !== undefined ? (v: string | number) => apply(i, v) : undefined,
-          tolerance: opts.tolerance,
-          fill: opts.fill,
-          composite: opts.composite,
-          format: opts.format,
-          now: opts.now,
-          requestFrame: opts.requestFrame,
-          setTimer: opts.setTimer,
-        }),
-    );
+    const springs = new Array<CompositorSpring>(count);
+    // CompositorSpring синхронно захватывает значения опций и не удерживает
+    // объект. Один переиспользуемый carrier убирает N краткоживущих option-
+    // объектов перед первым кадром большого каскада.
+    const child = {
+      spring: opts.spring,
+      property: opts.property,
+      from: opts.from,
+      to: opts.to,
+      delay: 0,
+      target: undefined as WaapiAnimatable | undefined,
+      apply: undefined as ((value: string | number) => void) | undefined,
+      tolerance: opts.tolerance,
+      fill: opts.fill,
+      composite: opts.composite,
+      format: opts.format,
+      now: opts.now,
+      requestFrame: opts.requestFrame,
+      setTimer: opts.setTimer,
+    };
+    for (let i = 0; i < count; i++) {
+      child.delay = delays[i]!;
+      child.target = opts.targets[i];
+      child.apply = apply && ((value: string | number): void => apply(i, value));
+      springs[i] = new CompositorSpring(child);
+    }
+    this._springs = springs;
   }
 
   /** Путь исполнения группы (по первому элементу; пустая группа → 'fallback'). */
@@ -274,10 +273,9 @@ export class CompositorStaggerGroup {
     return this._plan;
   }
 
-  /** Текущее аналитическое значение i-го элемента (или NaN при выходе индекса). */
+  /** Последнее известное значение i-го элемента (или NaN при выходе индекса). */
   valueAt(index: number): number {
-    const s = this._springs[index];
-    return s !== undefined ? s.value : NaN;
+    return this._springs[index]?.value ?? NaN;
   }
 
   /** Запускает КАСКАД: каждый элемент стартует со своей stagger-задержкой (per-group). */
@@ -287,16 +285,14 @@ export class CompositorStaggerGroup {
   }
 
   /**
-   * ONE-SHOT ретаргет ОДНОГО элемента на newTarget с сохранением скорости (C¹) —
+   * ONE-SHOT ретаргет ОДНОГО элемента с сохранением effect-space slope —
    * per-element примитив M2. index вне диапазона → MotionParamError.
    */
   retarget(index: number, newTarget: number): void {
     if (this._destroyed) return;
     const s = this._springs[index];
     if (s === undefined) {
-      throw new MotionParamError(
-        `CompositorStaggerGroup.retarget: index ${index} вне диапазона [0, ${this._springs.length - 1}]`,
-      );
+      throw new MotionParamError('LM019');
     }
     s.retarget(newTarget);
   }
@@ -304,7 +300,7 @@ export class CompositorStaggerGroup {
   /**
    * Ретаргет ВСЕЙ группы на общий newTarget: fan-out в N НЕЗАВИСИМЫХ per-element
    * ретаргетов, ОДНОВРЕМЕННО (каскад НЕ переигрывается — ретаргет есть дискретное
-   * прерывание, не новый парад; см. шапку). Каждый элемент сохраняет свой C¹.
+   * прерывание, не новый парад; см. шапку). Каждый элемент сохраняет свой slope.
    */
   retargetAll(newTarget: number): void {
     if (this._destroyed) return;
@@ -313,29 +309,15 @@ export class CompositorStaggerGroup {
 
   /**
    * ХЕНДОФФ ОДНОГО элемента compositor→live (per-element примитив M2): снимает
-   * (value, velocity) замкнутой формой, отменяет compositor-Animation и отдаёт
+   * (value, velocity) из execution stops, отменяет compositor-Animation и отдаёт
    * элемент живой rAF-пружине (MotionValue). Возвращает MotionValue — им дальше
    * управляет вызывающий. Группового хендоффа нет (см. шапку). index вне
    * диапазона → MotionParamError.
    */
   handoffToLive(index: number, newTarget?: number): MotionValue {
-    // После destroy() группа мертва: рано выходим — как guard-соседи (start/
-    // retarget/retargetAll), но контракт метода обязывает вернуть MotionValue.
-    // Отдаём инертное значение (сконструировано на СВОИХ _spring/_from и сразу
-    // destroy'нуто → петля не стартует, инъектированный requestFrame не зовётся),
-    // зеркаля inert-паттерн ребёнка (index.ts) и НЕ тянемся к мёртвому ребёнку.
-    // Так поведение уничтоженной группы согласовано: любой индекс — тихий no-op,
-    // а не «in-range действует / out-of-range бросает».
-    if (this._destroyed) {
-      const inert = new MotionValue({ initial: this._from, spring: this._spring });
-      inert.destroy();
-      return inert;
-    }
     const s = this._springs[index];
     if (s === undefined) {
-      throw new MotionParamError(
-        `CompositorStaggerGroup.handoffToLive: index ${index} вне диапазона [0, ${this._springs.length - 1}]`,
-      );
+      throw new MotionParamError('LM020');
     }
     return s.handoffToLive(newTarget);
   }
@@ -350,4 +332,5 @@ export class CompositorStaggerGroup {
     for (const s of this._springs) s.destroy();
     this._destroyed = true;
   }
+
 }

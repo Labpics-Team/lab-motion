@@ -264,8 +264,8 @@ describe('D7 мгновенный settle: degenerate/overflow/reduced', () => {
 
 describe('D8 dt-guards / GLOBAL_CAP / валидация', () => {
   it('не-конечные from/to → MotionParamError с именем параметра', () => {
-    expect(() => mk({ from: NaN })).toThrow(/from/);
-    expect(() => mk({ to: Infinity })).toThrow(/to/);
+    expect(() => mk({ from: NaN })).toThrow(/^LM026$/);
+    expect(() => mk({ to: Infinity })).toThrow(/^LM027$/);
   });
   it('невалидная пружина → MotionParamError (validateSpringParams)', () => {
     expect(() => mk({ spring: { mass: 0, stiffness: 100, damping: 20 } })).toThrow(MotionParamError);

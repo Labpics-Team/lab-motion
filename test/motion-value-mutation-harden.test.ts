@@ -273,19 +273,19 @@ describe('T8 snapTo: конъюнкты guard-а идемпотентности 
   });
 });
 
-// ─── T9 — сообщения ошибок называют параметр (строки 136, 190, 267) ─────────────
+// ─── T9 — единый code-only страж числовых входов ────────────────────────────────
 
-describe('T9 сообщения ошибок называют невалидный параметр (136, 190, 267)', () => {
-  it('constructor: не-конечный initial → сообщение содержит "initial"', () => {
-    expect(() => new MotionValue({ initial: NaN, spring: STD_SPRING })).toThrow(/initial/);
+describe('T9 не-конечные входы MotionValue → LM045', () => {
+  it('constructor: не-конечный initial', () => {
+    expect(() => new MotionValue({ initial: NaN, spring: STD_SPRING })).toThrow(/^LM045$/);
   });
-  it('setTarget: не-конечный target → сообщение содержит "target"', () => {
+  it('setTarget: не-конечный target', () => {
     const mv = new MotionValue({ initial: 0, spring: STD_SPRING, requestFrame: makeClock().requestFrame });
-    expect(() => mv.setTarget(Infinity)).toThrow(/target/);
+    expect(() => mv.setTarget(Infinity)).toThrow(/^LM045$/);
   });
-  it('snapTo: не-конечный target → сообщение содержит "snapTo"', () => {
+  it('snapTo: не-конечный target', () => {
     const mv = new MotionValue({ initial: 0, spring: STD_SPRING, requestFrame: makeClock().requestFrame });
-    expect(() => mv.snapTo(NaN)).toThrow(/snapTo/);
+    expect(() => mv.snapTo(NaN)).toThrow(/^LM045$/);
   });
 });
 

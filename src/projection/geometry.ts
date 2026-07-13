@@ -25,9 +25,9 @@
  * из units.ts; импорт утянул бы чужой граф при splitting:false).
  *
  * Ноль аллокаций на горячем at(p): массив и объекты кадров ПЕРЕИСПОЛЬЗУЮТСЯ
- * между вызовами (канон MainUnit._lt, src/animate/main-unit.ts:80-86) — ссылки
- * не удерживать. Короткоживущие объекты живых вызовов counterScale/correctRadius —
- * осознанная спековая цена переиспользования ядра flip.
+ * между вызовами (тот же принцип у MainUnit._snap) — ссылки
+ * не удерживать. Горячая коррекция радиусов пишет сразу в предвыделенный target:
+ * это та же finiteDiv-формула, но без лишней оси и объекта от публичного correctRadius.
  *
  * Риск (спека §10.4): сингулярность k→0 достижима при clamp:false overshoot
  * (V.size флорится в 0) — finiteDiv-фоллбеки держат кадр конечным (s → 1,
@@ -339,10 +339,10 @@ export function createProjector(nodes: readonly ProjectionNodeInit[]): Projector
   for (let i = 0; i < count; i++) {
     const id = nodes[i].id;
     if (typeof id !== 'string' || id === '') {
-      throw new MotionParamError('projection: node id must be a non-empty string');
+      throw new MotionParamError('LM079');
     }
     if (indexById.has(id)) {
-      throw new MotionParamError(`projection: duplicate node id "${id}"`);
+      throw new MotionParamError('LM080');
     }
     indexById.set(id, i);
     // Radii-кортежи: ровно 4 угла с обеих сторон (мальформный as-any вход —
@@ -359,9 +359,7 @@ export function createProjector(nodes: readonly ProjectionNodeInit[]): Projector
         r.last.every((c) => c !== null && typeof c === 'object')
       )
     ) {
-      throw new MotionParamError(
-        `projection: node "${id}" radii must be two tuples of exactly 4 corners`,
-      );
+      throw new MotionParamError('LM081');
     }
   }
 
@@ -375,7 +373,7 @@ export function createProjector(nodes: readonly ProjectionNodeInit[]): Projector
     }
     const idx = indexById.get(parent);
     if (idx === undefined) {
-      throw new MotionParamError(`projection: unknown parent "${parent}" of node "${nodes[i].id}"`);
+      throw new MotionParamError('LM082');
     }
     parentIdx[i] = idx;
   }
@@ -395,7 +393,7 @@ export function createProjector(nodes: readonly ProjectionNodeInit[]): Projector
       j = parentIdx[j];
     }
     if (j !== null && state[j] === 1) {
-      throw new MotionParamError(`projection: parent cycle at node "${nodes[j].id}"`);
+      throw new MotionParamError('LM083');
     }
     for (let k = chain.length - 1; k >= 0; k--) {
       state[chain[k]] = 2;
@@ -503,7 +501,7 @@ export function createProjector(nodes: readonly ProjectionNodeInit[]): Projector
       if (radii !== undefined) {
         // Инлайн семантики cornerRadiusAt в переиспользуемый target (ноль
         // промежуточных объектов лерпа): lerp по tc → floor 0 → живой
-        // correctRadius пер-оси (эллиптический угол). target предвыделен на
+        // correctRadius-семантика пер-оси (эллиптический угол). target предвыделен на
         // precompute для каждого невырожденного узла с radii.
         const target = frame.radii as [
           MutableCorner,
@@ -518,8 +516,10 @@ export function createProjector(nodes: readonly ProjectionNodeInit[]): Projector
           let ry = finite(finite(rf.y) + (finite(rl.y) - finite(rf.y)) * tc);
           if (rx < 0) rx = 0;
           if (ry < 0) ry = 0;
-          target[c].x = finite(correctRadius(rx, kx[i], ky[i]).x) + 0;
-          target[c].y = finite(correctRadius(ry, kx[i], ky[i]).y) + 0;
+          // Скалярный путь делает два деления на угол вместо четырёх: публичный
+          // correctRadius считает обе оси, а здесь rx нужен только x, ry — только y.
+          target[c].x = finiteDiv(rx, kx[i], rx) + 0;
+          target[c].y = finiteDiv(ry, ky[i], ry) + 0;
         }
       }
 

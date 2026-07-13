@@ -211,7 +211,7 @@ describe('drive() spring-param validation is at the boundary — scheduler-indep
       expect(caught).toBeInstanceOf(Error);
     });
 
-    it('error message names the invalid param (stiffness)', () => {
+    it('невалидная stiffness имеет код LM089', () => {
       let msg = '';
       try {
         drive({
@@ -225,7 +225,7 @@ describe('drive() spring-param validation is at the boundary — scheduler-indep
       } catch (e) {
         msg = (e as Error).message;
       }
-      expect(msg).toMatch(/stiffness/);
+      expect(msg).toBe('LM089');
     });
   });
 

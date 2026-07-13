@@ -25,7 +25,7 @@
  *   SC4. Zero runtime deps.
  */
 
-import { trimSlidingWindow } from '../internal/sliding-window.js';
+import { advanceSlidingWindow } from '../internal/sliding-window.js';
 
 // ─── Общие утилиты ───────────────────────────────────────────────────────────
 
@@ -139,22 +139,24 @@ export function createScrollVelocity(windowSec?: number): ScrollVelocityTracker 
       ? windowSec
       : DEFAULT_WINDOW_S;
   let samples: ScrollSample[] = [];
+  let start = 0;
   return {
     push(s: ScrollSample): void {
       const p = { pos: finite(s.pos), t: finite(s.t) };
       samples.push(p);
-      samples = trimSlidingWindow(samples, win);
+      start = advanceSlidingWindow(samples, start, win);
     },
     velocity(): number {
-      if (samples.length < 2) return 0;
-      const a = samples[0];
+      if (samples.length - start < 2) return 0;
+      const a = samples[start]!;
       const b = samples[samples.length - 1];
       const dt = b.t - a.t;
       if (!(dt > 0)) return 0;
       return finite(finite(b.pos - a.pos) / dt);
     },
     reset(): void {
-      samples = [];
+      samples.length = 0;
+      start = 0;
     },
   };
 }

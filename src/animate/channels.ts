@@ -14,13 +14,15 @@
  */
 
 import { MotionParamError } from '../errors.js';
+import { interpolateColor } from '../value/color.js';
+import type { ValueAST } from '../value/parse.js';
+import { tryParseValue } from '../value/parse.js';
 import {
-  buildTransform,
-  interpolate,
-  parse,
-  type TransformState,
-  type ValueAST,
-} from '../value/index.js';
+  interpolateUnit,
+  type ParsedRelative,
+  type ParsedUnit,
+  type ParsedVar,
+} from '../value/units.js';
 
 // ─── Ключи transform-шортхендов (словарь = TransformState ядра ./value) ──────
 
@@ -56,21 +58,21 @@ export type GroupKey = string; // 'transform' | 'opacity' | kebab-case CSS-им�
 
 /** Числовой канал (transform-шортхенд или opacity): физика в пространстве значения. */
 export interface NumericChannelSpec {
-  readonly kind: 'num';
-  readonly key: string;
-  readonly group: GroupKey;
+  readonly _kind: 'num';
+  readonly _key: string;
+  readonly _group: GroupKey;
   /** Явный from из пары [from, to]; undefined — резолв из реестра/стиля. */
-  readonly explicitFrom: number | undefined;
-  readonly to: number;
+  readonly _explicitFrom: number | undefined;
+  readonly _to: number;
 }
 
 /** CSS-канал (цвет/юниты через ./value): физика в прогресс-пространстве [0..1]. */
 export interface CssChannelSpec {
-  readonly kind: 'css';
-  readonly key: string;
-  readonly group: GroupKey;
-  readonly explicitFrom: ValueAST | undefined;
-  readonly to: ValueAST;
+  readonly _kind: 'css';
+  readonly _key: string;
+  readonly _group: GroupKey;
+  readonly _explicitFrom: ValueAST | undefined;
+  readonly _to: ValueAST;
 }
 
 export type ChannelSpec = NumericChannelSpec | CssChannelSpec;
@@ -79,31 +81,23 @@ function camelToKebab(key: string): string {
   return key.replace(/[A-Z]/g, (c) => '-' + c.toLowerCase());
 }
 
-function requireFinite(key: string, v: unknown): number {
+function requireFinite(v: unknown): number {
   if (typeof v !== 'number' || !Number.isFinite(v)) {
-    throw new MotionParamError(
-      `animate: значение '${key}' должно быть конечным числом, получено ${String(v)}`,
-    );
+    throw new MotionParamError('LM142');
   }
   return v;
 }
 
-function parseCssValue(key: string, v: unknown): ValueAST {
+function parseCssValue(v: unknown): ValueAST {
   if (typeof v === 'number' && !Number.isFinite(v)) {
-    throw new MotionParamError(
-      `animate: значение '${key}' должно быть конечным числом, получено ${String(v)}`,
-    );
+    throw new MotionParamError('LM142');
   }
   if (typeof v !== 'string' && typeof v !== 'number') {
-    throw new MotionParamError(
-      `animate: значение '${key}' должно быть строкой или числом, получено ${typeof v}`,
-    );
+    throw new MotionParamError('LM143');
   }
-  try {
-    return parse(v);
-  } catch (e) {
-    throw new MotionParamError(`animate: '${key}': ${(e as Error).message}`);
-  }
+  const parsed = tryParseValue(v);
+  if (parsed === undefined) throw new MotionParamError('LM144');
+  return parsed;
 }
 
 /**
@@ -116,32 +110,28 @@ export function parseProps(props: Record<string, unknown>): ChannelSpec[] {
   for (const key of Object.keys(props)) {
     const raw = props[key];
     if (key === 'transform') {
-      throw new MotionParamError(
-        `animate: свойство 'transform' целиком не поддерживается — используйте шортхенды (x, y, scale, rotate, …), они сливаются в одну transform-строку`,
-      );
+      throw new MotionParamError('LM140');
     }
     const pair = Array.isArray(raw) ? raw : undefined;
-    if (pair !== undefined && pair.length !== 2) {
-      throw new MotionParamError(
-        `animate: пара '${key}' должна быть [from, to], получено ${pair.length} элемент(ов)`,
-      );
+    if (pair && pair.length !== 2) {
+      throw new MotionParamError('LM141');
     }
     if (isTransformKey(key) || key === 'opacity') {
       const group: GroupKey = key === 'opacity' ? 'opacity' : 'transform';
       specs.push({
-        kind: 'num',
-        key,
-        group,
-        explicitFrom: pair !== undefined ? requireFinite(key, pair[0]) : undefined,
-        to: requireFinite(key, pair !== undefined ? pair[1] : raw),
+        _kind: 'num',
+        _key: key,
+        _group: group,
+        _explicitFrom: pair ? requireFinite(pair[0]) : undefined,
+        _to: requireFinite(pair ? pair[1] : raw),
       });
     } else {
       specs.push({
-        kind: 'css',
-        key,
-        group: camelToKebab(key),
-        explicitFrom: pair !== undefined ? parseCssValue(key, pair[0]) : undefined,
-        to: parseCssValue(key, pair !== undefined ? pair[1] : raw),
+        _kind: 'css',
+        _key: key,
+        _group: camelToKebab(key),
+        _explicitFrom: pair ? parseCssValue(pair[0]) : undefined,
+        _to: parseCssValue(pair ? pair[1] : raw),
       });
     }
   }
@@ -152,32 +142,36 @@ export function parseProps(props: Record<string, unknown>): ChannelSpec[] {
 
 /** Числовой канал в полёте: from/to/v0 + последнее эмитнутое состояние. */
 export interface NumericChannel {
-  readonly kind: 'num';
-  readonly key: string;
-  readonly from: number;
-  readonly to: number;
+  readonly _key: string;
+  readonly _from: number;
+  readonly _to: number;
+  /** Численно представимая цель солвера; финальный snap всё равно идёт в to. */
+  readonly _solverTo: number;
   /** Нормализованная стартовая скорость (канон солвера: v0 / range). */
-  readonly v0: number;
-  value: number;
-  velocity: number;
+  readonly _v0: number;
+  _value: number;
+  _velocity: number;
+  /** Последнее состояние, которое успешно прошло host write. */
+  _renderedValue: number;
+  _renderedVelocity: number;
 }
 
 /** CSS-канал в полёте: прогресс-пространство + последняя эмитнутая строка. */
 export interface CssChannel {
-  readonly kind: 'css';
-  readonly key: string;
-  readonly fromAst: ValueAST;
-  readonly toAst: ValueAST;
+  readonly _key: string;
+  readonly _fromAst: ValueAST;
+  readonly _toAst: ValueAST;
   /**
    * Стартовая скорость прогресса (прогресс/с). Явная пара [from, to] — 0
    * (покой, канон числовых каналов); перехват живого рана — проекция ṗ̂
    * источника между прогресс-пространствами (projectCssV0, C¹-контракт #93).
    */
-  readonly v0: number;
-  p: number;
+  readonly _v0: number;
   /** Текущая производная прогресса ṗ (прогресс/с) — сырьё C¹-подхвата. */
-  dpdt: number;
-  css: string | number;
+  _dpdt: number;
+  _css: string | number;
+  _renderedDpdt: number;
+  _renderedCss: string | number;
 }
 
 /** Порог вырожденного диапазона (зеркалит RANGE_EPSILON compositor-пути). */
@@ -191,6 +185,89 @@ export function normalizeV0(velocity: number, range: number): number {
   if (!(Math.abs(range) > RANGE_EPSILON)) return 0;
   const v0 = velocity / range;
   return Number.isFinite(v0) ? v0 + 0 : 0;
+}
+
+/**
+ * Строит числовой канал из абсолютного снимка. Вырожденный целевой диапазон
+ * получает минимальную представимую solver-амплитуду: произведение этой
+ * амплитуды на нормализованный v0 сохраняет исходный абсолютный импульс, а
+ * публичный `to` остаётся точной финальной целью для snap.
+ */
+function numericChannel(
+  key: string,
+  from: number,
+  to: number,
+  velocity: number,
+): NumericChannel {
+  const range = to - from;
+  const representableRange = Math.max(
+    RANGE_EPSILON,
+    Math.abs(from) * Number.EPSILON,
+  );
+  let solverTo = to;
+  if (!(Math.abs(range) > RANGE_EPSILON) && velocity !== 0) {
+    solverTo = from + (velocity < 0 ? -representableRange : representableRange);
+    if (!Number.isFinite(solverTo) || solverTo === from) {
+      throw new MotionParamError('LM150');
+    }
+  }
+  return {
+    _key: key,
+    _from: from,
+    _to: to,
+    _solverTo: solverTo,
+    _v0: normalizeV0(velocity, solverTo - from),
+    _value: from,
+    _velocity: velocity,
+    _renderedValue: from,
+    _renderedVelocity: velocity,
+  };
+}
+
+/** Устойчивая позиция канала: взвешенная форма не переполняет MAX ↔ -MAX. */
+export function channelAt(channel: NumericChannel, progress: number): number {
+  if (progress === 0) return channel._from;
+  if (progress === 1) return channel._to;
+  const value = (1 - progress) * channel._from + progress * channel._to;
+  return Number.isFinite(value) ? value : channel._to;
+}
+
+/**
+ * Пересевает каналы из их текущего абсолютного снимка для live-движка.
+ * Единственный конструктор выше не даёт initial bind и WAAPI→live handoff
+ * разойтись в политике нулевого диапазона.
+ */
+export function rebaseNumericChannels(
+  channels: readonly NumericChannel[],
+): NumericChannel[] {
+  return channels.map((channel) =>
+    numericChannel(channel._key, channel._value, channel._to, channel._velocity),
+  );
+}
+
+/**
+ * Скорость общей кривой по каналу с наибольшим оставшимся диапазоном.
+ * Один канон используют preflight фасада и WAAPI-юнит: иначе решение о бюджете
+ * могло бы проверить не ту скорость, которую затем компилирует compositor.
+ * До первого кадра `_value === _from`; после снимка `_value` становится точкой
+ * перехвата, поэтому тот же расчёт без второго pickup-алгоритма остаётся точным.
+ */
+export function dominantV0(channels: readonly NumericChannel[]): number {
+  let dominant: NumericChannel | undefined;
+  for (const channel of channels) {
+    if (
+      dominant === undefined ||
+      Math.abs(channel._to - channel._value) > Math.abs(dominant._to - dominant._value)
+    ) {
+      dominant = channel;
+    }
+  }
+  if (dominant === undefined) return 0;
+  const range = dominant._to - dominant._value;
+  // Нормализованная compositor-кривая не представляет импульс при нулевом
+  // диапазоне. Infinity здесь — только preflight-sentinel: фасад выберет live.
+  if (!(Math.abs(range) > RANGE_EPSILON) && dominant._velocity !== 0) return Infinity;
+  return normalizeV0(dominant._velocity, range);
 }
 
 /**
@@ -220,22 +297,22 @@ function spanVec(from: ValueAST, to: ValueAST): number[] | undefined {
  * оба юнитные — иначе undefined выше); −0 схлопывает normalizeV0.
  */
 function projectCssV0(live: CssChannel, fromAst: ValueAST, toAst: ValueAST): number {
-  const a = spanVec(live.fromAst, live.toAst);
+  const a = spanVec(live._fromAst, live._toAst);
   const b = spanVec(fromAst, toAst);
   if (!a || !b) return 0; // undefined-гейт: определённый спан — непустой массив (truthy)
   let i = 0;
   for (let k = 1; k < b.length; k++) {
     if (Math.abs(b[k]!) > Math.abs(b[i]!)) i = k;
   }
-  return normalizeV0(live.dpdt * a[i]!, b[i]!);
+  return normalizeV0(live._dpdt * a[i]!, b[i]!);
 }
 
 // ─── Реестр состояния по элементам ───────────────────────────────────────────
 
 /** Снимок числового канала (значение + скорость units/s). */
 export interface ChannelSnapshot {
-  readonly value: number;
-  readonly velocity: number;
+  readonly _value: number;
+  readonly _velocity: number;
 }
 
 /**
@@ -243,23 +320,32 @@ export interface ChannelSnapshot {
  * (capture → supersede). Оба движка (rAF и WAAPI) реализуют этот контракт.
  */
 export interface GroupOwner {
+  /** Снимает резерв при rollback до supersede. */
+  _release?(): void;
+  /** Фиксирует общий снимок до поканального чтения stateful host-часов. */
+  _capture?(): void;
   /** Аналитический снимок числового канала в момент прерывания. */
-  captureNum(key: string): ChannelSnapshot | undefined;
+  _captureNum(key: string): ChannelSnapshot | undefined;
   /** Живой CSS-канал в момент прерывания (значение + ṗ для C¹-проекции). */
-  captureCss(key: string): CssChannel | undefined;
+  _captureCss(key: string): CssChannel | undefined;
   /** Ключи числовых каналов прогона (для остаточного transform-состояния). */
-  numericKeys(): readonly string[];
-  /** Прервать прогон: стоп без записи, finished резолвится (не natural). */
-  supersede(): void;
+  _numericKeys(): readonly string[];
+  /**
+   * Прервать прогон. Опциональный replacement пишется до destructive cleanup:
+   * его отказ оставляет старого владельца живым и повторяемым.
+   */
+  _supersede(replacement?: () => void): void;
 }
 
 /** Запись группы: живой владелец + последнее известное состояние каналов. */
 export interface GroupRecord {
-  owner: GroupOwner | undefined;
+  _owner: GroupOwner | undefined;
+  /** Commit-reservation закрывает reentry даже до публикации первого owner. */
+  _transition: boolean;
   /** Последние известные числовые значения по субканалам (после settle/cancel). */
-  readonly numeric: Map<string, ChannelSnapshot>;
+  readonly _numeric: Map<string, ChannelSnapshot>;
   /** Последнее известное значение CSS-канала. */
-  cssValue: string | number | undefined;
+  _cssValue: string | number | undefined;
 }
 
 /**
@@ -272,13 +358,18 @@ const registry = new WeakMap<object, Map<GroupKey, GroupRecord>>();
 /** Запись группы элемента (создаётся лениво). */
 export function groupRecord(el: object, group: GroupKey): GroupRecord {
   let groups = registry.get(el);
-  if (groups === undefined) {
+  if (!groups) {
     groups = new Map();
     registry.set(el, groups);
   }
   let rec = groups.get(group);
-  if (rec === undefined) {
-    rec = { owner: undefined, numeric: new Map(), cssValue: undefined };
+  if (!rec) {
+    rec = {
+      _owner: undefined,
+      _transition: false,
+      _numeric: new Map(),
+      _cssValue: undefined,
+    };
     groups.set(group, rec);
   }
   return rec;
@@ -316,39 +407,74 @@ export function readStyleValue(el: AnimatableElement, cssName: string): string {
 
 // ─── Форматирование записи ───────────────────────────────────────────────────
 
-/**
- * Собирает transform-строку из остаточного состояния (замороженные каналы
- * прежних прогонов) и живых значений — полная проекция известного состояния,
- * чтобы новый прогон одного канала не сбрасывал остальные в identity.
- */
-export function formatTransform(
+/** Один mutable state на lifecycle группы заменяет Map+object на каждом кадре. */
+function createTransformState(
   residuals: ReadonlyMap<string, number>,
-  live?: ReadonlyMap<string, number>,
-): string {
+  channels: readonly NumericChannel[],
+): Record<string, number> {
   const state: Record<string, number> = {};
   residuals.forEach((v, k) => {
     state[k] = v;
   });
-  if (live !== undefined) {
-    live.forEach((v, k) => {
-      state[k] = v;
-    });
+  for (const channel of channels) {
+    state[channel._key] = channel._value;
   }
-  return buildTransform(state as TransformState);
+  return state;
 }
 
-/** Значение CSS-канала при прогрессе p (финитные стражи — в ./value). */
+/** Интерполяция AST, уже прошедшего parse-границу фасада. */
+function interpolateParsed(from: ValueAST, to: ValueAST, p: number): string | number {
+  if (from.kind === 'color' && to.kind === 'color') {
+    return interpolateColor(from, to, p);
+  }
+  if (from.kind !== 'color' && to.kind !== 'color') {
+    return interpolateUnit(
+      from as ParsedUnit | ParsedRelative | ParsedVar,
+      to as ParsedUnit | ParsedRelative | ParsedVar,
+      p,
+    );
+  }
+  const value = Number.isNaN(p) || p < 0.5 ? from : to;
+  if (value.kind === 'unit') {
+    return value.unit ? `${value.value}${value.unit}` : value.value;
+  }
+  if (value.kind === 'relative') return `${value.op}=${value.amount}${value.unit}`;
+  if (value.kind === 'var') {
+    return value.fallback !== undefined
+      ? `var(${value.name}, ${value.fallback})`
+      : `var(${value.name})`;
+  }
+  return `rgb(${Math.round(value.r)}, ${Math.round(value.g)}, ${Math.round(value.b)})`;
+}
+
+/** Значение CSS-канала при прогрессе p. */
 export function cssAt(ch: CssChannel, p: number): string | number {
-  return interpolate(ch.fromAst, ch.toAst, p);
+  return interpolateParsed(ch._fromAst, ch._toAst, p);
+}
+
+/**
+ * SSOT сериализации узкой numeric-поверхности. Вызов допустим только после
+ * доказанной topology: transform содержит ровно `x` без residual-каналов,
+ * иначе нужен общий buildTransform.
+ */
+export function formatSingleNumericSurface(
+  transformX: boolean,
+  value: number,
+): string {
+  return transformX
+    ? value === 0 ? 'none' : `translateX(${value}px)`
+    : String(value);
 }
 
 // ─── Привязка группы к элементу (from-резолв + подхват прерывания) ───────────
 
 /** Каналы группы, привязанные к элементу, + остаточное transform-состояние. */
 export interface BoundGroup {
-  readonly numeric: NumericChannel[];
-  readonly css: CssChannel | undefined;
-  readonly residuals: Map<string, number>;
+  readonly _numeric: NumericChannel[];
+  readonly _css: CssChannel | undefined;
+  readonly _residuals: Map<string, number>;
+  /** Единственный transform-state группы; undefined для остальных поверхностей. */
+  readonly _transform: Record<string, number> | undefined;
 }
 
 /**
@@ -364,63 +490,57 @@ export function bindGroup(
   specs: readonly ChannelSpec[],
   rec: GroupRecord,
 ): BoundGroup {
-  const owner = rec.owner;
+  const owner = rec._owner;
+  owner?._capture?.();
   const numeric: NumericChannel[] = [];
   let css: CssChannel | undefined;
 
   for (const spec of specs) {
-    if (spec.kind === 'num') {
+    if (spec._kind === 'num') {
       let from: number;
       let velocity = 0;
-      if (spec.explicitFrom !== undefined) {
-        from = spec.explicitFrom;
+      if (spec._explicitFrom !== undefined) {
+        from = spec._explicitFrom;
       } else {
-        const live = owner?.captureNum(spec.key);
-        const stored = rec.numeric.get(spec.key);
-        if (live !== undefined) {
-          from = live.value;
-          velocity = live.velocity;
-        } else if (stored !== undefined) {
-          from = stored.value;
+        const live = owner?._captureNum(spec._key);
+        const stored = rec._numeric.get(spec._key);
+        if (live) {
+          from = live._value;
+          velocity = live._velocity;
+        } else if (stored) {
+          from = stored._value;
         } else if (group === 'transform') {
-          from = transformIdentity(spec.key);
+          from = transformIdentity(spec._key);
         } else {
           const read = parseFloat(readStyleValue(el, group));
           from = Number.isFinite(read) ? read : 1; // opacity: дефолт браузера
         }
       }
-      numeric.push({
-        kind: 'num',
-        key: spec.key,
-        from,
-        to: spec.to,
-        v0: normalizeV0(velocity, spec.to - from),
-        value: from,
-        velocity,
-      });
+      numeric.push(numericChannel(spec._key, from, spec._to, velocity));
     } else {
       let fromAst: ValueAST;
       let v0 = 0;
-      if (spec.explicitFrom !== undefined) {
-        fromAst = spec.explicitFrom;
+      if (spec._explicitFrom !== undefined) {
+        fromAst = spec._explicitFrom;
       } else {
-        const live = owner?.captureCss(spec.key);
+        const live = owner?._captureCss(spec._key);
         // live.css не бывает nullish (string | number) — ?? безопасно каскадит.
-        const source = live?.css ?? rec.cssValue ?? readStyleValue(el, group);
-        fromAst = tryParse(source) ?? spec.to; // нечитаемо → дискретный старт с цели
+        const source = live?._css ?? rec._cssValue ?? readStyleValue(el, group);
+        fromAst = tryParse(source) ?? spec._to; // нечитаемо → дискретный старт с цели
         // Живой прогон отдаёт ṗ̂ — проекция в новое прогресс-пространство (C¹);
         // live — объект канала (truthy) либо undefined.
-        if (live) v0 = projectCssV0(live, fromAst, spec.to);
+        if (live) v0 = projectCssV0(live, fromAst, spec._to);
       }
+      const initialCss = interpolateParsed(fromAst, spec._to, 0);
       css = {
-        kind: 'css',
-        key: spec.key,
-        fromAst,
-        toAst: spec.to,
-        v0,
-        p: 0,
-        dpdt: v0, // производная на старте = засеянная (перехват до кадров — C¹)
-        css: interpolate(fromAst, spec.to, 0),
+        _key: spec._key,
+        _fromAst: fromAst,
+        _toAst: spec._to,
+        _v0: v0,
+        _dpdt: v0, // производная на старте = засеянная (перехват до кадров — C¹)
+        _css: initialCss,
+        _renderedDpdt: v0,
+        _renderedCss: initialCss,
       };
     }
   }
@@ -430,25 +550,24 @@ export function bindGroup(
   // проекцией состояния (новый прогон x не сбрасывает прежний rotate).
   const residuals = new Map<string, number>();
   if (group === 'transform') {
-    const animated = new Set(specs.map((s) => s.key));
-    const known = new Set<string>(rec.numeric.keys());
-    if (owner !== undefined) for (const k of owner.numericKeys()) known.add(k);
+    const animated = new Set(specs.map((s) => s._key));
+    const known = new Set<string>(rec._numeric.keys());
+    if (owner) for (const k of owner._numericKeys()) known.add(k);
     for (const key of known) {
       if (animated.has(key)) continue;
-      const snap = owner?.captureNum(key) ?? rec.numeric.get(key);
-      if (snap !== undefined) residuals.set(key, snap.value);
+      const snap = owner?._captureNum(key) ?? rec._numeric.get(key);
+      if (snap) residuals.set(key, snap._value);
     }
   }
 
-  return { numeric, css, residuals };
+  const transform = group === 'transform'
+    ? createTransformState(residuals, numeric)
+    : undefined;
+  return { _numeric: numeric, _css: css, _residuals: residuals, _transform: transform };
 }
 
 /** parse() без броска: нераспознанное значение → undefined. */
 function tryParse(value: string | number): ValueAST | undefined {
   if (value === '') return undefined;
-  try {
-    return parse(value);
-  } catch {
-    return undefined;
-  }
+  return tryParseValue(value);
 }

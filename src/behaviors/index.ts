@@ -452,7 +452,7 @@ export function createBottomSheet(options: SheetOptions): SheetController {
   const snaps = [...options.snapPoints].map(_finite).sort((a, b) => a - b);
   if (snaps.length === 0) {
     // Дешёвый детерминированный fail-fast (класс MotionParamError ядра).
-    throw new MotionParamError('behaviors: snapPoints must be non-empty');
+    throw new MotionParamError('LM003');
   }
   const axis = options.axis ?? 'y';
   const springParams = options.spring ?? (springTokens.default as SpringParams);
@@ -607,9 +607,7 @@ export function createDragDismiss(options: DismissOptions): DismissController {
   const dir: 1 | -1 = options.direction === -1 ? -1 : 1;
   const dist = _finite(options.distanceThreshold);
   if (!(dist > 0)) {
-    throw new MotionParamError(
-      `behaviors: distanceThreshold must be positive finite, got ${options.distanceThreshold}`,
-    );
+    throw new MotionParamError('LM004');
   }
   const velThresh =
     typeof options.velocityThreshold === 'number' && Number.isFinite(options.velocityThreshold)
@@ -765,10 +763,10 @@ export function createCarousel(options: CarouselOptions): CarouselController {
   const pageCount = Math.trunc(_finite(options.pageCount));
   const pageSize = _finite(options.pageSize);
   if (!(pageCount >= 1)) {
-    throw new MotionParamError(`behaviors: pageCount must be >= 1, got ${options.pageCount}`);
+    throw new MotionParamError('LM005');
   }
   if (!(pageSize > 0)) {
-    throw new MotionParamError(`behaviors: pageSize must be positive finite, got ${options.pageSize}`);
+    throw new MotionParamError('LM006');
   }
   const axis = options.axis ?? 'x';
   const rtl = options.rtl === true;
@@ -940,7 +938,7 @@ export interface PullController {
 export function createPullToRefresh(options: PullOptions): PullController {
   const threshold = _finite(options.threshold);
   if (!(threshold > 0)) {
-    throw new MotionParamError(`behaviors: threshold must be positive finite, got ${options.threshold}`);
+    throw new MotionParamError('LM007');
   }
   const axis = options.axis ?? 'y';
   const dir: 1 | -1 = options.direction === -1 ? -1 : 1;

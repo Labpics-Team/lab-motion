@@ -28,6 +28,7 @@
  */
 
 import { MotionParamError } from '../errors.js';
+import { cubicBezierUnchecked } from '../internal/cubic-bezier.js';
 
 // ---------------------------------------------------------------------------
 // Internal guard — mirrors spring.ts clampFinite exactly
@@ -545,9 +546,7 @@ export function bounce(t: number): number {
  */
 export function power(exponent: number): (t: number) => number {
   if (!Number.isFinite(exponent)) {
-    throw new MotionParamError(
-      `power(exponent): exponent must be a finite number, got ${exponent}`,
-    );
+    throw new MotionParamError('LM028');
   }
   return (t: number): number => {
     const ep = endpointOrUndefined(t);
@@ -563,88 +562,6 @@ export function power(exponent: number): (t: number) => number {
 //   Newton-Raphson with bisection fallback (same approach as Chrome's
 //   CubicBezierTimingFunction and Framer Motion's bezier solver).
 // ---------------------------------------------------------------------------
-
-/** Maximum Newton-Raphson iterations before falling back to bisection. */
-const BEZIER_NEWTON_ITERS = 8;
-/** Bisection convergence threshold (x precision). */
-const BEZIER_EPSILON = 1e-7;
-/** Derivative threshold below which Newton is unreliable — use bisection. */
-const BEZIER_DERIV_THRESHOLD = 1e-6;
-/** Precision of table pre-sample for initial Newton guess. */
-const BEZIER_TABLE_SIZE = 11;
-
-/** Pre-computed sample table values for the x-component. */
-function buildSampleTable(x1: number, x2: number): Float64Array {
-  const table = new Float64Array(BEZIER_TABLE_SIZE);
-  for (let i = 0; i < BEZIER_TABLE_SIZE; i++) {
-    table[i] = calcBezierX(i / (BEZIER_TABLE_SIZE - 1), x1, x2);
-  }
-  return table;
-}
-
-/** Cubic Bezier polynomial value for the x-axis: B(t) with P0=0, P1=x1, P2=x2, P3=1. */
-function calcBezierX(t: number, x1: number, x2: number): number {
-  // B(t) = 3(1-t)²t·x1 + 3(1-t)t²·x2 + t³
-  return ((1 - t) * 3 * (1 - t) * t * x1) + (3 * (1 - t) * t * t * x2) + (t * t * t);
-}
-
-/** Cubic Bezier polynomial value for the y-axis: B(t) with P0=0, P1=y1, P2=y2, P3=1. */
-function calcBezierY(t: number, y1: number, y2: number): number {
-  return ((1 - t) * 3 * (1 - t) * t * y1) + (3 * (1 - t) * t * t * y2) + (t * t * t);
-}
-
-/** Derivative dB/dt of the x-component. */
-function calcBezierXDerivative(t: number, x1: number, x2: number): number {
-  // dB/dt = 3(1-t)²·x1 + 6(1-t)t·(x2-x1) + 3t²·(1-x2)
-  return (3 * (1 - t) * (1 - t) * x1) + (6 * (1 - t) * t * (x2 - x1)) + (3 * t * t * (1 - x2));
-}
-
-/** Solve for the Bezier parameter t given CSS input x, using Newton + bisection. */
-function bezierSolve(
-  x: number,
-  x1: number,
-  x2: number,
-  table: Float64Array,
-): number {
-  // Find initial guess from sample table
-  let intervalStart = 0;
-  let currentSample = 1;
-  const lastSample = BEZIER_TABLE_SIZE - 1;
-  while (currentSample !== lastSample && table[currentSample] <= x) {
-    intervalStart += 1 / (BEZIER_TABLE_SIZE - 1);
-    currentSample++;
-  }
-  currentSample--;
-
-  // Linear interpolation in the table interval for a good initial guess
-  const dist =
-    (x - table[currentSample]) / (table[currentSample + 1] - table[currentSample]);
-  let guessForT = intervalStart + dist / (BEZIER_TABLE_SIZE - 1);
-
-  // Newton-Raphson (fast path — only if derivative is large enough)
-  const deriv0 = calcBezierXDerivative(guessForT, x1, x2);
-  if (deriv0 >= BEZIER_DERIV_THRESHOLD) {
-    for (let i = 0; i < BEZIER_NEWTON_ITERS; i++) {
-      const currentX = calcBezierX(guessForT, x1, x2) - x;
-      const currentSlope = calcBezierXDerivative(guessForT, x1, x2);
-      if (currentSlope === 0) break;
-      guessForT -= currentX / currentSlope;
-    }
-    return guessForT;
-  }
-
-  // Bisection fallback (robust path)
-  let aT = intervalStart;
-  let bT = intervalStart + 1 / (BEZIER_TABLE_SIZE - 1);
-  for (let i = 0; i < 54; i++) {
-    const mid = (aT + bT) / 2;
-    const midX = calcBezierX(mid, x1, x2) - x;
-    if (Math.abs(midX) < BEZIER_EPSILON) return mid;
-    if (midX < 0) aT = mid;
-    else bT = mid;
-  }
-  return (aT + bT) / 2;
-}
 
 /**
  * Factory: returns a cubic-bezier easing matching the CSS cubic-bezier(x1,y1,x2,y2) curve.
@@ -673,18 +590,14 @@ export function cubicBezier(
   y2: number,
 ): (t: number) => number {
   if (!Number.isFinite(x1) || !Number.isFinite(y1) || !Number.isFinite(x2) || !Number.isFinite(y2)) {
-    throw new MotionParamError(
-      `cubicBezier(x1,y1,x2,y2): all control points must be finite numbers, got (${x1},${y1},${x2},${y2})`,
-    );
+    throw new MotionParamError('LM029');
   }
   // x1 and x2 must be in [0,1] — the Bezier x-component is only monotonic
   // (and thus invertible by the solver) when both x control points are in [0,1].
   // CSS cubic-bezier() rejects out-of-range x values for the same reason.
   // y1/y2 are unconstrained (allow overshoot).
   if (x1 < 0 || x1 > 1 || x2 < 0 || x2 > 1) {
-    throw new MotionParamError(
-      `cubicBezier(x1,y1,x2,y2): x1 and x2 must be in [0,1], got x1=${x1} x2=${x2}`,
-    );
+    throw new MotionParamError('LM030');
   }
 
   // Linear fast path (x1===y1 && x2===y2 === the control points lie on diagonal)
@@ -692,16 +605,7 @@ export function cubicBezier(
     return linear;
   }
 
-  // Pre-compute sample table once for this bezier curve (NE4: deterministic)
-  const sampleTable = buildSampleTable(x1, x2);
-
-  return (t: number): number => {
-    const ep = endpointOrUndefined(t);
-    if (ep !== undefined) return ep;
-    // Solve for bezier parameter u such that B_x(u) = t, then return B_y(u)
-    const u = bezierSolve(t, x1, x2, sampleTable);
-    return clampFinite(calcBezierY(u, y1, y2));
-  };
+  return cubicBezierUnchecked(x1, y1, x2, y2);
 }
 
 // ---------------------------------------------------------------------------
@@ -747,14 +651,10 @@ export type StepPosition = 'start' | 'end';
  */
 export function steps(n: number, position: StepPosition = 'end'): (t: number) => number {
   if (!Number.isFinite(n) || n <= 0 || Math.floor(n) !== n) {
-    throw new MotionParamError(
-      `steps(n, position): n must be a positive integer, got ${n}`,
-    );
+    throw new MotionParamError('LM031');
   }
   if (position !== 'start' && position !== 'end') {
-    throw new MotionParamError(
-      `steps(n, position): position must be "start" or "end", got "${String(position)}"`,
-    );
+    throw new MotionParamError('LM032');
   }
 
   return (t: number): number => {

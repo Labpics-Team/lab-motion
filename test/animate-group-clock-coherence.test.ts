@@ -22,12 +22,12 @@
  *
  * ── RED PROOF (вневременно) ──────────────────────────────────────────────────
  * Характеризация: на базе среза (main a13eb1a) все пины зелёные — контракт
- * держится конструкцией MainUnit/WaapiUnit (один юнит на группу). Файл
+ * держится конструкцией MainUnit/WaapiUnit (один unit на группу). Файл
  * born-green как пин; RED-режим доказан мутациями (ниже): рассинхронизация
  * времени каналов внутри кадра ловится пропорцией и когерентностью перехвата.
  *
  * ── MUTATION PROOF (тест обязан падать на своей мутации; посеяно и откачено) ─
- *   [skew-t]     main-unit._emitAt (spring): второй+ канал читает t + FIXED_DT_S
+ *   [skew-t]     main-unit._compute (spring): второй+ канал читает t + FIXED_DT_S
  *                (личное время канала) → 2 красных: «атомарный вектор» и
  *                «когерентный перехват» (пропорция y=2x ломается).
  *   [stale-cap]  captureNum отдаёт value − velocity·dt (значение соседнего
@@ -41,8 +41,13 @@
 import { describe, expect, it } from 'vitest';
 import * as animateApi from '../src/animate/index.js';
 import { readCompositorSpring } from '../src/compositor/index.js';
+import {
+  compileSpringExecutionArtifactUnchecked,
+  DEFAULT_TOLERANCE,
+} from '../src/compositor/curve.js';
+import { sampleSerializedSpring } from '../src/compositor/sample.js';
 import { linear } from '../src/easing/index.js';
-import type { SpringParams } from '../src/spring.js';
+import { settleTimeUpperBound, type SpringParams } from '../src/spring.js';
 import {
   fakeEl,
   makeClock,
@@ -54,6 +59,19 @@ import {
 
 const animate = pickAnimate(animateApi as Record<string, unknown>);
 const SPRING: SpringParams = { mass: 1, stiffness: 170, damping: 26 };
+
+function executionProgress(tMs: number): number {
+  const artifact = compileSpringExecutionArtifactUnchecked(
+    SPRING,
+    0,
+    DEFAULT_TOLERANCE,
+  );
+  return sampleSerializedSpring(
+    artifact.samples,
+    settleTimeUpperBound(SPRING, 0) * 1000,
+    tMs,
+  ).value;
+}
 
 // ─── Разбор transform-вектора ────────────────────────────────────────────────
 
@@ -229,8 +247,8 @@ describe('animate группа: compositor-путь когерентен (Кла
     animate(f.el, { x: 300, y: 600 }, { spring: SPRING, now: now.now, setTimer: timer.setTimer });
     expect(f.animateCalls.length).toBe(2);
     const from2 = parseTf(String(f.animateCalls[1]!.keyframes[0]!['transform']));
-    const p = readCompositorSpring(SPRING, { from: 0, to: 1, v0: 0, t: 0.1 }).value;
-    expect(from2.x).toBeCloseTo(100 * p, 9); // аналитический снимок ровно в t̂
+    const p = executionProgress(100);
+    expect(from2.x).toBeCloseTo(100 * p, 9); // actual effect-снимок ровно в t̂
     expect(from2.y).toBeCloseTo(2 * from2.x, 9); // когерентный вектор
   });
 });

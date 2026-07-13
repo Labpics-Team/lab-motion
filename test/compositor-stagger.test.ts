@@ -17,16 +17,33 @@ import { describe, expect, it, vi } from 'vitest';
 import {
   compileStaggerPlan,
   CompositorStaggerGroup,
-  compileSpringLinear,
-  readCompositorSpring,
   type SetTimerFn,
-} from '../src/compositor/index.js';
+} from '../src/compositor/stagger/index.js';
+import { compileSpringLinear } from '../src/compositor/index.js';
 import { stagger } from '../src/stagger/index.js';
+import {
+  compileSpringExecutionArtifactUnchecked,
+  DEFAULT_TOLERANCE,
+} from '../src/compositor/curve.js';
+import { sampleSerializedSpring } from '../src/compositor/sample.js';
 import { MotionParamError } from '../src/errors.js';
-import { type SpringParams } from '../src/spring.js';
+import { settleTimeUpperBound, type SpringParams } from '../src/spring.js';
 import { easeOut } from '../src/easing/index.js';
 
 const SPRING: SpringParams = { mass: 1, stiffness: 170, damping: 26 };
+
+function executionValue(tMs: number): number {
+  const artifact = compileSpringExecutionArtifactUnchecked(
+    SPRING,
+    0,
+    DEFAULT_TOLERANCE,
+  );
+  return sampleSerializedSpring(
+    artifact.samples,
+    settleTimeUpperBound(SPRING, 0) * 1000,
+    tMs,
+  ).value * 100;
+}
 
 /** Фейк-Element, ЗАПИСЫВАЮЩИЙ каждый вызов animate (keyframes + timing). */
 function recordingEl(): {
@@ -200,7 +217,7 @@ describe('compositor stagger: группа compositor-путь', () => {
     g.retarget(0, 300);
     // Ожидаемое from пере-эмиссии = пружина в t=0.05с (физическое время ПОСЛЕ делея,
     // НЕ wall-время 0.15с). Числовой пин против ошибки вычитания/знака _startDelay.
-    const expected = readCompositorSpring(SPRING, { from: 0, to: 100, v0: 0, t: elapsedPastDelay }).value;
+    const expected = executionValue(elapsedPastDelay * 1000);
     expect(el.calls[1]!.keyframes[0]!['x']).toBeCloseTo(expected, 9);
     expect(expected).toBeGreaterThan(0); // реально уехала (граница не вырождена)
   });
@@ -268,12 +285,7 @@ describe('compositor stagger: группа compositor-путь', () => {
     expect(mv.value).toBe(before); // значение НЕ поехало → петля не стартовала (инертна)
   });
 
-  it('handoffToLive после destroy(): _destroyed-гард согласован с соседями (requestFrame НЕ зван; out-of-range — no-op, не throw)', () => {
-    // Регресс #70: handoffToLive был ЕДИНСТВЕННЫМ публичным мутатором без
-    // `if (this._destroyed) return` — соседи (start/retarget/retargetAll) после
-    // destroy рано выходят, а он валидировал индекс (бросал на out-of-range
-    // мёртвой группы) и для in-range тянулся к мёртвому ребёнку. Гард строит
-    // ИНЕРТНЫЙ MotionValue на СВОИХ _spring/_from → петля не стартует.
+  it('handoffToLive после destroy(): ребёнок остаётся инертным, индекс всегда валидируется', () => {
     const rf = vi.fn((): number => 1); // шпион: инертное значение не должно его звать
     const g = new CompositorStaggerGroup({
       spring: SPRING, property: 'x', from: 5, to: 100, targets: [recordingEl()], requestFrame: rf,
@@ -286,14 +298,25 @@ describe('compositor stagger: группа compositor-путь', () => {
     expect(typeof mv.setTarget).toBe('function'); // контракт: всегда MotionValue
     expect(rf).not.toHaveBeenCalled();            // инертность → нет rAF-петли
 
-    // (2) СОГЛАСОВАНО с guard-соседями: out-of-range на мёртвой группе — тихий
-    //     no-op (как start/retarget после destroy), а НЕ MotionParamError. Без
-    //     гарда этот путь бросает → рассогласование post-destroy контракта (RED).
-    expect(() => g.handoffToLive(5)).not.toThrow();
-    expect(() => g.retarget(5, 10)).not.toThrow(); // сосед-эталон: молча no-op после destroy
-    const oob = g.handoffToLive(99);
-    expect(typeof oob.setTarget).toBe('function'); // и он вернул MotionValue (контракт)
-    expect(rf).not.toHaveBeenCalled();             // по-прежнему инертно на всех путях
+    // Возвращающий значение API не фабрикует MotionValue для отсутствующего
+    // ребёнка: LM020 стабилен до и после destroy.
+    for (const index of [5, 99]) {
+      try {
+        g.handoffToLive(index);
+        throw new Error('Ожидалась LM020');
+      } catch (error) {
+        expect(error).toBeInstanceOf(MotionParamError);
+        expect((error as MotionParamError).code).toBe('LM020');
+      }
+    }
+    expect(() => g.retarget(5, 10)).not.toThrow(); // void-мутатор остаётся no-op
+    expect(rf).not.toHaveBeenCalled();
+
+    const empty = new CompositorStaggerGroup({
+      spring: SPRING, property: 'x', from: 5, to: 100, targets: [], requestFrame: rf,
+    });
+    empty.destroy();
+    expect(() => empty.handoffToLive(0)).toThrow(MotionParamError);
   });
 });
 

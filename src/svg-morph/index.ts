@@ -296,9 +296,7 @@ export function interpolatePath(
 ): (p: number) => string {
   const samples = options.samples ?? DEFAULT_SAMPLES;
   if (!Number.isInteger(samples) || samples < 2) {
-    throw new MotionParamError(
-      `interpolatePath: samples должен быть целым >= 2, получено ${samples}`,
-    );
+    throw new MotionParamError('LM094');
   }
   const cmdsFrom = parsePath(dFrom);
   const cmdsTo = parsePath(dTo);

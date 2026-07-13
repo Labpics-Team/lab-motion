@@ -4,15 +4,15 @@
  * Тезис M1 (research «compass_1937 / compass_395597»): незанятая брешь индустрии —
  * ОБЪЕДИНЕНИЕ двух свойств, которых нет вместе ни у Motion, ни у GSAP, ни у Framer
  * Motion: (1) steady-state с НУЛЁМ работы main-потока (пружина скомпилирована один
- * раз в compositor-резидентный linear()-план на transform/opacity/filter — браузер
- * гоняет её на compositor-потоке, переживая любые фризы) И (2) ONE-SHOT хендофф с
- * СОХРАНЕНИЕМ СКОРОСТИ за O(1) (замкнутая форма читает позицию+скорость в момент
- * события, cancel + пере-эмиссия новой кривой, засеянной этой скоростью — C¹).
+ * раз в compositor-резидентный linear()-план на transform/opacity — браузер
+ * гоняет её на compositor-потоке, переживая любые фризы) И (2) ONE-SHOT хендофф
+ * с сохранением скорости фактической serialized-кривой за O(log K), без layout.
  *
  * Наше преимущество перед compositor-путём Motion (у которого spring→linear() —
- * СТАТИЧНЫЙ снимок, не умеющий перенацеливаться): closed-form солвер даёт (value,
- * velocity) аналитически, поэтому хендофф НЕ читает DOM (getComputedStyle форсил
- * бы синхронный recalc, побеждая compositor) — состояние держится в плане.
+ * СТАТИЧНЫЙ снимок, не умеющий перенацеливаться): O(log K)-семплер читает (value,
+ * velocity) из тех же serialized stops по `Animation.currentTime`, поэтому
+ * хендофф НЕ читает DOM (getComputedStyle форсил бы синхронный recalc) —
+ * состояние исполняемой кривой держится в плане.
  *
  * ГРАНИЦЫ ПРИМЕНИМОСТИ (фазовая модель, red-team 2026-07-08): этот путь — для
  * АВТОНОМНЫХ переходов и RELEASE-фазы (fire-and-forget). Прерывание —
@@ -23,8 +23,8 @@
  * снимать после завершения.
  *
  * Что ОТВЕРГНУТО с доказательствами (контрфакты, НЕ реализованы — см. README):
- * - WASM/SIMD для одиночных пружин: наш замер precompute-контрфакта −24.6%
- *   (Graphiti «lab-motion перф», bench.mjs) — closed-form уже в физ. оптимуме;
+ * - WASM/SIMD для одиночных DOM-пружин: граница JS↔WASM не убирает DOM-запись;
+ *   SIMD полезен большим однородным батчам, не одной автономной анимации;
  * - GPU compute: не может писать в DOM (readback-stall), только canvas при 10k+;
  * - движок в Worker: не снижает input→photon для DOM (ввод всё равно через
  *   compositor/main, +hop postMessage), SAB требует COOP/COEP;
@@ -37,21 +37,37 @@
  */
 
 import { MotionParamError } from '../errors.js';
-import { solveSpring } from '../internal/solver.js';
+import { readSpringUnchecked } from '../internal/read-spring.js';
 import {
   type SpringParams,
-  settleTimeUpperBound,
   validateSpringParams,
 } from '../spring.js';
 import { supportsWaapi, type WaapiAnimatable } from '../waapi/index.js';
 import { MotionValue, type RequestFrameFn } from '../motion-value.js';
-import { buildSpringNodes, type SpringNode } from './segmenter.js';
-import { roundShortest } from './format.js';
+import { type SpringNode } from './segmenter.js';
 import { SpringLinearCache, DEFAULT_CACHE_CAPACITY } from './cache.js';
+import {
+  compileSpringExecutionArtifactTupleUnchecked,
+  compileSpringEasingUnchecked,
+  type SpringExecutionArtifactTuple,
+  type SpringSerializedSamples,
+  DEFAULT_TOLERANCE,
+  tryCompileSpringExecutionArtifactTupleUnchecked,
+  validateTolerance,
+} from './curve.js';
+import {
+  compileSpringRuntimeExecutionTupleUnchecked,
+} from './execution.js';
+import {
+  animationTimeOrFallback,
+  sampleSerializedSpring,
+  scaleSerializedVelocity,
+} from './sample.js';
 import { handoffToLive } from './handoff.js';
 import {
   type CompositorTier,
   type MatchMediaLike,
+  requiresExplicitSpringKeyframes,
   resolveCompositorTier,
   supportsLinearEasing,
 } from './detect.js';
@@ -72,44 +88,10 @@ export {
 // угл.мин. 1/400 прогресса при типичной амплитуде UI-перемещения 100 px = 0.25 px
 // ≈ 0.18 угл.мин — комфортно ниже порога. Крупнее амплитуда → передайте
 // tolerance меньше (ε_progress = ε_px / амплитуда_px).
-export const DEFAULT_TOLERANCE = 1 / 400;
-
-// ─── Квантование ключа кэша ──────────────────────────────────────────────────
-//
-// Ключ кэша — пять квантованных целых. Шаг мелкий: компиляция идёт по
-// ДЕ-квантованным параметрам, дельта ≪ tolerance (перцептивно невидима), так что
-// план всегда соответствует ключу. Идентичные пружины-константы (staggered-списки,
-// повторные интеракции) хешируются одинаково → делят один план.
-const Q_MASS = 1e6;
-const Q_STIFF = 1e4;
-const Q_DAMP = 1e4;
-const Q_V0 = 1e6;
-const Q_TOL = 1e9;
-/** Порог безопасного целого для квантованного ключа (за ним теряется точность). */
-const SAFE_Q = 2 ** 52;
+export { DEFAULT_TOLERANCE } from './curve.js';
 
 /** Порог вырожденного диапазона (деление на ~0 дало бы ±∞/NaN). */
 const RANGE_EPSILON = 1e-10;
-
-// ─── Финитные стражи (политика прогресса: не-конечное → цель/покой) ──────────
-
-function clampToFinite(x: number, snap: number): number {
-  return Number.isFinite(x) ? x : snap;
-}
-
-// ─── Эмиссия linear()-строки ─────────────────────────────────────────────────
-
-/** Строит linear()-строку из узлов (округление: прогресс 4 знака, процент 3). */
-function emitLinear(params: SpringParams, v0: number, tolerance: number): string {
-  const nodes = buildSpringNodes(params, v0, tolerance);
-  let out = 'linear(';
-  for (let i = 0; i < nodes.length; i++) {
-    const n = nodes[i]!;
-    out += roundShortest(n.progress, 4) + ' ' + roundShortest(n.percent, 3) + '%';
-    if (i < nodes.length - 1) out += ', ';
-  }
-  return out + ')';
-}
 
 // ─── compileSpringLinear (общий кэш) ─────────────────────────────────────────
 
@@ -119,39 +101,6 @@ export interface SpringLinearOptions {
   readonly v0?: number;
   /** Макс. отклонение реконструкции в ед. прогресса. По умолчанию DEFAULT_TOLERANCE. */
   readonly tolerance?: number;
-}
-
-/** Общий (module-singleton) кэш — staggered-списки делят планы между элементами. */
-const sharedCache = new SpringLinearCache(DEFAULT_CACHE_CAPACITY);
-
-function validateTolerance(tolerance: number): void {
-  if (!Number.isFinite(tolerance) || tolerance <= 0 || tolerance >= 1) {
-    throw new MotionParamError(
-      `compositor: tolerance должен быть конечным в (0, 1), получено ${tolerance}`,
-    );
-  }
-}
-
-function quantizeKey(
-  params: SpringParams,
-  v0: number,
-  tolerance: number,
-): { a: number; b: number; c: number; d: number; e: number } | null {
-  const a = Math.round(params.mass * Q_MASS);
-  const b = Math.round(params.stiffness * Q_STIFF);
-  const c = Math.round(params.damping * Q_DAMP);
-  const d = Math.round(v0 * Q_V0);
-  const e = Math.round(tolerance * Q_TOL);
-  // Кэшируемо, только если ключ в безопасных целых И де-квантование не вырождает
-  // физику (иначе — некэшируемая компиляция по СЫРЫМ params, корректность важнее).
-  if (
-    Math.abs(a) >= SAFE_Q || Math.abs(b) >= SAFE_Q || Math.abs(c) >= SAFE_Q ||
-    Math.abs(d) >= SAFE_Q || Math.abs(e) >= SAFE_Q
-  ) {
-    return null;
-  }
-  if (!(a / Q_MASS > 0) || !(b / Q_STIFF > 0) || !(c / Q_DAMP >= 0)) return null;
-  return { a, b, c, d, e };
 }
 
 /**
@@ -166,26 +115,10 @@ export function compileSpringLinear(spring: SpringParams, options?: SpringLinear
   const v0 = options?.v0 ?? 0;
   const tolerance = options?.tolerance ?? DEFAULT_TOLERANCE;
   if (!Number.isFinite(v0)) {
-    throw new MotionParamError(`compositor: v0 должен быть конечным, получено ${v0}`);
+    throw new MotionParamError('LM008');
   }
   validateTolerance(tolerance);
-
-  const q = quantizeKey(spring, v0, tolerance);
-  if (q === null) {
-    // Некэшируемый край: компилируем по сырым параметрам без кэша (корректность).
-    return emitLinear(spring, v0, tolerance);
-  }
-  // Ветка попадания возвращает строку ДО любой аллокации (zero-alloc hot-path).
-  const hit = sharedCache.lookup(q.a, q.b, q.c, q.d, q.e);
-  if (hit !== undefined) return hit;
-  // Промах: компиляция по ДЕ-квантованным параметрам (план соответствует ключу).
-  const s = emitLinear(
-    { mass: q.a / Q_MASS, stiffness: q.b / Q_STIFF, damping: q.c / Q_DAMP },
-    q.d / Q_V0,
-    q.e / Q_TOL,
-  );
-  sharedCache.store(q.a, q.b, q.c, q.d, q.e, s);
-  return s;
+  return compileSpringEasingUnchecked(spring, v0, tolerance);
 }
 
 // ─── createSpringLinearCache (изолированный слот-кэш) ────────────────────────
@@ -204,27 +137,17 @@ export interface SpringLinearCompiler {
 
 /** Создаёт изолированный кэш-компилятор пружин с заданной ёмкостью LRU. */
 export function createSpringLinearCache(capacity: number = DEFAULT_CACHE_CAPACITY): SpringLinearCompiler {
-  const cache = new SpringLinearCache(capacity);
+  const cache = new SpringLinearCache<SpringExecutionArtifactTuple>(capacity);
   return {
     compile(spring: SpringParams, options?: SpringLinearOptions): string {
       validateSpringParams(spring);
       const v0 = options?.v0 ?? 0;
       const tolerance = options?.tolerance ?? DEFAULT_TOLERANCE;
       if (!Number.isFinite(v0)) {
-        throw new MotionParamError(`compositor: v0 должен быть конечным, получено ${v0}`);
+        throw new MotionParamError('LM008');
       }
       validateTolerance(tolerance);
-      const q = quantizeKey(spring, v0, tolerance);
-      if (q === null) return emitLinear(spring, v0, tolerance);
-      const hit = cache.lookup(q.a, q.b, q.c, q.d, q.e);
-      if (hit !== undefined) return hit;
-      const s = emitLinear(
-        { mass: q.a / Q_MASS, stiffness: q.b / Q_STIFF, damping: q.c / Q_DAMP },
-        q.d / Q_V0,
-        q.e / Q_TOL,
-      );
-      cache.store(q.a, q.b, q.c, q.d, q.e, s);
-      return s;
+      return compileSpringEasingUnchecked(spring, v0, tolerance, cache);
     },
     clear(): void {
       cache.clear();
@@ -242,9 +165,9 @@ export function createSpringLinearCache(capacity: number = DEFAULT_CACHE_CAPACIT
 
 /** Аргументы Element.animate() + метаданные плана. */
 export interface CompositorPlan {
-  /** Кейфреймы [{prop: from}, {prop: to}] (вся кривая — в easing). */
+  /** Два крайних кадра с CSS linear(); в WebKit — явные адаптивные кадры. */
   readonly keyframes: Record<string, string | number>[];
-  /** CSS linear()-строка (пружинная траектория как easing). */
+  /** CSS linear()-строка либо обычный linear для явных WebKit-кадров. */
   readonly easing: string;
   /** Длительность (миллисекунды; движок считает в секундах). */
   readonly duration: number;
@@ -279,67 +202,66 @@ export interface CompositorPlanOptions {
   readonly format?: (v: number) => string | number;
 }
 
-function validateFinite(v: number, name: string): void {
+function validateFinite(v: number): void {
   if (!Number.isFinite(v)) {
-    throw new MotionParamError(`compositor: ${name} должен быть конечным, получено ${v}`);
+    throw new MotionParamError('LM009');
   }
 }
 
 /**
- * Пружина + from/to/property → полный план для Element.animate(). Compositor-путь:
- * два кейфрейма [from, to] на свойстве, ВСЯ пружинная кривая — в адаптивном
- * linear()-easing. Чистая, SSR-safe (не трогает DOM).
+ * Пружина + from/to/property → исполнимый план Element.animate(): два крайних
+ * кадра с CSS linear() либо явные адаптивные кадры для WebKit. SSR-safe:
+ * capability-проба не обращается к DOM и fail-closed вне браузера.
  */
 export function compileSpringPlan(options: CompositorPlanOptions): CompositorPlan {
   validateSpringParams(options.spring);
   if (typeof options.property !== 'string' || options.property.length === 0) {
-    throw new MotionParamError(`compositor: property должен быть непустой строкой`);
+    throw new MotionParamError('LM010');
   }
   // Имена метаданных кейфрейма WAAPI: значение свойства перезаписало бы их.
   if (options.property === 'offset' || options.property === 'easing' || options.property === 'composite') {
-    throw new MotionParamError(
-      `compositor: property '${options.property}' конфликтует с полем WAAPI-кейфрейма` +
-        (options.property === 'offset' ? `; CSS-свойство offset задаётся как 'cssOffset'` : ''),
-    );
+    throw new MotionParamError('LM011');
   }
-  validateFinite(options.from, 'from');
-  validateFinite(options.to, 'to');
+  validateFinite(options.from);
+  validateFinite(options.to);
   const v0 = options.v0 ?? 0;
-  validateFinite(v0, 'v0');
+  validateFinite(v0);
   const tolerance = options.tolerance ?? DEFAULT_TOLERANCE;
   validateTolerance(tolerance);
 
-  const settleMs = settleDurationSeconds(options.spring) * 1000;
-  const easing = compileSpringLinear(options.spring, { v0, tolerance });
-  const nodes = buildSpringNodes(options.spring, v0, tolerance);
-  const format = options.format ?? ((v: number): string | number => v);
-
+  // Публичная диагностика — свежий снимок защищённых сериализованных остановок:
+  // это реально исполняемая браузером кривая, без второго источника истины.
+  const execution = compileSpringRuntimeExecutionTupleUnchecked(
+    options.spring,
+    options.property,
+    options.from,
+    options.to,
+    v0,
+    tolerance,
+    options.fill,
+    options.composite,
+    options.format,
+  );
+  const samples = execution[5];
+  const nodes = new Array<SpringNode>(samples.length / 2);
+  for (let i = 0; i < nodes.length; i++) {
+    nodes[i] = {
+      progress: samples[i * 2 + 1]!,
+      percent: samples[i * 2]!,
+    };
+  }
   return {
-    keyframes: [
-      { offset: 0, [options.property]: format(options.from) },
-      { offset: 1, [options.property]: format(options.to) },
-    ],
-    easing,
-    duration: settleMs,
+    keyframes: execution[0],
+    easing: execution[1],
+    duration: execution[2],
     iterations: 1,
-    fill: options.fill ?? 'both',
-    composite: options.composite ?? 'replace',
+    fill: execution[3],
+    composite: execution[4],
     nodes,
   };
 }
 
-/**
- * Длительность плана (секунды) = канонический settle spring.ts (grounded, не ново).
- * settleTimeUpperBound — запечатанный закон оседания ядра (≤ бюджета кадра-капа,
- * валидирован бенчами #64). Переиспользуем, чтобы НЕ плодить параллельную
- * settle-константу (класс дрифта). Для валидных params конечно > 0.
- */
-function settleDurationSeconds(params: SpringParams): number {
-  const t = settleTimeUpperBound(params);
-  return Number.isFinite(t) && t > 0 ? t : 1;
-}
-
-// ─── readCompositorSpring (O(1) аналитическое чтение для ретаргета) ──────────
+// ─── readCompositorSpring (O(1) аналитический reference/diagnostics) ─────────
 
 /** Опции аналитического чтения. */
 export interface ReadSpringOptions {
@@ -369,39 +291,28 @@ export function readCompositorSpring(
   const to = options.to ?? 1;
   const v0 = options.v0 ?? 0;
   const t = options.t;
-  validateFinite(from, 'from');
-  validateFinite(to, 'to');
-  validateFinite(v0, 'v0');
+  validateFinite(from);
+  validateFinite(to);
+  validateFinite(v0);
   if (!Number.isFinite(t)) {
-    throw new MotionParamError(`compositor: t должен быть конечным, получено ${t}`);
+    throw new MotionParamError('LM012');
   }
-  const raw = out ?? { value: 0, velocity: 0 };
-  solveSpring(spring, t, v0, raw);
-  const range = to - from;
-  // Политика прогресса (зеркалит motion-value): не-конечное value → цель (1),
-  // velocity → 0. Финальный клэмп: даже конечный range может переполниться до
-  // ∞ на экстремальных величинах — тогда снап к (валидно-конечной) цели.
-  const normPos = clampToFinite(raw.value, 1);
-  const normVel = clampToFinite(raw.velocity, 0);
-  const value = clampToFinite(from + normPos * range, to);
-  const velocity = clampToFinite(normVel * range, 0);
-  if (out) {
-    out.value = value;
-    out.velocity = velocity;
-    return out;
-  }
-  return { value, velocity };
+  // Граница API проверила входы; hot-path движков зовёт тот же
+  // финитный сэмплер без повторного validator/settle-расчёта.
+  return readSpringUnchecked(spring, from, to, v0, t, out);
 }
 
 // ─── supportsCompositor (capability detection, SSR-safe) ─────────────────────
 
 /**
- * Пригодна ли цель/среда для compositor-пути (WAAPI + CSS linear()). SSR-safe:
- * проверка среды только внутри вызова; без цели проверяет Element.prototype.animate.
- * linear()-проба кэширована (detect.ts) — та же детекция, что у resolveCompositorTier.
+ * Пригодна ли цель/среда для compositor-пути: WAAPI + исполнимая форма кривой.
+ * WebKit использует явные кадры без многостопового linear(); остальные движки —
+ * CSS linear(). SSR-safe: среда читается только внутри вызова, без цели
+ * проверяется Element.prototype.animate. Оба решения мемоизированы в detect.ts.
  */
 export function supportsCompositor(target?: unknown): boolean {
-  return supportsWaapi(target) && supportsLinearEasing();
+  return supportsWaapi(target) &&
+    (requiresExplicitSpringKeyframes() || supportsLinearEasing());
 }
 
 // ─── CompositorSpring (контроллер: ретаргет + байт-паритетный fallback) ──────
@@ -474,8 +385,8 @@ export interface CompositorSpringOptions {
  *
  *  • COMPOSITOR (WAAPI + CSS linear()): компилирует план и коммитит в Element.animate().
  *    Steady-state — ноль работы main-потока. retarget() — РЕДКОЕ ONE-SHOT событие:
- *    читает (value, velocity) ЗАМКНУТОЙ ФОРМОЙ (readCompositorSpring, без чтения
- *    DOM), отменяет Animation и эмитит новую кривую, засеянную этой скоростью.
+ *    читает (value, velocity) из serialized stops по `Animation.currentTime`
+ *    (без style/layout), отменяет Animation и эмитит новую кривую с этой скоростью.
  *
  *  • ЖИВОЙ rAF (тиры waapi-no-linear / raf / ssr): main-thread драйвер MotionValue,
  *    чей setTarget() уже делает smooth-pickup (перенос скорости). Значения — в apply().
@@ -493,13 +404,12 @@ export interface CompositorSpringOptions {
  * живёт на MAIN-потоке (drive/MotionValue). Здесь retarget — дискретное событие
  * (смена цели, прерывание перехода), стоящее ~один commit-кадр хендоффа.
  *
- * ГАРАНТИЯ НЕПРЕРЫВНОСТИ (C¹) при ретаргете: новый прогон стартует с ТОЧНОЙ
- * позиции (from' = readCompositorSpring().value — непрерывность C⁰) и с ТОЧНОЙ
- * скоростью (v0' = velocity/range' — непрерывность C¹), обе взяты из аналитической
- * модели в момент события. Ни позиция, ни скорость не имеют разрыва. На
- * fallback-пути ту же гарантию несёт smooth-pickup MotionValue (solveSpring с
- * произвольным v0). SSR-safe: конструктор не трогает DOM/часы (кроме
- * feature-detect); часы читаются лениво в start()/retarget().
+ * ГРАНИЦА НЕПРЕРЫВНОСТИ: в effect-space numeric/affine-канала при активном
+ * default fill:'both' новый прогон точно продолжает piecewise position и правый
+ * slope (на kink производная неоднозначна, выбран правый сегмент). Это не
+ * обещание rendered-pixel C¹ для clamping, non-affine format, composite с
+ * меняющимся underlying или fill вне active interval. SSR-safe: конструктор не
+ * трогает DOM/часы; native time читается только при прерывании.
  */
 export class CompositorSpring {
   private readonly _spring: SpringParams;
@@ -523,12 +433,17 @@ export class CompositorSpring {
   private _startTime = 0;
   /** Задержка ТЕКУЩЕГО прогона (мс): _delay на первичном start, 0 на retarget/handoff. */
   private _startDelay = 0;
-  private _anim: { cancel?: () => void } | undefined;
+  private _anim: { cancel?: () => void; currentTime?: number | null } | undefined;
+  private _samples: SpringSerializedSamples | undefined;
+  private _durationMs = 0;
+  private readonly _sample = { value: 0, velocity: 0 };
   private _mv: MotionValue | undefined;
   /** Cancel-функция отложенного fallback-старта (пока задержка не истекла). */
   private _timerCancel: (() => void) | undefined;
   private _started = false;
   private _destroyed = false;
+  /** Capability остаётся compositor, но конкретный owner может стать live. */
+  private _forceLive = false;
 
   /**
    * Единый мост «кадр живой пружины → внутреннее значение + apply». Один экземпляр
@@ -545,14 +460,14 @@ export class CompositorSpring {
   constructor(opts: CompositorSpringOptions) {
     validateSpringParams(opts.spring);
     if (typeof opts.property !== 'string' || opts.property.length === 0) {
-      throw new MotionParamError(`CompositorSpring: property должен быть непустой строкой`);
+      throw new MotionParamError('LM010');
     }
-    validateFinite(opts.from, 'from');
-    validateFinite(opts.to, 'to');
+    validateFinite(opts.from);
+    validateFinite(opts.to);
     if (opts.tolerance !== undefined) validateTolerance(opts.tolerance);
     const delay = opts.delay ?? 0;
     if (!Number.isFinite(delay) || delay < 0) {
-      throw new MotionParamError(`CompositorSpring: delay должен быть >= 0 и конечным, получено ${delay}`);
+      throw new MotionParamError('LM013');
     }
 
     this._spring = opts.spring;
@@ -593,10 +508,10 @@ export class CompositorSpring {
    * тира; все прочие тиры (включая reduced/ssr) → 'fallback' (не compositor-поток).
    */
   get mode(): 'compositor' | 'fallback' {
-    return this._tier === 'compositor' ? 'compositor' : 'fallback';
+    return this._usesCompositor() ? 'compositor' : 'fallback';
   }
 
-  /** Текущее аналитическое значение (всегда конечно). */
+  /** Последнее известное значение контроллера (всегда конечно). */
   get value(): number {
     return this._value;
   }
@@ -610,10 +525,31 @@ export class CompositorSpring {
   start(): void {
     if (this._destroyed) return;
     this._started = true;
-    if (this._tier === 'compositor') {
+    let artifact: SpringExecutionArtifactTuple | undefined;
+    if (this._usesCompositor()) {
+      validateSpringParams(this._spring);
+      artifact = tryCompileSpringExecutionArtifactTupleUnchecked(
+        this._spring,
+        this._v0Norm,
+        this._tolerance,
+      );
+    }
+    if (this._usesCompositor() && artifact === undefined) {
+      // Writer делает живую деградацию наблюдаемой; без него сохраняем честный
+      // fail-fast контракт чистого compositor-контроллера.
+      if (this._apply === undefined) {
+        compileSpringExecutionArtifactTupleUnchecked(
+          this._spring,
+          this._v0Norm,
+          this._tolerance,
+        );
+      }
+      this._forceLive = true;
+    }
+    if (this._usesCompositor()) {
       // Первичный старт несёт задержку (нативный WAAPI-delay, off-main-thread);
       // retarget/handoff вызывают _emitCompositor с delay=0 (события «сейчас»).
-      this._emitCompositor(this._from, this._to, this._v0Norm, this._delay);
+      this._emitCompositor(this._from, this._to, this._v0Norm, artifact!, this._delay);
     } else if (this._tier === 'reduced') {
       this._settleImmediately(this._to);
     } else {
@@ -642,15 +578,15 @@ export class CompositorSpring {
   }
 
   /**
-   * ONE-SHOT перенацеливание на newTarget с сохранением скорости (C¹). Для
+   * ONE-SHOT перенацеливание с сохранением effect-space правого slope. Для
    * ДИСКРЕТНЫХ событий (смена цели, прерывание перехода) — НЕ для покадрового
-   * gesture-follow (антипаттерн, см. класс). На compositor-пути — O(1) чтение
-   * (value, velocity) + cancel + пере-эмиссия (стоимость ~один commit-кадр
-   * хендоффа); на fallback — MotionValue.setTarget (smooth-pickup).
+   * gesture-follow (антипаттерн, см. класс). На compositor-пути — O(log K)
+   * snapshot (value, velocity) + cancel + пере-эмиссия (стоимость ~один
+   * commit-кадр хендоффа); на fallback — MotionValue.setTarget.
    */
   retarget(newTarget: number): void {
     if (this._destroyed) return;
-    validateFinite(newTarget, 'newTarget');
+    validateFinite(newTarget);
 
     if (this._tier === 'reduced') {
       // reduce активен: снап к новой цели, без анимации.
@@ -660,7 +596,7 @@ export class CompositorSpring {
       return;
     }
 
-    if (this._tier !== 'compositor') {
+    if (!this._usesCompositor()) {
       // Живой rAF-путь: smooth-pickup MotionValue переносит скорость.
       this._ensureFallback();
       this._clearTimer(); // retarget = «сейчас»: снимаем отложенный старт, если ждёт delay
@@ -678,26 +614,60 @@ export class CompositorSpring {
       return;
     }
 
-    // В полёте: читаем аналитическое состояние в момент прерывания (без DOM).
+    // В полёте: читаем фактическое effect-состояние в момент прерывания (без layout).
     const read = this._snapshot();
-    // Отменяем текущую Animation (compositor запускает новую).
-    if (typeof this._anim.cancel === 'function') {
-      try {
-        this._anim.cancel();
-      } catch {
-        // duck-typed цель могла не реализовать cancel полноценно — не роняем ретаргет.
-      }
-    }
     const range = newTarget - read.value;
-    const v0Norm = Math.abs(range) > RANGE_EPSILON ? read.velocity / range : 0;
-    this._emitCompositor(read.value, newTarget, v0Norm);
+    const v0Norm = Math.abs(range) > RANGE_EPSILON
+      ? read.velocity / range
+      : read.velocity === 0
+        ? 0
+        : Infinity; // normalized curve cannot represent absolute impulse at zero range
+    validateSpringParams(this._spring);
+    const artifact = tryCompileSpringExecutionArtifactTupleUnchecked(
+      this._spring,
+      v0Norm,
+      this._tolerance,
+    );
+    if (artifact === undefined) {
+      // Без writer live-путь не может сохранить видимый контракт. Ошибка должна
+      // случиться ДО cancel: прежний compositor-прогон остаётся владельцем.
+      if (this._apply === undefined) {
+        compileSpringExecutionArtifactTupleUnchecked(
+          this._spring,
+          v0Norm,
+          this._tolerance,
+        );
+      }
+      const mv = handoffToLive({
+        spring: this._spring,
+        value: read.value,
+        velocity: read.velocity,
+        target: newTarget,
+        requestFrame: this._requestFrame,
+        clamp: false,
+        onChange: this._onLiveFrame,
+      });
+      // Новый owner уже активен: отказ hostile host-cancel не должен откатить
+      // хендофф или оставить ссылку на прежний Animation.
+      this._cancelAnimation();
+      this._forceLive = true;
+      this._from = read.value;
+      this._to = newTarget;
+      this._v0Norm = v0Norm;
+      this._mv = mv;
+      this._started = true;
+      return;
+    }
+    // Preflight доказал ограниченную кривую; только теперь снимаем старого owner.
+    this._cancelAnimation();
+    this._emitCompositor(read.value, newTarget, v0Norm, artifact);
   }
 
   /**
-   * ХЕНДОФФ compositor→live: снимает текущее (value, velocity) ЗАМКНУТОЙ ФОРМОЙ
-   * (readCompositorSpring по elapsed, без чтения DOM), отменяет compositor-
+   * ХЕНДОФФ compositor→live: снимает текущее (value, velocity) из execution stops
+   * по native currentTime (без чтения style/layout), отменяет compositor-
    * Animation и продолжает движение ЖИВОЙ rAF-пружиной (MotionValue),
-   * рождённой в этой точке — позиция И скорость непрерывны (C¹). Для перехода
+   * рождённой в этой effect-точке — position и выбранный правый slope непрерывны.
    * в follow-фазу жеста (будущая траектория стала интерактивной).
    *
    * newTarget — цель live-пружины: не задан → продолжаем к текущему `to` (хвост
@@ -708,7 +678,7 @@ export class CompositorSpring {
    * (страховка от утечки). SSR-safe: fallback-путь уже живой — вернёт свой mv.
    */
   handoffToLive(newTarget?: number): MotionValue {
-    if (newTarget !== undefined) validateFinite(newTarget, 'newTarget');
+    if (newTarget !== undefined) validateFinite(newTarget);
 
     // После destroy() контроллер мёртв: НЕ поднимаем новую live-петлю (иначе
     // зомби-rAF на уничтоженном элементе — утечка). Возвращаем инертное значение
@@ -741,7 +711,7 @@ export class CompositorSpring {
       return mv;
     }
 
-    if (this._tier !== 'compositor') {
+    if (!this._usesCompositor()) {
       // Живой rAF-путь (waapi-no-linear / raf / ssr): тот же MotionValue,
       // при новой цели — retarget через smooth-pickup.
       this._ensureFallback();
@@ -753,21 +723,14 @@ export class CompositorSpring {
       return this._mv!;
     }
 
-    // Compositor-путь: аналитический снимок состояния в момент хендоффа.
+    // Compositor-путь: снимок фактически исполняемой effect-кривой.
     let value = this._from;
     let velocity = 0;
     if (this._started && this._anim !== undefined) {
       const read = this._snapshot();
       value = read.value;
       velocity = read.velocity;
-      if (typeof this._anim.cancel === 'function') {
-        try {
-          this._anim.cancel();
-        } catch {
-          /* см. retarget */
-        }
-      }
-      this._anim = undefined;
+      this._cancelAnimation();
     }
     const target = newTarget ?? this._to;
     const mv = handoffToLive({
@@ -781,6 +744,7 @@ export class CompositorSpring {
     });
     this._to = target;
     this._mv = mv;
+    this._forceLive = true;
     this._started = true;
     return mv;
   }
@@ -790,14 +754,7 @@ export class CompositorSpring {
     this._clearTimer(); // снять отложенный fallback-старт, если задержка не истекла
     // Единый путь для всех тиров: compositor держит _anim, живой/reduced — _mv,
     // снап — ни того ни другого. Отменяем/останавливаем то, что есть.
-    if (this._anim !== undefined && typeof this._anim.cancel === 'function') {
-      try {
-        this._anim.cancel();
-      } catch {
-        /* duck-typed цель могла не реализовать cancel — не роняем stop */
-      }
-    }
-    this._anim = undefined;
+    this._cancelAnimation();
     // Мог быть отдан live-mv через handoffToLive() — остановить и его (анти-утечка).
     if (this._mv !== undefined) this._mv.stop();
     this._started = false;
@@ -812,50 +769,87 @@ export class CompositorSpring {
 
   // ─── Приватное ──────────────────────────────────────────────────────────────
 
-  /**
-   * Аналитический снимок (value, velocity) текущего compositor-прогона по elapsed
-   * (замкнутая форма, БЕЗ чтения DOM) — общий механизм retarget и handoffToLive.
-   */
-  private _snapshot(): { value: number; velocity: number } {
-    // Физический t=0 пружины наступает ПОСЛЕ окна задержки (WAAPI держит `from` в
-    // delay-фазе): вычитаем _startDelay. До старта (t<0) читаем from, скорость 0.
-    const tSec = (this._now() - this._startTime - this._startDelay) / 1000;
-    return readCompositorSpring(this._spring, {
-      from: this._from,
-      to: this._to,
-      v0: this._v0Norm,
-      t: tSec >= 0 ? tSec : 0,
-    });
+  private _usesCompositor(): boolean {
+    return this._tier === 'compositor' && !this._forceLive;
   }
 
-  private _emitCompositor(from: number, to: number, v0Norm: number, delayMs = 0): void {
-    const plan = compileSpringPlan({
-      spring: this._spring,
-      property: this._property,
+  /** Снимает host-owner один раз даже при бросающем getter/call cancel. */
+  private _cancelAnimation(): void {
+    const animation = this._anim;
+    if (animation === undefined) return;
+    try {
+      const cancel = animation.cancel;
+      if (typeof cancel === 'function') cancel.call(animation);
+    } catch {
+      // Host-object не должен удерживать уже логически снятое владение.
+    } finally {
+      this._anim = undefined;
+    }
+  }
+
+  /** Фактический piecewise-снимок без style/layout-read. */
+  private _snapshot(): { value: number; velocity: number } {
+    const currentTime = animationTimeOrFallback(
+      this._anim,
+      this._now() - this._startTime,
+    );
+    const sample = sampleSerializedSpring(
+      this._samples!,
+      this._durationMs,
+      currentTime,
+      this._startDelay,
+      this._sample,
+    );
+    const progress = sample.value;
+    const rawValue = progress === 0
+      ? this._from
+      : progress === 1
+        ? this._to
+        : (1 - progress) * this._from + progress * this._to;
+    // Scratch не пересекает публичную границу: оба вызывающих синхронно
+    // копируют поля до следующего snapshot. Это убирает allocation на прерывание.
+    sample.value = Number.isFinite(rawValue) ? rawValue : this._to;
+    sample.velocity = scaleSerializedVelocity(sample.velocity, this._from, this._to);
+    return sample;
+  }
+
+  private _emitCompositor(
+    from: number,
+    to: number,
+    v0Norm: number,
+    artifact: SpringExecutionArtifactTuple,
+    delayMs = 0,
+  ): void {
+    const plan = compileSpringRuntimeExecutionTupleUnchecked(
+      this._spring,
+      this._property,
       from,
       to,
-      v0: v0Norm,
-      tolerance: this._tolerance,
-      fill: this._fill,
-      composite: this._composite,
-      format: this._format,
-    });
+      v0Norm,
+      this._tolerance,
+      this._fill,
+      this._composite,
+      this._format,
+      artifact,
+    );
     this._from = from;
     this._to = to;
     this._v0Norm = v0Norm;
     this._value = from;
     this._startDelay = delayMs;
     this._startTime = this._now();
-    this._anim = this._target!.animate(plan.keyframes, {
-      duration: plan.duration,
-      easing: plan.easing,
-      iterations: plan.iterations,
-      fill: plan.fill,
-      composite: plan.composite,
+    this._samples = plan[5];
+    this._durationMs = plan[2];
+    this._anim = this._target!.animate(plan[0], {
+      duration: plan[2],
+      easing: plan[1],
+      iterations: 1,
+      fill: plan[3],
+      composite: plan[4],
       // Нативный WAAPI-delay только на первичном старте (delayMs>0); браузер
       // планирует старт off-main-thread — каскад stagger без работы main-потока.
       ...(delayMs > 0 ? { delay: delayMs } : {}),
-    }) as { cancel?: () => void };
+    }) as { cancel?: () => void; currentTime?: number | null };
   }
 
   /**

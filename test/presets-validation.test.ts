@@ -105,13 +105,13 @@ describe('presets — compilePreset: валидация', () => {
     }
   });
 
-  it('А: сообщения ошибок префиксованы "presets:" (диагностируемость)', () => {
+  it('А: ошибка длительности имеет стабильный код', () => {
     try {
       compilePreset(base({ duration: -1 }));
       expect.unreachable('должно было бросить');
     } catch (e) {
       expect(e).toBeInstanceOf(MotionParamError);
-      expect((e as Error).message).toMatch(/^presets:/);
+      expect((e as MotionParamError).code).toBe('LM047');
     }
   });
 });

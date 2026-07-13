@@ -8,8 +8,8 @@
  * Единая семантика времени: и spring, и tween, и все кодеки живут в ОДНОМ
  * прогресс-пространстве p∈[0,1] (readCompositorSpring на from=0,to=1 — та же
  * замкнутая форма, что у compositor-пути пакета). Значение канала =
- * codec.interpolate(from,to)(p). keyframe-массивы и per-property переходы (full)
- * наследуют ЭТОТ же клок — одна семантика времени по построению.
+ * codec.interpolate(from,to)(p). Расширение этого внутреннего слоя не меняет
+ * фиксированную публичную поверхность mini.
  *
  * Пути (авто по среде):
  *   reduced — prefers-reduced-motion: reduce → мгновенный снап к финалу без кадров;
@@ -30,11 +30,16 @@
  * детерминизм (часы только через инжектируемый ./frame requestFrame).
  */
 
-import { readCompositorSpring } from '../../compositor/core.js';
 import { MotionParamError } from '../../errors.js';
 import { createFrameLoop, frame as defaultFrame, type FrameLoop } from '../../frame/index.js';
-import type { SpringParams } from '../../spring.js';
-import type { CodecRegistry, PropertyCodec, TargetAdapter } from '../registry.js';
+import { sampleSpringUnchecked } from '../../internal/read-spring.js';
+import { type SpringParams, validateSpringParams } from '../../spring.js';
+import type { CodecResolver, PropertyCodec, TargetAdapter } from '../registry.js';
+import {
+  collectBoundedArrayLike,
+  requireAnimateOptions,
+  requireAnimateProps,
+} from '../targets.js';
 
 const FIXED_DT_MS = (1 / 60) * 1000;
 const EASE_DERIV_H = 1e-3;
@@ -50,8 +55,8 @@ const _defaultEase = (t: number): number =>
 
 /** Режим движения (spring/tween взаимоисключающие — гейт в _resolveMode). */
 export type MotionMode =
-  | { readonly type: 'spring'; readonly spring: SpringParams }
-  | { readonly type: 'tween'; readonly durationMs: number; readonly ease: (t: number) => number };
+  | { readonly _type: 'spring'; readonly _spring: SpringParams }
+  | { readonly _type: 'tween'; readonly _durationMs: number; readonly _ease: (t: number) => number };
 
 /** Значение канала: цель или пара [from, to] (явный from отключает подхват). */
 export type PropValue = number | string | readonly [number | string, number | string];
@@ -77,6 +82,7 @@ export interface AnimateControls {
   readonly finished: Promise<void>;
   play(): void;
   pause(): void;
+  /** Перемотать к конечному времени (мс); пауза сохраняется, нефинитное игнорируется. */
   seek(tMs: number): void;
   cancel(): void;
   stop(): void;
@@ -84,20 +90,28 @@ export interface AnimateControls {
 
 // ─── Реестр состояния по целям (владелец + последнее значение канала) ────────
 
+// Runtime-shape поля ниже приватны всему mini-графу и потому имеют `_`:
+// tsup сжимает только такие свойства. Публичные EngineOptions и registry seam
+// намеренно остаются без префикса — их имена являются контрактом потребителя.
+
 interface ChannelSnapshot {
-  readonly value: string | number;
-  readonly velocity: number;
+  readonly _value: string | number;
+  readonly _velocity: number;
 }
 
 interface SurfaceOwner {
-  captureChannel(property: string): ChannelSnapshot | undefined;
-  knownChannels(): readonly string[];
-  supersede(): void;
+  _prepare(): void;
+  _release(): void;
+  _captureChannel(property: string): ChannelSnapshot | undefined;
+  _knownChannels(): readonly string[];
+  _supersede(replacement?: () => void): void;
 }
 
 interface SurfaceRecord {
-  owner: SurfaceOwner | undefined;
-  readonly last: Map<string, ChannelSnapshot>;
+  _owner: SurfaceOwner | undefined;
+  /** Резерв commit закрывает host-reentry до публикации successor. */
+  _transition: boolean;
+  readonly _last: Map<string, ChannelSnapshot>;
 }
 
 const _registry = new WeakMap<object, Map<string, SurfaceRecord>>();
@@ -111,7 +125,7 @@ function _surfaceRecord(target: object, surface: string): SurfaceRecord {
   }
   let rec = map.get(surface);
   if (rec === undefined) {
-    rec = { owner: undefined, last: new Map() };
+    rec = { _owner: undefined, _transition: false, _last: new Map() };
     map.set(surface, rec);
   }
   return rec;
@@ -124,27 +138,32 @@ function _resolveMode(o: EngineOptions): MotionMode {
   const hasSpring = o.spring !== undefined;
   const hasTween = o.duration !== undefined || o.ease !== undefined;
   if (hasSpring && hasTween) {
-    throw new MotionParamError(`animate: spring и duration/ease несовместимы`);
+    throw new MotionParamError('LM136');
   }
   if (hasTween) {
     const durationMs = o.duration ?? DEFAULT_DURATION_MS;
     if (!Number.isFinite(durationMs) || durationMs <= 0) {
-      throw new MotionParamError(`animate: duration > 0, получено ${String(o.duration)}`);
+      throw new MotionParamError('LM137');
     }
     const ease = o.ease ?? _defaultEase;
     if (typeof ease !== 'function') {
-      throw new MotionParamError(`animate: ease не функция`);
+      throw new MotionParamError('LM138');
     }
-    return { type: 'tween', durationMs, ease };
+    return { _type: 'tween', _durationMs: durationMs, _ease: ease };
   }
-  return { type: 'spring', spring: o.spring ?? DEFAULT_SPRING };
+  if (o.spring === undefined) return { _type: 'spring', _spring: DEFAULT_SPRING };
+  validateSpringParams(o.spring);
+  return {
+    _type: 'spring',
+    _spring: { ...o.spring },
+  };
 }
 
 /** Неотрицательное конечное число или дефолт; иначе fail-fast MotionParamError. */
-function _nonNeg(name: string, v: number | undefined, dflt: number): number {
+function _nonNeg(v: number | undefined, dflt: number): number {
   const x = v ?? dflt;
   if (!Number.isFinite(x) || x < 0) {
-    throw new MotionParamError(`animate: ${name} >= 0, получено ${String(v)}`);
+    throw new MotionParamError('LM139');
   }
   return x;
 }
@@ -153,7 +172,9 @@ function _nonNeg(name: string, v: number | undefined, dflt: number): number {
 function _prefersReduced(mm: ((q: string) => { matches: boolean }) | undefined): boolean {
   if (typeof mm !== 'function') return false;
   try {
-    return mm('(prefers-reduced-motion: reduce)').matches === true;
+    // Платформенный matchMedia в ряде движков требует Window как receiver;
+    // call сохраняет этот контракт без bind-замыкания на каждый animate().
+    return mm.call(globalThis, '(prefers-reduced-motion: reduce)').matches === true;
   } catch {
     return false;
   }
@@ -163,45 +184,41 @@ function _prefersReduced(mm: ((q: string) => { matches: boolean }) | undefined):
 
 /** Канал в полёте: кодек + parsed from/to + сериализованное текущее значение. */
 interface Channel {
-  readonly property: string;
-  readonly codec: PropertyCodec;
-  from: unknown;
-  readonly to: unknown;
-  interp: (p: number) => unknown;
+  readonly _property: string;
+  readonly _codec: PropertyCodec;
+  _interp: (p: number) => unknown;
   /** Числовой диапазон to−from ИЛИ undefined (C⁰-канал). */
-  readonly numRange: number | undefined;
-  value: string | number;
-  velocity: number;
+  readonly _numRange: number | undefined;
+  _value: string | number;
+  _velocity: number;
 }
 
 /** Спецификация одного свойства (после codec.parse — валидна). */
 interface Spec {
-  readonly property: string;
-  readonly codec: PropertyCodec;
-  readonly explicitFrom: unknown | undefined;
-  readonly to: unknown;
+  readonly _property: string;
+  readonly _codec: PropertyCodec;
+  readonly _explicitFrom: unknown | undefined;
+  readonly _to: unknown;
 }
 
 /** Разбирает props → спеки, резолвя кодек и парся значения (fail-fast ДО записи). */
-function _parseSpecs(props: Record<string, PropValue>, registry: CodecRegistry): Spec[] {
+function _parseSpecs(props: Record<string, PropValue>, registry: CodecResolver): Spec[] {
   const specs: Spec[] = [];
   for (const property of Object.keys(props)) {
     if (property === 'transform') {
-      throw new MotionParamError(
-        `animate: 'transform' целиком нельзя — используйте x/y/scale/rotate`,
-      );
+      throw new MotionParamError('LM140');
     }
     const codec = registry.resolveCodec(property);
     const raw = props[property]!;
     const pair = Array.isArray(raw) ? (raw as readonly [unknown, unknown]) : undefined;
     if (pair !== undefined && pair.length !== 2) {
-      throw new MotionParamError(`animate: пара '${property}' — [from, to]`);
+      throw new MotionParamError('LM141');
     }
     specs.push({
-      property,
-      codec,
-      explicitFrom: pair !== undefined ? codec.parse(pair[0], property) : undefined,
-      to: codec.parse(pair !== undefined ? pair[1] : raw, property),
+      _property: property,
+      _codec: codec,
+      _explicitFrom: pair !== undefined ? codec.parse(pair[0], property) : undefined,
+      _to: codec.parse(pair !== undefined ? pair[1] : raw, property),
     });
   }
   return specs;
@@ -220,9 +237,11 @@ function _normalizeV0(velocity: number, range: number | undefined): number {
 
 /** Привязанная поверхность: каналы + остаточные (замороженные) + v0 группы. */
 interface BoundSurface {
-  readonly channels: Channel[];
-  readonly residuals: Map<string, string | number>;
-  readonly v0: number;
+  readonly _channels: Channel[];
+  readonly _residuals: Map<string, string | number>;
+  /** Рабочая композиция переиспользуется между кадрами: render не создаёт Map. */
+  readonly _values: Map<string, string | number>;
+  readonly _v0: number;
 }
 
 /**
@@ -238,40 +257,38 @@ function _bindSurface(
   adapter: TargetAdapter,
   rec: SurfaceRecord,
 ): BoundSurface {
-  const owner = rec.owner;
+  const owner = rec._owner;
   const channels: Channel[] = [];
   let domVel = 0;
   let domRange: number | undefined;
 
   for (const spec of specs) {
-    const codec = spec.codec;
+    const codec = spec._codec;
     let from: unknown;
     let velocity = 0;
-    if (spec.explicitFrom !== undefined) {
-      from = spec.explicitFrom;
+    if (spec._explicitFrom !== undefined) {
+      from = spec._explicitFrom;
     } else {
-      const live = owner?.captureChannel(spec.property);
-      const stored = rec.last.get(spec.property);
+      const live = owner?._captureChannel(spec._property);
+      const stored = rec._last.get(spec._property);
       if (live !== undefined) {
-        from = codec.parse(live.value, spec.property);
-        velocity = live.velocity;
+        from = codec.parse(live._value, spec._property);
+        velocity = live._velocity;
       } else if (stored !== undefined) {
-        from = codec.parse(stored.value, spec.property);
+        from = codec.parse(stored._value, spec._property);
       } else {
-        from = codec.parse(adapter.read(target, spec.property), spec.property);
+        from = codec.parse(adapter.read(target, spec._property), spec._property);
       }
     }
-    const numRange = codec.range?.(from, spec.to);
-    const interp = codec.interpolate(from, spec.to);
+    const numRange = codec.range?.(from, spec._to);
+    const interp = codec.interpolate(from, spec._to);
     channels.push({
-      property: spec.property,
-      codec,
-      from,
-      to: spec.to,
-      interp,
-      numRange,
-      value: codec.serialize(interp(0)),
-      velocity,
+      _property: spec._property,
+      _codec: codec,
+      _interp: interp,
+      _numRange: numRange,
+      _value: codec.serialize(interp(0)),
+      _velocity: velocity,
     });
     if (numRange !== undefined && (domRange === undefined || Math.abs(numRange) > Math.abs(domRange))) {
       domRange = numRange;
@@ -281,9 +298,9 @@ function _bindSurface(
 
   const residuals = new Map<string, string | number>();
   if (surface === 'transform') {
-    const animated = new Set(specs.map((s) => s.property));
-    const known = new Set<string>(rec.last.keys());
-    if (owner !== undefined) for (const k of owner.knownChannels()) known.add(k);
+    const animated = new Set(specs.map((s) => s._property));
+    const known = new Set<string>(rec._last.keys());
+    if (owner !== undefined) for (const k of owner._knownChannels()) known.add(k);
     // scale выигрывает у scaleX/scaleY в _buildTransform: остаточный uniform-scale
     // при анимации ОСЕВОГО канала «съел» бы новый рендер (scaleX не виден). НЕ
     // несём конфликтующий residual 'scale' — тогда осевой канал реально рендерится.
@@ -294,35 +311,43 @@ function _bindSurface(
       ) {
         continue;
       }
-      const snap = owner?.captureChannel(key) ?? rec.last.get(key);
-      if (snap !== undefined) residuals.set(key, snap.value);
+      const snap = owner?._captureChannel(key) ?? rec._last.get(key);
+      if (snap !== undefined) residuals.set(key, snap._value);
     }
   }
 
-  return { channels, residuals, v0: _normalizeV0(domVel, domRange) };
+  const values = new Map(residuals);
+  for (const channel of channels) values.set(channel._property, channel._value);
+  return {
+    _channels: channels,
+    _residuals: residuals,
+    _values: values,
+    _v0: _normalizeV0(domVel, domRange),
+  };
 }
 
 // ─── Unit: один прогон одной поверхности одной цели ──────────────────────────
 
 interface UnitOptions {
-  readonly target: object;
-  readonly surface: string;
-  readonly adapter: TargetAdapter;
-  readonly record: SurfaceRecord;
-  readonly bound: BoundSurface;
-  readonly mode: MotionMode;
-  readonly delayMs: number;
-  readonly frame: FrameLoop;
+  readonly _target: object;
+  readonly _surface: string;
+  readonly _adapter: TargetAdapter;
+  readonly _record: SurfaceRecord;
+  readonly _bound: BoundSurface;
+  readonly _mode: MotionMode;
+  readonly _delayMs: number;
+  readonly _frame: FrameLoop;
   /** reduced-motion: мгновенный снап к финалу без кадров (= _settle сразу). */
-  readonly reduced: boolean;
-  readonly onDone: (natural: boolean) => void;
+  readonly _reduced: boolean;
+  readonly _onDone: (natural: boolean) => void;
 }
 
 class Unit implements SurfaceOwner {
-  readonly finished: Promise<void>;
   private readonly _o: UnitOptions;
-  private _resolve!: () => void;
-  private _done = false;
+  /** До публикации unit инертен тем же состоянием, что после терминала. */
+  private _done = true;
+  private _prepared = false;
+  private _transition = false;
   private _paused = false;
   private _active = false;
   private _gen = 0;
@@ -332,63 +357,115 @@ class Unit implements SurfaceOwner {
   private _lastTs: number | undefined;
   private _converged = false;
   private _off: (() => void) | undefined;
+  private _tweenK = 0;
+  private _tweenDpdt: number | undefined;
 
-  /** Стартует прогон: reduced → мгновенный снап, иначе планирует первый кадр. */
+  /** Конструктор намеренно чистый: host-эффекты выполняет prepare/commit. */
   constructor(o: UnitOptions) {
     this._o = o;
-    this._v0 = o.bound.v0;
-    this.finished = new Promise<void>((res) => {
-      this._resolve = res;
-    });
-    // reduced-motion — снап к финалу (то же, что естественное оседание _settle).
-    if (o.reduced) this._settle();
-    else this._schedule();
+    this._v0 = o._bound._v0;
   }
 
   // ── SurfaceOwner (подхват при повторном animate) ──────────────────────────
 
+  /** Замораживает старого owner на время потенциально враждебного host prepare. */
+  _prepare(): void {
+    if (this._prepared || this._transition) throw new MotionParamError('LM157');
+    this._prepared = true;
+  }
+
+  /** Failed successor возвращает старого owner в тот же повторяемый lifecycle. */
+  _release(): void {
+    this._prepared = false;
+  }
+
   /** Снимок канала для C¹-подхвата: живой канал (value+velocity) или остаток. */
-  captureChannel(property: string): ChannelSnapshot | undefined {
-    const ch = this._o.bound.channels.find((c) => c.property === property);
-    if (ch !== undefined) return { value: ch.value, velocity: ch.velocity };
-    const frozen = this._o.bound.residuals.get(property);
-    return frozen === undefined ? undefined : { value: frozen, velocity: 0 };
+  _captureChannel(property: string): ChannelSnapshot | undefined {
+    const ch = this._o._bound._channels.find((c) => c._property === property);
+    if (ch !== undefined) {
+      // Delay ещё не двигает effect: внутренний seed сохраняется до старта,
+      // внешний ретаргет получает фактическую скорость покоя.
+      let velocity = this._active ? ch._velocity : 0;
+      if (this._active && this._o._mode._type === 'tween') {
+        const sampled = (ch._numRange ?? 0) * this._tweenDerivative();
+        velocity = Number.isFinite(sampled) ? sampled + 0 : 0;
+      }
+      return { _value: ch._value, _velocity: velocity };
+    }
+    const frozen = this._o._bound._residuals.get(property);
+    return frozen === undefined ? undefined : { _value: frozen, _velocity: 0 };
   }
 
   /** Все ключи прогона: живые каналы + остаточные (для residual-проекции). */
-  knownChannels(): readonly string[] {
-    return [...this._o.bound.channels.map((c) => c.property), ...this._o.bound.residuals.keys()];
+  _knownChannels(): readonly string[] {
+    return [
+      ...this._o._bound._channels.map((c) => c._property),
+      ...this._o._bound._residuals.keys(),
+    ];
   }
 
   /** Прерывание прогона повторным animate: стоп без записи, finished (не natural). */
-  supersede(): void {
-    if (this._done) return;
-    this._teardown();
+  _supersede(replacement?: () => void): void {
+    if (this._done) {
+      this._prepared = false;
+      return;
+    }
+    if (this._transition) throw new MotionParamError('LM157');
+    this._prepared = false;
+    this._transition = true;
+    try {
+      replacement?.();
+    } catch (error) {
+      this._transition = false;
+      throw error;
+    }
     this._finish(false);
+  }
+
+  /** Публикация открывает callbacks; reduced пишет только внутри commit. */
+  _commit(): void {
+    this._done = false;
+    if (this._o._reduced) this._settle();
+  }
+
+  /** Откат неопубликованного successor без записи и aggregate-report. */
+  _rollback(): void {
+    this._done = true;
+    this._teardown();
   }
 
   // ── Контролы ──────────────────────────────────────────────────────────────
 
   /** Пауза: замораживает прогон, уже запланированный кадр становится инертен. */
   pause(): void {
-    if (this._done || this._paused) return;
+    if (this._done || this._prepared || this._transition || this._paused) return;
     this._paused = true;
-    this._gen++; // уже запланированный кадр инертен
+    this._teardown(); // постоянные phase-подписки на паузе не держат цикл живым
   }
 
   /** Возобновление после паузы: сбрасывает ts-базу и планирует новый кадр. */
   play(): void {
-    if (this._done || !this._paused) return;
+    if (this._done || this._prepared || this._transition || !this._paused) return;
     this._paused = false;
     this._lastTs = undefined;
-    this._schedule();
+    try {
+      this._subscribe();
+    } catch (error) {
+      this._paused = true;
+      throw error;
+    }
   }
 
   /** Перемотка к виртуальному времени tMs: синхронный эмит (вычисление+запись). */
   seek(tMs: number): void {
     // !isFinite отсекает и NaN, и ±Infinity: Infinity утекал бы в _compute/spring
     // (tMs/1000 → ∞ → бросок изнутри). Нефинитная перемотка — no-op, как NaN.
-    if (this._done || !Number.isFinite(tMs)) return;
+    if (
+      this._done ||
+      this._prepared ||
+      this._transition ||
+      !Number.isFinite(tMs)
+    ) return;
     this._active = true;
     this._tMs = Math.max(0, tMs);
     this._lastTs = undefined;
@@ -399,41 +476,64 @@ class Unit implements SurfaceOwner {
 
   /** Отмена: стоп на текущем значении, фиксация в реестр, finished (не natural). */
   cancel(): void {
-    if (this._done) return;
-    this._teardown();
+    if (this._done || this._prepared || this._transition) return;
     this._writeBack();
     this._finish(false);
   }
 
   // ── main-путь: единый ./frame, фазы update(вычисление)→render(запись) ─────
   //
-  // update и render — once-подписки ОДНОГО кадра ./frame: в тике сначала фаза
+  // update и render — постоянные подписки lifecycle: в тике сначала фаза
   // update (продвинуть время, посчитать значения каналов, БЕЗ записи в DOM),
   // затем фаза render (записать посчитанное). Так чтение current-value
   // (сделано один раз в _bindSurface) и записи разведены по фазам — layout-
-  // thrash исключён. render перепланирует кадр (batch-семантика ./frame).
+  // thrash исключён. Пустой lifecycle снимает обе подписки и останавливает ./frame.
 
-  /** Планирует один кадр: update (вычисление) + render (запись) как once-подписки. */
-  private _schedule(): void {
+  /** Одна пара постоянных phase-подписок на весь lifecycle убирает per-frame Entry/closure/off аллокации. */
+  _subscribe(): void {
     const gen = this._gen;
-    this._off?.();
-    const offU = this._o.frame.update((ts) => this._update(ts, gen), { once: true });
-    const offR = this._o.frame.render(() => this._render(gen), { once: true });
+    const offU = this._o._frame.update((ts) => {
+      try { this._update(ts, gen); } catch { this.cancel(); }
+    });
+    let offR: () => void;
+    try {
+      offR = this._o._frame.render(() => {
+        try { this._render(gen); } catch { this.cancel(); }
+      });
+    } catch (error) {
+      try { offU(); } catch { /* сохраняем первичную ошибку render-subscribe */ }
+      throw error;
+    }
     this._off = (): void => {
-      offU();
-      offR();
+      try { offU(); } finally { offR(); }
     };
   }
 
   /** Фаза update: продвинуть время и посчитать значения каналов (без записи). */
   private _update(ts: number | undefined, gen: number): void {
-    if (gen !== this._gen || this._done || this._paused) return;
-    let dt = ts !== undefined ? (this._lastTs !== undefined ? ts - this._lastTs : 0) : FIXED_DT_MS;
-    if (ts !== undefined) this._lastTs = ts;
+    if (
+      gen !== this._gen ||
+      this._done ||
+      this._prepared ||
+      this._transition ||
+      this._paused
+    ) return;
+    let dt: number;
+    if (ts === undefined || !Number.isFinite(ts)) {
+      dt = FIXED_DT_MS;
+      this._lastTs = undefined;
+    } else {
+      dt = this._lastTs !== undefined ? ts - this._lastTs : 0;
+      this._lastTs = ts;
+      if (!Number.isFinite(dt)) {
+        dt = FIXED_DT_MS;
+        this._lastTs = undefined;
+      }
+    }
     if (dt < 0) dt = 0;
     this._wallMs += dt;
     if (!this._active) {
-      if (this._wallMs + FIXED_DT_MS >= this._o.delayMs) {
+      if (this._wallMs + FIXED_DT_MS >= this._o._delayMs) {
         this._active = true;
         this._tMs = 0;
       }
@@ -445,13 +545,18 @@ class Unit implements SurfaceOwner {
 
   /** Фаза render: записать посчитанное; сходимость → точный финал. */
   private _render(gen: number): void {
-    if (gen !== this._gen || this._done || this._paused) return;
+    if (
+      gen !== this._gen ||
+      this._done ||
+      this._prepared ||
+      this._transition ||
+      this._paused
+    ) return;
     if (this._converged) {
       this._settle();
       return;
     }
     if (this._active) this._write();
-    this._schedule();
   }
 
   /**
@@ -461,46 +566,62 @@ class Unit implements SurfaceOwner {
   private _compute(tMs: number): boolean {
     const o = this._o;
     let p: number;
-    let dpdt: number;
-    if (o.mode.type === 'tween') {
-      if (tMs >= o.mode.durationMs) return true;
-      const k = tMs / o.mode.durationMs;
-      const eased = o.mode.ease(k);
+    let dpdt: number | undefined;
+    if (o._mode._type === 'tween') {
+      if (tMs >= o._mode._durationMs) return true;
+      const k = tMs / o._mode._durationMs;
+      const eased = o._mode._ease(k);
       p = Number.isFinite(eased) ? eased : k;
-      const k0 = k > EASE_DERIV_H ? k - EASE_DERIV_H : 0;
-      const k1 = k + EASE_DERIV_H < 1 ? k + EASE_DERIV_H : 1;
-      const slope = (o.mode.ease(k1) - o.mode.ease(k0)) / (k1 - k0);
-      const raw = (slope * 1000) / o.mode.durationMs;
-      dpdt = Number.isFinite(raw) ? raw + 0 : 0;
+      this._tweenK = k;
+      this._tweenDpdt = undefined;
     } else {
-      const r = readCompositorSpring(o.mode.spring, { from: 0, to: 1, v0: this._v0, t: tMs / 1000 });
+      const r = sampleSpringUnchecked(o._mode._spring, this._v0, tMs / 1000);
       p = r.value;
       dpdt = r.velocity;
       if (Math.abs(p - 1) < CONVERGENCE && Math.abs(dpdt) < CONVERGENCE) return true;
     }
-    for (const ch of o.bound.channels) {
-      ch.value = ch.codec.serialize(ch.interp(p));
-      const vel = ch.numRange !== undefined ? ch.numRange * dpdt : 0;
-      ch.velocity = Number.isFinite(vel) ? vel + 0 : 0;
+    for (const ch of o._bound._channels) {
+      ch._value = ch._codec.serialize(ch._interp(p));
+      if (dpdt !== undefined) {
+        const vel = ch._numRange !== undefined ? ch._numRange * dpdt : 0;
+        ch._velocity = Number.isFinite(vel) ? vel + 0 : 0;
+      }
     }
     return false;
+  }
+
+  /** Обычный tween-кадр не сэмплирует ease ради скорости; это нужно только ретаргету. */
+  private _tweenDerivative(): number {
+    if (this._tweenDpdt !== undefined) return this._tweenDpdt;
+    const mode = this._o._mode;
+    if (mode._type !== 'tween') return 0;
+    const k = this._tweenK;
+    const k0 = k > EASE_DERIV_H ? k - EASE_DERIV_H : 0;
+    const k1 = k + EASE_DERIV_H < 1 ? k + EASE_DERIV_H : 1;
+    const raw =
+      ((mode._ease(k1) - mode._ease(k0)) * 1000) /
+      ((k1 - k0) * mode._durationMs);
+    this._tweenDpdt = Number.isFinite(raw) ? raw + 0 : 0;
+    return this._tweenDpdt;
   }
 
   /** Запись поверхности: остаточные + живые каналы → compose → apply в цель. */
   private _write(): void {
     const o = this._o;
-    const map = new Map<string, string | number>();
-    o.bound.residuals.forEach((v, k) => map.set(k, v));
-    for (const ch of o.bound.channels) map.set(ch.property, ch.value);
-    o.adapter.apply(o.target, o.surface, o.adapter.compose(o.surface, map));
+    for (const ch of o._bound._channels) o._bound._values.set(ch._property, ch._value);
+    o._adapter.apply(
+      o._target,
+      o._surface,
+      o._adapter.compose(o._surface, o._bound._values),
+    );
   }
 
   /** Оседание: точный финал (interp(1)) записан, зафиксирован, finished (natural). */
   private _settle(): void {
     if (this._done) return;
-    for (const ch of this._o.bound.channels) {
-      ch.value = ch.codec.serialize(ch.interp(1));
-      ch.velocity = 0;
+    for (const ch of this._o._bound._channels) {
+      ch._value = ch._codec.serialize(ch._interp(1));
+      ch._velocity = 0;
     }
     this._write();
     this._writeBack();
@@ -512,18 +633,18 @@ class Unit implements SurfaceOwner {
   /** Снятие подписок кадра и инвалидация поколения (запланированный кадр инертен). */
   private _teardown(): void {
     this._gen++;
-    this._off?.();
+    try { this._off?.(); } catch { /* host-off не должен рвать owner transition */ }
     this._off = undefined;
   }
 
   /** Фиксация последних значений каналов/остатков в реестр (для будущего from). */
   private _writeBack(): void {
-    const rec = this._o.record;
-    for (const ch of this._o.bound.channels) {
-      rec.last.set(ch.property, { value: ch.value, velocity: 0 });
+    const rec = this._o._record;
+    for (const ch of this._o._bound._channels) {
+      rec._last.set(ch._property, { _value: ch._value, _velocity: 0 });
     }
-    this._o.bound.residuals.forEach((v, k) => {
-      if (!rec.last.has(k)) rec.last.set(k, { value: v, velocity: 0 });
+    this._o._bound._residuals.forEach((v, k) => {
+      if (!rec._last.has(k)) rec._last.set(k, { _value: v, _velocity: 0 });
     });
   }
 
@@ -531,66 +652,51 @@ class Unit implements SurfaceOwner {
   private _finish(natural: boolean): void {
     if (this._done) return;
     this._done = true;
-    this._gen++;
-    if (this._o.record.owner === this) this._o.record.owner = undefined;
-    this._resolve();
-    this._o.onDone(natural);
+    // Все терминалы сходятся сюда: единый teardown не даёт cancel/supersede
+    // дважды инвалидировать поколение и дублировать lifecycle-код.
+    this._teardown();
+    if (this._o._record._owner === this) this._o._record._owner = undefined;
+    this._o._onDone(natural);
   }
+
 }
 
 // ─── Резолв целей (в момент вызова — SSR-safe) ───────────────────────────────
 
-/** Похоже ли на список элементов (массив/NodeList): number-length + object-элемент. */
-function _isArrayLike(t: unknown): boolean {
-  if (Array.isArray(t)) return true;
-  const len = (t as { length?: unknown } | null)?.length;
-  // Number.isFinite сам отвергает не-числовой length (доп. typeof-гейт не нужен).
-  if (!Number.isFinite(len as number)) return false;
-  // Список элементов (NodeList/массив), не plain-object со случайным length.
-  return len === 0 || typeof (t as ArrayLike<unknown>)[0] === 'object';
-}
-
 /** Резолв цели(ей) в момент вызова (SSR-safe): селектор → NodeList, список, объект. */
-function _resolveTargets(target: unknown, registry: CodecRegistry): object[] {
+function _resolveTargets(target: unknown, registry: CodecResolver): object[] {
+  let source = target;
   if (typeof target === 'string') {
     const doc = (globalThis as { document?: { querySelectorAll?: (s: string) => ArrayLike<object> } }).document;
-    if (doc === undefined || typeof doc.querySelectorAll !== 'function') {
-      throw new MotionParamError(
-        `animate: селектор '${target}' требует document`,
-      );
+    const query = doc?.querySelectorAll;
+    if (doc === undefined || typeof query !== 'function') {
+      throw new MotionParamError('LM149');
     }
-    return _collect(doc.querySelectorAll(target));
+    source = query.call(doc, target);
   }
-  if (target !== null && typeof target === 'object') {
+  if (source !== null && typeof source === 'object') {
     // Прямая adapter-цель ПЕРВЫМ: объект с полем length:0 (напр. style-цель)
     // иначе трактуется как пустой список → тихий no-op (цель не анимируется).
     // Валидная прямая цель (resolveAdapter не бросает) — ОДНА цель, не список.
     try {
-      registry.resolveAdapter(target);
-      return [target as object];
-    } catch {
-      /* не прямая цель — пробуем как список */
+      registry.resolveAdapter(source);
+      return [source];
+    } catch (error) {
+      // Не маскируем отказ пользовательского matcher-а под array-like fallback.
+      if (!(error instanceof MotionParamError)) throw error;
     }
-    if (_isArrayLike(target)) return _collect(target as ArrayLike<object>);
-    return [target as object];
+    const snapshot = collectBoundedArrayLike(source);
+    for (let i = 0; i < snapshot.length; i++) {
+      if (snapshot[i] === null || typeof snapshot[i] !== 'object') {
+        throw new MotionParamError('LM147');
+      }
+    }
+    return snapshot as object[];
   }
-  throw new MotionParamError(`animate: цель — объект/список/селектор`);
-}
-
-function _collect(list: ArrayLike<object>): object[] {
-  // Number.isFinite сам отвергает не-числовой length (доп. typeof не нужен).
-  const n = Number.isFinite(list.length) ? list.length : 0;
-  const out: object[] = [];
-  for (let i = 0; i < n; i++) out.push(list[i]!);
-  return out;
+  throw new MotionParamError('LM146');
 }
 
 /** Дефолтный matchMedia-шов: globalThis.matchMedia, если среда его предоставляет. */
-function _defaultMatchMedia(): ((q: string) => { matches: boolean }) | undefined {
-  const mm = (globalThis as { matchMedia?: (q: string) => { matches: boolean } }).matchMedia;
-  return typeof mm === 'function' ? mm.bind(globalThis) : undefined;
-}
-
 // ─── runAnimate: оркестрация целей × поверхностей ────────────────────────────
 
 /**
@@ -599,18 +705,23 @@ function _defaultMatchMedia(): ((q: string) => { matches: boolean }) | undefined
  * бросок MotionParamError не пишет ни одного стиля (fail-fast).
  */
 export function runAnimate(
-  registry: CodecRegistry,
+  registry: CodecResolver,
   target: unknown,
   props: Record<string, PropValue>,
   options: EngineOptions = {},
 ): AnimateControls {
+  // Options валидируются до props/target: оба входа могут содержать getters.
+  options = requireAnimateOptions(options);
   const mode = _resolveMode(options);
-  const baseDelay = _nonNeg('delay', options.delay, 0);
-  const staggerStep = _nonNeg('stagger', options.stagger, 0);
-  const specs = _parseSpecs(props, registry);
+  const baseDelay = _nonNeg(options.delay, 0);
+  const staggerStep = _nonNeg(options.stagger, 0);
+  const specs = _parseSpecs(requireAnimateProps(props), registry);
   const targets = _resolveTargets(target, registry);
 
-  const reduced = _prefersReduced(options.matchMedia ?? _defaultMatchMedia());
+  const reduced = _prefersReduced(
+    options.matchMedia ??
+      (globalThis as { matchMedia?: (q: string) => { matches: boolean } }).matchMedia,
+  );
   // Единый ./frame-шедулер: инжектированный requestFrame → выделенный цикл
   // (детерминизм тестов); иначе разделяемый синглтон (один rAF на весь пакет).
   const frameLoop =
@@ -618,24 +729,6 @@ export function runAnimate(
     (options.requestFrame !== undefined
       ? createFrameLoop({ requestFrame: options.requestFrame })
       : defaultFrame);
-
-  const units: Unit[] = [];
-  let total = 0;
-  let done = 0;
-  let natural = 0;
-  let setupDone = false;
-  let completed = false;
-  const maybeComplete = (): void => {
-    if (!completed && setupDone && done === total && natural === total) {
-      completed = true;
-      options.onComplete?.();
-    }
-  };
-  const report = (nat: boolean): void => {
-    done++;
-    if (nat) natural++;
-    maybeComplete();
-  };
 
   // ── Фаза 1: собрать и провалидировать ВЕСЬ план ДО любой мутации ──────────
   // Резолв адаптера + surfaceOf + _bindSurface (все могут бросить) выполняются
@@ -650,11 +743,13 @@ export function runAnimate(
   for (let i = 0; i < targets.length; i++) {
     const tgt = targets[i]!;
     const adapter = registry.resolveAdapter(tgt);
-    const delayMs = baseDelay + staggerStep * i;
+    // Оба операнда конечны, но их сумма/произведение всё ещё могут overflow.
+    // Проверяем derived-значение в read-only plan-фазе, до первой подписки.
+    const delayMs = _nonNeg(baseDelay + staggerStep * i, 0);
 
     const bySurface = new Map<string, Spec[]>();
     for (const spec of specs) {
-      const surface = adapter.surfaceOf(spec.property);
+      const surface = adapter.surfaceOf(spec._property);
       const list = bySurface.get(surface);
       if (list === undefined) bySurface.set(surface, [spec]);
       else list.push(spec);
@@ -667,39 +762,105 @@ export function runAnimate(
     }
   }
 
-  // ── Фаза 2: мутации (supersede + instantiate) — только после полной валидации ─
-  for (const [tgt, surface, adapter, rec, bound, delayMs] of plan) {
-    rec.owner?.supersede();
-    total++;
-    const unit = new Unit({
-      target: tgt,
-      surface,
-      adapter,
-      record: rec,
-      bound,
-      mode,
-      delayMs,
-      frame: frameLoop,
-      reduced,
-      onDone: report,
-    });
-    // reduced-снап оседает в конструкторе синхронно (пишет rec.last, finished
-    // резолвится) — владельцем НЕ становится (прогон завершён). Живой прогон —
-    // становится: повторный animate подхватит value+velocity через него.
-    if (!reduced) rec.owner = unit;
-    units.push(unit);
+  // Deferred живёт только после полной plan/read-валидации: ошибочный
+  // вызов не аллоцирует abandoned Promise и не маскирует MotionParamError.
+  const units: Unit[] = [];
+  const total = plan.length;
+  let done = 0;
+  let natural = 0;
+  let setupDone = false;
+  let resolveFinished!: () => void;
+  // Публичный run один, поэтому отдельные Promise каждой поверхности были
+  // чистым O(N) мусором: Unit теперь сообщает terminal aggregate-счётчику.
+  const maybeComplete = (): void => {
+    if (!setupDone || done !== total) return;
+    setupDone = false;
+    queueMicrotask(resolveFinished);
+    if (natural === total) options.onComplete?.();
+  };
+  const report = (nat: boolean): void => {
+    done++;
+    if (nat) natural++;
+    maybeComplete();
+  };
+
+  // ── Фаза 2: transactional commit — только после полной валидации ──────────
+  // Host prepare выполняется при замороженном старом owner. До его успешного
+  // завершения successor не опубликован, callbacks инертны, а reduced не пишет.
+  // Дубликат цели берёт owner прямо из record: второй entry обязан заменить
+  // первый локальный unit, а его неудача — сохранить первый повторяемым.
+  const localOwners = new Set<SurfaceOwner>();
+  let protectedOwner: SurfaceOwner | undefined;
+  try {
+    for (const [tgt, surface, adapter, rec, bound, delayMs] of plan) {
+      const previous = rec._owner;
+      const localPrevious = previous !== undefined && localOwners.has(previous);
+      if (rec._transition) throw new MotionParamError('LM157');
+      rec._transition = true;
+      if (previous !== undefined) {
+        try {
+          previous._prepare();
+        } catch (error) {
+          rec._transition = false;
+          throw error;
+        }
+      }
+      const unit = new Unit({
+        _target: tgt,
+        _surface: surface,
+        _adapter: adapter,
+        _record: rec,
+        _bound: bound,
+        _mode: mode,
+        _delayMs: delayMs,
+        _frame: frameLoop,
+        _reduced: reduced,
+        _onDone: report,
+      });
+      try {
+        if (!reduced) unit._subscribe();
+        if (reduced) {
+          if (previous === undefined) unit._commit();
+          else previous._supersede(() => unit._commit());
+        } else {
+          previous?._supersede();
+          rec._owner = unit;
+          rec._transition = false;
+          unit._commit();
+          localOwners.add(unit);
+        }
+      } catch (error) {
+        unit._rollback();
+        if (localPrevious) protectedOwner = previous;
+        previous?._release();
+        rec._transition = false;
+        throw error;
+      }
+      // reduced-снап уже завершён и владельцем не становится. Старый owner
+      // очистил запись только ПОСЛЕ успешной replacement-записи.
+      if (reduced) rec._transition = false;
+      units.push(unit);
+    }
+  } catch (error) {
+    for (let i = units.length - 1; i >= 0; i--) {
+      if (units[i] === protectedOwner) continue;
+      try { units[i]!.cancel(); } catch { /* продолжаем cleanup соседей */ }
+    }
+    throw error;
   }
+  const finished = new Promise<void>((resolve) => {
+    resolveFinished = resolve;
+  });
   setupDone = true;
   maybeComplete();
 
-  const finished = Promise.all(units.map((u) => u.finished)).then(() => undefined);
-
+  const cancel = (): void => units.forEach((u) => u.cancel());
   return {
     finished,
     play: () => units.forEach((u) => u.play()),
     pause: () => units.forEach((u) => u.pause()),
     seek: (tMs) => units.forEach((u) => u.seek(tMs)),
-    cancel: () => units.forEach((u) => u.cancel()),
-    stop: () => units.forEach((u) => u.cancel()),
+    cancel,
+    stop: cancel,
   };
 }

@@ -54,10 +54,7 @@ export interface ParsedColor {
 
 // ── Парсинг ───────────────────────────────────────────────────────────────────
 
-const HEX3_RE = /^#([0-9a-f])([0-9a-f])([0-9a-f])$/i;
-const HEX4_RE = /^#([0-9a-f])([0-9a-f])([0-9a-f])([0-9a-f])$/i;
-const HEX6_RE = /^#([0-9a-f]{2})([0-9a-f]{2})([0-9a-f]{2})$/i;
-const HEX8_RE = /^#([0-9a-f]{2})([0-9a-f]{2})([0-9a-f]{2})([0-9a-f]{2})$/i;
+const HEX_RE = /^#([0-9a-f]{3,4}|[0-9a-f]{6}|[0-9a-f]{8})$/i;
 
 const NUM_PCT = '(\\d+(?:\\.\\d+)?%?)';
 // Hue по W3C CSS Color (legacy comma-синтаксис) — <number> СО знаком и БЕЗ
@@ -83,44 +80,21 @@ const HSL_RE = new RegExp(`^hsla?\\(\\s*${HUE}${SEP}${NUM_PCT}${SEP}${NUM_PCT}(?
 export function parseColor(value: string): ParsedColor | null {
   const s = value.trim();
 
-  // Hex shorthand #rgb
-  const h3 = HEX3_RE.exec(s);
-  if (h3) {
-    return { kind: 'color', format: 'hex',
-      r: parseInt(h3[1] + h3[1], 16),
-      g: parseInt(h3[2] + h3[2], 16),
-      b: parseInt(h3[3] + h3[3], 16),
-      a: 1 };
-  }
-
-  // Hex shorthand #rgba
-  const h4 = HEX4_RE.exec(s);
-  if (h4) {
-    return { kind: 'color', format: 'hex',
-      r: parseInt(h4[1] + h4[1], 16),
-      g: parseInt(h4[2] + h4[2], 16),
-      b: parseInt(h4[3] + h4[3], 16),
-      a: parseInt(h4[4] + h4[4], 16) / 255 };
-  }
-
-  // Hex #rrggbb
-  const h6 = HEX6_RE.exec(s);
-  if (h6) {
-    return { kind: 'color', format: 'hex',
-      r: parseInt(h6[1], 16),
-      g: parseInt(h6[2], 16),
-      b: parseInt(h6[3], 16),
-      a: 1 };
-  }
-
-  // Hex #rrggbbaa
-  const h8 = HEX8_RE.exec(s);
-  if (h8) {
-    return { kind: 'color', format: 'hex',
-      r: parseInt(h8[1], 16),
-      g: parseInt(h8[2], 16),
-      b: parseInt(h8[3], 16),
-      a: parseInt(h8[4], 16) / 255 };
+  const hex = HEX_RE.exec(s);
+  if (hex) {
+    const raw = hex[1]!;
+    const short = raw.length < 5;
+    const alpha = raw.length === 4
+      ? raw[3]! + raw[3]!
+      : raw.length === 8 ? raw.slice(6) : undefined;
+    return {
+      kind: 'color',
+      format: 'hex',
+      r: parseInt(short ? raw[0]! + raw[0]! : raw.slice(0, 2), 16),
+      g: parseInt(short ? raw[1]! + raw[1]! : raw.slice(2, 4), 16),
+      b: parseInt(short ? raw[2]! + raw[2]! : raw.slice(4, 6), 16),
+      a: alpha === undefined ? 1 : parseInt(alpha, 16) / 255,
+    };
   }
 
   // rgb() / rgba()

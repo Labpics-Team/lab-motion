@@ -17,7 +17,11 @@
  */
 
 import { describe, expect, it } from 'vitest';
-import { trimSlidingWindow, type TimedSample } from '../src/internal/sliding-window.js';
+import {
+  advanceSlidingWindow,
+  trimSlidingWindow,
+  type TimedSample,
+} from '../src/internal/sliding-window.js';
 
 /** Массив таймстемпов → сэмплы. */
 const s = (...ts: number[]): TimedSample[] => ts.map((t) => ({ t }));
@@ -113,5 +117,30 @@ describe('документированные эквиваленты sliding-wind
   it('последний сэмпл всегда в окне при window≥0 (характеризация окна)', () => {
     expect(ts(trimSlidingWindow(s(0, 100), 1))).toEqual([0, 100]); // <2 в окне → пара
     expect(ts(trimSlidingWindow(s(0, 1, 2), 1000))).toEqual([0, 1, 2]); // всё в окне
+  });
+});
+
+describe('allocation-free cursor — дифференциальный пин', () => {
+  it('на плотном и редком потоке даёт тот же логический срез, что чистый оракул', () => {
+    for (const stream of [
+      [0, 0.01, 0.02, 0.03, 0.2, 0.21],
+      [0, 1, 10, 10.01, 20],
+    ]) {
+      const samples: TimedSample[] = [];
+      let start = 0;
+      for (const t of stream) {
+        samples.push({ t });
+        start = advanceSlidingWindow(samples, start, 0.1);
+        expect(ts(samples.slice(start))).toEqual(ts(trimSlidingWindow(samples.slice(0), 0.1)));
+      }
+    }
+  });
+
+  it('при накопленном префиксе не возвращает уже вытесненные сэмплы', () => {
+    const samples = s(0, 1, 10);
+    const start = advanceSlidingWindow(samples, 0, 1);
+    expect(ts(samples.slice(start))).toEqual([1, 10]);
+    samples.push({ t: 10.5 });
+    expect(ts(samples.slice(advanceSlidingWindow(samples, start, 1)))).toEqual([10, 10.5]);
   });
 });

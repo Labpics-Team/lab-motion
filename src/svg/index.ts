@@ -93,14 +93,12 @@ export function parsePath(d: string): SVGCommand[] {
     skipSep();
     const m = NUM_RE.exec(s.slice(i));
     if (!m) {
-      throw new MotionParamError(
-        `parsePath: ожидалось число на позиции ${i} в «${d}»`,
-      );
+      throw new MotionParamError('LM095');
     }
     i += m[0].length;
     const v = parseFloat(m[0]);
     if (!Number.isFinite(v)) {
-      throw new MotionParamError(`parsePath: неконечное число «${m[0]}» в «${d}»`);
+      throw new MotionParamError('LM096');
     }
     return v;
   };
@@ -110,7 +108,7 @@ export function parsePath(d: string): SVGCommand[] {
     skipSep();
     const ch = s[i];
     if (ch !== '0' && ch !== '1') {
-      throw new MotionParamError(`parsePath: ожидался arc-флаг 0/1 на позиции ${i} в «${d}»`);
+      throw new MotionParamError('LM097');
     }
     i++;
     return ch === '1' ? 1 : 0;
@@ -123,7 +121,7 @@ export function parsePath(d: string): SVGCommand[] {
   };
 
   skipSep();
-  if (i >= s.length) throw new MotionParamError('parsePath: пустой путь');
+  if (i >= s.length) throw new MotionParamError('LM098');
 
   let sawMove = false;
 
@@ -133,10 +131,10 @@ export function parsePath(d: string): SVGCommand[] {
     const cmdCh = s[i];
     const upper = cmdCh.toUpperCase();
     if (!(upper in ARITY)) {
-      throw new MotionParamError(`parsePath: неизвестная команда «${cmdCh}» в «${d}»`);
+      throw new MotionParamError('LM099');
     }
     if (!sawMove && upper !== 'M') {
-      throw new MotionParamError(`parsePath: путь обязан начинаться с M/m, встречено «${cmdCh}»`);
+      throw new MotionParamError('LM100');
     }
     i++;
     const arity = ARITY[upper];
@@ -162,7 +160,7 @@ export function parsePath(d: string): SVGCommand[] {
     } while (hasMoreArgs());
   }
 
-  if (out.length === 0) throw new MotionParamError('parsePath: путь без команд');
+  if (out.length === 0) throw new MotionParamError('LM101');
   return out;
 }
 

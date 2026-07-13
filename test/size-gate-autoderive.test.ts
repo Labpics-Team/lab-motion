@@ -1,8 +1,22 @@
 import { describe, expect, it } from 'vitest';
-import { CORE_GATE_BYTES, SUBPATH_GATE_BYTES, deriveEntriesFromExports, IMPORT_COST_SCENARIOS, measureEntries, measureScenario } from '../scripts/size-gate.mjs';
-import { readFileSync } from 'node:fs';
+import {
+  BESPOKE_SUBPATH_GATES,
+  COMPOSITOR_CAPABILITY_GATE_BYTES,
+  CORE_GATE_BYTES,
+  FULL_ANIMATE_GATE_BYTES,
+  FULL_CORE_CONSUMER_GATE_BYTES,
+  SUBPATH_GATE_BYTES,
+  deriveEntriesFromExports,
+  IMPORT_COST_SCENARIOS,
+  measureEntries,
+  measureEsmTransfer,
+  measureScenario,
+} from '../scripts/size-gate.mjs';
+import { mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { resolve, dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { tmpdir } from 'node:os';
+import { gzipSync } from 'node:zlib';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const ROOT = resolve(__dirname, '..');
@@ -103,6 +117,22 @@ describe('size-gate: auto-derive subpath entries from package.json exports', () 
     }
   });
 
+  it('full animate имеет один SSOT-потолок для shipped subpath и consumer import-cost', () => {
+    const full = IMPORT_COST_SCENARIOS.find((scenario) => scenario.name.startsWith('animate-one-liner'));
+    expect(FULL_ANIMATE_GATE_BYTES).toBe(12_000);
+    expect(BESPOKE_SUBPATH_GATES['./animate']).toBe(FULL_ANIMATE_GATE_BYTES);
+    expect(full?.gate).toBe(FULL_ANIMATE_GATE_BYTES);
+  });
+
+  it('разделяет физические и consumer-потолки ядра и compositor capability', () => {
+    expect(FULL_CORE_CONSUMER_GATE_BYTES).toBe(2330);
+    expect(COMPOSITOR_CAPABILITY_GATE_BYTES).toBe(6600);
+    expect(IMPORT_COST_SCENARIOS.find(({ name }) => name === 'full-core')?.gate)
+      .toBe(FULL_CORE_CONSUMER_GATE_BYTES);
+    expect(IMPORT_COST_SCENARIOS.find(({ name }) => name === 'compositor-stagger capability')?.gate)
+      .toBe(COMPOSITOR_CAPABILITY_GATE_BYTES);
+  });
+
   it('measureScenario: пропавший экспорт даёт error (громкий FAIL), а не тихий ноль', async () => {
     const distIndex = resolve(ROOT, 'dist/index.js');
     const broken = { name: 'broken', code: `import { noSuchExport } from '%DIST%'; console.log(noSuchExport);`, gate: 1 };
@@ -118,6 +148,7 @@ describe('size-gate: auto-derive subpath entries from package.json exports', () 
     const m = await measureScenario(onlySpring, distIndex);
     expect(m.error).toBeUndefined();
     expect(m.gzBytes).toBeGreaterThan(0);
+    expect(m.brBytes).toBeGreaterThan(0);
     // Класс tree-shakeability: частичный импорт обязан быть ДЕШЕВЛЕ полного ядра.
     const full = await measureScenario(IMPORT_COST_SCENARIOS.find(s => s.name === 'full-core'), distIndex);
     expect(m.gzBytes).toBeLessThan(full.gzBytes);
@@ -132,6 +163,74 @@ describe('size-gate: auto-derive subpath entries from package.json exports', () 
     expect(rows[0].error).toMatch(/MISSING/);
   });
 
+  it('shipped CDN size includes the recursive static ESM import closure once per subpath', () => {
+    const root = mkdtempSync(resolve(tmpdir(), 'lab-motion-size-closure-'));
+    try {
+      mkdirSync(resolve(root, 'dist'), { recursive: true });
+      const entry = `import { frame } from './frame.js'; export const value = frame; import('./lazy.js');`;
+      const frame = `export const frame = 1;`;
+      const lazy = `export const lazy = 'not part of initial transfer';`;
+      writeFileSync(resolve(root, 'dist/index.js'), entry);
+      writeFileSync(resolve(root, 'dist/frame.js'), frame);
+      writeFileSync(resolve(root, 'dist/lazy.js'), lazy);
+
+      const { rows, hasWarnings } = measureEntries(
+        [{ key: '.', label: 'core', importPath: 'dist/index.js', gate: 100_000 }],
+        root,
+      );
+      const row = rows[0];
+      expect(hasWarnings).toBe(false);
+      expect(row.closureFiles).toBe(2);
+      expect(row.entryGzBytes).toBe(gzipSync(Buffer.from(entry), { level: 9 }).length);
+      expect(row.gzBytes).toBe(
+        gzipSync(Buffer.from(entry), { level: 9 }).length +
+        gzipSync(Buffer.from(frame), { level: 9 }).length,
+      );
+      expect(row.gzBytes).toBeLessThan(
+        row.entryGzBytes + gzipSync(Buffer.from(frame), { level: 9 }).length +
+        gzipSync(Buffer.from(lazy), { level: 9 }).length,
+      );
+    } finally {
+      rmSync(root, { recursive: true, force: true });
+    }
+  });
+
+  it('includes recursive CSS @import in the initial shipped graph', () => {
+    const root = mkdtempSync(resolve(tmpdir(), 'lab-motion-size-css-'));
+    try {
+      mkdirSync(resolve(root, 'dist'), { recursive: true });
+      const entry = `import './theme.css'; export const value = 1;`;
+      const theme = `@import './tokens.css'; .box { color: var(--ink); }`;
+      const tokens = `:root { --ink: #111; }`;
+      writeFileSync(resolve(root, 'dist/index.js'), entry);
+      writeFileSync(resolve(root, 'dist/theme.css'), theme);
+      writeFileSync(resolve(root, 'dist/tokens.css'), tokens);
+
+      const measured = measureEsmTransfer('dist/index.js', root);
+      expect(measured.closureFiles).toBe(3);
+      expect(measured.gzBytes).toBe(
+        gzipSync(Buffer.from(entry), { level: 9 }).length +
+        gzipSync(Buffer.from(theme), { level: 9 }).length +
+        gzipSync(Buffer.from(tokens), { level: 9 }).length,
+      );
+    } finally {
+      rmSync(root, { recursive: true, force: true });
+    }
+  });
+
+  it('fails closed when a shipped entry imports a local file outside dist', () => {
+    const root = mkdtempSync(resolve(tmpdir(), 'lab-motion-size-boundary-'));
+    try {
+      mkdirSync(resolve(root, 'dist'), { recursive: true });
+      mkdirSync(resolve(root, 'src'), { recursive: true });
+      writeFileSync(resolve(root, 'dist/index.js'), `export { secret } from '../src/private.js';`);
+      writeFileSync(resolve(root, 'src/private.js'), `export const secret = 1;`);
+      expect(() => measureEsmTransfer('dist/index.js', root)).toThrow(/dist/);
+    } finally {
+      rmSync(root, { recursive: true, force: true });
+    }
+  });
+
   it('integration: current repo package.json exports every subpath the real dist/ build emits', () => {
     // Заземление в реальность: не мок, а фактический package.json + dist после `pnpm build`.
     const pkg = JSON.parse(readFileSync(resolve(ROOT, 'package.json'), 'utf8'));
@@ -143,5 +242,6 @@ describe('size-gate: auto-derive subpath entries from package.json exports', () 
     expect(missing, `subpaths missing from built dist/: ${missing.map(r => r.label).join(', ')}`).toHaveLength(0);
     // Достигаем этой ветки только если dist/ реально собран этим тестраном.
     expect(hasWarnings === true || hasWarnings === false).toBe(true);
+    expect(rows.every(r => r.error || (r.brBytes > 0 && r.gzBytes > 0))).toBe(true);
   });
 });

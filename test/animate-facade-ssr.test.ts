@@ -18,6 +18,7 @@
 
 import { describe, expect, it } from 'vitest';
 import * as animateApi from '../src/animate/index.js';
+import { MotionParamError } from '../src/errors.js';
 import { pickAnimate } from './animate-facade-helpers.js';
 
 describe('./animate — SSR-safe импорт (инвариант 4)', () => {
@@ -35,7 +36,7 @@ describe('./animate — SSR-safe импорт (инвариант 4)', () => {
     expect(typeof (globalThis as { document?: unknown }).document).toBe('undefined');
   });
 
-  it('вызов с селектором без document → MotionParamError с понятным сообщением, не ReferenceError', () => {
+  it('вызов с селектором без document → LM149, не ReferenceError', () => {
     const animate = pickAnimate(animateApi as Record<string, unknown>);
     let caught: unknown;
     try {
@@ -45,7 +46,8 @@ describe('./animate — SSR-safe импорт (инвариант 4)', () => {
     }
     expect(caught).toBeDefined();
     expect((caught as Error).name).not.toBe('ReferenceError');
-    expect(String((caught as Error).message)).toMatch(/document/i);
+    expect(caught).toBeInstanceOf(MotionParamError);
+    expect((caught as MotionParamError).code).toBe('LM149');
   });
 
   it('duck-typed цель анимируется в node без DOM (headless-контракт)', async () => {

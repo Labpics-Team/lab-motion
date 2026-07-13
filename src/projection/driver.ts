@@ -362,9 +362,7 @@ export function createProjection(options?: ProjectionOptions): ProjectionControl
         if (n.first === undefined) {
           const old = prevById?.get(n.id);
           if (old === undefined) {
-            throw new MotionParamError(
-              `projection.play: node "${n.id}" has no "first" and no active flight to pick up from`,
-            );
+            throw new MotionParamError('LM078');
           }
           return rebaseNode(n.id, n, old, pPrev);
         }

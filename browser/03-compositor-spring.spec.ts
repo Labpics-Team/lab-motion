@@ -156,3 +156,51 @@ test('underdamped-пружина реально уходит в overshoot за t
   expect(r.analyticMax).toBeGreaterThan(r.to);
   expect(Math.abs(r.observedMax - r.analyticMax)).toBeLessThanOrEqual(1.0);
 });
+
+test('production-план выбирает residency-safe форму для каждого движка', async ({
+  page,
+  browserName,
+}) => {
+  const result = await page.evaluate(async () => {
+    const { CompositorSpring } = await import('/dist/compositor/index.js');
+    const el = document.createElement('div');
+    document.body.appendChild(el);
+    const spring = new CompositorSpring({
+      spring: { mass: 1, stiffness: 220, damping: 8 },
+      property: 'opacity',
+      from: 0,
+      to: 1,
+      target: el,
+    });
+    spring.start();
+    const animation = el.getAnimations()[0]!;
+    const effect = animation.effect as KeyframeEffect;
+    const frames = effect.getKeyframes();
+    const timing = effect.getTiming();
+    const offsets = frames.map((frame) => frame.computedOffset);
+    spring.destroy();
+    el.remove();
+    return {
+      count: frames.length,
+      easing: timing.easing,
+      offsets,
+      vendor: navigator.vendor,
+      userAgent: navigator.userAgent,
+    };
+  });
+
+  expect(result.offsets[0]).toBe(0);
+  expect(result.offsets.at(-1)).toBe(1);
+  for (let i = 1; i < result.offsets.length; i++) {
+    expect(result.offsets[i]!).toBeGreaterThan(result.offsets[i - 1]!);
+  }
+  if (browserName === 'webkit') {
+    expect(result.vendor).toContain('Apple');
+    expect(result.userAgent).toContain('AppleWebKit');
+    expect(result.count).toBeGreaterThan(2);
+    expect(result.easing).toBe('linear');
+  } else {
+    expect(result.count).toBe(2);
+    expect(String(result.easing).startsWith('linear(')).toBe(true);
+  }
+});

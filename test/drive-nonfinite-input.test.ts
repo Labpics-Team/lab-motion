@@ -85,7 +85,7 @@ describe('drive() non-finite from/to — MotionParamError at entry (regression l
     ).toThrow(MotionParamError);
   });
 
-  it('error message names the invalid parameter', () => {
+  it('error exposes a stable code and the invalid value', () => {
     let caughtMessage = '';
     try {
       drive({
@@ -97,8 +97,7 @@ describe('drive() non-finite from/to — MotionParamError at entry (regression l
     } catch (e) {
       caughtMessage = (e as Error).message;
     }
-    expect(caughtMessage).toMatch(/from/);
-    expect(caughtMessage).toMatch(/NaN/);
+    expect(caughtMessage).toBe('LM023');
   });
 
   it('error is instanceof MotionParamError AND Error', () => {

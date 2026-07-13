@@ -57,8 +57,8 @@ export interface SpringResult {
  */
 const SETTLE_BUDGET_S = MAX_FRAMES * FIXED_DT_S;
 
-/** Аналитическая верхняя граница времени оседания (сек) для валидных m/k/c. */
-export function settleTimeUpperBound(p: SpringParams): number {
+/** Канонический бюджет пружины, рождённой в покое; отдельный seam нужен DCE. */
+export function settleTimeAtRestUpperBound(p: SpringParams): number {
   const omega0 = Math.sqrt(p.stiffness / p.mass);
   // ζ = c/(2√(km)) = c/(2m·ω₀) — без второго sqrt (тождество √(km) = m·√(k/m)).
   const zetaRaw = p.damping / (2 * p.mass * omega0);
@@ -78,6 +78,62 @@ export function settleTimeUpperBound(p: SpringParams): number {
 }
 
 /**
+ * Аналитическая верхняя граница времени оседания (сек) для валидных m/k/c и
+ * произвольной нормализованной начальной скорости. Нулевой v0 сохраняет
+ * исторический бюджет бит-в-бит; ненулевой учитывает энергию подхвата.
+ */
+export function settleTimeUpperBound(p: SpringParams, v0 = 0): number {
+  if (v0 === 0) return settleTimeAtRestUpperBound(p);
+
+  const omega0 = Math.sqrt(p.stiffness / p.mass);
+
+  // Для y=x−1 обе величины ограничиваются одной экспонентой с линейным
+  // множителем. Неравенство t·e^(−rt) ≤ 8/(e·r)·e^(−7rt/8) превращает его в
+  // замкнутый консервативный горизонт без итераций и аллокаций. В
+  // передемпфированной ветке r=ω₀²/(α+√(α²−ω₀²)) — устойчивая форма медленного
+  // корня без катастрофического вычитания.
+  const alpha = p.damping / (2 * p.mass);
+  const omega2 = omega0 * omega0;
+  const delta = omega2 - alpha * alpha;
+  const split = Math.sqrt(Math.abs(delta));
+  const envelopeRate = delta >= 0 ? alpha : omega2 / (alpha + split);
+  if (!(envelopeRate > 0)) return Infinity;
+  const stableExponent =
+    (8 * Math.log(
+      Math.max(
+        envelopeRate + (8 * Math.abs(v0 - alpha)) / Math.E,
+        envelopeRate * Math.abs(v0) +
+          (8 * Math.abs(omega2 - alpha * v0)) / Math.E,
+      ) /
+        (envelopeRate * CONVERGENCE_THRESHOLD),
+    )) / 7;
+
+  // Вдали от критического режима модальные амплитуды дают более тесную, но
+  // столь же доказанную границу. Берём минимум ДВУХ верхних границ: около
+  // критического демпфирования стабильная полиномиальная форма естественно
+  // выигрывает, без эмпирического epsilon-переключателя.
+  if (delta === 0) return stableExponent / envelopeRate;
+  // |a|+|b| и slow·|a|+fast·|b| overdamped-мод точно сворачиваются в
+  // L∞-нормы. Амплитуда ≥ 1, поэтому её логарифм относительно ε положителен.
+  const modalAmplitude =
+    delta > 0
+      ? Math.max(
+        Math.hypot(1, (v0 - alpha) / split),
+        Math.hypot(v0, (omega2 - alpha * v0) / split),
+      )
+      : Math.max(
+        1,
+        Math.abs((v0 - alpha) / split),
+        Math.abs(v0),
+        Math.abs((omega2 - alpha * v0) / split),
+      );
+  return Math.min(
+    stableExponent,
+    Math.log(modalAmplitude / CONVERGENCE_THRESHOLD),
+  ) / envelopeRate;
+}
+
+/**
  * Validate spring params. Throws MotionParamError for invalid inputs.
  *
  * Exported so drive() can call this synchronously at its boundary —
@@ -87,25 +143,21 @@ export function settleTimeUpperBound(p: SpringParams): number {
  */
 export function validateSpringParams(p: SpringParams): void {
   if (!Number.isFinite(p.mass) || p.mass <= 0) {
-    throw new MotionParamError(`spring: mass must be positive finite, got ${p.mass}`);
+    throw new MotionParamError('LM088');
   }
   if (!Number.isFinite(p.stiffness) || p.stiffness <= 0) {
-    throw new MotionParamError(
-      `spring: stiffness must be positive finite, got ${p.stiffness}`,
-    );
+    throw new MotionParamError('LM089');
   }
   if (!Number.isFinite(p.damping) || p.damping < 0) {
-    throw new MotionParamError(
-      `spring: damping must be non-negative finite, got ${p.damping}`,
-    );
+    throw new MotionParamError('LM090');
   }
   // Единый выведенный гард (взамен коробочных ω₀/ζ-полов, см. SETTLE_BUDGET_S):
   // аналитическое время оседания обязано помещаться в бюджет кадра-капа.
-  const tSettle = settleTimeUpperBound(p);
+  // Валидатору нужна только пружина из покоя. Отдельный вызов позволяет
+  // tree-shaking удалить v0-envelope из MotionValue/биндингов без компилятора.
+  const tSettle = settleTimeAtRestUpperBound(p);
   if (!(tSettle <= SETTLE_BUDGET_S)) {
-    throw new MotionParamError(
-      `spring: settle time ${Number.isFinite(tSettle) ? tSettle.toFixed(1) : '∞'}s > budget ${SETTLE_BUDGET_S.toFixed(1)}s (m:${p.mass} k:${p.stiffness} c:${p.damping}) — increase damping·ω₀`,
-    );
+    throw new MotionParamError('LM091');
   }
 }
 

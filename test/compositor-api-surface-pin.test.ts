@@ -13,11 +13,9 @@ describe('compositor: api-surface-pin', () => {
   it('ровно запиненный набор runtime-экспортов (типы стёрты)', () => {
     expect(Object.keys(compositor).sort()).toEqual([
       'CompositorSpring',
-      'CompositorStaggerGroup',
       'DEFAULT_TOLERANCE',
       'compileSpringLinear',
       'compileSpringPlan',
-      'compileStaggerPlan',
       'createSpringLinearCache',
       'handoffToLive',
       'readCompositorSpring',
@@ -39,9 +37,6 @@ describe('compositor: api-surface-pin', () => {
       // handoffToLive без requestFrame использует node-фоллбек (setTimeout-шим) —
       // импорт и построение значения не трогают window/document.
       compositor.handoffToLive({ spring: { mass: 1, stiffness: 170, damping: 26 }, value: 0, velocity: 0, target: 1 }).destroy();
-      // compileStaggerPlan — чистый планировщик (без DOM); группа без целей = fallback.
-      compositor.compileStaggerPlan({ spring: { mass: 1, stiffness: 170, damping: 26 }, property: 'opacity', from: 0, to: 1, count: 3 });
-      new compositor.CompositorStaggerGroup({ spring: { mass: 1, stiffness: 170, damping: 26 }, property: 'opacity', from: 0, to: 1, targets: [undefined, undefined] }).destroy();
     }).not.toThrow();
   });
 
@@ -53,8 +48,6 @@ describe('compositor: api-surface-pin', () => {
     expect(typeof compositor.createSpringLinearCache).toBe('function');
     expect(typeof compositor.CompositorSpring).toBe('function');
     expect(typeof compositor.handoffToLive).toBe('function');
-    expect(typeof compositor.compileStaggerPlan).toBe('function');
-    expect(typeof compositor.CompositorStaggerGroup).toBe('function');
     expect(typeof compositor.resolveCompositorTier).toBe('function');
     expect(typeof compositor.supportsLinearEasing).toBe('function');
     expect(typeof compositor.DEFAULT_TOLERANCE).toBe('number');

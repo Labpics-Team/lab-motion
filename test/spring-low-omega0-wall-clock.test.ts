@@ -135,7 +135,7 @@ describe('convergence-class guard — wall-clock-stall class (regression lock)',
       expect(() => spring({ mass: 1, stiffness: 0.01, damping: 0.08 }, 0.5)).toThrow(MotionParamError);
     });
 
-    it('error message names natural frequency (ω₀) to guide the caller', () => {
+    it('медленная натуральная частота имеет код LM091', () => {
       let msg = '';
       try {
         drive({
@@ -147,7 +147,7 @@ describe('convergence-class guard — wall-clock-stall class (regression lock)',
       } catch (e) {
         msg = (e as Error).message;
       }
-      expect(msg).toMatch(/natural frequency|stiffness.*mass|omega|ω/i);
+      expect(msg).toBe('LM091');
     });
 
     it('error is MotionParamError (not TypeError or generic Error)', () => {
@@ -253,7 +253,7 @@ describe('convergence-class guard — wall-clock-stall class (regression lock)',
       expect(frame).toBeLessThan(MAX_FRAMES);
     });
 
-    it('error message names damping to guide the caller', () => {
+    it('неоседающая near-undamped конфигурация имеет код LM091', () => {
       let msg = '';
       try {
         drive({
@@ -265,7 +265,7 @@ describe('convergence-class guard — wall-clock-stall class (regression lock)',
       } catch (e) {
         msg = (e as Error).message;
       }
-      expect(msg).toMatch(/damping/i);
+      expect(msg).toBe('LM091');
     });
 
     it('spring() also throws for near-undamped configs', () => {

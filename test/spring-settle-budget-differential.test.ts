@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { settleTimeUpperBound, spring, springUnchecked, validateSpringParams } from '../src/spring.js';
 import { MotionParamError } from '../src/errors.js';
-import { CONVERGENCE_THRESHOLD, FIXED_DT_S, MAX_FRAMES } from '../src/internal/constants.js';
+import { CONVERGENCE_THRESHOLD } from '../src/internal/constants.js';
 
 /**
  * Test: settleTimeUpperBound — дифференциал против независимой формулы
@@ -32,8 +32,6 @@ import { CONVERGENCE_THRESHOLD, FIXED_DT_S, MAX_FRAMES } from '../src/internal/c
  *   - потеря ln(ω₀)-члена / amp-члена в needLn → (1) падает;
  *   - слом ζ-отвода (0.999/1.001) → (1) падает на ζ=1 и ζ=1±5e-4.
  */
-
-const SETTLE_BUDGET_S = MAX_FRAMES * FIXED_DT_S;
 
 /** Независимая реализация формулы из шапки spring.ts (не импорт!). */
 function canonicalSettle(mass: number, stiffness: number, damping: number): number {
@@ -114,38 +112,36 @@ describe('validateSpringParams: КАКАЯ ошибка стреляет (пин
   // Stryker-находка: mass=0/NaN, stiffness=0, damping=NaN/0 все ПАДАЮТ, но ни
   // один тест не различал, каким гардом — мутанты границ (<=→<) и веток
   // (isFinite||…→false) переключали вход на бюджет-ошибку и выживали.
-  // Пины сообщения делают каждый гард наблюдаемым.
-  const msgOf = (p: { mass: number; stiffness: number; damping: number }): string => {
+  // Раздельные коды делают каждый гард наблюдаемым без отражения входных данных.
+  const codeOf = (p: { mass: number; stiffness: number; damping: number }): string => {
     try {
       validateSpringParams(p);
     } catch (e) {
-      return (e as Error).message;
+      return (e as MotionParamError).code;
     }
     return '';
   };
 
   it('mass=0 → именно mass-гард (не бюджет через ω₀=∞)', () => {
-    expect(msgOf({ mass: 0, stiffness: 100, damping: 10 })).toMatch(/mass must be positive/);
+    expect(codeOf({ mass: 0, stiffness: 100, damping: 10 })).toBe('LM088');
   });
   it('mass=NaN и mass=∞ → mass-гард', () => {
-    expect(msgOf({ mass: NaN, stiffness: 100, damping: 10 })).toMatch(/mass must be positive/);
-    expect(msgOf({ mass: Infinity, stiffness: 100, damping: 10 })).toMatch(/mass must be positive/);
+    expect(codeOf({ mass: NaN, stiffness: 100, damping: 10 })).toBe('LM088');
+    expect(codeOf({ mass: Infinity, stiffness: 100, damping: 10 })).toBe('LM088');
   });
   it('stiffness=0 → именно stiffness-гард (не бюджет через rate=0)', () => {
-    expect(msgOf({ mass: 1, stiffness: 0, damping: 10 })).toMatch(/stiffness must be positive/);
+    expect(codeOf({ mass: 1, stiffness: 0, damping: 10 })).toBe('LM089');
   });
   it('damping=NaN → damping-гард', () => {
-    expect(msgOf({ mass: 1, stiffness: 100, damping: NaN })).toMatch(/damping must be non-negative/);
+    expect(codeOf({ mass: 1, stiffness: 100, damping: NaN })).toBe('LM090');
   });
   it('damping=0 — ВАЛИДНОЕ значение гарда, падает дальше по бюджету с t=∞', () => {
     // Гард damping строго < 0 (ноль разрешён): ζ=0 → t_settle=∞ → бюджет.
-    // Мутант `damping <= 0` перевёл бы ноль на damping-сообщение — пин кусает.
-    const msg = msgOf({ mass: 1, stiffness: 100, damping: 0 });
-    expect(msg).toMatch(/settle time/);
-    expect(msg).toContain('∞');
+    // Мутант `damping <= 0` перевёл бы ноль на LM090 — пин различает ветки.
+    expect(codeOf({ mass: 1, stiffness: 100, damping: 0 })).toBe('LM091');
   });
   it('damping=-1 → damping-гард', () => {
-    expect(msgOf({ mass: 1, stiffness: 100, damping: -1 })).toMatch(/damping must be non-negative/);
+    expect(codeOf({ mass: 1, stiffness: 100, damping: -1 })).toBe('LM090');
   });
 });
 
@@ -162,14 +158,14 @@ describe('validateSpringParams: вердикт при mass ≠ 1', () => {
     expect(() => validateSpringParams({ mass: 0.25, stiffness: 0.01, damping: 0.11 }))
       .toThrow(MotionParamError);
   });
-  it('бюджет в сообщении совпадает с MAX_FRAMES·FIXED_DT_S', () => {
-    let msg = '';
+  it('медленная мода при mass ≠ 1 сохраняет код LM091', () => {
+    let code = '';
     try {
       validateSpringParams({ mass: 100, stiffness: 100, damping: 2 });
     } catch (e) {
-      msg = (e as Error).message;
+      code = (e as MotionParamError).code;
     }
-    expect(msg).toContain(SETTLE_BUDGET_S.toFixed(1));
+    expect(code).toBe('LM091');
   });
 });
 

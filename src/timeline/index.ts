@@ -221,19 +221,13 @@ function buildSegments(configs: readonly SegmentConfig[], initialLabels: Map<str
 
     // Валидация from/to/duration
     if (!Number.isFinite(cfg.from)) {
-      throw new MotionParamError(
-        `timeline: segment[${i}].from должен быть конечным числом, получено ${cfg.from}`,
-      );
+      throw new MotionParamError('LM102');
     }
     if (!Number.isFinite(cfg.to)) {
-      throw new MotionParamError(
-        `timeline: segment[${i}].to должен быть конечным числом, получено ${cfg.to}`,
-      );
+      throw new MotionParamError('LM103');
     }
     if (!Number.isFinite(cfg.duration) || cfg.duration <= 0) {
-      throw new MotionParamError(
-        `timeline: segment[${i}].duration должен быть положительным конечным числом, получено ${cfg.duration}`,
-      );
+      throw new MotionParamError('LM104');
     }
 
     // Позиционирование с поддержкой строк (label, < > += -= )
@@ -242,18 +236,14 @@ function buildSegments(configs: readonly SegmentConfig[], initialLabels: Map<str
       if (typeof cfg.at === 'string') {
         startTime = resolvePosition(cfg.at, labels, prevEndTime, prevStartTime);
       } else if (!Number.isFinite(cfg.at) || cfg.at < 0) {
-        throw new MotionParamError(
-          `timeline: segment[${i}].at должен быть >= 0 и конечным, получено ${cfg.at}`,
-        );
+        throw new MotionParamError('LM105');
       } else {
         startTime = cfg.at;
       }
     } else {
       const offset = cfg.offset ?? 0;
       if (!Number.isFinite(offset) || offset < 0) {
-        throw new MotionParamError(
-          `timeline: segment[${i}].offset должен быть >= 0 и конечным, получено ${offset}`,
-        );
+        throw new MotionParamError('LM106');
       }
       startTime = prevEndTime + offset;
     }
@@ -356,9 +346,7 @@ export function createTimeline(opts: TimelineOptions): TimelineControls {
 
   // ── Валидация массива сегментов ───────────────────────────────────────────
   if (!segConfigs || segConfigs.length === 0) {
-    throw new MotionParamError(
-      'timeline: segments не может быть пустым — необходим хотя бы один сегмент',
-    );
+    throw new MotionParamError('LM107');
   }
 
   // Подготовка начальных меток

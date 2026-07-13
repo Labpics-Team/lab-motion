@@ -188,10 +188,21 @@ export function sampleKeyframes(
   if (pClamped <= times[0]!) return values[0]!;
   if (pClamped >= times[n - 1]!) return values[n - 1]!;
 
-  // Линейный поиск сегмента — values обычно короткий (авторский keyframe-список).
+  // Короткие авторские списки ищем линейно; длинные импортированные треки — за O(log N).
   let i = 0;
-  for (; i < n - 2; i++) {
-    if (pClamped < times[i + 1]!) break;
+  if (n > 10) {
+    let lo = 0;
+    let hi = n - 1;
+    while (hi - lo > 1) {
+      const mid = (lo + hi) >>> 1;
+      if (pClamped < times[mid]!) hi = mid;
+      else lo = mid;
+    }
+    i = lo;
+  } else {
+    for (; i < n - 2; i++) {
+      if (pClamped < times[i + 1]!) break;
+    }
   }
 
   const t0 = times[i]!;
@@ -233,15 +244,11 @@ interface CompiledKeyframes {
 function compileKeyframes(opts: KeyframesOptions): CompiledKeyframes {
   const values = opts.values;
   if (!values || values.length < 2) {
-    throw new MotionParamError(
-      `keyframes: values должен содержать минимум 2 элемента, получено ${values?.length ?? 0}`,
-    );
+    throw new MotionParamError('LM033');
   }
   for (let i = 0; i < values.length; i++) {
     if (!Number.isFinite(values[i])) {
-      throw new MotionParamError(
-        `keyframes: values[${i}] должен быть конечным числом, получено ${values[i]}`,
-      );
+      throw new MotionParamError('LM034');
     }
   }
 
@@ -249,24 +256,22 @@ function compileKeyframes(opts: KeyframesOptions): CompiledKeyframes {
   let times: readonly number[];
   if (opts.times !== undefined) {
     if (opts.times.length !== n) {
-      throw new MotionParamError(
-        `keyframes: times.length (${opts.times.length}) должен совпадать с values.length (${n})`,
-      );
+      throw new MotionParamError('LM035');
     }
     for (let i = 0; i < n; i++) {
       const t = opts.times[i]!;
       if (!Number.isFinite(t)) {
-        throw new MotionParamError(`keyframes: times[${i}] должен быть конечным числом, получено ${t}`);
+        throw new MotionParamError('LM036');
       }
       if (i > 0 && t < opts.times[i - 1]!) {
-        throw new MotionParamError('keyframes: times должны быть неубывающими (ascending)');
+        throw new MotionParamError('LM037');
       }
     }
     if (opts.times[0] !== 0) {
-      throw new MotionParamError(`keyframes: times[0] должен быть 0, получено ${opts.times[0]}`);
+      throw new MotionParamError('LM038');
     }
     if (opts.times[n - 1] !== 1) {
-      throw new MotionParamError(`keyframes: times[last] должен быть 1, получено ${opts.times[n - 1]}`);
+      throw new MotionParamError('LM039');
     }
     times = opts.times;
   } else {
@@ -280,9 +285,7 @@ function compileKeyframes(opts: KeyframesOptions): CompiledKeyframes {
   let easings: readonly EasingFn[];
   if (Array.isArray(opts.easing)) {
     if (opts.easing.length !== segCount) {
-      throw new MotionParamError(
-        `keyframes: easing[].length (${opts.easing.length}) должен совпадать с числом сегментов (${segCount})`,
-      );
+      throw new MotionParamError('LM040');
     }
     easings = opts.easing;
   } else if (typeof opts.easing === 'function') {
@@ -294,25 +297,25 @@ function compileKeyframes(opts: KeyframesOptions): CompiledKeyframes {
 
   const duration = opts.duration ?? 1;
   if (!Number.isFinite(duration) || duration <= 0) {
-    throw new MotionParamError(`keyframes: duration должен быть положительным конечным числом, получено ${duration}`);
+    throw new MotionParamError('LM041');
   }
 
   const repeatRaw = opts.repeat ?? 0;
   if (repeatRaw !== Infinity && (!Number.isFinite(repeatRaw) || repeatRaw < 0 || Math.floor(repeatRaw) !== repeatRaw)) {
-    throw new MotionParamError(`keyframes: repeat должен быть неотрицательным целым числом или Infinity, получено ${repeatRaw}`);
+    throw new MotionParamError('LM042');
   }
   const repeat = repeatRaw;
 
   const repeatTypeRaw = opts.repeatType ?? 'loop';
   if (repeatTypeRaw !== 'loop' && repeatTypeRaw !== 'reverse' && repeatTypeRaw !== 'mirror') {
-    throw new MotionParamError(`keyframes: repeatType должен быть 'loop'|'reverse'|'mirror', получено ${String(repeatTypeRaw)}`);
+    throw new MotionParamError('LM043');
   }
   // 'mirror' — принимаемый алиас 'reverse' (yoyo); единая внутренняя обработка.
   const repeatType: KeyframesRepeatType = repeatTypeRaw === 'mirror' ? 'reverse' : repeatTypeRaw;
 
   const repeatDelay = opts.repeatDelay ?? 0;
   if (!Number.isFinite(repeatDelay) || repeatDelay < 0) {
-    throw new MotionParamError(`keyframes: repeatDelay должен быть >= 0 и конечным, получено ${repeatDelay}`);
+    throw new MotionParamError('LM044');
   }
 
   return { values, times, easings, duration, repeat, repeatType, repeatDelay };

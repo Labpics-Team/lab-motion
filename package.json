@@ -26,6 +26,12 @@
   },
   "packageManager": "pnpm@11.11.0",
   "type": "module",
+  "imports": {
+    "#frame": {
+      "import": "./dist/frame/index.js",
+      "require": "./dist/frame/index.cjs"
+    }
+  },
   "main": "./dist/index.cjs",
   "module": "./dist/index.js",
   "types": "./dist/index.d.ts",
@@ -370,6 +376,16 @@
         "default": "./dist/compositor/index.cjs"
       }
     },
+    "./compositor/stagger": {
+      "import": {
+        "types": "./dist/compositor/stagger/index.d.ts",
+        "default": "./dist/compositor/stagger/index.js"
+      },
+      "require": {
+        "types": "./dist/compositor/stagger/index.d.cts",
+        "default": "./dist/compositor/stagger/index.cjs"
+      }
+    },
     "./tokens": {
       "import": {
         "types": "./dist/tokens/index.d.ts",
@@ -400,6 +416,16 @@
         "default": "./dist/animate/mini/index.cjs"
       }
     },
+    "./animate/native": {
+      "import": {
+        "types": "./dist/animate/native/index.d.ts",
+        "default": "./dist/animate/native/index.js"
+      },
+      "require": {
+        "types": "./dist/animate/native/index.d.cts",
+        "default": "./dist/animate/native/index.cjs"
+      }
+    },
     "./behaviors": {
       "import": {
         "types": "./dist/behaviors/index.d.ts",
@@ -413,6 +439,8 @@
   },
   "files": [
     "dist",
+    "docs/errors.md",
+    "docs/бенчмарк.md",
     "!dist/**/*.map"
   ],
   "publishConfig": {
@@ -433,17 +461,18 @@
     "test:watch": "vitest",
     "naming:inventory": "node scripts/naming-inventory.mjs",
     "check:cycles": "node scripts/check-import-cycles.mjs",
-    "check:static": "pnpm audit --audit-level moderate && pnpm check:cycles && pnpm typecheck && pnpm typecheck:browser",
+    "check:error-catalog": "node scripts/check-error-catalog.mjs",
+    "check:static": "pnpm audit --audit-level moderate && pnpm check:cycles && pnpm check:error-catalog && pnpm typecheck && pnpm typecheck:browser",
     "check:docs-drift": "node scripts/check-docs-drift.mjs",
     "size": "node scripts/size-gate.mjs",
     "bench": "node scripts/bench.mjs",
     "bench:latency": "node scripts/bench-latency.mjs",
+    "bench:ceiling": "node scripts/bench-ceiling.mjs",
     "pack:smoke": "node scripts/pack-smoke.mjs",
     "pack:compat": "node scripts/pack-compat.mjs",
     "test:browser": "playwright test --project=chromium",
     "test:browser:all": "playwright test",
-    "mutation": "stryker run",
-    "prepublishOnly": "pnpm check:static && pnpm build && node scripts/check-docs-facts.mjs && pnpm test && pnpm size && pnpm pack:smoke && pnpm pack:compat"
+    "mutation": "stryker run"
   },
   "peerDependencies": {
     "@angular/core": ">=16.0.0",

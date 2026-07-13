@@ -22,13 +22,40 @@ import {
   readCompositorSpring,
 } from '../src/compositor/index.js';
 import { MotionValue } from '../src/index.js';
+import {
+  compileSpringExecutionArtifactUnchecked,
+  DEFAULT_TOLERANCE,
+} from '../src/compositor/curve.js';
+import { sampleSerializedSpring } from '../src/compositor/sample.js';
 import { FIXED_DT_S } from '../src/internal/constants.js';
 import { MotionParamError } from '../src/index.js';
-import type { SpringParams } from '../src/spring.js';
+import { settleTimeUpperBound, type SpringParams } from '../src/spring.js';
 
 const STIFF: SpringParams = { mass: 1, stiffness: 170, damping: 26 };
 const BOUNCY: SpringParams = { mass: 1, stiffness: 180, damping: 8 };
 const DEFAULT_TOL = 1 / 400;
+
+function executionSnapshot(
+  physics: SpringParams,
+  from: number,
+  to: number,
+  tMs: number,
+): { value: number; velocity: number } {
+  const artifact = compileSpringExecutionArtifactUnchecked(
+    physics,
+    0,
+    DEFAULT_TOLERANCE,
+  );
+  const sample = sampleSerializedSpring(
+    artifact.samples,
+    settleTimeUpperBound(physics, 0) * 1000,
+    tMs,
+  );
+  return {
+    value: (1 - sample.value) * from + sample.value * to,
+    velocity: sample.velocity * to - sample.velocity * from,
+  };
+}
 
 /** Синхронные дренируемые часы (ts НЕ передаётся → шаг FIXED_DT_S; handle ≠ 0). */
 function makeClock() {
@@ -193,7 +220,7 @@ describe('compositor handoff: handoffToLive — валидация', () => {
 // ─── CompositorSpring.handoffToLive: снимок с compositor-трека ─────────────────
 
 describe('compositor handoff: CompositorSpring.handoffToLive — compositor-путь', () => {
-  it('в полёте: отменяет compositor Animation, стартует live с аналитической позиции', () => {
+  it('в полёте: отменяет compositor Animation, стартует live с execution-позиции', () => {
     const f = fakeElement();
     const clock = makeClock();
     let nowMs = 1000;
@@ -210,14 +237,14 @@ describe('compositor handoff: CompositorSpring.handoffToLive — compositor-пу
     expect(cs.mode).toBe('compositor');
     nowMs = 1100; // 0.1 с в полёте
 
-    const expected = readCompositorSpring(STIFF, { from: 0, to: 100, v0: 0, t: 0.1 });
+    const expected = executionSnapshot(STIFF, 0, 100, 100);
     const seen: number[] = [];
     const mv = cs.handoffToLive();
     mv.onChange((v) => seen.push(v));
 
     // Compositor-анимация отменена (передана в live).
     expect(f.animations[0]!.cancelled).toBe(true);
-    // Возвращён живой MotionValue, рождённый в аналитической точке (C⁰).
+    // Возвращён живой MotionValue, рождённый в фактической effect-точке (C⁰).
     expect(mv).toBeInstanceOf(MotionValue);
     expect(mv.value).toBe(expected.value);
     expect(seen[0]).toBe(expected.value);

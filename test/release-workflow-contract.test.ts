@@ -1,10 +1,15 @@
+import { spawnSync } from 'node:child_process';
 import { readFileSync } from 'node:fs';
+import { fileURLToPath } from 'node:url';
 import { describe, expect, it } from 'vitest';
 
-const workflow = readFileSync(new URL('../.github/workflows/release.yml', import.meta.url), 'utf8').replace(
+const workflowUrl = new URL('../.github/workflows/release.yml', import.meta.url);
+const workflow = readFileSync(workflowUrl, 'utf8').replace(
   /\r\n?/g,
   '\n',
 );
+const ciWorkflow = readFileSync(new URL('../.github/workflows/ci.yml', import.meta.url), 'utf8')
+  .replace(/\r\n?/g, '\n');
 const releases = readFileSync(new URL('../docs/RELEASES.md', import.meta.url), 'utf8').replace(
   /\r\n?/g,
   '\n',
@@ -21,7 +26,86 @@ function job(name: string): string {
   return lines.slice(start, end).join('\n');
 }
 
+function publishProgram(source = workflow): string {
+  const marker = '      - name: Publish or reconcile verified tarball through npm OIDC';
+  const start = source.indexOf(marker);
+  if (start < 0) throw new Error('publish step отсутствует');
+  const tail = source.slice(start);
+  const match = /node --input-type=module <<'NODE'\n([\s\S]*?)\n          NODE/.exec(tail);
+  if (match === null) throw new Error('publish Node program отсутствует');
+  return match[1]!;
+}
+
+function assertPublishContract(program: string): void {
+  const required = [
+    "const candidate = stableVersion(version, 'кандидат')",
+    "const existing = await lookupVersion()",
+    "await reconcile(12, 'idempotent')",
+    "compareVersions(candidate, latest.parsed) <= 0",
+    "await reconcile(12, 'published')",
+    "mode === 'published'",
+    "comparison > 0",
+    "comparison >= 0 && provenanceReady",
+    "mode === 'idempotent'",
+    "comparison < 0",
+    "['publish', process.env.TARBALL, '--registry=https://registry.npmjs.org', '--tag', 'latest', '--access', 'public', '--provenance', '--ignore-scripts']",
+  ];
+  for (const token of required) {
+    if (!program.includes(token)) throw new Error(`release contract: отсутствует ${token}`);
+  }
+  if (/dist-tag\s+(?:add|set)|['"]dist-tag['"]/.test(program)) {
+    throw new Error('release contract: запрещён отдельный retag');
+  }
+  const existing = program.indexOf('const existing = await lookupVersion()');
+  const publish = program.indexOf("['publish', process.env.TARBALL");
+  if (!(existing >= 0 && publish > existing)) {
+    throw new Error('release contract: publish расположен до idempotent lookup');
+  }
+}
+
+function runBlocks(): string[] {
+  const lines = workflow.split('\n');
+  const blocks: string[] = [];
+  for (let i = 0; i < lines.length; i++) {
+    const match = /^(\s*)run: \|$/.exec(lines[i]!);
+    if (match === null) continue;
+    const bodyIndent = match[1]!.length + 2;
+    const body: string[] = [];
+    for (i++; i < lines.length; i++) {
+      const line = lines[i]!;
+      if (line !== '' && line.length - line.trimStart().length < bodyIndent) {
+        i--;
+        break;
+      }
+      body.push(line.slice(Math.min(bodyIndent, line.length)));
+    }
+    blocks.push(body.join('\n'));
+  }
+  return blocks;
+}
+
 describe('release workflow: граница тега и npm OIDC', () => {
+  it('CI валидирует сохранённую дату, а release — отдельную UTC-дату intent', () => {
+    expect(ciWorkflow.split('\n'))
+      .toContain('          node scripts/check-release.mjs "v${version}" --validate-stored-date');
+    expect(job('verify'))
+      .toContain('node scripts/check-release.mjs "$RELEASE_TAG" "$RELEASE_DATE"');
+  });
+
+  it('фиксирует UTC-дату intent один раз и сверяет с CHANGELOG до упаковки', () => {
+    const resolve = job('resolve');
+    const verify = job('verify');
+    const check = '        run: node scripts/check-release.mjs "$RELEASE_TAG" "$RELEASE_DATE"';
+    const pack = '      - name: Pack release candidate once';
+
+    expect(resolve.split('\n')).toContain('      release_date: ${{ steps.resolve.outputs.release_date }}');
+    expect(resolve).toContain('echo "release_date=$(date -u +%F)"');
+    expect(verify.split('\n')).toContain('      RELEASE_DATE: ${{ needs.resolve.outputs.release_date }}');
+    expect(verify.split('\n').filter((line) => line === check)).toHaveLength(1);
+    expect(verify.indexOf(check)).toBeGreaterThanOrEqual(0);
+    expect(verify.indexOf(check)).toBeLessThan(verify.indexOf(pack));
+  });
+
   it('создаёт тег только после полной проверки артефакта', () => {
     const tag = job('tag');
 
@@ -62,8 +146,8 @@ describe('release workflow: граница тега и npm OIDC', () => {
 
     expect(workflow.split('\n')).toContain('  group: release-labpics-motion');
     expect(workflow).not.toContain('group: release-refs/tags/');
-    expect(publish).toContain('await assertMonotonicLatest();');
-    expect(publish).toContain('не может его откатить');
+    expect(publish).toContain('await assertPublishPreflight(await lookupLatest());');
+    expect(publish).toContain('не может откатить npm latest');
   });
 
   it('синхронизирует документ с границей reviewer и tag-job', () => {
@@ -71,5 +155,89 @@ describe('release workflow: граница тега и npm OIDC', () => {
     expect(releases).toContain('required reviewer разрешает\nтолько npm-публикацию');
     expect(releases).toContain('ruleset без bypass');
     expect(releases).toContain('перемещение `refs/tags/v*.*.*`');
+  });
+});
+
+describe('release workflow: fail-closed npm registry state machine', () => {
+  it('публикует только explicit OIDC-командой и никогда не retag-ит', () => {
+    const program = publishProgram();
+    assertPublishContract(program);
+    expect(program).not.toMatch(/NODE_AUTH_TOKEN|NPM_TOKEN|_authToken|process\.env\.[A-Z_]*TOKEN/);
+  });
+
+  it('для отсутствующей версии требует candidate strictly greater than latest', () => {
+    const program = publishProgram();
+    expect(program.indexOf("const candidate = stableVersion(version, 'кандидат')"))
+      .toBeLessThan(program.indexOf("execFileSync(\n              'npm'"));
+    expect(program).toContain('не может откатить npm latest');
+    expect(program).toContain('compareVersions(candidate, latest.parsed) <= 0');
+  });
+
+  it('idempotent-ветка не публикует и требует integrity+provenance+latest>=candidate', () => {
+    const program = publishProgram();
+    const start = program.indexOf('if (existing !== null)');
+    const end = program.indexOf('await assertPublishPreflight', start);
+    const branch = program.slice(start, end);
+    expect(branch).toContain("await reconcile(12, 'idempotent')");
+    expect(branch).toContain('process.exit(0)');
+    expect(branch).not.toContain("['publish'");
+    expect(program).toContain('версия уже существует с другим integrity');
+    expect(program).toContain('idempotent latest ниже кандидата');
+  });
+
+  it('post-publish принимает integrity+provenance и монотонный latest в одном retry', () => {
+    const program = publishProgram();
+    expect(program).toContain("await Promise.all([lookupVersion(), lookupLatest()])");
+    expect(program).toContain("mode === 'published'");
+    expect(program).toContain('монотонная конкурентная публикация');
+    expect(program).toContain('comparison >= 0 && provenanceReady');
+    expect(program).not.toMatch(/dist-tag\s+add|dist-tag\s+set/);
+  });
+
+  it('мутации downgrade/race/idempotency/flags превращают контракт в RED', () => {
+    const program = publishProgram();
+    const mutants = [
+      program.replace("'--registry=https://registry.npmjs.org', ", ''),
+      program.replace("'--tag', 'latest', ", ''),
+      program.replace("await reconcile(12, 'idempotent')", "await reconcile(1, 'published')"),
+      program.replace('comparison > 0', 'comparison < 0'),
+      program.replace('comparison >= 0 && provenanceReady', 'comparison === 0 && provenanceReady'),
+      program.replace(
+        'compareVersions(candidate, latest.parsed) <= 0',
+        'compareVersions(candidate, latest.parsed) < 0',
+      ),
+    ];
+    for (const mutant of mutants) {
+      expect(() => assertPublishContract(mutant)).toThrow(/release contract/);
+    }
+  });
+
+  it('OIDC job остаётся GitHub-hosted Node 24 с npm >=11.5.1 и без npm secrets', () => {
+    const publish = job('publish');
+    expect(publish.split('\n')).toContain('    runs-on: ubuntu-latest');
+    expect(publish).toContain('node-version: "24"');
+    expect(publish).toContain('требуется >= 11.5.1');
+    expect(publish).toContain('      id-token: write');
+    expect(publish).not.toMatch(/NPM_TOKEN|NODE_AUTH_TOKEN|npm[_-]?token|secrets\./i);
+  });
+
+  it('workflow, shell blocks и embedded Node programs синтаксически валидны', () => {
+    const yaml = spawnSync(
+      'ruby',
+      ['-e', "require 'yaml'; Psych.parse_file(ARGV.fetch(0))", fileURLToPath(workflowUrl)],
+      { encoding: 'utf8' },
+    );
+    expect(yaml.status, yaml.stderr).toBe(0);
+    for (const block of runBlocks()) {
+      const shell = spawnSync('bash', ['-n'], { input: block, encoding: 'utf8' });
+      expect(shell.status, shell.stderr).toBe(0);
+      for (const match of block.matchAll(/node --input-type=module <<'NODE'\n([\s\S]*?)\nNODE/g)) {
+        const syntax = spawnSync(process.execPath, ['--input-type=module', '--check'], {
+          input: match[1],
+          encoding: 'utf8',
+        });
+        expect(syntax.status, syntax.stderr).toBe(0);
+      }
+    }
   });
 });

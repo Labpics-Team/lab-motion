@@ -1,7 +1,8 @@
 /**
  * animate/mini-codecs.ts — МИНИМАЛЬНЫЙ набор кодеков/адаптеров поставки mini.
  *
- * Регистрируется в mini-реестре (mini/index.ts). Покрывает ровно контракт mini:
+ * Выбирается фиксированным O(1)-resolver из mini/index.ts. Покрывает ровно
+ * контракт mini без массивов матчеров и init-аллокаций:
  *   - transform-компоненты (x/y/scale/scaleX/scaleY/rotate/skewX/skewY) — число,
  *     compositor-eligible, сливаются DOM-адаптером в ОДНУ transform-строку;
  *   - opacity — число, compositor-eligible;
@@ -58,7 +59,7 @@ const _UNIT_RE = /^([+-]?(?:\d+\.?\d*|\.\d+)(?:[eE][+-]?\d+)?)([a-z%]*)$/;
  * полно-строчную числовую валидацию (без юнита): '1rad'/'12oops' — бросок, а не
  * тихий parseFloat-обрез до 1/12 (иначе `rotate: "1rad"` → rotate(1deg)).
  */
-function _finite(property: string, v: unknown): number {
+function _finite(v: unknown): number {
   let n: number;
   if (typeof v === 'string') {
     // Строгий гейт: полная числовая строка БЕЗ юнита; иначе NaN → бросок ниже
@@ -70,22 +71,20 @@ function _finite(property: string, v: unknown): number {
   }
   // Number.isFinite сам отвергает не-числа (boolean/object/NaN/±∞) — доп. typeof не нужен.
   if (!Number.isFinite(n)) {
-    throw new MotionParamError(`animate: '${property}' — не конечное число: ${String(v)}`);
+    throw new MotionParamError('LM142');
   }
   return n;
 }
 
 /**
  * Кодек числовых каналов: parse → число, linear-интерполяция, serialize → число.
- * canComposite=true — transform/opacity уходят на compositor-путь, когда tier
- * это позволяет. range=to−from питает C¹-подхват скорости в пространстве значения.
+ * range=to−from питает C¹-подхват скорости в пространстве значения.
  */
 export const numberCodec: PropertyCodec<number> = {
-  parse: (value, property) => _finite(property, value),
+  parse: (value) => _finite(value),
   interpolate: (from, to) => (p) => from + (to - from) * p,
   // Финитность-страж (враждебный p / переполнение): non-finite → 0 (+0 схлопывает −0).
   serialize: (value) => (Number.isFinite(value) ? value + 0 : 0),
-  canComposite: () => true,
   range: (from, to) => to - from,
 };
 
@@ -100,25 +99,22 @@ interface VarValue {
 /**
  * Кодек CSS-переменной: '10px'→{10,'px'}, 0.5→{0.5,''}, '50%'→{50,'%'}.
  * Интерполирует число, юнит несёт ЦЕЛЬ (to.unit — включая явно-безюнитную цель
- * '' → результат-число; несовпадение юнитов — цель побеждает, C⁰). canComposite=
- * false — переменные не идут на compositor-путь (linear()-
- * кейфрейм по custom-property ненадёжен кроссбраузерно; mini держит их на main).
+ * '' → результат-число; несовпадение юнитов — цель побеждает, C⁰.
  * range=undefined → C⁰-подхват (velocity 0), канон css-каналов фасада.
  */
 export const cssVarCodec: PropertyCodec<VarValue> = {
   parse: (value, property) => {
     if (typeof value === 'number') {
-      if (!Number.isFinite(value)) {
-        throw new MotionParamError(`animate: '${property}' — не конечное число: ${String(value)}`);
-      }
-      return { n: value, unit: '' };
+      // Числовая финитность имеет один SSOT с transform/opacity: отдельный
+      // throw здесь разошёлся бы в тексте и правилах валидации.
+      return { n: _finite(value), unit: '' };
     }
     if (typeof value !== 'string') {
-      throw new MotionParamError(`animate: '${property}' — строка/число, получено ${typeof value}`);
+      throw new MotionParamError('LM143');
     }
     const m = _UNIT_RE.exec(value.trim());
     if (m === null) {
-      throw new MotionParamError(`animate: '${property}' — не разобрано: '${value}'`);
+      throw new MotionParamError('LM144');
     }
     return { n: parseFloat(m[1]!), unit: m[2]! };
   },
@@ -128,7 +124,6 @@ export const cssVarCodec: PropertyCodec<VarValue> = {
     const n = Number.isFinite(value.n) ? value.n + 0 : 0;
     return value.unit === '' ? n : `${n}${value.unit}`;
   },
-  canComposite: () => false,
 };
 
 // ─── DOM-адаптер элемента (surface-композиция transform) ─────────────────────

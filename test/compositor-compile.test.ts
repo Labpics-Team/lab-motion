@@ -204,6 +204,12 @@ describe('compositor: сегментер — базовая сетка и RDP', 
     expect(douglasPeuckerVertical(xs, ys, 1.5)).toEqual([0, 2]);
   });
 
+  it('douglasPeuckerVertical: защищённый tangent-anchor не удаляется RDP', () => {
+    const xs = [0, 0.125, 0.25, 0.5, 1];
+    const ys = [0, 0.125, 0.25, 0.5, 1];
+    expect(douglasPeuckerVertical(xs, ys, 1, 1)).toEqual([0, 1, 4]);
+  });
+
   it('buildSpringNodes: первый прогресс 0, последний ровно 1', () => {
     const nodes = buildSpringNodes(BOUNCY, 0, 0.002);
     expect(nodes[0]!.progress).toBe(0);

@@ -25,11 +25,11 @@ describe('@labpics/motion/utils factory validation', () => {
   });
 
   // ── clamp: NaN bounds throw; ±Infinity bounds allowed ──────────────────────
-  it('clamp(NaN, 1) throws MotionParamError (/NaN/i)', () => {
+  it('clamp(NaN, 1) throws LM111', () => {
     expect(() => clamp(Number.NaN, 1)).toThrow(MotionParamError);
-    expect(() => clamp(Number.NaN, 1)).toThrow(/nan/i);
+    expect(() => clamp(Number.NaN, 1)).toThrow(/^LM111$/);
   });
-  it('clamp(0, NaN) throws MotionParamError (/NaN/i)', () => {
+  it('clamp(0, NaN) throws MotionParamError', () => {
     expect(() => clamp(0, Number.NaN)).toThrow(MotionParamError);
   });
   it('clamp(0, Infinity) does NOT throw (one-sided clamp idiom)', () => {
@@ -44,10 +44,10 @@ describe('@labpics/motion/utils factory validation', () => {
     expect(() => clamp(0, 1, Number.POSITIVE_INFINITY)).not.toThrow();
   });
 
-  // ── wrap: all non-finite bounds throw (/finite/i) ──────────────────────────
-  it('wrap(NaN, 1) throws MotionParamError (/finite/i)', () => {
+  // ── wrap: все неконечные границы бросают LM110 ─────────────────────────────
+  it('wrap(NaN, 1) throws LM110', () => {
     expect(() => wrap(Number.NaN, 1)).toThrow(MotionParamError);
-    expect(() => wrap(Number.NaN, 1)).toThrow(/finite/i);
+    expect(() => wrap(Number.NaN, 1)).toThrow(/^LM110$/);
   });
   it('wrap(0, Infinity) throws MotionParamError (non-finite bound)', () => {
     expect(() => wrap(0, Number.POSITIVE_INFINITY)).toThrow(MotionParamError);
@@ -61,24 +61,24 @@ describe('@labpics/motion/utils factory validation', () => {
   });
 
   // ── snap: increment 0 / non-finite / empty targets / non-finite element ────
-  it('snap(0) throws MotionParamError (/zero/i)', () => {
+  it('snap(0) throws LM113', () => {
     expect(() => snap(0)).toThrow(MotionParamError);
-    expect(() => snap(0)).toThrow(/zero/i);
+    expect(() => snap(0)).toThrow('LM113');
   });
-  it('snap(NaN) throws MotionParamError (/finite/i)', () => {
+  it('snap(NaN) throws LM110', () => {
     expect(() => snap(Number.NaN)).toThrow(MotionParamError);
-    expect(() => snap(Number.NaN)).toThrow(/finite/i);
+    expect(() => snap(Number.NaN)).toThrow(/^LM110$/);
   });
-  it('snap(Infinity) throws MotionParamError (/finite/i)', () => {
+  it('snap(Infinity) throws MotionParamError', () => {
     expect(() => snap(Number.POSITIVE_INFINITY)).toThrow(MotionParamError);
   });
-  it('snap([]) throws MotionParamError (/empty/i)', () => {
+  it('snap([]) throws LM112', () => {
     expect(() => snap([])).toThrow(MotionParamError);
-    expect(() => snap([])).toThrow(/empty/i);
+    expect(() => snap([])).toThrow('LM112');
   });
-  it('snap([0, NaN, 1]) throws MotionParamError (/finite/i)', () => {
+  it('snap([0, NaN, 1]) throws LM110', () => {
     expect(() => snap([0, Number.NaN, 1])).toThrow(MotionParamError);
-    expect(() => snap([0, Number.NaN, 1])).toThrow(/finite/i);
+    expect(() => snap([0, Number.NaN, 1])).toThrow(/^LM110$/);
   });
   it('snap(-5) does NOT throw (negative increment legal — same lattice as |increment|)', () => {
     expect(() => snap(-5)).not.toThrow();
@@ -89,10 +89,10 @@ describe('@labpics/motion/utils factory validation', () => {
     expect(() => snap([0, 1], Number.POSITIVE_INFINITY)).not.toThrow();
   });
 
-  // ── mapRange: any non-finite bound throws (/finite/i) ──────────────────────
-  it('mapRange(0, Infinity, 0, 1) throws MotionParamError (/finite/i)', () => {
+  // ── mapRange: любая неконечная граница бросает LM110 ───────────────────────
+  it('mapRange(0, Infinity, 0, 1) throws LM110', () => {
     expect(() => mapRange(0, Number.POSITIVE_INFINITY, 0, 1)).toThrow(MotionParamError);
-    expect(() => mapRange(0, Number.POSITIVE_INFINITY, 0, 1)).toThrow(/finite/i);
+    expect(() => mapRange(0, Number.POSITIVE_INFINITY, 0, 1)).toThrow(/^LM110$/);
   });
   it('mapRange(NaN, 1, 0, 1) throws MotionParamError', () => {
     expect(() => mapRange(Number.NaN, 1, 0, 1)).toThrow(MotionParamError);
@@ -106,36 +106,35 @@ describe('@labpics/motion/utils factory validation', () => {
   });
 
   // ── interpolate: eager factory validation ──────────────────────────────────
-  it('interpolate([0], [0]) throws (needs >= 2 stops, /length/i)', () => {
+  it('interpolate([0], [0]) throws LM115', () => {
     expect(() => interpolate([0], [0])).toThrow(MotionParamError);
-    expect(() => interpolate([0], [0])).toThrow(/length/i);
+    expect(() => interpolate([0], [0])).toThrow(/^LM115$/);
   });
-  it('interpolate([0,1], [0]) throws (length mismatch, /length/i)', () => {
+  it('interpolate([0,1], [0]) throws LM114', () => {
     expect(() => interpolate([0, 1], [0])).toThrow(MotionParamError);
-    expect(() => interpolate([0, 1], [0])).toThrow(/length/i);
+    expect(() => interpolate([0, 1], [0])).toThrow(/^LM114$/);
   });
-  it('interpolate([1,0], [0,1]) throws (not ascending, /ascend|increasing/i)', () => {
+  it('interpolate([1,0], [0,1]) throws LM116', () => {
     expect(() => interpolate([1, 0], [0, 1])).toThrow(MotionParamError);
-    expect(() => interpolate([1, 0], [0, 1])).toThrow(/ascend|increasing/i);
+    expect(() => interpolate([1, 0], [0, 1])).toThrow(/^LM116$/);
   });
-  it('interpolate([0,0], [0,1]) throws (zero-width segment, /ascend|increasing/i)', () => {
+  it('interpolate([0,0], [0,1]) rejects zero-width segment', () => {
     expect(() => interpolate([0, 0], [0, 1])).toThrow(MotionParamError);
   });
-  it('interpolate([0, Infinity], [0,1]) throws (non-finite input, /finite/i)', () => {
+  it('interpolate([0, Infinity], [0,1]) throws LM110', () => {
     expect(() => interpolate([0, Number.POSITIVE_INFINITY], [0, 1])).toThrow(MotionParamError);
-    expect(() => interpolate([0, Number.POSITIVE_INFINITY], [0, 1])).toThrow(/finite/i);
+    expect(() => interpolate([0, Number.POSITIVE_INFINITY], [0, 1])).toThrow(/^LM110$/);
   });
-  it('interpolate([0,1], [0, NaN]) throws (non-finite numeric output, /finite/i)', () => {
+  it('interpolate([0,1], [0, NaN]) throws LM110', () => {
     expect(() => interpolate([0, 1], [0, Number.NaN])).toThrow(MotionParamError);
-    expect(() => interpolate([0, 1], [0, Number.NaN])).toThrow(/finite/i);
+    expect(() => interpolate([0, 1], [0, Number.NaN])).toThrow(/^LM110$/);
   });
-  it('interpolate ease-array of wrong length throws (/ease|length/i)', () => {
+  it('interpolate ease-array неправильной длины возвращает стабильный код', () => {
     expect(() => interpolate([0, 0.5, 1], [0, 10, 20], { ease: [(t: number) => t] })).toThrow(
       MotionParamError,
     );
-    expect(() => interpolate([0, 0.5, 1], [0, 10, 20], { ease: [(t: number) => t] })).toThrow(
-      /ease|length/i,
-    );
+    expect(() => interpolate([0, 0.5, 1], [0, 10, 20], { ease: [(t: number) => t] }))
+      .toThrow('LM117');
   });
   it('interpolate valid numeric config does NOT throw', () => {
     expect(() => interpolate([0, 1], [0, 1])).not.toThrow();

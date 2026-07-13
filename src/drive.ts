@@ -135,10 +135,10 @@ export function drive(opts: DriveOptions): Promise<void> {
   // false forever (NaN comparisons), running the loop to MAX_FRAMES = 2000.
   // Mirror the validation pattern in spring.ts validate().
   if (!Number.isFinite(from)) {
-    throw new MotionParamError(`drive: 'from' must be finite, got ${from}`);
+    throw new MotionParamError('LM023');
   }
   if (!Number.isFinite(to)) {
-    throw new MotionParamError(`drive: 'to' must be finite, got ${to}`);
+    throw new MotionParamError('LM024');
   }
 
   // v0 (C¹-хендофф, #93): валидируется так же рано, как from/to — non-finite
@@ -146,7 +146,7 @@ export function drive(opts: DriveOptions): Promise<void> {
   // и гонял бы цикл до MAX_FRAMES, тот же класс, что дыра from/to выше).
   const v0 = opts.initialVelocity ?? 0;
   if (!Number.isFinite(v0)) {
-    throw new MotionParamError(`drive: 'initialVelocity' must be finite, got ${v0}`);
+    throw new MotionParamError('LM025');
   }
 
   // Validate spring params synchronously at the drive() boundary — before any
@@ -194,6 +194,9 @@ export function drive(opts: DriveOptions): Promise<void> {
         : (setTimeout(cb, FIXED_DT_S * 1000) as unknown as number));
 
   return new Promise<void>((resolve) => {
+    // Один буфер на запуск: солвер переписывает его на месте, поэтому горячий
+    // кадр не создаёт короткоживущий объект и не давит на GC.
+    const solved = { value: 0, velocity: v0Normalized };
     let settled = false;
     let frameCount = 0;
     let elapsedSeconds = 0;
@@ -247,7 +250,7 @@ export function drive(opts: DriveOptions): Promise<void> {
       // springUnchecked-пути. Стражи конечности — на cv ниже (политика этого
       // модуля: снап в `to`, как MotionValue._tick).
       // spring params already validated synchronously at drive() entry above.
-      const result = solveSpring(opts.spring, elapsedSeconds, v0Normalized);
+      const result = solveSpring(opts.spring, elapsedSeconds, v0Normalized, solved);
       const rawValue = from + result.value * range;
       // bounded=true (default): CSS-safe clamp to [from, to]. bounded=false:
       // honest trajectory — overshoot is the point, no clamp.

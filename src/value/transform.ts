@@ -69,7 +69,7 @@ const DEFAULTS: Required<TransformState> = {
  *   // → "translateX(10px) rotate(45deg)"
  */
 export function buildTransform(state: TransformState): string {
-  const parts: string[] = [];
+  let result = '';
 
   const x = fin(state.x ?? DEFAULTS.x);
   const y = fin(state.y ?? DEFAULTS.y);
@@ -77,47 +77,47 @@ export function buildTransform(state: TransformState): string {
   // translate (объединяем в translate3d для GPU-слой, или раздельно)
   if (x !== 0 || y !== 0) {
     if (x !== 0 && y === 0) {
-      parts.push(`translateX(${x}px)`);
+      result += ` translateX(${x}px)`;
     } else if (x === 0 && y !== 0) {
-      parts.push(`translateY(${y}px)`);
+      result += ` translateY(${y}px)`;
     } else {
-      parts.push(`translate(${x}px, ${y}px)`);
+      result += ` translate(${x}px, ${y}px)`;
     }
   }
 
   // scale: если задан scale — перекрывает scaleX/scaleY
   if (state.scale !== undefined) {
     const sv = fin(state.scale);
-    if (sv !== 1) parts.push(`scale(${sv})`);
+    if (sv !== 1) result += ` scale(${sv})`;
   } else {
     const sx = fin(state.scaleX ?? DEFAULTS.scaleX);
     const sy = fin(state.scaleY ?? DEFAULTS.scaleY);
     if (sx !== 1 || sy !== 1) {
       if (sx === sy) {
-        parts.push(`scale(${sx})`);
+        result += ` scale(${sx})`;
       } else {
-        parts.push(`scaleX(${sx})`);
-        if (sy !== 1) parts.push(`scaleY(${sy})`);
+        result += ` scaleX(${sx})`;
+        if (sy !== 1) result += ` scaleY(${sy})`;
       }
     }
   }
 
   // rotate
   const rot = fin(state.rotate ?? DEFAULTS.rotate);
-  if (rot !== 0) parts.push(`rotate(${rot}deg)`);
+  if (rot !== 0) result += ` rotate(${rot}deg)`;
 
   // skew
   const skewX = fin(state.skewX ?? DEFAULTS.skewX);
   const skewY = fin(state.skewY ?? DEFAULTS.skewY);
   if (skewX !== 0 && skewY !== 0) {
-    parts.push(`skew(${skewX}deg, ${skewY}deg)`);
+    result += ` skew(${skewX}deg, ${skewY}deg)`;
   } else if (skewX !== 0) {
-    parts.push(`skewX(${skewX}deg)`);
+    result += ` skewX(${skewX}deg)`;
   } else if (skewY !== 0) {
-    parts.push(`skewY(${skewY}deg)`);
+    result += ` skewY(${skewY}deg)`;
   }
 
-  return parts.length === 0 ? 'none' : parts.join(' ');
+  return result === '' ? 'none' : result.slice(1);
 }
 
 // ── interpolateTransform ──────────────────────────────────────────────────────

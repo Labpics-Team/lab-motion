@@ -8,8 +8,7 @@
  *
  * Две абстракции (внутренняя граница поставки mini↔full):
  *   PropertyCodec  — как ПАРСИТЬ вход свойства в TParsed, ИНТЕРПОЛИРОВАТЬ пару
- *                    и СЕРИАЛИЗОВАТЬ в CSS-значение; canComposite — можно ли
- *                    свойство отдать compositor-пути (transform/opacity — да).
+ *                    и СЕРИАЛИЗОВАТЬ в CSS-значение.
  *   TargetAdapter  — как ЧИТАТЬ текущее значение свойства цели и как ПИСАТЬ:
  *                    surfaceOf группирует каналы одной записи (transform-
  *                    компоненты → одна transform-строка), compose — ЧИСТАЯ
@@ -35,8 +34,6 @@ export interface PropertyCodec<TParsed = unknown> {
   interpolate(from: TParsed, to: TParsed): (progress: number) => TParsed;
   /** TParsed → CSS-значение (строка/число). */
   serialize(value: TParsed): string | number;
-  /** Можно ли свойство отдать compositor-пути (transform/opacity — true). */
-  canComposite(property: string): boolean;
   /**
    * Числовой диапазон to−from ИЛИ undefined (не-числовой кодек). Даёт движку
    * C¹-подхват в пространстве значения (velocity = range·ṗ); undefined-кодеки
@@ -69,16 +66,20 @@ interface AdapterEntry {
   readonly adapter: TargetAdapter;
 }
 
-/** Реестр кодеков/адаптеров. Расширяется register*, читается resolve*. */
-export interface CodecRegistry {
-  /** Регистрирует кодек под предикатом свойства (позже — выше приоритет). */
-  registerCodec(match: (property: string) => boolean, codec: PropertyCodec): void;
-  /** Регистрирует адаптер под предикатом цели (позже — выше приоритет). */
-  registerAdapter(match: (target: unknown) => boolean, adapter: TargetAdapter): void;
+/** Узкая граница движка: ему нужен только разбор, не мутация реестра. */
+export interface CodecResolver {
   /** Кодек для свойства; нет матча → MotionParamError (fail-fast, ДО записи). */
   resolveCodec(property: string): PropertyCodec;
   /** Адаптер для цели; нет матча → MotionParamError (fail-fast, ДО записи). */
   resolveAdapter(target: unknown): TargetAdapter;
+}
+
+/** Расширяемый реестр full-поставки. */
+export interface CodecRegistry extends CodecResolver {
+  /** Регистрирует кодек под предикатом свойства (позже — выше приоритет). */
+  registerCodec(match: (property: string) => boolean, codec: PropertyCodec): void;
+  /** Регистрирует адаптер под предикатом цели (позже — выше приоритет). */
+  registerAdapter(match: (target: unknown) => boolean, adapter: TargetAdapter): void;
 }
 
 /**
@@ -101,13 +102,13 @@ export function createRegistry(): CodecRegistry {
       for (let i = codecs.length - 1; i >= 0; i--) {
         if (codecs[i]!.match(property)) return codecs[i]!.codec;
       }
-      throw new MotionParamError(`animate: нет кодека для свойства '${property}'`);
+      throw new MotionParamError('LM145');
     },
     resolveAdapter(target): TargetAdapter {
       for (let i = adapters.length - 1; i >= 0; i--) {
         if (adapters[i]!.match(target)) return adapters[i]!.adapter;
       }
-      throw new MotionParamError(`animate: нет адаптера для цели`);
+      throw new MotionParamError('LM148');
     },
   };
 }

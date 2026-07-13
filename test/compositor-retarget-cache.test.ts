@@ -5,8 +5,8 @@
  *
  * Контекст: ретаргет пере-компилирует linear() с НОВОЙ начальной скоростью
  * (v0 = velocity/range) — тот же путь compileSpringLinear ЧЕРЕЗ кэш, БЕЗ обхода.
- * Ключ кэша квантует v0 (Q_V0=1e6), поэтому идентичные условия ретаргета делят
- * план, а разные скорости получают свой (корректность важнее хит-рейта).
+ * Ключ кэша хранит v0 точно, поэтому идентичные условия ретаргета делят план,
+ * а даже соседние скорости получают свой (корректность важнее хит-рейта).
  */
 
 import { describe, expect, it } from 'vitest';
@@ -59,12 +59,12 @@ describe('compositor retarget: кэш по засеянной скорости v
     expect(compileSpringLinear(STIFF, { v0: 0.75 })).toBe(compileSpringLinear(STIFF, { v0: 0.75 }));
   });
 
-  it('квантование v0: перцептивно-идентичная скорость делит план, заметная — нет', () => {
+  it('exact v0: соседние скорости не смешивают физику, повтор даёт hit', () => {
     const c = createSpringLinearCache(16);
     c.compile(STIFF, { v0: 1 });
-    c.compile(STIFF, { v0: 1 + 1e-9 }); // ниже шага квантования (Q_V0=1e6) → тот же ключ
-    expect(c.size).toBe(1);
-    c.compile(STIFF, { v0: 1.5 }); // заметно другая скорость → отдельный план
+    c.compile(STIFF, { v0: 1 + 1e-9 });
+    expect(c.size).toBe(2);
+    c.compile(STIFF, { v0: 1 });
     expect(c.size).toBe(2);
   });
 });

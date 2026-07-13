@@ -423,15 +423,13 @@ describe('projection/dom: capture mid-flight — аналитика вместо
   });
 });
 
-describe('projection/dom: play без capture — MotionParamError (текст §2.2 буквально)', () => {
-  it('бросает рано с точным сообщением', () => {
+describe('projection/dom: play без capture — code-only LM077', () => {
+  it('бросает рано с точным кодом', () => {
     const world = makeWorld();
     const clock = makeClock();
     const dom = createDomProjection(domOptions(world, clock));
     expect(() => dom.play()).toThrow(MotionParamError);
-    expect(() => dom.play()).toThrow(
-      'projection.play: call capture(elements) before mutating the DOM',
-    );
+    expect(() => dom.play()).toThrow('LM077');
   });
 });
 
@@ -450,9 +448,7 @@ describe('projection/dom: capture потребляется ОДНОКРАТНО 
     const mark = world.ops.length;
     // Снимок потреблён первым play: телепорт по протухшему first — хуже ошибки.
     expect(() => dom.play()).toThrow(MotionParamError);
-    expect(() => dom.play()).toThrow(
-      'projection.play: call capture(elements) before mutating the DOM',
-    );
+    expect(() => dom.play()).toThrow('LM077');
     expect(world.ops.length).toBe(mark); // ранний: ни записей, ни замеров
     expect(dom.playing).toBe(true); // живой полёт не тронут
     clock.drain(16);

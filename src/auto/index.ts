@@ -47,7 +47,7 @@ const DEFAULT_EPSILON = 0.5;
 
 function checkEpsilon(epsilon: number): void {
   if (!Number.isFinite(epsilon) || epsilon < 0) {
-    throw new MotionParamError(`planAuto: epsilon должен быть конечным >= 0, получено ${epsilon}`);
+    throw new MotionParamError('LM001');
   }
 }
 
@@ -203,9 +203,7 @@ export function autoAnimate(
 ): AutoAnimateControls {
   const duration = options.duration ?? 0.25;
   if (!Number.isFinite(duration) || duration <= 0) {
-    throw new MotionParamError(
-      `autoAnimate: duration должен быть положительным конечным, получено ${duration}`,
-    );
+    throw new MotionParamError('LM002');
   }
   const epsilon = options.epsilon ?? DEFAULT_EPSILON;
   checkEpsilon(epsilon);

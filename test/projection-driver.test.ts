@@ -230,7 +230,7 @@ describe('projection/driver: перехват (velocity continuity, §2.3.2 + §
     }
   });
 
-  it('живой id без first валиден; НОВЫЙ id без first → MotionParamError с текстом спеки', () => {
+  it('живой id без first валиден; НОВЫЙ id без first → LM078', () => {
     const clock = makeClock();
     const controls = createProjection({ requestFrame: clock.requestFrame, onFrame: () => {} });
     controls.play([{ id: 'a', first: F, last: L }]);
@@ -247,15 +247,13 @@ describe('projection/driver: перехват (velocity continuity, §2.3.2 + §
         { id: 'a', last: L },
         { id: 'new', last: L },
       ]),
-    ).toThrow('projection.play: node "new" has no "first" and no active flight to pick up from');
+    ).toThrow('LM078');
   });
 
-  it('play без first на новый id без полёта — MotionParamError (текст §2.2 буквально)', () => {
+  it('play без first на новый id без полёта — стабильный код MotionParamError', () => {
     const controls = createProjection();
     expect(() => controls.play([{ id: 'x', last: L }])).toThrow(MotionParamError);
-    expect(() => controls.play([{ id: 'x', last: L }])).toThrow(
-      'projection.play: node "x" has no "first" and no active flight to pick up from',
-    );
+    expect(() => controls.play([{ id: 'x', last: L }])).toThrow('LM078');
   });
 
   it('stale-кадры старого полёта инертны (generation-гард, канон flip :210-227)', () => {
