@@ -1,5 +1,5 @@
 import { execFileSync } from 'node:child_process';
-import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs';
+import { existsSync, mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { afterEach, describe, expect, it } from 'vitest';
@@ -57,5 +57,9 @@ describe('NUL-delimited git path list', () => {
     expect(listChangedGitPaths(repository, `${base}..HEAD`)).toEqual([
       'docs/бенчмарк.md',
     ]);
+
+    const optionOutput = join(repository, 'option-output');
+    expect(() => listChangedGitPaths(repository, `--output=${optionOutput}`)).toThrow();
+    expect(existsSync(optionOutput)).toBe(false);
   });
 });

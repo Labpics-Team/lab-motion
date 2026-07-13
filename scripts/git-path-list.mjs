@@ -19,8 +19,8 @@ export function parseNulDelimitedGitPaths(raw) {
 export function listChangedGitPaths(root, range) {
   const raw = execFileSync(
     'git',
-    ['diff', '--name-only', '-z', range],
-    { cwd: root, encoding: 'utf8' },
+    ['diff', '--name-only', '-z', '--end-of-options', range, '--'],
+    { cwd: root, encoding: 'utf8', stdio: ['ignore', 'pipe', 'pipe'] },
   );
   return parseNulDelimitedGitPaths(raw);
 }
