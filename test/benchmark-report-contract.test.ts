@@ -274,6 +274,16 @@ describe('paired comparative benchmark report', () => {
     expect(markdown).not.toMatch(/overall score|общий балл/i);
   });
 
+  it('diagnoses the exact claim, competitor, cluster and invalid sample', () => {
+    const { payload } = fixture();
+    payload.results.motion.raw.warm.s1[0].samples[0] = 0;
+    expect(() => createBenchmarkClaims(payload.results, {
+      seed: payload.orderSeed,
+      iterations: 200,
+      timerQuantumMs: payload.calibration.timerQuantumMs,
+    })).toThrow(/warm\.s1:motion.*competitor.*cluster 1.*sample 1.*0/i);
+  });
+
   it.each([
     ['dirty claim', (f: any) => { f.payload.provenance.dirty = true; }],
     ['future date', (f: any) => { f.now -= 10 * 60_000; }],
