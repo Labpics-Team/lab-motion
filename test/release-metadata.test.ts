@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import {
   validateArchiveMetadata,
+  validateReleaseChangelog,
   validateReleaseMetadata,
 } from '../scripts/release-metadata.mjs';
 
@@ -138,5 +139,35 @@ describe('release metadata SSOT', () => {
     else if (field === 'files') archive.files = [...archive.files].reverse();
     else archive.peerDependencies.react = '>=19.0.0';
     expect(() => validateArchiveMetadata(root, archive)).toThrow();
+  });
+});
+
+describe('release changelog truth', () => {
+  const current = (date = '2026-07-13') =>
+    `# Журнал изменений\n\n## [0.3.0] — ${date}\n\n- Готово.\n`;
+
+  it('принимает ровно одну секцию версии с датой release intent', () => {
+    expect(() => validateReleaseChangelog(current(), '0.3.0', '2026-07-13')).not.toThrow();
+  });
+
+  it.each(['2000-02-29', '2024-02-29'])('принимает календарную дату %s', (date) => {
+    expect(() => validateReleaseChangelog(current(date), '0.3.0', date)).not.toThrow();
+  });
+
+  it.each([
+    ['устаревшую дату', current(), '0.3.0', '2026-07-14'],
+    ['отсутствующую версию', current(), '0.3.1', '2026-07-13'],
+    ['нулевой день', current('2026-02-00'), '0.3.0', '2026-02-00'],
+    ['29 февраля невисокосного года', current('2026-02-29'), '0.3.0', '2026-02-29'],
+    ['29 февраля невисокосного века', current('1900-02-29'), '0.3.0', '1900-02-29'],
+    ['30 февраля', current('2026-02-30'), '0.3.0', '2026-02-30'],
+    [
+      'дубликат секции версии',
+      `${current()}\n## [0.3.0] — 2026-07-13\n`,
+      '0.3.0',
+      '2026-07-13',
+    ],
+  ])('отклоняет %s', (_label, changelog, version, releaseDate) => {
+    expect(() => validateReleaseChangelog(changelog, version, releaseDate)).toThrow();
   });
 });

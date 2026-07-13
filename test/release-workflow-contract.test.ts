@@ -83,6 +83,20 @@ function runBlocks(): string[] {
 }
 
 describe('release workflow: граница тега и npm OIDC', () => {
+  it('фиксирует UTC-дату intent один раз и сверяет с CHANGELOG до упаковки', () => {
+    const resolve = job('resolve');
+    const verify = job('verify');
+    const check = '        run: node scripts/check-release.mjs "$RELEASE_TAG" "$RELEASE_DATE"';
+    const pack = '      - name: Pack release candidate once';
+
+    expect(resolve.split('\n')).toContain('      release_date: ${{ steps.resolve.outputs.release_date }}');
+    expect(resolve).toContain('echo "release_date=$(date -u +%F)"');
+    expect(verify.split('\n')).toContain('      RELEASE_DATE: ${{ needs.resolve.outputs.release_date }}');
+    expect(verify.split('\n').filter((line) => line === check)).toHaveLength(1);
+    expect(verify.indexOf(check)).toBeGreaterThanOrEqual(0);
+    expect(verify.indexOf(check)).toBeLessThan(verify.indexOf(pack));
+  });
+
   it('создаёт тег только после полной проверки артефакта', () => {
     const tag = job('tag');
 

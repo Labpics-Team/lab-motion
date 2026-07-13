@@ -128,6 +128,14 @@ function fail(label, message) {
   throw new Error(`${label}: ${message}`);
 }
 
+function isCalendarDate(value) {
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(value)) return false;
+  const [year, month, day] = value.split('-').map(Number);
+  const leap = year % 4 === 0 && (year % 100 !== 0 || year % 400 === 0);
+  const days = [31, leap ? 29 : 28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31];
+  return year > 0 && month >= 1 && month <= 12 && day >= 1 && day <= days[month - 1];
+}
+
 function assertPlainObject(value, label) {
   if (value === null || typeof value !== 'object' || Array.isArray(value)) {
     fail(label, 'ожидался объект');
@@ -178,6 +186,27 @@ function assertExports(exportsMap, label) {
         }
       }
     }
+  }
+}
+
+/** Версия в changelog обязана отражать дату зафиксированного release intent. */
+export function validateReleaseChangelog(changelog, version, releaseDate) {
+  if (typeof changelog !== 'string') fail('CHANGELOG.md', 'ожидался текст');
+  if (typeof version !== 'string' || !/^\d+\.\d+\.\d+$/.test(version)) {
+    fail('CHANGELOG.md', `некорректная версия ${String(version)}`);
+  }
+  if (typeof releaseDate !== 'string' || !isCalendarDate(releaseDate)) {
+    fail('release date', `ожидалась календарная UTC-дата YYYY-MM-DD, получено ${String(releaseDate)}`);
+  }
+
+  const prefix = `## [${version}]`;
+  const headings = changelog
+    .replace(/\r\n?/g, '\n')
+    .split('\n')
+    .filter((line) => line.startsWith(prefix));
+  const expected = `${prefix} — ${releaseDate}`;
+  if (headings.length !== 1 || headings[0] !== expected) {
+    fail('CHANGELOG.md', `ожидалась ровно одна секция ${expected}`);
   }
 }
 
