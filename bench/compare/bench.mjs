@@ -517,7 +517,10 @@ async function waitForBaselineFrame(frames) {
   while (Date.now() < deadline) {
     while (inspected < frames.length) {
       const frame = frames[inspected++];
-      if (redLeftEdge(Buffer.from(frame.data, 'base64')) !== null) return;
+      if (
+        Number.isFinite(frame.ts) &&
+        redLeftEdge(Buffer.from(frame.data, 'base64')) !== null
+      ) return;
     }
     await new Promise((resolve) => setTimeout(resolve, 16));
   }
@@ -579,7 +582,7 @@ async function runFirstPresented(browser, adapterPath, scenario, pageUrl) {
   });
   const rawFrames = [];
   cdp.on('Page.screencastFrame', (event) => {
-    rawFrames.push({ timestampSeconds: event.metadata.timestamp, data: event.data });
+    rawFrames.push({ ts: event.metadata.timestamp, data: event.data });
     cdp.send('Page.screencastFrameAck', { sessionId: event.sessionId }).catch(() => {});
   });
   await cdp.send('Page.startScreencast', {
@@ -608,7 +611,7 @@ async function runFirstPresented(browser, adapterPath, scenario, pageUrl) {
     rawFrames: rawFrames.length,
     frames: rawFrames
       .map((frame) => ({
-        timestampSeconds: frame.timestampSeconds,
+        timestampSeconds: frame.ts,
         x: redLeftEdge(Buffer.from(frame.data, 'base64')),
       }))
       .filter((frame) => frame.x !== null)
@@ -628,74 +631,88 @@ const BLOCK_MS = 900;
 async function captureTrajectory(browser, adapterPath, blocked, pageUrl) {
   const { context, page } = await newPage(browser, adapterPath, pageUrl);
   const cdp = await context.newCDPSession(page);
-  await page.evaluate(() => {
-    const p = document.createElement('div');
-    p.id = 'probe';
-    document.body.appendChild(p);
-  });
-
-  // Кадры забираем скринкастом: компоситор пушит их сам, main-thread страницы
-  // не участвует. Одиночный Page.captureScreenshot при мёртвом main стопорится
-  // и возвращает кадр уже ПОСЛЕ разблокировки — это давало бы wall-clock-прыжку
-  // RAF-библиотек фальшивые 100% (проверено первым прогоном этого файла).
   const frames = [];
-  cdp.on('Page.screencastFrame', (ev) => {
-    frames.push({ ts: ev.metadata.timestamp, data: ev.data });
-    cdp.send('Page.screencastFrameAck', { sessionId: ev.sessionId }).catch(() => {});
-  });
-  await cdp.send('Page.startScreencast', {
-    format: 'png', everyNthFrame: 1, maxWidth: 800, maxHeight: 200,
-  });
-
-  // Epoch фиксируется в page realm рядом с API-вызовом: RTT Node↔page не входит.
-  const startedAt = await page.evaluate(({ px, duration, shouldBlock, blockAt, blockMs }) => {
-    const el = document.getElementById('probe');
-    const epoch = () => (performance.timeOrigin + performance.now()) / 1000;
-    const start = epoch();
-    window.__benchTiming = { startedAt: start, blockStartedAt: null, blockEndedAt: null };
-    window.__c = window.__adapterModule.start([el], px, duration);
-    if (shouldBlock) setTimeout(() => {
-      window.__benchTiming.blockStartedAt = epoch();
-      const end = performance.now() + blockMs;
-      while (performance.now() < end) { /* реальная блокировка main-thread */ }
-      window.__benchTiming.blockEndedAt = epoch();
-    }, blockAt);
-    return start;
-  }, {
-    px: FREEZE_PX,
-    duration: FREEZE_DURATION_MS,
-    shouldBlock: blocked,
-    blockAt: BLOCK_AT_MS,
-    blockMs: BLOCK_MS,
-  });
-
-  // Ждём: анимация + блок + запас на lagSmoothing-подобное продление (GSAP
-  // после лага честно доигрывает сдвинутый таймлайн, а не прыгает — это
-  // валидное поведение, ему нужно время).
-  await new Promise((r) => setTimeout(
-    r,
-    FREEZE_DURATION_MS + (blocked ? BLOCK_MS : 0) + 700,
-  ));
-  await cdp.send('Page.stopScreencast').catch(() => {});
-  const terminal = await page.evaluate(() => {
-    const el = document.getElementById('probe');
-    return {
-      finalX: new DOMMatrixReadOnly(getComputedStyle(el).transform).e,
-      timing: window.__benchTiming,
-    };
-  });
-  await context.close();
-
-  const decoded = frames
-    .map((f) => ({ t: f.ts - startedAt, x: redLeftEdge(Buffer.from(f.data, 'base64')) }))
-    .filter((f) => Number.isFinite(f.t) && f.x !== null)
-    .sort((a, b) => a.t - b.t);
-  return {
-    decoded,
-    finalX: terminal.finalX,
-    timing: terminal.timing,
-    rawFrames: frames.length,
+  let screencastActive = false;
+  const stopScreencast = async () => {
+    if (!screencastActive) return;
+    screencastActive = false;
+    await cdp.send('Page.stopScreencast').catch(() => {});
   };
+  try {
+    await page.evaluate(() => {
+      const p = document.createElement('div');
+      p.id = 'probe';
+      document.body.appendChild(p);
+    });
+
+    // Кадры забираем скринкастом: компоситор пушит их сам, main-thread страницы
+    // не участвует. Одиночный Page.captureScreenshot при мёртвом main стопорится
+    // и возвращает кадр уже ПОСЛЕ разблокировки — это давало бы wall-clock-прыжку
+    // RAF-библиотек фальшивые 100% (проверено первым прогоном этого файла).
+    cdp.on('Page.screencastFrame', (ev) => {
+      frames.push({ ts: ev.metadata.timestamp, data: ev.data });
+      cdp.send('Page.screencastFrameAck', { sessionId: ev.sessionId }).catch(() => {});
+    });
+    await cdp.send('Page.startScreencast', {
+      format: 'png', everyNthFrame: 1, maxWidth: 800, maxHeight: 200,
+    });
+    screencastActive = true;
+    // CDP может не прислать новый кадр во время блокировки без visual damage.
+    // Предстартовый пиксель даёт честную точку удержания, не синтезируя движение.
+    await waitForBaselineFrame(frames);
+
+    // Epoch фиксируется в page realm рядом с API-вызовом: RTT Node↔page не входит.
+    const startedAt = await page.evaluate(({ px, duration, shouldBlock, blockAt, blockMs }) => {
+      const el = document.getElementById('probe');
+      const epoch = () => (performance.timeOrigin + performance.now()) / 1000;
+      const start = epoch();
+      window.__benchTiming = { startedAt: start, blockStartedAt: null, blockEndedAt: null };
+      window.__c = window.__adapterModule.start([el], px, duration);
+      if (shouldBlock) setTimeout(() => {
+        window.__benchTiming.blockStartedAt = epoch();
+        const end = performance.now() + blockMs;
+        while (performance.now() < end) { /* реальная блокировка main-thread */ }
+        window.__benchTiming.blockEndedAt = epoch();
+      }, blockAt);
+      return start;
+    }, {
+      px: FREEZE_PX,
+      duration: FREEZE_DURATION_MS,
+      shouldBlock: blocked,
+      blockAt: BLOCK_AT_MS,
+      blockMs: BLOCK_MS,
+    });
+
+    // Ждём: анимация + блок + запас на lagSmoothing-подобное продление (GSAP
+    // после лага честно доигрывает сдвинутый таймлайн, а не прыгает — это
+    // валидное поведение, ему нужно время).
+    await new Promise((r) => setTimeout(
+      r,
+      FREEZE_DURATION_MS + (blocked ? BLOCK_MS : 0) + 700,
+    ));
+    await stopScreencast();
+    const terminal = await page.evaluate(() => {
+      const el = document.getElementById('probe');
+      return {
+        finalX: new DOMMatrixReadOnly(getComputedStyle(el).transform).e,
+        timing: window.__benchTiming,
+      };
+    });
+
+    const decoded = frames
+      .map((f) => ({ t: f.ts - startedAt, x: redLeftEdge(Buffer.from(f.data, 'base64')) }))
+      .filter((f) => Number.isFinite(f.t) && f.x !== null)
+      .sort((a, b) => a.t - b.t);
+    return {
+      decoded,
+      finalX: terminal.finalX,
+      timing: terminal.timing,
+      rawFrames: frames.length,
+    };
+  } finally {
+    await stopScreencast();
+    await context.close();
+  }
 }
 
 async function runFreezePair(browser, adapterPath, blockedFirst, pageUrl) {
