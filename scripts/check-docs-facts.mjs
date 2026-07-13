@@ -11,6 +11,7 @@ import {
   revisionFingerprint,
   sha256Bytes,
 } from '../bench/compare/provenance.mjs';
+import { listChangedGitPaths } from './git-path-list.mjs';
 
 const write = process.argv.includes('--write');
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
@@ -58,9 +59,7 @@ function validateRevision(payload, stem) {
   if (revisionFingerprint(ROOT, revision) !== worktreeSha256) {
     throw new Error('dirty:false не подтверждается байтами Git revision');
   }
-  const changed = git(['diff', '--name-only', `${revision}..HEAD`])
-    .split('\n')
-    .filter(Boolean);
+  const changed = listChangedGitPaths(ROOT, `${revision}..HEAD`);
   assertAllowedPostReportChanges(changed, stem);
   const commitTime = Date.parse(git(['show', '-s', '--format=%cI', revision]).trim());
   if (!Number.isFinite(commitTime) || commitTime > Date.parse(payload.generatedAt)) {
