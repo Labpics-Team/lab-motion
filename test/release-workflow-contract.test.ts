@@ -85,6 +85,14 @@ function runBlocks(): string[] {
 }
 
 describe('release workflow: граница тега и npm OIDC', () => {
+  it('CI загружает историю для проверки provenance-предка', () => {
+    const checkoutStart = ciWorkflow.indexOf('      - name: Checkout');
+    const checkoutEnd = ciWorkflow.indexOf('      - name: GitHub Actions contract', checkoutStart);
+    const checkout = ciWorkflow.slice(checkoutStart, checkoutEnd);
+
+    expect(checkout).toContain('          fetch-depth: 0');
+  });
+
   it('CI валидирует сохранённую дату, а release — отдельную UTC-дату intent', () => {
     expect(ciWorkflow.split('\n'))
       .toContain('          node scripts/check-release.mjs "v${version}" --validate-stored-date');
