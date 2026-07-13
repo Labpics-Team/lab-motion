@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import {
+  readReleaseChangelogDate,
   validateArchiveMetadata,
   validateReleaseChangelog,
   validateReleaseMetadata,
@@ -147,6 +148,7 @@ describe('release changelog truth', () => {
     `# Журнал изменений\n\n## [0.3.0] — ${date}\n\n- Готово.\n`;
 
   it('принимает ровно одну секцию версии с датой release intent', () => {
+    expect(readReleaseChangelogDate(current(), '0.3.0')).toBe('2026-07-13');
     expect(() => validateReleaseChangelog(current(), '0.3.0', '2026-07-13')).not.toThrow();
   });
 

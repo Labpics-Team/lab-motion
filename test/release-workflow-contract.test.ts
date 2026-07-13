@@ -8,6 +8,8 @@ const workflow = readFileSync(workflowUrl, 'utf8').replace(
   /\r\n?/g,
   '\n',
 );
+const ciWorkflow = readFileSync(new URL('../.github/workflows/ci.yml', import.meta.url), 'utf8')
+  .replace(/\r\n?/g, '\n');
 const releases = readFileSync(new URL('../docs/RELEASES.md', import.meta.url), 'utf8').replace(
   /\r\n?/g,
   '\n',
@@ -83,6 +85,13 @@ function runBlocks(): string[] {
 }
 
 describe('release workflow: граница тега и npm OIDC', () => {
+  it('CI валидирует сохранённую дату, а release — отдельную UTC-дату intent', () => {
+    expect(ciWorkflow.split('\n'))
+      .toContain('          node scripts/check-release.mjs "v${version}" --validate-stored-date');
+    expect(job('verify'))
+      .toContain('node scripts/check-release.mjs "$RELEASE_TAG" "$RELEASE_DATE"');
+  });
+
   it('фиксирует UTC-дату intent один раз и сверяет с CHANGELOG до упаковки', () => {
     const resolve = job('resolve');
     const verify = job('verify');

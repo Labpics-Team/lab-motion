@@ -189,14 +189,11 @@ function assertExports(exportsMap, label) {
   }
 }
 
-/** Версия в changelog обязана отражать дату зафиксированного release intent. */
-export function validateReleaseChangelog(changelog, version, releaseDate) {
+/** Возвращает каноническую календарную дату единственной секции версии. */
+export function readReleaseChangelogDate(changelog, version) {
   if (typeof changelog !== 'string') fail('CHANGELOG.md', 'ожидался текст');
   if (typeof version !== 'string' || !/^\d+\.\d+\.\d+$/.test(version)) {
     fail('CHANGELOG.md', `некорректная версия ${String(version)}`);
-  }
-  if (typeof releaseDate !== 'string' || !isCalendarDate(releaseDate)) {
-    fail('release date', `ожидалась календарная UTC-дата YYYY-MM-DD, получено ${String(releaseDate)}`);
   }
 
   const prefix = `## [${version}]`;
@@ -204,9 +201,28 @@ export function validateReleaseChangelog(changelog, version, releaseDate) {
     .replace(/\r\n?/g, '\n')
     .split('\n')
     .filter((line) => line.startsWith(prefix));
-  const expected = `${prefix} — ${releaseDate}`;
-  if (headings.length !== 1 || headings[0] !== expected) {
-    fail('CHANGELOG.md', `ожидалась ровно одна секция ${expected}`);
+  if (headings.length !== 1) {
+    fail('CHANGELOG.md', `ожидалась ровно одна секция ${prefix}`);
+  }
+  const marker = `${prefix} — `;
+  if (!headings[0].startsWith(marker)) {
+    fail('CHANGELOG.md', `секция ${prefix} имеет неканонический заголовок`);
+  }
+  const date = headings[0].slice(marker.length);
+  if (!isCalendarDate(date)) {
+    fail('CHANGELOG.md', `секция ${prefix} имеет некалендарную дату ${date}`);
+  }
+  return date;
+}
+
+/** Версия в changelog обязана отражать дату зафиксированного release intent. */
+export function validateReleaseChangelog(changelog, version, releaseDate) {
+  if (typeof releaseDate !== 'string' || !isCalendarDate(releaseDate)) {
+    fail('release date', `ожидалась календарная UTC-дата YYYY-MM-DD, получено ${String(releaseDate)}`);
+  }
+  const storedDate = readReleaseChangelogDate(changelog, version);
+  if (storedDate !== releaseDate) {
+    fail('CHANGELOG.md', `секция ## [${version}] датирована ${storedDate}, ожидалась ${releaseDate}`);
   }
 }
 
