@@ -92,10 +92,9 @@ const EPSILON = 1e-10;
 /**
  * Единый fail-fast страж конечности публичных числовых входов MotionValue:
  * NaN/±Infinity → MotionParamError синхронно (до Promise и до единого кадра).
- * Один throw-сайт вместо четырёх (initial/initialVelocity/setTarget/snapTo) —
- * заодно размерный шейв под гейт ядра (2220 gz ровно, без люфта).
+ * Один throw-сайт не даёт четырём публичным входам разойтись в политике.
  */
-function assertFinite(v: number, label: string): number {
+function assertFinite(v: number): number {
   if (!Number.isFinite(v)) {
     throw new MotionParamError('LM045');
   }
@@ -185,7 +184,7 @@ export class MotionValue {
   constructor(opts: MotionValueOptions) {
     // Цепочка присваиваний: value/from/target рождаются одним (проверенным)
     // числом — и это дешевле трёх чтений opts.initial под гейтом ядра.
-    this._value = this._from = this._target = assertFinite(opts.initial, 'initial');
+    this._value = this._from = this._target = assertFinite(opts.initial);
     validateSpringParams(opts.spring);
     this._spring = opts.spring;
     this._clamp = opts.clamp !== false;
@@ -194,7 +193,7 @@ export class MotionValue {
     // CodeRabbit #112): NaN/±Infinity — не «нет сида», а ошибка вызова, как
     // initial/spring; молчаливое проглатывание маскировало бы битый донор
     // скорости (жест/decay/compositor-хендофф). Отсутствие опции = 0 (покой).
-    this._velocity = assertFinite(opts.initialVelocity ?? 0, 'initialVelocity');
+    this._velocity = assertFinite(opts.initialVelocity ?? 0);
     this._requestFrame = opts.requestFrame ?? MotionValue._defaultRequestFrame;
   }
 
@@ -261,7 +260,7 @@ export class MotionValue {
    */
   setTarget(target: number): void {
     if (this._destroyed) return;
-    assertFinite(target, 'setTarget');
+    assertFinite(target);
 
     // Snap instantly if already at target with negligible velocity.
     if (target === this._value && Math.abs(this._velocity) < EPSILON) {
@@ -343,7 +342,7 @@ export class MotionValue {
    */
   snapTo(target: number): void {
     if (this._destroyed) return;
-    assertFinite(target, 'snapTo');
+    assertFinite(target);
     // Идемпотентность: уже покоимся ровно в target → нечего менять и незачем
     // эмитить (лишний requestUpdate у Lit-хоста). Живой ран в тот же target —
     // НЕ no-op: его надо прервать и снапнуть.

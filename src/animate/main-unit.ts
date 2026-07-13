@@ -1,5 +1,6 @@
 /** Main-thread executor одной CSS-поверхности внутри общего SurfaceBatch. */
 
+import { scaleSerializedVelocity } from '../compositor/sample.js';
 import { CONVERGENCE_THRESHOLD, FIXED_DT_S, MAX_FRAMES } from '../internal/constants.js';
 import {
   readSpringFromBasisUnchecked,
@@ -10,6 +11,7 @@ import type { SpringParams } from '../spring.js';
 import { buildTransform } from '../value/transform.js';
 import {
   RANGE_EPSILON,
+  channelAt,
   cssAt,
   type AnimatableElement,
   type BoundGroup,
@@ -73,8 +75,6 @@ export class MainUnit implements GroupOwner, SurfaceUnit {
       throw error;
     }
   }
-
-  _capture(): void {}
 
   _captureNum(key: string): ChannelSnapshot | undefined {
     if (this._done) return undefined;
@@ -151,7 +151,7 @@ export class MainUnit implements GroupOwner, SurfaceUnit {
 
   cancel(): void {
     if (this._done || this._o!._record._transition) return;
-    this._cancel();
+    this._batchAbort();
   }
 
   _updateStep(ts: number | undefined): void {
@@ -191,12 +191,10 @@ export class MainUnit implements GroupOwner, SurfaceUnit {
     else if (this._active) this._write();
   }
 
-  _batchFail(): void {
-    try { this._cancel(); } catch { /* frame siblings продолжаются */ }
-  }
-
-  _batchTeardown(): void {
-    try { this._cancel(); } catch { /* global teardown освобождает всех */ }
+  _batchAbort(): void {
+    if (this._done) return;
+    this._writeBack();
+    this._finish(false);
   }
 
   private _compute(): boolean {
@@ -210,9 +208,7 @@ export class MainUnit implements GroupOwner, SurfaceUnit {
       this._tweenK = k;
       this._tweenDpdt = NaN;
       for (const channel of bound._numeric) {
-        const value = channel._from + (channel._to - channel._from) * progress;
-        if (!Number.isFinite(value)) return true;
-        channel._value = value;
+        channel._value = channelAt(channel, progress);
       }
       if (bound._css !== undefined) bound._css._css = cssAt(bound._css, progress);
       return false;
@@ -221,6 +217,22 @@ export class MainUnit implements GroupOwner, SurfaceUnit {
     const basis = this._batch!._springBasis(o._mode._spring, this._tMs / 1000);
     let converged = true;
     for (const channel of bound._numeric) {
+      const range = channel._solverTo - channel._from;
+      if (!Number.isFinite(range)) {
+        // Нормализованный базис остаётся конечным даже когда физический span
+        // переполняется; взвешенная позиция сохраняет представимый MAX ↔ -MAX.
+        sampleSpringFromBasisUnchecked(basis, channel._v0, this._snap);
+        channel._value = channelAt(channel, this._snap.value);
+        channel._velocity = scaleSerializedVelocity(
+          this._snap.velocity,
+          channel._from,
+          channel._solverTo,
+        );
+        converged = converged &&
+          Math.abs(this._snap.value - 1) < CONVERGENCE_THRESHOLD &&
+          Math.abs(this._snap.velocity) < CONVERGENCE_THRESHOLD;
+        continue;
+      }
       readSpringFromBasisUnchecked(
         basis,
         channel._from,
@@ -230,13 +242,10 @@ export class MainUnit implements GroupOwner, SurfaceUnit {
       );
       channel._value = this._snap.value;
       channel._velocity = this._snap.velocity;
-      const range = channel._solverTo - channel._from;
-      if (Number.isFinite(range)) {
-        const scale = Math.max(Math.abs(range), RANGE_EPSILON);
-        converged = converged &&
-          Math.abs(this._snap.value - channel._solverTo) / scale < CONVERGENCE_THRESHOLD &&
-          Math.abs(this._snap.velocity) / scale < CONVERGENCE_THRESHOLD;
-      }
+      const scale = Math.max(Math.abs(range), RANGE_EPSILON);
+      converged = converged &&
+        Math.abs(this._snap.value - channel._solverTo) / scale < CONVERGENCE_THRESHOLD &&
+        Math.abs(this._snap.velocity) / scale < CONVERGENCE_THRESHOLD;
     }
     const css = bound._css;
     if (css !== undefined) {
@@ -295,12 +304,6 @@ export class MainUnit implements GroupOwner, SurfaceUnit {
     this._write();
     this._writeBack();
     this._finish(true);
-  }
-
-  private _cancel(): void {
-    if (this._done) return;
-    this._writeBack();
-    this._finish(false);
   }
 
   private _writeBack(): void {

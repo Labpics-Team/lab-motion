@@ -144,8 +144,7 @@ function fakeSurface(
     _batchSlot: -1,
     _updateStep: update,
     _renderStep: render,
-    _batchFail: fail,
-    _batchTeardown: fail,
+    _batchAbort: fail,
   };
 }
 
@@ -279,6 +278,73 @@ describe('SurfaceBatch: потолок подписок', () => {
 });
 
 describe('SurfaceBatch: граница кадра и lifecycle', () => {
+  it('бросок cleanup в update не лишает кадра поздние slots', () => {
+    const host = frameHarness();
+    const batch = new SurfaceBatch(host.frame);
+    const events: string[] = [];
+    const first = fakeSurface(
+      () => { events.push('u1'); throw new Error('update failed'); },
+      () => events.push('r1'),
+      () => { events.push('f1'); throw new Error('cleanup failed'); },
+    );
+    const second = fakeSurface(
+      () => events.push('u2'),
+      () => events.push('r2'),
+    );
+    batch._add(first, false);
+    batch._add(second, false);
+
+    expect(() => host.tick(16)).not.toThrow();
+    expect(events).toEqual(['u1', 'f1', 'u2', 'r1', 'r2']);
+    batch._remove(first, false);
+    batch._remove(second, false);
+  });
+
+  it('бросок cleanup в render не лишает кадра поздние slots', () => {
+    const host = frameHarness();
+    const batch = new SurfaceBatch(host.frame);
+    const events: string[] = [];
+    const first = fakeSurface(
+      () => events.push('u1'),
+      () => { events.push('r1'); throw new Error('render failed'); },
+      () => { events.push('f1'); throw new Error('cleanup failed'); },
+    );
+    const second = fakeSurface(
+      () => events.push('u2'),
+      () => events.push('r2'),
+    );
+    batch._add(first, false);
+    batch._add(second, false);
+
+    expect(() => host.tick(16)).not.toThrow();
+    expect(events).toEqual(['u1', 'u2', 'r1', 'f1', 'r2']);
+    batch._remove(first, false);
+    batch._remove(second, false);
+  });
+
+  it('бросок teardown одного slot не удерживает остальные и scheduler', () => {
+    const host = frameHarness();
+    const batch = new SurfaceBatch(host.frame);
+    const events: string[] = [];
+    const first = fakeSurface(
+      () => {},
+      () => {},
+      () => { events.push('t1'); throw new Error('teardown failed'); },
+    );
+    const second = fakeSurface(
+      () => {},
+      () => {},
+      () => events.push('t2'),
+    );
+    batch._add(first, false);
+    batch._add(second, false);
+
+    const teardown = (batch as unknown as { _frameTeardown(): void })._frameTeardown;
+    expect(() => teardown()).not.toThrow();
+    expect(events).toEqual(['t1', 't2']);
+    expect(host.removals).toEqual({ update: 1, render: 1 });
+  });
+
   it('добавление из update ждёт следующего кадра', () => {
     const host = frameHarness();
     const batch = new SurfaceBatch(host.frame);

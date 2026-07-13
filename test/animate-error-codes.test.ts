@@ -100,6 +100,14 @@ describe('animate: общие коды режимов и значений', () =
     expect(codeOf(() => springTo(nativeElement() as never, { x: [0, NaN] }))).toBe('LM142');
   });
 
+  it('LM150 не подменяет представимый MAX ↔ -MAX переполнением разности', () => {
+    const controls = fullAnimate(fakeEl().el, {
+      x: [Number.MAX_VALUE, -Number.MAX_VALUE],
+    }, { requestFrame: () => 1 });
+    expect(typeof controls.cancel).toBe('function');
+    controls.cancel();
+  });
+
   it('LM143/LM144 — тип и синтаксис CSS-значения', () => {
     expect(codeOf(() => fullAnimate(fakeEl().el, { backgroundColor: {} as never }))).toBe('LM143');
     expect(codeOf(() => miniAnimate(fakeEl().el, { '--gap': {} as never }))).toBe('LM143');

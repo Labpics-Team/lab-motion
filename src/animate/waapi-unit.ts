@@ -42,6 +42,7 @@ import {
 import type { SpringParams } from '../spring.js';
 import { buildTransform } from '../value/transform.js';
 import {
+  channelAt,
   dominantV0,
   rebaseNumericChannels,
   type AnimatableElement,
@@ -125,8 +126,9 @@ export class WaapiUnit implements GroupOwner {
   }
 
   _capture(): void {
-    if (this._delegate !== undefined) this._delegate._capture();
-    else if (!this._o._record._transition && !this._locked) this._syncSnapshot();
+    if (this._delegate === undefined && !this._o._record._transition && !this._locked) {
+      this._syncSnapshot();
+    }
   }
 
   _captureNum(key: string): ChannelSnapshot | undefined {
@@ -589,16 +591,6 @@ export class WaapiUnit implements GroupOwner {
     if (this._o._record._owner === this) this._o._record._owner = undefined;
     this._o._onDone(natural);
   }
-}
-
-/** Значение канала при прогрессе p; края возвращают ТОЧНЫЕ from/to (без fp-дрейфа). */
-function channelAt(ch: NumericChannel, p: number): number {
-  if (p === 0) return ch._from;
-  if (p === 1) return ch._to;
-  // Взвешенная форма не переполняется на конечном интервале MAX ↔ -MAX;
-  // за его пределами сохраняет реальный overshoot, пока он представим.
-  const v = (1 - p) * ch._from + p * ch._to;
-  return Number.isFinite(v) ? v : ch._to;
 }
 
 function safeCancelTimer(cancel: () => void): void {

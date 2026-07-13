@@ -224,6 +224,14 @@ function numericChannel(
   };
 }
 
+/** Устойчивая позиция канала: взвешенная форма не переполняет MAX ↔ -MAX. */
+export function channelAt(channel: NumericChannel, progress: number): number {
+  if (progress === 0) return channel._from;
+  if (progress === 1) return channel._to;
+  const value = (1 - progress) * channel._from + progress * channel._to;
+  return Number.isFinite(value) ? value : channel._to;
+}
+
 /**
  * Пересевает каналы из их текущего абсолютного снимка для live-движка.
  * Единственный конструктор выше не даёт initial bind и WAAPI→live handoff
@@ -315,7 +323,7 @@ export interface GroupOwner {
   /** Снимает резерв при rollback до supersede. */
   _release?(): void;
   /** Фиксирует общий снимок до поканального чтения stateful host-часов. */
-  _capture(): void;
+  _capture?(): void;
   /** Аналитический снимок числового канала в момент прерывания. */
   _captureNum(key: string): ChannelSnapshot | undefined;
   /** Живой CSS-канал в момент прерывания (значение + ṗ для C¹-проекции). */
@@ -483,7 +491,7 @@ export function bindGroup(
   rec: GroupRecord,
 ): BoundGroup {
   const owner = rec._owner;
-  owner?._capture();
+  owner?._capture?.();
   const numeric: NumericChannel[] = [];
   let css: CssChannel | undefined;
 

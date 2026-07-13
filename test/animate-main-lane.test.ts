@@ -84,6 +84,108 @@ describe('animate MainUnit: compact executor', () => {
 });
 
 describe('animate MainUnit: plan-order и изоляция', () => {
+  it('tween MAX ↔ -MAX не телепортируется в цель из-за overflow span', () => {
+    const clock = makeClock();
+    const writes: number[] = [];
+    const controls = animate({
+      style: {
+        getPropertyValue: () => '',
+        setProperty(_name, value) {
+          if (value === 'none') writes.push(0);
+          else writes.push(Number(/translateX\((-?[\d.eE+]+)px\)/.exec(value)?.[1]));
+        },
+      },
+    }, { x: [Number.MAX_VALUE, -Number.MAX_VALUE] }, {
+      duration: 1000,
+      ease: (progress) => progress,
+      requestFrame: clock.requestFrame,
+    });
+
+    clock.step(16);
+    clock.step(100);
+
+    expect(writes.every(Number.isFinite)).toBe(true);
+    expect(writes.at(-1)).not.toBe(-Number.MAX_VALUE);
+    controls.cancel();
+  });
+
+  it('устойчиво ведёт и завершает пружину на диапазоне MAX ↔ -MAX', () => {
+    const callbacks: Array<(ts?: number) => void> = [];
+    const frame: FrameLoop = {
+      read: () => () => {},
+      update: (cb) => { callbacks.push(cb); return () => {}; },
+      render: (cb) => { callbacks.push(cb); return () => {}; },
+      cancelAll() {},
+    };
+    const record: GroupRecord = {
+      _owner: undefined,
+      _transition: false,
+      _numeric: new Map(),
+      _cssValue: undefined,
+    };
+    let natural: boolean | undefined;
+    const writes: number[] = [];
+    const unit = new MainUnit({
+      _el: {
+        style: {
+          getPropertyValue: () => '',
+          setProperty(_name, value) {
+            if (value === 'none') {
+              writes.push(0);
+              return;
+            }
+            const match = /translateX\((-?[\d.eE+]+)px\)/.exec(value);
+            writes.push(Number(match?.[1]));
+          },
+        },
+      },
+      _group: 'transform',
+      _record: record,
+      _bound: {
+        _numeric: [{
+          _key: 'x',
+          _from: Number.MAX_VALUE,
+          _to: -Number.MAX_VALUE,
+          _solverTo: -Number.MAX_VALUE,
+          _v0: 0,
+          _value: Number.MAX_VALUE,
+          _velocity: 0,
+        }],
+        _css: undefined,
+        _residuals: new Map(),
+        _transform: { x: Number.MAX_VALUE },
+      },
+      _mode: { _type: 'spring', _spring: { mass: 1, stiffness: 170, damping: 26 } },
+      _delayMs: 0,
+      _batch: new SurfaceBatch(frame),
+      _onDone(value) { natural = value; },
+    });
+    record._owner = unit;
+
+    callbacks[0]?.(16);
+    callbacks[1]?.(16);
+    callbacks[0]?.(116);
+    callbacks[1]?.(116);
+    callbacks[0]?.(516);
+    callbacks[1]?.(516);
+
+    const pickup = unit._captureNum('x');
+    expect(Number.isFinite(pickup?._velocity)).toBe(true);
+    expect(pickup?._velocity).not.toBe(0);
+
+    for (let frameIndex = 2; frameIndex < 1000 && record._owner === unit; frameIndex++) {
+      const ts = 516 + frameIndex * 16;
+      callbacks[0]?.(ts);
+      callbacks[1]?.(ts);
+    }
+
+    expect(record._owner).toBeUndefined();
+    expect(natural).toBe(true);
+    expect(writes.every(Number.isFinite)).toBe(true);
+    expect(writes.some((value) => value !== Number.MAX_VALUE && value !== -Number.MAX_VALUE))
+      .toBe(true);
+  });
+
   it('mixed x|opacity сохраняет target-major compute-all → write-all', () => {
     const events: string[] = [];
     const clock = makeClock();

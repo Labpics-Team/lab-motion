@@ -11,8 +11,7 @@ export interface SurfaceUnit {
   _batchSlot: number;
   _updateStep(ts: number | undefined): void;
   _renderStep(): void;
-  _batchFail(): void;
-  _batchTeardown(): void;
+  _batchAbort(): void;
 }
 
 /** Две FrameLoop-подписки независимо от числа поверхностей aggregate. */
@@ -36,7 +35,9 @@ export class SurfaceBatch {
   private _offRender: (() => void) | undefined;
   private readonly _frameTeardown = (): void => {
     const end = this._units.length;
-    for (let i = 0; i < end; i++) this._units[i]?._batchTeardown();
+    for (let i = 0; i < end; i++) {
+      try { this._units[i]?._batchAbort(); } catch { /* teardown siblings обязаны освободиться */ }
+    }
     this._teardown();
     if (this._live === 0) this._resetStorage();
   };
@@ -123,7 +124,9 @@ export class SurfaceBatch {
     for (let i = 0; i < this._end; i++) {
       const unit = this._units[i];
       if (!unit) continue;
-      try { unit._updateStep(ts); } catch { unit._batchFail(); }
+      try { unit._updateStep(ts); } catch {
+        try { unit._batchAbort(); } catch { /* cleanup одного slot не прерывает кадр */ }
+      }
     }
     // Pause/cancel-all в update снимает render-подписку: второй
     // фазы не будет, значит stable compaction уже безопасна.
@@ -137,7 +140,9 @@ export class SurfaceBatch {
     for (let i = 0; i < this._end; i++) {
       const unit = this._units[i];
       if (!unit) continue;
-      try { unit._renderStep(); } catch { unit._batchFail(); }
+      try { unit._renderStep(); } catch {
+        try { unit._batchAbort(); } catch { /* cleanup одного slot не прерывает кадр */ }
+      }
     }
     this._betweenPhases = false;
     this._compact();
