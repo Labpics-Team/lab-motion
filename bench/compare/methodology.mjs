@@ -599,25 +599,35 @@ export function evaluateStartSemanticEvidence(evidence, expected, calls) {
           return false;
         }
       }
+      const leadingPosition = group.positions[0];
+      if (
+        leadingPosition < expected.movementThresholdPx ||
+        leadingPosition >= expected.toPx - expected.finalTolerancePx
+      ) return false;
+      const staggerStepPx = (
+        expected.toPx * expected.staggerGapMs / expected.durationMs
+      );
+      for (let target = 1; target < group.positions.length; target++) {
+        const relativeExpected = Math.max(0, leadingPosition - staggerStepPx * target);
+        if (
+          Math.abs(group.positions[target] - relativeExpected) > expected.movementThresholdPx
+        ) return false;
+      }
       let lastMoved = -1;
       for (let target = 0; target < group.positions.length; target++) {
         if (group.positions[target] >= expected.movementThresholdPx) lastMoved = target;
       }
-      const sinceStartLow = group.readStartedMs - evidence.callStartedAtMs[call];
-      const sinceStartHigh = group.readEndedMs - evidence.callStartedAtMs[call];
-      const expectedLow = Math.min(
-        expected.targetsPerCall - 1,
-        Math.max(-1, Math.floor(sinceStartLow / expected.staggerGapMs) - 1),
-      );
-      const expectedHigh = Math.min(
-        expected.targetsPerCall - 1,
-        Math.max(-1, Math.floor(sinceStartHigh / expected.staggerGapMs) + 1),
-      );
-      if (lastMoved < expectedLow || lastMoved > expectedHigh) return false;
       if (lastMoved >= 0 && lastMoved < expected.targetsPerCall - 1) provedPartialStagger = true;
     }
   }
   return provedPartialStagger;
+}
+
+/** Publish-run не имеет права сохранять sample с недоказанной топологией. */
+export function assertStartSemanticEvidence(name, evidence) {
+  if (typeof name !== 'string' || name.length === 0 || evidence?.valid !== true) {
+    throw new Error(`${String(name)}: semantic evidence не доказал сценарий`);
+  }
 }
 
 function quantile(values, probability) {

@@ -401,6 +401,9 @@ function recomputeResult(
     values.forEach((cluster, run) => {
       const semanticEvidence = cluster?.semanticEvidence;
       const semantic = evaluateStartSemanticEvidence(semanticEvidence, config, calls);
+      if (semantic !== true) {
+        fail(`${label}: run-кластер ${run + 1} не доказал semantic топологию`);
+      }
       if (
         cluster?.run !== run ||
         semanticEvidence?.valid !== semantic ||

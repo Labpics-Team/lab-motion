@@ -335,6 +335,25 @@ describe('paired comparative benchmark report', () => {
     expect(() => validateBenchmarkReportPair(fixture(40))).not.toThrow();
   });
 
+  it('rejects a fully self-consistent report when any start topology is unproved', () => {
+    const report = fixture() as any;
+    const cluster = report.payload.results.motion.raw.warm.s3[0];
+    cluster.semanticEvidence.checkpoints[0].groups.forEach((group: any) => {
+      group.positions.fill(30);
+    });
+    cluster.semanticEvidence.valid = false;
+    cluster.semantic = false;
+    report.payload.claims = createBenchmarkClaims(report.payload.results, {
+      seed: report.payload.orderSeed,
+      iterations: 200,
+      scenarioManifest: report.payload.scenarioManifest,
+    });
+    report.markdown = renderBenchmarkMarkdown(report.payload);
+    report.payload.companion.markdownSha256 = sha256Text(report.markdown);
+
+    expect(() => validateBenchmarkReportPair(report)).toThrow(/semantic/i);
+  });
+
   it('publishes scoped ratio intervals and verdicts without an overall score', () => {
     const { payload, markdown } = fixture();
     expect(payload.claims.performance).toHaveLength(24);

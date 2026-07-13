@@ -47,6 +47,7 @@ import {
   assertBalancedRunBlocks,
   assertFreezeMatrix,
   assertPositiveFiniteSamples,
+  assertStartSemanticEvidence,
   assertWarmStartMeasurement,
   BENCHMARK_TIMER_ISOLATION_POLICY,
   createFreezeEvidence,
@@ -882,6 +883,7 @@ async function main() {
           measurement.measurementTimeOriginMs,
         );
         const semanticEvidence = await runSemanticStartCheck(page, config, config.warmCalls);
+        assertStartSemanticEvidence(`${id}.${scenario} run ${run + 1}`, semanticEvidence);
         const semantic = semanticEvidence.valid;
         results[id].raw.warm[scenario].push({
           run,
@@ -900,6 +902,7 @@ async function main() {
         const measurement = await runColdStartCost(page, config);
         assertPositiveFiniteSamples(`${id}.cold.${scenario} run ${run + 1}`, [measurement.sample]);
         const semanticEvidence = await runSemanticStartCheck(page, config, 1);
+        assertStartSemanticEvidence(`${id}.cold.${scenario} run ${run + 1}`, semanticEvidence);
         const semantic = semanticEvidence.valid;
         results[id].raw.cold[scenario].push({
           run,
@@ -921,6 +924,7 @@ async function main() {
         assertPositiveFiniteSamples(`${id}.cold.firstPresented run ${run + 1}`, [presented.sample]);
         const { context, page } = await newPage(browser, adapterPath, benchmarkOrigin.url);
         const semanticEvidence = await runSemanticStartCheck(page, scenarioManifest.s1, 1);
+        assertStartSemanticEvidence(`cold.firstPresented ${id} run ${run + 1}`, semanticEvidence);
         const semantic = semanticEvidence.valid;
         results[id].raw.cold.firstPresented.push({
           run,
@@ -1034,7 +1038,7 @@ async function main() {
   const md = renderBenchmarkMarkdown(rawPayload);
 
   rawPayload.companion.markdownSha256 = sha256Bytes(Buffer.from(md));
-  const rawJson = JSON.stringify(rawPayload, null, 2) + '\n';
+  const rawJson = JSON.stringify(rawPayload) + '\n';
   validateBenchmarkReportPair({
     stem,
     markdown: md,
