@@ -8,6 +8,7 @@ import {
 import {
   assertBalancedRunBlocks,
   assertFreezeMatrix,
+  assertStartSemanticEvidence,
   assertWarmStartMeasurement,
   applyHolmCorrection,
   createFreezeEvidence,
@@ -439,6 +440,36 @@ describe('benchmark methodology fail-closed contracts', () => {
       START_SCENARIO_MANIFEST.s3,
       START_SCENARIO_MANIFEST.s3.warmCalls,
     )).toBe(false);
+
+    const phaseShifted = structuredClone(s3);
+    phaseShifted.checkpoints.forEach((checkpoint: any) => {
+      checkpoint.groups.forEach((group: any) => {
+        const sampledAtMs = group.readStartedMs + 8;
+        group.positions = group.positions.map((_: number, target: number) => {
+          const progress = (
+            sampledAtMs - target * START_SCENARIO_MANIFEST.s3.staggerGapMs
+          ) / START_SCENARIO_MANIFEST.s3.durationMs;
+          return START_SCENARIO_MANIFEST.s3.toPx * Math.max(0, Math.min(1, progress));
+        });
+      });
+    });
+    expect(evaluateStartSemanticEvidence(
+      phaseShifted,
+      START_SCENARIO_MANIFEST.s3,
+      START_SCENARIO_MANIFEST.s3.warmCalls,
+    )).toBe(true);
+
+    const wrongRelativeProfile = structuredClone(s3);
+    wrongRelativeProfile.checkpoints[0].groups[0].positions[5] += 0.75;
+    expect(evaluateStartSemanticEvidence(
+      wrongRelativeProfile,
+      START_SCENARIO_MANIFEST.s3,
+      START_SCENARIO_MANIFEST.s3.warmCalls,
+    )).toBe(false);
+    expect(() => assertStartSemanticEvidence('anime.s3 run 1', {
+      ...phaseShifted,
+      valid: false,
+    })).toThrow(/anime\.s3 run 1.*semantic/i);
   });
 
   it('bootstraps paired independent run clusters reproducibly without flattening rounds', () => {
@@ -602,6 +633,9 @@ describe('benchmark methodology fail-closed contracts', () => {
     expect(source).toContain('page.evaluate(() => globalThis.crossOriginIsolated)');
     expect(source).not.toContain('timerEvidence: { crossOriginIsolated: true');
     expect(source).not.toContain('semantic: true');
+    expect(source.match(/assertStartSemanticEvidence\(/g)).toHaveLength(3);
+    expect(source).toContain("const rawJson = JSON.stringify(rawPayload) + '\\n';");
+    expect(source).not.toContain('JSON.stringify(rawPayload, null, 2)');
   });
 
   it('captures a decodable pre-start pixel before the freeze trajectory begins', () => {
