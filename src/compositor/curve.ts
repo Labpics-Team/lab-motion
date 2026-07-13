@@ -1,9 +1,10 @@
 /**
  * Внутренний компилятор spring → CSS linear().
  *
- * Один exact-key LRU хранит единый исполняемый artifact: CSS linear()-строку и
- * те же разобранные numeric stops. Chromium исполняет строку, WebKit строит из
- * stops явные кадры, snapshot сэмплирует их же. Абсолютное квантование ключа
+ * Generic-путь хранит artifact в exact-key LRU; узкий native v0=0 использует
+ * ограниченный exact-key список без веса generic Map/LRU в своём bundle-графе.
+ * Оба пути вызывают один emitter: Chromium исполняет CSS linear()-строку,
+ * WebKit строит кадры из тех же numeric stops. Абсолютное квантование ключа
  * запрещено: у малых валидных m/k/c оно меняло физику сильнее tolerance.
  */
 
@@ -42,8 +43,26 @@ export type SpringExecutionArtifactTuple = [
   facade?: SpringExecutionArtifact,
 ];
 
-/** Один ограниченный LRU на realm; публичная диагностика восстанавливается из samples. */
-const sharedCache = new SpringLinearCache<SpringExecutionArtifactTuple>(DEFAULT_CACHE_CAPACITY);
+/** Generic LRU на realm; публичная диагностика восстанавливается из samples. */
+const sharedCache = /* @__PURE__ */ new SpringLinearCache<SpringExecutionArtifactTuple>(
+  DEFAULT_CACHE_CAPACITY,
+);
+
+// Малая ёмкость — часть bundle/retention-контракта узкого native subpath;
+// граница и FIFO-вытеснение защищены identity-тестом.
+const RESTING_CACHE_CAPACITY = 8;
+
+type RestingEntry = [
+  mass: number,
+  stiffness: number,
+  damping: number,
+  tolerance: number,
+  artifact: SpringExecutionArtifactTuple,
+];
+
+// Native v0=0 не платит за generic hash-map/LRU; линейный hit точен и ничего
+// не аллоцирует.
+const restingCache: RestingEntry[] = [];
 
 export function validateTolerance(tolerance: number): void {
   if (!Number.isFinite(tolerance) || tolerance <= 0 || tolerance >= 1) {
@@ -226,11 +245,20 @@ export function compileRestingSpringExecutionArtifactTupleUnchecked(
   tolerance: number,
 ): SpringExecutionArtifactTuple {
   const { mass, stiffness, damping } = spring;
-  const hit = sharedCache.lookup(mass, stiffness, damping, 0, tolerance);
-  if (hit !== undefined) return hit;
+  // Обратный поиск даёт горячим новым ключам короткий путь.
+  for (let i = restingCache.length; i--;) {
+    const entry = restingCache[i]!;
+    if (
+      entry[0] === mass
+      && entry[1] === stiffness
+      && entry[2] === damping
+      && entry[3] === tolerance
+    ) return entry[4];
+  }
   const build = buildRestingSpringNodesWithHorizon(spring, tolerance);
   const artifact = emitArtifact(build[0], tolerance, build[1] * 1000);
-  sharedCache.store(mass, stiffness, damping, 0, tolerance, artifact);
+  restingCache.push([mass, stiffness, damping, tolerance, artifact]);
+  if (restingCache.length > RESTING_CACHE_CAPACITY) restingCache.shift();
   return artifact;
 }
 
@@ -251,7 +279,8 @@ export function compileRestingSpringEasingUnchecked(
   return compileRestingSpringExecutionArtifactTupleUnchecked(spring, tolerance)[0];
 }
 
-/** Герметичный сброс единого execution artifact-LRU. */
+/** Герметичный сброс всех execution artifact-кэшей. */
 export function clearSpringExecutionArtifactCacheUnchecked(): void {
   sharedCache.clear();
+  restingCache.length = 0;
 }

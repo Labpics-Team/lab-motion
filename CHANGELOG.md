@@ -6,12 +6,20 @@
 
 ## [Unreleased]
 
+### Fixed
+
+- `./animate/native`: host-методы вызываются без доверия к own `.call`,
+  доставка завершения не зависит от глобальной `queueMicrotask`, отмена
+  разрывает связь вечного host `finished` с DOM, а несходящаяся реентрантная
+  компенсация завершается `LM157` вместо ложного успеха.
+
 ## [0.3.0] — 2026-07-13
 
 ### Added
 
 - `./animate/native`: узкий WAAPI-путь `springTo` для явных пар
-  transform/opacity. Одна `Animation` на цель, без скрытого rAF-fallback;
+  transform/opacity. Отдельная `Animation` на независимый CSS-канал цели
+  позволяет вытеснять transform и opacity раздельно; скрытого rAF-fallback нет.
   Chromium/Firefox используют CSS `linear()`, WebKit — явные адаптивные кадры.
 
 - `./react`: `useReducedMotion(): boolean` — реактивно отражает системное

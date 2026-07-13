@@ -185,6 +185,43 @@ test('нативный WAAPI: finish() резолвит finished; cancel() от�
   expect(r.rejected).toBe(true);
 });
 
+test('springTo: поздний finish старого WAAPI-effect не меняет финал owner', async ({
+  page,
+}) => {
+  const r = await page.evaluate(async () => {
+    const { springTo } = await import('/dist/animate/native/index.js');
+    const el = document.createElement('div');
+    document.body.appendChild(el);
+
+    const older = springTo(
+      el,
+      { x: [0, 100] },
+      { spring: { mass: 1, stiffness: 50, damping: 1 } },
+    );
+    const olderEffect = el.getAnimations()[0];
+    const newer = springTo(el, { x: [0, 200] });
+    const newerEffect = el.getAnimations().find((effect) => effect !== olderEffect);
+    if (olderEffect === undefined || newerEffect === undefined) {
+      throw new Error('springTo не создал два WAAPI-effect');
+    }
+
+    newerEffect.finish();
+    await newer.finished;
+    const afterNewer = el.style.transform;
+    olderEffect.finish();
+    await older.finished;
+    const afterOlder = el.style.transform;
+    const computed = getComputedStyle(el).transform;
+
+    el.remove();
+    return { afterNewer, afterOlder, computed };
+  });
+
+  expect(r.afterNewer).toBe('translateX(200px)');
+  expect(r.afterOlder).toBe('translateX(200px)');
+  expect(r.computed).not.toBe('none');
+});
+
 test('retarget: C¹-снимок совпадает с readCompositorSpring в момент перехвата', async ({
   page,
 }) => {

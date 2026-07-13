@@ -1,6 +1,6 @@
 /**
  * Контракт узкого `./animate/native`: WAAPI, custom linear() только вне WebKit,
- * один нативный прогон на цель и никакого скрытого rAF-пути.
+ * независимые нативные CSS-lane и никакого скрытого rAF-пути.
  */
 
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
@@ -66,7 +66,7 @@ afterEach(() => {
 });
 
 describe('animate/native: springTo', () => {
-  it('объединяет transform+opacity в одну Animation на цель', async () => {
+  it('запускает независимые transform и opacity эффекты', async () => {
     const el = element();
     const controls = springTo(el, {
       x: [0, 240],
@@ -76,24 +76,25 @@ describe('animate/native: springTo', () => {
       opacity: [0, 1],
     });
 
-    expect(el.calls).toHaveLength(1);
+    expect(el.calls).toHaveLength(2);
     expect(el.calls[0]!.keyframes).toEqual([
       {
         transform: 'translateX(0px) translateY(10px) scale(1) rotate(0deg)',
-        opacity: 0,
       },
       {
         transform: 'translateX(240px) translateY(20px) scale(1.2) rotate(45deg)',
-        opacity: 1,
       },
     ]);
-    expect(el.calls[0]!.timing['easing']).toMatch(/^linear\(/);
-    expect(el.calls[0]!.timing).toMatchObject({
-      fill: 'both',
-      composite: 'replace',
-      iterations: 1,
-    });
-    expect(el.calls[0]!.timing['duration']).toBeGreaterThan(0);
+    expect(el.calls[1]!.keyframes).toEqual([{ opacity: 0 }, { opacity: 1 }]);
+    for (const call of el.calls) {
+      expect(call.timing['easing']).toMatch(/^linear\(/);
+      expect(call.timing).toMatchObject({
+        fill: 'both',
+        composite: 'replace',
+        iterations: 1,
+      });
+      expect(call.timing['duration']).toBeGreaterThan(0);
+    }
 
     el.resolve();
     await expect(controls.finished).resolves.toBeUndefined();
@@ -182,7 +183,7 @@ describe('animate/native: springTo', () => {
     expect(Object.isFrozen(cancel)).toBe(true);
   });
 
-  it('в WebKit объединяет все свойства в adaptive keyframes с обычным linear', () => {
+  it('в WebKit строит отдельные adaptive keyframes с общим linear timing', () => {
     vi.stubGlobal('navigator', {
       vendor: 'Apple Computer, Inc.',
       userAgent: 'Mozilla/5.0 AppleWebKit/605.1.15 Version/18.0 Safari/605.1.15',
@@ -193,33 +194,33 @@ describe('animate/native: springTo', () => {
 
     const controls = springTo(el, { x: [0, 240], opacity: [0, 1] });
 
-    expect(el.calls).toHaveLength(1);
-    expect(el.calls[0]!.timing['easing']).toBe('linear');
-    expect(el.calls[0]!.keyframes.length).toBeGreaterThan(2);
-    for (const frame of el.calls[0]!.keyframes) {
-      expect(frame).toHaveProperty('transform');
-      expect(frame).toHaveProperty('opacity');
-      expect(frame).toHaveProperty('offset');
+    expect(el.calls).toHaveLength(2);
+    for (const call of el.calls) {
+      expect(call.timing['easing']).toBe('linear');
+      expect(call.keyframes.length).toBeGreaterThan(2);
+      for (const frame of call.keyframes) expect(frame).toHaveProperty('offset');
     }
     expect(el.calls[0]!.keyframes[0]).toEqual({
       transform: 'translateX(0px)',
-      opacity: 0,
       offset: 0,
     });
     expect(el.calls[0]!.keyframes.at(-1)).toEqual({
       transform: 'translateX(240px)',
-      opacity: 1,
       offset: 1,
     });
+    expect(el.calls[1]!.keyframes[0]).toEqual({ opacity: 0, offset: 0 });
+    expect(el.calls[1]!.keyframes.at(-1)).toEqual({ opacity: 1, offset: 1 });
     const samples = compileRestingSpringExecutionArtifactUnchecked(
       { mass: 1, stiffness: 170, damping: 26 },
       DEFAULT_TOLERANCE,
     ).samples;
     for (let i = 0; i < samples.length / 2; i++) {
-      expect(el.calls[0]!.keyframes[i]!['offset']).toBe(samples[i * 2]! / 100);
-      if (i > 0) {
-        expect(Number(el.calls[0]!.keyframes[i]!['offset']))
-          .toBeGreaterThan(Number(el.calls[0]!.keyframes[i - 1]!['offset']));
+      for (const call of el.calls) {
+        expect(call.keyframes[i]!['offset']).toBe(samples[i * 2]! / 100);
+        if (i > 0) {
+          expect(Number(call.keyframes[i]!['offset']))
+            .toBeGreaterThan(Number(call.keyframes[i - 1]!['offset']));
+        }
       }
     }
     controls.cancel();
