@@ -51,7 +51,8 @@ import {
   BENCHMARK_TIMER_ISOLATION_POLICY,
   createFreezeEvidence,
   deriveFirstPresentedElapsedMs,
-  deriveRealmTimerQuantum,
+  deriveRealmClockUncertainty,
+  deriveRealmTimerStep,
   deriveWarmStartCalibration,
   evaluateStartSemanticEvidence,
   makeRoundRobinOrders,
@@ -262,7 +263,8 @@ async function measureTimerCalibration(browser, pageUrl) {
   await context.close();
   return {
     timerEvidence,
-    timerQuantumMs: deriveRealmTimerQuantum('reference timer', timerEvidence),
+    timerStepMs: deriveRealmTimerStep('reference timer', timerEvidence),
+    clockUncertaintyMs: deriveRealmClockUncertainty('reference timer', timerEvidence),
     isolation: BENCHMARK_TIMER_ISOLATION_POLICY,
   };
 }
@@ -358,7 +360,7 @@ async function measureWarmStartCalibration(browser, adapters, libs, pageUrl) {
         .map((participant) => `${participant}=[${measurements[participant]
           .map((cluster) => (
             `${cluster.batchElapsedMs.map((value) => value.toFixed(3)).join('/')}` +
-            `@q${deriveRealmTimerQuantum(
+            `@step${deriveRealmTimerStep(
               `${id}.${participant} pilot`,
               cluster.timerEvidence,
             ).toFixed(6)}`
@@ -368,7 +370,7 @@ async function measureWarmStartCalibration(browser, adapters, libs, pageUrl) {
       if (participantIds.every((participant) => (
         measurements[participant].every((cluster) => (
           cluster.batchElapsedMs.every((value) => (
-            value >= deriveRealmTimerQuantum(
+            value >= deriveRealmTimerStep(
               `${id}.${participant} pilot`,
               cluster.timerEvidence,
             ) *
@@ -837,7 +839,8 @@ async function main() {
       referenceTimerEvidence: timerCalibration.timerEvidence,
       warmStartPilots: warmCalibration.pilots,
     },
-    referenceTimerQuantumMs: timerCalibration.timerQuantumMs,
+    referenceTimerStepMs: timerCalibration.timerStepMs,
+    referenceClockUncertaintyMs: timerCalibration.clockUncertaintyMs,
     isolation: timerCalibration.isolation,
     policy: WARM_TIMER_CALIBRATION_POLICY,
     effectiveWarmCalls: warmCalibration.effectiveWarmCalls,
@@ -969,7 +972,7 @@ async function main() {
   const ids = LIBS.map((l) => l.id);
   const stem = `${generatedAt.slice(0, 10)}-${provenance.revisionLabel}-${provenance.distRuntime.sha256.slice(0, 12)}`;
   const rawPayload = {
-    schema: 6,
+    schema: 7,
     package: { name: rootPkg.name, version: rootPkg.version },
     generatedAt,
     companion: { markdownFile: `${stem}.md`, markdownSha256: '' },

@@ -205,8 +205,8 @@ function fixture(startRuns = 20, warmCalls: Partial<Record<keyof typeof START_SC
   const revision = 'a'.repeat(40);
   const dist = SHA('b');
   const stem = `2026-07-13-${revision.slice(0, 12)}-${dist.slice(0, 12)}`;
-  const timerQuantumMs = 0.1;
-  const minimumElapsedMs = timerQuantumMs * WARM_TIMER_CALIBRATION_POLICY.minimumElapsedQuanta;
+  const timerStepMs = 0.1;
+  const minimumElapsedMs = timerStepMs * WARM_TIMER_CALIBRATION_POLICY.minimumElapsedQuanta;
   const warmStartPilots = Object.fromEntries(Object.entries(START_SCENARIO_MANIFEST).map(([id, config]) => {
     const targetCalls = warmCalls[id as keyof typeof START_SCENARIO_MANIFEST] ?? config.warmCalls;
     const rounds = [];
@@ -220,7 +220,7 @@ function fixture(startRuns = 20, warmCalls: Partial<Record<keyof typeof START_SC
               batchElapsedMs: Array.from({ length: config.warmSamples }, () => (
                 calls === targetCalls || participant !== 'gsap' ? minimumElapsedMs : 0
               )),
-              timerEvidence: timerEvidence(timerQuantumMs),
+              timerEvidence: timerEvidence(timerStepMs),
               measurementTimeOriginMs: TIMER_ORIGIN_MS,
             }
           )),
@@ -250,7 +250,7 @@ function fixture(startRuns = 20, warmCalls: Partial<Record<keyof typeof START_SC
     },
   };
   const payload: any = {
-    schema: 6,
+    schema: 7,
     package: { name: rootPackage.name, version: rootPackage.version },
     generatedAt,
     companion: { markdownFile: `${stem}.md`, markdownSha256: '' },
@@ -302,10 +302,11 @@ function fixture(startRuns = 20, warmCalls: Partial<Record<keyof typeof START_SC
     },
     calibration: {
       raw: {
-        referenceTimerEvidence: timerEvidence(timerQuantumMs),
+        referenceTimerEvidence: timerEvidence(timerStepMs),
         warmStartPilots,
       },
-      referenceTimerQuantumMs: timerQuantumMs,
+      referenceTimerStepMs: timerStepMs,
+      referenceClockUncertaintyMs: timerStepMs,
       isolation: structuredClone(BENCHMARK_TIMER_ISOLATION_POLICY),
       policy: structuredClone(WARM_TIMER_CALIBRATION_POLICY),
       effectiveWarmCalls: structuredClone(calibrated.effectiveWarmCalls),
@@ -351,9 +352,9 @@ describe('paired comparative benchmark report', () => {
     expect(payload.claims.method).toMatchObject({
       p95NonInferiorityMargin: 0.05,
       p95NonInferiorityMarginProvenance: 'product-tail-noninferiority-policy',
-      absoluteThresholdBasis: 'sum-of-participant-max-realm-local-clock-uncertainty',
-      intervalErrorQuantaPerParticipant: 1,
-      minimumTimedBatchQuanta: 4,
+      absoluteThresholdBasis: 'sum-of-participant-max-observed-clock-uncertainty',
+      intervalObservedBoundsPerParticipant: 1,
+      minimumTimedBatchSteps: 4,
       calibrationPilotClusters: 3,
       effectiveWarmCalls: { s1: 40, s2: 5, s3: 3, s4: 1 },
       relativeThresholdProvenance: 'product-practical-significance-policy',
@@ -387,7 +388,7 @@ describe('paired comparative benchmark report', () => {
     const f = fixture() as any;
     const calls = f.payload.scenarioManifest.s1.warmCalls;
     const minimumElapsedMs = (
-      f.payload.calibration.referenceTimerQuantumMs *
+      f.payload.calibration.referenceTimerStepMs *
       f.payload.calibration.policy.minimumElapsedQuanta
     );
     const cluster = f.payload.results.lab.raw.warm.s1[0];
@@ -412,8 +413,41 @@ describe('paired comparative benchmark report', () => {
       scenarioManifest: f.payload.scenarioManifest,
     });
     const claim = claims.performance.find((entry: any) => entry.id === 'warm.s1:motion');
-    expect(claim.realmTimerQuantumMs).toEqual({ lab: 0.2, competitor: 0.3 });
+    expect(claim.realmObservedUpperMs).toEqual({ lab: 0.2, competitor: 0.3 });
     expect(claim.absoluteThresholdMs).toBe((0.2 + 0.3) / 40);
+  });
+
+  it('keeps harmonic probe mass in the superiority uncertainty, not the warm floor', () => {
+    const f = fixture() as any;
+    const harmonicEvidence = () => {
+      const evidence = timerEvidence(0.005);
+      for (const probe of evidence.probes) {
+        probe.performanceNowDeltasMs = [
+          ...Array.from({ length: 48 }, () => 0.005),
+          ...Array.from({ length: 16 }, () => 0.01),
+        ];
+      }
+      return evidence;
+    };
+    for (const [id, sample] of [['lab', 0.185], ['motion', 0.2]] as const) {
+      for (const cluster of f.payload.results[id].raw.cold.s2) {
+        cluster.samples = [sample];
+        cluster.batchElapsedMs = [sample];
+        cluster.timerEvidence = harmonicEvidence();
+      }
+    }
+
+    const claims = createBenchmarkClaims(f.payload.results, {
+      seed: f.payload.orderSeed,
+      iterations: 200,
+      scenarioManifest: f.payload.scenarioManifest,
+    });
+    const claim = claims.performance.find((entry: any) => entry.id === 'cold.s2:motion');
+    expect(claim.realmObservedUpperMs).toEqual({ lab: 0.01, competitor: 0.01 });
+    expect(claim.absoluteThresholdMs).toBe(0.02);
+    expect(claim.absoluteGainMs).toBeCloseTo(0.015, 12);
+    expect(claim.gates.clockResolved).toBe(false);
+    expect(claim.verdict).toBe('inconclusive');
   });
 
   it.each([
@@ -443,7 +477,8 @@ describe('paired comparative benchmark report', () => {
     ['unbalanced start order', (f: any) => { f.payload.startOrders[1] = [...f.payload.startOrders[0]]; }],
     ['missing tool hash', (f: any) => { delete f.payload.provenance.environment.nodeExecutableSha256; }],
     ['missing Chromium tree hash', (f: any) => { delete f.payload.browser.treeSha256; }],
-    ['forged timer quantum', (f: any) => { f.payload.calibration.referenceTimerQuantumMs = 0.001; }],
+    ['forged timer step', (f: any) => { f.payload.calibration.referenceTimerStepMs = 0.001; }],
+    ['forged clock uncertainty', (f: any) => { f.payload.calibration.referenceClockUncertaintyMs = 0.001; }],
     ['missing timer isolation', (f: any) => { f.payload.calibration.isolation.crossOriginIsolated = false; }],
     ['missing publish realm evidence', (f: any) => { delete f.payload.results.lab.raw.warm.s1[0].timerEvidence; }],
     ['publish measurement realm drift', (f: any) => {

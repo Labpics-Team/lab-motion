@@ -5,12 +5,13 @@ import {
   applyHolmCorrection,
   assertBalancedRunBlocks,
   assertFreezeMatrix,
-  assertRealmTimeOrigin,
+  assertRealmClockUncertainty,
   assertWarmStartMeasurement,
   BENCHMARK_TIMER_ISOLATION_POLICY,
   deriveFirstPresentedElapsedMs,
   deriveFirstPresentedUncertaintyMs,
-  deriveRealmTimerQuantum,
+  deriveRealmClockUncertainty,
+  deriveRealmTimerStep,
   deriveWarmStartCalibration,
   evaluateStartSemanticEvidence,
   evaluatePerformanceClaim,
@@ -164,7 +165,7 @@ export function createBenchmarkClaims(
       const labClusters = results.lab?.raw?.[metric.section]?.[metric.rawScenario];
       const competitorClusters = results[competitor]?.raw?.[metric.section]?.[metric.rawScenario];
       let evidence;
-      let realmTimerQuantumMs;
+      let realmObservedUpperMs;
       let clockUncertaintyMs;
       try {
         if (metric.section === 'warm') {
@@ -184,7 +185,7 @@ export function createBenchmarkClaims(
             ));
           }
         }
-        const realmQuanta = { lab: [], competitor: [] };
+        const realmObserved = { lab: [], competitor: [] };
         for (const [role, clusters] of [
           ['lab', labClusters],
           ['competitor', competitorClusters],
@@ -197,18 +198,18 @@ export function createBenchmarkClaims(
             const measurementTimeOriginMs = metric.rawScenario === 'firstPresented'
               ? cluster?.presentedEvidence?.startClock?.pageTimeOriginMs
               : cluster?.measurementTimeOriginMs;
-            realmQuanta[role].push(assertRealmTimeOrigin(
+            realmObserved[role].push(assertRealmClockUncertainty(
               `${id}:${role}: cluster ${run + 1}`,
               calibration,
               measurementTimeOriginMs,
             ));
           });
         }
-        realmTimerQuantumMs = {
-          lab: Math.max(...realmQuanta.lab),
-          competitor: Math.max(...realmQuanta.competitor),
+        realmObservedUpperMs = {
+          lab: Math.max(...realmObserved.lab),
+          competitor: Math.max(...realmObserved.competitor),
         };
-        if (!Number.isFinite(realmTimerQuantumMs.lab) || !Number.isFinite(realmTimerQuantumMs.competitor)) {
+        if (!Number.isFinite(realmObservedUpperMs.lab) || !Number.isFinite(realmObservedUpperMs.competitor)) {
           throw new Error('нет realm-local timer calibration');
         }
         const calls = metric.section === 'warm'
@@ -227,12 +228,12 @@ export function createBenchmarkClaims(
         } else {
           clockUncertaintyMs = {
             lab: (
-              realmTimerQuantumMs.lab *
-              WARM_TIMER_CALIBRATION_POLICY.intervalErrorQuantaPerParticipant
+              realmObservedUpperMs.lab *
+              WARM_TIMER_CALIBRATION_POLICY.intervalObservedBoundsPerParticipant
             ) / calls,
             competitor: (
-              realmTimerQuantumMs.competitor *
-              WARM_TIMER_CALIBRATION_POLICY.intervalErrorQuantaPerParticipant
+              realmObservedUpperMs.competitor *
+              WARM_TIMER_CALIBRATION_POLICY.intervalObservedBoundsPerParticipant
             ) / calls,
           };
         }
@@ -248,7 +249,7 @@ export function createBenchmarkClaims(
         id,
         metric: metric.metric,
         competitor,
-        realmTimerQuantumMs,
+        realmObservedUpperMs,
         clockUncertaintyMs,
         absoluteThresholdMs: clockUncertaintyMs.lab + clockUncertaintyMs.competitor,
         evidence,
@@ -310,9 +311,9 @@ export function createBenchmarkClaims(
       alpha: 0.05,
       relativeThreshold: WARM_TIMER_CALIBRATION_POLICY.practicalRelativeThreshold,
       relativeThresholdProvenance: 'product-practical-significance-policy',
-      absoluteThresholdBasis: 'sum-of-participant-max-realm-local-clock-uncertainty',
-      intervalErrorQuantaPerParticipant: WARM_TIMER_CALIBRATION_POLICY.intervalErrorQuantaPerParticipant,
-      minimumTimedBatchQuanta: WARM_TIMER_CALIBRATION_POLICY.minimumElapsedQuanta,
+      absoluteThresholdBasis: 'sum-of-participant-max-observed-clock-uncertainty',
+      intervalObservedBoundsPerParticipant: WARM_TIMER_CALIBRATION_POLICY.intervalObservedBoundsPerParticipant,
+      minimumTimedBatchSteps: WARM_TIMER_CALIBRATION_POLICY.minimumElapsedQuanta,
       calibrationPilotClusters: WARM_TIMER_CALIBRATION_POLICY.pilotClusters,
       effectiveWarmCalls: Object.fromEntries(Object.keys(START_SCENARIO_MANIFEST).map((id) => (
         [id, scenarioManifest[id]?.warmCalls]
@@ -486,9 +487,11 @@ export function renderBenchmarkEnvironment(payload) {
     `Ревизия: ${payload.provenance.revisionLabel}`,
     `Машина: ${system.cpu} × ${system.logicalCpus}, ${system.memoryGiB} GB RAM`,
     `ОС: ${system.osType} ${system.osRelease}; Node ${payload.provenance.environment.node}; Chromium ${payload.browser.version} (binary SHA-256 ${payload.browser.executableSha256})`,
-    `Справочная верхняя граница кванта performance.now(): ${payload.calibration.referenceTimerQuantumMs} мс (${referenceProbes.reduce((total, probe) => total + probe.performanceNowDeltasMs.length, 0)} raw delta)`,
+    `Справочный шаг сетки performance.now(): ${payload.calibration.referenceTimerStepMs} мс`,
+    `Наблюдаемая граница погрешности часов: ${payload.calibration.referenceClockUncertaintyMs} мс (${referenceProbes.reduce((total, probe) => total + probe.performanceNowDeltasMs.length, 0)} исходных дельт)`,
     `Timer isolation: cross-origin isolated; COOP=${payload.calibration.isolation.crossOriginOpenerPolicy}, COEP=${payload.calibration.isolation.crossOriginEmbedderPolicy}; claims используют before/after probes каждого realm`,
-    `Warm-калибровка: ${payload.calibration.policy.pilotClusters} pilot-кластера publish-формы × ≥${payload.calibration.policy.minimumElapsedQuanta} квантов; calls ${Object.entries(payload.calibration.effectiveWarmCalls).map(([id, calls]) => `${id}=${calls}`).join(', ')}`,
+    'Шаг сетки: верхний край устойчивой одношаговой моды; дельты выше края обязаны лежать в диапазоне целого числа её шагов',
+    `Warm-калибровка: ${payload.calibration.policy.pilotClusters} pilot-кластера publish-формы × ≥${payload.calibration.policy.minimumElapsedQuanta} шагов сетки; calls ${Object.entries(payload.calibration.effectiveWarmCalls).map(([id, calls]) => `${id}=${calls}`).join(', ')}`,
     `Прогонов: S1–S4 × ${payload.startOrders.length} (p50/p95), freeze × ${payload.freezeOrders.length} (p50); raw JSON`,
     `Библиотеки: ${payload.participants.freeze.map((id) => payload.results[id].version).join(', ')}`,
   ];
@@ -580,9 +583,9 @@ export function renderBenchmarkMarkdown(payload) {
     'Победа требует CI целиком ниже 1, выигрыш не менее 5% и строго больше clock uncertainty, зелёную семантику,',
     `Holm-гейт всего семейства и p95 upper CI ≤ ${(1 + payload.claims.method.p95NonInferiorityMargin).toFixed(2)}. Общего рейтинга нет.`,
     'Один calls-батч на сценарий выбирается общими pilot-раундами всех участников и удваивается,',
-    `пока каждый sample каждого из ${payload.calibration.policy.pilotClusters} pilot-кластеров publish-формы не достигнет ${payload.calibration.policy.minimumElapsedQuanta} локальных квантов performance.now(); pilots не входят в report samples.`,
-    'Каждый publish-кластер повторяет raw timer probes до и после измерения; warm batch ниже собственного пола инвалидирует отчёт.',
-    'Clock threshold — сумма худших realm-local неопределённостей Lab и конкурента; равенство порогу не считается различием.',
+    `пока каждое пакетное измерение каждого из ${payload.calibration.policy.pilotClusters} pilot-кластеров publish-формы не достигнет ${payload.calibration.policy.minimumElapsedQuanta} локальных шагов performance.now(); pilots не входят в выборку.`,
+    'Каждый publish-кластер повторяет исходные пробы часов до и после измерения; пакет ниже собственного пола инвалидирует отчёт.',
+    'Порог часов — сумма максимумов всех наблюдаемых дельт Lab и конкурента с учётом числа вызовов; равенство порогу не считается различием.',
     '5% для p50 — продуктовая граница практической значимости; 5% для p95 — отдельная продуктовая',
     'non-inferiority policy. Эти значения не выдаются за статистические константы.',
     '',
@@ -642,7 +645,7 @@ export function validateBenchmarkReportPair({
   benchmarkPackage,
   now = Date.now(),
 }) {
-  if (payload?.schema !== 6) fail(`schema ${String(payload?.schema)} не поддержана`);
+  if (payload?.schema !== 7) fail(`schema ${String(payload?.schema)} не поддержана`);
   if (
     payload.package?.name !== rootPackage.name ||
     payload.package?.version !== rootPackage.version
@@ -736,9 +739,13 @@ export function validateBenchmarkReportPair({
   assertSha(payload.browser.executableSha256, 'Chromium executable');
   assertSha(payload.browser.treeSha256, 'Chromium runtime tree');
   const referenceTimerEvidence = payload.calibration?.raw?.referenceTimerEvidence;
-  const timerQuantumMs = deriveRealmTimerQuantum('reference timer', referenceTimerEvidence);
-  if (payload.calibration?.referenceTimerQuantumMs !== timerQuantumMs) {
-    fail('timer quantum не пересчитывается из raw calibration');
+  const timerStepMs = deriveRealmTimerStep('reference timer', referenceTimerEvidence);
+  const clockUncertaintyMs = deriveRealmClockUncertainty('reference timer', referenceTimerEvidence);
+  if (payload.calibration?.referenceTimerStepMs !== timerStepMs) {
+    fail('timer step не пересчитывается из исходной калибровки');
+  }
+  if (payload.calibration?.referenceClockUncertaintyMs !== clockUncertaintyMs) {
+    fail('clock uncertainty не пересчитывается из исходной калибровки');
   }
   if (!isDeepStrictEqual(payload.calibration?.isolation, BENCHMARK_TIMER_ISOLATION_POLICY)) {
     fail('timer realm не подтверждает каноническую cross-origin isolation');
