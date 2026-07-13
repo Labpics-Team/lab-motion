@@ -47,6 +47,20 @@ describe('compositor cache: SpringLinearCache — roundtrip', () => {
     expect(c.size).toBe(1);
     expect(c.lookup(1, 1, 1, 1, 1)).toBe('v2');
   });
+
+  it('generic node-pool сверяет raw exact-key при коллизии числового хеша', () => {
+    const c = new SpringLinearCache<readonly { progress: number; percent: number }[]>(4);
+    const oldNodes = [{ progress: 0, percent: 0 }];
+    const nextNodes = [{ progress: 1, percent: 100 }];
+    // Детерминированная коллизия числовой свёртки: +1 в первом поле ровно
+    // компенсируется −31 во втором. Identity всё равно решают raw-поля.
+    c.store(1, 0, 3, 4, 5, oldNodes);
+    c.store(2, -31, 3, 4, 5, nextNodes);
+
+    expect(c.lookup(1, 0, 3, 4, 5)).toBeUndefined();
+    expect(c.lookup(2, -31, 3, 4, 5)).toBe(nextNodes);
+    expect(c.size).toBe(1);
+  });
 });
 
 describe('compositor cache: LRU-вытеснение и recency', () => {
@@ -70,6 +84,20 @@ describe('compositor cache: LRU-вытеснение и recency', () => {
     expect(c.lookup(1, 0, 0, 0, 0)).toBe('A'); // выжил (был тронут)
     expect(c.lookup(2, 0, 0, 0, 0)).toBeUndefined(); // B вытеснен
     expect(c.lookup(3, 0, 0, 0, 0)).toBe('C');
+  });
+
+  it('чтение WebKit-узлов участвует в том же LRU-recency', () => {
+    const c = new SpringLinearCache<readonly { progress: number; percent: number }[]>(2);
+    const nodes = (progress: number) => [{ progress, percent: progress * 100 }];
+    c.store(1, 0, 0, 0, 0, nodes(1));
+    c.store(2, 0, 0, 0, 0, nodes(2));
+    c.lookup(1, 0, 0, 0, 0); // 1 теперь MRU, 2 — LRU
+    c.store(3, 0, 0, 0, 0, nodes(3));
+
+    expect(c.lookup(1, 0, 0, 0, 0)).toBeDefined();
+    expect(c.lookup(2, 0, 0, 0, 0)).toBeUndefined();
+    expect(c.lookup(3, 0, 0, 0, 0)).toBeDefined();
+    expect(c.size).toBe(2);
   });
 
   it('clear опустошает кэш', () => {
@@ -147,14 +175,12 @@ describe('compositor cache: компилятор поверх кэша', () => {
     expect(compiler.size).toBe(0);
   });
 
-  it('квантование: перцептивно-идентичные пружины делят план, но не грубо', () => {
+  it('exact-key: даже близкие коэффициенты не смешивают физику', () => {
     const compiler = createSpringLinearCache(8);
     compiler.compile({ mass: 1, stiffness: 170, damping: 26 });
-    // Отличие ниже шага квантования (stiffness Q=1e4 → шаг 1e-4) → тот же ключ.
     compiler.compile({ mass: 1, stiffness: 170.000001, damping: 26 });
-    expect(compiler.size).toBe(1);
-    // Заметное отличие → отдельный план.
-    compiler.compile({ mass: 1, stiffness: 175, damping: 26 });
     expect(compiler.size).toBe(2);
+    compiler.compile({ mass: 1, stiffness: 175, damping: 26 });
+    expect(compiler.size).toBe(3);
   });
 });

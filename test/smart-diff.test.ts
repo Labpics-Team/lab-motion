@@ -53,18 +53,16 @@ describe('./smart: walker по keyAttr (light DOM + открытые shadow root
     expect(cap.size).toBe(2); // inner (shadow) + deep (за keyless-обёрткой)
   });
 
-  it('дубликат ключа → MotionParamError с буквальным текстом', () => {
+  it('дубликат ключа → MotionParamError с кодом LM084', () => {
     const world = makeSmartWorld();
     const a = world.el('a', { x: 0, y: 0, width: 10, height: 10 }, { key: 'card-3' });
     const b = world.el('b', { x: 20, y: 0, width: 10, height: 10 }, { key: 'card-3' });
     const root = world.root('root', { x: 0, y: 0, width: 100, height: 100 }, { children: [a, b] });
     expect(() => captureSmart(root, opts(world, makeClock()))).toThrowError(MotionParamError);
-    expect(() => captureSmart(root, opts(world, makeClock()))).toThrowError(
-      'smart: duplicate data-motion-key="card-3" under root',
-    );
+    expect(() => captureSmart(root, opts(world, makeClock()))).toThrowError('LM084');
   });
 
-  it('кастомный keyAttr уважается (и walker, и текст ошибки дубликата)', () => {
+  it('кастомный keyAttr уважается и сохраняет код дубликата', () => {
     const world = makeSmartWorld();
     const a = world.el('a', { x: 0, y: 0, width: 10, height: 10 });
     a.attrs.set('data-id', 'x');
@@ -72,9 +70,8 @@ describe('./smart: walker по keyAttr (light DOM + открытые shadow root
     b.attrs.set('data-id', 'x');
     const root = world.root('root', { x: 0, y: 0, width: 100, height: 100 }, { children: [a, b] });
     const clock = makeClock();
-    expect(() => captureSmart(root, { ...opts(world, clock), keyAttr: 'data-id' })).toThrowError(
-      'smart: duplicate data-id="x" under root',
-    );
+    expect(() => captureSmart(root, { ...opts(world, clock), keyAttr: 'data-id' }))
+      .toThrowError('LM084');
   });
 });
 

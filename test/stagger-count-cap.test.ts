@@ -2,7 +2,7 @@
  * test/stagger-count-cap.test.ts — availability guard for extreme `count` (ST6)
  *
  * Invariant ST6: count is clamped to a fixed upper bound (MAX_STAGGER_COUNT
- * = 100_000, private to src/stagger/index.ts). A hostile or accidental
+ * = 100_000, private to the stagger scheduler). A hostile or accidental
  * extreme count MUST NOT hang the event loop or attempt an unbounded
  * `new Array(n)` allocation — the guard exists precisely so
  * `stagger(Number.MAX_SAFE_INTEGER)` / `stagger(1e9)` complete fast and
@@ -32,7 +32,7 @@
 import { describe, expect, it } from 'vitest';
 import { stagger } from '../src/stagger/index.js';
 
-// Mirrors the private MAX_STAGGER_COUNT in src/stagger/index.ts.
+// Mirrors the private MAX_STAGGER_COUNT in the stagger scheduler.
 // Kept as a local literal (not exported) — the cap value is an
 // implementation detail of ST6, not part of the public API surface.
 const MAX_STAGGER_COUNT = 100_000;

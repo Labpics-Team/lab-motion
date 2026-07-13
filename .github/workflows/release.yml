@@ -392,23 +392,22 @@ jobs:
             return 0;
           }
 
-          async function assertMonotonicLatest() {
+          const candidate = stableVersion(version, 'кандидат');
+
+          async function lookupLatest() {
             const response = await fetch(`${packageUrl}?latest=${Date.now()}`, {
               cache: 'no-store',
               headers: { accept: 'application/json' },
             });
-            if (response.status === 404) return;
+            if (response.status === 404) return null;
             if (!response.ok) fail(`npm packument ответил ${response.status}`);
             const packument = await response.json();
-            const latest = packument['dist-tags']?.latest;
-            if (typeof latest !== 'string') fail('npm packument не содержит dist-tags.latest');
-            if (compareVersions(stableVersion(version, 'кандидат'), stableVersion(latest, 'npm latest')) < 0) {
-              fail(`кандидат ${version} ниже npm latest ${latest} и не может его откатить`);
-            }
-            console.log(`npm latest ${latest}; кандидат ${version} не откатывает dist-tag`);
+            const raw = packument['dist-tags']?.latest;
+            if (typeof raw !== 'string') fail('npm packument не содержит dist-tags.latest');
+            return { raw, parsed: stableVersion(raw, 'npm latest') };
           }
 
-          async function lookup() {
+          async function lookupVersion() {
             const response = await fetch(`${registryUrl}?reconcile=${Date.now()}`, {
               cache: 'no-store',
               headers: { accept: 'application/json' },
@@ -418,19 +417,44 @@ jobs:
             return response.json();
           }
 
-          async function reconcile(attempts) {
+          function assertPublishPreflight(latest) {
+            if (latest === null) return;
+            if (compareVersions(candidate, latest.parsed) <= 0) {
+              fail(`новый кандидат ${version} должен быть строго выше npm latest ${latest.raw} и не может откатить npm latest`);
+            }
+          }
+
+          async function reconcile(attempts, mode) {
+            if (mode !== 'idempotent' && mode !== 'published') fail(`неизвестный режим reconcile: ${mode}`);
             for (let attempt = 1; attempt <= attempts; attempt++) {
-              const metadata = await lookup();
+              const [metadata, latest] = await Promise.all([lookupVersion(), lookupLatest()]);
               if (metadata !== null) {
                 const published = metadata.dist?.integrity;
                 if (published !== integrity) {
                   fail(`версия уже существует с другим integrity: ${String(published)}`);
                 }
-                if (
+                const provenanceReady =
                   metadata.dist?.attestations?.provenance?.predicateType === provenanceType &&
-                  typeof metadata.dist?.attestations?.url === 'string'
-                ) {
-                  return true;
+                  typeof metadata.dist?.attestations?.url === 'string';
+                if (latest !== null) {
+                  const comparison = compareVersions(latest.parsed, candidate);
+                  if (mode === 'published') {
+                    if (comparison >= 0 && provenanceReady) {
+                      if (comparison > 0) {
+                        console.log(
+                          `${identity}: монотонная конкурентная публикация подняла npm latest ` +
+                          `до ${latest.raw}; кандидат ${version} проверен и не требует retag`,
+                        );
+                      }
+                      return true;
+                    }
+                  }
+                  if (mode === 'idempotent') {
+                    if (comparison < 0) {
+                      fail(`idempotent latest ниже кандидата: ${latest.raw} < ${version}`);
+                    }
+                    if (provenanceReady) return true;
+                  }
                 }
               }
               if (attempt < attempts) await delay(5_000);
@@ -438,30 +462,34 @@ jobs:
             return false;
           }
 
-          if (await reconcile(1)) {
-            console.log(`${identity} уже опубликован с проверенными байтами и provenance`);
-            process.exit(0);
+          const existing = await lookupVersion();
+          if (existing !== null) {
+            if (await reconcile(12, 'idempotent')) {
+              console.log(`${identity} уже опубликован с проверенными байтами, provenance и latest не ниже кандидата`);
+              process.exit(0);
+            }
+            fail(`${identity}: idempotent registry state не подтвердился`);
           }
 
-          await assertMonotonicLatest();
+          await assertPublishPreflight(await lookupLatest());
 
           let publishError;
           try {
             execFileSync(
               'npm',
-              ['publish', process.env.TARBALL, '--access', 'public', '--provenance', '--ignore-scripts'],
+              ['publish', process.env.TARBALL, '--registry=https://registry.npmjs.org', '--tag', 'latest', '--access', 'public', '--provenance', '--ignore-scripts'],
               { stdio: 'inherit' },
             );
           } catch (error) {
             publishError = error;
           }
 
-          if (await reconcile(12)) {
-            console.log(`${identity}: registry integrity и provenance подтверждены`);
+          if (await reconcile(12, 'published')) {
+            console.log(`${identity}: registry integrity, provenance и монотонный latest подтверждены`);
             process.exit(0);
           }
           if (publishError) throw publishError;
-          fail(`${identity} не появился в registry с provenance после npm publish`);
+          fail(`${identity}: registry не подтвердил integrity, provenance и монотонный latest после npm publish`);
           NODE
 
       - name: Verify registry provenance statement and signatures

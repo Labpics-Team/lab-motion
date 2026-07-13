@@ -9,7 +9,7 @@
  *   Убрать страж `t <= 0 ? 0` в interpolateUnit → endpoint-тесты для t=0 падают.
  *   Убрать hue-wraparound в interpolateHsl → тест "кратчайший путь hue" падает.
  *   Убрать clampFinite в lerpField → overflow-тест падает.
- *   Убрать `parts.push('none')` default в buildTransform → тест identity-трансформа падает.
+ *   Убрать identity-fallback `none` в buildTransform → тест identity-трансформа падает.
  */
 
 import { describe, expect, it } from 'vitest';

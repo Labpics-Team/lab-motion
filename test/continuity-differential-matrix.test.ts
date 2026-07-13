@@ -357,11 +357,12 @@ const P1_TESTS: Partial<Record<CheckId, () => void | Promise<void>>> = {
   DEGEN() {
     const { clock, mv } = p1Vertical();
     expect(Math.abs(mv.velocity)).toBeGreaterThan(1);
+    const velocity = mv.velocity;
     const here = mv.value;
     mv.setTarget(here); // вырожденный range≈0 при живой скорости
     clock.drain(1);
-    expect(mv.value).toBe(here); // снап в цель
-    expect(Object.is(mv.velocity, 0)).toBe(true); // скорость РОВНО 0, не −0
+    expect(mv.value).toBe(here); // новый ран рождается в точке захвата
+    expect(mv.velocity / velocity).toBeCloseTo(1, 10); // импульс не потерян
     mv.destroy();
   },
   NONFIN() {
@@ -777,10 +778,11 @@ const P3_TESTS: Partial<Record<CheckId, () => void | Promise<void>>> = {
   },
   DEGEN() {
     // Перехват в ТУ ЖЕ точку (range₂ = 0) при живой скорости tween:
-    // вырожденный ран снапается, скорость не «оживляет» его.
+    // синтетический solver-span сохраняет абсолютный импульс.
     const r = p3Intercept({ durationMs: 400, ease: linear, seekMs: 200, to2: 50 });
     expect(r.xMid).toBeCloseTo(50, 9);
-    expect(r.xs.at(-1)!).toBe(50); // остался ровно в точке
+    expect(r.xs.at(-2)!).toBeCloseTo(50, 9); // кадр t=0 без скачка
+    expect(r.xs.at(-1)!).toBeGreaterThan(50); // затем едет по импульсу tween
     expect(allWritesFinite(r.f.writes)).toBe(true);
   },
   NONFIN() {
@@ -1386,8 +1388,8 @@ const P7_TESTS: Partial<Record<CheckId, () => void | Promise<void>>> = {
     expect(Math.min(...live.slice(1))).toBeLessThan(50); // знак не перевёрнут
   },
   DEGEN() {
-    // Документированный вырожденный дефолт: target опущен (= value) при
-    // ненулевой скорости → нуль-range снапает сразу, скорость гаснет в 0.
+    // target опущен (= value), но ненулевой абсолютный импульс не исчезает:
+    // значение выбегает в его направлении и физически возвращается в ту же точку.
     const clock = drainClock();
     const seen: number[] = [];
     const mv = handoffToLive({
@@ -1398,9 +1400,11 @@ const P7_TESTS: Partial<Record<CheckId, () => void | Promise<void>>> = {
       onChange: (v) => seen.push(v),
     });
     clock.drain();
-    for (const v of seen) expect(v).toBe(70);
+    expect(seen[0]).toBe(70);
+    expect(Math.max(...seen.slice(1, -1))).toBeGreaterThan(70);
+    expect(seen.at(-1)).toBe(70);
     expect(mv.value).toBe(70);
-    expect(mv.velocity).toBe(0); // вырожденное → ровно 0
+    expect(mv.velocity).toBe(0);
     mv.destroy();
   },
   NONFIN() {

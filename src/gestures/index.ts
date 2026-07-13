@@ -22,7 +22,7 @@
  */
 
 import { createDecay, type DecayModel } from '../decay.js';
-import { trimSlidingWindow } from '../internal/sliding-window.js';
+import { advanceSlidingWindow } from '../internal/sliding-window.js';
 import { solveSpring } from '../internal/solver.js';
 import { CONVERGENCE_THRESHOLD } from '../internal/constants.js';
 import type { MatchMediaLike } from '../internal/media-query.js';
@@ -82,23 +82,25 @@ export function createVelocityTracker(windowSec?: number): VelocityTracker {
       ? windowSec
       : DEFAULT_VELOCITY_WINDOW_S;
   let samples: GesturePoint[] = [];
+  let start = 0;
 
   return {
     push(p: GesturePoint): void {
       const s = { x: finite(p.x), y: finite(p.y), t: finite(p.t) };
       samples.push(s);
-      samples = trimSlidingWindow(samples, win);
+      start = advanceSlidingWindow(samples, start, win);
     },
     velocity(): { vx: number; vy: number } {
-      if (samples.length < 2) return { vx: 0, vy: 0 };
-      const a = samples[0];
+      if (samples.length - start < 2) return { vx: 0, vy: 0 };
+      const a = samples[start]!;
       const b = samples[samples.length - 1];
       const dt = b.t - a.t;
       if (!(dt > 0)) return { vx: 0, vy: 0 }; // Δt<=0/NaN → нет наклона
       return { vx: finite(finiteSub(b.x, a.x) / dt), vy: finite(finiteSub(b.y, a.y) / dt) };
     },
     reset(): void {
-      samples = [];
+      samples.length = 0;
+      start = 0;
     },
   };
 }

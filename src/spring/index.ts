@@ -28,7 +28,7 @@
  * Инварианты: zero-DOM, zero-deps, детерминизм, MotionParamError рано.
  */
 
-import { settleTimeUpperBound, spring, type SpringParams } from '../spring.js';
+import { settleTimeAtRestUpperBound, spring, type SpringParams } from '../spring.js';
 import { MotionParamError } from '../errors.js';
 
 // ─── Бюджет валидатора (зеркалит выведенный закон spring.ts, 2026-07-03) ─────
@@ -62,13 +62,13 @@ export interface FromBounceOptions {
 
 function checkBounce(bounce: number, name: string): void {
   if (!Number.isFinite(bounce) || bounce < -1 || bounce > 1) {
-    throw new MotionParamError(`${name}: bounce должен быть конечным в [−1, 1], получено ${bounce}`);
+    throw new MotionParamError('LM092');
   }
 }
 
 function checkPositive(v: number, name: string, field: string): void {
   if (!Number.isFinite(v) || v <= 0) {
-    throw new MotionParamError(`${name}: ${field} должен быть положительным конечным, получено ${v}`);
+    throw new MotionParamError('LM093');
   }
 }
 
@@ -98,7 +98,7 @@ function toParams(omega0Raw: number, zetaRaw: number, mass: number): SpringParam
       stiffness: mass * omega0 * omega0,
       damping: 2 * mass * zeta * omega0,
     };
-    const t = settleTimeUpperBound(params);
+    const t = settleTimeAtRestUpperBound(params);
     if (t <= SETTLE_BUDGET_S) break;
     omega0 *= (t / SETTLE_BUDGET_S) * 1.02;
   }
@@ -167,7 +167,7 @@ export function fromVisualDuration(options: FromVisualDurationOptions): SpringPa
       return { mass, stiffness: mass * w * w, damping: 2 * mass * z * w };
     };
     const fits = (z: number): boolean =>
-      settleTimeUpperBound(paramsAt(z)) <= SETTLE_BUDGET_S;
+      settleTimeAtRestUpperBound(paramsAt(z)) <= SETTLE_BUDGET_S;
     if (fits(zeta)) return paramsAt(zeta);
     const Z_HI = 0.995; // почти-критическая; ближе к 1 касание вырождается численно
     if (fits(Z_HI)) {

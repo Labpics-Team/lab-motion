@@ -200,6 +200,23 @@ describe('animate tween: аналитическая скорость = range·ea
 // ─── Класс Б: границы контракта (покой и враждебный ease) ────────────────────
 
 describe('animate tween: границы скорости (Класс Б)', () => {
+  it('opaque ease вызывается один раз на обычный кадр; производная — только при перехвате', () => {
+    const f = fakeEl();
+    const clock = makeClock();
+    let calls = 0;
+    const ease = (t: number): number => {
+      calls++;
+      return t;
+    };
+    animate(f.el, { x: 100 }, { duration: 1000, ease, requestFrame: clock.requestFrame });
+    for (let i = 0; i < 5; i++) clock.step(16);
+    expect(calls).toBe(5);
+
+    // Повторный animate захватывает velocity: два сэмпла центральной разности.
+    animate(f.el, { x: 200 }, { spring: SPRING, requestFrame: clock.requestFrame });
+    expect(calls).toBe(7);
+  });
+
   it('после естественного оседания tween реестр в покое: следующий ран стартует с v0=0', async () => {
     const f = fakeEl();
     const clock = makeClock();

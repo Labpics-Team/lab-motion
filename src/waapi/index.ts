@@ -84,9 +84,7 @@ const DEFAULT_EASING_POINTS = 33;
  */
 export function easingToLinear(fn: WaapiEasingFn, points: number = DEFAULT_EASING_POINTS): string {
   if (!Number.isInteger(points) || points < 2) {
-    throw new MotionParamError(
-      `easingToLinear: points должен быть целым >= 2, получено ${points}`,
-    );
+    throw new MotionParamError('LM119');
   }
   const safe = normalizeEasing(fn);
   const stops: string[] = [];
@@ -107,23 +105,20 @@ function validateOptions(o: WaapiCompileOptions): {
   segmentEasings: readonly WaapiEasingFn[] | undefined;
 } {
   if (typeof o.property !== 'string' || o.property.length === 0) {
-    throw new MotionParamError(`compileWaapi: property должен быть непустой строкой`);
+    throw new MotionParamError('LM120');
   }
   // Эти имена — метаданные WAAPI-кейфрейма: значение перезаписало бы offset/easing
   // кадра. CSS-свойство offset в WAAPI пишется как cssOffset (MDN Keyframe Formats).
   if (o.property === 'offset' || o.property === 'easing' || o.property === 'composite') {
-    throw new MotionParamError(
-      `compileWaapi: property '${o.property}' конфликтует с полем WAAPI-кейфрейма` +
-        (o.property === 'offset' ? `; CSS-свойство offset задаётся как 'cssOffset'` : ''),
-    );
+    throw new MotionParamError('LM121');
   }
   const n = o.values.length;
   if (n < 2) {
-    throw new MotionParamError(`compileWaapi: values должен содержать >= 2 значений, получено ${n}`);
+    throw new MotionParamError('LM122');
   }
   for (const v of o.values) {
     if (!Number.isFinite(v)) {
-      throw new MotionParamError(`compileWaapi: values должны быть конечными, получено ${v}`);
+      throw new MotionParamError('LM123');
     }
   }
 
@@ -132,17 +127,15 @@ function validateOptions(o: WaapiCompileOptions): {
     times = o.values.map((_, i) => i / (n - 1));
   } else {
     if (o.times.length !== n) {
-      throw new MotionParamError(
-        `compileWaapi: длина times (${o.times.length}) должна совпадать с values (${n})`,
-      );
+      throw new MotionParamError('LM124');
     }
     if (o.times[0] !== 0 || o.times[n - 1] !== 1) {
-      throw new MotionParamError(`compileWaapi: times[0] должен быть 0, times[last] — 1`);
+      throw new MotionParamError('LM125');
     }
     for (let i = 0; i < n; i++) {
       const t = o.times[i]!;
       if (!Number.isFinite(t) || (i > 0 && t < o.times[i - 1]!)) {
-        throw new MotionParamError(`compileWaapi: times должны быть конечными и неубывающими`);
+        throw new MotionParamError('LM126');
       }
     }
     times = o.times;
@@ -150,34 +143,25 @@ function validateOptions(o: WaapiCompileOptions): {
 
   const duration = o.duration ?? 1;
   if (!Number.isFinite(duration) || duration <= 0) {
-    throw new MotionParamError(`compileWaapi: duration должен быть положительным конечным, получено ${duration}`);
+    throw new MotionParamError('LM127');
   }
 
   const repeat = o.repeat ?? 0;
   if (repeat !== Infinity && (!Number.isInteger(repeat) || repeat < 0)) {
-    throw new MotionParamError(
-      `compileWaapi: repeat должен быть целым >= 0 или Infinity, получено ${repeat}`,
-    );
+    throw new MotionParamError('LM128');
   }
 
   const repeatDelay = o.repeatDelay ?? 0;
   if (!Number.isFinite(repeatDelay) || repeatDelay < 0) {
-    throw new MotionParamError(
-      `compileWaapi: repeatDelay должен быть конечным >= 0, получено ${repeatDelay}`,
-    );
+    throw new MotionParamError('LM129');
   }
 
   const repeatType = o.repeatType ?? 'loop';
   if (repeatType !== 'loop' && repeatType !== 'reverse' && repeatType !== 'mirror') {
-    throw new MotionParamError(
-      `compileWaapi: repeatType должен быть 'loop', 'reverse' или 'mirror', получено ${String(repeatType)}`,
-    );
+    throw new MotionParamError('LM130');
   }
   if (repeatDelay > 0 && repeat > 0 && repeatType !== 'loop') {
-    throw new MotionParamError(
-      `compileWaapi: repeatDelay с repeatType '${repeatType}' не поддерживается WAAPI-путём — ` +
-        `hold-запекание исказило бы обратные циклы; используйте ./keyframes (rAF-путь) или 'loop'`,
-    );
+    throw new MotionParamError('LM131');
   }
 
   let segmentEasings: readonly WaapiEasingFn[] | undefined;
@@ -186,20 +170,14 @@ function validateOptions(o: WaapiCompileOptions): {
       segmentEasings = Array.from({ length: n - 1 }, () => o.easing as WaapiEasingFn);
     } else {
       if (!Array.isArray(o.easing)) {
-        throw new MotionParamError(
-          `compileWaapi: easing должен быть функцией или массивом функций, получено ${typeof o.easing}`,
-        );
+        throw new MotionParamError('LM132');
       }
       if (o.easing.length !== n - 1) {
-        throw new MotionParamError(
-          `compileWaapi: массив easing (${o.easing.length}) должен иметь length = values.length − 1 (${n - 1})`,
-        );
+        throw new MotionParamError('LM133');
       }
       for (const e of o.easing) {
         if (typeof e !== 'function') {
-          throw new MotionParamError(
-            `compileWaapi: каждый easing должен быть функцией, получено ${typeof e}`,
-          );
+          throw new MotionParamError('LM134');
         }
       }
       segmentEasings = o.easing;
@@ -289,9 +267,7 @@ export function animateWaapi(
   options: WaapiCompileOptions & { fill?: WaapiCompiled['timing']['fill'] },
 ): unknown {
   if (!supportsWaapi(el)) {
-    throw new MotionParamError(
-      `animateWaapi: цель не поддерживает WAAPI (нет метода animate); проверяйте supportsWaapi() и используйте rAF-путь как фоллбек`,
-    );
+    throw new MotionParamError('LM135');
   }
   const { fill, ...compileOptions } = options;
   const compiled = compileWaapi(compileOptions);

@@ -5,7 +5,7 @@
  * (1) валидация без ПОЗИТИВНОГО контр-теста (мутант `if(true)`/всегда-throw
  *     выживает — ни один тест не подавал keyframes() ВАЛИДНЫЕ явные times/easing[]
  *     и не проверял, что они ПРИНЯТЫ; дифф-тесты зовут sampleKeyframes напрямую,
- *     минуя compileKeyframes) + текст сообщений (throw проверялся без контента);
+ *     минуя compileKeyframes) + смысловой код каждой границы;
  * (2) направление yoyo `cycleIndex % 2` — пинилось лишь на 2-м цикле (нужен 3-й);
  * (3) lastCycleEndValue / progress / seek-clamp — точность значений не пиналась.
  *
@@ -45,10 +45,10 @@ function runToEnd(opts: Omit<KeyframesOptions, 'requestFrame' | 'onStep'>): numb
   return last;
 }
 
-// ─── КЛАСС 1: валидация принимает валидное + сообщение называет поле ──────────
+// ─── КЛАСС 1: валидация принимает валидное + ошибки различаются кодами ─────────
 // Убивает: `if(true)`/`if(false)`/`===`↔`!==` мутанты условий валидации
-// (нужен ПОЗИТИВНЫЙ путь) + мутации текста сообщений `...` → `` (нужен контент).
-describe('keyframes валидация: валидное ПРИНЯТО + сообщение называет поле', () => {
+// (нужен ПОЗИТИВНЫЙ путь) + подмена смыслового кода.
+describe('keyframes валидация: валидное ПРИНЯТО + точный code-only контракт', () => {
   it('валидные явные times (length===n, [0..1], ascending) ПРИНЯТЫ (kill if(true) на times-блоке)', () => {
     // Ни один прежний тест не подавал keyframes() валидные явные times →
     // мутант `if (opts.times.length !== n)` → `if (true)` (всегда throw) выживал.
@@ -75,22 +75,22 @@ describe('keyframes валидация: валидное ПРИНЯТО + соо
   });
 
   const cases: Array<[string, KeyframesOptions, RegExp]> = [
-    ['values<2', { values: [0] }, /values/],
-    ['values non-finite', { values: [0, NaN] }, /values\[1\]|конечным/],
-    ['times length', { values: [0, 1, 2], times: [0, 1] }, /times\.length|совпадать/],
-    ['times non-finite', { values: [0, 1], times: [0, NaN] }, /times\[1\]|конечным/],
-    ['times[0]!==0', { values: [0, 1], times: [0.1, 1] }, /times\[0\]/],
-    ['times[last]!==1', { values: [0, 1], times: [0, 0.9] }, /times\[last\]|последн|=\s*1/],
-    ['times non-ascending', { values: [0, 1, 2], times: [0, 0.8, 0.5] }, /ascending|неубыва/],
-    ['easing[] length', { values: [0, 1, 2], easing: [linear] }, /easing|сегмент/],
-    ['duration<=0', { values: [0, 1], duration: 0 }, /duration|положительн/],
-    ['repeat negative', { values: [0, 1], repeat: -1 }, /repeat/],
-    ['repeat non-integer', { values: [0, 1], repeat: 1.5 }, /repeat|цел/],
-    ['bad repeatType', { values: [0, 1], repeatType: 'zzz' as unknown as 'loop' }, /repeatType/],
-    ['repeatDelay negative', { values: [0, 1], repeatDelay: -1 }, /repeatDelay/],
+    ['values<2', { values: [0] }, /^LM033$/],
+    ['values non-finite', { values: [0, NaN] }, /^LM034$/],
+    ['times length', { values: [0, 1, 2], times: [0, 1] }, /^LM035$/],
+    ['times non-finite', { values: [0, 1], times: [0, NaN] }, /^LM036$/],
+    ['times[0]!==0', { values: [0, 1], times: [0.1, 1] }, /^LM038$/],
+    ['times[last]!==1', { values: [0, 1], times: [0, 0.9] }, /^LM039$/],
+    ['times non-ascending', { values: [0, 1, 2], times: [0, 0.8, 0.5] }, /^LM037$/],
+    ['easing[] length', { values: [0, 1, 2], easing: [linear] }, /^LM040$/],
+    ['duration<=0', { values: [0, 1], duration: 0 }, /^LM041$/],
+    ['repeat negative', { values: [0, 1], repeat: -1 }, /^LM042$/],
+    ['repeat non-integer', { values: [0, 1], repeat: 1.5 }, /^LM042$/],
+    ['bad repeatType', { values: [0, 1], repeatType: 'zzz' as unknown as 'loop' }, /^LM043$/],
+    ['repeatDelay negative', { values: [0, 1], repeatDelay: -1 }, /^LM044$/],
   ];
   for (const [name, opts, msgRe] of cases) {
-    it(`невалидное «${name}» → throw с сообщением, называющим поле (kill text-мутанта)`, () => {
+    it(`невалидное «${name}» → throw со стабильным кодом`, () => {
       let err: unknown;
       try {
         keyframes({ ...opts, requestFrame: frozenRaf });
@@ -99,7 +99,7 @@ describe('keyframes валидация: валидное ПРИНЯТО + соо
       }
       expect(err).toBeInstanceOf(MotionParamError);
       expect((err as Error).message).toMatch(msgRe);
-      expect((err as Error).message.length).toBeGreaterThan(0); // kill `...`→``
+      expect((err as Error).message).toHaveLength(5);
     });
   }
 });
@@ -372,7 +372,7 @@ describe('keyframes: одиночный easing, CSS-safety при патолог
     // t[i] === t[i-1] допустимо (неубывающие); t[i] < t[i-1] — нет.
     expect(() => keyframes({ values: [0, 1, 2], times: [0, 0.5, 1], requestFrame: frozenRaf })).not.toThrow();
     expect(() => keyframes({ values: [0, 1, 2, 3], times: [0, 0.5, 0.5, 1], requestFrame: frozenRaf })).not.toThrow();
-    expect(() => keyframes({ values: [0, 1, 2], times: [0, 0.6, 0.5] as unknown as number[], requestFrame: frozenRaf })).toThrow(/ascending|неубыва/);
+    expect(() => keyframes({ values: [0, 1, 2], times: [0, 0.6, 0.5] as unknown as number[], requestFrame: frozenRaf })).toThrow(/^LM037$/);
   });
 
   it('авто-распределение times равными долями i/(n-1) (kill 275)', () => {

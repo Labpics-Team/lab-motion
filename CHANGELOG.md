@@ -10,6 +10,10 @@
 
 ### Added
 
+- `./animate/native`: узкий WAAPI-путь `springTo` для явных пар
+  transform/opacity. Одна `Animation` на цель, без скрытого rAF-fallback;
+  Chromium/Firefox используют CSS `linear()`, WebKit — явные адаптивные кадры.
+
 - `./react`: `useReducedMotion(): boolean` — реактивно отражает системное
   `prefers-reduced-motion` (фаза I, срез 2, #104): перерендеривает компонент при
   переключении предпочтения на лету. Построен на `useSyncExternalStore` —
@@ -57,28 +61,20 @@
   жестов), 2 browser-conformance спеки (pointer capture/cancel на реальном движке).
   Runnable DOM-адаптер и раздел «Behaviors-путь» — в README (#92).
 
-- `./animate/mini`: новый субпуть — ЛЁГКИЙ срез animate с потолком **≤ 5 KB gz**
-  поверх **адаптерной архитектуры**
-  целей/свойств. Внутренняя граница — `PropertyCodec` (parse/interpolate/
-  serialize/canComposite) и `TargetAdapter` (read/surfaceOf/compose/apply) в общем
-  реестре (`createRegistry`): движок дергает кодек/адаптер и НИКОГДА не ветвится по
-  имени свойства — новый вид входит РЕГИСТРАЦИЕЙ, а не ростом switch. mini
-  регистрирует минимум (числовой transform/opacity + CSS-переменная + DOM-адаптер)
-  и НЕ тянет full-набор/`./value`/compositor-компилятор (граф проверяется
+- `./animate/mini`: новый субпуть — лёгкий срез animate с потолком **≤ 5 KB gz**.
+  Внутри движок разделяет кодеки свойств и адаптер цели; публичный набор
+  фиксирован: числовой transform/opacity, CSS-переменные и DOM-цель. Mini
+  не тянет расширенный набор, `./value` и compositor-компилятор (граф проверяется
   import-cost сценарием). Покрытие: transform-шортхенды, `opacity`, CSS-переменные,
-  spring/tween в ЕДИНОМ прогресс-клоке (значение канала — скаляр/строка/`[from, to]`;
-  keyframe-массивы и per-property переходы — субпуть `./animate`, НЕ mini),
+  spring/tween в едином прогресс-клоке (значение канала — скаляр/строка/`[from, to]`),
   `delay`/`stagger`, контролы `{ finished, play, pause, seek, cancel,
   stop }`, C¹-подхват value+velocity при повторном запуске (dominant-канал),
   фазы кадра update→render единого `./frame` (чтение once при привязке, запись —
   в render), reduced-motion снап, SSR-safe импорт, fail-fast `MotionParamError`
-  ДО записи стиля. Расширенный набор (`createFullRegistry`): кодек цвета (reuse
-  `./value`), SVG-атрибут-адаптер, plain-object адаптер (**ноль DOM** — цель =
-  чистое JS-состояние) — contract-тесты на CSS-переменные, SVG-атрибуты и
-  plain-object. Финитность — seeded-LCG фаззинг `codec.interpolate` (≥12 000 на
-  кодек). ГРАНИЦА первой версии (потолок 5 KB): compositor-offload (WAAPI через
-  compileSpringPlan) в mini НЕ включён — floor «compositor+codecs+registry+frame»
-  = 5186 gz БЕЗ движка, физически не под 5120; полный WAAPI-путь — в `./animate`.
+  ДО записи стиля. Расширенные кодеки и адаптеры проверяются как внутренняя
+  архитектура, но не экспортируются как публичный API npm-пакета. Финитность
+  проверяется seeded-LCG фаззингом `codec.interpolate`. Compositor-путь в mini
+  не включён из-за размерного потолка; полный WAAPI-путь находится в `./animate`.
   Таблица миграции с Motion JS / Anime.js — в README (#103).
 - `./smart`: новый субпуть — Figma-подобный smart-animate поверх `./projection`
   (жанр shared-element). Диф ДВУХ снимков дерева по строке-ключу `data-motion-key`
@@ -142,11 +138,41 @@
 
 ### Changed
 
+- `CompositorStaggerGroup.handoffToLive` теперь всегда проверяет индекс: после
+  `destroy()` существующий ребёнок возвращает инертный `MotionValue`, а
+  отсутствующий стабильно завершает вызов с `LM020` вместо искусственного
+  значения без владельца.
+
+- До `1.0` несовместимое изменение: `compileStaggerPlan` и
+  `CompositorStaggerGroup` перенесены из `./compositor` в
+  `./compositor/stagger`. Новый фасад также экспортирует `compileSpringPlan` и
+  `CompositorSpring`, чтобы одиночные и групповые переходы использовали один
+  consumer-entry. Deprecated alias не оставлен: он вернул бы групповой граф в
+  базовый compositor.
+
+- `MotionParamError` получил добавочное поле `.code` и экспортируемый тип
+  `MotionParamErrorCode`. Внутренние сообщения теперь содержат только `LMddd`,
+  без отражения входных значений; причины и исправления находятся в каталоге.
+  Разбор старого prose/detail-текста `message` несовместим, ветвление по `.code`
+  стабильно; строковый публичный конструктор сохраняет текст с `LM000`.
+
+- `./animate`, `./animate/mini`, framework bindings и web component используют
+  один общий фазовый frame-loop. Массовый запуск больше не создаёт отдельный
+  `requestAnimationFrame` и отдельный Promise на каждую группу.
+- `drive` и `MotionValue` переиспользуют один буфер результата солвера на весь
+  прогон; `./stagger` считает расстояния в одном массиве. Горячий кадр не
+  создаёт result-объект, а каскад не держит второй буфер размера группы.
+- Compositor-компилятор учитывает начальную скорость в горизонте и бюджете сетки,
+  хранит exact IEEE-754 ключи в ограниченном LRU и сохраняет стартовую касательную.
+- `compileSpringPlan` в WebKit выдаёт исполнимые явные кадры; `nodes` теперь
+  являются свежим снимком фактически сериализованных остановок в пределах
+  `tolerance`, а повторная компиляция переиспользует подготовленную кривую из кэша.
+
 - npm-артефакт получил раздельные ESM/CJS declaration-ветки для всех экспортов,
   `typesVersions` для legacy TypeScript resolver, точный `sideEffects`-allowlist,
   честный Preact floor `10.3.1` и consumer-гейты на реальные байты tarball.
-- Релиз собирает tgz один раз, публикует только опечатанный artifact через OIDC,
-  проверяет registry integrity и SLSA provenance, а тег создаёт после публикации.
+- Релиз собирает tgz один раз, после всех гейтов фиксирует тег, публикует только
+  опечатанный artifact через OIDC и проверяет registry integrity и SLSA provenance.
 
 - Минимальный runtime-контракт поднят до Node.js 22: ветки 18 и 20 больше не
   получают security-исправления, а CI и package-manager работают на поддерживаемой
@@ -161,6 +187,13 @@
   трекера (0.1 s) по-прежнему естественно гасит скорость до нуля.
 
 ### Fixed
+
+- WebKit получает явные ключевые кадры: пружина продолжает движение при
+  блокировке главного потока. ESM-файлы `dist` используют браузерные относительные
+  импорты общего frame-loop и загружаются напрямую из CDN.
+- Full/mini/WAAPI одинаково сохраняют паузу при `seek`; `NaN` и `±Infinity`
+  игнорируются. Медленные пружины не завершаются искусственно после 2000 кадров,
+  а нулевой диапазон не теряет унаследованный импульс.
 
 - Framework bindings при reduced motion атомарно снэпают состояние без
   отложенного stale-кадра; React-адаптер сохраняет владельца `MotionValue` при

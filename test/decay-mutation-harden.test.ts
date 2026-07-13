@@ -13,7 +13,7 @@
  *      огромная velocity → amplitude/rest переполняются → ±MAX_VALUE по знаку.
  *   D2 accept-пути knobs (163 power, 167/169 timeConstant, 173/175 restDelta):
  *      undefined→дефолт, валидный→используется, невалидный(NaN/∞/≤0)→дефолт.
- *   D3 сообщения ошибок (153,157): называют невалидный параметр.
+ *   D3 ошибки (153,157): сохраняют смысловые коды границ.
  *   D4 matchMedia (110 typeof, 112 query-строка): reduced-motion CHARACTER-switch.
  *
  * Эквиваленты/недостижимые (199,205,213,219,220,110-if(false)) — в блоке внизу.
@@ -139,16 +139,16 @@ describe('D2 accept-путь restDelta (строки 173, 175)', () => {
   });
 });
 
-// ─── D3 — сообщения ошибок называют параметр (строки 153, 157) ──────────────────
+// ─── D3 — смысловые коды ошибок (строки 153, 157) ───────────────────────────────
 
-describe('D3 сообщения ошибок называют невалидный параметр (153, 157)', () => {
-  it('from не конечен → MotionParamError с "from"', () => {
+describe('D3 ошибки различают from и velocity кодами', () => {
+  it('from не конечен → LM021', () => {
     expect(() => createDecay({ from: NaN, velocity: 0 })).toThrow(MotionParamError);
-    expect(() => createDecay({ from: Infinity, velocity: 0 })).toThrow(/from/);
+    expect(() => createDecay({ from: Infinity, velocity: 0 })).toThrow(/^LM021$/);
   });
-  it('velocity не конечна → MotionParamError с "velocity"', () => {
-    expect(() => createDecay({ from: 0, velocity: NaN })).toThrow(/velocity/);
-    expect(() => createDecay({ from: 0, velocity: -Infinity })).toThrow(/velocity/);
+  it('velocity не конечна → LM022', () => {
+    expect(() => createDecay({ from: 0, velocity: NaN })).toThrow(/^LM022$/);
+    expect(() => createDecay({ from: 0, velocity: -Infinity })).toThrow(/^LM022$/);
   });
 });
 

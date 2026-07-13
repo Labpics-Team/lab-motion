@@ -317,7 +317,7 @@ describe('drive initialVelocity — non-finite → MotionParamError рано (cl
     ).toThrow(MotionParamError);
   });
 
-  it('сообщение называет параметр и значение; ошибка — MotionParamError и Error', () => {
+  it('ошибка имеет код LM025 и сохраняет классы MotionParamError/Error', () => {
     let caught: unknown;
     try {
       drive({
@@ -332,8 +332,7 @@ describe('drive initialVelocity — non-finite → MotionParamError рано (cl
     }
     expect(caught).toBeInstanceOf(MotionParamError);
     expect(caught).toBeInstanceOf(Error);
-    expect((caught as Error).message).toMatch(/initialVelocity/);
-    expect((caught as Error).message).toMatch(/NaN/);
+    expect((caught as Error).message).toBe('LM025');
   });
 });
 

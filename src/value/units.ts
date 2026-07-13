@@ -79,18 +79,14 @@ const MAX_PARSE_LENGTH = 4096;
 
 // ── Парсинг ───────────────────────────────────────────────────────────────────
 
+type UnitAST = ParsedUnit | ParsedRelative | ParsedVar;
+
 /**
- * Парсит CSS-значение юнита/относительного значения/var() в типизированный AST.
- *
- * Поддерживаемые форматы:
- *   - Числа:           `42`, `3.14`, `-1.5e2`
- *   - С юнитом:        `"100px"`, `"50%"`, `"360deg"`, `"2rem"`, `"1.5vh"`, …
- *   - Относительные:   `"+=10"`, `"-=5"`, `"+=10px"`, `"-=5%"`
- *   - CSS var():       `"var(--my-var)"`, `"var(--my-var, 10px)"`
- *
- * @throws RangeError если значение не распознаётся
+ * Единый parser-контур. `diagnostic=false` превращает обе ошибки в undefined;
+ * константный флаг позволяет tree-shaker полностью удалить публичные строки из
+ * графа фасада, не создавая второй реализации грамматики.
  */
-export function parseUnit(value: string | number): ParsedUnit | ParsedRelative | ParsedVar {
+function parseUnitImpl(value: string | number, diagnostic: boolean): UnitAST | undefined {
   if (typeof value === 'number') {
     return { kind: 'unit', value: clampFinite(value), unit: '' };
   }
@@ -98,9 +94,12 @@ export function parseUnit(value: string | number): ParsedUnit | ParsedRelative |
   const s = value.trim();
 
   if (s.length > MAX_PARSE_LENGTH) {
-    throw new RangeError(
-      `@labpics/motion value: CSS-значение слишком длинное (${s.length} символов, максимум ${MAX_PARSE_LENGTH})`,
-    );
+    if (diagnostic) {
+      throw new RangeError(
+        `@labpics/motion value: CSS-значение слишком длинное (${s.length} символов, максимум ${MAX_PARSE_LENGTH})`,
+      );
+    }
+    return undefined;
   }
 
   // CSS var()
@@ -134,7 +133,30 @@ export function parseUnit(value: string | number): ParsedUnit | ParsedRelative |
     };
   }
 
-  throw new RangeError(`@labpics/motion value: не удалось распарсить CSS-значение "${value}"`);
+  if (diagnostic) {
+    throw new RangeError(`@labpics/motion value: не удалось распарсить CSS-значение "${value}"`);
+  }
+  return undefined;
+}
+
+/** Внутренний no-throw seam для фасадов, которые имеют свою диагностику. */
+export function tryParseUnit(value: string | number): UnitAST | undefined {
+  return parseUnitImpl(value, false);
+}
+
+/**
+ * Парсит CSS-значение юнита/относительного значения/var() в типизированный AST.
+ *
+ * Поддерживаемые форматы:
+ *   - Числа:           `42`, `3.14`, `-1.5e2`
+ *   - С юнитом:        `"100px"`, `"50%"`, `"360deg"`, `"2rem"`, `"1.5vh"`, …
+ *   - Относительные:   `"+=10"`, `"-=5"`, `"+=10px"`, `"-=5%"`
+ *   - CSS var():       `"var(--my-var)"`, `"var(--my-var, 10px)"`
+ *
+ * @throws RangeError если значение не распознаётся
+ */
+export function parseUnit(value: string | number): UnitAST {
+  return parseUnitImpl(value, true)!;
 }
 
 // ── Интерполяция ──────────────────────────────────────────────────────────────

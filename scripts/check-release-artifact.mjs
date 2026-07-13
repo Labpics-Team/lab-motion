@@ -2,8 +2,9 @@ import { execFileSync } from 'node:child_process';
 import { createHash } from 'node:crypto';
 import { basename, resolve } from 'node:path';
 import { readFileSync, writeFileSync } from 'node:fs';
+import { validateArchiveMetadata } from './release-metadata.mjs';
 
-const [tarballArgument, tag, sourceSha, manifestArgument] = process.argv.slice(2);
+const [tarballArgument, tag, sourceSha, manifestArgument, rootPackageArgument] = process.argv.slice(2);
 
 function fail(message) {
   console.error(`release-artifact-check: ${message}`);
@@ -32,18 +33,19 @@ try {
   fail(`не удалось прочитать package/package.json из tgz: ${error?.message ?? String(error)}`);
 }
 
-if (archivePackage.name !== '@labpics/motion') {
-  fail(`неожиданное имя пакета в tgz: ${String(archivePackage.name)}`);
+let rootPackage;
+try {
+  rootPackage = JSON.parse(readFileSync(
+    rootPackageArgument ? resolve(rootPackageArgument) : new URL('../package.json', import.meta.url),
+    'utf8',
+  ));
+  validateArchiveMetadata(rootPackage, archivePackage);
+} catch (error) {
+  fail(error?.message ?? String(error));
 }
-if (archivePackage.private === true) fail('tgz содержит private:true');
+
 if (archivePackage.version !== tag.slice(1)) {
   fail(`версия tgz ${String(archivePackage.version)} не совпадает с тегом ${tag}`);
-}
-if (archivePackage.publishConfig?.access !== 'public') {
-  fail('publishConfig.access в tgz обязан быть public');
-}
-if (archivePackage.repository?.url !== 'git+https://github.com/Labpics-Team/lab-motion.git') {
-  fail('repository.url в tgz не соответствует репозиторию доверенной публикации');
 }
 
 const tarballName = basename(tarball);

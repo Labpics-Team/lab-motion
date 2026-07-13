@@ -58,7 +58,7 @@ describe('overdamped spring rejected at drive() boundary — no MAX_FRAMES stall
       ).toThrow(MotionParamError);
     });
 
-    it('error message references the settle budget (derived law, 2026-07-03)', () => {
+    it('ошибка медленной моды имеет код LM091', () => {
       let msg = '';
       try {
         drive({
@@ -72,9 +72,7 @@ describe('overdamped spring rejected at drive() boundary — no MAX_FRAMES stall
       } catch (e) {
         msg = (e as Error).message;
       }
-      // Сообщение обязано называть время оседания и бюджет — новый закон валидатора.
-      expect(msg).toMatch(/settle time/i);
-      expect(msg).toMatch(/budget/i);
+      expect(msg).toBe('LM091');
     });
 
     it('throws for extreme damping zeta >> 4 (damping=100, stiffness=1, mass=1)', () => {

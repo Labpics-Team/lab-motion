@@ -55,14 +55,13 @@ describe('cubicBezier() factory validation — NE7', () => {
     expect(() => cubicBezier(Number.NaN, Number.NaN, Number.NaN, Number.NaN)).toThrow(MotionParamError);
   });
 
-  // Verify that the error message is informative (not empty or generic)
-  it('cubicBezier(NaN,0,1,1) error message mentions control points', () => {
+  it('cubicBezier(NaN,0,1,1) возвращает code-only LM029', () => {
     try {
       cubicBezier(Number.NaN, 0, 1, 1);
       expect.fail('Expected MotionParamError to be thrown');
     } catch (e) {
       expect(e).toBeInstanceOf(MotionParamError);
-      expect((e as MotionParamError).message).toMatch(/finite/i);
+      expect((e as MotionParamError).message).toBe('LM029');
     }
   });
 
@@ -81,13 +80,13 @@ describe('cubicBezier() factory validation — NE7', () => {
   it('cubicBezier(0,0,1.1,1) throws MotionParamError (x2 > 1)', () => {
     expect(() => cubicBezier(0, 0, 1.1, 1)).toThrow(MotionParamError);
   });
-  it('cubicBezier x-out-of-range error message mentions x1/x2 and [0,1]', () => {
+  it('cubicBezier x-out-of-range возвращает code-only LM030', () => {
     try {
       cubicBezier(1.5, 0, 0.5, 1);
       expect.fail('Expected MotionParamError');
     } catch (e) {
       expect(e).toBeInstanceOf(MotionParamError);
-      expect((e as MotionParamError).message).toMatch(/x1.*x2|x2.*x1|\[0,1\]|0.*1/i);
+      expect((e as MotionParamError).message).toBe('LM030');
     }
   });
 
@@ -163,13 +162,13 @@ describe('steps() factory validation — NE7', () => {
     expect(() => steps(100, 'end')).not.toThrow();
   });
 
-  it('steps() error message mentions positive integer', () => {
+  it('steps() возвращает code-only LM031', () => {
     try {
       steps(0, 'end');
       expect.fail('Expected MotionParamError');
     } catch (e) {
       expect(e).toBeInstanceOf(MotionParamError);
-      expect((e as MotionParamError).message).toMatch(/positive/i);
+      expect((e as MotionParamError).message).toBe('LM031');
     }
   });
 
@@ -200,13 +199,13 @@ describe('steps() factory validation — NE7', () => {
   it('steps(1, "end") does NOT throw — valid position (control group)', () => {
     expect(() => steps(1, 'end')).not.toThrow();
   });
-  it('steps() invalid-position error message mentions "start" or "end"', () => {
+  it('steps() invalid-position возвращает code-only LM032', () => {
     try {
       steps(4, 'middle' as never);
       expect.fail('Expected MotionParamError');
     } catch (e) {
       expect(e).toBeInstanceOf(MotionParamError);
-      expect((e as MotionParamError).message).toMatch(/start.*end|end.*start/i);
+      expect((e as MotionParamError).message).toBe('LM032');
     }
   });
 });
@@ -240,13 +239,13 @@ describe('power() factory validation — NE7', () => {
     expect(() => power(0.5)).not.toThrow();
   });
 
-  it('power() error message mentions finite', () => {
+  it('power() возвращает code-only LM028', () => {
     try {
       power(Number.NaN);
       expect.fail('Expected MotionParamError');
     } catch (e) {
       expect(e).toBeInstanceOf(MotionParamError);
-      expect((e as MotionParamError).message).toMatch(/finite/i);
+      expect((e as MotionParamError).message).toBe('LM028');
     }
   });
 

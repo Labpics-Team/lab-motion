@@ -225,6 +225,26 @@ describe('frame: гонка позднего дрейна (класс Finding 3 
 });
 
 describe('frame: lifecycle-классы (ноты QA-ревью)', () => {
+  it('бросок requestFrame откатывает подписку и не отравляет следующий старт', () => {
+    const queue: Array<(ts?: number) => void> = [];
+    let first = true;
+    const loop = createFrameLoop({
+      requestFrame: (cb) => {
+        if (first) {
+          first = false;
+          throw new Error('host scheduler failed');
+        }
+        queue.push(cb);
+        return 1;
+      },
+    });
+    let calls = 0;
+    expect(() => loop.update(() => calls++)).toThrow('host scheduler failed');
+    expect(() => loop.update(() => calls++, { once: true })).not.toThrow();
+    queue.shift()?.(0);
+    expect(calls).toBe(1);
+  });
+
   it('контракт-пин: клок-нарушитель, зовущий колбэк дважды, не ломает состояние', () => {
     // Двойной синхронный вызов одного fire гасится токеном (или, при пустых
     // фазах, наблюдаемо-нейтрален). Пин против будущих регрессий механики.
@@ -258,6 +278,41 @@ describe('frame: lifecycle-классы (ноты QA-ревью)', () => {
     loop.update(() => calls.push('b'));
     vc.step();
     expect(calls).toEqual(['a']);
+    expect(vc.pending).toBe(0);
+  });
+
+  it('cancelAll в read-фазе гасит update/render без OOB по старым границам', () => {
+    const vc = makeVirtualClock();
+    const loop = createFrameLoop({ requestFrame: vc.requestFrame });
+    const calls: string[] = [];
+    loop.read(() => {
+      calls.push('read');
+      loop.cancelAll();
+    });
+    loop.update(() => calls.push('update'));
+    loop.render(() => calls.push('render'));
+
+    expect(() => vc.step()).not.toThrow();
+    expect(calls).toEqual(['read']);
+    expect(vc.pending).toBe(0);
+  });
+
+  it('resubscribe из cancelAll-callback ждёт следующего кадра', () => {
+    const vc = makeVirtualClock();
+    const loop = createFrameLoop({ requestFrame: vc.requestFrame });
+    const calls: string[] = [];
+    loop.read(() => {
+      calls.push('old');
+      loop.cancelAll();
+      loop.render(() => calls.push('new'), { once: true });
+    });
+    loop.update(() => calls.push('stale'));
+
+    vc.step();
+    expect(calls).toEqual(['old']);
+    expect(vc.pending).toBe(1);
+    vc.step();
+    expect(calls).toEqual(['old', 'new']);
     expect(vc.pending).toBe(0);
   });
 

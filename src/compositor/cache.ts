@@ -1,66 +1,64 @@
 /**
- * compositor/cache.ts — ограниченный LRU-кэш linear()-строк пружин.
+ * compositor/cache.ts — ограниченный LRU-кэш execution-артефактов пружин.
  *
  * Зачем: staggered-списки и повторные интеракции компилируют ОДНУ и ту же
  * пружину много раз; компиляция (сетка + RDP) дороже поиска. Кэш амортизирует её
  * по элементам списка.
  *
  * Инвариант hot-path (mandate M1): ПОПАДАНИЕ не аллоцирует. Достигается так:
- * - Ключ — пять КВАНТОВАННЫХ целых (mass/stiffness/damping/v0/tolerance),
- *   свёрнутых в один 32-битный числовой хеш (Math.imul-микс). Целые и хеш —
- *   числа, не объекты: их вычисление у вызывающего не аллоцирует.
+ * - Оба компилятора передают пять исходных IEEE-754 чисел
+ *   (mass/stiffness/damping/v0/tolerance). Полиномиальная свёртка остаётся
+ *   числом и не создаёт строк/объектов; окончательную identity проверяют поля.
  * - lookup(a,b,c,d,e) НЕ принимает замыкание-компилятор (замыкание аллоцировало
  *   бы на КАЖДЫЙ вызов, включая попадание); вызывающий сам делает
  *   `lookup → если undefined: compile+store`. Ветка попадания возвращает
- *   существующую строку до любой аллокации.
+ *   существующий артефакт до любой аллокации.
  * - LRU — интрузивный двусвязный список: перенос узла в голову на попадании —
  *   переприсваивание указателей (без new). Вытеснение хвоста на промахе при
  *   заполнении ПЕРЕИСПОЛЬЗУЕТ объект узла (реассайн полей), новый узел
  *   аллоцируется только пока ёмкость не достигнута.
  *
- * Коллизии хеша безопасны: узел хранит пять квантованных целых и сверяет их на
+ * Коллизии хеша безопасны: узел хранит пять исходных чисел и сверяет их на
  * попадании (без аллокаций) — несовпадение трактуется как промах (перекомпиляция
- * и перезапись), НИКОГДА не как чужой план. Квантование — часть контракта:
- * компиляция идёт по ДЕ-квантованным параметрам (шаг мелкий, дельта ≪ tolerance),
- * так что план всегда соответствует своему ключу.
+ * и перезапись), НИКОГДА не как чужой план. Exact-ключ принципиален: абсолютное
+ * квантование малых коэффициентов меняло бы физику сильнее tolerance.
  */
 
 /** Узел интрузивного LRU. Поля мутабельны ради переиспользования при вытеснении. */
-interface CacheNode {
-  hash: number;
+interface CacheNode<T> {
+  _hash: number;
   a: number;
   b: number;
   c: number;
   d: number;
   e: number;
-  value: string;
-  prev: CacheNode | null;
-  next: CacheNode | null;
+  _value: T;
+  _prev: CacheNode<T> | null;
+  _next: CacheNode<T> | null;
 }
 
-/** Свёртка пяти целых в 32-битный хеш (Math.imul-микс, без аллокаций). */
+/**
+ * Свёртка пяти raw double без аллокаций. Коллизия влияет только на hit-rate:
+ * lookup всегда сверяет все исходные поля до возврата значения.
+ */
 function hash5(a: number, b: number, c: number, d: number, e: number): number {
-  let h = 0x811c9dc5 | 0;
-  h = Math.imul(h ^ (a | 0), 0x01000193);
-  h = Math.imul(h ^ (b | 0), 0x01000193);
-  h = Math.imul(h ^ (c | 0), 0x01000193);
-  h = Math.imul(h ^ (d | 0), 0x01000193);
-  h = Math.imul(h ^ (e | 0), 0x01000193);
-  return h | 0;
+  return ((((a * 31 + b) * 31 + c) * 31 + d) * 31 + e);
 }
 
-/** Ёмкость по умолчанию — слотов linear()-строк в общем кэше. */
+/** Ёмкость по умолчанию — слотов артефактов кривой в одном кэше. */
 export const DEFAULT_CACHE_CAPACITY = 256;
 
 /**
- * Ограниченный LRU квантованный-ключ → linear()-строка. O(1) поиск/вставка,
- * ноль аллокаций на попадании. Не потокобезопасен (JS однопоточен на кадре).
+ * Ограниченный LRU числовой exact-key → артефакт кривой. Тип значения задаёт
+ * владелец; compositor хранит единый `{ easing, serialized samples }` для всех
+ * browser-веток. O(1) поиск/вставка, ноль аллокаций на попадании. Не
+ * потокобезопасен (JS однопоточен на кадре).
  */
-export class SpringLinearCache {
+export class SpringLinearCache<T = string> {
   private readonly _capacity: number;
-  private readonly _map = new Map<number, CacheNode>();
-  private _head: CacheNode | null = null; // MRU
-  private _tail: CacheNode | null = null; // LRU
+  private readonly _map = new Map<number, CacheNode<T>>();
+  private _head: CacheNode<T> | null = null; // MRU
+  private _tail: CacheNode<T> | null = null; // LRU
 
   constructor(capacity: number = DEFAULT_CACHE_CAPACITY) {
     this._capacity = Number.isInteger(capacity) && capacity > 0 ? capacity : DEFAULT_CACHE_CAPACITY;
@@ -77,26 +75,26 @@ export class SpringLinearCache {
   }
 
   /**
-   * Поиск по квантованному ключу. Возвращает строку при попадании (и двигает
+   * Поиск по точному числовому ключу. Возвращает артефакт при попадании (и двигает
    * узел в голову LRU — без аллокаций) либо undefined при промахе.
    */
-  lookup(a: number, b: number, c: number, d: number, e: number): string | undefined {
+  lookup(a: number, b: number, c: number, d: number, e: number): T | undefined {
     const hash = hash5(a, b, c, d, e);
     const node = this._map.get(hash);
-    // Сверка квантованных полей отсекает коллизию хеша (промах, не чужой план).
+    // Сверка исходных чисел отсекает коллизию хеша (промах, не чужой план).
     if (node !== undefined && node.a === a && node.b === b && node.c === c && node.d === d && node.e === e) {
       this._moveToHead(node);
-      return node.value;
+      return node._value;
     }
     return undefined;
   }
 
   /**
-   * Кладёт строку под квантованный ключ. При заполнении вытесняет LRU-хвост,
+   * Кладёт артефакт под точный числовой ключ. При заполнении вытесняет LRU-хвост,
    * ПЕРЕИСПОЛЬЗУЯ его объект-узел (без аллокации нового). Промах на коллизии
    * хеша перезаписывает старую запись под тем же хешем (её ключ отличался).
    */
-  store(a: number, b: number, c: number, d: number, e: number, value: string): void {
+  store(a: number, b: number, c: number, d: number, e: number, value: T): void {
     const hash = hash5(a, b, c, d, e);
     const existing = this._map.get(hash);
     if (existing !== undefined) {
@@ -107,27 +105,27 @@ export class SpringLinearCache {
       existing.c = c;
       existing.d = d;
       existing.e = e;
-      existing.value = value;
+      existing._value = value;
       this._moveToHead(existing);
       return;
     }
 
-    let node: CacheNode;
+    let node: CacheNode<T>;
     if (this._map.size >= this._capacity && this._tail !== null) {
       // Вытеснение LRU с переиспользованием узла (ноль аллокаций на устоявшемся
       // потоке промахов при полном кэше).
       node = this._tail;
-      this._map.delete(node.hash);
+      this._map.delete(node._hash);
       this._unlink(node);
-      node.hash = hash;
+      node._hash = hash;
       node.a = a;
       node.b = b;
       node.c = c;
       node.d = d;
       node.e = e;
-      node.value = value;
+      node._value = value;
     } else {
-      node = { hash, a, b, c, d, e, value, prev: null, next: null };
+      node = { _hash: hash, a, b, c, d, e, _value: value, _prev: null, _next: null };
     }
     this._map.set(hash, node);
     this._pushHead(node);
@@ -142,25 +140,25 @@ export class SpringLinearCache {
 
   // ─── Интрузивный список ────────────────────────────────────────────────────
 
-  private _unlink(node: CacheNode): void {
-    const { prev, next } = node;
-    if (prev !== null) prev.next = next;
+  private _unlink(node: CacheNode<T>): void {
+    const { _prev: prev, _next: next } = node;
+    if (prev !== null) prev._next = next;
     else this._head = next;
-    if (next !== null) next.prev = prev;
+    if (next !== null) next._prev = prev;
     else this._tail = prev;
-    node.prev = null;
-    node.next = null;
+    node._prev = null;
+    node._next = null;
   }
 
-  private _pushHead(node: CacheNode): void {
-    node.prev = null;
-    node.next = this._head;
-    if (this._head !== null) this._head.prev = node;
+  private _pushHead(node: CacheNode<T>): void {
+    node._prev = null;
+    node._next = this._head;
+    if (this._head !== null) this._head._prev = node;
     this._head = node;
     if (this._tail === null) this._tail = node;
   }
 
-  private _moveToHead(node: CacheNode): void {
+  private _moveToHead(node: CacheNode<T>): void {
     if (this._head === node) return;
     this._unlink(node);
     this._pushHead(node);

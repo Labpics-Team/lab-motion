@@ -21,12 +21,39 @@ import {
   readCompositorSpring,
   supportsCompositor,
 } from '../src/compositor/index.js';
+import {
+  compileSpringExecutionArtifactUnchecked,
+  DEFAULT_TOLERANCE,
+} from '../src/compositor/curve.js';
+import { sampleSerializedSpring } from '../src/compositor/sample.js';
 import { FIXED_DT_S } from '../src/internal/constants.js';
 import { MotionParamError } from '../src/index.js';
-import type { SpringParams } from '../src/spring.js';
+import { settleTimeUpperBound, type SpringParams } from '../src/spring.js';
 
 const STIFF: SpringParams = { mass: 1, stiffness: 170, damping: 26 };
 const BOUNCY: SpringParams = { mass: 1, stiffness: 180, damping: 8 };
+
+function executionSnapshot(
+  physics: SpringParams,
+  from: number,
+  to: number,
+  tMs: number,
+): { value: number; velocity: number } {
+  const artifact = compileSpringExecutionArtifactUnchecked(
+    physics,
+    0,
+    DEFAULT_TOLERANCE,
+  );
+  const sample = sampleSerializedSpring(
+    artifact.samples,
+    settleTimeUpperBound(physics, 0) * 1000,
+    tMs,
+  );
+  return {
+    value: (1 - sample.value) * from + sample.value * to,
+    velocity: sample.velocity * to - sample.velocity * from,
+  };
+}
 
 // ─── Фейки (без DOM) ─────────────────────────────────────────────────────────
 
@@ -133,8 +160,8 @@ describe('compositor: CompositorSpring — compositor-путь', () => {
     expect(f.animations[0]!.cancelled).toBe(true);
     // Новая animate вызвана (всего 2).
     expect(f.calls).toHaveLength(2);
-    const expected = readCompositorSpring(STIFF, { from: 0, to: 1, v0: 0, t: 0.1 });
-    // C⁰: новый прогон стартует РОВНО с аналитической позиции в момент прерывания.
+    const expected = executionSnapshot(STIFF, 0, 1, 100);
+    // C⁰: новый прогон стартует с фактически видимой serialized-позиции.
     expect(f.calls[1]!.keyframes[0]!['opacity']).toBe(expected.value);
     expect(f.calls[1]!.keyframes[1]!['opacity']).toBe(0.5);
   });
@@ -158,6 +185,90 @@ describe('compositor: CompositorSpring — compositor-путь', () => {
     expect(f.calls[1]!.timing['easing']).not.toBe(restEasing);
   });
 
+  it('скорость вне конечного grid-бюджета переходит в live без разрыва C1', () => {
+    const f = fakeElement();
+    const clock = makeClock();
+    const values: number[] = [];
+    let nowMs = 0;
+    const cs = new CompositorSpring({
+      spring: BOUNCY,
+      property: 'x',
+      from: 0,
+      to: 100,
+      target: f.el,
+      apply: (value) => values.push(value as number),
+      requestFrame: clock.requestFrame,
+      now: () => nowMs,
+    });
+    cs.start();
+    nowMs = 100;
+    const snapshot = executionSnapshot(BOUNCY, 0, 100, 100);
+    const target = snapshot.value + 1.01e-10;
+
+    cs.retarget(target);
+
+    expect(f.animations[0]!.cancelled).toBe(true);
+    expect(f.calls).toHaveLength(1); // чрезмерная вторая WAAPI-кривая не строилась
+    expect(cs.tier).toBe('compositor'); // capability среды не изменилась
+    expect(cs.mode).toBe('fallback'); // текущий owner теперь live
+    expect(values[0]).toBe(snapshot.value); // C0; MotionValue засеян тем же снимком
+    clock.drain();
+    expect(values.at(-1)).toBe(target);
+  });
+
+  it('ретаргет ровно в текущую позицию не теряет ненулевой импульс', () => {
+    const f = fakeElement();
+    const clock = makeClock();
+    const values: number[] = [];
+    let nowMs = 0;
+    const cs = new CompositorSpring({
+      spring: BOUNCY,
+      property: 'x',
+      from: 0,
+      to: 100,
+      target: f.el,
+      apply: (value) => values.push(value as number),
+      requestFrame: clock.requestFrame,
+      now: () => nowMs,
+    });
+    cs.start();
+    nowMs = 100;
+    const snapshot = executionSnapshot(BOUNCY, 0, 100, 100);
+
+    cs.retarget(snapshot.value);
+
+    expect(f.calls).toHaveLength(1);
+    expect(f.animations[0]!.cancelled).toBe(true);
+    expect(values[0]).toBe(snapshot.value);
+    clock.drain(1);
+    const firstDelta = values.at(-1)! - snapshot.value;
+    expect(Math.abs(firstDelta)).toBeGreaterThan(0);
+    expect(Math.sign(firstDelta)).toBe(Math.sign(snapshot.velocity));
+    clock.drain();
+    expect(values.at(-1)).toBe(snapshot.value);
+  });
+
+  it('без apply чрезмерный ретаргет бросает ДО cancel и сохраняет старый прогон', () => {
+    const f = fakeElement();
+    let nowMs = 0;
+    const cs = new CompositorSpring({
+      spring: BOUNCY,
+      property: 'x',
+      from: 0,
+      to: 100,
+      target: f.el,
+      now: () => nowMs,
+    });
+    cs.start();
+    nowMs = 100;
+    const snapshot = executionSnapshot(BOUNCY, 0, 100, 100);
+
+    expect(() => cs.retarget(snapshot.value + 1.01e-10)).toThrow(MotionParamError);
+    expect(f.animations[0]!.cancelled).toBe(false);
+    expect(f.calls).toHaveLength(1);
+    expect(cs.mode).toBe('compositor');
+  });
+
   it('ретаргет ДО старта → просто задаёт цель и стартует (один animate)', () => {
     const f = fakeElement();
     const cs = new CompositorSpring({
@@ -179,6 +290,61 @@ describe('compositor: CompositorSpring — compositor-путь', () => {
     cs.start();
     cs.stop();
     expect(f.animations[0]!.cancelled).toBe(true);
+  });
+
+  it('hostile cancel-getter не роняет stop и старый owner очищается', () => {
+    let reads = 0;
+    const target = {
+      animate() {
+        return Object.defineProperty({}, 'cancel', {
+          get() {
+            reads++;
+            throw new Error('hostile cancel getter');
+          },
+        });
+      },
+    };
+    const cs = new CompositorSpring({
+      spring: STIFF,
+      property: 'opacity',
+      from: 0,
+      to: 1,
+      target,
+    });
+    cs.start();
+
+    expect(() => cs.stop()).not.toThrow();
+    expect(reads).toBe(1);
+    // Повторный stop не должен снова читать getter уже снятого owner.
+    expect(() => cs.stop()).not.toThrow();
+    expect(reads).toBe(1);
+  });
+
+  it('hostile cancel-call не роняет stop и старый owner очищается', () => {
+    let calls = 0;
+    const target = {
+      animate() {
+        return {
+          cancel() {
+            calls++;
+            throw new Error('hostile cancel call');
+          },
+        };
+      },
+    };
+    const cs = new CompositorSpring({
+      spring: STIFF,
+      property: 'opacity',
+      from: 0,
+      to: 1,
+      target,
+    });
+    cs.start();
+
+    expect(() => cs.stop()).not.toThrow();
+    expect(calls).toBe(1);
+    expect(() => cs.stop()).not.toThrow();
+    expect(calls).toBe(1);
   });
 
   it('format прокидывается в кейфреймы', () => {

@@ -148,6 +148,9 @@ function clamp(v: number, lo: number, hi: number): number {
   return Math.max(lo, Math.min(hi, v));
 }
 
+/** Один аналитический снимок нормированной пружины. */
+type SpringSample = ReturnType<typeof springUnchecked>;
+
 // ─── createDriver ─────────────────────────────────────────────────────────────
 
 /**
@@ -166,10 +169,10 @@ export function createDriver(opts: DriverOptions): AnimationControls {
 
   // ── Валидация входных данных (eagerly, до создания Promise) ───────────────
   if (!Number.isFinite(from)) {
-    throw new MotionParamError(`driver: 'from' должно быть конечным числом, получено ${from}`);
+    throw new MotionParamError('LM026');
   }
   if (!Number.isFinite(to)) {
-    throw new MotionParamError(`driver: 'to' должно быть конечным числом, получено ${to}`);
+    throw new MotionParamError('LM027');
   }
   validateSpringParams(opts.spring);
 
@@ -239,7 +242,7 @@ export function createDriver(opts: DriverOptions): AnimationControls {
    * Всегда возвращает конечное значение.
    * @internal
    */
-  function computeAt(t: number): number {
+  function computeAt(t: number, sampled?: SpringSample): number {
     // Degenerate / overflow cases.
     if (from === to) return to;
     if (overflowRange) return to;
@@ -250,7 +253,9 @@ export function createDriver(opts: DriverOptions): AnimationControls {
     if (clamped === Infinity) return to;
     if (clamped === 0) return from;
 
-    const r = springUnchecked(opts.spring, clamped);
+    // Прямой кадр передаёт готовый снимок: проверка сходимости и эмит делят
+    // один вызов солвера. seek/progress/cancel остаются независимыми чтениями.
+    const r = sampled ?? springUnchecked(opts.spring, clamped);
     const raw = from + r.value * range;
 
     // CSS-safety guard: overflow, NaN или ∞ → snap to to.
@@ -276,15 +281,10 @@ export function createDriver(opts: DriverOptions): AnimationControls {
   }
 
   /**
-   * Проверить сходимость пружины при текущем _vt.
+   * Проверить сходимость по уже вычисленному состоянию пружины.
    * @internal
    */
-  function isConvergedAt(t: number): boolean {
-    if (from === to || overflowRange) return true;
-    if (!Number.isFinite(t) && t > 0) return true; // t = +Infinity → сошлась
-
-    const safe = Math.max(0, t);
-    const r = springUnchecked(opts.spring, safe);
+  function isConvergedState(r: SpringSample): boolean {
     const v = from + r.value * range;
     const vel = Math.abs(r.velocity) * absRange;
 
@@ -363,16 +363,26 @@ export function createDriver(opts: DriverOptions): AnimationControls {
     _vt += dt * _timeScale;
 
     // ── Проверки границ и сходимости ─────────────────────────────────────
-    if (_timeScale > 0 || (!Number.isFinite(_timeScale) && _timeScale > 0)) {
-      // Forward path (timeScale > 0 или +Infinity).
+    // Прямой путь сохраняет снимок до эмита: обычный кадр решает пружину
+    // ровно один раз вместо прежней пары isConvergedAt + computeAt.
+    let forwardState: SpringSample | undefined;
+    if (_timeScale > 0) {
+      // Прямой путь: сравнение естественно включает +Infinity.
       _fwdFrameCount++;
-      if (isConvergedAt(_vt) || _fwdFrameCount >= MAX_FRAMES) {
+      // На предохранительном кадре и в +Infinity итог уже известен: солвер не нужен.
+      if (_fwdFrameCount >= MAX_FRAMES || _vt === Infinity) {
         _tickActive = false;
         settle(to);
         return;
       }
-    } else if (_timeScale < 0 || (!Number.isFinite(_timeScale) && _timeScale < 0)) {
-      // Reverse path (timeScale < 0 или -Infinity).
+      forwardState = springUnchecked(opts.spring, Math.max(0, _vt));
+      if (isConvergedState(forwardState)) {
+        _tickActive = false;
+        settle(to);
+        return;
+      }
+    } else if (_timeScale < 0) {
+      // Обратный путь: сравнение естественно включает -Infinity.
       if (_vt <= 0) {
         _vt = 0;
         _tickActive = false;
@@ -384,7 +394,7 @@ export function createDriver(opts: DriverOptions): AnimationControls {
     // (_totalFrameCount GLOBAL_CAP выше является safety escape).
 
     // ── Эмитировать текущую позицию ───────────────────────────────────────
-    const val = computeAt(_vt);
+    const val = computeAt(_vt, forwardState);
     onStep(val);
 
     _tickActive = false;

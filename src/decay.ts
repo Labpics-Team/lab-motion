@@ -149,12 +149,10 @@ export function createDecay(options: DecayOptions): DecayModel {
 
   // ── Валидация обязательных входных данных ─────────────────────────────────
   if (!Number.isFinite(from)) {
-    throw new MotionParamError(`decay: 'from' должно быть конечным числом, получено ${from}`);
+    throw new MotionParamError('LM021');
   }
   if (!Number.isFinite(velocity)) {
-    throw new MotionParamError(
-      `decay: 'velocity' должно быть конечным числом, получено ${velocity}`,
-    );
+    throw new MotionParamError('LM022');
   }
 
   // ── Опциональные knobs — невалидное значение мягко заменяется дефолтом ─────

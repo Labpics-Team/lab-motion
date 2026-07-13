@@ -43,17 +43,16 @@ export function isColorProperty(property: string): boolean {
 export const colorCodec: PropertyCodec = {
   parse: (value, property) => {
     if (typeof value !== 'string') {
-      throw new MotionParamError(`animate: '${property}' — цвет строкой, получено ${typeof value}`);
+      throw new MotionParamError('LM143');
     }
     const c = parseColor(value);
     if (c === null) {
-      throw new MotionParamError(`animate: '${property}' — не цвет: '${value}'`);
+      throw new MotionParamError('LM144');
     }
     return c;
   },
   interpolate: (from, to) => (p) => interpolateColor(from as ParsedColor, to as ParsedColor, p),
   serialize: (value) => String(value),
-  canComposite: () => false,
 };
 
 // ─── SVG-адаптер (атрибуты через get/setAttribute) ───────────────────────────
@@ -95,7 +94,7 @@ export const svgAttrAdapter: TargetAdapter = {
   read: (target, property) => (target as SvgTarget).getAttribute(property) ?? '',
   surfaceOf: (property) => {
     if (!_SVG_ATTRS.has(property)) {
-      throw new MotionParamError(`animate: SVG-атрибут '${property}' не поддержан`);
+      throw new MotionParamError('LM145');
     }
     return property;
   },

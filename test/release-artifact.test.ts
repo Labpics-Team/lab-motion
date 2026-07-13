@@ -7,7 +7,7 @@ import {
   writeFileSync,
 } from 'node:fs';
 import { tmpdir } from 'node:os';
-import { join } from 'node:path';
+import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { afterEach, describe, expect, it } from 'vitest';
 
@@ -17,6 +17,67 @@ const TAG = `v${VERSION}`;
 const SHA = 'a'.repeat(40);
 const workspaces: string[] = [];
 
+function releaseMetadata() {
+  return {
+    name: '@labpics/motion',
+    version: VERSION,
+    private: false,
+    description: 'Headless zero-dependency motion engine: analytic spring solver, keyframes, timeline, FLIP, gestures, WAAPI compositor path, 9 framework bindings.',
+    author: 'Labpics',
+    keywords: ['animation', 'motion', 'spring', 'physics', 'keyframes', 'timeline', 'flip', 'waapi', 'headless', 'zero-dependency'],
+    license: 'MIT',
+    repository: {
+      type: 'git',
+      url: 'git+https://github.com/Labpics-Team/lab-motion.git',
+    },
+    engines: { node: '>=22' },
+    packageManager: 'pnpm@11.11.0',
+    type: 'module',
+    main: './dist/index.cjs',
+    module: './dist/index.js',
+    types: './dist/index.d.ts',
+    imports: {
+      '#frame': { import: './dist/frame/index.js', require: './dist/frame/index.cjs' },
+    },
+    typesVersions: { '*': { '*': ['dist/*/index.d.ts'] } },
+    exports: {
+      '.': {
+        import: { types: './dist/index.d.ts', default: './dist/index.js' },
+        require: { types: './dist/index.d.cts', default: './dist/index.cjs' },
+      },
+    },
+    files: ['dist', 'docs/errors.md', 'docs/бенчмарк.md', '!dist/**/*.map'],
+    publishConfig: { access: 'public' },
+    sideEffects: [
+      './dist/lit/index.js',
+      './dist/lit/index.cjs',
+      './dist/wc/index.js',
+      './dist/wc/index.cjs',
+    ],
+    scripts: { build: 'tsup' },
+    peerDependencies: {
+      '@angular/core': '>=16.0.0',
+      '@builder.io/qwik': '>=1.4.0',
+      lit: '>=3.0.0',
+      preact: '>=10.3.1',
+      react: '>=18.0.0',
+      'solid-js': '>=1.8.0',
+      svelte: '>=4.0.0',
+      vue: '>=3.0.0',
+    },
+    peerDependenciesMeta: {
+      lit: { optional: true },
+      react: { optional: true },
+      svelte: { optional: true },
+      vue: { optional: true },
+      'solid-js': { optional: true },
+      preact: { optional: true },
+      '@angular/core': { optional: true },
+      '@builder.io/qwik': { optional: true },
+    },
+  };
+}
+
 function archive(
   overrides: Record<string, unknown> = {},
   fileName = `labpics-motion-${VERSION}.tgz`,
@@ -25,14 +86,11 @@ function archive(
   workspaces.push(work);
   const packageDirectory = join(work, 'package');
   mkdirSync(packageDirectory);
+  writeFileSync(join(work, 'root-package.json'), JSON.stringify(releaseMetadata()));
   writeFileSync(
     join(packageDirectory, 'package.json'),
     JSON.stringify({
-      name: '@labpics/motion',
-      version: VERSION,
-      private: false,
-      publishConfig: { access: 'public' },
-      repository: { url: 'git+https://github.com/Labpics-Team/lab-motion.git' },
+      ...releaseMetadata(),
       ...overrides,
     }),
   );
@@ -47,7 +105,14 @@ function check(
   tag = TAG,
   sha = SHA,
 ) {
-  return spawnSync(process.execPath, [SCRIPT, tarball, tag, sha, manifest], {
+  return spawnSync(process.execPath, [
+    SCRIPT,
+    tarball,
+    tag,
+    sha,
+    manifest,
+    join(dirname(tarball), 'root-package.json'),
+  ], {
     encoding: 'utf8',
   });
 }

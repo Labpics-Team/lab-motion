@@ -6,53 +6,107 @@
  *   собранные esbuild'ом в IIFE и исполняемые в реальном Chromium (Playwright).
  * - Ни одного захардкоженного «vendor»-числа, ни одного множителя поверх измерений,
  *   ни одного sim-фоллбэка: нет браузера или dist — процесс падает с ошибкой.
- * - Freeze-тест меряется ВИЗУАЛЬНО: скриншоты через сырой CDP Page.captureScreenshot
+ * - Freeze-тест меряется ВИЗУАЛЬНО: кадры через CDP Page.startScreencast
  *   (компоситор жив при заблокированном main-thread), позиция — пиксель-скан pngjs.
  * - Смоук-гейт: если адаптер библиотеки не двигает элемент — прогон прерывается,
  *   а не публикует нули за конкурента.
  *
- * Запуск: cd bench/compare && pnpm i && node bench.mjs   (перед этим: pnpm build в корне)
- * Переменные: BENCH_RUNS (дефолт 5), BENCH_FREEZE_RUNS (дефолт 3).
+ * Запуск: cd bench/compare && pnpm i && node bench.mjs
+ * Корневой dist пересобирается самим стендом до фиксации provenance.
+ * Переменные: BENCH_RUNS (дефолт 20), BENCH_FREEZE_RUNS (дефолт 9, полный
+ * позиционно-сбалансированный блок; допустимы только кратные числу участников).
  */
 
-import { execSync } from 'node:child_process';
-import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
+import {
+  linkSync,
+  mkdirSync,
+  mkdtempSync,
+  readFileSync,
+  realpathSync,
+  rmSync,
+  unlinkSync,
+  writeFileSync,
+} from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
-import { fileURLToPath } from 'node:url';
-import { gzipSync } from 'node:zlib';
+import { fileURLToPath, pathToFileURL } from 'node:url';
+import { brotliCompressSync, constants as zlibConstants, gzipSync } from 'node:zlib';
 import esbuild from 'esbuild';
 import { chromium } from 'playwright';
 import { PNG } from 'pngjs';
+import {
+  assertFileHashesUnchanged,
+  assertCheckoutUnchanged,
+  hashFileTree,
+  prepareBenchmarkCheckout,
+  sha256Bytes,
+  sha256File,
+} from './provenance.mjs';
+import {
+  assertBalancedRunBlocks,
+  assertFreezeMatrix,
+  createFreezeEvidence,
+  deriveTimerQuantum,
+  evaluateStartSemanticEvidence,
+  makeRoundRobinOrders,
+  movementStats,
+  parseBenchCount,
+  PRODUCTION_ADAPTER_PROFILE,
+  scoreAgainstBaseline,
+  START_SCENARIO_MANIFEST,
+  summarizeReportSamples,
+  summarizeMedianSamples,
+} from './methodology.mjs';
+import {
+  renderBenchmarkMarkdown,
+  renderBenchmarkEnvironment,
+  createBenchmarkClaims,
+  validateBenchmarkReportPair,
+} from './report-contract.mjs';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const ROOT = path.resolve(__dirname, '..', '..');
-const RUNS = Math.max(1, Number(process.env.BENCH_RUNS ?? 5));
-const FREEZE_RUNS = Math.max(1, Number(process.env.BENCH_FREEZE_RUNS ?? 3));
+const RUNS = parseBenchCount('BENCH_RUNS', process.env.BENCH_RUNS, 20, { min: 20, max: 60 });
+const FREEZE_RUNS = parseBenchCount(
+  'BENCH_FREEZE_RUNS',
+  process.env.BENCH_FREEZE_RUNS,
+  9,
+  { min: 3, max: 45 },
+);
+const ORDER_SEED = 0x51f15e;
+const BOOTSTRAP_ITERATIONS = 10_000;
 
 const LIBS = [
-  { id: 'lab', entry: 'entries/lab.entry.mjs', pkg: null },
-  { id: 'motion', entry: 'entries/motion.entry.mjs', pkg: 'motion' },
-  { id: 'gsap', entry: 'entries/gsap.entry.mjs', pkg: 'gsap' },
-  { id: 'anime', entry: 'entries/anime.entry.mjs', pkg: 'animejs' },
-  // S4-only ряды вне tween-матрицы (S1–S3/S5 у них «н/д» намеренно):
+  { id: 'lab', entry: 'entries/lab.entry.mjs', pkg: null, group: 'transform-linear-start+stagger-adapter', startCosts: true },
+  { id: 'motion', entry: 'entries/motion.entry.mjs', pkg: 'motion', group: 'transform-linear-start+stagger-adapter', startCosts: true },
+  { id: 'gsap', entry: 'entries/gsap.entry.mjs', pkg: 'gsap', group: 'transform-linear-start+stagger-adapter', startCosts: true },
+  { id: 'anime', entry: 'entries/anime.entry.mjs', pkg: 'animejs', group: 'transform-linear-start+stagger-adapter', startCosts: true },
+  // Freeze-only ряды вне tween-матрицы (S1–S4 у них «н/д»; S6 измеряется):
   // контроль инструмента и компоситорный (spring→WAAPI) путь нашего фасада.
-  { id: 'waapi-ctl', entry: 'entries/waapi-control.entry.mjs', pkg: null, s4Only: true, ver: 'платформа Chromium (без библиотеки)' },
-  { id: 'lab-spring', entry: 'entries/lab-spring.entry.mjs', pkg: null, s4Only: true },
+  { id: 'waapi-ctl', entry: 'entries/waapi-control.entry.mjs', pkg: null, group: 'transform-linear-waapi-control', ver: 'платформа Chromium (без библиотеки)' },
+  { id: 'lab-spring', entry: 'entries/lab-spring.entry.mjs', pkg: null, group: 'transform-spring-start-adapter' },
+  { id: 'lab-native', entry: 'entries/lab-native.entry.mjs', pkg: null, group: 'transform-spring-start-adapter' },
+  // Лучшие официальные native-пути: без них freeze-победа была бы ложной.
+  { id: 'motion-mini', entry: 'entries/motion-mini.entry.mjs', pkg: 'motion', group: 'transform-linear-native-start-adapter' },
+  { id: 'anime-waapi', entry: 'entries/anime-waapi.entry.mjs', pkg: 'animejs', group: 'transform-linear-native-start-adapter' },
 ];
+const BENCH_PACKAGES = ['animejs', 'esbuild', 'gsap', 'motion', 'playwright', 'pngjs'];
 
 // ─── утилиты ─────────────────────────────────────────────────────────────────
-
-const median = (arr) => {
-  const a = [...arr].sort((x, y) => x - y);
-  return a.length % 2 ? a[a.length >> 1] : (a[a.length / 2 - 1] + a[a.length / 2]) / 2;
-};
-const fmt = (n, d = 2) => (n === null || Number.isNaN(n) ? 'н/д' : n.toFixed(d));
 
 function fail(msg) {
   console.error(`\nБЕНЧ ПРЕРВАН: ${msg}`);
   console.error('Симуляций и подстановок этот бенчмарк не делает намеренно.');
   process.exit(1);
+}
+
+async function resolveChromiumInstall() {
+  const playwrightRoot = realpathSync(path.join(__dirname, 'node_modules', 'playwright'));
+  const coreRoot = path.join(path.dirname(playwrightRoot), 'playwright-core');
+  const registryBundle = path.join(coreRoot, 'lib', 'coreBundle.js');
+  const registryModule = await import(pathToFileURL(registryBundle).href);
+  const descriptor = registryModule.registry.registry.findExecutable('chromium');
+  return { directory: descriptor.directory, revision: descriptor.revision };
 }
 
 function libVersion(lib, rootPkg) {
@@ -67,30 +121,34 @@ function libVersion(lib, rootPkg) {
 function buildAdapter(lib) {
   const outfile = path.join(__dirname, 'results', `.${lib.id}.iife.js`);
   esbuild.buildSync({
+    ...PRODUCTION_ADAPTER_PROFILE,
     entryPoints: [path.join(__dirname, lib.entry)],
-    bundle: true,
     format: 'iife',
     globalName: '__adapterModule',
-    platform: 'browser',
     outfile,
     logLevel: 'silent',
   });
-  return outfile;
+  return { path: outfile, sha256: sha256File(outfile) };
 }
 
-/** import-cost: тот же entry, но ESM + minify + gzip-9 — реальные байты потребителя. */
+/** import-cost: один ESM+minify артефакт, затем gzip-9 и Brotli-11. */
 function measureSize(lib) {
   const res = esbuild.buildSync({
+    ...PRODUCTION_ADAPTER_PROFILE,
     entryPoints: [path.join(__dirname, lib.entry)],
-    bundle: true,
     format: 'esm',
-    platform: 'browser',
-    minify: true,
     write: false,
     logLevel: 'silent',
   });
   const raw = res.outputFiles[0].contents;
-  return { raw: raw.byteLength, gz: gzipSync(raw, { level: 9 }).byteLength };
+  return {
+    raw: raw.byteLength,
+    gz: gzipSync(raw, { level: 9 }).byteLength,
+    br: brotliCompressSync(raw, {
+      params: { [zlibConstants.BROTLI_PARAM_QUALITY]: 11 },
+    }).byteLength,
+    sha256: sha256Bytes(raw),
+  };
 }
 
 // ─── страница ────────────────────────────────────────────────────────────────
@@ -129,54 +187,183 @@ async function smokeCheck(page, libId) {
   if (!(moved > 10)) fail(`смоук ${libId}: элемент не сдвинулся (x=${moved}) — адаптер неисправен, числа были бы враньём`);
 }
 
-// ─── сценарии S1–S3: scripting-стоимость старта ──────────────────────────────
-
-async function runStartCosts(page) {
-  return page.evaluate(() => {
-    const A = window.__adapterModule;
-    const mk = (n) => {
-      const list = [];
-      for (let i = 0; i < n; i++) {
-        const d = document.createElement('div');
-        d.className = 'box';
-        document.body.appendChild(d);
-        list.push(d);
+async function measureTimerCalibration(browser) {
+  const context = await browser.newContext();
+  const page = await context.newPage();
+  const performanceNowDeltasMs = await page.evaluate(() => {
+    const deltas = [];
+    for (let observation = 0; observation < 64; observation++) {
+      const started = performance.now();
+      let current = started;
+      for (let spin = 0; spin < 1_000_000 && current === started; spin++) {
+        current = performance.now();
       }
-      return list;
-    };
-    const drop = (els, c) => { try { c.cancel(); } catch { /* noop */ } els.forEach((e) => e.remove()); };
-    const med = (a) => { const s = [...a].sort((x, y) => x - y); return s[s.length >> 1]; };
-
-    // S1: 40 стартов в одном таймированном блоке — квантование performance.now()
-    // (~100µs) делает поштучный замер нулевым; делим суммарное время.
-    const els1 = mk(40);
-    const ctrls = [];
-    const t1s = performance.now();
-    for (const el of els1) ctrls.push(A.start([el], 300, 1200));
-    const s1 = (performance.now() - t1s) / 40;
-    ctrls.forEach((c) => { try { c.cancel(); } catch { /* noop */ } });
-    els1.forEach((e) => e.remove());
-
-    // S2: один вызов на 100 элементов.
-    const els2 = mk(100);
-    const t2 = performance.now();
-    const c2 = A.start(els2, 300, 1200);
-    const s2 = performance.now() - t2;
-    drop(els2, c2);
-
-    // S3: stagger-каскад на 200 элементов, gap 5ms.
-    const els3 = mk(200);
-    const t3 = performance.now();
-    const c3 = A.startStagger(els3, 300, 1200, 5);
-    const s3 = performance.now() - t3;
-    drop(els3, c3);
-
-    void med;
-    return { s1, s2, s3 };
+      if (current > started) deltas.push(current - started);
+    }
+    return deltas;
   });
+  await context.close();
+  return {
+    raw: { performanceNowDeltasMs },
+    timerQuantumMs: deriveTimerQuantum(performanceNowDeltasMs),
+  };
 }
 
-// ─── сценарий S4: freeze-continuity (визуальный) ─────────────────────────────
+// ─── сценарии S1–S4: scripting-стоимость старта ──────────────────────────────
+
+async function runWarmStartCosts(page, scenario) {
+  return page.evaluate(async (config) => {
+    const A = window.__adapterModule;
+    const mk = (n) => Array.from({ length: n }, () => {
+      const element = document.createElement('div');
+      element.className = 'box';
+      document.body.appendChild(element);
+      return element;
+    });
+    const drain = () => new Promise((resolve) => requestAnimationFrame(() => resolve()));
+    const measure = async ({ calls, targets, staggerGapMs, samples, toPx, durationMs }) => {
+      const rows = [];
+      for (let sample = -1; sample < samples; sample++) {
+        const groups = Array.from({ length: calls }, () => mk(targets));
+        const controls = [];
+        const started = performance.now();
+        for (const elements of groups) {
+          controls.push(staggerGapMs > 0
+            ? A.startStagger(elements, toPx, durationMs, staggerGapMs)
+            : A.start(elements, toPx, durationMs));
+        }
+        const perCall = (performance.now() - started) / calls;
+        for (const control of controls) { try { control.cancel(); } catch { /* noop */ } }
+        for (const elements of groups) for (const element of elements) element.remove();
+        // Первый батч — warmup. Дрен rAF/микрозадач не даёт следующему батчу
+        // бесплатно присоединиться к pending-frame предыдущего.
+        await Promise.resolve();
+        await drain();
+        if (sample >= 0) rows.push(perCall);
+      }
+      return rows;
+    };
+    return measure({
+      calls: config.warmCalls,
+      targets: config.targetsPerCall,
+      staggerGapMs: config.staggerGapMs,
+      samples: config.warmSamples,
+      toPx: config.toPx,
+      durationMs: config.durationMs,
+    });
+  }, scenario);
+}
+
+/** Cold single-call только для S2–S4; null/ноль затем fail-closed отклоняет отчёт. */
+async function runColdStartCost(page, scenario) {
+  return page.evaluate((config) => {
+    const A = window.__adapterModule;
+    const elements = Array.from({ length: config.targetsPerCall }, () => {
+      const element = document.createElement('div');
+      element.className = 'box';
+      document.body.appendChild(element);
+      return element;
+    });
+    const started = performance.now();
+    const control = config.staggerGapMs > 0
+      ? A.startStagger(elements, config.toPx, config.durationMs, config.staggerGapMs)
+      : A.start(elements, config.toPx, config.durationMs);
+    const elapsed = performance.now() - started;
+    try { control.cancel(); } catch { /* noop */ }
+    for (const element of elements) element.remove();
+    return elapsed > 0 ? elapsed : null;
+  }, scenario);
+}
+
+/** Cold S1: надёжная пользовательская метрика до первого реально видимого сдвига. */
+async function runFirstVisible(page) {
+  return page.evaluate(async (config) => {
+    const element = document.createElement('div');
+    element.className = 'box';
+    document.body.appendChild(element);
+    const started = performance.now();
+    const control = window.__adapterModule.start([element], config.toPx, config.durationMs);
+    let elapsed = null;
+    for (let frame = 0; frame < 12; frame++) {
+      await new Promise((resolve) => requestAnimationFrame(resolve));
+      const x = new DOMMatrixReadOnly(getComputedStyle(element).transform).e;
+      if (Math.abs(x) >= 0.5) {
+        elapsed = performance.now() - started;
+        break;
+      }
+    }
+    try { control.cancel(); } catch { /* noop */ }
+    element.remove();
+    return elapsed;
+  }, START_SCENARIO_MANIFEST.s1);
+}
+
+/** Untimed oracle проверяет всю топологию, а не одного выжившего target. */
+async function runSemanticStartCheck(page, scenario, calls) {
+  const evidence = await page.evaluate(async ({ config, calls: expectedCalls }) => {
+    const A = window.__adapterModule;
+    const groups = Array.from({ length: expectedCalls }, () => (
+      Array.from({ length: config.targetsPerCall }, () => {
+        const element = document.createElement('div');
+        element.className = 'box';
+        document.body.appendChild(element);
+        return element;
+      })
+    ));
+    const epoch = performance.now();
+    const callStartedAtMs = [];
+    const controls = groups.map((elements) => {
+      callStartedAtMs.push(performance.now() - epoch);
+      return config.staggerGapMs > 0
+        ? A.startStagger(elements, config.toPx, config.durationMs, config.staggerGapMs)
+        : A.start(elements, config.toPx, config.durationMs);
+    });
+    const delaySpan = config.staggerGapMs * (config.targetsPerCall - 1);
+    const checkpointTimes = config.staggerGapMs > 0
+      ? [0.2, 0.5, 0.8].map((fraction) => delaySpan * fraction)
+      : [config.durationMs * 0.25];
+    const checkpoints = [];
+    for (const checkpointTime of checkpointTimes) {
+      const remaining = checkpointTime - (performance.now() - epoch);
+      if (remaining > 0) await new Promise((resolve) => setTimeout(resolve, remaining));
+      checkpoints.push({
+        groups: groups.map((elements) => {
+          const readStartedMs = performance.now() - epoch;
+          const positions = elements.map((element) => (
+            new DOMMatrixReadOnly(getComputedStyle(element).transform).e
+          ));
+          return { readStartedMs, readEndedMs: performance.now() - epoch, positions };
+        }),
+      });
+    }
+    const terminalAt = config.durationMs + delaySpan + 100;
+    const remaining = terminalAt - (performance.now() - epoch);
+    if (remaining > 0) await new Promise((resolve) => setTimeout(resolve, remaining));
+    const terminal = groups.map((elements) => elements.map((element) => (
+      new DOMMatrixReadOnly(getComputedStyle(element).transform).e
+    )));
+    for (const control of controls) { try { control.cancel(); } catch { /* семантика уже снята */ } }
+    for (const elements of groups) for (const element of elements) element.remove();
+    return {
+      topology: {
+        calls: expectedCalls,
+        targetsPerCall: config.targetsPerCall,
+        staggerGapMs: config.staggerGapMs,
+        durationMs: config.durationMs,
+        toPx: config.toPx,
+      },
+      callStartedAtMs,
+      checkpoints,
+      terminal,
+    };
+  }, { config: scenario, calls });
+  return {
+    ...evidence,
+    valid: evaluateStartSemanticEvidence(evidence, scenario, calls),
+  };
+}
+
+// ─── сценарий S5: freeze-continuity (визуальный) ─────────────────────────────
 
 function redLeftEdge(pngBuf) {
   // Полный скан: кадры скринкаста — целый вьюпорт (возможен и letterbox),
@@ -196,7 +383,12 @@ function redLeftEdge(pngBuf) {
   return left;
 }
 
-async function runFreeze(browser, adapterPath, libId) {
+const FREEZE_PX = 600;
+const FREEZE_DURATION_MS = 2400;
+const BLOCK_AT_MS = 300;
+const BLOCK_MS = 900;
+
+async function captureTrajectory(browser, adapterPath, blocked) {
   const { context, page } = await newPage(browser, adapterPath);
   const cdp = await context.newCDPSession(page);
   await page.evaluate(() => {
@@ -204,8 +396,6 @@ async function runFreeze(browser, adapterPath, libId) {
     p.id = 'probe';
     document.body.appendChild(p);
   });
-
-  const PX = 600, DUR = 2400, BLOCK_AT = 300, BLOCK_MS = 900;
 
   // Кадры забираем скринкастом: компоситор пушит их сам, main-thread страницы
   // не участвует. Одиночный Page.captureScreenshot при мёртвом main стопорится
@@ -220,78 +410,130 @@ async function runFreeze(browser, adapterPath, libId) {
     format: 'png', everyNthFrame: 1, maxWidth: 800, maxHeight: 200,
   });
 
-  // Старт анимации + отложенная блокировка main-thread изнутри страницы.
-  await page.evaluate(({ PX, DUR, BLOCK_AT, BLOCK_MS }) => {
+  // Epoch фиксируется в page realm рядом с API-вызовом: RTT Node↔page не входит.
+  const startedAt = await page.evaluate(({ px, duration, shouldBlock, blockAt, blockMs }) => {
     const el = document.getElementById('probe');
-    window.__c = window.__adapterModule.start([el], PX, DUR);
-    setTimeout(() => {
-      const end = performance.now() + BLOCK_MS;
-      while (performance.now() < end) { /* busy: реальный фриз main-thread */ }
-    }, BLOCK_AT);
-  }, { PX, DUR, BLOCK_AT, BLOCK_MS });
-  const wall0 = Date.now() / 1000; // ≈ старт анимации (±RTT evaluate, ~единицы мс)
+    const epoch = () => (performance.timeOrigin + performance.now()) / 1000;
+    const start = epoch();
+    window.__benchTiming = { startedAt: start, blockStartedAt: null, blockEndedAt: null };
+    window.__c = window.__adapterModule.start([el], px, duration);
+    if (shouldBlock) setTimeout(() => {
+      window.__benchTiming.blockStartedAt = epoch();
+      const end = performance.now() + blockMs;
+      while (performance.now() < end) { /* реальная блокировка main-thread */ }
+      window.__benchTiming.blockEndedAt = epoch();
+    }, blockAt);
+    return start;
+  }, {
+    px: FREEZE_PX,
+    duration: FREEZE_DURATION_MS,
+    shouldBlock: blocked,
+    blockAt: BLOCK_AT_MS,
+    blockMs: BLOCK_MS,
+  });
 
   // Ждём: анимация + блок + запас на lagSmoothing-подобное продление (GSAP
   // после лага честно доигрывает сдвинутый таймлайн, а не прыгает — это
   // валидное поведение, ему нужно время).
-  await new Promise((r) => setTimeout(r, DUR + BLOCK_MS + 700));
+  await new Promise((r) => setTimeout(
+    r,
+    FREEZE_DURATION_MS + (blocked ? BLOCK_MS : 0) + 700,
+  ));
   await cdp.send('Page.stopScreencast').catch(() => {});
-  const finalX = await page.evaluate(() => {
+  const terminal = await page.evaluate(() => {
     const el = document.getElementById('probe');
-    return new DOMMatrixReadOnly(getComputedStyle(el).transform).e;
+    return {
+      finalX: new DOMMatrixReadOnly(getComputedStyle(el).transform).e,
+      timing: window.__benchTiming,
+    };
   });
   await context.close();
 
-  // Декод кадров и hold-семантика дисплея: в грид-момент видна ПОСЛЕДНЯЯ
-  // закоммиченная позиция. Окно с полями 80мс от краёв блока.
   const decoded = frames
-    .map((f) => ({ ts: f.ts, x: redLeftEdge(Buffer.from(f.data, 'base64')) }))
-    .filter((f) => f.x !== null)
-    .sort((a, b) => a.ts - b.ts);
-  const w0 = wall0 + (BLOCK_AT + 80) / 1000;
-  const w1 = wall0 + (BLOCK_AT + BLOCK_MS - 80) / 1000;
-  const framesInWindow = decoded.filter((f) => f.ts >= w0 && f.ts <= w1).length;
-
-  const ratios = [];
-  for (let g = w0; g <= w1; g += 0.1) {
-    let held = null;
-    for (const f of decoded) { if (f.ts <= g) held = f; else break; }
-    if (!held) continue;
-    const tAnim = (g - wall0) * 1000;
-    const expected = PX * Math.min(tAnim / DUR, 1);
-    if (expected > 0) ratios.push(Math.min(held.x / expected, 1));
-  }
-
-  if (decoded.length === 0 || ratios.length < 5) {
-    console.warn(`  ${libId}: скринкаст не дал пригодных кадров (raw=${frames.length}, с красным=${decoded.length}, ratios=${ratios.length}) — честный ответ: н/д`);
-    return { continuity: null, framesInWindow, finalX };
-  }
-  if (finalX < PX * 0.9) {
-    console.warn(`  ${libId}: финал ${fmt(finalX, 0)}px < ${PX * 0.9} спустя DUR+BLOCK+700мс — адаптер невалиден, н/д`);
-    return { continuity: null, framesInWindow, finalX };
-  }
+    .map((f) => ({ t: f.ts - startedAt, x: redLeftEdge(Buffer.from(f.data, 'base64')) }))
+    .filter((f) => Number.isFinite(f.t) && f.x !== null)
+    .sort((a, b) => a.t - b.t);
   return {
-    continuity: (ratios.reduce((a, b) => a + b, 0) / ratios.length) * 100,
-    framesInWindow,
-    finalX,
+    decoded,
+    finalX: terminal.finalX,
+    timing: terminal.timing,
+    rawFrames: frames.length,
+  };
+}
+
+async function runFreezePair(browser, adapterPath, blockedFirst) {
+  const first = await captureTrajectory(browser, adapterPath, blockedFirst);
+  const second = await captureTrajectory(browser, adapterPath, !blockedFirst);
+  const baseline = blockedFirst ? second : first;
+  const blocked = blockedFirst ? first : second;
+  const blockStart = blocked.timing?.blockStartedAt - blocked.timing?.startedAt;
+  const blockEnd = blocked.timing?.blockEndedAt - blocked.timing?.startedAt;
+  const windowStart = blockStart + 0.08;
+  const windowEnd = blockEnd - 0.08;
+  const grid = [];
+  if (Number.isFinite(windowStart) && Number.isFinite(windowEnd)) {
+    for (let t = windowStart; t <= windowEnd; t += 0.1) grid.push(t);
+  }
+  const evidence = createFreezeEvidence(blocked.decoded, baseline.decoded, grid);
+  const scored = scoreAgainstBaseline(evidence.blocked, evidence.baseline, evidence.grid);
+  const blockedWindow = blocked.decoded.filter((f) => f.t >= windowStart && f.t <= windowEnd);
+  const baselineWindow = baseline.decoded.filter((f) => f.t >= windowStart && f.t <= windowEnd);
+  const movement = movementStats(blockedWindow);
+  const baselineMovement = movementStats(baselineWindow);
+  const finalTolerance = 2;
+  const finalsValid =
+    Math.abs(baseline.finalX - FREEZE_PX) <= finalTolerance &&
+    Math.abs(blocked.finalX - FREEZE_PX) <= finalTolerance;
+  const valid =
+    finalsValid &&
+    Number.isFinite(scored.score) &&
+    scored.samples >= 5 &&
+    baselineMovement.distinctPositions >= 5 &&
+    baselineMovement.totalAdvancement >= 10;
+  return {
+    valid,
+    score: scored.score,
+    samples: scored.samples,
+    movement,
+    baselineMovement,
+    finalX: blocked.finalX,
+    baselineFinalX: baseline.finalX,
+    blockStart,
+    blockEnd,
+    rawFrames: { baseline: baseline.rawFrames, blocked: blocked.rawFrames },
+    evidence,
   };
 }
 
 // ─── main ────────────────────────────────────────────────────────────────────
 
 async function main() {
-  if (!existsSync(path.join(ROOT, 'dist', 'animate', 'index.js'))) {
-    fail('нет dist/animate/index.js — сначала `pnpm build` в корне репозитория');
-  }
+  const generatedAt = new Date().toISOString();
+  console.log('=== Подготовка воспроизводимого артефакта: pnpm build ===');
+  const provenance = prepareBenchmarkCheckout({
+    root: ROOT,
+    benchDirectory: __dirname,
+    requiredDist: [
+      'dist/animate/index.js',
+      'dist/animate/native/index.js',
+    ],
+    requiredPackages: BENCH_PACKAGES,
+    requiredInputs: [
+      ['bench/bench.mjs', path.join(__dirname, 'bench.mjs')],
+      ['bench/methodology.mjs', path.join(__dirname, 'methodology.mjs')],
+      ['bench/provenance.mjs', path.join(__dirname, 'provenance.mjs')],
+      ['bench/report-contract.mjs', path.join(__dirname, 'report-contract.mjs')],
+    ],
+  });
   mkdirSync(path.join(__dirname, 'results'), { recursive: true });
 
   const rootPkg = JSON.parse(readFileSync(path.join(ROOT, 'package.json'), 'utf8'));
-  let gitRev = 'н/д';
-  try { gitRev = execSync('git rev-parse --short HEAD', { cwd: ROOT }).toString().trim(); } catch { /* вне git */ }
+  const chromiumInstall = await resolveChromiumInstall();
+  const chromiumTreeBefore = hashFileTree(chromiumInstall.directory);
 
   // Headed обязателен: headless-Chromium производит кадры только по main-thread
   // коммитам (BeginFrame по требованию) — во время фриза кадров нет ни у кого,
-  // и S4 выродился бы в hold-артефакт ~45% у всех (проверено v3-прогоном).
+  // и S5 выродился бы в hold-артефакт ~45% у всех (проверено v3-прогоном).
   let browser;
   try {
     browser = await chromium.launch({
@@ -307,124 +549,212 @@ async function main() {
     fail(`Chromium не запустился (${e.message.split('\n')[0]}). Установите: npx playwright install chromium`);
   }
   const browserVersion = browser.version();
+  const browserExecutableSha256 = sha256File(chromium.executablePath());
+  const calibration = await measureTimerCalibration(browser);
 
-  const env = [
-    `Дата: ${new Date().toISOString()}`,
-    `Ревизия: ${gitRev}`,
-    `Машина: ${os.cpus()[0]?.model?.trim() ?? 'н/д'} × ${os.cpus().length}, ${Math.round(os.totalmem() / 2 ** 30)} GB RAM`,
-    `ОС: ${os.type()} ${os.release()}; Node ${process.version}; Chromium ${browserVersion}`,
-    `Прогонов: S1–S3 × ${RUNS}, freeze × ${FREEZE_RUNS}; агрегация — медиана`,
-    `Библиотеки: ${LIBS.map((l) => libVersion(l, rootPkg)).join(', ')}`,
-  ];
-  console.log('=== Честный сравнительный бенчмарк ===');
-  env.forEach((l) => console.log(l));
+  const system = {
+    cpu: os.cpus()[0]?.model?.trim() ?? 'н/д',
+    logicalCpus: os.cpus().length,
+    memoryGiB: Math.round(os.totalmem() / 2 ** 30),
+    osType: os.type(),
+    osRelease: os.release(),
+  };
 
   const results = {};
+  const adapters = {};
+  const scenarioIds = Object.keys(START_SCENARIO_MANIFEST);
+  const coldScenarioIds = scenarioIds.filter((id) => (
+    START_SCENARIO_MANIFEST[id].coldMetric === 'apiReturn'
+  ));
   for (const lib of LIBS) {
-    console.log(`\n— ${lib.id}: сборка адаптера…`);
-    const adapterPath = buildAdapter(lib);
-    const size = lib.s4Only ? null : measureSize(lib);
+    console.log(`\n— ${lib.id}: production-сборка адаптера…`);
+    adapters[lib.id] = buildAdapter(lib);
+    results[lib.id] = {
+      version: libVersion(lib, rootPkg),
+      group: lib.group,
+      size: measureSize(lib),
+      adapterSha256: adapters[lib.id].sha256,
+      raw: {
+        warm: Object.fromEntries(scenarioIds.map((id) => [id, []])),
+        cold: {
+          ...Object.fromEntries(coldScenarioIds.map((id) => [id, []])),
+          firstVisible: [],
+        },
+        freeze: [],
+      },
+    };
+    const { context, page } = await newPage(browser, adapters[lib.id].path);
+    await smokeCheck(page, lib.id);
+    await context.close();
+  }
 
-    { // смоук на свежей странице
-      const { context, page } = await newPage(browser, adapterPath);
-      await smokeCheck(page, lib.id);
-      await context.close();
-    }
-
-    const s1 = [], s2 = [], s3 = [];
-    if (!lib.s4Only) {
-      for (let r = 0; r < RUNS; r++) {
+  const startLibs = LIBS.filter((lib) => lib.startCosts);
+  const startIds = startLibs.map((lib) => lib.id);
+  const startOrders = makeRoundRobinOrders(startIds, RUNS, ORDER_SEED);
+  assertBalancedRunBlocks('BENCH_RUNS', startOrders, startIds);
+  for (let run = 0; run < RUNS; run++) {
+    for (const id of startOrders[run]) {
+      const adapterPath = adapters[id].path;
+      console.log(`  start run ${run + 1}/${RUNS}: ${id}`);
+      for (const scenario of scenarioIds) {
+        const config = START_SCENARIO_MANIFEST[scenario];
         const { context, page } = await newPage(browser, adapterPath);
-        const res = await runStartCosts(page);
-        s1.push(res.s1); s2.push(res.s2); s3.push(res.s3);
+        const samples = await runWarmStartCosts(page, config);
+        const semanticEvidence = await runSemanticStartCheck(page, config, config.warmCalls);
+        const semantic = semanticEvidence.valid;
+        results[id].raw.warm[scenario].push({ run, samples, semantic, semanticEvidence });
+        await context.close();
+      }
+      for (const scenario of coldScenarioIds) {
+        const config = START_SCENARIO_MANIFEST[scenario];
+        const { context, page } = await newPage(browser, adapterPath);
+        const sample = await runColdStartCost(page, config);
+        const semanticEvidence = await runSemanticStartCheck(page, config, 1);
+        const semantic = semanticEvidence.valid;
+        results[id].raw.cold[scenario].push({ run, samples: [sample], semantic, semanticEvidence });
+        await context.close();
+      }
+      {
+        const { context, page } = await newPage(browser, adapterPath);
+        const sample = await runFirstVisible(page);
+        const semanticEvidence = await runSemanticStartCheck(page, START_SCENARIO_MANIFEST.s1, 1);
+        const semantic = semanticEvidence.valid;
+        results[id].raw.cold.firstVisible.push({ run, samples: [sample], semantic, semanticEvidence });
         await context.close();
       }
     }
+  }
 
-    const freezes = [];
-    const framesW = [];
-    let finalX = null;
-    for (let r = 0; r < FREEZE_RUNS; r++) {
-      const f = await runFreeze(browser, adapterPath, lib.id);
-      freezes.push(f.continuity);
-      framesW.push(f.framesInWindow);
-      finalX = f.finalX;
+  const freezeOrders = makeRoundRobinOrders(LIBS.map((lib) => lib.id), FREEZE_RUNS, ORDER_SEED ^ 0xa5a5a5);
+  assertBalancedRunBlocks('BENCH_FREEZE_RUNS', freezeOrders, LIBS.map((lib) => lib.id));
+  for (let run = 0; run < FREEZE_RUNS; run++) {
+    for (const id of freezeOrders[run]) {
+      console.log(`  freeze run ${run + 1}/${FREEZE_RUNS}: ${id}`);
+      results[id].raw.freeze.push(await runFreezePair(browser, adapters[id].path, (run & 1) === 1));
     }
-    const valid = freezes.filter((f) => f !== null);
+  }
+  assertFreezeMatrix(
+    Object.fromEntries(LIBS.map((lib) => [lib.id, results[lib.id].raw.freeze])),
+    'waapi-ctl',
+  );
 
-    results[lib.id] = {
-      version: libVersion(lib, rootPkg),
-      s1: s1.length ? median(s1) : null,
-      s2: s2.length ? median(s2) : null,
-      s3: s3.length ? median(s3) : null,
-      freeze: valid.length ? median(valid) : null,
-      framesInWindow: median(framesW),
-      finalX,
-      size,
+  for (const lib of LIBS) {
+    const result = results[lib.id];
+    const flatten = (clusters) => clusters.flatMap((cluster) => cluster.samples);
+    result.warm = Object.fromEntries(
+      Object.entries(result.raw.warm).map(([name, clusters]) => [name, summarizeReportSamples(flatten(clusters))]),
+    );
+    result.cold = Object.fromEntries(
+      Object.entries(result.raw.cold).map(([name, clusters]) => [name, summarizeReportSamples(flatten(clusters), { strict: true })]),
+    );
+    result.freeze = {
+      score: summarizeMedianSamples(result.raw.freeze.map((run) => run.score)),
+      frames: summarizeMedianSamples(result.raw.freeze.map((run) => run.movement.frames)),
+      distinct: summarizeMedianSamples(result.raw.freeze.map((run) => run.movement.distinctPositions)),
+      net: summarizeMedianSamples(result.raw.freeze.map((run) => run.movement.netAdvancement)),
+      total: summarizeMedianSamples(result.raw.freeze.map((run) => run.movement.totalAdvancement)),
+      finalX: summarizeMedianSamples(result.raw.freeze.map((run) => run.finalX)),
     };
-    console.log(`  s1=${fmt(results[lib.id].s1)}ms s2=${fmt(results[lib.id].s2)}ms s3=${fmt(results[lib.id].s3)}ms freeze=${fmt(results[lib.id].freeze, 0)}% gz=${size ? `${size.gz}B` : 'н/д'}`);
   }
   await browser.close();
+  // Любая правка checkout во время долгого browser-прогона делает числа
+  // непривязанными к зафиксированным входам — такой отчёт не публикуем.
+  assertCheckoutUnchanged(ROOT, provenance);
+  assertFileHashesUnchanged({
+    chromium: { path: chromium.executablePath(), sha256: browserExecutableSha256 },
+    ...adapters,
+  });
+  const chromiumTreeAfter = hashFileTree(chromiumInstall.directory);
+  if (
+    chromiumTreeAfter.files !== chromiumTreeBefore.files ||
+    chromiumTreeAfter.sha256 !== chromiumTreeBefore.sha256
+  ) fail('Chromium runtime tree изменился во время benchmark-прогона');
 
   // ─── отчёт ─────────────────────────────────────────────────────────────────
   const ids = LIBS.map((l) => l.id);
-  const row = (label, f) => `| ${label} | ${ids.map((id) => f(results[id])).join(' | ')} |`;
-  const md = [
-    '# Сравнительный бенчмарк — реальный прогон',
-    '',
-    ...env.map((l) => `- ${l}`),
-    '',
-    'Все столбцы измерены этим скриптом в одном Chromium-прогоне; сценарий — линейный tween',
-    'x→300px/1200ms (общий знаменатель всех библиотек; пружины у всех разные и несравнимы напрямую).',
-    'Столбцы `waapi-ctl` и `lab-spring` — S4-only, вне tween-матрицы (их S1–S3/S5 — «н/д» намеренно).',
-    '',
-    `| Метрика | ${ids.join(' | ')} |`,
-    `|---|${ids.map(() => '---').join('|')}|`,
-    row('Версия', (r) => r.version),
-    row('S1: старт, 1 эл (среднее по 40 в блоке, мс)', (r) => fmt(r.s1, 3)),
-    row('S2: старт, 100 эл одним вызовом (мс)', (r) => fmt(r.s2)),
-    row('S3: stagger 200 эл, gap 5мс (мс)', (r) => fmt(r.s3)),
-    row('S4: continuity при фризе main 900мс (%)', (r) => fmt(r.freeze, 0)),
-    row('S4: кадров компоситора в окне фриза', (r) => fmt(r.framesInWindow, 0)),
-    row('S4: финальная позиция x (санити, px)', (r) => fmt(r.finalX, 0)),
-    row('S5: import-cost адаптера, min+gz (B)', (r) => (r.size ? String(r.size.gz) : 'н/д')),
-    '',
-    '## Методология S4 (freeze)',
-    '',
-    'Анимация 600px/2400ms; на t=300ms страница блокирует свой main-thread busy-циклом на 900ms.',
-    'Кадры собираются CDP `Page.startScreencast` — их пушит компоситор, main-thread страницы не',
-    'участвует; позиция = пиксель-скан левого края красного квадрата (pngjs). continuity — среднее',
-    'по 100мс-гриду окна блокировки (поля 80мс) отношения «удержанная позиция последнего кадра /',
-    'ожидаемая по wall-clock», cap 1.0. Одиночный `Page.captureScreenshot` для этого непригоден:',
-    'при мёртвом main он стопорится и возвращает кадр после разблокировки, что дарит RAF-библиотекам',
-    'фальшивые 100% за счёт wall-clock-прыжка (наблюдалось на первом прогоне этого скрипта).',
-    '«Кадров в окне» ≈ 0 означает: библиотека не производила видимых кадров во время фриза.',
-    '',
-    '## Оговорки честности',
-    '',
-    '- S1–S3 — синхронная стоимость вызова. GSAP ленив (`lazy: true`): часть работы уезжает в',
-    '  первый тик и в S1–S3 не попадает — его числа занижены относительно остальных.',
-    '- GSAP после лага не прыгает (lag smoothing), а доигрывает сдвинутый таймлайн — поэтому его',
-    '  финальная позиция снимается с запасом +700мс; это поведение, а не дефект.',
-    '- Пружины четырёх библиотек математически разные и напрямую несравнимы — потому общий',
-    '  знаменатель здесь линейный tween.',
-    '- Часы Node и страницы сведены с точностью RTT `evaluate` (±единицы мс) — на 900мс-окне шум.',
-    '- `waapi-ctl` — голый `Element.animate` (платформа, не библиотека): контроль того, что скринкаст',
-    '  вообще видит компоситорные кадры при фризе main. Если у него кадры в окне есть, а у библиотеки — 0,',
-    '  ноль настоящий (библиотека рисует по main-thread RAF), а не артефакт инструмента.',
-    '- `lab-spring` — spring-режим @labpics/motion: единственный путь фасада через компоситор (WaapiUnit;',
-    '  tween-режим уходит в MainUnit по main-thread у ВСЕХ четырёх участников, включая наш). Его',
-    '  continuity считается против линейного эталона и потому приближение; ключевая метрика —',
-    '  «кадров компоситора в окне фриза».',
-    '',
-    '_Файл сгенерирован bench/compare/bench.mjs; правки руками = подлог._',
-    '',
-  ].join('\n');
+  const stem = `${generatedAt.slice(0, 10)}-${provenance.revisionLabel}-${provenance.distRuntime.sha256.slice(0, 12)}`;
+  const rawPayload = {
+    schema: 4,
+    package: { name: rootPkg.name, version: rootPkg.version },
+    generatedAt,
+    companion: { markdownFile: `${stem}.md`, markdownSha256: '' },
+    environment: [],
+    system,
+    provenance,
+    browser: {
+      name: 'chromium',
+      version: browserVersion,
+      revision: chromiumInstall.revision,
+      files: chromiumTreeBefore.files,
+      treeSha256: chromiumTreeBefore.sha256,
+      executableSha256: browserExecutableSha256,
+    },
+    calibration,
+    scenarioManifest: START_SCENARIO_MANIFEST,
+    orderSeed: ORDER_SEED,
+    participants: { start: startIds, freeze: ids },
+    startOrders,
+    freezeOrders,
+    results: Object.fromEntries(ids.map((id) => [id, {
+      version: results[id].version,
+      group: results[id].group,
+      size: results[id].size,
+      adapterSha256: results[id].adapterSha256,
+      summary: {
+        warm: results[id].warm,
+        cold: results[id].cold,
+        freeze: results[id].freeze,
+      },
+      raw: results[id].raw,
+    }])),
+  };
+  rawPayload.claims = createBenchmarkClaims(rawPayload.results, {
+    seed: ORDER_SEED,
+    iterations: BOOTSTRAP_ITERATIONS,
+    timerQuantumMs: calibration.timerQuantumMs,
+  });
+  rawPayload.environment = renderBenchmarkEnvironment(rawPayload);
+  console.log('=== Честный сравнительный бенчмарк ===');
+  rawPayload.environment.forEach((line) => console.log(line));
+  const md = renderBenchmarkMarkdown(rawPayload);
 
-  const outPath = path.join(__dirname, 'results', `${new Date().toISOString().slice(0, 10)}-${gitRev}.md`);
-  writeFileSync(outPath, md);
+  rawPayload.companion.markdownSha256 = sha256Bytes(Buffer.from(md));
+  const rawJson = JSON.stringify(rawPayload, null, 2) + '\n';
+  validateBenchmarkReportPair({
+    stem,
+    markdown: md,
+    payload: rawPayload,
+    rootPackage: rootPkg,
+    benchmarkPackage: JSON.parse(readFileSync(path.join(__dirname, 'package.json'), 'utf8')),
+    now: Date.parse(generatedAt),
+  });
+
+  const outPath = path.join(__dirname, 'results', `${stem}.md`);
+  const rawPath = path.join(__dirname, 'results', `${stem}.json`);
+  const staging = mkdtempSync(path.join(__dirname, 'results', '.report-pair-'));
+  const stagedMarkdown = path.join(staging, `${stem}.md`);
+  const stagedJson = path.join(staging, `${stem}.json`);
+  const linked = [];
+  try {
+    writeFileSync(stagedMarkdown, md, { flag: 'wx' });
+    writeFileSync(stagedJson, rawJson, { flag: 'wx' });
+    // link(2) не перезаписывает цель: same-day rerun не может заменить историю.
+    linkSync(stagedJson, rawPath);
+    linked.push(rawPath);
+    linkSync(stagedMarkdown, outPath);
+    linked.push(outPath);
+  } catch (error) {
+    for (const file of linked) {
+      try { unlinkSync(file); } catch { /* первична исходная ошибка */ }
+    }
+    throw error;
+  } finally {
+    rmSync(staging, { recursive: true, force: true });
+  }
   console.log(`\n${md}`);
   console.log(`Отчёт: ${outPath}`);
+  console.log(`Raw: ${rawPath}`);
 }
 
-main().catch((e) => fail(e.stack ?? String(e)));
+const isDirectRun = process.argv[1] && path.resolve(process.argv[1]) === fileURLToPath(import.meta.url);
+if (isDirectRun) main().catch((e) => fail(e.stack ?? String(e)));

@@ -25,11 +25,28 @@
 import { describe, expect, it } from 'vitest';
 import { MotionParamError } from '../src/errors.js';
 import { animate } from '../src/animate/mini/index.js';
+import { createFrameLoop, type FrameLoop } from '../src/frame/index.js';
 import { fakeEl, makeClock, translateXSeries } from './animate-facade-helpers.js';
 
 const RF = (clock: ReturnType<typeof makeClock>) => ({ requestFrame: clock.requestFrame });
 
 describe('mini — базовая анимация', () => {
+  it('живой ран не зависит от последующей мутации caller-owned spring', () => {
+    const a = fakeEl();
+    const b = fakeEl();
+    const ca = makeClock();
+    const cb = makeClock();
+    const spring = { mass: 1, stiffness: 170, damping: 26 };
+    animate(a.el, { x: 120 }, { ...RF(ca), spring });
+    animate(b.el, { x: 120 }, { ...RF(cb), spring: { ...spring } });
+    spring.mass = 0;
+    for (let i = 0; i < 6; i++) {
+      ca.step(16);
+      cb.step(16);
+    }
+    expect(translateXSeries(a.writes)).toEqual(translateXSeries(b.writes));
+  });
+
   it('spring transform x оседает в точной цели', async () => {
     const f = fakeEl();
     const clock = makeClock();
@@ -74,6 +91,45 @@ describe('mini — базовая анимация', () => {
 });
 
 describe('mini — настройка не пишет до кадра (фаза render)', () => {
+  it('бросок DOM-writer терминализирует юнит и не держит idle-loop', async () => {
+    const clock = makeClock();
+    const target = {
+      style: {
+        getPropertyValue: () => '',
+        setProperty: () => { throw new Error('detached host'); },
+      },
+    };
+    const controls = animate(target, { x: 100 }, { ...RF(clock), duration: 100 });
+
+    expect(() => clock.step(16)).not.toThrow();
+    await controls.finished;
+    expect(clock.drain()).toBe(0);
+  });
+
+  it('update/render подписываются один раз на lifecycle, а не на каждом кадре', () => {
+    const f = fakeEl();
+    const clock = makeClock();
+    const base = createFrameLoop({ requestFrame: clock.requestFrame });
+    let updates = 0;
+    let renders = 0;
+    const frame: FrameLoop = {
+      read: base.read,
+      update(cb, options) {
+        updates++;
+        return base.update(cb, options);
+      },
+      render(cb, options) {
+        renders++;
+        return base.render(cb, options);
+      },
+      cancelAll: base.cancelAll,
+    };
+    const controls = animate(f.el, { x: 100 }, { frame, duration: 1000 });
+    for (let i = 0; i < 5; i++) clock.step(16);
+    expect({ updates, renders }).toEqual({ updates: 1, renders: 1 });
+    controls.cancel();
+  });
+
   // RED без разведения фаз/ленивого старта: запись случилась бы синхронно в
   // конструкторе. Инвариант: чтение сделано в bind, запись — в render-фазе кадра.
   it('настройка не пишет до кадра', () => {
@@ -106,6 +162,18 @@ describe('mini — fail-fast (валидация ДО записи)', () => {
     expect(() =>
       animate(f.el, { x: 1 }, { spring: { mass: 1, stiffness: 100, damping: 10 }, duration: 100 }),
     ).toThrow(MotionParamError);
+  });
+
+  it('невалидная spring бросает синхронно до кадра и записи', () => {
+    const f = fakeEl();
+    const clock = makeClock();
+    expect(() =>
+      animate(f.el, { x: 1 }, {
+        ...RF(clock),
+        spring: { mass: 0, stiffness: 100, damping: 10 },
+      }),
+    ).toThrow(MotionParamError);
+    expect(f.writes).toEqual([]);
   });
 
   it('отрицательный delay — ошибка до записи', () => {
@@ -215,6 +283,22 @@ describe('mini — контролы', () => {
 });
 
 describe('mini — C¹-подхват при повторном запуске', () => {
+  it('opaque ease считается один раз на кадр, а производная — лениво при перехвате', () => {
+    const f = fakeEl();
+    const clock = makeClock();
+    let calls = 0;
+    const ease = (t: number): number => {
+      calls++;
+      return t;
+    };
+    animate(f.el, { x: 100 }, { ...RF(clock), duration: 1000, ease });
+    for (let i = 0; i < 5; i++) clock.step(16);
+    expect(calls).toBe(5);
+
+    animate(f.el, { x: 200 }, { ...RF(clock), spring: { mass: 1, stiffness: 170, damping: 26 } });
+    expect(calls).toBe(7);
+  });
+
   it('повторный animate стартует от текущего значения (континуальность)', async () => {
     const f = fakeEl();
     const clock = makeClock();

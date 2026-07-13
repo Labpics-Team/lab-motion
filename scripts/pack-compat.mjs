@@ -43,7 +43,7 @@ const RUNNABLE = Object.keys(pkg.exports).filter((k) => !PEER_BINDING_SUBPATHS.h
 const specOf = (sub) => (sub === '.' ? pkg.name : `${pkg.name}/${sub.slice(2)}`);
 
 /** DOM-facing субпути — их SSR-import (в Node без DOM) обязан НЕ падать. */
-const DOM_FACING = ['./compositor', './animate', './gestures', './projection', './a11y', './presence', './flip', './waapi']
+const DOM_FACING = ['./compositor', './compositor/stagger', './animate', './animate/native', './gestures', './projection', './a11y', './presence', './flip', './waapi']
   .filter((s) => RUNNABLE.includes(s));
 
 const work = mkdtempSync(join(tmpdir(), 'labmotion-pack-compat-'));
@@ -174,17 +174,21 @@ try {
     writeFileSync(
       join(dir, 'consumer.ts'),
       `import { spring, type SpringResult } from '${pkg.name}';\n` +
-        `import { compileSpringPlan, readCompositorSpring } from '${pkg.name}/compositor';\n` +
+        `import { readCompositorSpring } from '${pkg.name}/compositor';\n` +
+        `import { CompositorSpring, CompositorStaggerGroup, compileSpringPlan, compileStaggerPlan, type CompositorStaggerPlan } from '${pkg.name}/compositor/stagger';\n` +
         `import { animate, type AnimateControls } from '${pkg.name}/animate';\n` +
         `import { createDrag } from '${pkg.name}/gestures';\n` +
         `import { createMotionConfig } from '${pkg.name}/a11y';\n` +
         `const r: SpringResult = spring({ mass: 1, stiffness: 200, damping: 20 }, 0.1);\n` +
         `const v: number = r.value + r.velocity;\n` +
         `const plan = compileSpringPlan({ spring: { mass: 1, stiffness: 200, damping: 20 }, property: 'opacity', from: 0, to: 1 });\n` +
+        `const staggerPlan: CompositorStaggerPlan = compileStaggerPlan({ spring: { mass: 1, stiffness: 200, damping: 20 }, property: 'opacity', from: 0, to: 1, count: 0 });\n` +
+        `const single = new CompositorSpring({ spring: { mass: 1, stiffness: 200, damping: 20 }, property: 'opacity', from: 0, to: 1 });\n` +
+        `const group = new CompositorStaggerGroup({ spring: { mass: 1, stiffness: 200, damping: 20 }, property: 'opacity', from: 0, to: 1, targets: [] });\n` +
         `const read = readCompositorSpring({ mass: 1, stiffness: 200, damping: 20 }, { t: 0.1 });\n` +
         `const drag = createDrag({ inertia: false });\n` +
         `const cfg = createMotionConfig({ reducedMotion: 'system' });\n` +
-        `export function use(): number { return v + plan.duration + read.value + drag.x + (cfg.prefersReduced() ? 1 : 0); }\n` +
+        `export function use(): number { single.destroy(); group.destroy(); return v + plan.duration + staggerPlan.count + read.value + drag.x + (cfg.prefersReduced() ? 1 : 0); }\n` +
         `export type C = AnimateControls; export const a = animate;\n`,
     );
     const tscBin = join(ROOT, 'node_modules', 'typescript', 'bin', 'tsc');
@@ -259,15 +263,22 @@ try {
       `import { spring } from '${pkg.name}';\n` +
         `import { clamp } from '${pkg.name}/utils';\n` +
         `import { animate } from '${pkg.name}/animate/mini';\n` +
+        `import { springTo } from '${pkg.name}/animate/native';\n` +
+        `import { compileStaggerPlan } from '${pkg.name}/compositor/stagger';\n` +
         `export const value: number = clamp(0, 1, spring({ mass: 1, stiffness: 200, damping: 20 }, 0.1).value);\n` +
-        `export const motion = animate;\n`,
+        `export const motion = [animate, springTo, compileStaggerPlan] as const;\n`,
     );
     const tscBin = join(ROOT, 'node_modules', 'typescript', 'bin', 'tsc');
     const trace = execSync(`node "${tscBin}" --project tsconfig.json --traceResolution`, {
       cwd: dir,
       encoding: 'utf8',
     }).replaceAll('\\', '/');
-    for (const declaration of ['dist/utils/index.d.ts', 'dist/animate/mini/index.d.ts']) {
+    for (const declaration of [
+      'dist/utils/index.d.ts',
+      'dist/animate/mini/index.d.ts',
+      'dist/animate/native/index.d.ts',
+      'dist/compositor/stagger/index.d.ts',
+    ]) {
       if (!trace.includes(declaration)) fail(`TS Node10 не разрешил typesVersions: ${declaration}`);
     }
     log('TS legacy: Node10-resolver разрешил вложенные субпути через typesVersions ✓');
@@ -316,16 +327,20 @@ try {
     writeFileSync(
       join(dir, 'consumer.cts'),
       `import { spring, type SpringResult } from '${pkg.name}';\n` +
-        `import { compileSpringPlan } from '${pkg.name}/compositor';\n` +
+        `import { CompositorSpring, CompositorStaggerGroup, compileSpringPlan, compileStaggerPlan } from '${pkg.name}/compositor/stagger';\n` +
         `const r: SpringResult = spring({ mass: 1, stiffness: 200, damping: 20 }, 0.1);\n` +
-        `export const duration: number = compileSpringPlan({ spring: { mass: 1, stiffness: 200, damping: 20 }, property: 'opacity', from: 0, to: 1 }).duration + r.value;\n`,
+        `const physics = { mass: 1, stiffness: 200, damping: 20 };\n` +
+        `const single = new CompositorSpring({ spring: physics, property: 'opacity', from: 0, to: 1 });\n` +
+        `const group = new CompositorStaggerGroup({ spring: physics, property: 'opacity', from: 0, to: 1, targets: [] });\n` +
+        `export const duration: number = compileSpringPlan({ spring: physics, property: 'opacity', from: 0, to: 1 }).duration + compileStaggerPlan({ spring: physics, property: 'opacity', from: 0, to: 1, count: 0 }).count + r.value;\n` +
+        `single.destroy(); group.destroy();\n`,
     );
     const tscBin = join(ROOT, 'node_modules', 'typescript', 'bin', 'tsc');
     const trace = execSync(`node "${tscBin}" --project tsconfig.json --traceResolution`, {
       cwd: dir,
       encoding: 'utf8',
     }).replaceAll('\\', '/');
-    for (const declaration of ['dist/index.d.cts', 'dist/compositor/index.d.cts']) {
+    for (const declaration of ['dist/index.d.cts', 'dist/compositor/stagger/index.d.cts']) {
       if (!trace.includes(declaration)) {
         fail(`TS CJS резолвит не CommonJS-декларацию: ${declaration} не найден в trace`);
       }
@@ -367,8 +382,8 @@ try {
       `import { spring } from '${pkg.name}';\n` +
         `import { animate } from '${pkg.name}/animate';\n` +
         `import { createDrag } from '${pkg.name}/gestures';\n` +
-        `import { compileSpringPlan } from '${pkg.name}/compositor';\n` +
-        `export const out = [typeof spring, typeof animate, typeof createDrag, typeof compileSpringPlan];\n`,
+        `import { CompositorSpring, CompositorStaggerGroup, compileSpringPlan, compileStaggerPlan } from '${pkg.name}/compositor/stagger';\n` +
+        `export const out = [typeof spring, typeof animate, typeof createDrag, typeof CompositorSpring, typeof CompositorStaggerGroup, typeof compileSpringPlan, typeof compileStaggerPlan];\n`,
     );
     writeFileSync(
       join(dir, 'vite.config.mjs'),

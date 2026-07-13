@@ -134,18 +134,16 @@ describe('./smart: SSR-инертность (node-env, без DOM — канон
 });
 
 describe('./smart: fail-fast валидация ПАРАМЕТРОВ (MotionParamError рано, даже под reduce)', () => {
-  it('пустой keyAttr → MotionParamError «smart: keyAttr must be a non-empty string»', () => {
+  it('пустой keyAttr → MotionParamError LM085', () => {
     expect(() => pickCaptureSmart(mod)({}, { keyAttr: '' })).toThrowError(MotionParamError);
     expect(() => pickCaptureSmart(mod)({}, { keyAttr: '' })).toThrowError(
-      'smart: keyAttr must be a non-empty string',
+      'LM085',
     );
   });
 
-  it('невалидный epsilon → MotionParamError с именем и значением', () => {
+  it('невалидный epsilon → code-only LM086', () => {
     expect(() => pickCaptureSmart(mod)({}, { epsilon: -1 })).toThrowError(MotionParamError);
-    expect(() => pickCaptureSmart(mod)({}, { epsilon: NaN })).toThrowError(
-      'smart: epsilon must be a finite number >= 0, got NaN',
-    );
+    expect(() => pickCaptureSmart(mod)({}, { epsilon: NaN })).toThrowError('LM086');
   });
 
   it('невалидная пружина → MotionParamError В ФАБРИКЕ, даже под reduced-motion', () => {

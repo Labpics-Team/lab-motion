@@ -143,21 +143,17 @@ function linearEasing(t: number): number {
  */
 export function compilePreset(spec: PresetSpec): CompiledPreset {
   if (!spec || typeof spec !== 'object') {
-    throw new MotionParamError('presets: spec должен быть объектом PresetSpec');
+    throw new MotionParamError('LM046');
   }
 
   const duration = spec.duration;
   if (!Number.isFinite(duration) || duration <= 0) {
-    throw new MotionParamError(
-      `presets: duration должен быть положительным конечным числом, получено ${duration}`,
-    );
+    throw new MotionParamError('LM047');
   }
 
   const rawTracks = spec.tracks;
   if (!rawTracks || rawTracks.length < 1) {
-    throw new MotionParamError(
-      `presets: tracks должен содержать минимум 1 трек, получено ${rawTracks?.length ?? 0}`,
-    );
+    throw new MotionParamError('LM048');
   }
 
   const seen = new Set<PresetProperty>();
@@ -166,28 +162,20 @@ export function compilePreset(spec: PresetSpec): CompiledPreset {
     const track = rawTracks[ti]!;
     const property = track.property;
     if (!PRESET_PROPERTIES.includes(property)) {
-      throw new MotionParamError(
-        `presets: tracks[${ti}].property "${String(property)}" вне перечня ${PRESET_PROPERTIES.join('|')}`,
-      );
+      throw new MotionParamError('LM049');
     }
     if (seen.has(property)) {
-      throw new MotionParamError(
-        `presets: свойство "${property}" встречается в tracks более одного раза`,
-      );
+      throw new MotionParamError('LM050');
     }
     seen.add(property);
 
     const values = track.values;
     if (!values || values.length < 2) {
-      throw new MotionParamError(
-        `presets: tracks[${ti}].values должен содержать минимум 2 элемента, получено ${values?.length ?? 0}`,
-      );
+      throw new MotionParamError('LM051');
     }
     for (let i = 0; i < values.length; i++) {
       if (!Number.isFinite(values[i])) {
-        throw new MotionParamError(
-          `presets: tracks[${ti}].values[${i}] должен быть конечным числом, получено ${values[i]}`,
-        );
+        throw new MotionParamError('LM052');
       }
     }
 
@@ -195,30 +183,22 @@ export function compilePreset(spec: PresetSpec): CompiledPreset {
     let times: readonly number[];
     if (track.times !== undefined) {
       if (track.times.length !== n) {
-        throw new MotionParamError(
-          `presets: tracks[${ti}].times.length (${track.times.length}) должен совпадать с values.length (${n})`,
-        );
+        throw new MotionParamError('LM053');
       }
       for (let i = 0; i < n; i++) {
         const t = track.times[i]!;
         if (!Number.isFinite(t)) {
-          throw new MotionParamError(
-            `presets: tracks[${ti}].times[${i}] должен быть конечным числом, получено ${t}`,
-          );
+          throw new MotionParamError('LM054');
         }
         if (i > 0 && t < track.times[i - 1]!) {
-          throw new MotionParamError(`presets: tracks[${ti}].times должны быть неубывающими`);
+          throw new MotionParamError('LM055');
         }
       }
       if (track.times[0] !== 0) {
-        throw new MotionParamError(
-          `presets: tracks[${ti}].times[0] должен быть 0, получено ${track.times[0]}`,
-        );
+        throw new MotionParamError('LM056');
       }
       if (track.times[n - 1] !== 1) {
-        throw new MotionParamError(
-          `presets: tracks[${ti}].times[last] должен быть 1, получено ${track.times[n - 1]}`,
-        );
+        throw new MotionParamError('LM057');
       }
       times = track.times;
     } else {
@@ -231,9 +211,7 @@ export function compilePreset(spec: PresetSpec): CompiledPreset {
     let easings: readonly EasingFn[];
     if (Array.isArray(track.easing)) {
       if (track.easing.length !== segCount) {
-        throw new MotionParamError(
-          `presets: tracks[${ti}].easing[].length (${track.easing.length}) должен совпадать с числом сегментов (${segCount})`,
-        );
+        throw new MotionParamError('LM058');
       }
       easings = track.easing;
     } else if (typeof track.easing === 'function') {
@@ -247,9 +225,7 @@ export function compilePreset(spec: PresetSpec): CompiledPreset {
 
   const delay = spec.delay ?? 0;
   if (!Number.isFinite(delay) || delay < 0) {
-    throw new MotionParamError(
-      `presets: delay должен быть >= 0 и конечным, получено ${delay}`,
-    );
+    throw new MotionParamError('LM059');
   }
 
   const repeatRaw = spec.repeat ?? 0;
@@ -257,24 +233,18 @@ export function compilePreset(spec: PresetSpec): CompiledPreset {
     repeatRaw !== Infinity &&
     (!Number.isFinite(repeatRaw) || repeatRaw < 0 || Math.floor(repeatRaw) !== repeatRaw)
   ) {
-    throw new MotionParamError(
-      `presets: repeat должен быть неотрицательным целым числом или Infinity, получено ${repeatRaw}`,
-    );
+    throw new MotionParamError('LM060');
   }
 
   const repeatTypeRaw = spec.repeatType ?? 'loop';
   if (repeatTypeRaw !== 'loop' && repeatTypeRaw !== 'reverse' && repeatTypeRaw !== 'mirror') {
-    throw new MotionParamError(
-      `presets: repeatType должен быть 'loop'|'reverse'|'mirror', получено ${String(repeatTypeRaw)}`,
-    );
+    throw new MotionParamError('LM061');
   }
   const repeatType: 'loop' | 'reverse' = repeatTypeRaw === 'mirror' ? 'reverse' : repeatTypeRaw;
 
   const repeatDelay = spec.repeatDelay ?? 0;
   if (!Number.isFinite(repeatDelay) || repeatDelay < 0) {
-    throw new MotionParamError(
-      `presets: repeatDelay должен быть >= 0 и конечным, получено ${repeatDelay}`,
-    );
+    throw new MotionParamError('LM062');
   }
 
   return {
@@ -381,15 +351,13 @@ export function samplePreset(compiled: CompiledPreset, tSeconds: number): Preset
 
 function assertFinite(name: string, value: number): void {
   if (!Number.isFinite(value)) {
-    throw new MotionParamError(`presets: ${name} должен быть конечным числом, получено ${value}`);
+    throw new MotionParamError('LM063');
   }
 }
 
 function assertDuration(name: string, value: number): void {
   if (!Number.isFinite(value) || value <= 0) {
-    throw new MotionParamError(
-      `presets: ${name}.duration должен быть положительным конечным числом, получено ${value}`,
-    );
+    throw new MotionParamError('LM064');
   }
 }
 
@@ -407,9 +375,7 @@ export function pulse(opts: PulseOptions = {}): PresetSpec {
   assertFinite('pulse.amount', amount);
   assertDuration('pulse', duration);
   if (amount <= -1) {
-    throw new MotionParamError(
-      `presets: pulse.amount должен быть > -1 (масштаб в пике 1+amount > 0), получено ${amount}`,
-    );
+    throw new MotionParamError('LM065');
   }
   return {
     duration,
@@ -431,7 +397,7 @@ export function blink(opts: BlinkOptions = {}): PresetSpec {
   assertFinite('blink.min', min);
   assertDuration('blink', duration);
   if (min < 0 || min > 1) {
-    throw new MotionParamError(`presets: blink.min должен быть в [0,1], получено ${min}`);
+    throw new MotionParamError('LM066');
   }
   return {
     duration,
@@ -462,9 +428,7 @@ export function wiggle(opts: WiggleOptions = {}): PresetSpec {
   assertFinite('wiggle.degrees', degrees);
   assertDuration('wiggle', duration);
   if (!Number.isFinite(cycles) || cycles < 1 || Math.floor(cycles) !== cycles) {
-    throw new MotionParamError(
-      `presets: wiggle.cycles должен быть целым числом >= 1, получено ${cycles}`,
-    );
+    throw new MotionParamError('LM067');
   }
   const values: number[] = [0];
   for (let k = 1; k <= cycles; k++) {
@@ -511,9 +475,7 @@ export function breathe(opts: BreatheOptions = {}): PresetSpec {
   assertFinite('breathe.amount', amount);
   assertDuration('breathe', duration);
   if (amount <= -1) {
-    throw new MotionParamError(
-      `presets: breathe.amount должен быть > -1, получено ${amount}`,
-    );
+    throw new MotionParamError('LM068');
   }
   return {
     duration,
@@ -536,9 +498,7 @@ export function pop(opts: PopOptions = {}): PresetSpec {
   assertFinite('pop.overshoot', overshoot);
   assertDuration('pop', duration);
   if (overshoot <= 0) {
-    throw new MotionParamError(
-      `presets: pop.overshoot должен быть > 0, получено ${overshoot}`,
-    );
+    throw new MotionParamError('LM069');
   }
   return {
     duration,
@@ -597,7 +557,7 @@ export function drift(opts: DriftOptions = {}): PresetSpec {
   assertFinite('drift.dy', dy);
   assertDuration('drift', duration);
   if (dx === 0 && dy === 0) {
-    throw new MotionParamError('presets: drift — dx и dy одновременно нулевые, дрейфа нет');
+    throw new MotionParamError('LM070');
   }
   const tracks: PresetTrack[] = [];
   if (dx !== 0) tracks.push({ property: 'x', values: [0, dx, 0], easing: sineInOut });
@@ -966,9 +926,7 @@ const WAAPI_GRID_INTERVALS = 24;
 export function presetToWaapi(spec: PresetSpec | CompiledPreset): WaapiConversion {
   const compiled = isCompiled(spec) ? spec : compilePreset(spec);
   if (compiled.repeatDelay > 0) {
-    throw new MotionParamError(
-      'presets: presetToWaapi не поддерживает repeatDelay > 0 (в WAAPI нет паузы между итерациями) — используйте runPreset',
-    );
+    throw new MotionParamError('LM071');
   }
 
   // Offsets: точки times всех треков ∪ равномерная сетка (дедуп через Set).
@@ -1069,14 +1027,10 @@ export type SplitMode = 'chars' | 'words';
  */
 export function splitText(text: string, mode: SplitMode = 'chars'): readonly string[] {
   if (typeof text !== 'string') {
-    throw new MotionParamError(
-      `presets: splitText.text должен быть строкой, получено ${typeof text}`,
-    );
+    throw new MotionParamError('LM072');
   }
   if (mode !== 'chars' && mode !== 'words') {
-    throw new MotionParamError(
-      `presets: splitText.mode должен быть 'chars' | 'words', получено ${String(mode)}`,
-    );
+    throw new MotionParamError('LM073');
   }
   if (text.length === 0) return [];
   if (mode === 'words') return text.split(/(\s+)/).filter(Boolean);
@@ -1185,7 +1139,7 @@ export interface SugarRunOptions {
 
 function assertCallback(name: string, fn: unknown): void {
   if (typeof fn !== 'function') {
-    throw new MotionParamError(`presets: ${name} должен быть функцией, получено ${typeof fn}`);
+    throw new MotionParamError('LM074');
   }
 }
 
@@ -1248,15 +1202,13 @@ export function runScramble(
 ): PresetControls {
   assertCallback('runScramble.onUpdate', onUpdate);
   if (typeof text !== 'string') {
-    throw new MotionParamError(
-      `presets: runScramble.text должен быть строкой, получено ${typeof text}`,
-    );
+    throw new MotionParamError('LM075');
   }
   const seed = opts.seed ?? SCRAMBLE_DEFAULT_SEED;
   assertFinite('runScramble.seed', seed);
   const alphabet = opts.alphabet ?? SCRAMBLE_ALPHABET;
   if (typeof alphabet !== 'string' || alphabet.length === 0) {
-    throw new MotionParamError('presets: runScramble.alphabet должен быть непустой строкой');
+    throw new MotionParamError('LM076');
   }
   const duration = opts.duration ?? durationTokens.slower / 1000;
   assertDuration('runScramble', duration);

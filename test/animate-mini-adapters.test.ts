@@ -156,6 +156,39 @@ describe('contract — цвет', () => {
 // ─── Реестр: fail-fast и расширение ──────────────────────────────────────────
 
 describe('реестр — fail-fast и расширение', () => {
+  it('горячий render переиспользует одну карту композиции без кадровых аллокаций', () => {
+    const maps: ReadonlyMap<string, string | number>[] = [];
+    const target = { level: 0 };
+    const adapter: TargetAdapter = {
+      read: (t, property) => (t as Record<string, unknown>)[property],
+      surfaceOf: (property) => property,
+      compose: (_surface, channels) => {
+        maps.push(channels);
+        return channels.get('level') ?? 0;
+      },
+      apply: (t, property, value) => {
+        (t as Record<string, unknown>)[property] = value;
+      },
+    };
+    const registry = createRegistry();
+    registry.registerCodec(() => true, numberCodec);
+    registry.registerAdapter(() => true, adapter);
+    const clock = makeClock();
+    const controls = runAnimate(
+      registry,
+      target,
+      { level: 1 },
+      { ...RF(clock), duration: 1000 },
+    );
+    clock.step(16);
+    clock.step(16);
+    clock.step(16);
+
+    expect(maps.length).toBeGreaterThan(1);
+    expect(new Set(maps).size).toBe(1);
+    controls.cancel();
+  });
+
   it('реестр: неизвестное свойство fail-fast', () => {
     // mini не знает 'width' — resolveCodec бросает ДО записи (не молчаливый
     // fallback на первый попавшийся кодек). Явная пара [10,100] исключает
@@ -177,7 +210,6 @@ describe('реестр — fail-fast и расширение', () => {
       parse: (v) => Number(v),
       interpolate: (from, to) => (p) => from + (to - from) * p,
       serialize: (v) => `${v.toFixed(1)}dB`,
-      canComposite: () => false,
     };
     const target: Record<string, unknown> = { db: '0' };
     const objAdapter: TargetAdapter = {
@@ -203,8 +235,8 @@ describe('реестр — fail-fast и расширение', () => {
 
   it('позже зарегистрированный кодек перекрывает ранний (last-first)', () => {
     const reg = createRegistry();
-    const a: PropertyCodec<number> = { parse: () => 1, interpolate: () => () => 1, serialize: () => 'A', canComposite: () => false };
-    const b: PropertyCodec<number> = { parse: () => 1, interpolate: () => () => 1, serialize: () => 'B', canComposite: () => false };
+    const a: PropertyCodec<number> = { parse: () => 1, interpolate: () => () => 1, serialize: () => 'A' };
+    const b: PropertyCodec<number> = { parse: () => 1, interpolate: () => () => 1, serialize: () => 'B' };
     reg.registerCodec(() => true, a);
     reg.registerCodec(() => true, b);
     expect(reg.resolveCodec('anything').serialize(1)).toBe('B');

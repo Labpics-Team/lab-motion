@@ -428,7 +428,7 @@ function _pageBox(el: SmartElement, scroll: { x: number; y: number }): _Rect {
  * Обход root → упорядоченный (document order) список keyed-элементов с nearest
  * keyed-предком. Keyless-обёртки прозрачны; открытый shadowRoot прозрачен при
  * shadow. Известные ghost-элементы (владение адаптера) пропускаются целиком.
- * Дубликат ключа → ранний MotionParamError с буквальным текстом.
+ * Дубликат ключа → ранний code-only MotionParamError LM084.
  */
 function _structure(
   root: SmartRoot,
@@ -448,7 +448,7 @@ function _structure(
       let nextAncestor = ancestorKey;
       if (key !== null && key !== '') {
         if (seen.has(key)) {
-          throw new MotionParamError(`smart: duplicate ${keyAttr}="${key}" under root`);
+          throw new MotionParamError('LM084');
         }
         seen.add(key);
         out.push({ el: child, key, parentKey: ancestorKey });
@@ -499,14 +499,12 @@ export function resolveSmartTier(inputs?: Record<string, unknown>): SmartTier {
 function _validateOptions(opt: SmartOptions): void {
   if (opt.keyAttr !== undefined) {
     if (typeof opt.keyAttr !== 'string' || opt.keyAttr === '') {
-      throw new MotionParamError('smart: keyAttr must be a non-empty string');
+      throw new MotionParamError('LM085');
     }
   }
   if (opt.epsilon !== undefined) {
     if (!Number.isFinite(opt.epsilon) || opt.epsilon < 0) {
-      throw new MotionParamError(
-        `smart: epsilon must be a finite number >= 0, got ${opt.epsilon}`,
-      );
+      throw new MotionParamError('LM086');
     }
   }
   if (opt.spring !== undefined) {
@@ -1155,7 +1153,7 @@ export function smartTransition(
   options?: SmartOptions,
 ): SmartHandle {
   if (typeof mutate !== 'function') {
-    throw new MotionParamError('smart: mutate must be a function');
+    throw new MotionParamError('LM087');
   }
   const opt = options ?? {};
   const cap = captureSmart(root, opt); // валидация параметров здесь же (fail-fast)

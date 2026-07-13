@@ -3,9 +3,12 @@
  *
  * Две метрики, обе жёсткие (превышение или отсутствующий dist-файл → exit 1):
  *
- * 1. ШИПНУТЫЙ вес: gz каждого ESM-subpath в dist/ (что качает CDN/raw-потребитель).
- *    Список subpath-точек выводится АВТОМАТИЧЕСКИ из package.json → "exports".
- *    Порог несёт только ядро (".").
+ * 1. ШИПНУТЫЙ вес: gzip и Brotli начального статического ESM-графа каждого
+ *    subpath (entry + recursive local imports, каждый HTTP-файл сжат отдельно).
+ *    Это то, что качает CDN/raw-потребитель. Регрессионный порог остаётся на gzip; Brotli —
+ *    независимая наблюдаемая метрика, чтобы оптимизация не подгонялась под один кодек.
+ *    Список subpath-точек выводится АВТОМАТИЧЕСКИ из package.json → "exports";
+ *    каждый subpath имеет hard ceiling, отдельные capability-пути — более узкий.
  *
  * 2. СЦЕНАРНЫЙ import-cost: сколько gz реально платит npm-потребитель за
  *    типовой импорт — esbuild bundle+minify против dist (ровно то, что сделает
@@ -25,11 +28,16 @@
  *   pnpm size
  */
 
-import { readFileSync } from 'node:fs';
-import { gzipSync } from 'node:zlib';
-import { resolve, dirname } from 'node:path';
+import { existsSync, readFileSync, realpathSync } from 'node:fs';
+import { brotliCompressSync, constants as zlibConstants, gzipSync } from 'node:zlib';
+import { resolve, dirname, isAbsolute, relative, sep as pathSeparator } from 'node:path';
 import { pathToFileURL, fileURLToPath } from 'node:url';
-import { build } from 'esbuild';
+import { build, buildSync } from 'esbuild';
+
+const brotli = (bytes) =>
+  brotliCompressSync(bytes, {
+    params: { [zlibConstants.BROTLI_PARAM_QUALITY]: 11 },
+  });
 
 // Порог (в байтах) для ядра пакета (".") — фактический вес после s09 = ~2090 gz
 // + небольшой люфт. Дожимание до 2048 отменено решением Даниила 2026-07-02:
@@ -48,6 +56,27 @@ export const CORE_GATE_BYTES = 2220;
 // общий потолок не трогаем — калибровку по остальным субпутям он сохраняет.
 export const SUBPATH_GATE_BYTES = 4608;
 
+// Один потолок закрывает один runtime-граф в двух представлениях: shipped
+// ./animate + shared frame и типичный consumer bundle. Прежние 11 200 B были
+// только снимком первой реализации и конфликтовали с производственным
+// SurfaceBatch: +~0.7 KB дают 3–5× на 1000 независимых вызовах. Предел 12 000 B
+// зафиксирован от обязательного production-факта 11 938 B с запасом 62 B
+// (0.52%). Это регрессионный budget, не конкурентное утверждение: сравнения
+// живут в воспроизводимом benchmark-report. Обе формы обязаны оставаться внутри
+// одного потолка, а массовый perf-контракт не даёт купить размер замедлением.
+export const FULL_ANIMATE_GATE_BYTES = 12_000;
+
+// Consumer-rebundle ядра после стабильных кодов ошибок и изоляции listener-
+// сбоев. Физический shipped-граф при этом уменьшился и по-прежнему ограничен
+// CORE_GATE_BYTES; 2 330 B — узкий предел только для повторной минификации
+// namespace-сценария, а не новый бюджет самого entry.
+export const FULL_CORE_CONSUMER_GATE_BYTES = 2330;
+
+// Совместный импорт одиночного и группового compositor API. Оба физических
+// entry отдельно остаются под прежними 6 450 B; 6 600 B ловят раздувание их
+// общего consumer-графа, не смешивая его с file-level потолком.
+export const COMPOSITOR_CAPABILITY_GATE_BYTES = 6600;
+
 // Точечные (bespoke) пороги субпутей — жёстче общего SUBPATH_GATE_BYTES там, где
 // это осмысленно. ./utils — семь чистых скалярных примитивов + сегментный движок;
 // факт после первой сборки 1197 gz, люфт ~15%. Отдельный порог не даёт будущему
@@ -55,41 +84,26 @@ export const SUBPATH_GATE_BYTES = 4608;
 // CORE_GATE_BYTES для ядра). Поднимать только осознанно.
 export const BESPOKE_SUBPATH_GATES = {
   './utils': 1400,
-  // ./compositor — компилятор пружина→linear() (сегментер + LRU-кэш + контроллер)
-  // + C¹-хендофф compositor→live (M2) + COMPOSITED STAGGER (M3) + FALLBACK-МАТРИЦА (M4).
-  // Хронология факта/порога:
-  //   M1: 4408 / 4600 — компилятор + сегментер + LRU + CompositorSpring.
-  //   M2: 4672 / 4800 — живой мост в rAF-пружину (handoffToLive).
-  //   M3: 5919 / 6100 — composited stagger. НЕИЗБЕЖНЫЙ рост на новую capability:
-  //       (а) compileStaggerPlan — чистый планировщик (общий план + per-element
-  //           задержки из ./stagger); (б) CompositorStaggerGroup — контроллер группы
-  //           (N CompositorSpring, per-group каскад, per-element retarget/handoff);
-  //       (в) delay + setTimer в CompositorSpring (нативный WAAPI-delay на compositor-
-  //           пути, отложенный старт на fallback). Рост +1247 gz на весь слой каскада.
-  //       Порог 6100 = факт 5919 + ~3% люфт (дисциплина M1/M2 сохранена; ./stagger
-  //       переиспользуется, не дублируется). Жёстче общего 4608.
-  //   M4: 6193 / 6380 — fallback-матрица (detect.ts: резолвер 5 тиров
-  //       compositor / waapi-no-linear / raf / reduced / ssr; мемо-проба
-  //       CSS.supports('linear()') на реалм, reduced-motion снап-политика,
-  //       диагностический `tier` + телеметрия-резолвер resolveCompositorTier/
-  //       supportsLinearEasing). Вклад M4 на объединённом с M3 коде: 6193 − 5919 =
-  //       +274 gz (на изолированном M2-базисе был +245 / порог 5040; +29 gz —
-  //       интеграция detect с stagger-контроллером). Порог 6380 = факт 6193 + ~3%
-  //       люфт — выведен ОТ ФАКТА, не суммой порогов. Поднимать только решением Даниила.
+  // Базовый compositor не несёт групповой оркестратор. Старый потолок сохранён:
+  // capability-split не имеет права маскировать регрессию повышением порога.
   './compositor': 6450,
+  // Групповой фасад самодостаточен и включает только нужные ему базовые план и
+  // контроллер. Порог равен прежнему полному compositor-контракту, не новому факту.
+  './compositor/stagger': 6450,
+  // Native-only springTo: runtime spring-план + строгая WAAPI-граница,
+  // custom linear() либо WebKit adaptive keyframes, explicit transform/opacity
+  // и controls без rAF fallback. Hard ceiling совпадает
+  // с главным consumer-сценарием: лёгкий путь обязан оставаться < 3.5 KB gzip.
+  './animate/native': 3500,
   // ./tokens — motion-токены (SSOT labui): duration/easing/spring/staggerGap +
   // distanceScale + springFromDurationBounce (каноническая пара ДС (duration,bounce)
   // → SpringParams; тянет validateSpringParams ядра, чтобы выход ГАРАНТИРОВАННО
-  // оседал). Чистые данные + 4 cubic-bezier (тянут ../easing.cubicBezier).
-  // Хронология факта/порога (дисциплина ./compositor: порог ОТ ФАКТА):
-  //   1117 gz / 1250 — до канонической пары;
-  //   2026-07-09: 1552 gz / 1650 (~6% люфт) — конвертер + валидатор ядра
-  //   (settle-гарантия) + ДС-пресеты smooth/expressive. Вызовы пресетов
-  //   PURE-аннотированы: соседние субпути (presets, animate-пути без spring)
-  //   конвертер не платят — проверено фактами presets/animate-one-liner.
+  // оседал). Изинг `standard` специализирован под дефолтную кривую; ещё три
+  // именованные кривые используют общий решатель cubic-bezier. Вызовы пресетов
+  // PURE-аннотированы, поэтому соседние функциональные срезы не платят за конвертер.
   // Гарантия — СУБПУТЬ-изоляция: точный sideEffects-allowlist не удерживает ./tokens,
-  // ядро не растёт (full-core сценарий это и стережёт). Внутри субпутя семейства в
-  // минифициров. dist по отдельности не шейкаются; целиком дёшев. Поднимать осознанно.
+  // ядро не растёт (full-core сценарий это и стережёт). Порог — регрессионный
+  // потолок всего субпути; поднимать его можно только осознанным решением.
   './tokens': 1650,
   // ./projection — вложенный FLIP (жанр Framer projection): geometry (замкнутая
   // форма child-local transform через visual box ближайшего проецирующего предка,
@@ -134,28 +148,21 @@ export const BESPOKE_SUBPATH_GATES = {
   //   ./compositor: порог ОТ ФАКТА, не суммой хотелок). Поднимать только
   //   осознанно; сам этот подъём — часть переноса PR#79, подсвечен в PR.
   './presets': 5600,
-  // ./animate — одно-строчный DOM-фасад (паритет DX Motion/anime v4). Порог выше
+  // ./animate — одно-строчный DOM-фасад. Порог выше
   // общего 4608 НЕ потому, что фасад «раздут», а потому, что при splitting:false
   // самодостаточный субпуть НЕСЁТ КОПИИ композируемых подсистем (общий порог
-  // калибровался по субпутям с 1-2 зависимостями). Разбивка факта 10389 gz:
-  //   ~2.6 KB — движок значений ./value (цвета hex/rgb/hsl + юниты + var() +
-  //             transform-компоненты) — канал «любое CSS-свойство»;
-  //   ~3.7 KB — compositor-подмножество: compileSpringPlan (сегментер + LRU-кэш +
-  //             формат linear()) + readCompositorSpring + detect (авто-tier);
-  //             мёртвый вес отсутствует — CompositorSpring/MotionValue/driver/
-  //             stagger-group вытряхнуты (проверено пробами строк-литералов);
-  //   ~1.1 KB — ./tokens (дефолты spring/duration/easing = характеризация);
-  //   ~0.7 KB — ./stagger (каскад);
-  //   ~2.3 KB — сам фасад: цели/селектор, реестр прерываний (C¹-подхват),
-  //             два движка прогонов (rAF-микроцикл + WAAPI-юнит), контролы.
+  // калибровался по субпутям с 1-2 зависимостями). Фасад включает движок значений,
+  // compositor-подмножество, токены, stagger, два пути исполнения и контролы;
+  // изинг по умолчанию при этом разделяет специальную функцию с ./tokens.
   // Потребитель, который composит вручную (ядро+value+compositor), платит то же —
-  // фасад не добавляет физики. Порог 10700 = факт 10389 + ~3% люфт (канон M4).
+  // фасад не добавляет физики. Число ниже — регрессионный потолок, не описание
+  // текущего веса: фактический размер каждый запуск вычисляет из артефакта.
   // Дедуп через splitting/shared chunks — отдельное архитектурное решение
   // Даниила на весь пакет, не этого субпутя. Поднимать только осознанно.
-  './animate': 10700,
+  './animate': FULL_ANIMATE_GATE_BYTES,
   // ./animate/mini — ЛЁГКИЙ срез animate поверх адаптерного реестра кодеков/
   // адаптеров (registry.ts): transform-компоненты + opacity + CSS-переменные,
-  // spring/tween в ЕДИНОМ прогресс-пространстве (readCompositorSpring), delay/
+  // spring/tween в ЕДИНОМ прогресс-пространстве (внутренний unchecked sampler), delay/
   // stagger, контролы, reduced-motion снап. Расширение — РЕГИСТРАЦИЕЙ кодека, не
   // ростом switch. Граница поставки: mini НЕ импортирует full-набор/compositor-
   // компилятор — граф не тянет ./value (цвета) и compileSpringPlan (доказано
@@ -219,7 +226,9 @@ export const IMPORT_COST_SCENARIOS = [
     // 1600→1620 (M2): +~14 gz за opts.initialVelocity — засев скорости рождения,
     // НЕОБХОДИМЫЙ для C¹-хендоффа compositor→live (нет иного публичного seam'а;
     // дублировать rAF-цикл MotionValue в handoff = запрещённый coupled-дубль). Факт 1606.
-    gate: 1640, // updated for perf changes
+    // Каталогизированная runtime-граница отклоняет shaped, но неизвестные LM-коды;
+    // физический root-entry при этом остаётся под отдельным CORE_GATE_BYTES.
+    gate: 1660,
   },
   {
     name: 'full-core',
@@ -231,7 +240,14 @@ export const IMPORT_COST_SCENARIOS = [
     // (2026-07-03, «каждый следующий шаг решай автономно»); дешёвые шейвы
     // уже сняты (−15 gz: √(km)=m·ω₀, дедуп √(ζ²−1), сжатие сообщения).
     // Люфт прежний ~1.5% от факта 2254.
-    gate: 2300,
+    gate: FULL_CORE_CONSUMER_GATE_BYTES,
+  },
+  {
+    // Типичный потребитель одиночных и групповых compositor-переходов обязан
+    // брать их из одного capability-entry и не платить за два prebundle-графа.
+    name: 'compositor-stagger capability',
+    code: `import { CompositorSpring, CompositorStaggerGroup, compileSpringPlan, compileStaggerPlan } from '%DIST%/../compositor/stagger/index.js'; console.log(CompositorSpring, CompositorStaggerGroup, compileSpringPlan, compileStaggerPlan);`,
+    gate: COMPOSITOR_CAPABILITY_GATE_BYTES,
   },
   {
     // Один скалярный примитив из ./utils обязан трястись до горстки байт — это
@@ -245,35 +261,37 @@ export const IMPORT_COST_SCENARIOS = [
     gate: 340, // факт 308 (2026-07-07, первая сборка ./utils); люфт ~10%
   },
   {
-    // ПРАВДА потребительской цены фасада. Отгрузочный gz субпутя ./animate
-    // (~10.4 KB, bespoke-порог выше) — двойной счёт: при splitting:false субпуть
+    // ПРАВДА потребительской цены фасада. Отгрузочный gz субпутя ./animate —
+    // двойной счёт: при splitting:false субпуть
     // несёт копии value/compositor/tokens/stagger. Реальная цена в бандле
     // потребителя ПОСЛЕ его tree-shake — вот этот сценарий; именно ЕГО число
-    // публикуется в сравнениях размеров (vs Motion mini animate 2.6 KB
-    // vendor-published). Скачок сценария = регрессия tree-shakeability фасада.
+    // публикуется в отчёте. Скачок сценария = регрессия tree-shakeability фасада.
     name: 'animate-one-liner (фасад)',
     code: `import { animate } from '%DIST%/../animate/index.js'; console.log(typeof animate('.hero', { x: 240, opacity: 1 }).pause);`,
-    // Факт 10865 (2026-07-09, первая сборка фасада) + ~3% люфт. ЧЕСТНАЯ находка:
-    // tree-shake почти не снижает цену — фасад статически тянет весь граф
-    // (value+compositor+tokens+stagger) из-за рантайм-диспетчеризации props.
-    // Позиция рынка: ≈ anime.js full (~10 KB), < Motion full (18 KB vendor),
-    // НО > Motion mini 2.6+1 KB. Следующий шаг эпика — слоистый animate/mini
-    // (transform/opacity + compositor-пружина БЕЗ движка значений) с целью
-    // ≤5 KB; этот порог тогда останется стражем полного фасада.
-    gate: 11200,
+    // Фасад статически тянет функциональный граф из-за диспетчеризации свойств;
+    // порог остаётся стражем полного пути, а лёгкие случаи обслуживают mini/native.
+    gate: FULL_ANIMATE_GATE_BYTES,
   },
   {
     // ПРАВДА потребительской цены лёгкого среза + СТРАЖ границы поставки: mini
     // не тянет full. Если бы mini импортировал full-набор (./value цвета) или
     // compileSpringPlan (компилятор пружина→linear()), число скакнуло бы к ~10 KB
     // (порядок full-фасада). Держится ~5.2 KB ⇒ граф mini замкнут на минимум:
-    // readCompositorSpring (замкнутая форма) + числовой/var кодеки + DOM-адаптер +
+    // unchecked spring sampler (замкнутая форма) + числовой/var кодеки + DOM-адаптер +
     // ./frame. Скачок сценария = регрессия границы (mini потянул full/compositor).
     name: 'animate-mini-one-liner',
     code: `import { animate } from '%DIST%/../animate/mini/index.js'; console.log(typeof animate('.hero', { x: 240, opacity: 1 }).pause);`,
-    // Факт 5200 (2026-07-10, первая сборка среза) + ~3% люфт. Заметно < full 11200 —
-    // это и есть машинное доказательство «граф mini не тянет full».
-    gate: 5360,
+    // Бюджет < 5 KB — контракт лёгкого среза. Он ловит не только full-импорты,
+    // но и скрытые eager-side-effects: mini не компилирует WAAPI linear(), значит не должен
+    // платить за его LRU-кэш. Baseline 5287 B обязан пасть до прохода этого гейта.
+    gate: 5000,
+  },
+  {
+    // Capability-specialized native WAAPI-путь: explicit [from,to], один WAAPI-
+    // прогон на цель, без value registry/tokens/frame/main-thread fallback.
+    name: 'animate-native-springTo',
+    code: `import { springTo } from '%DIST%/../animate/native/index.js'; console.log(typeof springTo(el, { x: [0, 240] }).cancel);`,
+    gate: 3500,
   },
   {
     // ПРАВДА потребительской цены поведения + СТРАЖ переиспользования: одна
@@ -307,7 +325,13 @@ export async function measureScenario(scenario, distIndexPath) {
       logLevel: 'silent',
     });
     const out = result.outputFiles[0].contents;
-    return { name: scenario.name, gzBytes: gzipSync(out, { level: 9 }).length, rawBytes: out.length, gate: scenario.gate };
+    return {
+      name: scenario.name,
+      gzBytes: gzipSync(out, { level: 9 }).length,
+      brBytes: brotli(out).length,
+      rawBytes: out.length,
+      gate: scenario.gate,
+    };
   } catch (err) {
     return { name: scenario.name, error: String(err?.message ?? err).split('\n')[0], gate: scenario.gate };
   }
@@ -364,16 +388,103 @@ export function deriveEntriesFromExports(pkg) {
  * Измеряет gz-вес каждой entry относительно ROOT. Чистая функция ввода/вывода
  * данных (без console.log) — тестируема отдельно от CLI-форматирования.
  */
+/**
+ * Начальная CDN-передача ESM — entry плюс рекурсивное замыкание СТАТИЧЕСКИХ
+ * относительных импортов. Каждый файл сжимается отдельно, как отдельный HTTP-
+ * ответ; dynamic import не входит до фактического вызова, bare peer imports
+ * принадлежат приложению, а не этому npm-пакету.
+ */
+export function measureEsmTransfer(importPath, root) {
+  const normalizedEntry = importPath.replaceAll('\\', '/');
+  const entryAbsolute = resolve(root, normalizedEntry);
+  if (!existsSync(entryAbsolute)) {
+    const error = new Error(`ESM entry отсутствует: ${importPath}`);
+    error.code = 'ENOENT';
+    throw error;
+  }
+  const distRoot = realpathSync(resolve(root, 'dist'));
+  const assertInsideDist = (name) => {
+    const absolute = resolve(root, name);
+    const physical = realpathSync(absolute);
+    const fromDist = relative(distRoot, physical);
+    if (fromDist.startsWith(`..${pathSeparator}`) || fromDist === '..' || isAbsolute(fromDist)) {
+      throw new Error(`ESM shipped graph вышел за границу dist: ${name}`);
+    }
+  };
+  assertInsideDist(normalizedEntry);
+  const graph = buildSync({
+    absWorkingDir: root,
+    entryPoints: [normalizedEntry],
+    bundle: true,
+    treeShaking: false,
+    packages: 'external',
+    format: 'esm',
+    platform: 'browser',
+    write: false,
+    outdir: '.size-gate-meta',
+    metafile: true,
+    logLevel: 'silent',
+  }).metafile;
+  const inputNames = Object.keys(graph.inputs);
+  const entryName = inputNames.find((name) => resolve(root, name) === entryAbsolute);
+  if (entryName === undefined) throw new Error(`ESM entry не найден в графе: ${importPath}`);
+
+  const closure = new Set();
+  const pending = [entryName];
+  while (pending.length > 0) {
+    const name = pending.pop();
+    if (closure.has(name)) continue;
+    assertInsideDist(name);
+    closure.add(name);
+    const input = graph.inputs[name];
+    if (input === undefined) throw new Error(`ESM input отсутствует в metafile: ${name}`);
+    for (const edge of input.imports) {
+      if (
+        !edge.external &&
+        (edge.kind === 'import-statement' || edge.kind === 'import-rule')
+      ) pending.push(edge.path);
+    }
+  }
+
+  let rawBytes = 0;
+  let gzBytes = 0;
+  let brBytes = 0;
+  let entryRawBytes = 0;
+  let entryGzBytes = 0;
+  let entryBrBytes = 0;
+  for (const name of closure) {
+    const raw = readFileSync(resolve(root, name));
+    const gz = gzipSync(raw, { level: 9 }).length;
+    const br = brotli(raw).length;
+    rawBytes += raw.length;
+    gzBytes += gz;
+    brBytes += br;
+    if (name === entryName) {
+      entryRawBytes = raw.length;
+      entryGzBytes = gz;
+      entryBrBytes = br;
+    }
+  }
+  return {
+    rawBytes,
+    gzBytes,
+    brBytes,
+    entryRawBytes,
+    entryGzBytes,
+    entryBrBytes,
+    closureFiles: closure.size,
+  };
+}
+
 export function measureEntries(entries, root) {
   let totalGzBytes = 0;
+  let totalBrBytes = 0;
   let hasWarnings = false;
 
   const rows = entries.map(entry => {
-    const fullPath = resolve(root, entry.importPath);
-    let raw, gz;
+    let measured;
     try {
-      raw = readFileSync(fullPath);
-      gz = gzipSync(raw, { level: 9 });
+      measured = measureEsmTransfer(entry.importPath, root);
     } catch (err) {
       hasWarnings = true;
       // Различаем "файла нет" (ожидаемо до сборки/для ещё-не-смерженных
@@ -383,20 +494,20 @@ export function measureEntries(entries, root) {
       return { label: entry.label, error: `${reason}: ${entry.importPath}` };
     }
 
-    totalGzBytes += gz.length;
-    const exceeded = entry.gate !== null && gz.length > entry.gate;
+    totalGzBytes += measured.gzBytes;
+    totalBrBytes += measured.brBytes;
+    const exceeded = entry.gate !== null && measured.gzBytes > entry.gate;
     if (exceeded) hasWarnings = true;
 
     return {
       label: entry.label,
-      rawBytes: raw.length,
-      gzBytes: gz.length,
+      ...measured,
       gate: entry.gate,
       exceeded,
     };
   });
 
-  return { rows, totalGzBytes, hasWarnings };
+  return { rows, totalGzBytes, totalBrBytes, hasWarnings };
 }
 
 async function runCli() {
@@ -405,24 +516,26 @@ async function runCli() {
 
   const pkg = JSON.parse(readFileSync(resolve(ROOT, 'package.json'), 'utf8'));
   const entries = deriveEntriesFromExports(pkg);
-  const { rows, totalGzBytes, hasWarnings: measuredWarnings } = measureEntries(entries, ROOT);
+  const { rows, totalGzBytes, totalBrBytes, hasWarnings: measuredWarnings } = measureEntries(entries, ROOT);
   let hasWarnings = measuredWarnings;
 
   // ─── вывод ────────────────────────────────────────────────────────────────
 
-  const COL = { label: 22, raw: 10, gz: 10 };
+  const COL = { label: 22, files: 7, raw: 10, gz: 10, br: 10 };
 
   const pad = (s, n) => String(s).padEnd(n);
   const lpad = (s, n) => String(s).padStart(n);
 
-  console.log('\n@labpics/motion — bundle size (ESM, gzip level-9)\n');
+  console.log('\n@labpics/motion — bundle size (ESM, gzip-9 + Brotli-11)\n');
   console.log(
     pad('Entry', COL.label) +
+    lpad('Files', COL.files) +
     lpad('Raw', COL.raw) +
     lpad('GZ', COL.gz) +
+    lpad('BR', COL.br) +
     '  Status'
   );
-  console.log('-'.repeat(COL.label + COL.raw + COL.gz + 10));
+  console.log('-'.repeat(COL.label + COL.files + COL.raw + COL.gz + COL.br + 10));
 
   for (const row of rows) {
     if (row.error) {
@@ -430,20 +543,27 @@ async function runCli() {
       continue;
     }
 
+    const filesFmt = lpad(row.closureFiles, COL.files);
     const rawFmt = lpad((row.rawBytes / 1024).toFixed(2) + ' KB', COL.raw);
     const gzFmt = lpad((row.gzBytes / 1024).toFixed(2) + ' KB gz', COL.gz + 3);
+    const brFmt = lpad((row.brBytes / 1024).toFixed(2) + ' KB br', COL.br + 3);
 
     let status = 'OK';
     if (row.exceeded) {
       status = `WARN > ${(row.gate / 1024).toFixed(1)} KB gz [OPEN ITEM]`;
     }
 
-    console.log(pad(row.label, COL.label) + rawFmt + gzFmt + '  ' + status);
+    console.log(pad(row.label, COL.label) + filesFmt + rawFmt + gzFmt + brFmt + '  ' + status);
   }
 
-  console.log('-'.repeat(COL.label + COL.raw + COL.gz + 10));
+  console.log('-'.repeat(COL.label + COL.files + COL.raw + COL.gz + COL.br + 10));
   const totalFmt = (totalGzBytes / 1024).toFixed(2);
-  console.log(pad(`TOTAL (${rows.length} subpaths)`, COL.label + COL.raw) + lpad(totalFmt + ' KB gz', COL.gz + 3));
+  const totalBrFmt = (totalBrBytes / 1024).toFixed(2);
+  console.log(
+    pad(`SUM COSTS (${rows.length}; shared повторён)`, COL.label + COL.files + COL.raw) +
+      lpad(totalFmt + ' KB gz', COL.gz + 3) +
+      lpad(totalBrFmt + ' KB br', COL.br + 3),
+  );
 
   // ─── OPEN ITEMS ─────────────────────────────────────────────────────────
 
@@ -463,7 +583,7 @@ core (index) gz = ${(core.gzBytes / 1024).toFixed(2)} KB > порог ${(core.ga
 
   // ─── сценарный import-cost (главный потребительский гейт) ───────────────
 
-  console.log('\nimport-cost потребителя (esbuild bundle+minify+gz против dist)\n');
+  console.log('\nimport-cost потребителя (esbuild bundle+minify+gzip/Brotli против dist)\n');
   const distIndexPath = resolve(ROOT, 'dist/index.js');
   for (const scenario of IMPORT_COST_SCENARIOS) {
     const m = await measureScenario(scenario, distIndexPath);
@@ -477,6 +597,7 @@ core (index) gz = ${(core.gzBytes / 1024).toFixed(2)} KB > порог ${(core.ga
     console.log(
       pad(m.name, COL.label) +
       lpad(`${m.gzBytes} B gz`, COL.gz) +
+      lpad(`${m.brBytes} B br`, COL.br) +
       `  ${exceeded ? `РЕГРЕССИЯ > ${m.gate} B (найди раздувший коммит; порог не поднимать без решения Даниила)` : `OK (порог ${m.gate})`}`
     );
   }

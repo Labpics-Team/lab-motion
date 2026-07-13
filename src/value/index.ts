@@ -25,55 +25,19 @@
 export type { ParsedUnit, ParsedRelative, ParsedVar } from './units.js';
 export type { ParsedColor, ColorMixSpace, ColorMixOptions } from './color.js';
 export type { TransformState } from './transform.js';
+export type { ValueAST } from './parse.js';
 
 // ── Re-exports: функции ──────────────────────────────────────────────────────
 export { parseUnit, interpolateUnit } from './units.js';
 export { parseColor, interpolateColor, mixColor, hslToRgb, rgbToHsl } from './color.js';
 export { buildTransform, interpolateTransform } from './transform.js';
+export { parse } from './parse.js';
 
 // ── Unified parse / interpolate ──────────────────────────────────────────────
 
-import { type ParsedUnit, type ParsedRelative, type ParsedVar, parseUnit, interpolateUnit, clampFinite } from './units.js';
-import { type ParsedColor, parseColor, interpolateColor } from './color.js';
-
-/**
- * Дискриминированный тип для всех разбираемых CSS-значений.
- *
- * kind='unit'     — числовое с юнитом или без (px, %, deg, …)
- * kind='relative' — относительное: +=10px, -=5
- * kind='var'      — CSS custom property: var(--name)
- * kind='color'    — CSS цвет: #hex, rgb(), hsl()
- */
-export type ValueAST = ParsedUnit | ParsedRelative | ParsedVar | ParsedColor;
-
-/**
- * Единая точка парсинга CSS-значения → ValueAST.
- *
- * Обнаружение по эвристике:
- *   1. Число → ParsedUnit (unitless)
- *   2. Строка "#..." или "rgb..." или "hsl..." → ParsedColor
- *   3. Строка "var(..." → ParsedVar
- *   4. Строка "+=..." / "-=..." → ParsedRelative
- *   5. Строка с числом + юнит → ParsedUnit
- *
- * @throws RangeError если значение не распознаётся
- */
-export function parse(value: string | number): ValueAST {
-  if (typeof value === 'number') {
-    return parseUnit(value);
-  }
-  const s = value.trim();
-
-  // Пробуем цвет в первую очередь (специфичный префикс)
-  if (s.startsWith('#') || /^rgba?/i.test(s) || /^hsla?/i.test(s)) {
-    const color = parseColor(s);
-    if (color) return color;
-    throw new RangeError(`@labpics/motion value: не удалось распарсить цвет "${value}"`);
-  }
-
-  // Всё остальное → parseUnit (юниты, var(), относительные)
-  return parseUnit(s);
-}
+import { type ParsedUnit, type ParsedRelative, type ParsedVar, interpolateUnit, clampFinite } from './units.js';
+import { interpolateColor } from './color.js';
+import type { ValueAST } from './parse.js';
 
 /**
  * Интерполирует два ValueAST при нормированном прогрессе t ∈ [0,1].

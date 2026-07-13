@@ -31,8 +31,13 @@
  * вовсе, путь попадания в кэш — без аллокаций (см. cache.ts).
  */
 
+import { MotionParamError } from '../errors.js';
 import { makeSpringValueSampler } from '../internal/solver.js';
-import { settleTimeUpperBound, type SpringParams } from '../spring.js';
+import {
+  settleTimeAtRestUpperBound,
+  settleTimeUpperBound,
+  type SpringParams,
+} from '../spring.js';
 
 /** Один узел linear(): нормализованный прогресс + доля времени в процентах. */
 export interface SpringNode {
@@ -52,17 +57,33 @@ export interface SpringNode {
 // дефекта поймал флагманский тест границы ошибки: reconstruction 0.0096 при
 // tol 0.002.)
 //
-// Бонд кривизны: |d²p/dτ²| = T²|x″| ≤ T²[ω₀²·|1−x| + 2ζω₀·|x′|]. С запасом
-// |1−x| ≤ 2, |x′| ≤ ω₀+|v0| (нормализ.) ⇒ |d²p/dτ²| ≤ 4(Tω₀)²·(1+|v0|). Требуем
-// дискретизацию ≤ tol/2 (RDP берёт вторую половину бюджета, eps = tol/2):
-//   (h²/8)·4(Tω₀)²(1+|v0|) ≤ tol/2 ⇒ base = 1/h ≥ Tω₀·√((1+|v0|)/tol)
-// Множитель CURVATURE_SAFETY покрывает грубость бонда.
-const CURVATURE_SAFETY = 1.5;
+// Строгий бонд кривизны следует из энергии затухающего осциллятора:
+// E=(x′²+ω₀²(x−1)²)/2, E′=−2ζω₀x′²≤0. Поэтому при
+// H=hypot(v0,ω₀): |x′|≤H, |x−1|≤H/ω₀, а из ODE
+// |x″|≤(ω₀+c/m)H. В нормализованном времени τ=t/T:
+// M=max|p″(τ)|≤T²(ω₀+c/m)H. Берём N≥√(M/(2tol)). Тогда обычный
+// grid-интервал и half-step tangent ошибаются ≤tol/4, соседний модифицированный
+// интервал — ≤5tol/16. Вместе с RDP eps=tol/2 raw-план занимает ≤13tol/16;
+// CSS-сериализация получает tol/8, а 1/16 остаётся численным запасом.
 /** Пол числа интервалов (гладкие кривые). */
 const BASE_GRID_FLOOR = 24;
 const BASE_GRID_MIN = 32;
-/** Потолок (страховка стоимости компиляции; RDP всё равно прорежает выход). */
-const BASE_GRID_MAX = 4096;
+/** Физический потолок компиляции: выше живой солвер дешевле и честнее. */
+export const BASE_GRID_MAX = 4096;
+
+function requiredGridSize(
+  params: SpringParams,
+  settle: number,
+  tolerance: number,
+  v0: number,
+): number {
+  const omega0 = Math.sqrt(params.stiffness / params.mass);
+  const curvature = settle * settle
+    * (omega0 + params.damping / params.mass)
+    * Math.hypot(v0, omega0);
+  const raw = Math.sqrt(curvature / (2 * tolerance));
+  return Math.max(BASE_GRID_MIN, Math.ceil(raw) + BASE_GRID_FLOOR);
+}
 
 /**
  * Размер базовой сетки (число ИНТЕРВАЛОВ), выведенный из бонда кривизны так, что
@@ -74,10 +95,35 @@ export function baseGridSize(
   tolerance: number,
   v0 = 0,
 ): number {
-  const omega0 = Math.sqrt(params.stiffness / params.mass);
-  const raw = CURVATURE_SAFETY * settle * omega0 * Math.sqrt((1 + Math.abs(v0)) / tolerance);
-  const n = Math.ceil(raw) + BASE_GRID_FLOOR;
-  return Math.min(BASE_GRID_MAX, Math.max(BASE_GRID_MIN, n));
+  const required = requiredGridSize(params, settle, tolerance, v0);
+  if (!Number.isSafeInteger(required) || required > BASE_GRID_MAX) {
+    throw new MotionParamError('LM016');
+  }
+  return required;
+}
+
+/**
+ * Можно ли доказанно скомпилировать скорость в ограниченную compositor-сетку.
+ * Чистый O(1)-предикат нужен фасаду ДО supersede: небезопасный подхват сразу
+ * остаётся на общем живом frame-loop и не обрывает предыдущего владельца рано.
+ */
+export function fitsSpringCurveBudget(
+  params: SpringParams,
+  v0: number,
+  tolerance: number,
+): boolean {
+  const settle = settleTimeUpperBound(params, v0);
+  const required = requiredGridSize(params, settle, tolerance, v0);
+  return Number.isSafeInteger(required) && required <= BASE_GRID_MAX;
+}
+
+/** Fail-fast версия того же preflight с каноническим MotionParamError. */
+export function assertSpringCurveBudget(
+  params: SpringParams,
+  v0: number,
+  tolerance: number,
+): void {
+  baseGridSize(params, settleTimeUpperBound(params, v0), tolerance, v0);
 }
 
 /**
@@ -86,25 +132,34 @@ export function baseGridSize(
  * Итеративный (явный стек) — без рекурсивного переполнения на больших сетках.
  *
  * ПРЕДУСЛОВИЕ: xs СТРОГО ВОЗРАСТАЮТ (dx = xs[j]−xs[i] > 0 для всех пар стека).
- * Единственный вызывающий — buildSpringNodes — подаёт равномерную сетку tau=i/N,
- * так что предусловие держится по построению. Прежний per-точечный страж
+ * Единственный вызывающий — buildSpringNodes — подаёт возрастающую сетку с
+ * защищённой half-step точкой и далее tau=i/N, так что предусловие держится по
+ * построению. Прежний per-точечный страж
  * `dx===0?yi:` снят как мёртвая ветка (см. ниже). При нарушении (невозрастающие
  * xs, dx≤0) наклон хорды даст NaN/∞ и результат не определён — контракт узкий
  * намеренно, страж не восстанавливается ради несуществующего вызова.
+ * protectedIndex — внутренний индекс обязательного узла; RDP упрощает две
+ * половины независимо и потому не может провести хорду сквозь эту точку.
  * @internal — экспорт для тестов, не часть публичного API ./compositor.
  */
 export function douglasPeuckerVertical(
   xs: readonly number[],
   ys: readonly number[],
   eps: number,
+  protectedIndex = -1,
 ): number[] {
   const n = xs.length;
   if (n <= 2) return n === 2 ? [0, 1] : n === 1 ? [0] : [];
   const keep = new Uint8Array(n);
   keep[0] = 1;
   keep[n - 1] = 1;
-  // Стек интервалов [i, j] (индексы), i<j.
-  const stack: number[] = [0, n - 1];
+  // Стек интервалов [i, j] (индексы), i<j. Защищённый interior-узел делит
+  // задачу до первого скана: последующая хорда физически не может его удалить.
+  const hasProtected = protectedIndex > 0 && protectedIndex < n - 1;
+  if (hasProtected) keep[protectedIndex] = 1;
+  const stack: number[] = hasProtected
+    ? [0, protectedIndex, protectedIndex, n - 1]
+    : [0, n - 1];
   while (stack.length > 0) {
     const j = stack.pop()!;
     const i = stack.pop()!;
@@ -148,10 +203,9 @@ export function douglasPeuckerVertical(
  *
  * @param params    — физические параметры пружины (валидированы вызывающим).
  * @param v0        — нормализованная начальная скорость (0 для покоя; ≠0 —
- *                    ретаргет с сохранением скорости). Оседание берётся
- *                    параметр-зависимым (settleTimeUpperBound v0-агностичен) —
- *                    для ПЕРЕНОСИМОЙ скорости (ограниченной прошлой пружиной)
- *                    амплитудный запас бонда покрывает удлинение траектории.
+ *                    ретаргет с сохранением скорости). Горизонт и сетка
+ *                    учитывают v0; если доказанный бюджет превышает физический
+ *                    кап, вызывающий обязан выбрать живой путь.
  * @param tolerance — макс. вертикальное отклонение реконструкции (ед. прогресса).
  * @returns массив узлов; percent[0]=0, percent[last]=100, progress[last]=1.
  */
@@ -160,33 +214,108 @@ export function buildSpringNodes(
   v0: number,
   tolerance: number,
 ): SpringNode[] {
-  const settle = settleTimeUpperBound(params);
+  return buildSpringNodesWithHorizon(params, v0, tolerance)[0];
+}
+
+/** Nodes и канонический horizon вычисляются одной границей. */
+export function buildSpringNodesWithHorizon(
+  params: SpringParams,
+  v0: number,
+  tolerance: number,
+): [nodes: SpringNode[], horizon: number] {
+  const settle = settleTimeUpperBound(params, v0);
+  return [
+    buildSpringNodesAtHorizon(
+      params,
+      v0,
+      tolerance,
+      settle,
+      baseGridSize(params, settle, tolerance, v0),
+    ),
+    settle,
+  ];
+}
+
+/**
+ * Production compile-as-preflight: безопасная кривая сразу строится и готова к
+ * кэшированию; over-cap возвращает undefined до сетки/RDP и до смены owner.
+ */
+export function tryBuildSpringNodes(
+  params: SpringParams,
+  v0: number,
+  tolerance: number,
+): [nodes: SpringNode[], horizon: number] | undefined {
+  const settle = settleTimeUpperBound(params, v0);
+  const intervals = requiredGridSize(params, settle, tolerance, v0);
+  if (!Number.isSafeInteger(intervals) || intervals > BASE_GRID_MAX) return undefined;
+  return [
+    buildSpringNodesAtHorizon(params, v0, tolerance, settle, intervals),
+    settle,
+  ];
+}
+
+/** Specialized v0=0 nodes + тот же horizon для native artifact. */
+export function buildRestingSpringNodesWithHorizon(
+  params: SpringParams,
+  tolerance: number,
+): [nodes: SpringNode[], horizon: number] {
+  const settle = settleTimeAtRestUpperBound(params);
+  return [
+    buildSpringNodesAtHorizon(
+      params,
+      0,
+      tolerance,
+      settle,
+      baseGridSize(params, settle, tolerance),
+    ),
+    settle,
+  ];
+}
+
+function buildSpringNodesAtHorizon(
+  params: SpringParams,
+  v0: number,
+  tolerance: number,
+  settle: number,
+  intervals: number,
+): SpringNode[] {
   // Валидный набор params всегда оседает в бюджет (гарантия validateSpringParams),
   // так что settle конечно; на всякий случай — деградация к малой ненулевой шкале.
   const T = Number.isFinite(settle) && settle > 0 ? settle : 1;
 
-  const intervals = baseGridSize(params, T, tolerance, v0);
-  const count = intervals + 1;
+  // Half-step tangent anchor выводится из того же energy-bound: при h=1/(2N)
+  // ошибка касательной ≤M·h²/2≤tol/4. На соседней половине exact-хорда
+  // добавляет ≤tol/16, итого ≤5tol/16. Первый slope физически равен v0;
+  // anchor обязан пережить RDP, иначе эта граничная производная исчезнет.
+  const count = intervals + 2;
   const xs = new Array<number>(count);
   const ys = new Array<number>(count);
   // Инварианты пружины (omega0/zeta/omegaD/A/B) петле-инвариантны на всей сетке
   // (params/v0 фиксированы) → считаем их ОДИН раз фабрикой, а не на каждый узел.
   // Значение бит-в-бит равно solveSpring(...).value (см. makeSpringValueSampler).
   const sampleValue = makeSpringValueSampler(params, v0);
-  for (let i = 0; i < count; i++) {
+  xs[0] = 0;
+  ys[0] = 0;
+  const tangentTau = 0.5 / intervals;
+  xs[1] = tangentTau;
+  // Считаем через тот же percent→offset, который использует WebKit execution:
+  // после shortest-roundtrip CSS и keyframes делят один физический slope.
+  ys[1] = v0 * ((tangentTau * 100) / 100 * T);
+  for (let i = 1; i <= intervals; i++) {
     const tau = i / intervals; // ∈ [0, 1]
-    xs[i] = tau;
+    const index = i + 1;
+    xs[index] = tau;
     // Финитный страж (не-конечное → цель 1, зеркалит motion-value; для валидных
     // params не срабатывает — покрыто finiteness-fuzz; инвариант «в CSS никогда
     // не NaN/∞») заинлайнен в цикл — минус кадр вызова на КАЖДЫЙ узел сетки
     // (доминирующий путь cold-compile). Тот же Number.isFinite(v)?v:1, бит-в-бит.
     const v = sampleValue(tau * T);
-    ys[i] = Number.isFinite(v) ? v : 1;
+    ys[index] = Number.isFinite(v) ? v : 1;
   }
 
   // eps = tolerance/2: вторая половина бюджета — под дискретизацию базовой сетки
   // (baseGridSize её и гарантирует ≤ tol/2) ⇒ суммарная реконструкция ≤ tolerance.
-  const kept = douglasPeuckerVertical(xs, ys, tolerance / 2);
+  const kept = douglasPeuckerVertical(xs, ys, tolerance / 2, 1);
   const nodes: SpringNode[] = [];
   for (let n = 0; n < kept.length; n++) {
     const k = kept[n]!;

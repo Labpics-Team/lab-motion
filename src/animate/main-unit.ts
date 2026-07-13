@@ -1,335 +1,330 @@
-/**
- * animate/main-unit.ts — main-thread движок одной группы каналов ./animate.
- *
- * Один юнит = одна CSS-декларация одного элемента (transform | opacity |
- * произвольное свойство) в одном вызове animate(). Свой rAF-микроцикл:
- * значение каждого кадра — ЗАМКНУТАЯ ФОРМА (readCompositorSpring), не
- * пошаговая симуляция — та же аналитика, что у compositor-пути, поэтому
- * C¹-семантика прерывания едина на обоих путях (класс, не совпадение).
- *
- * Почему не буквально createDriver: он spring-only и seek у него в секундах
- * пружинного времени; контракт фасада требует tween-режим (duration+ease),
- * seek в мс и семантику кадра drive.ts («первый кадр = elapsed 0» — bit-exact
- * контрольная точка ретаргета). Здесь оба режима в одном цикле.
- *
- * Часы: только инжектируемый requestFrame (детерминизм, инвариант 3);
- * ts-less вызов колбэка двигает время на FIXED_DT_S (канон drive).
- * Конвенция delay: отсчёт от ВЫЗОВА animate(); зазор вызов→первый кадр
- * не наблюдаем из rAF-шва и оценивается одним кадром FIXED_DT_S.
- */
+/** Main-thread executor одной CSS-поверхности внутри общего SurfaceBatch. */
 
-import { readCompositorSpring } from '../compositor/core.js';
 import { CONVERGENCE_THRESHOLD, FIXED_DT_S, MAX_FRAMES } from '../internal/constants.js';
+import {
+  readSpringFromBasisUnchecked,
+  sampleSpringFromBasisUnchecked,
+} from '../internal/read-spring.js';
+import type { RequestFrameFn } from '../motion-value.js';
 import type { SpringParams } from '../spring.js';
+import { buildTransform } from '../value/transform.js';
 import {
   RANGE_EPSILON,
   cssAt,
-  formatTransform,
-  normalizeV0,
   type AnimatableElement,
+  type BoundGroup,
   type ChannelSnapshot,
   type CssChannel,
   type GroupKey,
   type GroupOwner,
   type GroupRecord,
-  type NumericChannel,
 } from './channels.js';
+import { SurfaceBatch, type SurfaceUnit } from './surface-batch.js';
 
-/** Режим движения прогона (spring и tween взаимоисключающие — гейт в фасаде). */
 export type MotionMode =
-  | { readonly type: 'spring'; readonly spring: SpringParams }
-  | { readonly type: 'tween'; readonly durationMs: number; readonly ease: (t: number) => number };
+  | { readonly _type: 'spring'; readonly _spring: SpringParams }
+  | { readonly _type: 'tween'; readonly _durationMs: number; readonly _ease: (t: number) => number };
 
-/** Шов кадра (контракт drive/MotionValue: handle 0 = non-draining step-clock). */
-export type RequestFrameFn = (cb: (ts?: number) => void) => number;
+export type { RequestFrameFn };
 
 export interface MainUnitOptions {
-  readonly el: AnimatableElement;
-  readonly group: GroupKey;
-  readonly record: GroupRecord;
-  readonly numeric: NumericChannel[];
-  readonly css: CssChannel | undefined;
-  /** Замороженные transform-каналы прежних прогонов (полная проекция состояния). */
-  readonly residuals: Map<string, number>;
-  readonly mode: MotionMode;
-  readonly delayMs: number;
-  readonly requestFrame: RequestFrameFn;
-  /** natural=true — естественное оседание (для семантики onComplete). */
-  readonly onDone: (natural: boolean) => void;
+  readonly _el: AnimatableElement;
+  readonly _group: GroupKey;
+  readonly _record: GroupRecord;
+  readonly _bound: BoundGroup;
+  readonly _mode: MotionMode;
+  readonly _delayMs: number;
+  readonly _batch: SurfaceBatch;
+  readonly _onDone: (natural: boolean) => void;
+  readonly _startPaused?: boolean | undefined;
 }
 
 const FIXED_DT_MS = FIXED_DT_S * 1000;
-
-/**
- * Фиксированный шаг центральной разности производной изинга (в прогресс-
- * пространстве k∈[0,1]). Фиксированный — детерминизм (инвариант 3); численный,
- * а не аналитический — ease в контракте opaque `(t)=>number` (cubicBezier —
- * небрендированное замыкание, дешёвого аналитического пути без смены
- * публичного контракта фабрик изинга нет). Ошибка на гладких кривых O(h²).
- */
 const EASE_DERIV_H = 1e-3;
 
-/** Main-thread прогон группы: rAF-цикл с pause/play/seek/cancel и подхватом. */
-export class MainUnit implements GroupOwner {
-  readonly finished: Promise<void>;
-
-  private readonly _o: MainUnitOptions;
-  private _resolve!: () => void;
+/** Unit хранит семантику группы; scheduler и spring-basis принадлежат aggregate. */
+export class MainUnit implements GroupOwner, SurfaceUnit {
+  _batchSlot = -1;
+  private _o: MainUnitOptions | undefined;
+  private _batch: SurfaceBatch | undefined;
   private _done = false;
-  private _paused = false;
+  private _paused: boolean;
   private _active = false;
-  /** Смена поколения инвалидирует уже запланированные кадры (канон MotionValue). */
-  private _gen = 0;
+  private _converged = false;
   private _wallMs = 0;
   private _tMs = 0;
   private _lastTs: number | undefined;
   private _frames = 0;
-  private _useTimeoutFallback = false;
+  private _tweenK = 0;
+  private _renderedTweenK = 0;
+  private _tweenDpdt = NaN;
+  private readonly _snap = { value: 0, velocity: 0 };
 
-  /**
-   * Переиспользуемый буфер live-каналов transform: заводится один раз на юнит,
-   * чтобы не аллоцировать Map на каждый кадр в _write (цель этой оптимизации).
-   * Именно Map, а не Record: formatTransform принимает ReadonlyMap, и очистка
-   * через clear() сохраняет ссылку — переприсваивание readonly-поля не нужно.
-   */
-  private readonly _lt = new Map<string, number>();
-  private readonly _ss = { value: 0, velocity: 0 };
-
-  constructor(opts: MainUnitOptions) {
-    this._o = opts;
-    this.finished = new Promise<void>((res) => {
-      this._resolve = res;
-    });
-    this._schedule(true);
+  constructor(options: MainUnitOptions) {
+    this._o = options;
+    this._batch = options._batch;
+    this._paused = options._startPaused === true;
+    try {
+      options._batch._add(this, this._paused);
+    } catch (error) {
+      this._done = true;
+      this._o = undefined;
+      this._batch = undefined;
+      throw error;
+    }
   }
 
-  // ── GroupOwner (подхват при повторном animate) ────────────────────────────
+  _capture(): void {}
 
-  captureNum(key: string): ChannelSnapshot | undefined {
-    const ch = this._o.numeric.find((c) => c.key === key);
-    if (ch !== undefined) return { value: ch.value, velocity: ch.velocity };
-    const frozen = this._o.residuals.get(key);
-    return frozen === undefined ? undefined : { value: frozen, velocity: 0 };
+  _captureNum(key: string): ChannelSnapshot | undefined {
+    if (this._done) return undefined;
+    const o = this._o!;
+    const channel = o._bound._numeric.find((item) => item._key === key);
+    if (channel !== undefined) {
+      let velocity = this._active ? channel._renderedVelocity : 0;
+      if (this._active && o._mode._type === 'tween') {
+        const sampled = (channel._to - channel._from) *
+          this._tweenDerivative(this._renderedTweenK);
+        velocity = Number.isFinite(sampled) ? sampled + 0 : 0;
+      }
+      return { _value: channel._renderedValue, _velocity: velocity };
+    }
+    const frozen = o._bound._residuals.get(key);
+    return frozen === undefined ? undefined : { _value: frozen, _velocity: 0 };
   }
 
-  captureCss(key: string): CssChannel | undefined {
-    const ch = this._o.css;
-    return ch !== undefined && ch.key === key ? ch : undefined;
+  _captureCss(key: string): CssChannel | undefined {
+    if (this._done) return undefined;
+    const channel = this._o!._bound._css;
+    if (channel === undefined || channel._key !== key) return undefined;
+    const dpdt = !this._active
+      ? 0
+      : this._o!._mode._type === 'tween'
+        ? this._tweenDerivative(this._renderedTweenK)
+        : channel._renderedDpdt;
+    return { ...channel, _dpdt: dpdt, _css: channel._renderedCss };
   }
 
-  numericKeys(): readonly string[] {
-    return [...this._o.numeric.map((c) => c.key), ...this._o.residuals.keys()];
+  _numericKeys(): readonly string[] {
+    if (this._done) return [];
+    const bound = this._o!._bound;
+    return [...bound._numeric.map((channel) => channel._key), ...bound._residuals.keys()];
   }
 
-  supersede(): void {
-    this._finish(false);
-  }
-
-  // ── Контролы ──────────────────────────────────────────────────────────────
-
-  pause(): void {
-    if (this._done || this._paused) return;
-    this._paused = true;
-    this._gen++; // уже запланированный кадр — инертен
-  }
-
-  play(): void {
-    if (this._done || !this._paused) return;
-    this._paused = false;
-    this._lastTs = undefined; // без скачка dt за время паузы
-    this._schedule(false);
-  }
-
-  /** Перемотка к виртуальному времени анимации (мс) с немедленным эмитом. */
-  seek(tMs: number): void {
-    if (this._done || Number.isNaN(tMs)) return;
-    this._active = true;
-    this._tMs = Math.max(0, tMs);
-    this._lastTs = undefined;
-    if (this._emitAt(this._tMs)) this._settle();
-  }
-
-  /** Стоп в текущей позиции: без записи, finished резолвится. */
-  cancel(): void {
+  _supersede(replacement?: () => void): void {
     if (this._done) return;
+    replacement?.();
     this._writeBack();
     this._finish(false);
   }
 
-  // ── Кадровый цикл ─────────────────────────────────────────────────────────
+  _rollback(): void {
+    this._finish(false);
+  }
 
-  private _schedule(bootstrap: boolean): void {
-    const gen = this._gen;
-    if (this._useTimeoutFallback) {
-      setTimeout(() => this._tick(undefined, gen), 0);
-      return;
-    }
-    const handle = this._o.requestFrame((ts) => this._tick(ts, gen));
-    if (bootstrap && handle === 0) {
-      // Non-draining step-clock (канон drive): страховка от дедлока finished.
-      this._useTimeoutFallback = true;
-      setTimeout(() => this._tick(undefined, gen), 0);
+  play(): void {
+    if (this._done || !this._paused || this._o!._record._transition) return;
+    this._lastTs = undefined;
+    this._paused = false;
+    try {
+      this._batch!._activate(this);
+    } catch (error) {
+      this._paused = true;
+      throw error;
     }
   }
 
-  private _tick(ts: number | undefined, gen: number): void {
-    if (gen !== this._gen || this._done || this._paused) return;
+  pause(): void {
+    if (this._done || this._paused || this._o!._record._transition) return;
+    this._paused = true;
+    this._batch!._deactivate(this);
+  }
 
+  seek(tMs: number): void {
+    if (this._done || this._o!._record._transition || !Number.isFinite(tMs)) return;
+    this._active = true;
+    this._tMs = Math.max(0, tMs);
+    this._lastTs = undefined;
+    if (this._compute()) this._settle();
+    else this._write();
+  }
+
+  cancel(): void {
+    if (this._done || this._o!._record._transition) return;
+    this._cancel();
+  }
+
+  _updateStep(ts: number | undefined): void {
+    if (this._done || this._paused || this._o!._record._transition) return;
     let dt: number;
-    if (ts !== undefined) {
-      dt = this._lastTs !== undefined ? ts - this._lastTs : 0;
-      this._lastTs = ts;
-    } else {
+    if (ts === undefined || !Number.isFinite(ts)) {
       dt = FIXED_DT_MS;
+      this._lastTs = undefined;
+    } else {
+      dt = this._lastTs === undefined ? 0 : ts - this._lastTs;
+      this._lastTs = ts;
+      if (!Number.isFinite(dt)) {
+        dt = FIXED_DT_MS;
+        this._lastTs = undefined;
+      }
     }
     if (dt < 0) dt = 0;
     this._wallMs += dt;
-
     if (!this._active) {
-      // Зазор вызов→первый кадр ≈ один кадр: конвенция отсчёта delay.
-      if (this._wallMs + FIXED_DT_MS >= this._o.delayMs) {
+      if (this._wallMs + FIXED_DT_MS >= this._o!._delayMs) {
         this._active = true;
         this._tMs = 0;
       }
-    } else {
-      this._tMs += dt;
-    }
-
+    } else this._tMs += dt;
     if (this._active) {
       this._frames++;
-      if (this._emitAt(this._tMs) || this._frames >= MAX_FRAMES) {
-        this._settle();
-        return;
-      }
+      if (
+        this._compute() ||
+        (this._frames >= MAX_FRAMES && this._tMs <= 0)
+      ) this._converged = true;
     }
-    this._schedule(false);
   }
 
-  /**
-   * Эмит состояния при виртуальном времени tMs. Возвращает true, когда прогон
-   * сошёлся (пороги ядра, range-независимые) — вызывающий пишет точный финал.
-   */
-  private _emitAt(tMs: number): boolean {
-    const o = this._o;
-    if (o.mode.type === 'tween') {
-      if (tMs >= o.mode.durationMs) return true;
-      const k = tMs / o.mode.durationMs;
-      const eased = o.mode.ease(k);
-      const p = Number.isFinite(eased) ? eased : k; // враждебный ease → линейный кадр
-      // Аналитическая скорость tween (C¹-контракт #93): v = range·ease′(k)/duration —
-      // captureNum отдаёт её при прерывании, и spring-ран наследует импульс
-      // (перехват tween→spring стал C¹, как spring→spring). Окно разности
-      // поджимается в [0,1]: изинги клампят снаружи диапазона (endpoint-
-      // дисциплина ядра), сэмпл за краем дал бы ложный слом производной.
-      // Производная нужна ОБОИМ видам каналов: числовым — v = range·ṗ, css —
-      // сам ṗ (C¹-подхват css, #93 срез 4); группа всегда несёт хотя бы один.
-      const k0 = k > EASE_DERIV_H ? k - EASE_DERIV_H : 0;
-      const k1 = k + EASE_DERIV_H < 1 ? k + EASE_DERIV_H : 1;
-      const slope = (o.mode.ease(k1) - o.mode.ease(k0)) / (k1 - k0);
-      // Прогресс/с; non-finite (враждебный ease) → 0: NaN не сеется в подхват;
-      // `+ 0` схлопывает −0 (враждебный ease, отдающий −0 на сэмплах).
-      const raw = (slope * 1000) / o.mode.durationMs;
-      const dpdt = Number.isFinite(raw) ? raw + 0 : 0;
-      for (const ch of o.numeric) {
-        const range = ch.to - ch.from;
-        const v = ch.from + range * p;
-        if (!Number.isFinite(v)) return true; // непредставимый спан → снап к цели
-        ch.value = v;
-        // `+ 0` схлопывает −0 (range<0 при нулевом наклоне ease).
-        const vel = range * dpdt;
-        ch.velocity = Number.isFinite(vel) ? vel + 0 : 0;
+  _renderStep(): void {
+    if (this._done || this._paused || this._o!._record._transition) return;
+    if (this._converged) this._settle();
+    else if (this._active) this._write();
+  }
+
+  _batchFail(): void {
+    try { this._cancel(); } catch { /* frame siblings продолжаются */ }
+  }
+
+  _batchTeardown(): void {
+    try { this._cancel(); } catch { /* global teardown освобождает всех */ }
+  }
+
+  private _compute(): boolean {
+    const o = this._o!;
+    const bound = o._bound;
+    if (o._mode._type === 'tween') {
+      if (this._tMs >= o._mode._durationMs) return true;
+      const k = this._tMs / o._mode._durationMs;
+      const eased = o._mode._ease(k);
+      const progress = Number.isFinite(eased) ? eased : k;
+      this._tweenK = k;
+      this._tweenDpdt = NaN;
+      for (const channel of bound._numeric) {
+        const value = channel._from + (channel._to - channel._from) * progress;
+        if (!Number.isFinite(value)) return true;
+        channel._value = value;
       }
-      if (o.css !== undefined) {
-        o.css.p = p;
-        o.css.dpdt = dpdt;
-        o.css.css = cssAt(o.css, p);
-      }
-      this._write();
+      if (bound._css !== undefined) bound._css._css = cssAt(bound._css, progress);
       return false;
     }
 
-    // Spring: замкнутая форма на канал — та же аналитика, что compositor-путь.
-    const t = tMs / 1000;
+    const basis = this._batch!._springBasis(o._mode._spring, this._tMs / 1000);
     let converged = true;
-    const snap = this._ss;
-    for (const ch of o.numeric) {
-      readCompositorSpring(o.mode.spring, { from: ch.from, to: ch.to, v0: ch.v0, t }, snap);
-      ch.value = snap.value;
-      ch.velocity = snap.velocity;
-      const range = ch.to - ch.from;
+    for (const channel of bound._numeric) {
+      readSpringFromBasisUnchecked(
+        basis,
+        channel._from,
+        channel._solverTo,
+        channel._v0,
+        this._snap,
+      );
+      channel._value = this._snap.value;
+      channel._velocity = this._snap.velocity;
+      const range = channel._solverTo - channel._from;
       if (Number.isFinite(range)) {
-        const ar = Math.max(Math.abs(range), RANGE_EPSILON);
-        converged =
-          converged &&
-          Math.abs(snap.value - ch.to) / ar < CONVERGENCE_THRESHOLD &&
-          Math.abs(snap.velocity) / ar < CONVERGENCE_THRESHOLD;
-      } // непредставимый спан: канал считается сошедшимся (снап-политика ядра)
+        const scale = Math.max(Math.abs(range), RANGE_EPSILON);
+        converged = converged &&
+          Math.abs(this._snap.value - channel._solverTo) / scale < CONVERGENCE_THRESHOLD &&
+          Math.abs(this._snap.velocity) / scale < CONVERGENCE_THRESHOLD;
+      }
     }
-    const css = o.css;
+    const css = bound._css;
     if (css !== undefined) {
-      readCompositorSpring(o.mode.spring, { from: 0, to: 1, v0: css.v0, t }, snap);
-      css.p = snap.value;
-      css.dpdt = snap.velocity;
-      css.css = cssAt(css, snap.value);
-      converged =
-        converged &&
-        Math.abs(snap.value - 1) < CONVERGENCE_THRESHOLD &&
-        Math.abs(snap.velocity) < CONVERGENCE_THRESHOLD;
+      sampleSpringFromBasisUnchecked(basis, css._v0, this._snap);
+      css._dpdt = this._snap.velocity;
+      css._css = cssAt(css, this._snap.value);
+      converged = converged &&
+        Math.abs(this._snap.value - 1) < CONVERGENCE_THRESHOLD &&
+        Math.abs(this._snap.velocity) < CONVERGENCE_THRESHOLD;
     }
-    if (converged) return true;
-    this._write();
-    return false;
+    return converged;
   }
 
-  /** Запись текущего состояния группы одной CSS-декларацией. */
+  private _tweenDerivative(k = this._tweenK): number {
+    if (k === this._tweenK && !Number.isNaN(this._tweenDpdt)) return this._tweenDpdt;
+    const mode = this._o!._mode;
+    if (mode._type !== 'tween') return 0;
+    const k0 = k > EASE_DERIV_H ? k - EASE_DERIV_H : 0;
+    const k1 = k + EASE_DERIV_H < 1 ? k + EASE_DERIV_H : 1;
+    const raw = ((mode._ease(k1) - mode._ease(k0)) * 1000) /
+      ((k1 - k0) * mode._durationMs);
+    const value = Number.isFinite(raw) ? raw + 0 : 0;
+    if (k === this._tweenK) this._tweenDpdt = value;
+    return value;
+  }
+
   private _write(): void {
-    const o = this._o;
-    if (o.group === 'transform') {
-      this._lt.clear();
-      for (const ch of o.numeric) this._lt.set(ch.key, ch.value);
-      o.el.style.setProperty('transform', formatTransform(o.residuals, this._lt));
-    } else if (o.css !== undefined) {
-      o.el.style.setProperty(o.group, String(o.css.css));
-    } else {
-      o.el.style.setProperty(o.group, String(o.numeric[0]!.value));
+    const o = this._o!;
+    const bound = o._bound;
+    if (o._group === 'transform') {
+      const state = bound._transform!;
+      for (const channel of bound._numeric) state[channel._key] = channel._value;
+      o._el.style.setProperty('transform', buildTransform(state));
+    } else if (bound._css !== undefined) {
+      o._el.style.setProperty(o._group, String(bound._css._css));
+    } else o._el.style.setProperty(o._group, String(bound._numeric[0]!._value));
+    for (const channel of bound._numeric) {
+      channel._renderedValue = channel._value;
+      channel._renderedVelocity = channel._velocity;
     }
+    if (bound._css !== undefined) {
+      bound._css._renderedCss = bound._css._css;
+      bound._css._renderedDpdt = bound._css._dpdt;
+    }
+    this._renderedTweenK = this._tweenK;
   }
 
-  /** Естественное оседание: точный финал в стиль + finished. */
   private _settle(): void {
     if (this._done) return;
-    const o = this._o;
-    for (const ch of o.numeric) {
-      ch.value = ch.to;
-      ch.velocity = 0;
+    const bound = this._o!._bound;
+    for (const channel of bound._numeric) {
+      channel._value = channel._to;
+      channel._velocity = 0;
     }
-    if (o.css !== undefined) {
-      o.css.p = 1;
-      o.css.css = cssAt(o.css, 1);
-    }
+    if (bound._css !== undefined) bound._css._css = cssAt(bound._css, 1);
     this._write();
     this._writeBack();
     this._finish(true);
   }
 
-  /** Фиксация состояния в реестре; после cancel/settle публичная скорость — покой. */
+  private _cancel(): void {
+    if (this._done) return;
+    this._writeBack();
+    this._finish(false);
+  }
+
   private _writeBack(): void {
-    const rec = this._o.record;
-    for (const ch of this._o.numeric) {
-      rec.numeric.set(ch.key, { value: ch.value, velocity: 0 });
+    const o = this._o!;
+    const record = o._record;
+    const bound = o._bound;
+    for (const channel of bound._numeric) {
+      record._numeric.set(channel._key, { _value: channel._renderedValue, _velocity: 0 });
     }
-    this._o.residuals.forEach((v, k) => {
-      if (!rec.numeric.has(k)) rec.numeric.set(k, { value: v, velocity: 0 });
+    bound._residuals.forEach((value, key) => {
+      if (!record._numeric.has(key)) record._numeric.set(key, { _value: value, _velocity: 0 });
     });
-    if (this._o.css !== undefined) rec.cssValue = this._o.css.css;
+    if (bound._css !== undefined) record._cssValue = bound._css._renderedCss;
   }
 
   private _finish(natural: boolean): void {
     if (this._done) return;
     this._done = true;
-    this._gen++;
-    if (this._o.record.owner === this) this._o.record.owner = undefined;
-    this._resolve();
-    this._o.onDone(natural);
+    const o = this._o!;
+    this._batch!._remove(this, this._paused);
+    if (o._record._owner === this) o._record._owner = undefined;
+    const done = o._onDone;
+    this._o = undefined;
+    this._batch = undefined;
+    done(natural);
   }
 }

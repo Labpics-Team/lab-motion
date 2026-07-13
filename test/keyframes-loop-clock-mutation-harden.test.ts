@@ -328,10 +328,10 @@ describe('sampleKeyframes endpoint-exactness: концы минуют easing', (
   });
 });
 
-// ─── (9) Сообщения валидации называют фактическое значение ───────────────────
+// ─── (9) Code-only сообщения не отражают фактическое значение ────────────────
 
-describe('keyframes валидация: сообщение цитирует полученное значение', () => {
-  it('values=undefined → MotionParamError с «получено 0» (не TypeError)', () => {
+describe('keyframes валидация: code-only сообщения', () => {
+  it('values=undefined → LM033 (не TypeError)', () => {
     let err: unknown;
     try {
       keyframes({ values: undefined as unknown as number[], requestFrame: frozenRaf });
@@ -339,10 +339,10 @@ describe('keyframes валидация: сообщение цитирует по
       err = e;
     }
     expect(err).toBeInstanceOf(MotionParamError);
-    expect((err as Error).message).toMatch(/получено 0/);
+    expect((err as Error).message).toBe('LM033');
   });
 
-  it('values=[7] → сообщение называет фактическую длину 1', () => {
+  it('values=[7] → LM033 без отражения длины', () => {
     let err: unknown;
     try {
       keyframes({ values: [7], requestFrame: frozenRaf });
@@ -350,10 +350,10 @@ describe('keyframes валидация: сообщение цитирует по
       err = e;
     }
     expect(err).toBeInstanceOf(MotionParamError);
-    expect((err as Error).message).toMatch(/получено 1/);
+    expect((err as Error).message).toBe('LM033');
   });
 
-  it('times[last]=0.9 → сообщение цитирует 0.9', () => {
+  it('times[last]=0.9 → LM039 без отражения значения', () => {
     let err: unknown;
     try {
       keyframes({ values: [0, 1], times: [0, 0.9], requestFrame: frozenRaf });
@@ -361,7 +361,7 @@ describe('keyframes валидация: сообщение цитирует по
       err = e;
     }
     expect(err).toBeInstanceOf(MotionParamError);
-    expect((err as Error).message).toContain('0.9');
+    expect((err as Error).message).toBe('LM039');
   });
 });
 

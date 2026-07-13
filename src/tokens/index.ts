@@ -25,17 +25,22 @@
  *
  * Инварианты (наследуют ядро):
  *   1. Субпуть-изоляция: не импортируешь ./tokens — платишь ноль (ядро не растёт,
- *      проверено size-гейтом full-core). Весь субпуть ~1.1 KB gz. NB: внутри
- *      субпутя семейства НЕ шейкаются по отдельности в отгруженном (минифициров.)
- *      dist — `easing` тянет ../easing.cubicBezier (~0.9 KB) на любой импорт.
+ *      проверено размерным гейтом full-core). `standard` использует специальную
+ *      функцию, остальные именованные кривые — общий решатель cubic-bezier.
  *   2. Zero-DOM / SSR-safe — только данные и чистые функции.
  *   3. Детерминизм — distanceScale чист; одинаковый вход → бит-идентичный выход.
  *   4. Финитность — distanceScale клэмпит враждебный вход (NaN/∞ → границы band).
  *   5. Типобезопасность — `as const` + выведенные union-типы имён токенов.
  */
 
-import { cubicBezier } from '../easing/index.js';
 import { MotionParamError } from '../errors.js';
+import { cubicBezierUnchecked } from '../internal/cubic-bezier.js';
+import {
+  DEFAULT_DURATION_MS,
+  DEFAULT_SPRING,
+  STANDARD_EASING,
+  STANDARD_EASING_COORDS,
+} from '../internal/motion-defaults.js';
 import { validateSpringParams, type SpringParams } from '../spring.js';
 
 // ─── Длительности (мс) ───────────────────────────────────────────────────────
@@ -53,7 +58,7 @@ export const duration = {
   /** Микровзаимодействия (hover, нажатие, мелкая смена состояния), 100 мс. */
   fast: 100,
   /** Дефолтный UI-переход (появление, смена состояния), 200 мс. */
-  base: 200,
+  base: DEFAULT_DURATION_MS,
   /** Крупнее и намереннее (панели, перемещения), 300 мс. */
   slow: 300,
   /** Полноэкранный / крупный переход поверхностей, 500 мс. */
@@ -80,7 +85,7 @@ export interface EasingToken {
 
 /** Строит EasingToken из четырёх координат Безье (единый источник fn и css). */
 function bezierToken(x1: number, y1: number, x2: number, y2: number): EasingToken {
-  return { fn: cubicBezier(x1, y1, x2, y2), css: `cubic-bezier(${x1}, ${y1}, ${x2}, ${y2})` };
+  return { fn: cubicBezierUnchecked(x1, y1, x2, y2), css: `cubic-bezier(${x1}, ${y1}, ${x2}, ${y2})` };
 }
 
 /**
@@ -93,13 +98,15 @@ function bezierToken(x1: number, y1: number, x2: number, y2: number): EasingToke
  *   accelerate — «выход»: мягкий старт, быстрый уход (M3 standard-accelerate).
  *   emphasized — единственный сдержанный overshoot (M3 Expressive web-fallback).
  */
-// Примечание: `easing` тянет ../easing.cubicBezier (eager). В ОТГРУЖЕННОМ dist
-// (terser-минифицирован, PURE-аннотации вырезаны) семейства НЕ шейкаются по
-// отдельности — импорт любого токена подтягивает cubicBezier (~0.9 KB). Реальная
-// гарантия — СУБПУТЬ-изоляция (не импортишь ./tokens = ноль; весь субпуть ~1.1 KB).
+// `standard` разделяет ссылочную идентичность с дефолтом фасада и не проходит
+// через общую фабрику; остальные три кривые остаются на едином решателе
+// cubic-bezier. Поэтому граница размера — весь субпуть ./tokens, а не сумма полей.
 export const easing = {
   /** Универсальный дефолт: оба конца сглажены (M3 easing-standard). */
-  standard: bezierToken(0.2, 0, 0, 1),
+  standard: {
+    fn: STANDARD_EASING,
+    css: `cubic-bezier(${STANDARD_EASING_COORDS.join(', ')})`,
+  },
   /** Вход с торможением: элемент влетает и мягко садится (M3 decelerate). */
   decelerate: bezierToken(0, 0, 0, 1),
   /** Выход с разгоном: элемент трогается мягко и быстро уходит (M3 accelerate). */
@@ -141,14 +148,10 @@ export type EasingTokenName = keyof typeof easing;
  */
 export function springFromDurationBounce(durationS: number, bounce: number): SpringParams {
   if (!Number.isFinite(durationS) || durationS <= 0) {
-    throw new MotionParamError(
-      `springFromDurationBounce: durationS must be positive finite seconds, got ${durationS}`,
-    );
+    throw new MotionParamError('LM108');
   }
   if (!Number.isFinite(bounce) || bounce < 0 || bounce >= 1) {
-    throw new MotionParamError(
-      `springFromDurationBounce: bounce must be in [0, 1), got ${bounce}`,
-    );
+    throw new MotionParamError('LM109');
   }
   const dampingRatio = 1 - bounce;
   const omega0 = (2 * Math.PI) / durationS;
@@ -176,7 +179,7 @@ export function springFromDurationBounce(durationS: number, bounce: number): Spr
 /** Именованные пружинные пресеты (физпараметры для ./compositor и ./value). */
 export const spring = {
   /** Дефолт: ~критично-задемпфирован, без bounce (Framer-подобный). */
-  default: { mass: 1, stiffness: 170, damping: 26 },
+  default: DEFAULT_SPRING,
   /** Мягкий и медленный: спокойное оседание. */
   gentle: { mass: 1, stiffness: 120, damping: 30 },
   /** Быстрый и собранный: минимальный overshoot. */
