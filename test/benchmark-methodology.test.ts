@@ -604,6 +604,21 @@ describe('benchmark methodology fail-closed contracts', () => {
     expect(source).not.toContain('semantic: true');
   });
 
+  it('captures a decodable pre-start pixel before the freeze trajectory begins', () => {
+    const source = readFileSync('bench/compare/bench.mjs', 'utf8');
+    const capture = source.slice(
+      source.indexOf('async function captureTrajectory'),
+      source.indexOf('async function runFreezePair'),
+    );
+    const screencastStarted = capture.indexOf("await cdp.send('Page.startScreencast'");
+    const baselinePresented = capture.indexOf('await waitForBaselineFrame(frames)');
+    const animationStarted = capture.indexOf('const startedAt = await page.evaluate');
+
+    expect(screencastStarted).toBeGreaterThan(-1);
+    expect(baselinePresented).toBeGreaterThan(screencastStarted);
+    expect(animationStarted).toBeGreaterThan(baselinePresented);
+  });
+
   it('scores against the same library unblocked trajectory and penalizes both lag and lead', () => {
     const baseline = [
       { t: 0.3, x: 435 },

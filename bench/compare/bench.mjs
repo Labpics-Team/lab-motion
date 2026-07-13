@@ -646,6 +646,9 @@ async function captureTrajectory(browser, adapterPath, blocked, pageUrl) {
   await cdp.send('Page.startScreencast', {
     format: 'png', everyNthFrame: 1, maxWidth: 800, maxHeight: 200,
   });
+  // CDP может не прислать новый кадр во время блокировки без visual damage.
+  // Предстартовый пиксель даёт честную точку удержания, не синтезируя движение.
+  await waitForBaselineFrame(frames);
 
   // Epoch фиксируется в page realm рядом с API-вызовом: RTT Node↔page не входит.
   const startedAt = await page.evaluate(({ px, duration, shouldBlock, blockAt, blockMs }) => {
