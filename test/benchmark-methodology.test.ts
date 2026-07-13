@@ -1,10 +1,21 @@
 import { readFileSync } from 'node:fs';
 import { describe, expect, it } from 'vitest';
 import {
+  startClock,
+  TIMER_ORIGIN_MS,
+  timerEvidence,
+} from './benchmark-clock-fixture.js';
+import {
   assertBalancedRunBlocks,
   assertFreezeMatrix,
+  assertWarmStartMeasurement,
   applyHolmCorrection,
   createFreezeEvidence,
+  deriveCdpStartClock,
+  deriveFirstPresentedElapsedMs,
+  deriveFirstPresentedUncertaintyMs,
+  deriveRealmTimerQuantum,
+  deriveWarmStartCalibration,
   deriveTimerQuantum,
   evaluateStartSemanticEvidence,
   evaluatePerformanceClaim,
@@ -17,9 +28,30 @@ import {
   START_SCENARIO_MANIFEST,
   scoreAgainstBaseline,
   summarizeSamples,
+  WARM_TIMER_CALIBRATION_POLICY,
 } from '../bench/compare/methodology.mjs';
 
 describe('benchmark methodology fail-closed contracts', () => {
+  it('rejects publish warm measurements below the calibrated timer floor', () => {
+    expect(() => assertWarmStartMeasurement(
+      'lab.s1 run 1',
+      [0.399 / 40],
+      [0.399],
+      40,
+      timerEvidence(),
+      TIMER_ORIGIN_MS,
+    )).toThrow(/lab\.s1.*ниже.*0\.4/i);
+
+    expect(() => assertWarmStartMeasurement(
+      'lab.s1 run 1',
+      [0.01],
+      [0.399],
+      40,
+      timerEvidence(),
+      TIMER_ORIGIN_MS,
+    )).toThrow(/не пересчитывается|batch/i);
+  });
+
   it('uses one production-minified adapter profile for every runtime participant', () => {
     expect(PRODUCTION_ADAPTER_PROFILE).toMatchObject({
       bundle: true,
@@ -96,6 +128,197 @@ describe('benchmark methodology fail-closed contracts', () => {
       ...Array.from({ length: 8 }, () => 0.1),
       ...Array.from({ length: 8 }, () => 0.3),
     ])).toThrow(/концентрац/i);
+  });
+
+  it('binds conservative before/after timer evidence to one realm', () => {
+    const changedGrid = timerEvidence(0.1);
+    changedGrid.probes[1].performanceNowDeltasMs.fill(0.2);
+    expect(deriveRealmTimerQuantum('publish', changedGrid)).toBe(0.2);
+
+    const conservative = timerEvidence(0.1);
+    conservative.probes[0].performanceNowDeltasMs[0] = 0.15;
+    expect(deriveRealmTimerQuantum('publish', conservative)).toBe(0.15);
+    const otherRealm = timerEvidence();
+    otherRealm.probes[1].timeOriginMs += 1;
+    expect(() => deriveRealmTimerQuantum('publish', otherRealm)).toThrow(/разным realm/i);
+    const unstable = timerEvidence();
+    unstable.probes[0].performanceNowDeltasMs = [
+      ...Array.from({ length: 8 }, () => 0.1),
+      ...Array.from({ length: 8 }, () => 0.3),
+    ];
+    expect(() => deriveRealmTimerQuantum('publish', unstable)).toThrow(/концентрац/i);
+    expect(() => deriveRealmTimerQuantum('publish', {
+      ...timerEvidence(),
+      probes: timerEvidence().probes.slice(0, 1),
+    })).toThrow(/before\/after/i);
+  });
+
+  it('derives first presented movement only from screencast frame timestamps', () => {
+    const clock = startClock();
+    const startedAtSeconds = clock.cdpRuntimeTimestampMs / 1000;
+    const evidence = {
+      startedAtSeconds,
+      timerEvidence: timerEvidence(),
+      startClock: clock,
+      movementThresholdPx: 0.5,
+      rawFrames: 4,
+      frames: [
+        { timestampSeconds: startedAtSeconds - 0.01, x: 0 },
+        { timestampSeconds: startedAtSeconds + 0.01, x: 0 },
+        { timestampSeconds: startedAtSeconds + 0.02, x: 1 },
+        { timestampSeconds: startedAtSeconds + 0.03, x: 2 },
+      ],
+    };
+    expect(deriveFirstPresentedElapsedMs(evidence, 0.5)).toBeCloseTo(20, 3);
+    expect(deriveFirstPresentedUncertaintyMs(evidence, 0.5)).toBeGreaterThan(0.1);
+    expect(deriveCdpStartClock(
+      'first presented',
+      evidence.startClock,
+      evidence.timerEvidence,
+    ).markerToApiUpperMs).toBeGreaterThan(0.1);
+    expect(deriveFirstPresentedElapsedMs({
+      ...evidence,
+      frames: evidence.frames.map((frame) => ({ ...frame, x: 0 })),
+    }, 0.5)).toBeNull();
+    expect(() => deriveFirstPresentedElapsedMs({
+      ...evidence,
+      frames: evidence.frames.slice(1),
+    }, 0.5)).toThrow(/baseline|старт/i);
+    expect(() => deriveFirstPresentedElapsedMs({
+      ...evidence,
+      movementThresholdPx: 0.1,
+    }, 0.5)).toThrow(/threshold|порог/i);
+    expect(() => deriveFirstPresentedElapsedMs({
+      ...evidence,
+      frames: [evidence.frames[0], evidence.frames[2], evidence.frames[1]],
+    }, 0.5)).toThrow(/поряд|timestamp/i);
+    expect(() => deriveFirstPresentedElapsedMs({
+      ...evidence,
+      startClock: { ...evidence.startClock, cdpToken: 'other' },
+    }, 0.5)).toThrow(/start clock|token|cdp/i);
+    expect(() => deriveFirstPresentedElapsedMs({
+      ...evidence,
+      startClock: {
+        ...evidence.startClock,
+        cdpRuntimeTimestampMs: evidence.startClock.cdpRuntimeTimestampMs + 100,
+      },
+    }, 0.5)).toThrow(/page epoch|runtime marker/i);
+  });
+
+  it('derives one minimal warm call count per scenario from every participant', () => {
+    const participants = ['lab', 'motion', 'gsap', 'anime'];
+    const measurements = (value: number, samples: number) => Object.fromEntries(
+      participants.map((id) => [
+        id,
+        Array.from({ length: WARM_TIMER_CALIBRATION_POLICY.pilotClusters }, () => (
+          {
+            batchElapsedMs: Array.from({ length: samples }, () => value),
+            timerEvidence: timerEvidence(),
+            measurementTimeOriginMs: TIMER_ORIGIN_MS,
+          }
+        )),
+      ]),
+    );
+    const thresholdMs = 0.1 * WARM_TIMER_CALIBRATION_POLICY.minimumElapsedQuanta;
+    const pilots = Object.fromEntries(Object.entries(START_SCENARIO_MANIFEST).map(([id, config]) => [
+      id,
+      id === 's1'
+        ? [
+          {
+            calls: config.warmCalls,
+            measurements: {
+              ...measurements(thresholdMs + 1, config.warmSamples),
+              gsap: measurements(0, config.warmSamples).gsap,
+            },
+          },
+          {
+            calls: config.warmCalls * 2,
+            measurements: measurements(thresholdMs, config.warmSamples),
+          },
+        ]
+        : [{
+          calls: config.warmCalls,
+          measurements: measurements(thresholdMs, config.warmSamples),
+        }],
+    ]));
+
+    const calibrated = deriveWarmStartCalibration(pilots, participants);
+    expect(calibrated.effectiveWarmCalls).toEqual({ s1: 80, s2: 5, s3: 3, s4: 1 });
+    expect(calibrated.scenarioManifest.s1.warmCalls).toBe(80);
+    expect(calibrated.scenarioManifest.s2).toEqual(START_SCENARIO_MANIFEST.s2);
+    expect(WARM_TIMER_CALIBRATION_POLICY.intervalErrorQuantaPerParticipant).toBe(1);
+  });
+
+  it('rejects forged warm calibration paths, per-library drift and cap overflow', () => {
+    const participants = ['lab', 'motion', 'gsap', 'anime'];
+    const thresholdMs = 0.1 * WARM_TIMER_CALIBRATION_POLICY.minimumElapsedQuanta;
+    const measurements = (value: number, samples: number) => Object.fromEntries(
+      participants.map((id) => [
+        id,
+        Array.from({ length: WARM_TIMER_CALIBRATION_POLICY.pilotClusters }, () => (
+          {
+            batchElapsedMs: Array.from({ length: samples }, () => value),
+            timerEvidence: timerEvidence(),
+            measurementTimeOriginMs: TIMER_ORIGIN_MS,
+          }
+        )),
+      ]),
+    );
+    const valid = Object.fromEntries(Object.entries(START_SCENARIO_MANIFEST).map(([id, config]) => [
+      id,
+      [{ calls: config.warmCalls, measurements: measurements(thresholdMs, config.warmSamples) }],
+    ]));
+
+    const skippedDoubling = structuredClone(valid);
+    const s1Measurements = measurements(thresholdMs, START_SCENARIO_MANIFEST.s1.warmSamples);
+    skippedDoubling.s1 = [
+      {
+        calls: 40,
+        measurements: {
+          ...s1Measurements,
+          gsap: s1Measurements.gsap.map((cluster) => ({
+            ...cluster,
+            batchElapsedMs: cluster.batchElapsedMs.map(() => 0),
+          })),
+        },
+      },
+      { calls: 160, measurements: s1Measurements },
+    ];
+    expect(() => deriveWarmStartCalibration(skippedDoubling, participants))
+      .toThrow(/s1.*calls|удво/i);
+
+    const perLibraryCalls = structuredClone(valid);
+    perLibraryCalls.s1[0].measurements.gsap = { calls: 80, elapsedMs: thresholdMs };
+    expect(() => deriveWarmStartCalibration(perLibraryCalls, participants))
+      .toThrow(/gsap|measurements/i);
+
+    const extraAfterPass = structuredClone(valid);
+    extraAfterPass.s1.push({ calls: 80, measurements: s1Measurements });
+    expect(() => deriveWarmStartCalibration(extraAfterPass, participants))
+      .toThrow(/s1.*минималь|после/i);
+
+    const overflow = structuredClone(valid);
+    const rounds = [];
+    for (let calls = START_SCENARIO_MANIFEST.s1.warmCalls;
+      calls <= WARM_TIMER_CALIBRATION_POLICY.maximumTargetsPerPilot;
+      calls *= 2) {
+      rounds.push({
+        calls,
+        measurements: Object.fromEntries(participants.map((id) => [
+          id,
+          Array.from({ length: WARM_TIMER_CALIBRATION_POLICY.pilotClusters }, () => (
+            {
+              batchElapsedMs: Array.from({ length: START_SCENARIO_MANIFEST.s1.warmSamples }, () => 0),
+              timerEvidence: timerEvidence(),
+              measurementTimeOriginMs: TIMER_ORIGIN_MS,
+            }
+          )),
+        ])),
+      });
+    }
+    overflow.s1 = rounds;
+    expect(() => deriveWarmStartCalibration(overflow, participants))
+      .toThrow(/s1.*лимит|предел|сход/i);
   });
 
   it('recomputes exact concurrent and stagger topology from raw semantic checkpoints', () => {
@@ -236,11 +459,12 @@ describe('benchmark methodology fail-closed contracts', () => {
     };
     const gates = { relativeThreshold: 0.05, absoluteThreshold: 1, holmAccepted: true };
 
-    expect(evaluatePerformanceClaim(evidence, gates)).toMatchObject({
+    const winning = evaluatePerformanceClaim(evidence, gates);
+    expect(winning).toMatchObject({
       verdict: 'win',
-      relativeGain: 0.2,
       absoluteGain: 2,
     });
+    expect(winning.relativeGain).toBeCloseTo(0.2, 12);
     expect(evaluatePerformanceClaim({ ...evidence, p50: { ...evidence.p50, high: 1 } }, gates).verdict)
       .toBe('inconclusive');
     expect(evaluatePerformanceClaim({
@@ -261,6 +485,30 @@ describe('benchmark methodology fail-closed contracts', () => {
       ...evidence,
       p95: { ratio: 1.02, low: 0.98, high: 1.06, lab: 12.2, competitor: 12 },
     }, gates).verdict).toBe('inconclusive');
+    expect(evaluatePerformanceClaim({
+      ...evidence,
+      p50: {
+        ratio: 0.95000000000001,
+        low: 0.94,
+        high: 0.96,
+        lab: 9.5000000000001,
+        competitor: 10,
+      },
+    }, { ...gates, absoluteThreshold: 0 })).toMatchObject({
+      verdict: 'inconclusive',
+      gates: { practicalRelative: false },
+    });
+    expect(evaluatePerformanceClaim({
+      ...evidence,
+      p50: { ...evidence.p50, lab: 8.00000000000001, competitor: 10 },
+    }, { ...gates, absoluteThreshold: 2 })).toMatchObject({
+      verdict: 'inconclusive',
+      gates: { clockResolved: false },
+    });
+    expect(evaluatePerformanceClaim(evidence, { ...gates, absoluteThreshold: 2 })).toMatchObject({
+      verdict: 'inconclusive',
+      gates: { clockResolved: false },
+    });
   });
 
   it('declares a size win only inside one exact capability group and in both codecs', () => {
@@ -300,8 +548,10 @@ describe('benchmark methodology fail-closed contracts', () => {
     expect(source).not.toContain('{ calls: 40, targets: 1');
     expect(source).toContain('Object.fromEntries(coldScenarioIds.map');
     expect(source).toContain('semanticEvidence = await runSemanticStartCheck');
-    expect(source).toContain('push({ run, samples, semantic, semanticEvidence })');
-    expect(source).toContain('push({ run, samples: [sample], semantic, semanticEvidence })');
+    expect(source).toContain('batchElapsedMs: measurement.batchElapsedMs');
+    expect(source).toContain('timerEvidence: measurement.timerEvidence');
+    expect(source).toContain('page.evaluate(() => globalThis.crossOriginIsolated)');
+    expect(source).not.toContain('timerEvidence: { crossOriginIsolated: true');
     expect(source).not.toContain('semantic: true');
   });
 

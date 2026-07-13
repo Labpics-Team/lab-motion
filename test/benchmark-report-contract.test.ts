@@ -1,12 +1,21 @@
 import { describe, expect, it } from 'vitest';
 import {
+  startClock,
+  TIMER_ORIGIN_MS,
+  timerEvidence,
+} from './benchmark-clock-fixture.js';
+import {
   movementStats,
   makeRoundRobinOrders,
   scoreAgainstBaseline,
+  BENCHMARK_TIMER_ISOLATION_POLICY,
+  deriveFirstPresentedElapsedMs,
+  deriveWarmStartCalibration,
   evaluateStartSemanticEvidence,
   START_SCENARIO_MANIFEST,
   summarizeReportSamples,
   summarizeMedianSamples,
+  WARM_TIMER_CALIBRATION_POLICY,
 } from '../bench/compare/methodology.mjs';
 import {
   assertAllowedPostReportChanges,
@@ -29,7 +38,6 @@ const FREEZE = [
   'anime-waapi',
 ];
 const SHA = (digit: string) => digit.repeat(64);
-
 function freezeRun() {
   const baseline = Array.from({ length: 6 }, (_, index) => ({
     t: (index + 1) / 10,
@@ -87,7 +95,12 @@ function semanticEvidence(scenario: keyof typeof START_SCENARIO_MANIFEST, calls:
   return evidence;
 }
 
-function result(id: string, index: number, startRuns: number) {
+function result(
+  id: string,
+  index: number,
+  startRuns: number,
+  scenarioManifest: typeof START_SCENARIO_MANIFEST,
+) {
   const isStart = START.includes(id);
   const clusters = (
     offset: number,
@@ -95,24 +108,60 @@ function result(id: string, index: number, startRuns: number) {
     scenario: keyof typeof START_SCENARIO_MANIFEST,
     calls: number,
   ) => isStart
-    ? Array.from({ length: startRuns }, (_, run) => ({
-      run,
-      samples: Array.from({ length: samples }, (_, sample) => offset + run + sample / 10),
-      semantic: true,
-      semanticEvidence: semanticEvidence(scenario, calls),
-    }))
+    ? Array.from({ length: startRuns }, (_, run) => {
+      const batchElapsedMs = Array.from(
+        { length: samples },
+        (_, sample) => (offset + run + sample / 10) * calls,
+      );
+      return {
+        run,
+        samples: batchElapsedMs.map((batch) => batch / calls),
+        batchElapsedMs,
+        timerEvidence: timerEvidence(),
+        measurementTimeOriginMs: TIMER_ORIGIN_MS,
+        semantic: true,
+        semanticEvidence: semanticEvidence(scenario, calls),
+      };
+    })
     : [];
   const warm = {
-    s1: clusters(index + 1, 7, 's1', START_SCENARIO_MANIFEST.s1.warmCalls),
-    s2: clusters(index + 2, 7, 's2', START_SCENARIO_MANIFEST.s2.warmCalls),
-    s3: clusters(index + 3, 7, 's3', START_SCENARIO_MANIFEST.s3.warmCalls),
-    s4: clusters(index + 4, 7, 's4', START_SCENARIO_MANIFEST.s4.warmCalls),
+    s1: clusters(index + 1, 7, 's1', scenarioManifest.s1.warmCalls),
+    s2: clusters(index + 2, 7, 's2', scenarioManifest.s2.warmCalls),
+    s3: clusters(index + 3, 7, 's3', scenarioManifest.s3.warmCalls),
+    s4: clusters(index + 4, 7, 's4', scenarioManifest.s4.warmCalls),
   };
   const cold = {
     s2: clusters(index + 5, 1, 's2', 1),
     s3: clusters(index + 6, 1, 's3', 1),
     s4: clusters(index + 7, 1, 's4', 1),
-    firstVisible: clusters(index + 8, 1, 's1', 1),
+    firstPresented: isStart
+      ? Array.from({ length: startRuns }, (_, run) => {
+        const clock = startClock();
+        const startedAtSeconds = clock.cdpRuntimeTimestampMs / 1000;
+        const evidence = {
+          startedAtSeconds,
+          timerEvidence: timerEvidence(),
+          startClock: clock,
+          movementThresholdPx: scenarioManifest.s1.movementThresholdPx,
+          rawFrames: 3,
+          frames: [
+            { timestampSeconds: startedAtSeconds - 0.01, x: 0 },
+            { timestampSeconds: startedAtSeconds + 0.01 + (index + run) / 1000, x: 0 },
+            { timestampSeconds: startedAtSeconds + 0.02 + (index + run) / 1000, x: 1 },
+          ],
+        };
+        return {
+          run,
+          samples: [deriveFirstPresentedElapsedMs(
+            evidence,
+            scenarioManifest.s1.movementThresholdPx,
+          )],
+          semantic: true,
+          semanticEvidence: semanticEvidence('s1', 1),
+          presentedEvidence: evidence,
+        };
+      })
+      : [],
   };
   const flatten = (values: Array<{ samples: number[] }>) => values.flatMap((cluster) => cluster.samples);
   const freeze = Array.from({ length: 9 }, freezeRun);
@@ -151,12 +200,41 @@ function result(id: string, index: number, startRuns: number) {
   };
 }
 
-function fixture(startRuns = 20) {
+function fixture(startRuns = 20, warmCalls: Partial<Record<keyof typeof START_SCENARIO_MANIFEST, number>> = {}) {
   const generatedAt = '2026-07-13T00:00:00.000Z';
   const revision = 'a'.repeat(40);
   const dist = SHA('b');
   const stem = `2026-07-13-${revision.slice(0, 12)}-${dist.slice(0, 12)}`;
-  const results = Object.fromEntries(FREEZE.map((id, index) => [id, result(id, index, startRuns)]));
+  const timerQuantumMs = 0.1;
+  const minimumElapsedMs = timerQuantumMs * WARM_TIMER_CALIBRATION_POLICY.minimumElapsedQuanta;
+  const warmStartPilots = Object.fromEntries(Object.entries(START_SCENARIO_MANIFEST).map(([id, config]) => {
+    const targetCalls = warmCalls[id as keyof typeof START_SCENARIO_MANIFEST] ?? config.warmCalls;
+    const rounds = [];
+    for (let calls = config.warmCalls; calls <= targetCalls; calls *= 2) {
+      rounds.push({
+        calls,
+        measurements: Object.fromEntries(START.map((participant) => [
+          participant,
+          Array.from({ length: WARM_TIMER_CALIBRATION_POLICY.pilotClusters }, () => (
+            {
+              batchElapsedMs: Array.from({ length: config.warmSamples }, () => (
+                calls === targetCalls || participant !== 'gsap' ? minimumElapsedMs : 0
+              )),
+              timerEvidence: timerEvidence(timerQuantumMs),
+              measurementTimeOriginMs: TIMER_ORIGIN_MS,
+            }
+          )),
+        ])),
+      });
+    }
+    return [id, rounds];
+  }));
+  const calibrated = deriveWarmStartCalibration(warmStartPilots, START);
+  const scenarioManifest = calibrated.scenarioManifest as typeof START_SCENARIO_MANIFEST;
+  const results = Object.fromEntries(FREEZE.map((id, index) => [
+    id,
+    result(id, index, startRuns, scenarioManifest),
+  ]));
   const rootPackage = {
     name: '@labpics/motion',
     version: '0.3.0',
@@ -172,7 +250,7 @@ function fixture(startRuns = 20) {
     },
   };
   const payload: any = {
-    schema: 4,
+    schema: 6,
     package: { name: rootPackage.name, version: rootPackage.version },
     generatedAt,
     companion: { markdownFile: `${stem}.md`, markdownSha256: '' },
@@ -223,10 +301,16 @@ function fixture(startRuns = 20) {
       executableSha256: SHA('5'),
     },
     calibration: {
-      raw: { performanceNowDeltasMs: Array.from({ length: 16 }, () => 0.1) },
-      timerQuantumMs: 0.1,
+      raw: {
+        referenceTimerEvidence: timerEvidence(timerQuantumMs),
+        warmStartPilots,
+      },
+      referenceTimerQuantumMs: timerQuantumMs,
+      isolation: structuredClone(BENCHMARK_TIMER_ISOLATION_POLICY),
+      policy: structuredClone(WARM_TIMER_CALIBRATION_POLICY),
+      effectiveWarmCalls: structuredClone(calibrated.effectiveWarmCalls),
     },
-    scenarioManifest: structuredClone(START_SCENARIO_MANIFEST),
+    scenarioManifest: structuredClone(scenarioManifest),
     orderSeed: 1,
     participants: { start: START, freeze: FREEZE },
     startOrders: makeRoundRobinOrders(START, startRuns, 1),
@@ -236,7 +320,7 @@ function fixture(startRuns = 20) {
   payload.claims = createBenchmarkClaims(results, {
     seed: payload.orderSeed,
     iterations: 200,
-    timerQuantumMs: payload.calibration.timerQuantumMs,
+    scenarioManifest: payload.scenarioManifest,
   });
   payload.environment = renderBenchmarkEnvironment(payload);
   const markdown = renderBenchmarkMarkdown(payload);
@@ -261,17 +345,32 @@ describe('paired comparative benchmark report', () => {
     });
     expect(payload.claims.size).toHaveLength(3);
     expect(payload.claims.performance.find((claim: any) => claim.id === 'warm.s1:motion').absoluteThresholdMs)
-      .toBe(0.1 / 40);
+      .toBe(0.2 / 40);
     expect(payload.claims.performance.find((claim: any) => claim.id === 'warm.s4:motion').absoluteThresholdMs)
-      .toBe(0.1);
+      .toBe(0.2);
     expect(payload.claims.method).toMatchObject({
       p95NonInferiorityMargin: 0.05,
       p95NonInferiorityMarginProvenance: 'product-tail-noninferiority-policy',
-      absoluteThresholdBasis: 'measured-performance-now-quantum-per-timed-call',
+      absoluteThresholdBasis: 'sum-of-participant-max-realm-local-clock-uncertainty',
+      intervalErrorQuantaPerParticipant: 1,
+      minimumTimedBatchQuanta: 4,
+      calibrationPilotClusters: 3,
+      effectiveWarmCalls: { s1: 40, s2: 5, s3: 3, s4: 1 },
       relativeThresholdProvenance: 'product-practical-significance-policy',
     });
     expect(markdown).toContain('95% CI отношения Lab / конкурент');
     expect(markdown).not.toMatch(/overall score|общий балл/i);
+  });
+
+  it('uses the shared calibrated calls in samples, thresholds and canonical markdown', () => {
+    const calibrated = fixture(20, { s1: 80 });
+    expect(() => validateBenchmarkReportPair(calibrated)).not.toThrow();
+    expect(calibrated.payload.scenarioManifest.s1.warmCalls).toBe(80);
+    expect(calibrated.payload.results.lab.raw.warm.s1[0].semanticEvidence.topology.calls).toBe(80);
+    expect(calibrated.payload.claims.performance.find((claim: any) => claim.id === 'warm.s1:motion').absoluteThresholdMs)
+      .toBe(0.2 / 80);
+    expect(calibrated.markdown).toContain('S1: 1 элемент × 80 вызовов');
+    expect(calibrated.markdown).not.toContain('батч 40 вызовов');
   });
 
   it('diagnoses the exact claim, competitor, cluster and invalid sample', () => {
@@ -280,8 +379,41 @@ describe('paired comparative benchmark report', () => {
     expect(() => createBenchmarkClaims(payload.results, {
       seed: payload.orderSeed,
       iterations: 200,
-      timerQuantumMs: payload.calibration.timerQuantumMs,
+      scenarioManifest: payload.scenarioManifest,
     })).toThrow(/warm\.s1:motion.*competitor.*cluster 1.*sample 1.*0/i);
+  });
+
+  it('rejects a publish warm batch below the calibrated timer floor before claims', () => {
+    const f = fixture() as any;
+    const calls = f.payload.scenarioManifest.s1.warmCalls;
+    const minimumElapsedMs = (
+      f.payload.calibration.referenceTimerQuantumMs *
+      f.payload.calibration.policy.minimumElapsedQuanta
+    );
+    const cluster = f.payload.results.lab.raw.warm.s1[0];
+    cluster.batchElapsedMs[0] = minimumElapsedMs - Number.EPSILON;
+    cluster.samples[0] = cluster.batchElapsedMs[0] / calls;
+
+    expect(() => createBenchmarkClaims(f.payload.results, {
+      seed: f.payload.orderSeed,
+      iterations: 200,
+      scenarioManifest: f.payload.scenarioManifest,
+    })).toThrow(/warm\.s1.*ниже|timer.*floor|квант/i);
+    expect(() => validateBenchmarkReportPair(f)).toThrow(/warm\.s1.*ниже|timer.*floor|квант/i);
+  });
+
+  it('uses separate participant maxima even when worst realms are in different runs', () => {
+    const f = fixture() as any;
+    f.payload.results.lab.raw.warm.s1[0].timerEvidence = timerEvidence(0.2);
+    f.payload.results.motion.raw.warm.s1[1].timerEvidence = timerEvidence(0.3);
+    const claims = createBenchmarkClaims(f.payload.results, {
+      seed: f.payload.orderSeed,
+      iterations: 200,
+      scenarioManifest: f.payload.scenarioManifest,
+    });
+    const claim = claims.performance.find((entry: any) => entry.id === 'warm.s1:motion');
+    expect(claim.realmTimerQuantumMs).toEqual({ lab: 0.2, competitor: 0.3 });
+    expect(claim.absoluteThresholdMs).toBe((0.2 + 0.3) / 40);
   });
 
   it.each([
@@ -311,11 +443,45 @@ describe('paired comparative benchmark report', () => {
     ['unbalanced start order', (f: any) => { f.payload.startOrders[1] = [...f.payload.startOrders[0]]; }],
     ['missing tool hash', (f: any) => { delete f.payload.provenance.environment.nodeExecutableSha256; }],
     ['missing Chromium tree hash', (f: any) => { delete f.payload.browser.treeSha256; }],
-    ['forged timer quantum', (f: any) => { f.payload.calibration.timerQuantumMs = 0.001; }],
+    ['forged timer quantum', (f: any) => { f.payload.calibration.referenceTimerQuantumMs = 0.001; }],
+    ['missing timer isolation', (f: any) => { f.payload.calibration.isolation.crossOriginIsolated = false; }],
+    ['missing publish realm evidence', (f: any) => { delete f.payload.results.lab.raw.warm.s1[0].timerEvidence; }],
+    ['publish measurement realm drift', (f: any) => {
+      f.payload.results.lab.raw.warm.s1[0].measurementTimeOriginMs += 1;
+    }],
+    ['cross-realm publish evidence', (f: any) => {
+      f.payload.results.lab.raw.warm.s1[0].timerEvidence.probes[1].timeOriginMs += 1;
+    }],
+    ['forged calibration policy', (f: any) => { f.payload.calibration.policy.minimumElapsedQuanta = 1; }],
+    ['forged effective calls', (f: any) => { f.payload.calibration.effectiveWarmCalls.s1 *= 2; }],
+    ['forged pilot elapsed', (f: any) => {
+      f.payload.calibration.raw.warmStartPilots.s1[0].measurements.gsap[0].batchElapsedMs[0] = 0;
+    }],
+    ['per-library pilot shape', (f: any) => {
+      f.payload.calibration.raw.warmStartPilots.s1[0].measurements.gsap = { calls: 80, elapsedMs: 4 };
+    }],
+    ['missing pilot participant', (f: any) => {
+      delete f.payload.calibration.raw.warmStartPilots.s1[0].measurements.anime;
+    }],
     ['scenario manifest drift', (f: any) => { f.payload.scenarioManifest.s4.targetsPerCall = 999; }],
     ['missing package fingerprint', (f: any) => { delete f.payload.provenance.environment.packages.motion; }],
     ['missing cold sample', (f: any) => { f.payload.results.lab.raw.cold.s2.pop(); }],
     ['null cold sample', (f: any) => { f.payload.results.lab.raw.cold.s2[0].samples[0] = null; }],
+    ['presented sample forgery', (f: any) => {
+      f.payload.results.lab.raw.cold.firstPresented[0].samples[0] += 1;
+    }],
+    ['presented frame forgery', (f: any) => {
+      f.payload.results.lab.raw.cold.firstPresented[0].presentedEvidence.frames[2].x = 0;
+    }],
+    ['presented start token forgery', (f: any) => {
+      f.payload.results.lab.raw.cold.firstPresented[0].presentedEvidence.startClock.cdpToken = 'other';
+    }],
+    ['presented start realm drift', (f: any) => {
+      f.payload.results.lab.raw.cold.firstPresented[0].presentedEvidence.startClock.pageTimeOriginMs += 1;
+    }],
+    ['presented clock unit forgery', (f: any) => {
+      f.payload.results.lab.raw.cold.firstPresented[0].presentedEvidence.startClock.frameTimestampUnit = 'milliseconds';
+    }],
     ['survivor-filtered warm cluster', (f: any) => { f.payload.results.lab.raw.warm.s1[0] = null; }],
     ['semantic failure hidden from verdict', (f: any) => {
       const cluster = f.payload.results.lab.raw.warm.s1[0];
