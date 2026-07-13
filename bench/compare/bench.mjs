@@ -28,6 +28,7 @@ import {
   writeFileSync,
 } from 'node:fs';
 import os from 'node:os';
+import { createServer } from 'node:http';
 import path from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 import { brotliCompressSync, constants as zlibConstants, gzipSync } from 'node:zlib';
@@ -45,8 +46,13 @@ import {
 import {
   assertBalancedRunBlocks,
   assertFreezeMatrix,
+  assertPositiveFiniteSamples,
+  assertWarmStartMeasurement,
+  BENCHMARK_TIMER_ISOLATION_POLICY,
   createFreezeEvidence,
-  deriveTimerQuantum,
+  deriveFirstPresentedElapsedMs,
+  deriveRealmTimerQuantum,
+  deriveWarmStartCalibration,
   evaluateStartSemanticEvidence,
   makeRoundRobinOrders,
   movementStats,
@@ -56,6 +62,7 @@ import {
   START_SCENARIO_MANIFEST,
   summarizeReportSamples,
   summarizeMedianSamples,
+  WARM_TIMER_CALIBRATION_POLICY,
 } from './methodology.mjs';
 import {
   renderBenchmarkMarkdown,
@@ -159,13 +166,43 @@ const PAGE_HTML = `<!DOCTYPE html><html><head><meta charset="utf-8"><style>
   #probe { position: absolute; left: 0; top: 20px; width: 30px; height: 30px; background: #ff0000; }
 </style></head><body></body></html>`;
 
-async function newPage(browser, adapterPath) {
+async function startBenchmarkOrigin() {
+  const server = createServer((_request, response) => {
+    response.writeHead(200, {
+      'content-type': 'text/html; charset=utf-8',
+      'cache-control': 'no-store',
+      'cross-origin-opener-policy': BENCHMARK_TIMER_ISOLATION_POLICY.crossOriginOpenerPolicy,
+      'cross-origin-embedder-policy': BENCHMARK_TIMER_ISOLATION_POLICY.crossOriginEmbedderPolicy,
+      'origin-agent-cluster': BENCHMARK_TIMER_ISOLATION_POLICY.originAgentCluster,
+    });
+    response.end(PAGE_HTML);
+  });
+  await new Promise((resolve, reject) => {
+    server.once('error', reject);
+    server.listen(0, '127.0.0.1', resolve);
+  });
+  const address = server.address();
+  if (address === null || typeof address === 'string') throw new Error('benchmark origin не получил TCP port');
+  return {
+    url: `http://127.0.0.1:${address.port}/`,
+    close: () => new Promise((resolve, reject) => server.close((error) => (
+      error === undefined ? resolve() : reject(error)
+    ))),
+  };
+}
+
+async function newPage(browser, adapterPath, pageUrl) {
   const context = await browser.newContext({
     viewport: { width: 800, height: 200 },
     deviceScaleFactor: 1,
   });
   const page = await context.newPage();
-  await page.setContent(PAGE_HTML);
+  await page.goto(pageUrl, { waitUntil: 'load' });
+  await page.bringToFront();
+  const isolated = await page.evaluate(() => crossOriginIsolated);
+  if (isolated !== BENCHMARK_TIMER_ISOLATION_POLICY.crossOriginIsolated) {
+    throw new Error('benchmark page не получила cross-origin isolated timer realm');
+  }
   await page.addScriptTag({ path: adapterPath });
   const ok = await page.evaluate(() => typeof window.__adapterModule?.start === 'function');
   if (!ok) fail(`адаптер не загрузился: ${adapterPath}`);
@@ -179,18 +216,19 @@ async function smokeCheck(page, libId) {
     el.className = 'box';
     document.body.appendChild(el);
     window.__adapterModule.start([el], 200, 400);
-    await new Promise((r) => setTimeout(r, 250));
-    const m = new DOMMatrixReadOnly(getComputedStyle(el).transform);
+    let x = 0;
+    for (let attempt = 0; attempt < 20 && x <= 10; attempt++) {
+      await new Promise((resolve) => setTimeout(resolve, 50));
+      x = new DOMMatrixReadOnly(getComputedStyle(el).transform).e;
+    }
     el.remove();
-    return m.e;
+    return x;
   });
   if (!(moved > 10)) fail(`смоук ${libId}: элемент не сдвинулся (x=${moved}) — адаптер неисправен, числа были бы враньём`);
 }
 
-async function measureTimerCalibration(browser) {
-  const context = await browser.newContext();
-  const page = await context.newPage();
-  const performanceNowDeltasMs = await page.evaluate(() => {
+async function measurePageTimerProbe(page, phase) {
+  const raw = await page.evaluate(() => {
     const deltas = [];
     for (let observation = 0; observation < 64; observation++) {
       const started = performance.now();
@@ -200,19 +238,40 @@ async function measureTimerCalibration(browser) {
       }
       if (current > started) deltas.push(current - started);
     }
-    return deltas;
+    return { timeOriginMs: performance.timeOrigin, performanceNowDeltasMs: deltas };
   });
+  return { phase, ...raw };
+}
+
+async function measureTimerCalibration(browser, pageUrl) {
+  const context = await browser.newContext();
+  const page = await context.newPage();
+  await page.goto(pageUrl, { waitUntil: 'load' });
+  await page.bringToFront();
+  const crossOriginIsolated = await page.evaluate(() => globalThis.crossOriginIsolated);
+  if (crossOriginIsolated !== BENCHMARK_TIMER_ISOLATION_POLICY.crossOriginIsolated) {
+    throw new Error('timer calibration запущена без cross-origin isolation');
+  }
+  const timerEvidence = {
+    crossOriginIsolated,
+    probes: [
+      await measurePageTimerProbe(page, 'before'),
+      await measurePageTimerProbe(page, 'after'),
+    ],
+  };
   await context.close();
   return {
-    raw: { performanceNowDeltasMs },
-    timerQuantumMs: deriveTimerQuantum(performanceNowDeltasMs),
+    timerEvidence,
+    timerQuantumMs: deriveRealmTimerQuantum('reference timer', timerEvidence),
+    isolation: BENCHMARK_TIMER_ISOLATION_POLICY,
   };
 }
 
 // ─── сценарии S1–S4: scripting-стоимость старта ──────────────────────────────
 
 async function runWarmStartCosts(page, scenario) {
-  return page.evaluate(async (config) => {
+  const before = await measurePageTimerProbe(page, 'before');
+  const measurement = await page.evaluate(async (config) => {
     const A = window.__adapterModule;
     const mk = (n) => Array.from({ length: n }, () => {
       const element = document.createElement('div');
@@ -232,31 +291,112 @@ async function runWarmStartCosts(page, scenario) {
             ? A.startStagger(elements, toPx, durationMs, staggerGapMs)
             : A.start(elements, toPx, durationMs));
         }
-        const perCall = (performance.now() - started) / calls;
+        const batchElapsedMs = performance.now() - started;
         for (const control of controls) { try { control.cancel(); } catch { /* noop */ } }
         for (const elements of groups) for (const element of elements) element.remove();
         // Первый батч — warmup. Дрен rAF/микрозадач не даёт следующему батчу
         // бесплатно присоединиться к pending-frame предыдущего.
         await Promise.resolve();
         await drain();
-        if (sample >= 0) rows.push(perCall);
+        if (sample >= 0) rows.push({
+          batchElapsedMs,
+          perCallMs: batchElapsedMs / calls,
+        });
       }
-      return rows;
+      return {
+        samples: rows.map((row) => row.perCallMs),
+        batchElapsedMs: rows.map((row) => row.batchElapsedMs),
+      };
     };
-    return measure({
+    return {
+      ...(await measure({
       calls: config.warmCalls,
       targets: config.targetsPerCall,
       staggerGapMs: config.staggerGapMs,
       samples: config.warmSamples,
       toPx: config.toPx,
       durationMs: config.durationMs,
-    });
+      })),
+      measurementTimeOriginMs: performance.timeOrigin,
+    };
   }, scenario);
+  const after = await measurePageTimerProbe(page, 'after');
+  const crossOriginIsolated = await page.evaluate(() => globalThis.crossOriginIsolated);
+  return {
+    ...measurement,
+    timerEvidence: { crossOriginIsolated, probes: [before, after] },
+  };
+}
+
+/**
+ * Все библиотеки проходят один и тот же calls-раунд. Удвоение прекращается
+ * только когда каждый batch выше физического timer-floor.
+ */
+async function measureWarmStartCalibration(browser, adapters, libs, pageUrl) {
+  const participantIds = libs.map((lib) => lib.id);
+  const pilots = {};
+  for (const [id, config] of Object.entries(START_SCENARIO_MANIFEST)) {
+    const rounds = [];
+    let calls = config.warmCalls;
+    for (;;) {
+      const measurements = {};
+      for (const lib of libs) {
+        measurements[lib.id] = [];
+        for (let cluster = 0; cluster < WARM_TIMER_CALIBRATION_POLICY.pilotClusters; cluster++) {
+          const { context, page } = await newPage(browser, adapters[lib.id].path, pageUrl);
+          const measurement = await runWarmStartCosts(page, { ...config, warmCalls: calls });
+          measurements[lib.id].push({
+            batchElapsedMs: measurement.batchElapsedMs,
+            timerEvidence: measurement.timerEvidence,
+            measurementTimeOriginMs: measurement.measurementTimeOriginMs,
+          });
+          await context.close();
+        }
+      }
+      rounds.push({ calls, measurements });
+      console.log(`  calibration ${id}: calls=${calls}, ` + participantIds
+        .map((participant) => `${participant}=[${measurements[participant]
+          .map((cluster) => (
+            `${cluster.batchElapsedMs.map((value) => value.toFixed(3)).join('/')}` +
+            `@q${deriveRealmTimerQuantum(
+              `${id}.${participant} pilot`,
+              cluster.timerEvidence,
+            ).toFixed(6)}`
+          ))
+          .join(',')}]ms`)
+        .join(', '));
+      if (participantIds.every((participant) => (
+        measurements[participant].every((cluster) => (
+          cluster.batchElapsedMs.every((value) => (
+            value >= deriveRealmTimerQuantum(
+              `${id}.${participant} pilot`,
+              cluster.timerEvidence,
+            ) *
+              WARM_TIMER_CALIBRATION_POLICY.minimumElapsedQuanta
+          ))
+        ))
+      ))) break;
+      const nextCalls = calls * 2;
+      if (
+        !Number.isSafeInteger(nextCalls) ||
+        nextCalls * config.targetsPerCall > WARM_TIMER_CALIBRATION_POLICY.maximumTargetsPerPilot
+      ) {
+        throw new Error(`${id}: warm calibration не сошлась до лимита целей пилота`);
+      }
+      calls = nextCalls;
+    }
+    pilots[id] = rounds;
+  }
+  return {
+    pilots,
+    ...deriveWarmStartCalibration(pilots, participantIds),
+  };
 }
 
 /** Cold single-call только для S2–S4; null/ноль затем fail-closed отклоняет отчёт. */
 async function runColdStartCost(page, scenario) {
-  return page.evaluate((config) => {
+  const before = await measurePageTimerProbe(page, 'before');
+  const measurement = await page.evaluate((config) => {
     const A = window.__adapterModule;
     const elements = Array.from({ length: config.targetsPerCall }, () => {
       const element = document.createElement('div');
@@ -271,31 +411,17 @@ async function runColdStartCost(page, scenario) {
     const elapsed = performance.now() - started;
     try { control.cancel(); } catch { /* noop */ }
     for (const element of elements) element.remove();
-    return elapsed > 0 ? elapsed : null;
+    return {
+      sample: elapsed > 0 ? elapsed : null,
+      measurementTimeOriginMs: performance.timeOrigin,
+    };
   }, scenario);
-}
-
-/** Cold S1: надёжная пользовательская метрика до первого реально видимого сдвига. */
-async function runFirstVisible(page) {
-  return page.evaluate(async (config) => {
-    const element = document.createElement('div');
-    element.className = 'box';
-    document.body.appendChild(element);
-    const started = performance.now();
-    const control = window.__adapterModule.start([element], config.toPx, config.durationMs);
-    let elapsed = null;
-    for (let frame = 0; frame < 12; frame++) {
-      await new Promise((resolve) => requestAnimationFrame(resolve));
-      const x = new DOMMatrixReadOnly(getComputedStyle(element).transform).e;
-      if (Math.abs(x) >= 0.5) {
-        elapsed = performance.now() - started;
-        break;
-      }
-    }
-    try { control.cancel(); } catch { /* noop */ }
-    element.remove();
-    return elapsed;
-  }, START_SCENARIO_MANIFEST.s1);
+  const after = await measurePageTimerProbe(page, 'after');
+  const crossOriginIsolated = await page.evaluate(() => globalThis.crossOriginIsolated);
+  return {
+    ...measurement,
+    timerEvidence: { crossOriginIsolated, probes: [before, after] },
+  };
 }
 
 /** Untimed oracle проверяет всю топологию, а не одного выжившего target. */
@@ -383,13 +509,122 @@ function redLeftEdge(pngBuf) {
   return left;
 }
 
+async function waitForBaselineFrame(frames) {
+  const deadline = Date.now() + 2_000;
+  let inspected = 0;
+  while (Date.now() < deadline) {
+    while (inspected < frames.length) {
+      const frame = frames[inspected++];
+      if (redLeftEdge(Buffer.from(frame.data, 'base64')) !== null) return;
+    }
+    await new Promise((resolve) => setTimeout(resolve, 16));
+  }
+  throw new Error('first presented: screencast не отдал baseline-пиксель');
+}
+
+let cdpStartSequence = 0;
+
+async function startWithCdpClock(page, cdp, scenario) {
+  const token = `lab-motion-start-${++cdpStartSequence}`;
+  let timeout;
+  const eventPromise = new Promise((resolve, reject) => {
+    const onConsole = (event) => {
+      const cdpToken = event.args?.[0]?.value;
+      if (cdpToken !== token) return;
+      clearTimeout(timeout);
+      cdp.off('Runtime.consoleAPICalled', onConsole);
+      resolve({ cdpToken, cdpRuntimeTimestampMs: event.timestamp });
+    };
+    cdp.on('Runtime.consoleAPICalled', onConsole);
+    timeout = setTimeout(() => {
+      cdp.off('Runtime.consoleAPICalled', onConsole);
+      reject(new Error('first presented: CDP start marker timeout'));
+    }, 2_000);
+  });
+  const pageClock = await page.evaluate(({ clockToken, config }) => {
+    const element = document.getElementById('probe');
+    const pageTimeOriginMs = performance.timeOrigin;
+    const pageBeforeNowMs = performance.now();
+    console.debug(clockToken);
+    const pageApiNowMs = performance.now();
+    window.__firstPresentedControl = window.__adapterModule.start(
+      [element],
+      config.toPx,
+      config.durationMs,
+    );
+    return { pageTimeOriginMs, pageBeforeNowMs, pageApiNowMs };
+  }, { clockToken: token, config: scenario });
+  return {
+    token,
+    cdpClockDomain: 'TimeSinceEpoch',
+    runtimeTimestampUnit: 'milliseconds',
+    frameTimestampUnit: 'seconds',
+    ...pageClock,
+    ...await eventPromise,
+  };
+}
+
+/** Cold S1: CDP marker перед API → первый сдвинувшийся compositor-пиксель. */
+async function runFirstPresented(browser, adapterPath, scenario, pageUrl) {
+  const { context, page } = await newPage(browser, adapterPath, pageUrl);
+  const timerBefore = await measurePageTimerProbe(page, 'before');
+  const cdp = await context.newCDPSession(page);
+  await cdp.send('Runtime.enable');
+  await page.evaluate(() => {
+    const element = document.createElement('div');
+    element.id = 'probe';
+    document.body.appendChild(element);
+  });
+  const rawFrames = [];
+  cdp.on('Page.screencastFrame', (event) => {
+    rawFrames.push({ timestampSeconds: event.metadata.timestamp, data: event.data });
+    cdp.send('Page.screencastFrameAck', { sessionId: event.sessionId }).catch(() => {});
+  });
+  await cdp.send('Page.startScreencast', {
+    format: 'png', everyNthFrame: 1, maxWidth: 800, maxHeight: 200,
+  });
+  await waitForBaselineFrame(rawFrames);
+  const startClock = await startWithCdpClock(page, cdp, scenario);
+  const startedAtSeconds = startClock.cdpRuntimeTimestampMs / 1000;
+  await new Promise((resolve) => setTimeout(resolve, 700));
+  await cdp.send('Page.stopScreencast').catch(() => {});
+  await page.evaluate(() => {
+    try { window.__firstPresentedControl.cancel(); } catch { /* evidence уже снят */ }
+    document.getElementById('probe')?.remove();
+  });
+  const timerAfter = await measurePageTimerProbe(page, 'after');
+  const crossOriginIsolated = await page.evaluate(() => globalThis.crossOriginIsolated);
+  await context.close();
+  const evidence = {
+    startedAtSeconds,
+    timerEvidence: {
+      crossOriginIsolated,
+      probes: [timerBefore, timerAfter],
+    },
+    startClock,
+    movementThresholdPx: scenario.movementThresholdPx,
+    rawFrames: rawFrames.length,
+    frames: rawFrames
+      .map((frame) => ({
+        timestampSeconds: frame.timestampSeconds,
+        x: redLeftEdge(Buffer.from(frame.data, 'base64')),
+      }))
+      .filter((frame) => frame.x !== null)
+      .sort((left, right) => left.timestampSeconds - right.timestampSeconds),
+  };
+  return {
+    sample: deriveFirstPresentedElapsedMs(evidence, scenario.movementThresholdPx),
+    evidence,
+  };
+}
+
 const FREEZE_PX = 600;
 const FREEZE_DURATION_MS = 2400;
 const BLOCK_AT_MS = 300;
 const BLOCK_MS = 900;
 
-async function captureTrajectory(browser, adapterPath, blocked) {
-  const { context, page } = await newPage(browser, adapterPath);
+async function captureTrajectory(browser, adapterPath, blocked, pageUrl) {
+  const { context, page } = await newPage(browser, adapterPath, pageUrl);
   const cdp = await context.newCDPSession(page);
   await page.evaluate(() => {
     const p = document.createElement('div');
@@ -461,9 +696,9 @@ async function captureTrajectory(browser, adapterPath, blocked) {
   };
 }
 
-async function runFreezePair(browser, adapterPath, blockedFirst) {
-  const first = await captureTrajectory(browser, adapterPath, blockedFirst);
-  const second = await captureTrajectory(browser, adapterPath, !blockedFirst);
+async function runFreezePair(browser, adapterPath, blockedFirst, pageUrl) {
+  const first = await captureTrajectory(browser, adapterPath, blockedFirst, pageUrl);
+  const second = await captureTrajectory(browser, adapterPath, !blockedFirst, pageUrl);
   const baseline = blockedFirst ? second : first;
   const blocked = blockedFirst ? first : second;
   const blockStart = blocked.timing?.blockStartedAt - blocked.timing?.startedAt;
@@ -530,6 +765,7 @@ async function main() {
   const rootPkg = JSON.parse(readFileSync(path.join(ROOT, 'package.json'), 'utf8'));
   const chromiumInstall = await resolveChromiumInstall();
   const chromiumTreeBefore = hashFileTree(chromiumInstall.directory);
+  const benchmarkOrigin = await startBenchmarkOrigin();
 
   // Headed обязателен: headless-Chromium производит кадры только по main-thread
   // коммитам (BeginFrame по требованию) — во время фриза кадров нет ни у кого,
@@ -550,7 +786,7 @@ async function main() {
   }
   const browserVersion = browser.version();
   const browserExecutableSha256 = sha256File(chromium.executablePath());
-  const calibration = await measureTimerCalibration(browser);
+  const timerCalibration = await measureTimerCalibration(browser, benchmarkOrigin.url);
 
   const system = {
     cpu: os.cpus()[0]?.model?.trim() ?? 'н/д',
@@ -578,18 +814,35 @@ async function main() {
         warm: Object.fromEntries(scenarioIds.map((id) => [id, []])),
         cold: {
           ...Object.fromEntries(coldScenarioIds.map((id) => [id, []])),
-          firstVisible: [],
+          firstPresented: [],
         },
         freeze: [],
       },
     };
-    const { context, page } = await newPage(browser, adapters[lib.id].path);
+    const { context, page } = await newPage(browser, adapters[lib.id].path, benchmarkOrigin.url);
     await smokeCheck(page, lib.id);
     await context.close();
   }
 
   const startLibs = LIBS.filter((lib) => lib.startCosts);
   const startIds = startLibs.map((lib) => lib.id);
+  const warmCalibration = await measureWarmStartCalibration(
+    browser,
+    adapters,
+    startLibs,
+    benchmarkOrigin.url,
+  );
+  const calibration = {
+    raw: {
+      referenceTimerEvidence: timerCalibration.timerEvidence,
+      warmStartPilots: warmCalibration.pilots,
+    },
+    referenceTimerQuantumMs: timerCalibration.timerQuantumMs,
+    isolation: timerCalibration.isolation,
+    policy: WARM_TIMER_CALIBRATION_POLICY,
+    effectiveWarmCalls: warmCalibration.effectiveWarmCalls,
+  };
+  const scenarioManifest = warmCalibration.scenarioManifest;
   const startOrders = makeRoundRobinOrders(startIds, RUNS, ORDER_SEED);
   assertBalancedRunBlocks('BENCH_RUNS', startOrders, startIds);
   for (let run = 0; run < RUNS; run++) {
@@ -597,29 +850,65 @@ async function main() {
       const adapterPath = adapters[id].path;
       console.log(`  start run ${run + 1}/${RUNS}: ${id}`);
       for (const scenario of scenarioIds) {
-        const config = START_SCENARIO_MANIFEST[scenario];
-        const { context, page } = await newPage(browser, adapterPath);
-        const samples = await runWarmStartCosts(page, config);
+        const config = scenarioManifest[scenario];
+        const { context, page } = await newPage(browser, adapterPath, benchmarkOrigin.url);
+        const measurement = await runWarmStartCosts(page, config);
+        assertWarmStartMeasurement(
+          `${id}.${scenario} run ${run + 1}`,
+          measurement.samples,
+          measurement.batchElapsedMs,
+          config.warmCalls,
+          measurement.timerEvidence,
+          measurement.measurementTimeOriginMs,
+        );
         const semanticEvidence = await runSemanticStartCheck(page, config, config.warmCalls);
         const semantic = semanticEvidence.valid;
-        results[id].raw.warm[scenario].push({ run, samples, semantic, semanticEvidence });
+        results[id].raw.warm[scenario].push({
+          run,
+          samples: measurement.samples,
+          batchElapsedMs: measurement.batchElapsedMs,
+          timerEvidence: measurement.timerEvidence,
+          measurementTimeOriginMs: measurement.measurementTimeOriginMs,
+          semantic,
+          semanticEvidence,
+        });
         await context.close();
       }
       for (const scenario of coldScenarioIds) {
-        const config = START_SCENARIO_MANIFEST[scenario];
-        const { context, page } = await newPage(browser, adapterPath);
-        const sample = await runColdStartCost(page, config);
+        const config = scenarioManifest[scenario];
+        const { context, page } = await newPage(browser, adapterPath, benchmarkOrigin.url);
+        const measurement = await runColdStartCost(page, config);
+        assertPositiveFiniteSamples(`${id}.cold.${scenario} run ${run + 1}`, [measurement.sample]);
         const semanticEvidence = await runSemanticStartCheck(page, config, 1);
         const semantic = semanticEvidence.valid;
-        results[id].raw.cold[scenario].push({ run, samples: [sample], semantic, semanticEvidence });
+        results[id].raw.cold[scenario].push({
+          run,
+          samples: [measurement.sample],
+          timerEvidence: measurement.timerEvidence,
+          measurementTimeOriginMs: measurement.measurementTimeOriginMs,
+          semantic,
+          semanticEvidence,
+        });
         await context.close();
       }
       {
-        const { context, page } = await newPage(browser, adapterPath);
-        const sample = await runFirstVisible(page);
-        const semanticEvidence = await runSemanticStartCheck(page, START_SCENARIO_MANIFEST.s1, 1);
+        const presented = await runFirstPresented(
+          browser,
+          adapterPath,
+          scenarioManifest.s1,
+          benchmarkOrigin.url,
+        );
+        assertPositiveFiniteSamples(`${id}.cold.firstPresented run ${run + 1}`, [presented.sample]);
+        const { context, page } = await newPage(browser, adapterPath, benchmarkOrigin.url);
+        const semanticEvidence = await runSemanticStartCheck(page, scenarioManifest.s1, 1);
         const semantic = semanticEvidence.valid;
-        results[id].raw.cold.firstVisible.push({ run, samples: [sample], semantic, semanticEvidence });
+        results[id].raw.cold.firstPresented.push({
+          run,
+          samples: [presented.sample],
+          semantic,
+          semanticEvidence,
+          presentedEvidence: presented.evidence,
+        });
         await context.close();
       }
     }
@@ -630,7 +919,12 @@ async function main() {
   for (let run = 0; run < FREEZE_RUNS; run++) {
     for (const id of freezeOrders[run]) {
       console.log(`  freeze run ${run + 1}/${FREEZE_RUNS}: ${id}`);
-      results[id].raw.freeze.push(await runFreezePair(browser, adapters[id].path, (run & 1) === 1));
+      results[id].raw.freeze.push(await runFreezePair(
+        browser,
+        adapters[id].path,
+        (run & 1) === 1,
+        benchmarkOrigin.url,
+      ));
     }
   }
   assertFreezeMatrix(
@@ -657,6 +951,7 @@ async function main() {
     };
   }
   await browser.close();
+  await benchmarkOrigin.close();
   // Любая правка checkout во время долгого browser-прогона делает числа
   // непривязанными к зафиксированным входам — такой отчёт не публикуем.
   assertCheckoutUnchanged(ROOT, provenance);
@@ -674,7 +969,7 @@ async function main() {
   const ids = LIBS.map((l) => l.id);
   const stem = `${generatedAt.slice(0, 10)}-${provenance.revisionLabel}-${provenance.distRuntime.sha256.slice(0, 12)}`;
   const rawPayload = {
-    schema: 4,
+    schema: 6,
     package: { name: rootPkg.name, version: rootPkg.version },
     generatedAt,
     companion: { markdownFile: `${stem}.md`, markdownSha256: '' },
@@ -690,7 +985,7 @@ async function main() {
       executableSha256: browserExecutableSha256,
     },
     calibration,
-    scenarioManifest: START_SCENARIO_MANIFEST,
+    scenarioManifest,
     orderSeed: ORDER_SEED,
     participants: { start: startIds, freeze: ids },
     startOrders,
@@ -711,7 +1006,7 @@ async function main() {
   rawPayload.claims = createBenchmarkClaims(rawPayload.results, {
     seed: ORDER_SEED,
     iterations: BOOTSTRAP_ITERATIONS,
-    timerQuantumMs: calibration.timerQuantumMs,
+    scenarioManifest,
   });
   rawPayload.environment = renderBenchmarkEnvironment(rawPayload);
   console.log('=== Честный сравнительный бенчмарк ===');

@@ -5,7 +5,13 @@ import {
   applyHolmCorrection,
   assertBalancedRunBlocks,
   assertFreezeMatrix,
-  deriveTimerQuantum,
+  assertRealmTimeOrigin,
+  assertWarmStartMeasurement,
+  BENCHMARK_TIMER_ISOLATION_POLICY,
+  deriveFirstPresentedElapsedMs,
+  deriveFirstPresentedUncertaintyMs,
+  deriveRealmTimerQuantum,
+  deriveWarmStartCalibration,
   evaluateStartSemanticEvidence,
   evaluatePerformanceClaim,
   evaluateSizeClaim,
@@ -15,6 +21,7 @@ import {
   summarizeReportSamples,
   summarizeMedianSamples,
   START_SCENARIO_MANIFEST,
+  WARM_TIMER_CALIBRATION_POLICY,
 } from './methodology.mjs';
 
 const SHA256 = /^[0-9a-f]{64}$/;
@@ -58,10 +65,10 @@ const CLAIM_METRICS = Object.freeze([
       rawScenario: scenario,
     })),
   {
-    metric: 'cold.firstVisible',
+    metric: 'cold.firstPresented',
     section: 'cold',
     scenario: 's1',
-    rawScenario: 'firstVisible',
+    rawScenario: 'firstPresented',
   },
 ]);
 
@@ -141,24 +148,97 @@ function claimSeed(seed, id) {
 /** Один генератор claims обслуживает стенд, Markdown и независимую валидацию JSON. */
 export function createBenchmarkClaims(
   results,
-  { seed, iterations = 10_000, timerQuantumMs } = {},
+  { seed, iterations = 10_000, scenarioManifest } = {},
 ) {
   if (
     !Number.isSafeInteger(seed) || seed < 0 ||
     !Number.isSafeInteger(iterations) || iterations < 100 ||
-    !Number.isFinite(timerQuantumMs) || timerQuantumMs <= 0
+    scenarioManifest === null || typeof scenarioManifest !== 'object'
   ) {
-    fail('claims требуют seed, timer quantum и не менее 100 bootstrap iterations');
+    fail('claims требуют seed, scenario manifest и не менее 100 bootstrap iterations');
   }
   const provisional = [];
   for (const metric of CLAIM_METRICS) {
     for (const competitor of START_IDS.slice(1)) {
       const id = `${metric.metric}:${competitor}`;
+      const labClusters = results.lab?.raw?.[metric.section]?.[metric.rawScenario];
+      const competitorClusters = results[competitor]?.raw?.[metric.section]?.[metric.rawScenario];
       let evidence;
+      let realmTimerQuantumMs;
+      let clockUncertaintyMs;
       try {
+        if (metric.section === 'warm') {
+          const calls = scenarioManifest[metric.scenario]?.warmCalls;
+          for (const [role, clusters] of [
+            ['lab', labClusters],
+            ['competitor', competitorClusters],
+          ]) {
+            if (!Array.isArray(clusters)) continue;
+            clusters.forEach((cluster, run) => assertWarmStartMeasurement(
+              `${id}:${role}: cluster ${run + 1}`,
+              cluster?.samples,
+              cluster?.batchElapsedMs,
+              calls,
+              cluster?.timerEvidence,
+              cluster?.measurementTimeOriginMs,
+            ));
+          }
+        }
+        const realmQuanta = { lab: [], competitor: [] };
+        for (const [role, clusters] of [
+          ['lab', labClusters],
+          ['competitor', competitorClusters],
+        ]) {
+          if (!Array.isArray(clusters)) continue;
+          clusters.forEach((cluster, run) => {
+            const calibration = metric.rawScenario === 'firstPresented'
+              ? cluster?.presentedEvidence?.timerEvidence
+              : cluster?.timerEvidence;
+            const measurementTimeOriginMs = metric.rawScenario === 'firstPresented'
+              ? cluster?.presentedEvidence?.startClock?.pageTimeOriginMs
+              : cluster?.measurementTimeOriginMs;
+            realmQuanta[role].push(assertRealmTimeOrigin(
+              `${id}:${role}: cluster ${run + 1}`,
+              calibration,
+              measurementTimeOriginMs,
+            ));
+          });
+        }
+        realmTimerQuantumMs = {
+          lab: Math.max(...realmQuanta.lab),
+          competitor: Math.max(...realmQuanta.competitor),
+        };
+        if (!Number.isFinite(realmTimerQuantumMs.lab) || !Number.isFinite(realmTimerQuantumMs.competitor)) {
+          throw new Error('нет realm-local timer calibration');
+        }
+        const calls = metric.section === 'warm'
+          ? scenarioManifest[metric.scenario]?.warmCalls
+          : 1;
+        if (metric.rawScenario === 'firstPresented') {
+          clockUncertaintyMs = Object.fromEntries([
+            ['lab', labClusters],
+            ['competitor', competitorClusters],
+          ].map(([role, clusters]) => [role, Math.max(...clusters.map((cluster) => (
+            deriveFirstPresentedUncertaintyMs(
+              cluster.presentedEvidence,
+              scenarioManifest.s1.movementThresholdPx,
+            )
+          )))]));
+        } else {
+          clockUncertaintyMs = {
+            lab: (
+              realmTimerQuantumMs.lab *
+              WARM_TIMER_CALIBRATION_POLICY.intervalErrorQuantaPerParticipant
+            ) / calls,
+            competitor: (
+              realmTimerQuantumMs.competitor *
+              WARM_TIMER_CALIBRATION_POLICY.intervalErrorQuantaPerParticipant
+            ) / calls,
+          };
+        }
         evidence = pairedClusterBootstrap(
-          results.lab?.raw?.[metric.section]?.[metric.rawScenario],
-          results[competitor]?.raw?.[metric.section]?.[metric.rawScenario],
+          labClusters,
+          competitorClusters,
           { seed: claimSeed(seed, id), iterations },
         );
       } catch (error) {
@@ -168,9 +248,9 @@ export function createBenchmarkClaims(
         id,
         metric: metric.metric,
         competitor,
-        absoluteThresholdMs: timerQuantumMs / (
-          metric.section === 'warm' ? START_SCENARIO_MANIFEST[metric.scenario].warmCalls : 1
-        ),
+        realmTimerQuantumMs,
+        clockUncertaintyMs,
+        absoluteThresholdMs: clockUncertaintyMs.lab + clockUncertaintyMs.competitor,
         evidence,
       });
     }
@@ -183,7 +263,7 @@ export function createBenchmarkClaims(
   const performance = provisional.map((claim) => {
     const correction = holmById.get(claim.id);
     const evaluated = evaluatePerformanceClaim(claim.evidence, {
-      relativeThreshold: 0.05,
+      relativeThreshold: WARM_TIMER_CALIBRATION_POLICY.practicalRelativeThreshold,
       absoluteThreshold: claim.absoluteThresholdMs,
       holmAccepted: correction.accepted,
       p95NonInferiorityMargin: 0.05,
@@ -228,10 +308,15 @@ export function createBenchmarkClaims(
       seed,
       correction: 'holm',
       alpha: 0.05,
-      relativeThreshold: 0.05,
+      relativeThreshold: WARM_TIMER_CALIBRATION_POLICY.practicalRelativeThreshold,
       relativeThresholdProvenance: 'product-practical-significance-policy',
-      absoluteThresholdBasis: 'measured-performance-now-quantum-per-timed-call',
-      timerQuantumMs,
+      absoluteThresholdBasis: 'sum-of-participant-max-realm-local-clock-uncertainty',
+      intervalErrorQuantaPerParticipant: WARM_TIMER_CALIBRATION_POLICY.intervalErrorQuantaPerParticipant,
+      minimumTimedBatchQuanta: WARM_TIMER_CALIBRATION_POLICY.minimumElapsedQuanta,
+      calibrationPilotClusters: WARM_TIMER_CALIBRATION_POLICY.pilotClusters,
+      effectiveWarmCalls: Object.fromEntries(Object.keys(START_SCENARIO_MANIFEST).map((id) => (
+        [id, scenarioManifest[id]?.warmCalls]
+      ))),
       p95NonInferiorityMargin: 0.05,
       p95NonInferiorityMarginProvenance: 'product-tail-noninferiority-policy',
     },
@@ -287,7 +372,13 @@ function recomputeRun(run, label) {
   if (run.valid !== valid || !valid) fail(`${label}: valid не пересчитывается`);
 }
 
-function recomputeResult(result, id, startRuns, freezeRuns) {
+function recomputeResult(
+  result,
+  id,
+  startRuns,
+  freezeRuns,
+  scenarioManifest,
+) {
   const raw = result?.raw;
   if (raw === null || typeof raw !== 'object') fail(`${id}: нет raw samples`);
   const scenarioIds = Object.keys(START_SCENARIO_MANIFEST);
@@ -297,7 +388,7 @@ function recomputeResult(result, id, startRuns, freezeRuns) {
   if (!isDeepStrictEqual(Object.keys(raw.warm ?? {}), scenarioIds)) {
     fail(`${id}: неверная warm schema`);
   }
-  if (!isDeepStrictEqual(Object.keys(raw.cold ?? {}), [...coldScenarioIds, 'firstVisible'])) {
+  if (!isDeepStrictEqual(Object.keys(raw.cold ?? {}), [...coldScenarioIds, 'firstPresented'])) {
     fail(`${id}: неверная cold schema`);
   }
   const isStart = START_IDS.includes(id);
@@ -322,12 +413,42 @@ function recomputeResult(result, id, startRuns, freezeRuns) {
     });
   };
   for (const [name, clusters] of Object.entries(raw.warm)) {
-    const config = START_SCENARIO_MANIFEST[name];
+    const config = scenarioManifest[name];
     validateClusters(clusters, config.warmSamples, config, config.warmCalls, `${id}.${name}`);
+    clusters.forEach((cluster, run) => {
+      try {
+        assertWarmStartMeasurement(
+          `${id}.${name} run ${run + 1}`,
+          cluster.samples,
+          cluster.batchElapsedMs,
+          config.warmCalls,
+          cluster.timerEvidence,
+          cluster.measurementTimeOriginMs,
+        );
+      } catch (error) {
+        fail(error?.message ?? String(error));
+      }
+    });
   }
   for (const [name, clusters] of Object.entries(raw.cold)) {
-    const config = START_SCENARIO_MANIFEST[name === 'firstVisible' ? 's1' : name];
+    const config = scenarioManifest[name === 'firstPresented' ? 's1' : name];
     validateClusters(clusters, 1, config, 1, `${id}.${name}`);
+    if (name === 'firstPresented') {
+      clusters.forEach((cluster, run) => {
+        let elapsedMs;
+        try {
+          elapsedMs = deriveFirstPresentedElapsedMs(
+            cluster.presentedEvidence,
+            config.movementThresholdPx,
+          );
+        } catch (error) {
+          fail(`${id}.firstPresented run ${run + 1}: ${error?.message ?? String(error)}`);
+        }
+        if (cluster.samples[0] !== elapsedMs) {
+          fail(`${id}.firstPresented run ${run + 1}: sample не пересчитывается из кадров`);
+        }
+      });
+    }
   }
   const flatten = (clusters) => clusters.flatMap((cluster) => cluster.samples);
   const warm = Object.fromEntries(
@@ -359,12 +480,15 @@ export function sha256Text(value) {
 
 export function renderBenchmarkEnvironment(payload) {
   const system = payload.system;
+  const referenceProbes = payload.calibration.raw.referenceTimerEvidence.probes;
   return [
     `Дата: ${payload.generatedAt}`,
     `Ревизия: ${payload.provenance.revisionLabel}`,
     `Машина: ${system.cpu} × ${system.logicalCpus}, ${system.memoryGiB} GB RAM`,
     `ОС: ${system.osType} ${system.osRelease}; Node ${payload.provenance.environment.node}; Chromium ${payload.browser.version} (binary SHA-256 ${payload.browser.executableSha256})`,
-    `Квант performance.now(): ${payload.calibration.timerQuantumMs} мс (${payload.calibration.raw.performanceNowDeltasMs.length} raw delta)`,
+    `Справочная верхняя граница кванта performance.now(): ${payload.calibration.referenceTimerQuantumMs} мс (${referenceProbes.reduce((total, probe) => total + probe.performanceNowDeltasMs.length, 0)} raw delta)`,
+    `Timer isolation: cross-origin isolated; COOP=${payload.calibration.isolation.crossOriginOpenerPolicy}, COEP=${payload.calibration.isolation.crossOriginEmbedderPolicy}; claims используют before/after probes каждого realm`,
+    `Warm-калибровка: ${payload.calibration.policy.pilotClusters} pilot-кластера publish-формы × ≥${payload.calibration.policy.minimumElapsedQuanta} квантов; calls ${Object.entries(payload.calibration.effectiveWarmCalls).map(([id, calls]) => `${id}=${calls}`).join(', ')}`,
     `Прогонов: S1–S4 × ${payload.startOrders.length} (p50/p95), freeze × ${payload.freezeOrders.length} (p50); raw JSON`,
     `Библиотеки: ${payload.participants.freeze.map((id) => payload.results[id].version).join(', ')}`,
   ];
@@ -431,18 +555,21 @@ export function renderBenchmarkMarkdown(payload) {
     '## S1–S4: linear full API',
     '',
     ...table('Warm API-return, мс', startIds, [
-      ['S1: 1 элемент, батч 40 вызовов', (result) => summaryCell(result.summary.warm.s1)],
-      ['S2: 100 элементов одним вызовом', (result) => summaryCell(result.summary.warm.s2)],
-      ['S3: stagger 200, gap 5мс', (result) => summaryCell(result.summary.warm.s3)],
-      ['S4: 1000 элементов одним вызовом', (result) => summaryCell(result.summary.warm.s4)],
+      [`S1: 1 элемент × ${payload.scenarioManifest.s1.warmCalls} вызовов`, (result) => summaryCell(result.summary.warm.s1)],
+      [`S2: 100 элементов × ${payload.scenarioManifest.s2.warmCalls} вызовов`, (result) => summaryCell(result.summary.warm.s2)],
+      [`S3: stagger 200, gap 5мс × ${payload.scenarioManifest.s3.warmCalls} вызовов`, (result) => summaryCell(result.summary.warm.s3)],
+      [`S4: 1000 элементов × ${payload.scenarioManifest.s4.warmCalls} вызовов`, (result) => summaryCell(result.summary.warm.s4)],
     ]),
     ...table('Cold realm', startIds, [
-      ['S1: start→первый видимый кадр, мс', (result) => summaryCell(result.summary.cold.firstVisible, 2)],
+      ['S1: start marker→первый сдвинувшийся screencast-пиксель, мс', (result) => summaryCell(result.summary.cold.firstPresented, 2)],
       ['S2: API-return 100 элементов, мс', (result) => summaryCell(result.summary.cold.s2)],
       ['S3: API-return stagger 200, мс', (result) => summaryCell(result.summary.cold.s3)],
       ['S4: API-return 1000 элементов, мс', (result) => summaryCell(result.summary.cold.s4)],
     ]),
-    'Cold API-return одного элемента намеренно не публикуется: вместо него измеряется первый видимый кадр.',
+    'Cold API-return одного элемента не публикуется: вместо него берётся первый сдвинувшийся пиксель',
+    'compositor-screencast. Это browser-presented evidence, но не input→photon физического дисплея.',
+    'CDP Runtime marker ставится непосредственно перед API; marker и screencast frame используют',
+    'pinned CDP TimeSinceEpoch, а raw page-интервал marker→API входит в clock uncertainty.',
     'Null/ноль любой публикуемой cold-метрики инвалидирует весь отчёт; survivor filtering и «н/д» запрещены.',
     'Cold realm означает новый JS realm с уже загруженным production-адаптером; network/module fetch и parse',
     'в эту метрику не входят и не выдаются за startup приложения.',
@@ -450,9 +577,12 @@ export function renderBenchmarkMarkdown(payload) {
     '## Статистически проверяемые утверждения',
     '',
     '95% CI отношения Lab / конкурент получен paired cluster bootstrap по независимым round-robin runs.',
-    'Победа требует CI целиком ниже 1, выигрыш не менее 5% и абсолютного порога, зелёную семантику,',
+    'Победа требует CI целиком ниже 1, выигрыш не менее 5% и строго больше clock uncertainty, зелёную семантику,',
     `Holm-гейт всего семейства и p95 upper CI ≤ ${(1 + payload.claims.method.p95NonInferiorityMargin).toFixed(2)}. Общего рейтинга нет.`,
-    'Абсолютный порог выводится из raw-кванта performance.now() и числа вызовов внутри timed batch;',
+    'Один calls-батч на сценарий выбирается общими pilot-раундами всех участников и удваивается,',
+    `пока каждый sample каждого из ${payload.calibration.policy.pilotClusters} pilot-кластеров publish-формы не достигнет ${payload.calibration.policy.minimumElapsedQuanta} локальных квантов performance.now(); pilots не входят в report samples.`,
+    'Каждый publish-кластер повторяет raw timer probes до и после измерения; warm batch ниже собственного пола инвалидирует отчёт.',
+    'Clock threshold — сумма худших realm-local неопределённостей Lab и конкурента; равенство порогу не считается различием.',
     '5% для p50 — продуктовая граница практической значимости; 5% для p95 — отдельная продуктовая',
     'non-inferiority policy. Эти значения не выдаются за статистические константы.',
     '',
@@ -491,7 +621,7 @@ export function renderBenchmarkMarkdown(payload) {
     '',
     '## Оговорки честности',
     '',
-    '- API-return не равен полной стоимости: lazy-работу отражает отдельный first-visible metric.',
+    '- API-return не равен полной стоимости: lazy-работу отражает отдельный first-presented screencast metric.',
     '- Нулевой/null cold API-return прерывает отчёт, а не становится «н/д» или победным нулём.',
     '- GSAP после лага не прыгает (lag smoothing), а доигрывает сдвинутый таймлайн — поэтому его',
     '  финальная позиция снимается с запасом +700мс; это поведение, а не дефект.',
@@ -512,7 +642,7 @@ export function validateBenchmarkReportPair({
   benchmarkPackage,
   now = Date.now(),
 }) {
-  if (payload?.schema !== 4) fail(`schema ${String(payload?.schema)} не поддержана`);
+  if (payload?.schema !== 6) fail(`schema ${String(payload?.schema)} не поддержана`);
   if (
     payload.package?.name !== rootPackage.name ||
     payload.package?.version !== rootPackage.version
@@ -605,13 +735,32 @@ export function validateBenchmarkReportPair({
   }
   assertSha(payload.browser.executableSha256, 'Chromium executable');
   assertSha(payload.browser.treeSha256, 'Chromium runtime tree');
-  const calibrationDeltas = payload.calibration?.raw?.performanceNowDeltasMs;
-  const timerQuantumMs = deriveTimerQuantum(calibrationDeltas);
-  if (payload.calibration?.timerQuantumMs !== timerQuantumMs) {
+  const referenceTimerEvidence = payload.calibration?.raw?.referenceTimerEvidence;
+  const timerQuantumMs = deriveRealmTimerQuantum('reference timer', referenceTimerEvidence);
+  if (payload.calibration?.referenceTimerQuantumMs !== timerQuantumMs) {
     fail('timer quantum не пересчитывается из raw calibration');
   }
-  if (!isDeepStrictEqual(payload.scenarioManifest, START_SCENARIO_MANIFEST)) {
-    fail('scenario manifest не совпадает с канонической топологией');
+  if (!isDeepStrictEqual(payload.calibration?.isolation, BENCHMARK_TIMER_ISOLATION_POLICY)) {
+    fail('timer realm не подтверждает каноническую cross-origin isolation');
+  }
+  if (!isDeepStrictEqual(payload.calibration?.policy, WARM_TIMER_CALIBRATION_POLICY)) {
+    fail('warm calibration policy не совпадает с канонической');
+  }
+  let warmCalibration;
+  try {
+    warmCalibration = deriveWarmStartCalibration(
+      payload.calibration?.raw?.warmStartPilots,
+      START_IDS,
+      payload.calibration.policy,
+    );
+  } catch (error) {
+    fail(`warm calibration не пересчитывается: ${error?.message ?? String(error)}`);
+  }
+  if (
+    !isDeepStrictEqual(payload.calibration?.effectiveWarmCalls, warmCalibration.effectiveWarmCalls) ||
+    !isDeepStrictEqual(payload.scenarioManifest, warmCalibration.scenarioManifest)
+  ) {
+    fail('effective warm calls или scenario manifest не пересчитываются из pilots');
   }
 
   if (!isDeepStrictEqual(payload.participants?.start, START_IDS)) fail('изменён состав S1–S4');
@@ -654,14 +803,20 @@ export function validateBenchmarkReportPair({
     if (!markdown.includes(result.adapterSha256) || !markdown.includes(result.size.sha256)) {
       fail(`${id}: Markdown не содержит хеши адаптеров`);
     }
-    recomputeResult(result, id, payload.startOrders.length, payload.freezeOrders.length);
+    recomputeResult(
+      result,
+      id,
+      payload.startOrders.length,
+      payload.freezeOrders.length,
+      warmCalibration.scenarioManifest,
+    );
     freezeMatrix[id] = result.raw.freeze;
   }
   assertFreezeMatrix(freezeMatrix, 'waapi-ctl');
   const expectedClaims = createBenchmarkClaims(payload.results, {
     seed: payload.orderSeed,
     iterations: payload.claims?.method?.bootstrapIterations,
-    timerQuantumMs,
+    scenarioManifest: warmCalibration.scenarioManifest,
   });
   if (!isDeepStrictEqual(payload.claims, expectedClaims)) fail('claims не пересчитываются из raw-кластеров');
   return payload;

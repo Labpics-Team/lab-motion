@@ -8,6 +8,26 @@ export const PRODUCTION_ADAPTER_PROFILE = Object.freeze({
   legalComments: 'none',
 });
 
+/** Один локальный origin возвращает браузеру полную timer precision без flags. */
+export const BENCHMARK_TIMER_ISOLATION_POLICY = Object.freeze({
+  crossOriginIsolated: true,
+  crossOriginOpenerPolicy: 'same-origin',
+  crossOriginEmbedderPolicy: 'require-corp',
+  originAgentCluster: '?1',
+});
+
+/** Один interval ограничен своим квантом; batch хранит четырёхкратный floor. */
+export const WARM_TIMER_CALIBRATION_POLICY = Object.freeze({
+  practicalRelativeThreshold: 0.05,
+  intervalErrorQuantaPerParticipant: 1,
+  minimumElapsedQuanta: 4,
+  pilotClusters: 3,
+  maximumTargetsPerPilot: 65_536,
+  timerFloorProvenance: 'four-local-quanta-per-publish-batch',
+  pilotClustersProvenance: 'minimum-independent-repeatability-policy',
+  maximumTargetsPerPilotProvenance: 'harness-resource-safety-policy',
+});
+
 const scenario = (value) => Object.freeze(value);
 
 /** Каноническая топология: runner, raw schema и claim thresholds читают один объект. */
@@ -21,7 +41,7 @@ export const START_SCENARIO_MANIFEST = Object.freeze({
     toPx: 300,
     movementThresholdPx: 0.5,
     finalTolerancePx: 2,
-    coldMetric: 'firstVisible',
+    coldMetric: 'firstPresented',
   }),
   s2: scenario({
     targetsPerCall: 100,
@@ -193,6 +213,277 @@ export function deriveTimerQuantum(values) {
     : (concentrated[middle - 1] + concentrated[middle]) / 2;
 }
 
+function nextUp(value) {
+  if (Number.isNaN(value) || value === Infinity) return value;
+  if (value === 0) return Number.MIN_VALUE;
+  const buffer = new ArrayBuffer(8);
+  const view = new DataView(buffer);
+  view.setFloat64(0, value);
+  const bits = view.getBigUint64(0);
+  view.setBigUint64(0, bits + (value > 0 ? 1n : -1n));
+  return view.getFloat64(0);
+}
+
+function binary64Ulp(value) {
+  const magnitude = Math.abs(value);
+  return nextUp(magnitude) - magnitude;
+}
+
+/** Верхняя граница кванта выводится из raw before/after probes измеряемого realm. */
+export function deriveRealmTimerQuantum(name, evidence) {
+  if (
+    evidence?.crossOriginIsolated !== true ||
+    !Array.isArray(evidence?.probes) ||
+    evidence.probes.length !== 2 ||
+    evidence.probes[0]?.phase !== 'before' ||
+    evidence.probes[1]?.phase !== 'after'
+  ) {
+    throw new Error(`${name}: нужны before/after probes cross-origin isolated realm`);
+  }
+  const timeOriginMs = evidence.probes[0]?.timeOriginMs;
+  if (!Number.isFinite(timeOriginMs) || timeOriginMs <= 0) {
+    throw new Error(`${name}.before: отсутствует timeOrigin`);
+  }
+  const quantumUpperBounds = evidence.probes.map((probe) => {
+    if (!Number.isFinite(probe.timeOriginMs) || probe.timeOriginMs <= 0) {
+      throw new Error(`${name}.${probe.phase}: отсутствует timeOrigin`);
+    }
+    if (probe.timeOriginMs !== timeOriginMs) {
+      throw new Error(`${name}: before/after probes принадлежат разным realm`);
+    }
+    try {
+      deriveTimerQuantum(probe.performanceNowDeltasMs);
+    } catch (error) {
+      throw new Error(`${name}.${probe.phase}: ${error?.message ?? String(error)}`);
+    }
+    return Math.max(...probe.performanceNowDeltasMs);
+  });
+  return Math.max(...quantumUpperBounds);
+}
+
+export function assertRealmTimeOrigin(name, evidence, measurementTimeOriginMs) {
+  const quantum = deriveRealmTimerQuantum(name, evidence);
+  if (measurementTimeOriginMs !== evidence.probes[0].timeOriginMs) {
+    throw new Error(`${name}: измерение и timer probes принадлежат разным realm`);
+  }
+  return quantum;
+}
+
+/** Runtime marker и API-вызов связываются raw-часами одного page realm. */
+export function deriveCdpStartClock(name, startClock, timerEvidence) {
+  const timerQuantumMs = assertRealmTimeOrigin(
+    name,
+    timerEvidence,
+    startClock?.pageTimeOriginMs,
+  );
+  if (
+    typeof startClock?.token !== 'string' || startClock.token.length === 0 ||
+    startClock.cdpToken !== startClock.token ||
+    startClock.cdpClockDomain !== 'TimeSinceEpoch' ||
+    startClock.runtimeTimestampUnit !== 'milliseconds' ||
+    startClock.frameTimestampUnit !== 'seconds' ||
+    !Number.isFinite(startClock.pageBeforeNowMs) || startClock.pageBeforeNowMs < 0 ||
+    !Number.isFinite(startClock.pageApiNowMs) ||
+    startClock.pageApiNowMs < startClock.pageBeforeNowMs ||
+    !Number.isFinite(startClock.cdpRuntimeTimestampMs) || startClock.cdpRuntimeTimestampMs <= 0
+  ) {
+    throw new Error(`${name}: CDP start clock невалиден`);
+  }
+  const pageBeforeEpochMs = startClock.pageTimeOriginMs + startClock.pageBeforeNowMs;
+  const pageApiEpochMs = startClock.pageTimeOriginMs + startClock.pageApiNowMs;
+  if (
+    startClock.cdpRuntimeTimestampMs < pageBeforeEpochMs - timerQuantumMs ||
+    startClock.cdpRuntimeTimestampMs > pageApiEpochMs + timerQuantumMs
+  ) {
+    throw new Error(`${name}: Runtime marker не связан с page epoch`);
+  }
+  return {
+    startedAtSeconds: startClock.cdpRuntimeTimestampMs / 1000,
+    markerToApiUpperMs: (
+      startClock.pageApiNowMs - startClock.pageBeforeNowMs + timerQuantumMs
+    ),
+    timerQuantumMs,
+  };
+}
+
+function exactStringKeys(value, expected) {
+  if (value === null || typeof value !== 'object' || Array.isArray(value)) return false;
+  const keys = Object.keys(value);
+  return keys.length === expected.length && keys.every((key, index) => key === expected[index]);
+}
+
+/**
+ * Пилоты идут общими раундами: каждый участник меряется с тем же `calls`, затем
+ * весь сценарий удваивается. Последний раунд обязан быть первым прошедшим.
+ */
+export function deriveWarmStartCalibration(
+  pilots,
+  participantIds,
+  policy = WARM_TIMER_CALIBRATION_POLICY,
+) {
+  if (
+    !Array.isArray(participantIds) || participantIds.length === 0 ||
+    participantIds.some((id) => typeof id !== 'string' || id.length === 0) ||
+    new Set(participantIds).size !== participantIds.length
+  ) {
+    throw new Error('warm calibration: нужен уникальный список участников');
+  }
+  if (
+    !Number.isFinite(policy?.practicalRelativeThreshold) ||
+    policy.practicalRelativeThreshold <= 0 || policy.practicalRelativeThreshold >= 1 ||
+    !Number.isSafeInteger(policy?.intervalErrorQuantaPerParticipant) ||
+    policy.intervalErrorQuantaPerParticipant !== 1 ||
+    !Number.isSafeInteger(policy.minimumElapsedQuanta) || policy.minimumElapsedQuanta <= 0 ||
+    !Number.isSafeInteger(policy.pilotClusters) || policy.pilotClusters < 2 ||
+    !Number.isSafeInteger(policy.maximumTargetsPerPilot) || policy.maximumTargetsPerPilot <= 0
+  ) {
+    throw new Error('warm calibration: невалидная policy');
+  }
+
+  const scenarioIds = Object.keys(START_SCENARIO_MANIFEST);
+  if (!exactStringKeys(pilots, scenarioIds)) {
+    throw new Error('warm calibration: pilots не совпадают со сценарной матрицей');
+  }
+  const effectiveWarmCalls = {};
+  const scenarioManifest = {};
+
+  for (const id of scenarioIds) {
+    const config = START_SCENARIO_MANIFEST[id];
+    const rounds = pilots[id];
+    if (!Array.isArray(rounds) || rounds.length === 0) {
+      throw new Error(`${id}: warm calibration не содержит раундов`);
+    }
+    let expectedCalls = config.warmCalls;
+    for (let index = 0; index < rounds.length; index++) {
+      const round = rounds[index];
+      if (!Number.isSafeInteger(round?.calls) || round.calls !== expectedCalls) {
+        throw new Error(`${id}: calls обязаны начинаться с ${config.warmCalls} и удваиваться`);
+      }
+      if (
+        !Number.isSafeInteger(round.calls * config.targetsPerCall) ||
+        round.calls * config.targetsPerCall > policy.maximumTargetsPerPilot
+      ) {
+        throw new Error(`${id}: warm calibration превысила лимит целей пилота`);
+      }
+      if (!exactStringKeys(round.measurements, participantIds)) {
+        throw new Error(`${id}: measurements должны содержать ровно всех участников`);
+      }
+      const values = participantIds.map((participant) => round.measurements[participant]);
+      if (values.some((clusters) => (
+        !Array.isArray(clusters) || clusters.length !== policy.pilotClusters ||
+        clusters.some((measurement) => (
+          !Array.isArray(measurement?.batchElapsedMs) ||
+          measurement.batchElapsedMs.length !== config.warmSamples ||
+          measurement.batchElapsedMs.some((value) => !Number.isFinite(value) || value < 0)
+        ))
+      ))) {
+        throw new Error(`${id}: measurements требуют полные конечные pilot-кластеры publish-формы`);
+      }
+      const passed = values.every((clusters, participant) => (
+        clusters.every((measurement, cluster) => {
+          const quantum = assertRealmTimeOrigin(
+            `${id}.${participantIds[participant]} pilot ${cluster + 1}`,
+            measurement.timerEvidence,
+            measurement.measurementTimeOriginMs,
+          );
+          const minimumElapsedMs = quantum * policy.minimumElapsedQuanta;
+          return measurement.batchElapsedMs.every((value) => value >= minimumElapsedMs);
+        })
+      ));
+      if (passed && index !== rounds.length - 1) {
+        throw new Error(`${id}: после первого прошедшего раунда pilots нарушают минимальность`);
+      }
+      if (index === rounds.length - 1) {
+        if (!passed) {
+          const nextCalls = round.calls * 2;
+          if (
+            !Number.isSafeInteger(nextCalls) ||
+            nextCalls * config.targetsPerCall > policy.maximumTargetsPerPilot
+          ) {
+            throw new Error(`${id}: warm calibration не сошлась до лимита целей пилота`);
+          }
+          throw new Error(`${id}: warm calibration оборвана до сходящегося раунда`);
+        }
+        effectiveWarmCalls[id] = round.calls;
+        scenarioManifest[id] = scenario({ ...config, warmCalls: round.calls });
+      }
+      expectedCalls *= 2;
+    }
+  }
+
+  return Object.freeze({
+    effectiveWarmCalls: Object.freeze(effectiveWarmCalls),
+    scenarioManifest: Object.freeze(scenarioManifest),
+  });
+}
+
+function selectFirstPresentedFrame(evidence, expectedMovementThresholdPx) {
+  const startClock = deriveCdpStartClock(
+    'first presented',
+    evidence?.startClock,
+    evidence?.timerEvidence,
+  );
+  if (
+    !Number.isFinite(expectedMovementThresholdPx) || expectedMovementThresholdPx <= 0 ||
+    evidence?.movementThresholdPx !== expectedMovementThresholdPx ||
+    evidence?.startedAtSeconds !== startClock.startedAtSeconds ||
+    !Number.isSafeInteger(evidence?.rawFrames) || evidence.rawFrames <= 0 ||
+    !Array.isArray(evidence?.frames) || evidence.frames.length < 2 ||
+    evidence.rawFrames < evidence.frames.length
+  ) {
+    throw new Error('first presented: невалидные evidence или threshold');
+  }
+  let previousTimestamp = -Infinity;
+  let baseline;
+  for (const frame of evidence.frames) {
+    if (
+      !Number.isFinite(frame?.timestampSeconds) || frame.timestampSeconds <= previousTimestamp ||
+      !Number.isFinite(frame?.x)
+    ) {
+      throw new Error('first presented: кадры обязаны иметь строгий timestamp-порядок');
+    }
+    previousTimestamp = frame.timestampSeconds;
+    if (frame.timestampSeconds < evidence.startedAtSeconds) baseline = frame.x;
+  }
+  if (baseline === undefined) {
+    throw new Error('first presented: нет baseline-кадра до старта');
+  }
+  const moved = evidence.frames.find((frame) => (
+    frame.timestampSeconds > evidence.startedAtSeconds &&
+    Math.abs(frame.x - baseline) >= expectedMovementThresholdPx
+  ));
+  return { startClock, baseline, moved };
+}
+
+/** Первый сдвинувшийся пиксель выводится только из timestamp кадров скринкаста. */
+export function deriveFirstPresentedElapsedMs(evidence, expectedMovementThresholdPx) {
+  const { moved } = selectFirstPresentedFrame(evidence, expectedMovementThresholdPx);
+  return moved === undefined
+    ? null
+    : (moved.timestampSeconds - evidence.startedAtSeconds) * 1000;
+}
+
+/** Clock uncertainty для first-presented claim выводится только из raw evidence. */
+export function deriveFirstPresentedUncertaintyMs(evidence, expectedMovementThresholdPx) {
+  const { startClock, moved } = selectFirstPresentedFrame(
+    evidence,
+    expectedMovementThresholdPx,
+  );
+  const elapsedMs = moved === undefined
+    ? null
+    : (moved.timestampSeconds - evidence.startedAtSeconds) * 1000;
+  if (!Number.isFinite(elapsedMs) || elapsedMs <= 0) {
+    throw new Error('first presented uncertainty: нет положительного moved-frame sample');
+  }
+  const elapsedSeconds = moved.timestampSeconds - evidence.startedAtSeconds;
+  const binary64BoundMs = (
+    binary64Ulp(moved.timestampSeconds) +
+    binary64Ulp(evidence.startedAtSeconds) +
+    binary64Ulp(elapsedSeconds)
+  ) * 1000;
+  return startClock.markerToApiUpperMs + binary64BoundMs;
+}
+
 function sameTopology(actual, expected, calls) {
   return (
     actual?.calls === calls &&
@@ -277,6 +568,60 @@ function quantile(values, probability) {
   return sorted[Math.min(sorted.length - 1, Math.max(0, Math.ceil(sorted.length * probability) - 1))];
 }
 
+/** Долгий browser-run падает на первом потерянном измерении, не через часы. */
+export function assertPositiveFiniteSamples(name, values) {
+  if (!Array.isArray(values) || values.length === 0) {
+    throw new Error(`${name}: samples обязаны быть непустым массивом`);
+  }
+  const invalidSample = values.findIndex((value) => !Number.isFinite(value) || value <= 0);
+  if (invalidSample !== -1) {
+    throw new Error(
+      `${name}: sample ${invalidSample + 1}=${String(values[invalidSample])} ` +
+      'не является положительным конечным числом',
+    );
+  }
+}
+
+/** Raw batch остаётся измеримым и является SSOT для публикуемой per-call цены. */
+export function assertWarmStartMeasurement(
+  name,
+  samples,
+  batchElapsedMs,
+  calls,
+  timerEvidence,
+  measurementTimeOriginMs,
+  policy = WARM_TIMER_CALIBRATION_POLICY,
+) {
+  if (
+    !Number.isSafeInteger(calls) || calls <= 0 ||
+    !Number.isSafeInteger(policy?.minimumElapsedQuanta) || policy.minimumElapsedQuanta <= 0
+  ) {
+    throw new Error(`${name}: calls и minimumElapsedQuanta обязаны быть положительными целыми`);
+  }
+  const timerQuantumMs = assertRealmTimeOrigin(
+    name,
+    timerEvidence,
+    measurementTimeOriginMs,
+  );
+  const minimumElapsedMs = timerQuantumMs * policy.minimumElapsedQuanta;
+  assertPositiveFiniteSamples(name, samples);
+  assertPositiveFiniteSamples(`${name}: raw batch`, batchElapsedMs);
+  if (samples.length !== batchElapsedMs.length) {
+    throw new Error(`${name}: samples и raw batch имеют разную длину`);
+  }
+  for (let sample = 0; sample < samples.length; sample++) {
+    if (samples[sample] !== batchElapsedMs[sample] / calls) {
+      throw new Error(`${name}: sample ${sample + 1} не пересчитывается из raw batch`);
+    }
+    if (batchElapsedMs[sample] < minimumElapsedMs) {
+      throw new Error(
+        `${name}: raw batch sample ${sample + 1}=${batchElapsedMs[sample]} ` +
+        `ниже timer floor ${minimumElapsedMs}`,
+      );
+    }
+  }
+}
+
 function validateClusters(name, clusters) {
   if (!Array.isArray(clusters) || clusters.length < 2) {
     throw new Error(`${name}: paired bootstrap требует не менее двух run-кластеров`);
@@ -290,15 +635,7 @@ function validateClusters(name, clusters) {
     if (!Array.isArray(cluster.samples) || cluster.samples.length === 0) {
       throw new Error(`${name}: cluster ${index + 1} содержит невалидные samples`);
     }
-    const invalidSample = cluster.samples.findIndex(
-      (value) => !Number.isFinite(value) || value <= 0,
-    );
-    if (invalidSample !== -1) {
-      throw new Error(
-        `${name}: cluster ${index + 1}, sample ${invalidSample + 1}=` +
-        `${String(cluster.samples[invalidSample])} не является положительным конечным числом`,
-      );
-    }
+    assertPositiveFiniteSamples(`${name}: cluster ${index + 1}`, cluster.samples);
     if (cluster.semantic !== true && cluster.semantic !== false) {
       throw new Error(`${name}: cluster ${index + 1} не содержит semantic gate`);
     }
@@ -447,12 +784,12 @@ export function evaluatePerformanceClaim(
   ) {
     throw new Error('claim: невалидные evidence или thresholds');
   }
-  const relativeGain = Number((1 - evidence.p50.ratio).toFixed(12));
-  const absoluteGain = Number((evidence.p50.competitor - evidence.p50.lab).toFixed(12));
+  const relativeGain = 1 - evidence.p50.ratio;
+  const absoluteGain = evidence.p50.competitor - evidence.p50.lab;
   const gates = {
     confidence: evidence.p50.high < 1,
     practicalRelative: relativeGain >= relativeThreshold,
-    practicalAbsolute: absoluteGain >= absoluteThreshold,
+    clockResolved: absoluteGain > absoluteThreshold,
     semantic: evidence.semantic === true,
     holm: holmAccepted,
     p95NonInferiority: evidence.p95.high <= 1 + p95NonInferiorityMargin,
