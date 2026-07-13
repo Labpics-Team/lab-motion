@@ -6,7 +6,7 @@ import type { BoundGroup, GroupRecord } from '../src/animate/channels.js';
 import { MainUnit } from '../src/animate/main-unit.js';
 import { SurfaceBatch } from '../src/animate/surface-batch.js';
 import type { FrameLoop } from '../src/frame/index.js';
-import { makeClock } from './animate-facade-helpers.js';
+import { makeClock, readTranslateX, translateXSeries } from './animate-facade-helpers.js';
 
 function target(id: string, events: string[]): AnimatableElement {
   const values = new Map<string, string>([['opacity', '1']]);
@@ -26,6 +26,30 @@ function target(id: string, events: string[]): AnimatableElement {
 afterEach(() => vi.restoreAllMocks());
 
 describe('animate MainUnit: compact executor', () => {
+  it.each([
+    ['1e-7', 1e-7],
+    ['-1.25e-7', -1.25e-7],
+    ['1e+7', 1e7],
+    ['-1.25e+7', -1.25e7],
+    ['.5', 0.5],
+  ])('test harness принимает CSS-number %s', (serialized, expected) => {
+    expect(readTranslateX(`translateX(${serialized}px)`)).toBe(expected);
+  });
+
+  it.each(['0x10', ' ', '1e+', '.', '1.', 'Infinity'])
+  ('test harness fail-closed отклоняет %s', (serialized) => {
+    expect(readTranslateX(`translateX(${serialized}px)`)).toBeNaN();
+  });
+
+  it('malformed последняя запись не маскируется предыдущей конечной', () => {
+    const values = translateXSeries([
+      { prop: 'transform', value: 'translateX(1px)' },
+      { prop: 'transform', value: 'translateX(1e+px)' },
+    ]);
+    expect(values[0]).toBe(1);
+    expect(values[1]).toBeNaN();
+  });
+
   it('N=2 equal-delay x исполняет два unit в общем scheduler', () => {
     const units = vi.spyOn(MainUnit.prototype, '_updateStep');
     const clock = makeClock();
@@ -92,7 +116,7 @@ describe('animate MainUnit: plan-order и изоляция', () => {
         getPropertyValue: () => '',
         setProperty(_name, value) {
           if (value === 'none') writes.push(0);
-          else writes.push(Number(/translateX\((-?[\d.eE+]+)px\)/.exec(value)?.[1]));
+          else writes.push(readTranslateX(value) ?? Number.NaN);
         },
       },
     }, { x: [Number.MAX_VALUE, -Number.MAX_VALUE] }, {
@@ -134,8 +158,7 @@ describe('animate MainUnit: plan-order и изоляция', () => {
               writes.push(0);
               return;
             }
-            const match = /translateX\((-?[\d.eE+]+)px\)/.exec(value);
-            writes.push(Number(match?.[1]));
+            writes.push(readTranslateX(value) ?? Number.NaN);
           },
         },
       },

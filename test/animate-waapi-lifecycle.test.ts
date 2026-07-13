@@ -16,7 +16,13 @@ import { sampleSerializedSpring } from '../src/compositor/sample.js';
 import { MotionParamError } from '../src/errors.js';
 import { settleTimeUpperBound, type SpringParams } from '../src/spring.js';
 import { spring } from '../src/tokens/index.js';
-import { fakeEl, makeClock, makeTimer, translateXSeries } from './animate-facade-helpers.js';
+import {
+  fakeEl,
+  makeClock,
+  makeTimer,
+  readTranslateX,
+  translateXSeries,
+} from './animate-facade-helpers.js';
 
 beforeEach(() => {
   __resetDetectionCache();
@@ -630,11 +636,7 @@ describe('animate: жизненный цикл WAAPI-юнита', () => {
 
     await first.finished;
     expect(target.animateCalls).toHaveLength(2);
-    const from = Number(
-      /translateX\((-?[\d.eE+]+)px\)/.exec(
-        String(target.animateCalls[1]!.keyframes[0]!['transform']),
-      )?.[1],
-    );
+    const from = readTranslateX(String(target.animateCalls[1]!.keyframes[0]!['transform']));
     expect(from).toBe(100);
     second.cancel();
   });
@@ -856,8 +858,7 @@ describe('animate: жизненный цикл WAAPI-юнита', () => {
     const call = target.animateCalls[0]!;
     expect(call.timing['easing']).toBe('linear');
     const values = call.keyframes.map((frame) => {
-      const match = /translateX\((-?[\d.eE+]+)px\)/.exec(String(frame['transform']));
-      return Number(match?.[1]);
+      return readTranslateX(String(frame['transform'])) ?? Number.NaN;
     });
     expect(values.some((value) => value > 100)).toBe(true);
     controls.cancel();
@@ -879,7 +880,7 @@ describe('animate: жизненный цикл WAAPI-юнита', () => {
 
     controls.seek(100);
     const start = String(target.animateCalls.at(-1)!.keyframes[0]!['transform']);
-    const value = Number(/translateX\((-?[\d.eE+]+)px\)/.exec(start)?.[1]);
+    const value = readTranslateX(start) ?? Number.NaN;
     expect(Number.isFinite(value)).toBe(true);
     expect(value).not.toBe(-max);
     controls.cancel();

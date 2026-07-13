@@ -18,6 +18,7 @@ import {
   fakeEl,
   makeClock,
   makeTimer,
+  readTranslateX,
   translateXSeries,
   type AnimateFn,
 } from './animate-facade-helpers.js';
@@ -104,7 +105,7 @@ describe('animate: единый pause -> seek -> play', () => {
     controls.play();
     expect(target.animateCalls).toHaveLength(2);
     const resumed = String(target.animateCalls[1]!.keyframes[0]!['transform']);
-    expect(Number(/translateX\((-?[\d.eE+]+)px\)/.exec(resumed)?.[1])).toBeCloseTo(sought, 9);
+    expect(readTranslateX(resumed)).toBeCloseTo(sought, 9);
     controls.cancel();
   });
 
