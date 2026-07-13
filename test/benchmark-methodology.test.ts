@@ -606,6 +606,10 @@ describe('benchmark methodology fail-closed contracts', () => {
 
   it('captures a decodable pre-start pixel before the freeze trajectory begins', () => {
     const source = readFileSync('bench/compare/bench.mjs', 'utf8');
+    const baselineWait = source.slice(
+      source.indexOf('async function waitForBaselineFrame'),
+      source.indexOf('let cdpStartSequence'),
+    );
     const capture = source.slice(
       source.indexOf('async function captureTrajectory'),
       source.indexOf('async function runFreezePair'),
@@ -617,6 +621,8 @@ describe('benchmark methodology fail-closed contracts', () => {
     const screencastStopped = capture.indexOf('await stopScreencast()', cleanup);
     const contextClosed = capture.indexOf('await context.close()', cleanup);
 
+    expect(baselineWait).toContain('Number.isFinite(frame.ts)');
+    expect(baselineWait).toContain("redLeftEdge(Buffer.from(frame.data, 'base64'))");
     expect(screencastStarted).toBeGreaterThan(-1);
     expect(baselinePresented).toBeGreaterThan(screencastStarted);
     expect(animationStarted).toBeGreaterThan(baselinePresented);

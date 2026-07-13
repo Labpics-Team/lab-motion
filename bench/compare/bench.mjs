@@ -517,7 +517,10 @@ async function waitForBaselineFrame(frames) {
   while (Date.now() < deadline) {
     while (inspected < frames.length) {
       const frame = frames[inspected++];
-      if (redLeftEdge(Buffer.from(frame.data, 'base64')) !== null) return;
+      if (
+        Number.isFinite(frame.ts) &&
+        redLeftEdge(Buffer.from(frame.data, 'base64')) !== null
+      ) return;
     }
     await new Promise((resolve) => setTimeout(resolve, 16));
   }
@@ -579,7 +582,7 @@ async function runFirstPresented(browser, adapterPath, scenario, pageUrl) {
   });
   const rawFrames = [];
   cdp.on('Page.screencastFrame', (event) => {
-    rawFrames.push({ timestampSeconds: event.metadata.timestamp, data: event.data });
+    rawFrames.push({ ts: event.metadata.timestamp, data: event.data });
     cdp.send('Page.screencastFrameAck', { sessionId: event.sessionId }).catch(() => {});
   });
   await cdp.send('Page.startScreencast', {
@@ -608,7 +611,7 @@ async function runFirstPresented(browser, adapterPath, scenario, pageUrl) {
     rawFrames: rawFrames.length,
     frames: rawFrames
       .map((frame) => ({
-        timestampSeconds: frame.timestampSeconds,
+        timestampSeconds: frame.ts,
         x: redLeftEdge(Buffer.from(frame.data, 'base64')),
       }))
       .filter((frame) => frame.x !== null)
