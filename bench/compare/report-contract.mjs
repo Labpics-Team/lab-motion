@@ -154,11 +154,16 @@ export function createBenchmarkClaims(
   for (const metric of CLAIM_METRICS) {
     for (const competitor of START_IDS.slice(1)) {
       const id = `${metric.metric}:${competitor}`;
-      const evidence = pairedClusterBootstrap(
-        results.lab?.raw?.[metric.section]?.[metric.rawScenario],
-        results[competitor]?.raw?.[metric.section]?.[metric.rawScenario],
-        { seed: claimSeed(seed, id), iterations },
-      );
+      let evidence;
+      try {
+        evidence = pairedClusterBootstrap(
+          results.lab?.raw?.[metric.section]?.[metric.rawScenario],
+          results[competitor]?.raw?.[metric.section]?.[metric.rawScenario],
+          { seed: claimSeed(seed, id), iterations },
+        );
+      } catch (error) {
+        fail(`${id}: ${error?.message ?? String(error)}`);
+      }
       provisional.push({
         id,
         metric: metric.metric,

@@ -287,12 +287,17 @@ function validateClusters(name, clusters) {
       throw new Error(`${name}: cluster ${index + 1} содержит невалидный run`);
     }
     runs.add(cluster.run);
-    if (
-      !Array.isArray(cluster.samples) ||
-      cluster.samples.length === 0 ||
-      cluster.samples.some((value) => !Number.isFinite(value) || value <= 0)
-    ) {
+    if (!Array.isArray(cluster.samples) || cluster.samples.length === 0) {
       throw new Error(`${name}: cluster ${index + 1} содержит невалидные samples`);
+    }
+    const invalidSample = cluster.samples.findIndex(
+      (value) => !Number.isFinite(value) || value <= 0,
+    );
+    if (invalidSample !== -1) {
+      throw new Error(
+        `${name}: cluster ${index + 1}, sample ${invalidSample + 1}=` +
+        `${String(cluster.samples[invalidSample])} не является положительным конечным числом`,
+      );
     }
     if (cluster.semantic !== true && cluster.semantic !== false) {
       throw new Error(`${name}: cluster ${index + 1} не содержит semantic gate`);

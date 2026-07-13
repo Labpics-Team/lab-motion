@@ -202,7 +202,7 @@ describe('benchmark methodology fail-closed contracts', () => {
         ? { ...cluster, samples: [Number.NaN] }
         : cluster),
       options,
-    )).toThrow(/samples/i);
+    )).toThrow(/competitor.*cluster 3.*sample 1.*NaN/i);
     expect(() => pairedClusterBootstrap(
       lab,
       competitor.map((cluster, index) => index === 4
