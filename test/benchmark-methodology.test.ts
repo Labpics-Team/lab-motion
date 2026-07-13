@@ -14,9 +14,10 @@ import {
   deriveCdpStartClock,
   deriveFirstPresentedElapsedMs,
   deriveFirstPresentedUncertaintyMs,
-  deriveRealmTimerQuantum,
+  deriveRealmClockUncertainty,
+  deriveRealmTimerStep,
   deriveWarmStartCalibration,
-  deriveTimerQuantum,
+  deriveTimerStep,
   evaluateStartSemanticEvidence,
   evaluatePerformanceClaim,
   evaluateSizeClaim,
@@ -119,38 +120,86 @@ describe('benchmark methodology fail-closed contracts', () => {
 
   it('derives the absolute floor from recorded performance.now deltas', () => {
     const deltas = Array.from({ length: 16 }, () => 0.1);
-    expect(deriveTimerQuantum(deltas)).toBe(0.1);
-    expect(() => deriveTimerQuantum(deltas.slice(1))).toThrow(/16/);
-    expect(() => deriveTimerQuantum([...deltas.slice(0, 15), 0])).toThrow(/положительных/);
-    expect(deriveTimerQuantum([1e-12, ...Array.from({ length: 15 }, () => 0.1)]))
+    expect(deriveTimerStep(deltas)).toBe(0.1);
+    expect(() => deriveTimerStep(deltas.slice(1))).toThrow(/16/);
+    const sparse = Array<number>(16);
+    for (let index = 0; index < 12; index++) sparse[index] = 0.1;
+    expect(() => deriveTimerStep(sparse)).toThrow(/положительных|плотн|dense/i);
+    expect(() => deriveTimerStep([...deltas.slice(0, 15), 0])).toThrow(/положительных/);
+    expect(() => deriveTimerStep(Array.from({ length: 16 }, () => Number.MAX_VALUE)))
+      .toThrow(/конечной|finite|арифмет/i);
+    expect(deriveTimerStep([1e-12, ...Array.from({ length: 15 }, () => 0.1)]))
       .toBe(0.1);
-    expect(() => deriveTimerQuantum([
+    expect(deriveTimerStep([
+      ...Array.from({ length: 8 }, () => 0.099),
+      ...Array.from({ length: 8 }, () => 0.101),
+    ])).toBe(0.101);
+    expect(() => deriveTimerStep([
       ...Array.from({ length: 8 }, () => 0.1),
       ...Array.from({ length: 8 }, () => 0.3),
     ])).toThrow(/концентрац/i);
+    expect(() => deriveTimerStep([
+      ...Array.from({ length: 48 }, () => 0.005),
+      ...Array.from({ length: 16 }, () => 0.006),
+    ])).toThrow(/multi-tick|гармоник/i);
+    const outwardRounded = deriveTimerStep([
+      ...Array.from({ length: 15 }, () => 0.1),
+      0.20000000000000004,
+    ]);
+    expect(outwardRounded).toBeGreaterThan(0.20000000000000004 / 2);
+    expect(() => deriveTimerStep([
+      ...Array.from({ length: 15 }, () => 0.1),
+      0.200000000000001,
+    ])).toThrow(/multi-tick|гармоник/i);
+    expect(() => deriveTimerStep([
+      ...Array.from({ length: 15 }, () => 0.1),
+      Number.MAX_VALUE,
+    ])).toThrow(/multi-tick|гармоник/i);
+    expect(() => deriveTimerStep([
+      ...Array.from({ length: 16 }, () => 8e307),
+      Number.MAX_VALUE,
+    ])).toThrow(/multi-tick|гармоник/i);
   });
 
   it('binds conservative before/after timer evidence to one realm', () => {
     const changedGrid = timerEvidence(0.1);
     changedGrid.probes[1].performanceNowDeltasMs.fill(0.2);
-    expect(deriveRealmTimerQuantum('publish', changedGrid)).toBe(0.2);
+    expect(deriveRealmTimerStep('publish', changedGrid)).toBe(0.2);
+    expect(deriveRealmClockUncertainty('publish', changedGrid)).toBe(0.2);
 
-    const conservative = timerEvidence(0.1);
-    conservative.probes[0].performanceNowDeltasMs[0] = 0.15;
-    expect(deriveRealmTimerQuantum('publish', conservative)).toBe(0.15);
+    const delayedRead = timerEvidence(0.1);
+    delayedRead.probes[0].performanceNowDeltasMs[0] = 0.2;
+    expect(deriveRealmTimerStep('publish', delayedRead)).toBe(0.1);
+    expect(deriveRealmClockUncertainty('publish', delayedRead)).toBe(0.2);
     const otherRealm = timerEvidence();
     otherRealm.probes[1].timeOriginMs += 1;
-    expect(() => deriveRealmTimerQuantum('publish', otherRealm)).toThrow(/разным realm/i);
+    expect(() => deriveRealmClockUncertainty('publish', otherRealm)).toThrow(/разным realm/i);
     const unstable = timerEvidence();
     unstable.probes[0].performanceNowDeltasMs = [
       ...Array.from({ length: 8 }, () => 0.1),
       ...Array.from({ length: 8 }, () => 0.3),
     ];
-    expect(() => deriveRealmTimerQuantum('publish', unstable)).toThrow(/концентрац/i);
-    expect(() => deriveRealmTimerQuantum('publish', {
+    expect(() => deriveRealmClockUncertainty('publish', unstable)).toThrow(/концентрац/i);
+    expect(() => deriveRealmClockUncertainty('publish', {
       ...timerEvidence(),
       probes: timerEvidence().probes.slice(0, 1),
     })).toThrow(/before\/after/i);
+  });
+
+  it('does not misclassify a delayed probe iteration as timer resolution', () => {
+    const delayedProbe = timerEvidence(0.005);
+    delayedProbe.probes[0].performanceNowDeltasMs[0] = 0.04;
+
+    expect(deriveRealmTimerStep('publish', delayedProbe)).toBe(0.005);
+    expect(deriveRealmClockUncertainty('publish', delayedProbe)).toBe(0.04);
+    expect(() => assertWarmStartMeasurement(
+      'gsap.s1 run 6',
+      [0.14 / 80],
+      [0.14],
+      80,
+      delayedProbe,
+      TIMER_ORIGIN_MS,
+    )).not.toThrow();
   });
 
   it('derives first presented movement only from screencast frame timestamps', () => {
@@ -246,7 +295,7 @@ describe('benchmark methodology fail-closed contracts', () => {
     expect(calibrated.effectiveWarmCalls).toEqual({ s1: 80, s2: 5, s3: 3, s4: 1 });
     expect(calibrated.scenarioManifest.s1.warmCalls).toBe(80);
     expect(calibrated.scenarioManifest.s2).toEqual(START_SCENARIO_MANIFEST.s2);
-    expect(WARM_TIMER_CALIBRATION_POLICY.intervalErrorQuantaPerParticipant).toBe(1);
+    expect(WARM_TIMER_CALIBRATION_POLICY.intervalObservedBoundsPerParticipant).toBe(1);
   });
 
   it('rejects forged warm calibration paths, per-library drift and cap overflow', () => {

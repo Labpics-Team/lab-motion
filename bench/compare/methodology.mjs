@@ -16,14 +16,14 @@ export const BENCHMARK_TIMER_ISOLATION_POLICY = Object.freeze({
   originAgentCluster: '?1',
 });
 
-/** Один interval ограничен своим квантом; batch хранит четырёхкратный floor. */
+/** Warm-floor использует шаг моды; superiority-порог — максимум всех дельт. */
 export const WARM_TIMER_CALIBRATION_POLICY = Object.freeze({
   practicalRelativeThreshold: 0.05,
-  intervalErrorQuantaPerParticipant: 1,
+  intervalObservedBoundsPerParticipant: 1,
   minimumElapsedQuanta: 4,
   pilotClusters: 3,
   maximumTargetsPerPilot: 65_536,
-  timerFloorProvenance: 'four-local-quanta-per-publish-batch',
+  timerFloorProvenance: 'four-local-steps-per-publish-batch',
   pilotClustersProvenance: 'minimum-independent-repeatability-policy',
   maximumTargetsPerPilotProvenance: 'harness-resource-safety-policy',
 });
@@ -190,27 +190,61 @@ export function summarizeMedianSamples(values, options) {
   return { samples: summary.samples, p50: summary.p50 };
 }
 
-/** Физический абсолютный порог выводится из raw-калибровки часов браузера. */
-export function deriveTimerQuantum(values) {
-  if (
-    !Array.isArray(values) ||
-    values.length < 16 ||
-    values.some((value) => !Number.isFinite(value) || value <= 0)
-  ) {
+/** Шаг сетки для измеримого warm-batch выводится из одношаговой концентрации. */
+export function deriveTimerStep(values) {
+  if (!Array.isArray(values) || values.length < 16) {
     throw new Error('timer calibration: нужны минимум 16 положительных конечных delta');
   }
-  const sorted = [...values].sort((left, right) => left - right);
+  const denseValues = Array.from(values);
+  if (denseValues.some((value) => !Number.isFinite(value) || value <= 0)) {
+    throw new Error('timer calibration: нужны минимум 16 положительных конечных delta');
+  }
+  const sorted = denseValues.sort((left, right) => left - right);
   const median = sorted.length % 2
     ? sorted[sorted.length >> 1]
     : (sorted[(sorted.length >> 1) - 1] + sorted[sorted.length >> 1]) / 2;
+  if (!Number.isFinite(median) || median <= 0) {
+    throw new Error('timer calibration: медиана потеряла конечность при арифметике');
+  }
   const concentrated = sorted.filter((value) => Math.abs(value - median) <= median * 0.1);
   if (concentrated.length < Math.ceil(sorted.length * 0.75)) {
     throw new Error('timer calibration: delta не образуют устойчивую концентрацию');
   }
-  const middle = concentrated.length >> 1;
-  return concentrated.length % 2
-    ? concentrated[middle]
-    : (concentrated[middle - 1] + concentrated[middle]) / 2;
+  const lower = concentrated[0];
+  const upper = concentrated[concentrated.length - 1];
+  let stepUpper = upper;
+  for (const value of sorted) {
+    if (value <= upper) continue;
+    const ticks = Math.round(value / median);
+    if (!Number.isSafeInteger(ticks) || ticks < 2) {
+      throw new Error('timer calibration: delta вне одношаговой моды не является целочисленной гармоникой');
+    }
+    const low = ticks * lower;
+    const high = ticks * upper;
+    if (!Number.isFinite(low) || !Number.isFinite(high)) {
+      throw new Error('timer calibration: delta вне одношаговой моды не является целочисленной гармоникой');
+    }
+    const floatingTolerance = (
+      binary64Ulp(value) + binary64Ulp(low) + binary64Ulp(high)
+    );
+    if (
+      !Number.isFinite(floatingTolerance) ||
+      value < low - floatingTolerance ||
+      value > high + floatingTolerance
+    ) {
+      throw new Error('timer calibration: delta вне одношаговой моды не является целочисленной гармоникой');
+    }
+    if (value > high) {
+      const outward = nextUp(value / ticks);
+      if (!Number.isFinite(outward)) {
+        throw new Error('timer calibration: верхняя граница гармоники потеряла конечность');
+      }
+      stepUpper = Math.max(stepUpper, outward);
+    }
+  }
+  // Гармоническая дельта доказывает только пропуск нескольких шагов сетки, но
+  // не его причину. Верхний край одношаговой моды остаётся консервативной границей.
+  return stepUpper;
 }
 
 function nextUp(value) {
@@ -229,8 +263,7 @@ function binary64Ulp(value) {
   return nextUp(magnitude) - magnitude;
 }
 
-/** Верхняя граница кванта выводится из raw before/after probes измеряемого realm. */
-export function deriveRealmTimerQuantum(name, evidence) {
+function deriveRealmTimerBounds(name, evidence) {
   if (
     evidence?.crossOriginIsolated !== true ||
     !Array.isArray(evidence?.probes) ||
@@ -244,7 +277,9 @@ export function deriveRealmTimerQuantum(name, evidence) {
   if (!Number.isFinite(timeOriginMs) || timeOriginMs <= 0) {
     throw new Error(`${name}.before: отсутствует timeOrigin`);
   }
-  const quantumUpperBounds = evidence.probes.map((probe) => {
+  const stepUpperBounds = [];
+  const observedUpperBounds = [];
+  for (const probe of evidence.probes) {
     if (!Number.isFinite(probe.timeOriginMs) || probe.timeOriginMs <= 0) {
       throw new Error(`${name}.${probe.phase}: отсутствует timeOrigin`);
     }
@@ -252,26 +287,48 @@ export function deriveRealmTimerQuantum(name, evidence) {
       throw new Error(`${name}: before/after probes принадлежат разным realm`);
     }
     try {
-      deriveTimerQuantum(probe.performanceNowDeltasMs);
+      stepUpperBounds.push(deriveTimerStep(probe.performanceNowDeltasMs));
+      observedUpperBounds.push(Math.max(...probe.performanceNowDeltasMs));
     } catch (error) {
       throw new Error(`${name}.${probe.phase}: ${error?.message ?? String(error)}`);
     }
-    return Math.max(...probe.performanceNowDeltasMs);
-  });
-  return Math.max(...quantumUpperBounds);
+  }
+  return {
+    timeOriginMs,
+    stepMs: Math.max(...stepUpperBounds),
+    observedUpperMs: Math.max(...observedUpperBounds),
+  };
 }
 
-export function assertRealmTimeOrigin(name, evidence, measurementTimeOriginMs) {
-  const quantum = deriveRealmTimerQuantum(name, evidence);
-  if (measurementTimeOriginMs !== evidence.probes[0].timeOriginMs) {
+/** Одношаговая граница служит только для выбора измеримого warm-batch. */
+export function deriveRealmTimerStep(name, evidence) {
+  return deriveRealmTimerBounds(name, evidence).stepMs;
+}
+
+/** Все наблюдаемые дельты остаются консервативной границей superiority-claim. */
+export function deriveRealmClockUncertainty(name, evidence) {
+  return deriveRealmTimerBounds(name, evidence).observedUpperMs;
+}
+
+function assertRealmMeasurement(name, evidence, measurementTimeOriginMs, field) {
+  const bounds = deriveRealmTimerBounds(name, evidence);
+  if (measurementTimeOriginMs !== bounds.timeOriginMs) {
     throw new Error(`${name}: измерение и timer probes принадлежат разным realm`);
   }
-  return quantum;
+  return bounds[field];
+}
+
+export function assertRealmTimerStep(name, evidence, measurementTimeOriginMs) {
+  return assertRealmMeasurement(name, evidence, measurementTimeOriginMs, 'stepMs');
+}
+
+export function assertRealmClockUncertainty(name, evidence, measurementTimeOriginMs) {
+  return assertRealmMeasurement(name, evidence, measurementTimeOriginMs, 'observedUpperMs');
 }
 
 /** Runtime marker и API-вызов связываются raw-часами одного page realm. */
 export function deriveCdpStartClock(name, startClock, timerEvidence) {
-  const timerQuantumMs = assertRealmTimeOrigin(
+  const clockUncertaintyMs = assertRealmClockUncertainty(
     name,
     timerEvidence,
     startClock?.pageTimeOriginMs,
@@ -292,17 +349,17 @@ export function deriveCdpStartClock(name, startClock, timerEvidence) {
   const pageBeforeEpochMs = startClock.pageTimeOriginMs + startClock.pageBeforeNowMs;
   const pageApiEpochMs = startClock.pageTimeOriginMs + startClock.pageApiNowMs;
   if (
-    startClock.cdpRuntimeTimestampMs < pageBeforeEpochMs - timerQuantumMs ||
-    startClock.cdpRuntimeTimestampMs > pageApiEpochMs + timerQuantumMs
+    startClock.cdpRuntimeTimestampMs < pageBeforeEpochMs - clockUncertaintyMs ||
+    startClock.cdpRuntimeTimestampMs > pageApiEpochMs + clockUncertaintyMs
   ) {
     throw new Error(`${name}: Runtime marker не связан с page epoch`);
   }
   return {
     startedAtSeconds: startClock.cdpRuntimeTimestampMs / 1000,
     markerToApiUpperMs: (
-      startClock.pageApiNowMs - startClock.pageBeforeNowMs + timerQuantumMs
+      startClock.pageApiNowMs - startClock.pageBeforeNowMs + clockUncertaintyMs
     ),
-    timerQuantumMs,
+    clockUncertaintyMs,
   };
 }
 
@@ -331,8 +388,8 @@ export function deriveWarmStartCalibration(
   if (
     !Number.isFinite(policy?.practicalRelativeThreshold) ||
     policy.practicalRelativeThreshold <= 0 || policy.practicalRelativeThreshold >= 1 ||
-    !Number.isSafeInteger(policy?.intervalErrorQuantaPerParticipant) ||
-    policy.intervalErrorQuantaPerParticipant !== 1 ||
+    !Number.isSafeInteger(policy?.intervalObservedBoundsPerParticipant) ||
+    policy.intervalObservedBoundsPerParticipant !== 1 ||
     !Number.isSafeInteger(policy.minimumElapsedQuanta) || policy.minimumElapsedQuanta <= 0 ||
     !Number.isSafeInteger(policy.pilotClusters) || policy.pilotClusters < 2 ||
     !Number.isSafeInteger(policy.maximumTargetsPerPilot) || policy.maximumTargetsPerPilot <= 0
@@ -381,7 +438,7 @@ export function deriveWarmStartCalibration(
       }
       const passed = values.every((clusters, participant) => (
         clusters.every((measurement, cluster) => {
-          const quantum = assertRealmTimeOrigin(
+          const quantum = assertRealmTimerStep(
             `${id}.${participantIds[participant]} pilot ${cluster + 1}`,
             measurement.timerEvidence,
             measurement.measurementTimeOriginMs,
@@ -598,12 +655,12 @@ export function assertWarmStartMeasurement(
   ) {
     throw new Error(`${name}: calls и minimumElapsedQuanta обязаны быть положительными целыми`);
   }
-  const timerQuantumMs = assertRealmTimeOrigin(
+  const timerStepMs = assertRealmTimerStep(
     name,
     timerEvidence,
     measurementTimeOriginMs,
   );
-  const minimumElapsedMs = timerQuantumMs * policy.minimumElapsedQuanta;
+  const minimumElapsedMs = timerStepMs * policy.minimumElapsedQuanta;
   assertPositiveFiniteSamples(name, samples);
   assertPositiveFiniteSamples(`${name}: raw batch`, batchElapsedMs);
   if (samples.length !== batchElapsedMs.length) {
