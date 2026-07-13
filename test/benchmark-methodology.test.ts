@@ -613,10 +613,16 @@ describe('benchmark methodology fail-closed contracts', () => {
     const screencastStarted = capture.indexOf("await cdp.send('Page.startScreencast'");
     const baselinePresented = capture.indexOf('await waitForBaselineFrame(frames)');
     const animationStarted = capture.indexOf('const startedAt = await page.evaluate');
+    const cleanup = capture.indexOf('} finally {', baselinePresented);
+    const screencastStopped = capture.indexOf('await stopScreencast()', cleanup);
+    const contextClosed = capture.indexOf('await context.close()', cleanup);
 
     expect(screencastStarted).toBeGreaterThan(-1);
     expect(baselinePresented).toBeGreaterThan(screencastStarted);
     expect(animationStarted).toBeGreaterThan(baselinePresented);
+    expect(cleanup).toBeGreaterThan(animationStarted);
+    expect(screencastStopped).toBeGreaterThan(cleanup);
+    expect(contextClosed).toBeGreaterThan(cleanup);
   });
 
   it('scores against the same library unblocked trajectory and penalizes both lag and lead', () => {
