@@ -1,4 +1,9 @@
 import { describe, expect, it } from 'vitest';
+import { execFileSync } from 'node:child_process';
+import { cpSync, existsSync, mkdirSync, mkdtempSync, rmSync } from 'node:fs';
+import { tmpdir } from 'node:os';
+import { dirname, join, resolve } from 'node:path';
+import { pathToFileURL } from 'node:url';
 import {
   startClock,
   TIMER_ORIGIN_MS,
@@ -239,6 +244,7 @@ function fixture(startRuns = 20, warmCalls: Partial<Record<keyof typeof START_SC
     name: '@labpics/motion',
     version: '0.3.0',
     packageManager: 'pnpm@11.11.0',
+    devDependencies: { pako: '3.0.1' },
   };
   const benchmarkPackage = {
     packageManager: 'pnpm@11.11.0',
@@ -250,7 +256,7 @@ function fixture(startRuns = 20, warmCalls: Partial<Record<keyof typeof START_SC
     },
   };
   const payload: any = {
-    schema: 7,
+    schema: 8,
     package: { name: rootPackage.name, version: rootPackage.version },
     generatedAt,
     companion: { markdownFile: `${stem}.md`, markdownSha256: '' },
@@ -272,6 +278,8 @@ function fixture(startRuns = 20, warmCalls: Partial<Record<keyof typeof START_SC
       inputs: {
         'root/package.json': SHA('d'),
         'root/pnpm-lock.yaml': SHA('e'),
+        'root/scripts/compression-policy.mjs': SHA('4'),
+        'root/scripts/compression-oracle.mjs': SHA('5'),
         'bench/package.json': SHA('f'),
         'bench/pnpm-lock.yaml': SHA('1'),
         'bench/bench.mjs': SHA('6'),
@@ -284,6 +292,9 @@ function fixture(startRuns = 20, warmCalls: Partial<Record<keyof typeof START_SC
         node: 'v24.4.0',
         nodeExecutableSha256: SHA('2'),
         pnpm: '11.11.0',
+        rootPackages: {
+          pako: { version: '3.0.1', files: 5, sha256: SHA('5') },
+        },
         packages: {
           motion: { version: '12.42.2', files: 5, sha256: SHA('3') },
           playwright: { version: '1.61.1', files: 5, sha256: SHA('4') },
@@ -379,6 +390,8 @@ describe('paired comparative benchmark report', () => {
       relativeThresholdProvenance: 'product-practical-significance-policy',
     });
     expect(markdown).toContain('95% CI отношения Lab / конкурент');
+    expect(markdown).toContain('канонический gzip через pako@3.0.1');
+    expect(markdown).toContain('уменьшении канонического gzip-9 и системного Brotli-11');
     expect(markdown).not.toMatch(/overall score|общий балл/i);
   });
 
@@ -519,6 +532,18 @@ describe('paired comparative benchmark report', () => {
     }],
     ['scenario manifest drift', (f: any) => { f.payload.scenarioManifest.s4.targetsPerCall = 999; }],
     ['missing package fingerprint', (f: any) => { delete f.payload.provenance.environment.packages.motion; }],
+    ['missing root codec fingerprint', (f: any) => {
+      delete f.payload.provenance.environment.rootPackages.pako;
+    }],
+    ['root codec version drift', (f: any) => {
+      f.payload.provenance.environment.rootPackages.pako.version = '3.0.0';
+    }],
+    ['missing canonical gzip helper hash', (f: any) => {
+      delete f.payload.provenance.inputs['root/scripts/compression-oracle.mjs'];
+    }],
+    ['missing canonical gzip policy hash', (f: any) => {
+      delete f.payload.provenance.inputs['root/scripts/compression-policy.mjs'];
+    }],
     ['missing cold sample', (f: any) => { f.payload.results.lab.raw.cold.s2.pop(); }],
     ['null cold sample', (f: any) => { f.payload.results.lab.raw.cold.s2[0].samples[0] = null; }],
     ['presented sample forgery', (f: any) => {
@@ -590,5 +615,35 @@ describe('benchmark documentation evidence state', () => {
     ['extra report', `${permalink}\n${permalink.replace(stem, `${stem}-extra`)}`],
   ])('rejects %s', (_label, document) => {
     expect(() => parseBenchmarkDocumentationState(document, pkg)).toThrow();
+  });
+
+  it('reader отчёта загружается в consumer-checkout без dev-кодека', () => {
+    const isolated = mkdtempSync(join(tmpdir(), 'lab-motion-report-reader-'));
+    try {
+      const files = [
+        'bench/compare/report-contract.mjs',
+        'bench/compare/provenance.mjs',
+        'bench/compare/methodology.mjs',
+        'scripts/compression-oracle.mjs',
+        'scripts/compression-policy.mjs',
+      ];
+      for (const relative of files) {
+        const source = resolve(relative);
+        if (!existsSync(source)) continue;
+        const target = join(isolated, relative);
+        mkdirSync(dirname(target), { recursive: true });
+        cpSync(source, target);
+      }
+      const reader = pathToFileURL(
+        join(isolated, 'bench', 'compare', 'report-contract.mjs'),
+      ).href;
+      expect(() => execFileSync(
+        process.execPath,
+        ['--input-type=module', '--eval', `await import(${JSON.stringify(reader)})`],
+        { cwd: isolated, stdio: 'pipe' },
+      )).not.toThrow();
+    } finally {
+      rmSync(isolated, { recursive: true, force: true });
+    }
   });
 });

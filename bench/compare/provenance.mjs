@@ -117,6 +117,59 @@ function installedPnpmVersion() {
   return execFileSync('pnpm', ['--version'], { encoding: 'utf8' }).trim();
 }
 
+const EXACT_PACKAGE_VERSION = /^\d+\.\d+\.\d+(?:[-+].+)?$/;
+
+/** Единый контракт точной версии для фиксации и проверки происхождения. */
+export function isExactPackageVersion(version) {
+  return typeof version === 'string' && EXACT_PACKAGE_VERSION.test(version);
+}
+
+function captureInstalledPackages(baseDirectory, packageJson, requiredPackages, owner) {
+  const packages = {};
+  for (const name of requiredPackages) {
+    const expected = packageJson.devDependencies?.[name] ?? packageJson.dependencies?.[name];
+    if (!isExactPackageVersion(expected)) {
+      throw new Error(`provenance: ${name} должен иметь точную версию в ${owner} package.json`);
+    }
+    let packageDirectory;
+    try {
+      packageDirectory = realpathSync(path.join(baseDirectory, 'node_modules', name));
+    } catch {
+      throw new Error(`provenance: ${name}@${expected} не установлен в ${owner} node_modules`);
+    }
+    const installed = JSON.parse(readFileSync(path.join(packageDirectory, 'package.json'), 'utf8'));
+    if (installed.version !== expected) {
+      throw new Error(`provenance: ${name}: ожидалась ${expected}, установлена ${installed.version}`);
+    }
+    packages[name] = { version: installed.version, ...hashFileTree(packageDirectory) };
+  }
+  return packages;
+}
+
+/**
+ * Повторно разрешает и хеширует фактические package trees после долгого прогона.
+ * Lock-файл сам по себе не замечает подмену ignored node_modules во время замера.
+ */
+export function assertInstalledPackageTreesUnchanged(baseDirectory, expectedPackages) {
+  for (const [name, expected] of Object.entries(expectedPackages ?? {})) {
+    let packageDirectory;
+    try {
+      packageDirectory = realpathSync(path.join(baseDirectory, 'node_modules', name));
+    } catch {
+      throw new Error(`provenance: ${name} исчез во время benchmark-прогона`);
+    }
+    const installed = JSON.parse(readFileSync(path.join(packageDirectory, 'package.json'), 'utf8'));
+    const tree = hashFileTree(packageDirectory);
+    if (
+      installed.version !== expected.version ||
+      tree.files !== expected.files ||
+      tree.sha256 !== expected.sha256
+    ) {
+      throw new Error(`provenance: ${name} изменился во время benchmark-прогона`);
+    }
+  }
+}
+
 /**
  * Проверяет фактический toolchain и установленные vendor-байты, а не только
  * обещания lock-файла. Node 24 — канонический publish-runtime бенчмарков.
@@ -147,24 +200,24 @@ export function captureBenchmarkEnvironment(
       `provenance: packageManager benchmark package должен совпадать с root (${rootPkg.packageManager})`,
     );
   }
-  const packages = {};
-  for (const name of requiredPackages) {
-    const expected = benchPkg.devDependencies?.[name] ?? benchPkg.dependencies?.[name];
-    if (typeof expected !== 'string' || !/^\d+\.\d+\.\d+(?:[-+].+)?$/.test(expected)) {
-      throw new Error(`provenance: ${name} должен иметь точную версию в benchmark package.json`);
-    }
-    const packageDirectory = realpathSync(path.join(benchDirectory, 'node_modules', name));
-    const installed = JSON.parse(readFileSync(path.join(packageDirectory, 'package.json'), 'utf8'));
-    if (installed.version !== expected) {
-      throw new Error(`provenance: ${name}: ожидалась ${expected}, установлена ${installed.version}`);
-    }
-    packages[name] = { version: installed.version, ...hashFileTree(packageDirectory) };
-  }
+  const packages = captureInstalledPackages(
+    benchDirectory,
+    benchPkg,
+    requiredPackages,
+    'benchmark',
+  );
+  const rootPackages = captureInstalledPackages(
+    root,
+    rootPkg,
+    options.requiredRootPackages ?? [],
+    'root',
+  );
   return {
     node: nodeVersion,
     nodeExecutableSha256: options.nodeVersion === undefined ? sha256File(process.execPath) : undefined,
     pnpm: pnpmVersion,
     packages,
+    rootPackages,
   };
 }
 
@@ -215,7 +268,10 @@ export function prepareBenchmarkCheckout({
   build = buildCurrentCheckout,
   readState = readCheckoutState,
   requiredPackages = [],
-  captureEnvironment = (r, b) => captureBenchmarkEnvironment(r, b, requiredPackages),
+  requiredRootPackages = [],
+  captureEnvironment = (r, b) => captureBenchmarkEnvironment(r, b, requiredPackages, {
+    requiredRootPackages,
+  }),
   requireClean = true,
   requiredInputs = [],
 }) {
@@ -297,6 +353,13 @@ export function formatProvenanceMarkdown(prepared, adapters) {
   if (packageEntries.length > 0) {
     lines.push('- Фактически установленные benchmark-пакеты:');
     for (const [name, info] of packageEntries) {
+      lines.push(`  - \`${name}@${info.version}\`: ${info.files} файлов; SHA-256 \`${info.sha256}\``);
+    }
+  }
+  const rootPackageEntries = Object.entries(prepared.environment?.rootPackages ?? {});
+  if (rootPackageEntries.length > 0) {
+    lines.push('- Фактически установленный root-tooling:');
+    for (const [name, info] of rootPackageEntries) {
       lines.push(`  - \`${name}@${info.version}\`: ${info.files} файлов; SHA-256 \`${info.sha256}\``);
     }
   }

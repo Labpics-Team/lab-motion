@@ -3,7 +3,7 @@
  *
  * Две метрики, обе жёсткие (превышение или отсутствующий dist-файл → exit 1):
  *
- * 1. ШИПНУТЫЙ вес: gzip и Brotli начального статического ESM-графа каждого
+ * 1. ШИПНУТЫЙ вес: канонический gzip и Brotli начального статического ESM-графа каждого
  *    subpath (entry + recursive local imports, каждый HTTP-файл сжат отдельно).
  *    Это то, что качает CDN/raw-потребитель. Регрессионный порог остаётся на gzip; Brotli —
  *    независимая наблюдаемая метрика, чтобы оптимизация не подгонялась под один кодек.
@@ -29,15 +29,16 @@
  */
 
 import { existsSync, readFileSync, realpathSync } from 'node:fs';
-import { brotliCompressSync, constants as zlibConstants, gzipSync } from 'node:zlib';
 import { resolve, dirname, isAbsolute, relative, sep as pathSeparator } from 'node:path';
 import { pathToFileURL, fileURLToPath } from 'node:url';
 import { build, buildSync } from 'esbuild';
+import {
+  canonicalGzip,
+  observationalBrotli,
+} from './compression-oracle.mjs';
 
-const brotli = (bytes) =>
-  brotliCompressSync(bytes, {
-    params: { [zlibConstants.BROTLI_PARAM_QUALITY]: 11 },
-  });
+// Compression-политика вынесена в узкий SSOT: сравнительный стенд использует
+// те же байты gzip, не импортируя esbuild, пороги и остальной размерный гейт.
 
 // Порог (в байтах) для ядра пакета (".") — фактический вес после s09 = ~2090 gz
 // + небольшой люфт. Дожимание до 2048 отменено решением Даниила 2026-07-02:
@@ -327,8 +328,8 @@ export async function measureScenario(scenario, distIndexPath) {
     const out = result.outputFiles[0].contents;
     return {
       name: scenario.name,
-      gzBytes: gzipSync(out, { level: 9 }).length,
-      brBytes: brotli(out).length,
+      gzBytes: canonicalGzip(out).length,
+      brBytes: observationalBrotli(out).length,
       rawBytes: out.length,
       gate: scenario.gate,
     };
@@ -454,8 +455,8 @@ export function measureEsmTransfer(importPath, root) {
   let entryBrBytes = 0;
   for (const name of closure) {
     const raw = readFileSync(resolve(root, name));
-    const gz = gzipSync(raw, { level: 9 }).length;
-    const br = brotli(raw).length;
+    const gz = canonicalGzip(raw).length;
+    const br = observationalBrotli(raw).length;
     rawBytes += raw.length;
     gzBytes += gz;
     brBytes += br;
@@ -526,7 +527,7 @@ async function runCli() {
   const pad = (s, n) => String(s).padEnd(n);
   const lpad = (s, n) => String(s).padStart(n);
 
-  console.log('\n@labpics/motion — bundle size (ESM, gzip-9 + Brotli-11)\n');
+  console.log('\n@labpics/motion — bundle size (ESM, канонический gzip-9 + Brotli-11)\n');
   console.log(
     pad('Entry', COL.label) +
     lpad('Files', COL.files) +

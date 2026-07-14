@@ -68,6 +68,8 @@ function validateRevision(payload, stem) {
   const historicalInputs = {
     'root/package.json': 'package.json',
     'root/pnpm-lock.yaml': 'pnpm-lock.yaml',
+    'root/scripts/compression-policy.mjs': 'scripts/compression-policy.mjs',
+    'root/scripts/compression-oracle.mjs': 'scripts/compression-oracle.mjs',
     'bench/package.json': 'bench/compare/package.json',
     'bench/pnpm-lock.yaml': 'bench/compare/pnpm-lock.yaml',
     'bench/bench.mjs': 'bench/compare/bench.mjs',

@@ -12,11 +12,16 @@ import {
   measureEsmTransfer,
   measureScenario,
 } from '../scripts/size-gate.mjs';
+import {
+  canonicalGzip,
+} from '../scripts/compression-oracle.mjs';
+import { CANONICAL_GZIP_OPTIONS } from '../scripts/compression-policy.mjs';
+import { gzip as pakoGzip } from 'pako';
 import { mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { resolve, dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { tmpdir } from 'node:os';
-import { gzipSync } from 'node:zlib';
+import { createHash } from 'node:crypto';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const ROOT = resolve(__dirname, '..');
@@ -30,6 +35,48 @@ const ROOT = resolve(__dirname, '..');
  * package.json → exports, а не хранится литералом в скрипте.
  */
 describe('size-gate: auto-derive subpath entries from package.json exports', () => {
+  it('канонический gzip различает мутацию каждого параметра и не зависит от системного zlib', () => {
+    const fixture = new Uint8Array(20_175);
+    let random = 7;
+    for (let index = 0; index < fixture.length; index++) {
+      if (index % 997 < 600) {
+        fixture[index] = index % 97 < 70 ? 65 + index % 23 : index * 17 % 251;
+      } else {
+        random = (Math.imul(random, 1_103_515_245) + 12_345) >>> 0;
+        fixture[index] = random >>> 16;
+      }
+    }
+
+    expect(Object.isFrozen(CANONICAL_GZIP_OPTIONS)).toBe(true);
+    expect(CANONICAL_GZIP_OPTIONS).toStrictEqual({
+      level: 9,
+      windowBits: 15,
+      memLevel: 8,
+      strategy: 0,
+      legacyHash: false,
+    });
+
+    const compressed = canonicalGzip(fixture);
+    expect(compressed).toHaveLength(9_378);
+    expect(createHash('sha256').update(compressed).digest('hex'))
+      .toBe('9a33ac41e630a5fe732001e3d2a5ea2209e6927b426dbe237a5f21307bbc878e');
+
+    const mutations = [
+      ['level', 8, 9_378, '652554b4de4f64134ac942e966728c556e7a43fa6b3d67109a3507bb65e8cadc'],
+      ['windowBits', 14, 9_377, '318b4b34eb34229b0ad399d476a142e772c9145343cf2364d18b92e292db6734'],
+      ['memLevel', 7, 9_398, '57ead4c09c1980d469cd93864a0ae7d0a4efb69c88e31b8f531bb88428a0f70f'],
+      ['strategy', 1, 9_396, 'def46aa231b6f2df672a17f47aed05d3f78359dd1b9896b564a10ca5b078b606'],
+      ['legacyHash', true, 9_375, '5400ba29946e1c0223e4202225287dc4b879042a42626f8042c2db90f74b898a'],
+    ] as const;
+    for (const [parameter, value, bytes, sha256] of mutations) {
+      const mutated = pakoGzip(fixture, { ...CANONICAL_GZIP_OPTIONS, [parameter]: value });
+      expect(mutated, `${parameter}: корпус обязан различать мутацию`).not.toEqual(compressed);
+      expect(mutated, `${parameter}: неверная длина мутации`).toHaveLength(bytes);
+      expect(createHash('sha256').update(mutated).digest('hex'), `${parameter}: неверный SHA-256`)
+        .toBe(sha256);
+    }
+  });
+
   it('derives one entry per exports key that has an "import" condition', () => {
     const pkg = {
       exports: {
@@ -181,14 +228,14 @@ describe('size-gate: auto-derive subpath entries from package.json exports', () 
       const row = rows[0];
       expect(hasWarnings).toBe(false);
       expect(row.closureFiles).toBe(2);
-      expect(row.entryGzBytes).toBe(gzipSync(Buffer.from(entry), { level: 9 }).length);
+      expect(row.entryGzBytes).toBe(canonicalGzip(Buffer.from(entry)).length);
       expect(row.gzBytes).toBe(
-        gzipSync(Buffer.from(entry), { level: 9 }).length +
-        gzipSync(Buffer.from(frame), { level: 9 }).length,
+        canonicalGzip(Buffer.from(entry)).length +
+        canonicalGzip(Buffer.from(frame)).length,
       );
       expect(row.gzBytes).toBeLessThan(
-        row.entryGzBytes + gzipSync(Buffer.from(frame), { level: 9 }).length +
-        gzipSync(Buffer.from(lazy), { level: 9 }).length,
+        row.entryGzBytes + canonicalGzip(Buffer.from(frame)).length +
+        canonicalGzip(Buffer.from(lazy)).length,
       );
     } finally {
       rmSync(root, { recursive: true, force: true });
@@ -209,9 +256,9 @@ describe('size-gate: auto-derive subpath entries from package.json exports', () 
       const measured = measureEsmTransfer('dist/index.js', root);
       expect(measured.closureFiles).toBe(3);
       expect(measured.gzBytes).toBe(
-        gzipSync(Buffer.from(entry), { level: 9 }).length +
-        gzipSync(Buffer.from(theme), { level: 9 }).length +
-        gzipSync(Buffer.from(tokens), { level: 9 }).length,
+        canonicalGzip(Buffer.from(entry)).length +
+        canonicalGzip(Buffer.from(theme)).length +
+        canonicalGzip(Buffer.from(tokens)).length,
       );
     } finally {
       rmSync(root, { recursive: true, force: true });

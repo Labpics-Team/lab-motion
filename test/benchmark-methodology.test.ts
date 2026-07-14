@@ -604,6 +604,17 @@ describe('benchmark methodology fail-closed contracts', () => {
     }).verdict).toBe('incomparable');
   });
 
+  it('routes comparative gzip through the root deterministic codec SSOT', () => {
+    const source = readFileSync('bench/compare/bench.mjs', 'utf8');
+    expect(source).not.toContain("from 'node:zlib'");
+    expect(source).not.toContain('gzipSync');
+    expect(source).toContain('gz: canonicalGzip(raw).byteLength');
+    expect(source).toContain('br: observationalBrotli(raw).byteLength');
+    expect(source).toContain("['root/scripts/compression-policy.mjs'");
+    expect(source).toContain("['root/scripts/compression-oracle.mjs'");
+    expect(source).toContain('assertInstalledPackageTreesUnchanged(ROOT');
+  });
+
   it('mass ceiling хранит 120 paired lifecycle clusters с 60-frame и semantic evidence', () => {
     const source = readFileSync('scripts/bench-ceiling.mjs', 'utf8');
     expect(source).toContain('const MASS_LIFECYCLE_RUNS = 120');
