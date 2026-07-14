@@ -62,7 +62,12 @@ export default defineConfig({
   sourcemap: false,
   clean: true,
   minify: 'terser',
-  terserOptions: { compress: { passes: 3, pure_getters: true }, mangle: { properties: { regex: /^_/ } } },
+  // tsup запускает ESM/CJS minify параллельно, а Terser дописывает служебные
+  // поля в nested options. Свежие объекты не дают форматам менять друг друга.
+  terserOptions: {
+    get compress() { return { passes: 3, pure_getters: true }; },
+    get mangle() { return { properties: { regex: /^_/ } }; },
+  },
   treeshake: true,
   esbuildPlugins: [sharedFramePlugin],
   onSuccess: makeSharedFrameBrowserNative,
