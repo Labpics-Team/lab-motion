@@ -14,6 +14,12 @@
   Скрытого layout-read, rAF-fallback, C1-подхвата и hostile-host контракта нет;
   кривые выше общего compiler-ceiling отклоняются до materialization.
 
+### Changed
+
+- `./compositor`: exact-key LRU вынесен в functional state без смены policy;
+  общий cache сохраняет O(1) lookup, нулевые аллокации на hit и прежний порядок
+  вытеснения, а одноразовая проверка ёмкости складывается при сборке.
+
 ### Fixed
 
 - Сборка: параллельная минификация ESM/CJS изолирует настройки Terser, поэтому

@@ -45,7 +45,13 @@ import {
 import { supportsWaapi, type WaapiAnimatable } from '../waapi/index.js';
 import { MotionValue, type RequestFrameFn } from '../motion-value.js';
 import { type SpringNode } from './segmenter.js';
-import { SpringLinearCache, DEFAULT_CACHE_CAPACITY } from './cache.js';
+import {
+  DEFAULT_CACHE_CAPACITY,
+  clearSpringLinearCache,
+  createSpringLinearCacheState,
+  springLinearCacheCapacity,
+  springLinearCacheSize,
+} from './cache.js';
 import {
   compileSpringExecutionArtifactTupleUnchecked,
   compileSpringEasingUnchecked,
@@ -105,7 +111,7 @@ export interface SpringLinearOptions {
 
 /**
  * Пружина → CSS linear()-строка с АДАПТИВНЫМ числом узлов (минимум под бюджет
- * ошибки), через общий LRU-кэш. Чистая, SSR-safe, детерминированная.
+ * ошибки), через общий bounded cache. Чистая, SSR-safe, детерминированная.
  *
  * @param spring    — физические параметры (валидируются рано).
  * @param options   — v0 (нормализ.), tolerance (ед. прогресса).
@@ -123,7 +129,7 @@ export function compileSpringLinear(spring: SpringParams, options?: SpringLinear
 
 // ─── createSpringLinearCache (изолированный слот-кэш) ────────────────────────
 
-/** Изолированный компилятор пружин со своим LRU (для тестов/независимых зон). */
+/** Изолированный компилятор пружин со своим bounded cache (для тестов/независимых зон). */
 export interface SpringLinearCompiler {
   /** Компилирует (или достаёт из своего кэша) linear()-строку пружины. */
   compile(spring: SpringParams, options?: SpringLinearOptions): string;
@@ -135,9 +141,9 @@ export interface SpringLinearCompiler {
   readonly capacity: number;
 }
 
-/** Создаёт изолированный кэш-компилятор пружин с заданной ёмкостью LRU. */
+/** Создаёт изолированный кэш-компилятор пружин с заданной ёмкостью. */
 export function createSpringLinearCache(capacity: number = DEFAULT_CACHE_CAPACITY): SpringLinearCompiler {
-  const cache = new SpringLinearCache<SpringExecutionArtifactTuple>(capacity);
+  const cache = createSpringLinearCacheState<SpringExecutionArtifactTuple>(capacity);
   return {
     compile(spring: SpringParams, options?: SpringLinearOptions): string {
       validateSpringParams(spring);
@@ -150,13 +156,13 @@ export function createSpringLinearCache(capacity: number = DEFAULT_CACHE_CAPACIT
       return compileSpringEasingUnchecked(spring, v0, tolerance, cache);
     },
     clear(): void {
-      cache.clear();
+      clearSpringLinearCache(cache);
     },
     get size(): number {
-      return cache.size;
+      return springLinearCacheSize(cache);
     },
     get capacity(): number {
-      return cache.capacity;
+      return springLinearCacheCapacity(cache);
     },
   };
 }

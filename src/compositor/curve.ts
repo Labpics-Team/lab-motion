@@ -1,8 +1,8 @@
 /**
  * Внутренний компилятор spring → CSS linear().
  *
- * Generic-путь хранит artifact в exact-key LRU; узкий native v0=0 использует
- * ограниченный exact-key список без веса generic Map/LRU в своём bundle-графе.
+ * Generic-путь хранит artifact в exact-key LRU; узкий native v0=0
+ * использует ограниченный список без веса generic Map в своём bundle-графе.
  * Оба пути вызывают один emitter: Chromium исполняет CSS linear()-строку,
  * WebKit строит кадры из тех же numeric stops. Абсолютное квантование ключа
  * запрещено: у малых валидных m/k/c оно меняло физику сильнее tolerance.
@@ -10,7 +10,14 @@
 
 import { MotionParamError } from '../errors.js';
 import { settleTimeUpperBound, type SpringParams } from '../spring.js';
-import { SpringLinearCache, DEFAULT_CACHE_CAPACITY } from './cache.js';
+import {
+  DEFAULT_CACHE_CAPACITY,
+  clearSpringLinearCache,
+  createSpringLinearCacheState,
+  lookupSpringLinearCache,
+  storeSpringLinearCache,
+  type SpringLinearCache,
+} from './cache.js';
 import { roundShortest } from './format.js';
 import {
   assertSpringCurveBudget,
@@ -43,8 +50,11 @@ export type SpringExecutionArtifactTuple = [
   facade?: SpringExecutionArtifact,
 ];
 
-/** Generic LRU на realm; публичная диагностика восстанавливается из samples. */
-const sharedCache = /* @__PURE__ */ new SpringLinearCache<SpringExecutionArtifactTuple>(
+/**
+ * Generic bounded cache на realm; default — build-константа, поэтому inline
+ * складывает cold capacity-parser вне consumer-графа animate.
+ */
+const sharedCache = /* @__INLINE__ */ createSpringLinearCacheState<SpringExecutionArtifactTuple>(
   DEFAULT_CACHE_CAPACITY,
 );
 
@@ -60,7 +70,7 @@ type RestingEntry = [
   artifact: SpringExecutionArtifactTuple,
 ];
 
-// Native v0=0 не платит за generic hash-map/LRU; линейный hit точен и ничего
+// Native v0=0 не платит за generic hash-map/cache; линейный hit точен и ничего
 // не аллоцирует.
 const restingCache: RestingEntry[] = [];
 
@@ -178,7 +188,16 @@ export function tryCompileSpringExecutionArtifactTupleUnchecked(
   prebuiltDurationMs?: number,
 ): SpringExecutionArtifactTuple | undefined {
   const { mass, stiffness, damping } = spring;
-  const hit = cache.lookup(mass, stiffness, damping, v0, tolerance);
+  // Единственный production-consumer: inline оставляет functional core отдельно
+  // тестируемым в source, а import-cost ratchet контролирует итоговый артефакт.
+  const hit = /* @__INLINE__ */ lookupSpringLinearCache(
+    cache,
+    mass,
+    stiffness,
+    damping,
+    v0,
+    tolerance,
+  );
   if (hit !== undefined) return hit;
   let nodes = prebuiltNodes;
   let durationMs = prebuiltDurationMs;
@@ -193,7 +212,15 @@ export function tryCompileSpringExecutionArtifactTupleUnchecked(
     tolerance,
     durationMs ?? settleTimeUpperBound(spring, v0) * 1000,
   );
-  cache.store(mass, stiffness, damping, v0, tolerance, artifact);
+  /* @__INLINE__ */ storeSpringLinearCache(
+    cache,
+    mass,
+    stiffness,
+    damping,
+    v0,
+    tolerance,
+    artifact,
+  );
   return artifact;
 }
 
@@ -281,6 +308,6 @@ export function compileRestingSpringEasingUnchecked(
 
 /** Герметичный сброс всех execution artifact-кэшей. */
 export function clearSpringExecutionArtifactCacheUnchecked(): void {
-  sharedCache.clear();
+  clearSpringLinearCache(sharedCache);
   restingCache.length = 0;
 }
