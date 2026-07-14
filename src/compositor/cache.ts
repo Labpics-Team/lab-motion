@@ -1,5 +1,5 @@
 /**
- * compositor/cache.ts — ограниченный LRU-кэш execution-артефактов пружин.
+ * compositor/cache.ts — ограниченный LRU-cache артефактов пружин.
  *
  * Зачем: staggered-списки и повторные интеракции компилируют ОДНУ и ту же
  * пружину много раз; компиляция (сетка + RDP) дороже поиска. Кэш амортизирует её
@@ -13,10 +13,8 @@
  *   бы на КАЖДЫЙ вызов, включая попадание); вызывающий сам делает
  *   `lookup → если undefined: compile+store`. Ветка попадания возвращает
  *   существующий артефакт до любой аллокации.
- * - LRU — интрузивный двусвязный список: перенос узла в голову на попадании —
- *   переприсваивание указателей (без new). Вытеснение хвоста на промахе при
- *   заполнении ПЕРЕИСПОЛЬЗУЕТ объект узла (реассайн полей), новый узел
- *   аллоцируется только пока ёмкость не достигнута.
+ * - Recency — интрузивный двусвязный LRU: hit переставляет существующий узел
+ *   без аллокации, а полный cold-miss переиспользует хвостовой объект.
  *
  * Коллизии хеша безопасны: узел хранит пять исходных чисел и сверяет их на
  * попадании (без аллокаций) — несовпадение трактуется как промах (перекомпиляция
@@ -33,8 +31,8 @@ interface CacheNode<T> {
   d: number;
   e: number;
   _value: T;
-  _prev: CacheNode<T> | null;
-  _next: CacheNode<T> | null;
+  _prev: CacheNode<T> | undefined;
+  _next: CacheNode<T> | undefined;
 }
 
 /**
@@ -49,118 +47,136 @@ function hash5(a: number, b: number, c: number, d: number, e: number): number {
 export const DEFAULT_CACHE_CAPACITY = 256;
 
 /**
- * Ограниченный LRU числовой exact-key → артефакт кривой. Тип значения задаёт
+ * Ограниченный LRU-cache: числовой exact-key → артефакт кривой. Тип задаёт
  * владелец; compositor хранит единый `{ easing, serialized samples }` для всех
- * browser-веток. O(1) поиск/вставка, ноль аллокаций на попадании. Не
- * потокобезопасен (JS однопоточен на кадре).
+ * browser-веток. O(1) и ноль аллокаций на попадании/устоявшемся вытеснении.
+ * Не потокобезопасен (JS однопоточен на кадре).
  */
-export class SpringLinearCache<T = string> {
-  private readonly _capacity: number;
-  private readonly _map = new Map<number, CacheNode<T>>();
-  private _head: CacheNode<T> | null = null; // MRU
-  private _tail: CacheNode<T> | null = null; // LRU
+export interface SpringLinearCache<T = string> {
+  readonly _capacity: number;
+  readonly _map: Map<number, CacheNode<T>>;
+  _head: CacheNode<T> | undefined;
+  _tail: CacheNode<T> | undefined;
+}
 
-  constructor(capacity: number = DEFAULT_CACHE_CAPACITY) {
-    this._capacity = Number.isInteger(capacity) && capacity > 0 ? capacity : DEFAULT_CACHE_CAPACITY;
+export function createSpringLinearCacheState<T = string>(capacity: number): SpringLinearCache<T> {
+  // Нормализация живёт на единственной границе создания состояния: ни прямой
+  // internal-consumer, ни публичная оболочка не могут собрать безграничный
+  // либо неработающий LRU. Дефолт сохраняет прежний публичный контракт.
+  const parsed = typeof capacity === 'number' && capacity > 0 && capacity % 1 === 0
+    ? capacity
+    : DEFAULT_CACHE_CAPACITY;
+  return { _capacity: parsed, _map: new Map(), _head: undefined, _tail: undefined };
+}
+
+/** Переносит существующий узел в MRU-голову без аллокаций. */
+function touch<T>(cache: SpringLinearCache<T>, node: CacheNode<T>): void {
+  if (cache._head === node) return;
+  const prev = node._prev;
+  const next = node._next;
+  if (prev) prev._next = next;
+  if (next) next._prev = prev;
+  else cache._tail = prev;
+  node._prev = undefined;
+  node._next = cache._head;
+  cache._head!._prev = node;
+  cache._head = node;
+}
+
+/**
+ * Поиск по точному числовому ключу. Возвращает артефакт при попадании и даёт
+ * узел в MRU-голову либо undefined при промахе.
+ */
+export function lookupSpringLinearCache<T>(
+  cache: SpringLinearCache<T>,
+  a: number,
+  b: number,
+  c: number,
+  d: number,
+  e: number,
+): T | undefined {
+  const hash = hash5(a, b, c, d, e);
+  const node = cache._map.get(hash);
+  // Сверка исходных чисел отсекает коллизию хеша (промах, не чужой план).
+  if (node !== undefined && node.a === a && node.b === b && node.c === c && node.d === d && node.e === e) {
+    touch(cache, node);
+    return node._value;
+  }
+  return undefined;
+}
+
+/**
+ * Кладёт артефакт под точный числовой ключ. При заполнении ПЕРЕИСПОЛЬЗУЕТ
+ * LRU-хвост. Промах на коллизии
+ * хеша перезаписывает старую запись под тем же хешем (её ключ отличался).
+ */
+export function storeSpringLinearCache<T>(
+  cache: SpringLinearCache<T>,
+  a: number,
+  b: number,
+  c: number,
+  d: number,
+  e: number,
+  value: T,
+): void {
+  const hash = hash5(a, b, c, d, e);
+  const existing = cache._map.get(hash);
+  if (existing !== undefined) {
+    // Тот же хеш: либо повторный store того же ключа, либо коллизия — в обоих
+    // случаях перезаписываем узел на месте (реассайн, без аллокации).
+    existing.a = a;
+    existing.b = b;
+    existing.c = c;
+    existing.d = d;
+    existing.e = e;
+    existing._value = value;
+    touch(cache, existing);
+    return;
   }
 
-  /** Текущее число занятых слотов (диагностика/тесты). */
-  get size(): number {
-    return this._map.size;
+  let node: CacheNode<T>;
+  if (cache._map.size >= cache._capacity) {
+    node = cache._tail!;
+    cache._map.delete(node._hash);
+    touch(cache, node);
+    node._hash = hash;
+    node.a = a;
+    node.b = b;
+    node.c = c;
+    node.d = d;
+    node.e = e;
+    node._value = value;
+  } else {
+    node = {
+      _hash: hash,
+      a,
+      b,
+      c,
+      d,
+      e,
+      _value: value,
+      _prev: undefined,
+      _next: cache._head,
+    };
+    if (cache._head) cache._head._prev = node;
+    else cache._tail = node;
+    cache._head = node;
   }
+  cache._map.set(hash, node);
+}
 
-  /** Ёмкость (число слотов). */
-  get capacity(): number {
-    return this._capacity;
-  }
+// Холодный inspection/reset shell вынесен из class prototype: consumer-путь
+// общей кривой не платит за методы, которые нужны только изолированной фабрике.
+export function springLinearCacheSize(cache: SpringLinearCache<unknown>): number {
+  return cache._map.size;
+}
 
-  /**
-   * Поиск по точному числовому ключу. Возвращает артефакт при попадании (и двигает
-   * узел в голову LRU — без аллокаций) либо undefined при промахе.
-   */
-  lookup(a: number, b: number, c: number, d: number, e: number): T | undefined {
-    const hash = hash5(a, b, c, d, e);
-    const node = this._map.get(hash);
-    // Сверка исходных чисел отсекает коллизию хеша (промах, не чужой план).
-    if (node !== undefined && node.a === a && node.b === b && node.c === c && node.d === d && node.e === e) {
-      this._moveToHead(node);
-      return node._value;
-    }
-    return undefined;
-  }
+export function springLinearCacheCapacity(cache: SpringLinearCache<unknown>): number {
+  return cache._capacity;
+}
 
-  /**
-   * Кладёт артефакт под точный числовой ключ. При заполнении вытесняет LRU-хвост,
-   * ПЕРЕИСПОЛЬЗУЯ его объект-узел (без аллокации нового). Промах на коллизии
-   * хеша перезаписывает старую запись под тем же хешем (её ключ отличался).
-   */
-  store(a: number, b: number, c: number, d: number, e: number, value: T): void {
-    const hash = hash5(a, b, c, d, e);
-    const existing = this._map.get(hash);
-    if (existing !== undefined) {
-      // Тот же хеш: либо повторный store того же ключа, либо коллизия — в обоих
-      // случаях перезаписываем узел на месте (реассайн, без аллокации).
-      existing.a = a;
-      existing.b = b;
-      existing.c = c;
-      existing.d = d;
-      existing.e = e;
-      existing._value = value;
-      this._moveToHead(existing);
-      return;
-    }
-
-    let node: CacheNode<T>;
-    if (this._map.size >= this._capacity && this._tail !== null) {
-      // Вытеснение LRU с переиспользованием узла (ноль аллокаций на устоявшемся
-      // потоке промахов при полном кэше).
-      node = this._tail;
-      this._map.delete(node._hash);
-      this._unlink(node);
-      node._hash = hash;
-      node.a = a;
-      node.b = b;
-      node.c = c;
-      node.d = d;
-      node.e = e;
-      node._value = value;
-    } else {
-      node = { _hash: hash, a, b, c, d, e, _value: value, _prev: null, _next: null };
-    }
-    this._map.set(hash, node);
-    this._pushHead(node);
-  }
-
-  /** Очистка (тесты/сброс между независимыми прогонами). */
-  clear(): void {
-    this._map.clear();
-    this._head = null;
-    this._tail = null;
-  }
-
-  // ─── Интрузивный список ────────────────────────────────────────────────────
-
-  private _unlink(node: CacheNode<T>): void {
-    const { _prev: prev, _next: next } = node;
-    if (prev !== null) prev._next = next;
-    else this._head = next;
-    if (next !== null) next._prev = prev;
-    else this._tail = prev;
-    node._prev = null;
-    node._next = null;
-  }
-
-  private _pushHead(node: CacheNode<T>): void {
-    node._prev = null;
-    node._next = this._head;
-    if (this._head !== null) this._head._prev = node;
-    this._head = node;
-    if (this._tail === null) this._tail = node;
-  }
-
-  private _moveToHead(node: CacheNode<T>): void {
-    if (this._head === node) return;
-    this._unlink(node);
-    this._pushHead(node);
-  }
+export function clearSpringLinearCache(cache: SpringLinearCache<unknown>): void {
+  cache._map.clear();
+  cache._head = undefined;
+  cache._tail = undefined;
 }
