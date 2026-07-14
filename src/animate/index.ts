@@ -166,13 +166,6 @@ function defaultSetTimer(cb: () => void, ms: number): () => void {
   return () => clearTimeout(h);
 }
 
-function defaultMatchMedia():
-  | ((query: string) => { matches: boolean })
-  | undefined {
-  const mm = (globalThis as { matchMedia?: (q: string) => { matches: boolean } }).matchMedia;
-  return typeof mm === 'function' ? mm : undefined;
-}
-
 // ─── Разбор опций ────────────────────────────────────────────────────────────
 
 function resolveMode(options: AnimateOptions): MotionMode {
@@ -327,8 +320,8 @@ type PlannedGroup = readonly [
   record: ReturnType<typeof groupRecord>,
   bound: BoundGroup,
   delayMs: number,
-  tier: CompositorTierCode,
-  artifact: SpringExecutionArtifactTuple | undefined,
+  /** Tier 3 — reduced, undefined — main, tuple — compositor. */
+  execution: SpringExecutionArtifactTuple | Extract<CompositorTierCode, 3> | undefined,
 ];
 
 // ─── animate ─────────────────────────────────────────────────────────────────
@@ -359,7 +352,9 @@ export function animate(
   const els = resolveTargets(target);
   const staggerDelays = resolveStaggerDelays(staggerInput, els.length);
 
-  const matchMedia = options.matchMedia ?? defaultMatchMedia();
+  // Тип/host-ошибки канонически гасит prefersReduced внутри tier-resolver.
+  const matchMedia = options.matchMedia ??
+    (globalThis as { matchMedia?: (query: string) => { matches: boolean } }).matchMedia;
   const now = options.now ?? defaultNow;
   const setTimer = options.setTimer ?? defaultSetTimer;
   // 2. Фаза plan/read: читаем и привязываем ВСЕ цели до первой мутации.
@@ -379,17 +374,18 @@ export function animate(
     for (const [group, list] of groups) {
       const rec = groupRecord(el, group);
       const bound = bindGroup(el, group, list, rec);
-      const artifact =
-        tier === 0 &&
-        mode._type === 'spring' &&
-        (group === 'transform' || group === 'opacity')
-          ? tryCompileSpringExecutionArtifactTupleUnchecked(
-              mode._spring,
-              dominantV0(bound._numeric),
-              DEFAULT_TOLERANCE,
-            )
-          : undefined;
-      plan.push([el, group, rec, bound, delayMs, tier, artifact]);
+      const execution = tier === 3
+        ? tier
+        : tier === 0 &&
+          mode._type === 'spring' &&
+          (group === 'transform' || group === 'opacity')
+            ? tryCompileSpringExecutionArtifactTupleUnchecked(
+                mode._spring,
+                dominantV0(bound._numeric),
+                DEFAULT_TOLERANCE,
+              )
+            : undefined;
+      plan.push([el, group, rec, bound, delayMs, execution]);
     }
   }
 
@@ -417,8 +413,7 @@ export function animate(
     // микрозадачу. Сохраняем этот порядок без N deferred: Promise
     // завершится даже если onComplete бросит.
     queueMicrotask(resolveFinished);
-    if (natural !== total) return;
-    options.onComplete?.();
+    if (natural === total) options.onComplete?.();
   };
   const report = (nat: boolean): void => {
     done++;
@@ -434,12 +429,11 @@ export function animate(
   //    record ЗДЕСЬ, а не сохраняется в плане: повтор цели в списке обязан
   //    прервать юнит, созданный предыдущей записью того же commit.
   try {
-    for (const entry of plan) {
-      const [el, group, rec, bound, delayMs, tier, artifact] = entry;
+    for (const [el, group, rec, bound, delayMs, execution] of plan) {
       const previous = rec._owner;
       if (rec._transition) throw new MotionParamError('LM157');
       rec._transition = true;
-      if (tier === 3) {
+      if (execution === 3) {
         try {
           if (previous) previous._supersede(() => writeSnap(el, group, bound));
           else writeSnap(el, group, bound);
@@ -453,7 +447,9 @@ export function animate(
         report(true);
         continue;
       }
-      if (artifact !== undefined && mode._type === 'spring') {
+      // Compositor execution строится только из spring-mode в plan-фазе, поэтому второй
+      // runtime-discriminant здесь был бы дублированием того же решения.
+      if (execution) {
         let unit: WaapiUnit;
         try {
           unit = new WaapiUnit({
@@ -463,13 +459,13 @@ export function animate(
             _numeric: bound._numeric,
             _residuals: bound._residuals,
             _transform: bound._transform,
-            _spring: mode._spring,
+            _spring: (mode as Extract<MotionMode, { _type: 'spring' }>)._spring,
             _delayMs: delayMs,
             _now: now,
             _setTimer: setTimer,
             _getBatch: getMainBatch,
             _onDone: report,
-            _artifact: artifact,
+            _artifact: execution,
           });
         } catch (error) {
           protectedOwner = previous;

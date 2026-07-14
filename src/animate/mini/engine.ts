@@ -33,6 +33,7 @@
 import { MotionParamError } from '../../errors.js';
 import { createFrameLoop, frame as defaultFrame, type FrameLoop } from '../../frame/index.js';
 import { sampleSpringUnchecked } from '../../internal/read-spring.js';
+import { finiteOrZero } from '../../internal/finite.js';
 import { type SpringParams, validateSpringParams } from '../../spring.js';
 import type { CodecResolver, PropertyCodec, TargetAdapter } from '../registry.js';
 import {
@@ -232,7 +233,7 @@ const _RANGE_EPS = 1e-10;
 function _normalizeV0(velocity: number, range: number | undefined): number {
   if (range === undefined || !(Math.abs(range) > _RANGE_EPS)) return 0;
   const v0 = velocity / range;
-  return Number.isFinite(v0) ? v0 + 0 : 0;
+  return finiteOrZero(v0);
 }
 
 /** Привязанная поверхность: каналы + остаточные (замороженные) + v0 группы. */
@@ -388,7 +389,7 @@ class Unit implements SurfaceOwner {
       let velocity = this._active ? ch._velocity : 0;
       if (this._active && this._o._mode._type === 'tween') {
         const sampled = (ch._numRange ?? 0) * this._tweenDerivative();
-        velocity = Number.isFinite(sampled) ? sampled + 0 : 0;
+        velocity = finiteOrZero(sampled);
       }
       return { _value: ch._value, _velocity: velocity };
     }
@@ -584,7 +585,7 @@ class Unit implements SurfaceOwner {
       ch._value = ch._codec.serialize(ch._interp(p));
       if (dpdt !== undefined) {
         const vel = ch._numRange !== undefined ? ch._numRange * dpdt : 0;
-        ch._velocity = Number.isFinite(vel) ? vel + 0 : 0;
+        ch._velocity = finiteOrZero(vel);
       }
     }
     return false;
@@ -601,7 +602,7 @@ class Unit implements SurfaceOwner {
     const raw =
       ((mode._ease(k1) - mode._ease(k0)) * 1000) /
       ((k1 - k0) * mode._durationMs);
-    this._tweenDpdt = Number.isFinite(raw) ? raw + 0 : 0;
+    this._tweenDpdt = finiteOrZero(raw);
     return this._tweenDpdt;
   }
 

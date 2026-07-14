@@ -2,6 +2,7 @@
 
 import { scaleSerializedVelocity } from '../compositor/sample.js';
 import { CONVERGENCE_THRESHOLD, FIXED_DT_S, MAX_FRAMES } from '../internal/constants.js';
+import { finiteOrZero } from '../internal/finite.js';
 import {
   readSpringFromBasisUnchecked,
   sampleSpringFromBasisUnchecked,
@@ -85,7 +86,7 @@ export class MainUnit implements GroupOwner, SurfaceUnit {
       if (this._active && o._mode._type === 'tween') {
         const sampled = (channel._to - channel._from) *
           this._tweenDerivative(this._renderedTweenK);
-        velocity = Number.isFinite(sampled) ? sampled + 0 : 0;
+        velocity = finiteOrZero(sampled);
       }
       return { _value: channel._renderedValue, _velocity: velocity };
     }
@@ -267,7 +268,7 @@ export class MainUnit implements GroupOwner, SurfaceUnit {
     const k1 = k + EASE_DERIV_H < 1 ? k + EASE_DERIV_H : 1;
     const raw = ((mode._ease(k1) - mode._ease(k0)) * 1000) /
       ((k1 - k0) * mode._durationMs);
-    const value = Number.isFinite(raw) ? raw + 0 : 0;
+    const value = finiteOrZero(raw);
     if (k === this._tweenK) this._tweenDpdt = value;
     return value;
   }
