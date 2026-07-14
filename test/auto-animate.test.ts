@@ -261,6 +261,9 @@ describe('auto: autoAnimate — адаптер (duck-typed DOM)', () => {
   it('удаление → реинсерт absolute на старом месте, exit-анимация, удаление на onfinish', () => {
     const seam = fakeObserverSeam();
     const doomed = fakeEl(R(20, 40), 'doomed');
+    doomed.style['position'] = 'relative';
+    doomed.style['left'] = '2px';
+    doomed.style['top'] = '3px';
     const parent = fakeParent([doomed]);
     autoAnimate(parent as never, { MutationObserverCtor: seam.Ctor as never });
     parent.children = parent.children.filter((c) => c !== doomed);
@@ -276,6 +279,7 @@ describe('auto: autoAnimate — адаптер (duck-typed DOM)', () => {
     expect(parent.removed).not.toContain(doomed);
     doomed.animations[0]!.onfinish!();
     expect(parent.removed).toContain(doomed);
+    expect(doomed.style).toMatchObject({ position: 'relative', left: '2px', top: '3px' });
   });
 
   it('border родителя учитывается: absolute считается от padding-box (минус clientLeft/clientTop)', () => {
@@ -292,6 +296,9 @@ describe('auto: autoAnimate — адаптер (duck-typed DOM)', () => {
   it('реинкарнация во время exit: эхо своего re-append не путается с возвратом потребителя', () => {
     const seam = fakeObserverSeam();
     const phoenix = fakeEl(R(10, 10), 'phoenix');
+    phoenix.style['position'] = 'relative';
+    phoenix.style['left'] = '7px';
+    phoenix.style['top'] = '8px';
     const parent = fakeParent([phoenix]);
     autoAnimate(parent as never, { MutationObserverCtor: seam.Ctor as never });
     // удаление → exit пошёл (адаптер сам re-append'ит узел absolute)
@@ -307,9 +314,9 @@ describe('auto: autoAnimate — адаптер (duck-typed DOM)', () => {
     // а теперь ПОТРЕБИТЕЛЬ вернул тот же узел до onfinish
     seam.state.callback!([{ addedNodes: [phoenix], removedNodes: [] }]);
     expect(exitAnim.cancelled).toBe(true); // exit отменён
-    expect(phoenix.style['position']).toBe(''); // наши инлайны сняты
-    expect(phoenix.style['left']).toBe('');
-    expect(phoenix.style['top']).toBe('');
+    expect(phoenix.style['position']).toBe('relative'); // исходные инлайны восстановлены
+    expect(phoenix.style['left']).toBe('7px');
+    expect(phoenix.style['top']).toBe('8px');
     expect(phoenix.animateCalls).toHaveLength(2); // exit + enter
     const enterKf = phoenix.animateCalls[1]!.keyframes as Record<string, unknown>[];
     expect(enterKf.map((k) => k['opacity'])).toEqual([0, 1]);
@@ -352,6 +359,166 @@ describe('auto: autoAnimate — адаптер (duck-typed DOM)', () => {
     expect(parent.removed).not.toContain(phoenix);
     secondFinish();
     expect(parent.removed).toContain(phoenix);
+  });
+
+  it('одна host Animation завершает tickets всех узлов', () => {
+    const seam = fakeObserverSeam();
+    const a = fakeEl(R(0, 0), 'a');
+    const b = fakeEl(R(20, 0), 'b');
+    const shared: FakeAnimation = {
+      onfinish: null,
+      cancelled: false,
+      cancel() { this.cancelled = true; },
+    };
+    a.animate = b.animate = () => shared;
+    const parent = fakeParent([a, b]);
+    autoAnimate(parent as never, { MutationObserverCtor: seam.Ctor as never });
+
+    parent.children = [];
+    seam.state.callback!([{ addedNodes: [], removedNodes: [a, b] }]);
+    shared.onfinish!();
+
+    expect(parent.removed.map((node) => node.name)).toEqual(['a', 'b']);
+    expect(parent.children).toEqual([]);
+  });
+
+  it('возврат одного ticket не отменяет общую Animation оставшегося exit', () => {
+    const seam = fakeObserverSeam();
+    const a = fakeEl(R(0, 0), 'a');
+    const b = fakeEl(R(20, 0), 'b');
+    const shared: FakeAnimation = {
+      onfinish: null,
+      cancelled: false,
+      cancel() { this.cancelled = true; },
+    };
+    a.animate = b.animate = () => shared;
+    const parent = fakeParent([a, b]);
+    autoAnimate(parent as never, { MutationObserverCtor: seam.Ctor as never });
+
+    parent.children = [];
+    seam.state.callback!([{ addedNodes: [], removedNodes: [a, b] }]);
+    seam.state.callback!([{ addedNodes: [a], removedNodes: [] }]);
+    seam.state.callback!([{ addedNodes: [a], removedNodes: [] }]);
+
+    expect(shared.cancelled).toBe(false);
+    shared.onfinish!();
+    expect(parent.removed).not.toContain(a);
+    expect(parent.removed).toContain(b);
+  });
+
+  it('одна host Animation имеет единого terminal-владельца между контроллерами', () => {
+    const leftSeam = fakeObserverSeam();
+    const rightSeam = fakeObserverSeam();
+    const left = fakeEl(R(0, 0), 'left');
+    const right = fakeEl(R(0, 0), 'right');
+    const shared: FakeAnimation = {
+      onfinish: null,
+      cancelled: false,
+      cancel() { this.cancelled = true; },
+    };
+    left.animate = right.animate = () => shared;
+    const leftParent = fakeParent([left]);
+    const rightParent = fakeParent([right]);
+    autoAnimate(leftParent as never, { MutationObserverCtor: leftSeam.Ctor as never });
+    autoAnimate(rightParent as never, { MutationObserverCtor: rightSeam.Ctor as never });
+
+    leftParent.children = [];
+    leftSeam.state.callback!([{ addedNodes: [], removedNodes: [left] }]);
+    rightParent.children = [];
+    rightSeam.state.callback!([{ addedNodes: [], removedNodes: [right] }]);
+    shared.onfinish!();
+
+    expect(leftParent.removed).toEqual([left]);
+    expect(rightParent.removed).toEqual([right]);
+  });
+
+  it('disconnect одного контроллера не отменяет shared Animation другого', () => {
+    const leftSeam = fakeObserverSeam();
+    const rightSeam = fakeObserverSeam();
+    const left = fakeEl(R(0, 0), 'left');
+    const right = fakeEl(R(0, 0), 'right');
+    const shared: FakeAnimation = {
+      onfinish: null,
+      cancelled: false,
+      cancel() { this.cancelled = true; },
+    };
+    left.animate = right.animate = () => shared;
+    const leftParent = fakeParent([left]);
+    const rightParent = fakeParent([right]);
+    const leftControl = autoAnimate(leftParent as never, {
+      MutationObserverCtor: leftSeam.Ctor as never,
+    });
+    autoAnimate(rightParent as never, { MutationObserverCtor: rightSeam.Ctor as never });
+
+    leftParent.children = [];
+    leftSeam.state.callback!([{ addedNodes: [], removedNodes: [left] }]);
+    rightParent.children = [];
+    rightSeam.state.callback!([{ addedNodes: [], removedNodes: [right] }]);
+    leftControl.disconnect();
+
+    expect(shared.cancelled).toBe(false);
+    expect(leftParent.removed).toEqual([left]);
+    expect(rightParent.removed).toEqual([]);
+    shared.onfinish!();
+    expect(rightParent.removed).toEqual([right]);
+  });
+
+  it('бросок onfinish-setter откатывает ghost, но не обрывает соседний exit', () => {
+    const seam = fakeObserverSeam();
+    const hostile = fakeEl(R(0, 0), 'hostile');
+    const healthy = fakeEl(R(20, 0), 'healthy');
+    hostile.style['position'] = 'relative';
+    hostile.style['left'] = '3px';
+    hostile.style['top'] = '4px';
+    let cancelCalls = 0;
+    const assigned: Array<() => void> = [];
+    const broken = { cancel: () => { cancelCalls++; } } as unknown as FakeAnimation;
+    Object.defineProperty(broken, 'onfinish', {
+      set(next: (() => void) | null) {
+        if (next !== null) assigned.push(next);
+        throw new Error('host setter failed');
+      },
+    });
+    hostile.animate = () => broken;
+    const parent = fakeParent([hostile, healthy]);
+    autoAnimate(parent as never, { MutationObserverCtor: seam.Ctor as never });
+
+    parent.children = [];
+    expect(() => {
+      seam.state.callback!([{ addedNodes: [], removedNodes: [hostile, healthy] }]);
+    }).not.toThrow();
+
+    expect(cancelCalls).toBe(1);
+    expect(parent.removed).toContain(hostile);
+    expect(hostile.style).toMatchObject({ position: 'relative', left: '3px', top: '4px' });
+    expect(healthy.animateCalls).toHaveLength(1);
+    healthy.animations[0]!.onfinish!();
+    expect(parent.removed).toContain(healthy);
+    assigned[0]!();
+    expect(parent.removed.filter((node) => node === hostile)).toHaveLength(1);
+  });
+
+  it('бросок node.animate откатывает ghost, но не обрывает соседний exit', () => {
+    const seam = fakeObserverSeam();
+    const hostile = fakeEl(R(0, 0), 'hostile');
+    const healthy = fakeEl(R(20, 0), 'healthy');
+    hostile.style['position'] = 'sticky';
+    hostile.style['left'] = '5px';
+    hostile.style['top'] = '6px';
+    hostile.animate = () => { throw new Error('host animate failed'); };
+    const parent = fakeParent([hostile, healthy]);
+    autoAnimate(parent as never, { MutationObserverCtor: seam.Ctor as never });
+
+    parent.children = [];
+    expect(() => {
+      seam.state.callback!([{ addedNodes: [], removedNodes: [hostile, healthy] }]);
+    }).not.toThrow();
+
+    expect(parent.removed).toContain(hostile);
+    expect(hostile.style).toMatchObject({ position: 'sticky', left: '5px', top: '6px' });
+    expect(healthy.animateCalls).toHaveLength(1);
+    healthy.animations[0]!.onfinish!();
+    expect(parent.removed).toContain(healthy);
   });
 
   it('reduced-motion (по умолчанию уважается): move НЕ анимируется (снап), exit — opacity', () => {
@@ -407,11 +574,42 @@ describe('auto: autoAnimate — адаптер (duck-typed DOM)', () => {
 
   it('disconnect() отписывает observer', () => {
     const seam = fakeObserverSeam();
-    const ctl = autoAnimate(fakeParent([]) as never, {
+    const parent = fakeParent([]);
+    const ctl = autoAnimate(parent as never, {
       MutationObserverCtor: seam.Ctor as never,
     });
     ctl.disconnect();
     expect(seam.state.disconnected).toBe(true);
+
+    const late = fakeEl(R(0, 0), 'late');
+    parent.children.push(late);
+    seam.state.callback!([{ addedNodes: [late], removedNodes: [] }]);
+    expect(late.animateCalls).toHaveLength(0);
+  });
+
+  it('disconnect до observer-эха завершает ghost cleanup', () => {
+    const seam = fakeObserverSeam();
+    const doomed = fakeEl(R(0, 0), 'doomed');
+    doomed.style['position'] = 'relative';
+    doomed.style['left'] = '9px';
+    doomed.style['top'] = '10px';
+    const parent = fakeParent([doomed]);
+    const ctl = autoAnimate(parent as never, { MutationObserverCtor: seam.Ctor as never });
+
+    parent.children = [];
+    seam.state.callback!([{ addedNodes: [], removedNodes: [doomed] }]);
+    const animation = doomed.animations[0]!;
+    const lateFinish = animation.onfinish!;
+    ctl.disconnect();
+
+    expect(animation.cancelled).toBe(true);
+    expect(parent.removed).toEqual([doomed]);
+    expect(parent.children).toEqual([]);
+    expect(doomed.style).toMatchObject({ position: 'relative', left: '9px', top: '10px' });
+    lateFinish();
+    seam.state.callback!([{ addedNodes: [doomed], removedNodes: [] }]);
+    expect(parent.removed).toEqual([doomed]);
+    expect(doomed.animateCalls).toHaveLength(1);
   });
 
   it('duration/easing прокидываются в timing (сек движка → мс WAAPI, easing → linear())', () => {

@@ -132,13 +132,34 @@ interface AnimationLike {
   cancel?(): void;
 }
 
-type ExitTicket = [
+type ExitGroup = [
   animation: AnimationLike | undefined,
-  node: AutoChild | undefined,
-  parent: AutoParent | undefined,
-  registry: Map<AutoChild, ExitTicket> | undefined,
+  tickets: Set<ExitTicket>,
   finish: () => void,
 ];
+
+type ExitOwner = readonly [
+  registry: Map<AutoChild, ExitTicket>,
+  echo: Set<AutoChild>,
+];
+
+type ExitStyle = readonly [
+  target: Record<string, string>,
+  position: string,
+  left: string,
+  top: string,
+];
+
+type ExitTicket = [
+  group: ExitGroup | undefined,
+  node: AutoChild | undefined,
+  parent: AutoParent | undefined,
+  owner: ExitOwner | undefined,
+  style: ExitStyle | undefined,
+];
+
+/** Один host-handle имеет ровно одного terminal-владельца во всех адаптерах. */
+const exitGroups = new WeakMap<AnimationLike, ExitGroup>();
 
 /** Duck-typed минимум ребёнка: замер + WAAPI + инлайн-стили. */
 interface AutoChild {
@@ -159,36 +180,136 @@ export interface AutoParent {
   style: Record<string, string>;
 }
 
-/** Снимает все сильные DOM-ссылки до любого реентрантного host-вызова. */
+/** Возвращает независимые inline-значения даже при частично hostile style. */
+function restoreExitStyle(style: ExitStyle): void {
+  try { style[0]['position'] = style[1]; } catch { /* следующий ключ независим */ }
+  try { style[0]['left'] = style[2]; } catch { /* следующий ключ независим */ }
+  try { style[0]['top'] = style[3]; } catch { /* terminal всё равно продолжится */ }
+}
+
+/** Снимает ticket со всех владельцев до любого реентрантного host-вызова. */
 function releaseExit(ticket: ExitTicket): AnimationLike | undefined {
-  const animation = ticket[0];
+  const group = ticket[0];
+  const node = ticket[1];
+  const owner = ticket[3];
+  group?.[1].delete(ticket);
+  if (node !== undefined && owner?.[0].get(node) === ticket) {
+    owner[0].delete(node);
+    owner[1].delete(node);
+  }
   ticket[0] = undefined;
   ticket[1] = undefined;
   ticket[2] = undefined;
   ticket[3] = undefined;
+  ticket[4] = undefined;
+  if (group === undefined || group[1].size > 0) return undefined;
+
+  const animation = group[0];
+  if (animation !== undefined && exitGroups.get(animation) === group) {
+    exitGroups.delete(animation);
+  }
+  group[0] = undefined;
+  group[1].clear();
   return animation;
 }
 
 function finishExit(ticket: ExitTicket): void {
   const node = ticket[1];
   const parent = ticket[2];
-  const registry = ticket[3];
-  if (node === undefined || parent === undefined || registry?.get(node) !== ticket) return;
-  registry.delete(node);
+  const owner = ticket[3];
+  const style = ticket[4];
+  if (node === undefined || parent === undefined || owner?.[0].get(node) !== ticket) {
+    releaseExit(ticket);
+    return;
+  }
   releaseExit(ticket);
+  if (style !== undefined) restoreExitStyle(style);
   parent.removeChild(node);
 }
 
-/** Отдельная лексическая ячейка не захватывает кадр MutationObserver. */
-function exitTerminal(ticket: ExitTicket): () => void {
-  return () => finishExit(ticket);
+/** Все tickets одного host-handle завершаются одним terminal-сигналом. */
+function finishGroup(group: ExitGroup): AnimationLike | undefined {
+  const animation = group[0];
+  if (animation === undefined || exitGroups.get(animation) !== group) return undefined;
+  exitGroups.delete(animation);
+  group[0] = undefined;
+  for (const ticket of group[1]) {
+    try {
+      finishExit(ticket);
+    } catch { /* ошибка одного host-remove не блокирует остальных владельцев */ }
+  }
+  group[1].clear();
+  return animation;
 }
 
 function cancelExit(ticket: ExitTicket): void {
+  const style = ticket[4];
   const animation = releaseExit(ticket);
+  if (style !== undefined) restoreExitStyle(style);
   try {
     animation?.cancel?.();
   } catch { /* вызов среды больше не владеет DOM-ссылками */ }
+}
+
+function registerExit(
+  animation: AnimationLike,
+  node: AutoChild,
+  parent: AutoParent,
+  owner: ExitOwner,
+  style: ExitStyle,
+): void {
+  let group = exitGroups.get(animation);
+  const install = group === undefined;
+  if (group === undefined) {
+    let created!: ExitGroup;
+    created = [animation, new Set(), () => { finishGroup(created); }];
+    group = created;
+    exitGroups.set(animation, group);
+  }
+
+  const ticket: ExitTicket = [group, node, parent, owner, style];
+  group[1].add(ticket);
+  owner[0].set(node, ticket);
+  if (!install) return;
+
+  try {
+    animation.onfinish = group[2];
+  } catch {
+    // Setter и все синхронно присоединившиеся tickets — одна транзакция:
+    // без принятого terminal callback ни один re-append не остаётся ghost.
+    const terminalAnimation = finishGroup(group);
+    try {
+      terminalAnimation?.cancel?.();
+    } catch { /* group уже не владеет host/DOM-ссылками */ }
+  }
+}
+
+/** Disconnect освобождает все tickets до восстановления DOM через host. */
+function disconnectExits(owner: ExitOwner): void {
+  const cleanups: Array<readonly [AutoChild, AutoParent, ExitStyle | undefined]> = [];
+  const animations = new Set<AnimationLike>();
+  for (const ticket of Array.from(owner[0].values())) {
+    const node = ticket[1];
+    const parent = ticket[2];
+    const style = ticket[4];
+    const animation = releaseExit(ticket);
+    if (node !== undefined && parent !== undefined) cleanups.push([node, parent, style]);
+    if (animation !== undefined) animations.add(animation);
+  }
+  owner[0].clear();
+  owner[1].clear();
+
+  for (const [node, parent, style] of cleanups) {
+    if (style !== undefined) restoreExitStyle(style);
+    try {
+      parent.removeChild(node);
+    } catch { /* host уже мог удалить ghost */ }
+  }
+  for (const animation of animations) {
+    try {
+      animation.cancel?.();
+    } catch { /* terminal ownership уже освобождено */ }
+  }
 }
 
 interface MutationObserverLike {
@@ -275,10 +396,10 @@ export function autoAnimate(
   const reduce = resolveReduce(options);
 
   let disabled = false;
-  /** Узлы, доигрывающие exit (и их анимации): вне планирования до удаления. */
-  const exiting = new Map<AutoChild, ExitTicket>();
-  /** Эхо наших собственных re-append'ов: observer увидит их как addedNodes. */
-  const selfEcho = new Set<AutoChild>();
+  let disconnected = false;
+  /** Реестр живых exit и эхо их re-append имеют одного явного владельца. */
+  const owner: ExitOwner = [new Map(), new Set()];
+  const [exiting, selfEcho] = owner;
 
   const snapshot = (): [AutoChild, FlipRect][] => {
     const entries: [AutoChild, FlipRect][] = [];
@@ -291,6 +412,7 @@ export function autoAnimate(
   let cache = snapshot();
 
   const onRecords = (records: readonly unknown[]): void => {
+    if (disconnected) return;
     // Пре-пасс реинкарнаций: узел в addedNodes, доигрывающий exit, — либо эхо
     // нашего же re-append (потребляется один раз), либо потребитель вернул
     // узел до onfinish → exit отменяется (onfinish отменённого не сработает),
@@ -299,17 +421,10 @@ export function autoAnimate(
       const added = (record as { addedNodes?: ArrayLike<AutoChild> }).addedNodes;
       if (added === undefined) continue;
       for (const node of Array.from(added)) {
+        if (selfEcho.delete(node)) continue;
         const exit = exiting.get(node);
         if (exit === undefined) continue;
-        if (selfEcho.has(node)) {
-          selfEcho.delete(node);
-          continue;
-        }
-        exiting.delete(node);
         cancelExit(exit);
-        node.style['position'] = '';
-        node.style['left'] = '';
-        node.style['top'] = '';
       }
     }
 
@@ -325,22 +440,32 @@ export function autoAnimate(
     // через clientLeft/clientTop (иначе узел уезжает вглубь на его ширину).
     const parentRect = parent.getBoundingClientRect();
     for (const [node, rect] of plan.exits) {
-      if (typeof node.animate !== 'function') continue;
-      node.style['position'] = 'absolute';
-      node.style['left'] = `${num(rect.x - parentRect.x - (parent.clientLeft ?? 0))}px`;
-      node.style['top'] = `${num(rect.y - parentRect.y - (parent.clientTop ?? 0))}px`;
-      selfEcho.add(node);
-      parent.appendChild(node);
-      const anim = node.animate(exitKeyframes(), timing);
-      const ticket = [anim, node, parent, exiting] as unknown as ExitTicket;
-      ticket[4] = exitTerminal(ticket);
-      exiting.set(node, ticket);
+      let style: ExitStyle | undefined;
       try {
-        anim.onfinish = ticket[4];
-      } catch (error) {
-        if (exiting.get(node) === ticket) exiting.delete(node);
-        cancelExit(ticket);
-        throw error;
+        const animate = node.animate;
+        if (typeof animate !== 'function') continue;
+        const target = node.style;
+        style = [
+          target,
+          target['position'] ?? '',
+          target['left'] ?? '',
+          target['top'] ?? '',
+        ];
+        target['position'] = 'absolute';
+        target['left'] = `${num(rect.x - parentRect.x - (parent.clientLeft ?? 0))}px`;
+        target['top'] = `${num(rect.y - parentRect.y - (parent.clientTop ?? 0))}px`;
+        selfEcho.add(node);
+        parent.appendChild(node);
+        const animation = Reflect.apply(animate, node, [exitKeyframes(), timing]) as AnimationLike;
+        registerExit(animation, node, parent, owner, style);
+      } catch {
+        // Частично успешная подготовка откатывается локально: соседние exits
+        // той же observer-транзакции продолжают устанавливаться независимо.
+        selfEcho.delete(node);
+        if (style !== undefined) restoreExitStyle(style);
+        try {
+          parent.removeChild(node);
+        } catch { /* среда уже могла удалить узел или не принять re-append */ }
       }
     }
 
@@ -363,14 +488,21 @@ export function autoAnimate(
 
   return {
     enable(): void {
+      if (disconnected) return;
       disabled = false;
       cache = snapshot();
     },
     disable(): void {
+      if (disconnected) return;
       disabled = true;
     },
     disconnect(): void {
-      observer.disconnect();
+      if (disconnected) return;
+      disconnected = true;
+      try {
+        observer.disconnect();
+      } catch { /* cleanup ниже остаётся обязательным */ }
+      disconnectExits(owner);
     },
   };
 }
