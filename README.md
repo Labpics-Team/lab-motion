@@ -6,7 +6,7 @@ DOM — рендер делает ваш колбэк, время приходи
 
 Три вещи, которые нужно понять сразу:
 
-1. **Всё — субпути.** Корневой экспорт + 38 субпутей (39 входов `exports` в
+1. **Всё — субпути.** Корневой экспорт + 39 субпутей (40 входов `exports` в
    `package.json`); точный `sideEffects`-allowlist сохраняет только авто-регистрацию
    web components, остальные неиспользуемые субпути вырезаются.
 2. **Две фазы движения.** Интерактив и фаза слежения (палец ведёт значение) — на
@@ -64,6 +64,32 @@ await anim; // thenable
 ```
 
 ### Автономный переход на compositor-потоке
+
+Для короткого platform-trusted one-liner без fallback и defensive host-границы:
+
+```typescript
+import { animate } from '@labpics/motion/nano';
+
+const moves = animate('.card', { translate: '240px', rotate: 8, opacity: 1 }, {
+  spring: { mass: 1, stiffness: 170, damping: 26 },
+  stagger: 40,
+});
+moves[0]?.pause(); // каждый элемент — нативный Animation
+await moves.finished;
+```
+
+`./nano` — to-only WAAPI-вход под жёстким гейтом 1 КБ gzip. Числа —
+миллисекунды; `translate/scale/rotate` — целые нативные CSS longhand-каналы,
+цвета/фильтры/единицы интерполирует браузер. `nano` не трактует CSS `x/y` как
+оси `translate` и не читает layout, чтобы угадывать вторую ось; transform-
+шортхенды `x/y` принадлежат полному `./animate`. Нужны нативные `Element.animate`,
+`Animation.commitStyles` и CSS `linear()`; скрытого rAF-fallback, C1-подхвата и
+защиты от hostile/polyfill-host здесь нет. Физические параметры должны задавать
+конечную затухающую пружину; длительность и плотность `linear()` выводятся из её
+полюсов и допуска реконструкции, без wall-clock cap. Кривая выше общего
+compiler-ceiling отклоняется до синхронной материализации; полный `./animate`
+исполняет такой случай живым solver. Для defensive-границы, C1-подхвата и
+fallback также используйте `./animate`.
 
 ```typescript
 import { CompositorSpring, compileSpringLinear } from '@labpics/motion/compositor';
@@ -160,6 +186,7 @@ flowchart TB
 | `@labpics/motion` | `spring` (аналитический closed-form солвер), `tween`, `drive` (декларативный запуск), `MotionValue` (реактивное значение со smooth-pickup), `MotionParamError` |
 | `…/driver` | Scrubbable-контроллер: `play/pause/reverse/seek/timeScale/progress` + thenable |
 | `…/frame` | Единый frame-шедулер: `createFrameLoop` / синглтон `frame` — один rAF на кадр, фазы read→update→render против layout-thrash, SSR-safe; `asRequestFrame(loop)` сажает `MotionValue`/`drive` на общий кадр. **Биндинги используют его по умолчанию** (как shared-ticker у Framer Motion/GSAP); инжекция своего `requestFrame` переопределяет |
+| `…/nano` | **Platform-trusted WAAPI to-only ≤ 1 КБ gzip**: spring/tween, целые `translate/scale/rotate` longhand-каналы, любые нативно-анимируемые CSS-свойства, `delay`/`stagger`, reduced-motion и сами `Animation` как контролы. Без layout-read, независимых `x/y`, rAF-fallback, C1-подхвата и hostile-host обещаний |
 | `…/animate` | Фасад-one-liner: `animate(target, props, options)` — цели по каналам (`x`/`y`/`scale`/`rotate`, `opacity`, CSS-свойства), режим `{ spring }` или `{ duration, ease }`, `delay`/`stagger`, контролы `{ finished, play, pause, seek, cancel, stop }`. Это полный DX-срез; ядро от него не растёт |
 | `…/animate/mini` | **Лёгкий срез (≤ 5 KB gz)**: transform-шортхенды, `opacity`, CSS-переменные, spring/tween, `delay`/`stagger`, контролы и reduced-motion снап. Внутри движок разделён на кодеки и адаптер цели, но публичный набор mini фиксирован. Цветовые CSS-значения и compositor-offload остаются в `./animate` |
 | `…/animate/native` | **Нативная пружина ≤ 3.5 KB gzip**: `springTo(target, { x: [0, 240] })`, только явные пары transform/opacity, отдельный WAAPI-эффект на независимый CSS-канал и раздельное вытеснение, мгновенный финал при reduced-motion. Chromium/Firefox требуют CSS `linear()`, WebKit использует адаптивные ключевые кадры; скрытого rAF-пути нет |

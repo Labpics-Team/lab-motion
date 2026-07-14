@@ -73,6 +73,10 @@ export const FULL_ANIMATE_GATE_BYTES = 12_000;
 // namespace-сценария, а не новый бюджет самого entry.
 export const FULL_CORE_CONSUMER_GATE_BYTES = 2330;
 
+// Публичный platform-trusted WAAPI entry. 1024 B — продуктовая граница,
+// утверждённая владельцем до реализации; она не выводится из текущего факта.
+export const NANO_GATE_BYTES = 1024;
+
 // Совместный импорт одиночного и группового compositor API. Оба физических
 // entry отдельно остаются под прежними 6 450 B; 6 600 B ловят раздувание их
 // общего consumer-графа, не смешивая его с file-level потолком.
@@ -177,6 +181,9 @@ export const BESPOKE_SUBPATH_GATES = {
   //   формой на main-потоке + reduced-motion детект; полный WAAPI-путь — в ./animate.
   //   Подъём порога — только решением владельца (это и есть класс, что гейт ловит).
   './animate/mini': 5120,
+  // To-only individual properties + spring->linear() + native Animation controls.
+  // Отдельный hard gate не разрешает новому entry спрятаться под общим 4608 B.
+  './nano': NANO_GATE_BYTES,
   // ./behaviors — headless state machines типовых мобильных взаимодействий
   // (bottom sheet / drag-to-dismiss / carousel / pull-to-refresh) поверх
   // ПЕРЕИСПОЛЬЗУЕМЫХ примитивов: createVelocityTracker (./gestures), createDecay
@@ -199,6 +206,11 @@ export const BESPOKE_SUBPATH_GATES = {
  * абсолютным путём dist/index.js.
  */
 export const IMPORT_COST_SCENARIOS = [
+  {
+    name: 'nano spring-to',
+    code: `import { animate } from '%DIST%/../nano/index.js'; console.log(animate('.hero', { translate: '240px', opacity: 1 }).length);`,
+    gate: NANO_GATE_BYTES,
+  },
   {
     name: 'only-spring',
     code: `import { spring } from '%DIST%'; console.log(spring({mass:1,stiffness:200,damping:20}, 0.1).value);`,

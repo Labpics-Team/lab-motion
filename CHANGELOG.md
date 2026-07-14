@@ -6,6 +6,14 @@
 
 ## [Unreleased]
 
+### Added
+
+- `./nano`: platform-trusted WAAPI to-only вход под hard gate 1 КБ gzip:
+  spring/tween, целые `translate/scale/rotate` longhand-каналы, CSS-значения
+  силами браузера, delay/stagger, reduced-motion и native `Animation` controls.
+  Скрытого layout-read, rAF-fallback, C1-подхвата и hostile-host контракта нет;
+  кривые выше общего compiler-ceiling отклоняются до materialization.
+
 ### Fixed
 
 - Сборка: параллельная минификация ESM/CJS изолирует настройки Terser, поэтому
