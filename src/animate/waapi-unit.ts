@@ -33,6 +33,7 @@ import {
 } from '../compositor/curve.js';
 import { compileSpringRuntimeExecutionTupleUnchecked } from '../compositor/execution.js';
 import { MotionParamError } from '../errors.js';
+import { finiteOrZero } from '../internal/finite.js';
 import {
   animationTimeOrFallback,
   sampleSerializedSpringIntoUnchecked,
@@ -361,9 +362,7 @@ export class WaapiUnit implements GroupOwner {
       delayMs,
       SPRING_SAMPLE,
     );
-    const remaining = 1 - r.value;
-    const sampledV0 = r.velocity / remaining;
-    const v0 = Number.isFinite(sampledV0) ? sampledV0 + 0 : 0;
+    const v0 = finiteOrZero(r.velocity / (1 - r.value));
     for (const ch of this._o._numeric) {
       // Та же устойчивая интерполяция, что у кадров WebKit: снимок MAX ↔
       // -MAX не должен телепортироваться в цель из-за переполнения.

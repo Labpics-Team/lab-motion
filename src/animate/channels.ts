@@ -278,17 +278,12 @@ export function rebaseNumericChannels(
 export function sharedV0(channels: readonly NumericChannel[]): number | undefined {
   let shared: number | undefined;
   for (const channel of channels) {
-    const range = channel._to - channel._from;
-    if (range === 0) {
-      if (channel._velocity !== 0) return undefined;
-      continue;
-    }
-    if (channel._solverTo !== channel._to && channel._velocity !== 0) {
+    if (channel._to === channel._from && channel._velocity === 0) continue;
+    const v0 = channel._v0;
+    if (channel._solverTo !== channel._to || (shared !== undefined && v0 !== shared)) {
       return undefined;
     }
-    const v0 = channel._v0;
-    if (shared === undefined) shared = v0;
-    else if (v0 !== shared) return undefined;
+    shared = v0;
   }
   return shared ?? 0;
 }
