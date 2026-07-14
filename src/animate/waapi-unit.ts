@@ -12,9 +12,9 @@
  * re-emit с правым slope фактического сегмента. cancel()/pause()
  * фиксируют значение инлайн ДО cancel Animation — элемент не мигает к базе.
  *
- * Завершение: WAAPI Animation.finished недетерминируем в тестах и отсутствует
- * у duck-целей — Unit сообщает aggregate-вызову по setTimer-шву на
- * АНАЛИТИЧЕСКОЕ время оседания (delay + duration плана).
+ * Завершение: representable deadline обслуживает setTimer-шов. Для диапазона
+ * больше host timer native Animation.finished — основной clock; duck-цель без
+ * finished просыпается bounded timer-ом и сверяется с currentTime/now.
  *
  * Ограничение честно: несколько transform-каналов делят одну кривую
  * (физика WAAPI: одно свойство = одна Animation) — при ретаргете slope точен
@@ -56,12 +56,26 @@ import {
 import { MainUnit } from './main-unit.js';
 import { SurfaceBatch } from './surface-batch.js';
 
+// Sampler синхронен и чист: единый scratch безопасен между unit и не создаёт
+// объект на каждый compositor-run.
+const SPRING_SAMPLE = { value: 0, velocity: 0 };
+
+// HTML timers clamp delays above signed int32. Это граница платформы, а не
+// настраиваемый лимит.
+const MAX_TIMER_MS = 2 ** 31 - 1;
+
+interface WaapiAnimation {
+  cancel?: () => void;
+  currentTime?: number | null;
+  finished?: PromiseLike<unknown>;
+}
+
 /** Duck-контракт WAAPI-цели фасада (Element.animate → {cancel}). */
 export interface WaapiTarget extends AnimatableElement {
   animate(
     keyframes: Record<string, string | number>[],
     timing: Record<string, unknown>,
-  ): { cancel?: () => void; currentTime?: number | null };
+  ): WaapiAnimation;
 }
 
 export interface WaapiUnitOptions {
@@ -89,7 +103,7 @@ export class WaapiUnit implements GroupOwner {
   private _paused = false;
   /** Блокирует реентрантные controls, пока terminal pose/семантика фиксируются. */
   private _locked = false;
-  private _anim: { cancel?: () => void; currentTime?: number | null } | undefined;
+  private _anim: WaapiAnimation | undefined;
   /**
    * Редкий exact-handoff: нормализованная WAAPI-кривая не кодирует абсолютный
    * импульс при нулевой/чрезмерно малой оставшейся амплитуде, live — кодирует.
@@ -97,9 +111,7 @@ export class WaapiUnit implements GroupOwner {
    */
   private _delegate: MainUnit | undefined;
   private _timerCancel: (() => void) | undefined;
-  /** Внутренний ticket отличает прогоны даже при общем host cancel-handle. */
-  private _timerGeneration = 0;
-  /** Timer может быть синхронным: публикация owner должна предшествовать settle. */
+  /** Natural wake может опередить публикацию owner. */
   private _pendingNatural = false;
   /** Прогресс-пространство текущей кривой (пере-сеется при re-emit). */
   private _v0 = 0;
@@ -107,7 +119,6 @@ export class WaapiUnit implements GroupOwner {
   private _startDelay = 0;
   private _durationMs = 0;
   private _samples: SpringSerializedSamples | undefined;
-  private readonly _sample = { value: 0, velocity: 0 };
   private readonly _format = (progress: number): string | number =>
     this._valueAt(progress);
 
@@ -156,37 +167,28 @@ export class WaapiUnit implements GroupOwner {
     }
     if (this._locked) throw new MotionParamError('LM157');
     if (this._delegate !== undefined) {
-      this._locked = true;
-      try {
-        this._delegate._supersede(replacement);
-      } catch (error) {
-        this._locked = false;
-        throw error;
-      }
+      this._transaction(() => this._delegate!._supersede(replacement));
       return;
     }
     // Inline hold проходит до destructive cleanup: hostile style не должен
     // уничтожать старый owner/effect при неудачном successor.
-    this._locked = true;
-    try {
+    this._transaction(() => {
       this._holdInline();
       replacement?.();
-    } catch (error) {
-      this._locked = false;
-      throw error;
-    }
-    this._clearTimer();
-    this._cancelAnim();
-    this._writeBack();
-    this._finish(false);
+      this._clearTimer();
+      this._cancelAnim();
+      this._writeBack();
+      this._finish(false);
+    });
   }
 
   /** Откат ещё не опубликованного successor без inline-записи. */
   _rollback(): void {
-    if (this._done) return;
-    this._clearTimer();
-    this._cancelAnim();
-    this._finish(false);
+    this._transaction(() => {
+      this._clearTimer();
+      this._cancelAnim();
+      this._finish(false);
+    });
   }
 
   // ── Контролы ──────────────────────────────────────────────────────────────
@@ -194,23 +196,19 @@ export class WaapiUnit implements GroupOwner {
   pause(): void {
     if (this._done || this._o._record._transition || this._locked || this._paused) return;
     if (this._delegate !== undefined) {
-      this._paused = true;
-      this._delegate.pause();
+      this._transaction(() => {
+        this._delegate!.pause();
+        this._paused = true;
+      });
       return;
     }
-    this._locked = true;
-    try {
+    this._transaction(() => {
       this._syncSnapshot();
       this._holdInline();
       this._clearTimer();
       this._cancelAnim();
       this._paused = true;
-      this._pendingNatural = false;
-    } catch (error) {
-      this._locked = false;
-      throw error;
-    }
-    this._locked = false;
+    });
   }
 
   play(): void {
@@ -218,15 +216,10 @@ export class WaapiUnit implements GroupOwner {
     if (this._delegate !== undefined) {
       // Wrapper меняет состояние только после успешной подписки delegate:
       // бросок оставляет оба уровня повторяемо paused.
-      this._locked = true;
-      try {
-        this._delegate.play();
+      this._transaction(() => {
+        this._delegate!.play();
         this._paused = false;
-      } catch (error) {
-        this._locked = false;
-        throw error;
-      }
-      if (!this._done) this._locked = false;
+      });
       return;
     }
     const artifact = this._tryReseedFromSnapshot();
@@ -234,17 +227,12 @@ export class WaapiUnit implements GroupOwner {
       this._handoffToLive(false);
       return;
     }
-    this._locked = true;
-    try {
+    this._transaction(() => {
       // До успешной установки effect wrapper остаётся paused: это отличает
       // повторяемый replay от active seek, уже снявшего прежний effect.
       this._emit(0, artifact);
-    } catch (error) {
-      this._locked = false;
-      throw error;
-    }
-    this._paused = false;
-    this._locked = false;
+      this._paused = false;
+    });
     this._commit();
   }
 
@@ -257,14 +245,7 @@ export class WaapiUnit implements GroupOwner {
       !Number.isFinite(tMs)
     ) return;
     if (this._delegate !== undefined) {
-      this._locked = true;
-      try {
-        this._delegate.seek(tMs);
-      } catch (error) {
-        this._locked = false;
-        throw error;
-      }
-      if (!this._done) this._locked = false;
+      this._transaction(() => this._delegate!.seek(tMs));
       return;
     }
     const wasPaused = this._paused;
@@ -274,24 +255,15 @@ export class WaapiUnit implements GroupOwner {
       this._handoffToLive(wasPaused);
       return;
     }
-    this._locked = true;
-    try {
+    this._transaction(() => {
       // Paused effect уже снят, но hold всё равно предшествует любому cleanup:
       // hostile style не должен терминализировать wrapper реентрантно.
       if (wasPaused) this._holdInline();
       this._clearTimer();
       this._cancelAnim();
       if (!wasPaused) this._emit(0, artifact);
-    } catch (error) {
-      this._locked = false;
-      throw error;
-    }
-    if (wasPaused) {
-      this._pendingNatural = false;
-      this._locked = false;
-      return;
-    }
-    this._locked = false;
+    });
+    if (wasPaused) return;
     this._commit();
   }
 
@@ -299,21 +271,17 @@ export class WaapiUnit implements GroupOwner {
   cancel(): void {
     if (this._done || this._o._record._transition || this._locked) return;
     if (this._delegate !== undefined) {
-      this._delegate.cancel();
+      this._transaction(() => this._delegate!.cancel());
       return;
     }
-    this._locked = true;
-    try {
+    this._transaction(() => {
       this._syncSnapshot();
       this._holdInline();
-    } catch (error) {
-      this._locked = false;
-      throw error;
-    }
-    this._clearTimer();
-    this._cancelAnim();
-    this._writeBack();
-    this._finish(false);
+      this._clearTimer();
+      this._cancelAnim();
+      this._writeBack();
+      this._finish(false);
+    });
   }
 
   // ── Приватное ─────────────────────────────────────────────────────────────
@@ -336,7 +304,6 @@ export class WaapiUnit implements GroupOwner {
     this._startDelay = delayMs;
     this._durationMs = plan[2];
     this._samples = plan[5];
-    const timerGeneration = ++this._timerGeneration;
     try {
       this._startTime = o._now();
       this._anim = o._el.animate(plan[0], {
@@ -347,35 +314,31 @@ export class WaapiUnit implements GroupOwner {
         composite: plan[4],
         ...(delayMs > 0 ? { delay: delayMs } : {}),
       });
-      // Завершение привязано к аналитическому времени оседания. Шов вправе
-      // вызвать callback до возврата: тогда cancel нельзя сохранить как живой.
-      const cancelTimer = o._setTimer(() => {
-        // Поздний callback уже снятого/неудачного прогона не имеет права
-        // обнулить cancel-handle и завершить более новый replay.
-        if (timerGeneration !== this._timerGeneration) return;
-        this._timerCancel = undefined;
-        if (
-          this._o._record._owner === this &&
-          !this._o._record._transition &&
-          !this._locked
-        ) {
-          this._settleNatural();
-        } else this._pendingNatural = true;
-      }, delayMs + plan[2]);
-      if (this._done) {
-        safeCancelTimer(cancelTimer);
+      const deadline = delayMs + plan[2];
+      const verify = deadline > MAX_TIMER_MS;
+      const finished = verify && this._anim.finished;
+      if (finished) {
+        const token = (): void => {
+          if (this._timerCancel === token) this._rollback();
+        };
+        this._timerCancel = token;
+        Promise.resolve(finished).then(
+          () => this._wake(token, -1),
+          token,
+        );
       } else {
-        this._timerCancel = cancelTimer;
+        this._armCompletion(deadline, verify ? 0 : -1);
       }
     } catch (error) {
       // Element.animate уже мог запустить compositor-прогон, а setTimer —
       // бросить после частичного планирования. В обоих случаях снимаем effect;
       // опубликованный paused-wrapper остаётся owner для повторного play, тогда
       // как не опубликованный constructor обязан терминализировать aggregate.
-      this._clearTimer();
-      this._cancelAnim();
-      this._pendingNatural = false;
-      if (this._o._record._owner !== this || !this._paused) this._finish(false);
+      this._transaction(() => {
+        this._clearTimer();
+        this._cancelAnim();
+        if (this._o._record._owner !== this || !this._paused) this._finish(false);
+      });
       throw error;
     }
   }
@@ -398,7 +361,7 @@ export class WaapiUnit implements GroupOwner {
       this._durationMs,
       currentTimeMs,
       delayMs,
-      this._sample,
+      SPRING_SAMPLE,
     );
     for (const ch of this._o._numeric) {
       // Та же устойчивая интерполяция, что у кадров WebKit: снимок MAX ↔
@@ -410,22 +373,23 @@ export class WaapiUnit implements GroupOwner {
 
   /** Нативный currentTime побеждает drifted JS clock, но не требует layout. */
   private _syncSnapshot(): void {
+    this._snapshotAt(this._elapsed(false), this._startDelay);
+  }
+
+  /** Native local time, затем injected clock; -1 = pre-start/unavailable. */
+  private _elapsed(fallbackPending: boolean): number {
     // NaN — ленивый sentinel: валидный native currentTime не вызывает now().
-    // Host-clock нужен лишь при реально отсутствующем/невалидном native времени.
-    let currentTime = animationTimeOrFallback(this._anim, NaN);
-    if (!Number.isFinite(currentTime)) {
-      let elapsed = -1;
+    let current = animationTimeOrFallback(this._anim, NaN);
+    if (Number.isNaN(current) || (fallbackPending && current < 0)) {
       try {
-        const now = this._o._now();
-        if (Number.isFinite(now) && Number.isFinite(this._startTime)) {
-          elapsed = now - this._startTime;
-        }
+        current = this._o._now() - this._startTime;
       } catch {
-        // Отказ fallback-clock означает безопасный pre-start, не потерю owner.
+        // Отказ clock означает безопасный pre-start либо fail-closed wake.
       }
-      currentTime = Number.isFinite(elapsed) ? elapsed : -1;
     }
-    this._snapshotAt(currentTime, this._startDelay);
+    // Для числового clock x-x равен нулю только при конечном x; это сохраняет
+    // NaN/±Infinity как fail-closed sentinel без coercive global isFinite.
+    return current - current === 0 ? current : -1;
   }
 
   /**
@@ -458,44 +422,38 @@ export class WaapiUnit implements GroupOwner {
     const o = this._o;
     const batch = o._getBatch();
     const rebased = rebaseNumericChannels(o._numeric);
-    this._locked = true;
-    try {
+    this._transaction(() => {
       this._holdInline();
       this._clearTimer();
       this._cancelAnim();
-      this._pendingNatural = false;
-    } catch (error) {
-      this._locked = false;
-      throw error;
-    }
-    o._numeric.length = 0;
-    o._numeric.push(...rebased);
-    this._paused = paused;
-    try {
-      this._delegate = new MainUnit({
-        _el: o._el,
-        _group: o._group,
-        _record: o._record,
-        _bound: {
-          _numeric: o._numeric,
-          _css: undefined,
-          _residuals: o._residuals,
-          _transform: o._transform,
-        },
-        _mode: { _type: 'spring', _spring: o._spring },
-        _delayMs: 0,
-        _batch: batch,
-        _onDone: (natural) => this._finish(natural),
-        _startPaused: paused,
-      });
-    } catch (error) {
-      // Старый compositor уже снят: терминализируем wrapper, чтобы aggregate и
-      // registry не удерживали полусозданный handoff.
-      this._writeBack();
-      this._finish(false);
-      throw error;
-    }
-    if (!this._done) this._locked = false;
+      o._numeric.length = 0;
+      o._numeric.push(...rebased);
+      this._paused = paused;
+      try {
+        this._delegate = new MainUnit({
+          _el: o._el,
+          _group: o._group,
+          _record: o._record,
+          _bound: {
+            _numeric: o._numeric,
+            _css: undefined,
+            _residuals: o._residuals,
+            _transform: o._transform,
+          },
+          _mode: { _type: 'spring', _spring: o._spring },
+          _delayMs: 0,
+          _batch: batch,
+          _onDone: (natural) => this._finish(natural),
+          _startPaused: paused,
+        });
+      } catch (error) {
+        // Старый compositor уже снят: терминализируем wrapper, чтобы aggregate и
+        // registry не удерживали полусозданный handoff.
+        this._writeBack();
+        this._finish(false);
+        throw error;
+      }
+    });
   }
 
   /** Инлайн-фиксация текущего значения (перед cancel — без миганья к базе). */
@@ -513,22 +471,92 @@ export class WaapiUnit implements GroupOwner {
   private _cancelAnim(): void {
     const anim = this._anim;
     this._anim = undefined;
-    const wasLocked = this._locked;
-    this._locked = true;
     try {
-      if (typeof anim?.cancel === 'function') anim.cancel();
+      anim?.cancel?.();
     } catch {
       /* duck-цель могла не реализовать cancel — не роняем прерывание */
-    } finally {
-      this._locked = wasLocked;
     }
   }
 
+  /** Единая граница реентрантных host/delegate-вызовов. */
+  private _transaction(action: () => void): void {
+    this._locked = true;
+    try {
+      action();
+    } finally {
+      this._locked = false;
+    }
+  }
+
+  private _wake(token: () => void, last: number): void {
+    const elapsed = last < 0
+      ? animationTimeOrFallback(this._anim, -1)
+      : this._elapsed(true);
+    if (this._timerCancel !== token) return;
+    const activeMs = elapsed - this._startDelay;
+    if ((last < 0 && elapsed < 0) || activeMs >= this._durationMs) this._complete();
+    else if (!elapsed || elapsed <= last) this._rollback();
+    else {
+      this._armCompletion(this._durationMs - activeMs, elapsed);
+    }
+  }
+
+  private _armCompletion(
+    wait: number,
+    last: number,
+  ): void {
+    let sync = true;
+    let active = true;
+    let hostCancel: (() => void) | undefined;
+    const cancel = (): void => {
+      if (!active) return;
+      active = false;
+      try { hostCancel?.(); } catch { /* host cleanup не блокирует lifecycle */ }
+    };
+    this._timerCancel = cancel;
+    try {
+      hostCancel = this._o._setTimer(() => {
+        if (!active || this._timerCancel !== cancel) return;
+        active = false;
+        if (sync) {
+          if (last >= 0) queueMicrotask(() => {
+            if (this._timerCancel === cancel) this._rollback();
+          });
+          return;
+        }
+        if (last < 0) {
+          this._complete();
+          return;
+        }
+        this._wake(cancel, last);
+      }, Math.min(wait, MAX_TIMER_MS));
+    } catch (error) {
+      cancel();
+      if (this._timerCancel !== cancel) return;
+      if (last <= 0) {
+        this._timerCancel = undefined;
+        throw error;
+      }
+      this._rollback();
+    }
+    sync = false;
+    if (!active) {
+      active = true;
+      cancel();
+      if (last < 0) this._complete();
+    }
+  }
+
+  private _complete(): void {
+    this._pendingNatural = true;
+    this._commit();
+  }
+
   private _clearTimer(): void {
-    this._timerGeneration++;
     const cancel = this._timerCancel;
     this._timerCancel = undefined;
-    if (cancel !== undefined) safeCancelTimer(cancel);
+    this._pendingNatural = false;
+    cancel?.();
   }
 
   /** Публикует unit: выпускает sync timer только вне host-транзакции и ровно один раз. */
@@ -536,37 +564,27 @@ export class WaapiUnit implements GroupOwner {
     if (
       this._o._record._owner !== this ||
       !this._pendingNatural ||
-      this._done ||
       this._o._record._transition ||
       this._locked
     ) return;
-    this._pendingNatural = false;
-    this._locked = true;
-    this._clearTimer();
-    // Hostile cancel-timer мог повторно вызвать callback под lock.
-    this._pendingNatural = false;
-    this._locked = false;
-    this._settleNatural();
-  }
-
-  private _settleNatural(): void {
-    if (this._done || this._o._record._transition || this._locked || this._paused) return;
-    for (const ch of this._o._numeric) {
-      ch._value = ch._to;
-      ch._velocity = 0;
-    }
-    // Успешный inline hold позволяет снять fill:both effect и освободить host.
-    // При hostile style сам effect остаётся визуальным fallback, но логическая
-    // ссылка отпускается и aggregate продолжает терминализацию.
-    this._locked = true;
-    try {
-      this._holdInline();
-      this._cancelAnim();
-    } catch {
-      this._anim = undefined;
-    }
-    this._writeBack();
-    this._finish(true);
+    this._transaction(() => {
+      this._clearTimer();
+      for (const ch of this._o._numeric) {
+        ch._value = ch._to;
+        ch._velocity = 0;
+      }
+      // Успешный inline hold позволяет снять fill:both effect и освободить host.
+      // При hostile style сам effect остаётся визуальным fallback, но логическая
+      // ссылка отпускается и aggregate продолжает терминализацию.
+      try {
+        this._holdInline();
+        this._cancelAnim();
+      } catch {
+        this._anim = undefined;
+      }
+      this._writeBack();
+      this._finish(true);
+    });
   }
 
   private _writeBack(): void {
@@ -581,13 +599,5 @@ export class WaapiUnit implements GroupOwner {
     this._done = true;
     if (this._o._record._owner === this) this._o._record._owner = undefined;
     this._o._onDone(natural);
-  }
-}
-
-function safeCancelTimer(cancel: () => void): void {
-  try {
-    cancel();
-  } catch {
-    /* отказ host-cleanup не должен блокировать остальную терминализацию */
   }
 }

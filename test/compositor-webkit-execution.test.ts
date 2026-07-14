@@ -323,7 +323,7 @@ describe('compositor: WebKit исполняет пружину явными keyf
     // проецируют её в keyframes, сетка/RDP не повторяются.
     expect(work.builds - before).toBe(1);
     // Публичная диагностика caller-owned; мутация после конструктора не должна
-    // отравить защищённые узлы общего исполняемого LRU.
+    // отравить защищённые узлы общего исполняемого cache.
     (group.plan.nodes[1] as { progress: number }).progress = 999;
     group.start();
     expect(work.builds - before).toBe(1);
@@ -354,7 +354,7 @@ describe('compositor: WebKit исполняет пружину явными keyf
     group.destroy();
   });
 
-  it('Chromium второй production-план попадает в строковый LRU без нового node-build', () => {
+  it('Chromium второй production-план попадает в cache без нового node-build', () => {
     stubEngine(
       'Google Inc.',
       'Mozilla/5.0 AppleWebKit/537.36 Chrome/126.0.0.0 Safari/537.36',

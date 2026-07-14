@@ -14,8 +14,17 @@
   Скрытого layout-read, rAF-fallback, C1-подхвата и hostile-host контракта нет;
   кривые выше общего compiler-ceiling отклоняются до materialization.
 
+### Changed
+
+- `./compositor`: exact-key LRU вынесен в functional state без смены policy;
+  общий cache сохраняет O(1) lookup, нулевые аллокации на hit и прежний порядок
+  вытеснения, а одноразовая проверка ёмкости складывается при сборке.
+
 ### Fixed
 
+- `./animate`: переполнение составной delay отклоняется до host-effects, а
+  завершение задержек длиннее диапазона HTML timer сверяется с WAAPI-clock без
+  раннего settle, starvation и скачка terminal pose.
 - Сборка: параллельная минификация ESM/CJS изолирует настройки Terser, поэтому
   повторный запуск даёт тот же CJS-артефакт, включая strict-семантику и mangling.
 - `./animate/native`: host-методы вызываются без доверия к own `.call`,

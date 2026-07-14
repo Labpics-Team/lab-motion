@@ -242,7 +242,7 @@ export function compileSpringRuntimeExecutionTupleUnchecked(
 /**
  * Исполняемый путь выбирает форму плана по реальному движку:
  * Chromium/Firefox сохраняют двухточечный CSS linear() и ранний строковый
- * попадание в LRU; WebKit получает адаптивные явные кадры с обычным `linear`,
+ * попадание в bounded cache; WebKit получает адаптивные явные кадры с обычным `linear`,
  * который продолжает исполняться при блокировке главного потока.
  */
 export function compileSpringRuntimeExecutionPlanUnchecked(

@@ -5,7 +5,7 @@
  * ТЕЗИС: каскадный (staggered) запуск группы элементов, где ЗАДЕРЖКИ каждого
  * элемента реализованы нативным WAAPI-delay поверх ОДНОЙ запечённой linear()-
  * кривой пружины — а не покадровой работой main-потока. Пружина компилируется
- * ОДИН раз (общий LRU-кэш ./compositor отдаёт всем элементам одну и ту же
+ * ОДИН раз (общий bounded cache ./compositor отдаёт всем элементам одну и ту же
  * linear()-строку: идентичная пружина → cache hit), а per-element сдвиг во
  * времени задаёт браузер на compositor-потоке. Steady-state каскада — НОЛЬ
  * работы main-потока, как и у одиночного compositor-перехода M1.
@@ -137,7 +137,7 @@ function compileStaggerPlanForCount(
     throw new MotionParamError('LM017');
   }
 
-  // Общий план пружины — ОДНА компиляция на всю группу. Общий LRU-кэш ./compositor
+  // Общий план пружины — ОДНА компиляция на всю группу. Общий cache ./compositor
   // отдаёт идентичным пружинам одну linear()-строку, поэтому N элементов делят
   // одну кривую (валидация spring/property/from/to/v0/tolerance — внутри).
   const plan = compileSpringPlan({
@@ -156,6 +156,7 @@ function compileStaggerPlanForCount(
   // строго проверенный count и не создаёт промежуточный options-carrier.
   const delays = scheduleStagger(
     count,
+    false,
     options.gap,
     options.staggerFrom,
     options.staggerEasing,
