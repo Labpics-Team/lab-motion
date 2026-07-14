@@ -328,13 +328,20 @@ function restoreStyleField(lease: StyleFieldLease): void {
   let map: Map<StyleName, StyleFieldLease> | undefined;
   try {
     map = styleOwners.get(lease[0]);
-    if (map?.get(lease[1]) !== lease || lease[3] === undefined) return;
+    if (map?.get(lease[1]) !== lease) return;
+    // Terminal внутри setter видит ещё не подтверждённую запись. С этого
+    // момента post-write значение может принадлежать реентрантному consumer;
+    // reservation надо отпустить до возврата host-вызова, не присваивая его себе.
+    if (lease[3] === undefined) {
+      map.delete(lease[1]);
+      return;
+    }
     if (sameStyle(readStyle(lease[0], lease[1]), lease[3])) {
       writeStyle(lease[0], lease[1], lease[2]);
     }
   } catch { /* terminal остальных ресурсов не зависит от одного CSSOM-поля */ }
   finally {
-    if (map?.get(lease[1]) === lease && lease[3] !== undefined) map.delete(lease[1]);
+    if (map?.get(lease[1]) === lease) map.delete(lease[1]);
   }
 }
 

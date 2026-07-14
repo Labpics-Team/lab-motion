@@ -1314,6 +1314,35 @@ describe('auto: autoAnimate — адаптер (duck-typed DOM)', () => {
     expect(after).toEqual(before);
   });
 
+  it('reentrant disconnect в CSS setter не присваивает последующую запись consumer', () => {
+    const seam = fakeObserverSeam();
+    const node = fakeEl(R(0, 0), 'reentrant-style-owner');
+    let position = 'relative';
+    let reenter = true;
+    let controls!: ReturnType<typeof autoAnimate>;
+    Object.defineProperty(node.style, 'position', {
+      configurable: true,
+      get: () => position,
+      set(next: string) {
+        position = next;
+        if (reenter && next === 'absolute') {
+          reenter = false;
+          controls.disconnect();
+          position = 'consumer';
+        }
+      },
+    });
+    const parent = fakeParent([node]);
+    controls = autoAnimate(parent as never, { MutationObserverCtor: seam.Ctor as never });
+
+    parent.children = [];
+    seam.state.callback!([{ addedNodes: [], removedNodes: [node] }]);
+
+    expect(position).toBe('consumer');
+    expect(node.animateCalls).toHaveLength(0);
+    expect(parent.appended).not.toContain(node);
+  });
+
   it('throwing pending record не клинит disconnecting и не пропускает terminal cleanup', () => {
     const seam = fakeObserverSeam();
     const node = fakeEl(R(0, 0), 'hostile-record');
