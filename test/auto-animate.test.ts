@@ -354,12 +354,12 @@ describe('auto: autoAnimate — адаптер (duck-typed DOM)', () => {
     const parent = fakeParent([node]);
     autoAnimate(parent as never, { MutationObserverCtor: first.Ctor as never });
     autoAnimate(parent as never, { MutationObserverCtor: second.Ctor as never });
+    expect(second.state.callback).toBeNull();
 
     parent.children = [];
     const record = { addedNodes: [], removedNodes: [node] };
     first.state.callback!([record]);
     const finish = node.animations[0]!.onfinish!;
-    second.state.callback!([record]);
 
     expect(node.animations[0]!.cancelled).toBe(false);
     expect(parent.children).toContain(node);
@@ -368,18 +368,96 @@ describe('auto: autoAnimate — адаптер (duck-typed DOM)', () => {
     expect(parent.removed).toEqual([node]);
   });
 
-  it('duck-child без parentNode использует children как ownership-oracle и завершает exit', () => {
-    const seam = fakeObserverSeam();
-    const node = fakeEl(R(20, 40), 'duck-without-parent-node');
+  it('sync terminal в onfinish-setter не даёт второй сессии повторить remove', () => {
+    const first = fakeObserverSeam();
+    const second = fakeObserverSeam();
+    const node = fakeEl(R(20, 40), 'sync-terminal');
     const parent = fakeParent([node]);
-    autoAnimate(parent as never, { MutationObserverCtor: seam.Ctor as never });
-    const append = parent.appendChild.bind(parent);
-    parent.appendChild = (child: FakeEl) => {
+    let storedFinish: (() => void) | null = null;
+    let firstInstall = true;
+    let animateCalls = 0;
+    const animation = { oncancel: null, cancel() {} } as unknown as FakeAnimation;
+    Object.defineProperty(animation, 'onfinish', {
+      configurable: true,
+      get: () => storedFinish,
+      set(next: (() => void) | null) {
+        storedFinish = next;
+        if (next !== null && firstInstall) {
+          firstInstall = false;
+          next();
+        }
+      },
+    });
+    node.animate = () => {
+      animateCalls++;
+      return animation;
+    };
+    autoAnimate(parent as never, { MutationObserverCtor: first.Ctor as never });
+    autoAnimate(parent as never, { MutationObserverCtor: second.Ctor as never });
+    expect(second.state.callback).toBeNull();
+
+    parent.children = [];
+    const record = { addedNodes: [], removedNodes: [node] };
+    first.state.callback!([record]);
+
+    expect(animateCalls).toBe(1);
+    expect(parent.children).not.toContain(node);
+    expect(parent.removed).toEqual([node]);
+  });
+
+  it('registered duck-parent B авторитетен при transfer без parentNode', () => {
+    const leftSeam = fakeObserverSeam();
+    const rightSeam = fakeObserverSeam();
+    const node = fakeEl(R(20, 40), 'registered-transfer');
+    const left = fakeParent([node]);
+    const right = fakeParent([]);
+    autoAnimate(left as never, { MutationObserverCtor: leftSeam.Ctor as never });
+    autoAnimate(right as never, { MutationObserverCtor: rightSeam.Ctor as never });
+    const leftAppend = left.appendChild.bind(left);
+    left.appendChild = (child: FakeEl) => {
+      Reflect.set(child, 'parentNode', null);
+      leftAppend(child);
+      Reflect.deleteProperty(child, 'parentNode');
+    };
+
+    left.children = [];
+    right.children = [node];
+    Reflect.deleteProperty(node, 'parentNode');
+    leftSeam.state.callback!([{ addedNodes: [], removedNodes: [node] }]);
+
+    expect(left.children).not.toContain(node);
+    expect(right.children).toContain(node);
+    expect(node.animateCalls).toHaveLength(0);
+  });
+
+  it('unregistered ownership без parentNode fail-closed: старый parent не крадёт node', () => {
+    const seam = fakeObserverSeam();
+    const node = fakeEl(R(20, 40), 'unknown-transfer');
+    const left = fakeParent([node]);
+    const right = fakeParent([]);
+    autoAnimate(left as never, { MutationObserverCtor: seam.Ctor as never });
+    const append = left.appendChild.bind(left);
+    left.appendChild = (child: FakeEl) => {
       Reflect.set(child, 'parentNode', null);
       append(child);
       Reflect.deleteProperty(child, 'parentNode');
     };
+
+    left.children = [];
+    right.children = [node];
     Reflect.deleteProperty(node, 'parentNode');
+    seam.state.callback!([{ addedNodes: [], removedNodes: [node] }]);
+
+    expect(left.children).not.toContain(node);
+    expect(right.children).toContain(node);
+    expect(node.animateCalls).toHaveLength(0);
+  });
+
+  it('duck-child с explicit parentNode:null завершает detached exit', () => {
+    const seam = fakeObserverSeam();
+    const node = fakeEl(R(20, 40), 'explicit-detached-duck');
+    const parent = fakeParent([node]);
+    autoAnimate(parent as never, { MutationObserverCtor: seam.Ctor as never });
 
     parent.children = [];
     seam.state.callback!([{ addedNodes: [], removedNodes: [node] }]);
@@ -1051,6 +1129,41 @@ describe('auto: autoAnimate — адаптер (duck-typed DOM)', () => {
     expect(Object.hasOwn(animation, 'oncancel')).toBe(false);
   });
 
+  it('acquire oncancel не затирает reentrant external onfinish', () => {
+    const seam = fakeObserverSeam();
+    const node = fakeEl(R(0, 0), 'handler-cas');
+    const external = () => {};
+    let storedFinish: (() => void) | null = null;
+    let storedCancel: (() => void) | null = null;
+    let reenter = true;
+    const animation = { cancel() {} } as unknown as FakeAnimation;
+    Object.defineProperty(animation, 'onfinish', {
+      configurable: true,
+      get: () => storedFinish,
+      set: (next: (() => void) | null) => { storedFinish = next; },
+    });
+    Object.defineProperty(animation, 'oncancel', {
+      configurable: true,
+      get() {
+        if (reenter) {
+          reenter = false;
+          storedFinish = external;
+        }
+        return storedCancel;
+      },
+      set: (next: (() => void) | null) => { storedCancel = next; },
+    });
+    node.animate = () => animation;
+    const parent = fakeParent([node]);
+    autoAnimate(parent as never, { MutationObserverCtor: seam.Ctor as never });
+
+    parent.children = [];
+    seam.state.callback!([{ addedNodes: [], removedNodes: [node] }]);
+
+    expect(storedFinish).toBe(external);
+    expect(parent.children).not.toContain(node);
+  });
+
   it('CSSOM lease восстанавливает presence, canonical value и !important', () => {
     const seam = fakeObserverSeam();
     const node = fakeEl(R(10.123456789, 20.987654321), 'cssom');
@@ -1252,6 +1365,34 @@ describe('auto: autoAnimate — адаптер (duck-typed DOM)', () => {
     seam.state.callback!([{ addedNodes: [c2], removedNodes: [] }]);
     expect(c1.animateCalls).toHaveLength(1); // не enter повторно и не move
     expect(c2.animateCalls).toHaveLength(1);
+  });
+
+  it('transient throw первого snapshot восстанавливает baseline на следующем callback', () => {
+    const seam = fakeObserverSeam();
+    const parent = fakeParent([]);
+    const descriptor = Object.getOwnPropertyDescriptor(parent, 'children')!;
+    let fail = true;
+    Object.defineProperty(parent, 'children', {
+      configurable: true,
+      get() {
+        if (fail) {
+          fail = false;
+          throw new Error('transient children read');
+        }
+        return descriptor.get!.call(parent) as FakeEl[];
+      },
+      set(next: FakeEl[]) { descriptor.set!.call(parent, next); },
+    });
+    autoAnimate(parent as never, { MutationObserverCtor: seam.Ctor as never });
+    const baseline = fakeEl(R(0, 0), 'baseline');
+    parent.children = [baseline];
+    seam.state.callback!([{ addedNodes: [baseline], removedNodes: [] }]);
+    const animated = fakeEl(R(0, 60), 'animated');
+    parent.children = [baseline, animated];
+    seam.state.callback!([{ addedNodes: [animated], removedNodes: [] }]);
+
+    expect(baseline.animateCalls).toHaveLength(0);
+    expect(animated.animateCalls).toHaveLength(1);
   });
 
   it('disconnect() отписывает observer', () => {
