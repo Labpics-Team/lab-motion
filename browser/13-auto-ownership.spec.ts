@@ -73,6 +73,42 @@ test('transfer активного ghost восстанавливает CSS и о
   });
 });
 
+test('две autoAnimate на одном parent оставляют exit одному writer', async ({ page }) => {
+  const result = await page.evaluate(async () => {
+    const { autoAnimate } = await import('/dist/auto/index.js');
+    const parent = document.createElement('div');
+    const node = document.createElement('div');
+    parent.appendChild(node);
+    document.body.appendChild(parent);
+    const first = autoAnimate(parent as never, { duration: 10, respectReducedMotion: false });
+    const second = autoAnimate(parent as never, { duration: 10, respectReducedMotion: false });
+
+    node.remove();
+    await new Promise<void>((resolve) => setTimeout(resolve, 0));
+    const animation = node.getAnimations()[0];
+    const active = {
+      contained: parent.contains(node),
+      animations: node.getAnimations().length,
+      playState: animation?.playState,
+    };
+    const terminal = new Promise<void>((resolve) => {
+      animation?.addEventListener('finish', () => resolve(), { once: true });
+    });
+    animation?.finish();
+    await terminal;
+    const finished = { contained: parent.contains(node) };
+    first.disconnect();
+    second.disconnect();
+    parent.remove();
+    return { active, finished };
+  });
+
+  expect(result).toEqual({
+    active: { contained: true, animations: 1, playState: 'running' },
+    finished: { contained: false },
+  });
+});
+
 test('natural finish и внешний cancel оба являются terminal и снимают fill', async ({ page }) => {
   const result = await page.evaluate(async () => {
     const { autoAnimate } = await import('/dist/auto/index.js');
@@ -178,6 +214,59 @@ test('retained controls после disconnect не удерживают parent',
       };
       return retained.__autoParent.deref() !== undefined ||
         retained.__autoChild.deref() !== undefined;
+    });
+  }
+  expect(alive).toBe(false);
+});
+
+test('reentrant disconnect в snapshot не публикует stale strong-cache', async ({ page }) => {
+  await page.evaluate(async () => {
+    const { autoAnimate } = await import('/dist/auto/index.js');
+    let parent: HTMLDivElement | undefined = document.createElement('div');
+    let child: HTMLDivElement | undefined = document.createElement('div');
+    let trigger: HTMLDivElement | undefined = document.createElement('div');
+    parent.appendChild(child);
+    document.body.appendChild(parent);
+    const controls = autoAnimate(parent as never);
+    const rect = child.getBoundingClientRect.bind(child);
+    child.getBoundingClientRect = () => {
+      controls.disconnect();
+      return rect();
+    };
+    parent.appendChild(trigger);
+    await new Promise<void>((resolve) => setTimeout(resolve, 0));
+    const weakParent = new WeakRef(parent);
+    const weakChild = new WeakRef(child);
+    const weakTrigger = new WeakRef(trigger);
+    parent.remove();
+    parent = undefined;
+    child = undefined;
+    trigger = undefined;
+    const retained = window as unknown as {
+      __staleControls: typeof controls;
+      __staleParent: WeakRef<HTMLDivElement>;
+      __staleChild: WeakRef<HTMLDivElement>;
+      __staleTrigger: WeakRef<HTMLDivElement>;
+    };
+    retained.__staleControls = controls;
+    retained.__staleParent = weakParent;
+    retained.__staleChild = weakChild;
+    retained.__staleTrigger = weakTrigger;
+  });
+
+  let alive = true;
+  for (let attempt = 0; attempt < 20 && alive; attempt++) {
+    await page.evaluate(nextTask);
+    await page.requestGC();
+    alive = await page.evaluate(() => {
+      const retained = window as unknown as {
+        __staleParent: WeakRef<HTMLDivElement>;
+        __staleChild: WeakRef<HTMLDivElement>;
+        __staleTrigger: WeakRef<HTMLDivElement>;
+      };
+      return retained.__staleParent.deref() !== undefined ||
+        retained.__staleChild.deref() !== undefined ||
+        retained.__staleTrigger.deref() !== undefined;
     });
   }
   expect(alive).toBe(false);

@@ -152,6 +152,7 @@ type DomOwnership = 'parent' | 'detached' | 'foreign' | 'unknown';
 
 interface ExitOwner {
   phase: OwnerPhase;
+  snapshotGeneration: number;
   parent: AutoParent | undefined;
   observer: MutationObserverLike | undefined;
   cache: [AutoChild, FlipRect][] | undefined;
@@ -216,6 +217,8 @@ interface PropertyHandlerLease {
   readonly cancel: () => void;
   readonly previousFinish: unknown;
   readonly previousCancel: unknown;
+  readonly previousFinishOwn: boolean;
+  readonly previousCancelOwn: boolean;
   finishWritten: boolean;
   cancelWritten: boolean;
 }
@@ -479,9 +482,7 @@ function inspectOwnership(node: AutoChild, parent: AutoParent): DomOwnership {
     const direct = Reflect.get(node, 'parentNode');
     if (direct === parent) return 'parent';
     if (Array.from(parent.children).includes(node)) return 'parent';
-    if (direct === null) return 'detached';
-    if (direct !== undefined) return 'foreign';
-    return 'unknown';
+    return direct === null || direct === undefined ? 'detached' : 'foreign';
   } catch {
     return 'unknown';
   }
@@ -533,12 +534,14 @@ function releaseHandlers(group: ExitGroup, final: boolean): void {
   } else {
     try {
       if (lease.finishWritten && Reflect.get(animation, 'onfinish') === lease.finish) {
-        Reflect.set(animation, 'onfinish', lease.previousFinish ?? null);
+        Reflect.set(animation, 'onfinish', lease.previousFinish);
+        if (!lease.previousFinishOwn) Reflect.deleteProperty(animation, 'onfinish');
       }
     } catch { /* oncancel освобождается независимо */ }
     try {
       if (lease.cancelWritten && Reflect.get(animation, 'oncancel') === lease.cancel) {
-        Reflect.set(animation, 'oncancel', lease.previousCancel ?? null);
+        Reflect.set(animation, 'oncancel', lease.previousCancel);
+        if (!lease.previousCancelOwn) Reflect.deleteProperty(animation, 'oncancel');
       }
     } catch { /* terminal ticket уже не зависит от host property */ }
   }
@@ -608,7 +611,7 @@ function reconcileRecords(owner: ExitOwner, records: readonly unknown[]): void {
   for (const record of list) {
     for (const node of recordNodes(record, 'addedNodes')) {
       const transaction = exitNodes.get(node);
-      if (transaction === undefined) continue;
+      if (transaction?.owner !== owner) continue;
       if (
         transaction.owner === owner &&
         owner.echo.get(node) === transaction.generation
@@ -620,7 +623,7 @@ function reconcileRecords(owner: ExitOwner, records: readonly unknown[]): void {
     }
     for (const node of recordNodes(record, 'removedNodes')) {
       const transaction = exitNodes.get(node);
-      if (transaction !== undefined) terminalExit(transaction, 'transfer');
+      if (transaction?.owner === owner) terminalExit(transaction, 'transfer');
     }
   }
 }
@@ -672,6 +675,10 @@ function installHandlers(group: ExitGroup): boolean {
       cancel: group.cancel,
       previousFinish: Reflect.get(animation, 'onfinish'),
       previousCancel: Reflect.get(animation, 'oncancel'),
+      // Presence — часть lease: собственный undefined и отсутствующее поле
+      // дают разный observable shape для duck-typed host.
+      previousFinishOwn: Object.prototype.hasOwnProperty.call(animation, 'onfinish'),
+      previousCancelOwn: Object.prototype.hasOwnProperty.call(animation, 'oncancel'),
       finishWritten: true,
       cancelWritten: false,
     };
@@ -1019,13 +1026,27 @@ function resolveReduce(options: AutoAnimateOptions): boolean {
   }
 }
 
-function snapshot(owner: ExitOwner): [AutoChild, FlipRect][] {
+function currentSnapshot(owner: ExitOwner, parent: AutoParent, generation: number): boolean {
+  return owner.phase === 'connected' && owner.parent === parent &&
+    owner.snapshotGeneration === generation;
+}
+
+function snapshot(owner: ExitOwner): [AutoChild, FlipRect][] | undefined {
+  if (owner.phase !== 'connected') return undefined;
+  const generation = ++owner.snapshotGeneration;
   const parent = owner.parent;
-  if (parent === undefined) return [];
+  if (parent === undefined) return undefined;
+  let children: AutoChild[];
+  try { children = Array.from(parent.children); } catch { return undefined; }
+  if (!currentSnapshot(owner, parent, generation)) return undefined;
   const entries: [AutoChild, FlipRect][] = [];
-  for (const child of Array.from(parent.children)) {
+  for (const child of children) {
+    if (!currentSnapshot(owner, parent, generation)) return undefined;
     if (!exitNodes.has(child) && !owner.settling.has(child)) {
-      entries.push([child, child.getBoundingClientRect()]);
+      let rect: FlipRect;
+      try { rect = child.getBoundingClientRect(); } catch { return undefined; }
+      if (!currentSnapshot(owner, parent, generation)) return undefined;
+      entries.push([child, rect]);
     }
   }
   return entries;
@@ -1039,6 +1060,7 @@ function processRecords(owner: ExitOwner, records: readonly unknown[]): void {
   if (owner.phase !== 'connected' || parent === undefined || previous === undefined) return;
 
   const current = snapshot(owner);
+  if (current === undefined) return;
   owner.cache = current; // DOM-факт коммитится до любого host effect.
   if (owner.disabled) return;
   const plan = planAuto(previous, current, owner.epsilon);
@@ -1084,6 +1106,7 @@ function observerCallback(owner: ExitOwner): (records: unknown[]) => void {
 function closeOwner(owner: ExitOwner): void {
   if (owner.phase !== 'connected') return;
   owner.phase = 'disconnecting';
+  owner.snapshotGeneration++;
   const observer = owner.observer;
   let pending: readonly unknown[] = [];
   try {
@@ -1108,7 +1131,8 @@ function controlsFor(owner: ExitOwner): AutoAnimateControls {
     enable(): void {
       if (owner.phase !== 'connected') return;
       owner.disabled = false;
-      owner.cache = snapshot(owner);
+      const current = snapshot(owner);
+      if (current !== undefined) owner.cache = current;
     },
     disable(): void {
       if (owner.phase === 'connected') owner.disabled = true;
@@ -1161,6 +1185,7 @@ export function autoAnimate(
   /** Session — единственный strong owner parent/observer/cache до disconnect. */
   const owner: ExitOwner = {
     phase: 'connected',
+    snapshotGeneration: 0,
     parent,
     observer: undefined,
     cache: undefined,

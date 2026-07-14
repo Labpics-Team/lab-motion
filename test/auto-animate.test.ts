@@ -347,6 +347,49 @@ describe('auto: autoAnimate — адаптер (duck-typed DOM)', () => {
     expect(doomed.style).toMatchObject({ position: 'relative', left: '2px', top: '3px' });
   });
 
+  it('две сессии одного parent не путают общий remove-record с transfer', () => {
+    const first = fakeObserverSeam();
+    const second = fakeObserverSeam();
+    const node = fakeEl(R(20, 40), 'single-writer');
+    const parent = fakeParent([node]);
+    autoAnimate(parent as never, { MutationObserverCtor: first.Ctor as never });
+    autoAnimate(parent as never, { MutationObserverCtor: second.Ctor as never });
+
+    parent.children = [];
+    const record = { addedNodes: [], removedNodes: [node] };
+    first.state.callback!([record]);
+    const finish = node.animations[0]!.onfinish!;
+    second.state.callback!([record]);
+
+    expect(node.animations[0]!.cancelled).toBe(false);
+    expect(parent.children).toContain(node);
+    finish();
+    expect(parent.children).not.toContain(node);
+    expect(parent.removed).toEqual([node]);
+  });
+
+  it('duck-child без parentNode использует children как ownership-oracle и завершает exit', () => {
+    const seam = fakeObserverSeam();
+    const node = fakeEl(R(20, 40), 'duck-without-parent-node');
+    const parent = fakeParent([node]);
+    autoAnimate(parent as never, { MutationObserverCtor: seam.Ctor as never });
+    const append = parent.appendChild.bind(parent);
+    parent.appendChild = (child: FakeEl) => {
+      Reflect.set(child, 'parentNode', null);
+      append(child);
+      Reflect.deleteProperty(child, 'parentNode');
+    };
+    Reflect.deleteProperty(node, 'parentNode');
+
+    parent.children = [];
+    seam.state.callback!([{ addedNodes: [], removedNodes: [node] }]);
+
+    expect(node.animations).toHaveLength(1);
+    node.animations[0]!.onfinish!();
+    expect(parent.children).not.toContain(node);
+    expect(parent.removed).toEqual([node]);
+  });
+
   it('border родителя учитывается: absolute считается от padding-box (минус clientLeft/clientTop)', () => {
     const seam = fakeObserverSeam();
     const doomed = fakeEl(R(20, 40), 'doomed');
@@ -663,6 +706,53 @@ describe('auto: autoAnimate — адаптер (duck-typed DOM)', () => {
     expect(doomed.style['position']).toBe('relative');
   });
 
+  it('snapshot прекращает host-чтения после reentrant disconnect', () => {
+    const seam = fakeObserverSeam();
+    const first = fakeEl(R(0, 0), 'disconnecting-rect');
+    const stale = fakeEl(R(20, 0), 'must-not-be-read');
+    const parent = fakeParent([first, stale]);
+    const controls = autoAnimate(parent as never, { MutationObserverCtor: seam.Ctor as never });
+    let staleReads = 0;
+    first.getBoundingClientRect = () => {
+      controls.disconnect();
+      return R(0, 0);
+    };
+    stale.getBoundingClientRect = () => {
+      staleReads++;
+      return R(20, 0);
+    };
+
+    seam.state.callback!([{ addedNodes: [], removedNodes: [] }]);
+
+    expect(seam.state.disconnected).toBe(true);
+    expect(staleReads).toBe(0);
+  });
+
+  it('nested snapshot инвалидирует внешнее поколение без disconnect', () => {
+    const seam = fakeObserverSeam();
+    const first = fakeEl(R(0, 0), 'reentrant-rect');
+    const stale = fakeEl(R(20, 0), 'single-read');
+    const parent = fakeParent([first, stale]);
+    autoAnimate(parent as never, { MutationObserverCtor: seam.Ctor as never });
+    let reenter = true;
+    let staleReads = 0;
+    first.getBoundingClientRect = () => {
+      if (reenter) {
+        reenter = false;
+        seam.state.callback!([{ addedNodes: [], removedNodes: [] }]);
+      }
+      return R(0, 0);
+    };
+    stale.getBoundingClientRect = () => {
+      staleReads++;
+      return R(20, 0);
+    };
+
+    seam.state.callback!([{ addedNodes: [], removedNodes: [] }]);
+
+    expect(staleReads).toBe(1);
+  });
+
   it('stale animate continuation не отменяет handle живого чужого exit', () => {
     const leftSeam = fakeObserverSeam();
     const rightSeam = fakeObserverSeam();
@@ -937,6 +1027,28 @@ describe('auto: autoAnimate — адаптер (duck-typed DOM)', () => {
     expect(cancelCalls).toBe(1);
     expect(parent.removed).toEqual([node]);
     expect(node.style['position']).toBe('relative');
+  });
+
+  it('property-handler lease восстанавливает отсутствие own onfinish/oncancel', () => {
+    const seam = fakeObserverSeam();
+    const node = fakeEl(R(0, 0), 'absent-handlers');
+    const animation = { cancel() {} } as Animation & {
+      onfinish?: (() => void) | null;
+      oncancel?: (() => void) | null;
+    };
+    node.animate = () => animation as never;
+    const parent = fakeParent([node]);
+    autoAnimate(parent as never, { MutationObserverCtor: seam.Ctor as never });
+
+    parent.children = [];
+    seam.state.callback!([{ addedNodes: [], removedNodes: [node] }]);
+    const finish = animation.onfinish!;
+    expect(Object.hasOwn(animation, 'onfinish')).toBe(true);
+    expect(Object.hasOwn(animation, 'oncancel')).toBe(true);
+    finish();
+
+    expect(Object.hasOwn(animation, 'onfinish')).toBe(false);
+    expect(Object.hasOwn(animation, 'oncancel')).toBe(false);
   });
 
   it('CSSOM lease восстанавливает presence, canonical value и !important', () => {
