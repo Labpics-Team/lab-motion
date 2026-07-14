@@ -380,14 +380,16 @@ export class WaapiUnit implements GroupOwner {
   private _elapsed(fallbackPending: boolean): number {
     // NaN — ленивый sentinel: валидный native currentTime не вызывает now().
     let current = animationTimeOrFallback(this._anim, NaN);
-    if (current !== current || (fallbackPending && current < 0)) {
+    if (Number.isNaN(current) || (fallbackPending && current < 0)) {
       try {
         current = this._o._now() - this._startTime;
       } catch {
         // Отказ clock означает безопасный pre-start либо fail-closed wake.
       }
     }
-    return isFinite(current) ? current : -1;
+    // Для числового clock x-x равен нулю только при конечном x; это сохраняет
+    // NaN/±Infinity как fail-closed sentinel без coercive global isFinite.
+    return current - current === 0 ? current : -1;
   }
 
   /**
