@@ -66,7 +66,7 @@ import {
 } from './execution.js';
 import {
   animationTimeOrFallback,
-  sampleSerializedSpring,
+  sampleSerializedSpringIntoUnchecked,
   scaleSerializedVelocity,
 } from './sample.js';
 import { handoffToLive } from './handoff.js';
@@ -802,7 +802,7 @@ export class CompositorSpring {
       this._anim,
       this._now() - this._startTime,
     );
-    const sample = sampleSerializedSpring(
+    const sample = sampleSerializedSpringIntoUnchecked(
       this._samples!,
       this._durationMs,
       currentTime,
