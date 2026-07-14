@@ -121,8 +121,8 @@ describe('contract — plain-object (ноль-DOM)', () => {
     const target = { level: 5 };
     const clock = makeClock();
     const reg = createRegistry();
-    reg.registerCodec(() => true, numberCodec);
-    reg.registerAdapter((t) => typeof t === 'object' && t !== null, plainObjectAdapter);
+    reg._registerCodec(() => true, numberCodec);
+    reg._registerAdapter((t) => typeof t === 'object' && t !== null, plainObjectAdapter);
     const c = runAnimate(reg, target, { level: 10 }, { ...RF(clock), duration: 50 });
     clock.drain(16);
     await c.finished;
@@ -160,19 +160,19 @@ describe('реестр — fail-fast и расширение', () => {
     const maps: ReadonlyMap<string, string | number>[] = [];
     const target = { level: 0 };
     const adapter: TargetAdapter = {
-      read: (t, property) => (t as Record<string, unknown>)[property],
-      surfaceOf: (property) => property,
-      compose: (_surface, channels) => {
+      _read: (t, property) => (t as Record<string, unknown>)[property],
+      _surfaceOf: (property) => property,
+      _compose: (_surface, channels) => {
         maps.push(channels);
         return channels.get('level') ?? 0;
       },
-      apply: (t, property, value) => {
+      _apply: (t, property, value) => {
         (t as Record<string, unknown>)[property] = value;
       },
     };
     const registry = createRegistry();
-    registry.registerCodec(() => true, numberCodec);
-    registry.registerAdapter(() => true, adapter);
+    registry._registerCodec(() => true, numberCodec);
+    registry._registerAdapter(() => true, adapter);
     const clock = makeClock();
     const controls = runAnimate(
       registry,
@@ -190,7 +190,7 @@ describe('реестр — fail-fast и расширение', () => {
   });
 
   it('реестр: неизвестное свойство fail-fast', () => {
-    // mini не знает 'width' — resolveCodec бросает ДО записи (не молчаливый
+    // mini не знает 'width' — _resolveCodec бросает ДО записи (не молчаливый
     // fallback на первый попавшийся кодек). Явная пара [10,100] исключает
     // побочный бросок при чтении from — тест пинует ИМЕННО резолв кодека.
     const f = fakeEl();
@@ -207,25 +207,25 @@ describe('реестр — fail-fast и расширение', () => {
     // ЗАКОН расширения: регистрируем кодек 'децибелы' (лог-шкала) — движок
     // прогоняет его теми же parse/interpolate/serialize, ни строки в engine.ts.
     const dbCodec: PropertyCodec<number> = {
-      parse: (v) => Number(v),
-      interpolate: (from, to) => (p) => from + (to - from) * p,
-      serialize: (v) => `${v.toFixed(1)}dB`,
+      _parse: (v) => Number(v),
+      _interpolate: (from, to) => (p) => from + (to - from) * p,
+      _serialize: (v) => `${v.toFixed(1)}dB`,
     };
     const target: Record<string, unknown> = { db: '0' };
     const objAdapter: TargetAdapter = {
-      read: (t, prop) => (t as Record<string, unknown>)[prop],
-      surfaceOf: (p) => p,
-      compose: (_s, ch) => {
+      _read: (t, prop) => (t as Record<string, unknown>)[prop],
+      _surfaceOf: (p) => p,
+      _compose: (_s, ch) => {
         for (const v of ch.values()) return v;
         return '';
       },
-      apply: (t, s, v) => {
+      _apply: (t, s, v) => {
         (t as Record<string, unknown>)[s] = v;
       },
     };
     const reg = createRegistry();
-    reg.registerCodec((p) => p === 'db', dbCodec);
-    reg.registerAdapter(() => true, objAdapter);
+    reg._registerCodec((p) => p === 'db', dbCodec);
+    reg._registerAdapter(() => true, objAdapter);
     const clock = makeClock();
     const c = runAnimate(reg, target, { db: [0, 6] }, { ...RF(clock), duration: 50 });
     clock.drain(16);
@@ -235,10 +235,10 @@ describe('реестр — fail-fast и расширение', () => {
 
   it('позже зарегистрированный кодек перекрывает ранний (last-first)', () => {
     const reg = createRegistry();
-    const a: PropertyCodec<number> = { parse: () => 1, interpolate: () => () => 1, serialize: () => 'A' };
-    const b: PropertyCodec<number> = { parse: () => 1, interpolate: () => () => 1, serialize: () => 'B' };
-    reg.registerCodec(() => true, a);
-    reg.registerCodec(() => true, b);
-    expect(reg.resolveCodec('anything').serialize(1)).toBe('B');
+    const a: PropertyCodec<number> = { _parse: () => 1, _interpolate: () => () => 1, _serialize: () => 'A' };
+    const b: PropertyCodec<number> = { _parse: () => 1, _interpolate: () => () => 1, _serialize: () => 'B' };
+    reg._registerCodec(() => true, a);
+    reg._registerCodec(() => true, b);
+    expect(reg._resolveCodec('anything')._serialize(1)).toBe('B');
   });
 });

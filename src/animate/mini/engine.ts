@@ -2,13 +2,13 @@
  * animate/mini/engine.ts — движок анимации поверх адаптерного реестра.
  *
  * НЕ ВЕТВИТСЯ по имени свойства: канал резолвит codec через реестр, запись —
- * через adapter.surfaceOf/compose/apply. Новый вид свойства/цели = регистрация
+ * через adapter._surfaceOf/_compose/_apply. Новый вид свойства/цели = регистрация
  * в реестре, не правка этого файла (ЗАКОН расширения, registry.ts).
  *
  * Единая семантика времени: и spring, и tween, и все кодеки живут в ОДНОМ
  * прогресс-пространстве p∈[0,1] (readCompositorSpring на from=0,to=1 — та же
  * замкнутая форма, что у compositor-пути пакета). Значение канала =
- * codec.interpolate(from,to)(p). Расширение этого внутреннего слоя не меняет
+ * codec._interpolate(from,to)(p). Расширение этого внутреннего слоя не меняет
  * фиксированную публичную поверхность mini.
  *
  * Пути (авто по среде):
@@ -26,7 +26,7 @@
  *
  * Инварианты: один владелец пары target/поверхность (реестр, supersede при
  * повторном запуске); C¹-подхват value+velocity (dominant-канал); fail-fast
- * (валидация ДО записи — codec.parse); SSR-safe (DOM только в момент вызова);
+ * (валидация ДО записи — codec._parse); SSR-safe (DOM только в момент вызова);
  * детерминизм (часы только через инжектируемый ./frame requestFrame).
  */
 
@@ -91,9 +91,9 @@ export interface AnimateControls {
 
 // ─── Реестр состояния по целям (владелец + последнее значение канала) ────────
 
-// Runtime-shape поля ниже приватны всему mini-графу и потому имеют `_`:
-// tsup сжимает только такие свойства. Публичные EngineOptions и registry seam
-// намеренно остаются без префикса — их имена являются контрактом потребителя.
+// Runtime-shape и registry seam приватны всему mini-графу и потому имеют `_`:
+// tsup сжимает только такие свойства. Без префикса остаются лишь публичные
+// EngineOptions — их имена являются контрактом потребителя.
 
 interface ChannelSnapshot {
   readonly _value: string | number;
@@ -209,7 +209,7 @@ function _parseSpecs(props: Record<string, PropValue>, registry: CodecResolver):
     if (property === 'transform') {
       throw new MotionParamError('LM140');
     }
-    const codec = registry.resolveCodec(property);
+    const codec = registry._resolveCodec(property);
     const raw = props[property]!;
     const pair = Array.isArray(raw) ? (raw as readonly [unknown, unknown]) : undefined;
     if (pair !== undefined && pair.length !== 2) {
@@ -218,8 +218,8 @@ function _parseSpecs(props: Record<string, PropValue>, registry: CodecResolver):
     specs.push({
       _property: property,
       _codec: codec,
-      _explicitFrom: pair !== undefined ? codec.parse(pair[0], property) : undefined,
-      _to: codec.parse(pair !== undefined ? pair[1] : raw, property),
+      _explicitFrom: pair !== undefined ? codec._parse(pair[0], property) : undefined,
+      _to: codec._parse(pair !== undefined ? pair[1] : raw, property),
     });
   }
   return specs;
@@ -273,22 +273,22 @@ function _bindSurface(
       const live = owner?._captureChannel(spec._property);
       const stored = rec._last.get(spec._property);
       if (live !== undefined) {
-        from = codec.parse(live._value, spec._property);
+        from = codec._parse(live._value, spec._property);
         velocity = live._velocity;
       } else if (stored !== undefined) {
-        from = codec.parse(stored._value, spec._property);
+        from = codec._parse(stored._value, spec._property);
       } else {
-        from = codec.parse(adapter.read(target, spec._property), spec._property);
+        from = codec._parse(adapter._read(target, spec._property), spec._property);
       }
     }
-    const numRange = codec.range?.(from, spec._to);
-    const interp = codec.interpolate(from, spec._to);
+    const numRange = codec._range?.(from, spec._to);
+    const interp = codec._interpolate(from, spec._to);
     channels.push({
       _property: spec._property,
       _codec: codec,
       _interp: interp,
       _numRange: numRange,
-      _value: codec.serialize(interp(0)),
+      _value: codec._serialize(interp(0)),
       _velocity: velocity,
     });
     if (numRange !== undefined && (domRange === undefined || Math.abs(numRange) > Math.abs(domRange))) {
@@ -582,7 +582,7 @@ class Unit implements SurfaceOwner {
       if (Math.abs(p - 1) < CONVERGENCE && Math.abs(dpdt) < CONVERGENCE) return true;
     }
     for (const ch of o._bound._channels) {
-      ch._value = ch._codec.serialize(ch._interp(p));
+      ch._value = ch._codec._serialize(ch._interp(p));
       if (dpdt !== undefined) {
         const vel = ch._numRange !== undefined ? ch._numRange * dpdt : 0;
         ch._velocity = finiteOrZero(vel);
@@ -610,10 +610,10 @@ class Unit implements SurfaceOwner {
   private _write(): void {
     const o = this._o;
     for (const ch of o._bound._channels) o._bound._values.set(ch._property, ch._value);
-    o._adapter.apply(
+    o._adapter._apply(
       o._target,
       o._surface,
-      o._adapter.compose(o._surface, o._bound._values),
+      o._adapter._compose(o._surface, o._bound._values),
     );
   }
 
@@ -621,7 +621,7 @@ class Unit implements SurfaceOwner {
   private _settle(): void {
     if (this._done) return;
     for (const ch of this._o._bound._channels) {
-      ch._value = ch._codec.serialize(ch._interp(1));
+      ch._value = ch._codec._serialize(ch._interp(1));
       ch._velocity = 0;
     }
     this._write();
@@ -678,9 +678,9 @@ function _resolveTargets(target: unknown, registry: CodecResolver): object[] {
   if (source !== null && typeof source === 'object') {
     // Прямая adapter-цель ПЕРВЫМ: объект с полем length:0 (напр. style-цель)
     // иначе трактуется как пустой список → тихий no-op (цель не анимируется).
-    // Валидная прямая цель (resolveAdapter не бросает) — ОДНА цель, не список.
+    // Валидная прямая цель (_resolveAdapter не бросает) — ОДНА цель, не список.
     try {
-      registry.resolveAdapter(source);
+      registry._resolveAdapter(source);
       return [source];
     } catch (error) {
       // Не маскируем отказ пользовательского matcher-а под array-like fallback.
@@ -743,14 +743,14 @@ export function runAnimate(
   const plan: PlanEntry[] = [];
   for (let i = 0; i < targets.length; i++) {
     const tgt = targets[i]!;
-    const adapter = registry.resolveAdapter(tgt);
+    const adapter = registry._resolveAdapter(tgt);
     // Оба операнда конечны, но их сумма/произведение всё ещё могут overflow.
     // Проверяем derived-значение в read-only plan-фазе, до первой подписки.
     const delayMs = _nonNeg(baseDelay + staggerStep * i, 0);
 
     const bySurface = new Map<string, Spec[]>();
     for (const spec of specs) {
-      const surface = adapter.surfaceOf(spec._property);
+      const surface = adapter._surfaceOf(spec._property);
       const list = bySurface.get(surface);
       if (list === undefined) bySurface.set(surface, [spec]);
       else list.push(spec);
