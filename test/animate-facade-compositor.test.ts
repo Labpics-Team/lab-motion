@@ -112,6 +112,32 @@ describe('animate: compositor-путь (Класс А + contract)', () => {
     await controls.finished;
   });
 
+  it('reduced-policy снимается один раз на aggregate и не читает hostile WAAPI', async () => {
+    let policyReads = 0;
+    let capabilityReads = 0;
+    const target = () => Object.defineProperty(fakeEl().el, 'animate', {
+      get() {
+        capabilityReads++;
+        throw new Error('WAAPI capability не должна читаться в reduced-policy');
+      },
+    });
+
+    const controls = animate(
+      [target(), target()],
+      { x: 100 },
+      {
+        spring: SPRING,
+        matchMedia: () => {
+          policyReads++;
+          return { matches: true };
+        },
+      },
+    );
+
+    expect({ policyReads, capabilityReads }).toEqual({ policyReads: 1, capabilityReads: 0 });
+    await controls.finished;
+  });
+
   it('повторный animate на compositor-ране: cancel старой Animation + новая с mid-flight from (C¹-ретаргет)', () => {
     const f = fakeEl({}, true);
     const now = makeNow();

@@ -141,7 +141,7 @@ export function __resetDetectionCache(): void {
 // ─── Вспомогательные швы ──────────────────────────────────────────────────────
 
 /** Активно ли предпочтение reduce (guard: нет matchMedia или бросок → false). */
-function prefersReduced(matchMedia: MatchMediaLike | undefined): boolean {
+export function prefersReduced(matchMedia: MatchMediaLike | undefined): boolean {
   if (typeof matchMedia !== 'function') return false;
   try {
     // Window.matchMedia — host-метод с receiver-проверкой в части движков.
@@ -150,11 +150,6 @@ function prefersReduced(matchMedia: MatchMediaLike | undefined): boolean {
   } catch {
     return false;
   }
-}
-
-/** Есть ли DOM-площадка анимации (браузер/jsdom), а не чистый серверный рантайм. */
-function domPresent(): boolean {
-  return typeof document !== 'undefined' || typeof window !== 'undefined';
 }
 
 // ─── resolveCompositorTier ────────────────────────────────────────────────────
@@ -167,25 +162,40 @@ function domPresent(): boolean {
 export function resolveCompositorTierCode(inputs: TierInputs): CompositorTierCode {
   // 1. Политика доступности перекрывает всё (снап независимо от движка).
   if (prefersReduced(inputs.matchMedia)) return 3;
+  return resolveCompositorTierCodeFromCapability(
+    supportsWaapi(inputs.target),
+    inputs.requestFrame,
+  );
+}
+
+/** Внутренний вход после однократного non-policy capability snapshot. */
+export function resolveCompositorTierCodeFromCapability(
+  hasWaapi: boolean,
+  requestFrame: unknown,
+): CompositorTierCode {
   // 2. WebKit исполняет явные ключевые кадры с обычным linear, поэтому одного
   //    WAAPI достаточно. Остальным движкам нужен многостоповый CSS linear().
-  if (supportsWaapi(inputs.target)) {
+  if (hasWaapi) {
     return requiresExplicitSpringKeyframes() || supportsLinearEasing() ? 0 : 1;
   }
   // 3. WAAPI нет → живой rAF-движок. SSR-ярлык, если нет ни DOM, ни планировщика.
-  return inputs.requestFrame !== undefined || domPresent() ? 2 : 4;
+  return requestFrame !== undefined ||
+    typeof document !== 'undefined' ||
+    typeof window !== 'undefined'
+      ? 2
+      : 4;
 }
+
+/** Строковый public label отделён от компактного runtime-discriminant. */
+export const COMPOSITOR_TIERS: readonly CompositorTier[] = [
+  'compositor',
+  'waapi-no-linear',
+  'raf',
+  'reduced',
+  'ssr',
+];
 
 /** Публичный диагностический resolver сохраняет точные строковые ярлыки. */
 export function resolveCompositorTier(inputs: TierInputs): CompositorTier {
-  const code = resolveCompositorTierCode(inputs);
-  return code === 0
-    ? 'compositor'
-    : code === 1
-      ? 'waapi-no-linear'
-      : code === 2
-        ? 'raf'
-        : code === 3
-          ? 'reduced'
-          : 'ssr';
+  return COMPOSITOR_TIERS[resolveCompositorTierCode(inputs)]!;
 }
