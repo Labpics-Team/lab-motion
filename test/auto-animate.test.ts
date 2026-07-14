@@ -127,6 +127,7 @@ describe('auto: строители кейфреймов', () => {
 
 interface FakeAnimation {
   onfinish: (() => void) | null;
+  oncancel?: (() => void) | null;
   cancelled: boolean;
   cancel(): void;
 }
@@ -139,6 +140,7 @@ function fakeEl(rect: { x: number; y: number; width: number; height: number }, n
     rect,
     animateCalls,
     animations,
+    parentNode: null as unknown | null,
     style: {} as Record<string, string>,
     getBoundingClientRect() {
       return { ...this.rect };
@@ -159,11 +161,64 @@ function fakeEl(rect: { x: number; y: number; width: number; height: number }, n
 }
 type FakeEl = ReturnType<typeof fakeEl>;
 
+function fakeCanonicalStyle(
+  initial: Partial<Record<'position' | 'left' | 'top', readonly [string, string]>>,
+) {
+  type Name = 'position' | 'left' | 'top';
+  const values = new Map<Name, string>();
+  const priorities = new Map<Name, string>();
+  const canonical = (value: string): string =>
+    value.replace(/(-?\d+\.\d{6})\d+px/g, '$1px');
+  const style = {
+    getPropertyValue(name: Name): string {
+      return values.get(name) ?? '';
+    },
+    getPropertyPriority(name: Name): string {
+      return priorities.get(name) ?? '';
+    },
+    setProperty(name: Name, value: string, priority = ''): void {
+      values.set(name, canonical(value));
+      priorities.set(name, priority);
+    },
+    removeProperty(name: Name): string {
+      const previous = values.get(name) ?? '';
+      values.delete(name);
+      priorities.delete(name);
+      return previous;
+    },
+  } as Record<Name, string> & {
+    getPropertyValue(name: Name): string;
+    getPropertyPriority(name: Name): string;
+    setProperty(name: Name, value: string, priority?: string): void;
+    removeProperty(name: Name): string;
+  };
+  for (const name of ['position', 'left', 'top'] as const) {
+    Object.defineProperty(style, name, {
+      configurable: true,
+      get: () => values.get(name) ?? '',
+      set: (value: string) => style.setProperty(name, value),
+    });
+    const entry = initial[name];
+    if (entry !== undefined) style.setProperty(name, entry[0], entry[1]);
+  }
+  return style;
+}
+
 function fakeParent(children: FakeEl[], border = { left: 0, top: 0 }) {
   const appended: FakeEl[] = [];
   const removed: FakeEl[] = [];
+  let owned = [...children];
   const parent = {
-    children: [...children] as FakeEl[],
+    get children(): FakeEl[] {
+      return owned;
+    },
+    set children(next: FakeEl[]) {
+      for (const child of owned) {
+        if (!next.includes(child) && child.parentNode === parent) child.parentNode = null;
+      }
+      owned = [...next];
+      for (const child of owned) child.parentNode = parent;
+    },
     appended,
     removed,
     style: {} as Record<string, string>,
@@ -174,13 +229,19 @@ function fakeParent(children: FakeEl[], border = { left: 0, top: 0 }) {
     },
     appendChild(el: FakeEl) {
       appended.push(el);
-      if (!this.children.includes(el)) this.children.push(el);
+      const previous = el.parentNode as { removeChild?(child: FakeEl): void } | null;
+      if (previous !== null && previous !== this) previous.removeChild?.(el);
+      owned = owned.filter((child) => child !== el);
+      owned.push(el);
+      el.parentNode = this;
     },
     removeChild(el: FakeEl) {
       removed.push(el);
-      this.children = this.children.filter((c) => c !== el);
+      owned = owned.filter((child) => child !== el);
+      if (el.parentNode === this) el.parentNode = null;
     },
   };
+  for (const child of owned) child.parentNode = parent;
   return parent;
 }
 
@@ -761,6 +822,275 @@ describe('auto: autoAnimate — адаптер (duck-typed DOM)', () => {
     expect(leftParent.removed).toEqual([]);
   });
 
+  it('transfer A→B до callback не даёт старому плану отобрать узел', () => {
+    const leftSeam = fakeObserverSeam();
+    const node = fakeEl(R(0, 0), 'transferred');
+    const left = fakeParent([node]);
+    const right = fakeParent([]);
+    autoAnimate(left as never, { MutationObserverCtor: leftSeam.Ctor as never });
+
+    left.children = [];
+    right.appendChild(node);
+    leftSeam.state.callback!([{ addedNodes: [], removedNodes: [node] }]);
+
+    expect(right.children).toContain(node);
+    expect(left.children).not.toContain(node);
+    expect(left.appended).not.toContain(node);
+    expect(node.animateCalls).toHaveLength(0);
+  });
+
+  it('removed record активного ghost завершает transfer и снимает fill-effect', () => {
+    const leftSeam = fakeObserverSeam();
+    const node = fakeEl(R(0, 0), 'transferred');
+    node.style['position'] = 'relative';
+    node.style['left'] = '7px';
+    node.style['top'] = '8px';
+    const left = fakeParent([node]);
+    const right = fakeParent([]);
+    autoAnimate(left as never, { MutationObserverCtor: leftSeam.Ctor as never });
+
+    left.children = [];
+    leftSeam.state.callback!([{ addedNodes: [], removedNodes: [node] }]);
+    const animation = node.animations[0]!;
+    const lateFinish = animation.onfinish!;
+    leftSeam.state.callback!([{ addedNodes: [node], removedNodes: [] }]);
+    right.appendChild(node);
+    leftSeam.state.callback!([{ addedNodes: [], removedNodes: [node] }]);
+
+    expect(right.children).toContain(node);
+    expect(animation.cancelled).toBe(true);
+    expect(node.style).toMatchObject({ position: 'relative', left: '7px', top: '8px' });
+    lateFinish();
+    expect(right.children).toContain(node);
+  });
+
+  it('reentrant transfer во время terminal restore не удаляется старым owner', () => {
+    const seam = fakeObserverSeam();
+    const node = fakeEl(R(0, 0), 'reentrant-transfer');
+    const left = fakeParent([node]);
+    const right = fakeParent([]);
+    let position = 'relative';
+    let transfer = false;
+    Object.defineProperty(node.style, 'position', {
+      configurable: true,
+      get: () => position,
+      set(next: string) {
+        position = next;
+        if (transfer && next === 'relative') {
+          transfer = false;
+          right.appendChild(node);
+        }
+      },
+    });
+    autoAnimate(left as never, { MutationObserverCtor: seam.Ctor as never });
+
+    left.children = [];
+    seam.state.callback!([{ addedNodes: [], removedNodes: [node] }]);
+    const animation = node.animations[0]!;
+    transfer = true;
+    animation.onfinish!();
+
+    expect(right.children).toContain(node);
+    expect(left.children).not.toContain(node);
+    expect(animation.cancelled).toBe(true);
+    expect(position).toBe('relative');
+  });
+
+  it('natural finish всегда отменяет fill:both effect после terminal', () => {
+    const seam = fakeObserverSeam();
+    const node = fakeEl(R(0, 0), 'finished');
+    const parent = fakeParent([node]);
+    autoAnimate(parent as never, { MutationObserverCtor: seam.Ctor as never });
+
+    parent.children = [];
+    seam.state.callback!([{ addedNodes: [], removedNodes: [node] }]);
+    const animation = node.animations[0]!;
+    animation.onfinish!();
+
+    expect(animation.cancelled).toBe(true);
+    expect(parent.removed).toEqual([node]);
+  });
+
+  it('external Animation.cancel является terminal-сигналом', () => {
+    const seam = fakeObserverSeam();
+    const node = fakeEl(R(0, 0), 'cancelled');
+    node.style['position'] = 'relative';
+    let cancelCalls = 0;
+    const animation: FakeAnimation = {
+      onfinish: null,
+      oncancel: null,
+      cancelled: false,
+      cancel() {
+        cancelCalls++;
+        this.cancelled = true;
+        this.oncancel?.();
+      },
+    };
+    node.animate = () => animation;
+    const parent = fakeParent([node]);
+    autoAnimate(parent as never, { MutationObserverCtor: seam.Ctor as never });
+
+    parent.children = [];
+    seam.state.callback!([{ addedNodes: [], removedNodes: [node] }]);
+    animation.cancel();
+
+    expect(cancelCalls).toBe(1);
+    expect(parent.removed).toEqual([node]);
+    expect(node.style['position']).toBe('relative');
+  });
+
+  it('CSSOM lease восстанавливает presence, canonical value и !important', () => {
+    const seam = fakeObserverSeam();
+    const node = fakeEl(R(10.123456789, 20.987654321), 'cssom');
+    const style = fakeCanonicalStyle({
+      position: ['relative', 'important'],
+      left: ['1.234567891px', 'important'],
+    });
+    node.style = style;
+    const before = (['position', 'left', 'top'] as const).map((name) => [
+      style.getPropertyValue(name),
+      style.getPropertyPriority(name),
+    ]);
+    const parent = fakeParent([node]);
+    autoAnimate(parent as never, { MutationObserverCtor: seam.Ctor as never });
+
+    parent.children = [];
+    seam.state.callback!([{ addedNodes: [], removedNodes: [node] }]);
+    node.animations[0]!.onfinish!();
+
+    const after = (['position', 'left', 'top'] as const).map((name) => [
+      style.getPropertyValue(name),
+      style.getPropertyPriority(name),
+    ]);
+    expect(after).toEqual(before);
+  });
+
+  it('throwing pending record не клинит disconnecting и не пропускает terminal cleanup', () => {
+    const seam = fakeObserverSeam();
+    const node = fakeEl(R(0, 0), 'hostile-record');
+    node.style['position'] = 'relative';
+    const parent = fakeParent([node]);
+    const controls = autoAnimate(parent as never, { MutationObserverCtor: seam.Ctor as never });
+
+    parent.children = [];
+    seam.state.callback!([{ addedNodes: [], removedNodes: [node] }]);
+    const animation = node.animations[0]!;
+    seam.state.pending.push(Object.defineProperty({}, 'addedNodes', {
+      get() { throw new Error('hostile addedNodes'); },
+    }));
+
+    expect(() => controls.disconnect()).not.toThrow();
+    expect(seam.state.disconnected).toBe(true);
+    expect(animation.cancelled).toBe(true);
+    expect(parent.removed).toEqual([node]);
+    expect(node.style['position']).toBe('relative');
+  });
+
+  it('nested onfinish setter не оставляет stale handler поверх нового поколения', () => {
+    const leftSeam = fakeObserverSeam();
+    const rightSeam = fakeObserverSeam();
+    const leftNode = fakeEl(R(0, 0), 'left');
+    const rightNode = fakeEl(R(20, 0), 'right');
+    const left = fakeParent([leftNode]);
+    const right = fakeParent([rightNode]);
+    let stored: (() => void) | null = null;
+    let setterDepth = 0;
+    let reenter = true;
+    const shared = {
+      cancelled: false,
+      cancel() { this.cancelled = true; },
+    } as unknown as FakeAnimation;
+    Object.defineProperty(shared, 'onfinish', {
+      configurable: true,
+      get: () => stored,
+      set(next: (() => void) | null) {
+        setterDepth++;
+        if (reenter && setterDepth === 1 && next !== null) {
+          reenter = false;
+          leftSeam.state.callback!([
+            { addedNodes: [leftNode], removedNodes: [] },
+            { addedNodes: [leftNode], removedNodes: [] },
+          ]);
+          right.children = [];
+          rightSeam.state.callback!([{ addedNodes: [], removedNodes: [rightNode] }]);
+        }
+        stored = next;
+        setterDepth--;
+      },
+    });
+    leftNode.animate = rightNode.animate = () => shared;
+    autoAnimate(left as never, { MutationObserverCtor: leftSeam.Ctor as never });
+    autoAnimate(right as never, { MutationObserverCtor: rightSeam.Ctor as never });
+
+    left.children = [];
+    leftSeam.state.callback!([{ addedNodes: [], removedNodes: [leftNode] }]);
+    stored!();
+
+    expect(left.removed).toEqual([]);
+    expect(right.removed).toEqual([rightNode]);
+  });
+
+  it('handler release сериализован: старый restore не затирает новое поколение', () => {
+    const leftSeam = fakeObserverSeam();
+    const rightSeam = fakeObserverSeam();
+    const leftNode = fakeEl(R(0, 0), 'left');
+    const rightNode = fakeEl(R(20, 0), 'right');
+    const left = fakeParent([leftNode]);
+    const right = fakeParent([rightNode]);
+    let stored: (() => void) | null = null;
+    let reenterOnRelease = true;
+    const shared = {
+      cancelled: false,
+      cancel() { this.cancelled = true; },
+    } as unknown as FakeAnimation;
+    Object.defineProperty(shared, 'onfinish', {
+      configurable: true,
+      get: () => stored,
+      set(next: (() => void) | null) {
+        if (next === null && reenterOnRelease) {
+          reenterOnRelease = false;
+          right.children = [];
+          rightSeam.state.callback!([{ addedNodes: [], removedNodes: [rightNode] }]);
+        }
+        stored = next;
+      },
+    });
+    leftNode.animate = rightNode.animate = () => shared;
+    autoAnimate(left as never, { MutationObserverCtor: leftSeam.Ctor as never });
+    autoAnimate(right as never, { MutationObserverCtor: rightSeam.Ctor as never });
+
+    left.children = [];
+    leftSeam.state.callback!([{ addedNodes: [], removedNodes: [leftNode] }]);
+    leftSeam.state.callback!([
+      { addedNodes: [leftNode], removedNodes: [] },
+      { addedNodes: [leftNode], removedNodes: [] },
+    ]);
+    stored!();
+
+    expect(left.removed).toEqual([]);
+    expect(right.removed).toEqual([rightNode]);
+  });
+
+  it('failed remove всё равно завершает ticket и отменяет effect', () => {
+    const seam = fakeObserverSeam();
+    const node = fakeEl(R(0, 0), 'failed-remove');
+    node.style['position'] = 'relative';
+    const parent = fakeParent([node]);
+    parent.removeChild = () => { throw new Error('remove failed'); };
+    autoAnimate(parent as never, { MutationObserverCtor: seam.Ctor as never });
+
+    parent.children = [];
+    seam.state.callback!([{ addedNodes: [], removedNodes: [node] }]);
+    parent.appendChild(node);
+    const animation = node.animations[0]!;
+    const lateFinish = animation.onfinish!;
+
+    expect(() => lateFinish()).not.toThrow();
+    expect(animation.cancelled).toBe(true);
+    expect(node.style['position']).toBe('relative');
+    expect(() => lateFinish()).not.toThrow();
+  });
+
   it('reduced-motion (по умолчанию уважается): move НЕ анимируется (снап), exit — opacity', () => {
     const seam = fakeObserverSeam();
     const moved = fakeEl(R(0, 60), 'moved');
@@ -954,16 +1284,20 @@ describe('auto: autoAnimate — адаптер (duck-typed DOM)', () => {
     expect(parent.removed).toContain(doomed);
   });
 
-  it('регрессия: disconnect() во время живого exit — exit доигрывает и удаляет узел (нет утечки)', () => {
+  it('disconnect() terminal-ит живой exit и поздний finish остаётся no-op', () => {
     const seam = fakeObserverSeam();
     const doomed = fakeEl(R(0, 0), 'doomed');
     const parent = fakeParent([doomed]);
     const ctl = autoAnimate(parent as never, { MutationObserverCtor: seam.Ctor as never });
     parent.children = [];
     seam.state.callback!([{ addedNodes: [], removedNodes: [doomed] }]);
+    const animation = doomed.animations[0]!;
+    const lateFinish = animation.onfinish!;
     ctl.disconnect();
-    doomed.animations[0]!.onfinish!();
+    expect(animation.cancelled).toBe(true);
     expect(parent.removed).toContain(doomed);
+    expect(() => lateFinish()).not.toThrow();
+    expect(parent.removed.filter((node) => node === doomed)).toHaveLength(1);
   });
 
   it('без MutationObserver в среде → инертный контроллер, не бросает (SSR/legacy)', () => {

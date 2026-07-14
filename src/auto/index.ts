@@ -127,9 +127,11 @@ export function exitKeyframes(): Record<string, string | number>[] {
 
 /** Хендл нативной Animation в объёме, нужном адаптеру. */
 interface AnimationLike {
-  /** Владение onfinish exit-анимации — у адаптера (физическое удаление узла). */
-  onfinish: (() => void) | null;
+  onfinish?: (() => void) | null;
+  oncancel?: (() => void) | null;
   cancel?(): void;
+  addEventListener?(type: 'finish' | 'cancel', listener: () => void): void;
+  removeEventListener?(type: 'finish' | 'cancel', listener: () => void): void;
 }
 
 type OwnerPhase = 'connected' | 'disconnecting' | 'disconnected';
@@ -143,33 +145,49 @@ type ExitPhase =
   | 'active'
   | 'settling'
   | 'released';
-type ExitDisposition = 'none' | 'preserve' | 'remove';
+type ExitOutcome = 'revival' | 'transfer' | 'finish' | 'cancel' | 'disconnect' | 'failure';
 type GroupPhase = 'installing' | 'live' | 'retired';
+type StyleName = 'position' | 'left' | 'top';
+type DomOwnership = 'parent' | 'detached' | 'foreign' | 'unknown';
 
 interface ExitOwner {
   phase: OwnerPhase;
+  parent: AutoParent | undefined;
+  observer: MutationObserverLike | undefined;
+  cache: [AutoChild, FlipRect][] | undefined;
+  disabled: boolean;
+  readonly epsilon: number;
+  readonly reduce: boolean;
+  readonly timing: object;
   readonly current: Map<AutoChild, ExitTransaction>;
   readonly echo: Map<AutoChild, object>;
   readonly settling: WeakMap<AutoChild, object>;
 }
 
+interface StyleState {
+  readonly present: boolean;
+  readonly value: string;
+  readonly priority: string;
+}
+
 interface StyleFieldLease {
-  readonly previous: string;
-  readonly owned: string;
+  readonly generation: object;
+  readonly target: Record<string, string>;
+  readonly name: StyleName;
+  readonly previous: StyleState;
+  owned: StyleState | undefined;
 }
 
 interface ExitStyleLease {
-  readonly target: Record<string, string>;
-  readonly position: StyleFieldLease;
-  readonly left: StyleFieldLease;
-  readonly top: StyleFieldLease;
+  readonly fields: StyleFieldLease[];
 }
 
 interface ExitTransaction {
   readonly generation: object;
   phase: ExitPhase;
-  disposition: ExitDisposition;
+  outcome: ExitOutcome | undefined;
   inFlight: number;
+  ghost: boolean;
   owner: ExitOwner | undefined;
   node: AutoChild | undefined;
   parent: AutoParent | undefined;
@@ -180,8 +198,29 @@ interface ExitTransaction {
 interface HandleOwner {
   generation: object;
   group: ExitGroup | undefined;
+  installing: ExitGroup | undefined;
   cancelling: object | undefined;
 }
+
+interface EventHandlerLease {
+  readonly kind: 'events';
+  readonly finish: () => void;
+  readonly cancel: () => void;
+  finishAdded: boolean;
+  cancelAdded: boolean;
+}
+
+interface PropertyHandlerLease {
+  readonly kind: 'properties';
+  readonly finish: () => void;
+  readonly cancel: () => void;
+  readonly previousFinish: unknown;
+  readonly previousCancel: unknown;
+  finishWritten: boolean;
+  cancelWritten: boolean;
+}
+
+type HandlerLease = EventHandlerLease | PropertyHandlerLease;
 
 interface ExitGroup {
   readonly generation: object;
@@ -190,6 +229,8 @@ interface ExitGroup {
   readonly owner: HandleOwner;
   readonly tickets: Set<ExitTransaction>;
   readonly finish: () => void;
+  readonly cancel: () => void;
+  handlers: HandlerLease | undefined;
 }
 
 interface CancelToken {
@@ -205,11 +246,16 @@ interface ExitCleanup {
   readonly parent: AutoParent;
   readonly generation: object;
   readonly style: ExitStyleLease | undefined;
-  cancel: CancelToken | undefined;
+  readonly outcome: ExitOutcome;
+  readonly ghost: boolean;
+  readonly retired: ExitGroup | undefined;
+  readonly cancel: CancelToken | undefined;
 }
 
-/** Один host-handle хранит монотонную identity поколений во всех адаптерах. */
+/** SSOT identity: один node-ticket и одно поколение host-handle во всех сессиях. */
+const exitNodes = new WeakMap<AutoChild, ExitTransaction>();
 const exitHandles = new WeakMap<AnimationLike, HandleOwner>();
+const styleOwners = new WeakMap<object, Map<StyleName, StyleFieldLease>>();
 
 /** Duck-typed минимум ребёнка: замер + WAAPI + инлайн-стили. */
 interface AutoChild {
@@ -237,6 +283,7 @@ function isCurrent(transaction: ExitTransaction, phase?: ExitPhase): boolean {
   const current = owner.current.get(node);
   return (
     current === transaction &&
+    exitNodes.get(node) === transaction &&
     current.generation === transaction.generation &&
     (phase === undefined || transaction.phase === phase)
   );
@@ -245,14 +292,15 @@ function isCurrent(transaction: ExitTransaction, phase?: ExitPhase): boolean {
 function reserveExit(owner: ExitOwner, node: AutoChild, parent: AutoParent): ExitTransaction | undefined {
   if (
     owner.phase !== 'connected' ||
-    owner.current.has(node) ||
+    exitNodes.has(node) ||
     owner.settling.has(node)
   ) return undefined;
   const transaction: ExitTransaction = {
     generation: {},
     phase: 'reserved',
-    disposition: 'none',
+    outcome: undefined,
     inFlight: 0,
+    ghost: false,
     owner,
     node,
     parent,
@@ -260,29 +308,78 @@ function reserveExit(owner: ExitOwner, node: AutoChild, parent: AutoParent): Exi
     group: undefined,
   };
   owner.current.set(node, transaction);
+  exitNodes.set(node, transaction);
   return transaction;
 }
 
-function restoreStyleField(
-  target: Record<string, string>,
-  key: 'position' | 'left' | 'top',
-  lease: StyleFieldLease,
-): void {
+function readStyle(target: Record<string, string>, name: StyleName): StyleState {
+  const getValue = Reflect.get(target, 'getPropertyValue');
+  const getPriority = Reflect.get(target, 'getPropertyPriority');
+  if (typeof getValue === 'function' && typeof getPriority === 'function') {
+    const value = String(Reflect.apply(getValue, target, [name]));
+    const priority = String(Reflect.apply(getPriority, target, [name]));
+    return { present: value !== '' || priority !== '', value, priority };
+  }
+  const raw = Reflect.get(target, name);
+  const value = raw === undefined || raw === null ? '' : String(raw);
+  return {
+    present: Object.prototype.hasOwnProperty.call(target, name) || value !== '',
+    value,
+    priority: '',
+  };
+}
+
+function writeStyle(target: Record<string, string>, name: StyleName, state: StyleState): void {
+  const set = Reflect.get(target, 'setProperty');
+  const remove = Reflect.get(target, 'removeProperty');
+  if (typeof set === 'function' && typeof remove === 'function') {
+    if (state.present) Reflect.apply(set, target, [name, state.value, state.priority]);
+    else Reflect.apply(remove, target, [name]);
+    return;
+  }
+  if (state.present) {
+    if (!Reflect.set(target, name, state.value)) throw new TypeError('style write rejected');
+  } else {
+    Reflect.deleteProperty(target, name);
+  }
+}
+
+function styleOwnerMap(target: Record<string, string>): Map<StyleName, StyleFieldLease> {
+  let map = styleOwners.get(target);
+  if (map === undefined) {
+    map = new Map();
+    styleOwners.set(target, map);
+  }
+  return map;
+}
+
+function sameStyle(left: StyleState, right: StyleState): boolean {
+  return left.present === right.present && left.value === right.value &&
+    left.priority === right.priority;
+}
+
+function restoreStyleField(lease: StyleFieldLease): void {
+  let map: Map<StyleName, StyleFieldLease> | undefined;
   try {
-    if (target[key] === lease.owned) target[key] = lease.previous;
-  } catch { /* каждое поле имеет независимую compare-and-restore lease */ }
+    map = styleOwners.get(lease.target);
+    if (map?.get(lease.name) !== lease || lease.owned === undefined) return;
+    if (sameStyle(readStyle(lease.target, lease.name), lease.owned)) {
+      writeStyle(lease.target, lease.name, lease.previous);
+    }
+  } catch { /* terminal остальных ресурсов не зависит от одного CSSOM-поля */ }
+  finally {
+    if (map?.get(lease.name) === lease && lease.owned !== undefined) map.delete(lease.name);
+  }
 }
 
 function restoreExitStyle(style: ExitStyleLease): void {
-  restoreStyleField(style.target, 'position', style.position);
-  restoreStyleField(style.target, 'left', style.left);
-  restoreStyleField(style.target, 'top', style.top);
+  for (const field of style.fields) restoreStyleField(field);
 }
 
 function getHandleOwner(animation: AnimationLike): HandleOwner {
   let owner = exitHandles.get(animation);
   if (owner === undefined) {
-    owner = { generation: {}, group: undefined, cancelling: undefined };
+    owner = { generation: {}, group: undefined, installing: undefined, cancelling: undefined };
     exitHandles.set(animation, owner);
   }
   return owner;
@@ -300,21 +397,19 @@ function captureCancelToken(animation: AnimationLike): CancelToken | undefined {
 
 function deactivateGroup(group: ExitGroup): CancelToken | undefined {
   const animation = group.animation;
-  if (
-    group.phase === 'retired' ||
-    animation === undefined ||
-    group.owner.group !== group ||
-    group.owner.generation !== group.generation
-  ) return undefined;
-  group.owner.group = undefined;
+  if (group.phase === 'retired') return undefined;
+  const owns = group.owner.group === group && group.owner.generation === group.generation;
+  if (owns) group.owner.group = undefined;
   group.phase = 'retired';
-  group.animation = undefined;
-  return { animation, owner: group.owner, generation: group.generation };
+  return owns && animation !== undefined
+    ? { animation, owner: group.owner, generation: group.generation }
+    : undefined;
 }
 
-function settleExit(
+function detachExit(
   transaction: ExitTransaction,
-  disposition: Exclude<ExitDisposition, 'none'>,
+  outcome: ExitOutcome,
+  groupManaged = false,
 ): ExitCleanup | undefined {
   const owner = transaction.owner;
   const node = transaction.node;
@@ -322,10 +417,10 @@ function settleExit(
   if (owner === undefined || node === undefined || parent === undefined) return undefined;
 
   if (
-    owner.current.get(node) === transaction &&
-    transaction.generation === owner.current.get(node)?.generation
+    owner.current.get(node) === transaction && exitNodes.get(node) === transaction
   ) {
     owner.current.delete(node);
+    exitNodes.delete(node);
     if (owner.echo.get(node) === transaction.generation) owner.echo.delete(node);
     owner.settling.set(node, transaction.generation);
   }
@@ -333,17 +428,19 @@ function settleExit(
   const group = transaction.group;
   group?.tickets.delete(transaction);
   const style = transaction.style;
+  const ghost = transaction.ghost;
   transaction.phase = 'settling';
-  transaction.disposition = disposition;
+  transaction.outcome = outcome;
   transaction.owner = undefined;
   transaction.node = undefined;
   transaction.parent = undefined;
   transaction.style = undefined;
   transaction.group = undefined;
 
-  const cancel = group !== undefined && group.tickets.size === 0
-    ? deactivateGroup(group)
+  const retired = !groupManaged && group !== undefined && group.tickets.size === 0
+    ? group
     : undefined;
+  const cancel = retired === undefined ? undefined : deactivateGroup(retired);
   return {
     transaction,
     owner,
@@ -351,6 +448,9 @@ function settleExit(
     parent,
     generation: transaction.generation,
     style,
+    outcome,
+    ghost,
+    retired,
     cancel,
   };
 }
@@ -374,10 +474,21 @@ function finalizeFromContinuation(
   if (transaction.phase === 'settling') transaction.phase = 'released';
 }
 
-function removeExitNode(parent: AutoParent, node: AutoChild): void {
+function inspectOwnership(node: AutoChild, parent: AutoParent): DomOwnership {
   try {
-    if (!Array.from(parent.children).includes(node)) return;
-  } catch { /* hostile children getter: removeChild остаётся oracle среды */ }
+    const direct = Reflect.get(node, 'parentNode');
+    if (direct === parent) return 'parent';
+    if (Array.from(parent.children).includes(node)) return 'parent';
+    if (direct === null) return 'detached';
+    if (direct !== undefined) return 'foreign';
+    return 'unknown';
+  } catch {
+    return 'unknown';
+  }
+}
+
+function removeExitNode(parent: AutoParent, node: AutoChild): void {
+  if (inspectOwnership(node, parent) !== 'parent') return;
   try {
     parent.removeChild(node);
   } catch { /* узел уже удалён или больше не принадлежит parent */ }
@@ -405,40 +516,111 @@ function cancelIfUnclaimed(token: CancelToken): void {
   }
 }
 
-function applyCleanup(cleanup: ExitCleanup, remove: boolean): void {
+function releaseHandlers(group: ExitGroup, final: boolean): void {
+  const animation = group.animation;
+  const lease = group.handlers;
+  if (animation === undefined || lease === undefined) return;
+  if (lease.kind === 'events') {
+    const remove = animation.removeEventListener;
+    if (typeof remove === 'function') {
+      try {
+        if (lease.finishAdded) Reflect.apply(remove, animation, ['finish', lease.finish]);
+      } catch { /* cancel-listener освобождается независимо */ }
+      try {
+        if (lease.cancelAdded) Reflect.apply(remove, animation, ['cancel', lease.cancel]);
+      } catch { /* terminal ticket уже не зависит от host listener */ }
+    }
+  } else {
+    try {
+      if (lease.finishWritten && Reflect.get(animation, 'onfinish') === lease.finish) {
+        Reflect.set(animation, 'onfinish', lease.previousFinish ?? null);
+      }
+    } catch { /* oncancel освобождается независимо */ }
+    try {
+      if (lease.cancelWritten && Reflect.get(animation, 'oncancel') === lease.cancel) {
+        Reflect.set(animation, 'oncancel', lease.previousCancel ?? null);
+      }
+    } catch { /* terminal ticket уже не зависит от host property */ }
+  }
+  if (final) group.handlers = undefined;
+}
+
+function completeRetiredGroup(group: ExitGroup): void {
+  const owner = group.owner;
+  if (owner.installing === group) {
+    releaseHandlers(group, false);
+    return;
+  }
+  if (owner.installing !== undefined) {
+    releaseHandlers(group, false);
+    return;
+  }
+  // Restore handler тоже host-вызов: lock не даёт старому setter записаться
+  // после реентрантной установки следующего поколения.
+  owner.installing = group;
+  releaseHandlers(group, true);
+  group.animation = undefined;
+  owner.installing = undefined;
+  pumpHandlers(owner);
+}
+
+function applyCleanup(cleanup: ExitCleanup): void {
+  if (cleanup.retired !== undefined) completeRetiredGroup(cleanup.retired);
   if (cleanup.style !== undefined) restoreExitStyle(cleanup.style);
-  if (remove) removeExitNode(cleanup.parent, cleanup.node);
+  if (cleanup.ghost && cleanup.outcome !== 'revival' && cleanup.outcome !== 'transfer') {
+    removeExitNode(cleanup.parent, cleanup.node);
+  }
   if (cleanup.cancel !== undefined) cancelIfUnclaimed(cleanup.cancel);
   finalizeSettlement(cleanup);
 }
 
-function finishGroup(group: ExitGroup, cancel: boolean): void {
+function terminalExit(transaction: ExitTransaction, outcome: ExitOutcome): void {
+  const cleanup = detachExit(transaction, outcome);
+  if (cleanup !== undefined) applyCleanup(cleanup);
+}
+
+function finishGroup(group: ExitGroup, outcome: 'finish' | 'cancel' | 'failure'): void {
+  if (group.phase === 'retired') return;
   const token = deactivateGroup(group);
-  if (token === undefined) return;
   const cleanups: ExitCleanup[] = [];
   for (const transaction of Array.from(group.tickets)) {
-    const cleanup = settleExit(transaction, 'remove');
+    const cleanup = detachExit(transaction, outcome, true);
     if (cleanup !== undefined) cleanups.push(cleanup);
   }
   group.tickets.clear();
-  for (const cleanup of cleanups) applyCleanup(cleanup, true);
-  if (cancel) cancelIfUnclaimed(token);
+  completeRetiredGroup(group);
+  for (const cleanup of cleanups) applyCleanup(cleanup);
+  if (outcome !== 'cancel' && token !== undefined) cancelIfUnclaimed(token);
 }
 
-function reconcileAdded(owner: ExitOwner, records: readonly unknown[]): void {
-  for (const record of records) {
-    const added = (record as { addedNodes?: ArrayLike<AutoChild> }).addedNodes;
-    if (added === undefined) continue;
-    for (const node of Array.from(added)) {
-      const echoGeneration = owner.echo.get(node);
-      if (echoGeneration !== undefined) {
-        owner.echo.delete(node);
-        continue;
-      }
-      const transaction = owner.current.get(node);
+function recordNodes(record: unknown, key: 'addedNodes' | 'removedNodes'): AutoChild[] {
+  try {
+    const nodes = Reflect.get(record as object, key) as ArrayLike<AutoChild> | undefined;
+    return nodes === undefined ? [] : Array.from(nodes);
+  } catch {
+    return [];
+  }
+}
+
+function reconcileRecords(owner: ExitOwner, records: readonly unknown[]): void {
+  let list: readonly unknown[];
+  try { list = Array.from(records); } catch { return; }
+  for (const record of list) {
+    for (const node of recordNodes(record, 'addedNodes')) {
+      const transaction = exitNodes.get(node);
       if (transaction === undefined) continue;
-      const cleanup = settleExit(transaction, 'preserve');
-      if (cleanup !== undefined) applyCleanup(cleanup, false);
+      if (
+        transaction.owner === owner &&
+        owner.echo.get(node) === transaction.generation
+      ) {
+        owner.echo.delete(node);
+      } else {
+        terminalExit(transaction, 'revival');
+      }
+    }
+    for (const node of recordNodes(record, 'removedNodes')) {
+      const transaction = exitNodes.get(node);
+      if (transaction !== undefined) terminalExit(transaction, 'transfer');
     }
   }
 }
@@ -462,6 +644,75 @@ function callHost<T>(
   }
 }
 
+function installHandlers(group: ExitGroup): boolean {
+  const animation = group.animation;
+  if (animation === undefined) return false;
+  try {
+    const add = animation.addEventListener;
+    const remove = animation.removeEventListener;
+    if (typeof add === 'function' && typeof remove === 'function') {
+      const lease: EventHandlerLease = {
+        kind: 'events',
+        finish: group.finish,
+        cancel: group.cancel,
+        finishAdded: true,
+        cancelAdded: false,
+      };
+      group.handlers = lease;
+      Reflect.apply(add, animation, ['finish', lease.finish]);
+      if (group.owner.group !== group || group.phase !== 'installing') return false;
+      lease.cancelAdded = true;
+      Reflect.apply(add, animation, ['cancel', lease.cancel]);
+      return group.owner.group === group && group.phase === 'installing';
+    }
+
+    const lease: PropertyHandlerLease = {
+      kind: 'properties',
+      finish: group.finish,
+      cancel: group.cancel,
+      previousFinish: Reflect.get(animation, 'onfinish'),
+      previousCancel: Reflect.get(animation, 'oncancel'),
+      finishWritten: true,
+      cancelWritten: false,
+    };
+    group.handlers = lease;
+    if (!Reflect.set(animation, 'onfinish', lease.finish)) return false;
+    if (
+      group.owner.group !== group || group.phase !== 'installing' ||
+      Reflect.get(animation, 'onfinish') !== lease.finish
+    ) return false;
+    lease.cancelWritten = true;
+    if (!Reflect.set(animation, 'oncancel', lease.cancel)) return false;
+    return group.owner.group === group && group.phase === 'installing' &&
+      Reflect.get(animation, 'oncancel') === lease.cancel;
+  } catch {
+    return false;
+  }
+}
+
+function pumpHandlers(owner: HandleOwner): void {
+  if (owner.installing !== undefined) return;
+  while (owner.group !== undefined && owner.group.phase === 'installing') {
+    const group = owner.group;
+    owner.installing = group;
+    const installed = installHandlers(group);
+    if (installed && owner.group === group && group.phase === 'installing') {
+      group.phase = 'live';
+      for (const ticket of group.tickets) {
+        if (isCurrent(ticket)) ticket.phase = 'active';
+      }
+      owner.installing = undefined;
+      return;
+    }
+    if (owner.group === group && group.phase === 'installing') {
+      finishGroup(group, 'failure');
+    }
+    releaseHandlers(group, true);
+    group.animation = undefined;
+    owner.installing = undefined;
+  }
+}
+
 type BindResult = 'bound' | 'rejected' | 'settled';
 
 function bindExit(transaction: ExitTransaction, animation: AnimationLike): BindResult {
@@ -481,7 +732,9 @@ function bindExit(transaction: ExitTransaction, animation: AnimationLike): BindR
       animation,
       owner,
       tickets: new Set(),
-      finish: () => finishGroup(created, false),
+      finish: () => finishGroup(created, 'finish'),
+      cancel: () => finishGroup(created, 'cancel'),
+      handlers: undefined,
     };
     group = created;
     owner.group = group;
@@ -489,26 +742,13 @@ function bindExit(transaction: ExitTransaction, animation: AnimationLike): BindR
 
   transaction.group = group;
   group.tickets.add(transaction);
-  if (!install) {
-    transaction.phase = group.phase === 'live' ? 'active' : 'binding';
-    return isCurrent(transaction, transaction.phase) ? 'bound' : 'settled';
-  }
-
-  const installed = callHost(transaction, 'binding', () => {
-    animation.onfinish = group.finish;
-  });
-  const stillOwner = owner.group === group && owner.generation === group.generation;
-  if (!installed.ok) {
-    if (stillOwner) finishGroup(group, true);
-    return 'settled';
-  }
-  if (!stillOwner) return 'settled';
-
-  group.phase = 'live';
-  for (const ticket of group.tickets) {
-    if (isCurrent(ticket)) ticket.phase = 'active';
-  }
-  return isCurrent(transaction, 'active') ? 'bound' : 'settled';
+  transaction.phase = group.phase === 'live' ? 'active' : 'binding';
+  if (install) pumpHandlers(owner);
+  if (!isCurrent(transaction)) return 'settled';
+  return transaction.group === owner.group &&
+    (transaction.phase === 'active' || transaction.phase === 'binding')
+    ? 'bound'
+    : 'rejected';
 }
 
 function rollbackExit(
@@ -520,25 +760,71 @@ function rollbackExit(
   animation: AnimationLike | undefined,
   appended: boolean,
 ): void {
-  const current = owner.current.get(node) === transaction;
+  const bound = transaction.group !== undefined;
+  const current = isCurrent(transaction);
   if (current) {
-    const cleanup = settleExit(transaction, 'remove');
-    if (cleanup !== undefined) {
-      if (cleanup.cancel === undefined && animation !== undefined) {
-        cleanup.cancel = captureCancelToken(animation);
-      }
-      applyCleanup(cleanup, appended);
-      return;
-    }
+    terminalExit(transaction, 'failure');
   }
 
   if (lease !== undefined) restoreExitStyle(lease);
-  if (appended && transaction.disposition !== 'preserve') removeExitNode(parent, node);
-  if (animation !== undefined) {
+  if (
+    appended && transaction.outcome !== 'revival' && transaction.outcome !== 'transfer'
+  ) removeExitNode(parent, node);
+  if (animation !== undefined && !bound) {
     const token = captureCancelToken(animation);
     if (token !== undefined) cancelIfUnclaimed(token);
   }
   finalizeFromContinuation(transaction, owner, node, transaction.generation);
+}
+
+function observeOwnership(
+  transaction: ExitTransaction,
+  node: AutoChild,
+  parent: AutoParent,
+): HostResult<DomOwnership> {
+  return callHost(transaction, 'reading', () => inspectOwnership(node, parent));
+}
+
+function writeStyleField(
+  transaction: ExitTransaction,
+  target: Record<string, string>,
+  name: StyleName,
+  value: string,
+): boolean {
+  const previous = callHost(transaction, 'reading', () => readStyle(target, name));
+  if (!previous.ok || !isCurrent(transaction, 'reading')) return false;
+  const field: StyleFieldLease = {
+    generation: transaction.generation,
+    target,
+    name,
+    previous: previous.value,
+    owned: undefined,
+  };
+  let map: Map<StyleName, StyleFieldLease>;
+  try {
+    map = styleOwnerMap(target);
+    if (map.has(name)) return false;
+    map.set(name, field);
+  } catch {
+    return false;
+  }
+  transaction.style?.fields.push(field);
+
+  const requested: StyleState = { present: true, value, priority: '' };
+  const written = callHost(transaction, 'styling', () => writeStyle(target, name, requested));
+  // CSSOM сериализует дроби по-разному в каждом движке; owned — только
+  // фактический post-write snapshot, а не отправленная строка.
+  const captured = isCurrent(transaction)
+    ? callHost(transaction, 'styling', () => readStyle(target, name))
+    : (() => {
+        try { return { ok: true, value: readStyle(target, name) } as const; }
+        catch { return { ok: false } as const; }
+      })();
+  if (captured.ok) field.owned = captured.value;
+  else if (map.get(name) === field) map.delete(name);
+  if (written.ok && captured.ok && isCurrent(transaction, 'styling')) return true;
+  restoreStyleField(field);
+  return false;
 }
 
 function startExit(
@@ -556,6 +842,21 @@ function startExit(
   let animation: AnimationLike | undefined;
   let appended = false;
 
+  // Актуальный parent oracle проверяется до любых style/DOM effects: старый
+  // план не вправе отобрать узел, уже перенесённый потребителем в другой parent.
+  const initialOwnership = observeOwnership(transaction, node, parent);
+  if (!initialOwnership.ok || !isCurrent(transaction, 'reading')) {
+    rollbackExit(transaction, owner, node, parent, lease, animation, appended);
+    return;
+  }
+  if (initialOwnership.value !== 'detached') {
+    terminalExit(
+      transaction,
+      initialOwnership.value === 'parent' ? 'revival' : 'transfer',
+    );
+    return;
+  }
+
   const animateResult = callHost(transaction, 'reading', () => node.animate);
   if (!animateResult.ok || !isCurrent(transaction, 'reading')) {
     rollbackExit(transaction, owner, node, parent, lease, animation, appended);
@@ -563,8 +864,7 @@ function startExit(
   }
   const animate = animateResult.value;
   if (typeof animate !== 'function') {
-    const cleanup = settleExit(transaction, 'remove');
-    if (cleanup !== undefined) applyCleanup(cleanup, false);
+    terminalExit(transaction, 'failure');
     return;
   }
 
@@ -574,15 +874,9 @@ function startExit(
     return;
   }
   const target = styleResult.value;
-  const previousPosition = callHost(transaction, 'reading', () => target['position'] ?? '');
-  const previousLeft = callHost(transaction, 'reading', () => target['left'] ?? '');
-  const previousTop = callHost(transaction, 'reading', () => target['top'] ?? '');
   const clientLeft = callHost(transaction, 'reading', () => parent.clientLeft ?? 0);
   const clientTop = callHost(transaction, 'reading', () => parent.clientTop ?? 0);
   if (
-    !previousPosition.ok ||
-    !previousLeft.ok ||
-    !previousTop.ok ||
     !clientLeft.ok ||
     !clientTop.ok ||
     !isCurrent(transaction, 'reading')
@@ -591,40 +885,46 @@ function startExit(
     return;
   }
 
-  lease = {
-    target,
-    position: { previous: previousPosition.value, owned: 'absolute' },
-    left: {
-      previous: previousLeft.value,
-      owned: `${num(rect.x - parentRect.x - clientLeft.value)}px`,
-    },
-    top: {
-      previous: previousTop.value,
-      owned: `${num(rect.y - parentRect.y - clientTop.value)}px`,
-    },
-  };
+  lease = { fields: [] };
   transaction.style = lease;
-
-  for (const [key, field] of [
-    ['position', lease.position],
-    ['left', lease.left],
-    ['top', lease.top],
+  for (const [name, value] of [
+    ['position', 'absolute'],
+    ['left', `${num(rect.x - parentRect.x - clientLeft.value)}px`],
+    ['top', `${num(rect.y - parentRect.y - clientTop.value)}px`],
   ] as const) {
-    const written = callHost(transaction, 'styling', () => {
-      target[key] = field.owned;
-    });
-    if (!written.ok || !isCurrent(transaction, 'styling')) {
+    if (!writeStyleField(transaction, target, name, value)) {
       rollbackExit(transaction, owner, node, parent, lease, animation, appended);
       return;
     }
   }
 
+  const beforeAppend = observeOwnership(transaction, node, parent);
+  if (!beforeAppend.ok || !isCurrent(transaction, 'reading')) {
+    rollbackExit(transaction, owner, node, parent, lease, animation, appended);
+    return;
+  }
+  if (beforeAppend.value !== 'detached') {
+    terminalExit(transaction, beforeAppend.value === 'parent' ? 'revival' : 'transfer');
+    return;
+  }
+
   transaction.phase = 'appending';
   owner.echo.set(node, transaction.generation);
+  transaction.ghost = true;
   appended = true;
   const appendResult = callHost(transaction, 'appending', () => parent.appendChild(node));
   if (!appendResult.ok || !isCurrent(transaction, 'appending')) {
     rollbackExit(transaction, owner, node, parent, lease, animation, appended);
+    return;
+  }
+
+  const afterAppend = observeOwnership(transaction, node, parent);
+  if (!afterAppend.ok || !isCurrent(transaction, 'reading')) {
+    rollbackExit(transaction, owner, node, parent, lease, animation, appended);
+    return;
+  }
+  if (afterAppend.value !== 'parent') {
+    terminalExit(transaction, afterAppend.value === 'foreign' ? 'transfer' : 'failure');
     return;
   }
 
@@ -668,14 +968,11 @@ function animateIsolated(
 }
 
 function disconnectExits(owner: ExitOwner): void {
-  const cleanups: ExitCleanup[] = [];
   for (const transaction of Array.from(owner.current.values())) {
-    const cleanup = settleExit(transaction, 'remove');
-    if (cleanup !== undefined) cleanups.push(cleanup);
+    terminalExit(transaction, 'disconnect');
   }
   owner.current.clear();
   owner.echo.clear();
-  for (const cleanup of cleanups) applyCleanup(cleanup, true);
 }
 
 interface MutationObserverLike {
@@ -722,6 +1019,106 @@ function resolveReduce(options: AutoAnimateOptions): boolean {
   }
 }
 
+function snapshot(owner: ExitOwner): [AutoChild, FlipRect][] {
+  const parent = owner.parent;
+  if (parent === undefined) return [];
+  const entries: [AutoChild, FlipRect][] = [];
+  for (const child of Array.from(parent.children)) {
+    if (!exitNodes.has(child) && !owner.settling.has(child)) {
+      entries.push([child, child.getBoundingClientRect()]);
+    }
+  }
+  return entries;
+}
+
+function processRecords(owner: ExitOwner, records: readonly unknown[]): void {
+  if (owner.phase !== 'connected') return;
+  reconcileRecords(owner, records);
+  const parent = owner.parent;
+  const previous = owner.cache;
+  if (owner.phase !== 'connected' || parent === undefined || previous === undefined) return;
+
+  const current = snapshot(owner);
+  owner.cache = current; // DOM-факт коммитится до любого host effect.
+  if (owner.disabled) return;
+  const plan = planAuto(previous, current, owner.epsilon);
+
+  const reservations: Array<readonly [ExitTransaction, FlipRect]> = [];
+  for (const [node, rect] of plan.exits) {
+    const transaction = reserveExit(owner, node, parent);
+    if (transaction !== undefined) reservations.push([transaction, rect]);
+  }
+
+  let parentRect: FlipRect | undefined;
+  if (reservations.length > 0) {
+    try {
+      parentRect = parent.getBoundingClientRect();
+    } catch {
+      for (const [transaction] of reservations) terminalExit(transaction, 'failure');
+    }
+  }
+  if (parentRect !== undefined) {
+    for (const [transaction, rect] of reservations) {
+      if (owner.phase !== 'connected') break;
+      startExit(transaction, rect, parentRect, owner.timing);
+    }
+  }
+
+  if (owner.phase !== 'connected') return;
+  for (const node of plan.enters) {
+    animateIsolated(node, enterKeyframes(), owner.timing);
+    if (owner.phase !== 'connected') return;
+  }
+  if (!owner.reduce) {
+    for (const [node, { first, last }] of plan.moves) {
+      animateIsolated(node, moveKeyframes(first, last), owner.timing);
+      if (owner.phase !== 'connected') return;
+    }
+  }
+}
+
+function observerCallback(owner: ExitOwner): (records: unknown[]) => void {
+  return (records) => processRecords(owner, records);
+}
+
+function closeOwner(owner: ExitOwner): void {
+  if (owner.phase !== 'connected') return;
+  owner.phase = 'disconnecting';
+  const observer = owner.observer;
+  let pending: readonly unknown[] = [];
+  try {
+    // takeRecords — browser SSOT revival до того, как disconnect потеряет очередь.
+    try { pending = observer?.takeRecords?.() ?? []; } catch { /* очередь недоступна */ }
+    try { observer?.disconnect(); } catch { /* terminal выполняется в finally */ }
+    reconcileRecords(owner, pending);
+  } finally {
+    try {
+      disconnectExits(owner);
+    } finally {
+      owner.cache = undefined;
+      owner.parent = undefined;
+      owner.observer = undefined;
+      owner.phase = 'disconnected';
+    }
+  }
+}
+
+function controlsFor(owner: ExitOwner): AutoAnimateControls {
+  return {
+    enable(): void {
+      if (owner.phase !== 'connected') return;
+      owner.disabled = false;
+      owner.cache = snapshot(owner);
+    },
+    disable(): void {
+      if (owner.phase === 'connected') owner.disabled = true;
+    },
+    disconnect(): void {
+      closeOwner(owner);
+    },
+  };
+}
+
 /**
  * Zero-config аниматор childList-мутаций родителя. Возвращает контроллер;
  * среда без MutationObserver → инертный контроллер (SSR/legacy), не бросок.
@@ -761,117 +1158,23 @@ export function autoAnimate(
     parent.style['position'] = 'relative';
   }
 
-  const reduce = resolveReduce(options);
-
-  let disabled = false;
-  /** Один owner публикует reservation, echo и settling-tombstone каждого exit. */
+  /** Session — единственный strong owner parent/observer/cache до disconnect. */
   const owner: ExitOwner = {
     phase: 'connected',
+    parent,
+    observer: undefined,
+    cache: undefined,
+    disabled: false,
+    epsilon,
+    reduce: resolveReduce(options),
+    timing,
     current: new Map(),
     echo: new Map(),
     settling: new WeakMap(),
   };
-
-  const snapshot = (): [AutoChild, FlipRect][] => {
-    const entries: [AutoChild, FlipRect][] = [];
-    for (const child of Array.from(parent.children)) {
-      if (!owner.current.has(child) && !owner.settling.has(child)) {
-        entries.push([child, child.getBoundingClientRect()]);
-      }
-    }
-    return entries;
-  };
-
-  let cache = snapshot();
-
-  const onRecords = (records: readonly unknown[]): void => {
-    if (owner.phase !== 'connected') return;
-    // Пре-пасс реинкарнаций: узел в addedNodes, доигрывающий exit, — либо эхо
-    // нашего же re-append (потребляется один раз), либо потребитель вернул
-    // узел до terminal → transaction завершается как preserve.
-    reconcileAdded(owner, records);
-    if (owner.phase !== 'connected') return;
-
-    const previous = cache;
-    const current = snapshot();
-    cache = current; // DOM-факт коммитится до любого host effect.
-    if (disabled) {
-      return;
-    }
-    const plan = planAuto(previous, current, epsilon);
-
-    // Все exits резервируются одним чистым pre-pass: host первого узла уже
-    // видит identity остальных и не может исполнить их stale-план реентрантно.
-    const reservations: Array<readonly [ExitTransaction, FlipRect]> = [];
-    for (const [node, rect] of plan.exits) {
-      const transaction = reserveExit(owner, node, parent);
-      if (transaction !== undefined) reservations.push([transaction, rect]);
-    }
-
-    // Уходящие: реинсерт absolute на прежнем месте, exit, удаление на onfinish.
-    // left/top отсчитываются от padding-box родителя — border вычитается
-    // через clientLeft/clientTop (иначе узел уезжает вглубь на его ширину).
-    let parentRect: FlipRect | undefined;
-    if (reservations.length > 0) {
-      try {
-        parentRect = parent.getBoundingClientRect();
-      } catch {
-        for (const [transaction] of reservations) {
-          const cleanup = settleExit(transaction, 'remove');
-          if (cleanup !== undefined) applyCleanup(cleanup, false);
-        }
-      }
-    }
-    if (parentRect !== undefined) {
-      for (const [transaction, rect] of reservations) {
-        if (owner.phase !== 'connected') break;
-        startExit(transaction, rect, parentRect, timing);
-      }
-    }
-
-    if (owner.phase !== 'connected') return;
-
-    for (const node of plan.enters) {
-      animateIsolated(node, enterKeyframes(), timing);
-      if (owner.phase !== 'connected') return;
-    }
-
-    // Reduced-motion: движение снапает — позиция уже новая, кадров нет.
-    if (!reduce) {
-      for (const [node, { first, last }] of plan.moves) {
-        animateIsolated(node, moveKeyframes(first, last), timing);
-        if (owner.phase !== 'connected') return;
-      }
-    }
-  };
-
-  const observer = new Ctor(onRecords);
+  owner.cache = snapshot(owner);
+  const observer = new Ctor(observerCallback(owner));
+  owner.observer = observer;
   observer.observe(parent, { childList: true });
-
-  return {
-    enable(): void {
-      if (owner.phase !== 'connected') return;
-      disabled = false;
-      cache = snapshot();
-    },
-    disable(): void {
-      if (owner.phase !== 'connected') return;
-      disabled = true;
-    },
-    disconnect(): void {
-      if (owner.phase !== 'connected') return;
-      owner.phase = 'disconnecting';
-      let pending: readonly unknown[] = [];
-      try {
-        pending = observer.takeRecords?.() ?? [];
-      } catch { /* custom seam без доступной очереди */ }
-      try {
-        observer.disconnect();
-      } catch { /* cleanup ниже остаётся обязательным */ }
-      // После disconnect запускается только revival pre-pass, без нового plan.
-      reconcileAdded(owner, pending);
-      owner.phase = 'disconnected';
-      disconnectExits(owner);
-    },
-  };
+  return controlsFor(owner);
 }
