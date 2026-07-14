@@ -426,6 +426,16 @@
         "default": "./dist/animate/native/index.cjs"
       }
     },
+    "./nano": {
+      "import": {
+        "types": "./dist/nano/index.d.ts",
+        "default": "./dist/nano/index.js"
+      },
+      "require": {
+        "types": "./dist/nano/index.d.cts",
+        "default": "./dist/nano/index.cjs"
+      }
+    },
     "./behaviors": {
       "import": {
         "types": "./dist/behaviors/index.d.ts",

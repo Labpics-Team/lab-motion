@@ -43,7 +43,7 @@ const RUNNABLE = Object.keys(pkg.exports).filter((k) => !PEER_BINDING_SUBPATHS.h
 const specOf = (sub) => (sub === '.' ? pkg.name : `${pkg.name}/${sub.slice(2)}`);
 
 /** DOM-facing субпути — их SSR-import (в Node без DOM) обязан НЕ падать. */
-const DOM_FACING = ['./compositor', './compositor/stagger', './animate', './animate/native', './gestures', './projection', './a11y', './presence', './flip', './waapi']
+const DOM_FACING = ['./compositor', './compositor/stagger', './animate', './animate/native', './nano', './gestures', './projection', './a11y', './presence', './flip', './waapi']
   .filter((s) => RUNNABLE.includes(s));
 
 const work = mkdtempSync(join(tmpdir(), 'labmotion-pack-compat-'));
@@ -177,6 +177,7 @@ try {
         `import { readCompositorSpring } from '${pkg.name}/compositor';\n` +
         `import { CompositorSpring, CompositorStaggerGroup, compileSpringPlan, compileStaggerPlan, type CompositorStaggerPlan } from '${pkg.name}/compositor/stagger';\n` +
         `import { animate, type AnimateControls } from '${pkg.name}/animate';\n` +
+        `import { animate as nanoAnimate, type NanoControls } from '${pkg.name}/nano';\n` +
         `import { createDrag } from '${pkg.name}/gestures';\n` +
         `import { createMotionConfig } from '${pkg.name}/a11y';\n` +
         `const r: SpringResult = spring({ mass: 1, stiffness: 200, damping: 20 }, 0.1);\n` +
@@ -188,8 +189,11 @@ try {
         `const read = readCompositorSpring({ mass: 1, stiffness: 200, damping: 20 }, { t: 0.1 });\n` +
         `const drag = createDrag({ inertia: false });\n` +
         `const cfg = createMotionConfig({ reducedMotion: 'system' });\n` +
+        `const nano: NanoControls = nanoAnimate(document.body, { translate: '10px 20px' }, { duration: 100 });\n` +
+        `// @ts-expect-error spring и tween — взаимоисключающие режимы.\n` +
+        `nanoAnimate(document.body, { opacity: 1 }, { duration: 100, spring: { mass: 1, stiffness: 100, damping: 10 } });\n` +
         `export function use(): number { single.destroy(); group.destroy(); return v + plan.duration + staggerPlan.count + read.value + drag.x + (cfg.prefersReduced() ? 1 : 0); }\n` +
-        `export type C = AnimateControls; export const a = animate;\n`,
+        `export type C = AnimateControls; export type N = NanoControls; export const a = animate; export const n = nanoAnimate;\n`,
     );
     const tscBin = join(ROOT, 'node_modules', 'typescript', 'bin', 'tsc');
     execSync(`node "${tscBin}" --project tsconfig.json`, { cwd: dir, stdio: 'pipe' });
@@ -264,9 +268,10 @@ try {
         `import { clamp } from '${pkg.name}/utils';\n` +
         `import { animate } from '${pkg.name}/animate/mini';\n` +
         `import { springTo } from '${pkg.name}/animate/native';\n` +
+        `import { animate as nanoAnimate } from '${pkg.name}/nano';\n` +
         `import { compileStaggerPlan } from '${pkg.name}/compositor/stagger';\n` +
         `export const value: number = clamp(0, 1, spring({ mass: 1, stiffness: 200, damping: 20 }, 0.1).value);\n` +
-        `export const motion = [animate, springTo, compileStaggerPlan] as const;\n`,
+        `export const motion = [animate, springTo, nanoAnimate, compileStaggerPlan] as const;\n`,
     );
     const tscBin = join(ROOT, 'node_modules', 'typescript', 'bin', 'tsc');
     const trace = execSync(`node "${tscBin}" --project tsconfig.json --traceResolution`, {
@@ -277,6 +282,7 @@ try {
       'dist/utils/index.d.ts',
       'dist/animate/mini/index.d.ts',
       'dist/animate/native/index.d.ts',
+      'dist/nano/index.d.ts',
       'dist/compositor/stagger/index.d.ts',
     ]) {
       if (!trace.includes(declaration)) fail(`TS Node10 не разрешил typesVersions: ${declaration}`);
@@ -328,11 +334,13 @@ try {
       join(dir, 'consumer.cts'),
       `import { spring, type SpringResult } from '${pkg.name}';\n` +
         `import { CompositorSpring, CompositorStaggerGroup, compileSpringPlan, compileStaggerPlan } from '${pkg.name}/compositor/stagger';\n` +
+        `import { animate as nanoAnimate, type NanoControls } from '${pkg.name}/nano';\n` +
         `const r: SpringResult = spring({ mass: 1, stiffness: 200, damping: 20 }, 0.1);\n` +
         `const physics = { mass: 1, stiffness: 200, damping: 20 };\n` +
         `const single = new CompositorSpring({ spring: physics, property: 'opacity', from: 0, to: 1 });\n` +
         `const group = new CompositorStaggerGroup({ spring: physics, property: 'opacity', from: 0, to: 1, targets: [] });\n` +
         `export const duration: number = compileSpringPlan({ spring: physics, property: 'opacity', from: 0, to: 1 }).duration + compileStaggerPlan({ spring: physics, property: 'opacity', from: 0, to: 1, count: 0 }).count + r.value;\n` +
+        `export type N = NanoControls; export const nano = nanoAnimate;\n` +
         `single.destroy(); group.destroy();\n`,
     );
     const tscBin = join(ROOT, 'node_modules', 'typescript', 'bin', 'tsc');
@@ -340,7 +348,7 @@ try {
       cwd: dir,
       encoding: 'utf8',
     }).replaceAll('\\', '/');
-    for (const declaration of ['dist/index.d.cts', 'dist/compositor/stagger/index.d.cts']) {
+    for (const declaration of ['dist/index.d.cts', 'dist/compositor/stagger/index.d.cts', 'dist/nano/index.d.cts']) {
       if (!trace.includes(declaration)) {
         fail(`TS CJS резолвит не CommonJS-декларацию: ${declaration} не найден в trace`);
       }
