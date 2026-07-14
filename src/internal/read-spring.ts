@@ -8,6 +8,7 @@
  */
 
 import { solveSpring, type MutableSpringBasis } from './solver.js';
+import { finiteOr } from './finite.js';
 import type { SpringParams } from './types.js';
 
 export type { MutableSpringBasis } from './solver.js';
@@ -15,10 +16,6 @@ export type { MutableSpringBasis } from './solver.js';
 export interface MutableSpringState {
   value: number;
   velocity: number;
-}
-
-function finiteOr(value: number, fallback: number): number {
-  return Number.isFinite(value) ? value : fallback;
 }
 
 /**

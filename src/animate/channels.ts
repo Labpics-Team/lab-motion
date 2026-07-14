@@ -46,11 +46,6 @@ export function isTransformKey(key: string): boolean {
   return typeof TRANSFORM_IDENTITY[key] === 'number';
 }
 
-/** Identity-значение transform-канала (0, для scale-семейства 1). */
-export function transformIdentity(key: string): number {
-  return TRANSFORM_IDENTITY[key] ?? 0;
-}
-
 // ─── Спецификации каналов (до привязки к элементу) ───────────────────────────
 
 /** Группа записи: одна CSS-декларация на кадр. */
@@ -510,7 +505,7 @@ export function bindGroup(
         } else if (stored) {
           from = stored._value;
         } else if (group === 'transform') {
-          from = transformIdentity(spec._key);
+          from = TRANSFORM_IDENTITY[spec._key]!;
         } else {
           const read = parseFloat(readStyleValue(el, group));
           from = Number.isFinite(read) ? read : 1; // opacity: дефолт браузера

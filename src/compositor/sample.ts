@@ -1,5 +1,6 @@
 /** Точный sampler фактически исполняемых serialized stops. */
 
+import { finiteOrZero } from '../internal/finite.js';
 import type { SpringSerializedSamples } from './curve.js';
 
 export interface SerializedSpringSample {
@@ -79,7 +80,7 @@ export function sampleSerializedSpring(
   const value = (1 - q) * p0 + q * p1;
   const velocity = (p1 - p0) / ((x1 - x0) * durationMs / 100_000);
   result.value = Number.isFinite(value) ? value : p1;
-  result.velocity = Number.isFinite(velocity) ? velocity : 0;
+  result.velocity = finiteOrZero(velocity);
   return result;
 }
 
@@ -97,5 +98,5 @@ export function scaleSerializedVelocity(
   const raw = Number.isFinite(range)
     ? progressVelocity * range
     : progressVelocity * to - progressVelocity * from;
-  return Number.isFinite(raw) ? raw + 0 : 0;
+  return finiteOrZero(raw);
 }

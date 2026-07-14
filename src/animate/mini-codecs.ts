@@ -20,6 +20,7 @@
  */
 
 import { MotionParamError } from '../errors.js';
+import { finiteOrZero } from '../internal/finite.js';
 import type { PropertyCodec, TargetAdapter } from './registry.js';
 
 // ─── Ключи transform-шортхендов (словарь TransformState ядра) ────────────────
@@ -42,11 +43,6 @@ const TRANSFORM_IDENTITY: Readonly<Record<string, number>> = {
  */
 export function isTransformKey(key: string): boolean {
   return typeof TRANSFORM_IDENTITY[key] === 'number';
-}
-
-/** Identity transform-канала (0, для scale-семейства 1). */
-export function transformIdentity(key: string): number {
-  return TRANSFORM_IDENTITY[key] ?? 0;
 }
 
 // ─── Числовой кодек (transform-компоненты + opacity) ─────────────────────────
@@ -81,10 +77,10 @@ function _finite(v: unknown): number {
  * range=to−from питает C¹-подхват скорости в пространстве значения.
  */
 export const numberCodec: PropertyCodec<number> = {
-  parse: (value) => _finite(value),
+  parse: _finite,
   interpolate: (from, to) => (p) => from + (to - from) * p,
   // Финитность-страж (враждебный p / переполнение): non-finite → 0 (+0 схлопывает −0).
-  serialize: (value) => (Number.isFinite(value) ? value + 0 : 0),
+  serialize: finiteOrZero,
   range: (from, to) => to - from,
 };
 
@@ -121,7 +117,7 @@ export const cssVarCodec: PropertyCodec<VarValue> = {
   interpolate: (from, to) => (p) => ({ n: from.n + (to.n - from.n) * p, unit: to.unit }),
   // Финитность-страж: non-finite n → 0 (враждебный p не течёт в CSS-значение).
   serialize: (value) => {
-    const n = Number.isFinite(value.n) ? value.n + 0 : 0;
+    const n = finiteOrZero(value.n);
     return value.unit === '' ? n : `${n}${value.unit}`;
   },
 };
@@ -154,10 +150,6 @@ function _camelToKebab(key: string): string {
 }
 
 /** Конечное число или 0 (значения уже валидны finite — страж переполнения). */
-function _fin(x: number): number {
-  return Number.isFinite(x) ? x : 0;
-}
-
 /**
  * Лёгкая компоновка transform-строки из каналов (порядок Motion/GSAP:
  * translate→scale→rotate→skew; identity-компоненты опущены; пусто → 'none').
@@ -166,17 +158,17 @@ function _fin(x: number): number {
  */
 function _buildTransform(s: Record<string, number>): string {
   const parts: string[] = [];
-  const x = _fin(s.x ?? 0);
-  const y = _fin(s.y ?? 0);
+  const x = finiteOrZero(s.x ?? 0);
+  const y = finiteOrZero(s.y ?? 0);
   if (x !== 0 && y === 0) parts.push(`translateX(${x}px)`);
   else if (x === 0 && y !== 0) parts.push(`translateY(${y}px)`);
   else if (x !== 0 || y !== 0) parts.push(`translate(${x}px, ${y}px)`);
   if (s.scale !== undefined) {
-    const sv = _fin(s.scale);
+    const sv = finiteOrZero(s.scale);
     if (sv !== 1) parts.push(`scale(${sv})`);
   } else {
-    const sx = _fin(s.scaleX ?? 1);
-    const sy = _fin(s.scaleY ?? 1);
+    const sx = finiteOrZero(s.scaleX ?? 1);
+    const sy = finiteOrZero(s.scaleY ?? 1);
     if (sx === sy) {
       if (sx !== 1) parts.push(`scale(${sx})`);
     } else {
@@ -184,10 +176,10 @@ function _buildTransform(s: Record<string, number>): string {
       if (sy !== 1) parts.push(`scaleY(${sy})`);
     }
   }
-  const rot = _fin(s.rotate ?? 0);
+  const rot = finiteOrZero(s.rotate ?? 0);
   if (rot !== 0) parts.push(`rotate(${rot}deg)`);
-  const skewX = _fin(s.skewX ?? 0);
-  const skewY = _fin(s.skewY ?? 0);
+  const skewX = finiteOrZero(s.skewX ?? 0);
+  const skewY = finiteOrZero(s.skewY ?? 0);
   if (skewX !== 0 && skewY !== 0) parts.push(`skew(${skewX}deg, ${skewY}deg)`);
   else if (skewX !== 0) parts.push(`skewX(${skewX}deg)`);
   else if (skewY !== 0) parts.push(`skewY(${skewY}deg)`);
@@ -204,7 +196,7 @@ function _buildTransform(s: Record<string, number>): string {
  */
 export const domAdapter: TargetAdapter = {
   read: (target, property) => {
-    if (isTransformKey(property)) return transformIdentity(property);
+    if (isTransformKey(property)) return TRANSFORM_IDENTITY[property]!;
     const el = target as StyleTarget;
     const name = property === 'opacity' ? 'opacity' : _camelToKebab(property);
     try {
