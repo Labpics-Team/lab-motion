@@ -50,6 +50,19 @@ function scaleFrames(writes: readonly StyleWrite[], from = 0): { x: number; y: n
 }
 
 describe('animate: конфликт uniform и осевого scale', () => {
+  it('края сохраняют точные operands, включая знак IEEE-ноля', () => {
+    const cases = [
+      { from: -0, to: Number.MIN_VALUE, progress: 0, expected: -0 },
+      { from: Number.MIN_VALUE, to: -0, progress: 1, expected: -0 },
+      { from: -0, to: +0, progress: 1, expected: +0 },
+      { from: +0, to: -0, progress: 1, expected: -0 },
+    ];
+    for (const { from, to, progress, expected } of cases) {
+      const channel = { _from: from, _to: to } as NumericChannel;
+      expect(Object.is(channelAt(channel, progress), expected)).toBe(true);
+    }
+  });
+
   it('точный static-канал неподвижен для любого конечного progress', () => {
     const values = [
       -Number.MAX_VALUE,
@@ -109,6 +122,32 @@ describe('animate: конфликт uniform и осевого scale', () => {
     });
     expect([...new Set(scaleYValues)]).toEqual([Number.MAX_VALUE]);
     controls.cancel();
+  });
+
+  it('WebKit сохраняет знак ноля в первом и последнем явном кадре', () => {
+    vi.stubGlobal('navigator', {
+      vendor: 'Apple Computer, Inc.',
+      userAgent: 'Mozilla/5.0 AppleWebKit/605.1.15 Version/18 Safari/605.1.15',
+    });
+    __resetDetectionCache();
+
+    const endpoints = [
+      { from: -0, to: Number.MIN_VALUE },
+      { from: Number.MIN_VALUE, to: -0 },
+      { from: -0, to: +0 },
+      { from: +0, to: -0 },
+    ];
+    for (const { from, to } of endpoints) {
+      const target = fakeEl({}, true);
+      const controls = animate(target.el, { opacity: [from, to] }, {
+        spring: UNDERDAMPED,
+        setTimer: () => () => {},
+      });
+      const frames = target.animateCalls[0]!.keyframes;
+      expect(Object.is(frames[0]!.opacity, from)).toBe(true);
+      expect(Object.is(frames.at(-1)!.opacity, to)).toBe(true);
+      controls.cancel();
+    }
   });
 
   it('pause/play не приписывает progress-v0 IEEE-дрейфующей static-оси', () => {

@@ -241,6 +241,10 @@ function numericChannel(
 
 /** Устойчивая позиция канала: взвешенная форма не переполняет MAX ↔ -MAX. */
 export function channelAt(channel: NumericChannel, progress: number): number {
+  // Границы возвращают именно public operands: взвешенная форма и `===`
+  // стирают знак IEEE -0, который является частью точного endpoint-контракта.
+  if (progress === 0) return channel._from;
+  if (progress === 1) return channel._to;
   // Точный static-span — константа, а не две равные IEEE-слагаемые: у MAX
   // взвешенная форма может округлиться в nextDown и изобрести движение/C1.
   if (channel._from === channel._to) return channel._from;
