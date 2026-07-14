@@ -136,15 +136,23 @@ export class WaapiUnit implements GroupOwner {
   }
 
   _capture(): void {
-    if (this._delegate === undefined && !this._o._record._transition && !this._locked) {
+    const rec = this._o._record;
+    if (this._delegate || rec._transition || this._locked) return;
+    // currentTime — hostile host-boundary: nested animate не должен успеть
+    // опубликовать owner, после чего внешний снимок перезапишет новое видимое
+    // поколение. Общий commit-reservation даёт nested-вызову штатный LM157.
+    rec._transition = true;
+    try {
       this._syncSnapshot();
+    } finally {
+      rec._transition = false;
     }
   }
 
   _captureNum(key: string): ChannelSnapshot | undefined {
-    if (this._delegate !== undefined) return this._delegate._captureNum(key);
+    if (this._delegate) return this._delegate._captureNum(key);
     const ch = this._o._numeric.find((c) => c._key === key);
-    if (ch !== undefined) {
+    if (ch) {
       return { _value: ch._value, _velocity: ch._velocity };
     }
     const frozen = this._o._residuals.get(key);
@@ -156,7 +164,7 @@ export class WaapiUnit implements GroupOwner {
   }
 
   _numericKeys(): readonly string[] {
-    if (this._delegate !== undefined) return this._delegate._numericKeys();
+    if (this._delegate) return this._delegate._numericKeys();
     return [...this._o._numeric.map((c) => c._key), ...this._o._residuals.keys()];
   }
 
@@ -212,7 +220,7 @@ export class WaapiUnit implements GroupOwner {
 
   play(): void {
     if (this._done || this._o._record._transition || this._locked || !this._paused) return;
-    if (this._delegate !== undefined) {
+    if (this._delegate) {
       // Wrapper меняет состояние только после успешной подписки delegate:
       // бросок оставляет оба уровня повторяемо paused.
       this._transaction(() => {
@@ -222,7 +230,7 @@ export class WaapiUnit implements GroupOwner {
       return;
     }
     const artifact = this._tryReseedFromSnapshot();
-    if (artifact === undefined) {
+    if (!artifact) {
       this._handoffToLive(false);
       return;
     }
@@ -250,7 +258,7 @@ export class WaapiUnit implements GroupOwner {
     const wasPaused = this._paused;
     this._snapshotAt(Math.max(0, tMs));
     const artifact = this._tryReseedFromSnapshot();
-    if (artifact === undefined) {
+    if (!artifact) {
       this._handoffToLive(wasPaused);
       return;
     }
@@ -409,7 +417,7 @@ export class WaapiUnit implements GroupOwner {
       v0,
       DEFAULT_TOLERANCE,
     );
-    if (artifact === undefined) return undefined;
+    if (!artifact) return undefined;
     o._numeric.length = 0;
     o._numeric.push(...rebased);
     this._v0 = v0;
