@@ -140,6 +140,7 @@ export function stagger(count: number, options?: StaggerOptions): number[] {
   const n = nRaw > MAX_STAGGER_COUNT ? MAX_STAGGER_COUNT : nRaw;
   return scheduleStagger(
     n,
+    false,
     options?.gap,
     options?.from,
     options?.easing,

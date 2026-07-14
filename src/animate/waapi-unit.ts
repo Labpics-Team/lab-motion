@@ -56,6 +56,10 @@ import {
 import { MainUnit } from './main-unit.js';
 import { SurfaceBatch } from './surface-batch.js';
 
+// Sampler синхронен и чист: единый scratch безопасен между unit и не создаёт
+// объект на каждый compositor-run.
+const SPRING_SAMPLE = { value: 0, velocity: 0 };
+
 /** Duck-контракт WAAPI-цели фасада (Element.animate → {cancel}). */
 export interface WaapiTarget extends AnimatableElement {
   animate(
@@ -97,8 +101,6 @@ export class WaapiUnit implements GroupOwner {
    */
   private _delegate: MainUnit | undefined;
   private _timerCancel: (() => void) | undefined;
-  /** Внутренний ticket отличает прогоны даже при общем host cancel-handle. */
-  private _timerGeneration = 0;
   /** Timer может быть синхронным: публикация owner должна предшествовать settle. */
   private _pendingNatural = false;
   /** Прогресс-пространство текущей кривой (пере-сеется при re-emit). */
@@ -107,7 +109,6 @@ export class WaapiUnit implements GroupOwner {
   private _startDelay = 0;
   private _durationMs = 0;
   private _samples: SpringSerializedSamples | undefined;
-  private readonly _sample = { value: 0, velocity: 0 };
   private readonly _format = (progress: number): string | number =>
     this._valueAt(progress);
 
@@ -336,7 +337,6 @@ export class WaapiUnit implements GroupOwner {
     this._startDelay = delayMs;
     this._durationMs = plan[2];
     this._samples = plan[5];
-    const timerGeneration = ++this._timerGeneration;
     try {
       this._startTime = o._now();
       this._anim = o._el.animate(plan[0], {
@@ -349,21 +349,12 @@ export class WaapiUnit implements GroupOwner {
       });
       // Завершение привязано к аналитическому времени оседания. Шов вправе
       // вызвать callback до возврата: тогда cancel нельзя сохранить как живой.
-      const cancelTimer = o._setTimer(() => {
-        // Поздний callback уже снятого/неудачного прогона не имеет права
-        // обнулить cancel-handle и завершить более новый replay.
-        if (timerGeneration !== this._timerGeneration) return;
-        this._timerCancel = undefined;
-        if (
-          this._o._record._owner === this &&
-          !this._o._record._transition &&
-          !this._locked
-        ) {
-          this._settleNatural();
-        } else this._pendingNatural = true;
-      }, delayMs + plan[2]);
+      const cancelTimer = scheduleAnalyticalTimer(o._setTimer, () => {
+        this._pendingNatural = true;
+        this._commit();
+      }, delayMs, plan[2]);
       if (this._done) {
-        safeCancelTimer(cancelTimer);
+        cancelTimer();
       } else {
         this._timerCancel = cancelTimer;
       }
@@ -398,7 +389,7 @@ export class WaapiUnit implements GroupOwner {
       this._durationMs,
       currentTimeMs,
       delayMs,
-      this._sample,
+      SPRING_SAMPLE,
     );
     for (const ch of this._o._numeric) {
       // Та же устойчивая интерполяция, что у кадров WebKit: снимок MAX ↔
@@ -525,10 +516,9 @@ export class WaapiUnit implements GroupOwner {
   }
 
   private _clearTimer(): void {
-    this._timerGeneration++;
     const cancel = this._timerCancel;
     this._timerCancel = undefined;
-    if (cancel !== undefined) safeCancelTimer(cancel);
+    cancel?.();
   }
 
   /** Публикует unit: выпускает sync timer только вне host-транзакции и ровно один раз. */
@@ -584,10 +574,57 @@ export class WaapiUnit implements GroupOwner {
   }
 }
 
-function safeCancelTimer(cancel: () => void): void {
-  try {
-    cancel();
-  } catch {
-    /* отказ host-cleanup не должен блокировать остальную терминализацию */
-  }
+// HTML timers clamp delays above signed int32. Это граница платформы, а не
+// настраиваемый лимит: analytical duration режется на точные host-chunks.
+const MAX_TIMER_MS = 2 ** 31 - 1;
+
+function scheduleAnalyticalTimer(
+  setTimer: SetTimerFn,
+  done: () => void,
+  delay: number,
+  duration: number,
+): () => void {
+  let remaining = delay;
+  let tail = duration;
+  let cancel: (() => void) | undefined;
+  let active = true;
+  const arm = (): void => {
+    if (!active) return;
+    if (remaining <= 0) {
+      remaining = tail;
+      tail = 0;
+    }
+    // Складываем сегменты только когда сумма уже доказанно помещается в один
+    // host-chunk; поэтому delay + duration никогда не вычисляется как Infinity.
+    if (remaining <= MAX_TIMER_MS - tail) {
+      remaining += tail;
+      tail = 0;
+    }
+    const ms = Math.min(remaining, MAX_TIMER_MS);
+    let fired = false;
+    try {
+      cancel = setTimer(() => {
+        if (!active || fired) return;
+        fired = true;
+        remaining -= ms;
+        if (remaining > 0 || tail > 0) queueMicrotask(arm);
+        else {
+          active = false;
+          done();
+        }
+      }, ms);
+    } catch (error) {
+      active = false;
+      throw error;
+    }
+  };
+  arm();
+  return () => {
+    active = false;
+    try {
+      cancel?.();
+    } catch {
+      /* отказ host-cleanup не должен блокировать остальную терминализацию */
+    }
+  };
 }
