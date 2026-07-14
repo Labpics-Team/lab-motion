@@ -298,6 +298,7 @@ describe('auto: autoAnimate — адаптер (duck-typed DOM)', () => {
     parent.children = parent.children.filter((c) => c !== phoenix);
     seam.state.callback!([{ addedNodes: [], removedNodes: [phoenix] }]);
     const exitAnim = phoenix.animations[0]!;
+    const lateFinish = exitAnim.onfinish!;
     expect(phoenix.style['position']).toBe('absolute');
     // эхо-запись нашего же re-append (реальный MutationObserver её принесёт)
     seam.state.callback!([{ addedNodes: [phoenix], removedNodes: [] }]);
@@ -313,6 +314,44 @@ describe('auto: autoAnimate — адаптер (duck-typed DOM)', () => {
     const enterKf = phoenix.animateCalls[1]!.keyframes as Record<string, unknown>[];
     expect(enterKf.map((k) => k['opacity'])).toEqual([0, 1]);
     expect(parent.removed).not.toContain(phoenix); // onfinish отменённого не удалит
+    // Host мог уже захватить callback до обнуления onfinish.
+    // Старый terminal обязан проверить identity текущего exit.
+    lateFinish();
+    expect(parent.removed).not.toContain(phoenix);
+    expect(parent.children).toContain(phoenix);
+  });
+
+  it('старый terminal не завершает новый exit при повторной host Animation', () => {
+    const seam = fakeObserverSeam();
+    const phoenix = fakeEl(R(10, 10), 'phoenix');
+    const reused: FakeAnimation = {
+      onfinish: null,
+      cancelled: false,
+      cancel() { this.cancelled = true; },
+    };
+    phoenix.animate = (keyframes: unknown, timing: Record<string, unknown>) => {
+      phoenix.animateCalls.push({ keyframes, timing });
+      phoenix.animations.push(reused);
+      return reused;
+    };
+    const parent = fakeParent([phoenix]);
+    autoAnimate(parent as never, { MutationObserverCtor: seam.Ctor as never });
+
+    parent.children = [];
+    seam.state.callback!([{ addedNodes: [], removedNodes: [phoenix] }]);
+    const firstFinish = reused.onfinish!;
+    seam.state.callback!([{ addedNodes: [phoenix], removedNodes: [] }]);
+    seam.state.callback!([{ addedNodes: [phoenix], removedNodes: [] }]);
+
+    parent.children = [];
+    seam.state.callback!([{ addedNodes: [], removedNodes: [phoenix] }]);
+    const secondFinish = reused.onfinish!;
+    expect(secondFinish).not.toBe(firstFinish);
+
+    firstFinish();
+    expect(parent.removed).not.toContain(phoenix);
+    secondFinish();
+    expect(parent.removed).toContain(phoenix);
   });
 
   it('reduced-motion (по умолчанию уважается): move НЕ анимируется (снап), exit — opacity', () => {

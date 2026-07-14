@@ -132,6 +132,14 @@ interface AnimationLike {
   cancel?(): void;
 }
 
+type ExitTicket = [
+  animation: AnimationLike | undefined,
+  node: AutoChild | undefined,
+  parent: AutoParent | undefined,
+  registry: Map<AutoChild, ExitTicket> | undefined,
+  finish: () => void,
+];
+
 /** Duck-typed минимум ребёнка: замер + WAAPI + инлайн-стили. */
 interface AutoChild {
   getBoundingClientRect(): FlipRect;
@@ -149,6 +157,38 @@ export interface AutoParent {
   appendChild(child: AutoChild): unknown;
   removeChild(child: AutoChild): unknown;
   style: Record<string, string>;
+}
+
+/** Снимает все сильные DOM-ссылки до любого реентрантного host-вызова. */
+function releaseExit(ticket: ExitTicket): AnimationLike | undefined {
+  const animation = ticket[0];
+  ticket[0] = undefined;
+  ticket[1] = undefined;
+  ticket[2] = undefined;
+  ticket[3] = undefined;
+  return animation;
+}
+
+function finishExit(ticket: ExitTicket): void {
+  const node = ticket[1];
+  const parent = ticket[2];
+  const registry = ticket[3];
+  if (node === undefined || parent === undefined || registry?.get(node) !== ticket) return;
+  registry.delete(node);
+  releaseExit(ticket);
+  parent.removeChild(node);
+}
+
+/** Отдельная лексическая ячейка не захватывает кадр MutationObserver. */
+function exitTerminal(ticket: ExitTicket): () => void {
+  return () => finishExit(ticket);
+}
+
+function cancelExit(ticket: ExitTicket): void {
+  const animation = releaseExit(ticket);
+  try {
+    animation?.cancel?.();
+  } catch { /* вызов среды больше не владеет DOM-ссылками */ }
 }
 
 interface MutationObserverLike {
@@ -236,7 +276,7 @@ export function autoAnimate(
 
   let disabled = false;
   /** Узлы, доигрывающие exit (и их анимации): вне планирования до удаления. */
-  const exiting = new Map<AutoChild, AnimationLike>();
+  const exiting = new Map<AutoChild, ExitTicket>();
   /** Эхо наших собственных re-append'ов: observer увидит их как addedNodes. */
   const selfEcho = new Set<AutoChild>();
 
@@ -259,15 +299,14 @@ export function autoAnimate(
       const added = (record as { addedNodes?: ArrayLike<AutoChild> }).addedNodes;
       if (added === undefined) continue;
       for (const node of Array.from(added)) {
-        const exitAnim = exiting.get(node);
-        if (exitAnim === undefined) continue;
+        const exit = exiting.get(node);
+        if (exit === undefined) continue;
         if (selfEcho.has(node)) {
           selfEcho.delete(node);
           continue;
         }
-        exitAnim.onfinish = null;
-        exitAnim.cancel?.();
         exiting.delete(node);
+        cancelExit(exit);
         node.style['position'] = '';
         node.style['left'] = '';
         node.style['top'] = '';
@@ -293,11 +332,16 @@ export function autoAnimate(
       selfEcho.add(node);
       parent.appendChild(node);
       const anim = node.animate(exitKeyframes(), timing);
-      exiting.set(node, anim);
-      anim.onfinish = (): void => {
-        exiting.delete(node);
-        parent.removeChild(node);
-      };
+      const ticket = [anim, node, parent, exiting] as unknown as ExitTicket;
+      ticket[4] = exitTerminal(ticket);
+      exiting.set(node, ticket);
+      try {
+        anim.onfinish = ticket[4];
+      } catch (error) {
+        if (exiting.get(node) === ticket) exiting.delete(node);
+        cancelExit(ticket);
+        throw error;
+      }
     }
 
     for (const node of plan.enters) {
