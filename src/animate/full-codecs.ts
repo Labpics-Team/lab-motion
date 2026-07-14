@@ -3,8 +3,8 @@
  *
  * Демонстрирует ЗАКОН расширения (registry.ts): новые виды свойств/целей входят
  * РЕГИСТРАЦИЕЙ в реестр, а движок (mini/engine.ts) не меняется ни строкой — он
- * дергает те же codec.parse/interpolate/serialize и adapter.read/surfaceOf/
- * compose/apply. Поверх МИНИМАЛЬНОГО набора mini добавляет:
+ * дергает те же codec._parse/_interpolate/_serialize и adapter._read/_surfaceOf/
+ * _compose/_apply. Поверх МИНИМАЛЬНОГО набора mini добавляет:
  *   - colorCodec        — цвет (hex/rgb/hsl) через движок ./value (reused);
  *   - svgAttrAdapter    — SVG-атрибуты (cx/cy/r/…) через get/setAttribute;
  *   - plainObjectAdapter — plain JS-объект как цель, БЕЗ единого касания DOM.
@@ -41,7 +41,7 @@ export function isColorProperty(property: string): boolean {
  * трактует его непрозрачно (serialize замыкает контур).
  */
 export const colorCodec: PropertyCodec = {
-  parse: (value, property) => {
+  _parse: (value, property) => {
     if (typeof value !== 'string') {
       throw new MotionParamError('LM143');
     }
@@ -51,8 +51,8 @@ export const colorCodec: PropertyCodec = {
     }
     return c;
   },
-  interpolate: (from, to) => (p) => interpolateColor(from as ParsedColor, to as ParsedColor, p),
-  serialize: (value) => String(value),
+  _interpolate: (from, to) => (p) => interpolateColor(from as ParsedColor, to as ParsedColor, p),
+  _serialize: (value) => String(value),
 };
 
 // ─── SVG-адаптер (атрибуты через get/setAttribute) ───────────────────────────
@@ -91,18 +91,18 @@ const _SVG_ATTRS = new Set([
  * трогаются только в read/apply.
  */
 export const svgAttrAdapter: TargetAdapter = {
-  read: (target, property) => (target as SvgTarget).getAttribute(property) ?? '',
-  surfaceOf: (property) => {
+  _read: (target, property) => (target as SvgTarget).getAttribute(property) ?? '',
+  _surfaceOf: (property) => {
     if (!_SVG_ATTRS.has(property)) {
       throw new MotionParamError('LM145');
     }
     return property;
   },
-  compose: (_surface, channels) => {
+  _compose: (_surface, channels) => {
     for (const v of channels.values()) return v;
     return '';
   },
-  apply: (target, surface, value) => {
+  _apply: (target, surface, value) => {
     (target as SvgTarget).setAttribute(surface, String(value));
   },
 };
@@ -121,13 +121,13 @@ export function isPlainObjectTarget(t: unknown): boolean {
  * Каждое поле — своя поверхность (без композиции transform).
  */
 export const plainObjectAdapter: TargetAdapter = {
-  read: (target, property) => (target as Record<string, unknown>)[property],
-  surfaceOf: (property) => property,
-  compose: (_surface, channels) => {
+  _read: (target, property) => (target as Record<string, unknown>)[property],
+  _surfaceOf: (property) => property,
+  _compose: (_surface, channels) => {
     for (const v of channels.values()) return v;
     return '';
   },
-  apply: (target, surface, value) => {
+  _apply: (target, surface, value) => {
     (target as Record<string, unknown>)[surface] = value;
   },
 };
@@ -143,17 +143,17 @@ export const plainObjectAdapter: TargetAdapter = {
 export function createFullRegistry(): CodecRegistry {
   const r = createRegistry();
   // Кодеки.
-  r.registerCodec((p) => p.startsWith('--'), cssVarCodec);
-  r.registerCodec((p) => isTransformKey(p) || p === 'opacity', numberCodec);
-  r.registerCodec(isColorProperty, colorCodec);
+  r._registerCodec((p) => p.startsWith('--'), cssVarCodec);
+  r._registerCodec((p) => isTransformKey(p) || p === 'opacity', numberCodec);
+  r._registerCodec(isColorProperty, colorCodec);
   // Числовые SVG-атрибуты — та же числовая математика (reuse numberCodec).
-  r.registerCodec(
+  r._registerCodec(
     (p) => /^(cx|cy|r|rx|ry|x|y|x1|y1|x2|y2|width|height|stroke-width|stroke-dashoffset)$/.test(p),
     numberCodec,
   );
   // Адаптеры (last-first: узкие предикаты первыми).
-  r.registerAdapter(isStyleTarget, domAdapter);
-  r.registerAdapter(isSvgTarget, svgAttrAdapter);
-  r.registerAdapter(isPlainObjectTarget, plainObjectAdapter);
+  r._registerAdapter(isStyleTarget, domAdapter);
+  r._registerAdapter(isSvgTarget, svgAttrAdapter);
+  r._registerAdapter(isPlainObjectTarget, plainObjectAdapter);
   return r;
 }

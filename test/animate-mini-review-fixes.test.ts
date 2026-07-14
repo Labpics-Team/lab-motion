@@ -29,11 +29,11 @@ const lastVal = (writes: readonly StyleWrite[], prop: string): string | undefine
 
 describe('A — unit-интерполяция: явно-безюнитная цель побеждает', () => {
   it("'10px' → 20 заканчивается РОВНО числом 20 (не '20px')", () => {
-    const from = cssVarCodec.parse('10px', '--v');
-    const to = cssVarCodec.parse(20, '--v');
-    const end = cssVarCodec.interpolate(from, to)(1);
+    const from = cssVarCodec._parse('10px', '--v');
+    const to = cssVarCodec._parse(20, '--v');
+    const end = cssVarCodec._interpolate(from, to)(1);
     expect(end.unit).toBe(''); // юнит цели — пустой, не 'px'
-    expect(cssVarCodec.serialize(end)).toBe(20); // число, а не строка '20px'
+    expect(cssVarCodec._serialize(end)).toBe(20); // число, а не строка '20px'
   });
 });
 
@@ -42,16 +42,16 @@ describe('A — unit-интерполяция: явно-безюнитная ц�
 
 describe('B — numberCodec: строгая полно-строчная числовая валидация', () => {
   it("'1rad' → бросок MotionParamError (не тихий обрез до 1)", () => {
-    expect(() => numberCodec.parse('1rad', 'rotate')).toThrow(MotionParamError);
+    expect(() => numberCodec._parse('1rad', 'rotate')).toThrow(MotionParamError);
   });
   it("'12oops' → бросок MotionParamError", () => {
-    expect(() => numberCodec.parse('12oops', 'x')).toThrow(MotionParamError);
+    expect(() => numberCodec._parse('12oops', 'x')).toThrow(MotionParamError);
   });
   it('валидные числовые строки по-прежнему проходят', () => {
-    expect(numberCodec.parse('12', 'x')).toBe(12);
-    expect(numberCodec.parse('-3.5', 'x')).toBe(-3.5);
-    expect(numberCodec.parse('1e3', 'x')).toBe(1000);
-    expect(numberCodec.parse(42, 'x')).toBe(42);
+    expect(numberCodec._parse('12', 'x')).toBe(12);
+    expect(numberCodec._parse('-3.5', 'x')).toBe(-3.5);
+    expect(numberCodec._parse('1e3', 'x')).toBe(1000);
+    expect(numberCodec._parse(42, 'x')).toBe(42);
   });
   it('движок бросает fail-fast на rotate: "1rad" ДО записи', () => {
     const f = fakeEl();
@@ -173,7 +173,7 @@ describe('H — [good, bad] бросает и НЕ оставляет части
   const reduce = (q: string): { matches: boolean } => ({ matches: q.includes('reduce') });
   it('под reduced good-цель НЕ тронута, если bad-цель невалидна', () => {
     const good = fakeEl();
-    const bad = {}; // mini не знает адаптера для plain-object → resolveAdapter бросит
+    const bad = {}; // mini не знает адаптера для plain-object → _resolveAdapter бросит
     expect(() =>
       animate([good.el, bad], { x: 100 }, { matchMedia: reduce }),
     ).toThrow(MotionParamError);

@@ -31,9 +31,9 @@ describe('fuzz — numberCodec.interpolate финитность (12k)', () => {
     for (let i = 0; i < N; i++) {
       const from = (rnd() - 0.5) * 2e6;
       const to = (rnd() - 0.5) * 2e6;
-      const interp = numberCodec.interpolate(from, to);
+      const interp = numberCodec._interpolate(from, to);
       const p = i % 40 === 0 ? HOSTILE_P[(i / 40) % HOSTILE_P.length]! : (rnd() - 0.5) * 2 + 0.5;
-      const out = numberCodec.serialize(interp(p));
+      const out = numberCodec._serialize(interp(p));
       expect(isFiniteSerialized(out), `from=${from} to=${to} p=${p} → ${out}`).toBe(true);
     }
   });
@@ -42,8 +42,8 @@ describe('fuzz — numberCodec.interpolate финитность (12k)', () => {
     const rnd = lcg(99);
     for (let i = 0; i < 2000; i++) {
       const v = (rnd() - 0.5) * 1e6;
-      const interp = numberCodec.interpolate(v, v);
-      expect(numberCodec.serialize(interp(rnd() * 3 - 1))).toBe(v);
+      const interp = numberCodec._interpolate(v, v);
+      expect(numberCodec._serialize(interp(rnd() * 3 - 1))).toBe(v);
     }
   });
 });
@@ -54,11 +54,11 @@ describe('fuzz — cssVarCodec.interpolate финитность (12k)', () => {
     const units = ['px', '%', 'em', 'rem', 'vh', ''];
     for (let i = 0; i < N; i++) {
       const u = units[Math.floor(rnd() * units.length)]!;
-      const from = cssVarCodec.parse(`${((rnd() - 0.5) * 2e4).toFixed(3)}${u}`, '--v');
-      const to = cssVarCodec.parse(`${((rnd() - 0.5) * 2e4).toFixed(3)}${u}`, '--v');
-      const interp = cssVarCodec.interpolate(from, to);
+      const from = cssVarCodec._parse(`${((rnd() - 0.5) * 2e4).toFixed(3)}${u}`, '--v');
+      const to = cssVarCodec._parse(`${((rnd() - 0.5) * 2e4).toFixed(3)}${u}`, '--v');
+      const interp = cssVarCodec._interpolate(from, to);
       const p = i % 40 === 0 ? HOSTILE_P[(i / 40) % HOSTILE_P.length]! : (rnd() - 0.5) * 2 + 0.5;
-      const out = cssVarCodec.serialize(interp(p));
+      const out = cssVarCodec._serialize(interp(p));
       expect(isFiniteSerialized(out), `p=${p} → ${out}`).toBe(true);
     }
   });
@@ -70,13 +70,13 @@ describe('fuzz — cssVarCodec.interpolate финитность (12k)', () => {
     const units = ['px', '%', 'em', 'rem', ''];
     for (let i = 0; i < 2000; i++) {
       const u = units[Math.floor(rnd() * units.length)]!;
-      const v = cssVarCodec.parse(`${((rnd() - 0.5) * 1e4).toFixed(2)}${u}`, '--v');
-      const interp = cssVarCodec.interpolate(v, v);
+      const v = cssVarCodec._parse(`${((rnd() - 0.5) * 1e4).toFixed(2)}${u}`, '--v');
+      const interp = cssVarCodec._interpolate(v, v);
       const p = i % 10 === 0 ? HOSTILE_P[(i / 10) % HOSTILE_P.length]! : rnd() * 3 - 1;
-      const out = cssVarCodec.serialize(interp(p));
+      const out = cssVarCodec._serialize(interp(p));
       expect(isFiniteSerialized(out), `u=${u} p=${p} → ${out}`).toBe(true);
       // Конечный p → ровно исходное значение (0-дельта, без дрейфа юнита/числа).
-      if (Number.isFinite(p)) expect(out).toBe(cssVarCodec.serialize(v));
+      if (Number.isFinite(p)) expect(out).toBe(cssVarCodec._serialize(v));
     }
   });
 });
@@ -89,11 +89,11 @@ describe('fuzz — colorCodec.interpolate финитность (12k)', () => {
       return `#${c()}${c()}${c()}`;
     };
     for (let i = 0; i < N; i++) {
-      const from = colorCodec.parse(hx(), 'color');
-      const to = colorCodec.parse(hx(), 'color');
-      const interp = colorCodec.interpolate(from, to);
+      const from = colorCodec._parse(hx(), 'color');
+      const to = colorCodec._parse(hx(), 'color');
+      const interp = colorCodec._interpolate(from, to);
       const p = i % 40 === 0 ? HOSTILE_P[(i / 40) % HOSTILE_P.length]! : (rnd() - 0.5) * 2 + 0.5;
-      const out = colorCodec.serialize(interp(p));
+      const out = colorCodec._serialize(interp(p));
       expect(isFiniteSerialized(out), `p=${p} → ${out}`).toBe(true);
     }
   });
@@ -107,10 +107,10 @@ describe('fuzz — colorCodec.interpolate финитность (12k)', () => {
       return `#${c()}${c()}${c()}`;
     };
     for (let i = 0; i < 2000; i++) {
-      const v = colorCodec.parse(hx(), 'color');
-      const interp = colorCodec.interpolate(v, v);
+      const v = colorCodec._parse(hx(), 'color');
+      const interp = colorCodec._interpolate(v, v);
       const p = i % 10 === 0 ? HOSTILE_P[(i / 10) % HOSTILE_P.length]! : rnd() * 3 - 1;
-      const out = colorCodec.serialize(interp(p));
+      const out = colorCodec._serialize(interp(p));
       expect(isFiniteSerialized(out), `p=${p} → ${out}`).toBe(true);
     }
   });

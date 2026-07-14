@@ -45,12 +45,12 @@ export type AnimateProps = Record<string, PropValue>;
  * не выдаёт реестр и не допускает скрытого роста графа зависимостей.
  */
 const _miniRegistry: CodecResolver = {
-  resolveCodec(property) {
+  _resolveCodec(property) {
     if (property === 'opacity' || isTransformKey(property)) return numberCodec;
     if (property.startsWith('--')) return cssVarCodec;
     throw new MotionParamError('LM145');
   },
-  resolveAdapter(target) {
+  _resolveAdapter(target) {
     if (isStyleTarget(target)) return domAdapter;
     throw new MotionParamError('LM148');
   },

@@ -303,13 +303,13 @@ for (const [name, animate] of engines) {
       } else {
         const badAdapter: TargetAdapter = {
           ...domAdapter,
-          surfaceOf() {
+          _surfaceOf() {
             throw new MotionParamError('late mini plan');
           },
         };
         const registry: CodecResolver = {
-          resolveCodec: () => numberCodec,
-          resolveAdapter(value) {
+          _resolveCodec: () => numberCodec,
+          _resolveAdapter(value) {
             if (Array.isArray(value)) throw new MotionParamError('список');
             return value === bad ? badAdapter : domAdapter;
           },

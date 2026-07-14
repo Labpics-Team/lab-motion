@@ -77,11 +77,11 @@ function _finite(v: unknown): number {
  * range=to−from питает C¹-подхват скорости в пространстве значения.
  */
 export const numberCodec: PropertyCodec<number> = {
-  parse: _finite,
-  interpolate: (from, to) => (p) => from + (to - from) * p,
+  _parse: _finite,
+  _interpolate: (from, to) => (p) => from + (to - from) * p,
   // Финитность-страж (враждебный p / переполнение): non-finite → 0 (+0 схлопывает −0).
-  serialize: finiteOrZero,
-  range: (from, to) => to - from,
+  _serialize: finiteOrZero,
+  _range: (from, to) => to - from,
 };
 
 // ─── Кодек CSS-переменной (число + юнит, passthrough) ────────────────────────
@@ -99,7 +99,7 @@ interface VarValue {
  * range=undefined → C⁰-подхват (velocity 0), канон css-каналов фасада.
  */
 export const cssVarCodec: PropertyCodec<VarValue> = {
-  parse: (value, property) => {
+  _parse: (value, property) => {
     if (typeof value === 'number') {
       // Числовая финитность имеет один SSOT с transform/opacity: отдельный
       // throw здесь разошёлся бы в тексте и правилах валидации.
@@ -114,9 +114,9 @@ export const cssVarCodec: PropertyCodec<VarValue> = {
     }
     return { n: parseFloat(m[1]!), unit: m[2]! };
   },
-  interpolate: (from, to) => (p) => ({ n: from.n + (to.n - from.n) * p, unit: to.unit }),
+  _interpolate: (from, to) => (p) => ({ n: from.n + (to.n - from.n) * p, unit: to.unit }),
   // Финитность-страж: non-finite n → 0 (враждебный p не течёт в CSS-значение).
-  serialize: (value) => {
+  _serialize: (value) => {
     const n = finiteOrZero(value.n);
     return value.unit === '' ? n : `${n}${value.unit}`;
   },
@@ -195,7 +195,7 @@ function _buildTransform(s: Record<string, number>): string {
  * прочее → inline/computed стиль. SSR-safe: DOM трогается лишь в read/apply.
  */
 export const domAdapter: TargetAdapter = {
-  read: (target, property) => {
+  _read: (target, property) => {
     if (isTransformKey(property)) return TRANSFORM_IDENTITY[property]!;
     const el = target as StyleTarget;
     const name = property === 'opacity' ? 'opacity' : _camelToKebab(property);
@@ -217,9 +217,9 @@ export const domAdapter: TargetAdapter = {
     }
     return '';
   },
-  surfaceOf: (property) =>
+  _surfaceOf: (property) =>
     isTransformKey(property) ? 'transform' : property === 'opacity' ? 'opacity' : _camelToKebab(property),
-  compose: (surface, channels) => {
+  _compose: (surface, channels) => {
     if (surface === 'transform') {
       const state: Record<string, number> = {};
       channels.forEach((v, k) => {
@@ -231,7 +231,7 @@ export const domAdapter: TargetAdapter = {
     for (const v of channels.values()) return v;
     return '';
   },
-  apply: (target, surface, value) => {
+  _apply: (target, surface, value) => {
     (target as StyleTarget).style.setProperty(surface, String(value));
   },
 };

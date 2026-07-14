@@ -111,17 +111,17 @@ describe('animate: общие коды режимов и значений', () =
   it('LM143/LM144 — тип и синтаксис CSS-значения', () => {
     expect(codeOf(() => fullAnimate(fakeEl().el, { backgroundColor: {} as never }))).toBe('LM143');
     expect(codeOf(() => miniAnimate(fakeEl().el, { '--gap': {} as never }))).toBe('LM143');
-    expect(codeOf(() => colorCodec.parse(42, 'color'))).toBe('LM143');
+    expect(codeOf(() => colorCodec._parse(42, 'color'))).toBe('LM143');
 
     expect(codeOf(() => fullAnimate(fakeEl().el, { backgroundColor: 'not-a-value' }))).toBe('LM144');
     expect(codeOf(() => miniAnimate(fakeEl().el, { '--gap': 'not-a-value' }))).toBe('LM144');
-    expect(codeOf(() => colorCodec.parse('not-a-color', 'color'))).toBe('LM144');
+    expect(codeOf(() => colorCodec._parse('not-a-color', 'color'))).toBe('LM144');
   });
 
   it('LM145 — неподдерживаемое свойство во внутренних и публичных resolver', () => {
     expect(codeOf(() => miniAnimate(fakeEl().el, { z: 1 }))).toBe('LM145');
-    expect(codeOf(() => createRegistry().resolveCodec('x'))).toBe('LM145');
-    expect(codeOf(() => svgAttrAdapter.surfaceOf('scale'))).toBe('LM145');
+    expect(codeOf(() => createRegistry()._resolveCodec('x'))).toBe('LM145');
+    expect(codeOf(() => svgAttrAdapter._surfaceOf('scale'))).toBe('LM145');
     expect(codeOf(() => springTo(nativeElement() as never, { z: [0, 1] } as never))).toBe('LM145');
   });
 
@@ -162,7 +162,7 @@ describe('animate: общие коды целей', () => {
 
   it('LM148 — адаптер цели отсутствует в mini/registry', () => {
     expect(codeOf(() => miniAnimate([{}], { x: [0, 1] }))).toBe('LM148');
-    expect(codeOf(() => createRegistry().resolveAdapter({}))).toBe('LM148');
+    expect(codeOf(() => createRegistry()._resolveAdapter({}))).toBe('LM148');
   });
 
   it('LM149 — selector без document в full/mini/native и selector не входит в message', () => {
