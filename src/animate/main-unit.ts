@@ -13,7 +13,6 @@ import { buildTransform } from '../value/transform.js';
 import {
   RANGE_EPSILON,
   channelAt,
-  commitResiduals,
   cssAt,
   type AnimatableElement,
   type BoundGroup,
@@ -312,7 +311,6 @@ export class MainUnit implements GroupOwner, SurfaceUnit {
     for (const channel of bound._numeric) {
       record._numeric.set(channel._key, { _value: channel._renderedValue, _velocity: 0 });
     }
-    commitResiduals(record, bound._residuals);
     if (bound._css !== undefined) record._cssValue = bound._css._renderedCss;
   }
 

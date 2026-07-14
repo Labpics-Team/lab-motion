@@ -43,7 +43,6 @@ import type { SpringParams } from '../spring.js';
 import { buildTransform } from '../value/transform.js';
 import {
   channelAt,
-  commitResiduals,
   dominantV0,
   rebaseNumericChannels,
   type AnimatableElement,
@@ -575,7 +574,6 @@ export class WaapiUnit implements GroupOwner {
     for (const ch of this._o._numeric) {
       rec._numeric.set(ch._key, { _value: ch._value, _velocity: 0 });
     }
-    commitResiduals(rec, this._o._residuals);
   }
 
   private _finish(natural: boolean): void {
