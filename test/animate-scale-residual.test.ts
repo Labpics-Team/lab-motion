@@ -1,8 +1,14 @@
-import { describe, expect, it } from 'vitest';
-import { sharedV0, type NumericChannel } from '../src/animate/channels.js';
+import { afterEach, describe, expect, it, vi } from 'vitest';
+import { channelAt, sharedV0, type NumericChannel } from '../src/animate/channels.js';
 import { animate, type AnimateProps } from '../src/animate/index.js';
+import {
+  compileSpringExecutionArtifactUnchecked,
+  DEFAULT_TOLERANCE,
+} from '../src/compositor/curve.js';
+import { __resetDetectionCache } from '../src/compositor/detect.js';
 import { readCompositorSpring } from '../src/compositor/index.js';
-import type { SpringParams } from '../src/spring.js';
+import { sampleSerializedSpring } from '../src/compositor/sample.js';
+import { settleTimeUpperBound, type SpringParams } from '../src/spring.js';
 import {
   fakeEl,
   makeClock,
@@ -13,6 +19,12 @@ import {
 
 const LINEAR = (value: number): number => value;
 const SPRING: SpringParams = { mass: 1, stiffness: 170, damping: 26 };
+const UNDERDAMPED: SpringParams = { mass: 1, stiffness: 170, damping: 10 };
+
+afterEach(() => {
+  vi.unstubAllGlobals();
+  __resetDetectionCache();
+});
 
 function lastTransform(writes: readonly StyleWrite[]): string {
   return writes.filter((write) => write.prop === 'transform').at(-1)?.value ?? '';
@@ -38,6 +50,124 @@ function scaleFrames(writes: readonly StyleWrite[], from = 0): { x: number; y: n
 }
 
 describe('animate: конфликт uniform и осевого scale', () => {
+  it('точный static-канал неподвижен для любого конечного progress', () => {
+    const values = [
+      -Number.MAX_VALUE,
+      -1e308,
+      -1,
+      -Number.MIN_VALUE,
+      -0,
+      0,
+      Number.MIN_VALUE,
+      1,
+      1e308,
+      Number.MAX_VALUE,
+    ];
+    const progress = [
+      -Number.MAX_VALUE,
+      -1e308,
+      -1,
+      -Number.MIN_VALUE,
+      -0,
+      0,
+      Number.MIN_VALUE,
+      0.5,
+      1,
+      2,
+      1e308,
+      Number.MAX_VALUE,
+    ];
+    for (const value of values) {
+      const staticChannel = {
+        _from: value,
+        _to: value,
+      } as NumericChannel;
+      for (const p of progress) {
+        expect(Object.is(channelAt(staticChannel, p), value)).toBe(true);
+      }
+    }
+  });
+
+  it('WebKit не создаёт 1-ULP траекторию для static MAX scale-оси', () => {
+    vi.stubGlobal('navigator', {
+      vendor: 'Apple Computer, Inc.',
+      userAgent: 'Mozilla/5.0 AppleWebKit/605.1.15 Version/18 Safari/605.1.15',
+    });
+    __resetDetectionCache();
+    const target = fakeEl({}, true);
+    const controls = animate(target.el, {
+      scaleX: [1, 2],
+      scaleY: [Number.MAX_VALUE, Number.MAX_VALUE],
+    }, {
+      spring: UNDERDAMPED,
+      setTimer: () => () => {},
+    });
+
+    const scaleYValues = target.animateCalls[0]!.keyframes.map((frame) => {
+      const token = /scaleY\(([^)]+)\)/.exec(String(frame.transform))?.[1];
+      return Number(token);
+    });
+    expect([...new Set(scaleYValues)]).toEqual([Number.MAX_VALUE]);
+    controls.cancel();
+  });
+
+  it('pause/play не приписывает progress-v0 IEEE-дрейфующей static-оси', () => {
+    const artifact = compileSpringExecutionArtifactUnchecked(
+      UNDERDAMPED,
+      0,
+      DEFAULT_TOLERANCE,
+    );
+    const durationMs = settleTimeUpperBound(UNDERDAMPED, 0) * 1_000;
+    let pickupMs = -1;
+    for (let tMs = 1; tMs < Math.min(durationMs, 1_000); tMs++) {
+      const progress = sampleSerializedSpring(artifact.samples, durationMs, tMs).value;
+      const roundedStatic =
+        (1 - progress) * Number.MAX_VALUE + progress * Number.MAX_VALUE;
+      if (Number.isFinite(roundedStatic) && roundedStatic !== Number.MAX_VALUE) {
+        pickupMs = tMs;
+        break;
+      }
+    }
+    expect(pickupMs).toBeGreaterThan(0);
+
+    const target = fakeEl({}, true);
+    const clock = makeClock();
+    let requests = 0;
+    target.el.animate = (keyframes, timing) => {
+      target.animateCalls.push({ keyframes, timing });
+      return {
+        currentTime: pickupMs,
+        cancel: () => { target.cancels++; },
+      } as { currentTime: number; cancel: () => void };
+    };
+    const controls = animate(target.el, {
+      scaleX: [1, 2],
+      scaleY: [Number.MAX_VALUE, Number.MAX_VALUE],
+    }, {
+      spring: UNDERDAMPED,
+      now: () => 0,
+      setTimer: () => () => {},
+      requestFrame(callback) {
+        requests++;
+        return clock.requestFrame(callback);
+      },
+    });
+
+    controls.pause();
+    expect(lastTransform(target.writes)).toContain(`scaleY(${Number.MAX_VALUE})`);
+    controls.play();
+
+    // Точный нулевой span не зависит от общей progress-кривой: повторный
+    // compositor-effect допустим, но каждый его кадр обязан держать Y точно.
+    expect(target.animateCalls).toHaveLength(2);
+    expect(requests).toBe(0);
+    const replayY = target.animateCalls[1]!.keyframes.map((frame) =>
+      Number(/scaleY\(([^)]+)\)/.exec(String(frame.transform))?.[1]),
+    );
+    expect([...new Set(replayY)]).toEqual([Number.MAX_VALUE]);
+    controls.cancel();
+  });
+
   it('sharedV0 отклоняет даже Number.EPSILON-разницу без tolerance', () => {
     const channel = (_v0: number): NumericChannel => ({
       _from: 0,
