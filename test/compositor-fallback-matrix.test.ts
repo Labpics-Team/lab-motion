@@ -344,6 +344,30 @@ describe('compositor: fallback-матрица', () => {
       }
     });
 
+    it('reduce решается до чтения ненужного hostile WAAPI capability', () => {
+      let animateReads = 0;
+      let targetReads = 0;
+      const target = Object.defineProperty({}, 'animate', {
+        get() {
+          animateReads++;
+          throw new Error('reduced-ветка не должна читать WAAPI capability');
+        },
+      });
+      const inputs = {
+        matchMedia: stubMatchMedia(true),
+      } as Record<string, unknown>;
+      Object.defineProperty(inputs, 'target', {
+        get() {
+          targetReads++;
+          return target;
+        },
+      });
+
+      expect(resolveCompositorTier(inputs)).toBe('reduced');
+      expect(targetReads).toBe(0);
+      expect(animateReads).toBe(0);
+    });
+
     it('WAAPI + linear() → compositor; linear() нет → waapi-no-linear', () => {
       const f = fakeElement();
       let restore = mockLinearSupport(true);
