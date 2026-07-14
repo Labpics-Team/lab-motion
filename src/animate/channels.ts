@@ -546,8 +546,8 @@ export function bindGroup(
   const residuals = new Map<string, number>();
   if (group === 'transform') {
     // Каждый остаточный канал уже принадлежит записи либо живому владельцу.
-    // До публикации нового владельца прежний фиксирует свои каналы, поэтому
-    // отдельное копирование при завершении не нужно: это инвариант реестра.
+    // До публикации нового владельца `_supersede()` фиксирует его каналы,
+    // поэтому отдельное копирование при завершении не нужно: это инвариант реестра.
     const animated = new Set(specs.map((s) => s._key));
     const known = new Set<string>(rec._numeric.keys());
     if (owner) for (const k of owner._numericKeys()) known.add(k);

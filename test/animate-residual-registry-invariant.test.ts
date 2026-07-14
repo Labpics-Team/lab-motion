@@ -7,6 +7,30 @@ import { fakeEl, makeClock } from './animate-facade-helpers.js';
 const LINEAR = (value: number): number => value;
 
 describe('animate: инвариант остаточного transform', () => {
+  it('natural completion сохраняет residual в реестре без successor', () => {
+    const f = fakeEl();
+    const clock = makeClock();
+    animate(f.el, { rotate: [0, 90] }, {
+      duration: 1_000,
+      ease: LINEAR,
+      requestFrame: clock.requestFrame,
+    });
+    clock.step(0);
+    clock.step(1_000);
+
+    animate(f.el, { x: [0, 50] }, {
+      duration: 1_000,
+      ease: LINEAR,
+      requestFrame: clock.requestFrame,
+    });
+    clock.step(0);
+    clock.step(1_000);
+
+    const record = groupRecord(f.el, 'transform');
+    expect(record._numeric.get('rotate')?._value).toBe(90);
+    expect(record._numeric.get('x')?._value).toBe(50);
+  });
+
   it('живой owner фиксирует residual до публикации main-successor', () => {
     const f = fakeEl();
     const clock = makeClock();
