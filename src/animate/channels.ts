@@ -152,8 +152,12 @@ export interface NumericChannel {
   readonly _to: number;
   /** Численно представимая цель солвера; финальный snap всё равно идёт в to. */
   readonly _solverTo: number;
-  /** Нормализованная стартовая скорость (канон солвера: v0 / range). */
-  readonly _v0: number;
+  /**
+   * Нормализованная скорость текущей кривой. WAAPI обновляет её одним числом
+   * из общего progress-снимка: так равенство осей определяется происхождением
+   * кривой, а не случайным округлением двух абсолютных диапазонов.
+   */
+  _v0: number;
   _value: number;
   _velocity: number;
   /** Последнее состояние, которое успешно прошло host write. */
@@ -203,6 +207,7 @@ function numericChannel(
   from: number,
   to: number,
   velocity: number,
+  sourceV0?: number,
 ): NumericChannel {
   const range = to - from;
   const representableRange = Math.max(
@@ -221,7 +226,12 @@ function numericChannel(
     _from: from,
     _to: to,
     _solverTo: solverTo,
-    _v0: normalizeV0(velocity, solverTo - from),
+    // Структурный v0 допустим только когда публичный span сам представляет
+    // импульс. На target-crossing synthetic solver-span обязан заново
+    // нормализовать абсолютную скорость для C1 live-handoff.
+    _v0: sourceV0 !== undefined && solverTo === to
+      ? sourceV0
+      : normalizeV0(velocity, solverTo - from),
     _value: from,
     _velocity: velocity,
     _renderedValue: from,
@@ -246,21 +256,41 @@ export function rebaseNumericChannels(
   channels: readonly NumericChannel[],
 ): NumericChannel[] {
   return channels.map((channel) =>
-    numericChannel(channel._key, channel._value, channel._to, channel._velocity),
+    numericChannel(
+      channel._key,
+      channel._value,
+      channel._to,
+      channel._velocity,
+      channel._v0,
+    ),
   );
 }
 
 /**
- * Единый прогресс WAAPI существует только при строго общем нормализованном v0.
- * Даже малая разница означает разные физические кривые; tolerance здесь скрыл
- * бы разрыв скорости одного из каналов. Пустая группа канонически покоится.
+ * Единый прогресс WAAPI существует только в публично сериализуемом диапазоне:
+ * `_solverTo` может хранить искусственную амплитуду live-ядра, но keyframes
+ * всегда заканчиваются в `_to`. Поэтому импульс, потребовавший такой подмены,
+ * не представим WAAPI-кривой и обязан остаться на main thread. Точный нулевой
+ * span без импульса не ограничивает общий progress; любой ненулевой span —
+ * канал движения, даже если он меньше solver-порога. Для движущихся каналов
+ * tolerance запрещён: разные структурные v0 означают разные траектории.
  */
 export function sharedV0(channels: readonly NumericChannel[]): number | undefined {
-  const shared = channels[0]?._v0 ?? 0;
-  for (let i = 1; i < channels.length; i++) {
-    if (channels[i]!._v0 !== shared) return undefined;
+  let shared: number | undefined;
+  for (const channel of channels) {
+    const range = channel._to - channel._from;
+    if (range === 0) {
+      if (channel._velocity !== 0) return undefined;
+      continue;
+    }
+    if (channel._solverTo !== channel._to && channel._velocity !== 0) {
+      return undefined;
+    }
+    const v0 = channel._v0;
+    if (shared === undefined) shared = v0;
+    else if (v0 !== shared) return undefined;
   }
-  return shared;
+  return shared ?? 0;
 }
 
 /**

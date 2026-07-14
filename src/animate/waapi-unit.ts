@@ -16,13 +16,12 @@
  * больше host timer native Animation.finished — основной clock; duck-цель без
  * finished просыпается bounded timer-ом и сверяется с currentTime/now.
  *
- * Ограничение честно: несколько transform-каналов делят одну кривую
- * (физика WAAPI: одно свойство = одна Animation) — при ретаргете slope точен
- * для доминантного канала (максимальный |range|), остальные C⁰+пропорция.
- * Одиночный affine-канал точен в effect-space вне kink, пока следующая точка
- * представима конечным Number; на числовой границе handoff остаётся fail-closed
- * со старым owner. Rendered clamping, non-affine format и меняющийся underlying
- * лежат за границей гарантии.
+ * Несколько transform-каналов делят одну Animation только когда все движущиеся
+ * каналы имеют строго общий нормализованный v0; точные константы кривую не
+ * ограничивают. Иначе фасад выбирает независимые main-thread каналы. На
+ * численной границе, где публичные keyframes не представляют live-импульс,
+ * handoff остаётся fail-closed со старым owner. Rendered clamping, non-affine
+ * format и меняющийся underlying лежат за границей гарантии.
  */
 
 import { type SetTimerFn } from '../compositor/core.js';
@@ -362,11 +361,17 @@ export class WaapiUnit implements GroupOwner {
       delayMs,
       SPRING_SAMPLE,
     );
+    const remaining = 1 - r.value;
+    const sampledV0 = r.velocity / remaining;
+    const v0 = Number.isFinite(sampledV0) ? sampledV0 + 0 : 0;
     for (const ch of this._o._numeric) {
       // Та же устойчивая интерполяция, что у кадров WebKit: снимок MAX ↔
       // -MAX не должен телепортироваться в цель из-за переполнения.
       ch._value = channelAt(ch, r.value);
       ch._velocity = scaleSerializedVelocity(r.velocity, ch._from, ch._to);
+      // Один progress-снимок — один v0. Поканальный velocity/range дал бы
+      // ложное расхождение на 1 ULP для общей физической траектории.
+      ch._v0 = ch._to === ch._from ? 0 : v0;
     }
   }
 

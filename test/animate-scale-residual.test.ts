@@ -39,9 +39,63 @@ function scaleFrames(writes: readonly StyleWrite[], from = 0): { x: number; y: n
 
 describe('animate: конфликт uniform и осевого scale', () => {
   it('sharedV0 отклоняет даже Number.EPSILON-разницу без tolerance', () => {
-    const channel = (_v0: number): NumericChannel => ({ _v0 }) as NumericChannel;
+    const channel = (_v0: number): NumericChannel => ({
+      _from: 0,
+      _to: 1,
+      _solverTo: 1,
+      _velocity: _v0,
+      _v0,
+    }) as NumericChannel;
     expect(sharedV0([channel(1), channel(1)])).toBe(1);
     expect(sharedV0([channel(1), channel(1 + Number.EPSILON)])).toBeUndefined();
+  });
+
+  it('sharedV0 смотрит public span: живой нулевой span остаётся на main', () => {
+    const impulse = {
+      _from: 1.0000000074925934,
+      _to: 1.0000000074925934,
+      _solverTo: 1.0000000075925935,
+      _velocity: 8.97e-8,
+      _v0: 897,
+    } as NumericChannel;
+    expect(sharedV0([impulse])).toBeUndefined();
+  });
+
+  it('точный статический канал не ограничивает WAAPI-кривую движущегося', () => {
+    const moving = {
+      _from: 1,
+      _to: 3,
+      _solverTo: 3,
+      _velocity: 4,
+      _v0: 2,
+    } as NumericChannel;
+    const inert = {
+      _from: 2,
+      _to: 2,
+      _solverTo: 2,
+      _velocity: 0,
+      _v0: 0,
+    } as NumericChannel;
+    expect(sharedV0([moving, inert])).toBe(2);
+    expect(sharedV0([inert, moving])).toBe(2);
+  });
+
+  it('ненулевой sub-epsilon span остаётся движущимся и ограничивает WAAPI', () => {
+    const tiny = {
+      _from: 1,
+      _to: 1 + Number.EPSILON,
+      _solverTo: 1 + Number.EPSILON,
+      _velocity: 0,
+      _v0: 0,
+    } as NumericChannel;
+    const moving = {
+      _from: 0,
+      _to: 1,
+      _solverTo: 1,
+      _velocity: 1,
+      _v0: 1,
+    } as NumericChannel;
+    expect(sharedV0([tiny, moving])).toBeUndefined();
   });
 
   it.each(['scaleX', 'scaleY'] as const)(
@@ -276,5 +330,25 @@ describe('animate: конфликт uniform и осевого scale', () => {
 
     expect(target.animateCalls).toHaveLength(2);
     compatible.cancel();
+  });
+
+  it('seek общей кривой не теряет compositor из-за поканального 1 ULP', () => {
+    const target = fakeEl({}, true);
+    const controls = animate(target.el, {
+      scaleX: [2.998266875266529e-11, 9.325277294421096e-10],
+      scaleY: [-1.0238667362138987e-8, -2.1550411860147135e-10],
+    }, {
+      spring: SPRING,
+      now: () => 0,
+      setTimer: () => () => {},
+    });
+
+    expect(target.animateCalls).toHaveLength(1);
+    controls.seek(120);
+    // Оба канала происходят из одного serialized progress. Пересчёт
+    // velocity / remainingRange даёт 8.127445620305012 и ...5010 только
+    // из-за округления; структурный v0 обязан сохранить единый WAAPI effect.
+    expect(target.animateCalls).toHaveLength(2);
+    controls.cancel();
   });
 });
