@@ -102,7 +102,8 @@ function parseCssValue(v: unknown): ValueAST {
  */
 export function parseProps(props: Record<string, unknown>): ChannelSpec[] {
   const specs: ChannelSpec[] = [];
-  for (const key of Object.keys(props)) {
+  const keys = Object.keys(props);
+  for (const key of keys) {
     const raw = props[key];
     if (key === 'transform') {
       throw new MotionParamError('LM140');
@@ -113,13 +114,22 @@ export function parseProps(props: Record<string, unknown>): ChannelSpec[] {
     }
     if (isTransformKey(key) || key === 'opacity') {
       const group: GroupKey = key === 'opacity' ? 'opacity' : 'transform';
-      specs.push({
-        _kind: 'num',
-        _key: key,
-        _group: group,
-        _explicitFrom: pair ? requireFinite(pair[0]) : undefined,
-        _to: requireFinite(pair ? pair[1] : raw),
-      });
+      const explicitFrom = pair ? requireFinite(pair[0]) : undefined;
+      const to = requireFinite(pair ? pair[1] : raw);
+      // Full-движок хранит scale как две независимые физические оси. Равные
+      // значения всё равно сериализуются в компактный scale(N), зато переход
+      // uniform↔axial не меняет представление: обе позиции и pickup-скорость
+      // перехватываемого канала остаются явными.
+      if (key === 'scale') {
+        if (!keys.includes('scaleX')) {
+          specs.push({ _kind: 'num', _key: 'scaleX', _group: group, _explicitFrom: explicitFrom, _to: to });
+        }
+        if (!keys.includes('scaleY')) {
+          specs.push({ _kind: 'num', _key: 'scaleY', _group: group, _explicitFrom: explicitFrom, _to: to });
+        }
+      } else {
+        specs.push({ _kind: 'num', _key: key, _group: group, _explicitFrom: explicitFrom, _to: to });
+      }
     } else {
       specs.push({
         _kind: 'css',
