@@ -53,7 +53,6 @@ import { scheduleStagger } from '../stagger/scheduler.js';
 import { buildTransform } from '../value/transform.js';
 import {
   bindGroup,
-  commitResiduals,
   cssAt,
   dominantV0,
   groupRecord,
@@ -302,7 +301,6 @@ function commitSnap(
     rec._cssValue = bound._css._css;
   }
   for (const ch of bound._numeric) rec._numeric.set(ch._key, { _value: ch._to, _velocity: 0 });
-  commitResiduals(rec, bound._residuals);
 }
 
 /**

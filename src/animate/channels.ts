@@ -370,18 +370,6 @@ export function groupRecord(el: object, group: GroupKey): GroupRecord {
   return rec;
 }
 
-/** Один SSOT переносит неанимированные transform-компоненты во все terminal-пути. */
-export function commitResiduals(
-  record: GroupRecord,
-  residuals: ReadonlyMap<string, number>,
-): void {
-  residuals.forEach((value, key) => {
-    if (!record._numeric.has(key)) {
-      record._numeric.set(key, { _value: value, _velocity: 0 });
-    }
-  });
-}
-
 // ─── Чтение текущего состояния из стиля (в момент вызова, SSR-safe) ──────────
 
 /** Duck-контракт цели: стиль с getPropertyValue/setProperty (Element подходит). */
@@ -557,6 +545,9 @@ export function bindGroup(
   // проекцией состояния (новый прогон x не сбрасывает прежний rotate).
   const residuals = new Map<string, number>();
   if (group === 'transform') {
+    // Каждый остаточный канал уже принадлежит записи либо живому владельцу.
+    // До публикации нового владельца `_supersede()` фиксирует его каналы,
+    // поэтому отдельное копирование при завершении не нужно: это инвариант реестра.
     const animated = new Set(specs.map((s) => s._key));
     const known = new Set<string>(rec._numeric.keys());
     if (owner) for (const k of owner._numericKeys()) known.add(k);
