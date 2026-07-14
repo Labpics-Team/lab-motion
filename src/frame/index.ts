@@ -12,25 +12,22 @@
  * - батч кадра фиксируется на входе в тик: add во время тика исполняется со
  *   СЛЕДУЮЩЕГО кадра (детерминизм: кадр не видит собственных порождений);
  * - отписка действует немедленно (сосед, снятый в тике, в этом кадре уже не
- *   вызывается) — записи гасятся флагом alive, чистка ленивая;
+ *   вызывается) — callback обнуляется сразу, физическая чистка массива ленивая;
  * - исключение подписчика не срывает ни соседей, ни цикл (try/catch на кадр
  *   каждого cb);
  * - ленивый старт/стоп: пустой цикл не планирует кадров вовсе.
  *
  * Планирование: инжектируемый requestFrame (детерминированные тесты) или
  * глобальный rAF/setTimeout-шим. handle=0 (non-draining тест-клок) переключает
- * на setTimeout-фоллбек; токен кадра гасит возможный дубль тика от уже
- * заклоненного пути (класс двойного цикла — Finding 3 ядра — закрыт
- * конструктивно, а не пост-фактум).
+ * на setTimeout-фоллбек; identity callback-владельца гасит дубль и stale-путь.
+ * Любой синхронный host переводится в отслеживаемый async-trampoline: фазы не
+ * вклиниваются в subscribe/cancelAll/teardown-транзакцию.
  *
  * SSR-safe: на импорте ничего не планируется — дефолтный синглтон `frame`
  * трогает rAF только при первой подписке.
  */
 
 import { type RequestFrameFn } from '../motion-value.js';
-
-/** Фиксированный шаг фоллбека (сек) — тот же, что в ядре. */
-const FIXED_DT_S = 1 / 60;
 
 export interface FrameCallbackOptions {
   /**
@@ -66,100 +63,166 @@ export interface FrameLoop {
 }
 
 interface Entry {
-  readonly _cb: (ts?: number) => void;
-  readonly _once: boolean;
-  readonly _onTeardown: (() => void) | undefined;
-  _alive: boolean;
+  _cb: ((ts?: number) => void) | null;
+  _onTeardown: (() => void) | undefined | null;
+  _once: boolean | undefined;
 }
 
 export function createFrameLoop(options?: { requestFrame?: RequestFrameFn }): FrameLoop {
-  const phases: [Entry[], Entry[], Entry[]] = [[], [], []];
+  let phases: [Entry[], Entry[], Entry[]] = [[], [], []];
 
-  let scheduled = false;
-  let useTimeoutFallback = false;
-  /** Токен планирования: тик чужого токена — no-op (гард двойного цикла). */
-  let token = 0;
+  let fallbackTimer: ReturnType<typeof setTimeout> | null = null;
+  /** Callback-владелец reserve; `schedule` — sentinel исполняемого тика. */
+  let reservation: ((ts?: number) => void) | null = null;
+  /** Живые entries — O(1)-решение остановки без квадратичного off-компакта. */
+  let live = 0;
 
-  const defaultRequestFrame: RequestFrameFn = (cb) =>
-    typeof requestAnimationFrame !== 'undefined'
-      ? requestAnimationFrame(cb)
-      : (setTimeout(cb, FIXED_DT_S * 1000) as unknown as number);
-  const requestFrame = options?.requestFrame ?? defaultRequestFrame;
-
-  const schedule = (): void => {
-    if (scheduled) return;
-    scheduled = true;
-    const myToken = ++token;
-    const fire = (ts?: number): void => tick(myToken, ts);
-    if (useTimeoutFallback) {
-      setTimeout(fire, FIXED_DT_S * 1000);
-      return;
-    }
-    let handle: number;
-    try {
-      handle = requestFrame(fire);
-    } catch (error) {
-      // Host-планировщик не должен навечно оставлять scheduled=true:
-      // следующая валидная подписка обязана снова запустить цикл.
-      if (myToken === token) scheduled = false;
-      throw error;
-    }
-    if (handle === 0) {
-      // Non-draining тест-клок: колбэк из requestFrame может не прийти никогда
-      // (а если придёт — его погасит токен следующего планирования).
-      useTimeoutFallback = true;
-      setTimeout(fire, 0);
-    }
+  const clearFallback = (): void => {
+    const timer = fallbackTimer;
+    fallbackTimer = null;
+    if (timer !== null) clearTimeout(timer);
   };
 
-  const tick = (myToken: number, ts?: number): void => {
-    // Токен-гард покрывает и поздний дрейн, и двойной вызов одного колбэка:
-    // каждый schedule инкрементит токен, чужой/повторный тик гаснет здесь.
-    // Отдельная scheduled-защёлка была бы мёртвым дублем (эквивалентный
-    // мутант) — scheduled остаётся только флагом «не планируй дважды».
-    if (myToken !== token) return;
-    scheduled = false;
+  const idle = (): void => {
+    reservation = null;
+    clearFallback();
+  };
 
-    // Границы всех фаз фиксируются ДО callback-ов: добавленное в тике ждёт
-    // следующего кадра без трёх slice-аллокаций. alive сохраняет немедленную отписку.
-    // Ссылки тоже фиксированы: cancelAll внутри read/update заменяет массивы
-    // фаз. Старые entries уже помечены dead и безопасно дочитываются, тогда как
-    // обращение к новым пустым массивам по старой границе дало бы OOB.
-    const list0 = phases[0];
-    const list1 = phases[1];
-    const list2 = phases[2];
-    const end0 = list0.length;
-    const end1 = list1.length;
-    const end2 = list2.length;
-    for (let phase = 0; phase < phases.length; phase++) {
-      const list = phase === 0 ? list0 : phase === 1 ? list1 : list2;
-      const end = phase === 0 ? end0 : phase === 1 ? end1 : end2;
-      for (let i = 0; i < end; i++) {
-        const entry = list[i]!;
-        if (!entry._alive) continue; // отписан в этом же кадре — не вызывать
-        if (entry._once) entry._alive = false;
-        try {
-          entry._cb(ts);
-        } catch {
-          // Подписчик не имеет права срывать кадр соседям и убивать цикл.
-        }
-      }
-    }
+  const fallback: RequestFrameFn = (cb) =>
+    (fallbackTimer = setTimeout(cb, 1000 / 60)) as unknown as number;
+  // undefined резолвит поздний global rAF; fallback — демотированный host.
+  let requestFrame = options?.requestFrame;
 
-    // In-place compaction сохраняет порядок и новые записи без filter-массива на каждом кадре.
-    for (let phase = 0; phase < 3; phase++) {
-      const list = phases[phase];
+  const release = (entry: Entry): void => {
+    live--;
+    entry._cb = entry._onTeardown = null;
+  };
+
+  /** Единый in-place compactor запускается только вне зафиксированного тика. */
+  const compact = (): void => {
+    if (live === phases[0].length + phases[1].length + phases[2].length) return;
+    for (const list of phases) {
       let write = 0;
       for (let read = 0; read < list.length; read++) {
         const entry = list[read]!;
-        if (entry._alive) list[write++] = entry;
+        if (entry._cb) list[write++] = entry;
       }
       list.length = write;
     }
+  };
 
-    // После compaction «есть живые» ≡ «списки непусты»: отдельный alive-скан
-    // дублировал бы механику, а callback для Array.some аллоцировался бы на кадре.
-    if (phases[0].length + phases[1].length + phases[2].length > 0) schedule();
+  /** Один terminal снимает очередь, ссылки и teardown-владельцев. */
+  const stopAll = (): void => {
+    idle();
+    const teardown: Array<() => void> = [];
+    const owned = phases;
+    phases = [[], [], []];
+    for (const list of owned) {
+      for (const entry of list) {
+        if (entry._cb) {
+          if (entry._onTeardown) teardown.push(entry._onTeardown);
+          release(entry);
+        }
+      }
+    }
+    for (const terminal of teardown) {
+      try { terminal(); } catch { /* teardown одного owner не блокирует остальных */ }
+    }
+  };
+
+  const schedule = (): void => {
+    if (reservation) return;
+    let synchronous = true;
+    const fire = (ts?: number): void => {
+      if (reservation !== fire) return;
+      if (synchronous) {
+        if (fallbackTimer === null) {
+          requestFrame = fallback;
+          // Нарушивший rAF-фазу timestamp не переносим в новый временной домен.
+          fallbackTimer = setTimeout(fire, 0);
+        }
+        return;
+      }
+      tick(fire, ts);
+    };
+    reservation = fire;
+    let handle: number;
+    try {
+      const injected = requestFrame;
+      const native = (globalThis as { requestAnimationFrame?: RequestFrameFn })
+        .requestAnimationFrame;
+      // Injected clock остаётся receiver-free; native rAF получает
+      // Window receiver без доверия к подменному own `.call` host-функции.
+      handle = injected
+        ? injected(fire)
+        : native
+          ? Reflect.apply(native, globalThis, [fire])
+          : fallback(fire);
+    } catch (error) {
+      // Host-планировщик не должен навечно оставлять цикл не-idle:
+      // следующая валидная подписка обязана снова запустить цикл.
+      if (reservation === fire) idle();
+      throw error;
+    }
+    synchronous = false;
+    if (!handle && reservation === fire && fallbackTimer === null) {
+      // Non-draining тест-клок: колбэк из requestFrame может не прийти никогда
+      // (а если придёт — callback identity погасит stale-доставку).
+      requestFrame = fallback;
+      fallbackTimer = setTimeout(fire, 0);
+    }
+  };
+
+  const recover = (): void => {
+    // Ошибка stale host не владеет уже зарезервированным fresh-кадром:
+    // проверка обязана предшествовать подмене clock, иначе следующий тик
+    // незаметно уйдёт с инжектированного времени на fallback.
+    if (reservation) return;
+    requestFrame = fallback;
+    try { schedule(); } catch { stopAll(); }
+  };
+
+  const runPhase = (list: Entry[], end: number, ts?: number): void => {
+    for (let i = 0; i < end; i++) {
+      const entry = list[i]!;
+      const cb = entry._cb;
+      if (!cb) continue;
+      if (entry._once) release(entry);
+      try { cb(ts); } catch { /* подписчик не блокирует соседей */ }
+    }
+  };
+
+  const tick = (owner: (ts?: number) => void, ts?: number): void => {
+    // Identity-гард покрывает поздний дрейн и повтор одного host callback.
+    if (reservation !== owner) return;
+    clearFallback();
+    reservation = schedule;
+
+    // Границы всех фаз фиксируются ДО callback-ов: добавленное в тике ждёт
+    // следующего кадра без трёх slice-аллокаций. null-callback даёт немедленный off.
+    // Ссылки тоже фиксированы: cancelAll внутри read/update заменяет массивы
+    // фаз. Старые entries уже помечены dead и безопасно дочитываются, тогда как
+    // обращение к новым пустым массивам по старой границе дало бы OOB.
+    const batch = phases;
+    const end1 = batch[1].length;
+    const end2 = batch[2].length;
+    runPhase(batch[0], batch[0].length, ts);
+    runPhase(batch[1], end1, ts);
+    runPhase(batch[2], end2, ts);
+
+    if (reservation === schedule) reservation = null;
+    compact();
+    if (live) {
+      try {
+        schedule();
+      } catch {
+        // У async-reschedule нет caller, которому можно отдать ошибку host:
+        // один раз демотируемся, затем терминализируем недоступный clock.
+        recover();
+      }
+    } else {
+      idle();
+    }
   };
 
   const subscribe = (
@@ -169,10 +232,10 @@ export function createFrameLoop(options?: { requestFrame?: RequestFrameFn }): Fr
   ): (() => void) => {
     const entry: Entry = {
       _cb: cb,
-      _once: options?.once === true,
+      _once: options?.once,
       _onTeardown: options?.onTeardown,
-      _alive: true,
     };
+    live++;
     const list = phases[phase];
     list.push(entry);
     try {
@@ -180,12 +243,22 @@ export function createFrameLoop(options?: { requestFrame?: RequestFrameFn }): Fr
     } catch (error) {
       // Создатель юнита ещё не получил off-handle: откатываем его
       // последнюю запись, чтобы брошенная подписка не ожила позже.
-      entry._alive = false;
-      if (list[list.length - 1] === entry) list.pop();
+      if (entry._cb) release(entry);
+      // Реентрантная подписка могла присоединиться к ещё не закоммиченной
+      // host-заявке; ошибка внешнего юнита не должна лишать её собственного кадра.
+      compact();
+      if (live) recover();
       throw error;
     }
     return () => {
-      entry._alive = false;
+      if (!entry._cb) return;
+      release(entry);
+      // Внутри tick только tombstone сохраняет его зафиксированные индексы;
+      // снаружи terminal обязан сразу разорвать callback/DOM и pending reservation.
+      if (reservation !== schedule && !live) {
+        compact();
+        idle();
+      }
     };
   };
 
@@ -193,27 +266,7 @@ export function createFrameLoop(options?: { requestFrame?: RequestFrameFn }): Fr
     read: (cb, o) => subscribe(0, cb, o),
     update: (cb, o) => subscribe(1, cb, o),
     render: (cb, o) => subscribe(2, cb, o),
-    cancelAll(): void {
-      // Выданный host callback отменить переносимо нельзя; новый token делает
-      // его инертным, а scheduled=false позволяет следующей подписке сразу
-      // поставить собственный кадр вместо ожидания чужого drain.
-      scheduled = false;
-      token++;
-      const teardown: Entry[] = [];
-      for (const list of phases) {
-        for (const entry of list) {
-          if (!entry._alive) continue;
-          entry._alive = false;
-          if (entry._onTeardown !== undefined) teardown.push(entry);
-        }
-      }
-      phases[0] = [];
-      phases[1] = [];
-      phases[2] = [];
-      for (const entry of teardown) {
-        try { entry._onTeardown!(); } catch { /* teardown одного owner не блокирует остальных */ }
-      }
-    },
+    cancelAll: stopAll,
   };
 }
 
