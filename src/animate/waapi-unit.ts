@@ -370,7 +370,7 @@ export class WaapiUnit implements GroupOwner {
       ch._velocity = scaleSerializedVelocity(r.velocity, ch._from, ch._to);
       // Один progress-снимок — один v0. Поканальный velocity/range дал бы
       // ложное расхождение на 1 ULP для общей физической траектории.
-      ch._v0 = ch._to === ch._from ? 0 : v0;
+      ch._v0 = v0;
     }
   }
 
