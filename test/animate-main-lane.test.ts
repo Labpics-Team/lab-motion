@@ -289,37 +289,50 @@ describe('animate MainUnit: plan-order и изоляция', () => {
     controls.cancel();
   });
 
-  it('sync resume публикует первый slot до остальных', () => {
-    const events: string[] = [];
-    const queued: Array<(ts?: number) => void> = [];
-    let synchronous = false;
-    const requestFrame = (cb: (ts?: number) => void): number => {
-      if (synchronous) {
-        synchronous = false;
-        cb(32);
-      } else queued.push(cb);
-      return 1;
-    };
-    const controls = animate(
-      [target('a', events), target('b', events)],
-      { x: [0, 100] },
-      {
-        duration: 1000,
-        ease: (t) => {
-          events.push('compute');
-          return t;
+  it('sync resume ждёт tracked trampoline и коммитит aggregate целиком', () => {
+    vi.useFakeTimers();
+    try {
+      const events: string[] = [];
+      const queued: Array<(ts?: number) => void> = [];
+      let synchronous = false;
+      const requestFrame = (cb: (ts?: number) => void): number => {
+        if (synchronous) {
+          synchronous = false;
+          cb(32);
+        } else queued.push(cb);
+        return 1;
+      };
+      const controls = animate(
+        [target('a', events), target('b', events)],
+        { x: [0, 100] },
+        {
+          duration: 1000,
+          ease: (t) => {
+            events.push('compute');
+            return t;
+          },
+          requestFrame,
         },
-        requestFrame,
-      },
-    );
-    controls.pause();
-    queued.splice(0).forEach((cb) => cb(16));
-    events.length = 0;
+      );
+      controls.pause();
+      queued.splice(0).forEach((cb) => cb(16));
+      events.length = 0;
 
-    synchronous = true;
-    controls.play();
-    expect(events).toEqual(['compute']);
-    controls.cancel();
+      synchronous = true;
+      controls.play();
+      // Host-нарушитель не вправе вклинить update между активацией двух slots.
+      expect({ events, timers: vi.getTimerCount() }).toEqual({ events: [], timers: 1 });
+      vi.advanceTimersToNextTimer();
+      expect(events).toEqual([
+        'compute', 'compute',
+        'write:a:transform', 'write:b:transform',
+      ]);
+      expect(vi.getTimerCount()).toBe(1);
+      controls.cancel();
+      expect(vi.getTimerCount()).toBe(0);
+    } finally {
+      vi.useRealTimers();
+    }
   });
 
   it('public cancel прекращает fan-out на втором onDone-сбое', () => {
