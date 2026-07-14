@@ -251,28 +251,16 @@ export function rebaseNumericChannels(
 }
 
 /**
- * Скорость общей кривой по каналу с наибольшим оставшимся диапазоном.
- * Один канон используют preflight фасада и WAAPI-юнит: иначе решение о бюджете
- * могло бы проверить не ту скорость, которую затем компилирует compositor.
- * До первого кадра `_value === _from`; после снимка `_value` становится точкой
- * перехвата, поэтому тот же расчёт без второго pickup-алгоритма остаётся точным.
+ * Единый прогресс WAAPI существует только при строго общем нормализованном v0.
+ * Даже малая разница означает разные физические кривые; tolerance здесь скрыл
+ * бы разрыв скорости одного из каналов. Пустая группа канонически покоится.
  */
-export function dominantV0(channels: readonly NumericChannel[]): number {
-  let dominant: NumericChannel | undefined;
-  for (const channel of channels) {
-    if (
-      dominant === undefined ||
-      Math.abs(channel._to - channel._value) > Math.abs(dominant._to - dominant._value)
-    ) {
-      dominant = channel;
-    }
+export function sharedV0(channels: readonly NumericChannel[]): number | undefined {
+  const shared = channels[0]?._v0 ?? 0;
+  for (let i = 1; i < channels.length; i++) {
+    if (channels[i]!._v0 !== shared) return undefined;
   }
-  if (dominant === undefined) return 0;
-  const range = dominant._to - dominant._value;
-  // Нормализованная compositor-кривая не представляет импульс при нулевом
-  // диапазоне. Infinity здесь — только preflight-sentinel: фасад выберет live.
-  if (!(Math.abs(range) > RANGE_EPSILON) && dominant._velocity !== 0) return Infinity;
-  return normalizeV0(dominant._velocity, range);
+  return shared;
 }
 
 /**
@@ -293,8 +281,8 @@ function spanVec(from: ValueAST, to: ValueAST): number[] | undefined {
  * Проекция скорости css-канала между прогресс-пространствами при перехвате
  * (C¹-контракт #93): скорость значения по компоненту i равна ṗ̂·Δold_i, новая
  * скорость прогресса — её нормировка на новый спан. i — ДОМИНАНТНЫЙ компонент
- * НОВОГО спана (канон dominantV0 WaapiUnit и projection/driver: доминанта
- * всегда по целевому диапазону — иначе малый b[i] при большом a[i] взрывает
+ * НОВОГО спана (канон projection/driver: доминанта всегда по целевому
+ * диапазону — иначе малый b[i] при большом a[i] взрывает
  * усиление на неколлинеарном цветовом ретаргете). Для юнитных значений (1
  * компонент) и коллинеарных ретаргетов проекция точна. Несовместимые виды AST
  * (var(), unit×color) → 0; длины определённых спанов совпадают по построению:

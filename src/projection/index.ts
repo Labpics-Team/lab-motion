@@ -21,8 +21,8 @@
  *     (прецедент src/auto/index.ts:35).
  *   Паттерны-копии (НЕ импорты — импорт утянул бы чужой граф в копию субпутя при
  *   splitting:false): finite/finiteDiv/clamp01 (приватны в flip, ~12 строк);
- *   dominantV0 (waapi-unit.ts:309-318) и normalizeV0/RANGE_EPSILON
- *   (channels.ts:174-182); generation-инвалидация / handle=0 / FIXED_DT / REST /
+ *   доминантная проекция v0 (projection/driver.ts) и normalizeV0/RANGE_EPSILON
+ *   (animate/channels.ts); generation-инвалидация / handle=0 / FIXED_DT / REST /
  *   MAX_FRAMES / синхронный первый кадр / финал ровно identity (flip :217-293);
  *   prefersReducedMotion (flip :192-199); принцип compositor: «состояние
  *   снимается замкнутой формой, не из DOM».

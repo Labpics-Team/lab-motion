@@ -43,8 +43,8 @@ import type { SpringParams } from '../spring.js';
 import { buildTransform } from '../value/transform.js';
 import {
   channelAt,
-  dominantV0,
   rebaseNumericChannels,
+  sharedV0,
   type AnimatableElement,
   type ChannelSnapshot,
   type CssChannel,
@@ -124,9 +124,8 @@ export class WaapiUnit implements GroupOwner {
 
   constructor(opts: WaapiUnitOptions) {
     this._o = opts;
-    // v0 прогресса кривой группы — по доминантному каналу (max |range|):
-    // одиночный affine-канал → effect-space pickup точен.
-    this._v0 = dominantV0(opts._numeric);
+    // Конструктор достижим только после sharedV0-гейта plan-фазы.
+    this._v0 = sharedV0(opts._numeric)!;
     this._emit(opts._delayMs, opts._artifact);
   }
 
@@ -393,20 +392,20 @@ export class WaapiUnit implements GroupOwner {
   }
 
   /**
-   * Пере-сев кривой из снимка: каналы продолжают from=значение снимка;
-   * v0 прогресса — по доминантному каналу (максимальный |range|), slope для него
-   * точен, одиночный канал — всегда точен.
+   * Пере-сев кривой из снимка: каналы продолжают from=значение снимка.
+   * Разошедшиеся v0 не сжимаются в одну кривую — caller переведёт группу в live.
    */
   private _tryReseedFromSnapshot(): SpringExecutionArtifactTuple | undefined {
     const o = this._o;
-    const v0 = dominantV0(o._numeric);
+    const rebased = rebaseNumericChannels(o._numeric);
+    const v0 = sharedV0(rebased);
+    if (v0 === undefined) return undefined;
     const artifact = tryCompileSpringExecutionArtifactTupleUnchecked(
       o._spring,
       v0,
       DEFAULT_TOLERANCE,
     );
     if (artifact === undefined) return undefined;
-    const rebased = rebaseNumericChannels(o._numeric);
     o._numeric.length = 0;
     o._numeric.push(...rebased);
     this._v0 = v0;

@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'vitest';
+import { sharedV0, type NumericChannel } from '../src/animate/channels.js';
 import { animate, type AnimateProps } from '../src/animate/index.js';
 import { readCompositorSpring } from '../src/compositor/index.js';
 import type { SpringParams } from '../src/spring.js';
@@ -37,6 +38,12 @@ function scaleFrames(writes: readonly StyleWrite[], from = 0): { x: number; y: n
 }
 
 describe('animate: конфликт uniform и осевого scale', () => {
+  it('sharedV0 отклоняет даже Number.EPSILON-разницу без tolerance', () => {
+    const channel = (_v0: number): NumericChannel => ({ _v0 }) as NumericChannel;
+    expect(sharedV0([channel(1), channel(1)])).toBe(1);
+    expect(sharedV0([channel(1), channel(1 + Number.EPSILON)])).toBeUndefined();
+  });
+
   it.each(['scaleX', 'scaleY'] as const)(
     'после scale:2 новый %s:3 стартует с 2 и сохраняет вторую ось',
     async (axis) => {
@@ -232,5 +239,42 @@ describe('animate: конфликт uniform и осевого scale', () => {
     const keyframes = target.animateCalls.at(-1)!.keyframes;
     expect(scaleAxes(String(keyframes[0]!['transform']))).toEqual({ x: 2, y: 2 });
     expect(scaleAxes(String(keyframes.at(-1)!['transform']))).toEqual({ x: 3, y: 2 });
+  });
+
+  it.each([true, false])(
+    'разные axial-скорости запрещают общий WAAPI-прогресс (scaleXFirst=%s)',
+    async (scaleXFirst) => {
+      const target = fakeEl({}, true);
+      const now = makeNow();
+      const timer = makeTimer();
+      const options = { spring: SPRING, now: now.now, setTimer: timer.setTimer };
+      const props: AnimateProps = scaleXFirst
+        ? { scaleX: [1, 4], scaleY: [2, 2] }
+        : { scaleY: [2, 2], scaleX: [1, 4] };
+
+      const moving = animate(target.el, props, options);
+      expect(target.animateCalls).toHaveLength(1);
+      now.advance(120);
+
+      const incompatible = animate(target.el, { scale: 6 }, options);
+      expect(target.animateCalls).toHaveLength(1);
+
+      incompatible.cancel();
+      await Promise.all([moving.finished, incompatible.finished]);
+    },
+  );
+
+  it('одинаковый live-v0 нескольких каналов сохраняет compositor-route', () => {
+    const target = fakeEl({}, true);
+    const now = makeNow();
+    const timer = makeTimer();
+    const options = { spring: SPRING, now: now.now, setTimer: timer.setTimer };
+
+    animate(target.el, { scaleX: [1, 4], scaleY: [1, 4] }, options);
+    now.advance(120);
+    const compatible = animate(target.el, { scale: 6 }, options);
+
+    expect(target.animateCalls).toHaveLength(2);
+    compatible.cancel();
   });
 });

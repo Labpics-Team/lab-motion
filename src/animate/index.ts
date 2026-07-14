@@ -55,9 +55,9 @@ import { buildTransform } from '../value/transform.js';
 import {
   bindGroup,
   cssAt,
-  dominantV0,
   groupRecord,
   parseProps,
+  sharedV0,
   type AnimatableElement,
   type BoundGroup,
   type ChannelSpec,
@@ -367,14 +367,16 @@ export function animate(
     for (const [group, list] of groups) {
       const rec = groupRecord(el, group);
       const bound = bindGroup(el, group, list, rec);
+      const v0 = sharedV0(bound._numeric);
       const execution = tier === 3
         ? tier
         : tier === 0 &&
           mode._type === 'spring' &&
-          (group === 'transform' || group === 'opacity')
+          (group === 'transform' || group === 'opacity') &&
+          v0 !== undefined
             ? tryCompileSpringExecutionArtifactTupleUnchecked(
                 mode._spring,
-                dominantV0(bound._numeric),
+                v0,
                 DEFAULT_TOLERANCE,
               )
             : undefined;
