@@ -147,6 +147,7 @@ type StyleName = 'position' | 'left' | 'top';
 type DomOwnership = 0 | 1 | 2 | 3;
 
 interface ExitOwner {
+  readonly identity: object;
   phase: OwnerPhase;
   snapshotGeneration: number;
   parent: AutoParent | undefined;
@@ -222,11 +223,13 @@ type ExitCleanup = readonly [
 const exitNodes = new WeakMap<AutoChild, ExitTransaction>();
 const exitHandles = new WeakMap<AnimationLike, HandleOwner>();
 const styleOwners = new WeakMap<object, Map<StyleName, StyleFieldLease>>();
-const parentOwners = new Map<AutoParent, ExitOwner>();
+const parentOwners = new WeakMap<AutoParent, ExitOwner>();
+/** Последний наблюдённый owner-token не удерживает ни parent, ни его сессию. */
+const observedParents = new WeakMap<AutoChild, object>();
 
 /** Duck-typed минимум ребёнка: замер + WAAPI + инлайн-стили. */
 interface AutoChild {
-  /** Отсутствие parentNode означает detached, если ребёнка не заявляет зарегистрированный parent. */
+  /** Отсутствие parentNode означает unknown: transfer в незарегистрированный parent неотличим от detach. */
   readonly parentNode?: unknown | null;
   getBoundingClientRect(): FlipRect;
   animate?(keyframes: Record<string, string | number>[], timing: object): AnimationLike;
@@ -439,13 +442,13 @@ function inspectOwnership(node: AutoChild, parent: AutoParent, added = false): D
   if (direct !== undefined) return direct === parent ? 1 : direct === null ? 2 : 3;
   // add-record — временной oracle нового owner; его children сильнее stale old-parent list.
   if (added) try { return hasChild(parent, node) ? 1 : 2; } catch { return 0; }
-  for (const candidate of parentOwners.keys()) {
-    if (candidate === parent) continue;
-    try {
-      if (hasChild(candidate, node)) return 3;
-    } catch { /* один hostile parent не отменяет остальные oracles */ }
-  }
-  try { return hasChild(parent, node) ? 1 : 2; } catch { return 0; }
+  const identity = parentOwners.get(parent)?.identity;
+  const observed = observedParents.get(node);
+  if (observed !== undefined && observed !== identity) return 3;
+  // Старый children-snapshot не доказывает ни владение, ни detach: новый
+  // незарегистрированный parent принципиально невидим. Без direct/add oracle
+  // безопасно оставить узел внешнему владельцу.
+  return 0;
 }
 
 function removeExitNode(parent: AutoParent, node: AutoChild): void {
@@ -499,15 +502,16 @@ function releaseHandlers(group: ExitGroup, final: boolean): void {
   const lease = group.handlers;
   if (animation === undefined || lease === undefined) return;
   if (lease[0] === 0) {
-    const remove = animation.removeEventListener;
-    if (typeof remove === 'function') {
-      try {
-        if (lease[3]) Reflect.apply(remove, animation, ['finish', lease[1]]);
-      } catch { /* cancel-listener освобождается независимо */ }
-      try {
-        if (lease[4]) Reflect.apply(remove, animation, ['cancel', lease[2]]);
-      } catch { /* terminal ticket уже не зависит от host listener */ }
-    }
+    // Getter и сам host-вызов недоверен; каждый listener освобождается
+    // независимо, чтобы первый бросок не удержал второй и весь ghost cleanup.
+    if (lease[3]) try {
+      const remove = animation.removeEventListener;
+      if (typeof remove === 'function') Reflect.apply(remove, animation, ['finish', lease[1]]);
+    } catch { /* cancel-listener освобождается независимо */ }
+    if (lease[4]) try {
+      const remove = animation.removeEventListener;
+      if (typeof remove === 'function') Reflect.apply(remove, animation, ['cancel', lease[2]]);
+    } catch { /* terminal ticket уже не зависит от host listener */ }
   } else {
     try { restoreHandler(animation, 'onfinish', lease[4], lease[3]); }
     catch { /* oncancel освобождается независимо */ }
@@ -580,10 +584,13 @@ function reconcileRecords(owner: ExitOwner, records: readonly unknown[]): void {
   for (const record of list) {
     for (const node of recordNodes(record, 'addedNodes')) {
       const transaction = exitNodes.get(node);
+      const parent = owner.parent;
+      if (!owner.phase && parent !== undefined && inspectOwnership(node, parent, true) === 1) {
+        observedParents.set(node, owner.identity);
+      }
       if (transaction === undefined) continue;
       if (transaction.owner !== owner) {
-        const parent = owner.parent;
-        if (!owner.phase && parent !== undefined && inspectOwnership(node, parent, true) === 1) {
+        if (!owner.phase && parent !== undefined && observedParents.get(node) === owner.identity) {
           terminalExit(transaction, 1);
         }
         continue;
@@ -1044,6 +1051,8 @@ function snapshot(owner: ExitOwner): [AutoChild, FlipRect][] | undefined {
       entries.push([child, rect]);
     }
   }
+  if (!currentSnapshot(owner, parent, generation)) return undefined;
+  for (const [child] of entries) observedParents.set(child, owner.identity);
   return entries;
 }
 
@@ -1158,6 +1167,7 @@ export function autoAnimate(
   // Reservation публикуется до любого host-вызова. Повторный вход получает
   // тот же single-writer owner, а disconnect инвалидирует все поздние effects.
   const owner: ExitOwner = {
+    identity: {},
     phase: 0,
     snapshotGeneration: 0,
     parent,

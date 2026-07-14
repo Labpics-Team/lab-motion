@@ -473,23 +473,22 @@ describe('auto: autoAnimate — адаптер (duck-typed DOM)', () => {
     expect(node.animateCalls).toHaveLength(0);
   });
 
-  it('duck-child без parentNode представляет detached и завершает exit', () => {
+  it('незарегистрированный parent неотличим от detach без parentNode — старый owner fail-closed', () => {
     const seam = fakeObserverSeam();
-    const node = fakeEl(R(20, 40), 'implicit-detached');
-    const parent = fakeParent([node]);
-    parent.appendChild = (child: FakeEl) => {
-      parent.appended.push(child);
-      parent.children = [...parent.children.filter((item) => item !== child), child];
-    };
-    autoAnimate(parent as never, { MutationObserverCtor: seam.Ctor as never });
-    parent.children = [];
+    const node = fakeEl(R(20, 40), 'unregistered-transfer');
+    const left = fakeParent([node]);
+    const right = fakeParent([]);
+    autoAnimate(left as never, { MutationObserverCtor: seam.Ctor as never });
+
+    left.children = [];
+    right.children = [node];
     Reflect.deleteProperty(node, 'parentNode');
     seam.state.callback!([{ addedNodes: [], removedNodes: [node] }]);
 
-    expect(node.animations).toHaveLength(1);
-    node.animations[0]!.onfinish!();
-    expect(parent.children).not.toContain(node);
-    expect(parent.removed).toEqual([node]);
+    expect(node.animations).toHaveLength(0);
+    expect(left.children).not.toContain(node);
+    expect(left.appended).not.toContain(node);
+    expect(right.children).toContain(node);
   });
 
   it('duck-child с explicit parentNode:null завершает detached exit', () => {
@@ -1334,6 +1333,32 @@ describe('auto: autoAnimate — адаптер (duck-typed DOM)', () => {
     expect(animation.cancelled).toBe(true);
     expect(parent.removed).toEqual([node]);
     expect(node.style['position']).toBe('relative');
+  });
+
+  it('throwing removeEventListener getter не обрывает terminal cleanup', () => {
+    const seam = fakeObserverSeam();
+    const node = fakeEl(R(0, 0), 'hostile-remove-listener');
+    const parent = fakeParent([node]);
+    let removeReads = 0;
+    let cancelled = false;
+    const animation = {
+      addEventListener() {},
+      get removeEventListener() {
+        if (removeReads++ === 0) return () => {};
+        throw new Error('hostile removeEventListener getter');
+      },
+      cancel() { cancelled = true; },
+    };
+    node.animate = () => animation as never;
+    const controls = autoAnimate(parent as never, { MutationObserverCtor: seam.Ctor as never });
+
+    parent.children = [];
+    seam.state.callback!([{ addedNodes: [], removedNodes: [node] }]);
+
+    expect(() => controls.disconnect()).not.toThrow();
+    expect(cancelled).toBe(true);
+    expect(parent.removed).toEqual([node]);
+    expect(node.style).toEqual({});
   });
 
   it('nested onfinish setter не оставляет stale handler поверх нового поколения', () => {
