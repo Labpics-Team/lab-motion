@@ -53,6 +53,7 @@ import {
 import {
   animationTimeOrFallback,
   sampleSerializedSpring,
+  sampleSerializedSpringIntoUnchecked,
   scaleSerializedVelocity,
 } from '../src/compositor/sample.js';
 import { settleTimeUpperBound } from '../src/spring.js';
@@ -392,6 +393,32 @@ describe('compositor: exact piecewise sampler', () => {
     expect(sampleSerializedSpring(large, 2000, 1234.5, 0, out)).toBe(out);
     expect(out.value).toBeCloseTo(1.2345, 14);
     expect(out.velocity).toBeCloseTo(1, 14);
+  });
+
+  it('allocation-free seam бит-в-бит равен wrapper на seeded временах', () => {
+    let seed = 0x6d2b79f5;
+    const random = (): number => {
+      seed = (Math.imul(seed, 1664525) + 1013904223) >>> 0;
+      return seed / 0x1_0000_0000;
+    };
+    for (let i = 0; i < 256; i++) {
+      const duration = 1 + random() * 5000;
+      const delay = random() * 1000;
+      const current = (random() * 1.5 - 0.25) * duration + delay;
+      const wrapped = { value: Number.NaN, velocity: Number.NaN };
+      const direct = { value: Number.NaN, velocity: Number.NaN };
+
+      expect(sampleSerializedSpring(samples, duration, current, delay, wrapped)).toBe(wrapped);
+      expect(sampleSerializedSpringIntoUnchecked(
+        samples,
+        duration,
+        current,
+        delay,
+        direct,
+      )).toBe(direct);
+      expect(Object.is(direct.value, wrapped.value)).toBe(true);
+      expect(Object.is(direct.velocity, wrapped.velocity)).toBe(true);
+    }
   });
 
   it('present currentTime:null означает pending pre-start, absent использует now', () => {

@@ -36,7 +36,7 @@ import { compileSpringRuntimeExecutionTupleUnchecked } from '../compositor/execu
 import { MotionParamError } from '../errors.js';
 import {
   animationTimeOrFallback,
-  sampleSerializedSpring,
+  sampleSerializedSpringIntoUnchecked,
   scaleSerializedVelocity,
 } from '../compositor/sample.js';
 import type { SpringParams } from '../spring.js';
@@ -356,7 +356,7 @@ export class WaapiUnit implements GroupOwner {
 
   /** Снимок каналов при времени WAAPI (мс) из actual serialized curve. */
   private _snapshotAt(currentTimeMs: number, delayMs = 0): void {
-    const r = sampleSerializedSpring(
+    const r = sampleSerializedSpringIntoUnchecked(
       this._samples!,
       this._durationMs,
       currentTimeMs,
