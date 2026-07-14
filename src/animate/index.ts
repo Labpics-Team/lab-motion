@@ -201,35 +201,12 @@ function resolveMode(options: AnimateOptions): MotionMode {
   return { _type: 'spring', _spring: spring };
 }
 
-function resolveDelay(options: AnimateOptions): number {
-  const delay = options.delay ?? 0;
+function resolveDelay(input: number | undefined): number {
+  const delay = input ?? 0;
   if (!Number.isFinite(delay) || delay < 0) {
     throw new MotionParamError('LM139');
   }
   return delay;
-}
-
-function resolveStaggerInput(options: AnimateOptions): AnimateOptions['stagger'] {
-  const s = options.stagger;
-  if (typeof s === 'number' && (!Number.isFinite(s) || s < 0)) {
-    throw new MotionParamError('LM139');
-  }
-  return s;
-}
-
-function resolveStaggerDelays(s: AnimateOptions['stagger'], count: number): number[] | undefined {
-  if (s === undefined) return undefined;
-  if (typeof s === 'number') {
-    return scheduleStagger(count, s);
-  }
-  return scheduleStagger(
-    count,
-    s.gap,
-    s.from,
-    s.easing,
-    s.grid?.columns,
-    s.reducedMotion,
-  );
 }
 
 // ─── Резолв целей (в момент вызова — SSR-safe импорт) ────────────────────────
@@ -339,11 +316,31 @@ export function animate(
   options = requireAnimateOptions(options);
   // Остальная валидация — вся ДО побочных эффектов (ноль записей при броске).
   const mode = resolveMode(options);
-  const baseDelay = resolveDelay(options);
-  const staggerInput = resolveStaggerInput(options);
+  const baseDelay = resolveDelay(options.delay);
+  const staggerInput = options.stagger;
+  if (typeof staggerInput === 'number') resolveDelay(staggerInput);
   const specs = parseProps(requireAnimateProps(props));
   const els = resolveTargets(target);
-  const staggerDelays = resolveStaggerDelays(staggerInput, els.length);
+  let targetDelays: number[] | undefined;
+  if (staggerInput !== undefined) {
+    targetDelays = typeof staggerInput === 'number'
+      ? scheduleStagger(els.length, true, staggerInput)
+      : scheduleStagger(
+        els.length,
+        true,
+        staggerInput.gap,
+        staggerInput.from,
+        staggerInput.easing,
+        staggerInput.grid?.columns,
+        staggerInput.reducedMotion,
+      );
+    // scheduleStagger сигнализирует нечисловой/переполненный offset через NaN;
+    // сумма двух конечных чисел всё ещё может overflow. Сворачиваем base в
+    // принадлежащий фасаду буфер до plan/read и любого host-effect.
+    for (let i = 0; i < targetDelays.length; i++) {
+      targetDelays[i] = resolveDelay(baseDelay + targetDelays[i]!);
+    }
+  }
 
   // Тип/host-ошибки канонически гасит prefersReduced внутри tier-resolver.
   const matchMedia = options.matchMedia ??
@@ -358,7 +355,7 @@ export function animate(
   const plan: PlannedGroup[] = [];
   for (let i = 0; i < els.length; i++) {
     const el = els[i]!;
-    const delayMs = baseDelay + (staggerDelays?.[i] ?? 0);
+    const delayMs = targetDelays?.[i] ?? baseDelay;
     const tier = resolveCompositorTierCode({
       target: el,
       matchMedia,
@@ -439,11 +436,11 @@ export function animate(
         report(true);
         continue;
       }
-      // Compositor execution строится только из spring-mode в plan-фазе, поэтому второй
-      // runtime-discriminant здесь был бы дублированием того же решения.
-      if (execution) {
-        let unit: WaapiUnit;
-        try {
+      let unit: WaapiUnit | MainUnit;
+      try {
+        // Compositor execution строится только из spring-mode в plan-фазе, поэтому второй
+        // runtime-discriminant здесь был бы дублированием того же решения.
+        if (execution) {
           unit = new WaapiUnit({
             _el: el as WaapiTarget,
             _group: group,
@@ -459,28 +456,7 @@ export function animate(
             _onDone: report,
             _artifact: execution,
           });
-        } catch (error) {
-          protectedOwner = previous;
-          releaseTransition(rec, previous);
-          throw error;
-        }
-        try {
-          previous?._supersede();
-        } catch (error) {
-          unit._rollback();
-          protectedOwner = previous;
-          releaseTransition(rec, previous);
-          throw error;
-        }
-        rec._owner = unit;
-        rec._transition = false;
-        units.push(unit);
-        // Sync timer остаётся pending, пока не опубликованы все
-        // owners: иначе duplicate target успевает записать target,
-        // а следующий заранее связанный effect возвращает from.
-      } else {
-        let unit: MainUnit;
-        try {
+        } else {
           unit = new MainUnit({
             _el: el,
             _group: group,
@@ -491,23 +467,26 @@ export function animate(
             _batch: getMainBatch(),
             _onDone: report,
           });
-        } catch (error) {
-          protectedOwner = previous;
-          releaseTransition(rec, previous);
-          throw error;
         }
-        try {
-          previous?._supersede();
-        } catch (error) {
-          unit._rollback();
-          protectedOwner = previous;
-          releaseTransition(rec, previous);
-          throw error;
-        }
-        rec._owner = unit;
-        rec._transition = false;
-        units.push(unit);
+      } catch (error) {
+        protectedOwner = previous;
+        releaseTransition(rec, previous);
+        throw error;
       }
+      try {
+        previous?._supersede();
+      } catch (error) {
+        unit._rollback();
+        protectedOwner = previous;
+        releaseTransition(rec, previous);
+        throw error;
+      }
+      rec._owner = unit;
+      rec._transition = false;
+      units.push(unit);
+      // Sync timer остаётся pending, пока не опубликованы все
+      // owners: иначе duplicate target успевает записать target,
+      // а следующий заранее связанный effect возвращает from.
     }
     // Вторая commit-фаза: host completion видит уже целый owner graph.
     // Юнит, вытесненный поздним duplicate, к этому моменту done.
@@ -531,6 +510,9 @@ export function animate(
   maybeComplete();
 
   // 5. Агрегированные контролы (пустой список целей → уже разрешённый no-op).
+  const cancel = (): void => {
+    for (const u of units) u.cancel();
+  };
   return {
     finished,
     play(): void {
@@ -542,11 +524,7 @@ export function animate(
     seek(tMs: number): void {
       for (const u of units) u.seek(tMs);
     },
-    cancel(): void {
-      for (const u of units) u.cancel();
-    },
-    stop(): void {
-      for (const u of units) u.cancel();
-    },
+    cancel,
+    stop: cancel,
   };
 }

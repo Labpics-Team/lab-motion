@@ -22,6 +22,9 @@
 
 ### Fixed
 
+- `./animate`: переполнение составной delay отклоняется до host-effects, а
+  завершение задержек длиннее диапазона HTML timer сверяется с WAAPI-clock без
+  раннего settle, starvation и скачка terminal pose.
 - Сборка: параллельная минификация ESM/CJS изолирует настройки Terser, поэтому
   повторный запуск даёт тот же CJS-артефакт, включая strict-семантику и mangling.
 - `./animate/native`: host-методы вызываются без доверия к own `.call`,

@@ -14,21 +14,24 @@ function delayAt(
   maxDistance: number,
   gap: number,
   ease: ((value: number) => number) | undefined,
+  strict: boolean,
 ): number {
   const position = distance / maxDistance;
   const easedPosition = ease ? ease(position) : position;
-  const delay = Number.isFinite(easedPosition)
-    ? easedPosition * maxDistance * gap
-    : 0;
-  return Number.isFinite(delay) && delay >= 0 ? delay : 0;
+  if (!Number.isFinite(easedPosition)) return strict ? NaN : 0;
+  const delay = easedPosition * maxDistance * gap;
+  return Number.isFinite(delay) && delay >= 0 ? delay : strict ? NaN : 0;
 }
 
 /**
  * Материализует задержки для уже проверенного целого count.
+ * strict оставляет ошибочный derived delay как NaN для parse-границы фасада;
+ * false сохраняет forgiving-контракт публичного/compositor scheduler.
  * Позиционные аргументы не создают промежуточный объект на горячей границе.
  */
 export function scheduleStagger(
   count: number,
+  strict: boolean,
   gapInput?: number,
   fromInput?: StaggerFrom,
   easingInput?: (value: number) => number,
@@ -88,7 +91,7 @@ export function scheduleStagger(
     }
     if (!maxDistance) return result.fill(0);
     for (let index = 0; index < count; index++) {
-      result[index] = delayAt(result[index]!, maxDistance, gap, ease);
+      result[index] = delayAt(result[index]!, maxDistance, gap, ease, strict);
     }
     return result;
   }
@@ -110,7 +113,7 @@ export function scheduleStagger(
     const distance = fromEdges
       ? Math.min(index, count - 1 - index)
       : Math.abs(index - origin);
-    result[index] = delayAt(distance, maxDistance, gap, ease);
+    result[index] = delayAt(distance, maxDistance, gap, ease, strict);
   }
 
   return result;

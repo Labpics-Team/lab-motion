@@ -156,6 +156,7 @@ function compileStaggerPlanForCount(
   // строго проверенный count и не создаёт промежуточный options-carrier.
   const delays = scheduleStagger(
     count,
+    false,
     options.gap,
     options.staggerFrom,
     options.staggerEasing,

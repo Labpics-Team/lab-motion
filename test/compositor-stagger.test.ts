@@ -104,6 +104,19 @@ describe('compositor stagger: compileStaggerPlan — чистый план', () 
     expect(plan.count).toBe(5);
   });
 
+  it('public/compositor сохраняют clamp собственного overflow в 0', () => {
+    const expected = [0, Number.MAX_VALUE, 0];
+    expect(stagger(3, { gap: Number.MAX_VALUE })).toEqual(expected);
+    expect(compileStaggerPlan({
+      spring: SPRING,
+      property: 'opacity',
+      from: 0,
+      to: 1,
+      count: 3,
+      gap: Number.MAX_VALUE,
+    }).delays).toEqual(expected);
+  });
+
   it('общая кривая = compileSpringLinear (одна компиляция на группу)', () => {
     const plan = compileStaggerPlan({ spring: SPRING, property: 'transform', from: 0, to: 100, count: 8 });
     expect(plan.easing).toBe(compileSpringLinear(SPRING));
