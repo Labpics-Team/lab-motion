@@ -54,7 +54,9 @@ function springLinear(input?: NanoSpring): [number, string] {
     throw new RangeError('spring parameters must be finite and positive');
   }
   const w = Math.sqrt(k / m);
-  const a = c / (2 * m);
+  // Сначала нормализуем ОДУ по mass: `2*m` само переполняется при конечных
+  // scale-equivalent m/k/c и не должно менять физику той же системы.
+  const a = c / m / 2;
   const d = Math.sqrt(Math.abs(w * w - a * a));
   const critical = d <= w * Math.sqrt(Number.EPSILON);
   const under = a < w && !critical;

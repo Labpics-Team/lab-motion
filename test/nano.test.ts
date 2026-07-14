@@ -152,6 +152,19 @@ describe('nano: публичный WAAPI-only контракт', () => {
     expect(Number(target.calls[0]!.timing.duration)).toBeGreaterThan(10_000);
   });
 
+  it('сохраняет ту же кривую при общем конечном масштабе m/k/c', () => {
+    const timings = [Number.MIN_VALUE, 1e-300, 1, 1e300, Number.MAX_VALUE]
+      .map((scale) => {
+        const target = recordingElement();
+        animate(target as unknown as Element, { opacity: 1 }, {
+          spring: { mass: scale, stiffness: scale, damping: scale },
+        });
+        return target.calls[0]!.timing;
+      });
+
+    for (const timing of timings.slice(1)) expect(timing).toEqual(timings[0]);
+  });
+
   it('отклоняет кривую выше общего compiler ceiling до materialization и host-write', () => {
     const target = recordingElement();
     const materialize = vi.spyOn(Math, 'round').mockImplementation(() => {
