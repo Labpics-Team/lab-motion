@@ -106,6 +106,17 @@ describe('nano: публичный WAAPI-only контракт', () => {
     });
   });
 
+  it('не превращает enumerable prototype props в CSS keyframes', () => {
+    const target = recordingElement();
+    const props = Object.assign(Object.create({ opacity: 0 }), { color: 'red' }) as {
+      color: string;
+    };
+
+    animate(target as unknown as Element, props, { duration: 100 });
+
+    expect(target.calls[0]!.keyframes).toEqual({ color: 'red' });
+  });
+
   it('схлопывает и длительность, и каскад при reduced motion', () => {
     const first = recordingElement();
     const second = recordingElement();

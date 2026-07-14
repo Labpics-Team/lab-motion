@@ -124,7 +124,7 @@ export function animate(
   const frame: PropertyIndexedKeyframes = {};
   if (props.scale != null) frame.scale = props.scale;
   if (props.rotate != null) frame.rotate = `${props.rotate}deg`;
-  for (const property in props) {
+  for (const property of Object.keys(props)) {
     if (!(property in TRANSFORM)) frame[property] = props[property];
   }
 
