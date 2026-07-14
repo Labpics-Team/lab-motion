@@ -31,13 +31,18 @@ import os from 'node:os';
 import { createServer } from 'node:http';
 import path from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
-import { brotliCompressSync, constants as zlibConstants, gzipSync } from 'node:zlib';
 import esbuild from 'esbuild';
 import { chromium } from 'playwright';
 import { PNG } from 'pngjs';
 import {
+  canonicalGzip,
+  observationalBrotli,
+} from '../../scripts/compression-oracle.mjs';
+import { CANONICAL_GZIP_PACKAGE } from '../../scripts/compression-policy.mjs';
+import {
   assertFileHashesUnchanged,
   assertCheckoutUnchanged,
+  assertInstalledPackageTreesUnchanged,
   hashFileTree,
   prepareBenchmarkCheckout,
   sha256Bytes,
@@ -152,10 +157,8 @@ function measureSize(lib) {
   const raw = res.outputFiles[0].contents;
   return {
     raw: raw.byteLength,
-    gz: gzipSync(raw, { level: 9 }).byteLength,
-    br: brotliCompressSync(raw, {
-      params: { [zlibConstants.BROTLI_PARAM_QUALITY]: 11 },
-    }).byteLength,
+    gz: canonicalGzip(raw).byteLength,
+    br: observationalBrotli(raw).byteLength,
     sha256: sha256Bytes(raw),
   };
 }
@@ -773,7 +776,10 @@ async function main() {
       'dist/animate/native/index.js',
     ],
     requiredPackages: BENCH_PACKAGES,
+    requiredRootPackages: [CANONICAL_GZIP_PACKAGE],
     requiredInputs: [
+      ['root/scripts/compression-policy.mjs', path.join(ROOT, 'scripts', 'compression-policy.mjs')],
+      ['root/scripts/compression-oracle.mjs', path.join(ROOT, 'scripts', 'compression-oracle.mjs')],
       ['bench/bench.mjs', path.join(__dirname, 'bench.mjs')],
       ['bench/methodology.mjs', path.join(__dirname, 'methodology.mjs')],
       ['bench/provenance.mjs', path.join(__dirname, 'provenance.mjs')],
@@ -983,6 +989,8 @@ async function main() {
     chromium: { path: chromium.executablePath(), sha256: browserExecutableSha256 },
     ...adapters,
   });
+  assertInstalledPackageTreesUnchanged(__dirname, provenance.environment.packages);
+  assertInstalledPackageTreesUnchanged(ROOT, provenance.environment.rootPackages);
   const chromiumTreeAfter = hashFileTree(chromiumInstall.directory);
   if (
     chromiumTreeAfter.files !== chromiumTreeBefore.files ||
@@ -993,7 +1001,7 @@ async function main() {
   const ids = LIBS.map((l) => l.id);
   const stem = `${generatedAt.slice(0, 10)}-${provenance.revisionLabel}-${provenance.distRuntime.sha256.slice(0, 12)}`;
   const rawPayload = {
-    schema: 7,
+    schema: 8,
     package: { name: rootPkg.name, version: rootPkg.version },
     generatedAt,
     companion: { markdownFile: `${stem}.md`, markdownSha256: '' },

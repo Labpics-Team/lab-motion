@@ -1,6 +1,7 @@
 import { createHash } from 'node:crypto';
 import { isDeepStrictEqual } from 'node:util';
-import { formatProvenanceMarkdown } from './provenance.mjs';
+import { CANONICAL_GZIP_PACKAGE } from '../../scripts/compression-policy.mjs';
+import { formatProvenanceMarkdown, isExactPackageVersion } from './provenance.mjs';
 import {
   applyHolmCorrection,
   assertBalancedRunBlocks,
@@ -485,6 +486,7 @@ export function sha256Text(value) {
 export function renderBenchmarkEnvironment(payload) {
   const system = payload.system;
   const referenceProbes = payload.calibration.raw.referenceTimerEvidence.probes;
+  const gzipCodec = payload.provenance.environment.rootPackages?.[CANONICAL_GZIP_PACKAGE];
   return [
     `Дата: ${payload.generatedAt}`,
     `Ревизия: ${payload.provenance.revisionLabel}`,
@@ -497,6 +499,7 @@ export function renderBenchmarkEnvironment(payload) {
     `Warm-калибровка: ${payload.calibration.policy.pilotClusters} pilot-кластера publish-формы × ≥${payload.calibration.policy.minimumElapsedQuanta} шагов сетки; calls ${Object.entries(payload.calibration.effectiveWarmCalls).map(([id, calls]) => `${id}=${calls}`).join(', ')}`,
     `Прогонов: S1–S4 × ${payload.startOrders.length} (p50/p95), freeze × ${payload.freezeOrders.length} (p50); raw JSON`,
     `Библиотеки: ${payload.participants.freeze.map((id) => payload.results[id].version).join(', ')}`,
+    `S6: канонический gzip через ${CANONICAL_GZIP_PACKAGE}@${gzipCodec?.version ?? 'н/д'}; системный Brotli-11 привязан к зафиксированному Node executable`,
   ];
 }
 
@@ -612,8 +615,8 @@ export function renderBenchmarkMarkdown(payload) {
     '## S6: executable import-cost адаптера',
     '',
     ...table('Одинаковый esbuild production profile', ids, [
-      ['min+gzip-9, B', (result) => String(result.size.gz)],
-      ['min+Brotli-11, B', (result) => String(result.size.br)],
+      ['min+канонический gzip-9, B', (result) => String(result.size.gz)],
+      ['min+системный Brotli-11, B', (result) => String(result.size.br)],
       ['Capability-группа', (result) => result.group],
     ]),
     '| Конкурент | Точная capability-группа | gzip | Brotli | Verdict |',
@@ -623,7 +626,7 @@ export function renderBenchmarkMarkdown(payload) {
     )),
     '',
     'Size-победа допускается только внутри точной capability-группы и только при одновременном',
-    'уменьшении gzip-9 и Brotli-11.',
+    'уменьшении канонического gzip-9 и системного Brotli-11.',
     '',
     '## Оговорки честности',
     '',
@@ -648,7 +651,7 @@ export function validateBenchmarkReportPair({
   benchmarkPackage,
   now = Date.now(),
 }) {
-  if (payload?.schema !== 7) fail(`schema ${String(payload?.schema)} не поддержана`);
+  if (payload?.schema !== 8) fail(`schema ${String(payload?.schema)} не поддержана`);
   if (
     payload.package?.name !== rootPackage.name ||
     payload.package?.version !== rootPackage.version
@@ -697,6 +700,8 @@ export function validateBenchmarkReportPair({
   for (const name of [
     'root/package.json',
     'root/pnpm-lock.yaml',
+    'root/scripts/compression-policy.mjs',
+    'root/scripts/compression-oracle.mjs',
     'bench/package.json',
     'bench/pnpm-lock.yaml',
     'bench/bench.mjs',
@@ -726,6 +731,20 @@ export function validateBenchmarkReportPair({
     fail('display environment не выводится из structured provenance');
   }
   assertSha(environment?.nodeExecutableSha256, 'Node executable');
+  const expectedGzipCodec = rootPackage.devDependencies?.[CANONICAL_GZIP_PACKAGE]
+    ?? rootPackage.dependencies?.[CANONICAL_GZIP_PACKAGE];
+  if (!isExactPackageVersion(expectedGzipCodec)) {
+    fail(`${CANONICAL_GZIP_PACKAGE}: root package обязан фиксировать точную версию gzip-кодека`);
+  }
+  const installedGzipCodec = environment?.rootPackages?.[CANONICAL_GZIP_PACKAGE];
+  if (
+    installedGzipCodec?.version !== expectedGzipCodec ||
+    !Number.isSafeInteger(installedGzipCodec.files) ||
+    installedGzipCodec.files <= 0
+  ) {
+    fail(`${CANONICAL_GZIP_PACKAGE}: не зафиксированы версия и дерево фактического root-кодека`);
+  }
+  assertSha(installedGzipCodec.sha256, `${CANONICAL_GZIP_PACKAGE} root package tree`);
   for (const [name, version] of Object.entries(benchmarkPackage.devDependencies ?? {})) {
     const installed = environment?.packages?.[name];
     if (installed?.version !== version || !Number.isSafeInteger(installed.files) || installed.files <= 0) {

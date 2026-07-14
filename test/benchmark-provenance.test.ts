@@ -12,6 +12,7 @@ import { afterEach, describe, expect, it } from 'vitest';
 import {
   assertFileHashesUnchanged,
   assertCheckoutUnchanged,
+  assertInstalledPackageTreesUnchanged,
   formatProvenanceMarkdown,
   hashFileTree,
   prepareBenchmarkCheckout,
@@ -198,6 +199,52 @@ describe('benchmark provenance', () => {
     expect(() => captureBenchmarkEnvironment(f.root, f.benchDirectory, ['vendor'], {
       nodeVersion: 'v24.9.0', pnpmVersion: '11.11.0',
     })).toThrow(/packageManager.*bench/i);
+  });
+
+  it('фиксирует exact root-кодек и отвергает подмену его версии или дерева', () => {
+    const f = fixture();
+    writeFileSync(path.join(f.root, 'package.json'), JSON.stringify({
+      packageManager: 'pnpm@11.11.0',
+      devDependencies: { pako: '3.0.1' },
+    }));
+    writeFileSync(path.join(f.benchDirectory, 'package.json'), JSON.stringify({
+      packageManager: 'pnpm@11.11.0',
+    }));
+    const codec = path.join(f.root, 'node_modules', 'pako');
+    mkdirSync(codec, { recursive: true });
+    writeFileSync(path.join(codec, 'package.json'), JSON.stringify({ name: 'pako', version: '3.0.0' }));
+    writeFileSync(path.join(codec, 'index.js'), 'export const gzip = 1;');
+
+    const options = {
+      nodeVersion: 'v24.9.0',
+      pnpmVersion: '11.11.0',
+      requiredRootPackages: ['pako'],
+    };
+    expect(() => captureBenchmarkEnvironment(f.root, f.benchDirectory, [], options))
+      .toThrow(/pako.*3\.0\.1.*3\.0\.0/);
+
+    writeFileSync(path.join(codec, 'package.json'), JSON.stringify({ name: 'pako', version: '3.0.1' }));
+    const prepared = prepareBenchmarkCheckout({
+      root: f.root,
+      benchDirectory: f.benchDirectory,
+      build() {},
+      readState: () => f.state,
+      requiredRootPackages: ['pako'],
+      captureEnvironment: (root, benchDirectory) => (
+        captureBenchmarkEnvironment(root, benchDirectory, [], options)
+      ),
+    });
+    expect(prepared.environment.rootPackages.pako).toMatchObject({
+      version: '3.0.1',
+      files: 2,
+    });
+    expect(prepared.environment.rootPackages.pako.sha256).toMatch(/^[a-f0-9]{64}$/);
+    expect(() => assertInstalledPackageTreesUnchanged(f.root, prepared.environment.rootPackages))
+      .not.toThrow();
+
+    writeFileSync(path.join(codec, 'index.js'), 'export const gzip = 2;');
+    expect(() => assertInstalledPackageTreesUnchanged(f.root, prepared.environment.rootPackages))
+      .toThrow(/pako.*измен/i);
   });
 
   it('re-hashes generated runtime adapters after the benchmark', () => {
