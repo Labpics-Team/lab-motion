@@ -287,8 +287,8 @@ export const IMPORT_COST_SCENARIOS = [
     gate: 5000,
   },
   {
-    // Capability-specialized native WAAPI-путь: explicit [from,to], один WAAPI-
-    // прогон на цель, без value registry/tokens/frame/main-thread fallback.
+    // Capability-specialized native WAAPI-путь: explicit [from,to], отдельный
+    // WAAPI-эффект на CSS-канал, без value registry/tokens/frame/main-thread fallback.
     name: 'animate-native-springTo',
     code: `import { springTo } from '%DIST%/../animate/native/index.js'; console.log(typeof springTo(el, { x: [0, 240] }).cancel);`,
     gate: 3500,

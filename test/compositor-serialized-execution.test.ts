@@ -21,6 +21,12 @@ vi.mock('../src/compositor/segmenter.js', async (importOriginal) => {
       work.builds++;
       return actual.buildSpringNodesWithHorizon(...args);
     },
+    buildRestingSpringNodesWithHorizon(
+      ...args: Parameters<typeof actual.buildRestingSpringNodesWithHorizon>
+    ) {
+      work.builds++;
+      return actual.buildRestingSpringNodesWithHorizon(...args);
+    },
     tryBuildSpringNodes(...args: Parameters<typeof actual.tryBuildSpringNodes>) {
       work.builds++;
       return actual.tryBuildSpringNodes(...args);
@@ -35,6 +41,8 @@ import {
 } from '../src/compositor/core.js';
 import {
   clearSpringExecutionArtifactCacheUnchecked,
+  compileRestingSpringExecutionArtifactTupleUnchecked,
+  compileSpringExecutionArtifactTupleUnchecked,
   compileSpringExecutionArtifactUnchecked,
 } from '../src/compositor/curve.js';
 import { __resetDetectionCache } from '../src/compositor/detect.js';
@@ -115,6 +123,92 @@ describe('compositor: unified serialized execution artifact', () => {
     expect(second).toBe(first);
     expect(second.samples).toBe(first.samples);
     expect(work.builds).toBe(builds);
+  });
+
+  it('resting capability сохраняет identity на hit без повторной компиляции', () => {
+    const first = compileRestingSpringExecutionArtifactTupleUnchecked(SPRING, TOLERANCE);
+    const builds = work.builds;
+
+    const second = compileRestingSpringExecutionArtifactTupleUnchecked(SPRING, TOLERANCE);
+
+    expect(second).toBe(first);
+    expect(second[1]).toBe(first[1]);
+    expect(work.builds).toBe(builds);
+  });
+
+  it('resting capability ограничен восемью exact-профилями', () => {
+    const springs = Array.from({ length: 9 }, (_, i) => ({
+      mass: 1 + i / 100,
+      stiffness: 170 + i,
+      damping: 26 + i / 10,
+    }));
+    const resident = springs.slice(0, 8).map((spring) =>
+      compileRestingSpringExecutionArtifactTupleUnchecked(spring, TOLERANCE));
+    const builds = work.builds;
+    for (let i = 0; i < resident.length; i++) {
+      expect(compileRestingSpringExecutionArtifactTupleUnchecked(springs[i]!, TOLERANCE))
+        .toBe(resident[i]);
+    }
+    expect(work.builds).toBe(builds);
+
+    compileRestingSpringExecutionArtifactTupleUnchecked(springs[8]!, TOLERANCE);
+    const buildsAfterEviction = work.builds;
+
+    const recompiled = compileRestingSpringExecutionArtifactTupleUnchecked(
+      springs[0]!,
+      TOLERANCE,
+    );
+
+    expect(recompiled).not.toBe(resident[0]);
+    expect(work.builds).toBe(buildsAfterEviction + 1);
+  });
+
+  it('resting capability бит-в-бит равен generic v0=0 на разных режимах', () => {
+    let seed = 0x6d2b79f5;
+    const random = (): number => {
+      seed = (Math.imul(seed, 1664525) + 1013904223) >>> 0;
+      return seed / 0x100000000;
+    };
+
+    for (let sample = 0; sample < 32; sample++) {
+      const mass = 0.25 + 3.75 * random();
+      const stiffness = 40 + 560 * random();
+      const criticalDamping = 2 * Math.sqrt(mass * stiffness);
+      const spring = {
+        mass,
+        stiffness,
+        damping: criticalDamping * (0.08 + 1.92 * random()),
+      };
+      const tolerance = 0.0015 + 0.0035 * random();
+      const generic = compileSpringExecutionArtifactTupleUnchecked(
+        spring,
+        0,
+        tolerance,
+      );
+      const resting = compileRestingSpringExecutionArtifactTupleUnchecked(
+        spring,
+        tolerance,
+      );
+
+      expect(resting[0]).toBe(generic[0]);
+      expect(resting[2]).toBe(generic[2]);
+      expect(resting[1]).toHaveLength(generic[1].length);
+      for (let i = 0; i < generic[1].length; i++) {
+        expect(resting[1][i]).toBe(generic[1][i]);
+      }
+    }
+  });
+
+  it('общий reset очищает generic и resting capability-кэши', () => {
+    const generic = compileSpringExecutionArtifactUnchecked(SPRING, 0.25, TOLERANCE);
+    const resting = compileRestingSpringExecutionArtifactTupleUnchecked(SPRING, TOLERANCE);
+
+    clearSpringExecutionArtifactCacheUnchecked();
+
+    expect(compileSpringExecutionArtifactUnchecked(SPRING, 0.25, TOLERANCE))
+      .not.toBe(generic);
+    expect(compileRestingSpringExecutionArtifactTupleUnchecked(SPRING, TOLERANCE))
+      .not.toBe(resting);
   });
 
   it('public raw diagnostics свежи и их мутация не отравляет artifact', () => {

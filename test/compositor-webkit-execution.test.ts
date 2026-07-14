@@ -269,6 +269,7 @@ describe('compositor: WebKit исполняет пружину явными keyf
   });
 
   it('engine policy требует одновременно Apple vendor и AppleWebKit', () => {
+    expect(requiresExplicitSpringKeyframesFor(undefined)).toBe(false);
     expect(requiresExplicitSpringKeyframesFor({
       vendor: 'Apple Computer, Inc.',
       userAgent: 'Mozilla/5.0 AppleWebKit/605.1.15 Safari/605.1.15',

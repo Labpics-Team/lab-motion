@@ -93,11 +93,14 @@ await move.finished;
 ```
 
 `springTo` принимает только явные пары `[from, to]` для `x`, `y`, `scale`,
-`rotate`, `opacity` и объединяет их в одну `Element.animate()` на цель. Нужен
-WAAPI; Chromium/Firefox также требуют CSS `linear()`, а WebKit получает явные
-адаптивные ключевые кадры. Без нужной возможности функция падает синхронно. При
-reduced-motion она сразу ставит финальный кадр. Для запасного пути используйте
-`…/animate`.
+`rotate`, `opacity` и запускает отдельную `Element.animate()` для каждого
+присутствующего CSS-канала цели. Поэтому transform и opacity вытесняются
+независимо. Нужен WAAPI; Chromium/Firefox также требуют CSS `linear()`, а WebKit
+получает явные адаптивные ключевые кадры. Без нужной возможности функция падает
+синхронно. При reduced-motion она сразу ставит финальный кадр. Для запасного пути
+используйте `…/animate`. Повторная смена владельца уже внутри
+компенсационной host-записи завершается `LM157`: синхронный путь бросает
+ошибку, а `finished` естественно завершившегося WAAPI-эффекта отклоняется.
 
 Больше примеров (drag, FLIP, presence, scroll-scrub, value-mapping) — в разделе
 «Примеры» после карты субпутей.
@@ -159,7 +162,7 @@ flowchart TB
 | `…/frame` | Единый frame-шедулер: `createFrameLoop` / синглтон `frame` — один rAF на кадр, фазы read→update→render против layout-thrash, SSR-safe; `asRequestFrame(loop)` сажает `MotionValue`/`drive` на общий кадр. **Биндинги используют его по умолчанию** (как shared-ticker у Framer Motion/GSAP); инжекция своего `requestFrame` переопределяет |
 | `…/animate` | Фасад-one-liner: `animate(target, props, options)` — цели по каналам (`x`/`y`/`scale`/`rotate`, `opacity`, CSS-свойства), режим `{ spring }` или `{ duration, ease }`, `delay`/`stagger`, контролы `{ finished, play, pause, seek, cancel, stop }`. Это полный DX-срез; ядро от него не растёт |
 | `…/animate/mini` | **Лёгкий срез (≤ 5 KB gz)**: transform-шортхенды, `opacity`, CSS-переменные, spring/tween, `delay`/`stagger`, контролы и reduced-motion снап. Внутри движок разделён на кодеки и адаптер цели, но публичный набор mini фиксирован. Цветовые CSS-значения и compositor-offload остаются в `./animate` |
-| `…/animate/native` | **Нативная пружина ≤ 3.5 KB gzip**: `springTo(target, { x: [0, 240] })`, только явные пары transform/opacity, один WAAPI-прогон на цель, мгновенный финал при reduced-motion. Chromium/Firefox требуют CSS `linear()`, WebKit использует адаптивные ключевые кадры; скрытого rAF-пути нет |
+| `…/animate/native` | **Нативная пружина ≤ 3.5 KB gzip**: `springTo(target, { x: [0, 240] })`, только явные пары transform/opacity, отдельный WAAPI-эффект на независимый CSS-канал и раздельное вытеснение, мгновенный финал при reduced-motion. Chromium/Firefox требуют CSS `linear()`, WebKit использует адаптивные ключевые кадры; скрытого rAF-пути нет |
 
 **Математика значений**
 

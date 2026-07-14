@@ -105,10 +105,10 @@ export function supportsLinearEasing(): boolean {
  * Чистый шов идентичности для прямых тестов. Связка Apple vendor+AppleWebKit
  * отличает WebKit/iOS-браузеры от Chromium на macOS (его vendor — Google).
  */
-export function requiresExplicitSpringKeyframesFor(identity: EngineIdentity): boolean {
+export function requiresExplicitSpringKeyframesFor(identity: EngineIdentity | undefined): boolean {
   return (
-    (identity.vendor ?? '').includes('Apple') &&
-    (identity.userAgent ?? '').includes('AppleWebKit')
+    (identity?.vendor ?? '').includes('Apple') &&
+    (identity?.userAgent ?? '').includes('AppleWebKit')
   );
 }
 
@@ -121,9 +121,7 @@ export function requiresExplicitSpringKeyframes(): boolean {
   if (_explicitKeyframesMemo !== undefined) return _explicitKeyframesMemo;
   try {
     const nav = (globalThis as { navigator?: EngineIdentity }).navigator;
-    _explicitKeyframesMemo =
-      nav !== undefined &&
-      requiresExplicitSpringKeyframesFor(nav);
+    _explicitKeyframesMemo = requiresExplicitSpringKeyframesFor(nav);
   } catch {
     _explicitKeyframesMemo = false;
   }

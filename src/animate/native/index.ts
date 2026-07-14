@@ -1,5 +1,5 @@
 /**
- * Узкоспециализированная DOM-пружина: явные значения → один прогон WAAPI.
+ * Узкоспециализированная DOM-пружина: явные значения → независимые WAAPI-lane.
  *
  * Граница намеренно узкая: только transform/opacity и WAAPI. Chromium/Firefox
  * требуют CSS linear(); WebKit получает явные адаптивные ключевые кадры.
@@ -7,7 +7,7 @@
  * rAF-пути здесь нет; универсальный путь остаётся в `../index`.
  */
 
-import { compileRestingSpringRuntimeCurveUnchecked } from '../../compositor/execution.js';
+import { compileRestingSpringRuntimeTimingIntoUnchecked } from '../../compositor/execution.js';
 import { MotionParamError, type MotionParamErrorCode } from '../../errors.js';
 import { type SpringParams, validateSpringParams } from '../../spring.js';
 import {
@@ -60,13 +60,107 @@ interface NativeAnimation {
 
 const DEFAULT_SPRING: SpringParams = { mass: 1, stiffness: 170, damping: 26 };
 const DONE_FINISHED: Promise<void> = Object.freeze(Promise.resolve());
-const DONE_CANCEL = Object.freeze(() => {});
 const DONE: NativeSpringControls = Object.freeze({
   finished: DONE_FINISHED,
-  cancel: DONE_CANCEL,
+  cancel: Object.freeze(() => {}),
 });
+type Owner = (() => void) & {
+  _generation: number;
+  _slot: number;
+  _frame: Record<string, string | number>;
+};
+type Channel = 'transform' | 'opacity';
+type Run = [owner: Owner, element: NativeSpringElement, channel: Channel];
+type RunSlot = Run | null;
+type Repair = [element: NativeSpringElement, channel: Channel, parent: Repair | undefined];
+type TerminalCell = [
+  state: 0 | 1 | 2,
+  action: (() => void) | null,
+  fulfill: () => void,
+  reject: () => void,
+];
+
+// Владелец гасит вытесненный эффект; фиксированный реестр WeakMap закрывает
+// Object.prototype и не удерживает DOM-цели.
+const ownerMaps: Record<Channel, WeakMap<NativeSpringElement, Owner>> = {
+  transform: new WeakMap(),
+  opacity: new WeakMap(),
+};
+// Связная цепочка замыкает цикл по той же паре element×channel,
+// но сохраняет независимые вложенные каналы без числового предела.
+let repairing: Repair | undefined;
+let generation = 0;
 let lastCss: unknown;
 let lastLinear = false;
+
+function claimOwnership(
+  runs: readonly RunSlot[],
+): void {
+  const displaced: Owner[] = [];
+  for (const run of runs) {
+    if (run === null) continue;
+    const [owner, element, channel] = run;
+    const map = ownerMaps[channel];
+    const previous = map.get(element);
+    if (previous?._generation! > owner._generation) {
+      displaced.push(owner);
+      continue;
+    }
+    if (previous) displaced.push(previous);
+    map.set(element, owner);
+  }
+  // Весь новый граф владения опубликован до реентрантной отмены хоста.
+  for (const owner of displaced) owner();
+}
+
+function writeOwned(
+  owner: Owner,
+  element: NativeSpringElement,
+  channel: Channel,
+  value: string | number,
+): void {
+  const map = ownerMaps[channel];
+  if (map.get(element) !== owner) return;
+  try {
+    element.style.setProperty(channel, String(value));
+  } catch (error) {
+    // Ошибка текущего владельца сохраняет его effect; вытесненная запись всё
+    // равно обязана перейти к единственной компенсации победителя.
+    if (map.get(element) === owner) throw error;
+  }
+  const winner = map.get(element);
+  if (winner === owner) return;
+
+  const previous = repairing;
+  repairing = [element, channel, previous];
+  try {
+    element.style.setProperty(channel, String((winner ?? owner)._frame[channel]));
+  } catch {
+    // Бросок из компенсации не доказывает commit; это та же non-quiescent
+    // транзакция независимо от причины host-ошибки.
+    failNative('LM157');
+  } finally {
+    repairing = previous;
+  }
+}
+
+function publishTerminal(cell: TerminalCell, state: 1 | 2): void {
+  if (cell[0]) return;
+  cell[0] = state;
+  const action = cell[1];
+  cell[1] = null;
+  // Разрыв выполняется до возврата в host thenable; DOM-действие доставляется
+  // отдельно и потому сохраняет Promise-подобную асинхронность terminal.
+  if (action) void DONE_FINISHED.then(action);
+}
+
+function createTerminalCell(): TerminalCell {
+  const cell = [0] as unknown as TerminalCell;
+  // Эти callbacks создаются в top-level factory без DOM lexical scope.
+  cell[2] = () => publishTerminal(cell, 1);
+  cell[3] = () => publishTerminal(cell, 2);
+  return cell;
+}
 
 /** @motionErrorFactory */
 function failNative(code: MotionParamErrorCode): never {
@@ -112,9 +206,8 @@ function parseProps(input: NativeSpringProps): Partial<Record<Prop, Pair>> {
     const pair = (input as unknown as Record<string, unknown>)[key];
     if (!Array.isArray(pair) || pair.length !== 2) failNative('LM141');
     const from: unknown = pair[0];
-    if (!Number.isFinite(from)) failNative('LM142');
     const to: unknown = pair[1];
-    if (!Number.isFinite(to)) failNative('LM142');
+    if (!Number.isFinite(from) || !Number.isFinite(to)) failNative('LM142');
     parsed[key as Prop] = [from as number, to as number];
   }
   return parsed;
@@ -131,20 +224,21 @@ function frameAt(
   props: Partial<Record<Prop, Pair>>,
   progress: number,
 ): Record<string, string | number> {
-  const frame: Record<string, string | number> = {};
   let transform = '';
   let pair = props.x;
   if (pair) transform = `translateX(${valueAt(pair, progress)}px)`;
   pair = props.y;
-  if (pair) transform += (transform ? ' ' : '') + `translateY(${valueAt(pair, progress)}px)`;
+  if (pair) transform += (transform && ' ') + `translateY(${valueAt(pair, progress)}px)`;
   pair = props.scale;
-  if (pair) transform += (transform ? ' ' : '') + `scale(${valueAt(pair, progress)})`;
+  if (pair) transform += (transform && ' ') + `scale(${valueAt(pair, progress)})`;
   pair = props.rotate;
-  if (pair) transform += (transform ? ' ' : '') + `rotate(${valueAt(pair, progress)}deg)`;
-  if (transform) frame['transform'] = transform;
+  if (pair) transform += (transform && ' ') + `rotate(${valueAt(pair, progress)}deg)`;
   pair = props.opacity;
-  if (pair) frame['opacity'] = valueAt(pair, progress);
-  return frame;
+  // Литералы создают собственные поля данных, не вызывая установщик прототипа.
+  if (transform) {
+    return pair ? { transform, opacity: valueAt(pair, progress) } : { transform };
+  }
+  return { opacity: valueAt(pair!, progress) };
 }
 
 function prefersReduced(explicit: boolean | undefined): boolean {
@@ -175,15 +269,16 @@ function supportsLinear(): boolean {
 }
 
 /**
- * Компилирует одну пружинную кривую и запускает одну Animation на каждую цель.
- * Все свойства одной цели объединяются в общие ключевые кадры, поэтому
- * transform и opacity не создают конкурирующие временные шкалы браузера.
+ * Компилирует одну пружинную кривую и запускает отдельный эффект на каждый
+ * независимый CSS-канал цели. Это позволяет вытеснять transform и opacity
+ * раздельно, сохраняя общий физический тайминг.
  */
 export function springTo(
   target: NativeSpringTarget,
   props: NativeSpringProps,
   options: NativeSpringOptions = {},
 ): NativeSpringControls {
+  const token = ++generation;
   // Options — первая граница до чтения потенциально hostile target/props.
   options = requireAnimateOptions(options);
   // Snapshot закрывает caller-mutation после однократной валидирующей границы.
@@ -192,14 +287,30 @@ export function springTo(
   const values = parseProps(requireAnimateProps(props));
   const targets = resolveTargets(target);
   const finalFrame = frameAt(values, 1);
+  const names = Object.keys(finalFrame);
+  for (const element of targets) {
+    for (const name of names) {
+      for (let repair = repairing; repair; repair = repair[2]) {
+        if (repair[0] === element && repair[1] === name) failNative('LM157');
+      }
+    }
+  }
 
   if (prefersReduced(options.reducedMotion)) {
-    // Только собственные ключи: загрязнённый Object.prototype не является CSS.
-    const names = Object.keys(finalFrame);
+    const owner = (() => {}) as Owner;
+    owner._generation = token;
+    owner._frame = finalFrame;
+    const runs: Run[] = [];
     for (const element of targets) {
       for (const name of names) {
-        element.style.setProperty(name, String(finalFrame[name]));
+        const channel = name as Channel;
+        runs.push([owner, element, channel]);
       }
+    }
+    claimOwnership(runs);
+    // Repair закрывает hostile reentry как между, так и внутри host-записей.
+    for (const [, element, channel] of runs) {
+      writeOwned(owner, element, channel, finalFrame[channel]!);
     }
     return DONE;
   }
@@ -212,11 +323,19 @@ export function springTo(
   // Runtime-план — единый SSOT выбора custom linear() либо явных WebKit-кадров.
   // Runtime-plan уже имеет ровно WAAPI timing-shape; только
   // внутренние samples не должны утечь в hostile/polyfill host.
-  const { samples, ...timing } = compileRestingSpringRuntimeCurveUnchecked({ spring });
+  const timing: Record<string, unknown> = {
+    iterations: 1,
+    fill: 'both',
+    composite: 'replace',
+  };
+  const samples = compileRestingSpringRuntimeTimingIntoUnchecked(spring, timing);
   if (samples === undefined && !supportsLinear()) failNative('LM154');
+  // Baseline не передаётся host: mutable single-effect keyframes не могут
+  // отравить authoritative repair отменённого/вытесненного владельца.
+  const initialFrame = frameAt(values, 0);
   let keyframes: Record<string, string | number>[];
   if (samples === undefined) {
-    keyframes = [frameAt(values, 0), finalFrame];
+    keyframes = [frameAt(values, 0), frameAt(values, 1)];
   } else {
     keyframes = new Array(samples.length / 2);
     for (let i = 0; i < keyframes.length; i++) {
@@ -224,94 +343,125 @@ export function springTo(
       keyframes[i]!['offset'] = samples[i * 2]! / 100;
     }
   }
-  if (targets.length > 1) {
+  const plans = [keyframes];
+  if (names.length > 1) {
+    plans.push(keyframes.map((frame) => {
+      const { transform: _transform, ...opacity } = frame;
+      delete frame['opacity'];
+      return opacity;
+    }));
+  }
+  let pending = targets.length * plans.length;
+  if (pending > 1) {
     // Один immutable-план не даёт hostile/polyfill первой цели изменить
     // семантику следующих без O(K × targets) копий и давления на GC.
-    for (const frame of keyframes) Object.freeze(frame);
-    Object.freeze(keyframes);
+    for (const plan of plans) {
+      for (const frame of plan) Object.freeze(frame);
+      Object.freeze(plan);
+    }
     Object.freeze(timing);
   }
-  const cancellations: Array<() => void> = [];
-  const completions: PromiseLike<unknown>[] = [];
+  const runs: RunSlot[] = [];
+  let resolveFinished!: () => void;
+  let rejectFinished!: (reason: unknown) => void;
+  const finished = new Promise<void>((resolve, reject) => {
+    resolveFinished = resolve;
+    rejectFinished = reject;
+  });
+  let active = false;
+  const settle = (owner: Owner): void => {
+    // Знак кодирует library terminal; ноль уже снят и не воскресает.
+    const live = owner._generation > 0;
+    if (live) {
+      owner._generation *= -1;
+      pending--;
+    }
+    if (!pending) {
+      let count = 0;
+      for (const run of runs) {
+        if (run) {
+          run[0]._slot = count;
+          runs[count++] = run;
+        }
+      }
+      runs.length = count;
+    }
+    if (!pending && !active) resolveFinished();
+  };
   try {
     for (const element of targets) {
-      // Узкая WebIDL-граница не отдаёт подменной реализации доступ к узлам кэша.
-      const animation = element.animate(keyframes, timing) as Partial<NativeAnimation> | null;
-      const cancel = animation?.cancel;
-      if (typeof cancel !== 'function') failNative('LM155');
-      // Cancel регистрируется до чтения finished: бросающий host-getter не
-      // оставит уже запущенную цель вне rollback-транзакции.
-      cancellations.push(() => cancel.call(animation));
-      const completion = animation!.finished;
-      if (typeof completion?.then !== 'function') failNative('LM155');
-      // allSettled сам нормализует thenable; отдельный
-      // Promise на цель дублировал бы ту же операцию.
-      completions.push(completion);
+      for (let i = 0; i < plans.length; i++) {
+        const channel = names[i]! as Channel;
+        const map = ownerMaps[channel];
+        // Узкая WebIDL-граница не отдаёт подменной реализации доступ к узлам кэша.
+        const animation = element.animate(plans[i]!, timing) as Partial<NativeAnimation> | null;
+        const cancel = animation?.cancel;
+        if (typeof cancel !== 'function') failNative('LM155');
+        // Cancel регистрируется до чтения finished: бросающий host-getter не
+        // оставит уже запущенную lane вне rollback-транзакции.
+        const cell = createTerminalCell();
+        let owner!: Owner;
+        const stop = (): void => {
+          cell[1] = null;
+          if (!owner._generation) return;
+          if (runs[owner._slot]?.[0] === owner) runs[owner._slot] = null;
+          settle(owner);
+          owner._generation = 0;
+          if (map.get(element) === owner) map.delete(element);
+          try { Reflect.apply(cancel, animation, []); } catch { /* эффект уже логически снят */ }
+        };
+        owner = stop as Owner;
+        owner._generation = token;
+        owner._slot = runs.length;
+        owner._frame = initialFrame;
+        runs.push([owner, element, channel]);
+        const completion = animation!.finished;
+        const then = completion?.then;
+        if (typeof then !== 'function') failNative('LM155');
+        cell[1] = (): void => {
+          if (cell[0] === 2) {
+            if (owner._generation) cancelAll(runs);
+            return;
+          }
+          if (!owner._generation) return;
+          active = true;
+          try {
+            writeOwned(owner, element, channel, finalFrame[channel]!);
+            owner();
+          } catch (error) {
+            if ((error as { code?: unknown }).code === 'LM157') {
+              // Reject занимает terminal до sibling-cancel, который может
+              // синхронно довести pending до нуля.
+              rejectFinished(error);
+              cancelAll(runs);
+            } else {
+              settle(owner);
+            }
+          } finally {
+            active = false;
+            if (!pending) resolveFinished();
+          }
+        };
+        try {
+          Reflect.apply(then, completion, [cell[2], cell[3]]);
+        } catch {
+          cell[3]();
+        }
+      }
     }
   } catch (error) {
-    void Promise.allSettled(completions);
-    cancelAll(cancellations);
+    cancelAll(runs);
     throw error;
   }
-
-  // Host finished может навсегда остаться pending после cancel у polyfill.
-  // Публичный lifecycle поэтому имеет собственный terminal deferred, а host-
-  // агрегация безопасно дочищает effects в фоне, если всё же завершится.
-  let done = false;
-  let resolveFinished!: () => void;
-  const finished = new Promise<void>((resolve) => { resolveFinished = resolve; });
-  const finish = (): void => {
-    if (done) return;
-    done = true;
-    resolveFinished();
-  };
-  void Promise.allSettled(completions).then((results) => {
-    if (done) return;
-    // Только нетронутый набор fulfilled-effect можно заменить точным inline
-    // target. Cancel/rollback/rejection не имеют права дорисовывать финал.
-    if (
-      cancellations.length !== targets.length ||
-      results.some((result) => result.status === 'rejected')
-    ) {
-      cancelAll(cancellations);
-      finish();
-      return;
-    }
-    let cancel: (() => void) | undefined;
-    // Single-target polyfill мог мутировать отданный keyframe: точная цель
-    // пересобирается из закрытого validated snapshot, а не доверяет host-объекту.
-    const targetFrame = frameAt(values, 1);
-    const names = Object.keys(targetFrame);
-    // Pop до host-вызовов закрывает реентрантный cancel; отказ одной цели не
-    // мешает освободить остальные. Без полного inline кадра effect сохраняется.
-    while ((cancel = cancellations.pop()) !== undefined) {
-      const element = targets[cancellations.length]!;
-      try {
-        for (const name of names) {
-          element.style.setProperty(name, String(targetFrame[name]));
-        }
-      } catch {
-        continue;
-      }
-      try { cancel(); } catch { /* host-effect уже логически освобождён */ }
-    }
-    finish();
-  });
+  claimOwnership(runs);
 
   return {
     finished,
-    cancel(): void {
-      if (done) return;
-      cancelAll(cancellations);
-      finish();
-    },
+    cancel(): void { cancelAll(runs); },
   };
 }
 
-function cancelAll(cancellations: Array<() => void>): void {
-  let cancel: (() => void) | undefined;
+function cancelAll(runs: RunSlot[]): void {
   // Pop до host-вызова закрывает реентрантный cancel без отдельного latch.
-  while ((cancel = cancellations.pop()) !== undefined) {
-    try { cancel(); } catch { /* одна цель не блокирует остальные */ }
-  }
+  while (runs.length) runs.pop()?.[0]();
 }

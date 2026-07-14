@@ -295,22 +295,17 @@ export function compileSpringRuntimeCurveUnchecked(
   };
 }
 
-/** Специализированный v0=0 seam: native-entry не тащит envelope ретаргета. */
-export function compileRestingSpringRuntimeCurveUnchecked(
-  options: Omit<SpringRuntimeCurveOptions, 'v0'>,
-): SpringRuntimeCurve {
-  const tolerance = options.tolerance ?? DEFAULT_TOLERANCE;
-  const artifact = compileRestingSpringExecutionArtifactTupleUnchecked(options.spring, tolerance);
-  if (!requiresExplicitSpringKeyframes()) {
-    return buildRuntimeTiming(
-      artifact[0],
-      artifact[2],
-      options.fill,
-      options.composite,
-    );
+/** Узкий шов v0=0 с умолчаниями: результат пишется прямо в запись тайминга хоста. */
+export function compileRestingSpringRuntimeTimingIntoUnchecked(
+  spring: SpringParams,
+  timing: Record<string, unknown>,
+): SpringSerializedSamples | undefined {
+  const artifact = compileRestingSpringExecutionArtifactTupleUnchecked(spring, DEFAULT_TOLERANCE);
+  timing['duration'] = artifact[2];
+  if (requiresExplicitSpringKeyframes()) {
+    timing['easing'] = 'linear';
+    return artifact[1];
   }
-  return {
-    ...buildRuntimeTiming('linear', artifact[2], options.fill, options.composite),
-    samples: artifact[1],
-  };
+  timing['easing'] = artifact[0];
+  return undefined;
 }
