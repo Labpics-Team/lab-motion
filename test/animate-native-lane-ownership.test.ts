@@ -617,6 +617,7 @@ describe('animate/native: независимое владение каналам
           }
         },
       },
+      animate: vi.fn(),
     });
     elementA = createElement('A');
     elementB = createElement('B');
@@ -650,6 +651,7 @@ describe('animate/native: независимое владение каналам
           inline.set(name, value);
         },
       },
+      animate: vi.fn(),
     };
 
     expect(() => {
