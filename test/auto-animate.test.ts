@@ -368,6 +368,49 @@ describe('auto: autoAnimate — адаптер (duck-typed DOM)', () => {
     expect(parent.removed).toEqual([node]);
   });
 
+  it('reentrant acquisition публикует owner до чтения host position', () => {
+    const first = fakeObserverSeam();
+    const nested = fakeObserverSeam();
+    const parent = fakeParent([]);
+
+    autoAnimate(parent as never, {
+      MutationObserverCtor: first.Ctor as never,
+      getComputedPosition() {
+        autoAnimate(parent as never, { MutationObserverCtor: nested.Ctor as never });
+        return 'relative';
+      },
+    });
+
+    expect(first.state.observed).toHaveLength(1);
+    expect(nested.state.callback).toBeNull();
+  });
+
+  it('reentrant disconnect из initial snapshot не оставляет orphan observer', () => {
+    const outer = fakeObserverSeam();
+    const nested = fakeObserverSeam();
+    const parent = fakeParent([]);
+    const descriptor = Object.getOwnPropertyDescriptor(parent, 'children')!;
+    let reenter = true;
+    Object.defineProperty(parent, 'children', {
+      configurable: true,
+      get() {
+        if (reenter) {
+          reenter = false;
+          autoAnimate(parent as never, {
+            MutationObserverCtor: nested.Ctor as never,
+          }).disconnect();
+        }
+        return descriptor.get!.call(parent) as FakeEl[];
+      },
+      set(next: FakeEl[]) { descriptor.set!.call(parent, next); },
+    });
+
+    autoAnimate(parent as never, { MutationObserverCtor: outer.Ctor as never });
+
+    expect(nested.state.callback).toBeNull();
+    expect(outer.state.observed).toEqual([]);
+  });
+
   it('sync terminal в onfinish-setter не даёт второй сессии повторить remove', () => {
     const first = fakeObserverSeam();
     const second = fakeObserverSeam();
@@ -430,27 +473,23 @@ describe('auto: autoAnimate — адаптер (duck-typed DOM)', () => {
     expect(node.animateCalls).toHaveLength(0);
   });
 
-  it('unregistered ownership без parentNode fail-closed: старый parent не крадёт node', () => {
+  it('duck-child без parentNode представляет detached и завершает exit', () => {
     const seam = fakeObserverSeam();
-    const node = fakeEl(R(20, 40), 'unknown-transfer');
-    const left = fakeParent([node]);
-    const right = fakeParent([]);
-    autoAnimate(left as never, { MutationObserverCtor: seam.Ctor as never });
-    const append = left.appendChild.bind(left);
-    left.appendChild = (child: FakeEl) => {
-      Reflect.set(child, 'parentNode', null);
-      append(child);
-      Reflect.deleteProperty(child, 'parentNode');
+    const node = fakeEl(R(20, 40), 'implicit-detached');
+    const parent = fakeParent([node]);
+    parent.appendChild = (child: FakeEl) => {
+      parent.appended.push(child);
+      parent.children = [...parent.children.filter((item) => item !== child), child];
     };
-
-    left.children = [];
-    right.children = [node];
+    autoAnimate(parent as never, { MutationObserverCtor: seam.Ctor as never });
+    parent.children = [];
     Reflect.deleteProperty(node, 'parentNode');
     seam.state.callback!([{ addedNodes: [], removedNodes: [node] }]);
 
-    expect(left.children).not.toContain(node);
-    expect(right.children).toContain(node);
-    expect(node.animateCalls).toHaveLength(0);
+    expect(node.animations).toHaveLength(1);
+    node.animations[0]!.onfinish!();
+    expect(parent.children).not.toContain(node);
+    expect(parent.removed).toEqual([node]);
   });
 
   it('duck-child с explicit parentNode:null завершает detached exit', () => {
@@ -466,6 +505,24 @@ describe('auto: autoAnimate — адаптер (duck-typed DOM)', () => {
     node.animations[0]!.onfinish!();
     expect(parent.children).not.toContain(node);
     expect(parent.removed).toEqual([node]);
+  });
+
+  it('explicit foreign parent сильнее stale children старого parent', () => {
+    const seam = fakeObserverSeam();
+    const node = fakeEl(R(20, 40), 'foreign-over-stale');
+    const parent = fakeParent([node]);
+    autoAnimate(parent as never, { MutationObserverCtor: seam.Ctor as never });
+
+    parent.children = [];
+    seam.state.callback!([{ addedNodes: [], removedNodes: [node] }]);
+    const foreign = fakeParent([]);
+    node.parentNode = foreign;
+    parent.children.push(node); // hostile stale collection old parent
+    node.parentNode = foreign;
+    node.animations[0]!.onfinish!();
+
+    expect(parent.removed).not.toContain(node);
+    expect(node.parentNode).toBe(foreign);
   });
 
   it('border родителя учитывается: absolute считается от padding-box (минус clientLeft/clientTop)', () => {
@@ -1032,6 +1089,34 @@ describe('auto: autoAnimate — адаптер (duck-typed DOM)', () => {
     expect(right.children).toContain(node);
   });
 
+  it('right-before-left transfer атомарно переносит active exit в новый cache', () => {
+    const leftSeam = fakeObserverSeam();
+    const rightSeam = fakeObserverSeam();
+    const node = fakeEl(R(0, 0), 'right-first');
+    node.style['position'] = 'relative';
+    const left = fakeParent([node]);
+    const right = fakeParent([]);
+    autoAnimate(left as never, { MutationObserverCtor: leftSeam.Ctor as never });
+    autoAnimate(right as never, { MutationObserverCtor: rightSeam.Ctor as never });
+
+    left.children = [];
+    leftSeam.state.callback!([{ addedNodes: [], removedNodes: [node] }]);
+    const exit = node.animations[0]!;
+    right.children = [node];
+    Reflect.deleteProperty(node, 'parentNode'); // left ещё содержит stale ghost
+
+    // Новый owner видит add раньше remove-record старого owner.
+    rightSeam.state.callback!([{ addedNodes: [node], removedNodes: [] }]);
+    expect(exit.cancelled).toBe(true);
+    expect(node.animateCalls).toHaveLength(2); // exit + enter нового owner
+
+    left.children = [];
+    leftSeam.state.callback!([{ addedNodes: [], removedNodes: [node] }]);
+    rightSeam.state.callback!([{ addedNodes: [], removedNodes: [] }]);
+    expect(node.animateCalls).toHaveLength(2); // нет отложенного второго enter
+    expect(right.children).toContain(node);
+  });
+
   it('reentrant transfer во время terminal restore не удаляется старым owner', () => {
     const seam = fakeObserverSeam();
     const node = fakeEl(R(0, 0), 'reentrant-transfer');
@@ -1127,6 +1212,46 @@ describe('auto: autoAnimate — адаптер (duck-typed DOM)', () => {
 
     expect(Object.hasOwn(animation, 'onfinish')).toBe(false);
     expect(Object.hasOwn(animation, 'oncancel')).toBe(false);
+  });
+
+  it('restore property lease не стирает external own handler из inherited setter', () => {
+    const seam = fakeObserverSeam();
+    const node = fakeEl(R(0, 0), 'restore-cas');
+    const previous = () => {};
+    const external = () => {};
+    let stored: (() => void) | null = previous;
+    let animation!: FakeAnimation;
+    const proto = {};
+    Object.defineProperty(proto, 'onfinish', {
+      configurable: true,
+      get: () => stored,
+      set(next: (() => void) | null) {
+        if (next === previous) {
+          Object.defineProperty(animation, 'onfinish', {
+            configurable: true,
+            writable: true,
+            value: external,
+          });
+        } else {
+          stored = next;
+        }
+      },
+    });
+    animation = Object.assign(Object.create(proto) as FakeAnimation, {
+      oncancel: null,
+      cancelled: false,
+      cancel() {},
+    });
+    node.animate = () => animation;
+    const parent = fakeParent([node]);
+    autoAnimate(parent as never, { MutationObserverCtor: seam.Ctor as never });
+
+    parent.children = [];
+    seam.state.callback!([{ addedNodes: [], removedNodes: [node] }]);
+    stored!();
+
+    expect(Object.hasOwn(animation, 'onfinish')).toBe(true);
+    expect(animation.onfinish).toBe(external);
   });
 
   it('acquire oncancel не затирает reentrant external onfinish', () => {
@@ -1395,6 +1520,33 @@ describe('auto: autoAnimate — адаптер (duck-typed DOM)', () => {
     expect(animated.animateCalls).toHaveLength(1);
   });
 
+  it('throw post-baseline инвалидирует cache и не анимирует пропущенный переход', () => {
+    const seam = fakeObserverSeam();
+    const before = fakeEl(R(0, 0), 'before');
+    const skipped = fakeEl(R(0, 60), 'skipped');
+    const parent = fakeParent([before]);
+    autoAnimate(parent as never, { MutationObserverCtor: seam.Ctor as never });
+    let fail = true;
+    skipped.getBoundingClientRect = () => {
+      if (fail) {
+        fail = false;
+        throw new Error('transient rect');
+      }
+      return { ...skipped.rect };
+    };
+
+    parent.children = [skipped];
+    seam.state.callback!([{ addedNodes: [skipped], removedNodes: [before] }]);
+    seam.state.callback!([{ addedNodes: [], removedNodes: [] }]);
+
+    expect(before.animateCalls).toHaveLength(0);
+    expect(skipped.animateCalls).toHaveLength(0);
+    const after = fakeEl(R(0, 120), 'after');
+    parent.children = [skipped, after];
+    seam.state.callback!([{ addedNodes: [after], removedNodes: [] }]);
+    expect(after.animateCalls).toHaveLength(1);
+  });
+
   it('disconnect() отписывает observer', () => {
     const seam = fakeObserverSeam();
     const parent = fakeParent([]);
@@ -1561,6 +1713,21 @@ describe('auto: autoAnimate — адаптер (duck-typed DOM)', () => {
       ctl.enable();
       ctl.disconnect();
     }).not.toThrow();
+  });
+
+  it('duplicate без доступного global observer управляет уже живым owner', () => {
+    const seam = fakeObserverSeam();
+    const parent = fakeParent([]);
+    autoAnimate(parent as never, { MutationObserverCtor: seam.Ctor as never });
+    const duplicate = autoAnimate(parent as never, {});
+
+    duplicate.disconnect();
+
+    expect(seam.state.disconnected).toBe(true);
+    const late = fakeEl(R(0, 0), 'late-after-duplicate');
+    parent.children = [late];
+    seam.state.callback!([{ addedNodes: [late], removedNodes: [] }]);
+    expect(late.animateCalls).toHaveLength(0);
   });
 
   it('невалидные опции → MotionParamError', () => {
