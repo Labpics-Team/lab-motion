@@ -370,6 +370,18 @@ export function groupRecord(el: object, group: GroupKey): GroupRecord {
   return rec;
 }
 
+/** Один SSOT переносит неанимированные transform-компоненты во все terminal-пути. */
+export function commitResiduals(
+  record: GroupRecord,
+  residuals: ReadonlyMap<string, number>,
+): void {
+  residuals.forEach((value, key) => {
+    if (!record._numeric.has(key)) {
+      record._numeric.set(key, { _value: value, _velocity: 0 });
+    }
+  });
+}
+
 // ─── Чтение текущего состояния из стиля (в момент вызова, SSR-safe) ──────────
 
 /** Duck-контракт цели: стиль с getPropertyValue/setProperty (Element подходит). */

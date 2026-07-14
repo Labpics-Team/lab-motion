@@ -27,10 +27,9 @@ export class SurfaceBatch {
   private _basisSpring: SpringParams | undefined;
   private _basisTime = NaN;
   private _active = 0;
-  private _live = 0;
   private _holes = 0;
-  private _betweenPhases = false;
-  private _end = 0;
+  /** -1 вне кадра; иначе зафиксированная граница update→render. */
+  private _end = -1;
   private _offUpdate: (() => void) | undefined;
   private _offRender: (() => void) | undefined;
   private readonly _frameTeardown = (): void => {
@@ -39,7 +38,7 @@ export class SurfaceBatch {
       try { this._units[i]?._batchAbort(); } catch { /* teardown siblings обязаны освободиться */ }
     }
     this._teardown();
-    if (this._live === 0) this._resetStorage();
+    if (this._units.length === this._holes) this._resetStorage();
   };
 
   constructor(frame: FrameLoop) {
@@ -48,10 +47,9 @@ export class SurfaceBatch {
 
   _add(unit: SurfaceUnit, paused: boolean): void {
     // Persistent default-pool не должен расти от churn после peak live.
-    if (!this._betweenPhases && this._holes > 0) this._compact();
+    if (this._end < 0 && this._holes > 0) this._compact();
     const slot = this._units.length;
     this._units.push(unit);
-    this._live++;
     unit._batchSlot = slot;
     if (paused) return;
     this._active++;
@@ -62,17 +60,16 @@ export class SurfaceBatch {
       if (this._units[slot] === unit) {
         this._units[slot] = undefined;
         this._holes++;
-        this._live--;
       }
       unit._batchSlot = -1;
-      if (this._live === 0) this._resetStorage();
+      if (this._units.length === this._holes) this._resetStorage();
       throw error;
     }
   }
 
   _activate(unit: SurfaceUnit): void {
     if (unit._batchSlot < 0) return;
-    if (!this._betweenPhases && this._holes > 0) this._compact();
+    if (this._end < 0 && this._holes > 0) this._compact();
     this._active++;
     try {
       this._subscribe();
@@ -92,10 +89,9 @@ export class SurfaceBatch {
     if (slot < 0 || this._units[slot] !== unit) return;
     this._units[slot] = undefined;
     this._holes++;
-    this._live--;
     unit._batchSlot = -1;
     if (!paused && --this._active === 0) this._teardown();
-    if (this._live === 0) this._resetStorage();
+    if (this._units.length === this._holes) this._resetStorage();
   }
 
   _springBasis(spring: SpringParams, t: number): MutableSpringBasis {
@@ -119,7 +115,6 @@ export class SurfaceBatch {
   }
 
   private _runUpdate(ts: number | undefined): void {
-    this._betweenPhases = true;
     this._end = this._units.length;
     for (let i = 0; i < this._end; i++) {
       const unit = this._units[i];
@@ -131,7 +126,7 @@ export class SurfaceBatch {
     // Pause/cancel-all в update снимает render-подписку: второй
     // фазы не будет, значит stable compaction уже безопасна.
     if (this._active === 0) {
-      this._betweenPhases = false;
+      this._end = -1;
       this._compact();
     }
   }
@@ -144,7 +139,7 @@ export class SurfaceBatch {
         try { unit._batchAbort(); } catch { /* cleanup одного slot не прерывает кадр */ }
       }
     }
-    this._betweenPhases = false;
+    this._end = -1;
     this._compact();
   }
 
@@ -164,7 +159,7 @@ export class SurfaceBatch {
   private _resetStorage(): void {
     this._units.length = 0;
     this._holes = 0;
-    this._end = 0;
+    this._end = -1;
   }
 
   private _subscribe(): void {

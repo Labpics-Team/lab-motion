@@ -43,6 +43,7 @@ import type { SpringParams } from '../spring.js';
 import { buildTransform } from '../value/transform.js';
 import {
   channelAt,
+  commitResiduals,
   dominantV0,
   rebaseNumericChannels,
   type AnimatableElement,
@@ -122,7 +123,7 @@ export class WaapiUnit implements GroupOwner {
   // ── GroupOwner ────────────────────────────────────────────────────────────
 
   _release(): void {
-    this._flushNatural();
+    this._commit();
   }
 
   _capture(): void {
@@ -179,12 +180,6 @@ export class WaapiUnit implements GroupOwner {
     this._cancelAnim();
     this._writeBack();
     this._finish(false);
-  }
-
-  /** Публикует подготовленный unit и выпускает отложенный synchronous timer. */
-  _commit(): void {
-    if (this._done) return;
-    this._flushNatural();
   }
 
   /** Откат ещё не опубликованного successor без inline-записи. */
@@ -251,7 +246,7 @@ export class WaapiUnit implements GroupOwner {
     }
     this._paused = false;
     this._locked = false;
-    this._flushNatural();
+    this._commit();
   }
 
   /** Перемотка к времени прогона: на паузе фиксирует позу, иначе продолжает. */
@@ -298,7 +293,7 @@ export class WaapiUnit implements GroupOwner {
       return;
     }
     this._locked = false;
-    this._flushNatural();
+    this._commit();
   }
 
   /** Стоп в текущей позиции: инлайн-фиксация ДО cancel (без отката к базе). */
@@ -537,8 +532,8 @@ export class WaapiUnit implements GroupOwner {
     if (cancel !== undefined) safeCancelTimer(cancel);
   }
 
-  /** Выпускает sync timer только вне host-транзакции и ровно один раз. */
-  private _flushNatural(): void {
+  /** Публикует unit: выпускает sync timer только вне host-транзакции и ровно один раз. */
+  _commit(): void {
     if (
       this._o._record._owner !== this ||
       !this._pendingNatural ||
@@ -580,9 +575,7 @@ export class WaapiUnit implements GroupOwner {
     for (const ch of this._o._numeric) {
       rec._numeric.set(ch._key, { _value: ch._value, _velocity: 0 });
     }
-    this._o._residuals.forEach((v, k) => {
-      if (!rec._numeric.has(k)) rec._numeric.set(k, { _value: v, _velocity: 0 });
-    });
+    commitResiduals(rec, this._o._residuals);
   }
 
   private _finish(natural: boolean): void {

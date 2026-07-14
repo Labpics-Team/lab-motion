@@ -53,6 +53,7 @@ import { scheduleStagger } from '../stagger/scheduler.js';
 import { buildTransform } from '../value/transform.js';
 import {
   bindGroup,
+  commitResiduals,
   cssAt,
   dominantV0,
   groupRecord,
@@ -141,6 +142,7 @@ export interface AnimateControls {
 
 /** Общий интерфейс юнитов обоих движков (fan-out контролов). */
 interface UnitControls {
+  _commit?(): void;
   play(): void;
   pause(): void;
   seek(tMs: number): void;
@@ -259,12 +261,7 @@ function resolveTargets(target: unknown): AnimatableElement[] {
   // Валидная прямая цель побеждает случайное/hostile поле length.
   if (isElementLike(source)) return [source];
   const snapshot = collectBoundedArrayLike(source);
-  for (let i = 0; i < snapshot.length; i++) {
-    const el = snapshot[i];
-    if (!isElementLike(el)) {
-      throw new MotionParamError('LM147');
-    }
-  }
+  if (!snapshot.every(isElementLike)) throw new MotionParamError('LM147');
   return snapshot as AnimatableElement[];
 }
 
@@ -305,9 +302,7 @@ function commitSnap(
     rec._cssValue = bound._css._css;
   }
   for (const ch of bound._numeric) rec._numeric.set(ch._key, { _value: ch._to, _velocity: 0 });
-  bound._residuals.forEach((v, k) => {
-    if (!rec._numeric.has(k)) rec._numeric.set(k, { _value: v, _velocity: 0 });
-  });
+  commitResiduals(rec, bound._residuals);
 }
 
 /**
@@ -392,7 +387,6 @@ export function animate(
   // 3. Aggregate создаётся только после успешной plan/read-фазы:
   // невалидный вызов не оставляет abandoned Promise и не меняет fail-fast precedence.
   const units: UnitControls[] = [];
-  const pendingWaapi: WaapiUnit[] = [];
   // Дубликат цели строит successor до cancel прежнего owner: синхронный
   // start→cancel не рисуется между кадрами, зато сбой конструктора сохраняет
   // текущего владельца этой записи вместо разрушения обоих прогонов.
@@ -486,7 +480,6 @@ export function animate(
         // Sync timer остаётся pending, пока не опубликованы все
         // owners: иначе duplicate target успевает записать target,
         // а следующий заранее связанный effect возвращает from.
-        pendingWaapi.push(unit);
       } else {
         let unit: MainUnit;
         try {
@@ -520,7 +513,7 @@ export function animate(
     }
     // Вторая commit-фаза: host completion видит уже целый owner graph.
     // Юнит, вытесненный поздним duplicate, к этому моменту done.
-    for (const unit of pendingWaapi) unit._commit();
+    for (const unit of units) unit._commit?.();
   } catch (error) {
     // Host-commit не должен оставить ранее созданные циклы без
     // доступных controls. Отменяем новые юниты в обратном порядке;

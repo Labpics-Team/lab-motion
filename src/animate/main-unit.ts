@@ -13,6 +13,7 @@ import { buildTransform } from '../value/transform.js';
 import {
   RANGE_EPSILON,
   channelAt,
+  commitResiduals,
   cssAt,
   type AnimatableElement,
   type BoundGroup,
@@ -49,7 +50,6 @@ const EASE_DERIV_H = 1e-3;
 export class MainUnit implements GroupOwner, SurfaceUnit {
   _batchSlot = -1;
   private _o: MainUnitOptions | undefined;
-  private _batch: SurfaceBatch | undefined;
   private _done = false;
   private _paused: boolean;
   private _active = false;
@@ -65,14 +65,12 @@ export class MainUnit implements GroupOwner, SurfaceUnit {
 
   constructor(options: MainUnitOptions) {
     this._o = options;
-    this._batch = options._batch;
     this._paused = options._startPaused === true;
     try {
       options._batch._add(this, this._paused);
     } catch (error) {
       this._done = true;
       this._o = undefined;
-      this._batch = undefined;
       throw error;
     }
   }
@@ -128,7 +126,7 @@ export class MainUnit implements GroupOwner, SurfaceUnit {
     this._lastTs = undefined;
     this._paused = false;
     try {
-      this._batch!._activate(this);
+      this._o!._batch._activate(this);
     } catch (error) {
       this._paused = true;
       throw error;
@@ -138,7 +136,7 @@ export class MainUnit implements GroupOwner, SurfaceUnit {
   pause(): void {
     if (this._done || this._paused || this._o!._record._transition) return;
     this._paused = true;
-    this._batch!._deactivate(this);
+    this._o!._batch._deactivate(this);
   }
 
   seek(tMs: number): void {
@@ -215,7 +213,7 @@ export class MainUnit implements GroupOwner, SurfaceUnit {
       return false;
     }
 
-    const basis = this._batch!._springBasis(o._mode._spring, this._tMs / 1000);
+    const basis = o._batch._springBasis(o._mode._spring, this._tMs / 1000);
     let converged = true;
     for (const channel of bound._numeric) {
       const range = channel._solverTo - channel._from;
@@ -314,9 +312,7 @@ export class MainUnit implements GroupOwner, SurfaceUnit {
     for (const channel of bound._numeric) {
       record._numeric.set(channel._key, { _value: channel._renderedValue, _velocity: 0 });
     }
-    bound._residuals.forEach((value, key) => {
-      if (!record._numeric.has(key)) record._numeric.set(key, { _value: value, _velocity: 0 });
-    });
+    commitResiduals(record, bound._residuals);
     if (bound._css !== undefined) record._cssValue = bound._css._renderedCss;
   }
 
@@ -324,11 +320,10 @@ export class MainUnit implements GroupOwner, SurfaceUnit {
     if (this._done) return;
     this._done = true;
     const o = this._o!;
-    this._batch!._remove(this, this._paused);
+    o._batch._remove(this, this._paused);
     if (o._record._owner === this) o._record._owner = undefined;
     const done = o._onDone;
     this._o = undefined;
-    this._batch = undefined;
     done(natural);
   }
 }
