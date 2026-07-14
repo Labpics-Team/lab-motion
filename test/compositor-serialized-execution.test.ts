@@ -529,7 +529,7 @@ describe('compositor: owner snapshot читает actual WAAPI curve', () => {
     expect(parse(String(f.calls[1]!.timing['easing']))[3]).toBe(0);
   });
 
-  it('активный owner держит samples после LRU eviction', () => {
+  it('активный owner держит samples после cache eviction', () => {
     const currentTime = 120;
     const physics = { mass: 1.017, stiffness: 173.019, damping: 17.023 };
     const artifact = compileSpringExecutionArtifactUnchecked(
