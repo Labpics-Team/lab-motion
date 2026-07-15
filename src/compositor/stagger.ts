@@ -211,7 +211,6 @@ export interface CompositorStaggerGroupOptions extends StaggerPlanBase {
 export class CompositorStaggerGroup {
   private readonly _plan: CompositorStaggerPlan;
   private readonly _springs: CompositorSpring[];
-  private _destroyed = false;
 
   constructor(opts: CompositorStaggerGroupOptions) {
     if (!Array.isArray(opts.targets)) {
@@ -281,7 +280,6 @@ export class CompositorStaggerGroup {
 
   /** Запускает КАСКАД: каждый элемент стартует со своей stagger-задержкой (per-group). */
   start(): void {
-    if (this._destroyed) return;
     for (const s of this._springs) s.start();
   }
 
@@ -290,7 +288,6 @@ export class CompositorStaggerGroup {
    * per-element примитив M2. index вне диапазона → MotionParamError.
    */
   retarget(index: number, newTarget: number): void {
-    if (this._destroyed) return;
     const s = this._springs[index];
     if (s === undefined) {
       throw new MotionParamError('LM019');
@@ -304,7 +301,6 @@ export class CompositorStaggerGroup {
    * прерывание, не новый парад; см. шапку). Каждый элемент сохраняет свой slope.
    */
   retargetAll(newTarget: number): void {
-    if (this._destroyed) return;
     for (const s of this._springs) s.retarget(newTarget);
   }
 
@@ -331,7 +327,6 @@ export class CompositorStaggerGroup {
   /** Полностью останавливает и освобождает ресурсы всех элементов. */
   destroy(): void {
     for (const s of this._springs) s.destroy();
-    this._destroyed = true;
   }
 
 }
