@@ -52,8 +52,48 @@ async function makeSharedFrameBrowserNative(): Promise<void> {
   }
 }
 
+/**
+ * Entry-points НЕ дублируются руками: package.json `exports` — единственный
+ * источник (раньше список жил и здесь, и в exports, а дрейф ловил только
+ * поздний pack-smoke). Для каждого субпутя берётся ESM-цель `import.default`
+ * вида ./dist/<name>.js и превращается в пару <name> → src/<name>.ts
+ * (корневой '.' даёт index → src/index.ts). Ключ-строка на ресурс вне dist
+ * (не-JS ключ) — легальный passthrough, не entry; всё остальное без валидной
+ * dist-JS-цели или без исходника — ошибка ДО сборки.
+ */
+export function entriesFromPackageExports(): Record<string, string> {
+  const pkg = JSON.parse(readFileSync('package.json', 'utf8')) as {
+    exports?: Record<string, unknown>;
+  };
+  const exportsMap = pkg.exports ?? {};
+  if (Object.keys(exportsMap).length === 0) {
+    throw new Error('build: package.json не содержит exports — нечего собирать');
+  }
+  const entries: Record<string, string> = {};
+  for (const [subpath, target] of Object.entries(exportsMap)) {
+    if (typeof target === 'string' && !target.startsWith('./dist/')) continue;
+    const esm = typeof target === 'string'
+      ? target
+      : (target as { import?: { default?: unknown } } | null)?.import?.default;
+    const match = typeof esm === 'string' ? /^\.\/dist\/(.+)\.js$/.exec(esm) : null;
+    if (match === null) {
+      throw new Error(`build: exports['${subpath}'] не указывает import.default на ./dist/*.js`);
+    }
+    const name = match[1]!;
+    const source = `src/${name}.ts`;
+    if (!existsSync(source)) {
+      throw new Error(`build: exports['${subpath}'] требует отсутствующий исходник ${source}`);
+    }
+    if (entries[name] !== undefined) {
+      throw new Error(`build: exports дублируют dist-цель ${name} (субпуть '${subpath}')`);
+    }
+    entries[name] = source;
+  }
+  return entries;
+}
+
 export default defineConfig({
-  entry: ['src/index.ts', 'src/easing/index.ts', 'src/react/index.ts', 'src/svelte/index.ts', 'src/vue/index.ts', 'src/value/index.ts', 'src/driver/index.ts', 'src/stagger/index.ts', 'src/timeline/index.ts', 'src/keyframes/index.ts', 'src/decay/index.ts', 'src/lit/index.ts', 'src/gestures/index.ts', 'src/scroll/index.ts', 'src/presence/index.ts', 'src/flip/index.ts', 'src/projection/index.ts', 'src/smart/index.ts', 'src/svg/index.ts', 'src/a11y/index.ts', 'src/spring/index.ts', 'src/waapi/index.ts', 'src/auto/index.ts', 'src/svg-morph/index.ts', 'src/solid/index.ts', 'src/preact/index.ts', 'src/angular/index.ts', 'src/wc/index.ts', 'src/qwik/index.ts', 'src/frame/index.ts', 'src/presets/index.ts', 'src/utils/index.ts', 'src/compositor/index.ts', 'src/compositor/stagger/index.ts', 'src/tokens/index.ts', 'src/animate/index.ts', 'src/animate/mini/index.ts', 'src/animate/native/index.ts', 'src/nano/index.ts', 'src/behaviors/index.ts'],
+  entry: entriesFromPackageExports(),
   format: ['cjs', 'esm'],
   dts: true,
   splitting: false,

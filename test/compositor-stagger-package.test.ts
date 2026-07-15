@@ -5,9 +5,9 @@ import {
   COMPOSITOR_CAPABILITY_GATE_BYTES,
   IMPORT_COST_SCENARIOS,
 } from '../scripts/size-gate.mjs';
+import { entriesFromPackageExports } from '../tsup.config.js';
 
 const pkg = JSON.parse(readFileSync(new URL('../package.json', import.meta.url), 'utf8'));
-const tsup = readFileSync(new URL('../tsup.config.ts', import.meta.url), 'utf8');
 
 describe('compositor/stagger: package contract', () => {
   it('публикует раздельные ESM/CJS runtime и declarations', () => {
@@ -24,7 +24,9 @@ describe('compositor/stagger: package contract', () => {
   });
 
   it('собирает официальный entry из исходного capability-фасада', () => {
-    expect(tsup).toContain("'src/compositor/stagger/index.ts'");
+    // exports — SSOT entry-points: субпуть обязан выводиться в build-entry.
+    expect(entriesFromPackageExports()['compositor/stagger/index'])
+      .toBe('src/compositor/stagger/index.ts');
   });
 
   it('не переносит consumer-предел на физические entry', () => {

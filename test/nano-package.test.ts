@@ -6,9 +6,9 @@ import {
   IMPORT_COST_SCENARIOS,
   NANO_GATE_BYTES,
 } from '../scripts/size-gate.mjs';
+import { entriesFromPackageExports } from '../tsup.config.js';
 
 const pkg = JSON.parse(readFileSync(new URL('../package.json', import.meta.url), 'utf8'));
-const tsup = readFileSync(new URL('../tsup.config.ts', import.meta.url), 'utf8');
 
 describe('nano: package contract', () => {
   it('публикует ровно один новый entry с ESM/CJS и соответствующими типами', () => {
@@ -23,7 +23,8 @@ describe('nano: package contract', () => {
         default: './dist/nano/index.cjs',
       },
     });
-    expect(tsup).toContain("'src/nano/index.ts'");
+    // exports — SSOT entry-points: субпуть обязан выводиться в build-entry.
+    expect(entriesFromPackageExports()['nano/index']).toBe('src/nano/index.ts');
   });
 
   it('держит один и тот же hard gate для shipped entry и consumer import-cost', () => {
