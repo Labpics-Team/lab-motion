@@ -46,7 +46,7 @@ function releaseMetadata() {
         require: { types: './dist/index.d.cts', default: './dist/index.cjs' },
       },
     },
-    files: ['dist', 'docs/errors.md', 'docs/бенчмарк.md', '!dist/**/*.map'],
+    files: ['dist', 'docs/errors.md', 'docs/benchmark.md', '!dist/**/*.map'],
     publishConfig: { access: 'public' },
     sideEffects: [
       './dist/lit/index.js',

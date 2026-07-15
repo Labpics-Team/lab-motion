@@ -7,8 +7,8 @@ const smoke = readFileSync(new URL('../scripts/pack-smoke.mjs', import.meta.url)
 describe('packed release boundary', () => {
   it('ships both referenced support documents', () => {
     expect(pkg.files).toContain('docs/errors.md');
-    expect(pkg.files).toContain('docs/бенчмарк.md');
-    expect(smoke).toContain("'docs/бенчмарк.md'");
+    expect(pkg.files).toContain('docs/benchmark.md');
+    expect(smoke).toContain("'docs/benchmark.md'");
     expect(smoke).toContain("readFileSync(installedBenchmark, 'utf8') !== readFileSync");
     expect(smoke).toContain('parseBenchmarkDocumentationState(benchmarkDocument, installedPackage)');
     expect(smoke).not.toContain('/bench/compare/results/`;');

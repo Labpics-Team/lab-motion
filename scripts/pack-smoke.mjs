@@ -226,7 +226,7 @@ try {
 
   // 5. Метаданные и документы, на которые ссылается README, должны доехать
   // до потребителя без отдельного источника истины вне npm-артефакта.
-  for (const file of ['LICENSE', 'README.md', 'package.json', 'docs/errors.md', 'docs/бенчмарк.md']) {
+  for (const file of ['LICENSE', 'README.md', 'package.json', 'docs/errors.md', 'docs/benchmark.md']) {
     if (!existsSync(join(installedRoot, file))) {
       failed = true;
       log(`FAIL: ${file} не в артефакте`);
@@ -238,11 +238,11 @@ try {
     failed = true;
     log('FAIL: docs/errors.md в артефакте расходится с каталогом исходников');
   }
-  const installedBenchmark = join(installedRoot, 'docs', 'бенчмарк.md');
+  const installedBenchmark = join(installedRoot, 'docs', 'benchmark.md');
   if (existsSync(installedBenchmark)
-    && readFileSync(installedBenchmark, 'utf8') !== readFileSync(join(ROOT, 'docs', 'бенчмарк.md'), 'utf8')) {
+    && readFileSync(installedBenchmark, 'utf8') !== readFileSync(join(ROOT, 'docs', 'benchmark.md'), 'utf8')) {
     failed = true;
-    log('FAIL: docs/бенчмарк.md в артефакте расходится с методологией исходников');
+    log('FAIL: docs/benchmark.md в артефакте расходится с методологией исходников');
   }
   if (existsSync(installedBenchmark)) {
     const benchmarkDocument = readFileSync(installedBenchmark, 'utf8');
