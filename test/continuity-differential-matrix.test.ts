@@ -2070,16 +2070,31 @@ const CHECK_TITLES: Record<CheckId, string> = {
   FINITE: 'финитность всех эмиссий',
 };
 
+/**
+ * P9 на новом ядре (R3c-1): непрерывность ЗНАЧЕНИЯ css идёт через шов
+ * formatCssAt и точный (p, ṗ)-снимок css-полосы live — клетки значения
+ * (C0/DEGEN/NONFIN/REDUCE/REST/SETTLE) закреплены. Клетки СКОРОСТИ
+ * (C1/SIGN/UNITS/CLAMP/FINITE-дрейф) требуют проекции projectCssV0 —
+ * по директиве R3a она не входит в базу и live (v0 css-полосы всегда 0)
+ * и уезжает в композируемый css-модуль; формулы сверки сохранены.
+ */
+// @todo-css-module: клетки скорости P9 — css-проекция v0 вне базы и live.
+const P9_VELOCITY_CELLS: ReadonlySet<CheckId> = new Set([
+  'C1',
+  'SIGN',
+  'UNITS',
+  'CLAMP',
+  'FINITE',
+]);
+
 for (const pair of PAIRS) {
-  // @todo-R3c: P9 (projectCssV0) — скоростная проекция css за пределами шва
-  // formatCssAt (политика R3a: css v0=0, непрерывность значения через шов);
-  // уезжает в композируемый css-модуль вместе с проекцией.
-  const declare = pair.id === 'P9' ? describe.skip : describe;
-  declare(`continuity-матрица ${pair.id}: ${pair.title}`, () => {
+  describe(`continuity-матрица ${pair.id}: ${pair.title}`, () => {
     for (const checkId of CHECK_IDS) {
       const impl = TESTS[pair.id][checkId];
       if (MATRIX[pair.id][checkId] === 'covered') {
-        it(`${checkId} — ${CHECK_TITLES[checkId]}`, impl!, 30_000);
+        const declare =
+          pair.id === 'P9' && P9_VELOCITY_CELLS.has(checkId) ? it.skip : it;
+        declare(`${checkId} — ${CHECK_TITLES[checkId]}`, impl!, 30_000);
       }
     }
   });
