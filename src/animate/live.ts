@@ -138,6 +138,8 @@ class LiveRun implements AnimateEngineRun {
   // ── Кэш последнего РЕНДЕРЕННОГО tween-кадра (снимок не пере-зовёт ease) ───
   private _renderedK = 0;
   private _renderedP = 0;
+  /** Производная в _renderedK: NaN = не вычислена (канон _tweenDpdt #174). */
+  private _renderedDpdt = Number.NaN;
 
   constructor(group: PlannedLiveGroup, context: AnimateEngineContext) {
     this._group = group;
@@ -299,16 +301,20 @@ class LiveRun implements AnimateEngineRun {
       const mode = this._context.mode;
       // Значение — кэш последнего рендеренного кадра (ease не пере-зовётся);
       // производная — центральная разность с окном, поджатым внутрь [0,1]
-      // (изинги клампят снаружи — разность через край сломала бы наклон).
-      const k = this._renderedK;
-      const k0 = k > EASE_DERIV_H ? k - EASE_DERIV_H : 0;
-      const k1 = k + EASE_DERIV_H < 1 ? k + EASE_DERIV_H : 1;
-      const slope = (mode.ease(k1) - mode.ease(k0)) / (k1 - k0);
-      return {
-        value: this._renderedP,
+      // (изинги клампят снаружи — разность через край сломала бы наклон),
+      // вычисляется один раз на рендеренный k (канон _tweenDpdt: повторный
+      // снимок того же кадра не пере-зовёт opaque ease).
+      if (Number.isNaN(this._renderedDpdt)) {
+        const k = this._renderedK;
+        const k0 = k > EASE_DERIV_H ? k - EASE_DERIV_H : 0;
+        const k1 = k + EASE_DERIV_H < 1 ? k + EASE_DERIV_H : 1;
+        const slope = (mode.ease(k1) - mode.ease(k0)) / (k1 - k0);
         // Наклон по k → прогресс/с; враждебная производная не сеется в v0.
-        velocity: Number.isFinite(slope) ? slope / (mode.durationMs / 1000) : 0,
-      };
+        this._renderedDpdt = Number.isFinite(slope)
+          ? slope / (mode.durationMs / 1000)
+          : 0;
+      }
+      return { value: this._renderedP, velocity: this._renderedDpdt };
     }
     // Пружина: прогресс-пространство первой движущейся полосы (sharedV0-группы
     // делят прогресс; v0-mismatch группы честно отдают доминантную полосу).
@@ -406,6 +412,7 @@ class LiveRun implements AnimateEngineRun {
       // Натуральное завершение: точные финальные операнды, ease не зовётся.
       this._renderedK = 1;
       this._renderedP = 1;
+      this._renderedDpdt = Number.NaN;
       for (const ch of this._group.numeric) this._state[ch.key] = ch.to;
       this._writeNumeric();
       this._writeCssFinal();
@@ -419,6 +426,7 @@ class LiveRun implements AnimateEngineRun {
     const p = Number.isFinite(raw) ? raw : k;
     this._renderedK = k;
     this._renderedP = p;
+    this._renderedDpdt = Number.NaN;
     for (const ch of this._group.numeric) {
       this._state[ch.key] = laneAt(ch.from, ch.to, p);
     }
