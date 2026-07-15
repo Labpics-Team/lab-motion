@@ -22,6 +22,9 @@
 
 ### Fixed
 
+- `./animate`: main-thread stagger сохраняет субкадровую фазу — монотонное
+  logical-time и signed local phase не дают малым задержкам (< кадра)
+  схлопнуться в один кадровый bucket, overshoot не теряется.
 - `./compositor`: WAAPI effect и fallback timer теперь атомарно сменяют единственного
   owner; stale callbacks и реентрантный host-cleanup не могут оживить или отменить
   новый прогон, а `destroy()` разрывает удержание target, effect и timer.

@@ -53,7 +53,10 @@ export class MainUnit implements GroupOwner, SurfaceUnit {
   private _paused: boolean;
   private _active = false;
   private _converged = false;
-  private _wallMs = 0;
+  /** Монотонные часы unit; seek двигает только локальную координату. */
+  private _logicalMs = 0;
+  /** logical − anchor, сохранённое отдельно от больших абсолютных timestamps. */
+  private _phaseMs: number;
   private _tMs = 0;
   private _lastTs: number | undefined;
   private _frames = 0;
@@ -65,6 +68,7 @@ export class MainUnit implements GroupOwner, SurfaceUnit {
   constructor(options: MainUnitOptions) {
     this._o = options;
     this._paused = options._startPaused === true;
+    this._phaseMs = -options._delayMs;
     try {
       options._batch._add(this, this._paused);
     } catch (error) {
@@ -140,8 +144,11 @@ export class MainUnit implements GroupOwner, SurfaceUnit {
 
   seek(tMs: number): void {
     if (this._done || this._o!._record._transition || !Number.isFinite(tMs)) return;
+    const localMs = Math.max(0, tMs);
     this._active = true;
-    this._tMs = Math.max(0, tMs);
+    this._tMs = localMs;
+    // Seek двигает anchor через локальную координату; logical-часы не откатываются.
+    this._phaseMs = localMs;
     this._lastTs = undefined;
     if (this._compute()) this._settle();
     else this._write();
@@ -167,13 +174,12 @@ export class MainUnit implements GroupOwner, SurfaceUnit {
       }
     }
     if (dt < 0) dt = 0;
-    this._wallMs += dt;
-    if (!this._active) {
-      if (this._wallMs + FIXED_DT_MS >= this._o!._delayMs) {
-        this._active = true;
-        this._tMs = 0;
-      }
-    } else this._tMs += dt;
+    this._logicalMs += dt;
+    // Signed phase эквивалентна logical-anchor, но не вычитает два почти равных
+    // MAX-числа после seek. Пересечение delay сохраняет весь frame-overshoot.
+    this._phaseMs += dt;
+    if (this._phaseMs >= 0) this._active = true;
+    this._tMs = Math.max(0, this._phaseMs);
     if (this._active) {
       this._frames++;
       if (
