@@ -1,7 +1,6 @@
 import { readFileSync } from 'node:fs';
 import { describe, expect, it } from 'vitest';
 import { animate as full } from '../src/animate/index.js';
-import { animate as mini } from '../src/animate/mini/index.js';
 import { buildTransform } from '../src/value/index.js';
 import {
   checksumTransformOutputs,
@@ -85,7 +84,7 @@ describe('benchmark support contracts', () => {
       tolerance: 1e-9,
     });
 
-    for (const animate of [full, mini]) {
+    for (const animate of [full]) {
       for (const motion of ['tween', 'spring'] as const) {
         for (const count of MASS_LIFECYCLE_PROFILE.counts) {
           let now = 0n;
@@ -225,26 +224,4 @@ describe('benchmark support contracts', () => {
     );
   });
 
-  it('one package-level frame batches separate full and mini source calls', () => {
-    const clock = createBenchClock();
-    const previous = globalThis.requestAnimationFrame;
-    globalThis.requestAnimationFrame = clock.requestFrame;
-    const target = () => ({ style: { getPropertyValue: () => '', setProperty: () => {} } });
-    try {
-      const a = full(target(), { x: [0, 10] }, { duration: 1000, ease: (t: number) => t });
-      const b = mini(target(), { x: [0, 10] }, { duration: 1000, ease: (t: number) => t });
-      expect(clock.requests).toBe(1);
-      clock.step(16);
-      expect(clock.requests).toBe(2);
-      a.cancel();
-      b.cancel();
-      const executions = clock.executions;
-      clock.step(32);
-      expect(clock.executions).toBe(executions + 1);
-      expect(clock.requests).toBe(2);
-    } finally {
-      if (previous === undefined) delete globalThis.requestAnimationFrame;
-      else globalThis.requestAnimationFrame = previous;
-    }
-  });
 });

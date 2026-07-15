@@ -5,7 +5,7 @@ import { dirname, join, relative, resolve } from 'node:path';
 /**
  * Несколько публичных субпутей используют один scheduler. Без приватного
  * self-reference `splitting: false` встраивает отдельный singleton в каждый
- * entry: совместный импорт mini + bindings запускает несколько rAF-циклов.
+ * entry: совместный импорт animate + bindings запускал бы несколько rAF-циклов.
  * Точечный resolver сохраняет остальные entries самодостаточными и не плодит
  * общие чанки, но оставляет frame единым на уровне установленного пакета.
  */
@@ -23,7 +23,7 @@ const sharedFramePlugin = {
  * Node понимает package#imports, голый browser/CDN ESM — нет. После сборки
  * переводим только ESM-ссылки на физический общий entry; CJS сохраняет #frame
  * и выбирает .cjs через package.json. Относительный путь выводится из каждого
- * output-файла, поэтому вложенный animate/mini не является особым случаем.
+ * output-файла, поэтому вложенный compositor/stagger не является особым случаем.
  */
 async function makeSharedFrameBrowserNative(): Promise<void> {
   const dist = resolve('dist');

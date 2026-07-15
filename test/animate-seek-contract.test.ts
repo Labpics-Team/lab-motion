@@ -1,12 +1,11 @@
 /**
- * Единый контракт контролов full WAAPI, full main и mini:
+ * Единый контракт контролов full WAAPI и full main:
  * pause -> seek меняет позу, но не возобновляет время; play продолжает с неё.
  * Нефинитное виртуальное время не меняет ни позу, ни жизненный цикл.
  */
 
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { animate as animateFull } from '../src/animate/index.js';
-import { animate as animateMini } from '../src/animate/mini/index.js';
 import {
   compileSpringExecutionArtifactUnchecked,
   DEFAULT_TOLERANCE,
@@ -51,7 +50,6 @@ afterEach(() => {
 describe('animate: единый pause -> seek -> play', () => {
   it.each([
     ['full main', animateFull as AnimateFn],
-    ['mini', animateMini as AnimateFn],
   ])('%s: seek меняет позу и сохраняет паузу', async (_name, animate) => {
     const target = fakeEl();
     const clock = makeClock();
@@ -112,7 +110,6 @@ describe('animate: единый pause -> seek -> play', () => {
   it.each([
     ['full main', animateFull as AnimateFn, false],
     ['full WAAPI', animateFull as AnimateFn, true],
-    ['mini', animateMini as AnimateFn, false],
   ])('%s: seek(NaN | +/-Infinity) — полный no-op', (_name, animate, withWaapi) => {
     const target = fakeEl({}, withWaapi);
     const clock = makeClock();

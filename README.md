@@ -6,7 +6,7 @@ DOM — рендер делает ваш колбэк, время приходи
 
 Три вещи, которые нужно понять сразу:
 
-1. **Всё — субпути.** Корневой экспорт + 39 субпутей (40 входов `exports` в
+1. **Всё — субпути.** Корневой экспорт + 37 субпутей (38 входов `exports` в
    `package.json`); точный `sideEffects`-allowlist сохраняет только авто-регистрацию
    web components, остальные неиспользуемые субпути вырезаются.
 2. **Две фазы движения.** Интерактив и фаза слежения (палец ведёт значение) — на
@@ -109,24 +109,20 @@ const panel = new CompositorSpring({
 panel.start();
 ```
 
-Если нужен минимальный нативный вызов без запасного движка:
+Если нужен минимальный нативный вызов без запасного движка — `./nano`
+(единственный спринг-движок на compositor-потоке легче килобайта):
 
 ```typescript
-import { springTo } from '@labpics/motion/animate/native';
+import { animate } from '@labpics/motion/nano';
 
-const move = springTo(el, { x: [0, 240], opacity: [0, 1] });
+const move = animate(el, { translate: '240px', opacity: 1 });
 await move.finished;
 ```
 
-`springTo` принимает только явные пары `[from, to]` для `x`, `y`, `scale`,
-`rotate`, `opacity` и запускает отдельную `Element.animate()` для каждого
-присутствующего CSS-канала цели. Поэтому transform и opacity вытесняются
-независимо. Нужен WAAPI; Chromium/Firefox также требуют CSS `linear()`, а WebKit
-получает явные адаптивные ключевые кадры. Без нужной возможности функция падает
-синхронно. При reduced-motion она сразу ставит финальный кадр. Для запасного пути
-используйте `…/animate`. Повторная смена владельца уже внутри
-компенсационной host-записи завершается `LM157`: синхронный путь бросает
-ошибку, а `finished` естественно завершившегося WAAPI-эффекта отклоняется.
+`nano` — platform-trusted to-only вход: значения компилируются в native WAAPI
+(`translate`/`scale`/`rotate` longhand-каналы и любые нативно-анимируемые
+CSS-свойства), пружина — в CSS `linear()`, контролы — сами `Animation`.
+Валидация hostile-host и C1-подхват остаются контрактом полного `./animate`.
 
 Больше примеров (drag, FLIP, presence, scroll-scrub, value-mapping) — в разделе
 «Примеры» после карты субпутей.
@@ -188,8 +184,6 @@ flowchart TB
 | `…/frame` | Единый frame-шедулер: `createFrameLoop` / синглтон `frame` — один rAF на кадр, фазы read→update→render против layout-thrash, SSR-safe; `asRequestFrame(loop)` сажает `MotionValue`/`drive` на общий кадр. **Биндинги используют его по умолчанию** (как shared-ticker у Framer Motion/GSAP); инжекция своего `requestFrame` переопределяет |
 | `…/nano` | **Platform-trusted WAAPI to-only ≤ 1 КБ gzip**: spring/tween, целые `translate/scale/rotate` longhand-каналы, любые нативно-анимируемые CSS-свойства, `delay`/`stagger`, reduced-motion и сами `Animation` как контролы. Без layout-read, независимых `x/y`, rAF-fallback, C1-подхвата и hostile-host обещаний |
 | `…/animate` | Фасад-one-liner: `animate(target, props, options)` — цели по каналам (`x`/`y`/`scale`/`rotate`, `opacity`, CSS-свойства), режим `{ spring }` или `{ duration, ease }`, `delay`/`stagger`, контролы `{ finished, play, pause, seek, cancel, stop }`. Это полный DX-срез; ядро от него не растёт |
-| `…/animate/mini` | **Лёгкий срез (≤ 5 KB gz)**: transform-шортхенды, `opacity`, CSS-переменные, spring/tween, `delay`/`stagger`, контролы и reduced-motion снап. Внутри движок разделён на кодеки и адаптер цели, но публичный набор mini фиксирован. Цветовые CSS-значения и compositor-offload остаются в `./animate` |
-| `…/animate/native` | **Нативная пружина ≤ 3.5 KB gzip**: `springTo(target, { x: [0, 240] })`, только явные пары transform/opacity, отдельный WAAPI-эффект на независимый CSS-канал и раздельное вытеснение, мгновенный финал при reduced-motion. Chromium/Firefox требуют CSS `linear()`, WebKit использует адаптивные ключевые кадры; скрытого rAF-пути нет |
 
 **Математика значений**
 
@@ -835,15 +829,15 @@ distanceScale(200);     // 200 (мс) в дефолтной полосе 0→400
 зафиксированному Node executable. Методология, источник сравнительного runtime-отчёта и
 границы допустимых выводов описаны в [docs/benchmark.md](docs/benchmark.md).
 
-## Миграция на `./animate/mini`
+## Миграция с Motion JS / Anime.js
 
-`./animate/mini` — one-liner-паритет с mini-слоями Motion JS и Anime.js.
+`./animate` — one-liner-паритет с `animate()` Motion JS и Anime.js.
 Базовые сценарии переносятся почти строка-в-строку; отличия — там, где мы
 детерминированнее (инжектируемое время, fail-fast на невалидном значении).
 
-**Motion JS (`animate` mini) → `./animate/mini`**
+**Motion JS → `./animate`**
 
-| Motion JS | `@labpics/motion/animate/mini` | Заметка |
+| Motion JS | `@labpics/motion/animate` | Заметка |
 |---|---|---|
 | `animate(el, { x: 100 })` | `animate(el, { x: 100 })` | transform-шортхенды идентичны |
 | `animate(el, { opacity: [0, 1] })` | `animate(el, { opacity: [0, 1] })` | пара `[from, to]` — тот же смысл |
@@ -855,9 +849,9 @@ distanceScale(200);     // 200 (мс) в дефолтной полосе 0→400
 | `a.finished.then(…)` | `a.finished` + `onComplete` | `finished` резолвится и на cancel; `onComplete` — только естественное оседание |
 | `animate(el, { '--x': 100 })` | `animate(el, { '--x': ['0px', '100px'] })` | CSS-переменная с юнитом |
 
-**Anime.js (v4) → `./animate/mini`**
+**Anime.js (v4) → `./animate`**
 
-| Anime.js | `@labpics/motion/animate/mini` | Заметка |
+| Anime.js | `@labpics/motion/animate` | Заметка |
 |---|---|---|
 | `animate(el, { translateX: 100 })` | `animate(el, { x: 100 })` | `x`/`y` вместо `translateX/Y` |
 | `animate(el, { scale: 1.2, rotate: 45 })` | `animate(el, { scale: 1.2, rotate: 45 })` | компоненты сливаются в одну `transform` |

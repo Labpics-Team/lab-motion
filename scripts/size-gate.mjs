@@ -95,11 +95,6 @@ export const BESPOKE_SUBPATH_GATES = {
   // Групповой фасад самодостаточен и включает только нужные ему базовые план и
   // контроллер. Порог равен прежнему полному compositor-контракту, не новому факту.
   './compositor/stagger': 6450,
-  // Native-only springTo: runtime spring-план + строгая WAAPI-граница,
-  // custom linear() либо WebKit adaptive keyframes, explicit transform/opacity
-  // и controls без rAF fallback. Hard ceiling совпадает
-  // с главным consumer-сценарием: лёгкий путь обязан оставаться < 3.5 KB gzip.
-  './animate/native': 3500,
   // ./tokens — motion-токены (SSOT labui): duration/easing/spring/staggerGap +
   // distanceScale + springFromDurationBounce (каноническая пара ДС (duration,bounce)
   // → SpringParams; тянет validateSpringParams ядра, чтобы выход ГАРАНТИРОВАННО
@@ -165,26 +160,6 @@ export const BESPOKE_SUBPATH_GATES = {
   // Дедуп через splitting/shared chunks — отдельное архитектурное решение
   // Даниила на весь пакет, не этого субпутя. Поднимать только осознанно.
   './animate': FULL_ANIMATE_GATE_BYTES,
-  // ./animate/mini — ЛЁГКИЙ срез animate: transform-компоненты + opacity +
-  // CSS-переменные, spring/tween в ЕДИНОМ прогресс-пространстве (внутренний
-  // unchecked sampler), delay/stagger, контролы, reduced-motion снап. Кодеки/
-  // адаптеры выбирает компилированный O(1)-resolver (mini/index.ts) поверх
-  // фиксированного набора mini-codecs.ts; runtime-реестра в поставке нет —
-  // registry.ts даёт только типовой шов CodecResolver, расширение = новая
-  // реализация за швом, не рост switch в движке. Граница поставки: mini НЕ
-  // импортирует ./value (цвета) и compositor-компилятор compileSpringPlan
-  // (доказано import-cost сценарием 'animate-mini-one-liner' ниже:
-  // ~5.2 KB против ~10.9 KB full).
-  // Потолок 5120 — headline эпика «≤ 5 KB» (первый потолок), НЕ от щедрого люфта.
-  // Хронология факта/порога:
-  //   2026-07-10: факт первой сборки 5050 gz (shipped, terser) → порог 5120.
-  //   ЧЕСТНАЯ ГРАНИЦА: compositor-offload (WAAPI через compileSpringPlan) в mini
-  //   НЕ включён — floor «compositor+codecs+реестр той сборки+frame» мерился в
-  //   5186 gz БЕЗ движка, физически не под 5120. mini гонит transform/opacity
-  //   аналитической замкнутой формой на main-потоке + reduced-motion детект;
-  //   полный WAAPI-путь — в ./animate.
-  //   Подъём порога — только решением владельца (это и есть класс, что гейт ловит).
-  './animate/mini': 5120,
   // To-only individual properties + spring->linear() + native Animation controls.
   // Отдельный hard gate не разрешает новому entry спрятаться под общим 4608 B.
   './nano': NANO_GATE_BYTES,
@@ -286,29 +261,10 @@ export const IMPORT_COST_SCENARIOS = [
     name: 'animate-one-liner (фасад)',
     code: `import { animate } from '%DIST%/../animate/index.js'; console.log(typeof animate('.hero', { x: 240, opacity: 1 }).pause);`,
     // Фасад статически тянет функциональный граф из-за диспетчеризации свойств;
-    // порог остаётся стражем полного пути, а лёгкие случаи обслуживают mini/native.
+    // порог — страж полного пути. Линейка из двух входов: лёгкий case = ./nano
+    // (собственный hard gate выше), перестройка фасада (эпик nano-core) получит
+    // сценарий «animate без допов» с порогом от факта первой реализации.
     gate: FULL_ANIMATE_GATE_BYTES,
-  },
-  {
-    // ПРАВДА потребительской цены лёгкого среза + СТРАЖ границы поставки: mini
-    // не тянет full. Если бы mini импортировал full-набор (./value цвета) или
-    // compileSpringPlan (компилятор пружина→linear()), число скакнуло бы к ~10 KB
-    // (порядок full-фасада). Держится ~5.2 KB ⇒ граф mini замкнут на минимум:
-    // unchecked spring sampler (замкнутая форма) + числовой/var кодеки + DOM-адаптер +
-    // ./frame. Скачок сценария = регрессия границы (mini потянул full/compositor).
-    name: 'animate-mini-one-liner',
-    code: `import { animate } from '%DIST%/../animate/mini/index.js'; console.log(typeof animate('.hero', { x: 240, opacity: 1 }).pause);`,
-    // Бюджет < 5 KB — контракт лёгкого среза. Он ловит не только full-импорты,
-    // но и скрытые eager-side-effects: mini не компилирует WAAPI linear(), значит не должен
-    // платить за его LRU-кэш. Baseline 5287 B обязан пасть до прохода этого гейта.
-    gate: 5000,
-  },
-  {
-    // Capability-specialized native WAAPI-путь: explicit [from,to], отдельный
-    // WAAPI-эффект на CSS-канал, без value registry/tokens/frame/main-thread fallback.
-    name: 'animate-native-springTo',
-    code: `import { springTo } from '%DIST%/../animate/native/index.js'; console.log(typeof springTo(el, { x: [0, 240] }).cancel);`,
-    gate: 3500,
   },
   {
     // ПРАВДА потребительской цены поведения + СТРАЖ переиспользования: одна

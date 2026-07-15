@@ -406,26 +406,6 @@
         "default": "./dist/animate/index.cjs"
       }
     },
-    "./animate/mini": {
-      "import": {
-        "types": "./dist/animate/mini/index.d.ts",
-        "default": "./dist/animate/mini/index.js"
-      },
-      "require": {
-        "types": "./dist/animate/mini/index.d.cts",
-        "default": "./dist/animate/mini/index.cjs"
-      }
-    },
-    "./animate/native": {
-      "import": {
-        "types": "./dist/animate/native/index.d.ts",
-        "default": "./dist/animate/native/index.js"
-      },
-      "require": {
-        "types": "./dist/animate/native/index.d.cts",
-        "default": "./dist/animate/native/index.cjs"
-      }
-    },
     "./nano": {
       "import": {
         "types": "./dist/nano/index.d.ts",

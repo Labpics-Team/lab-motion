@@ -156,16 +156,16 @@
 | `LM142` | animate numeric | Некорректное числовое значение | Передать конечное число | active |
 | `LM143` | animate CSS type | Неподдерживаемый тип CSS-значения | Передать строку или число | active |
 | `LM144` | animate CSS syntax | CSS-значение не разобрано | Передать поддерживаемое значение или цвет | active |
-| `LM145` | animate property | Свойство или кодек не поддерживается | Выбрать поддерживаемое свойство | active |
+| `LM145` | animate property | Свойство или кодек не поддерживается | Выбрать поддерживаемое свойство | retired |
 | `LM146` | animate targets | Некорректный контейнер целей | Передать цель или ограниченный список целей | active |
 | `LM147` | animate targets | Некорректный элемент списка целей | Проверить каждый элемент списка | active |
-| `LM148` | animate adapter | Адаптер цели отсутствует | Использовать поддерживаемый вид цели | active |
+| `LM148` | animate adapter | Адаптер цели отсутствует | Использовать поддерживаемый вид цели | retired |
 | `LM149` | animate selector | Селектор недоступен без document | Передать цель напрямую или запускать в DOM-среде | active |
 | `LM150` | animate impulse | Импульс не представим у числовой границы | Уменьшить значение или скорость | active |
 | `LM151` | animate props | Props не является объектом-записью | Передать объект поддерживаемых свойств | active |
-| `LM152` | animate native props | Props не содержит свойств | Добавить хотя бы одно свойство | active |
-| `LM153` | animate native WAAPI | Цель не поддерживает WAAPI | Использовать WAAPI-цель или полный animate | active |
-| `LM154` | animate native easing | CSS linear недоступен | Использовать WebKit-кадры или полный animate | active |
-| `LM155` | animate native host | Host вернул некорректную Animation | Исправить WAAPI или polyfill | active |
+| `LM152` | animate native props | Props не содержит свойств | Добавить хотя бы одно свойство | retired |
+| `LM153` | animate native WAAPI | Цель не поддерживает WAAPI | Использовать WAAPI-цель или полный animate | retired |
+| `LM154` | animate native easing | CSS linear недоступен | Использовать WebKit-кадры или полный animate | retired |
+| `LM155` | animate native host | Host вернул некорректную Animation | Исправить WAAPI или polyfill | retired |
 | `LM156` | animate options | Options не является объектом | Передать объект опций или не передавать аргумент | active |
 | `LM157` | animate transition | Реентрантная смена владельца | Завершить текущую host-транзакцию перед новым animate | active |

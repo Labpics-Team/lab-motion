@@ -99,7 +99,7 @@ describe('benchmark provenance', () => {
     expect(() => prepareBenchmarkCheckout({
       root: f.root,
       benchDirectory: f.benchDirectory,
-      requiredDist: ['dist/animate/native/index.js'],
+      requiredDist: ['dist/nano/index.js'],
       build() {},
       readState: () => f.state,
       captureEnvironment: () => ({ node: 'v24.0.0', pnpm: '11.11.0', packages: {} }),

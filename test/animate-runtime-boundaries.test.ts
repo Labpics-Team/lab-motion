@@ -1,14 +1,10 @@
 /**
- * Враждебные runtime-границы full/mini: цели, delay-capture и host-clock.
+ * Враждебные runtime-границы фасада ./animate: цели, delay-capture и host-clock.
  * Проверки идут через публичную траекторию; deep-import нужен только для SSOT cap.
  */
 
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import * as fullApi from '../src/animate/index.js';
-import * as miniApi from '../src/animate/mini/index.js';
-import { runAnimate } from '../src/animate/mini/engine.js';
-import { domAdapter, numberCodec } from '../src/animate/mini-codecs.js';
-import type { CodecResolver, TargetAdapter } from '../src/animate/registry.js';
 import {
   collectBoundedArrayLike,
   MAX_ANIMATE_TARGETS,
@@ -26,7 +22,6 @@ import {
 
 const engines: ReadonlyArray<readonly [string, AnimateFn]> = [
   ['full', pickAnimate(fullApi as Record<string, unknown>)],
-  ['mini', pickAnimate(miniApi as Record<string, unknown>)],
 ];
 const SPRING = { mass: 1, stiffness: 170, damping: 26 };
 const linear = (t: number): number => t;
@@ -74,26 +69,6 @@ function makeHostClock(): {
     pending: () => queue.length,
   };
 }
-
-it('mini снимает update-подписку, если custom frame.render бросает', () => {
-  const offUpdate = vi.fn();
-  const noopPhase: FrameLoop['read'] = () => () => {};
-  const frame: FrameLoop = {
-    read: noopPhase,
-    update: () => offUpdate,
-    render: () => {
-      throw new Error('render subscribe failed');
-    },
-    cancelAll() {},
-  };
-
-  expect(() => pickAnimate(miniApi as Record<string, unknown>)(
-    fakeEl().el,
-    { x: [0, 100] },
-    { duration: 100, frame },
-  )).toThrow('render subscribe failed');
-  expect(offUpdate).toHaveBeenCalledTimes(1);
-});
 
 function expectedSpring(from: number, to: number, velocity: number, t = 0.016): number {
   return readCompositorSpring(SPRING, {
@@ -292,31 +267,13 @@ for (const [name, animate] of engines) {
       });
 
       const bad = fakeEl().el;
-      if (name === 'full') {
-        Object.defineProperty(bad, 'animate', {
-          get() {
-            throw new Error('late full plan');
-          },
-        });
-        expect(() => animate([target.el, bad], { x: 400 }, { duration: 100 }))
-          .toThrow('late full plan');
-      } else {
-        const badAdapter: TargetAdapter = {
-          ...domAdapter,
-          _surfaceOf() {
-            throw new MotionParamError('late mini plan');
-          },
-        };
-        const registry: CodecResolver = {
-          _resolveCodec: () => numberCodec,
-          _resolveAdapter(value) {
-            if (Array.isArray(value)) throw new MotionParamError('список');
-            return value === bad ? badAdapter : domAdapter;
-          },
-        };
-        expect(() => runAnimate(registry, [target.el, bad], { x: 400 }, { duration: 100 }))
-          .toThrow('late mini plan');
-      }
+      Object.defineProperty(bad, 'animate', {
+        get() {
+          throw new Error('late full plan');
+        },
+      });
+      expect(() => animate([target.el, bad], { x: 400 }, { duration: 100 }))
+        .toThrow('late full plan');
 
       clock.step(16);
       clock.step(16);
