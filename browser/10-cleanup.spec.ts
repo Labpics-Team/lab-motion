@@ -49,6 +49,7 @@ test('animate().stop() снимает нативную Animation', async ({ page
     document.body.appendChild(el);
 
     const controls = animate(el, { x: 150 }, { spring: { mass: 1, stiffness: 180, damping: 18 } });
+    await Promise.resolve(); // физический старт юнита — microtask (R3b)
     const during = el.getAnimations().length;
     controls.stop();
     await controls.finished;
