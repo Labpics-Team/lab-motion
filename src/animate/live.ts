@@ -1,5 +1,5 @@
 /**
- * animate/live.ts — композируемый живой движок ./animate (срез R3b).
+ * animate/live.ts — композируемый живой движок ./animate (срез R3c-1).
  *
  * Исполняет группы, не представимые синхронной WAAPI-кривой (среды без WAAPI,
  * jsdom-харнессы, разошедшиеся v0, перебор бюджета сетки). Регистрация —
@@ -9,18 +9,42 @@
  *
  * Клауза «не переписывать солвер»: пружинные полосы — тонкий адаптер над
  * публичным ядром MotionValue (тот же аналитический солвер, smooth-pickup,
- * финитные стражи); tween — микро-цикл прогресса без физики (ease-функция
- * не солвер). Инлайн-стиль пишется на каждый кадр — он же и есть «hold» при
- * прерывании: _supersede без replacement не мигает к базе.
+ * финитные стражи); tween — микро-вычисление прогресса без физики. Полосы НЕ
+ * крутят собственных циклов: ран владеет ЕДИНСТВЕННОЙ requestFrame-подпиской
+ * на кадр (канон «N полос — один шов») и кормит MotionValue синтетическими
+ * timestamp'ами ЛОКАЛЬНОГО времени полосы. Эпоха MotionValue якорится в нуле
+ * активной фазы, поэтому elapsed солвера == локальное время: позиция и
+ * скорость аналитичны в любой момент (замкнутая форма, не интегрирование),
+ * а seek пружинной полосы — это просто подача нужного ts.
  *
- * Ограничения v1 (документированный контракт, добор — R3c):
- *   - seek точен для tween; для пружинных полос — no-op (аналитическая
- *     перемотка MotionValue не экспонирована публичным ядром);
+ * Субкадровая фаза delay/stagger — порт #169/#174 (эталон: main-unit):
+ *   local = logical − anchor. Кадровые дельты накапливаются в signed-фазе
+ *   _phaseMs, стартующей с −delayMs (первый ts — анкер, dt=0; нефинитный ts
+ *   или переполнившаяся дельта — ровно один fixed-step со сбросом анкера;
+ *   отрицательная дельта клампится в 0 и не откатывает фазу). Пересечение
+ *   нуля активирует полосы С ПОЛНЫМ frame-overshoot: полоса стартует с точной
+ *   субкадровой фазы delay/stagger, а не «тиком после делэя». Хранится именно
+ *   signed-фаза, а не пара (logical, anchor): после seek у IEEE-границы
+ *   вычитание двух почти равных MAX-чисел стёрло бы малую локальную фазу.
+ *   Активация — ТОЛЬКО по фактическому знаку фазы (исторический порог
+ *   «wallMs + 16ms >= delay» из #174 сюда не возвращать).
+ *   pause исключает wall-gap (play заново якорит dt), seek переносит anchor
+ *   локальной координатой БЕЗ отката logical-времени и без пересева
+ *   MotionValue-ранов (их elapsed — то же локальное время).
+ *
+ * Кадровая дисциплина: все полосы группы тикают одним локальным ts; DOM
+ * пишется один раз на кадр на канал группы (атомарный transform-вектор +
+ * css-эмит). Инлайн-стиль на каждом кадре — он же «hold» при прерывании:
+ * _supersede без replacement не мигает к базе.
+ *
+ * Ограничения (директива R3a, живут в композируемом css-модуле):
  *   - css-полоса без formatCssAt-шва пишет только финал (C⁰-дискретно);
  *   - скоростная проекция css (projectCssV0-канон) не выполняется — v0
- *     прогресс-полосы css всегда 0 (политика R3a).
+ *     прогресс-полосы css всегда 0; снимок середины css-полосы отдаёт
+ *     точную пару (p, ṗ) для C⁰-непрерывности значения через шов.
  */
 
+import { FIXED_DT_S, MAX_FRAMES } from '../internal/constants.js';
 import { MotionValue } from '../motion-value.js';
 import { buildTransform } from '../value/transform.js';
 import type { PlannedLiveGroup } from './compositor-plan.js';
@@ -28,8 +52,38 @@ import type {
   AnimateEngine,
   AnimateEngineContext,
   AnimateEngineRun,
+  RequestFrameFn,
 } from './index.js';
 import type { ProgressSnapshot } from './compositor-unit.js';
+
+const FIXED_DT_MS = FIXED_DT_S * 1000;
+
+/** Шаг центральной разности производной изинга (канон main-лейнов #174). */
+const EASE_DERIV_H = 1e-3;
+
+/**
+ * Порог покоя MotionValue (EPSILON ядра): суб-эпсилон импульс на нулевом
+ * спане — покой. Без этого гарда setTarget проглотил бы полосу своим
+ * snap-if-at-rest и подвесил finished (полоса без единого эмита).
+ */
+const REST_EPSILON = 1e-10;
+
+/** Канон channelAt старых лейнов: взвешенная форма не переполняется на
+ *  MAX ↔ −MAX (никакой «телепортации» в цель), края — точные операнды. */
+function laneAt(from: number, to: number, p: number): number {
+  if (p === 1) return to;
+  if (p === 0 || from === to) return from;
+  const value = (1 - p) * from + p * to;
+  return Number.isFinite(value) ? value : to;
+}
+
+function defaultRequestFrame(cb: (ts?: number) => void): number {
+  const raf = (globalThis as {
+    requestAnimationFrame?: (cb: (ts?: number) => void) => number;
+  }).requestAnimationFrame;
+  if (typeof raf === 'function') return raf(cb);
+  return setTimeout(cb, FIXED_DT_MS) as unknown as number;
+}
 
 /** Полоса живого прогона: движущийся числовой канал на MotionValue. */
 interface LiveLane {
@@ -38,6 +92,8 @@ interface LiveLane {
   readonly to: number;
   readonly value: MotionValue;
   settled: boolean;
+  /** Оседание уже учтено в _pending (сметается кадровым sweep'ом). */
+  reported: boolean;
 }
 
 class LiveRun implements AnimateEngineRun {
@@ -54,15 +110,39 @@ class LiveRun implements AnimateEngineRun {
   private _paused = false;
   private _started = false;
   private _pending = 0;
-  /** Остаток кадровой задержки до старта полос (мс). */
-  private _delayLeft = 0;
-  /** Tween-прогресс: единственный источник — накопленные кадровые дельты. */
-  private _tweenElapsed = 0;
-  private _tweenGeneration = 0;
+
+  // ── Логические часы рана (порт #169/#174) ─────────────────────────────────
+  /** Signed local phase: local = max(0, _phaseMs); рождается в −delayMs. */
+  private _phaseMs: number;
+  private _lastTs: number | undefined;
+  /** Кадры активной фазы — страховка замёрзших host-часов (канон MAX_FRAMES). */
+  private _frames = 0;
+  /** Глушит кадры, выданные до pause/cancel (у RequestFrameFn нет отмены). */
+  private _generation = 0;
+
+  // ── Синтетический кадровый шов полос ──────────────────────────────────────
+  /** Тики, которые MotionValue-полосы попросили на следующий кадр. */
+  private _laneTicks: Array<(ts?: number) => void> = [];
+  private readonly _laneFrame: RequestFrameFn = (cb) => {
+    this._laneTicks.push(cb);
+    return 1; // ненулевой handle: MotionValue не строит setTimeout-fallback
+  };
+
+  // ── Кадровые dirty-флаги: одна DOM-запись на канал на кадр ────────────────
+  private _numericDirty = false;
+  private _cssAt: number | undefined;
+  private _cssFinal = false;
+  private _cssSettled = false;
+  private _cssReported = false;
+
+  // ── Кэш последнего РЕНДЕРЕННОГО tween-кадра (снимок не пере-зовёт ease) ───
+  private _renderedK = 0;
+  private _renderedP = 0;
 
   constructor(group: PlannedLiveGroup, context: AnimateEngineContext) {
     this._group = group;
     this._context = context;
+    this._phaseMs = -group.delayMs;
     this.finished = new Promise<void>((resolve) => {
       this._resolve = resolve;
     });
@@ -76,21 +156,29 @@ class LiveRun implements AnimateEngineRun {
     if (context.mode.kind === 'spring') {
       const spring = context.mode.spring;
       for (const ch of group.numeric) {
-        if (ch.from === ch.to && ch.velocity === 0) continue; // статичный канал
+        // Статичный канал; суб-эпсилон импульс на нулевом спане — тоже покой.
+        if (ch.from === ch.to && Math.abs(ch.velocity) < REST_EPSILON) continue;
         const value = new MotionValue({
           initial: ch.from,
           spring,
-          requestFrame: context.requestFrame,
+          requestFrame: this._laneFrame,
           initialVelocity: ch.velocity,
           clamp: false, // честная траектория: перелёт эмитится
         });
-        this._lanes.push({ key: ch.key, from: ch.from, to: ch.to, value, settled: false });
+        this._lanes.push({
+          key: ch.key,
+          from: ch.from,
+          to: ch.to,
+          value,
+          settled: false,
+          reported: false,
+        });
       }
       if (group.css !== undefined) {
         this._cssProgress = new MotionValue({
           initial: 0,
           spring,
-          requestFrame: context.requestFrame,
+          requestFrame: this._laneFrame,
           clamp: false,
         });
       }
@@ -106,13 +194,37 @@ class LiveRun implements AnimateEngineRun {
       this._finish();
       return;
     }
-    if (group.delayMs > 0) {
-      // Задержка живёт на кадровых дельтах (канон main-лейнов): шаг-часы
-      // харнессов и живой rAF детерминированно делят одну шкалу.
-      this._delayLoop();
-    } else {
-      this._start();
+
+    // Подписки полос: немедленный emit MotionValue глушится (поза from уже
+    // в _state), запись в DOM делает кадровый flush — не каждый emit.
+    for (const lane of this._lanes) {
+      let armed = false;
+      lane.value.onChange((value) => {
+        if (!armed || this._done || lane.settled) return;
+        this._state[lane.key] = value;
+        this._numericDirty = true;
+        // Канон settle MotionValue: финальный emit — ровно target, скорость 0.
+        if (value === lane.to && lane.value.velocity === 0 && this._started) {
+          lane.settled = true;
+        }
+      });
+      armed = true;
     }
+    const cssProgress = this._cssProgress;
+    if (cssProgress !== undefined) {
+      let armed = false;
+      cssProgress.onChange((p) => {
+        if (!armed || this._done || this._cssSettled) return;
+        if (p === 1 && cssProgress.velocity === 0 && this._started) {
+          this._cssSettled = true;
+          this._cssFinal = true;
+          return;
+        }
+        this._cssAt = p;
+      });
+      armed = true;
+    }
+    this._arm();
   }
 
   // ── Контролы ──────────────────────────────────────────────────────────────
@@ -120,41 +232,39 @@ class LiveRun implements AnimateEngineRun {
   play(): void {
     if (this._done || !this._paused) return;
     this._paused = false;
-    if (!this._started) {
-      // Остаток delay добирается тем же кадровым циклом.
-      if (this._delayLeft > 0) this._delayLoop();
-      else this._start();
-      return;
+    // Wall-gap исключается: следующий host-ts — новый анкер (dt = 0).
+    this._lastTs = undefined;
+    try {
+      this._arm();
+    } catch (error) {
+      // Неудачный host-schedule восстанавливает paused и допускает повтор.
+      this._paused = true;
+      throw error;
     }
-    // C¹-резюме: setTarget подхватывает сохранённую скорость полосы.
-    for (const lane of this._lanes) {
-      if (!lane.settled) lane.value.setTarget(lane.to);
-    }
-    this._cssProgress?.setTarget(1);
-    if (this._context.mode.kind === 'tween') this._startTweenLoop();
   }
 
   pause(): void {
     if (this._done || this._paused) return;
     this._paused = true;
-    if (!this._started) {
-      // Пауза в delay-фазе: кадровый цикл сам заглохнет по флагу,
-      // накопленный остаток задержки сохранён в _delayLeft.
-      return;
-    }
-    for (const lane of this._lanes) lane.value.stop();
-    this._cssProgress?.stop();
-    // Tween: elapsed уже накоплен кадрами; поколение глушит висящий кадр.
-    if (this._context.mode.kind === 'tween') this._tweenGeneration++;
+    // Уже выданный host-кадр глохнет поколением. Полосы НЕ stop()-аются:
+    // их elapsed — локальное время, пауза просто перестаёт его кормить,
+    // поэтому resume продолжает ту же аналитическую траекторию (C¹ точно).
+    this._generation++;
   }
 
-  /** Точен для tween; для пружинных полос — документированный no-op (v1). */
+  /**
+   * Перемотка к локальному времени полосы (мс активной фазы, канон
+   * main-лейнов): logical-часы не откатываются, anchor переносится
+   * (следующий host-ts — dt=0), остаток delay снимается — seek активирует
+   * полосу. Пружинные полосы перематываются аналитически: локальное время
+   * подаётся синтетическим ts, солвер решает замкнутой формой.
+   */
   seek(tMs: number): void {
     if (this._done || !Number.isFinite(tMs)) return;
-    if (this._context.mode.kind !== 'tween' || !this._started) return;
-    this._tweenElapsed = Math.max(0, tMs - this._group.delayMs);
-    this._tweenWrite(this._tweenElapsed);
-    if (!this._paused) this._startTweenLoop();
+    const localMs = Math.max(0, tMs);
+    this._phaseMs = localMs;
+    this._lastTs = undefined;
+    this._runAt(localMs);
   }
 
   cancel(): void {
@@ -182,24 +292,36 @@ class LiveRun implements AnimateEngineRun {
 
   /** Прогресс-снимок для C¹-подхвата следующим планом. */
   _snapshot(): ProgressSnapshot {
+    // Полоса до активации неподвижна: capture-до-delay отдаёт покой
+    // (посеянный initialVelocity — стартовое условие, не текущее движение).
+    if (!this._started) return { value: 0, velocity: 0 };
     if (this._context.mode.kind === 'tween') {
-      const duration = this._context.mode.durationMs;
-      const u = Math.min(1, Math.max(0, this._tweenElapsed / duration));
-      const ease = this._context.mode.ease;
-      const h = 1e-4;
-      const rawValue = ease(u);
-      const value = Number.isFinite(rawValue) ? rawValue : u; // линейный гард
-      const slope = (ease(Math.min(1, u + h)) - ease(Math.max(0, u - h)))
-        / (Math.min(1, u + h) - Math.max(0, u - h) || 1);
+      const mode = this._context.mode;
+      // Значение — кэш последнего рендеренного кадра (ease не пере-зовётся);
+      // производная — центральная разность с окном, поджатым внутрь [0,1]
+      // (изинги клампят снаружи — разность через край сломала бы наклон).
+      const k = this._renderedK;
+      const k0 = k > EASE_DERIV_H ? k - EASE_DERIV_H : 0;
+      const k1 = k + EASE_DERIV_H < 1 ? k + EASE_DERIV_H : 1;
+      const slope = (mode.ease(k1) - mode.ease(k0)) / (k1 - k0);
       return {
-        value,
-        velocity: Number.isFinite(slope) ? slope / (duration / 1000) : 0,
+        value: this._renderedP,
+        // Наклон по k → прогресс/с; враждебная производная не сеется в v0.
+        velocity: Number.isFinite(slope) ? slope / (mode.durationMs / 1000) : 0,
       };
     }
     // Пружина: прогресс-пространство первой движущейся полосы (sharedV0-группы
     // делят прогресс; v0-mismatch группы честно отдают доминантную полосу).
     const lane = this._lanes[0];
-    if (lane === undefined) return { value: 1, velocity: 0 };
+    if (lane === undefined) {
+      // Чисто css-группа: точная пара (p, ṗ) прогресс-полосы — C⁰ значения
+      // идёт через шов formatCssAt, скорость css планировщик не проецирует.
+      const cssProgress = this._cssProgress;
+      if (cssProgress !== undefined) {
+        return { value: cssProgress.value, velocity: cssProgress.velocity };
+      }
+      return { value: 1, velocity: 0 };
+    }
     const range = lane.to - lane.from;
     if (range === 0) return { value: 1, velocity: 0 };
     return {
@@ -208,134 +330,134 @@ class LiveRun implements AnimateEngineRun {
     };
   }
 
-  // ── Приватное ─────────────────────────────────────────────────────────────
+  // ── Кадровый цикл ─────────────────────────────────────────────────────────
 
-  private _requestFrame(): (cb: (ts?: number) => void) => number {
-    return this._context.requestFrame
-      ?? ((cb: (ts?: number) => void): number => {
-        const raf = (globalThis as {
-          requestAnimationFrame?: (cb: (ts?: number) => void) => number;
-        }).requestAnimationFrame;
-        if (typeof raf === 'function') return raf(cb);
-        return setTimeout(cb, 16) as unknown as number;
-      });
+  private _arm(): void {
+    const generation = this._generation;
+    (this._context.requestFrame ?? defaultRequestFrame)(
+      (ts) => this._step(ts, generation),
+    );
   }
 
-  /** Кадровая задержка: тот же ts-дельта-канон, что и tween-цикл. */
-  private _delayLoop(): void {
-    if (this._delayLeft <= 0) this._delayLeft = this._group.delayMs;
-    const requestFrame = this._requestFrame();
-    let lastTs: number | undefined;
-    const step = (ts?: number): void => {
-      if (this._done || this._paused || this._started) return;
-      if (ts !== undefined) {
-        if (lastTs !== undefined) this._delayLeft -= ts - lastTs;
-        lastTs = ts;
-      } else {
-        this._delayLeft -= 1000 / 60;
+  private _step(ts: number | undefined, generation: number): void {
+    if (this._done || this._paused || generation !== this._generation) return;
+    let dt: number;
+    if (ts === undefined || !Number.isFinite(ts)) {
+      // Кадр без ts / нефинитный ts: ровно один fixed-step, анкер сброшен.
+      dt = FIXED_DT_MS;
+      this._lastTs = undefined;
+    } else {
+      dt = this._lastTs === undefined ? 0 : ts - this._lastTs;
+      this._lastTs = ts;
+      if (!Number.isFinite(dt)) {
+        // Переполнение конечной дельты (±MAX-скачок) — один fixed-step.
+        dt = FIXED_DT_MS;
+        this._lastTs = undefined;
       }
-      if (this._delayLeft <= 0) {
-        this._start();
-        return;
-      }
-      requestFrame(step);
-    };
-    requestFrame(step);
+    }
+    if (dt < 0) dt = 0; // регресс host-часов не откатывает локальную фазу
+    this._phaseMs += dt;
+    if (this._phaseMs >= 0) {
+      this._frames++;
+      this._runAt(Math.max(0, this._phaseMs));
+    }
+    if (!this._done && !this._paused) this._arm();
   }
 
-  private _start(): void {
-    if (this._done || this._started || this._paused) return;
-    this._started = true;
-    if (this._context.mode.kind === 'tween') {
-      this._startTweenLoop();
+  /** Кадр в локальном времени tMs: активация, тики полос, один flush в DOM. */
+  private _runAt(tMs: number): void {
+    const mode = this._context.mode;
+    if (mode.kind === 'tween') {
+      this._started = true;
+      // Страховка замёрзших host-часов — канон MAX_FRAMES ядра.
+      const frozen = this._frames >= MAX_FRAMES && tMs <= 0;
+      this._tweenFrame(frozen ? mode.durationMs : tMs);
       return;
     }
-    for (const lane of this._lanes) {
-      // Подписочный emit MotionValue (текущее значение немедленно) глушится:
-      // серия кадров группы начинается с ПЕРВОГО тика (канон main-харнессов),
-      // а поза from уже лежит в _state с конструктора.
-      let armed = false;
-      lane.value.onChange((value) => {
-        if (!armed || this._done || lane.settled) return;
-        this._state[lane.key] = value;
-        this._writeNumeric();
-        // Канон settle MotionValue: финальный emit — ровно target, скорость 0.
-        if (value === lane.to && lane.value.velocity === 0 && this._started) {
-          lane.settled = true;
-          this._laneDone();
-        }
-      });
-      armed = true;
-      lane.value.setTarget(lane.to);
+    if (!this._started) {
+      this._started = true;
+      // Активация: setTarget подхватывает посеянный initialVelocity полос
+      // (C¹-подхват), анкерный тик 0 якорит эпоху солвера в нуле фазы, тик
+      // tMs доносит точный субкадровый overshoot пересечения delay.
+      for (const lane of this._lanes) lane.value.setTarget(lane.to);
+      this._cssProgress?.setTarget(1);
+      this._tickLanes(0);
+      if (tMs > 0) this._tickLanes(tMs);
+    } else {
+      this._tickLanes(tMs);
     }
-    const cssProgress = this._cssProgress;
-    if (cssProgress !== undefined) {
-      let armed = false;
-      cssProgress.onChange((p) => {
-        if (!armed || this._done) return;
-        if (p === 1 && cssProgress.velocity === 0 && this._started) {
-          this._writeCssFinal();
-          this._laneDone();
-          return;
-        }
-        this._writeCssAt(p);
-      });
-      armed = true;
-      cssProgress.setTarget(1);
-    }
+    this._flushWrites();
+    this._sweepSettled();
   }
 
-  private _startTweenLoop(): void {
-    const generation = ++this._tweenGeneration;
-    const mode = this._context.mode;
-    if (mode.kind !== 'tween') return;
-    const requestFrame = this._context.requestFrame
-      ?? ((cb: (ts?: number) => void): number => {
-        const raf = (globalThis as {
-          requestAnimationFrame?: (cb: (ts?: number) => void) => number;
-        }).requestAnimationFrame;
-        if (typeof raf === 'function') return raf(cb);
-        return setTimeout(cb, 16) as unknown as number;
-      });
-    // Elapsed накапливается кадровыми дельтами host-timestamp (канон
-    // MotionValue: первый ts — эпоха, кадр без ts — фиксированный шаг):
-    // детерминизм step-clock харнессов и живого rAF одинаков.
-    let lastTs: number | undefined;
-    const step = (ts?: number): void => {
-      if (this._done || this._paused || generation !== this._tweenGeneration) return;
-      if (ts !== undefined) {
-        if (lastTs !== undefined) this._tweenElapsed += ts - lastTs;
-        lastTs = ts;
-      } else {
-        this._tweenElapsed += 1000 / 60;
-      }
-      if (this._tweenElapsed >= mode.durationMs) {
-        this._tweenWrite(mode.durationMs);
-        this._laneDone();
-        return;
-      }
-      this._tweenWrite(this._tweenElapsed);
-      requestFrame(step);
-    };
-    requestFrame(step);
+  /** Кормит полосы одним локальным ts: атомарный вектор одного времени. */
+  private _tickLanes(tMs: number): void {
+    const ticks = this._laneTicks;
+    if (ticks.length === 0) return;
+    this._laneTicks = [];
+    for (const tick of ticks) tick(tMs);
   }
 
-  /** Кадр tween: точный ease-прогресс по всем каналам группы. */
-  private _tweenWrite(elapsedMs: number): void {
+  /** Кадр tween: точный ease-прогресс по всем каналам группы, один вызов ease. */
+  private _tweenFrame(tMs: number): void {
     const mode = this._context.mode;
     if (mode.kind !== 'tween') return;
-    const u = Math.min(1, Math.max(0, elapsedMs / mode.durationMs));
+    if (tMs >= mode.durationMs) {
+      // Натуральное завершение: точные финальные операнды, ease не зовётся.
+      this._renderedK = 1;
+      this._renderedP = 1;
+      for (const ch of this._group.numeric) this._state[ch.key] = ch.to;
+      this._writeNumeric();
+      this._writeCssFinal();
+      if (--this._pending <= 0) this._finish();
+      return;
+    }
+    const k = tMs / mode.durationMs;
     // Враждебный ease (NaN/∞) → линейный кадр (контракт старых tween-лейнов);
-    // производная такого кадра не сеется в подхват (снимок ниже — тот же гард).
-    const raw = u >= 1 ? 1 : mode.ease(u);
-    const p = Number.isFinite(raw) ? raw : u;
+    // производная такого кадра не сеется в подхват (гард снимка выше).
+    const raw = mode.ease(k);
+    const p = Number.isFinite(raw) ? raw : k;
+    this._renderedK = k;
+    this._renderedP = p;
     for (const ch of this._group.numeric) {
-      const value = ch.from + (ch.to - ch.from) * p;
-      this._state[ch.key] = Number.isFinite(value) ? value : ch.to;
+      this._state[ch.key] = laneAt(ch.from, ch.to, p);
     }
     this._writeNumeric();
-    if (u >= 1) this._writeCssFinal();
-    else this._writeCssAt(p);
+    this._writeCssAt(p);
+  }
+
+  /** Одна DOM-запись на канал на кадр: собранный вектор + css-эмит. */
+  private _flushWrites(): void {
+    if (this._numericDirty) {
+      this._numericDirty = false;
+      this._writeNumeric();
+    }
+    if (this._cssFinal) {
+      this._cssFinal = false;
+      this._cssAt = undefined;
+      this._writeCssFinal();
+    } else if (this._cssAt !== undefined) {
+      const p = this._cssAt;
+      this._cssAt = undefined;
+      this._writeCssAt(p);
+    }
+  }
+
+  /** Учитывает осевшие полосы ПОСЛЕ финальной записи кадра. */
+  private _sweepSettled(): void {
+    if (this._done) return;
+    let settled = 0;
+    for (const lane of this._lanes) {
+      if (lane.settled && !lane.reported) {
+        lane.reported = true;
+        settled++;
+      }
+    }
+    if (this._cssSettled && !this._cssReported) {
+      this._cssReported = true;
+      settled++;
+    }
+    if (settled > 0 && (this._pending -= settled) <= 0) this._finish();
   }
 
   private _writeNumeric(): void {
@@ -378,17 +500,13 @@ class LiveRun implements AnimateEngineRun {
     }
   }
 
-  private _laneDone(): void {
-    if (this._done) return;
-    if (--this._pending <= 0) this._finish();
-  }
-
   private _finish(): void {
     if (this._done) return;
     this._done = true;
-    this._tweenGeneration++;
+    this._generation++;
     for (const lane of this._lanes) lane.value.destroy();
     this._cssProgress?.destroy();
+    this._laneTicks = [];
     this._resolve();
   }
 }

@@ -60,17 +60,15 @@ function expectedAt(mode: 'tween' | 'spring', localMs: number): number {
   }).value;
 }
 
-describe('animate MainUnit: субкадровая фаза delay/stagger (#169)', () => {
-  // @todo-R3c: subframe-delay: субкадровая фаза delay/stagger (#169/#174) — live-v1 стартует полосы тиком после делэя (эпоха MotionValue); точный перенос фазы — R3c
-  it.skip('не схлопывает stagger=5ms в один 16ms frame bucket', () => {
+describe('animate live: субкадровая фаза delay/stagger (#169)', () => {
+  it('не схлопывает stagger=5ms в один 16ms frame bucket', () => {
     const { actual } = run(5, [16, 16], 'tween');
     [1.6, 1.1, 0.6, 0.1].forEach((value, index) => {
       expect(actual[index]).toBeCloseTo(value, 12);
     });
   });
 
-  // @todo-R3c: subframe-delay: точный перенос фазы #169/#174 в live — R3c
-  it.skip.each([
+  it.each([
     ['60Hz', Array.from({ length: 13 }, () => 1000 / 60)],
     ['120Hz', Array.from({ length: 25 }, () => 1000 / 120)],
     ['irregular', [3, 11, 7, 23, 5, 19, 13, 29, 2, 17, 31, 41]],
@@ -109,8 +107,7 @@ describe('animate MainUnit: субкадровая фаза delay/stagger (#169)
     controls.cancel();
   });
 
-  // @todo-R3c: subframe-delay: субкадровая фаза delay/stagger (#169/#174) — live-v1 стартует полосы тиком после делэя (эпоха MotionValue); точный перенос фазы — R3c
-  it.skip('pause исключает wall-gap, а seek переносит anchor без сброса logical-time', () => {
+  it('pause исключает wall-gap, а seek переносит anchor без сброса logical-time', () => {
     const target = fakeEl();
     const clock = makeClock();
     const controls = animate(target.el, { x: [0, 100] }, {
@@ -140,8 +137,7 @@ describe('animate MainUnit: субкадровая фаза delay/stagger (#169)
     controls.cancel();
   });
 
-  // @todo-R3c: subframe-delay: субкадровая фаза delay/stagger (#169/#174) — live-v1 стартует полосы тиком после делэя (эпоха MotionValue); точный перенос фазы — R3c
-  it.skip('seek сохраняет малую local-фазу у конечной IEEE-границы logical-time', () => {
+  it('seek сохраняет малую local-фазу у конечной IEEE-границы logical-time', () => {
     const target = fakeEl();
     const clock = makeClock();
     const controls = animate(target.el, { x: [0, 100] }, {
