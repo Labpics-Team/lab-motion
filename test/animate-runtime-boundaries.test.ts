@@ -321,6 +321,8 @@ for (const [name, animate] of engines) {
       clock.step(16);
       clock.step(16);
       clock.step(16);
+      // Full на третьем кадре logical=delay: local=0; mini имеет иной clock contract.
+      if (name === 'full') clock.step(16);
       expect(translateXSeries(target.writes).at(-1))
         .toBeCloseTo(expectedSpring(50, 300, 250), 7);
     });

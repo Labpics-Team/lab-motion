@@ -239,19 +239,21 @@ describe('animate: stagger и delay (Класс А, integration)', () => {
     const c = fakeEl();
     const clock = makeClock();
     animate([a.el, b.el, c.el], { x: 100 }, { spring: SPRING, stagger: 40, requestFrame: clock.requestFrame });
-    // 2 кадра по 16 мс → t=32: el0 уже движется, el1/el2 ещё на from.
+    // Первый timestamp задаёт anchor: после двух кадров logical=16.
     clock.step(16);
     clock.step(16);
     expect(translateXSeries(a.writes).at(-1)!).toBeGreaterThan(0);
     expect(translateXSeries(b.writes).at(-1) ?? 0).toBe(0);
     expect(translateXSeries(c.writes).at(-1) ?? 0).toBe(0);
-    // t=64: el1 движется, el2 ещё нет.
+    // После четырёх кадров logical=48: el1 движется, el2 ещё нет.
     clock.step(16);
     clock.step(16);
     expect(translateXSeries(b.writes).at(-1)!).toBeGreaterThan(0);
     expect(translateXSeries(c.writes).at(-1) ?? 0).toBe(0);
-    // t=96: движется и el2.
+    // logical=80: el2 ровно на своей границе, первый ненулевой шаг — следующий.
     clock.step(16);
+    clock.step(16);
+    expect(translateXSeries(c.writes).at(-1) ?? 0).toBe(0);
     clock.step(16);
     expect(translateXSeries(c.writes).at(-1)!).toBeGreaterThan(0);
   });
