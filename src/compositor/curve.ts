@@ -22,7 +22,6 @@ import { roundShortest } from './format.js';
 import {
   assertSpringCurveBudget,
   buildRestingSpringNodesWithHorizon,
-  fitsSpringCurveBudget,
   tryBuildSpringNodes,
   type SpringNode,
 } from './segmenter.js';
@@ -127,24 +126,6 @@ function emitArtifact(
     if (i < nodes.length - 1) out += ', ';
   }
   return [out + ')', samples, durationMs];
-}
-
-/** Preflight ровно той exact-кривой, которую построит compile. */
-export function fitsCompiledSpringCurveBudgetUnchecked(
-  spring: SpringParams,
-  v0: number,
-  tolerance: number,
-): boolean {
-  return fitsSpringCurveBudget(spring, v0, tolerance);
-}
-
-/** Fail-fast версия того же канонического preflight. */
-export function assertCompiledSpringCurveBudgetUnchecked(
-  spring: SpringParams,
-  v0: number,
-  tolerance: number,
-): void {
-  assertSpringCurveBudget(spring, v0, tolerance);
 }
 
 /**
@@ -287,23 +268,6 @@ export function compileRestingSpringExecutionArtifactTupleUnchecked(
   restingCache.push([mass, stiffness, damping, tolerance, artifact]);
   if (restingCache.length > RESTING_CACHE_CAPACITY) restingCache.shift();
   return artifact;
-}
-
-/** Совместимый named-seam; production native читает tuple напрямую. */
-export function compileRestingSpringExecutionArtifactUnchecked(
-  spring: SpringParams,
-  tolerance: number,
-): SpringExecutionArtifact {
-  const artifact = compileRestingSpringExecutionArtifactTupleUnchecked(spring, tolerance);
-  return artifact[3] ??= { easing: artifact[0], samples: artifact[1] };
-}
-
-/** v0=0 строковый seam узкого native Chromium-пути. */
-export function compileRestingSpringEasingUnchecked(
-  spring: SpringParams,
-  tolerance: number,
-): string {
-  return compileRestingSpringExecutionArtifactTupleUnchecked(spring, tolerance)[0];
 }
 
 /** Герметичный сброс всех execution artifact-кэшей. */

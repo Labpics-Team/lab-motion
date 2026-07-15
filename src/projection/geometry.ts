@@ -113,7 +113,7 @@ export function finite(x: number): number {
 }
 
 /** Конечное деление; знаменатель 0/NaN → нейтральный fallback. @internal */
-export function finiteDiv(num: number, den: number, fallback: number): number {
+function finiteDiv(num: number, den: number, fallback: number): number {
   const d = finite(den);
   if (d === 0) return fallback;
   return finite(finite(num) / d);

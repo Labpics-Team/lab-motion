@@ -159,7 +159,7 @@ export function prefersReduced(matchMedia: MatchMediaLike | undefined): boolean 
  * конструкторе CompositorSpring). Чистая относительно входов; читает globals
  * (WAAPI/linear/DOM) через кэшированные/дешёвые швы. SSR-safe: без побочек.
  */
-export function resolveCompositorTierCode(inputs: TierInputs): CompositorTierCode {
+function resolveCompositorTierCode(inputs: TierInputs): CompositorTierCode {
   // Делегация в positional-вариант невозможна: она читала бы inputs.target до
   // policy-проверки, а property-read сам по себе — наблюдаемое чтение hostile
   // capability (пин: fallback-matrix «reduce решается до чтения…»).
