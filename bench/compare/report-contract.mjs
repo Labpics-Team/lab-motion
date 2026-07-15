@@ -856,7 +856,7 @@ export function assertAllowedPostReportChanges(files, stem) {
   const allowed = new Set([
     `bench/compare/results/${stem}.md`,
     `bench/compare/results/${stem}.json`,
-    'docs/бенчмарк.md',
+    'docs/benchmark.md',
   ]);
   const unexpected = files.filter((file) => !allowed.has(file));
   if (unexpected.length > 0) {

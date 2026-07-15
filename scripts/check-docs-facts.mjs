@@ -16,7 +16,7 @@ import { listChangedGitPaths } from './git-path-list.mjs';
 const write = process.argv.includes('--write');
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const readmePath = path.join(ROOT, 'README.md');
-const benchmarkPath = path.join(ROOT, 'docs', 'бенчмарк.md');
+const benchmarkPath = path.join(ROOT, 'docs', 'benchmark.md');
 const benchmarkResultsDirectory = path.join(ROOT, 'bench', 'compare', 'results');
 const rootPackagePath = path.join(ROOT, 'package.json');
 const benchmarkPackagePath = path.join(ROOT, 'bench', 'compare', 'package.json');

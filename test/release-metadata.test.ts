@@ -45,7 +45,7 @@ function metadata() {
         },
       },
     },
-    files: ['dist', 'docs/errors.md', 'docs/бенчмарк.md', '!dist/**/*.map'],
+    files: ['dist', 'docs/errors.md', 'docs/benchmark.md', '!dist/**/*.map'],
     publishConfig: { access: 'public' },
     sideEffects: [
       './dist/lit/index.js',
@@ -115,7 +115,7 @@ describe('release metadata SSOT', () => {
     ['pack hook', (pkg: any) => { pkg.scripts.prepare = 'pnpm build'; }],
     ['parallel publish path', (pkg: any) => { pkg.scripts.prepublishOnly = 'pnpm build'; }],
     ['missing benchmark methodology', (pkg: any) => {
-      pkg.files = pkg.files.filter((file: string) => file !== 'docs/бенчмарк.md');
+      pkg.files = pkg.files.filter((file: string) => file !== 'docs/benchmark.md');
     }],
     ['wrong Node floor', (pkg: any) => { pkg.engines.node = '>=24'; }],
     ['missing peer', (pkg: any) => { delete pkg.peerDependencies.react; }],

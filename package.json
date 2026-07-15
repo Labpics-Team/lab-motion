@@ -450,7 +450,7 @@
   "files": [
     "dist",
     "docs/errors.md",
-    "docs/бенчмарк.md",
+    "docs/benchmark.md",
     "!dist/**/*.map"
   ],
   "publishConfig": {

@@ -581,7 +581,7 @@ describe('paired comparative benchmark report', () => {
     expect(() => assertAllowedPostReportChanges([
       `bench/compare/results/${stem}.md`,
       `bench/compare/results/${stem}.json`,
-      'docs/бенчмарк.md',
+      'docs/benchmark.md',
     ], stem)).not.toThrow();
     expect(() => assertAllowedPostReportChanges(['src/spring.ts'], stem)).toThrow(/src\/spring\.ts/);
     expect(() => assertAllowedPostReportChanges(['package.json'], stem)).toThrow(/package\.json/);
