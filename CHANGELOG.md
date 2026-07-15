@@ -25,6 +25,9 @@
 - `./auto`: exit использует единое identity-владение между сессиями; stale
   observer больше не забирает перенесённый узел, а reentrant disconnect
   детерминированно освобождает ghost, handlers, style leases и parent-ссылки.
+- `./animate`: uniform/axial scale сохраняет обе оси и точные signed-zero края;
+  pause/seek переносит effect-space скорость без скачка, а несовместимые оси
+  продолжает независимым main-thread путём вместо ложного общего WAAPI-progress.
 - `./animate`: переполнение составной delay отклоняется до host-effects, а
   завершение задержек длиннее диапазона HTML timer сверяется с WAAPI-clock без
   раннего settle, starvation и скачка terminal pose.
