@@ -16,13 +16,12 @@
  * больше host timer native Animation.finished — основной clock; duck-цель без
  * finished просыпается bounded timer-ом и сверяется с currentTime/now.
  *
- * Ограничение честно: несколько transform-каналов делят одну кривую
- * (физика WAAPI: одно свойство = одна Animation) — при ретаргете slope точен
- * для доминантного канала (максимальный |range|), остальные C⁰+пропорция.
- * Одиночный affine-канал точен в effect-space вне kink, пока следующая точка
- * представима конечным Number; на числовой границе handoff остаётся fail-closed
- * со старым owner. Rendered clamping, non-affine format и меняющийся underlying
- * лежат за границей гарантии.
+ * Несколько transform-каналов делят одну Animation только когда все движущиеся
+ * каналы имеют строго общий нормализованный v0; точные константы кривую не
+ * ограничивают. Иначе фасад выбирает независимые main-thread каналы. На
+ * численной границе, где публичные keyframes не представляют live-импульс,
+ * handoff остаётся fail-closed со старым owner. Rendered clamping, non-affine
+ * format и меняющийся underlying лежат за границей гарантии.
  */
 
 import { type SetTimerFn } from '../compositor/core.js';
@@ -43,8 +42,8 @@ import type { SpringParams } from '../spring.js';
 import { buildTransform } from '../value/transform.js';
 import {
   channelAt,
-  dominantV0,
   rebaseNumericChannels,
+  sharedV0,
   type AnimatableElement,
   type ChannelSnapshot,
   type CssChannel,
@@ -124,9 +123,8 @@ export class WaapiUnit implements GroupOwner {
 
   constructor(opts: WaapiUnitOptions) {
     this._o = opts;
-    // v0 прогресса кривой группы — по доминантному каналу (max |range|):
-    // одиночный affine-канал → effect-space pickup точен.
-    this._v0 = dominantV0(opts._numeric);
+    // Конструктор достижим только после sharedV0-гейта plan-фазы.
+    this._v0 = sharedV0(opts._numeric)!;
     this._emit(opts._delayMs, opts._artifact);
   }
 
@@ -137,15 +135,23 @@ export class WaapiUnit implements GroupOwner {
   }
 
   _capture(): void {
-    if (this._delegate === undefined && !this._o._record._transition && !this._locked) {
+    const rec = this._o._record;
+    if (this._delegate || rec._transition || this._locked) return;
+    // currentTime — hostile host-boundary: nested animate не должен успеть
+    // опубликовать owner, после чего внешний снимок перезапишет новое видимое
+    // поколение. Общий commit-reservation даёт nested-вызову штатный LM157.
+    rec._transition = true;
+    try {
       this._syncSnapshot();
+    } finally {
+      rec._transition = false;
     }
   }
 
   _captureNum(key: string): ChannelSnapshot | undefined {
-    if (this._delegate !== undefined) return this._delegate._captureNum(key);
+    if (this._delegate) return this._delegate._captureNum(key);
     const ch = this._o._numeric.find((c) => c._key === key);
-    if (ch !== undefined) {
+    if (ch) {
       return { _value: ch._value, _velocity: ch._velocity };
     }
     const frozen = this._o._residuals.get(key);
@@ -157,7 +163,7 @@ export class WaapiUnit implements GroupOwner {
   }
 
   _numericKeys(): readonly string[] {
-    if (this._delegate !== undefined) return this._delegate._numericKeys();
+    if (this._delegate) return this._delegate._numericKeys();
     return [...this._o._numeric.map((c) => c._key), ...this._o._residuals.keys()];
   }
 
@@ -213,7 +219,7 @@ export class WaapiUnit implements GroupOwner {
 
   play(): void {
     if (this._done || this._o._record._transition || this._locked || !this._paused) return;
-    if (this._delegate !== undefined) {
+    if (this._delegate) {
       // Wrapper меняет состояние только после успешной подписки delegate:
       // бросок оставляет оба уровня повторяемо paused.
       this._transaction(() => {
@@ -223,7 +229,7 @@ export class WaapiUnit implements GroupOwner {
       return;
     }
     const artifact = this._tryReseedFromSnapshot();
-    if (artifact === undefined) {
+    if (!artifact) {
       this._handoffToLive(false);
       return;
     }
@@ -251,7 +257,7 @@ export class WaapiUnit implements GroupOwner {
     const wasPaused = this._paused;
     this._snapshotAt(Math.max(0, tMs));
     const artifact = this._tryReseedFromSnapshot();
-    if (artifact === undefined) {
+    if (!artifact) {
       this._handoffToLive(wasPaused);
       return;
     }
@@ -393,20 +399,20 @@ export class WaapiUnit implements GroupOwner {
   }
 
   /**
-   * Пере-сев кривой из снимка: каналы продолжают from=значение снимка;
-   * v0 прогресса — по доминантному каналу (максимальный |range|), slope для него
-   * точен, одиночный канал — всегда точен.
+   * Пере-сев кривой из снимка: каналы продолжают from=значение снимка.
+   * Разошедшиеся v0 не сжимаются в одну кривую — caller переведёт группу в live.
    */
   private _tryReseedFromSnapshot(): SpringExecutionArtifactTuple | undefined {
     const o = this._o;
-    const v0 = dominantV0(o._numeric);
+    const rebased = rebaseNumericChannels(o._numeric);
+    const v0 = sharedV0(rebased);
+    if (v0 === undefined) return undefined;
     const artifact = tryCompileSpringExecutionArtifactTupleUnchecked(
       o._spring,
       v0,
       DEFAULT_TOLERANCE,
     );
-    if (artifact === undefined) return undefined;
-    const rebased = rebaseNumericChannels(o._numeric);
+    if (!artifact) return undefined;
     o._numeric.length = 0;
     o._numeric.push(...rebased);
     this._v0 = v0;

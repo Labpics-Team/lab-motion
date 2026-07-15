@@ -102,7 +102,8 @@ function parseCssValue(v: unknown): ValueAST {
  */
 export function parseProps(props: Record<string, unknown>): ChannelSpec[] {
   const specs: ChannelSpec[] = [];
-  for (const key of Object.keys(props)) {
+  const keys = Object.keys(props);
+  for (const key of keys) {
     const raw = props[key];
     if (key === 'transform') {
       throw new MotionParamError('LM140');
@@ -113,13 +114,22 @@ export function parseProps(props: Record<string, unknown>): ChannelSpec[] {
     }
     if (isTransformKey(key) || key === 'opacity') {
       const group: GroupKey = key === 'opacity' ? 'opacity' : 'transform';
-      specs.push({
-        _kind: 'num',
-        _key: key,
-        _group: group,
-        _explicitFrom: pair ? requireFinite(pair[0]) : undefined,
-        _to: requireFinite(pair ? pair[1] : raw),
-      });
+      const explicitFrom = pair ? requireFinite(pair[0]) : undefined;
+      const to = requireFinite(pair ? pair[1] : raw);
+      // Full-движок хранит scale как две независимые физические оси. Равные
+      // значения всё равно сериализуются в компактный scale(N), зато переход
+      // uniform↔axial не меняет представление: обе позиции и pickup-скорость
+      // перехватываемого канала остаются явными.
+      if (key === 'scale') {
+        if (!keys.includes('scaleX')) {
+          specs.push({ _kind: 'num', _key: 'scaleX', _group: group, _explicitFrom: explicitFrom, _to: to });
+        }
+        if (!keys.includes('scaleY')) {
+          specs.push({ _kind: 'num', _key: 'scaleY', _group: group, _explicitFrom: explicitFrom, _to: to });
+        }
+      } else {
+        specs.push({ _kind: 'num', _key: key, _group: group, _explicitFrom: explicitFrom, _to: to });
+      }
     } else {
       specs.push({
         _kind: 'css',
@@ -142,7 +152,7 @@ export interface NumericChannel {
   readonly _to: number;
   /** Численно представимая цель солвера; финальный snap всё равно идёт в to. */
   readonly _solverTo: number;
-  /** Нормализованная стартовая скорость (канон солвера: v0 / range). */
+  /** Нормализованная скорость в представимом effect-space канала. */
   readonly _v0: number;
   _value: number;
   _velocity: number;
@@ -211,6 +221,8 @@ function numericChannel(
     _from: from,
     _to: to,
     _solverTo: solverTo,
+    // Seed принадлежит effect-space: IEEE-rounded current может не сохранять
+    // алгебраическую связь с исходным progress, особенно на соседних huge f64.
     _v0: normalizeV0(velocity, solverTo - from),
     _value: from,
     _velocity: velocity,
@@ -221,8 +233,12 @@ function numericChannel(
 
 /** Устойчивая позиция канала: взвешенная форма не переполняет MAX ↔ -MAX. */
 export function channelAt(channel: NumericChannel, progress: number): number {
-  if (progress === 0) return channel._from;
+  // Границы возвращают именно public operands: взвешенная форма и `===`
+  // стирают знак IEEE -0, который является частью точного endpoint-контракта.
   if (progress === 1) return channel._to;
+  // Точный static-span — константа, а не две равные IEEE-слагаемые: у MAX
+  // взвешенная форма может округлиться в nextDown и изобрести движение/C1.
+  if (progress === 0 || channel._from === channel._to) return channel._from;
   const value = (1 - progress) * channel._from + progress * channel._to;
   return Number.isFinite(value) ? value : channel._to;
 }
@@ -236,33 +252,35 @@ export function rebaseNumericChannels(
   channels: readonly NumericChannel[],
 ): NumericChannel[] {
   return channels.map((channel) =>
-    numericChannel(channel._key, channel._value, channel._to, channel._velocity),
+    numericChannel(
+      channel._key,
+      channel._value,
+      channel._to,
+      channel._velocity,
+    ),
   );
 }
 
 /**
- * Скорость общей кривой по каналу с наибольшим оставшимся диапазоном.
- * Один канон используют preflight фасада и WAAPI-юнит: иначе решение о бюджете
- * могло бы проверить не ту скорость, которую затем компилирует compositor.
- * До первого кадра `_value === _from`; после снимка `_value` становится точкой
- * перехвата, поэтому тот же расчёт без второго pickup-алгоритма остаётся точным.
+ * Единый прогресс WAAPI существует только в публично сериализуемом диапазоне:
+ * `_solverTo` может хранить искусственную амплитуду live-ядра, но keyframes
+ * всегда заканчиваются в `_to`. Поэтому импульс, потребовавший такой подмены,
+ * не представим WAAPI-кривой и обязан остаться на main thread. Точный нулевой
+ * span без импульса не ограничивает общий progress; любой ненулевой span —
+ * канал движения, даже если он меньше solver-порога. Для движущихся каналов
+ * tolerance запрещён: разные структурные v0 означают разные траектории.
  */
-export function dominantV0(channels: readonly NumericChannel[]): number {
-  let dominant: NumericChannel | undefined;
+export function sharedV0(channels: readonly NumericChannel[]): number | undefined {
+  let shared: number | undefined;
   for (const channel of channels) {
-    if (
-      dominant === undefined ||
-      Math.abs(channel._to - channel._value) > Math.abs(dominant._to - dominant._value)
-    ) {
-      dominant = channel;
+    if (channel._to === channel._from && channel._velocity === 0) continue;
+    const v0 = channel._v0;
+    if (channel._solverTo !== channel._to || (shared !== undefined && v0 !== shared)) {
+      return undefined;
     }
+    shared = v0;
   }
-  if (dominant === undefined) return 0;
-  const range = dominant._to - dominant._value;
-  // Нормализованная compositor-кривая не представляет импульс при нулевом
-  // диапазоне. Infinity здесь — только preflight-sentinel: фасад выберет live.
-  if (!(Math.abs(range) > RANGE_EPSILON) && dominant._velocity !== 0) return Infinity;
-  return normalizeV0(dominant._velocity, range);
+  return shared ?? 0;
 }
 
 /**
@@ -283,8 +301,8 @@ function spanVec(from: ValueAST, to: ValueAST): number[] | undefined {
  * Проекция скорости css-канала между прогресс-пространствами при перехвате
  * (C¹-контракт #93): скорость значения по компоненту i равна ṗ̂·Δold_i, новая
  * скорость прогресса — её нормировка на новый спан. i — ДОМИНАНТНЫЙ компонент
- * НОВОГО спана (канон dominantV0 WaapiUnit и projection/driver: доминанта
- * всегда по целевому диапазону — иначе малый b[i] при большом a[i] взрывает
+ * НОВОГО спана (канон projection/driver: доминанта всегда по целевому
+ * диапазону — иначе малый b[i] при большом a[i] взрывает
  * усиление на неколлинеарном цветовом ретаргете). Для юнитных значений (1
  * компонент) и коллинеарных ретаргетов проекция точна. Несовместимые виды AST
  * (var(), unit×color) → 0; длины определённых спанов совпадают по построению:

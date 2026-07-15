@@ -37,8 +37,8 @@
  * синхронный эмит p=1 + onRest, ноль кадров rAF (двигать нечего — пружинный
  * прогон был бы 2000 пустых кадров).
  *
- * Паттерны-копии: dominantV0 (src/animate/waapi-unit.ts:309-318),
- * normalizeV0/RANGE_EPSILON (channels.ts:174-182) — приватны в своих модулях;
+ * Паттерны-копии: доминантная проекция v0 и normalizeV0/RANGE_EPSILON
+ * (animate/channels.ts) — приватны в своих модулях;
  * generation-инвалидация / handle=0-фоллбек / REST / синхронный первый кадр /
  * финал ровно identity (src/flip/index.ts:217-293), prefersReducedMotion
  * (flip :192-199). FIXED_DT_S/MAX_FRAMES — локальные копии по канону «субпути
@@ -372,7 +372,7 @@ export function createProjection(options?: ProjectionOptions): ProjectionControl
       });
 
       // C¹: v0' по доминантному каналу ВСЕХ продолжающихся узлов (новые не участвуют —
-      // их px/s не определены). Паттерн dominantV0 + normalizeV0 (см. шапку).
+      // их px/s не определены). Паттерн доминантной проекции + normalizeV0.
       let v0 = 0;
       if (prevById !== undefined && vPrev !== 0) {
         let bestAbs = 0;

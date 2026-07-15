@@ -7,8 +7,9 @@ import {
   DEFAULT_TOLERANCE,
 } from '../src/compositor/curve.js';
 import { __resetDetectionCache } from '../src/compositor/detect.js';
+import { sampleSerializedSpring } from '../src/compositor/sample.js';
 import { MotionParamError } from '../src/errors.js';
-import { settleTimeUpperBound } from '../src/spring.js';
+import { settleTimeUpperBound, type SpringParams } from '../src/spring.js';
 
 const SPRING = { mass: 1, stiffness: 170, damping: 26 };
 
@@ -66,6 +67,31 @@ function firstTargetCrossingMs(spring = SPRING): number {
     }
   }
   throw new Error('target crossing отсутствует');
+}
+
+function scaleX(transform: string): number {
+  const uniform = /(?:^| )scale\(([^)]+)\)/.exec(transform);
+  if (uniform !== null) return Number(uniform[1]);
+  return Number(/(?:^| )scaleX\(([^)]+)\)/.exec(transform)?.[1]);
+}
+
+function serializedState(
+  spring: SpringParams,
+  from: number,
+  to: number,
+  v0: number,
+  tMs: number,
+): { value: number; velocity: number } {
+  const artifact = compileSpringExecutionArtifactUnchecked(spring, v0, DEFAULT_TOLERANCE);
+  const sample = sampleSerializedSpring(
+    artifact.samples,
+    settleTimeUpperBound(spring, v0) * 1_000,
+    tMs,
+  );
+  return {
+    value: (1 - sample.value) * from + sample.value * to,
+    velocity: sample.velocity * (to - from),
+  };
 }
 
 describe('animate: атомарный lifecycle', () => {
@@ -207,6 +233,62 @@ describe('animate: атомарный lifecycle', () => {
     });
 
     expect(f.reads()).toBe(1);
+  });
+
+  it('currentTime-reentry отклоняется либо outer подхватывает нового owner', () => {
+    const calls: Array<{ keyframes: Record<string, string | number>[] }> = [];
+    const inline = new Map<string, string>();
+    let nestedError: unknown;
+    let nestedControls: ReturnType<typeof animate> | undefined;
+    let reentered = false;
+    const options = {
+      spring: SPRING,
+      now: () => 0,
+      setTimer: () => () => {},
+    };
+    const el = {
+      style: {
+        getPropertyValue: (name: string) => inline.get(name) ?? '',
+        setProperty(name: string, value: string) { inline.set(name, value); },
+      },
+      animate(keyframes: Record<string, string | number>[]) {
+        const index = calls.length;
+        calls.push({ keyframes });
+        return {
+          get currentTime() {
+            if (index === 0 && !reentered) {
+              reentered = true;
+              try {
+                nestedControls = animate(el, { scale: 4 }, options);
+              } catch (error) {
+                nestedError = error;
+              }
+            }
+            return index === 0 ? 100 : index === 1 ? 300 : 0;
+          },
+          cancel() {},
+        };
+      },
+    };
+
+    const first = animate(el, { scale: [1, 2] }, options);
+    const outer = animate(el, { scale: 6 }, options);
+
+    if (nestedError !== undefined) {
+      expect((nestedError as { code?: unknown }).code).toBe('LM157');
+      expect(calls).toHaveLength(2);
+    } else {
+      expect(calls).toHaveLength(3);
+      const old = serializedState(SPRING, 1, 2, 0, 100);
+      const nestedV0 = old.velocity / (4 - old.value);
+      const nestedVisible = serializedState(SPRING, old.value, 4, nestedV0, 300).value;
+      const outerFrom = scaleX(String(calls[2]!.keyframes[0]!.transform));
+      expect(outerFrom).toBe(nestedVisible);
+    }
+
+    first.cancel();
+    nestedControls?.cancel();
+    outer.cancel();
   });
 
   it('host-ошибка successor оставляет старый owner/effect живым', () => {
