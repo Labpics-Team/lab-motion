@@ -38,7 +38,6 @@ const FREEZE = [
   ...START,
   'waapi-ctl',
   'lab-spring',
-  'lab-native',
   'motion-mini',
   'anime-waapi',
 ];
@@ -169,11 +168,11 @@ function result(
       : [],
   };
   const flatten = (values: Array<{ samples: number[] }>) => values.flatMap((cluster) => cluster.samples);
-  const freeze = Array.from({ length: 9 }, freezeRun);
+  const freeze = Array.from({ length: FREEZE.length }, freezeRun);
   return {
     version: id === 'waapi-ctl'
       ? 'платформа Chromium (без библиотеки)'
-      : ['lab', 'lab-spring', 'lab-native'].includes(id)
+      : ['lab', 'lab-spring'].includes(id)
         ? '@labpics/motion@0.3.0 (локальный dist)'
         : ['motion', 'motion-mini'].includes(id)
           ? 'motion@12.42.2'
@@ -184,7 +183,7 @@ function result(
       ? 'transform-linear-start+stagger-adapter'
       : id === 'waapi-ctl'
         ? 'transform-linear-waapi-control'
-        : ['lab-spring', 'lab-native'].includes(id)
+        : id === 'lab-spring'
           ? 'transform-spring-start-adapter'
           : 'transform-linear-native-start-adapter',
     size: { raw: 10, gz: 9, br: 8, sha256: SHA(String((index + 2) % 10)) },
@@ -256,7 +255,7 @@ function fixture(startRuns = 20, warmCalls: Partial<Record<keyof typeof START_SC
     },
   };
   const payload: any = {
-    schema: 8,
+    schema: 9,
     package: { name: rootPackage.name, version: rootPackage.version },
     generatedAt,
     companion: { markdownFile: `${stem}.md`, markdownSha256: '' },
@@ -286,6 +285,14 @@ function fixture(startRuns = 20, warmCalls: Partial<Record<keyof typeof START_SC
         'bench/methodology.mjs': SHA('7'),
         'bench/provenance.mjs': SHA('8'),
         'bench/report-contract.mjs': SHA('9'),
+        'bench/entries/lab.entry.mjs': SHA('1'),
+        'bench/entries/motion.entry.mjs': SHA('2'),
+        'bench/entries/gsap.entry.mjs': SHA('3'),
+        'bench/entries/anime.entry.mjs': SHA('4'),
+        'bench/entries/waapi-control.entry.mjs': SHA('5'),
+        'bench/entries/lab-spring.entry.mjs': SHA('6'),
+        'bench/entries/motion-mini.entry.mjs': SHA('7'),
+        'bench/entries/anime-waapi.entry.mjs': SHA('8'),
       },
       distRuntime: { files: 2, sha256: dist },
       environment: {
@@ -326,7 +333,7 @@ function fixture(startRuns = 20, warmCalls: Partial<Record<keyof typeof START_SC
     orderSeed: 1,
     participants: { start: START, freeze: FREEZE },
     startOrders: makeRoundRobinOrders(START, startRuns, 1),
-    freezeOrders: makeRoundRobinOrders(FREEZE, 9, 2),
+    freezeOrders: makeRoundRobinOrders(FREEZE, FREEZE.length, 2),
     results,
   };
   payload.claims = createBenchmarkClaims(results, {
@@ -483,6 +490,7 @@ describe('paired comparative benchmark report', () => {
   });
 
   it.each([
+    ['retired participant schema', (f: any) => { f.payload.schema = 8; }],
     ['dirty claim', (f: any) => { f.payload.provenance.dirty = true; }],
     ['future date', (f: any) => { f.now -= 10 * 60_000; }],
     ['package drift', (f: any) => { f.payload.package.version = '0.2.0'; }],
@@ -502,7 +510,7 @@ describe('paired comparative benchmark report', () => {
     }],
     ['adapter hash', (f: any) => { f.payload.results.lab.adapterSha256 = 'fake'; }],
     ['competitor version', (f: any) => { f.payload.results.motion.version = 'motion@99.0.0'; }],
-    ['capability group', (f: any) => { f.payload.results['lab-native'].group = 'linear-full'; }],
+    ['capability group', (f: any) => { f.payload.results['lab-spring'].group = 'linear-full'; }],
     ['size bytes', (f: any) => { f.payload.results.gsap.size.gz = -1; }],
     ['summary mutation', (f: any) => { f.payload.results.lab.summary.freeze.score.p50 = 0; }],
     ['evidence mutation', (f: any) => { f.payload.results.lab.raw.freeze[0].score = 0; }],
@@ -543,6 +551,9 @@ describe('paired comparative benchmark report', () => {
     }],
     ['missing canonical gzip policy hash', (f: any) => {
       delete f.payload.provenance.inputs['root/scripts/compression-policy.mjs'];
+    }],
+    ['missing benchmark entry hash', (f: any) => {
+      delete f.payload.provenance.inputs['bench/entries/lab-spring.entry.mjs'];
     }],
     ['missing cold sample', (f: any) => { f.payload.results.lab.raw.cold.s2.pop(); }],
     ['null cold sample', (f: any) => { f.payload.results.lab.raw.cold.s2[0].samples[0] = null; }],

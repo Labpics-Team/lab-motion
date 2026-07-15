@@ -13,7 +13,7 @@
  *
  * Запуск: cd bench/compare && pnpm i && node bench.mjs
  * Корневой dist пересобирается самим стендом до фиксации provenance.
- * Переменные: BENCH_RUNS (дефолт 20), BENCH_FREEZE_RUNS (дефолт 9, полный
+ * Переменные: BENCH_RUNS (дефолт 20), BENCH_FREEZE_RUNS (дефолт 8, полный
  * позиционно-сбалансированный блок; допустимы только кратные числу участников).
  */
 
@@ -81,12 +81,6 @@ import {
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const ROOT = path.resolve(__dirname, '..', '..');
 const RUNS = parseBenchCount('BENCH_RUNS', process.env.BENCH_RUNS, 20, { min: 20, max: 60 });
-const FREEZE_RUNS = parseBenchCount(
-  'BENCH_FREEZE_RUNS',
-  process.env.BENCH_FREEZE_RUNS,
-  9,
-  { min: 3, max: 45 },
-);
 const ORDER_SEED = 0x51f15e;
 const BOOTSTRAP_ITERATIONS = 10_000;
 
@@ -99,11 +93,20 @@ const LIBS = [
   // контроль инструмента и компоситорный (spring→WAAPI) путь нашего фасада.
   { id: 'waapi-ctl', entry: 'entries/waapi-control.entry.mjs', pkg: null, group: 'transform-linear-waapi-control', ver: 'платформа Chromium (без библиотеки)' },
   { id: 'lab-spring', entry: 'entries/lab-spring.entry.mjs', pkg: null, group: 'transform-spring-start-adapter' },
-  { id: 'lab-native', entry: 'entries/lab-native.entry.mjs', pkg: null, group: 'transform-spring-start-adapter' },
   // Лучшие официальные native-пути: без них freeze-победа была бы ложной.
   { id: 'motion-mini', entry: 'entries/motion-mini.entry.mjs', pkg: 'motion', group: 'transform-linear-native-start-adapter' },
   { id: 'anime-waapi', entry: 'entries/anime-waapi.entry.mjs', pkg: 'animejs', group: 'transform-linear-native-start-adapter' },
 ];
+const FREEZE_RUNS = parseBenchCount(
+  'BENCH_FREEZE_RUNS',
+  process.env.BENCH_FREEZE_RUNS,
+  LIBS.length,
+  { min: LIBS.length, max: LIBS.length * 5 },
+);
+const ENTRY_INPUTS = LIBS.map(({ entry }) => [
+  `bench/${entry}`,
+  path.join(__dirname, entry),
+]);
 const BENCH_PACKAGES = ['animejs', 'esbuild', 'gsap', 'motion', 'playwright', 'pngjs'];
 
 // ─── утилиты ─────────────────────────────────────────────────────────────────
@@ -773,7 +776,6 @@ async function main() {
     benchDirectory: __dirname,
     requiredDist: [
       'dist/animate/index.js',
-      'dist/animate/native/index.js',
     ],
     requiredPackages: BENCH_PACKAGES,
     requiredRootPackages: [CANONICAL_GZIP_PACKAGE],
@@ -785,6 +787,7 @@ async function main() {
       ['bench/provenance.mjs', path.join(__dirname, 'provenance.mjs')],
       ['bench/report-contract.mjs', path.join(__dirname, 'report-contract.mjs')],
     ],
+    requiredEntries: ENTRY_INPUTS,
   });
   mkdirSync(path.join(__dirname, 'results'), { recursive: true });
 
@@ -1001,7 +1004,7 @@ async function main() {
   const ids = LIBS.map((l) => l.id);
   const stem = `${generatedAt.slice(0, 10)}-${provenance.revisionLabel}-${provenance.distRuntime.sha256.slice(0, 12)}`;
   const rawPayload = {
-    schema: 8,
+    schema: 9,
     package: { name: rootPkg.name, version: rootPkg.version },
     generatedAt,
     companion: { markdownFile: `${stem}.md`, markdownSha256: '' },

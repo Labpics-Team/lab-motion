@@ -10,6 +10,7 @@ import { tmpdir } from 'node:os';
 import path from 'node:path';
 import { afterEach, describe, expect, it } from 'vitest';
 import {
+  assertBenchmarkExportSurface,
   assertFileHashesUnchanged,
   assertCheckoutUnchanged,
   assertInstalledPackageTreesUnchanged,
@@ -35,7 +36,14 @@ function fixture() {
   const distDirectory = path.join(root, 'dist', 'animate');
   mkdirSync(benchDirectory, { recursive: true });
   mkdirSync(distDirectory, { recursive: true });
-  writeFileSync(path.join(root, 'package.json'), '{"name":"root"}');
+  writeFileSync(path.join(root, 'package.json'), JSON.stringify({
+    name: 'root',
+    exports: {
+      '.': './dist/index.js',
+      './animate': './dist/animate/index.js',
+      './nano': './dist/nano/index.js',
+    },
+  }));
   writeFileSync(path.join(root, 'pnpm-lock.yaml'), 'root-lock');
   writeFileSync(path.join(benchDirectory, 'package.json'), '{"name":"bench"}');
   writeFileSync(path.join(benchDirectory, 'pnpm-lock.yaml'), 'bench-lock');
@@ -51,6 +59,61 @@ function fixture() {
 }
 
 describe('benchmark provenance', () => {
+  it('rejects requiredDist and benchmark entries outside published exports', () => {
+    const f = fixture();
+    writeFileSync(path.join(f.root, 'package.json'), JSON.stringify({
+      exports: {
+        './animate': {
+          import: { default: './dist/animate/index.js' },
+          require: { default: './dist/animate/index.cjs' },
+        },
+      },
+    }));
+    const entry = path.join(f.benchDirectory, 'entry.mjs');
+    writeFileSync(entry, "import { animate } from '../../dist/animate/index.js';\n");
+
+    expect(() => assertBenchmarkExportSurface({
+      root: f.root,
+      requiredDist: ['dist/animate/index.js'],
+      requiredEntries: [['bench/entry.mjs', entry]],
+    })).not.toThrow();
+    expect(() => assertBenchmarkExportSurface({
+      root: f.root,
+      requiredDist: [],
+      requiredEntries: [['bench/entry.mjs', entry]],
+    })).toThrow(/animate\/index.*requiredDist/i);
+    expect(() => assertBenchmarkExportSurface({
+      root: f.root,
+      requiredDist: ['dist/animate/native/index.js'],
+      requiredEntries: [],
+    })).toThrow(/requiredDist.*animate\/native.*export/i);
+
+    writeFileSync(entry, "import { springTo } from '../../dist/animate/native/index.js';\n");
+    expect(() => assertBenchmarkExportSurface({
+      root: f.root,
+      requiredDist: ['dist/animate/index.js'],
+      requiredEntries: [['bench/entry.mjs', entry]],
+    })).toThrow(/bench\/entry\.mjs.*export.*animate\/native/i);
+  });
+
+  it('runs the export-surface guard before an expensive benchmark build', () => {
+    const f = fixture();
+    const entry = path.join(f.benchDirectory, 'entry.mjs');
+    writeFileSync(entry, "import { springTo } from '../../dist/animate/native/index.js';\n");
+    let builds = 0;
+
+    expect(() => prepareBenchmarkCheckout({
+      root: f.root,
+      benchDirectory: f.benchDirectory,
+      requiredDist: ['dist/animate/index.js'],
+      requiredEntries: [['bench/entry.mjs', entry]],
+      build: () => { builds++; },
+      readState: () => f.state,
+      captureEnvironment: () => ({ node: 'v24.0.0', pnpm: '11.11.0', packages: {} }),
+    })).toThrow(/bench\/entry\.mjs.*animate\/native/i);
+    expect(builds).toBe(0);
+  });
+
   it('включает symlink target в tree fingerprint, не следуя за ним наружу', () => {
     const f = fixture();
     const tree = path.join(f.root, 'browser-tree');

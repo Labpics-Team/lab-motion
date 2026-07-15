@@ -27,7 +27,7 @@ export function summarizeBusyPoints(points) {
 }
 
 export function validateWebkitFreezeEvidence(report) {
-  if (report?.schema !== 1) fail('неподдерживаемая schema');
+  if (report?.schema !== 2) fail('неподдерживаемая schema');
   const generatedAt = Date.parse(report.generatedAt);
   if (!Number.isFinite(generatedAt) || new Date(generatedAt).toISOString() !== report.generatedAt) {
     fail('невалидный generatedAt');
@@ -52,7 +52,7 @@ export function validateWebkitFreezeEvidence(report) {
   for (const name of [
     'bench/webkit-freeze.mjs',
     'bench/webkit-contract.mjs',
-    'bench/entries/lab-native.entry.mjs',
+    'bench/entries/lab-spring.entry.mjs',
   ]) assertSha(provenance.inputs?.[name], name);
 
   const toolchain = report.toolchain;

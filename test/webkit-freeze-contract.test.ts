@@ -11,7 +11,7 @@ function report() {
   const customPoints = points(Array.from({ length: 10 }, () => 5));
   const productionPoints = points(Array.from({ length: 10 }, (_, index) => index * 10));
   return {
-    schema: 1,
+    schema: 2,
     generatedAt: '2026-07-13T00:00:00.000Z',
     provenance: {
       revision: 'a'.repeat(40),
@@ -21,7 +21,7 @@ function report() {
       inputs: {
         'bench/webkit-freeze.mjs': SHA('3'),
         'bench/webkit-contract.mjs': SHA('4'),
-        'bench/entries/lab-native.entry.mjs': SHA('5'),
+        'bench/entries/lab-spring.entry.mjs': SHA('5'),
       },
       environment: {
         node: 'v24.0.0',
@@ -67,6 +67,7 @@ describe('WebKit freeze raw evidence', () => {
   });
 
   it.each([
+    ['retired native-adapter schema', (value: any) => { value.schema = 1; }],
     ['derived summary', (value: any) => { value.production.summary.red.rangePx = 0; }],
     ['frozen control', (value: any) => {
       value.production.busyPoints.forEach((point: any) => { point.blue = 1; });

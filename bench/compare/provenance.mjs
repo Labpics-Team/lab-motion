@@ -20,6 +20,77 @@ import path from 'node:path';
 
 const RUNTIME_FILE = /\.(?:c?js|mjs)$/;
 
+function publishedRuntimeFiles(packageMetadata) {
+  const files = new Set();
+  const visit = (value) => {
+    if (typeof value === 'string') {
+      if (value.startsWith('./dist/') && RUNTIME_FILE.test(value)) files.add(value.slice(2));
+      return;
+    }
+    if (Array.isArray(value)) {
+      value.forEach(visit);
+      return;
+    }
+    if (value !== null && typeof value === 'object') Object.values(value).forEach(visit);
+  };
+  visit(packageMetadata.exports);
+  return files;
+}
+
+function localRuntimeImports(root, entry) {
+  const source = readFileSync(entry, 'utf8');
+  const specifiers = new Set();
+  const patterns = [
+    /\b(?:import\s+(?:[^'\"]*?\s+from\s+)?|export\s+[^'\"]*?\s+from\s+)['\"]([^'\"\r\n]+)['\"]/g,
+    /\bimport\s*\(\s*['\"]([^'\"\r\n]+)['\"]\s*\)/g,
+  ];
+  for (const pattern of patterns) {
+    for (const match of source.matchAll(pattern)) specifiers.add(match[1]);
+  }
+  const imports = [];
+  for (const specifier of specifiers) {
+    if (!specifier.startsWith('.')) continue;
+    const absolute = path.resolve(path.dirname(entry), specifier);
+    const relative = path.relative(root, absolute).split(path.sep).join('/');
+    if (!relative.startsWith('dist/') || !RUNTIME_FILE.test(relative)) continue;
+    imports.push(relative);
+  }
+  return imports;
+}
+
+/**
+ * Бенч не может объявить артефактом или импортировать удалённый публичный вход.
+ * Проверка идёт до дорогой сборки/браузера и выводится из package.exports —
+ * отдельного списка существующих subpath здесь нет.
+ */
+export function assertBenchmarkExportSurface({
+  root,
+  requiredDist = [],
+  requiredEntries = [],
+}) {
+  const packageMetadata = JSON.parse(readFileSync(path.join(root, 'package.json'), 'utf8'));
+  const published = publishedRuntimeFiles(packageMetadata);
+  const required = new Set();
+  for (const declared of requiredDist) {
+    const relative = declared.replace(/^\.\//, '').split(path.sep).join('/');
+    if (!published.has(relative)) {
+      throw new Error(`provenance: requiredDist ${declared} не соответствует package export`);
+    }
+    required.add(relative);
+  }
+  for (const [label, entry] of requiredEntries) {
+    if (!existsSync(entry)) throw new Error(`provenance: benchmark entry отсутствует: ${entry}`);
+    for (const relative of localRuntimeImports(root, entry)) {
+      if (!published.has(relative)) {
+        throw new Error(`provenance: ${label} ссылается на отсутствующий package export ${relative}`);
+      }
+      if (!required.has(relative)) {
+        throw new Error(`provenance: ${label} импортирует ${relative}, не закреплённый в requiredDist`);
+      }
+    }
+  }
+}
+
 export function sha256Bytes(bytes) {
   return createHash('sha256').update(bytes).digest('hex');
 }
@@ -274,11 +345,13 @@ export function prepareBenchmarkCheckout({
   }),
   requireClean = true,
   requiredInputs = [],
+  requiredEntries = [],
 }) {
   const before = readState(root);
   if (requireClean && before.dirty) {
     throw new Error('provenance: publish-бенчмарк требует clean checkout');
   }
+  assertBenchmarkExportSurface({ root, requiredDist, requiredEntries });
   const environment = captureEnvironment(root, benchDirectory);
   build(root);
   for (const relative of requiredDist) {
@@ -298,7 +371,7 @@ export function prepareBenchmarkCheckout({
   return {
     ...checkout,
     builtAt: new Date().toISOString(),
-    inputs: inputHashes(root, benchDirectory, requiredInputs),
+    inputs: inputHashes(root, benchDirectory, [...requiredInputs, ...requiredEntries]),
     distRuntime: hashFileTree(path.join(root, 'dist'), (file) => RUNTIME_FILE.test(file)),
     environment,
   };

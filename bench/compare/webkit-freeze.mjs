@@ -44,7 +44,7 @@ import {
 
 const HERE = path.dirname(fileURLToPath(import.meta.url));
 const ROOT = path.resolve(HERE, '..', '..');
-const ENTRY = path.join(HERE, 'entries', 'lab-native.entry.mjs');
+const ENTRY = path.join(HERE, 'entries', 'lab-spring.entry.mjs');
 
 function fail(message) {
   throw new Error(`WebKit freeze-бенч: ${message}`);
@@ -88,7 +88,7 @@ function coloredLeftEdge(buffer, color) {
 }
 
 function buildAdapter(directory) {
-  const outfile = path.join(directory, 'lab-native.iife.js');
+  const outfile = path.join(directory, 'lab-animate.iife.js');
   esbuild.buildSync({
     entryPoints: [ENTRY],
     bundle: true,
@@ -183,13 +183,13 @@ console.log('=== Подготовка воспроизводимого арте�
 const provenance = prepareBenchmarkCheckout({
   root: ROOT,
   benchDirectory: HERE,
-  requiredDist: ['dist/animate/native/index.js'],
+  requiredDist: ['dist/animate/index.js'],
   requiredPackages: ['esbuild', 'playwright', 'pngjs'],
   requiredInputs: [
     ['bench/webkit-freeze.mjs', path.join(HERE, 'webkit-freeze.mjs')],
     ['bench/webkit-contract.mjs', path.join(HERE, 'webkit-contract.mjs')],
-    ['bench/entries/lab-native.entry.mjs', ENTRY],
   ],
+  requiredEntries: [['bench/entries/lab-spring.entry.mjs', ENTRY]],
 });
 
 const generatedAt = new Date().toISOString();
@@ -219,7 +219,7 @@ try {
   const production = await record('production', adapter.path, ffmpeg, artifactDirectory);
   assertCheckoutUnchanged(ROOT, provenance);
   const report = {
-    schema: 1,
+    schema: 2,
     generatedAt,
     provenance,
     toolchain: {
