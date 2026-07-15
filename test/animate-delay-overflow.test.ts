@@ -162,8 +162,7 @@ describe('animate: конечность итоговой delay', () => {
     expect(requestFrame).not.toHaveBeenCalled();
   });
 
-  // @todo-R3c: subframe-delay: live-v1 ведёт delay кадровым циклом (без wall-таймера) — счётчики rAF старого пути пере-выводятся в R3c
-  it.skip('тот же MAX schedule не даёт ложного overflow для нуля и одной цели', async () => {
+  it('тот же MAX schedule не даёт ложного overflow для нуля и одной цели', async () => {
     const empty = animate([], { opacity: [1, 0] }, {
       duration: 100,
       delay: Number.MAX_VALUE,
@@ -171,6 +170,9 @@ describe('animate: конечность итоговой delay', () => {
     });
     await expect(empty.finished).resolves.toBeUndefined();
 
+    // Одна цель: offset(0)=0, суммарный delay = MAX_VALUE — конечен, LM139 нет.
+    // WAAPI-first strict: цель с .animate едет юнитом — rAF не трогается вовсе
+    // (пере-вывод счётчика: старый rAF-фасад бутстрапил один кадровый цикл).
     const target = observedTarget();
     const requestFrame = vi.fn(() => 1);
     const single = animate(target.el, { opacity: [1, 0] }, {
@@ -178,14 +180,15 @@ describe('animate: конечность итоговой delay', () => {
       delay: Number.MAX_VALUE,
       stagger: Number.MAX_VALUE,
       requestFrame,
+      setTimer: () => () => {},
     });
 
-    expect(requestFrame).toHaveBeenCalledTimes(1);
+    expect(requestFrame).not.toHaveBeenCalled();
     single.cancel();
+    await expect(single.finished).resolves.toBeUndefined();
   });
 
-  // @todo-R3c: subframe-delay: live-v1 ведёт delay кадровым циклом (без wall-таймера) — счётчики rAF старого пути пере-выводятся в R3c
-  it.skip('stagger reducedMotion обнуляет schedule до strict-easing', () => {
+  it('stagger reducedMotion обнуляет schedule до strict-easing', () => {
     const targets = [observedTarget(), observedTarget(), observedTarget()];
     const easing = vi.fn(() => Number.NaN);
     const requestFrame = vi.fn(() => 1);
@@ -202,11 +205,14 @@ describe('animate: конечность итоговой delay', () => {
           reducedMotion: true,
         },
         requestFrame,
+        setTimer: () => () => {},
       },
     );
 
+    // Обнулённый schedule снимается ДО вычисления easing (NaN-изинг с
+    // MAX-гэпом дал бы LM139); WAAPI-first: rAF в базе не используется.
     expect(easing).not.toHaveBeenCalled();
-    expect(requestFrame).toHaveBeenCalledTimes(1);
+    expect(requestFrame).not.toHaveBeenCalled();
     controls.cancel();
   });
 });

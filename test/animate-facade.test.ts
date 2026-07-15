@@ -234,8 +234,7 @@ describe('animate: цели (Класс А, integration)', () => {
 });
 
 describe('animate: stagger и delay (Класс А, integration)', () => {
-  // @todo-R3c: subframe-delay: граница кадра у delay/stagger в live-v1 сдвинута на тик (эпоха MotionValue после делэя); точный перенос фазы — R3c
-  it.skip('stagger: 40 — каскад: el0 сразу, el1 после 40мс, el2 после 80мс', () => {
+  it('stagger: 40 — каскад: el0 сразу, el1 после 40мс, el2 после 80мс', () => {
     const a = fakeEl();
     const b = fakeEl();
     const c = fakeEl();
@@ -276,8 +275,7 @@ describe('animate: stagger и delay (Класс А, integration)', () => {
     expect(translateXSeries(a.writes).at(-1) ?? 0).toBe(0);
   });
 
-  // @todo-R3c: subframe-delay: граница кадра у delay/stagger в live-v1 сдвинута на тик (эпоха MotionValue после делэя); точный перенос фазы — R3c
-  it.skip('delay задерживает старт всех элементов', () => {
+  it('delay задерживает старт всех элементов', () => {
     const f = fakeEl();
     const clock = makeClock();
     animate(f.el, { x: 100 }, { spring: SPRING, delay: 100, requestFrame: clock.requestFrame });
