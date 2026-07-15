@@ -492,6 +492,12 @@ export class CompositorUnit {
    * Bounded-таймер завершения: инжектированные часы — единственный авторитет
    * (host currentTime/finished не читаются). Кламп int32 добирается
    * повторными плечами; дрейф paused/seek переармирует то же плечо.
+   *
+   * Wake — host-колбэк: тело транзакционно, синхронный ре-wake из hostile
+   * setTimer гасится замком (канон реентри юнита) — рекурсивная цепь плеч
+   * не строится. Бросок шва при (пере)армировании — та же fail-closed
+   * дисциплина, что у host-старта: частичный effect снимается, юнит
+   * терминализируется реджектом finished; wake-вызыватель броска не видит.
    */
   private _armTimer(): void {
     this._clearTimer();
@@ -505,11 +511,19 @@ export class CompositorUnit {
     };
     this._timerOff = off;
     const wait = Math.min(Math.max(this._deadline - this._position(), 0), MAX_TIMER_MS);
-    hostOff = this._setTimer(() => {
-      if (this._timerOff !== off || this._done || this._paused) return;
-      if (this._position() >= this._deadline) this._complete();
-      else this._armTimer();
-    }, wait);
+    try {
+      hostOff = this._setTimer(() => {
+        if (this._timerOff !== off || this._done || this._paused || this._locked) return;
+        this._transaction(() => {
+          if (this._position() >= this._deadline) this._complete();
+          else this._armTimer();
+        });
+      }, wait);
+    } catch (error) {
+      if (this._timerOff === off) this._timerOff = undefined;
+      this._cancelAnim();
+      this._finish(false, error);
+    }
   }
 
   /** Естественное завершение: финальная поза из плана (SSOT), не из хоста. */
