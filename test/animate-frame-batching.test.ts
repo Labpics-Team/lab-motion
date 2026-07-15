@@ -9,7 +9,7 @@ import { describe, expect, it, vi } from 'vitest';
 import { animate as animateBase } from '../src/animate/index.js';
 import type { AnimatableElement } from '../src/animate/index.js';
 import { frame as defaultFrame } from '../src/frame/index.js';
-import { fakeEl, makeClock, withLiveEngine } from './animate-facade-helpers.js';
+import { fakeEl, makeClock, translateXSeries, withLiveEngine } from './animate-facade-helpers.js';
 
 // Харнесс R3b: rAF-пути исполняет композируемый live-движок (см. helpers).
 const animate = withLiveEngine(animateBase as never);
@@ -432,5 +432,93 @@ describe('animate: общий main-thread FrameLoop', () => {
       defaultFrame.cancelAll();
       vi.unstubAllGlobals();
     }
+  });
+});
+
+// ─── Наследие SurfaceBatch (R3c-1): инварианты, пережившие модуль ─────────────
+//
+// Сам scheduler умер вместе с rAF-фасадом; переносимые инварианты живут на
+// live-движке: (1) N полос одной группы делят ОДИН requestFrame-шов;
+// (2) сбой host-schedule у successor не рушит старого владельца;
+// (3) индивидуальный supersede не останавливает sibling старого aggregate.
+
+describe('animate live: полосы группы делят один requestFrame-шов', () => {
+  it('numeric-вектор + css-полоса: один колбэк на кадр, не по числу полос', () => {
+    const events: string[] = [];
+    const el = loggedElement('a', events).el;
+    const clock = makeClock();
+    let requests = 0;
+    const requestFrame = (cb: (ts?: number) => void): number => {
+      requests++;
+      return clock.requestFrame(cb);
+    };
+
+    // Группа transform: x/y/scale (3 полосы) + группа width (css-полоса).
+    const controls = animate(el, { x: 100, y: 200, scale: 2, width: '100px' }, {
+      spring: { mass: 1, stiffness: 170, damping: 26 },
+      requestFrame,
+    });
+    // Два live-рана (по одному на группу) — по одному bootstrap-колбэку.
+    expect(requests).toBe(2);
+    clock.step(16);
+    expect(requests).toBe(4); // ровно +1 на кадр на группу, не +4 полосы
+    clock.step(16);
+    expect(requests).toBe(6);
+    controls.cancel();
+    clock.step(16); // выданные кадры инертны после cancel
+    expect(requests).toBe(6);
+  });
+});
+
+describe('animate live: атомарность владения при сбое host-schedule', () => {
+  it('host scheduler failure successor сохраняет старого owner', async () => {
+    const target = fakeEl();
+    const clock = makeClock();
+    const source = animate(target.el, { x: [0, 100] }, {
+      duration: 1000,
+      ease: (t) => t,
+      requestFrame: clock.requestFrame,
+    });
+    let finished = false;
+    void source.finished.then(() => {
+      finished = true;
+    });
+
+    // Сбой requestFrame при создании successor: rollback ДО publish —
+    // прежний владелец жив и не терминализирован.
+    expect(() => animate(target.el, { x: 200 }, {
+      duration: 1000,
+      requestFrame: () => {
+        throw new Error('schedule failed');
+      },
+    })).toThrow('schedule failed');
+    await Promise.resolve();
+    expect(finished).toBe(false);
+
+    // Старый ран остаётся исполняемым владельцем.
+    clock.step(16);
+    clock.step(100);
+    expect(translateXSeries(target.writes).at(-1)!).toBeCloseTo(10, 9);
+    source.cancel();
+    await source.finished;
+  });
+
+  it('индивидуальный supersede не останавливает sibling старого aggregate', () => {
+    const a = fakeEl();
+    const b = fakeEl();
+    const clock = makeClock();
+    const first = animate([a.el, b.el], { x: [0, 100] }, {
+      duration: 1000,
+      requestFrame: clock.requestFrame,
+    });
+    const next = animate(a.el, { x: 200 }, {
+      duration: 1000,
+      requestFrame: clock.requestFrame,
+    });
+    clock.step(16);
+
+    expect(b.writes.length).toBeGreaterThan(0);
+    first.cancel();
+    next.cancel();
   });
 });
