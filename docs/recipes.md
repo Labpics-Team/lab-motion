@@ -9,6 +9,7 @@
 ```typescript
 import { createDrag } from '@labpics/motion/gestures';
 
+const el = document.querySelector('.card') as HTMLElement;
 const drag = createDrag({
   bounds: { x: { min: 0, max: 300 } },
   matchMedia: window.matchMedia.bind(window),
@@ -28,8 +29,10 @@ serialized position/right-slope по `Animation.currentTime` без style/layout
 Жест наследует этот импульс, а не аналитическую аппроксимацию:
 
 ```typescript
-// Продолжение примера drag выше; controller — CompositorSpring этого элемента.
+// ЗАМЕНА pointerdown-обработчика выше (не второй listener): controller —
+// CompositorSpring этого элемента, ведущий его текущую compositor-анимацию.
 el.addEventListener('pointerdown', (e) => {
+  el.setPointerCapture(e.pointerId);
   const live = controller.handoffToLive(); // отменяет Animation после snapshot
   const vx = live.velocity;
   live.destroy();                         // дальше владельцем становится gesture
@@ -42,6 +45,7 @@ el.addEventListener('pointerdown', (e) => {
 ```typescript
 import { createFlip } from '@labpics/motion/flip';
 
+const el = document.querySelector('.card') as HTMLElement;
 const fl = createFlip({
   requestFrame: requestAnimationFrame.bind(window),
   onStep: (t) => { el.style.transform = `translate(${t.tx}px, ${t.ty}px) scale(${t.sx}, ${t.sy})`; },
@@ -58,6 +62,7 @@ fl.play(first, el.getBoundingClientRect()); // элемент «доезжает
 import { drive } from '@labpics/motion';
 import { createPresence } from '@labpics/motion/presence';
 
+const el = document.querySelector('.toast') as HTMLElement;
 const spring = { mass: 1, stiffness: 200, damping: 24 };
 const p = createPresence({
   onExitStart: (done) => {
@@ -75,6 +80,8 @@ exit продолжает движение из текущих (value, velocity)
 ```typescript
 import { MotionValue } from '@labpics/motion';
 
+const el = document.querySelector('.toast') as HTMLElement;
+const undoButton = document.querySelector('.undo') as HTMLElement;
 const p = createPresence({
   onExitStart: (done, from, capture) => {
     const mv = new MotionValue({
@@ -90,10 +97,22 @@ const p = createPresence({
     mv.setTarget(0);
     capture(() => ({ value: mv.value, velocity: mv.velocity }));
   },
-  onEnterStart: (done, from, capture) => { /* тот же паттерн: цель 1, done при v === 1 */ },
+  onEnterStart: (done, from, capture) => {
+    const mv = new MotionValue({
+      initial: from?.value ?? 0, initialVelocity: from?.velocity ?? 0,
+      spring, clamp: false,
+    });
+    mv.onChange((v) => {
+      el.style.opacity = String(v);
+      if (v === 1 && mv.velocity === 0) done();
+    });
+    mv.setTarget(1);
+    capture(() => ({ value: mv.value, velocity: mv.velocity }));
+  },
 });
 p.exit();
-p.enter(); // передумали: reversed continuation из точки и скорости exit-рана
+// Передумали ДО onGone: reversed continuation из точки и скорости exit-рана.
+undoButton.addEventListener('click', () => p.enter(), { once: true });
 ```
 
 ## Скролл-прогресс → таймлайн
