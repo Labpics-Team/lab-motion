@@ -33,7 +33,8 @@ import {
   type SetTimerFn,
 } from '../compositor/core.js';
 import {
-  resolveCompositorTierCode,
+  prefersReduced,
+  resolveCompositorTierCodeFromCapability,
   type CompositorTierCode,
 } from '../compositor/detect.js';
 import {
@@ -342,9 +343,10 @@ export function animate(
     }
   }
 
-  // Тип/host-ошибки канонически гасит prefersReduced внутри tier-resolver.
-  const matchMedia = options.matchMedia ??
-    (globalThis as { matchMedia?: (query: string) => { matches: boolean } }).matchMedia;
+  // Accessibility policy — один snapshot на aggregate. Он сохраняет единый
+  // plan и не читает hostile capability целей, когда движение запрещено.
+  const reduced = els.length > 0 && prefersReduced(options.matchMedia ??
+    (globalThis as { matchMedia?: (query: string) => { matches: boolean } }).matchMedia);
   const now = options.now ?? defaultNow;
   const setTimer = options.setTimer ?? defaultSetTimer;
   // 2. Фаза plan/read: читаем и привязываем ВСЕ цели до первой мутации.
@@ -356,11 +358,12 @@ export function animate(
   for (let i = 0; i < els.length; i++) {
     const el = els[i]!;
     const delayMs = targetDelays?.[i] ?? baseDelay;
-    const tier = resolveCompositorTierCode({
-      target: el,
-      matchMedia,
-      requestFrame: options.requestFrame,
-    });
+    const tier = reduced
+      ? 3
+      : resolveCompositorTierCodeFromCapability(
+        typeof (el as Partial<WaapiTarget>).animate === 'function',
+        options.requestFrame,
+      );
     for (const [group, list] of groups) {
       const rec = groupRecord(el, group);
       const bound = bindGroup(el, group, list, rec);

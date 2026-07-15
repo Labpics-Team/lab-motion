@@ -161,6 +161,26 @@ describe('compositor stagger: строгая граница count', () => {
     }));
   });
 
+  it('hostile count отклоняется LM017 без coercion и до остальных полей', () => {
+    let coercions = 0;
+    const hostile = {
+      valueOf(): never {
+        coercions++;
+        throw new Error('count не должен приводиться к числу');
+      },
+    };
+    for (const count of [Symbol('count'), 1n, hostile]) {
+      expectLm017(() => compileStaggerPlan({
+        spring: { mass: -1, stiffness: 0, damping: -1 },
+        property: '',
+        from: Number.NaN,
+        to: Number.POSITIVE_INFINITY,
+        count: count as unknown as number,
+      }));
+    }
+    expect(coercions).toBe(0);
+  });
+
   it('группа не может получить обрезанный план и нулевой хвост', () => {
     const targets = new Array<undefined>(MAX_STAGGER_COUNT + 1);
     expectLm017(() => new CompositorStaggerGroup({

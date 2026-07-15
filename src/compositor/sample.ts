@@ -47,7 +47,23 @@ export function sampleSerializedSpring(
   delayMs = 0,
   out?: SerializedSpringSample,
 ): SerializedSpringSample {
-  const result = out ?? { value: 0, velocity: 0 };
+  return sampleSerializedSpringIntoUnchecked(
+    samples,
+    durationMs,
+    currentTimeMs,
+    delayMs,
+    out ?? { value: 0, velocity: 0 },
+  );
+}
+
+/** Allocation-free seam после проверки единоличного scratch-owner. */
+export function sampleSerializedSpringIntoUnchecked(
+  samples: SpringSerializedSamples,
+  durationMs: number,
+  currentTimeMs: number,
+  delayMs: number,
+  result: SerializedSpringSample,
+): SerializedSpringSample {
   const activeMs = currentTimeMs - delayMs;
   if (activeMs < 0) {
     result.value = 0;

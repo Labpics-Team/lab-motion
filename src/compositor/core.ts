@@ -66,15 +66,18 @@ import {
 } from './execution.js';
 import {
   animationTimeOrFallback,
-  sampleSerializedSpring,
+  sampleSerializedSpringIntoUnchecked,
   scaleSerializedVelocity,
 } from './sample.js';
 import { handoffToLive } from './handoff.js';
 import {
   type CompositorTier,
+  type CompositorTierCode,
   type MatchMediaLike,
+  COMPOSITOR_TIERS,
   requiresExplicitSpringKeyframes,
   resolveCompositorTier,
+  resolveCompositorTierCode,
   supportsLinearEasing,
 } from './detect.js';
 
@@ -430,7 +433,7 @@ export class CompositorSpring {
   private readonly _requestFrame: RequestFrameFn | undefined;
   private readonly _delay: number;
   private readonly _setTimer: SetTimerFn;
-  private readonly _tier: CompositorTier;
+  private readonly _tier: CompositorTierCode;
 
   private _from: number;
   private _to: number;
@@ -493,7 +496,7 @@ export class CompositorSpring {
     this._value = opts.from;
     // Детекция тира — единственное обращение к среде в конструкторе (SSR-safe),
     // один раз. matchMedia (reduce) имеет высший precedence над WAAPI/linear().
-    this._tier = resolveCompositorTier({
+    this._tier = resolveCompositorTierCode({
       target: opts.target,
       matchMedia: opts.matchMedia,
       requestFrame: opts.requestFrame,
@@ -506,7 +509,7 @@ export class CompositorSpring {
    * весь жизненный цикл контроллера (детекция один раз в конструкторе).
    */
   get tier(): CompositorTier {
-    return this._tier;
+    return COMPOSITOR_TIERS[this._tier]!;
   }
 
   /**
@@ -556,7 +559,7 @@ export class CompositorSpring {
       // Первичный старт несёт задержку (нативный WAAPI-delay, off-main-thread);
       // retarget/handoff вызывают _emitCompositor с delay=0 (события «сейчас»).
       this._emitCompositor(this._from, this._to, this._v0Norm, artifact!, this._delay);
-    } else if (this._tier === 'reduced') {
+    } else if (this._tier === 3) {
       this._settleImmediately(this._to);
     } else {
       // Живой rAF-путь (waapi-no-linear / raf / ssr).
@@ -594,7 +597,7 @@ export class CompositorSpring {
     if (this._destroyed) return;
     validateFinite(newTarget);
 
-    if (this._tier === 'reduced') {
+    if (this._tier === 3) {
       // reduce активен: снап к новой цели, без анимации.
       this._to = newTarget;
       this._settleImmediately(newTarget);
@@ -696,7 +699,7 @@ export class CompositorSpring {
       return inert;
     }
 
-    if (this._tier === 'reduced') {
+    if (this._tier === 3) {
       // reduce активен: живой путь НЕ должен анимировать. Отдаём MotionValue,
       // рождённый уже на цели (в покое) — согласовано со снап-политикой. Значение
       // эмитится один раз; дальнейшее движение — на усмотрение владельца.
@@ -776,7 +779,7 @@ export class CompositorSpring {
   // ─── Приватное ──────────────────────────────────────────────────────────────
 
   private _usesCompositor(): boolean {
-    return this._tier === 'compositor' && !this._forceLive;
+    return this._tier === 0 && !this._forceLive;
   }
 
   /** Снимает host-owner один раз даже при бросающем getter/call cancel. */
@@ -799,7 +802,7 @@ export class CompositorSpring {
       this._anim,
       this._now() - this._startTime,
     );
-    const sample = sampleSerializedSpring(
+    const sample = sampleSerializedSpringIntoUnchecked(
       this._samples!,
       this._durationMs,
       currentTime,

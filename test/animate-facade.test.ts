@@ -162,9 +162,17 @@ describe('animate: ошибки границы (Класс А, unit)', () => {
   });
 
   it('пустой список целей → controls с уже разрешённым finished (no-op)', async () => {
-    const controls = animate([], { x: 100 }, { spring: SPRING });
+    let policyReads = 0;
+    const controls = animate([], { x: 100 }, {
+      spring: SPRING,
+      matchMedia: () => {
+        policyReads++;
+        throw new Error('пустой aggregate не должен читать host-policy');
+      },
+    });
     await controls.finished; // не зависает
     expect(typeof controls.cancel).toBe('function');
+    expect(policyReads).toBe(0);
   });
 });
 
