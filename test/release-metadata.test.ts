@@ -34,14 +34,14 @@ function metadata() {
         import: { types: './dist/index.d.ts', default: './dist/index.js' },
         require: { types: './dist/index.d.cts', default: './dist/index.cjs' },
       },
-      './animate/native': {
+      './compositor/stagger': {
         import: {
-          types: './dist/animate/native/index.d.ts',
-          default: './dist/animate/native/index.js',
+          types: './dist/compositor/stagger/index.d.ts',
+          default: './dist/compositor/stagger/index.js',
         },
         require: {
-          types: './dist/animate/native/index.d.cts',
-          default: './dist/animate/native/index.cjs',
+          types: './dist/compositor/stagger/index.d.cts',
+          default: './dist/compositor/stagger/index.cjs',
         },
       },
     },
@@ -134,7 +134,7 @@ describe('release metadata SSOT', () => {
     const root = metadata() as any;
     const archive = structuredClone(root);
     if (field === 'version') archive.version = '0.3.1';
-    else if (field === 'exports') archive.exports['./animate/native'].import.default = './dist/other.js';
+    else if (field === 'exports') archive.exports['./compositor/stagger'].import.default = './dist/other.js';
     else if (field === 'typesVersions') archive.typesVersions = { '*': { '*': ['wrong'] } };
     else if (field === 'sideEffects') archive.sideEffects = [];
     else if (field === 'files') archive.files = [...archive.files].reverse();

@@ -43,7 +43,7 @@ const RUNNABLE = Object.keys(pkg.exports).filter((k) => !PEER_BINDING_SUBPATHS.h
 const specOf = (sub) => (sub === '.' ? pkg.name : `${pkg.name}/${sub.slice(2)}`);
 
 /** DOM-facing субпути — их SSR-import (в Node без DOM) обязан НЕ падать. */
-const DOM_FACING = ['./compositor', './compositor/stagger', './animate', './animate/native', './nano', './gestures', './projection', './a11y', './presence', './flip', './waapi']
+const DOM_FACING = ['./compositor', './compositor/stagger', './animate', './nano', './gestures', './projection', './a11y', './presence', './flip', './waapi']
   .filter((s) => RUNNABLE.includes(s));
 
 const work = mkdtempSync(join(tmpdir(), 'labmotion-pack-compat-'));
@@ -266,12 +266,10 @@ try {
       join(dir, 'consumer.ts'),
       `import { spring } from '${pkg.name}';\n` +
         `import { clamp } from '${pkg.name}/utils';\n` +
-        `import { animate } from '${pkg.name}/animate/mini';\n` +
-        `import { springTo } from '${pkg.name}/animate/native';\n` +
         `import { animate as nanoAnimate } from '${pkg.name}/nano';\n` +
         `import { compileStaggerPlan } from '${pkg.name}/compositor/stagger';\n` +
         `export const value: number = clamp(0, 1, spring({ mass: 1, stiffness: 200, damping: 20 }, 0.1).value);\n` +
-        `export const motion = [animate, springTo, nanoAnimate, compileStaggerPlan] as const;\n`,
+        `export const motion = [nanoAnimate, compileStaggerPlan] as const;\n`,
     );
     const tscBin = join(ROOT, 'node_modules', 'typescript', 'bin', 'tsc');
     const trace = execSync(`node "${tscBin}" --project tsconfig.json --traceResolution`, {
@@ -280,8 +278,6 @@ try {
     }).replaceAll('\\', '/');
     for (const declaration of [
       'dist/utils/index.d.ts',
-      'dist/animate/mini/index.d.ts',
-      'dist/animate/native/index.d.ts',
       'dist/nano/index.d.ts',
       'dist/compositor/stagger/index.d.ts',
     ]) {

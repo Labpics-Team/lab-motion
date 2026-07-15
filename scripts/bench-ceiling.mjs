@@ -37,16 +37,18 @@ const provenance = prepareBenchmarkCheckout({
   requireClean: false,
   requiredDist: [
     'dist/animate/index.js',
-    'dist/animate/mini/index.js',
+    'dist/wc/index.js',
+    'dist/frame/index.js',
     'dist/utils/index.js',
     'dist/gestures/index.js',
   ],
 });
 
-const [{ animate: animateFull }, { animate: animateMini }, utils, gestures] =
+const [{ animate: animateFull }, { createLabSpringElementClass }, { frame }, utils, gestures] =
   await Promise.all([
     import(dist('dist/animate/index.js')),
-    import(dist('dist/animate/mini/index.js')),
+    import(dist('dist/wc/index.js')),
+    import(dist('dist/frame/index.js')),
     import(dist('dist/utils/index.js')),
     import(dist('dist/gestures/index.js')),
   ]);
@@ -67,19 +69,25 @@ function fakeTargets(count) {
   return Array.from({ length: count }, () => ({ style: FAKE_STYLE }));
 }
 
-/** Несколько вызовов и оба entry обязаны делить один package-level frame. */
+/** Несколько вызовов и разные entries обязаны делить один package-level frame. */
 function assertCrossEntryFanout() {
   const clock = makeClock();
   const previous = globalThis.requestAnimationFrame;
   globalThis.requestAnimationFrame = clock.requestFrame;
   try {
     const full = animateFull(fakeTargets(1), { x: [0, 240] }, { duration: 1_000_000, ease: LINEAR });
-    const mini = animateMini(fakeTargets(1), { x: [0, 240] }, { duration: 1_000_000, ease: LINEAR });
+    // Второй consumer общего frame — zero-dependency wc-binding (как в pack-smoke).
+    class Base { style = {}; getAttribute() { return null; } }
+    const host = new (createLabSpringElementClass(Base))();
+    host.connectedCallback();
+    host.attributeChangedCallback('target', '0', '1');
     if (clock.requests !== 1) throw new Error(`cross-entry: создано ${clock.requests} rAF вместо 1`);
     clock.step(16);
     if (clock.requests !== 2) throw new Error('cross-entry: кадр не сохранил единый rAF');
     full.cancel();
-    mini.cancel();
+    // У wc-хоста нет разъединяющего lifecycle-хука — общий scheduler гасится
+    // пакетным cancelAll (тот же приём, что в pack-smoke shared-frame пробе).
+    frame.cancelAll();
     const executions = clock.executions;
     clock.step(32);
     if (clock.requests !== 2 || clock.executions !== executions + 1) {
@@ -96,7 +104,7 @@ assertCrossEntryFanout();
 const massRows = [];
 let massChecksum = 0;
 const massScenarios = [];
-for (const [label, animate] of [['full', animateFull], ['mini', animateMini]]) {
+for (const [label, animate] of [['full', animateFull]]) {
   for (const motion of ['tween', 'spring']) {
     for (const count of MASS_LIFECYCLE_PROFILE.counts) {
       massScenarios.push({ id: `${label}-${motion}-${count}`, label, animate, motion, count });
@@ -188,7 +196,7 @@ for (const row of massRows) {
   }
 }
 
-line('\n  структурный гейт: full/mini/cross-entry — 1 rAF/кадр; cancel: 1 queued drain, 0 повторных заявок ✓');
+line('\n  структурный гейт: full/cross-entry — 1 rAF/кадр; cancel: 1 queued drain, 0 повторных заявок ✓');
 line(`  mass methodology: N=1/100/1000 × tween/spring; ${MASS_LIFECYCLE_RUNS} paired lifecycle clusters; start + 60 frames + teardown p50/p95/p99`);
 line(`  raw paired clusters: ${JSON.stringify(rawMass)}`);
 line(`  interpolate 1000 стопов: ${fmt(largeInterpolate.ns)}/запрос`);

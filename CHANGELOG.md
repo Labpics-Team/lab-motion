@@ -6,6 +6,16 @@
 
 ## [Unreleased]
 
+### Removed
+
+- **Breaking (pre-1.0):** публичные входы `./animate/mini` и `./animate/native`
+  удалены вместе с их гейтами и тестами; линейка анимации — ровно два входа:
+  `./nano` (platform-trusted, ≤1 КБ) и `./animate` (полный контракт).
+  Нишу native закрывает `./nano`; one-liner-сценарии mini живут в `./animate`
+  с тем же сигнатурным контрактом. Опубликованный npm `0.1.0` этих subpath не
+  содержал — миграция не требуется. Коды `LM145/LM148/LM152–LM155` переведены
+  в `retired`.
+
 ### Added
 
 - `./nano`: platform-trusted WAAPI to-only вход под hard gate 1 КБ gzip:

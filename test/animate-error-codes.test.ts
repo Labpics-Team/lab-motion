@@ -1,9 +1,7 @@
-/** Смысловые коды ошибок одинаковы во всех публичных animate-срезах. */
+/** Смысловые коды ошибок фасада ./animate (единственного полного среза). */
 
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { animate as fullAnimate } from '../src/animate/index.js';
-import { animate as miniAnimate } from '../src/animate/mini/index.js';
-import { springTo } from '../src/animate/native/index.js';
 import { __resetDetectionCache } from '../src/compositor/detect.js';
 import { __resetSpringExecutionCache } from '../src/compositor/execution.js';
 import { MotionParamError, type MotionParamErrorCode } from '../src/errors.js';
@@ -30,19 +28,6 @@ function thrownBy(run: () => unknown): unknown {
   return undefined;
 }
 
-function nativeElement(animation: unknown = {
-  cancel() {},
-  finished: Promise.resolve(),
-}): {
-  style: { setProperty(): void };
-  animate(): unknown;
-} {
-  return {
-    style: { setProperty() {} },
-    animate: () => animation,
-  };
-}
-
 beforeEach(() => {
   __resetDetectionCache();
   __resetSpringExecutionCache();
@@ -57,45 +42,36 @@ afterEach(() => {
 });
 
 describe('animate: общие коды режимов и значений', () => {
-  it('LM136 — конфликт spring и tween в full/mini', () => {
+  it('LM136 — конфликт spring и tween', () => {
     const options = { spring: SPRING, duration: 100 };
     expect(codeOf(() => fullAnimate(fakeEl().el, { x: 1 }, options))).toBe('LM136');
-    expect(codeOf(() => miniAnimate(fakeEl().el, { x: 1 }, options))).toBe('LM136');
   });
 
-  it('LM137/LM138 — duration и ease в full/mini', () => {
+  it('LM137/LM138 — duration и ease', () => {
     expect(codeOf(() => fullAnimate(fakeEl().el, { x: 1 }, { duration: 0 }))).toBe('LM137');
-    expect(codeOf(() => miniAnimate(fakeEl().el, { x: 1 }, { duration: 0 }))).toBe('LM137');
     expect(codeOf(() => fullAnimate(fakeEl().el, { x: 1 }, { ease: 1 as never }))).toBe('LM138');
-    expect(codeOf(() => miniAnimate(fakeEl().el, { x: 1 }, { ease: 1 as never }))).toBe('LM138');
   });
 
   it('диагностика не вызывает hostile toString после fail-fast guard', () => {
     const toString = vi.fn(() => 'poison');
     const hostile = { toString } as never;
     expect(codeOf(() => fullAnimate(fakeEl().el, { x: 1 }, { duration: hostile }))).toBe('LM137');
-    expect(codeOf(() => miniAnimate(fakeEl().el, { x: 1 }, { duration: hostile }))).toBe('LM137');
     expect(toString).not.toHaveBeenCalled();
   });
 
-  it('LM139 — отрицательные delay/stagger в full/mini', () => {
+  it('LM139 — отрицательные delay/stagger', () => {
     expect(codeOf(() => fullAnimate(fakeEl().el, { x: 1 }, { delay: -1 }))).toBe('LM139');
-    expect(codeOf(() => miniAnimate(fakeEl().el, { x: 1 }, { stagger: -1 }))).toBe('LM139');
+    expect(codeOf(() => fullAnimate(fakeEl().el, { x: 1 }, { stagger: -1 }))).toBe('LM139');
   });
 
-  it('LM140 — whole transform в full/mini', () => {
+  it('LM140 — whole transform', () => {
     expect(codeOf(() => fullAnimate(fakeEl().el, { transform: 'none' }))).toBe('LM140');
-    expect(codeOf(() => miniAnimate(fakeEl().el, { transform: 'none' }))).toBe('LM140');
   });
 
-  it('LM141/LM142 — пара и конечные числа в full/mini/native', () => {
+  it('LM141/LM142 — пара и конечные числа', () => {
     expect(codeOf(() => fullAnimate(fakeEl().el, { x: [0] as never }))).toBe('LM141');
-    expect(codeOf(() => miniAnimate(fakeEl().el, { x: [0] as never }))).toBe('LM141');
-    expect(codeOf(() => springTo(nativeElement() as never, { x: [0] } as never))).toBe('LM141');
 
     expect(codeOf(() => fullAnimate(fakeEl().el, { x: NaN }))).toBe('LM142');
-    expect(codeOf(() => miniAnimate(fakeEl().el, { x: NaN }))).toBe('LM142');
-    expect(codeOf(() => springTo(nativeElement() as never, { x: [0, NaN] }))).toBe('LM142');
   });
 
   it('LM150 не подменяет представимый MAX ↔ -MAX переполнением разности', () => {
@@ -108,15 +84,10 @@ describe('animate: общие коды режимов и значений', () =
 
   it('LM143/LM144 — тип и синтаксис CSS-значения', () => {
     expect(codeOf(() => fullAnimate(fakeEl().el, { backgroundColor: {} as never }))).toBe('LM143');
-    expect(codeOf(() => miniAnimate(fakeEl().el, { '--gap': {} as never }))).toBe('LM143');
+    expect(codeOf(() => fullAnimate(fakeEl().el, { '--gap': {} as never }))).toBe('LM143');
 
     expect(codeOf(() => fullAnimate(fakeEl().el, { backgroundColor: 'not-a-value' }))).toBe('LM144');
-    expect(codeOf(() => miniAnimate(fakeEl().el, { '--gap': 'not-a-value' }))).toBe('LM144');
-  });
-
-  it('LM145 — неподдерживаемое свойство в mini/native resolver', () => {
-    expect(codeOf(() => miniAnimate(fakeEl().el, { z: 1 }))).toBe('LM145');
-    expect(codeOf(() => springTo(nativeElement() as never, { z: [0, 1] } as never))).toBe('LM145');
+    expect(codeOf(() => fullAnimate(fakeEl().el, { '--gap': 'not-a-value' }))).toBe('LM144');
   });
 
   it.each([null, 42, true, '', () => {}, []])(
@@ -124,8 +95,6 @@ describe('animate: общие коды режимов и значений', () =
     (invalid) => {
       const target = fakeEl().el;
       expect(codeOf(() => fullAnimate(target, invalid as never))).toBe('LM151');
-      expect(codeOf(() => miniAnimate(target, invalid as never))).toBe('LM151');
-      expect(codeOf(() => springTo(nativeElement() as never, invalid as never))).toBe('LM151');
     },
   );
 
@@ -133,37 +102,25 @@ describe('animate: общие коды режимов и значений', () =
     const readLength = vi.fn(() => { throw new Error('target getter reached'); });
     const target = Object.defineProperty({}, 'length', { get: readLength });
     expect(codeOf(() => fullAnimate(target as never, null as never))).toBe('LM151');
-    expect(codeOf(() => miniAnimate(target, null as never))).toBe('LM151');
-    expect(codeOf(() => springTo(target as never, null as never))).toBe('LM151');
     expect(readLength).not.toHaveBeenCalled();
   });
 });
 
 describe('animate: общие коды целей', () => {
-  it('LM146 — неверный контейнер целей в full/mini/native', () => {
+  it('LM146 — неверный контейнер целей', () => {
     const invalid = { length: -1 };
     expect(codeOf(() => fullAnimate(invalid as never, { x: [0, 1] }))).toBe('LM146');
-    expect(codeOf(() => miniAnimate(invalid, { x: [0, 1] }))).toBe('LM146');
-    expect(codeOf(() => springTo(invalid as never, { x: [0, 1] }))).toBe('LM146');
   });
 
-  it('LM147 — неверный элемент списка в full/mini/native', () => {
+  it('LM147 — неверный элемент списка', () => {
     const invalid = [1] as never;
     expect(codeOf(() => fullAnimate(invalid, { x: [0, 1] }))).toBe('LM147');
-    expect(codeOf(() => miniAnimate(invalid, { x: [0, 1] }))).toBe('LM147');
-    expect(codeOf(() => springTo(invalid, { x: [0, 1] }))).toBe('LM147');
   });
 
-  it('LM148 — адаптер цели отсутствует в mini', () => {
-    expect(codeOf(() => miniAnimate([{}], { x: [0, 1] }))).toBe('LM148');
-  });
-
-  it('LM149 — selector без document в full/mini/native и selector не входит в message', () => {
+  it('LM149 — selector без document и selector не входит в message', () => {
     vi.stubGlobal('document', undefined);
     for (const run of [
       () => fullAnimate('.secret-selector', { x: [0, 1] }),
-      () => miniAnimate('.secret-selector', { x: [0, 1] }),
-      () => springTo('.secret-selector', { x: [0, 1] }),
     ]) {
       try {
         run();
@@ -174,27 +131,6 @@ describe('animate: общие коды целей', () => {
         expect((error as Error).message).not.toContain('secret-selector');
       }
     }
-  });
-});
-
-describe('animate/native: специальные коды', () => {
-  it('LM152 — props пуст', () => {
-    const target = nativeElement() as never;
-    expect(codeOf(() => springTo(target, {}))).toBe('LM152');
-  });
-
-  it('LM153 — WAAPI отсутствует', () => {
-    const target = { style: { setProperty() {} } };
-    expect(codeOf(() => springTo(target as never, { x: [0, 1] }))).toBe('LM153');
-  });
-
-  it('LM154 — CSS linear отсутствует вне WebKit', () => {
-    vi.stubGlobal('CSS', { supports: vi.fn(() => false) });
-    expect(codeOf(() => springTo(nativeElement() as never, { x: [0, 1] }))).toBe('LM154');
-  });
-
-  it('LM155 — host вернул некорректную Animation', () => {
-    expect(codeOf(() => springTo(nativeElement({}) as never, { x: [0, 1] }))).toBe('LM155');
   });
 });
 
@@ -242,7 +178,6 @@ describe('animate: options boundary', () => {
 
   it.each([
     ['full', fullAnimate],
-    ['mini', miniAnimate],
   ] as const)('%s проверяет numeric stagger до props и target', (_name, run) => {
     let touches = 0;
     const props = new Proxy({ x: [0, 1] as const }, {
@@ -265,10 +200,6 @@ describe('animate: options boundary', () => {
   it.each([
     ['full', fullAnimate, null],
     ['full', fullAnimate, 1],
-    ['mini', miniAnimate, null],
-    ['mini', miniAnimate, 1],
-    ['native', springTo, null],
-    ['native', springTo, 1],
   ] as const)('%s отвергает не-объект options до чтения остальных входов', (_name, run, options) => {
     let touches = 0;
     const style = {

@@ -146,7 +146,7 @@ try {
   writeFileSync(join(app, 'cjs.cjs'), cjsProbe);
   log(execSync('node cjs.cjs', { cwd: app, encoding: 'utf8' }).trim());
 
-  // 3. Публичный frame, mini и zero-dependency binding обязаны разделять один
+  // 3. Публичный frame, фасад ./animate и zero-dependency binding обязаны разделять один
   // scheduler ИМЕННО после pack/install. Source-тест не ловит дублирование,
   // которое создаёт сборщик при `splitting: false`: три entry могли пройти все
   // тесты, но поставить три native rAF на одном экране.
@@ -161,10 +161,10 @@ try {
 
     ${moduleKind === 'esm'
       ? `const { frame } = await import('${pkg.name}/frame');
-    const { animate } = await import('${pkg.name}/animate/mini');
+    const { animate } = await import('${pkg.name}/animate');
     const { createLabSpringElementClass } = await import('${pkg.name}/wc');`
       : `const { frame } = require('${pkg.name}/frame');
-    const { animate } = require('${pkg.name}/animate/mini');
+    const { animate } = require('${pkg.name}/animate');
     const { createLabSpringElementClass } = require('${pkg.name}/wc');`}
 
     const values = new Map([['opacity', '0']]);
@@ -280,7 +280,7 @@ try {
 
   // package#imports работает в Node/bundler, но голый browser/CDN ESM не читает
   // package.json при загрузке URL. Собранная ESM-ветка обязана ссылаться на
-  // общий scheduler относительным URL; иначе import('/dist/animate/mini') падает.
+  // общий scheduler относительным URL; иначе import('/dist/animate') падает.
   const browserBareFrame = runtimeFiles.filter(
     (file) => file.endsWith('.js') && /["']#frame["']/.test(readFileSync(file, 'utf8')),
   );
