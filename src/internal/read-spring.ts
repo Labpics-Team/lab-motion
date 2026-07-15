@@ -11,8 +11,6 @@ import { solveSpring, type MutableSpringBasis } from './solver.js';
 import { finiteOr } from './finite.js';
 import type { SpringParams } from './types.js';
 
-export type { MutableSpringBasis } from './solver.js';
-
 export interface MutableSpringState {
   value: number;
   velocity: number;

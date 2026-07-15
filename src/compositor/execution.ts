@@ -7,17 +7,15 @@
  * не нужны, поэтому этот внутренний путь не строит и не удерживает их на hit.
  */
 
-import { settleTimeUpperBound, type SpringParams } from '../spring.js';
+import type { SpringParams } from '../spring.js';
 import {
   clearSpringExecutionArtifactCacheUnchecked,
-  compileRestingSpringExecutionArtifactTupleUnchecked,
   compileSpringExecutionArtifactTupleUnchecked,
   DEFAULT_TOLERANCE,
   type SpringExecutionArtifactTuple,
   type SpringSerializedSamples,
 } from './curve.js';
 import { requiresExplicitSpringKeyframes } from './detect.js';
-import type { SpringNode } from './segmenter.js';
 
 export interface SpringExecutionPlan {
   readonly keyframes: Record<string, string | number>[];
@@ -89,23 +87,6 @@ function explicitKeyframes(
   return frames;
 }
 
-function buildPlan(
-  options: SpringExecutionOptions,
-  easing: string,
-  keyframes: Record<string, string | number>[],
-  durationMs: number,
-): SpringExecutionPlan {
-  return {
-    keyframes,
-    ...buildRuntimeTiming(
-      easing,
-      durationMs,
-      options.fill,
-      options.composite,
-    ),
-  };
-}
-
 export interface SpringExecutionOptions {
   readonly spring: SpringParams;
   readonly property: string;
@@ -116,81 +97,6 @@ export interface SpringExecutionOptions {
   readonly fill?: 'none' | 'forwards' | 'backwards' | 'both';
   readonly composite?: 'replace' | 'add' | 'accumulate';
   readonly format?: (v: number) => string | number;
-}
-
-/** Минимальные входы общей исполняемой кривой без лишних кадров свойства. */
-export type SpringRuntimeCurveOptions = Pick<
-  SpringExecutionOptions,
-  'spring' | 'v0' | 'tolerance' | 'fill' | 'composite'
->;
-
-/** Тайминг и узлы движка; составные потребители строят собственные кадры. */
-export interface SpringRuntimeCurve {
-  readonly easing: string;
-  readonly duration: number;
-  readonly iterations: 1;
-  readonly fill: 'none' | 'forwards' | 'backwards' | 'both';
-  readonly composite: 'replace' | 'add' | 'accumulate';
-  /** Chromium snapshot и WebKit keyframes делят одни serialized stops. */
-  readonly samples?: SpringSerializedSamples | undefined;
-}
-
-function buildRuntimeTiming(
-  easing: string,
-  duration: number,
-  fill: SpringFill | undefined,
-  composite: SpringComposite | undefined,
-): SpringRuntimeCurve {
-  // Все вызовы проходят валидирующую границу; для валидной пружины settle
-  // конечен и положителен, поэтому повторный defensive fallback здесь лишний.
-  return {
-    easing,
-    duration,
-    iterations: 1,
-    fill: fill ?? 'both',
-    composite: composite ?? 'replace',
-  };
-}
-
-export function buildSpringExecutionPlanUnchecked(
-  options: SpringExecutionOptions,
-  easing: string,
-): SpringExecutionPlan;
-export function buildSpringExecutionPlanUnchecked(
-  options: SpringExecutionOptions,
-  easing: string,
-  nodes: readonly SpringNode[],
-): SpringExecutionPlan & { readonly nodes: readonly SpringNode[] };
-export function buildSpringExecutionPlanUnchecked(
-  options: SpringExecutionOptions,
-  easing: string,
-  nodes?: readonly SpringNode[],
-): SpringExecutionPlan & { readonly nodes?: readonly SpringNode[] } {
-  const plan: SpringExecutionPlan & { nodes?: readonly SpringNode[] } =
-    buildPlan(
-      options,
-      easing,
-      endpointKeyframes(
-        options.property,
-        options.from,
-        options.to,
-        options.format,
-      ),
-      settleTimeUpperBound(options.spring, options.v0 ?? 0) * 1000,
-    );
-  if (nodes !== undefined) plan.nodes = nodes;
-  return plan;
-}
-
-/**
- * Совместимый внутренний вход после однократной валидации владельцем прогона.
- * Делегирует выбор исполняемой формы, чтобы старые потребители шва получили
- * безопасный для WebKit план без дублирования логики движка.
- */
-export function compileSpringExecutionPlanUnchecked(
-  options: SpringExecutionOptions,
-): SpringExecutionPlan {
-  return compileSpringRuntimeExecutionPlanUnchecked(options);
 }
 
 /**
@@ -268,44 +174,4 @@ export function compileSpringRuntimeExecutionPlanUnchecked(
     composite: tuple[4],
     samples: tuple[5],
   };
-}
-
-/**
- * Единый источник выбора, кэша и тайминга без кадров фиктивного свойства.
- * Составной нативный путь строит transform+opacity прямо по узлам и не
- * выделяет память под выбрасываемый план.
- */
-export function compileSpringRuntimeCurveUnchecked(
-  options: SpringRuntimeCurveOptions,
-): SpringRuntimeCurve & { readonly samples: SpringSerializedSamples } {
-  const artifact = compileSpringExecutionArtifactTupleUnchecked(
-    options.spring,
-    options.v0 ?? 0,
-    options.tolerance ?? DEFAULT_TOLERANCE,
-  );
-  const explicit = requiresExplicitSpringKeyframes();
-  return {
-    ...buildRuntimeTiming(
-      explicit ? 'linear' : artifact[0],
-      artifact[2],
-      options.fill,
-      options.composite,
-    ),
-    samples: artifact[1],
-  };
-}
-
-/** Узкий шов v0=0 с умолчаниями: результат пишется прямо в запись тайминга хоста. */
-export function compileRestingSpringRuntimeTimingIntoUnchecked(
-  spring: SpringParams,
-  timing: Record<string, unknown>,
-): SpringSerializedSamples | undefined {
-  const artifact = compileRestingSpringExecutionArtifactTupleUnchecked(spring, DEFAULT_TOLERANCE);
-  timing['duration'] = artifact[2];
-  if (requiresExplicitSpringKeyframes()) {
-    timing['easing'] = 'linear';
-    return artifact[1];
-  }
-  timing['easing'] = artifact[0];
-  return undefined;
 }
