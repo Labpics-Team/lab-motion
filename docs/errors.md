@@ -169,3 +169,4 @@
 | `LM155` | animate native host | Host вернул некорректную Animation | Исправить WAAPI или polyfill | retired |
 | `LM156` | animate options | Options не является объектом | Передать объект опций или не передавать аргумент | active |
 | `LM157` | animate transition | Реентрантная смена владельца | Завершить текущую host-транзакцию перед новым animate | active |
+| `LM158` | animate linear-compile | Ease вернула неконечное значение | Вернуть конечное число из ease-функции | active |
