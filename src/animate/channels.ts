@@ -152,12 +152,8 @@ export interface NumericChannel {
   readonly _to: number;
   /** Численно представимая цель солвера; финальный snap всё равно идёт в to. */
   readonly _solverTo: number;
-  /**
-   * Нормализованная скорость текущей кривой. WAAPI обновляет её одним числом
-   * из общего progress-снимка: так равенство осей определяется происхождением
-   * кривой, а не случайным округлением двух абсолютных диапазонов.
-   */
-  _v0: number;
+  /** Нормализованная скорость в представимом effect-space канала. */
+  readonly _v0: number;
   _value: number;
   _velocity: number;
   /** Последнее состояние, которое успешно прошло host write. */
@@ -207,7 +203,6 @@ function numericChannel(
   from: number,
   to: number,
   velocity: number,
-  sourceV0?: number,
 ): NumericChannel {
   const range = to - from;
   const representableRange = Math.max(
@@ -226,12 +221,9 @@ function numericChannel(
     _from: from,
     _to: to,
     _solverTo: solverTo,
-    // Структурный v0 допустим только когда публичный span сам представляет
-    // импульс. На target-crossing synthetic solver-span обязан заново
-    // нормализовать абсолютную скорость для C1 live-handoff.
-    _v0: sourceV0 !== undefined && solverTo === to
-      ? sourceV0
-      : normalizeV0(velocity, solverTo - from),
+    // Seed принадлежит effect-space: IEEE-rounded current может не сохранять
+    // алгебраическую связь с исходным progress, особенно на соседних huge f64.
+    _v0: normalizeV0(velocity, solverTo - from),
     _value: from,
     _velocity: velocity,
     _renderedValue: from,
@@ -265,7 +257,6 @@ export function rebaseNumericChannels(
       channel._value,
       channel._to,
       channel._velocity,
-      channel._v0,
     ),
   );
 }

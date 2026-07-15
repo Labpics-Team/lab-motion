@@ -1,13 +1,22 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import { channelAt, sharedV0, type NumericChannel } from '../src/animate/channels.js';
+import {
+  channelAt,
+  normalizeV0,
+  sharedV0,
+  type NumericChannel,
+} from '../src/animate/channels.js';
 import { animate, type AnimateProps } from '../src/animate/index.js';
 import {
   compileSpringExecutionArtifactUnchecked,
   DEFAULT_TOLERANCE,
+  tryCompileSpringExecutionArtifactTupleUnchecked,
 } from '../src/compositor/curve.js';
 import { __resetDetectionCache } from '../src/compositor/detect.js';
 import { readCompositorSpring } from '../src/compositor/index.js';
-import { sampleSerializedSpring } from '../src/compositor/sample.js';
+import {
+  sampleSerializedSpring,
+  scaleSerializedVelocity,
+} from '../src/compositor/sample.js';
 import { settleTimeUpperBound, type SpringParams } from '../src/spring.js';
 import {
   fakeEl,
@@ -206,6 +215,73 @@ describe('animate: конфликт uniform и осевого scale', () => {
     expect([...new Set(replayY)]).toEqual([Number.MAX_VALUE]);
     controls.cancel();
   });
+
+  it.each([
+    {
+      property: 'opacity',
+      // В верхней binade IEEE-754 шаг равен 2^971: это непосредственный
+      // predecessor MAX, а не произвольное "большое" тестовое число.
+      from: Number.MAX_VALUE - 2 ** 971,
+      to: Number.MAX_VALUE,
+      pickupMs: 134.4,
+    },
+    {
+      property: 'rotate',
+      // При 2^50 один ULP равен 0.25: второй независимый binade-контрпример.
+      from: 2 ** 50,
+      to: 2 ** 50 + 0.25,
+      pickupMs: 125.92,
+    },
+  ] as const)(
+    'pause/play сохраняет effect-space C1 у соседних huge $property endpoints',
+    ({ property, from, to, pickupMs }) => {
+      const initial = tryCompileSpringExecutionArtifactTupleUnchecked(
+        UNDERDAMPED,
+        0,
+        DEFAULT_TOLERANCE,
+      )!;
+      const sample = sampleSerializedSpring(initial[1], initial[2], pickupMs);
+      const current = channelAt({ _from: from, _to: to } as NumericChannel, sample.value);
+      const velocity = scaleSerializedVelocity(sample.velocity, from, to);
+      const effectV0 = normalizeV0(velocity, to - current);
+      const structuralV0 = sample.velocity / (1 - sample.value);
+
+      expect(Object.is(current, from)).toBe(true);
+      expect(effectV0).not.toBe(structuralV0);
+
+      const target = fakeEl({}, true);
+      target.el.animate = (keyframes, timing) => {
+        target.animateCalls.push({ keyframes, timing });
+        return {
+          currentTime: pickupMs,
+          cancel: () => { target.cancels++; },
+        };
+      };
+      const controls = animate(target.el, { [property]: [from, to] }, {
+        spring: UNDERDAMPED,
+        now: () => 0,
+        setTimer: () => () => {},
+      });
+
+      controls.pause();
+      controls.play();
+
+      const effectDuration = tryCompileSpringExecutionArtifactTupleUnchecked(
+        UNDERDAMPED,
+        effectV0,
+        DEFAULT_TOLERANCE,
+      )![2];
+      const structuralDuration = tryCompileSpringExecutionArtifactTupleUnchecked(
+        UNDERDAMPED,
+        structuralV0,
+        DEFAULT_TOLERANCE,
+      )![2];
+      expect(target.animateCalls).toHaveLength(2);
+      expect(target.animateCalls[1]!.timing.duration).toBe(effectDuration);
+      expect(target.animateCalls[1]!.timing.duration).not.toBe(structuralDuration);
+      controls.cancel();
+    },
+  );
 
   it('sharedV0 отклоняет даже Number.EPSILON-разницу без tolerance', () => {
     const channel = (_v0: number): NumericChannel => ({
@@ -501,8 +577,10 @@ describe('animate: конфликт uniform и осевого scale', () => {
     compatible.cancel();
   });
 
-  it('seek общей кривой не теряет compositor из-за поканального 1 ULP', () => {
+  it('seek переводит 1-ULP несовместимые effect-speeds на независимый main', () => {
     const target = fakeEl({}, true);
+    const clock = makeClock();
+    let requests = 0;
     const controls = animate(target.el, {
       scaleX: [2.998266875266529e-11, 9.325277294421096e-10],
       scaleY: [-1.0238667362138987e-8, -2.1550411860147135e-10],
@@ -510,14 +588,19 @@ describe('animate: конфликт uniform и осевого scale', () => {
       spring: SPRING,
       now: () => 0,
       setTimer: () => () => {},
+      requestFrame(callback) {
+        requests++;
+        return clock.requestFrame(callback);
+      },
     });
 
     expect(target.animateCalls).toHaveLength(1);
     controls.seek(120);
-    // Оба канала происходят из одного serialized progress. Пересчёт
-    // velocity / remainingRange даёт 8.127445620305012 и ...5010 только
-    // из-за округления; структурный v0 обязан сохранить единый WAAPI effect.
-    expect(target.animateCalls).toHaveLength(2);
+    // IEEE-rounded positions дают разные effect-space v0. Ни один общий WAAPI
+    // progress не сохраняет обе абсолютные скорости точно, поэтому C1 важнее
+    // compositor residency и каналы продолжаются независимо.
+    expect(target.animateCalls).toHaveLength(1);
+    expect(requests).toBeGreaterThan(0);
     controls.cancel();
   });
 });
