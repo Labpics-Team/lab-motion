@@ -9,12 +9,10 @@
 
 import { describe, expect, it } from 'vitest';
 import { MotionParamError } from '../src/errors.js';
-import { runAnimate } from '../src/animate/mini/engine.js';
 import { animate } from '../src/animate/mini/index.js';
 import { cssVarCodec, numberCodec } from '../src/animate/mini-codecs.js';
 import { isTransformKey as isTransformKeyMini } from '../src/animate/mini-codecs.js';
 import { isTransformKey as isTransformKeyFacade } from '../src/animate/channels.js';
-import { createFullRegistry } from '../src/animate/full-codecs.js';
 import { fakeEl, makeClock, type StyleWrite } from './animate-facade-helpers.js';
 
 const RF = (clock: ReturnType<typeof makeClock>): { requestFrame: (cb: (ts?: number) => void) => number } => ({
@@ -137,32 +135,6 @@ describe('F — анимация scaleX поверх residual scale меняет
     const last = lastVal(f.writes, 'transform')!;
     expect(last).toContain('scaleX(3)'); // осевой канал реально рендерится
     expect(last).not.toBe('scale(2)'); // старый uniform-scale не «съел» новый
-  });
-});
-
-// ─── G. svgAttrAdapter.surfaceOf отклоняет не-SVG имена fail-fast ─────────────
-// RED: surfaceOf=(p)=>p принимает scale/--foo → пишет scale="…"/--foo="…" (no-op).
-
-describe('G — SVG-адаптер отклоняет transform-шортхенды и CSS-vars', () => {
-  const fakeSvg = (): { el: Record<string, unknown> } => ({
-    el: {
-      namespaceURI: 'http://www.w3.org/2000/svg',
-      setAttribute: () => {},
-      getAttribute: () => null,
-    },
-  });
-  it('scale на SVG-цели → MotionParamError (fail-fast, гейт surfaceOf)', () => {
-    // Явная пара [1,2] исключает read-парс from → бросок ИМЕННО из surfaceOf.
-    const s = fakeSvg();
-    expect(() => runAnimate(createFullRegistry(), s.el, { scale: [1, 2] })).toThrow(MotionParamError);
-  });
-  it('--foo на SVG-цели → MotionParamError (fail-fast)', () => {
-    const s = fakeSvg();
-    expect(() => runAnimate(createFullRegistry(), s.el, { '--foo': [0, 1] })).toThrow(MotionParamError);
-  });
-  it('легитимный SVG-атрибут cx — проходит (не отклонён)', () => {
-    const s = fakeSvg();
-    expect(() => runAnimate(createFullRegistry(), s.el, { cx: [0, 10] })).not.toThrow();
   });
 });
 

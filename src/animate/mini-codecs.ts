@@ -10,8 +10,8 @@
  *
  * НЕ тянет ../value/index.js (движок цветов/юнитов ~2.6 KB) — только
  * buildTransform из ../value/transform.js (компоновка transform, дёшево).
- * Расширенные виды (цвет/SVG-атрибут/plain-object) живут в full-наборе и mini
- * их НЕ импортирует (граф mini не тянет full — проверяемо import-cost тестом).
+ * Расширенные виды значений (цвет) обслуживает полный фасад ./animate
+ * (channels.ts); mini их НЕ тянет (проверяемо import-cost сценарием).
  *
  * Инварианты: SSR-safe (DOM трогается только в apply/read В МОМЕНТ вызова);
  * fail-fast (parse на не-конечном/некорректном входе → MotionParamError ДО

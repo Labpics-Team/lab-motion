@@ -12,7 +12,6 @@
 
 import { describe, expect, it } from 'vitest';
 import { cssVarCodec, numberCodec } from '../src/animate/mini-codecs.js';
-import { colorCodec } from '../src/animate/full-codecs.js';
 import { lcg } from './animate-facade-helpers.js';
 
 const N = 12_000;
@@ -77,41 +76,6 @@ describe('fuzz — cssVarCodec.interpolate финитность (12k)', () => {
       expect(isFiniteSerialized(out), `u=${u} p=${p} → ${out}`).toBe(true);
       // Конечный p → ровно исходное значение (0-дельта, без дрейфа юнита/числа).
       if (Number.isFinite(p)) expect(out).toBe(cssVarCodec._serialize(v));
-    }
-  });
-});
-
-describe('fuzz — colorCodec.interpolate финитность (12k)', () => {
-  it('rgb-интерполяция на любом p — конечная css-строка', () => {
-    const rnd = lcg(555);
-    const hx = (): string => {
-      const c = (): string => Math.floor(rnd() * 256).toString(16).padStart(2, '0');
-      return `#${c()}${c()}${c()}`;
-    };
-    for (let i = 0; i < N; i++) {
-      const from = colorCodec._parse(hx(), 'color');
-      const to = colorCodec._parse(hx(), 'color');
-      const interp = colorCodec._interpolate(from, to);
-      const p = i % 40 === 0 ? HOSTILE_P[(i / 40) % HOSTILE_P.length]! : (rnd() - 0.5) * 2 + 0.5;
-      const out = colorCodec._serialize(interp(p));
-      expect(isFiniteSerialized(out), `p=${p} → ${out}`).toBe(true);
-    }
-  });
-
-  // Зеркало numberCodec-регресса: вырожденное from==to на ЛЮБОМ p (включая
-  // враждебный) даёт конечную css-строку — 0-дельта цвета не эмитит NaN.
-  it('вырожденное from==to на hostile p сериализуется конечно', () => {
-    const rnd = lcg(778899);
-    const hx = (): string => {
-      const c = (): string => Math.floor(rnd() * 256).toString(16).padStart(2, '0');
-      return `#${c()}${c()}${c()}`;
-    };
-    for (let i = 0; i < 2000; i++) {
-      const v = colorCodec._parse(hx(), 'color');
-      const interp = colorCodec._interpolate(v, v);
-      const p = i % 10 === 0 ? HOSTILE_P[(i / 10) % HOSTILE_P.length]! : rnd() * 3 - 1;
-      const out = colorCodec._serialize(interp(p));
-      expect(isFiniteSerialized(out), `p=${p} → ${out}`).toBe(true);
     }
   });
 });

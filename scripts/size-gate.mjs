@@ -165,20 +165,24 @@ export const BESPOKE_SUBPATH_GATES = {
   // Дедуп через splitting/shared chunks — отдельное архитектурное решение
   // Даниила на весь пакет, не этого субпутя. Поднимать только осознанно.
   './animate': FULL_ANIMATE_GATE_BYTES,
-  // ./animate/mini — ЛЁГКИЙ срез animate поверх адаптерного реестра кодеков/
-  // адаптеров (registry.ts): transform-компоненты + opacity + CSS-переменные,
-  // spring/tween в ЕДИНОМ прогресс-пространстве (внутренний unchecked sampler), delay/
-  // stagger, контролы, reduced-motion снап. Расширение — РЕГИСТРАЦИЕЙ кодека, не
-  // ростом switch. Граница поставки: mini НЕ импортирует full-набор/compositor-
-  // компилятор — граф не тянет ./value (цвета) и compileSpringPlan (доказано
-  // import-cost сценарием 'mini-one-liner' ниже: ~5.2 KB против ~10.9 KB full).
+  // ./animate/mini — ЛЁГКИЙ срез animate: transform-компоненты + opacity +
+  // CSS-переменные, spring/tween в ЕДИНОМ прогресс-пространстве (внутренний
+  // unchecked sampler), delay/stagger, контролы, reduced-motion снап. Кодеки/
+  // адаптеры выбирает компилированный O(1)-resolver (mini/index.ts) поверх
+  // фиксированного набора mini-codecs.ts; runtime-реестра в поставке нет —
+  // registry.ts даёт только типовой шов CodecResolver, расширение = новая
+  // реализация за швом, не рост switch в движке. Граница поставки: mini НЕ
+  // импортирует ./value (цвета) и compositor-компилятор compileSpringPlan
+  // (доказано import-cost сценарием 'animate-mini-one-liner' ниже:
+  // ~5.2 KB против ~10.9 KB full).
   // Потолок 5120 — headline эпика «≤ 5 KB» (первый потолок), НЕ от щедрого люфта.
   // Хронология факта/порога:
   //   2026-07-10: факт первой сборки 5050 gz (shipped, terser) → порог 5120.
   //   ЧЕСТНАЯ ГРАНИЦА: compositor-offload (WAAPI через compileSpringPlan) в mini
-  //   НЕ включён — floor «compositor+codecs+registry+frame» = 5186 gz БЕЗ движка,
-  //   физически не под 5120. mini гонит transform/opacity аналитической замкнутой
-  //   формой на main-потоке + reduced-motion детект; полный WAAPI-путь — в ./animate.
+  //   НЕ включён — floor «compositor+codecs+реестр той сборки+frame» мерился в
+  //   5186 gz БЕЗ движка, физически не под 5120. mini гонит transform/opacity
+  //   аналитической замкнутой формой на main-потоке + reduced-motion детект;
+  //   полный WAAPI-путь — в ./animate.
   //   Подъём порога — только решением владельца (это и есть класс, что гейт ловит).
   './animate/mini': 5120,
   // To-only individual properties + spring->linear() + native Animation controls.
