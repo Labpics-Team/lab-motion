@@ -160,10 +160,9 @@ export function prefersReduced(matchMedia: MatchMediaLike | undefined): boolean 
  * (WAAPI/linear/DOM) через кэшированные/дешёвые швы. SSR-safe: без побочек.
  */
 export function resolveCompositorTierCode(inputs: TierInputs): CompositorTierCode {
-  // 1. Политика доступности перекрывает всё (снап независимо от движка).
-  if (prefersReduced(inputs.matchMedia)) return 3;
-  return resolveCompositorTierCodeFromCapability(
-    supportsWaapi(inputs.target),
+  return resolveCompositorTierCodeFromInputs(
+    inputs.target,
+    inputs.matchMedia,
     inputs.requestFrame,
   );
 }
