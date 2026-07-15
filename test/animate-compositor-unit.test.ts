@@ -353,13 +353,13 @@ describe('compositor-unit: hostile host', () => {
     expect(target.writes).toHaveLength(0);
   });
 
-  it('animate вернул объект без cancel → LM155, партиал не остаётся', async () => {
+  it('animate вернул объект без cancel → LM162, партиал не остаётся', async () => {
     const target = fakeTarget(() => ({}));
     const f = makeFixture({ el: target.el });
     const unit = createCompositorUnit(f.plan)!;
     flushBatch();
 
-    await expect(unit.finished).rejects.toMatchObject({ code: 'LM155' });
+    await expect(unit.finished).rejects.toMatchObject({ code: 'LM162' });
     expect(target.writes).toHaveLength(0);
   });
 
@@ -782,9 +782,9 @@ describe('compositor-unit: LM-граница плана', () => {
     expectCode(() => createCompositorUnit(broken('seams', {})), 'LM156');
     expectCode(
       () => createCompositorUnit(broken('el', { style: { setProperty() {} } })),
-      'LM153',
+      'LM160',
     );
-    expectCode(() => createCompositorUnit(broken('el', { animate() {} })), 'LM148');
+    expectCode(() => createCompositorUnit(broken('el', { animate() {} })), 'LM161');
     expectCode(() => createCompositorUnit(broken('group', '')), 'LM010');
     expectCode(() => createCompositorUnit(broken('keyframes', [0])), 'LM141');
     expectCode(() => createCompositorUnit(broken('keyframes', [Number.NaN, 1])), 'LM142');

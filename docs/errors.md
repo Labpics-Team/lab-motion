@@ -171,3 +171,6 @@
 | `LM157` | animate transition | Реентрантная смена владельца | Завершить текущую host-транзакцию перед новым animate | active |
 | `LM158` | animate linear-compile | Ease вернула неконечное значение | Вернуть конечное число из ease-функции | active |
 | `LM159` | animate compositor-unit | IR не является кривой прогресса | Передать ProgressCurveIR из linear-compile | active |
+| `LM160` | animate compositor-unit | Цель не поддерживает WAAPI | Передать WAAPI-цель или зарегистрировать живой движок | active |
+| `LM161` | animate compositor-unit | Цель без style-адаптера | Передать цель с style.setProperty | active |
+| `LM162` | animate compositor-unit | Host вернул некорректную Animation | Исправить WAAPI или polyfill | active |

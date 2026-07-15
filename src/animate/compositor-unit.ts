@@ -466,7 +466,7 @@ export class CompositorUnit {
       // Read-once граница host-полей: методы читаются один раз сразу после
       // animate(); дальше hostile getters не имеют канала влияния.
       const cancel = anim?.['cancel'];
-      if (typeof cancel !== 'function') throw new MotionParamError('LM155');
+      if (typeof cancel !== 'function') throw new MotionParamError('LM162');
       const pause = anim!['pause'];
       const play = anim!['play'];
       const commit = anim!['commitStyles'];
@@ -641,7 +641,7 @@ if (disposeSymbol !== undefined) {
  * юнит, либо undefined-отказ: explicit-режим не представляет нечисловую
  * пару без интерполятора — маршрут решает планировщик (живой путь/отказ).
  *
- * Бросает MotionParamError по каталогу: LM153/LM148 (цель без animate /
+ * Бросает MotionParamError по каталогу: LM160/LM161 (цель без animate /
  * style), LM156 (швы/сигнал не функции), LM010 (пустое имя группы),
  * LM141/LM142/LM143 (пара from/to), LM139 (delay), LM137 (длительность IR),
  * LM159 (IR не является кривой прогресса).
@@ -663,9 +663,9 @@ export function createCompositorUnit(
     failUnit('LM156');
   }
   if (typeof (el as Partial<CompositorUnitTarget> | null)?.animate !== 'function') {
-    failUnit('LM153');
+    failUnit('LM160');
   }
-  if (typeof el.style?.setProperty !== 'function') failUnit('LM148');
+  if (typeof el.style?.setProperty !== 'function') failUnit('LM161');
   if (typeof group !== 'string' || group.length === 0) failUnit('LM010');
   if (!Array.isArray(pair) || pair.length !== 2) failUnit('LM141');
   const from: unknown = pair[0];
