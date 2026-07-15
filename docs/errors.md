@@ -170,3 +170,4 @@
 | `LM156` | animate options | Options не является объектом | Передать объект опций или не передавать аргумент | active |
 | `LM157` | animate transition | Реентрантная смена владельца | Завершить текущую host-транзакцию перед новым animate | active |
 | `LM158` | animate linear-compile | Ease вернула неконечное значение | Вернуть конечное число из ease-функции | active |
+| `LM159` | animate compositor-unit | IR не является кривой прогресса | Передать ProgressCurveIR из linear-compile | active |
