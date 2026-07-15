@@ -1164,6 +1164,10 @@ function controlsFor(owner: ExitOwner): AutoAnimateControls {
 /**
  * Zero-config аниматор childList-мутаций родителя. Возвращает контроллер;
  * среда без MutationObserver → инертный контроллер (SSR/legacy), не бросок.
+ * Повторный вызов на уже занятом parent возвращает контроллер его owner;
+ * новые options не перенастраивают действующую сессию.
+ * Ownership ограничен экземпляром модуля: для одного DOM-документа нужен один
+ * канонический экземпляр пакета, если разные callers могут трогать одни nodes.
  */
 export function autoAnimate(
   parent: AutoParent,
