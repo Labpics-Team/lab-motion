@@ -322,7 +322,14 @@ describe('compositor stagger: группа compositor-путь', () => {
         expect((error as MotionParamError).code).toBe('LM020');
       }
     }
-    expect(() => g.retarget(5, 10)).not.toThrow(); // void-мутатор остаётся no-op
+    expect(() => g.retarget(0, 10)).not.toThrow(); // живой индекс делегирует инертному ребёнку
+    try {
+      g.retarget(5, 10);
+      throw new Error('Ожидалась LM019');
+    } catch (error) {
+      expect(error).toBeInstanceOf(MotionParamError);
+      expect((error as MotionParamError).code).toBe('LM019');
+    }
     expect(rf).not.toHaveBeenCalled();
 
     const empty = new CompositorStaggerGroup({
@@ -372,9 +379,9 @@ describe('compositor stagger: группа fallback-путь (нет WAAPI)', ()
     g.start();
     expect(timers.scheduled).toHaveLength(1); // элемент 0 (delay 100) поставил таймер
     g.destroy();
-    expect(timers.scheduled[0]!.cancelled).toBe(true); // destroy → _clearTimer отменил (первичная защита)
+    expect(timers.scheduled[0]!.cancelled).toBe(true); // destroy снял и отменил единый host-owner
     const beforeCount = applied.length;
-    timers.flush(); // cancelled → колбэк не зван; плюс guard _destroyed внутри — двойная защита
+    timers.flush(); // harness не зовёт cancelled callback; terminal generation также отклонит поздний
     expect(applied.length).toBe(beforeCount); // никаких новых драйв-эмиссий после destroy
   });
 

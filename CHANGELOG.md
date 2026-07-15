@@ -22,6 +22,9 @@
 
 ### Fixed
 
+- `./compositor`: WAAPI effect и fallback timer теперь атомарно сменяют единственного
+  owner; stale callbacks и реентрантный host-cleanup не могут оживить или отменить
+  новый прогон, а `destroy()` разрывает удержание target, effect и timer.
 - `./auto`: exit использует единое identity-владение между сессиями; stale
   observer больше не забирает перенесённый узел, а reentrant disconnect
   детерминированно освобождает ghost, handlers, style leases и parent-ссылки.

@@ -168,6 +168,20 @@ export function resolveCompositorTierCode(inputs: TierInputs): CompositorTierCod
   );
 }
 
+/** Positional hot seam: групповой compositor не создаёт N временных TierInputs. */
+export function resolveCompositorTierCodeFromInputs(
+  target: unknown,
+  matchMedia: MatchMediaLike | undefined,
+  requestFrame: unknown,
+): CompositorTierCode {
+  // Сначала policy: reduced не должен читать даже hostile target capability.
+  if (prefersReduced(matchMedia)) return 3;
+  return resolveCompositorTierCodeFromCapability(
+    supportsWaapi(target),
+    requestFrame,
+  );
+}
+
 /** Внутренний вход после однократного non-policy capability snapshot. */
 export function resolveCompositorTierCodeFromCapability(
   hasWaapi: boolean,
