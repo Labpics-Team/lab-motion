@@ -226,7 +226,14 @@ try {
 
   // 5. Метаданные и документы, на которые ссылается README, должны доехать
   // до потребителя без отдельного источника истины вне npm-артефакта.
-  for (const file of ['LICENSE', 'README.md', 'package.json', 'docs/errors.md', 'docs/benchmark.md']) {
+  for (const file of [
+    'LICENSE',
+    'README.md',
+    'package.json',
+    'docs/errors.md',
+    'docs/benchmark.md',
+    'docs/recipes.md',
+  ]) {
     if (!existsSync(join(installedRoot, file))) {
       failed = true;
       log(`FAIL: ${file} не в артефакте`);
@@ -253,6 +260,12 @@ try {
       failed = true;
       log(`FAIL: пакетная методология: ${error?.message ?? String(error)}`);
     }
+  }
+  const installedRecipes = join(installedRoot, 'docs', 'recipes.md');
+  if (existsSync(installedRecipes)
+    && readFileSync(installedRecipes, 'utf8') !== readFileSync(join(ROOT, 'docs', 'recipes.md'), 'utf8')) {
+    failed = true;
+    log('FAIL: docs/recipes.md в артефакте расходится с исходником');
   }
 
   // 6. Карты исключены package#files-контрактом. Runtime-файлы также не должны

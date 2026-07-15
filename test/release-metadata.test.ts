@@ -45,7 +45,13 @@ function metadata() {
         },
       },
     },
-    files: ['dist', 'docs/errors.md', 'docs/benchmark.md', '!dist/**/*.map'],
+    files: [
+      'dist',
+      'docs/errors.md',
+      'docs/benchmark.md',
+      'docs/recipes.md',
+      '!dist/**/*.map',
+    ],
     publishConfig: { access: 'public' },
     sideEffects: [
       './dist/lit/index.js',
@@ -116,6 +122,9 @@ describe('release metadata SSOT', () => {
     ['parallel publish path', (pkg: any) => { pkg.scripts.prepublishOnly = 'pnpm build'; }],
     ['missing benchmark methodology', (pkg: any) => {
       pkg.files = pkg.files.filter((file: string) => file !== 'docs/benchmark.md');
+    }],
+    ['missing referenced recipes', (pkg: any) => {
+      pkg.files = pkg.files.filter((file: string) => file !== 'docs/recipes.md');
     }],
     ['wrong Node floor', (pkg: any) => { pkg.engines.node = '>=24'; }],
     ['missing peer', (pkg: any) => { delete pkg.peerDependencies.react; }],
