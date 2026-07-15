@@ -121,8 +121,9 @@ class LiveRun implements AnimateEngineRun {
   private _generation = 0;
 
   // ── Синтетический кадровый шов полос ──────────────────────────────────────
-  /** Тики, которые MotionValue-полосы попросили на следующий кадр. */
-  private _laneTicks: Array<(ts?: number) => void> = [];
+  /** Тики, которые MotionValue-полосы попросили на следующий кадр (один
+   *  переиспользуемый контейнер: горячий кадр не аллоцирует). */
+  private readonly _laneTicks: Array<(ts?: number) => void> = [];
   private readonly _laneFrame: RequestFrameFn = (cb) => {
     this._laneTicks.push(cb);
     return 1; // ненулевой handle: MotionValue не строит setTimeout-fallback
@@ -399,9 +400,14 @@ class LiveRun implements AnimateEngineRun {
   /** Кормит полосы одним локальным ts: атомарный вектор одного времени. */
   private _tickLanes(tMs: number): void {
     const ticks = this._laneTicks;
-    if (ticks.length === 0) return;
-    this._laneTicks = [];
-    for (const tick of ticks) tick(tMs);
+    const count = ticks.length;
+    if (count === 0) return;
+    // Голова исполняется, re-schedule полос прибывает в хвост ТОГО ЖЕ
+    // массива — горячий кадр не аллоцирует контейнеров (канон hot-path).
+    for (let i = 0; i < count; i++) ticks[i]!(tMs);
+    const remaining = ticks.length - count;
+    for (let i = 0; i < remaining; i++) ticks[i] = ticks[count + i]!;
+    ticks.length = remaining;
   }
 
   /** Кадр tween: точный ease-прогресс по всем каналам группы, один вызов ease. */
@@ -514,7 +520,7 @@ class LiveRun implements AnimateEngineRun {
     this._generation++;
     for (const lane of this._lanes) lane.value.destroy();
     this._cssProgress?.destroy();
-    this._laneTicks = [];
+    this._laneTicks.length = 0;
     this._resolve();
   }
 }

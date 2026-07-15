@@ -27,6 +27,7 @@ import {
   makeClock,
   pickAnimate,
   pickLiveAnimate,
+  readTranslateX,
   translateXSeries,
   numericSeries,
 } from './animate-facade-helpers.js';
@@ -450,5 +451,123 @@ describe('animate: duration/ease путь (Класс А)', () => {
     expect(numericSeries(f.writes, 'opacity').at(-1)).toBe(0.5);
     await controls.finished;
     expect(completed).toBe(1);
+  });
+});
+
+// ─── Наследие main-lane (R3c-1): пины, пережившие старый rAF-фасад ────────────
+
+describe('animate: харнесс разбора transform (пины helpers)', () => {
+  it.each([
+    ['1e-7', 1e-7],
+    ['-1.25e-7', -1.25e-7],
+    ['1e+7', 1e7],
+    ['-1.25e+7', -1.25e7],
+    ['.5', 0.5],
+  ])('test harness принимает CSS-number %s', (serialized, expected) => {
+    expect(readTranslateX(`translateX(${serialized}px)`)).toBe(expected);
+  });
+
+  it.each(['0x10', ' ', '1e+', '.', '1.', 'Infinity'])
+  ('test harness fail-closed отклоняет %s', (serialized) => {
+    expect(readTranslateX(`translateX(${serialized}px)`)).toBeNaN();
+  });
+
+  it('malformed последняя запись не маскируется предыдущей конечной', () => {
+    const values = translateXSeries([
+      { prop: 'transform', value: 'translateX(1px)' },
+      { prop: 'transform', value: 'translateX(1e+px)' },
+    ]);
+    expect(values[0]).toBe(1);
+    expect(values[1]).toBeNaN();
+  });
+});
+
+describe('animate: живой путь на overflow-спане MAX ↔ −MAX', () => {
+  it('tween не телепортируется в цель из-за overflow span (взвешенная форма)', () => {
+    const clock = makeClock();
+    const writes: number[] = [];
+    const controls = animate({
+      style: {
+        getPropertyValue: () => '',
+        setProperty(_name: string, value: string): void {
+          if (value === 'none') writes.push(0);
+          else writes.push(readTranslateX(value) ?? Number.NaN);
+        },
+      },
+    }, { x: [Number.MAX_VALUE, -Number.MAX_VALUE] }, {
+      duration: 1000,
+      ease: (progress: number) => progress,
+      requestFrame: clock.requestFrame,
+    });
+
+    clock.step(16);
+    clock.step(100);
+
+    expect(writes.every(Number.isFinite)).toBe(true);
+    expect(writes.at(-1)).not.toBe(-Number.MAX_VALUE);
+    controls.cancel();
+  });
+
+  it('spring на непредставимом спане завершается конечно и натурально', async () => {
+    // Политика ядра MotionValue: |from|+|to| переполняет range → снап к цели
+    // (документированный converged-гард); записи конечны, финал натуральный.
+    const clock = makeClock();
+    const writes: number[] = [];
+    let completed = 0;
+    const controls = animate({
+      style: {
+        getPropertyValue: () => '',
+        setProperty(_name: string, value: string): void {
+          if (value === 'none') writes.push(0);
+          else writes.push(readTranslateX(value) ?? Number.NaN);
+        },
+      },
+    }, { x: [Number.MAX_VALUE, -Number.MAX_VALUE] }, {
+      spring: SPRING,
+      requestFrame: clock.requestFrame,
+      onComplete: () => completed++,
+    });
+
+    clock.drain(16);
+    await controls.finished;
+    expect(writes.every(Number.isFinite)).toBe(true);
+    expect(writes.at(-1)).toBe(-Number.MAX_VALUE);
+    expect(completed).toBe(1);
+  });
+});
+
+describe('animate: fan-out контролов target-major (наследие plan-order)', () => {
+  it('public seek пробрасывает второй ease-сбой и не трогает поздние slots', () => {
+    const events: string[] = [];
+    const target = (id: string): { style: { getPropertyValue(n: string): string; setProperty(n: string, v: string): void } } => ({
+      style: {
+        getPropertyValue: () => '',
+        setProperty(name: string): void {
+          events.push(`write:${id}:${name}`);
+        },
+      },
+    });
+    let calls = 0;
+    const controls = animate(
+      [target('a'), target('b')],
+      { x: [0, 100], opacity: [1, 0] },
+      {
+        duration: 1000,
+        ease: (t: number) => {
+          calls++;
+          events.push(`compute:${calls}`);
+          if (calls === 2) throw new Error('seek failed');
+          return t;
+        },
+        requestFrame: () => 1,
+      },
+    );
+
+    expect(() => controls.seek(100)).toThrow('seek failed');
+    expect(events).toEqual([
+      'compute:1', 'write:a:transform',
+      'compute:2',
+    ]);
+    controls.cancel();
   });
 });

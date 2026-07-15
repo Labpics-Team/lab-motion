@@ -1,11 +1,14 @@
 import { withLiveEngine } from './animate-facade-helpers.js';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import {
-  channelAt,
-  normalizeV0,
-  sharedV0,
-  type NumericChannel,
-} from '../src/animate/channels.js';
+  buildCompositorPlan,
+  type CompositorPlanOptions,
+  type PlanGroupOwner,
+  type PlannedUnitGroup,
+  type PlanTarget,
+} from '../src/animate/compositor-plan.js';
+import type { ProgressSnapshot } from '../src/animate/compositor-unit.js';
+import { springProgressCurve } from '../src/animate/linear-compile.js';
 import { animate as animateBase, type AnimateProps } from '../src/animate/index.js';
 import {
   compileSpringExecutionArtifactUnchecked,
@@ -62,56 +65,98 @@ function scaleFrames(writes: readonly StyleWrite[], from = 0): { x: number; y: n
     .map((write) => scaleAxes(write.value));
 }
 
+// ─── Плановая обвязка: точные операнды и sharedV0-канон на новом ядре ─────────
+
+function planEl(initial: Record<string, string> = {}): PlanTarget {
+  const el: PlanTarget = {
+    style: {
+      setProperty(): void {},
+      getPropertyValue(name: string): string {
+        return initial[name] ?? '';
+      },
+    },
+  };
+  (el as { animate?: unknown }).animate = () => ({ cancel() {} });
+  return el;
+}
+
+function planOptions(
+  el: PlanTarget,
+  props: Record<string, unknown>,
+): CompositorPlanOptions {
+  return {
+    targets: [el],
+    props,
+    mode: { kind: 'spring', spring: SPRING },
+    seams: { now: () => 0, setTimer: () => () => {} },
+    capability: { linearSupported: true },
+    reducedMotion: false,
+  };
+}
+
+/** Публикует владельца с фиксированным снимком (середина полёта). */
+function publishOwner(
+  entry: PlannedUnitGroup,
+  snapshot?: ProgressSnapshot,
+): PlanGroupOwner {
+  const owner: PlanGroupOwner = {
+    _supersede(replacement?: () => void): void {
+      replacement?.();
+    },
+    _rollback(): void {},
+  };
+  if (snapshot) owner._snapshot = (): ProgressSnapshot => snapshot;
+  entry.begin();
+  entry.publish(owner);
+  return owner;
+}
+
 describe('animate: конфликт uniform и осевого scale', () => {
-  it('края сохраняют точные operands, включая знак IEEE-ноля', () => {
+  it('края держат точные operands, включая знак IEEE-ноля (реестр → кадры)', () => {
+    // Канон channelAt пережил модуль: кадры юнита — сами операнды (без
+    // интерполяции краёв), натуральный финал пишет в реестр ровно цель,
+    // и следующий план стартует с неё бит-в-бит (Object.is, −0 живёт).
     const cases = [
-      { from: -0, to: Number.MIN_VALUE, progress: 0, expected: -0 },
-      { from: Number.MIN_VALUE, to: -0, progress: 1, expected: -0 },
-      { from: -0, to: +0, progress: 1, expected: +0 },
-      { from: +0, to: -0, progress: 1, expected: -0 },
+      { from: -0, to: Number.MIN_VALUE },
+      { from: Number.MIN_VALUE, to: -0 },
+      { from: -0, to: +0 },
+      { from: +0, to: -0 },
     ];
-    for (const { from, to, progress, expected } of cases) {
-      const channel = { _from: from, _to: to } as NumericChannel;
-      expect(Object.is(channelAt(channel, progress), expected)).toBe(true);
+    for (const { from, to } of cases) {
+      const el = planEl();
+      const first = buildCompositorPlan(planOptions(el, { opacity: [from, to] }));
+      expect(Object.is(first.plans[0]!.plan.keyframes[0], from)).toBe(true);
+      expect(Object.is(first.plans[0]!.plan.keyframes[1], to)).toBe(true);
+      const owner = publishOwner(first.plans[0]!);
+      first.plans[0]!.settle(owner, true);
+
+      const second = buildCompositorPlan(planOptions(el, { opacity: 1 }));
+      expect(Object.is(second.plans[0]!.plan.keyframes[0], to)).toBe(true);
     }
   });
 
-  it('точный static-канал неподвижен для любого конечного progress', () => {
-    const values = [
-      -Number.MAX_VALUE,
-      -1e308,
-      -1,
-      -Number.MIN_VALUE,
-      -0,
-      0,
-      Number.MIN_VALUE,
-      1,
-      1e308,
-      Number.MAX_VALUE,
-    ];
-    const progress = [
-      -Number.MAX_VALUE,
-      -1e308,
-      -1,
-      -Number.MIN_VALUE,
-      -0,
-      0,
-      Number.MIN_VALUE,
-      0.5,
-      1,
-      2,
-      1e308,
-      Number.MAX_VALUE,
-    ];
-    for (const value of values) {
-      const staticChannel = {
-        _from: value,
-        _to: value,
-      } as NumericChannel;
-      for (const p of progress) {
-        expect(Object.is(channelAt(staticChannel, p), value)).toBe(true);
-      }
-    }
+  it('точный static-канал неподвижен: live-кадры держат операнд бит-в-бит', () => {
+    // Наследник пина channelAt(static, p) === value: движущийся сосед не
+    // сдвигает статичную ось ни на одном кадре живого прогона.
+    const target = fakeEl();
+    const clock = makeClock();
+    const controls = animate(target.el, {
+      x: [0, 100],
+      scaleY: [Number.MAX_VALUE, Number.MAX_VALUE],
+    }, {
+      duration: 100,
+      ease: LINEAR,
+      requestFrame: clock.requestFrame,
+    });
+    for (let i = 0; i < 5; i++) clock.step(16);
+    const scaleYs = target.writes
+      .filter((w) => w.prop === 'transform')
+      .map((w) => /scaleY\(([^)]+)\)/.exec(w.value)?.[1]);
+    expect(scaleYs.length).toBeGreaterThan(3);
+    expect(new Set(scaleYs.map((token) => Number(token)))).toEqual(
+      new Set([Number.MAX_VALUE]),
+    );
+    controls.cancel();
   });
 
   // @todo-R3c: pickup-parity: 1-ULP effect-space и WebKit-кадры старых лейнов; residual/оси-канон закреплён R3a-сьютом, точные пины — R3c
@@ -292,64 +337,74 @@ describe('animate: конфликт uniform и осевого scale', () => {
   );
 
   it('sharedV0 отклоняет даже Number.EPSILON-разницу без tolerance', () => {
-    const channel = (_v0: number): NumericChannel => ({
-      _from: 0,
-      _to: 1,
-      _solverTo: 1,
-      _velocity: _v0,
-      _v0,
-    }) as NumericChannel;
-    expect(sharedV0([channel(1), channel(1)])).toBe(1);
-    expect(sharedV0([channel(1), channel(1 + Number.EPSILON)])).toBeUndefined();
+    // Канон sharedV0 живёт в планировщике: равные v0 каналов — общая
+    // WAAPI-кривая, ULP-сдвиг производной скорости — честный живой путь.
+    const seeded = (prevYTo: number) => {
+      const el = planEl();
+      const first = buildCompositorPlan(
+        planOptions(el, { x: [0, 100], y: [0, prevYTo] }),
+      );
+      publishOwner(first.plans[0]!, { value: 0, velocity: 1 });
+      return buildCompositorPlan(planOptions(el, { x: 100, y: 100 }));
+    };
+
+    const equal = seeded(100); // v0x = v0y = 1 ровно
+    expect(equal.live).toHaveLength(0);
+    expect(equal.plans[0]!.plan.ir.points)
+      .toEqual(springProgressCurve(SPRING, 1)!.points);
+
+    const skewed = seeded(100 * (1 + Number.EPSILON)); // v0y = 1 + ULP
+    expect(skewed.plans).toHaveLength(0);
+    expect(skewed.live[0]!.reason).toBe('v0-mismatch');
   });
 
-  it('sharedV0 смотрит public span: живой нулевой span остаётся на main', () => {
-    const impulse = {
-      _from: 1.0000000074925934,
-      _to: 1.0000000074925934,
-      _solverTo: 1.0000000075925935,
-      _velocity: 8.97e-8,
-      _v0: 897,
-    } as NumericChannel;
-    expect(sharedV0([impulse])).toBeUndefined();
+  it('живой нулевой span с импульсом не получает общий WAAPI-прогресс', () => {
+    // Public span нулевой, но импульс жив: solver-амплитуда подменена —
+    // группа честно уходит на живой путь (канон «sharedV0 смотрит public span»).
+    const el = planEl();
+    const first = buildCompositorPlan(planOptions(el, { x: 100 }));
+    publishOwner(first.plans[0]!, { value: 1, velocity: 8.97e-10 });
+
+    const second = buildCompositorPlan(planOptions(el, { x: 100 }));
+    expect(second.plans).toHaveLength(0);
+    expect(second.live[0]!.reason).toBe('v0-mismatch');
   });
 
-  it('точный статический канал не ограничивает WAAPI-кривую движущегося', () => {
-    const moving = {
-      _from: 1,
-      _to: 3,
-      _solverTo: 3,
-      _velocity: 4,
-      _v0: 2,
-    } as NumericChannel;
-    const inert = {
-      _from: 2,
-      _to: 2,
-      _solverTo: 2,
-      _velocity: 0,
-      _v0: 0,
-    } as NumericChannel;
-    expect(sharedV0([moving, inert])).toBe(2);
-    expect(sharedV0([inert, moving])).toBe(2);
-  });
+  it.each([true, false])(
+    'точный статический канал не ограничивает WAAPI-кривую движущегося (movingFirst=%s)',
+    (movingFirst) => {
+      const el = planEl();
+      const first = buildCompositorPlan(planOptions(el, { x: 100 }));
+      publishOwner(first.plans[0]!, { value: 0.5, velocity: 1.2 });
 
-  it('ненулевой sub-epsilon span остаётся движущимся и ограничивает WAAPI', () => {
-    const tiny = {
-      _from: 1,
-      _to: 1 + Number.EPSILON,
-      _solverTo: 1 + Number.EPSILON,
-      _velocity: 0,
-      _v0: 0,
-    } as NumericChannel;
-    const moving = {
-      _from: 0,
-      _to: 1,
-      _solverTo: 1,
-      _velocity: 1,
-      _v0: 1,
-    } as NumericChannel;
-    expect(sharedV0([tiny, moving])).toBeUndefined();
-  });
+      // rotate заморожен явной парой [5,5]; x несёт импульс 120/(200−50)=0.8.
+      const props: AnimateProps = movingFirst
+        ? { x: 200, rotate: [5, 5] }
+        : { rotate: [5, 5], x: 200 };
+      const second = buildCompositorPlan(planOptions(el, props));
+      expect(second.live).toHaveLength(0);
+      expect(second.plans[0]!.plan.ir.points)
+        .toEqual(springProgressCurve(SPRING, 0.8)!.points);
+    },
+  );
+
+  it.each([true, false])(
+    'ненулевой sub-epsilon span остаётся движущимся и ограничивает WAAPI (tinyFirst=%s)',
+    (tinyFirst) => {
+      const el = planEl();
+      const first = buildCompositorPlan(planOptions(el, { x: 100 }));
+      publishOwner(first.plans[0]!, { value: 0.5, velocity: 1.2 });
+
+      // y движется на sub-epsilon span из покоя (v0=0), x несёт импульс —
+      // единого прогресса нет, группа не сворачивается в WAAPI.
+      const props: AnimateProps = tinyFirst
+        ? { y: [1, 1 + Number.EPSILON], x: 200 }
+        : { x: 200, y: [1, 1 + Number.EPSILON] };
+      const second = buildCompositorPlan(planOptions(el, props));
+      expect(second.plans).toHaveLength(0);
+      expect(second.live[0]!.reason).toBe('v0-mismatch');
+    },
+  );
 
   it.each(['scaleX', 'scaleY'] as const)(
     'после scale:2 новый %s:3 стартует с 2 и сохраняет вторую ось',

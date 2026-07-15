@@ -7,20 +7,14 @@
 import { readFileSync } from 'node:fs';
 import ts from 'typescript';
 import { describe, expect, it } from 'vitest';
-import {
-  bindGroup,
-  parseProps,
-  type BoundGroup,
-  type GroupRecord,
-} from '../src/animate/channels.js';
-import { MainUnit } from '../src/animate/main-unit.js';
-import { SurfaceBatch } from '../src/animate/surface-batch.js';
-import { WaapiUnit, type WaapiTarget } from '../src/animate/waapi-unit.js';
-import { __resetDetectionCache } from '../src/compositor/detect.js';
-import type { FrameLoop } from '../src/frame/index.js';
+import { animate as animateBase } from '../src/animate/index.js';
 import { buildTransform } from '../src/value/index.js';
 import type { TransformState } from '../src/value/transform.js';
 import { clampFinite } from '../src/value/units.js';
+import { fakeEl, makeClock, withLiveEngine } from './animate-facade-helpers.js';
+
+// Харнесс R3b: rAF-пути исполняет композируемый live-движок (см. helpers).
+const animate = withLiveEngine(animateBase as never);
 
 function referenceBuildTransform(state: TransformState): string {
   const parts: string[] = [];
@@ -227,82 +221,20 @@ describe('transform hot path: direct-container AST gate', () => {
     expect(directContainerSyntax(file, namedFunction(file, 'buildTransform'))).toEqual([]);
   });
 
-  it('MainUnit._write не содержит прямого локального контейнера', () => {
-    const main = source('src/animate/main-unit.ts');
-    expect(directContainerSyntax(main, namedFunction(main, '_write'))).toEqual([]);
+  it('горячие кадровые методы live не содержат прямых локальных контейнеров', () => {
+    // Наследник гейтов MainUnit._write / WaapiUnit._valueAt: кадровый цикл
+    // живого движка (шаг, тики полос, запись вектора) не аллоцирует.
+    const live = source('src/animate/live.ts');
+    for (const name of ['_step', '_tickLanes', '_tweenFrame', '_flushWrites', '_writeNumeric']) {
+      expect(directContainerSyntax(live, namedFunction(live, name)), name).toEqual([]);
+    }
   });
 
-  it('WaapiUnit formatter/snapshot/hold не содержат прямые локальные контейнеры', () => {
-    const waapi = source('src/animate/waapi-unit.ts');
-    expect(directContainerSyntax(waapi, namedFunction(waapi, '_valueAt')), '_valueAt').toEqual([]);
-    expect(directContainerSyntax(waapi, namedFunction(waapi, '_snapshotAt')), '_snapshotAt').toEqual([]);
-    expect(directContainerSyntax(waapi, namedFunction(waapi, '_holdInline')), '_holdInline').toEqual([]);
+  it('_holdInline юнита не содержит прямого локального контейнера', () => {
+    const unit = source('src/animate/compositor-unit.ts');
+    expect(directContainerSyntax(unit, namedFunction(unit, '_holdInline'))).toEqual([]);
   });
 });
-
-function makeTransformBound(el: WaapiTarget): { bound: BoundGroup; record: GroupRecord } {
-  const record: GroupRecord = {
-    _owner: undefined,
-    _transition: false,
-    _numeric: new Map(),
-    _cssValue: undefined,
-  };
-  const bound = bindGroup(
-    el,
-    'transform',
-    parseProps({ x: [0, 240], rotate: [0, 90] }),
-    record,
-  );
-  expect(bound._transform).toBeDefined();
-  return { bound, record };
-}
-
-function instrumentTransformState(state: Record<string, number>): {
-  readonly state: Record<string, number>;
-  readonly writes: () => number;
-} {
-  let writes = 0;
-  for (const key of FIELDS) {
-    let value = state[key];
-    Object.defineProperty(state, key, {
-      configurable: true,
-      enumerable: true,
-      get: () => value,
-      set: (next: number) => {
-        writes++;
-        value = next;
-      },
-    });
-  }
-  return { state, writes: () => writes };
-}
-
-function manualFrame(): { readonly frame: FrameLoop; tick(ts: number): void } {
-  let update: ((ts?: number) => void) | undefined;
-  let render: ((ts?: number) => void) | undefined;
-  const noRead = (): (() => void) => () => {};
-  return {
-    frame: {
-      read: noRead,
-      update(cb) {
-        update = cb;
-        return () => { if (update === cb) update = undefined; };
-      },
-      render(cb) {
-        render = cb;
-        return () => { if (render === cb) render = undefined; };
-      },
-      cancelAll() {
-        update = undefined;
-        render = undefined;
-      },
-    },
-    tick(ts) {
-      update?.(ts);
-      render?.(ts);
-    },
-  };
-}
 
 function countHotMapAllocations(run: () => void): number {
   const NativeMap = globalThis.Map;
@@ -323,99 +255,43 @@ function countHotMapAllocations(run: () => void): number {
 }
 
 describe.each([1, 1000])('transform Map/state evidence: N=$samples', (samples) => {
-  it('MainUnit пишет реальные кадры в один BoundGroup._transform', () => {
-    let styleWrites = 0;
-    const el: WaapiTarget = {
-      style: {
-        getPropertyValue: () => '',
-        setProperty: () => { styleWrites++; },
-      },
-      animate: () => ({ cancel() {} }),
-    };
-    const { bound, record } = makeTransformBound(el);
-    const tracked = instrumentTransformState(bound._transform!);
-    const clock = manualFrame();
-    const unit = new MainUnit({
-      _el: el,
-      _group: 'transform',
-      _record: record,
-      _bound: bound,
-      _mode: { _type: 'tween', _durationMs: 1_000_000, _ease: (t) => t },
-      _delayMs: 0,
-      _batch: new SurfaceBatch(clock.frame),
-      _onDone() {},
+  it('live-кадры tween: одна запись вектора на кадр, ноль Map-аллокаций', () => {
+    // Наследник evidence-пинов MainUnit/WaapiUnit: кадровый цикл живого
+    // движка пишет группу одной transform-декларацией и не строит Map.
+    const target = fakeEl();
+    const clock = makeClock();
+    const controls = animate(target.el, { x: [0, 240], rotate: [0, 90] }, {
+      duration: 1_000_000,
+      ease: (t: number) => t,
+      requestFrame: clock.requestFrame,
     });
-    record._owner = unit;
 
     const maps = countHotMapAllocations(() => {
-      for (let i = 0; i < samples; i++) clock.tick(i * 16);
+      for (let i = 0; i < samples; i++) clock.step(16);
     });
 
-    expect((unit as unknown as {
-      _o: { _bound: BoundGroup };
-    })._o._bound._transform).toBe(tracked.state);
-    expect(bound._transform).toBe(tracked.state);
-    expect(tracked.writes()).toBe(samples * bound._numeric.length);
-    expect(styleWrites).toBe(samples);
+    expect(target.writes).toHaveLength(samples); // один setProperty на кадр
+    expect(target.writes.every((w) => w.prop === 'transform')).toBe(true);
     expect(maps).toBe(0);
-    unit.cancel();
+    controls.cancel();
   });
 
-  it('WaapiUnit форматирует explicit samples через один BoundGroup._transform', () => {
-    let keyframeCount = 0;
-    const el: WaapiTarget = {
-      style: { getPropertyValue: () => '', setProperty() {} },
-      animate(keyframes) {
-        keyframeCount = keyframes.length;
-        return { cancel() {} };
-      },
-    };
-    const { bound, record } = makeTransformBound(el);
-    const tracked = instrumentTransformState(bound._transform!);
-    const serialized = new Float64Array(samples * 2);
-    for (let i = 0; i < samples; i++) {
-      serialized[i * 2] = samples === 1 ? 0 : i / (samples - 1) * 100;
-      serialized[i * 2 + 1] = samples === 1 ? 0 : i / (samples - 1);
-    }
-    const descriptor = Object.getOwnPropertyDescriptor(globalThis, 'navigator');
-    Object.defineProperty(globalThis, 'navigator', {
-      configurable: true,
-      value: { vendor: 'Apple Computer, Inc.', userAgent: 'AppleWebKit/617.1' },
+  it('live-кадры spring: вектор x/rotate — одна запись на кадр, ноль Map', () => {
+    const target = fakeEl();
+    const clock = makeClock();
+    const controls = animate(target.el, { x: [0, 240], rotate: [0, 90] }, {
+      spring: { mass: 1, stiffness: 100, damping: 10 },
+      requestFrame: clock.requestFrame,
     });
-    __resetDetectionCache();
-    let unit: WaapiUnit | undefined;
-    let maps = -1;
-    try {
-      maps = countHotMapAllocations(() => {
-        unit = new WaapiUnit({
-          _el: el,
-          _group: 'transform',
-          _record: record,
-          _numeric: bound._numeric,
-          _residuals: bound._residuals,
-          _transform: tracked.state,
-          _spring: { mass: 1, stiffness: 100, damping: 10 },
-          _delayMs: 0,
-          _now: () => 0,
-          _setTimer: () => () => {},
-          _getBatch: () => new SurfaceBatch(manualFrame().frame),
-          _onDone() {},
-          _artifact: ['linear(0, 1)', serialized, 1000],
-        });
-        unit._capture();
-      });
-    } finally {
-      if (descriptor === undefined) delete (globalThis as { navigator?: unknown }).navigator;
-      else Object.defineProperty(globalThis, 'navigator', descriptor);
-      __resetDetectionCache();
-    }
 
-    expect(unit).toBeDefined();
-    expect((unit as unknown as { _o: { _transform: unknown } })._o._transform).toBe(tracked.state);
-    expect(bound._transform).toBe(tracked.state);
-    expect(tracked.writes()).toBe(samples * bound._numeric.length);
-    expect(keyframeCount).toBe(samples);
+    const maps = countHotMapAllocations(() => {
+      for (let i = 0; i < samples; i++) clock.step(16);
+    });
+
+    expect(target.writes.length).toBeLessThanOrEqual(samples);
+    expect(target.writes.length).toBeGreaterThan(0);
+    expect(target.writes.every((w) => w.prop === 'transform')).toBe(true);
     expect(maps).toBe(0);
-    unit!._rollback();
+    controls.cancel();
   });
 });
