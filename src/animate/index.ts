@@ -1,47 +1,42 @@
 /**
- * animate/index.ts — одно-строчный DOM-фасад (subpath ./animate).
+ * animate/index.ts — одно-строчный DOM-фасад (subpath ./animate),
+ * WAAPI-first strict (срез R3b rebuild).
  *
  * Subpath export: import { animate } from '@labpics/motion/animate'
  *
- * ЗАЧЕМ: паритет DX с Motion/anime.js v4 — `animate(el, { x: 100 })` вместо
- * ручной сборки MotionValue/drive/CompositorSpring. Фасад НЕ добавляет физики:
- * вся математика — существующие ядро и субпути (см. карту ниже), здесь только
- * DOM-склейка (цели, каналы, реестр прерываний, маршрутизация путей).
+ * АРХИТЕКТУРНЫЙ КОНТРАКТ БАЗЫ (решение владельца, R3b):
+ *   - Базовый граф = планировщик (compositor-plan) + юнит (compositor-unit) +
+ *     компилятор кривых (linear-compile). rAF-движок в базу НЕ входит.
+ *   - Среда без WAAPI (и любая группа, не представимая синхронной кривой:
+ *     разошедшиеся v0, перебор бюджета сетки, нечисловая пара без linear())
+ *     получает ВАЛИДИРОВАННЫЙ СНАП к финалу — та же семантика, что политика
+ *     reduced-motion: мгновенный финал без кадров, finished резолвится,
+ *     onComplete срабатывает. Это документированный контракт деградации
+ *     (дисциплина native), а не скрытый запасной путь.
+ *   - Живой fallback — КОМПОЗИРУЕМЫЙ модуль (animate/live): регистрируется
+ *     опцией `engine`; база не несёт ни байта его реализации (тип стирается).
+ *     Цветовая C¹-непрерывность css-групп — второй композируемый модуль
+ *     (animate/format-css) через опцию `formatCssAt`; без него css
+ *     интерполирует браузер, а прерывание рестартует по политике R3a (C⁰,
+ *     from = цель прерванного прогона). Числовые группы C¹ всегда.
+ *   - WebKit-хедж явных кадров сознательно снят в базе: linear() исполняется
+ *     как есть (поддержка Baseline 12.2023); explicit-кадры остаются для
+ *     сред без linear() (числовые группы). Возврат хеджа — компонуемый слой.
  *
- * Карта переиспользования (ядро не тронуто ни байтом):
- *   ./compositor — readCompositorSpring (аналитика кадра и C¹-ретаргета),
- *                  compileSpringPlan (WAAPI-план), resolveCompositorTier (авто-tier);
- *   ./value      — parse/interpolate (цвета/юниты), buildTransform (шортхенды);
- *   internal defaults — тот же SSOT, что spring.default/duration.base/easing.standard;
- *   ./stagger    — каскад задержек (число = gap, конфиг — как есть).
+ * Маршрутизация (решение на вызов): reduced → снап-план; WAAPI + представимая
+ * кривая → Element.animate через юнит R2 (ноль работы main-потока); иначе →
+ * engine-опция либо снап. Повторный animate на том же (el, group) — прерывание
+ * с C¹-подхватом из аналитического снимка владельца (канон MotionValue).
  *
- * Маршрутизация (авто-tier, решение на вызов):
- *   reduced       → единая снап-политика пакета (мгновенный финал, без кадров);
- *   compositor    → spring-режим + transform/opacity → Element.animate
- *                   (вся кривая в linear()-easing, ноль работы main-потока);
- *   иначе         → main-thread rAF-микроцикл (та же замкнутая форма).
- *
- * Инварианты (наследуют ядро): SSR-safe импорт (DOM — только в вызове,
- * селектор резолвится через document.querySelectorAll В МОМЕНТ вызова);
- * финитность (NaN/∞ → ранний MotionParamError, в стиль не эмитятся);
- * детерминизм (время только через инжектируемый requestFrame/now/setTimer);
- * повторный animate на том же элементе/свойстве — прерывание с подхватом
- * скорости (канон MotionValue smooth-pickup, C¹ на обоих путях).
+ * Инварианты (наследуют ядро): SSR-safe импорт (DOM только в вызове, селектор
+ * резолвится в момент вызова); финитность (NaN/∞ → ранний MotionParamError);
+ * детерминизм (время только через инжектируемые now/setTimer; физический старт
+ * юнитов — один queueMicrotask на вызов, не rAF); LM-коды границ целей,
+ * options и режима остаются здесь, каналы валидирует планировщик.
  */
 
-import {
-  type SetTimerFn,
-} from '../compositor/core.js';
-import {
-  prefersReduced,
-  resolveCompositorTierCodeFromCapability,
-  type CompositorTierCode,
-} from '../compositor/detect.js';
-import {
-  DEFAULT_TOLERANCE,
-  tryCompileSpringExecutionArtifactTupleUnchecked,
-  type SpringExecutionArtifactTuple,
-} from '../compositor/curve.js';
+import { type SetTimerFn } from '../compositor/core.js';
+import { prefersReduced, supportsLinearEasing } from '../compositor/detect.js';
 import { MotionParamError } from '../errors.js';
 import {
   DEFAULT_DURATION_MS,
@@ -51,52 +46,69 @@ import {
 import { type SpringParams, validateSpringParams } from '../spring.js';
 import type { StaggerOptions } from '../stagger/index.js';
 import { scheduleStagger } from '../stagger/scheduler.js';
-import { buildTransform } from '../value/transform.js';
 import {
-  bindGroup,
-  cssAt,
-  groupRecord,
-  parseProps,
-  sharedV0,
-  type AnimatableElement,
-  type BoundGroup,
-  type ChannelSpec,
-  type GroupKey,
-  type GroupOwner,
-  type GroupRecord,
-} from './channels.js';
+  buildCompositorPlan,
+  parsePlanProps,
+  type FormatCssAt,
+  type PlanGroupOwner,
+  type PlanMode,
+  type PlannedLiveGroup,
+  type PlanTarget,
+} from './compositor-plan.js';
 import {
-  MainUnit,
-  type MotionMode,
-  type RequestFrameFn,
-} from './main-unit.js';
-import { surfaceBatchFor, type SurfaceBatch } from './surface-batch.js';
+  createCompositorUnit,
+  type AbortSignalLike,
+  type ProgressSnapshot,
+} from './compositor-unit.js';
 import {
   collectBoundedArrayLike,
   requireAnimateOptions,
   requireAnimateProps,
 } from './targets.js';
-import { WaapiUnit, type WaapiTarget } from './waapi-unit.js';
 
 // ─── Публичные типы ──────────────────────────────────────────────────────────
 
-export type { AnimatableElement };
+/** Duck-цель фасада: Element подходит; SSR-объекты с тем же контрактом тоже. */
+export type AnimatableElement = PlanTarget;
 
-/** Цель: элемент, список (Array/NodeList) или CSS-селектор (резолв в вызове). */
 export type AnimateTarget =
   | AnimatableElement
   | string
   | ArrayLike<AnimatableElement>
   | readonly AnimatableElement[];
 
-/** Значение канала: цель или пара [from, to] (явный from отключает подхват). */
-export type AnimatePropValue =
-  | number
-  | string
-  | readonly [number | string, number | string];
+export type AnimateProps = Record<string, unknown>;
 
-/** Каналы движения: transform-шортхенды, opacity, любые CSS-свойства. */
-export type AnimateProps = Record<string, AnimatePropValue>;
+/** Кадровый шов живого движка (тип живёт здесь, вес — в animate/live). */
+export type RequestFrameFn = (cb: (ts?: number) => void) => number;
+
+/** Контекст, который фасад отдаёт композируемому живому движку. */
+export interface AnimateEngineContext {
+  readonly mode: PlanMode;
+  readonly now: () => number;
+  readonly setTimer: SetTimerFn;
+  readonly requestFrame: RequestFrameFn | undefined;
+  readonly formatCssAt: FormatCssAt | undefined;
+}
+
+/** Ран живого движка: контролы + владение в терминах юнита R2. */
+export interface AnimateEngineRun extends PlanGroupOwner {
+  readonly finished: Promise<void>;
+  play(): void;
+  pause(): void;
+  seek(tMs: number): void;
+  cancel(): void;
+}
+
+/**
+ * Композируемый живой движок: исполняет группы, не представимые синхронной
+ * WAAPI-кривой. Регистрация — опцией `engine` (tree-shakeable: база не несёт
+ * ни байта реализации). Эталонная реализация — animate/live.
+ */
+export type AnimateEngine = (
+  group: PlannedLiveGroup,
+  context: AnimateEngineContext,
+) => AnimateEngineRun;
 
 /** Опции animate(). spring и duration/ease взаимоисключающие. */
 export interface AnimateOptions {
@@ -112,14 +124,20 @@ export interface AnimateOptions {
   readonly stagger?: number | StaggerOptions | undefined;
   /** Вызывается один раз, когда ВСЕ цели осели естественно (не cancel). */
   readonly onComplete?: (() => void) | undefined;
-  /** Шов кадра main-пути (детерминизм тестов). Дефолт: rAF / setTimeout-шим. */
-  readonly requestFrame?: RequestFrameFn | undefined;
   /** Шов reduced-motion. Дефолт: globalThis.matchMedia (если среда умеет). */
   readonly matchMedia?: ((query: string) => { matches: boolean }) | undefined;
-  /** Часы (мс) compositor-пути. Дефолт: performance.now / Date.now. */
+  /** Часы (мс). Дефолт: performance.now / Date.now. */
   readonly now?: (() => number) | undefined;
-  /** Таймер compositor-finished. Дефолт: setTimeout/clearTimeout. */
+  /** Таймер завершения юнитов. Дефолт: setTimeout/clearTimeout. */
   readonly setTimer?: SetTimerFn | undefined;
+  /** Живой движок для непредставимых групп (animate/live). Без него — снап. */
+  readonly engine?: AnimateEngine | undefined;
+  /** Кадровый шов живого движка (детерминизм тестов; базе не нужен). */
+  readonly requestFrame?: RequestFrameFn | undefined;
+  /** C¹-шов css-групп (animate/format-css). Без него — политика C⁰ R3a. */
+  readonly formatCssAt?: FormatCssAt | undefined;
+  /** Прерывание всего вызова: abort = cancel агрегата. */
+  readonly signal?: AbortSignalLike | undefined;
 }
 
 /** Контролы прогона (для группы целей — агрегированные). */
@@ -140,19 +158,27 @@ export interface AnimateControls {
 
 // ─── Внутренние контракты ────────────────────────────────────────────────────
 
-/** Общий интерфейс юнитов обоих движков (fan-out контролов). */
-interface UnitControls {
-  _commit?(): void;
+/** Общий интерфейс запущенных ранов (юнит R2 / живой движок) для fan-out. */
+interface RunControls {
   play(): void;
   pause(): void;
   seek(tMs: number): void;
   cancel(): void;
+  _snapshot?(): ProgressSnapshot;
 }
 
-function releaseTransition(rec: GroupRecord, owner: GroupOwner | undefined): void {
-  rec._transition = false;
-  // User onComplete при release не должен скрыть исходный host-сбой successor.
-  try { owner?._release?.(); } catch { /* owner уже терминализирован */ }
+interface StartedRun {
+  run: RunControls;
+  readonly settle: (
+    owner: PlanGroupOwner,
+    natural: boolean,
+    snapshot?: ProgressSnapshot,
+  ) => void;
+  owner: PlanGroupOwner;
+  /** Прерывания фасада (cancel/stop/abort) — ненатуральный исход engine-ранов. */
+  interrupted: boolean;
+  /** Снимок позы, снятый фасадом ДО cancel — терминальная правда реестра. */
+  pendingSnapshot: ProgressSnapshot | undefined;
 }
 
 // ─── Дефолтные швы (читаются в вызове — SSR-safe) ────────────────────────────
@@ -170,7 +196,7 @@ function defaultSetTimer(cb: () => void, ms: number): () => void {
 
 // ─── Разбор опций ────────────────────────────────────────────────────────────
 
-function resolveMode(options: AnimateOptions): MotionMode {
+function resolveMode(options: AnimateOptions): PlanMode {
   const input = options.spring;
   const durationInput = options.duration;
   const easeInput = options.ease;
@@ -188,10 +214,9 @@ function resolveMode(options: AnimateOptions): MotionMode {
     if (typeof ease !== 'function') {
       throw new MotionParamError('LM138');
     }
-    return { _type: 'tween', _durationMs: durationMs, _ease: ease };
+    return { kind: 'tween', durationMs, ease };
   }
-  // Внутренний snapshot не даёт мутации caller-owned объекта сменить физику живого рана
-  // после однократного чтения и валидации; кадровый hot-path может быть unchecked.
+  // Snapshot закрывает caller-mutation после однократного чтения и валидации.
   const source = input ?? DEFAULT_SPRING;
   const spring = {
     mass: source.mass,
@@ -199,7 +224,7 @@ function resolveMode(options: AnimateOptions): MotionMode {
     damping: source.damping,
   };
   validateSpringParams(spring);
-  return { _type: 'spring', _spring: spring };
+  return { kind: 'spring', spring };
 }
 
 function resolveDelay(input: number | undefined): number {
@@ -242,59 +267,6 @@ function resolveTargets(target: unknown): AnimatableElement[] {
   return snapshot as AnimatableElement[];
 }
 
-// ─── Группировка спецификаций ────────────────────────────────────────────────
-
-function groupSpecs(specs: readonly ChannelSpec[]): Map<GroupKey, ChannelSpec[]> {
-  const groups = new Map<GroupKey, ChannelSpec[]>();
-  for (const spec of specs) {
-    const list = groups.get(spec._group);
-    // Map создаётся здесь и хранит только непустые массивы.
-    if (list) list.push(spec);
-    else groups.set(spec._group, [spec]);
-  }
-  return groups;
-}
-
-// ─── Снап (единая reduced-политика пакета: мгновенный финал, без кадров) ─────
-
-function writeSnap(el: AnimatableElement, group: GroupKey, bound: BoundGroup): void {
-  if (group === 'transform') {
-    const state = bound._transform!;
-    for (const ch of bound._numeric) state[ch._key] = ch._to;
-    el.style.setProperty('transform', buildTransform(state));
-  } else if (bound._css !== undefined) {
-    bound._css._css = cssAt(bound._css, 1);
-    el.style.setProperty(group, String(bound._css._css));
-  } else {
-    el.style.setProperty(group, String(bound._numeric[0]!._to));
-  }
-}
-
-/** Реестр получает target только после успешного style+cleanup старого owner. */
-function commitSnap(
-  rec: ReturnType<typeof groupRecord>,
-  bound: BoundGroup,
-): void {
-  if (bound._css !== undefined) {
-    rec._cssValue = bound._css._css;
-  }
-  for (const ch of bound._numeric) rec._numeric.set(ch._key, { _value: ch._to, _velocity: 0 });
-}
-
-/**
- * Полностью прочитанная группа. Tuple остаётся внутри plan/read→commit границы,
- * поэтому package не платит за повторные runtime property-имена каждого entry.
- */
-type PlannedGroup = readonly [
-  el: AnimatableElement,
-  group: GroupKey,
-  record: ReturnType<typeof groupRecord>,
-  bound: BoundGroup,
-  delayMs: number,
-  /** Tier 3 — reduced, undefined — main, tuple — compositor. */
-  execution: SpringExecutionArtifactTuple | Extract<CompositorTierCode, 3> | undefined,
-];
-
 // ─── animate ─────────────────────────────────────────────────────────────────
 
 /**
@@ -303,7 +275,8 @@ type PlannedGroup = readonly [
  * @param target  Element | список | CSS-селектор (резолв в момент вызова).
  * @param props   Каналы: x/y/scale/rotate/… (шортхенды transform), opacity,
  *                любые CSS-свойства; значение — цель или пара [from, to].
- * @param options { spring } ИЛИ { duration, ease }; delay; stagger; onComplete.
+ * @param options { spring } ИЛИ { duration, ease }; delay; stagger; onComplete;
+ *                engine/formatCssAt — композируемые слои; signal.
  * @returns Контролы { finished, play, pause, seek, cancel, stop }.
  * @throws {MotionParamError} рано, ДО записей в стиль: не-конечные числа,
  *         'transform' целиком, конфликт режимов, селектор без document.
@@ -315,12 +288,21 @@ export function animate(
 ): AnimateControls {
   // 1. Options — первая граница: остальные входы могут быть hostile getters.
   options = requireAnimateOptions(options);
-  // Остальная валидация — вся ДО побочных эффектов (ноль записей при броске).
+  // Валидация — вся ДО побочных эффектов (ноль записей при броске).
   const mode = resolveMode(options);
   const baseDelay = resolveDelay(options.delay);
   const staggerInput = options.stagger;
   if (typeof staggerInput === 'number') resolveDelay(staggerInput);
-  const specs = parseProps(requireAnimateProps(props));
+  const signal = options.signal;
+  if (
+    signal !== undefined &&
+    (typeof signal.addEventListener !== 'function' ||
+      typeof signal.removeEventListener !== 'function')
+  ) {
+    throw new MotionParamError('LM156');
+  }
+  // Канон порядка: props-граница (LM151, LM140–144) до чтения hostile целей.
+  const specs = parsePlanProps(requireAnimateProps(props));
   const els = resolveTargets(target);
   let targetDelays: number[] | undefined;
   if (staggerInput !== undefined) {
@@ -335,77 +317,69 @@ export function animate(
         staggerInput.grid?.columns,
         staggerInput.reducedMotion,
       );
-    // scheduleStagger сигнализирует нечисловой/переполненный offset через NaN;
-    // сумма двух конечных чисел всё ещё может overflow. Сворачиваем base в
-    // принадлежащий фасаду буфер до plan/read и любого host-effect.
+    // scheduleStagger сигнализирует нечисловой offset через NaN; сумма двух
+    // конечных чисел всё ещё может overflow — сворачиваем до любых эффектов.
     for (let i = 0; i < targetDelays.length; i++) {
       targetDelays[i] = resolveDelay(baseDelay + targetDelays[i]!);
     }
   }
 
-  // Accessibility policy — один snapshot на aggregate. Он сохраняет единый
-  // plan и не читает hostile capability целей, когда движение запрещено.
+  // Accessibility policy — один snapshot на aggregate (канон фасада).
   const reduced = els.length > 0 && prefersReduced(options.matchMedia ??
     (globalThis as { matchMedia?: (query: string) => { matches: boolean } }).matchMedia);
   const now = options.now ?? defaultNow;
   const setTimer = options.setTimer ?? defaultSetTimer;
-  // 2. Фаза plan/read: читаем и привязываем ВСЕ цели до первой мутации.
-  //    bindGroup снимает живой state, но не прерывает владельца. Поэтому ни
-  //    поздний DOM-read, ни ошибка привязки не оставят ранние цели уже
-  //    запущенными; браузер также не увидит чередование read→write→read.
-  const groups = groupSpecs(specs);
-  const plan: PlannedGroup[] = [];
-  for (let i = 0; i < els.length; i++) {
-    const el = els[i]!;
-    const delayMs = targetDelays?.[i] ?? baseDelay;
-    const tier = reduced
-      ? 3
-      : resolveCompositorTierCodeFromCapability(
-        typeof (el as Partial<WaapiTarget>).animate === 'function',
-        options.requestFrame,
-      );
-    for (const [group, list] of groups) {
-      const rec = groupRecord(el, group);
-      const bound = bindGroup(el, group, list, rec);
-      const v0 = sharedV0(bound._numeric);
-      const execution = tier === 3
-        ? tier
-        : tier === 0 &&
-          mode._type === 'spring' &&
-          (group === 'transform' || group === 'opacity') &&
-          v0 !== undefined
-            ? tryCompileSpringExecutionArtifactTupleUnchecked(
-                mode._spring,
-                v0,
-                DEFAULT_TOLERANCE,
-              )
-            : undefined;
-      plan.push([el, group, rec, bound, delayMs, execution]);
-    }
-  }
+  const engine = options.engine;
+  const formatCssAt = options.formatCssAt;
 
-  // 3. Aggregate создаётся только после успешной plan/read-фазы:
-  // невалидный вызов не оставляет abandoned Promise и не меняет fail-fast precedence.
-  const units: UnitControls[] = [];
-  // Дубликат цели строит successor до cancel прежнего owner: синхронный
-  // start→cancel не рисуется между кадрами, зато сбой конструктора сохраняет
-  // текущего владельца этой записи вместо разрушения обоих прогонов.
-  let protectedOwner: object | undefined;
-  let mainBatch: SurfaceBatch | undefined;
-  const total = plan.length;
+  // 2. Фаза plan/read: планировщик читает и привязывает ВСЕ цели до первой
+  //    мутации (реестр, снимки владельцев, style-read холодного from).
+  const { plans, snaps, live } = buildCompositorPlan({
+    targets: els,
+    props,
+    specs,
+    mode,
+    delayMs: baseDelay,
+    targetDelays,
+    seams: { now, setTimer },
+    // Одна проба среды на вызов; без linear() числовые группы едут
+    // explicit-кадрами, символьные — в engine либо снап (см. контракт).
+    capability: { linearSupported: supportsLinearEasing() },
+    reducedMotion: reduced,
+    formatCssAt,
+    // signal обслуживается агрегатом: один слушатель на вызов, а не N.
+  });
+
+  // 3. Aggregate-состояние создаётся после успешной plan-фазы: невалидный
+  //    вызов не оставляет abandoned Promise и не меняет fail-fast precedence.
+  const total = plans.length + snaps.length + live.length;
   let done = 0;
   let natural = 0;
   let setupDone = false;
   let resolveFinished!: () => void;
-  // Наружу виден один lifecycle, поэтому один aggregate Promise заменяет N
-  // скрытых Unit-deferred и не превращает массовый start в GC-hot-path.
+  const runs: StartedRun[] = [];
+  const cancelAll = (): void => {
+    for (const started of runs) {
+      if (started.interrupted) continue;
+      started.interrupted = true;
+      // Снимок ДО cancel: терминальная запись реестра — поза остановки;
+      // ран после done отдаёт финальную позицию, и снимок был бы ложным.
+      started.pendingSnapshot = started.run._snapshot?.();
+      started.run.cancel();
+    }
+  };
   const maybeComplete = (): void => {
     if (!setupDone || done !== total) return;
-    setupDone = false; // та же защёлка гасит повторную terminal-отчётность
-    mainBatch = undefined;
-    // Старые per-unit Promise ставили aggregate-resolution на следующую
-    // микрозадачу. Сохраняем этот порядок без N deferred: Promise
-    // завершится даже если onComplete бросит.
+    setupDone = false; // защёлка гасит повторную terminal-отчётность
+    if (signal !== undefined) {
+      try {
+        signal.removeEventListener('abort', cancelAll);
+      } catch {
+        /* hostile signal не блокирует терминализацию */
+      }
+    }
+    // Aggregate-resolution остаётся на следующей микрозадаче (канон фасада);
+    // Promise завершится, даже если onComplete бросит.
     queueMicrotask(resolveFinished);
     if (natural === total) options.onComplete?.();
   };
@@ -414,122 +388,138 @@ export function animate(
     if (nat) natural++;
     maybeComplete();
   };
-  // Чистый compositor/reduced не создаёт main-state. WAAPI handoff и обычные
-  // main slots одного aggregate делят kernel и исходный plan capacity.
-  const getMainBatch = (): SurfaceBatch =>
-    mainBatch ??= surfaceBatchFor(options.requestFrame);
+  /** Engine-раны слушаются через finished (у них свой Promise per-run). */
+  const wireEngineCompletion = (started: StartedRun, run: AnimateEngineRun): void => {
+    run.finished.then(
+      () => {
+        // Натуральность engine-рана выводит агрегат: ненатуральные исходы
+        // идут только через фасадные пути (cancel/stop/abort) либо через
+        // supersede дубликата, который уже записал реестр в publish.
+        const nat = !started.interrupted;
+        started.settle(started.owner, nat, started.pendingSnapshot);
+        report(nat);
+      },
+      () => {
+        started.settle(started.owner, false, started.pendingSnapshot);
+        report(false);
+      },
+    );
+  };
 
-  // 4. Фаза commit в исходном target-major порядке. Владелец берётся из
-  //    record ЗДЕСЬ, а не сохраняется в плане: повтор цели в списке обязан
-  //    прервать юнит, созданный предыдущей записью того же commit.
+  // 4. Фаза commit в исходном target-major порядке. Дубликат цели в одном
+  //    вызове прерывает ран, созданный предыдущей записью того же commit
+  //    (publish-хук выполняет supersede с терминальной записью его снимка).
   try {
-    for (const [el, group, rec, bound, delayMs, execution] of plan) {
-      const previous = rec._owner;
-      if (rec._transition) throw new MotionParamError('LM157');
-      rec._transition = true;
-      if (execution === 3) {
-        try {
-          if (previous) previous._supersede(() => writeSnap(el, group, bound));
-          else writeSnap(el, group, bound);
-        } catch (error) {
-          protectedOwner = previous;
-          releaseTransition(rec, previous);
-          throw error;
-        }
-        commitSnap(rec, bound);
-        rec._transition = false;
+    for (const snap of snaps) {
+      snap.commit();
+      report(true);
+    }
+    for (const entry of plans) {
+      entry.begin();
+      const started: StartedRun = {
+        run: undefined as unknown as RunControls,
+        settle: (owner, nat, snapshot) => entry.settle(owner, nat, snapshot),
+        owner: undefined as unknown as PlanGroupOwner,
+        interrupted: false,
+        pendingSnapshot: undefined,
+      };
+      let unit: ReturnType<typeof createCompositorUnit>;
+      try {
+        // Канал onDone вместо unit.finished: aggregate не платит Promise-
+        // аллокацией на юнит (контракт O(1) finished на N целей), а
+        // натуральность отдаёт сам юнит (complete против cancel/supersede).
+        unit = createCompositorUnit(entry.plan, (nat, failure) => {
+          started.settle(started.owner, nat && failure === undefined, started.pendingSnapshot);
+          report(nat && failure === undefined);
+        });
+      } catch (error) {
+        entry.rollback();
+        throw error;
+      }
+      if (unit === undefined) {
+        // Планировщик уже отфильтровал непредставимое; защитная ветвь на
+        // расхождение capability — честный снап вместо тихой потери группы.
+        entry.rollback();
         report(true);
         continue;
       }
-      let unit: WaapiUnit | MainUnit;
-      try {
-        // Compositor execution строится только из spring-mode в plan-фазе, поэтому второй
-        // runtime-discriminant здесь был бы дублированием того же решения.
-        if (execution) {
-          unit = new WaapiUnit({
-            _el: el as WaapiTarget,
-            _group: group,
-            _record: rec,
-            _numeric: bound._numeric,
-            _residuals: bound._residuals,
-            _transform: bound._transform,
-            _spring: (mode as Extract<MotionMode, { _type: 'spring' }>)._spring,
-            _delayMs: delayMs,
-            _now: now,
-            _setTimer: setTimer,
-            _getBatch: getMainBatch,
-            _onDone: report,
-            _artifact: execution,
-          });
-        } else {
-          unit = new MainUnit({
-            _el: el,
-            _group: group,
-            _record: rec,
-            _bound: bound,
-            _mode: mode,
-            _delayMs: delayMs,
-            _batch: getMainBatch(),
-            _onDone: report,
-          });
-        }
-      } catch (error) {
-        protectedOwner = previous;
-        releaseTransition(rec, previous);
-        throw error;
-      }
-      try {
-        previous?._supersede();
-      } catch (error) {
-        unit._rollback();
-        protectedOwner = previous;
-        releaseTransition(rec, previous);
-        throw error;
-      }
-      rec._owner = unit;
-      rec._transition = false;
-      units.push(unit);
-      // Sync timer остаётся pending, пока не опубликованы все
-      // owners: иначе duplicate target успевает записать target,
-      // а следующий заранее связанный effect возвращает from.
+      started.run = unit;
+      started.owner = unit;
+      entry.publish(unit);
+      runs.push(started);
     }
-    // Вторая commit-фаза: host completion видит уже целый owner graph.
-    // Юнит, вытесненный поздним duplicate, к этому моменту done.
-    for (const unit of units) unit._commit?.();
+    for (const entry of live) {
+      if (engine === undefined) {
+        // Контракт базы: непредставимая синхронной кривой группа получает
+        // валидированный снап к финалу (единая политика с reduced).
+        entry.snap();
+        report(true);
+        continue;
+      }
+      entry.begin();
+      let run: AnimateEngineRun;
+      try {
+        run = engine(entry, {
+          mode,
+          now,
+          setTimer,
+          requestFrame: options.requestFrame,
+          formatCssAt,
+        });
+      } catch (error) {
+        entry.rollback();
+        throw error;
+      }
+      entry.publish(run);
+      const started: StartedRun = {
+        run,
+        settle: (owner, nat, snapshot) => entry.settle(owner, nat, snapshot),
+        owner: run,
+        interrupted: false,
+        pendingSnapshot: undefined,
+      };
+      runs.push(started);
+      wireEngineCompletion(started, run);
+    }
   } catch (error) {
-    // Host-commit не должен оставить ранее созданные циклы без
-    // доступных controls. Отменяем новые юниты в обратном порядке;
-    // исходное host-исключение остаётся причиной.
-    for (let i = units.length - 1; i >= 0; i--) {
-      if (units[i] === protectedOwner) continue;
-      try { units[i]!.cancel(); } catch { /* best-effort cleanup остальных */ }
+    // Сбой commit не оставляет ранее созданные раны без controls: отменяем
+    // в обратном порядке; исходное исключение остаётся причиной.
+    for (let i = runs.length - 1; i >= 0; i--) {
+      try {
+        runs[i]!.interrupted = true;
+        runs[i]!.run.cancel();
+      } catch {
+        /* best-effort cleanup остальных */
+      }
     }
     throw error;
   }
-  // Commit успешен: только теперь публичный deferred может стать
-  // достижимым. Бросок host-а во время commit не оставит abandoned Promise.
+
+  // 5. Публичный deferred достижим только после успешного commit.
   const finished = new Promise<void>((resolve) => {
     resolveFinished = resolve;
   });
   setupDone = true;
   maybeComplete();
 
-  // 5. Агрегированные контролы (пустой список целей → уже разрешённый no-op).
-  const cancel = (): void => {
-    for (const u of units) u.cancel();
-  };
+  if (signal !== undefined) {
+    if (signal.aborted === true) cancelAll();
+    else signal.addEventListener('abort', cancelAll, { once: true });
+  }
+
+  // 6. Агрегированные контролы (пустой список целей → уже разрешённый no-op).
   return {
     finished,
     play(): void {
-      for (const u of units) u.play();
+      for (const started of runs) started.run.play();
     },
     pause(): void {
-      for (const u of units) u.pause();
+      for (const started of runs) started.run.pause();
     },
     seek(tMs: number): void {
-      for (const u of units) u.seek(tMs);
+      for (const started of runs) started.run.seek(tMs);
     },
-    cancel,
-    stop: cancel,
+    cancel: cancelAll,
+    stop: cancelAll,
   };
 }

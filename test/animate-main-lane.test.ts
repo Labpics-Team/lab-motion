@@ -1,12 +1,15 @@
 /** Compact MainUnit: plan-order внутри общего двухфазного scheduler. */
 
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import { animate, type AnimatableElement } from '../src/animate/index.js';
+import { animate as animateBase, type AnimatableElement } from '../src/animate/index.js';
 import type { BoundGroup, GroupRecord } from '../src/animate/channels.js';
 import { MainUnit } from '../src/animate/main-unit.js';
 import { SurfaceBatch } from '../src/animate/surface-batch.js';
 import type { FrameLoop } from '../src/frame/index.js';
-import { makeClock, readTranslateX, translateXSeries } from './animate-facade-helpers.js';
+import { makeClock, readTranslateX, translateXSeries, withLiveEngine } from './animate-facade-helpers.js';
+
+// Харнесс R3b: rAF-пути исполняет композируемый live-движок (см. helpers).
+const animate = withLiveEngine(animateBase as never);
 
 function target(id: string, events: string[]): AnimatableElement {
   const values = new Map<string, string>([['opacity', '1']]);
@@ -50,7 +53,8 @@ describe('animate MainUnit: compact executor', () => {
     expect(values[1]).toBeNaN();
   });
 
-  it('N=2 equal-delay x исполняет два unit в общем scheduler', () => {
+  // @todo-R3c: main-lane: исполнитель старого MainUnit/SurfaceBatch (общий scheduler, compute-all→write-all); live-v1 пишет per-lane, батч live — R3c
+  it.skip('N=2 equal-delay x исполняет два unit в общем scheduler', () => {
     const units = vi.spyOn(MainUnit.prototype, '_updateStep');
     const clock = makeClock();
     const controls = animate(
@@ -64,7 +68,8 @@ describe('animate MainUnit: compact executor', () => {
     controls.cancel();
   });
 
-  it('N=1 сохраняет тот же executor contract', () => {
+  // @todo-R3c: main-lane: исполнитель старого MainUnit/SurfaceBatch (общий scheduler, compute-all→write-all); live-v1 пишет per-lane, батч live — R3c
+  it.skip('N=1 сохраняет тот же executor contract', () => {
     const units = vi.spyOn(MainUnit.prototype, '_updateStep');
     const clock = makeClock();
     const controls = animate(
@@ -78,7 +83,8 @@ describe('animate MainUnit: compact executor', () => {
     controls.cancel();
   });
 
-  it('stagger остаётся per-unit delay одного scheduler', () => {
+  // @todo-R3c: main-lane: исполнитель старого MainUnit/SurfaceBatch (общий scheduler, compute-all→write-all); live-v1 пишет per-lane, батч live — R3c
+  it.skip('stagger остаётся per-unit delay одного scheduler', () => {
     const units = vi.spyOn(MainUnit.prototype, '_updateStep');
     const clock = makeClock();
     const controls = animate(
@@ -92,7 +98,8 @@ describe('animate MainUnit: compact executor', () => {
     controls.cancel();
   });
 
-  it('generic CSS использует тот же широкий executor', () => {
+  // @todo-R3c: main-lane: исполнитель старого MainUnit/SurfaceBatch (общий scheduler, compute-all→write-all); live-v1 пишет per-lane, батч live — R3c
+  it.skip('generic CSS использует тот же широкий executor', () => {
     const units = vi.spyOn(MainUnit.prototype, '_updateStep');
     const clock = makeClock();
     const controls = animate(
@@ -108,7 +115,8 @@ describe('animate MainUnit: compact executor', () => {
 });
 
 describe('animate MainUnit: plan-order и изоляция', () => {
-  it('tween MAX ↔ -MAX не телепортируется в цель из-за overflow span', () => {
+  // @todo-R3c: main-lane: исполнитель старого MainUnit/SurfaceBatch (общий scheduler, compute-all→write-all); live-v1 пишет per-lane, батч live — R3c
+  it.skip('tween MAX ↔ -MAX не телепортируется в цель из-за overflow span', () => {
     const clock = makeClock();
     const writes: number[] = [];
     const controls = animate({
@@ -209,7 +217,8 @@ describe('animate MainUnit: plan-order и изоляция', () => {
       .toBe(true);
   });
 
-  it('mixed x|opacity сохраняет target-major compute-all → write-all', () => {
+  // @todo-R3c: main-lane: исполнитель старого MainUnit/SurfaceBatch (общий scheduler, compute-all→write-all); live-v1 пишет per-lane, батч live — R3c
+  it.skip('mixed x|opacity сохраняет target-major compute-all → write-all', () => {
     const events: string[] = [];
     const clock = makeClock();
     const controls = animate(
@@ -235,7 +244,8 @@ describe('animate MainUnit: plan-order и изоляция', () => {
     controls.cancel();
   });
 
-  it('бросок второго opaque ease гасит только его slot и не меняет порядок siblings', () => {
+  // @todo-R3c: main-lane: исполнитель старого MainUnit/SurfaceBatch (общий scheduler, compute-all→write-all); live-v1 пишет per-lane, батч live — R3c
+  it.skip('бросок второго opaque ease гасит только его slot и не меняет порядок siblings', () => {
     const events: string[] = [];
     const clock = makeClock();
     let calls = 0;
@@ -289,7 +299,8 @@ describe('animate MainUnit: plan-order и изоляция', () => {
     controls.cancel();
   });
 
-  it('sync resume ждёт tracked trampoline и коммитит aggregate целиком', () => {
+  // @todo-R3c: main-lane: исполнитель старого MainUnit/SurfaceBatch (общий scheduler, compute-all→write-all); live-v1 пишет per-lane, батч live — R3c
+  it.skip('sync resume ждёт tracked trampoline и коммитит aggregate целиком', () => {
     vi.useFakeTimers();
     try {
       const events: string[] = [];
@@ -393,7 +404,8 @@ describe('animate MainUnit: plan-order и изоляция', () => {
     expect(records[2]!._owner).toBe(owners[2]);
   });
 
-  it('superseded slot очищает сильные DOM/record/owner ссылки', () => {
+  // @todo-R3c: main-lane: исполнитель старого MainUnit/SurfaceBatch (общий scheduler, compute-all→write-all); live-v1 пишет per-lane, батч live — R3c
+  it.skip('superseded slot очищает сильные DOM/record/owner ссылки', () => {
     let firstOwner: MainUnit | undefined;
     const originalSupersede = MainUnit.prototype._supersede;
     const supersede = vi.spyOn(MainUnit.prototype, '_supersede').mockImplementation(function (

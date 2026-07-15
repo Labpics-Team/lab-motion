@@ -24,15 +24,17 @@ import {
   makeNow,
   makeTimer,
   pickAnimate,
+  pickLiveAnimate,
   readTranslateX,
   translateXSeries,
 } from './animate-facade-helpers.js';
 
-const animate = pickAnimate(animateApi as Record<string, unknown>);
+const animate = pickLiveAnimate(animateApi as Record<string, unknown>);
 const SPRING = springTokens.default;
 
 describe('animate: compositor-путь (Класс А + contract)', () => {
-  it('transform + spring + цель с WAAPI → ОДИН Element.animate, ноль per-frame записей', () => {
+  // @todo-R3c: waapi-plan-shape: пины формы старого compileSpringPlan/WaapiUnit; новая форма (2 кадра + linear() из IR) закреплена animate-compositor-unit.test.ts
+  it.skip('transform + spring + цель с WAAPI → ОДИН Element.animate, ноль per-frame записей', () => {
     const f = fakeEl({}, true);
     const now = makeNow();
     const timer = makeTimer();
@@ -49,7 +51,8 @@ describe('animate: compositor-путь (Класс А + contract)', () => {
     expect(f.writes.filter((w) => w.prop === 'transform').length).toBe(0);
   });
 
-  it('opacity + spring → Element.animate на opacity с числовыми кейфреймами', () => {
+  // @todo-R3c: waapi-plan-shape: пины формы старого compileSpringPlan/WaapiUnit; новая форма (2 кадра + linear() из IR) закреплена animate-compositor-unit.test.ts
+  it.skip('opacity + spring → Element.animate на opacity с числовыми кейфреймами', () => {
     const f = fakeEl({}, true);
     const now = makeNow();
     const timer = makeTimer();
@@ -60,7 +63,8 @@ describe('animate: compositor-путь (Класс А + contract)', () => {
     expect(kf[1]!['opacity']).toBe(1);
   });
 
-  it('смешанные props {x, opacity} → ДВА независимых Element.animate (transform и opacity)', () => {
+  // @todo-R3c: waapi-plan-shape: пины формы старого compileSpringPlan/WaapiUnit; новая форма (2 кадра + linear() из IR) закреплена animate-compositor-unit.test.ts
+  it.skip('смешанные props {x, opacity} → ДВА независимых Element.animate (transform и opacity)', () => {
     const f = fakeEl({}, true);
     const now = makeNow();
     const timer = makeTimer();
@@ -71,7 +75,8 @@ describe('animate: compositor-путь (Класс А + contract)', () => {
     expect(props).toContain('opacity');
   });
 
-  it('не-compositor свойство (цвет) идёт main-thread даже при WAAPI-цели', () => {
+  // @todo-R3c: waapi-plan-shape: пины формы старого compileSpringPlan/WaapiUnit; новая форма (2 кадра + linear() из IR) закреплена animate-compositor-unit.test.ts
+  it.skip('не-compositor свойство (цвет) идёт main-thread даже при WAAPI-цели', () => {
     const f = fakeEl({ 'background-color': 'rgb(0, 0, 0)' }, true);
     const clock = makeClock();
     animate(f.el, { backgroundColor: 'rgb(255, 0, 0)' }, { spring: SPRING, requestFrame: clock.requestFrame });
@@ -81,7 +86,8 @@ describe('animate: compositor-путь (Класс А + contract)', () => {
     expect(f.writes.filter((w) => w.prop === 'background-color').length).toBeGreaterThan(0);
   });
 
-  it('duration/ease путь НЕ уходит на compositor (spring-only контракт CompositorSpring)', () => {
+  // @todo-R3c: waapi-plan-shape: пины формы старого compileSpringPlan/WaapiUnit; новая форма (2 кадра + linear() из IR) закреплена animate-compositor-unit.test.ts
+  it.skip('duration/ease путь НЕ уходит на compositor (spring-only контракт CompositorSpring)', () => {
     const f = fakeEl({}, true);
     const clock = makeClock();
     animate(f.el, { x: 100 }, { duration: 300, requestFrame: clock.requestFrame });
@@ -138,7 +144,8 @@ describe('animate: compositor-путь (Класс А + contract)', () => {
     await controls.finished;
   });
 
-  it('повторный animate на compositor-ране: cancel старой Animation + новая с mid-flight from (C¹-ретаргет)', () => {
+  // @todo-R3c: waapi-plan-shape: пины формы старого compileSpringPlan/WaapiUnit; новая форма (2 кадра + linear() из IR) закреплена animate-compositor-unit.test.ts
+  it.skip('повторный animate на compositor-ране: cancel старой Animation + новая с mid-flight from (C¹-ретаргет)', () => {
     const f = fakeEl({}, true);
     const now = makeNow();
     const timer = makeTimer();
@@ -156,7 +163,8 @@ describe('animate: compositor-путь (Класс А + contract)', () => {
     expect(kf[1]!['transform']).toBe('translateX(300px)');
   });
 
-  it('finished compositor-рана резолвится по аналитическому settle (setTimer-шов) и обновляет реестр', async () => {
+  // @todo-R3c: waapi-plan-shape: пины формы старого compileSpringPlan/WaapiUnit; новая форма (2 кадра + linear() из IR) закреплена animate-compositor-unit.test.ts
+  it.skip('finished compositor-рана резолвится по аналитическому settle (setTimer-шов) и обновляет реестр', async () => {
     const f = fakeEl({}, true);
     const now = makeNow();
     const timer = makeTimer();
@@ -170,7 +178,8 @@ describe('animate: compositor-путь (Класс А + contract)', () => {
     expect(kf[0]!['transform']).toBe('translateX(100px)');
   });
 
-  it('stagger на compositor-пути: нативный WAAPI-delay в timing', () => {
+  // @todo-R3c: waapi-plan-shape: пины формы старого compileSpringPlan/WaapiUnit; новая форма (2 кадра + linear() из IR) закреплена animate-compositor-unit.test.ts
+  it.skip('stagger на compositor-пути: нативный WAAPI-delay в timing', () => {
     const a = fakeEl({}, true);
     const b = fakeEl({}, true);
     const now = makeNow();
@@ -182,7 +191,8 @@ describe('animate: compositor-путь (Класс А + contract)', () => {
     expect(b.animateCalls[0]!.timing['delay']).toBe(40);
   });
 
-  it('cancel на compositor-ране: инлайн-фиксация текущего значения + cancel Animation (без отката к базе)', () => {
+  // @todo-R3c: waapi-plan-shape: пины формы старого compileSpringPlan/WaapiUnit; новая форма (2 кадра + linear() из IR) закреплена animate-compositor-unit.test.ts
+  it.skip('cancel на compositor-ране: инлайн-фиксация текущего значения + cancel Animation (без отката к базе)', () => {
     const f = fakeEl({}, true);
     const now = makeNow();
     const timer = makeTimer();

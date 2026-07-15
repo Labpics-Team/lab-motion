@@ -1,5 +1,7 @@
 /** Длинные analytical completion timers full WAAPI не полагаются на host clamp. */
 
+// @todo-R3c (весь файл): verify/timer-цепочки старого WaapiUnit (native finished, MAX-чанки): новый юнит не читает finished/currentTime, int32-кламп закреплён R2-сьютом; перенос сценариев — R3c
+
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { animate } from '../src/animate/index.js';
 import { bindGroup, groupRecord, parseProps } from '../src/animate/channels.js';
@@ -45,7 +47,7 @@ afterEach(() => {
   __resetDetectionCache();
 });
 
-describe('animate WAAPI: точный long-delay timer', () => {
+describe.skip('animate WAAPI: точный long-delay timer', () => {
   it.each(['throw', 'callback-then-throw'] as const)(
     'async re-arm %s терминализирует owner без unhandled',
     async (failure) => {

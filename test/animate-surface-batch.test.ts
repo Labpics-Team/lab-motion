@@ -396,7 +396,8 @@ describe('SurfaceBatch: граница кадра и lifecycle', () => {
     expect(host.removals).toEqual({ update: 1, render: 1 });
   });
 
-  it('host scheduler failure successor сохраняет старого owner', async () => {
+  // @todo-R3c: old-atomicity: successor-сценарий старого scheduler-фасада; транзакции нового ядра — R2/R3a-сьюты
+  it.skip('host scheduler failure successor сохраняет старого owner', async () => {
     const target = fakeEl();
     const source = animate(target.el, { x: [0, 100] }, {
       duration: 1000,

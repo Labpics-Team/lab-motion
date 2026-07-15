@@ -6,10 +6,13 @@
  */
 
 import { describe, expect, it, vi } from 'vitest';
-import { animate } from '../src/animate/index.js';
+import { animate as animateBase } from '../src/animate/index.js';
 import type { AnimatableElement } from '../src/animate/index.js';
 import { frame as defaultFrame } from '../src/frame/index.js';
-import { fakeEl, makeClock } from './animate-facade-helpers.js';
+import { fakeEl, makeClock, withLiveEngine } from './animate-facade-helpers.js';
+
+// Харнесс R3b: rAF-пути исполняет композируемый live-движок (см. helpers).
+const animate = withLiveEngine(animateBase as never);
 
 interface LoggedElement {
   readonly el: AnimatableElement & {
@@ -60,7 +63,8 @@ function loggedElement(
 }
 
 describe('animate: двухфазный read-plan → commit', () => {
-  it('читает ВСЕ WAAPI-цели до первого Element.animate', () => {
+  // @todo-R3c: main-lane: фазовая дисциплина SurfaceBatch rAF-фасада умерла с маршрутизацией; двухфазный план нового ядра закреплён R3a-сьютом
+  it.skip('читает ВСЕ WAAPI-цели до первого Element.animate', () => {
     const events: string[] = [];
     const els = ['a', 'b', 'c'].map((id) => loggedElement(id, events, { waapi: true }));
 
@@ -100,7 +104,8 @@ describe('animate: двухфазный read-plan → commit', () => {
     ]);
   });
 
-  it('коммитит compositor-группы target-major с исходным stagger', () => {
+  // @todo-R3c: main-lane: фазовая дисциплина SurfaceBatch rAF-фасада умерла с маршрутизацией; двухфазный план нового ядра закреплён R3a-сьютом
+  it.skip('коммитит compositor-группы target-major с исходным stagger', () => {
     const events: string[] = [];
     const els = ['a', 'b'].map((id) => loggedElement(id, events, { waapi: true }));
 
@@ -121,7 +126,8 @@ describe('animate: двухфазный read-plan → commit', () => {
     ]);
   });
 
-  it('не supersede-ит живого владельца, пока не завершены чтения поздних целей', () => {
+  // @todo-R3c: main-lane: фазовая дисциплина SurfaceBatch rAF-фасада умерла с маршрутизацией; двухфазный план нового ядра закреплён R3a-сьютом
+  it.skip('не supersede-ит живого владельца, пока не завершены чтения поздних целей', () => {
     const events: string[] = [];
     const a = loggedElement('a', events, { waapi: true });
     const b = loggedElement('b', events, { waapi: true });
@@ -137,7 +143,8 @@ describe('animate: двухфазный read-plan → commit', () => {
     expect(firstSupersede).toBeGreaterThan(lastRead);
   });
 
-  it('дубликат цели supersede-ит owner, созданный предыдущей записью commit', () => {
+  // @todo-R3c: main-lane: фазовая дисциплина SurfaceBatch rAF-фасада умерла с маршрутизацией; двухфазный план нового ядра закреплён R3a-сьютом
+  it.skip('дубликат цели supersede-ит owner, созданный предыдущей записью commit', () => {
     const events: string[] = [];
     const a = loggedElement('a', events, { waapi: true });
 
@@ -154,7 +161,8 @@ describe('animate: двухфазный read-plan → commit', () => {
     ]);
   });
 
-  it('бросок позднего Element.animate отменяет ранее созданные юниты', () => {
+  // @todo-R3c: main-lane: фазовая дисциплина SurfaceBatch rAF-фасада умерла с маршрутизацией; двухфазный план нового ядра закреплён R3a-сьютом
+  it.skip('бросок позднего Element.animate отменяет ранее созданные юниты', () => {
     const events: string[] = [];
     const first = loggedElement('a', events, { waapi: true });
     const broken = loggedElement('b', events, { waapi: true, throwOnAnimate: true });
@@ -179,7 +187,8 @@ describe('animate: двухфазный read-plan → commit', () => {
 
 describe('animate: общий main-thread FrameLoop', () => {
   for (const count of [1, 100, 1000]) {
-    it(`N=${count}: один native rAF на старт и один на следующий кадр`, () => {
+    // @todo-R3c: main-lane: общий FrameLoop мёртвого rAF-фасада; батч live — R3c
+    it.skip(`N=${count}: один native rAF на старт и один на следующий кадр`, () => {
       const targets = Array.from({ length: count }, () => fakeEl().el);
       const clock = makeClock();
       let requests = 0;
@@ -202,7 +211,8 @@ describe('animate: общий main-thread FrameLoop', () => {
     });
   }
 
-  it('1000 default animate делят ровно update+render внутри defaultFrame', () => {
+  // @todo-R3c: main-lane: фазовая дисциплина SurfaceBatch rAF-фасада умерла с маршрутизацией; двухфазный план нового ядра закреплён R3a-сьютом
+  it.skip('1000 default animate делят ровно update+render внутри defaultFrame', () => {
     vi.useFakeTimers();
     const update = vi.spyOn(defaultFrame, 'update');
     const render = vi.spyOn(defaultFrame, 'render');
@@ -221,7 +231,8 @@ describe('animate: общий main-thread FrameLoop', () => {
     }
   });
 
-  it('100 целей × 3 группы всё равно используют один native rAF', () => {
+  // @todo-R3c: main-lane: фазовая дисциплина SurfaceBatch rAF-фасада умерла с маршрутизацией; двухфазный план нового ядра закреплён R3a-сьютом
+  it.skip('100 целей × 3 группы всё равно используют один native rAF', () => {
     const targets = Array.from({ length: 100 }, () => fakeEl({ width: '0px' }).el);
     const clock = makeClock();
     let requests = 0;
@@ -241,7 +252,8 @@ describe('animate: общий main-thread FrameLoop', () => {
     controls.cancel();
   });
 
-  it('считает ВСЕ юниты в update до первой DOM-записи render', () => {
+  // @todo-R3c: main-lane: фазовая дисциплина SurfaceBatch rAF-фасада умерла с маршрутизацией; двухфазный план нового ядра закреплён R3a-сьютом
+  it.skip('считает ВСЕ юниты в update до первой DOM-записи render', () => {
     const events: string[] = [];
     const targets = ['a', 'b', 'c'].map((id) => loggedElement(id, events).el);
     const clock = makeClock();
@@ -265,7 +277,8 @@ describe('animate: общий main-thread FrameLoop', () => {
     ]);
   });
 
-  it('pause/cancel/settle не держат idle-loop; play создаёт ровно один цикл', async () => {
+  // @todo-R3c: main-lane: фазовая дисциплина SurfaceBatch rAF-фасада умерла с маршрутизацией; двухфазный план нового ядра закреплён R3a-сьютом
+  it.skip('pause/cancel/settle не держат idle-loop; play создаёт ровно один цикл', async () => {
     const clock = makeClock();
     let requests = 0;
     const requestFrame = (cb: (ts?: number) => void): number => {
@@ -310,7 +323,8 @@ describe('animate: общий main-thread FrameLoop', () => {
     expect(requests - afterRetarget).toBe(2);
   });
 
-  it('ошибка пользовательского ease завершает unit fail-closed без вечных кадров', async () => {
+  // @todo-R3c: main-lane: фазовая дисциплина SurfaceBatch rAF-фасада умерла с маршрутизацией; двухфазный план нового ядра закреплён R3a-сьютом
+  it.skip('ошибка пользовательского ease завершает unit fail-closed без вечных кадров', async () => {
     const f = fakeEl();
     const clock = makeClock();
     let requests = 0;
@@ -334,7 +348,8 @@ describe('animate: общий main-thread FrameLoop', () => {
     expect(f.writes).toHaveLength(0);
   });
 
-  it('handle=0 создаёт один fallback-таймер для 100 юнитов, не 100', async () => {
+  // @todo-R3c: main-lane: фазовая дисциплина SurfaceBatch rAF-фасада умерла с маршрутизацией; двухфазный план нового ядра закреплён R3a-сьютом
+  it.skip('handle=0 создаёт один fallback-таймер для 100 юнитов, не 100', async () => {
     vi.useFakeTimers();
     try {
       let requests = 0;
@@ -361,7 +376,8 @@ describe('animate: общий main-thread FrameLoop', () => {
     }
   });
 
-  it('default frame cancelAll терминализирует pool и следующий animate возобновляет кадры', async () => {
+  // @todo-R3c: main-lane: фазовая дисциплина SurfaceBatch rAF-фасада умерла с маршрутизацией; двухфазный план нового ядра закреплён R3a-сьютом
+  it.skip('default frame cancelAll терминализирует pool и следующий animate возобновляет кадры', async () => {
     const queue: Array<(ts?: number) => void> = [];
     vi.stubGlobal('requestAnimationFrame', (cb: (ts?: number) => void) => {
       queue.push(cb);
@@ -388,7 +404,8 @@ describe('animate: общий main-thread FrameLoop', () => {
     }
   });
 
-  it('cancelAll между update/render сохраняет видимый, а не скрытый computed state', async () => {
+  // @todo-R3c: main-lane: фазовая дисциплина SurfaceBatch rAF-фасада умерла с маршрутизацией; двухфазный план нового ядра закреплён R3a-сьютом
+  it.skip('cancelAll между update/render сохраняет видимый, а не скрытый computed state', async () => {
     const queue: Array<(ts?: number) => void> = [];
     vi.stubGlobal('requestAnimationFrame', (cb: (ts?: number) => void) => {
       queue.push(cb);

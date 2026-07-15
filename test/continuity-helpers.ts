@@ -22,6 +22,7 @@ export {
   makeClock,
   numericSeries,
   pickAnimate,
+  pickLiveAnimate,
   translateXSeries,
   type StyleWrite,
 } from './animate-facade-helpers.js';

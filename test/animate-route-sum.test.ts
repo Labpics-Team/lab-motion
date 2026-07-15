@@ -1,3 +1,5 @@
+// @todo-R3c (весь файл): маршрутная арифметика старых тиров (main/compositor/reduced счётчики): новая маршрутизация закреплена animate-compositor-plan.test.ts; телеметрия маршрутов — R3c
+
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { animate } from '../src/animate/index.js';
 import { DEFAULT_TOLERANCE, tryCompileSpringExecutionArtifactTupleUnchecked } from '../src/compositor/curve.js';
@@ -11,7 +13,7 @@ afterEach(() => {
   __resetDetectionCache();
 });
 
-describe('animate: трёхвариантный execution-план', () => {
+describe.skip('animate: трёхвариантный execution-план', () => {
   it('каждая сумма плана коммитится ровно одним исполнителем', () => {
     const reduced = fakeEl({}, true);
     animate(

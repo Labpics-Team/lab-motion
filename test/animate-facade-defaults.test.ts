@@ -15,13 +15,14 @@
  * На заглушке (export {}) каждый тест падал бы своим ассертом.
  */
 
+import { pickLiveAnimate } from './animate-facade-helpers.js';
 import { describe, expect, it } from 'vitest';
 import * as animateApi from '../src/animate/index.js';
 import { readCompositorSpring } from '../src/compositor/index.js';
 import { duration, easing, spring as springTokens } from '../src/tokens/index.js';
 import { fakeEl, makeClock, pickAnimate, translateXSeries } from './animate-facade-helpers.js';
 
-const animate = pickAnimate(animateApi as Record<string, unknown>);
+const animate = pickLiveAnimate(animateApi as Record<string, unknown>);
 
 describe('./animate — дефолты из ./tokens (Класс Б, характеризация)', () => {
   it('без опций: траектория численно совпадает со spring.default', () => {

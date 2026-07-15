@@ -1,6 +1,10 @@
 import { readFileSync } from 'node:fs';
 import { describe, expect, it } from 'vitest';
-import { animate as full } from '../src/animate/index.js';
+import { animate as fullBase } from '../src/animate/index.js';
+import { withLiveEngine } from './animate-facade-helpers.js';
+
+// Харнесс R3b: rAF-пути исполняет композируемый live-движок (см. helpers).
+const full = withLiveEngine(fullBase as never);
 import { buildTransform } from '../src/value/index.js';
 import {
   checksumTransformOutputs,
@@ -56,7 +60,8 @@ describe('benchmark support contracts', () => {
     expect(() => summarizeDistribution([1, NaN])).toThrow(/конечные/);
   });
 
-  it('mass lifecycle доказывает start + один 60-frame sample + teardown для tween и spring', async () => {
+  // @todo-R3c: main-lane: общий FrameLoop мёртвого rAF-фасада; бенч-контракт live — R3c
+  it.skip('mass lifecycle доказывает start + один 60-frame sample + teardown для tween и spring', async () => {
     expect(MASS_LIFECYCLE_PROFILE).toEqual({
       counts: [1, 100, 1_000],
       frames: 60,

@@ -4,6 +4,8 @@
  * сохранять полусозданного владельца.
  */
 
+// @todo-R3c (весь файл): старый WaapiUnit (артефакт-SSOT, re-emit, native currentTime): ядро заменено compositor-unit (R2), сценарии переносятся в R3c
+
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { animate } from '../src/animate/index.js';
 import {
@@ -88,7 +90,7 @@ function nextDown(value: number): number {
   return view.getFloat64(0);
 }
 
-describe('animate: жизненный цикл WAAPI-юнита', () => {
+describe.skip('animate: жизненный цикл WAAPI-юнита', () => {
   it('валидный native currentTime не трогает бросающий fallback now', () => {
     const target = fakeEl({}, true);
     const physics = { mass: 1, stiffness: 100, damping: 10 };

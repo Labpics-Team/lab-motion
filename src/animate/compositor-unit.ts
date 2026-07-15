@@ -141,10 +141,11 @@ export function __resetCompositorUnitBatch(): void {
 
 // ─── Юнит ────────────────────────────────────────────────────────────────────
 
+/** Канал завершения без аллокаций: natural=false — прерывание/отказ хоста. */
+export type CompositorUnitDone = (natural: boolean, failure?: unknown) => void;
+
 /** Исполнитель одной группы: host Animation + виртуальное состояние. */
 export class CompositorUnit {
-  readonly finished: Promise<void>;
-
   /** Слот в microtask-очереди; epoch-ссылка инвалидируется при finish. */
   _batchSlot = 0;
   _batchEpoch: BatchQueue | undefined;
@@ -165,9 +166,14 @@ export class CompositorUnit {
   private readonly _easing: string | undefined;
   private readonly _signal: AbortSignalLike | undefined;
   private readonly _onAbort: (() => void) | undefined;
+  private readonly _onDone: CompositorUnitDone | undefined;
 
-  private _resolve!: () => void;
-  private _reject!: (reason: unknown) => void;
+  /** 0 — pending, 1 — resolved, 2 — rejected(_failure). */
+  private _settled: 0 | 1 | 2 = 0;
+  private _failure: unknown;
+  private _finished: Promise<void> | undefined;
+  private _finishedResolve: (() => void) | undefined;
+  private _finishedReject: ((reason: unknown) => void) | undefined;
   private _done = false;
   private _locked = false;
   private _paused = false;
@@ -198,6 +204,7 @@ export class CompositorUnit {
     easing: string | undefined,
     signal: AbortSignalLike | undefined,
     dead: boolean,
+    onDone: CompositorUnitDone | undefined,
   ) {
     this._el = el;
     this._group = group;
@@ -212,20 +219,12 @@ export class CompositorUnit {
     this._setTimer = seams.setTimer;
     this._frames = frames;
     this._easing = easing;
-    this.finished = new Promise<void>((resolve, reject) => {
-      this._resolve = resolve;
-      this._reject = reject;
-    });
-    // Отказ host-старта доставляется реджектом; внутренний noop-хендлер
-    // помечает promise обслуженным, не меняя семантики для потребителя, —
-    // иначе планировщик, не подписавшийся мгновенно, ловил бы unhandled.
-    this.finished.catch(() => {});
+    this._onDone = onDone;
     if (dead) {
       // Уже отменённый signal: юнит рождается завершённым, ноль DOM/батча.
-      this._done = true;
       this._signal = undefined;
       this._onAbort = undefined;
-      this._resolve();
+      this._finish(false);
       return;
     }
     this._signal = signal;
@@ -237,6 +236,29 @@ export class CompositorUnit {
       this._onAbort = undefined;
     }
     scheduleFlush(this);
+  }
+
+  /**
+   * Обещание завершения — ЛЕНИВОЕ: фасад слушает onDone-канал и не платит
+   * Promise-аллокацией на юнит (контракт O(1) аллокаций aggregate на N целей);
+   * прямой потребитель получает обещание при первом чтении. Отказ host-старта
+   * доставляется реджектом; внутренний noop-хендлер помечает promise
+   * обслуженным, не меняя семантики потребителя (без него не подписавшийся
+   * мгновенно ловил бы unhandled rejection).
+   */
+  get finished(): Promise<void> {
+    if (this._finished === undefined) {
+      this._finished = new Promise<void>((resolve, reject) => {
+        if (this._settled === 1) resolve();
+        else if (this._settled === 2) reject(this._failure);
+        else {
+          this._finishedResolve = resolve;
+          this._finishedReject = reject;
+        }
+      });
+      this._finished.catch(() => {});
+    }
+    return this._finished;
   }
 
   // ── Протокол владения (термины waapi-unit; реестр — у планировщика) ───────
@@ -261,7 +283,7 @@ export class CompositorUnit {
       replacement?.();
       this._clearTimer();
       this._cancelAnim();
-      this._finish();
+      this._finish(false);
     });
   }
 
@@ -271,7 +293,7 @@ export class CompositorUnit {
     this._transaction(() => {
       this._clearTimer();
       this._cancelAnim();
-      this._finish();
+      this._finish(false);
     });
   }
 
@@ -376,7 +398,7 @@ export class CompositorUnit {
         }
         this._cancelAnim();
       }
-      this._finish();
+      this._finish(false);
     });
   }
 
@@ -462,7 +484,7 @@ export class CompositorUnit {
       } catch {
         /* частичный effect мог не создаться — cleanup best-effort */
       }
-      this._finish(error);
+      this._finish(false, error);
     }
   }
 
@@ -502,7 +524,7 @@ export class CompositorUnit {
         // логическая ссылка отпускается, терминализация продолжается.
         this._anim = undefined;
       }
-      this._finish();
+      this._finish(true);
     });
   }
 
@@ -569,7 +591,7 @@ export class CompositorUnit {
     }
   }
 
-  private _finish(failure?: unknown): void {
+  private _finish(natural: boolean, failure?: unknown): void {
     if (this._done) return;
     this._done = true;
     this._clearTimer();
@@ -585,8 +607,19 @@ export class CompositorUnit {
         /* hostile signal не блокирует терминализацию */
       }
     }
-    if (failure === undefined) this._resolve();
-    else this._reject(failure);
+    if (failure === undefined) {
+      this._settled = 1;
+      this._finishedResolve?.();
+    } else {
+      this._settled = 2;
+      this._failure = failure;
+      this._finishedReject?.(failure);
+    }
+    this._finishedResolve = undefined;
+    this._finishedReject = undefined;
+    // Callback-канал — после фиксации состояния: бросок слушателя не может
+    // оставить юнит полу-завершённым.
+    this._onDone?.(natural && failure === undefined, failure);
   }
 }
 
@@ -615,6 +648,7 @@ if (disposeSymbol !== undefined) {
  */
 export function createCompositorUnit(
   plan: CompositorUnitPlan,
+  onDone?: CompositorUnitDone,
 ): CompositorUnit | undefined {
   const el = plan.el;
   const group = plan.group;
@@ -701,5 +735,6 @@ export function createCompositorUnit(
     easing,
     signal ?? undefined,
     aborted,
+    onDone,
   );
 }

@@ -247,3 +247,33 @@ export function allWritesFinite(writes: readonly StyleWrite[]): boolean {
   }
   return true;
 }
+
+// ─── Харнесс R3b: живой движок как опция ──────────────────────────────────────
+
+import { formatCssAt } from '../src/animate/format-css.js';
+import { liveEngine } from '../src/animate/live.js';
+
+/**
+ * Фасад R3b — WAAPI-first strict: rAF-пути исполняет композируемый live-движок.
+ * Обёртка инжектирует его (и css-шов) опциями, сохраняя явные опции теста;
+ * это канонический способ миграции старых rAF-харнессов на новое ядро.
+ */
+export function pickLiveAnimate(mod: Record<string, unknown>): AnimateFn {
+  const base = pickAnimate(mod);
+  return (target, props, options) =>
+    base(target, props, {
+      engine: liveEngine,
+      formatCssAt,
+      ...(options ?? {}),
+    });
+}
+
+/** Обёртка той же миграции для прямых импортов animate. */
+export function withLiveEngine(base: AnimateFn): AnimateFn {
+  return (target, props, options) =>
+    base(target, props, {
+      engine: liveEngine,
+      formatCssAt,
+      ...(options ?? {}),
+    });
+}

@@ -670,7 +670,9 @@ export function buildCompositorPlan(
   for (let i = 0; i < targets.length; i++) {
     const el = targets[i]!;
     const delayMs = delays[i]!;
-    const waapi = typeof el.animate === 'function';
+    // Capability не читается при reduced: политика доступности снимается один
+    // раз на план и не трогает hostile WAAPI-поля целей (канон фасада).
+    const waapi = reduced ? false : typeof el.animate === 'function';
     for (const [group, list] of groups) {
       const rec = groupRecordOf(el, group);
       // Фаза чтения: подхват состояния БЕЗ прерывания владельца.

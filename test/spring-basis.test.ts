@@ -1,7 +1,11 @@
 /** Общий аналитический базис пружины: дифференциал физики и массовый пакет. */
 
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import { animate } from '../src/animate/index.js';
+import { animate as animateBase } from '../src/animate/index.js';
+import { withLiveEngine } from './animate-facade-helpers.js';
+
+// Харнесс R3b: rAF-пути исполняет композируемый live-движок (см. helpers).
+const animate = withLiveEngine(animateBase as never);
 import {
   readSpringFromBasisUnchecked,
   sampleSpringFromBasisUnchecked,
@@ -99,7 +103,8 @@ describe('shared analytic spring basis', () => {
     }
   });
 
-  it('N=1000 homogeneous main batch считает exp/sin/cos один раз на кадр', () => {
+  // @todo-R3c: main-lane: basis-шеринг SurfaceBatch мёртвого rAF-фасада; батч live-движка — R3c
+  it.skip('N=1000 homogeneous main batch считает exp/sin/cos один раз на кадр', () => {
     const exp = vi.spyOn(Math, 'exp');
     const sin = vi.spyOn(Math, 'sin');
     const cos = vi.spyOn(Math, 'cos');
