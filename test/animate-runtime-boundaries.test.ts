@@ -81,8 +81,7 @@ function expectedSpring(from: number, to: number, velocity: number, t = 0.016): 
 }
 
 for (const [name, animate] of engines) {
-  // @todo-R3c: old-lane: play-throw контракт старого MainUnit; политика live — R3c
-  it.skip(`${name}: неудачный play восстанавливает paused и допускает повтор`, () => {
+  it(`${name}: неудачный play восстанавливает paused и допускает повтор`, () => {
     let queue: Array<(ts?: number) => void> = [];
     let fail = false;
     const requestFrame = (cb: (ts?: number) => void): number => {
@@ -212,8 +211,7 @@ for (const [name, animate] of engines) {
   });
 
   describe(`${name}: capture до delay`, () => {
-    // @todo-R3c: old-lane: capture-до-delay семантика старых лейнов; live — R3c
-    it.skip('не переносит скорость неподвижного delayed tween в numeric и CSS-канал', () => {
+    it('не переносит скорость неподвижного delayed tween в numeric и CSS-канал', () => {
       const target = fakeEl({ '--gap': '0px' });
       const clock = makeClock();
       animate(target.el, { x: [0, 100], '--gap': ['0px', '100px'] }, {
@@ -237,8 +235,7 @@ for (const [name, animate] of engines) {
       expect(gap).toBeCloseTo(expected, 8);
     });
 
-    // @todo-R3c: old-lane: capture-до-delay семантика старых лейнов; live — R3c
-    it.skip('seek активирует delayed tween и сохраняет его реальную скорость', () => {
+    it('seek активирует delayed tween и сохраняет его реальную скорость', () => {
       const target = fakeEl();
       const clock = makeClock();
       const delayed = animate(target.el, { x: [0, 100] }, {
@@ -255,8 +252,7 @@ for (const [name, animate] of engines) {
         .toBeCloseTo(expectedSpring(50, 200, 250), 7);
     });
 
-    // @todo-R3c: old-lane: capture-до-delay семантика старых лейнов; live — R3c
-    it.skip('неудачный preflight capture не уничтожает seeded v0 delayed spring', () => {
+    it('неудачный preflight capture не уничтожает seeded v0 delayed spring', () => {
       const target = fakeEl();
       const clock = makeClock();
       const source = animate(target.el, { x: [0, 100] }, {
@@ -291,8 +287,7 @@ for (const [name, animate] of engines) {
   });
 
   describe(`${name}: нефинитный timestamp`, () => {
-    // @todo-R3c: old-lane: timestamp-контракт кадрового цикла закрыт тестами MotionValue; live-обёртка — R3c
-    it.skip.each([NaN, Infinity, -Infinity])(
+    it.each([NaN, Infinity, -Infinity])(
       '%s даёт ровно fixed-step и сбрасывает baseline без скачка',
       async (badTs) => {
         const target = fakeEl();
@@ -317,15 +312,16 @@ for (const [name, animate] of engines) {
         expect(translateXSeries(target.writes).at(-1)).toBeCloseTo(100 * (16 + 1_000 / 60) / 1_000, 10);
 
         clock.emit(1_001_016);
-        expect(onComplete).toHaveBeenCalledTimes(1);
         expect(translateXSeries(target.writes).at(-1)).toBe(100);
-        expect(clock.pending()).toBe(0);
+        expect(clock.pending()).toBe(0); // цикл не оживает после финала
+        // Завершение engine-рана доставляется Promise-каналом (микрозадача) —
+        // натуральность и единственность onComplete держатся за finished.
         await expect(controls.finished).resolves.toBeUndefined();
+        expect(onComplete).toHaveBeenCalledTimes(1);
       },
     );
 
-    // @todo-R3c: old-lane: timestamp-контракт кадрового цикла закрыт тестами MotionValue; live-обёртка — R3c
-    it.skip('переполнение конечной дельты использует один fixed-step', () => {
+    it('переполнение конечной дельты использует один fixed-step', () => {
       const target = fakeEl();
       const clock = makeHostClock();
       const controls = animate(target.el, { x: [0, 100] }, {
