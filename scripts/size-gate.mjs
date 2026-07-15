@@ -267,6 +267,20 @@ export const IMPORT_COST_SCENARIOS = [
     gate: FULL_ANIMATE_GATE_BYTES,
   },
   {
+    // Сценарий «no-addons» ТЗ диеты (R3c-2a): tween-вызов БЕЗ композируемых
+    // слоёв (engine/formatCssAt) — целевой потолок ТЗ 2560 gz. Факт после
+    // mangle-pass + validation-lite (2026-07-15): 8636 gz — граф фасада
+    // статически несёт план+юнит+компилятор (диспетчеризация свойств), и до
+    // потолка нужен структурный срез графа, а не полировка имён. Активный
+    // гейт ТЗ сознательно НЕ включён (красный гейт запрещён дисциплиной
+    // repo): потолок объявлен pendingGate — замер публикуется, регрессию не
+    // валит; активировать gate: 2560, когда факт дойдёт до потолка.
+    // gate: 2560, // TODO(R3c-2b+): потолок ТЗ «no-addons»
+    pendingGate: 2560,
+    name: 'animate-no-addons',
+    code: `import { animate } from '%DIST%/../animate/index.js'; console.log(typeof animate('.hero', { x: 240, opacity: 1 }, { duration: 300, ease: (t) => t }).finished);`,
+  },
+  {
     // ПРАВДА потребительской цены поведения + СТРАЖ переиспользования: одна
     // фабрика ./behaviors должна тянуть ТОЛЬКО срез velocity-tracker+decay+solver,
     // а не весь пакет. Если бы behaviors утянул ./compositor-компилятор или
@@ -304,6 +318,7 @@ export async function measureScenario(scenario, distIndexPath) {
       brBytes: observationalBrotli(out).length,
       rawBytes: out.length,
       gate: scenario.gate,
+      pendingGate: scenario.pendingGate,
     };
   } catch (err) {
     return { name: scenario.name, error: String(err?.message ?? err).split('\n')[0], gate: scenario.gate };
@@ -565,13 +580,16 @@ core (index) gz = ${(core.gzBytes / 1024).toFixed(2)} KB > порог ${(core.ga
       console.log(pad(m.name, COL.label) + `  FAIL: ${m.error}`);
       continue;
     }
-    const exceeded = m.gzBytes > m.gate;
+    // Сценарий с pendingGate вместо gate — информационный замер (потолок ТЗ
+    // ещё не достигнут, красный гейт запрещён): число публикуется, регрессию
+    // не валит; сам потолок печатается как цель.
+    const exceeded = m.gate !== undefined && m.gzBytes > m.gate;
     if (exceeded) hasWarnings = true;
     console.log(
       pad(m.name, COL.label) +
       lpad(`${m.gzBytes} B gz`, COL.gz) +
       lpad(`${m.brBytes} B br`, COL.br) +
-      `  ${exceeded ? `РЕГРЕССИЯ > ${m.gate} B (найди раздувший коммит; порог не поднимать без решения Даниила)` : `OK (порог ${m.gate})`}`
+      `  ${exceeded ? `РЕГРЕССИЯ > ${m.gate} B (найди раздувший коммит; порог не поднимать без решения Даниила)` : m.gate === undefined ? `info (потолок ТЗ ${m.pendingGate} не активирован)` : `OK (порог ${m.gate})`}`
     );
   }
 

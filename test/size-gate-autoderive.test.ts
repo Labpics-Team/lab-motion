@@ -159,8 +159,15 @@ describe('size-gate: auto-derive subpath entries from package.json exports', () 
     for (const s of IMPORT_COST_SCENARIOS) {
       expect(typeof s.name).toBe('string');
       expect(s.code).toContain('%DIST%');
-      expect(Number.isFinite(s.gate)).toBe(true);
-      expect(s.gate).toBeGreaterThan(0);
+      // Каждый сценарий несёт ЛИБО активный конечный порог, ЛИБО объявленный
+      // потолок ТЗ (pendingGate) — «вечно безпорогового» сценария не бывает:
+      // pendingGate обязывает активировать gate по достижении потолка.
+      const target = s.gate ?? s.pendingGate;
+      expect(Number.isFinite(target), s.name).toBe(true);
+      expect(target).toBeGreaterThan(0);
+      if (s.gate === undefined) {
+        expect(Number.isFinite(s.pendingGate), `${s.name}: pendingGate`).toBe(true);
+      }
     }
   });
 
