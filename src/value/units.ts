@@ -145,6 +145,21 @@ export function tryParseUnit(value: string | number): UnitAST | undefined {
 }
 
 /**
+ * Лёгкая accept/reject-огибающая грамматики БЕЗ построения AST — для границ,
+ * которым нужен только вердикт (LM144-валидация планировщика ./animate).
+ * Единственный источник грамматики — те же регексы, что у parseUnitImpl:
+ * `matchesUnitGrammar(s) === (tryParseUnit(s) !== undefined)` для любых строк
+ * по построению (trim + потолок длины + те же три альтернативы). Отдельная
+ * функция позволяет tree-shaker'у выбросить AST-строителей и diagnostic-строки
+ * из базового графа ./animate (диета R3c-2a).
+ */
+export function matchesUnitGrammar(value: string): boolean {
+  const s = value.trim();
+  if (s.length > MAX_PARSE_LENGTH) return false;
+  return VAR_RE.test(s) || RELATIVE_RE.test(s) || UNIT_RE.test(s);
+}
+
+/**
  * Парсит CSS-значение юнита/относительного значения/var() в типизированный AST.
  *
  * Поддерживаемые форматы:

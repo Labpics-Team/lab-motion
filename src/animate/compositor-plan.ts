@@ -20,7 +20,7 @@
  *     движок в базовый граф не входит: C¹-подхват css идёт через
  *     инжектируемый шов formatCssAt(from,to,p); без шва планировщик честно
  *     деградирует до C⁰-рестарта с from = текущий to (директива владельца);
- *   - синтаксическая граница LM144 держится грамматикой юнитов (tryParseUnit,
+ *   - синтаксическая граница LM144 держится грамматикой юнитов (matchesUnitGrammar,
  *     лёгкий) + head-проверкой цвета: глубокий разбор ТЕЛ цветов — вес
  *     value-движка, планировщик принимает форму и отдаёт значение браузеру.
  *
@@ -35,7 +35,7 @@ import { prefersReduced } from '../compositor/detect.js';
 import { MotionParamError, type MotionParamErrorCode } from '../errors.js';
 import { type SpringParams } from '../spring.js';
 import { buildTransform } from '../value/transform.js';
-import { tryParseUnit } from '../value/units.js';
+import { matchesUnitGrammar } from '../value/units.js';
 import type {
   AbortSignalLike,
   CompositorUnitCapability,
@@ -228,8 +228,9 @@ function requireFinite(value: unknown): number {
 
 /**
  * Синтаксическая граница css-значения БЕЗ цветового движка: число (конечное),
- * грамматика юнитов/var()/relative (тот же tryParseUnit, что у value-движка —
- * ноль дубля грамматики) либо head цвета (#/rgb(a)/hsl(a) — канон голов
+ * грамматика юнитов/var()/relative (matchesUnitGrammar — та же огибающая,
+ * что tryParseUnit value-движка: единый источник регексов, ноль дубля
+ * грамматики и ноль AST-строителей в базовом графе) либо head цвета (канон голов
  * tryParseValue). Глубокий разбор тела цвета — вес value/color; планировщик
  * принимает форму, значение исполняет браузер. Это единственное осознанное
  * ослабление LM144 против старой модели (документировано срезом).
@@ -242,7 +243,7 @@ function requireCssValue(value: unknown): string | number {
   if (typeof value !== 'string') failPlan('LM143');
   const source = value.trim();
   if (
-    tryParseUnit(source) === undefined &&
+    !matchesUnitGrammar(source) &&
     !source.startsWith('#') &&
     !/^rgba?/i.test(source) &&
     !/^hsla?/i.test(source)

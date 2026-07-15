@@ -7,7 +7,7 @@ import { build } from 'esbuild';
 import { describe, expect, it } from 'vitest';
 import { parse } from '../src/value/index.js';
 import { tryParseValue } from '../src/value/parse.js';
-import { parseUnit, tryParseUnit } from '../src/value/units.js';
+import { matchesUnitGrammar, parseUnit, tryParseUnit } from '../src/value/units.js';
 
 const VALID = [
   0,
@@ -81,6 +81,23 @@ describe('value: internal no-throw parser', () => {
       const ast = tryParseValue(value);
       expect(ast?.kind).toBe('unit');
       expect(Number.isFinite((ast as { value: number }).value)).toBe(true);
+    }
+  });
+
+  it('matchesUnitGrammar ≡ tryParseUnit-огибающая бит-в-бит (дифференциал)', () => {
+    // Лёгкая огибающая LM144-границы ./animate обязана принимать/отклонять
+    // РОВНО те же строки, что полный парсер (единый источник регексов).
+    const corpus: string[] = [
+      ...VALID.filter((v): v is Exclude<typeof v, number> => typeof v === 'string'),
+      'nope', '', ' ', 'px', '10 px', '10pxx', '1e+', '.', '1.',
+      '42', ' 42 ', '.5', '1.5e-3', '-0', '+0deg', '100PX', '2TURN',
+      '+=', '-=x', '+=10furlong', 'var(--a', 'var(a)', 'var(--a,)',
+      'calc(100% - 1px)', '#fff', 'rgb(0,0,0)', 'translateX(1px)',
+      'x'.repeat(4096), 'x'.repeat(4097), `var(--gap${' '.repeat(4080)})`,
+    ];
+    for (const value of corpus) {
+      expect(matchesUnitGrammar(value), JSON.stringify(value.slice(0, 40)))
+        .toBe(tryParseUnit(value) !== undefined);
     }
   });
 });
