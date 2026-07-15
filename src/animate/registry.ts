@@ -1,12 +1,13 @@
 /**
- * animate/registry.ts — адаптерный реестр целей и кодеков свойств.
+ * animate/registry.ts — типовой шов «движок ↔ кодеки/адаптеры».
  *
- * ЗАКОН расширения: новый вид свойства/цели добавляется РЕГИСТРАЦИЕЙ кодека/
- * адаптера в реестр, а НЕ ростом центрального switch в движке анимации. Ядро
- * движка (mini/engine.ts) дергает только codec._parse/_interpolate/_serialize и
- * adapter._read/_surfaceOf/_compose/_apply — и НИКОГДА не ветвится по имени свойства.
+ * ЗАКОН расширения: новый вид свойства/цели добавляется НОВОЙ реализацией
+ * кодека/адаптера за швом CodecResolver, а НЕ ростом центрального switch в
+ * движке анимации. Ядро движка (mini/engine.ts) дергает только
+ * codec._parse/_interpolate/_serialize и adapter._read/_surfaceOf/_compose/
+ * _apply — и НИКОГДА не ветвится по имени свойства.
  *
- * Две абстракции (внутренняя граница поставки mini↔full):
+ * Две абстракции:
  *   PropertyCodec  — как ПАРСИТЬ вход свойства в TParsed, ИНТЕРПОЛИРОВАТЬ пару
  *                    и СЕРИАЛИЗОВАТЬ в CSS-значение.
  *   TargetAdapter  — как ЧИТАТЬ текущее значение свойства цели и как ПИСАТЬ:
@@ -15,16 +16,16 @@
  *                    композиция каналов поверхности в значение (нужна и
  *                    compositor-кейфрейму, и main-записи), apply — запись в цель.
  *
- * Граница поставки: mini регистрирует МИНИМАЛЬНЫЙ набор (числовой transform/
- * opacity + CSS-переменная + DOM-адаптер); full — расширенный (цвет, SVG-атрибут,
- * plain-object адаптер). mini НЕ импортирует full-набор (граф mini не тянет full).
+ * Здесь ЖИВУТ ТОЛЬКО ТИПЫ: единственная production-реализация шва —
+ * компилированный O(1)-resolver mini (mini/index.ts) поверх фиксированного
+ * набора mini-codecs.ts. Runtime-фабрики реестра в поставке НЕТ намеренно:
+ * расширяемый рантайм-реестр был прототипом, недостижимым из публичных
+ * entries, и не входит ни в один production-граф.
  *
- * Инварианты: SSR-safe (реестр — чистые данные, DOM не трогается на импорте);
+ * Инварианты реализаций шва: SSR-safe (DOM не трогается на импорте);
  * fail-fast (_resolveCodec/_resolveAdapter на неподдержанном входе бросают
  * MotionParamError ДО любой записи).
  */
-
-import { MotionParamError } from '../errors.js';
 
 /** Кодек свойства: парс/интерполяция/сериализация одного канала значения. */
 export interface PropertyCodec<TParsed = unknown> {
@@ -54,61 +55,10 @@ export interface TargetAdapter {
   _apply(target: unknown, surface: string, value: string | number): void;
 }
 
-/** Матчер кодека: предикат по имени свойства + сам кодек. */
-interface CodecEntry {
-  readonly _match: (property: string) => boolean;
-  readonly _codec: PropertyCodec;
-}
-
-/** Матчер адаптера: предикат по цели + сам адаптер. */
-interface AdapterEntry {
-  readonly _match: (target: unknown) => boolean;
-  readonly _adapter: TargetAdapter;
-}
-
-/** Узкая граница движка: ему нужен только разбор, не мутация реестра. */
+/** Узкая граница движка: ему нужен только разбор, не мутация набора кодеков. */
 export interface CodecResolver {
   /** Кодек для свойства; нет матча → MotionParamError (fail-fast, ДО записи). */
   _resolveCodec(property: string): PropertyCodec;
   /** Адаптер для цели; нет матча → MotionParamError (fail-fast, ДО записи). */
   _resolveAdapter(target: unknown): TargetAdapter;
-}
-
-/** Расширяемый реестр full-поставки. */
-export interface CodecRegistry extends CodecResolver {
-  /** Регистрирует кодек под предикатом свойства (позже — выше приоритет). */
-  _registerCodec(match: (property: string) => boolean, codec: PropertyCodec): void;
-  /** Регистрирует адаптер под предикатом цели (позже — выше приоритет). */
-  _registerAdapter(match: (target: unknown) => boolean, adapter: TargetAdapter): void;
-}
-
-/**
- * Пустой реестр. Кодеки/адаптеры пробуются в порядке ОБРАТНОМ регистрации
- * (позже зарегистрированный перекрывает — full может уточнить mini-дефолт).
- * НИКАКОГО switch — это и есть механизм расширения регистрацией.
- */
-export function createRegistry(): CodecRegistry {
-  const codecs: CodecEntry[] = [];
-  const adapters: AdapterEntry[] = [];
-
-  return {
-    _registerCodec(match, codec): void {
-      codecs.push({ _match: match, _codec: codec });
-    },
-    _registerAdapter(match, adapter): void {
-      adapters.push({ _match: match, _adapter: adapter });
-    },
-    _resolveCodec(property): PropertyCodec {
-      for (let i = codecs.length - 1; i >= 0; i--) {
-        if (codecs[i]!._match(property)) return codecs[i]!._codec;
-      }
-      throw new MotionParamError('LM145');
-    },
-    _resolveAdapter(target): TargetAdapter {
-      for (let i = adapters.length - 1; i >= 0; i--) {
-        if (adapters[i]!._match(target)) return adapters[i]!._adapter;
-      }
-      throw new MotionParamError('LM148');
-    },
-  };
 }
