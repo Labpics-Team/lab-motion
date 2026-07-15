@@ -180,7 +180,8 @@ WebKit-доказательства нет.
 - сколько занимает один paired-блок из 60 живых кадров тех же групп (p50/p95/p99);
 - какую справочную долю бюджета 120/240 Гц занимает synthetic JS-хвост p99;
 - сохраняется ли `1 requestFrame/кадр`, один уже queued drain после cancel и
-  отсутствие повторных idle-заявок между full/mini и несколькими вызовами.
+  отсутствие повторных idle-заявок между разными entries пакета (фасад
+  `./animate` + wc-биндинг на общем frame) и несколькими вызовами.
 
 Каждый sample проверяет ровно одну запись каждого target в каждом кадре, scheduler,
 `finished`/`onComplete`, queued drain и rolling hash полного property/value trace.
