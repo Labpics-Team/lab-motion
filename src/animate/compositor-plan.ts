@@ -85,6 +85,12 @@ export type FormatCssAt = (
 export interface CompositorPlanOptions {
   readonly targets: readonly PlanTarget[];
   readonly props: Record<string, unknown>;
+  /**
+   * Пред-разобранные спецификации (parsePlanProps). Фасад валидирует props ДО
+   * резолва целей (канон fail-fast порядка) и передаёт результат сюда — props
+   * тогда не читается повторно (hostile getters остаются read-once).
+   */
+  readonly specs?: readonly PlanSpec[] | undefined;
   readonly mode: PlanMode;
   /** Базовая задержка (мс) всем целям; scheduleStagger остаётся у фасада. */
   readonly delayMs?: number | undefined;
@@ -142,7 +148,12 @@ export interface PlannedSnapGroup {
   commit(): void;
 }
 
-/** Группа, не представимая синхронной WAAPI-кривой — живой путь фасада. */
+/**
+ * Группа, не представимая синхронной WAAPI-кривой. Судьбу решает фасад:
+ * зарегистрированный композируемый движок исполняет её живьём (ownership-хуки
+ * идентичны юнит-пути: живой ран — полноправный владелец с C¹-снимком),
+ * без движка — валидированный снап к финалу (snap(), контракт базы R3b).
+ */
 export interface PlannedLiveGroup {
   readonly kind: 'live';
   readonly el: PlanTarget;
@@ -161,6 +172,14 @@ export interface PlannedLiveGroup {
     readonly velocity: number;
   }[];
   readonly css: { readonly from: string | number; readonly to: string | number } | undefined;
+  /** Замороженные transform-каналы вне прогона: живой писатель их сохраняет. */
+  readonly residuals: ReadonlyMap<string, number>;
+  begin(): void;
+  publish(owner: PlanGroupOwner): void;
+  rollback(): void;
+  settle(owner: PlanGroupOwner, natural: boolean, snapshot?: ProgressSnapshot): void;
+  /** Деградация базового фасада: валидированный снап к финалу (канон reduced). */
+  snap(): void;
 }
 
 export type PlannedGroup = PlannedUnitGroup | PlannedSnapGroup | PlannedLiveGroup;
@@ -193,7 +212,8 @@ function camelToKebab(key: string): string {
   return key.replace(/[A-Z]/g, (c) => '-' + c.toLowerCase());
 }
 
-interface PlanSpec {
+/** Спецификация канала: результат parsePlanProps (валидированный вход). */
+export interface PlanSpec {
   readonly kind: 'num' | 'css';
   readonly key: string;
   readonly group: string;
@@ -330,7 +350,8 @@ function sharedGroupV0(channels: readonly BoundChannel[]): number | undefined {
 interface PlanRunState {
   readonly channels: ReadonlyMap<string, { readonly from: number; readonly to: number }>;
   readonly css: { readonly from: string | number; readonly to: string | number } | undefined;
-  readonly ir: ProgressCurveIR;
+  /** IR прогона; у живого владельца кривой нет — undefined (информационное). */
+  readonly ir: ProgressCurveIR | undefined;
   readonly startedAt: number;
 }
 
@@ -597,6 +618,7 @@ export function buildCompositorPlan(
   // Каждое поле опций читается один раз (hostile getters — read-once граница).
   const targets = options.targets;
   const props = options.props;
+  const preParsed = options.specs;
   const mode = options.mode;
   const baseDelay = options.delayMs;
   const targetDelays = options.targetDelays;
@@ -608,7 +630,8 @@ export function buildCompositorPlan(
   const signal = options.signal;
 
   // Валидация ДО чтений состояния: props (LM140–144), задержки (LM139).
-  const specs = parsePlanProps(props);
+  // Пред-разобранные specs фасада исключают повторное чтение hostile props.
+  const specs = preParsed ?? parsePlanProps(props);
   const groups = new Map<string, PlanSpec[]>();
   for (const spec of specs) {
     const list = groups.get(spec.group);
@@ -675,6 +698,11 @@ export function buildCompositorPlan(
             binding.cssTo === undefined
               ? undefined
               : { from: binding.cssFrom!, to: binding.cssTo },
+          residuals: binding.residuals,
+          ...makeOwnershipHooks(rec, binding, formatCssAt, seams, undefined),
+          snap(): void {
+            snapCommit(el, group, rec, binding);
+          },
         });
       };
 
@@ -740,6 +768,30 @@ export function buildCompositorPlan(
 
 // ─── Commit-хуки (единственные писатели реестра/DOM) ─────────────────────────
 
+/** Снап-запись как функция: писатель финала + supersede-канон + реестр. */
+function snapCommit(
+  el: PlanTarget,
+  group: string,
+  rec: PlanGroupRecord,
+  binding: GroupBinding,
+): void {
+  if (rec._transition) failPlan('LM157');
+  rec._transition = true;
+  const previous = rec._owner;
+  const write = (): void => el.style.setProperty(group, finalGroupValue(group, binding));
+  try {
+    if (previous) previous._supersede(write);
+    else write();
+  } catch (error) {
+    rec._transition = false;
+    throw error;
+  }
+  rec._owner = undefined;
+  rec._run = undefined;
+  commitFinal(rec, binding);
+  rec._transition = false;
+}
+
 function makeSnapEntry(
   el: PlanTarget,
   group: string,
@@ -751,34 +803,26 @@ function makeSnapEntry(
     el,
     group,
     commit(): void {
-      if (rec._transition) failPlan('LM157');
-      rec._transition = true;
-      const previous = rec._owner;
-      const write = (): void => el.style.setProperty(group, finalGroupValue(group, binding));
-      try {
-        if (previous) previous._supersede(write);
-        else write();
-      } catch (error) {
-        rec._transition = false;
-        throw error;
-      }
-      rec._owner = undefined;
-      rec._run = undefined;
-      commitFinal(rec, binding);
-      rec._transition = false;
+      snapCommit(el, group, rec, binding);
     },
   };
 }
 
-function makeUnitEntry(
-  el: PlanTarget,
-  group: string,
+/** Ownership-протокол, общий для юнит- и живых групп (владелец = любой ран). */
+interface OwnershipHooks {
+  begin(): void;
+  publish(owner: PlanGroupOwner): void;
+  rollback(): void;
+  settle(owner: PlanGroupOwner, natural: boolean, snapshot?: ProgressSnapshot): void;
+}
+
+function makeOwnershipHooks(
   rec: PlanGroupRecord,
   binding: GroupBinding,
-  plan: CompositorUnitPlan,
   formatCssAt: FormatCssAt | undefined,
   seams: CompositorUnitSeams,
-): PlannedUnitGroup {
+  ir: ProgressCurveIR | undefined,
+): OwnershipHooks {
   const runState = (): PlanRunState => {
     const channels = new Map<string, { from: number; to: number }>();
     for (const ch of binding.channels) {
@@ -796,15 +840,11 @@ function makeUnitEntry(
         binding.cssTo === undefined
           ? undefined
           : { from: binding.cssFrom!, to: binding.cssTo },
-      ir: plan.ir,
+      ir,
       startedAt,
     };
   };
   return {
-    kind: 'unit',
-    el,
-    group,
-    plan,
     begin(): void {
       // Канон LM157: commit-reservation закрывает реентри до публикации.
       if (rec._transition) failPlan('LM157');
@@ -847,5 +887,23 @@ function makeUnitEntry(
       }
       writeInterrupted(rec, run, snapshot, formatCssAt);
     },
+  };
+}
+
+function makeUnitEntry(
+  el: PlanTarget,
+  group: string,
+  rec: PlanGroupRecord,
+  binding: GroupBinding,
+  plan: CompositorUnitPlan,
+  formatCssAt: FormatCssAt | undefined,
+  seams: CompositorUnitSeams,
+): PlannedUnitGroup {
+  return {
+    kind: 'unit',
+    el,
+    group,
+    plan,
+    ...makeOwnershipHooks(rec, binding, formatCssAt, seams, plan.ir),
   };
 }
