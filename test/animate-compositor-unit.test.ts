@@ -162,13 +162,13 @@ function makeFixture(overrides: Partial<CompositorUnitPlan> = {}, animOptions?: 
   const clock = makeClock();
   const timer = makeTimer();
   const plan: CompositorUnitPlan = {
-    el: target.el,
-    group: 'opacity',
-    keyframes: [0, 100],
-    ir: IR,
-    delayMs: 0,
-    seams: { now: clock.now, setTimer: timer.setTimer },
-    capability: { linearSupported: true },
+    _el: target.el,
+    _group: 'opacity',
+    _keyframes: [0, 100],
+    _ir: IR,
+    _delayMs: 0,
+    _seams: { _now: clock.now, _setTimer: timer.setTimer },
+    _capability: { _linearSupported: true },
     ...overrides,
   };
   return { target, clock, timer, plan };
@@ -233,7 +233,7 @@ describe('compositor-unit: lazy-commit', () => {
       spawning.calls.push({ keyframes, timing, host });
       return host.anim;
     });
-    createCompositorUnit({ ...early.plan, el: spawning.el });
+    createCompositorUnit({ ...early.plan, _el: spawning.el });
 
     expect(tasks).toHaveLength(1);
     tasks.shift()!();
@@ -257,7 +257,7 @@ describe('compositor-unit: lazy-commit', () => {
   });
 
   it('виртуальный seek до коммита смещает delay эмиссии без DOM-вызовов', () => {
-    const f = makeFixture({ delayMs: 100 });
+    const f = makeFixture({ _delayMs: 100 });
     const unit = createCompositorUnit(f.plan)!;
     unit.seek(400);
     expect(f.target.calls).toHaveLength(0);
@@ -273,9 +273,9 @@ describe('compositor-unit: lazy-commit', () => {
 describe('compositor-unit: режимы исполнения', () => {
   it('linear(): два кадра + easing из toLinear(ir.points), делэй при > 0', () => {
     const f = makeFixture({
-      group: 'transform',
-      keyframes: ['translateX(0px)', 'translateX(100px)'],
-      delayMs: 250,
+      _group: 'transform',
+      _keyframes: ['translateX(0px)', 'translateX(100px)'],
+      _delayMs: 250,
     });
     createCompositorUnit(f.plan);
     flushBatch();
@@ -304,8 +304,8 @@ describe('compositor-unit: режимы исполнения', () => {
 
   it('explicit keyframes: offsets кадров = ir-пары, значения — лерп from/to', () => {
     const f = makeFixture({
-      capability: { linearSupported: false },
-      keyframes: [10, 20],
+      _capability: { _linearSupported: false },
+      _keyframes: [10, 20],
     });
     createCompositorUnit(f.plan);
     flushBatch();
@@ -322,8 +322,8 @@ describe('compositor-unit: режимы исполнения', () => {
 
   it('explicit + нечисловая пара → честный undefined-отказ без DOM и батча', () => {
     const f = makeFixture({
-      capability: { linearSupported: false },
-      keyframes: ['red', 'blue'],
+      _capability: { _linearSupported: false },
+      _keyframes: ['red', 'blue'],
       group: 'color',
     });
     expect(createCompositorUnit(f.plan)).toBeUndefined();
@@ -341,7 +341,7 @@ describe('compositor-unit: hostile host', () => {
     const target = fakeTarget(() => {
       throw boom;
     });
-    const f = makeFixture({ el: target.el });
+    const f = makeFixture({ _el: target.el });
     const unit = createCompositorUnit(f.plan)!;
     flushBatch();
 
@@ -355,7 +355,7 @@ describe('compositor-unit: hostile host', () => {
 
   it('animate вернул объект без cancel → LM162, партиал не остаётся', async () => {
     const target = fakeTarget(() => ({}));
-    const f = makeFixture({ el: target.el });
+    const f = makeFixture({ _el: target.el });
     const unit = createCompositorUnit(f.plan)!;
     flushBatch();
 
@@ -370,7 +370,7 @@ describe('compositor-unit: hostile host', () => {
     };
     const unit = createCompositorUnit({
       ...f.plan,
-      seams: { now: f.clock.now, setTimer: throwingTimer },
+      _seams: { _now: f.clock.now, _setTimer: throwingTimer },
     })!;
     flushBatch();
 
@@ -406,7 +406,7 @@ describe('compositor-unit: hostile host', () => {
       target.calls.push({ keyframes, timing, host });
       return host.anim;
     });
-    const f = makeFixture({ el: target.el });
+    const f = makeFixture({ _el: target.el });
     const unit = createCompositorUnit(f.plan)!;
     flushBatch();
 
@@ -422,7 +422,7 @@ describe('compositor-unit: hostile host', () => {
       unit._supersede();
       return makeHostAnim().anim;
     });
-    const f = makeFixture({ el: target.el });
+    const f = makeFixture({ _el: target.el });
     const unit = createCompositorUnit(f.plan)!;
     flushBatch();
 
@@ -437,30 +437,30 @@ describe('compositor-unit: контролы и аналитический сни
     const f = makeFixture();
     const unit = createCompositorUnit(f.plan)!;
     // До коммита время прогона не течёт: снимок — стартовая пара IR.
-    expect(unit._snapshot()).toEqual({ value: 0, velocity: 0 });
+    expect(unit._snapshot()).toEqual({ _value: 0, _velocity: 0 });
     flushBatch();
 
     f.clock.set(250); // u=0.25, первый сегмент: 0→0.8 на половине оси
-    expect(unit._snapshot().value).toBeCloseTo(0.4, 12);
-    expect(unit._snapshot().velocity).toBeCloseTo(1.6, 12);
+    expect(unit._snapshot()._value).toBeCloseTo(0.4, 12);
+    expect(unit._snapshot()._velocity).toBeCloseTo(1.6, 12);
 
     f.clock.set(750); // u=0.75, второй сегмент: 0.8→1
-    expect(unit._snapshot().value).toBeCloseTo(0.9, 12);
-    expect(unit._snapshot().velocity).toBeCloseTo(0.4, 12);
+    expect(unit._snapshot()._value).toBeCloseTo(0.9, 12);
+    expect(unit._snapshot()._velocity).toBeCloseTo(0.4, 12);
 
     f.clock.set(5000); // за дедлайном — терминальная пара, скорость нулевая
-    expect(unit._snapshot()).toEqual({ value: 1, velocity: 0 });
+    expect(unit._snapshot()).toEqual({ _value: 1, _velocity: 0 });
   });
 
   it('delay сдвигает активное окно снимка', () => {
-    const f = makeFixture({ delayMs: 500 });
+    const f = makeFixture({ _delayMs: 500 });
     const unit = createCompositorUnit(f.plan)!;
     flushBatch();
 
     f.clock.set(250); // ещё в delay-фазе
-    expect(unit._snapshot()).toEqual({ value: 0, velocity: 0 });
+    expect(unit._snapshot()).toEqual({ _value: 0, _velocity: 0 });
     f.clock.set(750); // u=0.25
-    expect(unit._snapshot().value).toBeCloseTo(0.4, 12);
+    expect(unit._snapshot()._value).toBeCloseTo(0.4, 12);
   });
 
   it('pause замораживает позицию через host pause, play возобновляет', () => {
@@ -475,7 +475,7 @@ describe('compositor-unit: контролы и аналитический сни
     expect(f.timer.entries[0]!.alive).toBe(false); // плечо завершения снято
 
     f.clock.set(900); // время идёт — позиция стоит
-    expect(unit._snapshot().value).toBeCloseTo(0.4, 12);
+    expect(unit._snapshot()._value).toBeCloseTo(0.4, 12);
 
     unit.play();
     expect(host.play).toHaveBeenCalledTimes(1);
@@ -483,7 +483,7 @@ describe('compositor-unit: контролы и аналитический сни
     expect(rearmed.alive).toBe(true);
     expect(rearmed.ms).toBe(750); // остаток дедлайна от замороженных 250 мс
     f.clock.set(900 + 200);
-    expect(unit._snapshot().value).toBeCloseTo(0.4 + 1.6 * 0.2, 12);
+    expect(unit._snapshot()._value).toBeCloseTo(0.4 + 1.6 * 0.2, 12);
   });
 
   it('host без pause: числовая группа держится аналитическим инлайн-hold', () => {
@@ -506,7 +506,7 @@ describe('compositor-unit: контролы и аналитический сни
 
   it('host без pause: нечисловая пара фиксируется commitStyles хоста', () => {
     const f = makeFixture(
-      { group: 'color', keyframes: ['red', 'blue'] },
+      { _group: 'color', _keyframes: ['red', 'blue'] },
       { pause: false },
     );
     const unit = createCompositorUnit(f.plan)!;
@@ -531,7 +531,7 @@ describe('compositor-unit: контролы и аналитический сни
     const rearmed = f.timer.entries.at(-1)!;
     expect(rearmed.alive).toBe(true);
     expect(rearmed.ms).toBe(200);
-    expect(unit._snapshot().value).toBeCloseTo(0.8 + 0.4 * (0.8 - 0.5), 12);
+    expect(unit._snapshot()._value).toBeCloseTo(0.8 + 0.4 * (0.8 - 0.5), 12);
   });
 
   it('hostile сеттер currentTime → транзакционная ре-эмиссия с той позиции', () => {
@@ -549,7 +549,7 @@ describe('compositor-unit: контролы и аналитический сни
       target.calls.push({ keyframes, timing, host });
       return host.anim;
     });
-    const f = makeFixture({ el: target.el });
+    const f = makeFixture({ _el: target.el });
     const unit = createCompositorUnit(f.plan)!;
     flushBatch();
 
@@ -557,7 +557,7 @@ describe('compositor-unit: контролы и аналитический сни
     expect(target.calls).toHaveLength(2);
     expect(target.calls[0]!.host.cancel).toHaveBeenCalledTimes(1);
     expect(target.calls[1]!.timing['delay']).toBe(-600);
-    expect(unit._snapshot().value).toBeCloseTo(0.8 + 0.4 * (0.6 - 0.5), 12);
+    expect(unit._snapshot()._value).toBeCloseTo(0.8 + 0.4 * (0.6 - 0.5), 12);
   });
 
   it('seek на числовой паузе двигает уже записанную инлайн-позу', () => {
@@ -572,7 +572,7 @@ describe('compositor-unit: контролы и аналитический сни
       { prop: 'opacity', value: '80' },
       { prop: 'opacity', value: '40' },
     ]);
-    expect(unit._snapshot().value).toBeCloseTo(0.4, 12);
+    expect(unit._snapshot()._value).toBeCloseTo(0.4, 12);
   });
 
   it('cancel живого прогона: инлайн-фиксация текущей позы до host cancel', async () => {
@@ -587,7 +587,7 @@ describe('compositor-unit: контролы и аналитический сни
       target.writes.push({ prop, value });
       order.push(`write:${prop}=${value}`);
     };
-    const f = makeFixture({ el: target.el });
+    const f = makeFixture({ _el: target.el });
     const unit = createCompositorUnit(f.plan)!;
     flushBatch();
 
@@ -598,7 +598,7 @@ describe('compositor-unit: контролы и аналитический сни
   });
 
   it('естественное завершение: финальная поза из плана, effect снимается', async () => {
-    const f = makeFixture({ keyframes: [0, 100] });
+    const f = makeFixture({ _keyframes: [0, 100] });
     const unit = createCompositorUnit(f.plan)!;
     flushBatch();
     const host = f.target.calls[0]!.host;
@@ -613,7 +613,7 @@ describe('compositor-unit: контролы и аналитический сни
 
   it('дедлайн выше int32-клампа добирается повторными плечами таймера', () => {
     const huge: ProgressCurveIR = { durationMs: 2 ** 32, points: IR.points };
-    const f = makeFixture({ ir: huge });
+    const f = makeFixture({ _ir: huge });
     createCompositorUnit(f.plan);
     flushBatch();
 
@@ -642,7 +642,7 @@ describe('compositor-unit: ownership', () => {
       target.writes.push({ prop, value });
       order.push('hold');
     };
-    const f = makeFixture({ el: target.el });
+    const f = makeFixture({ _el: target.el });
     const unit = createCompositorUnit(f.plan)!;
     flushBatch();
 
@@ -703,7 +703,7 @@ describe('compositor-unit: dispose и signal', () => {
 
   it('abort до коммита = pre-commit cancel без DOM', async () => {
     const controller = new AbortController();
-    const f = makeFixture({ signal: controller.signal });
+    const f = makeFixture({ _signal: controller.signal });
     const unit = createCompositorUnit(f.plan)!;
     controller.abort();
     flushBatch();
@@ -714,7 +714,7 @@ describe('compositor-unit: dispose и signal', () => {
 
   it('abort живого прогона = cancel-семантика с фиксацией позы', () => {
     const controller = new AbortController();
-    const f = makeFixture({ signal: controller.signal });
+    const f = makeFixture({ _signal: controller.signal });
     const unit = createCompositorUnit(f.plan)!;
     flushBatch();
 
@@ -728,7 +728,7 @@ describe('compositor-unit: dispose и signal', () => {
   it('уже отменённый signal рождает завершённый юнит: ноль DOM и батча', async () => {
     const controller = new AbortController();
     controller.abort();
-    const f = makeFixture({ signal: controller.signal });
+    const f = makeFixture({ _signal: controller.signal });
     const unit = createCompositorUnit(f.plan)!;
 
     expect(tasks).toHaveLength(0);
@@ -742,7 +742,7 @@ describe('compositor-unit: dispose и signal', () => {
     const addEventListener = vi.fn();
     const removeEventListener = vi.fn();
     const signal = { aborted: false, addEventListener, removeEventListener };
-    const f = makeFixture({ signal });
+    const f = makeFixture({ _signal: signal });
     const unit = createCompositorUnit(f.plan)!;
     flushBatch();
 
@@ -779,47 +779,47 @@ describe('compositor-unit: LM-граница плана', () => {
     ): CompositorUnitPlan =>
       ({ ...base, [key]: value }) as CompositorUnitPlan;
 
-    expectCode(() => createCompositorUnit(broken('seams', {})), 'LM156');
+    expectCode(() => createCompositorUnit(broken('_seams', {})), 'LM156');
     expectCode(
-      () => createCompositorUnit(broken('el', { style: { setProperty() {} } })),
+      () => createCompositorUnit(broken('_el', { style: { setProperty() {} } })),
       'LM160',
     );
-    expectCode(() => createCompositorUnit(broken('el', { animate() {} })), 'LM161');
-    expectCode(() => createCompositorUnit(broken('group', '')), 'LM010');
-    expectCode(() => createCompositorUnit(broken('keyframes', [0])), 'LM141');
-    expectCode(() => createCompositorUnit(broken('keyframes', [Number.NaN, 1])), 'LM142');
-    expectCode(() => createCompositorUnit(broken('keyframes', [{}, 1])), 'LM143');
-    expectCode(() => createCompositorUnit(broken('delayMs', -1)), 'LM139');
-    expectCode(() => createCompositorUnit(broken('delayMs', Number.NaN)), 'LM139');
+    expectCode(() => createCompositorUnit(broken('_el', { animate() {} })), 'LM161');
+    expectCode(() => createCompositorUnit(broken('_group', '')), 'LM010');
+    expectCode(() => createCompositorUnit(broken('_keyframes', [0])), 'LM141');
+    expectCode(() => createCompositorUnit(broken('_keyframes', [Number.NaN, 1])), 'LM142');
+    expectCode(() => createCompositorUnit(broken('_keyframes', [{}, 1])), 'LM143');
+    expectCode(() => createCompositorUnit(broken('_delayMs', -1)), 'LM139');
+    expectCode(() => createCompositorUnit(broken('_delayMs', Number.NaN)), 'LM139');
     expectCode(
-      () => createCompositorUnit(broken('ir', { durationMs: 0, points: IR.points })),
+      () => createCompositorUnit(broken('_ir', { durationMs: 0, points: IR.points })),
       'LM137',
     );
     expectCode(
-      () => createCompositorUnit(broken('ir', { durationMs: 1000, points: [0, 0] })),
+      () => createCompositorUnit(broken('_ir', { durationMs: 1000, points: [0, 0] })),
       'LM159',
     );
     expectCode(
       () =>
         createCompositorUnit(
-          broken('ir', { durationMs: 1000, points: [0, 0, 0.5, 0.8, 1] }),
+          broken('_ir', { durationMs: 1000, points: [0, 0, 0.5, 0.8, 1] }),
         ),
       'LM159',
     );
     expectCode(
       () =>
         createCompositorUnit(
-          broken('ir', { durationMs: 1000, points: [0, 0, 0.5, Number.NaN, 1, 1] }),
+          broken('_ir', { durationMs: 1000, points: [0, 0, 0.5, Number.NaN, 1, 1] }),
         ),
       'LM159',
     );
-    expectCode(() => createCompositorUnit(broken('signal', { aborted: false })), 'LM156');
+    expectCode(() => createCompositorUnit(broken('_signal', { aborted: false })), 'LM156');
   });
 
   it('hostile capability не считается доказанным linear()', () => {
     const f = makeFixture({
-      capability: { linearSupported: 'yes' as unknown as boolean },
-      keyframes: [0, 1],
+      _capability: { _linearSupported: 'yes' as unknown as boolean },
+      _keyframes: [0, 1],
     });
     createCompositorUnit(f.plan);
     flushBatch();

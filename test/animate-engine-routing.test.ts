@@ -121,8 +121,8 @@ describe('animate маршрутизация: engine зовётся ровно �
     await Promise.resolve();
 
     expect(calls).toHaveLength(1);
-    expect(calls[0]!.el).toBe(bare.el);
-    expect(calls[0]!.reason).toBe('no-waapi');
+    expect(calls[0]!._el).toBe(bare.el);
+    expect(calls[0]!._reason).toBe('no-waapi');
     expect(waapi.animateCalls).toHaveLength(1);
     controls.cancel();
   });
@@ -153,8 +153,8 @@ describe('animate маршрутизация: engine зовётся ровно �
     });
 
     expect(calls).toHaveLength(1);
-    expect(calls[0]!.reason).toBe('v0-mismatch');
-    expect(calls[0]!.el).toBe(target.el);
+    expect(calls[0]!._reason).toBe('v0-mismatch');
+    expect(calls[0]!._el).toBe(target.el);
     second.cancel();
   });
 });

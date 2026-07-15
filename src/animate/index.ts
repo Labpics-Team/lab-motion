@@ -82,11 +82,19 @@ export type AnimateProps = Record<string, unknown>;
 /** Кадровый шов живого движка (тип живёт здесь, вес — в animate/live). */
 export type RequestFrameFn = (cb: (ts?: number) => void) => number;
 
-/** Контекст, который фасад отдаёт композируемому живому движку. */
+/**
+ * Контекст, который фасад отдаёт композируемому живому движку.
+ *
+ * ПУБЛИЧНАЯ поверхность стороннего движка сознательно минимальна (решение
+ * R3c-2a): mode — режим движения (публичные же имена опций), requestFrame —
+ * кадровый шов, formatCssAt — css-шов. Часы/таймеры фасада (now/setTimer)
+ * в контракт НЕ входят: живой движок живёт на кадровых дельтах (канон live),
+ * wall-таймеры — модель WAAPI-юнита; движку, которому нужны часы, их
+ * инжектирует его собственный автор. Поля контекста остаются plain-именами —
+ * это граница расширения; всё прочее межмодульное манглится (_-префиксы).
+ */
 export interface AnimateEngineContext {
   readonly mode: PlanMode;
-  readonly now: () => number;
-  readonly setTimer: SetTimerFn;
   readonly requestFrame: RequestFrameFn | undefined;
   readonly formatCssAt: FormatCssAt | undefined;
 }
@@ -168,17 +176,17 @@ interface RunControls {
 }
 
 interface StartedRun {
-  run: RunControls;
-  readonly settle: (
+  _run: RunControls;
+  readonly _settle: (
     owner: PlanGroupOwner,
     natural: boolean,
     snapshot?: ProgressSnapshot,
   ) => void;
-  owner: PlanGroupOwner;
+  _owner: PlanGroupOwner;
   /** Прерывания фасада (cancel/stop/abort) — ненатуральный исход engine-ранов. */
-  interrupted: boolean;
+  _interrupted: boolean;
   /** Снимок позы, снятый фасадом ДО cancel — терминальная правда реестра. */
-  pendingSnapshot: ProgressSnapshot | undefined;
+  _pendingSnapshot: ProgressSnapshot | undefined;
 }
 
 // ─── Дефолтные швы (читаются в вызове — SSR-safe) ────────────────────────────
@@ -334,19 +342,19 @@ export function animate(
 
   // 2. Фаза plan/read: планировщик читает и привязывает ВСЕ цели до первой
   //    мутации (реестр, снимки владельцев, style-read холодного from).
-  const { plans, snaps, live } = buildCompositorPlan({
-    targets: els,
-    props,
-    specs,
-    mode,
-    delayMs: baseDelay,
-    targetDelays,
-    seams: { now, setTimer },
+  const { _plans: plans, _snaps: snaps, _live: live } = buildCompositorPlan({
+    _targets: els,
+    _props: props,
+    _specs: specs,
+    _mode: mode,
+    _delayMs: baseDelay,
+    _targetDelays: targetDelays,
+    _seams: { _now: now, _setTimer: setTimer },
     // Одна проба среды на вызов; без linear() числовые группы едут
     // explicit-кадрами, символьные — в engine либо снап (см. контракт).
-    capability: { linearSupported: supportsLinearEasing() },
-    reducedMotion: reduced,
-    formatCssAt,
+    _capability: { _linearSupported: supportsLinearEasing() },
+    _reducedMotion: reduced,
+    _formatCssAt: formatCssAt,
     // signal обслуживается агрегатом: один слушатель на вызов, а не N.
   });
 
@@ -360,12 +368,12 @@ export function animate(
   const runs: StartedRun[] = [];
   const cancelAll = (): void => {
     for (const started of runs) {
-      if (started.interrupted) continue;
-      started.interrupted = true;
+      if (started._interrupted) continue;
+      started._interrupted = true;
       // Снимок ДО cancel: терминальная запись реестра — поза остановки;
       // ран после done отдаёт финальную позицию, и снимок был бы ложным.
-      started.pendingSnapshot = started.run._snapshot?.();
-      started.run.cancel();
+      started._pendingSnapshot = started._run._snapshot?.();
+      started._run.cancel();
     }
   };
   const maybeComplete = (): void => {
@@ -395,12 +403,12 @@ export function animate(
         // Натуральность engine-рана выводит агрегат: ненатуральные исходы
         // идут только через фасадные пути (cancel/stop/abort) либо через
         // supersede дубликата, который уже записал реестр в publish.
-        const nat = !started.interrupted;
-        started.settle(started.owner, nat, started.pendingSnapshot);
+        const nat = !started._interrupted;
+        started._settle(started._owner, nat, started._pendingSnapshot);
         report(nat);
       },
       () => {
-        started.settle(started.owner, false, started.pendingSnapshot);
+        started._settle(started._owner, false, started._pendingSnapshot);
         report(false);
       },
     );
@@ -411,72 +419,70 @@ export function animate(
   //    (publish-хук выполняет supersede с терминальной записью его снимка).
   try {
     for (const snap of snaps) {
-      snap.commit();
+      snap._commit();
       report(true);
     }
     for (const entry of plans) {
-      entry.begin();
+      entry._begin();
       const started: StartedRun = {
-        run: undefined as unknown as RunControls,
-        settle: (owner, nat, snapshot) => entry.settle(owner, nat, snapshot),
-        owner: undefined as unknown as PlanGroupOwner,
-        interrupted: false,
-        pendingSnapshot: undefined,
+        _run: undefined as unknown as RunControls,
+        _settle: (owner, nat, snapshot) => entry._settle(owner, nat, snapshot),
+        _owner: undefined as unknown as PlanGroupOwner,
+        _interrupted: false,
+        _pendingSnapshot: undefined,
       };
       let unit: ReturnType<typeof createCompositorUnit>;
       try {
         // Канал onDone вместо unit.finished: aggregate не платит Promise-
         // аллокацией на юнит (контракт O(1) finished на N целей), а
         // натуральность отдаёт сам юнит (complete против cancel/supersede).
-        unit = createCompositorUnit(entry.plan, (nat, failure) => {
-          started.settle(started.owner, nat && failure === undefined, started.pendingSnapshot);
+        unit = createCompositorUnit(entry._plan, (nat, failure) => {
+          started._settle(started._owner, nat && failure === undefined, started._pendingSnapshot);
           report(nat && failure === undefined);
         });
       } catch (error) {
-        entry.rollback();
+        entry._rollback();
         throw error;
       }
       if (unit === undefined) {
         // Планировщик уже отфильтровал непредставимое; защитная ветвь на
         // расхождение capability — честный снап вместо тихой потери группы.
-        entry.rollback();
+        entry._rollback();
         report(true);
         continue;
       }
-      started.run = unit;
-      started.owner = unit;
-      entry.publish(unit);
+      started._run = unit;
+      started._owner = unit;
+      entry._publish(unit);
       runs.push(started);
     }
     for (const entry of live) {
       if (engine === undefined) {
         // Контракт базы: непредставимая синхронной кривой группа получает
         // валидированный снап к финалу (единая политика с reduced).
-        entry.snap();
+        entry._snap();
         report(true);
         continue;
       }
-      entry.begin();
+      entry._begin();
       let run: AnimateEngineRun;
       try {
         run = engine(entry, {
           mode,
-          now,
-          setTimer,
           requestFrame: options.requestFrame,
           formatCssAt,
         });
       } catch (error) {
-        entry.rollback();
+        entry._rollback();
         throw error;
       }
-      entry.publish(run);
+      entry._publish(run);
       const started: StartedRun = {
-        run,
-        settle: (owner, nat, snapshot) => entry.settle(owner, nat, snapshot),
-        owner: run,
-        interrupted: false,
-        pendingSnapshot: undefined,
+        _run: run,
+        _settle: (owner, nat, snapshot) => entry._settle(owner, nat, snapshot),
+        _owner: run,
+        _interrupted: false,
+        _pendingSnapshot: undefined,
       };
       runs.push(started);
       wireEngineCompletion(started, run);
@@ -486,8 +492,8 @@ export function animate(
     // в обратном порядке; исходное исключение остаётся причиной.
     for (let i = runs.length - 1; i >= 0; i--) {
       try {
-        runs[i]!.interrupted = true;
-        runs[i]!.run.cancel();
+        runs[i]!._interrupted = true;
+        runs[i]!._run.cancel();
       } catch {
         /* best-effort cleanup остальных */
       }
@@ -511,13 +517,13 @@ export function animate(
   return {
     finished,
     play(): void {
-      for (const started of runs) started.run.play();
+      for (const started of runs) started._run.play();
     },
     pause(): void {
-      for (const started of runs) started.run.pause();
+      for (const started of runs) started._run.pause();
     },
     seek(tMs: number): void {
-      for (const started of runs) started.run.seek(tMs);
+      for (const started of runs) started._run.seek(tMs);
     },
     cancel: cancelAll,
     stop: cancelAll,

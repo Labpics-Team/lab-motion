@@ -85,12 +85,12 @@ function planOptions(
   props: Record<string, unknown>,
 ): CompositorPlanOptions {
   return {
-    targets: [el],
-    props,
-    mode: { kind: 'spring', spring: SPRING },
-    seams: { now: () => 0, setTimer: () => () => {} },
-    capability: { linearSupported: true },
-    reducedMotion: false,
+    _targets: [el],
+    _props: props,
+    _mode: { kind: 'spring', spring: SPRING },
+    _seams: { _now: () => 0, _setTimer: () => () => {} },
+    _capability: { _linearSupported: true },
+    _reducedMotion: false,
   };
 }
 
@@ -106,8 +106,8 @@ function publishOwner(
     _rollback(): void {},
   };
   if (snapshot) owner._snapshot = (): ProgressSnapshot => snapshot;
-  entry.begin();
-  entry.publish(owner);
+  entry._begin();
+  entry._publish(owner);
   return owner;
 }
 
@@ -125,13 +125,13 @@ describe('animate: конфликт uniform и осевого scale', () => {
     for (const { from, to } of cases) {
       const el = planEl();
       const first = buildCompositorPlan(planOptions(el, { opacity: [from, to] }));
-      expect(Object.is(first.plans[0]!.plan.keyframes[0], from)).toBe(true);
-      expect(Object.is(first.plans[0]!.plan.keyframes[1], to)).toBe(true);
-      const owner = publishOwner(first.plans[0]!);
-      first.plans[0]!.settle(owner, true);
+      expect(Object.is(first._plans[0]!._plan._keyframes[0], from)).toBe(true);
+      expect(Object.is(first._plans[0]!._plan._keyframes[1], to)).toBe(true);
+      const owner = publishOwner(first._plans[0]!);
+      first._plans[0]!._settle(owner, true);
 
       const second = buildCompositorPlan(planOptions(el, { opacity: 1 }));
-      expect(Object.is(second.plans[0]!.plan.keyframes[0], to)).toBe(true);
+      expect(Object.is(second._plans[0]!._plan._keyframes[0], to)).toBe(true);
     }
   });
 
@@ -344,18 +344,18 @@ describe('animate: конфликт uniform и осевого scale', () => {
       const first = buildCompositorPlan(
         planOptions(el, { x: [0, 100], y: [0, prevYTo] }),
       );
-      publishOwner(first.plans[0]!, { value: 0, velocity: 1 });
+      publishOwner(first._plans[0]!, { _value: 0, _velocity: 1 });
       return buildCompositorPlan(planOptions(el, { x: 100, y: 100 }));
     };
 
     const equal = seeded(100); // v0x = v0y = 1 ровно
-    expect(equal.live).toHaveLength(0);
-    expect(equal.plans[0]!.plan.ir.points)
+    expect(equal._live).toHaveLength(0);
+    expect(equal._plans[0]!._plan._ir.points)
       .toEqual(springProgressCurve(SPRING, 1)!.points);
 
     const skewed = seeded(100 * (1 + Number.EPSILON)); // v0y = 1 + ULP
-    expect(skewed.plans).toHaveLength(0);
-    expect(skewed.live[0]!.reason).toBe('v0-mismatch');
+    expect(skewed._plans).toHaveLength(0);
+    expect(skewed._live[0]!._reason).toBe('v0-mismatch');
   });
 
   it('живой нулевой span с импульсом не получает общий WAAPI-прогресс', () => {
@@ -363,11 +363,11 @@ describe('animate: конфликт uniform и осевого scale', () => {
     // группа честно уходит на живой путь (канон «sharedV0 смотрит public span»).
     const el = planEl();
     const first = buildCompositorPlan(planOptions(el, { x: 100 }));
-    publishOwner(first.plans[0]!, { value: 1, velocity: 8.97e-10 });
+    publishOwner(first._plans[0]!, { _value: 1, _velocity: 8.97e-10 });
 
     const second = buildCompositorPlan(planOptions(el, { x: 100 }));
-    expect(second.plans).toHaveLength(0);
-    expect(second.live[0]!.reason).toBe('v0-mismatch');
+    expect(second._plans).toHaveLength(0);
+    expect(second._live[0]!._reason).toBe('v0-mismatch');
   });
 
   it.each([true, false])(
@@ -375,15 +375,15 @@ describe('animate: конфликт uniform и осевого scale', () => {
     (movingFirst) => {
       const el = planEl();
       const first = buildCompositorPlan(planOptions(el, { x: 100 }));
-      publishOwner(first.plans[0]!, { value: 0.5, velocity: 1.2 });
+      publishOwner(first._plans[0]!, { _value: 0.5, _velocity: 1.2 });
 
       // rotate заморожен явной парой [5,5]; x несёт импульс 120/(200−50)=0.8.
       const props: AnimateProps = movingFirst
         ? { x: 200, rotate: [5, 5] }
         : { rotate: [5, 5], x: 200 };
       const second = buildCompositorPlan(planOptions(el, props));
-      expect(second.live).toHaveLength(0);
-      expect(second.plans[0]!.plan.ir.points)
+      expect(second._live).toHaveLength(0);
+      expect(second._plans[0]!._plan._ir.points)
         .toEqual(springProgressCurve(SPRING, 0.8)!.points);
     },
   );
@@ -393,7 +393,7 @@ describe('animate: конфликт uniform и осевого scale', () => {
     (tinyFirst) => {
       const el = planEl();
       const first = buildCompositorPlan(planOptions(el, { x: 100 }));
-      publishOwner(first.plans[0]!, { value: 0.5, velocity: 1.2 });
+      publishOwner(first._plans[0]!, { _value: 0.5, _velocity: 1.2 });
 
       // y движется на sub-epsilon span из покоя (v0=0), x несёт импульс —
       // единого прогресса нет, группа не сворачивается в WAAPI.
@@ -401,8 +401,8 @@ describe('animate: конфликт uniform и осевого scale', () => {
         ? { y: [1, 1 + Number.EPSILON], x: 200 }
         : { x: 200, y: [1, 1 + Number.EPSILON] };
       const second = buildCompositorPlan(planOptions(el, props));
-      expect(second.plans).toHaveLength(0);
-      expect(second.live[0]!.reason).toBe('v0-mismatch');
+      expect(second._plans).toHaveLength(0);
+      expect(second._live[0]!._reason).toBe('v0-mismatch');
     },
   );
 

@@ -87,13 +87,13 @@ function defaultRequestFrame(cb: (ts?: number) => void): number {
 
 /** Полоса живого прогона: движущийся числовой канал на MotionValue. */
 interface LiveLane {
-  readonly key: string;
-  readonly from: number;
-  readonly to: number;
-  readonly value: MotionValue;
-  settled: boolean;
+  readonly _key: string;
+  readonly _from: number;
+  readonly _to: number;
+  readonly _mv: MotionValue;
+  _settled: boolean;
   /** Оседание уже учтено в _pending (сметается кадровым sweep'ом). */
-  reported: boolean;
+  _reported: boolean;
 }
 
 class LiveRun implements AnimateEngineRun {
@@ -145,39 +145,39 @@ class LiveRun implements AnimateEngineRun {
   constructor(group: PlannedLiveGroup, context: AnimateEngineContext) {
     this._group = group;
     this._context = context;
-    this._phaseMs = -group.delayMs;
+    this._phaseMs = -group._delayMs;
     this.finished = new Promise<void>((resolve) => {
       this._resolve = resolve;
     });
-    group.residuals.forEach((value, key) => {
+    group._residuals.forEach((value, key) => {
       this._state[key] = value;
     });
-    for (const ch of group.numeric) this._state[ch.key] = ch.from;
+    for (const ch of group._numeric) this._state[ch._key] = ch._from;
 
     // Полосы создаются лениво-неподвижными: MotionValue не тикает до
     // setTarget, поэтому конструктор не эмитит кадров (фаза commit фасада).
     if (context.mode.kind === 'spring') {
       const spring = context.mode.spring;
-      for (const ch of group.numeric) {
+      for (const ch of group._numeric) {
         // Статичный канал; суб-эпсилон импульс на нулевом спане — тоже покой.
-        if (ch.from === ch.to && Math.abs(ch.velocity) < REST_EPSILON) continue;
+        if (ch._from === ch._to && Math.abs(ch._velocity) < REST_EPSILON) continue;
         const value = new MotionValue({
-          initial: ch.from,
+          initial: ch._from,
           spring,
           requestFrame: this._laneFrame,
-          initialVelocity: ch.velocity,
+          initialVelocity: ch._velocity,
           clamp: false, // честная траектория: перелёт эмитится
         });
         this._lanes.push({
-          key: ch.key,
-          from: ch.from,
-          to: ch.to,
-          value,
-          settled: false,
-          reported: false,
+          _key: ch._key,
+          _from: ch._from,
+          _to: ch._to,
+          _mv: value,
+          _settled: false,
+          _reported: false,
         });
       }
-      if (group.css !== undefined) {
+      if (group._css !== undefined) {
         this._cssProgress = new MotionValue({
           initial: 0,
           spring,
@@ -202,13 +202,13 @@ class LiveRun implements AnimateEngineRun {
     // в _state), запись в DOM делает кадровый flush — не каждый emit.
     for (const lane of this._lanes) {
       let armed = false;
-      lane.value.onChange((value) => {
-        if (!armed || this._done || lane.settled) return;
-        this._state[lane.key] = value;
+      lane._mv.onChange((value) => {
+        if (!armed || this._done || lane._settled) return;
+        this._state[lane._key] = value;
         this._numericDirty = true;
         // Канон settle MotionValue: финальный emit — ровно target, скорость 0.
-        if (value === lane.to && lane.value.velocity === 0 && this._started) {
-          lane.settled = true;
+        if (value === lane._to && lane._mv.velocity === 0 && this._started) {
+          lane._settled = true;
         }
       });
       armed = true;
@@ -297,7 +297,7 @@ class LiveRun implements AnimateEngineRun {
   _snapshot(): ProgressSnapshot {
     // Полоса до активации неподвижна: capture-до-delay отдаёт покой
     // (посеянный initialVelocity — стартовое условие, не текущее движение).
-    if (!this._started) return { value: 0, velocity: 0 };
+    if (!this._started) return { _value: 0, _velocity: 0 };
     if (this._context.mode.kind === 'tween') {
       const mode = this._context.mode;
       // Значение — кэш последнего рендеренного кадра (ease не пере-зовётся);
@@ -315,7 +315,7 @@ class LiveRun implements AnimateEngineRun {
           ? slope / (mode.durationMs / 1000)
           : 0;
       }
-      return { value: this._renderedP, velocity: this._renderedDpdt };
+      return { _value: this._renderedP, _velocity: this._renderedDpdt };
     }
     // Пружина: прогресс-пространство первой движущейся полосы (sharedV0-группы
     // делят прогресс; v0-mismatch группы честно отдают доминантную полосу).
@@ -325,15 +325,15 @@ class LiveRun implements AnimateEngineRun {
       // идёт через шов formatCssAt, скорость css планировщик не проецирует.
       const cssProgress = this._cssProgress;
       if (cssProgress !== undefined) {
-        return { value: cssProgress.value, velocity: cssProgress.velocity };
+        return { _value: cssProgress.value, _velocity: cssProgress.velocity };
       }
-      return { value: 1, velocity: 0 };
+      return { _value: 1, _velocity: 0 };
     }
-    const range = lane.to - lane.from;
-    if (range === 0) return { value: 1, velocity: 0 };
+    const range = lane._to - lane._from;
+    if (range === 0) return { _value: 1, _velocity: 0 };
     return {
-      value: (lane.value.value - lane.from) / range,
-      velocity: lane.value.velocity / range,
+      _value: (lane._mv.value - lane._from) / range,
+      _velocity: lane._mv.velocity / range,
     };
   }
 
@@ -386,7 +386,7 @@ class LiveRun implements AnimateEngineRun {
       // Активация: setTarget подхватывает посеянный initialVelocity полос
       // (C¹-подхват), анкерный тик 0 якорит эпоху солвера в нуле фазы, тик
       // tMs доносит точный субкадровый overshoot пересечения delay.
-      for (const lane of this._lanes) lane.value.setTarget(lane.to);
+      for (const lane of this._lanes) lane._mv.setTarget(lane._to);
       this._cssProgress?.setTarget(1);
       this._tickLanes(0);
       if (tMs > 0) this._tickLanes(tMs);
@@ -419,7 +419,7 @@ class LiveRun implements AnimateEngineRun {
       this._renderedK = 1;
       this._renderedP = 1;
       this._renderedDpdt = Number.NaN;
-      for (const ch of this._group.numeric) this._state[ch.key] = ch.to;
+      for (const ch of this._group._numeric) this._state[ch._key] = ch._to;
       this._writeNumeric();
       this._writeCssFinal();
       if (--this._pending <= 0) this._finish();
@@ -433,8 +433,8 @@ class LiveRun implements AnimateEngineRun {
     this._renderedK = k;
     this._renderedP = p;
     this._renderedDpdt = Number.NaN;
-    for (const ch of this._group.numeric) {
-      this._state[ch.key] = laneAt(ch.from, ch.to, p);
+    for (const ch of this._group._numeric) {
+      this._state[ch._key] = laneAt(ch._from, ch._to, p);
     }
     this._writeNumeric();
     this._writeCssAt(p);
@@ -462,8 +462,8 @@ class LiveRun implements AnimateEngineRun {
     if (this._done) return;
     let settled = 0;
     for (const lane of this._lanes) {
-      if (lane.settled && !lane.reported) {
-        lane.reported = true;
+      if (lane._settled && !lane._reported) {
+        lane._reported = true;
         settled++;
       }
     }
@@ -476,14 +476,14 @@ class LiveRun implements AnimateEngineRun {
 
   private _writeNumeric(): void {
     const group = this._group;
-    if (group.numeric.length === 0) return;
+    if (group._numeric.length === 0) return;
     try {
-      if (group.group === 'transform') {
-        group.el.style.setProperty('transform', buildTransform(this._state));
+      if (group._group === 'transform') {
+        group._el.style.setProperty('transform', buildTransform(this._state));
       } else {
-        group.el.style.setProperty(
-          group.group,
-          String(this._state[group.numeric[0]!.key]),
+        group._el.style.setProperty(
+          group._group,
+          String(this._state[group._numeric[0]!._key]),
         );
       }
     } catch {
@@ -492,23 +492,23 @@ class LiveRun implements AnimateEngineRun {
   }
 
   private _writeCssAt(p: number): void {
-    const css = this._group.css;
+    const css = this._group._css;
     if (css === undefined) return;
     // Без шва середина не представима — пишется только финал (C⁰-дискретно).
-    const value = this._context.formatCssAt?.(css.from, css.to, p);
+    const value = this._context.formatCssAt?.(css._from, css._to, p);
     if (value === undefined) return;
     try {
-      this._group.el.style.setProperty(this._group.group, String(value));
+      this._group._el.style.setProperty(this._group._group, String(value));
     } catch {
       /* hostile style не роняет кадровую полосу */
     }
   }
 
   private _writeCssFinal(): void {
-    const css = this._group.css;
+    const css = this._group._css;
     if (css === undefined) return;
     try {
-      this._group.el.style.setProperty(this._group.group, String(css.to));
+      this._group._el.style.setProperty(this._group._group, String(css._to));
     } catch {
       /* hostile style не роняет терминализацию */
     }
@@ -518,7 +518,7 @@ class LiveRun implements AnimateEngineRun {
     if (this._done) return;
     this._done = true;
     this._generation++;
-    for (const lane of this._lanes) lane.value.destroy();
+    for (const lane of this._lanes) lane._mv.destroy();
     this._cssProgress?.destroy();
     this._laneTicks.length = 0;
     this._resolve();

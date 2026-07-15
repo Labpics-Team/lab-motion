@@ -83,27 +83,27 @@ export type FormatCssAt = (
 ) => string | number | undefined;
 
 export interface CompositorPlanOptions {
-  readonly targets: readonly PlanTarget[];
-  readonly props: Record<string, unknown>;
+  readonly _targets: readonly PlanTarget[];
+  readonly _props: Record<string, unknown>;
   /**
    * Пред-разобранные спецификации (parsePlanProps). Фасад валидирует props ДО
    * резолва целей (канон fail-fast порядка) и передаёт результат сюда — props
    * тогда не читается повторно (hostile getters остаются read-once).
    */
-  readonly specs?: readonly PlanSpec[] | undefined;
-  readonly mode: PlanMode;
+  readonly _specs?: readonly PlanSpec[] | undefined;
+  readonly _mode: PlanMode;
   /** Базовая задержка (мс) всем целям; scheduleStagger остаётся у фасада. */
-  readonly delayMs?: number | undefined;
+  readonly _delayMs?: number | undefined;
   /** Готовые пер-целевые задержки (уже сложенные с base фасадом). */
-  readonly targetDelays?: readonly number[] | undefined;
-  readonly seams: CompositorUnitSeams;
-  readonly capability: CompositorUnitCapability;
+  readonly _targetDelays?: readonly number[] | undefined;
+  readonly _seams: CompositorUnitSeams;
+  readonly _capability: CompositorUnitCapability;
   /** Политика доступности — канон фасада (prefersReduced). */
-  readonly matchMedia?: ((query: string) => { matches: boolean }) | undefined;
+  readonly _matchMedia?: ((query: string) => { matches: boolean }) | undefined;
   /** Явное перекрытие политики (детеминизм тестов/фасадный snapshot). */
-  readonly reducedMotion?: boolean | undefined;
-  readonly formatCssAt?: FormatCssAt | undefined;
-  readonly signal?: AbortSignalLike | undefined;
+  readonly _reducedMotion?: boolean | undefined;
+  readonly _formatCssAt?: FormatCssAt | undefined;
+  readonly _signal?: AbortSignalLike | undefined;
 }
 
 // ─── Выход ───────────────────────────────────────────────────────────────────
@@ -118,34 +118,34 @@ export interface PlanGroupOwner {
 
 /** Группа, исполнимая юнитом R2 без дообработки. */
 export interface PlannedUnitGroup {
-  readonly kind: 'unit';
-  readonly el: PlanTarget;
-  readonly group: string;
-  readonly plan: CompositorUnitPlan;
+  readonly _kind: 'unit';
+  readonly _el: PlanTarget;
+  readonly _group: string;
+  readonly _plan: CompositorUnitPlan;
   /** Commit-резерв записи: LM157 при реентри той же (el, group). */
-  begin(): void;
+  _begin(): void;
   /**
    * Прерывает прежнего владельца (с терминальной записью его снимка в реестр)
    * и публикует successor. Канон дубликатов: successor уже создан вызывающим.
    * Бросок supersede откатывает successor (_rollback) и снимает резерв.
    */
-  publish(owner: PlanGroupOwner): void;
+  _publish(owner: PlanGroupOwner): void;
   /** Сбой создания successor до publish: прежний владелец жив. */
-  rollback(): void;
+  _rollback(): void;
   /** Терминальная запись реестра владельцем (natural / прерывание со снимком). */
-  settle(owner: PlanGroupOwner, natural: boolean, snapshot?: ProgressSnapshot): void;
+  _settle(owner: PlanGroupOwner, natural: boolean, snapshot?: ProgressSnapshot): void;
 }
 
 /** Reduced/финал: писатель финала — отдельная запись плана, юнит не создаётся. */
 export interface PlannedSnapGroup {
-  readonly kind: 'snap';
-  readonly el: PlanTarget;
-  readonly group: string;
+  readonly _kind: 'snap';
+  readonly _el: PlanTarget;
+  readonly _group: string;
   /**
    * Снап-семантика фасада: резерв → supersede прежнего владельца с writer
    * в роли replacement (или прямой writer) → терминальная запись реестра.
    */
-  commit(): void;
+  _commit(): void;
 }
 
 /**
@@ -155,39 +155,39 @@ export interface PlannedSnapGroup {
  * без движка — валидированный снап к финалу (snap(), контракт базы R3b).
  */
 export interface PlannedLiveGroup {
-  readonly kind: 'live';
-  readonly el: PlanTarget;
-  readonly group: string;
-  readonly delayMs: number;
-  readonly reason:
+  readonly _kind: 'live';
+  readonly _el: PlanTarget;
+  readonly _group: string;
+  readonly _delayMs: number;
+  readonly _reason:
     | 'no-waapi'
     | 'v0-mismatch'
     | 'curve-budget'
     | 'explicit-non-numeric';
   /** Подхваченные каналы для живого движка (абсолютные величины, units/s). */
-  readonly numeric: readonly {
-    readonly key: string;
-    readonly from: number;
-    readonly to: number;
-    readonly velocity: number;
+  readonly _numeric: readonly {
+    readonly _key: string;
+    readonly _from: number;
+    readonly _to: number;
+    readonly _velocity: number;
   }[];
-  readonly css: { readonly from: string | number; readonly to: string | number } | undefined;
+  readonly _css: { readonly _from: string | number; readonly _to: string | number } | undefined;
   /** Замороженные transform-каналы вне прогона: живой писатель их сохраняет. */
-  readonly residuals: ReadonlyMap<string, number>;
-  begin(): void;
-  publish(owner: PlanGroupOwner): void;
-  rollback(): void;
-  settle(owner: PlanGroupOwner, natural: boolean, snapshot?: ProgressSnapshot): void;
+  readonly _residuals: ReadonlyMap<string, number>;
+  _begin(): void;
+  _publish(owner: PlanGroupOwner): void;
+  _rollback(): void;
+  _settle(owner: PlanGroupOwner, natural: boolean, snapshot?: ProgressSnapshot): void;
   /** Деградация базового фасада: валидированный снап к финалу (канон reduced). */
-  snap(): void;
+  _snap(): void;
 }
 
 export type PlannedGroup = PlannedUnitGroup | PlannedSnapGroup | PlannedLiveGroup;
 
 export interface CompositorPlanResult {
-  readonly plans: PlannedUnitGroup[];
-  readonly snaps: PlannedSnapGroup[];
-  readonly live: PlannedLiveGroup[];
+  readonly _plans: PlannedUnitGroup[];
+  readonly _snaps: PlannedSnapGroup[];
+  readonly _live: PlannedLiveGroup[];
 }
 
 // ─── Спецификации каналов (канон parseProps channels.ts) ─────────────────────
@@ -214,11 +214,11 @@ function camelToKebab(key: string): string {
 
 /** Спецификация канала: результат parsePlanProps (валидированный вход). */
 export interface PlanSpec {
-  readonly kind: 'num' | 'css';
-  readonly key: string;
-  readonly group: string;
-  readonly explicitFrom: number | string | undefined;
-  readonly to: number | string;
+  readonly _kind: 'num' | 'css';
+  readonly _key: string;
+  readonly _group: string;
+  readonly _explicitFrom: number | string | undefined;
+  readonly _to: number | string;
 }
 
 function requireFinite(value: unknown): number {
@@ -267,21 +267,21 @@ export function parsePlanProps(props: Record<string, unknown>): PlanSpec[] {
       // uniform↔axial не меняет представление и подхват.
       if (key === 'scale') {
         if (!keys.includes('scaleX')) {
-          specs.push({ kind: 'num', key: 'scaleX', group, explicitFrom, to });
+          specs.push({ _kind: 'num', _key: 'scaleX', _group: group, _explicitFrom: explicitFrom, _to: to });
         }
         if (!keys.includes('scaleY')) {
-          specs.push({ kind: 'num', key: 'scaleY', group, explicitFrom, to });
+          specs.push({ _kind: 'num', _key: 'scaleY', _group: group, _explicitFrom: explicitFrom, _to: to });
         }
       } else {
-        specs.push({ kind: 'num', key, group, explicitFrom, to });
+        specs.push({ _kind: 'num', _key: key, _group: group, _explicitFrom: explicitFrom, _to: to });
       }
     } else {
       specs.push({
-        kind: 'css',
-        key,
-        group: camelToKebab(key),
-        explicitFrom: pair ? requireCssValue(pair[0]) : undefined,
-        to: requireCssValue(pair ? pair[1] : raw),
+        _kind: 'css',
+        _key: key,
+        _group: camelToKebab(key),
+        _explicitFrom: pair ? requireCssValue(pair[0]) : undefined,
+        _to: requireCssValue(pair ? pair[1] : raw),
       });
     }
   }
@@ -301,13 +301,13 @@ function normalizeV0(velocity: number, range: number): number {
 }
 
 interface BoundChannel {
-  readonly key: string;
-  readonly from: number;
-  readonly to: number;
-  readonly velocity: number;
+  readonly _key: string;
+  readonly _from: number;
+  readonly _to: number;
+  readonly _velocity: number;
   /** Представимая солвером цель (канон LM150: вырожденный диапазон с импульсом). */
-  readonly solverTo: number;
-  readonly v0: number;
+  readonly _solverTo: number;
+  readonly _v0: number;
 }
 
 function bindChannel(
@@ -324,7 +324,7 @@ function bindChannel(
     // Импульс у числовой границы непредставим даже минимальной амплитудой.
     if (!Number.isFinite(solverTo) || solverTo === from) failPlan('LM150');
   }
-  return { key, from, to, velocity, solverTo, v0: normalizeV0(velocity, solverTo - from) };
+  return { _key: key, _from: from, _to: to, _velocity: velocity, _solverTo: solverTo, _v0: normalizeV0(velocity, solverTo - from) };
 }
 
 /**
@@ -335,12 +335,12 @@ function bindChannel(
 function sharedGroupV0(channels: readonly BoundChannel[]): number | undefined {
   let shared: number | undefined;
   for (const channel of channels) {
-    if (channel.to === channel.from && channel.velocity === 0) continue;
+    if (channel._to === channel._from && channel._velocity === 0) continue;
     if (
-      channel.solverTo !== channel.to ||
-      (shared !== undefined && channel.v0 !== shared)
+      channel._solverTo !== channel._to ||
+      (shared !== undefined && channel._v0 !== shared)
     ) return undefined;
-    shared = channel.v0;
+    shared = channel._v0;
   }
   return shared ?? 0;
 }
@@ -348,11 +348,11 @@ function sharedGroupV0(channels: readonly BoundChannel[]): number | undefined {
 // ─── Реестр планировщика ─────────────────────────────────────────────────────
 
 interface PlanRunState {
-  readonly channels: ReadonlyMap<string, { readonly from: number; readonly to: number }>;
-  readonly css: { readonly from: string | number; readonly to: string | number } | undefined;
+  readonly _channels: ReadonlyMap<string, { readonly _from: number; readonly _to: number }>;
+  readonly _css: { readonly _from: string | number; readonly _to: string | number } | undefined;
   /** IR прогона; у живого владельца кривой нет — undefined (информационное). */
-  readonly ir: ProgressCurveIR | undefined;
-  readonly startedAt: number;
+  readonly _ir: ProgressCurveIR | undefined;
+  readonly _startedAt: number;
 }
 
 interface PlanGroupRecord {
@@ -360,7 +360,7 @@ interface PlanGroupRecord {
   /** Commit-reservation: закрывает реентри до публикации владельца (LM157). */
   _transition: boolean;
   /** Последние известные числовые значения (после завершения/фиксации). */
-  readonly _numeric: Map<string, { value: number; velocity: number }>;
+  readonly _numeric: Map<string, { _value: number; _velocity: number }>;
   _cssValue: string | number | undefined;
   /** Форма ЖИВОГО прогона: снимок владельца деривирует поканальные значения. */
   _run: PlanRunState | undefined;
@@ -397,18 +397,18 @@ function writeInterrupted(
   formatCssAt: FormatCssAt | undefined,
 ): void {
   if (!run || !snapshot) return;
-  const p = snapshot.value;
-  run.channels.forEach((span, key) => {
-    const range = span.to - span.from;
-    const value = span.from + range * p;
+  const p = snapshot._value;
+  run._channels.forEach((span, key) => {
+    const range = span._to - span._from;
+    const value = span._from + range * p;
     rec._numeric.set(key, {
-      value: Number.isFinite(value) ? value : span.to,
-      velocity: range * snapshot.velocity,
+      _value: Number.isFinite(value) ? value : span._to,
+      _velocity: range * snapshot._velocity,
     });
   });
-  if (run.css !== undefined) {
+  if (run._css !== undefined) {
     // Без шва честная C⁰-деградация: последняя правда — цель прогона.
-    rec._cssValue = formatCssAt?.(run.css.from, run.css.to, p) ?? run.css.to;
+    rec._cssValue = formatCssAt?.(run._css._from, run._css._to, p) ?? run._css._to;
   }
 }
 
@@ -466,9 +466,9 @@ function buildTransformFrames(
     toState[key] = value;
   });
   for (const ch of channels) {
-    const moving = ch.from !== ch.to;
-    fromState[ch.key] = moving ? forceEmission(ch.key, ch.from) : ch.from;
-    toState[ch.key] = moving ? forceEmission(ch.key, ch.to) : ch.to;
+    const moving = ch._from !== ch._to;
+    fromState[ch._key] = moving ? forceEmission(ch._key, ch._from) : ch._from;
+    toState[ch._key] = moving ? forceEmission(ch._key, ch._to) : ch._to;
   }
   let from = buildTransform(fromState);
   let to = buildTransform(toState);
@@ -502,10 +502,10 @@ function resolveDelay(input: number | undefined): number {
 }
 
 interface GroupBinding {
-  readonly channels: BoundChannel[];
-  readonly cssFrom: string | number | undefined;
-  readonly cssTo: string | number | undefined;
-  readonly residuals: Map<string, number>;
+  readonly _channels: BoundChannel[];
+  readonly _cssFrom: string | number | undefined;
+  readonly _cssTo: string | number | undefined;
+  readonly _residuals: Map<string, number>;
 }
 
 /** Фаза чтения одной группы: подхват C¹ из снимка владельца + residuals. */
@@ -525,45 +525,45 @@ function bindGroupState(
   let cssTo: string | number | undefined;
 
   for (const spec of specs) {
-    if (spec.kind === 'num') {
+    if (spec._kind === 'num') {
       let from: number;
       let velocity = 0;
-      const span = run?.channels.get(spec.key);
-      if (spec.explicitFrom !== undefined) {
+      const span = run?._channels.get(spec._key);
+      if (spec._explicitFrom !== undefined) {
         // Явная пара отключает подхват (канон: рестарт из покоя).
-        from = spec.explicitFrom as number;
+        from = spec._explicitFrom as number;
       } else if (span !== undefined && snap !== undefined) {
-        const range = span.to - span.from;
-        const value = span.from + range * snap.value;
-        from = Number.isFinite(value) ? value : span.to;
-        velocity = range * snap.velocity;
+        const range = span._to - span._from;
+        const value = span._from + range * snap._value;
+        from = Number.isFinite(value) ? value : span._to;
+        velocity = range * snap._velocity;
         if (!Number.isFinite(velocity)) velocity = 0;
       } else {
-        const stored = rec._numeric.get(spec.key);
+        const stored = rec._numeric.get(spec._key);
         if (stored !== undefined) {
-          from = stored.value;
+          from = stored._value;
         } else if (group === 'transform') {
-          from = TRANSFORM_IDENTITY[spec.key]!;
+          from = TRANSFORM_IDENTITY[spec._key]!;
         } else {
           const read = parseFloat(readStyle(el, group));
           from = Number.isFinite(read) ? read : 1; // opacity: дефолт браузера
         }
       }
-      channels.push(bindChannel(spec.key, from, spec.to as number, velocity));
+      channels.push(bindChannel(spec._key, from, spec._to as number, velocity));
     } else {
-      cssTo = spec.to;
-      if (spec.explicitFrom !== undefined) {
-        cssFrom = spec.explicitFrom;
-      } else if (run?.css !== undefined && snap !== undefined) {
+      cssTo = spec._to;
+      if (spec._explicitFrom !== undefined) {
+        cssFrom = spec._explicitFrom;
+      } else if (run?._css !== undefined && snap !== undefined) {
         // C¹-значение середины полёта — только через инжектированный шов;
         // без него честный C⁰-рестарт с from = текущий to (директива).
-        cssFrom = formatCssAt?.(run.css.from, run.css.to, snap.value) ?? run.css.to;
+        cssFrom = formatCssAt?.(run._css._from, run._css._to, snap._value) ?? run._css._to;
       } else if (rec._cssValue !== undefined) {
         cssFrom = rec._cssValue;
       } else {
         const read = readStyle(el, group);
         // Нечитаемый источник → дискретный старт с цели (канон bindGroup).
-        cssFrom = read === '' ? spec.to : read;
+        cssFrom = read === '' ? spec._to : read;
       }
     }
   }
@@ -572,71 +572,71 @@ function bindGroupState(
   // замораживаются — строка остаётся полной проекцией состояния.
   const residuals = new Map<string, number>();
   if (group === 'transform') {
-    const animated = new Set(specs.map((s) => s.key));
+    const animated = new Set(specs.map((s) => s._key));
     const known = new Set<string>(rec._numeric.keys());
-    run?.channels.forEach((_span, key) => known.add(key));
+    run?._channels.forEach((_span, key) => known.add(key));
     for (const key of known) {
       if (animated.has(key)) continue;
-      const span = run?.channels.get(key);
+      const span = run?._channels.get(key);
       if (span !== undefined && snap !== undefined) {
-        const value = span.from + (span.to - span.from) * snap.value;
-        residuals.set(key, Number.isFinite(value) ? value : span.to);
+        const value = span._from + (span._to - span._from) * snap._value;
+        residuals.set(key, Number.isFinite(value) ? value : span._to);
       } else {
         const stored = rec._numeric.get(key);
-        if (stored !== undefined) residuals.set(key, stored.value);
+        if (stored !== undefined) residuals.set(key, stored._value);
       }
     }
   }
-  return { channels, cssFrom, cssTo, residuals };
+  return { _channels: channels, _cssFrom: cssFrom, _cssTo: cssTo, _residuals: residuals };
 }
 
 /** Финальная строка группы для снапа/реестра (без нуджей — статичная запись). */
 function finalGroupValue(group: string, binding: GroupBinding): string {
   if (group === 'transform') {
     const state: Record<string, number> = {};
-    binding.residuals.forEach((value, key) => {
+    binding._residuals.forEach((value, key) => {
       state[key] = value;
     });
-    for (const ch of binding.channels) state[ch.key] = ch.to;
+    for (const ch of binding._channels) state[ch._key] = ch._to;
     return buildTransform(state);
   }
-  if (binding.cssTo !== undefined) return String(binding.cssTo);
-  return String(binding.channels[0]!.to);
+  if (binding._cssTo !== undefined) return String(binding._cssTo);
+  return String(binding._channels[0]!._to);
 }
 
 /** Терминальная запись реестра: снап/натуральный финиш (значения = цели). */
 function commitFinal(rec: PlanGroupRecord, binding: GroupBinding): void {
-  for (const ch of binding.channels) {
-    rec._numeric.set(ch.key, { value: ch.to, velocity: 0 });
+  for (const ch of binding._channels) {
+    rec._numeric.set(ch._key, { _value: ch._to, _velocity: 0 });
   }
-  if (binding.cssTo !== undefined) rec._cssValue = binding.cssTo;
+  if (binding._cssTo !== undefined) rec._cssValue = binding._cssTo;
 }
 
 export function buildCompositorPlan(
   options: CompositorPlanOptions,
 ): CompositorPlanResult {
   // Каждое поле опций читается один раз (hostile getters — read-once граница).
-  const targets = options.targets;
-  const props = options.props;
-  const preParsed = options.specs;
-  const mode = options.mode;
-  const baseDelay = options.delayMs;
-  const targetDelays = options.targetDelays;
-  const seams = options.seams;
-  const capability = options.capability;
-  const matchMedia = options.matchMedia;
-  const reducedInput = options.reducedMotion;
-  const formatCssAt = options.formatCssAt;
-  const signal = options.signal;
+  const targets = options._targets;
+  const props = options._props;
+  const preParsed = options._specs;
+  const mode = options._mode;
+  const baseDelay = options._delayMs;
+  const targetDelays = options._targetDelays;
+  const seams = options._seams;
+  const capability = options._capability;
+  const matchMedia = options._matchMedia;
+  const reducedInput = options._reducedMotion;
+  const formatCssAt = options._formatCssAt;
+  const signal = options._signal;
 
   // Валидация ДО чтений состояния: props (LM140–144), задержки (LM139).
   // Пред-разобранные specs фасада исключают повторное чтение hostile props.
   const specs = preParsed ?? parsePlanProps(props);
   const groups = new Map<string, PlanSpec[]>();
   for (const spec of specs) {
-    const list = groups.get(spec.group);
+    const list = groups.get(spec._group);
     if (list) list.push(spec);
-    else groups.set(spec.group, [spec]);
+    else groups.set(spec._group, [spec]);
   }
   const base = resolveDelay(baseDelay);
   const delays: number[] = [];
@@ -647,7 +647,7 @@ export function buildCompositorPlan(
   // Политика доступности — один snapshot на план (канон фасада).
   const reduced =
     targets.length > 0 && (reducedInput ?? prefersReduced(matchMedia));
-  const linear = capability?.linearSupported === true;
+  const linear = capability?._linearSupported === true;
 
   // Кривая компилируется один раз на различимый v0 (N целей = 1 компиляция
   // в холодном большинстве); tween-кривая одна на весь план.
@@ -683,26 +683,26 @@ export function buildCompositorPlan(
         continue;
       }
 
-      const toLive = (reason: PlannedLiveGroup['reason']): void => {
+      const toLive = (reason: PlannedLiveGroup['_reason']): void => {
         live.push({
-          kind: 'live',
-          el,
-          group,
-          delayMs,
-          reason,
-          numeric: binding.channels.map((ch) => ({
-            key: ch.key,
-            from: ch.from,
-            to: ch.to,
-            velocity: ch.velocity,
+          _kind: 'live',
+          _el: el,
+          _group: group,
+          _delayMs: delayMs,
+          _reason: reason,
+          _numeric: binding._channels.map((ch) => ({
+            _key: ch._key,
+            _from: ch._from,
+            _to: ch._to,
+            _velocity: ch._velocity,
           })),
-          css:
-            binding.cssTo === undefined
+          _css:
+            binding._cssTo === undefined
               ? undefined
-              : { from: binding.cssFrom!, to: binding.cssTo },
-          residuals: binding.residuals,
+              : { _from: binding._cssFrom!, _to: binding._cssTo },
+          _residuals: binding._residuals,
           ...makeOwnershipHooks(rec, binding, formatCssAt, seams, undefined),
-          snap(): void {
+          _snap(): void {
             snapCommit(el, group, rec, binding);
           },
         });
@@ -713,7 +713,7 @@ export function buildCompositorPlan(
         continue;
       }
       // v0 группы: у tween подхват C⁰ по построению (кривая без импульса).
-      const v0 = mode.kind === 'spring' ? sharedGroupV0(binding.channels) : 0;
+      const v0 = mode.kind === 'spring' ? sharedGroupV0(binding._channels) : 0;
       if (v0 === undefined) {
         toLive('v0-mismatch');
         continue;
@@ -727,12 +727,12 @@ export function buildCompositorPlan(
       // Кадры собираются один раз; интерполяция значений — у браузера.
       let keyframes: readonly [string | number, string | number] | undefined;
       if (group === 'transform') {
-        keyframes = buildTransformFrames(binding.channels, binding.residuals);
-      } else if (binding.cssTo !== undefined) {
-        keyframes = [binding.cssFrom!, binding.cssTo];
+        keyframes = buildTransformFrames(binding._channels, binding._residuals);
+      } else if (binding._cssTo !== undefined) {
+        keyframes = [binding._cssFrom!, binding._cssTo];
       } else {
-        const ch = binding.channels[0]!;
-        keyframes = [ch.from, ch.to];
+        const ch = binding._channels[0]!;
+        keyframes = [ch._from, ch._to];
       }
       const numericPair =
         keyframes !== undefined &&
@@ -751,21 +751,21 @@ export function buildCompositorPlan(
         rec,
         binding,
         {
-          el: el as CompositorUnitTarget,
-          group,
-          keyframes,
-          ir,
-          delayMs,
-          seams,
-          capability,
-          signal,
+          _el: el as CompositorUnitTarget,
+          _group: group,
+          _keyframes: keyframes,
+          _ir: ir,
+          _delayMs: delayMs,
+          _seams: seams,
+          _capability: capability,
+          _signal: signal,
         },
         formatCssAt,
         seams,
       ));
     }
   }
-  return { plans, snaps, live };
+  return { _plans: plans, _snaps: snaps, _live: live };
 }
 
 // ─── Commit-хуки (единственные писатели реестра/DOM) ─────────────────────────
@@ -801,10 +801,10 @@ function makeSnapEntry(
   binding: GroupBinding,
 ): PlannedSnapGroup {
   return {
-    kind: 'snap',
-    el,
-    group,
-    commit(): void {
+    _kind: 'snap',
+    _el: el,
+    _group: group,
+    _commit(): void {
       snapCommit(el, group, rec, binding);
     },
   };
@@ -812,10 +812,10 @@ function makeSnapEntry(
 
 /** Ownership-протокол, общий для юнит- и живых групп (владелец = любой ран). */
 interface OwnershipHooks {
-  begin(): void;
-  publish(owner: PlanGroupOwner): void;
-  rollback(): void;
-  settle(owner: PlanGroupOwner, natural: boolean, snapshot?: ProgressSnapshot): void;
+  _begin(): void;
+  _publish(owner: PlanGroupOwner): void;
+  _rollback(): void;
+  _settle(owner: PlanGroupOwner, natural: boolean, snapshot?: ProgressSnapshot): void;
 }
 
 function makeOwnershipHooks(
@@ -826,33 +826,33 @@ function makeOwnershipHooks(
   ir: ProgressCurveIR | undefined,
 ): OwnershipHooks {
   const runState = (): PlanRunState => {
-    const channels = new Map<string, { from: number; to: number }>();
-    for (const ch of binding.channels) {
-      channels.set(ch.key, { from: ch.from, to: ch.to });
+    const channels = new Map<string, { _from: number; _to: number }>();
+    for (const ch of binding._channels) {
+      channels.set(ch._key, { _from: ch._from, _to: ch._to });
     }
     let startedAt = 0;
     try {
-      startedAt = seams.now();
+      startedAt = seams._now();
     } catch {
       /* отказ часов не рвёт публикацию — поле информационное */
     }
     return {
-      channels,
-      css:
-        binding.cssTo === undefined
+      _channels: channels,
+      _css:
+        binding._cssTo === undefined
           ? undefined
-          : { from: binding.cssFrom!, to: binding.cssTo },
-      ir,
-      startedAt,
+          : { _from: binding._cssFrom!, _to: binding._cssTo },
+      _ir: ir,
+      _startedAt: startedAt,
     };
   };
   return {
-    begin(): void {
+    _begin(): void {
       // Канон LM157: commit-reservation закрывает реентри до публикации.
       if (rec._transition) failPlan('LM157');
       rec._transition = true;
     },
-    publish(owner: PlanGroupOwner): void {
+    _publish(owner: PlanGroupOwner): void {
       const previous = rec._owner;
       try {
         if (previous) {
@@ -875,10 +875,10 @@ function makeOwnershipHooks(
       rec._run = runState();
       rec._transition = false;
     },
-    rollback(): void {
+    _rollback(): void {
       rec._transition = false;
     },
-    settle(owner: PlanGroupOwner, natural: boolean, snapshot?: ProgressSnapshot): void {
+    _settle(owner: PlanGroupOwner, natural: boolean, snapshot?: ProgressSnapshot): void {
       if (rec._owner !== owner) return;
       rec._owner = undefined;
       const run = rec._run;
@@ -902,10 +902,10 @@ function makeUnitEntry(
   seams: CompositorUnitSeams,
 ): PlannedUnitGroup {
   return {
-    kind: 'unit',
-    el,
-    group,
-    plan,
-    ...makeOwnershipHooks(rec, binding, formatCssAt, seams, plan.ir),
+    _kind: 'unit',
+    _el: el,
+    _group: group,
+    _plan: plan,
+    ...makeOwnershipHooks(rec, binding, formatCssAt, seams, plan._ir),
   };
 }

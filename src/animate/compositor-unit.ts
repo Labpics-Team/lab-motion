@@ -59,15 +59,19 @@ export interface CompositorUnitTarget {
   ): unknown;
 }
 
-/** Инжектируемые швы детерминизма — без чтения глобальных часов/таймеров. */
+/**
+ * Инжектируемые швы детерминизма — без чтения глобальных часов/таймеров.
+ * Кросс-модульный ВНУТРЕННИЙ контракт (фасад → план → юнит): поля на
+ * _-префиксах — их жмёт property-mangle терсера в dist (диета R3c-2a).
+ */
 export interface CompositorUnitSeams {
-  readonly now: () => number;
-  readonly setTimer: SetTimerFn;
+  readonly _now: () => number;
+  readonly _setTimer: SetTimerFn;
 }
 
 /** Возможности среды, разрешённые планировщиком (детект — его забота). */
 export interface CompositorUnitCapability {
-  readonly linearSupported: boolean;
+  readonly _linearSupported: boolean;
 }
 
 /** Узкий структурный AbortSignal: без зависимости от DOM-lib. */
@@ -90,22 +94,23 @@ export interface AbortSignalLike {
  * краевые значения: строки (transform-строка, цвет) либо конечные числа.
  */
 export interface CompositorUnitPlan {
-  readonly el: CompositorUnitTarget;
-  readonly group: string;
-  readonly keyframes: readonly [string | number, string | number];
-  readonly ir: ProgressCurveIR;
-  readonly delayMs: number;
-  readonly seams: CompositorUnitSeams;
-  readonly capability: CompositorUnitCapability;
-  readonly signal?: AbortSignalLike | undefined;
+  readonly _el: CompositorUnitTarget;
+  readonly _group: string;
+  readonly _keyframes: readonly [string | number, string | number];
+  /** Поле _-манглится; сам IR (durationMs/points) — портируемый контракт, plain. */
+  readonly _ir: ProgressCurveIR;
+  readonly _delayMs: number;
+  readonly _seams: CompositorUnitSeams;
+  readonly _capability: CompositorUnitCapability;
+  readonly _signal?: AbortSignalLike | undefined;
 }
 
 /** Аналитический снимок прогресса для C¹-ретаргета планировщиком. */
 export interface ProgressSnapshot {
   /** Прогресс-пространство кривой (может выходить за [0,1] при перелёте). */
-  readonly value: number;
+  readonly _value: number;
   /** Скорость прогресса, 1/с — из наклона соседних пар IR. */
-  readonly velocity: number;
+  readonly _velocity: number;
 }
 
 // ─── Статический microtask-батч ──────────────────────────────────────────────
@@ -215,8 +220,8 @@ export class CompositorUnit {
     this._durationMs = ir.durationMs;
     this._delayMs = delayMs;
     this._deadline = delayMs + ir.durationMs;
-    this._now = seams.now;
-    this._setTimer = seams.setTimer;
+    this._now = seams._now;
+    this._setTimer = seams._setTimer;
     this._frames = frames;
     this._easing = easing;
     this._onDone = onDone;
@@ -406,9 +411,9 @@ export class CompositorUnit {
   _snapshot(): ProgressSnapshot {
     const points = this._points;
     const u = (this._position() - this._delayMs) / this._durationMs;
-    if (!(u > 0)) return { value: points[1]!, velocity: 0 };
+    if (!(u > 0)) return { _value: points[1]!, _velocity: 0 };
     const lastPair = points.length - 2;
-    if (u >= 1) return { value: points[lastPair + 1]!, velocity: 0 };
+    if (u >= 1) return { _value: points[lastPair + 1]!, _velocity: 0 };
     // Бинарный поиск сегмента по offset-парам [offset, value, ...].
     let lo = 0;
     let hi = lastPair / 2;
@@ -422,9 +427,9 @@ export class CompositorUnit {
     const span = points[hi * 2]! - o0;
     const slope = (points[hi * 2 + 1]! - v0) / span;
     return {
-      value: v0 + slope * (u - o0),
+      _value: v0 + slope * (u - o0),
       // offset-пространство → секунды: наклон делится на активную длительность.
-      velocity: slope / (this._durationMs / 1000),
+      _velocity: slope / (this._durationMs / 1000),
     };
   }
 
@@ -559,7 +564,7 @@ export class CompositorUnit {
   /** Числовая фиксация позы из IR — артефакт как SSOT, стиль не читается. */
   private _holdInline(): void {
     const from = this._from as number;
-    const value = from + ((this._to as number) - from) * this._snapshot().value;
+    const value = from + ((this._to as number) - from) * this._snapshot()._value;
     this._el.style.setProperty(
       this._group,
       // Перелёт на краевых величинах может быть непредставим в IEEE-754 —
@@ -664,16 +669,16 @@ export function createCompositorUnit(
   plan: CompositorUnitPlan,
   onDone?: CompositorUnitDone,
 ): CompositorUnit | undefined {
-  const el = plan.el;
-  const group = plan.group;
-  const pair = plan.keyframes;
-  const ir = plan.ir;
-  const delayMs = plan.delayMs;
-  const seams = plan.seams;
-  const capability = plan.capability;
-  const signal = plan.signal;
+  const el = plan._el;
+  const group = plan._group;
+  const pair = plan._keyframes;
+  const ir = plan._ir;
+  const delayMs = plan._delayMs;
+  const seams = plan._seams;
+  const capability = plan._capability;
+  const signal = plan._signal;
 
-  if (typeof seams?.now !== 'function' || typeof seams.setTimer !== 'function') {
+  if (typeof seams?._now !== 'function' || typeof seams._setTimer !== 'function') {
     failUnit('LM156');
   }
   if (typeof (el as Partial<CompositorUnitTarget> | null)?.animate !== 'function') {
@@ -714,7 +719,7 @@ export function createCompositorUnit(
   const numeric = typeof from === 'number' && typeof to === 'number';
   // Строгий гейт capability: любой не-true (включая hostile мусор) — это
   // отсутствие доказанного linear(), безопасный маршрут — явные кадры.
-  const linear = capability?.linearSupported === true;
+  const linear = capability?._linearSupported === true;
   let frames: Record<string, string | number>[];
   let easing: string | undefined;
   if (linear) {
