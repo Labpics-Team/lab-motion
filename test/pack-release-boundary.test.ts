@@ -5,10 +5,13 @@ const pkg = JSON.parse(readFileSync(new URL('../package.json', import.meta.url),
 const smoke = readFileSync(new URL('../scripts/pack-smoke.mjs', import.meta.url), 'utf8');
 
 describe('packed release boundary', () => {
-  it('ships both referenced support documents', () => {
+  it('ships every referenced support document', () => {
     expect(pkg.files).toContain('docs/errors.md');
     expect(pkg.files).toContain('docs/benchmark.md');
+    expect(pkg.files).toContain('docs/recipes.md');
     expect(smoke).toContain("'docs/benchmark.md'");
+    expect(smoke).toContain("'docs/recipes.md'");
+    expect(smoke).toContain("readFileSync(installedRecipes, 'utf8') !== readFileSync");
     expect(smoke).toContain("readFileSync(installedBenchmark, 'utf8') !== readFileSync");
     expect(smoke).toContain('parseBenchmarkDocumentationState(benchmarkDocument, installedPackage)');
     expect(smoke).not.toContain('/bench/compare/results/`;');

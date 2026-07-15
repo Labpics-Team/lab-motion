@@ -431,6 +431,7 @@
     "dist",
     "docs/errors.md",
     "docs/benchmark.md",
+    "docs/recipes.md",
     "!dist/**/*.map"
   ],
   "publishConfig": {

@@ -40,6 +40,7 @@ const EXACT_FIELDS = Object.freeze({
     'dist',
     'docs/errors.md',
     'docs/benchmark.md',
+    'docs/recipes.md',
     '!dist/**/*.map',
   ],
   publishConfig: { access: 'public' },
