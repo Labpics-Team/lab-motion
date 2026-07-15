@@ -638,6 +638,33 @@ describe('CompositorSpring host-owner protocol', () => {
     spring.destroy();
   });
 
+  it('stop не фиксирует позу compositor-прогона: restart от последнего известного значения', () => {
+    let cancels = 0;
+    let effects = 0;
+    const spring = controller({
+      animate() {
+        effects++;
+        // Полёт на середине эффекта: snapshot дал бы value>0.
+        return { currentTime: 400, cancel: () => { cancels++; } };
+      },
+    });
+    spring.start();
+
+    spring.stop();
+
+    expect(cancels).toBe(1);
+    // Контракт stop(): поза прерывания НЕ читается и не публикуется.
+    expect(spring.value).toBe(0);
+
+    spring.start();
+
+    // Свежий прогон компилируется заново от last-known, не от позы прерывания.
+    expect(effects).toBe(2);
+    expect(spring.value).toBe(0);
+    spring.destroy();
+    expect(cancels).toBe(2);
+  });
+
   it('stop инвалидирует live-кадры до timer cancel', () => {
     const queue: Array<(timestamp?: number) => void> = [];
     const seen: Array<string | number> = [];
@@ -705,7 +732,7 @@ describe('CompositorSpring host-owner protocol', () => {
     spring.destroy();
   });
 
-  it('после destroy public API инертен, но живой handoff валидирует цель', () => {
+  it('живой handoffToLive валидирует цель; после destroy весь public API инертен', () => {
     const spring = controller({ animate: () => ({ cancel() {} }) });
     expect(() => spring.handoffToLive(Number.NaN)).toThrow();
     spring.destroy();

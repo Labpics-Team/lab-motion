@@ -732,7 +732,12 @@ export class CompositorSpring {
     return mv;
   }
 
-  /** Останавливает прогон (без разрушения; повторный start()/retarget() возобновит). */
+  /**
+   * Останавливает прогон (без разрушения контроллера). Позиция прерывания
+   * compositor-эффекта НЕ фиксируется: cancel снимает effect, повторный
+   * start()/retarget() запускает контроллер заново от последнего известного
+   * значения. Пауза с сохранением позы — контракт handoffToLive(), не stop().
+   */
   stop(): void {
     if (!this._now || this._cleaning) return;
     this._epoch++;

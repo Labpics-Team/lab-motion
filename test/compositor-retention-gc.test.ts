@@ -24,6 +24,8 @@ describe('compositor retention', () => {
       const output = execFileSync(process.execPath, ['--expose-gc', outfile], {
         cwd: ROOT,
         encoding: 'utf8',
+        // Синхронный probe без предела повесил бы весь ран при зависшем handle.
+        timeout: 60_000,
       });
       expect(output).toContain('compositor-retention: PASS');
     } finally {
