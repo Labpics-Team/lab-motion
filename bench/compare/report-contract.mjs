@@ -36,7 +36,6 @@ const FREEZE_IDS = Object.freeze([
   'anime',
   'waapi-ctl',
   'lab-spring',
-  'lab-native',
   'motion-mini',
   'anime-waapi',
 ]);
@@ -47,7 +46,6 @@ const GROUPS = Object.freeze({
   anime: 'transform-linear-start+stagger-adapter',
   'waapi-ctl': 'transform-linear-waapi-control',
   'lab-spring': 'transform-spring-start-adapter',
-  'lab-native': 'transform-spring-start-adapter',
   'motion-mini': 'transform-linear-native-start-adapter',
   'anime-waapi': 'transform-linear-native-start-adapter',
 });
@@ -603,8 +601,8 @@ export function renderBenchmarkMarkdown(payload) {
     '',
     ...table('Linear full API пути', startIds, freezeMetrics),
     ...table('Linear native пути и платформенный контроль', ['waapi-ctl', 'motion-mini', 'anime-waapi'], freezeMetrics),
-    ...table('Lab spring-native пути', ['lab-spring', 'lab-native'], freezeMetrics),
-    'Группы разделены намеренно: spring-native не ранжируется против linear-native — траектории и',
+    ...table('Lab spring→WAAPI путь', ['lab-spring'], freezeMetrics),
+    'Группы разделены намеренно: spring→WAAPI не ранжируется против linear-native — траектории и',
     'набор возможностей разные. Каждая blocked-траектория сравнивается симметричной ошибкой только',
     'с собственным unblocked-прогоном той же библиотеки; ранний jump и отставание штрафуются одинаково.',
     'Кадры берутся `Page.startScreencast`, позиция — пиксель-скан. В отчёт проходят только все валидные',
@@ -651,7 +649,7 @@ export function validateBenchmarkReportPair({
   benchmarkPackage,
   now = Date.now(),
 }) {
-  if (payload?.schema !== 8) fail(`schema ${String(payload?.schema)} не поддержана`);
+  if (payload?.schema !== 9) fail(`schema ${String(payload?.schema)} не поддержана`);
   if (
     payload.package?.name !== rootPackage.name ||
     payload.package?.version !== rootPackage.version
@@ -708,6 +706,14 @@ export function validateBenchmarkReportPair({
     'bench/methodology.mjs',
     'bench/provenance.mjs',
     'bench/report-contract.mjs',
+    'bench/entries/lab.entry.mjs',
+    'bench/entries/motion.entry.mjs',
+    'bench/entries/gsap.entry.mjs',
+    'bench/entries/anime.entry.mjs',
+    'bench/entries/waapi-control.entry.mjs',
+    'bench/entries/lab-spring.entry.mjs',
+    'bench/entries/motion-mini.entry.mjs',
+    'bench/entries/anime-waapi.entry.mjs',
   ]) {
     assertSha(inputs?.[name], `input ${name}`);
   }
@@ -811,7 +817,6 @@ export function validateBenchmarkReportPair({
     anime: packageVersion('animejs'),
     'waapi-ctl': 'платформа Chromium (без библиотеки)',
     'lab-spring': localVersion,
-    'lab-native': localVersion,
     'motion-mini': packageVersion('motion'),
     'anime-waapi': packageVersion('animejs'),
   };
