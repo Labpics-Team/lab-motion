@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import {
+  ANIMATE_COMPOSITOR_MIXED_GATE_BYTES,
   BESPOKE_SUBPATH_GATES,
   COMPOSITOR_CAPABILITY_GATE_BYTES,
   CORE_GATE_BYTES,
@@ -178,6 +179,17 @@ describe('size-gate: auto-derive subpath entries from package.json exports', () 
       .toBe(FULL_CORE_CONSUMER_GATE_BYTES);
     expect(IMPORT_COST_SCENARIOS.find(({ name }) => name === 'compositor-stagger capability')?.gate)
       .toBe(COMPOSITOR_CAPABILITY_GATE_BYTES);
+  });
+
+  it('фиксирует mixed animate + compositor не выше exact clean-base факта', () => {
+    expect(ANIMATE_COMPOSITOR_MIXED_GATE_BYTES).toBe(12_494);
+    const mixed = IMPORT_COST_SCENARIOS.find(
+      ({ name }) => name === 'animate + compositor',
+    );
+    expect(mixed?.gate).toBe(ANIMATE_COMPOSITOR_MIXED_GATE_BYTES);
+    expect(mixed?.code).toContain('/animate/index.js');
+    expect(mixed?.code).toContain('/compositor/index.js');
+    expect(mixed?.code).toContain('compileSpringLinear');
   });
 
   it('measureScenario: пропавший экспорт даёт error (громкий FAIL), а не тихий ноль', async () => {

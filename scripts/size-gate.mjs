@@ -82,6 +82,12 @@ export const NANO_GATE_BYTES = 1024;
 // общего consumer-графа, не смешивая его с file-level потолком.
 export const COMPOSITOR_CAPABILITY_GATE_BYTES = 6600;
 
+// Совместный consumer-граф ./animate + базового spring-компилятора. Exact
+// clean-base 7968d161 (2026-07-16): 12 494 B gz; потолок равен факту без люфта,
+// чтобы локальная оптимизация одного entry не покупалась дублированием между
+// двумя реально совместимыми capability.
+export const ANIMATE_COMPOSITOR_MIXED_GATE_BYTES = 12_494;
+
 // Точечные (bespoke) пороги субпутей — жёстче общего SUBPATH_GATE_BYTES там, где
 // это осмысленно. ./utils — семь чистых скалярных примитивов + сегментный движок;
 // факт после первой сборки 1197 gz, люфт ~15%. Отдельный порог не даёт будущему
@@ -240,6 +246,13 @@ export const IMPORT_COST_SCENARIOS = [
     name: 'compositor-stagger capability',
     code: `import { CompositorSpring, CompositorStaggerGroup, compileSpringPlan, compileStaggerPlan } from '%DIST%/../compositor/stagger/index.js'; console.log(CompositorSpring, CompositorStaggerGroup, compileSpringPlan, compileStaggerPlan);`,
     gate: COMPOSITOR_CAPABILITY_GATE_BYTES,
+  },
+  {
+    // Cross-entry страж: фасад и прямой spring-компилятор часто сосуществуют;
+    // их суммарная цена не выводится из двух изолированных сценариев.
+    name: 'animate + compositor',
+    code: `import { animate } from '%DIST%/../animate/index.js'; import { compileSpringLinear } from '%DIST%/../compositor/index.js'; console.log(typeof animate('.hero', { x: 240, opacity: 1 }).pause, typeof compileSpringLinear);`,
+    gate: ANIMATE_COMPOSITOR_MIXED_GATE_BYTES,
   },
   {
     // Один скалярный примитив из ./utils обязан трястись до горстки байт — это
