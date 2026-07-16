@@ -108,6 +108,17 @@ export function expectIssue(run: () => unknown, code: MotionProgramParseError['c
   expect((error as Error).message).toBe(code);
 }
 
+export function adjacentFloat(value: number, direction: -1 | 1): number {
+  if (!Number.isFinite(value)) throw new Error('expected finite f64');
+  if (value === 0) return direction < 0 ? -Number.MIN_VALUE : Number.MIN_VALUE;
+  const bytes = new ArrayBuffer(8);
+  const view = new DataView(bytes);
+  view.setFloat64(0, value, true);
+  const step = value > 0 ? direction : -direction;
+  view.setBigUint64(0, view.getBigUint64(0, true) + BigInt(step), true);
+  return view.getFloat64(0, true);
+}
+
 export function ownPath(root: unknown, path: readonly number[]): unknown {
   let value = root;
   for (const index of path) value = (value as readonly unknown[])[index];
