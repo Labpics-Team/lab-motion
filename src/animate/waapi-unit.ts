@@ -31,7 +31,7 @@ import {
   type SpringExecutionArtifactTuple,
   type SpringSerializedSamples,
 } from '../compositor/curve.js';
-import { compileSpringRuntimeExecutionTupleUnchecked } from '../compositor/execution.js';
+import { requiresExplicitSpringKeyframes } from '../compositor/detect.js';
 import { MotionParamError } from '../errors.js';
 import {
   animationTimeOrFallback,
@@ -112,19 +112,13 @@ export class WaapiUnit implements GroupOwner {
   private _timerCancel: (() => void) | undefined;
   /** Natural wake может опередить публикацию owner. */
   private _pendingNatural = false;
-  /** Прогресс-пространство текущей кривой (пере-сеется при re-emit). */
-  private _v0 = 0;
   private _startTime = 0;
   private _startDelay = 0;
   private _durationMs = 0;
   private _samples: SpringSerializedSamples | undefined;
-  private readonly _format = (progress: number): string | number =>
-    this._valueAt(progress);
 
   constructor(opts: WaapiUnitOptions) {
     this._o = opts;
-    // Конструктор достижим только после sharedV0-гейта plan-фазы.
-    this._v0 = sharedV0(opts._numeric)!;
     this._emit(opts._delayMs, opts._artifact);
   }
 
@@ -295,32 +289,34 @@ export class WaapiUnit implements GroupOwner {
   /** Коммит плана в Element.animate (канон _emitCompositor CompositorSpring). */
   private _emit(delayMs: number, artifact: SpringExecutionArtifactTuple): void {
     const o = this._o;
-    const plan = compileSpringRuntimeExecutionTupleUnchecked(
-      o._spring,
-      o._group,
-      0,
-      1,
-      this._v0,
-      DEFAULT_TOLERANCE,
-      undefined,
-      undefined,
-      this._format,
-      artifact,
-    );
+    const explicit = requiresExplicitSpringKeyframes();
+    const samples = artifact[1];
+    const durationMs = artifact[2];
+    const count = explicit ? samples.length / 2 : 2;
+    const frames = new Array<Record<string, string | number>>(count);
+    const stride = explicit ? 2 : samples.length - 2;
+    for (let i = 0; i < count; i++) {
+      const sample = i * stride;
+      const progress = samples[sample + 1]!;
+      frames[i] = {
+        offset: samples[sample]! / 100,
+        [o._group]: this._valueAt(progress),
+      };
+    }
     this._startDelay = delayMs;
-    this._durationMs = plan[2];
-    this._samples = plan[5];
+    this._durationMs = durationMs;
+    this._samples = samples;
     try {
       this._startTime = o._now();
-      this._anim = o._el.animate(plan[0], {
-        duration: plan[2],
-        easing: plan[1],
+      this._anim = o._el.animate(frames, {
+        duration: durationMs,
+        easing: explicit ? 'linear' : artifact[0],
         iterations: 1,
-        fill: plan[3],
-        composite: plan[4],
+        fill: 'both',
+        composite: 'replace',
         ...(delayMs > 0 ? { delay: delayMs } : {}),
       });
-      const deadline = delayMs + plan[2];
+      const deadline = delayMs + durationMs;
       const verify = deadline > MAX_TIMER_MS;
       const finished = verify && this._anim.finished;
       if (finished) {
@@ -415,7 +411,6 @@ export class WaapiUnit implements GroupOwner {
     if (!artifact) return undefined;
     o._numeric.length = 0;
     o._numeric.push(...rebased);
-    this._v0 = v0;
     return artifact;
   }
 
