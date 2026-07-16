@@ -54,6 +54,37 @@ import {
   validProgramInput,
 } from './motion-program-v1.fixtures.js';
 
+const REQUIRED_VALID_WIRE_VECTOR_MANIFEST = [
+  {
+    name: 'structural-v1-forms',
+    categories: ['wire-schema', 'little-endian', 'ieee754', 'tuple-forms'],
+  },
+  {
+    name: 'unicode-canonical-equivalence-distinct-scalars',
+    categories: ['string', 'utf8', 'unicode-scalar-identity'],
+  },
+  {
+    name: 'utf8-leading-bom-preserved',
+    categories: ['string', 'utf8', 'bom-preservation'],
+  },
+  { name: 'repeat-zero', categories: ['schedule', 'finite-repeat'] },
+  { name: 'repeat-infinite', categories: ['schedule', 'infinite-repeat'] },
+  { name: 'feature-current', categories: ['feature', 'current-values'] },
+  { name: 'feature-relative', categories: ['feature', 'relative-values'] },
+  {
+    name: 'feature-host',
+    categories: ['feature', 'host-extensions', 'string-index'],
+  },
+  { name: 'direction-mirror', categories: ['schedule', 'mirror-direction'] },
+  { name: 'codec-colors', categories: ['codec', 'color'] },
+  {
+    name: 'mixed-codec-mirror',
+    categories: ['codec', 'color', 'mirror-direction', 'segments'],
+  },
+  { name: 'steps-jump-none', categories: ['curve', 'sampled', 'steps-jump-none'] },
+  { name: 'compiled-v0-spring', categories: ['curve', 'compiled-origin', 'spring'] },
+] as const;
+
 describe('MotionProgram V1 canonical wire', () => {
   it('детерминированно делает round-trip и сохраняет каждый IEEE-754 минус-ноль', () => {
     const parsed = parseMotionProgramV1(validProgramInput());
@@ -461,6 +492,8 @@ describe('MotionProgram V1 canonical wire', () => {
       }>;
       valid: Array<{
         name: string;
+        categories: string[];
+        program: unknown[];
         wireHex: string;
         probes?: Array<{ path: number[]; ieee754LittleEndianHex: string }>;
         stringProbes?: Array<{
@@ -554,10 +587,13 @@ describe('MotionProgram V1 canonical wire', () => {
       mirrorRecaptures: false,
       mirrorEasing: 'forward-after-endpoint-swap',
     });
+    expect(corpus.valid.map(({ name, categories }) => ({ name, categories })))
+      .toEqual(REQUIRED_VALID_WIRE_VECTOR_MANIFEST);
     const decodedSource = new Map<string, MotionProgramV1>();
     for (const vector of corpus.valid) {
       const bytes = hexBytes(vector.wireHex);
       const decoded = decodeMotionProgramV1(bytes);
+      expect(decoded).toEqual(vector.program);
       expect(bytesHex(encodeMotionProgramV1(decoded))).toBe(vector.wireHex);
       for (const probe of vector.probes ?? []) {
         expect(numberHex(ownPath(decoded, probe.path) as number))
