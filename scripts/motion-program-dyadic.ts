@@ -190,11 +190,14 @@ export function motionProgramInfiniteBoundaryV1(
   cycleMs: number,
   iteration: bigint,
 ): number {
-  if (!Number.isFinite(startMs) || !(cycleMs > 0) || !Number.isFinite(cycleMs) || iteration < 0n) {
+  if (!Number.isFinite(startMs) || !(cycleMs > 0) || !Number.isFinite(cycleMs)) {
     throw new RangeError('invalid infinite schedule boundary');
   }
   if (iteration >= GUARANTEED_PRODUCT_OVERFLOW_ITERATION) {
     return Number.POSITIVE_INFINITY;
+  }
+  if (iteration < 0n) {
+    throw new RangeError('invalid infinite schedule boundary');
   }
   const product = roundToBinary64(multiplyInteger(decodeFinite(cycleMs), iteration));
   if (!Number.isFinite(product)) return product;

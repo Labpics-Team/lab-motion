@@ -72,6 +72,41 @@ describe('MotionProgram V1 infinite binary64 schedule', () => {
       Number.MIN_VALUE,
       1n << 1_000_000n,
     )).toBe(Number.POSITIVE_INFINITY);
+
+    // Test-only sentinel: доказывает single-consumption guard, но не расширяет
+    // контракт bigint до произвольных coercible-объектов.
+    let coercions = 0;
+    const singleUseIteration = {
+      [Symbol.toPrimitive]() {
+        if (++coercions > 1) throw new Error('overflowing iteration was consumed twice');
+        return guaranteedOverflowIteration;
+      },
+    } as unknown as bigint;
+    expect(motionProgramInfiniteBoundaryV1(
+      0,
+      Number.MIN_VALUE,
+      singleUseIteration,
+    )).toBe(Number.POSITIVE_INFINITY);
+    expect(coercions).toBe(1);
+  });
+
+  it('валидирует schedule до overflow shortcut и сохраняет negative-index ошибку', () => {
+    const guaranteedOverflowIteration = ((1n << 54n) - 1n) << 2044n;
+    for (const [startMs, cycleMs] of [
+      [Number.NaN, 1],
+      [Number.POSITIVE_INFINITY, 1],
+      [0, 0],
+      [0, -1],
+      [0, Number.NaN],
+      [0, Number.POSITIVE_INFINITY],
+    ]) {
+      expect(() => motionProgramInfiniteBoundaryV1(
+        startMs,
+        cycleMs,
+        guaranteedOverflowIteration,
+      )).toThrow(RangeError);
+    }
+    expect(() => motionProgramInfiniteBoundaryV1(0, 1, -1n)).toThrow(RangeError);
   });
 
   it('сохраняет exact parity за safe quotient и выбирает последний collapsed boundary', () => {
