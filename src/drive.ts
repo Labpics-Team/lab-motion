@@ -29,6 +29,7 @@
 
 import { MotionParamError } from './errors.js';
 import type { MatchMediaLike } from './internal/media-query.js';
+import { defaultRequestFrame } from './internal/request-frame.js';
 import { solveSpring } from './internal/solver.js';
 import { type SpringParams, validateSpringParams } from './spring.js';
 
@@ -187,11 +188,7 @@ export function drive(opts: DriveOptions): Promise<void> {
 
   // L4: platform driver — injected or fallback to the global rAF.
   const scheduleFrame: (cb: (ts?: number) => void) => number =
-    requestFrame ??
-    ((cb) =>
-      typeof requestAnimationFrame !== 'undefined'
-        ? requestAnimationFrame(cb)
-        : (setTimeout(cb, FIXED_DT_S * 1000) as unknown as number));
+    requestFrame ?? defaultRequestFrame;
 
   return new Promise<void>((resolve) => {
     // Один буфер на запуск: солвер переписывает его на месте, поэтому горячий

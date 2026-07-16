@@ -29,6 +29,7 @@
 
 import { type SpringParams, validateSpringParams } from './spring.js';
 import { MotionParamError } from './errors.js';
+import { defaultRequestFrame } from './internal/request-frame.js';
 import { solveSpring } from './internal/solver.js';
 
 // ─── Public types ────────────────────────────────────────────────────────────
@@ -194,15 +195,7 @@ export class MotionValue {
     // initial/spring; молчаливое проглатывание маскировало бы битый донор
     // скорости (жест/decay/compositor-хендофф). Отсутствие опции = 0 (покой).
     this._velocity = assertFinite(opts.initialVelocity ?? 0);
-    this._requestFrame = opts.requestFrame ?? MotionValue._defaultRequestFrame;
-  }
-
-  /** Default requestFrame: global rAF or setTimeout(~16ms) shim for Node. */
-  private static _defaultRequestFrame(cb: (ts?: number) => void): number {
-    if (typeof requestAnimationFrame !== 'undefined') {
-      return requestAnimationFrame(cb);
-    }
-    return setTimeout(cb, FIXED_DT_S * 1000) as unknown as number;
+    this._requestFrame = opts.requestFrame ?? defaultRequestFrame;
   }
 
   // ── Public API ───────────────────────────────────────────────────────────
