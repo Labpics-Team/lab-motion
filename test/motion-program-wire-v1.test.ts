@@ -85,6 +85,19 @@ const REQUIRED_VALID_WIRE_VECTOR_MANIFEST = [
   { name: 'compiled-v0-spring', categories: ['curve', 'compiled-origin', 'spring'] },
 ] as const;
 
+function replaceWireBytes(
+  input: Uint8Array,
+  start: number,
+  deleteCount: number,
+  replacement: Uint8Array,
+): Uint8Array {
+  const output = new Uint8Array(input.length - deleteCount + replacement.length);
+  output.set(input.subarray(0, start));
+  output.set(replacement, start);
+  output.set(input.subarray(start + deleteCount), start + replacement.length);
+  return output;
+}
+
 describe('MotionProgram V1 canonical wire', () => {
   it('детерминированно делает round-trip и сохраняет каждый IEEE-754 минус-ноль', () => {
     const parsed = parseMotionProgramV1(validProgramInput());
@@ -124,6 +137,35 @@ describe('MotionProgram V1 canonical wire', () => {
     );
   });
 
+  it('отклоняет wire выше физического ceiling до многомегабайтного snapshot', () => {
+    const oversized = new Uint8Array(MOTION_PROGRAM_MAX_WIRE_BYTES_V1 + 1);
+    const nativeUint8Array = Uint8Array;
+    const descriptor = Object.getOwnPropertyDescriptor(globalThis, 'Uint8Array');
+    expect(descriptor).toBeDefined();
+    let allocations = 0;
+    const countingUint8Array = new Proxy(nativeUint8Array, {
+      construct(target, args) {
+        allocations++;
+        return Reflect.construct(target, args, target);
+      },
+    });
+    let error: unknown;
+    Object.defineProperty(globalThis, 'Uint8Array', {
+      ...descriptor,
+      value: countingUint8Array,
+    });
+    try {
+      decodeMotionProgramV1(oversized);
+    } catch (caught) {
+      error = caught;
+    } finally {
+      Object.defineProperty(globalThis, 'Uint8Array', descriptor!);
+    }
+
+    expectIssue(() => { throw error; }, 'LMP_WIRE');
+    expect(allocations).toBe(0);
+  });
+
   it('принимает ровно maxItems декодированного графа без off-by-one', () => {
     const input = minimalProgramInput();
     const curves = input[3] as unknown[];
@@ -146,6 +188,17 @@ describe('MotionProgram V1 canonical wire', () => {
       encodeMotionProgramV1(parseMotionProgramV1(input)),
     );
     expect(decoded[3][1]).toHaveLength(pointCount * 2 + 1);
+  });
+
+  it('принимает ровно максимальный трёхбайтовый UTF-8 бюджет', () => {
+    const value = '\u0800'.repeat(MOTION_PROGRAM_LIMITS_V1.maxStringCodeUnits);
+    const encoded = new TextEncoder().encode(value);
+    expect(encoded).toHaveLength(MOTION_PROGRAM_LIMITS_V1.maxStringCodeUnits * 3);
+    const input = minimalProgramInput();
+    input[2] = [value];
+
+    const wire = encodeMotionProgramV1(parseMotionProgramV1(input));
+    expect(decodeMotionProgramV1(wire)[2]).toEqual([value]);
   });
 
   it('сохраняет пустую UTF-8 строку через raw(0)', () => {
@@ -222,6 +275,43 @@ describe('MotionProgram V1 canonical wire', () => {
     const encodedTag = tokenWire.slice();
     encodedTag[tokenExpressionOffset + 1] = 3;
     expectIssue(() => decodeMotionProgramV1(encodedTag), 'LMP_WIRE');
+  });
+
+  it('классифицирует неизвестный curve tag как повреждение wire до shape-parser', () => {
+    expectIssue(
+      () => decodeMotionProgramV1(hexBytes('4c4d5000010000000000000001000000000002')),
+      'LMP_WIRE',
+    );
+  });
+
+  it('не выпускает RangeError из нулевых и дробных preallocation-размеров', () => {
+    const canonical = encodeMotionProgramV1(
+      parseMotionProgramV1(minimalProgramInput()),
+    );
+    // header + linear curve + binding + track header + segment offsets + absolute tag.
+    const encodedValueOffset = 18 + 1 + 5 + 34 + 16 + 1;
+    const emptyVector = replaceWireBytes(
+      canonical,
+      encodedValueOffset,
+      9,
+      Uint8Array.of(1, 0, 0),
+    );
+    const emptySampledCurve = replaceWireBytes(
+      canonical,
+      18,
+      1,
+      Uint8Array.of(1, 0, 0),
+    );
+    const onePointSampledCurve = replaceWireBytes(
+      canonical,
+      18,
+      1,
+      Uint8Array.of(1, 1, 0, ...new Uint8Array(16)),
+    );
+
+    expectIssue(() => decodeMotionProgramV1(emptyVector), 'LMP_SHAPE');
+    expectIssue(() => decodeMotionProgramV1(emptySampledCurve), 'LMP_SHAPE');
+    expectIssue(() => decodeMotionProgramV1(onePointSampledCurve), 'LMP_SHAPE');
   });
 
   it('отличает исчерпание смысловых лимитов от повреждения wire', () => {
