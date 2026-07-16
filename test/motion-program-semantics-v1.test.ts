@@ -838,6 +838,57 @@ describe('MotionProgram V1 portable semantics', () => {
     expect(at(1)).toEqual([0, 10]);
   });
 
+  it('выбирает правый reflected segment по representable mirror-boundary', () => {
+    const boundary = 0.00003051760077154911;
+    const reflectedBoundary = 1 - boundary;
+    const parsed = parseMotionProgramV1([
+      1, 0, [], [0],
+      [[0, MOTION_PROGRAM_STANDARD_CHANNEL_V1.value, 0]],
+      [[0, 0, 1, 1, MOTION_PROGRAM_DIRECTION_V1.mirror, 0, 0, [
+        [0, boundary, [1, [0, 0]], [1, [0, 10]], 0, 0],
+        [boundary, 1, [1, [0, 20]], [1, [0, 30]], 0, 0],
+      ]]],
+    ]);
+    const track = parsed[5][0]!;
+    const resolved = resolveMotionProgramSegmentsV1(track[7]);
+    const at = (progress: number) => evaluateMotionProgramSegmentsV1(
+      track[7],
+      resolved,
+      parsed[3],
+      { state: 'motion', iteration: null, iterationParity: 1, progress, mirrored: true },
+    )[1]!;
+
+    expect(at(adjacentFloat(reflectedBoundary, -1))).toBe(20);
+    expect(at(reflectedBoundary)).toBe(10);
+    expect(at(adjacentFloat(reflectedBoundary, 1))).toBe(9.99999999996362);
+  });
+
+  it('сохраняет sampled-curve jump в прямых reflected координатах', () => {
+    const boundary = 0.10720231540575624;
+    const parsed = parseMotionProgramV1([
+      1, 0, [], [0, [1, 0, 0, boundary, 0, boundary, 1, 1, 1]],
+      [[0, MOTION_PROGRAM_STANDARD_CHANNEL_V1.value, 0]],
+      [[0, -1, 1, 1, MOTION_PROGRAM_DIRECTION_V1.mirror, 0, 0, [
+        [0, 1, [1, [0, 0]], [1, [0, 1]], 1, 0],
+      ]]],
+    ]);
+    const track = parsed[5][0]!;
+    const schedule = evaluateMotionProgramScheduleV1(track, boundary);
+    expect(schedule).toMatchObject({
+      state: 'motion',
+      iteration: 1,
+      iterationParity: 1,
+      progress: boundary,
+      mirrored: true,
+    });
+    expect(evaluateMotionProgramSegmentsV1(
+      track[7],
+      resolveMotionProgramSegmentsV1(track[7]),
+      parsed[3],
+      schedule,
+    )).toEqual([0, 0]);
+  });
+
   it('не сводит HSL→HSL→RGB к binding-level codec при normal и mirror', () => {
     const parsed = parseMotionProgramV1([
       1, 0, [], [0],

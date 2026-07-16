@@ -28,6 +28,10 @@ const OVERFLOW_MIDPOINT: Dyadic = {
   coefficient: (1n << 54n) - 1n,
   exponent: 970,
 };
+const GUARANTEED_PRODUCT_OVERFLOW_ITERATION =
+  // The smallest positive cycle is 2^-1074. Dividing the exact overflow
+  // midpoint by it shifts the coefficient by 970 - (-1074) = 2044 bits.
+  OVERFLOW_MIDPOINT.coefficient << 2044n;
 
 const bitsBuffer = new ArrayBuffer(8);
 const bitsView = new DataView(bitsBuffer);
@@ -188,6 +192,9 @@ export function motionProgramInfiniteBoundaryV1(
 ): number {
   if (!Number.isFinite(startMs) || !(cycleMs > 0) || !Number.isFinite(cycleMs) || iteration < 0n) {
     throw new RangeError('invalid infinite schedule boundary');
+  }
+  if (iteration >= GUARANTEED_PRODUCT_OVERFLOW_ITERATION) {
+    return Number.POSITIVE_INFINITY;
   }
   const product = roundToBinary64(multiplyInteger(decodeFinite(cycleMs), iteration));
   if (!Number.isFinite(product)) return product;

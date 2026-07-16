@@ -44,6 +44,36 @@ function track(
 }
 
 describe('MotionProgram V1 infinite binary64 schedule', () => {
+  it('ограничивает arbitrary BigInt точной границей неизбежного inner overflow', () => {
+    // (2^1024 - 2^970) / 2^-1074: ниже ещё существует конечный результат,
+    // на границе первая RN64 операция уже обязана вернуть +Infinity.
+    const guaranteedOverflowIteration = ((1n << 54n) - 1n) << 2044n;
+    const lastFiniteIteration = guaranteedOverflowIteration - 1n;
+
+    expect(motionProgramInfiniteBoundaryV1(
+      0,
+      Number.MIN_VALUE,
+      lastFiniteIteration,
+    )).toBe(Number.MAX_VALUE);
+    expect(motionProgramInfiniteBoundaryV1(
+      -Number.MAX_VALUE,
+      Number.MIN_VALUE,
+      lastFiniteIteration,
+    )).toBe(0);
+    for (const startMs of [0, -Number.MAX_VALUE]) {
+      expect(motionProgramInfiniteBoundaryV1(
+        startMs,
+        Number.MIN_VALUE,
+        guaranteedOverflowIteration,
+      )).toBe(Number.POSITIVE_INFINITY);
+    }
+    expect(motionProgramInfiniteBoundaryV1(
+      0,
+      Number.MIN_VALUE,
+      1n << 1_000_000n,
+    )).toBe(Number.POSITIVE_INFINITY);
+  });
+
   it('сохраняет exact parity за safe quotient и выбирает последний collapsed boundary', () => {
     const startMs = 0.1;
     const durationMs = 2 ** -54;
