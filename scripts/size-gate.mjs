@@ -12,9 +12,11 @@
  *
  * 2. СЦЕНАРНЫЙ import-cost: сколько gz реально платит npm-потребитель за
  *    типовой импорт — esbuild bundle+minify против dist (ровно то, что сделает
- *    его бандлер). Это главный потребительский гейт: он ловит и регрессию
- *    tree-shakeability (раздутый сценарий при неизменном шипнутом весе), и
- *    совокупное раздувание — поэтому отдельного «full-bundle»-гейта нет.
+ *    его бандлер). Статическое замыкание entry считается initial, достижимые
+ *    dynamic chunks — lazy, а total включает оба среза ровно один раз. Initial
+ *    и total — независимые жёсткие бюджеты; без явного scenario.totalGate оба
+ *    ограничены прежним gate. Поэтому import() не может превратить регрессию в
+ *    ложное «похудение», как при старом чтении result.outputFiles[0].
  *    Заземление 2026-07-02: шипнутый terser-минифицированный dist трясётся
  *    esbuild'ом ЛУЧШЕ неминифицированного во всех сценариях (856 vs 873 /
  *    1536 vs 1701 / 2173 vs 2350 gz) — mangle /^_/ даёт выигрыш, который
@@ -187,8 +189,8 @@ export const BESPOKE_SUBPATH_GATES = {
 
 /**
  * Потребительские сценарии: код — то, что реально пишет потребитель;
- * gate — потолок от замера 2026-07-02 (+~4% люфт). `%DIST%` подставляется
- * абсолютным путём dist/index.js.
+ * gate ограничивает initial, optional totalGate — весь split-граф (без него
+ * равен gate). `%DIST%` подставляется абсолютным путём dist/index.js.
  */
 export const IMPORT_COST_SCENARIOS = [
   {
@@ -292,34 +294,257 @@ export const IMPORT_COST_SCENARIOS = [
   },
 ];
 
+const SCENARIO_OUTDIR = '.size-gate-scenario';
+const SCENARIO_ENTRY_SOURCE = '__lab_motion_size_scenario__.mjs';
+
+// Заморожено по Metafile.outputs.imports из pinned esbuild 0.28.1. Новый kind
+// требует явного решения о static/dynamic семантике, иначе гейт падает закрыто.
+const ESBUILD_OUTPUT_IMPORT_KINDS = new Set([
+  'entry-point',
+  'import-statement',
+  'require-call',
+  'dynamic-import',
+  'require-resolve',
+  'import-rule',
+  'composes-from',
+  'url-token',
+  'file-loader',
+]);
+
 /**
- * Меряет один сценарий: esbuild stdin (без временных файлов) → minify ESM →
- * gz level-9. Ошибка сборки (пропавший экспорт, битый dist) НЕ маскируется —
+ * Разбирает output-граф esbuild без зависимости от порядка outputFiles.
+ * Initial — только статическое замыкание сценарного entry; lazy — всё, что
+ * достижимо после первого dynamic-import. Set-ы делают общий chunk одним
+ * физическим transfer, даже если на него ссылаются несколько lazy entry.
+ */
+export function measureScenarioOutputGraph(result, { absWorkingDir, outdir, entryPoint }) {
+  const outputs = result?.metafile?.outputs;
+  if (!outputs || typeof outputs !== 'object') {
+    throw new Error('scenario metafile.outputs отсутствует');
+  }
+  if (!Array.isArray(result.outputFiles) || result.outputFiles.length === 0) {
+    throw new Error('scenario outputFiles отсутствует или пуст');
+  }
+
+  // outputFiles у esbuild физикализует symlink-префиксы (например /var →
+  // /private/var). Канонический ID относительно realpath(outdir) одинаков для
+  // metafile, outputFiles, macOS symlink-префиксов и Windows-разделителей.
+  const workingDir = realpathSync(absWorkingDir);
+  const outputRoot = resolve(workingDir, outdir);
+  const expectedEntryPoint = isAbsolute(entryPoint)
+    ? resolve(entryPoint)
+    : resolve(workingDir, entryPoint);
+  const outputId = (name, description) => {
+    if (typeof name !== 'string') throw new Error(`${description} не содержит path`);
+    const fromRoot = relative(outputRoot, resolve(workingDir, name));
+    if (
+      fromRoot === '..' ||
+      fromRoot.startsWith(`..${pathSeparator}`) ||
+      isAbsolute(fromRoot)
+    ) throw new Error(`${description} вышел за границу scenario outdir: ${name}`);
+    return fromRoot.split(pathSeparator).join('/');
+  };
+
+  const nodes = new Map();
+  for (const [name, metadata] of Object.entries(outputs)) {
+    const id = outputId(name, `scenario metafile output ${name}`);
+    if (nodes.has(id)) {
+      throw new Error(`scenario metafile содержит неоднозначный output: ${name}`);
+    }
+    nodes.set(id, metadata);
+  }
+  if (nodes.size === 0) throw new Error('scenario metafile.outputs пуст');
+
+  const files = new Map();
+  for (const file of result.outputFiles) {
+    if (!(file?.contents instanceof Uint8Array)) {
+      throw new Error('scenario outputFile не содержит path/contents');
+    }
+    const id = outputId(file.path, `scenario outputFile ${file.path}`);
+    if (files.has(id)) {
+      throw new Error(`scenario outputFiles содержит дубликат: ${file.path}`);
+    }
+    files.set(id, file.contents);
+  }
+
+  const withoutFile = [...nodes.keys()].find((id) => !files.has(id));
+  if (withoutFile) throw new Error(`scenario output отсутствует в outputFiles: ${withoutFile}`);
+  const withoutNode = [...files.keys()].find((id) => !nodes.has(id));
+  if (withoutNode) throw new Error(`scenario output отсутствует в metafile: ${withoutNode}`);
+
+  const entryPointMatches = (value) => {
+    if (typeof value !== 'string') return false;
+    if (isAbsolute(value)) return resolve(value) === expectedEntryPoint;
+    return resolve(workingDir, value) === expectedEntryPoint;
+  };
+  const entryCandidates = [...nodes.entries()]
+    .filter(([, metadata]) => entryPointMatches(metadata.entryPoint));
+  if (entryCandidates.length === 0) {
+    throw new Error(`scenario entryPoint не найден в metafile: ${entryPoint}`);
+  }
+  if (entryCandidates.length > 1) {
+    throw new Error(`scenario entryPoint неоднозначен в metafile: ${entryPoint}`);
+  }
+  const entryId = entryCandidates[0][0];
+
+  const targetId = (path, description) => {
+    const id = outputId(path, description);
+    if (!nodes.has(id)) throw new Error(`${description} указывает на отсутствующий output`);
+    return id;
+  };
+  const edgesOf = (id) => {
+    const node = nodes.get(id);
+    if (!Array.isArray(node?.imports)) throw new Error(`scenario imports отсутствует: ${id}`);
+    const edges = [];
+    for (const edge of node.imports) {
+      if (!edge || typeof edge !== 'object' || typeof edge.path !== 'string') {
+        throw new Error(`scenario import edge повреждён: ${id}`);
+      }
+      if (edge.external !== undefined && typeof edge.external !== 'boolean') {
+        throw new Error(`scenario import external должен быть boolean: ${id}`);
+      }
+      if (typeof edge.kind !== 'string' || !ESBUILD_OUTPUT_IMPORT_KINDS.has(edge.kind)) {
+        throw new Error(`scenario import kind неизвестен: ${String(edge.kind)}`);
+      }
+      if (edge.external === true) continue;
+      edges.push({
+        target: targetId(edge.path, `scenario import ${edge.path}`),
+        dynamic: edge.kind === 'dynamic-import',
+      });
+    }
+    if (node.cssBundle !== undefined) {
+      if (typeof node.cssBundle !== 'string') {
+        throw new Error(`scenario cssBundle повреждён: ${id}`);
+      }
+      edges.push({
+        target: targetId(node.cssBundle, `scenario cssBundle ${node.cssBundle}`),
+        dynamic: false,
+      });
+    }
+    return edges;
+  };
+
+  const collect = (seeds, found, excluded, deferDynamic) => {
+    const deferred = [];
+    const pending = [...seeds];
+    while (pending.length > 0) {
+      const id = pending.pop();
+      if (excluded?.has(id) || found.has(id)) continue;
+      found.add(id);
+      for (const edge of edgesOf(id)) {
+        if (deferDynamic && edge.dynamic) deferred.push(edge.target);
+        else pending.push(edge.target);
+      }
+    }
+    return deferred;
+  };
+  const initial = new Set();
+  const lazySeeds = collect([entryId], initial, null, true);
+  const lazy = new Set();
+  collect(lazySeeds, lazy, initial, false);
+
+  if (initial.size + lazy.size !== nodes.size) {
+    const unreachable = [...nodes.keys()]
+      .filter((id) => !initial.has(id) && !lazy.has(id));
+    throw new Error(`scenario graph содержит недостижимые outputs: ${unreachable.join(', ')}`);
+  }
+
+  const aggregate = (paths) => {
+    let rawBytes = 0;
+    let gzBytes = 0;
+    let brBytes = 0;
+    for (const id of paths) {
+      const contents = files.get(id);
+      rawBytes += contents.length;
+      gzBytes += canonicalGzip(contents).length;
+      brBytes += observationalBrotli(contents).length;
+    }
+    return { rawBytes, gzBytes, brBytes, files: paths.size };
+  };
+  const initialSize = aggregate(initial);
+  const lazySize = aggregate(lazy);
+
+  return {
+    // Старые aliases означают initial: действующие пороги не меняют смысл.
+    rawBytes: initialSize.rawBytes,
+    gzBytes: initialSize.gzBytes,
+    brBytes: initialSize.brBytes,
+    initialFiles: initialSize.files,
+    lazyRawBytes: lazySize.rawBytes,
+    lazyGzBytes: lazySize.gzBytes,
+    lazyBrBytes: lazySize.brBytes,
+    lazyFiles: lazySize.files,
+    totalRawBytes: initialSize.rawBytes + lazySize.rawBytes,
+    totalGzBytes: initialSize.gzBytes + lazySize.gzBytes,
+    totalBrBytes: initialSize.brBytes + lazySize.brBytes,
+    totalFiles: initialSize.files + lazySize.files,
+  };
+}
+
+export function evaluateScenarioBudget(measurement) {
+  const { gzBytes, gate, totalGzBytes, totalGate } = measurement ?? {};
+  if (
+    ![gzBytes, gate, totalGzBytes, totalGate].every(Number.isFinite) ||
+    gzBytes < 0 || totalGzBytes < gzBytes || gate <= 0 || totalGate <= 0
+  ) {
+    throw new Error('scenario budget measurement неполон или некорректен');
+  }
+  const initialExceeded = gzBytes > gate;
+  const totalExceeded = totalGzBytes > totalGate;
+  return {
+    initialExceeded,
+    totalExceeded,
+    exceeded: initialExceeded || totalExceeded,
+  };
+}
+
+/**
+ * Меряет один сценарий: esbuild stdin (без временных файлов) → split+minify ESM
+ * → initial/lazy/total. Ошибка сборки или неполный output-граф НЕ маскируется —
  * возвращается error, гейт падает громко.
  */
 export async function measureScenario(scenario, distIndexPath) {
   // Прямые слэши: esbuild принимает абсолютный путь как спецификатор,
   // но не file://-URL; бэкслэши Windows ломают парсинг строки-импорта.
   const code = scenario.code.replaceAll('%DIST%', distIndexPath.replace(/\\/g, '/'));
+  const totalGate = scenario.totalGate ?? scenario.gate;
   try {
+    const absWorkingDir = realpathSync(dirname(distIndexPath));
+    const entryPoint = resolve(absWorkingDir, SCENARIO_ENTRY_SOURCE);
     const result = await build({
-      stdin: { contents: code, resolveDir: dirname(distIndexPath), loader: 'js' },
+      absWorkingDir,
+      stdin: {
+        contents: code,
+        resolveDir: absWorkingDir,
+        loader: 'js',
+        sourcefile: entryPoint,
+      },
       bundle: true,
       minify: true,
       format: 'esm',
+      splitting: true,
+      metafile: true,
+      outdir: SCENARIO_OUTDIR,
       write: false,
       logLevel: 'silent',
     });
-    const out = result.outputFiles[0].contents;
     return {
       name: scenario.name,
-      gzBytes: canonicalGzip(out).length,
-      brBytes: observationalBrotli(out).length,
-      rawBytes: out.length,
+      ...measureScenarioOutputGraph(result, {
+        absWorkingDir,
+        outdir: SCENARIO_OUTDIR,
+        entryPoint,
+      }),
       gate: scenario.gate,
+      totalGate,
     };
   } catch (err) {
-    return { name: scenario.name, error: String(err?.message ?? err).split('\n')[0], gate: scenario.gate };
+    return {
+      name: scenario.name,
+      error: String(err?.message ?? err).split('\n')[0],
+      gate: scenario.gate,
+      totalGate,
+    };
   }
 }
 
@@ -578,13 +803,22 @@ core (index) gz = ${(core.gzBytes / 1024).toFixed(2)} KB > порог ${(core.ga
       console.log(pad(m.name, COL.label) + `  FAIL: ${m.error}`);
       continue;
     }
-    const exceeded = m.gzBytes > m.gate;
-    if (exceeded) hasWarnings = true;
+    const budget = evaluateScenarioBudget(m);
+    if (budget.exceeded) hasWarnings = true;
+    const failures = [];
+    if (budget.initialExceeded) failures.push(`initial ${m.gzBytes} B > ${m.gate} B`);
+    if (
+      budget.totalExceeded &&
+      (m.totalGzBytes !== m.gzBytes || m.totalGate !== m.gate)
+    ) failures.push(`total ${m.totalGzBytes} B > ${m.totalGate} B`);
+    const deferred = m.lazyFiles > 0
+      ? `; lazy ${m.lazyGzBytes} B gz/${m.lazyBrBytes} B br (${m.lazyFiles} files), total ${m.totalGzBytes} B gz/${m.totalBrBytes} B br (порог ${m.totalGate})`
+      : '';
     console.log(
       pad(m.name, COL.label) +
       lpad(`${m.gzBytes} B gz`, COL.gz) +
       lpad(`${m.brBytes} B br`, COL.br) +
-      `  ${exceeded ? `РЕГРЕССИЯ > ${m.gate} B (найди раздувший коммит; порог не поднимать без решения Даниила)` : `OK (порог ${m.gate})`}`
+      `  ${budget.exceeded ? `РЕГРЕССИЯ ${failures.join(', ')} (найди раздувший коммит; порог не поднимать без решения Даниила)` : `OK (порог ${m.gate})`}${deferred}`
     );
   }
 
