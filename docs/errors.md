@@ -169,3 +169,4 @@
 | `LM155` | animate native host | Host вернул некорректную Animation | Исправить WAAPI или polyfill | retired |
 | `LM156` | animate options | Options не является объектом | Передать объект опций или не передавать аргумент | active |
 | `LM157` | animate transition | Реентрантная смена владельца | Завершить текущую host-транзакцию перед новым animate | active |
+| `LM158` | splitText segmenter | Доступный grapheme segmenter не создался или нарушил контракт | Исправить `Intl.Segmenter` либо передать корректный Unicode ponyfill | active |

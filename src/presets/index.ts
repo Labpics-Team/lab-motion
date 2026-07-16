@@ -1019,22 +1019,108 @@ export function presetToWaapi(spec: PresetSpec | CompiledPreset): WaapiConversio
 export type SplitMode = 'chars' | 'words';
 
 /**
- * Разбивает текст для пошагового раскрытия.
- * 'chars' — Unicode-safe посимвольно (Array.from: суррогатные пары эмодзи не
- * рвутся на половинки); 'words' — слова ВМЕСТЕ с пробельными токенами, чтобы
- * join('') восстанавливал исходную строку бит-в-бит.
- * @throws MotionParamError при не-строке или неизвестном режиме.
+ * Минимальный контракт Unicode-segmenter ponyfill. Реализация обязана вернуть
+ * точные extended grapheme clusters в исходном порядке; splitText дополнительно
+ * проверяет отсутствие пустых сегментов, потерь и перестановок.
+ *
+ * Intl.Segmenter структурно совместим с этим контрактом.
  */
-export function splitText(text: string, mode: SplitMode = 'chars'): readonly string[] {
-  if (typeof text !== 'string') {
-    throw new MotionParamError('LM072');
+export interface GraphemeSegmenter {
+  segment(text: string): Iterable<{ readonly segment: string }>;
+}
+
+let cachedSegmenterConstructor: typeof Intl.Segmenter | undefined;
+let cachedNativeSegmenter: GraphemeSegmenter | undefined;
+
+/** Конструирование Intl.Segmenter дорого; экземпляр лениво кэшируется. */
+function nativeGraphemeSegmenter(): GraphemeSegmenter | undefined {
+  const Segmenter = (globalThis as {
+    Intl?: { Segmenter?: typeof Intl.Segmenter };
+  }).Intl?.Segmenter;
+  if (Segmenter === undefined) return undefined;
+  if (cachedNativeSegmenter === undefined || cachedSegmenterConstructor !== Segmenter) {
+    const candidate = new Segmenter(undefined, { granularity: 'grapheme' });
+    cachedSegmenterConstructor = Segmenter;
+    cachedNativeSegmenter = candidate;
   }
-  if (mode !== 'chars' && mode !== 'words') {
-    throw new MotionParamError('LM073');
+  return cachedNativeSegmenter;
+}
+
+function invalidGraphemeSegmenter(): never {
+  throw new MotionParamError('LM158');
+}
+
+function segmentGraphemes(text: string, segmenter: GraphemeSegmenter): readonly string[] {
+  let segment: unknown;
+  try {
+    segment = segmenter?.segment;
+  } catch {
+    invalidGraphemeSegmenter();
   }
+  if (typeof segment !== 'function') invalidGraphemeSegmenter();
+
+  const parts: string[] = [];
+  let consumedCodeUnits = 0;
+  let invalid = false;
+  try {
+    const iterable = Reflect.apply(segment, segmenter, [text]) as Iterable<unknown>;
+    for (const value of iterable) {
+      if (
+        value === null
+        || (typeof value !== 'object' && typeof value !== 'function')
+      ) {
+        invalid = true;
+        break;
+      }
+      const part = (value as { segment?: unknown }).segment;
+      if (
+        typeof part !== 'string'
+        || part.length === 0
+        || !text.startsWith(part, consumedCodeUnits)
+      ) {
+        invalid = true;
+        break;
+      }
+      consumedCodeUnits += part.length;
+      parts.push(part);
+    }
+  } catch {
+    invalid = true;
+  }
+  if (invalid || consumedCodeUnits !== text.length) invalidGraphemeSegmenter();
+  return parts;
+}
+
+function requireSplitTextInput(text: unknown, mode: unknown): asserts text is string {
+  if (typeof text !== 'string') throw new MotionParamError('LM072');
+  if (mode !== 'chars' && mode !== 'words') throw new MotionParamError('LM073');
+}
+
+/**
+ * Разбивает текст для пошагового раскрытия.
+ * 'chars' — по extended grapheme clusters при наличии Intl.Segmenter или
+ * явного ponyfill; в старой среде сохраняется прежний code-point fallback,
+ * поэтому суррогатные пары не рвутся и обновление не ломает существующий вызов.
+ * 'words' сохраняет пробельные токены, чтобы join('') восстановил строку.
+ * @throws MotionParamError при не-строке, неизвестном режиме или нарушении
+ * контракта доступного/injected segmenter.
+ */
+export function splitText(
+  text: string,
+  mode: SplitMode = 'chars',
+  segmenter?: GraphemeSegmenter,
+): readonly string[] {
+  requireSplitTextInput(text, mode);
   if (text.length === 0) return [];
   if (mode === 'words') return text.split(/(\s+)/).filter(Boolean);
-  return Array.from(text);
+  let exactSegmenter: GraphemeSegmenter | undefined;
+  try {
+    exactSegmenter = segmenter === undefined ? nativeGraphemeSegmenter() : segmenter;
+  } catch {
+    invalidGraphemeSegmenter();
+  }
+  if (exactSegmenter === undefined) return Array.from(text);
+  return segmentGraphemes(text, exactSegmenter);
 }
 
 /** Клэмп прогресса в [0,1]; NaN → 0. CSS-safe: эмитим только валидные кадры. */
@@ -1165,13 +1251,16 @@ function runProgressTrack(
 export interface TypewriterRunOptions extends SugarRunOptions {
   /** Режим разбиения текста. По умолчанию 'chars'. */
   readonly mode?: SplitMode;
+  /** Exact Unicode ponyfill вместо совместимого code-point fallback. */
+  readonly segmenter?: GraphemeSegmenter;
 }
 
 /**
  * Печатная машинка поверх runPreset: onUpdate получает растущий префикс.
  * Дефолт длительности — staggerGap.normal (40 мс) НА ГЛИФ: машинка и есть
  * стаггер по глифам, темп печати не должен зависеть от длины текста.
- * Reduced-motion: ровно один эмит полного текста (CHARACTER-switch).
+ * Reduced-motion: ровно один эмит полного текста без сегментации и кадров;
+ * default totalDuration схлопывается до минимального шага раннера.
  * @throws MotionParamError при невалидных text/mode/duration/onUpdate.
  */
 export function runTypewriter(
@@ -1180,11 +1269,31 @@ export function runTypewriter(
   opts: TypewriterRunOptions = {},
 ): PresetControls {
   assertCallback('runTypewriter.onUpdate', onUpdate);
-  const parts = splitText(text, opts.mode ?? 'chars');
-  const duration =
-    opts.duration ?? Math.max((parts.length * staggerGap.normal) / 1000, FIXED_DT_S);
+  const mode = opts.mode ?? 'chars';
+  requireSplitTextInput(text, mode);
+  const durationInput = opts.duration;
+  if (durationInput !== undefined) assertDuration('runTypewriter', durationInput);
+  const easing = opts.easing;
+  const matchMedia = opts.matchMedia;
+  const requestFrame = opts.requestFrame;
+  const reduce = prefersReducedMotion(matchMedia);
+  if (reduce) {
+    const duration = durationInput ?? FIXED_DT_S;
+    return runProgressTrack(
+      duration,
+      { easing, requestFrame, matchMedia: () => ({ matches: true }) },
+      () => onUpdate(text),
+    );
+  }
+  const parts = splitText(text, mode, opts.segmenter);
+  const duration = durationInput
+    ?? Math.max((parts.length * staggerGap.normal) / 1000, FIXED_DT_S);
   assertDuration('runTypewriter', duration);
-  return runProgressTrack(duration, opts, (p) => onUpdate(typewriterAt(parts, p)));
+  return runProgressTrack(
+    duration,
+    { easing, requestFrame, matchMedia: () => ({ matches: false }) },
+    (p) => onUpdate(typewriterAt(parts, p)),
+  );
 }
 
 export interface ScrambleRunOptions extends SugarRunOptions, ScrambleAtOptions {}

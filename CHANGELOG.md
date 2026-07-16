@@ -32,6 +32,10 @@
 
 ### Fixed
 
+- `./presets`: `splitText(..., 'chars')` теперь делит текст по extended
+  grapheme clusters через `Intl.Segmenter`, поэтому combining marks, emoji-ZWJ,
+  flags, Hangul и Indic conjuncts не рвутся; явный exact-segmenter шов покрывает
+  старые среды, а без него сохраняется прежний code-point fallback.
 - `./animate`: main-thread stagger сохраняет субкадровую фазу — монотонное
   logical-time и signed local phase не дают малым задержкам (< кадра)
   схлопнуться в один кадровый bucket, overshoot не теряется.
