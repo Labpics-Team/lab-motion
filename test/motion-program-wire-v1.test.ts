@@ -93,6 +93,106 @@ describe('MotionProgram V1 canonical wire', () => {
     );
   });
 
+  it('принимает ровно maxItems декодированного графа без off-by-one', () => {
+    const input = minimalProgramInput();
+    const curves = input[3] as unknown[];
+    // Budget = две curves + binding + track + segment + sampled points.
+    // Последний segment списывает последний разрешённый item ровно в ноль.
+    const fixedItems = 2 + 1 + 1 + 1;
+    const pointCount = MOTION_PROGRAM_LIMITS_V1.maxItems - fixedItems;
+    const sampled = new Array<unknown>(pointCount * 2 + 1);
+    sampled[0] = 1;
+    for (let point = 0; point < pointCount; point++) {
+      const terminal = point === pointCount - 1;
+      sampled[point * 2 + 1] = terminal ? 1 : 0;
+      sampled[point * 2 + 2] = terminal ? 1 : 0;
+    }
+    curves.push(sampled);
+    const segment = ((input[5] as unknown[][])[0]![7] as unknown[][])[0]!;
+    segment[4] = 1;
+
+    const decoded = decodeMotionProgramV1(
+      encodeMotionProgramV1(parseMotionProgramV1(input)),
+    );
+    expect(decoded[3][1]).toHaveLength(pointCount * 2 + 1);
+  });
+
+  it('сохраняет пустую UTF-8 строку через raw(0)', () => {
+    const input = validProgramInput();
+    (input[2] as unknown[])[0] = '';
+    const wire = encodeMotionProgramV1(parseMotionProgramV1(input));
+    // Сразу после 18-byte header идёт u32 длины первой строки.
+    expect(new DataView(wire.buffer, wire.byteOffset, wire.byteLength).getUint32(18, true))
+      .toBe(0);
+    expect(decodeMotionProgramV1(wire)[2][0]).toBe('');
+  });
+
+  it('не принимает non-Uint8 view даже со spoofed toStringTag', () => {
+    const wire = encodeMotionProgramV1(parseMotionProgramV1(minimalProgramInput()));
+    const signed = new Int8Array(wire.buffer, wire.byteOffset, wire.byteLength);
+    Object.defineProperty(signed, Symbol.toStringTag, { value: 'Uint8Array' });
+    expectIssue(() => decodeMotionProgramV1(signed as never), 'LMP_WIRE');
+    expectIssue(
+      () => decodeMotionProgramV1(
+        new Uint8ClampedArray(wire.buffer, wire.byteOffset, wire.byteLength) as never,
+      ),
+      'LMP_WIRE',
+    );
+  });
+
+  it('решает magic/version/features до враждебных collection counts', () => {
+    const header = (version: number, features: number): Uint8Array => {
+      const bytes = hexBytes('4c4d5000000000000000ffffffffffffffff');
+      const view = new DataView(bytes.buffer);
+      bytes[4] = version;
+      view.setUint32(6, features, true);
+      return bytes;
+    };
+
+    const wrongMagic = header(1, 0);
+    wrongMagic[0] ^= 0xff;
+    expectIssue(() => decodeMotionProgramV1(wrongMagic), 'LMP_WIRE');
+    expectIssue(() => decodeMotionProgramV1(header(2, 0x8000_0000)), 'LMP_VERSION');
+    expectIssue(() => decodeMotionProgramV1(header(1, 0x8000_0000)), 'LMP_FEATURE');
+  });
+
+  it('отклоняет неизвестные value-expression и encoded-value tags', () => {
+    // header + linear curve + binding + track header + segment offsets.
+    const fromExpressionOffset = 18 + 1 + 5 + 34 + 16;
+    const relativeInput = minimalProgramInput();
+    relativeInput[1] = MOTION_PROGRAM_FEATURE_V1.relativeValues;
+    const relativeSegment = ((relativeInput[5] as unknown[][])[0]![7] as unknown[][])[0]!;
+    relativeSegment[2] = [2, 1, [0, 0]];
+    const relativeWire = encodeMotionProgramV1(parseMotionProgramV1(relativeInput));
+    expect(relativeWire[fromExpressionOffset]).toBe(2);
+
+    // Unknown tag сохраняет payload последней известной формы: мутант
+    // «любой оставшийся tag = relative» принял бы программу без сдвига wire.
+    const valueTag = relativeWire.slice();
+    valueTag[fromExpressionOffset] = 3;
+    expectIssue(() => decodeMotionProgramV1(valueTag), 'LMP_WIRE');
+
+    const tokenInput = minimalProgramInput();
+    tokenInput[1] = MOTION_PROGRAM_FEATURE_V1.hostExtensions;
+    tokenInput[2] = ['--custom', 'token'];
+    tokenInput[4] = [[0, [255, 0], 0]];
+    const tokenSegment = ((tokenInput[5] as unknown[][])[0]![7] as unknown[][])[0]!;
+    tokenSegment[2] = [1, [2, 1]];
+    tokenSegment[3] = [1, [2, 1]];
+    tokenSegment[5] = MOTION_PROGRAM_CODEC_V1.webCssOpaque;
+    const tokenWire = encodeMotionProgramV1(parseMotionProgramV1(tokenInput));
+    const stringBytes = (tokenInput[2] as string[]).reduce(
+      (size, value) => size + 4 + new TextEncoder().encode(value).length,
+      0,
+    );
+    const tokenExpressionOffset = 18 + stringBytes + 1 + 7 + 34 + 16;
+    expect(tokenWire[tokenExpressionOffset]).toBe(1);
+    expect(tokenWire[tokenExpressionOffset + 1]).toBe(2);
+    const encodedTag = tokenWire.slice();
+    encodedTag[tokenExpressionOffset + 1] = 3;
+    expectIssue(() => decodeMotionProgramV1(encodedTag), 'LMP_WIRE');
+  });
+
   it('отличает исчерпание смысловых лимитов от повреждения wire', () => {
     expectIssue(
       () => decodeMotionProgramV1(hexBytes(
