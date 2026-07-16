@@ -108,6 +108,25 @@ export function expectIssue(run: () => unknown, code: MotionProgramParseError['c
   expect((error as Error).message).toBe(code);
 }
 
+export function hexBytes(hex: string): Uint8Array {
+  if (!/^(?:[0-9a-f]{2})*$/.test(hex)) throw new Error('invalid conformance hex');
+  const bytes = new Uint8Array(hex.length / 2);
+  for (let i = 0; i < bytes.length; i++) bytes[i] = Number.parseInt(hex.slice(i * 2, i * 2 + 2), 16);
+  return bytes;
+}
+
+export function bytesHex(bytes: Uint8Array): string {
+  let hex = '';
+  for (const byte of bytes) hex += byte.toString(16).padStart(2, '0');
+  return hex;
+}
+
+export function numberHex(value: number): string {
+  const bytes = new Uint8Array(8);
+  new DataView(bytes.buffer).setFloat64(0, value, true);
+  return bytesHex(bytes);
+}
+
 export function adjacentFloat(value: number, direction: -1 | 1): number {
   if (!Number.isFinite(value)) throw new Error('expected finite f64');
   if (value === 0) return direction < 0 ? -Number.MIN_VALUE : Number.MIN_VALUE;
