@@ -129,7 +129,7 @@ document.querySelector<HTMLElement>('.card')!
 | `…/driver` | Scrubbable-контроллер: `play/pause/reverse/seek/timeScale/progress` + thenable |
 | `…/frame` | Единый frame-шедулер: `createFrameLoop` / синглтон `frame` — один rAF на кадр, фазы read→update→render против layout-thrash, SSR-safe; `asRequestFrame(loop)` сажает `MotionValue`/`drive` на общий кадр. **Биндинги используют его по умолчанию** (как shared-ticker у Framer Motion/GSAP); инжекция своего `requestFrame` переопределяет |
 | `…/nano` | **Platform-trusted WAAPI to-only ≤ 1 КБ gzip**: spring/tween, целые `translate/scale/rotate` longhand-каналы, любые нативно-анимируемые CSS-свойства, `delay`/`stagger`, reduced-motion и сами `Animation` как контролы. Без layout-read, независимых `x/y`, rAF-fallback, C1-подхвата и hostile-host обещаний |
-| `…/animate` | Фасад-one-liner: `animate(target, props, options)` — цели по каналам (`x`/`y`/`scale`/`rotate`, `opacity`, CSS-свойства), режим `{ spring }` или `{ duration, ease }`, `delay`/`stagger`, контролы `{ finished, play, pause, seek, cancel, stop }`. Это полный DX-срез; ядро от него не растёт |
+| `…/animate` | Фасад-one-liner: `animate(target, props, options)` — цели по каналам (`x`/`y`/`scale`/`rotate`, `opacity`, CSS-свойства), режим `{ spring }` или `{ duration, ease }`, `delay`/`stagger`, контролы `{ finished, play, pause, seek, cancel, stop }`. Это базовый single-transition DX-срез; ядро от него не растёт |
 
 **Математика значений**
 
@@ -591,39 +591,51 @@ distanceScale(200);     // 200 (мс) в дефолтной полосе 0→400
 
 ## Миграция с Motion JS / Anime.js
 
-`./animate` — one-liner-паритет с `animate()` Motion JS и Anime.js.
-Базовые сценарии переносятся почти строка-в-строку; отличия — там, где мы
-детерминированнее (инжектируемое время, fail-fast на невалидном значении).
+`./animate` даёт похожую one-liner форму для перечисленного ниже подмножества
+одиночных переходов CSS-стилей DOM- и SVG-элементов. Таблицы — карта переноса
+конкретных вызовов, а не утверждение о совпадении возможностей, поведения или
+lifecycle. Полный целевой пользовательский охват ведётся в [roadmap #106](https://github.com/Labpics-Team/lab-motion/issues/106).
 
 **Motion JS → `./animate`**
 
 | Motion JS | `@labpics/motion/animate` | Заметка |
 |---|---|---|
-| `animate(el, { x: 100 })` | `animate(el, { x: 100 })` | transform-шортхенды идентичны |
+| `animate(el, { x: 100 })` | `animate(el, { x: 100 })` | совпадает этот `x/y`-срез; у Motion набор transform-осей шире |
 | `animate(el, { opacity: [0, 1] })` | `animate(el, { opacity: [0, 1] })` | пара `[from, to]` — тот же смысл |
 | `animate(el, { x: 100 }, { type: 'spring', stiffness: 200 })` | `animate(el, { x: 100 }, { spring: { mass: 1, stiffness: 200, damping: 20 } })` | пружина как `SpringParams` |
 | `animate(el, { x: 100 }, { duration: 0.3 })` | `animate(el, { x: 100 }, { duration: 300 })` | **мс, не секунды** |
 | `animate(el, { x: 100 }, { delay: 0.1 })` | `animate(el, { x: 100 }, { delay: 100 })` | мс |
 | `animate('.item', …, { delay: stagger(0.05) })` | `animate('.item', …, { stagger: 50 })` | шаг-мс между целями |
-| `const a = animate(…); a.pause(); a.play()` | то же | контролы `play/pause/seek/cancel/stop` |
-| `a.finished.then(…)` | `a.finished` + `onComplete` | `finished` резолвится и на cancel; `onComplete` — только естественное оседание |
+| `const a = animate(…); a.pause(); a.play()` | то же | после естественного завершения Motion перезапускается, Lab Motion — нет |
+| `await animate(…)` или `animate(…).then(…)` | `await animate(…).finished` | control Motion thenable; Lab Motion предоставляет отдельный Promise |
+| `a.time = 0.5` | `a.seek(500)` | Motion использует секунды и getter/setter; `seek` Lab Motion — write-only, мс |
+| `a.stop()` | `a.stop()` | оба сохраняют текущую позу; в Lab Motion `stop` — алиас `cancel` |
+| `a.cancel()` | прямого эквивалента нет | Motion возвращает initial pose; Lab Motion сохраняет текущую |
 | `animate(el, { '--x': 100 })` | `animate(el, { '--x': ['0px', '100px'] })` | CSS-переменная с юнитом |
 
 **Anime.js (v4) → `./animate`**
 
-| Anime.js | `@labpics/motion/animate` | Заметка |
+| Anime.js v4 | `@labpics/motion/animate` | Заметка |
 |---|---|---|
-| `animate(el, { translateX: 100 })` | `animate(el, { x: 100 })` | `x`/`y` вместо `translateX/Y` |
-| `animate(el, { scale: 1.2, rotate: 45 })` | `animate(el, { scale: 1.2, rotate: 45 })` | компоненты сливаются в одну `transform` |
-| `animate(el, { opacity: [0, 1], duration: 300 })` | `animate(el, { opacity: [0, 1] }, { duration: 300 })` | опции — третий аргумент |
-| `{ easing: 'easeInOutQuad' }` | `{ ease: (t) => … }` | функция `t∈[0,1]→прогресс` (каталог — `./easing`) |
-| `{ delay: anime.stagger(50) }` | `{ stagger: 50 }` | шаг-мс |
-| `anime({ targets, … })` | `animate(targets, props, options)` | цель — первый аргумент |
+| `animate(el, { translateX: 100 })` | `animate(el, { x: 100 })` | Anime v4 также допускает shorthand `x`; Lab Motion использует `x/y` |
+| `animate(el, { opacity: [0, 1], duration: 300 })` | `animate(el, { opacity: [0, 1] }, { duration: 300 })` | в Anime параметры находятся во втором объекте; в Lab Motion опции — третий аргумент |
+| `{ ease: 'inOutCirc' }` | `{ ease: circInOut }` | `circInOut` импортируется из `./easing` |
+| `{ delay: stagger(50) }` | `{ stagger: 50 }` | в Anime v4 `stagger` — именованный импорт |
+| `animate(targets, parameters)` | `animate(targets, props, options)` | разные сигнатуры, общий только one-liner характер |
 
-`./animate` работает с DOM-стилями, transform-шортхендами, числовыми и цветовыми
-CSS-значениями; ключевые кадры, повторы и оркестрация — отдельные субпути
-`./keyframes` и `./timeline`. Публичного API регистрации произвольных кодеков
-или адаптеров целей пакет пока не предоставляет.
+Текущий `./animate` объединяет одним lifecycle только from/to-переходы
+поддерживаемых CSS-стилей и transform-шортхендов: spring/tween, delay/stagger
+и контролы `finished/play/pause/seek/cancel/stop`.
+
+Не объединены: N-keyframes и offsets, per-segment и per-property transitions,
+repeat/reverse/mirror/repeatDelay, inertia/decay, sequences/timeline,
+value/object targets, HTML/SVG attributes и path-specific SVG-каналы.
+`SVGElement` при этом уже является допустимой целью для поддерживаемых
+CSS-стилей. Отдельные низкоуровневые субпути не образуют общий owner,
+`finished` и interruption/cleanup-контракт. Также отсутствуют thenable control,
+`time/speed/duration` getters, `reverse`, `complete` и `restart`.
+Публичного API регистрации произвольных кодеков или адаптеров целей пакет пока
+не предоставляет.
 
 ## Инварианты (гарантии потребителю)
 

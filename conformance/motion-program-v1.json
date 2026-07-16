@@ -1,0 +1,2691 @@
+{
+  "format": "lab-motion-program-conformance",
+  "version": 1,
+  "endianness": "little",
+  "canonicality": "tuple-graph",
+  "limits": {
+    "maxItems": 65535,
+    "maxStringCodeUnits": 65535
+  },
+  "coverageCounts": {
+    "validWireVectors": 13,
+    "invalidWireVectors": 23,
+    "invalidProgramVectors": 8,
+    "semanticValueVectors": 9,
+    "semanticScheduleCaseVectors": 12,
+    "semanticMirrorSegmentVectors": 1,
+    "generatedLimitVectors": 2
+  },
+  "stringSemantics": {
+    "encoding": "utf-8",
+    "identity": "exact-scalar-sequence",
+    "normalization": "none",
+    "canonicallyEquivalentSequencesMayDiffer": true
+  },
+  "registry": {
+    "features": {
+      "currentValues": 1,
+      "relativeValues": 2,
+      "hostExtensions": 4
+    },
+    "channels": {
+      "value": 0,
+      "opacity": 1,
+      "translateX": 2,
+      "translateY": 3,
+      "scaleX": 4,
+      "scaleY": 5,
+      "rotate": 6,
+      "skewX": 7,
+      "skewY": 8,
+      "color": 9,
+      "backgroundColor": 10,
+      "borderColor": 11
+    },
+    "codecs": {
+      "scalar": 0,
+      "colorGamma2": 1,
+      "colorSrgb": 2,
+      "colorHslShortest": 3,
+      "discrete": 4,
+      "webCssOpaque": 5
+    },
+    "directions": {
+      "normal": 0,
+      "reverse": 1,
+      "alternate": 2,
+      "alternateReverse": 3,
+      "mirror": 4
+    },
+    "composites": {
+      "replace": 0,
+      "add": 1,
+      "accumulate": 2
+    }
+  },
+  "channelSemantics": {
+    "value": {
+      "quantity": "number",
+      "unit": "one",
+      "presentationClamp": "none"
+    },
+    "opacity": {
+      "quantity": "coverage",
+      "unit": "one",
+      "presentationClamp": "unitInterval"
+    },
+    "translateX": {
+      "quantity": "length",
+      "unit": "hostLogicalUnit",
+      "presentationClamp": "none"
+    },
+    "translateY": {
+      "quantity": "length",
+      "unit": "hostLogicalUnit",
+      "presentationClamp": "none"
+    },
+    "scaleX": {
+      "quantity": "scale",
+      "unit": "ratio",
+      "presentationClamp": "none"
+    },
+    "scaleY": {
+      "quantity": "scale",
+      "unit": "ratio",
+      "presentationClamp": "none"
+    },
+    "rotate": {
+      "quantity": "angle",
+      "unit": "degree",
+      "presentationClamp": "none"
+    },
+    "skewX": {
+      "quantity": "angle",
+      "unit": "degree",
+      "presentationClamp": "none"
+    },
+    "skewY": {
+      "quantity": "angle",
+      "unit": "degree",
+      "presentationClamp": "none"
+    },
+    "color": {
+      "quantity": "color",
+      "unit": "codec",
+      "presentationClamp": "codec"
+    },
+    "backgroundColor": {
+      "quantity": "color",
+      "unit": "codec",
+      "presentationClamp": "codec"
+    },
+    "borderColor": {
+      "quantity": "color",
+      "unit": "codec",
+      "presentationClamp": "codec"
+    }
+  },
+  "transformOrder": [
+    2,
+    3,
+    4,
+    5,
+    6,
+    7,
+    8
+  ],
+  "transformSemantics": {
+    "numericModel": "ieee754-binary64",
+    "matrixOrder": "translate*scale*rotate*combinedSkew",
+    "matrixEvaluation": "closed-form-T*S*R*combinedSkew",
+    "cssMatrixLayout": "[a,b,c,d,tx,ty]",
+    "combinedSkewMatrix": "[1,tan(skewY),tan(skewX),1,0,0]",
+    "angleReduction": "truncating-remainder-then-half-open-fold-before-radians",
+    "matrixOverflow": "componentwise-saturate-to-f64-greatest-finite",
+    "matrixOverflowFeedsBack": false,
+    "totalityDomain": "all-seven-resolved-finite-scalars",
+    "yUpAdapter": {
+      "negate": [
+        "translateY",
+        "rotate",
+        "skewX",
+        "skewY"
+      ],
+      "preserve": [
+        "translateX",
+        "scaleX",
+        "scaleY"
+      ]
+    }
+  },
+  "coordinateSemantics": {
+    "hostLogicalUnit": {
+      "web": "css-px",
+      "apple": "point",
+      "android": "dp",
+      "other": "host-layout-logical-unit"
+    },
+    "angle": {
+      "unit": "degree",
+      "positive": "clockwise-in-y-down",
+      "yUpAdapter": "negate-rotate-skewX-skewY-at-presentation"
+    },
+    "yAxis": {
+      "positive": "down",
+      "yUpAdapter": "negate-translateY-at-presentation"
+    },
+    "transformComposition": "translate-scale-rotate-skew",
+    "pathCompilation": "sampled-translateX-translateY-optional-rotate",
+    "effectClamp": "none",
+    "presentationClampFeedsBack": false
+  },
+  "codecSemantics": {
+    "scalar": {
+      "encoded": "scalar",
+      "layout": "f64",
+      "interpolation": "affine-unclamped",
+      "relative": true,
+      "portable": true
+    },
+    "colorGamma2": {
+      "encoded": "vector",
+      "layout": "encoded-srgb-straight-rgba",
+      "ranges": [
+        "[0,255]",
+        "[0,255]",
+        "[0,255]",
+        "[0,1]"
+      ],
+      "interpolation": "sqrt-energy-rgb-linear-alpha-clamped-progress",
+      "relative": false,
+      "portable": true
+    },
+    "colorSrgb": {
+      "encoded": "vector",
+      "layout": "encoded-srgb-straight-rgba",
+      "ranges": [
+        "[0,255]",
+        "[0,255]",
+        "[0,255]",
+        "[0,1]"
+      ],
+      "interpolation": "encoded-srgb-linear-alpha-clamped-progress",
+      "relative": false,
+      "portable": true
+    },
+    "colorHslShortest": {
+      "encoded": "vector",
+      "layout": "h-deg-s-l-straight-a",
+      "ranges": [
+        "[0,360)",
+        "[0,1]",
+        "[0,1]",
+        "[0,1]"
+      ],
+      "interpolation": "shortest-hue-linear-sla-clamped-progress",
+      "relative": false,
+      "portable": true
+    },
+    "discrete": {
+      "encoded": "token",
+      "layout": "string-index",
+      "interpolation": "right-continuous-half-swap",
+      "relative": false,
+      "portable": false
+    },
+    "webCssOpaque": {
+      "encoded": "token",
+      "layout": "string-index",
+      "interpolation": "registered-host",
+      "relative": false,
+      "portable": false
+    }
+  },
+  "curveSemantics": {
+    "forms": "linear-or-sampled",
+    "sourceCurves": "compiled-out",
+    "interpolation": "piecewise-affine",
+    "duplicateOffset": "last-sample-wins-at-exact-boundary"
+  },
+  "segmentSemantics": {
+    "codecOwner": "outgoing-segment",
+    "coverage": "strict-positive-contiguous-zero-to-one",
+    "boundary": "right-segment-wins-at-exact-offset",
+    "boundaryRepresentation": "explicit-left-to-and-right-from",
+    "mixedCodec": "portable-within-one-track"
+  },
+  "ownershipSemantics": {
+    "ownerGroupScope": "program-local",
+    "invariant": "one-owner-per-subject-surface",
+    "duplicateChannel": "forbidden",
+    "transformWrite": "single-batched-surface-write",
+    "transformCoverage": "all-seven-standard-components-required",
+    "transformCurrent": "adapter-owned-component-state-or-identity-never-matrix-decomposition",
+    "surfaceCapture": "all-binding-baselines-once-before-first-surface-write",
+    "inactiveTrackPresentation": "captured-binding-baseline",
+    "subjectSlotBinding": "owned-injective-snapshot-before-capture-or-io"
+  },
+  "hostExtensions": {
+    "portable": false,
+    "nativePolicy": "reject-before-bind",
+    "escapedChannel": "adapter-registered",
+    "additiveComposite": "adapter-registered",
+    "webCssOpaque": "adapter-registered"
+  },
+  "scheduleSemantics": {
+    "timeDomain": "finite-ieee754-binary64-milliseconds",
+    "startTime": "any-finite",
+    "repeat": "additional-iterations",
+    "infiniteRepeat": -1,
+    "repeatDelay": "between-iterations-only",
+    "cycleArithmetic": "round-ties-even-duration-plus-repeatDelay",
+    "iterationBoundary": "round-ties-even(round-ties-even(index-times-cycle)-plus-start)",
+    "zeroDelayMotionEnd": "next-iteration-boundary",
+    "positiveDelayMotionEnd": "round-ties-even(iteration-boundary-plus-duration)",
+    "finiteTerminalBoundary": "round-ties-even(last-iteration-boundary-plus-duration)",
+    "finiteRepresentability": "reject-unproven-distinct-nonzero-phase-boundaries",
+    "finiteResolutionBudget": "max-product-gap-plus-twice-max-absolute-gap",
+    "zeroFiniteDuration": "allowed",
+    "infiniteCycle": "duration-plus-repeatDelay-must-be-positive",
+    "infiniteRepresentability": "sample-defined-no-global-phase-resolution-guarantee",
+    "infiniteBoundarySelection": "greatest-index-with-absolute-boundary-not-after-sample",
+    "infiniteIterationIndex": "unbounded-exact-internal-null-public",
+    "infiniteParity": "exact-low-bit-never-rounded-number-quotient",
+    "unsafeQuotient": "bounded-exact-binary64-dyadic-division",
+    "beforeStart": "inactive",
+    "motionInterval": "half-open",
+    "repeatBoundary": "next-iteration-wins",
+    "repeatDelayPose": "directional-endpoint",
+    "finiteEnd": "closed-terminal-commit",
+    "afterEnd": "terminal-pose-remains-committed-without-live-writer",
+    "zeroDuration": "instant-terminal-of-current-direction",
+    "normal": "forward-every-iteration",
+    "reverse": "reverse-every-iteration",
+    "alternate": "forward-even-reverse-odd",
+    "alternateReverse": "reverse-even-forward-odd",
+    "mirror": "odd-reverse-segment-order-reflect-interval-swap-endpoints-keep-source-curve-forward",
+    "publicRepeatTypeCompilerMapping": {
+      "loop": "normal",
+      "reverse": "alternate",
+      "mirror": "mirror"
+    }
+  },
+  "valueResolution": {
+    "capture": "once-before-first-host-write",
+    "firstCurrent": "binding-snapshot",
+    "laterCurrent": "previous-resolved-frame",
+    "firstRelativeBase": "binding-snapshot",
+    "laterRelativeBase": "previous-resolved-frame",
+    "relativeMagnitude": "nonnegative-and-not-negative-zero",
+    "repeatRecaptures": false,
+    "mirrorRecaptures": false,
+    "mirrorEasing": "forward-after-endpoint-swap"
+  },
+  "limitRecipes": {
+    "generator": "concat-repeated-scalars-at-program-path",
+    "generatorVersion": 1,
+    "limit": "maxStringCodeUnits",
+    "countingUnit": "utf16-code-units",
+    "targetPath": [
+      2,
+      0
+    ],
+    "baseProgram": [
+      1,
+      0,
+      [
+        ""
+      ],
+      [
+        0
+      ],
+      [
+        [
+          0,
+          0,
+          0
+        ]
+      ],
+      [
+        [
+          0,
+          0,
+          1,
+          0,
+          0,
+          0,
+          0,
+          [
+            [
+              0,
+              1,
+              [
+                1,
+                [
+                  0,
+                  0
+                ]
+              ],
+              [
+                1,
+                [
+                  0,
+                  1
+                ]
+              ],
+              0,
+              0
+            ]
+          ]
+        ]
+      ]
+    ],
+    "cases": [
+      {
+        "name": "max-string-code-units-astral-plus-bmp",
+        "components": [
+          {
+            "scalar": "😀",
+            "utf8Hex": "f09f9880",
+            "unicodeScalarsHex": [
+              "1f600"
+            ],
+            "utf16CodeUnits": 2,
+            "repeat": 32767
+          },
+          {
+            "scalar": "x",
+            "utf8Hex": "78",
+            "unicodeScalarsHex": [
+              "0078"
+            ],
+            "utf16CodeUnits": 1,
+            "repeat": 1
+          }
+        ],
+        "expected": {
+          "utf16CodeUnits": 65535,
+          "parse": "valid"
+        }
+      },
+      {
+        "name": "string-code-units-one-over-limit",
+        "components": [
+          {
+            "scalar": "😀",
+            "utf8Hex": "f09f9880",
+            "unicodeScalarsHex": [
+              "1f600"
+            ],
+            "utf16CodeUnits": 2,
+            "repeat": 32767
+          },
+          {
+            "scalar": "x",
+            "utf8Hex": "78",
+            "unicodeScalarsHex": [
+              "0078"
+            ],
+            "utf16CodeUnits": 1,
+            "repeat": 2
+          }
+        ],
+        "expected": {
+          "utf16CodeUnits": 65536,
+          "parse": "invalid",
+          "issue": "LMP_LIMIT"
+        }
+      }
+    ]
+  },
+  "semanticProbes": {
+    "curves": [
+      {
+        "source": "steps-jump-none",
+        "curveIndex": 1,
+        "probes": [
+          {
+            "progress": 0,
+            "value": 0
+          },
+          {
+            "progress": 0.333,
+            "value": 0
+          },
+          {
+            "progress": 0.3333333333333333,
+            "value": 0.5
+          },
+          {
+            "progress": 0.5,
+            "value": 0.5
+          },
+          {
+            "progress": 0.6666666666666666,
+            "value": 1
+          },
+          {
+            "progress": 1,
+            "value": 1
+          }
+        ]
+      }
+    ],
+    "values": [
+      {
+        "codec": 0,
+        "from": [
+          0,
+          0
+        ],
+        "to": [
+          0,
+          1
+        ],
+        "progress": 1.25,
+        "result": [
+          0,
+          1.25
+        ]
+      },
+      {
+        "name": "scalar-affine-weighted-binary64-order",
+        "codec": 0,
+        "from": [
+          0,
+          0.23645552527159452
+        ],
+        "to": [
+          0,
+          0.3692706737201661
+        ],
+        "progress": 0.5042420323006809,
+        "result": [
+          0,
+          0.30342650564561885
+        ],
+        "resultNumberBits": [
+          {
+            "componentIndex": 1,
+            "ieee754LittleEndianHex": "13339f01576bd33f"
+          }
+        ]
+      },
+      {
+        "codec": 1,
+        "from": [
+          1,
+          255,
+          0,
+          0,
+          0
+        ],
+        "to": [
+          1,
+          0,
+          0,
+          255,
+          1
+        ],
+        "progress": 0.5,
+        "result": [
+          1,
+          180.31222920256963,
+          0,
+          180.31222920256963,
+          0.5
+        ],
+        "formatted": "rgba(180, 0, 180, 0.5)"
+      },
+      {
+        "codec": 2,
+        "from": [
+          1,
+          255,
+          0,
+          0,
+          0
+        ],
+        "to": [
+          1,
+          0,
+          0,
+          255,
+          1
+        ],
+        "progress": 0.5,
+        "result": [
+          1,
+          127.5,
+          0,
+          127.5,
+          0.5
+        ],
+        "formatted": "rgba(128, 0, 128, 0.5)"
+      },
+      {
+        "codec": 3,
+        "from": [
+          1,
+          350,
+          1,
+          0.5,
+          0.2
+        ],
+        "to": [
+          1,
+          10,
+          0.5,
+          0.25,
+          0.8
+        ],
+        "progress": 0.5,
+        "result": [
+          1,
+          0,
+          0.75,
+          0.375,
+          0.5
+        ],
+        "formatted": "hsla(0, 75%, 37.5%, 0.5)"
+      },
+      {
+        "name": "hsl-shortest-positive-180-tie",
+        "codec": 3,
+        "from": [
+          1,
+          0,
+          1,
+          0.5,
+          1
+        ],
+        "to": [
+          1,
+          180,
+          1,
+          0.5,
+          1
+        ],
+        "progress": 0.25,
+        "signedHueDeltaDegrees": 180,
+        "result": [
+          1,
+          45,
+          1,
+          0.5,
+          1
+        ],
+        "formatted": "hsl(45, 100%, 50%)"
+      },
+      {
+        "name": "hsl-shortest-negative-180-tie",
+        "codec": 3,
+        "from": [
+          1,
+          180,
+          1,
+          0.5,
+          1
+        ],
+        "to": [
+          1,
+          0,
+          1,
+          0.5,
+          1
+        ],
+        "progress": 0.25,
+        "signedHueDeltaDegrees": -180,
+        "result": [
+          1,
+          135,
+          1,
+          0.5,
+          1
+        ],
+        "formatted": "hsl(135, 100%, 50%)"
+      },
+      {
+        "codec": 4,
+        "from": [
+          2,
+          0
+        ],
+        "to": [
+          2,
+          1
+        ],
+        "progress": 0.5,
+        "result": [
+          2,
+          1
+        ]
+      },
+      {
+        "codec": 5,
+        "from": [
+          2,
+          0
+        ],
+        "to": [
+          2,
+          1
+        ],
+        "progress": 0.5,
+        "issue": "LMP_FEATURE"
+      }
+    ],
+    "presentation": [
+      {
+        "channel": 0,
+        "value": 1.25,
+        "result": 1.25
+      },
+      {
+        "channel": 1,
+        "value": 1.25,
+        "result": 1
+      }
+    ],
+    "schedules": [
+      {
+        "source": "repeat-zero",
+        "trackIndex": 0,
+        "probes": [
+          {
+            "timeMs": -1,
+            "state": "before",
+            "iteration": 0,
+            "iterationParity": 0,
+            "progress": 0,
+            "mirrored": false
+          },
+          {
+            "timeMs": 0,
+            "state": "motion",
+            "iteration": 0,
+            "iterationParity": 0,
+            "progress": 0,
+            "mirrored": false
+          },
+          {
+            "timeMs": 0.5,
+            "state": "motion",
+            "iteration": 0,
+            "iterationParity": 0,
+            "progress": 0.5,
+            "mirrored": false
+          },
+          {
+            "timeMs": 1,
+            "state": "terminal",
+            "iteration": 0,
+            "iterationParity": 0,
+            "progress": 1,
+            "mirrored": false
+          },
+          {
+            "timeMs": 1.25,
+            "state": "after",
+            "iteration": 0,
+            "iterationParity": 0,
+            "progress": 1,
+            "mirrored": false
+          }
+        ]
+      },
+      {
+        "source": "direction-mirror",
+        "trackIndex": 0,
+        "probes": [
+          {
+            "timeMs": 0,
+            "state": "motion",
+            "iteration": 0,
+            "iterationParity": 0,
+            "progress": 0,
+            "mirrored": false
+          },
+          {
+            "timeMs": 0.5,
+            "state": "motion",
+            "iteration": 0,
+            "iterationParity": 0,
+            "progress": 0.5,
+            "mirrored": false
+          },
+          {
+            "timeMs": 1,
+            "state": "motion",
+            "iteration": 1,
+            "iterationParity": 1,
+            "progress": 0,
+            "mirrored": true
+          },
+          {
+            "timeMs": 1.5,
+            "state": "motion",
+            "iteration": 1,
+            "iterationParity": 1,
+            "progress": 0.5,
+            "mirrored": true
+          },
+          {
+            "timeMs": 2,
+            "state": "terminal",
+            "iteration": 1,
+            "iterationParity": 1,
+            "progress": 1,
+            "mirrored": true
+          }
+        ]
+      },
+      {
+        "source": "repeat-infinite",
+        "trackIndex": 0,
+        "probes": [
+          {
+            "timeMs": 0,
+            "state": "motion",
+            "iteration": null,
+            "iterationParity": 0,
+            "progress": 0,
+            "mirrored": false
+          },
+          {
+            "timeMs": 1,
+            "state": "motion",
+            "iteration": null,
+            "iterationParity": 1,
+            "progress": 0,
+            "mirrored": false
+          },
+          {
+            "timeMs": 2,
+            "state": "motion",
+            "iteration": null,
+            "iterationParity": 0,
+            "progress": 0,
+            "mirrored": false
+          }
+        ]
+      }
+    ],
+    "trackValues": [
+      {
+        "source": "repeat-zero",
+        "trackIndex": 0,
+        "bindingBaseline": [
+          0,
+          7
+        ],
+        "probes": [
+          {
+            "timeMs": -1,
+            "result": [
+              0,
+              7
+            ]
+          },
+          {
+            "timeMs": 0,
+            "result": [
+              0,
+              0
+            ]
+          },
+          {
+            "timeMs": 0.5,
+            "result": [
+              0,
+              0.5
+            ]
+          },
+          {
+            "timeMs": 1,
+            "result": [
+              0,
+              1
+            ]
+          },
+          {
+            "timeMs": 1.25,
+            "result": [
+              0,
+              1
+            ]
+          }
+        ]
+      },
+      {
+        "source": "direction-mirror",
+        "trackIndex": 0,
+        "bindingBaseline": [
+          0,
+          7
+        ],
+        "probes": [
+          {
+            "timeMs": -1,
+            "result": [
+              0,
+              7
+            ]
+          },
+          {
+            "timeMs": 0.5,
+            "result": [
+              0,
+              0.5
+            ]
+          },
+          {
+            "timeMs": 1,
+            "result": [
+              0,
+              1
+            ]
+          },
+          {
+            "timeMs": 1.5,
+            "result": [
+              0,
+              0.5
+            ]
+          },
+          {
+            "timeMs": 2,
+            "result": [
+              0,
+              0
+            ]
+          }
+        ]
+      },
+      {
+        "source": "mixed-codec-mirror",
+        "trackIndex": 0,
+        "bindingBaseline": [
+          1,
+          300,
+          0.5,
+          0.5,
+          1
+        ],
+        "probes": [
+          {
+            "timeMs": -1,
+            "result": [
+              1,
+              300,
+              0.5,
+              0.5,
+              1
+            ]
+          },
+          {
+            "timeMs": 0.25,
+            "result": [
+              1,
+              60,
+              1,
+              0.5,
+              1
+            ]
+          },
+          {
+            "timeMs": 0.5,
+            "result": [
+              1,
+              0,
+              255,
+              0,
+              1
+            ]
+          },
+          {
+            "timeMs": 0.75,
+            "result": [
+              1,
+              127.5,
+              255,
+              0,
+              1
+            ]
+          },
+          {
+            "timeMs": 1.25,
+            "result": [
+              1,
+              127.5,
+              255,
+              0,
+              1
+            ]
+          },
+          {
+            "timeMs": 1.5,
+            "result": [
+              1,
+              120,
+              1,
+              0.5,
+              1
+            ]
+          },
+          {
+            "timeMs": 1.75,
+            "result": [
+              1,
+              60,
+              1,
+              0.5,
+              1
+            ]
+          },
+          {
+            "timeMs": 2,
+            "result": [
+              1,
+              0,
+              1,
+              0.5,
+              1
+            ]
+          }
+        ]
+      }
+    ],
+    "resolutions": [
+      {
+        "name": "current-relative-chain",
+        "features": 3,
+        "segments": [
+          [
+            0,
+            0.5,
+            [
+              0
+            ],
+            [
+              2,
+              1,
+              [
+                0,
+                2
+              ]
+            ],
+            0,
+            0
+          ],
+          [
+            0.5,
+            1,
+            [
+              0
+            ],
+            [
+              2,
+              -1,
+              [
+                0,
+                1
+              ]
+            ],
+            0,
+            0
+          ]
+        ],
+        "bindingSnapshot": [
+          0,
+          10
+        ],
+        "result": [
+          [
+            [
+              0,
+              10
+            ],
+            [
+              0,
+              12
+            ]
+          ],
+          [
+            [
+              0,
+              12
+            ],
+            [
+              0,
+              11
+            ]
+          ]
+        ]
+      },
+      {
+        "name": "relative-overflow-before-write",
+        "features": 2,
+        "segments": [
+          [
+            0,
+            1,
+            [
+              1,
+              [
+                0,
+                1.7976931348623157e+308
+              ]
+            ],
+            [
+              2,
+              1,
+              [
+                0,
+                1.7976931348623157e+308
+              ]
+            ],
+            0,
+            0
+          ]
+        ],
+        "issue": "LMP_NUMBER"
+      }
+    ],
+    "transforms": [
+      {
+        "name": "composition-and-y-up-presentation",
+        "input": {
+          "translateX": 5,
+          "translateY": 7,
+          "scaleX": 2,
+          "scaleY": 3,
+          "rotate": 90,
+          "skewX": 45,
+          "skewY": -45
+        },
+        "matrix": [
+          2,
+          3,
+          -2,
+          3,
+          5,
+          7
+        ],
+        "yUpPresentation": {
+          "translateX": 5,
+          "translateY": -7,
+          "scaleX": 2,
+          "scaleY": 3,
+          "rotate": -90,
+          "skewX": -45,
+          "skewY": 45
+        },
+        "yUpMatrix": [
+          2,
+          -3,
+          2,
+          3,
+          5,
+          -7
+        ],
+        "comparison": {
+          "kind": "absolute",
+          "tolerance": 1e-12,
+          "provenance": "cross-language-libm-roundoff-for-bounded-trigonometric-probe"
+        }
+      }
+    ],
+    "transformTotality": [
+      {
+        "name": "rotate-greatest-finite",
+        "input": {
+          "translateX": 0,
+          "translateY": 0,
+          "scaleX": 1,
+          "scaleY": 1,
+          "rotate": 1.7976931348623157e+308,
+          "skewX": 0,
+          "skewY": 0
+        },
+        "expected": {
+          "reducedDegrees": {
+            "rotate": 128,
+            "skewX": 0,
+            "skewY": 0
+          },
+          "allFinite": true,
+          "componentSigns": [
+            "negative",
+            "positive",
+            "negative",
+            "negative",
+            "positive-zero",
+            "positive-zero"
+          ]
+        }
+      },
+      {
+        "name": "scale-greatest-finite-positive-saturation",
+        "input": {
+          "translateX": 0,
+          "translateY": 0,
+          "scaleX": 1.7976931348623157e+308,
+          "scaleY": 1,
+          "rotate": -45,
+          "skewX": 0,
+          "skewY": 45
+        },
+        "expected": {
+          "reducedDegrees": {
+            "rotate": -45,
+            "skewX": 0,
+            "skewY": 45
+          },
+          "allFinite": true,
+          "componentSigns": [
+            "positive",
+            "positive-zero",
+            "positive",
+            "positive",
+            "positive-zero",
+            "positive-zero"
+          ],
+          "saturatedComponents": [
+            {
+              "component": 0,
+              "sign": 1,
+              "magnitude": "f64-greatest-finite",
+              "ieee754LittleEndianHex": "ffffffffffffef7f"
+            }
+          ]
+        }
+      },
+      {
+        "name": "skew-positive-90-half-open-fold",
+        "input": {
+          "translateX": 0,
+          "translateY": 0,
+          "scaleX": 1,
+          "scaleY": 1,
+          "rotate": 0,
+          "skewX": 90,
+          "skewY": 0
+        },
+        "expected": {
+          "reducedDegrees": {
+            "rotate": 0,
+            "skewX": -90,
+            "skewY": 0
+          },
+          "allFinite": true,
+          "componentSigns": [
+            "positive",
+            "positive-zero",
+            "negative",
+            "positive",
+            "positive-zero",
+            "positive-zero"
+          ]
+        }
+      },
+      {
+        "name": "skew-negative-90-lower-bound",
+        "input": {
+          "translateX": 0,
+          "translateY": 0,
+          "scaleX": 1,
+          "scaleY": 1,
+          "rotate": 0,
+          "skewX": -90,
+          "skewY": 0
+        },
+        "expected": {
+          "reducedDegrees": {
+            "rotate": 0,
+            "skewX": -90,
+            "skewY": 0
+          },
+          "allFinite": true,
+          "componentSigns": [
+            "positive",
+            "positive-zero",
+            "negative",
+            "positive",
+            "positive-zero",
+            "positive-zero"
+          ]
+        }
+      },
+      {
+        "name": "skew-positive-greatest-finite",
+        "input": {
+          "translateX": 0,
+          "translateY": 0,
+          "scaleX": 1,
+          "scaleY": 1,
+          "rotate": 0,
+          "skewX": 1.7976931348623157e+308,
+          "skewY": 0
+        },
+        "expected": {
+          "reducedDegrees": {
+            "rotate": 0,
+            "skewX": -52,
+            "skewY": 0
+          },
+          "allFinite": true,
+          "componentSigns": [
+            "positive",
+            "positive-zero",
+            "negative",
+            "positive",
+            "positive-zero",
+            "positive-zero"
+          ]
+        }
+      },
+      {
+        "name": "skew-negative-greatest-finite",
+        "input": {
+          "translateX": 0,
+          "translateY": 0,
+          "scaleX": 1,
+          "scaleY": 1,
+          "rotate": 0,
+          "skewX": -1.7976931348623157e+308,
+          "skewY": 0
+        },
+        "expected": {
+          "reducedDegrees": {
+            "rotate": 0,
+            "skewX": 52,
+            "skewY": 0
+          },
+          "allFinite": true,
+          "componentSigns": [
+            "positive",
+            "positive-zero",
+            "positive",
+            "positive",
+            "positive-zero",
+            "positive-zero"
+          ]
+        }
+      }
+    ],
+    "scheduleCases": [
+      {
+        "name": "repeat-delay-boundaries",
+        "track": {
+          "startMs": 10,
+          "durationMs": 100,
+          "repeat": 1,
+          "direction": 0,
+          "repeatDelayMs": 20
+        },
+        "probes": [
+          {
+            "timeMs": 9,
+            "state": "before",
+            "iteration": 0,
+            "iterationParity": 0,
+            "progress": 0,
+            "mirrored": false
+          },
+          {
+            "timeMs": 10,
+            "state": "motion",
+            "iteration": 0,
+            "iterationParity": 0,
+            "progress": 0,
+            "mirrored": false
+          },
+          {
+            "timeMs": 110,
+            "state": "repeatDelay",
+            "iteration": 0,
+            "iterationParity": 0,
+            "progress": 1,
+            "mirrored": false
+          },
+          {
+            "timeMs": 129,
+            "state": "repeatDelay",
+            "iteration": 0,
+            "iterationParity": 0,
+            "progress": 1,
+            "mirrored": false
+          },
+          {
+            "timeMs": 130,
+            "state": "motion",
+            "iteration": 1,
+            "iterationParity": 1,
+            "progress": 0,
+            "mirrored": false
+          },
+          {
+            "timeMs": 230,
+            "state": "terminal",
+            "iteration": 1,
+            "iterationParity": 1,
+            "progress": 1,
+            "mirrored": false
+          },
+          {
+            "timeMs": 231,
+            "state": "after",
+            "iteration": 1,
+            "iterationParity": 1,
+            "progress": 1,
+            "mirrored": false
+          }
+        ]
+      },
+      {
+        "name": "zero-duration-alternate-with-delay",
+        "track": {
+          "startMs": 0,
+          "durationMs": 0,
+          "repeat": 1,
+          "direction": 2,
+          "repeatDelayMs": 1
+        },
+        "probes": [
+          {
+            "timeMs": 0,
+            "state": "repeatDelay",
+            "iteration": 0,
+            "iterationParity": 0,
+            "progress": 1,
+            "mirrored": false
+          },
+          {
+            "timeMs": 0.5,
+            "state": "repeatDelay",
+            "iteration": 0,
+            "iterationParity": 0,
+            "progress": 1,
+            "mirrored": false
+          },
+          {
+            "timeMs": 1,
+            "state": "terminal",
+            "iteration": 1,
+            "iterationParity": 1,
+            "progress": 0,
+            "mirrored": false
+          },
+          {
+            "timeMs": 2,
+            "state": "after",
+            "iteration": 1,
+            "iterationParity": 1,
+            "progress": 0,
+            "mirrored": false
+          }
+        ]
+      },
+      {
+        "name": "zero-duration-collapsed-repeats",
+        "track": {
+          "startMs": 0,
+          "durationMs": 0,
+          "repeat": 7,
+          "direction": 2,
+          "repeatDelayMs": 0
+        },
+        "probes": [
+          {
+            "timeMs": 0,
+            "state": "terminal",
+            "iteration": 7,
+            "iterationParity": 1,
+            "progress": 0,
+            "mirrored": false
+          }
+        ]
+      },
+      {
+        "name": "direction-reverse",
+        "track": {
+          "startMs": 0,
+          "durationMs": 1,
+          "repeat": 1,
+          "direction": 1,
+          "repeatDelayMs": 0
+        },
+        "probes": [
+          {
+            "timeMs": 0,
+            "state": "motion",
+            "iteration": 0,
+            "iterationParity": 0,
+            "progress": 1,
+            "mirrored": false
+          },
+          {
+            "timeMs": 0.25,
+            "state": "motion",
+            "iteration": 0,
+            "iterationParity": 0,
+            "progress": 0.75,
+            "mirrored": false
+          },
+          {
+            "timeMs": 1,
+            "state": "motion",
+            "iteration": 1,
+            "iterationParity": 1,
+            "progress": 1,
+            "mirrored": false
+          },
+          {
+            "timeMs": 1.25,
+            "state": "motion",
+            "iteration": 1,
+            "iterationParity": 1,
+            "progress": 0.75,
+            "mirrored": false
+          },
+          {
+            "timeMs": 2,
+            "state": "terminal",
+            "iteration": 1,
+            "iterationParity": 1,
+            "progress": 0,
+            "mirrored": false
+          }
+        ]
+      },
+      {
+        "name": "direction-alternate",
+        "track": {
+          "startMs": 0,
+          "durationMs": 1,
+          "repeat": 1,
+          "direction": 2,
+          "repeatDelayMs": 0
+        },
+        "probes": [
+          {
+            "timeMs": 0,
+            "state": "motion",
+            "iteration": 0,
+            "iterationParity": 0,
+            "progress": 0,
+            "mirrored": false
+          },
+          {
+            "timeMs": 0.25,
+            "state": "motion",
+            "iteration": 0,
+            "iterationParity": 0,
+            "progress": 0.25,
+            "mirrored": false
+          },
+          {
+            "timeMs": 1,
+            "state": "motion",
+            "iteration": 1,
+            "iterationParity": 1,
+            "progress": 1,
+            "mirrored": false
+          },
+          {
+            "timeMs": 1.25,
+            "state": "motion",
+            "iteration": 1,
+            "iterationParity": 1,
+            "progress": 0.75,
+            "mirrored": false
+          },
+          {
+            "timeMs": 2,
+            "state": "terminal",
+            "iteration": 1,
+            "iterationParity": 1,
+            "progress": 0,
+            "mirrored": false
+          }
+        ]
+      },
+      {
+        "name": "direction-alternate-reverse",
+        "track": {
+          "startMs": 0,
+          "durationMs": 1,
+          "repeat": 1,
+          "direction": 3,
+          "repeatDelayMs": 0
+        },
+        "probes": [
+          {
+            "timeMs": 0,
+            "state": "motion",
+            "iteration": 0,
+            "iterationParity": 0,
+            "progress": 1,
+            "mirrored": false
+          },
+          {
+            "timeMs": 0.25,
+            "state": "motion",
+            "iteration": 0,
+            "iterationParity": 0,
+            "progress": 0.75,
+            "mirrored": false
+          },
+          {
+            "timeMs": 1,
+            "state": "motion",
+            "iteration": 1,
+            "iterationParity": 1,
+            "progress": 0,
+            "mirrored": false
+          },
+          {
+            "timeMs": 1.25,
+            "state": "motion",
+            "iteration": 1,
+            "iterationParity": 1,
+            "progress": 0.25,
+            "mirrored": false
+          },
+          {
+            "timeMs": 2,
+            "state": "terminal",
+            "iteration": 1,
+            "iterationParity": 1,
+            "progress": 1,
+            "mirrored": false
+          }
+        ]
+      },
+      {
+        "name": "finite-decimal-positive-start-boundaries",
+        "track": {
+          "startMs": 0.1,
+          "durationMs": 1,
+          "repeat": 5,
+          "direction": 0,
+          "repeatDelayMs": 3
+        },
+        "probes": [
+          {
+            "boundary": "iteration-start-1",
+            "relation": "previous-f64",
+            "timeMs": 4.099999999999999,
+            "timeMsIeee754LittleEndianHex": "6566666666661040",
+            "state": "repeatDelay",
+            "iteration": 0,
+            "iterationParity": 0,
+            "progress": 1,
+            "mirrored": false
+          },
+          {
+            "boundary": "iteration-start-1",
+            "relation": "exact",
+            "timeMs": 4.1,
+            "timeMsIeee754LittleEndianHex": "6666666666661040",
+            "state": "motion",
+            "iteration": 1,
+            "iterationParity": 1,
+            "progress": 0,
+            "mirrored": false
+          },
+          {
+            "boundary": "iteration-start-1",
+            "relation": "next-f64",
+            "timeMs": 4.1000000000000005,
+            "timeMsIeee754LittleEndianHex": "6766666666661040",
+            "state": "motion",
+            "iteration": 1,
+            "iterationParity": 1,
+            "progress": 8.881784197001252e-16,
+            "mirrored": false
+          },
+          {
+            "boundary": "terminal",
+            "relation": "previous-f64",
+            "timeMs": 21.099999999999998,
+            "timeMsIeee754LittleEndianHex": "9999999999193540",
+            "state": "motion",
+            "iteration": 5,
+            "iterationParity": 1,
+            "progress": 0.9999999999999964,
+            "mirrored": false
+          },
+          {
+            "boundary": "terminal",
+            "relation": "exact",
+            "timeMs": 21.1,
+            "timeMsIeee754LittleEndianHex": "9a99999999193540",
+            "state": "terminal",
+            "iteration": 5,
+            "iterationParity": 1,
+            "progress": 1,
+            "mirrored": false
+          },
+          {
+            "boundary": "terminal",
+            "relation": "next-f64",
+            "timeMs": 21.100000000000005,
+            "timeMsIeee754LittleEndianHex": "9b99999999193540",
+            "state": "after",
+            "iteration": 5,
+            "iterationParity": 1,
+            "progress": 1,
+            "mirrored": false
+          }
+        ]
+      },
+      {
+        "name": "finite-decimal-negative-start-boundaries",
+        "track": {
+          "startMs": -0.1,
+          "durationMs": 1,
+          "repeat": 5,
+          "direction": 0,
+          "repeatDelayMs": 3
+        },
+        "probes": [
+          {
+            "boundary": "iteration-start-1",
+            "relation": "previous-f64",
+            "timeMs": 3.8999999999999995,
+            "timeMsIeee754LittleEndianHex": "3233333333330f40",
+            "state": "repeatDelay",
+            "iteration": 0,
+            "iterationParity": 0,
+            "progress": 1,
+            "mirrored": false
+          },
+          {
+            "boundary": "iteration-start-1",
+            "relation": "exact",
+            "timeMs": 3.9,
+            "timeMsIeee754LittleEndianHex": "3333333333330f40",
+            "state": "motion",
+            "iteration": 1,
+            "iterationParity": 1,
+            "progress": 0,
+            "mirrored": false
+          },
+          {
+            "boundary": "iteration-start-1",
+            "relation": "next-f64",
+            "timeMs": 3.9000000000000004,
+            "timeMsIeee754LittleEndianHex": "3433333333330f40",
+            "state": "motion",
+            "iteration": 1,
+            "iterationParity": 1,
+            "progress": 4.440892098500624e-16,
+            "mirrored": false
+          },
+          {
+            "boundary": "terminal",
+            "relation": "previous-f64",
+            "timeMs": 20.899999999999995,
+            "timeMsIeee754LittleEndianHex": "6566666666e63440",
+            "state": "motion",
+            "iteration": 5,
+            "iterationParity": 1,
+            "progress": 0.9999999999999964,
+            "mirrored": false
+          },
+          {
+            "boundary": "terminal",
+            "relation": "exact",
+            "timeMs": 20.9,
+            "timeMsIeee754LittleEndianHex": "6666666666e63440",
+            "state": "terminal",
+            "iteration": 5,
+            "iterationParity": 1,
+            "progress": 1,
+            "mirrored": false
+          },
+          {
+            "boundary": "terminal",
+            "relation": "next-f64",
+            "timeMs": 20.900000000000002,
+            "timeMsIeee754LittleEndianHex": "6766666666e63440",
+            "state": "after",
+            "iteration": 5,
+            "iterationParity": 1,
+            "progress": 1,
+            "mirrored": false
+          }
+        ]
+      },
+      {
+        "name": "finite-huge-positive-start-boundaries",
+        "track": {
+          "startMs": 1152921504606847000,
+          "durationMs": 1024,
+          "repeat": 2,
+          "direction": 0,
+          "repeatDelayMs": 2048
+        },
+        "probes": [
+          {
+            "boundary": "start",
+            "relation": "previous-f64",
+            "timeMs": 1152921504606846800,
+            "timeMsIeee754LittleEndianHex": "ffffffffffffaf43",
+            "state": "before",
+            "iteration": 0,
+            "iterationParity": 0,
+            "progress": 0,
+            "mirrored": false
+          },
+          {
+            "boundary": "start",
+            "relation": "exact",
+            "timeMs": 1152921504606847000,
+            "timeMsIeee754LittleEndianHex": "000000000000b043",
+            "state": "motion",
+            "iteration": 0,
+            "iterationParity": 0,
+            "progress": 0,
+            "mirrored": false
+          },
+          {
+            "boundary": "start",
+            "relation": "next-f64",
+            "timeMs": 1152921504606847200,
+            "timeMsIeee754LittleEndianHex": "010000000000b043",
+            "state": "motion",
+            "iteration": 0,
+            "iterationParity": 0,
+            "progress": 0.25,
+            "mirrored": false
+          },
+          {
+            "boundary": "motion-end-0",
+            "relation": "previous-f64",
+            "timeMs": 1152921504606847700,
+            "timeMsIeee754LittleEndianHex": "030000000000b043",
+            "state": "motion",
+            "iteration": 0,
+            "iterationParity": 0,
+            "progress": 0.75,
+            "mirrored": false
+          },
+          {
+            "boundary": "motion-end-0",
+            "relation": "exact",
+            "timeMs": 1152921504606848000,
+            "timeMsIeee754LittleEndianHex": "040000000000b043",
+            "state": "repeatDelay",
+            "iteration": 0,
+            "iterationParity": 0,
+            "progress": 1,
+            "mirrored": false
+          },
+          {
+            "boundary": "motion-end-0",
+            "relation": "next-f64",
+            "timeMs": 1152921504606848300,
+            "timeMsIeee754LittleEndianHex": "050000000000b043",
+            "state": "repeatDelay",
+            "iteration": 0,
+            "iterationParity": 0,
+            "progress": 1,
+            "mirrored": false
+          },
+          {
+            "boundary": "iteration-start-1",
+            "relation": "previous-f64",
+            "timeMs": 1152921504606849800,
+            "timeMsIeee754LittleEndianHex": "0b0000000000b043",
+            "state": "repeatDelay",
+            "iteration": 0,
+            "iterationParity": 0,
+            "progress": 1,
+            "mirrored": false
+          },
+          {
+            "boundary": "iteration-start-1",
+            "relation": "exact",
+            "timeMs": 1152921504606850000,
+            "timeMsIeee754LittleEndianHex": "0c0000000000b043",
+            "state": "motion",
+            "iteration": 1,
+            "iterationParity": 1,
+            "progress": 0,
+            "mirrored": false
+          },
+          {
+            "boundary": "iteration-start-1",
+            "relation": "next-f64",
+            "timeMs": 1152921504606850300,
+            "timeMsIeee754LittleEndianHex": "0d0000000000b043",
+            "state": "motion",
+            "iteration": 1,
+            "iterationParity": 1,
+            "progress": 0.25,
+            "mirrored": false
+          },
+          {
+            "boundary": "terminal",
+            "relation": "previous-f64",
+            "timeMs": 1152921504606854000,
+            "timeMsIeee754LittleEndianHex": "1b0000000000b043",
+            "state": "motion",
+            "iteration": 2,
+            "iterationParity": 0,
+            "progress": 0.75,
+            "mirrored": false
+          },
+          {
+            "boundary": "terminal",
+            "relation": "exact",
+            "timeMs": 1152921504606854100,
+            "timeMsIeee754LittleEndianHex": "1c0000000000b043",
+            "state": "terminal",
+            "iteration": 2,
+            "iterationParity": 0,
+            "progress": 1,
+            "mirrored": false
+          },
+          {
+            "boundary": "terminal",
+            "relation": "next-f64",
+            "timeMs": 1152921504606854400,
+            "timeMsIeee754LittleEndianHex": "1d0000000000b043",
+            "state": "after",
+            "iteration": 2,
+            "iterationParity": 0,
+            "progress": 1,
+            "mirrored": false
+          }
+        ]
+      },
+      {
+        "name": "finite-huge-negative-start-boundaries",
+        "track": {
+          "startMs": -1152921504606847000,
+          "durationMs": 1024,
+          "repeat": 2,
+          "direction": 0,
+          "repeatDelayMs": 2048
+        },
+        "probes": [
+          {
+            "boundary": "start",
+            "relation": "previous-f64",
+            "timeMs": -1152921504606847200,
+            "timeMsIeee754LittleEndianHex": "010000000000b0c3",
+            "state": "before",
+            "iteration": 0,
+            "iterationParity": 0,
+            "progress": 0,
+            "mirrored": false
+          },
+          {
+            "boundary": "start",
+            "relation": "exact",
+            "timeMs": -1152921504606847000,
+            "timeMsIeee754LittleEndianHex": "000000000000b0c3",
+            "state": "motion",
+            "iteration": 0,
+            "iterationParity": 0,
+            "progress": 0,
+            "mirrored": false
+          },
+          {
+            "boundary": "start",
+            "relation": "next-f64",
+            "timeMs": -1152921504606846800,
+            "timeMsIeee754LittleEndianHex": "ffffffffffffafc3",
+            "state": "motion",
+            "iteration": 0,
+            "iterationParity": 0,
+            "progress": 0.125,
+            "mirrored": false
+          },
+          {
+            "boundary": "motion-end-0",
+            "relation": "previous-f64",
+            "timeMs": -1152921504606846100,
+            "timeMsIeee754LittleEndianHex": "f9ffffffffffafc3",
+            "state": "motion",
+            "iteration": 0,
+            "iterationParity": 0,
+            "progress": 0.875,
+            "mirrored": false
+          },
+          {
+            "boundary": "motion-end-0",
+            "relation": "exact",
+            "timeMs": -1152921504606846000,
+            "timeMsIeee754LittleEndianHex": "f8ffffffffffafc3",
+            "state": "repeatDelay",
+            "iteration": 0,
+            "iterationParity": 0,
+            "progress": 1,
+            "mirrored": false
+          },
+          {
+            "boundary": "motion-end-0",
+            "relation": "next-f64",
+            "timeMs": -1152921504606845800,
+            "timeMsIeee754LittleEndianHex": "f7ffffffffffafc3",
+            "state": "repeatDelay",
+            "iteration": 0,
+            "iterationParity": 0,
+            "progress": 1,
+            "mirrored": false
+          },
+          {
+            "boundary": "iteration-start-1",
+            "relation": "previous-f64",
+            "timeMs": -1152921504606844000,
+            "timeMsIeee754LittleEndianHex": "e9ffffffffffafc3",
+            "state": "repeatDelay",
+            "iteration": 0,
+            "iterationParity": 0,
+            "progress": 1,
+            "mirrored": false
+          },
+          {
+            "boundary": "iteration-start-1",
+            "relation": "exact",
+            "timeMs": -1152921504606843900,
+            "timeMsIeee754LittleEndianHex": "e8ffffffffffafc3",
+            "state": "motion",
+            "iteration": 1,
+            "iterationParity": 1,
+            "progress": 0,
+            "mirrored": false
+          },
+          {
+            "boundary": "iteration-start-1",
+            "relation": "next-f64",
+            "timeMs": -1152921504606843800,
+            "timeMsIeee754LittleEndianHex": "e7ffffffffffafc3",
+            "state": "motion",
+            "iteration": 1,
+            "iterationParity": 1,
+            "progress": 0.125,
+            "mirrored": false
+          },
+          {
+            "boundary": "terminal",
+            "relation": "previous-f64",
+            "timeMs": -1152921504606839900,
+            "timeMsIeee754LittleEndianHex": "c9ffffffffffafc3",
+            "state": "motion",
+            "iteration": 2,
+            "iterationParity": 0,
+            "progress": 0.875,
+            "mirrored": false
+          },
+          {
+            "boundary": "terminal",
+            "relation": "exact",
+            "timeMs": -1152921504606839800,
+            "timeMsIeee754LittleEndianHex": "c8ffffffffffafc3",
+            "state": "terminal",
+            "iteration": 2,
+            "iterationParity": 0,
+            "progress": 1,
+            "mirrored": false
+          },
+          {
+            "boundary": "terminal",
+            "relation": "next-f64",
+            "timeMs": -1152921504606839700,
+            "timeMsIeee754LittleEndianHex": "c7ffffffffffafc3",
+            "state": "after",
+            "iteration": 2,
+            "iterationParity": 0,
+            "progress": 1,
+            "mirrored": false
+          }
+        ]
+      },
+      {
+        "name": "finite-nextdown-binade-gap-accepted",
+        "track": {
+          "startMs": 0,
+          "durationMs": 6.821210263296962e-13,
+          "repeat": 1,
+          "direction": 0,
+          "repeatDelayMs": 1023.9999999999992
+        },
+        "probes": [
+          {
+            "timeMs": 0,
+            "timeMsIeee754LittleEndianHex": "0000000000000000",
+            "state": "motion",
+            "iteration": 0,
+            "iterationParity": 0,
+            "progress": 0,
+            "mirrored": false
+          },
+          {
+            "timeMs": 6.821210263296962e-13,
+            "timeMsIeee754LittleEndianHex": "000000000000683d",
+            "state": "repeatDelay",
+            "iteration": 0,
+            "iterationParity": 0,
+            "progress": 1,
+            "mirrored": false
+          },
+          {
+            "timeMs": 1023.9999999999999,
+            "timeMsIeee754LittleEndianHex": "ffffffffffff8f40",
+            "state": "motion",
+            "iteration": 1,
+            "iterationParity": 1,
+            "progress": 0,
+            "mirrored": false
+          },
+          {
+            "timeMs": 1024.0000000000005,
+            "timeMsIeee754LittleEndianHex": "0200000000009040",
+            "state": "terminal",
+            "iteration": 1,
+            "iterationParity": 1,
+            "progress": 1,
+            "mirrored": false
+          }
+        ]
+      },
+      {
+        "name": "infinite-collapsed-boundary-exact-parity",
+        "track": {
+          "startMs": 0.1,
+          "durationMs": 5.551115123125783e-17,
+          "repeat": -1,
+          "direction": 2,
+          "repeatDelayMs": 0
+        },
+        "probes": [
+          {
+            "timeMs": 0.9999999999999999,
+            "timeMsIeee754LittleEndianHex": "ffffffffffffef3f",
+            "state": "motion",
+            "iteration": null,
+            "iterationParity": 1,
+            "progress": 1,
+            "mirrored": false
+          },
+          {
+            "timeMs": 1,
+            "timeMsIeee754LittleEndianHex": "000000000000f03f",
+            "state": "motion",
+            "iteration": null,
+            "iterationParity": 0,
+            "progress": 0,
+            "mirrored": false
+          },
+          {
+            "timeMs": 1.0000000000000002,
+            "timeMsIeee754LittleEndianHex": "010000000000f03f",
+            "state": "motion",
+            "iteration": null,
+            "iterationParity": 0,
+            "progress": 0,
+            "mirrored": false
+          }
+        ]
+      }
+    ],
+    "mirrorSegments": [
+      {
+        "name": "mirror-min-positive-offset-total",
+        "segments": [
+          [0, 5e-324, [1, [0, 10]], [1, [0, 11]], 0, 0],
+          [5e-324, 1, [1, [0, 11]], [1, [0, 20]], 0, 0]
+        ],
+        "probes": [
+          {
+            "progress": 0.9999999999999999,
+            "progressIeee754LittleEndianHex": "ffffffffffffef3f",
+            "result": [0, 11]
+          },
+          {
+            "progress": 1,
+            "progressIeee754LittleEndianHex": "000000000000f03f",
+            "result": [0, 10]
+          }
+        ]
+      }
+    ],
+    "ownership": [
+      {
+        "name": "injective-snapshot-before-capture-and-write",
+        "program": [
+          1,
+          0,
+          [],
+          [
+            0
+          ],
+          [
+            [
+              0,
+              0,
+              0
+            ],
+            [
+              1,
+              1,
+              1
+            ]
+          ],
+          [
+            [
+              0,
+              0,
+              1,
+              0,
+              0,
+              0,
+              0,
+              [
+                [
+                  0,
+                  1,
+                  [
+                    1,
+                    [
+                      0,
+                      0
+                    ]
+                  ],
+                  [
+                    1,
+                    [
+                      0,
+                      1
+                    ]
+                  ],
+                  0,
+                  0
+                ]
+              ]
+            ],
+            [
+              1,
+              0,
+              1,
+              0,
+              0,
+              0,
+              0,
+              [
+                [
+                  0,
+                  1,
+                  [
+                    1,
+                    [
+                      0,
+                      1
+                    ]
+                  ],
+                  [
+                    1,
+                    [
+                      0,
+                      0
+                    ]
+                  ],
+                  0,
+                  0
+                ]
+              ]
+            ]
+          ]
+        ],
+        "subjectIdentities": [
+          10,
+          20
+        ],
+        "expected": {
+          "snapshotIdentities": [
+            10,
+            20
+          ],
+          "frozen": true,
+          "captureCalls": 2,
+          "writeCalls": 1,
+          "events": [
+            "snapshot",
+            "capture:0",
+            "capture:1",
+            "write"
+          ]
+        }
+      },
+      {
+        "name": "subject-alias-rejected-before-capture-or-write",
+        "program": [
+          1,
+          0,
+          [],
+          [
+            0
+          ],
+          [
+            [
+              0,
+              0,
+              0
+            ],
+            [
+              1,
+              1,
+              1
+            ]
+          ],
+          [
+            [
+              0,
+              0,
+              1,
+              0,
+              0,
+              0,
+              0,
+              [
+                [
+                  0,
+                  1,
+                  [
+                    1,
+                    [
+                      0,
+                      0
+                    ]
+                  ],
+                  [
+                    1,
+                    [
+                      0,
+                      1
+                    ]
+                  ],
+                  0,
+                  0
+                ]
+              ]
+            ],
+            [
+              1,
+              0,
+              1,
+              0,
+              0,
+              0,
+              0,
+              [
+                [
+                  0,
+                  1,
+                  [
+                    1,
+                    [
+                      0,
+                      1
+                    ]
+                  ],
+                  [
+                    1,
+                    [
+                      0,
+                      0
+                    ]
+                  ],
+                  0,
+                  0
+                ]
+              ]
+            ]
+          ]
+        ],
+        "subjectIdentities": [
+          10,
+          10
+        ],
+        "expected": {
+          "issue": "LMP_CANONICAL",
+          "captureCalls": 0,
+          "writeCalls": 0,
+          "events": []
+        }
+      }
+    ]
+  },
+  "compiledOrigins": [
+    {
+      "source": "compiled-v0-spring",
+      "curveIndex": 1,
+      "kind": "spring",
+      "generator": "lab-motion.compileSpringExecutionArtifactTupleUnchecked",
+      "generatorVersion": 1,
+      "verification": "exact-regeneration",
+      "mass": 1,
+      "stiffness": 170,
+      "damping": 26,
+      "v0": 3,
+      "compilerTolerance": 0.0025,
+      "durationMs": 772.2521946132229
+    }
+  ],
+  "valid": [
+    {
+      "name": "structural-v1-forms",
+      "categories": ["wire-schema", "little-endian", "ieee754", "tuple-forms"],
+      "program": [1, 7, ["--lab-x", "red"], [0, [1, 0, -0, 0.5, 1, 0.5, 2, 1, 3]], [[0, 0, 7], [1, [255, 0], 8], [2, 10, 9]], [[0, -0, 1000, 2, 3, -0, 0, [[-0, 0.5, [0], [1, [0, -0]], 0, 0], [0.5, 1, [2, -1, [0, 2]], [1, [0, 3]], 1, 0]]], [1, 250, 500, -1, 0, 25, 2, [[0, 1, [1, [2, 1]], [1, [2, 1]], 1, 5]]], [2, 0, 100, 0, 4, 0, 1, [[0, 1, [1, [1, 0, 0, 0, 1]], [1, [1, 255, 128, 64, 0.5]], 1, 1]]]]],
+      "wireHex": "4c4d50000100070000000200020003000300070000002d2d6c61622d78030000007265640001040000000000000000000000000000000080000000000000e03f000000000000f03f000000000000e03f0000000000000040000000000000f03f000000000000084000000007000100ff0000080002000a0900000000000000000000800000000000408f40020000000300000000000000800002000000000000000080000000000000e03f0001000000000000000080000000000000000000e03f000000000000f03f02ff0000000000000000400100000000000000084001000001000000000000406f400000000000407f40ffffffff0000000000000039400201000000000000000000000000000000f03f0102010001020100010005020000000000000000000000000000005940000000000400000000000000000101000000000000000000000000000000f03f01010400000000000000000000000000000000000000000000000000000000000000f03f010104000000000000e06f4000000000000060400000000000005040000000000000e03f010001",
+      "probes": [
+        {
+          "path": [
+            3,
+            1,
+            2
+          ],
+          "ieee754LittleEndianHex": "0000000000000080"
+        },
+        {
+          "path": [
+            5,
+            0,
+            1
+          ],
+          "ieee754LittleEndianHex": "0000000000000080"
+        },
+        {
+          "path": [
+            5,
+            0,
+            5
+          ],
+          "ieee754LittleEndianHex": "0000000000000080"
+        },
+        {
+          "path": [
+            5,
+            0,
+            7,
+            0,
+            0
+          ],
+          "ieee754LittleEndianHex": "0000000000000080"
+        },
+        {
+          "path": [
+            5,
+            0,
+            7,
+            0,
+            3,
+            1,
+            1
+          ],
+          "ieee754LittleEndianHex": "0000000000000080"
+        }
+      ]
+    },
+    {
+      "name": "unicode-canonical-equivalence-distinct-scalars",
+      "categories": ["string", "utf8", "unicode-scalar-identity"],
+      "program": [1, 0, ["é", "é"], [0], [[0, 0, 0]], [[0, 0, 1, 0, 0, 0, 0, [[0, 1, [1, [0, 0]], [1, [0, 1]], 0, 0]]]]],
+      "wireHex": "4c4d5000010000000000020001000100010002000000c3a90300000065cc8100000000000000000000000000000000000000000000f03f000000000000000000000000000001000000000000000000000000000000f03f010000000000000000000100000000000000f03f000000",
+      "stringProbes": [
+        {
+          "index": 0,
+          "utf8Hex": "c3a9",
+          "unicodeScalarsHex": [
+            "00e9"
+          ],
+          "canonicalEquivalenceGroup": "nfc-e-acute"
+        },
+        {
+          "index": 1,
+          "utf8Hex": "65cc81",
+          "unicodeScalarsHex": [
+            "0065",
+            "0301"
+          ],
+          "canonicalEquivalenceGroup": "nfc-e-acute"
+        }
+      ]
+    },
+    {
+      "name": "utf8-leading-bom-preserved",
+      "categories": ["string", "utf8", "bom-preservation"],
+      "program": [1, 0, ["﻿x", "é"], [0], [[0, 0, 0]], [[0, 0, 1, 0, 0, 0, 0, [[0, 1, [1, [0, 0]], [1, [0, 1]], 0, 0]]]]],
+      "wireHex": "4c4d5000010000000000020001000100010004000000efbbbf780300000065cc8100000000000000000000000000000000000000000000f03f000000000000000000000000000001000000000000000000000000000000f03f010000000000000000000100000000000000f03f000000",
+      "stringProbes": [
+        {
+          "index": 0,
+          "utf8Hex": "efbbbf78",
+          "unicodeScalarsHex": [
+            "feff",
+            "0078"
+          ]
+        }
+      ]
+    },
+    {
+      "name": "repeat-zero",
+      "categories": ["schedule", "finite-repeat"],
+      "program": [1, 0, [], [0], [[0, 0, 0]], [[0, 0, 1, 0, 0, 0, 0, [[0, 1, [1, [0, 0]], [1, [0, 1]], 0, 0]]]]],
+      "wireHex": "4c4d5000010000000000000001000100010000000000000000000000000000000000000000000000f03f000000000000000000000000000001000000000000000000000000000000f03f010000000000000000000100000000000000f03f000000"
+    },
+    {
+      "name": "repeat-infinite",
+      "categories": ["schedule", "infinite-repeat"],
+      "program": [1, 0, [], [0], [[0, 0, 0]], [[0, 0, 1, -1, 0, 0, 0, [[0, 1, [1, [0, 0]], [1, [0, 1]], 0, 0]]]]],
+      "wireHex": "4c4d5000010000000000000001000100010000000000000000000000000000000000000000000000f03fffffffff0000000000000000000001000000000000000000000000000000f03f010000000000000000000100000000000000f03f000000"
+    },
+    {
+      "name": "feature-current",
+      "categories": ["feature", "current-values"],
+      "program": [1, 1, [], [0], [[0, 0, 0]], [[0, 0, 1, 0, 0, 0, 0, [[0, 1, [0], [1, [0, 1]], 0, 0]]]]],
+      "wireHex": "4c4d5000010001000000000001000100010000000000000000000000000000000000000000000000f03f000000000000000000000000000001000000000000000000000000000000f03f000100000000000000f03f000000"
+    },
+    {
+      "name": "feature-relative",
+      "categories": ["feature", "relative-values"],
+      "program": [1, 2, [], [0], [[0, 0, 0]], [[0, 0, 1, 0, 0, 0, 0, [[0, 1, [1, [0, 0]], [2, 1, [0, 1]], 0, 0]]]]],
+      "wireHex": "4c4d5000010002000000000001000100010000000000000000000000000000000000000000000000f03f000000000000000000000000000001000000000000000000000000000000f03f01000000000000000000020100000000000000f03f000000"
+    },
+    {
+      "name": "feature-host",
+      "categories": ["feature", "host-extensions", "string-index"],
+      "program": [1, 4, ["--x", "from", "to"], [0], [[0, [255, 0], 0]], [[0, 0, 1, -1, 0, 0, 0, [[0, 1, [1, [2, 1]], [1, [2, 2]], 0, 5]]]]],
+      "wireHex": "4c4d50000100040000000300010001000100030000002d2d780400000066726f6d02000000746f000000ff0000000000000000000000000000000000000000f03fffffffff0000000000000000000001000000000000000000000000000000f03f0102010001020200000005"
+    },
+    {
+      "name": "direction-mirror",
+      "categories": ["schedule", "mirror-direction"],
+      "program": [1, 0, [], [0], [[0, 0, 0]], [[0, 0, 1, 1, 4, 0, 0, [[0, 1, [1, [0, 0]], [1, [0, 1]], 0, 0]]]]],
+      "wireHex": "4c4d5000010000000000000001000100010000000000000000000000000000000000000000000000f03f010000000400000000000000000001000000000000000000000000000000f03f010000000000000000000100000000000000f03f000000"
+    },
+    {
+      "name": "codec-colors",
+      "categories": ["codec", "color"],
+      "program": [1, 0, [], [0], [[0, 9, 0], [1, 10, 1], [2, 11, 2]], [[0, 0, 1, 0, 0, 0, 0, [[0, 1, [1, [1, 255, 0, 0, 0]], [1, [1, 0, 0, 255, 1]], 0, 1]]], [1, 0, 1, 0, 0, 0, 0, [[0, 1, [1, [1, 0, 0, 0, 0]], [1, [1, 255, 255, 255, 1]], 0, 2]]], [2, 0, 1, 0, 0, 0, 0, [[0, 1, [1, [1, 350, 1, 0.5, 0.2]], [1, [1, 10, 0.5, 0.25, 0.8]], 0, 3]]]]],
+      "wireHex": "4c4d5000010000000000000001000300030000000009000001000a010002000b020000000000000000000000000000000000f03f000000000000000000000000000001000000000000000000000000000000f03f010104000000000000e06f4000000000000000000000000000000000000000000000000001010400000000000000000000000000000000000000000000e06f40000000000000f03f00000101000000000000000000000000000000f03f000000000000000000000000000001000000000000000000000000000000f03f010104000000000000000000000000000000000000000000000000000000000000000000010104000000000000e06f400000000000e06f400000000000e06f40000000000000f03f00000202000000000000000000000000000000f03f000000000000000000000000000001000000000000000000000000000000f03f010104000000000000e07540000000000000f03f000000000000e03f9a9999999999c93f010104000000000000002440000000000000e03f000000000000d03f9a9999999999e93f000003"
+    },
+    {
+      "name": "mixed-codec-mirror",
+      "categories": ["codec", "color", "mirror-direction", "segments"],
+      "program": [1, 0, [], [0], [[0, 9, 0]], [[0, 0, 1, 1, 4, 0, 0, [[0, 0.5, [1, [1, 0, 1, 0.5, 1]], [1, [1, 120, 1, 0.5, 1]], 0, 3], [0.5, 1, [1, [1, 0, 255, 0, 1]], [1, [1, 255, 255, 0, 1]], 0, 2]]]]],
+      "wireHex": "4c4d5000010000000000000001000100010000000009000000000000000000000000000000000000f03f010000000400000000000000000002000000000000000000000000000000e03f010104000000000000000000000000000000f03f000000000000e03f000000000000f03f010104000000000000005e40000000000000f03f000000000000e03f000000000000f03f000003000000000000e03f000000000000f03f0101040000000000000000000000000000e06f400000000000000000000000000000f03f010104000000000000e06f400000000000e06f400000000000000000000000000000f03f000002"
+    },
+    {
+      "name": "steps-jump-none",
+      "categories": ["curve", "sampled", "steps-jump-none"],
+      "program": [1, 0, [], [0, [1, 0, 0, 0.3333333333333333, 0, 0.3333333333333333, 0.5, 0.6666666666666666, 0.5, 0.6666666666666666, 1, 1, 1]], [[0, 0, 0]], [[0, 0, 1, 0, 0, 0, 0, [[0, 1, [1, [0, 0]], [1, [0, 1]], 1, 0]]]]],
+      "wireHex": "4c4d500001000000000000000200010001000001060000000000000000000000000000000000555555555555d53f0000000000000000555555555555d53f000000000000e03f555555555555e53f000000000000e03f555555555555e53f000000000000f03f000000000000f03f000000000000f03f000000000000000000000000000000000000000000f03f000000000000000000000000000001000000000000000000000000000000f03f010000000000000000000100000000000000f03f010000"
+    },
+    {
+      "name": "compiled-v0-spring",
+      "categories": ["curve", "compiled-origin", "spring"],
+      "program": [1, 0, [], [0, [1, 0, 0, 0.0018248175182481751, 0.004227657999707424, 0.0146, 0.039, 0.032850000000000004, 0.0987, 0.051089999999999997, 0.1656, 0.09853999999999999, 0.3465, 0.12774, 0.4508, 0.14234, 0.4991, 0.15693, 0.5445, 0.18248, 0.6166, 0.19707999999999998, 0.6537, 0.21533000000000002, 0.6959, 0.23358, 0.7337, 0.25182, 0.7675, 0.27007000000000003, 0.7974, 0.29197, 0.8288, 0.31022, 0.8515, 0.33212, 0.8751, 0.35401000000000005, 0.8952, 0.37591, 0.9123, 0.39781, 0.9267, 0.42335999999999996, 0.9407, 0.4781, 0.9626, 0.5438000000000001, 0.9788, 0.6167900000000001, 0.9888, 0.70438, 0.9949, 0.8211700000000001, 0.9982, 1, 1]], [[0, 0, 0]], [[0, 0, 772.2521946132229, 0, 0, 0, 0, [[0, 1, [1, [0, 0]], [1, [0, 1]], 1, 0]]]]],
+      "wireHex": "4c4d5000010000000000000002000100010000011c00000000000000000000000000000000008a86f8e3d6e55d3f40048f4d0551713f9f3c2cd49ae68d3f2b8716d9cef7a33f1ae25817b7d1a03fbf7d1d386744b93fd4264eee7728aa3f51da1b7c6132c53f0a0c59ddea39b93f931804560e2dd63f990d32c9c859c03fee5a423ee8d9dc3f63d174763238c23f1ac05b2041f1df3f9f71e1404816c43f068195438b6ce13f41481630815bc73fd0d556ec2fbbe33f0a0c59ddea39c93f7aa52c431cebe43fc880ecf5ee8fcb3f302aa913d044e63f84f57f0ef3e5cd3f0a68226c787ae73f59a31ea2d11dd03f8fc2f5285c8fe83fb85d68aed348d13fa3923a014d84e93f8f705af0a2afd23ff697dd938785ea3fed2aa4fca4dad33f736891ed7c3feb3fc53d963e7441d53fe25817b7d100ec3fd63e1d8f19a8d63f68226c787aa5ec3fad510fd1e80ed83f6f8104c58f31ed3f84640113b875d93f9d8026c286a7ed3fd4cf9b8a5418db3f431cebe2361aee3f29ed0dbe3099de3faf25e4839ecdee3fd812f241cf66e13fc364aa605452ef3fb1fecf61bebce33f151dc9e53fa4ef3f7c9bfeec478ae63ff54a598638d6ef3f2d9ace4e0647ea3f1ac05b2041f1ef3f000000000000f03f000000000000f03f00000000000000000000000000000028009c7e04228840000000000000000000000000000001000000000000000000000000000000f03f010000000000000000000100000000000000f03f010000"
+    }
+  ],
+  "invalid": [
+    {
+      "name": "transform-incomplete-surface",
+      "invariant": "all-seven-standard-transform-components-required",
+      "program": [1, 0, [], [0], [[0, 2, 0]], [[0, 0, 1, 0, 0, 0, 0, [[0, 1, [1, [0, 0]], [1, [0, 1]], 0, 0]]]]],
+      "wireHex": "4c4d5000010000000000000001000100010000000002000000000000000000000000000000000000f03f000000000000000000000000000001000000000000000000000000000000f03f010000000000000000000100000000000000f03f000000",
+      "issue": "LMP_CANONICAL"
+    },
+    {
+      "name": "duplicate-subject-channel-writer",
+      "invariant": "duplicate-subject-channel-writer-forbidden",
+      "program": [1, 0, [], [0], [[0, 0, 0], [0, 0, 1]], [[0, 0, 1, 0, 0, 0, 0, [[0, 1, [1, [0, 0]], [1, [0, 1]], 0, 0]]], [1, 0, 1, 0, 0, 0, 0, [[0, 1, [1, [0, 0]], [1, [0, 1]], 0, 0]]]]],
+      "wireHex": "4c4d50000100000000000000010002000200000000000000000000010000000000000000000000000000000000f03f000000000000000000000000000001000000000000000000000000000000f03f010000000000000000000100000000000000f03f00000001000000000000000000000000000000f03f000000000000000000000000000001000000000000000000000000000000f03f010000000000000000000100000000000000f03f000000",
+      "issue": "LMP_CANONICAL"
+    },
+    {
+      "name": "transform-surface-owner-mismatch",
+      "invariant": "one-owner-per-subject-surface",
+      "program": [1, 0, [], [0], [[0, 2, 3], [0, 3, 3], [0, 4, 3], [0, 5, 3], [0, 6, 4], [0, 7, 3], [0, 8, 3]], [[0, 0, 1, 0, 0, 0, 0, [[0, 1, [1, [0, 0]], [1, [0, 1]], 0, 0]]], [1, 0, 1, 0, 0, 0, 0, [[0, 1, [1, [0, 0]], [1, [0, 1]], 0, 0]]], [2, 0, 1, 0, 0, 0, 0, [[0, 1, [1, [0, 1]], [1, [0, 1]], 0, 0]]], [3, 0, 1, 0, 0, 0, 0, [[0, 1, [1, [0, 1]], [1, [0, 1]], 0, 0]]], [4, 0, 1, 0, 0, 0, 0, [[0, 1, [1, [0, 0]], [1, [0, 1]], 0, 0]]], [5, 0, 1, 0, 0, 0, 0, [[0, 1, [1, [0, 0]], [1, [0, 1]], 0, 0]]], [6, 0, 1, 0, 0, 0, 0, [[0, 1, [1, [0, 0]], [1, [0, 1]], 0, 0]]]]],
+      "wireHex": "4c4d5000010000000000000001000700070000000002030000000303000000040300000005030000000604000000070300000008030000000000000000000000000000000000f03f000000000000000000000000000001000000000000000000000000000000f03f010000000000000000000100000000000000f03f00000001000000000000000000000000000000f03f000000000000000000000000000001000000000000000000000000000000f03f010000000000000000000100000000000000f03f00000002000000000000000000000000000000f03f000000000000000000000000000001000000000000000000000000000000f03f0100000000000000f03f0100000000000000f03f00000003000000000000000000000000000000f03f000000000000000000000000000001000000000000000000000000000000f03f0100000000000000f03f0100000000000000f03f00000004000000000000000000000000000000f03f000000000000000000000000000001000000000000000000000000000000f03f010000000000000000000100000000000000f03f00000005000000000000000000000000000000f03f000000000000000000000000000001000000000000000000000000000000f03f010000000000000000000100000000000000f03f00000006000000000000000000000000000000f03f000000000000000000000000000001000000000000000000000000000000f03f010000000000000000000100000000000000f03f000000",
+      "issue": "LMP_CANONICAL"
+    },
+    {
+      "name": "finite-lost-final-motion",
+      "invariant": "finite-last-motion-duration-representable",
+      "program": [1, 0, [], [0], [[0, 0, 0]], [[0, 0, 0.1, 5, 0, 1000000000000000, 0, [[0, 1, [1, [0, 0]], [1, [0, 1]], 0, 0]]]]],
+      "issue": "LMP_BOUNDS"
+    },
+    {
+      "name": "finite-huge-start-motion-loss",
+      "invariant": "finite-duration-representable-at-start-magnitude",
+      "program": [1, 0, [], [0], [[0, 0, 0]], [[0, 1152921504606847000, 1, 2, 0, 1024, 0, [[0, 1, [1, [0, 0]], [1, [0, 1]], 0, 0]]]]],
+      "issue": "LMP_BOUNDS"
+    },
+    {
+      "name": "finite-huge-start-delay-loss",
+      "invariant": "finite-repeat-delay-representable-at-start-magnitude",
+      "program": [1, 0, [], [0], [[0, 0, 0]], [[0, 1152921504606847000, 1024, 2, 0, 1, 0, [[0, 1, [1, [0, 0]], [1, [0, 1]], 0, 0]]]]],
+      "issue": "LMP_BOUNDS"
+    },
+    {
+      "name": "finite-interior-boundary-collapse",
+      "invariant": "finite-interior-boundaries-strictly-increasing",
+      "program": [1, 0, [], [0], [[0, 0, 0]], [[0, 3.192153723814767e+255, 1.4590828405955197e+240, 287, 0, 5.069789595563282e+239, 0, [[0, 1, [1, [0, 0]], [1, [0, 1]], 0, 0]]]]],
+      "issue": "LMP_BOUNDS"
+    },
+    {
+      "name": "finite-repeat-product-overflow",
+      "invariant": "finite-repeat-cycle-product-finite",
+      "program": [1, 0, [], [0], [[0, 0, 0]], [[0, 0, 8.988465674311579e+307, 3, 0, 0, 0, [[0, 1, [1, [0, 0]], [1, [0, 1]], 0, 0]]]]],
+      "issue": "LMP_BOUNDS"
+    },
+    {
+      "name": "wire-item-budget-exhausted",
+      "wireHex": "4c4d5000010000000000ffff010000000000",
+      "issue": "LMP_LIMIT"
+    },
+    {
+      "name": "wire-string-byte-ceiling-exceeded",
+      "wireHex": "4c4d50000100000000000100000000000000feff0200",
+      "issue": "LMP_LIMIT"
+    },
+    {
+      "name": "utf8-overlong-sequence",
+      "wireHex": "4c4d5000010000000000010000000000000002000000c1b8",
+      "issue": "LMP_WIRE"
+    },
+    {
+      "name": "unknown-version",
+      "wireHex": "4c4d5000020000000000000001000100010000000000000000000000000000000000000000000000f03f000000000000000000000000000001000000000000000000000000000000f03f010000000000000000000100000000000000f03f000000",
+      "issue": "LMP_VERSION"
+    },
+    {
+      "name": "unknown-feature-bit",
+      "wireHex": "4c4d5000010008000000000001000100010000000000000000000000000000000000000000000000f03f000000000000000000000000000001000000000000000000000000000000f03f010000000000000000000100000000000000f03f000000",
+      "issue": "LMP_FEATURE"
+    },
+    {
+      "name": "feature-use-mismatch",
+      "wireHex": "4c4d5000010000000000000001000100010000000000000000000000000000000000000000000000f03f000000000000000000000000000001000000000000000000000000000000f03f000100000000000000f03f000000",
+      "issue": "LMP_FEATURE"
+    },
+    {
+      "name": "host-feature-use-mismatch",
+      "wireHex": "4c4d50000100000000000300010001000100030000002d2d780400000066726f6d02000000746f000000ff0000000000000000000000000000000000000000f03fffffffff0000000000000000000001000000000000000000000000000000f03f0102010001020200000005",
+      "issue": "LMP_FEATURE"
+    },
+    {
+      "name": "nonzero-reserved-flags",
+      "wireHex": "4c4d5000010100000000000001000100010000000000000000000000000000000000000000000000f03f000000000000000000000000000001000000000000000000000000000000f03f010000000000000000000100000000000000f03f000000",
+      "issue": "LMP_WIRE"
+    },
+    {
+      "name": "unknown-curve-tag",
+      "wireHex": "4c4d500001000000000000000200010001000002060000000000000000000000000000000000555555555555d53f0000000000000000555555555555d53f000000000000e03f555555555555e53f000000000000e03f555555555555e53f000000000000f03f000000000000f03f000000000000f03f000000000000000000000000000000000000000000f03f000000000000000000000000000001000000000000000000000000000000f03f010000000000000000000100000000000000f03f010000",
+      "issue": "LMP_WIRE"
+    },
+    {
+      "name": "sample-first-offset-not-zero",
+      "wireHex": "4c4d5000010000000000000002000100010000010600000000000000d03f0000000000000000555555555555d53f0000000000000000555555555555d53f000000000000e03f555555555555e53f000000000000e03f555555555555e53f000000000000f03f000000000000f03f000000000000f03f000000000000000000000000000000000000000000f03f000000000000000000000000000001000000000000000000000000000000f03f010000000000000000000100000000000000f03f010000",
+      "issue": "LMP_OFFSET"
+    },
+    {
+      "name": "binding-index-out-of-range",
+      "wireHex": "4c4d5000010000000000000001000100010000000000000001000000000000000000000000000000f03f000000000000000000000000000001000000000000000000000000000000f03f010000000000000000000100000000000000f03f000000",
+      "issue": "LMP_INDEX"
+    },
+    {
+      "name": "first-frame-offset-not-zero",
+      "wireHex": "4c4d5000010000000000000001000100010000000000000000000000000000000000000000000000f03f00000000000000000000000000000100000000000000d03f000000000000f03f010000000000000000000100000000000000f03f000000",
+      "issue": "LMP_OFFSET"
+    },
+    {
+      "name": "non-finite-scalar",
+      "wireHex": "4c4d5000010000000000000001000100010000000000000000000000000000000000000000000000f03f000000000000000000000000000001000000000000000000000000000000f03f0100000000000000f87f0100000000000000f03f000000",
+      "issue": "LMP_NUMBER"
+    },
+    {
+      "name": "channel-codec-mismatch",
+      "wireHex": "4c4d5000010000000000000001000100010000000009000000000000000000000000000000000000f03f000000000000000000000000000001000000000000000000000000000000f03f010000000000000000000100000000000000f03f000000",
+      "issue": "LMP_CODEC"
+    },
+    {
+      "name": "direction-out-of-range",
+      "wireHex": "4c4d5000010000000000000001000100010000000000000000000000000000000000000000000000f03f000000000500000000000000000001000000000000000000000000000000f03f010000000000000000000100000000000000f03f000000",
+      "issue": "LMP_BOUNDS"
+    },
+    {
+      "name": "composite-out-of-range",
+      "wireHex": "4c4d5000010000000000000001000100010000000000000000000000000000000000000000000000f03f000000000000000000000000000301000000000000000000000000000000f03f010000000000000000000100000000000000f03f000000",
+      "issue": "LMP_BOUNDS"
+    },
+    {
+      "name": "infinite-zero-cycle",
+      "wireHex": "4c4d50000100000000000000010001000100000000000000000000000000000000000000000000000000ffffffff0000000000000000000001000000000000000000000000000000f03f010000000000000000000100000000000000f03f000000",
+      "issue": "LMP_BOUNDS"
+    },
+    {
+      "name": "invalid-utf8",
+      "wireHex": "4c4d5000010004000000030001000100010003000000ff2d780400000066726f6d02000000746f000000ff0000000000000000000000000000000000000000f03fffffffff0000000000000000000001000000000000000000000000000000f03f0102010001020200000005",
+      "issue": "LMP_WIRE"
+    },
+    {
+      "name": "trailing-byte",
+      "wireHex": "4c4d5000010000000000000001000100010000000000000000000000000000000000000000000000f03f000000000000000000000000000001000000000000000000000000000000f03f010000000000000000000100000000000000f03f00000000",
+      "issue": "LMP_WIRE"
+    },
+    {
+      "name": "truncated-final-byte",
+      "wireHex": "4c4d5000010000000000000001000100010000000000000000000000000000000000000000000000f03f000000000000000000000000000001000000000000000000000000000000f03f010000000000000000000100000000000000f03f0000",
+      "issue": "LMP_WIRE"
+    }
+  ]
+}
