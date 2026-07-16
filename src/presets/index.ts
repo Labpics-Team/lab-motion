@@ -1051,7 +1051,12 @@ function invalidGraphemeSegmenter(): never {
 }
 
 function segmentGraphemes(text: string, segmenter: GraphemeSegmenter): readonly string[] {
-  const segment = segmenter?.segment;
+  let segment: unknown;
+  try {
+    segment = segmenter?.segment;
+  } catch {
+    invalidGraphemeSegmenter();
+  }
   if (typeof segment !== 'function') invalidGraphemeSegmenter();
 
   const parts: string[] = [];

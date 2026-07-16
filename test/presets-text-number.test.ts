@@ -195,6 +195,23 @@ describe('presets/splitText', () => {
     }
   });
 
+  it('В: hostile getter segment нормализуется в LM158', () => {
+    const segmenter = Object.defineProperty({}, 'segment', {
+      get() {
+        throw new Error('hostile getter');
+      },
+    }) as GraphemeSegmenter;
+
+    let error: unknown;
+    try {
+      splitText('ab', 'chars', segmenter);
+    } catch (caught) {
+      error = caught;
+    }
+    expect(error).toBeInstanceOf(MotionParamError);
+    expect((error as MotionParamError).code).toBe('LM158');
+  });
+
   it('Б: hostile длинный ZWJ-input проходит segmenter и iterable ровно по одному разу', () => {
     const family = '👨‍👩‍👧‍👦';
     const count = 4096;
