@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { readdirSync, readFileSync } from 'node:fs';
 import { join } from 'node:path';
+import { fileURLToPath } from 'node:url';
 import {
   MOTION_PROGRAM_CODEC_V1,
   MOTION_PROGRAM_COMPOSITE_V1,
@@ -438,7 +439,7 @@ describe('MotionProgram V1 parser', () => {
     expect(runtimeSource).not.toMatch(
       /\b(?:AbortSignal|requestAnimationFrame|cancelAnimationFrame|setTimeout|setInterval|performance\.now|Date\.now|TextEncoder|TextDecoder|DataView)\b/,
     );
-    const srcRoot = new URL('../src', import.meta.url).pathname;
+    const srcRoot = fileURLToPath(new URL('../src', import.meta.url));
     const accidentalImports = sourceFiles(srcRoot).filter((path) =>
       readFileSync(path, 'utf8').includes('motion-program-wire'),
     );
