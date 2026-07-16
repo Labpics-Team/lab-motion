@@ -26,6 +26,8 @@
 
 ### Changed
 
+- Ядро: `drive` и `MotionValue` используют один поздно привязываемый default
+  frame-scheduler; дублированный runtime удалён без смены rAF/fallback-семантики.
 - `./compositor`: exact-key LRU вынесен в functional state без смены policy;
   общий cache сохраняет O(1) lookup, нулевые аллокации на hit и прежний порядок
   вытеснения, а одноразовая проверка ёмкости складывается при сборке.
