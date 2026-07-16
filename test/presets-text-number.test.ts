@@ -166,15 +166,11 @@ describe('presets/splitText', () => {
     expect(splitText('e\u0301', 'chars', { segment: () => iterable })).toEqual(['e\u0301']);
   });
 
-  it('В: без Intl.Segmenter и injection явно сообщает о capability', () => {
-    let error: unknown;
-    try {
-      withoutIntlSegmenter(() => splitText('x'));
-    } catch (caught) {
-      error = caught;
-    }
-    expect(error).toBeInstanceOf(MotionParamError);
-    expect((error as MotionParamError).code).toBe('LM158');
+  it('А: без Intl.Segmenter сохраняет прежний code-point контракт', () => {
+    const family = '👨‍👩‍👧‍👦';
+    const parts = withoutIntlSegmenter(() => splitText(`a${family}б`));
+    expect(parts).toEqual(Array.from(`a${family}б`));
+    expect(parts.join('')).toBe(`a${family}б`);
   });
 
   it('В: injected segmenter не может потерять, переставить или опустошить input', () => {

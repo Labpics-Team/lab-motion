@@ -1093,13 +1093,12 @@ function requireSplitTextInput(text: unknown, mode: unknown): asserts text is st
 
 /**
  * Разбивает текст для пошагового раскрытия.
- * 'chars' — по extended grapheme clusters: combining marks, emoji-ZWJ и flags
- * не рвутся; 'words' — слова ВМЕСТЕ с пробельными токенами, чтобы join('')
- * восстанавливал исходную строку бит-в-бит.
- * В среде без Intl.Segmenter передайте точный Unicode ponyfill через segmenter;
- * тихого приближённого fallback нет.
- * @throws MotionParamError при не-строке, неизвестном режиме, отсутствии exact
- * segmenter или нарушении его контракта.
+ * 'chars' — по extended grapheme clusters при наличии Intl.Segmenter или
+ * явного ponyfill; в старой среде сохраняется прежний code-point fallback,
+ * поэтому суррогатные пары не рвутся и обновление не ломает существующий вызов.
+ * 'words' сохраняет пробельные токены, чтобы join('') восстановил строку.
+ * @throws MotionParamError при не-строке, неизвестном режиме или нарушении
+ * контракта доступного/injected segmenter.
  */
 export function splitText(
   text: string,
@@ -1115,7 +1114,7 @@ export function splitText(
   } catch {
     invalidGraphemeSegmenter();
   }
-  if (exactSegmenter === undefined) invalidGraphemeSegmenter();
+  if (exactSegmenter === undefined) return Array.from(text);
   return segmentGraphemes(text, exactSegmenter);
 }
 
@@ -1247,7 +1246,7 @@ function runProgressTrack(
 export interface TypewriterRunOptions extends SugarRunOptions {
   /** Режим разбиения текста. По умолчанию 'chars'. */
   readonly mode?: SplitMode;
-  /** Exact Unicode ponyfill для среды без Intl.Segmenter. */
+  /** Exact Unicode ponyfill вместо совместимого code-point fallback. */
   readonly segmenter?: GraphemeSegmenter;
 }
 
