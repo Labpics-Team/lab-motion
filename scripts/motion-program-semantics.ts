@@ -412,11 +412,14 @@ export function evaluateMotionProgramSegmentsV1(
       }
     }
   } else {
-    const sourceProgress = 1 - progress;
     for (let i = segments.length - 1; i >= 0; i--) {
       const segment = segments[i]!;
-      if (sourceProgress > segment[0] || i === 0) {
-        const local = (segment[1] - sourceProgress) / (segment[1] - segment[0]);
+      const reflectedStart = 1 - segment[1];
+      const reflectedEnd = 1 - segment[0];
+      if (progress < reflectedEnd || i === 0) {
+        const local = reflectedEnd > reflectedStart
+          ? (progress - reflectedStart) / (reflectedEnd - reflectedStart)
+          : 1;
         const curved = evaluateMotionProgramCurveV1(curves[segment[4]]!, local);
         return interpolateMotionProgramValueV1(
           segment[5],
