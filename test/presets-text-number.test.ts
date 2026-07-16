@@ -18,6 +18,7 @@ import {
   splitText,
   tickerCells,
   typewriterAt,
+  type GraphemeSegmenter,
 } from '../src/presets/index.js';
 
 // ── Тестовая инфраструктура ──────────────────────────────────────────────────
@@ -50,11 +51,191 @@ const reduceOn = (query: string): { matches: boolean } => ({
   matches: query.includes('prefers-reduced-motion'),
 });
 
+function withoutIntlSegmenter<T>(run: () => T): T {
+  const descriptor = Object.getOwnPropertyDescriptor(Intl, 'Segmenter');
+  Object.defineProperty(Intl, 'Segmenter', { configurable: true, value: undefined });
+  try {
+    return run();
+  } finally {
+    if (descriptor === undefined) delete (Intl as { Segmenter?: unknown }).Segmenter;
+    else Object.defineProperty(Intl, 'Segmenter', descriptor);
+  }
+}
+
 // ── splitText ────────────────────────────────────────────────────────────────
 
 describe('presets/splitText', () => {
   it('А: chars — Unicode-safe, суррогатные пары не рвутся', () => {
     expect(splitText('a👍б')).toEqual(['a', '👍', 'б']);
+  });
+
+  const graphemeCases = [
+    ['комбинируемый акцент', 'e\u0301'],
+    ['семья через ZWJ', '👨‍👩‍👧‍👦'],
+    ['флаг из regional indicators', '🇺🇦'],
+    ['emoji + модификатор тона кожи', '👍🏽'],
+    ['keycap + variation selector', '1️⃣'],
+    ['CRLF', '\r\n'],
+    ['Hangul jamo sequence', '각'],
+    ['Indic conjunct', 'क्ष'],
+    ['Prepend + base', '\u0600A'],
+  ] as const;
+
+  it.each(graphemeCases)('А: chars — %s остаётся одним grapheme cluster', (_name, grapheme) => {
+    expect(splitText(grapheme)).toEqual([grapheme]);
+  });
+
+  it('А: chars — разбиение не теряет данные для композиции hostile clusters', () => {
+    const source = graphemeCases.map(([, grapheme]) => `a${grapheme}б`).join('');
+    const parts = splitText(source);
+    expect(parts.join('')).toBe(source);
+    expect(parts.every((part) => part.length > 0)).toBe(true);
+  });
+
+  it('Б: Intl.Segmenter создаётся лениво и переиспользуется', () => {
+    const descriptor = Object.getOwnPropertyDescriptor(Intl, 'Segmenter');
+    const NativeSegmenter = Intl.Segmenter;
+    let constructions = 0;
+    const CountingSegmenter = new Proxy(NativeSegmenter, {
+      construct(target, args, newTarget) {
+        constructions++;
+        return Reflect.construct(target, args, newTarget);
+      },
+    });
+    Object.defineProperty(Intl, 'Segmenter', {
+      configurable: true,
+      value: CountingSegmenter,
+    });
+    try {
+      expect(splitText('e\u0301')).toEqual(['e\u0301']);
+      expect(splitText('👍🏽')).toEqual(['👍🏽']);
+      expect(constructions).toBe(1);
+    } finally {
+      if (descriptor === undefined) delete (Intl as { Segmenter?: unknown }).Segmenter;
+      else Object.defineProperty(Intl, 'Segmenter', descriptor);
+    }
+  });
+
+  it('В: бросок конструктора не публикует рассогласованное cache-состояние', () => {
+    splitText('warm');
+    const descriptor = Object.getOwnPropertyDescriptor(Intl, 'Segmenter');
+    let attempts = 0;
+    const ThrowingSegmenter = new Proxy(Intl.Segmenter, {
+      construct() {
+        attempts++;
+        throw new Error('constructor boom');
+      },
+    });
+    Object.defineProperty(Intl, 'Segmenter', {
+      configurable: true,
+      value: ThrowingSegmenter,
+    });
+    try {
+      for (let call = 0; call < 2; call++) {
+        let error: unknown;
+        try {
+          splitText('x');
+        } catch (caught) {
+          error = caught;
+        }
+        expect(error).toBeInstanceOf(MotionParamError);
+        expect((error as MotionParamError).code).toBe('LM158');
+      }
+      expect(attempts).toBe(2);
+    } finally {
+      if (descriptor === undefined) delete (Intl as { Segmenter?: unknown }).Segmenter;
+      else Object.defineProperty(Intl, 'Segmenter', descriptor);
+    }
+  });
+
+  it('А: без Intl.Segmenter использует injected exact segmenter', () => {
+    const family = '👨‍👩‍👧‍👦';
+    const segmenter: GraphemeSegmenter = {
+      segment: (input) => [{ segment: input }],
+    };
+    expect(withoutIntlSegmenter(() => splitText(family, 'chars', segmenter))).toEqual([family]);
+  });
+
+  it('А: принимает callable iterable и callable segment record по публичному контракту', () => {
+    const record = Object.assign(() => undefined, { segment: 'e\u0301' });
+    const iterable = Object.assign(() => undefined, {
+      *[Symbol.iterator]() {
+        yield record;
+      },
+    });
+    expect(splitText('e\u0301', 'chars', { segment: () => iterable })).toEqual(['e\u0301']);
+  });
+
+  it('В: без Intl.Segmenter и injection явно сообщает о capability', () => {
+    let error: unknown;
+    try {
+      withoutIntlSegmenter(() => splitText('x'));
+    } catch (caught) {
+      error = caught;
+    }
+    expect(error).toBeInstanceOf(MotionParamError);
+    expect((error as MotionParamError).code).toBe('LM158');
+  });
+
+  it('В: injected segmenter не может потерять, переставить или опустошить input', () => {
+    const losesInput: GraphemeSegmenter = {
+      segment: () => [{ segment: 'a' }],
+    };
+    const reordersInput: GraphemeSegmenter = {
+      segment: () => [{ segment: 'b' }, { segment: 'a' }],
+    };
+    const emitsEmpty: GraphemeSegmenter = {
+      segment: () => [{ segment: '' }, { segment: 'ab' }],
+    };
+    for (const segmenter of [losesInput, reordersInput, emitsEmpty]) {
+      let error: unknown;
+      try {
+        splitText('ab', 'chars', segmenter);
+      } catch (caught) {
+        error = caught;
+      }
+      expect(error).toBeInstanceOf(MotionParamError);
+      expect((error as MotionParamError).code).toBe('LM158');
+    }
+  });
+
+  it('Б: hostile длинный ZWJ-input проходит segmenter и iterable ровно по одному разу', () => {
+    const family = '👨‍👩‍👧‍👦';
+    const count = 4096;
+    const source = family.repeat(count);
+    let segmentCalls = 0;
+    let iteratorCalls = 0;
+    let nextCalls = 0;
+    const segmenter: GraphemeSegmenter = {
+      segment(input) {
+        segmentCalls++;
+        expect(input).toBe(source);
+        return Object.defineProperty({}, Symbol.iterator, {
+          configurable: true,
+          get() {
+            iteratorCalls++;
+            return function iterator() {
+              let index = 0;
+              return {
+                next(): IteratorResult<{ segment: string }> {
+                  nextCalls++;
+                  return index++ < count
+                    ? { done: false, value: { segment: family } }
+                    : { done: true, value: undefined };
+                },
+              };
+            };
+          },
+        }) as Iterable<{ segment: string }>;
+      },
+    };
+
+    const parts = splitText(source, 'chars', segmenter);
+    expect(parts).toHaveLength(count);
+    expect(parts.join('')).toBe(source);
+    expect(segmentCalls).toBe(1);
+    expect(iteratorCalls).toBe(1);
+    expect(nextCalls).toBe(count + 1);
   });
 
   it('А: words — join("") восстанавливает исходную строку бит-в-бит', () => {
@@ -198,6 +379,20 @@ describe('presets/runTypewriter', () => {
     expect(frames).toEqual(['Привет']);
   });
 
+  it('Б: reduced-motion не требует grapheme capability для финального emit', async () => {
+    const { requestFrame, pump } = createFramePump();
+    const family = '👨‍👩‍👧‍👦';
+    const frames: string[] = [];
+    const controls = withoutIntlSegmenter(() => runTypewriter(
+      family,
+      (value) => frames.push(value),
+      { requestFrame, matchMedia: reduceOn },
+    ));
+    pump();
+    await controls;
+    expect(frames).toEqual([family]);
+  });
+
   it('А: пустой текст завершается корректно (floor длительности — один кадр)', async () => {
     const { requestFrame, pump } = createFramePump();
     const frames: string[] = [];
@@ -205,6 +400,28 @@ describe('presets/runTypewriter', () => {
     pump();
     await controls;
     expect(frames).toEqual(['']);
+  });
+
+  it('Б: протягивает exact segmenter в среде без Intl.Segmenter', async () => {
+    const { requestFrame, pump } = createFramePump();
+    const family = '👨‍👩‍👧‍👦';
+    let calls = 0;
+    const segmenter: GraphemeSegmenter = {
+      segment(input) {
+        calls++;
+        return [{ segment: input }];
+      },
+    };
+    const frames: string[] = [];
+    const controls = withoutIntlSegmenter(() => runTypewriter(
+      family,
+      (value) => frames.push(value),
+      { requestFrame, segmenter },
+    ));
+    pump();
+    await controls;
+    expect(calls).toBe(1);
+    expect(frames.at(-1)).toBe(family);
   });
 
   it('В: невалидные onUpdate/duration/mode → MotionParamError', () => {
