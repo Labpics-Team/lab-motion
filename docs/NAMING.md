@@ -66,11 +66,12 @@
 
 ## Карта субпутей
 
-Корневой субпуть `.` — ядро (animate-фасад, реэкспорты). Домены:
+Корневой субпуть `.` — headless-ядро и реэкспорты; DOM-фасады доступны через
+`./nano` и `./animate`. Домены:
 
 | Группа | Субпути |
 | --- | --- |
-| Ядро анимации | `./nano` (platform-trusted WAAPI, ≤1 KB), `./animate` (полный продукт), `./frame`, `./driver`, `./compositor`, `./compositor/stagger`, `./waapi`, `./auto` |
+| Ядро анимации | `./nano` (platform-trusted WAAPI, ≤1 KB), `./animate` (основной продуктовый вход), `./frame`, `./driver`, `./compositor`, `./compositor/stagger`, `./waapi`, `./auto` |
 | Значения и физика | `./value`, `./spring`, `./decay`, `./easing`, `./keyframes`, `./stagger`, `./timeline`, `./presets`, `./tokens`, `./utils` |
 | Доменные эффекты | `./flip`, `./projection`, `./smart`, `./gestures`, `./behaviors`, `./scroll`, `./presence`, `./svg`, `./svg-morph`, `./a11y` |
 | Биндинги (9) | `./react`, `./svelte`, `./vue`, `./lit`, `./solid`, `./preact`, `./angular`, `./wc`, `./qwik` |

@@ -3,8 +3,9 @@
  *
  * Subpath export: import { animate } from '@labpics/motion/animate'
  *
- * ЗАЧЕМ: паритет DX с Motion/anime.js v4 — `animate(el, { x: 100 })` вместо
- * ручной сборки MotionValue/drive/CompositorSpring. Фасад НЕ добавляет физики:
+ * ЗАЧЕМ: one-liner для частого DOM-сценария — `animate(el, { x: 100 })` вместо
+ * ручной сборки MotionValue/drive/CompositorSpring. Это не обещание полного
+ * совпадения с Motion/Anime.js. Фасад НЕ добавляет физики:
  * вся математика — существующие ядро и субпути (см. карту ниже), здесь только
  * DOM-склейка (цели, каналы, реестр прерываний, маршрутизация путей).
  *
