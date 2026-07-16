@@ -1,4 +1,4 @@
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, onTestFinished } from 'vitest';
 import {
   ANIMATE_COMPOSITOR_MIXED_GATE_BYTES,
   BESPOKE_SUBPATH_GATES,
@@ -8,24 +8,106 @@ import {
   FULL_CORE_CONSUMER_GATE_BYTES,
   SUBPATH_GATE_BYTES,
   deriveEntriesFromExports,
+  evaluateScenarioBudget,
   IMPORT_COST_SCENARIOS,
   measureEntries,
   measureEsmTransfer,
   measureScenario,
+  measureScenarioOutputGraph,
 } from '../scripts/size-gate.mjs';
 import {
   canonicalGzip,
+  observationalBrotli,
 } from '../scripts/compression-oracle.mjs';
 import { CANONICAL_GZIP_OPTIONS } from '../scripts/compression-policy.mjs';
 import { gzip as pakoGzip } from 'pako';
-import { mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
+import { mkdirSync, mkdtempSync, readFileSync, realpathSync, rmSync, writeFileSync } from 'node:fs';
 import { resolve, dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { tmpdir } from 'node:os';
 import { createHash } from 'node:crypto';
+import { build as esbuildBuild } from 'esbuild';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const ROOT = resolve(__dirname, '..');
+
+function createTestRoot(prefix: string) {
+  const root = mkdtempSync(resolve(tmpdir(), prefix));
+  onTestFinished(() => rmSync(root, { recursive: true, force: true }));
+  return root;
+}
+
+function createSplitOutputFixture() {
+  const root = createTestRoot('lab-motion-size-split-output-');
+  const absWorkingDir = resolve(root, 'dist');
+  mkdirSync(absWorkingDir, { recursive: true });
+
+  const physicalWorkingDir = realpathSync(absWorkingDir);
+  const outdir = '.size-gate-output';
+  const outputRoot = resolve(physicalWorkingDir, outdir);
+  const entryPoint = resolve(physicalWorkingDir, '__scenario__.mjs');
+  const contents = {
+    css: Buffer.from(`.hero{transform:translateX(1px)}`),
+    entry: Buffer.from(`const a=()=>import('./lazy-a.js'),b=()=>import('./lazy-b.js');export{a,b};`),
+    lazyA: Buffer.from(`import{shared as s}from'./shared.js';const a='a'+s;export{a};`),
+    lazyB: Buffer.from(`import{shared as s}from'./shared.js';const b='b'+s;export{b};`),
+    shared: Buffer.from(`const shared='one physical shared chunk';export{shared};`),
+  };
+  const names = {
+    css: `${outdir}/scenario.css`,
+    entry: `${outdir}/entry.js`,
+    lazyA: `${outdir}/lazy-a.js`,
+    lazyB: `${outdir}/lazy-b.js`,
+    shared: `${outdir}/shared.js`,
+  };
+  type OutputName = keyof typeof names;
+  type OutputNode = {
+    imports: Array<{ path: string; kind: string; external?: unknown }>;
+    entryPoint?: string;
+    cssBundle?: string;
+  };
+  const outputs: Record<string, OutputNode> = {
+    // Hostile insertion order: neither metadata nor outputFiles starts at entry.
+    [names.shared]: { imports: [] },
+    [names.lazyB]: {
+      imports: [{ path: names.shared, kind: 'import-statement' }],
+      entryPoint: resolve(physicalWorkingDir, 'lazy-b.js'),
+    },
+    [names.lazyA]: {
+      imports: [{ path: names.shared, kind: 'import-statement' }],
+      entryPoint: resolve(physicalWorkingDir, 'lazy-a.js'),
+    },
+    [names.entry]: {
+      imports: [
+        { path: names.lazyA, kind: 'dynamic-import' },
+        { path: names.lazyB, kind: 'dynamic-import' },
+      ],
+      entryPoint,
+    },
+  };
+  const outputFiles = (['shared', 'lazyB', 'lazyA', 'entry'] as OutputName[])
+    .map((name) => ({
+      path: resolve(outputRoot, names[name].slice(outdir.length + 1)),
+      contents: contents[name],
+    }));
+  const outputPath = (name: string) => resolve(outputRoot, name.slice(outdir.length + 1));
+
+  return {
+    result: { metafile: { inputs: {}, outputs }, outputFiles },
+    options: { absWorkingDir, outdir, entryPoint },
+    contents,
+    names,
+    outputPath,
+    outputs,
+  };
+}
+
+function measureSplitOutputFixture(
+  result: ReturnType<typeof createSplitOutputFixture>['result'],
+  options: ReturnType<typeof createSplitOutputFixture>['options'],
+) {
+  return measureScenarioOutputGraph(result, options);
+}
 
 /**
  * Класс регрессии, который закрывает этот файл: размерный гейт раньше нёс
@@ -211,6 +293,271 @@ describe('size-gate: auto-derive subpath entries from package.json exports', () 
     // Класс tree-shakeability: частичный импорт обязан быть ДЕШЕВЛЕ полного ядра.
     const full = await measureScenario(IMPORT_COST_SCENARIOS.find(s => s.name === 'full-core'), distIndex);
     expect(m.gzBytes).toBeLessThan(full.gzBytes);
+  });
+
+  it('measureScenario: dynamic import не входит в initial, но входит в lazy и total', async () => {
+    const root = createTestRoot('lab-motion-size-dynamic-');
+    mkdirSync(resolve(root, 'dist'), { recursive: true });
+    writeFileSync(resolve(root, 'dist/index.js'), `export const placeholder = true;`);
+    writeFileSync(resolve(root, 'dist/lazy.js'), `export const lazy = '${'lazy payload '.repeat(40)}';`);
+
+    const measured = await measureScenario(
+      {
+        name: 'dynamic fixture',
+        code: `export const load = () => import('%DIST%/../lazy.js');`,
+        gate: 100_000,
+      },
+      resolve(root, 'dist/index.js'),
+    );
+
+    expect(measured.error).toBeUndefined();
+    expect(measured.initialFiles).toBe(1);
+    expect(measured.lazyFiles).toBe(1);
+    expect(measured.totalFiles).toBe(2);
+    expect(measured.totalGate).toBe(100_000);
+    expect(measured.lazyGzBytes).toBeGreaterThan(0);
+    expect(measured.totalRawBytes).toBe(measured.rawBytes + measured.lazyRawBytes);
+    expect(measured.totalGzBytes).toBe(measured.gzBytes + measured.lazyGzBytes);
+    expect(measured.totalBrBytes).toBe(measured.brBytes + measured.lazyBrBytes);
+  });
+
+  it('dynamic total budget: incompressible lazy payload проходит initial и валит total', async () => {
+    const root = createTestRoot('lab-motion-size-total-budget-');
+    mkdirSync(resolve(root, 'dist'), { recursive: true });
+    writeFileSync(resolve(root, 'dist/index.js'), `export const placeholder = true;`);
+    const bytes = Buffer.alloc(4096);
+    let random = 0x9e3779b9;
+    for (let index = 0; index < bytes.length; index++) {
+      random = (Math.imul(random, 1664525) + 1013904223) >>> 0;
+      bytes[index] = random >>> 24;
+    }
+    writeFileSync(
+      resolve(root, 'dist/lazy.js'),
+      `export const lazy = '${bytes.toString('base64')}';`,
+    );
+
+    const measured = await measureScenario(
+      {
+        name: 'incompressible lazy fixture',
+        code: `export const load = () => import('%DIST%/../lazy.js');`,
+        gate: 128,
+        totalGate: 512,
+      },
+      resolve(root, 'dist/index.js'),
+    );
+    const budget = evaluateScenarioBudget(measured);
+
+    expect(measured.error).toBeUndefined();
+    expect(measured.gate).toBe(128);
+    expect(measured.totalGate).toBe(512);
+    expect(measured.gzBytes).toBeLessThanOrEqual(128);
+    expect(measured.totalGzBytes).toBeGreaterThan(512);
+    expect(budget).toStrictEqual({
+      initialExceeded: false,
+      totalExceeded: true,
+      exceeded: true,
+    });
+    expect(evaluateScenarioBudget({
+      ...measured,
+      gzBytes: 129,
+      totalGate: 10_000,
+    })).toStrictEqual({
+      initialExceeded: true,
+      totalExceeded: false,
+      exceeded: true,
+    });
+  });
+
+  it('scenario budget: fails closed если total меньше initial', () => {
+    expect(() => evaluateScenarioBudget({
+      gzBytes: 100,
+      gate: 1_000,
+      totalGzBytes: 1,
+      totalGate: 1_000,
+    })).toThrow(/некорректен/);
+  });
+
+  it('scenario output graph: shared lazy chunk считается один раз', () => {
+    const fixture = createSplitOutputFixture();
+    const measured = measureSplitOutputFixture(fixture.result, fixture.options);
+    const uniqueLazy = [fixture.contents.lazyA, fixture.contents.lazyB, fixture.contents.shared];
+
+    expect(measured.lazyFiles).toBe(3);
+    expect(measured.lazyRawBytes).toBe(
+      uniqueLazy.reduce((total, contents) => total + contents.length, 0),
+    );
+    expect(measured.lazyGzBytes).toBe(
+      uniqueLazy.reduce((total, contents) => total + canonicalGzip(contents).length, 0),
+    );
+    expect(measured.totalFiles).toBe(4);
+  });
+
+  it('scenario output graph: entry выбирается по entryPoint, а не по порядку outputFiles', () => {
+    const fixture = createSplitOutputFixture();
+    const measured = measureSplitOutputFixture(fixture.result, fixture.options);
+
+    expect(fixture.result.outputFiles[0].contents).not.toEqual(fixture.contents.entry);
+    expect(measured.initialFiles).toBe(1);
+    expect(measured.rawBytes).toBe(fixture.contents.entry.length);
+    expect(measured.gzBytes).toBe(canonicalGzip(fixture.contents.entry).length);
+  });
+
+  it('scenario output graph: ambient cwd не переопределяет базу relative entryPoint', () => {
+    const fixture = createSplitOutputFixture();
+    fixture.options.entryPoint = resolve(process.cwd(), 'ambient-entry.mjs');
+    fixture.outputs[fixture.names.entry].entryPoint = 'ambient-entry.mjs';
+
+    expect(() => measureSplitOutputFixture(fixture.result, fixture.options))
+      .toThrow(/entryPoint не найден/);
+  });
+
+  it('scenario output graph: chunk из initial и dynamic branch не считается в lazy повторно', () => {
+    const fixture = createSplitOutputFixture();
+    fixture.outputs[fixture.names.entry].imports.unshift({
+      path: fixture.names.shared,
+      kind: 'import-statement',
+    });
+
+    const measured = measureSplitOutputFixture(fixture.result, fixture.options);
+    const expectedInitial = [fixture.contents.entry, fixture.contents.shared];
+    const expectedLazy = [fixture.contents.lazyA, fixture.contents.lazyB];
+
+    expect(measured.initialFiles).toBe(2);
+    expect(measured.rawBytes).toBe(
+      expectedInitial.reduce((total, contents) => total + contents.length, 0),
+    );
+    expect(measured.lazyFiles).toBe(2);
+    expect(measured.lazyRawBytes).toBe(
+      expectedLazy.reduce((total, contents) => total + contents.length, 0),
+    );
+    expect(measured.totalFiles).toBe(4);
+  });
+
+  it('scenario output graph: нормализует внутренние ..-сегменты до проверки графа', () => {
+    const fixture = createSplitOutputFixture();
+    const normalizedLazyName = '.size-gate-output/nested/../lazy-a.js';
+    fixture.outputs[normalizedLazyName] = fixture.outputs[fixture.names.lazyA];
+    delete fixture.outputs[fixture.names.lazyA];
+    fixture.outputs[fixture.names.entry].imports[0].path = normalizedLazyName;
+    fixture.outputs[normalizedLazyName].imports[0].path = '.size-gate-output/chunks/../shared.js';
+
+    const measured = measureSplitOutputFixture(fixture.result, fixture.options);
+    expect(measured.initialFiles).toBe(1);
+    expect(measured.lazyFiles).toBe(3);
+    expect(measured.totalFiles).toBe(4);
+  });
+
+  it('scenario output graph: cssBundle входит в initial и total', () => {
+    const fixture = createSplitOutputFixture();
+    fixture.outputs[fixture.names.css] = { imports: [] };
+    fixture.outputs[fixture.names.entry].cssBundle = fixture.names.css;
+    fixture.result.outputFiles.push({
+      path: fixture.outputPath(fixture.names.css),
+      contents: fixture.contents.css,
+    });
+
+    const measured = measureSplitOutputFixture(fixture.result, fixture.options);
+    expect(measured.initialFiles).toBe(2);
+    expect(measured.rawBytes).toBe(fixture.contents.entry.length + fixture.contents.css.length);
+    expect(measured.totalRawBytes).toBe(
+      measured.rawBytes + measured.lazyRawBytes,
+    );
+    expect(measured.totalBrBytes).toBe(measured.brBytes + measured.lazyBrBytes);
+    expect(measured.totalFiles).toBe(5);
+  });
+
+  it('scenario output graph: валидный external edge не считается package output', () => {
+    const fixture = createSplitOutputFixture();
+    fixture.outputs[fixture.names.entry].imports.unshift({
+      path: 'external-peer',
+      kind: 'import-statement',
+      external: true,
+    });
+
+    const measured = measureSplitOutputFixture(fixture.result, fixture.options);
+    expect(measured.initialFiles).toBe(1);
+    expect(measured.totalFiles).toBe(4);
+  });
+
+  it.each([
+    ['небулев external', { path: 'peer', kind: 'import-statement', external: 'yes' }, /external/],
+    ['неизвестный kind', { path: 'peer', kind: 'future-import', external: true }, /kind/],
+  ])('scenario output graph: fails closed — %s', (_name, edge, error) => {
+    const fixture = createSplitOutputFixture();
+    fixture.outputs[fixture.names.entry].imports.unshift(edge);
+    expect(() => measureSplitOutputFixture(fixture.result, fixture.options)).toThrow(error);
+  });
+
+  it('scenario output graph: fails closed на недостижимый output', () => {
+    const fixture = createSplitOutputFixture();
+    fixture.outputs[fixture.names.css] = { imports: [] };
+    fixture.result.outputFiles.push({
+      path: fixture.outputPath(fixture.names.css),
+      contents: fixture.contents.css,
+    });
+
+    expect(() => measureSplitOutputFixture(fixture.result, fixture.options))
+      .toThrow(/недостижимые outputs/);
+  });
+
+  it('scenario output graph: fails closed на edge к отсутствующему output', () => {
+    const fixture = createSplitOutputFixture();
+    fixture.outputs[fixture.names.lazyA].imports[0].path = '.size-gate-output/missing.js';
+
+    expect(() => measureSplitOutputFixture(fixture.result, fixture.options))
+      .toThrow(/отсутствующий output/);
+  });
+
+  it('scenario output graph: fails closed на output без пары в outputFiles', () => {
+    const fixture = createSplitOutputFixture();
+    fixture.result.outputFiles.shift();
+    expect(() => measureSplitOutputFixture(fixture.result, fixture.options))
+      .toThrow(/отсутствует в outputFiles/);
+  });
+
+  it('scenario output graph: fails closed на неоднозначный entryPoint', () => {
+    const fixture = createSplitOutputFixture();
+    fixture.outputs[fixture.names.lazyA].entryPoint = fixture.options.entryPoint;
+
+    expect(() => measureSplitOutputFixture(fixture.result, fixture.options))
+      .toThrow(/entryPoint неоднозначен/);
+  });
+
+  it('scenario output graph: fails closed на output за пределами outdir', () => {
+    const fixture = createSplitOutputFixture();
+    fixture.result.outputFiles[0].path = resolve(
+      realpathSync(fixture.options.absWorkingDir),
+      'escaped.js',
+    );
+    expect(() => measureSplitOutputFixture(fixture.result, fixture.options))
+      .toThrow(/вышел за границу scenario outdir/);
+  });
+
+  it('measureScenario: все текущие статические сценарии byte-identical старому single-output oracle', async () => {
+    const distIndexPath = resolve(ROOT, 'dist/index.js');
+    for (const scenario of IMPORT_COST_SCENARIOS) {
+      const code = scenario.code.replaceAll('%DIST%', distIndexPath.replace(/\\/g, '/'));
+      const legacy = await esbuildBuild({
+        stdin: { contents: code, resolveDir: dirname(distIndexPath), loader: 'js' },
+        bundle: true,
+        minify: true,
+        format: 'esm',
+        write: false,
+        logLevel: 'silent',
+      });
+      const legacyOutput = legacy.outputFiles[0].contents;
+      const measured = await measureScenario(scenario, distIndexPath);
+
+      expect(measured.error, scenario.name).toBeUndefined();
+      expect(measured.initialFiles, scenario.name).toBe(1);
+      expect(measured.lazyFiles, scenario.name).toBe(0);
+      expect(measured.rawBytes, scenario.name).toBe(legacyOutput.length);
+      expect(measured.gzBytes, scenario.name).toBe(canonicalGzip(legacyOutput).length);
+      expect(measured.brBytes, scenario.name).toBe(observationalBrotli(legacyOutput).length);
+      expect(measured.totalRawBytes, scenario.name).toBe(measured.rawBytes);
+      expect(measured.totalGzBytes, scenario.name).toBe(measured.gzBytes);
+      expect(measured.totalBrBytes, scenario.name).toBe(measured.brBytes);
+    }
   });
 
   it('measureEntries flags MISSING for a dist file that does not exist, without throwing', () => {
