@@ -39,6 +39,7 @@ export interface MainUnitOptions {
   readonly _delayMs: number;
   readonly _batch: SurfaceBatch;
   readonly _onDone: (natural: boolean) => void;
+  readonly _onRollback?: (() => void) | undefined;
   readonly _startPaused?: boolean | undefined;
 }
 
@@ -199,6 +200,12 @@ export class MainUnit implements GroupOwner, SurfaceUnit {
     if (this._done) return;
     this._writeBack();
     this._finish(false);
+  }
+
+  _batchRollback(): void {
+    if (this._done) return;
+    this._paused = true;
+    this._o!._onRollback?.();
   }
 
   private _compute(): boolean {

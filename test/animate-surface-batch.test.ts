@@ -135,6 +135,73 @@ function batchWithUnits(
   return { batch, units };
 }
 
+function mainUnit(
+  batch: SurfaceBatch,
+  id: string,
+  startPaused = false,
+  onDone: (natural: boolean) => void = () => {},
+): MainUnit {
+  const item = slot(id);
+  const unit = new MainUnit({
+    ...item.input,
+    _mode: { _type: 'tween', _durationMs: 1000, _ease: (t) => t },
+    _batch: batch,
+    _onDone: onDone,
+    _startPaused: startPaused,
+  });
+  item.record._owner = unit;
+  return unit;
+}
+
+function reentrantSubscribeHarness(
+  hostError: Error | undefined,
+  onFirstUpdateSubscribe: () => void,
+): {
+  readonly frame: FrameLoop;
+  readonly subscriptions: { update: number; render: number };
+  readonly removals: { update: number; render: number };
+  tick(ts: number): void;
+} {
+  let update: ((ts?: number) => void) | undefined;
+  let render: ((ts?: number) => void) | undefined;
+  const subscriptions = { update: 0, render: 0 };
+  const removals = { update: 0, render: 0 };
+  return {
+    subscriptions,
+    removals,
+    frame: {
+      read: () => () => {},
+      update(cb) {
+        subscriptions.update++;
+        if (subscriptions.update === 1) {
+          onFirstUpdateSubscribe();
+          if (hostError !== undefined) throw hostError;
+        }
+        update = cb;
+        return () => {
+          removals.update++;
+          if (update === cb) update = undefined;
+        };
+      },
+      render(cb) {
+        subscriptions.render++;
+        render = cb;
+        return () => {
+          removals.render++;
+          if (render === cb) render = undefined;
+        };
+      },
+      cancelAll() {},
+    },
+    tick(ts) {
+      const updateAtBoundary = update;
+      const renderAtBoundary = render;
+      updateAtBoundary?.(ts);
+      renderAtBoundary?.(ts);
+    },
+  };
+}
+
 function fakeSurface(
   update: () => void,
   render: () => void,
@@ -145,6 +212,7 @@ function fakeSurface(
     _updateStep: update,
     _renderStep: render,
     _batchAbort: fail,
+    _batchRollback() {},
   };
 }
 
@@ -272,6 +340,179 @@ describe('SurfaceBatch: потолок подписок', () => {
       _onDone() {},
     })).toThrow('render subscribe failed');
     expect(host.removals.update).toBe(1);
+    expect((batch as unknown as { _units: unknown[] })._units).toHaveLength(0);
+    expect((batch as unknown as { _active: number })._active).toBe(0);
+  });
+
+  it('cancel A → compaction → B.play → host throw откатывает всю subscribe-транзакцию', () => {
+    const hostError = new Error('host update subscribe failed');
+    let reenter = (): void => {};
+    const host = reentrantSubscribeHarness(hostError, () => reenter());
+    const batch = new SurfaceBatch(host.frame);
+    const a = mainUnit(batch, 'a', true);
+    const completions: boolean[] = [];
+    const b = mainUnit(batch, 'b', true, (natural) => completions.push(natural));
+    reenter = () => {
+      a.cancel();
+      b.play();
+    };
+
+    let thrown: unknown;
+    try {
+      mainUnit(batch, 'failed-c');
+    } catch (error) {
+      thrown = error;
+    }
+
+    const state = batch as unknown as {
+      _units: Array<SurfaceUnit | undefined>;
+      _active: number;
+      _offUpdate?: () => void;
+      _offRender?: () => void;
+    };
+    expect(thrown).toBe(hostError);
+    expect(state._units).toEqual([b]);
+    expect(b._batchSlot).toBe(0);
+    expect((b as unknown as { _paused: boolean })._paused).toBe(true);
+    expect(state._active).toBe(0);
+    expect(state._offUpdate).toBeUndefined();
+    expect(state._offRender).toBeUndefined();
+    expect(host.subscriptions).toEqual({ update: 1, render: 0 });
+
+    b.play();
+    expect(host.subscriptions).toEqual({ update: 2, render: 1 });
+    host.tick(0);
+    host.tick(1001);
+    expect(completions).toEqual([true]);
+    expect(state._units).toHaveLength(0);
+    expect(state._active).toBe(0);
+  });
+
+  it('reentrant B.play при успехе получает ту же update/render-пару', () => {
+    let reenter = (): void => {};
+    const host = reentrantSubscribeHarness(undefined, () => reenter());
+    const batch = new SurfaceBatch(host.frame);
+    const completions: string[] = [];
+    const b = mainUnit(batch, 'b', true, (natural) => completions.push(`b:${natural}`));
+    reenter = () => b.play();
+
+    const c = mainUnit(batch, 'c', false, (natural) => completions.push(`c:${natural}`));
+
+    expect(host.subscriptions).toEqual({ update: 1, render: 1 });
+    expect((batch as unknown as { _active: number })._active).toBe(2);
+    expect((b as unknown as { _paused: boolean })._paused).toBe(false);
+    expect(b._batchSlot).toBe(0);
+    expect(c._batchSlot).toBe(1);
+
+    host.tick(0);
+    host.tick(1001);
+    expect(completions).toEqual(['b:true', 'c:true']);
+    expect(host.removals).toEqual({ update: 1, render: 1 });
+    expect((batch as unknown as { _units: unknown[] })._units).toHaveLength(0);
+  });
+
+  it('WAAPI-wrapper остаётся paused/retryable вместе с откатившимся live delegate', () => {
+    const hostError = new Error('host update subscribe failed');
+    let reenter = (): void => {};
+    const host = reentrantSubscribeHarness(hostError, () => reenter());
+    const batch = new SurfaceBatch(host.frame);
+    const wrapper = waapiUnit(() => batch);
+    wrapper.pause();
+    wrapper.seek(targetCrossingMs());
+    const delegate = (wrapper as unknown as { _delegate: MainUnit })._delegate;
+    reenter = () => wrapper.play();
+
+    let thrown: unknown;
+    try {
+      mainUnit(batch, 'failed-outer');
+    } catch (error) {
+      thrown = error;
+    }
+
+    expect(thrown).toBe(hostError);
+    expect((wrapper as unknown as { _paused: boolean })._paused).toBe(true);
+    expect((delegate as unknown as { _paused: boolean })._paused).toBe(true);
+    expect((batch as unknown as { _active: number })._active).toBe(0);
+    expect((batch as unknown as { _units: unknown[] })._units).toEqual([delegate]);
+    expect(host.subscriptions).toEqual({ update: 1, render: 0 });
+
+    wrapper.play();
+    expect(host.subscriptions).toEqual({ update: 2, render: 1 });
+    wrapper.cancel();
+    expect((batch as unknown as { _units: unknown[] })._units).toHaveLength(0);
+  });
+
+  it.each([
+    ['add/cancel', ['cancel'], false],
+    ['add/pause', ['pause'], true],
+    ['add/pause-play', ['pause', 'play'], true],
+  ] as const)(
+    'hostile property: nested %s не оставляет active/ghost slots',
+    (_name, operations, retained) => {
+      const hostError = new Error('host update subscribe failed');
+      let reenter = (): void => {};
+      const host = reentrantSubscribeHarness(hostError, () => reenter());
+      const batch = new SurfaceBatch(host.frame);
+      let nested!: MainUnit;
+      reenter = () => {
+        nested = mainUnit(batch, 'nested');
+        for (const operation of operations) nested[operation]();
+      };
+
+      let thrown: unknown;
+      try {
+        mainUnit(batch, 'failed-outer');
+      } catch (error) {
+        thrown = error;
+      }
+
+      const state = batch as unknown as {
+        _units: Array<SurfaceUnit | undefined>;
+        _active: number;
+        _offUpdate?: () => void;
+        _offRender?: () => void;
+      };
+      expect(thrown).toBe(hostError);
+      expect(state._active).toBe(0);
+      expect(state._offUpdate).toBeUndefined();
+      expect(state._offRender).toBeUndefined();
+      expect(host.subscriptions).toEqual({ update: 1, render: 0 });
+      expect(state._units).toEqual(retained ? [nested] : []);
+      for (let index = 0; index < state._units.length; index++) {
+        expect(state._units[index]!._batchSlot).toBe(index);
+      }
+
+      if (retained) {
+        expect((nested as unknown as { _paused: boolean })._paused).toBe(true);
+        nested.play();
+        expect(host.subscriptions).toEqual({ update: 2, render: 1 });
+        nested.cancel();
+      }
+      expect(state._units).toHaveLength(0);
+      expect(state._active).toBe(0);
+    },
+  );
+
+  it('исходную host-ошибку не заменяет бросок cleanup', () => {
+    const hostError = new Error('render subscribe failed');
+    const cleanupError = new Error('update cleanup failed');
+    const batch = new SurfaceBatch({
+      read: () => () => {},
+      update: () => () => { throw cleanupError; },
+      render: () => { throw hostError; },
+      cancelAll() {},
+    });
+    const unit = fakeSurface(() => {}, () => {});
+
+    let thrown: unknown;
+    try {
+      batch._add(unit, false);
+    } catch (error) {
+      thrown = error;
+    }
+
+    expect(thrown).toBe(hostError);
+    expect(unit._batchSlot).toBe(-1);
     expect((batch as unknown as { _units: unknown[] })._units).toHaveLength(0);
     expect((batch as unknown as { _active: number })._active).toBe(0);
   });

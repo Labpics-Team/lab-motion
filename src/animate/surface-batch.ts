@@ -12,6 +12,7 @@ export interface SurfaceUnit {
   _updateStep(ts: number | undefined): void;
   _renderStep(): void;
   _batchAbort(): void;
+  _batchRollback(): void;
 }
 
 /** Две FrameLoop-подписки независимо от числа поверхностей aggregate. */
@@ -32,6 +33,7 @@ export class SurfaceBatch {
   private _end = -1;
   private _offUpdate: (() => void) | undefined;
   private _offRender: (() => void) | undefined;
+  private _subscribing = false;
   private readonly _frameTeardown = (): void => {
     const end = this._units.length;
     for (let i = 0; i < end; i++) {
@@ -56,13 +58,15 @@ export class SurfaceBatch {
     try {
       this._subscribe();
     } catch (error) {
-      this._active--;
-      if (this._units[slot] === unit) {
-        this._units[slot] = undefined;
+      // Host reentry мог сдвинуть unit compaction-ом: identity живёт в slot unit.
+      const current = unit._batchSlot;
+      if (current >= 0 && this._units[current] === unit) {
+        this._units[current] = undefined;
         this._holes++;
+        unit._batchSlot = -1;
       }
-      unit._batchSlot = -1;
       if (this._units.length === this._holes) this._resetStorage();
+      else if (this._end < 0) this._compact();
       throw error;
     }
   }
@@ -71,12 +75,7 @@ export class SurfaceBatch {
     if (unit._batchSlot < 0) return;
     if (this._end < 0 && this._holes > 0) this._compact();
     this._active++;
-    try {
-      this._subscribe();
-    } catch (error) {
-      this._active--;
-      throw error;
-    }
+    this._subscribe();
   }
 
   _deactivate(unit: SurfaceUnit): void {
@@ -163,7 +162,8 @@ export class SurfaceBatch {
   }
 
   private _subscribe(): void {
-    if (this._offUpdate !== undefined || this._active === 0) return;
+    if (this._offUpdate !== undefined || this._active === 0 || this._subscribing) return;
+    this._subscribing = true;
     let offUpdate: (() => void) | undefined;
     try {
       offUpdate = this._frame.update(
@@ -171,15 +171,27 @@ export class SurfaceBatch {
         { onTeardown: this._frameTeardown },
       );
       if (this._active === 0) {
+        this._subscribing = false;
         offUpdate();
         return;
       }
       const offRender = this._frame.render(() => this._runRender());
       this._offUpdate = offUpdate;
       this._offRender = offRender;
+      this._subscribing = false;
       if (this._active === 0) this._teardown();
     } catch (error) {
-      offUpdate?.();
+      if (this._subscribing) {
+        // Всё, что reentrant host присоединил до commit общей пары, принадлежит
+        // той же попытке. Cleanup остаётся внутри неё и не подменяет host-error.
+        try { offUpdate?.(); } catch { /* исходная host-ошибка приоритетна */ }
+        this._active = 0;
+        for (let i = 0; i < this._units.length; i++) {
+          try { this._units[i]?._batchRollback(); } catch { /* sibling rollback продолжается */ }
+        }
+        this._active = 0;
+        this._subscribing = false;
+      }
       throw error;
     }
   }
