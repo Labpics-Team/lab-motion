@@ -148,6 +148,39 @@ describe('waapi: compileWaapi — маппинг известных чисел',
     expect(r.keyframes[0]!['transform']).toBe('translateX(0px)');
     expect(r.keyframes[1]!['transform']).toBe('translateX(10px)');
   });
+
+  it('snapshots validated inputs before format can mutate caller-owned state', () => {
+    const values = [0, 10, 20];
+    const times = [0, 0.5, 1];
+    const easings = [(t: number): number => t, (t: number): number => t * t];
+    let propertyReads = 0;
+    const options = {
+      get property(): string {
+        propertyReads++;
+        return propertyReads === 1 ? 'transform' : 'offset';
+      },
+      values,
+      times,
+      easing: easings,
+      easingPoints: 3,
+      format(value: number): string {
+        values[1] = 999;
+        times[1] = 0.9;
+        easings[0] = () => 0;
+        easings[1] = () => 0;
+        return `translateX(${value}px)`;
+      },
+    };
+
+    const result = compileWaapi(options);
+
+    expect(propertyReads).toBe(1);
+    expect(result.keyframes).toEqual([
+      { offset: 0, transform: 'translateX(0px)', easing: 'linear(0, 0.5, 1)' },
+      { offset: 0.5, transform: 'translateX(10px)', easing: 'linear(0, 0.25, 1)' },
+      { offset: 1, transform: 'translateX(20px)' },
+    ]);
+  });
 });
 
 // ─── compileWaapi: repeatDelay portable boundary ─────────────────────────────

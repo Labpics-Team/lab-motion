@@ -706,6 +706,11 @@ export function runPreset(
   let _tickActive = false;
   let _frameCount = 0;
   let _operation = 0;
+  let _samplingPhase: 0 | 1 | 2 = 0;
+  let _publicationQueued = false;
+  let _queuedTime = 0;
+  let _queuedSettling = false;
+  let _queuedCursor: number | undefined;
 
   let _resolve!: () => void;
   const _promise = new Promise<void>((res) => {
@@ -732,12 +737,46 @@ export function runPreset(
     }
   }
 
-  /** Sampling can invoke user easing; a nested operation invalidates this owner. */
+  /**
+   * A reentrant control gets one deferred sample. Further sampling controls
+   * raised by that easing are ignored so it cannot recurse or livelock.
+   */
+  function samplePublication(
+    time: number,
+    provenCursor: number | undefined,
+    phase: 1 | 2,
+  ): PresetValues {
+    _samplingPhase = phase;
+    try {
+      return provenCursor === undefined
+        ? samplePreset(compiled, time)
+        : samplePresetCursor(compiled, provenCursor);
+    } finally {
+      _samplingPhase = 0;
+    }
+  }
+
   function publishAt(time: number, settling: boolean, provenCursor?: number): void {
-    const owner = ++_operation;
-    const values = provenCursor === undefined
-      ? samplePreset(compiled, time)
-      : samplePresetCursor(compiled, provenCursor);
+    let owner = ++_operation;
+    if (_samplingPhase !== 0) {
+      _publicationQueued = true;
+      _queuedTime = time;
+      _queuedSettling = settling;
+      _queuedCursor = provenCursor;
+      return;
+    }
+
+    // A throwing easing can leave only a stale private intent behind.
+    _publicationQueued = false;
+    let values = samplePublication(time, provenCursor, 1);
+    if (_publicationQueued) {
+      _publicationQueued = false;
+      if (_settled) return;
+      owner = _operation;
+      settling = _queuedSettling;
+      values = samplePublication(_queuedTime, _queuedCursor, 2);
+    }
+
     if (owner !== _operation || _settled) return;
     if (settling) settle(values);
     else emit(values);
@@ -871,6 +910,7 @@ export function runPreset(
         return;
       }
       _operation++;
+      _publicationQueued = false;
       _paused = false;
       _lastRealTs = undefined;
       ensureLoop();
@@ -879,11 +919,12 @@ export function runPreset(
     pause(): void {
       if (_settled || _paused) return;
       _operation++;
+      _publicationQueued = false;
       _paused = true;
     },
 
     seek(t: number): void {
-      if (_settled) return;
+      if (_settled || _samplingPhase === 2) return;
       if (Number.isNaN(t)) return;
       if (t === Infinity) {
         if (compiled.repeat === Infinity) throw new MotionParamError('LM166');
@@ -908,7 +949,7 @@ export function runPreset(
     },
 
     complete(): void {
-      if (_settled) return;
+      if (_settled || _samplingPhase === 2) return;
       if (compiled.repeat === Infinity) {
         publishAt(0, true); // нейтральная поза — у лупа нет финала
         return;
@@ -918,7 +959,7 @@ export function runPreset(
     },
 
     cancel(): void {
-      if (_settled) return;
+      if (_settled || _samplingPhase === 2) return;
       publishAt(_vt, true);
     },
 

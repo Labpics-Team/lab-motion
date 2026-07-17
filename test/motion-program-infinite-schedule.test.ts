@@ -14,7 +14,8 @@ const bitsView = new DataView(bitsBuffer);
 function adjacentFloat(value: number, direction: -1 | 1): number {
   bitsView.setFloat64(0, value, false);
   let bits = bitsView.getBigUint64(0, false);
-  bits += direction > 0 ? 1n : -1n;
+  if (value === 0) return direction < 0 ? -Number.MIN_VALUE : Number.MIN_VALUE;
+  bits += (direction > 0) === (value > 0) ? 1n : -1n;
   bitsView.setBigUint64(0, bits, false);
   return bitsView.getFloat64(0, false);
 }
@@ -39,6 +40,15 @@ function track(
 }
 
 describe('MotionProgram V1 infinite schedule domain', () => {
+  it('steps to the adjacent numeric float across both signs and zero', () => {
+    expect(adjacentFloat(0, -1)).toBe(-Number.MIN_VALUE);
+    expect(adjacentFloat(-0, 1)).toBe(Number.MIN_VALUE);
+    expect(adjacentFloat(1, -1)).toBe(0.9999999999999999);
+    expect(adjacentFloat(1, 1)).toBe(1.0000000000000002);
+    expect(adjacentFloat(-1, -1)).toBe(-1.0000000000000002);
+    expect(adjacentFloat(-1, 1)).toBe(-0.9999999999999999);
+  });
+
   it('matches the finite greatest-boundary evaluator throughout the shared domain', () => {
     const cases = [
       [0.1, 1, 3],

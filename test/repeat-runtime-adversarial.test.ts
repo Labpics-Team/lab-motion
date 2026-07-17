@@ -37,6 +37,122 @@ describe('repeat runtime — canonical public boundaries', () => {
 });
 
 describe('repeat runtime — reentrant easing is linearizable', () => {
+  it.each(['seek', 'cancel'] as const)(
+    'bounds always-reentrant %s to one deferred sampling pass',
+    (operation) => {
+      let keyframeControls!: KeyframesControls;
+      let presetControls!: PresetControls;
+      let keyframeCalls = 0;
+      let presetCalls = 0;
+      let keyframeReentry = true;
+      let presetReentry = true;
+      const keyframeValues: number[] = [];
+      const presetValues: number[] = [];
+
+      keyframeControls = keyframes({
+        values: [0, 100],
+        duration: 1,
+        easing(t) {
+          keyframeCalls++;
+          if (keyframeReentry && keyframeCalls <= 8) {
+            if (operation === 'seek') keyframeControls.seek(0.75);
+            else keyframeControls.cancel();
+          }
+          return t;
+        },
+        requestFrame: frozenFrame,
+        onStep: (value) => keyframeValues.push(value),
+      });
+      presetControls = runPreset({
+        duration: 1,
+        tracks: [{
+          property: 'x',
+          values: [0, 100],
+          easing(t) {
+            presetCalls++;
+            if (presetReentry && presetCalls <= 8) {
+              if (operation === 'seek') presetControls.seek(0.75);
+              else presetControls.cancel();
+            }
+            return t;
+          },
+        }],
+      }, {
+        requestFrame: frozenFrame,
+        onUpdate: (values) => presetValues.push(values.x!),
+      });
+      keyframeControls.pause();
+      presetControls.pause();
+
+      expect(() => keyframeControls.seek(0.25)).not.toThrow();
+      expect(() => presetControls.seek(0.25)).not.toThrow();
+
+      expect(keyframeCalls).toBe(2);
+      expect(presetCalls).toBe(2);
+      const expected = operation === 'seek' ? 75 : 25;
+      expect(keyframeValues).toEqual([expected]);
+      expect(presetValues).toEqual([expected]);
+
+      keyframeReentry = false;
+      presetReentry = false;
+      keyframeControls.cancel();
+      presetControls.cancel();
+    },
+  );
+
+  it('ignores a deferred complete consistently across both runners', () => {
+    let keyframeControls!: KeyframesControls;
+    let presetControls!: PresetControls;
+    let reenter = true;
+    const keyframeValues: number[] = [];
+    const presetValues: number[] = [];
+
+    keyframeControls = keyframes({
+      values: [0, 100],
+      duration: 1,
+      easing(t) {
+        if (reenter) {
+          if (t < 0.5) keyframeControls.seek(0.75);
+          else keyframeControls.complete();
+        }
+        return t;
+      },
+      requestFrame: frozenFrame,
+      onStep: (value) => keyframeValues.push(value),
+    });
+    presetControls = runPreset({
+      duration: 1,
+      tracks: [{
+        property: 'x',
+        values: [0, 100],
+        easing(t) {
+          if (reenter) {
+            if (t < 0.5) presetControls.seek(0.75);
+            else presetControls.complete();
+          }
+          return t;
+        },
+      }],
+    }, {
+      requestFrame: frozenFrame,
+      onUpdate: (values) => presetValues.push(values.x!),
+    });
+    keyframeControls.pause();
+    presetControls.pause();
+
+    keyframeControls.seek(0.25);
+    presetControls.seek(0.25);
+
+    expect(keyframeValues).toEqual([75]);
+    expect(presetValues).toEqual([75]);
+    expect([keyframeControls.time, keyframeControls.progress]).toEqual([0.75, 0.75]);
+    expect([presetControls.time, presetControls.progress]).toEqual([0.75, 0.75]);
+
+    reenter = false;
+    keyframeControls.cancel();
+    presetControls.cancel();
+  });
+
   it('keeps the operation lease when a proven frame cursor reenters seek', () => {
     const keyframeCallbacks: Array<(timestamp?: number) => void> = [];
     const presetCallbacks: Array<(timestamp?: number) => void> = [];
@@ -99,13 +215,21 @@ describe('repeat runtime — reentrant easing is linearizable', () => {
   it('keyframes: a nested seek wins and the stale outer sample is not emitted', () => {
     let controls!: KeyframesControls;
     let first = true;
+    let easingDepth = 0;
+    let maxEasingDepth = 0;
     const emitted: number[] = [];
     const easing = (t: number): number => {
-      if (first) {
-        first = false;
-        controls.seek(0.75);
+      easingDepth++;
+      maxEasingDepth = Math.max(maxEasingDepth, easingDepth);
+      try {
+        if (first) {
+          first = false;
+          controls.seek(0.75);
+        }
+        return t * t;
+      } finally {
+        easingDepth--;
       }
-      return t * t;
     };
     controls = keyframes({
       values: [0, 100],
@@ -121,19 +245,28 @@ describe('repeat runtime — reentrant easing is linearizable', () => {
     expect(controls.time).toBe(0.75);
     expect(controls.progress).toBe(0.75);
     expect(emitted).toEqual([56.25]);
+    expect(maxEasingDepth).toBe(1);
     controls.cancel();
   });
 
   it('keyframes: a nested cancel settles once and suppresses the outer emission', () => {
     let controls!: KeyframesControls;
     let first = true;
+    let easingDepth = 0;
+    let maxEasingDepth = 0;
     const emitted: number[] = [];
     const easing = (t: number): number => {
-      if (first) {
-        first = false;
-        controls.cancel();
+      easingDepth++;
+      maxEasingDepth = Math.max(maxEasingDepth, easingDepth);
+      try {
+        if (first) {
+          first = false;
+          controls.cancel();
+        }
+        return t * t;
+      } finally {
+        easingDepth--;
       }
-      return t * t;
     };
     controls = keyframes({
       values: [0, 100],
@@ -150,18 +283,27 @@ describe('repeat runtime — reentrant easing is linearizable', () => {
     expect(emitted).toEqual([6.25]);
     controls.seek(0.75);
     expect(controls.time).toBe(0.25);
+    expect(maxEasingDepth).toBe(1);
   });
 
   it('runPreset: a nested seek wins atomically across every track', () => {
     let controls!: PresetControls;
     let first = true;
+    let easingDepth = 0;
+    let maxEasingDepth = 0;
     const emitted: Array<readonly [number, number]> = [];
     const easing = (t: number): number => {
-      if (first) {
-        first = false;
-        controls.seek(0.75);
+      easingDepth++;
+      maxEasingDepth = Math.max(maxEasingDepth, easingDepth);
+      try {
+        if (first) {
+          first = false;
+          controls.seek(0.75);
+        }
+        return t * t;
+      } finally {
+        easingDepth--;
       }
-      return t * t;
     };
     controls = runPreset({
       duration: 1,
@@ -179,19 +321,28 @@ describe('repeat runtime — reentrant easing is linearizable', () => {
 
     expect(controls.time).toBe(0.75);
     expect(emitted).toEqual([[56.25, 0.75]]);
+    expect(maxEasingDepth).toBe(1);
     controls.cancel();
   });
 
   it('runPreset: a nested cancel settles once and suppresses the outer pose', () => {
     let controls!: PresetControls;
     let first = true;
+    let easingDepth = 0;
+    let maxEasingDepth = 0;
     const emitted: number[] = [];
     const easing = (t: number): number => {
-      if (first) {
-        first = false;
-        controls.cancel();
+      easingDepth++;
+      maxEasingDepth = Math.max(maxEasingDepth, easingDepth);
+      try {
+        if (first) {
+          first = false;
+          controls.cancel();
+        }
+        return t * t;
+      } finally {
+        easingDepth--;
       }
-      return t * t;
     };
     controls = runPreset({
       duration: 1,
@@ -208,6 +359,7 @@ describe('repeat runtime — reentrant easing is linearizable', () => {
     expect(emitted).toEqual([6.25]);
     controls.seek(0.75);
     expect(controls.time).toBe(0.25);
+    expect(maxEasingDepth).toBe(1);
   });
 });
 

@@ -100,6 +100,8 @@ export function easingToLinear(fn: WaapiEasingFn, points: number = DEFAULT_EASIN
 // ─── Валидация compileWaapi ──────────────────────────────────────────────────
 
 type ValidatedOptions = readonly [
+  property: string,
+  values: readonly number[],
   times: readonly number[] | undefined,
   duration: number,
   repeat: number,
@@ -109,25 +111,29 @@ type ValidatedOptions = readonly [
 ];
 
 function validateOptions(o: WaapiCompileOptions): ValidatedOptions {
-  if (typeof o.property !== 'string' || o.property.length === 0) {
+  const property = o.property;
+  if (typeof property !== 'string' || property.length === 0) {
     throw new MotionParamError('LM120');
   }
   // Эти имена — метаданные WAAPI-кейфрейма: значение перезаписало бы offset/easing
   // кадра. CSS-свойство offset в WAAPI пишется как cssOffset (MDN Keyframe Formats).
-  if (o.property === 'offset' || o.property === 'easing' || o.property === 'composite') {
+  if (property === 'offset' || property === 'easing' || property === 'composite') {
     throw new MotionParamError('LM121');
   }
-  const n = o.values.length;
+
+  const values = [...o.values];
+  const n = values.length;
   if (n < 2) {
     throw new MotionParamError('LM122');
   }
-  for (const v of o.values) {
+  for (const v of values) {
     if (!Number.isFinite(v)) {
       throw new MotionParamError('LM123');
     }
   }
 
-  const times = o.times;
+  const sourceTimes = o.times;
+  const times = sourceTimes === undefined ? undefined : [...sourceTimes];
   if (times !== undefined) {
     if (times.length !== n) {
       throw new MotionParamError('LM124');
@@ -174,7 +180,8 @@ function validateOptions(o: WaapiCompileOptions): ValidatedOptions {
   if (repeatDelay > 0 && repeat > 0 && repeat !== Infinity) {
     throw new MotionParamError('LM161');
   }
-  const easing = o.easing;
+  const sourceEasing = o.easing;
+  const easing = Array.isArray(sourceEasing) ? [...sourceEasing] : sourceEasing;
   if (easing !== undefined && typeof easing !== 'function') {
       if (!Array.isArray(easing)) {
         throw new MotionParamError('LM132');
@@ -189,16 +196,15 @@ function validateOptions(o: WaapiCompileOptions): ValidatedOptions {
       }
   }
 
-  return [times, duration, repeat, repeatType, repeatDelay, easing];
+  return [property, values, times, duration, repeat, repeatType, repeatDelay, easing];
 }
 
 // ─── compileWaapi ────────────────────────────────────────────────────────────
 
 /** Чистая компиляция модели движка в аргументы Element.animate(). */
 export function compileWaapi(options: WaapiCompileOptions): WaapiCompiled {
-  const [times, duration, repeat, repeatType, repeatDelay, easing] =
+  const [property, values, times, duration, repeat, repeatType, repeatDelay, easing] =
     validateOptions(options);
-  const { property, values } = options;
   const n = values.length;
 
   // После validation hold возможен здесь только у infinite loop. Без повторов

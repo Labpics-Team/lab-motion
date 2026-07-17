@@ -326,6 +326,10 @@ export function keyframes(opts: KeyframesOptions): KeyframesControls {
   let _tickActive = false;
   let _frameCount = 0;
   let _operation = 0;
+  let _samplingPhase: 0 | 1 | 2 = 0;
+  let _publicationQueued = false;
+  let _queuedSettling = false;
+  let _queuedCursor: number | undefined;
 
   let _resolve!: () => void;
   const _promise = new Promise<void>((res) => {
@@ -367,10 +371,39 @@ export function keyframes(opts: KeyframesOptions): KeyframesControls {
     }
   }
 
-  /** Sample may invoke user easing; only its still-current owner may publish. */
+  /**
+   * A reentrant control gets one deferred sample. Further sampling controls
+   * raised by that easing are ignored so it cannot recurse or livelock.
+   */
+  function samplePublication(provenCursor: number | undefined, phase: 1 | 2): number {
+    _samplingPhase = phase;
+    try {
+      return provenCursor === undefined ? computeAt(_vt) : sampleCursor(provenCursor);
+    } finally {
+      _samplingPhase = 0;
+    }
+  }
+
   function publishCurrent(settling: boolean, provenCursor?: number): void {
-    const owner = ++_operation;
-    const value = provenCursor === undefined ? computeAt(_vt) : sampleCursor(provenCursor);
+    let owner = ++_operation;
+    if (_samplingPhase !== 0) {
+      _publicationQueued = true;
+      _queuedSettling = settling;
+      _queuedCursor = provenCursor;
+      return;
+    }
+
+    // A throwing easing can leave only a stale private intent behind.
+    _publicationQueued = false;
+    let value = samplePublication(provenCursor, 1);
+    if (_publicationQueued) {
+      _publicationQueued = false;
+      if (_settled) return;
+      owner = _operation;
+      settling = _queuedSettling;
+      value = samplePublication(_queuedCursor, 2);
+    }
+
     if (owner !== _operation || _settled) return;
     if (settling) settle(value);
     else emit(value);
@@ -496,6 +529,7 @@ export function keyframes(opts: KeyframesOptions): KeyframesControls {
         return;
       }
       _operation++;
+      _publicationQueued = false;
       _paused = false;
       _lastRealTs = undefined;
       ensureLoop();
@@ -504,11 +538,12 @@ export function keyframes(opts: KeyframesOptions): KeyframesControls {
     pause(): void {
       if (_settled || _paused) return;
       _operation++;
+      _publicationQueued = false;
       _paused = true;
     },
 
     seek(t: number): void {
-      if (_settled) return;
+      if (_settled || _samplingPhase === 2) return;
       if (Number.isNaN(t)) return;
       if (t === Infinity) {
         if (repeat === Infinity) throw new MotionParamError('LM166');
@@ -524,7 +559,7 @@ export function keyframes(opts: KeyframesOptions): KeyframesControls {
     },
 
     complete(): void {
-      if (_settled) return;
+      if (_settled || _samplingPhase === 2) return;
       _operation++;
       // Совпадает с reduced-motion контрактом: мгновенный snap к финалу.
       _vt = totalDuration === Infinity ? _vt : totalDuration;
@@ -532,7 +567,7 @@ export function keyframes(opts: KeyframesOptions): KeyframesControls {
     },
 
     cancel(): void {
-      if (_settled) return;
+      if (_settled || _samplingPhase === 2) return;
       publishCurrent(true);
     },
 
