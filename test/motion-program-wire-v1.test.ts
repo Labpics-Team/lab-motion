@@ -40,6 +40,11 @@ import {
   resolveMotionProgramSegmentsV1,
 } from '../scripts/motion-program-semantics.js';
 import {
+  scheduleV1GreatestIterationAtOrBefore,
+  SCHEDULE_V1_ITERATION_OUT_OF_RANGE,
+} from '../src/internal/schedule-v1.js';
+import { repeatCursor, type RepeatDirection } from '../src/internal/repeat-cursor.js';
+import {
   compileSpringExecutionArtifactTupleUnchecked,
   DEFAULT_TOLERANCE,
 } from '../src/compositor/curve.js';
@@ -543,8 +548,37 @@ describe('MotionProgram V1 canonical wire', () => {
             mirrored: boolean;
           }>;
         }>;
+        rejectedSchedules: Array<{
+          name: string;
+          track: {
+            startMs: number;
+            durationMs: number;
+            repeat: -1;
+            direction: number;
+            consumerDirection: RepeatDirection;
+            repeatDelayMs: number;
+          };
+          probes: Array<{
+            relation: 'last-supported' | 'horizon' | 'next-f64';
+            timeMs: number;
+            timeMsIeee754LittleEndianHex: string;
+            generatorIteration: number;
+            sample?: {
+              state: 'before' | 'motion' | 'repeatDelay' | 'terminal' | 'after';
+              iteration: number | null;
+              iterationParity: 0 | 1;
+              progress: number;
+              mirrored: boolean;
+            };
+            referenceIssue?: MotionProgramParseError['code'];
+            consumerIssue?: 'LM166';
+            consumerCursor?: number;
+          }>;
+        }>;
         mirrorSegments: Array<{
           name: string;
+          channel?: number;
+          curves: unknown[];
           segments: unknown[][];
           probes: Array<{
             progress: number;
@@ -647,6 +681,7 @@ describe('MotionProgram V1 canonical wire', () => {
       invalidProgramVectors: corpus.invalid.filter((vector) => vector.program !== undefined).length,
       semanticValueVectors: corpus.semanticProbes.values.length,
       semanticScheduleCaseVectors: corpus.semanticProbes.scheduleCases.length,
+      semanticRejectedScheduleVectors: corpus.semanticProbes.rejectedSchedules.length,
       semanticMirrorSegmentVectors: corpus.semanticProbes.mirrorSegments.length,
       generatedLimitVectors: corpus.limitRecipes.cases.length,
     });
@@ -898,19 +933,6 @@ describe('MotionProgram V1 canonical wire', () => {
           .toBe(adjacentFloat(exact.timeMs, 1));
       }
     }
-    const infiniteExact = corpus.semanticProbes.scheduleCases.find((candidate) =>
-      candidate.name === 'infinite-collapsed-boundary-exact-parity');
-    expect(infiniteExact).toBeDefined();
-    expect(infiniteExact!.probes.map((probe) => probe.timeMsIeee754LittleEndianHex))
-      .toEqual([
-        'ffffffffffffef3f',
-        '000000000000f03f',
-        '010000000000f03f',
-      ]);
-    expect(infiniteExact!.probes[0]!.timeMs)
-      .toBe(adjacentFloat(infiniteExact!.probes[1]!.timeMs, -1));
-    expect(infiniteExact!.probes[2]!.timeMs)
-      .toBe(adjacentFloat(infiniteExact!.probes[1]!.timeMs, 1));
     expect(corpus.semanticProbes.scheduleCases.some((candidate) =>
       candidate.name === 'finite-nextdown-binade-gap-accepted'))
       .toBe(true);
@@ -937,10 +959,61 @@ describe('MotionProgram V1 canonical wire', () => {
           .toEqual(sample);
       }
     }
+    expect(corpus.semanticProbes.rejectedSchedules.map((vector) => vector.name))
+      .toContain('infinite-exact-index-horizon');
+    for (const vector of corpus.semanticProbes.rejectedSchedules) {
+      const input = minimalProgramInput();
+      const rawTrack = (input[5] as unknown[][])[0]!;
+      rawTrack[1] = vector.track.startMs;
+      rawTrack[2] = vector.track.durationMs;
+      rawTrack[3] = vector.track.repeat;
+      rawTrack[4] = vector.track.direction;
+      rawTrack[5] = vector.track.repeatDelayMs;
+      const track = parseMotionProgramV1(input)[5][0]!;
+      const cycle = vector.track.durationMs + vector.track.repeatDelayMs;
+      for (const probe of vector.probes) {
+        expect(numberHex(probe.timeMs)).toBe(probe.timeMsIeee754LittleEndianHex);
+        expect(scheduleV1GreatestIterationAtOrBefore(
+          vector.track.startMs,
+          cycle,
+          vector.track.repeat,
+          probe.timeMs,
+        )).toBe(probe.generatorIteration);
+        if (probe.referenceIssue !== undefined) {
+          expect(probe.generatorIteration).toBe(SCHEDULE_V1_ITERATION_OUT_OF_RANGE);
+          expectIssue(
+            () => evaluateMotionProgramScheduleV1(track, probe.timeMs),
+            probe.referenceIssue,
+          );
+        } else {
+          expect(evaluateMotionProgramScheduleV1(track, probe.timeMs))
+            .toEqual(probe.sample);
+        }
+        const consume = (): number => repeatCursor(
+          probe.timeMs,
+          vector.track.startMs,
+          vector.track.durationMs,
+          Infinity,
+          vector.track.repeatDelayMs,
+          vector.track.consumerDirection,
+        );
+        if (probe.consumerIssue !== undefined) {
+          expect(consume).toThrowError(new RegExp(`^${probe.consumerIssue}$`));
+        } else {
+          expect(consume()).toBe(probe.consumerCursor);
+        }
+      }
+    }
     expect(corpus.semanticProbes.mirrorSegments.map((vector) => vector.name))
-      .toContain('mirror-min-positive-offset-total');
+      .toEqual(expect.arrayContaining([
+        'mirror-min-positive-offset-total',
+        'mirror-nonuniform-forward-easing-matrix',
+        'mirror-exact-heterogeneous-endpoints-before-curve',
+      ]));
     for (const vector of corpus.semanticProbes.mirrorSegments) {
       const input = minimalProgramInput();
+      input[3] = vector.curves;
+      if (vector.channel !== undefined) (input[4] as unknown[][])[0]![1] = vector.channel;
       (input[5] as unknown[][])[0]![7] = vector.segments;
       const program = parseMotionProgramV1(input);
       const segments = program[5][0]![7];

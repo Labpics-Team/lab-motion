@@ -53,7 +53,7 @@
 | `LM039` | keyframes times | Последняя отметка не равна единице | Завершить шкалу единицей | active |
 | `LM040` | keyframes easing | Длина не совпадает с сегментами | Передать easing для каждого сегмента | active |
 | `LM041` | keyframes duration | Некорректная длительность | Передать положительную конечную длительность | active |
-| `LM042` | keyframes repeat | Некорректное число повторов | Передать неотрицательное целое или Infinity | active |
+| `LM042` | keyframes repeat | Некорректное число повторов | Передать целое 0…2147483647 или Infinity | active |
 | `LM043` | keyframes repeat | Неизвестный тип повтора | Использовать loop reverse или mirror | active |
 | `LM044` | keyframes repeat | Некорректная задержка повтора | Передать конечное значение не меньше нуля | active |
 | `LM045` | MotionValue | Неконечное значение | Исправить указанную числовую границу | active |
@@ -71,7 +71,7 @@
 | `LM057` | presets times | Последняя отметка не равна единице | Завершить шкалу единицей | active |
 | `LM058` | presets easing | Длина не совпадает с сегментами | Передать easing для каждого сегмента | active |
 | `LM059` | presets delay | Некорректная задержка | Передать конечное значение не меньше нуля | active |
-| `LM060` | presets repeat | Некорректное число повторов | Передать неотрицательное целое или Infinity | active |
+| `LM060` | presets repeat | Некорректное число повторов | Передать целое 0…2147483647 или Infinity | active |
 | `LM061` | presets repeat | Неизвестный тип повтора | Использовать loop reverse или mirror | active |
 | `LM062` | presets repeat | Некорректная задержка повтора | Передать конечное значение не меньше нуля | active |
 | `LM063` | presets scalar | Неконечный именованный параметр | Исправить указанное поле | active |
@@ -82,7 +82,7 @@
 | `LM068` | preset breathe | Некорректная амплитуда | Передать значение больше минус единицы | active |
 | `LM069` | preset pop | Некорректный overshoot | Передать положительное значение | active |
 | `LM070` | preset drift | Оба смещения равны нулю | Задать ненулевое смещение | active |
-| `LM071` | preset WAAPI | repeatDelay не представим | Использовать runPreset | active |
+| `LM071` | preset WAAPI | repeatDelay между повторами не представим | Использовать runPreset либо repeat 0 | active |
 | `LM072` | splitText | text не является строкой | Передать строку | active |
 | `LM073` | splitText | Неизвестный режим | Использовать chars или words | active |
 | `LM074` | presets callback | Значение не является функцией | Передать функцию | active |
@@ -139,7 +139,7 @@
 | `LM125` | compileWaapi times | Некорректные концы шкалы | Начать нулём и завершить единицей | active |
 | `LM126` | compileWaapi times | Неконечная или убывающая отметка | Исправить отметку по индексу | active |
 | `LM127` | compileWaapi duration | Некорректная длительность | Передать положительную конечную длительность | active |
-| `LM128` | compileWaapi repeat | Некорректное число повторов | Передать неотрицательное целое или Infinity | active |
+| `LM128` | compileWaapi repeat | Некорректное число повторов | Передать целое 0…2147483647 или Infinity | active |
 | `LM129` | compileWaapi repeat | Некорректная задержка | Передать конечное значение не меньше нуля | active |
 | `LM130` | compileWaapi repeat | Неизвестный тип повтора | Использовать loop reverse или mirror | active |
 | `LM131` | compileWaapi repeat | Задержка несовместима с типом | Использовать loop или живой keyframes-путь | active |
@@ -170,3 +170,11 @@
 | `LM156` | animate options | Options не является объектом | Передать объект опций или не передавать аргумент | active |
 | `LM157` | animate transition | Реентрантная смена владельца | Завершить текущую host-транзакцию перед новым animate | active |
 | `LM158` | splitText segmenter | Доступный grapheme segmenter не создался или нарушил контракт | Исправить `Intl.Segmenter` либо передать корректный Unicode ponyfill | active |
+| `LM159` | preset WAAPI | Mirror repeat не представим через WAAPI alternate | Использовать runPreset или точный двухцикловый track | active |
+| `LM160` | compileWaapi repeat | Mirror repeat не представим через WAAPI alternate | Использовать keyframes или точный двухцикловый track | active |
+| `LM161` | repeat schedule | Расписание численно неразличимо либо finite repeatDelay не имеет portable WAAPI-эмита | Уменьшить расписание или использовать живой keyframes-путь | active |
+| `LM162` | WAAPI artifact | Timing или значение не конечно либо разные authored stops схлопнулись после WAAPI-масштаба | Уменьшить длительность, задержку, масштаб или разнести stops | active |
+| `LM163` | keyframes easing | Scalar или элемент easing не является функцией | Передать функцию для каждого сегмента | active |
+| `LM164` | presets easing | Scalar или элемент easing не является функцией | Передать функцию для каждого сегмента | active |
+| `LM165` | frame scheduler | requestFrame не является функцией | Передать функцию планирования кадра | active |
+| `LM166` | infinite repeat sample | Время требует номер итерации выше точного binary64 integer domain | Сэмплировать до 9_007_199_254_740_991-й итерации или завершить контрол явно | active |

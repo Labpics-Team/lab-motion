@@ -210,6 +210,7 @@ describe('MotionProgram V1 portable semantics', () => {
     expect(MOTION_PROGRAM_SEGMENT_SEMANTICS_V1).toEqual({
       codecOwner: 'outgoing-segment',
       coverage: 'strict-positive-contiguous-zero-to-one',
+      endpoint: 'exact-before-curve',
       boundary: 'right-segment-wins-at-exact-offset',
       boundaryRepresentation: 'explicit-left-to-and-right-from',
       mixedCodec: 'portable-within-one-track',
@@ -789,7 +790,7 @@ describe('MotionProgram V1 portable semantics', () => {
     );
   });
 
-  it('исполняет per-segment codec и N-segment mirror без разрыва траектории', () => {
+  it('исполняет per-segment codec с authored timing/curve и exact mirror endpoint', () => {
     const parsed = parseMotionProgramV1([
       1, 0, [], [0, [1, 0, 0, 1, 0.25]],
       [[0, MOTION_PROGRAM_STANDARD_CHANNEL_V1.value, 0]],
@@ -807,7 +808,7 @@ describe('MotionProgram V1 portable semantics', () => {
       return value[1]!;
     };
     expect(at(1)).toBe(20);
-    expect(at(1.75)).toBe(10);
+    expect(at(1.75)).toBe(25 / 3);
     expect(at(2)).toBe(0);
 
     const normalBoundary = evaluateMotionProgramSegmentsV1(
@@ -817,7 +818,7 @@ describe('MotionProgram V1 portable semantics', () => {
     expect(normalBoundary).toEqual([0, 12]);
   });
 
-  it('оставляет mirror total для минимального положительного segment offset', () => {
+  it('оставляет authored mirror interval total для минимального положительного offset', () => {
     const parsed = parseMotionProgramV1([
       1, 0, [], [0],
       [[0, MOTION_PROGRAM_STANDARD_CHANNEL_V1.value, 0]],
@@ -834,13 +835,12 @@ describe('MotionProgram V1 portable semantics', () => {
       parsed[3],
       { state: 'motion', iteration: null, iterationParity: 1, progress, mirrored: true },
     );
-    expect(at(adjacentFloat(1, -1))).toEqual([0, 11]);
+    expect(at(adjacentFloat(1, -1))).toEqual([0, 10]);
     expect(at(1)).toEqual([0, 10]);
   });
 
-  it('выбирает правый reflected segment по representable mirror-boundary', () => {
+  it('выбирает правый authored segment по representable mirror-boundary', () => {
     const boundary = 0.00003051760077154911;
-    const reflectedBoundary = 1 - boundary;
     const parsed = parseMotionProgramV1([
       1, 0, [], [0],
       [[0, MOTION_PROGRAM_STANDARD_CHANNEL_V1.value, 0]],
@@ -858,12 +858,12 @@ describe('MotionProgram V1 portable semantics', () => {
       { state: 'motion', iteration: null, iterationParity: 1, progress, mirrored: true },
     )[1]!;
 
-    expect(at(adjacentFloat(reflectedBoundary, -1))).toBe(20);
-    expect(at(reflectedBoundary)).toBe(10);
-    expect(at(adjacentFloat(reflectedBoundary, 1))).toBe(9.99999999996362);
+    expect(at(adjacentFloat(boundary, -1))).toBe(20.000000000000004);
+    expect(at(boundary)).toBe(10);
+    expect(at(adjacentFloat(boundary, 1))).toBe(10);
   });
 
-  it('сохраняет sampled-curve jump в прямых reflected координатах', () => {
+  it('сохраняет sampled-curve jump в authored forward координатах', () => {
     const boundary = 0.10720231540575624;
     const parsed = parseMotionProgramV1([
       1, 0, [], [0, [1, 0, 0, boundary, 0, boundary, 1, 1, 1]],
@@ -922,6 +922,40 @@ describe('MotionProgram V1 portable semantics', () => {
     // Mirror меняет порядок сегментов; на границе теперь побеждает HSL green.
     expect(at(1.5)).toEqual([1, 120, 1, 0.5, 1]);
     expect(at(1.75)).toEqual([1, 60, 1, 0.5, 1]);
+  });
+
+  it('возвращает exact heterogeneous endpoints до sampled curve при normal и mirror', () => {
+    const parsed = parseMotionProgramV1([
+      1, 0, [], [0, [1, 0, 0.25, 1, 0.25]],
+      [[0, MOTION_PROGRAM_STANDARD_CHANNEL_V1.color, 0]],
+      [[0, 0, 1, 0, MOTION_PROGRAM_DIRECTION_V1.normal, 0, 0, [
+        [
+          0, 0.5,
+          [1, [1, 0, 1, 0.5, 1]],
+          [1, [1, 120, 1, 0.5, 1]],
+          1, MOTION_PROGRAM_CODEC_V1.colorHslShortest,
+        ],
+        [
+          0.5, 1,
+          [1, [1, 0, 255, 0, 1]],
+          [1, [1, 255, 255, 0, 1]],
+          1, MOTION_PROGRAM_CODEC_V1.colorSrgb,
+        ],
+      ]]],
+    ]);
+    const track = parsed[5][0]!;
+    const resolved = resolveMotionProgramSegmentsV1(track[7]);
+    const at = (progress: number, mirrored: boolean) => evaluateMotionProgramSegmentsV1(
+      track[7],
+      resolved,
+      parsed[3],
+      { state: 'motion', iteration: null, iterationParity: 0, progress, mirrored },
+    );
+
+    expect(at(0, false)).toEqual([1, 0, 1, 0.5, 1]);
+    expect(at(1, false)).toEqual([1, 255, 255, 0, 1]);
+    expect(at(0, true)).toEqual([1, 255, 255, 0, 1]);
+    expect(at(1, true)).toEqual([1, 0, 1, 0.5, 1]);
   });
 
   it('в batched transform до start берёт captured baseline задержанного канала', () => {

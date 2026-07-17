@@ -7,8 +7,8 @@
  * дублируются здесь устаревающими числами.
  *
  * Остаток выживших keyframes/motion-value/decay — задокументированные ЭКВИВАЛЕНТНЫЕ
- * ('mirror' yoyo'ит и без нормализации; границы `<`↔`<=`; gen ++/--; `!==undefined`
- * избыточен с isFinite) и НЕДОСТИЖИМЫЕ defensive-ветки (MAX_FRAMES-cap для валидных
+ * (границы `<`↔`<=`; gen ++/--; `!==undefined` избыточен с isFinite) и
+ * НЕДОСТИЖИМЫЕ defensive-ветки (MAX_FRAMES-cap для валидных
  * пружин; finite-net поверх clamp; velocity-конъюнкт снап-guard; Infinity-short-circuit
  * = формула в пределе); догон до 100% — театр (Гудхарт).
  *
@@ -31,7 +31,7 @@ export default {
   // намеренно медленнее и не должен подменять функциональный mutation-оракул.
   vitest: { configFile: 'vitest.stryker.config.ts' },
   // Чистая projection-геометрия входит в тот же scheduled baseline, что физика.
-  mutate: ['src/spring.ts', 'src/internal/solver.ts', 'src/keyframes/index.ts', 'src/motion-value.ts', 'src/decay.ts', 'src/value/color.ts', 'src/internal/sliding-window.ts', 'src/tween.ts', 'src/projection/geometry.ts'],
+  mutate: ['src/spring.ts', 'src/internal/solver.ts', 'src/internal/frame-requester.ts', 'src/internal/schedule-v1.ts', 'src/internal/repeat-cursor.ts', 'src/internal/sample-keyframes.ts', 'src/keyframes/index.ts', 'src/motion-value.ts', 'src/decay.ts', 'src/value/color.ts', 'src/internal/sliding-window.ts', 'src/tween.ts', 'src/projection/geometry.ts'],
   coverageAnalysis: 'perTest',
   reporters: ['clear-text', 'progress', 'html'],
   htmlReporter: { fileName: 'reports/mutation/index.html' },

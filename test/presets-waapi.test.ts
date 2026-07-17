@@ -39,6 +39,28 @@ import {
 } from '../src/presets/index.js';
 
 describe('presets — presetToWaapi: структура', () => {
+  it('repeatDelay без repeat не влияет на WAAPI-артефакт', () => {
+    const result = presetToWaapi({
+      duration: 1,
+      repeat: 0,
+      repeatDelay: 10,
+      tracks: [{ property: 'x', values: [0, 100] }],
+    });
+    expect(result.timing.duration).toBe(1000);
+    expect(result.timing.iterations).toBe(1);
+  });
+
+  it('огромный repeatDelay без repeat остаётся ненаблюдаемым', () => {
+    const result = presetToWaapi({
+      ...pulse({ duration: 1 }),
+      repeat: 0,
+      repeatDelay: 2 ** 60,
+    });
+
+    expect(result.timing.duration).toBe(1000);
+    expect(result.timing.iterations).toBe(1);
+  });
+
   it('А: offsets отсортированы, края 0 и 1', () => {
     const w = presetToWaapi(pulse());
     expect(w.keyframes.length).toBeGreaterThan(2);
@@ -113,7 +135,17 @@ describe('presets — presetToWaapi: структура', () => {
   });
 
   it('А: repeatDelay > 0 → MotionParamError (честный отказ)', () => {
-    expect(() => presetToWaapi({ ...pulse(), repeatDelay: 0.5 })).toThrow(MotionParamError);
+    expect(() => presetToWaapi({ ...pulse(), repeat: 1, repeatDelay: 0.5 }))
+      .toThrow(MotionParamError);
+  });
+
+  it('А: mirror с повтором fail-closed: WAAPI alternate разворачивает easing', () => {
+    expect(() => presetToWaapi({
+      duration: 1,
+      tracks: [{ property: 'x', values: [0, 100, 20], easing: (t) => t * t }],
+      repeat: 1,
+      repeatType: 'mirror',
+    })).toThrowError(/^LM159$/);
   });
 });
 

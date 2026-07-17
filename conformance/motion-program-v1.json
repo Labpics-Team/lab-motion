@@ -12,8 +12,9 @@
     "invalidWireVectors": 23,
     "invalidProgramVectors": 8,
     "semanticValueVectors": 9,
-    "semanticScheduleCaseVectors": 12,
-    "semanticMirrorSegmentVectors": 1,
+    "semanticScheduleCaseVectors": 11,
+    "semanticRejectedScheduleVectors": 1,
+    "semanticMirrorSegmentVectors": 3,
     "generatedLimitVectors": 2
   },
   "stringSemantics": {
@@ -250,6 +251,7 @@
   "segmentSemantics": {
     "codecOwner": "outgoing-segment",
     "coverage": "strict-positive-contiguous-zero-to-one",
+    "endpoint": "exact-before-curve",
     "boundary": "right-segment-wins-at-exact-offset",
     "boundaryRepresentation": "explicit-left-to-and-right-from",
     "mixedCodec": "portable-within-one-track"
@@ -288,10 +290,10 @@
     "zeroFiniteDuration": "allowed",
     "infiniteCycle": "duration-plus-repeatDelay-must-be-positive",
     "infiniteRepresentability": "sample-defined-no-global-phase-resolution-guarantee",
-    "infiniteBoundarySelection": "greatest-index-with-absolute-boundary-not-after-sample",
-    "infiniteIterationIndex": "unbounded-exact-internal-null-public",
-    "infiniteParity": "exact-low-bit-never-rounded-number-quotient",
-    "unsafeQuotient": "bounded-exact-binary64-dyadic-division",
+    "infiniteBoundarySelection": "greatest-exact-integer-index-with-absolute-boundary-not-after-sample",
+    "infiniteIterationIndex": "zero-through-9007199254740991-internal-null-public",
+    "infiniteParity": "exact-low-bit-within-supported-iteration-domain",
+    "unsafeQuotient": "fail-LMP_BOUNDS-before-iteration-9007199254740992-boundary",
     "beforeStart": "inactive",
     "motionInterval": "half-open",
     "repeatBoundary": "next-iteration-wins",
@@ -303,7 +305,7 @@
     "reverse": "reverse-every-iteration",
     "alternate": "forward-even-reverse-odd",
     "alternateReverse": "reverse-even-forward-odd",
-    "mirror": "odd-reverse-segment-order-reflect-interval-swap-endpoints-keep-source-curve-forward",
+    "mirror": "odd-reverse-values-keep-authored-interval-and-curve-forward",
     "publicRepeatTypeCompilerMapping": {
       "loop": "normal",
       "reverse": "alternate",
@@ -2094,43 +2096,49 @@
             "mirrored": false
           }
         ]
-      },
+      }
+    ],
+    "rejectedSchedules": [
       {
-        "name": "infinite-collapsed-boundary-exact-parity",
+        "name": "infinite-exact-index-horizon",
         "track": {
-          "startMs": 0.1,
-          "durationMs": 5.551115123125783e-17,
+          "startMs": 0,
+          "durationMs": 1,
           "repeat": -1,
-          "direction": 2,
+          "direction": 0,
+          "consumerDirection": 0,
           "repeatDelayMs": 0
         },
         "probes": [
           {
-            "timeMs": 0.9999999999999999,
-            "timeMsIeee754LittleEndianHex": "ffffffffffffef3f",
-            "state": "motion",
-            "iteration": null,
-            "iterationParity": 1,
-            "progress": 1,
-            "mirrored": false
+            "relation": "last-supported",
+            "timeMs": 9007199254740991,
+            "timeMsIeee754LittleEndianHex": "ffffffffffff3f43",
+            "generatorIteration": 9007199254740991,
+            "sample": {
+              "state": "motion",
+              "iteration": null,
+              "iterationParity": 1,
+              "progress": 0,
+              "mirrored": false
+            },
+            "consumerCursor": 0
           },
           {
-            "timeMs": 1,
-            "timeMsIeee754LittleEndianHex": "000000000000f03f",
-            "state": "motion",
-            "iteration": null,
-            "iterationParity": 0,
-            "progress": 0,
-            "mirrored": false
+            "relation": "horizon",
+            "timeMs": 9007199254740992,
+            "timeMsIeee754LittleEndianHex": "0000000000004043",
+            "generatorIteration": -1,
+            "referenceIssue": "LMP_BOUNDS",
+            "consumerIssue": "LM166"
           },
           {
-            "timeMs": 1.0000000000000002,
-            "timeMsIeee754LittleEndianHex": "010000000000f03f",
-            "state": "motion",
-            "iteration": null,
-            "iterationParity": 0,
-            "progress": 0,
-            "mirrored": false
+            "relation": "next-f64",
+            "timeMs": 9007199254740994,
+            "timeMsIeee754LittleEndianHex": "0100000000004043",
+            "generatorIteration": -1,
+            "referenceIssue": "LMP_BOUNDS",
+            "consumerIssue": "LM166"
           }
         ]
       }
@@ -2138,6 +2146,7 @@
     "mirrorSegments": [
       {
         "name": "mirror-min-positive-offset-total",
+        "curves": [0],
         "segments": [
           [0, 5e-324, [1, [0, 10]], [1, [0, 11]], 0, 0],
           [5e-324, 1, [1, [0, 11]], [1, [0, 20]], 0, 0]
@@ -2146,12 +2155,68 @@
           {
             "progress": 0.9999999999999999,
             "progressIeee754LittleEndianHex": "ffffffffffffef3f",
-            "result": [0, 11]
+            "result": [0, 10]
           },
           {
             "progress": 1,
             "progressIeee754LittleEndianHex": "000000000000f03f",
             "result": [0, 10]
+          }
+        ]
+      },
+      {
+        "name": "mirror-nonuniform-forward-easing-matrix",
+        "curves": [0, [1, 0, 0, 1, 0]],
+        "segments": [
+          [0, 0.2, [1, [0, 0]], [1, [0, 100]], 1, 0],
+          [0.2, 1, [1, [0, 100]], [1, [0, 20]], 0, 0]
+        ],
+        "probes": [
+          {
+            "progress": 0,
+            "progressIeee754LittleEndianHex": "0000000000000000",
+            "result": [0, 20]
+          },
+          {
+            "progress": 0.1,
+            "progressIeee754LittleEndianHex": "9a9999999999b93f",
+            "result": [0, 20]
+          },
+          {
+            "progress": 0.2,
+            "progressIeee754LittleEndianHex": "9a9999999999c93f",
+            "result": [0, 100]
+          },
+          {
+            "progress": 0.6,
+            "progressIeee754LittleEndianHex": "333333333333e33f",
+            "result": [0, 50]
+          },
+          {
+            "progress": 1,
+            "progressIeee754LittleEndianHex": "000000000000f03f",
+            "result": [0, 0]
+          }
+        ]
+      },
+      {
+        "name": "mirror-exact-heterogeneous-endpoints-before-curve",
+        "channel": 9,
+        "curves": [0, [1, 0, 0.25, 1, 0.25]],
+        "segments": [
+          [0, 0.5, [1, [1, 0, 1, 0.5, 1]], [1, [1, 120, 1, 0.5, 1]], 1, 3],
+          [0.5, 1, [1, [1, 0, 255, 0, 1]], [1, [1, 255, 255, 0, 1]], 1, 2]
+        ],
+        "probes": [
+          {
+            "progress": 0,
+            "progressIeee754LittleEndianHex": "0000000000000000",
+            "result": [1, 255, 255, 0, 1]
+          },
+          {
+            "progress": 1,
+            "progressIeee754LittleEndianHex": "000000000000f03f",
+            "result": [1, 0, 1, 0.5, 1]
           }
         ]
       }
