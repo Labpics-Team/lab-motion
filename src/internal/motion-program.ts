@@ -6,6 +6,13 @@
  * неизменяемый граф кортежей; хост появляется лишь при привязке программы.
  */
 
+import {
+  isScheduleV1Representable,
+  scheduleV1Binary64Gap,
+  scheduleV1IterationBoundary,
+  SCHEDULE_V1_INT32_MAX,
+} from './schedule-v1.js';
+
 export const MOTION_PROGRAM_VERSION_V1 = 1 as const;
 
 export const MOTION_PROGRAM_FEATURE_V1 = Object.freeze({
@@ -189,6 +196,7 @@ export const MOTION_PROGRAM_CURVE_SEMANTICS_V1 = Object.freeze({
 export const MOTION_PROGRAM_SEGMENT_SEMANTICS_V1 = Object.freeze({
   codecOwner: 'outgoing-segment',
   coverage: 'strict-positive-contiguous-zero-to-one',
+  endpoint: 'exact-before-curve',
   boundary: 'right-segment-wins-at-exact-offset',
   boundaryRepresentation: 'explicit-left-to-and-right-from',
   mixedCodec: 'portable-within-one-track',
@@ -310,10 +318,10 @@ export const MOTION_PROGRAM_SCHEDULE_SEMANTICS_V1 = Object.freeze({
   zeroFiniteDuration: 'allowed',
   infiniteCycle: 'duration-plus-repeatDelay-must-be-positive',
   infiniteRepresentability: 'sample-defined-no-global-phase-resolution-guarantee',
-  infiniteBoundarySelection: 'greatest-index-with-absolute-boundary-not-after-sample',
-  infiniteIterationIndex: 'unbounded-exact-internal-null-public',
-  infiniteParity: 'exact-low-bit-never-rounded-number-quotient',
-  unsafeQuotient: 'bounded-exact-binary64-dyadic-division',
+  infiniteBoundarySelection: 'greatest-exact-integer-index-with-absolute-boundary-not-after-sample',
+  infiniteIterationIndex: 'zero-through-9007199254740991-internal-null-public',
+  infiniteParity: 'exact-low-bit-within-supported-iteration-domain',
+  unsafeQuotient: 'fail-LMP_BOUNDS-before-iteration-9007199254740992-boundary',
   beforeStart: 'inactive',
   motionInterval: 'half-open',
   repeatBoundary: 'next-iteration-wins',
@@ -325,7 +333,7 @@ export const MOTION_PROGRAM_SCHEDULE_SEMANTICS_V1 = Object.freeze({
   reverse: 'reverse-every-iteration',
   alternate: 'forward-even-reverse-odd',
   alternateReverse: 'reverse-even-forward-odd',
-  mirror: 'odd-reverse-segment-order-reflect-interval-swap-endpoints-keep-source-curve-forward',
+  mirror: 'odd-reverse-values-keep-authored-interval-and-curve-forward',
   publicRepeatTypeCompilerMapping: Object.freeze({
     loop: 'normal',
     reverse: 'alternate',
@@ -452,7 +460,6 @@ interface FeatureUse {
 
 const UINT16_MAX = 0xffff;
 const UINT32_MAX = 0xffff_ffff;
-const INT32_MAX = 0x7fff_ffff;
 const STANDARD_CHANNEL_MAX = MOTION_PROGRAM_STANDARD_CHANNEL_V1.borderColor;
 const CODEC_MAX = MOTION_PROGRAM_CODEC_V1.webCssOpaque;
 const DIRECTION_MAX = MOTION_PROGRAM_DIRECTION_V1.mirror;
@@ -528,29 +535,11 @@ function finite(input: unknown): number {
   return input;
 }
 
-const BINARY64_MIN_NORMAL = 2 ** -1022;
-
 /** Максимальный конечный adjacent gap в binade заданной абсолютной величины. */
-export function motionProgramBinary64GapV1(value: number): number {
-  const magnitude = Math.abs(value);
-  if (magnitude < BINARY64_MIN_NORMAL) return Number.MIN_VALUE;
-  // libm может округлить log2(nextDown(2^k)) ровно к k. Точные границы
-  // binade исправляют обе стороны оценки до использования в wire-контракте.
-  let exponent = Math.min(1023, Math.floor(Math.log2(magnitude)));
-  const lower = 2 ** exponent;
-  if (magnitude < lower) exponent--;
-  else if (magnitude >= lower * 2) exponent++;
-  return 2 ** (exponent - 52);
-}
+export const motionProgramBinary64GapV1 = scheduleV1Binary64Gap;
 
 /** Канонический порядок: сначала RN64(index * cycle), затем RN64(+ start). */
-export function motionProgramIterationBoundaryV1(
-  startMs: number,
-  cycleMs: number,
-  iteration: number,
-): number {
-  return iteration * cycleMs + startMs;
-}
+export const motionProgramIterationBoundaryV1 = scheduleV1IterationBoundary;
 
 function boundedFinite(input: unknown, minimum: number, maximum: number): number {
   const value = finite(input);
@@ -895,61 +884,15 @@ function parseTracks(
       !Number.isInteger(repeat) ||
       Object.is(repeat, -0) ||
       repeat < -1 ||
-      repeat > INT32_MAX
+      repeat > SCHEDULE_V1_INT32_MAX
     ) {
       fail('LMP_BOUNDS');
     }
     const direction = unsignedInteger(tuple[4], DIRECTION_MAX) as MotionProgramDirectionV1;
     const repeatDelayMs = finite(tuple[5]);
     if (repeatDelayMs < 0) fail('LMP_BOUNDS');
-    const cycleMs = durationMs + repeatDelayMs;
-    if (
-      !Number.isFinite(startMs + durationMs) ||
-      (durationMs > 0 && startMs + durationMs === startMs) ||
-      !Number.isFinite(cycleMs) ||
-      (durationMs > 0 && repeatDelayMs > 0 &&
-        (cycleMs === durationMs || cycleMs === repeatDelayMs)) ||
-      (cycleMs > 0 && startMs + cycleMs === startMs)
-    ) {
+    if (!isScheduleV1Representable(startMs, durationMs, repeat, repeatDelayMs)) {
       fail('LMP_BOUNDS');
-    }
-    if (repeat !== -1) {
-      const productMs = repeat * cycleMs;
-      const lastStartMs = motionProgramIterationBoundaryV1(startMs, cycleMs, repeat);
-      const terminalMs = lastStartMs + durationMs;
-      if (
-        !Number.isFinite(productMs) ||
-        !Number.isFinite(lastStartMs) ||
-        !Number.isFinite(terminalMs) ||
-        (durationMs > 0 && !(terminalMs > lastStartMs))
-      ) {
-        fail('LMP_BOUNDS');
-      }
-      if (repeat > 0) {
-        const previousStartMs = motionProgramIterationBoundaryV1(startMs, cycleMs, repeat - 1);
-        const previousEndMs = repeatDelayMs === 0
-          ? lastStartMs
-          : previousStartMs + durationMs;
-        const maxAbsolute = Math.max(
-          Math.abs(startMs),
-          Math.abs(lastStartMs),
-          Math.abs(terminalMs),
-        );
-        const resolutionBudget =
-          motionProgramBinary64GapV1(productMs) +
-          2 * motionProgramBinary64GapV1(maxAbsolute);
-        const representedDelayMs = cycleMs - durationMs;
-        if (
-          (cycleMs > 0 && !(lastStartMs > previousStartMs)) ||
-          (repeatDelayMs > 0 && !(previousEndMs < lastStartMs)) ||
-          (durationMs > 0 && !(durationMs > resolutionBudget)) ||
-          (repeatDelayMs > 0 && !(representedDelayMs > resolutionBudget))
-        ) {
-          fail('LMP_BOUNDS');
-        }
-      }
-    } else {
-      if (!(cycleMs > 0) || !Number.isFinite(cycleMs)) fail('LMP_BOUNDS');
     }
     const composite = unsignedInteger(tuple[6], COMPOSITE_MAX) as MotionProgramCompositeV1;
     if (composite !== MOTION_PROGRAM_COMPOSITE_V1.replace) {

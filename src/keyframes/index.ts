@@ -3,7 +3,7 @@
  *
  * Интерполирует значение через N>=2 опорных точек (`values`) с явными или
  * авто-распределёнными долями (`times`), per-сегментное easing, и опциональный
- * repeat/loop/reverse(mirror=yoyo)/repeatDelay поверх единого виртуального
+ * repeat/loop/reverse/mirror/repeatDelay поверх единого виртуального
  * времени (тот же injectable-clock seam, что и timeline/driver/spring).
  *
  * Инварианты (North):
@@ -20,6 +20,15 @@
  */
 
 import { MotionParamError } from '../errors.js';
+import { createFrameRequester } from '../internal/frame-requester.js';
+import {
+  isRepeatScheduleRepresentable,
+  isRepeatCount,
+  repeatCursor,
+  repeatDuration,
+  type RepeatDirection,
+} from '../internal/repeat-cursor.js';
+import { sampleKeyframesUnchecked } from '../internal/sample-keyframes.js';
 
 // ─── Публичные типы ───────────────────────────────────────────────────────────
 
@@ -29,10 +38,8 @@ export type EasingFn = (t: number) => number;
 /**
  * Политика повторов.
  *   'loop'    — каждый цикл проигрывается заново от values[0] к values[last].
- *   'reverse' — циклы чередуют направление (yoyo): чётный цикл вперёд,
- *               нечётный — назад. Алиас: 'mirror' (то же самое поведение).
- *   'mirror'  — алиас 'reverse' (yoyo). Оставлен как отдельное принимаемое
- *               значение для совместимости именования с WAAPI-подобными API.
+ *   'reverse' — нечётный цикл воспроизводит исходный track и easing назад.
+ *   'mirror'  — нечётный цикл меняет порядок values, сохраняя easing вперёд.
  */
 export type KeyframesRepeatType = 'loop' | 'reverse' | 'mirror';
 
@@ -65,13 +72,14 @@ export interface KeyframesOptions {
    * Массив — по одному easing на сегмент, длина = values.length - 1.
    * Не задано → линейная идентичность.
    * Выход любого easing зашивается finiteness-guard'ом (NaN→0, ±Infinity→±MAX_VALUE).
-   * @throws MotionParamError если массив easings не совпадает по длине с числом сегментов.
+   * @throws MotionParamError если массив не совпадает по длине с числом
+   *   сегментов или содержит не-функцию.
    */
   readonly easing?: EasingFn | readonly EasingFn[];
   /**
    * Число ДОПОЛНИТЕЛЬНЫХ повторов после первого проигрывания.
    * 0 (по умолчанию) = сыграть один раз. `Infinity` = бесконечный повтор.
-   * @throws MotionParamError если не целое неотрицательное число (или Infinity).
+   * @throws MotionParamError если не целое 0…2_147_483_647 (или Infinity).
    */
   readonly repeat?: number;
   /** Политика направления повторов. По умолчанию: 'loop'. */
@@ -112,7 +120,8 @@ export interface KeyframesControls {
   pause(): void;
   /**
    * Перемотать к виртуальному времени t (секунды) от начала первого цикла.
-   * t < 0 → 0, NaN → no-op, +Infinity → complete().
+   * t < 0 → 0, NaN → no-op. +Infinity завершает конечный schedule, но для
+   * repeat=Infinity даёт LM166; явное завершение доступно через complete().
    */
   seek(t: number): void;
   /** Немедленно снэпнуть к финальному keyframe (values[last]) и разрешить Promise. */
@@ -131,14 +140,6 @@ export interface KeyframesControls {
 const FIXED_DT_S = 1 / 60;
 /** Safety-cap кадров — идентичен timeline/index.ts MAX_FRAMES. */
 const MAX_FRAMES = 100_000;
-
-// ─── Finiteness guard (mirrors timeline.ts / easing.ts clampFinite) ─────────
-
-function clampFinite(x: number): number {
-  if (Number.isFinite(x)) return x;
-  if (Number.isNaN(x)) return 0;
-  return x > 0 ? Number.MAX_VALUE : -Number.MAX_VALUE;
-}
 
 function linearEasing(t: number): number {
   return t;
@@ -182,51 +183,7 @@ export function sampleKeyframes(
   easings: readonly EasingFn[],
   p: number,
 ): number {
-  const n = values.length;
-  const pClamped = Number.isFinite(p) ? p : p === Infinity ? 1 : p === -Infinity ? 0 : 0;
-
-  if (pClamped <= times[0]!) return values[0]!;
-  if (pClamped >= times[n - 1]!) return values[n - 1]!;
-
-  // Короткие авторские списки ищем линейно; длинные импортированные треки — за O(log N).
-  let i = 0;
-  if (n > 10) {
-    let lo = 0;
-    let hi = n - 1;
-    while (hi - lo > 1) {
-      const mid = (lo + hi) >>> 1;
-      if (pClamped < times[mid]!) hi = mid;
-      else lo = mid;
-    }
-    i = lo;
-  } else {
-    for (; i < n - 2; i++) {
-      if (pClamped < times[i + 1]!) break;
-    }
-  }
-
-  const t0 = times[i]!;
-  const t1 = times[i + 1]!;
-  const v0 = values[i]!;
-  const v1 = values[i + 1]!;
-
-  // Нулевая ширина сегмента (дубликат times) → мгновенный переход.
-  if (t1 <= t0) return v1;
-
-  const localT = clampFinite((pClamped - t0) / (t1 - t0));
-  const localTClamped = localT < 0 ? 0 : localT > 1 ? 1 : localT;
-
-  const ease = easings[i] ?? linearEasing;
-  const eased = clampFinite(ease(localTClamped));
-
-  const range = v1 - v0;
-  const raw = v0 + range * eased;
-  // Overflow guard (invariant 2): covers BOTH the case where `range` itself
-  // overflowed to ±Infinity (e.g. v0/v1 near opposite ends of MAX_VALUE) AND
-  // the case where `range * eased` overflows on its own — `range` finite but
-  // `raw` still non-finite is caught by the same check. Verified load-bearing
-  // by mutation (see keyframes-property-fuzz.test.ts RED-proof).
-  return Number.isFinite(raw) ? raw : v1;
+  return sampleKeyframesUnchecked(values, times, easings, p);
 }
 
 // ─── Компиляция/валидация опций ──────────────────────────────────────────────
@@ -237,7 +194,7 @@ interface CompiledKeyframes {
   readonly easings: readonly EasingFn[];
   readonly duration: number;
   readonly repeat: number;
-  readonly repeatType: KeyframesRepeatType;
+  readonly repeatType: RepeatDirection;
   readonly repeatDelay: number;
 }
 
@@ -287,12 +244,19 @@ function compileKeyframes(opts: KeyframesOptions): CompiledKeyframes {
     if (opts.easing.length !== segCount) {
       throw new MotionParamError('LM040');
     }
+    for (let i = 0; i < segCount; i++) {
+      if (typeof opts.easing[i] !== 'function') {
+        throw new MotionParamError('LM163');
+      }
+    }
     easings = opts.easing;
   } else if (typeof opts.easing === 'function') {
     const fn = opts.easing;
     easings = new Array<EasingFn>(segCount).fill(fn);
-  } else {
+  } else if (opts.easing === undefined) {
     easings = new Array<EasingFn>(segCount).fill(linearEasing);
+  } else {
+    throw new MotionParamError('LM163');
   }
 
   const duration = opts.duration ?? 1;
@@ -301,7 +265,7 @@ function compileKeyframes(opts: KeyframesOptions): CompiledKeyframes {
   }
 
   const repeatRaw = opts.repeat ?? 0;
-  if (repeatRaw !== Infinity && (!Number.isFinite(repeatRaw) || repeatRaw < 0 || Math.floor(repeatRaw) !== repeatRaw)) {
+  if (!isRepeatCount(repeatRaw)) {
     throw new MotionParamError('LM042');
   }
   const repeat = repeatRaw;
@@ -310,12 +274,14 @@ function compileKeyframes(opts: KeyframesOptions): CompiledKeyframes {
   if (repeatTypeRaw !== 'loop' && repeatTypeRaw !== 'reverse' && repeatTypeRaw !== 'mirror') {
     throw new MotionParamError('LM043');
   }
-  // 'mirror' — принимаемый алиас 'reverse' (yoyo); единая внутренняя обработка.
-  const repeatType: KeyframesRepeatType = repeatTypeRaw === 'mirror' ? 'reverse' : repeatTypeRaw;
+  const repeatType: RepeatDirection = repeatTypeRaw === 'reverse' ? 1 : repeatTypeRaw === 'mirror' ? 2 : 0;
 
   const repeatDelay = opts.repeatDelay ?? 0;
   if (!Number.isFinite(repeatDelay) || repeatDelay < 0) {
     throw new MotionParamError('LM044');
+  }
+  if (!isRepeatScheduleRepresentable(0, duration, repeat, repeatDelay)) {
+    throw new MotionParamError('LM161');
   }
 
   return { values, times, easings, duration, repeat, repeatType, repeatDelay };
@@ -335,15 +301,17 @@ export function keyframes(opts: KeyframesOptions): KeyframesControls {
   const globalOnStep = opts.onStep;
   const lastValue = values[values.length - 1]!;
 
-  const totalCycles = repeat === Infinity ? Infinity : repeat + 1;
-  const cycleLen = duration + repeatDelay;
-  const totalDuration =
-    totalCycles === Infinity ? Infinity : duration * totalCycles + repeatDelay * repeat;
+  const totalDuration = repeatDuration(duration, repeat, repeatDelay);
 
   const reduce = prefersReducedMotion(opts.matchMedia);
 
+  const injectedFrame = opts.requestFrame;
+  if (injectedFrame !== undefined && typeof injectedFrame !== 'function') {
+    throw new MotionParamError('LM165');
+  }
+
   const scheduleFrame: (cb: (ts?: number) => void) => number =
-    opts.requestFrame ??
+    injectedFrame ??
     ((cb) =>
       typeof requestAnimationFrame !== 'undefined'
         ? requestAnimationFrame(cb)
@@ -356,28 +324,31 @@ export function keyframes(opts: KeyframesOptions): KeyframesControls {
   let _settled = false;
   let _loopRunning = false;
   let _tickActive = false;
-  let _useTimeoutFallback = false;
   let _frameCount = 0;
+  let _operation = 0;
+  let _samplingPhase: 0 | 1 | 2 = 0;
+  let _publicationQueued = false;
+  let _queuedSettling = false;
+  let _queuedCursor: number | undefined;
 
   let _resolve!: () => void;
   const _promise = new Promise<void>((res) => {
     _resolve = res;
   });
 
+  function sampleCursor(cursor: number): number {
+    return sampleKeyframesUnchecked(
+      values,
+      times,
+      easings,
+      cursor < 0 ? -1 - cursor : cursor,
+      cursor < 0,
+    );
+  }
+
   /** Вычислить интерполированное значение при виртуальном времени vt. */
   function computeAt(vt: number): number {
-    let cycleIndex = Math.floor(vt / cycleLen);
-    if (totalCycles !== Infinity && cycleIndex >= totalCycles) cycleIndex = totalCycles - 1;
-    if (cycleIndex < 0) cycleIndex = 0;
-
-    const local = vt - cycleIndex * cycleLen;
-    const phaseP = local <= duration ? clampFinite(local / duration) : 1;
-    const phaseClamped = phaseP < 0 ? 0 : phaseP > 1 ? 1 : phaseP;
-
-    const forward = repeatType === 'loop' || cycleIndex % 2 === 0;
-    const effectiveP = forward ? phaseClamped : 1 - phaseClamped;
-
-    return clampFinite(sampleKeyframes(values, times, easings, effectiveP));
+    return sampleCursor(repeatCursor(vt, 0, duration, repeat, repeatDelay, repeatType));
   }
 
   function emit(value: number): void {
@@ -400,6 +371,44 @@ export function keyframes(opts: KeyframesOptions): KeyframesControls {
     }
   }
 
+  /**
+   * A reentrant control gets one deferred sample. Further sampling controls
+   * raised by that easing are ignored so it cannot recurse or livelock.
+   */
+  function samplePublication(provenCursor: number | undefined, phase: 1 | 2): number {
+    _samplingPhase = phase;
+    try {
+      return provenCursor === undefined ? computeAt(_vt) : sampleCursor(provenCursor);
+    } finally {
+      _samplingPhase = 0;
+    }
+  }
+
+  function publishCurrent(settling: boolean, provenCursor?: number): void {
+    let owner = ++_operation;
+    if (_samplingPhase !== 0) {
+      _publicationQueued = true;
+      _queuedSettling = settling;
+      _queuedCursor = provenCursor;
+      return;
+    }
+
+    // A throwing easing can leave only a stale private intent behind.
+    _publicationQueued = false;
+    let value = samplePublication(provenCursor, 1);
+    if (_publicationQueued) {
+      _publicationQueued = false;
+      if (_settled) return;
+      owner = _operation;
+      settling = _queuedSettling;
+      value = samplePublication(_queuedCursor, 2);
+    }
+
+    if (owner !== _operation || _settled) return;
+    if (settling) settle(value);
+    else emit(value);
+  }
+
   function tick(ts?: number): void {
     if (_settled) { _loopRunning = false; return; }
     if (_tickActive) return;
@@ -414,60 +423,79 @@ export function keyframes(opts: KeyframesOptions): KeyframesControls {
     try {
       _frameCount++;
       if (_frameCount >= MAX_FRAMES) {
-        // Safety cap — bail out at CURRENT position (not a real natural-complete).
-        settle(computeAt(_vt));
-        return;
+        _frameCount = 0;
+        if (totalDuration !== Infinity) {
+          // Safety cap — bail out at CURRENT position (not a real natural-complete).
+          publishCurrent(true);
+          return;
+        }
       }
 
-      let dt: number;
+      let dt = FIXED_DT_S;
+      let nextRealTs = _lastRealTs;
+      // Omitted timestamps preserve the last real anchor; a present timestamp
+      // is parsed into local transaction state first.
       if (ts !== undefined) {
-        dt = _lastRealTs !== undefined ? (ts - _lastRealTs) / 1000 : FIXED_DT_S;
-        _lastRealTs = ts;
-      } else {
-        dt = FIXED_DT_S;
+        if (Number.isFinite(ts)) {
+          const previous = _lastRealTs;
+          nextRealTs = ts;
+          if (previous !== undefined) {
+            const elapsed = (ts - previous) / 1000;
+            if (Number.isFinite(elapsed) && elapsed > 0) dt = elapsed;
+            else if (!Number.isFinite(elapsed)) nextRealTs = undefined;
+          }
+        } else {
+          nextRealTs = undefined;
+        }
       }
-      if (dt <= 0) dt = FIXED_DT_S;
-
-      _vt += dt;
+      const nextVt = _vt + dt;
+      let provenCursor: number | undefined;
+      // Infinite schedules own an exact parity horizon. Prove the candidate
+      // before committing either clock coordinate; LM166 leaves a resumable
+      // owner at the last valid sample.
+      if (totalDuration === Infinity) {
+        provenCursor = repeatCursor(nextVt, 0, duration, repeat, repeatDelay, repeatType);
+      }
+      _lastRealTs = nextRealTs;
+      _vt = nextVt;
 
       if (totalDuration !== Infinity && _vt >= totalDuration) {
         _vt = totalDuration;
+        _operation++;
         settle(lastCycleEndValue());
         return;
       }
 
-      emit(computeAt(_vt));
+      publishCurrent(false, provenCursor);
+    } catch (error) {
+      _loopRunning = false;
+      throw error;
     } finally {
       _tickActive = false;
     }
 
-    if (_useTimeoutFallback) {
-      setTimeout(tick, 0);
-    } else {
-      const h = scheduleFrame(tick);
-      if (h === 0) {
-        _useTimeoutFallback = true;
-        setTimeout(tick, 0);
-      }
+    if (_settled || _paused) {
+      _loopRunning = false;
+      return;
     }
+    requestNextFrame();
   }
+
+  const requestNextFrame = createFrameRequester(
+    scheduleFrame,
+    tick,
+    injectedFrame !== undefined,
+  );
 
   /** Значение на конце ПОСЛЕДНЕГО цикла (учитывает направление yoyo). */
   function lastCycleEndValue(): number {
-    if (totalCycles === Infinity) return lastValue; // unreachable in practice
-    const lastCycleIndex = totalCycles - 1;
-    const forward = repeatType === 'loop' || lastCycleIndex % 2 === 0;
-    return forward ? values[values.length - 1]! : values[0]!;
+    return repeatType === 0 || repeat % 2 === 0 ? lastValue : values[0]!;
   }
 
   function ensureLoop(): void {
     if (_loopRunning || _settled || _paused) return;
     _loopRunning = true;
-    const h = scheduleFrame(tick);
-    if (h === 0) {
-      _useTimeoutFallback = true;
-      setTimeout(tick, 0);
-    }
+    requestNextFrame();
   }
 
   // ── Reduced-motion CHARACTER-switch (invariant 4) ─────────────────────────
@@ -488,48 +516,59 @@ export function keyframes(opts: KeyframesOptions): KeyframesControls {
     },
     get progress(): number {
       if (_settled) return 1;
-      let cycleIndex = Math.floor(_vt / cycleLen);
-      if (totalCycles !== Infinity && cycleIndex >= totalCycles) cycleIndex = totalCycles - 1;
-      const local = _vt - Math.max(0, cycleIndex) * cycleLen;
-      const p = local <= duration ? local / duration : 1;
-      return Math.min(1, Math.max(0, p));
+      // Public progress is the iteration clock, independent of direction.
+      // Reuse the schedule oracle so value/progress cannot disagree exactly
+      // at a representable iteration boundary.
+      return repeatCursor(_vt, 0, duration, repeat, repeatDelay, 0);
     },
 
     play(): void {
       if (_settled) return;
-      if (!_paused) return;
+      if (!_paused) {
+        ensureLoop();
+        return;
+      }
+      _operation++;
+      _publicationQueued = false;
       _paused = false;
       _lastRealTs = undefined;
       ensureLoop();
     },
 
     pause(): void {
+      if (_settled || _paused) return;
+      _operation++;
+      _publicationQueued = false;
       _paused = true;
     },
 
     seek(t: number): void {
-      if (_settled) return;
+      if (_settled || _samplingPhase === 2) return;
       if (Number.isNaN(t)) return;
       if (t === Infinity) {
+        if (repeat === Infinity) throw new MotionParamError('LM166');
         controls.complete();
         return;
       }
       const upper = totalDuration === Infinity ? Number.MAX_VALUE : totalDuration;
-      _vt = Math.max(0, Math.min(upper, t));
+      const next = Math.max(0, Math.min(upper, t));
+      if (repeat === Infinity) repeatCursor(next, 0, duration, repeat, repeatDelay, 0);
+      _vt = next;
       _lastRealTs = undefined;
-      emit(computeAt(_vt));
+      publishCurrent(false);
     },
 
     complete(): void {
-      if (_settled) return;
+      if (_settled || _samplingPhase === 2) return;
+      _operation++;
       // Совпадает с reduced-motion контрактом: мгновенный snap к финалу.
       _vt = totalDuration === Infinity ? _vt : totalDuration;
       settle(lastValue);
     },
 
     cancel(): void {
-      if (_settled) return;
-      settle(computeAt(_vt));
+      if (_settled || _samplingPhase === 2) return;
+      publishCurrent(true);
     },
 
     then<TResult1 = void, TResult2 = never>(

@@ -183,6 +183,14 @@ describe('keyframes — validation throws MotionParamError', () => {
     ).toThrow(MotionParamError);
   });
 
+  it('repeat integer above MAX_SAFE_INTEGER → throws', () => {
+    expect(() => keyframes({
+      values: [0, 100],
+      repeat: Number.MAX_SAFE_INTEGER + 1,
+      requestFrame: noRaf(),
+    })).toThrow(MotionParamError);
+  });
+
   it('repeatDelay negative → throws', () => {
     expect(() => keyframes({ values: [0, 100], repeatDelay: -1, requestFrame: noRaf() })).toThrow(
       MotionParamError,
@@ -303,8 +311,13 @@ describe('keyframes — repeat + repeatType (loop vs reverse/mirror yoyo)', () =
       requestFrame: noRaf(),
       onStep: (v) => steps.push(v),
     });
+    // V1 and WAAPI use a half-open intermediate boundary: exact restart.
+    c.seek(1);
+    expect(steps.at(-1)).toBe(0);
+    expect(c.progress).toBe(0);
     c.seek(1.0001); // just after first cycle boundary → second cycle, near start
     expect(steps[steps.length - 1]).toBeLessThan(5);
+    expect(c.progress).toBeCloseTo(0.0001, 12);
     c.cancel();
   });
 
@@ -325,19 +338,54 @@ describe('keyframes — repeat + repeatType (loop vs reverse/mirror yoyo)', () =
     c.cancel();
   });
 
-  it("repeatType='mirror' is accepted as alias of 'reverse'", () => {
-    const steps: number[] = [];
-    const c = keyframes({
-      values: [0, 100],
+  it("repeatType='mirror' swaps track endpoints but keeps easing forward", () => {
+    const reverseSteps: number[] = [];
+    const mirrorSteps: number[] = [];
+    const quadratic = (t: number): number => t * t;
+    const reverse = keyframes({
+      values: [0, 100, 20],
+      duration: 1,
+      repeat: 1,
+      repeatType: 'reverse',
+      requestFrame: noRaf(),
+      easing: quadratic,
+      onStep: (v) => reverseSteps.push(v),
+    });
+    const mirror = keyframes({
+      values: [0, 100, 20],
       duration: 1,
       repeat: 1,
       repeatType: 'mirror',
       requestFrame: noRaf(),
-      onStep: (v) => steps.push(v),
+      easing: quadratic,
+      onStep: (v) => mirrorSteps.push(v),
     });
-    c.seek(2); // end of 2nd (mirrored/backward) cycle → values[0]=0
-    expect(steps[steps.length - 1]).toBeCloseTo(0, 6);
-    c.cancel();
+    reverse.seek(1.25);
+    mirror.seek(1.25);
+    expect(reverseSteps.at(-1)).toBe(80);
+    expect(mirrorSteps.at(-1)).toBe(40);
+    reverse.cancel();
+    mirror.cancel();
+  });
+
+  it('mirror captures both segment endpoints before a reentrant easing mutates values', () => {
+    const values = [0, 100, 20];
+    const steps: number[] = [];
+    const controls = keyframes({
+      values,
+      duration: 1,
+      repeat: 1,
+      repeatType: 'mirror',
+      requestFrame: noRaf(),
+      easing: (t) => {
+        values[2] = 999;
+        return t * t;
+      },
+      onStep: (value) => steps.push(value),
+    });
+    controls.seek(1.25);
+    expect(steps.at(-1)).toBe(40);
+    controls.cancel();
   });
 
   it('repeatDelay holds the end-of-cycle value during the pause window', () => {

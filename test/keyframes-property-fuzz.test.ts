@@ -9,8 +9,8 @@
  * Seed: deterministic LCG (no Math.random) — reproducible across runs/CI.
  *
  * ── RED PROOF (verified by actual mutation, not merely asserted) ────────────
- * Replace `return Number.isFinite(raw) ? raw : v1;` with `return raw;` in
- * sampleKeyframes() (src/keyframes/index.ts) → both fuzz suites below
+ * Replace `return Number.isFinite(value) ? value : to;` with `return value;` in
+ * sampleKeyframesUnchecked() (src/internal/sample-keyframes.ts) → both fuzz suites below
  * (random overflow-range inputs AND the dedicated MAX_VALUE-scale edge test)
  * immediately fail with a non-finite (-Infinity/NaN) result at iter=5 →
  * confirmed RED. Restore → GREEN (54/54 passing). This is the sole

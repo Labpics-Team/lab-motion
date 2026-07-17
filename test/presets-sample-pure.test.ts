@@ -7,8 +7,8 @@
  *     БЕЗ повторной валидации (дисциплина sampleKeyframes).
  *   - Мультитрек: один момент времени t → значение КАЖДОГО трека спеки.
  *   - delay: t < delay → поза t=0 (первые значения треков), не «до-старта-пусто».
- *   - repeat/repeatType: семантика идентична keyframes ('loop' | 'reverse',
- *     'mirror' — алиас 'reverse'); repeatDelay держит конец цикла.
+ *   - repeat/repeatType: семантика идентична keyframes: reverse разворачивает
+ *     time/easing, mirror разворачивает values и сохраняет easing вперёд.
  *   - t за пределами totalDuration → значения конца ПОСЛЕДНЕГО цикла (yoyo-aware).
  *   - Инвариант конечности: ЛЮБОЙ вход (NaN/±Infinity/overflow) → конечный выход.
  *   - Детерминизм: бит-идентичные значения на повторном прогоне.
@@ -127,6 +127,12 @@ describe('presets — samplePreset: repeat и границы', () => {
     const c = compilePreset(pulseLikeSpec({ repeat: 1 }));
     // второй цикл, t=1.25 → фаза 0.25 → 1.5
     expect(samplePreset(c, 1.25).scale).toBeCloseTo(1.5, 12);
+    const asymmetric = compilePreset({
+      duration: 1,
+      tracks: [{ property: 'x', values: [0, 100, 20] }],
+      repeat: 1,
+    });
+    expect(samplePreset(asymmetric, 1).x).toBe(0); // half-open V1 boundary: next start
   });
 
   it("А: repeatType 'reverse' — нечётный цикл идёт назад (yoyo)", () => {
@@ -143,12 +149,17 @@ describe('presets — samplePreset: repeat и границы', () => {
     expect(samplePreset(c, 2).x).toBeCloseTo(0, 12);
   });
 
-  it("А: 'mirror' — принимаемый алиас 'reverse'", () => {
-    const a = compilePreset(pulseLikeSpec({ repeat: 1, repeatType: 'mirror' }));
-    const b = compilePreset(pulseLikeSpec({ repeat: 1, repeatType: 'reverse' }));
-    for (const t of [0, 0.3, 1.1, 1.7, 2]) {
-      expect(samplePreset(a, t)).toEqual(samplePreset(b, t));
-    }
+  it("А: 'mirror' reverses values while 'reverse' reverses time/easing", () => {
+    const quadratic = (t: number): number => t * t;
+    const spec = {
+      duration: 1,
+      tracks: [{ property: 'x' as const, values: [0, 100, 20], easing: quadratic }],
+      repeat: 1,
+    };
+    const reverse = compilePreset({ ...spec, repeatType: 'reverse' });
+    const mirror = compilePreset({ ...spec, repeatType: 'mirror' });
+    expect(samplePreset(reverse, 1.25).x).toBe(80);
+    expect(samplePreset(mirror, 1.25).x).toBe(40);
   });
 
   it('А: repeatDelay держит значение конца цикла между циклами', () => {
@@ -176,7 +187,7 @@ describe('presets — samplePreset: repeat и границы', () => {
     expect(samplePreset(yoyo, 99).x).toBeCloseTo(0, 12);
   });
 
-  it('А: repeat=Infinity — сэмплируется в любом далёком t без зависаний', () => {
+  it('А: repeat=Infinity — сэмплируется в далёком поддерживаемом t без зависаний', () => {
     const c = compilePreset(pulseLikeSpec({ repeat: Infinity }));
     expect(presetTotalDuration(c)).toBe(Infinity);
     const v = samplePreset(c, 1e9 + 0.25);
@@ -198,11 +209,9 @@ describe('presets — samplePreset: хостильное t', () => {
     expect(samplePreset(c, -5).x).toBe(3);
   });
 
-  it('А: NaN в reverse-режиме тоже даёт позу t=0 (NaN-нормализация load-bearing)', () => {
-    // Mutation proof: убрать NaN-ветку нормализации t → NaN доплывает до
-    // cycleIndex, NaN%2===0 → false → forward=false → effectiveP=1 → ФИНАЛ
-    // вместо позы t=0 → RED. В loop-режиме мутация замаскирована downstream-
-    // клампами — этот кейс закрывает класс целиком.
+  it('А: NaN в reverse-режиме делегируется каноническому cursor и даёт позу t=0', () => {
+    // Пинит общую границу владения временем: repeat-cursor нормализует
+    // hostile time до выбора чётности reverse-итерации.
     const c = compilePreset({
       duration: 1,
       tracks: [{ property: 'x', values: [3, 10] }],
@@ -235,9 +244,9 @@ describe('presets — samplePreset: детерминизм и конечност
   });
 
   it('В: fuzz 10k+ хостильных входов — выход ВСЕГДА конечен', () => {
-    // Конечность несёт sampleKeyframes (внутренний overflow-guard `isFinite(raw) ? raw : v1`).
-    // Mutation proof: в src/keyframes/index.ts заменить `return Number.isFinite(raw) ? raw : v1`
-    // на `return raw` → overflow-спека [-MAX, MAX, 0] даёт ±Infinity → RED здесь.
+    // Конечность несёт sampleKeyframes (overflow-guard `isFinite(value) ? value : to`).
+    // Mutation proof: в src/internal/sample-keyframes.ts заменить finite-result guard
+    // на `return value` → overflow-спека [-MAX, MAX, 0] даёт ±Infinity → RED здесь.
     const hostileT = [
       Number.NaN,
       Infinity,
@@ -275,6 +284,10 @@ describe('presets — samplePreset: детерминизм и конечност
     for (const spec of specs) {
       const c = compilePreset(spec);
       for (const t of hostileT) {
+        if (c.repeat === Infinity && (t === Infinity || t === Number.MAX_VALUE || t === 1e308)) {
+          expect(() => samplePreset(c, t)).toThrowError(/^LM166$/);
+          continue;
+        }
         const v = samplePreset(c, t);
         for (const key of Object.keys(v) as (keyof typeof v)[]) {
           expect(Number.isFinite(v[key]!)).toBe(true);

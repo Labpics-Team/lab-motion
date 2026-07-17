@@ -14,7 +14,7 @@ export type MotionParamErrorCode = `LM${Digit}${Digit}${Digit}`;
 const MOTION_PARAM_ERROR_CODE = /^LM\d{3}$/;
 
 /** Последний непрерывный код каталога; contract-тест сверяет его с docs/errors.md. */
-export const LAST_MOTION_PARAM_ERROR_CODE: MotionParamErrorCode = 'LM158';
+export const LAST_MOTION_PARAM_ERROR_CODE: MotionParamErrorCode = 'LM166';
 
 /** Thrown when caller-supplied physics parameters are invalid (invariant 2). */
 export class MotionParamError extends Error {

@@ -26,6 +26,13 @@ function base(patch: Record<string, unknown>): PresetSpec {
 }
 
 describe('presets — compilePreset: валидация', () => {
+  it('невызываемый scalar easing отвергается стабильным LM164', () => {
+    expect(() => compilePreset({
+      duration: 1,
+      tracks: [{ property: 'x', values: [0, 1], easing: 42 as never }],
+    })).toThrowError(/^LM164$/);
+  });
+
   it('А: duration ≤ 0 / NaN / Infinity → MotionParamError', () => {
     for (const duration of [0, -1, Number.NaN, Infinity, -Infinity]) {
       expect(() => compilePreset(base({ duration }))).toThrow(MotionParamError);
@@ -87,8 +94,8 @@ describe('presets — compilePreset: валидация', () => {
     ).toThrow(MotionParamError);
   });
 
-  it('А: repeat дробный/отрицательный/NaN → MotionParamError; Infinity — валиден', () => {
-    for (const repeat of [-1, 0.5, Number.NaN]) {
+  it('А: repeat не safe-целый/отрицательный/NaN → MotionParamError; Infinity — валиден', () => {
+    for (const repeat of [-1, 0.5, Number.NaN, Number.MAX_SAFE_INTEGER + 1]) {
       expect(() => compilePreset(base({ repeat }))).toThrow(MotionParamError);
     }
     expect(() => compilePreset(base({ repeat: Infinity }))).not.toThrow();

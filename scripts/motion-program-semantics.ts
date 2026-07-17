@@ -23,9 +23,9 @@ import {
   type MotionProgramV1,
 } from '../src/internal/motion-program.js';
 import {
-  motionProgramInfiniteBoundaryAtOrBeforeV1,
-  motionProgramInfiniteBoundaryV1,
-} from './motion-program-dyadic.js';
+  scheduleV1GreatestIterationAtOrBefore,
+  SCHEDULE_V1_ITERATION_OUT_OF_RANGE,
+} from '../src/internal/schedule-v1.js';
 
 function semanticFailure(
   code: 'LMP_NUMBER' | 'LMP_CODEC' | 'LMP_FEATURE' | 'LMP_SHAPE' | 'LMP_BOUNDS' | 'LMP_CANONICAL',
@@ -339,16 +339,13 @@ export function evaluateMotionProgramScheduleV1(
       const parity = (repeat & 1) as 0 | 1;
       return scheduleSample(timeMs === terminalMs ? 'terminal' : 'after', repeat, parity, 1, direction);
     }
-    // repeat <= int32: 31 шага находят greatest absolute boundary <= sample,
-    // не используя нестабильное вычитание start и quotient.
-    let low = 0;
-    let high = repeat;
-    while (low < high) {
-      const middle = low + Math.ceil((high - low) / 2);
-      if (motionProgramIterationBoundaryV1(startMs, cycleMs, middle) <= timeMs) low = middle;
-      else high = middle - 1;
-    }
-    const iteration = low;
+    const iteration = scheduleV1GreatestIterationAtOrBefore(
+      startMs,
+      cycleMs,
+      repeat,
+      timeMs,
+    );
+    if (iteration === SCHEDULE_V1_ITERATION_OUT_OF_RANGE) semanticFailure('LMP_BOUNDS');
     const parity = (iteration & 1) as 0 | 1;
     const iterationStartMs = motionProgramIterationBoundaryV1(startMs, cycleMs, iteration);
     const motionEndMs = repeatDelayMs === 0 && iteration < repeat
@@ -367,13 +364,15 @@ export function evaluateMotionProgramScheduleV1(
     return scheduleSample('repeatDelay', iteration, parity, 1, direction);
   }
 
-  const infinite = motionProgramInfiniteBoundaryAtOrBeforeV1(startMs, cycleMs, timeMs);
-  const parity = Number(infinite.iteration & 1n) as 0 | 1;
+  const iteration = scheduleV1GreatestIterationAtOrBefore(startMs, cycleMs, -1, timeMs);
+  if (iteration === SCHEDULE_V1_ITERATION_OUT_OF_RANGE) semanticFailure('LMP_BOUNDS');
+  const iterationStartMs = motionProgramIterationBoundaryV1(startMs, cycleMs, iteration);
+  const parity = (iteration & 1) as 0 | 1;
   const motionEndMs = repeatDelayMs === 0
-    ? motionProgramInfiniteBoundaryV1(startMs, cycleMs, infinite.iteration + 1n)
-    : infinite.boundaryMs + durationMs;
+    ? motionProgramIterationBoundaryV1(startMs, cycleMs, iteration + 1)
+    : iterationStartMs + durationMs;
   if (durationMs > 0 && timeMs < motionEndMs) {
-    const progress = (timeMs - infinite.boundaryMs) / (motionEndMs - infinite.boundaryMs);
+    const progress = (timeMs - iterationStartMs) / (motionEndMs - iterationStartMs);
     return scheduleSample(
       'motion',
       null,
@@ -386,8 +385,10 @@ export function evaluateMotionProgramScheduleV1(
 }
 
 /**
- * Исполняет уже разрешённые segments. Mirror разворачивает их порядок,
- * отражает interval, меняет from/to и оставляет исходную curve forward.
+ * Исполняет уже разрешённые segments. Mirror меняет порядок значений, но
+ * authored interval и curve остаются на своём forward-индексе. Codec следует
+ * за развёрнутой парой значений: иначе heterogeneous portable tracks читали бы
+ * endpoint в чужом формате.
  */
 export function evaluateMotionProgramSegmentsV1(
   segments: readonly MotionProgramSegmentV1[],
@@ -397,6 +398,9 @@ export function evaluateMotionProgramSegmentsV1(
 ): MotionProgramEncodedValueV1 {
   if (segments.length !== resolved.length || segments.length === 0) semanticFailure('LMP_CODEC');
   const progress = clamp01(requireFinite(schedule.progress));
+  const last = resolved.length - 1;
+  if (progress === 0) return schedule.mirrored ? resolved[last]![1] : resolved[0]![0];
+  if (progress === 1) return schedule.mirrored ? resolved[0]![0] : resolved[last]![1];
   if (!schedule.mirrored) {
     for (let i = 0; i < segments.length; i++) {
       const segment = segments[i]!;
@@ -412,19 +416,17 @@ export function evaluateMotionProgramSegmentsV1(
       }
     }
   } else {
-    for (let i = segments.length - 1; i >= 0; i--) {
-      const segment = segments[i]!;
-      const reflectedStart = 1 - segment[1];
-      const reflectedEnd = 1 - segment[0];
-      if (progress < reflectedEnd || i === 0) {
-        const local = reflectedEnd > reflectedStart
-          ? (progress - reflectedStart) / (reflectedEnd - reflectedStart)
-          : 1;
-        const curved = evaluateMotionProgramCurveV1(curves[segment[4]]!, local);
+    for (let authoredIndex = 0; authoredIndex < segments.length; authoredIndex++) {
+      const authored = segments[authoredIndex]!;
+      if (progress < authored[1] || authoredIndex === segments.length - 1) {
+        const valueIndex = segments.length - 1 - authoredIndex;
+        const valueSegment = segments[valueIndex]!;
+        const local = (progress - authored[0]) / (authored[1] - authored[0]);
+        const curved = evaluateMotionProgramCurveV1(curves[authored[4]]!, local);
         return interpolateMotionProgramValueV1(
-          segment[5],
-          resolved[i]![1],
-          resolved[i]![0],
+          valueSegment[5],
+          resolved[valueIndex]![1],
+          resolved[valueIndex]![0],
           curved,
         );
       }

@@ -26,8 +26,16 @@
 
 import { easeOut, sineInOut } from '../easing/index.js';
 import { MotionParamError } from '../errors.js';
+import { createFrameRequester } from '../internal/frame-requester.js';
 import {
-  sampleKeyframes,
+  isRepeatScheduleRepresentable,
+  isRepeatCount,
+  repeatCursor,
+  repeatEndTime,
+  type RepeatDirection,
+} from '../internal/repeat-cursor.js';
+import { sampleKeyframesUnchecked } from '../internal/sample-keyframes.js';
+import {
   type EasingFn,
   type MatchMediaResult,
 } from '../keyframes/index.js';
@@ -52,7 +60,7 @@ export type PresetProperty =
   | 'opacity'
   | 'progress';
 
-/** Политика повторов — семантика идентична keyframes ('mirror' = алиас 'reverse'). */
+/** Политика повторов — семантика идентична keyframes. */
 export type PresetRepeatType = 'loop' | 'reverse' | 'mirror';
 
 /** Один трек пресета: опорные значения одного свойства во времени цикла. */
@@ -66,7 +74,7 @@ export interface PresetTrack {
    * times[0]=0, times[last]=1. Не задано → равномерное авто-распределение.
    */
   readonly times?: readonly number[];
-  /** Easing на сегмент: один общий или массив длиной values.length-1. */
+  /** Easing на сегмент: функция или массив функций длиной values.length-1. */
   readonly easing?: EasingFn | readonly EasingFn[];
 }
 
@@ -81,7 +89,7 @@ export interface PresetSpec {
    * позу t=0 (первые значения треков) — слой видим и статичен, не «пуст».
    */
   readonly delay?: number;
-  /** Число ДОПОЛНИТЕЛЬНЫХ циклов: целое >= 0 или Infinity. По умолчанию 0. */
+  /** Дополнительные циклы: целое 0…2_147_483_647 или Infinity. По умолчанию 0. */
   readonly repeat?: number;
   /** Политика направления повторов. По умолчанию 'loop'. */
   readonly repeatType?: PresetRepeatType;
@@ -103,7 +111,7 @@ export interface CompiledPreset {
   readonly duration: number;
   readonly delay: number;
   readonly repeat: number;
-  readonly repeatType: 'loop' | 'reverse';
+  readonly repeatType: PresetRepeatType;
   readonly repeatDelay: number;
   readonly tracks: readonly CompiledTrack[];
 }
@@ -213,11 +221,18 @@ export function compilePreset(spec: PresetSpec): CompiledPreset {
       if (track.easing.length !== segCount) {
         throw new MotionParamError('LM058');
       }
+      for (let i = 0; i < segCount; i++) {
+        if (typeof track.easing[i] !== 'function') {
+          throw new MotionParamError('LM164');
+        }
+      }
       easings = track.easing;
     } else if (typeof track.easing === 'function') {
       easings = new Array<EasingFn>(segCount).fill(track.easing);
-    } else {
+    } else if (track.easing === undefined) {
       easings = new Array<EasingFn>(segCount).fill(linearEasing);
+    } else {
+      throw new MotionParamError('LM164');
     }
 
     tracks.push({ property, values, times, easings });
@@ -229,10 +244,7 @@ export function compilePreset(spec: PresetSpec): CompiledPreset {
   }
 
   const repeatRaw = spec.repeat ?? 0;
-  if (
-    repeatRaw !== Infinity &&
-    (!Number.isFinite(repeatRaw) || repeatRaw < 0 || Math.floor(repeatRaw) !== repeatRaw)
-  ) {
+  if (!isRepeatCount(repeatRaw)) {
     throw new MotionParamError('LM060');
   }
 
@@ -240,11 +252,12 @@ export function compilePreset(spec: PresetSpec): CompiledPreset {
   if (repeatTypeRaw !== 'loop' && repeatTypeRaw !== 'reverse' && repeatTypeRaw !== 'mirror') {
     throw new MotionParamError('LM061');
   }
-  const repeatType: 'loop' | 'reverse' = repeatTypeRaw === 'mirror' ? 'reverse' : repeatTypeRaw;
-
   const repeatDelay = spec.repeatDelay ?? 0;
   if (!Number.isFinite(repeatDelay) || repeatDelay < 0) {
     throw new MotionParamError('LM062');
+  }
+  if (!isRepeatScheduleRepresentable(delay, duration, repeatRaw, repeatDelay)) {
+    throw new MotionParamError('LM161');
   }
 
   return {
@@ -252,7 +265,7 @@ export function compilePreset(spec: PresetSpec): CompiledPreset {
     duration,
     delay,
     repeat: repeatRaw,
-    repeatType,
+    repeatType: repeatTypeRaw,
     repeatDelay,
     tracks,
   };
@@ -265,9 +278,12 @@ export function compilePreset(spec: PresetSpec): CompiledPreset {
  * Infinity при repeat=Infinity — метаданные, не эмитируемое значение.
  */
 export function presetTotalDuration(compiled: CompiledPreset): number {
-  const cycles = compiled.repeat === Infinity ? Infinity : compiled.repeat + 1;
-  if (cycles === Infinity) return Infinity;
-  return compiled.delay + compiled.duration * cycles + compiled.repeatDelay * compiled.repeat;
+  return repeatEndTime(
+    compiled.delay,
+    compiled.duration,
+    compiled.repeat,
+    compiled.repeatDelay,
+  );
 }
 
 // ─── samplePreset: чистый горячий сэмплер ────────────────────────────────────
@@ -278,64 +294,43 @@ export function presetTotalDuration(compiled: CompiledPreset): number {
  * (контракт: compiled получен из compilePreset).
  *
  * Хостильное t: NaN → поза t=0; -Infinity/отрицательное → поза t=0;
- * +Infinity/за totalDuration → конец последнего цикла (yoyo-aware).
- * Конечность значений гарантируют guards sampleKeyframes (инвариант 2);
- * NaN, дошедший до фазы, нормализуется там же (pClamped → 0).
+ * конечный schedule после terminal → последняя поза (yoyo-aware).
+ * Infinite schedule за точным integer-горизонтом, включая +Infinity, → LM166.
+ * Нормализация принадлежит единому repeat cursor; конечность значений —
+ * внутреннему keyframe sampler (инвариант 2).
+ * @throws MotionParamError LM166, если infinite sample требует неточный индекс.
  */
-export function samplePreset(compiled: CompiledPreset, tSeconds: number): PresetValues {
-  // Хостильное время → детерминированные края. Ветка NaN load-bearing для
-  // reverse-режима: без неё NaN доплывает до cycleIndex, NaN%2===0 даёт
-  // false → forward=false → финал вместо позы t=0 (запинено тестом).
-  let t: number;
-  if (Number.isNaN(tSeconds)) {
-    t = 0;
-  } else if (tSeconds === Infinity) {
-    t = Number.MAX_VALUE;
-  } else if (tSeconds === -Infinity || tSeconds < 0) {
-    t = 0;
-  } else {
-    t = tSeconds;
-  }
-
-  // Delay-окно: держим позу t=0 (первые значения треков).
-  let vt = t - compiled.delay;
-  if (vt < 0) vt = 0;
-
-  const { duration, repeat, repeatType, repeatDelay, tracks } = compiled;
-  const totalCycles = repeat === Infinity ? Infinity : repeat + 1;
-  const cycleLen = duration + repeatDelay;
-  const activeTotal =
-    totalCycles === Infinity ? Infinity : duration * totalCycles + repeatDelay * repeat;
-
-  // За пределами активной длительности → конец ПОСЛЕДНЕГО цикла (yoyo-aware).
-  let cycleIndex: number;
-  let phaseP: number;
-  if (activeTotal !== Infinity && vt >= activeTotal) {
-    cycleIndex = totalCycles - 1;
-    phaseP = 1;
-  } else {
-    cycleIndex = Math.floor(vt / cycleLen);
-    if (cycleIndex < 0) cycleIndex = 0;
-    if (totalCycles !== Infinity && cycleIndex >= totalCycles) cycleIndex = totalCycles - 1;
-    const local = vt - cycleIndex * cycleLen;
-    // Окно repeatDelay (local > duration) держит конец цикла: p=1.
-    // Не-конечная фаза здесь не нормализуется намеренно: <0/>1 режут края,
-    // а NaN нормализует pClamped внутри sampleKeyframes (внешний clamp был
-    // бы мёртвым кодом — урок верификации s07).
-    phaseP = local <= duration ? local / duration : 1;
-    if (phaseP < 0) phaseP = 0;
-    else if (phaseP > 1) phaseP = 1;
-  }
-
-  const forward = repeatType === 'loop' || cycleIndex % 2 === 0;
-  const effectiveP = forward ? phaseP : 1 - phaseP;
+function samplePresetCursor(compiled: CompiledPreset, cursor: number): PresetValues {
+  const { tracks } = compiled;
+  const progress = cursor < 0 ? -1 - cursor : cursor;
+  const mirrored = cursor < 0;
 
   const out: PresetValues = {};
   for (let i = 0; i < tracks.length; i++) {
     const track = tracks[i]!;
-    out[track.property] = sampleKeyframes(track.values, track.times, track.easings, effectiveP);
+    out[track.property] = sampleKeyframesUnchecked(
+      track.values,
+      track.times,
+      track.easings,
+      progress,
+      mirrored,
+    );
   }
   return out;
+}
+
+export function samplePreset(compiled: CompiledPreset, tSeconds: number): PresetValues {
+  const { duration, repeat, repeatType, repeatDelay } = compiled;
+  const direction: RepeatDirection = repeatType === 'reverse' ? 1 : repeatType === 'mirror' ? 2 : 0;
+  const cursor = repeatCursor(
+    tSeconds,
+    compiled.delay,
+    duration,
+    repeat,
+    repeatDelay,
+    direction,
+  );
+  return samplePresetCursor(compiled, cursor);
 }
 
 // ─── Фабрики пресетов ────────────────────────────────────────────────────────
@@ -637,7 +632,7 @@ export interface PresetControls {
   play(): void;
   /** Пауза (замораживает виртуальное время). */
   pause(): void;
-  /** Перемотка к t секунд. NaN → no-op, +Infinity → complete(). */
+  /** NaN → no-op; +Infinity завершает finite, а для repeat=∞ даёт LM166. */
   seek(t: number): void;
   /** Снэп к финальной позе (repeat=∞ → нейтральная поза t=0) и резолв. */
   complete(): void;
@@ -681,12 +676,22 @@ export function runPreset(
 ): PresetControls {
   const compiled = isCompiled(spec) ? spec : compilePreset(spec);
   const totalDuration = presetTotalDuration(compiled);
+  const repeatDirection: RepeatDirection = compiled.repeatType === 'reverse'
+    ? 1
+    : compiled.repeatType === 'mirror'
+      ? 2
+      : 0;
   const onUpdate = opts.onUpdate;
 
   const reduce = prefersReducedMotion(opts.matchMedia);
 
+  const injectedFrame = opts.requestFrame;
+  if (injectedFrame !== undefined && typeof injectedFrame !== 'function') {
+    throw new MotionParamError('LM165');
+  }
+
   const scheduleFrame: (cb: (ts?: number) => void) => number =
-    opts.requestFrame ??
+    injectedFrame ??
     ((cb) =>
       typeof requestAnimationFrame !== 'undefined'
         ? requestAnimationFrame(cb)
@@ -699,8 +704,13 @@ export function runPreset(
   let _settled = false;
   let _loopRunning = false;
   let _tickActive = false;
-  let _useTimeoutFallback = false;
   let _frameCount = 0;
+  let _operation = 0;
+  let _samplingPhase: 0 | 1 | 2 = 0;
+  let _publicationQueued = false;
+  let _queuedTime = 0;
+  let _queuedSettling = false;
+  let _queuedCursor: number | undefined;
 
   let _resolve!: () => void;
   const _promise = new Promise<void>((res) => {
@@ -727,6 +737,51 @@ export function runPreset(
     }
   }
 
+  /**
+   * A reentrant control gets one deferred sample. Further sampling controls
+   * raised by that easing are ignored so it cannot recurse or livelock.
+   */
+  function samplePublication(
+    time: number,
+    provenCursor: number | undefined,
+    phase: 1 | 2,
+  ): PresetValues {
+    _samplingPhase = phase;
+    try {
+      return provenCursor === undefined
+        ? samplePreset(compiled, time)
+        : samplePresetCursor(compiled, provenCursor);
+    } finally {
+      _samplingPhase = 0;
+    }
+  }
+
+  function publishAt(time: number, settling: boolean, provenCursor?: number): void {
+    let owner = ++_operation;
+    if (_samplingPhase !== 0) {
+      _publicationQueued = true;
+      _queuedTime = time;
+      _queuedSettling = settling;
+      _queuedCursor = provenCursor;
+      return;
+    }
+
+    // A throwing easing can leave only a stale private intent behind.
+    _publicationQueued = false;
+    let values = samplePublication(time, provenCursor, 1);
+    if (_publicationQueued) {
+      _publicationQueued = false;
+      if (_settled) return;
+      owner = _operation;
+      settling = _queuedSettling;
+      values = samplePublication(_queuedTime, _queuedCursor, 2);
+    }
+
+    if (owner !== _operation || _settled) return;
+    if (settling) settle(values);
+    else emit(values);
+  }
+
   function tick(ts?: number): void {
     if (_settled) {
       _loopRunning = false;
@@ -744,52 +799,77 @@ export function runPreset(
     try {
       _frameCount++;
       if (_frameCount >= MAX_FRAMES) {
-        // Safety cap — выходим в ТЕКУЩЕЙ позиции (не «естественный» финал).
-        settle(samplePreset(compiled, _vt));
-        return;
+        _frameCount = 0;
+        if (totalDuration !== Infinity) {
+          // Safety cap — выходим в ТЕКУЩЕЙ позиции (не «естественный» финал).
+          publishAt(_vt, true);
+          return;
+        }
       }
 
-      let dt: number;
+      let dt = FIXED_DT_S;
+      let nextRealTs = _lastRealTs;
+      // Omitted timestamps preserve the last real anchor; a present timestamp
+      // is parsed into local transaction state first.
       if (ts !== undefined) {
-        dt = _lastRealTs !== undefined ? (ts - _lastRealTs) / 1000 : FIXED_DT_S;
-        _lastRealTs = ts;
-      } else {
-        dt = FIXED_DT_S;
+        if (Number.isFinite(ts)) {
+          const previous = _lastRealTs;
+          nextRealTs = ts;
+          if (previous !== undefined) {
+            const elapsed = (ts - previous) / 1000;
+            if (Number.isFinite(elapsed) && elapsed > 0) dt = elapsed;
+            else if (!Number.isFinite(elapsed)) nextRealTs = undefined;
+          }
+        } else {
+          nextRealTs = undefined;
+        }
       }
-      if (dt <= 0) dt = FIXED_DT_S;
-
-      _vt += dt;
+      const nextVt = _vt + dt;
+      let provenCursor: number | undefined;
+      if (totalDuration === Infinity) {
+        provenCursor = repeatCursor(
+          nextVt,
+          compiled.delay,
+          compiled.duration,
+          compiled.repeat,
+          compiled.repeatDelay,
+          repeatDirection,
+        );
+      }
+      _lastRealTs = nextRealTs;
+      _vt = nextVt;
 
       if (totalDuration !== Infinity && _vt >= totalDuration) {
         _vt = totalDuration;
-        settle(samplePreset(compiled, totalDuration));
+        publishAt(_vt, true);
         return;
       }
 
-      emit(samplePreset(compiled, _vt));
+      publishAt(_vt, false, provenCursor);
+    } catch (error) {
+      _loopRunning = false;
+      throw error;
     } finally {
       _tickActive = false;
     }
 
-    if (_useTimeoutFallback) {
-      setTimeout(tick, 0);
-    } else {
-      const h = scheduleFrame(tick);
-      if (h === 0) {
-        _useTimeoutFallback = true;
-        setTimeout(tick, 0);
-      }
+    if (_settled || _paused) {
+      _loopRunning = false;
+      return;
     }
+    requestNextFrame();
   }
+
+  const requestNextFrame = createFrameRequester(
+    scheduleFrame,
+    tick,
+    injectedFrame !== undefined,
+  );
 
   function ensureLoop(): void {
     if (_loopRunning || _settled || _paused) return;
     _loopRunning = true;
-    const h = scheduleFrame(tick);
-    if (h === 0) {
-      _useTimeoutFallback = true;
-      setTimeout(tick, 0);
-    }
+    requestNextFrame();
   }
 
   // ── Reduced-motion CHARACTER-switch — синхронно, до старта лупа ───────────
@@ -813,54 +893,74 @@ export function runPreset(
     },
     get progress(): number {
       if (_settled) return 1;
-      const active = Math.max(0, _vt - compiled.delay);
-      const cycleLen = compiled.duration + compiled.repeatDelay;
-      const totalCycles = compiled.repeat === Infinity ? Infinity : compiled.repeat + 1;
-      let cycleIndex = Math.floor(active / cycleLen);
-      if (totalCycles !== Infinity && cycleIndex >= totalCycles) cycleIndex = totalCycles - 1;
-      const local = active - Math.max(0, cycleIndex) * cycleLen;
-      const p = local <= compiled.duration ? local / compiled.duration : 1;
-      return Math.min(1, Math.max(0, p));
+      return repeatCursor(
+        _vt,
+        compiled.delay,
+        compiled.duration,
+        compiled.repeat,
+        compiled.repeatDelay,
+        0,
+      );
     },
 
     play(): void {
       if (_settled) return;
-      if (!_paused) return;
+      if (!_paused) {
+        ensureLoop();
+        return;
+      }
+      _operation++;
+      _publicationQueued = false;
       _paused = false;
       _lastRealTs = undefined;
       ensureLoop();
     },
 
     pause(): void {
+      if (_settled || _paused) return;
+      _operation++;
+      _publicationQueued = false;
       _paused = true;
     },
 
     seek(t: number): void {
-      if (_settled) return;
+      if (_settled || _samplingPhase === 2) return;
       if (Number.isNaN(t)) return;
       if (t === Infinity) {
+        if (compiled.repeat === Infinity) throw new MotionParamError('LM166');
         controls.complete();
         return;
       }
       const upper = totalDuration === Infinity ? Number.MAX_VALUE : totalDuration;
-      _vt = Math.max(0, Math.min(upper, t));
+      const next = Math.max(0, Math.min(upper, t));
+      if (compiled.repeat === Infinity) {
+        repeatCursor(
+          next,
+          compiled.delay,
+          compiled.duration,
+          compiled.repeat,
+          compiled.repeatDelay,
+          0,
+        );
+      }
+      _vt = next;
       _lastRealTs = undefined;
-      emit(samplePreset(compiled, _vt));
+      publishAt(_vt, false);
     },
 
     complete(): void {
-      if (_settled) return;
+      if (_settled || _samplingPhase === 2) return;
       if (compiled.repeat === Infinity) {
-        settle(samplePreset(compiled, 0)); // нейтральная поза — у лупа нет финала
+        publishAt(0, true); // нейтральная поза — у лупа нет финала
         return;
       }
       _vt = totalDuration;
-      settle(samplePreset(compiled, totalDuration));
+      publishAt(_vt, true);
     },
 
     cancel(): void {
-      if (_settled) return;
-      settle(samplePreset(compiled, _vt));
+      if (_settled || _samplingPhase === 2) return;
+      publishAt(_vt, true);
     },
 
     then<TResult1 = void, TResult2 = never>(
@@ -913,20 +1013,40 @@ const WAAPI_GRID_INTERVALS = 24;
  * ТОЛЬКО данные (keyframes + timing), DOM-вызов делает потребитель.
  *
  * Семантика easing сохраняется плотной сеткой offset'ов: в каждой точке
- * значение вычислено точно (sampleKeyframes), между точками WAAPI
+ * значение вычислено точно (sampleKeyframesUnchecked), между точками WAAPI
  * интерполирует линейно (timing.easing='linear').
  *
  * transform собирается в фикс-порядке translate → rotate → scale;
  * оси масштаба перемножаются: sx = scale·scaleX, sy = scale·scaleY.
  *
- * @throws MotionParamError при невалидной спеке и при repeatDelay > 0
+ * @throws MotionParamError при невалидной спеке, repeatDelay > 0 между
+ *   повторами или mirror с повтором: WAAPI alternate разворачивает easing.
+ *
+ * При repeat > 0 и repeatDelay > 0
  *   (в WAAPI нет нативного repeatDelay; честный отказ вместо тихо-неверной
  *   семантики — для repeatDelay используйте runPreset).
  */
 export function presetToWaapi(spec: PresetSpec | CompiledPreset): WaapiConversion {
   const compiled = isCompiled(spec) ? spec : compilePreset(spec);
-  if (compiled.repeatDelay > 0) {
+  if (compiled.repeat > 0 && compiled.repeatDelay > 0) {
     throw new MotionParamError('LM071');
+  }
+  if (compiled.repeat > 0 && compiled.repeatType === 'mirror') {
+    throw new MotionParamError('LM159');
+  }
+  const timingDuration = compiled.duration * 1000;
+  const timingDelay = compiled.delay * 1000;
+  const timingIterations = compiled.repeat === Infinity ? Infinity : compiled.repeat + 1;
+  if (!Number.isFinite(timingDuration) || !(timingDuration > 0) ||
+    !Number.isFinite(timingDelay) || timingDelay < 0) {
+    throw new MotionParamError('LM162');
+  }
+  if (compiled.repeat !== Infinity && !(timingIterations > compiled.repeat)) {
+    throw new MotionParamError('LM161');
+  }
+  if (compiled.repeat !== Infinity &&
+    !Number.isFinite(timingDelay + timingDuration * timingIterations)) {
+    throw new MotionParamError('LM162');
   }
 
   // Offsets: точки times всех треков ∪ равномерная сетка (дедуп через Set).
@@ -946,11 +1066,11 @@ export function presetToWaapi(spec: PresetSpec | CompiledPreset): WaapiConversio
   const hasProgress = has('progress');
   const hasCss = hasTranslate || hasRotate || hasScale || hasOpacity;
 
-  // Конечность значений гарантирует sampleKeyframes (см. инвариант 2).
+  // Конечность значений гарантирует sampleKeyframesUnchecked (см. инвариант 2).
   const sampleTrackAt = (p: PresetProperty, offset: number): number | undefined => {
     const track = compiled.tracks.find((t) => t.property === p);
     if (!track) return undefined;
-    return sampleKeyframes(track.values, track.times, track.easings, offset);
+    return sampleKeyframesUnchecked(track.values, track.times, track.easings, offset);
   };
 
   const keyframes: WaapiKeyframe[] = [];
@@ -972,6 +1092,9 @@ export function presetToWaapi(spec: PresetSpec | CompiledPreset): WaapiConversio
         const s = sampleTrackAt('scale', offset) ?? 1;
         const sx = s * (sampleTrackAt('scaleX', offset) ?? 1);
         const sy = s * (sampleTrackAt('scaleY', offset) ?? 1);
+        if (!Number.isFinite(sx) || !Number.isFinite(sy)) {
+          throw new MotionParamError('LM162');
+        }
         parts.push(`scale(${sx}, ${sy})`);
       }
       const kf: { offset: number; transform?: string; opacity?: number } = { offset };
@@ -992,9 +1115,9 @@ export function presetToWaapi(spec: PresetSpec | CompiledPreset): WaapiConversio
   } = {
     keyframes,
     timing: {
-      duration: compiled.duration * 1000,
-      delay: compiled.delay * 1000,
-      iterations: compiled.repeat === Infinity ? Infinity : compiled.repeat + 1,
+      duration: timingDuration,
+      delay: timingDelay,
+      iterations: timingIterations,
       direction: compiled.repeatType === 'reverse' ? 'alternate' : 'normal',
       fill: 'both',
       easing: 'linear',

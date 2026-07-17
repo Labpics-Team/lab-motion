@@ -12,16 +12,15 @@
  *   эмитится строкой CSS linear() (Baseline с 12.2023) — равноудалённое
  *   сэмплирование, проценты не нужны;
  * - repeat (ДОПОЛНИТЕЛЬНЫЕ повторы) → iterations = repeat + 1 (ПОЛНОЕ число);
- * - repeatType 'loop' → direction 'normal'; 'reverse'/'mirror' → 'alternate';
- * - repeatDelay: у WAAPI нет per-iteration delay (только delay/endDelay) —
- *   пауза ЗАПЕКАЕТСЯ hold-сегментом: цикл растягивается до duration+repeatDelay,
- *   offsets сжимаются, хвост держит последнее значение. Пауза у движка только
- *   МЕЖДУ циклами (totalDuration = d·(repeat+1) + r·repeat, см. keyframes), а
- *   цикл WAAPI несёт hold всегда — поэтому последняя итерация обрезается
- *   ДРОБНЫМИ iterations = repeat + d/(d+r): активная длительность совпадает с
- *   движком точно, Animation.finished не запаздывает на хвостовой hold. Для
- *   'reverse'/'mirror' запекание исказило бы чётные циклы (hold оказался бы в
- *   начале обратного прохода) — комбинация отвергается рано, MotionParamError.
+ * - repeatType 'loop' → direction 'normal'; 'reverse' → 'alternate'; mirror
+ *   с repeat fail-closed: WAAPI alternate разворачивает time/easing и не
+ *   эквивалентен перестановке generator values;
+ * - repeatDelay: у WAAPI нет per-iteration delay. Бесконечный loop запекает
+ *   паузу hold-сегментом в повторяемый цикл. Для конечного repeat ни дробная
+ *   итерация, ни развёрнутый single-timeline не дают portable terminal/reset
+ *   semantics во всех Chromium/Firefox/WebKit, поэтому compileWaapi/animateWaapi
+ *   fail-closed с LM161 до host commit. Вызывающий должен направить такой track
+ *   в канонический keyframes runner, где finite repeatDelay поддержан полностью.
  * - fill по умолчанию 'both': WAAPI-дефолт 'none' снэпает элемент обратно после
  *   finish — для анимационной библиотеки это сюрприз, не поведение.
  *
@@ -33,6 +32,10 @@
 
 import { normalizeEasing } from '../easing/index.js';
 import { MotionParamError } from '../errors.js';
+import {
+  isRepeatCount,
+  isRepeatScheduleRepresentable,
+} from '../internal/repeat-cursor.js';
 
 /** Секция движка: easing-функция t∈[0,1] → значение. */
 export type WaapiEasingFn = (t: number) => number;
@@ -49,11 +52,11 @@ export interface WaapiCompileOptions {
   readonly times?: readonly number[];
   /** Easing на сегмент (один общий или массив length = values.length − 1). */
   readonly easing?: WaapiEasingFn | readonly WaapiEasingFn[];
-  /** Дополнительные повторы (0 = один прогон). Целое >= 0 или Infinity. */
+  /** Дополнительные повторы: целое 0…2_147_483_647 или Infinity. */
   readonly repeat?: number;
   /** Политика повторов. По умолчанию 'loop'. */
   readonly repeatType?: 'loop' | 'reverse' | 'mirror';
-  /** Пауза между циклами (секунды), >= 0. Запекается hold-сегментом. */
+  /** Пауза между циклами (секунды), >= 0. */
   readonly repeatDelay?: number;
   /** Форматтер значения (единицы/шаблоны). По умолчанию число как есть. */
   readonly format?: (v: number) => string | number;
@@ -96,49 +99,54 @@ export function easingToLinear(fn: WaapiEasingFn, points: number = DEFAULT_EASIN
 
 // ─── Валидация compileWaapi ──────────────────────────────────────────────────
 
-function validateOptions(o: WaapiCompileOptions): {
-  times: readonly number[];
-  duration: number;
-  repeat: number;
-  repeatType: 'loop' | 'reverse' | 'mirror';
-  repeatDelay: number;
-  segmentEasings: readonly WaapiEasingFn[] | undefined;
-} {
-  if (typeof o.property !== 'string' || o.property.length === 0) {
+type ValidatedOptions = readonly [
+  property: string,
+  values: readonly number[],
+  times: readonly number[] | undefined,
+  duration: number,
+  repeat: number,
+  repeatType: 'loop' | 'reverse' | 'mirror',
+  repeatDelay: number,
+  easing: WaapiEasingFn | readonly WaapiEasingFn[] | undefined,
+];
+
+function validateOptions(o: WaapiCompileOptions): ValidatedOptions {
+  const property = o.property;
+  if (typeof property !== 'string' || property.length === 0) {
     throw new MotionParamError('LM120');
   }
   // Эти имена — метаданные WAAPI-кейфрейма: значение перезаписало бы offset/easing
   // кадра. CSS-свойство offset в WAAPI пишется как cssOffset (MDN Keyframe Formats).
-  if (o.property === 'offset' || o.property === 'easing' || o.property === 'composite') {
+  if (property === 'offset' || property === 'easing' || property === 'composite') {
     throw new MotionParamError('LM121');
   }
-  const n = o.values.length;
+
+  const values = [...o.values];
+  const n = values.length;
   if (n < 2) {
     throw new MotionParamError('LM122');
   }
-  for (const v of o.values) {
+  for (const v of values) {
     if (!Number.isFinite(v)) {
       throw new MotionParamError('LM123');
     }
   }
 
-  let times: readonly number[];
-  if (o.times === undefined) {
-    times = o.values.map((_, i) => i / (n - 1));
-  } else {
-    if (o.times.length !== n) {
+  const sourceTimes = o.times;
+  const times = sourceTimes === undefined ? undefined : [...sourceTimes];
+  if (times !== undefined) {
+    if (times.length !== n) {
       throw new MotionParamError('LM124');
     }
-    if (o.times[0] !== 0 || o.times[n - 1] !== 1) {
+    if (times[0] !== 0 || times[n - 1] !== 1) {
       throw new MotionParamError('LM125');
     }
     for (let i = 0; i < n; i++) {
-      const t = o.times[i]!;
-      if (!Number.isFinite(t) || (i > 0 && t < o.times[i - 1]!)) {
+      const t = times[i]!;
+      if (!Number.isFinite(t) || (i > 0 && t < times[i - 1]!)) {
         throw new MotionParamError('LM126');
       }
     }
-    times = o.times;
   }
 
   const duration = o.duration ?? 1;
@@ -147,7 +155,7 @@ function validateOptions(o: WaapiCompileOptions): {
   }
 
   const repeat = o.repeat ?? 0;
-  if (repeat !== Infinity && (!Number.isInteger(repeat) || repeat < 0)) {
+  if (!isRepeatCount(repeat)) {
     throw new MotionParamError('LM128');
   }
 
@@ -160,58 +168,91 @@ function validateOptions(o: WaapiCompileOptions): {
   if (repeatType !== 'loop' && repeatType !== 'reverse' && repeatType !== 'mirror') {
     throw new MotionParamError('LM130');
   }
+  if (!isRepeatScheduleRepresentable(0, duration, repeat, repeatDelay)) {
+    throw new MotionParamError('LM161');
+  }
+  if (repeat > 0 && repeatType === 'mirror') {
+    throw new MotionParamError('LM160');
+  }
   if (repeatDelay > 0 && repeat > 0 && repeatType !== 'loop') {
     throw new MotionParamError('LM131');
   }
-
-  let segmentEasings: readonly WaapiEasingFn[] | undefined;
-  if (o.easing !== undefined) {
-    if (typeof o.easing === 'function') {
-      segmentEasings = Array.from({ length: n - 1 }, () => o.easing as WaapiEasingFn);
-    } else {
-      if (!Array.isArray(o.easing)) {
+  if (repeatDelay > 0 && repeat > 0 && repeat !== Infinity) {
+    throw new MotionParamError('LM161');
+  }
+  const sourceEasing = o.easing;
+  const easing = Array.isArray(sourceEasing) ? [...sourceEasing] : sourceEasing;
+  if (easing !== undefined && typeof easing !== 'function') {
+      if (!Array.isArray(easing)) {
         throw new MotionParamError('LM132');
       }
-      if (o.easing.length !== n - 1) {
+      if (easing.length !== n - 1) {
         throw new MotionParamError('LM133');
       }
-      for (const e of o.easing) {
+      for (const e of easing) {
         if (typeof e !== 'function') {
           throw new MotionParamError('LM134');
         }
       }
-      segmentEasings = o.easing;
-    }
   }
 
-  return { times, duration, repeat, repeatType, repeatDelay, segmentEasings };
+  return [property, values, times, duration, repeat, repeatType, repeatDelay, easing];
 }
 
 // ─── compileWaapi ────────────────────────────────────────────────────────────
 
 /** Чистая компиляция модели движка в аргументы Element.animate(). */
 export function compileWaapi(options: WaapiCompileOptions): WaapiCompiled {
-  const { times, duration, repeat, repeatType, repeatDelay, segmentEasings } =
+  const [property, values, times, duration, repeat, repeatType, repeatDelay, easing] =
     validateOptions(options);
-  const { property, values } = options;
-  const format = options.format ?? ((v: number): string | number => v);
-  const points = options.easingPoints ?? DEFAULT_EASING_POINTS;
   const n = values.length;
 
-  // Hold-запекание паузы между циклами (см. шапку). Без повторов пауза
-  // не наблюдаема — нечего запекать.
+  // После validation hold возможен здесь только у infinite loop. Без повторов
+  // repeatDelay ненаблюдаем и не меняет артефакт.
   const bakeHold = repeatDelay > 0 && repeat > 0;
   const total = bakeHold ? duration + repeatDelay : duration;
   const scale = bakeHold ? duration / total : 1;
-
+  const timingDuration = total * 1000;
+  const iterations = repeat === Infinity ? Infinity : repeat + 1;
+  if (!Number.isFinite(timingDuration) || !(timingDuration > 0) ||
+    !Number.isFinite(scale) || !(scale > 0)) {
+    throw new MotionParamError('LM162');
+  }
+  if (repeat !== Infinity && !(iterations > repeat)) {
+    throw new MotionParamError('LM161');
+  }
+  if (repeat !== Infinity && !Number.isFinite(timingDuration * iterations)) {
+    throw new MotionParamError('LM162');
+  }
+  // Positive scaling is monotone mathematically, but two distinct binary64
+  // authored stops can round onto one WAAPI offset. Preflight every stop before
+  // user format/easing callbacks; authored duplicates remain intentional jumps.
+  if (scale !== 1) {
+    let previousSource = times === undefined ? 0 : times[0]!;
+    let previousOffset = previousSource * scale;
+    for (let i = 1; i < n; i++) {
+      const source = times === undefined ? i / (n - 1) : times[i]!;
+      const offset = source * scale;
+      if (source > previousSource && !(offset > previousOffset)) {
+        throw new MotionParamError('LM162');
+      }
+      previousSource = source;
+      previousOffset = offset;
+    }
+  }
+  const format = options.format ?? ((v: number): string | number => v);
+  const points = options.easingPoints ?? DEFAULT_EASING_POINTS;
   const keyframes: Record<string, string | number>[] = [];
   for (let i = 0; i < n; i++) {
     const frame: Record<string, string | number> = {
-      offset: times[i]! * scale,
+      offset: (times === undefined ? i / (n - 1) : times[i]!) * scale,
       [property]: format(values[i]!),
     };
-    if (segmentEasings !== undefined && i < n - 1) {
-      frame['easing'] = easingToLinear(segmentEasings[i]!, points);
+    if (easing !== undefined && i < n - 1) {
+      frame['easing'] = easingToLinear(
+        typeof easing === 'function' ? easing : easing[i]!,
+        points,
+      );
     }
     keyframes.push(frame);
   }
@@ -222,12 +263,9 @@ export function compileWaapi(options: WaapiCompileOptions): WaapiCompiled {
   return {
     keyframes,
     timing: {
-      duration: total * 1000,
-      // Пауза движка — только между циклами: при запекании последняя итерация
-      // дробная, хвостовой hold обрезается (активная длительность = движковой).
-      iterations:
-        repeat === Infinity ? Infinity : bakeHold ? repeat + duration / total : repeat + 1,
-      direction: repeatType === 'loop' ? 'normal' : 'alternate',
+      duration: timingDuration,
+      iterations,
+      direction: repeatType === 'reverse' ? 'alternate' : 'normal',
       fill: 'both',
     },
   };

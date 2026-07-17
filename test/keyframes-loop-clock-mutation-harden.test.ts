@@ -14,9 +14,8 @@
  * (2) ГРАНИЦА NATURAL-COMPLETE: _vt >= totalDuration — settle РОВНО на кадре
  *     попадания (x+x=2x в FP точно). Оракул — счётчик заявок кадров у инжект-
  *     клока (наблюдаемая граница seam). Убивает L430 (>=→>).
- * (3) MAX_FRAMES-CAP ДОСТИЖИМ: repeat=Infinity не завершается естественно →
- *     обязан settle ровно на кадре 100 000 конечным значением (CSS-safety).
- *     Убивает L412 (++→--), L413 (false, >=→>, block).
+ * (3) MAX_FRAMES-CAP НЕ МЕНЯЕТ Infinity-КОНТРАКТ: счётчик сбрасывается на
+ *     кадре 100 000, но вечный repeat остаётся живым и конечным по значению.
  * (4) POST-SETTLE ДИСЦИПЛИНА: после settle НИЧЕГО не эмитится и не планируется;
  *     seek/complete/cancel после settle не двигают время; seek(NaN) — no-op;
  *     seek(Infinity) ≡ complete (настоящий settle, не только снап значения).
@@ -131,10 +130,10 @@ describe('keyframes natural-complete: settle ровно при _vt === totalDura
   });
 });
 
-// ─── (3) MAX_FRAMES-cap достижим при repeat=Infinity ─────────────────────────
+// ─── (3) MAX_FRAMES не превращает repeat=Infinity в конечный ────────────────
 
-describe('keyframes safety-cap: бесконечная анимация обязана остановиться на кадре MAX_FRAMES', () => {
-  it('repeat=Infinity → settle ровно на кадре 100 000, значение конечно (CSS-safety)', () => {
+describe('keyframes safety-cap: бесконечная анимация остаётся бесконечной', () => {
+  it('repeat=Infinity жив после кадра 100 000, значение конечно', () => {
     const clock = makeQueueClock();
     let last = Number.NaN;
     const kf = keyframes({
@@ -144,11 +143,12 @@ describe('keyframes safety-cap: бесконечная анимация обяз
       requestFrame: clock.requestFrame,
       onStep: (v) => { last = v; },
     });
-    let guard = 0;
-    while (clock.q.length > 0 && guard++ < 100_050) clock.fire(undefined);
-    expect(clock.requests()).toBe(100_000); // ровно MAX_FRAMES заявок: cap на кадре 100 000
-    expect(kf.progress).toBe(1);            // settled
+    for (let i = 0; i < 100_000; i++) clock.fire(undefined);
+    expect(clock.requests()).toBe(100_001);
+    expect(clock.q).toHaveLength(1);
+    expect(kf.progress).not.toBe(1);
     expect(Number.isFinite(last)).toBe(true);
+    kf.cancel();
   });
 });
 

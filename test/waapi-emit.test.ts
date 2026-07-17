@@ -7,7 +7,7 @@
  * Написаны до реализации — на стабе падал бы каждый поведенческий блок своим ассертом.
  * Mutation-proof: сломать iterations=repeat+1 (→repeat) → «repeat=2 → iterations=3»
  * RED; сломать маппинг 'reverse'→'alternate' → таблица направлений RED; сломать
- * масштаб offsets при repeatDelay → «hold-запекание» RED; сломать клауза
+ * finite repeatDelay portable guard → LM161 до format/easing/host commit RED; сломать клауза
  * равноудалённых стопов linear() → известные числа easingToLinear RED.
  *
  * Заземление (MDN, точные цитаты в Graphiti research «S11 WAAPI»):
@@ -15,7 +15,7 @@
  *   нашей per-segment моделью;
  * - offset ∈ [0,1] по возрастанию;
  * - iterations = ПОЛНОЕ число проигрываний (наш repeat = дополнительные);
- * - у WAAPI НЕТ per-iteration delay → repeatDelay запекается hold-сегментом;
+ * - у WAAPI НЕТ portable finite per-iteration delay → route в keyframes runner;
  * - CSS linear(): равноудалённые стопы не требуют процентов.
  */
 
@@ -124,12 +124,18 @@ describe('waapi: compileWaapi — маппинг известных чисел',
     ).toBe(Infinity);
   });
 
-  it("repeatType: 'loop'→'normal', 'reverse'/'mirror'→'alternate'", () => {
-    const dir = (repeatType: 'loop' | 'reverse' | 'mirror') =>
+  it("repeatType: 'loop'→'normal', 'reverse'→'alternate'; mirror fails closed", () => {
+    const dir = (repeatType: 'loop' | 'reverse') =>
       compileWaapi({ property: 'o', values: [0, 1], duration: 1, repeat: 1, repeatType }).timing.direction;
     expect(dir('loop')).toBe('normal');
     expect(dir('reverse')).toBe('alternate');
-    expect(dir('mirror')).toBe('alternate');
+    expect(() => compileWaapi({
+      property: 'o',
+      values: [0, 100, 20],
+      duration: 1,
+      repeat: 1,
+      repeatType: 'mirror',
+    })).toThrowError(/^LM160$/);
   });
 
   it('format форматирует значения (числа → строки с единицами)', () => {
@@ -142,61 +148,112 @@ describe('waapi: compileWaapi — маппинг известных чисел',
     expect(r.keyframes[0]!['transform']).toBe('translateX(0px)');
     expect(r.keyframes[1]!['transform']).toBe('translateX(10px)');
   });
+
+  it('snapshots validated inputs before format can mutate caller-owned state', () => {
+    const values = [0, 10, 20];
+    const times = [0, 0.5, 1];
+    const easings = [(t: number): number => t, (t: number): number => t * t];
+    let propertyReads = 0;
+    const options = {
+      get property(): string {
+        propertyReads++;
+        return propertyReads === 1 ? 'transform' : 'offset';
+      },
+      values,
+      times,
+      easing: easings,
+      easingPoints: 3,
+      format(value: number): string {
+        values[1] = 999;
+        times[1] = 0.9;
+        easings[0] = () => 0;
+        easings[1] = () => 0;
+        return `translateX(${value}px)`;
+      },
+    };
+
+    const result = compileWaapi(options);
+
+    expect(propertyReads).toBe(1);
+    expect(result.keyframes).toEqual([
+      { offset: 0, transform: 'translateX(0px)', easing: 'linear(0, 0.5, 1)' },
+      { offset: 0.5, transform: 'translateX(10px)', easing: 'linear(0, 0.25, 1)' },
+      { offset: 1, transform: 'translateX(20px)' },
+    ]);
+  });
 });
 
-// ─── compileWaapi: hold-запекание repeatDelay ────────────────────────────────
+// ─── compileWaapi: repeatDelay portable boundary ─────────────────────────────
 
-describe('waapi: repeatDelay → hold-сегмент (у WAAPI нет per-iteration delay)', () => {
-  it('loop: duration растягивается, offsets масштабируются, хвост держит значение', () => {
-    const r = compileWaapi({
+describe('waapi: repeatDelay → portable boundary', () => {
+  it('infinite hold rejects strictly increasing authored times that collapse after scaling', () => {
+    const left = 0.7974094492383301;
+    const right = 0.7974094492383302;
+    let calls = 0;
+    expect(left).toBeLessThan(right);
+    expect(() => compileWaapi({
       property: 'opacity',
-      values: [0, 1],
-      duration: 1,
-      repeat: 1,
+      values: [0, 1, 2, 3],
+      times: [0, left, right, 1],
+      duration: 0.1,
+      repeat: Infinity,
+      repeatDelay: 1,
+      format(value) {
+        calls++;
+        return value;
+      },
+      easing: [
+        (t) => { calls++; return t; },
+        (t) => { calls++; return t; },
+        (t) => { calls++; return t; },
+      ],
+    })).toThrowError(/^LM162$/);
+    expect(calls).toBe(0);
+
+    const duplicate = compileWaapi({
+      property: 'opacity',
+      values: [0, 1, 2, 3],
+      times: [0, left, left, 1],
+      duration: 0.1,
+      repeat: Infinity,
       repeatDelay: 1,
     });
-    expect(r.timing.duration).toBe(2000); // (1s движения + 1s hold) в мс
-    const offs = r.keyframes.map((k) => k.offset);
-    expect(offs).toEqual([0, 0.5, 1]); // движение сжато в первую половину
-    expect(r.keyframes[1]!['opacity']).toBe(1);
-    expect(r.keyframes[2]!['opacity']).toBe(1); // hold той же величины
+    expect(duplicate.keyframes[1]!.offset).toBe(duplicate.keyframes[2]!.offset);
   });
 
-  it('пауза только МЕЖДУ циклами: дробные iterations обрезают хвостовой hold', () => {
-    // Семантика движка (keyframes/index.ts): totalDuration = d·(repeat+1) + r·repeat —
-    // у N циклов N−1 пауз. Цикл WAAPI включает hold, поэтому последняя итерация
-    // дробная: iterations = repeat + d/(d+r).
-    const r = compileWaapi({
-      property: 'o',
-      values: [0, 1],
-      duration: 1,
-      repeat: 1,
-      repeatDelay: 1,
-    });
-    expect(r.timing.iterations).toBeCloseTo(1.5, 12); // 1 + 1/(1+1)
-    // активная длительность = 2s·1.5 = 3s = движок: 1·2 + 1·1
-    expect((r.timing.duration / 1000) * r.timing.iterations).toBeCloseTo(3, 12);
-  });
-
-  it('differential: активная длительность WAAPI ≡ totalDuration движка (сетка repeat×repeatDelay)', () => {
-    for (const repeat of [0, 1, 3]) {
-      for (const repeatDelay of [0, 0.25, 2]) {
-        for (const duration of [0.5, 1.7]) {
-          const r = compileWaapi({ property: 'o', values: [0, 1], duration, repeat, repeatDelay });
-          const engine = keyframes({
-            values: [0, 1],
-            duration,
-            repeat,
-            repeatDelay,
-            requestFrame: () => 0,
-          });
-          expect((r.timing.duration / 1000) * r.timing.iterations).toBeCloseTo(
-            engine.totalDuration,
-            10,
-          );
-        }
-      }
+  it('любой finite repeatDelay fail-closed до format/easing и host commit', () => {
+    let calls = 0;
+    for (const [duration, repeat, repeatDelay] of [
+      [1, 1, 1],
+      [0.00005, 2, 0.00002],
+      [8.3e-7, 2_147_483_647, 0.99999917],
+      [0.00006907150968459744, 1_055_663_962, 0.30355795758042775],
+    ] as const) {
+      expect(() => compileWaapi({
+        property: 'opacity',
+        values: [0, 1],
+        duration,
+        repeat,
+        repeatDelay,
+        format: (value) => {
+          calls++;
+          return value;
+        },
+        easing: (t) => {
+          calls++;
+          return t;
+        },
+      })).toThrowError(/^LM161$/);
     }
+    expect(calls).toBe(0);
+  });
+
+  it('canonical keyframes runner сохраняет полную finite repeatDelay семантику', () => {
+    const runner = keyframes({
+      values: [0, 1], duration: 1, repeat: 1, repeatDelay: 1, requestFrame: () => 0,
+    });
+    expect(runner.totalDuration).toBe(3);
+    runner.cancel();
   });
 
   it('repeat=Infinity с repeatDelay: iterations=Infinity, цикл несёт hold', () => {
@@ -217,7 +274,7 @@ describe('waapi: repeatDelay → hold-сегмент (у WAAPI нет per-iterat
     expect(r.keyframes.map((k) => k.offset)).toEqual([0, 1]);
   });
 
-  it('reverse/mirror + repeatDelay>0 → MotionParamError рано (честная граница)', () => {
+  it('reverse/mirror + repeatDelay>0 → MotionParamError рано', () => {
     for (const repeatType of ['reverse', 'mirror'] as const) {
       expect(() =>
         compileWaapi({
@@ -274,6 +331,7 @@ describe('waapi: compileWaapi — невалидные входы → MotionPara
     expect(() => compileWaapi({ ...base, duration: NaN })).toThrow(MotionParamError);
     expect(() => compileWaapi({ ...base, repeat: -1 })).toThrow(MotionParamError);
     expect(() => compileWaapi({ ...base, repeat: 1.5 })).toThrow(MotionParamError);
+    expect(() => compileWaapi({ ...base, repeat: Number.MAX_SAFE_INTEGER + 1 })).toThrow(MotionParamError);
     expect(() => compileWaapi({ ...base, repeatDelay: -0.1 })).toThrow(MotionParamError);
     expect(() => compileWaapi({ ...base, property: '' })).toThrow(MotionParamError);
     expect(() => compileWaapi({ ...base, easing: [(t: number) => t] })).not.toThrow(); // 1 easing на 1 сегмент — валидно
@@ -362,7 +420,7 @@ describe('waapi: fuzz — инварианты на злых валидных в
         values,
         duration: 0.01 + rnd() * 100,
         repeat: n % 3 === 0 ? Math.floor(rnd() * 5) : 0,
-        repeatDelay: n % 3 === 0 ? rnd() : 0,
+        repeatDelay: 0,
       });
       const offs = r.keyframes.map((k) => k.offset as number);
       expect(offs[0]).toBe(0);
@@ -432,6 +490,27 @@ describe('waapi: animateWaapi — тонкий адаптер', () => {
     expect((f.calls[0]!.timing as Record<string, unknown>)['fill']).toBe('forwards');
   });
 
+  it('finite repeatDelay не коммитит неверный native effect молча', () => {
+    const f = fakeElement();
+    expect(() => animateWaapi(f.el, {
+      property: 'o', values: [0, 1], duration: 1, repeat: 1, repeatDelay: 1,
+    })).toThrowError(/^LM161$/);
+    expect(f.calls).toHaveLength(0);
+  });
+
+  it('collapsed infinite-hold offsets fail before native effect commit', () => {
+    const f = fakeElement();
+    expect(() => animateWaapi(f.el, {
+      property: 'o',
+      values: [0, 1, 2, 3],
+      times: [0, 0.7974094492383301, 0.7974094492383302, 1],
+      duration: 0.1,
+      repeat: Infinity,
+      repeatDelay: 1,
+    })).toThrowError(/^LM162$/);
+    expect(f.calls).toHaveLength(0);
+  });
+
   it('цель без animate → MotionParamError рано, до компиляции', () => {
     expect(() =>
       animateWaapi({} as never, { property: 'o', values: [0, 1], duration: 1 }),
@@ -449,7 +528,7 @@ describe('waapi: детерминизм', () => {
       duration: 1.5,
       easing: easeOut,
       repeat: 2,
-      repeatDelay: 0.3,
+      repeatDelay: 0,
     };
     expect(compileWaapi(opts)).toEqual(compileWaapi(opts));
   });
