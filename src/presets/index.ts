@@ -783,10 +783,7 @@ export function runPreset(
   }
 
   function tick(ts?: number): void {
-    if (_settled) {
-      _loopRunning = false;
-      return;
-    }
+    if (_settled) return;
     if (_tickActive) return;
 
     if (_paused) {
@@ -846,18 +843,14 @@ export function runPreset(
       }
 
       publishAt(_vt, false, provenCursor);
-    } catch (error) {
-      _loopRunning = false;
-      throw error;
     } finally {
+      // Доставленный кадр больше не владеет будущей заявкой. Следующая
+      // транзакция ensureLoop либо получает владение, либо откатывается в idle.
+      _loopRunning = false;
       _tickActive = false;
     }
 
-    if (_settled || _paused) {
-      _loopRunning = false;
-      return;
-    }
-    requestNextFrame();
+    ensureLoop();
   }
 
   const requestNextFrame = createFrameRequester(
@@ -869,7 +862,14 @@ export function runPreset(
   function ensureLoop(): void {
     if (_loopRunning || _settled || _paused) return;
     _loopRunning = true;
-    requestNextFrame();
+    try {
+      requestNextFrame();
+    } catch (error) {
+      // Host не создал кадр: публикуем idle до исходной ошибки, чтобы следующий
+      // play() мог получить ровно одного нового владельца.
+      _loopRunning = false;
+      throw error;
+    }
   }
 
   // ── Reduced-motion CHARACTER-switch — синхронно, до старта лупа ───────────
