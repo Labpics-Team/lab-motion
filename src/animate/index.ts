@@ -150,6 +150,16 @@ interface UnitControls {
   cancel(): void;
 }
 
+// Снимок constructor берётся при загрузке модуля: lifecycle создаётся после
+// host-effects и потому не может доверять поздней подмене globalThis.Promise.
+const INTRINSIC_PROMISE = Promise;
+
+// Promise ассимилирует thenable отдельной внутренней job. Так сохраняется
+// публичный порядок без доверия к заменяемому host-шву queueMicrotask.
+const ASYNC_FINISH = {
+  then(resolve: () => void): void { resolve(); },
+} as unknown as PromiseLike<void>;
+
 function releaseTransition(rec: GroupRecord, owner: GroupOwner | undefined): void {
   rec._transition = false;
   // User onComplete при release не должен скрыть исходный host-сбой successor.
@@ -397,18 +407,25 @@ export function animate(
   let done = 0;
   let natural = 0;
   let setupDone = false;
-  let resolveFinished!: () => void;
+  let resolveFinished!: (value: void | PromiseLike<void>) => void;
   // Наружу виден один lifecycle, поэтому один aggregate Promise заменяет N
   // скрытых Unit-deferred и не превращает массовый start в GC-hot-path.
   const maybeComplete = (): void => {
     if (!setupDone || done !== total) return;
     setupDone = false; // та же защёлка гасит повторную terminal-отчётность
     mainBatch = undefined;
-    // Старые per-unit Promise ставили aggregate-resolution на следующую
-    // микрозадачу. Сохраняем этот порядок без N deferred: Promise
-    // завершится даже если onComplete бросит.
-    queueMicrotask(resolveFinished);
-    if (natural === total) options.onComplete?.();
+    // Thenable-adoption даёт промежуточную Promise job: уже поставленная
+    // caller-микрозадача остаётся перед finished reactions.
+    resolveFinished(ASYNC_FINISH);
+    if (natural === total) {
+      try { options.onComplete?.(); } catch (error) {
+        // Отчёт об ошибке callback не владеет lifecycle: hostile reporter не
+        // может спрятать controls или заменить natural completion.
+        try {
+          (globalThis as { reportError?: (reason: unknown) => void }).reportError?.(error);
+        } catch { /* best-effort отчёт host-у */ }
+      }
+    }
   };
   const report = (nat: boolean): void => {
     done++;
@@ -509,7 +526,7 @@ export function animate(
   }
   // Commit успешен: только теперь публичный deferred может стать
   // достижимым. Бросок host-а во время commit не оставит abandoned Promise.
-  const finished = new Promise<void>((resolve) => {
+  const finished = new INTRINSIC_PROMISE<void>((resolve) => {
     resolveFinished = resolve;
   });
   setupDone = true;

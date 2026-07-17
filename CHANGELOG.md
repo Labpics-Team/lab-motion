@@ -56,6 +56,11 @@
 
 ### Fixed
 
+- `./animate`: создание и завершение `finished`, ассимиляция WAAPI completion и
+  отложенный release owner больше не зависят от поздней подмены `Promise` или
+  `queueMicrotask`; бросающий host scheduler и ошибка `onComplete` не прячут
+  controls, не оставляют Promise pending и не меняют успешный supersede на
+  natural completion.
 - MotionProgram V1 возвращает exact track endpoints до authored easing при
   normal и mirror, включая дорожки со сменой codec между сегментами; reference,
   web sampler и future-host conformance corpus теперь следуют одному закону.
