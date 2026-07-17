@@ -451,6 +451,9 @@ export class WaapiUnit implements GroupOwner {
           _delayMs: 0,
           _batch: batch,
           _onDone: (natural) => this._finish(natural),
+          // Wrapper и delegate — один public control: rollback обязан вернуть оба
+          // уровня в retryable pause, не только live executor.
+          _onRollback: () => { this._paused = true; },
           _startPaused: paused,
         });
       } catch (error) {

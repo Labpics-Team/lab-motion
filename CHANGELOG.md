@@ -56,6 +56,9 @@
 
 ### Fixed
 
+- `./animate`: неудачная реентрантная подписка `SurfaceBatch` теперь
+  транзакционно откатывает все присоединённые в этой попытке поверхности,
+  сохраняет исходную host-ошибку и оставляет paused controls повторяемыми.
 - `./animate`: создание и завершение `finished`, ассимиляция WAAPI completion и
   отложенный release owner больше не зависят от поздней подмены `Promise` или
   `queueMicrotask`; бросающий host scheduler и ошибка `onComplete` не прячут
