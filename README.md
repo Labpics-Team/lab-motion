@@ -6,7 +6,7 @@ DOM — рендер делает ваш колбэк, время приходи
 
 Три вещи, которые нужно понять сразу:
 
-1. **Всё — субпути.** Корневой экспорт + 37 субпутей (38 входов `exports` в
+1. **Всё — субпути.** Корневой экспорт + 38 субпутей (39 входов `exports` в
    `package.json`); точный `sideEffects`-allowlist сохраняет только авто-регистрацию
    web components, остальные неиспользуемые субпути вырезаются.
 2. **Две фазы движения.** Интерактив и фаза слежения (палец ведёт значение) — на
@@ -158,7 +158,8 @@ document.querySelector<HTMLElement>('.card')!
 |---|---|
 | `…/gestures` | `createPress` (tap + клавиатурный путь Enter/Space), `createHover`, `createPan`, `createDrag` (границы + rubber-band + инерция + reduced-motion) |
 | `…/behaviors` | Headless state machines типовых мобильных взаимодействий поверх `./gestures`/`./decay`/пружины ядра: `createBottomSheet` (snap-точки + выбор по положению+скорости), `createDragDismiss` (порог по смещению/скорости + направление), `createCarousel` (единый clock позиции+индекса, RTL/вертикаль), `createPullToRefresh` (резистентный overscroll + pending). Единый контракт `BehaviorState { value, velocity, phase }`; `cancel`/`destroy`, reduced-motion меняет характер. Подробно — раздел «Behaviors-путь» |
-| `…/scroll` | Прогресс страницы/target-с-офсетами (семантика Motion), in-view машина, скорость, scrub-клей к timeline |
+| `…/scroll` | Headless-прогресс страницы/target-с-офсетами (семантика Motion), чистая in-view машина, скорость, scrub-клей к timeline |
+| `…/in-view` | Нативный `IntersectionObserver`-адаптер: selector/Element/список, custom root/margin/amount, one-shot либо парный enter/leave cleanup; возвращает idempotent `stop` |
 | `…/presence` | Enter/exit lifecycle: «доиграй exit-анимацию → потом убирай из DOM», прерывания, `swapPresence` (wait/sync) |
 | `…/flip` | Layout-анимация FLIP: инверсия first→last, пружинный «доезд», коррекция scale-искажений (`correctRadius`, `counterScale`) |
 | `…/projection` | Вложенный FLIP-движок (жанр Framer projection): дерево узлов — transform родителя НЕ искажает детей и border-radius; `projectAt` (чистая математика), `createProjection` (headless-драйвер: одна пружина, velocity continuity при перехвате, `seek`/`release` под жест), `createDomProjection` (capture → мутация DOM → play). Подробно — раздел «Projection-путь» |

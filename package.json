@@ -186,6 +186,16 @@
         "default": "./dist/scroll/index.cjs"
       }
     },
+    "./in-view": {
+      "import": {
+        "types": "./dist/in-view/index.d.ts",
+        "default": "./dist/in-view/index.js"
+      },
+      "require": {
+        "types": "./dist/in-view/index.d.cts",
+        "default": "./dist/in-view/index.cjs"
+      }
+    },
     "./presence": {
       "import": {
         "types": "./dist/presence/index.d.ts",

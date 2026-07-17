@@ -6,6 +6,8 @@ import {
   CORE_GATE_BYTES,
   FULL_ANIMATE_GATE_BYTES,
   FULL_CORE_CONSUMER_GATE_BYTES,
+  IN_VIEW_CONSUMER_GATE_BYTES,
+  IN_VIEW_GATE_BYTES,
   SUBPATH_GATE_BYTES,
   deriveEntriesFromExports,
   evaluateScenarioBudget,
@@ -252,6 +254,16 @@ describe('size-gate: auto-derive subpath entries from package.json exports', () 
     expect(FULL_ANIMATE_GATE_BYTES).toBe(12_000);
     expect(BESPOKE_SUBPATH_GATES['./animate']).toBe(FULL_ANIMATE_GATE_BYTES);
     expect(full?.gate).toBe(FULL_ANIMATE_GATE_BYTES);
+  });
+
+  it('фиксирует отдельные exact-ратчеты shipped и consumer для in-view', () => {
+    const consumer = IMPORT_COST_SCENARIOS.find(({ name }) => name === 'in-view one-liner');
+
+    expect(IN_VIEW_GATE_BYTES).toBe(1839);
+    expect(IN_VIEW_CONSUMER_GATE_BYTES).toBe(1907);
+    expect(BESPOKE_SUBPATH_GATES['./in-view']).toBe(IN_VIEW_GATE_BYTES);
+    expect(consumer?.gate).toBe(IN_VIEW_CONSUMER_GATE_BYTES);
+    expect(consumer?.code).toContain('/in-view/index.js');
   });
 
   it('разделяет физические и consumer-потолки ядра и compositor capability', () => {
