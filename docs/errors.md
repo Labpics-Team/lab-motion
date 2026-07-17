@@ -157,17 +157,17 @@
 | `LM143` | animate CSS type | Неподдерживаемый тип CSS-значения | Передать строку или число | active |
 | `LM144` | animate CSS syntax | CSS-значение не разобрано | Передать поддерживаемое значение или цвет | active |
 | `LM145` | animate property | Свойство или кодек не поддерживается | Выбрать поддерживаемое свойство | retired |
-| `LM146` | animate targets | Некорректный контейнер целей | Передать цель или ограниченный список целей | active |
-| `LM147` | animate targets | Некорректный элемент списка целей | Проверить каждый элемент списка | active |
+| `LM146` | DOM targets | Некорректный контейнер целей | Передать цель или ограниченный список целей | active |
+| `LM147` | DOM targets | Некорректный элемент списка целей | Проверить каждый элемент списка | active |
 | `LM148` | animate adapter | Адаптер цели отсутствует | Использовать поддерживаемый вид цели | retired |
-| `LM149` | animate selector | Селектор недоступен без document | Передать цель напрямую или запускать в DOM-среде | active |
+| `LM149` | DOM capability host | Селектор либо нативный DOM-host недоступен или нарушил контракт | Передать цель напрямую либо запускать с исправным browser host | active |
 | `LM150` | animate impulse | Импульс не представим у числовой границы | Уменьшить значение или скорость | active |
 | `LM151` | animate props | Props не является объектом-записью | Передать объект поддерживаемых свойств | active |
 | `LM152` | animate native props | Props не содержит свойств | Добавить хотя бы одно свойство | retired |
 | `LM153` | animate native WAAPI | Цель не поддерживает WAAPI | Использовать WAAPI-цель или полный animate | retired |
 | `LM154` | animate native easing | CSS linear недоступен | Использовать WebKit-кадры или полный animate | retired |
 | `LM155` | animate native host | Host вернул некорректную Animation | Исправить WAAPI или polyfill | retired |
-| `LM156` | animate options | Options не является объектом | Передать объект опций или не передавать аргумент | active |
+| `LM156` | DOM facade options | Options/callback либо поле опций не соответствует контракту | Передать корректный объект опций и вызываемые callback-функции | active |
 | `LM157` | animate transition | Реентрантная смена владельца | Завершить текущую host-транзакцию перед новым animate | active |
 | `LM158` | splitText segmenter | Доступный grapheme segmenter не создался или нарушил контракт | Исправить `Intl.Segmenter` либо передать корректный Unicode ponyfill | active |
 | `LM159` | preset WAAPI | Mirror repeat не представим через WAAPI alternate | Использовать runPreset или точный двухцикловый track | active |

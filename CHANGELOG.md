@@ -18,6 +18,9 @@
 
 ### Added
 
+- `./in-view`: SSR-safe нативный `IntersectionObserver`-адаптер с snapshot
+  selector/Element/списка, custom root/margin/amount, one-shot по умолчанию,
+  парным enter/leave cleanup и идемпотентным terminal `stop()`.
 - `./nano`: platform-trusted WAAPI to-only вход под hard gate 1 КБ gzip:
   spring/tween, целые `translate/scale/rotate` longhand-каналы, CSS-значения
   силами браузера, delay/stagger, reduced-motion и native `Animation` controls.
