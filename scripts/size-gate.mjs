@@ -79,6 +79,14 @@ export const FULL_CORE_CONSUMER_GATE_BYTES = 2330;
 // утверждённая владельцем до реализации; она не выводится из текущего факта.
 export const NANO_GATE_BYTES = 1024;
 
+// Нативный IntersectionObserver-адаптер: два независимых exact-ратчета от
+// первой завершённой реализации 2026-07-17. Shipped-порог ловит физическое
+// раздувание самодостаточного entry при splitting:false; consumer-порог —
+// потерю tree-shakeability типичного вызова. Люфт намеренно нулевой: новая
+// capability ещё не имеет исторического шума, повышать только по факту решения.
+export const IN_VIEW_GATE_BYTES = 1839;
+export const IN_VIEW_CONSUMER_GATE_BYTES = 1907;
+
 // Совместный импорт одиночного и группового compositor API. Оба физических
 // entry отдельно остаются под прежними 6 450 B; 6 600 B ловят раздувание их
 // общего consumer-графа, не смешивая его с file-level потолком.
@@ -171,6 +179,8 @@ export const BESPOKE_SUBPATH_GATES = {
   // To-only individual properties + spring->linear() + native Animation controls.
   // Отдельный hard gate не разрешает новому entry спрятаться под общим 4608 B.
   './nano': NANO_GATE_BYTES,
+  // Native IntersectionObserver capability; exact first-implementation ratchet.
+  './in-view': IN_VIEW_GATE_BYTES,
   // ./behaviors — headless state machines типовых мобильных взаимодействий
   // (bottom sheet / drag-to-dismiss / carousel / pull-to-refresh) поверх
   // ПЕРЕИСПОЛЬЗУЕМЫХ примитивов: createVelocityTracker (./gestures), createDecay
@@ -197,6 +207,13 @@ export const IMPORT_COST_SCENARIOS = [
     name: 'nano spring-to',
     code: `import { animate } from '%DIST%/../nano/index.js'; console.log(animate('.hero', { translate: '240px', opacity: 1 }).length);`,
     gate: NANO_GATE_BYTES,
+  },
+  {
+    // Реальный минимальный вызов capability обязан оставаться изолированным от
+    // animate/scroll и не скрываться под общим потолком физического субпутя.
+    name: 'in-view one-liner',
+    code: `import { inView } from '%DIST%/../in-view/index.js'; console.log(typeof inView('.card', () => () => {}));`,
+    gate: IN_VIEW_CONSUMER_GATE_BYTES,
   },
   {
     name: 'only-spring',

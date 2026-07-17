@@ -115,6 +115,40 @@ p.exit();
 undoButton.addEventListener('click', () => p.enter(), { once: true });
 ```
 
+## Видимость DOM-цели
+
+```typescript
+import { inView } from '@labpics/motion/in-view';
+
+const stop = inView('.card', (element) => {
+  element.dataset.visible = 'true';
+  // Возвращённая функция включает повторяемый enter/leave. Без неё target
+  // автоматически снимается после первого входа (one-shot).
+  return () => delete (element as HTMLElement).dataset.visible;
+}, { amount: 0.5, margin: '0px 0px -10%' });
+
+// На unmount: disconnect observer + cleanup всех активных входов.
+stop();
+```
+
+`inView` использует только нативный `IntersectionObserver`; scrub/pin и запуск
+анимации не входят в этот capability. Для числового прогресса используйте
+headless `./scroll` и явно передавайте измеренные метрики.
+
+Для `instanceof` импортируйте constructor из того же физического entry, что и
+`inView`; корневой entry намеренно не связывает независимые bundle-графы:
+
+```typescript
+import { inView, MotionParamError } from '@labpics/motion/in-view';
+
+try {
+  inView('.card', () => undefined);
+} catch (error) {
+  if (error instanceof MotionParamError) console.error(error.code);
+  else throw error;
+}
+```
+
 ## Скролл-прогресс → таймлайн
 
 ```typescript
