@@ -2,9 +2,10 @@
  * Один публичный animate-вызов владеет одним завершением независимо от числа
  * внутренних поверхностей. Иначе Promise+executor на каждый Unit превращают
  * start N=1000 в GC-зависимый hot path, хотя наружу виден только один finished.
- * Тест пинит конструкторы Promise самой библиотеки, не host-аллокации WAAPI.
+ * Тест пинит Promise-ресурсы самой библиотеки, не host-аллокации WAAPI.
  */
 
+import { createHook } from 'node:async_hooks';
 import { describe, expect, it } from 'vitest';
 import { animate as animateFull } from '../src/animate/index.js';
 import { MotionParamError } from '../src/errors.js';
@@ -12,28 +13,24 @@ import { fakeEl } from './animate-facade-helpers.js';
 
 const N = 1_000;
 
-/** Считает только Promise, синхронно созданные внутри проверяемого вызова. */
+/** Считает реальные Promise, синхронно созданные внутри проверяемого вызова. */
 function countPromises(run: () => void): number {
-  const NativePromise = globalThis.Promise;
   let allocations = 0;
-
-  class CountingPromise<T> extends NativePromise<T> {
-    constructor(
-      executor: (
-        resolve: (value: T | PromiseLike<T>) => void,
-        reject: (reason?: unknown) => void,
-      ) => void,
-    ) {
-      allocations++;
-      super(executor);
-    }
-  }
-
-  globalThis.Promise = CountingPromise as PromiseConstructor;
+  let active = false;
+  // Поздняя подмена global Promise больше не является допустимым probe:
+  // runtime намеренно захватывает intrinsic constructor при импорте.
+  const hook = createHook({
+    init(_id, type) {
+      if (active && type === 'PROMISE') allocations++;
+    },
+  });
+  hook.enable();
   try {
+    active = true;
     run();
   } finally {
-    globalThis.Promise = NativePromise;
+    active = false;
+    hook.disable();
   }
   return allocations;
 }

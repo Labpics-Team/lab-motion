@@ -59,6 +59,12 @@ import { SurfaceBatch } from './surface-batch.js';
 // объект на каждый compositor-run.
 const SPRING_SAMPLE = { value: 0, velocity: 0 };
 
+// Constructor и resolve снимаются вместе при загрузке модуля: lifecycle не
+// зависит ни от queueMicrotask, ни от поздней подмены globalThis.Promise.
+const INTRINSIC_PROMISE = Promise;
+const INTRINSIC_RESOLVE = INTRINSIC_PROMISE.resolve.bind(INTRINSIC_PROMISE);
+const PROMISE_JOB = INTRINSIC_RESOLVE();
+
 // HTML timers clamp delays above signed int32. Это граница платформы, а не
 // настраиваемый лимит.
 const MAX_TIMER_MS = 2 ** 31 - 1;
@@ -324,7 +330,7 @@ export class WaapiUnit implements GroupOwner {
           if (this._timerCancel === token) this._rollback();
         };
         this._timerCancel = token;
-        Promise.resolve(finished).then(
+        INTRINSIC_RESOLVE(finished).then(
           () => this._wake(token, -1),
           token,
         );
@@ -520,7 +526,7 @@ export class WaapiUnit implements GroupOwner {
         if (!active || this._timerCancel !== cancel) return;
         active = false;
         if (sync) {
-          if (last >= 0) queueMicrotask(() => {
+          if (last >= 0) void PROMISE_JOB.then(() => {
             if (this._timerCancel === cancel) this._rollback();
           });
           return;
@@ -551,6 +557,9 @@ export class WaapiUnit implements GroupOwner {
   private _complete(): void {
     this._pendingNatural = true;
     this._commit();
+    // Capture/host-транзакция может временно удерживать owner reservation.
+    // Successor синхронно сделает supersede; failed plan оставит release этой job.
+    if (this._pendingNatural) void PROMISE_JOB.then(() => this._release());
   }
 
   private _clearTimer(): void {
