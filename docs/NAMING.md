@@ -11,7 +11,7 @@
 
 | Метрика | N |
 | --- | --- |
-| экспорт-субпутей package.json | 39 |
+| экспорт-субпутей package.json | 41 |
 | фреймворк-биндингов | 9 |
 | CSS-литералов `--lab-motion-*` в src | 0 |
 | CSS-литералов вне `--lab-motion-*` в src | 0 |
@@ -75,6 +75,7 @@
 | Значения и физика | `./value`, `./spring`, `./decay`, `./easing`, `./keyframes`, `./stagger`, `./timeline`, `./presets`, `./tokens`, `./utils` |
 | Доменные эффекты | `./flip`, `./projection`, `./smart`, `./gestures`, `./behaviors`, `./scroll`, `./in-view`, `./presence`, `./svg`, `./svg-morph`, `./a11y` |
 | Биндинги (9) | `./react`, `./svelte`, `./vue`, `./lit`, `./solid`, `./preact`, `./angular`, `./wc`, `./qwik` |
+| Build-tool (не runtime-tier) | `./compiler/vite` (Vite-адаптер lowering), `./compiler/runtime` (private executor compiled-вызовов) |
 
 ## Известные отступления
 

@@ -105,6 +105,12 @@ export const ANIMATE_COMPOSITOR_MIXED_GATE_BYTES = 12_494;
 // CORE_GATE_BYTES для ядра). Поднимать только осознанно.
 export const BESPOKE_SUBPATH_GATES = {
   './utils': 1400,
+  // Build-tool entry (#208): Vite-адаптер lowering НАМЕРЕННО несёт канонический
+  // MotionProgram V1 parser + nano spring SSOT — это цена доверенного артефакта
+  // на стороне СБОРКИ, браузеру она не поставляется никогда (в bundle попадает
+  // только ./compiler/runtime, 0.36 KB gz). Хронология: 2026-07-19 факт первой
+  // сборки 5261 gz → порог 5470 (~4% люфт, дисциплина «порог ОТ ФАКТА»).
+  './compiler/vite': 5470,
   // Базовый compositor не несёт групповой оркестратор. Старый потолок сохранён:
   // capability-split не имеет права маскировать регрессию повышением порога.
   './compositor': 6450,
