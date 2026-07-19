@@ -64,6 +64,12 @@ export class MainUnit implements GroupOwner, SurfaceUnit {
   private _tweenK = 0;
   private _renderedTweenK = 0;
   private _tweenDpdt = NaN;
+  /**
+   * Host-write в полёте (#196): применяемые значения — уже опубликованное
+   * поколение поверхности для реентрантного capture/writeBack, хотя
+   * rendered-снапшот фиксируется только после успешного возврата setter-а.
+   */
+  private _writing = false;
   private readonly _snap = { value: 0, velocity: 0 };
 
   constructor(options: MainUnitOptions) {
@@ -84,13 +90,16 @@ export class MainUnit implements GroupOwner, SurfaceUnit {
     const o = this._o!;
     const channel = o._bound._numeric.find((item) => item._key === key);
     if (channel !== undefined) {
-      let velocity = this._active ? channel._renderedVelocity : 0;
+      // Во время host-write снимок обязан отдать применяемое поколение (#196):
+      // hostile setter уже сделал значение видимым до возврата.
+      const writing = this._writing;
+      let velocity = this._active ? (writing ? channel._velocity : channel._renderedVelocity) : 0;
       if (this._active && o._mode._type === 'tween') {
         const sampled = (channel._to - channel._from) *
-          this._tweenDerivative(this._renderedTweenK);
+          this._tweenDerivative(this._liveTweenK());
         velocity = finiteOrZero(sampled);
       }
-      return { _value: channel._renderedValue, _velocity: velocity };
+      return { _value: writing ? channel._value : channel._renderedValue, _velocity: velocity };
     }
     const frozen = o._bound._residuals.get(key);
     return frozen === undefined ? undefined : { _value: frozen, _velocity: 0 };
@@ -100,12 +109,18 @@ export class MainUnit implements GroupOwner, SurfaceUnit {
     if (this._done) return undefined;
     const channel = this._o!._bound._css;
     if (channel === undefined || channel._key !== key) return undefined;
+    const writing = this._writing;
     const dpdt = !this._active
       ? 0
       : this._o!._mode._type === 'tween'
-        ? this._tweenDerivative(this._renderedTweenK)
-        : channel._renderedDpdt;
-    return { ...channel, _dpdt: dpdt, _css: channel._renderedCss };
+        ? this._tweenDerivative(this._liveTweenK())
+        : writing ? channel._dpdt : channel._renderedDpdt;
+    return { ...channel, _dpdt: dpdt, _css: writing ? channel._css : channel._renderedCss };
+  }
+
+  /** k текущего поколения: во время host-write — применяемый, иначе rendered. */
+  private _liveTweenK(): number {
+    return this._writing ? this._tweenK : this._renderedTweenK;
   }
 
   _numericKeys(): readonly string[] {
@@ -286,13 +301,22 @@ export class MainUnit implements GroupOwner, SurfaceUnit {
   private _write(): void {
     const o = this._o!;
     const bound = o._bound;
-    if (o._group === 'transform') {
-      const state = bound._transform!;
-      for (const channel of bound._numeric) state[channel._key] = channel._value;
-      o._el.style.setProperty('transform', buildTransform(state));
-    } else if (bound._css !== undefined) {
-      o._el.style.setProperty(o._group, String(bound._css._css));
-    } else o._el.style.setProperty(o._group, String(bound._numeric[0]!._value));
+    // Host-write и снапшот — одно поколение поверхности (#196): реентрантный
+    // successor внутри setter-а видит применяемые значения через _writing,
+    // а бросок хоста откатывает поколение (rendered остаётся последним
+    // успешным) без stale repair-записи после потери lease.
+    this._writing = true;
+    try {
+      if (o._group === 'transform') {
+        const state = bound._transform!;
+        for (const channel of bound._numeric) state[channel._key] = channel._value;
+        o._el.style.setProperty('transform', buildTransform(state));
+      } else if (bound._css !== undefined) {
+        o._el.style.setProperty(o._group, String(bound._css._css));
+      } else o._el.style.setProperty(o._group, String(bound._numeric[0]!._value));
+    } finally {
+      this._writing = false;
+    }
     for (const channel of bound._numeric) {
       channel._renderedValue = channel._value;
       channel._renderedVelocity = channel._velocity;
@@ -313,6 +337,9 @@ export class MainUnit implements GroupOwner, SurfaceUnit {
     }
     if (bound._css !== undefined) bound._css._css = cssAt(bound._css, 1);
     this._write();
+    // Реентрантный successor внутри settle-записи уже потребил финальное
+    // поколение и терминализировал unit: старый owner молча уступает (#196).
+    if (this._done) return;
     this._writeBack();
     this._finish(true);
   }
@@ -321,10 +348,18 @@ export class MainUnit implements GroupOwner, SurfaceUnit {
     const o = this._o!;
     const record = o._record;
     const bound = o._bound;
+    // Supersede во время host-write фиксирует применяемое поколение (#196),
+    // а не rendered-снапшот прошлого кадра.
+    const writing = this._writing;
     for (const channel of bound._numeric) {
-      record._numeric.set(channel._key, { _value: channel._renderedValue, _velocity: 0 });
+      record._numeric.set(channel._key, {
+        _value: writing ? channel._value : channel._renderedValue,
+        _velocity: 0,
+      });
     }
-    if (bound._css !== undefined) record._cssValue = bound._css._renderedCss;
+    if (bound._css !== undefined) {
+      record._cssValue = writing ? bound._css._css : bound._css._renderedCss;
+    }
   }
 
   private _finish(natural: boolean): void {
