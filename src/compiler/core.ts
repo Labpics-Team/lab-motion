@@ -190,9 +190,16 @@ function bindsName(node: AstNode, parent: AstNode | undefined, name: string): bo
 /**
  * Планирует lowering модуля. undefined — трансформировать нечего либо
  * консервативный отказ целиком (shadowing/коллизия локального имени).
+ *
+ * `code` — байты модуля: ядро остаётся parse-независимым, но верифицирует
+ * тривиа-зоны вызова ПОБАЙТНО. Acorn (preserveParens: false) схлопывает
+ * скобки вокруг callee/target в сам узел, поэтому только байтовая проверка
+ * отличает `animate(el, …)` от `(animate)(el, …)` и `animate((x, y), …)` —
+ * первые правки без неё производили битый или тихо неверный вывод.
  */
 export function planNanoOpacityLowering(
   program: AstNode,
+  code: string,
   artifactLiteral: (opacity: number) => string,
 ): NanoLoweringPlan | undefined {
   let importedPlain = false;
@@ -244,6 +251,13 @@ export function planNanoOpacityLowering(
     if (targetArg.type === 'SpreadElement') { runtimeCalls++; return; }
     const opacity = staticOpacityLiteral(propsArg);
     if (opacity === undefined) { runtimeCalls++; return; }
+    // Побайтная верификация тривиа-зон: ровно `(`, `,`, `)` с пробелами.
+    // Скобки вокруг callee/target, комментарии и прочая экзотика — отказ.
+    if (
+      !/^\s*\(\s*$/.test(code.slice(callee.end, targetArg.start)) ||
+      !/^\s*,\s*$/.test(code.slice(targetArg.end, propsArg.start)) ||
+      !/^\s*,?\s*\)$/.test(code.slice(propsArg.end, node.end))
+    ) { runtimeCalls++; return; }
     edits.push(
       { start: callee.start, end: targetArg.start, replacement: `${IMPORT_LOCAL}(` },
       { start: targetArg.end, end: node.end, replacement: `, ${artifactLiteral(opacity)})` },
@@ -251,6 +265,11 @@ export function planNanoOpacityLowering(
   });
 
   if (edits.length === 0) return undefined;
+  // Walk идёт в pre-order (внешний вызов раньше вложенного в target):
+  // сортировка восстанавливает документированный инвариант возрастания start.
+  // Пары правок вложенных вызовов лежат целиком МЕЖДУ правками внешнего и
+  // после сортировки корректно понижаются вместе с ним.
+  edits.sort((a, b) => a.start - b.start);
   return {
     edits,
     importLocal: IMPORT_LOCAL,

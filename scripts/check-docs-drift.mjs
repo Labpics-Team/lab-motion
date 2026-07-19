@@ -75,7 +75,7 @@ export function inventoryTableErrors(rows, inv) {
 
 /** Бэктик-упоминания субпутей `./x` в доке. */
 export function extractSubpathMentions(text) {
-  return [...text.matchAll(/`(\.\/[a-z0-9-]+)`/g)].map((m) => m[1]);
+  return [...text.matchAll(/`(\.\/[a-z0-9-]+(?:\/[a-z0-9-]+)*)`/g)].map((m) => m[1]);
 }
 
 export function subpathMentionErrors(text, subpaths) {

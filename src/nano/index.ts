@@ -4,7 +4,6 @@
  * и произвольные keyframes намеренно остаются контрактом полного ./animate.
  */
 
-import { runNano, type NanoControls, type NanoTarget } from './run.js';
 import { springLinear, type NanoSpring } from './spring-linear.js';
 
 export type { NanoSpring } from './spring-linear.js';
@@ -36,7 +35,9 @@ export type NanoProps = Record<string, string | number | undefined> & {
   readonly rotate?: number | undefined;
 };
 
-export type { NanoControls, NanoTarget } from './run.js';
+export type NanoTarget = Element | string | Iterable<Element> | ArrayLike<Element>;
+
+export type NanoControls = Animation[] & { finished: Promise<Animation[]> };
 
 const TRANSFORM = { scale: 1, rotate: 1 };
 
@@ -51,6 +52,9 @@ export function animate(
   props: NanoProps,
   options: NanoOptions = {},
 ): NanoControls {
+  const source = typeof target === 'string'
+    ? document.querySelectorAll(target)
+    : 'animate' in target ? [target] : target;
   const frame: PropertyIndexedKeyframes = {};
   if (props.scale != null) frame.scale = props.scale;
   if (props.rotate != null) frame.rotate = `${props.rotate}deg`;
@@ -61,15 +65,27 @@ export function animate(
   const [duration, easing] = options.duration != null
     ? [options.duration, options.ease ?? 'ease']
     : springLinear(options.spring);
-  return runNano(
-    target,
-    frame,
-    duration,
-    easing,
-    options.delay ?? 0,
-    options.stagger ?? 0,
-    options.reducedMotion
-      ?? (typeof matchMedia !== 'undefined'
-        && matchMedia('(prefers-reduced-motion: reduce)').matches),
-  );
+  const reduced = options.reducedMotion
+    ?? (typeof matchMedia !== 'undefined'
+      && matchMedia('(prefers-reduced-motion: reduce)').matches);
+  const animations = Array.from(source, (element, index) => {
+    const animation = element.animate(frame, {
+      duration: reduced ? 0 : duration,
+      easing: reduced ? 'linear' : easing,
+      delay: reduced ? 0 : (options.delay ?? 0) + (options.stagger ?? 0) * index,
+      fill: 'both',
+    });
+    return animation;
+  }) as NanoControls;
+  animations.finished = Promise.all(animations.map((animation) => new Promise<Animation>((resolve, reject) => {
+    animation.finished.catch(reject);
+    animation.addEventListener('finish', () => {
+      try {
+        animation.commitStyles();
+        animation.cancel();
+      } catch { /* fill сохраняет финал на платформе без commitStyles */ }
+      resolve(animation);
+    });
+  })));
+  return animations;
 }

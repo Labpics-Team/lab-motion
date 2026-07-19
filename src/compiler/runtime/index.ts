@@ -2,15 +2,19 @@
  * compiler/runtime.ts — private executor compiled-nano артефактов (#208).
  *
  * Это build-tool деталь, не runtime-tier: сюда попадают ТОЛЬКО вызовы,
- * которые compiler доказанно понизил. Исполнительный хвост — общий runNano
- * (SSOT c ./nano): reduced-motion, native WAAPI lifecycle, `finished`,
- * `commitStyles()` и `cancel()` совпадают с runtime по построению.
- * Parser, IR, spring solver и compiler в этот модуль не входят.
+ * которые compiler доказанно понизил. Математика (springLinear) — общий SSOT
+ * с ./nano на build-стороне; исполнительный WAAPI-хвост НАМЕРЕННО дублирует
+ * nano/index байт-в-байт по семантике: непереговорный потолок nano 1024 B
+ * не оплачивает функциональную границу общего хвоста (§7.3), а паритет
+ * запечатан differential-сьютом compiler-nano-lowering (C4: журнал
+ * keyframes/options, reduced-политика, finished/commitStyles/cancel).
+ * Любая правка хвоста здесь или в nano/index обязана пройти этот сьют.
+ * Parser, IR, spring solver и compiler в модуль не входят.
  */
 
-import { runNano, type NanoControls, type NanoTarget } from '../../nano/run.js';
+import type { NanoControls, NanoTarget } from '../../nano/index.js';
 
-export type { NanoControls, NanoTarget } from '../../nano/run.js';
+export type { NanoControls, NanoTarget } from '../../nano/index.js';
 
 /** Компактная форма, которую инъецирует compiler: opacity/durationMs/easing. */
 export interface CompiledNanoCall {
@@ -20,9 +24,29 @@ export interface CompiledNanoCall {
 }
 
 export function animateCompiled(target: NanoTarget, artifact: CompiledNanoCall): NanoControls {
-  // Та же политика ./nano: prefers-reduced-motion читается в момент вызова
-  // (двухстрочная platform-читалка намеренно дублируется — см. nano/index).
+  const source = typeof target === 'string'
+    ? document.querySelectorAll(target)
+    : 'animate' in target ? [target] : target;
   const reduced = typeof matchMedia !== 'undefined'
     && matchMedia('(prefers-reduced-motion: reduce)').matches;
-  return runNano(target, { opacity: artifact.o }, artifact.d, artifact.e, 0, 0, reduced);
+  const animations = Array.from(source, (element) => {
+    const animation = element.animate({ opacity: artifact.o }, {
+      duration: reduced ? 0 : artifact.d,
+      easing: reduced ? 'linear' : artifact.e,
+      delay: 0,
+      fill: 'both',
+    });
+    return animation;
+  }) as NanoControls;
+  animations.finished = Promise.all(animations.map((animation) => new Promise<Animation>((resolve, reject) => {
+    animation.finished.catch(reject);
+    animation.addEventListener('finish', () => {
+      try {
+        animation.commitStyles();
+        animation.cancel();
+      } catch { /* fill сохраняет финал на платформе без commitStyles */ }
+      resolve(animation);
+    });
+  })));
+  return animations;
 }

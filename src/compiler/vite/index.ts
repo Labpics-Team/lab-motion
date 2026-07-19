@@ -5,11 +5,13 @@
  * парсит модуль штатным `this.parse` (acorn Rollup), передаёт ESTree ядру
  * (§13.5: ядро parse-независимо) и применяет байтовые правки.
  *
- * Sourcemap без вмешательства в исходные позиции: правки строго заменяют
- * фрагменты ВНУТРИ существующих строк (обрамление вызова), а единственная
- * вставка — hoisted-импорт executor — дописывается В КОНЕЦ файла (ESM
- * поднимает импорты, семантика неизменна). Поэтому карта — отображение
- * сегментов исходной строки с точным сдвигом колонок после каждой правки.
+ * Sourcemap строится двухуказательным проходом по отсортированным правкам:
+ * сохранённые байты исходника идут сегмент-в-сегмент (включая многострочные
+ * вызовы, чьи правки СХЛОПЫВАЮТ строки), замена целиком отображается в начало
+ * своей правки, а дописанный в конец hoisted-импорт executor остаётся
+ * неотображённым (это не пользовательский код). `sources` обязан нести id
+ * модуля: пустой источник Vite нормализует в null, и композиция карт теряла
+ * бы все маппинги последующих трансформов.
  */
 
 import {
@@ -26,6 +28,7 @@ interface TransformResult {
     readonly version: 3;
     readonly mappings: string;
     readonly sources: readonly string[];
+    readonly sourcesContent: readonly string[];
     readonly names: readonly string[];
   };
 }
@@ -60,59 +63,81 @@ function vlq(value: number): string {
 }
 
 /**
- * Идентичная карта строк с колонковыми сдвигами: для каждой исходной строки
- * эмитим сегменты [genCol, 0, line, srcCol] вокруг правок этой строки.
+ * Точная карта версии 3 для applyEdits того же списка правок: генерируемый и
+ * исходный курсоры идут парой; правка продвигает исходный курсор (возможно,
+ * через строки — многострочный вызов), а генерируемый — на длину замены.
+ * Замены не содержат '\n' по построению (артефакт-литерал одной строкой) —
+ * нарушение равно ошибке сборки, не тихой порче карты.
  */
-function buildMap(code: string, edits: readonly NanoLoweringEdit[]): TransformResult['map'] {
-  const lineStarts: number[] = [0];
-  for (let index = 0; index < code.length; index++) {
-    if (code.charCodeAt(index) === 10) lineStarts.push(index + 1);
-  }
-  const lineOf = (offset: number): [line: number, column: number] => {
-    let low = 0;
-    let high = lineStarts.length - 1;
-    while (low < high) {
-      const middle = (low + high + 1) >> 1;
-      if (lineStarts[middle]! <= offset) low = middle;
-      else high = middle - 1;
+function buildMap(
+  code: string,
+  edits: readonly NanoLoweringEdit[],
+  id: string,
+): TransformResult['map'] {
+  for (const edit of edits) {
+    if (edit.replacement.includes('\n')) {
+      throw new Error('lab-motion compiler: замена не может содержать перевод строки');
     }
-    return [low, offset - lineStarts[low]!];
-  };
-
+  }
+  const groups: string[][] = [[]];
+  let genColumn = 0;
+  let originalLine = 0;
+  let originalColumn = 0;
   let previousGenColumn = 0;
   let previousLine = 0;
   let previousColumn = 0;
-  const segment = (genColumn: number, line: number, column: number): string => {
-    const encoded = vlq(genColumn - previousGenColumn) + vlq(0) +
-      vlq(line - previousLine) + vlq(column - previousColumn);
+  const segment = (): void => {
+    groups.at(-1)!.push(
+      vlq(genColumn - previousGenColumn) + vlq(0) +
+      vlq(originalLine - previousLine) + vlq(originalColumn - previousColumn),
+    );
     previousGenColumn = genColumn;
-    previousLine = line;
-    previousColumn = column;
-    return encoded;
+    previousLine = originalLine;
+    previousColumn = originalColumn;
   };
-
-  const lines: string[][] = lineStarts.map(() => []);
-  for (let line = 0; line < lineStarts.length; line++) {
-    previousGenColumn = 0;
-    let shift = 0;
-    const start = lineStarts[line]!;
-    const end = line + 1 < lineStarts.length ? lineStarts[line + 1]! - 1 : code.length;
-    lines[line]!.push(segment(0, line, 0));
-    for (const edit of edits) {
-      const [editLine, editColumn] = lineOf(edit.start);
-      if (editLine !== line) continue;
-      const [endLine, endColumn] = lineOf(edit.end);
-      if (endLine !== line) continue; // правки ядра не пересекают строки
-      shift += edit.replacement.length - (edit.end - edit.start);
-      if (endColumn + shift >= 0 && end - start > endColumn) {
-        lines[line]!.push(segment(endColumn + shift, line, endColumn));
+  /** Пройти сохранённый диапазон исходника: оба курсора синхронно. */
+  const keep = (from: number, to: number): void => {
+    if (from < to) segment();
+    for (let index = from; index < to; index++) {
+      if (code.charCodeAt(index) === 10) {
+        groups.push([]);
+        genColumn = 0;
+        previousGenColumn = 0;
+        originalLine++;
+        originalColumn = 0;
+        if (index + 1 < to) segment();
+      } else {
+        genColumn++;
+        originalColumn++;
       }
     }
+  };
+  /** Пройти правку: исходный курсор до edit.end, замена — в генерируемый. */
+  const splice = (edit: NanoLoweringEdit): void => {
+    segment();
+    genColumn += edit.replacement.length;
+    for (let index = edit.start; index < edit.end; index++) {
+      if (code.charCodeAt(index) === 10) {
+        originalLine++;
+        originalColumn = 0;
+      } else originalColumn++;
+    }
+  };
+  let cursor = 0;
+  for (const edit of edits) {
+    keep(cursor, edit.start);
+    splice(edit);
+    cursor = edit.end;
   }
+  keep(cursor, code.length);
+  // Хвостовой перевод строки + строка импорта + финальный перевод строки:
+  // hoisted-импорт executor не мапится в пользовательский исходник.
+  groups.push([], []);
   return {
     version: 3,
-    mappings: lines.map((segments) => segments.join(',')).join(';'),
-    sources: [''],
+    mappings: groups.map((group) => group.join(',')).join(';'),
+    sources: [id],
+    sourcesContent: [code],
     names: [],
   };
 }
@@ -142,11 +167,11 @@ export function motionCompiler(): MotionCompilerPlugin {
       } catch {
         return undefined; // не наш синтаксис — пусть падает штатный пайплайн
       }
-      const plan = planNanoOpacityLowering(program as AstNode, nanoArtifactLiteral);
+      const plan = planNanoOpacityLowering(program as AstNode, code, nanoArtifactLiteral);
       if (plan === undefined) return undefined;
       const transformed = applyEdits(code, plan.edits) +
         `\nimport { ${COMPILED_IMPORT_NAME} as ${plan.importLocal} } from ${JSON.stringify(plan.importSource)};\n`;
-      return { code: transformed, map: buildMap(code, plan.edits) };
+      return { code: transformed, map: buildMap(code, plan.edits, id) };
     },
   };
 }
