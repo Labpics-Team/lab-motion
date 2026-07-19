@@ -426,6 +426,26 @@
         "default": "./dist/nano/index.cjs"
       }
     },
+    "./compiler/vite": {
+      "import": {
+        "types": "./dist/compiler/vite/index.d.ts",
+        "default": "./dist/compiler/vite/index.js"
+      },
+      "require": {
+        "types": "./dist/compiler/vite/index.d.cts",
+        "default": "./dist/compiler/vite/index.cjs"
+      }
+    },
+    "./compiler/runtime": {
+      "import": {
+        "types": "./dist/compiler/runtime/index.d.ts",
+        "default": "./dist/compiler/runtime/index.js"
+      },
+      "require": {
+        "types": "./dist/compiler/runtime/index.d.cts",
+        "default": "./dist/compiler/runtime/index.cjs"
+      }
+    },
     "./behaviors": {
       "import": {
         "types": "./dist/behaviors/index.d.ts",
@@ -454,7 +474,7 @@
     "./dist/wc/index.cjs"
   ],
   "scripts": {
-    "build": "tsup",
+    "build": "tsup && tsup --config tsup.compiler.config.ts",
     "audit": "pnpm audit --audit-level moderate",
     "typecheck": "tsc --noEmit",
     "typecheck:browser": "tsc --noEmit -p tsconfig.browser.json",
