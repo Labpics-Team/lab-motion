@@ -335,7 +335,17 @@ export class MainUnit implements GroupOwner, SurfaceUnit {
       channel._value = channel._to;
       channel._velocity = 0;
     }
-    if (bound._css !== undefined) bound._css._css = cssAt(bound._css, 1);
+    if (bound._css !== undefined) {
+      bound._css._css = cssAt(bound._css, 1);
+      // Поколение покоя целиком: финальный css без live-производной (#196) —
+      // симметрия с занулением _velocity числовых каналов выше.
+      bound._css._dpdt = 0;
+    }
+    // Терминальная ветвь _compute выходит до обновления _tweenK: реентрантный
+    // capture на settle-записи считал бы производную ПРОШЛОГО поколения при
+    // финальном значении. Ноль в кэше производной (ключ — текущий _tweenK,
+    // который capture и запросит) публикует скорость покоя без второй записи.
+    this._tweenDpdt = 0;
     this._write();
     // Реентрантный successor внутри settle-записи уже потребил финальное
     // поколение и терминализировал unit: старый owner молча уступает (#196).
@@ -357,9 +367,11 @@ export class MainUnit implements GroupOwner, SurfaceUnit {
         _velocity: 0,
       });
     }
-    if (bound._css !== undefined) {
-      record._cssValue = writing ? bound._css._css : bound._css._renderedCss;
-    }
+    // css без writing-ветки: у css-группы один канал, поэтому successor
+    // (live-capture либо его собственный writeBack) всегда перекрывает эту
+    // запись до любого чтения rec._cssValue — ветка была бы ненаблюдаемой
+    // (эквивалентный мутант) и не оправдывает байтов под size-гейтом.
+    if (bound._css !== undefined) record._cssValue = bound._css._renderedCss;
   }
 
   private _finish(natural: boolean): void {
