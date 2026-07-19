@@ -4,6 +4,7 @@
     "rootDir": ".",
     "noEmit": true,
     "declaration": false,
+    "isolatedDeclarations": false,
     "declarationMap": false,
     "sourceMap": false,
     "lib": ["ES2022", "DOM", "DOM.Iterable"],

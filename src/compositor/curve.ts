@@ -26,7 +26,7 @@ import {
   type SpringNode,
 } from './segmenter.js';
 
-export const DEFAULT_TOLERANCE = 1 / 400;
+export const DEFAULT_TOLERANCE: number = 1 / 400;
 
 /** Чередование [percent, progress, ...]; percent — точное число CSS-токена в [0,100]. */
 export type SpringSerializedSamples = Float64Array;

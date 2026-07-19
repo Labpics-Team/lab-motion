@@ -15,4 +15,4 @@ export const CONVERGENCE_THRESHOLD = 0.005;
 export const MAX_FRAMES = 2000;
 
 /** Фиксированный шаг setTimeout-фоллбека (сек) при отсутствии rAF. */
-export const FIXED_DT_S = 1 / 60;
+export const FIXED_DT_S: number = 1 / 60;
