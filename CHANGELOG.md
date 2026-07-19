@@ -6,6 +6,8 @@
 
 ## [Unreleased]
 
+## [0.3.0] — 2026-07-19
+
 ### Removed
 
 - **Breaking (pre-1.0):** публичные входы `./animate/mini` и `./animate/native`
@@ -26,113 +28,6 @@
   силами браузера, delay/stagger, reduced-motion и native `Animation` controls.
   Скрытого layout-read, rAF-fallback, C1-подхвата и hostile-host контракта нет;
   кривые выше общего compiler-ceiling отклоняются до materialization.
-
-### Changed
-
-- **Breaking (pre-1.0):** `repeatType: 'mirror'` в `./keyframes` и `./presets`
-  теперь означает настоящий mirror-generator: на нечётных итерациях меняется
-  порядок значений, но authored time/easing продолжает идти вперёд. Раньше
-  `mirror` был алиасом reverse-time; для прежней траектории замените его на
-  `repeatType: 'reverse'`. WAAPI-конвертеры честно отклоняют mirror с повторами,
-  потому что native `alternate` разворачивает и время, и easing. Изменение
-  предназначено для следующего minor-релиза до 1.0.
-- **Breaking (pre-1.0):** конечный `repeat` ограничен переносимым диапазоном
-  `0…2_147_483_647`; `Infinity` остаётся публичной записью бесконечного цикла
-  и однозначно кодируется как `-1` в MotionProgram V1 для Swift/Kotlin.
-- **Breaking (pre-1.0):** infinite repeat имеет один переносимый горизонт:
-  точные индексы `0…9_007_199_254_740_991`. Первая граница следующего индекса
-  fail-closed с `LM166` в web API / `LMP_BOUNDS` в V1 reference; `+Infinity`
-  в web API также даёт `LM166`. BigInt-oracle удалён, runtime больше не
-  угадывает parity через modulo.
-- `./animate`: WAAPI-путь строит кадры прямо из общего spring artifact без
-  повторного execution-plan wrapper и per-unit formatter closure; общий
-  compiler/cache/sampler остаётся единственным SSOT, а совместная стоимость
-  `animate + compositor` защищена отдельным import-cost ratchet.
-- Ядро: `drive` и `MotionValue` используют один поздно привязываемый default
-  frame-scheduler; дублированный runtime удалён без смены rAF/fallback-семантики.
-- `./compositor`: exact-key LRU вынесен в functional state без смены policy;
-  общий cache сохраняет O(1) lookup, нулевые аллокации на hit и прежний порядок
-  вытеснения, а одноразовая проверка ёмкости складывается при сборке.
-
-### Fixed
-
-- `./animate`: hostile `style.setProperty`, применяющий кадр и синхронно
-  запускающий `animate()` другой transform-компоненты, больше не теряет
-  только что видимый канал: снимок и реестр во время host-write отдают
-  применяемое поколение всей transform-поверхности (значение и скорость),
-  settle-запись после реентрантного вытеснения молча уступает successor-у,
-  а бросок хоста по-прежнему не публикует неприменённое поколение.
-- `./animate`: неудачная реентрантная подписка `SurfaceBatch` теперь
-  транзакционно откатывает все присоединённые в этой попытке поверхности,
-  сохраняет исходную host-ошибку и оставляет paused controls повторяемыми.
-- `./animate`: создание и завершение `finished`, ассимиляция WAAPI completion и
-  отложенный release owner больше не зависят от поздней подмены `Promise` или
-  `queueMicrotask`; бросающий host scheduler и ошибка `onComplete` не прячут
-  controls, не оставляют Promise pending и не меняют успешный supersede на
-  natural completion.
-- MotionProgram V1 возвращает exact track endpoints до authored easing при
-  normal и mirror, включая дорожки со сменой codec между сегментами; reference,
-  web sampler и future-host conformance corpus теперь следуют одному закону.
-- `./keyframes` и `./presets`: единый repeat-cursor владеет exact-boundary,
-  repeatDelay и progress; вложенный `seek()`/`cancel()` из пользовательского
-  easing линейризуется и не допускает позднюю публикацию внешнего сэмпла.
-  Следующее virtual-time и real-time anchor коммитятся только после проверки
-  infinite-horizon: `LM166` оставляет последний валидный clock и позволяет
-  явно продолжить либо завершить controls без зависшего scheduler-owner.
-  Синхронный injectable `requestFrame` проходит через async-trampoline, а
-  `repeat: Infinity` больше не завершается искусственно после 100 000 кадров.
-  Exact intermediate boundary теперь half-open и запускает следующую итерацию;
-  только конечный terminal закрыт. Это единый закон MotionProgram V1 и native
-  WAAPI, намеренно отличный от previous-end поведения Motion 12.42.2.
-- Repeat/WAAPI-компиляция общим V1-примитивом отклоняет абсолютные расписания,
-  где duration или repeatDelay не превосходят product/absolute binary64
-  resolution budget, а также неконечные миллисекунды и составные scale до
-  публикации адаптерных данных. Infinite WAAPI hold также fail-closed до
-  пользовательских callbacks, если его масштаб схлопывает разные authored
-  offsets; намеренные дубли offsets остаются допустимым скачком.
-  `repeatDelay` без повторов в preset WAAPI
-  канонически игнорируется. Shipped keyframe-sampler больше не содержит
-  создаваемый на каждом сэмпле IIFE.
-- Injectable frame scheduler получает уникального владельца каждой заявки:
-  поздний повторный вызов старого callback не может украсть уже созданную
-  следующую заявку; trusted native scheduler сохраняет стабильный callback.
-- `./keyframes` и `./presets` отклоняют невызываемый scalar/array easing
-  стабильными `LM163`/`LM164`, не подменяя ошибку линейным easing.
-- `./presets`: `splitText(..., 'chars')` теперь делит текст по extended
-  grapheme clusters через `Intl.Segmenter`, поэтому combining marks, emoji-ZWJ,
-  flags, Hangul и Indic conjuncts не рвутся; явный exact-segmenter шов покрывает
-  старые среды, а без него сохраняется прежний code-point fallback.
-- `./animate`: main-thread stagger сохраняет субкадровую фазу — монотонное
-  logical-time и signed local phase не дают малым задержкам (< кадра)
-  схлопнуться в один кадровый bucket, overshoot не теряется.
-- `./compositor`: WAAPI effect и fallback timer теперь атомарно сменяют единственного
-  owner; stale callbacks и реентрантный host-cleanup не могут оживить или отменить
-  новый прогон, а `destroy()` разрывает удержание target, effect и timer.
-- `./auto`: exit использует единое identity-владение между сессиями; stale
-  observer больше не забирает перенесённый узел, а reentrant disconnect
-  детерминированно освобождает ghost, handlers, style leases и parent-ссылки.
-- `./animate`: uniform/axial scale сохраняет обе оси и точные signed-zero края;
-  pause/seek переносит effect-space скорость без скачка, а несовместимые оси
-  продолжает независимым main-thread путём вместо ложного общего WAAPI-progress.
-- `./animate`: переполнение составной delay отклоняется до host-effects, а
-  завершение задержек длиннее диапазона HTML timer сверяется с WAAPI-clock без
-  раннего settle, starvation и скачка terminal pose.
-- Сборка: параллельная минификация ESM/CJS изолирует настройки Terser, поэтому
-  повторный запуск даёт тот же CJS-артефакт, включая strict-семантику и mangling.
-- `./animate/native`: host-методы вызываются без доверия к own `.call`,
-  доставка завершения не зависит от глобальной `queueMicrotask`, отмена
-  разрывает связь вечного host `finished` с DOM, а несходящаяся реентрантная
-  компенсация завершается `LM157` вместо ложного успеха.
-- `./frame`: единый identity-владелец резервирования гасит stale/двойную доставку,
-  любой синхронный `requestFrame` проходит через отменяемый async-trampoline, а
-  только ошибка текущего владельца демотирует clock без потери живых подписок.
-  `cancelAll()` завершает teardown атомарно; off/once/rollback сразу освобождают
-  callback и DOM-ссылки, массовая отписка остаётся линейной.
-
-## [0.3.0] — 2026-07-13
-
-### Added
-
 - `./animate/native`: узкий WAAPI-путь `springTo` для явных пар
   transform/opacity. Отдельная `Animation` на независимый CSS-канал цели
   позволяет вытеснять transform и opacity раздельно; скрытого rAF-fallback нет.
@@ -262,6 +157,30 @@
 
 ### Changed
 
+- **Breaking (pre-1.0):** `repeatType: 'mirror'` в `./keyframes` и `./presets`
+  теперь означает настоящий mirror-generator: на нечётных итерациях меняется
+  порядок значений, но authored time/easing продолжает идти вперёд. Раньше
+  `mirror` был алиасом reverse-time; для прежней траектории замените его на
+  `repeatType: 'reverse'`. WAAPI-конвертеры честно отклоняют mirror с повторами,
+  потому что native `alternate` разворачивает и время, и easing. Изменение
+  предназначено для следующего minor-релиза до 1.0.
+- **Breaking (pre-1.0):** конечный `repeat` ограничен переносимым диапазоном
+  `0…2_147_483_647`; `Infinity` остаётся публичной записью бесконечного цикла
+  и однозначно кодируется как `-1` в MotionProgram V1 для Swift/Kotlin.
+- **Breaking (pre-1.0):** infinite repeat имеет один переносимый горизонт:
+  точные индексы `0…9_007_199_254_740_991`. Первая граница следующего индекса
+  fail-closed с `LM166` в web API / `LMP_BOUNDS` в V1 reference; `+Infinity`
+  в web API также даёт `LM166`. BigInt-oracle удалён, runtime больше не
+  угадывает parity через modulo.
+- `./animate`: WAAPI-путь строит кадры прямо из общего spring artifact без
+  повторного execution-plan wrapper и per-unit formatter closure; общий
+  compiler/cache/sampler остаётся единственным SSOT, а совместная стоимость
+  `animate + compositor` защищена отдельным import-cost ratchet.
+- Ядро: `drive` и `MotionValue` используют один поздно привязываемый default
+  frame-scheduler; дублированный runtime удалён без смены rAF/fallback-семантики.
+- `./compositor`: exact-key LRU вынесен в functional state без смены policy;
+  общий cache сохраняет O(1) lookup, нулевые аллокации на hit и прежний порядок
+  вытеснения, а одноразовая проверка ёмкости складывается при сборке.
 - `CompositorStaggerGroup.handoffToLive` теперь всегда проверяет индекс: после
   `destroy()` существующий ребёнок возвращает инертный `MotionValue`, а
   отсутствующий стабильно завершает вызов с `LM020` вместо искусственного
@@ -312,6 +231,78 @@
 
 ### Fixed
 
+- `./animate`: hostile `style.setProperty`, применяющий кадр и синхронно
+  запускающий `animate()` другой transform-компоненты, больше не теряет
+  только что видимый канал: снимок и реестр во время host-write отдают
+  применяемое поколение всей transform-поверхности (значение и скорость),
+  settle-запись после реентрантного вытеснения молча уступает successor-у,
+  а бросок хоста по-прежнему не публикует неприменённое поколение.
+- `./animate`: неудачная реентрантная подписка `SurfaceBatch` теперь
+  транзакционно откатывает все присоединённые в этой попытке поверхности,
+  сохраняет исходную host-ошибку и оставляет paused controls повторяемыми.
+- `./animate`: создание и завершение `finished`, ассимиляция WAAPI completion и
+  отложенный release owner больше не зависят от поздней подмены `Promise` или
+  `queueMicrotask`; бросающий host scheduler и ошибка `onComplete` не прячут
+  controls, не оставляют Promise pending и не меняют успешный supersede на
+  natural completion.
+- MotionProgram V1 возвращает exact track endpoints до authored easing при
+  normal и mirror, включая дорожки со сменой codec между сегментами; reference,
+  web sampler и future-host conformance corpus теперь следуют одному закону.
+- `./keyframes` и `./presets`: единый repeat-cursor владеет exact-boundary,
+  repeatDelay и progress; вложенный `seek()`/`cancel()` из пользовательского
+  easing линейризуется и не допускает позднюю публикацию внешнего сэмпла.
+  Следующее virtual-time и real-time anchor коммитятся только после проверки
+  infinite-horizon: `LM166` оставляет последний валидный clock и позволяет
+  явно продолжить либо завершить controls без зависшего scheduler-owner.
+  Синхронный injectable `requestFrame` проходит через async-trampoline, а
+  `repeat: Infinity` больше не завершается искусственно после 100 000 кадров.
+  Exact intermediate boundary теперь half-open и запускает следующую итерацию;
+  только конечный terminal закрыт. Это единый закон MotionProgram V1 и native
+  WAAPI, намеренно отличный от previous-end поведения Motion 12.42.2.
+- Repeat/WAAPI-компиляция общим V1-примитивом отклоняет абсолютные расписания,
+  где duration или repeatDelay не превосходят product/absolute binary64
+  resolution budget, а также неконечные миллисекунды и составные scale до
+  публикации адаптерных данных. Infinite WAAPI hold также fail-closed до
+  пользовательских callbacks, если его масштаб схлопывает разные authored
+  offsets; намеренные дубли offsets остаются допустимым скачком.
+  `repeatDelay` без повторов в preset WAAPI
+  канонически игнорируется. Shipped keyframe-sampler больше не содержит
+  создаваемый на каждом сэмпле IIFE.
+- Injectable frame scheduler получает уникального владельца каждой заявки:
+  поздний повторный вызов старого callback не может украсть уже созданную
+  следующую заявку; trusted native scheduler сохраняет стабильный callback.
+- `./keyframes` и `./presets` отклоняют невызываемый scalar/array easing
+  стабильными `LM163`/`LM164`, не подменяя ошибку линейным easing.
+- `./presets`: `splitText(..., 'chars')` теперь делит текст по extended
+  grapheme clusters через `Intl.Segmenter`, поэтому combining marks, emoji-ZWJ,
+  flags, Hangul и Indic conjuncts не рвутся; явный exact-segmenter шов покрывает
+  старые среды, а без него сохраняется прежний code-point fallback.
+- `./animate`: main-thread stagger сохраняет субкадровую фазу — монотонное
+  logical-time и signed local phase не дают малым задержкам (< кадра)
+  схлопнуться в один кадровый bucket, overshoot не теряется.
+- `./compositor`: WAAPI effect и fallback timer теперь атомарно сменяют единственного
+  owner; stale callbacks и реентрантный host-cleanup не могут оживить или отменить
+  новый прогон, а `destroy()` разрывает удержание target, effect и timer.
+- `./auto`: exit использует единое identity-владение между сессиями; stale
+  observer больше не забирает перенесённый узел, а reentrant disconnect
+  детерминированно освобождает ghost, handlers, style leases и parent-ссылки.
+- `./animate`: uniform/axial scale сохраняет обе оси и точные signed-zero края;
+  pause/seek переносит effect-space скорость без скачка, а несовместимые оси
+  продолжает независимым main-thread путём вместо ложного общего WAAPI-progress.
+- `./animate`: переполнение составной delay отклоняется до host-effects, а
+  завершение задержек длиннее диапазона HTML timer сверяется с WAAPI-clock без
+  раннего settle, starvation и скачка terminal pose.
+- Сборка: параллельная минификация ESM/CJS изолирует настройки Terser, поэтому
+  повторный запуск даёт тот же CJS-артефакт, включая strict-семантику и mangling.
+- `./animate/native`: host-методы вызываются без доверия к own `.call`,
+  доставка завершения не зависит от глобальной `queueMicrotask`, отмена
+  разрывает связь вечного host `finished` с DOM, а несходящаяся реентрантная
+  компенсация завершается `LM157` вместо ложного успеха.
+- `./frame`: единый identity-владелец резервирования гасит stale/двойную доставку,
+  любой синхронный `requestFrame` проходит через отменяемый async-trampoline, а
+  только ошибка текущего владельца демотирует clock без потери живых подписок.
+  `cancelAll()` завершает teardown атомарно; off/once/rollback сразу освобождают
+  callback и DOM-ссылки, массовая отписка остаётся линейной.
 - WebKit получает явные ключевые кадры: пружина продолжает движение при
   блокировке главного потока. ESM-файлы `dist` используют браузерные относительные
   импорты общего frame-loop и загружаются напрямую из CDN.
