@@ -401,6 +401,42 @@ try {
     if (!built) fail('Vite не выдал ES-бандл');
     else log('Vite: bundler-резолв выбранных публичных субпутей + сборка ✓');
   }
+
+  // ── Vite-фикстура с ПЛАГИНОМ: build-time lowering поверх упакованного пакета ──
+  // Приёмка компилятора #208 у РЕАЛЬНОГО потребителя: motionCompiler() из
+  // установленного tarball понижает статический nano-вызов, инъектируя
+  // '@labpics/motion/compiler/runtime'. Доказывает резолюцию exports ОБОИХ
+  // compiler-субпутей (плагин + executor) и элиминацию solver из бандла —
+  // node-гейт scripts/compiler-acceptance.mjs делает то же на dist через alias;
+  // здесь то же самое поверх фактически публикуемых байтов.
+  {
+    const dir = installFixture('vite-compiler', { name: 'vite-compiler-fx', private: true, type: 'module' }, tarball);
+    writeFileSync(
+      join(dir, 'entry.js'),
+      `import { animate } from '${pkg.name}/nano';\n` +
+        `export function play(el) { return animate(el, { opacity: 0.5 }); }\n`,
+    );
+    writeFileSync(
+      join(dir, 'vite.config.mjs'),
+      `import { motionCompiler } from '${pkg.name}/compiler/vite';\n` +
+        `export default { logLevel: 'error', plugins: [motionCompiler()], build: { lib: { entry: 'entry.js', formats: ['es'], fileName: 'bundle' }, write: true, minify: false } };\n`,
+    );
+    const viteBin = join(ROOT, 'node_modules', 'vite', 'bin', 'vite.js');
+    execSync(`node "${viteBin}" build --config vite.config.mjs`, { cwd: dir, stdio: 'pipe' });
+    const outDir = join(dir, 'dist');
+    const built = readdirSync(outDir).find((f) => f.endsWith('.js') || f.endsWith('.mjs'));
+    if (!built) {
+      fail('Vite с плагином не выдал ES-бандл');
+    } else {
+      const code = readFileSync(join(outDir, built), 'utf8');
+      // Понижение произошло: precomputed linear()-артефакт инъектирован,
+      // spring-математика (замкнутая форма солвера) элиминирована из бандла.
+      let lowered = true;
+      if (!code.includes('linear(')) { fail('плагин не инъектировал precomputed linear()-артефакт'); lowered = false; }
+      if (/Math\.(exp|cos|sin|sqrt)/.test(code)) { fail('spring-solver не элиминирован из бандла потребителя'); lowered = false; }
+      if (lowered) log('Vite+плагин: lowering поверх tarball, solver элиминирован ✓');
+    }
+  }
 } catch (error) {
   fail(
     error?.stdout?.toString?.() ||
