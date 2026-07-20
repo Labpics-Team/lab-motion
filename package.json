@@ -492,6 +492,7 @@
     "bench:ceiling": "node scripts/bench-ceiling.mjs",
     "pack:smoke": "node scripts/pack-smoke.mjs",
     "pack:compat": "node scripts/pack-compat.mjs",
+    "acceptance:compiler": "node scripts/compiler-acceptance.mjs",
     "test:browser": "playwright test --project=chromium",
     "test:browser:all": "playwright test",
     "mutation": "stryker run"

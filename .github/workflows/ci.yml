@@ -119,6 +119,12 @@ jobs:
       - name: Consumer compatibility
         run: pnpm pack:compat
 
+      # Приёмка компиляторного среза (#208): реальный Vite-build fixture'а с
+      # плагином и без — доказывает элиминацию solver/parser/compiler из бандла
+      # потребителя и строго меньший вес. dist уже собран шагом Build выше.
+      - name: Compiler lowering acceptance
+        run: pnpm acceptance:compiler
+
       # Exact Node-floor job не может запускать pnpm 11 (его собственный floor
       # выше потребительского). Собираем кандидат на Node 24 и передаём байты.
       - name: Pack Node-floor candidate
