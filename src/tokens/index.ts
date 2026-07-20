@@ -52,16 +52,24 @@ import { validateSpringParams, type SpringParams } from '../spring.js';
 // «кино»-затягиваний. instant=0 — нулевой якорь и цель reduced-motion.
 
 /** Именованная шкала длительностей движения (мс). Tree-shakeable чистые данные. */
-export const duration = {
+export interface DurationTokens {
   /** Мгновенно, 0 мс — снэп без анимации (reduced-motion край). */
-  instant: 0,
+  readonly instant: 0;
   /** Микровзаимодействия (hover, нажатие, мелкая смена состояния), 100 мс. */
-  fast: 100,
+  readonly fast: 100;
   /** Дефолтный UI-переход (появление, смена состояния), 200 мс. */
-  base: DEFAULT_DURATION_MS,
+  readonly base: 200;
   /** Крупнее и намереннее (панели, перемещения), 300 мс. */
-  slow: 300,
+  readonly slow: 300;
   /** Полноэкранный / крупный переход поверхностей, 500 мс. */
+  readonly slower: 500;
+}
+
+export const duration: DurationTokens = {
+  instant: 0,
+  fast: 100,
+  base: DEFAULT_DURATION_MS,
+  slow: 300,
   slower: 500,
 } as const;
 
@@ -101,17 +109,27 @@ function bezierToken(x1: number, y1: number, x2: number, y2: number): EasingToke
 // `standard` разделяет ссылочную идентичность с дефолтом фасада и не проходит
 // через общую фабрику; остальные три кривые остаются на едином решателе
 // cubic-bezier. Поэтому граница размера — весь субпуть ./tokens, а не сумма полей.
-export const easing = {
+export interface EasingTokens {
   /** Универсальный дефолт: оба конца сглажены (M3 easing-standard). */
+  readonly standard: {
+    readonly fn: (input: number) => number;
+    readonly css: `cubic-bezier(${string})`;
+  };
+  /** Вход с торможением: элемент влетает и мягко садится (M3 decelerate). */
+  readonly decelerate: EasingToken;
+  /** Выход с разгоном: элемент трогается мягко и быстро уходит (M3 accelerate). */
+  readonly accelerate: EasingToken;
+  /** ЕДИНСТВЕННЫЙ сдержанный overshoot (y1=1.21) — под акцент/emphasis. */
+  readonly emphasized: EasingToken;
+}
+
+export const easing: EasingTokens = {
   standard: {
     fn: STANDARD_EASING,
     css: `cubic-bezier(${STANDARD_EASING_COORDS.join(', ')})`,
   },
-  /** Вход с торможением: элемент влетает и мягко садится (M3 decelerate). */
   decelerate: bezierToken(0, 0, 0, 1),
-  /** Выход с разгоном: элемент трогается мягко и быстро уходит (M3 accelerate). */
   accelerate: bezierToken(0.3, 0, 1, 1),
-  /** ЕДИНСТВЕННЫЙ сдержанный overshoot (y1=1.21) — под акцент/emphasis. */
   emphasized: bezierToken(0.38, 1.21, 0.22, 1),
 } as const;
 
@@ -177,23 +195,32 @@ export function springFromDurationBounce(durationS: number, bounce: number): Spr
 // compileSpringPlan / CompositorSpring / compileStaggerPlan.
 
 /** Именованные пружинные пресеты (физпараметры для ./compositor и ./value). */
-export const spring = {
+export interface SpringTokens {
   /** Дефолт: ~критично-задемпфирован, без bounce (Framer-подобный). */
-  default: DEFAULT_SPRING,
+  readonly default: SpringParams;
   /** Мягкий и медленный: спокойное оседание. */
-  gentle: { mass: 1, stiffness: 120, damping: 30 },
+  readonly gentle: { readonly mass: 1; readonly stiffness: 120; readonly damping: 30 };
   /** Быстрый и собранный: минимальный overshoot. */
-  snappy: { mass: 1, stiffness: 260, damping: 28 },
+  readonly snappy: { readonly mass: 1; readonly stiffness: 260; readonly damping: 28 };
   /** OPT-IN пружинистость (underdamped, эмитит overshoot). НЕ дефолт. */
+  readonly bounce: { readonly mass: 1; readonly stiffness: 180; readonly damping: 12 };
+  /** ДС SSOT effects: opacity/цвет, прерываемая, без overshoot (0.35s, bounce 0). */
+  readonly smooth: SpringParams;
+  /** ДС SSOT spatial: единственный сдержанный overshoot ~4.6% (0.5s, bounce 0.3). */
+  readonly expressive: SpringParams;
+}
+
+export const spring: SpringTokens = {
+  default: DEFAULT_SPRING,
+  gentle: { mass: 1, stiffness: 120, damping: 30 },
+  snappy: { mass: 1, stiffness: 260, damping: 28 },
   bounce: { mass: 1, stiffness: 180, damping: 12 },
   // PURE-аннотации: вызовы с константами не бросают (запинено тестом), поэтому
   // честно помечены чистыми — иначе tsup-бандлы соседних субпутей (presets,
   // animate), которым `spring` не нужен, утащили бы конвертер+валидатор (+0.4 KB gz).
-  /** ДС SSOT effects: opacity/цвет, прерываемая, без overshoot (0.35s, bounce 0). */
   smooth: /* @__PURE__ */ springFromDurationBounce(0.35, 0),
-  /** ДС SSOT spatial: единственный сдержанный overshoot ~4.6% (0.5s, bounce 0.3). */
   expressive: /* @__PURE__ */ springFromDurationBounce(0.5, 0.3),
-} as const satisfies Record<string, SpringParams>;
+} as const;
 
 /** Имя пружинного токена. */
 export type SpringToken = keyof typeof spring;

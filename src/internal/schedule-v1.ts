@@ -1,7 +1,7 @@
 /** Tiny host-free numeric core shared by MotionProgram parsing and web runtimes. */
 
 export const SCHEDULE_V1_INT32_MAX = 0x7fff_ffff;
-export const SCHEDULE_V1_MAX_EXACT_ITERATION = Number.MAX_SAFE_INTEGER;
+export const SCHEDULE_V1_MAX_EXACT_ITERATION: number = Number.MAX_SAFE_INTEGER;
 export const SCHEDULE_V1_ITERATION_OUT_OF_RANGE = -1;
 
 const BINARY64_MIN_NORMAL = 2 ** -1022;

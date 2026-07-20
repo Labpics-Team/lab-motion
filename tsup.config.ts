@@ -92,51 +92,27 @@ export function entriesFromPackageExports(): Record<string, string> {
   return entries;
 }
 
-// Общие настройки эмита: байтовый паритет обоих конфигов обязателен —
-// compiler/runtime поставляется браузеру и меряется тем же size-gate.
-// ВАЖНО: terserOptions отдаёт фабрика, а не spread-объект — object spread
-// вызвал бы геттеры один раз и заморозил nested options, вернув гонку
-// параллельного ESM/CJS minify, от которой геттеры защищают.
-export function sharedEmit() {
-  return {
-    format: ['cjs', 'esm'],
-    dts: true,
-    splitting: false,
-    // Карты не входят в npm-артефакт; их генерация оставляла в runtime-файлах
-    // ссылки на отсутствующие ресурсы и создавала ложные 404 в DevTools.
-    sourcemap: false,
-    minify: 'terser',
-    // tsup запускает ESM/CJS minify параллельно, а Terser дописывает служебные
-    // поля в nested options. Свежие объекты не дают форматам менять друг друга.
-    terserOptions: {
-      get compress() { return { passes: 3, pure_getters: true }; },
-      get mangle() { return { properties: { regex: /^_/ } }; },
-    },
-    treeshake: true,
-  } as const;
-}
-
-function splitEntries(): [runtime: Record<string, string>, compiler: Record<string, string>] {
-  const runtime: Record<string, string> = {};
-  const compiler: Record<string, string> = {};
-  for (const [name, source] of Object.entries(entriesFromPackageExports())) {
-    (name.startsWith('compiler/') ? compiler : runtime)[name] = source;
-  }
-  return [runtime, compiler];
-}
-
-export const [runtimeEntries, compilerEntries] = splitEntries();
-
-// Две ПОСЛЕДОВАТЕЛЬНЫЕ сборки (`tsup && tsup --config tsup.compiler.config.ts`)
-// = два DTS-воркера: build-tool entries (#208) впервые тянут тип-граф
-// MotionProgram V1, и общий с 39 runtime-entries dts-бандл упирается в
-// heap-лимит воркера на CI. Массив-конфиг tsup исполняет ПАРАЛЛЕЛЬНО, и
-// clean первого рейсился бы с выводом второго — поэтому отдельный файл
-// конфига и последовательный запуск в build-скрипте.
+// Декларации НЕ собираются tsup: DTS-бандлинг держал полный чекер в воркере
+// и упирался в heap (двухфазная сборка была временным ответом). Теперь их
+// эмитит scripts/emit-declarations.mjs по-файлово через ts.transpileDeclaration
+// под контрактом isolatedDeclarations — память O(файла), воркеров нет.
 export default defineConfig({
-  ...sharedEmit(),
-  entry: runtimeEntries,
+  entry: entriesFromPackageExports(),
+  format: ['cjs', 'esm'],
+  dts: false,
+  splitting: false,
+  // Карты не входят в npm-артефакт; их генерация оставляла в runtime-файлах
+  // ссылки на отсутствующие ресурсы и создавала ложные 404 в DevTools.
+  sourcemap: false,
   clean: true,
+  minify: 'terser',
+  // tsup запускает ESM/CJS minify параллельно, а Terser дописывает служебные
+  // поля в nested options. Свежие объекты не дают форматам менять друг друга.
+  terserOptions: {
+    get compress() { return { passes: 3, pure_getters: true }; },
+    get mangle() { return { properties: { regex: /^_/ } }; },
+  },
+  treeshake: true,
   esbuildPlugins: [sharedFramePlugin],
   onSuccess: makeSharedFrameBrowserNative,
 });

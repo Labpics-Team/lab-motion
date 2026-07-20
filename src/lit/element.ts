@@ -22,7 +22,7 @@
  * импортировать в Node/SSR без window/document.
  */
 
-import { LitElement, html, css, type PropertyValues } from 'lit';
+import { LitElement, html, css, type PropertyValues, type CSSResult, type TemplateResult } from 'lit';
 import { MotionController, type MatchMediaFn } from './controller.js';
 import { type SpringParams } from '../spring.js';
 import { type RequestFrameFn } from '../motion-value.js';
@@ -50,7 +50,11 @@ import { renderTemplateValue } from '../internal/template.js';
  *   - `matchMedia`   — инъектируемый prefers-reduced-motion seam.
  */
 export class LabMotionSpringElement extends LitElement {
-  static override readonly properties = {
+  static override readonly properties: {
+    target: { type: NumberConstructor };
+    property: { type: StringConstructor };
+    template: { type: StringConstructor };
+  } = {
     target: { type: Number },
     property: { type: String },
     template: { type: String },
@@ -72,7 +76,7 @@ export class LabMotionSpringElement extends LitElement {
   /** JS-only: инъектируемый matchMedia-seam (SSR/тесты). */
   matchMedia: MatchMediaFn | undefined;
 
-  static override readonly styles = css`
+  static override readonly styles: CSSResult = css`
     :host {
       display: inline-block;
     }
@@ -124,7 +128,7 @@ export class LabMotionSpringElement extends LitElement {
     (this.style as unknown as Record<string, string>)[this.property] = cssValue;
   }
 
-  protected override render() {
+  protected override render(): TemplateResult<1> {
     return html`<slot></slot>`;
   }
 }

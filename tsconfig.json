@@ -4,6 +4,7 @@
     "module": "NodeNext",
     "moduleResolution": "NodeNext",
     "declaration": true,
+    "isolatedDeclarations": true,
     "declarationMap": true,
     "sourceMap": true,
     "strict": true,

@@ -15,14 +15,18 @@ import {
 
 export const MOTION_PROGRAM_VERSION_V1 = 1 as const;
 
-export const MOTION_PROGRAM_FEATURE_V1 = Object.freeze({
+export const MOTION_PROGRAM_FEATURE_V1: Readonly<{
+    readonly currentValues: number;
+    readonly relativeValues: number;
+    readonly hostExtensions: number;
+}> = Object.freeze({
   currentValues: 1 << 0,
   relativeValues: 1 << 1,
   /** Любой host-специфичный channel/codec/composite; portable executor обязан отказать. */
   hostExtensions: 1 << 2,
 } as const);
 
-export const MOTION_PROGRAM_SUPPORTED_FEATURES_V1 =
+export const MOTION_PROGRAM_SUPPORTED_FEATURES_V1: number =
   MOTION_PROGRAM_FEATURE_V1.currentValues |
   MOTION_PROGRAM_FEATURE_V1.relativeValues |
   MOTION_PROGRAM_FEATURE_V1.hostExtensions;
@@ -32,13 +36,21 @@ export const MOTION_PROGRAM_SUPPORTED_FEATURES_V1 =
  * Общий бюджет также учитывает вложенные кадры, выборки и компоненты векторов,
  * поэтому внешне плоская враждебная программа не усиливает аллокации рекурсивно.
  */
-export const MOTION_PROGRAM_LIMITS_V1 = Object.freeze({
+export const MOTION_PROGRAM_LIMITS_V1: Readonly<{
+    readonly maxItems: 65535;
+    readonly maxStringCodeUnits: 65535;
+}> = Object.freeze({
   maxItems: 0xffff,
   maxStringCodeUnits: 0xffff,
 } as const);
 
 /** Native ports сравнивают строки по scalar sequence, не по своей Unicode equality. */
-export const MOTION_PROGRAM_STRING_SEMANTICS_V1 = Object.freeze({
+export const MOTION_PROGRAM_STRING_SEMANTICS_V1: Readonly<{
+    readonly encoding: "utf-8";
+    readonly identity: "exact-scalar-sequence";
+    readonly normalization: "none";
+    readonly canonicallyEquivalentSequencesMayDiffer: true;
+}> = Object.freeze({
   encoding: 'utf-8',
   identity: 'exact-scalar-sequence',
   normalization: 'none',
@@ -50,7 +62,20 @@ export const MOTION_PROGRAM_STRING_SEMANTICS_V1 = Object.freeze({
  * не маскируются generic-векторами: до отдельной схемы они проходят через
  * host-extension и потому не могут случайно получить ложный native parity.
  */
-export const MOTION_PROGRAM_STANDARD_CHANNEL_V1 = Object.freeze({
+export const MOTION_PROGRAM_STANDARD_CHANNEL_V1: Readonly<{
+    readonly value: 0;
+    readonly opacity: 1;
+    readonly translateX: 2;
+    readonly translateY: 3;
+    readonly scaleX: 4;
+    readonly scaleY: 5;
+    readonly rotate: 6;
+    readonly skewX: 7;
+    readonly skewY: 8;
+    readonly color: 9;
+    readonly backgroundColor: 10;
+    readonly borderColor: 11;
+}> = Object.freeze({
   value: 0,
   opacity: 1,
   translateX: 2,
@@ -69,7 +94,14 @@ export const MOTION_PROGRAM_STANDARD_CHANNEL_V1 = Object.freeze({
  * Surface — единица host-записи. Все transform-компоненты принадлежат
  * одному surface: адаптер обязан собрать их в одну атомарную запись.
  */
-export const MOTION_PROGRAM_SURFACE_V1 = Object.freeze({
+export const MOTION_PROGRAM_SURFACE_V1: Readonly<{
+    readonly value: 0;
+    readonly opacity: 1;
+    readonly transform: 2;
+    readonly color: 3;
+    readonly backgroundColor: 4;
+    readonly borderColor: 5;
+}> = Object.freeze({
   value: 0,
   opacity: 1,
   transform: 2,
@@ -79,7 +111,7 @@ export const MOTION_PROGRAM_SURFACE_V1 = Object.freeze({
 } as const);
 
 /** Index — `MOTION_PROGRAM_STANDARD_CHANNEL_V1`, value — `MOTION_PROGRAM_SURFACE_V1`. */
-export const MOTION_PROGRAM_CHANNEL_SURFACE_V1 = Object.freeze([
+export const MOTION_PROGRAM_CHANNEL_SURFACE_V1: readonly [0, 1, 2, 2, 2, 2, 2, 2, 2, 3, 4, 5] = Object.freeze([
   MOTION_PROGRAM_SURFACE_V1.value,
   MOTION_PROGRAM_SURFACE_V1.opacity,
   MOTION_PROGRAM_SURFACE_V1.transform,
@@ -94,7 +126,17 @@ export const MOTION_PROGRAM_CHANNEL_SURFACE_V1 = Object.freeze([
   MOTION_PROGRAM_SURFACE_V1.borderColor,
 ] as const);
 
-export const MOTION_PROGRAM_OWNERSHIP_SEMANTICS_V1 = Object.freeze({
+export const MOTION_PROGRAM_OWNERSHIP_SEMANTICS_V1: Readonly<{
+    readonly ownerGroupScope: "program-local";
+    readonly invariant: "one-owner-per-subject-surface";
+    readonly duplicateChannel: "forbidden";
+    readonly transformWrite: "single-batched-surface-write";
+    readonly transformCoverage: "all-seven-standard-components-required";
+    readonly transformCurrent: "adapter-owned-component-state-or-identity-never-matrix-decomposition";
+    readonly surfaceCapture: "all-binding-baselines-once-before-first-surface-write";
+    readonly inactiveTrackPresentation: "captured-binding-baseline";
+    readonly subjectSlotBinding: "owned-injective-snapshot-before-capture-or-io";
+}> = Object.freeze({
   ownerGroupScope: 'program-local',
   invariant: 'one-owner-per-subject-surface',
   duplicateChannel: 'forbidden',
@@ -115,7 +157,68 @@ export const MOTION_PROGRAM_OWNERSHIP_SEMANTICS_V1 = Object.freeze({
  * Clamp применяется только при presentation и не возвращается в effect-state,
  * поэтому overshoot и скорость пружины не теряются.
  */
-export const MOTION_PROGRAM_CHANNEL_SEMANTICS_V1 = Object.freeze({
+export const MOTION_PROGRAM_CHANNEL_SEMANTICS_V1: Readonly<{
+    readonly value: Readonly<{
+        quantity: "number";
+        unit: "one";
+        presentationClamp: "none";
+    }>;
+    readonly opacity: Readonly<{
+        quantity: "coverage";
+        unit: "one";
+        presentationClamp: "unitInterval";
+    }>;
+    readonly translateX: Readonly<{
+        quantity: "length";
+        unit: "hostLogicalUnit";
+        presentationClamp: "none";
+    }>;
+    readonly translateY: Readonly<{
+        quantity: "length";
+        unit: "hostLogicalUnit";
+        presentationClamp: "none";
+    }>;
+    readonly scaleX: Readonly<{
+        quantity: "scale";
+        unit: "ratio";
+        presentationClamp: "none";
+    }>;
+    readonly scaleY: Readonly<{
+        quantity: "scale";
+        unit: "ratio";
+        presentationClamp: "none";
+    }>;
+    readonly rotate: Readonly<{
+        quantity: "angle";
+        unit: "degree";
+        presentationClamp: "none";
+    }>;
+    readonly skewX: Readonly<{
+        quantity: "angle";
+        unit: "degree";
+        presentationClamp: "none";
+    }>;
+    readonly skewY: Readonly<{
+        quantity: "angle";
+        unit: "degree";
+        presentationClamp: "none";
+    }>;
+    readonly color: Readonly<{
+        quantity: "color";
+        unit: "codec";
+        presentationClamp: "codec";
+    }>;
+    readonly backgroundColor: Readonly<{
+        quantity: "color";
+        unit: "codec";
+        presentationClamp: "codec";
+    }>;
+    readonly borderColor: Readonly<{
+        quantity: "color";
+        unit: "codec";
+        presentationClamp: "codec";
+    }>;
+}> = Object.freeze({
   value: Object.freeze({ quantity: 'number', unit: 'one', presentationClamp: 'none' }),
   opacity: Object.freeze({ quantity: 'coverage', unit: 'one', presentationClamp: 'unitInterval' }),
   translateX: Object.freeze({ quantity: 'length', unit: 'hostLogicalUnit', presentationClamp: 'none' }),
@@ -131,7 +234,7 @@ export const MOTION_PROGRAM_CHANNEL_SEMANTICS_V1 = Object.freeze({
 } as const);
 
 /** Порядок совпадает с текущим Web formatter: translate → scale → rotate → skew. */
-export const MOTION_PROGRAM_TRANSFORM_ORDER_V1 = Object.freeze([
+export const MOTION_PROGRAM_TRANSFORM_ORDER_V1: readonly [2, 3, 4, 5, 6, 7, 8] = Object.freeze([
   MOTION_PROGRAM_STANDARD_CHANNEL_V1.translateX,
   MOTION_PROGRAM_STANDARD_CHANNEL_V1.translateY,
   MOTION_PROGRAM_STANDARD_CHANNEL_V1.scaleX,
@@ -141,7 +244,21 @@ export const MOTION_PROGRAM_TRANSFORM_ORDER_V1 = Object.freeze([
   MOTION_PROGRAM_STANDARD_CHANNEL_V1.skewY,
 ] as const);
 
-export const MOTION_PROGRAM_TRANSFORM_SEMANTICS_V1 = Object.freeze({
+export const MOTION_PROGRAM_TRANSFORM_SEMANTICS_V1: Readonly<{
+    readonly numericModel: "ieee754-binary64";
+    readonly matrixOrder: "translate*scale*rotate*combinedSkew";
+    readonly matrixEvaluation: "closed-form-T*S*R*combinedSkew";
+    readonly cssMatrixLayout: "[a,b,c,d,tx,ty]";
+    readonly combinedSkewMatrix: "[1,tan(skewY),tan(skewX),1,0,0]";
+    readonly angleReduction: "truncating-remainder-then-half-open-fold-before-radians";
+    readonly matrixOverflow: "componentwise-saturate-to-f64-greatest-finite";
+    readonly matrixOverflowFeedsBack: false;
+    readonly totalityDomain: "all-seven-resolved-finite-scalars";
+    readonly yUpAdapter: Readonly<{
+        negate: readonly ["translateY", "rotate", "skewX", "skewY"];
+        preserve: readonly ["translateX", "scaleX", "scaleY"];
+    }>;
+}> = Object.freeze({
   numericModel: 'ieee754-binary64',
   matrixOrder: 'translate*scale*rotate*combinedSkew',
   matrixEvaluation: 'closed-form-T*S*R*combinedSkew',
@@ -158,7 +275,27 @@ export const MOTION_PROGRAM_TRANSFORM_SEMANTICS_V1 = Object.freeze({
 } as const);
 
 /** Числа остаются в effect-space; адаптер меняет только представление на границе. */
-export const MOTION_PROGRAM_COORDINATE_SEMANTICS_V1 = Object.freeze({
+export const MOTION_PROGRAM_COORDINATE_SEMANTICS_V1: Readonly<{
+    readonly hostLogicalUnit: Readonly<{
+        web: "css-px";
+        apple: "point";
+        android: "dp";
+        other: "host-layout-logical-unit";
+    }>;
+    readonly angle: Readonly<{
+        unit: "degree";
+        positive: "clockwise-in-y-down";
+        yUpAdapter: "negate-rotate-skewX-skewY-at-presentation";
+    }>;
+    readonly yAxis: Readonly<{
+        positive: "down";
+        yUpAdapter: "negate-translateY-at-presentation";
+    }>;
+    readonly transformComposition: "translate-scale-rotate-skew";
+    readonly pathCompilation: "sampled-translateX-translateY-optional-rotate";
+    readonly effectClamp: "none";
+    readonly presentationClampFeedsBack: false;
+}> = Object.freeze({
   hostLogicalUnit: Object.freeze({
     web: 'css-px',
     apple: 'point',
@@ -180,7 +317,12 @@ export const MOTION_PROGRAM_COORDINATE_SEMANTICS_V1 = Object.freeze({
   presentationClampFeedsBack: false,
 } as const);
 
-export const MOTION_PROGRAM_CURVE_SEMANTICS_V1 = Object.freeze({
+export const MOTION_PROGRAM_CURVE_SEMANTICS_V1: Readonly<{
+    readonly forms: "linear-or-sampled";
+    readonly sourceCurves: "compiled-out";
+    readonly interpolation: "piecewise-affine";
+    readonly duplicateOffset: "last-sample-wins-at-exact-boundary";
+}> = Object.freeze({
   forms: 'linear-or-sampled',
   sourceCurves: 'compiled-out',
   interpolation: 'piecewise-affine',
@@ -193,7 +335,14 @@ export const MOTION_PROGRAM_CURVE_SEMANTICS_V1 = Object.freeze({
  * Граничное значение дублируется в `to` левого и `from` правого
  * сегмента: это позволяет хранить один цвет в двух codec-layout без потери.
  */
-export const MOTION_PROGRAM_SEGMENT_SEMANTICS_V1 = Object.freeze({
+export const MOTION_PROGRAM_SEGMENT_SEMANTICS_V1: Readonly<{
+    readonly codecOwner: "outgoing-segment";
+    readonly coverage: "strict-positive-contiguous-zero-to-one";
+    readonly endpoint: "exact-before-curve";
+    readonly boundary: "right-segment-wins-at-exact-offset";
+    readonly boundaryRepresentation: "explicit-left-to-and-right-from";
+    readonly mixedCodec: "portable-within-one-track";
+}> = Object.freeze({
   codecOwner: 'outgoing-segment',
   coverage: 'strict-positive-contiguous-zero-to-one',
   endpoint: 'exact-before-curve',
@@ -202,7 +351,13 @@ export const MOTION_PROGRAM_SEGMENT_SEMANTICS_V1 = Object.freeze({
   mixedCodec: 'portable-within-one-track',
 } as const);
 
-export const MOTION_PROGRAM_HOST_EXTENSION_SEMANTICS_V1 = Object.freeze({
+export const MOTION_PROGRAM_HOST_EXTENSION_SEMANTICS_V1: Readonly<{
+    readonly portable: false;
+    readonly nativePolicy: "reject-before-bind";
+    readonly escapedChannel: "adapter-registered";
+    readonly additiveComposite: "adapter-registered";
+    readonly webCssOpaque: "adapter-registered";
+}> = Object.freeze({
   portable: false,
   nativePolicy: 'reject-before-bind',
   escapedChannel: 'adapter-registered',
@@ -210,7 +365,14 @@ export const MOTION_PROGRAM_HOST_EXTENSION_SEMANTICS_V1 = Object.freeze({
   webCssOpaque: 'adapter-registered',
 } as const);
 
-export const MOTION_PROGRAM_CODEC_V1 = Object.freeze({
+export const MOTION_PROGRAM_CODEC_V1: Readonly<{
+    readonly scalar: 0;
+    readonly colorGamma2: 1;
+    readonly colorSrgb: 2;
+    readonly colorHslShortest: 3;
+    readonly discrete: 4;
+    readonly webCssOpaque: 5;
+}> = Object.freeze({
   scalar: 0,
   colorGamma2: 1,
   colorSrgb: 2,
@@ -238,7 +400,53 @@ const HSLA_RANGES = Object.freeze([
  * точный linear-light sRGB. Opaque codec делегирует и разбор, и интерполяцию
  * зарегистрированному хосту, поэтому сам по себе не является portable.
  */
-export const MOTION_PROGRAM_CODEC_SEMANTICS_V1 = Object.freeze({
+export const MOTION_PROGRAM_CODEC_SEMANTICS_V1: Readonly<{
+    readonly scalar: Readonly<{
+        encoded: "scalar";
+        layout: "f64";
+        interpolation: "affine-unclamped";
+        relative: true;
+        portable: true;
+    }>;
+    readonly colorGamma2: Readonly<{
+        encoded: "vector";
+        layout: "encoded-srgb-straight-rgba";
+        ranges: readonly ["[0,255]", "[0,255]", "[0,255]", "[0,1]"];
+        interpolation: "sqrt-energy-rgb-linear-alpha-clamped-progress";
+        relative: false;
+        portable: true;
+    }>;
+    readonly colorSrgb: Readonly<{
+        encoded: "vector";
+        layout: "encoded-srgb-straight-rgba";
+        ranges: readonly ["[0,255]", "[0,255]", "[0,255]", "[0,1]"];
+        interpolation: "encoded-srgb-linear-alpha-clamped-progress";
+        relative: false;
+        portable: true;
+    }>;
+    readonly colorHslShortest: Readonly<{
+        encoded: "vector";
+        layout: "h-deg-s-l-straight-a";
+        ranges: readonly ["[0,360)", "[0,1]", "[0,1]", "[0,1]"];
+        interpolation: "shortest-hue-linear-sla-clamped-progress";
+        relative: false;
+        portable: true;
+    }>;
+    readonly discrete: Readonly<{
+        encoded: "token";
+        layout: "string-index";
+        interpolation: "right-continuous-half-swap";
+        relative: false;
+        portable: false;
+    }>;
+    readonly webCssOpaque: Readonly<{
+        encoded: "token";
+        layout: "string-index";
+        interpolation: "registered-host";
+        relative: false;
+        portable: false;
+    }>;
+}> = Object.freeze({
   scalar: Object.freeze({
     encoded: 'scalar',
     layout: 'f64',
@@ -286,7 +494,13 @@ export const MOTION_PROGRAM_CODEC_SEMANTICS_V1 = Object.freeze({
   }),
 } as const);
 
-export const MOTION_PROGRAM_DIRECTION_V1 = Object.freeze({
+export const MOTION_PROGRAM_DIRECTION_V1: Readonly<{
+    readonly normal: 0;
+    readonly reverse: 1;
+    readonly alternate: 2;
+    readonly alternateReverse: 3;
+    readonly mirror: 4;
+}> = Object.freeze({
   normal: 0,
   reverse: 1,
   alternate: 2,
@@ -296,13 +510,54 @@ export const MOTION_PROGRAM_DIRECTION_V1 = Object.freeze({
   mirror: 4,
 } as const);
 
-export const MOTION_PROGRAM_COMPOSITE_V1 = Object.freeze({
+export const MOTION_PROGRAM_COMPOSITE_V1: Readonly<{
+    readonly replace: 0;
+    readonly add: 1;
+    readonly accumulate: 2;
+}> = Object.freeze({
   replace: 0,
   add: 1,
   accumulate: 2,
 } as const);
 
-export const MOTION_PROGRAM_SCHEDULE_SEMANTICS_V1 = Object.freeze({
+export const MOTION_PROGRAM_SCHEDULE_SEMANTICS_V1: Readonly<{
+    readonly timeDomain: "finite-ieee754-binary64-milliseconds";
+    readonly startTime: "any-finite";
+    readonly repeat: "additional-iterations";
+    readonly infiniteRepeat: -1;
+    readonly repeatDelay: "between-iterations-only";
+    readonly cycleArithmetic: "round-ties-even-duration-plus-repeatDelay";
+    readonly iterationBoundary: "round-ties-even(round-ties-even(index-times-cycle)-plus-start)";
+    readonly zeroDelayMotionEnd: "next-iteration-boundary";
+    readonly positiveDelayMotionEnd: "round-ties-even(iteration-boundary-plus-duration)";
+    readonly finiteTerminalBoundary: "round-ties-even(last-iteration-boundary-plus-duration)";
+    readonly finiteRepresentability: "reject-unproven-distinct-nonzero-phase-boundaries";
+    readonly finiteResolutionBudget: "max-product-gap-plus-twice-max-absolute-gap";
+    readonly zeroFiniteDuration: "allowed";
+    readonly infiniteCycle: "duration-plus-repeatDelay-must-be-positive";
+    readonly infiniteRepresentability: "sample-defined-no-global-phase-resolution-guarantee";
+    readonly infiniteBoundarySelection: "greatest-exact-integer-index-with-absolute-boundary-not-after-sample";
+    readonly infiniteIterationIndex: "zero-through-9007199254740991-internal-null-public";
+    readonly infiniteParity: "exact-low-bit-within-supported-iteration-domain";
+    readonly unsafeQuotient: "fail-LMP_BOUNDS-before-iteration-9007199254740992-boundary";
+    readonly beforeStart: "inactive";
+    readonly motionInterval: "half-open";
+    readonly repeatBoundary: "next-iteration-wins";
+    readonly repeatDelayPose: "directional-endpoint";
+    readonly finiteEnd: "closed-terminal-commit";
+    readonly afterEnd: "terminal-pose-remains-committed-without-live-writer";
+    readonly zeroDuration: "instant-terminal-of-current-direction";
+    readonly normal: "forward-every-iteration";
+    readonly reverse: "reverse-every-iteration";
+    readonly alternate: "forward-even-reverse-odd";
+    readonly alternateReverse: "reverse-even-forward-odd";
+    readonly mirror: "odd-reverse-values-keep-authored-interval-and-curve-forward";
+    readonly publicRepeatTypeCompilerMapping: Readonly<{
+        loop: "normal";
+        reverse: "alternate";
+        mirror: "mirror";
+    }>;
+}> = Object.freeze({
   timeDomain: 'finite-ieee754-binary64-milliseconds',
   startTime: 'any-finite',
   repeat: 'additional-iterations',
@@ -536,10 +791,10 @@ function finite(input: unknown): number {
 }
 
 /** Максимальный конечный adjacent gap в binade заданной абсолютной величины. */
-export const motionProgramBinary64GapV1 = scheduleV1Binary64Gap;
+export const motionProgramBinary64GapV1: typeof scheduleV1Binary64Gap = scheduleV1Binary64Gap;
 
 /** Канонический порядок: сначала RN64(index * cycle), затем RN64(+ start). */
-export const motionProgramIterationBoundaryV1 = scheduleV1IterationBoundary;
+export const motionProgramIterationBoundaryV1: typeof scheduleV1IterationBoundary = scheduleV1IterationBoundary;
 
 function boundedFinite(input: unknown, minimum: number, maximum: number): number {
   const value = finite(input);

@@ -474,7 +474,7 @@
     "./dist/wc/index.cjs"
   ],
   "scripts": {
-    "build": "tsup && tsup --config tsup.compiler.config.ts",
+    "build": "tsup && node scripts/emit-declarations.mjs",
     "audit": "pnpm audit --audit-level moderate",
     "typecheck": "tsc --noEmit",
     "typecheck:browser": "tsc --noEmit -p tsconfig.browser.json",
