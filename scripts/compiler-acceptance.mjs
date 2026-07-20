@@ -23,7 +23,6 @@ import { gzipSync } from 'node:zlib';
 import { existsSync, mkdirSync, rmSync, writeFileSync } from 'node:fs';
 import { dirname, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { motionCompiler } from '../dist/compiler/vite/index.js';
 
 const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '..');
 const DIST = resolve(ROOT, 'dist');
@@ -41,6 +40,10 @@ function distModules(chunk) {
     .filter((id) => id.startsWith(DIST))
     .map((id) => id.slice(DIST.length + 1).replaceAll('\\', '/'));
 }
+
+// Плагин грузится динамически в run() ПОСЛЕ проверки существования dist:
+// статический импорт из ../dist упал бы раньше дружелюбной диагностики.
+let motionCompiler;
 
 /** Один Vite-build fixture'а: возвращает entry-chunk {code, distModules}. */
 async function buildFixture(name, code, withPlugin) {
@@ -85,6 +88,7 @@ async function run() {
     console.error('compiler-acceptance: dist отсутствует — сначала pnpm build');
     process.exit(1);
   }
+  ({ motionCompiler } = await import('../dist/compiler/vite/index.js'));
   rmSync(TMP, { recursive: true, force: true });
   mkdirSync(TMP, { recursive: true });
   try {
