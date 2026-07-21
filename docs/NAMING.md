@@ -11,7 +11,7 @@
 
 | Метрика | N |
 | --- | --- |
-| экспорт-субпутей package.json | 41 |
+| экспорт-субпутей package.json | 42 |
 | фреймворк-биндингов | 9 |
 | CSS-литералов `--lab-motion-*` в src | 0 |
 | CSS-литералов вне `--lab-motion-*` в src | 0 |
@@ -71,7 +71,7 @@
 
 | Группа | Субпути |
 | --- | --- |
-| Ядро анимации | `./nano` (platform-trusted WAAPI, ≤1 KB), `./animate` (основной продуктовый вход), `./frame`, `./driver`, `./compositor`, `./compositor/stagger`, `./waapi`, `./auto` |
+| Ядро анимации | `./nano` (platform-trusted WAAPI, ≤1 KB), `./lite` (WAAPI-first эргономичный, <5 KB), `./animate` (основной продуктовый вход), `./frame`, `./driver`, `./compositor`, `./compositor/stagger`, `./waapi`, `./auto` |
 | Значения и физика | `./value`, `./spring`, `./decay`, `./easing`, `./keyframes`, `./stagger`, `./timeline`, `./presets`, `./tokens`, `./utils` |
 | Доменные эффекты | `./flip`, `./projection`, `./smart`, `./gestures`, `./behaviors`, `./scroll`, `./in-view`, `./presence`, `./svg`, `./svg-morph`, `./a11y` |
 | Биндинги (9) | `./react`, `./svelte`, `./vue`, `./lit`, `./solid`, `./preact`, `./angular`, `./wc`, `./qwik` |

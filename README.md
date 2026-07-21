@@ -6,7 +6,7 @@ DOM — рендер делает ваш колбэк, время приходи
 
 Три вещи, которые нужно понять сразу:
 
-1. **Всё — субпути.** Корневой экспорт + 40 субпутей (41 входов `exports` в
+1. **Всё — субпути.** Корневой экспорт + 41 субпутей (42 входов `exports` в
    `package.json`); точный `sideEffects`-allowlist сохраняет только авто-регистрацию
    web components, остальные неиспользуемые субпути вырезаются.
 2. **Две фазы движения.** Интерактив и фаза слежения (палец ведёт значение) — на
@@ -131,6 +131,7 @@ document.querySelector<HTMLElement>('.card')!
 | `…/driver` | Scrubbable-контроллер: `play/pause/reverse/seek/timeScale/progress` + thenable |
 | `…/frame` | Единый frame-шедулер: `createFrameLoop` / синглтон `frame` — один rAF на кадр, фазы read→update→render против layout-thrash, SSR-safe; `asRequestFrame(loop)` сажает `MotionValue`/`drive` на общий кадр. **Биндинги используют его по умолчанию** (как shared-ticker у Framer Motion/GSAP); инжекция своего `requestFrame` переопределяет |
 | `…/nano` | **Platform-trusted WAAPI ≤ 1 КБ gzip** (целевое значение или пара `[from, to]`, `rotate` — скаляр): spring/tween, целые `translate/scale/rotate` longhand-каналы, любые нативно-анимируемые CSS-свойства, `delay`/`stagger`, reduced-motion и сами `Animation` как контролы. Без layout-read, независимых `x/y`, rAF-fallback, C1-подхвата и hostile-host обещаний |
+| `…/lite` | **WAAPI-first эргономичный «полный» фасад < 5 КБ gzip** (класс Motion One mini): `animate(target, props, options)` полностью на нативном WAAPI (ноль main-thread работы во время проигрывания). Независимые оси `x`/`y`/`scale`/`rotate`/`skew` (компонуются в один `transform`; для to-only `from` берёт браузер), пары `[from, to]`, `opacity`, любые CSS-свойства, `{ spring }` или `{ duration, ease }` (`ease` — CSS-строка ИЛИ JS-функция, семплируется в `linear()`), `delay`/`stagger`, reduced-motion, агрегированные контролы `{ animations, finished, play, pause, seek, cancel, stop }`. Граница у полного `./animate`: C¹-подхват при прерывании, main-thread fallback, инжектируемый детерминизм |
 | `…/animate` | Фасад-one-liner: `animate(target, props, options)` — цели по каналам (`x`/`y`/`scale`/`rotate`, `opacity`, CSS-свойства), режим `{ spring }` или `{ duration, ease }`, `delay`/`stagger`, контролы `{ finished, play, pause, seek, cancel, stop }`. Это базовый single-transition DX-срез; ядро от него не растёт |
 
 **Математика значений**

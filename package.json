@@ -426,6 +426,16 @@
         "default": "./dist/nano/index.cjs"
       }
     },
+    "./lite": {
+      "import": {
+        "types": "./dist/lite/index.d.ts",
+        "default": "./dist/lite/index.js"
+      },
+      "require": {
+        "types": "./dist/lite/index.d.cts",
+        "default": "./dist/lite/index.cjs"
+      }
+    },
     "./compiler/vite": {
       "import": {
         "types": "./dist/compiler/vite/index.d.ts",
