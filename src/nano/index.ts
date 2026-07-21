@@ -1,7 +1,8 @@
 /**
- * Минимальный DOM-фасад для доверенной платформы: to-only значения компилируются
- * в native WAAPI, а пружина — в CSS linear(). Hostile/polyfill-защита, C1-подхват
- * и произвольные keyframes намеренно остаются контрактом полного ./animate.
+ * Минимальный DOM-фасад для доверенной платформы: целевое значение (или явная
+ * пара [from, to]) компилируется в native WAAPI, а пружина — в CSS linear().
+ * Hostile/polyfill-защита, C1-подхват и произвольные N-keyframes намеренно
+ * остаются контрактом полного ./animate.
  */
 
 import { springLinear, type NanoSpring } from './spring-linear.js';
@@ -28,10 +29,21 @@ export type NanoOptions = NanoCommonOptions & ({
   readonly ease?: string | undefined;
 });
 
-export type NanoProps = Record<string, string | number | undefined> & {
+/**
+ * Пара [from, to]: явный старт вместо to-only инференса WAAPI. Однородна по типу
+ * (числа ИЛИ строки — как того требует WAAPI PropertyIndexedKeyframes), поэтому
+ * `frame[prop] = props[prop]` пробрасывает её нативно без единого runtime-байта.
+ */
+export type NanoPair = [from: number, to: number] | [from: string, to: string];
+
+export type NanoProps = Record<string, string | number | NanoPair | undefined> & {
   /** Вся CSS translate longhand: независимыми x/y владеет полный ./animate. */
-  readonly translate?: string | undefined;
-  readonly scale?: number | undefined;
+  readonly translate?: string | [from: string, to: string] | undefined;
+  readonly scale?: number | [from: number, to: number] | undefined;
+  /**
+   * Только скаляр: принудительный `deg`-суффикс (`${rotate}deg`) не переживает
+   * массив — пара [from, to] для поворота остаётся контрактом полного ./animate.
+   */
   readonly rotate?: number | undefined;
 };
 

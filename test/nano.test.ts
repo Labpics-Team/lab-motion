@@ -86,6 +86,48 @@ describe('nano: публичный WAAPI-only контракт', () => {
     }
   });
 
+  it('пробрасывает пары [from, to] нативно для opacity/CSS/translate/scale', () => {
+    const target = recordingElement();
+
+    animate(
+      target as unknown as Element,
+      {
+        opacity: [0, 1],
+        backgroundColor: ['rgb(0, 0, 0)', 'rgb(255, 0, 0)'],
+        translate: ['0px 0px', '240px 12px'],
+        scale: [0.5, 1.2],
+      },
+      { duration: 180 },
+    );
+
+    // WAAPI PropertyIndexedKeyframes принимает массивы напрямую: to-only инференс
+    // WAAPI заменён явным стартом БЕЗ единого runtime-байта (тип-only расширение).
+    expect(target.calls[0]!.keyframes).toEqual({
+      opacity: [0, 1],
+      backgroundColor: ['rgb(0, 0, 0)', 'rgb(255, 0, 0)'],
+      translate: ['0px 0px', '240px 12px'],
+      scale: [0.5, 1.2],
+    });
+    expect(target.calls[0]!.timing).toMatchObject({ duration: 180, fill: 'both' });
+  });
+
+  it('пара [from, to] совместима со stagger и spring-режимом по умолчанию', () => {
+    const first = recordingElement();
+    const second = recordingElement();
+
+    animate(
+      [first, second] as unknown as Element[],
+      { opacity: [0, 1] },
+      { stagger: 25 },
+    );
+
+    for (const target of [first, second]) {
+      expect(target.calls[0]!.keyframes).toEqual({ opacity: [0, 1] });
+      expect(target.calls[0]!.timing.easing).toMatch(/^linear\(/);
+    }
+    expect(second.calls[0]!.timing.delay).toBe(25);
+  });
+
   it('делегирует tween и произвольные CSS-значения платформе', () => {
     const target = recordingElement();
 
