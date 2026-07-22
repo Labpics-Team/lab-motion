@@ -118,7 +118,8 @@ export const ANIMATE_COMPOSITOR_MIXED_GATE_BYTES = 13_340;
 // раздуванию прятаться под щедрым общим зонтом 4608 (тот же класс, что ловит
 // CORE_GATE_BYTES для ядра). Поднимать только осознанно.
 export const BESPOKE_SUBPATH_GATES = {
-  './utils': 1400,
+  // 1400 → 1100 (2026-07-22): факт 1055 — затяжка по факту (~4%).
+  './utils': 1100,
   // Build-tool entry (#208): Vite-адаптер lowering НАМЕРЕННО несёт канонический
   // MotionProgram V1 parser + nano spring SSOT — это цена доверенного артефакта
   // на стороне СБОРКИ, браузеру она не поставляется никогда (в bundle попадает
@@ -140,7 +141,8 @@ export const BESPOKE_SUBPATH_GATES = {
   './compiler/runtime': 365,
   // Базовый compositor не несёт групповой оркестратор. Старый потолок сохранён:
   // capability-split не имеет права маскировать регрессию повышением порога.
-  './compositor': 6450,
+  // 6450 → 6250 (2026-07-22): факт 6082 — затяжка по факту (~2.7%).
+  './compositor': 6250,
   // Групповой фасад самодостаточен и включает только нужные ему базовые план и
   // контроллер. Порог равен прежнему полному compositor-контракту, не новому факту.
   './compositor/stagger': 6450,
@@ -172,7 +174,9 @@ export const BESPOKE_SUBPATH_GATES = {
   //   (MotionParamError вместо TypeError из горячего at()). Ужим выполнен ДО
   //   подъёма (дедуп rebaseNode/lerp1, −100 gz); подъём — в рамках делегации
   //   Даниила на автономные решения (прецедент CORE 2150→2190 выше).
-  './projection': 5750,
+  //   5750 → 5350 (2026-07-22): факт 5202 после стабильной pole-формы #226 —
+  //   ратчет затянут по факту (~3%).
+  './projection': 5350,
   // ./smart — Figma-подобный smart-animate ПОВЕРХ ./projection (жанр shared-element
   // / smart-animate): диф двух снимков дерева по строке-ключу data-motion-key →
   // matched/entered/exited/skipped, оркестрация поверх ОДНОГО projection-движка
@@ -184,7 +188,8 @@ export const BESPOKE_SUBPATH_GATES = {
   //   2026-07-10: факт 7151 gz первой сборки → порог 7450 (~4% люфт, дисциплина
   //   ./projection «порог ОТ ФАКТА»). Выше общего 4608 законно: тянет проекционное
   //   ядро целиком. Поднимать только осознанно.
-  './smart': 7450,
+  //   7450 → 7000 (2026-07-22): факт 6840 — затяжка по факту (~2.3%).
+  './smart': 7000,
   // ./presets — headless-словарь движений + текстовые/числовые сахара
   // (порт ценного из PR#79: splitText/typewriterAt/scrambleAt/tickerCells/
   // formatNumber + раннеры runTypewriter/runScramble/runNumber поверх runPreset).
@@ -227,7 +232,8 @@ export const BESPOKE_SUBPATH_GATES = {
   //   вплотную к общему зонту, и точечный порог — ровно тот регрессионный класс,
   //   что общий 4608 бы пропустил на +130 gz. Люфт скромный (не 4%) осознанно:
   //   рост тут — новая capability, не шум минификатора. Поднимать только осознанно.
-  './behaviors': 4600,
+  //   4600 → 4150 (2026-07-22): факт 4045 после #226/#218 — затяжка по факту.
+  './behaviors': 4150,
 };
 
 /**
@@ -251,7 +257,10 @@ export const IMPORT_COST_SCENARIOS = [
   {
     name: 'only-spring',
     code: `import { spring } from '%DIST%'; console.log(spring({mass:1,stiffness:200,damping:20}, 0.1).value);`,
-    gate: 920, // updated for perf changes
+    // 920 → 645 (2026-07-22): pole-space #226 + разделение границ #218
+    // сняли settle-бюджет из чистого spring() — факт 625 (−21%). Ратчет
+    // затянут ПО ФАКТУ (~3% люфта): выигрыш математики зафиксирован гейтом.
+    gate: 645,
   },
   {
     // Страж tree-shake геометрии от драйвера/DOM: чистая функция projectAt не
@@ -259,16 +268,17 @@ export const IMPORT_COST_SCENARIOS = [
     name: 'projection-core-only',
     code: `import { projectAt } from '%DIST%/../projection/index.js'; console.log(projectAt({first:{x:0,y:0,width:1,height:1},last:{x:0,y:0,width:1,height:1}}, null, 0.5).sx);`,
     // 2026-07-10: факт первой сборки 655 gz → порог 720 (~10%, ОТ ФАКТА).
-    gate: 720,
+    // 720 → 700 (2026-07-22): факт 679 — затяжка по факту (~3%).
+    gate: 700,
   },
   {
     // Правда потребительской цены DOM-однострочника (капчур → мутация → play).
     name: 'projection-dom-one-liner',
     code: `import { createDomProjection } from '%DIST%/../projection/index.js'; const p = createDomProjection(); p.capture([]); p.play(); p.cancel(); console.log(p.playing);`,
     // 2026-07-10: факт первой сборки 4899 gz → порог 5350 (~9%, ОТ ФАКТА).
-    // 2026-07-10 (позже): факт 5536 gz → порог 5750 (~4%) — хронология и
-    // обоснование в комментарии './projection' в BESPOKE_SUBPATH_GATES.
-    gate: 5750,
+    // 2026-07-10 (позже): факт 5536 gz → порог 5750 (~4%).
+    // 5750 → 5350 (2026-07-22): факт 5202 после #226 — затяжка по факту (~3%).
+    gate: 5350,
   },
   {
     name: 'only-MotionValue',
@@ -278,7 +288,8 @@ export const IMPORT_COST_SCENARIOS = [
     // дублировать rAF-цикл MotionValue в handoff = запрещённый coupled-дубль). Факт 1606.
     // Каталогизированная runtime-граница отклоняет shaped, но неизвестные LM-коды;
     // физический root-entry при этом остаётся под отдельным CORE_GATE_BYTES.
-    gate: 1660,
+    // 1660 → 1650 (2026-07-22): факт 1619 после #226/#218 — затяжка по факту.
+    gate: 1650,
   },
   {
     name: 'full-core',
@@ -315,7 +326,8 @@ export const IMPORT_COST_SCENARIOS = [
     // сценарии» сохранён.
     name: 'only-clamp (utils tree-shake)',
     code: `import { clamp } from '%DIST%/../utils/index.js'; console.log(clamp(0,1,2));`,
-    gate: 340, // факт 308 (2026-07-07, первая сборка ./utils); люфт ~10%
+    // 340 → 300 (2026-07-22): факт 290 — затяжка по факту (~3.4%).
+    gate: 300,
   },
   {
     // ПРАВДА потребительской цены фасада. Отгрузочный gz субпутя ./animate —
@@ -347,7 +359,8 @@ export const IMPORT_COST_SCENARIOS = [
     code: `import { createBottomSheet } from '%DIST%/../behaviors/index.js'; const s = createBottomSheet({ snapPoints: [0, 300] }); s.pointerDown({ x: 0, y: 0, t: 0 }); console.log(typeof s.cancel);`,
     // Факт первой сборки 2026-07-10: 3542 gz + ~4% люфт. Заметно < shipped 4475 —
     // машинное доказательство, что одна фабрика трясётся (не тянет весь субпуть).
-    gate: 3700,
+    // 3700 → 3250 (2026-07-22): факт 3147 после #226/#218 — затяжка по факту.
+    gate: 3250,
   },
 ];
 
