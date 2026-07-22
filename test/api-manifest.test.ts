@@ -4,7 +4,7 @@
  * Закон: манифест генерируется из фактов (exports ↔ dist ↔ docs), ручная копия
  * поверхности запрещена. Тест перегенерирует манифест в памяти и сравнивает с
  * закоммиченным по ВСЕМ полям, кроме shipped*Bytes (размеры актуализирует
- * prepack перед публикацией; их правда защищена отдельно pnpm size).
+ * pnpm build перед публикацией; их правда защищена отдельно pnpm size).
  */
 
 import { readFileSync, existsSync } from 'node:fs';
@@ -53,7 +53,7 @@ describe('api-manifest: exports ↔ manifest ↔ docs без дрейфа', () =
     expect(new Set(actual).size).toBe(actual.length);
   });
 
-  it('перегенерация совпадает с закоммиченным (кроме размеров — их правит prepack)', async () => {
+  it('перегенерация совпадает с закоммиченным (кроме размеров — их правит build)', async () => {
     const fresh = (await buildManifest()) as Manifest;
     expect(stripSizes(fresh)).toEqual(stripSizes(committed));
   }, 120_000);

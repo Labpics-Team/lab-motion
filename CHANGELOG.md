@@ -36,7 +36,7 @@
 - **Машиночитаемый API (#96-срез):** генерируемые `api-manifest.json`
   (runtime-экспорты из esbuild-метафайла против dist, shipped-размеры тем же
   законом, что `pnpm size`, ссылки на справку) и `llms.txt` (карта выбора
-  API); `pnpm manifest` + prepack-хук; drift-тест exports ↔ manifest ↔ docs.
+  API); `pnpm manifest`, генерация в составе `pnpm build` (lifecycle-скрипты запрещены релизной политикой); drift-тест exports ↔ manifest ↔ docs.
   Оба артефакта и docs-суит входят в npm-тарбол.
 
 - **Воспроизводимый size-compare стенд (#95):** `bench/compare/size-compare.mjs`

@@ -233,6 +233,13 @@ try {
     'docs/errors.md',
     'docs/benchmark.md',
     'docs/recipes.md',
+    // #91/#96: документация и машиночитаемый API — часть артефакта.
+    'docs/getting-started.md',
+    'docs/reference/animate.md',
+    'docs/migration/framer-motion.md',
+    'docs/explanations/compositor-model.md',
+    'api-manifest.json',
+    'llms.txt',
   ]) {
     if (!existsSync(join(installedRoot, file))) {
       failed = true;
