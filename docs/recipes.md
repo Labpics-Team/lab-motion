@@ -28,7 +28,7 @@ el.addEventListener('pointerup', (e) => drag.pointerUp({ x: e.clientX, y: e.clie
 serialized position/right-slope по `Animation.currentTime` без style/layout-read.
 Жест наследует этот импульс, а не аналитическую аппроксимацию:
 
-```typescript
+```ts
 // ЗАМЕНА pointerdown-обработчика выше (не второй listener): controller —
 // CompositorSpring этого элемента, ведущий его текущую compositor-анимацию.
 el.addEventListener('pointerdown', (e) => {
@@ -79,7 +79,9 @@ exit продолжает движение из текущих (value, velocity)
 
 ```typescript
 import { MotionValue } from '@labpics/motion';
+import { createPresence } from '@labpics/motion/presence';
 
+const spring = { mass: 1, stiffness: 170, damping: 26 };
 const el = document.querySelector('.toast') as HTMLElement;
 const undoButton = document.querySelector('.undo') as HTMLElement;
 const p = createPresence({
@@ -121,7 +123,7 @@ undoButton.addEventListener('click', () => p.enter(), { once: true });
 import { inView } from '@labpics/motion/in-view';
 
 const stop = inView('.card', (element) => {
-  element.dataset.visible = 'true';
+  (element as HTMLElement).dataset.visible = 'true';
   // Возвращённая функция включает повторяемый enter/leave. Без неё target
   // автоматически снимается после первого входа (one-shot).
   return () => delete (element as HTMLElement).dataset.visible;

@@ -1,0 +1,145 @@
+# @labpics/motion 0.3.0
+
+> Zero-dependency headless motion: закрытая форма пружины, compositor-путь
+> (WAAPI + CSS linear()), build-time компилятор. Все единицы времени в
+> публичных опциях — МИЛЛИСЕКУНДЫ, если явно не сказано «секунды».
+
+## Быстрый выбор входа
+
+- Типовая DOM-анимация одной строкой → @labpics/motion/animate (animate(el, { x: 240, opacity: 1 }))
+- Минимальный вес, native WAAPI, to-only → @labpics/motion/nano
+- Статические вызовы без runtime-цены → плагин @labpics/motion/compiler/vite
+- Пружина из ощущений: fromBounce({ duration, bounce }) → @labpics/motion/spring
+- Каскады → @labpics/motion/stagger; жесты с инерцией → @labpics/motion/gestures
+
+## Субпути
+
+- @labpics/motion — Ядро `.` — MotionValue, drive и корневой экспорт
+  exports: MotionParamError, MotionValue, drive, spring, tween, validateSpringParams, validateSpringPhysics
+  docs: docs/reference/core.md
+- @labpics/motion/easing — кривые изинга
+  exports: anticipate, backIn, backInOut, backOut, bounce, circIn, circInOut, circOut, cubicBezier, easeIn, easeInOut, easeOut, elastic, expoIn, expoInOut, expoOut, linear, normalizeEasing, power, sineIn, sineInOut, sineOut, steps
+  docs: docs/reference/easing.md
+- @labpics/motion/react — Фреймворк-адаптеры — ./react, ./vue, ./svelte, ./solid, ./preact, ./angular, ./lit, ./wc, ./qwik
+  exports: useMotionStyle, useMotionValue, useReducedMotion, useSpring
+  docs: docs/reference/adapters.md
+- @labpics/motion/svelte — Фреймворк-адаптеры — ./react, ./vue, ./svelte, ./solid, ./preact, ./angular, ./lit, ./wc, ./qwik
+  exports: springStore
+  docs: docs/reference/adapters.md
+- @labpics/motion/vue — Фреймворк-адаптеры — ./react, ./vue, ./svelte, ./solid, ./preact, ./angular, ./lit, ./wc, ./qwik
+  exports: useMotionValue, useSpring, vMotion
+  docs: docs/reference/adapters.md
+- @labpics/motion/value — парсинг и интерполяция CSS-значений, transform
+  exports: buildTransform, hslToRgb, interpolate, interpolateColor, interpolateTransform, interpolateUnit, mixColor, parse, parseColor, parseUnit, rgbToHsl
+  docs: docs/reference/value.md
+- @labpics/motion/driver — ./driver и ./frame — управляемый драйвер и общий кадровый цикл
+  exports: createDriver
+  docs: docs/reference/driver-frame.md
+- @labpics/motion/stagger — каскады задержек
+  exports: stagger
+  docs: docs/reference/stagger.md
+- @labpics/motion/timeline — ./timeline и ./keyframes — секвенции и семплеры keyframes
+  exports: createTimeline
+  docs: docs/reference/timeline-keyframes.md
+- @labpics/motion/keyframes — ./timeline и ./keyframes — секвенции и семплеры keyframes
+  exports: keyframes, sampleKeyframes
+  docs: docs/reference/timeline-keyframes.md
+- @labpics/motion/decay — инерционное затухание
+  exports: createDecay
+  docs: docs/reference/decay.md
+- @labpics/motion/lit — Фреймворк-адаптеры — ./react, ./vue, ./svelte, ./solid, ./preact, ./angular, ./lit, ./wc, ./qwik
+  exports: LAB_MOTION_SPRING_TAG, LabMotionSpringElement, MotionController
+  docs: docs/reference/adapters.md
+- @labpics/motion/gestures — drag с инерцией и handoff
+  exports: createDrag, createHover, createPan, createPress, createVelocityTracker
+  docs: docs/reference/gestures.md
+- @labpics/motion/scroll — ./scroll и ./in-view — скролл-привязка и появление во вьюпорте
+  exports: createInView, createScrollObserver, createScrollVelocity, resolveTargetProgress, scrollProgress, scrubBinding
+  docs: docs/reference/scroll-in-view.md
+- @labpics/motion/in-view — ./scroll и ./in-view — скролл-привязка и появление во вьюпорте
+  exports: MotionParamError, inView
+  docs: docs/reference/scroll-in-view.md
+- @labpics/motion/presence — mount/unmount переходы (enter/exit lifecycle)
+  exports: createPresence, swapPresence
+  docs: docs/reference/presence.md
+- @labpics/motion/flip — FLIP layout-анимации
+  exports: computeFlip, correctRadius, counterScale, createFlip, flipAt
+  docs: docs/reference/flip.md
+- @labpics/motion/projection — проекционное дерево (вложенный FLIP)
+  exports: cornerRadiusAt, createDomProjection, createProjection, createProjector, mixBox, projectAt
+  docs: docs/reference/projection.md
+- @labpics/motion/smart — умные переходы
+  exports: SMART_KEY_ATTR, captureSmart, resolveSmartTier, smartTransition
+  docs: docs/reference/smart.md
+- @labpics/motion/svg — ./svg и ./svg-morph — SVG-анимации и морфинг
+  exports: createMotionPath, drawPath, parsePath, pathLength
+  docs: docs/reference/svg.md
+- @labpics/motion/a11y — политика reduced-motion
+  exports: createMotionConfig
+  docs: docs/reference/a11y.md
+- @labpics/motion/spring — точная пружина: параметры, конструкторы, easing
+  exports: fromBounce, fromOscillation, fromPeak, fromVisualDuration, springAsEasing, springPresets
+  docs: docs/reference/spring.md
+- @labpics/motion/waapi — ./compositor, ./compositor/stagger и ./waapi — compositor-путь и WAAPI
+  exports: animateWaapi, compileWaapi, easingToLinear, supportsWaapi
+  docs: docs/reference/compositor.md
+- @labpics/motion/auto — автоматические переходы (zero-config FLIP)
+  exports: autoAnimate, enterKeyframes, exitKeyframes, moveKeyframes, planAuto
+  docs: docs/reference/auto.md
+- @labpics/motion/svg-morph — ./svg и ./svg-morph — SVG-анимации и морфинг
+  exports: interpolatePath
+  docs: docs/reference/svg.md
+- @labpics/motion/solid — Фреймворк-адаптеры — ./react, ./vue, ./svelte, ./solid, ./preact, ./angular, ./lit, ./wc, ./qwik
+  exports: createMotionValue, createSpring
+  docs: docs/reference/adapters.md
+- @labpics/motion/preact — Фреймворк-адаптеры — ./react, ./vue, ./svelte, ./solid, ./preact, ./angular, ./lit, ./wc, ./qwik
+  exports: useMotionValue, useSpring
+  docs: docs/reference/adapters.md
+- @labpics/motion/angular — Фреймворк-адаптеры — ./react, ./vue, ./svelte, ./solid, ./preact, ./angular, ./lit, ./wc, ./qwik
+  exports: injectMotionValue, injectSpring
+  docs: docs/reference/adapters.md
+- @labpics/motion/wc — Фреймворк-адаптеры — ./react, ./vue, ./svelte, ./solid, ./preact, ./angular, ./lit, ./wc, ./qwik
+  exports: LAB_SPRING_TAG, createLabSpringElementClass, defineLabSpring, renderTemplateValue
+  docs: docs/reference/adapters.md
+- @labpics/motion/qwik — Фреймворк-адаптеры — ./react, ./vue, ./svelte, ./solid, ./preact, ./angular, ./lit, ./wc, ./qwik
+  exports: useSpring
+  docs: docs/reference/adapters.md
+- @labpics/motion/frame — ./driver и ./frame — управляемый драйвер и общий кадровый цикл
+  exports: asRequestFrame, createFrameLoop, frame
+  docs: docs/reference/driver-frame.md
+- @labpics/motion/presets — ./tokens и ./presets — токены движения и пресеты
+  exports: blink, bounceY, breathe, compilePreset, drawOn, drift, fadeSlide, formatNumber, pop, presetToWaapi, presetTotalDuration, pulse, runNumber, runPreset, runScramble, runTypewriter, samplePreset, scrambleAt, spin, splitText, tickerCells, typewriterAt, wiggle
+  docs: docs/reference/tokens-presets.md
+- @labpics/motion/utils — скалярные примитивы
+  exports: clamp, interpolate, mapRange, mix, pipe, snap, wrap
+  docs: docs/reference/utils.md
+- @labpics/motion/compositor — ./compositor, ./compositor/stagger и ./waapi — compositor-путь и WAAPI
+  exports: CompositorSpring, DEFAULT_TOLERANCE, compileSpringLinear, compileSpringPlan, createSpringLinearCache, handoffToLive, readCompositorSpring, resolveCompositorTier, supportsCompositor, supportsLinearEasing
+  docs: docs/reference/compositor.md
+- @labpics/motion/compositor/stagger — ./compositor, ./compositor/stagger и ./waapi — compositor-путь и WAAPI
+  exports: CompositorSpring, CompositorStaggerGroup, compileSpringPlan, compileStaggerPlan
+  docs: docs/reference/compositor.md
+- @labpics/motion/tokens — ./tokens и ./presets — токены движения и пресеты
+  exports: distanceScale, distanceScaleConfig, duration, easing, spring, springFromDurationBounce, staggerGap
+  docs: docs/reference/tokens-presets.md
+- @labpics/motion/animate — одно-строчный DOM-фасад
+  exports: animate
+  docs: docs/reference/animate.md
+- @labpics/motion/nano — минимальный WAAPI-вход
+  exports: animate
+  docs: docs/reference/nano.md
+- @labpics/motion/compiler/vite — build-time lowering: Vite-плагин и рантайм артефактов
+  exports: motionCompiler
+  docs: docs/reference/compiler.md
+- @labpics/motion/compiler/runtime — build-time lowering: Vite-плагин и рантайм артефактов
+  exports: animateCompiled
+  docs: docs/reference/compiler.md
+- @labpics/motion/behaviors — headless-машины мобильных взаимодействий
+  exports: createBottomSheet, createCarousel, createDragDismiss, createPullToRefresh
+  docs: docs/reference/behaviors.md
+
+## Дальше
+
+- Ошибки LMxxx: docs/errors.md
+- Методология размера/бенчей: docs/benchmark.md
+- Быстрый старт: docs/getting-started.md

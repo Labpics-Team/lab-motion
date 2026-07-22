@@ -21,3 +21,4 @@ blob-report
 .playwright
 browser/.artifacts
 .claude/
+.docs-examples-tmp/
