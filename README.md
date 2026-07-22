@@ -131,7 +131,7 @@ document.querySelector<HTMLElement>('.card')!
 | `…/driver` | Scrubbable-контроллер: `play/pause/reverse/seek/timeScale/progress` + thenable |
 | `…/frame` | Единый frame-шедулер: `createFrameLoop` / синглтон `frame` — один rAF на кадр, фазы read→update→render против layout-thrash, SSR-safe; `asRequestFrame(loop)` сажает `MotionValue`/`drive` на общий кадр. **Биндинги используют его по умолчанию** (как shared-ticker у Framer Motion/GSAP); инжекция своего `requestFrame` переопределяет |
 | `…/nano` | **Platform-trusted WAAPI ≤ 1 КБ gzip** (целевое значение или пара `[from, to]`, `rotate` — скаляр): spring/tween, целые `translate/scale/rotate` longhand-каналы, любые нативно-анимируемые CSS-свойства, `delay`/`stagger`, reduced-motion и сами `Animation` как контролы. Без layout-read, независимых `x/y`, rAF-fallback, C1-подхвата и hostile-host обещаний |
-| `…/animate` | Фасад-one-liner: `animate(target, props, options)` — цели по каналам (`x`/`y`/`scale`/`rotate`, `opacity`, CSS-свойства), режим `{ spring }` или `{ duration, ease }`, `delay`/`stagger`, контролы `{ finished, play, pause, seek, cancel, stop }`. Это базовый single-transition DX-срез; ядро от него не растёт |
+| `…/animate` | Фасад-one-liner: `animate(target, props, options)` — цели по каналам (`x`/`y`/`scale`/`rotate`, `opacity`, CSS-свойства), значения `to`, пары `[from, to]` и **N-keyframe кортежи** `x: [0, 120, -40, 0]` (+ `times`, per-segment `ease: [...]`), режим `{ spring }` или `{ duration, ease }`, `delay`/`stagger`, контролы `{ finished, play, pause, seek, cancel, stop }`; ядро от него не растёт |
 
 **Математика значений**
 
@@ -626,11 +626,14 @@ lifecycle. Полный целевой пользовательский охва
 | `{ delay: stagger(50) }` | `{ stagger: 50 }` | в Anime v4 `stagger` — именованный импорт |
 | `animate(targets, parameters)` | `animate(targets, props, options)` | разные сигнатуры, общий только one-liner характер |
 
-Текущий `./animate` объединяет одним lifecycle только from/to-переходы
-поддерживаемых CSS-стилей и transform-шортхендов: spring/tween, delay/stagger
-и контролы `finished/play/pause/seek/cancel/stop`.
+Текущий `./animate` объединяет одним lifecycle from/to-переходы и N-keyframe
+треки (#205) поддерживаемых CSS-стилей и transform-шортхендов: spring/tween,
+кортежи `x: [0, 120, -40, 0]` c `times` и per-segment `ease: [...]`
+(right-biased дубликаты offsets — скачок нулевой ширины; трек+`spring`
+отклоняется синхронно), delay/stagger и контролы
+`finished/play/pause/seek/cancel/stop`.
 
-Не объединены: N-keyframes и offsets, per-segment и per-property transitions,
+Не объединены: per-property transitions,
 repeat/reverse/mirror/repeatDelay, inertia/decay, sequences/timeline,
 value/object targets, HTML/SVG attributes и path-specific SVG-каналы.
 `SVGElement` при этом уже является допустимой целью для поддерживаемых

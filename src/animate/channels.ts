@@ -17,6 +17,7 @@ import { MotionParamError } from '../errors.js';
 import { interpolateColor } from '../value/color.js';
 import type { ValueAST } from '../value/parse.js';
 import { tryParseValue } from '../value/parse.js';
+import { trackProgressAt, type TrackAt } from './track.js';
 import {
   interpolateUnit,
   type ParsedRelative,
@@ -56,9 +57,13 @@ export interface NumericChannelSpec {
   readonly _kind: 'num';
   readonly _key: string;
   readonly _group: GroupKey;
-  /** Явный from из пары [from, to]; undefined — резолв из реестра/стиля. */
+  /** Явный from из пары/кортежа; undefined — резолв из реестра/стиля. */
   readonly _explicitFrom: number | undefined;
   readonly _to: number;
+  /** N-keyframe трек (#205): все стопы (кортеж ≥3); undefined — pair/destination. */
+  readonly _stops?: readonly number[] | undefined;
+  /** Offsets трека: authored times либо равномерная сетка (фасад заполняет). */
+  _offsets?: readonly number[] | undefined;
 }
 
 /** CSS-канал (цвет/юниты через ./value): физика в прогресс-пространстве [0..1]. */
@@ -68,6 +73,9 @@ export interface CssChannelSpec {
   readonly _group: GroupKey;
   readonly _explicitFrom: ValueAST | undefined;
   readonly _to: ValueAST;
+  /** N-keyframe трек (#205): все стопы (кортеж ≥3); undefined — pair/destination. */
+  readonly _stops?: readonly ValueAST[] | undefined;
+  _offsets?: readonly number[] | undefined;
 }
 
 export type ChannelSpec = NumericChannelSpec | CssChannelSpec;
@@ -108,35 +116,51 @@ export function parseProps(props: Record<string, unknown>): ChannelSpec[] {
     if (key === 'transform') {
       throw new MotionParamError('LM140');
     }
-    const pair = Array.isArray(raw) ? raw : undefined;
-    if (pair && pair.length !== 2) {
+    // Snapshot массива ДО валидации (#205): hostile getters/мутации длины не
+    // могут изменить набор между проверкой и привязкой (та же дисциплина, что
+    // collectBoundedArrayLike для целей).
+    const tuple = Array.isArray(raw) ? [...(raw as unknown[])] : undefined;
+    if (tuple && tuple.length < 2) {
       throw new MotionParamError('LM141');
     }
+    // Кортеж ≥3 — N-keyframe трек (#205); ровно 2 — прежняя пара [from, to].
+    const stops = tuple && tuple.length > 2 ? tuple : undefined;
     if (isTransformKey(key) || key === 'opacity') {
       const group: GroupKey = key === 'opacity' ? 'opacity' : 'transform';
-      const explicitFrom = pair ? requireFinite(pair[0]) : undefined;
-      const to = requireFinite(pair ? pair[1] : raw);
+      const numericStops = stops?.map(requireFinite);
+      const explicitFrom = numericStops !== undefined
+        ? numericStops[0]!
+        : tuple ? requireFinite(tuple[0]) : undefined;
+      const to = numericStops !== undefined
+        ? numericStops[numericStops.length - 1]!
+        : requireFinite(tuple ? tuple[1] : raw);
       // Full-движок хранит scale как две независимые физические оси. Равные
       // значения всё равно сериализуются в компактный scale(N), зато переход
       // uniform↔axial не меняет представление: обе позиции и pickup-скорость
       // перехватываемого канала остаются явными.
       if (key === 'scale') {
         if (!keys.includes('scaleX')) {
-          specs.push({ _kind: 'num', _key: 'scaleX', _group: group, _explicitFrom: explicitFrom, _to: to });
+          specs.push({ _kind: 'num', _key: 'scaleX', _group: group, _explicitFrom: explicitFrom, _to: to, _stops: numericStops });
         }
         if (!keys.includes('scaleY')) {
-          specs.push({ _kind: 'num', _key: 'scaleY', _group: group, _explicitFrom: explicitFrom, _to: to });
+          specs.push({ _kind: 'num', _key: 'scaleY', _group: group, _explicitFrom: explicitFrom, _to: to, _stops: numericStops });
         }
       } else {
-        specs.push({ _kind: 'num', _key: key, _group: group, _explicitFrom: explicitFrom, _to: to });
+        specs.push({ _kind: 'num', _key: key, _group: group, _explicitFrom: explicitFrom, _to: to, _stops: numericStops });
       }
     } else {
+      const astStops = stops?.map(parseCssValue);
       specs.push({
         _kind: 'css',
         _key: key,
         _group: camelToKebab(key),
-        _explicitFrom: pair ? parseCssValue(pair[0]) : undefined,
-        _to: parseCssValue(pair ? pair[1] : raw),
+        _explicitFrom: astStops !== undefined
+          ? astStops[0]!
+          : tuple ? parseCssValue(tuple[0]) : undefined,
+        _to: astStops !== undefined
+          ? astStops[astStops.length - 1]!
+          : parseCssValue(tuple ? tuple[1] : raw),
+        _stops: astStops,
       });
     }
   }
@@ -154,6 +178,9 @@ export interface NumericChannel {
   readonly _solverTo: number;
   /** Нормализованная скорость в представимом effect-space канала. */
   readonly _v0: number;
+  /** N-keyframe трек (#205): стопы + offsets; undefined — 2-стоповый путь. */
+  readonly _stops?: readonly number[] | undefined;
+  readonly _offsets?: readonly number[] | undefined;
   _value: number;
   _velocity: number;
   /** Последнее состояние, которое успешно прошло host write. */
@@ -166,6 +193,9 @@ export interface CssChannel {
   readonly _key: string;
   readonly _fromAst: ValueAST;
   readonly _toAst: ValueAST;
+  /** N-keyframe трек (#205): AST-стопы + offsets; undefined — 2-стоповый путь. */
+  readonly _stopsAst?: readonly ValueAST[] | undefined;
+  readonly _offsets?: readonly number[] | undefined;
   /**
    * Стартовая скорость прогресса (прогресс/с). Явная пара [from, to] — 0
    * (покой, канон числовых каналов); перехват живого рана — проекция ṗ̂
@@ -203,6 +233,8 @@ function numericChannel(
   from: number,
   to: number,
   velocity: number,
+  stops?: readonly number[],
+  offsets?: readonly number[],
 ): NumericChannel {
   const range = to - from;
   const representableRange = Math.max(
@@ -224,6 +256,8 @@ function numericChannel(
     // Seed принадлежит effect-space: IEEE-rounded current может не сохранять
     // алгебраическую связь с исходным progress, особенно на соседних huge f64.
     _v0: normalizeV0(velocity, solverTo - from),
+    _stops: stops,
+    _offsets: offsets,
     _value: from,
     _velocity: velocity,
     _renderedValue: from,
@@ -477,6 +511,22 @@ export function cssAt(ch: CssChannel, p: number): string | number {
 }
 
 /**
+ * Значение CSS-трека при глобальном k (сырое время/длительность, #205):
+ * выбор сегмента и easing — общий pure-модуль track.ts, интерполяция —
+ * тот же interpolateParsed, что у 2-стопового пути (кодек не копируется).
+ * `at` — переиспользуемый scratch вызывающего (ноль аллокаций на кадр).
+ */
+export function cssTrackAt(
+  ch: CssChannel,
+  k: number,
+  easeFor: (segment: number) => ((u: number) => number) | undefined,
+  at: TrackAt,
+): string | number {
+  trackProgressAt(ch._offsets!, k, easeFor, at);
+  return interpolateParsed(ch._stopsAst![at._segment]!, ch._stopsAst![at._segment + 1]!, at._progress);
+}
+
+/**
  * SSOT сериализации узкой numeric-поверхности. Вызов допустим только после
  * доказанной topology: transform содержит ровно `x` без residual-каналов,
  * иначе нужен общий buildTransform.
@@ -540,7 +590,9 @@ export function bindGroup(
           from = Number.isFinite(read) ? read : 1; // opacity: дефолт браузера
         }
       }
-      numeric.push(numericChannel(spec._key, from, spec._to, velocity));
+      numeric.push(
+        numericChannel(spec._key, from, spec._to, velocity, spec._stops, spec._offsets),
+      );
     } else {
       let fromAst: ValueAST;
       let v0 = 0;
@@ -560,6 +612,8 @@ export function bindGroup(
         _key: spec._key,
         _fromAst: fromAst,
         _toAst: spec._to,
+        _stopsAst: spec._stops,
+        _offsets: spec._offsets,
         _v0: v0,
         _dpdt: v0, // производная на старте = засеянная (перехват до кадров — C¹)
         _css: initialCss,

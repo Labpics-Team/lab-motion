@@ -67,7 +67,15 @@ export const SUBPATH_GATE_BYTES = 4608;
 // (0.52%). Это регрессионный budget, не конкурентное утверждение: сравнения
 // живут в воспроизводимом benchmark-report. Обе формы обязаны оставаться внутри
 // одного потолка, а массовый perf-контракт не даёт купить размер замедлением.
-export const FULL_ANIMATE_GATE_BYTES = 12_000;
+// 12 000 → 12 760 (2026-07-22, #205): +~700 gz — N-keyframe tracks (кортежи
+// ≥3 + times + per-segment ease[]) в фасаде: everyday-грамматика всего поля
+// (Framer/GSAP/anime). Рост НЕ раздувание: один pure track-модуль
+// (right-biased просмотр с out-scratch, ноль аллокаций в кадре), tuple-ветка
+// parseProps и валидация топологии; дешёвые шейвы сняты ДО подъёма (−20 gz),
+// дедупа в графе фасада не существует (sample-keyframes несёт repeat/reverse-
+// семантики ./keyframes и добавил бы вес). Факт 12 694 + ~0.5% люфт — та же
+// дисциплина, что 11 938 → 12 000. Подъём — решение владельца по делегации.
+export const FULL_ANIMATE_GATE_BYTES = 12_760;
 
 // Consumer-rebundle ядра после стабильных кодов ошибок и изоляции listener-
 // сбоев. Физический shipped-граф при этом уменьшился и по-прежнему ограничен
@@ -99,7 +107,10 @@ export const COMPOSITOR_CAPABILITY_GATE_BYTES = 6600;
 // clean-base 7968d161 (2026-07-16): 12 494 B gz; потолок равен факту без люфта,
 // чтобы локальная оптимизация одного entry не покупалась дублированием между
 // двумя реально совместимыми capability.
-export const ANIMATE_COMPOSITOR_MIXED_GATE_BYTES = 12_494;
+// 12 494 → 13 340 (2026-07-22, #205): рост тем же track-срезом фасада (см.
+// FULL_ANIMATE_GATE_BYTES); факт 13 275 + ~0.5% люфт, дублирования между
+// capability не добавлено (compositor-граф не тронут).
+export const ANIMATE_COMPOSITOR_MIXED_GATE_BYTES = 13_340;
 
 // Точечные (bespoke) пороги субпутей — жёстче общего SUBPATH_GATE_BYTES там, где
 // это осмысленно. ./utils — семь чистых скалярных примитивов + сегментный движок;
@@ -319,6 +330,13 @@ export const IMPORT_COST_SCENARIOS = [
     // (собственный hard gate выше), перестройка фасада (эпик nano-core) получит
     // сценарий «animate без допов» с порогом от факта первой реализации.
     gate: FULL_ANIMATE_GATE_BYTES,
+  },
+  {
+    // N-keyframe consumer ratchet (#205): типовой keyframe-вызов дизайнера.
+    // Первый принятый факт 2026-07-22: фиксируется ОТ ФАКТА ниже.
+    name: 'animate-keyframes (N-track)',
+    code: `import { animate } from '%DIST%/../animate/index.js'; console.log(typeof animate('.dot', { x: [0, 120, -40, 0], opacity: [0, 1, 1, 0] }, { duration: 800, times: [0, 0.25, 0.75, 1] }).pause);`,
+    gate: 12_760,
   },
   {
     // ПРАВДА потребительской цены поведения + СТРАЖ переиспользования: одна

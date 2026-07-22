@@ -8,6 +8,20 @@
 
 ### Added
 
+- **N-keyframe tracks в полном `./animate` (#205):** базовая keyframe-грамматика
+  поля (Framer/GSAP/anime) — кортежи `x: [0, 120, -40, 0]` для transform-осей,
+  `opacity` и произвольных CSS-каналов (включая цвета), `options.times`
+  (неубывающие 0→1, дубликаты — right-biased скачок нулевой ширины) и
+  per-segment `options.ease: [fn, …]` (длина N−1; scalar применяется к каждому
+  сегменту). Один owner/lifecycle с прежними контролами: seek/pause/play/
+  cancel/stagger/onComplete; reduced-motion публикует последний стоп без
+  кадров; residual-transform сохраняется; C¹-подхват скорости при перехвате
+  трека (числовые каналы). Трек + явная `spring` отклоняется синхронно
+  (`LM136`); трек без опций получает tween-режим по умолчанию. Новые коды
+  `LM168`/`LM169`. Семплер — один pure-модуль с out-scratch (ноль аллокаций
+  в кадре); потолки фасада переставлены по факту (+~0.7 KB gz, хронология в
+  scripts/size-gate.mjs), новый consumer-ратчет N-track зафиксирован.
+
 - **Compiler-driven common motion (#221, первый child эпика #220):** build-time
   lowering расширен с `{ opacity: N }` на статические NanoProps/NanoOptions —
   multi-prop кадр (`translate`/`scale`/`rotate`/`opacity`/произвольные CSS,

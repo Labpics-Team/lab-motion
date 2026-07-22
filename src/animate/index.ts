@@ -72,6 +72,7 @@ import {
   type RequestFrameFn,
 } from './main-unit.js';
 import { surfaceBatchFor, type SurfaceBatch } from './surface-batch.js';
+import { uniformOffsets } from './track.js';
 import {
   collectBoundedArrayLike,
   requireAnimateOptions,
@@ -90,11 +91,15 @@ export type AnimateTarget =
   | ArrayLike<AnimatableElement>
   | readonly AnimatableElement[];
 
-/** Значение канала: цель или пара [from, to] (явный from отключает подхват). */
+/**
+ * Значение канала: цель, пара [from, to] (явный from отключает подхват) или
+ * N-keyframe кортеж длины ≥3 (#205): `x: [0, 120, -40, 0]` — все стопы явные,
+ * offsets равномерные либо options.times, изинг per-segment (options.ease).
+ */
 export type AnimatePropValue =
   | number
   | string
-  | readonly [number | string, number | string];
+  | readonly (number | string)[];
 
 /** Каналы движения: transform-шортхенды, opacity, любые CSS-свойства. */
 export type AnimateProps = Record<string, AnimatePropValue>;
@@ -105,8 +110,18 @@ export interface AnimateOptions {
   readonly spring?: SpringParams | undefined;
   /** Длительность tween (мс). Задана → режим tween (дефолт ease: standard). */
   readonly duration?: number | undefined;
-  /** Изинг tween t∈[0,1]→прогресс. Задан без duration → duration.base. */
-  readonly ease?: ((t: number) => number) | undefined;
+  /**
+   * Изинг tween t∈[0,1]→прогресс. Задан без duration → duration.base.
+   * Массив (#205) — per-segment изинги N-keyframe вызова (длина N−1; все
+   * каналы вызова обязаны иметь одну authored-топологию N).
+   */
+  readonly ease?: ((t: number) => number) | readonly ((t: number) => number)[] | undefined;
+  /**
+   * Offsets N-keyframe вызова (#205): длина N, конечные, неубывающие,
+   * times[0]=0, times[N−1]=1; дубликаты легальны (right-biased скачок).
+   * Без times offsets равномерные. Требует authored-топологию N у всех каналов.
+   */
+  readonly times?: readonly number[] | undefined;
   /** Задержка старта (мс, ≥ 0) — всем целям. */
   readonly delay?: number | undefined;
   /** Каскад для многих целей: число = gap (мс) или конфиг ./stagger. */
@@ -186,7 +201,10 @@ function resolveMode(options: AnimateOptions): MotionMode {
   const durationInput = options.duration;
   const easeInput = options.ease;
   const hasSpring = input !== undefined;
-  const hasTween = durationInput !== undefined || easeInput !== undefined;
+  // times — грамматика keyframe-движка (#205): участвует в выборе режима,
+  // поэтому spring+times конфликтует тем же LM136, что spring+duration.
+  const hasTween =
+    durationInput !== undefined || easeInput !== undefined || options.times !== undefined;
   if (hasSpring && hasTween) {
     throw new MotionParamError('LM136');
   }
@@ -194,6 +212,21 @@ function resolveMode(options: AnimateOptions): MotionMode {
     const durationMs = durationInput ?? DEFAULT_DURATION_MS;
     if (!Number.isFinite(durationMs) || durationMs <= 0) {
       throw new MotionParamError('LM137');
+    }
+    if (Array.isArray(easeInput)) {
+      // Snapshot массива изингов (#205): длина фиксируется до топологии,
+      // элементы обязаны быть функциями (тот же LM138, что scalar).
+      const eases = [...(easeInput as readonly unknown[])];
+      if (eases.length === 0) throw new MotionParamError('LM169');
+      for (const segmentEase of eases) {
+        if (typeof segmentEase !== 'function') throw new MotionParamError('LM138');
+      }
+      return {
+        _type: 'tween',
+        _durationMs: durationMs,
+        _ease: eases[0] as (t: number) => number,
+        _eases: eases as ((t: number) => number)[],
+      };
     }
     const ease = easeInput ?? STANDARD_EASING;
     if (typeof ease !== 'function') {
@@ -219,6 +252,64 @@ function resolveDelay(input: number | undefined): number {
     throw new MotionParamError('LM139');
   }
   return delay;
+}
+
+/**
+ * Контракт N-keyframe вызова (#205): валидация times (конечные, неубывающие,
+ * 0 → 1, дубликаты легальны), единая authored-топология N при times/ease[]
+ * (скрытых эвристик нет), синхронный отказ трек+явная пружина (LM136) и
+ * наполнение offsets треков (times либо равномерная сетка канала). Треки без
+ * явного режима получают tween с дефолтными длительностью и изингом —
+ * keyframe-грамматика принадлежит keyframe-движку.
+ */
+function resolveTracks(
+  specs: readonly ChannelSpec[],
+  mode: MotionMode,
+  options: AnimateOptions,
+): MotionMode {
+  const timesInput = options.times;
+  let times: number[] | undefined;
+  if (timesInput !== undefined) {
+    if (!Array.isArray(timesInput)) throw new MotionParamError('LM168');
+    times = [...(timesInput as readonly unknown[])] as number[];
+    // Один проход: NaN/нечисло/убывание ловит !(t >= previous), диапазон — t > 1;
+    // цепочка от previous=0 гарантирует неотрицательность, края — точные 0 и 1.
+    let previous = 0;
+    for (const offset of times) {
+      if (typeof offset !== 'number' || !(offset >= previous) || offset > 1) {
+        throw new MotionParamError('LM168');
+      }
+      previous = offset;
+    }
+    if (times.length < 2 || times[0] !== 0 || previous !== 1) {
+      throw new MotionParamError('LM168');
+    }
+  }
+  const eases = mode._type === 'tween' ? mode._eases : undefined;
+  let hasTracks = false;
+  for (const spec of specs) if (spec._stops !== undefined) hasTracks = true;
+  if (!hasTracks && times === undefined && eases === undefined) return mode;
+  if (mode._type === 'spring') {
+    // options.spring задан явно (иначе times/eases уже выбрали бы tween).
+    if (options.spring !== undefined) throw new MotionParamError('LM136');
+    mode = { _type: 'tween', _durationMs: DEFAULT_DURATION_MS, _ease: STANDARD_EASING };
+  }
+  const topology = times !== undefined
+    ? times.length
+    : eases !== undefined ? eases.length + 1 : 0;
+  if (topology !== 0 && eases !== undefined && eases.length !== topology - 1) {
+    throw new MotionParamError('LM169');
+  }
+  for (const spec of specs) {
+    const stops = spec._stops;
+    if (topology !== 0 && (stops?.length ?? (spec._explicitFrom !== undefined ? 2 : 1)) !== topology) {
+      // Код по источнику топологии: authored times либо длина ease-массива.
+      if (times !== undefined) throw new MotionParamError('LM168');
+      throw new MotionParamError('LM169');
+    }
+    if (stops !== undefined) spec._offsets = times ?? uniformOffsets(stops.length);
+  }
+  return mode;
 }
 
 // ─── Резолв целей (в момент вызова — SSR-safe импорт) ────────────────────────
@@ -327,11 +418,12 @@ export function animate(
   // 1. Options — первая граница: остальные входы могут быть hostile getters.
   options = requireAnimateOptions(options);
   // Остальная валидация — вся ДО побочных эффектов (ноль записей при броске).
-  const mode = resolveMode(options);
+  let mode = resolveMode(options);
   const baseDelay = resolveDelay(options.delay);
   const staggerInput = options.stagger;
   if (typeof staggerInput === 'number') resolveDelay(staggerInput);
   const specs = parseProps(requireAnimateProps(props));
+  mode = resolveTracks(specs, mode, options);
   const els = resolveTargets(target);
   let targetDelays: number[] | undefined;
   if (staggerInput !== undefined) {
