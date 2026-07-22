@@ -79,15 +79,6 @@ export const FULL_CORE_CONSUMER_GATE_BYTES = 2330;
 // утверждённая владельцем до реализации; она не выводится из текущего факта.
 export const NANO_GATE_BYTES = 1024;
 
-// ./lite — WAAPI-first эргономичный «полный» фасад. 5120 B — продуктовая граница
-// (<5 КБ gzip, тот же класс, что NANO_GATE_BYTES: продуктовый потолок, не
-// fact-ratchet), задающая контракт «полной версии» и оставляющая запас под
-// будущую эргономику (C¹-подхват и т.п.). Текущий факт первой реализации
-// (2026-07-21): shipped 2478 gz, consumer one-liner 2591 gz — глубоко под
-// потолком; Motion One mini-класс. Порог оба среза (shipped subpath + consumer
-// scenario) держат общий.
-export const LITE_GATE_BYTES = 5120;
-
 // Нативный IntersectionObserver-адаптер: два независимых exact-ратчета от
 // первой завершённой реализации 2026-07-17. Shipped-порог ловит физическое
 // раздувание самодостаточного entry при splitting:false; consumer-порог —
@@ -201,10 +192,6 @@ export const BESPOKE_SUBPATH_GATES = {
   // To-only individual properties + spring->linear() + native Animation controls.
   // Отдельный hard gate не разрешает новому entry спрятаться под общим 4608 B.
   './nano': NANO_GATE_BYTES,
-  // ./lite — WAAPI-first эргономичный «полный» фасад (<5 КБ). Продуктовая
-  // граница LITE_GATE_BYTES, а не общий 4608: самодостаточный субпуть несёт
-  // springLinear + buildTransform + stagger + агрегированные контролы.
-  './lite': LITE_GATE_BYTES,
   // Native IntersectionObserver capability; exact first-implementation ratchet.
   './in-view': IN_VIEW_GATE_BYTES,
   // ./behaviors — headless state machines типовых мобильных взаимодействий
@@ -233,14 +220,6 @@ export const IMPORT_COST_SCENARIOS = [
     name: 'nano spring-to',
     code: `import { animate } from '%DIST%/../nano/index.js'; console.log(animate('.hero', { translate: '240px', opacity: 1 }).length);`,
     gate: NANO_GATE_BYTES,
-  },
-  {
-    // Реальная потребительская цена «полного» WAAPI-first фасада: независимые
-    // transform-оси + пары [from,to] + агрегированные контролы под <5 КБ.
-    // Скачок = регрессия tree-shakeability самодостаточного субпутя.
-    name: 'lite one-liner',
-    code: `import { animate } from '%DIST%/../lite/index.js'; console.log(typeof animate('.hero', { x: 240, opacity: 1 }).pause);`,
-    gate: LITE_GATE_BYTES,
   },
   {
     // Реальный минимальный вызов capability обязан оставаться изолированным от
