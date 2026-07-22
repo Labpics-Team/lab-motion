@@ -253,7 +253,7 @@ FINITENESS GUARD: все числовые поля AST при сериализа
 
 Разбор и интерполяция произвольного CSS-значения:
 
-```ts
+```typescript
 import { parse, interpolate } from '@labpics/motion/value';
 
 const from = parse('0px');
@@ -272,7 +272,7 @@ console.log(interpolate(parse(0), parse(1), 0.5)); // 0.5
 
 Transform-каналы в собственном rAF-цикле:
 
-```ts
+```typescript
 import { interpolateTransform, type TransformState } from '@labpics/motion/value';
 
 const el = document.querySelector('.card') as HTMLElement;
@@ -292,7 +292,7 @@ requestAnimationFrame(frame);
 
 Цветовые пространства и no-throw-обёртка:
 
-```ts
+```typescript
 import { mixColor, parseColor, interpolateColor } from '@labpics/motion/value';
 
 // Легаси-lerp кодированных каналов — для пиннивших старый вывод.

@@ -18,7 +18,7 @@
  * motionCompiler() (как приёмочный гейт scripts/compiler-acceptance.mjs):
  * это цена, которую платит потребитель с включённым build-time lowering.
  *
- * Запуск:  cd bench/compare && pnpm install && node size-compare.mjs
+ * Запуск:  cd bench/compare && pnpm install --frozen-lockfile && node size-compare.mjs
  * Выход:   таблица в stdout + size-compare.report.json (версии, ревизия,
  *          методология — provenance для docs/benchmark.md).
  */

@@ -505,8 +505,8 @@
         "supportsCompositor",
         "supportsLinearEasing"
       ],
-      "shippedGzBytes": 6060,
-      "shippedBrBytes": 5540,
+      "shippedGzBytes": 6072,
+      "shippedBrBytes": 5549,
       "docs": "docs/reference/compositor.md",
       "title": "./compositor, ./compositor/stagger и ./waapi — compositor-путь и WAAPI"
     },
@@ -519,8 +519,8 @@
         "compileSpringPlan",
         "compileStaggerPlan"
       ],
-      "shippedGzBytes": 6294,
-      "shippedBrBytes": 5758,
+      "shippedGzBytes": 6306,
+      "shippedBrBytes": 5766,
       "docs": "docs/reference/compositor.md",
       "title": "./compositor, ./compositor/stagger и ./waapi — compositor-путь и WAAPI"
     },
@@ -547,8 +547,8 @@
       "runtimeExports": [
         "animate"
       ],
-      "shippedGzBytes": 12268,
-      "shippedBrBytes": 11161,
+      "shippedGzBytes": 12264,
+      "shippedBrBytes": 11141,
       "docs": "docs/reference/animate.md",
       "title": "./animate — одно-строчный DOM-фасад"
     },

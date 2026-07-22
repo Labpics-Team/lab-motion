@@ -32,7 +32,7 @@ Performance-утверждение допустимо только вместе 
 пиненных версий `motion` (mini и hybrid), `gsap` и `animejs` этого workspace:
 
 ```bash
-pnpm build && cd bench/compare && pnpm install && node size-compare.mjs
+pnpm build && cd bench/compare && pnpm install --frozen-lockfile && node size-compare.mjs
 ```
 
 Методология — та же, что у merge-гейта: esbuild bundle+minify против

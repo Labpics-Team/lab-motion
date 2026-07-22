@@ -423,7 +423,7 @@ function runNumber(from: number, to: number, onUpdate: (formatted: string, value
 
 Токены в WAAPI-переходе: `easing.*.css` + динамическая длительность по травелу:
 
-```ts
+```typescript
 import { duration, easing, distanceScale } from '@labpics/motion/tokens';
 
 const card = document.querySelector('.card') as HTMLElement;
@@ -444,7 +444,7 @@ console.log(easing.decelerate.fn(0.5)); // та же кривая как фун�
 
 Пресет через управляемый frame-loop: фабрика → спред → `runPreset` (reduced-motion уважается через injectable `matchMedia`):
 
-```ts
+```typescript
 import { pulse, runPreset } from '@labpics/motion/presets';
 
 const icon = document.querySelector('.icon') as HTMLElement;
@@ -468,7 +468,7 @@ controls.then(() => {
 
 WAAPI-конвертация и числовой счётчик; ранняя ошибка по LM-коду:
 
-```ts
+```typescript
 import { MotionParamError } from '@labpics/motion';
 import { fadeSlide, presetToWaapi, runNumber } from '@labpics/motion/presets';
 
@@ -476,7 +476,8 @@ const badge = document.querySelector('.badge') as HTMLElement;
 
 // headless-конвертер отдаёт данные; DOM-вызов делает потребитель
 const { keyframes, timing } = presetToWaapi(fadeSlide({ dy: 8 }));
-badge.animate([...keyframes], { ...timing }); // timing.duration/delay — миллисекунды
+// timing.duration/delay — миллисекунды; каст сводит headless-тип к DOM Keyframe
+badge.animate(keyframes as Keyframe[], { ...timing });
 
 // счётчик: Intl-строка + сырое значение; дефолт длительности — duration.slow из ./tokens
 runNumber(0, 1287, (formatted) => {

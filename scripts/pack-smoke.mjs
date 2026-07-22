@@ -234,6 +234,7 @@ try {
     'docs/benchmark.md',
     'docs/recipes.md',
     // #91/#96: документация и машиночитаемый API — часть артефакта.
+    'docs/README.md',
     'docs/getting-started.md',
     'docs/reference/animate.md',
     'docs/migration/framer-motion.md',

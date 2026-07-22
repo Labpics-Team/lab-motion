@@ -169,7 +169,7 @@ function createScrollObserver(options?: ScrollObserverOptions): ScrollObserver;
 
 Оркестратор: прогресс + скорость + enter/leave одним `update`-каналом. Композиция `createScrollVelocity` + `createInView` + функций прогресса. Поведение `update`:
 
-- `t` задан → сэмпл уходит в трекер скорости; без `t` скорость остаётся `0`.
+- `t` задан → сэмпл уходит в трекер скорости; без `t` НОВЫЙ сэмпл не записывается — `velocity` продолжает отдавать значение окна по прежним timestamped-сэмплам.
 - `targetStart` и `targetSize` оба числа → обновляется in-view машина (`onEnter`/`onLeave` по `amount`/`margin`).
 - `onProgress` задан: при наличии target-метрик **и** `offset` — прогресс по `resolveTargetProgress` (наблюдатель сам переводит `targetStart` из координат вьюпорта в координаты контента: `contentStart = pos + targetStart`); иначе — прогресс страницы по `scrollProgress`. Вторым аргументом приходит `{ velocity, pos }`.
 

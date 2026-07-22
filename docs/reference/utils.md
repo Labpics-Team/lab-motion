@@ -181,7 +181,7 @@ function pipe<T>(...fns: Array<(value: T) => T>): (value: T) => T;
 
 Каррированные примитивы и `pipe`: скролл → трансформ через ремап, кламп и сетку:
 
-```ts
+```typescript
 import { clamp, mapRange, pipe, snap } from '@labpics/motion/utils';
 
 // scrollY 0..600 → translateX 0..240, экстраполяция обрезана, привязка к 8-сетке
@@ -199,7 +199,7 @@ window.addEventListener('scroll', () => {
 
 `interpolate`: N остановок, изинг на сегмент, ранняя ошибка по коду:
 
-```ts
+```typescript
 import { MotionParamError } from '@labpics/motion';
 import { easeInOut, easeOut } from '@labpics/motion/easing';
 import { interpolate } from '@labpics/motion/utils';
@@ -221,7 +221,7 @@ try {
 
 Нечисловой выход через шов `mixer`: цветовая шкала на `mixColor` из `./value`:
 
-```ts
+```typescript
 import { interpolate } from '@labpics/motion/utils';
 import { mixColor } from '@labpics/motion/value';
 

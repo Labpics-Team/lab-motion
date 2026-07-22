@@ -10,7 +10,7 @@
 
 Физическая модель (closed-form):
 
-```
+```text
 amplitude   = power · velocity · timeConstant
 value(t)    = from + amplitude · (1 − e^(−t/timeConstant))
 velocity(t) = (amplitude / timeConstant) · e^(−t/timeConstant)

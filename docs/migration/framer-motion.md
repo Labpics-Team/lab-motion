@@ -94,7 +94,7 @@ hostile/polyfill-защиты (это контракт полного `./animate
 | `animate(el, { opacity: [0, 1] })` | `nanoAnimate(el, { opacity: [0, 1] })` | пара `[from, to]` однородна по типу (числа ИЛИ строки) |
 | `{ duration: 0.3, ease: 'ease-out' }` | `{ duration: 300, ease: 'ease-out' }` | **мс**; `ease` — нативная CSS-строка |
 | `{ type: spring(...) }` | `{ spring: { mass: 1, stiffness: 170, damping: 26 } }` | пружина компилируется в CSS `linear()`; `spring` и `duration`/`ease` взаимоисключающие на уровне типов |
-| контролы Motion | `Animation[]` | каждый элемент — нативный `Animation`; `moves.finished` — общий Promise |
+| контролы Motion | `Animation[]` | каждый элемент — нативный `Animation`: `const controls = animate(...)`, общий финал — `Promise.all(controls.map((a) => a.finished))` |
 
 ## `useAnimate` / `motion.div` → фасад и адаптеры
 

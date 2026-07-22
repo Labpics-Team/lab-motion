@@ -149,16 +149,22 @@ const toast = document.querySelector('.toast') as HTMLElement;
 const mm = window.matchMedia.bind(window);
 const spring = { mass: 1, stiffness: 300, damping: 26 };
 
+// drive возвращает Promise (без контролов): done прерванной фазы инертен
+// (P-контракт), но onStep вытесненного рана БЕЗ гейта продолжал бы писать
+// style поверх новой фазы после реверса enter↔exit. Фазовый токен глушит
+// его; отмена с наследованием импульса — MotionValue-паттерн ниже.
+let phase = 0;
 const fade = (from: number, to: number, done: () => void): void => {
+  const mine = ++phase;
   void drive({
     from,
     to,
     spring,
     onStep: (v) => {
-      toast.style.opacity = String(v);
+      if (mine === phase) toast.style.opacity = String(v);
     },
     matchMedia: mm,
-  }).then(done); // done прерванной фазы инертен — поздний resolve безопасен
+  }).then(done);
 };
 
 const presence = createPresence({

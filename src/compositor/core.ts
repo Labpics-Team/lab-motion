@@ -255,7 +255,14 @@ export function compileSpringPlan(options: CompositorPlanOptions): CompositorPla
     // Закон #223: строже двух бюджетов; вырожденный span не делит (движения
     // нет — абсолютный бюджет не ограничивает normalized-кривую).
     const span = Math.abs(options.to - options.from);
-    if (span > RANGE_EPSILON) tolerance = Math.min(tolerance, maxValueError / span);
+    if (span > RANGE_EPSILON) {
+      const absolute = maxValueError / span;
+      // Переполненный span (MAX↔−MAX → ∞) или субнормальный бюджет дают 0:
+      // нулевой normalized-бюджет непредставим — честный LM170, а не нарушение
+      // positive-tolerance инварианта unchecked-границы.
+      if (!(absolute > 0)) throw new MotionParamError('LM170');
+      tolerance = Math.min(tolerance, absolute);
+    }
   }
 
   // Публичная диагностика — свежий снимок защищённых сериализованных остановок:

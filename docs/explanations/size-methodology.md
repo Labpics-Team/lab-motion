@@ -64,7 +64,7 @@ contract в отчёте фиксирует границы каждой стро
 pnpm install --frozen-lockfile
 pnpm build
 pnpm size
-cd bench/compare && pnpm install && node size-compare.mjs
+cd bench/compare && pnpm install --frozen-lockfile && node size-compare.mjs
 ```
 
 Правила runtime-бенчей (CDP, cold/warm, freeze-матрица, статистика) — в

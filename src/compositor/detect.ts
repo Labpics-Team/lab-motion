@@ -86,8 +86,10 @@ let _explicitKeyframesMemo: boolean | undefined;
  */
 export function supportsLinearEasing(): boolean {
   if (_linearMemo === undefined) {
-    const css = (globalThis as { CSS?: { supports?: (p: string, v: string) => boolean } }).CSS;
     try {
+      // Чтение globalThis.CSS — внутри try: hostile-хост с бросающим геттером
+      // получает false, а не сломанную детекцию у вызывающих.
+      const css = (globalThis as { CSS?: { supports?: (p: string, v: string) => boolean } }).CSS;
       _linearMemo = typeof css?.supports === 'function'
         ? css.supports('transition-timing-function', 'linear(0, 1)')
         : true;

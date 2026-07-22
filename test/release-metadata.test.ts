@@ -51,6 +51,7 @@ function metadata() {
       'docs/benchmark.md',
       'docs/recipes.md',
       // #91/#96 (2026-07-22): docs-суит и машиночитаемый API в артефакте.
+      'docs/README.md',
       'docs/getting-started.md',
       'docs/reference',
       'docs/migration',

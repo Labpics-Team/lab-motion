@@ -167,7 +167,7 @@ interface DismissController {
 
 Правило порога на `pointerUp` (проекции на направление `direction`, границы **включительно**):
 
-```
+```text
 direction·value ≥ distanceThreshold  ИЛИ  direction·velocity ≥ velocityThreshold  →  dismiss
 иначе                                                                              →  возврат в 0
 ```

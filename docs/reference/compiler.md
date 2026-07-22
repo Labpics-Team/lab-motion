@@ -82,7 +82,7 @@ interface MotionCompilerPlugin {
 LM-кодов (`MotionParamError`) в этом слое нет. **Доказанно-статический, но невалидный** вход — ошибка сборки с причиной, не silent fallback (#221): бросается `Error` с сообщением `lab-motion compiler: статический nano-вызов невалиден — <причина>`. Причины:
 
 - неконечное значение канала; пустой кадр;
-- непредставимая пружина (`springLinear`, `RangeError`): параметры не конечные положительные (`spring parameters must be finite and positive`) либо кривая не представима синхронной `linear()`-строкой — неконечная длительность или число узлов выше общего compiler-ceiling компоузитора (`spring is not representable`);
+- непредставимая пружина (`springLinear`, `RangeError`) — граница ИМЕННО lowering-а, не физики: ядро принимает `damping: 0` (#218), но незатухающая/нефинитно оседающая кривая не представима конечной `linear()`-строкой. Причины `RangeError`: параметры вне домена nano-грамматики (`spring parameters must be finite and positive`) либо кривая не сворачивается в конечный артефакт — неконечная длительность оседания или число узлов выше общего compiler-ceiling компоузитора (`spring is not representable`);
 - расхождение V1-проекции с nano SSOT (включая `MotionProgramParseError` с кодами `LMP_*` из внутренней верификации).
 
 ### animateCompiled

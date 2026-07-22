@@ -43,6 +43,7 @@ const EXACT_FIELDS = Object.freeze({
     'docs/recipes.md',
     // #91/#96 (2026-07-22): полный docs-суит и машиночитаемый API едут
     // в npm-артефакте; llms.txt/api-manifest.json генерирует prepack.
+    'docs/README.md',
     'docs/getting-started.md',
     'docs/reference',
     'docs/migration',

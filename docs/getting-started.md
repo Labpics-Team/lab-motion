@@ -75,14 +75,15 @@ await animate(el, { opacity: 1 });     // thenable — как у Motion
 | Ситуация | Вход |
 | --- | --- |
 | Типовые DOM-переходы, перехваты, keyframes | `@labpics/motion/animate` |
-| Минимальный вес, to-only, native WAAPI | `@labpics/motion/nano` |
+| Минимальный вес, цель или пара `[from, to]`, native WAAPI | `@labpics/motion/nano` |
 | Статические вызовы без runtime-цены | плагин `@labpics/motion/compiler/vite` |
 | Значение ведётся пальцем/скроллом | `.` (MotionValue) + `./gestures`/`./scroll` |
 | Свой рендер (canvas, WebGL, три.js) | `.` (`drive`, `spring`) — ядро не знает про DOM |
 
-`./nano` — та же математика пружины (spring → CSS `linear()` на лету), но
-to-only контракт и native Animation-контролы; фасадные transform-шортхенды
-`x`/`y` там намеренно запрещены типами — пишите `translate`. Компилятор
+`./nano` — та же математика пружины (spring → CSS `linear()` на лету):
+значение канала — цель либо явная пара `[from, to]`, контролы — нативные
+Animation; фасадные transform-шортхенды `x`/`y` там намеренно запрещены
+типами — пишите `translate`. Компилятор
 опускает статические вызовы nano-грамматики в готовый артефакт на сборке —
 браузер не получает ни солвер, ни парсер.
 
