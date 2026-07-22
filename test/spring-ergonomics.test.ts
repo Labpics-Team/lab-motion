@@ -289,8 +289,9 @@ describe('spring-ergonomics: полы движка = зеркало конста
 
 describe('spring-ergonomics-api-surface-pin', () => {
   it('ровно запиненный набор runtime-экспортов', () => {
+    // #230: + fromPeak/fromOscillation — точные observable-конструкторы.
     expect(Object.keys(ergo).sort()).toEqual(
-      ['fromBounce', 'fromVisualDuration', 'springAsEasing', 'springPresets'],
+      ['fromBounce', 'fromOscillation', 'fromPeak', 'fromVisualDuration', 'springAsEasing', 'springPresets'],
     );
   });
 

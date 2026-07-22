@@ -84,10 +84,7 @@ function toParams(omega0: number, zeta: number, mass: number): SpringParams {
 export function fromBounce(options: FromBounceOptions): SpringParams {
   checkPositive(options.duration, 'fromBounce', 'duration');
   checkBounce(options.bounce, 'fromBounce');
-  const mass =
-    typeof options.mass === 'number' && Number.isFinite(options.mass) && options.mass > 0
-      ? options.mass
-      : 1;
+  const mass = massOrOne(options.mass);
   const omega0 = (2 * Math.PI) / options.duration;
   const zeta = 1 - options.bounce;
   return toParams(omega0, zeta, mass);
@@ -117,10 +114,7 @@ export interface FromVisualDurationOptions {
 export function fromVisualDuration(options: FromVisualDurationOptions): SpringParams {
   checkPositive(options.visualDuration, 'fromVisualDuration', 'visualDuration');
   checkBounce(options.bounce, 'fromVisualDuration');
-  const mass =
-    typeof options.mass === 'number' && Number.isFinite(options.mass) && options.mass > 0
-      ? options.mass
-      : 1;
+  const mass = massOrOne(options.mass);
   const Tv = options.visualDuration;
   const zeta = 1 - options.bounce;
 
@@ -135,6 +129,84 @@ export function fromVisualDuration(options: FromVisualDurationOptions): SpringPa
   // r = ω0/(ζ + √(ζ²−1)) — стабильное тождество ω0(ζ − √(ζ²−1)) (#226).
   const slow = 1 / (zeta + Math.sqrt(Math.max(0, zeta * zeta - 1)));
   return toParams(LN_100 / (Tv * slow), zeta, mass);
+}
+
+// ─── Observable-конструкторы (#230): точные координатные преобразования ──────
+
+/** Опции first-overshoot параметризации. */
+export interface FromPeakOptions {
+  /** Доля первого перелёта относительно амплитуды ∈ (0, 1]. */
+  readonly overshoot: number;
+  /** Время первого пика (секунды), > 0. */
+  readonly peakTime: number;
+  /** Масса. По умолчанию 1. */
+  readonly mass?: number | undefined;
+}
+
+/** Дефолт массы конструкторов: невалидная масса → 1 (канон fromBounce). */
+function massOrOne(mass: number | undefined): number {
+  return typeof mass === 'number' && Number.isFinite(mass) && mass > 0 ? mass : 1;
+}
+
+/**
+ * Пружина из НАБЛЮДАЕМОГО первого перелёта и времени пика (#230). Точное
+ * обратное преобразование underdamped-системы из покоя, не пресет:
+ *   L = −ln(M), ζ = L/√(π²+L²), ω₀ = √(π²+L²)/tp,
+ *   k = m(π²+L²)/tp² (без sqrt), c = 2mL/tp — один log, ноль итераций.
+ * overshoot=1 честно означает ζ=0 (незатухающая, пик ровно 2−from);
+ * overshoot=0 НЕ имеет underdamped-прообраза (критический предел) и
+ * отклоняется LM171 без epsilon-подмены — «без перелёта» описывается
+ * fromBounce({bounce: 0}) или fromVisualDuration.
+ */
+export function fromPeak(options: FromPeakOptions): SpringParams {
+  const M = options.overshoot;
+  if (!Number.isFinite(M) || M <= 0 || M > 1) {
+    throw new MotionParamError('LM171');
+  }
+  checkPositive(options.peakTime, 'fromPeak', 'peakTime');
+  const mass = massOrOne(options.mass);
+  const tp = options.peakTime;
+  // `+ 0` схлопывает IEEE −0 у overshoot=1 (−ln(1) = −0): damping выходит +0.
+  const L = -Math.log(M) + 0;
+  const s = Math.PI * Math.PI + L * L; // = (ω₀·tp)²
+  const params = {
+    mass,
+    stiffness: mass * s / (tp * tp),
+    damping: 2 * mass * L / tp,
+  };
+  validateSpringPhysics(params);
+  return params;
+}
+
+/** Опции period+half-life параметризации. */
+export interface FromOscillationOptions {
+  /** Период затухающих колебаний (секунды), > 0. */
+  readonly period: number;
+  /** Полупериод огибающей: амплитуда падает вдвое (секунды), > 0. */
+  readonly halfLife: number;
+  /** Масса. По умолчанию 1. */
+  readonly mass?: number | undefined;
+}
+
+/**
+ * Пружина из НАБЛЮДАЕМОГО периода колебаний и half-life огибающей (#230).
+ * Комплексные полюса p = −α ± iβ при α = ln2/halfLife, β = 2π/period:
+ *   k = m(α²+β²), c = 2mα — всегда underdamped (β > 0 ⇒ ζ < 1), точно.
+ * «period=∞» не является скрытой критической ветвью — конечность обязательна.
+ */
+export function fromOscillation(options: FromOscillationOptions): SpringParams {
+  checkPositive(options.period, 'fromOscillation', 'period');
+  checkPositive(options.halfLife, 'fromOscillation', 'halfLife');
+  const mass = massOrOne(options.mass);
+  const alpha = Math.LN2 / options.halfLife;
+  const beta = (2 * Math.PI) / options.period;
+  const params = {
+    mass,
+    stiffness: mass * (alpha * alpha + beta * beta),
+    damping: 2 * mass * alpha,
+  };
+  validateSpringPhysics(params);
+  return params;
 }
 
 // ─── Пресеты (канон react-spring: tension/friction при mass=1) ───────────────
