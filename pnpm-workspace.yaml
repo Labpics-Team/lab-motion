@@ -3,6 +3,8 @@ allowBuilds:
 minimumReleaseAge: 1440
 overrides:
   esbuild: ^0.28.1
+  # GHSA-v2hh-gcrm-f6hx (host confusion): транзитивно через stryker→ajv; dev-only.
+  fast-uri: ">=3.1.4"
   qs: ^6.15.2
 pmOnFail: error
 peerDependencyRules:
