@@ -73,5 +73,9 @@ export function springLinear(input?: NanoSpring): [number, string] {
     points.push(Math.round(sample(duration * index / count) * 1e4) / 1e4);
   }
   points[count] = 1;
+  // NB (#232, замер 2026-07-22): ведущий-ноль-омиссия («.5») давала −1 байт/стоп
+  // строки, но +36 B gz кода в nano-графе (1038 > продуктовой границы 1024) и
+  // ломала бит-паритет пинов — NO-GO; лерв compiled-строки — versioned
+  // compiler-only портфель (#232/#222), не общий runtime-эмиттер.
   return [duration * 1000, `linear(${points})`];
 }
