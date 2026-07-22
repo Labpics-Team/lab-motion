@@ -275,9 +275,10 @@ describe('compositor: readCompositorSpring — closed-form (value, velocity)', (
         stiffness: 1 + rnd() * 900,
         damping: rnd() * 120,
       };
-      // Пропускаем неоседающие (валидатор их и так отвергнет).
+      // Пропускаем не представимые у ЭТОГО исполнителя: с #218 чистый spring()
+      // принимает всю физику, бюджет — граница compositor (validateSpringParams).
       try {
-        spring(p, 0);
+        validateSpringParams(p);
       } catch {
         continue;
       }

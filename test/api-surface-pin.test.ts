@@ -14,6 +14,7 @@ const EXPECTED_EXPORTS = new Set([
   'MotionParamError',
   'drive',
   'validateSpringParams',
+  'validateSpringPhysics',
   'MotionValue',
 ]);
 

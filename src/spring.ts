@@ -138,14 +138,12 @@ export function settleTimeUpperBound(p: SpringParams, v0 = 0): number {
 }
 
 /**
- * Validate spring params. Throws MotionParamError for invalid inputs.
- *
- * Exported so drive() can call this synchronously at its boundary —
- * before any Promise is constructed or frame scheduled — making invalid
- * spring config throw eagerly and deterministically regardless of the
- * injected scheduler.
+ * Физическая граница домена (#218): конечные mass > 0, stiffness > 0,
+ * damping ≥ 0 — и ничего больше. Замкнутой аналитической форме не нужен
+ * frame-loop, поэтому чистый `spring()` обязан вычислять ЛЮБУЮ физически
+ * валидную систему: сколь угодно медленную и незатухающую (ζ=0) включительно.
  */
-export function validateSpringParams(p: SpringParams): void {
+export function validateSpringPhysics(p: SpringParams): void {
   if (!Number.isFinite(p.mass) || p.mass <= 0) {
     throw new MotionParamError('LM088');
   }
@@ -155,6 +153,17 @@ export function validateSpringParams(p: SpringParams): void {
   if (!Number.isFinite(p.damping) || p.damping < 0) {
     throw new MotionParamError('LM090');
   }
+}
+
+/**
+ * Граница АВТОНОМНОГО frame-loop-исполнителя (#218): физика + гарантия, что
+ * аналитическое время оседания помещается в бюджет кадра-капа (иначе rAF-цикл
+ * drive/MotionValue/фасада не завершится в своём lifecycle). Чистый sampler
+ * использует validateSpringPhysics; эта граница принадлежит исполнителям и
+ * вызывается ими на их стороне — до Promise и до первого кадра.
+ */
+export function validateSpringParams(p: SpringParams): void {
+  validateSpringPhysics(p);
   // Единый выведенный гард (взамен коробочных ω₀/ζ-полов, см. SETTLE_BUDGET_S):
   // аналитическое время оседания обязано помещаться в бюджет кадра-капа.
   // Валидатору нужна только пружина из покоя. Отдельный вызов позволяет
@@ -220,10 +229,14 @@ export function springUnchecked(params: SpringParams, t: number): SpringResult {
  *   2. Critically:   c = 2*sqrt(k*m)
  *   3. Overdamped:   c > 2*sqrt(k*m)
  *
+ * Граница — ТОЛЬКО физическая валидность (#218): budget автономного
+ * frame-loop к чистому sampler-у не относится — медленные и незатухающие
+ * системы вычислимы замкнутой формой в произвольный момент времени.
+ *
  * @param params - spring physics parameters
  * @param t      - time in seconds (≥ 0)
  */
 export function spring(params: SpringParams, t: number): SpringResult {
-  validateSpringParams(params);
+  validateSpringPhysics(params);
   return springUnchecked(params, t);
 }

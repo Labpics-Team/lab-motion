@@ -50,15 +50,25 @@ describe('spring-ergonomics: fromBounce — известные числа', () =
     expect(Math.sqrt(p.stiffness / p.mass)).toBeCloseTo(2 * Math.PI, 3); // ω0 не зависит от массы
   });
 
-  it('результат ВСЕГДА проходит validateSpringParams (клампы под полы движка)', () => {
-    // Экстремумы публичного диапазона: bounce 1 (ζ-пол 0.2), длинный duration (ω0-пол 2.0).
-    for (const opts of [
-      { duration: 1, bounce: 1 },      // ζ клампится к полу движка
-      { duration: 100, bounce: 0 },    // ω0 клампится к полу движка
-      { duration: 0.05, bounce: -1 },  // очень быстрый + плоский
-    ]) {
-      expect(() => validateSpringParams(fromBounce(opts))).not.toThrow();
-    }
+  it('точное преобразование (#218): координаты НЕ подменяются под бюджет исполнителя', () => {
+    // Прежняя воронка «досаживала» ω₀/ζ под frame-loop budget — подмена
+    // запрошенной физики. Теперь: точный закон ω₀=2π/T, ζ=1−bounce всегда.
+    // duration=100, bounce=0 (пример из #218): ω₀=2π/100, ζ=1 ТОЧНО.
+    const slow = fromBounce({ duration: 100, bounce: 0 });
+    expect(Math.sqrt(slow.stiffness / slow.mass)).toBeCloseTo((2 * Math.PI) / 100, 12);
+    expect(slow.damping / (2 * Math.sqrt(slow.stiffness * slow.mass))).toBeCloseTo(1, 12);
+    expect(slow.stiffness).toBeCloseTo(0.0039478417604357434, 15);
+    expect(slow.damping).toBeCloseTo(0.12566370614359174, 15);
+    // bounce=1 честно означает ζ=0 ⇒ damping=0 (незатухающая).
+    const elastic = fromBounce({ duration: 1, bounce: 1 });
+    expect(elastic.damping).toBe(0);
+    // Чистый spring() вычисляет обе; медленная в бюджете frame-loop, а
+    // незатухающая — граница ИСПОЛНИТЕЛЯ (LM091), не конструктора.
+    expect(Number.isFinite(spring(slow, 3).value)).toBe(true);
+    expect(Number.isFinite(spring(elastic, 3).value)).toBe(true);
+    expect(() => validateSpringParams(elastic)).toThrow(MotionParamError);
+    // Быстрый плоский край остаётся представимым у frame-loop.
+    expect(() => validateSpringParams(fromBounce({ duration: 0.05, bounce: -1 }))).not.toThrow();
   });
 
   it('поведенческое свойство: при t=duration пружина у цели (|1−x| < 0.15)', () => {
@@ -117,35 +127,28 @@ describe('spring-ergonomics: fromVisualDuration', () => {
     }
   });
 
-  // Полный публичный домен ζ<1, включая зону клампа ω0 (класс, слепой для
-  // точечных тестов: длинный Tv + малый ζ → ω0 упирается в пол и пружина
-  // быстрее запрошенной).
-  it('property ζ<1: t1≈Tv (±1%) на ВСЁМ домене — бюджетная коэрсия жертвует bounce, не Tv', () => {
-    // Выведенный закон (2026-07-03): коробочного пола ω₀=2 больше нет. Если
-    // запрос за бюджетом оседания, fromVisualDuration поднимает ζ вдоль кривой
-    // Tv=const (ω₀ пересчитывается из формулы пересечения) — именованный
-    // контракт API (время первого касания) сохраняется ТОЧНО, деградирует
-    // только упругость. Прежняя коэрсия через ω₀-подъём ускоряла касание
-    // до −45% (bounce=0.5, Tv=10) — подмена намерения.
+  // Полный публичный домен ζ<1 — точный закон без какой-либо коэрсии (#218).
+  it('property ζ<1: t1≈Tv (±1%) на ВСЁМ домене, ζ = 1−bounce ТОЧНО', () => {
     for (const bounce of [0.1, 0.3, 0.5, 0.8, 1]) {
-      for (const Tv of [0.05, 0.5, 1.2, 1.5, 10]) {
-        const zetaRaw = Math.max(1e-6, 1 - bounce);
-        if (zetaRaw >= 1) continue;
+      for (const Tv of [0.05, 0.5, 1.2, 1.5, 10, 60]) {
+        const zetaRaw = 1 - bounce;
         const p = fromVisualDuration({ visualDuration: Tv, bounce });
-        const omega0Fin = Math.sqrt(p.stiffness / p.mass);
         const zetaFin = p.damping / (2 * Math.sqrt(p.stiffness * p.mass));
-        // ζ мог только подняться (коэрсия к бюджету), упасть — никогда
-        expect(zetaFin).toBeGreaterThanOrEqual(zetaRaw - 1e-9);
-        expect(zetaFin).toBeLessThan(1);
-        // инвариант: первое касание = точное решение для ФИНАЛЬНЫХ параметров
-        const sFin = Math.sqrt(1 - zetaFin * zetaFin);
-        const tStar = (Math.PI - Math.atan(sFin / zetaFin)) / (sFin * omega0Fin);
-        const t1 = firstCrossing(p, tStar * 2 + 0.1);
-        expect(Math.abs(t1 - tStar) / tStar).toBeLessThan(0.01);
-        // Контракт длительности: держится и в зоне коэрсии (допуск — шаг
+        // Упругость сохранена точно: никакой бюджетной коэрсии не существует.
+        expect(Math.abs(zetaFin - zetaRaw)).toBeLessThanOrEqual(1e-12);
+        // Контракт длительности: первое касание ровно в Tv (допуск — шаг
         // численной сетки firstCrossing + запас).
+        const t1 = firstCrossing(p, Tv * 2 + 0.1);
         expect(Math.abs(t1 - Tv) / Tv).toBeLessThan(0.01);
       }
+    }
+  });
+
+  it('bounce=1 (ζ=0): точное касание незатухающей x=1−cos: ω₀ = π/(2Tv)', () => {
+    for (const Tv of [0.2, 1, 5]) {
+      const p = fromVisualDuration({ visualDuration: Tv, bounce: 1 });
+      expect(p.damping).toBe(0);
+      expect(Math.sqrt(p.stiffness / p.mass)).toBeCloseTo(Math.PI / (2 * Tv), 12);
     }
   });
 
@@ -161,14 +164,20 @@ describe('spring-ergonomics: fromVisualDuration', () => {
     }
   });
 
-  it('результат проходит validateSpringParams на краях', () => {
+  it('края: физика всегда валидна; представимость frame-loop решает исполнитель (#218)', () => {
+    // Конструктор больше не «гарантирует» валидатор исполнителя — он точен.
     for (const opts of [
-      { visualDuration: 0.05, bounce: 1 },
-      { visualDuration: 50, bounce: 0.5 },
-      { visualDuration: 1, bounce: -1 },
+      { visualDuration: 0.05, bounce: 1 },  // ζ=0: физика ок, frame-loop откажет
+      { visualDuration: 50, bounce: 0.5 },  // медленная: физика ок
+      { visualDuration: 1, bounce: -1 },    // плоская быстрая: в бюджете
     ]) {
-      expect(() => validateSpringParams(fromVisualDuration(opts))).not.toThrow();
+      const p = fromVisualDuration(opts);
+      expect(Number.isFinite(spring(p, opts.visualDuration).value)).toBe(true);
     }
+    expect(() => validateSpringParams(fromVisualDuration({ visualDuration: 1, bounce: -1 })))
+      .not.toThrow();
+    expect(() => validateSpringParams(fromVisualDuration({ visualDuration: 0.05, bounce: 1 })))
+      .toThrow(MotionParamError); // ζ=0 — незатухающая: граница frame-loop
   });
 
   it('невалидные входы → MotionParamError', () => {
