@@ -116,7 +116,7 @@ interface NanoSpring {
 
 `ease` — нативная CSS `<easing-function>`-строка; nano её не парсит и не валидирует — она уходит в `Element.animate({ easing })` как есть:
 
-```
+```text
 <easing-function> = linear | ease | ease-in | ease-out | ease-in-out
                   | cubic-bezier(<x1>, <y1>, <x2>, <y2>)
                   | steps(<n> [, <jump-position>])

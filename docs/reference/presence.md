@@ -62,7 +62,7 @@ interface PresenceSnapshot {
 
 Создаёт машину enter/exit lifecycle. Граф состояний:
 
-```
+```text
 gone ──enter()──▶ entering ──done──▶ present ──exit()──▶ exiting ──done──▶ gone
                      ▲  └────────────exit()────────────────▶│
                      └────────────────enter()───────────────┘   (прерывания, со снимком)

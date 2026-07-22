@@ -102,7 +102,7 @@ function springFromDurationBounce(durationS: number, bounce: number): SpringPara
 
 Конвертирует каноническую пару восприятия (модель SwiftUI `Spring(duration:bounce:)` / Motion.dev; каноническая модель ДС-схемы labui) в физпараметры движка. Формулы — в точности SSOT labui:
 
-```
+```text
 ζ = 1 − bounce;  m = 1;  ω₀ = 2π / durationS;  stiffness = ω₀²;  damping = 2·ζ·ω₀
 ```
 
