@@ -51,6 +51,13 @@ function releaseMetadata() {
       'docs/errors.md',
       'docs/benchmark.md',
       'docs/recipes.md',
+      // #91/#96 (2026-07-22): docs-суит и машиночитаемый API в артефакте.
+      'docs/getting-started.md',
+      'docs/reference',
+      'docs/migration',
+      'docs/explanations',
+      'api-manifest.json',
+      'llms.txt',
       '!dist/**/*.map',
     ],
     publishConfig: { access: 'public' },
