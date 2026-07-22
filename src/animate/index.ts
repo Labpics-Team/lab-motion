@@ -106,14 +106,22 @@ export type AnimateProps = Record<string, AnimatePropValue>;
 
 /** Опции animate(). spring и duration/ease взаимоисключающие. */
 export interface AnimateOptions {
-  /** Пружина (дефолт режима: tokens spring.default). */
+  /**
+   * Пружина (дефолт режима: tokens spring.default). Думаете в duration/bounce?
+   * `spring: fromBounce({ duration, bounce })` из `@labpics/motion/spring` —
+   * точное преобразование (#218).
+   */
   readonly spring?: SpringParams | undefined;
-  /** Длительность tween (мс). Задана → режим tween (дефолт ease: standard). */
+  /**
+   * Длительность tween в МИЛЛИСЕКУНДАХ (Framer/Motion считают в секундах —
+   * ×1000). Задана → режим tween (дефолт ease: standard).
+   */
   readonly duration?: number | undefined;
   /**
-   * Изинг tween t∈[0,1]→прогресс. Задан без duration → duration.base.
-   * Массив (#205) — per-segment изинги N-keyframe вызова (длина N−1; все
-   * каналы вызова обязаны иметь одну authored-топологию N).
+   * Изинг tween t∈[0,1]→прогресс — ФУНКЦИЯ (готовые кривые — `./easing`;
+   * CSS-строки вида 'ease-out' — грамматика `./nano`). Задан без duration →
+   * duration.base. Массив (#205) — per-segment изинги N-keyframe вызова
+   * (длина N−1; все каналы вызова обязаны иметь одну authored-топологию N).
    */
   readonly ease?: ((t: number) => number) | readonly ((t: number) => number)[] | undefined;
   /**
@@ -122,9 +130,9 @@ export interface AnimateOptions {
    * Без times offsets равномерные. Требует authored-топологию N у всех каналов.
    */
   readonly times?: readonly number[] | undefined;
-  /** Задержка старта (мс, ≥ 0) — всем целям. */
+  /** Задержка старта в МИЛЛИСЕКУНДАХ (≥ 0) — всем целям. */
   readonly delay?: number | undefined;
-  /** Каскад для многих целей: число = gap (мс) или конфиг ./stagger. */
+  /** Каскад для многих целей: число = gap в МИЛЛИСЕКУНДАХ или конфиг ./stagger. */
   readonly stagger?: number | StaggerOptions | undefined;
   /** Вызывается один раз, когда ВСЕ цели осели естественно (не cancel). */
   readonly onComplete?: (() => void) | undefined;
@@ -138,9 +146,13 @@ export interface AnimateOptions {
   readonly setTimer?: SetTimerFn | undefined;
 }
 
-/** Контролы прогона (для группы целей — агрегированные). */
-export interface AnimateControls {
-  /** Резолвится при завершении всех целей (естественном или прерывании). */
+/** Контролы прогона (для группы целей — агрегированные). Thenable: `await animate(...)`. */
+export interface AnimateControls extends PromiseLike<void> {
+  /**
+   * Резолвится при завершении всех целей — естественном ИЛИ через cancel/stop
+   * (естественность сигналит onComplete). `await controls` эквивалентен
+   * `await controls.finished` (канон Motion/driver).
+   */
   readonly finished: Promise<void>;
   /** Возобновить после pause(). */
   play(): void;
@@ -630,6 +642,8 @@ export function animate(
   };
   return {
     finished,
+    // Thenable-канон Motion/driver: `await animate(...)` ждёт finished.
+    then: (onFulfilled, onRejected) => finished.then(onFulfilled, onRejected),
     play(): void {
       for (const u of units) u.play();
     },

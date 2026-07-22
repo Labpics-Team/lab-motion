@@ -39,6 +39,17 @@ tree shaking, точный минимальный Preact peer).
 
 ## Быстрый старт
 
+### Какой animate мне нужен?
+
+| Вход | Когда | Цена | Форма |
+|---|---|---|---|
+| `…/animate` | Продуктовые UI-переходы: transform-шортхенды `x`/`y`, keyframe-кортежи, C¹-подхват при прерывании, JS-изинги, fallback | ≤ 12.8 КБ gz | `animate(el, { x: 240, opacity: [0, 1] }, { spring })` → `await …` |
+| `…/nano` | Доверенная современная платформа, native `Animation`, минимальный вес | ≤ 1 КБ gz | `animate(el, { translate: '240px', opacity: 1 })` (longhand-строки) |
+| nano + `…/compiler/vite` | То же, но статические вызовы компилируются в артефакт **≤ 1 КБ** в бандле | ~0.9 КБ gz | пишете тот же nano-вызов; Vite-плагин убирает солвер из бандла |
+| ядро (`MotionValue`) | Значение без DOM: canvas/WebGL/атрибуты, свой рендер-колбэк | ≤ 2.3 КБ gz | `new MotionValue({ initial, spring })` + `onChange` |
+
+Все числа времени — **миллисекунды** (Framer/Motion считают в секундах).
+
 ### Пружина к значению (ядро)
 
 ```typescript
@@ -610,7 +621,7 @@ lifecycle. Полный целевой пользовательский охва
 | `animate(el, { x: 100 }, { delay: 0.1 })` | `animate(el, { x: 100 }, { delay: 100 })` | мс |
 | `animate('.item', …, { delay: stagger(0.05) })` | `animate('.item', …, { stagger: 50 })` | шаг-мс между целями |
 | `const a = animate(…); a.pause(); a.play()` | то же | после естественного завершения Motion перезапускается, Lab Motion — нет |
-| `await animate(…)` или `animate(…).then(…)` | `await animate(…).finished` | control Motion thenable; Lab Motion предоставляет отдельный Promise |
+| `await animate(…)` или `animate(…).then(…)` | то же (`await animate(…)`) | контролы thenable; `finished` доступен и отдельным Promise |
 | `a.time = 0.5` | `a.seek(500)` | Motion использует секунды и getter/setter; `seek` Lab Motion — write-only, мс |
 | `a.stop()` | `a.stop()` | оба сохраняют текущую позу; в Lab Motion `stop` — алиас `cancel` |
 | `a.cancel()` | прямого эквивалента нет | Motion возвращает initial pose; Lab Motion сохраняет текущую |
@@ -638,7 +649,8 @@ repeat/reverse/mirror/repeatDelay, inertia/decay, sequences/timeline,
 value/object targets, HTML/SVG attributes и path-specific SVG-каналы.
 `SVGElement` при этом уже является допустимой целью для поддерживаемых
 CSS-стилей. Отдельные низкоуровневые субпути не образуют общий owner,
-`finished` и interruption/cleanup-контракт. Также отсутствуют thenable control,
+`finished` и interruption/cleanup-контракт. Контролы thenable
+(`await animate(...)` ≡ `await animate(...).finished`); отсутствуют
 `time/speed/duration` getters, `reverse`, `complete` и `restart`.
 Публичного API регистрации произвольных кодеков или адаптеров целей пакет пока
 не предоставляет.

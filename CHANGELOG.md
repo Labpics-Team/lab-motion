@@ -8,6 +8,15 @@
 
 ### Added
 
+- **Thenable-контролы `./animate`:** `await animate(...)` эквивалентен
+  `await animate(...).finished` (канон Motion и `./driver`) — прежний код с
+  `.finished` не затронут.
+- **DX-защита от перепутанных грамматик (0 runtime-байт):** `NanoProps`
+  типо-запрещает `x`/`y`/`translateX`/`translateY` с подсказкой про
+  `./animate`; JSDoc-штампы «МИЛЛИСЕКУНДЫ» на duration/delay/stagger обоих
+  фасадов; перекрёстные ссылки `spring: fromBounce(...)` для мыслящих в
+  duration/bounce; README-чузер «Какой animate мне нужен?».
+
 - **N-keyframe tracks в полном `./animate` (#205):** базовая keyframe-грамматика
   поля (Framer/GSAP/anime) — кортежи `x: [0, 120, -40, 0]` для transform-осей,
   `opacity` и произвольных CSS-каналов (включая цвета), `options.times`

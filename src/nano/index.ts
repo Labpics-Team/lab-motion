@@ -10,22 +10,28 @@ import { springLinear, type NanoSpring } from './spring-linear.js';
 export type { NanoSpring } from './spring-linear.js';
 
 interface NanoCommonOptions {
+  /** Задержка старта в МИЛЛИСЕКУНДАХ (Framer/Motion считают в секундах — ×1000). */
   readonly delay?: number | undefined;
+  /** Шаг каскада между целями в МИЛЛИСЕКУНДАХ. */
   readonly stagger?: number | undefined;
   /** Явное значение; иначе prefers-reduced-motion читается в момент вызова. */
   readonly reducedMotion?: boolean | undefined;
 }
 
 export type NanoOptions = NanoCommonOptions & ({
-  /** Пружина из покоя; по умолчанию mass/stiffness/damping = 1/170/26. */
+  /**
+   * Пружина из покоя; по умолчанию mass/stiffness/damping = 1/170/26.
+   * Думаете в duration/bounce? `spring: fromBounce({ duration, bounce })`
+   * из `@labpics/motion/spring` — точное преобразование (#218).
+   */
   readonly spring?: NanoSpring | undefined;
   readonly duration?: never;
   readonly ease?: never;
 } | {
   readonly spring?: never;
-  /** Tween-длительность в миллисекундах. */
+  /** Tween-длительность в МИЛЛИСЕКУНДАХ (Framer/Motion: секунды — ×1000). */
   readonly duration: number;
-  /** Нативная CSS easing-строка tween. */
+  /** Нативная CSS easing-строка tween; JS-функции изинга — контракт `./animate`. */
   readonly ease?: string | undefined;
 });
 
@@ -45,6 +51,14 @@ export type NanoProps = Record<string, string | number | NanoPair | undefined> &
    * массив — пара [from, to] для поворота остаётся контрактом полного ./animate.
    */
   readonly rotate?: number | undefined;
+  /** Transform-шортхенды `x`/`y` — грамматика полного `./animate`; здесь — `translate: '240px 12px'`. */
+  readonly x?: never;
+  /** Transform-шортхенды `x`/`y` — грамматика полного `./animate`; здесь — `translate: '240px 12px'`. */
+  readonly y?: never;
+  /** `translateX/translateY` — оси полного `./animate` (`x`/`y`); nano ведёт целый `translate` longhand. */
+  readonly translateX?: never;
+  /** `translateX/translateY` — оси полного `./animate` (`x`/`y`); nano ведёт целый `translate` longhand. */
+  readonly translateY?: never;
 };
 
 export type NanoTarget = Element | string | Iterable<Element> | ArrayLike<Element>;
