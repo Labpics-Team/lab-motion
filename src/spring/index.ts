@@ -82,7 +82,8 @@ function toParams(omega0Raw: number, zetaRaw: number, mass: number): SpringParam
   //   коробка ω₀≥2 молча превращала 100-секундный запрос в ~2.3-секундный —
   //   худшая из возможных подмен намерения).
   const zetaSeed = Math.max(1e-4, zetaRaw);
-  const slowOf = (z: number) => (z < 1 ? z : z - Math.sqrt(z * z - 1));
+  // Медленный корень стабильной формой 1/(ζ+√(ζ²−1)) ≡ ζ−√(ζ²−1) (#226).
+  const slowOf = (z: number) => (z < 1 ? z : 1 / (z + Math.sqrt(z * z - 1)));
   let omega0 = Math.max(
     omega0Raw,
     lnBudget(omega0Raw) / (slowOf(zetaSeed) * SETTLE_BUDGET_S),
@@ -187,8 +188,8 @@ export function fromVisualDuration(options: FromVisualDurationOptions): SpringPa
   }
   // Пересечения нет: Tv = выход на ~99% цели по медленнейшей моде.
   // Для ζ=1 огибающая ~e^{−ω0 t}; для ζ>1 медленнейший корень
-  // r = ω0(ζ − √(ζ²−1)) → ω0 = ln(100) / (Tv · (ζ − √(ζ²−1))).
-  const slow = zeta - Math.sqrt(Math.max(0, zeta * zeta - 1));
+  // r = ω0/(ζ + √(ζ²−1)) — стабильное тождество ω0(ζ − √(ζ²−1)) (#226).
+  const slow = 1 / (zeta + Math.sqrt(Math.max(0, zeta * zeta - 1)));
   return toParams(LN_100 / (Tv * Math.max(slow, 1e-6)), zeta, mass);
 }
 
@@ -219,7 +220,8 @@ export function springAsEasing(params: SpringParams): (t: number) => number {
   spring(params, 0);
   const omega0 = Math.sqrt(params.stiffness / params.mass);
   const zeta = params.damping / (2 * Math.sqrt(params.stiffness * params.mass));
-  const slow = zeta >= 1 ? zeta - Math.sqrt(Math.max(0, zeta * zeta - 1)) : zeta;
+  // Медленный корень стабильной формой 1/(ζ+√(ζ²−1)) ≡ ζ−√(ζ²−1) (#226).
+  const slow = zeta >= 1 ? 1 / (zeta + Math.sqrt(Math.max(0, zeta * zeta - 1))) : zeta;
   const settle = LN_100 / (omega0 * Math.max(slow, 1e-6));
 
   return (t: number): number => {

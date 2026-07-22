@@ -51,7 +51,9 @@ function legacyRestBound(p: SpringParams): number {
   const zetaRaw = p.damping / (2 * p.mass * omega0);
   const zeta = Math.abs(zetaRaw - 1) < 1e-3 ? (zetaRaw < 1 ? 0.999 : 1.001) : zetaRaw;
   const d = Math.sqrt(Math.abs(zeta * zeta - 1));
-  const rate = zeta < 1 ? zeta * omega0 : omega0 * (zeta - d);
+  // Медленный корень стабильной формой 1/(ζ+d) ≡ ζ−d (#226): реплика следует
+  // канону spring.ts, смысл пина прежний — v0=0 делегирует к rest-bound бит-в-бит.
+  const rate = zeta < 1 ? zeta * omega0 : omega0 / (zeta + d);
   if (!(rate > 0)) return Infinity;
   const amp = zeta < 1 ? 1 / d : (zeta + d) / (2 * d);
   return (

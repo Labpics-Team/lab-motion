@@ -45,7 +45,8 @@ export interface SpringResult {
  * верхняя граница времени оседания медленной моды обязана помещаться в бюджет
  * кадра-капа.
  *
- *   rate  = ζ·ω₀ (underdamped) | ω₀·(ζ − √(ζ²−1)) (overdamped, медленный корень)
+ *   rate  = ζ·ω₀ (underdamped) | ω₀/(ζ + √(ζ²−1)) (overdamped, медленный корень —
+ *           стабильное тождество ω₀(ζ−√(ζ²−1)); вычитание теряло полюс при ζ ≳ 1e8, #226)
  *   amp   = 1/√(1−ζ²) | (ζ+√(ζ²−1))/(2√(ζ²−1))   (пик коэффициентов разложения;
  *           у ζ→1 факторизация вырождается — ζ_eff отводится на ±1e-3, истинный
  *           пик критической ветки ограничен)
@@ -67,7 +68,10 @@ export function settleTimeAtRestUpperBound(p: SpringParams): number {
     Math.abs(zetaRaw - 1) < 1e-3 ? (zetaRaw < 1 ? 0.999 : 1.001) : zetaRaw;
   const under = zeta < 1;
   const d = Math.sqrt(Math.abs(zeta * zeta - 1)); // √|ζ²−1|: ωd/ω₀ | расщепление корней
-  const rate = under ? zeta * omega0 : omega0 * (zeta - d);
+  // Медленный корень стабильной формой (ζ−d)(ζ+d)=1 ⇒ ζ−d = 1/(ζ+d): вычитание
+  // ζ−d теряло полюс при ζ ≳ 1e8 и ЛОЖНО отвергало быстро оседающие жёсткие
+  // overdamped-пружины (rate→0 ⇒ t_settle→∞ ⇒ LM091), #226.
+  const rate = under ? zeta * omega0 : omega0 / (zeta + d);
   if (!(rate > 0)) return Infinity; // ζ=0: незатухающая — не оседает никогда
   const amp = under ? 1 / d : (zeta + d) / (2 * d);
   const needLn =

@@ -9,6 +9,13 @@
  * Возвращает СЫРЫЕ числа без finite-стражей — политика стражей у вызывающих
  * РАЗНАЯ (spring.ts: clampFinite NaN→0; motion-value: value→1, velocity→0)
  * и сохранена на их сторонах бит-в-бит.
+ *
+ * Каноническая pole-space форма (#226): α = c/m/2, ω² = k/m, Δ = ω²−α²;
+ * ветвление по знаку Δ (>0 under, ==0 critical, <0 over). Медленный
+ * overdamped-полюс — резольвентным тождеством r_slow = −ω²/(α+√(−Δ)):
+ * прежняя запись −ω₀(ζ−√(ζ²−1)) страдала catastrophic cancellation и при
+ * ζ ≳ 1e8 теряла полюс целиком (неподвижная кривая). Обе стороны near-critical
+ * непрерывно сходятся к критической форме — branch-политика без magic-epsilon.
  */
 import { type SpringParams } from './types.js';
 
@@ -38,50 +45,60 @@ export function solveSpring(
       basis._velocityV0 = 1;
     }
   } else {
-    const omega0 = Math.sqrt(k / m);
-    // ζ = c/(2√(km)) = c/(2m·ω₀): тождество снимает второй sqrt горячего пути.
-    const zeta = c / (2 * m * omega0);
-    if (zeta < 1) {
-      const omegaD = omega0 * Math.sqrt(1 - zeta * zeta);
-      const decay = Math.exp(-zeta * omega0 * t);
+    // Канонические pole-коэффициенты (#226): α = c/m/2 (деление ДО половинения —
+    // 2·m переполняется при конечных scale-equivalent m/k/c, канон nano SSOT),
+    // ω² = k/m, Δ = ω²−α². Ветвление по знаку Δ; обе стороны near-critical
+    // непрерывно сходятся к критической форме, поэтому magic-epsilon не нужен.
+    const alpha = c / m / 2;
+    const omega2 = k / m;
+    const delta = omega2 - alpha * alpha;
+    if (delta > 0) {
+      const omegaD = Math.sqrt(delta);
+      const decay = Math.exp(-alpha * t);
       const cosD = Math.cos(omegaD * t);
       const sinD = Math.sin(omegaD * t);
-      const B = (v0 - zeta * omega0) / omegaD;
+      const B = (v0 - alpha) / omegaD;
       const mode = B * sinD - cosD;
       value = 1 + decay * mode;
       velocity =
-        decay * (-zeta * omega0 * mode + omegaD * (sinD + B * cosD));
+        decay * (-alpha * mode + omegaD * (sinD + B * cosD));
       if (basis !== undefined) {
         basis._valueV0 = decay * sinD / omegaD;
-        basis._velocityV0 = decay * (cosD - zeta * omega0 * sinD / omegaD);
+        basis._velocityV0 = decay * (cosD - alpha * sinD / omegaD);
       }
-    } else if (zeta === 1) {
-      const decay = Math.exp(-omega0 * t);
-      const B = v0 - omega0;
+    } else if (delta === 0) {
+      const decay = Math.exp(-alpha * t);
+      const B = v0 - alpha;
       const mode = B * t - 1;
       value = 1 + mode * decay;
-      velocity = decay * (B - omega0 * mode);
+      velocity = decay * (B - alpha * mode);
       if (basis !== undefined) {
         basis._valueV0 = t * decay;
-        basis._velocityV0 = decay * (1 - omega0 * t);
+        basis._velocityV0 = decay * (1 - alpha * t);
       }
     } else {
       // Две огромные модальные амплитуды при |v0|≈MAX взаимно уничтожаются у
       // t≈0. Разделение конечной базы и линейного вклада v0 сохраняет x'(0)=v0
       // без epsilon-переключателя и одновременно является базисом пакета.
-      const sqrtTerm = Math.sqrt(zeta * zeta - 1);
-      const r1 = -omega0 * (zeta - sqrtTerm);
-      const r2 = -omega0 * (zeta + sqrtTerm);
-      const denominator = r1 - r2;
-      const e1 = Math.exp(r1 * t);
-      // exp(r1·t)−exp(r2·t) округляется в ноль у t≈0. Форма от медленной
-      // моды и expm1 сохраняет предел valueV0→t, velocityV0→1 на всей шкале.
-      const modalDelta = Math.expm1(-denominator * t);
-      const valueV0 = (-e1 * modalDelta) / denominator;
-      const velocityV0 = e1 * (1 - (r2 * modalDelta) / denominator);
-      // −expm1(r2·t) сохраняет малую базовую позицию вместо 1−exp(r2·t).
-      value = -Math.expm1(r2 * t) + (r2 + v0) * valueV0;
-      velocity = r1 * r2 * valueV0 + v0 * velocityV0;
+      const split = Math.sqrt(-delta);
+      // Медленный полюс через резольвентное тождество r_slow·r_fast = ω²:
+      // −ω²/(α+split) ≡ −α+split, но БЕЗ катастрофического вычитания близких
+      // чисел (#226: старая форма −ω₀(ζ−√(ζ²−1)) теряла полюс при ζ ≳ 1e8).
+      const rSlow = -omega2 / (alpha + split);
+      const rFast = -alpha - split;
+      // r_slow − r_fast = 2·split точно — вычитание полюсов у critical
+      // сокращало бы α-части и возвращало cancellation в новом месте.
+      const poleGap = 2 * split;
+      const e1 = Math.exp(rSlow * t);
+      // exp(r_slow·t)−exp(r_fast·t) округляется в ноль у t≈0. Форма от
+      // медленной моды и expm1 сохраняет предел valueV0→t, velocityV0→1.
+      const modalDelta = Math.expm1(-poleGap * t);
+      const valueV0 = (-e1 * modalDelta) / poleGap;
+      const velocityV0 = e1 * (1 - (rFast * modalDelta) / poleGap);
+      // −expm1(r_fast·t) сохраняет малую базовую позицию вместо 1−exp(r_fast·t).
+      value = -Math.expm1(rFast * t) + (rFast + v0) * valueV0;
+      // r_slow·r_fast = ω² — точное тождество Виета вместо произведения полюсов.
+      velocity = omega2 * valueV0 + v0 * velocityV0;
       if (basis !== undefined) {
         basis._valueV0 = valueV0;
         basis._velocityV0 = velocityV0;
@@ -134,28 +151,30 @@ export function makeSpringValueSampler(
   v0: number,
 ): (t: number) => number {
   const { mass: m, stiffness: k, damping: c } = params;
-  const omega0 = Math.sqrt(k / m);
-  const zeta = c / (2 * m * omega0);
+  // Те же канонические pole-коэффициенты, что solveSpring (#226) — бит-в-бит
+  // одинаковые формулы и порядок операций обязательны для равенства значений.
+  const alpha = c / m / 2;
+  const omega2 = k / m;
+  const delta = omega2 - alpha * alpha;
 
-  if (zeta < 1) {
-    const omegaD = omega0 * Math.sqrt(1 - zeta * zeta);
-    const zw = zeta * omega0;
-    const B = (v0 - zw) / omegaD;
+  if (delta > 0) {
+    const omegaD = Math.sqrt(delta);
+    const B = (v0 - alpha) / omegaD;
     return (t) =>
-      t <= 0 ? 0 : 1 + Math.exp(-zw * t) * (-Math.cos(omegaD * t) + B * Math.sin(omegaD * t));
+      t <= 0 ? 0 : 1 + Math.exp(-alpha * t) * (-Math.cos(omegaD * t) + B * Math.sin(omegaD * t));
   }
-  if (zeta === 1) {
-    const B = v0 - omega0;
-    return (t) => (t <= 0 ? 0 : 1 + (-1 + B * t) * Math.exp(-omega0 * t));
+  if (delta === 0) {
+    const B = v0 - alpha;
+    return (t) => (t <= 0 ? 0 : 1 + (-1 + B * t) * Math.exp(-alpha * t));
   }
-  const sqrtTerm = Math.sqrt(zeta * zeta - 1);
-  const r1 = -omega0 * (zeta - sqrtTerm);
-  const r2 = -omega0 * (zeta + sqrtTerm);
-  const denominator = r1 - r2;
+  const split = Math.sqrt(-delta);
+  const rSlow = -omega2 / (alpha + split);
+  const rFast = -alpha - split;
+  const poleGap = 2 * split;
   return (t) => {
     if (t <= 0) return 0;
-    const e1 = Math.exp(r1 * t);
-    const valueV0 = (-e1 * Math.expm1(-denominator * t)) / denominator;
-    return -Math.expm1(r2 * t) + (r2 + v0) * valueV0;
+    const e1 = Math.exp(rSlow * t);
+    const valueV0 = (-e1 * Math.expm1(-poleGap * t)) / poleGap;
+    return -Math.expm1(rFast * t) + (rFast + v0) * valueV0;
   };
 }
