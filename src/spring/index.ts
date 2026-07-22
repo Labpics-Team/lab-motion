@@ -33,10 +33,11 @@
  * Инварианты: zero-DOM, zero-deps, детерминизм, MotionParamError рано.
  */
 
-import { validateSpringPhysics, spring, type SpringParams } from '../spring.js';
+import { springUnchecked, validateSpringPhysics, type SpringParams } from '../spring.js';
+import { CONVERGENCE_THRESHOLD } from '../internal/constants.js';
 import { MotionParamError } from '../errors.js';
 
-/** ln(100): множитель времени затухания огибающей до 1%. */
+/** ln(100): множитель времени затухания огибающей до 1% (шкала Tv при ζ≥1). */
 const LN_100 = Math.log(100);
 
 // ─── fromBounce ──────────────────────────────────────────────────────────────
@@ -154,29 +155,79 @@ export const springPresets: Readonly<Record<
 // ─── springAsEasing ──────────────────────────────────────────────────────────
 
 /**
+ * Конечный нормализованный горизонт U = ω₀·T (#219): наименьшее U замкнутой
+ * ОГИБАЮЩЕЙ, при котором |1−x(U)| + (4/27)·|U·x′(U)| ≤ tolerance — тогда
+ * C¹ Hermite-коррекция хвоста ограничена tolerance по построению
+ * (max|3t²−2t³| = 1, max|t³−t²| = 4/27). Безразмерно: зависит только от ζ,
+ * поэтому scale-equivalent (m,k,c) получают одну кривую. Детерминированная
+ * брекет-бисекция по монотонно затухающей огибающей — без wall-clock.
+ */
+function normalizedSpringHorizon(zeta: number, tolerance: number): number {
+  let envelope: (u: number) => number;
+  if (zeta < 1) {
+    // |x−1| ≤ e^(−ζu)/ω̂d;  |dx/du| = e^(−ζu)·sin(ω̂d·u)/ω̂d ≤ e^(−ζu)/ω̂d.
+    const omegaDHat = Math.sqrt(1 - zeta * zeta);
+    envelope = (u) => (Math.exp(-zeta * u) / omegaDHat) * (1 + (4 / 27) * u);
+  } else if (zeta === 1) {
+    // Точные формы: |x−1| = (1+u)e^(−u), dx/du = u·e^(−u).
+    envelope = (u) => Math.exp(-u) * (1 + u + (4 / 27) * u * u);
+  } else {
+    // Модальные амплитуды в стабильной pole-форме (#226): r̂s = −1/(ζ+d).
+    const d = Math.sqrt(zeta * zeta - 1);
+    const slowHat = 1 / (zeta + d);
+    const ampX = (zeta + d + slowHat) / (2 * d);
+    const ampV = 1 / d;
+    envelope = (u) => Math.exp(-slowHat * u) * (ampX + (4 / 27) * u * ampV);
+  }
+  // Брекет: огибающая экспоненциально затухает ⇒ удвоение конечно; бисекция
+  // держит инвариант envelope(hi) ≤ tolerance и возвращает hi.
+  let hi = 1;
+  let guard = 0;
+  while (envelope(hi) > tolerance && guard++ < 64) hi *= 2;
+  let lo = hi / 2;
+  for (let i = 0; i < 64; i++) {
+    const mid = (lo + hi) / 2;
+    if (envelope(mid) <= tolerance) hi = mid;
+    else lo = mid;
+  }
+  return hi;
+}
+
+/**
  * Пружина как easing-функция t∈[0,1] → value (форма OVERSHOOTING при ζ<1).
- * Шкала: t=1 соответствует времени оседания параметров (огибающая до 1%).
- * Эндпоинты точны: e(0)=0, e(1)=1; вход клампится, NaN→0 (дисциплина NE2/NE1).
+ * Шкала: t=1 — выведенный конечный горизонт параметров (normalizedSpringHorizon
+ * с settle-допуском пакета CONVERGENCE_THRESHOLD). Хвост запечатан C¹
+ * Hermite-коррекцией (#219): g = f + (1−f₁)(3t²−2t³) − s₁(t³−t²), поэтому
+ * g(0)=0, g′(0)=0, g(1)=1, g′(1)=0 — БЕЗ endpoint-прыжка старой шкалы
+ * (критическая пружина прыгала на ≈5.6% с наклоном ≈0.21), а |g−f| ≤
+ * |1−f₁| + (4/27)|s₁| ≤ допуска. Эндпоинты точны; вход клампится, NaN→0
+ * (дисциплина NE2/NE1). Валидация и горизонт — один раз в конструкторе;
+ * сэмпл — один springUnchecked без повторной валидации и аллокаций (#219).
  */
 export function springAsEasing(params: SpringParams): (t: number) => number {
   // Физическая граница — рано и один раз; бюджет frame-loop здесь не
   // применяется: easing живёт в НОРМАЛИЗОВАННОМ времени, медленная пружина
   // легальна (#218).
   validateSpringPhysics(params);
+  // Канонические частные (#226): точная масштабная инвариантность ζ и ω₀.
   const omega0 = Math.sqrt(params.stiffness / params.mass);
-  const zeta = params.damping / (2 * Math.sqrt(params.stiffness * params.mass));
-  // Медленный корень стабильной формой 1/(ζ+√(ζ²−1)) ≡ ζ−√(ζ²−1) (#226).
-  const slow = zeta >= 1 ? 1 / (zeta + Math.sqrt(Math.max(0, zeta * zeta - 1))) : zeta;
+  const zeta = params.damping / params.mass / 2 / omega0;
   // Конечная проекция на [0,1] существует только у затухающей системы:
   // ζ=0 не имеет конечного горизонта — граница ЭТОГО исполнителя (#218).
-  if (!(slow > 0)) throw new MotionParamError('LM167');
-  const settle = LN_100 / (omega0 * slow);
+  if (!(zeta > 0)) throw new MotionParamError('LM167');
+  const T = normalizedSpringHorizon(zeta, CONVERGENCE_THRESHOLD) / omega0;
+  const sample = springUnchecked(params, T);
+  const f1 = sample.value;
+  const s1 = T * sample.velocity;
+  // Horner-коэффициенты коррекции: g = f + t²·(c2 + t·c3).
+  const c2 = 3 * (1 - f1) + s1;
+  const c3 = -2 * (1 - f1) - s1;
 
   return (t: number): number => {
     const u = Number.isNaN(t) ? 0 : t;
     if (u <= 0) return 0;
     if (u >= 1) return 1;
-    const v = spring(params, u * settle).value;
-    return Number.isFinite(v) ? v : 1;
+    const g = springUnchecked(params, u * T).value + u * u * (c2 + u * c3);
+    return Number.isFinite(g) ? g : 1;
   };
 }
