@@ -20,3 +20,4 @@ playwright-report
 blob-report
 .playwright
 browser/.artifacts
+.claude/
