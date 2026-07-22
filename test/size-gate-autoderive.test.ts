@@ -264,7 +264,8 @@ describe('size-gate: auto-derive subpath entries from package.json exports', () 
     expect(IN_VIEW_GATE_BYTES).toBe(1839);
     // 1907 → 1908 (#218): +1 B gzip-словаря от строки LM167 в общем
     // errors-модуле; сам in-view не менялся, ратчет переставлен по факту.
-    expect(IN_VIEW_CONSUMER_GATE_BYTES).toBe(1908);
+    // 1908 → 1830 (охота-2b 2026-07-22): затяжка вниз по факту 1819.
+    expect(IN_VIEW_CONSUMER_GATE_BYTES).toBe(1830);
     expect(BESPOKE_SUBPATH_GATES['./in-view']).toBe(IN_VIEW_GATE_BYTES);
     expect(consumer?.gate).toBe(IN_VIEW_CONSUMER_GATE_BYTES);
     expect(consumer?.code).toContain('/in-view/index.js');

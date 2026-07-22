@@ -19,8 +19,7 @@ export function springLinear(input?: NanoSpring): [number, string] {
   const k = input?.stiffness ?? 170;
   const c = input?.damping ?? 26;
   const m = input?.mass ?? 1;
-  if (!(k > 0 && c > 0 && m > 0)
-    || !Number.isFinite(k) || !Number.isFinite(c) || !Number.isFinite(m)) {
+  if (!(k > 0 && c > 0 && m > 0) || ![k, c, m].every(Number.isFinite)) {
     throw new RangeError('spring parameters must be finite and positive');
   }
   const w = Math.sqrt(k / m);

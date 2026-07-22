@@ -12,7 +12,7 @@
 
 Поверх них — единый фасад `parse`/`interpolate`, диспетчеризующий по виду AST.
 
-Ключевой закон модуля — **FINITENESS GUARD**: ни одна интерполяция и ни одна сборка строки никогда не выпускает `NaN`/`Infinity` наружу — ни при переполнении диапазона, ни при hostile-`t`, ни при hand-constructed AST с неконечными полями.
+Ключевой закон модуля — **FINITENESS GUARD**: интерполяция и сборка строк не выпускают `NaN`/`Infinity` наружу ни при переполнении диапазона, ни при hostile-`t`, а все значения, прошедшие через `parse`/`parseUnit`/`parseColor`, зажаты стражем конечности ещё на разборе. Известное исключение — дискретный `var()`-свап в `interpolateUnit`: он сериализует стороны без клампа, и hand-constructed AST с неконечными `value`/`amount` может дать `"Infinitypx"` (детали — в разделе `interpolateUnit`).
 
 Характеристики размера/производительности — не в этой странице: снимок чисел даёт вывод `pnpm size` / `pnpm bench`, свод — в [docs/benchmark.md](../benchmark.md).
 
@@ -110,7 +110,7 @@ function interpolateUnit(
 - `relative` — разрешается как `±amount` от базы `0`, затем lerp;
 - `var()` (с любой стороны) — дискретный свап: сериализованный `from` при `t < 0.5`, `to` при `t ≥ 0.5`.
 
-FINITENESS GUARD: `range = to − from` может переполниться в `±Infinity` при `|from| + |to| > Number.MAX_VALUE` — результат зажимается до `±Number.MAX_VALUE`; hostile-`t` — по общей схеме. Не бросает.
+FINITENESS GUARD: `range = to − from` может переполниться в `±Infinity` при `|from| + |to| > Number.MAX_VALUE` — результат lerp'а зажимается до `±Number.MAX_VALUE`; hostile-`t` — по общей схеме. **Оговорка:** `var()`-свап сериализует стороны через внутренний `unitToString` без клампа `value`/`amount` — hand-constructed AST с неконечными числовыми полями пробивается в строку: `interpolateUnit({kind: 'unit', value: Infinity, unit: 'px'}, {kind: 'var', ...}, 0)` возвращает `"Infinitypx"`. Значения из `parseUnit` этому не подвержены (кламп на разборе). Не бросает.
 
 ### parseColor
 
@@ -132,7 +132,7 @@ interface ParsedColor {
 
 - **hex**: `#rgb`, `#rgba`, `#rrggbb`, `#rrggbbaa`;
 - **rgb**: `rgb(r, g, b)`, `rgba(r, g, b, a)` — legacy comma-синтаксис; `r,g,b` зажимаются в `[0, 255]`, `a` — в `[0, 1]`;
-- **hsl**: `hsl(h, s%, l%)`, `hsla(h, s%, l%, a)` — legacy comma-синтаксис; hue — `<number>` со знаком и без юнита (нормализуется в `[0, 360)`), `s`/`l` — проценты (суффикс `%` опционален); `format: 'hsl'` дополнительно сохраняет исходные `h`,`s`,`l` в поле `hsl` для HSL-интерполяции.
+- **hsl**: `hsl(h, s%, l%)`, `hsla(h, s%, l%, a)` — legacy comma-синтаксис; hue — `<number>` со знаком и без юнита (нормализуется в `[0, 360)`); `s`/`l` делятся на 100 **только при наличии суффикса `%`** — без суффикса значение трактуется как готовая доля и клампится в `[0, 1]`, поэтому `hsl(120, 50, 50)` даёт `s = 1`, `l = 1` (белый), а не 50%; `format: 'hsl'` дополнительно сохраняет исходные `h`,`s`,`l` в поле `hsl` для HSL-интерполяции.
 
 Modern space-синтаксис (`rgb(0 0 0 / 50%)`, angle-юниты `deg`/`turn` в hue) сознательно не поддерживается. `format` определяет формат вывода интерполяции: `'hex'`/`'rgb'` → `rgb()`/`rgba()`, `'hsl'` → `hsl()`/`hsla()`.
 
@@ -205,10 +205,10 @@ interface TransformState {
 
 Собирает CSS `transform`-строку из независимых каналов. Порядок функций фиксирован: **translate → scale → rotate → skew** (совпадает с Framer Motion / Motion One / GSAP). Правила эмиссии:
 
-- отсутствующие поля = identity (`0` для translate/rotate/skew, `1` для масштабов); identity-каналы в строку не попадают;
+- отсутствующие поля = identity (`0` для translate/rotate/skew, `1` для масштабов); identity-каналы, как правило, в строку не попадают (исключение — `scaleX`, см. ниже);
 - полностью identity-состояние → `"none"` (браузер не тратит ресурсы на layout/composite);
 - translate: `translateX(...)` / `translateY(...)` при одной ненулевой оси, `translate(x, y)` при обеих;
-- масштаб: заданный `scale` перекрывает `scaleX`/`scaleY`; равные оси схлопываются в один `scale(...)`;
+- масштаб: заданный `scale` перекрывает `scaleX`/`scaleY`; равные оси схлопываются в один `scale(...)`; при **разных** осях `scaleX(...)` эмитится безусловно — даже identity: `{scaleX: 1, scaleY: 2}` даёт `"scaleX(1) scaleY(2)"` (а `scaleY(...)` опускается только при `scaleY === 1`);
 - skew: `skew(x, y)` при обеих ненулевых осях, иначе `skewX(...)` / `skewY(...)`.
 
 FINITENESS GUARD: каждое значение зажимается стражем конечности до включения в строку. Не бросает.
@@ -233,7 +233,7 @@ function interpolate(from: ValueAST, to: ValueAST, t: number): string | number;
 - оба не-цвета (`unit`/`relative`/`var`) → `interpolateUnit`;
 - разные виды (цвет против юнита) → дискретный свап: сериализованный `from` при `t < 0.5`, `to` при `t ≥ 0.5`; цвет при свапе сериализуется как `rgb(...)`.
 
-FINITENESS GUARD: все числовые поля AST при сериализации свапа прогоняются через страж конечности — hand-constructed AST с `NaN`/`Infinity` не даёт `'NaN'`/`'Infinity'` в выводе. Не бросает.
+FINITENESS GUARD: при свапе **разных видов** все числовые поля AST (`value`, `amount`, `r`/`g`/`b`) прогоняются через страж конечности во внутреннем `valueAstToString` — здесь hand-constructed AST с `NaN`/`Infinity` в вывод не пробивается. Но ветка «оба не-цвета» делегируется в `interpolateUnit` как есть — её `var()`-свап наследует утечку неконечных полей hand-constructed AST (см. оговорку в `interpolateUnit`). Не бросает.
 
 ### Type-only экспорты
 
@@ -243,7 +243,7 @@ FINITENESS GUARD: все числовые поля AST при сериализа
 
 - **SSR-safe / zero-DOM.** `window`/`document` не используются ни при импорте, ни при вызове — модуль безопасен на сервере и в воркерах.
 - **Zero runtime deps.** Внешних npm-зависимостей нет.
-- **Финитность (FINITENESS GUARD).** Интерполяторы и сборщики строк никогда не возвращают `NaN`/`Infinity` — ни числом, ни подстрокой: переполнение диапазона зажимается до `±Number.MAX_VALUE`, hostile-`t` нормализуется (`NaN → 0`, `+∞ → 1`, `−∞ → 0`), цветовые каналы клампятся в свои диапазоны.
+- **Финитность (FINITENESS GUARD).** Переполнение диапазона lerp'а зажимается до `±Number.MAX_VALUE`, hostile-`t` нормализуется (`NaN → 0`, `+∞ → 1`, `−∞ → 0`), цветовые каналы клампятся в свои диапазоны, `buildTransform` зажимает каждое значение, числовые поля клампятся уже на разборе — для AST, полученных из `parse`/`parseUnit`/`parseColor`, `NaN`/`Infinity` в вывод не попадают. Гарантия не распространяется на hand-constructed AST в `var()`-свапе `interpolateUnit` (и в делегирующей в него ветке `interpolate`): неконечные `value`/`amount` сериализуются без клампа (`"Infinitypx"`).
 - **Детерминизм.** Чистые функции без wall-clock и глобального состояния: идентичный вход → идентичный выход.
 - **ReDoS-защита.** `var()`-регекс линейный; потолок длины входа юнитного контура — 4096 символов (превышение — ранний `RangeError`).
 - **Ошибки.** Бросают только `parse` и `parseUnit` — обычный `RangeError` с префиксом `@labpics/motion value:`, без LM-кодов (`MotionParamError` этим субпутём не используется). `parseColor` и `mixColor` — no-throw (возврат `null` / строковый фоллбек).

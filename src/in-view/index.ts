@@ -80,7 +80,6 @@ type Failure = readonly [unknown];
 // Тот же доказанный верхний предел, что у других публичных DOM target-входов
 // пакета. Меняется только общим решением о target-budget, не локально в adapter.
 const MAX_IN_VIEW_TARGETS = 100_000;
-const NOOP_STOP: InViewStop = () => undefined;
 
 function containerError(): never {
   throw new MotionParamError('LM146');
@@ -91,7 +90,7 @@ function targetError(): never {
 }
 
 function optionsError(): never {
-  throw new MotionParamError('LM156');
+  throw callbackError(); // тот же LM156, что у невалидного callback
 }
 
 function hostError(): MotionParamError {
@@ -122,10 +121,23 @@ function hasNativeNodeBrand(value: object, nodeType: 1 | 9): boolean | undefined
   }
 }
 
-function isDomInstance(value: unknown, name: 'Element' | 'Document'): boolean {
-  if ((typeof value !== 'object' && typeof value !== 'function') || value === null) return false;
-  const nativeBrand = hasNativeNodeBrand(value, name === 'Element' ? 1 : 9);
-  if (nativeBrand !== undefined) return nativeBrand;
+/**
+ * length не safe-integer в [0, MAX_IN_VIEW_TARGETS] (не-число — тоже bad:
+ * Number.isSafeInteger не коэрсит).
+ */
+function badLength(length: unknown): boolean {
+  return !Number.isSafeInteger(length as number) ||
+    (length as number) < 0 ||
+    (length as number) > MAX_IN_VIEW_TARGETS;
+}
+
+/** Значение способно нести свойства (object/function, не null). */
+function isObjectLike(value: unknown): value is object {
+  return (typeof value === 'object' || typeof value === 'function') && value !== null;
+}
+
+/** instanceof по ИМЕНИ глобального конструктора; любой сбой хоста → false. */
+function isInstanceOfGlobal(name: string, value: unknown): boolean {
   try {
     const Constructor = Reflect.get(globalThis, name);
     return typeof Constructor === 'function' && Reflect.apply(
@@ -138,17 +150,22 @@ function isDomInstance(value: unknown, name: 'Element' | 'Document'): boolean {
   }
 }
 
+function isDomInstance(value: unknown, name: 'Element' | 'Document'): boolean {
+  if (!isObjectLike(value)) return false;
+  const nativeBrand = hasNativeNodeBrand(value, name === 'Element' ? 1 : 9);
+  return nativeBrand ?? isInstanceOfGlobal(name, value);
+}
+
 function isElement(value: unknown): value is Element {
   return isDomInstance(value, 'Element');
 }
 
 function resolveSelector(selector: string): unknown {
   try {
-    const document = Reflect.get(globalThis, 'document') as object | undefined;
-    if (document === undefined || document === null) throw hostError();
-    const query = Reflect.get(document, 'querySelectorAll');
-    if (typeof query !== 'function') throw hostError();
-    return Reflect.apply(query, document, [selector]);
+    // Любой сбой хоста (нет document, document не объект, query не функция)
+    // сам бросает из Reflect и падает в catch → hostError.
+    const document = Reflect.get(globalThis, 'document') as object;
+    return Reflect.apply(Reflect.get(document, 'querySelectorAll'), document, [selector]);
   } catch {
     throw hostError();
   }
@@ -158,9 +175,7 @@ function resolveSelector(selector: string): unknown {
 function snapshotTargets(input: unknown): Element[] {
   const source = typeof input === 'string' ? resolveSelector(input) : input;
   if (isElement(source)) return [source];
-  if ((typeof source !== 'object' && typeof source !== 'function') || source === null) {
-    containerError();
-  }
+  if (!isObjectLike(source)) containerError();
 
   let length: unknown;
   try {
@@ -175,16 +190,11 @@ function snapshotTargets(input: unknown): Element[] {
       targetError();
     }
   }
-  if (
-    typeof length !== 'number' ||
-    !Number.isSafeInteger(length) ||
-    length < 0 ||
-    length > MAX_IN_VIEW_TARGETS
-  ) containerError();
+  if (badLength(length)) containerError();
 
   const snapshot: Element[] = [];
   const seen = new Set<Element>();
-  for (let i = 0; i < length; i++) {
+  for (let i = 0; i < (length as number); i++) {
     let target: unknown;
     try {
       target = Reflect.get(source, i);
@@ -228,15 +238,14 @@ function snapshotOptions(
     amount !== 'some' &&
     amount !== 'all' &&
     (
-      typeof amount !== 'number' ||
-      !Number.isFinite(amount) ||
-      amount < 0 ||
-      amount > 1
+      !Number.isFinite(amount as number) ||
+      (amount as number) < 0 ||
+      (amount as number) > 1
     )
   ) optionsError();
   return [
     {
-      root: root === undefined ? null : root as Element | Document | null,
+      root: (root ?? null) as Element | Document | null,
       rootMargin: margin ?? '0px',
       threshold: amount === 'all' ? 1 : typeof amount === 'number' ? amount : 0,
     },
@@ -246,19 +255,15 @@ function snapshotOptions(
 
 function isDomSyntaxError(error: unknown): boolean {
   try {
-    const Constructor = Reflect.get(globalThis, 'DOMException');
-    return typeof Constructor === 'function' && Reflect.apply(
-      Function.prototype[Symbol.hasInstance],
-      Constructor,
-      [error],
-    ) && Reflect.get(error as object, 'name') === 'SyntaxError';
+    return isInstanceOfGlobal('DOMException', error) &&
+      Reflect.get(error as object, 'name') === 'SyntaxError';
   } catch {
     return false;
   }
 }
 
 function captureLease(host: unknown): ObserverLease | undefined {
-  if ((typeof host !== 'object' && typeof host !== 'function') || host === null) return undefined;
+  if (!isObjectLike(host)) return undefined;
   try {
     const observe = Reflect.get(host, 'observe');
     const unobserve = Reflect.get(host, 'unobserve');
@@ -272,6 +277,11 @@ function captureLease(host: unknown): ObserverLease | undefined {
   } catch {
     return undefined;
   }
+}
+
+/** Пробросить первую сохранённую batch-ошибку, если она есть. */
+function throwFailure(failure: Failure | undefined): void {
+  if (failure !== undefined) throw failure[0];
 }
 
 /** Terminal transition публикуется до host/user cleanup: reentry видит no-op. */
@@ -323,15 +333,11 @@ function releaseOneShot(
   owner.done.add(target);
   owner.observed.delete(target);
   const lease = owner.lease;
-  if (lease === undefined) {
-    closeOwner(owner);
-    return current ?? [hostError()];
-  }
+  if (lease === undefined) return recordHostFailure(owner, current);
   try {
     Reflect.apply(lease.unobserve, lease.host, [target]);
   } catch {
-    closeOwner(owner);
-    return current ?? [hostError()];
+    return recordHostFailure(owner, current);
   }
   if (owner.observed.size === 0) {
     const closeFailure = closeOwner(owner);
@@ -357,15 +363,10 @@ function deliverEntries(
   } catch {
     failHost(owner);
   }
-  if (
-    typeof length !== 'number' ||
-    !Number.isSafeInteger(length) ||
-    length < 0 ||
-    length > MAX_IN_VIEW_TARGETS
-  ) failHost(owner);
+  if (badLength(length)) failHost(owner);
 
   let failure: Failure | undefined;
-  for (let i = 0; i < length && owner.phase === 1; i++) {
+  for (let i = 0; i < (length as number) && owner.phase === 1; i++) {
     let entry: IntersectionObserverEntry;
     let target: Element;
     try {
@@ -391,16 +392,15 @@ function deliverEntries(
     if (!owner.targets.has(target) || owner.done.has(target)) continue;
     if (
       typeof isIntersecting !== 'boolean' ||
-      typeof ratio !== 'number' ||
-      !Number.isFinite(ratio) ||
-      ratio < 0 ||
-      ratio > 1
+      !Number.isFinite(ratio as number) ||
+      (ratio as number) < 0 ||
+      (ratio as number) > 1
     ) {
       failure = recordHostFailure(owner, failure);
       break;
     }
 
-    const inside = isIntersecting && (threshold === 0 || ratio >= threshold);
+    const inside = isIntersecting && (threshold === 0 || (ratio as number) >= threshold);
     const activeLeave = owner.leaves.get(target);
     if (!inside) {
       if (activeLeave !== undefined) {
@@ -447,7 +447,7 @@ function deliverEntries(
       failure = releaseOneShot(owner, target, failure);
     }
   }
-  if (failure !== undefined) throw failure[0];
+  throwFailure(failure);
 }
 
 function callbackFor(
@@ -489,15 +489,7 @@ export function inView(
   if (typeof onEnter !== 'function') throw callbackError();
   const [init, hasExplicitMargin] = snapshotOptions(options);
   const targets = snapshotTargets(target);
-  if (targets.length === 0) return NOOP_STOP;
-
-  let Constructor: unknown;
-  try {
-    Constructor = Reflect.get(globalThis, 'IntersectionObserver');
-  } catch {
-    throw hostError();
-  }
-  if (typeof Constructor !== 'function') throw hostError();
+  if (targets.length === 0) return () => undefined;
 
   const owner: Owner = {
     phase: 0,
@@ -509,15 +501,14 @@ export function inView(
     done: new Set(),
     leaves: new Map(),
   };
-  const stop: InViewStop = () => {
-    const failure = closeOwner(owner);
-    if (failure !== undefined) throw failure[0];
-  };
-
   let constructing = true;
   try {
+    // Отсутствующий/не-функция/враждебный IntersectionObserver сам бросает из
+    // Reflect и попадает в catch → hostError (не DOM SyntaxError-ветка).
     const host = Reflect.construct(
-      Constructor,
+      Reflect.get(globalThis, 'IntersectionObserver') as new (
+        ...args: readonly unknown[]
+      ) => unknown,
       [callbackFor(owner, onEnter, init.threshold), init],
     );
     constructing = false;
@@ -534,9 +525,9 @@ export function inView(
     // rootMargin grammar belongs to the native parser. Its DOM SyntaxError for
     // an explicitly supplied margin is caller input, not a host failure.
     if (constructing && hasExplicitMargin && isDomSyntaxError(error)) {
-      throw new MotionParamError('LM156');
+      throw callbackError(); // LM156: невалидный margin — ошибка входа, не хоста
     }
     throw hostError();
   }
-  return stop;
+  return () => throwFailure(closeOwner(owner));
 }

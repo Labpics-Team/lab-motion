@@ -1,12 +1,12 @@
 # ./spring — точная пружина: параметры, конструкторы, easing
 
-> Роль: справка — публичный API экспорт-субпутя `./spring`: эргономичные конструкторы `SpringParams` (`fromBounce`, `fromVisualDuration`), канонические пресеты и пружина как C¹-конечная easing-функция.
+> Роль: справка — публичный API экспорт-субпутя `./spring`: эргономичные конструкторы `SpringParams` (`fromBounce`, `fromVisualDuration`, `fromPeak`, `fromOscillation`), канонические пресеты и пружина как C¹-конечная easing-функция.
 
 ## Назначение
 
 Субпуть `./spring` — слой эргономики поверх физического ядра `{mass, stiffness, damping}` (чистый солвер `spring()` из корневого субпутя). Он решает две задачи:
 
-1. **Интуитивные параметризации** — построить `SpringParams` из перцептивных координат: `duration + bounce` (канон SwiftUI `Spring(duration:bounce:)`) и `visualDuration + bounce` (класс Motion), плюс замороженные пресеты канона react-spring.
+1. **Интуитивные параметризации** — построить `SpringParams` из перцептивных координат: `duration + bounce` (канон SwiftUI `Spring(duration:bounce:)`) и `visualDuration + bounce` (класс Motion), из наблюдаемых координат: `overshoot + peakTime` и `period + halfLife` (observable-конструкторы, #230), плюс замороженные пресеты канона react-spring.
 2. **Пружина как easing** — спроецировать пружину на нормализованное время `t ∈ [0, 1] → value` для потребителей формы `(t: number) => number` (easing-слоты keyframes/tween).
 
 Модуль — чистая математика: zero-DOM, zero-deps, детерминизм, ранний `MotionParamError`. Ключевой закон слоя — **точность конструкторов (#218)**: `fromBounce`/`fromVisualDuration` возвращают точное математическое преобразование запрошенных координат, без скрытой коэрсии под бюджет какого-либо исполнителя. Представимость у конкретного исполнителя — граница самого исполнителя (см. «validateSpringPhysics vs validateSpringParams»).
@@ -19,10 +19,14 @@
 import {
   fromBounce,
   fromVisualDuration,
+  fromPeak,
+  fromOscillation,
   springPresets,
   springAsEasing,
   type FromBounceOptions,
   type FromVisualDurationOptions,
+  type FromPeakOptions,
+  type FromOscillationOptions,
 } from '@labpics/motion/spring';
 ```
 
@@ -41,7 +45,7 @@ import {
 
 ## API
 
-Все времена в этом модуле — **секунды** (не миллисекунды): `duration`, `visualDuration`, аргумент `t` солвера `spring()`. `SpringResult.velocity` — нормализованные единицы позиции в секунду.
+Все времена в этом модуле — **секунды** (не миллисекунды): `duration`, `visualDuration`, `peakTime`, `period`, `halfLife`, аргумент `t` солвера `spring()`. `SpringResult.velocity` — нормализованные единицы позиции в секунду.
 
 ### fromBounce
 
@@ -97,6 +101,65 @@ interface FromVisualDurationOptions {
 Именованный контракт API: `Tv` — время, `bounce` — характер; ни одна из запрошенных координат не подменяется под бюджет исполнителя. Инвариант «первое касание совпадает с аналитическим решением для возвращённых параметров» держится всегда. `mass` — как у `fromBounce` (дефолт `1`).
 
 Бросает: `LM093` (`visualDuration`), `LM092` (`bounce`); транзитом — `LM088`/`LM089`/`LM090`.
+
+### fromPeak
+
+```ts
+function fromPeak(options: FromPeakOptions): SpringParams;
+
+interface FromPeakOptions {
+  readonly overshoot: number;         // ∈ (0, 1]
+  readonly peakTime: number;          // секунды, > 0
+  readonly mass?: number | undefined; // по умолчанию 1
+}
+```
+
+Пружина из **наблюдаемого** первого перелёта и времени пика (observable-конструктор, #230). Точное обратное преобразование underdamped-системы из покоя, не пресет:
+
+```
+L  = −ln(overshoot)
+ζ  = L / √(π² + L²)
+ω₀ = √(π² + L²) / peakTime
+stiffness = mass · (π² + L²) / peakTime²
+damping   = 2 · mass · L / peakTime
+```
+
+— один `log`, ноль итераций.
+
+- `overshoot ∈ (0, 1]` — доля первого перелёта относительно амплитуды. `overshoot = 1` честно означает `ζ = 0` ⇒ `damping = 0` (незатухающая, пик ровно `2 − from`).
+- `overshoot = 0` **не** имеет underdamped-прообраза (критический предел) и отклоняется `LM171` без epsilon-подмены — «без перелёта» описывается `fromBounce({bounce: 0})` или `fromVisualDuration`.
+- `mass` — как у `fromBounce` (невалидная масса тихо заменяется на `1`).
+- Выход проверяется физической границей (`validateSpringPhysics`), как у остальных конструкторов.
+
+Бросает: `LM171` (`overshoot` не конечное или вне `(0, 1]`), `LM093` (`peakTime` не конечное или `≤ 0`); транзитом из проверки результата — `LM088`/`LM089`/`LM090`.
+
+### fromOscillation
+
+```ts
+function fromOscillation(options: FromOscillationOptions): SpringParams;
+
+interface FromOscillationOptions {
+  readonly period: number;            // секунды, > 0
+  readonly halfLife: number;          // секунды, > 0
+  readonly mass?: number | undefined; // по умолчанию 1
+}
+```
+
+Пружина из **наблюдаемого** периода затухающих колебаний и half-life огибающей (амплитуда падает вдвое) — observable-конструктор (#230). Комплексные полюса `p = −α ± iβ`:
+
+```
+α = ln 2 / halfLife
+β = 2π / period
+stiffness = mass · (α² + β²)
+damping   = 2 · mass · α
+```
+
+- Результат **всегда** underdamped (`β > 0` ⇒ `ζ < 1`), точно.
+- «`period = ∞`» не является скрытой критической ветвью — конечность входа обязательна.
+- `mass` — как у `fromBounce` (дефолт `1`).
+- Выход проверяется физической границей (`validateSpringPhysics`).
+
+Бросает: `LM093` (`period` или `halfLife` не конечное или `≤ 0`); транзитом из проверки результата — `LM088`/`LM089`/`LM090`.
 
 ### springPresets
 
@@ -154,13 +217,13 @@ g(0) = 0,  g′(0) = 0,  g(1) = 1,  g′(1) = 0
 | Граница | Физический домен: конечные `mass > 0`, `stiffness > 0`, `damping ≥ 0` — и ничего больше | Физика **плюс** бюджет автономного frame-loop-исполнителя |
 | Легальны | Сколь угодно медленные и незатухающие (`ζ = 0`) системы | Только пружины, чья аналитическая верхняя граница времени оседания помещается в бюджет кадра-капа (`MAX_FRAMES · FIXED_DT_S`, ≈33.3 с) |
 | Бросает | `LM088` (mass), `LM089` (stiffness), `LM090` (damping) | То же + `LM091` (время оседания превышает бюджет) |
-| Кто применяет | Чистый `spring()`; конструкторы `fromBounce`/`fromVisualDuration` (проверка представимости результата); `springAsEasing` | Автономные frame-loop-исполнители (`drive`, `MotionValue`, фасад) — на своей стороне, до Promise и до первого кадра |
+| Кто применяет | Чистый `spring()`; конструкторы `fromBounce`/`fromVisualDuration`/`fromPeak`/`fromOscillation` (проверка представимости результата); `springAsEasing` | Автономные frame-loop-исполнители (`drive`, `MotionValue`, фасад) — на своей стороне, до Promise и до первого кадра |
 
 Следствие: `fromBounce({duration, bounce: 1})` — валидный выход этого субпутя (`damping = 0`), пригодный для чистого сэмплирования и compositor-плана, но `validateSpringParams` у живого исполнителя честно отвергнет его с `LM091`, а `springAsEasing` — с `LM167`.
 
 ### Type-only экспорты
 
-`FromBounceOptions`, `FromVisualDurationOptions`. Тип `SpringParams` в сигнатурах импортируйте из корня `@labpics/motion`.
+`FromBounceOptions`, `FromVisualDurationOptions`, `FromPeakOptions`, `FromOscillationOptions`. Тип `SpringParams` в сигнатурах импортируйте из корня `@labpics/motion`.
 
 ## Контракты
 
@@ -170,7 +233,7 @@ g(0) = 0,  g′(0) = 0,  g(1) = 1,  g′(1) = 0
 - **Точность (#218).** `fromBounce`/`fromVisualDuration` — точные математические преобразования без коэрсии под чей-либо бюджет; границы представимости проверяются честной ошибкой, не подменой параметров.
 - **Единицы.** Все длительности — секунды; `bounce` и `t` easing-функции безразмерны.
 - **Reduced-motion.** Этот слой — чистая математика и `prefers-reduced-motion` не читает; уважение reduced-motion — контракт исполнителей (`drive` и выше).
-- **Ошибки.** Все броски — `MotionParamError` с полем `code` (`LM088`–`LM093`, `LM167`); полный каталог с лечением — [docs/errors.md](../errors.md).
+- **Ошибки.** Все броски — `MotionParamError` с полем `code` (`LM088`–`LM093`, `LM167`, `LM171`); полный каталог с лечением — [docs/errors.md](../errors.md).
 
 ## Примеры
 

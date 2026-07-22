@@ -156,7 +156,7 @@ function exitKeyframes(): Record<string, string | number>[];
 
 ## Контракты
 
-- **SSR-safe / zero-DOM.** Импорт не трогает DOM/`window`. Среда без `MutationObserver` (и без инжектированного `MutationObserverCtor`) получает инертный контроллер, не исключение; `matchMedia`/`getComputedStyle` опциональны, их отсутствие или бросок — «нет предпочтения» / «position неизвестен».
+- **SSR-safe / zero-DOM.** Импорт не трогает DOM/`window`. Среда без `MutationObserver` (и без инжектированного `MutationObserverCtor`) получает инертный контроллер, не исключение; `matchMedia`/`getComputedStyle` опциональны: отсутствие `matchMedia` или бросок из него — «нет предпочтения», отсутствие `getComputedStyle` — «position неизвестен» (`''`). Бросок из `getComputedStyle` (или инжектированного `getComputedPosition`) не глотается: общий catch `autoAnimate` закрывает сессию (`closeOwner`) и пробрасывает ошибку наружу.
 - **Reduced-motion — смена характера, не hard-off.** Под `(prefers-reduced-motion: reduce)` (детект при вызове `autoAnimate`, `respectReducedMotion: false` отключает): move снапает — позиция меняется мгновенно, вестибулярное движение убрано; enter/exit остаются opacity-фейдом — обратная связь сохраняется.
 - **Детерминизм чистого ядра.** `planAuto`, `moveKeyframes`, `enterKeyframes`, `exitKeyframes` — чистые функции: идентичный вход → идентичный план и кейфреймы. Ни wall-clock, ни `Math.random`.
 - **Финитность / CSS-safe.** Числа transform'а в `moveKeyframes` проходят стражи `computeFlip` — всегда конечны; `-0` схлопнут; `NaN`-разницы rect'ов не считаются движением — план строится без исключений.

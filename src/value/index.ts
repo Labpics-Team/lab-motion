@@ -35,8 +35,8 @@ export { parse } from './parse.js';
 
 // ── Unified parse / interpolate ──────────────────────────────────────────────
 
-import { type ParsedUnit, type ParsedRelative, type ParsedVar, interpolateUnit, clampFinite } from './units.js';
-import { interpolateColor } from './color.js';
+import { type ParsedUnit, type ParsedRelative, type ParsedVar, interpolateUnit, clampFinite, clampProgress, unitToString } from './units.js';
+import { clamp255, interpolateColor } from './color.js';
 import type { ValueAST } from './parse.js';
 
 /**
@@ -70,15 +70,7 @@ export function interpolate(from: ValueAST, to: ValueAST, t: number): string | n
   }
 
   // Разные типы → дискретный свап
-  const progress = Number.isFinite(t)
-    ? t <= 0 ? 0 : t >= 1 ? 1 : t
-    : Number.isNaN(t) ? 0
-    : t > 0 ? 1 : 0;
-
-  if (progress < 0.5) {
-    return valueAstToString(from);
-  }
-  return valueAstToString(to);
+  return valueAstToString(clampProgress(t) < 0.5 ? from : to);
 }
 
 /** Сериализует ValueAST обратно в строку (для дискретного свапа).
@@ -93,10 +85,7 @@ function valueAstToString(v: ValueAST): string | number {
     return v.unit ? `${safe}${v.unit}` : safe;
   }
   if (v.kind === 'relative') return `${v.op}=${clampFinite(v.amount)}${v.unit}`;
-  if (v.kind === 'var') {
-    return v.fallback !== undefined ? `var(${v.name}, ${v.fallback})` : `var(${v.name})`;
-  }
-  // color — сериализуем как rgb; каналы зажимаем в [0,255] через clampFinite
-  const clampCh = (x: number) => Math.max(0, Math.min(255, clampFinite(x)));
-  return `rgb(${Math.round(clampCh(v.r))}, ${Math.round(clampCh(v.g))}, ${Math.round(clampCh(v.b))})`;
+  if (v.kind === 'var') return unitToString(v); // var() без числовых полей
+  // color — сериализуем как rgb; каналы зажимаются clamp255 (внутри clampFinite)
+  return `rgb(${Math.round(clamp255(v.r))}, ${Math.round(clamp255(v.g))}, ${Math.round(clamp255(v.b))})`;
 }

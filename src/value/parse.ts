@@ -12,20 +12,23 @@ import {
 /** AST числа/юнита, relative, var() или цвета. */
 export type ValueAST = ParsedUnit | ParsedRelative | ParsedVar | ParsedColor;
 
+/** Строка выглядит цветом (hex/rgb()/hsl()); `a?`-хвост покрыт префиксом. */
+function looksLikeColor(source: string): boolean {
+  return source.startsWith('#') || /^(?:rgb|hsl)/i.test(source);
+}
+
 /** Внутренняя граница: invalid возвращает undefined и не строит RangeError. */
 export function tryParseValue(value: string | number): ValueAST | undefined {
   if (typeof value === 'number') return tryParseUnit(value);
   const source = value.trim();
-  return source.startsWith('#') || /^rgba?/i.test(source) || /^hsla?/i.test(source)
-    ? parseColor(source) ?? undefined
-    : tryParseUnit(source);
+  return looksLikeColor(source) ? parseColor(source) ?? undefined : tryParseUnit(source);
 }
 
 /** Публичный parser сохраняет прежние типы ошибок и сообщения дословно. */
 export function parse(value: string | number): ValueAST {
   if (typeof value === 'number') return parseUnit(value);
   const source = value.trim();
-  if (source.startsWith('#') || /^rgba?/i.test(source) || /^hsla?/i.test(source)) {
+  if (looksLikeColor(source)) {
     const color = parseColor(source);
     if (color) return color;
     throw new RangeError(`@labpics/motion value: не удалось распарсить цвет "${value}"`);

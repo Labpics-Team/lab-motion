@@ -65,7 +65,6 @@ export type NanoTarget = Element | string | Iterable<Element> | ArrayLike<Elemen
 
 export type NanoControls = Animation[] & { finished: Promise<Animation[]> };
 
-const TRANSFORM = { scale: 1, rotate: 1 };
 
 /**
  * Анимирует одну или несколько DOM-целей на native WAAPI.
@@ -85,7 +84,7 @@ export function animate(
   if (props.scale != null) frame.scale = props.scale;
   if (props.rotate != null) frame.rotate = `${props.rotate}deg`;
   for (const property of Object.keys(props)) {
-    if (!(property in TRANSFORM)) frame[property] = props[property];
+    if (property !== 'scale' && property !== 'rotate') frame[property] = props[property];
   }
 
   const [duration, easing] = options.duration != null
@@ -94,15 +93,12 @@ export function animate(
   const reduced = options.reducedMotion
     ?? (typeof matchMedia !== 'undefined'
       && matchMedia('(prefers-reduced-motion: reduce)').matches);
-  const animations = Array.from(source, (element, index) => {
-    const animation = element.animate(frame, {
-      duration: reduced ? 0 : duration,
-      easing: reduced ? 'linear' : easing,
-      delay: reduced ? 0 : (options.delay ?? 0) + (options.stagger ?? 0) * index,
-      fill: 'both',
-    });
-    return animation;
-  }) as NanoControls;
+  const animations = Array.from(source, (element, index) => element.animate(frame, {
+    duration: reduced ? 0 : duration,
+    easing: reduced ? 'linear' : easing,
+    delay: reduced ? 0 : (options.delay ?? 0) + (options.stagger ?? 0) * index,
+    fill: 'both',
+  })) as NanoControls;
   animations.finished = Promise.all(animations.map((animation) => new Promise<Animation>((resolve, reject) => {
     animation.finished.catch(reject);
     animation.addEventListener('finish', () => {
