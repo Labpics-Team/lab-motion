@@ -75,7 +75,12 @@ export const SUBPATH_GATE_BYTES = 4608;
 // дедупа в графе фасада не существует (sample-keyframes несёт repeat/reverse-
 // семантики ./keyframes и добавил бы вес). Факт 12 694 + ~0.5% люфт — та же
 // дисциплина, что 11 938 → 12 000. Подъём — решение владельца по делегации.
-export const FULL_ANIMATE_GATE_BYTES = 12_760;
+// 12 760 → 12 700 (2026-07-22, порт шейв-пакетов worktree-охоты): parseProps
+// группирует по GroupKey без второго прохода, transform-state и commitSnap
+// инлайн, дискретная ветка interpolateParsed делегирует сериализацию ./value.
+// Затяжка ВНИЗ по факту 12 632 + ~0.5% люфт — поведение бит-в-бит (вся
+// матрица зелёная), ослаблением не является.
+export const FULL_ANIMATE_GATE_BYTES = 12_700;
 
 // Consumer-rebundle ядра после стабильных кодов ошибок и изоляции listener-
 // сбоев. Физический shipped-граф при этом уменьшился и по-прежнему ограничен
@@ -110,7 +115,9 @@ export const COMPOSITOR_CAPABILITY_GATE_BYTES = 6600;
 // 12 494 → 13 340 (2026-07-22, #205): рост тем же track-срезом фасада (см.
 // FULL_ANIMATE_GATE_BYTES); факт 13 275 + ~0.5% люфт, дублирования между
 // capability не добавлено (compositor-граф не тронут).
-export const ANIMATE_COMPOSITOR_MIXED_GATE_BYTES = 13_340;
+// 13 340 → 13 290 (2026-07-22, порт шейв-пакетов): затяжка вниз по факту
+// 13 226 + ~0.5% люфт — тот же срез фасада, compositor-граф не тронут.
+export const ANIMATE_COMPOSITOR_MIXED_GATE_BYTES = 13_290;
 
 // Точечные (bespoke) пороги субпутей — жёстче общего SUBPATH_GATE_BYTES там, где
 // это осмысленно. ./utils — семь чистых скалярных примитивов + сегментный движок;
@@ -346,9 +353,10 @@ export const IMPORT_COST_SCENARIOS = [
   {
     // N-keyframe consumer ratchet (#205): типовой keyframe-вызов дизайнера.
     // Первый принятый факт 2026-07-22: фиксируется ОТ ФАКТА ниже.
+    // 12 760 → 12 730 (2026-07-22, порт шейв-пакетов): факт 12 663 + ~0.5%.
     name: 'animate-keyframes (N-track)',
     code: `import { animate } from '%DIST%/../animate/index.js'; console.log(typeof animate('.dot', { x: [0, 120, -40, 0], opacity: [0, 1, 1, 0] }, { duration: 800, times: [0, 0.25, 0.75, 1] }).pause);`,
-    gate: 12_760,
+    gate: 12_730,
   },
   {
     // ПРАВДА потребительской цены поведения + СТРАЖ переиспользования: одна

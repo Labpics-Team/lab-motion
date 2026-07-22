@@ -250,7 +250,9 @@ function makeTransformBound(el: WaapiTarget): { bound: BoundGroup; record: Group
   const bound = bindGroup(
     el,
     'transform',
-    parseProps({ x: [0, 240], rotate: [0, 90] }),
+    // Пин внутренней (не-контрактной) формы parseProps: спеки теперь
+    // приходят сгруппированными по GroupKey (Map), группа одна — 'transform'.
+    parseProps({ x: [0, 240], rotate: [0, 90] }).get('transform')!,
     record,
   );
   expect(bound._transform).toBeDefined();

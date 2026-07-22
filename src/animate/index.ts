@@ -197,8 +197,8 @@ function releaseTransition(rec: GroupRecord, owner: GroupOwner | undefined): voi
 
 function defaultNow(): number {
   const perf = (globalThis as { performance?: { now?: () => number } }).performance;
-  if (perf !== undefined && typeof perf.now === 'function') return perf.now();
-  return Date.now();
+  // Число чтений perf.now не меняется: typeof-проверка + вызов, как и раньше.
+  return typeof perf?.now === 'function' ? perf.now() : Date.now();
 }
 
 function defaultSetTimer(cb: () => void, ms: number): () => void {
@@ -329,11 +329,12 @@ function resolveTracks(
 function isElementLike(t: unknown): t is AnimatableElement {
   const style = (t as { style?: unknown } | null)?.style as
     | { setProperty?: unknown; getPropertyValue?: unknown }
+    | null
     | undefined;
+  // Optional chaining покрывает null/undefined style тем же одиночным чтением
+  // каждого метода, что и раньше (hostile getters не получают лишних чтений).
   return (
-    style !== undefined &&
-    style !== null &&
-    typeof style.setProperty === 'function' &&
+    typeof style?.setProperty === 'function' &&
     typeof style.getPropertyValue === 'function'
   );
 }
@@ -344,7 +345,9 @@ function resolveTargets(target: unknown): AnimatableElement[] {
     const doc = (globalThis as { document?: { querySelectorAll?: (s: string) => unknown } })
       .document;
     const query = doc?.querySelectorAll;
-    if (doc === undefined || typeof query !== 'function') {
+    // Отсутствующий document даёт query === undefined — одна typeof-проверка
+    // покрывает обе причины LM149 (нет document / нет querySelectorAll).
+    if (typeof query !== 'function') {
       throw new MotionParamError('LM149');
     }
     source = query.call(doc, target);
@@ -354,19 +357,6 @@ function resolveTargets(target: unknown): AnimatableElement[] {
   const snapshot = collectBoundedArrayLike(source);
   if (!snapshot.every(isElementLike)) throw new MotionParamError('LM147');
   return snapshot as AnimatableElement[];
-}
-
-// ─── Группировка спецификаций ────────────────────────────────────────────────
-
-function groupSpecs(specs: readonly ChannelSpec[]): Map<GroupKey, ChannelSpec[]> {
-  const groups = new Map<GroupKey, ChannelSpec[]>();
-  for (const spec of specs) {
-    const list = groups.get(spec._group);
-    // Map создаётся здесь и хранит только непустые массивы.
-    if (list) list.push(spec);
-    else groups.set(spec._group, [spec]);
-  }
-  return groups;
 }
 
 // ─── Снап (единая reduced-политика пакета: мгновенный финал, без кадров) ─────
@@ -382,17 +372,6 @@ function writeSnap(el: AnimatableElement, group: GroupKey, bound: BoundGroup): v
   } else {
     el.style.setProperty(group, String(bound._numeric[0]!._to));
   }
-}
-
-/** Реестр получает target только после успешного style+cleanup старого owner. */
-function commitSnap(
-  rec: ReturnType<typeof groupRecord>,
-  bound: BoundGroup,
-): void {
-  if (bound._css !== undefined) {
-    rec._cssValue = bound._css._css;
-  }
-  for (const ch of bound._numeric) rec._numeric.set(ch._key, { _value: ch._to, _velocity: 0 });
 }
 
 /**
@@ -434,8 +413,10 @@ export function animate(
   const baseDelay = resolveDelay(options.delay);
   const staggerInput = options.stagger;
   if (typeof staggerInput === 'number') resolveDelay(staggerInput);
-  const specs = parseProps(requireAnimateProps(props));
-  mode = resolveTracks(specs, mode, options);
+  // parseProps сразу группирует по GroupKey; треки валидируются по плоскому
+  // снимку тех же спеков (порядок безразличен: топология проверяется поканально).
+  const groups = parseProps(requireAnimateProps(props));
+  mode = resolveTracks([...groups.values()].flat(), mode, options);
   const els = resolveTargets(target);
   let targetDelays: number[] | undefined;
   if (staggerInput !== undefined) {
@@ -453,9 +434,7 @@ export function animate(
     // scheduleStagger сигнализирует нечисловой/переполненный offset через NaN;
     // сумма двух конечных чисел всё ещё может overflow. Сворачиваем base в
     // принадлежащий фасаду буфер до plan/read и любого host-effect.
-    for (let i = 0; i < targetDelays.length; i++) {
-      targetDelays[i] = resolveDelay(baseDelay + targetDelays[i]!);
-    }
+    targetDelays = targetDelays.map((offset) => resolveDelay(baseDelay + offset));
   }
 
   // Accessibility policy — один snapshot на aggregate. Он сохраняет единый
@@ -468,7 +447,6 @@ export function animate(
   //    bindGroup снимает живой state, но не прерывает владельца. Поэтому ни
   //    поздний DOM-read, ни ошибка привязки не оставят ранние цели уже
   //    запущенными; браузер также не увидит чередование read→write→read.
-  const groups = groupSpecs(specs);
   const plan: PlannedGroup[] = [];
   for (let i = 0; i < els.length; i++) {
     const el = els[i]!;
@@ -558,7 +536,12 @@ export function animate(
           releaseTransition(rec, previous);
           throw error;
         }
-        commitSnap(rec, bound);
+        // Реестр получает target только после успешного style+cleanup
+        // старого owner (снап выше уже прошёл).
+        if (bound._css !== undefined) rec._cssValue = bound._css._css;
+        for (const ch of bound._numeric) {
+          rec._numeric.set(ch._key, { _value: ch._to, _velocity: 0 });
+        }
         rec._transition = false;
         report(true);
         continue;

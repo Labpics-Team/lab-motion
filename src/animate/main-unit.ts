@@ -110,16 +110,17 @@ export class MainUnit implements GroupOwner, SurfaceUnit {
       // Во время host-write снимок обязан отдать применяемое поколение (#196):
       // hostile setter уже сделал значение видимым до возврата.
       const writing = this._writing;
-      let velocity = this._active ? (writing ? channel._velocity : channel._renderedVelocity) : 0;
-      if (this._active && o._mode._type === 'tween') {
-        // Трек (#205): производная в пространстве значения через семплер;
-        // 2-стоповый путь — прежняя формула (to−from)·ease′ бит-в-бит.
-        const sampled = channel._stops !== undefined
-          ? this._trackDerivative(channel, this._liveTweenK())
-          : (channel._to - channel._from) *
-            this._tweenDerivative(this._liveTweenK());
-        velocity = finiteOrZero(sampled);
-      }
+      // Трек (#205): производная в пространстве значения через семплер;
+      // 2-стоповый путь — прежняя формула (to−from)·ease′ бит-в-бит.
+      const velocity = !this._active
+        ? 0
+        : o._mode._type === 'tween'
+          ? finiteOrZero(
+              channel._stops !== undefined
+                ? this._trackDerivative(channel, this._liveTweenK())
+                : (channel._to - channel._from) * this._tweenDerivative(this._liveTweenK()),
+            )
+          : writing ? channel._velocity : channel._renderedVelocity;
       return { _value: writing ? channel._value : channel._renderedValue, _velocity: velocity };
     }
     const frozen = o._bound._residuals.get(key);
@@ -128,7 +129,8 @@ export class MainUnit implements GroupOwner, SurfaceUnit {
 
   _captureCss(key: string): CssChannel | undefined {
     if (this._done) return undefined;
-    const channel = this._o!._bound._css;
+    const o = this._o!;
+    const channel = o._bound._css;
     if (channel === undefined || channel._key !== key) return undefined;
     const writing = this._writing;
     // CSS-трек (#205): значение непрерывно (C⁰), скорость покоя — та же
@@ -136,7 +138,7 @@ export class MainUnit implements GroupOwner, SurfaceUnit {
     // остаётся контрактом числовых каналов и 2-стопового CSS.
     const dpdt = !this._active
       ? 0
-      : this._o!._mode._type === 'tween'
+      : o._mode._type === 'tween'
         ? channel._stopsAst !== undefined ? 0 : this._tweenDerivative(this._liveTweenK())
         : writing ? channel._dpdt : channel._renderedDpdt;
     return { ...channel, _dpdt: dpdt, _css: writing ? channel._css : channel._renderedCss };
