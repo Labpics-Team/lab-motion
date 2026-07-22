@@ -8,6 +8,13 @@
 
 ### Added
 
+- **Воспроизводимый size-compare стенд (#95):** `bench/compare/size-compare.mjs`
+  измеряет import-cost эквивалентного move+fade сценария против пиненных
+  Motion (mini/hybrid), GSAP и Anime.js той же методологией, что merge-гейт
+  (esbuild + канонический gzip; compiled-строка — реальный Vite с
+  `motionCompiler()`); артефакт прогона с ревизией и версиями —
+  `bench/compare/size-compare.report.json`.
+
 - **Thenable-контролы `./animate`:** `await animate(...)` эквивалентен
   `await animate(...).finished` (канон Motion и `./driver`) — прежний код с
   `.finished` не затронут.
