@@ -17,7 +17,7 @@
 import {
   COMPILED_IMPORT_NAME,
   nanoArtifactLiteral,
-  planNanoOpacityLowering,
+  planNanoLowering,
   type AstNode,
   type NanoLoweringEdit,
 } from '../core.js';
@@ -167,7 +167,7 @@ export function motionCompiler(): MotionCompilerPlugin {
       } catch {
         return undefined; // не наш синтаксис — пусть падает штатный пайплайн
       }
-      const plan = planNanoOpacityLowering(program as AstNode, code, nanoArtifactLiteral);
+      const plan = planNanoLowering(program as AstNode, code, nanoArtifactLiteral);
       if (plan === undefined) return undefined;
       const transformed = applyEdits(code, plan.edits) +
         `\nimport { ${COMPILED_IMPORT_NAME} as ${plan.importLocal} } from ${JSON.stringify(plan.importSource)};\n`;

@@ -102,6 +102,83 @@ test('compiled и uncompiled дают идентичную opacity-траект�
   expect(Math.abs(result.finalUncompiled - 0.5)).toBeLessThanOrEqual(0.001);
 });
 
+test('common-motion (#221): multi-prop кадр + delay/stagger идентичны по группе', async ({ page }) => {
+  const result = await page.evaluate(async ([compiledUrl, uncompiledUrl]) => {
+    const [{ play: playCompiled }, { play: playUncompiled }] = await Promise.all([
+      import(compiledUrl) as Promise<{ play: (els: Element[]) => Animation[] }>,
+      import(uncompiledUrl) as Promise<{ play: (els: Element[]) => Animation[] }>,
+    ]);
+    const group = (): HTMLElement[] => [0, 1].map(() => {
+      const el = document.createElement('div');
+      document.body.appendChild(el);
+      return el;
+    });
+    const elsCompiled = group();
+    const elsUncompiled = group();
+    const animsCompiled = playCompiled(elsCompiled);
+    const animsUncompiled = playUncompiled(elsUncompiled);
+    for (const anim of [...animsCompiled, ...animsUncompiled]) anim.pause();
+
+    const timings = [0, 1].map((i) => ({
+      compiled: animsCompiled[i]!.effect!.getTiming(),
+      uncompiled: animsUncompiled[i]!.effect!.getTiming(),
+    }));
+    const duration = Number(timings[0]!.uncompiled.duration);
+    const horizon = 40 + 20 + duration; // maxDelay + duration
+
+    // Одинаковый АБСОЛЮТНЫЙ currentTime всем: пары compiled/uncompiled обязаны
+    // совпадать поэлементно (delay+stagger включены в сравнение фаз).
+    const samples: Array<{ t: number; index: number; compiled: string; uncompiled: string }> = [];
+    for (let s = 0; s <= 8; s++) {
+      const t = (horizon * s) / 8;
+      for (const anim of [...animsCompiled, ...animsUncompiled]) anim.currentTime = t;
+      for (const index of [0, 1]) {
+        samples.push({
+          t,
+          index,
+          compiled: `${getComputedStyle(elsCompiled[index]!).opacity}|${getComputedStyle(elsCompiled[index]!).translate}|${getComputedStyle(elsCompiled[index]!).scale}|${getComputedStyle(elsCompiled[index]!).rotate}`,
+          uncompiled: `${getComputedStyle(elsUncompiled[index]!).opacity}|${getComputedStyle(elsUncompiled[index]!).translate}|${getComputedStyle(elsUncompiled[index]!).scale}|${getComputedStyle(elsUncompiled[index]!).rotate}`,
+        });
+      }
+    }
+    for (const anim of [...animsCompiled, ...animsUncompiled]) anim.finish();
+    await Promise.all([...animsCompiled, ...animsUncompiled].map((a) => a.finished));
+    const finals = [0, 1].map((i) => ({
+      compiled: `${getComputedStyle(elsCompiled[i]!).opacity}|${getComputedStyle(elsCompiled[i]!).translate}`,
+      uncompiled: `${getComputedStyle(elsUncompiled[i]!).opacity}|${getComputedStyle(elsUncompiled[i]!).translate}`,
+    }));
+    for (const el of [...elsCompiled, ...elsUncompiled]) el.remove();
+    return {
+      samples,
+      finals,
+      delays: timings.map((t) => ({
+        compiled: Number(t.compiled.delay),
+        uncompiled: Number(t.uncompiled.delay),
+      })),
+      durationParity: timings.every(
+        (t) => Math.abs(Number(t.compiled.duration) - Number(t.uncompiled.duration)) <= 1e-6,
+      ),
+      easingParity: timings.every((t) => String(t.compiled.easing) === String(t.uncompiled.easing)),
+      moved: samples.some((s) => s.uncompiled.includes('120px')),
+    };
+  }, ['/browser/.artifacts/compiled-common.js', '/browser/.artifacts/uncompiled-common.js'] as const);
+
+  // Каскад: delay = 40 + 20·index на ОБОИХ путях.
+  expect(result.delays[0]).toEqual({ compiled: 40, uncompiled: 40 });
+  expect(result.delays[1]).toEqual({ compiled: 60, uncompiled: 60 });
+  expect(result.durationParity).toBe(true);
+  expect(result.easingParity).toBe(true);
+  // Поэлементный паритет вычисленных opacity/translate/scale/rotate на всей сетке.
+  for (const sample of result.samples) {
+    expect(sample.compiled, `t=${sample.t} index=${sample.index}`).toBe(sample.uncompiled);
+  }
+  for (const final of result.finals) {
+    expect(final.compiled).toBe(final.uncompiled);
+  }
+  // Контроль не-тривиальности: translate реально доехал до 120px.
+  expect(result.moved).toBe(true);
+});
+
 test('compiled и uncompiled одинаково схлопывают анимацию под reduced motion', async ({ page }) => {
   await page.emulateMedia({ reducedMotion: 'reduce' });
   const result = await page.evaluate(async ([compiledUrl, uncompiledUrl]) => {

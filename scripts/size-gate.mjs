@@ -115,12 +115,18 @@ export const BESPOKE_SUBPATH_GATES = {
   // 5261 gz → порог 5470 (~4% люфт, «порог ОТ ФАКТА»); в тот же день
   // adversarial-ревью добавило сортировку правок, байтовую верификацию
   // тривиа-зон и полный line-collapse sourcemap → факт 5355 gz (в пороге).
-  './compiler/vite': 5470,
+  // 2026-07-22 (#221): факт 6285 gz — рост НЕ раздувание, а новая capability:
+  // статическая экстракция полных NanoProps/NanoOptions (props/spring/delay/
+  // stagger/reducedMotion) и multi-track V1-кандидат (escaped-каналы +
+  // webCssOpaque) с полной обратной проекцией. Порог 6540 (~4% люфт, ОТ ФАКТА).
+  './compiler/vite': 6540,
   // Единственный БРАУЗЕРНЫЙ compiler-артефакт: private executor compiled-nano
   // вызовов. Exact-ратчет от факта (канон ./in-view, люфт нулевой): новая
   // capability не прячется под общим потолком 4608 — рост только решением.
-  // 2026-07-19: факт 341 gz.
-  './compiler/runtime': 341,
+  // 2026-07-19: факт 341 gz. 2026-07-22 (#221): факт 365 gz — generic-артефакт
+  // {f,d,e,y,g,r} (multi-prop кадр, delay+stagger·index, explicit-reduced) —
+  // ратчет переставлен по факту, люфт остаётся нулевым.
+  './compiler/runtime': 365,
   // Базовый compositor не несёт групповой оркестратор. Старый потолок сохранён:
   // capability-split не имеет права маскировать регрессию повышением порога.
   './compositor': 6450,

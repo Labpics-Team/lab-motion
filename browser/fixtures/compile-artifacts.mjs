@@ -26,9 +26,19 @@ const ALIAS = {
 const FIXTURE = `import { animate } from '@labpics/motion/nano';
 export function play(el) { return animate(el, { opacity: 0.5 }); }`;
 
-async function bundle(motionCompiler, withPlugin) {
+// Полный common-motion срез #220/#221: multi-prop кадр + spring/delay/stagger.
+const FIXTURE_COMMON = `import { animate } from '@labpics/motion/nano';
+export function play(els) {
+  return animate(els, { translate: '120px 0', scale: 1.04, rotate: 8, opacity: 0.5 }, {
+    spring: { mass: 1, stiffness: 170, damping: 26 },
+    delay: 40,
+    stagger: 20,
+  });
+}`;
+
+async function bundle(motionCompiler, withPlugin, fixture = FIXTURE) {
   const entry = resolve(TMP, 'entry.js');
-  writeFileSync(entry, FIXTURE);
+  writeFileSync(entry, fixture);
   const result = await build({
     root: ROOT,
     logLevel: 'silent',
@@ -58,16 +68,25 @@ export default async function globalSetup() {
   try {
     const compiled = await bundle(motionCompiler, true);
     const uncompiled = await bundle(motionCompiler, false);
+    const compiledCommon = await bundle(motionCompiler, true, FIXTURE_COMMON);
+    const uncompiledCommon = await bundle(motionCompiler, false, FIXTURE_COMMON);
     // Санити globalSetup: бандлы самодостаточны (браузер грузит их как есть) и
     // несут ожидаемую форму — иначе спека упала бы позже с мутным import-сбоем.
-    if (/^\s*import\s/m.test(compiled) || /^\s*import\s/m.test(uncompiled)) {
-      throw new Error('compile-artifacts: бандл несёт bare-import — не самодостаточен');
+    for (const code of [compiled, uncompiled, compiledCommon, uncompiledCommon]) {
+      if (/^\s*import\s/m.test(code)) {
+        throw new Error('compile-artifacts: бандл несёт bare-import — не самодостаточен');
+      }
     }
-    if (!/linear\(/.test(compiled)) {
+    if (!/linear\(/.test(compiled) || !/linear\(/.test(compiledCommon)) {
       throw new Error('compile-artifacts: compiled не содержит precomputed linear()-артефакт');
+    }
+    if (!/8deg/.test(compiledCommon)) {
+      throw new Error('compile-artifacts: compiled-common не несёт канонический rotate-артефакт');
     }
     writeFileSync(resolve(OUT, 'compiled.js'), compiled);
     writeFileSync(resolve(OUT, 'uncompiled.js'), uncompiled);
+    writeFileSync(resolve(OUT, 'compiled-common.js'), compiledCommon);
+    writeFileSync(resolve(OUT, 'uncompiled-common.js'), uncompiledCommon);
   } finally {
     rmSync(TMP, { recursive: true, force: true });
   }

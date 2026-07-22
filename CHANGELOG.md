@@ -6,6 +6,24 @@
 
 ## [Unreleased]
 
+### Added
+
+- **Compiler-driven common motion (#221, первый child эпика #220):** build-time
+  lowering расширен с `{ opacity: N }` на статические NanoProps/NanoOptions —
+  multi-prop кадр (`translate`/`scale`/`rotate`/`opacity`/произвольные CSS,
+  числовые и строковые литералы) и options `{ spring?, delay?, stagger?,
+  reducedMotion? }` (spring-режим; частичная пружина получает те же дефолты,
+  что nano runtime). Кадр воспроизводит семантику nano байт-в-байт (включая
+  порядок ключей и `${rotate}deg`), артефакт проходит канонический
+  MotionProgram V1 (standard opacity + escaped-каналы webCssOpaque/scalar) с
+  полной обратной проекцией; невалидный доказанно-статический вход (например,
+  незатухающая пружина) — ошибка сборки, не silent fallback. Tween-режим
+  `{ duration, ease }` осознанно остаётся runtime: нативная CSS easing-строка
+  не выражается кусочно-линейными кривыми V1 без потери. Северная метрика
+  #220 запечатана acceptance-гейтом: полный common-motion consumer fixture
+  (multi-prop + spring + delay/stagger) — **893 B gzip ≤ 5 KB** (single-chunk,
+  initial = total), solver/parser/compiler элиминированы из бандла.
+
 ### Changed
 
 - **Поведенческая коррекция pre-1.0 (#218):** физическая валидность пружины

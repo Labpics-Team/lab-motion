@@ -67,12 +67,24 @@ async function buildFixture(name, code, withPlugin) {
   return { code: chunk.code, modules: distModules(chunk) };
 }
 
-// Статическая opacity — единственная форма в скоупе lowering (#208 §core).
+// Статическая opacity — исторический минимальный срез (#208 §core).
 const LOWERABLE = `import { animate } from '@labpics/motion/nano';
 export function play(el) { return animate(el, { opacity: 0.5 }); }`;
 // Динамическая opacity — вне скоупа: плагин обязан отказать (positive control).
 const DYNAMIC = `import { animate } from '@labpics/motion/nano';
 export function play(el, v) { return animate(el, { opacity: v }); }`;
+// Полный common-motion срез #220/#221: multi-prop + spring/delay/stagger.
+// Северная метрика эпика: consumer fixture ≤ 5 KB gzip (initial и total —
+// сборка single-chunk, поэтому один и тот же байтовый срез).
+const COMMON = `import { animate } from '@labpics/motion/nano';
+export function play(els) {
+  return animate(els, { translate: '120px 0', scale: 1.04, rotate: 8, opacity: 1 }, {
+    spring: { mass: 1, stiffness: 170, damping: 26 },
+    delay: 40,
+    stagger: 20,
+  });
+}`;
+const COMMON_MOTION_CEILING_GZ = 5120;
 
 /** Fingerprint spring-солвера: замкнутая форма тянет Math.exp/cos/sin/sqrt. */
 const SPRING_MATH = /Math\.(?:exp|cos|sin|sqrt)/;
@@ -148,6 +160,37 @@ async function run() {
     );
     notes.push(`no-op контроль: динамическая opacity сохранила рантаймовый путь (${NANO_MODULE})`);
     notes.push(`граф compiled: ${compiled.modules.join(', ') || '(только entry)'}`);
+
+    // ── (#221) Common-motion fixture: элиминация + северная метрика ≤5 KB ─────
+    const commonBaseline = await buildFixture('common-uncompiled', COMMON, false);
+    const commonCompiled = await buildFixture('common-compiled', COMMON, true);
+    const commonExtra = commonCompiled.modules.filter((m) => m !== RUNTIME_MODULE);
+    check(
+      commonCompiled.modules.includes(RUNTIME_MODULE) && commonExtra.length === 0,
+      `common-compiled несёт лишние dist-модули: ${commonExtra.join(', ')}`,
+    );
+    check(
+      !SPRING_MATH.test(commonCompiled.code),
+      'common-compiled содержит spring-математику — солвер не элиминирован',
+    );
+    check(
+      /8deg/.test(commonCompiled.code) && /120px 0/.test(commonCompiled.code),
+      'common-compiled не несёт канонический multi-prop артефакт',
+    );
+    const commonBaselineGz = gzipSync(commonBaseline.code).length;
+    const commonCompiledGz = gzipSync(commonCompiled.code).length;
+    check(
+      commonCompiledGz < commonBaselineGz,
+      `common-compiled (${commonCompiledGz} B gz) не меньше uncompiled (${commonBaselineGz} B gz)`,
+    );
+    check(
+      commonCompiledGz <= COMMON_MOTION_CEILING_GZ,
+      `common-motion fixture ${commonCompiledGz} B gz > потолка ${COMMON_MOTION_CEILING_GZ} (#220)`,
+    );
+    notes.push(
+      `common-motion (#221): uncompiled ${commonBaselineGz} B gz → compiled ${commonCompiledGz} B gz ` +
+      `(потолок ${COMMON_MOTION_CEILING_GZ}, single-chunk ⇒ initial = total)`,
+    );
   } finally {
     rmSync(TMP, { recursive: true, force: true });
   }
