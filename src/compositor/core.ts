@@ -111,6 +111,17 @@ export interface SpringLinearOptions {
   readonly tolerance?: number;
 }
 
+/** Общая валидация linear-входов: [v0, tolerance] (дедуп обоих компиляторов). */
+function resolveLinearInputs(options?: SpringLinearOptions): [number, number] {
+  const v0 = options?.v0 ?? 0;
+  if (!Number.isFinite(v0)) {
+    throw new MotionParamError('LM008');
+  }
+  const tolerance = options?.tolerance ?? DEFAULT_TOLERANCE;
+  validateTolerance(tolerance);
+  return [v0, tolerance];
+}
+
 /**
  * Пружина → CSS linear()-строка с АДАПТИВНЫМ числом узлов (минимум под бюджет
  * ошибки), через общий bounded cache. Чистая, SSR-safe, детерминированная.
@@ -120,12 +131,7 @@ export interface SpringLinearOptions {
  */
 export function compileSpringLinear(spring: SpringParams, options?: SpringLinearOptions): string {
   validateSpringParams(spring);
-  const v0 = options?.v0 ?? 0;
-  const tolerance = options?.tolerance ?? DEFAULT_TOLERANCE;
-  if (!Number.isFinite(v0)) {
-    throw new MotionParamError('LM008');
-  }
-  validateTolerance(tolerance);
+  const [v0, tolerance] = resolveLinearInputs(options);
   return compileSpringEasingUnchecked(spring, v0, tolerance);
 }
 
@@ -149,12 +155,7 @@ export function createSpringLinearCache(capacity: number = DEFAULT_CACHE_CAPACIT
   return {
     compile(spring: SpringParams, options?: SpringLinearOptions): string {
       validateSpringParams(spring);
-      const v0 = options?.v0 ?? 0;
-      const tolerance = options?.tolerance ?? DEFAULT_TOLERANCE;
-      if (!Number.isFinite(v0)) {
-        throw new MotionParamError('LM008');
-      }
-      validateTolerance(tolerance);
+      const [v0, tolerance] = resolveLinearInputs(options);
       return compileSpringEasingUnchecked(spring, v0, tolerance, cache);
     },
     clear(): void {
@@ -202,6 +203,16 @@ export interface CompositorPlanOptions {
   readonly v0?: number;
   /** Толерантность (ед. прогресса). По умолчанию DEFAULT_TOLERANCE. */
   readonly tolerance?: number;
+  /**
+   * Абсолютный бюджет ошибки реконструкции в ЕДИНИЦАХ свойства from/to (#223):
+   * effective tolerance = min(tolerance, maxValueError/|to−from|), один раз до
+   * кэша и сегментера — эквивалентные authoring-входы попадают в один artifact.
+   * Вырожденный span движения не имеет — деление не выполняется, действует
+   * normalized tolerance. Для группы каналов с общей кривой вызывающий обязан
+   * свернуть min по каналам (самый строгий контракт). Конечное число > 0,
+   * иначе LM170. Единицы — до format (число канала, не строка CSS).
+   */
+  readonly maxValueError?: number;
   /** Fill. По умолчанию 'both'. */
   readonly fill?: 'none' | 'forwards' | 'backwards' | 'both';
   /** Composite. По умолчанию 'replace'. */
@@ -210,10 +221,11 @@ export interface CompositorPlanOptions {
   readonly format?: (v: number) => string | number;
 }
 
-function validateFinite(v: number): void {
+function validateFinite(v: number): number {
   if (!Number.isFinite(v)) {
     throw new MotionParamError('LM009');
   }
+  return v;
 }
 
 /**
@@ -232,10 +244,19 @@ export function compileSpringPlan(options: CompositorPlanOptions): CompositorPla
   }
   validateFinite(options.from);
   validateFinite(options.to);
-  const v0 = options.v0 ?? 0;
-  validateFinite(v0);
-  const tolerance = options.tolerance ?? DEFAULT_TOLERANCE;
+  const v0 = validateFinite(options.v0 ?? 0);
+  let tolerance = options.tolerance ?? DEFAULT_TOLERANCE;
   validateTolerance(tolerance);
+  const maxValueError = options.maxValueError;
+  if (maxValueError !== undefined) {
+    if (!Number.isFinite(maxValueError) || maxValueError <= 0) {
+      throw new MotionParamError('LM170');
+    }
+    // Закон #223: строже двух бюджетов; вырожденный span не делит (движения
+    // нет — абсолютный бюджет не ограничивает normalized-кривую).
+    const span = Math.abs(options.to - options.from);
+    if (span > RANGE_EPSILON) tolerance = Math.min(tolerance, maxValueError / span);
+  }
 
   // Публичная диагностика — свежий снимок защищённых сериализованных остановок:
   // это реально исполняемая браузером кривая, без второго источника истины.
@@ -295,13 +316,10 @@ export function readCompositorSpring(
   out?: { value: number; velocity: number },
 ): { value: number; velocity: number } {
   validateSpringParams(spring);
-  const from = options.from ?? 0;
-  const to = options.to ?? 1;
-  const v0 = options.v0 ?? 0;
+  const from = validateFinite(options.from ?? 0);
+  const to = validateFinite(options.to ?? 1);
+  const v0 = validateFinite(options.v0 ?? 0);
   const t = options.t;
-  validateFinite(from);
-  validateFinite(to);
-  validateFinite(v0);
   if (!Number.isFinite(t)) {
     throw new MotionParamError('LM012');
   }
@@ -479,9 +497,11 @@ export class CompositorSpring {
     if (typeof opts.property !== 'string' || opts.property.length === 0) {
       throw new MotionParamError('LM010');
     }
-    validateFinite(opts.from);
-    validateFinite(opts.to);
-    if (opts.tolerance !== undefined) validateTolerance(opts.tolerance);
+    this._from = validateFinite(opts.from);
+    this._to = validateFinite(opts.to);
+    // Дефолт валиден по построению — guard «передан ли tolerance» лишний.
+    const tolerance = opts.tolerance ?? DEFAULT_TOLERANCE;
+    validateTolerance(tolerance);
     const delay = opts.delay ?? 0;
     if (!Number.isFinite(delay) || delay < 0) {
       throw new MotionParamError('LM013');
@@ -489,7 +509,7 @@ export class CompositorSpring {
 
     this._spring = opts.spring;
     this._property = opts.property;
-    this._tolerance = opts.tolerance ?? DEFAULT_TOLERANCE;
+    this._tolerance = tolerance;
     this._fill = opts.fill ?? 'both';
     this._composite = opts.composite ?? 'replace';
     this._format = opts.format ?? Number;
@@ -499,8 +519,6 @@ export class CompositorSpring {
     this._delay = delay;
     this._setTimer = opts.setTimer ?? defaultSetTimer;
     this._now = opts.now ?? defaultNow;
-    this._from = opts.from;
-    this._to = opts.to;
     // Детекция тира — единственное обращение к среде в конструкторе (SSR-safe),
     // один раз. matchMedia (reduce) имеет высший precedence над WAAPI/linear().
     this._tier = resolveCompositorTierCodeFromInputs(
@@ -689,19 +707,7 @@ export class CompositorSpring {
     }
     const generation = ++this._epoch;
 
-    if (this._tier === 3) {
-      // reduce активен: живой путь НЕ должен анимировать. Отдаём MotionValue,
-      // рождённый уже на цели (в покое) — согласовано со снап-политикой. Значение
-      // эмитится один раз; дальнейшее движение — на усмотрение владельца.
-      const target = newTarget ?? this._to;
-      const mv = this._liveCandidate(target, 0, generation);
-      // onChange эмитит текущее значение сразу при подписке (motion-value: «Emit
-      // current value immediately») → apply(target) вызывается один раз, снап-семантика.
-      this._adoptLive(mv, target, generation);
-      return mv;
-    }
-
-    if (!this._usesCompositor()) {
+    if (this._tier !== 3 && !this._usesCompositor()) {
       // Живой rAF-путь (waapi-no-linear / raf / ssr): тот же MotionValue,
       // при новой цели — retarget через smooth-pickup.
       const pending = this._host !== undefined;
@@ -717,16 +723,22 @@ export class CompositorSpring {
       return mv;
     }
 
+    // Тир reduced: живой путь НЕ должен анимировать — MotionValue рождается уже
+    // на цели (в покое), согласовано со снап-политикой; onChange эмитит текущее
+    // значение сразу при подписке → apply(target) вызывается один раз.
     // Compositor-путь: снимок фактически исполняемой effect-кривой.
-    let value = this._from;
-    let velocity = 0;
-    if (this._host) {
-      const read = this._snapshot(generation);
-      if (!read) return this._inertValue();
-      value = read.value;
-      velocity = read.velocity;
-    }
     const target = newTarget ?? this._to;
+    let value = target;
+    let velocity = 0;
+    if (this._tier !== 3) {
+      value = this._from;
+      if (this._host) {
+        const read = this._snapshot(generation);
+        if (!read) return this._inertValue();
+        value = read.value;
+        velocity = read.velocity;
+      }
+    }
     const mv = this._liveCandidate(value, velocity, generation);
     this._adoptLive(mv, target, generation);
     return mv;
@@ -965,6 +977,13 @@ export class CompositorSpring {
   }
 }
 
+// Порядок хелперов подобран по gzip-словарю (замер охоты, поведение идентично).
+/** Таймер по умолчанию: setTimeout → cancel через clearTimeout (SSR-safe). */
+function defaultSetTimer(cb: () => void, ms: number): () => void {
+  const h = setTimeout(cb, ms);
+  return () => clearTimeout(h);
+}
+
 /** Часы по умолчанию: performance.now при наличии, иначе Date.now (SSR-safe). */
 function defaultNow(): number {
   try {
@@ -972,10 +991,4 @@ function defaultNow(): number {
   } catch {
     return Date.now();
   }
-}
-
-/** Таймер по умолчанию: setTimeout → cancel через clearTimeout (SSR-safe). */
-function defaultSetTimer(cb: () => void, ms: number): () => void {
-  const h = setTimeout(cb, ms);
-  return () => clearTimeout(h);
 }

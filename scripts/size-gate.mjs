@@ -80,7 +80,10 @@ export const SUBPATH_GATE_BYTES = 4608;
 // инлайн, дискретная ветка interpolateParsed делегирует сериализацию ./value.
 // Затяжка ВНИЗ по факту 12 632 + ~0.5% люфт — поведение бит-в-бит (вся
 // матрица зелёная), ослаблением не является.
-export const FULL_ANIMATE_GATE_BYTES = 12_700;
+// 12 700 → 12 620 (2026-07-22, охота по curve/segmenter: прямой LM016,
+// компакция cache-store, kept.map, дедуп endpoint/explicit-кадров):
+// факт 12 560 + ~0.5%.
+export const FULL_ANIMATE_GATE_BYTES = 12_620;
 
 // Consumer-rebundle ядра после стабильных кодов ошибок и изоляции listener-
 // сбоев. Физический shipped-граф при этом уменьшился и по-прежнему ограничен
@@ -106,7 +109,12 @@ export const IN_VIEW_CONSUMER_GATE_BYTES = 1908;
 // Совместный импорт одиночного и группового compositor API. Оба физических
 // entry отдельно остаются под прежними 6 450 B; 6 600 B ловят раздувание их
 // общего consumer-графа, не смешивая его с file-level потолком.
-export const COMPOSITOR_CAPABILITY_GATE_BYTES = 6600;
+// 6 600 → 6 510 (2026-07-22, компенсированный #223 + двойная охота): закон
+// maxValueError/горизонта (+~130) полностью профинансирован шейвами
+// (stagger→compileSpringPlan(options), спред-carrier, прямой LM016 без
+// пересчёта, слияние reduced/compositor-хвоста handoffToLive и др.);
+// затяжка вниз по факту 6 477 + ~0.5%.
+export const COMPOSITOR_CAPABILITY_GATE_BYTES = 6510;
 
 // Совместный consumer-граф ./animate + базового spring-компилятора. Exact
 // clean-base 7968d161 (2026-07-16): 12 494 B gz; потолок равен факту без люфта,
@@ -117,7 +125,8 @@ export const COMPOSITOR_CAPABILITY_GATE_BYTES = 6600;
 // capability не добавлено (compositor-граф не тронут).
 // 13 340 → 13 290 (2026-07-22, порт шейв-пакетов): затяжка вниз по факту
 // 13 226 + ~0.5% люфт — тот же срез фасада, compositor-граф не тронут.
-export const ANIMATE_COMPOSITOR_MIXED_GATE_BYTES = 13_290;
+// 13 290 → 13 230 (2026-07-22, #223 + двойная охота): факт 13 166 + ~0.5%.
+export const ANIMATE_COMPOSITOR_MIXED_GATE_BYTES = 13_230;
 
 // Точечные (bespoke) пороги субпутей — жёстче общего SUBPATH_GATE_BYTES там, где
 // это осмысленно. ./utils — семь чистых скалярных примитивов + сегментный движок;
@@ -149,7 +158,8 @@ export const BESPOKE_SUBPATH_GATES = {
   // Базовый compositor не несёт групповой оркестратор. Старый потолок сохранён:
   // capability-split не имеет права маскировать регрессию повышением порога.
   // 6450 → 6250 (2026-07-22): факт 6082 — затяжка по факту (~2.7%).
-  './compositor': 6250,
+  // 6250 → 6090 (2026-07-22, #223+охота): факт 6 062 + ~0.5%.
+  './compositor': 6090,
   // Групповой фасад самодостаточен и включает только нужные ему базовые план и
   // контроллер. Порог равен прежнему полному compositor-контракту, не новому факту.
   './compositor/stagger': 6450,
@@ -354,9 +364,10 @@ export const IMPORT_COST_SCENARIOS = [
     // N-keyframe consumer ratchet (#205): типовой keyframe-вызов дизайнера.
     // Первый принятый факт 2026-07-22: фиксируется ОТ ФАКТА ниже.
     // 12 760 → 12 730 (2026-07-22, порт шейв-пакетов): факт 12 663 + ~0.5%.
+    // 12 730 → 12 650 (2026-07-22, #223+охота): факт 12 590 + ~0.5%.
     name: 'animate-keyframes (N-track)',
     code: `import { animate } from '%DIST%/../animate/index.js'; console.log(typeof animate('.dot', { x: [0, 120, -40, 0], opacity: [0, 1, 1, 0] }, { duration: 800, times: [0, 0.25, 0.75, 1] }).pause);`,
-    gate: 12_730,
+    gate: 12_650,
   },
   {
     // ПРАВДА потребительской цены поведения + СТРАЖ переиспользования: одна

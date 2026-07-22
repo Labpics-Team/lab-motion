@@ -181,3 +181,5 @@
 | `LM167` | spring easing horizon | Незатухающая пружина не имеет конечного easing-горизонта | Задать damping больше нуля либо использовать живой исполнитель | active |
 | `LM168` | animate times | Некорректные times либо несовпадение authored-топологии | Передать неубывающие конечные times от нуля до единицы длиной в число стопов каждого канала | active |
 | `LM169` | animate ease segments | Длина ease-массива не равна числу сегментов топологии | Передать по одной функции изинга на каждый сегмент | active |
+| `LM170` | compositor plan budget | maxValueError не является конечным положительным числом | Передать конечный положительный бюджет ошибки в единицах свойства | active |
+| `LM171` | spring overshoot domain | overshoot вне (0, 1] не имеет underdamped-прообраза | Задать overshoot в (0, 1] либо использовать fromBounce/fromVisualDuration | active |

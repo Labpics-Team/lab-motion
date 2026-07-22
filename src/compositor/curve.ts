@@ -20,13 +20,14 @@ import {
 } from './cache.js';
 import { roundShortest } from './format.js';
 import {
-  assertSpringCurveBudget,
   buildRestingSpringNodesWithHorizon,
   tryBuildSpringNodes,
   type SpringNode,
 } from './segmenter.js';
 
-export const DEFAULT_TOLERANCE: number = 1 / 400;
+// SSOT дефолтного бюджета — segmenter.ts (колено горизонт-закона #223);
+// здесь сохраняется исторический публичный путь импорта.
+export { DEFAULT_TOLERANCE } from './segmenter.js';
 
 /** Чередование [percent, progress, ...]; percent — точное число CSS-токена в [0,100]. */
 export type SpringSerializedSamples = Float64Array;
@@ -118,12 +119,14 @@ function emitArtifact(
     const percent = i === 1 || percentDigits > 100
         ? String(node.percent)
         : roundShortest(node.percent, percentDigits);
-    out += progress + ' ' + percent + '%';
-    // Number(token) моделирует CSS parser один раз на cold compile. TypedArray
-    // не совпадает по identity с caller-owned raw nodes и не выходит host-коду.
-    samples[i * 2] = Number(percent);
-    samples[i * 2 + 1] = Number(progress);
-    if (i < nodes.length - 1) out += ', ';
+    // Разделитель префиксом — та же байт-в-байт строка, что прежний суффикс
+    // после каждого не-последнего стопа.
+    out += (i === 0 ? '' : ', ') + progress + ' ' + percent + '%';
+    // Унарный + (=== Number(token) для строк) моделирует CSS parser один раз на
+    // cold compile. TypedArray не совпадает по identity с caller-owned raw
+    // nodes и не выходит host-коду.
+    samples[i * 2] = +percent;
+    samples[i * 2 + 1] = +progress;
   }
   return [out + ')', samples, durationMs];
 }
@@ -148,12 +151,15 @@ export function compileSpringExecutionArtifactTupleUnchecked(
     prebuiltNodes,
     prebuiltDurationMs,
   );
-  if (artifact === undefined) {
-    // Ошибочный public compile остаётся fail-fast; production preflight читает
-    // undefined и выбирает live до смены владельца.
-    assertSpringCurveBudget(spring, v0, tolerance);
+  // Truthiness эквивалентен !== undefined: значение — всегда tuple-массив.
+  if (!artifact) {
+    // Ошибочный public compile остаётся fail-fast. undefined возможен ТОЛЬКО
+    // при over-cap (tryBuildSpringNodes вернул undefined на том же чистом
+    // предикате, что fitsSpringCurveBudget) — прямой LM016 идентичен прежнему
+    // assertSpringCurveBudget без повторного пересчёта горизонта/сетки.
+    throw new MotionParamError('LM016');
   }
-  return artifact!;
+  return artifact;
 }
 
 /**
@@ -179,12 +185,13 @@ export function tryCompileSpringExecutionArtifactTupleUnchecked(
     v0,
     tolerance,
   );
-  if (hit !== undefined) return hit;
+  // Truthiness эквивалентен !== undefined: попадание — всегда tuple-массив.
+  if (hit) return hit;
   let nodes = prebuiltNodes;
   let durationMs = prebuiltDurationMs;
   if (nodes === undefined) {
     const build = tryBuildSpringNodes(spring, v0, tolerance);
-    if (build === undefined) return undefined;
+    if (!build) return;
     nodes = build[0];
     durationMs = build[1] * 1000;
   }

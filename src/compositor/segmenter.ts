@@ -32,12 +32,49 @@
  */
 
 import { MotionParamError } from '../errors.js';
+import { CONVERGENCE_THRESHOLD } from '../internal/constants.js';
 import { makeSpringValueSampler } from '../internal/solver.js';
 import {
-  settleTimeAtRestUpperBound,
   settleTimeUpperBound,
   type SpringParams,
 } from '../spring.js';
+
+/**
+ * Дефолтный бюджет реконструкции (ед. прогресса) и одновременно колено
+ * горизонт-закона ниже. Определён здесь (а не в curve.ts) — горизонт-закон
+ * не может импортировать curve без цикла; curve реэкспортирует.
+ */
+export const DEFAULT_TOLERANCE: number = 1 / 400;
+
+/**
+ * Горизонт компиляции (#223). Канонический settle оставляет терминальному
+ * снапу в 1 остаток порядка settle-допуска пакета: для tolerance ≥ дефолта он
+ * покрыт перцептивным бюджетом (снап субпиксельный при типичной амплитуде), и
+ * горизонт БАЙТ-В-БАЙТ равен settleTimeUpperBound — существующие артефакты не
+ * меняются. Бюджет СТРОЖЕ дефолтного (в т.ч. выведенный из absolute
+ * maxValueError) — запрос доказанной точности: горизонт продлевается по
+ * огибающей до остатка ≤ tolerance/8, и терминальный снап входит в общий
+ * бюджет реконструкции. Чистая функция (params, v0, tolerance) — кэш-ключ
+ * artifact-ов остаётся корректным без флагов.
+ */
+export function springCompileHorizon(
+  params: SpringParams,
+  v0: number,
+  tolerance: number,
+): number {
+  const settle = settleTimeUpperBound(params, v0);
+  if (tolerance >= DEFAULT_TOLERANCE) return settle;
+  const omega2 = params.stiffness / params.mass;
+  const alpha = params.damping / (2 * params.mass);
+  const delta = omega2 - alpha * alpha;
+  // Огибающая ~e^(−rate·t); медленный полюс — та же устойчивая форма без
+  // катастрофического вычитания, что в settle-законе (#226).
+  const rate = delta >= 0 ? alpha : omega2 / (alpha + Math.sqrt(-delta));
+  if (!(rate > 0)) return settle; // ζ=0 не имеет конечного горизонта (отвергнет бюджет-гейт)
+  // Канонический закон гарантирует остаток ≤ CONVERGENCE_THRESHOLD; добираем
+  // ln-дефицит до tolerance/8 (снап ≤ 1/8 бюджета; сетка+RDP+эмит — остальное).
+  return settle + Math.log(CONVERGENCE_THRESHOLD / (tolerance / 8)) / rate;
+}
 
 /** Один узел linear(): нормализованный прогресс + доля времени в процентах. */
 export interface SpringNode {
@@ -112,7 +149,7 @@ export function fitsSpringCurveBudget(
   v0: number,
   tolerance: number,
 ): boolean {
-  const settle = settleTimeUpperBound(params, v0);
+  const settle = springCompileHorizon(params, v0, tolerance);
   const required = requiredGridSize(params, settle, tolerance, v0);
   return Number.isSafeInteger(required) && required <= BASE_GRID_MAX;
 }
@@ -123,7 +160,11 @@ export function assertSpringCurveBudget(
   v0: number,
   tolerance: number,
 ): void {
-  baseGridSize(params, settleTimeUpperBound(params, v0), tolerance, v0);
+  // Тот же предикат и тот же LM016; baseGridSize остаётся тестовым seam-ом
+  // и не тянется в production-граф ради одного броска.
+  if (!fitsSpringCurveBudget(params, v0, tolerance)) {
+    throw new MotionParamError('LM016');
+  }
 }
 
 /**
@@ -151,8 +192,7 @@ export function douglasPeuckerVertical(
   const n = xs.length;
   if (n <= 2) return n === 2 ? [0, 1] : n === 1 ? [0] : [];
   const keep = new Uint8Array(n);
-  keep[0] = 1;
-  keep[n - 1] = 1;
+  keep[0] = keep[n - 1] = 1;
   // Стек интервалов [i, j] (индексы), i<j. Защищённый interior-узел делит
   // задачу до первого скана: последующая хорда физически не может его удалить.
   const hasProtected = protectedIndex > 0 && protectedIndex < n - 1;
@@ -188,7 +228,9 @@ export function douglasPeuckerVertical(
         idx = k;
       }
     }
-    if (maxDev > eps && idx > i) {
+    // maxDev > eps ⇒ скан выполнил ≥1 итерацию (иначе continue выше) и idx ≥ i+1;
+    // прежний страж idx > i был мёртвым.
+    if (maxDev > eps) {
       keep[idx] = 1;
       stack.push(i, idx, idx, j);
     }
@@ -223,17 +265,12 @@ export function buildSpringNodesWithHorizon(
   v0: number,
   tolerance: number,
 ): [nodes: SpringNode[], horizon: number] {
-  const settle = settleTimeUpperBound(params, v0);
-  return [
-    buildSpringNodesAtHorizon(
-      params,
-      v0,
-      tolerance,
-      settle,
-      baseGridSize(params, settle, tolerance, v0),
-    ),
-    settle,
-  ];
+  const built = tryBuildSpringNodes(params, v0, tolerance);
+  // Over-cap: тот же LM016, что бросала прямая baseGridSize-граница; undefined
+  // возможен только на предикате fitsSpringCurveBudget — прямой бросок
+  // идентичен прежнему assertSpringCurveBudget без пересчёта горизонта/сетки.
+  if (built === undefined) throw new MotionParamError('LM016');
+  return built;
 }
 
 /**
@@ -245,9 +282,9 @@ export function tryBuildSpringNodes(
   v0: number,
   tolerance: number,
 ): [nodes: SpringNode[], horizon: number] | undefined {
-  const settle = settleTimeUpperBound(params, v0);
+  const settle = springCompileHorizon(params, v0, tolerance);
   const intervals = requiredGridSize(params, settle, tolerance, v0);
-  if (!Number.isSafeInteger(intervals) || intervals > BASE_GRID_MAX) return undefined;
+  if (!Number.isSafeInteger(intervals) || intervals > BASE_GRID_MAX) return;
   return [
     buildSpringNodesAtHorizon(params, v0, tolerance, settle, intervals),
     settle,
@@ -259,17 +296,10 @@ export function buildRestingSpringNodesWithHorizon(
   params: SpringParams,
   tolerance: number,
 ): [nodes: SpringNode[], horizon: number] {
-  const settle = settleTimeAtRestUpperBound(params);
-  return [
-    buildSpringNodesAtHorizon(
-      params,
-      0,
-      tolerance,
-      settle,
-      baseGridSize(params, settle, tolerance),
-    ),
-    settle,
-  ];
+  // v0=0 проходит тот же #223-горизонт (settleTimeUpperBound(p,0) ===
+  // settleTimeAtRestUpperBound(p)); прежний DCE-мотив отдельного тела снят
+  // горизонт-законом, который в любом случае разделяет общий settle-модуль.
+  return buildSpringNodesWithHorizon(params, 0, tolerance);
 }
 
 function buildSpringNodesAtHorizon(
@@ -294,8 +324,7 @@ function buildSpringNodesAtHorizon(
   // (params/v0 фиксированы) → считаем их ОДИН раз фабрикой, а не на каждый узел.
   // Значение бит-в-бит равно solveSpring(...).value (см. makeSpringValueSampler).
   const sampleValue = makeSpringValueSampler(params, v0);
-  xs[0] = 0;
-  ys[0] = 0;
+  xs[0] = ys[0] = 0;
   const tangentTau = 0.5 / intervals;
   xs[1] = tangentTau;
   // Считаем через тот же percent→offset, который использует WebKit execution:
@@ -316,12 +345,9 @@ function buildSpringNodesAtHorizon(
   // eps = tolerance/2: вторая половина бюджета — под дискретизацию базовой сетки
   // (baseGridSize её и гарантирует ≤ tol/2) ⇒ суммарная реконструкция ≤ tolerance.
   const kept = douglasPeuckerVertical(xs, ys, tolerance / 2, 1);
-  const nodes: SpringNode[] = [];
-  for (let n = 0; n < kept.length; n++) {
-    const k = kept[n]!;
-    // Хвост — ровно цель (дисциплина эндпоинтов); прочие — сырой прогресс.
-    const progress = n === kept.length - 1 ? 1 : ys[k]!;
-    nodes.push({ progress, percent: xs[k]! * 100 });
-  }
-  return nodes;
+  // Хвост — ровно цель (дисциплина эндпоинтов); прочие — сырой прогресс.
+  return kept.map((k, n): SpringNode => ({
+    progress: n === kept.length - 1 ? 1 : ys[k]!,
+    percent: xs[k]! * 100,
+  }));
 }

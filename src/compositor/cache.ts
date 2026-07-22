@@ -98,7 +98,8 @@ export function lookupSpringLinearCache<T>(
   const hash = hash5(a, b, c, d, e);
   const node = cache._map.get(hash);
   // Сверка исходных чисел отсекает коллизию хеша (промах, не чужой план).
-  if (node !== undefined && node.a === a && node.b === b && node.c === c && node.d === d && node.e === e) {
+  // Truthiness-гейт эквивалентен !== undefined: в map лежат только узлы-объекты.
+  if (node && node.a === a && node.b === b && node.c === c && node.d === d && node.e === e) {
     touch(cache, node);
     return node._value;
   }
@@ -120,49 +121,43 @@ export function storeSpringLinearCache<T>(
   value: T,
 ): void {
   const hash = hash5(a, b, c, d, e);
-  const existing = cache._map.get(hash);
-  if (existing !== undefined) {
+  let node = cache._map.get(hash);
+  if (node) {
     // Тот же хеш: либо повторный store того же ключа, либо коллизия — в обоих
     // случаях перезаписываем узел на месте (реассайн, без аллокации).
-    existing.a = a;
-    existing.b = b;
-    existing.c = c;
-    existing.d = d;
-    existing.e = e;
-    existing._value = value;
-    touch(cache, existing);
-    return;
-  }
-
-  let node: CacheNode<T>;
-  if (cache._map.size >= cache._capacity) {
-    node = cache._tail!;
-    cache._map.delete(node._hash);
     touch(cache, node);
-    node._hash = hash;
-    node.a = a;
-    node.b = b;
-    node.c = c;
-    node.d = d;
-    node.e = e;
-    node._value = value;
   } else {
-    node = {
-      _hash: hash,
-      a,
-      b,
-      c,
-      d,
-      e,
-      _value: value,
-      _prev: undefined,
-      _next: cache._head,
-    };
-    if (cache._head) cache._head._prev = node;
-    else cache._tail = node;
-    cache._head = node;
+    if (cache._map.size >= cache._capacity) {
+      node = cache._tail!;
+      cache._map.delete(node._hash);
+      touch(cache, node);
+      node._hash = hash;
+    } else {
+      node = {
+        _hash: hash,
+        a,
+        b,
+        c,
+        d,
+        e,
+        _value: value,
+        _prev: undefined,
+        _next: cache._head,
+      };
+      if (cache._head) cache._head._prev = node;
+      else cache._tail = node;
+      cache._head = node;
+    }
+    cache._map.set(hash, node);
   }
-  cache._map.set(hash, node);
+  // Единая точка реассайна ключа/значения (для свежего literal-узла — повторная
+  // запись тех же значений, поведение идентично).
+  node.a = a;
+  node.b = b;
+  node.c = c;
+  node.d = d;
+  node.e = e;
+  node._value = value;
 }
 
 // Холодный inspection/reset shell вынесен из class prototype: consumer-путь
