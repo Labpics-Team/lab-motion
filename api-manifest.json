@@ -547,8 +547,8 @@
       "runtimeExports": [
         "animate"
       ],
-      "shippedGzBytes": 12198,
-      "shippedBrBytes": 11079,
+      "shippedGzBytes": 12120,
+      "shippedBrBytes": 11004,
       "docs": "docs/reference/animate.md",
       "title": "./animate — одно-строчный DOM-фасад"
     },

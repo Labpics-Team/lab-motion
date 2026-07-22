@@ -50,9 +50,7 @@ export class SurfaceBatch {
   _add(unit: SurfaceUnit, paused: boolean): void {
     // Persistent default-pool не должен расти от churn после peak live.
     if (this._end < 0 && this._holes > 0) this._compact();
-    const slot = this._units.length;
-    this._units.push(unit);
-    unit._batchSlot = slot;
+    unit._batchSlot = this._units.push(unit) - 1;
     if (paused) return;
     this._active++;
     try {
@@ -94,10 +92,11 @@ export class SurfaceBatch {
   }
 
   _springBasis(spring: SpringParams, t: number): MutableSpringBasis {
-    const cached = this._basisSpring;
+    // Начальный _basisTime = NaN не равен конечному t, поэтому первый вызов
+    // всегда семплирует и _basisSpring определён всюду за первым дизъюнктом.
+    const cached = this._basisSpring!;
     if (
       t !== this._basisTime ||
-      cached === undefined ||
       (spring !== cached && (
         spring.mass !== cached.mass ||
         spring.stiffness !== cached.stiffness ||

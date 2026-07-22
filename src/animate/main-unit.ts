@@ -10,12 +10,12 @@ import {
 } from '../internal/read-spring.js';
 import type { RequestFrameFn } from '../motion-value.js';
 import type { SpringParams } from '../spring.js';
-import { buildTransform } from '../value/transform.js';
 import {
   RANGE_EPSILON,
   channelAt,
   cssAt,
   cssTrackAt,
+  groupValueAt,
   type AnimatableElement,
   type BoundGroup,
   type ChannelSnapshot,
@@ -131,7 +131,7 @@ export class MainUnit implements GroupOwner, SurfaceUnit {
     if (this._done) return undefined;
     const o = this._o!;
     const channel = o._bound._css;
-    if (channel === undefined || channel._key !== key) return undefined;
+    if (channel?._key !== key) return undefined;
     const writing = this._writing;
     // CSS-трек (#205): значение непрерывно (C⁰), скорость покоя — та же
     // лестница деградации, что var()/смешанные AST в projectCssV0; полный C¹
@@ -252,10 +252,11 @@ export class MainUnit implements GroupOwner, SurfaceUnit {
   private _compute(): boolean {
     const o = this._o!;
     const bound = o._bound;
-    if (o._mode._type === 'tween') {
-      if (this._tMs >= o._mode._durationMs) return true;
-      const k = this._tMs / o._mode._durationMs;
-      const eased = o._mode._ease(k);
+    const mode = o._mode;
+    if (mode._type === 'tween') {
+      if (this._tMs >= mode._durationMs) return true;
+      const k = this._tMs / mode._durationMs;
+      const eased = mode._ease(k);
       const progress = Number.isFinite(eased) ? eased : k;
       this._tweenK = k;
       this._tweenDpdt = NaN;
@@ -275,7 +276,7 @@ export class MainUnit implements GroupOwner, SurfaceUnit {
       return false;
     }
 
-    const basis = o._batch._springBasis(o._mode._spring, this._tMs / 1000);
+    const basis = o._batch._springBasis(mode._spring, this._tMs / 1000);
     let converged = true;
     for (const channel of bound._numeric) {
       const range = channel._solverTo - channel._from;
@@ -360,13 +361,11 @@ export class MainUnit implements GroupOwner, SurfaceUnit {
     // успешным) без stale repair-записи после потери lease.
     this._writing = true;
     try {
-      if (o._group === 'transform') {
-        const state = bound._transform!;
-        for (const channel of bound._numeric) state[channel._key] = channel._value;
-        o._el.style.setProperty('transform', buildTransform(state));
-      } else if (bound._css !== undefined) {
-        o._el.style.setProperty(o._group, String(bound._css._css));
-      } else o._el.style.setProperty(o._group, String(bound._numeric[0]!._value));
+      o._el.style.setProperty(o._group, String(
+        bound._css !== undefined
+          ? bound._css._css
+          : groupValueAt(o._group, bound._transform, bound._numeric),
+      ));
     } finally {
       this._writing = false;
     }

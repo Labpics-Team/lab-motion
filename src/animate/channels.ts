@@ -17,6 +17,7 @@ import { MotionParamError } from '../errors.js';
 import { interpolateColor } from '../value/color.js';
 import type { ValueAST } from '../value/parse.js';
 import { tryParseValue } from '../value/parse.js';
+import { buildTransform } from '../value/transform.js';
 import { trackProgressAt, type TrackAt } from './track.js';
 import {
   interpolateUnit,
@@ -239,12 +240,12 @@ function numericChannel(
   offsets?: readonly number[],
 ): NumericChannel {
   const range = to - from;
-  const representableRange = Math.max(
-    RANGE_EPSILON,
-    Math.abs(from) * Number.EPSILON,
-  );
   let solverTo = to;
   if (!(Math.abs(range) > RANGE_EPSILON) && velocity !== 0) {
+    const representableRange = Math.max(
+      RANGE_EPSILON,
+      Math.abs(from) * Number.EPSILON,
+    );
     solverTo = from + (velocity < 0 ? -representableRange : representableRange);
     if (!Number.isFinite(solverTo) || solverTo === from) {
       throw new MotionParamError('LM150');
@@ -495,6 +496,26 @@ export function cssAt(ch: CssChannel, p: number): string | number {
 }
 
 /**
+ * SSOT сериализации групповой numeric-поверхности обоих движков и snap-пути:
+ * transform-строка либо единственный numeric-канал при прогрессе p;
+ * p === undefined — текущее живое _value каналов.
+ */
+export function groupValueAt(
+  group: GroupKey,
+  transform: Record<string, number> | undefined,
+  numeric: readonly NumericChannel[],
+  p?: number,
+): string | number {
+  if (group === 'transform') {
+    const state = transform!;
+    for (const ch of numeric) state[ch._key] = p === undefined ? ch._value : channelAt(ch, p);
+    return buildTransform(state);
+  }
+  const ch = numeric[0]!;
+  return p === undefined ? ch._value : channelAt(ch, p);
+}
+
+/**
  * Значение CSS-трека при глобальном k (сырое время/длительность, #205):
  * выбор сегмента и easing — общий pure-модуль track.ts, интерполяция —
  * тот же interpolateParsed, что у 2-стопового пути (кодек не копируется).
@@ -529,7 +550,7 @@ export function formatSingleNumericSurface(
 /** Каналы группы, привязанные к элементу, + остаточное transform-состояние. */
 export interface BoundGroup {
   readonly _numeric: NumericChannel[];
-  readonly _css: CssChannel | undefined;
+  readonly _css?: CssChannel | undefined;
   readonly _residuals: Map<string, number>;
   /** Единственный transform-state группы; undefined для остальных поверхностей. */
   readonly _transform: Record<string, number> | undefined;

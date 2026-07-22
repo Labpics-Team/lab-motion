@@ -83,7 +83,10 @@ export const SUBPATH_GATE_BYTES = 4608;
 // 12 700 → 12 620 (2026-07-22, охота по curve/segmenter: прямой LM016,
 // компакция cache-store, kept.map, дедуп endpoint/explicit-кадров):
 // факт 12 560 + ~0.5%.
-export const FULL_ANIMATE_GATE_BYTES = 12_620;
+// 12 620 → 12 530 (2026-07-22, охота-2b + SSOT groupValueAt: один сериализатор
+// групповой поверхности вместо 4 веток waapi/_write/writeSnap/hold; попутные
+// выигрыши consumers-среза): факт 12 470 + ~0.5%.
+export const FULL_ANIMATE_GATE_BYTES = 12_530;
 
 // Consumer-rebundle ядра после стабильных кодов ошибок и изоляции listener-
 // сбоев. Физический shipped-граф при этом уменьшился и по-прежнему ограничен
@@ -128,7 +131,8 @@ export const COMPOSITOR_CAPABILITY_GATE_BYTES = 6510;
 // 13 340 → 13 290 (2026-07-22, порт шейв-пакетов): затяжка вниз по факту
 // 13 226 + ~0.5% люфт — тот же срез фасада, compositor-граф не тронут.
 // 13 290 → 13 230 (2026-07-22, #223 + двойная охота): факт 13 166 + ~0.5%.
-export const ANIMATE_COMPOSITOR_MIXED_GATE_BYTES = 13_230;
+// 13 230 → 13 130 (2026-07-22, охота-2b + groupValueAt): факт 13 064 + ~0.5%.
+export const ANIMATE_COMPOSITOR_MIXED_GATE_BYTES = 13_130;
 
 // Точечные (bespoke) пороги субпутей — жёстче общего SUBPATH_GATE_BYTES там, где
 // это осмысленно. ./utils — семь чистых скалярных примитивов + сегментный движок;
@@ -368,9 +372,10 @@ export const IMPORT_COST_SCENARIOS = [
     // Первый принятый факт 2026-07-22: фиксируется ОТ ФАКТА ниже.
     // 12 760 → 12 730 (2026-07-22, порт шейв-пакетов): факт 12 663 + ~0.5%.
     // 12 730 → 12 650 (2026-07-22, #223+охота): факт 12 590 + ~0.5%.
+    // 12 650 → 12 560 (2026-07-22, охота-2b + groupValueAt): факт 12 501 + ~0.5%.
     name: 'animate-keyframes (N-track)',
     code: `import { animate } from '%DIST%/../animate/index.js'; console.log(typeof animate('.dot', { x: [0, 120, -40, 0], opacity: [0, 1, 1, 0] }, { duration: 800, times: [0, 0.25, 0.75, 1] }).pause);`,
-    gate: 12_650,
+    gate: 12_560,
   },
   {
     // ПРАВДА потребительской цены поведения + СТРАЖ переиспользования: одна

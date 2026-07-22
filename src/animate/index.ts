@@ -52,11 +52,11 @@ import {
 import { type SpringParams, validateSpringParams } from '../spring.js';
 import type { StaggerOptions } from '../stagger/index.js';
 import { scheduleStagger } from '../stagger/scheduler.js';
-import { buildTransform } from '../value/transform.js';
 import {
   bindGroup,
   cssAt,
   groupRecord,
+  groupValueAt,
   parseProps,
   sharedV0,
   type AnimatableElement,
@@ -191,19 +191,6 @@ function releaseTransition(rec: GroupRecord, owner: GroupOwner | undefined): voi
   rec._transition = false;
   // User onComplete при release не должен скрыть исходный host-сбой successor.
   try { owner?._release?.(); } catch { /* owner уже терминализирован */ }
-}
-
-// ─── Дефолтные швы (читаются в вызове — SSR-safe) ────────────────────────────
-
-function defaultNow(): number {
-  const perf = (globalThis as { performance?: { now?: () => number } }).performance;
-  // Число чтений perf.now не меняется: typeof-проверка + вызов, как и раньше.
-  return typeof perf?.now === 'function' ? perf.now() : Date.now();
-}
-
-function defaultSetTimer(cb: () => void, ms: number): () => void {
-  const h = setTimeout(cb, ms);
-  return () => clearTimeout(h);
 }
 
 // ─── Разбор опций ────────────────────────────────────────────────────────────
@@ -362,16 +349,12 @@ function resolveTargets(target: unknown): AnimatableElement[] {
 // ─── Снап (единая reduced-политика пакета: мгновенный финал, без кадров) ─────
 
 function writeSnap(el: AnimatableElement, group: GroupKey, bound: BoundGroup): void {
-  if (group === 'transform') {
-    const state = bound._transform!;
-    for (const ch of bound._numeric) state[ch._key] = ch._to;
-    el.style.setProperty('transform', buildTransform(state));
-  } else if (bound._css !== undefined) {
-    bound._css._css = cssAt(bound._css, 1);
-    el.style.setProperty(group, String(bound._css._css));
-  } else {
-    el.style.setProperty(group, String(bound._numeric[0]!._to));
-  }
+  el.style.setProperty(group, String(
+    bound._css !== undefined
+      ? bound._css._css = cssAt(bound._css, 1)
+      // channelAt(·, 1) — точный public `_to` канала (endpoint-контракт).
+      : groupValueAt(group, bound._transform, bound._numeric, 1),
+  ));
 }
 
 /**
@@ -441,8 +424,15 @@ export function animate(
   // plan и не читает hostile capability целей, когда движение запрещено.
   const reduced = els.length > 0 && prefersReduced(options.matchMedia ??
     (globalThis as { matchMedia?: (query: string) => { matches: boolean } }).matchMedia);
-  const now = options.now ?? defaultNow;
-  const setTimer = options.setTimer ?? defaultSetTimer;
+  // Дефолтные швы читаются в вызове — SSR-safe.
+  const now = options.now ?? ((): number => {
+    const perf = (globalThis as { performance?: { now?: () => number } }).performance;
+    return typeof perf?.now === 'function' ? perf.now() : Date.now();
+  });
+  const setTimer = options.setTimer ?? ((cb: () => void, ms: number): (() => void) => {
+    const h = setTimeout(cb, ms);
+    return () => clearTimeout(h);
+  });
   // 2. Фаза plan/read: читаем и привязываем ВСЕ цели до первой мутации.
   //    bindGroup снимает живой state, но не прерывает владельца. Поэтому ни
   //    поздний DOM-read, ни ошибка привязки не оставят ранние цели уже
