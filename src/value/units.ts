@@ -230,7 +230,9 @@ function resolveUnitValue(v: ParsedUnit | ParsedRelative | ParsedVar): number {
 
 /** Сериализует ParsedUnit/Relative/Var обратно в строку. @internal */
 export function unitToString(v: ParsedUnit | ParsedRelative | ParsedVar): string {
-  if (v.kind === 'unit') return v.unit ? `${v.value}${v.unit}` : String(v.value);
-  if (v.kind === 'relative') return `${v.op}=${v.amount}${v.unit}`;
+  // Кламп закрывает hand-constructed AST (V1); разобранные значения уже
+  // конечны, для них это no-op.
+  if (v.kind === 'unit') return `${clampFinite(v.value)}${v.unit}`;
+  if (v.kind === 'relative') return `${v.op}=${clampFinite(v.amount)}${v.unit}`;
   return v.fallback !== undefined ? `var(${v.name}, ${v.fallback})` : `var(${v.name})`;
 }

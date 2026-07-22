@@ -241,6 +241,9 @@ function _createRunner(
           lastTs = ts;
         } else {
           elapsed += FIXED_DT_S;
+          // Синтетический кадр рвёт цепочку меток: без сброса якоря следующий
+          // реальный ts досчитал бы тот же интервал второй раз (зеркало MainUnit).
+          lastTs = undefined;
         }
         frames++;
 

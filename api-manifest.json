@@ -111,8 +111,8 @@
         "parseUnit",
         "rgbToHsl"
       ],
-      "shippedGzBytes": 2539,
-      "shippedBrBytes": 2281,
+      "shippedGzBytes": 2519,
+      "shippedBrBytes": 2271,
       "docs": "docs/reference/value.md",
       "title": "./value — парсинг и интерполяция CSS-значений, transform"
     },
@@ -195,8 +195,8 @@
         "createPress",
         "createVelocityTracker"
       ],
-      "shippedGzBytes": 2965,
-      "shippedBrBytes": 2739,
+      "shippedGzBytes": 2969,
+      "shippedBrBytes": 2742,
       "docs": "docs/reference/gestures.md",
       "title": "./gestures — drag с инерцией и handoff"
     },
@@ -547,8 +547,8 @@
       "runtimeExports": [
         "animate"
       ],
-      "shippedGzBytes": 12120,
-      "shippedBrBytes": 11004,
+      "shippedGzBytes": 12117,
+      "shippedBrBytes": 10988,
       "docs": "docs/reference/animate.md",
       "title": "./animate — одно-строчный DOM-фасад"
     },
@@ -594,8 +594,8 @@
         "createDragDismiss",
         "createPullToRefresh"
       ],
-      "shippedGzBytes": 3330,
-      "shippedBrBytes": 2992,
+      "shippedGzBytes": 3335,
+      "shippedBrBytes": 2998,
       "docs": "docs/reference/behaviors.md",
       "title": "./behaviors — headless-машины мобильных взаимодействий"
     }

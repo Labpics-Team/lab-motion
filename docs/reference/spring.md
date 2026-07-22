@@ -61,7 +61,7 @@ interface FromBounceOptions {
 
 Пружина из перцептивной длительности и упругости — канон SwiftUI `Spring(duration:bounce:)`. Точное преобразование (#218):
 
-```
+```text
 ζ  = 1 − bounce
 ω₀ = 2π / duration
 stiffness = mass · ω₀²
@@ -116,7 +116,7 @@ interface FromPeakOptions {
 
 Пружина из **наблюдаемого** первого перелёта и времени пика (observable-конструктор, #230). Точное обратное преобразование underdamped-системы из покоя, не пресет:
 
-```
+```text
 L  = −ln(overshoot)
 ζ  = L / √(π² + L²)
 ω₀ = √(π² + L²) / peakTime
@@ -147,7 +147,7 @@ interface FromOscillationOptions {
 
 Пружина из **наблюдаемого** периода затухающих колебаний и half-life огибающей (амплитуда падает вдвое) — observable-конструктор (#230). Комплексные полюса `p = −α ± iβ`:
 
-```
+```text
 α = ln 2 / halfLife
 β = 2π / period
 stiffness = mass · (α² + β²)
@@ -193,7 +193,7 @@ function springAsEasing(params: SpringParams): (t: number) => number;
 
 **C¹-конечность (#219).** Хвост запечатан C¹ Hermite-коррекцией `g = f + (1−f₁)(3t²−2t³) − s₁(t³−t²)`, поэтому:
 
-```
+```text
 g(0) = 0,  g′(0) = 0,  g(1) = 1,  g′(1) = 0
 ```
 
