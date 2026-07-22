@@ -24,6 +24,24 @@ Performance-утверждение допустимо только вместе 
 
 Для `@labpics/motion@0.3.0` валидированного сравнительного отчёта нет; сравнительные результаты не заявлены.
 
+## Сравнительный размер против Motion / GSAP / Anime.js
+
+`bench/compare/size-compare.mjs` — воспроизводимый стенд import-cost
+эквивалентного продуктового сценария (move+fade одного элемента) против
+пиненных версий `motion` (mini и hybrid), `gsap` и `animejs` этого workspace:
+
+```bash
+pnpm build && cd bench/compare && pnpm install && node size-compare.mjs
+```
+
+Методология — та же, что у merge-гейта: esbuild bundle+minify против
+установленных пакетов (lab-motion — из свежего `dist`), канонический
+gzip-оракул; compiled-строка собирается реальным Vite с `motionCompiler()`.
+Числа не копируются в Markdown: артефакт прогона с ревизией, версиями и
+методологией — `bench/compare/size-compare.report.json`. Это сравнение цены
+типового вызова, не утверждение о паритете возможностей (колонка contract
+в отчёте фиксирует границы каждой строки).
+
 ## Размер и import-cost
 
 ### Что измеряется
