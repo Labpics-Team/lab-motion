@@ -36,31 +36,30 @@ export function animateCompiled(target: NanoTarget, artifact: CompiledNanoCall):
   const source = typeof target === 'string'
     ? document.querySelectorAll(target)
     : 'animate' in target ? [target] : target;
-  const reduced = artifact.r !== undefined
-    ? artifact.r === 1
-    : typeof matchMedia !== 'undefined'
-      && matchMedia('(prefers-reduced-motion: reduce)').matches;
+  // r: 0|1|undefined — `??` пропускает явный 0 как falsy (то же поведение,
+  // что прежний тернарий с === 1), ambient-ветка только при отсутствии r.
+  const reduced = artifact.r
+    ?? (typeof matchMedia !== 'undefined'
+      && matchMedia('(prefers-reduced-motion: reduce)').matches);
   // Один frame-объект на ВЕСЬ вызов (литерал артефакта), не на элемент —
   // паритет с nano, который строит кадр один раз.
   const frame = artifact.f as PropertyIndexedKeyframes;
-  const animations = Array.from(source, (element, index) => {
-    const animation = element.animate(frame, {
-      duration: reduced ? 0 : artifact.d,
-      easing: reduced ? 'linear' : artifact.e,
-      delay: reduced ? 0 : (artifact.y ?? 0) + (artifact.g ?? 0) * index,
-      fill: 'both',
-    });
-    return animation;
-  }) as NanoControls;
+  const animations = Array.from(source, (element, index) => element.animate(frame, {
+    duration: reduced ? 0 : artifact.d,
+    easing: reduced ? 'linear' : artifact.e,
+    delay: reduced ? 0 : (artifact.y ?? 0) + (artifact.g ?? 0) * index,
+    fill: 'both',
+  })) as NanoControls;
   animations.finished = Promise.all(animations.map((animation) => new Promise<Animation>((resolve, reject) => {
     animation.finished.catch(reject);
-    animation.addEventListener('finish', () => {
+    animation.addEventListener('finish', () => queueMicrotask(() => {
+      if (animation.playState !== 'finished') return;
       try {
         animation.commitStyles();
         animation.cancel();
       } catch { /* fill сохраняет финал на платформе без commitStyles */ }
       resolve(animation);
-    });
+    }));
   })));
   return animations;
 }

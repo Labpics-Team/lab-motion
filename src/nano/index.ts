@@ -102,13 +102,17 @@ export function animate(
     animation.finished.catch(reject);
     // Listener, не finished.then: пин «чистит каждый replay» (n-й finish после
     // play() тоже коммитится), а пользовательский onfinish остаётся свободным.
-    animation.addEventListener('finish', () => {
+    // Сама чистка — микротаском ПОСЛЕ рассылки события: пользовательские
+    // listeners видят finished-состояние, а guard пропускает чистку, если
+    // консюмер перезапустил анимацию прямо в хендлере.
+    animation.addEventListener('finish', () => queueMicrotask(() => {
+      if (animation.playState !== 'finished') return;
       try {
         animation.commitStyles();
         animation.cancel();
       } catch { /* fill сохраняет финал на платформе без commitStyles */ }
       resolve(animation);
-    });
+    }));
   })));
   return animations;
 }
