@@ -715,6 +715,17 @@ animate(el, { opacity: 1 }, { delay: -100 });
     expect(p!.edits[1]!.replacement).toContain('y:-100');
   });
 
+  it('отрицательный stagger доказан статическим и попадает в артефакт', async () => {
+    // Прежний отказный кейс «stagger unary minus» стал GREEN: тот же
+    // staticFinite-путь, что delay — регрессия на второй точке грамматики.
+    const p = await plan(`import { animate } from '@labpics/motion/nano';
+animate(el, { opacity: 1 }, { stagger: -20 });
+`);
+    expect(p).toBeDefined();
+    expect(p!.edits.length).toBe(2);
+    expect(p!.edits[1]!.replacement).toContain('g:-20');
+  });
+
   it('унарный плюс остаётся сомнением — вызов не понижается', async () => {
     const p = await plan(`import { animate } from '@labpics/motion/nano';
 animate(el, { opacity: +1 });
