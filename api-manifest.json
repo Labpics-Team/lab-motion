@@ -558,8 +558,8 @@
       "runtimeExports": [
         "animate"
       ],
-      "shippedGzBytes": 966,
-      "shippedBrBytes": 880,
+      "shippedGzBytes": 944,
+      "shippedBrBytes": 854,
       "docs": "docs/reference/nano.md",
       "title": "./nano — минимальный WAAPI-вход"
     },

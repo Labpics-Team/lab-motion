@@ -81,10 +81,9 @@ export function animate(
     ? document.querySelectorAll(target)
     : 'animate' in target ? [target] : target;
   const frame: PropertyIndexedKeyframes = {};
-  if (props.scale != null) frame.scale = props.scale;
-  if (props.rotate != null) frame.rotate = `${props.rotate}deg`;
   for (const property of Object.keys(props)) {
-    if (property !== 'scale' && property !== 'rotate') frame[property] = props[property];
+    const value = props[property];
+    frame[property] = property === 'rotate' && value != null ? `${value}deg` : value;
   }
 
   const [duration, easing] = options.duration != null
@@ -101,6 +100,8 @@ export function animate(
   })) as NanoControls;
   animations.finished = Promise.all(animations.map((animation) => new Promise<Animation>((resolve, reject) => {
     animation.finished.catch(reject);
+    // Listener, не finished.then: пин «чистит каждый replay» (n-й finish после
+    // play() тоже коммитится), а пользовательский onfinish остаётся свободным.
     animation.addEventListener('finish', () => {
       try {
         animation.commitStyles();
