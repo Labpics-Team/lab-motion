@@ -153,7 +153,12 @@ export const BESPOKE_SUBPATH_GATES = {
   // статическая экстракция полных NanoProps/NanoOptions (props/spring/delay/
   // stagger/reducedMotion) и multi-track V1-кандидат (escaped-каналы +
   // webCssOpaque) с полной обратной проекцией. Порог 6540 (~4% люфт, ОТ ФАКТА).
-  './compiler/vite': 6540,
+  // 2026-07-23 (#237): факт 6730 gz — новая capability, не раздувание:
+  // strict-режим (структурированные refusals с причиной и line:col-диагностикой,
+  // маркер @motion-runtime) + onBudget-квитанция (lowered/runtimeCalls/
+  // artifactChars). Build-tool entry, браузеру не поставляется. Порог 6990
+  // (~4% люфт, ОТ ФАКТА).
+  './compiler/vite': 6990,
   // Единственный БРАУЗЕРНЫЙ compiler-артефакт: private executor compiled-nano
   // вызовов. Exact-ратчет от факта (канон ./in-view, люфт нулевой): новая
   // capability не прячется под общим потолком 4608 — рост только решением.

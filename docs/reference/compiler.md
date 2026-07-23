@@ -37,16 +37,31 @@ import {
 ### motionCompiler
 
 ```ts
-function motionCompiler(): MotionCompilerPlugin;
+function motionCompiler(options?: MotionCompilerOptions): MotionCompilerPlugin;
+
+interface MotionCompilerOptions {
+  readonly strict?: boolean | undefined;
+  readonly onBudget?: ((report: MotionBudgetReport) => void) | undefined;
+}
+
+interface MotionBudgetReport {
+  readonly lowered: number;       // понижено вызовов за билд
+  readonly runtimeCalls: number;  // осталось рантаймовых (включая @motion-runtime)
+  readonly artifactChars: number; // суммарная длина инъецированных литералов
+}
 
 interface MotionCompilerPlugin {
   readonly name: string;    // 'lab-motion:nano-lowering'
   readonly enforce: 'pre';
   transform(code: string, id: string): { code: string; map: /* precise v3 */ object } | undefined;
+  buildEnd(): void;
 }
 ```
 
-Без параметров. Контракт плагина намеренно структурный — типы `vite` в `d.ts` пакета не затягиваются. `enforce: 'pre'` — трансформ идёт до остальных плагинов.
+Контракт плагина намеренно структурный — типы `vite` в `d.ts` пакета не затягиваются. `enforce: 'pre'` — трансформ идёт до остальных плагинов.
+
+- **`strict: true`** (#237) — любой непониженный nano-вызов останавливает сборку ошибкой с файлом, позицией `line:col` и причиной отказа (гарантия «`./nano` физически не в бандле»; худший тихий регресс — nano и executor-шов одновременно из-за одного непониженного вызова — становится невозможен). Сознательно-динамический вызов помечается блочным комментарием `@motion-runtime` вплотную перед ним: он остаётся рантаймовым без ошибки (и считается в `runtimeCalls` квитанции). Смешанный модуль в strict падает целиком — до частичного понижения.
+- **`onBudget`** (#237) — квитанция build-фактов по завершении билда (`buildEnd`): сколько вызовов понижено, сколько осталось рантаймовыми, суммарная длина артефакт-литералов. Из колбэка удобно писать `motion-budget.json` в CI.
 
 Поведение `transform`:
 

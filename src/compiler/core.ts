@@ -185,8 +185,8 @@ function verifyThroughMotionProgram(
 
 /**
  * Строит доверенный артефакт compiled-nano статического вызова (spring-режим).
- * Кадр воспроизводит семантику nano/index.ts БАЙТ-В-БАЙТ (включая порядок
- * ключей: scale, rotate→`${N}deg`, затем авторский порядок остальных); тайминг
+ * Кадр воспроизводит семантику nano/index.ts БАЙТ-В-БАЙТ (единый цикл:
+ * авторский порядок ключей, rotate→`${N}deg`); тайминг
  * — тот же springLinear SSOT (частичная пружина получает те же дефолты, что в
  * runtime). Бросает (ошибка сборки) при непредставимой пружине, пустом кадре
  * или расхождении V1-проекции.
@@ -201,10 +201,11 @@ export function compileNanoCallArtifact(
     }
   }
   const frame: Record<string, number | string> = {};
-  if (props['scale'] != null) frame['scale'] = props['scale'];
-  if (props['rotate'] != null) frame['rotate'] = `${props['rotate']}deg`;
+  // Зеркало nano/index.ts (единый цикл, авторский порядок ключей, rotate с
+  // deg-суффиксом) — байт-паритет кадра включая порядок.
   for (const property of Object.keys(props)) {
-    if (property !== 'scale' && property !== 'rotate') frame[property] = props[property]!;
+    const value = props[property]!;
+    frame[property] = property === 'rotate' ? `${value}deg` : value;
   }
   const spring = options.spring;
   const [durationMs, cssLinear] = springLinear(spring === undefined ? undefined : {
@@ -239,8 +240,20 @@ export interface NanoLoweringEdit {
   readonly replacement: string;
 }
 
+/** Непониженный вызов с причиной (#237): сырьё для strict-режима и леджера. */
+export interface NanoLoweringRefusal {
+  /** Байтовый offset начала вызова в исходнике (адаптер считает line:col). */
+  readonly start: number;
+  /** Человекочитаемая причина отказа. */
+  readonly reason: string;
+}
+
 export interface NanoLoweringPlan {
-  /** Непересекающиеся правки в порядке возрастания start. */
+  /**
+   * Непересекающиеся правки в порядке возрастания start. МОЖЕТ быть пустым:
+   * модуль без единого понижения, но с отказами (#237) — адаптер не
+   * трансформирует, но strict-режим обязан видеть отказы.
+   */
   readonly edits: readonly NanoLoweringEdit[];
   /** Локальное имя executor-биндинга; адаптер добавляет hoisted-импорт. */
   readonly importLocal: string;
@@ -248,6 +261,12 @@ export interface NanoLoweringPlan {
   readonly importSource: string;
   /** Число НЕтрансформированных вызовов nano-animate (для manifest). */
   readonly runtimeCalls: number;
+  /**
+   * Отказы БЕЗ маркера `@motion-runtime` (блочный комментарий вплотную перед вызовом) — кандидаты
+   * на ошибку сборки в strict-режиме (#237). Помеченные вызовы легитимно
+   * рантаймовые: считаются в runtimeCalls, но сюда не попадают.
+   */
+  readonly refusals: readonly NanoLoweringRefusal[];
 }
 
 const NANO_SOURCE = '@labpics/motion/nano';
@@ -358,21 +377,33 @@ export function planNanoLowering(
   if (!importedPlain || doubt || localNameCollision) return undefined;
 
   const edits: NanoLoweringEdit[] = [];
+  const refusals: NanoLoweringRefusal[] = [];
   let runtimeCalls = 0;
+  /**
+   * Отказ с причиной (#237): вызов с маркером `@motion-runtime` (блочный комментарий вплотную перед ним) —
+   * легитимно рантаймовый (в runtimeCalls, не в refusals). Маркер ищется
+   * вплотную перед вызовом (допускается только пробельный хвост).
+   */
+  const refuse = (node: AstNode, reason: string): void => {
+    runtimeCalls++;
+    if (!/\/\*\s*@motion-runtime\s*\*\/\s*$/.test(code.slice(0, node.start))) {
+      refusals.push({ start: node.start, reason });
+    }
+  };
 
   walk(program, (node) => {
     if (node.type !== 'CallExpression') return;
     const callee = node.callee as AstNode;
     if (callee.type !== 'Identifier' || callee.name !== 'animate') return;
-    if (node.optional === true) { runtimeCalls++; return; }
+    if (node.optional === true) { refuse(node, 'optional-вызов `animate?.()`'); return; }
     const args = node.arguments as AstNode[];
-    if (args.length !== 2 && args.length !== 3) { runtimeCalls++; return; }
+    if (args.length !== 2 && args.length !== 3) { refuse(node, 'не 2–3 аргумента'); return; }
     const [targetArg, propsArg, optionsArg] = args as [AstNode, AstNode, AstNode?];
-    if (targetArg.type === 'SpreadElement') { runtimeCalls++; return; }
+    if (targetArg.type === 'SpreadElement') { refuse(node, 'spread в target'); return; }
     const props = staticNanoProps(propsArg);
-    if (props === undefined) { runtimeCalls++; return; }
+    if (props === undefined) { refuse(node, 'props не доказаны статическими'); return; }
     const options = staticNanoOptions(optionsArg);
-    if (options === undefined) { runtimeCalls++; return; }
+    if (options === undefined) { refuse(node, 'options не доказаны статическими'); return; }
     // Побайтная верификация тривиа-зон: ровно `(`, `,`, `)` с пробелами.
     // Скобки вокруг callee/target, комментарии и прочая экзотика — отказ.
     const lastArg = optionsArg ?? propsArg;
@@ -382,7 +413,7 @@ export function planNanoLowering(
       (optionsArg !== undefined &&
         !/^\s*,\s*$/.test(code.slice(propsArg.end, optionsArg.start))) ||
       !/^\s*,?\s*\)$/.test(code.slice(lastArg.end, node.end))
-    ) { runtimeCalls++; return; }
+    ) { refuse(node, 'нестандартные разделители/комментарии внутри вызова'); return; }
     // Невалидный ДОКАЗАННО-статический вход (например незатухающая пружина) —
     // ошибка сборки с причиной, не silent fallback (#221).
     let literal: string;
@@ -401,7 +432,9 @@ export function planNanoLowering(
     );
   });
 
-  if (edits.length === 0) return undefined;
+  // Пустой план (ни правок, ни отказов) — модуль не при делах.
+  // План с отказами без правок нужен strict-режиму/леджеру (#237).
+  if (edits.length === 0 && refusals.length === 0) return undefined;
   // Walk идёт в pre-order (внешний вызов раньше вложенного в target):
   // сортировка восстанавливает документированный инвариант возрастания start.
   // Пары правок вложенных вызовов лежат целиком МЕЖДУ правками внешнего и
@@ -412,6 +445,7 @@ export function planNanoLowering(
     importLocal: IMPORT_LOCAL,
     importSource: COMPILED_IMPORT_SOURCE,
     runtimeCalls,
+    refusals,
   };
 }
 
