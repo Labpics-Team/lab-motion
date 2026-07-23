@@ -265,3 +265,36 @@ describe('compositor cache: компилятор поверх кэша', () => {
     expect(compiler.size).toBe(3);
   });
 });
+
+// ─── #239: scale-инвариантный exact-key (k/m, c/m) ───────────────────────────
+//
+// Артефакт — функция битовых частных ω²=k/m и c/m (канонические первые
+// операции всех потребителей, #226), поэтому масс-эквивалентные тройки
+// обязаны делить ОДИН слот кэша и получать бит-идентичный артефакт.
+// Mutation proof: вернуть ключ (m,k,c) → size станет 2 и identity-ассерт падёт.
+
+describe('#239: масс-эквивалентные пружины делят один слот кэша', () => {
+  it('{m:2,k:340,c:52} — cache hit артефакта {m:1,k:170,c:26}, один слот', async () => {
+    const { tryCompileSpringExecutionArtifactTupleUnchecked } = await import('../src/compositor/curve.js');
+    const { createSpringLinearCacheState, springLinearCacheSize } = await import('../src/compositor/cache.js');
+    const cache = createSpringLinearCacheState<never[]>(8) as never;
+    const base = tryCompileSpringExecutionArtifactTupleUnchecked(
+      { mass: 1, stiffness: 170, damping: 26 }, 0, 1 / 400, cache,
+    );
+    const scaled = tryCompileSpringExecutionArtifactTupleUnchecked(
+      { mass: 2, stiffness: 340, damping: 52 }, 0, 1 / 400, cache,
+    );
+    expect(base).toBeDefined();
+    expect(scaled).toBe(base); // тот же tuple-объект: hit, не перекомпиляция
+    expect(springLinearCacheSize(cache)).toBe(1);
+  });
+
+  it('другая физика (то же k/m, другой c/m) — честный промах', async () => {
+    const { tryCompileSpringExecutionArtifactTupleUnchecked } = await import('../src/compositor/curve.js');
+    const { createSpringLinearCacheState, springLinearCacheSize } = await import('../src/compositor/cache.js');
+    const cache = createSpringLinearCacheState<never[]>(8) as never;
+    tryCompileSpringExecutionArtifactTupleUnchecked({ mass: 1, stiffness: 170, damping: 26 }, 0, 1 / 400, cache);
+    tryCompileSpringExecutionArtifactTupleUnchecked({ mass: 1, stiffness: 170, damping: 27 }, 0, 1 / 400, cache);
+    expect(springLinearCacheSize(cache)).toBe(2);
+  });
+});

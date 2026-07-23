@@ -174,14 +174,19 @@ export function tryCompileSpringExecutionArtifactTupleUnchecked(
   prebuiltNodes?: readonly SpringNode[],
   prebuiltDurationMs?: number,
 ): SpringExecutionArtifactTuple | undefined {
-  const { mass, stiffness, damping } = spring;
+  // Scale-инвариантный exact-key (#239): артефакт — функция ТОЛЬКО битовых
+  // частных ω² = k/m и c/m (канонические ПЕРВЫЕ операции всех потребителей,
+  // #226; деление на 2 коммутирует с IEEE-округлением, поэтому и c/(2m)
+  // совпадает). Масс-эквивалентные тройки ({2,340,52} ≡ {1,170,26}) делят
+  // один слот честно: равные частные ⇒ бит-идентичный артефакт по построению.
+  const omega2 = spring.stiffness / spring.mass;
+  const dampingPerMass = spring.damping / spring.mass;
   // Единственный production-consumer: inline оставляет functional core отдельно
   // тестируемым в source, а import-cost ratchet контролирует итоговый артефакт.
   const hit = /* @__INLINE__ */ lookupSpringLinearCache(
     cache,
-    mass,
-    stiffness,
-    damping,
+    omega2,
+    dampingPerMass,
     v0,
     tolerance,
   );
@@ -202,9 +207,8 @@ export function tryCompileSpringExecutionArtifactTupleUnchecked(
   );
   /* @__INLINE__ */ storeSpringLinearCache(
     cache,
-    mass,
-    stiffness,
-    damping,
+    omega2,
+    dampingPerMass,
     v0,
     tolerance,
     artifact,

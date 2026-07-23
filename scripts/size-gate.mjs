@@ -158,7 +158,10 @@ export const BESPOKE_SUBPATH_GATES = {
   // маркер @motion-runtime) + onBudget-квитанция (lowered/runtimeCalls/
   // artifactChars). Build-tool entry, браузеру не поставляется. Порог 6990
   // (~4% люфт, ОТ ФАКТА).
-  './compiler/vite': 6990,
+  // 2026-07-23 (#239 срез 1): факт 6995 gz — memo артефактов билда
+  // (uniqueArtifacts: springLinear+V1-верификация раз на уникальную форму) и
+  // strict-модульные refusals. Порог 7270 (~4% люфт, ОТ ФАКТА).
+  './compiler/vite': 7270,
   // Единственный БРАУЗЕРНЫЙ compiler-артефакт: private executor compiled-nano
   // вызовов. Exact-ратчет от факта (канон ./in-view, люфт нулевой): новая
   // capability не прячется под общим потолком 4608 — рост только решением.

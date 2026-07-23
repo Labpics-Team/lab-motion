@@ -45,6 +45,12 @@ export interface MotionBudgetReport {
   readonly runtimeCalls: number;
   /** Суммарная длина инъецированных артефакт-литералов, символы исходника. */
   readonly artifactChars: number;
+  /**
+   * Уникальных артефактов за билд (#239): повторные вызовы с тем же
+   * (props, options) переиспользуют memoized-литерал — springLinear и
+   * V1-верификация исполняются раз на уникальную форму, не раз на call-site.
+   */
+  readonly uniqueArtifacts: number;
 }
 
 /** Опции плагина (#237). */
@@ -197,6 +203,19 @@ export function motionCompiler(options: MotionCompilerOptions = {}): MotionCompi
   let lowered = 0;
   let runtimeCalls = 0;
   let artifactChars = 0;
+  // Memo артефактов билда (#239): ключ — JSON (props, options) в авторском
+  // порядке ключей (кадр от порядка зависит байтово, так что разный порядок —
+  // честно разные артефакты). Дорогая часть (springLinear + V1-верификация)
+  // исполняется O(уникальных форм), не O(call-sites).
+  let artifactMemo = new Map<string, string>();
+  const memoizedLiteral: typeof nanoArtifactLiteral = (props, opts) => {
+    const key = JSON.stringify([props, opts]);
+    const hit = artifactMemo.get(key);
+    if (hit !== undefined) return hit;
+    const literal = nanoArtifactLiteral(props, opts);
+    artifactMemo.set(key, literal);
+    return literal;
+  };
   return {
     name: 'lab-motion:nano-lowering',
     enforce: 'pre',
@@ -208,7 +227,7 @@ export function motionCompiler(options: MotionCompilerOptions = {}): MotionCompi
       } catch {
         return undefined; // не наш синтаксис — пусть падает штатный пайплайн
       }
-      const plan = planNanoLowering(program as AstNode, code, nanoArtifactLiteral);
+      const plan = planNanoLowering(program as AstNode, code, memoizedLiteral);
       if (plan === undefined) return undefined;
       if (options.strict === true && plan.refusals.length > 0) {
         const [first] = plan.refusals;
@@ -229,9 +248,10 @@ export function motionCompiler(options: MotionCompilerOptions = {}): MotionCompi
       lowered = 0;
       runtimeCalls = 0;
       artifactChars = 0;
+      artifactMemo = new Map();
     },
     buildEnd() {
-      options.onBudget?.({ lowered, runtimeCalls, artifactChars });
+      options.onBudget?.({ lowered, runtimeCalls, artifactChars, uniqueArtifacts: artifactMemo.size });
     },
   };
 }

@@ -505,8 +505,8 @@
         "supportsCompositor",
         "supportsLinearEasing"
       ],
-      "shippedGzBytes": 6072,
-      "shippedBrBytes": 5549,
+      "shippedGzBytes": 6057,
+      "shippedBrBytes": 5544,
       "docs": "docs/reference/compositor.md",
       "title": "./compositor, ./compositor/stagger и ./waapi — compositor-путь и WAAPI"
     },
@@ -519,8 +519,8 @@
         "compileSpringPlan",
         "compileStaggerPlan"
       ],
-      "shippedGzBytes": 6306,
-      "shippedBrBytes": 5766,
+      "shippedGzBytes": 6293,
+      "shippedBrBytes": 5763,
       "docs": "docs/reference/compositor.md",
       "title": "./compositor, ./compositor/stagger и ./waapi — compositor-путь и WAAPI"
     },
@@ -547,8 +547,8 @@
       "runtimeExports": [
         "animate"
       ],
-      "shippedGzBytes": 12117,
-      "shippedBrBytes": 10988,
+      "shippedGzBytes": 12093,
+      "shippedBrBytes": 10959,
       "docs": "docs/reference/animate.md",
       "title": "./animate — одно-строчный DOM-фасад"
     },
@@ -569,8 +569,8 @@
       "runtimeExports": [
         "motionCompiler"
       ],
-      "shippedGzBytes": 6935,
-      "shippedBrBytes": 6155,
+      "shippedGzBytes": 6995,
+      "shippedBrBytes": 6200,
       "docs": "docs/reference/compiler.md",
       "title": "./compiler — build-time lowering: Vite-плагин и рантайм артефактов"
     },
