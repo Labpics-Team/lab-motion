@@ -34,26 +34,26 @@ import type { SpringParams } from '../src/spring.js';
 describe('compositor cache: functional state — roundtrip', () => {
   it('store → lookup возвращает то же значение; промах → undefined', () => {
     const c = createSpringLinearCacheState(4);
-    expect(lookupSpringLinearCache(c, 1, 2, 3, 4, 5)).toBeUndefined();
-    storeSpringLinearCache(c, 1, 2, 3, 4, 5, 'linear(A)');
-    expect(lookupSpringLinearCache(c, 1, 2, 3, 4, 5)).toBe('linear(A)');
+    expect(lookupSpringLinearCache(c, 1, 2, 3, 4)).toBeUndefined();
+    storeSpringLinearCache(c, 1, 2, 3, 4, 'linear(A)');
+    expect(lookupSpringLinearCache(c, 1, 2, 3, 4)).toBe('linear(A)');
     expect(springLinearCacheSize(c)).toBe(1);
   });
 
   it('отличный хоть на одно поле ключ → промах (верификация ключа, не только хеш)', () => {
     const c = createSpringLinearCacheState(4);
-    storeSpringLinearCache(c, 1, 2, 3, 4, 5, 'X');
-    expect(lookupSpringLinearCache(c, 1, 2, 3, 4, 6)).toBeUndefined(); // e отличается
-    expect(lookupSpringLinearCache(c, 9, 2, 3, 4, 5)).toBeUndefined(); // a отличается
-    expect(lookupSpringLinearCache(c, 1, 2, 3, 4, 5)).toBe('X'); // точный ключ — попадание
+    storeSpringLinearCache(c, 1, 2, 3, 4, 'X');
+    expect(lookupSpringLinearCache(c, 1, 2, 3, 5)).toBeUndefined(); // d отличается
+    expect(lookupSpringLinearCache(c, 9, 2, 3, 4)).toBeUndefined(); // a отличается
+    expect(lookupSpringLinearCache(c, 1, 2, 3, 4)).toBe('X'); // точный ключ — попадание
   });
 
   it('повторный store того же ключа не растит size (перезапись на месте)', () => {
     const c = createSpringLinearCacheState(4);
-    storeSpringLinearCache(c, 1, 1, 1, 1, 1, 'v1');
-    storeSpringLinearCache(c, 1, 1, 1, 1, 1, 'v2');
+    storeSpringLinearCache(c, 1, 1, 1, 1, 'v1');
+    storeSpringLinearCache(c, 1, 1, 1, 1, 'v2');
     expect(springLinearCacheSize(c)).toBe(1);
-    expect(lookupSpringLinearCache(c, 1, 1, 1, 1, 1)).toBe('v2');
+    expect(lookupSpringLinearCache(c, 1, 1, 1, 1)).toBe('v2');
   });
 
   it('generic node-pool сверяет raw exact-key при коллизии числового хеша', () => {
@@ -62,11 +62,11 @@ describe('compositor cache: functional state — roundtrip', () => {
     const nextNodes = [{ progress: 1, percent: 100 }];
     // Детерминированная коллизия числовой свёртки: +1 в первом поле ровно
     // компенсируется −31 во втором. Identity всё равно решают raw-поля.
-    storeSpringLinearCache(c, 1, 0, 3, 4, 5, oldNodes);
-    storeSpringLinearCache(c, 2, -31, 3, 4, 5, nextNodes);
+    storeSpringLinearCache(c, 1, 0, 3, 4, oldNodes);
+    storeSpringLinearCache(c, 2, -31, 3, 4, nextNodes);
 
-    expect(lookupSpringLinearCache(c, 1, 0, 3, 4, 5)).toBeUndefined();
-    expect(lookupSpringLinearCache(c, 2, -31, 3, 4, 5)).toBe(nextNodes);
+    expect(lookupSpringLinearCache(c, 1, 0, 3, 4)).toBeUndefined();
+    expect(lookupSpringLinearCache(c, 2, -31, 3, 4)).toBe(nextNodes);
     expect(springLinearCacheSize(c)).toBe(1);
   });
 });
@@ -74,37 +74,37 @@ describe('compositor cache: functional state — roundtrip', () => {
 describe('compositor cache: exact-LRU вытеснение и recency', () => {
   it('size никогда не превышает capacity; холодный слот вытесняется', () => {
     const c = createSpringLinearCacheState(2);
-    storeSpringLinearCache(c, 1, 0, 0, 0, 0, 'A');
-    storeSpringLinearCache(c, 2, 0, 0, 0, 0, 'B');
-    storeSpringLinearCache(c, 3, 0, 0, 0, 0, 'C'); // вытесняет A (самый старый)
+    storeSpringLinearCache(c, 1, 0, 0, 0, 'A');
+    storeSpringLinearCache(c, 2, 0, 0, 0, 'B');
+    storeSpringLinearCache(c, 3, 0, 0, 0, 'C'); // вытесняет A (самый старый)
     expect(springLinearCacheSize(c)).toBe(2);
-    expect(lookupSpringLinearCache(c, 1, 0, 0, 0, 0)).toBeUndefined(); // A вытеснен
-    expect(lookupSpringLinearCache(c, 2, 0, 0, 0, 0)).toBe('B');
-    expect(lookupSpringLinearCache(c, 3, 0, 0, 0, 0)).toBe('C');
+    expect(lookupSpringLinearCache(c, 1, 0, 0, 0)).toBeUndefined(); // A вытеснен
+    expect(lookupSpringLinearCache(c, 2, 0, 0, 0)).toBe('B');
+    expect(lookupSpringLinearCache(c, 3, 0, 0, 0)).toBe('C');
   });
 
   it('recency: lookup переносит ключ в MRU — вытесняется НЕ он', () => {
     const c = createSpringLinearCacheState(2);
-    storeSpringLinearCache(c, 1, 0, 0, 0, 0, 'A');
-    storeSpringLinearCache(c, 2, 0, 0, 0, 0, 'B');
-    lookupSpringLinearCache(c, 1, 0, 0, 0, 0); // трогаем A → теперь B самый старый
-    storeSpringLinearCache(c, 3, 0, 0, 0, 0, 'C'); // должно вытеснить B, не A
-    expect(lookupSpringLinearCache(c, 1, 0, 0, 0, 0)).toBe('A'); // выжил (был тронут)
-    expect(lookupSpringLinearCache(c, 2, 0, 0, 0, 0)).toBeUndefined(); // B вытеснен
-    expect(lookupSpringLinearCache(c, 3, 0, 0, 0, 0)).toBe('C');
+    storeSpringLinearCache(c, 1, 0, 0, 0, 'A');
+    storeSpringLinearCache(c, 2, 0, 0, 0, 'B');
+    lookupSpringLinearCache(c, 1, 0, 0, 0); // трогаем A → теперь B самый старый
+    storeSpringLinearCache(c, 3, 0, 0, 0, 'C'); // должно вытеснить B, не A
+    expect(lookupSpringLinearCache(c, 1, 0, 0, 0)).toBe('A'); // выжил (был тронут)
+    expect(lookupSpringLinearCache(c, 2, 0, 0, 0)).toBeUndefined(); // B вытеснен
+    expect(lookupSpringLinearCache(c, 3, 0, 0, 0)).toBe('C');
   });
 
   it('чтение WebKit-узлов участвует в том же LRU', () => {
     const c = createSpringLinearCacheState<readonly { progress: number; percent: number }[]>(2);
     const nodes = (progress: number) => [{ progress, percent: progress * 100 }];
-    storeSpringLinearCache(c, 1, 0, 0, 0, 0, nodes(1));
-    storeSpringLinearCache(c, 2, 0, 0, 0, 0, nodes(2));
-    lookupSpringLinearCache(c, 1, 0, 0, 0, 0); // 1 становится MRU; 2 остаётся LRU
-    storeSpringLinearCache(c, 3, 0, 0, 0, 0, nodes(3));
+    storeSpringLinearCache(c, 1, 0, 0, 0, nodes(1));
+    storeSpringLinearCache(c, 2, 0, 0, 0, nodes(2));
+    lookupSpringLinearCache(c, 1, 0, 0, 0); // 1 становится MRU; 2 остаётся LRU
+    storeSpringLinearCache(c, 3, 0, 0, 0, nodes(3));
 
-    expect(lookupSpringLinearCache(c, 1, 0, 0, 0, 0)).toBeDefined();
-    expect(lookupSpringLinearCache(c, 2, 0, 0, 0, 0)).toBeUndefined();
-    expect(lookupSpringLinearCache(c, 3, 0, 0, 0, 0)).toBeDefined();
+    expect(lookupSpringLinearCache(c, 1, 0, 0, 0)).toBeDefined();
+    expect(lookupSpringLinearCache(c, 2, 0, 0, 0)).toBeUndefined();
+    expect(lookupSpringLinearCache(c, 3, 0, 0, 0)).toBeDefined();
     expect(springLinearCacheSize(c)).toBe(2);
   });
 
@@ -116,13 +116,13 @@ describe('compositor cache: exact-LRU вытеснение и recency', () => {
       for (const key of keys) {
         const index = model.indexOf(key);
         const expectedHit = index >= 0;
-        const actual = lookupSpringLinearCache(cache, key, 0, 0, 0, 0);
+        const actual = lookupSpringLinearCache(cache, key, 0, 0, 0);
         expect(actual !== undefined).toBe(expectedHit);
         if (expectedHit) {
           hits++;
           model.splice(index, 1);
         } else {
-          storeSpringLinearCache(cache, key, 0, 0, 0, 0, key);
+          storeSpringLinearCache(cache, key, 0, 0, 0, key);
           if (model.length === capacity) model.pop();
         }
         model.unshift(key);
@@ -152,10 +152,10 @@ describe('compositor cache: exact-LRU вытеснение и recency', () => {
 
   it('clear опустошает кэш', () => {
     const c = createSpringLinearCacheState(4);
-    storeSpringLinearCache(c, 1, 2, 3, 4, 5, 'X');
+    storeSpringLinearCache(c, 1, 2, 3, 4, 'X');
     clearSpringLinearCache(c);
     expect(springLinearCacheSize(c)).toBe(0);
-    expect(lookupSpringLinearCache(c, 1, 2, 3, 4, 5)).toBeUndefined();
+    expect(lookupSpringLinearCache(c, 1, 2, 3, 4)).toBeUndefined();
   });
 
   it('невалидная ёмкость → дефолт', () => {
@@ -177,7 +177,7 @@ describe('compositor cache: exact-LRU вытеснение и recency', () => {
       const state = createSpringLinearCacheState<number>(capacity);
       expect(springLinearCacheCapacity(state)).toBe(DEFAULT_CACHE_CAPACITY);
       for (let key = 0; key <= DEFAULT_CACHE_CAPACITY; key++) {
-        storeSpringLinearCache(state, key, 0, 0, 0, 0, key);
+        storeSpringLinearCache(state, key, 0, 0, 0, key);
       }
       expect(springLinearCacheSize(state)).toBe(DEFAULT_CACHE_CAPACITY);
       expect(createSpringLinearCache(capacity).capacity).toBe(DEFAULT_CACHE_CAPACITY);
@@ -187,24 +187,24 @@ describe('compositor cache: exact-LRU вытеснение и recency', () => {
 
   it('заполнение + поток промахов держит size = capacity и переиспользует слоты', () => {
     const c = createSpringLinearCacheState(3);
-    for (let i = 0; i < 50; i++) storeSpringLinearCache(c, i, 0, 0, 0, 0, `v${i}`);
+    for (let i = 0; i < 50; i++) storeSpringLinearCache(c, i, 0, 0, 0, `v${i}`);
     expect(springLinearCacheSize(c)).toBe(3);
     // Последние три должны быть на месте.
-    expect(lookupSpringLinearCache(c, 49, 0, 0, 0, 0)).toBe('v49');
-    expect(lookupSpringLinearCache(c, 48, 0, 0, 0, 0)).toBe('v48');
-    expect(lookupSpringLinearCache(c, 47, 0, 0, 0, 0)).toBe('v47');
-    expect(lookupSpringLinearCache(c, 46, 0, 0, 0, 0)).toBeUndefined();
+    expect(lookupSpringLinearCache(c, 49, 0, 0, 0)).toBe('v49');
+    expect(lookupSpringLinearCache(c, 48, 0, 0, 0)).toBe('v48');
+    expect(lookupSpringLinearCache(c, 47, 0, 0, 0)).toBe('v47');
+    expect(lookupSpringLinearCache(c, 46, 0, 0, 0)).toBeUndefined();
   });
 
   it('часто читаемый слот переживает поток cold-miss без роста cache', () => {
     const c = createSpringLinearCacheState<number>(4);
-    for (let key = 0; key < 4; key++) storeSpringLinearCache(c, key, 0, 0, 0, 0, key);
+    for (let key = 0; key < 4; key++) storeSpringLinearCache(c, key, 0, 0, 0, key);
     for (let key = 4; key < 100; key++) {
-      expect(lookupSpringLinearCache(c, 0, 0, 0, 0, 0)).toBe(0);
-      storeSpringLinearCache(c, key, 0, 0, 0, 0, key);
+      expect(lookupSpringLinearCache(c, 0, 0, 0, 0)).toBe(0);
+      storeSpringLinearCache(c, key, 0, 0, 0, key);
       expect(springLinearCacheSize(c)).toBe(4);
     }
-    expect(lookupSpringLinearCache(c, 0, 0, 0, 0, 0)).toBe(0);
+    expect(lookupSpringLinearCache(c, 0, 0, 0, 0)).toBe(0);
   });
 });
 
