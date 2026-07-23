@@ -466,7 +466,28 @@ describe('compositor: owner snapshot читает actual WAAPI curve', () => {
 
   it('finite Animation.currentTime побеждает drifted now и переносит actual C0/C1', () => {
     const physics = { mass: 1, stiffness: 170, damping: 26 };
-    const currentTime = 372.096622;
+    const artifact = compileSpringExecutionArtifactUnchecked(
+      physics,
+      0,
+      TOLERANCE,
+    );
+    const durationMs = settleTimeUpperBound(physics, 0) * 1000;
+    // Probe — момент МАКСИМАЛЬНОГО расхождения serialized-кривой с аналитикой:
+    // дискриминатор «снапшот читает фактическую кривую» не зависит от того, где
+    // именно конкретная сетка (#228) поставила узлы, в отличие от магического
+    // фиксированного momenta прежней версии.
+    let currentTime = durationMs / 2;
+    let gap = 0;
+    for (let i = 1; i < 2000; i++) {
+      const t = (durationMs * i) / 2000;
+      const s = sampleSerializedSpring(artifact.samples, durationMs, t).value;
+      const a = readCompositorSpring(physics, { t: t / 1000 }).value;
+      const d = Math.abs(s - a);
+      if (d > gap) {
+        gap = d;
+        currentTime = t;
+      }
+    }
     let now = 0;
     const f = targetAt(() => currentTime);
     const cs = new CompositorSpring({
@@ -481,20 +502,17 @@ describe('compositor: owner snapshot читает actual WAAPI curve', () => {
     now = 100_000;
     cs.retarget(2);
 
-    const artifact = compileSpringExecutionArtifactUnchecked(
-      physics,
-      0,
-      TOLERANCE,
-    );
     const expected = sampleSerializedSpring(
       artifact.samples,
-      settleTimeUpperBound(physics, 0) * 1000,
+      durationMs,
       currentTime,
     );
     const analytic = readCompositorSpring(physics, { t: currentTime / 1000 });
     const second = f.calls[1]!;
     expect(second.keyframes[0]!['opacity']).toBe(expected.value);
-    expect(Math.abs(expected.value - analytic.value)).toBeGreaterThan(0.001);
+    // Расхождение измеримо (≫ float-шум closeTo ниже) — иначе тест не отличал
+    // бы serialized-путь от аналитического и стал бы вырожденным.
+    expect(Math.abs(expected.value - analytic.value)).toBeGreaterThan(1e-4);
 
     const serialized = parse(String(second.timing['easing']));
     const seededV0 = serialized[3]!

@@ -85,7 +85,8 @@ function emitArtifact(
   tolerance: number,
   durationMs: number,
 ): SpringExecutionArtifactTuple {
-  // Raw-кривая доказанно занимает ≤13/16 tolerance. Ещё 1/8 делим поровну:
+  // Raw-кривая доказанно занимает ≤7/8 tolerance (#228: сетка ≤ tol/2 + RDP
+  // 3tol/8). Оставшийся 1/8 делим поровну:
   // округление progress ≤tol/16 и сдвиг времени ≤tol/16. Для кусочно-
   // линейной функции с максимальным наклоном L
   // time-rounding эквивалентен монотонной перепараметризации и даёт ошибку
