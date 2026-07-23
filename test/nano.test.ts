@@ -4,7 +4,7 @@ import { animate } from '../src/nano/index.js';
 type Timing = KeyframeAnimationOptions & { easing?: string };
 
 interface RecordedAnimation {
-  readonly finished: Promise<RecordedAnimation>;
+  finished: Promise<RecordedAnimation>;
   readonly play: ReturnType<typeof vi.fn>;
   readonly pause: ReturnType<typeof vi.fn>;
   readonly reverse: ReturnType<typeof vi.fn>;
@@ -23,13 +23,24 @@ function recordingElement() {
     animations,
     animate(keyframes: PropertyIndexedKeyframes, timing: Timing) {
       let resolve!: (value: RecordedAnimation) => void;
+      let rejectFinished!: (reason: unknown) => void;
+      // WAAPI-семантика: play() из finished/idle начинает НОВЫЙ цикл с новым
+      // pending finished; cancel() реджектит текущий pending (на осевшем — no-op).
+      const nextFinished = () =>
+        new Promise<RecordedAnimation>((done, fail) => { resolve = done; rejectFinished = fail; });
       const finishListeners: Array<() => void> = [];
       const animation: RecordedAnimation = {
-        finished: new Promise<RecordedAnimation>((done) => { resolve = done; }),
-        play: vi.fn(() => { animation.playState = 'running'; }),
+        finished: undefined as unknown as Promise<RecordedAnimation>,
+        play: vi.fn(() => {
+          animation.playState = 'running';
+          animation.finished = nextFinished();
+        }),
         pause: vi.fn(),
         reverse: vi.fn(),
-        cancel: vi.fn(() => { animation.playState = 'idle'; }),
+        cancel: vi.fn(() => {
+          rejectFinished(new DOMException('The user aborted a request.', 'AbortError'));
+          animation.playState = 'idle';
+        }),
         commitStyles: vi.fn(),
         addEventListener: vi.fn((type: string, listener: () => void) => {
           if (type === 'finish') finishListeners.push(listener);
@@ -41,6 +52,7 @@ function recordingElement() {
           for (const listener of finishListeners) listener();
         },
       };
+      animation.finished = nextFinished();
       calls.push({ keyframes, timing });
       animations.push(animation);
       return animation;
@@ -277,6 +289,19 @@ describe('nano: публичный WAAPI-only контракт', () => {
     await Promise.resolve();
     expect(target.animations[0]!.commitStyles).not.toHaveBeenCalled();
     expect(target.animations[0]!.cancel).not.toHaveBeenCalled(); // guard уступил replay
+  });
+
+  it('replay из хендлера, затем cancel: controls.finished оседает reject-ом, не висит', async () => {
+    const target = recordingElement();
+    const controls = animate(target as unknown as Element, { opacity: 1 }, { duration: 100 });
+    target.animations[0]!.addEventListener('finish', () => {
+      target.animations[0]!.play(); // новый цикл с НОВЫМ finished-промисом
+    });
+
+    target.animations[0]!.finish();
+    await Promise.resolve(); // микротаск: guard уступил, reject перевзведён на новый цикл
+    target.animations[0]!.cancel();
+    await expect(controls.finished).rejects.toThrow('aborted');
   });
 });
 

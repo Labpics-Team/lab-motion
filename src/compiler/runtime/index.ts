@@ -53,6 +53,7 @@ export function animateCompiled(target: NanoTarget, artifact: CompiledNanoCall):
   animations.finished = Promise.all(animations.map((animation) => new Promise<Animation>((resolve, reject) => {
     animation.finished.catch(reject);
     animation.addEventListener('finish', () => queueMicrotask(() => {
+      animation.finished.catch(reject);
       if (animation.playState !== 'finished') return;
       try {
         animation.commitStyles();

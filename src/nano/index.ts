@@ -106,6 +106,10 @@ export function animate(
     // listeners видят finished-состояние, а guard пропускает чистку, если
     // консюмер перезапустил анимацию прямо в хендлере.
     animation.addEventListener('finish', () => queueMicrotask(() => {
+      // Каждый цикл перевзводит reject на ТЕКУЩИЙ finished: replay из хендлера
+      // создаёт новый промис, и его cancel обязан осадить обёртку (не вечный
+      // pending и не unhandled rejection). На осевшем промисе catch — no-op.
+      animation.finished.catch(reject);
       if (animation.playState !== 'finished') return;
       try {
         animation.commitStyles();
