@@ -93,7 +93,7 @@
   transform-state и commit-снап инлайн, каскад live ?? stored в один снимок) —
   consumer one-liner 12 706 → 12 632 B gz, animate+compositor 13 275 → 13 226,
   N-track 12 694 → 12 663; потолки затянуты ВНИЗ по фактам (хронология в
-  scripts/size-gate.mjs), nano неизменен (1011 B). В эквивалентном move+fade
+  scripts/size-gate.mjs), nano ужат до 1005 B gz. В эквивалентном move+fade
   сценарии size-compare: `./animate` 12 621 B gz < anime.js 12 773 B gz.
 - **Поведенческая коррекция pre-1.0 (#218):** физическая валидность пружины
   отделена от бюджетов исполнителей. Чистый `spring(params, t)` теперь

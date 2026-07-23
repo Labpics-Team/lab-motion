@@ -569,8 +569,8 @@
       "runtimeExports": [
         "motionCompiler"
       ],
-      "shippedGzBytes": 6726,
-      "shippedBrBytes": 5989,
+      "shippedGzBytes": 6935,
+      "shippedBrBytes": 6155,
       "docs": "docs/reference/compiler.md",
       "title": "./compiler — build-time lowering: Vite-плагин и рантайм артефактов"
     },

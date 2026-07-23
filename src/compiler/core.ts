@@ -261,6 +261,8 @@ export interface NanoLoweringPlan {
   readonly importSource: string;
   /** Число НЕтрансформированных вызовов nano-animate (для manifest). */
   readonly runtimeCalls: number;
+  /** Сумма длин ИНЪЕЦИРОВАННЫХ артефакт-литералов, символы (для onBudget). */
+  readonly literalChars: number;
   /**
    * Отказы БЕЗ маркера `@motion-runtime` (блочный комментарий вплотную перед вызовом) — кандидаты
    * на ошибку сборки в strict-режиме (#237). Помеченные вызовы легитимно
@@ -270,6 +272,11 @@ export interface NanoLoweringPlan {
 }
 
 const NANO_SOURCE = '@labpics/motion/nano';
+
+/** Блочный маркер `@motion-runtime` вплотную перед узлом: легитимный runtime. */
+function hasRuntimeMarker(code: string, start: number): boolean {
+  return /\/\*\s*@motion-runtime\s*\*\/\s*$/.test(code.slice(0, start));
+}
 export const COMPILED_IMPORT_SOURCE = '@labpics/motion/compiler/runtime';
 export const COMPILED_IMPORT_NAME = 'animateCompiled';
 const IMPORT_LOCAL = '__labMotionNanoCompiled';
@@ -343,10 +350,20 @@ export function planNanoLowering(
 ): NanoLoweringPlan | undefined {
   let importedPlain = false;
   const importNodes = new Set<AstNode>();
+  /** Узлы, удерживающие ./nano в графе (import/re-export форм всех видов). */
+  const nanoRetainers: AstNode[] = [];
   let doubt = false;
   let localNameCollision = false;
 
   walk(program, (node, parent) => {
+    if (
+      node.type === 'ImportDeclaration' ||
+      node.type === 'ExportNamedDeclaration' ||
+      node.type === 'ExportAllDeclaration'
+    ) {
+      const retainSource = node.source as AstNode | undefined;
+      if (retainSource?.value === NANO_SOURCE) nanoRetainers.push(node);
+    }
     if (node.type === 'ImportDeclaration') {
       const source = node.source as AstNode | undefined;
       if (source?.value === NANO_SOURCE) {
@@ -374,19 +391,39 @@ export function planNanoLowering(
     }
   });
 
-  if (!importedPlain || doubt || localNameCollision) return undefined;
+  if (!importedPlain || doubt || localNameCollision) {
+    // #237: ./nano удерживается в графе формой, которую ядро не анализирует
+    // (alias/namespace/side-effect импорт, re-export, затенение, коллизия) —
+    // это МОДУЛЬНЫЙ refusal: strict обязан его видеть, иначе гарантия
+    // «./nano физически не в бандле» дырява. Упоминание строки без
+    // import/export-формы (комментарий) — не при делах.
+    const anchor = nanoRetainers[0];
+    if (anchor === undefined) return undefined;
+    if (hasRuntimeMarker(code, anchor.start)) return undefined;
+    return {
+      edits: [],
+      importLocal: IMPORT_LOCAL,
+      importSource: COMPILED_IMPORT_SOURCE,
+      runtimeCalls: 0,
+      literalChars: 0,
+      refusals: [{
+        start: anchor.start,
+        reason: 'присутствие ./nano в неанализируемой форме (alias/namespace/re-export/затенение) — элиминация недоказуема',
+      }],
+    };
+  }
 
   const edits: NanoLoweringEdit[] = [];
   const refusals: NanoLoweringRefusal[] = [];
   let runtimeCalls = 0;
+  let literalChars = 0;
   /**
-   * Отказ с причиной (#237): вызов с маркером `@motion-runtime` (блочный комментарий вплотную перед ним) —
-   * легитимно рантаймовый (в runtimeCalls, не в refusals). Маркер ищется
-   * вплотную перед вызовом (допускается только пробельный хвост).
+   * Отказ с причиной (#237): вызов с маркером `@motion-runtime` —
+   * легитимно рантаймовый (в runtimeCalls, не в refusals).
    */
   const refuse = (node: AstNode, reason: string): void => {
     runtimeCalls++;
-    if (!/\/\*\s*@motion-runtime\s*\*\/\s*$/.test(code.slice(0, node.start))) {
+    if (!hasRuntimeMarker(code, node.start)) {
       refusals.push({ start: node.start, reason });
     }
   };
@@ -426,6 +463,7 @@ export function planNanoLowering(
         }`,
       );
     }
+    literalChars += literal.length;
     edits.push(
       { start: callee.start, end: targetArg.start, replacement: `${IMPORT_LOCAL}(` },
       { start: targetArg.end, end: node.end, replacement: `, ${literal})` },
@@ -445,6 +483,7 @@ export function planNanoLowering(
     importLocal: IMPORT_LOCAL,
     importSource: COMPILED_IMPORT_SOURCE,
     runtimeCalls,
+    literalChars,
     refusals,
   };
 }

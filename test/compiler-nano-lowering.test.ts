@@ -248,11 +248,12 @@ animate(b, { opacity: level });
 // ─── C3: hostile AST-negative corpus ─────────────────────────────────────────
 
 describe('консервативный отказ: источник остаётся семантически исходным', () => {
-  // Модульные отказы: план undefined целиком (доверять нечему).
+  // Модульные отказы (#237): план без правок, но с МОДУЛЬНЫМ refusal —
+  // ./nano удерживается в графе, strict обязан это видеть. Адаптер модуль
+  // не трансформирует. Чужой пакет — по-прежнему undefined (не при делах).
   const MODULE_CASES: readonly [name: string, code: string][] = [
     ['alias-импорт', `import { animate as go } from '@labpics/motion/nano'; go(el, { opacity: 1 });`],
     ['namespace-импорт', `import * as nano from '@labpics/motion/nano'; nano.animate(el, { opacity: 1 });`],
-    ['чужой пакет', `import { animate } from 'other-motion'; animate(el, { opacity: 1 });`],
     ['shadowing функцией', `import { animate } from '@labpics/motion/nano';
 function scope(animate) { return animate(el, { opacity: 1 }); }`],
     ['shadowing переменной', `import { animate } from '@labpics/motion/nano';
@@ -262,10 +263,19 @@ const __labMotionNanoCompiled = 1; animate(el, { opacity: 1 });`],
   ];
 
   for (const [name, code] of MODULE_CASES) {
-    it(`${name} → без трансформации модуля`, async () => {
-      expect(await plan(code)).toBeUndefined();
+    it(`${name} → без трансформации модуля, но с модульным refusal`, async () => {
+      const p = await plan(code);
+      expect(p).toBeDefined();
+      expect(p!.edits).toHaveLength(0);
+      expect(p!.refusals).toHaveLength(1);
+      expect(await applyPlugin(code)).toBeUndefined();
     });
   }
+
+  it('чужой пакет → план undefined целиком (не при делах)', async () => {
+    expect(await plan(`import { animate } from 'other-motion'; animate(el, { opacity: 1 });`))
+      .toBeUndefined();
+  });
 
   // Отказ по вызову: hostile-вызов остаётся runtime, а контрольный валидный
   // в том же модуле ОБЯЗАН понизиться — пин того, что сработал именно guard
@@ -320,8 +330,11 @@ animate(ok, { opacity: 1 });
     });
   }
 
-  it('re-export nano не трансформируется', async () => {
-    expect(await plan(`export { animate } from '@labpics/motion/nano';`)).toBeUndefined();
+  it('re-export nano не трансформируется, но даёт модульный refusal (#237)', async () => {
+    const p = await plan(`export { animate } from '@labpics/motion/nano';`);
+    expect(p).toBeDefined();
+    expect(p!.edits).toHaveLength(0);
+    expect(p!.refusals).toHaveLength(1);
   });
 
   it('отдельный export-statement: вызов понижается, nano-импорт сохраняется', async () => {
@@ -584,6 +597,64 @@ export function play(el, v) {
     const ast = await parseAstAsync(MIXED);
     expect(() => plugin.transform.call({ parse: () => ast }, MIXED, '/app/mixed.ts'))
       .toThrow(/strict/);
+  });
+
+  it('strict видит МОДУЛЬНЫЕ формы удержания ./nano: alias/namespace/re-export — refusal', async () => {
+    const forms = [
+      `import { animate as go } from '@labpics/motion/nano';\nexport const play = (el, v) => go(el, { opacity: v });\n`,
+      `import * as m from '@labpics/motion/nano';\nexport const play = (el, v) => m.animate(el, { opacity: v });\n`,
+      `export { animate } from '@labpics/motion/nano';\n`,
+      `import '@labpics/motion/nano';\n`,
+    ];
+    for (const code of forms) {
+      const p = await plan(code);
+      expect(p, code).toBeDefined();
+      expect(p!.edits, code).toHaveLength(0);
+      expect(p!.refusals, code).toHaveLength(1);
+      expect(p!.refusals[0]!.reason, code).toContain('неанализируемой форме');
+      const plugin = motionCompiler({ strict: true });
+      const ast = await parseAstAsync(code);
+      expect(() => plugin.transform.call({ parse: () => ast }, code, '/app/held.ts'), code)
+        .toThrow(/strict/);
+    }
+  });
+
+  it('маркер @motion-runtime перед неанализируемым импортом снимает модульный refusal', async () => {
+    const code = `/* @motion-runtime */ import * as m from '@labpics/motion/nano';\nexport const play = (el, v) => m.animate(el, { opacity: v });\n`;
+    expect(await plan(code)).toBeUndefined();
+  });
+
+  it('buildStart сбрасывает счётчики квитанции (watch-ребилды не наследуют)', async () => {
+    let report: { lowered: number; runtimeCalls: number; artifactChars: number } | undefined;
+    const plugin = motionCompiler({ onBudget: (r) => { report = r; } });
+    const lowerable = `import { animate } from '@labpics/motion/nano';
+export function play(el) { return animate(el, { opacity: 0.5 }); }
+`;
+    const ast = await parseAstAsync(lowerable);
+    plugin.buildStart();
+    plugin.transform.call({ parse: () => ast }, lowerable, '/app/a.ts');
+    plugin.buildEnd();
+    expect(report!.lowered).toBe(1);
+    plugin.buildStart(); // watch-ребилд без модулей
+    plugin.buildEnd();
+    expect(report).toEqual({ lowered: 0, runtimeCalls: 0, artifactChars: 0 });
+  });
+
+  it('artifactChars считает ТОЛЬКО литералы артефактов, без обёртки вызова', async () => {
+    let report: { artifactChars: number } | undefined;
+    const plugin = motionCompiler({ onBudget: (r) => { report = r; } });
+    const lowerable = `import { animate } from '@labpics/motion/nano';
+export function play(el) { return animate(el, { opacity: 0.5 }); }
+`;
+    const p = await plan(lowerable);
+    const ast = await parseAstAsync(lowerable);
+    plugin.buildStart();
+    plugin.transform.call({ parse: () => ast }, lowerable, '/app/a.ts');
+    plugin.buildEnd();
+    expect(report!.artifactChars).toBe(p!.literalChars);
+    // Литерал = ровно содержимое второй правки без ", " и ")".
+    const second = p!.edits[1]!.replacement;
+    expect(p!.literalChars).toBe(second.length - 3);
   });
 
   it('onBudget: квитанция lowered/runtimeCalls/artifactChars по buildEnd', async () => {

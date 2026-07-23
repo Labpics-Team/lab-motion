@@ -68,6 +68,8 @@ export interface MotionCompilerPlugin {
     code: string,
     id: string,
   ): TransformResult | undefined;
+  /** Сбрасывает счётчики квитанции: watch-ребилды не наследуют прошлый билд. */
+  buildStart(): void;
   buildEnd(): void;
 }
 
@@ -218,10 +220,15 @@ export function motionCompiler(options: MotionCompilerOptions = {}): MotionCompi
       runtimeCalls += plan.runtimeCalls;
       if (plan.edits.length === 0) return undefined; // только отказы — без трансформа
       lowered += plan.edits.length / 2;
-      for (const edit of plan.edits) artifactChars += edit.replacement.length;
+      artifactChars += plan.literalChars; // только литералы, без обёртки вызова
       const transformed = applyEdits(code, plan.edits) +
         `\nimport { ${COMPILED_IMPORT_NAME} as ${plan.importLocal} } from ${JSON.stringify(plan.importSource)};\n`;
       return { code: transformed, map: buildMap(code, plan.edits, id) };
+    },
+    buildStart() {
+      lowered = 0;
+      runtimeCalls = 0;
+      artifactChars = 0;
     },
     buildEnd() {
       options.onBudget?.({ lowered, runtimeCalls, artifactChars });
