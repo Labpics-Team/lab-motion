@@ -558,8 +558,8 @@
       "runtimeExports": [
         "animate"
       ],
-      "shippedGzBytes": 977,
-      "shippedBrBytes": 882,
+      "shippedGzBytes": 973,
+      "shippedBrBytes": 880,
       "docs": "docs/reference/nano.md",
       "title": "./nano — минимальный WAAPI-вход"
     },
@@ -569,8 +569,8 @@
       "runtimeExports": [
         "motionCompiler"
       ],
-      "shippedGzBytes": 6730,
-      "shippedBrBytes": 5992,
+      "shippedGzBytes": 6726,
+      "shippedBrBytes": 5989,
       "docs": "docs/reference/compiler.md",
       "title": "./compiler — build-time lowering: Vite-плагин и рантайм артефактов"
     },

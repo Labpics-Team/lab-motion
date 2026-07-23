@@ -19,6 +19,9 @@ export function springLinear(input?: NanoSpring): [number, string] {
   const k = input?.stiffness ?? 170;
   const c = input?.damping ?? 26;
   const m = input?.mass ?? 1;
+  // NB: isFinite(k+c+m)-слияние НЕЛЬЗЯ — сумма scale-эквивалентных конечных
+  // m/k/c переполняется, а контракт масштабной инвариантности требует принять
+  // (пин «та же кривая при общем конечном масштабе»).
   if (!(k > 0 && c > 0 && m > 0) || ![k, c, m].every(Number.isFinite)) {
     throw new RangeError('spring parameters must be finite and positive');
   }
@@ -49,11 +52,10 @@ export function springLinear(input?: NanoSpring): [number, string] {
   // осцилляций длительность выводится из строгих огибающих позиции и скорости;
   // монотонные режимы ищутся в безразмерном времени медленного полюса.
   const epsilon = 1e-3;
+  // max(ln x, ln y)/α ≡ ln(max(x, y))/α (log монотонен, оба аргумента > 0);
+  // y = x·(w/30) ⇒ max(x, y) = x·max(1, w/30) — один Math.log вместо двух.
   let duration = under
-    ? Math.max(
-        Math.log(w / d / epsilon) / a,
-        Math.log(w * w / d / (30 * epsilon)) / a,
-      )
+    ? Math.log(w / d / epsilon * Math.max(1, w / 30)) / a
     : 0;
   if (!under) {
     const step = 1 / (30 * slow);
