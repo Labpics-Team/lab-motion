@@ -1,6 +1,6 @@
 {
   "generatedFor": "0.3.0",
-  "revision": "633d4615f2b1e23fa2b5d65d800c3faaa607ff16",
+  "revision": "8091eb610db70ff097b010fd065aecd863546f45",
   "node": "v22.22.2",
   "esbuild": "0.28.1",
   "competitors": {
@@ -13,15 +13,15 @@
     {
       "id": "lab-compiled",
       "label": "lab-motion nano + compiler",
-      "gz": 866,
-      "raw": 1592,
+      "gz": 900,
+      "raw": 1669,
       "contract": "compile-time артефакт: native WAAPI, spring precomputed"
     },
     {
       "id": "lab-nano",
       "label": "lab-motion ./nano",
-      "gz": 1002,
-      "raw": 1728,
+      "gz": 1001,
+      "raw": 1718,
       "contract": "runtime: native WAAPI + spring→linear() на лету"
     },
     {
@@ -34,8 +34,8 @@
     {
       "id": "lab-animate",
       "label": "lab-motion ./animate (full)",
-      "gz": 12459,
-      "raw": 30580,
+      "gz": 12455,
+      "raw": 30563,
       "contract": "defensive runtime: C¹-подхват, fallback, hostile-host, N-keyframes"
     },
     {
