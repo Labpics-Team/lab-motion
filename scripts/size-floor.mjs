@@ -39,7 +39,7 @@ const __dirname = dirname(fileURLToPath(import.meta.url));
  * Каждая строка обязана буквально присутствовать в минифицированном бандле
  * сценария (см. гейт честности ниже).
  */
-const NANO_FLOOR_MANIFEST = {
+export const NANO_FLOOR_MANIFEST = {
   scenario: 'nano spring-to',
   categories: {
     'публичная грамматика (ключи опций/props)': [
@@ -79,7 +79,7 @@ const IDENTIFIER_TOKEN = /^[A-Za-z$_][\w$]*(\.[A-Za-z$_][\w$]*)*$/;
  * Валидность носителя проверяется машинно (см. main) — floor меряется по
  * байтам исполнимого кода, а не произвольной конкатенации.
  */
-function floorSource(manifest) {
+export function floorSource(manifest) {
   const tokens = Object.values(manifest.categories).flat();
   const statements = tokens.map((token) => {
     if (IDENTIFIER_TOKEN.test(token)) return token;
@@ -92,23 +92,40 @@ function floorSource(manifest) {
 }
 
 /** Тело носителя (без export-обёртки) — для синтакс-проверки new Function. */
-function floorBody(source) {
+export function floorBody(source) {
   return source.slice(source.indexOf('{') + 1, source.lastIndexOf('}'));
 }
 
-/** Токен → форма, в которой он обязан встретиться в минифицированном бандле. */
-function bundleNeedle(token) {
+const REGEXP_SPECIALS = /[.*+?^${}()|[\]\\]/g;
+const escapeRegExp = (value) => value.replace(REGEXP_SPECIALS, '\\$&');
+
+/**
+ * Присутствует ли токен манифеста в шипнутом бандле.
+ *
+ * Подстрочный поиск (первая версия, находка ревью #247) был ЛОЖНО щедрым:
+ * `mass` находился внутри `_mass`, `ease` внутри `easing`, `fill` внутри
+ * `fillMode`, `animate` внутри `el.animate` даже когда самого токена в
+ * контракте уже нет. Гейт честности при этом переставал ловить протухший
+ * манифест — то есть охранял ровно то, ради чего написан, лишь на словах.
+ *
+ * Поэтому идентификаторы ищутся по границам слова: слева не должно быть
+ * [\w$] (точка допустима — доступ к свойству host-объекта это нормальная
+ * форма шипа), справа не должно быть [\w$]. Не-идентификаторы (CSS-строки,
+ * тексты ошибок, фрагменты вроде `linear(`) остаются подстроками: они
+ * самодостаточно различимы и границ слова не имеют.
+ */
+export function isTokenShipped(token, shipped) {
   // Кавычки манифеста означают «строковый литерал» — в бандле он в кавычках
-  // (двойных либо одинарных, минификатор выбирает сам); голый токен ищется
-  // как есть (имена свойств/глобалов минификатор не переименовывает).
+  // (двойных либо одинарных, минификатор выбирает сам).
   if (token.startsWith('"') && token.endsWith('"')) {
     const body = token.slice(1, -1);
-    return [`"${body}"`, `'${body}'`];
+    return shipped.includes(`"${body}"`) || shipped.includes(`'${body}'`);
   }
-  return [token];
+  if (!IDENTIFIER_TOKEN.test(token)) return shipped.includes(token);
+  return new RegExp(`(?<![\\w$])${escapeRegExp(token)}(?![\\w$])`).test(shipped);
 }
 
-async function main() {
+export async function main() {
   const scenario = IMPORT_COST_SCENARIOS.find(
     (s) => s.name === NANO_FLOOR_MANIFEST.scenario,
   );
@@ -126,9 +143,7 @@ async function main() {
   const stale = [];
   for (const tokens of Object.values(NANO_FLOOR_MANIFEST.categories)) {
     for (const token of tokens) {
-      if (!bundleNeedle(token).some((needle) => shipped.includes(needle))) {
-        stale.push(token);
-      }
+      if (!isTokenShipped(token, shipped)) stale.push(token);
     }
   }
   if (stale.length > 0) {
@@ -181,4 +196,8 @@ async function main() {
   console.log('size-floor: PASS');
 }
 
-await main();
+// Прямой запуск исполняет гейт; импорт из теста — только чистые функции
+// (тот же приём, что в scripts/size-gate.mjs).
+const isDirectRun = process.argv[1]
+  && resolve(process.argv[1]) === fileURLToPath(import.meta.url);
+if (isDirectRun) await main();
