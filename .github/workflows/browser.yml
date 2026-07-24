@@ -9,7 +9,11 @@ on:
   push:
     branches: ["main"]
   pull_request:
-    branches: ["main"]
+    # Не только main: интеграционная ветка продакшен-среза — тоже база
+    # реальных PR. Без неё стековые PR (#245–#248) вообще не получали
+    # ни одного прогона: ни тестов, ни size-гейта, ни браузерной
+    # матрицы — «зелёный PR» означал лишь «бот не нашёл возражений».
+    branches: ["main", "claude/animation-library-production-4zhzvx"]
   merge_group:
   workflow_dispatch:
 
