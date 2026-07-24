@@ -90,12 +90,14 @@ jobs:
           version="$(node -p "require('./package.json').version")"
           node scripts/check-release.mjs "v${version}" --validate-stored-date
 
+      # Тот же единственный прогон сьюты, но с v8-покрытием: второй прогон ради
+      # ратчета покрытия не нужен, а sub-summary читает следующий шаг.
       - name: Vitest
         id: vitest
         shell: bash
         run: |
           set +e
-          pnpm vitest run 2>&1 | tee vitest.log
+          pnpm coverage 2>&1 | tee vitest.log
           status=${PIPESTATUS[0]}
           exit "$status"
 
@@ -113,6 +115,12 @@ jobs:
       # находка ревью #101 — потеря projection-fuzz при наивном разрешении конфликта).
       - name: Fuzz · finiteness gate (virtual-time, seeded LCG, zero-dep)
         run: pnpm vitest run --reporter=verbose test/*finiteness-fuzz.test.ts
+
+      # Ратчет покрытия (#249-урок): зелёная сьюта не означает, что тест ЗАШЁЛ в
+      # код. Полы по областям движутся только вверх; файл с исполнимыми строками
+      # и нулевым покрытием — всегда красный.
+      - name: Coverage ratchet
+        run: pnpm coverage:gate
 
       - name: Size gate
         run: pnpm size
