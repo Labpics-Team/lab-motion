@@ -56,16 +56,33 @@ describe('#243: носитель floor — валидный исполнимый
     expect(() => new Function(floorBody(source))).not.toThrow();
   });
 
-  it('каждый токен манифеста присутствует в носителе ровно один раз', () => {
+  it('носитель — ровно по одному стейтменту на токен, в порядке манифеста', () => {
+    // Подстрочный подсчёт здесь давал бы ЛОЖНЫЙ зелёный (находка ревью #247):
+    // токены манифеста перекрываются — `finish` живёт внутри `finished`,
+    // `ease` внутри `easing`. Пропажа стейтмента для `finish` осталась бы
+    // незамеченной. Поэтому сравнивается СТРУКТУРА: список стейтментов
+    // носителя против списка ожидаемых форм, позиция в позицию.
     const source = floorSource(NANO_FLOOR_MANIFEST);
     const tokens = Object.values(NANO_FLOOR_MANIFEST.categories).flat() as string[];
     // Анти-вырожденность: манифест не пуст, иначе тест ничего не проверяет.
     expect(tokens.length).toBeGreaterThan(30);
-    for (const token of tokens) {
-      const body = token.startsWith('"') && token.endsWith('"') ? token.slice(1, -1) : token;
-      const occurrences = source.split(body).length - 1;
-      expect(occurrences, `токен ${token}`).toBeGreaterThan(0);
-    }
+    const expected = tokens.map((token) => (
+      /^[A-Za-z$_][\w$]*(\.[A-Za-z$_][\w$]*)*$/.test(token)
+        ? token
+        : JSON.stringify(token.startsWith('"') && token.endsWith('"') ? token.slice(1, -1) : token)
+    ));
+    expect(floorBody(source).split(';')).toEqual(expected);
+  });
+
+  it('перекрывающиеся токены не подменяют друг друга (регрессия ревью #247)', () => {
+    // Манифест из перекрывающейся пары: пропажа короткого токена обязана быть
+    // видимой, хотя подстрока «finish» и остаётся в носителе внутри «finished».
+    const full = floorSource({ scenario: 'проба', categories: { c: ['"finish"', '"finished"'] } });
+    const missing = floorSource({ scenario: 'проба', categories: { c: ['"finished"'] } });
+    expect(missing).toContain('finish');           // подстрока — на месте
+    expect(floorBody(full).split(';')).toEqual(['"finish"', '"finished"']);
+    expect(floorBody(missing).split(';')).toEqual(['"finished"']);
+    expect(floorBody(missing).split(';')).not.toEqual(floorBody(full).split(';'));
   });
 
   it('строковые токены попадают в носитель экранированными, а не голыми', () => {
