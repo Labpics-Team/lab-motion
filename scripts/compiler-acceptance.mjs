@@ -94,6 +94,25 @@ const COMMON_MOTION_CEILING_GZ = 5120;
 // compiled-факт стенда size-compare был 866 B @633d461 — рост оплатили
 // ревью-фиксы контракта onfinish в шве; возврат ниже — цель портфеля
 // #238/#239), ×5 (3 уникальные пружины): 1516 B gz.
+// ── Стирание фасада (#240): «нулевая библиотека» ────────────────────────────
+// Авторский код — ПОЛНЫЙ ./animate (эргономика x/opacity, не nano-грамматика).
+// Понижение АВТОМАТИЧЕСКОЕ: установка плагина и есть согласие, автор ничего не
+// выбирает на каждый вызов. Фасад уходит tree-shake'ом. Ратчет от факта: он и есть заявление парадигмы.
+// Хронология: 2026-07-23 первый факт — 1758 B gz против 13624 B (−87.1%), но
+// тот исполнитель стартовал ВСЕГДА из identity и телепортировал элемент при
+// повторном вызове. 2026-07-24: 2411 B gz (−82.3%) — +653 B за корректность:
+// реестр прогонов, старт из живого положения (в т.ч. точная позиция при
+// прерывании на лету сэмплированием той же кривой) и чтение живого стиля для
+// не-transform групп. Решение: 650 байт дешевле визуального прыжка; целиться
+// обратно вниз — задача портфеля #238. Числа стенда выше сырого esbuild-среза
+// на обвязку vite lib-сборки — сравнивать можно только внутри харнесса.
+const ERASURE = `import { animate } from '@labpics/motion/animate';
+export function play(el) {
+  animate(el, { x: 240, opacity: 1 });
+}`;
+const ERASURE_CEILING_GZ = 2420;
+const ERASURE_RUNTIME_CEILING_GZ = 13700;
+
 const LEDGER_ONE_CEILING_GZ = 883;
 const LEDGER_FIVE_CEILING_GZ = 1516;
 // 5 вызовов, 3 уникальные пружины (дефолт + два литеральных пресета):
@@ -244,6 +263,33 @@ async function run() {
       `ledger (#237): ×1 = ${compiledGz} B gz (ратчет ${LEDGER_ONE_CEILING_GZ}), ` +
       `×5 (3 пружины) = ${fiveGz} B gz (ратчет ${LEDGER_FIVE_CEILING_GZ}); ` +
       `onBudget: lowered=${budget?.lowered}, runtime=${budget?.runtimeCalls}, artifactChars=${budget?.artifactChars}`,
+    );
+
+    // ── (#240) стирание фасада: «нулевая библиотека» ────────────────────────
+    const erasureRuntime = await buildFixture('erasure-runtime', ERASURE, false);
+    const erasureCompiled = await buildFixture('erasure-compiled', ERASURE, true);
+    const runtimeGz = gzipSync(erasureRuntime.code).length;
+    const erasureGz = gzipSync(erasureCompiled.code).length;
+    check(
+      runtimeGz <= ERASURE_RUNTIME_CEILING_GZ && runtimeGz > erasureGz * 3,
+      `контроль стирания подозрителен: рантаймовый фасад ${runtimeGz} B gz`,
+    );
+    check(
+      erasureGz <= ERASURE_CEILING_GZ,
+      `стирание фасада (${erasureGz} B gz) > ратчета ${ERASURE_CEILING_GZ}`,
+    );
+    // Несущая проверка парадигмы: фасада, солвера и сегментера в графе НЕТ.
+    const erasureGraph = [...erasureCompiled.modules].join(' ');
+    for (const forbidden of ['animate/index.js', 'animate/waapi-unit.js', 'compositor/segmenter.js', 'internal/solver.js']) {
+      check(
+        !erasureGraph.includes(forbidden),
+        `стирание неполно: в графе остался ${forbidden}`,
+      );
+    }
+    notes.push(
+      `стирание фасада (#240): полный ./animate ${runtimeGz} B gz → compiled ` +
+      `${erasureGz} B gz (−${(100 - erasureGz / runtimeGz * 100).toFixed(1)}%, ратчет ${ERASURE_CEILING_GZ}); ` +
+      `граф: ${[...erasureCompiled.modules].join(', ')}`,
     );
 
     // ── (#237) strict-smoke: непониженный вызов валит сборку, маркер — нет ───
