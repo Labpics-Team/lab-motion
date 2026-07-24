@@ -641,7 +641,7 @@ export function play(el) { return animate(el, { opacity: 0.5 }); }
     expect(report!.lowered).toBe(1);
     plugin.buildStart(); // watch-ребилд без модулей
     plugin.buildEnd();
-    expect(report).toEqual({ lowered: 0, runtimeCalls: 0, artifactChars: 0 });
+    expect(report).toEqual({ lowered: 0, runtimeCalls: 0, artifactChars: 0, erasableFacadeCalls: 0 });
   });
 
   it('artifactChars считает ТОЛЬКО литералы артефактов, без обёртки вызова', async () => {

@@ -820,6 +820,32 @@ export function facadeArtifactLiteral(
 }
 
 /**
+ * Понизился бы вызов, будь он помечен? Ровно те же проверки, что в плане, но
+ * без построения артефакта — предикат для квитанции кандидатов (#240).
+ */
+function isLowerableFacadeCall(
+  node: AstNode,
+  parent: AstNode | undefined,
+  code: string,
+): boolean {
+  if (node.optional === true) return false;
+  if (parent?.type !== 'ExpressionStatement') return false;
+  const args = node.arguments as AstNode[];
+  if (args.length !== 2 && args.length !== 3) return false;
+  const [targetArg, propsArg, optionsArg] = args as [AstNode, AstNode, AstNode?];
+  if (targetArg.type === 'SpreadElement') return false;
+  if (staticFacadeProps(propsArg) === undefined) return false;
+  if (staticFacadeOptions(optionsArg) === undefined) return false;
+  const callee = node.callee as AstNode;
+  const lastArg = optionsArg ?? propsArg;
+  return /^\s*\(\s*$/.test(code.slice(callee.end, targetArg.start))
+    && /^\s*,\s*$/.test(code.slice(targetArg.end, propsArg.start))
+    && (optionsArg === undefined
+      || /^\s*,\s*$/.test(code.slice(propsArg.end, optionsArg.start)))
+    && /^\s*,?\s*\)$/.test(code.slice(lastArg.end, node.end));
+}
+
+/**
  * Планирует понижение фасадных вызовов модуля. Отличия от nano-плана:
  * — источник `./animate`, а не `./nano`;
  * — вызов обязан нести прагму `@lm-oneshot` (иначе — рантаймовый, БЕЗ отказа:
@@ -829,6 +855,15 @@ export function facadeArtifactLiteral(
  * остаётся легальным рантаймовым тиром, его присутствие в графе — норма, а не
  * дырка в гарантии (в отличие от `./nano`, где действует закон #237).
  */
+export interface FacadeLoweringPlan extends NanoLoweringPlan {
+  /**
+   * Вызовы, которые понизились бы чисто, но не помечены прагмой (#240).
+   * Стирание — opt-in на вызов, поэтому без этой цифры автор просто не узнает,
+   * что 12 из его 40 вызовов уже готовы уехать из бандла.
+   */
+  readonly erasable: number;
+}
+
 export function planFacadeLowering(
   program: AstNode,
   code: string,
@@ -836,7 +871,7 @@ export function planFacadeLowering(
     groups: readonly StaticFacadeGroup[],
     options: StaticFacadeOptions,
   ) => string,
-): NanoLoweringPlan | undefined {
+): FacadeLoweringPlan | undefined {
   let importedPlain = false;
   const importNodes = new Set<AstNode>();
   let doubt = false;
@@ -876,6 +911,7 @@ export function planFacadeLowering(
   const refusals: NanoLoweringRefusal[] = [];
   let runtimeCalls = 0;
   let literalChars = 0;
+  let erasable = 0;
   /**
    * Помеченный прагмой вызов, который понизить не вышло, — ОТКАЗ с причиной
    * (автор запросил стирание и обязан узнать, почему его не случилось).
@@ -890,7 +926,15 @@ export function planFacadeLowering(
     if (node.type !== 'CallExpression') return;
     const callee = node.callee as AstNode;
     if (callee.type !== 'Identifier' || callee.name !== 'animate') return;
-    if (!hasOneshotMarker(code, node.start)) { runtimeCalls++; return; }
+    if (!hasOneshotMarker(code, node.start)) {
+      runtimeCalls++;
+      // Непомеченный вызов остаётся фасадом молча — но если он ПОНИЗИЛСЯ БЫ,
+      // автор должен об этом узнать из квитанции, иначе выигрыш парадигмы
+      // остаётся невидимым. Проверяется только грамматика: артефакт (кривая,
+      // верификация) не строится — кандидат стоит ноль build-времени.
+      if (isLowerableFacadeCall(node, parent, code)) erasable++;
+      return;
+    }
     if (node.optional === true) { refuse(node, 'optional-вызов `animate?.()`'); return; }
     if (parent?.type !== 'ExpressionStatement') {
       refuse(node, 'результат вызова используется — понижённый вызов не публикует owner и не отдаёт контролы');
@@ -935,7 +979,7 @@ export function planFacadeLowering(
     );
   });
 
-  if (edits.length === 0 && refusals.length === 0) return undefined;
+  if (edits.length === 0 && refusals.length === 0 && erasable === 0) return undefined;
   edits.sort((a, b) => a.start - b.start);
   return {
     edits,
@@ -944,5 +988,6 @@ export function planFacadeLowering(
     runtimeCalls,
     literalChars,
     refusals,
+    erasable,
   };
 }

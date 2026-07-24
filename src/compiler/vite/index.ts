@@ -48,6 +48,13 @@ export interface MotionBudgetReport {
   readonly runtimeCalls: number;
   /** Суммарная длина инъецированных артефакт-литералов, символы исходника. */
   readonly artifactChars: number;
+  /**
+   * Фасадные вызовы, которые понизились бы чисто, но не помечены прагмой
+   * `@lm-oneshot` (#240). Стирание — opt-in на вызов, поэтому без этой цифры
+   * автор не узнает, что часть его бандла уже готова уехать: квитанция
+   * превращает невидимый выигрыш в конкретное «N вызовов можно стереть».
+   */
+  readonly erasableFacadeCalls: number;
 }
 
 /** Опции плагина (#237). */
@@ -187,6 +194,12 @@ function applyEdits(code: string, edits: readonly NanoLoweringEdit[]): string {
 const QUICK_FILTER = '@labpics/motion/nano';
 /** Фасад понижается только под прагму — она и есть дешёвый отсев (#240). */
 const FACADE_QUICK_FILTER = '@lm-oneshot';
+/**
+ * Субпуть фасада. Модуль без прагмы разбирается ТОЛЬКО когда автор запросил
+ * квитанцию (`onBudget`): счёт кандидатов на стирание полезен, но платить за
+ * него разбором каждого фасадного модуля в каждой сборке — нет.
+ */
+const FACADE_SOURCE_FILTER = '@labpics/motion/animate';
 
 /** 0-базные line:col по байтовому offset (для strict-диагностики). */
 function positionAt(code: string, offset: number): string {
@@ -205,12 +218,15 @@ export function motionCompiler(options: MotionCompilerOptions = {}): MotionCompi
   let lowered = 0;
   let runtimeCalls = 0;
   let artifactChars = 0;
+  let erasableFacadeCalls = 0;
   return {
     name: 'lab-motion:nano-lowering',
     enforce: 'pre',
     transform(code, id) {
       if (id.includes('\0')) return undefined;
-      if (!code.includes(QUICK_FILTER) && !code.includes(FACADE_QUICK_FILTER)) return undefined;
+      const wantsFacade = code.includes(FACADE_QUICK_FILTER)
+        || (options.onBudget !== undefined && code.includes(FACADE_SOURCE_FILTER));
+      if (!code.includes(QUICK_FILTER) && !wantsFacade) return undefined;
       let program: unknown;
       try {
         program = this.parse(code);
@@ -224,7 +240,7 @@ export function motionCompiler(options: MotionCompilerOptions = {}): MotionCompi
       // обеих сливаются в один отсортированный список. Пересечься они не
       // могут — обе требуют локального имени `animate`, а два таких импорта
       // в одном модуле не сосуществуют.
-      const facadePlan = code.includes(FACADE_QUICK_FILTER)
+      const facadePlan = wantsFacade
         ? planFacadeLowering(program as AstNode, code, facadeArtifactLiteral)
         : undefined;
       if (plan === undefined && facadePlan === undefined) return undefined;
@@ -245,10 +261,11 @@ export function motionCompiler(options: MotionCompilerOptions = {}): MotionCompi
           `${facadeRefusal.reason}. Снимите прагму, если вызов должен остаться полным фасадом.`,
         );
       }
-      runtimeCalls += (plan?.runtimeCalls ?? 0) + (facadePlan?.runtimeCalls ?? 0);
+      runtimeCalls += plan?.runtimeCalls ?? 0;
+      erasableFacadeCalls += facadePlan?.erasable ?? 0;
       const edits = [...(plan?.edits ?? []), ...(facadePlan?.edits ?? [])]
         .sort((a, b) => a.start - b.start);
-      if (edits.length === 0) return undefined; // только отказы — без трансформа
+      if (edits.length === 0) return undefined; // только отказы/кандидаты — без трансформа
       lowered += edits.length / 2;
       artifactChars += (plan?.literalChars ?? 0) + (facadePlan?.literalChars ?? 0);
       let hoisted = '';
@@ -264,9 +281,10 @@ export function motionCompiler(options: MotionCompilerOptions = {}): MotionCompi
       lowered = 0;
       runtimeCalls = 0;
       artifactChars = 0;
+      erasableFacadeCalls = 0;
     },
     buildEnd() {
-      options.onBudget?.({ lowered, runtimeCalls, artifactChars });
+      options.onBudget?.({ lowered, runtimeCalls, artifactChars, erasableFacadeCalls });
     },
   };
 }

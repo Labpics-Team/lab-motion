@@ -129,11 +129,14 @@ describe('#240 C4: понижённый вызов подаёт браузеру
 // ─── Грамматика: что понижается и что честно отказывается ────────────────────
 
 describe('#240: грамматика понижения фасада', () => {
-  it('без прагмы вызов остаётся полным фасадом (план не трогает модуль)', async () => {
+  it('без прагмы вызов остаётся полным фасадом — правок нет, но он посчитан кандидатом', async () => {
     const p = await plan(`import { animate } from '@labpics/motion/animate';
 animate(el, { x: 240 });
 `);
-    expect(p).toBeUndefined();
+    expect(p!.edits).toHaveLength(0);
+    expect(p!.refusals).toHaveLength(0);
+    expect(p!.erasable).toBe(1);
+    expect(p!.runtimeCalls).toBe(1);
   });
 
   it('прагма понижает вызов и hoisted-импорт указывает на фасадный executor', async () => {
@@ -293,6 +296,60 @@ describe('#240: исполнитель compiled-фасада', () => {
     } finally {
       if (matchMediaDescriptor) Object.defineProperty(globalThis, 'matchMedia', matchMediaDescriptor);
       else delete (globalThis as { matchMedia?: unknown }).matchMedia;
+    }
+  });
+});
+
+// ─── Квитанция: невидимый выигрыш становится видимым ─────────────────────────
+//
+// Стирание — opt-in на вызов, поэтому автор обязан узнать, СКОЛЬКО его вызовов
+// уже готовы уехать из бандла. Mutation proof: перестать считать кандидатов →
+// «квитанция считает непомеченные кандидаты» RED.
+
+describe('#240: квитанция сборки показывает кандидатов на стирание', () => {
+  async function budgetOf(code: string) {
+    let report: { lowered: number; erasableFacadeCalls: number; runtimeCalls: number } | undefined;
+    const plugin = motionCompiler({ onBudget: (r) => { report = r; } });
+    plugin.buildStart();
+    const ast = await parseAstAsync(code);
+    plugin.transform.call({ parse: () => ast }, code, '/app/module.ts');
+    plugin.buildEnd();
+    return report!;
+  }
+
+  it('считает непомеченные вызовы, которые понизились бы чисто', async () => {
+    const report = await budgetOf(`import { animate } from '@labpics/motion/animate';
+export function a(el) { animate(el, { x: 240 }); }
+export function b(el) { animate(el, { opacity: [0, 1] }, { delay: 40 }); }
+export function c(el) { /* @lm-oneshot */ animate(el, { y: 10 }); }
+`);
+    expect(report.lowered).toBe(1);
+    expect(report.erasableFacadeCalls).toBe(2);
+  });
+
+  it('непонижаемые вызовы кандидатами НЕ считаются (честная цифра)', async () => {
+    const report = await budgetOf(`import { animate } from '@labpics/motion/animate';
+export function a(el, v) { animate(el, { x: v }); }
+export function b(el) { animate(el, { x: 1 }, { duration: 300 }); }
+export function c(el) { return animate(el, { x: 1 }); }
+export function d(el) { animate(el, { backgroundColor: 'red' }); }
+`);
+    expect(report.lowered).toBe(0);
+    expect(report.erasableFacadeCalls).toBe(0);
+  });
+
+  it('buildStart сбрасывает счётчик кандидатов (watch-ребилд не наследует)', async () => {
+    const source = `import { animate } from '@labpics/motion/animate';
+export function a(el) { animate(el, { x: 240 }); }
+`;
+    let report: { erasableFacadeCalls: number } | undefined;
+    const plugin = motionCompiler({ onBudget: (r) => { report = r; } });
+    const ast = await parseAstAsync(source);
+    for (let build = 0; build < 3; build++) {
+      plugin.buildStart();
+      plugin.transform.call({ parse: () => ast }, source, '/app/module.ts');
+      plugin.buildEnd();
+      expect(report!.erasableFacadeCalls, `сборка ${build}`).toBe(1);
     }
   });
 });
