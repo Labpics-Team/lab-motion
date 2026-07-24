@@ -15,8 +15,11 @@
  */
 
 import {
+  COMPILED_FACADE_IMPORT_NAME,
   COMPILED_IMPORT_NAME,
+  facadeArtifactLiteral,
   nanoArtifactLiteral,
+  planFacadeLowering,
   planNanoLowering,
   type AstNode,
   type NanoLoweringEdit,
@@ -98,6 +101,7 @@ function buildMap(
   code: string,
   edits: readonly NanoLoweringEdit[],
   id: string,
+  hoistedLines: number,
 ): TransformResult['map'] {
   for (const edit of edits) {
     if (edit.replacement.includes('\n')) {
@@ -155,9 +159,11 @@ function buildMap(
     cursor = edit.end;
   }
   keep(cursor, code.length);
-  // Хвостовой перевод строки + строка импорта + финальный перевод строки:
-  // hoisted-импорт executor не мапится в пользовательский исходник.
-  groups.push([], []);
+  // Хвостовой перевод строки + КАЖДАЯ строка hoisted-импорта + финальный
+  // перевод строки: импорты executor не мапятся в пользовательский исходник.
+  // Число строк передаётся явно — с двумя грамматиками (#240) их может быть
+  // две, и молчаливое расхождение сдвинуло бы всю карту последующих трансформов.
+  for (let line = 0; line <= hoistedLines; line++) groups.push([]);
   return {
     version: 3,
     mappings: groups.map((group) => group.join(',')).join(';'),
@@ -177,8 +183,10 @@ function applyEdits(code: string, edits: readonly NanoLoweringEdit[]): string {
   return out + code.slice(cursor);
 }
 
-/** Быстрый отсев до парсинга: модуль вообще не упоминает nano-субпуть. */
+/** Быстрый отсев до парсинга: модуль не упоминает ни один понижаемый субпуть. */
 const QUICK_FILTER = '@labpics/motion/nano';
+/** Фасад понижается только под прагму — она и есть дешёвый отсев (#240). */
+const FACADE_QUICK_FILTER = '@lm-oneshot';
 
 /** 0-базные line:col по байтовому offset (для strict-диагностики). */
 function positionAt(code: string, offset: number): string {
@@ -201,29 +209,56 @@ export function motionCompiler(options: MotionCompilerOptions = {}): MotionCompi
     name: 'lab-motion:nano-lowering',
     enforce: 'pre',
     transform(code, id) {
-      if (id.includes('\0') || !code.includes(QUICK_FILTER)) return undefined;
+      if (id.includes('\0')) return undefined;
+      if (!code.includes(QUICK_FILTER) && !code.includes(FACADE_QUICK_FILTER)) return undefined;
       let program: unknown;
       try {
         program = this.parse(code);
       } catch {
         return undefined; // не наш синтаксис — пусть падает штатный пайплайн
       }
-      const plan = planNanoLowering(program as AstNode, code, nanoArtifactLiteral);
-      if (plan === undefined) return undefined;
-      if (options.strict === true && plan.refusals.length > 0) {
-        const [first] = plan.refusals;
+      const plan = code.includes(QUICK_FILTER)
+        ? planNanoLowering(program as AstNode, code, nanoArtifactLiteral)
+        : undefined;
+      // Фасад (#240) — вторая грамматика в ТОМ ЖЕ проходе парсинга: правки
+      // обеих сливаются в один отсортированный список. Пересечься они не
+      // могут — обе требуют локального имени `animate`, а два таких импорта
+      // в одном модуле не сосуществуют.
+      const facadePlan = code.includes(FACADE_QUICK_FILTER)
+        ? planFacadeLowering(program as AstNode, code, facadeArtifactLiteral)
+        : undefined;
+      if (plan === undefined && facadePlan === undefined) return undefined;
+      const nanoRefusal = plan?.refusals[0];
+      if (options.strict === true && nanoRefusal !== undefined) {
         throw new Error(
-          `lab-motion compiler strict: непониженный nano-вызов ${id}:${positionAt(code, first!.start)} — ` +
-          `${first!.reason}. Сознательно рантаймовый вызов пометьте /* @motion-runtime */ вплотную перед ним.`,
+          `lab-motion compiler strict: непониженный nano-вызов ${id}:${positionAt(code, nanoRefusal.start)} — ` +
+          `${nanoRefusal.reason}. Сознательно рантаймовый вызов пометьте /* @motion-runtime */ вплотную перед ним.`,
         );
       }
-      runtimeCalls += plan.runtimeCalls;
-      if (plan.edits.length === 0) return undefined; // только отказы — без трансформа
-      lowered += plan.edits.length / 2;
-      artifactChars += plan.literalChars; // только литералы, без обёртки вызова
-      const transformed = applyEdits(code, plan.edits) +
-        `\nimport { ${COMPILED_IMPORT_NAME} as ${plan.importLocal} } from ${JSON.stringify(plan.importSource)};\n`;
-      return { code: transformed, map: buildMap(code, plan.edits, id) };
+      // Отказ помеченного прагмой фасадного вызова — ошибка сборки ВСЕГДА, не
+      // только в strict: автор явно запросил стирание, и тихий откат к полному
+      // фасаду (12+ КБ) противоречит запросу.
+      const facadeRefusal = facadePlan?.refusals[0];
+      if (facadeRefusal !== undefined) {
+        throw new Error(
+          `lab-motion compiler: непонижаемый @lm-oneshot вызов ${id}:${positionAt(code, facadeRefusal.start)} — ` +
+          `${facadeRefusal.reason}. Снимите прагму, если вызов должен остаться полным фасадом.`,
+        );
+      }
+      runtimeCalls += (plan?.runtimeCalls ?? 0) + (facadePlan?.runtimeCalls ?? 0);
+      const edits = [...(plan?.edits ?? []), ...(facadePlan?.edits ?? [])]
+        .sort((a, b) => a.start - b.start);
+      if (edits.length === 0) return undefined; // только отказы — без трансформа
+      lowered += edits.length / 2;
+      artifactChars += (plan?.literalChars ?? 0) + (facadePlan?.literalChars ?? 0);
+      let hoisted = '';
+      if (plan !== undefined && plan.edits.length > 0) {
+        hoisted += `\nimport { ${COMPILED_IMPORT_NAME} as ${plan.importLocal} } from ${JSON.stringify(plan.importSource)};`;
+      }
+      if (facadePlan !== undefined && facadePlan.edits.length > 0) {
+        hoisted += `\nimport { ${COMPILED_FACADE_IMPORT_NAME} as ${facadePlan.importLocal} } from ${JSON.stringify(facadePlan.importSource)};`;
+      }
+      return { code: applyEdits(code, edits) + hoisted + '\n', map: buildMap(code, edits, id, hoisted.split('\n').length - 1) };
     },
     buildStart() {
       lowered = 0;

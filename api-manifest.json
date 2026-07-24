@@ -569,8 +569,8 @@
       "runtimeExports": [
         "motionCompiler"
       ],
-      "shippedGzBytes": 6973,
-      "shippedBrBytes": 6191,
+      "shippedGzBytes": 9511,
+      "shippedBrBytes": 8431,
       "docs": "docs/reference/compiler.md",
       "title": "./compiler — build-time lowering: Vite-плагин и рантайм артефактов"
     },
@@ -578,10 +578,11 @@
       "subpath": "./compiler/runtime",
       "import": "@labpics/motion/compiler/runtime",
       "runtimeExports": [
-        "animateCompiled"
+        "animateCompiled",
+        "animateFacadeCompiled"
       ],
-      "shippedGzBytes": 390,
-      "shippedBrBytes": 322,
+      "shippedGzBytes": 1246,
+      "shippedBrBytes": 1078,
       "docs": "docs/reference/compiler.md",
       "title": "./compiler — build-time lowering: Vite-плагин и рантайм артефактов"
     },

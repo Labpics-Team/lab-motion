@@ -37,6 +37,9 @@ import {
   type MotionProgramV1,
 } from '../internal/motion-program.js';
 import { springLinear } from '../nano/spring-linear.js';
+import { compileRestingSpringExecutionArtifactTupleUnchecked, DEFAULT_TOLERANCE } from '../compositor/curve.js';
+import { DEFAULT_SPRING } from '../internal/motion-defaults.js';
+import { validateSpringParams, type SpringParams } from '../spring.js';
 
 // ─── Артефакт ────────────────────────────────────────────────────────────────
 
@@ -629,4 +632,317 @@ export function nanoArtifactLiteral(
   if (artifact.stagger !== undefined) out += `,g:${artifact.stagger}`;
   if (artifact.reducedMotion !== undefined) out += `,r:${artifact.reducedMotion ? 1 : 0}`;
   return out + '}';
+}
+
+// ─── #240 facade-erasure: понижение полного `./animate` ──────────────────────
+//
+// Отдельная грамматика рядом с nano: те же дисциплины (direct named import,
+// доказанная статика, побайтная верификация тривиа-зон, консервативный отказ),
+// но ДРУГАЯ семантика — фасад несёт реестр владения, C¹-подхват скорости,
+// residual-transform и rAF-фоллбек. Понижение отбрасывает всё это, поэтому оно
+// НЕ автоматическое: вызов обязан быть помечен прагмой `@lm-oneshot` вплотную
+// перед ним. Прагма — согласие автора на nano-семантику: «одноразовый прогон
+// из identity, без подхвата и без реестра». Результат обязан отбрасываться
+// (statement-позиция): понижённый вызов не публикует owner, поэтому любой
+// доступ к контролам был бы ложью о поведении.
+//
+// Кривая берётся из compositor/curve.ts (тот же артефакт, что строит фасадный
+// tier-0 при v0=0) — НЕ из nano/spring-linear.ts: у тиров разные эмиттеры и
+// разные длительности, и паритет требуется именно с фасадом (C4-дифференциал).
+
+const FACADE_SOURCE = '@labpics/motion/animate';
+export const COMPILED_FACADE_IMPORT_NAME = 'animateFacadeCompiled';
+const FACADE_IMPORT_LOCAL = '__labMotionFacadeCompiled';
+
+/** Прагма `@lm-oneshot` вплотную перед узлом: согласие на nano-семантику. */
+function hasOneshotMarker(code: string, start: number): boolean {
+  return /\/\*\s*@lm-oneshot\s*\*\/\s*$/.test(code.slice(0, start));
+}
+
+/**
+ * Identity transform-шортхендов — зеркало TRANSFORM_IDENTITY фасада
+ * (animate/channels.ts). Компилятор обязан выводить from ровно так же:
+ * фасад для transform-каналов НЕ читает computed-стиль, а берёт identity.
+ */
+const FACADE_TRANSFORM_IDENTITY: Readonly<Record<string, number>> = {
+  x: 0,
+  y: 0,
+  scale: 1,
+  scaleX: 1,
+  scaleY: 1,
+  rotate: 0,
+  skewX: 0,
+  skewY: 0,
+};
+
+/** Канал понижённого вызова: [ключ, from, to]. */
+export type StaticFacadeChannel = readonly [key: string, from: number, to: number];
+/** Группа записи: [CSS-группа, каналы] — одна Animation на группу. */
+export type StaticFacadeGroup = readonly [group: string, channels: readonly StaticFacadeChannel[]];
+
+/** Статически доказанные options фасада (spring-режим). */
+export interface StaticFacadeOptions {
+  readonly spring?: StaticNanoSpring | undefined;
+  readonly delay?: number | undefined;
+  readonly stagger?: number | undefined;
+}
+
+/**
+ * Статически доказанные props фасада: ObjectExpression, ключи — Identifier без
+ * дубликатов ТОЛЬКО из словаря transform-шортхендов и `opacity`; значения —
+ * конечный числовой литерал (from = identity/1) либо пара `[from, to]` из двух
+ * таких литералов. Всё прочее (CSS-каналы, var, цвета, треки ≥3) — undefined:
+ * их from фасад читает из живого стиля, что build доказать не может.
+ */
+function staticFacadeProps(props: AstNode): StaticFacadeGroup[] | undefined {
+  if (props.type !== 'ObjectExpression') return undefined;
+  const seen = new Set<string>();
+  // Группы в порядке ПЕРВОГО появления ключа — как parseProps фасада.
+  const groups = new Map<string, StaticFacadeChannel[]>();
+  for (const property of props.properties as AstNode[]) {
+    const plain = plainProperty(property);
+    if (plain === undefined) return undefined;
+    if (seen.has(plain.key)) return undefined;
+    seen.add(plain.key);
+    const isTransform = typeof FACADE_TRANSFORM_IDENTITY[plain.key] === 'number';
+    if (!isTransform && plain.key !== 'opacity') return undefined;
+    const group = isTransform ? 'transform' : 'opacity';
+    let from: number | undefined;
+    let to: number | undefined;
+    const single = staticFinite(plain.value);
+    if (single !== undefined) {
+      // Явной пары нет: фасад берёт from из identity (transform) либо из
+      // браузерного дефолта 1 (opacity) — прагма санкционирует это допущение.
+      from = isTransform ? FACADE_TRANSFORM_IDENTITY[plain.key]! : 1;
+      to = single;
+    } else if (plain.value.type === 'ArrayExpression') {
+      const items = plain.value.elements as (AstNode | null)[];
+      if (items.length !== 2) return undefined; // трек ≥3 — tween-режим фасада
+      const a = items[0] === null ? undefined : staticFinite(items[0]!);
+      const b = items[1] === null ? undefined : staticFinite(items[1]!);
+      if (a === undefined || b === undefined) return undefined;
+      from = a;
+      to = b;
+    } else return undefined;
+    const channels = groups.get(group);
+    if (channels === undefined) groups.set(group, [[plain.key, from, to]]);
+    else channels.push([plain.key, from, to]);
+  }
+  if (seen.size === 0) return undefined;
+  return [...groups].map(([group, channels]): StaticFacadeGroup => [group, channels]);
+}
+
+/**
+ * Статически доказанные options фасада: отсутствуют либо plain object из
+ * {spring?, delay?, stagger?}. duration/ease (tween), times/ease[] (треки),
+ * onComplete и прочие швы — undefined (вызов остаётся рантаймовым).
+ */
+function staticFacadeOptions(node: AstNode | undefined): StaticFacadeOptions | undefined {
+  if (node === undefined) return {};
+  if (node.type !== 'ObjectExpression') return undefined;
+  const out: { spring?: StaticNanoSpring; delay?: number; stagger?: number } = {};
+  const seen = new Set<string>();
+  for (const property of node.properties as AstNode[]) {
+    const plain = plainProperty(property);
+    if (plain === undefined) return undefined;
+    if (seen.has(plain.key)) return undefined;
+    seen.add(plain.key);
+    if (plain.key === 'spring') {
+      const spring = staticSpring(plain.value);
+      if (spring === undefined) return undefined;
+      out.spring = spring;
+    } else if (plain.key === 'delay' || plain.key === 'stagger') {
+      const value = staticFinite(plain.value);
+      if (value === undefined) return undefined;
+      out[plain.key] = value;
+    } else return undefined;
+  }
+  return out;
+}
+
+/** Готовый артефакт понижённого фасадного вызова. */
+export interface CompiledFacadeArtifact {
+  readonly groups: readonly StaticFacadeGroup[];
+  readonly durationMs: number;
+  readonly cssLinear: string;
+  readonly delay: number | undefined;
+  readonly stagger: number | undefined;
+}
+
+/**
+ * Собирает артефакт фасадного вызова. Кривая — тот же
+ * compileRestingSpringExecutionArtifactTupleUnchecked, который исполняет
+ * фасадный tier-0 при v0=0 (resting ≡ generic(v0=0) бит-в-бит), поэтому
+ * easing/duration совпадают с рантаймовым путём по построению; невалидная
+ * доказанно-статическая пружина — ошибка сборки (канон #221), не тихий
+ * фоллбек. Эндпоинты сетки (0% и 100%) проверяются явно: executor опирается
+ * на них, и молчаливый дрейф контракта сегментера должен ронять сборку.
+ */
+export function compileFacadeCallArtifact(
+  groups: readonly StaticFacadeGroup[],
+  options: StaticFacadeOptions = {},
+): CompiledFacadeArtifact {
+  const partial = options.spring;
+  const spring: SpringParams = {
+    mass: partial?.mass ?? DEFAULT_SPRING.mass,
+    stiffness: partial?.stiffness ?? DEFAULT_SPRING.stiffness,
+    damping: partial?.damping ?? DEFAULT_SPRING.damping,
+  };
+  validateSpringParams(spring);
+  const artifact = compileRestingSpringExecutionArtifactTupleUnchecked(spring, DEFAULT_TOLERANCE);
+  const samples = artifact[1];
+  if (samples[0] !== 0 || samples[samples.length - 2] !== 100) {
+    throw new Error('lab-motion compiler: сетка кривой не начинается в 0% / не кончается в 100%');
+  }
+  return {
+    groups,
+    durationMs: artifact[2],
+    cssLinear: artifact[0],
+    delay: options.delay,
+    stagger: options.stagger,
+  };
+}
+
+/** Компактный однострочный литерал фасадного артефакта (закон sourcemap). */
+export function facadeArtifactLiteral(
+  groups: readonly StaticFacadeGroup[],
+  options: StaticFacadeOptions = {},
+): string {
+  const artifact = compileFacadeCallArtifact(groups, options);
+  const channels = artifact.groups.map(([group, list]) =>
+    `[${JSON.stringify(group)},[${
+      list.map(([key, from, to]) => `[${JSON.stringify(key)},${from},${to}]`).join(',')
+    }]]`).join(',');
+  let out = `{c:[${channels}],d:${artifact.durationMs},e:${JSON.stringify(artifact.cssLinear)}`;
+  if (artifact.delay !== undefined) out += `,y:${artifact.delay}`;
+  if (artifact.stagger !== undefined) out += `,g:${artifact.stagger}`;
+  return out + '}';
+}
+
+/**
+ * Планирует понижение фасадных вызовов модуля. Отличия от nano-плана:
+ * — источник `./animate`, а не `./nano`;
+ * — вызов обязан нести прагму `@lm-oneshot` (иначе — рантаймовый, БЕЗ отказа:
+ *   отсутствие прагмы не дефект, а осознанный выбор полного фасада);
+ * — вызов обязан стоять в statement-позиции (результат отбрасывается).
+ * Модульный отказ (alias/namespace/re-export/затенение) НЕ выносится: фасад
+ * остаётся легальным рантаймовым тиром, его присутствие в графе — норма, а не
+ * дырка в гарантии (в отличие от `./nano`, где действует закон #237).
+ */
+export function planFacadeLowering(
+  program: AstNode,
+  code: string,
+  artifactLiteral: (
+    groups: readonly StaticFacadeGroup[],
+    options: StaticFacadeOptions,
+  ) => string,
+): NanoLoweringPlan | undefined {
+  let importedPlain = false;
+  const importNodes = new Set<AstNode>();
+  let doubt = false;
+  let localNameCollision = false;
+
+  walk(program, (node, parent) => {
+    if (node.type === 'ImportDeclaration') {
+      const source = node.source as AstNode | undefined;
+      if (source?.value === FACADE_SOURCE) {
+        for (const spec of (node.specifiers as AstNode[] | undefined) ?? []) {
+          importNodes.add(spec);
+          if (
+            spec.type === 'ImportSpecifier' &&
+            (spec.imported as AstNode).type === 'Identifier' &&
+            (spec.imported as AstNode).name === 'animate' &&
+            (spec.local as AstNode).name === 'animate'
+          ) {
+            importedPlain = true;
+          }
+        }
+      }
+    }
+    if (node.type === 'Identifier' && node.name === FACADE_IMPORT_LOCAL) localNameCollision = true;
+    if (
+      node.name === 'animate' &&
+      !importNodes.has(parent as AstNode) &&
+      parent?.type !== 'ImportSpecifier' &&
+      bindsName(node, parent, 'animate')
+    ) {
+      doubt = true;
+    }
+  });
+
+  if (!importedPlain || doubt || localNameCollision) return undefined;
+
+  const edits: NanoLoweringEdit[] = [];
+  const refusals: NanoLoweringRefusal[] = [];
+  let runtimeCalls = 0;
+  let literalChars = 0;
+  /**
+   * Помеченный прагмой вызов, который понизить не вышло, — ОТКАЗ с причиной
+   * (автор запросил стирание и обязан узнать, почему его не случилось).
+   * Непомеченный — просто рантаймовый фасад, без записи в refusals.
+   */
+  const refuse = (node: AstNode, reason: string): void => {
+    runtimeCalls++;
+    if (hasOneshotMarker(code, node.start)) refusals.push({ start: node.start, reason });
+  };
+
+  walk(program, (node, parent) => {
+    if (node.type !== 'CallExpression') return;
+    const callee = node.callee as AstNode;
+    if (callee.type !== 'Identifier' || callee.name !== 'animate') return;
+    if (!hasOneshotMarker(code, node.start)) { runtimeCalls++; return; }
+    if (node.optional === true) { refuse(node, 'optional-вызов `animate?.()`'); return; }
+    if (parent?.type !== 'ExpressionStatement') {
+      refuse(node, 'результат вызова используется — понижённый вызов не публикует owner и не отдаёт контролы');
+      return;
+    }
+    const args = node.arguments as AstNode[];
+    if (args.length !== 2 && args.length !== 3) { refuse(node, 'не 2–3 аргумента'); return; }
+    const [targetArg, propsArg, optionsArg] = args as [AstNode, AstNode, AstNode?];
+    if (targetArg.type === 'SpreadElement') { refuse(node, 'spread в target'); return; }
+    const groups = staticFacadeProps(propsArg);
+    if (groups === undefined) {
+      refuse(node, 'props не доказаны статическими (поддержаны transform-шортхенды и opacity: число либо пара [from, to])');
+      return;
+    }
+    const options = staticFacadeOptions(optionsArg);
+    if (options === undefined) {
+      refuse(node, 'options не доказаны статическими (поддержаны spring/delay/stagger; duration/ease — tween-режим фасада)');
+      return;
+    }
+    const lastArg = optionsArg ?? propsArg;
+    if (
+      !/^\s*\(\s*$/.test(code.slice(callee.end, targetArg.start)) ||
+      !/^\s*,\s*$/.test(code.slice(targetArg.end, propsArg.start)) ||
+      (optionsArg !== undefined &&
+        !/^\s*,\s*$/.test(code.slice(propsArg.end, optionsArg.start))) ||
+      !/^\s*,?\s*\)$/.test(code.slice(lastArg.end, node.end))
+    ) { refuse(node, 'нестандартные разделители/комментарии внутри вызова'); return; }
+    let literal: string;
+    try {
+      literal = artifactLiteral(groups, options);
+    } catch (error) {
+      throw new Error(
+        `lab-motion compiler: статический фасадный вызов невалиден — ${
+          error instanceof Error ? error.message : String(error)
+        }`,
+      );
+    }
+    literalChars += literal.length;
+    edits.push(
+      { start: callee.start, end: targetArg.start, replacement: `${FACADE_IMPORT_LOCAL}(` },
+      { start: targetArg.end, end: node.end, replacement: `, ${literal})` },
+    );
+  });
+
+  if (edits.length === 0 && refusals.length === 0) return undefined;
+  edits.sort((a, b) => a.start - b.start);
+  return {
+    edits,
+    importLocal: FACADE_IMPORT_LOCAL,
+    importSource: COMPILED_IMPORT_SOURCE,
+    runtimeCalls,
+    literalChars,
+    refusals,
+  };
 }

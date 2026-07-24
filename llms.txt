@@ -132,7 +132,7 @@
   exports: motionCompiler
   docs: docs/reference/compiler.md
 - @labpics/motion/compiler/runtime — build-time lowering: Vite-плагин и рантайм артефактов
-  exports: animateCompiled
+  exports: animateCompiled, animateFacadeCompiled
   docs: docs/reference/compiler.md
 - @labpics/motion/behaviors — headless-машины мобильных взаимодействий
   exports: createBottomSheet, createCarousel, createDragDismiss, createPullToRefresh
