@@ -288,7 +288,9 @@ const __labMotionNanoCompiled = 1; animate(el, { opacity: 1 });`],
     ['computed key', `animate(el, { ['opacity']: 1 });`],
     ['строковый key', `animate(el, { 'opacity': 1 });`],
     ['getter', `animate(el, { get opacity() { return 1; } });`],
-    ['unary minus', `animate(el, { opacity: -0.5 });`],
+    // «unary minus» снят 2026-07-23 (#240 шаг 1): -0.5 теперь статичен
+    // (GREEN-кейсы в блоке «#240: унарный минус» ниже); сомнение — унарный ~.
+    ['unary tilde', `animate(el, { opacity: ~1 });`],
     ['unary plus', `animate(el, { opacity: +1 });`],
     ['переменная значением', `animate(el, { opacity: level });`],
     ['Infinity идентификатором', `animate(el, { opacity: Infinity });`],
@@ -308,7 +310,9 @@ const __labMotionNanoCompiled = 1; animate(el, { opacity: 1 });`],
     ['spring с лишним ключом', `animate(el, { opacity: 1 }, { spring: { mass: 1, bounce: 1 } });`],
     ['spring со spread', `animate(el, { opacity: 1 }, { spring: { ...base } });`],
     ['delay переменной', `animate(el, { opacity: 1 }, { delay: wait });`],
-    ['stagger unary minus', `animate(el, { opacity: 1 }, { stagger: -20 });`],
+    // «stagger unary minus» снят 2026-07-23 (#240 шаг 1): -20 теперь статичен;
+    // эквивалентное сомнение — унарный плюс (не входит в грамматику).
+    ['stagger unary plus', `animate(el, { opacity: 1 }, { stagger: +20 });`],
     ['reducedMotion не boolean', `animate(el, { opacity: 1 }, { reducedMotion: 1 });`],
     ['дубликат ключа options', `animate(el, { opacity: 1 }, { delay: 1, delay: 2 });`],
     ['getter в options', `animate(el, { opacity: 1 }, { get delay() { return 1; } });`],
@@ -719,5 +723,81 @@ export const p = (el) => animate(el, { opacity: 0.5 });
     plugin.buildStart();
     plugin.buildEnd();
     expect(report!.uniqueArtifacts).toBe(0);
+  });
+});
+
+// ─── #240 шаг 1: унарный минус в статической грамматике ──────────────────────
+//
+// `-100` — это UnaryExpression('-', Literal): прежний staticFinite отвергал
+// типовые вызовы вида `rotate: -8` (кейс корпуса миграций animejs). Значение
+// вычисляется точно; прочие унарные операторы остаются сомнением → runtime.
+// Mutation proof: убрать ветку UnaryExpression → все GREEN-кейсы ниже падают
+// (план undefined); принять любой operator → кейс `+5` падает.
+
+describe('#240: унарный минус — статический литерал', () => {
+  it('rotate: -8 понижается, кадр несёт "-8deg" (порядок ключей авторский)', async () => {
+    const output = await applyPlugin(`import { animate } from '@labpics/motion/nano';
+export const run = (el) => { animate(el, { rotate: -8, opacity: 1 }); };
+`);
+    expect(output).toBeDefined();
+    // Кадр литерала — компактный JS; порядок ключей авторский (rotate, opacity).
+    expect(output).toContain('{f:{rotate:"-8deg",opacity:1}');
+  });
+
+  it('вложенный минус - -5 вычисляется точно в 5', async () => {
+    const p = await plan(`import { animate } from '@labpics/motion/nano';
+animate(el, { opacity: - -5 });
+`);
+    expect(p).toBeDefined();
+    expect(p!.edits.length).toBe(2);
+    expect(p!.edits[1]!.replacement).toContain('{f:{opacity:5}');
+  });
+
+  it('отрицательный delay доказан статическим и попадает в артефакт', async () => {
+    const p = await plan(`import { animate } from '@labpics/motion/nano';
+animate(el, { opacity: 1 }, { delay: -100 });
+`);
+    expect(p).toBeDefined();
+    expect(p!.edits.length).toBe(2);
+    expect(p!.edits[1]!.replacement).toContain('y:-100');
+  });
+
+  it('отрицательный stagger доказан статическим и попадает в артефакт', async () => {
+    // Прежний отказный кейс «stagger unary minus» стал GREEN: тот же
+    // staticFinite-путь, что delay — регрессия на второй точке грамматики.
+    const p = await plan(`import { animate } from '@labpics/motion/nano';
+animate(el, { opacity: 1 }, { stagger: -20 });
+`);
+    expect(p).toBeDefined();
+    expect(p!.edits.length).toBe(2);
+    expect(p!.edits[1]!.replacement).toContain('g:-20');
+  });
+
+  it('-0 понижается в 0 — паритет с рантаймовым nano (ревью #248)', async () => {
+    // Унарный минус сделал -0 статическим. Значение попадает в артефакт через
+    // String(-0) === '0', то есть кадр совпадает с рантаймовым путём поле в
+    // поле; отдельный пин нужен, потому что -0 — единственное значение, где
+    // Object.is отличает результат от литерала 0.
+    const p = await plan(`import { animate } from '@labpics/motion/nano';
+animate(el, { opacity: -0, rotate: -0 });
+`);
+    expect(p).toBeDefined();
+    expect(p!.edits.length).toBe(2);
+    expect(p!.edits[1]!.replacement).toContain('{f:{opacity:0,rotate:"0deg"}');
+  });
+
+  it('унарный плюс остаётся сомнением — вызов не понижается', async () => {
+    const p = await plan(`import { animate } from '@labpics/motion/nano';
+animate(el, { opacity: +1 });
+`);
+    expect(p).toBeDefined();
+    expect(p!.edits.length).toBe(0);
+    expect(p!.refusals.length).toBe(1);
+  });
+
+  it('отрицательная пружина — ошибка сборки, не silent fallback', async () => {
+    await expect(applyPlugin(`import { animate } from '@labpics/motion/nano';
+animate(el, { opacity: 1 }, { spring: { mass: 1, stiffness: -5, damping: 26 } });
+`)).rejects.toThrow(/статический nano-вызов невалиден/);
   });
 });

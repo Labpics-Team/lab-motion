@@ -502,8 +502,18 @@ function plainProperty(node: AstNode): { key: string; value: AstNode } | undefin
   return { key: key.name as string, value: node.value as AstNode };
 }
 
-/** Конечный числовой литерал (unary minus — UnaryExpression, отказ). */
+/**
+ * Конечный числовой литерал, включая унарный минус (#240: `-100` — это
+ * UnaryExpression('-', Literal), прежний отказ терял типовые вызовы вида
+ * `x: [-100, 100]`). Значение вычисляется точно (JS-семантика унарного
+ * минуса над литералом); прочие операторы (`+`, `~`, `!`) — по-прежнему
+ * сомнение → runtime.
+ */
 function staticFinite(node: AstNode): number | undefined {
+  if (node.type === 'UnaryExpression' && node.operator === '-' && node.argument !== undefined) {
+    const inner = staticFinite(node.argument as AstNode);
+    return inner === undefined ? undefined : -inner;
+  }
   return node.type === 'Literal' && typeof node.value === 'number' && Number.isFinite(node.value)
     ? node.value
     : undefined;

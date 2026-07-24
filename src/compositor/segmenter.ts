@@ -5,20 +5,19 @@
  * времени»): генераторы индустрии (Джейк Арчибальд, MDN, Motion) сэмплируют
  * пружину ФИКСИРОВАННЫМ числом равноудалённых точек (~33–100), пере-сэмплируя
  * пологие кривые и недо-сэмплируя жёсткие. Здесь число узлов ВЫВОДИТСЯ из
- * бюджета ошибки: узлы ставятся там, где кривизна прогресса |p″| высока (старт,
- * пики перелёта) и разрежены в экспоненциальном хвосте.
+ * бюджета ошибки, а сами узлы ставятся ЛОКАЛЬНЫМ шагом (#228): плотно там, где
+ * certified-бонд кривизны |p″| высок (старт, пики перелёта), и разреженно в
+ * экспоненциальном хвосте — глобальный worst-case пересэмплинг хвоста снят.
  *
- * Метод — вертикальный Дуглас–Пекер (RDP) поверх плотной аналитической сетки:
- * для функции-графика p(τ) ошибка кусочно-линейной реконструкции в точке τ —
- * это ВЕРТИКАЛЬНОЕ отклонение |p(τ) − lerp(τ)| (не перпендикулярное: нас
- * интересует ошибка значения в данный момент времени, а не геометрия кривой).
- * RDP жадно оставляет точку максимального отклонения, пока каждый сегмент не
- * уложится в eps. Бюджет ошибки делится ПОПОЛАМ: eps RDP = tolerance/2 (ошибка
- * прореживания на узлах сетки), а плотность базовой сетки выводится из бонда
- * кривизны так, что её СОБСТВЕННАЯ кусочно-линейная ошибка ≤ tolerance/2 —
- * суммарно реконструкция ≤ tolerance на всей непрерывной кривой (не только в
- * узлах сетки). Плотность НЕ из числа полуволн: доминирующая кривизна прогресса
- * — на СТАРТЕ (начальное ускорение ~T²ω₀²), а не в осцилляциях (см. baseGridSize).
+ * Схема (#228, спайк в issue): базовая сетка строится локальным шагом из
+ * certified-бонда кривизны на текущем состоянии (см. вывод у adaptiveGrid) —
+ * её собственная кусочно-линейная ошибка ≤ tolerance/2 НА ВСЕЙ непрерывной
+ * кривой; состояние переходит на следующий узел ЗАМКНУТОЙ формой solveSpring
+ * (точный transition-оператор, не численный Euler). Поверх — вертикальный
+ * Дуглас–Пекер (RDP) с eps = 3·tolerance/8: для функции-графика p(τ) ошибка
+ * реконструкции — ВЕРТИКАЛЬНОЕ отклонение |p(τ) − lerp(τ)| (нас интересует
+ * ошибка значения в момент времени, не геометрия кривой). Сериализация
+ * забирает ≤ tolerance/8 (см. emitArtifact) — замкнутая арифметика ≤ tolerance.
  *
  * Длительность плана = settleTimeUpperBound (запечатанный канонический закон
  * оседания spring.ts, ≤ бюджета кадра-капа, валидирован бенчами #64) — не новая
@@ -33,7 +32,7 @@
 
 import { MotionParamError } from '../errors.js';
 import { CONVERGENCE_THRESHOLD } from '../internal/constants.js';
-import { makeSpringValueSampler } from '../internal/solver.js';
+import { solveSpring } from '../internal/solver.js';
 import {
   settleTimeUpperBound,
   type SpringParams,
@@ -86,47 +85,125 @@ export interface SpringNode {
   readonly percent: number;
 }
 
-// ─── Плотность базовой сетки (из бонда кривизны, не из числа осцилляций) ─────
+// ─── #228: локальная энергетическая сетка (certified-бонды кривизны) ─────────
 //
-// Ошибка реконструкции = (ошибка RDP на узлах сетки) + (кусочно-линейная ошибка
-// САМОЙ базовой сетки МЕЖДУ её узлами). Второе — дискретизация: для C²-функции
-// ≤ (h²/8)·max|d²p/dτ²| на шаге h (ед. τ). ДОМИНИРУЮЩАЯ кривизна прогресса — НЕ в
-// осцилляциях, а на СТАРТЕ: при v0=0 x″(0)=ω₀², в τ-единицах d²p/dτ²|₀ = T²ω₀².
-// (Сетка, размеренная числом полуволн, недо-сэмплирует старт — ровно этот класс
-// дефекта поймал флагманский тест границы ошибки: reconstruction 0.0096 при
-// tol 0.002.)
+// Безразмерное состояние (канон #226): u = ω₀t, y = p−1, w = dy/du; ОДУ
+// y″ + 2ζy′ + y = 0. Энергия E = (y²+w²)/2 монотонно убывает (E′ = −2ζw² ≤ 0),
+// поэтому H = hypot(y, w) не растёт вдоль потока. Отсюда certified-бонды
+// БУДУЩЕЙ кривизны от текущего состояния — каждый ограничивает max|y″(u+s)|
+// при всех s ≥ 0, то есть на всём предстоящем шаге:
+// - все режимы (Коши–Шварц к y″ = −y − 2ζw): |y″| ≤ √(1+4ζ²)·H;
+// - ζ>1, модальное разложение y(s) = a·e^(−λs·s) + b·e^(−λf·s) с полюсами
+//   λf = ζ+√(ζ²−1), λs = 1/λf (резольвентная форма, λs·λf = 1 точно — без
+//   катастрофического вычитания, канон #226); огибающие мод не растут ⇒
+//   |y″| ≤ |a|·λs² + |b|·λf² (в монотонных режимах спектральный бонд κ·H
+//   завышает кривизну до κ× — модальный возвращает узлы старта);
+// - ζ=1: y(s) = (y+(w+y)s)·e^(−s) ⇒ y″(s) = ((w+y)s − (y+2w))·e^(−s), и с
+//   s·e^(−s) ≤ 1/e: |y″| ≤ |y+2w| + |w+y|/e.
+// min() двух certified-бондов certified; near-critical ζ→1⁺ модальные амплитуды
+// вырождаются (λf−λs → 0, |a|,|b| → ∞) — min сам выбирает спектральный бонд,
+// magic-epsilon для ветвления не нужен.
 //
-// Строгий бонд кривизны следует из энергии затухающего осциллятора:
-// E=(x′²+ω₀²(x−1)²)/2, E′=−2ζω₀x′²≤0. Поэтому при
-// H=hypot(v0,ω₀): |x′|≤H, |x−1|≤H/ω₀, а из ODE
-// |x″|≤(ω₀+c/m)H. В нормализованном времени τ=t/T:
-// M=max|p″(τ)|≤T²(ω₀+c/m)H. Берём N≥√(M/(2tol)). Тогда обычный
-// grid-интервал и half-step tangent ошибаются ≤tol/4, соседний модифицированный
-// интервал — ≤5tol/16. Вместе с RDP eps=tol/2 raw-план занимает ≤13tol/16;
-// CSS-сериализация получает tol/8, а 1/16 остаётся численным запасом.
-/** Пол числа интервалов (гладкие кривые). */
-const BASE_GRID_FLOOR = 24;
+// Шаг из бонда: ошибка линейной интерполяции на интервале h ≤ M·h²/8, поэтому
+// h = √(4·tol/M) даёт ошибку сетки ≤ tol/2 МЕЖДУ узлами (не только в узлах).
+// Tangent-anchor ставится на ЧЕТВЕРТИ первого шага: касательная в нём
+// ошибается ≤ M·(h/4)²/2 = tol/8, а соседний интервал [h/4, h] несёт
+// ≤ tol/8 (линейная интерполяция ошибки конца) + M·(3h/4)²/8 = 9·tol/32,
+// итого ≤ 13·tol/32 < tol/2. RDP забирает 3·tol/8, сериализация ≤ tol/8
+// (emitArtifact) — замкнутая арифметика ≤ tolerance. Худший замер спайка
+// #228 по корпусу 54 точек: 0.666·tol.
+/** Пол сетки: шаг капится 1/BASE_GRID_MIN горизонта (защита в глубину). */
 const BASE_GRID_MIN = 32;
 /** Физический потолок компиляции: выше живой солвер дешевле и честнее. */
 export const BASE_GRID_MAX = 4096;
 
-function requiredGridSize(
+/** Переиспользуемый выход solveSpring: ноль аллокаций на узел сетки. */
+const gridSample = { value: 0, velocity: 0 };
+
+/**
+ * Строит адаптивную базовую сетку (#228): xs — строго возрастающие τ ∈ [0,1]
+ * (индекс 1 — tangent-anchor), ys — прогресс. undefined — превышен физический
+ * кап BASE_GRID_MAX (fail-closed ДО больших аллокаций: массивы растут push-ем
+ * и обрываются на капе) либо не-конечный горизонт (ζ=0, v0=±∞).
+ * @internal — экспорт для покомпонентных доказательств бюджета (сетка ≤ tol/2
+ * отдельно от RDP ≤ 3tol/8), не часть публичного API ./compositor.
+ */
+export function tryBuildAdaptiveSpringGrid(
   params: SpringParams,
-  settle: number,
-  tolerance: number,
   v0: number,
-): number {
+  tolerance: number,
+  settle: number,
+): [xs: number[], ys: number[]] | undefined {
+  // Не-конечный горизонт не имеет представимой сетки — O(1) отказ до цикла
+  // (пин: MAX_VALUE-скорость не аллоцирует гигантский массив).
+  if (!Number.isFinite(settle) || settle <= 0) return undefined;
   const omega0 = Math.sqrt(params.stiffness / params.mass);
-  const curvature = settle * settle
-    * (omega0 + params.damping / params.mass)
-    * Math.hypot(v0, omega0);
-  const raw = Math.sqrt(curvature / (2 * tolerance));
-  return Math.max(BASE_GRID_MIN, Math.ceil(raw) + BASE_GRID_FLOOR);
+  const alpha = params.damping / params.mass / 2;
+  const zeta = alpha / omega0;
+  const delta = omega0 * omega0 - alpha * alpha;
+  const kappa = Math.sqrt(1 + 4 * zeta * zeta);
+  // Петле-инвариантные модальные полюса (ζ>1); λs резольвентной формой.
+  const lambdaF = zeta + Math.sqrt(Math.max(0, zeta * zeta - 1));
+  const lambdaS = 1 / lambdaF;
+  const poleGap = lambdaF - lambdaS;
+  // Перевод шага u → τ и пол сетки (≥ BASE_GRID_MIN интервалов на горизонте).
+  const omegaT = omega0 * settle;
+  const capTau = 1 / BASE_GRID_MIN;
+  const xs: number[] = [0];
+  const ys: number[] = [0];
+  // Стартовое состояние точно: p(0)=0 ⇒ y=−1; w = v0/ω₀ (безразмерная скорость).
+  let tau = 0;
+  let y = -1;
+  let w = v0 / omega0;
+  while (tau < 1) {
+    // Certified-бонд кривизны на всём предстоящем шаге (вывод в шапке блока).
+    let bound = kappa * Math.hypot(y, w);
+    // Условие модальной ветки — poleGap > 0, а НЕ delta < 0 (математически это
+    // одно и то же, ζ>1). Разница ровно в вырожденном случае: если ζ округлился
+    // в 1 при delta<0, то poleGap = 0, и модальный кандидат даёт −0/0 = NaN;
+    // `Math.min(x, NaN)` = NaN ⇒ `bound > 0` ложно ⇒ шаг МОЛЧА становится капом,
+    // и доказанный бюджет сетки перестаёт держаться (fail-OPEN). Проверка
+    // знаменателя оставляет в этом случае спектральный бонд — fail-closed
+    // без единого лишнего байта в бандле.
+    if (poleGap > 0) {
+      const b = -(w + lambdaS * y) / poleGap;
+      const a = y - b;
+      bound = Math.min(bound, Math.abs(a) * lambdaS * lambdaS + Math.abs(b) * lambdaF * lambdaF);
+    } else if (delta === 0) {
+      bound = Math.min(bound, Math.abs(y + 2 * w) + Math.abs(w + y) / Math.E);
+    }
+    // M·h²/8 ≤ tol/2 ⇔ h ≤ 2·√(tol/M); осевшее состояние (M=0) шагает капом.
+    const step = bound > 0
+      ? Math.min(capTau, 2 * Math.sqrt(tolerance / bound) / omegaT)
+      : capTau;
+    if (tau === 0) {
+      // Tangent-anchor на четверти первого шага: значение — ФИЗИЧЕСКАЯ
+      // касательная v0 (не сэмпл), тем же percent→offset путём, что WebKit
+      // execution: после shortest-roundtrip CSS и keyframes делят один slope.
+      const anchorTau = step / 4;
+      xs.push(anchorTau);
+      ys.push(v0 * ((anchorTau * 100) / 100 * settle));
+    }
+    const next = Math.min(tau + step, 1);
+    // Шаг, съеденный округлением у плотного бонда, эквивалентен over-cap:
+    // без стража цикл не продвигается (fail-closed, не зависание).
+    if (next === tau || xs.length > BASE_GRID_MAX) return undefined;
+    const sampled = solveSpring(params, next * settle, v0, gridSample);
+    // Финитные стражи зеркалят политику motion-value (value→1, velocity→0);
+    // для валидных params не срабатывают — инвариант «в CSS никогда не NaN/∞».
+    const value = Number.isFinite(sampled.value) ? sampled.value : 1;
+    xs.push(next);
+    ys.push(value);
+    y = value - 1;
+    w = Number.isFinite(sampled.velocity) ? sampled.velocity / omega0 : 0;
+    tau = next;
+  }
+  return [xs, ys];
 }
 
 /**
- * Размер базовой сетки (число ИНТЕРВАЛОВ), выведенный из бонда кривизны так, что
- * дискретизация сетки ≤ tolerance/2 (вторую половину бюджета несёт eps RDP).
+ * Размер базовой сетки (число ИНТЕРВАЛОВ) фактической адаптивной сетки (#228).
+ * Тестовый seam бюджета: НЕ O(1) — строит сетку (compile-as-preflight канон).
  */
 export function baseGridSize(
   params: SpringParams,
@@ -134,17 +211,17 @@ export function baseGridSize(
   tolerance: number,
   v0 = 0,
 ): number {
-  const required = requiredGridSize(params, settle, tolerance, v0);
-  if (!Number.isSafeInteger(required) || required > BASE_GRID_MAX) {
-    throw new MotionParamError('LM016');
-  }
-  return required;
+  const grid = tryBuildAdaptiveSpringGrid(params, v0, tolerance, settle);
+  if (grid === undefined) throw new MotionParamError('LM016');
+  return grid[0].length - 1;
 }
 
 /**
  * Можно ли доказанно скомпилировать скорость в ограниченную compositor-сетку.
- * Чистый O(1)-предикат нужен фасаду ДО supersede: небезопасный подхват сразу
- * остаётся на общем живом frame-loop и не обрывает предыдущего владельца рано.
+ * С #228 предикат — сама попытка построения сетки (бывшая O(1) формула global
+ * worst-case grid снята вместе с самой сеткой; второго источника правды нет).
+ * Production-путь это не зовёт: там compile-as-preflight через
+ * tryCompileSpringExecutionArtifactTupleUnchecked, а не отдельный гейт.
  */
 export function fitsSpringCurveBudget(
   params: SpringParams,
@@ -152,8 +229,7 @@ export function fitsSpringCurveBudget(
   tolerance: number,
 ): boolean {
   const settle = springCompileHorizon(params, v0, tolerance);
-  const required = requiredGridSize(params, settle, tolerance, v0);
-  return Number.isSafeInteger(required) && required <= BASE_GRID_MAX;
+  return tryBuildAdaptiveSpringGrid(params, v0, tolerance, settle) !== undefined;
 }
 
 /** Fail-fast версия того же preflight с каноническим MotionParamError. */
@@ -176,8 +252,8 @@ export function assertSpringCurveBudget(
  *
  * ПРЕДУСЛОВИЕ: xs СТРОГО ВОЗРАСТАЮТ (dx = xs[j]−xs[i] > 0 для всех пар стека).
  * Единственный вызывающий — buildSpringNodes — подаёт возрастающую сетку с
- * защищённой half-step точкой и далее tau=i/N, так что предусловие держится по
- * построению. Прежний per-точечный страж
+ * защищённой anchor-точкой и далее строго растущими τ, так что предусловие
+ * держится по построению. Прежний per-точечный страж
  * `dx===0?yi:` снят как мёртвая ветка (см. ниже). При нарушении (невозрастающие
  * xs, dx≤0) наклон хорды даст NaN/∞ и результат не определён — контракт узкий
  * намеренно, страж не восстанавливается ради несуществующего вызова.
@@ -277,7 +353,8 @@ export function buildSpringNodesWithHorizon(
 
 /**
  * Production compile-as-preflight: безопасная кривая сразу строится и готова к
- * кэшированию; over-cap возвращает undefined до сетки/RDP и до смены owner.
+ * кэшированию; over-cap возвращает undefined на капе степпинга (ограниченные
+ * push-массивы, без гигантской аллокации) и до смены owner.
  */
 export function tryBuildSpringNodes(
   params: SpringParams,
@@ -285,12 +362,19 @@ export function tryBuildSpringNodes(
   tolerance: number,
 ): [nodes: SpringNode[], horizon: number] | undefined {
   const settle = springCompileHorizon(params, v0, tolerance);
-  const intervals = requiredGridSize(params, settle, tolerance, v0);
-  if (!Number.isSafeInteger(intervals) || intervals > BASE_GRID_MAX) return;
-  return [
-    buildSpringNodesAtHorizon(params, v0, tolerance, settle, intervals),
-    settle,
-  ];
+  const grid = tryBuildAdaptiveSpringGrid(params, v0, tolerance, settle);
+  if (grid === undefined) return;
+  // eps = 3·tolerance/8: сетка несёт ≤ tol/2, сериализация ≤ tol/8 — замкнутая
+  // арифметика ≤ tolerance на всей непрерывной кривой (не только в узлах).
+  const kept = douglasPeuckerVertical(grid[0], grid[1], tolerance * 3 / 8, 1);
+  const xs = grid[0];
+  const ys = grid[1];
+  // Хвост — ровно цель (дисциплина эндпоинтов); прочие — сырой прогресс.
+  const nodes = kept.map((k, n): SpringNode => ({
+    progress: n === kept.length - 1 ? 1 : ys[k]!,
+    percent: xs[k]! * 100,
+  }));
+  return [nodes, settle];
 }
 
 /** Specialized v0=0 nodes + тот же horizon для native artifact. */
@@ -302,54 +386,4 @@ export function buildRestingSpringNodesWithHorizon(
   // settleTimeAtRestUpperBound(p)); прежний DCE-мотив отдельного тела снят
   // горизонт-законом, который в любом случае разделяет общий settle-модуль.
   return buildSpringNodesWithHorizon(params, 0, tolerance);
-}
-
-function buildSpringNodesAtHorizon(
-  params: SpringParams,
-  v0: number,
-  tolerance: number,
-  settle: number,
-  intervals: number,
-): SpringNode[] {
-  // Валидный набор params всегда оседает в бюджет (гарантия validateSpringParams),
-  // так что settle конечно; на всякий случай — деградация к малой ненулевой шкале.
-  const T = Number.isFinite(settle) && settle > 0 ? settle : 1;
-
-  // Half-step tangent anchor выводится из того же energy-bound: при h=1/(2N)
-  // ошибка касательной ≤M·h²/2≤tol/4. На соседней половине exact-хорда
-  // добавляет ≤tol/16, итого ≤5tol/16. Первый slope физически равен v0;
-  // anchor обязан пережить RDP, иначе эта граничная производная исчезнет.
-  const count = intervals + 2;
-  const xs = new Array<number>(count);
-  const ys = new Array<number>(count);
-  // Инварианты пружины (omega0/zeta/omegaD/A/B) петле-инвариантны на всей сетке
-  // (params/v0 фиксированы) → считаем их ОДИН раз фабрикой, а не на каждый узел.
-  // Значение бит-в-бит равно solveSpring(...).value (см. makeSpringValueSampler).
-  const sampleValue = makeSpringValueSampler(params, v0);
-  xs[0] = ys[0] = 0;
-  const tangentTau = 0.5 / intervals;
-  xs[1] = tangentTau;
-  // Считаем через тот же percent→offset, который использует WebKit execution:
-  // после shortest-roundtrip CSS и keyframes делят один физический slope.
-  ys[1] = v0 * ((tangentTau * 100) / 100 * T);
-  for (let i = 1; i <= intervals; i++) {
-    const tau = i / intervals; // ∈ [0, 1]
-    const index = i + 1;
-    xs[index] = tau;
-    // Финитный страж (не-конечное → цель 1, зеркалит motion-value; для валидных
-    // params не срабатывает — покрыто finiteness-fuzz; инвариант «в CSS никогда
-    // не NaN/∞») заинлайнен в цикл — минус кадр вызова на КАЖДЫЙ узел сетки
-    // (доминирующий путь cold-compile). Тот же Number.isFinite(v)?v:1, бит-в-бит.
-    const v = sampleValue(tau * T);
-    ys[index] = Number.isFinite(v) ? v : 1;
-  }
-
-  // eps = tolerance/2: вторая половина бюджета — под дискретизацию базовой сетки
-  // (baseGridSize её и гарантирует ≤ tol/2) ⇒ суммарная реконструкция ≤ tolerance.
-  const kept = douglasPeuckerVertical(xs, ys, tolerance / 2, 1);
-  // Хвост — ровно цель (дисциплина эндпоинтов); прочие — сырой прогресс.
-  return kept.map((k, n): SpringNode => ({
-    progress: n === kept.length - 1 ? 1 : ys[k]!,
-    percent: xs[k]! * 100,
-  }));
 }
