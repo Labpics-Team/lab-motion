@@ -512,7 +512,12 @@ describe('compositor: owner snapshot читает actual WAAPI curve', () => {
     expect(second.keyframes[0]!['opacity']).toBe(expected.value);
     // Расхождение измеримо (≫ float-шум closeTo ниже) — иначе тест не отличал
     // бы serialized-путь от аналитического и стал бы вырожденным.
-    expect(Math.abs(expected.value - analytic.value)).toBeGreaterThan(1e-4);
+    //
+    // Порог от факта (ревью #246): максимум расхождения на этой пружине —
+    // 1.158e-3 до #228 и 9.399e-4 после. Прежние 1e-3 перестали проходить
+    // ЗАКОННО (сетка точнее), но 1e-4 опустили дискриминатор на порядок ниже
+    // факта и он перестал что-либо ограничивать. 5e-4 — фактический запас ~1.9×.
+    expect(Math.abs(expected.value - analytic.value)).toBeGreaterThan(5e-4);
 
     const serialized = parse(String(second.timing['easing']));
     const seededV0 = serialized[3]!

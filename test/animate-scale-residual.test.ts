@@ -584,8 +584,15 @@ describe('animate: конфликт uniform и осевого scale', () => {
     // валиден только для сетки до #228). Свойство неизменно: при расхождении
     // v0 ни один общий WAAPI progress не сохраняет обе абсолютные скорости,
     // поэтому C1 важнее compositor residency и каналы продолжаются на main.
-    let found = false;
-    for (let seekMs = 90; seekMs <= 140 && !found; seekMs++) {
+    // Ревью #246: версия «нашлась хотя бы одна точка из 51» была зелёной даже
+    // если бы свойство сломалось на 50 точках из 51 — ассерт стоял ТОЛЬКО в
+    // найденной точке. Теперь ассертится КАЖДАЯ из 51 точки: расхождение v0
+    // зависит от момента (это физика, не дефект), но исход обязан быть одним из
+    // ровно двух корректных, и третьего — тихой заморозки (ни reseed, ни живого
+    // main) — быть не может. Плюс сохранена исходная проверка существования.
+    let mainHandoffs = 0;
+    let reseeds = 0;
+    for (let seekMs = 90; seekMs <= 140; seekMs++) {
       const target = fakeEl({}, true);
       const clock = makeClock();
       let requests = 0;
@@ -605,12 +612,25 @@ describe('animate: конфликт uniform и осевого scale', () => {
       expect(target.animateCalls).toHaveLength(1);
       controls.seek(seekMs);
       if (target.animateCalls.length === 1) {
-        // Расхождение поймано: reseed отвергнут, группа ушла на живой main.
-        expect(requests).toBeGreaterThan(0);
-        found = true;
+        // Расхождение v0: reseed отвергнут ⇒ группа ОБЯЗАНА продолжиться на
+        // живом main. Отсутствие кадров здесь означало бы замерший элемент.
+        expect(requests, `seek=${seekMs}: main без кадров`).toBeGreaterThan(0);
+        mainHandoffs++;
+      } else {
+        // Скорости совпали ⇒ законный reseed: ровно одна новая анимация с
+        // положительной длительностью (вырожденный reseed — тот же дефект).
+        expect(target.animateCalls, `seek=${seekMs}`).toHaveLength(2);
+        expect(
+          Number(target.animateCalls[1]!.timing.duration),
+          `seek=${seekMs}: длительность reseed`,
+        ).toBeGreaterThan(0);
+        reseeds++;
       }
       controls.cancel();
     }
-    expect(found).toBe(true);
+    // Существование расхождения — исходное свойство теста; полнота разбора —
+    // страховка от третьего (замершего) состояния.
+    expect(mainHandoffs).toBeGreaterThan(0);
+    expect(mainHandoffs + reseeds).toBe(51);
   });
 });

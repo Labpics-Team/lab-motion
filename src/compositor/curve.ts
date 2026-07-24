@@ -74,6 +74,28 @@ type RestingEntry = [
 // не аллоцирует.
 const restingCache: RestingEntry[] = [];
 
+/**
+ * Sentinel «эта пружина доказанно НЕ компилируется» — тот же LRU, тот же ключ.
+ *
+ * ЗАЧЕМ (ревью #246): с #228 предикат компилируемости — сама попытка построения
+ * адаптивной сетки, и на over-cap она честно доходит до физического потолка
+ * BASE_GRID_MAX (4096 узлов = 4096 вызовов солвера ≈ 0.6 мс). Прежняя O(1)
+ * формула global worst-case была ДЕШЕВЛЕ, но НЕСОСТОЯТЕЛЬНА как отказ: она
+ * отвергала пружины, которые адаптивная сетка компилирует (именно это #228 и
+ * исправил). Звать её обратно как «предфильтр» нельзя — вернутся ложные отказы.
+ *
+ * Поэтому дешевеет не первый отказ, а ПОВТОРНЫЙ: over-cap возникает на живом
+ * жесте (быстрый fling переносит скорость), где animate()/retarget зовут
+ * компиляцию каждый кадр с ТЕМ ЖЕ ключом. Sentinel делает второй и все
+ * последующие отказы O(1) — теряется максимум один кадр на уникальную пружину,
+ * а не каждый. Пин: test/compositor-overcap-memo.test.ts.
+ *
+ * Пустой tuple — не значение, а ИДЕНТИЧНОСТЬ: наружу он не выходит никогда
+ * (сравнение по ссылке гасит его в undefined), поэтому поля ему не нужны, и
+ * стоит он в бандле считанные байты — продуктовые пороги трогать не пришлось.
+ */
+const OVER_CAP = [] as unknown as SpringExecutionArtifactTuple;
+
 export function validateTolerance(tolerance: number): void {
   if (!Number.isFinite(tolerance) || tolerance <= 0 || tolerance >= 1) {
     throw new MotionParamError('LM014');
@@ -186,31 +208,38 @@ export function tryCompileSpringExecutionArtifactTupleUnchecked(
     v0,
     tolerance,
   );
-  // Truthiness эквивалентен !== undefined: попадание — всегда tuple-массив.
-  if (hit) return hit;
-  let nodes = prebuiltNodes;
-  let durationMs = prebuiltDurationMs;
-  if (nodes === undefined) {
-    const build = tryBuildSpringNodes(spring, v0, tolerance);
-    if (!build) return;
-    nodes = build[0];
-    durationMs = build[1] * 1000;
+  // Truthiness эквивалентен !== undefined: попадание — всегда tuple-массив
+  // (в том числе sentinel over-cap, который гасится общим возвратом ниже).
+  let artifact = hit;
+  if (!artifact) {
+    let nodes = prebuiltNodes;
+    let durationMs = prebuiltDurationMs;
+    if (nodes === undefined) {
+      const build = tryBuildSpringNodes(spring, v0, tolerance);
+      if (build) {
+        nodes = build[0];
+        durationMs = build[1] * 1000;
+      }
+    }
+    // Отрицательный результат (over-cap) стоит столько же, сколько
+    // положительный, и на живом жесте повторяется каждый кадр с тем же
+    // ключом — он кладётся в кэш тем же путём, что артефакт.
+    artifact = nodes === undefined ? OVER_CAP : emitArtifact(
+      nodes,
+      tolerance,
+      durationMs ?? settleTimeUpperBound(spring, v0) * 1000,
+    );
+    /* @__INLINE__ */ storeSpringLinearCache(
+      cache,
+      mass,
+      stiffness,
+      damping,
+      v0,
+      tolerance,
+      artifact,
+    );
   }
-  const artifact = emitArtifact(
-    nodes,
-    tolerance,
-    durationMs ?? settleTimeUpperBound(spring, v0) * 1000,
-  );
-  /* @__INLINE__ */ storeSpringLinearCache(
-    cache,
-    mass,
-    stiffness,
-    damping,
-    v0,
-    tolerance,
-    artifact,
-  );
-  return artifact;
+  return artifact === OVER_CAP ? undefined : artifact;
 }
 
 /**

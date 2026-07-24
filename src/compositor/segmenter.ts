@@ -156,7 +156,14 @@ export function tryBuildAdaptiveSpringGrid(
   while (tau < 1) {
     // Certified-бонд кривизны на всём предстоящем шаге (вывод в шапке блока).
     let bound = kappa * Math.hypot(y, w);
-    if (delta < 0) {
+    // Условие модальной ветки — poleGap > 0, а НЕ delta < 0 (математически это
+    // одно и то же, ζ>1). Разница ровно в вырожденном случае: если ζ округлился
+    // в 1 при delta<0, то poleGap = 0, и модальный кандидат даёт −0/0 = NaN;
+    // `Math.min(x, NaN)` = NaN ⇒ `bound > 0` ложно ⇒ шаг МОЛЧА становится капом,
+    // и доказанный бюджет сетки перестаёт держаться (fail-OPEN). Проверка
+    // знаменателя оставляет в этом случае спектральный бонд — fail-closed
+    // без единого лишнего байта в бандле.
+    if (poleGap > 0) {
       const b = -(w + lambdaS * y) / poleGap;
       const a = y - b;
       bound = Math.min(bound, Math.abs(a) * lambdaS * lambdaS + Math.abs(b) * lambdaF * lambdaF);
