@@ -75,7 +75,9 @@ describe('animate: трёхвариантный execution-план', () => {
     clock.step(0);
     clock.step(10);
     const from = readTranslateX(target.writes.at(-1)!.value)!;
-    const to = from + 0.1;
+    // #228: адаптивная сетка компилирует v0=10⁴ (прежний over-cap этой
+    // фикстуры) — эквивалентный переносимый v0 поднят до гарантированного капа.
+    const to = from + 0.0001;
     const v0 = 1000 / (to - from);
 
     expect(tryCompileSpringExecutionArtifactTupleUnchecked(
