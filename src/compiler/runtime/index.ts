@@ -157,6 +157,126 @@ function facadeRequiresExplicitKeyframes(): boolean {
   }
 }
 
+/**
+ * Реестр состояния понижённых прогонов: элемент → группа → значения каналов
+ * на КОНЕЦ последнего прогона. Без него второй вызов на том же элементе
+ * стартовал бы из identity и телепортировал элемент назад — фасад именно для
+ * этого держит свой реестр (см. bindGroup: живой прогон → реестр → identity →
+ * живой стиль). WeakMap: запись умирает вместе с элементом, чистить нечего.
+ */
+interface FacadeRun {
+  readonly channels: readonly CompiledFacadeChannel[];
+  readonly easing: string;
+  readonly durationMs: number;
+  readonly delayMs: number;
+  readonly animation: Animation | undefined;
+}
+const facadeRegistry = new WeakMap<object, Map<string, FacadeRun>>();
+
+/** Стопы кривой из уже инъецированной linear()-строки: [progress, доля]. */
+function facadeStops(easing: string): [progress: number, tau: number][] {
+  return easing.slice(7, -1).split(', ').map((stop) => {
+    const space = stop.indexOf(' ');
+    return [+stop.slice(0, space), +stop.slice(space + 1, -1) / 100];
+  });
+}
+
+/**
+ * Прогресс кривой в доле времени τ — та же кусочно-линейная функция, которую
+ * исполняет браузер по linear()-строке. Нужна, чтобы прерванный на лету прогон
+ * отдал СВОЮ текущую позицию: без этого следующий вызов стартовал бы из конца
+ * (прыжок вперёд) либо из identity (прыжок назад).
+ */
+function facadeProgressAt(easing: string, tau: number): number {
+  const stops = facadeStops(easing);
+  if (tau <= 0) return stops[0]![0];
+  const last = stops[stops.length - 1]!;
+  if (tau >= last[1]) return last[0];
+  for (let i = 1; i < stops.length; i++) {
+    const [progress, at] = stops[i]!;
+    if (tau > at) continue;
+    const [prevProgress, prevAt] = stops[i - 1]!;
+    const span = at - prevAt;
+    return span === 0
+      ? progress
+      : prevProgress + (progress - prevProgress) * ((tau - prevAt) / span);
+  }
+  return last[0];
+}
+
+/**
+ * Доля пройденного времени прогона. Отменённый прогон (playState idle) не
+ * оставил следа — его состояние игнорируется; нечитаемое время трактуется как
+ * завершение (fill:'both' держит финальную позу, значит визуально мы там).
+ */
+function facadeRunTau(run: FacadeRun): number | undefined {
+  const animation = run.animation;
+  if (animation === undefined) return 1;
+  try {
+    if (animation.playState === 'idle') return undefined;
+    const time = animation.currentTime;
+    // Нечитаемое время — состояние НЕИЗВЕСТНО, а не «завершено»: угадывать
+    // финальную позу значит рисковать прыжком вперёд. Неизвестность роняет нас
+    // в тот же каскад, что у фасада без живого владельца (стиль → identity).
+    if (typeof time !== 'number') return undefined;
+    const elapsed = time - run.delayMs;
+    return elapsed <= 0 ? 0 : Math.min(1, elapsed / run.durationMs);
+  } catch {
+    return undefined; // hostile-host: состояние неизвестно — тот же каскад
+  }
+}
+
+/**
+ * Старт канала — тем же каскадом, что фасад: реестр прошлого прогона →
+ * identity для transform (декомпозиция computed-матрицы ненадёжна, фасад её
+ * тоже не делает) → живой стиль для прочих групп (opacity и подобные).
+ * `from` артефакта используется ТОЛЬКО как identity/дефолт, потому что
+ * компилятор не может знать состояние страницы.
+ */
+function facadeStartValue(
+  element: object,
+  group: string,
+  key: string,
+  artifactFrom: number,
+): number {
+  const run = facadeRegistry.get(element)?.get(group);
+  if (run !== undefined) {
+    const tau = facadeRunTau(run);
+    if (tau !== undefined) {
+      const channel = run.channels.find(([name]) => name === key);
+      if (channel !== undefined) {
+        return facadeChannelAt(channel[1], channel[2], facadeProgressAt(run.easing, tau));
+      }
+    }
+  }
+  if (group === 'transform') return artifactFrom;
+  try {
+    const style = (element as { style?: { getPropertyValue?(n: string): string } }).style;
+    const inline = style?.getPropertyValue?.(group);
+    if (inline !== undefined && inline !== '') {
+      const parsed = parseFloat(inline);
+      if (Number.isFinite(parsed)) return parsed;
+    }
+  } catch { /* duck-цель без полного style-контракта */ }
+  const computed = (globalThis as {
+    getComputedStyle?: (e: unknown) => { getPropertyValue(n: string): string };
+  }).getComputedStyle;
+  if (typeof computed === 'function') {
+    try {
+      const parsed = parseFloat(computed(element).getPropertyValue(group));
+      if (Number.isFinite(parsed)) return parsed;
+    } catch { /* не-Element цель в DOM-среде */ }
+  }
+  return artifactFrom;
+}
+
+/** Запоминает прогон: следующий вызов читает из него ТЕКУЩУЮ позицию. */
+function rememberFacadeRun(element: object, group: string, run: FacadeRun): void {
+  let groups = facadeRegistry.get(element);
+  if (groups === undefined) facadeRegistry.set(element, groups = new Map());
+  groups.set(group, run);
+}
+
 export function animateFacadeCompiled(
   target: NanoTarget,
   artifact: CompiledFacadeCall,
@@ -170,23 +290,38 @@ export function animateFacadeCompiled(
   const animations: Animation[] = [];
   Array.from(source, (element, index) => {
     const delay = (artifact.y ?? 0) + (artifact.g ?? 0) * index;
-    for (const [group, channels] of artifact.c) {
+    for (const [group, artifactChannels] of artifact.c) {
+      // Старт — из ЖИВОГО состояния (реестр прошлого прогона / стиль), а не из
+      // артефакта: компилятор не знает состояние страницы, и вызов «верни
+      // карточку назад» обязан ехать оттуда, где она сейчас, а не телепортировать
+      // её в identity. Это тот же каскад, что у фасадного bindGroup.
+      const channels = artifactChannels.map(([key, from, to]): CompiledFacadeChannel =>
+        [key, facadeStartValue(element as object, group, key, from), to]);
       // Политика reduced-motion фасада: финальная поза пишется сразу, кадров
       // нет вовсе (не duration:0-анимация) — движение запрещено, а результат
       // обязан быть виден.
       if (reduced) {
         (element as unknown as { style: CSSStyleDeclaration }).style
           .setProperty(group, String(facadeGroupAt(group, channels, 1)));
+        rememberFacadeRun(element as object, group, {
+          channels, easing: artifact.e, durationMs: artifact.d, delayMs: 0, animation: undefined,
+        });
         continue;
       }
-      animations.push(element.animate(facadeFrames(group, channels, artifact.e, explicit), {
+      const animation = element.animate(facadeFrames(group, channels, artifact.e, explicit), {
         duration: artifact.d,
         easing: explicit ? 'linear' : artifact.e,
         iterations: 1,
         fill: 'both',
         composite: 'replace',
         ...(delay > 0 ? { delay } : {}),
-      }));
+      });
+      // Прогон регистрируется ЖИВЫМ: следующий вызов на этом элементе прочитает
+      // из него текущую позицию (сэмплированием той же кривой), а не финальную.
+      rememberFacadeRun(element as object, group, {
+        channels, easing: artifact.e, durationMs: artifact.d, delayMs: delay, animation,
+      });
+      animations.push(animation);
     }
   });
   const controls = animations as NanoControls;

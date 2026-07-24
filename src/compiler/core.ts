@@ -637,14 +637,19 @@ export function nanoArtifactLiteral(
 // ─── #240 facade-erasure: понижение полного `./animate` ──────────────────────
 //
 // Отдельная грамматика рядом с nano: те же дисциплины (direct named import,
-// доказанная статика, побайтная верификация тривиа-зон, консервативный отказ),
-// но ДРУГАЯ семантика — фасад несёт реестр владения, C¹-подхват скорости,
-// residual-transform и rAF-фоллбек. Понижение отбрасывает всё это, поэтому оно
-// НЕ автоматическое: вызов обязан быть помечен прагмой `@lm-oneshot` вплотную
-// перед ним. Прагма — согласие автора на nano-семантику: «одноразовый прогон
-// из identity, без подхвата и без реестра». Результат обязан отбрасываться
-// (statement-позиция): понижённый вызов не публикует owner, поэтому любой
-// доступ к контролам был бы ложью о поведении.
+// доказанная статика, побайтная верификация тривиа-зон, консервативный отказ).
+//
+// Понижение АВТОМАТИЧЕСКОЕ — установка плагина и есть согласие: выбирать на
+// каждый вызов автор не должен, а исполнитель ведёт себя как фасад (тот же
+// реестр состояния, тот же старт из живого положения, та же reduced-политика,
+// те же явные стопы на WebKit). Единственное, чего понижённый путь не умеет, —
+// подхват СКОРОСТИ при прерывании на лету (C¹): для него нужен солвер, которого
+// в бандле уже нет; позиция при этом остаётся непрерывной (C⁰, сэмплирование
+// той же кривой). Вызов, которому нужен C¹, помечается тем же маркером, что у
+// nano — `@motion-runtime`, одно слово на обе грамматики.
+//
+// Результат обязан отбрасываться (statement-позиция): понижённый вызов не
+// публикует owner, поэтому доступ к контролам был бы ложью о поведении.
 //
 // Кривая берётся из compositor/curve.ts (тот же артефакт, что строит фасадный
 // tier-0 при v0=0) — НЕ из nano/spring-linear.ts: у тиров разные эмиттеры и
@@ -654,10 +659,7 @@ const FACADE_SOURCE = '@labpics/motion/animate';
 export const COMPILED_FACADE_IMPORT_NAME = 'animateFacadeCompiled';
 const FACADE_IMPORT_LOCAL = '__labMotionFacadeCompiled';
 
-/** Прагма `@lm-oneshot` вплотную перед узлом: согласие на nano-семантику. */
-function hasOneshotMarker(code: string, start: number): boolean {
-  return /\/\*\s*@lm-oneshot\s*\*\/\s*$/.test(code.slice(0, start));
-}
+
 
 /**
  * Identity transform-шортхендов — зеркало TRANSFORM_IDENTITY фасада
@@ -820,32 +822,6 @@ export function facadeArtifactLiteral(
 }
 
 /**
- * Понизился бы вызов, будь он помечен? Ровно те же проверки, что в плане, но
- * без построения артефакта — предикат для квитанции кандидатов (#240).
- */
-function isLowerableFacadeCall(
-  node: AstNode,
-  parent: AstNode | undefined,
-  code: string,
-): boolean {
-  if (node.optional === true) return false;
-  if (parent?.type !== 'ExpressionStatement') return false;
-  const args = node.arguments as AstNode[];
-  if (args.length !== 2 && args.length !== 3) return false;
-  const [targetArg, propsArg, optionsArg] = args as [AstNode, AstNode, AstNode?];
-  if (targetArg.type === 'SpreadElement') return false;
-  if (staticFacadeProps(propsArg) === undefined) return false;
-  if (staticFacadeOptions(optionsArg) === undefined) return false;
-  const callee = node.callee as AstNode;
-  const lastArg = optionsArg ?? propsArg;
-  return /^\s*\(\s*$/.test(code.slice(callee.end, targetArg.start))
-    && /^\s*,\s*$/.test(code.slice(targetArg.end, propsArg.start))
-    && (optionsArg === undefined
-      || /^\s*,\s*$/.test(code.slice(propsArg.end, optionsArg.start)))
-    && /^\s*,?\s*\)$/.test(code.slice(lastArg.end, node.end));
-}
-
-/**
  * Планирует понижение фасадных вызовов модуля. Отличия от nano-плана:
  * — источник `./animate`, а не `./nano`;
  * — вызов обязан нести прагму `@lm-oneshot` (иначе — рантаймовый, БЕЗ отказа:
@@ -855,15 +831,6 @@ function isLowerableFacadeCall(
  * остаётся легальным рантаймовым тиром, его присутствие в графе — норма, а не
  * дырка в гарантии (в отличие от `./nano`, где действует закон #237).
  */
-export interface FacadeLoweringPlan extends NanoLoweringPlan {
-  /**
-   * Вызовы, которые понизились бы чисто, но не помечены прагмой (#240).
-   * Стирание — opt-in на вызов, поэтому без этой цифры автор просто не узнает,
-   * что 12 из его 40 вызовов уже готовы уехать из бандла.
-   */
-  readonly erasable: number;
-}
-
 export function planFacadeLowering(
   program: AstNode,
   code: string,
@@ -871,7 +838,7 @@ export function planFacadeLowering(
     groups: readonly StaticFacadeGroup[],
     options: StaticFacadeOptions,
   ) => string,
-): FacadeLoweringPlan | undefined {
+): NanoLoweringPlan | undefined {
   let importedPlain = false;
   const importNodes = new Set<AstNode>();
   let doubt = false;
@@ -911,30 +878,23 @@ export function planFacadeLowering(
   const refusals: NanoLoweringRefusal[] = [];
   let runtimeCalls = 0;
   let literalChars = 0;
-  let erasable = 0;
   /**
-   * Помеченный прагмой вызов, который понизить не вышло, — ОТКАЗ с причиной
-   * (автор запросил стирание и обязан узнать, почему его не случилось).
-   * Непомеченный — просто рантаймовый фасад, без записи в refusals.
+   * Вызов, который понизить не вышло, остаётся полным фасадом — это НЕ ошибка
+   * сборки (понижение автоматическое, ронять чужой билд из-за неподходящей
+   * формы вызова нельзя). Причина записывается для strict-режима и квитанции.
    */
   const refuse = (node: AstNode, reason: string): void => {
     runtimeCalls++;
-    if (hasOneshotMarker(code, node.start)) refusals.push({ start: node.start, reason });
+    refusals.push({ start: node.start, reason });
   };
 
   walk(program, (node, parent) => {
     if (node.type !== 'CallExpression') return;
     const callee = node.callee as AstNode;
     if (callee.type !== 'Identifier' || callee.name !== 'animate') return;
-    if (!hasOneshotMarker(code, node.start)) {
-      runtimeCalls++;
-      // Непомеченный вызов остаётся фасадом молча — но если он ПОНИЗИЛСЯ БЫ,
-      // автор должен об этом узнать из квитанции, иначе выигрыш парадигмы
-      // остаётся невидимым. Проверяется только грамматика: артефакт (кривая,
-      // верификация) не строится — кандидат стоит ноль build-времени.
-      if (isLowerableFacadeCall(node, parent, code)) erasable++;
-      return;
-    }
+    // Сознательно рантаймовый вызов (нужен C¹-подхват скорости или контролы):
+    // тот же маркер, что у nano-грамматики. Отказом не считается.
+    if (hasRuntimeMarker(code, node.start)) { runtimeCalls++; return; }
     if (node.optional === true) { refuse(node, 'optional-вызов `animate?.()`'); return; }
     if (parent?.type !== 'ExpressionStatement') {
       refuse(node, 'результат вызова используется — понижённый вызов не публикует owner и не отдаёт контролы');
@@ -979,7 +939,7 @@ export function planFacadeLowering(
     );
   });
 
-  if (edits.length === 0 && refusals.length === 0 && erasable === 0) return undefined;
+  if (edits.length === 0 && refusals.length === 0) return undefined;
   edits.sort((a, b) => a.start - b.start);
   return {
     edits,
@@ -988,6 +948,5 @@ export function planFacadeLowering(
     runtimeCalls,
     literalChars,
     refusals,
-    erasable,
   };
 }

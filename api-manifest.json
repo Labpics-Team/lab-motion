@@ -569,8 +569,8 @@
       "runtimeExports": [
         "motionCompiler"
       ],
-      "shippedGzBytes": 9650,
-      "shippedBrBytes": 8524,
+      "shippedGzBytes": 9452,
+      "shippedBrBytes": 8330,
       "docs": "docs/reference/compiler.md",
       "title": "./compiler — build-time lowering: Vite-плагин и рантайм артефактов"
     },
@@ -581,8 +581,8 @@
         "animateCompiled",
         "animateFacadeCompiled"
       ],
-      "shippedGzBytes": 1246,
-      "shippedBrBytes": 1078,
+      "shippedGzBytes": 1768,
+      "shippedBrBytes": 1557,
       "docs": "docs/reference/compiler.md",
       "title": "./compiler — build-time lowering: Vite-плагин и рантайм артефактов"
     },

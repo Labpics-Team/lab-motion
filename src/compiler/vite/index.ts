@@ -54,7 +54,7 @@ export interface MotionBudgetReport {
    * автор не узнает, что часть его бандла уже готова уехать: квитанция
    * превращает невидимый выигрыш в конкретное «N вызовов можно стереть».
    */
-  readonly erasableFacadeCalls: number;
+  readonly facadeCallsKept: number;
 }
 
 /** Опции плагина (#237). */
@@ -192,12 +192,9 @@ function applyEdits(code: string, edits: readonly NanoLoweringEdit[]): string {
 
 /** Быстрый отсев до парсинга: модуль не упоминает ни один понижаемый субпуть. */
 const QUICK_FILTER = '@labpics/motion/nano';
-/** Фасад понижается только под прагму — она и есть дешёвый отсев (#240). */
-const FACADE_QUICK_FILTER = '@lm-oneshot';
 /**
- * Субпуть фасада. Модуль без прагмы разбирается ТОЛЬКО когда автор запросил
- * квитанцию (`onBudget`): счёт кандидатов на стирание полезен, но платить за
- * него разбором каждого фасадного модуля в каждой сборке — нет.
+ * Субпуть фасада: понижение автоматическое (#240), поэтому отсев — сам импорт.
+ * Установка плагина и есть согласие; выбирать на каждый вызов автор не должен.
  */
 const FACADE_SOURCE_FILTER = '@labpics/motion/animate';
 
@@ -218,14 +215,13 @@ export function motionCompiler(options: MotionCompilerOptions = {}): MotionCompi
   let lowered = 0;
   let runtimeCalls = 0;
   let artifactChars = 0;
-  let erasableFacadeCalls = 0;
+  let facadeCallsKept = 0;
   return {
     name: 'lab-motion:nano-lowering',
     enforce: 'pre',
     transform(code, id) {
       if (id.includes('\0')) return undefined;
-      const wantsFacade = code.includes(FACADE_QUICK_FILTER)
-        || (options.onBudget !== undefined && code.includes(FACADE_SOURCE_FILTER));
+      const wantsFacade = code.includes(FACADE_SOURCE_FILTER);
       if (!code.includes(QUICK_FILTER) && !wantsFacade) return undefined;
       let program: unknown;
       try {
@@ -251,18 +247,19 @@ export function motionCompiler(options: MotionCompilerOptions = {}): MotionCompi
           `${nanoRefusal.reason}. Сознательно рантаймовый вызов пометьте /* @motion-runtime */ вплотную перед ним.`,
         );
       }
-      // Отказ помеченного прагмой фасадного вызова — ошибка сборки ВСЕГДА, не
-      // только в strict: автор явно запросил стирание, и тихий откат к полному
-      // фасаду (12+ КБ) противоречит запросу.
+      // Непонижаемый фасадный вызов — НЕ ошибка сборки: понижение
+      // автоматическое, и ронять чужой билд из-за формы вызова нельзя. Он
+      // просто остаётся полным фасадом. Гарантию «фасада в бандле нет» даёт
+      // strict — тем же законом, что для nano.
       const facadeRefusal = facadePlan?.refusals[0];
-      if (facadeRefusal !== undefined) {
+      if (options.strict === true && facadeRefusal !== undefined) {
         throw new Error(
-          `lab-motion compiler: непонижаемый @lm-oneshot вызов ${id}:${positionAt(code, facadeRefusal.start)} — ` +
-          `${facadeRefusal.reason}. Снимите прагму, если вызов должен остаться полным фасадом.`,
+          `lab-motion compiler strict: непониженный фасадный вызов ${id}:${positionAt(code, facadeRefusal.start)} — ` +
+          `${facadeRefusal.reason}. Сознательно рантаймовый вызов пометьте /* @motion-runtime */ вплотную перед ним.`,
         );
       }
       runtimeCalls += plan?.runtimeCalls ?? 0;
-      erasableFacadeCalls += facadePlan?.erasable ?? 0;
+      facadeCallsKept += facadePlan?.refusals.length ?? 0;
       const edits = [...(plan?.edits ?? []), ...(facadePlan?.edits ?? [])]
         .sort((a, b) => a.start - b.start);
       if (edits.length === 0) return undefined; // только отказы/кандидаты — без трансформа
@@ -281,10 +278,10 @@ export function motionCompiler(options: MotionCompilerOptions = {}): MotionCompi
       lowered = 0;
       runtimeCalls = 0;
       artifactChars = 0;
-      erasableFacadeCalls = 0;
+      facadeCallsKept = 0;
     },
     buildEnd() {
-      options.onBudget?.({ lowered, runtimeCalls, artifactChars, erasableFacadeCalls });
+      options.onBudget?.({ lowered, runtimeCalls, artifactChars, facadeCallsKept });
     },
   };
 }
