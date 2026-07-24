@@ -5,6 +5,10 @@ overrides:
   esbuild: ^0.28.1
   # GHSA-v2hh-gcrm-f6hx (host confusion): транзитивно через stryker→ajv; dev-only.
   fast-uri: ">=3.1.4"
+  # GHSA-r28c-9q8g-f849 (path traversal через sourceMappingURL, ≤8.5.17):
+  # транзитивно через qwik→vite→postcss и stryker→vitest→vite→postcss; dev-only,
+  # в поставку не входит (пакет zero-dep). 2026-07-24: гейт pnpm audit красный.
+  postcss: ">=8.5.18"
   qs: ^6.15.2
 pmOnFail: error
 peerDependencyRules:
