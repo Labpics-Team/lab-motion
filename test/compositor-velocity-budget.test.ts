@@ -8,7 +8,11 @@ import {
 } from '../src/compositor/segmenter.js';
 import { CONVERGENCE_THRESHOLD } from '../src/internal/constants.js';
 import { solveSpring } from '../src/internal/solver.js';
-import { settleTimeUpperBound, type SpringParams } from '../src/spring.js';
+import {
+  settleTimeAtRestUpperBound,
+  settleTimeUpperBound,
+  type SpringParams,
+} from '../src/spring.js';
 import { MotionParamError } from '../src/errors.js';
 
 const UNDER = { mass: 1, stiffness: 100, damping: 10 };
@@ -46,21 +50,32 @@ function firstPhysicalSlope(
     / (((second.percent - first.percent) / 100) * durationSeconds);
 }
 
-function legacyRestBound(p: SpringParams): number {
-  const omega0 = Math.sqrt(p.stiffness / p.mass);
-  const zetaRaw = p.damping / (2 * p.mass * omega0);
-  const zeta = Math.abs(zetaRaw - 1) < 1e-3 ? (zetaRaw < 1 ? 0.999 : 1.001) : zetaRaw;
-  const d = Math.sqrt(Math.abs(zeta * zeta - 1));
-  // Медленный корень стабильной формой 1/(ζ+d) ≡ ζ−d (#226): реплика следует
-  // канону spring.ts, смысл пина прежний — v0=0 делегирует к rest-bound бит-в-бит.
-  const rate = zeta < 1 ? zeta * omega0 : omega0 / (zeta + d);
-  if (!(rate > 0)) return Infinity;
-  const amp = zeta < 1 ? 1 / d : (zeta + d) / (2 * d);
-  return (
-    Math.log(1 / CONVERGENCE_THRESHOLD) +
-    Math.max(0, Math.log(omega0)) +
-    Math.log(Math.max(1, amp))
-  ) / rate;
+// ЗАМОРОЖЕННЫЕ значения rest-бюджета (секунды) для шести режимов корпуса.
+//
+// Раньше здесь жила РЕПЛИКА производственной формулы (`legacyRestBound`). Такой
+// пин тавтологичен: он повторял тот же расчёт и потому не мог поймать изменение
+// закона — только изменение маршрутизации. Заменён на два независимых пина:
+// (1) маршрут — через производственный seam `settleTimeAtRestUpperBound`;
+// (2) значение — замороженными литералами. Литерал не дрейфует вместе с
+// реализацией: любое изменение закона становится видимым намеренным диффом.
+//
+// Хронология значений:
+//   2026-07-24 — канонизация ζ = (c/m)/(2ω₀) вместо c/(2·m·ω₀) (#239): формы
+//   различаются на ≤1 ulp при массе ≠ 1 (SMALL_SCALE: …067 → …065), зато бюджет
+//   стал бит-инвариантным по масс-эквивалентности — предпосылка exact-ключа кэша.
+const FROZEN_REST_BOUND_S = new Map<SpringParams, number>([
+  [UNDER, 1.5489486991535946],
+  [CRITICAL, 1.051957473113693],
+  [OVER, 2.0312297233075087],
+  [SMALL_SCALE, 5.907342996227065],
+  [NEAR_CRITICAL_UNDER, 1.8734889905689867],
+  [NEAR_CRITICAL_OVER, 2.0442046523205253],
+]);
+
+function frozenRestBound(p: SpringParams): number {
+  const value = FROZEN_REST_BOUND_S.get(p);
+  if (value === undefined) throw new Error('режим без замороженного значения');
+  return value;
 }
 
 function slowRate(p: SpringParams): number {
@@ -70,10 +85,13 @@ function slowRate(p: SpringParams): number {
 }
 
 describe('compositor: v0 входит в доказанный горизонт и бюджет сетки', () => {
-  it('v0=0 сохраняет прежнюю длительность бит-в-бит', () => {
+  it('v0=0 делегирует к rest-закону и держит замороженные значения', () => {
     for (const p of CURVE_REGIMES) {
-      expect(settleTimeUpperBound(p, 0)).toBe(legacyRestBound(p));
-      expect(settleTimeUpperBound(p, -0)).toBe(legacyRestBound(p));
+      // Маршрут: обе нулевые формы уходят в тот же производственный seam.
+      expect(settleTimeUpperBound(p, 0)).toBe(settleTimeAtRestUpperBound(p));
+      expect(settleTimeUpperBound(p, -0)).toBe(settleTimeAtRestUpperBound(p));
+      // Значение: независимый пин литералом (не реплика формулы).
+      expect(settleTimeUpperBound(p, 0)).toBe(frozenRestBound(p));
     }
   });
 

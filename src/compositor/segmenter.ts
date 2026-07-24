@@ -64,7 +64,9 @@ export function springCompileHorizon(
   const settle = settleTimeUpperBound(params, v0);
   if (tolerance >= DEFAULT_TOLERANCE) return settle;
   const omega2 = params.stiffness / params.mass;
-  const alpha = params.damping / (2 * params.mass);
+  // Канонический порядок (#239, ревью): см. spring.ts — c/(2m) переполняется
+  // при валидной массе 1e308 и рвёт масс-инвариантность горизонта.
+  const alpha = params.damping / params.mass / 2;
   const delta = omega2 - alpha * alpha;
   // Огибающая ~e^(−rate·t); медленный полюс — та же устойчивая форма без
   // катастрофического вычитания, что в settle-законе (#226).

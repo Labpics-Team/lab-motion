@@ -63,9 +63,8 @@ const sharedCache = /* @__INLINE__ */ createSpringLinearCacheState<SpringExecuti
 const RESTING_CACHE_CAPACITY = 8;
 
 type RestingEntry = [
-  mass: number,
-  stiffness: number,
-  damping: number,
+  omega2: number,
+  dampingPerMass: number,
   tolerance: number,
   artifact: SpringExecutionArtifactTuple,
 ];
@@ -197,14 +196,21 @@ export function tryCompileSpringExecutionArtifactTupleUnchecked(
   prebuiltNodes?: readonly SpringNode[],
   prebuiltDurationMs?: number,
 ): SpringExecutionArtifactTuple | undefined {
-  const { mass, stiffness, damping } = spring;
+  // Scale-инвариантный exact-key (#239): артефакт — функция ТОЛЬКО битовых
+  // частных ω² = k/m и c/m. Это НЕ было верно автоматически: пока ζ считался
+  // как c/(2·m·ω₀), промежуточное произведение округлялось по-разному при
+  // разной массе, и кэш отдавал чужой план (контрпример в
+  // test/compositor-cache-mass-invariance.test.ts). Инвариантность держится
+  // тем, что ВСЕ численные потребители канонизированы на те же частные —
+  // тогда масс-эквивалентные тройки честно делят один слот.
+  const omega2 = spring.stiffness / spring.mass;
+  const dampingPerMass = spring.damping / spring.mass;
   // Единственный production-consumer: inline оставляет functional core отдельно
   // тестируемым в source, а import-cost ratchet контролирует итоговый артефакт.
   const hit = /* @__INLINE__ */ lookupSpringLinearCache(
     cache,
-    mass,
-    stiffness,
-    damping,
+    omega2,
+    dampingPerMass,
     v0,
     tolerance,
   );
@@ -231,9 +237,8 @@ export function tryCompileSpringExecutionArtifactTupleUnchecked(
     );
     /* @__INLINE__ */ storeSpringLinearCache(
       cache,
-      mass,
-      stiffness,
-      damping,
+      omega2,
+      dampingPerMass,
       v0,
       tolerance,
       artifact,
@@ -289,20 +294,25 @@ export function compileRestingSpringExecutionArtifactTupleUnchecked(
   spring: SpringParams,
   tolerance: number,
 ): SpringExecutionArtifactTuple {
-  const { mass, stiffness, damping } = spring;
+  // ОДИН закон идентичности на весь файл (#239): и generic LRU, и этот
+  // native-кэш ключуются частными ω²=k/m и c/m. Раньше здесь жил второй закон
+  // (сырые m/k/c), из-за чего масс-эквивалентные пружины дедуплицировались на
+  // одном пути и не дедуплицировались на другом — расхождение не было ни
+  // запинено, ни задокументировано. Пин: test/compositor-cache-mass-invariance.
+  const omega2 = spring.stiffness / spring.mass;
+  const dampingPerMass = spring.damping / spring.mass;
   // Обратный поиск даёт горячим новым ключам короткий путь.
   for (let i = restingCache.length; i--;) {
     const entry = restingCache[i]!;
     if (
-      entry[0] === mass
-      && entry[1] === stiffness
-      && entry[2] === damping
-      && entry[3] === tolerance
-    ) return entry[4];
+      entry[0] === omega2
+      && entry[1] === dampingPerMass
+      && entry[2] === tolerance
+    ) return entry[3];
   }
   const build = buildRestingSpringNodesWithHorizon(spring, tolerance);
   const artifact = emitArtifact(build[0], tolerance, build[1] * 1000);
-  restingCache.push([mass, stiffness, damping, tolerance, artifact]);
+  restingCache.push([omega2, dampingPerMass, tolerance, artifact]);
   if (restingCache.length > RESTING_CACHE_CAPACITY) restingCache.shift();
   return artifact;
 }

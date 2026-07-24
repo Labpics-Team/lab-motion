@@ -641,7 +641,7 @@ export function play(el) { return animate(el, { opacity: 0.5 }); }
     expect(report!.lowered).toBe(1);
     plugin.buildStart(); // watch-ребилд без модулей
     plugin.buildEnd();
-    expect(report).toEqual({ lowered: 0, runtimeCalls: 0, artifactChars: 0 });
+    expect(report).toEqual({ lowered: 0, runtimeCalls: 0, artifactChars: 0, uniqueArtifacts: 0 });
   });
 
   it('artifactChars считает ТОЛЬКО литералы артефактов, без обёртки вызова', async () => {
@@ -676,6 +676,53 @@ export function play(el) { return animate(el, { opacity: 0.5 }); }
     expect(report!.lowered).toBe(1);
     expect(report!.runtimeCalls).toBe(1);
     expect(report!.artifactChars).toBeGreaterThan(100); // linear()-строка внутри
+  });
+});
+
+// ─── #239: memo артефактов билда (uniqueArtifacts) ───────────────────────────
+//
+// Дорогая часть lowering (springLinear + V1-верификация) исполняется раз на
+// уникальную форму (props, options), не раз на call-site. Mutation proof:
+// убрать memo → uniqueArtifacts === lowered → ассерты ниже падают.
+
+describe('#239: memo артефактов — uniqueArtifacts в квитанции', () => {
+  it('3 одинаковых вызова → lowered=3, uniqueArtifacts=1; разные пружины растят счётчик', async () => {
+    let report: { lowered: number; uniqueArtifacts: number } | undefined;
+    const plugin = motionCompiler({ onBudget: (r) => { report = r; } });
+    const three = `import { animate } from '@labpics/motion/nano';
+export function play(el) {
+  animate(el, { opacity: 1 });
+  animate(el, { opacity: 1 });
+  return animate(el, { opacity: 1 });
+}
+`;
+    const other = `import { animate } from '@labpics/motion/nano';
+export const p = (el) => animate(el, { opacity: 1 }, { spring: { mass: 1, stiffness: 120, damping: 14 } });
+`;
+    plugin.buildStart();
+    const astA = await parseAstAsync(three);
+    plugin.transform.call({ parse: () => astA }, three, '/app/a.ts');
+    const astB = await parseAstAsync(other);
+    plugin.transform.call({ parse: () => astB }, other, '/app/b.ts');
+    plugin.buildEnd();
+    expect(report!.lowered).toBe(4);
+    expect(report!.uniqueArtifacts).toBe(2);
+  });
+
+  it('memo сбрасывается buildStart-ом вместе с остальной квитанцией', async () => {
+    let report: { uniqueArtifacts: number } | undefined;
+    const plugin = motionCompiler({ onBudget: (r) => { report = r; } });
+    const one = `import { animate } from '@labpics/motion/nano';
+export const p = (el) => animate(el, { opacity: 0.5 });
+`;
+    plugin.buildStart();
+    const ast = await parseAstAsync(one);
+    plugin.transform.call({ parse: () => ast }, one, '/app/a.ts');
+    plugin.buildEnd();
+    expect(report!.uniqueArtifacts).toBe(1);
+    plugin.buildStart();
+    plugin.buildEnd();
+    expect(report!.uniqueArtifacts).toBe(0);
   });
 });
 
