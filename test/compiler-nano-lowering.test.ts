@@ -726,6 +726,19 @@ animate(el, { opacity: 1 }, { stagger: -20 });
     expect(p!.edits[1]!.replacement).toContain('g:-20');
   });
 
+  it('-0 понижается в 0 — паритет с рантаймовым nano (ревью #248)', async () => {
+    // Унарный минус сделал -0 статическим. Значение попадает в артефакт через
+    // String(-0) === '0', то есть кадр совпадает с рантаймовым путём поле в
+    // поле; отдельный пин нужен, потому что -0 — единственное значение, где
+    // Object.is отличает результат от литерала 0.
+    const p = await plan(`import { animate } from '@labpics/motion/nano';
+animate(el, { opacity: -0, rotate: -0 });
+`);
+    expect(p).toBeDefined();
+    expect(p!.edits.length).toBe(2);
+    expect(p!.edits[1]!.replacement).toContain('{f:{opacity:0,rotate:"0deg"}');
+  });
+
   it('унарный плюс остаётся сомнением — вызов не понижается', async () => {
     const p = await plan(`import { animate } from '@labpics/motion/nano';
 animate(el, { opacity: +1 });
