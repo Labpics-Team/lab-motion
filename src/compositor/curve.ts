@@ -63,9 +63,8 @@ const sharedCache = /* @__INLINE__ */ createSpringLinearCacheState<SpringExecuti
 const RESTING_CACHE_CAPACITY = 8;
 
 type RestingEntry = [
-  mass: number,
-  stiffness: number,
-  damping: number,
+  omega2: number,
+  dampingPerMass: number,
   tolerance: number,
   artifact: SpringExecutionArtifactTuple,
 ];
@@ -73,6 +72,28 @@ type RestingEntry = [
 // Native v0=0 не платит за generic hash-map/cache; линейный hit точен и ничего
 // не аллоцирует.
 const restingCache: RestingEntry[] = [];
+
+/**
+ * Sentinel «эта пружина доказанно НЕ компилируется» — тот же LRU, тот же ключ.
+ *
+ * ЗАЧЕМ (ревью #246): с #228 предикат компилируемости — сама попытка построения
+ * адаптивной сетки, и на over-cap она честно доходит до физического потолка
+ * BASE_GRID_MAX (4096 узлов = 4096 вызовов солвера ≈ 0.6 мс). Прежняя O(1)
+ * формула global worst-case была ДЕШЕВЛЕ, но НЕСОСТОЯТЕЛЬНА как отказ: она
+ * отвергала пружины, которые адаптивная сетка компилирует (именно это #228 и
+ * исправил). Звать её обратно как «предфильтр» нельзя — вернутся ложные отказы.
+ *
+ * Поэтому дешевеет не первый отказ, а ПОВТОРНЫЙ: over-cap возникает на живом
+ * жесте (быстрый fling переносит скорость), где animate()/retarget зовут
+ * компиляцию каждый кадр с ТЕМ ЖЕ ключом. Sentinel делает второй и все
+ * последующие отказы O(1) — теряется максимум один кадр на уникальную пружину,
+ * а не каждый. Пин: test/compositor-overcap-memo.test.ts.
+ *
+ * Пустой tuple — не значение, а ИДЕНТИЧНОСТЬ: наружу он не выходит никогда
+ * (сравнение по ссылке гасит его в undefined), поэтому поля ему не нужны, и
+ * стоит он в бандле считанные байты — продуктовые пороги трогать не пришлось.
+ */
+const OVER_CAP = [] as unknown as SpringExecutionArtifactTuple;
 
 export function validateTolerance(tolerance: number): void {
   if (!Number.isFinite(tolerance) || tolerance <= 0 || tolerance >= 1) {
@@ -85,7 +106,8 @@ function emitArtifact(
   tolerance: number,
   durationMs: number,
 ): SpringExecutionArtifactTuple {
-  // Raw-кривая доказанно занимает ≤13/16 tolerance. Ещё 1/8 делим поровну:
+  // Raw-кривая доказанно занимает ≤7/8 tolerance (#228: сетка ≤ tol/2 + RDP
+  // 3tol/8). Оставшийся 1/8 делим поровну:
   // округление progress ≤tol/16 и сдвиг времени ≤tol/16. Для кусочно-
   // линейной функции с максимальным наклоном L
   // time-rounding эквивалентен монотонной перепараметризации и даёт ошибку
@@ -174,42 +196,55 @@ export function tryCompileSpringExecutionArtifactTupleUnchecked(
   prebuiltNodes?: readonly SpringNode[],
   prebuiltDurationMs?: number,
 ): SpringExecutionArtifactTuple | undefined {
-  const { mass, stiffness, damping } = spring;
+  // Scale-инвариантный exact-key (#239): артефакт — функция ТОЛЬКО битовых
+  // частных ω² = k/m и c/m. Это НЕ было верно автоматически: пока ζ считался
+  // как c/(2·m·ω₀), промежуточное произведение округлялось по-разному при
+  // разной массе, и кэш отдавал чужой план (контрпример в
+  // test/compositor-cache-mass-invariance.test.ts). Инвариантность держится
+  // тем, что ВСЕ численные потребители канонизированы на те же частные —
+  // тогда масс-эквивалентные тройки честно делят один слот.
+  const omega2 = spring.stiffness / spring.mass;
+  const dampingPerMass = spring.damping / spring.mass;
   // Единственный production-consumer: inline оставляет functional core отдельно
   // тестируемым в source, а import-cost ratchet контролирует итоговый артефакт.
   const hit = /* @__INLINE__ */ lookupSpringLinearCache(
     cache,
-    mass,
-    stiffness,
-    damping,
+    omega2,
+    dampingPerMass,
     v0,
     tolerance,
   );
-  // Truthiness эквивалентен !== undefined: попадание — всегда tuple-массив.
-  if (hit) return hit;
-  let nodes = prebuiltNodes;
-  let durationMs = prebuiltDurationMs;
-  if (nodes === undefined) {
-    const build = tryBuildSpringNodes(spring, v0, tolerance);
-    if (!build) return;
-    nodes = build[0];
-    durationMs = build[1] * 1000;
+  // Truthiness эквивалентен !== undefined: попадание — всегда tuple-массив
+  // (в том числе sentinel over-cap, который гасится общим возвратом ниже).
+  let artifact = hit;
+  if (!artifact) {
+    let nodes = prebuiltNodes;
+    let durationMs = prebuiltDurationMs;
+    if (nodes === undefined) {
+      const build = tryBuildSpringNodes(spring, v0, tolerance);
+      if (build) {
+        nodes = build[0];
+        durationMs = build[1] * 1000;
+      }
+    }
+    // Отрицательный результат (over-cap) стоит столько же, сколько
+    // положительный, и на живом жесте повторяется каждый кадр с тем же
+    // ключом — он кладётся в кэш тем же путём, что артефакт.
+    artifact = nodes === undefined ? OVER_CAP : emitArtifact(
+      nodes,
+      tolerance,
+      durationMs ?? settleTimeUpperBound(spring, v0) * 1000,
+    );
+    /* @__INLINE__ */ storeSpringLinearCache(
+      cache,
+      omega2,
+      dampingPerMass,
+      v0,
+      tolerance,
+      artifact,
+    );
   }
-  const artifact = emitArtifact(
-    nodes,
-    tolerance,
-    durationMs ?? settleTimeUpperBound(spring, v0) * 1000,
-  );
-  /* @__INLINE__ */ storeSpringLinearCache(
-    cache,
-    mass,
-    stiffness,
-    damping,
-    v0,
-    tolerance,
-    artifact,
-  );
-  return artifact;
+  return artifact === OVER_CAP ? undefined : artifact;
 }
 
 /**
@@ -259,20 +294,25 @@ export function compileRestingSpringExecutionArtifactTupleUnchecked(
   spring: SpringParams,
   tolerance: number,
 ): SpringExecutionArtifactTuple {
-  const { mass, stiffness, damping } = spring;
+  // ОДИН закон идентичности на весь файл (#239): и generic LRU, и этот
+  // native-кэш ключуются частными ω²=k/m и c/m. Раньше здесь жил второй закон
+  // (сырые m/k/c), из-за чего масс-эквивалентные пружины дедуплицировались на
+  // одном пути и не дедуплицировались на другом — расхождение не было ни
+  // запинено, ни задокументировано. Пин: test/compositor-cache-mass-invariance.
+  const omega2 = spring.stiffness / spring.mass;
+  const dampingPerMass = spring.damping / spring.mass;
   // Обратный поиск даёт горячим новым ключам короткий путь.
   for (let i = restingCache.length; i--;) {
     const entry = restingCache[i]!;
     if (
-      entry[0] === mass
-      && entry[1] === stiffness
-      && entry[2] === damping
-      && entry[3] === tolerance
-    ) return entry[4];
+      entry[0] === omega2
+      && entry[1] === dampingPerMass
+      && entry[2] === tolerance
+    ) return entry[3];
   }
   const build = buildRestingSpringNodesWithHorizon(spring, tolerance);
   const artifact = emitArtifact(build[0], tolerance, build[1] * 1000);
-  restingCache.push([mass, stiffness, damping, tolerance, artifact]);
+  restingCache.push([omega2, dampingPerMass, tolerance, artifact]);
   if (restingCache.length > RESTING_CACHE_CAPACITY) restingCache.shift();
   return artifact;
 }

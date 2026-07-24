@@ -45,9 +45,10 @@ interface MotionCompilerOptions {
 }
 
 interface MotionBudgetReport {
-  readonly lowered: number;       // понижено вызовов за билд
-  readonly runtimeCalls: number;  // осталось рантаймовых (включая @motion-runtime)
-  readonly artifactChars: number; // суммарная длина инъецированных литералов
+  readonly lowered: number;         // понижено вызовов за билд
+  readonly runtimeCalls: number;    // осталось рантаймовых (включая @motion-runtime)
+  readonly artifactChars: number;   // суммарная длина инъецированных литералов
+  readonly uniqueArtifacts: number; // уникальных форм (props, options) — memo (#239)
 }
 
 interface MotionCompilerPlugin {

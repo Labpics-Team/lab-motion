@@ -6,17 +6,17 @@
  * по элементам списка.
  *
  * Инвариант hot-path (mandate M1): ПОПАДАНИЕ не аллоцирует. Достигается так:
- * - Оба компилятора передают пять исходных IEEE-754 чисел
- *   (mass/stiffness/damping/v0/tolerance). Полиномиальная свёртка остаётся
+ * - Оба компилятора передают четыре исходных IEEE-754 числа
+ *   (ω²=k/m, c/m, v0, tolerance — scale-инвариантные частные, #239). Полиномиальная свёртка остаётся
  *   числом и не создаёт строк/объектов; окончательную identity проверяют поля.
- * - lookup(a,b,c,d,e) НЕ принимает замыкание-компилятор (замыкание аллоцировало
+ * - lookup(a,b,c,d) НЕ принимает замыкание-компилятор (замыкание аллоцировало
  *   бы на КАЖДЫЙ вызов, включая попадание); вызывающий сам делает
  *   `lookup → если undefined: compile+store`. Ветка попадания возвращает
  *   существующий артефакт до любой аллокации.
  * - Recency — интрузивный двусвязный LRU: hit переставляет существующий узел
  *   без аллокации, а полный cold-miss переиспользует хвостовой объект.
  *
- * Коллизии хеша безопасны: узел хранит пять исходных чисел и сверяет их на
+ * Коллизии хеша безопасны: узел хранит четыре исходных числа и сверяет их на
  * попадании (без аллокаций) — несовпадение трактуется как промах (перекомпиляция
  * и перезапись), НИКОГДА не как чужой план. Exact-ключ принципиален: абсолютное
  * квантование малых коэффициентов меняло бы физику сильнее tolerance.
@@ -29,18 +29,17 @@ interface CacheNode<T> {
   b: number;
   c: number;
   d: number;
-  e: number;
   _value: T;
   _prev: CacheNode<T> | undefined;
   _next: CacheNode<T> | undefined;
 }
 
 /**
- * Свёртка пяти raw double без аллокаций. Коллизия влияет только на hit-rate:
+ * Свёртка четырёх raw double без аллокаций. Коллизия влияет только на hit-rate:
  * lookup всегда сверяет все исходные поля до возврата значения.
  */
-function hash5(a: number, b: number, c: number, d: number, e: number): number {
-  return ((((a * 31 + b) * 31 + c) * 31 + d) * 31 + e);
+function hash4(a: number, b: number, c: number, d: number): number {
+  return (((a * 31 + b) * 31 + c) * 31 + d);
 }
 
 /** Ёмкость по умолчанию — слотов артефактов кривой в одном кэше. */
@@ -93,13 +92,12 @@ export function lookupSpringLinearCache<T>(
   b: number,
   c: number,
   d: number,
-  e: number,
 ): T | undefined {
-  const hash = hash5(a, b, c, d, e);
+  const hash = hash4(a, b, c, d);
   const node = cache._map.get(hash);
   // Сверка исходных чисел отсекает коллизию хеша (промах, не чужой план).
   // Truthiness-гейт эквивалентен !== undefined: в map лежат только узлы-объекты.
-  if (node && node.a === a && node.b === b && node.c === c && node.d === d && node.e === e) {
+  if (node && node.a === a && node.b === b && node.c === c && node.d === d) {
     touch(cache, node);
     return node._value;
   }
@@ -117,10 +115,9 @@ export function storeSpringLinearCache<T>(
   b: number,
   c: number,
   d: number,
-  e: number,
   value: T,
 ): void {
-  const hash = hash5(a, b, c, d, e);
+  const hash = hash4(a, b, c, d);
   let node = cache._map.get(hash);
   if (node) {
     // Тот же хеш: либо повторный store того же ключа, либо коллизия — в обоих
@@ -139,7 +136,6 @@ export function storeSpringLinearCache<T>(
         b,
         c,
         d,
-        e,
         _value: value,
         _prev: undefined,
         _next: cache._head,
@@ -156,7 +152,6 @@ export function storeSpringLinearCache<T>(
   node.b = b;
   node.c = c;
   node.d = d;
-  node.e = e;
   node._value = value;
 }
 

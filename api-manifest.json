@@ -19,8 +19,8 @@
         "validateSpringParams",
         "validateSpringPhysics"
       ],
-      "shippedGzBytes": 2159,
-      "shippedBrBytes": 2016,
+      "shippedGzBytes": 2158,
+      "shippedBrBytes": 2014,
       "docs": "docs/reference/core.md",
       "title": "Ядро `.` — MotionValue, drive и корневой экспорт"
     },
@@ -66,8 +66,8 @@
         "useReducedMotion",
         "useSpring"
       ],
-      "shippedGzBytes": 3529,
-      "shippedBrBytes": 3256,
+      "shippedGzBytes": 3528,
+      "shippedBrBytes": 3253,
       "docs": "docs/reference/adapters.md",
       "title": "Фреймворк-адаптеры — ./react, ./vue, ./svelte, ./solid, ./preact, ./angular, ./lit, ./wc, ./qwik"
     },
@@ -77,8 +77,8 @@
       "runtimeExports": [
         "springStore"
       ],
-      "shippedGzBytes": 2534,
-      "shippedBrBytes": 2346,
+      "shippedGzBytes": 2533,
+      "shippedBrBytes": 2345,
       "docs": "docs/reference/adapters.md",
       "title": "Фреймворк-адаптеры — ./react, ./vue, ./svelte, ./solid, ./preact, ./angular, ./lit, ./wc, ./qwik"
     },
@@ -91,7 +91,7 @@
         "vMotion"
       ],
       "shippedGzBytes": 3012,
-      "shippedBrBytes": 2794,
+      "shippedBrBytes": 2792,
       "docs": "docs/reference/adapters.md",
       "title": "Фреймворк-адаптеры — ./react, ./vue, ./svelte, ./solid, ./preact, ./angular, ./lit, ./wc, ./qwik"
     },
@@ -122,8 +122,8 @@
       "runtimeExports": [
         "createDriver"
       ],
-      "shippedGzBytes": 1679,
-      "shippedBrBytes": 1548,
+      "shippedGzBytes": 1678,
+      "shippedBrBytes": 1550,
       "docs": "docs/reference/driver-frame.md",
       "title": "./driver и ./frame — управляемый драйвер и общий кадровый цикл"
     },
@@ -181,7 +181,7 @@
         "MotionController"
       ],
       "shippedGzBytes": 3032,
-      "shippedBrBytes": 2764,
+      "shippedBrBytes": 2761,
       "docs": "docs/reference/adapters.md",
       "title": "Фреймворк-адаптеры — ./react, ./vue, ./svelte, ./solid, ./preact, ./angular, ./lit, ./wc, ./qwik"
     },
@@ -195,8 +195,8 @@
         "createPress",
         "createVelocityTracker"
       ],
-      "shippedGzBytes": 2969,
-      "shippedBrBytes": 2742,
+      "shippedGzBytes": 2968,
+      "shippedBrBytes": 2739,
       "docs": "docs/reference/gestures.md",
       "title": "./gestures — drag с инерцией и handoff"
     },
@@ -250,8 +250,8 @@
         "createFlip",
         "flipAt"
       ],
-      "shippedGzBytes": 1362,
-      "shippedBrBytes": 1258,
+      "shippedGzBytes": 1361,
+      "shippedBrBytes": 1266,
       "docs": "docs/reference/flip.md",
       "title": "./flip — FLIP layout-анимации"
     },
@@ -267,7 +267,7 @@
         "projectAt"
       ],
       "shippedGzBytes": 5206,
-      "shippedBrBytes": 4709,
+      "shippedBrBytes": 4712,
       "docs": "docs/reference/projection.md",
       "title": "./projection — проекционное дерево (вложенный FLIP)"
     },
@@ -280,8 +280,8 @@
         "resolveSmartTier",
         "smartTransition"
       ],
-      "shippedGzBytes": 6837,
-      "shippedBrBytes": 6180,
+      "shippedGzBytes": 6836,
+      "shippedBrBytes": 6177,
       "docs": "docs/reference/smart.md",
       "title": "./smart — умные переходы"
     },
@@ -374,7 +374,7 @@
         "createSpring"
       ],
       "shippedGzBytes": 2615,
-      "shippedBrBytes": 2417,
+      "shippedBrBytes": 2416,
       "docs": "docs/reference/adapters.md",
       "title": "Фреймворк-адаптеры — ./react, ./vue, ./svelte, ./solid, ./preact, ./angular, ./lit, ./wc, ./qwik"
     },
@@ -385,8 +385,8 @@
         "useMotionValue",
         "useSpring"
       ],
-      "shippedGzBytes": 2607,
-      "shippedBrBytes": 2424,
+      "shippedGzBytes": 2606,
+      "shippedBrBytes": 2423,
       "docs": "docs/reference/adapters.md",
       "title": "Фреймворк-адаптеры — ./react, ./vue, ./svelte, ./solid, ./preact, ./angular, ./lit, ./wc, ./qwik"
     },
@@ -397,8 +397,8 @@
         "injectMotionValue",
         "injectSpring"
       ],
-      "shippedGzBytes": 2627,
-      "shippedBrBytes": 2422,
+      "shippedGzBytes": 2626,
+      "shippedBrBytes": 2424,
       "docs": "docs/reference/adapters.md",
       "title": "Фреймворк-адаптеры — ./react, ./vue, ./svelte, ./solid, ./preact, ./angular, ./lit, ./wc, ./qwik"
     },
@@ -411,8 +411,8 @@
         "defineLabSpring",
         "renderTemplateValue"
       ],
-      "shippedGzBytes": 2930,
-      "shippedBrBytes": 2693,
+      "shippedGzBytes": 2929,
+      "shippedBrBytes": 2692,
       "docs": "docs/reference/adapters.md",
       "title": "Фреймворк-адаптеры — ./react, ./vue, ./svelte, ./solid, ./preact, ./angular, ./lit, ./wc, ./qwik"
     },
@@ -423,7 +423,7 @@
         "useSpring"
       ],
       "shippedGzBytes": 2624,
-      "shippedBrBytes": 2439,
+      "shippedBrBytes": 2438,
       "docs": "docs/reference/adapters.md",
       "title": "Фреймворк-адаптеры — ./react, ./vue, ./svelte, ./solid, ./preact, ./angular, ./lit, ./wc, ./qwik"
     },
@@ -505,8 +505,8 @@
         "supportsCompositor",
         "supportsLinearEasing"
       ],
-      "shippedGzBytes": 6072,
-      "shippedBrBytes": 5549,
+      "shippedGzBytes": 6054,
+      "shippedBrBytes": 5535,
       "docs": "docs/reference/compositor.md",
       "title": "./compositor, ./compositor/stagger и ./waapi — compositor-путь и WAAPI"
     },
@@ -519,8 +519,8 @@
         "compileSpringPlan",
         "compileStaggerPlan"
       ],
-      "shippedGzBytes": 6306,
-      "shippedBrBytes": 5766,
+      "shippedGzBytes": 6292,
+      "shippedBrBytes": 5747,
       "docs": "docs/reference/compositor.md",
       "title": "./compositor, ./compositor/stagger и ./waapi — compositor-путь и WAAPI"
     },
@@ -536,8 +536,8 @@
         "springFromDurationBounce",
         "staggerGap"
       ],
-      "shippedGzBytes": 1352,
-      "shippedBrBytes": 1242,
+      "shippedGzBytes": 1350,
+      "shippedBrBytes": 1239,
       "docs": "docs/reference/tokens-presets.md",
       "title": "./tokens и ./presets — токены движения и пресеты"
     },
@@ -547,8 +547,8 @@
       "runtimeExports": [
         "animate"
       ],
-      "shippedGzBytes": 12117,
-      "shippedBrBytes": 10988,
+      "shippedGzBytes": 12096,
+      "shippedBrBytes": 10994,
       "docs": "docs/reference/animate.md",
       "title": "./animate — одно-строчный DOM-фасад"
     },
@@ -569,8 +569,8 @@
       "runtimeExports": [
         "motionCompiler"
       ],
-      "shippedGzBytes": 6935,
-      "shippedBrBytes": 6155,
+      "shippedGzBytes": 7030,
+      "shippedBrBytes": 6287,
       "docs": "docs/reference/compiler.md",
       "title": "./compiler — build-time lowering: Vite-плагин и рантайм артефактов"
     },
@@ -594,8 +594,8 @@
         "createDragDismiss",
         "createPullToRefresh"
       ],
-      "shippedGzBytes": 3335,
-      "shippedBrBytes": 2998,
+      "shippedGzBytes": 3334,
+      "shippedBrBytes": 2997,
       "docs": "docs/reference/behaviors.md",
       "title": "./behaviors — headless-машины мобильных взаимодействий"
     }
