@@ -265,6 +265,34 @@ export interface FakeWorld {
   writes(el: FakeElement, prop?: string): WorldOp[];
 }
 
+/**
+ * #131: применяет ПРОСТОЙ inline translate/scale к layout-ректу — как реальный
+ * DOM. Замер под неснятым transform теперь ВИДЕН через возвращаемый рект, а не
+ * только через журнал: мутанты границы batch clear→measure→start и знака v0
+ * наблюдаемы рект-ассертами. Scale — центр-инвариантный (origin 50% 50%).
+ * rotate/skew вне модели (простые фейки, канон issue).
+ */
+export function applyInlineTransform(rect: RectLike, transform: string): RectLike {
+  let { x, y, width, height } = rect;
+  for (const [, fn, args] of transform.matchAll(/(translateX|translateY|translate|scale)\(([^)]*)\)/g)) {
+    const nums = args!.split(',').map((token) => parseFloat(token));
+    if (fn === 'translateX') x += nums[0]! || 0;
+    else if (fn === 'translateY') y += nums[0]! || 0;
+    else if (fn === 'translate') {
+      x += nums[0]! || 0;
+      y += nums.length > 1 ? nums[1]! || 0 : 0;
+    } else {
+      const sx = Number.isFinite(nums[0]) ? nums[0]! : 1;
+      const sy = nums.length > 1 && Number.isFinite(nums[1]) ? nums[1]! : sx;
+      x += (width - width * sx) / 2;
+      y += (height - height * sy) / 2;
+      width *= sx;
+      height *= sy;
+    }
+  }
+  return { x, y, width, height };
+}
+
 export function makeWorld(): FakeWorld {
   const ops: WorldOp[] = [];
   let seq = 0;
@@ -307,17 +335,17 @@ export function makeWorld(): FakeWorld {
           },
         },
         getBoundingClientRect(): RectLike {
-          ops.push({
-            seq: seq++,
-            el: fake,
-            kind: 'measure',
-            inlineTransform: inline.get('transform') ?? '',
-          });
+          const inlineTransform = inline.get('transform') ?? '';
+          ops.push({ seq: seq++, el: fake, kind: 'measure', inlineTransform });
+          // #131: неснятый transform смещает рект, как в реальном DOM.
+          const box = inlineTransform === ''
+            ? fake.rect
+            : applyInlineTransform(fake.rect, inlineTransform);
           return {
-            x: fake.rect.x - world.scroll.x,
-            y: fake.rect.y - world.scroll.y,
-            width: fake.rect.width,
-            height: fake.rect.height,
+            x: box.x - world.scroll.x,
+            y: box.y - world.scroll.y,
+            width: box.width,
+            height: box.height,
           };
         },
         getRootNode() {

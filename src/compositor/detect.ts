@@ -85,20 +85,19 @@ let _explicitKeyframesMemo: boolean | undefined;
  * true (при живом WAAPI linear() практически всегда есть; итог решает supportsWaapi).
  */
 export function supportsLinearEasing(): boolean {
-  if (_linearMemo !== undefined) return _linearMemo;
-  const css = (globalThis as { CSS?: { supports?: (p: string, v: string) => boolean } }).CSS;
-  let result: boolean;
-  if (css !== undefined && typeof css.supports === 'function') {
+  if (_linearMemo === undefined) {
     try {
-      result = css.supports('transition-timing-function', 'linear(0, 1)');
+      // Чтение globalThis.CSS — внутри try: hostile-хост с бросающим геттером
+      // получает false, а не сломанную детекцию у вызывающих.
+      const css = (globalThis as { CSS?: { supports?: (p: string, v: string) => boolean } }).CSS;
+      _linearMemo = typeof css?.supports === 'function'
+        ? css.supports('transition-timing-function', 'linear(0, 1)')
+        : true;
     } catch {
-      result = false;
+      _linearMemo = false;
     }
-  } else {
-    result = true;
   }
-  _linearMemo = result;
-  return result;
+  return _linearMemo;
 }
 
 /**
@@ -106,9 +105,9 @@ export function supportsLinearEasing(): boolean {
  * отличает WebKit/iOS-браузеры от Chromium на macOS (его vendor — Google).
  */
 export function requiresExplicitSpringKeyframesFor(identity: EngineIdentity | undefined): boolean {
-  return (
-    (identity?.vendor ?? '').includes('Apple') &&
-    (identity?.userAgent ?? '').includes('AppleWebKit')
+  return !!(
+    identity?.vendor?.includes('Apple') &&
+    identity?.userAgent?.includes('AppleWebKit')
   );
 }
 
@@ -118,12 +117,14 @@ export function requiresExplicitSpringKeyframesFor(identity: EngineIdentity | un
  * отделена выше и вытряхивается из публичных сборок.
  */
 export function requiresExplicitSpringKeyframes(): boolean {
-  if (_explicitKeyframesMemo !== undefined) return _explicitKeyframesMemo;
-  try {
-    const nav = (globalThis as { navigator?: EngineIdentity }).navigator;
-    _explicitKeyframesMemo = requiresExplicitSpringKeyframesFor(nav);
-  } catch {
-    _explicitKeyframesMemo = false;
+  if (_explicitKeyframesMemo === undefined) {
+    try {
+      _explicitKeyframesMemo = requiresExplicitSpringKeyframesFor(
+        (globalThis as { navigator?: EngineIdentity }).navigator,
+      );
+    } catch {
+      _explicitKeyframesMemo = false;
+    }
   }
   return _explicitKeyframesMemo;
 }
@@ -142,11 +143,12 @@ export function __resetDetectionCache(): void {
 
 /** Активно ли предпочтение reduce (guard: нет matchMedia или бросок → false). */
 export function prefersReduced(matchMedia: MatchMediaLike | undefined): boolean {
-  if (typeof matchMedia !== 'function') return false;
   try {
     // Window.matchMedia — host-метод с receiver-проверкой в части движков.
-    // call убирает bind-замыкание из каждого animate-вызова.
-    return matchMedia.call(globalThis, '(prefers-reduced-motion: reduce)').matches === true;
+    // call убирает bind-замыкание из каждого animate-вызова. typeof-гейт не
+    // бросает, поэтому его перенос внутрь try поведения не меняет.
+    return typeof matchMedia === 'function'
+      && matchMedia.call(globalThis, '(prefers-reduced-motion: reduce)').matches === true;
   } catch {
     return false;
   }

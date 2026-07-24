@@ -46,7 +46,7 @@ function distModules(chunk) {
 let motionCompiler;
 
 /** Один Vite-build fixture'а: возвращает entry-chunk {code, distModules}. */
-async function buildFixture(name, code, withPlugin) {
+async function buildFixture(name, code, withPlugin, pluginOptions) {
   const entry = resolve(TMP, `${name}.js`);
   writeFileSync(entry, code);
   const result = await build({
@@ -54,7 +54,7 @@ async function buildFixture(name, code, withPlugin) {
     logLevel: 'silent',
     configFile: false,
     resolve: { alias: ALIAS },
-    plugins: withPlugin ? [motionCompiler()] : [],
+    plugins: withPlugin ? [motionCompiler(pluginOptions)] : [],
     build: {
       write: false,
       minify: true,
@@ -67,12 +67,48 @@ async function buildFixture(name, code, withPlugin) {
   return { code: chunk.code, modules: distModules(chunk) };
 }
 
-// Статическая opacity — единственная форма в скоупе lowering (#208 §core).
+// Статическая opacity — исторический минимальный срез (#208 §core).
 const LOWERABLE = `import { animate } from '@labpics/motion/nano';
 export function play(el) { return animate(el, { opacity: 0.5 }); }`;
 // Динамическая opacity — вне скоупа: плагин обязан отказать (positive control).
 const DYNAMIC = `import { animate } from '@labpics/motion/nano';
 export function play(el, v) { return animate(el, { opacity: v }); }`;
+// Полный common-motion срез #220/#221: multi-prop + spring/delay/stagger.
+// Северная метрика эпика: consumer fixture ≤ 5 KB gzip (initial и total —
+// сборка single-chunk, поэтому один и тот же байтовый срез).
+const COMMON = `import { animate } from '@labpics/motion/nano';
+export function play(els) {
+  return animate(els, { translate: '120px 0', scale: 1.04, rotate: 8, opacity: 1 }, {
+    spring: { mass: 1, stiffness: 170, damping: 26 },
+    delay: 40,
+    stagger: 20,
+  });
+}`;
+const COMMON_MOTION_CEILING_GZ = 5120;
+
+// ── Леджер «шов+артефакт» (#237): ратчетируемые consumer-сценарии ────────────
+// Именно сумма «executor-шов + инъецированные артефакты» конкурирует с
+// compiled-стендами конкурентов (size-compare: 866 B gz). Exact-ратчет от
+// факта (люфт нулевой, конвенция ./compiler/runtime): рост — только решением.
+// Хронология: 2026-07-23 первые факты — ×1: 883 B gz (наш же прежний
+// compiled-факт стенда size-compare был 866 B @633d461 — рост оплатили
+// ревью-фиксы контракта onfinish в шве; возврат ниже — цель портфеля
+// #238/#239), ×5 (3 уникальные пружины): 1516 B gz.
+const LEDGER_ONE_CEILING_GZ = 883;
+const LEDGER_FIVE_CEILING_GZ = 1516;
+// 5 вызовов, 3 уникальные пружины (дефолт + два литеральных пресета):
+// gzip-дедуп повторной пружины — часть заявления леджера.
+const LEDGER_FIVE = `import { animate } from '@labpics/motion/nano';
+export function play(el) {
+  animate(el, { opacity: 1 });
+  animate(el, { translate: '0 12px' }, { spring: { mass: 1, stiffness: 120, damping: 14 } });
+  animate(el, { scale: 1.05 }, { spring: { mass: 1, stiffness: 260, damping: 28 } });
+  animate(el, { rotate: 6 }, { delay: 40, stagger: 20 });
+  return animate(el, { opacity: 0.5 }, { spring: { mass: 1, stiffness: 120, damping: 14 } });
+}`;
+// strict-smoke (#237): непониженный вызов валит сборку; маркер — пропускает.
+const MARKED_DYNAMIC = `import { animate } from '@labpics/motion/nano';
+export function play(el, v) { return /* @motion-runtime */ animate(el, { opacity: v }); }`;
 
 /** Fingerprint spring-солвера: замкнутая форма тянет Math.exp/cos/sin/sqrt. */
 const SPRING_MATH = /Math\.(?:exp|cos|sin|sqrt)/;
@@ -148,6 +184,86 @@ async function run() {
     );
     notes.push(`no-op контроль: динамическая opacity сохранила рантаймовый путь (${NANO_MODULE})`);
     notes.push(`граф compiled: ${compiled.modules.join(', ') || '(только entry)'}`);
+
+    // ── (#221) Common-motion fixture: элиминация + северная метрика ≤5 KB ─────
+    const commonBaseline = await buildFixture('common-uncompiled', COMMON, false);
+    const commonCompiled = await buildFixture('common-compiled', COMMON, true);
+    const commonExtra = commonCompiled.modules.filter((m) => m !== RUNTIME_MODULE);
+    check(
+      commonCompiled.modules.includes(RUNTIME_MODULE) && commonExtra.length === 0,
+      `common-compiled несёт лишние dist-модули: ${commonExtra.join(', ')}`,
+    );
+    check(
+      !SPRING_MATH.test(commonCompiled.code),
+      'common-compiled содержит spring-математику — солвер не элиминирован',
+    );
+    check(
+      /8deg/.test(commonCompiled.code) && /120px 0/.test(commonCompiled.code),
+      'common-compiled не несёт канонический multi-prop артефакт',
+    );
+    const commonBaselineGz = gzipSync(commonBaseline.code).length;
+    const commonCompiledGz = gzipSync(commonCompiled.code).length;
+    check(
+      commonCompiledGz < commonBaselineGz,
+      `common-compiled (${commonCompiledGz} B gz) не меньше uncompiled (${commonBaselineGz} B gz)`,
+    );
+    check(
+      commonCompiledGz <= COMMON_MOTION_CEILING_GZ,
+      `common-motion fixture ${commonCompiledGz} B gz > потолка ${COMMON_MOTION_CEILING_GZ} (#220)`,
+    );
+    notes.push(
+      `common-motion (#221): uncompiled ${commonBaselineGz} B gz → compiled ${commonCompiledGz} B gz ` +
+      `(потолок ${COMMON_MOTION_CEILING_GZ}, single-chunk ⇒ initial = total)`,
+    );
+
+    // ── (#237) Леджер «шов+артефакт»: ратчетируемые ×1 и ×5 ──────────────────
+    check(
+      compiledGz <= LEDGER_ONE_CEILING_GZ,
+      `ledger ×1 (${compiledGz} B gz) > ратчета ${LEDGER_ONE_CEILING_GZ}`,
+    );
+    let budget;
+    const five = await buildFixture('ledger-five', LEDGER_FIVE, true, {
+      onBudget: (report) => { budget = report; },
+    });
+    const fiveExtra = five.modules.filter((m) => m !== RUNTIME_MODULE);
+    check(
+      five.modules.includes(RUNTIME_MODULE) && fiveExtra.length === 0,
+      `ledger ×5 несёт лишние dist-модули: ${fiveExtra.join(', ')}`,
+    );
+    check(!SPRING_MATH.test(five.code), 'ledger ×5 содержит spring-математику');
+    const fiveGz = gzipSync(five.code).length;
+    check(
+      fiveGz <= LEDGER_FIVE_CEILING_GZ,
+      `ledger ×5 (${fiveGz} B gz) > ратчета ${LEDGER_FIVE_CEILING_GZ}`,
+    );
+    check(
+      budget !== undefined && budget.lowered === 5 && budget.runtimeCalls === 0,
+      `квитанция onBudget неожиданна: ${JSON.stringify(budget)}`,
+    );
+    notes.push(
+      `ledger (#237): ×1 = ${compiledGz} B gz (ратчет ${LEDGER_ONE_CEILING_GZ}), ` +
+      `×5 (3 пружины) = ${fiveGz} B gz (ратчет ${LEDGER_FIVE_CEILING_GZ}); ` +
+      `onBudget: lowered=${budget?.lowered}, runtime=${budget?.runtimeCalls}, artifactChars=${budget?.artifactChars}`,
+    );
+
+    // ── (#237) strict-smoke: непониженный вызов валит сборку, маркер — нет ───
+    let strictError;
+    try {
+      await buildFixture('dynamic-strict', DYNAMIC, true, { strict: true });
+    } catch (error) {
+      strictError = error;
+    }
+    check(
+      strictError !== undefined &&
+        /strict: непониженный nano-вызов/.test(String(strictError?.message ?? strictError)),
+      'strict-режим не остановил сборку с непониженным вызовом',
+    );
+    const marked = await buildFixture('marked-strict', MARKED_DYNAMIC, true, { strict: true });
+    check(
+      marked.modules.includes(NANO_MODULE) && !marked.modules.includes(RUNTIME_MODULE),
+      `маркированный @motion-runtime вызов обязан остаться рантаймовым при strict (граф: ${marked.modules.join(', ')})`,
+    );
+    notes.push('strict (#237): непониженный вызов — ошибка сборки с позицией; @motion-runtime — пропуск');
   } finally {
     rmSync(TMP, { recursive: true, force: true });
   }

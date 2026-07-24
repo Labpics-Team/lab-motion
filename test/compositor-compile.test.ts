@@ -24,6 +24,7 @@ import {
 } from '../src/compositor/index.js';
 import {
   buildSpringNodes,
+  buildSpringNodesWithHorizon,
   baseGridSize,
   douglasPeuckerVertical,
 } from '../src/compositor/segmenter.js';
@@ -135,8 +136,9 @@ describe('compositor: граница ошибки кусочно-линейно�
   it('УЗЛЫ сегментера: макс. отклонение реконструкции от истинной кривой ≤ tolerance (интерьер)', () => {
     for (const params of [STIFF, BOUNCY, GENTLE, OVER]) {
       const tol = 0.002;
-      const nodes = buildSpringNodes(params, 0, tol);
-      const T = settleTimeUpperBound(params);
+      // Горизонт — ВОЗВРАЩАЕМЫЙ строителем: tolerance строже дефолта продлевает
+      // его по #223-закону, и percent-шкала узлов живёт именно на нём.
+      const [nodes, T] = buildSpringNodesWithHorizon(params, 0, tol);
       // Интерьер: до предпоследнего узла (хвост форсится в 1 — снап эндпоинта
       // ≤0.5% исключаем из ТОЧНОЙ границы, проверяется отдельно ниже).
       const lastInteriorTau = nodes[nodes.length - 2]!.percent / 100;
@@ -275,9 +277,10 @@ describe('compositor: readCompositorSpring — closed-form (value, velocity)', (
         stiffness: 1 + rnd() * 900,
         damping: rnd() * 120,
       };
-      // Пропускаем неоседающие (валидатор их и так отвергнет).
+      // Пропускаем не представимые у ЭТОГО исполнителя: с #218 чистый spring()
+      // принимает всю физику, бюджет — граница compositor (validateSpringParams).
       try {
-        spring(p, 0);
+        validateSpringParams(p);
       } catch {
         continue;
       }

@@ -15,7 +15,7 @@
  * (совпадает с Framer Motion / Motion One / GSAP).
  */
 
-import { clampFinite } from './units.js';
+import { clampFinite, clampProgress } from './units.js';
 
 // ── TransformState ─────────────────────────────────────────────────────────────
 
@@ -71,8 +71,8 @@ const DEFAULTS: Required<TransformState> = {
 export function buildTransform(state: TransformState): string {
   let result = '';
 
-  const x = fin(state.x ?? DEFAULTS.x);
-  const y = fin(state.y ?? DEFAULTS.y);
+  const x = clampFinite(state.x ?? DEFAULTS.x);
+  const y = clampFinite(state.y ?? DEFAULTS.y);
 
   // translate (объединяем в translate3d для GPU-слой, или раздельно)
   if (x !== 0 || y !== 0) {
@@ -87,11 +87,11 @@ export function buildTransform(state: TransformState): string {
 
   // scale: если задан scale — перекрывает scaleX/scaleY
   if (state.scale !== undefined) {
-    const sv = fin(state.scale);
+    const sv = clampFinite(state.scale);
     if (sv !== 1) result += ` scale(${sv})`;
   } else {
-    const sx = fin(state.scaleX ?? DEFAULTS.scaleX);
-    const sy = fin(state.scaleY ?? DEFAULTS.scaleY);
+    const sx = clampFinite(state.scaleX ?? DEFAULTS.scaleX);
+    const sy = clampFinite(state.scaleY ?? DEFAULTS.scaleY);
     if (sx !== 1 || sy !== 1) {
       if (sx === sy) {
         result += ` scale(${sx})`;
@@ -103,12 +103,12 @@ export function buildTransform(state: TransformState): string {
   }
 
   // rotate
-  const rot = fin(state.rotate ?? DEFAULTS.rotate);
+  const rot = clampFinite(state.rotate ?? DEFAULTS.rotate);
   if (rot !== 0) result += ` rotate(${rot}deg)`;
 
   // skew
-  const skewX = fin(state.skewX ?? DEFAULTS.skewX);
-  const skewY = fin(state.skewY ?? DEFAULTS.skewY);
+  const skewX = clampFinite(state.skewX ?? DEFAULTS.skewX);
+  const skewY = clampFinite(state.skewY ?? DEFAULTS.skewY);
   if (skewX !== 0 && skewY !== 0) {
     result += ` skew(${skewX}deg, ${skewY}deg)`;
   } else if (skewX !== 0) {
@@ -128,7 +128,7 @@ export function buildTransform(state: TransformState): string {
  * Каждый канал интерполируется независимо: тот же lerp что tween.ts,
  * но применённый к каждому полю TransformState, затем buildTransform.
  *
- * FINITENESS GUARD (VT1): наследует от buildTransform + fin().
+ * FINITENESS GUARD (VT1): наследует от buildTransform + clampFinite().
  *
  * @param from     - начальное состояние трансформ
  * @param to       - конечное состояние трансформ
@@ -136,10 +136,7 @@ export function buildTransform(state: TransformState): string {
  * @returns CSS transform-строка
  */
 export function interpolateTransform(from: TransformState, to: TransformState, t: number): string {
-  const progress = Number.isFinite(t)
-    ? t <= 0 ? 0 : t >= 1 ? 1 : t
-    : Number.isNaN(t) ? 0
-    : t > 0 ? 1 : 0;
+  const progress = clampProgress(t);
 
   // Если scale задан в одном и не в другом — нормализуем
   const fromScaleX = from.scale !== undefined ? from.scale : (from.scaleX ?? DEFAULTS.scaleX);
@@ -161,11 +158,6 @@ export function interpolateTransform(from: TransformState, to: TransformState, t
 }
 
 // ── Вспомогательные ──────────────────────────────────────────────────────────
-
-/** Зажимает до конечного числа (VT1 guard). */
-function fin(x: number): number {
-  return clampFinite(x);
-}
 
 /**
  * Lerp одного поля с FINITENESS GUARD на переполнение range.

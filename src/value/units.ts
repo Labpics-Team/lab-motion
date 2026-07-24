@@ -22,6 +22,19 @@ export function clampFinite(x: number): number {
   return x > 0 ? Number.MAX_VALUE : -Number.MAX_VALUE;
 }
 
+/**
+ * Страж hostile-t: конечный t зажимается в [0,1]; NaN → 0 (позиция старта);
+ * ±Infinity → 1/0 (конечная/стартовая позиция). Единая копия для всех
+ * интерполяторов ./value.
+ * @internal
+ */
+export function clampProgress(t: number): number {
+  return Number.isFinite(t)
+    ? t <= 0 ? 0 : t >= 1 ? 1 : t
+    : Number.isNaN(t) ? 0
+    : t > 0 ? 1 : 0;
+}
+
 // ── AST-типы ─────────────────────────────────────────────────────────────────
 
 /**
@@ -108,7 +121,7 @@ function parseUnitImpl(value: string | number, diagnostic: boolean): UnitAST | u
     return {
       kind: 'var',
       name: varMatch[1],
-      fallback: varMatch[2] !== undefined ? varMatch[2].trim() : undefined,
+      fallback: varMatch[2]?.trim(),
     };
   }
 
@@ -186,10 +199,7 @@ export function interpolateUnit(
   t: number,
 ): string | number {
   // Страж hostile-t
-  const progress = Number.isFinite(t)
-    ? t <= 0 ? 0 : t >= 1 ? 1 : t
-    : Number.isNaN(t) ? 0
-    : t > 0 ? 1 : 0;
+  const progress = clampProgress(t);
 
   // var() → дискретный свап
   if (from.kind === 'var' || to.kind === 'var') {
@@ -204,15 +214,11 @@ export function interpolateUnit(
   const raw = fromVal + range * progress;
   const result = clampFinite(raw);
 
-  // После guard-а выше TypeScript сужает from/to до ParsedUnit|ParsedRelative.
-  // Оба типа имеют .unit: string — берём юнит из `to`, откатываемся на `from`.
-  // Assertion нужна, т.к. TS не всегда сужает по || внутри if-return.
-  const fNV = from as ParsedUnit | ParsedRelative;
-  const tNV = to as ParsedUnit | ParsedRelative;
-  const unit = tNV.unit !== '' ? tNV.unit : fNV.unit;
+  // После guard-а выше оба типа имеют .unit: string — юнит из `to`, откат на
+  // `from` ('' falsy). Assertion нужна: TS не сужает по || внутри if-return.
+  const unit = (to as ParsedUnit | ParsedRelative).unit || (from as ParsedUnit | ParsedRelative).unit;
 
-  if (unit === '') return result;
-  return `${result}${unit}`;
+  return unit === '' ? result : `${result}${unit}`;
 }
 
 /** Разрешает относительное/абсолютное значение в число (база = 0). */
@@ -222,9 +228,11 @@ function resolveUnitValue(v: ParsedUnit | ParsedRelative | ParsedVar): number {
   return 0; // var() → 0 (резерв; нормально не достигается после проверки выше)
 }
 
-/** Сериализует ParsedUnit/Relative/Var обратно в строку. */
-function unitToString(v: ParsedUnit | ParsedRelative | ParsedVar): string {
-  if (v.kind === 'unit') return v.unit ? `${v.value}${v.unit}` : String(v.value);
-  if (v.kind === 'relative') return `${v.op}=${v.amount}${v.unit}`;
+/** Сериализует ParsedUnit/Relative/Var обратно в строку. @internal */
+export function unitToString(v: ParsedUnit | ParsedRelative | ParsedVar): string {
+  // Кламп закрывает hand-constructed AST (V1); разобранные значения уже
+  // конечны, для них это no-op.
+  if (v.kind === 'unit') return `${clampFinite(v.value)}${v.unit}`;
+  if (v.kind === 'relative') return `${v.op}=${clampFinite(v.amount)}${v.unit}`;
   return v.fallback !== undefined ? `var(${v.name}, ${v.fallback})` : `var(${v.name})`;
 }

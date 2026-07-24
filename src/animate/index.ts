@@ -52,11 +52,11 @@ import {
 import { type SpringParams, validateSpringParams } from '../spring.js';
 import type { StaggerOptions } from '../stagger/index.js';
 import { scheduleStagger } from '../stagger/scheduler.js';
-import { buildTransform } from '../value/transform.js';
 import {
   bindGroup,
   cssAt,
   groupRecord,
+  groupValueAt,
   parseProps,
   sharedV0,
   type AnimatableElement,
@@ -72,6 +72,7 @@ import {
   type RequestFrameFn,
 } from './main-unit.js';
 import { surfaceBatchFor, type SurfaceBatch } from './surface-batch.js';
+import { uniformOffsets } from './track.js';
 import {
   collectBoundedArrayLike,
   requireAnimateOptions,
@@ -90,26 +91,48 @@ export type AnimateTarget =
   | ArrayLike<AnimatableElement>
   | readonly AnimatableElement[];
 
-/** Значение канала: цель или пара [from, to] (явный from отключает подхват). */
+/**
+ * Значение канала: цель, пара [from, to] (явный from отключает подхват) или
+ * N-keyframe кортеж длины ≥3 (#205): `x: [0, 120, -40, 0]` — все стопы явные,
+ * offsets равномерные либо options.times, изинг per-segment (options.ease).
+ */
 export type AnimatePropValue =
   | number
   | string
-  | readonly [number | string, number | string];
+  | readonly (number | string)[];
 
 /** Каналы движения: transform-шортхенды, opacity, любые CSS-свойства. */
 export type AnimateProps = Record<string, AnimatePropValue>;
 
 /** Опции animate(). spring и duration/ease взаимоисключающие. */
 export interface AnimateOptions {
-  /** Пружина (дефолт режима: tokens spring.default). */
+  /**
+   * Пружина (дефолт режима: tokens spring.default). Думаете в duration/bounce?
+   * `spring: fromBounce({ duration, bounce })` из `@labpics/motion/spring` —
+   * точное преобразование (#218).
+   */
   readonly spring?: SpringParams | undefined;
-  /** Длительность tween (мс). Задана → режим tween (дефолт ease: standard). */
+  /**
+   * Длительность tween в МИЛЛИСЕКУНДАХ (Framer/Motion считают в секундах —
+   * ×1000). Задана → режим tween (дефолт ease: standard).
+   */
   readonly duration?: number | undefined;
-  /** Изинг tween t∈[0,1]→прогресс. Задан без duration → duration.base. */
-  readonly ease?: ((t: number) => number) | undefined;
-  /** Задержка старта (мс, ≥ 0) — всем целям. */
+  /**
+   * Изинг tween t∈[0,1]→прогресс — ФУНКЦИЯ (готовые кривые — `./easing`;
+   * CSS-строки вида 'ease-out' — грамматика `./nano`). Задан без duration →
+   * duration.base. Массив (#205) — per-segment изинги N-keyframe вызова
+   * (длина N−1; все каналы вызова обязаны иметь одну authored-топологию N).
+   */
+  readonly ease?: ((t: number) => number) | readonly ((t: number) => number)[] | undefined;
+  /**
+   * Offsets N-keyframe вызова (#205): длина N, конечные, неубывающие,
+   * times[0]=0, times[N−1]=1; дубликаты легальны (right-biased скачок).
+   * Без times offsets равномерные. Требует authored-топологию N у всех каналов.
+   */
+  readonly times?: readonly number[] | undefined;
+  /** Задержка старта в МИЛЛИСЕКУНДАХ (≥ 0) — всем целям. */
   readonly delay?: number | undefined;
-  /** Каскад для многих целей: число = gap (мс) или конфиг ./stagger. */
+  /** Каскад для многих целей: число = gap в МИЛЛИСЕКУНДАХ или конфиг ./stagger. */
   readonly stagger?: number | StaggerOptions | undefined;
   /** Вызывается один раз, когда ВСЕ цели осели естественно (не cancel). */
   readonly onComplete?: (() => void) | undefined;
@@ -123,9 +146,13 @@ export interface AnimateOptions {
   readonly setTimer?: SetTimerFn | undefined;
 }
 
-/** Контролы прогона (для группы целей — агрегированные). */
-export interface AnimateControls {
-  /** Резолвится при завершении всех целей (естественном или прерывании). */
+/** Контролы прогона (для группы целей — агрегированные). Thenable: `await animate(...)`. */
+export interface AnimateControls extends PromiseLike<void> {
+  /**
+   * Резолвится при завершении всех целей — естественном ИЛИ через cancel/stop
+   * (естественность сигналит onComplete). `await controls` эквивалентен
+   * `await controls.finished` (канон Motion/driver).
+   */
   readonly finished: Promise<void>;
   /** Возобновить после pause(). */
   play(): void;
@@ -166,19 +193,6 @@ function releaseTransition(rec: GroupRecord, owner: GroupOwner | undefined): voi
   try { owner?._release?.(); } catch { /* owner уже терминализирован */ }
 }
 
-// ─── Дефолтные швы (читаются в вызове — SSR-safe) ────────────────────────────
-
-function defaultNow(): number {
-  const perf = (globalThis as { performance?: { now?: () => number } }).performance;
-  if (perf !== undefined && typeof perf.now === 'function') return perf.now();
-  return Date.now();
-}
-
-function defaultSetTimer(cb: () => void, ms: number): () => void {
-  const h = setTimeout(cb, ms);
-  return () => clearTimeout(h);
-}
-
 // ─── Разбор опций ────────────────────────────────────────────────────────────
 
 function resolveMode(options: AnimateOptions): MotionMode {
@@ -186,7 +200,10 @@ function resolveMode(options: AnimateOptions): MotionMode {
   const durationInput = options.duration;
   const easeInput = options.ease;
   const hasSpring = input !== undefined;
-  const hasTween = durationInput !== undefined || easeInput !== undefined;
+  // times — грамматика keyframe-движка (#205): участвует в выборе режима,
+  // поэтому spring+times конфликтует тем же LM136, что spring+duration.
+  const hasTween =
+    durationInput !== undefined || easeInput !== undefined || options.times !== undefined;
   if (hasSpring && hasTween) {
     throw new MotionParamError('LM136');
   }
@@ -194,6 +211,21 @@ function resolveMode(options: AnimateOptions): MotionMode {
     const durationMs = durationInput ?? DEFAULT_DURATION_MS;
     if (!Number.isFinite(durationMs) || durationMs <= 0) {
       throw new MotionParamError('LM137');
+    }
+    if (Array.isArray(easeInput)) {
+      // Snapshot массива изингов (#205): длина фиксируется до топологии,
+      // элементы обязаны быть функциями (тот же LM138, что scalar).
+      const eases = [...(easeInput as readonly unknown[])];
+      if (eases.length === 0) throw new MotionParamError('LM169');
+      for (const segmentEase of eases) {
+        if (typeof segmentEase !== 'function') throw new MotionParamError('LM138');
+      }
+      return {
+        _type: 'tween',
+        _durationMs: durationMs,
+        _ease: eases[0] as (t: number) => number,
+        _eases: eases as ((t: number) => number)[],
+      };
     }
     const ease = easeInput ?? STANDARD_EASING;
     if (typeof ease !== 'function') {
@@ -221,16 +253,75 @@ function resolveDelay(input: number | undefined): number {
   return delay;
 }
 
+/**
+ * Контракт N-keyframe вызова (#205): валидация times (конечные, неубывающие,
+ * 0 → 1, дубликаты легальны), единая authored-топология N при times/ease[]
+ * (скрытых эвристик нет), синхронный отказ трек+явная пружина (LM136) и
+ * наполнение offsets треков (times либо равномерная сетка канала). Треки без
+ * явного режима получают tween с дефолтными длительностью и изингом —
+ * keyframe-грамматика принадлежит keyframe-движку.
+ */
+function resolveTracks(
+  specs: readonly ChannelSpec[],
+  mode: MotionMode,
+  options: AnimateOptions,
+): MotionMode {
+  const timesInput = options.times;
+  let times: number[] | undefined;
+  if (timesInput !== undefined) {
+    if (!Array.isArray(timesInput)) throw new MotionParamError('LM168');
+    times = [...(timesInput as readonly unknown[])] as number[];
+    // Один проход: NaN/нечисло/убывание ловит !(t >= previous), диапазон — t > 1;
+    // цепочка от previous=0 гарантирует неотрицательность, края — точные 0 и 1.
+    let previous = 0;
+    for (const offset of times) {
+      if (typeof offset !== 'number' || !(offset >= previous) || offset > 1) {
+        throw new MotionParamError('LM168');
+      }
+      previous = offset;
+    }
+    if (times.length < 2 || times[0] !== 0 || previous !== 1) {
+      throw new MotionParamError('LM168');
+    }
+  }
+  const eases = mode._type === 'tween' ? mode._eases : undefined;
+  let hasTracks = false;
+  for (const spec of specs) if (spec._stops !== undefined) hasTracks = true;
+  if (!hasTracks && times === undefined && eases === undefined) return mode;
+  if (mode._type === 'spring') {
+    // options.spring задан явно (иначе times/eases уже выбрали бы tween).
+    if (options.spring !== undefined) throw new MotionParamError('LM136');
+    mode = { _type: 'tween', _durationMs: DEFAULT_DURATION_MS, _ease: STANDARD_EASING };
+  }
+  const topology = times !== undefined
+    ? times.length
+    : eases !== undefined ? eases.length + 1 : 0;
+  if (topology !== 0 && eases !== undefined && eases.length !== topology - 1) {
+    throw new MotionParamError('LM169');
+  }
+  for (const spec of specs) {
+    const stops = spec._stops;
+    if (topology !== 0 && (stops?.length ?? (spec._explicitFrom !== undefined ? 2 : 1)) !== topology) {
+      // Код по источнику топологии: authored times либо длина ease-массива.
+      if (times !== undefined) throw new MotionParamError('LM168');
+      throw new MotionParamError('LM169');
+    }
+    if (stops !== undefined) spec._offsets = times ?? uniformOffsets(stops.length);
+  }
+  return mode;
+}
+
 // ─── Резолв целей (в момент вызова — SSR-safe импорт) ────────────────────────
 
 function isElementLike(t: unknown): t is AnimatableElement {
   const style = (t as { style?: unknown } | null)?.style as
     | { setProperty?: unknown; getPropertyValue?: unknown }
+    | null
     | undefined;
+  // Optional chaining покрывает null/undefined style тем же одиночным чтением
+  // каждого метода, что и раньше (hostile getters не получают лишних чтений).
   return (
-    style !== undefined &&
-    style !== null &&
-    typeof style.setProperty === 'function' &&
+    typeof style?.setProperty === 'function' &&
     typeof style.getPropertyValue === 'function'
   );
 }
@@ -241,7 +332,9 @@ function resolveTargets(target: unknown): AnimatableElement[] {
     const doc = (globalThis as { document?: { querySelectorAll?: (s: string) => unknown } })
       .document;
     const query = doc?.querySelectorAll;
-    if (doc === undefined || typeof query !== 'function') {
+    // Отсутствующий document даёт query === undefined — одна typeof-проверка
+    // покрывает обе причины LM149 (нет document / нет querySelectorAll).
+    if (typeof query !== 'function') {
       throw new MotionParamError('LM149');
     }
     source = query.call(doc, target);
@@ -253,43 +346,15 @@ function resolveTargets(target: unknown): AnimatableElement[] {
   return snapshot as AnimatableElement[];
 }
 
-// ─── Группировка спецификаций ────────────────────────────────────────────────
-
-function groupSpecs(specs: readonly ChannelSpec[]): Map<GroupKey, ChannelSpec[]> {
-  const groups = new Map<GroupKey, ChannelSpec[]>();
-  for (const spec of specs) {
-    const list = groups.get(spec._group);
-    // Map создаётся здесь и хранит только непустые массивы.
-    if (list) list.push(spec);
-    else groups.set(spec._group, [spec]);
-  }
-  return groups;
-}
-
 // ─── Снап (единая reduced-политика пакета: мгновенный финал, без кадров) ─────
 
 function writeSnap(el: AnimatableElement, group: GroupKey, bound: BoundGroup): void {
-  if (group === 'transform') {
-    const state = bound._transform!;
-    for (const ch of bound._numeric) state[ch._key] = ch._to;
-    el.style.setProperty('transform', buildTransform(state));
-  } else if (bound._css !== undefined) {
-    bound._css._css = cssAt(bound._css, 1);
-    el.style.setProperty(group, String(bound._css._css));
-  } else {
-    el.style.setProperty(group, String(bound._numeric[0]!._to));
-  }
-}
-
-/** Реестр получает target только после успешного style+cleanup старого owner. */
-function commitSnap(
-  rec: ReturnType<typeof groupRecord>,
-  bound: BoundGroup,
-): void {
-  if (bound._css !== undefined) {
-    rec._cssValue = bound._css._css;
-  }
-  for (const ch of bound._numeric) rec._numeric.set(ch._key, { _value: ch._to, _velocity: 0 });
+  el.style.setProperty(group, String(
+    bound._css !== undefined
+      ? bound._css._css = cssAt(bound._css, 1)
+      // channelAt(·, 1) — точный public `_to` канала (endpoint-контракт).
+      : groupValueAt(group, bound._transform, bound._numeric, 1),
+  ));
 }
 
 /**
@@ -327,11 +392,14 @@ export function animate(
   // 1. Options — первая граница: остальные входы могут быть hostile getters.
   options = requireAnimateOptions(options);
   // Остальная валидация — вся ДО побочных эффектов (ноль записей при броске).
-  const mode = resolveMode(options);
+  let mode = resolveMode(options);
   const baseDelay = resolveDelay(options.delay);
   const staggerInput = options.stagger;
   if (typeof staggerInput === 'number') resolveDelay(staggerInput);
-  const specs = parseProps(requireAnimateProps(props));
+  // parseProps сразу группирует по GroupKey; треки валидируются по плоскому
+  // снимку тех же спеков (порядок безразличен: топология проверяется поканально).
+  const groups = parseProps(requireAnimateProps(props));
+  mode = resolveTracks([...groups.values()].flat(), mode, options);
   const els = resolveTargets(target);
   let targetDelays: number[] | undefined;
   if (staggerInput !== undefined) {
@@ -349,22 +417,26 @@ export function animate(
     // scheduleStagger сигнализирует нечисловой/переполненный offset через NaN;
     // сумма двух конечных чисел всё ещё может overflow. Сворачиваем base в
     // принадлежащий фасаду буфер до plan/read и любого host-effect.
-    for (let i = 0; i < targetDelays.length; i++) {
-      targetDelays[i] = resolveDelay(baseDelay + targetDelays[i]!);
-    }
+    targetDelays = targetDelays.map((offset) => resolveDelay(baseDelay + offset));
   }
 
   // Accessibility policy — один snapshot на aggregate. Он сохраняет единый
   // plan и не читает hostile capability целей, когда движение запрещено.
   const reduced = els.length > 0 && prefersReduced(options.matchMedia ??
     (globalThis as { matchMedia?: (query: string) => { matches: boolean } }).matchMedia);
-  const now = options.now ?? defaultNow;
-  const setTimer = options.setTimer ?? defaultSetTimer;
+  // Дефолтные швы читаются в вызове — SSR-safe.
+  const now = options.now ?? ((): number => {
+    const perf = (globalThis as { performance?: { now?: () => number } }).performance;
+    return typeof perf?.now === 'function' ? perf.now() : Date.now();
+  });
+  const setTimer = options.setTimer ?? ((cb: () => void, ms: number): (() => void) => {
+    const h = setTimeout(cb, ms);
+    return () => clearTimeout(h);
+  });
   // 2. Фаза plan/read: читаем и привязываем ВСЕ цели до первой мутации.
   //    bindGroup снимает живой state, но не прерывает владельца. Поэтому ни
   //    поздний DOM-read, ни ошибка привязки не оставят ранние цели уже
   //    запущенными; браузер также не увидит чередование read→write→read.
-  const groups = groupSpecs(specs);
   const plan: PlannedGroup[] = [];
   for (let i = 0; i < els.length; i++) {
     const el = els[i]!;
@@ -454,7 +526,12 @@ export function animate(
           releaseTransition(rec, previous);
           throw error;
         }
-        commitSnap(rec, bound);
+        // Реестр получает target только после успешного style+cleanup
+        // старого owner (снап выше уже прошёл).
+        if (bound._css !== undefined) rec._cssValue = bound._css._css;
+        for (const ch of bound._numeric) {
+          rec._numeric.set(ch._key, { _value: ch._to, _velocity: 0 });
+        }
         rec._transition = false;
         report(true);
         continue;
@@ -538,6 +615,8 @@ export function animate(
   };
   return {
     finished,
+    // Thenable-канон Motion/driver: `await animate(...)` ждёт finished.
+    then: (onFulfilled, onRejected) => finished.then(onFulfilled, onRejected),
     play(): void {
       for (const u of units) u.play();
     },

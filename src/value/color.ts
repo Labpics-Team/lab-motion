@@ -27,7 +27,7 @@
  *   HSL↔RGB: W3C CSS Color 3 §4.2.4 / MDN
  */
 
-import { clampFinite } from './units.js';
+import { clampFinite, clampProgress } from './units.js';
 
 // ── Тип ParsedColor ───────────────────────────────────────────────────────────
 
@@ -84,16 +84,17 @@ export function parseColor(value: string): ParsedColor | null {
   if (hex) {
     const raw = hex[1]!;
     const short = raw.length < 5;
-    const alpha = raw.length === 4
-      ? raw[3]! + raw[3]!
-      : raw.length === 8 ? raw.slice(6) : undefined;
+    /** i-й канал: короткая форма дублирует ниббл, длинная берёт пару цифр. */
+    const channel = (i: number): number =>
+      parseInt(short ? raw[i]! + raw[i]! : raw.slice(2 * i, 2 * i + 2), 16);
     return {
       kind: 'color',
       format: 'hex',
-      r: parseInt(short ? raw[0]! + raw[0]! : raw.slice(0, 2), 16),
-      g: parseInt(short ? raw[1]! + raw[1]! : raw.slice(2, 4), 16),
-      b: parseInt(short ? raw[2]! + raw[2]! : raw.slice(4, 6), 16),
-      a: alpha === undefined ? 1 : parseInt(alpha, 16) / 255,
+      r: channel(0),
+      g: channel(1),
+      b: channel(2),
+      // Альфа-ниббл(ы) есть ровно у длин 4 и 8.
+      a: raw.length % 4 === 0 ? channel(3) / 255 : 1,
     };
   }
 
@@ -110,7 +111,9 @@ export function parseColor(value: string): ParsedColor | null {
   // hsl() / hsla()
   const hsl = HSL_RE.exec(s);
   if (hsl) {
-    const h = parseHue(hsl[1]);
+    // Знак и >360 валидны по W3C — нормализуем в канон [0, 360), чтобы AST
+    // хранил один hue на цвет и интерполяция не делала лишний оборот.
+    const h = normalizeHue(clampFinite(parseFloat(hsl[1])));
     const sv = parsePct(hsl[2]);
     const lv = parsePct(hsl[3]);
     const av = hsl[4] !== undefined ? clamp01(parseFloat(hsl[4])) : 1;
@@ -156,10 +159,7 @@ export function interpolateColor(
   t: number,
   options?: ColorMixOptions,
 ): string {
-  const progress = Number.isFinite(t)
-    ? t <= 0 ? 0 : t >= 1 ? 1 : t
-    : Number.isNaN(t) ? 0
-    : t > 0 ? 1 : 0;
+  const progress = clampProgress(t);
 
   if (from.format === 'hsl' && to.format === 'hsl' && from.hsl && to.hsl) {
     return interpolateHsl(from, to, progress);
@@ -191,16 +191,14 @@ function interpolateRgb(from: ParsedColor, to: ParsedColor, t: number, linear: b
   const mix = linear
     ? (a: number, b: number) => Math.sqrt(a * a * (1 - t) + b * b * t)
     : (a: number, b: number) => a + (b - a) * t;
-  const r = clamp255(clampFinite(mix(from.r, to.r)));
-  const g = clamp255(clampFinite(mix(from.g, to.g)));
-  const b = clamp255(clampFinite(mix(from.b, to.b)));
+  // clamp255/clamp01 включают clampFinite: hostile-AST (Inf/NaN) → 0 (VC1).
+  const r = clamp255(mix(from.r, to.r));
+  const g = clamp255(mix(from.g, to.g));
+  const b = clamp255(mix(from.b, to.b));
   // Alpha — покрытие, не свет: всегда линейный lerp.
-  const a = clamp01(clampFinite(from.a + (to.a - from.a) * t));
-  const ri = Math.round(r);
-  const gi = Math.round(g);
-  const bi = Math.round(b);
-  if (a >= 1) return `rgb(${ri}, ${gi}, ${bi})`;
-  return `rgba(${ri}, ${gi}, ${bi}, ${+a.toFixed(4)})`;
+  const a = clamp01(from.a + (to.a - from.a) * t);
+  const body = `${Math.round(r)}, ${Math.round(g)}, ${Math.round(b)}`;
+  return a >= 1 ? `rgb(${body})` : `rgba(${body}, ${f4(a)})`;
 }
 
 function interpolateHsl(from: ParsedColor, to: ParsedColor, t: number): string {
@@ -216,16 +214,12 @@ function interpolateHsl(from: ParsedColor, to: ParsedColor, t: number): string {
   if (dh < -180) dh += 360;
 
   const h = clampFinite(fh.h + dh * t);
-  const s = clamp01(clampFinite(fh.s + (th.s - fh.s) * t));
-  const l = clamp01(clampFinite(fh.l + (th.l - fh.l) * t));
-  const a = clamp01(clampFinite(from.a + (to.a - from.a) * t));
+  const s = clamp01(fh.s + (th.s - fh.s) * t);
+  const l = clamp01(fh.l + (th.l - fh.l) * t);
+  const a = clamp01(from.a + (to.a - from.a) * t);
 
-  const hNorm = normalizeHue(h);
-  const sp = +(s * 100).toFixed(4);
-  const lp = +(l * 100).toFixed(4);
-
-  if (a >= 1) return `hsl(${+hNorm.toFixed(4)}, ${sp}%, ${lp}%)`;
-  return `hsla(${+hNorm.toFixed(4)}, ${sp}%, ${lp}%, ${+a.toFixed(4)})`;
+  const body = `${f4(normalizeHue(h))}, ${f4(s * 100)}%, ${f4(l * 100)}%`;
+  return a >= 1 ? `hsl(${body})` : `hsla(${body}, ${f4(a)})`;
 }
 
 // ── HSL ↔ RGB (канонические формулы W3C CSS Color 3 §4.2.4) ─────────────────
@@ -246,11 +240,8 @@ export function hslToRgb(h: number, s: number, l: number): { r: number; g: numbe
   const q = l < 0.5 ? l * (1 + s) : l + s - l * s;
   const p = 2 * l - q;
   const hk = normalizeHue(h) / 360;
-  return {
-    r: clamp255(hueToRgb(p, q, hk + 1 / 3) * 255),
-    g: clamp255(hueToRgb(p, q, hk) * 255),
-    b: clamp255(hueToRgb(p, q, hk - 1 / 3) * 255),
-  };
+  const channel = (t: number): number => clamp255(hueToRgb(p, q, t) * 255);
+  return { r: channel(hk + 1 / 3), g: channel(hk), b: channel(hk - 1 / 3) };
 }
 
 /** Вспомогательная функция H → канал по алгоритму W3C. */
@@ -299,9 +290,15 @@ export function rgbToHsl(r: number, g: number, b: number): { h: number; s: numbe
 
 // ── Вспомогательные зажимы ────────────────────────────────────────────────────
 
-function clamp255(x: number): number {
+/** @internal — переиспользуется index.ts (сериализация color-AST). */
+export function clamp255(x: number): number {
   const f = clampFinite(x);
   return f < 0 ? 0 : f > 255 ? 255 : f;
+}
+
+/** Число с точностью 4 знака без хвостовых нулей (канон вывода цвета). */
+function f4(x: number): number {
+  return +x.toFixed(4);
 }
 
 function clamp01(x: number): number {
@@ -314,14 +311,9 @@ function normalizeHue(h: number): number {
   return ((h % 360) + 360) % 360;
 }
 
-function parseHue(s: string): number {
-  // Знак и >360 валидны по W3C — нормализуем в канон [0, 360), чтобы AST
-  // хранил один hue на цвет и интерполяция не делала лишний оборот.
-  return normalizeHue(clampFinite(parseFloat(s)));
-}
 
 function parsePct(s: string): number {
   // S/L приходят как "50%" → 0.5; или как "50" → 0.5
   const v = parseFloat(s);
-  return clamp01(clampFinite(s.includes('%') ? v / 100 : v));
+  return clamp01(s.includes('%') ? v / 100 : v);
 }

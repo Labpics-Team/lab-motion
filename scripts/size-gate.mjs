@@ -67,7 +67,26 @@ export const SUBPATH_GATE_BYTES = 4608;
 // (0.52%). Это регрессионный budget, не конкурентное утверждение: сравнения
 // живут в воспроизводимом benchmark-report. Обе формы обязаны оставаться внутри
 // одного потолка, а массовый perf-контракт не даёт купить размер замедлением.
-export const FULL_ANIMATE_GATE_BYTES = 12_000;
+// 12 000 → 12 760 (2026-07-22, #205): +~700 gz — N-keyframe tracks (кортежи
+// ≥3 + times + per-segment ease[]) в фасаде: everyday-грамматика всего поля
+// (Framer/GSAP/anime). Рост НЕ раздувание: один pure track-модуль
+// (right-biased просмотр с out-scratch, ноль аллокаций в кадре), tuple-ветка
+// parseProps и валидация топологии; дешёвые шейвы сняты ДО подъёма (−20 gz),
+// дедупа в графе фасада не существует (sample-keyframes несёт repeat/reverse-
+// семантики ./keyframes и добавил бы вес). Факт 12 694 + ~0.5% люфт — та же
+// дисциплина, что 11 938 → 12 000. Подъём — решение владельца по делегации.
+// 12 760 → 12 700 (2026-07-22, порт шейв-пакетов worktree-охоты): parseProps
+// группирует по GroupKey без второго прохода, transform-state и commitSnap
+// инлайн, дискретная ветка interpolateParsed делегирует сериализацию ./value.
+// Затяжка ВНИЗ по факту 12 632 + ~0.5% люфт — поведение бит-в-бит (вся
+// матрица зелёная), ослаблением не является.
+// 12 700 → 12 620 (2026-07-22, охота по curve/segmenter: прямой LM016,
+// компакция cache-store, kept.map, дедуп endpoint/explicit-кадров):
+// факт 12 560 + ~0.5%.
+// 12 620 → 12 530 (2026-07-22, охота-2b + SSOT groupValueAt: один сериализатор
+// групповой поверхности вместо 4 веток waapi/_write/writeSnap/hold; попутные
+// выигрыши consumers-среза): факт 12 470 + ~0.5%.
+export const FULL_ANIMATE_GATE_BYTES = 12_530;
 
 // Consumer-rebundle ядра после стабильных кодов ошибок и изоляции listener-
 // сбоев. Физический shipped-граф при этом уменьшился и по-прежнему ограничен
@@ -85,18 +104,35 @@ export const NANO_GATE_BYTES = 1024;
 // потерю tree-shakeability типичного вызова. Люфт намеренно нулевой: новая
 // capability ещё не имеет исторического шума, повышать только по факту решения.
 export const IN_VIEW_GATE_BYTES = 1839;
-export const IN_VIEW_CONSUMER_GATE_BYTES = 1907;
+// 1907 → 1908 (2026-07-22, #218): +1 B gzip — строка нового кода каталога
+// LM167 в общем errors-модуле сместила словарь кодека; сам in-view не менялся.
+// Решение владельца: exact-ратчет переставлен ПО ФАКТУ, люфт остаётся нулевым.
+// 1908 → 1830 (2026-07-22, охота-2b: дедуп instanceOf/badLength/LM156-хелперов,
+// recordHostFailure в releaseOneShot, NOOP_STOP): факт 1819 + ~0.5%.
+export const IN_VIEW_CONSUMER_GATE_BYTES = 1830;
 
 // Совместный импорт одиночного и группового compositor API. Оба физических
 // entry отдельно остаются под прежними 6 450 B; 6 600 B ловят раздувание их
 // общего consumer-графа, не смешивая его с file-level потолком.
-export const COMPOSITOR_CAPABILITY_GATE_BYTES = 6600;
+// 6 600 → 6 510 (2026-07-22, компенсированный #223 + двойная охота): закон
+// maxValueError/горизонта (+~130) полностью профинансирован шейвами
+// (stagger→compileSpringPlan(options), спред-carrier, прямой LM016 без
+// пересчёта, слияние reduced/compositor-хвоста handoffToLive и др.);
+// затяжка вниз по факту 6 477 + ~0.5%.
+export const COMPOSITOR_CAPABILITY_GATE_BYTES = 6510;
 
 // Совместный consumer-граф ./animate + базового spring-компилятора. Exact
 // clean-base 7968d161 (2026-07-16): 12 494 B gz; потолок равен факту без люфта,
 // чтобы локальная оптимизация одного entry не покупалась дублированием между
 // двумя реально совместимыми capability.
-export const ANIMATE_COMPOSITOR_MIXED_GATE_BYTES = 12_494;
+// 12 494 → 13 340 (2026-07-22, #205): рост тем же track-срезом фасада (см.
+// FULL_ANIMATE_GATE_BYTES); факт 13 275 + ~0.5% люфт, дублирования между
+// capability не добавлено (compositor-граф не тронут).
+// 13 340 → 13 290 (2026-07-22, порт шейв-пакетов): затяжка вниз по факту
+// 13 226 + ~0.5% люфт — тот же срез фасада, compositor-граф не тронут.
+// 13 290 → 13 230 (2026-07-22, #223 + двойная охота): факт 13 166 + ~0.5%.
+// 13 230 → 13 130 (2026-07-22, охота-2b + groupValueAt): факт 13 064 + ~0.5%.
+export const ANIMATE_COMPOSITOR_MIXED_GATE_BYTES = 13_130;
 
 // Точечные (bespoke) пороги субпутей — жёстче общего SUBPATH_GATE_BYTES там, где
 // это осмысленно. ./utils — семь чистых скалярных примитивов + сегментный движок;
@@ -104,7 +140,8 @@ export const ANIMATE_COMPOSITOR_MIXED_GATE_BYTES = 12_494;
 // раздуванию прятаться под щедрым общим зонтом 4608 (тот же класс, что ловит
 // CORE_GATE_BYTES для ядра). Поднимать только осознанно.
 export const BESPOKE_SUBPATH_GATES = {
-  './utils': 1400,
+  // 1400 → 1100 (2026-07-22): факт 1055 — затяжка по факту (~4%).
+  './utils': 1100,
   // Build-tool entry (#208): Vite-адаптер lowering НАМЕРЕННО несёт канонический
   // MotionProgram V1 parser + nano spring SSOT — это цена доверенного артефакта
   // на стороне СБОРКИ, браузеру она не поставляется никогда (в bundle попадает
@@ -112,15 +149,43 @@ export const BESPOKE_SUBPATH_GATES = {
   // 5261 gz → порог 5470 (~4% люфт, «порог ОТ ФАКТА»); в тот же день
   // adversarial-ревью добавило сортировку правок, байтовую верификацию
   // тривиа-зон и полный line-collapse sourcemap → факт 5355 gz (в пороге).
-  './compiler/vite': 5470,
+  // 2026-07-22 (#221): факт 6285 gz — рост НЕ раздувание, а новая capability:
+  // статическая экстракция полных NanoProps/NanoOptions (props/spring/delay/
+  // stagger/reducedMotion) и multi-track V1-кандидат (escaped-каналы +
+  // webCssOpaque) с полной обратной проекцией. Порог 6540 (~4% люфт, ОТ ФАКТА).
+  // 2026-07-23 (#237): факт 6730 gz — новая capability, не раздувание:
+  // strict-режим (структурированные refusals с причиной и line:col-диагностикой,
+  // маркер @motion-runtime) + onBudget-квитанция (lowered/runtimeCalls/
+  // artifactChars). Build-tool entry, браузеру не поставляется. Порог 6990
+  // (~4% люфт, ОТ ФАКТА).
+  // 2026-07-23 (#239 срез 1): факт 6995 gz — memo артефактов билда
+  // (uniqueArtifacts: springLinear+V1-верификация раз на уникальную форму).
+  // 2026-07-24 (ревью #245): люфт сужен 4% → 1.5%. Внутри ветки это 7270 → 7100;
+  // относительно базы (6990) итог — +110 B под факт 6995. Обоснование
+  // прежней записи переиспользовало capability #237 (strict-модульные refusals),
+  // уже оплаченную подъёмом 6730→6990, — то есть 4% восстанавливали
+  // НЕЗАРАБОТАННЫЙ бюджет в 275 B. Сузили: 4% на этом entry — это размер целой
+  // фичи, гейт переставал ловить непреднамеренный рост. 1.5% (105 B) покрывают
+  // тривиальные правки и продолжают ловить фичу.
+  './compiler/vite': 7100,
   // Единственный БРАУЗЕРНЫЙ compiler-артефакт: private executor compiled-nano
   // вызовов. Exact-ратчет от факта (канон ./in-view, люфт нулевой): новая
   // capability не прячется под общим потолком 4608 — рост только решением.
-  // 2026-07-19: факт 341 gz.
-  './compiler/runtime': 341,
+  // 2026-07-19: факт 341 gz. 2026-07-22 (#221): факт 365 gz — generic-артефакт
+  // {f,d,e,y,g,r} (multi-prop кадр, delay+stagger·index, explicit-reduced) —
+  // ратчет переставлен по факту, люфт остаётся нулевым.
+  // 2026-07-23: факт 390 gz — ревью-фикс контракта onfinish (одно решение,
+  // два среза): чистка commitStyles/cancel отложена микротаском ПОСЛЕ рассылки
+  // finish (пользовательские listeners видят finished-состояние), guard по
+  // playState (replay из хендлера не затаптывается) и перевзвод reject на
+  // ТЕКУЩИЙ finished-цикл (replay+cancel оседает, не вечный pending/unhandled).
+  // Рост частично оплачен шейвами (?? для r, прямой return). Паритет C4.
+  './compiler/runtime': 390,
   // Базовый compositor не несёт групповой оркестратор. Старый потолок сохранён:
   // capability-split не имеет права маскировать регрессию повышением порога.
-  './compositor': 6450,
+  // 6450 → 6250 (2026-07-22): факт 6082 — затяжка по факту (~2.7%).
+  // 6250 → 6090 (2026-07-22, #223+охота): факт 6 062 + ~0.5%.
+  './compositor': 6090,
   // Групповой фасад самодостаточен и включает только нужные ему базовые план и
   // контроллер. Порог равен прежнему полному compositor-контракту, не новому факту.
   './compositor/stagger': 6450,
@@ -152,7 +217,9 @@ export const BESPOKE_SUBPATH_GATES = {
   //   (MotionParamError вместо TypeError из горячего at()). Ужим выполнен ДО
   //   подъёма (дедуп rebaseNode/lerp1, −100 gz); подъём — в рамках делегации
   //   Даниила на автономные решения (прецедент CORE 2150→2190 выше).
-  './projection': 5750,
+  //   5750 → 5350 (2026-07-22): факт 5202 после стабильной pole-формы #226 —
+  //   ратчет затянут по факту (~3%).
+  './projection': 5350,
   // ./smart — Figma-подобный smart-animate ПОВЕРХ ./projection (жанр shared-element
   // / smart-animate): диф двух снимков дерева по строке-ключу data-motion-key →
   // matched/entered/exited/skipped, оркестрация поверх ОДНОГО projection-движка
@@ -164,7 +231,8 @@ export const BESPOKE_SUBPATH_GATES = {
   //   2026-07-10: факт 7151 gz первой сборки → порог 7450 (~4% люфт, дисциплина
   //   ./projection «порог ОТ ФАКТА»). Выше общего 4608 законно: тянет проекционное
   //   ядро целиком. Поднимать только осознанно.
-  './smart': 7450,
+  //   7450 → 7000 (2026-07-22): факт 6840 — затяжка по факту (~2.3%).
+  './smart': 7000,
   // ./presets — headless-словарь движений + текстовые/числовые сахара
   // (порт ценного из PR#79: splitText/typewriterAt/scrambleAt/tickerCells/
   // formatNumber + раннеры runTypewriter/runScramble/runNumber поверх runPreset).
@@ -207,7 +275,9 @@ export const BESPOKE_SUBPATH_GATES = {
   //   вплотную к общему зонту, и точечный порог — ровно тот регрессионный класс,
   //   что общий 4608 бы пропустил на +130 gz. Люфт скромный (не 4%) осознанно:
   //   рост тут — новая capability, не шум минификатора. Поднимать только осознанно.
-  './behaviors': 4600,
+  //   4600 → 4150 (2026-07-22): факт 4045 после #226/#218 — затяжка по факту.
+  // 4150 → 3380 (2026-07-22, охота-2b): shipped 3343 после среза токен-графа.
+  './behaviors': 3380,
 };
 
 /**
@@ -231,7 +301,10 @@ export const IMPORT_COST_SCENARIOS = [
   {
     name: 'only-spring',
     code: `import { spring } from '%DIST%'; console.log(spring({mass:1,stiffness:200,damping:20}, 0.1).value);`,
-    gate: 920, // updated for perf changes
+    // 920 → 645 (2026-07-22): pole-space #226 + разделение границ #218
+    // сняли settle-бюджет из чистого spring() — факт 625 (−21%). Ратчет
+    // затянут ПО ФАКТУ (~3% люфта): выигрыш математики зафиксирован гейтом.
+    gate: 645,
   },
   {
     // Страж tree-shake геометрии от драйвера/DOM: чистая функция projectAt не
@@ -239,16 +312,17 @@ export const IMPORT_COST_SCENARIOS = [
     name: 'projection-core-only',
     code: `import { projectAt } from '%DIST%/../projection/index.js'; console.log(projectAt({first:{x:0,y:0,width:1,height:1},last:{x:0,y:0,width:1,height:1}}, null, 0.5).sx);`,
     // 2026-07-10: факт первой сборки 655 gz → порог 720 (~10%, ОТ ФАКТА).
-    gate: 720,
+    // 720 → 700 (2026-07-22): факт 679 — затяжка по факту (~3%).
+    gate: 700,
   },
   {
     // Правда потребительской цены DOM-однострочника (капчур → мутация → play).
     name: 'projection-dom-one-liner',
     code: `import { createDomProjection } from '%DIST%/../projection/index.js'; const p = createDomProjection(); p.capture([]); p.play(); p.cancel(); console.log(p.playing);`,
     // 2026-07-10: факт первой сборки 4899 gz → порог 5350 (~9%, ОТ ФАКТА).
-    // 2026-07-10 (позже): факт 5536 gz → порог 5750 (~4%) — хронология и
-    // обоснование в комментарии './projection' в BESPOKE_SUBPATH_GATES.
-    gate: 5750,
+    // 2026-07-10 (позже): факт 5536 gz → порог 5750 (~4%).
+    // 5750 → 5350 (2026-07-22): факт 5202 после #226 — затяжка по факту (~3%).
+    gate: 5350,
   },
   {
     name: 'only-MotionValue',
@@ -258,7 +332,8 @@ export const IMPORT_COST_SCENARIOS = [
     // дублировать rAF-цикл MotionValue в handoff = запрещённый coupled-дубль). Факт 1606.
     // Каталогизированная runtime-граница отклоняет shaped, но неизвестные LM-коды;
     // физический root-entry при этом остаётся под отдельным CORE_GATE_BYTES.
-    gate: 1660,
+    // 1660 → 1650 (2026-07-22): факт 1619 после #226/#218 — затяжка по факту.
+    gate: 1650,
   },
   {
     name: 'full-core',
@@ -295,7 +370,8 @@ export const IMPORT_COST_SCENARIOS = [
     // сценарии» сохранён.
     name: 'only-clamp (utils tree-shake)',
     code: `import { clamp } from '%DIST%/../utils/index.js'; console.log(clamp(0,1,2));`,
-    gate: 340, // факт 308 (2026-07-07, первая сборка ./utils); люфт ~10%
+    // 340 → 300 (2026-07-22): факт 290 — затяжка по факту (~3.4%).
+    gate: 300,
   },
   {
     // ПРАВДА потребительской цены фасада. Отгрузочный gz субпутя ./animate —
@@ -312,6 +388,16 @@ export const IMPORT_COST_SCENARIOS = [
     gate: FULL_ANIMATE_GATE_BYTES,
   },
   {
+    // N-keyframe consumer ratchet (#205): типовой keyframe-вызов дизайнера.
+    // Первый принятый факт 2026-07-22: фиксируется ОТ ФАКТА ниже.
+    // 12 760 → 12 730 (2026-07-22, порт шейв-пакетов): факт 12 663 + ~0.5%.
+    // 12 730 → 12 650 (2026-07-22, #223+охота): факт 12 590 + ~0.5%.
+    // 12 650 → 12 560 (2026-07-22, охота-2b + groupValueAt): факт 12 501 + ~0.5%.
+    name: 'animate-keyframes (N-track)',
+    code: `import { animate } from '%DIST%/../animate/index.js'; console.log(typeof animate('.dot', { x: [0, 120, -40, 0], opacity: [0, 1, 1, 0] }, { duration: 800, times: [0, 0.25, 0.75, 1] }).pause);`,
+    gate: 12_560,
+  },
+  {
     // ПРАВДА потребительской цены поведения + СТРАЖ переиспользования: одна
     // фабрика ./behaviors должна тянуть ТОЛЬКО срез velocity-tracker+decay+solver,
     // а не весь пакет. Если бы behaviors утянул ./compositor-компилятор или
@@ -320,7 +406,11 @@ export const IMPORT_COST_SCENARIOS = [
     code: `import { createBottomSheet } from '%DIST%/../behaviors/index.js'; const s = createBottomSheet({ snapPoints: [0, 300] }); s.pointerDown({ x: 0, y: 0, t: 0 }); console.log(typeof s.cancel);`,
     // Факт первой сборки 2026-07-10: 3542 gz + ~4% люфт. Заметно < shipped 4475 —
     // машинное доказательство, что одна фабрика трясётся (не тянет весь субпуть).
-    gate: 3700,
+    // 3700 → 3250 (2026-07-22): факт 3147 после #226/#218 — затяжка по факту.
+    // 3250 → 2440 (2026-07-22, охота-2b): непьюр bezierToken() в ./tokens тянул
+    // весь cubic-bezier-солвер в КАЖДЫЙ behaviors-бандл; DEFAULT_SPRING/локальный
+    // snappy + внутренний decayRest-шов срезали граф. Факт 2415 + ~1%.
+    gate: 2440,
   },
 ];
 

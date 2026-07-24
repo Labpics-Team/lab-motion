@@ -30,7 +30,10 @@ describe('compositor/stagger: package contract', () => {
   });
 
   it('не переносит consumer-предел на физические entry', () => {
-    expect(BESPOKE_SUBPATH_GATES['./compositor']).toBe(6450);
+    // 6450 → 6250 (2026-07-22): ратчет ./compositor затянут по факту 6082;
+    // смысл пина прежний — физический entry не наследует consumer-предел.
+    // 6250 → 6090 (2026-07-22, #223+охота): факт 6062.
+    expect(BESPOKE_SUBPATH_GATES['./compositor']).toBe(6090);
     expect(BESPOKE_SUBPATH_GATES['./compositor/stagger']).toBe(6450);
 
     const scenario = IMPORT_COST_SCENARIOS.find(

@@ -17,7 +17,7 @@
 import {
   COMPILED_IMPORT_NAME,
   nanoArtifactLiteral,
-  planNanoOpacityLowering,
+  planNanoLowering,
   type AstNode,
   type NanoLoweringEdit,
 } from '../core.js';
@@ -37,6 +37,34 @@ interface RollupTransformContext {
   parse(code: string): unknown;
 }
 
+/** Квитанция build-репорта (#237): факты понижения одного билда. */
+export interface MotionBudgetReport {
+  /** Понижено вызовов (по всем модулям билда). */
+  readonly lowered: number;
+  /** Осталось рантаймовых вызовов nano-animate (включая @motion-runtime). */
+  readonly runtimeCalls: number;
+  /** Суммарная длина инъецированных артефакт-литералов, символы исходника. */
+  readonly artifactChars: number;
+  /**
+   * Уникальных артефактов за билд (#239): повторные вызовы с тем же
+   * (props, options) переиспользуют memoized-литерал — springLinear и
+   * V1-верификация исполняются раз на уникальную форму, не раз на call-site.
+   */
+  readonly uniqueArtifacts: number;
+}
+
+/** Опции плагина (#237). */
+export interface MotionCompilerOptions {
+  /**
+   * Любой непониженный nano-вызов — ошибка сборки с файлом, позицией и
+   * причиной. Гарантия «./nano физически не в бандле». Легитимно-динамический
+   * вызов помечается блочным комментарием `@motion-runtime` вплотную перед ним.
+   */
+  readonly strict?: boolean | undefined;
+  /** Колбэк квитанции по завершении билда (buildEnd). */
+  readonly onBudget?: ((report: MotionBudgetReport) => void) | undefined;
+}
+
 /** Минимальный структурный контракт плагина: не тянем типы vite в d.ts. */
 export interface MotionCompilerPlugin {
   readonly name: string;
@@ -46,6 +74,9 @@ export interface MotionCompilerPlugin {
     code: string,
     id: string,
   ): TransformResult | undefined;
+  /** Сбрасывает счётчики квитанции: watch-ребилды не наследуют прошлый билд. */
+  buildStart(): void;
+  buildEnd(): void;
 }
 
 const VLQ = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/';
@@ -155,7 +186,36 @@ function applyEdits(code: string, edits: readonly NanoLoweringEdit[]): string {
 /** Быстрый отсев до парсинга: модуль вообще не упоминает nano-субпуть. */
 const QUICK_FILTER = '@labpics/motion/nano';
 
-export function motionCompiler(): MotionCompilerPlugin {
+/** 0-базные line:col по байтовому offset (для strict-диагностики). */
+function positionAt(code: string, offset: number): string {
+  let line = 1;
+  let lineStart = 0;
+  for (let index = 0; index < offset; index++) {
+    if (code.charCodeAt(index) === 10) {
+      line++;
+      lineStart = index + 1;
+    }
+  }
+  return `${line}:${offset - lineStart + 1}`;
+}
+
+export function motionCompiler(options: MotionCompilerOptions = {}): MotionCompilerPlugin {
+  let lowered = 0;
+  let runtimeCalls = 0;
+  let artifactChars = 0;
+  // Memo артефактов билда (#239): ключ — JSON (props, options) в авторском
+  // порядке ключей (кадр от порядка зависит байтово, так что разный порядок —
+  // честно разные артефакты). Дорогая часть (springLinear + V1-верификация)
+  // исполняется O(уникальных форм), не O(call-sites).
+  let artifactMemo = new Map<string, string>();
+  const memoizedLiteral: typeof nanoArtifactLiteral = (props, opts) => {
+    const key = JSON.stringify([props, opts]);
+    const hit = artifactMemo.get(key);
+    if (hit !== undefined) return hit;
+    const literal = nanoArtifactLiteral(props, opts);
+    artifactMemo.set(key, literal);
+    return literal;
+  };
   return {
     name: 'lab-motion:nano-lowering',
     enforce: 'pre',
@@ -167,11 +227,31 @@ export function motionCompiler(): MotionCompilerPlugin {
       } catch {
         return undefined; // не наш синтаксис — пусть падает штатный пайплайн
       }
-      const plan = planNanoOpacityLowering(program as AstNode, code, nanoArtifactLiteral);
+      const plan = planNanoLowering(program as AstNode, code, memoizedLiteral);
       if (plan === undefined) return undefined;
+      if (options.strict === true && plan.refusals.length > 0) {
+        const [first] = plan.refusals;
+        throw new Error(
+          `lab-motion compiler strict: непониженный nano-вызов ${id}:${positionAt(code, first!.start)} — ` +
+          `${first!.reason}. Сознательно рантаймовый вызов пометьте /* @motion-runtime */ вплотную перед ним.`,
+        );
+      }
+      runtimeCalls += plan.runtimeCalls;
+      if (plan.edits.length === 0) return undefined; // только отказы — без трансформа
+      lowered += plan.edits.length / 2;
+      artifactChars += plan.literalChars; // только литералы, без обёртки вызова
       const transformed = applyEdits(code, plan.edits) +
         `\nimport { ${COMPILED_IMPORT_NAME} as ${plan.importLocal} } from ${JSON.stringify(plan.importSource)};\n`;
       return { code: transformed, map: buildMap(code, plan.edits, id) };
+    },
+    buildStart() {
+      lowered = 0;
+      runtimeCalls = 0;
+      artifactChars = 0;
+      artifactMemo = new Map();
+    },
+    buildEnd() {
+      options.onBudget?.({ lowered, runtimeCalls, artifactChars, uniqueArtifacts: artifactMemo.size });
     },
   };
 }

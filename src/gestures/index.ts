@@ -78,8 +78,8 @@ const DEFAULT_VELOCITY_WINDOW_S = 0.1;
  */
 export function createVelocityTracker(windowSec?: number): VelocityTracker {
   const win =
-    typeof windowSec === 'number' && Number.isFinite(windowSec) && windowSec > 0
-      ? windowSec
+    Number.isFinite(windowSec as number) && (windowSec as number) > 0
+      ? (windowSec as number)
       : DEFAULT_VELOCITY_WINDOW_S;
   let samples: GesturePoint[] = [];
   let start = 0;
@@ -136,8 +136,8 @@ const DEFAULT_PRESS_SLOP_PX = 3;
 /** Создать распознаватель нажатия (tap) с клавиатурным путём. */
 export function createPress(options?: PressOptions): PressRecognizer {
   const slop =
-    typeof options?.slop === 'number' && Number.isFinite(options.slop) && options.slop >= 0
-      ? options.slop
+    Number.isFinite(options?.slop as number) && (options!.slop as number) >= 0
+      ? (options!.slop as number)
       : DEFAULT_PRESS_SLOP_PX;
   const onStart = options?.onPressStart;
   const onPress = options?.onPress;
@@ -278,8 +278,8 @@ const DEFAULT_PAN_THRESHOLD_PX = 3;
 /** Создать распознаватель pan (порог, оси, скорость на отпускании). */
 export function createPan(options?: PanOptions): PanRecognizer {
   const threshold =
-    typeof options?.threshold === 'number' && Number.isFinite(options.threshold) && options.threshold >= 0
-      ? options.threshold
+    Number.isFinite(options?.threshold as number) && (options!.threshold as number) >= 0
+      ? (options!.threshold as number)
       : DEFAULT_PAN_THRESHOLD_PX;
   const axis = options?.axis;
 
@@ -426,7 +426,8 @@ export interface DragPickup {
 
 /** Вырожденный внешний прайор → ровно 0 (нет прайора); −0 схлопывается. */
 function pickupV(v: number | undefined): number {
-  return typeof v === 'number' && Number.isFinite(v) ? v + 0 : 0;
+  // Number.isFinite не коэрсит: не-число даёт 0 без typeof-гварда.
+  return Number.isFinite(v as number) ? (v as number) + 0 : 0;
 }
 
 /** Контроллер перетаскивания. */
@@ -480,8 +481,8 @@ export function createDrag(options?: DragOptions): DragControls {
   const axis = options?.axis;
   const rubberBandRaw = options?.rubberBand;
   const rubberBand =
-    typeof rubberBandRaw === 'number' && Number.isFinite(rubberBandRaw)
-      ? Math.min(1, Math.max(0, rubberBandRaw))
+    Number.isFinite(rubberBandRaw as number)
+      ? Math.min(1, Math.max(0, rubberBandRaw as number))
       : DEFAULT_RUBBER_BAND;
   const inertia = options?.inertia;
   const snapBack = options?.snapBackSpring;
@@ -522,8 +523,8 @@ export function createDrag(options?: DragOptions): DragControls {
     const b = boundsFor(a);
     if (!b) return finite(raw);
     const v = finite(raw);
-    const min = typeof b.min === 'number' && Number.isFinite(b.min) ? b.min : -Infinity;
-    const max = typeof b.max === 'number' && Number.isFinite(b.max) ? b.max : Infinity;
+    const min = Number.isFinite(b.min as number) ? (b.min as number) : -Infinity;
+    const max = Number.isFinite(b.max as number) ? (b.max as number) : Infinity;
     if (v > max) return finite(max + (v - max) * rb);
     if (v < min) return finite(min + (v - min) * rb);
     return v;
@@ -650,11 +651,14 @@ export function createDrag(options?: DragOptions): DragControls {
 
     const tick = (ts?: number): void => {
       if (gen !== generation || !gliding) return; // stale-кадр после перехвата/stop
-      if (typeof ts === 'number' && Number.isFinite(ts)) {
-        elapsed = lastTs === undefined ? elapsed : elapsed + Math.max(0, (ts - lastTs) / 1000);
+      if (Number.isFinite(ts as number)) {
+        elapsed = lastTs === undefined ? elapsed : elapsed + Math.max(0, ((ts as number) - lastTs) / 1000);
         lastTs = ts;
       } else {
         elapsed += GLIDE_FIXED_DT_S;
+        // Синтетический кадр рвёт цепочку меток: без сброса якоря следующий
+        // реальный ts досчитал бы тот же интервал второй раз (зеркало MainUnit).
+        lastTs = undefined;
       }
       frames++;
 

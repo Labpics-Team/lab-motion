@@ -131,6 +131,7 @@ function clampAmplitude(ampRaw: number): number {
   return ampRaw > 0 ? Number.MAX_VALUE : -Number.MAX_VALUE;
 }
 
+
 // ─── createDecay ──────────────────────────────────────────────────────────────
 
 /**
@@ -218,4 +219,19 @@ export function createDecay(options: DecayOptions): DecayModel {
   }
 
   return { rest, reduced: false, valueAt, velocityAt, isSettledAt };
+}
+
+/**
+ * Проекция момента с дефолтными knobs: `createDecay({from, velocity}).rest`
+ * без аллокации модели (и без валидации — вход обязан быть конечным).
+ * НЕ публичный API (./decay/index.ts его не реэкспортирует): узкий внутренний
+ * шов для ./behaviors, где нужна только точка приземления, — полная модель
+ * не должна попадать в consumer bundle поведения.
+ *
+ * Выражение rest — то же, что в createDecay (общие clampAmplitude/finiteOr и
+ * дефолт-константы); менять только синхронно с ним (пин — differential-тесты).
+ */
+export function decayRest(from: number, velocity: number): number {
+  const amplitude = clampAmplitude(DEFAULT_POWER * velocity * DEFAULT_TIME_CONSTANT);
+  return finiteOr(from + amplitude, amplitude > 0 ? Number.MAX_VALUE : -Number.MAX_VALUE);
 }

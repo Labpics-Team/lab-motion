@@ -1,0 +1,603 @@
+{
+  "schemaVersion": 1,
+  "package": "@labpics/motion",
+  "version": "0.3.0",
+  "generatedBy": "scripts/api-manifest.mjs",
+  "note": "Генерируется из package.json#exports, dist и docs/reference. Не редактировать вручную: pnpm manifest.",
+  "errorsCatalog": "docs/errors.md",
+  "sizeMethodology": "docs/benchmark.md",
+  "subpaths": [
+    {
+      "subpath": ".",
+      "import": "@labpics/motion",
+      "runtimeExports": [
+        "MotionParamError",
+        "MotionValue",
+        "drive",
+        "spring",
+        "tween",
+        "validateSpringParams",
+        "validateSpringPhysics"
+      ],
+      "shippedGzBytes": 2158,
+      "shippedBrBytes": 2014,
+      "docs": "docs/reference/core.md",
+      "title": "Ядро `.` — MotionValue, drive и корневой экспорт"
+    },
+    {
+      "subpath": "./easing",
+      "import": "@labpics/motion/easing",
+      "runtimeExports": [
+        "anticipate",
+        "backIn",
+        "backInOut",
+        "backOut",
+        "bounce",
+        "circIn",
+        "circInOut",
+        "circOut",
+        "cubicBezier",
+        "easeIn",
+        "easeInOut",
+        "easeOut",
+        "elastic",
+        "expoIn",
+        "expoInOut",
+        "expoOut",
+        "linear",
+        "normalizeEasing",
+        "power",
+        "sineIn",
+        "sineInOut",
+        "sineOut",
+        "steps"
+      ],
+      "shippedGzBytes": 1409,
+      "shippedBrBytes": 1306,
+      "docs": "docs/reference/easing.md",
+      "title": "./easing — кривые изинга"
+    },
+    {
+      "subpath": "./react",
+      "import": "@labpics/motion/react",
+      "runtimeExports": [
+        "useMotionStyle",
+        "useMotionValue",
+        "useReducedMotion",
+        "useSpring"
+      ],
+      "shippedGzBytes": 3528,
+      "shippedBrBytes": 3253,
+      "docs": "docs/reference/adapters.md",
+      "title": "Фреймворк-адаптеры — ./react, ./vue, ./svelte, ./solid, ./preact, ./angular, ./lit, ./wc, ./qwik"
+    },
+    {
+      "subpath": "./svelte",
+      "import": "@labpics/motion/svelte",
+      "runtimeExports": [
+        "springStore"
+      ],
+      "shippedGzBytes": 2533,
+      "shippedBrBytes": 2345,
+      "docs": "docs/reference/adapters.md",
+      "title": "Фреймворк-адаптеры — ./react, ./vue, ./svelte, ./solid, ./preact, ./angular, ./lit, ./wc, ./qwik"
+    },
+    {
+      "subpath": "./vue",
+      "import": "@labpics/motion/vue",
+      "runtimeExports": [
+        "useMotionValue",
+        "useSpring",
+        "vMotion"
+      ],
+      "shippedGzBytes": 3012,
+      "shippedBrBytes": 2792,
+      "docs": "docs/reference/adapters.md",
+      "title": "Фреймворк-адаптеры — ./react, ./vue, ./svelte, ./solid, ./preact, ./angular, ./lit, ./wc, ./qwik"
+    },
+    {
+      "subpath": "./value",
+      "import": "@labpics/motion/value",
+      "runtimeExports": [
+        "buildTransform",
+        "hslToRgb",
+        "interpolate",
+        "interpolateColor",
+        "interpolateTransform",
+        "interpolateUnit",
+        "mixColor",
+        "parse",
+        "parseColor",
+        "parseUnit",
+        "rgbToHsl"
+      ],
+      "shippedGzBytes": 2519,
+      "shippedBrBytes": 2271,
+      "docs": "docs/reference/value.md",
+      "title": "./value — парсинг и интерполяция CSS-значений, transform"
+    },
+    {
+      "subpath": "./driver",
+      "import": "@labpics/motion/driver",
+      "runtimeExports": [
+        "createDriver"
+      ],
+      "shippedGzBytes": 1678,
+      "shippedBrBytes": 1550,
+      "docs": "docs/reference/driver-frame.md",
+      "title": "./driver и ./frame — управляемый драйвер и общий кадровый цикл"
+    },
+    {
+      "subpath": "./stagger",
+      "import": "@labpics/motion/stagger",
+      "runtimeExports": [
+        "stagger"
+      ],
+      "shippedGzBytes": 631,
+      "shippedBrBytes": 580,
+      "docs": "docs/reference/stagger.md",
+      "title": "./stagger — каскады задержек"
+    },
+    {
+      "subpath": "./timeline",
+      "import": "@labpics/motion/timeline",
+      "runtimeExports": [
+        "createTimeline"
+      ],
+      "shippedGzBytes": 1640,
+      "shippedBrBytes": 1499,
+      "docs": "docs/reference/timeline-keyframes.md",
+      "title": "./timeline и ./keyframes — секвенции и семплеры keyframes"
+    },
+    {
+      "subpath": "./keyframes",
+      "import": "@labpics/motion/keyframes",
+      "runtimeExports": [
+        "keyframes",
+        "sampleKeyframes"
+      ],
+      "shippedGzBytes": 2624,
+      "shippedBrBytes": 2407,
+      "docs": "docs/reference/timeline-keyframes.md",
+      "title": "./timeline и ./keyframes — секвенции и семплеры keyframes"
+    },
+    {
+      "subpath": "./decay",
+      "import": "@labpics/motion/decay",
+      "runtimeExports": [
+        "createDecay"
+      ],
+      "shippedGzBytes": 600,
+      "shippedBrBytes": 529,
+      "docs": "docs/reference/decay.md",
+      "title": "./decay — инерционное затухание"
+    },
+    {
+      "subpath": "./lit",
+      "import": "@labpics/motion/lit",
+      "runtimeExports": [
+        "LAB_MOTION_SPRING_TAG",
+        "LabMotionSpringElement",
+        "MotionController"
+      ],
+      "shippedGzBytes": 3032,
+      "shippedBrBytes": 2761,
+      "docs": "docs/reference/adapters.md",
+      "title": "Фреймворк-адаптеры — ./react, ./vue, ./svelte, ./solid, ./preact, ./angular, ./lit, ./wc, ./qwik"
+    },
+    {
+      "subpath": "./gestures",
+      "import": "@labpics/motion/gestures",
+      "runtimeExports": [
+        "createDrag",
+        "createHover",
+        "createPan",
+        "createPress",
+        "createVelocityTracker"
+      ],
+      "shippedGzBytes": 2968,
+      "shippedBrBytes": 2739,
+      "docs": "docs/reference/gestures.md",
+      "title": "./gestures — drag с инерцией и handoff"
+    },
+    {
+      "subpath": "./scroll",
+      "import": "@labpics/motion/scroll",
+      "runtimeExports": [
+        "createInView",
+        "createScrollObserver",
+        "createScrollVelocity",
+        "resolveTargetProgress",
+        "scrollProgress",
+        "scrubBinding"
+      ],
+      "shippedGzBytes": 994,
+      "shippedBrBytes": 918,
+      "docs": "docs/reference/scroll-in-view.md",
+      "title": "./scroll и ./in-view — скролл-привязка и появление во вьюпорте"
+    },
+    {
+      "subpath": "./in-view",
+      "import": "@labpics/motion/in-view",
+      "runtimeExports": [
+        "MotionParamError",
+        "inView"
+      ],
+      "shippedGzBytes": 1765,
+      "shippedBrBytes": 1611,
+      "docs": "docs/reference/scroll-in-view.md",
+      "title": "./scroll и ./in-view — скролл-привязка и появление во вьюпорте"
+    },
+    {
+      "subpath": "./presence",
+      "import": "@labpics/motion/presence",
+      "runtimeExports": [
+        "createPresence",
+        "swapPresence"
+      ],
+      "shippedGzBytes": 582,
+      "shippedBrBytes": 530,
+      "docs": "docs/reference/presence.md",
+      "title": "./presence — mount/unmount переходы (enter/exit lifecycle)"
+    },
+    {
+      "subpath": "./flip",
+      "import": "@labpics/motion/flip",
+      "runtimeExports": [
+        "computeFlip",
+        "correctRadius",
+        "counterScale",
+        "createFlip",
+        "flipAt"
+      ],
+      "shippedGzBytes": 1361,
+      "shippedBrBytes": 1266,
+      "docs": "docs/reference/flip.md",
+      "title": "./flip — FLIP layout-анимации"
+    },
+    {
+      "subpath": "./projection",
+      "import": "@labpics/motion/projection",
+      "runtimeExports": [
+        "cornerRadiusAt",
+        "createDomProjection",
+        "createProjection",
+        "createProjector",
+        "mixBox",
+        "projectAt"
+      ],
+      "shippedGzBytes": 5206,
+      "shippedBrBytes": 4712,
+      "docs": "docs/reference/projection.md",
+      "title": "./projection — проекционное дерево (вложенный FLIP)"
+    },
+    {
+      "subpath": "./smart",
+      "import": "@labpics/motion/smart",
+      "runtimeExports": [
+        "SMART_KEY_ATTR",
+        "captureSmart",
+        "resolveSmartTier",
+        "smartTransition"
+      ],
+      "shippedGzBytes": 6836,
+      "shippedBrBytes": 6177,
+      "docs": "docs/reference/smart.md",
+      "title": "./smart — умные переходы"
+    },
+    {
+      "subpath": "./svg",
+      "import": "@labpics/motion/svg",
+      "runtimeExports": [
+        "createMotionPath",
+        "drawPath",
+        "parsePath",
+        "pathLength"
+      ],
+      "shippedGzBytes": 2275,
+      "shippedBrBytes": 2046,
+      "docs": "docs/reference/svg.md",
+      "title": "./svg и ./svg-morph — SVG-анимации и морфинг"
+    },
+    {
+      "subpath": "./a11y",
+      "import": "@labpics/motion/a11y",
+      "runtimeExports": [
+        "createMotionConfig"
+      ],
+      "shippedGzBytes": 572,
+      "shippedBrBytes": 509,
+      "docs": "docs/reference/a11y.md",
+      "title": "./a11y — политика reduced-motion"
+    },
+    {
+      "subpath": "./spring",
+      "import": "@labpics/motion/spring",
+      "runtimeExports": [
+        "fromBounce",
+        "fromOscillation",
+        "fromPeak",
+        "fromVisualDuration",
+        "springAsEasing",
+        "springPresets"
+      ],
+      "shippedGzBytes": 1348,
+      "shippedBrBytes": 1239,
+      "docs": "docs/reference/spring.md",
+      "title": "./spring — точная пружина: параметры, конструкторы, easing"
+    },
+    {
+      "subpath": "./waapi",
+      "import": "@labpics/motion/waapi",
+      "runtimeExports": [
+        "animateWaapi",
+        "compileWaapi",
+        "easingToLinear",
+        "supportsWaapi"
+      ],
+      "shippedGzBytes": 1626,
+      "shippedBrBytes": 1462,
+      "docs": "docs/reference/compositor.md",
+      "title": "./compositor, ./compositor/stagger и ./waapi — compositor-путь и WAAPI"
+    },
+    {
+      "subpath": "./auto",
+      "import": "@labpics/motion/auto",
+      "runtimeExports": [
+        "autoAnimate",
+        "enterKeyframes",
+        "exitKeyframes",
+        "moveKeyframes",
+        "planAuto"
+      ],
+      "shippedGzBytes": 4578,
+      "shippedBrBytes": 4137,
+      "docs": "docs/reference/auto.md",
+      "title": "./auto — автоматические переходы (zero-config FLIP)"
+    },
+    {
+      "subpath": "./svg-morph",
+      "import": "@labpics/motion/svg-morph",
+      "runtimeExports": [
+        "interpolatePath"
+      ],
+      "shippedGzBytes": 3338,
+      "shippedBrBytes": 2985,
+      "docs": "docs/reference/svg.md",
+      "title": "./svg и ./svg-morph — SVG-анимации и морфинг"
+    },
+    {
+      "subpath": "./solid",
+      "import": "@labpics/motion/solid",
+      "runtimeExports": [
+        "createMotionValue",
+        "createSpring"
+      ],
+      "shippedGzBytes": 2615,
+      "shippedBrBytes": 2416,
+      "docs": "docs/reference/adapters.md",
+      "title": "Фреймворк-адаптеры — ./react, ./vue, ./svelte, ./solid, ./preact, ./angular, ./lit, ./wc, ./qwik"
+    },
+    {
+      "subpath": "./preact",
+      "import": "@labpics/motion/preact",
+      "runtimeExports": [
+        "useMotionValue",
+        "useSpring"
+      ],
+      "shippedGzBytes": 2606,
+      "shippedBrBytes": 2423,
+      "docs": "docs/reference/adapters.md",
+      "title": "Фреймворк-адаптеры — ./react, ./vue, ./svelte, ./solid, ./preact, ./angular, ./lit, ./wc, ./qwik"
+    },
+    {
+      "subpath": "./angular",
+      "import": "@labpics/motion/angular",
+      "runtimeExports": [
+        "injectMotionValue",
+        "injectSpring"
+      ],
+      "shippedGzBytes": 2626,
+      "shippedBrBytes": 2424,
+      "docs": "docs/reference/adapters.md",
+      "title": "Фреймворк-адаптеры — ./react, ./vue, ./svelte, ./solid, ./preact, ./angular, ./lit, ./wc, ./qwik"
+    },
+    {
+      "subpath": "./wc",
+      "import": "@labpics/motion/wc",
+      "runtimeExports": [
+        "LAB_SPRING_TAG",
+        "createLabSpringElementClass",
+        "defineLabSpring",
+        "renderTemplateValue"
+      ],
+      "shippedGzBytes": 2929,
+      "shippedBrBytes": 2692,
+      "docs": "docs/reference/adapters.md",
+      "title": "Фреймворк-адаптеры — ./react, ./vue, ./svelte, ./solid, ./preact, ./angular, ./lit, ./wc, ./qwik"
+    },
+    {
+      "subpath": "./qwik",
+      "import": "@labpics/motion/qwik",
+      "runtimeExports": [
+        "useSpring"
+      ],
+      "shippedGzBytes": 2624,
+      "shippedBrBytes": 2438,
+      "docs": "docs/reference/adapters.md",
+      "title": "Фреймворк-адаптеры — ./react, ./vue, ./svelte, ./solid, ./preact, ./angular, ./lit, ./wc, ./qwik"
+    },
+    {
+      "subpath": "./frame",
+      "import": "@labpics/motion/frame",
+      "runtimeExports": [
+        "asRequestFrame",
+        "createFrameLoop",
+        "frame"
+      ],
+      "shippedGzBytes": 739,
+      "shippedBrBytes": 688,
+      "docs": "docs/reference/driver-frame.md",
+      "title": "./driver и ./frame — управляемый драйвер и общий кадровый цикл"
+    },
+    {
+      "subpath": "./presets",
+      "import": "@labpics/motion/presets",
+      "runtimeExports": [
+        "blink",
+        "bounceY",
+        "breathe",
+        "compilePreset",
+        "drawOn",
+        "drift",
+        "fadeSlide",
+        "formatNumber",
+        "pop",
+        "presetToWaapi",
+        "presetTotalDuration",
+        "pulse",
+        "runNumber",
+        "runPreset",
+        "runScramble",
+        "runTypewriter",
+        "samplePreset",
+        "scrambleAt",
+        "spin",
+        "splitText",
+        "tickerCells",
+        "typewriterAt",
+        "wiggle"
+      ],
+      "shippedGzBytes": 5598,
+      "shippedBrBytes": 5101,
+      "docs": "docs/reference/tokens-presets.md",
+      "title": "./tokens и ./presets — токены движения и пресеты"
+    },
+    {
+      "subpath": "./utils",
+      "import": "@labpics/motion/utils",
+      "runtimeExports": [
+        "clamp",
+        "interpolate",
+        "mapRange",
+        "mix",
+        "pipe",
+        "snap",
+        "wrap"
+      ],
+      "shippedGzBytes": 1055,
+      "shippedBrBytes": 965,
+      "docs": "docs/reference/utils.md",
+      "title": "./utils — скалярные примитивы"
+    },
+    {
+      "subpath": "./compositor",
+      "import": "@labpics/motion/compositor",
+      "runtimeExports": [
+        "CompositorSpring",
+        "DEFAULT_TOLERANCE",
+        "compileSpringLinear",
+        "compileSpringPlan",
+        "createSpringLinearCache",
+        "handoffToLive",
+        "readCompositorSpring",
+        "resolveCompositorTier",
+        "supportsCompositor",
+        "supportsLinearEasing"
+      ],
+      "shippedGzBytes": 6054,
+      "shippedBrBytes": 5535,
+      "docs": "docs/reference/compositor.md",
+      "title": "./compositor, ./compositor/stagger и ./waapi — compositor-путь и WAAPI"
+    },
+    {
+      "subpath": "./compositor/stagger",
+      "import": "@labpics/motion/compositor/stagger",
+      "runtimeExports": [
+        "CompositorSpring",
+        "CompositorStaggerGroup",
+        "compileSpringPlan",
+        "compileStaggerPlan"
+      ],
+      "shippedGzBytes": 6292,
+      "shippedBrBytes": 5747,
+      "docs": "docs/reference/compositor.md",
+      "title": "./compositor, ./compositor/stagger и ./waapi — compositor-путь и WAAPI"
+    },
+    {
+      "subpath": "./tokens",
+      "import": "@labpics/motion/tokens",
+      "runtimeExports": [
+        "distanceScale",
+        "distanceScaleConfig",
+        "duration",
+        "easing",
+        "spring",
+        "springFromDurationBounce",
+        "staggerGap"
+      ],
+      "shippedGzBytes": 1350,
+      "shippedBrBytes": 1239,
+      "docs": "docs/reference/tokens-presets.md",
+      "title": "./tokens и ./presets — токены движения и пресеты"
+    },
+    {
+      "subpath": "./animate",
+      "import": "@labpics/motion/animate",
+      "runtimeExports": [
+        "animate"
+      ],
+      "shippedGzBytes": 12096,
+      "shippedBrBytes": 10994,
+      "docs": "docs/reference/animate.md",
+      "title": "./animate — одно-строчный DOM-фасад"
+    },
+    {
+      "subpath": "./nano",
+      "import": "@labpics/motion/nano",
+      "runtimeExports": [
+        "animate"
+      ],
+      "shippedGzBytes": 973,
+      "shippedBrBytes": 880,
+      "docs": "docs/reference/nano.md",
+      "title": "./nano — минимальный WAAPI-вход"
+    },
+    {
+      "subpath": "./compiler/vite",
+      "import": "@labpics/motion/compiler/vite",
+      "runtimeExports": [
+        "motionCompiler"
+      ],
+      "shippedGzBytes": 7030,
+      "shippedBrBytes": 6287,
+      "docs": "docs/reference/compiler.md",
+      "title": "./compiler — build-time lowering: Vite-плагин и рантайм артефактов"
+    },
+    {
+      "subpath": "./compiler/runtime",
+      "import": "@labpics/motion/compiler/runtime",
+      "runtimeExports": [
+        "animateCompiled"
+      ],
+      "shippedGzBytes": 390,
+      "shippedBrBytes": 322,
+      "docs": "docs/reference/compiler.md",
+      "title": "./compiler — build-time lowering: Vite-плагин и рантайм артефактов"
+    },
+    {
+      "subpath": "./behaviors",
+      "import": "@labpics/motion/behaviors",
+      "runtimeExports": [
+        "createBottomSheet",
+        "createCarousel",
+        "createDragDismiss",
+        "createPullToRefresh"
+      ],
+      "shippedGzBytes": 3334,
+      "shippedBrBytes": 2997,
+      "docs": "docs/reference/behaviors.md",
+      "title": "./behaviors — headless-машины мобильных взаимодействий"
+    }
+  ]
+}

@@ -4,13 +4,14 @@ import { animate } from '../src/nano/index.js';
 type Timing = KeyframeAnimationOptions & { easing?: string };
 
 interface RecordedAnimation {
-  readonly finished: Promise<RecordedAnimation>;
+  finished: Promise<RecordedAnimation>;
   readonly play: ReturnType<typeof vi.fn>;
   readonly pause: ReturnType<typeof vi.fn>;
   readonly reverse: ReturnType<typeof vi.fn>;
   readonly cancel: ReturnType<typeof vi.fn>;
   readonly commitStyles: ReturnType<typeof vi.fn>;
   readonly addEventListener: ReturnType<typeof vi.fn>;
+  playState: 'idle' | 'running' | 'finished';
   finish(): void;
 }
 
@@ -22,22 +23,36 @@ function recordingElement() {
     animations,
     animate(keyframes: PropertyIndexedKeyframes, timing: Timing) {
       let resolve!: (value: RecordedAnimation) => void;
+      let rejectFinished!: (reason: unknown) => void;
+      // WAAPI-семантика: play() из finished/idle начинает НОВЫЙ цикл с новым
+      // pending finished; cancel() реджектит текущий pending (на осевшем — no-op).
+      const nextFinished = () =>
+        new Promise<RecordedAnimation>((done, fail) => { resolve = done; rejectFinished = fail; });
       const finishListeners: Array<() => void> = [];
-      const animation = {
-        finished: new Promise<RecordedAnimation>((done) => { resolve = done; }),
-        play: vi.fn(),
+      const animation: RecordedAnimation = {
+        finished: undefined as unknown as Promise<RecordedAnimation>,
+        play: vi.fn(() => {
+          animation.playState = 'running';
+          animation.finished = nextFinished();
+        }),
         pause: vi.fn(),
         reverse: vi.fn(),
-        cancel: vi.fn(),
+        cancel: vi.fn(() => {
+          rejectFinished(new DOMException('The user aborted a request.', 'AbortError'));
+          animation.playState = 'idle';
+        }),
         commitStyles: vi.fn(),
         addEventListener: vi.fn((type: string, listener: () => void) => {
           if (type === 'finish') finishListeners.push(listener);
         }),
+        playState: 'running',
         finish() {
+          animation.playState = 'finished';
           resolve(animation);
           for (const listener of finishListeners) listener();
         },
-      } satisfies RecordedAnimation;
+      };
+      animation.finished = nextFinished();
       calls.push({ keyframes, timing });
       animations.push(animation);
       return animation;
@@ -84,6 +99,48 @@ describe('nano: публичный WAAPI-only контракт', () => {
       expect(target.animations[0]!.commitStyles).toHaveBeenCalledOnce();
       expect(target.animations[0]!.cancel).toHaveBeenCalledOnce();
     }
+  });
+
+  it('пробрасывает пары [from, to] нативно для opacity/CSS/translate/scale', () => {
+    const target = recordingElement();
+
+    animate(
+      target as unknown as Element,
+      {
+        opacity: [0, 1],
+        backgroundColor: ['rgb(0, 0, 0)', 'rgb(255, 0, 0)'],
+        translate: ['0px 0px', '240px 12px'],
+        scale: [0.5, 1.2],
+      },
+      { duration: 180 },
+    );
+
+    // WAAPI PropertyIndexedKeyframes принимает массивы напрямую: to-only инференс
+    // WAAPI заменён явным стартом БЕЗ единого runtime-байта (тип-only расширение).
+    expect(target.calls[0]!.keyframes).toEqual({
+      opacity: [0, 1],
+      backgroundColor: ['rgb(0, 0, 0)', 'rgb(255, 0, 0)'],
+      translate: ['0px 0px', '240px 12px'],
+      scale: [0.5, 1.2],
+    });
+    expect(target.calls[0]!.timing).toMatchObject({ duration: 180, fill: 'both' });
+  });
+
+  it('пара [from, to] совместима со stagger и spring-режимом по умолчанию', () => {
+    const first = recordingElement();
+    const second = recordingElement();
+
+    animate(
+      [first, second] as unknown as Element[],
+      { opacity: [0, 1] },
+      { stagger: 25 },
+    );
+
+    for (const target of [first, second]) {
+      expect(target.calls[0]!.keyframes).toEqual({ opacity: [0, 1] });
+      expect(target.calls[0]!.timing.easing).toMatch(/^linear\(/);
+    }
+    expect(second.calls[0]!.timing.delay).toBe(25);
   });
 
   it('делегирует tween и произвольные CSS-значения платформе', () => {
@@ -196,11 +253,55 @@ describe('nano: публичный WAAPI-only контракт', () => {
     target.animations[0]!.finish();
     await controls.finished;
     target.animations[0]!.finish();
+    await Promise.resolve(); // чистка отложена микротаском после рассылки события
 
     expect(target.animations[0]!.addEventListener)
       .toHaveBeenCalledWith('finish', expect.any(Function));
     expect(target.animations[0]!.commitStyles).toHaveBeenCalledTimes(2);
     expect(target.animations[0]!.cancel).toHaveBeenCalledTimes(2);
+  });
+
+  it('пользовательский finish-listener видит finished-состояние: чистка догоняет микротаском', async () => {
+    const target = recordingElement();
+    const controls = animate(target as unknown as Element, { opacity: 1 }, { duration: 100 });
+    let seen = '';
+    // Пользовательский listener регистрируется ПОСЛЕ библиотечного.
+    target.animations[0]!.addEventListener('finish', () => {
+      seen = target.animations[0]!.playState;
+    });
+
+    target.animations[0]!.finish();
+    expect(seen).toBe('finished'); // cancel ещё НЕ случился в момент рассылки
+    expect(target.animations[0]!.cancel).not.toHaveBeenCalled();
+    await controls.finished;
+    expect(target.animations[0]!.commitStyles).toHaveBeenCalledOnce();
+    expect(target.animations[0]!.cancel).toHaveBeenCalledOnce();
+  });
+
+  it('replay из пользовательского finish-хендлера не затаптывается чисткой (guard по playState)', async () => {
+    const target = recordingElement();
+    animate(target as unknown as Element, { opacity: 1 }, { duration: 100 });
+    target.animations[0]!.addEventListener('finish', () => {
+      target.animations[0]!.play(); // консюмер перезапускает прямо в хендлере
+    });
+
+    target.animations[0]!.finish();
+    await Promise.resolve();
+    expect(target.animations[0]!.commitStyles).not.toHaveBeenCalled();
+    expect(target.animations[0]!.cancel).not.toHaveBeenCalled(); // guard уступил replay
+  });
+
+  it('replay из хендлера, затем cancel: controls.finished оседает reject-ом, не висит', async () => {
+    const target = recordingElement();
+    const controls = animate(target as unknown as Element, { opacity: 1 }, { duration: 100 });
+    target.animations[0]!.addEventListener('finish', () => {
+      target.animations[0]!.play(); // новый цикл с НОВЫМ finished-промисом
+    });
+
+    target.animations[0]!.finish();
+    await Promise.resolve(); // микротаск: guard уступил, reject перевзведён на новый цикл
+    target.animations[0]!.cancel();
+    await expect(controls.finished).rejects.toThrow('aborted');
   });
 });
 

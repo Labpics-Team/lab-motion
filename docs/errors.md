@@ -178,3 +178,8 @@
 | `LM164` | presets easing | Scalar или элемент easing не является функцией | Передать функцию для каждого сегмента | active |
 | `LM165` | frame scheduler | requestFrame не является функцией | Передать функцию планирования кадра | active |
 | `LM166` | infinite repeat sample | Время требует номер итерации выше точного binary64 integer domain | Сэмплировать до 9_007_199_254_740_991-й итерации или завершить контрол явно | active |
+| `LM167` | spring easing horizon | Незатухающая пружина не имеет конечного easing-горизонта | Задать damping больше нуля либо использовать живой исполнитель | active |
+| `LM168` | animate times | Некорректные times либо несовпадение authored-топологии | Передать неубывающие конечные times от нуля до единицы длиной в число стопов каждого канала | active |
+| `LM169` | animate ease segments | Длина ease-массива не равна числу сегментов топологии | Передать по одной функции изинга на каждый сегмент | active |
+| `LM170` | compositor plan budget | maxValueError не является конечным положительным числом | Передать конечный положительный бюджет ошибки в единицах свойства | active |
+| `LM171` | spring overshoot domain | overshoot вне (0, 1] не имеет underdamped-прообраза | Задать overshoot в (0, 1] либо использовать fromBounce/fromVisualDuration | active |

@@ -4,7 +4,11 @@ on:
   push:
     branches: ["main"]
   pull_request:
-    branches: ["main"]
+    # Не только main: интеграционная ветка продакшен-среза — тоже база
+    # реальных PR. Без неё стековые PR (#245–#248) вообще не получали
+    # ни одного прогона: ни тестов, ни size-гейта, ни браузерной
+    # матрицы — «зелёный PR» означал лишь «бот не нашёл возражений».
+    branches: ["main", "claude/animation-library-production-4zhzvx"]
   merge_group:
   workflow_dispatch:
 
@@ -86,12 +90,14 @@ jobs:
           version="$(node -p "require('./package.json').version")"
           node scripts/check-release.mjs "v${version}" --validate-stored-date
 
+      # Тот же единственный прогон сьюты, но с v8-покрытием: второй прогон ради
+      # ратчета покрытия не нужен, а sub-summary читает следующий шаг.
       - name: Vitest
         id: vitest
         shell: bash
         run: |
           set +e
-          pnpm vitest run 2>&1 | tee vitest.log
+          pnpm coverage 2>&1 | tee vitest.log
           status=${PIPESTATUS[0]}
           exit "$status"
 
@@ -110,8 +116,22 @@ jobs:
       - name: Fuzz · finiteness gate (virtual-time, seeded LCG, zero-dep)
         run: pnpm vitest run --reporter=verbose test/*finiteness-fuzz.test.ts
 
+      # Ратчет покрытия (#249-урок): зелёная сьюта не означает, что тест ЗАШЁЛ в
+      # код. Полы по областям движутся только вверх; файл с исполнимыми строками
+      # и нулевым покрытием — всегда красный.
+      - name: Coverage ratchet
+        run: pnpm coverage:gate
+
       - name: Size gate
         run: pnpm size
+
+      # Гейт честности манифеста floor (#243): каждый заявленный несжимаемый
+      # токен обязан буквально присутствовать в шипнутом субпуте. Без этого шага
+      # клейм «честность манифеста охраняется машинно» держался бы на ручном
+      # запуске — то есть ни на чём. Красный здесь означает ревизию манифеста,
+      # а не подкрутку порога: чисел размера этот скрипт не гейтит.
+      - name: Size floor manifest honesty
+        run: pnpm size:floor
 
       - name: Pack smoke
         run: pnpm pack:smoke

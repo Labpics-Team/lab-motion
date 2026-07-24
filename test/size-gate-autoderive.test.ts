@@ -251,7 +251,9 @@ describe('size-gate: auto-derive subpath entries from package.json exports', () 
 
   it('full animate имеет один SSOT-потолок для shipped subpath и consumer import-cost', () => {
     const full = IMPORT_COST_SCENARIOS.find((scenario) => scenario.name.startsWith('animate-one-liner'));
-    expect(FULL_ANIMATE_GATE_BYTES).toBe(12_000);
+    // 12 000 → 12 760 (#205): N-keyframe tracks фасада, хронология в size-gate.mjs.
+    // 12 760 → 12 700 → 12 620 → 12 530 (охоты 2026-07-22): затяжки по фактам.
+    expect(FULL_ANIMATE_GATE_BYTES).toBe(12_530);
     expect(BESPOKE_SUBPATH_GATES['./animate']).toBe(FULL_ANIMATE_GATE_BYTES);
     expect(full?.gate).toBe(FULL_ANIMATE_GATE_BYTES);
   });
@@ -260,7 +262,10 @@ describe('size-gate: auto-derive subpath entries from package.json exports', () 
     const consumer = IMPORT_COST_SCENARIOS.find(({ name }) => name === 'in-view one-liner');
 
     expect(IN_VIEW_GATE_BYTES).toBe(1839);
-    expect(IN_VIEW_CONSUMER_GATE_BYTES).toBe(1907);
+    // 1907 → 1908 (#218): +1 B gzip-словаря от строки LM167 в общем
+    // errors-модуле; сам in-view не менялся, ратчет переставлен по факту.
+    // 1908 → 1830 (охота-2b 2026-07-22): затяжка вниз по факту 1819.
+    expect(IN_VIEW_CONSUMER_GATE_BYTES).toBe(1830);
     expect(BESPOKE_SUBPATH_GATES['./in-view']).toBe(IN_VIEW_GATE_BYTES);
     expect(consumer?.gate).toBe(IN_VIEW_CONSUMER_GATE_BYTES);
     expect(consumer?.code).toContain('/in-view/index.js');
@@ -268,7 +273,8 @@ describe('size-gate: auto-derive subpath entries from package.json exports', () 
 
   it('разделяет физические и consumer-потолки ядра и compositor capability', () => {
     expect(FULL_CORE_CONSUMER_GATE_BYTES).toBe(2330);
-    expect(COMPOSITOR_CAPABILITY_GATE_BYTES).toBe(6600);
+    // 6600 → 6510 (#223+охота 2026-07-22): затяжка вниз по факту 6477.
+    expect(COMPOSITOR_CAPABILITY_GATE_BYTES).toBe(6510);
     expect(IMPORT_COST_SCENARIOS.find(({ name }) => name === 'full-core')?.gate)
       .toBe(FULL_CORE_CONSUMER_GATE_BYTES);
     expect(IMPORT_COST_SCENARIOS.find(({ name }) => name === 'compositor-stagger capability')?.gate)
@@ -276,7 +282,9 @@ describe('size-gate: auto-derive subpath entries from package.json exports', () 
   });
 
   it('фиксирует mixed animate + compositor не выше exact clean-base факта', () => {
-    expect(ANIMATE_COMPOSITOR_MIXED_GATE_BYTES).toBe(12_494);
+    // 12 494 → 13 340 (#205): тот же track-срез, дублирования не добавлено.
+    // 13 340 → 13 290 → 13 230 → 13 130 (охоты 2026-07-22): затяжки по фактам.
+    expect(ANIMATE_COMPOSITOR_MIXED_GATE_BYTES).toBe(13_130);
     const mixed = IMPORT_COST_SCENARIOS.find(
       ({ name }) => name === 'animate + compositor',
     );

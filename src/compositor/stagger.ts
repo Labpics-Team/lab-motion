@@ -140,17 +140,9 @@ function compileStaggerPlanForCount(
   // Общий план пружины — ОДНА компиляция на всю группу. Общий cache ./compositor
   // отдаёт идентичным пружинам одну linear()-строку, поэтому N элементов делят
   // одну кривую (валидация spring/property/from/to/v0/tolerance — внутри).
-  const plan = compileSpringPlan({
-    spring: options.spring,
-    property: options.property,
-    from: options.from,
-    to: options.to,
-    v0: options.v0,
-    tolerance: options.tolerance,
-    fill: options.fill,
-    composite: options.composite,
-    format: options.format,
-  });
+  // compileSpringPlan читает только свои именованные поля, поэтому options
+  // передаётся как есть (лишние stagger-поля игнорируются).
+  const plan = compileSpringPlan(options);
 
   // Оба публичных stagger-входа делят одно ядро, но compositor передаёт уже
   // строго проверенный count и не создаёт промежуточный options-carrier.
@@ -209,8 +201,9 @@ export interface CompositorStaggerGroupOptions extends StaggerPlanBase {
  * CompositorSpring (execution-snapshot + reseed скорости).
  */
 export class CompositorStaggerGroup {
-  private readonly _plan: CompositorStaggerPlan;
-  private readonly _springs: CompositorSpring[];
+  // declare: только тип, без emit-а полей (значения присваивает конструктор).
+  declare private readonly _plan: CompositorStaggerPlan;
+  declare private readonly _springs: CompositorSpring[];
 
   constructor(opts: CompositorStaggerGroupOptions) {
     if (!Array.isArray(opts.targets)) {
@@ -227,22 +220,15 @@ export class CompositorStaggerGroup {
     const springs = new Array<CompositorSpring>(count);
     // CompositorSpring синхронно захватывает значения опций и не удерживает
     // объект. Один переиспользуемый carrier убирает N краткоживущих option-
-    // объектов перед первым кадром большого каскада.
+    // объектов перед первым кадром большого каскада. Spread переносит только
+    // поля, которые CompositorSpring читает по имени; per-element слоты и
+    // matchMedia (у группы reduce выражен через reducedMotion) перекрыты явно.
     const child = {
-      spring: opts.spring,
-      property: opts.property,
-      from: opts.from,
-      to: opts.to,
+      ...opts,
       delay: 0,
       target: undefined as WaapiAnimatable | undefined,
       apply: undefined as ((value: string | number) => void) | undefined,
-      tolerance: opts.tolerance,
-      fill: opts.fill,
-      composite: opts.composite,
-      format: opts.format,
-      now: opts.now,
-      requestFrame: opts.requestFrame,
-      setTimer: opts.setTimer,
+      matchMedia: undefined,
     };
     for (let i = 0; i < count; i++) {
       child.delay = delays[i]!;

@@ -233,8 +233,11 @@ describe('transform hot path: direct-container AST gate', () => {
   });
 
   it('WaapiUnit formatter/snapshot/hold не содержат прямые локальные контейнеры', () => {
+    // Формат группы дедуплицирован в groupValueAt (SSOT channels.ts): гейт
+    // следует за ним, hold/snapshot остаются на самом юните.
+    const channels = source('src/animate/channels.ts');
+    expect(directContainerSyntax(channels, namedFunction(channels, 'groupValueAt')), 'groupValueAt').toEqual([]);
     const waapi = source('src/animate/waapi-unit.ts');
-    expect(directContainerSyntax(waapi, namedFunction(waapi, '_valueAt')), '_valueAt').toEqual([]);
     expect(directContainerSyntax(waapi, namedFunction(waapi, '_snapshotAt')), '_snapshotAt').toEqual([]);
     expect(directContainerSyntax(waapi, namedFunction(waapi, '_holdInline')), '_holdInline').toEqual([]);
   });
@@ -250,7 +253,9 @@ function makeTransformBound(el: WaapiTarget): { bound: BoundGroup; record: Group
   const bound = bindGroup(
     el,
     'transform',
-    parseProps({ x: [0, 240], rotate: [0, 90] }),
+    // Пин внутренней (не-контрактной) формы parseProps: спеки теперь
+    // приходят сгруппированными по GroupKey (Map), группа одна — 'transform'.
+    parseProps({ x: [0, 240], rotate: [0, 90] }).get('transform')!,
     record,
   );
   expect(bound._transform).toBeDefined();

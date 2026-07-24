@@ -131,8 +131,10 @@ describe('convergence-class guard — wall-clock-stall class (regression lock)',
       ).toThrow(MotionParamError);
     });
 
-    it('spring() also throws for low-ω₀ configs', () => {
-      expect(() => spring({ mass: 1, stiffness: 0.01, damping: 0.08 }, 0.5)).toThrow(MotionParamError);
+    it('чистый spring() вычисляет low-ω₀ (бюджет — граница исполнителя, #218)', () => {
+      const r = spring({ mass: 1, stiffness: 0.01, damping: 0.08 }, 0.5);
+      expect(Number.isFinite(r.value)).toBe(true);
+      expect(Number.isFinite(r.velocity)).toBe(true);
     });
 
     it('медленная натуральная частота имеет код LM091', () => {
@@ -268,8 +270,9 @@ describe('convergence-class guard — wall-clock-stall class (regression lock)',
       expect(msg).toBe('LM091');
     });
 
-    it('spring() also throws for near-undamped configs', () => {
-      expect(() => spring({ mass: 1, stiffness: 100, damping: 0 }, 0.5)).toThrow(MotionParamError);
+    it('чистый spring() вычисляет незатухающую 1−cos (бюджет — граница исполнителя, #218)', () => {
+      const r = spring({ mass: 1, stiffness: 100, damping: 0 }, 0.5);
+      expect(Math.abs(r.value - (1 - Math.cos(5)))).toBeLessThanOrEqual(1e-12);
     });
 
     /**

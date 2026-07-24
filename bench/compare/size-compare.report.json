@@ -1,0 +1,63 @@
+{
+  "generatedFor": "0.3.0",
+  "revision": "8091eb610db70ff097b010fd065aecd863546f45",
+  "node": "v22.22.2",
+  "esbuild": "0.28.1",
+  "competitors": {
+    "motion": "12.42.2",
+    "animejs": "4.5.0",
+    "gsap": "3.15.0"
+  },
+  "methodology": "Один продуктовый сценарий (move+fade одного элемента), идиоматическая форма каждой библиотеки; esbuild bundle+minify (ESM, browser), канонический gzip-оракул пакета; lab-motion — из свежего dist, конкуренты — из установленных пиненных пакетов. Сравнение цены типового вызова, не паритета возможностей.",
+  "rows": [
+    {
+      "id": "lab-compiled",
+      "label": "lab-motion nano + compiler",
+      "gz": 900,
+      "raw": 1669,
+      "contract": "compile-time артефакт: native WAAPI, spring precomputed"
+    },
+    {
+      "id": "lab-nano",
+      "label": "lab-motion ./nano",
+      "gz": 1001,
+      "raw": 1718,
+      "contract": "runtime: native WAAPI + spring→linear() на лету"
+    },
+    {
+      "id": "motion-mini",
+      "label": "motion/mini (Motion One)",
+      "gz": 3127,
+      "raw": 7883,
+      "contract": "runtime: native WAAPI, без main-thread движка"
+    },
+    {
+      "id": "lab-animate",
+      "label": "lab-motion ./animate (full)",
+      "gz": 12455,
+      "raw": 30563,
+      "contract": "defensive runtime: C¹-подхват, fallback, hostile-host, N-keyframes"
+    },
+    {
+      "id": "animejs",
+      "label": "anime.js v4",
+      "gz": 12773,
+      "raw": 32403,
+      "contract": "main-thread движок"
+    },
+    {
+      "id": "motion-hybrid",
+      "label": "motion (hybrid animate)",
+      "gz": 22739,
+      "raw": 63157,
+      "contract": "hybrid runtime: main-thread значения + WAAPI"
+    },
+    {
+      "id": "gsap",
+      "label": "GSAP core",
+      "gz": 27688,
+      "raw": 70723,
+      "contract": "main-thread движок + timeline-ядро"
+    }
+  ]
+}

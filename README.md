@@ -4,6 +4,13 @@ Headless-движок анимаций дизайн-системы Labpics: чи
 (пружины, кадры, тайминги) **без единой runtime-зависимости**. Ядро не знает про
 DOM — рендер делает ваш колбэк, время приходит через инжектируемый `requestFrame`.
 
+Позиция по весу — **легче в каждом классе, и это проверяется, а не заявляется**:
+`./nano` ≤ 1 КБ gzip (кратно легче самого лёгкого аналога), build-time compiler
+опускает типовой вызов ещё ниже 1 КБ в бандле, а полный defensive `./animate`
+(C¹-подхват, fallback, N-keyframes) легче даже чисто main-thread движков.
+Числа — только из воспроизводимых прогонов: `pnpm size` (merge-гейт) и
+`bench/compare/size-compare.mjs` (пиненные версии Motion/GSAP/Anime.js).
+
 Три вещи, которые нужно понять сразу:
 
 1. **Всё — субпути.** Корневой экспорт + 40 субпутей (41 входов `exports` в
@@ -17,6 +24,11 @@ DOM — рендер делает ваш колбэк, время приходи
 3. **Гарантии запечатаны тестами.** `NaN`/`Infinity` никогда не попадают в CSS
    (fuzz-гейты в CI), `prefers-reduced-motion` меняет ХАРАКТЕР движения, а не
    выключает его грубо, публичная поверхность запинена api-surface тестами.
+
+Полная документация — [docs/README.md](./docs/README.md): быстрый старт,
+справка всех субпутей, миграции «за 15 минут» с Framer Motion / GSAP / Anime.js,
+объяснения математики. Машиночитаемая карта API — `api-manifest.json` и
+`llms.txt` в корне пакета.
 
 ## Установка
 
@@ -38,6 +50,17 @@ peer, ставится у потребителя (peer объявлены для
 tree shaking, точный минимальный Preact peer).
 
 ## Быстрый старт
+
+### Какой animate мне нужен?
+
+| Вход | Когда | Цена | Форма |
+|---|---|---|---|
+| `…/animate` | Продуктовые UI-переходы: transform-шортхенды `x`/`y`, keyframe-кортежи, C¹-подхват при прерывании, JS-изинги, fallback | ≤ 12.8 КБ gz | `animate(el, { x: 240, opacity: [0, 1] }, { spring })` → `await …` |
+| `…/nano` | Доверенная современная платформа, native `Animation`, минимальный вес | ≤ 1 КБ gz | `animate(el, { translate: '240px', opacity: 1 })` (longhand-строки) |
+| nano + `…/compiler/vite` | То же, но статические вызовы компилируются в артефакт **≤ 1 КБ** в бандле | ~0.9 КБ gz | пишете тот же nano-вызов; Vite-плагин убирает солвер из бандла |
+| ядро (`MotionValue`) | Значение без DOM: canvas/WebGL/атрибуты, свой рендер-колбэк | ≤ 2.3 КБ gz | `new MotionValue({ initial, spring })` + `onChange` |
+
+Все числа времени — **миллисекунды** (Framer/Motion считают в секундах).
 
 ### Пружина к значению (ядро)
 
@@ -74,8 +97,10 @@ moves[0]?.pause(); // каждый элемент — нативный Animation
 await moves.finished;
 ```
 
-`./nano` — platform-trusted to-only WAAPI-вход под жёстким гейтом 1 КБ gzip; контролы — сами
-`Animation`. Числа — миллисекунды; `translate/scale/rotate` — целые нативные CSS
+`./nano` — platform-trusted WAAPI-вход под жёстким гейтом 1 КБ gzip; контролы — сами
+`Animation`. Значение канала — целевое ИЛИ явная пара `[from, to]` (для `opacity`,
+произвольных CSS-свойств, `translate` и `scale`; `rotate` — только скаляр, так как
+получает суффикс `deg`). Числа — миллисекунды; `translate/scale/rotate` — целые нативные CSS
 longhand-каналы, цвета/фильтры/единицы интерполирует браузер. CSS `x/y` не
 трактуются как оси `translate` (nano не читает layout, чтобы угадывать вторую
 ось) — transform-шортхенды `x/y` принадлежат полному `./animate`. Нужны нативные
@@ -128,8 +153,8 @@ document.querySelector<HTMLElement>('.card')!
 | `@labpics/motion` | `spring` (аналитический closed-form солвер), `tween`, `drive` (декларативный запуск), `MotionValue` (реактивное значение со smooth-pickup), `MotionParamError` |
 | `…/driver` | Scrubbable-контроллер: `play/pause/reverse/seek/timeScale/progress` + thenable |
 | `…/frame` | Единый frame-шедулер: `createFrameLoop` / синглтон `frame` — один rAF на кадр, фазы read→update→render против layout-thrash, SSR-safe; `asRequestFrame(loop)` сажает `MotionValue`/`drive` на общий кадр. **Биндинги используют его по умолчанию** (как shared-ticker у Framer Motion/GSAP); инжекция своего `requestFrame` переопределяет |
-| `…/nano` | **Platform-trusted WAAPI to-only ≤ 1 КБ gzip**: spring/tween, целые `translate/scale/rotate` longhand-каналы, любые нативно-анимируемые CSS-свойства, `delay`/`stagger`, reduced-motion и сами `Animation` как контролы. Без layout-read, независимых `x/y`, rAF-fallback, C1-подхвата и hostile-host обещаний |
-| `…/animate` | Фасад-one-liner: `animate(target, props, options)` — цели по каналам (`x`/`y`/`scale`/`rotate`, `opacity`, CSS-свойства), режим `{ spring }` или `{ duration, ease }`, `delay`/`stagger`, контролы `{ finished, play, pause, seek, cancel, stop }`. Это базовый single-transition DX-срез; ядро от него не растёт |
+| `…/nano` | **Platform-trusted WAAPI ≤ 1 КБ gzip** (целевое значение или пара `[from, to]`, `rotate` — скаляр): spring/tween, целые `translate/scale/rotate` longhand-каналы, любые нативно-анимируемые CSS-свойства, `delay`/`stagger`, reduced-motion и сами `Animation` как контролы. Без layout-read, независимых `x/y`, rAF-fallback, C1-подхвата и hostile-host обещаний |
+| `…/animate` | Фасад-one-liner: `animate(target, props, options)` — цели по каналам (`x`/`y`/`scale`/`rotate`, `opacity`, CSS-свойства), значения `to`, пары `[from, to]` и **N-keyframe кортежи** `x: [0, 120, -40, 0]` (+ `times`, per-segment `ease: [...]`), режим `{ spring }` или `{ duration, ease }`, `delay`/`stagger`, контролы `{ finished, play, pause, seek, cancel, stop }`; ядро от него не растёт |
 
 **Математика значений**
 
@@ -585,7 +610,10 @@ distanceScale(200);     // 200 (мс) в дефолтной полосе 0→400
 
 Актуальные числа не копируются в Markdown: `pnpm size` воспроизводимо измеряет
 все публичные входы и сценарный import-cost, а CI сравнивает результат с
-регрессионными потолками. Gzip вычисляется закреплённым детерминированным кодеком;
+регрессионными потолками. Сравнение с Motion (mini/hybrid), GSAP и Anime.js —
+воспроизводимый стенд `bench/compare/size-compare.mjs` (эквивалентный
+move+fade сценарий, те же esbuild+gzip-оракул, пиненные версии конкурентов;
+артефакт прогона — `bench/compare/size-compare.report.json`). Gzip вычисляется закреплённым детерминированным кодеком;
 сравнительный S6 использует тот же оракул, а системный Brotli привязан к
 зафиксированному Node executable. Методология, источник сравнительного runtime-отчёта и
 границы допустимых выводов описаны в [docs/benchmark.md](docs/benchmark.md).
@@ -608,7 +636,7 @@ lifecycle. Полный целевой пользовательский охва
 | `animate(el, { x: 100 }, { delay: 0.1 })` | `animate(el, { x: 100 }, { delay: 100 })` | мс |
 | `animate('.item', …, { delay: stagger(0.05) })` | `animate('.item', …, { stagger: 50 })` | шаг-мс между целями |
 | `const a = animate(…); a.pause(); a.play()` | то же | после естественного завершения Motion перезапускается, Lab Motion — нет |
-| `await animate(…)` или `animate(…).then(…)` | `await animate(…).finished` | control Motion thenable; Lab Motion предоставляет отдельный Promise |
+| `await animate(…)` или `animate(…).then(…)` | то же (`await animate(…)`) | контролы thenable; `finished` доступен и отдельным Promise |
 | `a.time = 0.5` | `a.seek(500)` | Motion использует секунды и getter/setter; `seek` Lab Motion — write-only, мс |
 | `a.stop()` | `a.stop()` | оба сохраняют текущую позу; в Lab Motion `stop` — алиас `cancel` |
 | `a.cancel()` | прямого эквивалента нет | Motion возвращает initial pose; Lab Motion сохраняет текущую |
@@ -624,16 +652,20 @@ lifecycle. Полный целевой пользовательский охва
 | `{ delay: stagger(50) }` | `{ stagger: 50 }` | в Anime v4 `stagger` — именованный импорт |
 | `animate(targets, parameters)` | `animate(targets, props, options)` | разные сигнатуры, общий только one-liner характер |
 
-Текущий `./animate` объединяет одним lifecycle только from/to-переходы
-поддерживаемых CSS-стилей и transform-шортхендов: spring/tween, delay/stagger
-и контролы `finished/play/pause/seek/cancel/stop`.
+Текущий `./animate` объединяет одним lifecycle from/to-переходы и N-keyframe
+треки (#205) поддерживаемых CSS-стилей и transform-шортхендов: spring/tween,
+кортежи `x: [0, 120, -40, 0]` c `times` и per-segment `ease: [...]`
+(right-biased дубликаты offsets — скачок нулевой ширины; трек+`spring`
+отклоняется синхронно), delay/stagger и контролы
+`finished/play/pause/seek/cancel/stop`.
 
-Не объединены: N-keyframes и offsets, per-segment и per-property transitions,
+Не объединены: per-property transitions,
 repeat/reverse/mirror/repeatDelay, inertia/decay, sequences/timeline,
 value/object targets, HTML/SVG attributes и path-specific SVG-каналы.
 `SVGElement` при этом уже является допустимой целью для поддерживаемых
 CSS-стилей. Отдельные низкоуровневые субпути не образуют общий owner,
-`finished` и interruption/cleanup-контракт. Также отсутствуют thenable control,
+`finished` и interruption/cleanup-контракт. Контролы thenable
+(`await animate(...)` ≡ `await animate(...).finished`); отсутствуют
 `time/speed/duration` getters, `reverse`, `complete` и `restart`.
 Публичного API регистрации произвольных кодеков или адаптеров целей пакет пока
 не предоставляет.

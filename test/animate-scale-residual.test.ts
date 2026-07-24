@@ -578,29 +578,59 @@ describe('animate: конфликт uniform и осевого scale', () => {
   });
 
   it('seek переводит 1-ULP несовместимые effect-speeds на независимый main', () => {
-    const target = fakeEl({}, true);
-    const clock = makeClock();
-    let requests = 0;
-    const controls = animate(target.el, {
-      scaleX: [2.998266875266529e-11, 9.325277294421096e-10],
-      scaleY: [-1.0238667362138987e-8, -2.1550411860147135e-10],
-    }, {
-      spring: SPRING,
-      now: () => 0,
-      setTimer: () => () => {},
-      requestFrame(callback) {
-        requests++;
-        return clock.requestFrame(callback);
-      },
-    });
+    // Момент, в котором IEEE-rounded positions двух каналов дают РАЗНЫЕ
+    // effect-space v0, зависит от битов конкретного serialized-артефакта —
+    // тест ищет его сканом по временам (прежний магический seek(120) был
+    // валиден только для сетки до #228). Свойство неизменно: при расхождении
+    // v0 ни один общий WAAPI progress не сохраняет обе абсолютные скорости,
+    // поэтому C1 важнее compositor residency и каналы продолжаются на main.
+    // Ревью #246: версия «нашлась хотя бы одна точка из 51» была зелёной даже
+    // если бы свойство сломалось на 50 точках из 51 — ассерт стоял ТОЛЬКО в
+    // найденной точке. Теперь ассертится КАЖДАЯ из 51 точки: расхождение v0
+    // зависит от момента (это физика, не дефект), но исход обязан быть одним из
+    // ровно двух корректных, и третьего — тихой заморозки (ни reseed, ни живого
+    // main) — быть не может. Плюс сохранена исходная проверка существования.
+    let mainHandoffs = 0;
+    let reseeds = 0;
+    for (let seekMs = 90; seekMs <= 140; seekMs++) {
+      const target = fakeEl({}, true);
+      const clock = makeClock();
+      let requests = 0;
+      const controls = animate(target.el, {
+        scaleX: [2.998266875266529e-11, 9.325277294421096e-10],
+        scaleY: [-1.0238667362138987e-8, -2.1550411860147135e-10],
+      }, {
+        spring: SPRING,
+        now: () => 0,
+        setTimer: () => () => {},
+        requestFrame(callback) {
+          requests++;
+          return clock.requestFrame(callback);
+        },
+      });
 
-    expect(target.animateCalls).toHaveLength(1);
-    controls.seek(120);
-    // IEEE-rounded positions дают разные effect-space v0. Ни один общий WAAPI
-    // progress не сохраняет обе абсолютные скорости точно, поэтому C1 важнее
-    // compositor residency и каналы продолжаются независимо.
-    expect(target.animateCalls).toHaveLength(1);
-    expect(requests).toBeGreaterThan(0);
-    controls.cancel();
+      expect(target.animateCalls).toHaveLength(1);
+      controls.seek(seekMs);
+      if (target.animateCalls.length === 1) {
+        // Расхождение v0: reseed отвергнут ⇒ группа ОБЯЗАНА продолжиться на
+        // живом main. Отсутствие кадров здесь означало бы замерший элемент.
+        expect(requests, `seek=${seekMs}: main без кадров`).toBeGreaterThan(0);
+        mainHandoffs++;
+      } else {
+        // Скорости совпали ⇒ законный reseed: ровно одна новая анимация с
+        // положительной длительностью (вырожденный reseed — тот же дефект).
+        expect(target.animateCalls, `seek=${seekMs}`).toHaveLength(2);
+        expect(
+          Number(target.animateCalls[1]!.timing.duration),
+          `seek=${seekMs}: длительность reseed`,
+        ).toBeGreaterThan(0);
+        reseeds++;
+      }
+      controls.cancel();
+    }
+    // Существование расхождения — исходное свойство теста; полнота разбора —
+    // страховка от третьего (замершего) состояния.
+    expect(mainHandoffs).toBeGreaterThan(0);
+    expect(mainHandoffs + reseeds).toBe(51);
   });
 });

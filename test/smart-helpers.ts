@@ -183,17 +183,17 @@ export function makeSmartWorld(): SmartWorld {
         return attrs.get(n) ?? null;
       },
       getBoundingClientRect(): RectLike {
-        ops.push({
-          seq: seq++,
-          el: fake,
-          kind: 'measure',
-          inlineTransform: inline.get('transform') ?? '',
-        });
+        const inlineTransform = inline.get('transform') ?? '';
+        ops.push({ seq: seq++, el: fake, kind: 'measure', inlineTransform });
+        // #131: неснятый transform смещает рект, как в реальном DOM.
+        const box = inlineTransform === ''
+          ? fake.rect
+          : applyInlineTransform(fake.rect, inlineTransform);
         return {
-          x: fake.rect.x - world.scroll.x,
-          y: fake.rect.y - world.scroll.y,
-          width: fake.rect.width,
-          height: fake.rect.height,
+          x: box.x - world.scroll.x,
+          y: box.y - world.scroll.y,
+          width: box.width,
+          height: box.height,
         };
       },
     };

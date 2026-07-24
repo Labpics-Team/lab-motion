@@ -21,14 +21,15 @@
  * Карта ПЕРЕИСПОЛЬЗОВАНИЯ (ничего не дублировано — импорты, не копии):
  *   ../gestures createVelocityTracker — оценка скорости указателя по окну
  *     сэмплов (тот же трекер, что питает createDrag; velocity на отпускании).
- *   ../decay createDecay — ПРОЕКЦИЯ момента: `.rest` = куда прилетел бы элемент
+ *   ../decay decayRest — ПРОЕКЦИЯ момента: куда прилетел бы элемент
  *     под инерцией → выбор целевого snap/страницы по положению+скорости.
  *   ../internal/solver solveSpring — единый пружинный солвер (тот же, что ядро и
  *     smooth-pickup MotionValue): доводка value→target с наследованием velocity
  *     (v0n = velocity/range даёт C¹ на стыке follow|release).
  *   ../spring validateSpringParams — ранний fail-fast MotionParamError В ФАБРИКЕ.
- *   ../tokens spring — токены темпа (дефолтные пружины доводки); семантическую
- *     роль задаёт потребитель, labui НЕ импортируется.
+ *   ../internal/motion-defaults DEFAULT_SPRING — тот же объект, что токен
+ *     spring.default (./tokens); ./tokens не импортируется, чтобы его
+ *     side-effect изинг-токены не попадали в consumer bundle ./behaviors.
  *
  * Инварианты (нарушение = провал):
  *   B1. ОДНА state machine владеет фазой и переходами; pointer/programmatic
@@ -68,13 +69,13 @@
  */
 
 import { createVelocityTracker } from '../gestures/index.js';
-import { createDecay } from '../decay.js';
+import { decayRest } from '../decay.js';
 import { MotionParamError } from '../errors.js';
 import { solveSpring } from '../internal/solver.js';
 import { CONVERGENCE_THRESHOLD, FIXED_DT_S, MAX_FRAMES } from '../internal/constants.js';
 import type { MatchMediaLike } from '../internal/media-query.js';
 import { validateSpringParams, type SpringParams } from '../spring.js';
-import { spring as springTokens } from '../tokens/index.js';
+import { DEFAULT_SPRING } from '../internal/motion-defaults.js';
 import type { RequestFrameFn } from '../motion-value.js';
 
 // ─── Общий контракт ──────────────────────────────────────────────────────────
@@ -134,21 +135,20 @@ function _prefersReduced(matchMedia: MatchMediaLike | undefined): boolean {
   }
 }
 
-/**
- * Rubber-band сопротивление за границей (класс elastic у Motion): смещённая
- * координата = граница + overshoot·factor. factor ∈ [0,1] (0 = жёсткий clamp).
- * ЗНАК overshoot сохраняется — увод остаётся в ту же сторону, только короче.
- */
-function _rubberBand(overshoot: number, factor: number): number {
-  return _finite(overshoot) * factor;
-}
-
 /** Нормализовать factor сопротивления в [0,1] (дефолт при мусоре). */
 function _clampFactor(raw: number | undefined, dflt: number): number {
-  return typeof raw === 'number' && Number.isFinite(raw) ? Math.min(1, Math.max(0, raw)) : dflt;
+  // Number.isFinite не коэрсит: не-число (и undefined) честно даёт дефолт.
+  return Number.isFinite(raw as number) ? Math.min(1, Math.max(0, raw as number)) : dflt;
 }
 
 const DEFAULT_RUBBER_BAND = 0.5;
+/**
+ * Значения токена spring.snappy (./tokens) без импорта самого субпутя: импорт
+ * ./tokens тащил бы side-effect cubic-bezier изинг-токенов в каждый consumer
+ * bundle ./behaviors (~+0.3 KB gz). Значения запинены тестом токенов; при
+ * расхождении с ./tokens spring.snappy эталон — tokens.
+ */
+const SNAPPY_SPRING: SpringParams = { mass: 1, stiffness: 260, damping: 28 };
 /** Половина окна трекера — засев прайора скорости при перехвате (канон gestures). */
 const PICKUP_SEED_DT_S = 0.05;
 
@@ -236,11 +236,14 @@ function _createRunner(
 
       const tick = (ts?: number): void => {
         if (my !== gen || !running) return; // stale-кадр после перехвата/cancel
-        if (typeof ts === 'number' && Number.isFinite(ts)) {
-          elapsed = lastTs === undefined ? elapsed : elapsed + Math.max(0, (ts - lastTs) / 1000);
+        if (Number.isFinite(ts as number)) {
+          elapsed = lastTs === undefined ? elapsed : elapsed + Math.max(0, ((ts as number) - lastTs) / 1000);
           lastTs = ts;
         } else {
           elapsed += FIXED_DT_S;
+          // Синтетический кадр рвёт цепочку меток: без сброса якоря следующий
+          // реальный ts досчитал бы тот же интервал второй раз (зеркало MainUnit).
+          lastTs = undefined;
         }
         frames++;
 
@@ -376,8 +379,7 @@ function _seedPickup(
 ): void {
   if (vAxis === 0) return;
   const back = { x: _finite(p.x), y: _finite(p.y), t: _finite(p.t) - PICKUP_SEED_DT_S };
-  if (axis === 'x') back.x = _finite(p.x) - vAxis * PICKUP_SEED_DT_S;
-  else back.y = _finite(p.y) - vAxis * PICKUP_SEED_DT_S;
+  back[axis] = _coord(p, axis) - vAxis * PICKUP_SEED_DT_S;
   tracker.push(back);
 }
 
@@ -428,7 +430,7 @@ export interface SheetController {
  * Скорость влияет монотонно (больше скорость → дальше проекция → дальний snap).
  */
 function _pickSnap(snaps: readonly number[], value: number, velocity: number): number {
-  const landing = createDecay({ from: value, velocity }).rest;
+  const landing = decayRest(value, velocity);
   let best = 0;
   let bestDist = Infinity;
   for (let i = 0; i < snaps.length; i++) {
@@ -455,7 +457,7 @@ export function createBottomSheet(options: SheetOptions): SheetController {
     throw new MotionParamError('LM003');
   }
   const axis = options.axis ?? 'y';
-  const springParams = options.spring ?? (springTokens.default as SpringParams);
+  const springParams = options.spring ?? DEFAULT_SPRING;
   validateSpringParams(springParams);
   const rubber = _clampFactor(options.rubberBand, DEFAULT_RUBBER_BAND);
   const minSnap = snaps[0]!;
@@ -478,8 +480,10 @@ export function createBottomSheet(options: SheetOptions): SheetController {
 
   /** Применить rubber-band за крайними snap к сырой позиции под пальцем. */
   const clampFollow = (raw: number): number => {
-    if (raw > maxSnap) return _finite(maxSnap + _rubberBand(raw - maxSnap, rubber));
-    if (raw < minSnap) return _finite(minSnap + _rubberBand(raw - minSnap, rubber));
+    // Rubber-band (класс elastic у Motion): граница + overshoot·factor, знак
+    // overshoot сохраняется — увод в ту же сторону, только короче.
+    if (raw > maxSnap) return _finite(maxSnap + _finite(raw - maxSnap) * rubber);
+    if (raw < minSnap) return _finite(minSnap + _finite(raw - minSnap) * rubber);
     return _finite(raw);
   };
 
@@ -495,6 +499,8 @@ export function createBottomSheet(options: SheetOptions): SheetController {
       onDone: () => base.emit({ value: target, velocity: 0, phase: 'settle', snapIndex: index }),
     });
   };
+  /** Отпускание/перехват: доводка к snap, выбранному проекцией момента. */
+  const release = (v: number): void => settleTo(_pickSnap(snaps, base.state.value, v), _finite(v));
 
   const ctrl: SheetController = {
     pointerDown(p: BehaviorPoint): void {
@@ -520,16 +526,13 @@ export function createBottomSheet(options: SheetOptions): SheetController {
       if (!dragging) return;
       dragging = false;
       base.tracker.push(p);
-      const v = axis === 'x' ? base.tracker.velocity().vx : base.tracker.velocity().vy;
-      const index = _pickSnap(snaps, base.state.value, v);
-      settleTo(index, _finite(v));
+      release(axis === 'x' ? base.tracker.velocity().vx : base.tracker.velocity().vy);
     },
     pointerCancel(): void {
       if (!dragging) return;
       dragging = false;
       // Детерминизм: осесть в ближайший snap без унаследованной скорости.
-      const index = _pickSnap(snaps, base.state.value, 0);
-      settleTo(index, 0);
+      release(0);
     },
     snapTo(index: number): void {
       if (base.destroyed) return;
@@ -610,10 +613,10 @@ export function createDragDismiss(options: DismissOptions): DismissController {
     throw new MotionParamError('LM004');
   }
   const velThresh =
-    typeof options.velocityThreshold === 'number' && Number.isFinite(options.velocityThreshold)
-      ? Math.abs(options.velocityThreshold)
+    Number.isFinite(options.velocityThreshold as number)
+      ? Math.abs(options.velocityThreshold as number)
       : DEFAULT_DISMISS_VELOCITY;
-  const springParams = options.spring ?? (springTokens.default as SpringParams);
+  const springParams = options.spring ?? DEFAULT_SPRING;
   validateSpringParams(springParams);
   const dismissTarget = _finite(options.dismissTarget ?? dir * dist * 8);
 
@@ -771,10 +774,10 @@ export function createCarousel(options: CarouselOptions): CarouselController {
   const axis = options.axis ?? 'x';
   const rtl = options.rtl === true;
   const velThresh =
-    typeof options.velocityThreshold === 'number' && Number.isFinite(options.velocityThreshold)
-      ? Math.abs(options.velocityThreshold)
+    Number.isFinite(options.velocityThreshold as number)
+      ? Math.abs(options.velocityThreshold as number)
       : DEFAULT_CAROUSEL_VELOCITY;
-  const springParams = options.spring ?? (springTokens.snappy as SpringParams);
+  const springParams = options.spring ?? SNAPPY_SPRING;
   validateSpringParams(springParams);
 
   const clampIndex = (i: number): number => Math.max(0, Math.min(pageCount - 1, i));
@@ -844,7 +847,7 @@ export function createCarousel(options: CarouselOptions): CarouselController {
       // Скорость в position-пространстве.
       const posVel = posDirSign * vAxis;
       // Проекция момента через ./decay → куда прилетела бы позиция.
-      const landing = createDecay({ from: base.state.value, velocity: posVel }).rest;
+      const landing = decayRest(base.state.value, posVel);
       let target = Math.round(landing / pageSize);
       // Флик перелистывает минимум на страницу; доводка — максимум ±1 от старта свайпа.
       if (Math.abs(posVel) >= velThresh) target = swipeStartIndex + (posVel > 0 ? 1 : -1);
@@ -943,7 +946,7 @@ export function createPullToRefresh(options: PullOptions): PullController {
   const axis = options.axis ?? 'y';
   const dir: 1 | -1 = options.direction === -1 ? -1 : 1;
   const resistance = _clampFactor(options.resistance, DEFAULT_RUBBER_BAND);
-  const springParams = options.spring ?? (springTokens.default as SpringParams);
+  const springParams = options.spring ?? DEFAULT_SPRING;
   validateSpringParams(springParams);
   const pendingPos = _finite(options.pendingPosition ?? threshold);
 

@@ -3,21 +3,24 @@
 import { scaleSerializedVelocity } from '../compositor/sample.js';
 import { CONVERGENCE_THRESHOLD, FIXED_DT_S, MAX_FRAMES } from '../internal/constants.js';
 import { finiteOrZero } from '../internal/finite.js';
+import { sampleNumericTrack, type SegmentEase, type TrackAt } from './track.js';
 import {
   readSpringFromBasisUnchecked,
   sampleSpringFromBasisUnchecked,
 } from '../internal/read-spring.js';
 import type { RequestFrameFn } from '../motion-value.js';
 import type { SpringParams } from '../spring.js';
-import { buildTransform } from '../value/transform.js';
 import {
   RANGE_EPSILON,
   channelAt,
   cssAt,
+  cssTrackAt,
+  groupValueAt,
   type AnimatableElement,
   type BoundGroup,
   type ChannelSnapshot,
   type CssChannel,
+  type NumericChannel,
   type GroupKey,
   type GroupOwner,
   type GroupRecord,
@@ -26,7 +29,13 @@ import { SurfaceBatch, type SurfaceUnit } from './surface-batch.js';
 
 export type MotionMode =
   | { readonly _type: 'spring'; readonly _spring: SpringParams }
-  | { readonly _type: 'tween'; readonly _durationMs: number; readonly _ease: (t: number) => number };
+  | {
+    readonly _type: 'tween';
+    readonly _durationMs: number;
+    readonly _ease: (t: number) => number;
+    /** Per-segment изинги N-keyframe вызова (#205); undefined — scalar. */
+    readonly _eases?: readonly ((t: number) => number)[] | undefined;
+  };
 
 export type { RequestFrameFn };
 
@@ -71,11 +80,19 @@ export class MainUnit implements GroupOwner, SurfaceUnit {
    */
   private _writing = false;
   private readonly _snap = { value: 0, velocity: 0 };
+  /** Изинг сегмента трека (#205): eases[i] либо scalar; один замкнутый объект. */
+  private readonly _easeFor: (segment: number) => SegmentEase | undefined;
+  /** Переиспользуемый scratch просмотра трека (ноль аллокаций на кадр). */
+  private readonly _trackAt: TrackAt = { _segment: 0, _progress: 0 };
 
   constructor(options: MainUnitOptions) {
     this._o = options;
     this._paused = options._startPaused === true;
     this._phaseMs = -options._delayMs;
+    const mode = options._mode;
+    this._easeFor = mode._type === 'tween'
+      ? (segment) => mode._eases?.[segment] ?? mode._ease
+      : () => undefined;
     try {
       options._batch._add(this, this._paused);
     } catch (error) {
@@ -93,12 +110,17 @@ export class MainUnit implements GroupOwner, SurfaceUnit {
       // Во время host-write снимок обязан отдать применяемое поколение (#196):
       // hostile setter уже сделал значение видимым до возврата.
       const writing = this._writing;
-      let velocity = this._active ? (writing ? channel._velocity : channel._renderedVelocity) : 0;
-      if (this._active && o._mode._type === 'tween') {
-        const sampled = (channel._to - channel._from) *
-          this._tweenDerivative(this._liveTweenK());
-        velocity = finiteOrZero(sampled);
-      }
+      // Трек (#205): производная в пространстве значения через семплер;
+      // 2-стоповый путь — прежняя формула (to−from)·ease′ бит-в-бит.
+      const velocity = !this._active
+        ? 0
+        : o._mode._type === 'tween'
+          ? finiteOrZero(
+              channel._stops !== undefined
+                ? this._trackDerivative(channel, this._liveTweenK())
+                : (channel._to - channel._from) * this._tweenDerivative(this._liveTweenK()),
+            )
+          : writing ? channel._velocity : channel._renderedVelocity;
       return { _value: writing ? channel._value : channel._renderedValue, _velocity: velocity };
     }
     const frozen = o._bound._residuals.get(key);
@@ -107,13 +129,17 @@ export class MainUnit implements GroupOwner, SurfaceUnit {
 
   _captureCss(key: string): CssChannel | undefined {
     if (this._done) return undefined;
-    const channel = this._o!._bound._css;
-    if (channel === undefined || channel._key !== key) return undefined;
+    const o = this._o!;
+    const channel = o._bound._css;
+    if (channel?._key !== key) return undefined;
     const writing = this._writing;
+    // CSS-трек (#205): значение непрерывно (C⁰), скорость покоя — та же
+    // лестница деградации, что var()/смешанные AST в projectCssV0; полный C¹
+    // остаётся контрактом числовых каналов и 2-стопового CSS.
     const dpdt = !this._active
       ? 0
-      : this._o!._mode._type === 'tween'
-        ? this._tweenDerivative(this._liveTweenK())
+      : o._mode._type === 'tween'
+        ? channel._stopsAst !== undefined ? 0 : this._tweenDerivative(this._liveTweenK())
         : writing ? channel._dpdt : channel._renderedDpdt;
     return { ...channel, _dpdt: dpdt, _css: writing ? channel._css : channel._renderedCss };
   }
@@ -226,21 +252,31 @@ export class MainUnit implements GroupOwner, SurfaceUnit {
   private _compute(): boolean {
     const o = this._o!;
     const bound = o._bound;
-    if (o._mode._type === 'tween') {
-      if (this._tMs >= o._mode._durationMs) return true;
-      const k = this._tMs / o._mode._durationMs;
-      const eased = o._mode._ease(k);
+    const mode = o._mode;
+    if (mode._type === 'tween') {
+      if (this._tMs >= mode._durationMs) return true;
+      const k = this._tMs / mode._durationMs;
+      const eased = mode._ease(k);
       const progress = Number.isFinite(eased) ? eased : k;
       this._tweenK = k;
       this._tweenDpdt = NaN;
       for (const channel of bound._numeric) {
-        channel._value = channelAt(channel, progress);
+        // N-keyframe трек (#205) семплируется по сырому k (изинг per-segment);
+        // 2-стоповый канал сохраняет прежний глобально-eased путь бит-в-бит.
+        channel._value = channel._stops !== undefined
+          ? sampleNumericTrack(channel._stops, channel._offsets!, k, this._easeFor, this._trackAt)
+          : channelAt(channel, progress);
       }
-      if (bound._css !== undefined) bound._css._css = cssAt(bound._css, progress);
+      const css = bound._css;
+      if (css !== undefined) {
+        css._css = css._stopsAst !== undefined
+          ? cssTrackAt(css, k, this._easeFor, this._trackAt)
+          : cssAt(css, progress);
+      }
       return false;
     }
 
-    const basis = o._batch._springBasis(o._mode._spring, this._tMs / 1000);
+    const basis = o._batch._springBasis(mode._spring, this._tMs / 1000);
     let converged = true;
     for (const channel of bound._numeric) {
       const range = channel._solverTo - channel._from;
@@ -285,6 +321,24 @@ export class MainUnit implements GroupOwner, SurfaceUnit {
     return converged;
   }
 
+  /**
+   * Производная трека в пространстве значения (units/s, #205): численный
+   * дифференциал семплера тем же шагом, что _tweenDerivative. Right-biased
+   * скачок нулевой ширины даёт конечную секущую — finiteOrZero страхует край.
+   */
+  private _trackDerivative(channel: NumericChannel, k: number): number {
+    const mode = this._o!._mode;
+    if (mode._type !== 'tween') return 0;
+    const k0 = k > EASE_DERIV_H ? k - EASE_DERIV_H : 0;
+    const k1 = k + EASE_DERIV_H < 1 ? k + EASE_DERIV_H : 1;
+    const stops = channel._stops!;
+    const offsets = channel._offsets!;
+    const raw = ((sampleNumericTrack(stops, offsets, k1, this._easeFor, this._trackAt) -
+      sampleNumericTrack(stops, offsets, k0, this._easeFor, this._trackAt)) * 1000) /
+      ((k1 - k0) * mode._durationMs);
+    return finiteOrZero(raw);
+  }
+
   private _tweenDerivative(k = this._tweenK): number {
     if (k === this._tweenK && !Number.isNaN(this._tweenDpdt)) return this._tweenDpdt;
     const mode = this._o!._mode;
@@ -307,13 +361,11 @@ export class MainUnit implements GroupOwner, SurfaceUnit {
     // успешным) без stale repair-записи после потери lease.
     this._writing = true;
     try {
-      if (o._group === 'transform') {
-        const state = bound._transform!;
-        for (const channel of bound._numeric) state[channel._key] = channel._value;
-        o._el.style.setProperty('transform', buildTransform(state));
-      } else if (bound._css !== undefined) {
-        o._el.style.setProperty(o._group, String(bound._css._css));
-      } else o._el.style.setProperty(o._group, String(bound._numeric[0]!._value));
+      o._el.style.setProperty(o._group, String(
+        bound._css !== undefined
+          ? bound._css._css
+          : groupValueAt(o._group, bound._transform, bound._numeric),
+      ));
     } finally {
       this._writing = false;
     }

@@ -594,7 +594,9 @@ describe('animate WAAPI: точный long-delay timer', () => {
     const bound = bindGroup(
       target.el,
       'opacity',
-      parseProps({ opacity: [0, 1] }),
+      // Пин внутренней (не-контрактной) формы parseProps: спеки теперь
+      // приходят сгруппированными по GroupKey (Map), группа одна — 'opacity'.
+      parseProps({ opacity: [0, 1] }).get('opacity')!,
       record,
     );
     const onDone = vi.fn();

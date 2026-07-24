@@ -429,3 +429,39 @@ describe('Discrete-swap finiteness: non-finite AST-компоненты → ни
     expect(result.includes('Infinity')).toBe(false);
   });
 });
+
+// ── var()-свап unitToString: hand-constructed non-finite клампится (V1) ───────
+//
+// До фикса unitToString сериализовал value/amount без клампа — последняя дыра
+// FINITENESS GUARD: interpolateUnit(unit{∞,px} × var, 0) → "Infinitypx".
+// Mutation proof: убрать clampFinite() из unit/relative-веток unitToString →
+// точные ассерты ниже получат 'Infinity'/'NaN' в строке → RED.
+
+describe('var()-свап: non-finite value/amount hand-constructed AST клампятся при сериализации', () => {
+  const varAst = { kind: 'var' as const, name: '--x', fallback: undefined };
+
+  it('unit{Infinity,px} × var при t=0 → MAX_VALUE-строка, не "Infinitypx"', () => {
+    const result = interpolateUnit({ kind: 'unit', value: Infinity, unit: 'px' }, varAst, 0);
+    expect(result).toBe(`${Number.MAX_VALUE}px`);
+  });
+
+  it('var × unit{-Infinity,%} при t=1 → -MAX_VALUE-строка (to-ветка свапа)', () => {
+    const result = interpolateUnit(varAst, { kind: 'unit', value: -Infinity, unit: '%' }, 1);
+    expect(result).toBe(`${-Number.MAX_VALUE}%`);
+  });
+
+  it('relative{+=NaN,px} × var при t=0 → "+=0px"', () => {
+    const result = interpolateUnit(
+      { kind: 'relative', op: '+', amount: NaN, unit: 'px' },
+      varAst,
+      0,
+    );
+    expect(result).toBe('+=0px');
+  });
+
+  it('unit{NaN, unitless} × var при t=0 → "0" (кламп NaN → 0)', () => {
+    const result = interpolateUnit({ kind: 'unit', value: NaN, unit: '' }, varAst, 0);
+    expect(result).toBe('0');
+    assertFiniteOutput(result, 'unit{NaN,unitless} × var t=0');
+  });
+});

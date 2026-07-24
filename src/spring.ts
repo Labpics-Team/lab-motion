@@ -45,7 +45,8 @@ export interface SpringResult {
  * верхняя граница времени оседания медленной моды обязана помещаться в бюджет
  * кадра-капа.
  *
- *   rate  = ζ·ω₀ (underdamped) | ω₀·(ζ − √(ζ²−1)) (overdamped, медленный корень)
+ *   rate  = ζ·ω₀ (underdamped) | ω₀/(ζ + √(ζ²−1)) (overdamped, медленный корень —
+ *           стабильное тождество ω₀(ζ−√(ζ²−1)); вычитание теряло полюс при ζ ≳ 1e8, #226)
  *   amp   = 1/√(1−ζ²) | (ζ+√(ζ²−1))/(2√(ζ²−1))   (пик коэффициентов разложения;
  *           у ζ→1 факторизация вырождается — ζ_eff отводится на ±1e-3, истинный
  *           пик критической ветки ограничен)
@@ -60,14 +61,25 @@ const SETTLE_BUDGET_S = MAX_FRAMES * FIXED_DT_S;
 /** Канонический бюджет пружины, рождённой в покое; отдельный seam нужен DCE. */
 export function settleTimeAtRestUpperBound(p: SpringParams): number {
   const omega0 = Math.sqrt(p.stiffness / p.mass);
-  // ζ = c/(2√(km)) = c/(2m·ω₀) — без второго sqrt (тождество √(km) = m·√(k/m)).
-  const zetaRaw = p.damping / (2 * p.mass * omega0);
+  // ζ = c/(2√(km)) = (c/m)/(2ω₀) — без второго sqrt (тождество √(km) = m·√(k/m)).
+  //
+  // КАНОНИЧЕСКАЯ ФОРМА (#239): первые операции — ровно те частные, которыми
+  // пружина задана физически (ω²=k/m и c/m). Прежняя форма c/(2·m·ω₀) считала
+  // промежуточное произведение 2·m·ω₀, и оно округлялось по-разному при разной
+  // массе: масс-эквивалентные тройки (равные частные бит-в-бит) получали бюджеты,
+  // различающиеся на ulp. Это ломало и границу LM091, и exact-ключ кэша артефактов.
+  // Деление на 2 точно (степень двойки), поэтому (c/m)/(2ω₀) инвариантно
+  // ПО ПОСТРОЕНИЮ. Пин: test/compositor-cache-mass-invariance.test.ts.
+  const zetaRaw = p.damping / p.mass / (2 * omega0);
   // У ζ = 1 разложение на моды вырождено (см. solver) — отводим на ±1e-3.
   const zeta =
     Math.abs(zetaRaw - 1) < 1e-3 ? (zetaRaw < 1 ? 0.999 : 1.001) : zetaRaw;
   const under = zeta < 1;
   const d = Math.sqrt(Math.abs(zeta * zeta - 1)); // √|ζ²−1|: ωd/ω₀ | расщепление корней
-  const rate = under ? zeta * omega0 : omega0 * (zeta - d);
+  // Медленный корень стабильной формой (ζ−d)(ζ+d)=1 ⇒ ζ−d = 1/(ζ+d): вычитание
+  // ζ−d теряло полюс при ζ ≳ 1e8 и ЛОЖНО отвергало быстро оседающие жёсткие
+  // overdamped-пружины (rate→0 ⇒ t_settle→∞ ⇒ LM091), #226.
+  const rate = under ? zeta * omega0 : omega0 / (zeta + d);
   if (!(rate > 0)) return Infinity; // ζ=0: незатухающая — не оседает никогда
   const amp = under ? 1 / d : (zeta + d) / (2 * d);
   const needLn =
@@ -92,7 +104,13 @@ export function settleTimeUpperBound(p: SpringParams, v0 = 0): number {
   // замкнутый консервативный горизонт без итераций и аллокаций. В
   // передемпфированной ветке r=ω₀²/(α+√(α²−ω₀²)) — устойчивая форма медленного
   // корня без катастрофического вычитания.
-  const alpha = p.damping / (2 * p.mass);
+  // Канонический порядок (#239, ревью): (c/m)/2, а НЕ c/(2m). Формы совпадают
+  // бит-в-бит во всём нормальном диапазоне (деление на 2 точно), но при
+  // достаточно большой ФИЗИЧЕСКИ ВАЛИДНОЙ массе (m=1e308) произведение 2·m
+  // переполняется в Infinity, и c/(2m) даёт α=0 вместо честного (c/m)/2.
+  // Масс-эквивалентная пара {1e308,1e308,1e308} / {1e307,1e307,1e307} получала
+  // при этом ОДИН ключ кэша и РАЗНЫЕ горизонты (∞ против конечного).
+  const alpha = p.damping / p.mass / 2;
   const omega2 = omega0 * omega0;
   const delta = omega2 - alpha * alpha;
   const split = Math.sqrt(Math.abs(delta));
@@ -134,14 +152,12 @@ export function settleTimeUpperBound(p: SpringParams, v0 = 0): number {
 }
 
 /**
- * Validate spring params. Throws MotionParamError for invalid inputs.
- *
- * Exported so drive() can call this synchronously at its boundary —
- * before any Promise is constructed or frame scheduled — making invalid
- * spring config throw eagerly and deterministically regardless of the
- * injected scheduler.
+ * Физическая граница домена (#218): конечные mass > 0, stiffness > 0,
+ * damping ≥ 0 — и ничего больше. Замкнутой аналитической форме не нужен
+ * frame-loop, поэтому чистый `spring()` обязан вычислять ЛЮБУЮ физически
+ * валидную систему: сколь угодно медленную и незатухающую (ζ=0) включительно.
  */
-export function validateSpringParams(p: SpringParams): void {
+export function validateSpringPhysics(p: SpringParams): void {
   if (!Number.isFinite(p.mass) || p.mass <= 0) {
     throw new MotionParamError('LM088');
   }
@@ -151,6 +167,17 @@ export function validateSpringParams(p: SpringParams): void {
   if (!Number.isFinite(p.damping) || p.damping < 0) {
     throw new MotionParamError('LM090');
   }
+}
+
+/**
+ * Граница АВТОНОМНОГО frame-loop-исполнителя (#218): физика + гарантия, что
+ * аналитическое время оседания помещается в бюджет кадра-капа (иначе rAF-цикл
+ * drive/MotionValue/фасада не завершится в своём lifecycle). Чистый sampler
+ * использует validateSpringPhysics; эта граница принадлежит исполнителям и
+ * вызывается ими на их стороне — до Promise и до первого кадра.
+ */
+export function validateSpringParams(p: SpringParams): void {
+  validateSpringPhysics(p);
   // Единый выведенный гард (взамен коробочных ω₀/ζ-полов, см. SETTLE_BUDGET_S):
   // аналитическое время оседания обязано помещаться в бюджет кадра-капа.
   // Валидатору нужна только пружина из покоя. Отдельный вызов позволяет
@@ -216,10 +243,14 @@ export function springUnchecked(params: SpringParams, t: number): SpringResult {
  *   2. Critically:   c = 2*sqrt(k*m)
  *   3. Overdamped:   c > 2*sqrt(k*m)
  *
+ * Граница — ТОЛЬКО физическая валидность (#218): budget автономного
+ * frame-loop к чистому sampler-у не относится — медленные и незатухающие
+ * системы вычислимы замкнутой формой в произвольный момент времени.
+ *
  * @param params - spring physics parameters
  * @param t      - time in seconds (≥ 0)
  */
 export function spring(params: SpringParams, t: number): SpringResult {
-  validateSpringParams(params);
+  validateSpringPhysics(params);
   return springUnchecked(params, t);
 }

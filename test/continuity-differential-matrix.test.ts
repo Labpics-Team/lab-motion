@@ -2167,13 +2167,14 @@ describe('пункт В (#93): солвер main-пути и compositor-пути
 // ─── Пункт Б: характеризация хендла animate() ────────────────────────────────
 
 describe('пункт Б (#93): хендл animate() — агрегированные контролы БЕЗ velocity (отложено до #127)', () => {
-  it('хендл — ровно { finished, play, pause, seek, cancel, stop }; finished — Promise, остальное — функции', () => {
+  it('хендл — ровно { finished, then, play, pause, seek, cancel, stop }; finished — Promise, остальное — функции', () => {
     const f = fakeEl();
     const clock = makeClock();
     const h = animate(f.el, { x: 10 }, { spring: S170, requestFrame: clock.requestFrame });
-    expect(Object.keys(h).sort()).toEqual(['cancel', 'finished', 'pause', 'play', 'seek', 'stop']);
+    // then — thenable-канон Motion/driver: await animate(...) ≡ await finished.
+    expect(Object.keys(h).sort()).toEqual(['cancel', 'finished', 'pause', 'play', 'seek', 'stop', 'then']);
     expect(h.finished).toBeInstanceOf(Promise);
-    for (const k of ['play', 'pause', 'seek', 'cancel', 'stop'] as const) {
+    for (const k of ['then', 'play', 'pause', 'seek', 'cancel', 'stop'] as const) {
       expect(typeof (h as unknown as Record<string, unknown>)[k]).toBe('function');
     }
     h.cancel();

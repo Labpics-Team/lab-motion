@@ -1081,7 +1081,10 @@ describe('MotionProgram V1 canonical wire', () => {
       const curve = program![3][origin.curveIndex];
       expect(curve).not.toBe(0);
       expect(origin.generator).toBe('lab-motion.compileSpringExecutionArtifactTupleUnchecked');
-      expect(origin.generatorVersion).toBe(1);
+      // v2 — #228: локальная энергетическая сетка меняет эмитируемые стопы при
+      // тех же входах; verification=exact-regeneration заново держится текущим
+      // генератором (регенерация корпуса в том же PR).
+      expect(origin.generatorVersion).toBe(2);
       expect(origin.verification).toBe('exact-regeneration');
       expect(origin.compilerTolerance).toBe(DEFAULT_TOLERANCE);
       const artifact = compileSpringExecutionArtifactTupleUnchecked(

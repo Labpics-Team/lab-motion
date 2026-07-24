@@ -39,9 +39,9 @@ import {
   scaleSerializedVelocity,
 } from '../compositor/sample.js';
 import type { SpringParams } from '../spring.js';
-import { buildTransform } from '../value/transform.js';
 import {
   channelAt,
+  groupValueAt,
   rebaseNumericChannels,
   sharedV0,
   type AnimatableElement,
@@ -244,12 +244,7 @@ export class WaapiUnit implements GroupOwner {
 
   /** Перемотка к времени прогона: на паузе фиксирует позу, иначе продолжает. */
   seek(tMs: number): void {
-    if (
-      this._done ||
-      this._o._record._transition ||
-      this._locked ||
-      !Number.isFinite(tMs)
-    ) return;
+    if (this._done || this._o._record._transition || this._locked || !Number.isFinite(tMs)) return;
     if (this._delegate !== undefined) {
       this._transaction(() => this._delegate!.seek(tMs));
       return;
@@ -306,7 +301,7 @@ export class WaapiUnit implements GroupOwner {
       const progress = samples[sample + 1]!;
       frames[i] = {
         offset: samples[sample]! / 100,
-        [o._group]: this._valueAt(progress),
+        [o._group]: groupValueAt(o._group, o._transform, o._numeric, progress),
       };
     }
     this._startDelay = delayMs;
@@ -349,17 +344,6 @@ export class WaapiUnit implements GroupOwner {
       });
       throw error;
     }
-  }
-
-  /** Строка/число группы при прогрессе p (края — точные from/to каналов). */
-  private _valueAt(p: number): string | number {
-    const o = this._o;
-    if (o._group === 'transform') {
-      const state = o._transform!;
-      for (const ch of o._numeric) state[ch._key] = channelAt(ch, p);
-      return buildTransform(state);
-    }
-    return channelAt(o._numeric[0]!, p);
   }
 
   /** Снимок каналов при времени WAAPI (мс) из actual serialized curve. */
@@ -443,7 +427,6 @@ export class WaapiUnit implements GroupOwner {
           _record: o._record,
           _bound: {
             _numeric: o._numeric,
-            _css: undefined,
             _residuals: o._residuals,
             _transform: o._transform,
           },
@@ -469,13 +452,7 @@ export class WaapiUnit implements GroupOwner {
   /** Инлайн-фиксация текущего значения (перед cancel — без миганья к базе). */
   private _holdInline(): void {
     const o = this._o;
-    if (o._group === 'transform') {
-      const state = o._transform!;
-      for (const ch of o._numeric) state[ch._key] = ch._value;
-      o._el.style.setProperty('transform', buildTransform(state));
-    } else {
-      o._el.style.setProperty(o._group, String(o._numeric[0]!._value));
-    }
+    o._el.style.setProperty(o._group, String(groupValueAt(o._group, o._transform, o._numeric)));
   }
 
   private _cancelAnim(): void {
