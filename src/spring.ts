@@ -61,8 +61,16 @@ const SETTLE_BUDGET_S = MAX_FRAMES * FIXED_DT_S;
 /** Канонический бюджет пружины, рождённой в покое; отдельный seam нужен DCE. */
 export function settleTimeAtRestUpperBound(p: SpringParams): number {
   const omega0 = Math.sqrt(p.stiffness / p.mass);
-  // ζ = c/(2√(km)) = c/(2m·ω₀) — без второго sqrt (тождество √(km) = m·√(k/m)).
-  const zetaRaw = p.damping / (2 * p.mass * omega0);
+  // ζ = c/(2√(km)) = (c/m)/(2ω₀) — без второго sqrt (тождество √(km) = m·√(k/m)).
+  //
+  // КАНОНИЧЕСКАЯ ФОРМА (#239): первые операции — ровно те частные, которыми
+  // пружина задана физически (ω²=k/m и c/m). Прежняя форма c/(2·m·ω₀) считала
+  // промежуточное произведение 2·m·ω₀, и оно округлялось по-разному при разной
+  // массе: масс-эквивалентные тройки (равные частные бит-в-бит) получали бюджеты,
+  // различающиеся на ulp. Это ломало и границу LM091, и exact-ключ кэша артефактов.
+  // Деление на 2 точно (степень двойки), поэтому (c/m)/(2ω₀) инвариантно
+  // ПО ПОСТРОЕНИЮ. Пин: test/compositor-cache-mass-invariance.test.ts.
+  const zetaRaw = p.damping / p.mass / (2 * omega0);
   // У ζ = 1 разложение на моды вырождено (см. solver) — отводим на ±1e-3.
   const zeta =
     Math.abs(zetaRaw - 1) < 1e-3 ? (zetaRaw < 1 ? 0.999 : 1.001) : zetaRaw;
