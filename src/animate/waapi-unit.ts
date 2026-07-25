@@ -214,6 +214,8 @@ export class WaapiUnit implements GroupOwner {
       return;
     }
     this._transaction(() => {
+      // Снимок и отметка паузы — из ОДНОГО чтения часов: расхождение между
+      // зафиксированной позой и замороженным временем и есть тот самый прыжок.
       this._syncSnapshot();
       this._holdInline();
       this._clearTimer();
@@ -370,6 +372,16 @@ export class WaapiUnit implements GroupOwner {
 
   /** Нативный currentTime побеждает drifted JS clock, но не требует layout. */
   private _syncSnapshot(): void {
+    // На ПАУЗЕ поза уже зафиксирована самой паузой, и трогать её нельзя.
+    // pause() снимает WAAPI-эффект, поэтому native currentTime пропадает и
+    // _elapsed() уходит в fallback `now() − _startTime`, который продолжает
+    // идти. Аудит 2026-07-25: пауза фиксировала translateX(37.49px), а
+    // cancel() через 400 мс реального времени переснимал позу и писал
+    // translateX(98.90px) — прыжок на 61 px из положения, в котором элемент
+    // визуально стоял; тот же снимок уходил в реестр, поэтому и следующий
+    // animate() стартовал с 98.90. play() чинить не нужно: он пере-сеет
+    // кривую, и _emit заново ставит _startTime.
+    if (this._paused) return;
     this._snapshotAt(this._elapsed(false), this._startDelay);
   }
 

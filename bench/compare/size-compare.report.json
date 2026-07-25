@@ -1,6 +1,6 @@
 {
   "generatedFor": "0.3.0",
-  "revision": "048be262df815fa3779775c465b548090a5e0808",
+  "revision": "125f3298815290d305e9b3d0f0dc32bb88fc0efe",
   "node": "v22.22.2",
   "esbuild": "0.28.1",
   "competitors": {
@@ -34,8 +34,8 @@
     {
       "id": "lab-animate",
       "label": "lab-motion ./animate (full)",
-      "gz": 12513,
-      "raw": 30788,
+      "gz": 12515,
+      "raw": 30797,
       "contract": "defensive runtime: C¹-подхват, fallback, hostile-host, N-keyframes"
     },
     {
