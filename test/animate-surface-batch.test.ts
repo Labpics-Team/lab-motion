@@ -518,6 +518,106 @@ describe('SurfaceBatch: потолок подписок', () => {
   });
 });
 
+describe('SurfaceBatch: компакция дыр НИКОГДА не идёт внутри кадра', () => {
+  // ЗАКОН. `_add`/`_activate` схлопывают дыры массива юнитов, но только вне
+  // кадра: страж — `this._end < 0 && this._holes > 0`. Внутри кадра `_end`
+  // зафиксирован на границе update→render, и по индексам массива в этот момент
+  // ИДЁТ ИТЕРАЦИЯ. Компакция сдвигает элементы влево, поэтому запуск её из
+  // реентрантного `animate()` внутри чужого `_updateStep` сдвинул бы юниты под
+  // работающим циклом: часть кадра была бы обработана дважды, часть — пропущена.
+  //
+  // Прогон Stryker 2026-07-25: 15 выживших мутантов на этих двух строках
+  // (`_end < 0` → `>= 0`/`<= 0`, `&&` → `||`, вырождение условия в true/false).
+  // То есть страж стоял, но ничто не проверяло, что он что-то стережёт.
+
+  it('добавление юнита ИЗНУТРИ кадра не схлопывает дыры и не сбивает обход', () => {
+    const host = frameHarness();
+    const batch = new SurfaceBatch(host.frame);
+    const seen: string[] = [];
+    let holesInsideFrame = -1;
+
+    const middle = fakeSurface(() => seen.push('middle'), () => {});
+    const late = fakeSurface(() => seen.push('late'), () => {});
+    // Первый юнит кадра делает ровно то, что делает реальное приложение из
+    // onUpdate: гасит одну анимацию и запускает другую.
+    const head = fakeSurface(() => {
+      seen.push('head');
+      batch._remove(middle, false); // дыра появляется ПРЯМО В КАДРЕ
+      batch._add(late, false);      // и тут же приходит новый юнит
+      holesInsideFrame = (batch as unknown as { _holes: number })._holes;
+    }, () => {});
+    const tail = fakeSurface(() => seen.push('tail'), () => {});
+
+    batch._add(head, false);
+    batch._add(middle, false);
+    batch._add(tail, false);
+
+    host.tick(16);
+
+    // Страж сработал: дыра середины НЕ схлопнута под работающим циклом.
+    expect(holesInsideFrame, 'дыры схлопнуты ПОД работающим циклом').toBeGreaterThan(0);
+    // И потому хвост не потерян: компакция сдвинула бы его в слот ЛЕВЕЕ
+    // курсора, и его `_updateStep` в этом кадре не выполнился бы.
+    expect(seen, 'хвост кадра пропущен из-за сдвига слотов').toContain('tail');
+    expect(seen).toEqual(['head', 'tail']); // снятый middle не исполняется
+    batch._remove(tail, false);
+    batch._remove(head, false);
+    batch._remove(late, false);
+  });
+
+  it('ВОЗОБНОВЛЕНИЕ паузного юнита изнутри кадра тоже не схлопывает дыры', () => {
+    // Тот же страж стоит и в `_activate` — путь `controls.play()`. Приложение
+    // вправе возобновить одну анимацию из onUpdate другой; компакция в этот
+    // момент так же сдвинула бы слоты под работающим циклом.
+    const host = frameHarness();
+    const batch = new SurfaceBatch(host.frame);
+    const seen: string[] = [];
+    let holesInsideFrame = -1;
+
+    const middle = fakeSurface(() => seen.push('middle'), () => {});
+    const paused = fakeSurface(() => seen.push('paused'), () => {});
+    const head = fakeSurface(() => {
+      seen.push('head');
+      batch._remove(middle, false); // дыра в кадре
+      batch._activate(paused);      // возобновление в кадре
+      holesInsideFrame = (batch as unknown as { _holes: number })._holes;
+    }, () => {});
+    const tail = fakeSurface(() => seen.push('tail'), () => {});
+
+    batch._add(head, false);
+    batch._add(middle, false);
+    batch._add(paused, true); // добавлен на паузе
+    batch._add(tail, false);
+
+    host.tick(16);
+
+    expect(holesInsideFrame, 'дыры схлопнуты при возобновлении в кадре').toBeGreaterThan(0);
+    expect(seen, 'хвост кадра пропущен из-за сдвига слотов').toContain('tail');
+    batch._remove(tail, false);
+    batch._remove(head, false);
+    batch._remove(paused, false);
+  });
+
+  it('добавление ВНЕ кадра дыры схлопывает (иначе пул растёт от churn)', () => {
+    const host = frameHarness();
+    const batch = new SurfaceBatch(host.frame);
+    const units = Array.from({ length: 5 }, () => fakeSurface(() => {}, () => {}));
+    for (const u of units) batch._add(u, false);
+    for (const u of units.slice(0, 4)) batch._remove(u, false);
+    const storage = (): unknown[] => (batch as unknown as { _units: unknown[] })._units;
+    expect((batch as unknown as { _holes: number })._holes).toBe(4);
+    expect(storage()).toHaveLength(5);
+
+    // Вне кадра (_end === -1) следующий _add обязан схлопнуть дыры.
+    const fresh = fakeSurface(() => {}, () => {});
+    batch._add(fresh, false);
+    expect((batch as unknown as { _holes: number })._holes).toBe(0);
+    expect(storage(), 'дыры не схлопнуты — пул растёт от churn').toHaveLength(2);
+    batch._remove(units[4]!, false);
+    batch._remove(fresh, false);
+  });
+});
+
 describe('SurfaceBatch: реентрантный host во время подписки', () => {
   // ПОЧЕМУ ЭТОТ БЛОК. Прогон Stryker 2026-07-25 показал в surface-batch.ts два
   // мутанта БЕЗ ПОКРЫТИЯ, и оба — в окне между подпиской на update и подпиской
