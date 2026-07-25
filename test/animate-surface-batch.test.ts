@@ -518,6 +518,87 @@ describe('SurfaceBatch: потолок подписок', () => {
   });
 });
 
+describe('SurfaceBatch: реентрантный host во время подписки', () => {
+  // ПОЧЕМУ ЭТОТ БЛОК. Прогон Stryker 2026-07-25 показал в surface-batch.ts два
+  // мутанта БЕЗ ПОКРЫТИЯ, и оба — в окне между подпиской на update и подпиской
+  // на render внутри `_subscribe`. Окно существует не теоретически: `frame.update`
+  // принадлежит ХОСТУ, и хост вправе синхронно вернуть управление приложению
+  // (собственный планировщик, DevTools-хук, тестовый двойник). Если приложение в
+  // этот момент отменит все анимации, батч обязан снять уже созданную
+  // update-подписку и НЕ подписываться на render — иначе на кадровом контуре
+  // навсегда останется пара подписок при нуле живых юнитов.
+
+  /** Хост, который синхронно дёргает приложение прямо внутри frame.update(). */
+  function reentrantHost(onUpdateSubscribe: () => void): {
+    readonly frame: FrameLoop;
+    readonly subscriptions: { update: number; render: number };
+    readonly removals: { update: number; render: number };
+  } {
+    const subscriptions = { update: 0, render: 0 };
+    const removals = { update: 0, render: 0 };
+    return {
+      subscriptions,
+      removals,
+      frame: {
+        read: () => () => {},
+        update() {
+          subscriptions.update++;
+          // Реентрантный вызов ДО возврата подписки — тот самый момент.
+          onUpdateSubscribe();
+          return () => { removals.update++; };
+        },
+        render() {
+          subscriptions.render++;
+          return () => { removals.render++; };
+        },
+        cancelAll() {},
+      },
+    };
+  }
+
+  it('отмена всего внутри frame.update() снимает update и НЕ подписывает render', () => {
+    let batch: SurfaceBatch | undefined;
+    const unit = fakeSurface(() => {}, () => {});
+    const host = reentrantHost(() => {
+      // Приложение отменило единственную анимацию, пока хост регистрировал
+      // update: активных юнитов больше нет.
+      batch?._deactivate(unit);
+    });
+    batch = new SurfaceBatch(host.frame);
+    batch._add(unit, false);
+
+    expect(host.subscriptions.update, 'update подписан один раз').toBe(1);
+    expect(host.removals.update, 'и снят, раз живых юнитов не осталось').toBe(1);
+    expect(host.subscriptions.render, 'render подписывать было не для кого').toBe(0);
+    expect((batch as unknown as { _active: number })._active).toBe(0);
+  });
+
+  it('после такого отката батч остаётся рабочим (флаг подписки не залип)', () => {
+    // Мутант `_subscribing = true` вместо `false` в этой же ветке оставил бы
+    // батч навсегда «в процессе подписки»: следующий animate() не подписался бы
+    // ни на что, и анимации молча перестали бы идти.
+    let batch: SurfaceBatch | undefined;
+    const doomed = fakeSurface(() => {}, () => {});
+    let reenter = true;
+    const host = reentrantHost(() => {
+      if (!reenter) return;
+      reenter = false;
+      batch?._deactivate(doomed);
+    });
+    batch = new SurfaceBatch(host.frame);
+    batch._add(doomed, false);
+    expect(host.subscriptions.render).toBe(0);
+
+    // Новый юнит после отката обязан подписать ОБЕ фазы.
+    const fresh = fakeSurface(() => {}, () => {});
+    batch._add(fresh, false);
+    expect(host.subscriptions.update).toBe(2);
+    expect(host.subscriptions.render, 'батч залип в _subscribing').toBe(1);
+    expect((batch as unknown as { _active: number })._active).toBe(1);
+    batch._remove(fresh, false);
+  });
+});
+
 describe('SurfaceBatch: граница кадра и lifecycle', () => {
   it('бросок cleanup в update не лишает кадра поздние slots', () => {
     const host = frameHarness();
