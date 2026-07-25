@@ -35,5 +35,11 @@ describe('packed release boundary', () => {
     expect(smoke).toContain('mixed-graph.mjs');
     // Условные ветки в exports обязаны быть отказом, а не молчаливым «ок».
     expect(smoke).toContain("for (const forbidden of ['import', 'require'])");
+    // Гарды невакуумности: без них «получился 1 rAF» было бы верно и для
+    // фасада, который не планирует ничего, а «cancelAll погасил» — для
+    // пустой очереди. Замерено: animate в одиночку даёт 0 → 1 rAF и 1 кадр
+    // в очереди, поэтому оба гарда проверяют факт, а не тавтологию.
+    expect(smoke).toContain('проба была бы вакуумной');
+    expect(smoke).toContain('очередь кадров пуста — гасить нечего, проба вакуумна');
   });
 });

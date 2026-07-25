@@ -187,8 +187,13 @@ try {
       getAttribute() { return null; }
     }
 
-    frame.update(() => {});
+    // animate первым — иначе «получилось 1» было бы верно и для фасада,
+    // который не планирует ничего (см. пробу смешанного графа ниже).
     animate(target, { opacity: 1 });
+    if (requests !== 1) {
+      throw new Error('animate не поставил кадр: rAF получено ' + requests + ', проба вакуумна');
+    }
+    frame.update(() => {});
     const Host = createLabSpringElementClass(Base);
     const host = new Host();
     host.connectedCallback();
@@ -197,8 +202,9 @@ try {
     if (requests !== 1) {
       throw new Error('frame singleton раздвоен: ожидался 1 rAF, получено ' + requests);
     }
+    if (queue.length === 0) throw new Error('очередь кадров пуста — гасить нечего, проба вакуумна');
     frame.cancelAll();
-    queue.shift()?.(0);
+    queue.shift()();
     if (requests !== 1) throw new Error('cancelAll не погасил общий scheduler');
     console.log('${moduleKind.toUpperCase()} shared frame OK: 3 consumers → 1 rAF');
   `;
@@ -233,6 +239,11 @@ try {
 
     // И то же самое через потребителя: фасад подключён импортом, планировщик —
     // require. Один rAF означает один общий цикл на весь смешанный граф.
+    //
+    // ПОРЯДОК ЗДЕСЬ СУЩЕСТВЕНЕН. Если сначала дёрнуть frame.update(), счётчик
+    // уже равен 1, и проба «получилось 1» прошла бы даже когда animate не
+    // планирует НИЧЕГО. Поэтому первым идёт animate — и требование requests===1
+    // сразу после него означает «фасад реально поставил кадр», а не «промолчал».
     const { animate } = await import('${pkg.name}/animate');
     const values = new Map([['opacity', '0']]);
     const target = {
@@ -241,15 +252,21 @@ try {
         setProperty: (name, value) => values.set(name, value),
       },
     };
-    required.frame.update(() => {});
     animate(target, { opacity: 1 });
+    if (requests !== 1) {
+      throw new Error('import-половина не поставила кадр: rAF получено ' + requests + ', проба была бы вакуумной');
+    }
+    // Теперь планировщик со стороны require. Счётчик обязан ОСТАТЬСЯ 1:
+    // 2 означало бы второй независимый цикл, то есть второй экземпляр модуля.
+    required.frame.update(() => {});
     if (requests !== 1) {
       throw new Error('смешанный граф раздвоил scheduler: ожидался 1 rAF, получено ' + requests);
     }
     // cancelAll со стороны require обязан гасить работу, поставленную со
     // стороны import: при двух экземплярах он погасил бы только свою половину.
+    if (queue.length === 0) throw new Error('очередь кадров пуста — гасить нечего, проба вакуумна');
     required.frame.cancelAll();
-    queue.shift()?.(0);
+    queue.shift()();
     if (requests !== 1) throw new Error('cancelAll из require-половины не погасил import-половину');
     console.log('MIXED graph OK: require+import → 1 экземпляр, 1 rAF');
   `;
