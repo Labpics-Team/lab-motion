@@ -45,22 +45,59 @@ afterEach(() => { vi.unstubAllGlobals(); });
 
 describe('#lit: окружение с window, но без matchMedia', () => {
   it('контроллер создаётся и трактует reduced-motion как false, а не падает', () => {
-    // jsdom даёт window; убираем ИМЕННО matchMedia — та самая ветвь
-    // `typeof window.matchMedia === 'function'`, которая не исполнялась.
-    const original = window.matchMedia;
-    // @ts-expect-error — намеренно ломаем host-API, как это делают песочницы.
-    delete window.matchMedia;
+    // ФАКТ ОКРУЖЕНИЯ (замерен, а не предположен): jsdom этой версии НЕ
+    // реализует window.matchMedia вовсе — `typeof window.matchMedia` здесь
+    // 'undefined' по умолчанию. То есть это состояние по умолчанию всей
+    // lit-сьюты, и именно поэтому ambient-ветка ниже так долго не исполнялась.
+    expect(typeof window.matchMedia).toBe('undefined');
+    const host = makeHost();
+    const controller = new MotionController(host, 0, { spring: SPRING });
+    expect(host.controllers).toHaveLength(1);
+    // Значение живо и управляемо: деградация не отключила биндинг.
+    controller.hostConnected();
+    controller.setTarget(10);
+    expect(Number.isFinite(controller.value)).toBe(true);
+  });
+
+  it('AMBIENT window.matchMedia подхватывается без явного инжекта', () => {
+    // Ветвь, которая работает в КАЖДОМ реальном браузере и при этом не
+    // исполнялась ни одним unit-тестом: seam не передан, значит контроллер
+    // обязан взять глобальный matchMedia и уважать системную настройку
+    // «уменьшить движение». Раньше её покрывала только браузерная матрица.
+    const queries: string[] = [];
+    vi.stubGlobal('window', Object.assign(window, {
+      matchMedia: (query: string) => {
+        queries.push(query);
+        return { matches: true, media: query } as MediaQueryList;
+      },
+    }));
     try {
       const host = makeHost();
       const controller = new MotionController(host, 0, { spring: SPRING });
-      expect(host.controllers).toHaveLength(1);
-      // Значение живо и управляемо: деградация не отключила биндинг.
       controller.hostConnected();
-      controller.setTarget(10);
-      expect(Number.isFinite(controller.value)).toBe(true);
+      controller.setTarget(33);
+      expect(queries).toContain('(prefers-reduced-motion: reduce)');
+      // reduced=true пришёл из окружения ⇒ снап к цели без пружинных кадров.
+      expect(controller.value).toBe(33);
     } finally {
-      window.matchMedia = original;
+      delete (window as { matchMedia?: unknown }).matchMedia;
     }
+  });
+
+  it('окружение БЕЗ window (SSR/worker): контроллер строится, reduced-motion = false', () => {
+    // Ветвь `typeof window !== 'undefined'` — единственная в ./lit, которую не
+    // исполнял ни один тест: вся lit-сьюта идёт под jsdom, где window есть, а
+    // под node-окружением контроллер никто не строил. Сценарий не выдуманный:
+    // это SSR и worker, ради которых seam и объявлен ленивым.
+    vi.stubGlobal('window', undefined);
+    const host = makeHost();
+    const controller = new MotionController(host, 0, { spring: SPRING });
+    controller.hostConnected();
+    controller.setTarget(7);
+    // Без matchMedia reduced-motion трактуется как false ⇒ идёт обычная
+    // пружина, а не мгновенный снап; значение конечно и биндинг жив.
+    expect(Number.isFinite(controller.value)).toBe(true);
+    expect(host.controllers).toHaveLength(1);
   });
 
   it('явный инжект matchMedia побеждает окружение', () => {
@@ -101,6 +138,27 @@ describe('#lit: повторное подключение элемента', () 
     // элементе оказались бы два контроллера, оба пишущие в один style.
     expect((el as unknown as { _motion: unknown })._motion).toBe(first);
     el.remove();
+  });
+});
+
+describe('#lit: обновление до создания контроллера', () => {
+  it('_applyStyle молча выходит, если контроллера ещё нет (и ничего не пишет в стиль)', async () => {
+    // ЗАЧЕМ ДЕТЕРМИНИРОВАННО. Эта ветвь исполнялась на Node 22 (дважды за
+    // прогон сьюты) и НЕ исполнялась на Node 24 — расхождение зависело от
+    // порядка микрозадач Lit относительно connectedCallback, то есть покрытие
+    // приходило случайно. Здесь сценарий вызывается напрямую: цикл обновления
+    // прошёл раньше, чем connectedCallback успел создать контроллер.
+    const { LabMotionSpringElement } = await import('../src/lit/element.js');
+    const el = new LabMotionSpringElement();
+    el.property = 'opacity';
+    expect((el as unknown as { _motion: unknown })._motion).toBeUndefined();
+
+    // updated() — точка входа Lit в _applyStyle; Map пустой: это первый цикл.
+    (el as unknown as { updated(changed: Map<string, unknown>): void })
+      .updated(new Map());
+
+    // Ни записи в стиль, ни исключения: элемент просто ещё не анимируется.
+    expect(el.style.opacity).toBe('');
   });
 });
 
