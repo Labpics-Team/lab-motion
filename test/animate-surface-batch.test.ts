@@ -690,6 +690,36 @@ describe('SurfaceBatch: физический ключ spring-basis', () => {
       exp.mockRestore();
     }
   });
+
+  it('РАЗНЫЕ пружины в одном кадре получают РАЗНЫЙ базис (не делят кривую)', () => {
+    // Обратная половина того же закона, и без неё мутант выживал: снять
+    // сравнение m/k/c из ключа — и весь кадр считался бы по пружине, которая
+    // попросила базис первой. Позитивный кейс выше это не ловит: он лишь
+    // требует НЕ пересчитывать при равных параметрах.
+    const batch = new SurfaceBatch(frameHarness().frame);
+    const soft = { mass: 1, stiffness: 40, damping: 12 };
+    const stiff = { mass: 1, stiffness: 400, damping: 12 };
+    const t = 0.12;
+    // Базис мутируется на месте (ноль аллокаций на кадр) — снимаем копии.
+    const first = { ...batch._springBasis(soft, t) };
+    const second = { ...batch._springBasis(stiff, t) };
+    expect(second).not.toEqual(first);
+    // И это именно физика, а не «любое другое число»: жёсткая пружина в тот же
+    // момент времени ушла дальше к цели, чем мягкая.
+    // `_value` — прогресс базиса из покоя (v0-часть отдельным полем).
+    expect(second._value).toBeGreaterThan(first._value);
+    // Возврат к первой пружине снова даёт её собственный базис — кэш не
+    // «залипает» на последней увиденной физике.
+    expect({ ...batch._springBasis(soft, t) }).toEqual(first);
+  });
+
+  it('одна пружина в РАЗНЫЕ моменты кадра тоже не делит базис', () => {
+    const batch = new SurfaceBatch(frameHarness().frame);
+    const spring = { mass: 1, stiffness: 170, damping: 26 };
+    const early = { ...batch._springBasis(spring, 0.05) };
+    const later = { ...batch._springBasis(spring, 0.25) };
+    expect(later).not.toEqual(early);
+  });
 });
 
 describe('SurfaceBatch: retention общего default-pool', () => {
