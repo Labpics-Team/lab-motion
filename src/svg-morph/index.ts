@@ -63,7 +63,12 @@ const DEFAULT_SAMPLES = 64;
  * finite как есть, NaN → 0, ±∞ → ±MAX_VALUE.
  */
 function fmt(n: number): string {
-  const f = Number.isFinite(n) ? n : Number.isNaN(n) ? 0 : n > 0 ? Number.MAX_VALUE : -Number.MAX_VALUE;
+  // Отдельной ветки под NaN нет намеренно: из публичного пути он недостижим
+  // (координаты приходят из разобранного пути и лерпа двух конечных чисел),
+  // а если бы пришёл — `n > 0` ложно и он схлопнется в −MAX_VALUE, то есть
+  // инвариант «в d никогда не NaN/Infinity» держится всё равно. Лишняя ветка
+  // была бы непокрываемой и просела бы ратчет ветвей.
+  const f = Number.isFinite(n) ? n : n > 0 ? Number.MAX_VALUE : -Number.MAX_VALUE;
   const r = Number(f.toFixed(4));
   return String(r + 0 === 0 ? 0 : r);
 }

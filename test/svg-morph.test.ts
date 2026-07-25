@@ -256,7 +256,13 @@ describe('#svg-morph: инвариант конечности координат
   // выдавал `M -Infinity 0 L -Infinity 10` прямо внутрь d-строки; такой путь
   // браузер отбрасывает целиком, то есть фигура ИСЧЕЗАЕТ.
   it('экстремальные конечные координаты не дают Infinity/NaN в d', () => {
-    const morph = interpolatePath('M 1e308 0 L 1e308 10', 'M -1e308 0 L -1e308 10');
+    // ОБА знака переполнения: в одну сторону лерп уходит в −∞, в обратную —
+    // в +∞; страж обязан схлопывать оба, и обе его ветки обязаны исполняться.
+    const morphs = [
+      interpolatePath('M 1e308 0 L 1e308 10', 'M -1e308 0 L -1e308 10'),
+      interpolatePath('M -1e308 0 L -1e308 10', 'M 1e308 0 L 1e308 10'),
+    ];
+    for (const morph of morphs) {
     for (let i = 0; i <= 20; i++) {
       const d = morph(i / 20);
       expect(d, `t=${i / 20}`).not.toMatch(/Infinity|NaN/);
@@ -264,6 +270,7 @@ describe('#svg-morph: инвариант конечности координат
       for (const token of d.match(/-?[\d.]+(?:e[+-]?\d+)?/gi) ?? []) {
         expect(Number.isFinite(Number(token)), `${d} → ${token}`).toBe(true);
       }
+    }
     }
   });
 
