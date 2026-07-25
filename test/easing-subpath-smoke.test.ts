@@ -43,7 +43,7 @@ const pkg = JSON.parse(readFileSync(resolve(pkgRoot, 'package.json'), 'utf8')) a
 
 const easingExports = pkg.exports?.['./easing'];
 
-// Validate and resolve the actual dist path declared in exports["./easing"].import.
+// Validate and resolve the actual dist path declared in exports["./easing"].default.
 // All targets must be package-relative (start with "./") — absolute or parent-relative
 // ("../") paths are not valid package export targets and indicate a misconfigured build.
 const declaredImportPath = easingExports?.default; // e.g. "./dist/easing/index.js"
