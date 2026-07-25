@@ -313,9 +313,18 @@ try {
     log(`Preact peer floor: ${execSync('node preact-floor.mjs', { cwd: dir, encoding: 'utf8' }).trim()} ✓`);
   }
 
-  // CJS-потребитель выбирает require-ветку exports. Отдельная .cts-фикстура
-  // ловит класс, невидимый ESM-проверке: декларация обязана иметь тот же
-  // модульный формат, что и соответствующая runtime-ветка.
+  // CJS-потребитель приходит к ЕДИНСТВЕННОЙ декларации через require(esm).
+  // Отдельная .cts-фикстура ловит класс, невидимый ESM-проверке: под
+  // `module: nodenext` файл .cts компилирует import в require, и TypeScript
+  // обязан разрешить это на ESM-цели.
+  //
+  // Замер границы (та же фикстура, тот же tarball): TS 5.7.3 отвергает —
+  // `error TS1479: ... referenced file is an ECMAScript module and cannot be
+  // imported with 'require'`; TS 5.8.3 и 5.9.3 принимают молча. Значит эта
+  // проба заодно сторожит пол TypeScript у потребителя: если репозиторный tsc
+  // опустится ниже 5.8, она станет красной — ровно там, где потребитель на
+  // старом tsc получил бы TS1479. Требование зафиксировано в README и
+  // docs/getting-started.md.
   {
     const dir = installFixture('ts-cjs', { name: 'ts-cjs-fx', private: true }, tarball);
     writeFileSync(

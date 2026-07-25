@@ -1,7 +1,10 @@
 import { readFileSync } from 'node:fs';
 import { describe, expect, it } from 'vitest';
 
-const pkg = JSON.parse(readFileSync(new URL('../package.json', import.meta.url), 'utf8'));
+const pkg = JSON.parse(readFileSync(new URL('../package.json', import.meta.url), 'utf8')) as {
+  files: string[];
+  devDependencies?: Record<string, string>;
+};
 const smoke = readFileSync(new URL('../scripts/pack-smoke.mjs', import.meta.url), 'utf8');
 
 describe('packed release boundary', () => {
@@ -41,5 +44,21 @@ describe('packed release boundary', () => {
     // в очереди, поэтому оба гарда проверяют факт, а не тавтологию.
     expect(smoke).toContain('проба была бы вакуумной');
     expect(smoke).toContain('очередь кадров пуста — гасить нечего, проба вакуумна');
+  });
+
+  it('держит пол TypeScript, при котором CJS-потребитель вообще компилируется', () => {
+    // Замер на отгружаемом тарболе (.cts, module: nodenext): tsc 5.7.3 даёт
+    // `TS1479: ... cannot be imported with 'require'`, 5.8.3 и 5.9.3 — чисто.
+    // Пол задокументирован в README и docs/getting-started.md; проба
+    // pack-compat проверяет его репозиторным tsc, поэтому молчаливый откат
+    // ниже 5.8 сделал бы документированное обещание ложным.
+    const declared = pkg.devDependencies?.typescript as string | undefined;
+    expect(declared, 'typescript обязан быть в devDependencies').toBeDefined();
+    const [major, minor] = declared!.replace(/^[^\d]*/, '').split('.').map(Number);
+    expect(major).toBeGreaterThanOrEqual(5);
+    expect(major > 5 || minor >= 8, `tsc ${declared} ниже измеренного пола 5.8`).toBe(true);
+    const readme = readFileSync(new URL('../README.md', import.meta.url), 'utf8');
+    expect(readme).toContain('tsc ≥ 5.8');
+    expect(readme).toContain('TS1479');
   });
 });
