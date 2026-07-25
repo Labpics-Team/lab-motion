@@ -144,3 +144,74 @@ describe('allocation-free cursor — дифференциальный пин', (
     expect(ts(samples.slice(advanceSlidingWindow(samples, start, 1)))).toEqual([10, 10.5]);
   });
 });
+
+describe('S6: in-place compaction — единственная защита от роста ленты', () => {
+  // ЗАЧЕМ ЭТОТ БЛОК. Прогон Stryker 2026-07-25 показал по этому файлу
+  // 6 мутантов БЕЗ ПОКРЫТИЯ — все в ветке `start > 32 && start * 2 > n`.
+  // То есть единственный механизм, удерживающий ленту сэмплов от линейного
+  // роста, не исполнялся НИ ОДНИМ тестом. Цена отказа не абстрактна: трекеры
+  // скорости живут ровно столько, сколько держится палец на экране и сколько
+  // страница скроллится, — без компакции массив растёт на КАЖДОМ pointermove.
+
+  /** Лента 60 fps через живое окно: сколько сэмплов реально удерживается. */
+  function feed(events: number, windowSec: number): {
+    length: number; start: number; compactions: number;
+  } {
+    const samples: TimedSample[] = [];
+    let start = 0;
+    let compactions = 0;
+    for (let i = 0; i < events; i++) {
+      samples.push({ t: i / 60 });
+      const before = samples.length;
+      start = advanceSlidingWindow(samples, start, windowSec);
+      if (samples.length < before) compactions++;
+    }
+    return { length: samples.length, start, compactions };
+  }
+
+  it('длинная лента НЕ растёт линейно: 500 событий → десятки сэмплов', () => {
+    const { length, compactions } = feed(500, 0.1);
+    // Без компакции здесь было бы ровно 500 — то есть утечка на весь жест.
+    expect(length).toBeLessThan(64);
+    expect(compactions).toBeGreaterThanOrEqual(10);
+    // И масштаб не зависит от длины ленты: вдесятеро больше событий —
+    // та же удерживаемая длина (это и есть смысл амортизированного O(1)).
+    expect(feed(5000, 0.1).length).toBeLessThan(64);
+  });
+
+  it('после компакции курсор сбрасывается в 0, а живое окно сохраняется целиком', () => {
+    // Ровно 33 мёртвых сэмпла (start станет 33 > 32) при малом n ⇒ 33*2 > n.
+    const samples: TimedSample[] = [];
+    for (let i = 0; i < 33; i++) samples.push({ t: i * 0.001 });   // старьё
+    for (let i = 0; i < 5; i++) samples.push({ t: 10 + i * 0.001 }); // живое
+    const live = samples.slice(33).map((x) => x.t);
+    const start = advanceSlidingWindow(samples, 0, 0.1);
+    expect(start, 'после копирования курсор обязан быть нулевым').toBe(0);
+    expect(samples.length).toBe(5);
+    // Порядок и значения живого окна не пострадали — copyWithin, а не фильтр.
+    expect(ts(samples)).toEqual(live);
+  });
+
+  it('мёртвый префикс, который НЕ доминирует, копирование не запускает', () => {
+    // start = 40 > 32, но n = 240 и 40*2 = 80 ≤ 240: копировать 200 элементов
+    // ради 40 — дороже, чем оставить как есть. Мутант `start * 2 > n` → `>= 0`
+    // сделал бы компакцию на каждом событии (O(n) на кадр вместо O(1)).
+    const samples: TimedSample[] = [];
+    for (let i = 0; i < 40; i++) samples.push({ t: i * 0.0001 });
+    for (let i = 0; i < 200; i++) samples.push({ t: 10 + i * 0.0001 });
+    const start = advanceSlidingWindow(samples, 0, 0.1);
+    expect(start).toBe(40);
+    expect(samples.length, 'массив не должен быть тронут').toBe(240);
+  });
+
+  it('короткая лента не компактится вовсе (порог 32 — не декорация)', () => {
+    // 32 мёртвых сэмпла: `start > 32` ложно ⇒ ни одного копирования.
+    const samples: TimedSample[] = [];
+    for (let i = 0; i < 32; i++) samples.push({ t: i * 0.001 });
+    for (let i = 0; i < 3; i++) samples.push({ t: 10 + i * 0.001 });
+    const n = samples.length;
+    const start = advanceSlidingWindow(samples, 0, 0.1);
+    expect(samples.length).toBe(n);
+    expect(start).toBe(32);
+  });
+});
