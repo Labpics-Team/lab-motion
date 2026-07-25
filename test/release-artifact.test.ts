@@ -7,11 +7,12 @@ import {
   writeFileSync,
 } from 'node:fs';
 import { tmpdir } from 'node:os';
-import { dirname, join } from 'node:path';
+import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { afterEach, describe, expect, it } from 'vitest';
 
 const SCRIPT = fileURLToPath(new URL('../scripts/check-release-artifact.mjs', import.meta.url));
+const ROOT = dirname(fileURLToPath(new URL('../package.json', import.meta.url)));
 const VERSION = '9.8.7';
 const TAG = `v${VERSION}`;
 const SHA = 'a'.repeat(40);
@@ -185,4 +186,34 @@ describe('release artifact: fail-closed манифест', () => {
     expect(result.status).not.toBe(0);
     expect(readFileSync(manifest, 'utf8')).toBe('{"trusted":false}\n');
   });
+});
+
+describe('ссылки внутри npm-артефакта', () => {
+  // Аудит 2026-07-25: отгружаемый docs/README.md ссылался на ./NAMING.md и
+  // ./RELEASES.md, которых в `files` нет — потребитель, открывший документацию
+  // из node_modules, получал две битые ссылки. Гейт pack-smoke проверял
+  // СТРУКТУРУ экспортов, но не связность документации.
+  it('каждая относительная ссылка отгружаемых .md ведёт внутрь тарбола', () => {
+    const packed = JSON.parse(
+      execFileSync('npm', ['pack', '--dry-run', '--json'], {
+        cwd: ROOT, encoding: 'utf8', timeout: 120_000,
+      }),
+    ) as [{ files: { path: string }[] }];
+    const shipped = new Set(packed[0].files.map((f) => f.path));
+    const markdown = [...shipped].filter((f) => f.endsWith('.md'));
+    // Охват — часть утверждения: пустой список файлов сделал бы гейт зелёным.
+    expect(markdown.length).toBeGreaterThanOrEqual(30);
+
+    const broken: string[] = [];
+    for (const file of markdown) {
+      const text = readFileSync(resolve(ROOT, file), 'utf8');
+      for (const match of text.matchAll(/\[[^\]]*\]\(([^)#][^)]*)\)/g)) {
+        const link = (match[1] ?? '').split('#')[0]!.trim();
+        if (link === '' || /^(https?:|mailto:)/.test(link)) continue;
+        const target = join(dirname(file), link).replaceAll('\\', '/');
+        if (!shipped.has(target)) broken.push(`${file} → ${link} (нет ${target})`);
+      }
+    }
+    expect(broken, `битые ссылки в артефакте:\n${broken.join('\n')}`).toEqual([]);
+  }, 180_000);
 });

@@ -248,3 +248,29 @@ describe('svg-morph-api-surface-pin', () => {
     expect(mk()).toBe(mk());
   });
 });
+
+describe('#svg-morph: инвариант конечности координат d-строки', () => {
+  // Шапка модуля обещает «координаты конечны», но fmt() — единственная точка
+  // эмита — стража не имела, а лерп `v + (b − v)·t` переполняется на ВАЛИДНЫХ
+  // конечных входах. Аудит 2026-07-25: interpolatePath между 1e308 и −1e308
+  // выдавал `M -Infinity 0 L -Infinity 10` прямо внутрь d-строки; такой путь
+  // браузер отбрасывает целиком, то есть фигура ИСЧЕЗАЕТ.
+  it('экстремальные конечные координаты не дают Infinity/NaN в d', () => {
+    const morph = interpolatePath('M 1e308 0 L 1e308 10', 'M -1e308 0 L -1e308 10');
+    for (let i = 0; i <= 20; i++) {
+      const d = morph(i / 20);
+      expect(d, `t=${i / 20}`).not.toMatch(/Infinity|NaN/);
+      // И это по-прежнему разбираемые числа, а не пустые токены.
+      for (const token of d.match(/-?[\d.]+(?:e[+-]?\d+)?/gi) ?? []) {
+        expect(Number.isFinite(Number(token)), `${d} → ${token}`).toBe(true);
+      }
+    }
+  });
+
+  it('обычные пути правку не заметили', () => {
+    const morph = interpolatePath('M 0 0 L 10 10', 'M 20 20 L 30 30');
+    expect(morph(0.5)).toBe('M 10 10 L 20 20');
+    expect(morph(0)).toBe('M 0 0 L 10 10');
+    expect(morph(1)).toBe('M 20 20 L 30 30');
+  });
+});

@@ -363,8 +363,8 @@
       "runtimeExports": [
         "interpolatePath"
       ],
-      "shippedGzBytes": 3338,
-      "shippedBrBytes": 2985,
+      "shippedGzBytes": 3347,
+      "shippedBrBytes": 2994,
       "docs": "docs/reference/svg.md",
       "title": "./svg и ./svg-morph — SVG-анимации и морфинг"
     },

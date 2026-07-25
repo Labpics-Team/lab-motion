@@ -58,8 +58,8 @@
 
 - [Каталог ошибок LMxxx](./errors.md) — коды, причины, исправления.
 - [Бенчмарки и правила измерения](./benchmark.md) — числа не живут в Markdown.
-- [Нейминг-канон](./NAMING.md) — сверяется гейтом docs-drift.
-- [Релизы](./RELEASES.md).
+- [Нейминг-канон](https://github.com/Labpics-Team/lab-motion/blob/main/docs/NAMING.md) — сверяется гейтом docs-drift. Страница адресована контрибьюторам и в npm-артефакт не входит, поэтому ссылка абсолютная.
+- [Релизы](https://github.com/Labpics-Team/lab-motion/blob/main/docs/RELEASES.md) — там же, вне артефакта.
 
 ## Машиночитаемое
 

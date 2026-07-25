@@ -52,9 +52,19 @@ export interface InterpolatePathOptions {
 
 const DEFAULT_SAMPLES = 64;
 
-/** Округление до 4 знаков + схлопывание -0 (компактно и детерминированно). */
+/**
+ * Округление до 4 знаков + схлопывание -0 (компактно и детерминированно).
+ *
+ * Страж конечности здесь — ЕДИНСТВЕННАЯ точка эмита координат, а шапка модуля
+ * обещает «координаты конечны». Лерп `v + (b − v)·t` переполняется на
+ * ВАЛИДНЫХ конечных входах: interpolatePath('M 1e308 0 …', 'M -1e308 0 …') при
+ * t = 0.25 выдавал `M -Infinity 0 L -Infinity 10` прямо внутрь d-строки
+ * (аудит 2026-07-25). Семантика клампа — общепакетная (clampFinite ядра):
+ * finite как есть, NaN → 0, ±∞ → ±MAX_VALUE.
+ */
 function fmt(n: number): string {
-  const r = Number(n.toFixed(4));
+  const f = Number.isFinite(n) ? n : Number.isNaN(n) ? 0 : n > 0 ? Number.MAX_VALUE : -Number.MAX_VALUE;
+  const r = Number(f.toFixed(4));
   return String(r + 0 === 0 ? 0 : r);
 }
 
