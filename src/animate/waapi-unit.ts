@@ -103,7 +103,12 @@ export interface WaapiUnitOptions {
 
 /** Compositor-прогон группы: Element.animate + piecewise-прерывания. */
 export class WaapiUnit implements GroupOwner {
-  private readonly _o: WaapiUnitOptions;
+  /**
+   * Обнуляется в _finish: удержанный потребителем AnimateControls не должен
+   * держать ЦЕЛЬ после завершения прогона (см. _finish). Читатели за гардом
+   * `_done`, поэтому `!` здесь безопасно — тот же приём, что в MainUnit.
+   */
+  private _o: WaapiUnitOptions | undefined;
   private _done = false;
   private _paused = false;
   /** Блокирует реентрантные controls, пока terminal pose/семантика фиксируются. */
@@ -135,7 +140,7 @@ export class WaapiUnit implements GroupOwner {
   }
 
   _capture(): void {
-    const rec = this._o._record;
+    const rec = this._o!._record;
     if (this._delegate || rec._transition || this._locked) return;
     // currentTime — hostile host-boundary: nested animate не должен успеть
     // опубликовать owner, после чего внешний снимок перезапишет новое видимое
@@ -150,11 +155,11 @@ export class WaapiUnit implements GroupOwner {
 
   _captureNum(key: string): ChannelSnapshot | undefined {
     if (this._delegate) return this._delegate._captureNum(key);
-    const ch = this._o._numeric.find((c) => c._key === key);
+    const ch = this._o!._numeric.find((c) => c._key === key);
     if (ch) {
       return { _value: ch._value, _velocity: ch._velocity };
     }
-    const frozen = this._o._residuals.get(key);
+    const frozen = this._o!._residuals.get(key);
     return frozen === undefined ? undefined : { _value: frozen, _velocity: 0 };
   }
 
@@ -164,7 +169,7 @@ export class WaapiUnit implements GroupOwner {
 
   _numericKeys(): readonly string[] {
     if (this._delegate) return this._delegate._numericKeys();
-    return [...this._o._numeric.map((c) => c._key), ...this._o._residuals.keys()];
+    return [...this._o!._numeric.map((c) => c._key), ...this._o!._residuals.keys()];
   }
 
   _supersede(replacement?: () => void): void {
@@ -200,7 +205,7 @@ export class WaapiUnit implements GroupOwner {
   // ── Контролы ──────────────────────────────────────────────────────────────
 
   pause(): void {
-    if (this._done || this._o._record._transition || this._locked || this._paused) return;
+    if (this._done || this._o!._record._transition || this._locked || this._paused) return;
     if (this._delegate !== undefined) {
       this._transaction(() => {
         this._delegate!.pause();
@@ -218,7 +223,7 @@ export class WaapiUnit implements GroupOwner {
   }
 
   play(): void {
-    if (this._done || this._o._record._transition || this._locked || !this._paused) return;
+    if (this._done || this._o!._record._transition || this._locked || !this._paused) return;
     if (this._delegate) {
       // Wrapper меняет состояние только после успешной подписки delegate:
       // бросок оставляет оба уровня повторяемо paused.
@@ -244,7 +249,7 @@ export class WaapiUnit implements GroupOwner {
 
   /** Перемотка к времени прогона: на паузе фиксирует позу, иначе продолжает. */
   seek(tMs: number): void {
-    if (this._done || this._o._record._transition || this._locked || !Number.isFinite(tMs)) return;
+    if (this._done || this._o!._record._transition || this._locked || !Number.isFinite(tMs)) return;
     if (this._delegate !== undefined) {
       this._transaction(() => this._delegate!.seek(tMs));
       return;
@@ -270,7 +275,7 @@ export class WaapiUnit implements GroupOwner {
 
   /** Стоп в текущей позиции: инлайн-фиксация ДО cancel (без отката к базе). */
   cancel(): void {
-    if (this._done || this._o._record._transition || this._locked) return;
+    if (this._done || this._o!._record._transition || this._locked) return;
     if (this._delegate !== undefined) {
       this._transaction(() => this._delegate!.cancel());
       return;
@@ -289,7 +294,7 @@ export class WaapiUnit implements GroupOwner {
 
   /** Коммит плана в Element.animate (канон _emitCompositor CompositorSpring). */
   private _emit(delayMs: number, artifact: SpringExecutionArtifactTuple): void {
-    const o = this._o;
+    const o = this._o!;
     const explicit = requiresExplicitSpringKeyframes();
     const samples = artifact[1];
     const durationMs = artifact[2];
@@ -340,7 +345,7 @@ export class WaapiUnit implements GroupOwner {
       this._transaction(() => {
         this._clearTimer();
         this._cancelAnim();
-        if (this._o._record._owner !== this || !this._paused) this._finish(false);
+        if (this._o!._record._owner !== this || !this._paused) this._finish(false);
       });
       throw error;
     }
@@ -355,7 +360,7 @@ export class WaapiUnit implements GroupOwner {
       delayMs,
       SPRING_SAMPLE,
     );
-    for (const ch of this._o._numeric) {
+    for (const ch of this._o!._numeric) {
       // Та же устойчивая интерполяция, что у кадров WebKit: снимок MAX ↔
       // -MAX не должен телепортироваться в цель из-за переполнения.
       ch._value = channelAt(ch, r.value);
@@ -374,7 +379,7 @@ export class WaapiUnit implements GroupOwner {
     let current = animationTimeOrFallback(this._anim, NaN);
     if (Number.isNaN(current) || (fallbackPending && current < 0)) {
       try {
-        current = this._o._now() - this._startTime;
+        current = this._o!._now() - this._startTime;
       } catch {
         // Отказ clock означает безопасный pre-start либо fail-closed wake.
       }
@@ -389,7 +394,7 @@ export class WaapiUnit implements GroupOwner {
    * Разошедшиеся v0 не сжимаются в одну кривую — caller переведёт группу в live.
    */
   private _tryReseedFromSnapshot(): SpringExecutionArtifactTuple | undefined {
-    const o = this._o;
+    const o = this._o!;
     const rebased = rebaseNumericChannels(o._numeric);
     const v0 = sharedV0(rebased);
     if (v0 === undefined) return undefined;
@@ -410,7 +415,7 @@ export class WaapiUnit implements GroupOwner {
    * поэтому смена движка не раскрывает underlying style ни на один кадр.
    */
   private _handoffToLive(paused: boolean): void {
-    const o = this._o;
+    const o = this._o!;
     const batch = o._getBatch();
     const rebased = rebaseNumericChannels(o._numeric);
     this._transaction(() => {
@@ -451,7 +456,7 @@ export class WaapiUnit implements GroupOwner {
 
   /** Инлайн-фиксация текущего значения (перед cancel — без миганья к базе). */
   private _holdInline(): void {
-    const o = this._o;
+    const o = this._o!;
     o._el.style.setProperty(o._group, String(groupValueAt(o._group, o._transform, o._numeric)));
   }
 
@@ -502,7 +507,7 @@ export class WaapiUnit implements GroupOwner {
     };
     this._timerCancel = cancel;
     try {
-      hostCancel = this._o._setTimer(() => {
+      hostCancel = this._o!._setTimer(() => {
         if (!active || this._timerCancel !== cancel) return;
         active = false;
         if (sync) {
@@ -551,15 +556,22 @@ export class WaapiUnit implements GroupOwner {
 
   /** Публикует unit: выпускает sync timer только вне host-транзакции и ровно один раз. */
   _commit(): void {
+    // `_o === undefined` — юнит уже завершён (см. _finish, освобождение ссылок):
+    // дубликат цели в том же commit-проходе supersede-ит owner-а, и фасад всё
+    // равно вызывает _commit() на вытесненном юните. Прежде это было неотличимо
+    // от «не владелец» (поле было readonly и всегда определено), теперь —
+    // явная ветка.
+    const o = this._o;
     if (
-      this._o._record._owner !== this ||
+      o === undefined ||
+      o._record._owner !== this ||
       !this._pendingNatural ||
-      this._o._record._transition ||
+      o._record._transition ||
       this._locked
     ) return;
     this._transaction(() => {
       this._clearTimer();
-      for (const ch of this._o._numeric) {
+      for (const ch of this._o!._numeric) {
         ch._value = ch._to;
         ch._velocity = 0;
       }
@@ -578,8 +590,8 @@ export class WaapiUnit implements GroupOwner {
   }
 
   private _writeBack(): void {
-    const rec = this._o._record;
-    for (const ch of this._o._numeric) {
+    const rec = this._o!._record;
+    for (const ch of this._o!._numeric) {
       rec._numeric.set(ch._key, { _value: ch._value, _velocity: 0 });
     }
   }
@@ -587,7 +599,21 @@ export class WaapiUnit implements GroupOwner {
   private _finish(natural: boolean): void {
     if (this._done) return;
     this._done = true;
-    if (this._o._record._owner === this) this._o._record._owner = undefined;
-    this._o._onDone(natural);
+    const o = this._o!;
+    if (o._record._owner === this) o._record._owner = undefined;
+    const done = o._onDone;
+    // Освобождение ссылок ОБЯЗАТЕЛЬНО, а не гигиена. Реестр контролов ради
+    // последующего cancel() — стандартная практика SPA, и он держит юнит через
+    // методы controls сколь угодно долго. Пока `_o` жив, через него живут цель
+    // (DOM-узел вместе со всем detached-поддеревом), каналы, остатки и
+    // сериализованные сэмплы. Аудит 2026-07-25: 50 завершённых прогонов с
+    // удержанными контролами давали 118.8 МБ против 6.3 МБ на main-ветке,
+    // которая обнуляет `_o` ровно здесь же. Пин — test/fixtures/
+    // animate-retention-gc.probe.ts (WeakRef на цель обеих веток).
+    this._o = undefined;
+    this._samples = undefined;
+    this._delegate = undefined;
+    this._anim = undefined;
+    done(natural);
   }
 }

@@ -550,8 +550,8 @@
         "animate",
         "isMotionParamError"
       ],
-      "shippedGzBytes": 12168,
-      "shippedBrBytes": 11084,
+      "shippedGzBytes": 12175,
+      "shippedBrBytes": 11067,
       "docs": "docs/reference/animate.md",
       "title": "./animate — одно-строчный DOM-фасад"
     },
