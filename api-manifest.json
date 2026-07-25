@@ -20,8 +20,8 @@
         "validateSpringParams",
         "validateSpringPhysics"
       ],
-      "shippedGzBytes": 2177,
-      "shippedBrBytes": 2034,
+      "shippedGzBytes": 2180,
+      "shippedBrBytes": 2025,
       "docs": "docs/reference/core.md",
       "title": "Ядро `.` — MotionValue, drive и корневой экспорт"
     },
@@ -123,8 +123,8 @@
       "runtimeExports": [
         "createDriver"
       ],
-      "shippedGzBytes": 1678,
-      "shippedBrBytes": 1550,
+      "shippedGzBytes": 1686,
+      "shippedBrBytes": 1547,
       "docs": "docs/reference/driver-frame.md",
       "title": "./driver и ./frame — управляемый драйвер и общий кадровый цикл"
     },
@@ -145,8 +145,8 @@
       "runtimeExports": [
         "createTimeline"
       ],
-      "shippedGzBytes": 1640,
-      "shippedBrBytes": 1499,
+      "shippedGzBytes": 1641,
+      "shippedBrBytes": 1506,
       "docs": "docs/reference/timeline-keyframes.md",
       "title": "./timeline и ./keyframes — секвенции и семплеры keyframes"
     },

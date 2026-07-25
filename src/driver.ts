@@ -334,82 +334,87 @@ export function createDriver(opts: DriverOptions): AnimationControls {
 
     _tickActive = true;
     _totalFrameCount++;
+    // try/finally: `onStep` — ПОЛЬЗОВАТЕЛЬСКИЙ колбэк и вправе бросить. До
+    // 2026-07-25 бросок улетал ДО снятия single-flight флага и до
+    // перепланирования — драйвер умирал навсегда, промис не оседал, а
+    // play()/seek() его не воскрешали (замер: очередь кадров 0, promise
+    // pending). Ветки settle() приходят сюда через return: `_settled` уже
+    // true, поэтому перепланирования не будет.
+    try {
 
-    // ── Глобальный safety cap (любой timeScale, в т.ч. NaN/0) ─────────────
-    // Предотвращает бесконечный цикл при timeScale=0/NaN/замороженном состоянии.
-    // ×5 к MAX_FRAMES (одно forward-воспроизведение): скраб-драйвер легитимно
-    // живёт дольше одного прогона — реверс, повторные проходы на медленном
-    // timeScale, качание туда-обратно. Полог = 5 полных длин воспроизведения
-    // суммарного скраба до принудительного settle (не привязан к одному прогону).
-    const GLOBAL_CAP = MAX_FRAMES * 5;
-    if (_totalFrameCount >= GLOBAL_CAP) {
+      // ── Глобальный safety cap (любой timeScale, в т.ч. NaN/0) ─────────────
+      // Предотвращает бесконечный цикл при timeScale=0/NaN/замороженном состоянии.
+      // ×5 к MAX_FRAMES (одно forward-воспроизведение): скраб-драйвер легитимно
+      // живёт дольше одного прогона — реверс, повторные проходы на медленном
+      // timeScale, качание туда-обратно. Полог = 5 полных длин воспроизведения
+      // суммарного скраба до принудительного settle (не привязан к одному прогону).
+      const GLOBAL_CAP = MAX_FRAMES * 5;
+      if (_totalFrameCount >= GLOBAL_CAP) {
+        settle(computeAt(_vt));
+        return;
+      }
+
+      // ── Вычислить dt ──────────────────────────────────────────────────────
+      let dt: number;
+      if (ts !== undefined) {
+        dt = _lastRealTs !== undefined ? (ts - _lastRealTs) / 1000 : FIXED_DT_S;
+        _lastRealTs = ts;
+      } else {
+        dt = FIXED_DT_S;
+      }
+
+      // Protect against negative/zero dt (repeated ts, paused browser tab wake).
+      if (dt <= 0) dt = FIXED_DT_S;
+
+      // ── Продвинуть виртуальное время ─────────────────────────────────────
+      // _timeScale может быть ±∞ (намеренно: мгновенная сходимость / реверс к from).
+      _vt += dt * _timeScale;
+
+      // ── Проверки границ и сходимости ─────────────────────────────────────
+      // Прямой путь сохраняет снимок до эмита: обычный кадр решает пружину
+      // ровно один раз вместо прежней пары isConvergedAt + computeAt.
+      let forwardState: SpringSample | undefined;
+      if (_timeScale > 0) {
+        // Прямой путь: сравнение естественно включает +Infinity.
+        _fwdFrameCount++;
+        // На предохранительном кадре и в +Infinity итог уже известен: солвер не нужен.
+        if (_fwdFrameCount >= MAX_FRAMES || _vt === Infinity) {
+          settle(to);
+          return;
+        }
+        forwardState = springUnchecked(opts.spring, Math.max(0, _vt));
+        if (isConvergedState(forwardState)) {
+          settle(to);
+          return;
+        }
+      } else if (_timeScale < 0) {
+        // Обратный путь: сравнение естественно включает -Infinity.
+        if (_vt <= 0) {
+          _vt = 0;
+          settle(from);
+          return;
+        }
+      }
+      // timeScale = 0 или NaN: emit current, reschedule без convergence-check
+      // (_totalFrameCount GLOBAL_CAP выше является safety escape).
+
+      // ── Эмитировать текущую позицию ───────────────────────────────────────
+      const val = computeAt(_vt, forwardState);
+      onStep(val);
+    } finally {
       _tickActive = false;
-      settle(computeAt(_vt));
-      return;
-    }
-
-    // ── Вычислить dt ──────────────────────────────────────────────────────
-    let dt: number;
-    if (ts !== undefined) {
-      dt = _lastRealTs !== undefined ? (ts - _lastRealTs) / 1000 : FIXED_DT_S;
-      _lastRealTs = ts;
-    } else {
-      dt = FIXED_DT_S;
-    }
-
-    // Protect against negative/zero dt (repeated ts, paused browser tab wake).
-    if (dt <= 0) dt = FIXED_DT_S;
-
-    // ── Продвинуть виртуальное время ─────────────────────────────────────
-    // _timeScale может быть ±∞ (намеренно: мгновенная сходимость / реверс к from).
-    _vt += dt * _timeScale;
-
-    // ── Проверки границ и сходимости ─────────────────────────────────────
-    // Прямой путь сохраняет снимок до эмита: обычный кадр решает пружину
-    // ровно один раз вместо прежней пары isConvergedAt + computeAt.
-    let forwardState: SpringSample | undefined;
-    if (_timeScale > 0) {
-      // Прямой путь: сравнение естественно включает +Infinity.
-      _fwdFrameCount++;
-      // На предохранительном кадре и в +Infinity итог уже известен: солвер не нужен.
-      if (_fwdFrameCount >= MAX_FRAMES || _vt === Infinity) {
-        _tickActive = false;
-        settle(to);
-        return;
-      }
-      forwardState = springUnchecked(opts.spring, Math.max(0, _vt));
-      if (isConvergedState(forwardState)) {
-        _tickActive = false;
-        settle(to);
-        return;
-      }
-    } else if (_timeScale < 0) {
-      // Обратный путь: сравнение естественно включает -Infinity.
-      if (_vt <= 0) {
-        _vt = 0;
-        _tickActive = false;
-        settle(from);
-        return;
-      }
-    }
-    // timeScale = 0 или NaN: emit current, reschedule без convergence-check
-    // (_totalFrameCount GLOBAL_CAP выше является safety escape).
-
-    // ── Эмитировать текущую позицию ───────────────────────────────────────
-    const val = computeAt(_vt, forwardState);
-    onStep(val);
-
-    _tickActive = false;
-
-    // ── Перепланировать следующий кадр ────────────────────────────────────
-    if (_useTimeoutFallback) {
-      setTimeout(tick, 0);
-    } else {
-      const h = scheduleFrame(tick);
-      if (h === 0) {
-        // Переходим на setTimeout-fallback (non-draining clock convention).
-        _useTimeoutFallback = true;
-        setTimeout(tick, 0);
+      // ── Перепланировать следующий кадр ──────────────────────────────────
+      if (!_settled) {
+        if (_useTimeoutFallback) {
+          setTimeout(tick, 0);
+        } else {
+          const h = scheduleFrame(tick);
+          if (h === 0) {
+            // Переходим на setTimeout-fallback (non-draining clock convention).
+            _useTimeoutFallback = true;
+            setTimeout(tick, 0);
+          }
+        }
       }
     }
   }

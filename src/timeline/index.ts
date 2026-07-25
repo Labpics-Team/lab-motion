@@ -558,17 +558,23 @@ export function createTimeline(opts: TimelineOptions): TimelineControls {
       emit(_vt);
     } finally {
       _tickActive = false;
-    }
-
-    // Перепланировать следующий кадр
-    if (_useTimeoutFallback) {
-      setTimeout(tick, 0);
-    } else {
-      const h = scheduleFrame(tick);
-      if (h === 0) {
-        // Non-draining convention: переходим на setTimeout-fallback
-        _useTimeoutFallback = true;
-        setTimeout(tick, 0);
+      // Перепланирование ВНУТРИ finally. До 2026-07-25 оно стояло снаружи, и
+      // бросок из пользовательского onStep сегмента пропускал его целиком:
+      // флаг снимался, но следующий кадр никто не назначал, а `_loopRunning`
+      // оставался true — ensureLoop() отказывался перезапуститься. Таймлайн
+      // умирал навсегда, `await timeline` висел, и ни play(), ни pause()+play(),
+      // ни seek() его не воскрешали (замер: очередь кадров 0 после каждого).
+      if (!_settled && !_paused) {
+        if (_useTimeoutFallback) {
+          setTimeout(tick, 0);
+        } else {
+          const h = scheduleFrame(tick);
+          if (h === 0) {
+            // Non-draining convention: переходим на setTimeout-fallback
+            _useTimeoutFallback = true;
+            setTimeout(tick, 0);
+          }
+        }
       }
     }
   }

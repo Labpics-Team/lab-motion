@@ -231,82 +231,96 @@ export function drive(opts: DriveOptions): Promise<void> {
       if (tickActive) return;
       tickActive = true;
       frameCount++;
-      // Продвинуть часы (бывший advanceClock, единственный вызов — инлайн).
-      if (ts !== undefined) {
-        if (startTs === undefined) startTs = ts;
-        elapsedSeconds = (ts - startTs) / 1000;
-      } else {
-        elapsedSeconds += FIXED_DT_S;
-      }
+      // try/finally, а НЕ прямой поток: `onStep` — ПОЛЬЗОВАТЕЛЬСКИЙ колбэк, и
+      // он вправе бросить (запись в удалённый из DOM узел, setState после
+      // unmount). До 2026-07-25 бросок улетал ДО снятия single-flight флага и
+      // до перепланирования: цикл умирал навсегда, а возвращённый Promise
+      // НИКОГДА не оседал — `await drive(...)` висел вечно, и весь код после
+      // await (снятие слушателей, восстановление стиля) не выполнялся.
+      // Замер: onStep бросил один раз на 3-м кадре → очередь кадров 0,
+      // промис pending. Ни pause()+play(), ни seek() не воскрешали прогон.
+      try {
+        // Продвинуть часы (бывший advanceClock, единственный вызов — инлайн).
+        if (ts !== undefined) {
+          if (startTs === undefined) startTs = ts;
+          elapsedSeconds = (ts - startTs) / 1000;
+        } else {
+          elapsedSeconds += FIXED_DT_S;
+        }
 
-      // ОДИН вызов солвера на кадр: прежние computeValue/computeVelocity/
-      // isConverged делали до трёх идентичных вызовов чистой детерминированной
-      // функции — значения бит-в-бит те же, машинерия втрое легче.
-      // Канон солвера — solveSpring(params, t, v0) (internal/solver.ts, как в
-      // projection/driver): при v0Normalized=0 формы бит-в-бит равны прежнему
-      // springUnchecked-пути. Стражи конечности — на cv ниже (политика этого
-      // модуля: снап в `to`, как MotionValue._tick).
-      // spring params already validated synchronously at drive() entry above.
-      const result = solveSpring(opts.spring, elapsedSeconds, v0Normalized, solved);
-      const rawValue = from + result.value * range;
-      // bounded=true (default): CSS-safe clamp to [from, to]. bounded=false:
-      // honest trajectory — overshoot is the point, no clamp.
-      const cv = bounded ? Math.max(lo, Math.min(hi, rawValue)) : rawValue;
-      // absRange > 0 guaranteed by the from===to early-exit above.
-      const absRange = Math.abs(range);
+        // ОДИН вызов солвера на кадр: прежние computeValue/computeVelocity/
+        // isConverged делали до трёх идентичных вызовов чистой детерминированной
+        // функции — значения бит-в-бит те же, машинерия втрое легче.
+        // Канон солвера — solveSpring(params, t, v0) (internal/solver.ts, как в
+        // projection/driver): при v0Normalized=0 формы бит-в-бит равны прежнему
+        // springUnchecked-пути. Стражи конечности — на cv ниже (политика этого
+        // модуля: снап в `to`, как MotionValue._tick).
+        // spring params already validated synchronously at drive() entry above.
+        const result = solveSpring(opts.spring, elapsedSeconds, v0Normalized, solved);
+        const rawValue = from + result.value * range;
+        // bounded=true (default): CSS-safe clamp to [from, to]. bounded=false:
+        // honest trajectory — overshoot is the point, no clamp.
+        const cv = bounded ? Math.max(lo, Math.min(hi, rawValue)) : rawValue;
+        // absRange > 0 guaranteed by the from===to early-exit above.
+        const absRange = Math.abs(range);
 
-      // Convergence:
-      // 1) Visual-saturation early-exit — once the monotone emitter has committed
-      //    to `to` (maxEmittedToward === to), no value distinct from `to` can ever
-      //    be emitted; the raw velocity tail beyond the clamp boundary is invisible
-      //    (holding the Promise for it broke the resolution contract: an accepted
-      //    underdamped spring at the floor zeta=0.2, omega0=2.0 kept it pending
-      //    ~3.9s after visual completion).
-      // 2) The threshold is range-independent: the position term is divided by
-      //    absRange; velocity from solveSpring is already in normalized
-      //    progress-space, so it is compared to the threshold directly.
-      // The visual-saturation early-exit (maxEmittedToward === to) is a property
-      // of the MONOTONE emitter only: with the clamp off, values legitimately
-      // pass through `to` while the spring still carries velocity, so the
-      // threshold test is the sole convergence criterion there.
-      const converged =
-        (bounded && maxEmittedToward === to) ||
-        (Math.abs(cv - to) / absRange < CONVERGENCE_THRESHOLD &&
-          Math.abs(result.velocity) < CONVERGENCE_THRESHOLD);
+        // Convergence:
+        // 1) Visual-saturation early-exit — once the monotone emitter has committed
+        //    to `to` (maxEmittedToward === to), no value distinct from `to` can ever
+        //    be emitted; the raw velocity tail beyond the clamp boundary is invisible
+        //    (holding the Promise for it broke the resolution contract: an accepted
+        //    underdamped spring at the floor zeta=0.2, omega0=2.0 kept it pending
+        //    ~3.9s after visual completion).
+        // 2) The threshold is range-independent: the position term is divided by
+        //    absRange; velocity from solveSpring is already in normalized
+        //    progress-space, so it is compared to the threshold directly.
+        // The visual-saturation early-exit (maxEmittedToward === to) is a property
+        // of the MONOTONE emitter only: with the clamp off, values legitimately
+        // pass through `to` while the spring still carries velocity, so the
+        // threshold test is the sole convergence criterion there.
+        const converged =
+          (bounded && maxEmittedToward === to) ||
+          (Math.abs(cv - to) / absRange < CONVERGENCE_THRESHOLD &&
+            Math.abs(result.velocity) < CONVERGENCE_THRESHOLD);
 
-      // CSS-страж (инвариант 2) в том же снапе: сырой солвер с произвольным v0
-      // может дать NaN/±∞ на экстремумах (переполнение денормализации при
-      // clamp:false, вырожденный v0/range). Non-finite НЕ эмитится никогда —
-      // единственный контрактно-безопасный исход — settle в (конечный) `to`.
-      if (converged || frameCount >= MAX_FRAMES || !Number.isFinite(cv)) {
-        settle();
-        return;
-      }
+        // CSS-страж (инвариант 2) в том же снапе: сырой солвер с произвольным v0
+        // может дать NaN/±∞ на экстремумах (переполнение денормализации при
+        // clamp:false, вырожденный v0/range). Non-finite НЕ эмитится никогда —
+        // единственный контрактно-безопасный исход — settle в (конечный) `to`.
+        if (converged || frameCount >= MAX_FRAMES || !Number.isFinite(cv)) {
+          settle();
+          return;
+        }
 
-      if (bounded) {
-        // Monotonize: for positive range, never emit below the running maximum.
-        // For negative range, never emit above the running minimum.
-        // This absorbs underdamped oscillation after the spring passes `to`.
-        const monotoneValue =
-          range >= 0 ? Math.max(cv, maxEmittedToward) : Math.min(cv, maxEmittedToward);
-        maxEmittedToward = monotoneValue;
-        onStep(monotoneValue);
-      } else {
-        // Honest spring: emit the trajectory as solved, bounce included.
-        onStep(cv);
-      }
+        if (bounded) {
+          // Monotonize: for positive range, never emit below the running maximum.
+          // For negative range, never emit above the running minimum.
+          // This absorbs underdamped oscillation after the spring passes `to`.
+          const monotoneValue =
+            range >= 0 ? Math.max(cv, maxEmittedToward) : Math.min(cv, maxEmittedToward);
+          maxEmittedToward = monotoneValue;
+          onStep(monotoneValue);
+        } else {
+          // Honest spring: emit the trajectory as solved, bounce included.
+          onStep(cv);
+        }
 
-      // Release the single-flight lock before rescheduling so the next tick
-      // invocation (from either path) is not immediately dropped.
-      tickActive = false;
-
-      // Reschedule via the same mechanism that is currently active.
-      // useTimeoutFallback is set to true before tick() ever fires when the
-      // bootstrap call returned handle=0 (non-draining step-clock convention).
-      if (useTimeoutFallback) {
-        setTimeout(tick, 0);
-      } else {
-        scheduleFrame(tick);
+      } finally {
+        // Снятие single-flight и перепланирование — в finally: следующий кадр
+        // обязан быть назначен, даже если подписчик бросил. Ветка settle()
+        // сюда тоже приходит (через return), но `settled` уже true — цикл
+        // корректно останавливается, а не перепланируется.
+        tickActive = false;
+        if (!settled) {
+          // Reschedule via the same mechanism that is currently active.
+          // useTimeoutFallback is set to true before tick() ever fires when the
+          // bootstrap call returned handle=0 (non-draining step-clock convention).
+          if (useTimeoutFallback) {
+            setTimeout(tick, 0);
+          } else {
+            scheduleFrame(tick);
+          }
+        }
       }
     }
 
