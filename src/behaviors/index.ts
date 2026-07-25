@@ -97,6 +97,12 @@ export interface BehaviorState<T = number> {
 export interface BehaviorPoint {
   readonly x: number;
   readonly y: number;
+  /**
+   * Время точки в СЕКУНДАХ (браузерный `e.timeStamp` — в миллисекундах,
+   * делите на 1000). См. GesturePoint.t: ошибка ×1000 молча гасит скорость.
+   *
+   * @unit s
+   */
   readonly t: number;
 }
 

@@ -50,16 +50,21 @@ export interface StaticNanoSpring {
 /** Статически доказанные options nano (spring-режим среза #221). */
 export interface StaticNanoOptions {
   readonly spring?: StaticNanoSpring | undefined;
+  /** @unit ms */
   readonly delay?: number | undefined;
+  /** @unit ms */
   readonly stagger?: number | undefined;
   readonly reducedMotion?: boolean | undefined;
 }
 
 export interface CompiledNanoArtifact {
   readonly frame: Readonly<Record<string, number | string>>;
+  /** @unit ms */
   readonly durationMs: number;
   readonly cssLinear: string;
+  /** @unit ms */
   readonly delay: number | undefined;
+  /** @unit ms */
   readonly stagger: number | undefined;
   readonly reducedMotion: boolean | undefined;
 }

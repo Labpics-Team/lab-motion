@@ -44,7 +44,11 @@ const LN_100 = Math.log(100);
 
 /** Опции duration+bounce параметризации. */
 export interface FromBounceOptions {
-  /** Перцептивная длительность (секунды), > 0. */
+  /**
+   * Перцептивная длительность (секунды), > 0.
+   *
+   * @unit s
+   */
   readonly duration: number;
   /** Упругость ∈ [−1, 1]: 0 — критическое демпфирование. */
   readonly bounce: number;
@@ -180,7 +184,11 @@ export function fromPeak(options: FromPeakOptions): SpringParams {
 
 /** Опции period+half-life параметризации. */
 export interface FromOscillationOptions {
-  /** Период затухающих колебаний (секунды), > 0. */
+  /**
+   * Период затухающих колебаний (секунды), > 0.
+   *
+   * @unit s
+   */
   readonly period: number;
   /** Полупериод огибающей: амплитуда падает вдвое (секунды), > 0. */
   readonly halfLife: number;

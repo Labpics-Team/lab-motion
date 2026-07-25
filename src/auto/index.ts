@@ -993,7 +993,11 @@ interface MutationObserverLike {
 }
 
 export interface AutoAnimateOptions {
-  /** Длительность (секунды движка). > 0. По умолчанию 0.25 (канон 250ms). */
+  /**
+   * Длительность (секунды движка). > 0. По умолчанию 0.25 (канон 250ms).
+   *
+   * @unit s
+   */
   readonly duration?: number;
   /** Easing движка → эмитится CSS linear(). Нет → нативный 'ease-in-out'. */
   readonly easing?: WaapiEasingFn;

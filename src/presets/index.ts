@@ -80,20 +80,30 @@ export interface PresetTrack {
 
 /** Спецификация пресета: мультитрековые кейфреймы одного цикла + повторы. */
 export interface PresetSpec {
-  /** Длительность ОДНОГО цикла (секунды). > 0, конечна. */
+  /**
+   * Длительность ОДНОГО цикла (секунды). > 0, конечна.
+   *
+   * @unit s
+   */
   readonly duration: number;
   /** Треки. Минимум один; property уникальны. */
   readonly tracks: readonly PresetTrack[];
   /**
    * Задержка старта (секунды, >= 0). До истечения delay сэмплер держит
    * позу t=0 (первые значения треков) — слой видим и статичен, не «пуст».
+   *
+   * @unit s
    */
   readonly delay?: number;
   /** Дополнительные циклы: целое 0…2_147_483_647 или Infinity. По умолчанию 0. */
   readonly repeat?: number;
   /** Политика направления повторов. По умолчанию 'loop'. */
   readonly repeatType?: PresetRepeatType;
-  /** Пауза между циклами (секунды, >= 0), держит конец цикла. По умолчанию 0. */
+  /**
+   * Пауза между циклами (секунды, >= 0), держит конец цикла. По умолчанию 0.
+   *
+   * @unit s
+   */
   readonly repeatDelay?: number;
 }
 
@@ -108,10 +118,13 @@ export type PresetValues = Partial<Record<PresetProperty, number>>;
 export interface CompiledPreset {
   /** Брендирующий маркер — защита от подсовывания сырой PresetSpec. */
   readonly __compiledPreset: true;
+  /** @unit s */
   readonly duration: number;
+  /** @unit s */
   readonly delay: number;
   readonly repeat: number;
   readonly repeatType: PresetRepeatType;
+  /** @unit s */
   readonly repeatDelay: number;
   readonly tracks: readonly CompiledTrack[];
 }
@@ -359,7 +372,11 @@ function assertDuration(name: string, value: number): void {
 export interface PulseOptions {
   /** Амплитуда прироста масштаба в пике. По умолчанию 0.12 (мягкий пульс). */
   readonly amount?: number;
-  /** Длительность цикла, с. По умолчанию 0.9. */
+  /**
+   * Длительность цикла, с. По умолчанию 0.9.
+   *
+   * @unit s
+   */
   readonly duration?: number;
 }
 
@@ -381,7 +398,11 @@ export function pulse(opts: PulseOptions = {}): PresetSpec {
 export interface BlinkOptions {
   /** Минимальная непрозрачность в провале, [0,1]. По умолчанию 0. */
   readonly min?: number;
-  /** Длительность цикла, с. По умолчанию 1 (курсор из эталона ref-2). */
+  /**
+   * Длительность цикла, с. По умолчанию 1 (курсор из эталона ref-2).
+   *
+   * @unit s
+   */
   readonly duration?: number;
 }
 
@@ -406,7 +427,11 @@ export interface WiggleOptions {
   readonly degrees?: number;
   /** Число свингов (смен направления). Целое >= 1. По умолчанию 3. */
   readonly cycles?: number;
-  /** Длительность, с. По умолчанию 0.8. */
+  /**
+   * Длительность, с. По умолчанию 0.8.
+   *
+   * @unit s
+   */
   readonly duration?: number;
 }
 
@@ -440,7 +465,11 @@ export function wiggle(opts: WiggleOptions = {}): PresetSpec {
 export interface SpinOptions {
   /** Число оборотов (отрицательное — против часовой). По умолчанию 1. */
   readonly turns?: number;
-  /** Длительность, с. По умолчанию 1. */
+  /**
+   * Длительность, с. По умолчанию 1.
+   *
+   * @unit s
+   */
   readonly duration?: number;
 }
 
@@ -459,7 +488,11 @@ export function spin(opts: SpinOptions = {}): PresetSpec {
 export interface BreatheOptions {
   /** Амплитуда прироста масштаба. По умолчанию 0.05 (заметно мягче pulse). */
   readonly amount?: number;
-  /** Длительность цикла, с. По умолчанию 2.6 (ambient). */
+  /**
+   * Длительность цикла, с. По умолчанию 2.6 (ambient).
+   *
+   * @unit s
+   */
   readonly duration?: number;
 }
 
@@ -482,7 +515,11 @@ export function breathe(opts: BreatheOptions = {}): PresetSpec {
 export interface PopOptions {
   /** Пик перелёта масштаба перед оседанием в 1. По умолчанию 1.18. */
   readonly overshoot?: number;
-  /** Длительность, с. По умолчанию 0.5. */
+  /**
+   * Длительность, с. По умолчанию 0.5.
+   *
+   * @unit s
+   */
   readonly duration?: number;
 }
 
@@ -511,7 +548,11 @@ export function pop(opts: PopOptions = {}): PresetSpec {
 export interface BounceYOptions {
   /** Высота подскока, единицы координат (для 24px-иконки ~2-4). По умолчанию 2.5. */
   readonly height?: number;
-  /** Длительность, с. По умолчанию 0.6. */
+  /**
+   * Длительность, с. По умолчанию 0.6.
+   *
+   * @unit s
+   */
   readonly duration?: number;
 }
 
@@ -539,7 +580,11 @@ export interface DriftOptions {
   readonly dx?: number;
   /** Дрейф по y. По умолчанию −1.5 (лёгкий подъём, звёзды из эталона ref-3). */
   readonly dy?: number;
-  /** Длительность цикла, с. По умолчанию 5 (ambient). */
+  /**
+   * Длительность цикла, с. По умолчанию 5 (ambient).
+   *
+   * @unit s
+   */
   readonly duration?: number;
 }
 
@@ -565,7 +610,11 @@ export interface FadeSlideOptions {
   readonly dx?: number;
   /** Начальное смещение по y. По умолчанию 4. */
   readonly dy?: number;
-  /** Длительность, с. По умолчанию 0.35. */
+  /**
+   * Длительность, с. По умолчанию 0.35.
+   *
+   * @unit s
+   */
   readonly duration?: number;
 }
 
@@ -586,7 +635,11 @@ export function fadeSlide(opts: FadeSlideOptions = {}): PresetSpec {
 }
 
 export interface DrawOnOptions {
-  /** Длительность рисования, с. По умолчанию 1.2. */
+  /**
+   * Длительность рисования, с. По умолчанию 1.2.
+   *
+   * @unit s
+   */
   readonly duration?: number;
 }
 
@@ -622,9 +675,17 @@ export interface RunPresetOptions {
 
 /** Управляемый хендл пресета. Thenable — `await runPreset(...)`. */
 export interface PresetControls {
-  /** Суммарная длительность c delay/repeat (секунды); Infinity при repeat=∞. */
+  /**
+   * Суммарная длительность c delay/repeat (секунды); Infinity при repeat=∞.
+   *
+   * @unit s
+   */
   readonly totalDuration: number;
-  /** Текущее виртуальное время (секунды) от старта (delay входит в шкалу). */
+  /**
+   * Текущее виртуальное время (секунды) от старта (delay входит в шкалу).
+   *
+   * @unit s
+   */
   readonly time: number;
   /** Прогресс ТЕКУЩЕГО цикла [0,1]. */
   readonly progress: number;
@@ -978,6 +1039,11 @@ export function runPreset(
 
 /** Один WAAPI-кейфрейм: offset + собранные CSS-свойства. */
 export interface WaapiKeyframe {
+  /**
+   * Позиция кейфрейма — НОРМАЛИЗОВАННАЯ доля [0, 1], не время.
+   *
+   * @unit progress
+   */
   readonly offset: number;
   readonly transform?: string;
   readonly opacity?: number;
@@ -985,7 +1051,9 @@ export interface WaapiKeyframe {
 
 /** Тайминг для element.animate(): длительности в МИЛЛИСЕКУНДАХ. */
 export interface WaapiTiming {
+  /** @unit ms */
   readonly duration: number;
+  /** @unit ms */
   readonly delay: number;
   readonly iterations: number;
   readonly direction: 'normal' | 'alternate';
@@ -1336,7 +1404,11 @@ export function tickerCells(formatted: string): readonly string[] {
 
 /** Общие опции раннеров-сахаров (прогресс-трек поверх runPreset). */
 export interface SugarRunOptions {
-  /** Длительность, с. Дефолт — у каждого раннера свой, из ./tokens. */
+  /**
+   * Длительность, с. Дефолт — у каждого раннера свой, из ./tokens.
+   *
+   * @unit s
+   */
   readonly duration?: number;
   /** Изинг прогресса. По умолчанию линейный (равномерное раскрытие). */
   readonly easing?: EasingFn;

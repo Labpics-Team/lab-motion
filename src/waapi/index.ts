@@ -46,7 +46,11 @@ export interface WaapiCompileOptions {
   readonly property: string;
   /** Опорные значения, длина >= 2, конечные. */
   readonly values: readonly number[];
-  /** Длительность одного цикла (секунды движка). > 0. По умолчанию 1. */
+  /**
+   * Длительность одного цикла (секунды движка). > 0. По умолчанию 1.
+   *
+   * @unit s
+   */
   readonly duration?: number;
   /** Доли [0,1] на значение: неубывающие, [0]=0, [last]=1. Нет → равномерно. */
   readonly times?: readonly number[];
@@ -56,7 +60,11 @@ export interface WaapiCompileOptions {
   readonly repeat?: number;
   /** Политика повторов. По умолчанию 'loop'. */
   readonly repeatType?: 'loop' | 'reverse' | 'mirror';
-  /** Пауза между циклами (секунды), >= 0. */
+  /**
+   * Пауза между циклами (секунды), >= 0.
+   *
+   * @unit s
+   */
   readonly repeatDelay?: number;
   /** Форматтер значения (единицы/шаблоны). По умолчанию число как есть. */
   readonly format?: (v: number) => string | number;
@@ -68,7 +76,11 @@ export interface WaapiCompileOptions {
 export interface WaapiCompiled {
   readonly keyframes: Record<string, string | number>[];
   readonly timing: {
-    /** Миллисекунды (конвенция WAAPI; движок считает в секундах). */
+    /**
+     * Миллисекунды (конвенция WAAPI; движок считает в секундах).
+     *
+     * @unit ms
+     */
     readonly duration: number;
     readonly iterations: number;
     readonly direction: 'normal' | 'alternate';

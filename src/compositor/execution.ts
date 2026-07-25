@@ -20,6 +20,12 @@ import { requiresExplicitSpringKeyframes } from './detect.js';
 export interface SpringExecutionPlan {
   readonly keyframes: Record<string, string | number>[];
   readonly easing: string;
+  /**
+   * Длительность плана в МИЛЛИСЕКУНДАХ — поле уходит в `Element.animate()`
+   * как есть, поэтому здесь конвенция WAAPI, а не секунды солвера.
+   *
+   * @unit ms
+   */
   readonly duration: number;
   readonly iterations: 1;
   readonly fill: 'none' | 'forwards' | 'backwards' | 'both';

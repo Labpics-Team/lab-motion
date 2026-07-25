@@ -121,6 +121,8 @@ export interface AnimateOptions {
   /**
    * Длительность tween в МИЛЛИСЕКУНДАХ (Framer/Motion считают в секундах —
    * ×1000). Задана → режим tween (дефолт ease: standard).
+   *
+   * @unit ms
    */
   readonly duration?: number | undefined;
   /**
@@ -136,9 +138,17 @@ export interface AnimateOptions {
    * Без times offsets равномерные. Требует authored-топологию N у всех каналов.
    */
   readonly times?: readonly number[] | undefined;
-  /** Задержка старта в МИЛЛИСЕКУНДАХ (≥ 0) — всем целям. */
+  /**
+   * Задержка старта в МИЛЛИСЕКУНДАХ (≥ 0) — всем целям.
+   *
+   * @unit ms
+   */
   readonly delay?: number | undefined;
-  /** Каскад для многих целей: число = gap в МИЛЛИСЕКУНДАХ или конфиг ./stagger. */
+  /**
+   * Каскад для многих целей: число = gap в МИЛЛИСЕКУНДАХ или конфиг ./stagger.
+   *
+   * @unit ms
+   */
   readonly stagger?: number | StaggerOptions | undefined;
   /** Вызывается один раз, когда ВСЕ цели осели естественно (не cancel). */
   readonly onComplete?: (() => void) | undefined;
@@ -146,7 +156,11 @@ export interface AnimateOptions {
   readonly requestFrame?: RequestFrameFn | undefined;
   /** Шов reduced-motion. Дефолт: globalThis.matchMedia (если среда умеет). */
   readonly matchMedia?: ((query: string) => { matches: boolean }) | undefined;
-  /** Часы (мс) compositor-пути. Дефолт: performance.now / Date.now. */
+  /**
+   * Часы (мс) compositor-пути. Дефолт: performance.now / Date.now.
+   *
+   * @unit ms
+   */
   readonly now?: (() => number) | undefined;
   /** Таймер compositor-finished. Дефолт: setTimeout/clearTimeout. */
   readonly setTimer?: SetTimerFn | undefined;

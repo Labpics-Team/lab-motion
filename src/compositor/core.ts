@@ -178,7 +178,11 @@ export interface CompositorPlan {
   readonly keyframes: Record<string, string | number>[];
   /** CSS linear()-строка либо обычный linear для явных WebKit-кадров. */
   readonly easing: string;
-  /** Длительность (миллисекунды; движок считает в секундах). */
+  /**
+   * Длительность (миллисекунды; движок считает в секундах).
+   *
+   * @unit ms
+   */
   readonly duration: number;
   /** Всегда 1 (пружина не циклична). */
   readonly iterations: number;
@@ -307,7 +311,11 @@ export interface ReadSpringOptions {
   readonly to?: number;
   /** Нормализованная начальная скорость. По умолчанию 0. */
   readonly v0?: number;
-  /** Время (секунды) от старта прогона. ≥ 0. */
+  /**
+   * Время (секунды) от старта прогона. ≥ 0.
+   *
+   * @unit s
+   */
   readonly t: number;
 }
 
@@ -382,7 +390,11 @@ export interface CompositorSpringOptions {
   readonly fill?: 'none' | 'forwards' | 'backwards' | 'both' | undefined;
   readonly composite?: 'replace' | 'add' | 'accumulate' | undefined;
   readonly format?: ((v: number) => string | number) | undefined;
-  /** Часы (мс) для замера elapsed ретаргета. По умолчанию performance.now/Date.now. */
+  /**
+   * Часы (мс) для замера elapsed ретаргета. По умолчанию performance.now/Date.now.
+   *
+   * @unit ms
+   */
   readonly now?: (() => number) | undefined;
   /** Инжектируемый requestFrame для fallback-драйвера. */
   readonly requestFrame?: RequestFrameFn | undefined;
@@ -393,6 +405,8 @@ export interface CompositorSpringOptions {
    * setTimer-seam. Применяется ТОЛЬКО к первичному start(); retarget/handoff —
    * события «сейчас» (delay НЕ переигрывается). Основа composited stagger.
    * В тире 'reduced' игнорируется: reduce перекрывает и каскад (снап сразу).
+   *
+   * @unit ms
    */
   readonly delay?: number | undefined;
   /**

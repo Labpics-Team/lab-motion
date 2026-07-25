@@ -57,6 +57,8 @@ export interface KeyframesOptions {
   /**
    * Длительность ОДНОГО цикла (секунды виртуального времени). > 0, конечна.
    * По умолчанию: 1.
+   *
+   * @unit s
    */
   readonly duration?: number;
   /**
@@ -87,6 +89,8 @@ export interface KeyframesOptions {
   /**
    * Пауза между циклами (секунды), значение держится на конце цикла.
    * >= 0, конечна. По умолчанию: 0.
+   *
+   * @unit s
    */
   readonly repeatDelay?: number;
   /** Колбэк на каждый шаг — текущее интерполированное значение. */
@@ -104,9 +108,15 @@ export interface KeyframesControls {
    * `Infinity`, если `repeat === Infinity` (соответствует WAAPI
    * `activeDuration` для `iterations: Infinity`) — метаданные, НЕ эмитируемое
    * значение; invariant 2 (CSS-safety) на это поле не распространяется.
+   *
+   * @unit s
    */
   readonly totalDuration: number;
-  /** Текущее виртуальное время (секунды) от начала первого цикла. */
+  /**
+   * Текущее виртуальное время (секунды) от начала первого цикла.
+   *
+   * @unit s
+   */
   readonly time: number;
   /**
    * Прогресс ТЕКУЩЕГО цикла [0,1] (не всей последовательности повторов —

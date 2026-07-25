@@ -35,6 +35,14 @@ import type { RequestFrameFn } from '../motion-value.js';
 export interface GesturePoint {
   readonly x: number;
   readonly y: number;
+  /**
+   * Время точки в СЕКУНДАХ. Браузерный `e.timeStamp` — в миллисекундах:
+   * биндинг обязан делить на 1000 (`t: e.timeStamp / 1000`). Ошибка ×1000
+   * не бросает — она молча делает скорость в 1000 раз меньше, и инерция
+   * после отпускания просто не наступает.
+   *
+   * @unit s
+   */
   readonly t: number;
 }
 

@@ -119,6 +119,12 @@ export function resolveTargetProgress(
 /** Сэмпл позиции скролла: px + время (секунды). */
 export interface ScrollSample {
   readonly pos: number;
+  /**
+   * Время сэмпла в СЕКУНДАХ (`e.timeStamp / 1000`). Скорость считается как
+   * Δpos/Δt и выражена в px/s — единица здесь задаёт её масштаб.
+   *
+   * @unit s
+   */
   readonly t: number;
 }
 
@@ -262,7 +268,11 @@ export interface ScrollObserverOptions {
 
 /** Кадр обновления наблюдателя. Метрики оси выбирает потребитель. */
 export interface ScrollObserverUpdate extends ScrollMetrics {
-  /** Время кадра (секунды, напр. e.timeStamp/1000) — для скорости. */
+  /**
+   * Время кадра (секунды, напр. e.timeStamp/1000) — для скорости.
+   *
+   * @unit s
+   */
   readonly t?: number | undefined;
   /**
    * Позиция target в координатах ВЬЮПОРТА СКРОЛЛЕРА. Для скролла окна —
@@ -325,6 +335,12 @@ export function createScrollObserver(options?: ScrollObserverOptions): ScrollObs
 
 /** Scrubbable-цель: timeline (`createTimeline`) или совместимый объект. */
 export interface ScrubTarget {
+  /**
+   * Полная виртуальная длительность цели в СЕКУНДАХ — та же шкала, что у
+   * `seek(t)`. `createTimeline` этот контракт выполняет как есть.
+   *
+   * @unit s
+   */
   readonly totalDuration: number;
   seek(t: number): void;
 }

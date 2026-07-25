@@ -102,7 +102,11 @@ export interface CompositorStaggerPlan {
   readonly keyframes: Record<string, string | number>[];
   /** Общая linear()-строка (пружинная траектория) — одна на всю группу. */
   readonly easing: string;
-  /** Общая длительность (мс). */
+  /**
+   * Общая длительность (мс).
+   *
+   * @unit ms
+   */
   readonly duration: number;
   /** Всегда 1 (пружина не циклична). */
   readonly iterations: number;
@@ -179,7 +183,11 @@ export interface CompositorStaggerGroupOptions extends StaggerPlanBase {
    * На compositor-пути НЕ вызывается (значение пишет браузер).
    */
   readonly apply?: ((index: number, value: string | number) => void) | undefined;
-  /** Часы (мс) для замера elapsed ретаргета/хендоффа. По умолчанию performance.now. */
+  /**
+   * Часы (мс) для замера elapsed ретаргета/хендоффа. По умолчанию performance.now.
+   *
+   * @unit ms
+   */
   readonly now?: (() => number) | undefined;
   /** Инжектируемый requestFrame для fallback-драйверов. */
   readonly requestFrame?: RequestFrameFn | undefined;

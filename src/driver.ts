@@ -79,6 +79,8 @@ export interface DriverOptions {
 export interface AnimationControls {
   /**
    * Текущее виртуальное время (секунды с начала анимации, корректируется seek-ами).
+   *
+   * @unit s
    */
   readonly time: number;
   /**

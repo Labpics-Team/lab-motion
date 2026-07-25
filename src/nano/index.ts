@@ -10,9 +10,17 @@ import { springLinear, type NanoSpring } from './spring-linear.js';
 export type { NanoSpring } from './spring-linear.js';
 
 interface NanoCommonOptions {
-  /** Задержка старта в МИЛЛИСЕКУНДАХ (Framer/Motion считают в секундах — ×1000). */
+  /**
+   * Задержка старта в МИЛЛИСЕКУНДАХ (Framer/Motion считают в секундах — ×1000).
+   *
+   * @unit ms
+   */
   readonly delay?: number | undefined;
-  /** Шаг каскада между целями в МИЛЛИСЕКУНДАХ. */
+  /**
+   * Шаг каскада между целями в МИЛЛИСЕКУНДАХ.
+   *
+   * @unit ms
+   */
   readonly stagger?: number | undefined;
   /** Явное значение; иначе prefers-reduced-motion читается в момент вызова. */
   readonly reducedMotion?: boolean | undefined;
@@ -29,7 +37,11 @@ export type NanoOptions = NanoCommonOptions & ({
   readonly ease?: never;
 } | {
   readonly spring?: never;
-  /** Tween-длительность в МИЛЛИСЕКУНДАХ (Framer/Motion: секунды — ×1000). */
+  /**
+   * Tween-длительность в МИЛЛИСЕКУНДАХ (Framer/Motion: секунды — ×1000).
+   *
+   * @unit ms
+   */
   readonly duration: number;
   /** Нативная CSS easing-строка tween; JS-функции изинга — контракт `./animate`. */
   readonly ease?: string | undefined;
