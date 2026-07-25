@@ -53,7 +53,7 @@
         "sineOut",
         "steps"
       ],
-      "shippedGzBytes": 1409,
+      "shippedGzBytes": 1406,
       "shippedBrBytes": 1306,
       "docs": "docs/reference/easing.md",
       "title": "./easing — кривые изинга"
@@ -470,8 +470,8 @@
         "typewriterAt",
         "wiggle"
       ],
-      "shippedGzBytes": 5598,
-      "shippedBrBytes": 5101,
+      "shippedGzBytes": 5595,
+      "shippedBrBytes": 5097,
       "docs": "docs/reference/tokens-presets.md",
       "title": "./tokens и ./presets — токены движения и пресеты"
     },
@@ -538,8 +538,8 @@
         "springFromDurationBounce",
         "staggerGap"
       ],
-      "shippedGzBytes": 1350,
-      "shippedBrBytes": 1239,
+      "shippedGzBytes": 1344,
+      "shippedBrBytes": 1238,
       "docs": "docs/reference/tokens-presets.md",
       "title": "./tokens и ./presets — токены движения и пресеты"
     },
