@@ -743,12 +743,12 @@ Brotli-гейт — см. «Сравнение размеров».
 ## Ошибки
 
 ```typescript
-import { MotionParamError, spring } from '@labpics/motion';
+import { isMotionParamError, spring } from '@labpics/motion';
 
 try {
   spring({ mass: -1, stiffness: 100, damping: 10 }, 0);
 } catch (error) {
-  if (error instanceof MotionParamError) {
+  if (isMotionParamError(error)) {
     if (error.code === 'LM088') console.error('Масса должна быть больше нуля');
     else console.error(`Ошибка движения: ${error.code}`);
   }

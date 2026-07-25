@@ -110,9 +110,14 @@ afterEach(() => {
 describe('./in-view public boundary', () => {
   it('SSR-safe import экспортирует capability и её физический error constructor', () => {
     expect(typeof (globalThis as { document?: unknown }).document).toBe('undefined');
-    expect(Object.keys(inViewApi).sort()).toEqual(['MotionParamError', 'inView']);
+    expect(Object.keys(inViewApi).sort())
+      .toEqual(['MotionParamError', 'inView', 'isMotionParamError']);
     expect(typeof inViewApi.inView).toBe('function');
     expect(typeof inViewApi.MotionParamError).toBe('function');
+    // Гвард работает и на ошибке ЭТОГО субпутя (у него своя копия класса),
+    // и на ошибке любого другого — сравнивается бренд name, не ссылка.
+    expect(inViewApi.isMotionParamError(new inViewApi.MotionParamError('LM149'))).toBe(true);
+    expect(inViewApi.isMotionParamError(new TypeError('x'))).toBe(false);
   });
 
   it('снимает selector/array-like один раз и передаёт root/margin/amount host-у', () => {

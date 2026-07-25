@@ -44,6 +44,12 @@ import {
   type SpringExecutionArtifactTuple,
 } from '../compositor/curve.js';
 import { MotionParamError } from '../errors.js';
+
+// Ловля ошибок без импорта корневого entry: `instanceof` через границу
+// субпутей не работает (пакет собирается без code-splitting, у каждого
+// субпутя своя копия класса), поэтому рабочая проверка живёт рядом с
+// самим API. Функция tree-shakeable: кто не ловит — не платит.
+export { isMotionParamError } from '../errors.js';
 import {
   DEFAULT_DURATION_MS,
   DEFAULT_SPRING,

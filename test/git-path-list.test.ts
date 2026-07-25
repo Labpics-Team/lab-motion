@@ -36,9 +36,22 @@ describe('NUL-delimited git path list', () => {
   it('returns the original Unicode path when Git quotePath is enabled', () => {
     const repository = mkdtempSync(join(tmpdir(), 'lab-motion-git-paths-'));
     temporaryRepositories.push(repository);
+    // Гипотеза о плавающем падении (2026-07-25): тест зависел от ОКРУЖАЮЩЕЙ
+    // конфигурации git — глобальной и системной. Любая машина или CI-образ с
+    // собственными core.*/init.* настройками меняет поведение подпроцесса, а
+    // воспроизвести это на «своей» машине невозможно. Изолируем: конфиги
+    // отключены, промпты запрещены, у каждого вызова явный потолок времени —
+    // зависший git обязан дать понятную ошибку, а не молчаливый таймаут кейса.
     const git = (...args: string[]) => execFileSync('git', args, {
       cwd: repository,
       encoding: 'utf8',
+      timeout: 15_000,
+      env: {
+        ...process.env,
+        GIT_CONFIG_GLOBAL: '/dev/null',
+        GIT_CONFIG_SYSTEM: '/dev/null',
+        GIT_TERMINAL_PROMPT: '0',
+      },
     }).trim();
     git('init', '--quiet');
     git('config', 'user.name', 'test');

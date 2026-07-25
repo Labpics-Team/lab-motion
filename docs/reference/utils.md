@@ -200,7 +200,7 @@ window.addEventListener('scroll', () => {
 `interpolate`: N остановок, изинг на сегмент, ранняя ошибка по коду:
 
 ```typescript
-import { MotionParamError } from '@labpics/motion';
+import { isMotionParamError } from '@labpics/motion';
 import { easeInOut, easeOut } from '@labpics/motion/easing';
 import { interpolate } from '@labpics/motion/utils';
 
@@ -213,7 +213,7 @@ opacity(-2);   // 0 — clamp: true (дефолт) держит края
 try {
   interpolate([0, 1], [0]); // длины входа и выхода различаются
 } catch (e) {
-  if (e instanceof MotionParamError && e.code === 'LM114') {
+  if (isMotionParamError(e) && e.code === 'LM114') {
     // выровнять длины input/output
   }
 }

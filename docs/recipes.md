@@ -141,12 +141,12 @@ headless `./scroll` и явно передавайте измеренные ме
 `inView`; корневой entry намеренно не связывает независимые bundle-графы:
 
 ```typescript
-import { inView, MotionParamError } from '@labpics/motion/in-view';
+import { inView, isMotionParamError } from '@labpics/motion/in-view';
 
 try {
   inView('.card', () => undefined);
 } catch (error) {
-  if (error instanceof MotionParamError) console.error(error.code);
+  if (isMotionParamError(error)) console.error(error.code);
   else throw error;
 }
 ```

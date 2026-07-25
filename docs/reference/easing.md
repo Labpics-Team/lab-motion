@@ -171,7 +171,7 @@ requestAnimationFrame(frame);
 Фабрики: CSS-совместимый Безье и ступени, ранняя ошибка по коду:
 
 ```ts
-import { MotionParamError } from '@labpics/motion';
+import { isMotionParamError } from '@labpics/motion';
 import { cubicBezier, steps } from '@labpics/motion/easing';
 
 const standard = cubicBezier(0.4, 0, 0.2, 1); // как CSS cubic-bezier(.4,0,.2,1)
@@ -182,7 +182,7 @@ console.log(standard(0.5), sprite(0.5)); // конечные числа, дет�
 try {
   cubicBezier(1.5, 0, 0.2, 1); // x1 вне [0,1]
 } catch (e) {
-  if (e instanceof MotionParamError && e.code === 'LM030') {
+  if (isMotionParamError(e) && e.code === 'LM030') {
     // временны́е координаты x1/x2 обязаны лежать в [0,1]
   }
 }

@@ -14,13 +14,14 @@
         "MotionParamError",
         "MotionValue",
         "drive",
+        "isMotionParamError",
         "spring",
         "tween",
         "validateSpringParams",
         "validateSpringPhysics"
       ],
-      "shippedGzBytes": 2158,
-      "shippedBrBytes": 2014,
+      "shippedGzBytes": 2177,
+      "shippedBrBytes": 2034,
       "docs": "docs/reference/core.md",
       "title": "Ядро `.` — MotionValue, drive и корневой экспорт"
     },
@@ -221,10 +222,11 @@
       "import": "@labpics/motion/in-view",
       "runtimeExports": [
         "MotionParamError",
-        "inView"
+        "inView",
+        "isMotionParamError"
       ],
-      "shippedGzBytes": 1765,
-      "shippedBrBytes": 1611,
+      "shippedGzBytes": 1783,
+      "shippedBrBytes": 1627,
       "docs": "docs/reference/scroll-in-view.md",
       "title": "./scroll и ./in-view — скролл-привязка и появление во вьюпорте"
     },
@@ -545,10 +547,11 @@
       "subpath": "./animate",
       "import": "@labpics/motion/animate",
       "runtimeExports": [
-        "animate"
+        "animate",
+        "isMotionParamError"
       ],
-      "shippedGzBytes": 12096,
-      "shippedBrBytes": 10994,
+      "shippedGzBytes": 12121,
+      "shippedBrBytes": 11030,
       "docs": "docs/reference/animate.md",
       "title": "./animate — одно-строчный DOM-фасад"
     },

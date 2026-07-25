@@ -15,7 +15,7 @@
 ## Субпути
 
 - @labpics/motion — Ядро `.` — MotionValue, drive и корневой экспорт
-  exports: MotionParamError, MotionValue, drive, spring, tween, validateSpringParams, validateSpringPhysics
+  exports: MotionParamError, MotionValue, drive, isMotionParamError, spring, tween, validateSpringParams, validateSpringPhysics
   docs: docs/reference/core.md
 - @labpics/motion/easing — кривые изинга
   exports: anticipate, backIn, backInOut, backOut, bounce, circIn, circInOut, circOut, cubicBezier, easeIn, easeInOut, easeOut, elastic, expoIn, expoInOut, expoOut, linear, normalizeEasing, power, sineIn, sineInOut, sineOut, steps
@@ -57,7 +57,7 @@
   exports: createInView, createScrollObserver, createScrollVelocity, resolveTargetProgress, scrollProgress, scrubBinding
   docs: docs/reference/scroll-in-view.md
 - @labpics/motion/in-view — ./scroll и ./in-view — скролл-привязка и появление во вьюпорте
-  exports: MotionParamError, inView
+  exports: MotionParamError, inView, isMotionParamError
   docs: docs/reference/scroll-in-view.md
 - @labpics/motion/presence — mount/unmount переходы (enter/exit lifecycle)
   exports: createPresence, swapPresence
@@ -123,7 +123,7 @@
   exports: distanceScale, distanceScaleConfig, duration, easing, spring, springFromDurationBounce, staggerGap
   docs: docs/reference/tokens-presets.md
 - @labpics/motion/animate — одно-строчный DOM-фасад
-  exports: animate
+  exports: animate, isMotionParamError
   docs: docs/reference/animate.md
 - @labpics/motion/nano — минимальный WAAPI-вход
   exports: animate

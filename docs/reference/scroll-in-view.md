@@ -346,7 +346,7 @@ window.addEventListener(
 Появление карточек через нативный `./in-view`: enter запускает WAAPI-анимацию, возвращённый leave-cleanup включает повтор при каждом входе; `LM149` отличает headless-окружение:
 
 ```ts
-import { inView, MotionParamError } from '@labpics/motion/in-view';
+import { inView, isMotionParamError } from '@labpics/motion/in-view';
 
 let stop: () => void = () => {};
 try {
@@ -369,7 +369,7 @@ try {
     { amount: 0.5, margin: '0px 0px -10%' }, // нативный rootMargin: enter на полвысоты, чуть раньше низа
   );
 } catch (error) {
-  if (error instanceof MotionParamError && error.code === 'LM149') {
+  if (isMotionParamError(error) && error.code === 'LM149') {
     // Нет IntersectionObserver/host — показать контент без анимации.
     document.querySelectorAll('.card').forEach((el) => {
       (el as HTMLElement).style.opacity = '1';

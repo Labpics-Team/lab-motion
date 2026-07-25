@@ -21,7 +21,9 @@ import * as animateModule from '../src/animate/index.js';
  * AnimateOptions, AnimateProps, AnimateTarget, AnimatableElement) — type-only,
  * стираются при рантайме и в этот пин не входят.
  */
-const EXPECTED_EXPORTS = new Set(['animate']);
+// isMotionParamError живёт рядом с animate намеренно: ловить ошибку, не
+// импортируя корневой entry (иначе потребитель тянет ещё один граф).
+const EXPECTED_EXPORTS = new Set(['animate', 'isMotionParamError']);
 
 describe('./animate — пин публичной поверхности (инвариант 6)', () => {
   it('экспортирует ровно контрактные имена — не больше и не меньше', () => {

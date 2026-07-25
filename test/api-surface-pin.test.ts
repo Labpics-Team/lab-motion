@@ -12,6 +12,10 @@ const EXPECTED_EXPORTS = new Set([
   'spring',
   'tween',
   'MotionParamError',
+  // Гвард ловли через границу субпутей: `instanceof` в собранном пакете
+  // ложен между копиями класса (аудит 2026-07-25, пин на dist —
+  // test/errors-cross-subpath.test.ts). Функция tree-shakeable.
+  'isMotionParamError',
   'drive',
   'validateSpringParams',
   'validateSpringPhysics',

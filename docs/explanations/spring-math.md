@@ -345,7 +345,7 @@ requestAnimationFrame(frame);
 Границы точности и домена: экстремальный overdamped (#226) и незатухающий `ζ = 0`:
 
 ```ts
-import { MotionParamError, spring, type SpringParams } from '@labpics/motion';
+import { isMotionParamError, spring, type SpringParams } from '@labpics/motion';
 import { springAsEasing } from '@labpics/motion/spring';
 
 // ζ = c/(2√(km)) = 5·10⁸ — прежняя форма −ω₀(ζ−√(ζ²−1)) теряла медленный полюс,
@@ -357,7 +357,7 @@ console.log(spring(extreme, 1e9).value); // медленно, но честно 
 try {
   springAsEasing({ mass: 1, stiffness: 100, damping: 0 });
 } catch (e) {
-  if (e instanceof MotionParamError && e.code === 'LM167') {
+  if (isMotionParamError(e) && e.code === 'LM167') {
     // лечение: damping > 0 либо живой исполнитель (drive/MotionValue)
   }
 }

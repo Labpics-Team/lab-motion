@@ -9,6 +9,40 @@
 Коды со статусом `retired` не переиспользуются. `LM000` обозначает ошибку,
 созданную внешним кодом через совместимый строковый конструктор.
 
+## Как ловить: `isMotionParamError`, а не `instanceof`
+
+```typescript
+import { animate, isMotionParamError } from '@labpics/motion/animate';
+
+const target = '.card';
+
+try {
+  animate(target, { opacity: 1 });
+} catch (error) {
+  if (isMotionParamError(error)) console.error(error.code); // 'LM146'
+  else throw error;
+}
+```
+
+`instanceof MotionParamError` через границу субпутей **не работает и работать не
+будет**: пакет собирается без code-splitting, поэтому каждый субпуть несёт
+собственную копию класса, а сравнение по ссылке между копиями ложно. Проверка на
+собранном пакете: ошибка из `./animate` против класса из корня даёт `false`, а
+`error.constructor.name` после минификации равен `'o'`.
+
+Работают три вещи, и все они проверяются на dist в
+`test/errors-cross-subpath.test.ts`:
+
+- `isMotionParamError(error)` — экспортируется из корня, `./animate` и
+  `./in-view`; функция tree-shakeable, поэтому ничего не стоит тем, кто её не
+  импортирует;
+- `error.code` — стабильный машинный идентификатор из таблицы ниже;
+- `error.name === 'MotionParamError'` — то же самое вручную, если гвард
+  импортировать не хочется.
+
+Класс `MotionParamError` остаётся экспортированным для типизации и для
+`instanceof` **внутри одного субпутя**.
+
 | Код | Граница | Причина | Исправление | Статус |
 |---|---|---|---|---|
 | `LM000` | Внешний конструктор | Строка без кода каталога | Для машинной обработки использовать код из каталога | reserved |

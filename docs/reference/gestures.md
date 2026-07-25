@@ -34,7 +34,7 @@ import {
 Класс ошибки и тип пружины — из корневого субпутя:
 
 ```ts
-import { MotionParamError, type SpringParams } from '@labpics/motion';
+import { isMotionParamError, type SpringParams } from '@labpics/motion';
 ```
 
 ## API
@@ -328,7 +328,7 @@ card.addEventListener('pointercancel', () => drag.pointerCancel());
 Handoff compositor → gesture: перехват летящего элемента с наследованием скорости:
 
 ```ts
-import { MotionParamError, type SpringParams } from '@labpics/motion';
+import { isMotionParamError, type SpringParams } from '@labpics/motion';
 import { readCompositorSpring } from '@labpics/motion/compositor';
 import { createDrag } from '@labpics/motion/gestures';
 
@@ -350,7 +350,7 @@ try {
     },
   });
 } catch (e) {
-  if (e instanceof MotionParamError) {
+  if (isMotionParamError(e)) {
     // e.code: 'LM088'..'LM091' — невалидный snapBackSpring, синхронно из createDrag
   }
   throw e;

@@ -315,7 +315,7 @@ x.destroy();
 ### drive: одноразовый прогон с reduced-motion и типизированной ошибкой
 
 ```typescript
-import { drive, MotionParamError } from '@labpics/motion';
+import { drive, isMotionParamError } from '@labpics/motion';
 
 const panel = document.querySelector('.panel') as HTMLElement;
 
@@ -330,7 +330,7 @@ try {
   });
   // Promise разрешён: последний onStep был ровно 1
 } catch (e) {
-  if (e instanceof MotionParamError) {
+  if (isMotionParamError(e)) {
     console.error(e.code); // напр. 'LM091' — пружина не оседает в бюджет; см. docs/errors.md
   } else {
     throw e;

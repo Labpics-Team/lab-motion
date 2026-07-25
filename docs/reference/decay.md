@@ -30,7 +30,7 @@ import { createDecay, type DecayOptions, type DecayModel } from '@labpics/motion
 Класс ошибки экспортируется корневым субпутём:
 
 ```ts
-import { MotionParamError } from '@labpics/motion';
+import { isMotionParamError } from '@labpics/motion';
 ```
 
 ## API
@@ -137,7 +137,7 @@ requestAnimationFrame(frame);
 Детерминированное headless-сэмплирование (SSR/воркер/тест) и граница ошибок:
 
 ```ts
-import { MotionParamError } from '@labpics/motion';
+import { isMotionParamError } from '@labpics/motion';
 import { createDecay, type DecayModel } from '@labpics/motion/decay';
 
 let model: DecayModel;
@@ -151,7 +151,7 @@ try {
     // matchMedia не передан: SSR — reduced = false
   });
 } catch (e) {
-  if (e instanceof MotionParamError) {
+  if (isMotionParamError(e)) {
     // e.code: 'LM021' — from не конечна; 'LM022' — velocity не конечна
   }
   throw e;

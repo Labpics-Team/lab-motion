@@ -469,7 +469,7 @@ controls.then(() => {
 WAAPI-конвертация и числовой счётчик; ранняя ошибка по LM-коду:
 
 ```typescript
-import { MotionParamError } from '@labpics/motion';
+import { isMotionParamError } from '@labpics/motion';
 import { fadeSlide, presetToWaapi, runNumber } from '@labpics/motion/presets';
 
 const badge = document.querySelector('.badge') as HTMLElement;
@@ -487,7 +487,7 @@ runNumber(0, 1287, (formatted) => {
 try {
   presetToWaapi({ ...fadeSlide(), repeat: 2, repeatDelay: 0.2 });
 } catch (e) {
-  if (e instanceof MotionParamError && e.code === 'LM071') {
+  if (isMotionParamError(e) && e.code === 'LM071') {
     // WAAPI не имеет repeatDelay — для паузы между циклами используйте runPreset
   }
 }

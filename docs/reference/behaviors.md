@@ -34,7 +34,7 @@ import {
 Класс ошибки, тип пружины и тип кадрового шва — из корневого субпутя:
 
 ```ts
-import { MotionParamError, type SpringParams, type RequestFrameFn } from '@labpics/motion';
+import { isMotionParamError, type SpringParams, type RequestFrameFn } from '@labpics/motion';
 ```
 
 ## API
@@ -312,7 +312,7 @@ grip.addEventListener('pointercancel', () => ctrl.pointerCancel());
 Drag-to-dismiss headless: без `requestFrame` доводка снэпается синхронно — детерминизм для SSR/тестов; граница ошибок:
 
 ```ts
-import { MotionParamError } from '@labpics/motion';
+import { isMotionParamError } from '@labpics/motion';
 import { createDragDismiss } from '@labpics/motion/behaviors';
 
 let closed = false;
@@ -332,7 +332,7 @@ try {
   card.pointerUp({ x: 0, y: 90, t: 0.05 });   // …скорость 1800 px/s ≥ 600 → dismiss
   console.log(card.state.phase, card.state.dismissed, closed); // 'settle' true true
 } catch (e) {
-  if (e instanceof MotionParamError) {
+  if (isMotionParamError(e)) {
     console.error(e.code); // 'LM004' — невалидный distanceThreshold
   }
   throw e;

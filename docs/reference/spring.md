@@ -272,7 +272,7 @@ requestAnimationFrame(frame);
 Граница исполнителя: точный конструктор vs бюджет frame-loop:
 
 ```ts
-import { MotionParamError, validateSpringParams } from '@labpics/motion';
+import { isMotionParamError, validateSpringParams } from '@labpics/motion';
 import { fromVisualDuration } from '@labpics/motion/spring';
 
 // bounce = 1 ⇒ ζ = 0 ⇒ damping = 0 — точный и валидный выход конструктора.
@@ -281,7 +281,7 @@ const params = fromVisualDuration({ visualDuration: 0.4, bounce: 1 });
 try {
   validateSpringParams(params); // граница автономного frame-loop-исполнителя
 } catch (e) {
-  if (e instanceof MotionParamError && e.code === 'LM091') {
+  if (isMotionParamError(e) && e.code === 'LM091') {
     // Незатухающая пружина не осядет в бюджет кадра-капа:
     // для drive/MotionValue возьмите bounce < 1.
   }
