@@ -88,9 +88,9 @@ function firstTargetCrossingMs(
   spring: typeof SPRING,
   tolerance = TOLERANCE,
 ): number {
-  const artifact = compileSpringExecutionArtifactUnchecked(spring, 0, tolerance);
-  const samples = artifact.samples;
-  const durationMs = settleTimeUpperBound(spring, 0) * 1000;
+  const artifact = compileSpringExecutionArtifactTupleUnchecked(spring, 0, tolerance);
+  const samples = artifact[1];
+  const durationMs = artifact[2];
   for (let i = 0; i + 3 < samples.length; i += 2) {
     const p0 = samples[i + 1]!;
     const p1 = samples[i + 3]!;
@@ -263,20 +263,24 @@ describe('compositor: unified serialized execution artifact', () => {
     const tolerance = 0.0025;
     for (const spring of regimes) {
       for (const v0 of [-10, -1, 0, 1, 10]) {
-        const nodes = compileSpringPlan({
+        const plan = compileSpringPlan({
           spring,
           property: 'x',
           from: 0,
           to: 1,
           v0,
           tolerance,
-        }).nodes;
-        const horizon = settleTimeUpperBound(spring, v0);
-        const lastInterior = nodes.at(-2)!.percent / 100;
+        });
+        const nodes = plan.nodes;
+        // Горизонт — ДЛИТЕЛЬНОСТЬ ПЛАНА, а не реплика settle-закона: с правкой
+        // 2026-07-25 план продлевается до доказанного остатка, и реплика
+        // сэмплировала бы кривую чужим временем (регрессия ловится этим же
+        // ассертом: {1,170,40} v0=−10 давал 0.19 вместо 0.0023).
+        const horizon = plan.duration / 1000;
         let segment = 1;
         let maxError = 0;
         for (let i = 0; i <= 2048; i++) {
-          const tau = lastInterior * i / 2048;
+          const tau = i / 2048;
           const percent = tau * 100;
           while (percent > nodes[segment]!.percent) segment++;
           const a = nodes[segment - 1]!;
@@ -286,7 +290,10 @@ describe('compositor: unified serialized execution artifact', () => {
           const truth = solveSpring(spring, tau * horizon, v0).value;
           maxError = Math.max(maxError, Math.abs(reconstructed - truth));
         }
-        expect(maxError).toBeLessThanOrEqual(tolerance * 15 / 16);
+        // Скан идёт по ВСЕМУ плану, включая терминальный снап (прежде хвост
+        // вырезался через nodes.at(-2) — и ровно там жил дефект горизонта).
+        expect(maxError, `${spring.stiffness}/${spring.damping} v0=${v0}`)
+          .toBeLessThanOrEqual(tolerance * 15 / 16);
       }
     }
   });
@@ -616,16 +623,15 @@ describe('compositor: owner snapshot читает actual WAAPI curve', () => {
     const physics = { mass: 1, stiffness: 1, damping: 1 };
     const from = nextDown(Number.MAX_VALUE);
     const crossingMs = firstTargetCrossingMs(physics);
-    const artifact = compileSpringExecutionArtifactUnchecked(
+    // Длительность — из самого артефакта (индекс 2), а не из реплики
+    // settle-закона: горизонт медленной {1,1,1} после аудита 2026-07-25 равен
+    // 13657 мс против settle 10884, и реплика читала кривую чужим временем.
+    const artifact = compileSpringExecutionArtifactTupleUnchecked(
       physics,
       0,
       TOLERANCE,
     );
-    const sample = sampleSerializedSpring(
-      artifact.samples,
-      settleTimeUpperBound(physics, 0) * 1000,
-      crossingMs,
-    );
+    const sample = sampleSerializedSpring(artifact[1], artifact[2], crossingMs);
     const expectedVelocity = scaleSerializedVelocity(
       sample.velocity,
       from,

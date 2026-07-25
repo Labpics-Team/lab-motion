@@ -4,7 +4,9 @@ import {
   BASE_GRID_MAX,
   baseGridSize,
   buildSpringNodes,
+  buildSpringNodesWithHorizon,
   fitsSpringCurveBudget,
+  springCompileHorizon,
 } from '../src/compositor/segmenter.js';
 import { CONVERGENCE_THRESHOLD } from '../src/internal/constants.js';
 import { solveSpring } from '../src/internal/solver.js';
@@ -104,6 +106,10 @@ describe('compositor: v0 входит в доказанный горизонт �
         to: 1,
         v0,
       });
+      // Для быстрой пружины (ω₀ = 10) горизонт РАВЕН settle-закону: остаток на
+      // нём уже ≤ tolerance/2, продлевать нечего. Ассерт держит это как
+      // невырегрессию — правка горизонта (2026-07-25) не должна удлинять планы
+      // пружин, которые бюджет и так держали.
       expect(plan.duration).toBe(settleTimeUpperBound(UNDER, v0) * 1000);
     }
   });
@@ -112,11 +118,11 @@ describe('compositor: v0 входит в доказанный горизонт �
     const tolerance = 0.0025;
     for (const p of CURVE_REGIMES) {
       for (const v0 of [-10, -1, 0, 1, 10]) {
-        const duration = settleTimeUpperBound(p, v0);
-        const nodeSlope = firstPhysicalSlope(
-          buildSpringNodes(p, v0, tolerance),
-          duration,
-        );
+        // Горизонт берётся у ПРОИЗВОДСТВЕННОГО сегментера одним вызовом с
+        // узлами: реплика `settleTimeUpperBound` разъезжается с планом на
+        // медленных пружинах (аудит 2026-07-25 — продление до остатка ≤ tol/2).
+        const [nodes, duration] = buildSpringNodesWithHorizon(p, v0, tolerance);
+        const nodeSlope = firstPhysicalSlope(nodes, duration);
         const cssSlope = firstPhysicalSlope(
           parseLinear(compileSpringLinear(p, { v0, tolerance })),
           duration,
@@ -173,8 +179,7 @@ describe('compositor: v0 входит в доказанный горизонт �
     for (const p of CURVE_REGIMES) {
       for (const v0 of [-10, -1, 0, 1, 10]) {
         if (!fitsSpringCurveBudget(p, v0, tolerance)) continue;
-        const nodes = buildSpringNodes(p, v0, tolerance);
-        const horizon = settleTimeUpperBound(p, v0);
+        const [nodes, horizon] = buildSpringNodesWithHorizon(p, v0, tolerance);
         const interior = nodes.at(-2)!.percent / 100;
         let maxError = 0;
         for (let i = 0; i <= 4096; i++) {
@@ -200,7 +205,7 @@ describe('compositor: v0 входит в доказанный горизонт �
     const v0 = -20;
     const tolerance = 0.0025;
     const nodes = parseLinear(compileSpringLinear(physics, { v0, tolerance }));
-    const horizon = settleTimeUpperBound(physics, v0);
+    const horizon = springCompileHorizon(physics, v0, tolerance);
     const interior = nodes.at(-2)!.percent / 100;
     let hi = 1;
     let maxError = 0;
@@ -233,7 +238,17 @@ describe('compositor: v0 входит в доказанный горизонт �
       v0,
       tolerance,
     });
-    expect(plan.duration).toBe(settleTimeUpperBound(physics, v0) * 1000);
+    // ЗАМОРОЖЕННЫЙ литерал, а не реплика закона (та же дисциплина, что у
+    // FROZEN_REST_BOUND_S выше): реплика повторяет расчёт и потому не ловит
+    // изменение закона — только смену маршрута.
+    //
+    // Хронология:
+    //   до 2026-07-25 — 9459.584215263678 (горизонт = settleTimeUpperBound);
+    //   2026-07-25 — 10726.100415585513: горизонт продлевается ln-дефицитом до
+    //   доказанного остатка ≤ tolerance/2. У этой пружины ω₀ = 1.284 и v0 = 50,
+    //   поэтому settle оставлял |p−1| = 2.7e-3 > tolerance/2 = 1.25e-3 — снап
+    //   в 1 выносил ошибку реконструкции за обещанный бюджет.
+    expect(plan.duration).toBe(10726.100415585513);
     let i = 1;
     while (tau * 100 > plan.nodes[i]!.percent) i++;
     const a = plan.nodes[i - 1]!;

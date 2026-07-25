@@ -7,7 +7,7 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { animate } from '../src/animate/index.js';
 import {
-  compileSpringExecutionArtifactUnchecked,
+  compileSpringExecutionArtifactTupleUnchecked,
   DEFAULT_TOLERANCE,
 } from '../src/compositor/curve.js';
 import { readCompositorSpring } from '../src/compositor/index.js';
@@ -40,16 +40,17 @@ function executionSnapshot(
   to: number,
   tMs: number,
 ): { value: number; velocity: number } {
-  const artifact = compileSpringExecutionArtifactUnchecked(
+  // Длительность берётся из ПРОИЗВОДСТВЕННОГО артефакта (индекс 2 кортежа), а не
+  // пересчитывается по settleTimeUpperBound. Реплика закона горизонта в тесте
+  // молча разъезжается: аудит 2026-07-25 продлил горизонт медленных пружин до
+  // доказанного остатка ≤ tolerance/2, и реплики стали сэмплировать кривую
+  // чужой длительностью (пружина {1,1,1}: 10884 мс против фактических 13657).
+  const artifact = compileSpringExecutionArtifactTupleUnchecked(
     physics,
     0,
     DEFAULT_TOLERANCE,
   );
-  const sample = sampleSerializedSpring(
-    artifact.samples,
-    settleTimeUpperBound(physics, 0) * 1000,
-    tMs,
-  );
+  const sample = sampleSerializedSpring(artifact[1], artifact[2], tMs);
   return {
     value: (1 - sample.value) * from + sample.value * to,
     velocity: sample.velocity * to - sample.velocity * from,
@@ -63,13 +64,13 @@ function firstSlope(linear: string, durationMs: number): number {
 }
 
 function firstSerializedTargetCrossingMs(physics: SpringParams): number {
-  const artifact = compileSpringExecutionArtifactUnchecked(
+  const artifact = compileSpringExecutionArtifactTupleUnchecked(
     physics,
     0,
     DEFAULT_TOLERANCE,
   );
-  const samples = artifact.samples;
-  const durationMs = settleTimeUpperBound(physics, 0) * 1000;
+  const samples = artifact[1];
+  const durationMs = artifact[2];
   for (let i = 0; i + 3 < samples.length; i += 2) {
     const p0 = samples[i + 1]!;
     const p1 = samples[i + 3]!;

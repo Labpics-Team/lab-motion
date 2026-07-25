@@ -27,6 +27,7 @@ import {
   buildSpringNodesWithHorizon,
   baseGridSize,
   douglasPeuckerVertical,
+  springCompileHorizon,
 } from '../src/compositor/segmenter.js';
 import { spring, settleTimeUpperBound, type SpringParams } from '../src/spring.js';
 import { solveSpring } from '../src/internal/solver.js';
@@ -37,6 +38,14 @@ const STIFF: SpringParams = { mass: 1, stiffness: 170, damping: 26 }; // ~кри
 const BOUNCY: SpringParams = { mass: 1, stiffness: 180, damping: 8 }; // сильно underdamped
 const GENTLE: SpringParams = { mass: 1, stiffness: 120, damping: 30 }; // мягкий
 const OVER: SpringParams = { mass: 1, stiffness: 100, damping: 40 }; // передемпфированный
+// Медленные режимы (ω₀ ≤ 1): у них остаток закона оседания равен полному ε и
+// снап в 1 — самая крупная составляющая ошибки. Все четыре режима выше имеют
+// ω₀ ≥ 10, где остаток вдесятеро меньше, поэтому корпус дефекта не видел.
+const SLOW_REGIMES: SpringParams[] = [
+  { mass: 1, stiffness: 1, damping: 1 },    // ω₀ = 1, ζ = 0.5
+  { mass: 1, stiffness: 1, damping: 1.98 }, // ω₀ = 1, ζ = 0.99
+  { mass: 1, stiffness: 1, damping: 4 },    // ω₀ = 1, ζ = 2
+];
 
 /** Разбирает linear()-строку в узлы {progress, percent}. */
 function parseLinear(s: string): { progress: number; percent: number }[] {
@@ -133,49 +142,66 @@ describe('compositor: граница ошибки кусочно-линейно�
     return nodes[nodes.length - 1]!.progress;
   }
 
-  it('УЗЛЫ сегментера: макс. отклонение реконструкции от истинной кривой ≤ tolerance (интерьер)', () => {
-    for (const params of [STIFF, BOUNCY, GENTLE, OVER]) {
-      const tol = 0.002;
-      // Горизонт — ВОЗВРАЩАЕМЫЙ строителем: tolerance строже дефолта продлевает
-      // его по #223-закону, и percent-шкала узлов живёт именно на нём.
-      const [nodes, T] = buildSpringNodesWithHorizon(params, 0, tol);
-      // Интерьер: до предпоследнего узла (хвост форсится в 1 — снап эндпоинта
-      // ≤0.5% исключаем из ТОЧНОЙ границы, проверяется отдельно ниже).
-      const lastInteriorTau = nodes[nodes.length - 2]!.percent / 100;
-      let maxDev = 0;
-      for (let k = 0; k <= 400; k++) {
-        const tau = (k / 400) * lastInteriorTau;
-        const truth = solveSpring(params, tau * T, 0).value;
-        maxDev = Math.max(maxDev, Math.abs(reconstruct(nodes, tau) - truth));
+  it('УЗЛЫ сегментера: макс. отклонение реконструкции от истинной кривой ≤ tolerance (ВЕСЬ план)', () => {
+    for (const params of [STIFF, BOUNCY, GENTLE, OVER, ...SLOW_REGIMES]) {
+      for (const tol of [0.002, DEFAULT_TOLERANCE, 0.01]) {
+        // Горизонт — ВОЗВРАЩАЕМЫЙ строителем: закон продлевает его до
+        // доказанного остатка ≤ tolerance/2, и percent-шкала узлов живёт
+        // именно на нём. Реплика settle-закона здесь разъедется.
+        const [nodes, T] = buildSpringNodesWithHorizon(params, 0, tol);
+        // ВЕСЬ план, включая хвост. Прежняя версия скана обрывалась на
+        // предпоследнем узле «снап эндпоинта исключаем из ТОЧНОЙ границы» —
+        // и ровно в вырезанном куске жил дефект 2026-07-25: снап в 1 давал до
+        // 2.00× бюджета на медленных пружинах. Исключать из проверки часть
+        // плана, которую пользователь видит, было нельзя.
+        let maxDev = 0;
+        for (let k = 0; k <= 2000; k++) {
+          const tau = k / 2000;
+          const truth = solveSpring(params, tau * T, 0).value;
+          maxDev = Math.max(maxDev, Math.abs(reconstruct(nodes, tau) - truth));
+        }
+        expect(maxDev, `${params.stiffness}/${params.damping} tol=${tol}`)
+          .toBeLessThanOrEqual(tol);
       }
-      // Граница RDP: ≤ tolerance на узлах сетки; между узлами базовая сетка
-      // (16 сэмплов/полуволну) добавляет крохотный люфт → ×1.5 запас.
-      expect(maxDev).toBeLessThanOrEqual(tol * 1.5);
     }
   });
 
-  it('эндпоинт-снап хвоста в 1 субпиксельный (истинный p(T) в пределах ~0.5% цели)', () => {
-    for (const params of [STIFF, BOUNCY, GENTLE, OVER]) {
-      const T = settleTimeUpperBound(params);
-      const trueFinal = solveSpring(params, T, 0).value;
-      expect(Math.abs(1 - trueFinal)).toBeLessThan(0.01);
+  it('эндпоинт-снап хвоста укладывается в СВОЮ долю бюджета (tolerance/2)', () => {
+    // Было: «истинный p(T) в пределах ~0.5% цели» с порогом 0.01 — константа,
+    // не связанная с запрошенным бюджетом ВООБЩЕ. При дефолтном tolerance
+    // 0.0025 такой порог разрешал вчетверо большую ошибку, чем обещано, и
+    // именно он «подтверждал» корректность горизонта, пока тот её не давал.
+    // Стало: снап меряется на ПРОИЗВОДСТВЕННОМ горизонте против доли бюджета,
+    // которую закон ему выделяет.
+    for (const params of [STIFF, BOUNCY, GENTLE, OVER, ...SLOW_REGIMES]) {
+      for (const v0 of [0, 3, -3]) {
+        for (const tol of [0.0005, DEFAULT_TOLERANCE, 0.01]) {
+          const T = springCompileHorizon(params, v0, tol);
+          const trueFinal = solveSpring(params, T, v0).value;
+          expect(Math.abs(1 - trueFinal), `${params.stiffness}/${params.damping} v0=${v0} tol=${tol}`)
+            // Граница строгая: у пружин, где deficit ровно ноль (2ε/tolerance
+            // = max(1, ω₀)), остаток попадает В ТОЧКУ tolerance/2, и разница в
+            // последнем ULP — не нарушение закона.
+            .toBeLessThanOrEqual(tol / 2 * (1 + 1e-9));
+        }
+      }
     }
   });
 
   it('строка компилятора (округлённая) реконструирует истинную кривую в пределах бюджета+округление', () => {
     const tol = 0.003;
     const nodes = parseLinear(compileSpringLinear(BOUNCY, { tolerance: tol }));
-    const T = settleTimeUpperBound(BOUNCY);
+    const T = springCompileHorizon(BOUNCY, 0, tol);
     let maxDev = 0;
-    for (let k = 0; k <= 500; k++) {
-      const tau = k / 500;
+    for (let k = 0; k <= 2000; k++) {
+      const tau = k / 2000;
       const truth = solveSpring(BOUNCY, tau * T, 0).value;
       maxDev = Math.max(maxDev, Math.abs(reconstruct(nodes, tau) - truth));
     }
-    // tolerance + округление прогресса (5e-5) + округление % + эндпоинт-снап (≤0.01).
-    expect(maxDev).toBeLessThan(tol + 0.012);
-    // И не вырождено-велика (граница реальна, а не «всё сойдёт»).
-    expect(maxDev).toBeLessThan(0.02);
+    // Замкнутая арифметика бюджета: сетка + RDP + сериализация + снап ≤ tolerance.
+    // Прежний запас `tol + 0.012` был вчетверо шире самого бюджета — под него
+    // помещалось любое нарушение обещания.
+    expect(maxDev).toBeLessThanOrEqual(tol);
   });
 });
 
