@@ -37,7 +37,7 @@ const DIST = resolve(ROOT, 'dist');
 const TMP = resolve(HERE, '.size-compare-tmp');
 
 /** lab-motion резолвится в свежий dist (байты npm-потребителя). */
-const LAB_ALIAS = {
+export const LAB_ALIAS = {
   '@labpics/motion/nano': resolve(DIST, 'nano/index.js'),
   '@labpics/motion/animate': resolve(DIST, 'animate/index.js'),
   '@labpics/motion/compiler/runtime': resolve(DIST, 'compiler/runtime/index.js'),
@@ -47,7 +47,7 @@ const LAB_ALIAS = {
  * Эквивалентные сценарии «move + fade одного элемента». el — внешняя
  * переменная (globalThis), чтобы бандл не платил за создание элемента.
  */
-const SCENARIOS = [
+export const SCENARIOS = [
   {
     id: 'lab-compiled',
     label: 'lab-motion nano + compiler',
@@ -106,7 +106,7 @@ globalThis.play = (el) => gsap.to(el, { x: 240, opacity: 1 });`,
   },
 ];
 
-async function measureEsbuild(code) {
+export async function measureEsbuild(code) {
   const result = await build({
     absWorkingDir: HERE,
     stdin: { contents: code, resolveDir: HERE, loader: 'js' },
