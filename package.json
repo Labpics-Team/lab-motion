@@ -26,9 +26,6 @@
   },
   "packageManager": "pnpm@11.11.0",
   "type": "module",
-  "imports": {
-    "#frame": "./dist/frame/index.js"
-  },
   "module": "./dist/index.js",
   "types": "./dist/index.d.ts",
   "typesVersions": {

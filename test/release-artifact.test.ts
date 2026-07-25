@@ -36,9 +36,6 @@ function releaseMetadata() {
     type: 'module',
     module: './dist/index.js',
     types: './dist/index.d.ts',
-    imports: {
-      '#frame': './dist/frame/index.js',
-    },
     typesVersions: { '*': { '*': ['dist/*/index.d.ts'] } },
     exports: {
       '.': { types: './dist/index.d.ts', default: './dist/index.js' },

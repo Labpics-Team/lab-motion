@@ -24,9 +24,6 @@ function metadata() {
     type: 'module',
     module: './dist/index.js',
     types: './dist/index.d.ts',
-    imports: {
-      '#frame': './dist/frame/index.js',
-    },
     typesVersions: { '*': { '*': ['dist/*/index.d.ts'] } },
     exports: {
       '.': { types: './dist/index.d.ts', default: './dist/index.js' },
@@ -135,11 +132,10 @@ describe('release metadata SSOT', () => {
         require: { types: './dist/index.d.cts', default: './dist/index.cjs' },
       };
     }],
-    ['воскресшую ветку require в imports', (pkg: any) => {
-      pkg.imports['#frame'] = {
-        import: './dist/frame/index.js',
-        require: './dist/frame/index.cjs',
-      };
+    // Поле `imports` целиком: алиас #frame нужен был только CJS-ветке, а после
+    // её снятия ни один отгружаемый байт его не упоминает.
+    ['воскресшее поле imports', (pkg: any) => {
+      pkg.imports = { '#frame': './dist/frame/index.js' };
     }],
     // `main` указывал бы на CJS-артефакт, которого больше нет.
     ['воскресшее поле main', (pkg: any) => { pkg.main = './dist/index.cjs'; }],
