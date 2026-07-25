@@ -669,17 +669,25 @@ export async function measureScenario(scenario, distIndexPath) {
 }
 
 /**
- * Рекурсивно достаёт СТРОКОВЫЙ путь из conditional-exports значения.
- * package.json "exports" допускает произвольную вложенность условий
- * (например `{ import: { types, default } }`), поэтому просто `value.import`
- * не гарантированно строка — нужно спускаться, пока не найдётся строка.
- * Возвращает null, если строкового пути нет (вместо падения с TypeError).
+ * Достаёт СТРОКОВЫЙ runtime-путь из значения exports. Поставка одноформатная:
+ * у субпутя ровно одна цель (`{ types, default }` либо строка), поэтому
+ * спускаться некуда. Возвращает null для type-only субпутя — его нечего мерить.
+ *
+ * Условная ветка `import`/`require` здесь — ОШИБКА, а не форма для поддержки:
+ * молчаливое «не смог разобрать → null» выкинуло бы субпуть из гейта целиком,
+ * и возврат к двухформатной поставке прошёл бы зелёным вместе с потерей
+ * измерения. Поэтому отказ громкий.
  */
 function resolveImportString(value) {
   if (typeof value === 'string') return value;
   if (value && typeof value === 'object') {
-    const nested = value.import ?? value.default;
-    if (nested !== undefined) return resolveImportString(nested);
+    if (value.import !== undefined || value.require !== undefined) {
+      throw new Error(
+        'package.json: условные ветки import/require в exports — поставка одноформатная, '
+        + 'у субпутя обязана быть ровно одна цель',
+      );
+    }
+    if (typeof value.default === 'string') return value.default;
   }
   return null;
 }

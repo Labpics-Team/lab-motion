@@ -21,7 +21,7 @@
 
 ## Импорт
 
-Каждый субпуть самостоятелен (ESM и CJS ветки в `exports` package.json); в бандл попадает только импортированное:
+Каждый субпуть самостоятелен (одна цель на субпуть в `exports` package.json); в бандл попадает только импортированное:
 
 ```ts
 import { useMotionValue, useSpring, useMotionStyle, useReducedMotion } from '@labpics/motion/react';

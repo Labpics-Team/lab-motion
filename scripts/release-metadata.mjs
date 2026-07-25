@@ -24,17 +24,18 @@ const EXACT_FIELDS = Object.freeze({
   ],
   license: 'MIT',
   repository: RELEASE_REPOSITORY,
-  engines: { node: '>=22' },
+  // Поставка одноформатная (ESM). Пол Node 22.12 — первая версия, где
+  // `require(esm)` включён без флага: без него CJS-потребитель остался бы
+  // без пакета вовсе. Ниже 22.12 опускать нельзя.
+  engines: { node: '>=22.12' },
   packageManager: 'pnpm@11.11.0',
   type: 'module',
-  main: './dist/index.cjs',
+  // `main` отсутствует намеренно: единственная точка входа — exports, и
+  // отдельного CJS-артефакта, на который `main` мог бы указывать, больше нет.
   module: './dist/index.js',
   types: './dist/index.d.ts',
   imports: {
-    '#frame': {
-      import: './dist/frame/index.js',
-      require: './dist/frame/index.cjs',
-    },
+    '#frame': './dist/frame/index.js',
   },
   files: [
     'dist',
@@ -55,9 +56,7 @@ const EXACT_FIELDS = Object.freeze({
   publishConfig: { access: 'public' },
   sideEffects: [
     './dist/lit/index.js',
-    './dist/lit/index.cjs',
     './dist/wc/index.js',
-    './dist/wc/index.cjs',
   ],
   peerDependencies: {
     '@angular/core': '>=16.0.0',
@@ -158,12 +157,9 @@ function assertExact(value, expected, label) {
   }
 }
 
-function expectedExportTarget(subpath, kind, branch) {
+function expectedExportTarget(subpath, kind) {
   const directory = subpath === '.' ? '' : `${subpath.slice(2)}/`;
-  const extension = kind === 'types'
-    ? branch === 'import' ? 'd.ts' : 'd.cts'
-    : branch === 'import' ? 'js' : 'cjs';
-  return `./dist/${directory}index.${extension}`;
+  return `./dist/${directory}index.${kind === 'types' ? 'd.ts' : 'js'}`;
 }
 
 function assertExports(exportsMap, label) {
@@ -177,23 +173,17 @@ function assertExports(exportsMap, label) {
       fail(`${label}.exports`, `неканонический субпуть ${subpath}`);
     }
     assertPlainObject(target, `${label}.exports[${subpath}]`);
-    assertExact(Object.keys(target), ['import', 'require'], `${label}.exports[${subpath}] conditions`);
-    for (const branch of ['import', 'require']) {
-      const condition = target[branch];
-      assertPlainObject(condition, `${label}.exports[${subpath}].${branch}`);
-      assertExact(
-        Object.keys(condition),
-        ['types', 'default'],
-        `${label}.exports[${subpath}].${branch} conditions`,
-      );
-      for (const kind of ['types', 'default']) {
-        const expected = expectedExportTarget(subpath, kind, branch);
-        if (condition[kind] !== expected) {
-          fail(
-            `${label}.exports[${subpath}].${branch}.${kind}`,
-            `ожидалось ${expected}, получено ${String(condition[kind])}`,
-          );
-        }
+    // Условных веток нет вовсе. Отсутствие `require` здесь — не упущение, а
+    // сам механизм защиты от dual-package hazard: одна цель на субпуть
+    // означает один экземпляр модуля независимо от того, как его подключили.
+    assertExact(Object.keys(target), ['types', 'default'], `${label}.exports[${subpath}] conditions`);
+    for (const kind of ['types', 'default']) {
+      const expected = expectedExportTarget(subpath, kind);
+      if (target[kind] !== expected) {
+        fail(
+          `${label}.exports[${subpath}].${kind}`,
+          `ожидалось ${expected}, получено ${String(target[kind])}`,
+        );
       }
     }
   }

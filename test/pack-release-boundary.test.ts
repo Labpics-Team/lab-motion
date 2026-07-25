@@ -19,8 +19,21 @@ describe('packed release boundary', () => {
 
   it('derives the runnable Node floor and export surface from installed archive metadata', () => {
     expect(smoke).toContain("JSON.parse(readFileSync(join(installedRoot, 'package.json'), 'utf8'))");
-    expect(smoke).toContain("/^>=(\\d+)$/.exec(installedPackage.engines?.node ?? '')");
+    expect(smoke).toContain("/^>=(\\d+)\\.(\\d+)$/.exec(installedPackage.engines?.node ?? '')");
     expect(smoke).toContain('Object.keys(installedPackage.exports)');
-    expect(smoke).not.toContain("pkg.engines?.node !== '>=22'");
+    // Пол не должен быть зашит в скрипт ни в каком виде: смысл проверки —
+    // «раннер удовлетворяет тому, что реально отгружено», а не константе.
+    expect(smoke).not.toMatch(/engines\?\.node !== '/);
+  });
+
+  it('проверяет смешанный граф в одном процессе, а не две ветки порознь', () => {
+    // Разделённые ESM- и CJS-пробы не могут увидеть дублирование модуля:
+    // у каждой свой процесс. Смешанная проба — единственное место, где
+    // возврат к условным веткам import/require стал бы красным.
+    expect(smoke).toContain("createRequire(import.meta.url)");
+    expect(smoke).toContain('required.frame !== imported.frame');
+    expect(smoke).toContain('mixed-graph.mjs');
+    // Условные ветки в exports обязаны быть отказом, а не молчаливым «ок».
+    expect(smoke).toContain("for (const forbidden of ['import', 'require'])");
   });
 });

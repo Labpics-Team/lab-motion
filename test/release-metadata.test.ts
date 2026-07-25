@@ -19,30 +19,20 @@ function metadata() {
       type: 'git',
       url: 'git+https://github.com/Labpics-Team/lab-motion.git',
     },
-    engines: { node: '>=22' },
+    engines: { node: '>=22.12' },
     packageManager: 'pnpm@11.11.0',
     type: 'module',
-    main: './dist/index.cjs',
     module: './dist/index.js',
     types: './dist/index.d.ts',
     imports: {
-      '#frame': { import: './dist/frame/index.js', require: './dist/frame/index.cjs' },
+      '#frame': './dist/frame/index.js',
     },
     typesVersions: { '*': { '*': ['dist/*/index.d.ts'] } },
     exports: {
-      '.': {
-        import: { types: './dist/index.d.ts', default: './dist/index.js' },
-        require: { types: './dist/index.d.cts', default: './dist/index.cjs' },
-      },
+      '.': { types: './dist/index.d.ts', default: './dist/index.js' },
       './compositor/stagger': {
-        import: {
-          types: './dist/compositor/stagger/index.d.ts',
-          default: './dist/compositor/stagger/index.js',
-        },
-        require: {
-          types: './dist/compositor/stagger/index.d.cts',
-          default: './dist/compositor/stagger/index.cjs',
-        },
+        types: './dist/compositor/stagger/index.d.ts',
+        default: './dist/compositor/stagger/index.js',
       },
     },
     files: [
@@ -63,9 +53,7 @@ function metadata() {
     publishConfig: { access: 'public' },
     sideEffects: [
       './dist/lit/index.js',
-      './dist/lit/index.cjs',
       './dist/wc/index.js',
-      './dist/wc/index.cjs',
     ],
     scripts: { build: 'tsup' },
     peerDependencies: {
@@ -135,6 +123,27 @@ describe('release metadata SSOT', () => {
       pkg.files = pkg.files.filter((file: string) => file !== 'docs/recipes.md');
     }],
     ['wrong Node floor', (pkg: any) => { pkg.engines.node = '>=24'; }],
+    // Пол 22.12 — не косметика: ниже него `require(esm)` бросает
+    // ERR_REQUIRE_ESM, и одноформатная поставка становится недоступна
+    // CJS-потребителю вовсе. Откат пола обязан быть красным.
+    ['опущенный до 22.0 пол Node', (pkg: any) => { pkg.engines.node = '>=22'; }],
+    // Возврат условных веток вернул бы dual-package hazard: два экземпляра
+    // модульного состояния в одном процессе.
+    ['воскресшую ветку require в exports', (pkg: any) => {
+      pkg.exports['.'] = {
+        import: { types: './dist/index.d.ts', default: './dist/index.js' },
+        require: { types: './dist/index.d.cts', default: './dist/index.cjs' },
+      };
+    }],
+    ['воскресшую ветку require в imports', (pkg: any) => {
+      pkg.imports['#frame'] = {
+        import: './dist/frame/index.js',
+        require: './dist/frame/index.cjs',
+      };
+    }],
+    // `main` указывал бы на CJS-артефакт, которого больше нет.
+    ['воскресшее поле main', (pkg: any) => { pkg.main = './dist/index.cjs'; }],
+    ['CJS в sideEffects', (pkg: any) => { pkg.sideEffects.push('./dist/lit/index.cjs'); }],
     ['missing peer', (pkg: any) => { delete pkg.peerDependencies.react; }],
     ['description drift', (pkg: any) => { pkg.description = 'faster'; }],
     ['keyword drift', (pkg: any) => { pkg.keywords.pop(); }],
@@ -151,7 +160,7 @@ describe('release metadata SSOT', () => {
     const root = metadata() as any;
     const archive = structuredClone(root);
     if (field === 'version') archive.version = '0.3.1';
-    else if (field === 'exports') archive.exports['./compositor/stagger'].import.default = './dist/other.js';
+    else if (field === 'exports') archive.exports['./compositor/stagger'].default = './dist/other.js';
     else if (field === 'typesVersions') archive.typesVersions = { '*': { '*': ['wrong'] } };
     else if (field === 'sideEffects') archive.sideEffects = [];
     else if (field === 'files') archive.files = [...archive.files].reverse();

@@ -11,17 +11,11 @@ import { entriesFromPackageExports } from '../tsup.config.js';
 const pkg = JSON.parse(readFileSync(new URL('../package.json', import.meta.url), 'utf8'));
 
 describe('nano: package contract', () => {
-  it('публикует ровно один новый entry с ESM/CJS и соответствующими типами', () => {
+  it('публикует ровно один новый entry с единственной целью и типами', () => {
     expect(Object.keys(nano)).toEqual(['animate']);
     expect(pkg.exports['./nano']).toEqual({
-      import: {
-        types: './dist/nano/index.d.ts',
-        default: './dist/nano/index.js',
-      },
-      require: {
-        types: './dist/nano/index.d.cts',
-        default: './dist/nano/index.cjs',
-      },
+      types: './dist/nano/index.d.ts',
+      default: './dist/nano/index.js',
     });
     // exports — SSOT entry-points: субпуть обязан выводиться в build-entry.
     expect(entriesFromPackageExports()['nano/index']).toBe('src/nano/index.ts');

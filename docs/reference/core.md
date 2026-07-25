@@ -23,7 +23,7 @@ Runtime-поверхность корня запинена контрактны�
 
 ## Импорт
 
-ESM и CJS (ветка `"."` в `exports` package.json):
+Точка `"."` в `exports` package.json:
 
 ```typescript
 import {

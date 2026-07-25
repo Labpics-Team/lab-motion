@@ -12,13 +12,14 @@ import { canonicalGzip } from '../scripts/compression-oracle.mjs';
  * присутствуют в собранном артефакте.
  *
  * ОХВАТ (аудит 2026-07-25). До него «нет внешних импортов» проверялось на ОДНОМ
- * файле — dist/index.js — при 82 отгружаемых файлах и 41 субпути. То есть
- * публичное обещание «zero runtime dependencies» держалось на 1/82 поставки:
- * зависимость, приехавшая в любой другой субпуть (или в ЛЮБОЙ .cjs, которых
- * гейт не видел вовсе), проходила зелёной. Теперь сканируются все отгружаемые
- * файлы, обе формы модулей и все три формы ссылки (`from`, `import()`,
- * `require()`), а разрешены ровно две категории: объявленные peerDependencies
- * фреймворковых адаптеров и объявленный в package.json `imports` алиас #frame.
+ * файле — dist/index.js — при 41 субпути в поставке. То есть публичное обещание
+ * «zero runtime dependencies» держалось на одном файле из всей поставки:
+ * зависимость, приехавшая в любой другой субпуть, проходила зелёной. Теперь
+ * сканируются ВСЕ отгружаемые исполняемые файлы и все три формы ссылки
+ * (`from`, `import()`, `require()`), а разрешены ровно две категории:
+ * объявленные peerDependencies фреймворковых адаптеров и объявленный в
+ * package.json `imports` алиас #frame. Требуемый охват выводится из exports,
+ * поэтому новый субпуть попадает под гейт автоматически.
  */
 
 const here = dirname(fileURLToPath(import.meta.url));
@@ -29,6 +30,7 @@ const pkg = JSON.parse(readFileSync(resolve(pkgRoot, 'package.json'), 'utf8')) a
   dependencies?: Record<string, string>;
   peerDependencies?: Record<string, string>;
   imports?: Record<string, unknown>;
+  exports: Record<string, { types: string; default: string }>;
   name: string;
 };
 
@@ -118,10 +120,18 @@ describe.runIf(distReady())('zero-dep + bundle-size smoke (invariant 1)', () => 
   it('охват гейта покрывает всю поставку, а не один файл (страж самого гейта)', () => {
     // Пин на случай, если сборка перестанет класть часть выхода в dist/ либо
     // кто-то сузит обход: гейт без охвата зелен по построению и потому опасен.
+    // Требуемый охват выводится из exports, а не из константы: добавленный
+    // субпуть автоматически становится обязательным к сканированию.
     const files = shippedFiles();
-    expect(files.length).toBeGreaterThanOrEqual(80);
-    expect(files.filter((f) => f.endsWith('.cjs')).length).toBeGreaterThan(30);
-    expect(files.some((f) => f.endsWith('dist/index.js'))).toBe(true);
+    const scanned = new Set(files.map((f) => relative(pkgRoot, f).replaceAll('\\', '/')));
+    const targets = Object.values(pkg.exports).map((t) => t.default.replace(/^\.\//, ''));
+    expect(targets.length).toBeGreaterThanOrEqual(41);
+    const unscanned = targets.filter((t) => !scanned.has(t));
+    expect(unscanned, `цели exports вне охвата гейта:\n${unscanned.join('\n')}`).toEqual([]);
+    expect(files.length).toBeGreaterThanOrEqual(targets.length);
+    // Поставка одноформатная: CJS-артефакта нет ни одного файла. Его появление
+    // означало бы второй экземпляр модульного состояния у потребителя.
+    expect(files.filter((f) => f.endsWith('.cjs'))).toEqual([]);
   });
 
   it('корневой ESM использует канонический gzip и единый CORE-порог', () => {

@@ -100,13 +100,21 @@ try {
 
   const installedRoot = join(app, 'node_modules', ...pkg.name.split('/'));
   const installedPackage = JSON.parse(readFileSync(join(installedRoot, 'package.json'), 'utf8'));
-  const floorMatch = /^>=(\d+)$/.exec(installedPackage.engines?.node ?? '');
+  // Пол читается ИЗ АРХИВА, а не из констант скрипта: смысл проверки в том,
+  // что раннер удовлетворяет тому, что реально отгружено. Minor обязателен —
+  // граница `require(esm)` проходит внутри major 22 (22.12), и пол вида
+  // «>=22» молча пустил бы 22.0, где CJS-потребитель получил бы ERR_REQUIRE_ESM.
+  const floorMatch = /^>=(\d+)\.(\d+)$/.exec(installedPackage.engines?.node ?? '');
   if (floorMatch === null) {
     throw new Error(`архив содержит неканонический engines.node: ${String(installedPackage.engines?.node)}`);
   }
-  const nodeMajor = Number(process.versions.node.split('.')[0]);
-  const floor = Number(floorMatch[1]);
-  if (!Number.isSafeInteger(nodeMajor) || nodeMajor < floor) {
+  const [nodeMajor, nodeMinor] = process.versions.node.split('.').map(Number);
+  const floorMajor = Number(floorMatch[1]);
+  const floorMinor = Number(floorMatch[2]);
+  if (
+    !Number.isSafeInteger(nodeMajor) || !Number.isSafeInteger(nodeMinor)
+    || nodeMajor < floorMajor || (nodeMajor === floorMajor && nodeMinor < floorMinor)
+  ) {
     throw new Error(`Node ${process.versions.node} ниже отгруженного floor ${installedPackage.engines.node}`);
   }
   log(`Node contract: архив ${installedPackage.engines.node}, раннер ${process.versions.node} ✓`);
@@ -199,17 +207,61 @@ try {
   writeFileSync(join(app, 'shared-frame.cjs'), sharedFrameProbe('cjs'));
   log(execSync('node shared-frame.cjs', { cwd: app, encoding: 'utf8' }).trim());
 
-  // 4. Обе runtime-ветки и соответствующие им декларации обязаны существовать.
-  // Плоский общий types-путь здесь запрещён: CJS и ESM имеют разные форматы.
+  // 3b. СМЕШАННЫЙ ГРАФ в ОДНОМ процессе. Пробы выше гоняют ESM и CJS порознь,
+  // поэтому дублирование модуля им не видно: у каждой свой процесс и свой
+  // экземпляр по определению. Реальное же приложение почти всегда смешанное —
+  // ESM-код приложения импортирует пакет, а какая-нибудь CJS-зависимость его
+  // же требует. При двухформатной поставке (условные ветки import/require)
+  // такой граф получал ДВА экземпляра модульного состояния: два кадровых
+  // цикла, два реестра animate, два rAF на кадр — и cancelAll из одной
+  // половины не гасил вторую. Одноформатная поставка исключает это по
+  // построению, и вот проверка, что исключает на самом деле, а не на словах.
+  const mixedGraphProbe = `
+    import { createRequire } from 'node:module';
+    const require = createRequire(import.meta.url);
+
+    const queue = [];
+    let requests = 0;
+    globalThis.requestAnimationFrame = (cb) => { queue.push(cb); requests++; return requests; };
+
+    // Одна и та же цель, два способа подключения: тождество обязано совпасть.
+    const required = require('${pkg.name}/frame');
+    const imported = await import('${pkg.name}/frame');
+    if (required.frame !== imported.frame) {
+      throw new Error('дубль экземпляра: require и import дали РАЗНЫЕ frame');
+    }
+
+    // И то же самое через потребителя: фасад подключён импортом, планировщик —
+    // require. Один rAF означает один общий цикл на весь смешанный граф.
+    const { animate } = await import('${pkg.name}/animate');
+    const values = new Map([['opacity', '0']]);
+    const target = {
+      style: {
+        getPropertyValue: (name) => values.get(name) ?? '',
+        setProperty: (name, value) => values.set(name, value),
+      },
+    };
+    required.frame.update(() => {});
+    animate(target, { opacity: 1 });
+    if (requests !== 1) {
+      throw new Error('смешанный граф раздвоил scheduler: ожидался 1 rAF, получено ' + requests);
+    }
+    // cancelAll со стороны require обязан гасить работу, поставленную со
+    // стороны import: при двух экземплярах он погасил бы только свою половину.
+    required.frame.cancelAll();
+    queue.shift()?.(0);
+    if (requests !== 1) throw new Error('cancelAll из require-половины не погасил import-половину');
+    console.log('MIXED graph OK: require+import → 1 экземпляр, 1 rAF');
+  `;
+  writeFileSync(join(app, 'mixed-graph.mjs'), mixedGraphProbe);
+  log(execSync('node mixed-graph.mjs', { cwd: app, encoding: 'utf8' }).trim());
+
+  // 4. Единственная пара целей на субпуть обязана существовать. Условных веток
+  // больше нет: одна цель — один экземпляр модуля у любого потребителя.
   let checked = 0;
   for (const [key, value] of Object.entries(installedPackage.exports)) {
-    const targets = {
-      'import.types': value.import?.types,
-      'import.default': value.import?.default,
-      'require.types': value.require?.types,
-      'require.default': value.require?.default,
-    };
-    for (const [condition, relativePath] of Object.entries(targets)) {
+    for (const condition of ['types', 'default']) {
+      const relativePath = value[condition];
       if (!relativePath) {
         failed = true;
         log(`FAIL: exports['${key}'].${condition} отсутствует`);
@@ -221,8 +273,16 @@ try {
       }
       checked++;
     }
+    // Ветка require не должна воскреснуть: она вернула бы второй экземпляр
+    // модульного состояния (кадровый цикл, реестр animate) тому же процессу.
+    for (const forbidden of ['import', 'require']) {
+      if (value[forbidden] !== undefined) {
+        failed = true;
+        log(`FAIL: exports['${key}'] содержит условную ветку ${forbidden} — поставка снова двухформатная`);
+      }
+    }
   }
-  log(`структура OK: ${checked} условных export-целей на месте`);
+  log(`структура OK: ${checked} export-целей на месте`);
 
   // 5. Метаданные и документы, на которые ссылается README, должны доехать
   // до потребителя без отдельного источника истины вне npm-артефакта.

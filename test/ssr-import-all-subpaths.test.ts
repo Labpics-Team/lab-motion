@@ -45,8 +45,9 @@ function subpathEntries(): [subpath: string, file: string][] {
   const out: [string, string][] = [];
   for (const [subpath, value] of Object.entries(pkg.exports)) {
     if (typeof value !== 'object' || value === null) continue;
-    const target = (value as { import?: { default?: string } | string }).import;
-    const file = typeof target === 'string' ? target : target?.default;
+    // Одна цель на субпуть: `default` и есть тот файл, который получит
+    // потребитель, как бы он пакет ни подключил — import или require.
+    const file = (value as { default?: string }).default;
     if (typeof file !== 'string' || !file.endsWith('.js')) continue;
     out.push([subpath, resolve(repoRoot, file)]);
   }

@@ -126,18 +126,15 @@ function fixture(): {
     'tsconfig.json': '{}\n',
     'pnpm-lock.yaml': 'lockfileVersion: 9\n',
     'package.json': JSON.stringify({
-      exports: {
-        '.': {
-          import: { types: './dist/index.d.ts', default: './dist/index.js' },
-          require: { types: './dist/index.d.cts', default: './dist/index.cjs' },
-        },
-      },
+      exports: { '.': { types: './dist/index.d.ts', default: './dist/index.js' } },
     }),
     'dist/index.js': '',
-    'dist/index.cjs': '',
     'dist/index.d.ts': '',
-    'dist/index.d.cts': '',
+    // Файлы НЕ из exports: общий тип-чанк и общий runtime-чанк. Ровно их
+    // пропустила бы проверка «только по export-целям», а stale-чанк ломает
+    // потребителя так же надёжно, как stale entry.
     'dist/shared-types.d.ts': '',
+    'dist/shared-chunk.js': '',
   };
   for (const [name, body] of Object.entries(files)) writeFileSync(join(root, name), body);
   const sourceTime = new Date(1_000_000);
@@ -154,8 +151,8 @@ function fixture(): {
 }
 
 describe('dist freshness: false-green regression matrix', () => {
-  it.each(['index.cjs', 'index.d.ts', 'index.d.cts', 'shared-types.d.ts'])(
-    'видит stale %s при свежем ESM',
+  it.each(['index.d.ts', 'shared-types.d.ts', 'shared-chunk.js'])(
+    'видит stale %s при свежем entry',
     (name) => {
       const f = fixture();
       const stale = new Date(500_000);

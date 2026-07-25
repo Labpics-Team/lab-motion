@@ -31,21 +31,17 @@ function releaseMetadata() {
       type: 'git',
       url: 'git+https://github.com/Labpics-Team/lab-motion.git',
     },
-    engines: { node: '>=22' },
+    engines: { node: '>=22.12' },
     packageManager: 'pnpm@11.11.0',
     type: 'module',
-    main: './dist/index.cjs',
     module: './dist/index.js',
     types: './dist/index.d.ts',
     imports: {
-      '#frame': { import: './dist/frame/index.js', require: './dist/frame/index.cjs' },
+      '#frame': './dist/frame/index.js',
     },
     typesVersions: { '*': { '*': ['dist/*/index.d.ts'] } },
     exports: {
-      '.': {
-        import: { types: './dist/index.d.ts', default: './dist/index.js' },
-        require: { types: './dist/index.d.cts', default: './dist/index.cjs' },
-      },
+      '.': { types: './dist/index.d.ts', default: './dist/index.js' },
     },
     files: [
       'dist',
@@ -65,9 +61,7 @@ function releaseMetadata() {
     publishConfig: { access: 'public' },
     sideEffects: [
       './dist/lit/index.js',
-      './dist/lit/index.cjs',
       './dist/wc/index.js',
-      './dist/wc/index.cjs',
     ],
     scripts: { build: 'tsup' },
     peerDependencies: {

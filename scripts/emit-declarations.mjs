@@ -6,9 +6,11 @@
  * аннотирован явно, поэтому одинокий файл транспилируется в тот же d.ts, что
  * выдал бы полный чекер.
  *
- * Для каждого src/**\/*.ts эмитятся ОБА формата: <path>.d.ts (import) и
- * <path>.d.cts (require) с переписыванием относительных спецификаторов
- * .js → .cjs — тот же приём, что browser-rewrite '#frame' в tsup.config.
+ * Формат ОДИН: <path>.d.ts. Парная эмиссия <path>.d.cts снята вместе с
+ * CJS-веткой поставки (2026-07-25): пакет больше не возит одно и то же
+ * дважды, а `require()` с Node 22.12 читает ESM сам и получает ТОТ ЖЕ
+ * экземпляр модуля — то есть отдельные типы под require описывали бы файл,
+ * которого нет.
  */
 
 import { readdirSync, readFileSync, mkdirSync, writeFileSync } from 'node:fs';
@@ -27,10 +29,6 @@ const OPTIONS = {
   isolatedDeclarations: true,
 };
 
-/** Относительные .js-спецификаторы → .cjs (для require-ветки деклараций). */
-function toCjsSpecifiers(declaration) {
-  return declaration.replace(/(["'])((?:\.\.?\/)[^"']*)\.js\1/g, (_m, q, p) => `${q}${p}.cjs${q}`);
-}
 
 function* walk(directory) {
   for (const entry of readdirSync(directory, { withFileTypes: true })) {
@@ -63,7 +61,6 @@ for (const file of walk(SRC)) {
   const base = join(OUT, relative(SRC, file)).replace(/\.ts$/, '');
   mkdirSync(dirname(base), { recursive: true });
   writeFileSync(`${base}.d.ts`, declaration);
-  writeFileSync(`${base}.d.cts`, toCjsSpecifiers(declaration));
   emitted++;
 }
 
@@ -72,4 +69,4 @@ if (failures.length > 0) {
   for (const failure of failures) console.error('  ' + failure);
   process.exit(1);
 }
-console.log(`emit-declarations: OK — ${emitted} файлов × (d.ts + d.cts)`);
+console.log(`emit-declarations: OK — ${emitted} файлов (d.ts)`);

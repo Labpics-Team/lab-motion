@@ -24,10 +24,7 @@ const here = dirname(fileURLToPath(import.meta.url));
 const pkgRoot = resolve(here, '..');
 
 const pkg = JSON.parse(readFileSync(resolve(pkgRoot, 'package.json'), 'utf8')) as {
-  exports?: Record<string, {
-    import?: { types?: string; default?: string };
-    require?: { types?: string; default?: string };
-  }>;
+  exports?: Record<string, { types?: string; default?: string }>;
 };
 
 const utilsExports = pkg.exports?.['./utils'];
@@ -40,7 +37,7 @@ function resolvePackageRelative(declared: string | undefined): string | null {
   return resolve(pkgRoot, declared.slice(2));
 }
 
-const resolvedImportPath = resolvePackageRelative(utilsExports?.import?.default);
+const resolvedImportPath = resolvePackageRelative(utilsExports?.default);
 
 const REQUIRED_NAMES = ['clamp', 'mix', 'wrap', 'snap', 'mapRange', 'interpolate', 'pipe'];
 
@@ -49,29 +46,23 @@ describe('utils ./utils subpath — package-boundary smoke (U5)', () => {
     expect(utilsExports, 'package.json exports["./utils"] must exist').toBeDefined();
   });
 
-  it('./utils export map declares format-specific types and runtime targets', () => {
-    expect(utilsExports?.import?.types).toBeTruthy();
-    expect(utilsExports?.require?.types).toBeTruthy();
-    expect(utilsExports?.import?.default?.startsWith('./')).toBe(true);
-    expect(utilsExports?.require?.default?.startsWith('./')).toBe(true);
-    expect(utilsExports?.import?.types?.startsWith('./')).toBe(true);
-    expect(utilsExports?.require?.types?.startsWith('./')).toBe(true);
+  it('./utils export map declares exactly one runtime target and one declaration', () => {
+    expect(utilsExports?.types).toBeTruthy();
+    expect(utilsExports?.default?.startsWith('./')).toBe(true);
+    expect(utilsExports?.types?.startsWith('./')).toBe(true);
+    // Одноформатная поставка: условных веток нет.
+    expect(Object.keys(utilsExports ?? {})).toEqual(['types', 'default']);
   });
 
-  it('exports["./utils"] runtime and format-specific type targets exist on disk', () => {
+  it('exports["./utils"] runtime and declaration targets exist on disk', () => {
     expect(resolvedImportPath).not.toBeNull();
-    expect(existsSync(resolvedImportPath!), `import target "${utilsExports?.import?.default}" must exist`).toBe(true);
-    const cjs = resolvePackageRelative(utilsExports?.require?.default);
-    expect(existsSync(cjs!), `require target "${utilsExports?.require?.default}" must exist`).toBe(true);
-    const dts = resolvePackageRelative(utilsExports?.import?.types);
-    const dcts = resolvePackageRelative(utilsExports?.require?.types);
+    expect(existsSync(resolvedImportPath!), `target "${utilsExports?.default}" must exist`).toBe(true);
+    const dts = resolvePackageRelative(utilsExports?.types);
     expect(existsSync(dts!)).toBe(true);
-    expect(existsSync(dcts!)).toBe(true);
-    expect(utilsExports?.import?.types).toMatch(/\.d\.ts$/);
-    expect(utilsExports?.require?.types).toMatch(/\.d\.cts$/);
+    expect(utilsExports?.types).toMatch(/\.d\.ts$/);
   });
 
-  it('exports["./utils"].import loads via dynamic import and exposes all 7 exports', async () => {
+  it('exports["./utils"].default loads via dynamic import and exposes all 7 exports', async () => {
     expect(resolvedImportPath).not.toBeNull();
     const mod = (await import(pathToFileURL(resolvedImportPath!).href)) as Record<string, unknown>;
     const missing = REQUIRED_NAMES.filter((n) => typeof mod[n] !== 'function');

@@ -67,10 +67,18 @@ function installFixture(name, packageJson, tarball) {
 }
 
 try {
-  // ── Node ≥ 22 consumer contract (пункт 13) ────────────────────────────────
-  const major = Number(process.versions.node.split('.')[0]);
-  if (major < 22) fail(`Node ${process.versions.node} < 22 — consumer contract нарушен`);
-  if (pkg.engines?.node !== '>=22') fail(`engines.node ожидался '>=22', получено '${pkg.engines?.node}'`);
+  // ── Node ≥ 22.12 consumer contract (пункт 13) ─────────────────────────────
+  // Пол поднят с 22.0 вместе с переходом на одноформатную поставку: CJS-
+  // потребитель добирается до ESM-пакета через `require(esm)`, а он работает
+  // без флага только с 22.12. На 22.0–22.11 `require()` бросил бы
+  // ERR_REQUIRE_ESM, поэтому проверяем и раннер, и объявленный пол.
+  const [major, minor] = process.versions.node.split('.').map(Number);
+  if (major < 22 || (major === 22 && minor < 12)) {
+    fail(`Node ${process.versions.node} < 22.12 — consumer contract нарушен`);
+  }
+  if (pkg.engines?.node !== '>=22.12') {
+    fail(`engines.node ожидался '>=22.12', получено '${pkg.engines?.node}'`);
+  }
   log(`Node contract: раннер ${process.versions.node}, engines '${pkg.engines?.node}' ✓`);
 
   // В release-контуре путь передаётся явно: все consumer-гейты проверяют
@@ -344,12 +352,22 @@ try {
       cwd: dir,
       encoding: 'utf8',
     }).replaceAll('\\', '/');
-    for (const declaration of ['dist/index.d.cts', 'dist/compositor/stagger/index.d.cts', 'dist/nano/index.d.cts']) {
+    // Поставка одноформатная (2026-07-25): парных .d.cts больше нет, и это не
+    // регресс для CJS-потребителя. Node 22.12 читает ESM из require() сам, а
+    // TypeScript под nodenext типизирует такой require ЕДИНСТВЕННЫМ .d.ts —
+    // проверяется двумя фактами сразу: tsc отработал без ошибок (иначе
+    // execSync выше бросил бы) И резолвер дошёл именно до .d.ts субпутей.
+    for (const declaration of ['dist/index.d.ts', 'dist/compositor/stagger/index.d.ts', 'dist/nano/index.d.ts']) {
       if (!trace.includes(declaration)) {
-        fail(`TS CJS резолвит не CommonJS-декларацию: ${declaration} не найден в trace`);
+        fail(`TS CJS не дошёл до декларации субпутя: ${declaration} нет в trace`);
       }
     }
-    log('TS CJS: nodenext require-резолв exports выбрал .d.cts ✓');
+    // Обратная сторона: .d.cts не должен воскреснуть — иначе поставка снова
+    // возит одно и то же дважды и дублирование состояния возвращается.
+    if (trace.includes('.d.cts')) {
+      fail('TS CJS: в trace появился .d.cts — поставка снова двухформатная');
+    }
+    log('TS CJS: nodenext require-резолв типизирует ЕДИНСТВЕННЫЙ .d.ts ✓');
   }
 
   // Авто-регистрирующие subpath-entries обязаны переживать tree shaking при

@@ -162,12 +162,13 @@ describe('size-gate: auto-derive subpath entries from package.json exports', () 
     }
   });
 
-  it('derives one entry per exports key that has an "import" condition', () => {
+  it('derives one entry per exports key that has a runtime target', () => {
     const pkg = {
       exports: {
-        '.': { import: './dist/index.js', require: './dist/index.cjs' },
-        './easing': { import: './dist/easing/index.js' },
-        './types-only': { types: './dist/types-only.d.ts' }, // нет import → должен быть отфильтрован
+        // Отгружаемая форма: одна цель на субпуть, без условных веток.
+        '.': { types: './dist/index.d.ts', default: './dist/index.js' },
+        './easing': { types: './dist/easing/index.d.ts', default: './dist/easing/index.js' },
+        './types-only': { types: './dist/types-only.d.ts' }, // нет runtime → отфильтрован
       },
     };
 
@@ -185,9 +186,12 @@ describe('size-gate: auto-derive subpath entries from package.json exports', () 
     // увидеть его автоматически.
     const pkg = {
       exports: {
-        '.': { import: './dist/index.js' },
-        './timeline': { import: './dist/timeline/index.js' },
-        './fake-new-plugin': { import: './dist/fake-new-plugin/index.js' },
+        '.': { types: './dist/index.d.ts', default: './dist/index.js' },
+        './timeline': { types: './dist/timeline/index.d.ts', default: './dist/timeline/index.js' },
+        './fake-new-plugin': {
+          types: './dist/fake-new-plugin/index.d.ts',
+          default: './dist/fake-new-plugin/index.js',
+        },
       },
     };
 
@@ -198,13 +202,26 @@ describe('size-gate: auto-derive subpath entries from package.json exports', () 
     expect(labels).toContain('fake-new-plugin');
   });
 
+  it('отказывается молча пропустить условную ветку exports', () => {
+    // Возврат к двухформатной поставке не должен превращаться в тихую потерю
+    // измерения: субпуть с ветками import/require просто исчез бы из гейта.
+    expect(() => deriveEntriesFromExports({
+      exports: {
+        '.': {
+          import: { types: './dist/index.d.ts', default: './dist/index.js' },
+          require: { types: './dist/index.d.cts', default: './dist/index.cjs' },
+        },
+      },
+    })).toThrow(/одноформатн/);
+  });
+
   it('ядро несёт свой порог, каждый прочий субпуть — общий SUBPATH_GATE_BYTES (drift-класс)', () => {
     // Раньше субпути были measure-only: новый раздутый субпуть проходил
     // зелёным без порога. Теперь безлимитных строк в отчёте не существует.
     const pkg = {
       exports: {
-        '.': { import: './dist/index.js' },
-        './react': { import: './dist/react/index.js' },
+        '.': { types: './dist/index.d.ts', default: './dist/index.js' },
+        './react': { types: './dist/react/index.d.ts', default: './dist/react/index.js' },
       },
     };
 
@@ -215,14 +232,14 @@ describe('size-gate: auto-derive subpath entries from package.json exports', () 
     expect(entries.every(e => Number.isFinite(e.gate) && e.gate > 0)).toBe(true);
   });
 
-  it('resolves a NESTED conditional-exports value (e.g. { import: { types, default } }) instead of throwing', () => {
-    // Реальный package.json bundler-инструментов часто вкладывает условия
-    // ("import"/"require" → {types, default}) — плоский `value.import` тут
-    // был бы объектом, а не строкой, и .replace() уронил бы скрипт.
+  it('строковая цель субпутя тоже принимается, а type-only фильтруется без броска', () => {
+    // Короткая форма exports (`'./x': './dist/x/index.js'`) остаётся законной:
+    // это та же одна цель, записанная без объекта. А субпуть без runtime-цели
+    // нечего мерить — он выпадает из отчёта молча, а не роняет гейт.
     const pkg = {
       exports: {
-        '.': { import: { types: './dist/index.d.ts', default: './dist/index.js' } },
-        './no-string-leaf': { import: { types: './dist/x.d.ts' } }, // нет default/строки → должен быть отфильтрован, не бросать
+        '.': './dist/index.js',
+        './no-runtime': { types: './dist/x.d.ts' },
       },
     };
 

@@ -42,12 +42,19 @@ pnpm add @labpics/motion
 `pnpm add /путь/к/labpics-motion-<версия>.tgz`); git-установка не поддерживается:
 `dist/` собирается и не хранится в репозитории.
 
-Требования: Node ≥ 22. Runtime-зависимостей нет; фреймворк для биндинга — optional
-peer, ставится у потребителя (peer объявлены для 8 фреймворков; `./wc` не требует
-ничего). Целостность артефакта у потребителя проверяют `pnpm pack:smoke`
-(тарбол → чистый проект → ESM/CJS-импорт всех входов без обязательного peer,
-файлы каждой export-ветки) и `pnpm pack:compat` (TypeScript/Vite, SSR,
-tree shaking, точный минимальный Preact peer).
+Требования: Node ≥ 22.12. Поставка одноформатная — ESM; CJS-потребитель
+подключает пакет обычным `require()`, который с 22.12 работает без флага.
+Одна цель на субпуть означает один экземпляр модульного состояния (кадровый
+цикл, реестр `animate`) независимо от того, как пакет подключён — это и есть
+причина отказа от парного CJS-артефакта.
+
+Runtime-зависимостей нет; фреймворк для биндинга — optional peer, ставится у
+потребителя (peer объявлены для 8 фреймворков; `./wc` не требует ничего).
+Целостность артефакта у потребителя проверяют `pnpm pack:smoke`
+(тарбол → чистый проект → импорт и `require()` всех входов без обязательного
+peer, смешанный граф в одном процессе, файлы каждой export-цели) и
+`pnpm pack:compat` (TypeScript/Vite, SSR, tree shaking, точный минимальный
+Preact peer).
 
 ## Быстрый старт
 
@@ -369,7 +376,7 @@ WAAPI/`linear()` за жизнь контроллера и WebKit-policy за ж
 | WebKit (Safari и браузеры iOS) | Полный `compositor`-путь | WAAPI + адаптивные явные ключевые кадры; многостоповый `linear()` не используется |
 | Не-WebKit без CSS `linear()` | `waapi-no-linear` → живой rAF | доступной off-main формы пружинной кривой нет |
 | Без `Element.animate` | `raf` → живой rAF | нет WAAPI |
-| SSR / Node ≥ 22 | `ssr` → импорт SSR-safe, кадры не рисуются | нет DOM; см. `pack:compat` |
+| SSR / Node ≥ 22.12 | `ssr` → импорт SSR-safe, кадры не рисуются | нет DOM; см. `pack:compat` |
 
 Два уровня reduced-motion (единая политика — см. «Fallback-матрицу») и их
 согласование:
@@ -695,7 +702,7 @@ pnpm build      # → dist/* (tsup)
 pnpm test       # docs-drift гейт + vitest
 pnpm size       # размерный гейт (gz всех субпутей + сценарный import-cost)
 pnpm pack:smoke # целостность тарбола у потребителя
-pnpm pack:compat # ESM/CJS/TypeScript/Vite/SSR из реального тарбола
+pnpm pack:compat # ESM/require(esm)/TypeScript/Vite/SSR из реального тарбола
 pnpm bench      # текущий checkout → свежий build → ns/операцию + provenance
 pnpm bench:ceiling # engine-only p50/p95/p99 + структурный rAF-гейт
 ```

@@ -26,7 +26,7 @@
 
 ## Импорт
 
-ESM и CJS (ветки `"./driver"` и `"./frame"` в `exports` package.json):
+Точки `"./driver"` и `"./frame"` в `exports` package.json:
 
 ```typescript
 import {

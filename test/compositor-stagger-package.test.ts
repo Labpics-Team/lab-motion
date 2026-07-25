@@ -10,16 +10,10 @@ import { entriesFromPackageExports } from '../tsup.config.js';
 const pkg = JSON.parse(readFileSync(new URL('../package.json', import.meta.url), 'utf8'));
 
 describe('compositor/stagger: package contract', () => {
-  it('публикует раздельные ESM/CJS runtime и declarations', () => {
+  it('публикует одну runtime-цель и одну декларацию', () => {
     expect(pkg.exports['./compositor/stagger']).toEqual({
-      import: {
-        types: './dist/compositor/stagger/index.d.ts',
-        default: './dist/compositor/stagger/index.js',
-      },
-      require: {
-        types: './dist/compositor/stagger/index.d.cts',
-        default: './dist/compositor/stagger/index.cjs',
-      },
+      types: './dist/compositor/stagger/index.d.ts',
+      default: './dist/compositor/stagger/index.js',
     });
   });
 

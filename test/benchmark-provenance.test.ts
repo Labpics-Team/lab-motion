@@ -63,10 +63,7 @@ describe('benchmark provenance', () => {
     const f = fixture();
     writeFileSync(path.join(f.root, 'package.json'), JSON.stringify({
       exports: {
-        './animate': {
-          import: { default: './dist/animate/index.js' },
-          require: { default: './dist/animate/index.cjs' },
-        },
+        './animate': { types: './dist/animate/index.d.ts', default: './dist/animate/index.js' },
       },
     }));
     const entry = path.join(f.benchDirectory, 'entry.mjs');
@@ -138,7 +135,8 @@ describe('benchmark provenance', () => {
       build() {
         builds++;
         writeFileSync(path.join(f.distDirectory, 'index.js'), 'fresh-runtime');
-        writeFileSync(path.join(f.distDirectory, 'index.cjs'), 'fresh-cjs');
+        // Общий чанк сборки — тоже исполняемые байты и обязан входить в tree.
+        writeFileSync(path.join(f.distDirectory, 'shared-chunk.mjs'), 'fresh-chunk');
         // Декларации не являются исполняемыми байтами и в runtime-tree не входят.
         writeFileSync(path.join(f.distDirectory, 'index.d.ts'), 'declare const x: 1');
       },

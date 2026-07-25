@@ -40,8 +40,11 @@ describe('./in-view dist boundary', () => {
   it('CJS экспортирует constructor из того же bundled entry', () => {
     const root = resolve(import.meta.dirname, '..');
     const script = [
-      "const { MotionParamError: RootMotionParamError } = require('./dist/index.cjs');",
-      "const { inView, MotionParamError } = require('./dist/in-view/index.cjs');",
+      // Одноформатная поставка: CJS-потребитель добирается до ESM через
+      // require(esm) (Node ≥ 22.12). Тождество конструктора обязано выжить
+      // и на этом пути — иначе `instanceof` у CJS-клиента молча ложен.
+      "const { MotionParamError: RootMotionParamError } = require('./dist/index.js');",
+      "const { inView, MotionParamError } = require('./dist/in-view/index.js');",
       'try { inView({ nodeType: 1 }, () => undefined); }',
       'catch (error) {',
       '  console.log(JSON.stringify({',
