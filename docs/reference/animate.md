@@ -187,6 +187,25 @@ interface AnimateControls extends PromiseLike<void> {
 - вытесненный юнит завершается (его `finished` резолвится), `onComplete` вытесненного вызова не срабатывает;
 - реестр состояния — модульный `WeakMap` по элементам: повторный `animate` из любого места видит один и тот же прогон; уход элемента из DOM не удерживает состояние.
 
+### isMotionParamError
+
+```ts
+function isMotionParamError(value: unknown): value is MotionParamError;
+```
+
+Проверка «это ошибка параметров пакета», работающая **через границы субпутей**. Ловить нужно именно так, а не через `instanceof`: пакет собирается без code-splitting, у каждого субпутя своя копия класса, поэтому `e instanceof MotionParamError` с классом из корня и ошибкой из `./animate` ложен всегда. Гвард реэкспортирован отсюда, чтобы ловить ошибки, не импортируя корневой entry.
+
+```typescript
+import { animate, isMotionParamError } from '@labpics/motion/animate';
+
+try {
+  animate('.card', { x: 100 }, { duration: -1 });
+} catch (error) {
+  if (isMotionParamError(error)) console.warn(error.code); // 'LM013'
+  else throw error;
+}
+```
+
 ### Type-only экспорты
 
 `AnimatableElement`, `AnimateTarget`, `AnimatePropValue`, `AnimateProps`, `AnimateOptions`, `AnimateControls`. Типы `SpringParams` и `StaggerOptions` в сигнатурах импортируйте из `@labpics/motion` и `@labpics/motion/stagger` соответственно.
