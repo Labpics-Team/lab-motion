@@ -33,9 +33,9 @@ import { existsSync, readFileSync } from 'node:fs';
 import { dirname, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { afterEach, describe, expect, it } from 'vitest';
+import { distReady } from './support/dist-required.js';
 
 const repoRoot = resolve(dirname(fileURLToPath(import.meta.url)), '..');
-const distReady = existsSync(resolve(repoRoot, 'dist/index.js'));
 
 /** Все ESM-входы из карты exports — источник правды поставки. */
 function subpathEntries(): [subpath: string, file: string][] {
@@ -92,7 +92,7 @@ function restoreGlobals(): void {
 
 afterEach(restoreGlobals);
 
-describe.runIf(distReady)('инвариант 4: импорт субпутя не трогает DOM', () => {
+describe.runIf(distReady())('инвариант 4: импорт субпутя не трогает DOM', () => {
   it('среда действительно без DOM (герметичность самого теста)', () => {
     for (const name of ABSENT_IN_SSR) {
       expect(typeof (globalThis as Record<string, unknown>)[name], name).toBe('undefined');

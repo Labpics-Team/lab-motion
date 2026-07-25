@@ -2,6 +2,7 @@ import { existsSync, readdirSync, readFileSync, statSync } from 'node:fs';
 import { dirname, join, relative, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { describe, expect, it } from 'vitest';
+import { distReady } from './support/dist-required.js';
 import { CORE_GATE_BYTES } from '../scripts/size-gate.mjs';
 import { canonicalGzip } from '../scripts/compression-oracle.mjs';
 
@@ -65,7 +66,7 @@ function readDist(): string {
   return readFileSync(resolve(pkgRoot, 'dist/index.js'), 'utf8');
 }
 
-describe.runIf(existsSync(distRoot))('zero-dep + bundle-size smoke (invariant 1)', () => {
+describe.runIf(distReady())('zero-dep + bundle-size smoke (invariant 1)', () => {
   it('package.json has no runtime dependencies', () => {
     const deps = pkg.dependencies ?? {};
     expect(

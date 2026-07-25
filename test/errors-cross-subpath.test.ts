@@ -22,6 +22,7 @@ import { existsSync } from 'node:fs';
 import { dirname, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { describe, expect, it } from 'vitest';
+import { distReady } from './support/dist-required.js';
 
 const distRoot = resolve(dirname(fileURLToPath(import.meta.url)), '../dist');
 
@@ -36,7 +37,7 @@ async function errorFrom(subpath: string, run: (mod: never) => unknown): Promise
   throw new Error(`субпуть ${subpath} не бросил ошибку — кейс выродился`);
 }
 
-describe.runIf(existsSync(`${distRoot}/index.js`))('ошибки пакета через границы субпутей', () => {
+describe.runIf(distReady())('ошибки пакета через границы субпутей', () => {
   it('isMotionParamError из корня признаёт ошибки чужих субпутей', async () => {
     const { isMotionParamError } = await import(`${distRoot}/index.js`) as {
       isMotionParamError(value: unknown): boolean;

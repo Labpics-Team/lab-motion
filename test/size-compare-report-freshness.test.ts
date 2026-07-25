@@ -30,11 +30,11 @@ import { existsSync, readFileSync } from 'node:fs';
 import { dirname, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { describe, expect, it } from 'vitest';
+import { distReady } from './support/dist-required.js';
 import { SCENARIOS, measureEsbuild } from '../bench/compare/size-compare.mjs';
 
 const repoRoot = resolve(dirname(fileURLToPath(import.meta.url)), '..');
 const reportPath = resolve(repoRoot, 'bench/compare/size-compare.report.json');
-const distReady = existsSync(resolve(repoRoot, 'dist/nano/index.js'));
 
 interface Row {
   readonly id: string;
@@ -50,7 +50,7 @@ interface Report {
 
 const report = JSON.parse(readFileSync(reportPath, 'utf8')) as Report;
 
-describe.runIf(distReady)('отчёт size-compare соответствует поставке', () => {
+describe.runIf(distReady())('отчёт size-compare соответствует поставке', () => {
   it('СВОИ строки пересобираются байт-в-байт из текущего dist', async () => {
     const drift: string[] = [];
     for (const scenario of SCENARIOS as readonly {
