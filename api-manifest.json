@@ -212,8 +212,8 @@
         "scrollProgress",
         "scrubBinding"
       ],
-      "shippedGzBytes": 994,
-      "shippedBrBytes": 918,
+      "shippedGzBytes": 995,
+      "shippedBrBytes": 914,
       "docs": "docs/reference/scroll-in-view.md",
       "title": "./scroll и ./in-view — скролл-привязка и появление во вьюпорте"
     },

@@ -201,3 +201,36 @@ describe('scroll-api-surface-pin', () => {
     }).not.toThrow();
   });
 });
+
+describe('#in-view: доля 0 — «любой пиксель», а не «всегда»', () => {
+  // Аудит 2026-07-25: без стража `visible > 0` предикат при amount = 0
+  // вырождался в `0 >= 0`, и машина считала видимой цель за 10 000 px под
+  // вьюпортом — onEnter срабатывал немедленно, то есть scroll-триггер
+  // отрабатывал впустую при загрузке страницы. Все остальные пороги
+  // ('some', 'all', 0.5) вели себя верно, поэтому корпус без нуля дефекта
+  // не видел.
+  const far = { targetStart: 10_000, targetSize: 100, viewportLength: 800 };
+  const sliver = { targetStart: 799, targetSize: 100, viewportLength: 800 };
+  const near = { targetStart: 400, targetSize: 100, viewportLength: 800 };
+
+  it('цель далеко за вьюпортом не считается видимой ни при каком пороге', () => {
+    for (const amount of [0, 'some', 0.5, 'all'] as const) {
+      let enters = 0;
+      const view = scroll.createInView({ amount, onEnter: () => { enters++; } });
+      view.update(far);
+      expect(view.inView, `amount=${String(amount)}`).toBe(false);
+      expect(enters, `amount=${String(amount)}: onEnter впустую`).toBe(0);
+    }
+  });
+
+  it('доля 0 ведёт себя ровно как some: любой видимый пиксель включает', () => {
+    const zero = scroll.createInView({ amount: 0 });
+    const some = scroll.createInView({ amount: 'some' });
+    for (const metrics of [far, sliver, near]) {
+      zero.update(metrics);
+      some.update(metrics);
+      expect(zero.inView, JSON.stringify(metrics)).toBe(some.inView);
+    }
+    expect(zero.inView).toBe(true);
+  });
+});

@@ -223,7 +223,12 @@ export function createInView(options?: InViewOptions): InViewRecognizer {
           ? visible > 0
           : amount === 'all'
             ? size > 0 && visible >= size
-            : size > 0 && visible >= (amount as number) * size;
+            // `visible > 0` — не избыточность: без него amount = 0 вырождается
+            // в `0 >= 0` и машина считает видимым ЧТО УГОДНО, включая цель за
+            // 10 000 px под вьюпортом (аудит 2026-07-25: inView = true и
+            // onEnter срабатывал сразу). Доля 0 означает «любой пиксель», то
+            // есть ровно семантику 'some', а не «всегда».
+            : size > 0 && visible > 0 && visible >= (amount as number) * size;
       if (now && !inView) {
         inView = true;
         options?.onEnter?.();
