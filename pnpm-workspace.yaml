@@ -11,7 +11,3 @@ pmOnFail: error
 peerDependencyRules:
   allowedVersions:
     "@builder.io/qwik>vite": "8"
-minimumReleaseAgeExclude:
-  - fast-uri@3.1.4
-  - postcss@8.5.18
-  - brace-expansion@5.0.8
