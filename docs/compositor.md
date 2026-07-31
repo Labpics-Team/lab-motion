@@ -109,7 +109,7 @@ list.start();                                 // каскад: N Element.animate
 `./compositor/stagger` (смешивание двух compositor-entry дублирует
 предсобранное ядро); без групп используйте меньший `./compositor`.
 
-Граница per-group vs per-element (честно): каскад (`start`) — per-GROUP (это и
+Граница per-group vs per-element: каскад (`start`) — per-GROUP (это и
 есть composited-выигрыш); `retarget(i, to)` / `retargetAll(to)` — per-ELEMENT
 без пере-каскада (дискретное прерывание, не новый парад); `handoffToLive(i, to?)`
 отдаёт ОДИН элемент в живую rAF-пружину, группового хендоффа нет.
@@ -139,7 +139,7 @@ effect-space гарантия ограничена условиями выше �
 | `reduced` | `prefers-reduced-motion: reduce` | **Мгновенный снап** к цели: значение эмитится один раз, без анимации | Всякое движение (осознанно — политика доступности) |
 | `ssr` | Нет DOM и нет инжектированного `requestFrame` | Тот же rAF-движок под Node-обвязкой; импорт и конструктор не трогают `window`/`document` | На сервере кадры не рисуются |
 
-Честные границы: (1) все не-`compositor` тиры кроме `reduced` идут в ОДИН живой
+Границы: (1) все не-`compositor` тиры кроме `reduced` идут в ОДИН живой
 rAF-движок — ярлыки различают ПРИЧИНУ (телеметрия); (2) детекция одноразовая —
 WAAPI/`linear()` за жизнь контроллера и WebKit-policy за жизнь реалма не
 переопрашиваются; (3) на `waapi-no-linear`/`raf` анимация делит главный поток.
@@ -192,10 +192,9 @@ WAAPI/`linear()` за жизнь контроллера и WebKit-policy за ж
 Serialized effect сверяется с аналитическим солвером в пределах tolerance, а
 Chromium/Firefox/WebKit — между собой в `browser/*.spec.ts`. Локально:
 `pnpm test:browser` (только Chromium, opt-in — в дефолтный `pnpm test`
-браузеры не входят). Полная матрица Chromium/Firefox/WebKit — на CI
-(`.github/workflows/browser.yml`), **обязательна для PR, затрагивающих
-platform adapters** (`compositor`/`gestures`/`waapi`/`projection`/`animate`/
-`presence`/`flip`/`a11y`).
+браузеры не входят). Полная матрица Chromium/Firefox/WebKit гоняется на CI
+для каждого PR (`.github/workflows/browser.yml` — без paths-фильтра, чтобы
+required check не исчезал).
 
 Независимость WebKit-пути от главного потока дополнительно проверяет видеостенд
 `bench/compare/webkit-freeze.mjs` (запуск — `cd bench/compare && node

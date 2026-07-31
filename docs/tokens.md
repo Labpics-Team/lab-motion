@@ -2,12 +2,12 @@
 
 > Роль: контракт `./tokens` — типобезопасный словарь примитивов движения.
 
-Словарь `as const`, tree-shakeable по семействам. Это ФУНДАМЕНТ, а не вся
+Словарь `as const`, tree-shakeable по семействам. Это фундамент, а не вся
 дизайн-система: семантики ролей («кнопка-ховер») здесь нет — роль→токен маппит
 потребитель (labui). Физический словарь (длительности, изинги, ДС-пружины
-`smooth`/`expressive`) зеркалирует SSOT motion-токенов labui
-(`--lab-motion-*`, labui/docs/motion-tokens.md) — при пересечении имён
-значения совпадают байт-в-байт. Дефолты не кричащие (в духе Apple
+`smooth`/`expressive`) зеркалирует SSOT motion-токенов `--lab-motion-*`
+дизайн-системы [labui](https://github.com/Labpics-Team/labui) — при
+пересечении имён значения совпадают байт-в-байт. Дефолты не кричащие (в духе Apple
 spring-first / Fluent 2 / Material 3): критично-задемпфированные пружины и
 мягкие изинги; overshoot — ровно в двух opt-in токенах (`easing.emphasized`,
 `spring.expressive`/`bounce`). Значения запинены тестами как контракт.
@@ -32,5 +32,6 @@ springFromDurationBounce(0.35, 0); // { mass: 1, stiffness: ~322.3, damping: ~35
 distanceScale(200);     // 200 (мс) в дефолтной полосе 0→400px ↦ fast(100)→slow(300)
 ```
 
-Гарантия размера — субпуть-изоляция (`sideEffects`-allowlist): не импортируешь
-`./tokens` — платишь ноль, ядро не растёт (проверено size-гейтом).
+Гарантия размера — субпуть-изоляция (`sideEffects`-allowlist): не импортируете
+`./tokens` — не платите ничего, ядро не растёт (проверено size-гейтом; полный
+compositor-контракт пружин — [compositor.md](compositor.md)).

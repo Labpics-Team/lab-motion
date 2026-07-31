@@ -110,6 +110,9 @@ node scripts/check-issue-forms.mjs # схема issue forms и taxonomy
 pnpm mutation
 ```
 
+Каденцию и break-порог планового mutation-прогона держат
+`.github/workflows/mutation.yml` и `stryker.config.mjs` — не документация.
+
 ## Требования к PR
 
 В описании должны быть:

@@ -1,6 +1,6 @@
 # Рецепты @labpics/motion
 
-> Роль: справка — runnable-рецепты интеграции: связка с DOM-событиями и
+> Роль: практика — runnable-рецепты интеграции: связка с DOM-событиями и
 > композиция субпутей. Концепты и контракты каждого пути — в
 > [справочнике API](api.md) и топик-доках ([compositor.md](compositor.md),
 > [projection.md](projection.md), [smart.md](smart.md),

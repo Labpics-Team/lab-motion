@@ -21,10 +21,11 @@ proj.play();                         // card едет FLIP'ом; avatar/badge и
 
 ## Ключевые свойства (все запинены тестами)
 
-- **Слои**: `geometry` (чистая математика, SSR-safe, кандидат mutation-гейта) →
-  `driver` (headless: инжектируемые `requestFrame`/`matchMedia`) → `dom`
-  (тонкий адаптер: page-space замеры, composed-обход открытых shadow root'ов).
-  Клятва «ядро не знает про DOM» сохранена: DOM трогает только адаптер.
+- **Слои**: `geometry` (`projectAt` — чистая математика, SSR-safe, кандидат
+  mutation-гейта) → `driver` (`createProjection` — headless: инжектируемые
+  `requestFrame`/`matchMedia`) → `dom` (`createDomProjection` — тонкий адаптер:
+  page-space замеры, composed-обход открытых shadow root'ов). Клятва «ядро не
+  знает про DOM» сохранена: DOM трогает только адаптер.
 - **Одна нормированная пружина на переход** — дерево едет «одним жестом»,
   tearing родитель/ребёнок исключён по построению; каждый кадр — замкнутая
   форма `solveSpring(params, t, v0)` с ЖИВЫМ v0.
@@ -45,7 +46,7 @@ proj.play();                         // card едет FLIP'ом; avatar/badge и
   ректах, k→0 при overshoot — каждый кадр конечен (fuzz-гейт ≥10 000 деревьев
   в CI), `-0` схлопнут.
 
-## Не-цели v1 (честно)
+## Не-цели v1
 
 Rotate/skew и не-`'0 0'` transform-origin (модель строго осевая),
 `position: fixed/sticky`, компенсация вложенных scroll-контейнеров (только

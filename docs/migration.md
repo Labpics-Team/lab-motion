@@ -20,8 +20,8 @@ lifecycle. Полный целевой пользовательский охва
 | `animate(el, { x: 100 }, { delay: 0.1 })` | `animate(el, { x: 100 }, { delay: 100 })` | мс |
 | `animate('.item', …, { delay: stagger(0.05) })` | `animate('.item', …, { stagger: 50 })` | шаг-мс между целями |
 | `const a = animate(…); a.pause(); a.play()` | то же | после естественного завершения Motion перезапускается, Lab Motion — нет |
-| `await animate(…)` или `animate(…).then(…)` | `await animate(…).finished` | control Motion thenable; Lab Motion предоставляет отдельный Promise |
-| `a.time = 0.5` | `a.seek(500)` | Motion использует секунды и getter/setter; `seek` Lab Motion — write-only, мс |
+| `await animate(…)` или `animate(…).then(…)` | `await animate(…).finished` | у Motion контрол — thenable; у Lab Motion — отдельный Promise `finished` |
+| `a.time = 0.5` | `a.seek(500)` | у Motion — секунды и getter/setter; `seek` у Lab Motion — write-only, мс |
 | `a.stop()` | `a.stop()` | оба сохраняют текущую позу; в Lab Motion `stop` — алиас `cancel` |
 | `a.cancel()` | прямого эквивалента нет | Motion возвращает initial pose; Lab Motion сохраняет текущую |
 | `animate(el, { '--x': 100 })` | `animate(el, { '--x': ['0px', '100px'] })` | CSS-переменная с юнитом |
@@ -31,23 +31,23 @@ lifecycle. Полный целевой пользовательский охва
 | Anime.js v4 | `@labpics/motion/animate` | Заметка |
 |---|---|---|
 | `animate(el, { translateX: 100 })` | `animate(el, { x: 100 })` | Anime v4 также допускает shorthand `x`; Lab Motion использует `x/y` |
-| `animate(el, { opacity: [0, 1], duration: 300 })` | `animate(el, { opacity: [0, 1] }, { duration: 300 })` | в Anime параметры находятся во втором объекте; в Lab Motion опции — третий аргумент |
+| `animate(el, { opacity: [0, 1], duration: 300 })` | `animate(el, { opacity: [0, 1] }, { duration: 300 })` | у Anime параметры — во втором объекте; у Lab Motion опции — третий аргумент |
 | `{ ease: 'inOutCirc' }` | `{ ease: circInOut }` | `circInOut` импортируется из `./easing` |
 | `{ delay: stagger(50) }` | `{ stagger: 50 }` | в Anime v4 `stagger` — именованный импорт |
 | `animate(targets, parameters)` | `animate(targets, props, options)` | разные сигнатуры, общий только one-liner характер |
 
 ## Границы объединённого
 
-Текущий `./animate` объединяет одним lifecycle только from/to-переходы
-поддерживаемых CSS-стилей и transform-шортхендов: spring/tween, delay/stagger
-и контролы `finished/play/pause/seek/cancel/stop`.
+`./animate` объединяет одним lifecycle только from/to-переходы поддерживаемых
+CSS-стилей и transform-шортхендов: spring/tween, delay/stagger и контролы
+`finished/play/pause/seek/cancel/stop`.
 
 Не объединены: N-keyframes и offsets, per-segment и per-property transitions,
 repeat/reverse/mirror/repeatDelay, inertia/decay, sequences/timeline,
 value/object targets, HTML/SVG attributes и path-specific SVG-каналы.
 `SVGElement` при этом уже является допустимой целью для поддерживаемых
-CSS-стилей. Отдельные низкоуровневые субпути не образуют общий owner,
-`finished` и interruption/cleanup-контракт. Также отсутствуют thenable
-control, `time/speed/duration` getters, `reverse`, `complete` и `restart`.
-Публичного API регистрации произвольных кодеков или адаптеров целей пакет пока
-не предоставляет.
+CSS-стилей. Низкоуровневые субпути не объединены общим владельцем: нет общего
+`finished` и контракта прерывания/cleanup. Также отсутствуют thenable control,
+`time/speed/duration` getters, `reverse`, `complete` и `restart`. Публичного
+API регистрации произвольных кодеков или адаптеров целей пакет не
+предоставляет.

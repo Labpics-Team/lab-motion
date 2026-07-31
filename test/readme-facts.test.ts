@@ -9,7 +9,7 @@ describe('README: проверяемые факты публичной пове�
     const nestedSubpaths = subpaths.filter((subpath) => subpath !== '.').length;
 
     expect(readme).toContain(
-      `Корневой экспорт + ${nestedSubpaths} субпутей (${subpaths.length} входов \`exports\` в`,
+      `Корневой экспорт + ${nestedSubpaths} субпутей (входов \`exports\` в \`package.json\` — ${subpaths.length})`,
     );
   });
 

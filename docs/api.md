@@ -1,8 +1,10 @@
 # Справочник субпутей @labpics/motion
 
 > Роль: справка — карта всех публичных входов пакета и их контрактов.
-> Число входов сверяется с `package.json` гейтами (`check-docs-drift`,
-> api-surface-pin тесты); группировка — канон [NAMING.md](NAMING.md).
+> Число входов выводится из `package.json` и держится гейтами
+> (`check-docs-drift` по NAMING.md, `test/readme-facts.test.ts` по README);
+> состав экспортов запинен api-surface-pin тестами. Группировка — канон
+> [NAMING.md](NAMING.md).
 
 Импорт — `@labpics/motion` (ядро) или `@labpics/motion/<субпуть>`.
 Корневой экспорт + 40 субпутей; неиспользуемые субпути вырезаются
@@ -12,11 +14,15 @@ tree-shaking'ом: `sideEffects` — точный allowlist из двух авт
 ## Требования и артефакт
 
 Node ≥ 22; ESM и CJS, по-файловые декларации типов. Runtime-зависимостей нет;
-фреймворк биндинга — optional peer (объявлены для 8 фреймворков, `./wc` не
-требует ничего). Целостность артефакта у потребителя доказывают
-`pnpm pack:smoke` (тарбол → чистый проект → ESM/CJS-импорт всех входов без
-обязательного peer) и `pnpm pack:compat` (TypeScript/Vite, SSR, tree shaking,
-точный минимальный Preact peer).
+фреймворк для биндинга — optional peer (объявлены для 8 фреймворков, `./wc` не
+требует ничего).
+
+Установка из исходников — только тарболом (`dist/` собирается, в git его нет):
+`pnpm build && pnpm pack`, затем `pnpm add /путь/к/labpics-motion-<версия>.tgz`.
+Целостность артефакта у потребителя доказывают `pnpm pack:smoke` (тарбол →
+чистый проект → ESM/CJS-импорт всех входов без обязательного peer, файлы каждой
+export-ветки) и `pnpm pack:compat` (TypeScript/Vite, SSR, tree shaking, точный
+минимальный Preact peer).
 
 ## Ядро и управление
 
@@ -25,7 +31,7 @@ Node ≥ 22; ESM и CJS, по-файловые декларации типов. 
 | `@labpics/motion` | `spring` (аналитический closed-form солвер), `tween`, `drive` (декларативный запуск), `MotionValue` (реактивное значение со smooth-pickup), `MotionParamError` |
 | `…/driver` | Scrubbable-контроллер: `play/pause/reverse/seek/timeScale/progress` + thenable |
 | `…/frame` | Единый frame-шедулер: `createFrameLoop` / синглтон `frame` — один rAF на кадр, фазы read→update→render против layout-thrash, SSR-safe; `asRequestFrame(loop)` сажает `MotionValue`/`drive` на общий кадр. **Биндинги используют его по умолчанию** (как shared-ticker у Framer Motion/GSAP); инжекция своего `requestFrame` переопределяет |
-| `…/nano` | **Platform-trusted WAAPI to-only ≤ 1 КБ gzip**: spring/tween, целые `translate/scale/rotate` longhand-каналы, любые нативно-анимируемые CSS-свойства, `delay`/`stagger`, reduced-motion и сами `Animation` как контролы. Без layout-read, независимых `x/y`, rAF-fallback, C1-подхвата и hostile-host обещаний. Подробный контракт — ниже |
+| `…/nano` | **Platform-trusted WAAPI to-only ≤ 1 КБ gzip**: spring/tween, `delay`/`stagger`, reduced-motion, сами `Animation` как контролы; полный контракт и границы — ниже |
 | `…/animate` | Фасад-one-liner: `animate(target, props, options)` — цели по каналам (`x`/`y`/`scale`/`rotate`, `opacity`, CSS-свойства), режим `{ spring }` или `{ duration, ease }`, `delay`/`stagger`, контролы `{ finished, play, pause, seek, cancel, stop }`. Это базовый single-transition DX-срез; ядро от него не растёт |
 
 ### Пример: scrub-контроллер
@@ -98,7 +104,7 @@ await moves.finished;
 | `…/in-view` | Нативный `IntersectionObserver`-адаптер: selector/Element/список, custom root/margin/amount, one-shot либо парный enter/leave cleanup; возвращает idempotent `stop` |
 | `…/presence` | Enter/exit lifecycle: «доиграй exit-анимацию → потом убирай из DOM», прерывания, `swapPresence` (wait/sync) |
 | `…/flip` | Layout-анимация FLIP: инверсия first→last, пружинный «доезд», коррекция scale-искажений (`correctRadius`, `counterScale`) |
-| `…/projection` | Вложенный FLIP-движок (жанр Framer projection): transform родителя не искажает детей и border-radius. Подробно — [projection.md](projection.md) |
+| `…/projection` | Вложенный FLIP-движок (жанр Framer projection): transform родителя не искажает детей и border-radius; `projectAt` (чистая математика), `createProjection` (headless-драйвер), `createDomProjection` (DOM-адаптер). Подробно — [projection.md](projection.md) |
 | `…/smart` | Smart-animate поверх `./projection` (жанр Figma smart-animate / shared-element): диф двух снимков дерева по `data-motion-key`. Подробно — [smart.md](smart.md) |
 | `…/auto` | Zero-config FLIP: `autoAnimate(parent)` — add/remove/move детей анимируются сами; reduced-motion меняет характер (move→снап), не выключает |
 | `…/a11y` | `createMotionConfig` — политика reduced-motion (`system`/`always`/`never`), меняет характер анимации, не выключает |

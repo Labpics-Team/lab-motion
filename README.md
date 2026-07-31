@@ -9,8 +9,9 @@
 [![license](https://img.shields.io/npm/l/%40labpics%2Fmotion)](LICENSE)
 
 Lab Motion — headless-движок: чистая математика движения (аналитический
-spring-солвер, кейфреймы, инерция, FLIP) отделена от DOM. Рендерит ваш колбэк
-или готовый биндинг, время инжектируется — прогоны воспроизводимы бит-в-бит.
+spring-солвер, кейфреймы, инерция, FLIP) отделена от DOM. Рендер делает ваш
+колбэк или готовый биндинг; время инжектируется — прогоны воспроизводимы
+бит-в-бит.
 
 ## Установка
 
@@ -18,9 +19,9 @@ spring-солвер, кейфреймы, инерция, FLIP) отделена 
 pnpm add @labpics/motion
 ```
 
-Node ≥ 22, ESM и CJS, типы в комплекте. Фреймворк биндинга — optional peer.
-Git-установка не поддерживается (`dist/` собирается, в репозитории его нет) —
-для разработки из исходников см. [CONTRIBUTING.md](CONTRIBUTING.md).
+Node ≥ 22, ESM и CJS, типы в комплекте. Фреймворк для биндинга — optional
+peer. Git-установка не поддерживается (`dist/` собирается, в репозитории его
+нет) — установка из тарбола описана в [справочнике](docs/api.md).
 
 ## Быстрый старт
 
@@ -35,7 +36,7 @@ await animate('.card', { x: 240, opacity: 1 }, {
 }).finished;
 ```
 
-Реактивное значение: новая цель мид-полёта подхватывает позицию **и скорость**
+Реактивное значение: новая цель в полёте подхватывает позицию **и скорость**
 — перехваты без рывка:
 
 ```typescript
@@ -70,10 +71,9 @@ bottom sheet) — в [docs/recipes.md](docs/recipes.md).
   адаптивные кадры в WebKit) и живёт на compositor-потоке. Ретаргет и хендофф
   обратно в живую пружину — без разрыва траектории.
   → [docs/compositor.md](docs/compositor.md)
-- **Платите только за импортированное.**
-  Корневой экспорт + 40 субпутей (41 входов `exports` в `package.json`);
-  точный `sideEffects`-allowlist, ядро под жёстким size-гейтом CI, поле
-  `dependencies` отсутствует.
+- **Платите только за импортированное.** Каждая возможность — отдельный
+  субпуть; точный `sideEffects`-allowlist, неиспользуемое вырезает
+  tree-shaking, ядро под жёстким size-гейтом CI.
 - **9 фреймворков, одно ядро.** React, Preact, Vue, Svelte, Solid, Angular,
   Qwik, Lit, Web Components. Биндинг — тонкая прослойка; ядро про фреймворки
   не знает.
@@ -95,7 +95,8 @@ bottom sheet) — в [docs/recipes.md](docs/recipes.md).
 
 ## Карта пакета
 
-Импорт — `@labpics/motion` (ядро) или `@labpics/motion/<субпуть>`:
+Импорт — `@labpics/motion` (ядро) или `@labpics/motion/<субпуть>`.
+Корневой экспорт + 40 субпутей (входов `exports` в `package.json` — 41):
 
 | Группа | Субпути |
 | --- | --- |
@@ -105,7 +106,7 @@ bottom sheet) — в [docs/recipes.md](docs/recipes.md).
 | Биндинги | `./react`, `./preact`, `./vue`, `./svelte`, `./solid`, `./angular`, `./qwik`, `./lit`, `./wc` |
 | Build-tool | `./compiler/vite` (плагин), `./compiler/runtime` (исполнитель, вставляется плагином) |
 
-Что даёт каждый вход — в справочнике [docs/api.md](docs/api.md).
+Что даёт каждый субпуть — в справочнике [docs/api.md](docs/api.md).
 
 ## Compositor-путь в двух словах
 
@@ -116,7 +117,7 @@ const panel = new CompositorSpring({
   spring: { mass: 1, stiffness: 170, damping: 26 },
   property: 'transform', from: 0, to: 240,
   target: el, format: (v) => `translateX(${v}px)`,
-  apply: (v) => { el.style.transform = String(v); }, // только fallback-путь
+  apply: (val) => { el.style.transform = String(val); }, // только на fallback-пути
 });
 panel.start();          // браузер ведёт пружину без участия главного потока
 panel.retarget(120);    // дискретное прерывание: новая кривая из текущей точки
@@ -170,15 +171,14 @@ springFromDurationBounce(0.35, 0); // восприятие (duration, bounce) �
 
 ## Размер
 
-Актуальные числа не копируются в Markdown: `pnpm size` воспроизводимо измеряет
-вес всех публичных входов и сценарный import-cost, CI сравнивает с
-регрессионными потолками (ядро — 2220 байт gzip, `./nano` — 1024). Методология
+Ядро — до 2220 байт gzip, `./nano` — до 1024; потолки держит size-гейт CI.
+Актуальные числа не копируются в Markdown — их выдаёт `pnpm size`; методология
 и правила сравнения — [docs/benchmark.md](docs/benchmark.md).
 
 ## Миграция с Motion / Anime.js
 
 `./animate` даёт знакомую one-liner форму; карта переноса конкретных вызовов и
-честный список того, что пока не объединено, — [docs/migration.md](docs/migration.md).
+список того, что не объединено, — [docs/migration.md](docs/migration.md).
 
 ## Документация
 
