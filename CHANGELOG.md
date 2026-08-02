@@ -11,7 +11,7 @@
 ### Removed
 
 - **Breaking (pre-1.0):** публичные входы `./animate/mini` и `./animate/native`
-  удалены вместе с их гейтами и тестами; линейка анимации — ровно два входа:
+  удалены вместе с их проверками и тестами; линейка анимации — ровно два входа:
   `./nano` (platform-trusted, ≤1 КБ) и `./animate` (полный контракт).
   Нишу native закрывает `./nano`; one-liner-сценарии mini живут в `./animate`
   с тем же сигнатурным контрактом. Опубликованный npm `0.1.0` этих subpath не
@@ -23,7 +23,7 @@
 - `./in-view`: SSR-safe нативный `IntersectionObserver`-адаптер с snapshot
   selector/Element/списка, custom root/margin/amount, one-shot по умолчанию,
   парным enter/leave cleanup и идемпотентным terminal `stop()`.
-- `./nano`: platform-trusted WAAPI to-only вход под hard gate 1 КБ gzip:
+- `./nano`: platform-trusted WAAPI to-only вход с ограничением размера до 1 КБ gzip:
   spring/tween, целые `translate/scale/rotate` longhand-каналы, CSS-значения
   силами браузера, delay/stagger, reduced-motion и native `Animation` controls.
   Скрытого layout-read, rAF-fallback, C1-подхвата и hostile-host контракта нет;
@@ -105,7 +105,7 @@
   реинкарнация ключа), единый clock. `reduced` = смена характера (matched снап,
   фейды живые), `resolveSmartTier` (`reduced`/`projection`/`ssr`), SSR-инертность,
   fail-fast `MotionParamError` на параметрах и дубликате ключа. API: `captureSmart`,
-  `smartTransition`, `resolveSmartTier`, `SMART_KEY_ATTR`. Финитность — fuzz-гейт
+  `smartTransition`, `resolveSmartTier`, `SMART_KEY_ATTR`. Финитность — фаззинг-тест
   ≥10 000 злых дифов (ни броска, ни NaN/∞/`-0`). Минимальный скоуп #99: нативный
   View Transitions API вырезан (отдельная фаза) (#99).
 - `./animate`: tween-режим вычисляет аналитическую скорость канала —
@@ -213,8 +213,8 @@
 
 - npm-артефакт получил раздельные ESM/CJS declaration-ветки для всех экспортов,
   `typesVersions` для legacy TypeScript resolver, точный `sideEffects`-allowlist,
-  честный Preact floor `10.3.1` и consumer-гейты на реальные байты tarball.
-- Релиз собирает tgz один раз, после всех гейтов фиксирует тег, публикует только
+  честный Preact floor `10.3.1` и автоматические проверки на реальные байты tarball.
+- Релиз собирает tgz один раз, после всех проверок фиксирует тег, публикует только
   опечатанный artifact через OIDC и проверяет registry integrity и SLSA provenance.
 
 - Минимальный runtime-контракт поднят до Node.js 22: ветки 18 и 20 больше не
@@ -313,7 +313,7 @@
 - Framework bindings при reduced motion атомарно снэпают состояние без
   отложенного stale-кадра; React-адаптер сохраняет владельца `MotionValue` при
   StrictMode replay и уничтожает его только при настоящем unmount.
-- Удалён цикл `compositor ↔ stagger`; новый статический гейт запрещает возврат
+- Удалён цикл `compositor ↔ stagger`; новая статическая проверка запрещает возврат
   циклических импортов.
 - Headless-типы больше не требуют `lib.dom`, а npm-runtime не содержит ссылок
   на исключённые sourcemap-файлы.
@@ -334,7 +334,7 @@
 - `./tokens`: `springFromDurationBounce(durationS, bounce)` — каноническая
   пара восприятия (модель SwiftUI/Motion.dev) → `SpringParams` с гарантией
   оседания; ДС-пружины `spring.smooth` и `spring.expressive`.
-- Воспроизводимый release-процесс с проверкой версии, полным набором гейтов и npm provenance.
+- Воспроизводимый release-процесс с проверкой версии, полным набором проверок и npm provenance.
 - Политики вклада и безопасности, шаблоны issues и pull requests.
 - Регулярный mutation-прогон критического численного ядра.
 

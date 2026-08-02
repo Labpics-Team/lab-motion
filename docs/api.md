@@ -1,7 +1,7 @@
 # Справочник субпутей @labpics/motion
 
 > Роль: справка — карта всех публичных входов пакета и их контрактов.
-> Число входов выводится из `package.json` и держится гейтами
+> Число входов выводится из `package.json` и проверяется автоматически
 > (`check-docs-drift` по NAMING.md, `test/readme-facts.test.ts` по README);
 > состав экспортов запинен api-surface-pin тестами. Группировка — канон
 > [NAMING.md](NAMING.md).
@@ -48,7 +48,7 @@ await anim; // thenable
 
 ### Контракт `./nano`
 
-`./nano` — platform-trusted to-only WAAPI-вход под жёстким гейтом 1 КБ gzip;
+`./nano` — platform-trusted to-only WAAPI-вход с ограничением размера до 1 КБ gzip;
 контролы — сами `Animation`. Числа — миллисекунды; `translate/scale/rotate` —
 целые нативные CSS longhand-каналы, цвета/фильтры/единицы интерполирует
 браузер. CSS `x/y` не трактуются как оси `translate` (nano не читает layout,

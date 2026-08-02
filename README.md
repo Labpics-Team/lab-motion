@@ -73,7 +73,7 @@ bottom sheet) — в [docs/recipes.md](docs/recipes.md).
   → [docs/compositor.md](docs/compositor.md)
 - **Платите только за импортированное.** Каждая возможность — отдельный
   субпуть; точный `sideEffects`-allowlist, неиспользуемое вырезает
-  tree-shaking, ядро под жёстким size-гейтом CI.
+  tree-shaking, размер ядра отслеживается в CI.
 - **9 фреймворков, одно ядро.** React, Preact, Vue, Svelte, Solid, Angular,
   Qwik, Lit, Web Components. Биндинг — тонкая прослойка; ядро про фреймворки
   не знает.
@@ -91,7 +91,7 @@ bottom sheet) — в [docs/recipes.md](docs/recipes.md).
 - **Доступность и SSR всерьёз.** `prefers-reduced-motion` меняет характер
   движения (снап/фейд), а не выключает его грубо; импорт любого субпутя
   SSR-safe; `NaN`/`Infinity` никогда не попадают в CSS — гарантии запечатаны
-  fuzz-гейтами в CI.
+  фаззинг-тестами в CI.
 
 ## Карта пакета
 
@@ -171,7 +171,7 @@ springFromDurationBounce(0.35, 0); // восприятие (duration, bounce) �
 
 ## Размер
 
-Ядро — до 2220 байт gzip, `./nano` — до 1024; потолки держит size-гейт CI.
+Ядро — до 2220 байт gzip, `./nano` — до 1024; размер ядра контролируется в CI.
 Актуальные числа не копируются в Markdown — их выдаёт `pnpm size`; методология
 и правила сравнения — [docs/benchmark.md](docs/benchmark.md).
 
@@ -194,12 +194,12 @@ springFromDurationBounce(0.35, 0); // восприятие (duration, bounce) �
 | [Токены](docs/tokens.md) | Словарь движения и каноническая пара (duration, bounce) |
 | [Компилятор](docs/compiler.md) | Build-time lowering: скоуп, гарантии, sourcemaps |
 | [Ошибки](docs/errors.md) | Каталог кодов `MotionParamError` (`LMddd`) |
-| [Бенчмарки](docs/benchmark.md) | Методология измерений и законы size-гейта |
+| [Бенчмарки](docs/benchmark.md) | Методология измерений и автоматический контроль размера |
 | [Миграция](docs/migration.md) | Соответствие вызовов Motion JS и Anime.js |
 
 ## Вклад
 
-Рабочий процесс, архитектурные границы и обязательные гейты —
+Рабочий процесс, архитектурные границы и обязательные проверки качества —
 [CONTRIBUTING.md](CONTRIBUTING.md). Уязвимости — приватно через
 [SECURITY.md](SECURITY.md).
 

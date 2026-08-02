@@ -42,7 +42,7 @@ hoisted-импорт исполнителя не отображается (эт�
 
 ## Гарантии
 
-- **Приёмочный гейт CI** (`pnpm acceptance:compiler`): реальный Vite-build
+- **Приёмочная проверка CI** (`pnpm acceptance:compiler`): реальный Vite-build
   fixture с плагином и без — доказывает элиминацию солвера/парсера из бандла
   потребителя и строго меньший вес артефакта.
 - **Browser-differential**: compiled-вызов сверяется с не-compiled в трёх

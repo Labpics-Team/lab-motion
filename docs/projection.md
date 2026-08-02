@@ -22,7 +22,7 @@ proj.play();                         // card едет FLIP'ом; avatar/badge и
 ## Ключевые свойства (все запинены тестами)
 
 - **Слои**: `geometry` (`projectAt` — чистая математика, SSR-safe, кандидат
-  mutation-гейта) → `driver` (`createProjection` — headless: инжектируемые
+  мутационного тестирования) → `driver` (`createProjection` — headless: инжектируемые
   `requestFrame`/`matchMedia`) → `dom` (`createDomProjection` — тонкий адаптер:
   page-space замеры, composed-обход открытых shadow root'ов). Клятва «ядро не
   знает про DOM» сохранена: DOM трогает только адаптер.
@@ -43,7 +43,7 @@ proj.play();                         // card едет FLIP'ом; avatar/badge и
 - **Reduced-motion = смена характера**: снап в конечный layout одним кадром,
   ноль rAF; невалидная пружина бросает `MotionParamError` даже под reduce.
 - **Деградации без NaN**: вырожденные боксы (display:none, 0×0), NaN/∞ в
-  ректах, k→0 при overshoot — каждый кадр конечен (fuzz-гейт ≥10 000 деревьев
+  ректах, k→0 при overshoot — каждый кадр конечен (фаззинг-тест ≥10 000 деревьев
   в CI), `-0` схлопнут.
 
 ## Не-цели v1
