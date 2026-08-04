@@ -81,6 +81,7 @@ interface SceneState {
   boundary: HTMLElement;
   rafEl: HTMLElement;
   raw: HTMLElement;
+  list: HTMLElement;
   viewportCapacity: number;
   overscan: number;
   logicalRows: number;
@@ -103,6 +104,13 @@ test('freeze proof: compositor-контроли движутся, rAF-контр
     };
 
     let observerSamples = 0;
+    interface SurfaceControlsLike {
+      readonly ready: Promise<void>;
+      readonly committed: Promise<void>;
+      readonly finished: Promise<void>;
+      readonly tier: string;
+      cancel(): void;
+    }
     const controls = animate(
       scene.boundary,
       { width: [240, 360] },
@@ -112,7 +120,7 @@ test('freeze proof: compositor-контроли движутся, rAF-контр
         spring: { mass: 1, stiffness: 25, damping: 9 },
         onFrame: () => { observerSamples++; },
       },
-    );
+    ) as unknown as SurfaceControlsLike;
     await controls.ready;
     const tier = controls.tier;
     rows.afterCommit = materializedRows();

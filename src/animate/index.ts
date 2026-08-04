@@ -44,7 +44,10 @@ import {
   type SpringExecutionArtifactTuple,
 } from '../compositor/curve.js';
 import { MotionParamError } from '../errors.js';
-import { tryRouteSurfaceTransition } from '../future-layout/route.js';
+import {
+  tryRouteSurfaceTransition,
+  type SurfaceRouteControls,
+} from '../future-layout/route.js';
 import {
   DEFAULT_DURATION_MS,
   DEFAULT_SPRING,
@@ -122,6 +125,18 @@ export interface AnimateOptions {
   readonly now?: (() => number) | undefined;
   /** Таймер compositor-finished. Дефолт: setTimeout/clearTimeout. */
   readonly setTimer?: SetTimerFn | undefined;
+  /** Future Layout: 'project' маршрутизирует width-only цель в сопряжённые
+   * поверхности (контролы расширяются ready/committed/state/tier). */
+  readonly layout?: 'project' | undefined;
+  /** Future Layout: observer-подписка на кадры сопряжённой поверхности
+   * (1 callback на доставленный кадр, ноль аллокаций кадра). */
+  readonly onFrame?: ((frame: {
+    readonly time: number;
+    readonly progress: number;
+    readonly width: number;
+    readonly velocity: number;
+    readonly delta: number;
+  }) => void) | undefined;
 }
 
 /** Контролы прогона (для группы целей — агрегированные). */
@@ -327,7 +342,7 @@ export function animate(
 ): AnimateControls {
   // Future Layout (явный layout:'project'): консервативный маршрутизатор —
   // сомнение оставляет обычный runtime path без подмены семантики.
-  const surfaceRoute = tryRouteSurfaceTransition(
+  const surfaceRoute: SurfaceRouteControls | undefined = tryRouteSurfaceTransition(
     target,
     props as unknown as Record<string, unknown>,
     options as unknown as Record<string, unknown>,
