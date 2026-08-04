@@ -208,6 +208,9 @@ function buildReciprocalUnchecked(
 ): Float64Array | undefined {
   const count = samples.length / 2;
   const delta = 1 / toWidth - 1 / fromWidth;
+  // Fail-closed: без двух stops и без представимого ненулевого Δ доказательство
+  // невозможно, а сериализация дала бы невалидный `linear()` или NaN-токены.
+  if (count < 2 || !Number.isFinite(delta) || delta === 0) return undefined;
   const widthAt = (percent: number, i: number): number => {
     const x0 = samples[i * 2];
     const p0 = samples[i * 2 + 1];
