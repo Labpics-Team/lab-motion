@@ -1,15 +1,18 @@
 /**
- * test/future-layout-compiler.test.ts — RED: compiler lowering и erasure.
+ * test/future-layout-compiler.test.ts — compiler lowering и erasure.
  *
  * Спека: «COMPILER», «RUNTIME БЕЗ COMPILER»; RED-Фаза п.20 (Compiler graph
  * содержит solver/parser/full facade) и п.21-смежный seam: lowering
  * layout:'project' в versioned surface program ещё не существует.
  *
- * RED PROOF: src/compiler/core.ts умеет только nano-lowering; seam
- * `lowerSurfaceCall` отсутствует — pick-хелпер возвращает undefined, тест
- * падает СВОИМ ассертом (канон test/animate-facade-helpers.ts:9-31).
- * Erasure-гарантии (нет solver/parser/full facade в compiled consumer graph)
- * станут acceptance-ассертами scripts/compiler-acceptance.mjs в GREEN.
+ * RED PROOF (история): до GREEN src/compiler/core.ts умел только
+ * nano-lowering; seam `lowerSurfaceCall` отсутствовал — pick-хелпер
+ * возвращал undefined, тест падал СВОИМ ассертом
+ * (канон test/animate-facade-helpers.ts:9-31).
+ * GREEN: seam добавлен (conservative lowering, каждый guard с positive
+ * control в test/future-layout-compiler-lowering.test.ts).
+ * Erasure-гарантии (нет solver/parser/full facade в compiled consumer graph) —
+ * acceptance-ассерты scripts/compiler-acceptance.mjs (surface no-op секция).
  */
 
 import { describe, expect, it } from 'vitest';

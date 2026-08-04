@@ -32,6 +32,7 @@ const TMP = resolve(ROOT, 'scripts', '.compiler-acceptance-tmp');
 const ALIAS = {
   '@labpics/motion/nano': resolve(DIST, 'nano/index.js'),
   '@labpics/motion/compiler/runtime': resolve(DIST, 'compiler/runtime/index.js'),
+  '@labpics/motion/animate': resolve(DIST, 'animate/index.js'),
 };
 
 /** dist-модуль (не entry, не bare peer) в графе — нормализованный к dist-relative id. */
@@ -49,9 +50,11 @@ function distModules(chunk) {
 // статический импорт из ../dist упал бы раньше дружелюбной диагностики.
 let motionCompiler;
 
-/** Один Vite-build fixture'а: возвращает entry-chunk {code, distModules}. */
-async function buildFixture(name, code, withPlugin) {
-  const entry = resolve(TMP, `${name}.js`);
+/** Один Vite-build fixture'а: возвращает entry-chunk {code, distModules}.
+ * entryName — общий путь entry для байтово-сравниваемых пар (rolldown
+ * вшивает путь entry в вывод: разные пути ломают no-op-сравнение). */
+async function buildFixture(name, code, withPlugin, entryName = name) {
+  const entry = resolve(TMP, `${entryName}.js`);
   writeFileSync(entry, code);
   const result = await build({
     root: ROOT,
@@ -77,6 +80,10 @@ export function play(el) { return animate(el, { opacity: 0.5 }); }`;
 // Динамическая opacity — вне скоупа: плагин обязан отказать (positive control).
 const DYNAMIC = `import { animate } from '@labpics/motion/nano';
 export function play(el, v) { return animate(el, { opacity: v }); }`;
+// Surface-вызов полного фасада: V1 плагин обязан НЕ трогать layout:'project'
+// (conservative lowering; runtime path единственно корректен без surface-IR).
+const SURFACE = `import { animate } from '@labpics/motion/animate';
+export function play(el) { return animate(el, { width: [240, 360] }, { layout: 'project' }); }`;
 
 /** Fingerprint spring-солвера: замкнутая форма тянет Math.exp/cos/sin/sqrt. */
 const SPRING_MATH = /Math\.(?:exp|cos|sin|sqrt)/;
@@ -152,6 +159,24 @@ async function run() {
     );
     notes.push(`no-op контроль: динамическая opacity сохранила рантаймовый путь (${NANO_MODULE})`);
     notes.push(`граф compiled: ${compiled.modules.join(', ') || '(только entry)'}`);
+
+    // ── Surface erasure: layout:'project' V1 не понижается (conservative) ────
+    const surfaceBaseline = await buildFixture('surface-uncompiled', SURFACE, false, 'surface');
+    const surfaceCompiled = await buildFixture('surface-compiled', SURFACE, true, 'surface');
+    check(
+      surfaceCompiled.code === surfaceBaseline.code,
+      'surface-вызов изменился под плагином: V1 обязан оставлять корректный runtime path',
+    );
+    check(
+      !surfaceCompiled.modules.includes(RUNTIME_MODULE),
+      `surface-граф тянет nano-executor ${RUNTIME_MODULE}: ${surfaceCompiled.modules.join(', ')}`,
+    );
+    // Erasure-инвариант: AST/compiler-ядро не попадает в бандл потребителя.
+    check(
+      surfaceCompiled.modules.every((m) => !m.startsWith('compiler/')),
+      `surface-граф потребителя несёт compiler-модули: ${surfaceCompiled.modules.join(', ')}`,
+    );
+    notes.push(`surface no-op: layout:'project' остался runtime-путём (граф: ${surfaceCompiled.modules.join(', ')})`);
   } finally {
     rmSync(TMP, { recursive: true, force: true });
   }
