@@ -358,7 +358,7 @@ jobs:
 
       - name: Publish or reconcile verified tarball through npm OIDC
         env:
-          TARBALL: release-artifact/${{ needs.verify.outputs.tarball_name }}
+          TARBALL: ./release-artifact/${{ needs.verify.outputs.tarball_name }}
         run: |
           node --input-type=module <<'NODE'
           import { execFileSync } from 'node:child_process';
@@ -497,7 +497,7 @@ jobs:
 
       - name: Verify registry provenance statement and signatures
         env:
-          TARBALL: release-artifact/${{ needs.verify.outputs.tarball_name }}
+          TARBALL: ./release-artifact/${{ needs.verify.outputs.tarball_name }}
         run: |
           node --input-type=module <<'NODE'
           import { execFileSync } from 'node:child_process';
