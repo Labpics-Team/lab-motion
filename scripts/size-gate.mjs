@@ -84,8 +84,13 @@ export const NANO_GATE_BYTES = 1024;
 // раздувание самодостаточного entry при splitting:false; consumer-порог —
 // потерю tree-shakeability типичного вызова. Люфт намеренно нулевой: новая
 // capability ещё не имеет исторического шума, повышать только по факту решения.
+// 2026-08-04: consumer 1 907 → 1 908 (exact-факт, люфт остаётся нулевым):
+// этот домен-PR растит каталог ошибок до LM167 (Future Layout surface width) —
+// in-view шипит LAST_MOTION_PARAM_ERROR_CODE, и смена кода той же длины даёт
+// +1 B gz чистого parity-шума без изменения логики. Подъём по явному решению
+// Даниила (делегирование «минимальный подъём от факта»).
 export const IN_VIEW_GATE_BYTES = 1839;
-export const IN_VIEW_CONSUMER_GATE_BYTES = 1907;
+export const IN_VIEW_CONSUMER_GATE_BYTES = 1908;
 
 // Совместный импорт одиночного и группового compositor API. Оба физических
 // entry отдельно остаются под прежними 6 450 B; 6 600 B ловят раздувание их

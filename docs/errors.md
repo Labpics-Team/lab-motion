@@ -178,3 +178,4 @@
 | `LM164` | presets easing | Scalar или элемент easing не является функцией | Передать функцию для каждого сегмента | active |
 | `LM165` | frame scheduler | requestFrame не является функцией | Передать функцию планирования кадра | active |
 | `LM166` | infinite repeat sample | Время требует номер итерации выше точного binary64 integer domain | Сэмплировать до 9_007_199_254_740_991-й итерации или завершить контрол явно | active |
+| `LM167` | surface input | Ширина поверхности не является положительным конечным CSS px; либо budget точности сопряжения не положителен/не конечен | Передать положительные конечные px-endpoints bounded viewport и положительный конечный coupling budget | active |
