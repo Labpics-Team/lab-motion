@@ -17,7 +17,7 @@
  * ГЕЙТОМ НЕ ЯВЛЯЕТСЯ (ns wall-clock машинозависимы; тот же принцип, что bench.mjs).
  * Браузерный слой (PerformanceObserver LoAF / Event Timing, presentationTime) —
  * вне CI (нужен реальный Chrome + tracing для compositor-резидентности), ручная
- * валидация; см. README «Границы замера».
+ * валидация; см. docs/compositor.md «Латентность → Границы замера».
  *
  * Запуск: pnpm bench:latency (стенд пересобирает и fingerprint'ит checkout/dist)
  */
@@ -217,7 +217,7 @@ for (const [hz, ms] of Object.entries(FRAME_BUDGETS)) {
 }
 console.log(
   '\n  примечание: числа машинозависимы, гейтом НЕ являются; compositor-резидентность\n' +
-    '  и input→photon НЕ наблюдаемы из Node — только реальный Chrome + tracing (см. README).\n',
+    '  и input→photon НЕ наблюдаемы из Node — только реальный Chrome + tracing (см. docs/compositor.md).\n',
 );
 
 assertCheckoutUnchanged(pkgRoot, provenance);

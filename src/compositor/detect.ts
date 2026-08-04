@@ -11,7 +11,8 @@
  * шов использует пару navigator.vendor + AppleWebKit и выбирает явные ключевые
  * кадры с обычным linear.
  *
- * Матрица тиров (полная таблица «тир → поведение → что теряем» — в README):
+ * Матрица тиров (полная таблица «тир → поведение → что теряем» —
+ * docs/compositor.md «Fallback-матрица»):
  *
  *   'compositor'      WAAPI + (WebKit или CSS linear()) → план в Element.animate().
  *   'waapi-no-linear' WAAPI, но нет linear() → живой rAF (linear() не донесёт кривую).

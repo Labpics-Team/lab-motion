@@ -20,7 +20,7 @@ body:
   - type: textarea
     id: contract
     attributes:
-      label: Требуемый гейт
+      label: Требуемая автоматическая проверка
       description: Какое автоматическое условие должно предотвращать повторение?
     validations:
       required: true

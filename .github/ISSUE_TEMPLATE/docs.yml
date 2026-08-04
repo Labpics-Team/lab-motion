@@ -14,13 +14,13 @@ body:
     id: expected
     attributes:
       label: Как должно быть
-      description: Правильное содержание и его источник правды (код, гейт, измерение).
+      description: Правильное содержание и его источник правды (код, автопроверка, измерение).
     validations:
       required: true
   - type: textarea
     id: gate
     attributes:
-      label: Гейт от повторения
-      description: Может ли drift-гейт (docs-drift/docs-facts) ловить этот класс? Если да — какой пин добавить.
+      label: Проверка от повторения
+      description: Может ли автопроверка (docs-drift/docs-facts) ловить этот класс? Если да — какой пин добавить.
     validations:
       required: false
