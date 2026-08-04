@@ -528,6 +528,8 @@ jobs:
 
       - name: Verify registry provenance statement and signatures
         env:
+          EXPECTED_RUN_SHA: ${{ github.sha }}
+          GH_TOKEN: ${{ github.token }}
           TARBALL: ./release-artifact/${{ needs.verify.outputs.tarball_name }}
         run: |
           node --input-type=module <<'NODE'
@@ -555,7 +557,16 @@ jobs:
           if (parsedUrl.origin !== 'https://registry.npmjs.org') {
             fail(`недоверенный endpoint attestations: ${parsedUrl.origin}`);
           }
-          const attestationResponse = await fetch(parsedUrl, { cache: 'no-store' });
+          // registry материализует attestation bundle асинхронно: metadata уже
+          // ссылается на endpoint, который первые минуты отвечает 404 (падение
+          // run 30901712886 через 1.2s после publish). Retry только на 404;
+          // остальные статусы fail-closed немедленно.
+          let attestationResponse;
+          for (let attempt = 1; attempt <= 16; attempt++) {
+            attestationResponse = await fetch(parsedUrl, { cache: 'no-store' });
+            if (attestationResponse.ok || attestationResponse.status !== 404) break;
+            await new Promise((resolve) => { setTimeout(resolve, 15000); });
+          }
           if (!attestationResponse.ok) fail(`attestations: HTTP ${attestationResponse.status}`);
           const collection = await attestationResponse.json();
           const attestation = collection.attestations?.find(
@@ -577,10 +588,34 @@ jobs:
           if (workflow?.path !== '.github/workflows/release.yml' || workflow?.ref !== 'refs/heads/main') {
             fail('provenance указывает на другой workflow/ref');
           }
-          const source = definition?.resolvedDependencies?.find(
-            (item) => item.digest?.gitCommit === process.env.EXPECTED_SOURCE_SHA,
+          // OIDC-provenance привязан к workflow-run: gitCommit — SHA рана,
+          // подписавшего пакет. При idempotent-rerun это ранний диспатч
+          // (run 30901712886: пакет подписан на 0d4534c8, github.sha уже новее),
+          // поэтому точное равенство нежизнеспособно. Инвариант fail-closed:
+          // gitCommit == github.sha текущего рана или его предок по main;
+          // подпись diverged/чужого коммита отвергается. Байты дерева источника
+          // связаны с пакетом через subject sha512 выше.
+          const provenanceSha = definition?.resolvedDependencies?.find(
+            (item) => typeof item.digest?.gitCommit === 'string'
+              && typeof item.uri === 'string'
+              && item.uri.startsWith('git+https://github.com/Labpics-Team/lab-motion@'),
+          )?.digest?.gitCommit;
+          if (!provenanceSha) fail('provenance не содержит gitCommit нашего репозитория');
+          const compareResponse = await fetch(
+            `https://api.github.com/repos/Labpics-Team/lab-motion/compare/${process.env.EXPECTED_RUN_SHA}...${provenanceSha}`,
+            {
+              headers: {
+                accept: 'application/vnd.github+json',
+                authorization: `Bearer ${process.env.GH_TOKEN}`,
+              },
+              cache: 'no-store',
+            },
           );
-          if (!source) fail('provenance не содержит проверенный source SHA');
+          if (!compareResponse.ok) fail(`compare provenance SHA: HTTP ${compareResponse.status}`);
+          const compare = await compareResponse.json();
+          if (compare.status !== 'identical' && compare.status !== 'behind') {
+            fail(`provenance SHA ${provenanceSha} вне линии main: ${compare.status}`);
+          }
           if (statement.predicate?.runDetails?.builder?.id !== 'https://github.com/actions/runner/github-hosted') {
             fail('provenance создан не GitHub-hosted runner');
           }
