@@ -67,7 +67,42 @@ export const SUBPATH_GATE_BYTES = 4608;
 // (0.52%). Это регрессионный budget, не конкурентное утверждение: сравнения
 // живут в воспроизводимом benchmark-report. Обе формы обязаны оставаться внутри
 // одного потолка, а массовый perf-контракт не даёт купить размер замедлением.
-export const FULL_ANIMATE_GATE_BYTES = 12_000;
+// 2026-08-04: 12 000 → 13 950 — Future Layout V1 runtime (animate(...,
+// { layout: 'project' }) без compiler): route + transaction + artifact +
+// observer, факт 13 879 B gz (baseline 11 929 + 1 950). Подъём по явному
+// решению Даниила («сначала максимум ужатия, затем минимальный подъём от
+// факта»): ужатия исчерпаны ДО подъёма — diagnostics вынесены из production-
+// графа (proof.ts), easing-строки в один проход, обёртки/хелперы сокращены.
+// Responsibility-bytes: транзакция ~1.7 KB min (capture-old → microtask-
+// commit → barrier → capture-new → tier-эксперимент → 5 constant effects →
+// active phase), артефакт ~1.7 KB min (serialized P → reciprocal Q c
+// continuous proof → monotonic A), route ~0.9 KB min, observer ~0.5 KB min.
+// Мёртвого веса в существующем графе нет (все модули — живые фичи фасада);
+// нижняя граница: новая оркестрация snapshot-транзакции не выразима через
+// существующие numeric-каналы, lazy-chunk и новые exports запрещены спекой.
+// 2026-08-04 (второй шаг): 13 950 → 14 820 — тот же Future Layout V1 runtime,
+// завершение runtime-слоя: input policy (finish/cancel/block), scroll anchor
+// (preserve-start), coordinator ownership (generation begin/commit/finish/skip
+// в finalize) и same-document VT host (generated CSS инжект/снятие ровно один
+// раз, startViewTransition capability experiment, bounded имя на цели). Факт
+// consumer one-liner 14 744 B gz (shipped-замыкание ./animate 14 303 B gz);
+// люфт ~0.5% — тот же класс регрессионного рэтчета. Подъём в рамках делегации
+// Даниила («сначала максимум ужатия, затем минимальный подъём от факта»):
+// ужимать дальше нечего — каждый байт этого шага является законом спеки
+// (ACCESSIBILITY И INPUT, SCROLL ANCHOR, DOCUMENT-SCOPED COORDINATOR,
+// VIEW TRANSITION HOST), зафиксированным GREEN-тестами.
+// 2026-08-04 (третий шаг): 14 820 → 15 530 — сертифицированное представление
+// сопряжённой геометрии (adversarial BLOCKER): WAAPI-pseudoElement эмпирически
+// не исполняется в Chromium, native tier перенесён на generated CSS @keyframes
+// в pseudo-tree same-document VT. Новые байты: capability/model-эксперимент
+// (documentPseudoModelReader ~0.3 KB min), fail-closed сертификация базы B,
+// генерация 5 effects CSS (effectsCss ~0.6 KB min — строки псевдоправил не
+// сжимаемы дальше), additive injectCss, supersede-остановка старой транзакции
+// (onSupersede в coordinator + guard'ы после каждого await). До подъёма сняты
+// все доступные шейвы (компактный reader, одно vtName, hostCss-цикл). Подъём
+// по делегации Даниила («сначала максимум ужатия, затем минимальный подъём
+// от факта»); факт 15 453 B gz, люфт ~0.5% — тот же класс рэтчета.
+export const FULL_ANIMATE_GATE_BYTES = 15_530;
 
 // Consumer-rebundle ядра после стабильных кодов ошибок и изоляции listener-
 // сбоев. Физический shipped-граф при этом уменьшился и по-прежнему ограничен
@@ -85,9 +120,9 @@ export const NANO_GATE_BYTES = 1024;
 // потерю tree-shakeability типичного вызова. Люфт намеренно нулевой: новая
 // capability ещё не имеет исторического шума, повышать только по факту решения.
 // 2026-08-04: consumer 1 907 → 1 908 (exact-факт, люфт остаётся нулевым):
-// этот домен-PR растит каталог ошибок до LM167 (Future Layout surface width) —
-// in-view шипит LAST_MOTION_PARAM_ERROR_CODE, и смена кода той же длины даёт
-// +1 B gz чистого parity-шума без изменения логики. Подъём по явному решению
+// каталог ошибок вырос до LM167 (Future Layout surface width), in-view несёт
+// LAST_MOTION_PARAM_ERROR_CODE — смена 'LM166'→'LM167' той же длины дала +1 B
+// gz чистого parity-шума без изменения логики. Подъём по явному решению
 // Даниила (делегирование «минимальный подъём от факта»).
 export const IN_VIEW_GATE_BYTES = 1839;
 export const IN_VIEW_CONSUMER_GATE_BYTES = 1908;
@@ -101,7 +136,22 @@ export const COMPOSITOR_CAPABILITY_GATE_BYTES = 6600;
 // clean-base 7968d161 (2026-07-16): 12 494 B gz; потолок равен факту без люфта,
 // чтобы локальная оптимизация одного entry не покупалась дублированием между
 // двумя реально совместимыми capability.
-export const ANIMATE_COMPOSITOR_MIXED_GATE_BYTES = 12_494;
+// 2026-08-04: 12 494 → 15 860 — Future Layout V1 runtime (подъём по явному
+// решению Даниила, см. FULL_ANIMATE_GATE_BYTES). Факт 15 777 B gz; люфт ~0.5%
+// вместо прежнего нулевого осознанно: сценарий структурно хрупок к 32KB-окну
+// gzip (копии compositor-кода в self-contained entries дедупятся обратной
+// ссылкой, и рост animate-файла за окно частично снимает дедуп), нулевой люфт
+// давал ложные регрессии на ±15 B шума минификатора. Анти-дублирующий класс
+// гейта сохранён: рост покупается только новым runtime, не перекладкой копий.
+// 2026-08-04 (второй шаг): 15 860 → 16 770 — завершение runtime-слоя Future
+// Layout V1 (input policy, scroll anchor, coordinator ownership, VT host):
+// факт 16 683 B gz; люфт ~0.5% по той же причине хрупкости 32KB-окна gzip.
+// Подъём по делегации Даниила, см. FULL_ANIMATE_GATE_BYTES.
+// 2026-08-04 (третий шаг): 16 770 → 17 500 — тот же шаг сертифицированного
+// pseudo-tree представления (adversarial BLOCKER), см. третий шаг
+// FULL_ANIMATE_GATE_BYTES. Факт 17 410 B gz; люфт ~0.5% по той же причине
+// хрупкости 32KB-окна gzip. Подъём по делегации Даниила.
+export const ANIMATE_COMPOSITOR_MIXED_GATE_BYTES = 17_500;
 
 // Точечные (bespoke) пороги субпутей — жёстче общего SUBPATH_GATE_BYTES там, где
 // это осмысленно. ./utils — семь чистых скалярных примитивов + сегментный движок;

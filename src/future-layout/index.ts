@@ -8,14 +8,56 @@
  */
 
 export {
-  compileSurfaceArtifact,
-  certifyPositivity,
-  outerScaleKeyframes,
-  planeScaleKeyframes,
-  planSurface,
   tryCompileSurfaceArtifact,
   RECIPROCAL_MAX_STOPS,
   SURFACE_PRECISION_BUDGET_PX,
   type SurfaceExecutionArtifact,
-  type SurfacePlan,
 } from './artifact.js';
+
+export {
+  certifyPositivity,
+  compileSurfaceArtifact,
+  outerScaleKeyframes,
+  planeScaleKeyframes,
+  planSurface,
+  type SurfacePlan,
+} from './proof.js';
+
+export {
+  createSurfaceCoordinator,
+  type SurfaceCoordinator,
+  type SurfaceGeneration,
+  type SurfaceGenerationInput,
+} from './coordinator.js';
+
+export {
+  createSurfaceObserver,
+  type SurfaceFrameView,
+  type SurfaceObserver,
+  type SurfaceObserverClock,
+  type SurfaceOnFrame,
+} from './observer.js';
+
+export {
+  startSurfaceTransition,
+  type SurfaceControls,
+  type SurfaceHostLike,
+  type SurfaceInputPolicy,
+  type SurfaceRunOptions,
+  type SurfaceScrollAnchor,
+  type SurfaceSeams,
+  type SurfaceState,
+  type SurfaceTargetLike,
+  type SurfaceTier,
+} from './transaction.js';
+
+export {
+  buildSurfaceReceipt,
+  freezeProofManifest,
+  surfaceFixtureManifest,
+  surfaceSizeAccounting,
+  validateSurfaceReceipt,
+  SURFACE_RECEIPT_SCHEMA,
+  type SurfaceReceipt,
+  type SurfaceReceiptInput,
+} from './receipt.js';

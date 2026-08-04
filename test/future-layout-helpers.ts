@@ -112,7 +112,84 @@ export function pickCreateSurfaceObserver(
 export interface SurfaceObserverLike {
   start(clock: StepClock): void;
   stop(): void;
-  readonly frames: SurfaceFrameViewLike[];
+}
+
+// ─── Fake VT host: CSS pseudo-tree representation (детерминированный) ───────
+
+/** View Transition объект fake: ready немедленный, finished управляется
+ * тестом (в реальном движке — завершение всех CSS-анимаций псевдодерева). */
+export interface FakeViewTransition {
+  readonly ready: Promise<void>;
+  readonly finished: Promise<void>;
+  skipTransition(): void;
+}
+
+export interface FakeSurfaceHost {
+  injectCss(css: string): void;
+  removeCss(): void;
+  startViewTransition(update: () => void | Promise<void>): FakeViewTransition;
+  readonly injects: string[];
+  readonly removals: number;
+  readonly vtCalls: number;
+  readonly skips: number;
+  /** Число @keyframes в инжектённом CSS = число native effects. */
+  readonly effectCount: number;
+  /** Естественное завершение активного VT (резолвит finished). */
+  complete(): void;
+}
+
+export function makeSurfaceHost(): FakeSurfaceHost {
+  let finishedResolve: (() => void) | undefined;
+  let finishedReject: ((reason?: unknown) => void) | undefined;
+  const host: FakeSurfaceHost = {
+    injects: [],
+    removals: 0,
+    vtCalls: 0,
+    skips: 0,
+    injectCss(css: string): void {
+      host.injects.push(css);
+    },
+    removeCss(): void {
+      host.removals++;
+    },
+    startViewTransition(update: () => void | Promise<void>): FakeViewTransition {
+      host.vtCalls++;
+      // Update callback исполняется «браузером» до ready.
+      void update();
+      const finished = new Promise<void>((resolve, reject) => {
+        finishedResolve = resolve;
+        finishedReject = reject;
+      });
+      return {
+        ready: Promise.resolve(),
+        finished,
+        skipTransition(): void {
+          host.skips++;
+          finishedReject?.(new Error('skipped'));
+        },
+      };
+    },
+    get effectCount(): number {
+      return host.injects.join('\n').split('@keyframes').length - 1;
+    },
+    complete(): void {
+      finishedResolve?.();
+    },
+  };
+  return host;
+}
+
+/** Сертификация pseudo-модели: host-fit база B = committed ширина (360). */
+export function makePseudoModelReader(groupWidth = 360): (name: string) => { groupWidth: number; placement: string } {
+  return () => ({ groupWidth, placement: 'matrix(1, 0, 0, 1, 60, 40)' });
+}
+
+/** Полный native-комплект швов: host с VT + сертифицированная модель. */
+export function makeSurfaceEnv(groupWidth = 360): {
+  host: FakeSurfaceHost;
+  readPseudoModel: (name: string) => { groupWidth: number; placement: string };
+} {
+  return { host: makeSurfaceHost(), readPseudoModel: makePseudoModelReader(groupWidth) };
 }
 
 // ─── Duck-мир bounded virtualized viewport ────────────────────────────────────
@@ -146,6 +223,10 @@ export interface SurfaceWorld {
   readonly materializedRows: number;
   readonly viewport: SurfaceFakeElement;
   readonly rows: readonly SurfaceFakeElement[];
+  /** VT host duck-мира: инжект CSS pseudo-tree, journal effects. */
+  readonly host: FakeSurfaceHost;
+  /** Сертификация pseudo-модели: host-fit база B = committed ширина. */
+  readonly readPseudoModel: (name: string) => { groupWidth: number; placement: string };
   writes(target: string, prop?: string): LayoutOp[];
   effects(): LayoutOp[];
   recalcs(): LayoutOp[];
@@ -202,12 +283,27 @@ export function makeSurfaceWorld(
   for (let i = 0; i < materialized; i++) ops.push({ seq: seq++, kind: 'materialize', target: `row-${i}` });
   void rowHeight;
 
+  // VT host duck-мира: инжект CSS pseudo-tree журналами в общий ops-поток —
+  // каждый @keyframes есть один native effect (постоянное число = 5).
+  const host = makeSurfaceHost();
+  const baseInject = host.injectCss.bind(host);
+  host.injectCss = (css: string): void => {
+    baseInject(css);
+    const keyframes = css.split('@keyframes').length - 1;
+    for (let i = 0; i < keyframes; i++) {
+      ops.push({ seq: seq++, kind: 'effect', target: 'pseudo-tree' });
+    }
+  };
+  const readPseudoModel = makePseudoModelReader(360);
+
   return {
     ops,
     logicalRows,
     materializedRows: materialized,
     viewport,
     rows,
+    host,
+    readPseudoModel,
     writes(target, prop) {
       return ops.filter(
         (o) => o.kind === 'set' && o.target === target && (prop === undefined || o.prop === prop),

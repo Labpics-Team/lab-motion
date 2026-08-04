@@ -305,3 +305,184 @@ export function nanoArtifactLiteral(opacity: number): string {
   const artifact = compileNanoOpacityArtifact(opacity);
   return `{o:${artifact.frame.opacity},d:${artifact.durationMs},e:${JSON.stringify(artifact.cssLinear)}}`;
 }
+
+// ─── Surface lowering: animate(..., { layout: 'project' }) ───────────────────
+//
+// Спека «COMPILER»: versioned surface program, immutable representation,
+// untrusted input rejection, conservative lowering — любое сомнение оставляет
+// корректный runtime path. Lowering НЕ читает solver/parser (erasure): валидация
+// пружины выполняется локальными числовыми инвариантами, а полный сертификат
+// остаётся за tryCompileSurfaceArtifact в runtime.
+
+/** Любой не-литерал: сомнение → консервативный отказ. */
+export interface SurfaceDynamicNode {
+  readonly kind: string;
+  readonly name?: string;
+}
+
+export interface SurfaceIdentifierNode {
+  readonly kind: 'identifier';
+  readonly name: string;
+}
+
+export type SurfaceCallTarget = SurfaceIdentifierNode | SurfaceDynamicNode;
+
+export interface SurfaceCallInput {
+  readonly callee: unknown;
+  readonly target: unknown;
+  readonly props: unknown;
+  readonly options?: unknown;
+}
+
+export interface SurfaceSpringRecord {
+  readonly mass: number;
+  readonly stiffness: number;
+  readonly damping: number;
+  readonly velocity?: number;
+}
+
+/** Versioned IR: explicit named successor contract, не ad-hoc trusted object. */
+export interface SurfaceProgram {
+  readonly version: 'surface/1';
+  readonly target: { readonly kind: 'identifier'; readonly name: string };
+  readonly fromWidth: number;
+  readonly toWidth: number;
+  readonly spring?: SurfaceSpringRecord;
+  readonly inputPolicy?: 'finish' | 'cancel' | 'block';
+  readonly scrollAnchor?: 'preserve-start' | 'none';
+  readonly hasOnFrame?: boolean;
+}
+
+export type SurfaceLoweringResult =
+  | { readonly lowered: true; readonly program: SurfaceProgram }
+  | { readonly lowered: false; readonly reason: string };
+
+function isPlainRecord(value: unknown): value is Record<string, unknown> {
+  return value !== null && typeof value === 'object' && !Array.isArray(value);
+}
+
+/** Любой AST-узел (kind-запись) в выражающей позиции — динамика/сомнение. */
+function hasKind(value: unknown): boolean {
+  return isPlainRecord(value) && typeof value['kind'] === 'string';
+}
+
+function deepFreeze<T>(value: T): T {
+  if (value !== null && typeof value === 'object') {
+    for (const key of Object.keys(value)) {
+      deepFreeze((value as Record<string, unknown>)[key]);
+    }
+    Object.freeze(value);
+  }
+  return value;
+}
+
+const reject = (reason: string): SurfaceLoweringResult => ({ lowered: false, reason });
+
+/**
+ * Консервативное понижение одного вызова animate(..., { layout: 'project' }).
+ * Любое сомнение (динамический аргумент, не-width-канал, нечисловые/неположительные
+ * концы, NaN/Infinity, динамическая пружина, неизвестная политика) оставляет
+ * корректный runtime path — возврат lowered:false с причиной.
+ */
+export function lowerSurfaceCall(input: SurfaceCallInput): SurfaceLoweringResult {
+  if (input === null || typeof input !== 'object') return reject('input-not-call');
+  if (input.callee !== 'animate') return reject('callee-not-animate');
+
+  // Optional call / alias / namespace import выражаются не-plain callee.
+  const target = input.target;
+  if (!isPlainRecord(target) || target['kind'] !== 'identifier' || typeof target['name'] !== 'string') {
+    return reject('target-dynamic');
+  }
+
+  const props = input.props;
+  if (hasKind(props)) return reject('props-not-static');
+  if (!isPlainRecord(props)) return reject('props-not-static');
+  const keys = Object.keys(props);
+  // Ровно один канал width: spread/computed key/duplicate key/getter — сомнение.
+  if (keys.length !== 1 || keys[0] !== 'width') return reject('props-not-width');
+  const width = props['width'];
+  if (!Array.isArray(width) || width.length !== 2) return reject('width-not-pair');
+  const fromWidth = width[0];
+  const toWidth = width[1];
+  if (hasKind(fromWidth) || hasKind(toWidth)) return reject('width-dynamic');
+  if (typeof fromWidth !== 'number' || typeof toWidth !== 'number') return reject('width-not-numeric');
+  if (!Number.isFinite(fromWidth) || !Number.isFinite(toWidth)) return reject('width-not-finite');
+  if (fromWidth <= 0 || toWidth <= 0) return reject('width-not-positive');
+
+  const options = input.options;
+  const program: SurfaceProgram = {
+    version: 'surface/1',
+    target: { kind: 'identifier', name: target['name'] as string },
+    fromWidth,
+    toWidth,
+  } as SurfaceProgram;
+
+  // Режим всегда явный: surface-понижение существует только для
+  // animate(..., { layout: 'project' }); отсутствие опций — сомнение.
+  if (!isPlainRecord(options) || options['layout'] !== 'project') return reject('layout-not-project');
+
+  // Неизвестные ключи options — сомнение: runtime исполняет их, а lowered-
+  // программа нет (скрытая дивергенция семантики). Fail-closed reject.
+  for (const key of Object.keys(options)) {
+    if (key !== 'layout' && key !== 'spring' && key !== 'inputPolicy'
+      && key !== 'scrollAnchor' && key !== 'onFrame') {
+      return reject('options-unknown-key');
+    }
+  }
+
+  const spring = options['spring'];
+  if (spring !== undefined) {
+    if (hasKind(spring)) return reject('spring-not-static');
+    if (!isPlainRecord(spring)) return reject('spring-not-static');
+    for (const key of Object.keys(spring)) {
+      if (key !== 'mass' && key !== 'stiffness' && key !== 'damping' && key !== 'velocity') {
+        return reject('spring-unknown-key');
+      }
+    }
+    const mass = spring['mass'];
+    const stiffness = spring['stiffness'];
+    const damping = spring['damping'];
+    const velocity = spring['velocity'];
+    if (hasKind(mass) || hasKind(stiffness) || hasKind(damping) || hasKind(velocity)) {
+      return reject('spring-dynamic');
+    }
+    if (
+      typeof mass !== 'number' || typeof stiffness !== 'number' || typeof damping !== 'number'
+      || !Number.isFinite(mass) || !Number.isFinite(stiffness) || !Number.isFinite(damping)
+      || mass <= 0 || stiffness <= 0 || damping < 0
+    ) {
+      return reject('spring-invalid');
+    }
+    if (velocity !== undefined && (typeof velocity !== 'number' || !Number.isFinite(velocity))) {
+      return reject('velocity-invalid');
+    }
+    (program as { spring?: SurfaceSpringRecord }).spring = velocity === undefined
+      ? { mass, stiffness, damping }
+      : { mass, stiffness, damping, velocity };
+  }
+
+  const inputPolicy = options['inputPolicy'];
+  if (inputPolicy !== undefined) {
+    if (inputPolicy !== 'finish' && inputPolicy !== 'cancel' && inputPolicy !== 'block') {
+      return reject('input-policy-unknown');
+    }
+    (program as { inputPolicy?: 'finish' | 'cancel' | 'block' }).inputPolicy = inputPolicy;
+  }
+
+  const scrollAnchor = options['scrollAnchor'];
+  if (scrollAnchor !== undefined) {
+    if (scrollAnchor !== 'preserve-start' && scrollAnchor !== 'none') {
+      return reject('scroll-anchor-unknown');
+    }
+    (program as { scrollAnchor?: 'preserve-start' | 'none' }).scrollAnchor = scrollAnchor;
+  }
+
+  const onFrame = options['onFrame'];
+  if (onFrame !== undefined) {
+    if (hasKind(onFrame)) return reject('onframe-dynamic');
+    if (typeof onFrame !== 'function') return reject('onframe-not-function');
+    (program as { hasOnFrame?: boolean }).hasOnFrame = true;
+  }
+
+  return { lowered: true, program: deepFreeze(program) };
+}

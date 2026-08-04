@@ -43,6 +43,7 @@ export interface FakeElement {
     style: {
       setProperty(name: string, value: string): void;
       getPropertyValue(name: string): string;
+      removeProperty(name: string): void;
     };
     animate?: (
       keyframes: Record<string, string | number>[],
@@ -51,6 +52,8 @@ export interface FakeElement {
   };
   /** Журнал всех setProperty-записей (в порядке вызова). */
   writes: StyleWrite[];
+  /** Журнал removeProperty-вызовов (имена). */
+  removals: string[];
   /** Журнал вызовов .animate (compositor-путь). */
   animateCalls: { keyframes: Record<string, string | number>[]; timing: Record<string, unknown> }[];
   /** Число вызовов cancel() у выданных Animation. */
@@ -67,9 +70,11 @@ export function fakeEl(
 ): FakeElement {
   const inline = new Map<string, string>(Object.entries(initialStyle));
   const writes: StyleWrite[] = [];
+  const removals: string[] = [];
   const animateCalls: FakeElement['animateCalls'] = [];
   const fake: FakeElement = {
     writes,
+    removals,
     animateCalls,
     cancels: 0,
     el: {
@@ -80,6 +85,10 @@ export function fakeEl(
         },
         getPropertyValue(name: string): string {
           return inline.get(name) ?? '';
+        },
+        removeProperty(name: string): void {
+          removals.push(name);
+          inline.delete(name);
         },
       },
     },

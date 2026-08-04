@@ -28,6 +28,9 @@ export const SURFACE_PRECISION_BUDGET_PX = 0.25;
 /** Потолок adaptive subdivision: fail-closed до крупных аллокаций. */
 export const RECIPROCAL_MAX_STOPS = 4096;
 
+/** W0=W1: мгновенный вырожденный переход без делений. */
+const DEGENERATE_EASING = 'linear(0 0%, 1 100%)';
+
 export interface SurfaceExecutionArtifact {
   /** Serialized P: CSS linear() фактически исполняемой пружины. */
   readonly easing: string;
@@ -46,12 +49,6 @@ export interface SurfaceExecutionArtifact {
   readonly minWidth: number;
   readonly fromWidth: number;
   readonly toWidth: number;
-}
-
-export interface SurfacePlan {
-  readonly artifact: SurfaceExecutionArtifact;
-  /** Постоянное число native effects, не зависит от числа строк. */
-  readonly effectCount: number;
 }
 
 function validateSurfaceWidth(width: number): void {
@@ -81,9 +78,9 @@ export function tryCompileSurfaceArtifact(
 
   if (fromWidth === toWidth) {
     return {
-      easing: 'linear(0 0%, 1 100%)',
-      reciprocalEasing: 'linear(0 0%, 1 100%)',
-      blendEasing: 'linear(0 0%, 1 100%)',
+      easing: DEGENERATE_EASING,
+      reciprocalEasing: DEGENERATE_EASING,
+      blendEasing: DEGENERATE_EASING,
       samples: new Float64Array([0, 0, 100, 1]),
       reciprocalSamples: new Float64Array([0, 0, 100, 1]),
       blendSamples: [0, 1],
@@ -121,24 +118,23 @@ export function tryCompileSurfaceArtifact(
     return undefined;
   }
 
+  // Один проход: Q-stops → обе linear()-строки (reciprocal и blend A).
   const blendSamples: number[] = [];
+  let reciprocalEasing = 'linear(';
   let blendEasing = 'linear(';
-  for (let i = 0; i < reciprocal.length / 2; i++) {
+  const stopCount = reciprocal.length / 2;
+  for (let i = 0; i < stopCount; i++) {
     const percent = reciprocal[i * 2];
+    const q = reciprocal[i * 2 + 1];
     const x = percent / 100;
     const a = (3 - 2 * x) * x * x;
     blendSamples.push(a);
-    blendEasing += `${a} ${percent}%`;
-    if (i < reciprocal.length / 2 - 1) blendEasing += ', ';
-  }
-  blendEasing += ')';
-
-  let reciprocalEasing = 'linear(';
-  for (let i = 0; i < reciprocal.length / 2; i++) {
-    reciprocalEasing += `${reciprocal[i * 2 + 1]} ${reciprocal[i * 2]}%`;
-    if (i < reciprocal.length / 2 - 1) reciprocalEasing += ', ';
+    const separator = i < stopCount - 1 ? ', ' : '';
+    reciprocalEasing += `${q} ${percent}%${separator}`;
+    blendEasing += `${a} ${percent}%${separator}`;
   }
   reciprocalEasing += ')';
+  blendEasing += ')';
 
   return {
     easing,
@@ -165,29 +161,6 @@ function tryCompileSpringTuple(
   } catch {
     return undefined;
   }
-}
-
-/** Fail-fast обёртка preflight: недоказуемая поверхность — MotionParamError. */
-export function compileSurfaceArtifact(
-  spring: SpringParams,
-  fromWidth: number,
-  toWidth: number,
-  tolerance?: number,
-  couplingBudgetPx?: number,
-  initialVelocity?: number,
-): SurfaceExecutionArtifact {
-  const artifact = tryCompileSurfaceArtifact(
-    spring,
-    fromWidth,
-    toWidth,
-    tolerance,
-    couplingBudgetPx,
-    initialVelocity,
-  );
-  if (artifact === undefined) {
-    throw new MotionParamError('LM167');
-  }
-  return artifact;
 }
 
 /**
@@ -256,43 +229,4 @@ function buildReciprocalUnchecked(
     }
   }
   return Float64Array.from(out);
-}
-
-/**
- * Позитивный сертификат: min W(t) > W_min по serialized stops. W линеен между
- * stops, поэтому минимум достигается в stop'ах; samples хранят уже разобранные
- * CSS-токены (Number(percent/progress)), т.е. фактически исполняемые значения.
- */
-export function certifyPositivity(artifact: SurfaceExecutionArtifact, wMin: number): boolean {
-  return Number.isFinite(artifact.minWidth) && artifact.minWidth > wMin && wMin >= 0;
-}
-
-/** Constant-effects plan: 5 native effects при любом числе логических строк. */
-export function planSurface(
-  spring: SpringParams,
-  fromWidth: number,
-  toWidth: number,
-  tolerance?: number,
-): SurfacePlan {
-  return {
-    artifact: compileSurfaceArtifact(spring, fromWidth, toWidth, tolerance),
-    effectCount: 5,
-  };
-}
-
-/**
- * Keyframes контр-масштаба плоскости j в host-fit модели (F_j = B/W_j,
- * B = W1): scale от W_j/W0 к W_j/W1 c easing linear(Q). Инвариант
- * G·F_j·R_j = 1 выполнен тождественно: произведение affine в Q.
- */
-export function planeScaleKeyframes(
-  artifact: SurfaceExecutionArtifact,
-  planeWidth: number,
-): [number, number] {
-  return [planeWidth / artifact.fromWidth, planeWidth / artifact.toWidth];
-}
-
-/** Keyframes внешнего scale группы: G = W/B, B = W1. */
-export function outerScaleKeyframes(artifact: SurfaceExecutionArtifact): [number, number] {
-  return [artifact.fromWidth / artifact.toWidth, 1];
 }
