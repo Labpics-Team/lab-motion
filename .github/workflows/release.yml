@@ -26,6 +26,8 @@ jobs:
     if: github.repository == 'Labpics-Team/lab-motion'
     runs-on: ubuntu-latest
     timeout-minutes: 5
+    permissions:
+      contents: read
     outputs:
       release_tag: ${{ steps.resolve.outputs.release_tag }}
       release_date: ${{ steps.resolve.outputs.release_date }}
@@ -36,17 +38,46 @@ jobs:
         id: resolve
         env:
           INPUT_VERSION: ${{ inputs.version }}
+          GH_TOKEN: ${{ github.token }}
         run: |
           VERSION="$INPUT_VERSION"
           [[ "$GITHUB_REF" == "refs/heads/main" ]] \
             || { echo "::error::релиз разрешён только ручным запуском с main, получено: $GITHUB_REF"; exit 1; }
           [[ "$VERSION" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]] \
             || { echo "::error::version обязана быть x.y.z, получено: $VERSION"; exit 1; }
+          RELEASE_TAG="v$VERSION"
+          SOURCE_SHA="$GITHUB_SHA"
+          # Повторный диспатч после сбоя downstream-job: существующий тег —
+          # источник истины релиза (теги v*.*.* неизменяемы ruleset).
+          # HEAD main мог уйти вперёд: расхождение с тегом — не ошибка, а rerun.
+          TAG_REF=$(gh api "repos/$GITHUB_REPOSITORY/git/ref/tags/$RELEASE_TAG" \
+            --jq '[.object.type, .object.sha] | @tsv' 2>/dev/null || true)
+          if [[ -n "$TAG_REF" ]]; then
+            read -r OBJECT_TYPE OBJECT_SHA <<< "$TAG_REF"
+            for _ in {1..8}; do
+              if [[ "$OBJECT_TYPE" == "commit" ]]; then
+                TAG_SOURCE_SHA="$OBJECT_SHA"
+                break
+              fi
+              [[ "$OBJECT_TYPE" == "tag" ]] \
+                || { echo "::error::$RELEASE_TAG указывает на недопустимый объект $OBJECT_TYPE"; exit 1; }
+              read -r OBJECT_TYPE OBJECT_SHA < <(
+                gh api "repos/$GITHUB_REPOSITORY/git/tags/$OBJECT_SHA" \
+                  --jq '[.object.type, .object.sha] | @tsv'
+              )
+            done
+            [[ -n "${TAG_SOURCE_SHA:-}" ]] \
+              || { echo "::error::$RELEASE_TAG не раскрывается в commit"; exit 1; }
+            if [[ "$TAG_SOURCE_SHA" != "$GITHUB_SHA" ]]; then
+              echo "::warning::$RELEASE_TAG уже существует на $TAG_SOURCE_SHA; релиз сверяется с тегом вместо HEAD main $GITHUB_SHA"
+            fi
+            SOURCE_SHA="$TAG_SOURCE_SHA"
+          fi
           {
-            echo "release_tag=v$VERSION"
+            echo "release_tag=$RELEASE_TAG"
             echo "release_date=$(date -u +%F)"
             echo "version=$VERSION"
-            echo "source_sha=$GITHUB_SHA"
+            echo "source_sha=$SOURCE_SHA"
           } >> "$GITHUB_OUTPUT"
 
   verify:
@@ -74,7 +105,7 @@ jobs:
 
     steps:
       - name: Checkout
-        uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           ref: ${{ needs.resolve.outputs.source_sha }}
           fetch-depth: 0
@@ -358,7 +389,7 @@ jobs:
 
       - name: Publish or reconcile verified tarball through npm OIDC
         env:
-          TARBALL: release-artifact/${{ needs.verify.outputs.tarball_name }}
+          TARBALL: ./release-artifact/${{ needs.verify.outputs.tarball_name }}
         run: |
           node --input-type=module <<'NODE'
           import { execFileSync } from 'node:child_process';
@@ -497,7 +528,9 @@ jobs:
 
       - name: Verify registry provenance statement and signatures
         env:
-          TARBALL: release-artifact/${{ needs.verify.outputs.tarball_name }}
+          EXPECTED_RUN_SHA: ${{ github.sha }}
+          GH_TOKEN: ${{ github.token }}
+          TARBALL: ./release-artifact/${{ needs.verify.outputs.tarball_name }}
         run: |
           node --input-type=module <<'NODE'
           import { execFileSync } from 'node:child_process';
@@ -524,7 +557,16 @@ jobs:
           if (parsedUrl.origin !== 'https://registry.npmjs.org') {
             fail(`недоверенный endpoint attestations: ${parsedUrl.origin}`);
           }
-          const attestationResponse = await fetch(parsedUrl, { cache: 'no-store' });
+          // registry материализует attestation bundle асинхронно: metadata уже
+          // ссылается на endpoint, который первые минуты отвечает 404 (падение
+          // run 30901712886 через 1.2s после publish). Retry только на 404;
+          // остальные статусы fail-closed немедленно.
+          let attestationResponse;
+          for (let attempt = 1; attempt <= 16; attempt++) {
+            attestationResponse = await fetch(parsedUrl, { cache: 'no-store' });
+            if (attestationResponse.ok || attestationResponse.status !== 404) break;
+            await new Promise((resolve) => { setTimeout(resolve, 15000); });
+          }
           if (!attestationResponse.ok) fail(`attestations: HTTP ${attestationResponse.status}`);
           const collection = await attestationResponse.json();
           const attestation = collection.attestations?.find(
@@ -546,10 +588,34 @@ jobs:
           if (workflow?.path !== '.github/workflows/release.yml' || workflow?.ref !== 'refs/heads/main') {
             fail('provenance указывает на другой workflow/ref');
           }
-          const source = definition?.resolvedDependencies?.find(
-            (item) => item.digest?.gitCommit === process.env.EXPECTED_SOURCE_SHA,
+          // OIDC-provenance привязан к workflow-run: gitCommit — SHA рана,
+          // подписавшего пакет. При idempotent-rerun это ранний диспатч
+          // (run 30901712886: пакет подписан на 0d4534c8, github.sha уже новее),
+          // поэтому точное равенство нежизнеспособно. Инвариант fail-closed:
+          // gitCommit == github.sha текущего рана или его предок по main;
+          // подпись diverged/чужого коммита отвергается. Байты дерева источника
+          // связаны с пакетом через subject sha512 выше.
+          const provenanceSha = definition?.resolvedDependencies?.find(
+            (item) => typeof item.digest?.gitCommit === 'string'
+              && typeof item.uri === 'string'
+              && item.uri.startsWith('git+https://github.com/Labpics-Team/lab-motion@'),
+          )?.digest?.gitCommit;
+          if (!provenanceSha) fail('provenance не содержит gitCommit нашего репозитория');
+          const compareResponse = await fetch(
+            `https://api.github.com/repos/Labpics-Team/lab-motion/compare/${process.env.EXPECTED_RUN_SHA}...${provenanceSha}`,
+            {
+              headers: {
+                accept: 'application/vnd.github+json',
+                authorization: `Bearer ${process.env.GH_TOKEN}`,
+              },
+              cache: 'no-store',
+            },
           );
-          if (!source) fail('provenance не содержит проверенный source SHA');
+          if (!compareResponse.ok) fail(`compare provenance SHA: HTTP ${compareResponse.status}`);
+          const compare = await compareResponse.json();
+          if (compare.status !== 'identical' && compare.status !== 'behind') {
+            fail(`provenance SHA ${provenanceSha} вне линии main: ${compare.status}`);
+          }
           if (statement.predicate?.runDetails?.builder?.id !== 'https://github.com/actions/runner/github-hosted') {
             fail('provenance создан не GitHub-hosted runner');
           }
@@ -620,8 +686,18 @@ jobs:
               -f ref="refs/tags/$RELEASE_TAG" -f sha="$EXPECTED_SOURCE_SHA"; then
               echo "::warning::создание $RELEASE_TAG не подтверждено; проверяем итоговый ref"
             fi
-            EXISTING_REF=$(gh api "repos/$GITHUB_REPOSITORY/git/ref/tags/$RELEASE_TAG" \
-              --jq '[.object.type, .object.sha] | @tsv')
+            # refs API не гарантирует read-after-write: свежий ref может
+            # читаться как 404 с реплики (падение run 30892921662). Ограниченный
+            # retry сохраняет fail-closed: после исчерпания попыток шаг падает.
+            for _ in {1..5}; do
+              if EXISTING_REF=$(gh api "repos/$GITHUB_REPOSITORY/git/ref/tags/$RELEASE_TAG" \
+                --jq '[.object.type, .object.sha] | @tsv' 2>/dev/null); then
+                break
+              fi
+              sleep 0.5
+            done
+            [[ -n "$EXISTING_REF" ]] \
+              || { echo "::error::$RELEASE_TAG создан, но не читается после повторных попыток"; exit 1; }
           fi
 
           read -r OBJECT_TYPE OBJECT_SHA <<< "$EXISTING_REF"
