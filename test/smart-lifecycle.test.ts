@@ -618,3 +618,29 @@ describe('./smart: ghost восстанавливает инлайн-стили 
     expect(root.inline.get('position')).toBe('static');
   });
 });
+
+describe('oracle #131: gBCR фейка применяет активный inline translate/scale', () => {
+  it('translate сдвигает рект, scale масштабирует бокс; журнал пишет transform в момент замера', () => {
+    const world = makeSmartWorld();
+    const a = world.el('a', { x: 10, y: 20, width: 30, height: 40 });
+
+    expect(a.getBoundingClientRect()).toEqual({ x: 10, y: 20, width: 30, height: 40 });
+
+    a.style.setProperty('transform', 'translate(-5px, 8px) scale(2, 0.5)');
+    expect(a.getBoundingClientRect()).toEqual({ x: 5, y: 28, width: 60, height: 20 });
+
+    const measures = world.measures(a);
+    expect(measures[measures.length - 1]!.inlineTransform).toBe('translate(-5px, 8px) scale(2, 0.5)');
+  });
+
+  it('scroll вычитается после translate; неразобранный transform — identity', () => {
+    const world = makeSmartWorld();
+    world.scroll = { x: 3, y: 4 };
+    const a = world.el('a', { x: 10, y: 20, width: 30, height: 40 });
+    a.style.setProperty('transform', 'translate(1px, 2px) scale(1, 1)');
+    expect(a.getBoundingClientRect()).toEqual({ x: 8, y: 18, width: 30, height: 40 });
+
+    a.style.setProperty('transform', 'matrix(1, 0, 0, 1, 0, 0)');
+    expect(a.getBoundingClientRect()).toEqual({ x: 7, y: 16, width: 30, height: 40 });
+  });
+});

@@ -14,9 +14,9 @@
  * («… is not a function»), а не link-ошибкой: RED for the right reason.
  */
 
-import type { RectLike } from './projection-helpers.js';
+import { parseTranslateScale, type RectLike } from './projection-helpers.js';
 
-export { lcg, makeClock, reduceMedia, type RectLike, type StepClock } from './projection-helpers.js';
+export { lcg, makeClock, parseTranslateScale, reduceMedia, type RectLike, type StepClock } from './projection-helpers.js';
 
 // ─── Типы публичной поверхности (локальная копия для RED-фазы, спека §3.1) ───
 
@@ -183,17 +183,17 @@ export function makeSmartWorld(): SmartWorld {
         return attrs.get(n) ?? null;
       },
       getBoundingClientRect(): RectLike {
-        ops.push({
-          seq: seq++,
-          el: fake,
-          kind: 'measure',
-          inlineTransform: inline.get('transform') ?? '',
-        });
+        const inlineTransform = inline.get('transform') ?? '';
+        ops.push({ seq: seq++, el: fake, kind: 'measure', inlineTransform });
+        // #131: активный translate/scale применяется к возвращаемому ректу
+        // (origin 0 0 — формат записи src/smart/index.ts), иначе замер не
+        // видит грязный layout под transform и batch-граница не наблюдаема.
+        const parsed = parseTranslateScale(inlineTransform);
         return {
-          x: fake.rect.x - world.scroll.x,
-          y: fake.rect.y - world.scroll.y,
-          width: fake.rect.width,
-          height: fake.rect.height,
+          x: fake.rect.x + (parsed?.tx ?? 0) - world.scroll.x,
+          y: fake.rect.y + (parsed?.ty ?? 0) - world.scroll.y,
+          width: fake.rect.width * (parsed?.sx ?? 1),
+          height: fake.rect.height * (parsed?.sy ?? 1),
         };
       },
     };
