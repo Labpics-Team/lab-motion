@@ -26,6 +26,8 @@ jobs:
     if: github.repository == 'Labpics-Team/lab-motion'
     runs-on: ubuntu-latest
     timeout-minutes: 5
+    permissions:
+      contents: read
     outputs:
       release_tag: ${{ steps.resolve.outputs.release_tag }}
       release_date: ${{ steps.resolve.outputs.release_date }}
@@ -36,17 +38,46 @@ jobs:
         id: resolve
         env:
           INPUT_VERSION: ${{ inputs.version }}
+          GH_TOKEN: ${{ github.token }}
         run: |
           VERSION="$INPUT_VERSION"
           [[ "$GITHUB_REF" == "refs/heads/main" ]] \
             || { echo "::error::релиз разрешён только ручным запуском с main, получено: $GITHUB_REF"; exit 1; }
           [[ "$VERSION" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]] \
             || { echo "::error::version обязана быть x.y.z, получено: $VERSION"; exit 1; }
+          RELEASE_TAG="v$VERSION"
+          SOURCE_SHA="$GITHUB_SHA"
+          # Повторный диспатч после сбоя downstream-job: существующий тег —
+          # источник истины релиза (теги v*.*.* неизменяемы ruleset).
+          # HEAD main мог уйти вперёд: расхождение с тегом — не ошибка, а rerun.
+          TAG_REF=$(gh api "repos/$GITHUB_REPOSITORY/git/ref/tags/$RELEASE_TAG" \
+            --jq '[.object.type, .object.sha] | @tsv' 2>/dev/null || true)
+          if [[ -n "$TAG_REF" ]]; then
+            read -r OBJECT_TYPE OBJECT_SHA <<< "$TAG_REF"
+            for _ in {1..8}; do
+              if [[ "$OBJECT_TYPE" == "commit" ]]; then
+                TAG_SOURCE_SHA="$OBJECT_SHA"
+                break
+              fi
+              [[ "$OBJECT_TYPE" == "tag" ]] \
+                || { echo "::error::$RELEASE_TAG указывает на недопустимый объект $OBJECT_TYPE"; exit 1; }
+              read -r OBJECT_TYPE OBJECT_SHA < <(
+                gh api "repos/$GITHUB_REPOSITORY/git/tags/$OBJECT_SHA" \
+                  --jq '[.object.type, .object.sha] | @tsv'
+              )
+            done
+            [[ -n "${TAG_SOURCE_SHA:-}" ]] \
+              || { echo "::error::$RELEASE_TAG не раскрывается в commit"; exit 1; }
+            if [[ "$TAG_SOURCE_SHA" != "$GITHUB_SHA" ]]; then
+              echo "::warning::$RELEASE_TAG уже существует на $TAG_SOURCE_SHA; релиз сверяется с тегом вместо HEAD main $GITHUB_SHA"
+            fi
+            SOURCE_SHA="$TAG_SOURCE_SHA"
+          fi
           {
-            echo "release_tag=v$VERSION"
+            echo "release_tag=$RELEASE_TAG"
             echo "release_date=$(date -u +%F)"
             echo "version=$VERSION"
-            echo "source_sha=$GITHUB_SHA"
+            echo "source_sha=$SOURCE_SHA"
           } >> "$GITHUB_OUTPUT"
 
   verify:
