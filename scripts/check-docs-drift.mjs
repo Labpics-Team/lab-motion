@@ -1,4 +1,3 @@
-#!/usr/bin/env node
 /**
  * docs-drift guard для lab-motion (по образцу lab-icons feat/docs-drift-gate).
  *
