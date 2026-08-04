@@ -1,7 +1,11 @@
 /**
  * test/future-layout-runtime-policy.test.ts — input policy, scroll anchor и
  * coordinator-владение surface-транзакции (спеки «ACCESSIBILITY И INPUT»,
- * «SCROLL ANCHOR», «DOCUMENT-SCOPED COORDINATOR»).
+ * «SCROLL ANCHOR», «DOCUMENT-SCOPED COORDINATOR», «VIEW TRANSITION HOST»).
+ *
+ * Native tier существует только в pseudo-tree same-document VT: все
+ * native-сценарии получают полный комплект швов (makeSurfaceEnv), snap-сценарии
+ * документируют fail-closed деградацию (нет VT / недоказанная модель).
  */
 
 import { describe, expect, it } from 'vitest';
@@ -12,6 +16,12 @@ import {
   type SurfaceSeams,
 } from '../src/future-layout/index.js';
 import { fakeEl, makeClock, type FakeElement } from './animate-facade-helpers.js';
+import {
+  makePseudoModelReader,
+  makeSurfaceEnv,
+  makeSurfaceHost,
+  type FakeSurfaceHost,
+} from './future-layout-helpers.js';
 
 interface IntentHub {
   onInputIntent(handler: () => void): () => void;
@@ -89,15 +99,19 @@ describe('input policy', () => {
     const fake = fakeEl({ width: '240px' }, true);
     const clock = makeClock();
     const hub = makeIntentHub();
-    const controls = begin(fake, clock, { seams: { onInputIntent: hub.onInputIntent } });
+    const env = makeSurfaceEnv();
+    const controls = begin(fake, clock, {
+      seams: { onInputIntent: hub.onInputIntent, host: env.host, readPseudoModel: env.readPseudoModel },
+    });
     await controls.ready;
     expect(controls.state).toBe('running');
     expect(hub.activeHandlers).toBe(1);
 
     hub.fire();
     expect(controls.state).toBe('released');
-    // Проекция удалена: effects отменены, committed DOM (width) раскрыт.
-    expect(fake.cancels).toBe(5);
+    // Проекция удалена: snapshot-плоскости сняты skipTransition, stylesheet
+    // убран, committed DOM (width) раскрыт.
+    expect(env.host.skips).toBe(1);
     expect(fake.el.style.getPropertyValue('width')).toBe('360px');
     expect(hub.activeHandlers).toBe(0);
     expect(hub.cleanedUp).toBe(1);
@@ -108,13 +122,15 @@ describe('input policy', () => {
     const fake = fakeEl({ width: '240px' }, true);
     const clock = makeClock();
     const hub = makeIntentHub();
+    const env = makeSurfaceEnv();
     const controls = begin(fake, clock, {
       options: { inputPolicy: 'cancel' },
-      seams: { onInputIntent: hub.onInputIntent },
+      seams: { onInputIntent: hub.onInputIntent, host: env.host, readPseudoModel: env.readPseudoModel },
     });
     await controls.ready;
     hub.fire();
     expect(controls.state).toBe('canceled');
+    expect(env.host.skips).toBe(1);
     expect(fake.el.style.getPropertyValue('width')).toBe('360px');
     await controls.finished;
   });
@@ -123,15 +139,17 @@ describe('input policy', () => {
     const fake = fakeEl({ width: '240px' }, true);
     const clock = makeClock();
     const hub = makeIntentHub();
+    const env = makeSurfaceEnv();
     const controls = begin(fake, clock, {
       options: { inputPolicy: 'block' },
-      seams: { onInputIntent: hub.onInputIntent },
+      seams: { onInputIntent: hub.onInputIntent, host: env.host, readPseudoModel: env.readPseudoModel },
     });
     await controls.ready;
     expect(hub.activeHandlers).toBe(0);
     hub.fire();
     expect(controls.state).toBe('running');
-    clock.drain();
+    // Terminal authority — vt.finished: естественное завершение CSS-анимаций.
+    env.host.complete();
     await controls.finished;
     expect(controls.state).toBe('released');
   });
@@ -140,7 +158,10 @@ describe('input policy', () => {
     const fake = fakeEl({ width: '240px' }, true);
     const clock = makeClock();
     const hub = makeIntentHub();
-    const controls = begin(fake, clock, { seams: { onInputIntent: hub.onInputIntent } });
+    const env = makeSurfaceEnv();
+    const controls = begin(fake, clock, {
+      seams: { onInputIntent: hub.onInputIntent, host: env.host, readPseudoModel: env.readPseudoModel },
+    });
     await controls.ready;
     hub.fire();
     expect(controls.state).toBe('released');
@@ -170,7 +191,6 @@ describe('scroll anchor', () => {
       { kind: 'get', value: 340 },
       { kind: 'set', value: 340 },
     ]);
-    clock.drain();
     await controls.finished;
     // После terminal дополнительных записей scroll нет.
     expect(world.log).toHaveLength(2);
@@ -185,62 +205,51 @@ describe('scroll anchor', () => {
       seams: { getScroll: world.getScroll, scrollTo: world.scrollTo },
     });
     await controls.ready;
-    clock.drain();
     await controls.finished;
     expect(world.log).toHaveLength(0);
   });
 });
 
-interface FakeHost {
-  injectCss(css: string): void;
-  removeCss(): void;
-  startViewTransition?(update: () => void | Promise<void>): unknown;
-  readonly injects: string[];
-  readonly removals: number;
-  readonly vtCalls: number;
-}
-
-function makeFakeHost(withVt: boolean): FakeHost {
-  const host: FakeHost = {
-    injects: [],
-    removals: 0,
-    vtCalls: 0,
-    injectCss(css: string): void {
-      host.injects.push(css);
-    },
-    removeCss(): void {
-      host.removals++;
-    },
-  };
-  if (withVt) {
-    host.startViewTransition = (update) => {
-      host.vtCalls++;
-      return Promise.resolve(update());
-    };
-  }
-  return host;
-}
-
 describe('view transition host', () => {
-  it('native tier: generated CSS инжектится до effects и снимается ровно один раз на terminal', async () => {
+  it('native tier: UA-disable ДО VT, effects после сертификации; cleanup ровно один', async () => {
     const fake = fakeEl({ width: '240px' }, true);
     const clock = makeClock();
     const coordinator = createSurfaceCoordinator();
     const generation = coordinator.begin({ target: fake.el, fromWidth: 240, toWidth: 360 });
-    const host = makeFakeHost(false);
-    const controls = begin(fake, clock, { seams: { generation, host } });
+    const host = makeSurfaceHost();
+    const controls = begin(fake, clock, {
+      seams: { generation, host, readPseudoModel: makePseudoModelReader() },
+    });
     await controls.ready;
     expect(controls.tier).toBe('future-layout-native');
-    // CSS содержит отключение UA-анимаций всех четырёх псевдоуровней.
-    expect(host.injects).toHaveLength(1);
+    // Два инжекта: UA-отключение (до startViewTransition) и 5 effects (после).
+    expect(host.injects).toHaveLength(2);
     for (const pseudo of ['group', 'image-pair', 'old', 'new']) {
       expect(host.injects[0]).toContain(`::view-transition-${pseudo}(${generation.viewTransitionName})`);
       expect(host.injects[0]).toContain('animation: none');
     }
+    expect(host.effectCount).toBe(5);
+    expect(host.injects[1]).toContain(`::view-transition-group(${generation.viewTransitionName})`);
     expect(host.removals).toBe(0);
-    clock.drain();
+    host.complete();
     await controls.finished;
     expect(host.removals).toBe(1);
+  });
+
+  it('terminal cleanup снимает view-transition-name, если цель ещё носит наше имя', async () => {
+    const fake = fakeEl({ width: '240px' }, true);
+    const clock = makeClock();
+    const coordinator = createSurfaceCoordinator();
+    const generation = coordinator.begin({ target: fake.el, fromWidth: 240, toWidth: 360 });
+    // Route назначает имя inline до транзакции; эмулируем назначение.
+    fake.el.style.setProperty('view-transition-name', generation.viewTransitionName);
+    const env = makeSurfaceEnv();
+    const controls = begin(fake, clock, {
+      seams: { generation, host: env.host, readPseudoModel: env.readPseudoModel },
+    });
+    await controls.ready;
+    env.host.complete();
+    await controls.finished;
     // Временное имя снимается: inline-style не остаётся.
     expect(fake.removals).toEqual(['view-transition-name']);
     expect(fake.el.style.getPropertyValue('view-transition-name')).toBe('');
@@ -249,63 +258,94 @@ describe('view transition host', () => {
   it('startViewTransition capability: commit проходит внутри VT', async () => {
     const fake = fakeEl({ width: '240px' }, true);
     const clock = makeClock();
-    const host = makeFakeHost(true);
-    const controls = begin(fake, clock, { seams: { host } });
+    const env = makeSurfaceEnv();
+    const controls = begin(fake, clock, {
+      seams: { host: env.host, readPseudoModel: env.readPseudoModel },
+    });
     await controls.committed;
-    expect(host.vtCalls).toBe(1);
+    expect(env.host.vtCalls).toBe(1);
     expect(fake.el.style.getPropertyValue('width')).toBe('360px');
-    clock.drain();
+    env.host.complete();
     await controls.finished;
   });
 
-  it('startViewTransition отсутствует: транзакция полноценна без VT', async () => {
+  it('startViewTransition отсутствует: транзакция полноценна без VT (snap)', async () => {
     const fake = fakeEl({ width: '240px' }, true);
     const clock = makeClock();
-    const host = makeFakeHost(false);
-    const controls = begin(fake, clock, { seams: { host } });
+    const host: FakeSurfaceHost = makeSurfaceHost();
+    const hostNoVt = { injectCss: host.injectCss, removeCss: host.removeCss };
+    const controls = begin(fake, clock, {
+      seams: { host: hostNoVt, readPseudoModel: makePseudoModelReader() },
+    });
     await controls.committed;
     expect(host.vtCalls).toBe(0);
-    clock.drain();
     await controls.finished;
     expect(controls.state).toBe('released');
+    expect(controls.tier).toBe('future-layout-snap');
+    expect(fake.el.style.getPropertyValue('width')).toBe('360px');
   });
 
   it('host throw в startViewTransition не оставляет partial owner', async () => {
     const fake = fakeEl({ width: '240px' }, true);
     const clock = makeClock();
-    const host = makeFakeHost(false);
-    host.startViewTransition = () => {
-      throw new Error('vt unsupported');
+    const host = {
+      injectCss(): void {},
+      removeCss(): void {},
+      startViewTransition(): unknown {
+        throw new Error('vt unsupported');
+      },
     };
-    const controls = begin(fake, clock, { seams: { host } });
+    const controls = begin(fake, clock, {
+      seams: { host, readPseudoModel: makePseudoModelReader() },
+    });
     await controls.finished;
-    // Сбой host терминализирует без зависших состояний.
-    expect(['failed', 'released']).toContain(controls.state);
+    // Throw гасится: commit применяется напрямую, транзакция завершается snap.
+    expect(controls.state).toBe('released');
+    expect(controls.tier).toBe('future-layout-snap');
+    expect(fake.el.style.getPropertyValue('width')).toBe('360px');
   });
 
-  it('snap tier: CSS не инжектится и не снимается', async () => {
-    const fake = fakeEl({ width: '240px' }, false); // без animate → snap
+  it('недоказанная pseudo-модель: fail-closed snap, effects CSS не инжектится', async () => {
+    const fake = fakeEl({ width: '240px' }, true);
     const clock = makeClock();
     const coordinator = createSurfaceCoordinator();
     const generation = coordinator.begin({ target: fake.el, fromWidth: 240, toWidth: 360 });
-    const host = makeFakeHost(true);
-    const controls = begin(fake, clock, { seams: { generation, host } });
+    const host = makeSurfaceHost();
+    const controls = begin(fake, clock, {
+      seams: { generation, host, readPseudoModel: makePseudoModelReader(999) },
+    });
     await controls.finished;
     expect(controls.tier).toBe('future-layout-snap');
-    expect(host.injects).toHaveLength(0);
-    expect(host.removals).toBe(0);
+    // UA-отключение было инжектнуто до VT (и снято на terminal); effects нет.
+    expect(host.injects).toHaveLength(1);
+    expect(host.effectCount).toBe(0);
+    expect(host.removals).toBe(1);
+    expect(fake.el.style.getPropertyValue('width')).toBe('360px');
+  });
+
+  it('readPseudoModel отсутствует: snap без effects', async () => {
+    const fake = fakeEl({ width: '240px' }, true);
+    const clock = makeClock();
+    const host = makeSurfaceHost();
+    const controls = begin(fake, clock, { seams: { host } });
+    await controls.finished;
+    expect(controls.tier).toBe('future-layout-snap');
+    expect(host.effectCount).toBe(0);
   });
 
   it('cancel ДО commit: host не трогается вовсе', async () => {
     const fake = fakeEl({ width: '240px' }, true);
     const clock = makeClock();
-    const host = makeFakeHost(true);
-    const controls = begin(fake, clock, { seams: { host } });
+    const env = makeSurfaceEnv();
+    const controls = begin(fake, clock, {
+      seams: { host: env.host, readPseudoModel: env.readPseudoModel },
+    });
     controls.cancel();
     await controls.finished;
-    expect(host.vtCalls).toBe(0);
-    expect(host.injects).toHaveLength(0);
-    expect(host.removals).toBe(0);
+    expect(env.host.vtCalls).toBe(0);
+    expect(env.host.injects).toHaveLength(0);
+    expect(env.host.removals).toBe(0);
+    expect(env.host.skips).toBe(0);
   });
 });
 
@@ -315,10 +355,13 @@ describe('coordinator-владение транзакции', () => {
     const clock = makeClock();
     const coordinator = createSurfaceCoordinator();
     const generation = coordinator.begin({ target: fake.el, fromWidth: 240, toWidth: 360 });
-    const controls = begin(fake, clock, { seams: { generation } });
+    const env = makeSurfaceEnv();
+    const controls = begin(fake, clock, {
+      seams: { generation, host: env.host, readPseudoModel: env.readPseudoModel },
+    });
     await controls.committed;
     expect(generation.published).toBe(true);
-    clock.drain();
+    env.host.complete();
     await controls.finished;
     expect(generation.released).toBe(true);
     expect(coordinator.activeGeneration).toBe(0);
@@ -328,13 +371,13 @@ describe('coordinator-владение транзакции', () => {
   });
 
   it('snap-транзакция публикует commit и завершается finish', async () => {
-    const fake = fakeEl({ width: '240px' }, false); // без animate → snap
+    const fake = fakeEl({ width: '240px' }, true);
     const clock = makeClock();
     const coordinator = createSurfaceCoordinator();
     const generation = coordinator.begin({ target: fake.el, fromWidth: 240, toWidth: 360 });
+    // Без VT/модели — fail-closed snap, но commit публикуется всегда.
     const controls = begin(fake, clock, { seams: { generation } });
     await controls.finished;
-    // Коммит конечного DOM состоялся даже на snap-tier → published.
     expect(generation.published).toBe(true);
     expect(generation.released).toBe(true);
     expect(controls.tier).toBe('future-layout-snap');
@@ -355,18 +398,25 @@ describe('coordinator-владение транзакции', () => {
     expect(fake.el.style.getPropertyValue('width')).toBe('240px');
   });
 
-  it('supersede: stale-транзакция не очищает новую generation', async () => {
+  it('supersede: старая транзакция останавливается, новую generation не очищает', async () => {
     const fake = fakeEl({ width: '240px' }, true);
     const clock = makeClock();
     const coordinator = createSurfaceCoordinator();
     const first = coordinator.begin({ target: fake.el, fromWidth: 240, toWidth: 360 });
-    const controlsA = begin(fake, clock, { seams: { generation: first } });
+    const env = makeSurfaceEnv();
+    const controlsA = begin(fake, clock, {
+      seams: { generation: first, host: env.host, readPseudoModel: env.readPseudoModel },
+    });
     await controlsA.ready;
+    expect(controlsA.state).toBe('running');
 
-    // Новый transition вытесняет визуальное представление старого.
+    // Новый transition вытесняет визуальное представление старого: onSupersede
+    // останавливает active representation (skip + stylesheet cleanup).
     const second = coordinator.begin({ target: fake.el, fromWidth: 360, toWidth: 480 });
-    clock.drain();
     await controlsA.finished;
+    expect(controlsA.state).toBe('released');
+    expect(env.host.skips).toBe(1);
+    expect(env.host.removals).toBe(1);
 
     // Stale finish первой generation НЕ трогает вторую.
     expect(first.released).toBe(false);
@@ -391,7 +441,6 @@ describe('coordinator-владение транзакции', () => {
     await controls.committed;
     expect(calls).toEqual(['framework-flush']);
     expect(fake.el.style.getPropertyValue('width')).toBe('360px');
-    clock.drain();
     await controls.finished;
   });
 });

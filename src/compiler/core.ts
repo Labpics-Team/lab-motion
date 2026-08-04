@@ -421,10 +421,24 @@ export function lowerSurfaceCall(input: SurfaceCallInput): SurfaceLoweringResult
   // animate(..., { layout: 'project' }); отсутствие опций — сомнение.
   if (!isPlainRecord(options) || options['layout'] !== 'project') return reject('layout-not-project');
 
+  // Неизвестные ключи options — сомнение: runtime исполняет их, а lowered-
+  // программа нет (скрытая дивергенция семантики). Fail-closed reject.
+  for (const key of Object.keys(options)) {
+    if (key !== 'layout' && key !== 'spring' && key !== 'inputPolicy'
+      && key !== 'scrollAnchor' && key !== 'onFrame') {
+      return reject('options-unknown-key');
+    }
+  }
+
   const spring = options['spring'];
   if (spring !== undefined) {
     if (hasKind(spring)) return reject('spring-not-static');
     if (!isPlainRecord(spring)) return reject('spring-not-static');
+    for (const key of Object.keys(spring)) {
+      if (key !== 'mass' && key !== 'stiffness' && key !== 'damping' && key !== 'velocity') {
+        return reject('spring-unknown-key');
+      }
+    }
     const mass = spring['mass'];
     const stiffness = spring['stiffness'];
     const damping = spring['damping'];

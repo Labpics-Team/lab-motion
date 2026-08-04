@@ -3,7 +3,8 @@
  *
  * Спека «DOCUMENT-SCOPED COORDINATOR»: один document — одна active
  * Future Layout generation. Законы запечатаны RED-тестами:
- *  - новый transition supersede-ит визуальное представление старого;
+ *  - новый transition supersede-ит визуальное представление старого
+ *    (onSupersede-handler вытесняемой generation вызывается в begin());
  *  - stale commit НЕ публикует состояние после supersede;
  *  - stale finish НЕ очищает новую generation;
  *  - cleanup ровно один раз; skip освобождает owner.
@@ -31,6 +32,12 @@ export interface SurfaceGeneration {
   skip(): void;
   readonly published: boolean;
   readonly released: boolean;
+  /** true с момента, когда эта generation вытеснена новой (до finish/skip). */
+  readonly superseded: boolean;
+  /** Остановка старого визуального представления при supersede: begin()
+   * новой generation вызывает handler ровно один раз (если зарегистрирован
+   * и generation ещё не released). */
+  onSupersede(handler: () => void): void;
 }
 
 export interface SurfaceCoordinator {
@@ -44,6 +51,8 @@ interface GenerationRecord {
   readonly css: string;
   published: boolean;
   released: boolean;
+  superseded: boolean;
+  supersedeHandler?: (() => void) | undefined;
 }
 
 // Монотонный счётчик имён realm: уникальные bounded view-transition-name
@@ -53,12 +62,9 @@ let NAME_SEQ = 0;
 function hostCss(name: string): string {
   // UA default-анимации width/height/transform/opacity полностью отключены:
   // браузер не исполняет собственный layout transition поверх Lab Motion.
-  return (
-    `::view-transition-group(${name}) { animation: none; }\n`
-    + `::view-transition-image-pair(${name}) { animation: none; }\n`
-    + `::view-transition-old(${name}) { animation: none; }\n`
-    + `::view-transition-new(${name}) { animation: none; }`
-  );
+  return ['group', 'image-pair', 'old', 'new']
+    .map((p) => `::view-transition-${p}(${name}) { animation: none; }`)
+    .join('\n');
 }
 
 export function createSurfaceCoordinator(): SurfaceCoordinator {
@@ -68,6 +74,7 @@ export function createSurfaceCoordinator(): SurfaceCoordinator {
   const coordinator: SurfaceCoordinator = {
     begin(input: SurfaceGenerationInput): SurfaceGeneration {
       void input;
+      const previous = active;
       const name = `lm-surface-${++NAME_SEQ}`;
       const record: GenerationRecord = {
         number: ++generationSeq,
@@ -75,8 +82,21 @@ export function createSurfaceCoordinator(): SurfaceCoordinator {
         css: hostCss(name),
         published: false,
         released: false,
+        superseded: false,
       };
       active = record;
+      // Supersede: новое начало вытесняет визуальное представление старого —
+      // handler транзакции останавливает её effects/observer ПОСЛЕ того, как
+      // новая generation установлена active: её finish/skip внутри остановки
+      // обязан быть stale no-op (старая запись уже не владеет coordinator'ом).
+      if (previous !== undefined && !previous.released) {
+        previous.superseded = true;
+        const handler = previous.supersedeHandler;
+        previous.supersedeHandler = undefined;
+        if (handler !== undefined) {
+          try { handler(); } catch { /* остановка старой — best effort */ }
+        }
+      }
       return {
         generation: record.number,
         viewTransitionName: record.name,
@@ -102,6 +122,14 @@ export function createSurfaceCoordinator(): SurfaceCoordinator {
         },
         get released(): boolean {
           return record.released;
+        },
+        get superseded(): boolean {
+          return record.superseded;
+        },
+        onSupersede(handler: () => void): void {
+          // Регистрация после supersede бессмысленна: handler не вызывается.
+          if (record.superseded || record.released) return;
+          record.supersedeHandler = handler;
         },
       };
     },

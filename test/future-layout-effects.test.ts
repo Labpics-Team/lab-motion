@@ -29,7 +29,13 @@ function startTransition(world: ReturnType<typeof makeSurfaceWorld>, clock: Retu
   return animate(
     world.viewport,
     { width: [240, 360] },
-    { layout: 'project', spring: SPRING, requestFrame: clock.requestFrame },
+    {
+      layout: 'project',
+      spring: SPRING,
+      requestFrame: clock.requestFrame,
+      host: world.host,
+      readPseudoModel: world.readPseudoModel,
+    },
   ) as unknown as FutureLayoutControlsLike;
 }
 
@@ -44,8 +50,9 @@ describe('постоянное число effects: 100 == 10 000 == 1 000 000 с
       counts.push(world.effects().length);
       controls.cancel();
     }
-    expect(counts[0]).toBeGreaterThan(0);
-    expect(counts[0]).toBeLessThanOrEqual(5);
+    // Ровно 5 native CSS-effects (group scale, old scale+opacity, new
+    // scale+opacity) — постоянно при любом числе логических строк.
+    expect(counts[0]).toBe(5);
     expect(counts[0]).toBe(counts[1]);
     expect(counts[1]).toBe(counts[2]);
   });

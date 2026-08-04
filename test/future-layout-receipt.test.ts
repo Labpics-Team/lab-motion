@@ -13,7 +13,12 @@
  */
 
 import { describe, expect, it } from 'vitest';
+import { readFileSync } from 'node:fs';
+import { dirname, resolve } from 'node:path';
+import { fileURLToPath } from 'node:url';
 import * as surface from '../src/future-layout/index.js';
+
+const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '..');
 
 const mod = surface as unknown as Record<string, unknown>;
 
@@ -37,9 +42,31 @@ describe('proof receipt: версия, validator, fail-closed', () => {
     const buildReceipt = pick('buildSurfaceReceipt');
     const receipt = buildReceipt({ fixture: 'v1-width-240-360', spring: { mass: 1, stiffness: 170, damping: 26 } });
     // Отдельные бюджеты: spring/boundary/coupling/observer + certified bound.
-    for (const key of ['authoringBudgetPx', 'certifiedBoundPx', 'denseMaximumPx', 'serializationContributionPx', 'browserObservedMaximumPx']) {
+    for (const key of ['authoringBudgetPx', 'certifiedBoundPx', 'denseMaximumPx', 'serializationContributionPx']) {
       expect(Number.isFinite((receipt as Record<string, unknown>)[key])).toBe(true);
     }
+    // Независимый пересчёт метрики обязан укладываться в бюджет обеими оценками.
+    const rec = receipt as Record<string, number>;
+    expect(rec['certifiedBoundPx']).toBeLessThanOrEqual(rec['authoringBudgetPx']);
+    expect(rec['denseMaximumPx']).toBeLessThanOrEqual(rec['authoringBudgetPx']);
+    // Без браузерного измерения поле отсутствует (hardcode 0 запрещён).
+    expect('browserObservedMaximumPx' in (receipt as object)).toBe(false);
+  });
+
+  it('browserObservedMaximumPx: измерение стенда проходит валидацию, фальшивое — отвергается', () => {
+    const buildReceipt = pick('buildSurfaceReceipt');
+    const validateReceipt = pick('validateSurfaceReceipt');
+    const spring = { mass: 1, stiffness: 170, damping: 26 };
+
+    const measured = buildReceipt({ fixture: 'v1-width-240-360', spring, browserObservedMaximumPx: 0.1 });
+    expect((measured as Record<string, unknown>)['browserObservedMaximumPx']).toBe(0.1);
+    expect(validateReceipt(measured)).toBe(true);
+
+    // Вне бюджета — build fail-closed.
+    expect(() => buildReceipt({ fixture: 'v1-width-240-360', spring, browserObservedMaximumPx: 10 })).toThrow();
+    // Дорисованное вручную поле — validator отвергает.
+    const forged = { ...(buildReceipt({ fixture: 'v1-width-240-360', spring }) as object), browserObservedMaximumPx: -1 };
+    expect(validateReceipt(forged)).toBe(false);
   });
 });
 
@@ -55,11 +82,25 @@ describe('meta-tests: доказательства ломаются при ос�
     // raw WAAPI control, rAF control обязан остаться на месте.
     expect(proof['rafNegativeControl']).toBe(true);
     expect(proof['waapiPositiveControl']).toBe(true);
+    // Манифест привязан к реальному стенду: удаление контролов из spec-файла
+    // ломает meta-test (манифест без стенда — декларация, не доказательство).
+    const stand = readFileSync(resolve(ROOT, 'browser/18-surface-freeze.spec.ts'), 'utf8');
+    expect(stand).toContain('raf-control');
+    expect(stand).toContain('requestAnimationFrame(rafStep)');
+    expect(stand).toContain('raw.animate(');
+    expect(stand).toContain('rafControlFrozen');
   });
 
   it('RED п.25: freeze proof обязан содержать callback assertion', () => {
     const proof = pick('freezeProofManifest')();
     expect(proof['observerCallbackAssertion']).toBe(true);
+    // Стенд обязан содержать busy-loop, freeze-ассерт pseudo-tree (compositor-
+    // исполнение границы) и observer-ассерты — иначе proof не доказывает.
+    const stand = readFileSync(resolve(ROOT, 'browser/18-surface-freeze.spec.ts'), 'utf8');
+    expect(stand).toContain('while (performance.now() - t0 < busyMs)');
+    expect(stand).toContain('pseudoScaleXAfterFreeze');
+    expect(stand).toContain('observerFrozenDuringBusy');
+    expect(stand).toContain('observerResumedAfterUnlock');
   });
 
   it('RED п.21: size-учёт включает generated CSS в consumer total', () => {

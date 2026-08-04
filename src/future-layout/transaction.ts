@@ -7,11 +7,26 @@
  *   capture new → build snapshot tree → ready → start effects → active
  *   phase → release snapshots.
  * Commit конечного DOM НЕ откатывается при cancel(): cancel немедленно
- * раскрывает уже committed DOM.
+ * раскрывает уже committed DOM (skipTransition снимает snapshot-плоскости).
+ *
+ * Representation (эмпирически сертифицирована в browser): сопряжённая
+ * геометрия G·F_j·R_j=1 живёт в pseudo-tree same-document View Transition —
+ * 5 генерируемых CSS-анимаций (group scale, old scale+opacity, new
+ * scale+opacity) на ::view-transition-group/old/new. WAAPI-pseudoElement в
+ * Chromium не исполняется (animation создаётся, но не влияет на рендер и не
+ * продлевает transition), поэтому нативный tier — только generated CSS
+ * (compositor-driven transform/opacity, off-main). Pseudo-модель
+ * сертифицируется экспериментом: group-бокс обязан равняться committed ширине
+ * (host-fit B=W1); иначе — snap без Infinity/NaN в CSS.
  *
  * Tier выбирается capability-экспериментом, не предположением:
- *   animate() цели доступен и артефакт доказуем → native (постоянное число
- *   WAAPI-effects); иначе snap (мгновенное раскрытие committed DOM).
+ *   VT доступен + модель псевдодерева доказана + артефакт доказуем →
+ *   native (постоянное число CSS-effects = 5); иначе snap (мгновенное
+ *   раскрытие committed DOM).
+ *
+ * Terminal authority: vt.finished (transition завершается, когда все
+ * CSS-анимации псевдодерева закончились). Без observer в active phase не
+ * планируется ни одного rAF (спека «OBSERVER CLOCK»).
  */
 
 import type { SpringParams } from '../spring.js';
@@ -44,7 +59,7 @@ export interface SurfaceTargetLike {
   readonly style: {
     setProperty(name: string, value: string): void;
     getPropertyValue(name: string): string;
-    removeProperty?(name: string): void;
+    removeProperty?(name: string): string;
   };
   getBoundingClientRect?(): { width: number };
   animate?(keyframes: unknown, timing: unknown): { cancel(): void };
@@ -75,12 +90,28 @@ export interface SurfaceRunOptions {
   readonly commit?: (() => void | Promise<void>) | undefined;
 }
 
+/** Same-document View Transition: структурный контракт (thenable-совместимый
+ * ready/finished, skipTransition). Capability определяется экспериментом. */
+export interface SurfaceViewTransitionLike {
+  readonly ready?: Promise<void> | undefined;
+  readonly finished?: Promise<void> | undefined;
+  skipTransition?(): void;
+}
+
 /** Same-document View Transition host: capability определяется экспериментом
- * (startViewTransition может отсутствовать), CSS-инжект обязателен всегда. */
+ * (startViewTransition может отсутствовать), CSS-инжект обязателен всегда.
+ * injectCss аддитивен: повторный вызов дополняет тот же временный stylesheet. */
 export interface SurfaceHostLike {
   injectCss?(css: string): void;
   removeCss?(): void;
   startViewTransition?(update: () => void | Promise<void>): unknown;
+}
+
+/** Сертифицированная pseudo-модель host: ширина group-бокса (база B) и
+ * placement-transform group, который обязан сохраниться в keyframes. */
+export interface SurfacePseudoModel {
+  readonly groupWidth: number;
+  readonly placement: string;
 }
 
 export interface SurfaceSeams extends SurfaceObserverClock {
@@ -96,7 +127,13 @@ export interface SurfaceSeams extends SurfaceObserverClock {
   readonly generation?: SurfaceGeneration | undefined;
   /** VT host: generated CSS входит в consumer total; cleanup на terminal. */
   readonly host?: SurfaceHostLike | undefined;
+  /** Capability/model эксперимент: сертифицированная pseudo-модель
+   * (читается после VT-ready); undefined — модель недоказуема → snap. */
+  readonly readPseudoModel?: ((name: string) => SurfacePseudoModel | undefined) | undefined;
 }
+
+/** Допуск сертификации базы B: group-бокс равен committed ширине. */
+const MODEL_CERT_TOLERANCE_PX = 0.5;
 
 function deferred(): { promise: Promise<void>; resolve(): void } {
   let resolve!: () => void;
@@ -104,6 +141,36 @@ function deferred(): { promise: Promise<void>; resolve(): void } {
     resolve = r;
   });
   return { promise, resolve };
+}
+
+const thenable = (value: unknown): value is PromiseLike<void> =>
+  value !== null && typeof value === 'object' && typeof (value as { then?: unknown }).then === 'function';
+
+/** 5 генерируемых CSS-анимаций псевдодерева (постоянное число effects):
+ * group — внешний scale G(t)=W(t)/B; old/new — counter-scale R_j и opacity
+ * crossfade. transform-origin: left top: граница растёт от левого края,
+ * placement group сохранён в keyframes (UA ставит group через transform). */
+function effectsCss(
+  name: string,
+  artifact: SurfaceExecutionArtifact,
+  placement: string,
+): string {
+  const w0 = artifact.fromWidth;
+  const w1 = artifact.toWidth;
+  const dur = `${artifact.durationMs}ms`;
+  const s0 = w0 / w1;
+  const s1 = w1 / w0;
+  return (
+    `@keyframes ${name}-g { from { transform: ${placement} scaleX(${s0}); } to { transform: ${placement} scaleX(1); } }\n`
+    + `@keyframes ${name}-os { from { transform: scaleX(1); } to { transform: scaleX(${s0}); } }\n`
+    + `@keyframes ${name}-oo { from { opacity: 1; } to { opacity: 0; } }\n`
+    + `@keyframes ${name}-ns { from { transform: scaleX(${s1}); } to { transform: scaleX(1); } }\n`
+    + `@keyframes ${name}-no { from { opacity: 0; } to { opacity: 1; } }\n`
+    + `::view-transition-group(${name}) { transform-origin: left top; animation: ${name}-g ${dur} ${artifact.easing} both; }\n`
+    + `::view-transition-image-pair(${name}) { overflow: hidden; }\n`
+    + `::view-transition-old(${name}) { transform-origin: left top; animation: ${name}-os ${dur} ${artifact.reciprocalEasing} both, ${name}-oo ${dur} ${artifact.blendEasing} both; }\n`
+    + `::view-transition-new(${name}) { transform-origin: left top; animation: ${name}-ns ${dur} ${artifact.reciprocalEasing} both, ${name}-no ${dur} ${artifact.blendEasing} both; }`
+  );
 }
 
 export function startSurfaceTransition(
@@ -116,32 +183,42 @@ export function startSurfaceTransition(
   let state: SurfaceState = 'capturing-old';
   let tier: SurfaceTier = 'future-layout-snap';
   let canceled = false;
+  let cssInjected = false;
+  let vt: SurfaceViewTransitionLike | undefined;
 
   const committed = deferred();
   const ready = deferred();
   const finished = deferred();
-  const effects: Array<{ cancel(): void }> = [];
   let observer: ReturnType<typeof createSurfaceObserver> | undefined;
   let inputCleanup: (() => void) | undefined;
-  let hostCssInjected = false;
   const generation = seams.generation;
+  const vtName = generation?.viewTransitionName ?? 'lm-surface';
+  // Superseded читается после каждого await: getter мутируется coordinator'ом
+  // асинхронно, поэтому проверка — вызов, а не закэшированное значение.
+  const isSuperseded = (): boolean => generation !== undefined && generation.superseded;
 
   const finalize = (terminal: SurfaceState): void => {
     if (state === 'released' || state === 'canceled' || state === 'failed') return;
     state = terminal;
-    for (const effect of effects) {
-      try { effect.cancel(); } catch { /* эффект уже завершён */ }
-    }
     observer?.stop();
     inputCleanup?.();
     inputCleanup = undefined;
-    // Terminal cleanup: временные CSS rules и имя снимаются ровно один раз,
-    // style element после завершения не остаётся (спека «VIEW TRANSITION HOST»).
-    if (hostCssInjected) {
-      hostCssInjected = false;
+    // Terminal cleanup: временный stylesheet снимается ровно один раз
+    // (спека «VIEW TRANSITION HOST»); skipTransition немедленно раскрывает
+    // committed DOM, снимая snapshot-плоскости (cancel/supersede/finish).
+    if (cssInjected) {
+      cssInjected = false;
       seams.host?.removeCss?.();
     }
-    target.style.removeProperty?.('view-transition-name');
+    if (vt !== undefined) {
+      try { vt.skipTransition?.(); } catch { /* transition уже завершён */ }
+      vt = undefined;
+    }
+    // Имя снимается только если цель всё ещё носит НАШЕ имя: при supersede
+    // на той же цели новая generation уже назначила собственное имя.
+    if (target.style.getPropertyValue('view-transition-name') === generation?.viewTransitionName) {
+      target.style.removeProperty?.('view-transition-name');
+    }
     // Terminal authority coordinator'а: опубликованная generation — finish,
     // неопубликованная (snap/skip) — skip; cleanup ровно один раз.
     if (generation !== undefined && !generation.released) {
@@ -173,27 +250,64 @@ export function startSurfaceTransition(
 
   const barrier = seams.commitBarrier ?? (() => Promise.resolve());
 
+  // Единственный commit конечного layout (либо FutureLayoutTransaction).
+  // Canceled-гард: cancel ДО исполнения update callback не коммитит DOM.
+  const applyCommit = (): void | Promise<void> => {
+    if (canceled) return;
+    const result = options.commit !== undefined
+      ? options.commit()
+      : target.style.setProperty('width', `${toWidth}px`);
+    // Публикация состояния — только после фактического применения commit.
+    generation?.commit();
+    return result;
+  };
+
   // Commit уходит в microtask: старый визуальный state захвачен до него, а
   // барьер продолжается ДО резолва committed, чтобы наблюдатель committed
   // видел уже начавшийся capture-new/running, а не застрявший committing.
   void Promise.resolve().then(() => {
     if (canceled) return;
     state = 'committing';
-    // Единственный commit конечного layout (либо FutureLayoutTransaction).
-    // При наличии same-document VT capability commit проходит внутри
-    // startViewTransition; host throw не ломает transaction (commit уже
-    // применён) — capability определяется экспериментом, не предположением.
-    const applyCommit = (): void | Promise<void> => (options.commit !== undefined
-      ? options.commit()
-      : target.style.setProperty('width', `${toWidth}px`));
+    // UA-анимации псевдодерева отключаются ДО startViewTransition: браузер
+    // не успевает запустить собственный transition поверх Lab Motion.
+    if (generation !== undefined && seams.host?.injectCss !== undefined) {
+      seams.host.injectCss(generation.generatedCss);
+      cssInjected = true;
+    }
+    // VT capability — эксперимент: синхронный throw host не оставляет
+    // partial owner; commit применяется напрямую (final DOM определён),
+    // snapshot-плоскостей нет → транзакция продолжается как snap.
     const host = seams.host;
-    const commitResult = host?.startViewTransition !== undefined
-      ? host.startViewTransition(applyCommit)
-      : applyCommit();
-    generation?.commit();
+    if (host?.startViewTransition !== undefined) {
+      try {
+        const started = host.startViewTransition(applyCommit);
+        vt = started !== null && typeof started === 'object'
+          ? started as SurfaceViewTransitionLike
+          : undefined;
+      } catch {
+        vt = undefined;
+      }
+      // Skip (cancel/supersede) может случиться до прикрепления terminal-
+      // цепи: ранний catch гасит unhandled rejection, не влияя на цепи ниже.
+      if (vt !== undefined && thenable(vt.finished)) {
+        (vt.finished as Promise<void>).catch(() => {});
+      }
+    }
+    // Без VT update callback исполняется здесь же (вне barrier ничего не
+    // удерживает старый кадр — commit обязателен на всех путях).
+    if (vt === undefined) applyCommit();
 
-    return Promise.resolve(commitResult).then(() => barrier()).then(() => {
+    // VT ready резолвится после update callback + snapshot capture: это
+    // честный барьер «commit применён, псевдодерево готово».
+    const readyGate: Promise<void> = vt !== undefined && thenable(vt.ready)
+      ? vt.ready
+      : Promise.resolve();
+    return readyGate.then(() => {
+      if (isSuperseded()) return finalize('released');
+      return barrier();
+    }).then(() => {
       if (canceled) return;
+      if (isSuperseded()) return finalize('released');
       // Scroll correction выполняется внутри commit barrier.
       if (scroll0 !== undefined && seams.scrollTo !== undefined) {
         seams.scrollTo(scroll0);
@@ -202,8 +316,8 @@ export function startSurfaceTransition(
       state = 'capturing-new';
       captureWidth();
 
-      if (options.reducedMotion === true || target.animate === undefined) {
-        // Reduced character switch / нет native capability: snap.
+      if (options.reducedMotion === true) {
+        // Reduced character switch: мгновенное раскрытие committed DOM.
         return snap();
       }
 
@@ -218,15 +332,38 @@ export function startSurfaceTransition(
       // Позитивность/бюджет недоказуемы: snap без Infinity/NaN в CSS.
       if (artifact === undefined) return snap();
 
-      tier = 'future-layout-native';
-      // Generated CSS (отключение UA-анимаций псевдодерева) инжектится до
-      // старта effects: Lab Motion effects стартуют только после готовности
-      // host. Removal — ровно один раз в finalize.
-      if (generation !== undefined && seams.host?.injectCss !== undefined) {
-        seams.host.injectCss(generation.generatedCss);
-        hostCssInjected = true;
+      // Сопряжённая геометрия существует только в pseudo-tree VT: без VT
+      // snapshot-плоскостей нет — честный snap вместо имитации.
+      if (vt === undefined || seams.readPseudoModel === undefined) return snap();
+
+      // Сертификация pseudo-модели (host-fit база B = committed ширина):
+      // недоказанная модель → fail-closed snap.
+      const model = seams.readPseudoModel(vtName);
+      if (
+        model === undefined
+        || !Number.isFinite(model.groupWidth)
+        || Math.abs(model.groupWidth - toWidth) > MODEL_CERT_TOLERANCE_PX
+      ) {
+        return snap();
       }
-      startEffects(target, artifact);
+
+      tier = 'future-layout-native';
+      // Generated CSS (5 effects) инжектится после сертификации модели:
+      // CSS-анимации псевдодерева продлевают transition до своего финала.
+      seams.host?.injectCss?.(effectsCss(
+        vtName,
+        artifact,
+        model.placement,
+      ));
+
+      // Stale ready не запускает effects: supersede между инжектом и стартом
+      // гасит визуальное представление этой транзакции.
+      if (isSuperseded()) return finalize('released');
+
+      // Supersede останавливает active representation: снимаются effects и
+      // observer, committed DOM раскрывается skipTransition.
+      generation?.onSupersede(() => finalize('released'));
+
       ready.resolve();
       state = 'running';
       committed.resolve();
@@ -245,41 +382,34 @@ export function startSurfaceTransition(
         observer = createSurfaceObserver(artifact, options.onFrame);
         observer.start(seams);
       }
-      runActivePhase(artifact, () => finalize('released'));
+
+      // Terminal authority: transition завершается, когда все CSS-анимации
+      // псевдодерева закончились (vt.finished). Без observer rAF в active
+      // phase нет вовсе; reject (skip) поглощается — finalize идемпотентен.
+      const terminal = vt?.finished;
+      if (thenable(terminal)) {
+        terminal.then(
+          () => finalize('released'),
+          () => finalize('released'),
+        );
+      } else {
+        // Fallback для host без finished-контракта: duration-граница.
+        const guard = setTimeout(() => finalize('released'), artifact.durationMs + 250);
+        // Unref-совместимость не требуется: guard живёт не дольше run.
+        void guard;
+      }
     });
   }).catch(() => {
-    // Host-сбой барьера не оставляет partial owner: терминализируем.
+    // Host-сбой (update callback бросил, barrier упал): commit может быть не
+    // применён — применяем его напрямую, чтобы final DOM был определён, и
+    // терминализируем как failed без partial owner.
+    try {
+      if (target.style.getPropertyValue('width') !== `${toWidth}px` && !canceled) {
+        if (options.commit === undefined) target.style.setProperty('width', `${toWidth}px`);
+      }
+    } catch { /* цель уничтожена: final DOM недоопределим, фиксируем failed */ }
     finalize('failed');
   });
-
-  function startEffects(el: SurfaceTargetLike, artifact: SurfaceExecutionArtifact): void {
-    // Вызов МЕТОДОМ на элементе: оторванная ссылка animate бросает
-    // Illegal invocation в реальных движках.
-    const timing = { duration: artifact.durationMs, fill: 'both', delay: 0 };
-    const one = 'scaleX(1)';
-    const shrink = `scaleX(${artifact.fromWidth / artifact.toWidth})`;
-    const grow = `scaleX(${artifact.toWidth / artifact.fromWidth})`;
-    // Постоянное число effects (5), независимо от числа логических строк:
-    // outer boundary scale, old/new reciprocal scale, old/new opacity.
-    effects.push(el.animate!({ transform: [shrink, one] }, { ...timing, easing: artifact.easing }));
-    effects.push(el.animate!({ transform: [one, shrink] }, { ...timing, easing: artifact.reciprocalEasing }));
-    effects.push(el.animate!({ transform: [grow, one] }, { ...timing, easing: artifact.reciprocalEasing }));
-    effects.push(el.animate!({ opacity: [1, 0] }, { ...timing, easing: artifact.blendEasing }));
-    effects.push(el.animate!({ opacity: [0, 1] }, { ...timing, easing: artifact.blendEasing }));
-  }
-
-  function runActivePhase(artifact: SurfaceExecutionArtifact, done: () => void): void {
-    const t0 = seams.now ?? 0;
-    const tick = (ts?: number): void => {
-      if (canceled || state !== 'running') return;
-      if ((ts ?? 0) - t0 >= artifact.durationMs) {
-        done();
-        return;
-      }
-      seams.requestFrame(tick);
-    };
-    seams.requestFrame(tick);
-  }
 
   const cancel = (): void => {
     if (canceled) return;

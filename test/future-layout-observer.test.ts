@@ -78,11 +78,33 @@ describe('observer clock: один callback на доставленный main-t
     expect(seen[1].width).toBeGreaterThan(seen[0].width);
   });
 
-  it('RED: без observer active phase не планирует ни одного rAF', () => {
+  it('observer — единственный источник rAF: без него ноль запросов, с ним ровно один на кадр', () => {
     const plan = planSurface(SPRING, 240, 360);
     const clock = makeClock();
-    // observer не создан: очередь часов после старта эффектов пуста.
-    expect(plan.effectCount).toBeGreaterThan(0);
-    expect(clock.now).toBe(0);
+    // Plan сам по себе не планирует ни одного rAF (effects живут в CSS-слое).
+    expect(plan.effectCount).toBe(5);
+    expect(clock.rafCalls()).toBe(0);
+    expect(clock.pending()).toBe(0);
+
+    const seen: SurfaceFrameViewLike[] = [];
+    const observer = createSurfaceObserver(plan.artifact, (f) => seen.push({ ...f }));
+    observer.start(clock);
+    // Старт observer'а — ровно один запрос кадра, без очереди.
+    expect(clock.rafCalls()).toBe(1);
+    expect(clock.pending()).toBe(1);
+
+    clock.step(16);
+    expect(seen.length).toBe(1);
+    // Один доставленный кадр → ровно один следующий запрос (нет накопления).
+    expect(clock.rafCalls()).toBe(2);
+    expect(clock.pending()).toBe(1);
+
+    observer.stop();
+    clock.step(16);
+    // Запрошенный кадр доставлен после stop как no-op: callback не вызывается,
+    // новая очередь не создаётся.
+    expect(seen.length).toBe(1);
+    expect(clock.pending()).toBe(0);
+    expect(clock.rafCalls()).toBe(2);
   });
 });

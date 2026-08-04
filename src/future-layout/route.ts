@@ -5,10 +5,14 @@
  * Режим всегда явный: без layout:'project' прямой width-tween остаётся
  * прежним (спека «FALLBACK-МАТРИЦА»). Любое сомнение (не width-пара,
  * неединственный канал, селектор/список, нечисловые концы) оставляет
- * обычный runtime path — никаких скрытых подмен семантики.
+ * обычный runtime path — никаких скрытых подмен семантики. Невалидные
+ * концы/пружина бросают ошибки фасада ДО каких-либо побочных эффектов
+ * (имя не назначается, generation не создаётся).
  */
 
 import { prefersReduced } from '../compositor/detect.js';
+import { validateSpringParams } from '../spring.js';
+import { MotionParamError } from '../errors.js';
 import { DEFAULT_SPRING } from '../internal/motion-defaults.js';
 import type { SpringParams } from '../spring.js';
 import { createSurfaceCoordinator } from './coordinator.js';
@@ -17,6 +21,7 @@ import {
   type SurfaceControls,
   type SurfaceHostLike,
   type SurfaceInputPolicy,
+  type SurfacePseudoModel,
   type SurfaceScrollAnchor,
   type SurfaceTargetLike,
 } from './transaction.js';
@@ -40,6 +45,12 @@ interface LooseOptions {
   readonly getScroll?: unknown;
   readonly scrollTo?: unknown;
   readonly onInputIntent?: unknown;
+  /** Test/host seam: переопределение VT host. */
+  readonly host?: unknown;
+  /** Test seam: чтение сертифицированной pseudo-модели. */
+  readonly readPseudoModel?: unknown;
+  /** Test seam: барьер commit. */
+  readonly commitBarrier?: unknown;
 }
 
 // Один document — одна active generation: module-scoped координатор является
@@ -67,17 +78,30 @@ const NOOP = (): void => {};
 interface DocumentLike {
   createElement(tag: 'style'): { textContent: string };
   head: { appendChild(node: unknown): void; removeChild(node: unknown): void };
+  documentElement: unknown;
   startViewTransition?(update: () => void | Promise<void>): unknown;
+}
+
+interface GlobalWithComputed {
+  getComputedStyle?(el: unknown, pseudo?: string): {
+    width: string;
+    transform: string;
+  };
 }
 
 // DOM-реализация VT host: style element живёт ровно между inject и terminal
 // cleanup; CSS записывается через textContent (CSP без eval/Function).
+// injectCss аддитивен: UA-отключение инжектится до startViewTransition,
+// effects CSS — после сертификации pseudo-модели (один stylesheet).
 // startViewTransition прокидывается только при реальной capability.
 function documentSurfaceHost(doc: DocumentLike): SurfaceHostLike {
   let style: { textContent: string } | undefined;
   const host: SurfaceHostLike = {
     injectCss(css: string): void {
-      if (style !== undefined) return;
+      if (style !== undefined) {
+        style.textContent += `\n${css}`;
+        return;
+      }
       style = doc.createElement('style');
       style.textContent = css;
       doc.head.appendChild(style);
@@ -95,6 +119,32 @@ function documentSurfaceHost(doc: DocumentLike): SurfaceHostLike {
   return host;
 }
 
+// Capability/model эксперимент (после VT ready): group-бокс псевдодерева и
+// placement-transform. Ширина парсится из computed style; отсутствие
+// псевдоэлемента/функции — недоказанная модель (undefined → snap).
+function documentPseudoModelReader(doc: DocumentLike): (name: string) => SurfacePseudoModel | undefined {
+  return (name: string): SurfacePseudoModel | undefined => {
+    const gcs = (globalThis as GlobalWithComputed).getComputedStyle;
+    if (typeof gcs !== 'function') return undefined;
+    try {
+      const cs = gcs(doc.documentElement, `::view-transition-group(${name})`);
+      const groupWidth = Number.parseFloat(cs.width);
+      if (!Number.isFinite(groupWidth) || groupWidth <= 0) return undefined;
+      const t = cs.transform;
+      return { groupWidth, placement: t === 'none' || t === '' ? 'translate(0px, 0px)' : t };
+    } catch {
+      return undefined;
+    }
+  };
+}
+
+function requireSurfaceWidth(value: unknown, code: 'LM167'): number {
+  if (typeof value !== 'number' || !Number.isFinite(value) || value <= 0) {
+    throw new MotionParamError(code);
+  }
+  return value;
+}
+
 export function tryRouteSurfaceTransition(
   target: unknown,
   props: Record<string, unknown>,
@@ -110,9 +160,9 @@ export function tryRouteSurfaceTransition(
   if (keys.length !== 1 || keys[0] !== 'width') return undefined;
   const value = props['width'];
   if (!Array.isArray(value) || value.length !== 2) return undefined;
-  const fromWidth = value[0];
-  const toWidth = value[1];
-  if (typeof fromWidth !== 'number' || typeof toWidth !== 'number') return undefined;
+  const rawFrom = value[0];
+  const rawTo = value[1];
+  if (typeof rawFrom !== 'number' || typeof rawTo !== 'number') return undefined;
 
   // V1 slice: одна bounded-цель; селектор/список — обычный runtime path.
   if (typeof target === 'string') return undefined;
@@ -120,7 +170,14 @@ export function tryRouteSurfaceTransition(
   if (el.length !== undefined && typeof el.style !== 'object') return undefined;
   if (el.style === undefined || typeof el.style.setProperty !== 'function') return undefined;
 
-  const spring = (options.spring ?? DEFAULT_SPRING) as SpringParams;
+  // Валидация ДО побочных эффектов: невалидные концы/пружина бросают ошибки
+  // фасада, не назначая view-transition-name и не создавая generation.
+  const fromWidth = requireSurfaceWidth(rawFrom, 'LM167');
+  const toWidth = requireSurfaceWidth(rawTo, 'LM167');
+  const springInput = options.spring;
+  const spring = (springInput === undefined ? DEFAULT_SPRING : springInput) as SpringParams;
+  if (springInput !== undefined) validateSpringParams(spring);
+
   const reduced = prefersReduced(options.matchMedia as never);
   const requestFrame = typeof options.requestFrame === 'function'
     ? options.requestFrame as (cb: (ts?: number) => void) => number
@@ -145,13 +202,22 @@ export function tryRouteSurfaceTransition(
     ? options.onInputIntent as (handler: () => void) => () => void
     : undefined;
 
+  const doc = (globalThis as { document?: DocumentLike }).document;
+  const host = options.host !== undefined
+    ? options.host as SurfaceHostLike
+    : doc !== undefined ? documentSurfaceHost(doc) : undefined;
+  const readPseudoModel = typeof options.readPseudoModel === 'function'
+    ? options.readPseudoModel as (name: string) => SurfacePseudoModel | undefined
+    : doc !== undefined ? documentPseudoModelReader(doc) : undefined;
+  const commitBarrier = typeof options.commitBarrier === 'function'
+    ? options.commitBarrier as () => Promise<void>
+    : undefined;
+
   // Один document — одна active generation; уникальное bounded имя из
   // монотонной последовательности назначается цели inline (снимается в
   // terminal cleanup транзакции), host — DOM-backed capability experiment.
   const generation = DOCUMENT_SURFACE_COORDINATOR.begin({ target: el, fromWidth, toWidth });
   el.style.setProperty('view-transition-name', generation.viewTransitionName);
-  const doc = (globalThis as { document?: DocumentLike }).document;
-  const host = doc !== undefined ? documentSurfaceHost(doc) : undefined;
 
   const controls = startSurfaceTransition(
     el,
@@ -166,6 +232,8 @@ export function tryRouteSurfaceTransition(
       onInputIntent,
       generation,
       host,
+      readPseudoModel,
+      commitBarrier,
     },
   );
   return {

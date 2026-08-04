@@ -137,6 +137,12 @@ export interface AnimateOptions {
     readonly velocity: number;
     readonly delta: number;
   }) => void) | undefined;
+  /** Внутренний шов (conformance): VT host surface-транзакции. */
+  readonly host?: unknown;
+  /** Внутренний шов (conformance): чтение сертифицированной pseudo-модели. */
+  readonly readPseudoModel?: unknown;
+  /** Внутренний шов (conformance): барьер commit surface-транзакции. */
+  readonly commitBarrier?: unknown;
 }
 
 /** Контролы прогона (для группы целей — агрегированные). */

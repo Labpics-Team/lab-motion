@@ -91,7 +91,18 @@ export const SUBPATH_GATE_BYTES = 4608;
 // ужимать дальше нечего — каждый байт этого шага является законом спеки
 // (ACCESSIBILITY И INPUT, SCROLL ANCHOR, DOCUMENT-SCOPED COORDINATOR,
 // VIEW TRANSITION HOST), зафиксированным GREEN-тестами.
-export const FULL_ANIMATE_GATE_BYTES = 14_820;
+// 2026-08-04 (третий шаг): 14 820 → 15 530 — сертифицированное представление
+// сопряжённой геометрии (adversarial BLOCKER): WAAPI-pseudoElement эмпирически
+// не исполняется в Chromium, native tier перенесён на generated CSS @keyframes
+// в pseudo-tree same-document VT. Новые байты: capability/model-эксперимент
+// (documentPseudoModelReader ~0.3 KB min), fail-closed сертификация базы B,
+// генерация 5 effects CSS (effectsCss ~0.6 KB min — строки псевдоправил не
+// сжимаемы дальше), additive injectCss, supersede-остановка старой транзакции
+// (onSupersede в coordinator + guard'ы после каждого await). До подъёма сняты
+// все доступные шейвы (компактный reader, одно vtName, hostCss-цикл). Подъём
+// по делегации Даниила («сначала максимум ужатия, затем минимальный подъём
+// от факта»); факт 15 453 B gz, люфт ~0.5% — тот же класс рэтчета.
+export const FULL_ANIMATE_GATE_BYTES = 15_530;
 
 // Consumer-rebundle ядра после стабильных кодов ошибок и изоляции listener-
 // сбоев. Физический shipped-граф при этом уменьшился и по-прежнему ограничен
@@ -136,7 +147,11 @@ export const COMPOSITOR_CAPABILITY_GATE_BYTES = 6600;
 // Layout V1 (input policy, scroll anchor, coordinator ownership, VT host):
 // факт 16 683 B gz; люфт ~0.5% по той же причине хрупкости 32KB-окна gzip.
 // Подъём по делегации Даниила, см. FULL_ANIMATE_GATE_BYTES.
-export const ANIMATE_COMPOSITOR_MIXED_GATE_BYTES = 16_770;
+// 2026-08-04 (третий шаг): 16 770 → 17 500 — тот же шаг сертифицированного
+// pseudo-tree представления (adversarial BLOCKER), см. третий шаг
+// FULL_ANIMATE_GATE_BYTES. Факт 17 410 B gz; люфт ~0.5% по той же причине
+// хрупкости 32KB-окна gzip. Подъём по делегации Даниила.
+export const ANIMATE_COMPOSITOR_MIXED_GATE_BYTES = 17_500;
 
 // Точечные (bespoke) пороги субпутей — жёстче общего SUBPATH_GATE_BYTES там, где
 // это осмысленно. ./utils — семь чистых скалярных примитивов + сегментный движок;

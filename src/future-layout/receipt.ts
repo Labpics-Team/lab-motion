@@ -11,6 +11,7 @@
 
 import { gzipSync } from 'node:zlib';
 import { tryCompileSurfaceArtifact, SURFACE_PRECISION_BUDGET_PX } from './artifact.js';
+import { createSurfaceCoordinator } from './coordinator.js';
 import type { SpringParams } from '../spring.js';
 
 export const SURFACE_RECEIPT_SCHEMA = 1;
@@ -20,6 +21,9 @@ export interface SurfaceReceiptInput {
   readonly spring: SpringParams;
   readonly fromWidth?: number;
   readonly toWidth?: number;
+  /** Реальное браузерное измерение стенда; без измерения поле отсутствует
+   * (hardcode 0 был бы фальшивой точностью). */
+  readonly browserObservedMaximumPx?: number;
 }
 
 export interface SurfaceReceipt {
@@ -37,56 +41,89 @@ export interface SurfaceReceipt {
   readonly certifiedBoundPx: number;
   readonly denseMaximumPx: number;
   readonly serializationContributionPx: number;
-  readonly browserObservedMaximumPx: number;
+  readonly browserObservedMaximumPx?: number;
 }
 
-/** h²/8 · max|R''| с R''(u)=2β²/u³: сертифицированный верхний предел
- * кусочно-линейной аппроксимации reciprocal на stop-сетке Q. */
+/** Reciprocal-метрика receipts обязана совпадать с доказательством артефакта
+ * (src/future-layout/artifact.ts): производственная ошибка сопряжения на
+ * контенте шириной W_j — W(t)·W_j·|Δ|·|Q̂−Q|, Δ = 1/W1 − 1/W0; сертифицированный
+ * предел сегмента — W_max·W_content·(h²/8)·2β²/W_min³, β = |ΔW|/h (ширина
+ * линейна внутри сегмента serialized P). Ширина в stop-точке Q восстанавливается
+ * из самого Q: W = 1/(1/W0 + Q·Δ) — receipt читает ТОЛЬКО serialized Q. */
+
+function widthFromQ(q: number, fromWidth: number, delta: number): number {
+  return 1 / (1 / fromWidth + q * delta);
+}
+
+/** Сертифицированный верхний предел кусочно-линейной аппроксимации reciprocal
+ * на stop-сетке Q: максимум per-segment предела по всему Q-ряду. */
 function certifiedReciprocalBoundPx(
   reciprocalSamples: Float64Array,
   fromWidth: number,
   toWidth: number,
 ): number {
-  const beta = Math.abs(toWidth - fromWidth);
-  if (beta === 0) return 0;
-  let maxSecond = 0;
-  let maxStep = 0;
+  const delta = 1 / toWidth - 1 / fromWidth;
+  if (delta === 0) return 0;
+  const contentW = Math.max(fromWidth, toWidth);
   const stopCount = reciprocalSamples.length / 2;
-  for (let i = 0; i < stopCount; i++) {
-    const w = fromWidth + (toWidth - fromWidth) * reciprocalSamples[i * 2 + 1]!;
-    const second = (2 * beta * beta) / (w * w * w);
-    if (second > maxSecond) maxSecond = second;
-    if (i > 0) {
-      const step = Math.abs(reciprocalSamples[i * 2]! - reciprocalSamples[(i - 1) * 2]!);
-      if (step > maxStep) maxStep = step;
-    }
+  let maxBound = 0;
+  for (let i = 1; i < stopCount; i++) {
+    const h = Math.abs(reciprocalSamples[i * 2]! - reciprocalSamples[(i - 1) * 2]!);
+    if (h === 0) continue;
+    const wA = widthFromQ(reciprocalSamples[(i - 1) * 2 + 1]!, fromWidth, delta);
+    const wB = widthFromQ(reciprocalSamples[i * 2 + 1]!, fromWidth, delta);
+    const wMin = Math.min(wA, wB);
+    if (wMin <= 0) return Number.POSITIVE_INFINITY;
+    const maxW = Math.max(wA, wB);
+    const beta = Math.abs(wB - wA) / h;
+    const bound = maxW * contentW * (h * h / 8) * (2 * beta * beta) / (wMin * wMin * wMin);
+    if (bound > maxBound) maxBound = bound;
   }
-  // Процентная сетка → доля длительности; предел в CSS px ширины.
-  return ((maxStep / 100) ** 2 / 8) * maxSecond * Math.max(fromWidth, toWidth);
+  return maxBound;
 }
 
-/** Плотный независимый скан: максимум отклонения Q-аппроксимации от точного
- * reciprocal на 1000 равномерных точках (per-stop интерполяция). */
+/** Плотный независимый скан: максимум отклонения Q̂ (интерполяция stop-сетки)
+ * от точного Q = (1/W(u) − 1/W0)/Δ, где W(u) — serialized P (линейная
+ * интерполяция progress между stops пружины), в 1001 равномерной точке.
+ * Ошибка переводится в CSS px производственной формулой maxW·contentW·|Δ|. */
 function denseReciprocalMaximumPx(
   reciprocalSamples: Float64Array,
+  samples: Float64Array,
   fromWidth: number,
   toWidth: number,
 ): number {
-  const stopCount = reciprocalSamples.length / 2;
-  if (stopCount < 2) return 0;
+  const delta = 1 / toWidth - 1 / fromWidth;
+  const qStopCount = reciprocalSamples.length / 2;
+  const pStopCount = samples.length / 2;
+  if (qStopCount < 2 || pStopCount < 2 || delta === 0) return 0;
+  const contentW = Math.max(fromWidth, toWidth);
+  const progressAt = (u: number): number => {
+    let lo = 0;
+    while (lo < pStopCount - 2 && samples[(lo + 1) * 2]! <= u) lo++;
+    const x0 = samples[lo * 2]!;
+    const x1 = samples[(lo + 1) * 2]!;
+    const p0 = samples[lo * 2 + 1]!;
+    const p1 = samples[(lo + 1) * 2 + 1]!;
+    const t = x1 === x0 ? 0 : (u - x0) / (x1 - x0);
+    return p0 + (p1 - p0) * t;
+  };
   let maxError = 0;
+  let qLo = 0;
   for (let probe = 0; probe <= 1000; probe++) {
     const u = probe / 10; // percent 0..100
-    let lo = 0;
-    while (lo < stopCount - 2 && reciprocalSamples[(lo + 1) * 2]! <= u) lo++;
-    const p0 = reciprocalSamples[lo * 2]!;
-    const p1 = reciprocalSamples[(lo + 1) * 2]!;
-    const q0 = reciprocalSamples[lo * 2 + 1]!;
-    const q1 = reciprocalSamples[(lo + 1) * 2 + 1]!;
+    while (qLo < qStopCount - 2 && reciprocalSamples[(qLo + 1) * 2]! <= u) qLo++;
+    const p0 = reciprocalSamples[qLo * 2]!;
+    const p1 = reciprocalSamples[(qLo + 1) * 2]!;
+    const q0 = reciprocalSamples[qLo * 2 + 1]!;
+    const q1 = reciprocalSamples[(qLo + 1) * 2 + 1]!;
     const t = p1 === p0 ? 0 : (u - p0) / (p1 - p0);
     const approx = q0 + (q1 - q0) * t;
-    const exact = 1 / (1 + ((toWidth - fromWidth) / fromWidth) * (u / 100));
-    const errorPx = Math.abs(approx - exact) * Math.max(fromWidth, toWidth);
+    const w = fromWidth + (toWidth - fromWidth) * progressAt(u);
+    if (!(w > 0)) return Number.POSITIVE_INFINITY;
+    const exact = (1 / w - 1 / fromWidth) / delta;
+    // Производственная ошибка: W(t)·W_content·|Δ|·|Q̂−Q| (W(t) — фактическая
+    // ширина в точке, не глобальный максимум).
+    const errorPx = w * contentW * Math.abs(delta) * Math.abs(approx - exact);
     if (errorPx > maxError) maxError = errorPx;
   }
   return maxError;
@@ -99,10 +136,20 @@ export function buildSurfaceReceipt(input: SurfaceReceiptInput): SurfaceReceipt 
   if (artifact === undefined) {
     throw new Error('surface receipt: артефакт недоказуем (fail-closed)');
   }
+  const observed = input.browserObservedMaximumPx;
+  if (observed !== undefined
+    && (!Number.isFinite(observed) || observed < 0 || observed > SURFACE_PRECISION_BUDGET_PX)) {
+    throw new Error('surface receipt: browserObservedMaximumPx вне бюджета/нефинитно (fail-closed)');
+  }
   const generatedCss = artifact.easing + artifact.reciprocalEasing + artifact.blendEasing;
   const certifiedBoundPx = certifiedReciprocalBoundPx(artifact.reciprocalSamples, fromWidth, toWidth);
-  const denseMaximumPx = denseReciprocalMaximumPx(artifact.reciprocalSamples, fromWidth, toWidth);
-  return {
+  const denseMaximumPx = denseReciprocalMaximumPx(
+    artifact.reciprocalSamples,
+    artifact.samples as Float64Array,
+    fromWidth,
+    toWidth,
+  );
+  const receipt: SurfaceReceipt = {
     schema: SURFACE_RECEIPT_SCHEMA,
     fixture: input.fixture,
     fromWidth,
@@ -117,23 +164,28 @@ export function buildSurfaceReceipt(input: SurfaceReceiptInput): SurfaceReceipt 
     certifiedBoundPx,
     denseMaximumPx,
     serializationContributionPx: Math.max(0, denseMaximumPx - certifiedBoundPx),
-    browserObservedMaximumPx: 0,
   };
+  if (observed !== undefined) {
+    return { ...receipt, browserObservedMaximumPx: observed };
+  }
+  return receipt;
 }
 
 const RECEIPT_NUMBER_KEYS = [
   'fromWidth', 'toWidth', 'pStops', 'qStops', 'aStops', 'durationMs',
   'generatedCssBytes', 'authoringBudgetPx', 'certifiedBoundPx',
-  'denseMaximumPx', 'serializationContributionPx', 'browserObservedMaximumPx',
+  'denseMaximumPx', 'serializationContributionPx',
 ] as const;
 
 const RECEIPT_KNOWN_KEYS = new Set<string>([
-  'schema', 'fixture', 'metric', ...RECEIPT_NUMBER_KEYS,
+  'schema', 'fixture', 'metric', 'browserObservedMaximumPx', ...RECEIPT_NUMBER_KEYS,
 ]);
 
 /** Independent validator: fail-closed. Строгая схема (лишние поля — отказ:
  * повреждённый/дорисованный вручную receipt не проходит), конечность всех
- * чисел, бюджет соблюдён сертифицированным пределом. */
+ * чисел, бюджет соблюдён сертифицированным пределом. browserObservedMaximumPx
+ * опционален (отсутствие = стенд не измерял), но при наличии обязан быть
+ * конечным неотрицательным числом внутри бюджета. */
 export function validateSurfaceReceipt(receipt: unknown): boolean {
   if (receipt === null || typeof receipt !== 'object' || Array.isArray(receipt)) return false;
   const record = receipt as Record<string, unknown>;
@@ -146,6 +198,12 @@ export function validateSurfaceReceipt(receipt: unknown): boolean {
   for (const key of RECEIPT_NUMBER_KEYS) {
     const value = record[key];
     if (typeof value !== 'number' || !Number.isFinite(value)) return false;
+  }
+  const observed = record['browserObservedMaximumPx'];
+  if (observed !== undefined
+    && (typeof observed !== 'number' || !Number.isFinite(observed)
+      || observed < 0 || observed > (record['authoringBudgetPx'] as number))) {
+    return false;
   }
   return (record['certifiedBoundPx'] as number) <= (record['authoringBudgetPx'] as number);
 }
@@ -175,14 +233,12 @@ export function freezeProofManifest(): Record<string, unknown> {
 }
 
 /** SIZE: generated CSS входит в consumer total — флаг и gzip-байты
- * вычисляются из фактического CSS координатора, не декларируются. */
+ * вычисляются из фактического CSS координатора, не декларируются
+ * (hardcoded-дубликат hostCss дрейфовал бы от production-кода). */
 export function surfaceSizeAccounting(): Record<string, unknown> {
-  const representativeName = 'lm-surface-1';
-  const css =
-    `::view-transition-group(${representativeName}) { animation: none; }\n`
-    + `::view-transition-image-pair(${representativeName}) { animation: none; }\n`
-    + `::view-transition-old(${representativeName}) { animation: none; }\n`
-    + `::view-transition-new(${representativeName}) { animation: none; }`;
+  const coordinator = createSurfaceCoordinator();
+  const generation = coordinator.begin({ target: {}, fromWidth: 240, toWidth: 360 });
+  const css = generation.generatedCss;
   return {
     includesGeneratedCss: true,
     generatedCssBytesGzip: gzipSync(Buffer.from(css, 'utf8'), { level: 9 }).length,

@@ -251,8 +251,9 @@ describe('size-gate: auto-derive subpath entries from package.json exports', () 
 
   it('full animate имеет один SSOT-потолок для shipped subpath и consumer import-cost', () => {
     const full = IMPORT_COST_SCENARIOS.find((scenario) => scenario.name.startsWith('animate-one-liner'));
-    // 14 820: Future Layout V1 runtime завершение (факт 14 744; хронология в size-gate.mjs).
-    expect(FULL_ANIMATE_GATE_BYTES).toBe(14_820);
+    // 15 530: сертифицированное pseudo-tree представление (adversarial BLOCKER;
+    // факт 15 453; хронология в size-gate.mjs).
+    expect(FULL_ANIMATE_GATE_BYTES).toBe(15_530);
     expect(BESPOKE_SUBPATH_GATES['./animate']).toBe(FULL_ANIMATE_GATE_BYTES);
     expect(full?.gate).toBe(FULL_ANIMATE_GATE_BYTES);
   });
@@ -278,9 +279,9 @@ describe('size-gate: auto-derive subpath entries from package.json exports', () 
   });
 
   it('фиксирует mixed animate + compositor от факта с documented люфтом', () => {
-    // 16 770: Future Layout V1 runtime завершение, факт 16 683 + ~0.5% на
-    // gzip-window хрупкость сценария (хронология в size-gate.mjs).
-    expect(ANIMATE_COMPOSITOR_MIXED_GATE_BYTES).toBe(16_770);
+    // 17 500: сертифицированное pseudo-tree представление (adversarial BLOCKER),
+    // факт 17 410 + ~0.5% на gzip-window хрупкость (хронология в size-gate.mjs).
+    expect(ANIMATE_COMPOSITOR_MIXED_GATE_BYTES).toBe(17_500);
     const mixed = IMPORT_COST_SCENARIOS.find(
       ({ name }) => name === 'animate + compositor',
     );

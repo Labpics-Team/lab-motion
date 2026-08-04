@@ -8,7 +8,8 @@
  * busy-loop main thread >= 1000 ms. Во время busy-window:
  *   - raw WAAPI control движется (compositor);
  *   - rAF control замирает (main thread заблокирован);
- *   - Future Layout boundary движется (WAAPI-effects на compositor);
+ *   - Future Layout boundary движется (generated CSS-анимации pseudo-tree
+ *     same-document VT исполняются compositor'ом);
  *   - observer callback не исполняется;
  * после разблокировки observer получает актуальные samples, очередь
  * устаревших callbacks отсутствует. Animation.currentTime НЕ используется
@@ -96,6 +97,7 @@ test('freeze proof: compositor-контроли движутся, rAF-контр
 
     const materializedRows = (): number => scene.list.children.length;
     const readMatrix = (el: HTMLElement): string => getComputedStyle(el).transform;
+    const stylesCount = (): number => document.querySelectorAll('style').length;
     const rows = {
       beforeCommit: materializedRows(),
       afterCommit: 0,
@@ -125,11 +127,27 @@ test('freeze proof: compositor-контроли движутся, rAF-контр
     const tier = controls.tier;
     rows.afterCommit = materializedRows();
 
+    // Имя назначено маршрутизатором inline; pseudo-tree читается от корня.
+    const vtName = scene.boundary.style.getPropertyValue('view-transition-name');
+    const readPseudoGroup = (): { transform: string; width: string } => {
+      const cs = getComputedStyle(document.documentElement, `::view-transition-group(${vtName})`);
+      return { transform: cs.transform, width: cs.width };
+    };
+
+    // Warmup: три доставленных кадра — compositor активирует CSS-анимации
+    // псевдодерева. Эмпирический закон Chromium: анимации, закоммиченные в
+    // том же кадре, что и busy-block, до compositor не доходят; freeze-proof
+    // моделирует джанк ПОСЛЕ старта представления (активная фаза), а не гонку
+    // инжекта против блокировки.
+    for (let i = 0; i < 3; i++) {
+      await new Promise<void>((resolve) => requestAnimationFrame(() => resolve()));
+    }
     const pre = {
       raw: readMatrix(scene.raw),
       rafWidth: getComputedStyle(scene.rafEl).width,
-      boundary: readMatrix(scene.boundary),
+      pseudoGroup: readPseudoGroup(),
       observer: observerSamples,
+      stylesDuring: stylesCount(),
     };
 
     // Busy-window: main thread заблокирован, compositor продолжает работать.
@@ -138,6 +156,9 @@ test('freeze proof: compositor-контроли движутся, rAF-контр
 
     // Сразу после разблокировки (синхронно): rAF control и observer обязаны
     // быть замороженными — rAF callback не исполнялся в busy-window.
+    // Computed-стили псевдодерева в этот момент ещё не пересчитаны main
+    // thread'ом (compositor двигал анимации без него) — количественное
+    // доказательство читается после двух доставленных кадров ниже.
     const postBusy = {
       rafWidth: getComputedStyle(scene.rafEl).width,
       observer: observerSamples,
@@ -146,9 +167,14 @@ test('freeze proof: compositor-контроли движутся, rAF-контр
     // Два доставленных кадра: compositor коммитит состояние, стили синхронны.
     await new Promise<void>((resolve) => requestAnimationFrame(() => resolve()));
     await new Promise<void>((resolve) => requestAnimationFrame(() => resolve()));
+    const scaleXOf = (transform: string): number => {
+      // matrix(a, b, c, d, e, f): placement translate ∘ scaleX → a = scaleX.
+      const m = /^matrix\(([-\d.eE+]+),/.exec(transform);
+      return m !== null ? Number.parseFloat(m[1]!) : Number.NaN;
+    };
     const during = {
       raw: readMatrix(scene.raw),
-      boundary: readMatrix(scene.boundary),
+      pseudoScaleX: scaleXOf(readPseudoGroup().transform),
     };
     rows.during = materializedRows();
     const afterUnlockObserver = observerSamples;
@@ -165,7 +191,16 @@ test('freeze proof: compositor-контроли движутся, rAF-контр
       logicalRows: scene.logicalRows,
       platformControlMoved: pre.raw !== during.raw,
       rafControlFrozen: pre.rafWidth === postBusy.rafWidth,
-      surfaceMoved: pre.boundary !== during.boundary,
+      // Количественное доказательство compositor-исполнения границы: group
+      // scaleX = s0 + (1−s0)·P(t). За busy-window (1000 ms) пружина {1,25,9}
+      // обязана пройти P>0.5 (scaleX>0.833); rAF-привод дал бы ~2 кадра
+      // после разблокировки, P≈0.08 (scaleX≈0.69) — пороги не пересекаются.
+      pseudoScaleXAfterFreeze: during.pseudoScaleX,
+      // Сертификация host-fit модели: group-бокс равен committed ширине.
+      pseudoGroupWidthCommitted: pre.pseudoGroup.width,
+      // Generated stylesheet живёт ровно между inject и terminal cleanup.
+      stylesDuring: pre.stylesDuring,
+      stylesAfterFinish: stylesCount(),
       observerFrozenDuringBusy: postBusy.observer === pre.observer,
       observerResumedAfterUnlock: afterUnlockObserver > postBusy.observer,
       finalWidth: getComputedStyle(scene.boundary).width,
@@ -185,8 +220,16 @@ test('freeze proof: compositor-контроли движутся, rAF-контр
   expect(result.platformControlMoved).toBe(true);
   // Negative control: rAF/direct-width замер (main thread заблокирован).
   expect(result.rafControlFrozen).toBe(true);
-  // Future Layout boundary двигался: compositor-исполнение переживает freeze.
-  expect(result.surfaceMoved).toBe(true);
+  // Сопряжённая граница продвинулась БЕЗ main thread: за busy-window (1 s)
+  // compositor-анимация прошла P>0.5 (scaleX>0.833). rAF-привод дал бы только
+  // ~2 кадра после разблокировки (scaleX≈0.69) — порог недостижим без freeze-
+  // исполнения (пружина {1,25,9}: ζ=0.9, e^{−ζω0·1s}=e^{−4.5}≈0.011).
+  expect(result.pseudoScaleXAfterFreeze).toBeGreaterThan(0.833);
+  // Host-fit база B = committed ширина (модель сертифицирована экспериментом).
+  expect(result.pseudoGroupWidthCommitted).toBe('360px');
+  // Generated stylesheet: инжектится на active phase, снимается на terminal.
+  expect(result.stylesDuring).toBeGreaterThanOrEqual(1);
+  expect(result.stylesAfterFinish).toBe(result.stylesDuring - 1);
   // Observer callback не исполнялся в busy-window и ожил после разблокировки.
   expect(result.observerFrozenDuringBusy).toBe(true);
   expect(result.observerResumedAfterUnlock).toBe(true);

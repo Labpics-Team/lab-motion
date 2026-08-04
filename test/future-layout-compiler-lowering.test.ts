@@ -162,6 +162,23 @@ describe('lowerSurfaceCall: каждый guard спеки имеет positive co
     );
   });
 
+  it('неизвестный ключ options/spring — сомнение: runtime path без тихой дивергенции', () => {
+    // Runtime исполняет такие ключи (onUpdate, commit-швы и т.п.), lowered-
+    // программа нет: молча понизить = скрытая подмена семантики.
+    expectReject(
+      { ...staticCall, options: { layout: 'project', onUpdate: (): void => {} } },
+      'options-unknown-key',
+    );
+    expectReject(
+      { ...staticCall, options: { layout: 'project', commit: (): void => {} } },
+      'options-unknown-key',
+    );
+    expectReject(
+      { ...staticCall, options: { layout: 'project', spring: { mass: 1, stiffness: 170, damping: 26, bounce: 0.5 } } },
+      'spring-unknown-key',
+    );
+  });
+
   it('untrusted input: не-объект и пустые поля отклоняются, не бросая', () => {
     expect(lowerSurfaceCall(null as never).lowered).toBe(false);
     expect(lowerSurfaceCall({} as never).lowered).toBe(false);
