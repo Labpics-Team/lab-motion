@@ -185,7 +185,9 @@ const RECEIPT_KNOWN_KEYS = new Set<string>([
  * повреждённый/дорисованный вручную receipt не проходит), конечность всех
  * чисел, бюджет соблюдён сертифицированным пределом. browserObservedMaximumPx
  * опционален (отсутствие = стенд не измерял), но при наличии обязан быть
- * конечным неотрицательным числом внутри бюджета. */
+ * конечным неотрицательным числом внутри бюджета. Precision-метрики в CSS px
+ * физически неотрицательны и не могут превышать бюджет: отрицательное или
+ * сверхбюджетное значение — подделка, отказ. */
 export function validateSurfaceReceipt(receipt: unknown): boolean {
   if (receipt === null || typeof receipt !== 'object' || Array.isArray(receipt)) return false;
   const record = receipt as Record<string, unknown>;
@@ -199,13 +201,19 @@ export function validateSurfaceReceipt(receipt: unknown): boolean {
     const value = record[key];
     if (typeof value !== 'number' || !Number.isFinite(value)) return false;
   }
+  const budget = record['authoringBudgetPx'] as number;
+  if (budget < 0) return false;
+  for (const key of ['certifiedBoundPx', 'denseMaximumPx', 'serializationContributionPx'] as const) {
+    const value = record[key] as number;
+    if (value < 0 || value > budget) return false;
+  }
   const observed = record['browserObservedMaximumPx'];
   if (observed !== undefined
     && (typeof observed !== 'number' || !Number.isFinite(observed)
-      || observed < 0 || observed > (record['authoringBudgetPx'] as number))) {
+      || observed < 0 || observed > budget)) {
     return false;
   }
-  return (record['certifiedBoundPx'] as number) <= (record['authoringBudgetPx'] as number);
+  return true;
 }
 
 /** VIRTUALIZATION: fixture обязан покрывать 100/10 000/1 000 000 логических

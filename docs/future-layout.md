@@ -114,7 +114,9 @@ Same-document View Transitions — предпочтительный host, но c
   old/new`; весь CSS (UA-disable + 5 effects-анимаций) инжектится в один
   временный stylesheet и снимается ровно один раз в terminal cleanup; style
   element после завершения не остаётся;
-- CSP-safe: только `textContent`, без `eval`/`Function`;
+- без динамического кода: инжект только через `textContent` (нет
+  `eval`/`Function`); генерируемый `<style>` подчиняется `style-src` — строгий
+  CSP без `'unsafe-inline'`/nonce может заблокировать stylesheet;
 - host-сбой не оставляет partial owner — транзакция терминализируется.
 
 Representation: сопряжённая геометрия `G·F·R = 1` живёт в самом pseudo-tree —

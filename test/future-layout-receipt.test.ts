@@ -68,6 +68,25 @@ describe('proof receipt: версия, validator, fail-closed', () => {
     const forged = { ...(buildReceipt({ fixture: 'v1-width-240-360', spring }) as object), browserObservedMaximumPx: -1 };
     expect(validateReceipt(forged)).toBe(false);
   });
+
+  it('подделанные precision-метрики отвергаются validator fail-closed', () => {
+    const buildReceipt = pick('buildSurfaceReceipt');
+    const validateReceipt = pick('validateSurfaceReceipt');
+    const valid = buildReceipt({ fixture: 'v1-width-240-360', spring: { mass: 1, stiffness: 170, damping: 26 } });
+    expect(validateReceipt(valid)).toBe(true);
+    // Certified bound вне бюджета, неконечные метрики и дорисованный ключ —
+    // все формы подделки отвергаются.
+    const variants: Record<string, unknown>[] = [
+      { certifiedBoundPx: 10 },
+      { certifiedBoundPx: Number.NaN },
+      { denseMaximumPx: Number.POSITIVE_INFINITY },
+      { denseMaximumPx: -0.1 },
+      { forgedMetricPx: 0 },
+    ];
+    for (const patch of variants) {
+      expect(validateReceipt({ ...(valid as object), ...patch }), JSON.stringify(patch)).toBe(false);
+    }
+  });
 });
 
 describe('meta-tests: доказательства ломаются при ослаблении', () => {
