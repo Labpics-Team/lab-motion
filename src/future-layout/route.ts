@@ -138,9 +138,9 @@ function documentPseudoModelReader(doc: DocumentLike): (name: string) => Surface
   };
 }
 
-function requireSurfaceWidth(value: unknown, code: 'LM167'): number {
+function requireSurfaceWidth(value: unknown): number {
   if (typeof value !== 'number' || !Number.isFinite(value) || value <= 0) {
-    throw new MotionParamError(code);
+    throw new MotionParamError('LM167');
   }
   return value;
 }
@@ -172,8 +172,8 @@ export function tryRouteSurfaceTransition(
 
   // Валидация ДО побочных эффектов: невалидные концы/пружина бросают ошибки
   // фасада, не назначая view-transition-name и не создавая generation.
-  const fromWidth = requireSurfaceWidth(rawFrom, 'LM167');
-  const toWidth = requireSurfaceWidth(rawTo, 'LM167');
+  const fromWidth = requireSurfaceWidth(rawFrom);
+  const toWidth = requireSurfaceWidth(rawTo);
   const springInput = options.spring;
   const spring = (springInput === undefined ? DEFAULT_SPRING : springInput) as SpringParams;
   if (springInput !== undefined) validateSpringParams(spring);
