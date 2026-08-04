@@ -44,6 +44,7 @@ import {
   type SpringExecutionArtifactTuple,
 } from '../compositor/curve.js';
 import { MotionParamError } from '../errors.js';
+import { tryRouteSurfaceTransition } from '../future-layout/route.js';
 import {
   DEFAULT_DURATION_MS,
   DEFAULT_SPRING,
@@ -324,6 +325,15 @@ export function animate(
   props: AnimateProps,
   options: AnimateOptions = {},
 ): AnimateControls {
+  // Future Layout (явный layout:'project'): консервативный маршрутизатор —
+  // сомнение оставляет обычный runtime path без подмены семантики.
+  const surfaceRoute = tryRouteSurfaceTransition(
+    target,
+    props as unknown as Record<string, unknown>,
+    options as unknown as Record<string, unknown>,
+  );
+  if (surfaceRoute !== undefined) return surfaceRoute;
+
   // 1. Options — первая граница: остальные входы могут быть hostile getters.
   options = requireAnimateOptions(options);
   // Остальная валидация — вся ДО побочных эффектов (ноль записей при броске).

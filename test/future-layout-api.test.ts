@@ -50,7 +50,7 @@ describe('animate({ width: [240, 360] }, { layout: "project" }) — Future Layou
   });
 
   it('RED п.1: после committed конечный DOM уже 360px, snapshots ещё активны', async () => {
-    const target = fakeEl({ width: '240px' });
+    const target = fakeEl({ width: '240px' }, true);
     const clock = makeClock();
     const controls = animate(
       target.el,
@@ -64,7 +64,7 @@ describe('animate({ width: [240, 360] }, { layout: "project" }) — Future Layou
   });
 
   it('RED п.1: active phase не пишет width — только постоянное число transform/opacity effects', async () => {
-    const target = fakeEl({ width: '240px' });
+    const target = fakeEl({ width: '240px' }, true);
     const clock = makeClock();
     const controls = animate(
       target.el,
@@ -83,7 +83,7 @@ describe('animate({ width: [240, 360] }, { layout: "project" }) — Future Layou
   });
 
   it('RED п.13: cancel() раскрывает committed DOM и НЕ откатывает commit', async () => {
-    const target = fakeEl({ width: '240px' });
+    const target = fakeEl({ width: '240px' }, true);
     const clock = makeClock();
     const controls = animate(
       target.el,

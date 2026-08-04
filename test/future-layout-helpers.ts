@@ -112,7 +112,6 @@ export function pickCreateSurfaceObserver(
 export interface SurfaceObserverLike {
   start(clock: StepClock): void;
   stop(): void;
-  readonly frames: SurfaceFrameViewLike[];
 }
 
 // ─── Duck-мир bounded virtualized viewport ────────────────────────────────────
