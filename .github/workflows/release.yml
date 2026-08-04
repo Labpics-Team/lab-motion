@@ -620,8 +620,18 @@ jobs:
               -f ref="refs/tags/$RELEASE_TAG" -f sha="$EXPECTED_SOURCE_SHA"; then
               echo "::warning::создание $RELEASE_TAG не подтверждено; проверяем итоговый ref"
             fi
-            EXISTING_REF=$(gh api "repos/$GITHUB_REPOSITORY/git/ref/tags/$RELEASE_TAG" \
-              --jq '[.object.type, .object.sha] | @tsv')
+            # refs API не гарантирует read-after-write: свежий ref может
+            # читаться как 404 с реплики (падение run 30892921662). Ограниченный
+            # retry сохраняет fail-closed: после исчерпания попыток шаг падает.
+            for _ in {1..5}; do
+              if EXISTING_REF=$(gh api "repos/$GITHUB_REPOSITORY/git/ref/tags/$RELEASE_TAG" \
+                --jq '[.object.type, .object.sha] | @tsv' 2>/dev/null); then
+                break
+              fi
+              sleep 0.5
+            done
+            [[ -n "$EXISTING_REF" ]] \
+              || { echo "::error::$RELEASE_TAG создан, но не читается после повторных попыток"; exit 1; }
           fi
 
           read -r OBJECT_TYPE OBJECT_SHA <<< "$EXISTING_REF"
