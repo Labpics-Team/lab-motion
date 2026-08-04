@@ -80,7 +80,18 @@ export const SUBPATH_GATE_BYTES = 4608;
 // Мёртвого веса в существующем графе нет (все модули — живые фичи фасада);
 // нижняя граница: новая оркестрация snapshot-транзакции не выразима через
 // существующие numeric-каналы, lazy-chunk и новые exports запрещены спекой.
-export const FULL_ANIMATE_GATE_BYTES = 13_950;
+// 2026-08-04 (второй шаг): 13 950 → 14 820 — тот же Future Layout V1 runtime,
+// завершение runtime-слоя: input policy (finish/cancel/block), scroll anchor
+// (preserve-start), coordinator ownership (generation begin/commit/finish/skip
+// в finalize) и same-document VT host (generated CSS инжект/снятие ровно один
+// раз, startViewTransition capability experiment, bounded имя на цели). Факт
+// consumer one-liner 14 744 B gz (shipped-замыкание ./animate 14 303 B gz);
+// люфт ~0.5% — тот же класс регрессионного рэтчета. Подъём в рамках делегации
+// Даниила («сначала максимум ужатия, затем минимальный подъём от факта»):
+// ужимать дальше нечего — каждый байт этого шага является законом спеки
+// (ACCESSIBILITY И INPUT, SCROLL ANCHOR, DOCUMENT-SCOPED COORDINATOR,
+// VIEW TRANSITION HOST), зафиксированным GREEN-тестами.
+export const FULL_ANIMATE_GATE_BYTES = 14_820;
 
 // Consumer-rebundle ядра после стабильных кодов ошибок и изоляции listener-
 // сбоев. Физический shipped-граф при этом уменьшился и по-прежнему ограничен
@@ -121,7 +132,11 @@ export const COMPOSITOR_CAPABILITY_GATE_BYTES = 6600;
 // ссылкой, и рост animate-файла за окно частично снимает дедуп), нулевой люфт
 // давал ложные регрессии на ±15 B шума минификатора. Анти-дублирующий класс
 // гейта сохранён: рост покупается только новым runtime, не перекладкой копий.
-export const ANIMATE_COMPOSITOR_MIXED_GATE_BYTES = 15_860;
+// 2026-08-04 (второй шаг): 15 860 → 16 770 — завершение runtime-слоя Future
+// Layout V1 (input policy, scroll anchor, coordinator ownership, VT host):
+// факт 16 683 B gz; люфт ~0.5% по той же причине хрупкости 32KB-окна gzip.
+// Подъём по делегации Даниила, см. FULL_ANIMATE_GATE_BYTES.
+export const ANIMATE_COMPOSITOR_MIXED_GATE_BYTES = 16_770;
 
 // Точечные (bespoke) пороги субпутей — жёстче общего SUBPATH_GATE_BYTES там, где
 // это осмысленно. ./utils — семь чистых скалярных примитивов + сегментный движок;

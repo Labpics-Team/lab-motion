@@ -11,9 +11,13 @@
 import { prefersReduced } from '../compositor/detect.js';
 import { DEFAULT_SPRING } from '../internal/motion-defaults.js';
 import type { SpringParams } from '../spring.js';
+import { createSurfaceCoordinator } from './coordinator.js';
 import {
   startSurfaceTransition,
   type SurfaceControls,
+  type SurfaceHostLike,
+  type SurfaceInputPolicy,
+  type SurfaceScrollAnchor,
   type SurfaceTargetLike,
 } from './transaction.js';
 
@@ -30,7 +34,18 @@ interface LooseOptions {
   readonly onFrame?: unknown;
   readonly matchMedia?: unknown;
   readonly requestFrame?: unknown;
+  readonly inputPolicy?: unknown;
+  readonly scrollAnchor?: unknown;
+  readonly commit?: unknown;
+  readonly getScroll?: unknown;
+  readonly scrollTo?: unknown;
+  readonly onInputIntent?: unknown;
 }
+
+// Один document — одна active generation: module-scoped координатор является
+// единственным владельцем supersede/terminal authority (спека «DOCUMENT-SCOPED
+// COORDINATOR»). Не второй registry: begin() сам вытесняет старую generation.
+const DOCUMENT_SURFACE_COORDINATOR = createSurfaceCoordinator();
 
 function defaultRequestFrame(cb: (ts?: number) => void): number {
   const raf = (globalThis as { requestAnimationFrame?: (cb: () => void) => number }).requestAnimationFrame;
@@ -38,6 +53,36 @@ function defaultRequestFrame(cb: (ts?: number) => void): number {
 }
 
 const NOOP = (): void => {};
+
+interface DocumentLike {
+  createElement(tag: 'style'): { textContent: string };
+  head: { appendChild(node: unknown): void; removeChild(node: unknown): void };
+  startViewTransition?(update: () => void | Promise<void>): unknown;
+}
+
+// DOM-реализация VT host: style element живёт ровно между inject и terminal
+// cleanup; CSS записывается через textContent (CSP без eval/Function).
+// startViewTransition прокидывается только при реальной capability.
+function documentSurfaceHost(doc: DocumentLike): SurfaceHostLike {
+  let style: { textContent: string } | undefined;
+  const host: SurfaceHostLike = {
+    injectCss(css: string): void {
+      if (style !== undefined) return;
+      style = doc.createElement('style');
+      style.textContent = css;
+      doc.head.appendChild(style);
+    },
+    removeCss(): void {
+      if (style === undefined) return;
+      doc.head.removeChild(style);
+      style = undefined;
+    },
+  };
+  if (typeof doc.startViewTransition === 'function') {
+    host.startViewTransition = (update) => doc.startViewTransition!(update);
+  }
+  return host;
+}
 
 export function tryRouteSurfaceTransition(
   target: unknown,
@@ -72,13 +117,44 @@ export function tryRouteSurfaceTransition(
   const onFrame = typeof options.onFrame === 'function'
     ? options.onFrame as SurfaceRouteOnFrame
     : undefined;
+  const inputPolicy = options.inputPolicy === 'cancel' || options.inputPolicy === 'block'
+    ? options.inputPolicy as SurfaceInputPolicy
+    : 'finish';
+  const scrollAnchor: SurfaceScrollAnchor = options.scrollAnchor === 'none' ? 'none' : 'preserve-start';
+  const commit = typeof options.commit === 'function'
+    ? options.commit as () => void | Promise<void>
+    : undefined;
+  const getScroll = typeof options.getScroll === 'function'
+    ? options.getScroll as () => number
+    : undefined;
+  const scrollTo = typeof options.scrollTo === 'function'
+    ? options.scrollTo as (position: number) => void
+    : undefined;
+  const onInputIntent = typeof options.onInputIntent === 'function'
+    ? options.onInputIntent as (handler: () => void) => () => void
+    : undefined;
+
+  // Один document — одна active generation; уникальное bounded имя из
+  // монотонной последовательности назначается цели inline (снимается в
+  // terminal cleanup транзакции), host — DOM-backed capability experiment.
+  const generation = DOCUMENT_SURFACE_COORDINATOR.begin({ target: el, fromWidth, toWidth });
+  el.style.setProperty('view-transition-name', generation.viewTransitionName);
+  const doc = (globalThis as { document?: DocumentLike }).document;
+  const host = doc !== undefined ? documentSurfaceHost(doc) : undefined;
 
   const controls = startSurfaceTransition(
     el,
     fromWidth,
     toWidth,
-    { spring, onFrame, reducedMotion: reduced },
-    { requestFrame },
+    { spring, onFrame, reducedMotion: reduced, inputPolicy, scrollAnchor, commit },
+    {
+      requestFrame,
+      getScroll,
+      scrollTo,
+      onInputIntent,
+      generation,
+      host,
+    },
   );
   return {
     committed: controls.committed,

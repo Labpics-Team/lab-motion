@@ -41,7 +41,10 @@ export {
 export {
   startSurfaceTransition,
   type SurfaceControls,
+  type SurfaceHostLike,
+  type SurfaceInputPolicy,
   type SurfaceRunOptions,
+  type SurfaceScrollAnchor,
   type SurfaceSeams,
   type SurfaceState,
   type SurfaceTargetLike,
