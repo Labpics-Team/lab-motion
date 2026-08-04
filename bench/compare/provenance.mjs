@@ -185,7 +185,11 @@ export function readCheckoutState(root) {
 }
 
 function installedPnpmVersion() {
-  return execFileSync('pnpm', ['--version'], { encoding: 'utf8' }).trim();
+  // На win32 pnpm — .CMD-shim: execFileSync без shell не резолвит его (ENOENT).
+  return execFileSync('pnpm', ['--version'], {
+    encoding: 'utf8',
+    shell: process.platform === 'win32',
+  }).trim();
 }
 
 const EXACT_PACKAGE_VERSION = /^\d+\.\d+\.\d+(?:[-+].+)?$/;
@@ -297,6 +301,7 @@ export function buildCurrentCheckout(root) {
     execFileSync('pnpm', ['--dir', root, 'run', 'build'], {
       cwd: root,
       stdio: 'inherit',
+      shell: process.platform === 'win32',
     });
   } catch (error) {
     throw new Error(

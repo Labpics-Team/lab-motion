@@ -36,9 +36,13 @@ const ALIAS = {
 
 /** dist-модуль (не entry, не bare peer) в графе — нормализованный к dist-relative id. */
 function distModules(chunk) {
+  // Vite сообщает id с '/', а resolve() на Windows даёт '\': без нормализации
+  // startsWith никогда не совпадёт и граф dist-модулей будет ложно пустым.
+  const distSlash = DIST.replaceAll('\\', '/');
   return Object.keys(chunk.modules)
-    .filter((id) => id.startsWith(DIST))
-    .map((id) => id.slice(DIST.length + 1).replaceAll('\\', '/'));
+    .map((id) => id.replaceAll('\\', '/'))
+    .filter((id) => id.startsWith(distSlash))
+    .map((id) => id.slice(distSlash.length + 1));
 }
 
 // Плагин грузится динамически в run() ПОСЛЕ проверки существования dist:
