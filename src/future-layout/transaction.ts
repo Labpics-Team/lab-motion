@@ -148,6 +148,10 @@ export function startSurfaceTransition(
       if (generation.published) generation.finish();
       else generation.skip();
     }
+    // Терминальный путь не оставляет висящих awaiter'ов: на happy path оба
+    // уже зарезолвлены, на failed/canceled это no-op-страховка контракта.
+    ready.resolve();
+    committed.resolve();
     finished.resolve();
   };
 
@@ -249,18 +253,19 @@ export function startSurfaceTransition(
   });
 
   function startEffects(el: SurfaceTargetLike, artifact: SurfaceExecutionArtifact): void {
-    const animateFn = el.animate!;
+    // Вызов МЕТОДОМ на элементе: оторванная ссылка animate бросает
+    // Illegal invocation в реальных движках.
     const timing = { duration: artifact.durationMs, fill: 'both', delay: 0 };
     const one = 'scaleX(1)';
     const shrink = `scaleX(${artifact.fromWidth / artifact.toWidth})`;
     const grow = `scaleX(${artifact.toWidth / artifact.fromWidth})`;
     // Постоянное число effects (5), независимо от числа логических строк:
     // outer boundary scale, old/new reciprocal scale, old/new opacity.
-    effects.push(animateFn({ transform: [shrink, one] }, { ...timing, easing: artifact.easing }));
-    effects.push(animateFn({ transform: [one, shrink] }, { ...timing, easing: artifact.reciprocalEasing }));
-    effects.push(animateFn({ transform: [grow, one] }, { ...timing, easing: artifact.reciprocalEasing }));
-    effects.push(animateFn({ opacity: [1, 0] }, { ...timing, easing: artifact.blendEasing }));
-    effects.push(animateFn({ opacity: [0, 1] }, { ...timing, easing: artifact.blendEasing }));
+    effects.push(el.animate!({ transform: [shrink, one] }, { ...timing, easing: artifact.easing }));
+    effects.push(el.animate!({ transform: [one, shrink] }, { ...timing, easing: artifact.reciprocalEasing }));
+    effects.push(el.animate!({ transform: [grow, one] }, { ...timing, easing: artifact.reciprocalEasing }));
+    effects.push(el.animate!({ opacity: [1, 0] }, { ...timing, easing: artifact.blendEasing }));
+    effects.push(el.animate!({ opacity: [0, 1] }, { ...timing, easing: artifact.blendEasing }));
   }
 
   function runActivePhase(artifact: SurfaceExecutionArtifact, done: () => void): void {

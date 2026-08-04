@@ -48,8 +48,18 @@ interface LooseOptions {
 const DOCUMENT_SURFACE_COORDINATOR = createSurfaceCoordinator();
 
 function defaultRequestFrame(cb: (ts?: number) => void): number {
-  const raf = (globalThis as { requestAnimationFrame?: (cb: () => void) => number }).requestAnimationFrame;
-  return raf !== undefined ? raf(cb) : (setTimeout(cb, 16) as unknown as number);
+  const g = globalThis as { requestAnimationFrame?: (cb: (ts: number) => void) => number };
+  // Timestamp обязан пробрасываться: clock транзакции/observer'а сравнивает
+  // доставленные ts с t0 — без него finished не резолвится в реальном браузере.
+  // Вызов МЕТОДОМ на globalThis: оторванная ссылка бросает Illegal invocation.
+  return typeof g.requestAnimationFrame === 'function'
+    ? g.requestAnimationFrame((ts) => cb(ts))
+    : (setTimeout(() => cb(performanceNow()), 16) as unknown as number);
+}
+
+function performanceNow(): number {
+  const perf = (globalThis as { performance?: { now(): number } }).performance;
+  return perf !== undefined ? perf.now() : 0;
 }
 
 const NOOP = (): void => {};
@@ -79,7 +89,8 @@ function documentSurfaceHost(doc: DocumentLike): SurfaceHostLike {
     },
   };
   if (typeof doc.startViewTransition === 'function') {
-    host.startViewTransition = (update) => doc.startViewTransition!(update);
+    // Bind обязателен: оторванный метод document бросает Illegal invocation.
+    host.startViewTransition = (update) => doc.startViewTransition!.call(doc, update);
   }
   return host;
 }
@@ -149,6 +160,7 @@ export function tryRouteSurfaceTransition(
     { spring, onFrame, reducedMotion: reduced, inputPolicy, scrollAnchor, commit },
     {
       requestFrame,
+      now: performanceNow(),
       getScroll,
       scrollTo,
       onInputIntent,
