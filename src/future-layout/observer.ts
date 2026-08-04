@@ -42,6 +42,7 @@ export function createSurfaceObserver(
 ): SurfaceObserver {
   let stopped = false;
   let started = false;
+  let anchored = false;
   let t0 = 0;
   let prevWidth = artifact.fromWidth;
   // Единственные аллокации observer'а — scratch сэмпла и borrowed view.
@@ -56,6 +57,13 @@ export function createSurfaceObserver(
 
   const deliver = (ts: number, clock: SurfaceObserverClock): void => {
     if (stopped) return;
+    // Origin — первый ДОСТАВЛЕННЫЙ timestamp, не snapshot route-времени:
+    // effects стартуют после commit/VT-ready/barrier, и якорь на pre-commit
+    // мгновение сдвигал бы elapsed-math на латентность commit'а.
+    if (!anchored) {
+      anchored = true;
+      t0 = ts;
+    }
     const time = ts - t0;
     sampleSerializedSpringIntoUnchecked(artifact.samples, artifact.durationMs, time, 0, scratch);
     const range = artifact.toWidth - artifact.fromWidth;
@@ -82,7 +90,6 @@ export function createSurfaceObserver(
     start(clock: SurfaceObserverClock): void {
       if (started || stopped) return;
       started = true;
-      t0 = clock.now ?? 0;
       clock.requestFrame((ts) => deliver(ts ?? 0, clock));
     },
     stop(): void {

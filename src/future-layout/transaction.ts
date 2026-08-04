@@ -206,9 +206,11 @@ export function startSurfaceTransition(
     // Terminal cleanup: временный stylesheet снимается ровно один раз
     // (спека «VIEW TRANSITION HOST»); skipTransition немедленно раскрывает
     // committed DOM, снимая snapshot-плоскости (cancel/supersede/finish).
+    // Host-facing шаги изолированы: оторванный style element (re-render
+    // фреймворка) не должен срывать generation release и резолвы обещаний.
     if (cssInjected) {
       cssInjected = false;
-      seams.host?.removeCss?.();
+      try { seams.host?.removeCss?.(); } catch { /* host уже отсоединён */ }
     }
     if (vt !== undefined) {
       try { vt.skipTransition?.(); } catch { /* transition уже завершён */ }
@@ -217,7 +219,7 @@ export function startSurfaceTransition(
     // Имя снимается только если цель всё ещё носит НАШЕ имя: при supersede
     // на той же цели новая generation уже назначила собственное имя.
     if (target.style.getPropertyValue('view-transition-name') === generation?.viewTransitionName) {
-      target.style.removeProperty?.('view-transition-name');
+      try { target.style.removeProperty?.('view-transition-name'); } catch { /* цель уничтожена */ }
     }
     // Terminal authority coordinator'а: опубликованная generation — finish,
     // неопубликованная (snap/skip) — skip; cleanup ровно один раз.

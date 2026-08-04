@@ -78,6 +78,21 @@ describe('observer clock: один callback на доставленный main-t
     expect(seen[1].width).toBeGreaterThan(seen[0].width);
   });
 
+  it('origin времени — первый ДОСТАВЛЕННЫЙ timestamp, не snapshot clock.now', () => {
+    const plan = planSurface(SPRING, 240, 360);
+    // Часы уже «идут» (offset 1000 ms): snapshot route-времени вклинил бы
+    // латентность в elapsed-math; якорь на доставленный кадр её убирает.
+    const clock = makeClock(1000);
+    const seen: SurfaceFrameViewLike[] = [];
+    const observer = createSurfaceObserver(plan.artifact, (f) => seen.push({ ...f }));
+    observer.start(clock);
+    clock.step(16);
+    clock.step(16);
+    observer.stop();
+    expect(seen[0].time).toBe(0);
+    expect(seen[1].time).toBe(16);
+  });
+
   it('observer — единственный источник rAF: без него ноль запросов, с ним ровно один на кадр', () => {
     const plan = planSurface(SPRING, 240, 360);
     const clock = makeClock();

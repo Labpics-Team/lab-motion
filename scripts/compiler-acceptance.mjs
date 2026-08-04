@@ -89,6 +89,7 @@ export function play(el) { return animate(el, { width: [240, 360] }, { layout: '
 const SPRING_MATH = /Math\.(?:exp|cos|sin|sqrt)/;
 const RUNTIME_MODULE = 'compiler/runtime/index.js';
 const NANO_MODULE = 'nano/index.js';
+const ANIMATE_MODULE = 'animate/index.js';
 
 const failures = [];
 const notes = [];
@@ -163,6 +164,13 @@ async function run() {
     // ── Surface erasure: layout:'project' V1 не понижается (conservative) ────
     const surfaceBaseline = await buildFixture('surface-uncompiled', SURFACE, false, 'surface');
     const surfaceCompiled = await buildFixture('surface-compiled', SURFACE, true, 'surface');
+    // Контроль fixture'а: surface-вызов ДЕЙСТВИТЕЛЬНО тянет полный фасад из
+    // dist. Без него все ассерты ниже вакуумно проходят на пустом графе
+    // (нерезолвленный alias или externalized фасад).
+    check(
+      surfaceBaseline.modules.includes(ANIMATE_MODULE),
+      `surface-fixture не тянет ${ANIMATE_MODULE} (alias не разрешился, ассерты вакуумны): ${surfaceBaseline.modules.join(', ')}`,
+    );
     check(
       surfaceCompiled.code === surfaceBaseline.code,
       'surface-вызов изменился под плагином: V1 обязан оставлять корректный runtime path',

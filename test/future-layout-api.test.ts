@@ -17,6 +17,7 @@
 
 import { describe, expect, it } from 'vitest';
 import * as animateMod from '../src/animate/index.js';
+import { MotionParamError } from '../src/errors.js';
 import { fakeEl, makeClock, pickAnimate } from './animate-facade-helpers.js';
 import { makeSurfaceEnv, type FutureLayoutControlsLike } from './future-layout-helpers.js';
 
@@ -122,5 +123,56 @@ describe('animate({ width: [240, 360] }, { layout: "project" }) — Future Layou
     expect(env.host.skips).toBe(1);
     expect(env.host.removals).toBe(1);
     await controls.finished;
+  });
+});
+
+describe('маршрутизатор: hardening (adversarial review)', () => {
+  it('reduced-motion без явного шва: fallback на globalThis.matchMedia → snap', async () => {
+    const target = fakeEl({ width: '240px' }, true);
+    const clock = makeClock();
+    const env = makeSurfaceEnv();
+    const g = globalThis as { matchMedia?: unknown };
+    const saved = g.matchMedia;
+    g.matchMedia = (): { matches: boolean } => ({ matches: true });
+    try {
+      const controls = animate(
+        target.el,
+        { width: [240, 360] },
+        projectOptions(clock, env),
+      ) as unknown as FutureLayoutControlsLike;
+      await controls.finished;
+      expect(controls.tier).toBe('future-layout-snap');
+      expect(target.el.style.getPropertyValue('width')).toBe('360px');
+    } finally {
+      g.matchMedia = saved;
+    }
+  });
+
+  it('синхронный бросок setup (hostile getScroll): имя снято, ошибка проброшена', () => {
+    const target = fakeEl({ width: '240px' });
+    const clock = makeClock();
+    const env = makeSurfaceEnv();
+    expect(() => animate(
+      target.el,
+      { width: [240, 360] },
+      {
+        ...projectOptions(clock, env),
+        getScroll: (): number => {
+          throw new Error('hostile scroll');
+        },
+      },
+    )).toThrow('hostile scroll');
+    // Cleanup ДО rethrow: временное view-transition-name не остаётся.
+    expect(target.el.style.getPropertyValue('view-transition-name')).toBe('');
+  });
+
+  it('null-цель: типизированная ошибка фасада, не raw TypeError маршрутизатора', () => {
+    const clock = makeClock();
+    const env = makeSurfaceEnv();
+    expect(() => animate(
+      null as never,
+      { width: [240, 360] },
+      projectOptions(clock, env),
+    )).toThrow(MotionParamError);
   });
 });

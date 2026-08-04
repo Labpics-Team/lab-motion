@@ -166,6 +166,7 @@ export function tryRouteSurfaceTransition(
 
   // V1 slice: одна bounded-цель; селектор/список — обычный runtime path.
   if (typeof target === 'string') return undefined;
+  if (target === null || target === undefined) return undefined;
   const el = target as SurfaceTargetLike & { length?: unknown };
   if (el.length !== undefined && typeof el.style !== 'object') return undefined;
   if (el.style === undefined || typeof el.style.setProperty !== 'function') return undefined;
@@ -178,7 +179,10 @@ export function tryRouteSurfaceTransition(
   const spring = (springInput === undefined ? DEFAULT_SPRING : springInput) as SpringParams;
   if (springInput !== undefined) validateSpringParams(spring);
 
-  const reduced = prefersReduced(options.matchMedia as never);
+  // Фолбэк среды как в обычном runtime path: без него reduced-motion
+  // пользователь без явного шва получал бы движение вместо snap.
+  const reduced = prefersReduced((options.matchMedia ??
+    (globalThis as { matchMedia?: unknown }).matchMedia) as never);
   const requestFrame = typeof options.requestFrame === 'function'
     ? options.requestFrame as (cb: (ts?: number) => void) => number
     : defaultRequestFrame;
@@ -202,7 +206,11 @@ export function tryRouteSurfaceTransition(
     ? options.onInputIntent as (handler: () => void) => () => void
     : undefined;
 
-  const doc = (globalThis as { document?: DocumentLike }).document;
+  // Host и pseudo-модель резолвятся из документа ЦЕЛИ (iframe/вторичный
+  // document): global document — только fallback, иначе generated CSS попал
+  // бы не в тот head, а startViewTransition шёл на чужом документе.
+  const ownerDoc = (el as { ownerDocument?: DocumentLike | null }).ownerDocument;
+  const doc = ownerDoc ?? (globalThis as { document?: DocumentLike }).document;
   const host = options.host !== undefined
     ? options.host as SurfaceHostLike
     : doc !== undefined ? documentSurfaceHost(doc) : undefined;
@@ -219,23 +227,32 @@ export function tryRouteSurfaceTransition(
   const generation = DOCUMENT_SURFACE_COORDINATOR.begin({ target: el, fromWidth, toWidth });
   el.style.setProperty('view-transition-name', generation.viewTransitionName);
 
-  const controls = startSurfaceTransition(
-    el,
-    fromWidth,
-    toWidth,
-    { spring, onFrame, reducedMotion: reduced, inputPolicy, scrollAnchor, commit },
-    {
-      requestFrame,
-      now: performanceNow(),
-      getScroll,
-      scrollTo,
-      onInputIntent,
-      generation,
-      host,
-      readPseudoModel,
-      commitBarrier,
-    },
-  );
+  // Синхронный бросок setup (hostile getScroll/capture) не оставляет
+  // активного generation и чужого inline-имени: cleanup ДО rethrow.
+  let controls: SurfaceControls;
+  try {
+    controls = startSurfaceTransition(
+      el,
+      fromWidth,
+      toWidth,
+      { spring, onFrame, reducedMotion: reduced, inputPolicy, scrollAnchor, commit },
+      {
+        requestFrame,
+        now: performanceNow(),
+        getScroll,
+        scrollTo,
+        onInputIntent,
+        generation,
+        host,
+        readPseudoModel,
+        commitBarrier,
+      },
+    );
+  } catch (error) {
+    try { el.style.removeProperty?.('view-transition-name'); } catch { /* цель уничтожена */ }
+    generation.skip();
+    throw error;
+  }
   return {
     committed: controls.committed,
     ready: controls.ready,

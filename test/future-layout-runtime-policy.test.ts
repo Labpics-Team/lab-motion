@@ -236,6 +236,33 @@ describe('view transition host', () => {
     expect(host.removals).toBe(1);
   });
 
+  it('host-бросок в removeCss не срывает generation release и резолвы', async () => {
+    const fake = fakeEl({ width: '240px' }, true);
+    const clock = makeClock();
+    const coordinator = createSurfaceCoordinator();
+    const generation = coordinator.begin({ target: fake.el, fromWidth: 240, toWidth: 360 });
+    const inner = makeSurfaceHost();
+    const host = {
+      ...inner,
+      removeCss(): void {
+        inner.removeCss();
+        // Style element оторван re-render'ом фреймворка: DOM remove бросает.
+        throw new Error('style detached');
+      },
+    };
+    const controls = begin(fake, clock, {
+      seams: { generation, host, readPseudoModel: makePseudoModelReader() },
+    });
+    await controls.ready;
+    expect(controls.tier).toBe('future-layout-native');
+    inner.complete();
+    await controls.finished;
+    // Бросок изолирован: generation освобождён, состояние терминальное.
+    expect(generation.released).toBe(true);
+    expect(controls.state).toBe('released');
+    expect(coordinator.activeGeneration).toBe(0);
+  });
+
   it('terminal cleanup снимает view-transition-name, если цель ещё носит наше имя', async () => {
     const fake = fakeEl({ width: '240px' }, true);
     const clock = makeClock();
