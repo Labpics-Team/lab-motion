@@ -50,3 +50,14 @@ export {
   type SurfaceTargetLike,
   type SurfaceTier,
 } from './transaction.js';
+
+export {
+  buildSurfaceReceipt,
+  freezeProofManifest,
+  surfaceFixtureManifest,
+  surfaceSizeAccounting,
+  validateSurfaceReceipt,
+  SURFACE_RECEIPT_SCHEMA,
+  type SurfaceReceipt,
+  type SurfaceReceiptInput,
+} from './receipt.js';
