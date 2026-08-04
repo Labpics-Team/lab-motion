@@ -1,4 +1,3 @@
-#!/usr/bin/env node
 /**
  * naming-inventory — фактический нейминг-инвентарь lab-motion.
  *
