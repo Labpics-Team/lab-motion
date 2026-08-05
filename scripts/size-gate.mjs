@@ -102,7 +102,14 @@ export const SUBPATH_GATE_BYTES = 4608;
 // все доступные шейвы (компактный reader, одно vtName, hostCss-цикл). Подъём
 // по делегации Даниила («сначала максимум ужатия, затем минимальный подъём
 // от факта»); факт 15 453 B gz, люфт ~0.5% — тот же класс рэтчета.
-export const FULL_ANIMATE_GATE_BYTES = 15_530;
+// 2026-08-05 (четвёртый шаг): 15 530 → 15 600 — контрактные уточнения
+// surface-контролов (adversarial-критика п.4/п.5): coordinator стал
+// per-document (WeakMap<DocumentLike, Coordinator> + documentless-fallback —
+// документы не вытесняют друг друга), play/pause/seek поверхности бросают
+// типизированную LM168 вместо молчаливого no-op (+stop=cancel). Ужимать до
+// подъёма нечего: каждый байт — закон контракта (изоляция документов,
+// типизированная ошибка). Факт 15 552 B gz; люфт ~0.3% — тот же класс.
+export const FULL_ANIMATE_GATE_BYTES = 15_600;
 
 // Consumer-rebundle ядра после стабильных кодов ошибок и изоляции listener-
 // сбоев. Физический shipped-граф при этом уменьшился и по-прежнему ограничен
@@ -167,7 +174,14 @@ export const BESPOKE_SUBPATH_GATES = {
   // 5261 gz → порог 5470 (~4% люфт, «порог ОТ ФАКТА»); в тот же день
   // adversarial-ревью добавило сортировку правок, байтовую верификацию
   // тривиа-зон и полный line-collapse sourcemap → факт 5355 gz (в пороге).
-  './compiler/vite': 5470,
+  // 2026-08-05: 5470 → 9150 — surface-lowering: lowering layout:'project'
+  // сертифицирует артефакт НА СБОРКЕ тем же SSOT-механизмом (spring-исполнение
+  // → reciprocal-доказательство ≤0.25 px → позитивность), поэтому entry тянет
+  // future-layout/artifact + solver. Дублировать сертификацию нельзя —
+  // расхождение build/runtime артефактов запрещено спекой. Браузерная поставка
+  // не изменилась (./compiler/runtime 341, ./surface 1016). Факт 9125 gz;
+  // люфт ~0.3% — тот же рэтчет-класс.
+  './compiler/vite': 9150,
   // Единственный БРАУЗЕРНЫЙ compiler-артефакт: private executor compiled-nano
   // вызовов. Exact-ратчет от факта (канон ./in-view, люфт нулевой): новая
   // capability не прячется под общим потолком 4608 — рост только решением.
@@ -247,6 +261,12 @@ export const BESPOKE_SUBPATH_GATES = {
   // To-only individual properties + spring->linear() + native Animation controls.
   // Отдельный hard gate не разрешает новому entry спрятаться под общим 4608 B.
   './nano': NANO_GATE_BYTES,
+  // Приватный executor compiled surface-вызовов (build-tool деталь, цель
+  // lowering'а layout:'project'). 1024 B — продуктовая граница спеки
+  // («surface observer ≤1 KB») для КОДА без артефактных данных; люфт нулевой
+  // (канон ./compiler/runtime): факт 2026-08-05 ровно 1024 B gz после
+  // исчерпывающего ужатия (2743 → 2187 → 2003 total-бандл; код 1152 → 1024).
+  './surface': 1024,
   // Native IntersectionObserver capability; exact first-implementation ratchet.
   './in-view': IN_VIEW_GATE_BYTES,
   // ./behaviors — headless state machines типовых мобильных взаимодействий
@@ -275,6 +295,14 @@ export const IMPORT_COST_SCENARIOS = [
     name: 'nano spring-to',
     code: `import { animate } from '%DIST%/../nano/index.js'; console.log(animate('.hero', { translate: '240px', opacity: 1 }).length);`,
     gate: NANO_GATE_BYTES,
+  },
+  {
+    // Единственный артефакт surface-lowering: executor обязан стоить ≤1 KB gz
+    // и не тянуть ничего (фасад/солвер стираются на сборке, здесь страж
+    // consumer-цены самого субпутя — аналог nano spring-to).
+    name: 'surface executor',
+    code: `import { runSurface } from '%DIST%/../surface/index.js'; console.log(typeof runSurface);`,
+    gate: 1024,
   },
   {
     // Реальный минимальный вызов capability обязан оставаться изолированным от

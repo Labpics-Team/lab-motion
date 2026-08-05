@@ -1,12 +1,16 @@
 /**
- * compile-artifacts.mjs — playwright globalSetup для 17-compiler-nano.spec.
+ * compile-artifacts.mjs — playwright globalSetup для 17-compiler-nano.spec и
+ * 19-surface-compiler.spec.
  *
- * Собирает ОДИН fixture `animate(el, { opacity: 0.5 })` реальным Vite дважды —
- * с плагином motionCompiler() (compiled) и без (uncompiled) — в самодостаточные
- * ESM-бандлы `browser/.artifacts/{compiled,uncompiled}.js`. Спека грузит оба по
- * http и сверяет opacity-траекторию в реальном движке: доказывает, что
- * precomputed-артефакт compiled-пути рендерится идентично рантаймовому nano на
- * chromium/firefox/webkit. Alias публичных субпутей → dist (байты потребителя).
+ * Собирает ДВА fixture реальным Vite, каждый дважды — с плагином
+ * motionCompiler() (compiled) и без (uncompiled) — в самодостаточные
+ * ESM-бандлы `browser/.artifacts/`:
+ *   • nano: `animate(el, { opacity: 0.5 })` — compiled/uncompiled;
+ *   • surface: `animate(el, { width: [240, 360] }, { layout: 'project' })`
+ *     и list-вариант — surface-compiled/surface-uncompiled.
+ * Спеки грузят бандлы по http и сверяют наблюдаемое в РЕАЛЬНОМ движке
+ * (chromium/firefox/webkit): precomputed-артефакт compiled-пути рендерится
+ * идентично рантаймовому. Alias публичных субпутей → dist (байты потребителя).
  */
 
 import { build } from 'vite';
@@ -22,13 +26,20 @@ const TMP = resolve(OUT, '.tmp');
 const ALIAS = {
   '@labpics/motion/nano': resolve(DIST, 'nano/index.js'),
   '@labpics/motion/compiler/runtime': resolve(DIST, 'compiler/runtime/index.js'),
+  '@labpics/motion/animate': resolve(DIST, 'animate/index.js'),
+  '@labpics/motion/surface': resolve(DIST, 'surface/index.js'),
 };
-const FIXTURE = `import { animate } from '@labpics/motion/nano';
+const NANO_FIXTURE = `import { animate } from '@labpics/motion/nano';
 export function play(el) { return animate(el, { opacity: 0.5 }); }`;
+// Оба вызова статичны → плагин обязан понизить каждый в executor-вызов с
+// литеральным артефактом (один hoisted-import на модуль).
+const SURFACE_FIXTURE = `import { animate } from '@labpics/motion/animate';
+export function play(el) { return animate(el, { width: [240, 360] }, { layout: 'project' }); }
+export function playList(list) { return animate(list, { width: [240, 360] }, { layout: 'project' }); }`;
 
-async function bundle(motionCompiler, withPlugin) {
+async function bundle(motionCompiler, source, withPlugin) {
   const entry = resolve(TMP, 'entry.js');
-  writeFileSync(entry, FIXTURE);
+  writeFileSync(entry, source);
   const result = await build({
     root: ROOT,
     logLevel: 'silent',
@@ -47,6 +58,12 @@ async function bundle(motionCompiler, withPlugin) {
   return chunk.code;
 }
 
+function assertSelfContained(code, label) {
+  if (/^\s*import\s/m.test(code)) {
+    throw new Error(`compile-artifacts: ${label} несёт bare-import — не самодостаточен`);
+  }
+}
+
 export default async function globalSetup() {
   if (!existsSync(DIST)) {
     throw new Error('compile-artifacts: dist отсутствует — сначала pnpm build');
@@ -56,18 +73,32 @@ export default async function globalSetup() {
   rmSync(OUT, { recursive: true, force: true });
   mkdirSync(TMP, { recursive: true });
   try {
-    const compiled = await bundle(motionCompiler, true);
-    const uncompiled = await bundle(motionCompiler, false);
+    const compiled = await bundle(motionCompiler, NANO_FIXTURE, true);
+    const uncompiled = await bundle(motionCompiler, NANO_FIXTURE, false);
+    const surfaceCompiled = await bundle(motionCompiler, SURFACE_FIXTURE, true);
+    const surfaceUncompiled = await bundle(motionCompiler, SURFACE_FIXTURE, false);
     // Санити globalSetup: бандлы самодостаточны (браузер грузит их как есть) и
     // несут ожидаемую форму — иначе спека упала бы позже с мутным import-сбоем.
-    if (/^\s*import\s/m.test(compiled) || /^\s*import\s/m.test(uncompiled)) {
-      throw new Error('compile-artifacts: бандл несёт bare-import — не самодостаточен');
-    }
+    assertSelfContained(compiled, 'nano compiled');
+    assertSelfContained(uncompiled, 'nano uncompiled');
+    assertSelfContained(surfaceCompiled, 'surface compiled');
+    assertSelfContained(surfaceUncompiled, 'surface uncompiled');
     if (!/linear\(/.test(compiled)) {
       throw new Error('compile-artifacts: compiled не содержит precomputed linear()-артефакт');
     }
+    // Surface lowering обязан был сработать: литеральный артефакт {w0:240,w1:360…}
+    // присутствует, а исходный runtime-вызов animate(...) с layout:'project'
+    // заменён executor-вызовом (иначе спека молча тестирует runtime path).
+    if (!/\bw0:\s*240,\s*w1:\s*360/.test(surfaceCompiled)) {
+      throw new Error('compile-artifacts: surface compiled не содержит литеральный артефакт — lowering не сработал');
+    }
+    if (!/layout:\s*"project"|layout:\s*'project'/.test(surfaceUncompiled)) {
+      throw new Error('compile-artifacts: surface uncompiled потерял layout-опцию');
+    }
     writeFileSync(resolve(OUT, 'compiled.js'), compiled);
     writeFileSync(resolve(OUT, 'uncompiled.js'), uncompiled);
+    writeFileSync(resolve(OUT, 'surface-compiled.js'), surfaceCompiled);
+    writeFileSync(resolve(OUT, 'surface-uncompiled.js'), surfaceUncompiled);
   } finally {
     rmSync(TMP, { recursive: true, force: true });
   }

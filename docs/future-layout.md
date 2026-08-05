@@ -171,12 +171,34 @@ Generated CSS host'а входит в consumer total size
 
 ## Compiler
 
-Conservative lowering `animate(..., { layout: 'project' })` в versioned
-`SurfaceProgram` (`surface/1`, deep-frozen IR): любое сомнение
-(динамические аргументы, не-width props, невалидный spring, непроецируемые
-опции) оставляет runtime path с явной причиной. Erasure: solver/parser не
-попадают в граф скомпилированного потребителя — приёмка
-`scripts/compiler-acceptance.mjs` (байт-идентичный вывод без плагина).
+Настоящий build-time lowering (Vite/Rollup плагин `motionCompiler()` из
+`@labpics/motion/compiler/vite`), а не заготовка IR:
+
+1. **Conservative analysis**: `animate(target, { width: [W0, W1] }, { layout:
+   'project', ... })` понижается в versioned `SurfaceProgram` (`surface/1`,
+   deep-frozen IR) только при полной статике; любое сомнение (динамические
+   аргументы, не-width props, невалидный spring, непроецируемые опции,
+   onFrame, shadowing, коллизия имени executor) оставляет runtime path с
+   явной причиной отказа.
+2. **Сертификация на сборке**: артефакт `{w0,w1,d,p,q}` считается тем же
+   SSOT-механизмом (`tryCompileSurfaceArtifact`: позитивность + reciprocal
+   бюджет ≤ 0.25 px). Несертифицируемая пружина (например, отрицательная
+   стартовая скорость) → отказ понижения, не тихий fallback.
+3. **Правка**: вызов заменяется вызовом приватного executor'а с литеральным
+   артефактом (`runSurface as __labMotionSurface` из
+   `@labpics/motion/surface`, один hoisted-import на модуль); target остаётся
+   байт-в-байт и вычисляется ровно один раз; sourcemap v3 покрывает каждую
+   правку, включая схлопывание многострочных вызовов.
+4. **Executor ≤ 1 KB**: приватный runtime поверхности — жёсткий гейт кода
+   1024 B gz (факт 1016), отдельный от total-решётки; browser-поставка
+   `./compiler/runtime` и nano не изменились.
+5. **Erasure**: solver/parser/full facade не попадают в граф скомпилированного
+   потребителя — приёмка `scripts/compiler-acceptance.mjs` (surface fixture
+   16 929 → 2 003 B gz, −88 %, в графе только `surface/index.js`).
+6. **Движки**: рендер-эквивалентность compiled/runtime проверяется на
+   chromium/firefox/webkit — `browser/19-surface-compiler.spec.ts` (финал
+   360 px на обоих путях, lifecycle стилей псевдодерева, WAAPI list-путь с
+   артефактным easing, reduced-motion snap).
 
 ## Точные ограничения (не обещаем)
 

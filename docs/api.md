@@ -7,7 +7,7 @@
 > [NAMING.md](NAMING.md).
 
 Импорт — `@labpics/motion` (ядро) или `@labpics/motion/<субпуть>`.
-Корневой экспорт + 40 субпутей; неиспользуемые субпути вырезаются
+Корневой экспорт + 41 субпуть; неиспользуемые субпути вырезаются
 tree-shaking'ом: `sideEffects` — точный allowlist из двух авто-регистрирующих
 входов (`./lit`, `./wc`).
 
@@ -122,8 +122,9 @@ await moves.finished;
 
 | Импорт | Что даёт |
 |---|---|
-| `…/compiler/vite` | `motionCompiler()` — Vite/Rollup-плагин build-time lowering статических вызовов `./nano`. Подробно — [compiler.md](compiler.md) |
-| `…/compiler/runtime` | Исполнитель compiled-вызовов; импорт вставляет плагин, вручную не используется |
+| `…/compiler/vite` | `motionCompiler()` — Vite/Rollup-плагин build-time lowering статических вызовов `./nano` и `animate(..., { layout: 'project' })` (сертификация артефакта на сборке). Подробно — [compiler.md](compiler.md), [future-layout.md](future-layout.md) |
+| `…/compiler/runtime` | Исполнитель compiled-вызовов nano; импорт вставляет плагин, вручную не используется |
+| `…/surface` | Приватный executor compiled-поверхностей (≤1 KB gz); импорт вставляет плагин, вручную не используется |
 
 ## Биндинги
 
