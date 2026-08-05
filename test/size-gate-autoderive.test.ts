@@ -251,9 +251,9 @@ describe('size-gate: auto-derive subpath entries from package.json exports', () 
 
   it('full animate имеет один SSOT-потолок для shipped subpath и consumer import-cost', () => {
     const full = IMPORT_COST_SCENARIOS.find((scenario) => scenario.name.startsWith('animate-one-liner'));
-    // 15 530: сертифицированное pseudo-tree представление (adversarial BLOCKER;
-    // факт 15 453; хронология в size-gate.mjs).
-    expect(FULL_ANIMATE_GATE_BYTES).toBe(15_530);
+    // 15 600: per-document WeakMap-координатор + типизированные ошибки LM168
+    // (факт 15 552; хронология в size-gate.mjs).
+    expect(FULL_ANIMATE_GATE_BYTES).toBe(15_600);
     expect(BESPOKE_SUBPATH_GATES['./animate']).toBe(FULL_ANIMATE_GATE_BYTES);
     expect(full?.gate).toBe(FULL_ANIMATE_GATE_BYTES);
   });

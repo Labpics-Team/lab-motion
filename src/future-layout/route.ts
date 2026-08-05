@@ -15,7 +15,7 @@ import { validateSpringParams } from '../spring.js';
 import { MotionParamError } from '../errors.js';
 import { DEFAULT_SPRING } from '../internal/motion-defaults.js';
 import type { SpringParams } from '../spring.js';
-import { createSurfaceCoordinator } from './coordinator.js';
+import { createSurfaceCoordinator, type SurfaceCoordinator } from './coordinator.js';
 import {
   startSurfaceTransition,
   type SurfaceControls,
@@ -53,10 +53,26 @@ interface LooseOptions {
   readonly commitBarrier?: unknown;
 }
 
-// Один document — одна active generation: module-scoped координатор является
-// единственным владельцем supersede/terminal authority (спека «DOCUMENT-SCOPED
-// COORDINATOR»). Не второй registry: begin() сам вытесняет старую generation.
-const DOCUMENT_SURFACE_COORDINATOR = createSurfaceCoordinator();
+// Один document — одна active generation: координатор ПРИНАДЛЕЖИТ документу
+// цели (переходы в iframe и основном документе не вытесняют друг друга).
+// WeakMap: документ может быть отсоединён — координатор освобождается с ним.
+// Fallback без документа (нет ни ownerDocument, ни globalThis.document) —
+// отдельный documentless-координатор, не общий с чьим-либо document-scoped.
+const DOCUMENT_COORDINATORS = new WeakMap<object, SurfaceCoordinator>();
+let documentlessCoordinator: SurfaceCoordinator | undefined;
+
+function coordinatorFor(doc: DocumentLike | undefined): SurfaceCoordinator {
+  if (doc === undefined) {
+    documentlessCoordinator ??= createSurfaceCoordinator();
+    return documentlessCoordinator;
+  }
+  let coordinator = DOCUMENT_COORDINATORS.get(doc);
+  if (coordinator === undefined) {
+    coordinator = createSurfaceCoordinator();
+    DOCUMENT_COORDINATORS.set(doc, coordinator);
+  }
+  return coordinator;
+}
 
 function defaultRequestFrame(cb: (ts?: number) => void): number {
   const g = globalThis as { requestAnimationFrame?: (cb: (ts: number) => void) => number };
@@ -73,7 +89,12 @@ function performanceNow(): number {
   return perf !== undefined ? perf.now() : 0;
 }
 
-const NOOP = (): void => {};
+// play/pause/seek не существуют для поверхности: движение сертифицировано
+// парой CSS-анимаций псевдодерева, у которых нет адресата управления.
+// Молчаливый no-op скрывал бы ошибку вызывающего — бросаем типизированно.
+function unsupportedSurfaceControl(): never {
+  throw new MotionParamError('LM168');
+}
 
 interface DocumentLike {
   createElement(tag: 'style'): { textContent: string };
@@ -224,7 +245,7 @@ export function tryRouteSurfaceTransition(
   // Один document — одна active generation; уникальное bounded имя из
   // монотонной последовательности назначается цели inline (снимается в
   // terminal cleanup транзакции), host — DOM-backed capability experiment.
-  const generation = DOCUMENT_SURFACE_COORDINATOR.begin({ target: el, fromWidth, toWidth });
+  const generation = coordinatorFor(doc).begin({ target: el, fromWidth, toWidth });
   el.style.setProperty('view-transition-name', generation.viewTransitionName);
 
   // Синхронный бросок setup (hostile getScroll/capture) не оставляет
@@ -264,10 +285,12 @@ export function tryRouteSurfaceTransition(
     get tier() {
       return controls.tier;
     },
-    // one-shot проекция: play/pause/seek вне контракта, stop = cancel.
-    play: NOOP,
-    pause: NOOP,
-    seek: NOOP,
+    // one-shot проекция: play/pause/seek вне контракта поверхности —
+    // синхронная типизированная ошибка (LM168), не молчаливый no-op;
+    // stop = cancel.
+    play: unsupportedSurfaceControl,
+    pause: unsupportedSurfaceControl,
+    seek: unsupportedSurfaceControl,
     stop(): void {
       controls.cancel();
     },

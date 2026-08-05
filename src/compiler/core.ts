@@ -26,6 +26,9 @@ import {
   type MotionProgramV1,
 } from '../internal/motion-program.js';
 import { springLinear } from '../nano/spring-linear.js';
+import { tryCompileSurfaceArtifact } from '../future-layout/artifact.js';
+import { DEFAULT_SPRING } from '../internal/motion-defaults.js';
+import type { SpringParams } from '../spring.js';
 
 // ─── Артефакт ────────────────────────────────────────────────────────────────
 
@@ -127,6 +130,8 @@ export interface NanoLoweringPlan {
   readonly edits: readonly NanoLoweringEdit[];
   /** Локальное имя executor-биндинга; адаптер добавляет hoisted-импорт. */
   readonly importLocal: string;
+  /** Экспортируемое имя executor'а в hoisted-импорте. */
+  readonly importName: string;
   /** Субпуть executor-импорта. */
   readonly importSource: string;
   /** Число НЕтрансформированных вызовов nano-animate (для manifest). */
@@ -273,6 +278,7 @@ export function planNanoOpacityLowering(
   return {
     edits,
     importLocal: IMPORT_LOCAL,
+    importName: COMPILED_IMPORT_NAME,
     importSource: COMPILED_IMPORT_SOURCE,
     runtimeCalls,
   };
@@ -485,4 +491,193 @@ export function lowerSurfaceCall(input: SurfaceCallInput): SurfaceLoweringResult
   }
 
   return { lowered: true, program: deepFreeze(program) };
+}
+
+// ─── Surface lowering: build-time сертификат и план байтовых правок ──────────
+
+export const SURFACE_IMPORT_SOURCE = '@labpics/motion/surface';
+export const SURFACE_IMPORT_NAME = 'runSurface';
+const SURFACE_LOCAL = '__labMotionSurface';
+const ANIMATE_SOURCE = '@labpics/motion/animate';
+
+/**
+ * Литерал сертифицированного артефакта для инжекта в код потребителя.
+ * Сертификация НА СБОРКЕ: позитивность (minWidth>0) и reciprocal-бюджет
+ * ≤0.25 CSS px доказаны tryCompileSurfaceArtifact, иначе undefined —
+ * вызов остаётся на корректном runtime path (fail-closed, как в спеке).
+ */
+export function surfaceArtifactLiteral(program: SurfaceProgram): string | undefined {
+  const spring: SpringParams = program.spring === undefined
+    ? DEFAULT_SPRING
+    : {
+      mass: program.spring.mass,
+      stiffness: program.spring.stiffness,
+      damping: program.spring.damping,
+    };
+  const artifact = tryCompileSurfaceArtifact(
+    spring,
+    program.fromWidth,
+    program.toWidth,
+    undefined,
+    undefined,
+    program.spring?.velocity ?? 0,
+  );
+  if (artifact === undefined) return undefined;
+  // Blend A не сериализуется: executor вычисляет его на тех же Q-stops по
+  // канонической формуле (3−2x)x² — байты потребителя без потери геометрии.
+  return `{w0:${program.fromWidth},w1:${program.toWidth},d:${artifact.durationMs},`
+    + `p:${JSON.stringify(artifact.easing)},q:${JSON.stringify(artifact.reciprocalEasing)}}`;
+}
+
+/** Статический литерал AST → plain-значение; undefined = сомнение. */
+function staticValue(node: AstNode): unknown {
+  if (node.type === 'Literal') {
+    const value = node.value;
+    return typeof value === 'number' || typeof value === 'string' ? value : undefined;
+  }
+  if (node.type === 'UnaryExpression' && node.operator === '-') {
+    const arg = node.argument as AstNode;
+    if (arg.type === 'Literal' && typeof arg.value === 'number') return -arg.value;
+    return undefined;
+  }
+  if (node.type === 'ArrayExpression') {
+    const elements = node.elements as Array<AstNode | null>;
+    const out: unknown[] = [];
+    for (const element of elements) {
+      if (element === null || element.type === 'SpreadElement') return undefined;
+      const value = staticValue(element);
+      if (value === undefined) return undefined;
+      out.push(value);
+    }
+    return out;
+  }
+  if (node.type === 'ObjectExpression') {
+    const out: Record<string, unknown> = {};
+    for (const property of node.properties as AstNode[]) {
+      if (
+        property.type !== 'Property' || property.kind !== 'init'
+        || property.method === true || property.computed === true || property.shorthand === true
+      ) return undefined;
+      const key = property.key as AstNode;
+      const name: string | undefined = key.type === 'Identifier'
+        ? String(key.name)
+        : key.type === 'Literal' && typeof key.value === 'string' ? key.value
+          : undefined;
+      if (name === undefined) return undefined;
+      const value = staticValue(property.value as AstNode);
+      if (value === undefined) return undefined;
+      out[name] = value;
+    }
+    return out;
+  }
+  if (node.type === 'ArrowFunctionExpression' || node.type === 'FunctionExpression') {
+    // Нижится только флаг наличия (hasOnFrame); тело не исполняется.
+    return (): void => {};
+  }
+  return undefined;
+}
+
+/** Динамический аргумент: маркер, который lowerSurfaceCall отвергает. */
+const dynamicNode = (): { kind: string } => ({ kind: 'dynamic' });
+
+/**
+ * Планирует lowering surface-вызовов модуля (import { animate } из
+ * '@labpics/motion/animate'). undefined — трансформировать нечего либо
+ * консервативный отказ (shadowing/коллизия имени). Вызовы с onFrame НЕ
+ * нижятся: у compiled-executor'а нет observer-часа (семантика кадра
+ * остаётся за runtime path). Несертифицируемый артефакт (позитивность/
+ * бюджет недоказуемы) тоже остаётся на runtime path.
+ */
+export function planSurfaceLowering(
+  program: AstNode,
+  code: string,
+): NanoLoweringPlan | undefined {
+  let importedPlain = false;
+  const importNodes = new Set<AstNode>();
+  let doubt = false;
+  let localNameCollision = false;
+
+  walk(program, (node, parent) => {
+    if (node.type === 'ImportDeclaration') {
+      const source = node.source as AstNode | undefined;
+      if (source?.value === ANIMATE_SOURCE) {
+        for (const spec of (node.specifiers as AstNode[] | undefined) ?? []) {
+          importNodes.add(spec);
+          if (
+            spec.type === 'ImportSpecifier' &&
+            (spec.imported as AstNode).type === 'Identifier' &&
+            (spec.imported as AstNode).name === 'animate' &&
+            (spec.local as AstNode).name === 'animate'
+          ) {
+            importedPlain = true;
+          }
+        }
+      }
+    }
+    if (node.type === 'Identifier' && node.name === SURFACE_LOCAL) localNameCollision = true;
+    if (
+      node.name === 'animate' &&
+      !importNodes.has(parent as AstNode) &&
+      parent?.type !== 'ImportSpecifier' &&
+      bindsName(node, parent, 'animate')
+    ) {
+      doubt = true;
+    }
+  });
+
+  if (!importedPlain || doubt || localNameCollision) return undefined;
+
+  const edits: NanoLoweringEdit[] = [];
+  let runtimeCalls = 0;
+
+  walk(program, (node) => {
+    if (node.type !== 'CallExpression') return;
+    const callee = node.callee as AstNode;
+    if (callee.type !== 'Identifier' || callee.name !== 'animate') return;
+    if (node.optional === true) { runtimeCalls++; return; }
+    const args = node.arguments as AstNode[];
+    if (args.length !== 3) { runtimeCalls++; return; }
+    const [targetArg, propsArg, optionsArg] = args as [AstNode, AstNode, AstNode];
+    if (targetArg.type === 'SpreadElement' || propsArg.type === 'SpreadElement'
+      || optionsArg.type === 'SpreadElement') { runtimeCalls++; return; }
+
+    const target = targetArg.type === 'Identifier'
+      ? { kind: 'identifier' as const, name: targetArg.name as string }
+      : dynamicNode();
+    const props = propsArg.type === 'ObjectExpression'
+      ? staticValue(propsArg) ?? dynamicNode()
+      : dynamicNode();
+    const options = optionsArg.type === 'ObjectExpression'
+      ? staticValue(optionsArg) ?? dynamicNode()
+      : dynamicNode();
+
+    const result = lowerSurfaceCall({ callee: 'animate', target, props, options });
+    if (!result.lowered) { runtimeCalls++; return; }
+    // onFrame требует observer-час runtime-пути; executor его не несёт.
+    if (result.program.hasOnFrame === true) { runtimeCalls++; return; }
+    const literal = surfaceArtifactLiteral(result.program);
+    if (literal === undefined) { runtimeCalls++; return; }
+
+    // Побайтная верификация тривиа-зон (как в nano-плане): скобки/запятые.
+    if (
+      !/^\s*\(\s*$/.test(code.slice(callee.end, targetArg.start)) ||
+      !/^\s*,\s*$/.test(code.slice(targetArg.end, propsArg.start)) ||
+      !/^\s*,\s*$/.test(code.slice(propsArg.end, optionsArg.start)) ||
+      !/^\s*\)$/.test(code.slice(optionsArg.end, node.end))
+    ) { runtimeCalls++; return; }
+    edits.push(
+      { start: callee.start, end: targetArg.start, replacement: `${SURFACE_LOCAL}(` },
+      { start: targetArg.end, end: node.end, replacement: `, ${literal})` },
+    );
+  });
+
+  if (edits.length === 0) return undefined;
+  edits.sort((a, b) => a.start - b.start);
+  return {
+    edits,
+    importLocal: SURFACE_LOCAL,
+    importName: SURFACE_IMPORT_NAME,
+    importSource: SURFACE_IMPORT_SOURCE,
+    runtimeCalls,
+  };
 }

@@ -176,3 +176,79 @@ describe('маршрутизатор: hardening (adversarial review)', () => {
     )).toThrow(MotionParamError);
   });
 });
+
+describe('уточнения контракта: per-document coordinator и типизированные контролы', () => {
+  it('два документа в одном realm: переходы не вытесняют друг друга', async () => {
+    const docA = {};
+    const docB = {};
+    const a = fakeEl({ width: '240px' }, true);
+    const b = fakeEl({ width: '240px' }, true);
+    (a.el as Record<string, unknown>)['ownerDocument'] = docA;
+    (b.el as Record<string, unknown>)['ownerDocument'] = docB;
+    const clock = makeClock();
+    const envA = makeSurfaceEnv();
+    const envB = makeSurfaceEnv();
+
+    const controlsA = animate(
+      a.el,
+      { width: [240, 360] },
+      projectOptions(clock, envA),
+    ) as unknown as FutureLayoutControlsLike;
+    await controlsA.committed;
+
+    // Переход во ВТОРОМ документе не обязан вытеснять первый (iframe-контракт).
+    const controlsB = animate(
+      b.el,
+      { width: [240, 360] },
+      projectOptions(clock, envB),
+    ) as unknown as FutureLayoutControlsLike;
+
+    expect(controlsA.state).not.toBe('canceled');
+    expect(controlsB.state).not.toBe('canceled');
+    await controlsB.committed;
+
+    envA.host.complete();
+    envB.host.complete();
+    await controlsA.finished;
+    await controlsB.finished;
+    expect(controlsA.state).not.toBe('canceled');
+    expect(a.el.style.getPropertyValue('width')).toBe('360px');
+    expect(b.el.style.getPropertyValue('width')).toBe('360px');
+  });
+
+  it('play/pause/seek на surface-контролах: синхронный LM168, не молчаливый no-op', async () => {
+    const target = fakeEl({ width: '240px' }, true);
+    const clock = makeClock();
+    const env = makeSurfaceEnv();
+    const controls = animate(
+      target.el,
+      { width: [240, 360] },
+      projectOptions(clock, env),
+    ) as unknown as FutureLayoutControlsLike & {
+      play(): void;
+      pause(): void;
+      seek(tMs: number): void;
+      stop(): void;
+    };
+
+    for (const call of [
+      () => controls.play(),
+      () => controls.pause(),
+      () => controls.seek(100),
+    ]) {
+      let caught: unknown;
+      try {
+        call();
+      } catch (error) {
+        caught = error;
+      }
+      expect(caught).toBeInstanceOf(MotionParamError);
+      expect((caught as MotionParamError).code).toBe('LM168');
+    }
+
+    // stop = cancel остаётся в контракте.
+    controls.stop();
+    expect(controls.state).toBe('canceled');
+    await controls.finished;
+  });
+});
