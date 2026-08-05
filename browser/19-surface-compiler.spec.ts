@@ -80,9 +80,9 @@ test('compiled и runtime доставляют идентичный финал �
 
 test('compiled list-путь исполняется WAAPI с артефактными keyframes/easing', async ({ page }) => {
   const result = await page.evaluate(async ([compiledUrl]) => {
-    const { playList } = await import(compiledUrl) as Promise<{
+    const { playList } = (await import(compiledUrl)) as {
       playList: (list: Element[]) => SurfaceControlsLike;
-    }>;
+    };
     const els = [0, 1].map((): HTMLElement => {
       const el = document.createElement('div');
       el.style.cssText = 'width:240px;height:20px';
@@ -144,9 +144,9 @@ test('compiled list-путь исполняется WAAPI с артефактн�
 test('compiled схлопывается к мгновенному коммиту под reduced motion', async ({ page }) => {
   await page.emulateMedia({ reducedMotion: 'reduce' });
   const result = await page.evaluate(async ([compiledUrl]) => {
-    const { play } = await import(compiledUrl) as Promise<{
+    const { play } = (await import(compiledUrl)) as {
       play: (el: Element) => SurfaceControlsLike;
-    }>;
+    };
     const el = document.createElement('div');
     el.style.cssText = 'width:240px;height:40px';
     document.body.appendChild(el);
