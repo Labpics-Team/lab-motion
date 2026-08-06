@@ -70,8 +70,12 @@ export function solveSpring(
       // t≈0. Разделение конечной базы и линейного вклада v0 сохраняет x'(0)=v0
       // без epsilon-переключателя и одновременно является базисом пакета.
       const sqrtTerm = Math.sqrt(zeta * zeta - 1);
-      const r1 = -omega0 * (zeta - sqrtTerm);
+      // Быстрый полюс складывает слагаемые одного знака и потому точен всегда.
+      // Медленный берём из тождества r₁·r₂ = ω₀², а не как ω₀(ζ−√(ζ²−1)):
+      // при ζ > 1/√ε (≈6.7e7) √(ζ²−1) округляется ровно в ζ, разность даёт −0,
+      // и переход навсегда застывает на нуле вместо прихода в цель.
       const r2 = -omega0 * (zeta + sqrtTerm);
+      const r1 = (omega0 * omega0) / r2;
       const denominator = r1 - r2;
       const e1 = Math.exp(r1 * t);
       // exp(r1·t)−exp(r2·t) округляется в ноль у t≈0. Форма от медленной
@@ -149,8 +153,9 @@ export function makeSpringValueSampler(
     return (t) => (t <= 0 ? 0 : 1 + (-1 + B * t) * Math.exp(-omega0 * t));
   }
   const sqrtTerm = Math.sqrt(zeta * zeta - 1);
-  const r1 = -omega0 * (zeta - sqrtTerm);
+  // Тот же вывод медленного полюса, что и в solveSpring: см. комментарий там.
   const r2 = -omega0 * (zeta + sqrtTerm);
+  const r1 = (omega0 * omega0) / r2;
   const denominator = r1 - r2;
   return (t) => {
     if (t <= 0) return 0;
