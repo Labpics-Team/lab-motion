@@ -105,7 +105,7 @@ function archive(
   // `C:` абсолютного windows-пути за спецификацию удалённого хоста и падает
   // с «Cannot connect to C:». Относительный путь одинаково понимают и GNU tar,
   // и встроенный в Windows bsdtar.
-  execFileSync('tar', ['-czf', fileName, 'package'], { cwd: work });
+  execFileSync('tar', ['-czf', `./${fileName}`, 'package'], { cwd: work });
   return { work, tarball, manifest: join(work, 'release-manifest.json') };
 }
 
