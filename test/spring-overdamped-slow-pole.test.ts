@@ -142,3 +142,31 @@ describe('за границей домена валидация закрывае
     }
   });
 });
+
+/**
+ * Значение медленного корня, а не только его ненулевость. Без этого диверсия
+ * вида 1/(ζ+d) → 2/(ζ+d) переживала весь прогон: бюджет оставался конечным,
+ * и ни один тест не отличал верную ставку от вдвое завышенной.
+ */
+describe('медленная ставка пришпилена по величине', () => {
+  const params = { mass: 1, stiffness: 1e18, damping: 2e17 };
+
+  it('бюджет оседания отвечает физической ставке k/c', () => {
+    // Независимый вывод: при ζ→∞ медленный полюс равен k/c, амплитудный член
+    // стремится к 1, значит бюджет = ln(1/0.005) + ln(ω₀) делить на k/c.
+    const omega0 = Math.sqrt(params.stiffness / params.mass);
+    const expected = (Math.log(1 / 0.005) + Math.log(omega0)) / (params.stiffness / params.damping);
+    expect(settleTimeAtRestUpperBound(params)).toBeCloseTo(expected, 6);
+  });
+
+  it('springAsEasing строит кривую по истинной, а не полу́ченной ставке', async () => {
+    const { springAsEasing } = await import('../src/spring/index.js');
+    const easing = springAsEasing(params);
+    // Пол 1e-6 давал шкалу времени в двести раз короче истинной: кривая
+    // мгновенно упиралась в единицу и теряла всю форму перехода.
+    expect(easing(0)).toBe(0);
+    expect(easing(1)).toBeCloseTo(1, 6);
+    expect(easing(0.25)).toBeGreaterThan(0.05);
+    expect(easing(0.25)).toBeLessThan(0.95);
+  });
+});

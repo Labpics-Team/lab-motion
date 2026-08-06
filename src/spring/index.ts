@@ -48,6 +48,20 @@ const lnBudget = (omega0: number): number =>
 /** ln(100): множитель времени затухания огибающей до 1%. */
 const LN_100 = Math.log(100);
 
+/**
+ * Медленный корень в единицах ω₀. Прямая разность ζ−√(ζ²−1) при ζ > 1/√ε
+ * схлопывается ровно в ноль, и вызывающие подставляли пол 1e-6 — для ζ=1e8
+ * это в двести раз мимо истинных 5e-9, то есть кривая молча врала. Тождество
+ * ζ−√(ζ²−1) = 1/(ζ+√(ζ²−1)) вычитания не содержит, но округляется иначе,
+ * поэтому включается только на выродившемся входе: прежние значения остаются
+ * побитово теми же.
+ */
+function slowRoot(z: number): number {
+  if (z < 1) return z;
+  const d = Math.sqrt(z * z - 1);
+  return z - d || 1 / (z + d);
+}
+
 // ─── fromBounce ──────────────────────────────────────────────────────────────
 
 /** Опции duration+bounce параметризации. */
@@ -82,19 +96,9 @@ function toParams(omega0Raw: number, zetaRaw: number, mass: number): SpringParam
   //   коробка ω₀≥2 молча превращала 100-секундный запрос в ~2.3-секундный —
   //   худшая из возможных подмен намерения).
   const zetaSeed = Math.max(1e-4, zetaRaw);
-  // При больших z разность z−√(z²−1) схлопывается в ноль и бюджет уходит в
-  // бесконечность. Тождество z−√(z²−1) = 1/(z+√(z²−1)) вычитания не содержит,
-  // но округляется иначе — подставляем его только на выродившемся входе,
-  // чтобы прежние значения остались побитово теми же.
-  const slowOf = (z: number) => {
-    if (z < 1) return z;
-    const d = Math.sqrt(z * z - 1);
-    const split = z - d;
-    return split > 0 ? split : 1 / (z + d);
-  };
   let omega0 = Math.max(
     omega0Raw,
-    lnBudget(omega0Raw) / (slowOf(zetaSeed) * SETTLE_BUDGET_S),
+    lnBudget(omega0Raw) / (slowRoot(zetaSeed) * SETTLE_BUDGET_S),
   );
   const zetaMin = Math.min(1, lnBudget(omega0) / (omega0 * SETTLE_BUDGET_S));
   const zeta = Math.max(zetaMin, zetaRaw);
@@ -197,8 +201,8 @@ export function fromVisualDuration(options: FromVisualDurationOptions): SpringPa
   // Пересечения нет: Tv = выход на ~99% цели по медленнейшей моде.
   // Для ζ=1 огибающая ~e^{−ω0 t}; для ζ>1 медленнейший корень
   // r = ω0(ζ − √(ζ²−1)) → ω0 = ln(100) / (Tv · (ζ − √(ζ²−1))).
-  const slow = zeta - Math.sqrt(Math.max(0, zeta * zeta - 1));
-  return toParams(LN_100 / (Tv * Math.max(slow, 1e-6)), zeta, mass);
+  const slow = slowRoot(zeta);
+  return toParams(LN_100 / (Tv * slow), zeta, mass);
 }
 
 // ─── Пресеты (канон react-spring: tension/friction при mass=1) ───────────────
@@ -228,8 +232,8 @@ export function springAsEasing(params: SpringParams): (t: number) => number {
   spring(params, 0);
   const omega0 = Math.sqrt(params.stiffness / params.mass);
   const zeta = params.damping / (2 * Math.sqrt(params.stiffness * params.mass));
-  const slow = zeta >= 1 ? zeta - Math.sqrt(Math.max(0, zeta * zeta - 1)) : zeta;
-  const settle = LN_100 / (omega0 * Math.max(slow, 1e-6));
+  const slow = slowRoot(zeta);
+  const settle = LN_100 / (omega0 * slow);
 
   return (t: number): number => {
     const u = Number.isNaN(t) ? 0 : t;

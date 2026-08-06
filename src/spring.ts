@@ -61,9 +61,6 @@ const SETTLE_BUDGET_S = MAX_FRAMES * FIXED_DT_S;
 export function settleTimeAtRestUpperBound(p: SpringParams): number {
   const omega0 = Math.sqrt(p.stiffness / p.mass);
   // ζ = c/(2√(km)) = c/(2m·ω₀) — без второго sqrt (тождество √(km) = m·√(k/m)).
-  // Делим на 2 последним: 2·m переполняется при m≈1e308 и обнуляет ζ. Деление
-  // на степень двойки точное, поэтому значение не меняется нигде, где старая
-  // запись работала (см. тот же приём в internal/solver.ts).
   const zetaRaw = p.damping / (2 * p.mass * omega0);
   // У ζ = 1 разложение на моды вырождено (см. solver) — отводим на ±1e-3.
   const zeta =
