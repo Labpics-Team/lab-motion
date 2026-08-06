@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 
 import { makeSpringValueSampler, solveSpring } from '../src/internal/solver.js';
+import { settleTimeAtRestUpperBound, validateSpringParams } from '../src/spring.js';
 
 /**
  * Issue #226. При ζ > 1/√ε (≈6.7e7) выражение √(ζ²−1) округляется ровно в ζ,
@@ -51,8 +52,35 @@ describe('overdamped: медленный полюс не теряется на �
     }
   });
 
+  it('совпадает с модальным решением, построенным по корням Виета', () => {
+    // Умеренное ζ = 2.5: здесь классическая формула корней устойчива, поэтому
+    // годится как независимый оракул. Решение с x(0)=0, x'(0)=0, x(∞)=1:
+    //   x(t) = 1 + (r_slow·e^{r_fast t} − r_fast·e^{r_slow t}) / (r_fast − r_slow)
+    for (const exp of [-12, -6, 0, 6, 12]) {
+      const lambda = Math.pow(10, exp);
+      const p = { mass: lambda, stiffness: lambda * 4, damping: lambda * 10 };
+      const alpha = p.damping / (2 * p.mass);
+      const w2 = p.stiffness / p.mass;
+      const split = Math.sqrt(alpha * alpha - w2);
+      const rSlow = -(alpha - split);
+      const rFast = -(alpha + split);
+      // Тождества Виета — самостоятельная проверка корней оракула.
+      expect(rSlow * rFast).toBeCloseTo(w2, 10);
+      expect(rSlow + rFast).toBeCloseTo(-p.damping / p.mass, 10);
+
+      for (const t of [0.5, 2, 8]) {
+        const expected =
+          1 + (rSlow * Math.exp(rFast * t) - rFast * Math.exp(rSlow * t)) / (rFast - rSlow);
+        expect(solveSpring(p, t, 0).value).toBeCloseTo(expected, 10);
+      }
+    }
+  });
+
   it('переход монотонно доходит до цели на всём диапазоне ζ', () => {
-    for (const zeta of [2, 1e3, 1e6, 1e8, 1e10, 1e12]) {
+    // Сетка без разрывов вокруг порога вырождения 1/√ε ≈ 6.7e7: именно там
+    // прямая разность ζ−√(ζ²−1) теряет все значащие цифры, и дыра в покрытии
+    // между 1e6 и 1e8 оставила бы класс дефекта непришпиленным.
+    for (const zeta of [2, 1e2, 1e3, 1e4, 1e5, 1e6, 1e7, 6.7e7, 1e8, 1e9, 1e10, 1e12]) {
       // ω₀ = 1 при m=k=1, тогда c = 2ζ и постоянная времени k/c = 1/(2ζ).
       const p = { mass: 1, stiffness: 1, damping: 2 * zeta };
       const tau = (2 * zeta) / 1;
@@ -61,6 +89,56 @@ describe('overdamped: медленный полюс не теряется на �
       expect(early).toBeGreaterThan(0.3);
       expect(late).toBeGreaterThan(0.99);
       expect(late).toBeLessThanOrEqual(1 + 1e-12);
+    }
+  });
+});
+
+/**
+ * Пользовательская часть #226: бюджет оседания считался тем же нестабильным
+ * вычитанием, поэтому валидатор отвергал физически корректную пружину.
+ */
+describe('бюджет оседания и валидатор согласованы с солвером', () => {
+  const params = { mass: 1, stiffness: 1e18, damping: 2e17 };
+
+  it('бюджет конечен и отвечает медленной моде', () => {
+    // Медленный полюс −k/c = −5 ⇒ время оседания порядка единиц секунд,
+    // а не бесконечность, как давала выродившаяся разность.
+    const budget = settleTimeAtRestUpperBound(params);
+    expect(Number.isFinite(budget)).toBe(true);
+    expect(budget).toBeGreaterThan(1);
+    expect(budget).toBeLessThan(10);
+  });
+
+  it('публичная валидация принимает эту пружину', () => {
+    expect(() => validateSpringParams(params)).not.toThrow();
+  });
+
+  it('прежние отказы остаются отказами', () => {
+    for (const bad of [
+      { mass: 100, stiffness: 100, damping: 2 },
+      { mass: 0.25, stiffness: 0.01, damping: 0.11 },
+      { mass: 1, stiffness: 1, damping: 0 },
+    ]) {
+      expect(() => validateSpringParams(bad)).toThrow();
+    }
+  });
+});
+
+/**
+ * Граница домена. За ζ² > MAX_VALUE (ζ ≳ 1.34e154) и α² > MAX_VALUE полюса
+ * вырождаются в любой из форм. Страховать это в горячем пути дорого по байтам
+ * и незачем: такие параметры не проходят публичную валидацию. Тест закрепляет
+ * именно fail-closed поведение, чтобы граница не съехала молча в «тихо неверно».
+ */
+describe('за границей домена валидация закрывается, а не врёт', () => {
+  it('отвергает параметры, где ζ² или α² выходят за double', () => {
+    for (const outOfDomain of [
+      { mass: 1, stiffness: 1e-100, damping: 2e106 }, // ζ² > MAX_VALUE
+      { mass: 1, stiffness: 1, damping: 4e154 }, // α² > MAX_VALUE
+      { mass: 1e308, stiffness: 1e308, damping: 1e308 }, // 2·m > MAX_VALUE
+    ]) {
+      expect(settleTimeAtRestUpperBound(outOfDomain)).toBe(Infinity);
+      expect(() => validateSpringParams(outOfDomain)).toThrow();
     }
   });
 });

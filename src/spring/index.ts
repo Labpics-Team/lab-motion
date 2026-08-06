@@ -82,7 +82,16 @@ function toParams(omega0Raw: number, zetaRaw: number, mass: number): SpringParam
   //   коробка ω₀≥2 молча превращала 100-секундный запрос в ~2.3-секундный —
   //   худшая из возможных подмен намерения).
   const zetaSeed = Math.max(1e-4, zetaRaw);
-  const slowOf = (z: number) => (z < 1 ? z : z - Math.sqrt(z * z - 1));
+  // При больших z разность z−√(z²−1) схлопывается в ноль и бюджет уходит в
+  // бесконечность. Тождество z−√(z²−1) = 1/(z+√(z²−1)) вычитания не содержит,
+  // но округляется иначе — подставляем его только на выродившемся входе,
+  // чтобы прежние значения остались побитово теми же.
+  const slowOf = (z: number) => {
+    if (z < 1) return z;
+    const d = Math.sqrt(z * z - 1);
+    const split = z - d;
+    return split > 0 ? split : 1 / (z + d);
+  };
   let omega0 = Math.max(
     omega0Raw,
     lnBudget(omega0Raw) / (slowOf(zetaSeed) * SETTLE_BUDGET_S),

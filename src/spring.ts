@@ -61,15 +61,26 @@ const SETTLE_BUDGET_S = MAX_FRAMES * FIXED_DT_S;
 export function settleTimeAtRestUpperBound(p: SpringParams): number {
   const omega0 = Math.sqrt(p.stiffness / p.mass);
   // ζ = c/(2√(km)) = c/(2m·ω₀) — без второго sqrt (тождество √(km) = m·√(k/m)).
+  // Делим на 2 последним: 2·m переполняется при m≈1e308 и обнуляет ζ. Деление
+  // на степень двойки точное, поэтому значение не меняется нигде, где старая
+  // запись работала (см. тот же приём в internal/solver.ts).
   const zetaRaw = p.damping / (2 * p.mass * omega0);
   // У ζ = 1 разложение на моды вырождено (см. solver) — отводим на ±1e-3.
   const zeta =
     Math.abs(zetaRaw - 1) < 1e-3 ? (zetaRaw < 1 ? 0.999 : 1.001) : zetaRaw;
   const under = zeta < 1;
   const d = Math.sqrt(Math.abs(zeta * zeta - 1)); // √|ζ²−1|: ωd/ω₀ | расщепление корней
-  const rate = under ? zeta * omega0 : omega0 * (zeta - d);
+  // Прямая разность ζ−d при ζ > 1/√ε схлопывается ровно в ноль: бюджет уходит
+  // в Infinity, и валидатор отвергает физически корректную пружину как LM091.
+  // Тождество ζ−d = 1/(ζ+d) вычитания не содержит, но округляется иначе,
+  // поэтому включаем его только там, где прямая форма уже выродилась — так
+  // все прежние бюджеты остаются побитово теми же (пин в
+  // test/compositor-velocity-budget.test.ts).
+  const sum = zeta + d;
+  const rate = omega0 * (under ? zeta : zeta - d || 1 / sum);
   if (!(rate > 0)) return Infinity; // ζ=0: незатухающая — не оседает никогда
-  const amp = under ? 1 / d : (zeta + d) / (2 * d);
+  // (sum/2)/d вместо sum/(2·d): деление на двойку точное, значение то же.
+  const amp = (under ? 1 : sum / 2) / d;
   const needLn =
     Math.log(1 / CONVERGENCE_THRESHOLD) +
     Math.max(0, Math.log(omega0)) +
