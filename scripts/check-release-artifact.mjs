@@ -1,6 +1,6 @@
 import { execFileSync } from 'node:child_process';
 import { createHash } from 'node:crypto';
-import { basename, resolve } from 'node:path';
+import { basename, dirname, resolve } from 'node:path';
 import { readFileSync, writeFileSync } from 'node:fs';
 import { validateArchiveMetadata } from './release-metadata.mjs';
 
@@ -24,7 +24,12 @@ try {
   // Читаем метаданные из самого tgz, чтобы манифест описывал байты артефакта,
   // а не рабочее дерево, из которого он был собран.
   archivePackage = JSON.parse(
-    execFileSync('tar', ['-xOf', tarball, 'package/package.json'], {
+    // Архив адресуем именем относительно его каталога: GNU tar трактует
+    // ведущее `C:` абсолютного windows-пути как спецификацию удалённого хоста
+    // и отказывается его открывать. Относительное имя понимают и GNU tar,
+    // и bsdtar из состава Windows.
+    execFileSync('tar', ['-xOf', basename(tarball), 'package/package.json'], {
+      cwd: dirname(tarball),
       encoding: 'utf8',
       stdio: ['ignore', 'pipe', 'pipe'],
     }),
