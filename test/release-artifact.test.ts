@@ -173,6 +173,22 @@ describe('release artifact: fail-closed манифест', () => {
     expect(check(invalidName.tarball, invalidName.manifest).status).not.toBe(0);
   });
 
+  // Двоеточие в имени легально на POSIX; на Windows это синтаксис
+  // альтернативного потока NTFS, поэтому кейс осмыслен только там, где он и
+  // гейтит CI — на ubuntu-раннере.
+  it.skipIf(process.platform === 'win32')('читает архив, чьё имя ломает разбор пути в tar', () => {
+    // Двоеточие в имени воспроизводимо на Linux, поэтому этот тест реально
+    // гейтит класс в CI (все job-ы там ubuntu). Если чтение снова начнёт
+    // разбирать путь, скрипт упадёт на ЧТЕНИИ; при исправном чтении он
+    // доходит до проверки канонического имени и отвергает уже по ней.
+    const { tarball, manifest } = archive({}, 'labpics:motion-9.8.7.tgz');
+    const result = check(tarball, manifest);
+
+    expect(result.status).not.toBe(0);
+    expect(result.stderr).not.toContain('не удалось прочитать');
+    expect(result.stderr).toContain('release-artifact-check:');
+  });
+
   it('не перезаписывает уже созданный манифест', () => {
     const { tarball, manifest } = archive();
     writeFileSync(manifest, '{"trusted":false}\n');

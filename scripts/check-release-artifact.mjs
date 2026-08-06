@@ -1,6 +1,6 @@
 import { execFileSync } from 'node:child_process';
 import { createHash } from 'node:crypto';
-import { basename, dirname, resolve } from 'node:path';
+import { basename, resolve } from 'node:path';
 import { readFileSync, writeFileSync } from 'node:fs';
 import { validateArchiveMetadata } from './release-metadata.mjs';
 
@@ -24,14 +24,16 @@ try {
   // Читаем метаданные из самого tgz, чтобы манифест описывал байты артефакта,
   // а не рабочее дерево, из которого он был собран.
   archivePackage = JSON.parse(
-    // Архив адресуем как ./имя относительно его каталога: GNU tar трактует
-    // ведущее `C:` абсолютного windows-пути как спецификацию удалённого хоста
-    // и отказывается открывать; префикс ./ убирает двоеточие за первый слэш и
-    // закрывает тот же класс для имён с двоеточием. Форму понимают GNU tar и bsdtar.
-    execFileSync('tar', ['-xOf', `./${basename(tarball)}`, 'package/package.json'], {
-      cwd: dirname(tarball),
+    // Байты архива подаём на stdin: тогда tar не разбирает путь вообще, и
+    // класс закрыт целиком — ни ведущее «C:» windows-пути (GNU tar принимает
+    // его за спецификацию удалённого хоста), ни двоеточие в имени, ни путь
+    // длиннее MAX_PATH (такой нельзя выставить рабочим каталогом процесса)
+    // больше ни на что не влияют. Байты всё равно читаются ниже для sha256.
+    // Флаг -z обязателен: GNU tar на stdin не определяет сжатие сам.
+    execFileSync('tar', ['-xzOf', '-', 'package/package.json'], {
+      input: readFileSync(tarball),
       encoding: 'utf8',
-      stdio: ['ignore', 'pipe', 'pipe'],
+      stdio: ['pipe', 'pipe', 'pipe'],
     }),
   );
 } catch (error) {
