@@ -36,6 +36,32 @@ if (artifactBytes[0] !== 0x1f || artifactBytes[1] !== 0x8b) {
   fail(`артефакт ${basename(tarball)} не является gzip-архивом`);
 }
 
+// Верификатор и потребитель обязаны выбирать ОДИН И ТОТ ЖЕ член архива. tar
+// берёт запись по точному имени, а npm срезает первый компонент пути у всех
+// записей и оставляет ПОСЛЕДНЮЮ совпавшую. Расхождение воспроизводимо: архив
+// с package/package.json и zzz/package.json проходит проверку по первому, а
+// устанавливается по второму. Требуем ровно одну запись, дающую package.json
+// после среза, и чтобы это был канонический package/package.json.
+try {
+  const manifestMembers = execFileSync('tar', ['-tzf', '-'], {
+    input: artifactBytes,
+    encoding: 'utf8',
+    stdio: ['pipe', 'pipe', 'pipe'],
+  })
+    .split('\n')
+    .map((line) => line.trim().replace(/\/+$/, ''))
+    .filter((line) => line.split('/').slice(1).join('/') === 'package.json');
+
+  if (manifestMembers.length !== 1) {
+    fail(`в tgz ${manifestMembers.length} записей читаются как package.json: ${manifestMembers.join(', ')}`);
+  }
+  if (manifestMembers[0] !== 'package/package.json') {
+    fail(`манифест лежит в ${manifestMembers[0]}, а не в package/package.json`);
+  }
+} catch (error) {
+  fail(`не удалось перечислить содержимое tgz: ${error?.message ?? String(error)}`);
+}
+
 let archivePackage;
 try {
   // Читаем метаданные из самого tgz, чтобы манифест описывал байты артефакта,

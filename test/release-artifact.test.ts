@@ -7,7 +7,7 @@ import {
   writeFileSync,
 } from 'node:fs';
 import { tmpdir } from 'node:os';
-import { delimiter, dirname, join } from 'node:path';
+import { basename, delimiter, dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { afterEach, describe, expect, it } from 'vitest';
 
@@ -208,5 +208,22 @@ exec node "$(dirname "$0")/tar.js" "$@"
     const result = check(tarball, manifest);
     expect(result.status).not.toBe(0);
     expect(readFileSync(manifest, 'utf8')).toBe('{"trusted":false}\n');
+  });
+});
+
+describe('release artifact: верификатор и npm выбирают один член', () => {
+  it('отвергает архив, где package.json виден дважды после среза префикса', () => {
+    // npm срезает первый компонент пути у всех записей и берёт ПОСЛЕДНЮЮ
+    // совпавшую, а tar — запись по точному имени. Без этой проверки архив
+    // проходит контроль по package/package.json, а устанавливается по zzz/.
+    const { work, tarball, manifest } = archive();
+    const rogue = join(work, 'zzz');
+    mkdirSync(rogue);
+    writeFileSync(join(rogue, 'package.json'), JSON.stringify({ ...releaseMetadata(), name: '@attacker/evil' }));
+    execFileSync('tar', ['-czf', `./${basename(tarball)}`, 'package', 'zzz'], { cwd: work });
+
+    const result = check(tarball, manifest);
+    expect(result.status).not.toBe(0);
+    expect(result.stderr).toContain('читаются как package.json');
   });
 });
