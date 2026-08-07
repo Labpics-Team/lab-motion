@@ -10,7 +10,10 @@
  *     и list-вариант — surface-compiled/surface-uncompiled.
  * Спеки грузят бандлы по http и сверяют наблюдаемое в РЕАЛЬНОМ движке
  * (chromium/firefox/webkit): precomputed-артефакт compiled-пути рендерится
- * идентично рантаймовому. Alias публичных субпутей → dist (байты потребителя).
+ * идентично рантаймовому. Alias публичных субпутей → dist (байты потребителя);
+ * surface-executor живёт под приватным путём `@labpics/motion/compiler/surface`
+ * (горячий фикс наблюдаемой эквивалентности перевёл его из публичного
+ * `./surface` в приватный compiler-неймспейс).
  */
 
 import { build } from 'vite';
@@ -27,15 +30,20 @@ const ALIAS = {
   '@labpics/motion/nano': resolve(DIST, 'nano/index.js'),
   '@labpics/motion/compiler/runtime': resolve(DIST, 'compiler/runtime/index.js'),
   '@labpics/motion/animate': resolve(DIST, 'animate/index.js'),
-  '@labpics/motion/surface': resolve(DIST, 'surface/index.js'),
+  '@labpics/motion/compiler/surface': resolve(DIST, 'compiler/surface/index.js'),
 };
 const NANO_FIXTURE = `import { animate } from '@labpics/motion/nano';
 export function play(el) { return animate(el, { opacity: 0.5 }); }`;
 // Оба вызова статичны → плагин обязан понизить каждый в executor-вызов с
-// литеральным артефактом (один hoisted-import на модуль).
+// литеральным артефактом (один hoisted-import на модуль). Позитивная форма
+// после hotfix наблюдаемой эквивалентности (PR-1 Future Layout): lowering
+// сертифицируется ТОЛЬКО для голого expression statement — результат вызова
+// ни return'ом, ни присваиванием, ни await'ом не покидает модуль, иначе
+// неполные контролы compiled-пути (нет committed/ready/state/cancel) были бы
+// наблюдаемы потребителем. Здесь обе функции — именно голые вызовы.
 const SURFACE_FIXTURE = `import { animate } from '@labpics/motion/animate';
-export function play(el) { return animate(el, { width: [240, 360] }, { layout: 'project' }); }
-export function playList(list) { return animate(list, { width: [240, 360] }, { layout: 'project' }); }`;
+export function play(el) { animate(el, { width: [240, 360] }, { layout: 'project' }); }
+export function playList(list) { animate(list, { width: [240, 360] }, { layout: 'project' }); }`;
 
 async function bundle(motionCompiler, source, withPlugin) {
   const entry = resolve(TMP, 'entry.js');
@@ -94,6 +102,18 @@ export default async function globalSetup() {
     }
     if (!/layout:\s*"project"|layout:\s*'project'/.test(surfaceUncompiled)) {
       throw new Error('compile-artifacts: surface uncompiled потерял layout-опцию');
+    }
+    // Positive control пост-hotfix: вызов, чей результат уходит через return,
+    // НЕ обязан понижаться — иначе неполные compiled-контролы становятся
+    // наблюдаемыми (нет committed/ready/state/cancel у executor-вызова).
+    // Если плагин когда-либо понизит return-форму, эта проверка падает раньше
+    // мутных несовпадений в 19-surface-compiler.spec.
+    const RETURN_FIXTURE = `import { animate } from '@labpics/motion/animate';
+export function play(el) { return animate(el, { width: [240, 360] }, { layout: 'project' }); }`;
+    const surfaceReturn = await bundle(motionCompiler, RETURN_FIXTURE, true);
+    assertSelfContained(surfaceReturn, 'surface return-form');
+    if (!/layout:\s*"project"|layout:\s*'project'/.test(surfaceReturn) || /w0:\s*240,\s*w1:\s*360/.test(surfaceReturn)) {
+      throw new Error('compile-artifacts: return-форма ошибочно понижена — нарушена наблюдаемая эквивалентность');
     }
     writeFileSync(resolve(OUT, 'compiled.js'), compiled);
     writeFileSync(resolve(OUT, 'uncompiled.js'), uncompiled);
