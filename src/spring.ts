@@ -148,7 +148,14 @@ export function settleTimeUpperBound(p: SpringParams, v0 = 0): number {
  * spring config throw eagerly and deterministically regardless of the
  * injected scheduler.
  */
-export function validateSpringParams(p: SpringParams): void {
+/**
+ * Полевые проверки в каноническом порядке приоритета LM088 → LM089 → LM090.
+ * Отдельный seam нужен springAsEasing: её собственный LM169 (damping === 0)
+ * обязан уступать полевым кодам, но опережать бюджетный LM091 — иначе битая
+ * масса диагностировалась бы как «нет затухания», а нулевое затухание — как
+ * «не влезает в бюджет». Один SSOT условий, никаких повторных формулировок.
+ */
+export function validateSpringFieldRanges(p: SpringParams): void {
   if (!Number.isFinite(p.mass) || p.mass <= 0) {
     throw new MotionParamError('LM088');
   }
@@ -158,6 +165,10 @@ export function validateSpringParams(p: SpringParams): void {
   if (!Number.isFinite(p.damping) || p.damping < 0) {
     throw new MotionParamError('LM090');
   }
+}
+
+export function validateSpringParams(p: SpringParams): void {
+  validateSpringFieldRanges(p);
   // Единый выведенный гард (взамен коробочных ω₀/ζ-полов, см. SETTLE_BUDGET_S):
   // аналитическое время оседания обязано помещаться в бюджет кадра-капа.
   // Валидатору нужна только пружина из покоя. Отдельный вызов позволяет
