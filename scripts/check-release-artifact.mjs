@@ -42,16 +42,31 @@ if (artifactBytes[0] !== 0x1f || artifactBytes[1] !== 0x8b) {
 // с package/package.json и zzz/package.json проходит проверку по первому, а
 // устанавливается по второму. Требуем ровно одну запись, дающую package.json
 // после среза, и чтобы это был канонический package/package.json.
+//
+// Сравниваем НОРМАЛИЗОВАННЫЕ сегменты: npm нормализует путь записи, поэтому
+// package/./package.json для него неотличим от package/package.json, а наивный
+// пословный фильтр эту запись пропускал (обход, найден ревью). Пустые сегменты
+// («//») схлопываем, «..» — безусловный отказ: путь, выходящий вверх, не бывает
+// легитимным членом npm-архива.
+const normalizedTail = (member) => {
+  const segments = member.split('/').filter((part) => part !== '' && part !== '.');
+  if (segments.includes('..')) return '..';
+  return segments.slice(1).join('/');
+};
 try {
-  const manifestMembers = execFileSync('tar', ['-tzf', '-'], {
+  const members = execFileSync('tar', ['-tzf', '-'], {
     input: artifactBytes,
     encoding: 'utf8',
     stdio: ['pipe', 'pipe', 'pipe'],
   })
     .split('\n')
-    .map((line) => line.trim().replace(/\/+$/, ''))
-    .filter((line) => line.split('/').slice(1).join('/') === 'package.json');
+    .map((line) => line.trim())
+    .filter(Boolean);
 
+  if (members.some((member) => normalizedTail(member) === '..')) {
+    fail('в tgz есть запись с «..» в пути — архив отвергнут целиком');
+  }
+  const manifestMembers = members.filter((member) => normalizedTail(member) === 'package.json');
   if (manifestMembers.length !== 1) {
     fail(`в tgz ${manifestMembers.length} записей читаются как package.json: ${manifestMembers.join(', ')}`);
   }

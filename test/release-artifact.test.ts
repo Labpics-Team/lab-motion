@@ -211,6 +211,42 @@ exec node "$(dirname "$0")/tar.js" "$@"
   });
 });
 
+describe('release artifact: нормализация пути члена', () => {
+  it('отвергает запись с точкой-сегментом, неотличимую для npm от канонической', () => {
+    // package/./package.json: npm нормализует путь и видит второй package.json,
+    // а пословный фильтр без нормализации его пропускал (обход, найден ревью).
+    const { work, tarball, manifest } = archive();
+    mkdirSync(join(work, 'pkg2'));
+    writeFileSync(join(work, 'pkg2', 'evil.json'), JSON.stringify({ ...releaseMetadata(), name: '@attacker/evil' }));
+    execFileSync('tar', [
+      '-czf', `./${basename(tarball)}`,
+      'package',
+      '--transform', 's|^pkg2/evil.json$|package/./package.json|',
+      'pkg2/evil.json',
+    ], { cwd: work });
+
+    const result = check(tarball, manifest);
+    expect(result.status).not.toBe(0);
+    expect(result.stderr).toContain('читаются как package.json');
+  });
+
+  it('отвергает архив с «..» в пути записи целиком', () => {
+    const { work, tarball, manifest } = archive();
+    mkdirSync(join(work, 'pkg2'));
+    writeFileSync(join(work, 'pkg2', 'up.json'), '{}');
+    execFileSync('tar', [
+      '-czf', `./${basename(tarball)}`,
+      'package',
+      '--transform', 's|^pkg2/up.json$|package/../up.json|',
+      'pkg2/up.json',
+    ], { cwd: work });
+
+    const result = check(tarball, manifest);
+    expect(result.status).not.toBe(0);
+    expect(result.stderr).toContain('«..»');
+  });
+});
+
 describe('release artifact: верификатор и npm выбирают один член', () => {
   it('отвергает архив, где package.json виден дважды после среза префикса', () => {
     // npm срезает первый компонент пути у всех записей и берёт ПОСЛЕДНЮЮ
