@@ -17,7 +17,7 @@
  */
 
 import { execSync } from 'node:child_process';
-import { mkdirSync, mkdtempSync, readFileSync, readdirSync, rmSync, writeFileSync, existsSync } from 'node:fs';
+import { mkdirSync, mkdtempSync, readFileSync, readdirSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { basename, dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -25,16 +25,15 @@ import { build } from 'esbuild';
 
 const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '..');
 
+/** Тайпчекер, которым собираются публикуемые декларации (TypeScript 6). */
+const TSC_BIN = join(ROOT, 'node_modules', 'typescript', 'bin', 'tsc');
 /**
- * Бинарь тайпчекера для consumer-фикстур. Корневой devDependency typescript —
- * это alias на @typescript/typescript6 (issue #194), который кладёт tsc6, а не
- * tsc; ванильное имя остаётся у нативного TypeScript 7. Берём то, что реально
- * лежит в пакете, вместо предположения о его раскладке.
+ * Нижняя поддерживаемая версия компилятора у потребителя. Пакет объявляет себя
+ * всем версиям (typesVersions использует catch-all), поэтому одного гейта на
+ * актуальном TS мало: он не заметит конструкцию, которую эмитит новый
+ * компилятор, а массово развёрнутый TS 5.x разобрать не может.
  */
-const TSC_BIN = (() => {
-  const root = join(ROOT, 'node_modules', 'typescript', 'bin');
-  return join(root, existsSync(join(root, 'tsc')) ? 'tsc' : 'tsc6');
-})();
+const TSC5_BIN = join(ROOT, 'node_modules', 'typescript5', 'bin', 'tsc');
 const pkg = JSON.parse(readFileSync(join(ROOT, 'package.json'), 'utf8'));
 const suppliedTarball = process.argv[2] === undefined ? undefined : resolve(process.argv[2]);
 
@@ -208,6 +207,11 @@ try {
     );
     execSync(`node "${TSC_BIN}" --project tsconfig.json`, { cwd: dir, stdio: 'pipe' });
     log('TS: nodenext-резолв exports + типы прошли tsc --noEmit ✓');
+    // Та же поверхность предыдущим мажором. Без этого гейта смена компилятора
+    // деклараций (или его bump внутри 6.x) может начать эмитить конструкцию,
+    // которую TS 5.x не разбирает, и CI останется зелёным, а потребители нет.
+    execSync(`node "${TSC5_BIN}" --project tsconfig.json`, { cwd: dir, stdio: 'pipe' });
+    log('TS floor: те же публичные типы читаются TypeScript 5.9 ✓');
   }
 
   // Headless API обязан типизироваться в чистом Node без lib.dom. Структурный
