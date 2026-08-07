@@ -19,19 +19,35 @@ if (!/^[0-9a-f]{40}$/.test(sourceSha)) fail(`некорректный source SHA
 
 const tarball = resolve(tarballArgument);
 const manifestPath = resolve(manifestArgument);
+// Единственное чтение байтов артефакта: и проверка, и хеш в манифесте идут
+// от ОДНОГО буфера, иначе между «что проверили» и «что запечатали» остаётся
+// окно, в которое файл можно подменить.
+let artifactBytes;
+try {
+  artifactBytes = readFileSync(tarball);
+} catch (error) {
+  fail(`не удалось прочитать артефакт ${tarball}: ${error?.message ?? String(error)}`);
+}
+
+// gzip-магию проверяем сами: bsdtar в режиме извлечения игнорирует -z и
+// спокойно читает несжатый tar, тогда как GNU tar его отвергает. Без явной
+// проверки строгость гейта зависела бы от того, какой tar первым в PATH.
+if (artifactBytes[0] !== 0x1f || artifactBytes[1] !== 0x8b) {
+  fail(`артефакт ${basename(tarball)} не является gzip-архивом`);
+}
+
 let archivePackage;
 try {
   // Читаем метаданные из самого tgz, чтобы манифест описывал байты артефакта,
   // а не рабочее дерево, из которого он был собран.
   archivePackage = JSON.parse(
-    // Байты архива подаём на stdin: тогда tar не разбирает путь вообще, и
-    // класс закрыт целиком — ни ведущее «C:» windows-пути (GNU tar принимает
-    // его за спецификацию удалённого хоста), ни двоеточие в имени, ни путь
-    // длиннее MAX_PATH (такой нельзя выставить рабочим каталогом процесса)
-    // больше ни на что не влияют. Байты всё равно читаются ниже для sha256.
-    // Флаг -z обязателен: GNU tar на stdin не определяет сжатие сам.
+    // Байты подаём на stdin: тогда tar не разбирает путь вообще, и класс
+    // закрыт целиком — ни ведущее «C:» windows-пути (GNU tar принимает его за
+    // спецификацию удалённого хоста), ни двоеточие в имени, ни путь длиннее
+    // MAX_PATH (такой нельзя выставить рабочим каталогом процесса) больше ни
+    // на что не влияют. Флаг -z нужен GNU tar: на stdin он сжатие не угадывает.
     execFileSync('tar', ['-xzOf', '-', 'package/package.json'], {
-      input: readFileSync(tarball),
+      input: artifactBytes,
       encoding: 'utf8',
       stdio: ['pipe', 'pipe', 'pipe'],
     }),
@@ -61,7 +77,7 @@ if (tarballName !== expectedName) {
   fail(`имя tgz ${tarballName} не совпадает с ожидаемым ${expectedName}`);
 }
 
-const tarballSha256 = createHash('sha256').update(readFileSync(tarball)).digest('hex');
+const tarballSha256 = createHash('sha256').update(artifactBytes).digest('hex');
 const packageIdentity = `${archivePackage.name}@${archivePackage.version}`;
 const manifest = {
   schema: 1,

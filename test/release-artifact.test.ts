@@ -7,7 +7,7 @@ import {
   writeFileSync,
 } from 'node:fs';
 import { tmpdir } from 'node:os';
-import { dirname, join } from 'node:path';
+import { delimiter, dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { afterEach, describe, expect, it } from 'vitest';
 
@@ -173,20 +173,32 @@ describe('release artifact: fail-closed манифест', () => {
     expect(check(invalidName.tarball, invalidName.manifest).status).not.toBe(0);
   });
 
-  // Двоеточие в имени легально на POSIX; на Windows это синтаксис
-  // альтернативного потока NTFS, поэтому кейс осмыслен только там, где он и
-  // гейтит CI — на ubuntu-раннере.
-  it.skipIf(process.platform === 'win32')('читает архив, чьё имя ломает разбор пути в tar', () => {
-    // Двоеточие в имени воспроизводимо на Linux, поэтому этот тест реально
-    // гейтит класс в CI (все job-ы там ubuntu). Если чтение снова начнёт
-    // разбирать путь, скрипт упадёт на ЧТЕНИИ; при исправном чтении он
-    // доходит до проверки канонического имени и отвергает уже по ней.
-    const { tarball, manifest } = archive({}, 'labpics:motion-9.8.7.tgz');
-    const result = check(tarball, manifest);
+  // Инвариант, а не платформенный симптом: скрипт обязан подавать архив tar-у
+  // на stdin и НЕ передавать путь. Проверяем через шим в PATH, который
+  // записывает свой argv, — такой тест гейтит класс на любой ОС, в том числе
+  // на ubuntu-раннере, где сам симптом невоспроизводим.
+  // Пропуск на win32 вынужденный: Node с 18.20 не исполняет .cmd без shell,
+  // поэтому подменить tar шимом там нельзя. На Linux утверждение настоящее и
+  // упадёт, если скрипт снова начнёт передавать путь, — а CI именно ubuntu.
+  it.skipIf(process.platform === 'win32')('не передаёт путь к архиву в tar', () => {
+    const { tarball, manifest } = archive();
+    const shimDir = mkdtempSync(join(tmpdir(), 'labmotion-tar-shim-'));
+    workspaces.push(shimDir);
+    const argvLog = join(shimDir, 'argv.json');
+    const body = `require('node:fs').writeFileSync(${JSON.stringify(argvLog)}, JSON.stringify(process.argv.slice(2)));`;
+    writeFileSync(join(shimDir, 'tar.js'), body);
+    writeFileSync(join(shimDir, 'tar'), `#!/bin/sh
+exec node "$(dirname "$0")/tar.js" "$@"
+`, { mode: 0o755 });
 
-    expect(result.status).not.toBe(0);
-    expect(result.stderr).not.toContain('не удалось прочитать');
-    expect(result.stderr).toContain('release-artifact-check:');
+    spawnSync(process.execPath, [SCRIPT, tarball, TAG, SHA, manifest, join(dirname(tarball), 'root-package.json')], {
+      encoding: 'utf8',
+      env: { ...process.env, PATH: `${shimDir}${delimiter}${process.env.PATH ?? ''}` },
+    });
+
+    const argv: string[] = JSON.parse(readFileSync(argvLog, 'utf8'));
+    expect(argv).toContain('-');
+    expect(argv.some((a) => a.includes('.tgz'))).toBe(false);
   });
 
   it('не перезаписывает уже созданный манифест', () => {
