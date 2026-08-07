@@ -125,3 +125,43 @@ describe('springAsEasing: горячий путь и краевые входы',
     expect(e(5)).toBe(1);
   });
 });
+
+/**
+ * Канонический приоритет ошибок (бриф D2): LM088 → LM089 → LM090 → LM169 →
+ * LM091. Табличный корпус перебирает сочетания нескольких невалидных полей:
+ * побеждать обязан код старшего приоритета, а не порядок проверок в коде.
+ */
+describe('приоритет ошибок при нескольких невалидных полях', () => {
+  const CASES: readonly [label: string, p: { mass: number; stiffness: number; damping: number }, code: string][] = [
+    ['масса 0 + демпфирование 0', { mass: 0, stiffness: 100, damping: 0 }, 'LM088'],
+    ['масса NaN + жёсткость −1', { mass: Number.NaN, stiffness: -1, damping: 20 }, 'LM088'],
+    ['масса ∞ + демпфирование −5', { mass: Number.POSITIVE_INFINITY, stiffness: 100, damping: -5 }, 'LM088'],
+    ['жёсткость −1 + демпфирование 0', { mass: 1, stiffness: -1, damping: 0 }, 'LM089'],
+    ['жёсткость NaN + демпфирование −5', { mass: 1, stiffness: Number.NaN, damping: -5 }, 'LM089'],
+    ['демпфирование −5 (поле бьёт LM169)', { mass: 1, stiffness: 100, damping: -5 }, 'LM090'],
+    ['демпфирование NaN', { mass: 1, stiffness: 100, damping: Number.NaN }, 'LM090'],
+    ['демпфирование ровно 0 при валидных полях', { mass: 1, stiffness: 100, damping: 0 }, 'LM169'],
+    ['валидные поля, бюджет не выполняется', { mass: 100, stiffness: 100, damping: 2 }, 'LM091'],
+  ];
+
+  for (const [label, params, code] of CASES) {
+    it(`${label} → ${code}`, () => {
+      expect(() => springAsEasing(params)).toThrow(expect.objectContaining({ code }));
+    });
+  }
+});
+
+/**
+ * Пин формы ζ = c/(2m·ω₀) (заметка ревью #267): прежняя запись c/(2√(km))
+ * переполняла произведение k·m, и на валидной пружине m=k=c=1e200 (ζ=0.5)
+ * давала ζ=0 — кривая ломалась. Возврат той формы обязан краснить этот тест.
+ */
+describe('ζ не переполняется на масштабных краях', () => {
+  it('m=k=c=1e200 даёт ту же кривую, что m=k=c=1', () => {
+    const reference = springAsEasing({ mass: 1, stiffness: 1, damping: 1 });
+    const extreme = springAsEasing({ mass: 1e200, stiffness: 1e200, damping: 1e200 });
+    for (let i = 0; i <= 20; i++) {
+      expect(Object.is(extreme(i / 20), reference(i / 20))).toBe(true);
+    }
+  });
+});

@@ -28,7 +28,7 @@
  * Инварианты: zero-DOM, zero-deps, детерминизм, MotionParamError рано.
  */
 
-import { settleTimeAtRestUpperBound, spring, validateSpringFieldRanges, type SpringParams } from '../spring.js';
+import { settleTimeAtRestUpperBound, spring, type SpringParams } from '../spring.js';
 import { CONVERGENCE_THRESHOLD } from '../internal/constants.js';
 import { makeSpringValueSampler } from '../internal/solver.js';
 import { MotionParamError } from '../errors.js';
@@ -305,13 +305,19 @@ export function springAsEasing(params: SpringParams): (t: number) => number {
   // где ζ ещё считалась переполняющейся формой.
   const zeta = params.damping / (2 * params.mass * omega0);
   // Канонический приоритет ошибок: LM088 → LM089 → LM090 → LM169 → LM091.
-  // Полевые коды первыми (один SSOT условий — validateSpringFieldRanges),
-  // затем собственный LM169 easing-контракта: у незатухающей пружины финитной
-  // проекции на [0,1] не существует, и бюджетный LM091 не должен это
-  // перехватывать. Комбинированный инвалид {mass:0, damping:0} даёт LM088.
-  validateSpringFieldRanges(params);
-  if (params.damping === 0) throw new MotionParamError('LM169');
-  spring(params, 0);
+  // Полевые коды отдаёт сам валидатор (он проверяет поля до бюджета), поэтому
+  // комбинированный инвалид {mass:0, damping:0} даёт LM088. Единственный
+  // случай, где бюджетный LM091 маскировал бы истинную причину, — валидные
+  // поля с damping === 0: бюджет там бесконечен ВСЕГДА, а дефект — отсутствие
+  // затухания, это контракт easing (LM169). Узкий ремап ровно этого случая.
+  try {
+    spring(params, 0);
+  } catch (error) {
+    if (params.damping === 0 && (error as MotionParamError).code === 'LM091') {
+      throw new MotionParamError('LM169');
+    }
+    throw error;
+  }
 
   const horizon = easingHorizon(zeta);
   const settle = horizon / omega0;
