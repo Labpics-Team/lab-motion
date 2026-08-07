@@ -170,13 +170,9 @@ export function motionCompiler(): MotionCompilerPlugin {
         program = this.parse(code);
       } catch (error) {
         // Модуль упоминает наши субпути, но не парсится на фазе, где обязан
-        // быть JavaScript, — это не «чужой синтаксис», а сломанный вход.
-        // Диагностика не глотается: предупреждение видно в сборке.
-        this.warn(
-          `lab-motion:lowering: модуль не распарсен, lowering пропущен: ${
-            error instanceof Error ? error.message : String(error)
-          }`,
-        );
+        // быть JavaScript, — сломанный вход, а не «чужой синтаксис».
+        // Диагностика не глотается; имя плагина и позицию Rollup допишет сам.
+        this.warn(`lowering пропущен: ${error}`);
         return undefined;
       }
       const ast = program as AstNode;
