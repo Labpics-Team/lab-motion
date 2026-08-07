@@ -17,13 +17,24 @@
  */
 
 import { execSync } from 'node:child_process';
-import { mkdirSync, mkdtempSync, readFileSync, readdirSync, rmSync, writeFileSync } from 'node:fs';
+import { mkdirSync, mkdtempSync, readFileSync, readdirSync, rmSync, writeFileSync, existsSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { basename, dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { build } from 'esbuild';
 
 const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '..');
+
+/**
+ * Бинарь тайпчекера для consumer-фикстур. Корневой devDependency typescript —
+ * это alias на @typescript/typescript6 (issue #194), который кладёт tsc6, а не
+ * tsc; ванильное имя остаётся у нативного TypeScript 7. Берём то, что реально
+ * лежит в пакете, вместо предположения о его раскладке.
+ */
+const TSC_BIN = (() => {
+  const root = join(ROOT, 'node_modules', 'typescript', 'bin');
+  return join(root, existsSync(join(root, 'tsc')) ? 'tsc' : 'tsc6');
+})();
 const pkg = JSON.parse(readFileSync(join(ROOT, 'package.json'), 'utf8'));
 const suppliedTarball = process.argv[2] === undefined ? undefined : resolve(process.argv[2]);
 
@@ -195,8 +206,7 @@ try {
         `export function use(): number { single.destroy(); group.destroy(); return v + plan.duration + staggerPlan.count + read.value + drag.x + (cfg.prefersReduced() ? 1 : 0); }\n` +
         `export type C = AnimateControls; export type N = NanoControls; export const a = animate; export const n = nanoAnimate;\n`,
     );
-    const tscBin = join(ROOT, 'node_modules', 'typescript', 'bin', 'tsc');
-    execSync(`node "${tscBin}" --project tsconfig.json`, { cwd: dir, stdio: 'pipe' });
+    execSync(`node "${TSC_BIN}" --project tsconfig.json`, { cwd: dir, stdio: 'pipe' });
     log('TS: nodenext-резолв exports + типы прошли tsc --noEmit ✓');
   }
 
@@ -237,8 +247,7 @@ try {
         `export const contracts: [DragOptions, PresenceOptions, FlipOptions, SheetOptions] | undefined = undefined;\n` +
         `drive(root); createDriver(driver); createDecay(decay);\n`,
     );
-    const tscBin = join(ROOT, 'node_modules', 'typescript', 'bin', 'tsc');
-    execSync(`node "${tscBin}" --project tsconfig.json`, { cwd: dir, stdio: 'pipe' });
+    execSync(`node "${TSC_BIN}" --project tsconfig.json`, { cwd: dir, stdio: 'pipe' });
     log('TS headless: NodeNext без lib.dom и skipLibCheck прошёл ✓');
   }
 
@@ -252,6 +261,12 @@ try {
         compilerOptions: {
           module: 'commonjs',
           moduleResolution: 'node10',
+          // Фикстура НАМЕРЕННО проверяет legacy-резолвер: у части потребителей
+          // он ещё в ходу. TypeScript 6 объявил node10 deprecated и без этого
+          // флага отказывается компилировать. Флаг перестанет действовать в
+          // TypeScript 7 — тогда фикстуру придётся снимать вместе с
+          // заявленной поддержкой node10, и это осознанный decommission gate.
+          ignoreDeprecations: '6.0',
           target: 'ES2022',
           lib: ['ES2022', 'DOM'],
           strict: true,
@@ -271,8 +286,7 @@ try {
         `export const value: number = clamp(0, 1, spring({ mass: 1, stiffness: 200, damping: 20 }, 0.1).value);\n` +
         `export const motion = [nanoAnimate, compileStaggerPlan] as const;\n`,
     );
-    const tscBin = join(ROOT, 'node_modules', 'typescript', 'bin', 'tsc');
-    const trace = execSync(`node "${tscBin}" --project tsconfig.json --traceResolution`, {
+    const trace = execSync(`node "${TSC_BIN}" --project tsconfig.json --traceResolution`, {
       cwd: dir,
       encoding: 'utf8',
     }).replaceAll('\\', '/');
@@ -339,8 +353,7 @@ try {
         `export type N = NanoControls; export const nano = nanoAnimate;\n` +
         `single.destroy(); group.destroy();\n`,
     );
-    const tscBin = join(ROOT, 'node_modules', 'typescript', 'bin', 'tsc');
-    const trace = execSync(`node "${tscBin}" --project tsconfig.json --traceResolution`, {
+    const trace = execSync(`node "${TSC_BIN}" --project tsconfig.json --traceResolution`, {
       cwd: dir,
       encoding: 'utf8',
     }).replaceAll('\\', '/');

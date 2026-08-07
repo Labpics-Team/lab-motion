@@ -12,7 +12,10 @@
     "skipLibCheck": true,
     "forceConsistentCasingInFileNames": true,
     "rootDir": "src",
-    "outDir": "dist"
+    "outDir": "dist",
+    // TypeScript 6 больше не подтягивает @types/node неявно: без явного списка
+    // node:zlib и Buffer в src/future-layout/receipt.ts перестают резолвиться.
+    "types": ["node"]
   },
   "include": ["src"]
 }
