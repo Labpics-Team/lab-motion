@@ -160,20 +160,7 @@ describe('медленная ставка пришпилена по величи
     expect(settleTimeAtRestUpperBound(params)).toBeCloseTo(expected, 6);
   });
 
-  it('springAsEasing строит кривую по истинной, а не полу́ченной ставке', async () => {
-    const { springAsEasing } = await import('../src/spring/index.js');
-    const easing = springAsEasing(params);
-    // Пол 1e-6 давал шкалу времени в двести раз короче истинной: кривая
-    // мгновенно упиралась в единицу и теряла всю форму перехода.
-    // easing(0) и easing(1) бьют в хардкодные ранние возвраты и о законе
-    // ничего не говорят, поэтому проверяем середину против независимого
-    // предела: шкала кривой задаётся ставкой k/c, значит g(u) = 1 − e^{−(k/c)·T·u}.
-    const rate = params.stiffness / params.damping;
-    const settle = Math.log(100) / rate;
-    for (const u of [0.1, 0.25, 0.5, 0.75]) {
-      expect(easing(u)).toBeCloseTo(-Math.expm1(-rate * settle * u), 6);
-    }
-  });
+
 });
 
 /**

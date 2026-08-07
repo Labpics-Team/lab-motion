@@ -17,9 +17,9 @@
  * - springPresets — канонические пресеты react-spring (tension/friction
  *   при mass=1): default/gentle/wobbly/stiff/slow/molasses.
  * - springAsEasing(params) — пружина как easing-функция t∈[0,1]→value
- *   (совместима с keyframes/tween): шкала времени = время оседания
- *   параметров; эндпоинты точны (дисциплина NE2), форма OVERSHOOTING
- *   при ζ<1.
+ *   (совместима с keyframes/tween): шкала времени = горизонт допуска, кривая
+ *   C¹-запечатана на обоих концах, отклонение от настоящей пружины не
+ *   превышает CONVERGENCE_THRESHOLD; форма OVERSHOOTING при ζ<1.
  *
  * Все результаты уважают выведенный бюджет валидатора (settleTimeUpperBound
  * ≤ бюджета кадра-капа): краевые bounce/duration ЧЕСТНО клампятся к
@@ -29,6 +29,8 @@
  */
 
 import { settleTimeAtRestUpperBound, spring, type SpringParams } from '../spring.js';
+import { CONVERGENCE_THRESHOLD } from '../internal/constants.js';
+import { makeSpringValueSampler } from '../internal/solver.js';
 import { MotionParamError } from '../errors.js';
 
 // ─── Бюджет валидатора (зеркалит выведенный закон spring.ts, 2026-07-03) ─────
@@ -57,6 +59,73 @@ const LN_100 = Math.log(100);
  */
 function slowRoot(z: number): number {
   return z < 1 ? z : 1 / (z + Math.sqrt(z * z - 1));
+}
+
+/**
+ * Форменные множители траектории в нормированном времени τ = ω₀t: остаток до
+ * цели 1 − x(τ) и скорость dx/dτ. Для ζ≥1 записаны разностью экспонент по двум
+ * корням, а не через cosh/sinh: последние переполняются уже при ζ=10, и
+ * e^{−ζτ}·∞ даёт NaN. Медленный корень берётся тем же тождеством 1/(ζ+s), что
+ * и везде в файле, поэтому у ζ=1 ветви сходятся без полюса 1/√|ζ²−1|.
+ */
+function shape(z: number, tau: number): { rest: number; vel: number } {
+  if (z < 1) {
+    const d = Math.sqrt(1 - z * z);
+    const x = d * tau;
+    const e = Math.exp(-z * tau);
+    const sinc = x === 0 ? 1 : Math.sin(x) / x;
+    return { rest: e * (Math.cos(x) + z * tau * sinc), vel: tau * e * sinc };
+  }
+  const s = Math.sqrt(z * z - 1);
+  if (s === 0) {
+    const e = Math.exp(-tau);
+    return { rest: e * (1 + tau), vel: tau * e };
+  }
+  const slow = Math.exp(-slowRoot(z) * tau);
+  const fast = Math.exp(-(z + s) * tau);
+  const half = (slow - fast) / (2 * s);
+  return { rest: (slow + fast) / 2 + z * half, vel: half };
+}
+
+/**
+ * Горизонт финитной проекции: наименьшее τ, при котором эрмитова коррекция
+ * уводит кривую от истинной пружины не более чем на CONVERGENCE_THRESHOLD.
+ *
+ * Отклонение ограничено |1−x(U)| + (4/27)·U·|dx/dτ(U)|, потому что
+ * max|3u²−2u³| = 1 и max|u³−u²| = 4/27 на [0,1]. Для ζ<1 критерий осциллирует,
+ * поэтому мажорируем |cos| ≤ 1 и |sin(x)/x| ≤ 1; для ζ≥1 форма монотонна и
+ * берётся точно. В ζ=1 обе записи совпадают, разрыва горизонта нет.
+ *
+ * Зависит ТОЛЬКО от ζ и допуска — ни от ω₀, ни от массы, ни от бюджета кадра,
+ * поэтому scale-equivalent пружины дают бит-в-бит одну кривую.
+ */
+function easingHorizon(z: number): number {
+  const k = 4 / 27;
+  const deviation = (u: number): number => {
+    if (z < 1) {
+      // |sin(x)/x| ≤ min(1, 1/x): без второго ограничения горизонт рос как
+      // O(1/ζ²) и у слабо демпфированных пружин не помещался ни в какой
+      // разумный потолок. С ним рост — O(ln(1/tol)/ζ).
+      const d = Math.sqrt(1 - z * z);
+      return Math.exp(-z * u) * (1 + Math.min(z * u, z / d) + k * u * Math.min(u, 1 / d));
+    }
+    const { rest, vel } = shape(z, u);
+    return rest + k * u * vel;
+  };
+  // Потолок — страховка от бесконечного цикла, а не рабочий путь: при ζ>0
+  // экспонента всегда пересиливает полином. Если он всё же достигнут, финитной
+  // проекции в допуск не существует, и это отказ, а не тихая подмена кривой.
+  const CEILING = 1e12;
+  let hi = 1;
+  while (deviation(hi) > CONVERGENCE_THRESHOLD && hi < CEILING) hi *= 2;
+  if (deviation(hi) > CONVERGENCE_THRESHOLD) throw new MotionParamError('LM169');
+  let lo = 0;
+  for (let i = 0; i < 80; i++) {
+    const mid = (lo + hi) / 2;
+    if (deviation(mid) > CONVERGENCE_THRESHOLD) lo = mid;
+    else hi = mid;
+  }
+  return hi;
 }
 
 // ─── fromBounce ──────────────────────────────────────────────────────────────
@@ -221,25 +290,48 @@ export const springPresets: Readonly<Record<
 
 /**
  * Пружина как easing-функция t∈[0,1] → value (форма OVERSHOOTING при ζ<1).
- * Шкала: t=1 соответствует времени оседания параметров (огибающая до 1%).
+ * Шкала: t=1 соответствует ГОРИЗОНТУ ДОПУСКА — наименьшему времени, при
+ * котором C¹-запечатка уводит кривую от настоящей пружины не более чем на
+ * CONVERGENCE_THRESHOLD. Горизонт зависит только от ζ и допуска, поэтому
+ * scale-equivalent пружины дают одну кривую. Возвращается НЕ сама пружина,
+ * а её эрмитово скорректированная проекция: концы запечатаны точно
+ * (g(0)=0, g′(0)=0, g(1)=1, g′(1)=0), отклонение от пружины ≤ допуска.
  * Эндпоинты точны: e(0)=0, e(1)=1; вход клампится, NaN→0 (дисциплина NE2/NE1).
  */
 export function springAsEasing(params: SpringParams): (t: number) => number {
-  // Валидация рано и детерминированно (конвенция движка).
-  spring(params, 0);
   const omega0 = Math.sqrt(params.stiffness / params.mass);
   // ζ = c/(2√(km)) = c/(2m·ω₀): тождество снимает второй sqrt и не переполняет
   // произведение stiffness·mass — это было единственное место в репозитории,
   // где ζ ещё считалась переполняющейся формой.
   const zeta = params.damping / (2 * params.mass * omega0);
-  const slow = slowRoot(zeta);
-  const settle = LN_100 / (omega0 * slow);
+  // Своя проверка ДО физического валидатора: у незатухающей пружины финитной
+  // проекции на [0,1] не существует вовсе, и это свойство easing-контракта,
+  // а не бюджета кадра. Условие узкое — ровно damping === 0: иначе LM169 стал
+  // бы зонтиком для битой массы и жёсткости и подменял бы точные LM088/89/90.
+  if (params.damping === 0) throw new MotionParamError('LM169');
+  // Физическая валидация — после собственной: иначе бюджетный LM091 перехватил
+  // бы вход, у которого дефект не в бюджете, а в отсутствии затухания.
+  spring(params, 0);
+
+  const horizon = easingHorizon(zeta);
+  const settle = horizon / omega0;
+  // Сэмплер хойстит инварианты один раз: на вызов не остаётся ни валидации,
+  // ни расчёта горизонта, ни аллокации объекта.
+  const sample = makeSpringValueSampler(params, 0);
+  const gap = 1 - sample(settle);
+  const slopeAtEnd = horizon * shape(zeta, horizon).vel;
 
   return (t: number): number => {
     const u = Number.isNaN(t) ? 0 : t;
     if (u <= 0) return 0;
     if (u >= 1) return 1;
-    const v = spring(params, u * settle).value;
-    return Number.isFinite(v) ? v : 1;
+    const v = sample(u * settle);
+    if (!Number.isFinite(v)) return 1;
+    // Эрмитова C¹-запечатка: h₁=3u²−2u³ добирает остаток (h₁(1)=1, h₁′(1)=0),
+    // h₂=u³−u² гасит наклон (h₂(1)=0, h₂′(1)=1). Обе базисные функции и их
+    // производные равны нулю в u=0, поэтому старт не сдвигается.
+    const u2 = u * u;
+    const u3 = u2 * u;
+    return v + gap * (3 * u2 - 2 * u3) - slopeAtEnd * (u3 - u2);
   };
 }
