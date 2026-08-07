@@ -82,9 +82,12 @@ async function buildFixture(name, code, withPlugin, entryName = name, extension 
 
 // TypeScript-вход (бриф, этап C): аннотации, as const, satisfies, interface.
 const LOWERABLE_TS = `import { animate } from '@labpics/motion/nano';
-interface Opts { readonly level: number }
-const conf = { level: 0.5 } as const satisfies Opts;
-export function play(el: Element): unknown { animate(el, { opacity: conf.level }); return conf; }`;
+interface Marker { readonly kind: 'fixture' }
+const marker = { kind: 'fixture' } as const satisfies Marker;
+export function play(el: Element): typeof marker {
+  animate(el, { opacity: 0.5 });
+  return marker;
+}`;
 // TSX-вход: плагин заявляет поддержку через дефолтную фазу Vite.
 const LOWERABLE_TSX = `import { animate } from '@labpics/motion/nano';
 export function Play(props: { el: Element }): unknown {

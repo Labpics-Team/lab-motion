@@ -36,12 +36,12 @@ interface TransformResult {
 
 interface RollupTransformContext {
   parse(code: string): unknown;
+  warn(message: string): void;
 }
 
 /** Минимальный структурный контракт плагина: не тянем типы vite в d.ts. */
 export interface MotionCompilerPlugin {
   readonly name: string;
-  readonly enforce: 'pre';
   transform(
     this: RollupTransformContext,
     code: string,
@@ -160,14 +160,24 @@ const QUICK_FILTERS = ['@labpics/motion/nano', '@labpics/motion/animate'];
 export function motionCompiler(): MotionCompilerPlugin {
   return {
     name: 'lab-motion:lowering',
-    enforce: 'pre',
+    // Дефолтная фаза, а не enforce:'pre': до транспиляции хук получал сырой
+    // TypeScript, this.parse падал, и TS/TSX-модули молча оставались без
+    // lowering. После vite:oxc сюда приходит уже JavaScript.
     transform(code, id) {
       if (id.includes('\0') || !QUICK_FILTERS.some((f) => code.includes(f))) return undefined;
       let program: unknown;
       try {
         program = this.parse(code);
-      } catch {
-        return undefined; // не наш синтаксис — пусть падает штатный пайплайн
+      } catch (error) {
+        // Модуль упоминает наши субпути, но не парсится на фазе, где обязан
+        // быть JavaScript, — это не «чужой синтаксис», а сломанный вход.
+        // Диагностика не глотается: предупреждение видно в сборке.
+        this.warn(
+          `lab-motion:lowering: модуль не распарсен, lowering пропущен: ${
+            error instanceof Error ? error.message : String(error)
+          }`,
+        );
+        return undefined;
       }
       const ast = program as AstNode;
       // Два независимых плана: nano (2-арг opacity) и surface (3-арг
