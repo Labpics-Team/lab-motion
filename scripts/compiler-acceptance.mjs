@@ -38,7 +38,7 @@ const ALIAS = {
   '@labpics/motion/nano': resolve(DIST, 'nano/index.js'),
   '@labpics/motion/compiler/runtime': resolve(DIST, 'compiler/runtime/index.js'),
   '@labpics/motion/animate': resolve(DIST, 'animate/index.js'),
-  '@labpics/motion/surface': resolve(DIST, 'surface/index.js'),
+  '@labpics/motion/compiler/surface': resolve(DIST, 'surface/index.js'),
 };
 
 /** dist-модуль (не entry, не bare peer) в графе — нормализованный к dist-relative id. */

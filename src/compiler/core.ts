@@ -459,28 +459,22 @@ export function lowerSurfaceCall(input: SurfaceCallInput): SurfaceLoweringResult
     ) {
       return reject('spring-invalid');
     }
-    if (velocity !== undefined && (typeof velocity !== 'number' || !Number.isFinite(velocity))) {
-      return reject('velocity-invalid');
+    // Ненулевая начальная скорость меняет траекторию, а runtime-путь берёт её
+    // из живого наблюдателя; у executor'а наблюдателя нет — сомнение → отказ.
+    if (velocity !== undefined && velocity !== 0) {
+      return reject('velocity-not-executable');
     }
-    (program as { spring?: SurfaceSpringRecord }).spring = velocity === undefined
-      ? { mass, stiffness, damping }
-      : { mass, stiffness, damping, velocity };
+    (program as { spring?: SurfaceSpringRecord }).spring = { mass, stiffness, damping };
   }
 
-  const inputPolicy = options['inputPolicy'];
-  if (inputPolicy !== undefined) {
-    if (inputPolicy !== 'finish' && inputPolicy !== 'cancel' && inputPolicy !== 'block') {
-      return reject('input-policy-unknown');
-    }
-    (program as { inputPolicy?: 'finish' | 'cancel' | 'block' }).inputPolicy = inputPolicy;
+  // Политики ввода и скролла принимались в программу, но артефакт их не
+  // сериализовал, а executor не исполнял — латентная дивергенция. Fail-closed:
+  // любое их наличие оставляет корректный runtime-вызов.
+  if (options['inputPolicy'] !== undefined) {
+    return reject('input-policy-not-executable');
   }
-
-  const scrollAnchor = options['scrollAnchor'];
-  if (scrollAnchor !== undefined) {
-    if (scrollAnchor !== 'preserve-start' && scrollAnchor !== 'none') {
-      return reject('scroll-anchor-unknown');
-    }
-    (program as { scrollAnchor?: 'preserve-start' | 'none' }).scrollAnchor = scrollAnchor;
+  if (options['scrollAnchor'] !== undefined) {
+    return reject('scroll-anchor-not-executable');
   }
 
   const onFrame = options['onFrame'];
@@ -495,7 +489,7 @@ export function lowerSurfaceCall(input: SurfaceCallInput): SurfaceLoweringResult
 
 // ─── Surface lowering: build-time сертификат и план байтовых правок ──────────
 
-export const SURFACE_IMPORT_SOURCE = '@labpics/motion/surface';
+export const SURFACE_IMPORT_SOURCE = '@labpics/motion/compiler/surface';
 export const SURFACE_IMPORT_NAME = 'runSurface';
 const SURFACE_LOCAL = '__labMotionSurface';
 const ANIMATE_SOURCE = '@labpics/motion/animate';
@@ -523,10 +517,36 @@ export function surfaceArtifactLiteral(program: SurfaceProgram): string | undefi
     program.spring?.velocity ?? 0,
   );
   if (artifact === undefined) return undefined;
-  // Blend A не сериализуется: executor вычисляет его на тех же Q-stops по
-  // канонической формуле (3−2x)x² — байты потребителя без потери геометрии.
+  // P, Q и blend A сериализуются из ОДНОГО SSOT (tryCompileSurfaceArtifact):
+  // прежний executor восстанавливал A регулярным выражением из Q и дополнял
+  // пары вместо замены — расхождение с runtime достигало 0.738 между стопами.
+  // Соседние стопы с одинаковой позицией и разными значениями — не контракт
+  // домена, а признак битой строки: такой артефакт не эмитится.
+  for (const css of [artifact.easing, artifact.reciprocalEasing, artifact.blendEasing]) {
+    if (hasConflictingAdjacentStops(css)) return undefined;
+  }
   return `{w0:${program.fromWidth},w1:${program.toWidth},d:${artifact.durationMs},`
-    + `p:${JSON.stringify(artifact.easing)},q:${JSON.stringify(artifact.reciprocalEasing)}}`;
+    + `p:${JSON.stringify(artifact.easing)},q:${JSON.stringify(artifact.reciprocalEasing)},`
+    + `a:${JSON.stringify(artifact.blendEasing)}}`;
+}
+
+/**
+ * Соседние stops linear() с одинаковой позицией обязаны нести одинаковый
+ * output: дубль-пара «v pc%, v pc%» легальна (усиление границы сегмента),
+ * разные значения на одной позиции — разрыв, который не является доменным
+ * контрактом поверхности.
+ */
+export function hasConflictingAdjacentStops(cssLinear: string): boolean {
+  const stops = cssLinear.slice(cssLinear.indexOf('(') + 1, -1).split(',');
+  let previousPercent = '';
+  let previousValue = '';
+  for (const stop of stops) {
+    const [value = '', percent = ''] = stop.trim().split(/\s+/);
+    if (percent !== '' && percent === previousPercent && value !== previousValue) return true;
+    previousPercent = percent;
+    previousValue = value;
+  }
+  return false;
 }
 
 /** Статический литерал AST → plain-значение; undefined = сомнение. */
@@ -630,10 +650,16 @@ export function planSurfaceLowering(
   const edits: NanoLoweringEdit[] = [];
   let runtimeCalls = 0;
 
-  walk(program, (node) => {
+  walk(program, (node, parent) => {
     if (node.type !== 'CallExpression') return;
     const callee = node.callee as AstNode;
     if (callee.type !== 'Identifier' || callee.name !== 'animate') return;
+    // Наблюдаемая эквивалентность контролов compiled-пути НЕ доказана
+    // (committed/ready/state/tier/play/pause/seek у executor'а нет), поэтому
+    // понижается ТОЛЬКО доказанно неиспользуемый результат — голый
+    // expression statement. Присваивание, return, await, чтение свойства,
+    // аргумент, optional chaining — всё остаётся runtime-вызовом.
+    if (parent?.type !== 'ExpressionStatement') { runtimeCalls++; return; }
     if (node.optional === true) { runtimeCalls++; return; }
     const args = node.arguments as AstNode[];
     if (args.length !== 3) { runtimeCalls++; return; }

@@ -11,10 +11,10 @@
  * (будущее layout коммитится один раз; пиксели догоняют сопряжёнными
  * snapshot-плоскостями G·F·R=1).
  *
- * Blend-траектория A(t) НЕ сериализуется в артефакт: executor вычисляет её
- * на тех же Q-stops по канонической формуле a(x)=(3−2x)x² (пост-сертификация
- * blend — монотонность и endpoints), а CSS linear() семплирует обе строки в
- * одних и тех же авторских stops — геометрия идентична сериализованной A.
+ * Blend-траектория A(t) сериализуется в артефакт вместе с P и Q: SSOT всех
+ * трёх строк — компилятор (tryCompileSurfaceArtifact). Executor ничего не
+ * восстанавливает и не выводит: прежний regex по Q дополнял пары вместо
+ * замены, и compiled crossfade расходился с runtime до 0.738 между стопами.
  *
  * Fail-closed деградации (ни одна не оставляет Infinity/NaN в CSS и ни одна
  * не откатывает committed DOM):
@@ -37,6 +37,8 @@ export interface CompiledSurfaceCall {
   readonly p: string;
   /** Serialized Q: reciprocal-компаньон из serialized P. */
   readonly q: string;
+  /** Serialized blend A: монотонный crossfade на тех же стопах (SSOT — компилятор). */
+  readonly a: string;
 }
 
 export interface CompiledSurfaceControls {
@@ -121,9 +123,18 @@ export function runSurface(
     vtEl = target;
     vtName = `lm${++seq}`;
     target.style.viewTransitionName = vtName;
-    const t = doc.startViewTransition(() => {
+    let t: ViewTransitionLike;
+    try {
+      t = doc.startViewTransition(() => {
+        target.style.width = w1px;
+      });
+    } catch {
+      // Hostile host: синхронный бросок не должен оставлять ни имени, ни
+      // незакоммиченного DOM. Fail-closed snap — как путь без VT.
       target.style.width = w1px;
-    });
+      end();
+      return controls;
+    }
     vt = t;
     const certify = (): void => {
       if (done) return;
@@ -146,15 +157,10 @@ export function runSurface(
       // old/new opacity crossfade c monotonic blend A на Q-stops.
       const s0 = art.w0 / art.w1;
       const dur = `${art.d}ms`;
-      // Blend A на Q-stops одним проходом: каждая пара «v pc%» дополняется
-      // «a(pc) pc%» (a(x)=(3−2x)x²); «linear(» и хвост не матчатся.
-      const aCss = art.q.replace(
-        /(-?[\d.]+) ([\d.]+)%/g,
-        (m, v, pc) => {
-          const x = +pc / 100;
-          return `${v} ${pc}%, ${(3 - 2 * x) * x * x} ${pc}%`;
-        },
-      );
+      // Blend A приходит сериализованной из артефакта: SSOT — компилятор.
+      // Прежний regex по Q дополнял пары вместо замены, и crossfade расходился
+      // с runtime до 0.738 между стопами (пилообразный фликер).
+      const aCss = art.a;
       const style = doc.createElement('style');
       style.textContent =
         `@keyframes ${vtName}-g { from { transform: ${placement} scaleX(${s0}); } to { transform: ${placement} scaleX(1); } }\n`
