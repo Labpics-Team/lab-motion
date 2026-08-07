@@ -1,5 +1,5 @@
 /**
- * src/surface/index.ts — приватный executor compiled surface-артефактов.
+ * compiler/surface/index.ts — приватный executor compiled surface-артефактов.
  *
  * Это build-tool деталь, не runtime-tier: сюда попадают ТОЛЬКО вызовы
  * animate(el, { width: [w0, w1] }, { layout: 'project' }), которые compiler

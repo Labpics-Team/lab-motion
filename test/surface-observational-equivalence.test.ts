@@ -18,7 +18,7 @@ import { parseAstAsync } from 'vite';
 
 import { motionCompiler } from '../src/compiler/vite/index.js';
 import { tryCompileSurfaceArtifact } from '../src/future-layout/artifact.js';
-import { runSurface, type CompiledSurfaceCall } from '../src/surface/index.js';
+import { runSurface, type CompiledSurfaceCall } from '../src/compiler/surface/index.js';
 import packageJson from '../package.json' with { type: 'json' };
 
 async function applyPlugin(code: string): Promise<string | undefined> {

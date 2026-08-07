@@ -448,12 +448,12 @@
     },
     "./compiler/surface": {
       "import": {
-        "types": "./dist/surface/index.d.ts",
-        "default": "./dist/surface/index.js"
+        "types": "./dist/compiler/surface/index.d.ts",
+        "default": "./dist/compiler/surface/index.js"
       },
       "require": {
-        "types": "./dist/surface/index.d.cts",
-        "default": "./dist/surface/index.cjs"
+        "types": "./dist/compiler/surface/index.d.cts",
+        "default": "./dist/compiler/surface/index.cjs"
       }
     },
     "./behaviors": {

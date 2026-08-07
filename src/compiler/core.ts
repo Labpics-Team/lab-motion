@@ -537,14 +537,11 @@ export function surfaceArtifactLiteral(program: SurfaceProgram): string | undefi
  * контрактом поверхности.
  */
 export function hasConflictingAdjacentStops(cssLinear: string): boolean {
-  const stops = cssLinear.slice(cssLinear.indexOf('(') + 1, -1).split(',');
-  let previousPercent = '';
-  let previousValue = '';
-  for (const stop of stops) {
-    const [value = '', percent = ''] = stop.trim().split(/\s+/);
-    if (percent !== '' && percent === previousPercent && value !== previousValue) return true;
-    previousPercent = percent;
-    previousValue = value;
+  let previous: readonly string[] = [];
+  for (const stop of cssLinear.slice(cssLinear.indexOf('(') + 1, -1).split(',')) {
+    const pair = stop.trim().split(' ');
+    if (pair[1] !== undefined && pair[1] === previous[1] && pair[0] !== previous[0]) return true;
+    previous = pair;
   }
   return false;
 }
