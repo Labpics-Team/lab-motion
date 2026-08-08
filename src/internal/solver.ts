@@ -69,9 +69,17 @@ export function solveSpring(
       // Две огромные модальные амплитуды при |v0|≈MAX взаимно уничтожаются у
       // t≈0. Разделение конечной базы и линейного вклада v0 сохраняет x'(0)=v0
       // без epsilon-переключателя и одновременно является базисом пакета.
+      // Домен ограничен ζ² ≤ MAX_VALUE (ζ ≲ 1.34e154): дальше ζ² переполняется
+      // и полюса вырождаются. Страховать это здесь не нужно и дорого по байтам —
+      // такие параметры не проходят публичную валидацию (LM091, fail-closed),
+      // граница закреплена тестом в spring-overdamped-slow-pole.
       const sqrtTerm = Math.sqrt(zeta * zeta - 1);
-      const r1 = -omega0 * (zeta - sqrtTerm);
+      // Быстрый полюс складывает слагаемые одного знака и потому точен всегда.
+      // Медленный берём из тождества r₁·r₂ = ω₀², а не как ω₀(ζ−√(ζ²−1)):
+      // при ζ > 1/√ε (≈6.7e7) √(ζ²−1) округляется ровно в ζ, разность даёт −0,
+      // и переход навсегда застывает на нуле вместо прихода в цель.
       const r2 = -omega0 * (zeta + sqrtTerm);
+      const r1 = omega0 * omega0 / r2;
       const denominator = r1 - r2;
       const e1 = Math.exp(r1 * t);
       // exp(r1·t)−exp(r2·t) округляется в ноль у t≈0. Форма от медленной
@@ -148,9 +156,10 @@ export function makeSpringValueSampler(
     const B = v0 - omega0;
     return (t) => (t <= 0 ? 0 : 1 + (-1 + B * t) * Math.exp(-omega0 * t));
   }
+  // Вывод медленного полюса и граница домена — те же, что в solveSpring.
   const sqrtTerm = Math.sqrt(zeta * zeta - 1);
-  const r1 = -omega0 * (zeta - sqrtTerm);
   const r2 = -omega0 * (zeta + sqrtTerm);
+  const r1 = omega0 * omega0 / r2;
   const denominator = r1 - r2;
   return (t) => {
     if (t <= 0) return 0;
