@@ -7,7 +7,7 @@ import {
   writeFileSync,
 } from 'node:fs';
 import { tmpdir } from 'node:os';
-import { dirname, join } from 'node:path';
+import { delimiter, dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { afterEach, describe, expect, it } from 'vitest';
 
@@ -101,7 +101,11 @@ function archive(
     }),
   );
   const tarball = join(work, fileName);
-  execFileSync('tar', ['-czf', tarball, '-C', work, 'package']);
+  // Имя архива передаём относительным при cwd=work: GNU tar принимает ведущее
+  // `C:` абсолютного windows-пути за спецификацию удалённого хоста и падает
+  // с «Cannot connect to C:». Относительный путь одинаково понимают и GNU tar,
+  // и встроенный в Windows bsdtar.
+  execFileSync('tar', ['-czf', `./${fileName}`, 'package'], { cwd: work });
   return { work, tarball, manifest: join(work, 'release-manifest.json') };
 }
 
@@ -167,6 +171,34 @@ describe('release artifact: fail-closed манифест', () => {
 
     const invalidName = archive({}, 'candidate.tgz');
     expect(check(invalidName.tarball, invalidName.manifest).status).not.toBe(0);
+  });
+
+  // Инвариант, а не платформенный симптом: скрипт обязан подавать архив tar-у
+  // на stdin и НЕ передавать путь. Проверяем через шим в PATH, который
+  // записывает свой argv, — такой тест гейтит класс на любой ОС, в том числе
+  // на ubuntu-раннере, где сам симптом невоспроизводим.
+  // Пропуск на win32 вынужденный: Node с 18.20 не исполняет .cmd без shell,
+  // поэтому подменить tar шимом там нельзя. На Linux утверждение настоящее и
+  // упадёт, если скрипт снова начнёт передавать путь, — а CI именно ubuntu.
+  it.skipIf(process.platform === 'win32')('не передаёт путь к архиву в tar', () => {
+    const { tarball, manifest } = archive();
+    const shimDir = mkdtempSync(join(tmpdir(), 'labmotion-tar-shim-'));
+    workspaces.push(shimDir);
+    const argvLog = join(shimDir, 'argv.json');
+    const body = `require('node:fs').writeFileSync(${JSON.stringify(argvLog)}, JSON.stringify(process.argv.slice(2)));`;
+    writeFileSync(join(shimDir, 'tar.js'), body);
+    writeFileSync(join(shimDir, 'tar'), `#!/bin/sh
+exec node "$(dirname "$0")/tar.js" "$@"
+`, { mode: 0o755 });
+
+    spawnSync(process.execPath, [SCRIPT, tarball, TAG, SHA, manifest, join(dirname(tarball), 'root-package.json')], {
+      encoding: 'utf8',
+      env: { ...process.env, PATH: `${shimDir}${delimiter}${process.env.PATH ?? ''}` },
+    });
+
+    const argv: string[] = JSON.parse(readFileSync(argvLog, 'utf8'));
+    expect(argv).toContain('-');
+    expect(argv.some((a) => a.includes('.tgz'))).toBe(false);
   });
 
   it('не перезаписывает уже созданный манифест', () => {
