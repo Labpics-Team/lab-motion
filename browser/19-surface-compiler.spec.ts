@@ -89,6 +89,7 @@ test('compiled и runtime доставляют идентичный финал �
       stylesAfter: document.querySelectorAll('style').length,
       stylesBefore: st.stylesBefore,
       vtNameCompiled: st.compiled.style.getPropertyValue('view-transition-name'),
+      vtNameUncompiled: st.uncompiled.style.getPropertyValue('view-transition-name'),
       hasViewTransitions: typeof (document as { startViewTransition?: unknown }).startViewTransition === 'function',
     };
     st.compiled.remove();
@@ -103,6 +104,7 @@ test('compiled и runtime доставляют идентичный финал �
   expect(result.stylesAfter).toBe(result.stylesBefore);
   if (result.hasViewTransitions) {
     expect(result.vtNameCompiled).toBe('');
+    expect(result.vtNameUncompiled).toBe('');
   }
 });
 
@@ -119,11 +121,16 @@ test('compiled list-путь исполняется WAAPI с артефактн�
     });
     playList(els);
     // Ждём, пока у обоих появится активная WAAPI-анимация (startViewTransition
-    // не может стартовать мгновенно в некоторых движках) — polling по rAF.
-    await new Promise<void>((resolve) => {
+    // не может стартовать мгновенно в некоторых движках) — polling по rAF с
+    // явным дедлайном: без него отсутствие анимации выглядело бы как мутный
+    // таймаут всей спеки вместо точной ошибки готовности.
+    await new Promise<void>((resolve, reject) => {
+      const deadline = performance.now() + 5000;
       const tick = (): void => {
         if (els.every((el) => el.getAnimations().length > 0)) resolve();
-        else requestAnimationFrame(tick);
+        else if (performance.now() >= deadline) {
+          reject(new Error('WAAPI-анимации list-пути не появились за 5000 ms'));
+        } else requestAnimationFrame(tick);
       };
       tick();
     });
