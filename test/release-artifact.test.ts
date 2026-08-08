@@ -133,8 +133,12 @@ function check(
  * `tar --transform`, которого нет в bsdtar из состава Windows. Имя пишется
  * как есть (точки-сегменты и «..» сохраняются): цель тестов — скрафтить
  * враждебный член, который системный tar отказался бы создать или нормализует.
- * Формат: 512-байтовый ustar-заголовок, контент с padding до 512, в конце
- * архива — два нулевых блока (перезаписываем старые).
+ *
+ * Терминатор ищется СКАНИРОВАНИЕМ, а не срезом «последних 1024 байт»: GNU tar
+ * добивает архив нулями до record-блока 10240, и запись, вставленная после
+ * первого нулевого блока, для него невидима (обход крафта, пойман CI на
+ * ubuntu). Проходим по записям до первого нулевого заголовка — это логический
+ * конец — и дописываем туда.
  */
 function appendTarEntry(tarball: string, name: string, content: string): void {
   const body = Buffer.from(content, 'utf8');
@@ -156,8 +160,19 @@ function appendTarEntry(tarball: string, name: string, content: string): void {
   const padding = (512 - (body.length % 512)) % 512;
   const entry = Buffer.concat([header, body, Buffer.alloc(padding, 0)]);
   const tarBytes = gunzipSync(readFileSync(tarball));
-  // Терминатор — два нулевых блока в конце: срезаем, дописываем, возвращаем.
-  const end = tarBytes.length - 1024;
+  // Логический конец архива: первый полностью нулевой 512-байтовый заголовок
+  // при обходе записей (заголовок + payload, выровненный до 512).
+  let end = -1;
+  for (let offset = 0; offset + 512 <= tarBytes.length; ) {
+    const block = tarBytes.subarray(offset, offset + 512);
+    if (block.every((byte) => byte === 0)) {
+      end = offset;
+      break;
+    }
+    const size = Number.parseInt(block.toString('ascii', 124, 136).replace(/\0.*$/, '').trim() || '0', 8);
+    offset += 512 + Math.ceil(size / 512) * 512;
+  }
+  if (end < 0) throw new Error('appendTarEntry: терминатор tar-архива не найден');
   const out = Buffer.concat([tarBytes.subarray(0, end), entry, Buffer.alloc(1024, 0)]);
   writeFileSync(tarball, gzipSync(out));
 }
