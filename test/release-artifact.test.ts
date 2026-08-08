@@ -9,6 +9,7 @@ import {
 import { tmpdir } from 'node:os';
 import { basename, delimiter, dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { gunzipSync, gzipSync } from 'node:zlib';
 import { afterEach, describe, expect, it } from 'vitest';
 
 const SCRIPT = fileURLToPath(new URL('../scripts/check-release-artifact.mjs', import.meta.url));
@@ -127,6 +128,40 @@ function check(
   });
 }
 
+/**
+ * Дописывает одну запись с произвольным именем в существующий tgz — замена
+ * `tar --transform`, которого нет в bsdtar из состава Windows. Имя пишется
+ * как есть (точки-сегменты и «..» сохраняются): цель тестов — скрафтить
+ * враждебный член, который системный tar отказался бы создать или нормализует.
+ * Формат: 512-байтовый ustar-заголовок, контент с padding до 512, в конце
+ * архива — два нулевых блока (перезаписываем старые).
+ */
+function appendTarEntry(tarball: string, name: string, content: string): void {
+  const body = Buffer.from(content, 'utf8');
+  const header = Buffer.alloc(512, 0);
+  header.write(name, 0, 'utf8');
+  header.write('0000644\0', 100, 'ascii');
+  header.write('0000000\0', 108, 'ascii');
+  header.write('0000000\0', 116, 'ascii');
+  header.write(body.length.toString(8).padStart(11, '0') + '\0', 124, 'ascii');
+  header.write('00000000000\0', 136, 'ascii');
+  header.write('        ', 148, 'ascii'); // chksum placeholder: 8 пробелов
+  header.write('0', 156, 'ascii'); // typeflag: обычный файл
+  header.write('ustar\0', 257, 'ascii');
+  header.write('00', 263, 'ascii');
+  let checksum = 0;
+  for (const byte of header) checksum += byte;
+  header.write(checksum.toString(8).padStart(6, '0') + '\0 ', 148, 'ascii');
+
+  const padding = (512 - (body.length % 512)) % 512;
+  const entry = Buffer.concat([header, body, Buffer.alloc(padding, 0)]);
+  const tarBytes = gunzipSync(readFileSync(tarball));
+  // Терминатор — два нулевых блока в конце: срезаем, дописываем, возвращаем.
+  const end = tarBytes.length - 1024;
+  const out = Buffer.concat([tarBytes.subarray(0, end), entry, Buffer.alloc(1024, 0)]);
+  writeFileSync(tarball, gzipSync(out));
+}
+
 afterEach(() => {
   for (const work of workspaces.splice(0)) rmSync(work, { recursive: true, force: true });
 });
@@ -215,15 +250,8 @@ describe('release artifact: нормализация пути члена', () =>
   it('отвергает запись с точкой-сегментом, неотличимую для npm от канонической', () => {
     // package/./package.json: npm нормализует путь и видит второй package.json,
     // а пословный фильтр без нормализации его пропускал (обход, найден ревью).
-    const { work, tarball, manifest } = archive();
-    mkdirSync(join(work, 'pkg2'));
-    writeFileSync(join(work, 'pkg2', 'evil.json'), JSON.stringify({ ...releaseMetadata(), name: '@attacker/evil' }));
-    execFileSync('tar', [
-      '-czf', `./${basename(tarball)}`,
-      'package',
-      '--transform', 's|^pkg2/evil.json$|package/./package.json|',
-      'pkg2/evil.json',
-    ], { cwd: work });
+    const { tarball, manifest } = archive();
+    appendTarEntry(tarball, 'package/./package.json', JSON.stringify({ ...releaseMetadata(), name: '@attacker/evil' }));
 
     const result = check(tarball, manifest);
     expect(result.status).not.toBe(0);
@@ -231,15 +259,8 @@ describe('release artifact: нормализация пути члена', () =>
   });
 
   it('отвергает архив с «..» в пути записи целиком', () => {
-    const { work, tarball, manifest } = archive();
-    mkdirSync(join(work, 'pkg2'));
-    writeFileSync(join(work, 'pkg2', 'up.json'), '{}');
-    execFileSync('tar', [
-      '-czf', `./${basename(tarball)}`,
-      'package',
-      '--transform', 's|^pkg2/up.json$|package/../up.json|',
-      'pkg2/up.json',
-    ], { cwd: work });
+    const { tarball, manifest } = archive();
+    appendTarEntry(tarball, 'package/../up.json', '{}');
 
     const result = check(tarball, manifest);
     expect(result.status).not.toBe(0);
