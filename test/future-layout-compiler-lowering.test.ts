@@ -35,23 +35,18 @@ describe('lowerSurfaceCall: positive path', () => {
     }).toThrow();
   });
 
-  it('полные опции (spring/inputPolicy/scrollAnchor/onFrame) проходят целиком', () => {
-    const result = lowerSurfaceCall({
-      ...staticCall,
-      options: {
-        layout: 'project',
-        spring: { mass: 1, stiffness: 170, damping: 26, velocity: 12 },
-        inputPolicy: 'cancel',
-        scrollAnchor: 'none',
-        onFrame: (): void => {},
-      },
-    });
-    expect(result.lowered).toBe(true);
-    if (!result.lowered) throw new Error('unreachable');
-    expect(result.program.spring).toEqual({ mass: 1, stiffness: 170, damping: 26, velocity: 12 });
-    expect(result.program.inputPolicy).toBe('cancel');
-    expect(result.program.scrollAnchor).toBe('none');
-    expect(result.program.hasOnFrame).toBe(true);
+  it('неисполняемые опции (inputPolicy/scrollAnchor/velocity) — консервативный отказ', () => {
+    // Hotfix наблюдаемой эквивалентности: артефакт эти политики не сериализует
+    // и executor их не исполняет — их наличие оставляет runtime-вызов.
+    const base = { ...staticCall };
+    const withOptions = (extra: Record<string, unknown>) =>
+      lowerSurfaceCall({ ...base, options: { layout: 'project', ...extra } });
+    expect(withOptions({ inputPolicy: 'cancel' }).lowered).toBe(false);
+    expect(withOptions({ scrollAnchor: 'none' }).lowered).toBe(false);
+    expect(withOptions({ spring: { mass: 1, stiffness: 170, damping: 26, velocity: 12 } }).lowered).toBe(false);
+    // Пружина без скорости и голый layout остаются позитивным путём.
+    const clean = withOptions({ spring: { mass: 1, stiffness: 170, damping: 26 } });
+    expect(clean.lowered).toBe(true);
   });
 
   it('вызов без options: layout неявно обязателен → без layout понижения нет', () => {
@@ -139,18 +134,18 @@ describe('lowerSurfaceCall: каждый guard спеки имеет positive co
     );
     expectReject(
       { ...staticCall, options: { layout: 'project', spring: { mass: 1, stiffness: 170, damping: 26, velocity: Number.NaN } } },
-      'velocity-invalid',
+      'velocity-not-executable',
     );
   });
 
   it('неизвестные inputPolicy/scrollAnchor/onFrame — runtime path', () => {
     expectReject(
       { ...staticCall, options: { layout: 'project', inputPolicy: 'abort' } },
-      'input-policy-unknown',
+      'input-policy-not-executable',
     );
     expectReject(
       { ...staticCall, options: { layout: 'project', scrollAnchor: 'end' } },
-      'scroll-anchor-unknown',
+      'scroll-anchor-not-executable',
     );
     expectReject(
       { ...staticCall, options: { layout: 'project', onFrame: dyn('cb') } },

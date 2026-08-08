@@ -7,7 +7,7 @@
  * runtime'; (2) `animate(el, { width: [w0, w1] }, { layout: 'project' })`
  * из '@labpics/motion/animate' → сертифицированный НА СБОРКЕ артефакт
  * (позитивность, reciprocal-бюджет ≤0.25 px) + приватный surface-executor
- * '@labpics/motion/surface' (код executor'а ≤1 KB gz; total — решётка от
+ * '@labpics/motion/compiler/surface' (код executor'а ≤1 KB gz; total — решётка от
  * факта, см. SURFACE_*_MAX_GZ). Тогда в БАНДЛ ПОТРЕБИТЕЛЯ не
  * попадает ни spring-solver, ни MotionProgram V1 parser, ни compiler-ядро,
  * ни полный фасад. Бандл строго меньше.
@@ -38,7 +38,7 @@ const ALIAS = {
   '@labpics/motion/nano': resolve(DIST, 'nano/index.js'),
   '@labpics/motion/compiler/runtime': resolve(DIST, 'compiler/runtime/index.js'),
   '@labpics/motion/animate': resolve(DIST, 'animate/index.js'),
-  '@labpics/motion/surface': resolve(DIST, 'surface/index.js'),
+  '@labpics/motion/compiler/surface': resolve(DIST, 'compiler/surface/index.js'),
 };
 
 /** dist-модуль (не entry, не bare peer) в графе — нормализованный к dist-relative id. */
@@ -89,7 +89,7 @@ export function play(el, v) { return animate(el, { opacity: v }); }`;
 // Surface-вызов полного фасада: статические концы + явный layout:'project' —
 // единственная форма, которую плагин обязан понизить в surface-executor.
 const SURFACE = `import { animate } from '@labpics/motion/animate';
-export function play(el) { return animate(el, { width: [240, 360] }, { layout: 'project' }); }`;
+export function play(el) { animate(el, { width: [240, 360] }, { layout: 'project' }); }`;
 // Динамические концы — вне скоупа: корректный runtime path обязан остаться.
 const SURFACE_DYNAMIC = `import { animate } from '@labpics/motion/animate';
 export function play(el, w) { return animate(el, { width: [240, w] }, { layout: 'project' }); }`;
@@ -102,19 +102,23 @@ const SPRING_MATH = /Math\.(?:exp|cos|sin|sqrt)/;
 const RUNTIME_MODULE = 'compiler/runtime/index.js';
 const NANO_MODULE = 'nano/index.js';
 const ANIMATE_MODULE = 'animate/index.js';
-const SURFACE_MODULE = 'surface/index.js';
+const SURFACE_MODULE = 'compiler/surface/index.js';
 /**
  * Размерные гейты surface-lowering (хронология от факта):
  * 1. EXECUTOR ≤1 KB gzip — жёсткий гейт КОДА (спека «surface observer ≤1 KB»):
- *    dist/surface/index.js без артефактных данных. Факт 2026-08-05: 1024 B gz.
- * 2. TOTAL — решётка от факта: executor + сертифицированный артефакт (P/Q
+ *    dist/compiler/surface/index.js без артефактных данных. Факт 2026-08-05: 1024 B gz.
+ * 2. TOTAL — решётка от факта: executor + сертифицированный артефакт (P/Q/A
  *    serialization — сам payload доказательства ≤0.25 px; физически не сжимаем
- *    ниже без отказа от сертификата). Факт 2026-08-05: 2003 B gz → решётка 2048.
- *    История ужатия: 2743 → 2187 (blend-A вынесена из артефакта в executor) →
- *    2003 (микроужатия executor'а до 1024 B gz).
+ *    ниже без отказа от сертификата). История: 2743 → 2187 (blend-A вынесена
+ *    из артефакта в executor) → 2003 (микроужатия) → 2026-08-07 факт 2367,
+ *    решётка 2470: вынос blend-A ОТМЕНЁН хотфиксом наблюдаемой
+ *    эквивалентности — executor восстанавливал A регулярным выражением из Q
+ *    и расходился с runtime до 0.738 между стопами. A снова сериализуется из
+ *    SSOT компилятора; прежнее «ужатие» было оплачено семантикой и повторять
+ *    его запрещено. Executor при этом похудел до 961 B gz (удалён regex).
  */
 const SURFACE_EXECUTOR_MAX_GZ = 1024;
-const SURFACE_COMPILED_MAX_GZ = 2048;
+const SURFACE_COMPILED_MAX_GZ = 2470;
 
 const failures = [];
 const notes = [];
