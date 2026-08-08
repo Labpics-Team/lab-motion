@@ -36,10 +36,24 @@ test('custom root определяет enter/leave независимо от pag
       };
     }, { root, amount: 'all' });
 
+    // WebKit headless на Linux CI не производит rendering steps для визуально
+    // неподвижной страницы, а IO callbacks доставляются на rendering step:
+    // без кадровой накачки первое enter может не прийти вовсе (таймаут 30s,
+    // воспроизведено на двух независимых PR). rAF-петля запрашивает кадры до
+    // конца ожидания; семантика assertions не меняется, таймауты не растут.
+    let pumping = true;
+    const pump = (async () => {
+      while (pumping) {
+        await new Promise<void>((resolve) => { requestAnimationFrame(() => resolve()); });
+      }
+    })();
+
     await enterSignal;
     // Target остаётся внутри page viewport, но целиком выходит из custom root.
     target.style.top = '150px';
     await leaveSignal;
+    pumping = false;
+    await pump;
     stop();
     stop();
     const targetTop = target.getBoundingClientRect().top;
