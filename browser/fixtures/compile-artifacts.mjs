@@ -34,16 +34,20 @@ const ALIAS = {
 };
 const NANO_FIXTURE = `import { animate } from '@labpics/motion/nano';
 export function play(el) { return animate(el, { opacity: 0.5 }); }`;
-// Оба вызова статичны → плагин обязан понизить каждый в executor-вызов с
-// литеральным артефактом (один hoisted-import на модуль). Позитивная форма
-// после hotfix наблюдаемой эквивалентности (PR-1 Future Layout): lowering
-// сертифицируется ТОЛЬКО для голого expression statement — результат вызова
-// ни return'ом, ни присваиванием, ни await'ом не покидает модуль, иначе
-// неполные контролы compiled-пути (нет committed/ready/state/cancel) были бы
-// наблюдаемы потребителем. Здесь обе функции — именно голые вызовы.
+// Позитивная форма после hotfix наблюдаемой эквивалентности (PR-1 Future
+// Layout): lowering сертифицируется ТОЛЬКО для голого expression statement —
+// результат не присваивается, не return'ится, не await'ится: неполные
+// compiled-контролы тогда не наблюдаемы. Спека 19 потребляет observable
+// финал (ширина, стили движка, отсутствие residual-стилей) через DOM, без
+// чтения возвращаемого значения.
 const SURFACE_FIXTURE = `import { animate } from '@labpics/motion/animate';
 export function play(el) { animate(el, { width: [240, 360] }, { layout: 'project' }); }
 export function playList(list) { animate(list, { width: [240, 360] }, { layout: 'project' }); }`;
+// Return-форма обязана остаться не-lowered — positive control границы
+// наблюдаемой эквивалентности: вызов, чей результат уходит наружу, понижается
+// только когда lowered-контрол полностью эквивалентен runtime.
+const RETURN_FIXTURE = `import { animate } from '@labpics/motion/animate';
+export function play(el) { return animate(el, { width: [240, 360] }, { layout: 'project' }); }`;
 
 async function bundle(motionCompiler, source, withPlugin) {
   const entry = resolve(TMP, 'entry.js');
@@ -103,13 +107,9 @@ export default async function globalSetup() {
     if (!/layout:\s*"project"|layout:\s*'project'/.test(surfaceUncompiled)) {
       throw new Error('compile-artifacts: surface uncompiled потерял layout-опцию');
     }
-    // Positive control пост-hotfix: вызов, чей результат уходит через return,
-    // НЕ обязан понижаться — иначе неполные compiled-контролы становятся
-    // наблюдаемыми (нет committed/ready/state/cancel у executor-вызова).
-    // Если плагин когда-либо понизит return-форму, эта проверка падает раньше
-    // мутных несовпадений в 19-surface-compiler.spec.
-    const RETURN_FIXTURE = `import { animate } from '@labpics/motion/animate';
-export function play(el) { return animate(el, { width: [240, 360] }, { layout: 'project' }); }`;
+    // Positive control границы: return-форма НЕ понижается (горячий фикс
+    // наблюдаемой эквивалентности). Если плагин ослабит правило, спека 19
+    // начнёт молча мерить runtime-ветку и даст ложный PASS на compiled-контракт.
     const surfaceReturn = await bundle(motionCompiler, RETURN_FIXTURE, true);
     assertSelfContained(surfaceReturn, 'surface return-form');
     if (!/layout:\s*"project"|layout:\s*'project'/.test(surfaceReturn) || /w0:\s*240,\s*w1:\s*360/.test(surfaceReturn)) {
