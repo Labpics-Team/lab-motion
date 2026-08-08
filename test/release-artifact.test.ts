@@ -7,8 +7,9 @@ import {
   writeFileSync,
 } from 'node:fs';
 import { tmpdir } from 'node:os';
-import { dirname, join } from 'node:path';
+import { basename, delimiter, dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { gunzipSync, gzipSync } from 'node:zlib';
 import { afterEach, describe, expect, it } from 'vitest';
 
 const SCRIPT = fileURLToPath(new URL('../scripts/check-release-artifact.mjs', import.meta.url));
@@ -101,7 +102,11 @@ function archive(
     }),
   );
   const tarball = join(work, fileName);
-  execFileSync('tar', ['-czf', tarball, '-C', work, 'package']);
+  // Имя архива передаём относительным при cwd=work: GNU tar принимает ведущее
+  // `C:` абсолютного windows-пути за спецификацию удалённого хоста и падает
+  // с «Cannot connect to C:». Относительный путь одинаково понимают и GNU tar,
+  // и встроенный в Windows bsdtar.
+  execFileSync('tar', ['-czf', `./${fileName}`, 'package'], { cwd: work });
   return { work, tarball, manifest: join(work, 'release-manifest.json') };
 }
 
@@ -121,6 +126,55 @@ function check(
   ], {
     encoding: 'utf8',
   });
+}
+
+/**
+ * Дописывает одну запись с произвольным именем в существующий tgz — замена
+ * `tar --transform`, которого нет в bsdtar из состава Windows. Имя пишется
+ * как есть (точки-сегменты и «..» сохраняются): цель тестов — скрафтить
+ * враждебный член, который системный tar отказался бы создать или нормализует.
+ *
+ * Терминатор ищется СКАНИРОВАНИЕМ, а не срезом «последних 1024 байт»: GNU tar
+ * добивает архив нулями до record-блока 10240, и запись, вставленная после
+ * первого нулевого блока, для него невидима (обход крафта, пойман CI на
+ * ubuntu). Проходим по записям до первого нулевого заголовка — это логический
+ * конец — и дописываем туда.
+ */
+function appendTarEntry(tarball: string, name: string, content: string): void {
+  const body = Buffer.from(content, 'utf8');
+  const header = Buffer.alloc(512, 0);
+  header.write(name, 0, 'utf8');
+  header.write('0000644\0', 100, 'ascii');
+  header.write('0000000\0', 108, 'ascii');
+  header.write('0000000\0', 116, 'ascii');
+  header.write(body.length.toString(8).padStart(11, '0') + '\0', 124, 'ascii');
+  header.write('00000000000\0', 136, 'ascii');
+  header.write('        ', 148, 'ascii'); // chksum placeholder: 8 пробелов
+  header.write('0', 156, 'ascii'); // typeflag: обычный файл
+  header.write('ustar\0', 257, 'ascii');
+  header.write('00', 263, 'ascii');
+  let checksum = 0;
+  for (const byte of header) checksum += byte;
+  header.write(checksum.toString(8).padStart(6, '0') + '\0 ', 148, 'ascii');
+
+  const padding = (512 - (body.length % 512)) % 512;
+  const entry = Buffer.concat([header, body, Buffer.alloc(padding, 0)]);
+  const tarBytes = gunzipSync(readFileSync(tarball));
+  // Логический конец архива: первый полностью нулевой 512-байтовый заголовок
+  // при обходе записей (заголовок + payload, выровненный до 512).
+  let end = -1;
+  for (let offset = 0; offset + 512 <= tarBytes.length; ) {
+    const block = tarBytes.subarray(offset, offset + 512);
+    if (block.every((byte) => byte === 0)) {
+      end = offset;
+      break;
+    }
+    const size = Number.parseInt(block.toString('ascii', 124, 136).replace(/\0.*$/, '').trim() || '0', 8);
+    offset += 512 + Math.ceil(size / 512) * 512;
+  }
+  if (end < 0) throw new Error('appendTarEntry: терминатор tar-архива не найден');
+  const out = Buffer.concat([tarBytes.subarray(0, end), entry, Buffer.alloc(1024, 0)]);
+  writeFileSync(tarball, gzipSync(out));
 }
 
 afterEach(() => {
@@ -169,6 +223,34 @@ describe('release artifact: fail-closed манифест', () => {
     expect(check(invalidName.tarball, invalidName.manifest).status).not.toBe(0);
   });
 
+  // Инвариант, а не платформенный симптом: скрипт обязан подавать архив tar-у
+  // на stdin и НЕ передавать путь. Проверяем через шим в PATH, который
+  // записывает свой argv, — такой тест гейтит класс на любой ОС, в том числе
+  // на ubuntu-раннере, где сам симптом невоспроизводим.
+  // Пропуск на win32 вынужденный: Node с 18.20 не исполняет .cmd без shell,
+  // поэтому подменить tar шимом там нельзя. На Linux утверждение настоящее и
+  // упадёт, если скрипт снова начнёт передавать путь, — а CI именно ubuntu.
+  it.skipIf(process.platform === 'win32')('не передаёт путь к архиву в tar', () => {
+    const { tarball, manifest } = archive();
+    const shimDir = mkdtempSync(join(tmpdir(), 'labmotion-tar-shim-'));
+    workspaces.push(shimDir);
+    const argvLog = join(shimDir, 'argv.json');
+    const body = `require('node:fs').writeFileSync(${JSON.stringify(argvLog)}, JSON.stringify(process.argv.slice(2)));`;
+    writeFileSync(join(shimDir, 'tar.js'), body);
+    writeFileSync(join(shimDir, 'tar'), `#!/bin/sh
+exec node "$(dirname "$0")/tar.js" "$@"
+`, { mode: 0o755 });
+
+    spawnSync(process.execPath, [SCRIPT, tarball, TAG, SHA, manifest, join(dirname(tarball), 'root-package.json')], {
+      encoding: 'utf8',
+      env: { ...process.env, PATH: `${shimDir}${delimiter}${process.env.PATH ?? ''}` },
+    });
+
+    const argv: string[] = JSON.parse(readFileSync(argvLog, 'utf8'));
+    expect(argv).toContain('-');
+    expect(argv.some((a) => a.includes('.tgz'))).toBe(false);
+  });
+
   it('не перезаписывает уже созданный манифест', () => {
     const { tarball, manifest } = archive();
     writeFileSync(manifest, '{"trusted":false}\n');
@@ -176,5 +258,44 @@ describe('release artifact: fail-closed манифест', () => {
     const result = check(tarball, manifest);
     expect(result.status).not.toBe(0);
     expect(readFileSync(manifest, 'utf8')).toBe('{"trusted":false}\n');
+  });
+});
+
+describe('release artifact: нормализация пути члена', () => {
+  it('отвергает запись с точкой-сегментом, неотличимую для npm от канонической', () => {
+    // package/./package.json: npm нормализует путь и видит второй package.json,
+    // а пословный фильтр без нормализации его пропускал (обход, найден ревью).
+    const { tarball, manifest } = archive();
+    appendTarEntry(tarball, 'package/./package.json', JSON.stringify({ ...releaseMetadata(), name: '@attacker/evil' }));
+
+    const result = check(tarball, manifest);
+    expect(result.status).not.toBe(0);
+    expect(result.stderr).toContain('читаются как package.json');
+  });
+
+  it('отвергает архив с «..» в пути записи целиком', () => {
+    const { tarball, manifest } = archive();
+    appendTarEntry(tarball, 'package/../up.json', '{}');
+
+    const result = check(tarball, manifest);
+    expect(result.status).not.toBe(0);
+    expect(result.stderr).toContain('«..»');
+  });
+});
+
+describe('release artifact: верификатор и npm выбирают один член', () => {
+  it('отвергает архив, где package.json виден дважды после среза префикса', () => {
+    // npm срезает первый компонент пути у всех записей и берёт ПОСЛЕДНЮЮ
+    // совпавшую, а tar — запись по точному имени. Без этой проверки архив
+    // проходит контроль по package/package.json, а устанавливается по zzz/.
+    const { work, tarball, manifest } = archive();
+    const rogue = join(work, 'zzz');
+    mkdirSync(rogue);
+    writeFileSync(join(rogue, 'package.json'), JSON.stringify({ ...releaseMetadata(), name: '@attacker/evil' }));
+    execFileSync('tar', ['-czf', `./${basename(tarball)}`, 'package', 'zzz'], { cwd: work });
+
+    const result = check(tarball, manifest);
+    expect(result.status).not.toBe(0);
+    expect(result.stderr).toContain('читаются как package.json');
   });
 });

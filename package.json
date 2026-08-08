@@ -426,16 +426,6 @@
         "default": "./dist/nano/index.cjs"
       }
     },
-    "./surface": {
-      "import": {
-        "types": "./dist/surface/index.d.ts",
-        "default": "./dist/surface/index.js"
-      },
-      "require": {
-        "types": "./dist/surface/index.d.cts",
-        "default": "./dist/surface/index.cjs"
-      }
-    },
     "./compiler/vite": {
       "import": {
         "types": "./dist/compiler/vite/index.d.ts",
@@ -454,6 +444,16 @@
       "require": {
         "types": "./dist/compiler/runtime/index.d.cts",
         "default": "./dist/compiler/runtime/index.cjs"
+      }
+    },
+    "./compiler/surface": {
+      "import": {
+        "types": "./dist/compiler/surface/index.d.ts",
+        "default": "./dist/compiler/surface/index.js"
+      },
+      "require": {
+        "types": "./dist/compiler/surface/index.d.cts",
+        "default": "./dist/compiler/surface/index.cjs"
       }
     },
     "./behaviors": {

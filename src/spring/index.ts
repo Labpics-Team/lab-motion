@@ -103,10 +103,10 @@ function easingHorizon(z: number): number {
   const k = 4 / 27;
   const deviation = (u: number): number => {
     if (z < 1) {
+      const d = Math.sqrt(1 - z * z);
       // |sin(x)/x| ≤ min(1, 1/x): без второго ограничения горизонт рос как
       // O(1/ζ²) и у слабо демпфированных пружин не помещался ни в какой
       // разумный потолок. С ним рост — O(ln(1/tol)/ζ).
-      const d = Math.sqrt(1 - z * z);
       return Math.exp(-z * u) * (1 + Math.min(z * u, z / d) + k * u * Math.min(u, 1 / d));
     }
     const { rest, vel } = shape(z, u);
