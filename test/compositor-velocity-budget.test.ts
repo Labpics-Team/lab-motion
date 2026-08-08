@@ -51,7 +51,12 @@ function legacyRestBound(p: SpringParams): number {
   const zetaRaw = p.damping / (2 * p.mass * omega0);
   const zeta = Math.abs(zetaRaw - 1) < 1e-3 ? (zetaRaw < 1 ? 0.999 : 1.001) : zetaRaw;
   const d = Math.sqrt(Math.abs(zeta * zeta - 1));
-  const rate = zeta < 1 ? zeta * omega0 : omega0 * (zeta - d);
+  // Оракул считает медленный корень тем же тождеством 1/(ζ+d), что и код: до
+  // этого он воспроизводил прямую разность ζ−d, которая при ζ=5e7 ошибается на
+  // 25.5%, а при 1e8 обнуляется. Пин по-прежнему проверяет, что вход с v0=0
+  // совпадает с законом покоя, но сам закон теперь один и тот же — заодно он
+  // согласован со slowRate() ниже в этом же файле.
+  const rate = zeta < 1 ? zeta * omega0 : omega0 / (zeta + d);
   if (!(rate > 0)) return Infinity;
   const amp = zeta < 1 ? 1 / d : (zeta + d) / (2 * d);
   return (
