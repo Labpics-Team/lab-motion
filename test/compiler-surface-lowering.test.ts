@@ -53,7 +53,7 @@ function program(overrides: Partial<SurfaceProgram> = {}): SurfaceProgram {
 function realArtifact(): CompiledSurfaceCall {
   const artifact = tryCompileSurfaceArtifact({ mass: 1, stiffness: 170, damping: 26 }, 240, 360);
   if (artifact === undefined) throw new Error('тестовая пружина обязана сертифицироваться');
-  return { w0: 240, w1: 360, d: artifact.durationMs, p: artifact.easing, q: artifact.reciprocalEasing };
+  return { w0: 240, w1: 360, d: artifact.durationMs, p: artifact.easing, q: artifact.reciprocalEasing, a: artifact.blendEasing };
 }
 
 interface FakeStyle {

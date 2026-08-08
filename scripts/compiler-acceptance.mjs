@@ -106,7 +106,7 @@ const SURFACE_MODULE = 'compiler/surface/index.js';
 /**
  * Размерные гейты surface-lowering (хронология от факта):
  * 1. EXECUTOR ≤1 KB gzip — жёсткий гейт КОДА (спека «surface observer ≤1 KB»):
- *    dist/surface/index.js без артефактных данных. Факт 2026-08-05: 1024 B gz.
+ *    dist/compiler/surface/index.js без артефактных данных. Факт 2026-08-05: 1024 B gz.
  * 2. TOTAL — решётка от факта: executor + сертифицированный артефакт (P/Q/A
  *    serialization — сам payload доказательства ≤0.25 px; физически не сжимаем
  *    ниже без отказа от сертификата). История: 2743 → 2187 (blend-A вынесена
