@@ -48,6 +48,17 @@ const lnBudget = (omega0: number): number =>
 /** ln(100): множитель времени затухания огибающей до 1%. */
 const LN_100 = Math.log(100);
 
+/**
+ * Медленный корень в единицах ω₀ через тождество ζ−√(ζ²−1) = 1/(ζ+√(ζ²−1)).
+ * Прямая разность теряет значащие цифры задолго до вырождения: измерено 0.58%
+ * ошибки при ζ=1e7, 4.3% при 2e7, 25.5% при 5e7 и 100% при 1e8, где она
+ * обнуляется, а вызывающие подставляли пол 1e-6. Форма без вычитания точна на
+ * всём домене, поэтому применяется всегда, а не только на вырождении.
+ */
+function slowRoot(z: number): number {
+  return z < 1 ? z : 1 / (z + Math.sqrt(z * z - 1));
+}
+
 // ─── fromBounce ──────────────────────────────────────────────────────────────
 
 /** Опции duration+bounce параметризации. */
@@ -82,10 +93,9 @@ function toParams(omega0Raw: number, zetaRaw: number, mass: number): SpringParam
   //   коробка ω₀≥2 молча превращала 100-секундный запрос в ~2.3-секундный —
   //   худшая из возможных подмен намерения).
   const zetaSeed = Math.max(1e-4, zetaRaw);
-  const slowOf = (z: number) => (z < 1 ? z : z - Math.sqrt(z * z - 1));
   let omega0 = Math.max(
     omega0Raw,
-    lnBudget(omega0Raw) / (slowOf(zetaSeed) * SETTLE_BUDGET_S),
+    lnBudget(omega0Raw) / (slowRoot(zetaSeed) * SETTLE_BUDGET_S),
   );
   const zetaMin = Math.min(1, lnBudget(omega0) / (omega0 * SETTLE_BUDGET_S));
   const zeta = Math.max(zetaMin, zetaRaw);
@@ -188,8 +198,8 @@ export function fromVisualDuration(options: FromVisualDurationOptions): SpringPa
   // Пересечения нет: Tv = выход на ~99% цели по медленнейшей моде.
   // Для ζ=1 огибающая ~e^{−ω0 t}; для ζ>1 медленнейший корень
   // r = ω0(ζ − √(ζ²−1)) → ω0 = ln(100) / (Tv · (ζ − √(ζ²−1))).
-  const slow = zeta - Math.sqrt(Math.max(0, zeta * zeta - 1));
-  return toParams(LN_100 / (Tv * Math.max(slow, 1e-6)), zeta, mass);
+  const slow = slowRoot(zeta);
+  return toParams(LN_100 / (Tv * slow), zeta, mass);
 }
 
 // ─── Пресеты (канон react-spring: tension/friction при mass=1) ───────────────
@@ -218,9 +228,12 @@ export function springAsEasing(params: SpringParams): (t: number) => number {
   // Валидация рано и детерминированно (конвенция движка).
   spring(params, 0);
   const omega0 = Math.sqrt(params.stiffness / params.mass);
-  const zeta = params.damping / (2 * Math.sqrt(params.stiffness * params.mass));
-  const slow = zeta >= 1 ? zeta - Math.sqrt(Math.max(0, zeta * zeta - 1)) : zeta;
-  const settle = LN_100 / (omega0 * Math.max(slow, 1e-6));
+  // ζ = c/(2√(km)) = c/(2m·ω₀): тождество снимает второй sqrt и не переполняет
+  // произведение stiffness·mass — это было единственное место в репозитории,
+  // где ζ ещё считалась переполняющейся формой.
+  const zeta = params.damping / (2 * params.mass * omega0);
+  const slow = slowRoot(zeta);
+  const settle = LN_100 / (omega0 * slow);
 
   return (t: number): number => {
     const u = Number.isNaN(t) ? 0 : t;
