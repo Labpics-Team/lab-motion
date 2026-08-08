@@ -266,7 +266,7 @@ export const BESPOKE_SUBPATH_GATES = {
   // («surface observer ≤1 KB») для КОДА без артефактных данных; люфт нулевой
   // (канон ./compiler/runtime): факт 2026-08-05 ровно 1024 B gz после
   // исчерпывающего ужатия (2743 → 2187 → 2003 total-бандл; код 1152 → 1024).
-  './surface': 1024,
+  './compiler/surface': 1024,
   // Native IntersectionObserver capability; exact first-implementation ratchet.
   './in-view': IN_VIEW_GATE_BYTES,
   // ./behaviors — headless state machines типовых мобильных взаимодействий
@@ -301,7 +301,7 @@ export const IMPORT_COST_SCENARIOS = [
     // и не тянуть ничего (фасад/солвер стираются на сборке, здесь страж
     // consumer-цены самого субпутя — аналог nano spring-to).
     name: 'surface executor',
-    code: `import { runSurface } from '%DIST%/../surface/index.js'; console.log(typeof runSurface);`,
+    code: `import { runSurface } from '%DIST%/../compiler/surface/index.js'; console.log(typeof runSurface);`,
     gate: 1024,
   },
   {

@@ -27,7 +27,7 @@ import {
 } from '../src/compiler/core.js';
 import { motionCompiler } from '../src/compiler/vite/index.js';
 import { tryCompileSurfaceArtifact } from '../src/future-layout/artifact.js';
-import { runSurface, type CompiledSurfaceCall } from '../src/surface/index.js';
+import { runSurface, type CompiledSurfaceCall } from '../src/compiler/surface/index.js';
 
 // ─── Хелперы ─────────────────────────────────────────────────────────────────
 
@@ -53,7 +53,7 @@ function program(overrides: Partial<SurfaceProgram> = {}): SurfaceProgram {
 function realArtifact(): CompiledSurfaceCall {
   const artifact = tryCompileSurfaceArtifact({ mass: 1, stiffness: 170, damping: 26 }, 240, 360);
   if (artifact === undefined) throw new Error('тестовая пружина обязана сертифицироваться');
-  return { w0: 240, w1: 360, d: artifact.durationMs, p: artifact.easing, q: artifact.reciprocalEasing };
+  return { w0: 240, w1: 360, d: artifact.durationMs, p: artifact.easing, q: artifact.reciprocalEasing, a: artifact.blendEasing };
 }
 
 interface FakeStyle {
@@ -163,7 +163,8 @@ describe('surfaceArtifactLiteral — build-time сертификация', () =>
     expect(artifact).toBeDefined();
     expect(literal).toBe(
       `{w0:240,w1:360,d:${artifact!.durationMs},`
-      + `p:${JSON.stringify(artifact!.easing)},q:${JSON.stringify(artifact!.reciprocalEasing)}}`,
+      + `p:${JSON.stringify(artifact!.easing)},q:${JSON.stringify(artifact!.reciprocalEasing)},`
+      + `a:${JSON.stringify(artifact!.blendEasing)}}`,
     );
   });
 
@@ -192,9 +193,12 @@ describe('surfaceArtifactLiteral — build-time сертификация', () =>
 
 // ─── S2: AST-план и Vite-адаптер ─────────────────────────────────────────────
 
+// Позитивная форма после hotfix наблюдаемой эквивалентности: ТОЛЬКО голый
+// expression statement — результат никем не используется, поэтому неполные
+// compiled-контролы ненаблюдаемы. return-форма стала консервативным отказом.
 const POSITIVE = `import { animate } from '@labpics/motion/animate';
 export function open(viewport) {
-  return animate(viewport, { width: [240, 360] }, { layout: 'project' });
+  animate(viewport, { width: [240, 360] }, { layout: 'project' });
 }
 `;
 
