@@ -21,7 +21,10 @@ if (!native) {
 
 const ci = readFileSync(resolve(ROOT, '.github/workflows/ci.yml'), 'utf8');
 const aggregated = String(pkg.scripts['check:static'] ?? '').includes('typecheck:native');
-const inCi = /pnpm (run )?typecheck:native/.test(ci);
+// Распознаём ТОЛЬКО реальный executable шаг, а не текст в комментарии,
+// echo или похожее имя. Ищем строго "pnpm run typecheck:native" или
+// "pnpm typecheck:native" в позиции run-шага (не echo и не comment).
+const inCi = /(^|\n)\s*run:\s*pnpm\s+(?:run\s+)?typecheck:native\b/.test(ci);
 
 if (!aggregated && !inCi) {
   console.error(

@@ -289,17 +289,21 @@ async function run() {
     // catch глотал отказ как успешный no-op — lowering молча не происходил.
     const tsCompiled = await buildFixture('ts-compiled', LOWERABLE_TS, true, 'ts-fixture', 'ts');
     check(
-      tsCompiled.modules.includes('compiler/runtime/index.js'),
+      tsCompiled.modules.includes(RUNTIME_MODULE),
       `TS-вход не понижен: graph=${tsCompiled.modules.join(',') || '(пусто)'}`,
     );
     check(
-      !tsCompiled.modules.includes('nano/index.js'),
+      !tsCompiled.modules.includes(NANO_MODULE),
       'TS-вход: nano runtime остался в бандле — lowering не заменил вызов',
     );
     const tsxCompiled = await buildFixture('tsx-compiled', LOWERABLE_TSX, true, 'tsx-fixture', 'tsx');
     check(
-      tsxCompiled.modules.includes('compiler/runtime/index.js'),
+      tsxCompiled.modules.includes(RUNTIME_MODULE),
       `TSX-вход не понижен: graph=${tsxCompiled.modules.join(',') || '(пусто)'}`,
+    );
+    check(
+      !tsxCompiled.modules.includes(NANO_MODULE),
+      'TSX-вход: nano runtime остался в бандле — lowering не заменил вызов',
     );
     // Диагностика не скрыта: сборка с плагином не давит предупреждения — сам
     // факт lowering выше доказывает, что parse failure не съел трансформацию.
