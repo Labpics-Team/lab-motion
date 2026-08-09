@@ -275,3 +275,11 @@ export function clearSpringExecutionArtifactCacheUnchecked(): void {
   clearSpringLinearCache(sharedCache);
   restingCache.length = 0;
 }
+
+export {
+  maxValueError,
+  parseCssLinear,
+  type LinearStop,
+  type MaxValueErrorOptions,
+} from './error-bound.js';
+
