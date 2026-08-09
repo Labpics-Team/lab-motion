@@ -11,7 +11,9 @@
     "types": ["node"],
     "module": "ESNext",
     "moduleResolution": "Bundler",
-    "baseUrl": ".",
+    // baseUrl удалён: в TypeScript 6 он объявлен deprecated и перестанет
+    // работать в 7.0. Ключи paths резолвятся относительно самого tsconfig,
+    // поэтому маппинг ниже от его удаления не зависит.
     "paths": {
       "/dist/*": ["./src/*"]
     }

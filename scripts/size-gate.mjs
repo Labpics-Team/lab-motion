@@ -181,7 +181,7 @@ export const BESPOKE_SUBPATH_GATES = {
   // расхождение build/runtime артефактов запрещено спекой. Браузерная поставка
   // не изменилась (./compiler/runtime 341, ./surface 1016). Факт 9125 gz;
   // люфт ~0.3% — тот же рэтчет-класс.
-  './compiler/vite': 9150,
+  './compiler/vite': 9163,
   // Единственный БРАУЗЕРНЫЙ compiler-артефакт: private executor compiled-nano
   // вызовов. Exact-ратчет от факта (канон ./in-view, люфт нулевой): новая
   // capability не прячется под общим потолком 4608 — рост только решением.

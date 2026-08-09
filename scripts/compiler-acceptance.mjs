@@ -59,8 +59,8 @@ let motionCompiler;
 /** Один Vite-build fixture'а: возвращает entry-chunk {code, distModules}.
  * entryName — общий путь entry для байтово-сравниваемых пар (rolldown
  * вшивает путь entry в вывод: разные пути ломают no-op-сравнение). */
-async function buildFixture(name, code, withPlugin, entryName = name) {
-  const entry = resolve(TMP, `${entryName}.js`);
+async function buildFixture(name, code, withPlugin, entryName = name, extension = 'js') {
+  const entry = resolve(TMP, `${entryName}.${extension}`);
   writeFileSync(entry, code);
   const result = await build({
     root: ROOT,
@@ -79,6 +79,21 @@ async function buildFixture(name, code, withPlugin, entryName = name) {
   const chunk = output.find((o) => o.type === 'chunk' && o.isEntry) ?? output[0];
   return { code: chunk.code, modules: distModules(chunk) };
 }
+
+// TypeScript-вход (бриф, этап C): аннотации, as const, satisfies, interface.
+const LOWERABLE_TS = `import { animate } from '@labpics/motion/nano';
+interface Marker { readonly kind: 'fixture' }
+const marker = { kind: 'fixture' } as const satisfies Marker;
+export function play(el: Element): typeof marker {
+  animate(el, { opacity: 0.5 });
+  return marker;
+}`;
+// TSX-вход: плагин заявляет поддержку через дефолтную фазу Vite.
+const LOWERABLE_TSX = `import { animate } from '@labpics/motion/nano';
+export function Play(props: { el: Element }): unknown {
+  animate(props.el, { opacity: 0.5 });
+  return <div data-ok="1" />;
+}`;
 
 // Статическая opacity — единственная форма в скоупе lowering (#208 §core).
 const LOWERABLE = `import { animate } from '@labpics/motion/nano';
@@ -267,6 +282,32 @@ async function run() {
       `плагин ошибочно понизил surface-вызов с onFrame (граф: ${surfaceOnFrame.modules.join(', ')})`,
     );
     notes.push('surface no-op контроль: динамические концы и onFrame сохранили рантаймовый путь');
+
+    // ── TypeScript acceptance (бриф, этап C) ────────────────────────────────
+    // Плагин обязан нижать TS/TSX-вход реального Vite-приложения. На
+    // enforce:'pre' transform получал сырой TypeScript, this.parse падал, а
+    // catch глотал отказ как успешный no-op — lowering молча не происходил.
+    const tsCompiled = await buildFixture('ts-compiled', LOWERABLE_TS, true, 'ts-fixture', 'ts');
+    check(
+      tsCompiled.modules.includes(RUNTIME_MODULE),
+      `TS-вход не понижен: graph=${tsCompiled.modules.join(',') || '(пусто)'}`,
+    );
+    check(
+      !tsCompiled.modules.includes(NANO_MODULE),
+      'TS-вход: nano runtime остался в бандле — lowering не заменил вызов',
+    );
+    const tsxCompiled = await buildFixture('tsx-compiled', LOWERABLE_TSX, true, 'tsx-fixture', 'tsx');
+    check(
+      tsxCompiled.modules.includes(RUNTIME_MODULE),
+      `TSX-вход не понижен: graph=${tsxCompiled.modules.join(',') || '(пусто)'}`,
+    );
+    check(
+      !tsxCompiled.modules.includes(NANO_MODULE),
+      'TSX-вход: nano runtime остался в бандле — lowering не заменил вызов',
+    );
+    // Диагностика не скрыта: сборка с плагином не давит предупреждения — сам
+    // факт lowering выше доказывает, что parse failure не съел трансформацию.
+    notes.push('TypeScript acceptance: TS и TSX нижатся дефолтной фазой Vite');
   } finally {
     rmSync(TMP, { recursive: true, force: true });
   }

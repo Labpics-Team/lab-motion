@@ -24,6 +24,16 @@ import { fileURLToPath } from 'node:url';
 import { build } from 'esbuild';
 
 const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '..');
+
+/** Тайпчекер, которым собираются публикуемые декларации (TypeScript 6). */
+const TSC_BIN = join(ROOT, 'node_modules', 'typescript', 'bin', 'tsc');
+/**
+ * Нижняя поддерживаемая версия компилятора у потребителя. Пакет объявляет себя
+ * всем версиям (typesVersions использует catch-all), поэтому одного гейта на
+ * актуальном TS мало: он не заметит конструкцию, которую эмитит новый
+ * компилятор, а массово развёрнутый TS 5.x разобрать не может.
+ */
+const TSC5_BIN = join(ROOT, 'node_modules', 'typescript5', 'bin', 'tsc');
 const pkg = JSON.parse(readFileSync(join(ROOT, 'package.json'), 'utf8'));
 const suppliedTarball = process.argv[2] === undefined ? undefined : resolve(process.argv[2]);
 
@@ -195,9 +205,13 @@ try {
         `export function use(): number { single.destroy(); group.destroy(); return v + plan.duration + staggerPlan.count + read.value + drag.x + (cfg.prefersReduced() ? 1 : 0); }\n` +
         `export type C = AnimateControls; export type N = NanoControls; export const a = animate; export const n = nanoAnimate;\n`,
     );
-    const tscBin = join(ROOT, 'node_modules', 'typescript', 'bin', 'tsc');
-    execSync(`node "${tscBin}" --project tsconfig.json`, { cwd: dir, stdio: 'pipe' });
+    execSync(`node "${TSC_BIN}" --project tsconfig.json`, { cwd: dir, stdio: 'pipe' });
     log('TS: nodenext-резолв exports + типы прошли tsc --noEmit ✓');
+    // Та же поверхность предыдущим мажором. Без этого гейта смена компилятора
+    // деклараций (или его bump внутри 6.x) может начать эмитить конструкцию,
+    // которую TS 5.x не разбирает, и CI останется зелёным, а потребители нет.
+    execSync(`node "${TSC5_BIN}" --project tsconfig.json`, { cwd: dir, stdio: 'pipe' });
+    log('TS floor: те же публичные типы читаются TypeScript 5.9 ✓');
   }
 
   // Headless API обязан типизироваться в чистом Node без lib.dom. Структурный
@@ -237,8 +251,7 @@ try {
         `export const contracts: [DragOptions, PresenceOptions, FlipOptions, SheetOptions] | undefined = undefined;\n` +
         `drive(root); createDriver(driver); createDecay(decay);\n`,
     );
-    const tscBin = join(ROOT, 'node_modules', 'typescript', 'bin', 'tsc');
-    execSync(`node "${tscBin}" --project tsconfig.json`, { cwd: dir, stdio: 'pipe' });
+    execSync(`node "${TSC_BIN}" --project tsconfig.json`, { cwd: dir, stdio: 'pipe' });
     log('TS headless: NodeNext без lib.dom и skipLibCheck прошёл ✓');
   }
 
@@ -252,6 +265,12 @@ try {
         compilerOptions: {
           module: 'commonjs',
           moduleResolution: 'node10',
+          // Фикстура НАМЕРЕННО проверяет legacy-резолвер: у части потребителей
+          // он ещё в ходу. TypeScript 6 объявил node10 deprecated и без этого
+          // флага отказывается компилировать. Флаг перестанет действовать в
+          // TypeScript 7 — тогда фикстуру придётся снимать вместе с
+          // заявленной поддержкой node10, и это осознанный decommission gate.
+          ignoreDeprecations: '6.0',
           target: 'ES2022',
           lib: ['ES2022', 'DOM'],
           strict: true,
@@ -271,8 +290,7 @@ try {
         `export const value: number = clamp(0, 1, spring({ mass: 1, stiffness: 200, damping: 20 }, 0.1).value);\n` +
         `export const motion = [nanoAnimate, compileStaggerPlan] as const;\n`,
     );
-    const tscBin = join(ROOT, 'node_modules', 'typescript', 'bin', 'tsc');
-    const trace = execSync(`node "${tscBin}" --project tsconfig.json --traceResolution`, {
+    const trace = execSync(`node "${TSC_BIN}" --project tsconfig.json --traceResolution`, {
       cwd: dir,
       encoding: 'utf8',
     }).replaceAll('\\', '/');
@@ -339,8 +357,7 @@ try {
         `export type N = NanoControls; export const nano = nanoAnimate;\n` +
         `single.destroy(); group.destroy();\n`,
     );
-    const tscBin = join(ROOT, 'node_modules', 'typescript', 'bin', 'tsc');
-    const trace = execSync(`node "${tscBin}" --project tsconfig.json --traceResolution`, {
+    const trace = execSync(`node "${TSC_BIN}" --project tsconfig.json --traceResolution`, {
       cwd: dir,
       encoding: 'utf8',
     }).replaceAll('\\', '/');
