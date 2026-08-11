@@ -16,7 +16,6 @@ import {
   type SpringSerializedSamples,
 } from './curve.js';
 import { requiresExplicitSpringKeyframes } from './detect.js';
-import { effectiveSpringTolerance } from './error-bound.js';
 
 export interface SpringExecutionPlan {
   readonly keyframes: Record<string, string | number>[];
@@ -95,7 +94,6 @@ export interface SpringExecutionOptions {
   readonly to: number;
   readonly v0?: number;
   readonly tolerance?: number;
-  readonly maxValueError?: number;
   readonly fill?: 'none' | 'forwards' | 'backwards' | 'both';
   readonly composite?: 'replace' | 'add' | 'accumulate';
   readonly format?: (v: number) => string | number;
@@ -162,12 +160,7 @@ export function compileSpringRuntimeExecutionPlanUnchecked(
     options.from,
     options.to,
     options.v0 ?? 0,
-    effectiveSpringTolerance(
-      options.tolerance ?? DEFAULT_TOLERANCE,
-      options.from,
-      options.to,
-      options.maxValueError,
-    ),
+    options.tolerance ?? DEFAULT_TOLERANCE,
     options.fill,
     options.composite,
     options.format,
