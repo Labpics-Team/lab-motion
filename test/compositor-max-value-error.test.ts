@@ -49,6 +49,7 @@ describe('#223 effective output-space tolerance', () => {
   it('chooses the strict minimum and avoids division for zero and tiny spans', () => {
     const cases = [
       { tolerance: 0.01, from: 100, to: 300, budget: 0.5, effective: 0.0025 },
+      { tolerance: 0.01, from: 300, to: 100, budget: 0.5, effective: 0.0025 },
       { tolerance: 0.001, from: 100, to: 300, budget: 0.5, effective: 0.001 },
       { tolerance: 0.0025, from: 7, to: 7, budget: 0.25, effective: 0.0025 },
       { tolerance: 0.0025, from: 0, to: Number.MIN_VALUE, budget: 0.25, effective: 0.0025 },
