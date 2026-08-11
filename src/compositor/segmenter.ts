@@ -32,9 +32,9 @@
  */
 
 import { MotionParamError } from '../errors.js';
+import { CONVERGENCE_THRESHOLD } from '../internal/constants.js';
 import { makeSpringValueSampler } from '../internal/solver.js';
 import {
-  settleTimeAtRestUpperBound,
   settleTimeUpperBound,
   type SpringParams,
 } from '../spring.js';
@@ -70,35 +70,21 @@ const BASE_GRID_FLOOR = 24;
 const BASE_GRID_MIN = 32;
 /** Физический потолок компиляции: выше живой солвер дешевле и честнее. */
 export const BASE_GRID_MAX = 4096;
-const LEGACY_DEFAULT_TOLERANCE = 1 / 400;
-
 /**
- * Строгий authoring-допуск резервирует 1/16 под terminal snap. Legacy default
- * сохраняет прежний horizon и byte-identical артефакты старых программ.
+ * Любой authoring-допуск резервирует 1/16 под terminal snap. Один effective
+ * tolerance обязан давать один artifact независимо от формы authoring-входа.
  */
 function springCompileHorizon(
   params: SpringParams,
   v0: number,
   tolerance: number,
 ): number {
-  const legacy = settleTimeUpperBound(params, v0);
-  if (tolerance > LEGACY_DEFAULT_TOLERANCE / 2) return legacy;
-  const sample = makeSpringValueSampler(params, v0);
-  const endpointBudget = tolerance / 16;
-  if (Math.abs(sample(legacy) - 1) <= endpointBudget) return legacy;
-
-  let low = legacy;
-  let high = legacy * 2;
-  while (Math.abs(sample(high) - 1) > endpointBudget) {
-    low = high;
-    high *= 2;
-  }
-  for (let iteration = 0; iteration < 32; iteration++) {
-    const middle = (low + high) / 2;
-    if (Math.abs(sample(middle) - 1) <= endpointBudget) high = middle;
-    else low = middle;
-  }
-  return high;
+  const settle = settleTimeUpperBound(params, v0);
+  const omega2 = params.stiffness / params.mass;
+  const alpha = params.damping / (2 * params.mass);
+  const delta = omega2 - alpha * alpha;
+  const rate = delta >= 0 ? alpha : omega2 / (alpha + Math.sqrt(-delta));
+  return settle + Math.max(0, Math.log(CONVERGENCE_THRESHOLD * 16 / tolerance)) / rate;
 }
 
 function requiredGridSize(
@@ -181,8 +167,7 @@ export function douglasPeuckerVertical(
   const n = xs.length;
   if (n <= 2) return n === 2 ? [0, 1] : n === 1 ? [0] : [];
   const keep = new Uint8Array(n);
-  keep[0] = 1;
-  keep[n - 1] = 1;
+  keep[0] = keep[n - 1] = 1;
   // Стек интервалов [i, j] (индексы), i<j. Защищённый interior-узел делит
   // задачу до первого скана: последующая хорда физически не может его удалить.
   const hasProtected = protectedIndex > 0 && protectedIndex < n - 1;
@@ -218,7 +203,7 @@ export function douglasPeuckerVertical(
         idx = k;
       }
     }
-    if (maxDev > eps && idx > i) {
+    if (maxDev > eps) {
       keep[idx] = 1;
       stack.push(i, idx, idx, j);
     }
@@ -289,7 +274,7 @@ export function buildRestingSpringNodesWithHorizon(
   params: SpringParams,
   tolerance: number,
 ): [nodes: SpringNode[], horizon: number] {
-  const settle = settleTimeAtRestUpperBound(params);
+  const settle = springCompileHorizon(params, 0, tolerance);
   return [
     buildSpringNodesAtHorizon(
       params,
@@ -324,8 +309,7 @@ function buildSpringNodesAtHorizon(
   // (params/v0 фиксированы) → считаем их ОДИН раз фабрикой, а не на каждый узел.
   // Значение бит-в-бит равно solveSpring(...).value (см. makeSpringValueSampler).
   const sampleValue = makeSpringValueSampler(params, v0);
-  xs[0] = 0;
-  ys[0] = 0;
+  xs[0] = ys[0] = 0;
   const tangentTau = 0.5 / intervals;
   xs[1] = tangentTau;
   // Считаем через тот же percent→offset, который использует WebKit execution:
@@ -346,12 +330,8 @@ function buildSpringNodesAtHorizon(
   // eps = tolerance/2: вторая половина бюджета — под дискретизацию базовой сетки
   // (baseGridSize её и гарантирует ≤ tol/2) ⇒ суммарная реконструкция ≤ tolerance.
   const kept = douglasPeuckerVertical(xs, ys, tolerance / 2, 1);
-  const nodes: SpringNode[] = [];
-  for (let n = 0; n < kept.length; n++) {
-    const k = kept[n]!;
-    // Хвост — ровно цель (дисциплина эндпоинтов); прочие — сырой прогресс.
-    const progress = n === kept.length - 1 ? 1 : ys[k]!;
-    nodes.push({ progress, percent: xs[k]! * 100 });
-  }
-  return nodes;
+  return kept.map((k, n): SpringNode => ({
+    progress: n === kept.length - 1 ? 1 : ys[k]!,
+    percent: xs[k]! * 100,
+  }));
 }

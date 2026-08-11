@@ -61,7 +61,6 @@ import {
   tryCompileSpringExecutionArtifactTupleUnchecked,
   validateTolerance,
 } from './curve.js';
-import { effectiveSpringTolerance } from './effective-tolerance.js';
 import {
   compileSpringRuntimeExecutionTupleUnchecked,
 } from './execution.js';
@@ -238,14 +237,16 @@ export function compileSpringPlan(options: CompositorPlanOptions): CompositorPla
   validateFinite(options.to);
   const v0 = options.v0 ?? 0;
   validateFinite(v0);
-  const normalizedTolerance = options.tolerance ?? DEFAULT_TOLERANCE;
-  validateTolerance(normalizedTolerance);
-  const tolerance = effectiveSpringTolerance(
-    normalizedTolerance,
-    options.from,
-    options.to,
-    options.maxValueError,
-  );
+  let tolerance = options.tolerance ?? DEFAULT_TOLERANCE;
+  validateTolerance(tolerance);
+  const maxValueError = options.maxValueError;
+  if (maxValueError !== undefined) {
+    if (!(maxValueError > 0 && maxValueError < Infinity)) {
+      throw new MotionParamError('LM172');
+    }
+    const span = Math.abs(options.to - options.from);
+    if (span) tolerance = Math.min(tolerance, maxValueError / span);
+  }
 
   // Публичная диагностика — свежий снимок защищённых сериализованных остановок:
   // это реально исполняемая браузером кривая, без второго источника истины.

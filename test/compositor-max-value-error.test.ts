@@ -5,7 +5,6 @@ import {
   type CompositorPlan,
 } from '../src/compositor/index.js';
 import { compileSpringExecutionArtifactTupleUnchecked } from '../src/compositor/curve.js';
-import { effectiveSpringTolerance } from '../src/compositor/effective-tolerance.js';
 import { MotionParamError } from '../src/errors.js';
 import { solveSpring } from '../src/internal/solver.js';
 import type { SpringParams } from '../src/spring.js';
@@ -47,11 +46,31 @@ function observedValueError(
 }
 
 describe('#223 effective output-space tolerance', () => {
-  it('chooses the strict minimum and avoids division for an exact zero span', () => {
-    expect(effectiveSpringTolerance(0.01, 100, 300, 0.5)).toBe(0.0025);
-    expect(effectiveSpringTolerance(0.001, 100, 300, 0.5)).toBe(0.001);
-    expect(effectiveSpringTolerance(0.0025, 7, 7, 0.25)).toBe(0.0025);
-    expect(effectiveSpringTolerance(0.0025, 0, Number.MIN_VALUE, 0.25)).toBe(0.0025);
+  it('chooses the strict minimum and avoids division for zero and tiny spans', () => {
+    const cases = [
+      { tolerance: 0.01, from: 100, to: 300, budget: 0.5, effective: 0.0025 },
+      { tolerance: 0.001, from: 100, to: 300, budget: 0.5, effective: 0.001 },
+      { tolerance: 0.0025, from: 7, to: 7, budget: 0.25, effective: 0.0025 },
+      { tolerance: 0.0025, from: 0, to: Number.MIN_VALUE, budget: 0.25, effective: 0.0025 },
+    ] as const;
+    for (const { tolerance, from, to, budget, effective } of cases) {
+      const absolute = compileSpringPlan({
+        spring: SPRINGS.underdamped,
+        property: 'opacity',
+        from,
+        to,
+        tolerance,
+        maxValueError: budget,
+      });
+      const normalized = compileSpringPlan({
+        spring: SPRINGS.underdamped,
+        property: 'opacity',
+        from,
+        to,
+        tolerance: effective,
+      });
+      expect(absolute.easing).toBe(normalized.easing);
+    }
   });
 
   it.each([0, -1, Number.NaN, Number.POSITIVE_INFINITY])(

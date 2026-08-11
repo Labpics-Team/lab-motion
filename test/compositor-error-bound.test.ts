@@ -8,7 +8,7 @@ import {
   parseCssLinear,
 } from '../src/compositor/error-bound.js';
 import { solveSpring } from '../src/internal/solver.js';
-import { settleTimeUpperBound, type SpringParams } from '../src/spring.js';
+import type { SpringParams } from '../src/spring.js';
 
 describe('parseCssLinear', () => {
   it('parses standard linear() string correctly', () => {
@@ -65,7 +65,11 @@ describe('maxValueError', () => {
     const css = tuple[0];
     const scale = 200; // 200 px target
 
-    const errorPx = maxValueError(css, springUnderdamped, scale);
+    const errorPx = maxValueError(css, {
+      spring: springUnderdamped,
+      scale,
+      durationMs: tuple[2],
+    });
     expect(errorPx).toBeGreaterThan(0);
     // At tolerance 1/400 (0.0025), error for 200px should be around 0.5px
     expect(errorPx).toBeLessThan(scale * tolerance * 2);
@@ -80,8 +84,13 @@ describe('maxValueError', () => {
       spring: springUnderdamped,
       from: 100,
       to: 300,
+      durationMs: tuple[2],
     });
-    const errorPositional = maxValueError(css, springUnderdamped, 200);
+    const errorPositional = maxValueError(css, {
+      spring: springUnderdamped,
+      scale: 200,
+      durationMs: tuple[2],
+    });
 
     expect(errorOpts).toBeCloseTo(errorPositional, 5);
   });
@@ -96,9 +105,9 @@ describe('maxValueError', () => {
         for (const scale of scales) {
           const tuple = compileSpringExecutionArtifactTupleUnchecked(spring, v0, DEFAULT_TOLERANCE);
           const css = tuple[0];
-          const durationSec = settleTimeUpperBound(spring, v0);
+          const durationSec = tuple[2] / 1000;
 
-          const bound = maxValueError(css, { spring, scale, v0 });
+          const bound = maxValueError(css, { spring, scale, v0, durationMs: tuple[2] });
 
           // Calculate true max error empirically by fine dense sampling (10,000 points)
           const stops = parseCssLinear(css);
