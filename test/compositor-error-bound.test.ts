@@ -52,6 +52,7 @@ describe('maxValueError', () => {
   const springUnderdamped: SpringParams = { mass: 1, stiffness: 180, damping: 12 };
   const springCritical: SpringParams = { mass: 1, stiffness: 100, damping: 20 };
   const springOverdamped: SpringParams = { mass: 1, stiffness: 100, damping: 30 };
+  const springSlow: SpringParams = { mass: 2, stiffness: 8, damping: 2 };
 
   it('returns 0 when scale is 0 or invalid artifact', () => {
     expect(maxValueError('linear(0 0%, 1 100%)', springUnderdamped, 0)).toBe(0);
@@ -86,7 +87,7 @@ describe('maxValueError', () => {
   });
 
   it('guarantees tight bound: bound >= true max error and bound <= 2.0 * true max error', () => {
-    const springs = [springUnderdamped, springCritical, springOverdamped];
+    const springs = [springUnderdamped, springCritical, springOverdamped, springSlow];
     const scales = [100, 450];
     const velocities = [0, 5];
 
@@ -103,7 +104,7 @@ describe('maxValueError', () => {
           const stops = parseCssLinear(css);
           let trueMaxErrorNorm = 0;
 
-          const numSamples = 5000;
+          const numSamples = 8192;
           for (let k = 0; k <= numSamples; k++) {
             const t = (k / numSamples) * durationSec;
             const pct = (t / durationSec) * 100;
