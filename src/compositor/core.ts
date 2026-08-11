@@ -61,7 +61,7 @@ import {
   tryCompileSpringExecutionArtifactTupleUnchecked,
   validateTolerance,
 } from './curve.js';
-import { effectiveSpringTolerance } from './error-bound.js';
+import { effectiveSpringTolerance } from './effective-tolerance.js';
 import {
   compileSpringRuntimeExecutionTupleUnchecked,
 } from './execution.js';

@@ -5,7 +5,7 @@ import {
   type CompositorPlan,
 } from '../src/compositor/index.js';
 import { compileSpringExecutionArtifactTupleUnchecked } from '../src/compositor/curve.js';
-import { effectiveSpringTolerance } from '../src/compositor/error-bound.js';
+import { effectiveSpringTolerance } from '../src/compositor/effective-tolerance.js';
 import { MotionParamError } from '../src/errors.js';
 import { solveSpring } from '../src/internal/solver.js';
 import type { SpringParams } from '../src/spring.js';
