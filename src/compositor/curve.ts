@@ -282,4 +282,3 @@ export {
   type LinearStop,
   type MaxValueErrorOptions,
 } from './error-bound.js';
-
