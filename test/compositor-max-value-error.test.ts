@@ -107,6 +107,27 @@ describe('#223 effective output-space tolerance', () => {
     }
   });
 
+  it('bounds the full terminal band between normalized default and strict horizon', () => {
+    const span = 100;
+    for (const spring of Object.values(SPRINGS)) {
+      for (const v0 of [-5, 0, 5]) {
+        for (const tolerance of [1 / 400, 1 / 480, 1 / 600, 1 / 799]) {
+          const budget = tolerance * span;
+          const plan = compileSpringPlan({
+            spring,
+            property: 'transform',
+            from: 0,
+            to: span,
+            v0,
+            maxValueError: budget,
+          });
+          expect(observedValueError(plan, spring, span, v0), `${tolerance}, v0=${v0}`)
+            .toBeLessThanOrEqual(budget);
+        }
+      }
+    }
+  });
+
   it('keys artifacts by effective tolerance rather than authoring form', () => {
     const span = 1000;
     const budget = 0.25;
