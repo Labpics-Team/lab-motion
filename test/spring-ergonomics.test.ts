@@ -280,9 +280,14 @@ describe('spring-ergonomics: полы движка = зеркало конста
 
 describe('spring-ergonomics-api-surface-pin', () => {
   it('ровно запиненный набор runtime-экспортов', () => {
-    expect(Object.keys(ergo).sort()).toEqual(
-      ['fromBounce', 'fromVisualDuration', 'springAsEasing', 'springPresets'],
-    );
+    expect(Object.keys(ergo).sort()).toEqual([
+      'fromBounce',
+      'fromVisualDuration',
+      'springAsEasing',
+      'springFromOscillation',
+      'springFromPeak',
+      'springPresets',
+    ]);
   });
 
   it('SSR: node env — не бросает', () => {

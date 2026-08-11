@@ -341,3 +341,118 @@ export function springAsEasing(params: SpringParams): (t: number) => number {
     return v + gap * (3 * u2 - 2 * u3) - slopeAtEnd * (u3 - u2);
   };
 }
+
+// ─── springFromPeak ───────────────────────────────────────────────────────────
+
+/** Options for springFromPeak constructor. */
+export interface FromPeakOptions {
+  /** Time to first overshoot peak in seconds (> 0). */
+  readonly timeToPeak: number;
+  /** Peak ratio relative to step size (e.g. 1.15 for 15% overshoot, or 0.15). */
+  readonly peak?: number | undefined;
+  /** Overshoot fraction (e.g. 0.15 for 15% overshoot). */
+  readonly overshoot?: number | undefined;
+  /** Mass. Defaults to 1. */
+  readonly mass?: number | undefined;
+}
+
+/**
+ * Inverse constructor: spring from observable time to peak and overshoot ratio (#230).
+ *
+ * Reconstructs exact physical spring {mass, stiffness, damping} such that step response
+ * reaches its first peak at timeToPeak with position 1 + overshoot (velocity = 0).
+ */
+export function springFromPeak(options: FromPeakOptions): SpringParams {
+  checkPositive(options.timeToPeak, 'springFromPeak', 'timeToPeak');
+
+  let mp: number;
+  if (typeof options.overshoot === 'number') {
+    mp = options.overshoot;
+  } else if (typeof options.peak === 'number') {
+    mp = options.peak > 1 ? options.peak - 1 : options.peak;
+  } else {
+    throw new MotionParamError('LM092');
+  }
+
+  if (!Number.isFinite(mp) || mp <= 0 || mp >= 1) {
+    throw new MotionParamError('LM092');
+  }
+
+  const mass =
+    typeof options.mass === 'number' && Number.isFinite(options.mass) && options.mass > 0
+      ? options.mass
+      : 1;
+
+  const L = -Math.log(mp);
+  const zeta = L / Math.sqrt(Math.PI * Math.PI + L * L);
+  const omega0 = Math.sqrt(Math.PI * Math.PI + L * L) / options.timeToPeak;
+
+  return toParams(omega0, zeta, mass);
+}
+
+// ─── springFromOscillation ────────────────────────────────────────────────────
+
+/** Options for springFromOscillation constructor. */
+export interface FromOscillationOptions {
+  /** Damped oscillation period in seconds (> 0). */
+  readonly period?: number | undefined;
+  /** Damped oscillation frequency in Hz (> 0). */
+  readonly frequency?: number | undefined;
+  /** Time in seconds for oscillation amplitude to decay by 50% (> 0). */
+  readonly halfLife?: number | undefined;
+  /** Time constant in seconds for amplitude decay (1/e) (> 0). */
+  readonly decayTime?: number | undefined;
+  /** Damping ratio ζ ∈ (0, 1). */
+  readonly dampingRatio?: number | undefined;
+  /** Mass. Defaults to 1. */
+  readonly mass?: number | undefined;
+}
+
+/**
+ * Inverse constructor: spring from observable oscillation period/frequency and decay (#230).
+ *
+ * Reconstructs physical spring {mass, stiffness, damping} from damped frequency and decay envelope.
+ */
+export function springFromOscillation(options: FromOscillationOptions): SpringParams {
+  let period: number;
+  if (typeof options.period === 'number') {
+    period = options.period;
+  } else if (typeof options.frequency === 'number') {
+    if (!Number.isFinite(options.frequency) || options.frequency <= 0) {
+      throw new MotionParamError('LM093');
+    }
+    period = 1 / options.frequency;
+  } else {
+    throw new MotionParamError('LM093');
+  }
+
+  checkPositive(period, 'springFromOscillation', 'period');
+  const omegaD = (2 * Math.PI) / period;
+
+  let alpha: number;
+  if (typeof options.halfLife === 'number') {
+    checkPositive(options.halfLife, 'springFromOscillation', 'halfLife');
+    alpha = Math.LN2 / options.halfLife;
+  } else if (typeof options.decayTime === 'number') {
+    checkPositive(options.decayTime, 'springFromOscillation', 'decayTime');
+    alpha = 1 / options.decayTime;
+  } else if (typeof options.dampingRatio === 'number') {
+    const z = options.dampingRatio;
+    if (!Number.isFinite(z) || z <= 0 || z >= 1) {
+      throw new MotionParamError('LM092');
+    }
+    alpha = (omegaD * z) / Math.sqrt(1 - z * z);
+  } else {
+    throw new MotionParamError('LM093');
+  }
+
+  const omega0 = Math.sqrt(omegaD * omegaD + alpha * alpha);
+  const zeta = alpha / omega0;
+
+  const mass =
+    typeof options.mass === 'number' && Number.isFinite(options.mass) && options.mass > 0
+      ? options.mass
+      : 1;
+
+  return toParams(omega0, zeta, mass);
+}
