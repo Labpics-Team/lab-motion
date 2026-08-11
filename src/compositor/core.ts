@@ -61,6 +61,7 @@ import {
   tryCompileSpringExecutionArtifactTupleUnchecked,
   validateTolerance,
 } from './curve.js';
+import { effectiveSpringTolerance } from './error-bound.js';
 import {
   compileSpringRuntimeExecutionTupleUnchecked,
 } from './execution.js';
@@ -203,6 +204,8 @@ export interface CompositorPlanOptions {
   readonly v0?: number;
   /** Толерантность (ед. прогресса). По умолчанию DEFAULT_TOLERANCE. */
   readonly tolerance?: number;
+  /** Макс. ошибка реконструкции в единицах numeric from/to до format. */
+  readonly maxValueError?: number;
   /** Fill. По умолчанию 'both'. */
   readonly fill?: 'none' | 'forwards' | 'backwards' | 'both';
   /** Composite. По умолчанию 'replace'. */
@@ -235,8 +238,14 @@ export function compileSpringPlan(options: CompositorPlanOptions): CompositorPla
   validateFinite(options.to);
   const v0 = options.v0 ?? 0;
   validateFinite(v0);
-  const tolerance = options.tolerance ?? DEFAULT_TOLERANCE;
-  validateTolerance(tolerance);
+  const normalizedTolerance = options.tolerance ?? DEFAULT_TOLERANCE;
+  validateTolerance(normalizedTolerance);
+  const tolerance = effectiveSpringTolerance(
+    normalizedTolerance,
+    options.from,
+    options.to,
+    options.maxValueError,
+  );
 
   // Публичная диагностика — свежий снимок защищённых сериализованных остановок:
   // это реально исполняемая браузером кривая, без второго источника истины.
@@ -355,6 +364,8 @@ export interface CompositorSpringOptions {
    */
   readonly apply?: ((value: string | number) => void) | undefined;
   readonly tolerance?: number | undefined;
+  /** Макс. ошибка каждого прогона в единицах numeric from/to до format. */
+  readonly maxValueError?: number | undefined;
   readonly fill?: 'none' | 'forwards' | 'backwards' | 'both' | undefined;
   readonly composite?: 'replace' | 'add' | 'accumulate' | undefined;
   readonly format?: ((v: number) => string | number) | undefined;
@@ -433,6 +444,7 @@ export class CompositorSpring {
   private readonly _spring: SpringParams;
   private readonly _property: string;
   private readonly _tolerance: number;
+  private readonly _maxValueError: number | undefined;
   private readonly _fill: 'none' | 'forwards' | 'backwards' | 'both';
   private readonly _composite: 'replace' | 'add' | 'accumulate';
   private _format: ((v: number) => string | number) | undefined;
@@ -484,6 +496,7 @@ export class CompositorSpring {
     validateFinite(opts.from);
     validateFinite(opts.to);
     if (opts.tolerance !== undefined) validateTolerance(opts.tolerance);
+    effectiveSpringTolerance(DEFAULT_TOLERANCE, opts.from, opts.to, opts.maxValueError);
     const delay = opts.delay ?? 0;
     if (!Number.isFinite(delay) || delay < 0) {
       throw new MotionParamError('LM013');
@@ -492,6 +505,7 @@ export class CompositorSpring {
     this._spring = opts.spring;
     this._property = opts.property;
     this._tolerance = opts.tolerance ?? DEFAULT_TOLERANCE;
+    this._maxValueError = opts.maxValueError;
     this._fill = opts.fill ?? 'both';
     this._composite = opts.composite ?? 'replace';
     this._format = opts.format ?? Number;
@@ -549,7 +563,7 @@ export class CompositorSpring {
       artifact = tryCompileSpringExecutionArtifactTupleUnchecked(
         this._spring,
         this._v0Norm,
-        this._tolerance,
+        this._effectiveTolerance(this._from, this._to),
       );
       if (this._epoch !== generation) return;
       if (!artifact) {
@@ -559,7 +573,7 @@ export class CompositorSpring {
           compileSpringExecutionArtifactTupleUnchecked(
             this._spring,
             this._v0Norm,
-            this._tolerance,
+            this._effectiveTolerance(this._from, this._to),
           );
         }
       }
@@ -642,7 +656,7 @@ export class CompositorSpring {
     const artifact = tryCompileSpringExecutionArtifactTupleUnchecked(
       this._spring,
       v0Norm,
-      this._tolerance,
+      this._effectiveTolerance(read.value, newTarget),
     );
     if (this._epoch !== generation) return;
     if (!artifact) {
@@ -652,7 +666,7 @@ export class CompositorSpring {
         compileSpringExecutionArtifactTupleUnchecked(
           this._spring,
           v0Norm,
-          this._tolerance,
+          this._effectiveTolerance(read.value, newTarget),
         );
       }
       const mv = this._liveCandidate(read.value, read.velocity, generation);
@@ -767,6 +781,10 @@ export class CompositorSpring {
     return this._tier === 0 && !this._mv;
   }
 
+  private _effectiveTolerance(from: number, to: number): number {
+    return effectiveSpringTolerance(this._tolerance, from, to, this._maxValueError);
+  }
+
   private _inertValue(): MotionValue {
     const value = new MotionValue({ initial: this._from, spring: this._spring });
     value.destroy();
@@ -867,7 +885,7 @@ export class CompositorSpring {
       from,
       to,
       v0Norm,
-      this._tolerance,
+      this._effectiveTolerance(from, to),
       this._fill,
       this._composite,
       this._format,

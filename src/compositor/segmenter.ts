@@ -70,6 +70,36 @@ const BASE_GRID_FLOOR = 24;
 const BASE_GRID_MIN = 32;
 /** Физический потолок компиляции: выше живой солвер дешевле и честнее. */
 export const BASE_GRID_MAX = 4096;
+const LEGACY_DEFAULT_TOLERANCE = 1 / 400;
+
+/**
+ * Строгий authoring-допуск резервирует 1/16 под terminal snap. Legacy default
+ * сохраняет прежний horizon и byte-identical артефакты старых программ.
+ */
+function springCompileHorizon(
+  params: SpringParams,
+  v0: number,
+  tolerance: number,
+): number {
+  const legacy = settleTimeUpperBound(params, v0);
+  if (tolerance > LEGACY_DEFAULT_TOLERANCE / 2) return legacy;
+  const sample = makeSpringValueSampler(params, v0);
+  const endpointBudget = tolerance / 16;
+  if (Math.abs(sample(legacy) - 1) <= endpointBudget) return legacy;
+
+  let low = legacy;
+  let high = legacy * 2;
+  while (Math.abs(sample(high) - 1) > endpointBudget) {
+    low = high;
+    high *= 2;
+  }
+  for (let iteration = 0; iteration < 32; iteration++) {
+    const middle = (low + high) / 2;
+    if (Math.abs(sample(middle) - 1) <= endpointBudget) high = middle;
+    else low = middle;
+  }
+  return high;
+}
 
 function requiredGridSize(
   params: SpringParams,
@@ -112,7 +142,7 @@ export function fitsSpringCurveBudget(
   v0: number,
   tolerance: number,
 ): boolean {
-  const settle = settleTimeUpperBound(params, v0);
+  const settle = springCompileHorizon(params, v0, tolerance);
   const required = requiredGridSize(params, settle, tolerance, v0);
   return Number.isSafeInteger(required) && required <= BASE_GRID_MAX;
 }
@@ -123,7 +153,7 @@ export function assertSpringCurveBudget(
   v0: number,
   tolerance: number,
 ): void {
-  baseGridSize(params, settleTimeUpperBound(params, v0), tolerance, v0);
+  baseGridSize(params, springCompileHorizon(params, v0, tolerance), tolerance, v0);
 }
 
 /**
@@ -223,7 +253,7 @@ export function buildSpringNodesWithHorizon(
   v0: number,
   tolerance: number,
 ): [nodes: SpringNode[], horizon: number] {
-  const settle = settleTimeUpperBound(params, v0);
+  const settle = springCompileHorizon(params, v0, tolerance);
   return [
     buildSpringNodesAtHorizon(
       params,
@@ -245,7 +275,7 @@ export function tryBuildSpringNodes(
   v0: number,
   tolerance: number,
 ): [nodes: SpringNode[], horizon: number] | undefined {
-  const settle = settleTimeUpperBound(params, v0);
+  const settle = springCompileHorizon(params, v0, tolerance);
   const intervals = requiredGridSize(params, settle, tolerance, v0);
   if (!Number.isSafeInteger(intervals) || intervals > BASE_GRID_MAX) return undefined;
   return [
