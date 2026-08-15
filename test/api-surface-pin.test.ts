@@ -14,6 +14,8 @@ const EXPECTED_EXPORTS = new Set([
   'MotionParamError',
   'drive',
   'validateSpringParams',
+  'validateSpringPhysics',
+  'validateSpringForFrameLoop',
   'MotionValue',
 ]);
 
@@ -47,5 +49,12 @@ describe('public API surface pin', () => {
 
   it('validateSpringParams is a function', () => {
     expect(typeof motionModule.validateSpringParams).toBe('function');
+  });
+
+  it('validateSpringPhysics / validateSpringForFrameLoop are functions; params — исполнительский алиас (#218)', () => {
+    expect(typeof motionModule.validateSpringPhysics).toBe('function');
+    expect(typeof motionModule.validateSpringForFrameLoop).toBe('function');
+    // Историческое имя обязано сохранять семантику границы исполнителя.
+    expect(motionModule.validateSpringParams).toBe(motionModule.validateSpringForFrameLoop);
   });
 });

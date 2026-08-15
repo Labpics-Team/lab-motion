@@ -18,6 +18,8 @@ export {
   type SpringResult,
   spring,
   validateSpringParams,
+  validateSpringPhysics,
+  validateSpringForFrameLoop,
 } from './spring.js';
 export { tween } from './tween.js';
 export { type DriveOptions, drive } from './drive.js';
