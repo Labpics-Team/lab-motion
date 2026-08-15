@@ -131,8 +131,11 @@ describe('convergence-class guard — wall-clock-stall class (regression lock)',
       ).toThrow(MotionParamError);
     });
 
-    it('spring() also throws for low-ω₀ configs', () => {
-      expect(() => spring({ mass: 1, stiffness: 0.01, damping: 0.08 }, 0.5)).toThrow(MotionParamError);
+    it('spring() accepts low-ω₀ configs — physics-valid, executor rejects (#218)', () => {
+      // #218 architecture: spring() validates ONLY physics domain (mass>0,
+      // stiffness>0, damping≥0). Low-ω₀ systems are mathematically valid
+      // and computable in closed form. Budget check is at executor boundary.
+      expect(() => spring({ mass: 1, stiffness: 0.01, damping: 0.08 }, 0.5)).not.toThrow();
     });
 
     it('медленная натуральная частота имеет код LM091', () => {
@@ -268,8 +271,11 @@ describe('convergence-class guard — wall-clock-stall class (regression lock)',
       expect(msg).toBe('LM091');
     });
 
-    it('spring() also throws for near-undamped configs', () => {
-      expect(() => spring({ mass: 1, stiffness: 100, damping: 0 }, 0.5)).toThrow(MotionParamError);
+    it('spring() accepts near-undamped configs — physics-valid, executor rejects (#218)', () => {
+      // #218 architecture: spring() validates ONLY physics domain (mass>0,
+      // stiffness>0, damping≥0). damping=0 is physically valid (undamped
+      // harmonic oscillator). Budget check is at executor boundary.
+      expect(() => spring({ mass: 1, stiffness: 100, damping: 0 }, 0.5)).not.toThrow();
     });
 
     /**
