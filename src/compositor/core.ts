@@ -41,7 +41,7 @@ import { MotionParamError } from '../errors.js';
 import { readSpringUnchecked } from '../internal/read-spring.js';
 import {
   type SpringParams,
-  validateSpringParams,
+  validateSpringForFrameLoop,
 } from '../spring.js';
 import { supportsWaapi, type WaapiAnimatable } from '../waapi/index.js';
 import { MotionValue, type RequestFrameFn } from '../motion-value.js';
@@ -120,7 +120,7 @@ export interface SpringLinearOptions {
  * @param options   — v0 (нормализ.), tolerance (ед. прогресса).
  */
 export function compileSpringLinear(spring: SpringParams, options?: SpringLinearOptions): string {
-  validateSpringParams(spring);
+  validateSpringForFrameLoop(spring);
   const v0 = options?.v0 ?? 0;
   const tolerance = options?.tolerance ?? DEFAULT_TOLERANCE;
   if (!Number.isFinite(v0)) {
@@ -149,7 +149,7 @@ export function createSpringLinearCache(capacity: number = DEFAULT_CACHE_CAPACIT
   const cache = createSpringLinearCacheState<SpringExecutionArtifactTuple>(capacity);
   return {
     compile(spring: SpringParams, options?: SpringLinearOptions): string {
-      validateSpringParams(spring);
+      validateSpringForFrameLoop(spring);
       const v0 = options?.v0 ?? 0;
       const tolerance = options?.tolerance ?? DEFAULT_TOLERANCE;
       if (!Number.isFinite(v0)) {
@@ -223,7 +223,7 @@ function validateFinite(v: number): void {
  * capability-проба не обращается к DOM и fail-closed вне браузера.
  */
 export function compileSpringPlan(options: CompositorPlanOptions): CompositorPlan {
-  validateSpringParams(options.spring);
+  validateSpringForFrameLoop(options.spring);
   if (typeof options.property !== 'string' || options.property.length === 0) {
     throw new MotionParamError('LM010');
   }
@@ -295,7 +295,7 @@ export function readCompositorSpring(
   options: ReadSpringOptions,
   out?: { value: number; velocity: number },
 ): { value: number; velocity: number } {
-  validateSpringParams(spring);
+  validateSpringForFrameLoop(spring);
   const from = options.from ?? 0;
   const to = options.to ?? 1;
   const v0 = options.v0 ?? 0;
@@ -477,7 +477,7 @@ export class CompositorSpring {
   };
 
   constructor(opts: CompositorSpringOptions) {
-    validateSpringParams(opts.spring);
+    validateSpringForFrameLoop(opts.spring);
     if (typeof opts.property !== 'string' || opts.property.length === 0) {
       throw new MotionParamError('LM010');
     }
@@ -545,7 +545,7 @@ export class CompositorSpring {
     const generation = ++this._epoch;
     let artifact: SpringExecutionArtifactTuple | undefined;
     if (this._usesCompositor()) {
-      validateSpringParams(this._spring);
+      validateSpringForFrameLoop(this._spring);
       artifact = tryCompileSpringExecutionArtifactTupleUnchecked(
         this._spring,
         this._v0Norm,
@@ -638,7 +638,7 @@ export class CompositorSpring {
       : read.velocity === 0
         ? 0
         : Infinity; // normalized curve cannot represent absolute impulse at zero range
-    validateSpringParams(this._spring);
+    validateSpringForFrameLoop(this._spring);
     const artifact = tryCompileSpringExecutionArtifactTupleUnchecked(
       this._spring,
       v0Norm,

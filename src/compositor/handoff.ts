@@ -23,7 +23,7 @@
  */
 
 import { MotionValue, type RequestFrameFn } from '../motion-value.js';
-import { validateSpringParams, type SpringParams } from '../spring.js';
+import { validateSpringForFrameLoop, type SpringParams } from '../spring.js';
 import { MotionParamError } from '../errors.js';
 
 /** Опции хендоффа compositor→live. */
@@ -57,7 +57,7 @@ export interface HandoffToLiveOptions {
  * вызывающий дальше (setTarget для нового ретаргета, stop/destroy для уборки).
  */
 export function handoffToLive(opts: HandoffToLiveOptions): MotionValue {
-  validateSpringParams(opts.spring);
+  validateSpringForFrameLoop(opts.spring);
   const target = opts.target ?? opts.value;
   if (!Number.isFinite(opts.value) || !Number.isFinite(opts.velocity) || !Number.isFinite(target)) {
     throw new MotionParamError('LM015');

@@ -27,7 +27,7 @@
  *   In production, pass `requestAnimationFrame.bind(window)`.
  */
 
-import { type SpringParams, validateSpringParams } from './spring.js';
+import { type SpringParams, validateSpringForFrameLoop } from './spring.js';
 import { MotionParamError } from './errors.js';
 import { defaultRequestFrame } from './internal/request-frame.js';
 import { solveSpring } from './internal/solver.js';
@@ -186,7 +186,7 @@ export class MotionValue {
     // Цепочка присваиваний: value/from/target рождаются одним (проверенным)
     // числом — и это дешевле трёх чтений opts.initial под гейтом ядра.
     this._value = this._from = this._target = assertFinite(opts.initial);
-    validateSpringParams(opts.spring);
+    validateSpringForFrameLoop(opts.spring);
     this._spring = opts.spring;
     this._clamp = opts.clamp !== false;
     // Скорость рождения (units/s): подхватывается первым setTarget() через

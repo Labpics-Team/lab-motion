@@ -41,7 +41,7 @@ import {
   STANDARD_EASING,
   STANDARD_EASING_COORDS,
 } from '../internal/motion-defaults.js';
-import { validateSpringParams, type SpringParams } from '../spring.js';
+import { validateSpringForFrameLoop, type SpringParams } from '../spring.js';
 
 // ─── Длительности (мс) ───────────────────────────────────────────────────────
 //
@@ -178,7 +178,7 @@ export function springFromDurationBounce(durationS: number, bounce: number): Spr
     stiffness: omega0 * omega0,
     damping: 2 * dampingRatio * omega0,
   };
-  validateSpringParams(params); // settle-бюджет ядра — единый источник правды
+  validateSpringForFrameLoop(params); // settle-бюджет ядра — единый источник правды
   return params;
 }
 

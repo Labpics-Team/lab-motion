@@ -11,7 +11,7 @@
  */
 
 import { prefersReduced } from '../compositor/detect.js';
-import { validateSpringParams } from '../spring.js';
+import { validateSpringForFrameLoop } from '../spring.js';
 import { MotionParamError } from '../errors.js';
 import { DEFAULT_SPRING } from '../internal/motion-defaults.js';
 import type { SpringParams } from '../spring.js';
@@ -198,7 +198,7 @@ export function tryRouteSurfaceTransition(
   const toWidth = requireSurfaceWidth(rawTo);
   const springInput = options.spring;
   const spring = (springInput === undefined ? DEFAULT_SPRING : springInput) as SpringParams;
-  if (springInput !== undefined) validateSpringParams(spring);
+  if (springInput !== undefined) validateSpringForFrameLoop(spring);
 
   // Фолбэк среды как в обычном runtime path: без него reduced-motion
   // пользователь без явного шва получал бы движение вместо snap.

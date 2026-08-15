@@ -18,7 +18,7 @@
  *   G4. Reduced-motion (drag): CHARACTER-switch — release снапает в точку
  *       покоя физики немедленно (без глайд-кадров), а не отключает движение.
  *   G5. Zero runtime deps: только внутренние примитивы (./decay, канонический
- *       solveSpring/validateSpringParams ядра, errors).
+ *       solveSpring/validateSpringForFrameLoop ядра, errors).
  */
 
 import { createDecay, type DecayModel } from '../decay.js';
@@ -26,7 +26,7 @@ import { advanceSlidingWindow } from '../internal/sliding-window.js';
 import { solveSpring } from '../internal/solver.js';
 import { CONVERGENCE_THRESHOLD } from '../internal/constants.js';
 import type { MatchMediaLike } from '../internal/media-query.js';
-import { type SpringParams, validateSpringParams } from '../spring.js';
+import { type SpringParams, validateSpringForFrameLoop } from '../spring.js';
 import type { RequestFrameFn } from '../motion-value.js';
 
 // ─── Общие типы и утилиты ────────────────────────────────────────────────────
@@ -487,7 +487,7 @@ export function createDrag(options?: DragOptions): DragControls {
   const snapBack = options?.snapBackSpring;
   // Fail-fast как у всех пружинных входов ядра: невалидная пружина не должна
   // дожить до первого касания границы (там она молча зациклила бы глайд).
-  if (snapBack !== undefined) validateSpringParams(snapBack);
+  if (snapBack !== undefined) validateSpringForFrameLoop(snapBack);
   const requestFrame: RequestFrameFn | undefined = options?.requestFrame;
   const onStep = options?.onStep;
   const onRest = options?.onRest;
