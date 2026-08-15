@@ -24,12 +24,13 @@ import {
 import { MotionValue } from '../src/index.js';
 import {
   compileSpringExecutionArtifactUnchecked,
+  compileSpringExecutionArtifactTupleUnchecked,
   DEFAULT_TOLERANCE,
 } from '../src/compositor/curve.js';
 import { sampleSerializedSpring } from '../src/compositor/sample.js';
 import { FIXED_DT_S } from '../src/internal/constants.js';
 import { MotionParamError } from '../src/index.js';
-import { settleTimeUpperBound, type SpringParams } from '../src/spring.js';
+import { type SpringParams } from '../src/spring.js';
 
 const STIFF: SpringParams = { mass: 1, stiffness: 170, damping: 26 };
 const BOUNCY: SpringParams = { mass: 1, stiffness: 180, damping: 8 };
@@ -48,7 +49,7 @@ function executionSnapshot(
   );
   const sample = sampleSerializedSpring(
     artifact.samples,
-    settleTimeUpperBound(physics, 0) * 1000,
+    compileSpringExecutionArtifactTupleUnchecked(physics, 0, DEFAULT_TOLERANCE)[2],
     tMs,
   );
   return {

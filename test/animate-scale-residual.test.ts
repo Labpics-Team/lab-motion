@@ -8,6 +8,7 @@ import {
 import { animate, type AnimateProps } from '../src/animate/index.js';
 import {
   compileSpringExecutionArtifactUnchecked,
+  compileSpringExecutionArtifactTupleUnchecked,
   DEFAULT_TOLERANCE,
   tryCompileSpringExecutionArtifactTupleUnchecked,
 } from '../src/compositor/curve.js';
@@ -17,7 +18,7 @@ import {
   sampleSerializedSpring,
   scaleSerializedVelocity,
 } from '../src/compositor/sample.js';
-import { settleTimeUpperBound, type SpringParams } from '../src/spring.js';
+import { type SpringParams } from '../src/spring.js';
 import {
   fakeEl,
   makeClock,
@@ -165,7 +166,8 @@ describe('animate: конфликт uniform и осевого scale', () => {
       0,
       DEFAULT_TOLERANCE,
     );
-    const durationMs = settleTimeUpperBound(UNDERDAMPED, 0) * 1_000;
+    const durationMs =
+      compileSpringExecutionArtifactTupleUnchecked(UNDERDAMPED, 0, DEFAULT_TOLERANCE)[2];
     let pickupMs = -1;
     for (let tMs = 1; tMs < Math.min(durationMs, 1_000); tMs++) {
       const progress = sampleSerializedSpring(artifact.samples, durationMs, tMs).value;

@@ -47,9 +47,9 @@ import {
 } from '../src/compositor/execution.js';
 import {
   compileSpringExecutionArtifactUnchecked,
+  compileSpringExecutionArtifactTupleUnchecked,
   DEFAULT_TOLERANCE,
 } from '../src/compositor/curve.js';
-import { settleTimeUpperBound } from '../src/spring.js';
 
 const SPRING = { mass: 1, stiffness: 220, damping: 8 };
 
@@ -166,7 +166,11 @@ describe('compositor: WebKit исполняет пружину явными keyf
       const slope = Number(second['opacity']) / (Number(second['offset']) * durationMs / 1000);
       const machineBudget = Number.EPSILON * Math.max(1, Math.abs(v0)) * 4;
       expect(plan.easing).toBe('linear');
-      expect(durationMs).toBe(settleTimeUpperBound(SPRING, v0) * 1000);
+      // Единый горизонт effective-tolerance (#223): длительность плана обязана
+      // совпадать с durationMs артефакта, а не с legacy rest-оценкой.
+      expect(durationMs).toBe(
+        compileSpringExecutionArtifactTupleUnchecked(SPRING, v0, DEFAULT_TOLERANCE)[2],
+      );
       expect(Math.abs(slope - v0)).toBeLessThanOrEqual(machineBudget);
     }
   });

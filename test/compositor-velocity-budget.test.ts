@@ -4,6 +4,7 @@ import {
   BASE_GRID_MAX,
   baseGridSize,
   buildSpringNodes,
+  buildSpringNodesWithHorizon,
   fitsSpringCurveBudget,
 } from '../src/compositor/segmenter.js';
 import { CONVERGENCE_THRESHOLD } from '../src/internal/constants.js';
@@ -89,7 +90,7 @@ describe('compositor: v0 входит в доказанный горизонт �
         to: 1,
         v0,
       });
-      expect(plan.duration).toBe(settleTimeUpperBound(UNDER, v0) * 1000);
+      expect(plan.duration).toBe(buildSpringNodesWithHorizon(UNDER, v0, 0.0025)[1] * 1000);
     }
   });
 
@@ -97,9 +98,9 @@ describe('compositor: v0 входит в доказанный горизонт �
     const tolerance = 0.0025;
     for (const p of CURVE_REGIMES) {
       for (const v0 of [-10, -1, 0, 1, 10]) {
-        const duration = settleTimeUpperBound(p, v0);
+        const [nodes, duration] = buildSpringNodesWithHorizon(p, v0, tolerance);
         const nodeSlope = firstPhysicalSlope(
-          buildSpringNodes(p, v0, tolerance),
+          nodes,
           duration,
         );
         const cssSlope = firstPhysicalSlope(
@@ -158,8 +159,7 @@ describe('compositor: v0 входит в доказанный горизонт �
     for (const p of CURVE_REGIMES) {
       for (const v0 of [-10, -1, 0, 1, 10]) {
         if (!fitsSpringCurveBudget(p, v0, tolerance)) continue;
-        const nodes = buildSpringNodes(p, v0, tolerance);
-        const horizon = settleTimeUpperBound(p, v0);
+        const [nodes, horizon] = buildSpringNodesWithHorizon(p, v0, tolerance);
         const interior = nodes.at(-2)!.percent / 100;
         let maxError = 0;
         for (let i = 0; i <= 4096; i++) {
@@ -185,7 +185,7 @@ describe('compositor: v0 входит в доказанный горизонт �
     const v0 = -20;
     const tolerance = 0.0025;
     const nodes = parseLinear(compileSpringLinear(physics, { v0, tolerance }));
-    const horizon = settleTimeUpperBound(physics, v0);
+    const horizon = buildSpringNodesWithHorizon(physics, v0, tolerance)[1];
     const interior = nodes.at(-2)!.percent / 100;
     let hi = 1;
     let maxError = 0;
@@ -218,7 +218,7 @@ describe('compositor: v0 входит в доказанный горизонт �
       v0,
       tolerance,
     });
-    expect(plan.duration).toBe(settleTimeUpperBound(physics, v0) * 1000);
+    expect(plan.duration).toBe(buildSpringNodesWithHorizon(physics, v0, tolerance)[1] * 1000);
     let i = 1;
     while (tau * 100 > plan.nodes[i]!.percent) i++;
     const a = plan.nodes[i - 1]!;

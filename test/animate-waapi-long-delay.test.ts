@@ -208,7 +208,8 @@ describe('animate WAAPI: точный long-delay timer', () => {
     expect(timer.jobs).toHaveLength(2);
     expect(onComplete).not.toHaveBeenCalled();
 
-    currentTime = delay + 1024;
+    // 2048 кратно ULP(2^60)=256 и превышает новый unified-горизонт (#223).
+    currentTime = delay + 2048;
     timer.jobs[1]!.callback();
     await controls.finished;
     expect(onComplete).toHaveBeenCalledTimes(1);
@@ -246,7 +247,8 @@ describe('animate WAAPI: точный long-delay timer', () => {
 
     expect(onComplete).not.toHaveBeenCalled();
     expect(timer.jobs).toHaveLength(1);
-    currentTime = delay + 1024;
+    // 2048 кратно ULP(2^60)=256 и превышает новый unified-горизонт (#223).
+    currentTime = delay + 2048;
     timer.jobs[0]!.callback();
     await controls.finished;
     expect(onComplete).toHaveBeenCalledTimes(1);
