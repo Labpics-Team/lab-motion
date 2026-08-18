@@ -16,28 +16,39 @@ import type { NanoControls, NanoTarget } from '../../nano/index.js';
 
 export type { NanoControls, NanoTarget } from '../../nano/index.js';
 
-/** Компактная форма, которую инъецирует compiler: opacity/durationMs/easing. */
+/**
+ * Компактная форма, которую инъецирует compiler (#221): готовый frame, тайминг
+ * и политика исполнения. Производитель — только одноверсионный compiler,
+ * формат не публичный контракт: артефакт и импорт эмитятся одной сборкой.
+ */
 export interface CompiledNanoCall {
-  readonly o: number;
+  /** Канонизированный PropertyIndexedKeyframes-эквивалент (to-only). */
+  readonly f: Readonly<Record<string, string | number>>;
   readonly d: number;
   readonly e: string;
+  /** delay в мс; отсутствие = 0. */
+  readonly y?: number | undefined;
+  /** stagger в мс на индекс элемента; отсутствие = 0. */
+  readonly g?: number | undefined;
+  /** Явная reduced-политика; отсутствие = ambient prefers-reduced-motion. */
+  readonly r?: boolean | undefined;
 }
 
-export function animateCompiled(target: NanoTarget, artifact: CompiledNanoCall): NanoControls {
+export function animateCompiledNano(target: NanoTarget, artifact: CompiledNanoCall): NanoControls {
+  const { f, d, e, y = 0, g = 0, r } = artifact;
   const source = typeof target === 'string'
     ? document.querySelectorAll(target)
     : 'animate' in target ? [target] : target;
-  const reduced = typeof matchMedia !== 'undefined'
-    && matchMedia('(prefers-reduced-motion: reduce)').matches;
-  const animations = Array.from(source, (element) => {
-    const animation = element.animate({ opacity: artifact.o }, {
-      duration: reduced ? 0 : artifact.d,
-      easing: reduced ? 'linear' : artifact.e,
-      delay: 0,
-      fill: 'both',
-    });
-    return animation;
-  }) as NanoControls;
+  const reduced = r
+    ?? (typeof matchMedia !== 'undefined'
+      && matchMedia('(prefers-reduced-motion: reduce)').matches);
+  // Один frame-объект на вызов: литерал артефакта разделяется всеми элементами.
+  const animations = Array.from(source, (element, index) => element.animate(f, {
+    duration: reduced ? 0 : d,
+    easing: reduced ? 'linear' : e,
+    delay: reduced ? 0 : y + g * index,
+    fill: 'both',
+  })) as NanoControls;
   animations.finished = Promise.all(animations.map((animation) => new Promise<Animation>((resolve, reject) => {
     animation.finished.catch(reject);
     animation.addEventListener('finish', () => {
@@ -50,3 +61,4 @@ export function animateCompiled(target: NanoTarget, artifact: CompiledNanoCall):
   })));
   return animations;
 }
+
