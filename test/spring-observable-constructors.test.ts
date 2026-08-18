@@ -1,6 +1,13 @@
 import { describe, expect, it } from 'vitest';
 import { springFromPeak, springFromOscillation } from '../src/spring/index.js';
-import { spring, validateSpringParams, MotionParamError } from '../src/index.js';
+import {
+  spring,
+  validateSpringParams,
+  validateSpringPhysics,
+  validateSpringForFrameLoop,
+  MotionParamError,
+  type SpringParams,
+} from '../src/index.js';
 
 describe('springFromPeak — inverse constructor from observable peak (#230)', () => {
   it('reconstructs spring where velocity is 0 and position equals peak at timeToPeak', () => {
@@ -113,5 +120,55 @@ describe('springFromOscillation — inverse constructor from observable oscillat
     expect(() => springFromOscillation({ period: 1, halfLife: -0.1 })).toThrow(MotionParamError);
     expect(() => springFromOscillation({ period: 1, dampingRatio: 0 })).toThrow(MotionParamError);
     expect(() => springFromOscillation({ period: 1, dampingRatio: 1 })).toThrow(MotionParamError);
+  });
+});
+
+/**
+ * Пин эквивалентности дубликата (#218, size-инвариант): физические проверки
+ * в validateSpringForFrameLoop продублированы ТЕЛОМ (не вызовом
+ * validateSpringPhysics) — esbuild инлайнил вызов IIFE-обёрткой (+24 B gz
+ * в mixed-гейте). Дубликаты обязаны отвергать один и тот же физический
+ * домен с теми же кодами; рассинхрон обязан краснить этот корпус.
+ */
+describe('validateSpringPhysics ≡ физическая часть validateSpringForFrameLoop', () => {
+  const HOSTILE: readonly [label: string, p: SpringParams][] = [
+    ['mass 0', { mass: 0, stiffness: 100, damping: 10 }],
+    ['mass −1', { mass: -1, stiffness: 100, damping: 10 }],
+    ['mass NaN', { mass: Number.NaN, stiffness: 100, damping: 10 }],
+    ['mass Infinity', { mass: Number.POSITIVE_INFINITY, stiffness: 100, damping: 10 }],
+    ['stiffness 0', { mass: 1, stiffness: 0, damping: 10 }],
+    ['stiffness −1', { mass: 1, stiffness: -1, damping: 10 }],
+    ['stiffness NaN', { mass: 1, stiffness: Number.NaN, damping: 10 }],
+    ['stiffness Infinity', { mass: 1, stiffness: Number.POSITIVE_INFINITY, damping: 10 }],
+    ['damping −1', { mass: 1, stiffness: 100, damping: -1 }],
+    ['damping NaN', { mass: 1, stiffness: 100, damping: Number.NaN }],
+    ['damping Infinity', { mass: 1, stiffness: 100, damping: Number.POSITIVE_INFINITY }],
+  ];
+
+  for (const [label, p] of HOSTILE) {
+    it(`${label}: оба валидатора бросают одинаковый код`, () => {
+      let physicsCode = '';
+      let frameCode = '';
+      try {
+        validateSpringPhysics(p);
+      } catch (e) {
+        physicsCode = (e as MotionParamError).code;
+      }
+      try {
+        validateSpringForFrameLoop(p);
+      } catch (e) {
+        frameCode = (e as MotionParamError).code;
+      }
+      expect(physicsCode).not.toBe('');
+      expect(frameCode).toBe(physicsCode);
+    });
+  }
+
+  it('физически валидная, но за бюджетом кадра: physics молчит, frame-loop бросает LM091', () => {
+    const slow: SpringParams = { mass: 100, stiffness: 100, damping: 2 };
+    expect(() => validateSpringPhysics(slow)).not.toThrow();
+    expect(() => validateSpringForFrameLoop(slow)).toThrow(
+      expect.objectContaining({ code: 'LM091' }),
+    );
   });
 });
