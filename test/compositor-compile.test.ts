@@ -280,7 +280,10 @@ describe('compositor: readCompositorSpring — closed-form (value, velocity)', (
       // вызывает validateSpringForFrameLoop). Физика ≠ бюджет (#218).
       try {
         spring(p, 0);
-      } catch {
+      } catch (e) {
+        // Ожидаем только физический отказ; иной класс ошибки = регресс солвера.
+        const code = (e as MotionParamError).code;
+        if (code !== 'LM088' && code !== 'LM089' && code !== 'LM090') throw e;
         continue;
       }
       let r: ReturnType<typeof readCompositorSpring>;
@@ -291,11 +294,11 @@ describe('compositor: readCompositorSpring — closed-form (value, velocity)', (
           v0: (rnd() - 0.5) * 20,
           t: rnd() * 40,
         });
-      } catch {
+      } catch (e) {
         // readCompositorSpring вызывает validateSpringForFrameLoop на границе
-        // исполнителя (#218): физически валидная, но неоседающая в бюджет
-        // пружина отвергается здесь. Пропускаем — тест проверяет финитность
-        // для принятых конфигураций, а не бюджетный фильтр.
+        // исполнителя (#218): физика пройдена выше, поэтому легален только
+        // бюджетный LM091. Любая иная ошибка = регресс, тест обязан упасть.
+        if ((e as MotionParamError).code !== 'LM091') throw e;
         continue;
       }
       expect(Number.isFinite(r.value)).toBe(true);

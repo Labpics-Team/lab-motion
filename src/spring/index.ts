@@ -34,7 +34,7 @@
  *   (совместима с keyframes/tween): шкала времени = время оседания
  *   параметров; эндпоинты точны (дисциплина NE2), форма OVERSHOOTING
  *   при ζ<1. Требует оседающую пружину (ζ>0): у незатухающей e(1)=1
- *   недостижимо — MotionParamError LM091.
+ *   недостижимо — MotionParamError LM169.
  *
  * Инварианты: zero-DOM, zero-deps, детерминизм, MotionParamError рано,
  * обратимость: constructor(observables(params)) ≡ params с точностью IEEE-754.
@@ -141,7 +141,11 @@ function checkPositive(v: number): void {
 }
 
 function massOf(mass: number | undefined): number {
-  return typeof mass === 'number' && Number.isFinite(mass) && mass > 0 ? mass : 1;
+  if (mass === undefined) return 1;
+  // Явно переданный невалидный mass — отказ (LM088), не тихая подмена единицей:
+  // конструкторы #230 — точные биекции без коэрсии намерения (контракт шапки).
+  if (!Number.isFinite(mass) || mass <= 0) throw new MotionParamError('LM088');
+  return mass;
 }
 
 /**

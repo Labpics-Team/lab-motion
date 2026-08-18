@@ -41,7 +41,7 @@ import {
   STANDARD_EASING,
   STANDARD_EASING_COORDS,
 } from '../internal/motion-defaults.js';
-import { validateSpringForFrameLoop, type SpringParams } from '../spring.js';
+import { validateSpringPhysics, type SpringParams } from '../spring.js';
 
 // ─── Длительности (мс) ───────────────────────────────────────────────────────
 //
@@ -178,7 +178,9 @@ export function springFromDurationBounce(durationS: number, bounce: number): Spr
     stiffness: omega0 * omega0,
     damping: 2 * dampingRatio * omega0,
   };
-  validateSpringForFrameLoop(params); // settle-бюджет ядра — единый источник правды
+  // Физическая валидация (#218): конструктор токена — чистая биекция, бюджет
+  // кадра проверяет исполнитель на своей границе (validateSpringForFrameLoop).
+  validateSpringPhysics(params);
   return params;
 }
 

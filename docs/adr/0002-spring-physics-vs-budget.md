@@ -20,14 +20,14 @@
 ### Математический закон
 
 Канонические координаты формы движения:
-```
+```text
 ω₀ = sqrt(k / m)
 ζ  = c / (2 sqrt(km))
 v₀ = initial velocity
 ```
 
 Для `duration + bounce` (канон SwiftUI):
-```
+```text
 ω₀ = 2π / duration
 ζ  = 1 - bounce
 k  = m ω₀²
