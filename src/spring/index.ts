@@ -40,7 +40,7 @@
  * обратимость: constructor(observables(params)) ≡ params с точностью IEEE-754.
  */
 
-import { spring, validateSpringPhysics, type SpringParams } from '../spring.js';
+import { validateSpringPhysics, type SpringParams } from '../spring.js';
 import { CONVERGENCE_THRESHOLD } from '../internal/constants.js';
 import { makeSpringValueSampler } from '../internal/solver.js';
 import { MotionParamError } from '../errors.js';
@@ -367,7 +367,7 @@ export const springPresets: Readonly<Record<
  * Эндпоинты точны: e(0)=0, e(1)=1; вход клампится, NaN→0 (дисциплина NE2/NE1).
  *
  * Требует ОСЕДАЮЩУЮ пружину (ζ > 0): у незатухающей шкала времени не
- * существует и e(1)=1 недостижимо — MotionParamError LM091. Медленные
+ * существует и e(1)=1 недостижимо — MotionParamError LM169. Медленные
  * оседающие пружины валидны: функция чистая, шкала нормирована.
  */
 export function springAsEasing(params: SpringParams): (t: number) => number {
@@ -376,20 +376,12 @@ export function springAsEasing(params: SpringParams): (t: number) => number {
   // произведение stiffness·mass — это было единственное место в репозитории,
   // где ζ ещё считалась переполняющейся формой.
   const zeta = params.damping / (2 * params.mass * omega0);
-  // Канонический приоритет ошибок: LM088 → LM089 → LM090 → LM169 → LM091.
-  // Полевые коды отдаёт сам валидатор (он проверяет поля до бюджета), поэтому
-  // комбинированный инвалид {mass:0, damping:0} даёт LM088. Единственный
-  // случай, где бюджетный LM091 маскировал бы истинную причину, — валидные
-  // поля с damping === 0: бюджет там бесконечен ВСЕГДА, а дефект — отсутствие
-  // затухания, это контракт easing (LM169). Узкий ремап ровно этого случая.
-  try {
-    spring(params, 0);
-  } catch (error) {
-    if (params.damping === 0 && (error as MotionParamError).code === 'LM091') {
-      throw new MotionParamError('LM169');
-    }
-    throw error;
-  }
+  // Канонический приоритет ошибок: LM088 → LM089 → LM090 → LM169 (#218):
+  // полевые коды отдаёт физический валидатор; бюджетного LM091 здесь нет —
+  // медленная пружина валидна, шкала нормирована горизонтом. Незатухающая
+  // (damping=0) не имеет горизонта — контракт easing, LM169 явной проверкой.
+  validateSpringPhysics(params);
+  if (params.damping === 0) throw new MotionParamError('LM169');
 
   const horizon = easingHorizon(zeta);
   const settle = horizon / omega0;

@@ -102,7 +102,11 @@ describe('springAsEasing: горячий путь и краевые входы',
     const spy = vi.fn();
     vi.doMock('../src/spring.js', async () => {
       const actual = await vi.importActual<typeof import('../src/spring.js')>('../src/spring.js');
-      return { ...actual, spring: (...args: Parameters<typeof actual.spring>) => (spy(), actual.spring(...args)) };
+      return {
+        ...actual,
+        validateSpringPhysics: (...args: Parameters<typeof actual.validateSpringPhysics>) =>
+          (spy(), actual.validateSpringPhysics(...args)),
+      };
     });
     const { springAsEasing: mocked } = await import('../src/spring/index.js');
     const easing = mocked(CRITICAL);
@@ -127,9 +131,10 @@ describe('springAsEasing: горячий путь и краевые входы',
 });
 
 /**
- * Канонический приоритет ошибок (бриф D2): LM088 → LM089 → LM090 → LM169 →
- * LM091. Табличный корпус перебирает сочетания нескольких невалидных полей:
- * побеждать обязан код старшего приоритета, а не порядок проверок в коде.
+ * Канонический приоритет ошибок (бриф D2): LM088 → LM089 → LM090 → LM169.
+ * Бюджетного LM091 в easing больше нет (#218, ADR-0002): медленная пружина
+ * физически валидна, easing — чистая аналитика; бюджет проверяют кадровые
+ * исполнители (validateSpringForFrameLoop). Побеждает код старшего приоритета.
  */
 describe('приоритет ошибок при нескольких невалидных полях', () => {
   const CASES: readonly [label: string, p: { mass: number; stiffness: number; damping: number }, code: string][] = [
@@ -141,7 +146,6 @@ describe('приоритет ошибок при нескольких невал
     ['демпфирование −5 (поле бьёт LM169)', { mass: 1, stiffness: 100, damping: -5 }, 'LM090'],
     ['демпфирование NaN', { mass: 1, stiffness: 100, damping: Number.NaN }, 'LM090'],
     ['демпфирование ровно 0 при валидных полях', { mass: 1, stiffness: 100, damping: 0 }, 'LM169'],
-    ['валидные поля, бюджет не выполняется', { mass: 100, stiffness: 100, damping: 2 }, 'LM091'],
   ];
 
   for (const [label, params, code] of CASES) {

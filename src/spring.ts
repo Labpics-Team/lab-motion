@@ -171,9 +171,20 @@ export function validateSpringPhysics(p: SpringParams): void {
  * tree-shaking удалить v0-envelope из MotionValue/биндингов без компилятора.
  */
 export function validateSpringForFrameLoop(p: SpringParams): void {
-  validateSpringPhysics(p);
-  const tSettle = settleTimeAtRestUpperBound(p);
-  if (!(tSettle <= SETTLE_BUDGET_S)) {
+  // Физические проверки продублированы (не вызовом validateSpringPhysics):
+  // в графах, где физический валидатор больше нигде не используется, esbuild
+  // инлайнил вызов IIFE-обёрткой (+36 B raw в animate+compositor). Дубликат —
+  // осознанная цена size-инварианта; эквивалентность пинует тест приоритетов.
+  if (!Number.isFinite(p.mass) || p.mass <= 0) {
+    throw new MotionParamError('LM088');
+  }
+  if (!Number.isFinite(p.stiffness) || p.stiffness <= 0) {
+    throw new MotionParamError('LM089');
+  }
+  if (!Number.isFinite(p.damping) || p.damping < 0) {
+    throw new MotionParamError('LM090');
+  }
+  if (!(settleTimeAtRestUpperBound(p) <= SETTLE_BUDGET_S)) {
     throw new MotionParamError('LM091');
   }
 }
