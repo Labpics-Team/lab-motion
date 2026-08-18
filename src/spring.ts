@@ -141,14 +141,47 @@ export function settleTimeUpperBound(p: SpringParams, v0 = 0): number {
 }
 
 /**
- * Validate spring params. Throws MotionParamError for invalid inputs.
- *
- * Exported so drive() can call this synchronously at its boundary —
- * before any Promise is constructed or frame scheduled — making invalid
- * spring config throw eagerly and deterministically regardless of the
- * injected scheduler.
+ * Физическая валидность (#218, ADR-0002): ТОЛЬКО домен ОДУ —
+ * конечная mass > 0, stiffness > 0, damping ≥ 0. Никаких бюджетов
+ * исполнителя: медленные (ω₀ → 0) и незатухающие (c = 0) системы
+ * физически валидны, аналитический солвер вычисляет их точно на любом t.
  */
-export function validateSpringParams(p: SpringParams): void {
+export function validateSpringPhysics(p: SpringParams): void {
+  if (!Number.isFinite(p.mass) || p.mass <= 0) {
+    throw new MotionParamError('LM088');
+  }
+  if (!Number.isFinite(p.stiffness) || p.stiffness <= 0) {
+    throw new MotionParamError('LM089');
+  }
+  // Домен damping включает границу представимости (не бюджет исполнителя):
+  // за ζ² > MAX_VALUE полюса вырождаются в double и солвер молча врёт нулём
+  // (контрпример: m=1e-300,k=1,c=1e10, t=1e9 → 0 вместо 0.095). Раньше класс
+  // закрывал бюджетный LM091; после сплита #218 домен закрывает его сам.
+  // Одно условие покрывает всё: NaN damping → ζ=NaN → !(ζ≥0); отрицательный →
+  // ζ<0; Infinity/overflow → ζ² превышает MAX. √k·√m устойчиво к переполнению.
+  const zeta = p.damping / (2 * Math.sqrt(p.stiffness) * Math.sqrt(p.mass));
+  if (!(zeta >= 0 && zeta * zeta < 1 / 0)) {
+    throw new MotionParamError('LM090');
+  }
+}
+
+/**
+ * Валидатор ГРАНИЦЫ КАДРОВОГО ИСПОЛНИТЕЛЯ (#218, ADR-0002): физическая
+ * валидность ПЛЮС бюджет оседания — аналитическая верхняя граница времени
+ * оседания обязана помещаться в MAX_FRAMES·FIXED_DT_S (≈33.3 с), иначе
+ * исполнитель не способен представить траекторию (снап на кадре-капе).
+ *
+ * Вызывается синхронно на границе исполнителя (drive/driver/MotionValue/
+ * compositor/…) — до конструирования Promise и планирования кадра, чтобы
+ * невалидная конфигурация падала детерминированно при любом шедулере.
+ * Валидатору нужна только пружина из покоя; отдельный вызов позволяет
+ * tree-shaking удалить v0-envelope из MotionValue/биндингов без компилятора.
+ */
+export function validateSpringForFrameLoop(p: SpringParams): void {
+  // Полевые проверки продублированы телом (не вызовом validateSpringPhysics):
+  // esbuild инлайнит вызов IIFE-обёрткой (+24 B gz в mixed-гейте); эквивалентность
+  // пинует тест. ζ-гард здесь не нужен: вырожденные полюса дают settle=Infinity
+  // и отвергаются бюджетом ниже (LM091) — класс «молча неверно» не проходит.
   if (!Number.isFinite(p.mass) || p.mass <= 0) {
     throw new MotionParamError('LM088');
   }
@@ -158,15 +191,19 @@ export function validateSpringParams(p: SpringParams): void {
   if (!Number.isFinite(p.damping) || p.damping < 0) {
     throw new MotionParamError('LM090');
   }
-  // Единый выведенный гард (взамен коробочных ω₀/ζ-полов, см. SETTLE_BUDGET_S):
-  // аналитическое время оседания обязано помещаться в бюджет кадра-капа.
-  // Валидатору нужна только пружина из покоя. Отдельный вызов позволяет
-  // tree-shaking удалить v0-envelope из MotionValue/биндингов без компилятора.
-  const tSettle = settleTimeAtRestUpperBound(p);
-  if (!(tSettle <= SETTLE_BUDGET_S)) {
+  if (!(settleTimeAtRestUpperBound(p) <= SETTLE_BUDGET_S)) {
     throw new MotionParamError('LM091');
   }
 }
+
+/**
+ * Историческое имя (semver-совместимость): семантика границы исполнителя
+ * (физика + бюджет). Новый код выбирает валидатор явно:
+ * validateSpringPhysics — чистая аналитика, validateSpringForFrameLoop —
+ * кадровые исполнители.
+ */
+export const validateSpringParams: (p: SpringParams) => void =
+  validateSpringForFrameLoop;
 
 /**
  * Clamp a value to be finite. Defensive guard — analytical solver should
@@ -223,10 +260,15 @@ export function springUnchecked(params: SpringParams, t: number): SpringResult {
  *   2. Critically:   c = 2*sqrt(k*m)
  *   3. Overdamped:   c > 2*sqrt(k*m)
  *
+ * Чистая аналитика (#218): валидируется ТОЛЬКО физический домен —
+ * медленные и незатухающие системы математически валидны и вычислимы
+ * замкнутой формой на любом t. Бюджет оседания — забота кадровых
+ * исполнителей (validateSpringForFrameLoop на их границе).
+ *
  * @param params - spring physics parameters
  * @param t      - time in seconds (≥ 0)
  */
 export function spring(params: SpringParams, t: number): SpringResult {
-  validateSpringParams(params);
+  validateSpringPhysics(params);
   return springUnchecked(params, t);
 }

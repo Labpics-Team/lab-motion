@@ -14,7 +14,7 @@
  *   src/internal/solver.ts:15 solveSpring(params, t, v0) — единственный солвер
  *     драйвера (произвольный v0 = ядро continuity; springUnchecked НЕ используется —
  *     у него v0 жёстко 0, src/spring.ts:141-150, корень гэпа flip);
- *   src/spring.ts:88 validateSpringParams — ранний MotionParamError в фабрике;
+ *   src/spring.ts validateSpringForFrameLoop — ранний MotionParamError в фабрике;
  *   src/flip/index.ts:133 correctRadius и :145 counterScale — ЖИВЫЕ вызовы в
  *     geometry (пин ./flip — ровно 5 экспортов — не тронут); computeFlip/flipAt —
  *     differential-оракулы root-пути в тестах; FlipRect — type re-export

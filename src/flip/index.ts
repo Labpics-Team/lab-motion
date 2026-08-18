@@ -35,7 +35,7 @@
  *       (формулы dx/sx выведены для верхнего-левого origin).
  */
 
-import { springUnchecked, validateSpringParams, type SpringParams } from '../spring.js';
+import { springUnchecked, validateSpringForFrameLoop, type SpringParams } from '../spring.js';
 import type { MatchMediaLike } from '../internal/media-query.js';
 import type { RequestFrameFn } from '../motion-value.js';
 
@@ -205,7 +205,7 @@ export function createFlip(options?: FlipOptions): FlipControls {
   // Конвенция движка (drive/driver/MotionValue): невалидная пружина бросает
   // РАНО и детерминированно — не поздним исключением из кадра планировщика
   // (и не молча под reduced-motion).
-  validateSpringParams(params);
+  validateSpringForFrameLoop(params);
   // Клэмп-режим: default true; явный false = честный упругий доезд.
   const bounded = options?.clamp !== false;
   const requestFrame = options?.requestFrame;

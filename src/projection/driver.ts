@@ -57,7 +57,7 @@ import { MotionParamError } from '../errors.js';
 import type { FlipRect } from '../flip/index.js';
 import { solveSpring } from '../internal/solver.js';
 import type { RequestFrameFn } from '../motion-value.js';
-import { type SpringParams, validateSpringParams } from '../spring.js';
+import { type SpringParams, validateSpringForFrameLoop } from '../spring.js';
 import {
   clamp01,
   createProjector,
@@ -75,7 +75,7 @@ import {
 
 export interface ProjectionOptions {
   /** Default { mass: 1, stiffness: 200, damping: 24 } (= DEFAULT_FLIP_SPRING).
-   *  Невалидная → MotionParamError В ФАБРИКЕ (validateSpringParams), даже под reduce. */
+   *  Невалидная → MotionParamError В ФАБРИКЕ (validateSpringForFrameLoop), даже под reduce. */
   readonly spring?: SpringParams | undefined;
   readonly requestFrame?: RequestFrameFn | undefined;
   readonly matchMedia?: ((query: string) => { matches: boolean }) | undefined;
@@ -229,7 +229,7 @@ type ProjectionPhase = 'rest' | 'active' | 'held' | 'canceled';
 export function createProjection(options?: ProjectionOptions): ProjectionControls {
   const params = options?.spring ?? DEFAULT_PROJECTION_SPRING;
   // Ранний детерминированный бросок (канон drive/flip) — даже под reduced-motion.
-  validateSpringParams(params);
+  validateSpringForFrameLoop(params);
   // Clamp-режим: default FALSE — честный overshoot (отличие от легаси ./flip).
   const bounded = options?.clamp === true;
   const requestFrame = options?.requestFrame;

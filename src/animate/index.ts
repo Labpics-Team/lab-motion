@@ -53,7 +53,7 @@ import {
   DEFAULT_SPRING,
   STANDARD_EASING,
 } from '../internal/motion-defaults.js';
-import { type SpringParams, validateSpringParams } from '../spring.js';
+import { type SpringParams, validateSpringForFrameLoop } from '../spring.js';
 import type { StaggerOptions } from '../stagger/index.js';
 import { scheduleStagger } from '../stagger/scheduler.js';
 import { buildTransform } from '../value/transform.js';
@@ -231,7 +231,7 @@ function resolveMode(options: AnimateOptions): MotionMode {
     stiffness: source.stiffness,
     damping: source.damping,
   };
-  validateSpringParams(spring);
+  validateSpringForFrameLoop(spring);
   return { _type: 'spring', _spring: spring };
 }
 

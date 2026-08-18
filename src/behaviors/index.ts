@@ -26,7 +26,7 @@
  *   ../internal/solver solveSpring — единый пружинный солвер (тот же, что ядро и
  *     smooth-pickup MotionValue): доводка value→target с наследованием velocity
  *     (v0n = velocity/range даёт C¹ на стыке follow|release).
- *   ../spring validateSpringParams — ранний fail-fast MotionParamError В ФАБРИКЕ.
+ *   ../spring validateSpringForFrameLoop — ранний fail-fast MotionParamError В ФАБРИКЕ.
  *   ../tokens spring — токены темпа (дефолтные пружины доводки); семантическую
  *     роль задаёт потребитель, labui НЕ импортируется.
  *
@@ -73,7 +73,7 @@ import { MotionParamError } from '../errors.js';
 import { solveSpring } from '../internal/solver.js';
 import { CONVERGENCE_THRESHOLD, FIXED_DT_S, MAX_FRAMES } from '../internal/constants.js';
 import type { MatchMediaLike } from '../internal/media-query.js';
-import { validateSpringParams, type SpringParams } from '../spring.js';
+import { validateSpringForFrameLoop, type SpringParams } from '../spring.js';
 import { spring as springTokens } from '../tokens/index.js';
 import type { RequestFrameFn } from '../motion-value.js';
 
@@ -456,7 +456,7 @@ export function createBottomSheet(options: SheetOptions): SheetController {
   }
   const axis = options.axis ?? 'y';
   const springParams = options.spring ?? (springTokens.default as SpringParams);
-  validateSpringParams(springParams);
+  validateSpringForFrameLoop(springParams);
   const rubber = _clampFactor(options.rubberBand, DEFAULT_RUBBER_BAND);
   const minSnap = snaps[0]!;
   const maxSnap = snaps[snaps.length - 1]!;
@@ -614,7 +614,7 @@ export function createDragDismiss(options: DismissOptions): DismissController {
       ? Math.abs(options.velocityThreshold)
       : DEFAULT_DISMISS_VELOCITY;
   const springParams = options.spring ?? (springTokens.default as SpringParams);
-  validateSpringParams(springParams);
+  validateSpringForFrameLoop(springParams);
   const dismissTarget = _finite(options.dismissTarget ?? dir * dist * 8);
 
   const base = _createBase<DismissState>(
@@ -775,7 +775,7 @@ export function createCarousel(options: CarouselOptions): CarouselController {
       ? Math.abs(options.velocityThreshold)
       : DEFAULT_CAROUSEL_VELOCITY;
   const springParams = options.spring ?? (springTokens.snappy as SpringParams);
-  validateSpringParams(springParams);
+  validateSpringForFrameLoop(springParams);
 
   const clampIndex = (i: number): number => Math.max(0, Math.min(pageCount - 1, i));
   const startIndex = clampIndex(Math.round(_finite(options.index ?? 0)));
@@ -944,7 +944,7 @@ export function createPullToRefresh(options: PullOptions): PullController {
   const dir: 1 | -1 = options.direction === -1 ? -1 : 1;
   const resistance = _clampFactor(options.resistance, DEFAULT_RUBBER_BAND);
   const springParams = options.spring ?? (springTokens.default as SpringParams);
-  validateSpringParams(springParams);
+  validateSpringForFrameLoop(springParams);
   const pendingPos = _finite(options.pendingPosition ?? threshold);
 
   const base = _createBase<PullState>(

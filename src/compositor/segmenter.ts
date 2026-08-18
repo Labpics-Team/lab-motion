@@ -279,7 +279,7 @@ function buildSpringNodesAtHorizon(
   settle: number,
   intervals: number,
 ): SpringNode[] {
-  // Валидный набор params всегда оседает в бюджет (гарантия validateSpringParams),
+  // Валидный набор params всегда оседает в бюджет (гарантия validateSpringForFrameLoop),
   // так что settle конечно; на всякий случай — деградация к малой ненулевой шкале.
   const T = Number.isFinite(settle) && settle > 0 ? settle : 1;
 

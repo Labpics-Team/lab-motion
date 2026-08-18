@@ -48,4 +48,22 @@ describe('public API surface pin', () => {
   it('validateSpringParams is a function', () => {
     expect(typeof motionModule.validateSpringParams).toBe('function');
   });
+
+  it('validateSpringPhysics / validateSpringForFrameLoop живут в ./spring; root — исторический алиас (#218)', async () => {
+    // Пара валидаторов экспортируется субпутём ./spring (root не растёт —
+    // full-core size-гейт); исторический validateSpringParams в root обязан
+    // сохранять семантику границы исполнителя.
+    const springModule = await import('../src/spring/index.js');
+    expect(typeof springModule.validateSpringPhysics).toBe('function');
+    expect(typeof springModule.validateSpringForFrameLoop).toBe('function');
+    expect(motionModule.validateSpringParams).toBe(springModule.validateSpringForFrameLoop);
+  });
+
+  it('шипуемый dist/spring публикует пару валидаторов (#218, export map ./spring)', async () => {
+    // Источник может быть правильным при сломанной генерации dist-entry —
+    // пин обязан смотреть на артефакт, который получит потребитель.
+    const dist = await import('../dist/spring/index.js');
+    expect(typeof dist.validateSpringPhysics).toBe('function');
+    expect(typeof dist.validateSpringForFrameLoop).toBe('function');
+  });
 });

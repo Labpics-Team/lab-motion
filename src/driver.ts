@@ -22,7 +22,7 @@
 
 import { MotionParamError } from './errors.js';
 import type { MatchMediaLike } from './internal/media-query.js';
-import { type SpringParams, springUnchecked, validateSpringParams } from './spring.js';
+import { type SpringParams, springUnchecked, validateSpringForFrameLoop } from './spring.js';
 
 // ─── Константы ────────────────────────────────────────────────────────────────
 
@@ -174,7 +174,7 @@ export function createDriver(opts: DriverOptions): AnimationControls {
   if (!Number.isFinite(to)) {
     throw new MotionParamError('LM027');
   }
-  validateSpringParams(opts.spring);
+  validateSpringForFrameLoop(opts.spring);
 
   const range = to - from;
   const absRange = Math.abs(range);

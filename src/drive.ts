@@ -31,7 +31,7 @@ import { MotionParamError } from './errors.js';
 import type { MatchMediaLike } from './internal/media-query.js';
 import { defaultRequestFrame } from './internal/request-frame.js';
 import { solveSpring } from './internal/solver.js';
-import { type SpringParams, validateSpringParams } from './spring.js';
+import { type SpringParams, validateSpringForFrameLoop } from './spring.js';
 
 /** Options for drive(). All platform seams are injectable for testing. */
 export interface DriveOptions {
@@ -156,7 +156,7 @@ export function drive(opts: DriveOptions): Promise<void> {
   // closing the class: the error contract is no longer scheduler-dependent.
   // Also enforces the damping-ratio cap so overdamped springs cannot reach
   // MAX_FRAMES (CPU stall + abrupt snap).
-  validateSpringParams(opts.spring);
+  validateSpringForFrameLoop(opts.spring);
 
   // Fast path: from === to, nothing to animate.
   if (from === to) {

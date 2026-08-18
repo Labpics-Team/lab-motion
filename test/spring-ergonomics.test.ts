@@ -13,6 +13,7 @@ import { describe, expect, it } from 'vitest';
 import * as ergo from '../src/spring/index.js';
 import { fromBounce, fromVisualDuration, springPresets, springAsEasing } from '../src/spring/index.js';
 import { spring, validateSpringParams, MotionParamError } from '../src/index.js';
+import { validateSpringPhysics } from '../src/spring/index.js';
 
 // ─── fromBounce (канон SwiftUI/Motion: ζ = 1 − bounce, ω0 = 2π/duration) ─────
 
@@ -50,14 +51,46 @@ describe('spring-ergonomics: fromBounce — известные числа', () =
     expect(Math.sqrt(p.stiffness / p.mass)).toBeCloseTo(2 * Math.PI, 3); // ω0 не зависит от массы
   });
 
-  it('результат ВСЕГДА проходит validateSpringParams (клампы под полы движка)', () => {
-    // Экстремумы публичного диапазона: bounce 1 (ζ-пол 0.2), длинный duration (ω0-пол 2.0).
+  it('ТОЧНОСТЬ (#218): результат физически валиден БЕЗ коэрсии — даже вне бюджета исполнителя', () => {
+    // Никакой тихой подмены намерения: медленные/незатухающие результаты
+    // проходят физический валидатор; бюджет — забота кадрового исполнителя.
     for (const opts of [
-      { duration: 1, bounce: 1 },      // ζ клампится к полу движка
-      { duration: 100, bounce: 0 },    // ω0 клампится к полу движка
+      { duration: 1, bounce: 1 },      // ζ=0 — незатухающая (математический факт)
+      { duration: 100, bounce: 0 },    // ω₀=2π/100 — медленная, но точная
       { duration: 0.05, bounce: -1 },  // очень быстрый + плоский
     ]) {
-      expect(() => validateSpringParams(fromBounce(opts))).not.toThrow();
+      expect(() => validateSpringPhysics(fromBounce(opts))).not.toThrow();
+    }
+  });
+
+  it('ТОЧНОСТЬ (#218): duration=100, bounce=0, mass=1 → точные ω₀=2π/100, ζ=1, k, c', () => {
+    const p = fromBounce({ duration: 100, bounce: 0 });
+    const omega0 = 2 * Math.PI / 100;
+    expect(p.mass).toBe(1);
+    expect(p.stiffness).toBe(omega0 * omega0);          // ≈ 0.00394784176
+    expect(p.damping).toBe(2 * omega0);                 // ≈ 0.12566370614
+    expect(p.stiffness).toBeCloseTo(0.00394784176, 10);
+    expect(p.damping).toBeCloseTo(0.12566370614, 10);
+  });
+
+  it('ТОЧНОСТЬ (#218): bounce=1 → ζ=0 → damping=0 (незатухающий осциллятор)', () => {
+    const p = fromBounce({ duration: 1, bounce: 1 });
+    expect(p.damping).toBe(0);
+    expect(p.stiffness).toBe((2 * Math.PI) ** 2);
+    // Физически валидна; исполнительский бюджет её честно отклоняет.
+    expect(() => validateSpringPhysics(p)).not.toThrow();
+    expect(() => validateSpringParams(p)).toThrow(MotionParamError);
+  });
+
+  it('ОБРАТИМОСТЬ (#218): (duration, bounce) восстанавливаются из параметров точно', () => {
+    for (const duration of [0.3, 1, 7, 100]) {
+      for (const bounce of [-1, -0.25, 0, 0.5, 1]) {
+        const p = fromBounce({ duration, bounce });
+        const omega0 = Math.sqrt(p.stiffness / p.mass);
+        const zeta = p.damping / (2 * Math.sqrt(p.stiffness * p.mass));
+        expect(2 * Math.PI / omega0).toBeCloseTo(duration, 9);
+        expect(1 - zeta).toBeCloseTo(bounce, 9);
+      }
     }
   });
 
@@ -120,30 +153,28 @@ describe('spring-ergonomics: fromVisualDuration', () => {
   // Полный публичный домен ζ<1, включая зону клампа ω0 (класс, слепой для
   // точечных тестов: длинный Tv + малый ζ → ω0 упирается в пол и пружина
   // быстрее запрошенной).
-  it('property ζ<1: t1≈Tv (±1%) на ВСЁМ домене — бюджетная коэрсия жертвует bounce, не Tv', () => {
-    // Выведенный закон (2026-07-03): коробочного пола ω₀=2 больше нет. Если
-    // запрос за бюджетом оседания, fromVisualDuration поднимает ζ вдоль кривой
-    // Tv=const (ω₀ пересчитывается из формулы пересечения) — именованный
-    // контракт API (время первого касания) сохраняется ТОЧНО, деградирует
-    // только упругость. Прежняя коэрсия через ω₀-подъём ускоряла касание
-    // до −45% (bounce=0.5, Tv=10) — подмена намерения.
-    for (const bounce of [0.1, 0.3, 0.5, 0.8, 1]) {
+  it('property ζ<1: t1≈Tv (±1%) на ВСЁМ домене — ТОЧНОЕ преобразование (#218)', () => {
+    // Новый закон (#218, ADR-0002): fromVisualDuration — ТОЧНАЯ биекция
+    // наблюдаемых (Tv, bounce) в физические (ω₀, ζ). Никакой бюджетной
+    // коэрсии: ζ сохраняется точно (ζ = 1 − bounce), ω₀ выводится из
+    // формулы первого пересечения x(t)=1. Прежняя коэрсия подменяла
+    // намерение — теперь контракт точен и обратим.
+    for (const bounce of [0.1, 0.3, 0.5, 0.8, 0.99]) {
       for (const Tv of [0.05, 0.5, 1.2, 1.5, 10]) {
-        const zetaRaw = Math.max(1e-6, 1 - bounce);
-        if (zetaRaw >= 1) continue;
+        const zetaExpected = Math.max(1e-6, 1 - bounce);
+        if (zetaExpected >= 1) continue;
         const p = fromVisualDuration({ visualDuration: Tv, bounce });
         const omega0Fin = Math.sqrt(p.stiffness / p.mass);
         const zetaFin = p.damping / (2 * Math.sqrt(p.stiffness * p.mass));
-        // ζ мог только подняться (коэрсия к бюджету), упасть — никогда
-        expect(zetaFin).toBeGreaterThanOrEqual(zetaRaw - 1e-9);
+        // ТОЧНОСТЬ: ζ = 1 − bounce без коэрсии (IEEE-754 допуск)
+        expect(zetaFin).toBeCloseTo(zetaExpected, 10);
         expect(zetaFin).toBeLessThan(1);
         // инвариант: первое касание = точное решение для ФИНАЛЬНЫХ параметров
         const sFin = Math.sqrt(1 - zetaFin * zetaFin);
         const tStar = (Math.PI - Math.atan(sFin / zetaFin)) / (sFin * omega0Fin);
         const t1 = firstCrossing(p, tStar * 2 + 0.1);
         expect(Math.abs(t1 - tStar) / tStar).toBeLessThan(0.01);
-        // Контракт длительности: держится и в зоне коэрсии (допуск — шаг
-        // численной сетки firstCrossing + запас).
+        // Контракт длительности: первое касание = Tv (допуск — шаг сетки)
         expect(Math.abs(t1 - Tv) / Tv).toBeLessThan(0.01);
       }
     }
@@ -161,13 +192,17 @@ describe('spring-ergonomics: fromVisualDuration', () => {
     }
   });
 
-  it('результат проходит validateSpringParams на краях', () => {
+  it('результат проходит validateSpringPhysics на краях (#218: физика ≠ бюджет)', () => {
+    // fromVisualDuration — ТОЧНОЕ преобразование; результат всегда физически
+    // валиден. Но validateSpringParams (=validateSpringForFrameLoop) проверяет
+    // ещё и бюджет оседания — медленные/незатухающие системы могут его не пройти.
+    // Поэтому проверяем ФИЗИЧЕСКУЮ валидность отдельно.
     for (const opts of [
-      { visualDuration: 0.05, bounce: 1 },
-      { visualDuration: 50, bounce: 0.5 },
-      { visualDuration: 1, bounce: -1 },
+      { visualDuration: 0.05, bounce: 1 },   // ζ=0 → незатухающая
+      { visualDuration: 50, bounce: 0.5 },   // очень медленная
+      { visualDuration: 1, bounce: -1 },     // ζ=2 → передемпфированная
     ]) {
-      expect(() => validateSpringParams(fromVisualDuration(opts))).not.toThrow();
+      expect(() => validateSpringPhysics(fromVisualDuration(opts))).not.toThrow();
     }
   });
 
@@ -280,9 +315,17 @@ describe('spring-ergonomics: полы движка = зеркало конста
 
 describe('spring-ergonomics-api-surface-pin', () => {
   it('ровно запиненный набор runtime-экспортов', () => {
-    expect(Object.keys(ergo).sort()).toEqual(
-      ['fromBounce', 'fromVisualDuration', 'springAsEasing', 'springPresets'],
-    );
+    expect(Object.keys(ergo).sort()).toEqual([
+      'fromBounce',
+      'fromVisualDuration',
+      'springAsEasing',
+      'springFromOscillation',
+      'springFromPeak',
+      'springPresets',
+      // Пара валидаторов #218 публикуется этим субпутём (root не растёт).
+      'validateSpringForFrameLoop',
+      'validateSpringPhysics',
+    ]);
   });
 
   it('SSR: node env — не бросает', () => {

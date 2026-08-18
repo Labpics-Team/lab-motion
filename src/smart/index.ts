@@ -21,7 +21,7 @@
  *   ../projection createProjection — весь FLIP + continuity + C¹ (id = ключ);
  *     ProjectionPlayNode.first === undefined ⇒ visual pickup V(p̂) в драйвере
  *     (ноль DOM-чтений под нашим transform) — механика перехвата и continue-exit.
- *   ../spring validateSpringParams — ранний MotionParamError В ФАБРИКЕ, даже под
+ *   ../spring validateSpringForFrameLoop — ранний MotionParamError В ФАБРИКЕ, даже под
  *     reduced-motion (капчур валидирует параметры до любых эффектов).
  *   Паттерны-копии (НЕ импорты — импорт утянул бы чужой граф в копию субпутя при
  *   splitting:false): finite (~4 строки, приватна в projection/geometry);
@@ -68,7 +68,7 @@
  */
 
 import { MotionParamError } from '../errors.js';
-import { validateSpringParams, type SpringParams } from '../spring.js';
+import { validateSpringForFrameLoop, type SpringParams } from '../spring.js';
 import {
   createProjection,
   type BoxRadii,
@@ -508,7 +508,7 @@ function _validateOptions(opt: SmartOptions): void {
     }
   }
   if (opt.spring !== undefined) {
-    validateSpringParams(opt.spring); // MotionParamError В ФАБРИКЕ, даже под reduce
+    validateSpringForFrameLoop(opt.spring); // MotionParamError В ФАБРИКЕ, даже под reduce
   }
 }
 
