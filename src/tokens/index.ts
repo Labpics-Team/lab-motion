@@ -157,12 +157,13 @@ export type EasingTokenName = keyof typeof easing;
  * время оседания солвера может отличаться — пружина живёт по физике, не по
  * таймеру). `bounce` ∈ [0, 1): 0 = критическое демпфирование (без overshoot),
  * больше — упружее; bounce=1 (ζ=0, вечный звон) в live-движке непредставим —
- * отвергается. Результат прогоняется через валидатор ядра (settle-бюджет),
- * поэтому выход ГАРАНТИРОВАННО принимается всеми путями движка.
+ * отвергается. Результат физически валиден (validateSpringPhysics, #218);
+ * бюджет кадра проверяет исполнитель на своей границе — очень медленная
+ * пружина легальна как токен, но может быть отвергнута кадровым исполнителем.
  *
  * @example springFromDurationBounce(0.35, 0)   // ДС smooth (effects)
  * @example springFromDurationBounce(0.5, 0.3)  // ДС expressive (spatial)
- * @throws MotionParamError при неконечных/внедиапазонных входах или неоседании.
+ * @throws MotionParamError при неконечных/внедиапазонных входах.
  */
 export function springFromDurationBounce(durationS: number, bounce: number): SpringParams {
   if (!Number.isFinite(durationS) || durationS <= 0) {

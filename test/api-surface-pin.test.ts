@@ -14,8 +14,6 @@ const EXPECTED_EXPORTS = new Set([
   'MotionParamError',
   'drive',
   'validateSpringParams',
-  'validateSpringPhysics',
-  'validateSpringForFrameLoop',
   'MotionValue',
 ]);
 
@@ -51,10 +49,13 @@ describe('public API surface pin', () => {
     expect(typeof motionModule.validateSpringParams).toBe('function');
   });
 
-  it('validateSpringPhysics / validateSpringForFrameLoop are functions; params — исполнительский алиас (#218)', () => {
-    expect(typeof motionModule.validateSpringPhysics).toBe('function');
-    expect(typeof motionModule.validateSpringForFrameLoop).toBe('function');
-    // Историческое имя обязано сохранять семантику границы исполнителя.
-    expect(motionModule.validateSpringParams).toBe(motionModule.validateSpringForFrameLoop);
+  it('validateSpringPhysics / validateSpringForFrameLoop живут в ./spring; root — исторический алиас (#218)', async () => {
+    // Пара валидаторов экспортируется субпутём ./spring (root не растёт —
+    // full-core size-гейт); исторический validateSpringParams в root обязан
+    // сохранять семантику границы исполнителя.
+    const springModule = await import('../src/spring/index.js');
+    expect(typeof springModule.validateSpringPhysics).toBe('function');
+    expect(typeof springModule.validateSpringForFrameLoop).toBe('function');
+    expect(motionModule.validateSpringParams).toBe(springModule.validateSpringForFrameLoop);
   });
 });

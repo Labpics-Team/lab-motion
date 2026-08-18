@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 
 import { makeSpringValueSampler, solveSpring } from '../src/internal/solver.js';
-import { settleTimeAtRestUpperBound, validateSpringParams } from '../src/spring.js';
+import { settleTimeAtRestUpperBound, spring, validateSpringParams } from '../src/spring.js';
 
 /**
  * Issue #226. При ζ > 1/√ε (≈6.7e7) выражение √(ζ²−1) округляется ровно в ζ,
@@ -209,6 +209,26 @@ describe('ставка точна и до вырождения разности'
       const p = { mass: 1, stiffness, damping: 2 * zeta * omega0 };
       const expected = (Math.log(1 / 0.005) + Math.log(omega0)) / (stiffness / p.damping);
       expect(settleTimeAtRestUpperBound(p)).toBeCloseTo(expected, 6);
+    }
+  });
+});
+
+/**
+ * После сплита #218 (spring() = чистая физика) граница представимости обязана
+ * жить в самом физическом домене, а не в бюджете исполнителя: без гарда
+ * spring({m:1e-300, k:1, c:1e10}, 1e9) молча возвращал 0 вместо 0.095
+ * (полюса вырождены, ζ² = Infinity). RED-доказательство: гард снят → тест красный.
+ */
+describe('ζ²-overflow отвергается физическим доменом, а не только бюджетом', () => {
+  it('spring() бросает LM090 на вырожденных полюсах, а не врёт нулём', () => {
+    for (const outOfDomain of [
+      { mass: 1e-300, stiffness: 1, damping: 1e10 },
+      { mass: 1, stiffness: 1e-100, damping: 2e106 },
+      { mass: 1, stiffness: 1, damping: 4e154 },
+    ]) {
+      expect(() => spring(outOfDomain, 1)).toThrow(
+        expect.objectContaining({ code: 'LM090' }),
+      );
     }
   });
 });

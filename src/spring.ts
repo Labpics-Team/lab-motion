@@ -153,7 +153,14 @@ export function validateSpringPhysics(p: SpringParams): void {
   if (!Number.isFinite(p.stiffness) || p.stiffness <= 0) {
     throw new MotionParamError('LM089');
   }
-  if (!Number.isFinite(p.damping) || p.damping < 0) {
+  // Домен damping включает границу представимости (не бюджет исполнителя):
+  // за ζ² > MAX_VALUE полюса вырождаются в double и солвер молча врёт нулём
+  // (контрпример: m=1e-300,k=1,c=1e10, t=1e9 → 0 вместо 0.095). Раньше класс
+  // закрывал бюджетный LM091; после сплита #218 домен закрывает его сам.
+  // Одно условие покрывает всё: NaN damping → ζ=NaN → !(ζ≥0); отрицательный →
+  // ζ<0; Infinity/overflow → ζ² превышает MAX. √k·√m устойчиво к переполнению.
+  const zeta = p.damping / (2 * Math.sqrt(p.stiffness) * Math.sqrt(p.mass));
+  if (!(zeta >= 0 && zeta * zeta < 1 / 0)) {
     throw new MotionParamError('LM090');
   }
 }
@@ -171,10 +178,10 @@ export function validateSpringPhysics(p: SpringParams): void {
  * tree-shaking удалить v0-envelope из MotionValue/биндингов без компилятора.
  */
 export function validateSpringForFrameLoop(p: SpringParams): void {
-  // Физические проверки продублированы (не вызовом validateSpringPhysics):
-  // в графах, где физический валидатор больше нигде не используется, esbuild
-  // инлайнил вызов IIFE-обёрткой (+36 B raw в animate+compositor). Дубликат —
-  // осознанная цена size-инварианта; эквивалентность пинует тест приоритетов.
+  // Полевые проверки продублированы телом (не вызовом validateSpringPhysics):
+  // esbuild инлайнит вызов IIFE-обёрткой (+24 B gz в mixed-гейте); эквивалентность
+  // пинует тест. ζ-гард здесь не нужен: вырожденные полюса дают settle=Infinity
+  // и отвергаются бюджетом ниже (LM091) — класс «молча неверно» не проходит.
   if (!Number.isFinite(p.mass) || p.mass <= 0) {
     throw new MotionParamError('LM088');
   }

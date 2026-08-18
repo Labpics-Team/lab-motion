@@ -41,6 +41,7 @@
  */
 
 import { validateSpringPhysics, type SpringParams } from '../spring.js';
+export { validateSpringPhysics, validateSpringForFrameLoop } from '../spring.js';
 import { CONVERGENCE_THRESHOLD } from '../internal/constants.js';
 import { makeSpringValueSampler } from '../internal/solver.js';
 import { MotionParamError } from '../errors.js';

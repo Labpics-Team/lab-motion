@@ -12,12 +12,8 @@
 import { describe, expect, it } from 'vitest';
 import * as ergo from '../src/spring/index.js';
 import { fromBounce, fromVisualDuration, springPresets, springAsEasing } from '../src/spring/index.js';
-import {
-  spring,
-  validateSpringParams,
-  validateSpringPhysics,
-  MotionParamError,
-} from '../src/index.js';
+import { spring, validateSpringParams, MotionParamError } from '../src/index.js';
+import { validateSpringPhysics } from '../src/spring/index.js';
 
 // ─── fromBounce (канон SwiftUI/Motion: ζ = 1 − bounce, ω0 = 2π/duration) ─────
 
@@ -326,6 +322,9 @@ describe('spring-ergonomics-api-surface-pin', () => {
       'springFromOscillation',
       'springFromPeak',
       'springPresets',
+      // Пара валидаторов #218 публикуется этим субпутём (root не растёт).
+      'validateSpringForFrameLoop',
+      'validateSpringPhysics',
     ]);
   });
 

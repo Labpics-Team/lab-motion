@@ -1,10 +1,13 @@
 import { describe, expect, it } from 'vitest';
-import { springFromPeak, springFromOscillation } from '../src/spring/index.js';
+import {
+  springFromPeak,
+  springFromOscillation,
+  validateSpringPhysics,
+  validateSpringForFrameLoop,
+} from '../src/spring/index.js';
 import {
   spring,
   validateSpringParams,
-  validateSpringPhysics,
-  validateSpringForFrameLoop,
   MotionParamError,
   type SpringParams,
 } from '../src/index.js';
@@ -163,6 +166,23 @@ describe('validateSpringPhysics ≡ физическая часть validateSpri
       expect(frameCode).toBe(physicsCode);
     });
   }
+
+  it('ζ²-overflow: оба валидатора fail-closed, каждый своим кодом', () => {
+    // Вырожденные полюса: physics отвергает доменом (LM090), frame-loop —
+    // бюджетом (settle=Infinity → LM091). Разные коды легальны, «молча
+    // неверно» не проходит ни одну границу.
+    for (const p of [
+      { mass: 1e-300, stiffness: 1, damping: 1e10 },
+      { mass: 1, stiffness: 1e-100, damping: 2e106 },
+    ]) {
+      expect(() => validateSpringPhysics(p)).toThrow(
+        expect.objectContaining({ code: 'LM090' }),
+      );
+      expect(() => validateSpringForFrameLoop(p)).toThrow(
+        expect.objectContaining({ code: 'LM091' }),
+      );
+    }
+  });
 
   it('физически валидная, но за бюджетом кадра: physics молчит, frame-loop бросает LM091', () => {
     const slow: SpringParams = { mass: 100, stiffness: 100, damping: 2 };
