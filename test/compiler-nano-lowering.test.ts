@@ -25,7 +25,7 @@ import {
   type AstNode,
 } from '../src/compiler/core.js';
 import { motionCompiler } from '../src/compiler/vite/index.js';
-import { animateCompiled } from '../src/compiler/runtime/index.js';
+import { animateCompiledNano } from '../src/compiler/runtime/index.js';
 import { animate as nanoAnimate } from '../src/nano/index.js';
 import { springLinear } from '../src/nano/spring-linear.js';
 
@@ -116,9 +116,9 @@ describe('позитивный паттерн — единственный, ко
   it('вызов заменяется executor-вызовом; target остаётся байт-в-байт', async () => {
     const output = await applyPlugin(POSITIVE);
     expect(output).toBeDefined();
-    expect(output).toContain('__labMotionNanoCompiled(card, {o:1,d:');
+    expect(output).toContain('__labMotionNanoCompiled(card, {f:{"opacity":1},d:');
     expect(output).toContain(
-      `import { animateCompiled as __labMotionNanoCompiled } from "${COMPILED_IMPORT_SOURCE}";`,
+      `import { animateCompiledNano as __labMotionNanoCompiled } from "${COMPILED_IMPORT_SOURCE}";`,
     );
     // Исходный вызов исчез, повторного animate-идентификатора не осталось.
     expect(output).not.toContain('animate(card');
@@ -131,8 +131,8 @@ describe('позитивный паттерн — единственный, ко
 animate(a, { opacity: 0 });
 animate(b, { opacity: 0.5 });
 `);
-    expect(output).toContain('(a, {o:0,d:');
-    expect(output).toContain('(b, {o:0.5,d:');
+    expect(output).toContain('(a, {f:{"opacity":0},d:');
+    expect(output).toContain('(b, {f:{"opacity":0.5},d:');
     expect((output!.match(/__labMotionNanoCompiled\(/g) ?? []).length).toBe(2);
   });
 
@@ -220,7 +220,7 @@ animate(el, { opacity: 1 });
     expect(output).toBeDefined();
     expect(output).toContain(`import { animate } from '@labpics/motion/nano';`);
     expect(output).toContain('export { animate };');
-    expect(output).toContain('__labMotionNanoCompiled(el, {o:1,d:');
+    expect(output).toContain('__labMotionNanoCompiled(el, {f:{"opacity":1},d:');
   });
 });
 
@@ -231,7 +231,7 @@ export const r = animate(animate(x, { opacity: 1 }), { opacity: 0.5 });
 `);
     expect(output).toBeDefined();
     // Оба вызова понижены, target внешнего — понижённый внутренний.
-    expect(output).toContain('__labMotionNanoCompiled(__labMotionNanoCompiled(x, {o:1,d:');
+    expect(output).toContain('__labMotionNanoCompiled(__labMotionNanoCompiled(x, {f:{"opacity":1},d:');
     expect((output!.match(/__labMotionNanoCompiled\(/g) ?? []).length).toBe(2);
     // Выход обязан парситься (регрессия: несортированные правки дублировали хвост).
     await expect(parseAstAsync(output!)).resolves.toBeDefined();
@@ -246,7 +246,7 @@ export function open(card) {
 }
 `);
     expect(output).toBeDefined();
-    expect(output).toContain('__labMotionNanoCompiled(card, {o:1,d:');
+    expect(output).toContain('__labMotionNanoCompiled(card, {f:{"opacity":1},d:');
     await expect(parseAstAsync(output!)).resolves.toBeDefined();
   });
 });
@@ -321,8 +321,8 @@ describe('animateCompiled ≡ nano.animate для позитивного пат�
     const compiledJournal: JournalEntry[] = [];
     nanoAnimate(fakeElement(nanoJournal), { opacity: 0.25 });
     const artifact = compileNanoOpacityArtifact(0.25);
-    animateCompiled(fakeElement(compiledJournal), {
-      o: artifact.frame.opacity,
+    animateCompiledNano(fakeElement(compiledJournal), {
+      f: artifact.frame,
       d: artifact.durationMs,
       e: artifact.cssLinear,
     });
@@ -338,8 +338,8 @@ describe('animateCompiled ≡ nano.animate для позитивного пат�
       const compiledJournal: JournalEntry[] = [];
       nanoAnimate(fakeElement(nanoJournal), { opacity: 1 });
       const artifact = compileNanoOpacityArtifact(1);
-      animateCompiled(fakeElement(compiledJournal), {
-        o: 1,
+      animateCompiledNano(fakeElement(compiledJournal), {
+        f: artifact.frame,
         d: artifact.durationMs,
         e: artifact.cssLinear,
       });
@@ -355,7 +355,7 @@ describe('animateCompiled ≡ nano.animate для позитивного пат�
   it('finished-агрегат и controls-массив совпадают по форме', () => {
     const journal: JournalEntry[] = [];
     const artifact = compileNanoOpacityArtifact(1);
-    const controls = animateCompiled(fakeElement(journal), {
+    const controls = animateCompiledNano(fakeElement(journal), {
       o: 1,
       d: artifact.durationMs,
       e: artifact.cssLinear,

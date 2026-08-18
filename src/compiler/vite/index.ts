@@ -15,8 +15,8 @@
  */
 
 import {
-  nanoArtifactLiteral,
-  planNanoOpacityLowering,
+  nanoCallArtifactLiteral,
+  planNanoLowering,
   planSurfaceLowering,
   type AstNode,
   type NanoLoweringEdit,
@@ -176,12 +176,12 @@ export function motionCompiler(): MotionCompilerPlugin {
         return undefined;
       }
       const ast = program as AstNode;
-      // Два независимых плана: nano (2-арг opacity) и surface (3-арг
+      // Два независимых плана: nano (мультиканальный frame + spring-опции) и surface (3-арг
       // layout:'project'). Правки не пересекаются: surface-вызов нижится
       // только полностью статическим, а вложенный вызов в аргументе делает
       // его динамическим (консервативный отказ).
       const plans = [
-        planNanoOpacityLowering(ast, code, nanoArtifactLiteral),
+        planNanoLowering(ast, code, nanoCallArtifactLiteral),
         planSurfaceLowering(ast, code),
       ].filter((plan): plan is NanoLoweringPlan => plan !== undefined);
       if (plans.length === 0) return undefined;

@@ -109,6 +109,185 @@ export function compileNanoOpacityArtifact(opacity: number): CompiledNanoOpacity
   return { frame: { opacity }, durationMs, cssLinear };
 }
 
+// ─── Общий nano-артефакт: мультиканальный frame + spring-опции (#221) ────────
+
+/** Статически доказанный вызов nano: канонизированный frame + опции. */
+export interface StaticNanoCall {
+  readonly props: Readonly<Record<string, string | number>>;
+  readonly spring?: NanoSpringRecord | undefined;
+  readonly delayMs?: number | undefined;
+  readonly staggerMs?: number | undefined;
+  readonly reducedMotion?: boolean | undefined;
+}
+
+export interface NanoSpringRecord {
+  readonly mass: number;
+  readonly stiffness: number;
+  readonly damping: number;
+}
+
+export interface CompiledNanoArtifact {
+  /** Канонизированный frame ровно по закону nano (scale, rotate→deg, прочие как есть). */
+  readonly frame: Readonly<Record<string, string | number>>;
+  readonly durationMs: number;
+  readonly cssLinear: string;
+  readonly delayMs: number;
+  readonly staggerMs: number;
+  readonly reducedMotion: boolean | undefined;
+}
+
+/**
+ * Канонизация frame — побуквенно закон nano/index.ts: scale и rotate
+ * назначаются первыми, rotate получает суффикс deg, остальные ключи копируются
+ * в исходном порядке. Расхождение с рантаймом здесь ломает differential-сьют.
+ */
+function canonicalNanoFrame(props: Readonly<Record<string, string | number>>): Record<string, string | number> {
+  const frame: Record<string, string | number> = {};
+  if (props['scale'] !== undefined) frame['scale'] = props['scale'];
+  if (props['rotate'] !== undefined) frame['rotate'] = `${props['rotate'] as number}deg`;
+  for (const property of Object.keys(props)) {
+    if (property !== 'scale' && property !== 'rotate') frame[property] = props[property]!;
+  }
+  return frame;
+}
+
+/**
+ * Строит доверенный артефакт общего nano-вызова через канонический V1-парсер.
+ *
+ * Каждый CSS-канал кодируется host-extension каналом [255, stringIndex] со
+ * строковой таблицей; числовые значения — скаляром, строковые — token'ом с
+ * кодеком webCssOpaque; delay — startMs трека. stagger и reducedMotion в V1
+ * не выражаются (это политика исполнителя на элемент), поэтому проверяются
+ * литеральной валидацией и не входят в программу.
+ *
+ * Tween-форма (duration/ease) сюда не попадает вовсе: кривые V1 — только
+ * кусочно-линейные сэмплы, нативная easing-строка непредставима без расширения
+ * versioned-контракта. До этого расширения tween остаётся runtime-вызовом.
+ */
+export function compileNanoArtifact(call: StaticNanoCall): CompiledNanoArtifact {
+  const frame = canonicalNanoFrame(call.props);
+  const channels = Object.keys(frame);
+  if (channels.length === 0) {
+    throw new Error('lab-motion compiler: пустой frame непонижаем');
+  }
+  for (const [property, value] of Object.entries(frame)) {
+    if (typeof value === 'number' && !Number.isFinite(value)) {
+      throw new Error(`lab-motion compiler: значение ${property} обязано быть конечным`);
+    }
+  }
+  // springLinear — SSOT физики: невалидная статическая пружина падает здесь же
+  // с его собственной причиной (ошибка сборки, не silent fallback).
+  const [durationMs, cssLinear] = springLinear(call.spring);
+  const points = linearPoints(cssLinear);
+  const count = points.length - 1;
+  const samples: number[] = [1];
+  for (let index = 0; index <= count; index++) samples.push(index / count, points[index]!);
+  const curve = samples as unknown as MotionProgramCurveV1;
+
+  const delayMs = call.delayMs ?? 0;
+  const staggerMs = call.staggerMs ?? 0;
+  if (!Number.isFinite(delayMs) || !Number.isFinite(staggerMs)) {
+    throw new Error('lab-motion compiler: delay и stagger обязаны быть конечными');
+  }
+
+  const strings: string[] = [];
+  const stringIndex = (value: string): number => {
+    const existing = strings.indexOf(value);
+    if (existing !== -1) return existing;
+    strings.push(value);
+    return strings.length - 1;
+  };
+
+  // Один субъект (slot 0) на все каналы: nano анимирует один элемент. Каждый
+  // host-канал — своя поверхность, поэтому общий ownerGroup каноничен.
+  const bindings = channels.map((property) =>
+    [0, [255, stringIndex(property)] as const, 0] as const);
+  const tracks = channels.map((property, index) => {
+    const value = frame[property]!;
+    const encoded = typeof value === 'number'
+      ? ([1, [0, value]] as const)
+      : ([1, [2, stringIndex(value)]] as const);
+    const codec = typeof value === 'number'
+      ? MOTION_PROGRAM_CODEC_V1.scalar
+      : MOTION_PROGRAM_CODEC_V1.webCssOpaque;
+    return [
+      index,
+      delayMs,
+      durationMs,
+      0,
+      MOTION_PROGRAM_DIRECTION_V1.normal,
+      0,
+      MOTION_PROGRAM_COMPOSITE_V1.replace,
+      [[0, 1, [0], encoded, 1, codec]],
+    ];
+  });
+
+  const candidate = [
+    1,
+    // currentValues: from берётся снапшотом; hostExtensions: каналы адресуются
+    // CSS-именами через строковую таблицу — парсер требует объявить фактически
+    // используемые возможности.
+    MOTION_PROGRAM_FEATURE_V1.currentValues | MOTION_PROGRAM_FEATURE_V1.hostExtensions,
+    strings,
+    // Индекс 0 канонически зарезервирован линейной кривой.
+    [0, curve],
+    bindings,
+    tracks,
+  ];
+  // Единственный оракул доверия — канонический V1-парсер пакета.
+  const program: MotionProgramV1 = parseMotionProgramV1(candidate);
+
+  // Проекция обратно: каждый канал обязан бит-в-бит совпасть с nano SSOT.
+  const parsedStrings = program[2];
+  const parsedCurve = program[3][1];
+  const projectedPoints: number[] = [];
+  if (parsedCurve !== 0 && parsedCurve !== undefined) {
+    for (let index = 2; index < parsedCurve.length; index += 2) {
+      projectedPoints.push(parsedCurve[index] as number);
+    }
+  }
+  if (`linear(${projectedPoints})` !== cssLinear) {
+    throw new Error('lab-motion compiler: кривая V1 разошлась с nano SSOT');
+  }
+  const projected: Record<string, string | number> = {};
+  for (const track of program[5]) {
+    const binding = program[4][track[0]]!;
+    const channel = binding[1];
+    if (typeof channel === 'number' || channel[0] !== 255) {
+      throw new Error('lab-motion compiler: неожиданный канал после парсинга');
+    }
+    const property = parsedStrings[channel[1]]!;
+    const to = track[7][0]![3];
+    if (to[0] !== 1) throw new Error('lab-motion compiler: to-значение не абсолютно');
+    const encoded = to[1]!;
+    projected[property] = encoded[0] === 0
+      ? (encoded[1] as number)
+      : parsedStrings[encoded[1] as number]!;
+    if (track[2] !== durationMs || track[1] !== delayMs) {
+      throw new Error('lab-motion compiler: тайминг V1 разошёлся с nano SSOT');
+    }
+  }
+  if (JSON.stringify(projected) !== JSON.stringify(frame)) {
+    throw new Error('lab-motion compiler: проекция frame разошлась с nano SSOT');
+  }
+
+  return { frame, durationMs, cssLinear, delayMs, staggerMs, reducedMotion: call.reducedMotion };
+}
+
+/** Компактный литерал общего артефакта для инъекции в код (детерминированный). */
+export function nanoCallArtifactLiteral(call: StaticNanoCall): string {
+  const artifact = compileNanoArtifact(call);
+  const parts = [
+    `f:${JSON.stringify(artifact.frame)}`,
+    `d:${artifact.durationMs}`,
+    `e:${JSON.stringify(artifact.cssLinear)}`,
+  ];
+  if (artifact.delayMs !== 0) parts.push(`y:${artifact.delayMs}`);
+  if (artifact.staggerMs !== 0) parts.push(`g:${artifact.staggerMs}`);
+  if (artifact.reducedMotion !== undefined) parts.push(`r:${artifact.reducedMotion}`);
+  return `{${parts.join(',')}}`;
+}
+
 // ─── Нормализованный AST-контракт (§13.5) ────────────────────────────────────
 
 /** Минимальный структурный узел: адаптер обязан дать type + байтовые границы. */
@@ -140,7 +319,7 @@ export interface NanoLoweringPlan {
 
 const NANO_SOURCE = '@labpics/motion/nano';
 export const COMPILED_IMPORT_SOURCE = '@labpics/motion/compiler/runtime';
-export const COMPILED_IMPORT_NAME = 'animateCompiled';
+export const COMPILED_IMPORT_NAME = 'animateCompiledNano';
 const IMPORT_LOCAL = '__labMotionNanoCompiled';
 
 function walk(node: unknown, visit: (node: AstNode, parent: AstNode | undefined) => void, parent?: AstNode): void {
@@ -207,6 +386,25 @@ export function planNanoOpacityLowering(
   code: string,
   artifactLiteral: (opacity: number) => string,
 ): NanoLoweringPlan | undefined {
+  return planNanoCalls(program, code, (propsArg, optionsArg) => {
+    if (optionsArg !== undefined) return undefined;
+    const opacity = staticOpacityLiteral(propsArg);
+    if (opacity === undefined) return undefined;
+    return artifactLiteral(opacity);
+  });
+}
+
+/**
+ * Общий обход модуля: precondition-анализ импортов/затенений и байтовая
+ * верификация тривиа-зон вызова. tryLiteral возвращает литерал артефакта для
+ * доказуемого вызова либо undefined (консервативный отказ, вызов остаётся
+ * runtime). Поддерживаются формы с двумя и тремя аргументами.
+ */
+function planNanoCalls(
+  program: AstNode,
+  code: string,
+  tryLiteral: (propsArg: AstNode, optionsArg: AstNode | undefined) => string | undefined,
+): NanoLoweringPlan | undefined {
   let importedPlain = false;
   const importNodes = new Set<AstNode>();
   let doubt = false;
@@ -251,21 +449,26 @@ export function planNanoOpacityLowering(
     if (callee.type !== 'Identifier' || callee.name !== 'animate') return;
     if (node.optional === true) { runtimeCalls++; return; }
     const args = node.arguments as AstNode[];
-    if (args.length !== 2) { runtimeCalls++; return; }
-    const [targetArg, propsArg] = args as [AstNode, AstNode];
-    if (targetArg.type === 'SpreadElement') { runtimeCalls++; return; }
-    const opacity = staticOpacityLiteral(propsArg);
-    if (opacity === undefined) { runtimeCalls++; return; }
+    if (args.length !== 2 && args.length !== 3) { runtimeCalls++; return; }
+    const [targetArg, propsArg, optionsArg] = args as [AstNode, AstNode, AstNode | undefined];
+    if (targetArg.type === 'SpreadElement' || optionsArg?.type === 'SpreadElement') {
+      runtimeCalls++;
+      return;
+    }
+    const literal = tryLiteral(propsArg, optionsArg);
+    if (literal === undefined) { runtimeCalls++; return; }
     // Побайтная верификация тривиа-зон: ровно `(`, `,`, `)` с пробелами.
     // Скобки вокруг callee/target, комментарии и прочая экзотика — отказ.
+    const tailStart = optionsArg === undefined ? propsArg.end : optionsArg.end;
     if (
       !/^\s*\(\s*$/.test(code.slice(callee.end, targetArg.start)) ||
       !/^\s*,\s*$/.test(code.slice(targetArg.end, propsArg.start)) ||
-      !/^\s*,?\s*\)$/.test(code.slice(propsArg.end, node.end))
+      (optionsArg !== undefined && !/^\s*,\s*$/.test(code.slice(propsArg.end, optionsArg.start))) ||
+      !/^\s*,?\s*\)$/.test(code.slice(tailStart, node.end))
     ) { runtimeCalls++; return; }
     edits.push(
       { start: callee.start, end: targetArg.start, replacement: `${IMPORT_LOCAL}(` },
-      { start: targetArg.end, end: node.end, replacement: `, ${artifactLiteral(opacity)})` },
+      { start: targetArg.end, end: node.end, replacement: `, ${literal})` },
     );
   });
 
@@ -282,6 +485,143 @@ export function planNanoOpacityLowering(
     importSource: COMPILED_IMPORT_SOURCE,
     runtimeCalls,
   };
+}
+
+/**
+ * Статическое извлечение полного nano-вызова (#221): props + опции.
+ * undefined — консервативный отказ (динамика/сомнение), вызов остаётся runtime.
+ * Ошибки бросает ТОЛЬКО артефактный слой на доказанно-статическом инвалиде.
+ */
+function staticNanoCallLiteral(propsArg: AstNode, optionsArg: AstNode | undefined): StaticNanoCall | undefined {
+  const props = staticPropsLiteral(propsArg);
+  if (props === undefined) return undefined;
+  if (optionsArg === undefined) return { props };
+  const options = staticOptionsLiteral(optionsArg);
+  if (options === undefined) return undefined;
+  return { props, ...options };
+}
+
+/** Числовой/строковый литерал, включая унарный минус. undefined — отказ. */
+function staticScalarLiteral(value: AstNode): string | number | undefined {
+  if (value.type === 'Literal') {
+    const raw = value.value;
+    if (typeof raw === 'number' && Number.isFinite(raw)) return raw;
+    if (typeof raw === 'string') return raw;
+    return undefined; // null/true/false/regexp в позиции значения — сомнение
+  }
+  if (
+    value.type === 'UnaryExpression' &&
+    value.operator === '-' &&
+    (value.argument as AstNode).type === 'Literal'
+  ) {
+    const raw = (value.argument as AstNode).value;
+    if (typeof raw === 'number' && Number.isFinite(raw)) return -raw;
+  }
+  return undefined;
+}
+
+/** Плоский объектный литерал с Identifier-ключами без дублей. undefined — отказ. */
+function staticPlainObject(node: AstNode): Map<string, AstNode> | undefined {
+  if (node.type !== 'ObjectExpression') return undefined;
+  const out = new Map<string, AstNode>();
+  for (const property of node.properties as AstNode[]) {
+    if (
+      property.type !== 'Property' ||
+      property.kind !== 'init' ||
+      property.method === true ||
+      property.computed === true ||
+      property.shorthand === true
+    ) return undefined;
+    const key = property.key as AstNode;
+    if (key.type !== 'Identifier') return undefined;
+    // Дубликат ключа: last-wins в JS, но это неоднозначная форма — отказ.
+    if (out.has(key.name as string)) return undefined;
+    out.set(key.name as string, property.value as AstNode);
+  }
+  return out;
+}
+
+function staticPropsLiteral(node: AstNode): Record<string, string | number> | undefined {
+  const entries = staticPlainObject(node);
+  if (entries === undefined || entries.size === 0) return undefined;
+  const props: Record<string, string | number> = {};
+  for (const [name, valueNode] of entries) {
+    const value = staticScalarLiteral(valueNode);
+    if (value === undefined) return undefined;
+    // scale и rotate обязаны быть числами: строковый rotate nano молча
+    // отбрасывает из frame — воспроизводить эту странность компилятор не будет.
+    if ((name === 'scale' || name === 'rotate') && typeof value !== 'number') return undefined;
+    props[name] = value;
+  }
+  return props;
+}
+
+type StaticNanoOptions = Pick<StaticNanoCall, 'spring' | 'delayMs' | 'staggerMs' | 'reducedMotion'>;
+
+function staticOptionsLiteral(node: AstNode): StaticNanoOptions | undefined {
+  const entries = staticPlainObject(node);
+  if (entries === undefined) return undefined;
+  const options: {
+    spring?: NanoSpringRecord;
+    delayMs?: number;
+    staggerMs?: number;
+    reducedMotion?: boolean;
+  } = {};
+  for (const [name, valueNode] of entries) {
+    switch (name) {
+      case 'spring': {
+        const spring = staticPlainObject(valueNode);
+        if (spring === undefined) return undefined;
+        const record: Record<string, number> = {};
+        for (const [field, fieldNode] of spring) {
+          if (field !== 'mass' && field !== 'stiffness' && field !== 'damping') return undefined;
+          const fieldValue = staticScalarLiteral(fieldNode);
+          if (typeof fieldValue !== 'number') return undefined;
+          record[field] = fieldValue;
+        }
+        // Частичная пружина валидна: недостающие поля добирает SSOT springLinear.
+        options.spring = record as unknown as NanoSpringRecord;
+        break;
+      }
+      case 'delay':
+      case 'stagger': {
+        const value = staticScalarLiteral(valueNode);
+        if (typeof value !== 'number') return undefined;
+        if (name === 'delay') options.delayMs = value;
+        else options.staggerMs = value;
+        break;
+      }
+      case 'reducedMotion': {
+        const value = valueNode;
+        if (value.type !== 'Literal' || typeof value.value !== 'boolean') return undefined;
+        options.reducedMotion = value.value;
+        break;
+      }
+      // Tween-форма непредставима в V1 (нативная easing-строка) — runtime.
+      case 'duration':
+      case 'ease':
+        return undefined;
+      default:
+        return undefined; // неизвестная опция — сомнение
+    }
+  }
+  return options;
+}
+
+/**
+ * Планирует общий lowering модуля (#221): мультиканальный frame + spring-опции.
+ * Контракт совпадает с planNanoOpacityLowering; отличие — какой вызов доказуем.
+ */
+export function planNanoLowering(
+  program: AstNode,
+  code: string,
+  artifactLiteral: (call: StaticNanoCall) => string,
+): NanoLoweringPlan | undefined {
+  return planNanoCalls(program, code, (propsArg, optionsArg) => {
+    const call = staticNanoCallLiteral(propsArg, optionsArg);
+    if (call === undefined) return undefined;
+    return artifactLiteral(call);
+  });
 }
 
 /** Ровно `{ opacity: <конечный числовой литерал> }`; иначе undefined (отказ). */
