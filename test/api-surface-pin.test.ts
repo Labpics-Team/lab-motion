@@ -58,4 +58,12 @@ describe('public API surface pin', () => {
     expect(typeof springModule.validateSpringForFrameLoop).toBe('function');
     expect(motionModule.validateSpringParams).toBe(springModule.validateSpringForFrameLoop);
   });
+
+  it('шипуемый dist/spring публикует пару валидаторов (#218, export map ./spring)', async () => {
+    // Источник может быть правильным при сломанной генерации dist-entry —
+    // пин обязан смотреть на артефакт, который получит потребитель.
+    const dist = await import('../dist/spring/index.js');
+    expect(typeof dist.validateSpringPhysics).toBe('function');
+    expect(typeof dist.validateSpringForFrameLoop).toBe('function');
+  });
 });
