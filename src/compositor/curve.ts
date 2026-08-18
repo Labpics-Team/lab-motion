@@ -118,12 +118,11 @@ function emitArtifact(
     const percent = i === 1 || percentDigits > 100
         ? String(node.percent)
         : roundShortest(node.percent, percentDigits);
-    out += progress + ' ' + percent + '%';
+    out += (i === 0 ? '' : ', ') + progress + ' ' + percent + '%';
     // Number(token) моделирует CSS parser один раз на cold compile. TypedArray
     // не совпадает по identity с caller-owned raw nodes и не выходит host-коду.
-    samples[i * 2] = Number(percent);
-    samples[i * 2 + 1] = Number(progress);
-    if (i < nodes.length - 1) out += ', ';
+    samples[i * 2] = +percent;
+    samples[i * 2 + 1] = +progress;
   }
   return [out + ')', samples, durationMs];
 }
@@ -148,7 +147,7 @@ export function compileSpringExecutionArtifactTupleUnchecked(
     prebuiltNodes,
     prebuiltDurationMs,
   );
-  if (artifact === undefined) {
+  if (!artifact) {
     // Ошибочный public compile остаётся fail-fast; production preflight читает
     // undefined и выбирает live до смены владельца.
     assertSpringCurveBudget(spring, v0, tolerance);
@@ -179,12 +178,12 @@ export function tryCompileSpringExecutionArtifactTupleUnchecked(
     v0,
     tolerance,
   );
-  if (hit !== undefined) return hit;
+  if (hit) return hit;
   let nodes = prebuiltNodes;
   let durationMs = prebuiltDurationMs;
   if (nodes === undefined) {
     const build = tryBuildSpringNodes(spring, v0, tolerance);
-    if (build === undefined) return undefined;
+    if (!build) return;
     nodes = build[0];
     durationMs = build[1] * 1000;
   }

@@ -22,7 +22,6 @@ import {
   DEFAULT_TOLERANCE,
 } from '../src/compositor/curve.js';
 import type { FrameLoop } from '../src/frame/index.js';
-import { settleTimeUpperBound } from '../src/spring.js';
 import { fakeEl } from './animate-facade-helpers.js';
 
 function frameHarness(options: { readonly throwRender?: boolean } = {}): {
@@ -225,7 +224,7 @@ const HANDOFF_ARTIFACT = compileSpringExecutionArtifactTupleUnchecked(
 
 function targetCrossingMs(): number {
   const samples = HANDOFF_ARTIFACT[1];
-  const durationMs = settleTimeUpperBound(HANDOFF_SPRING, 0) * 1000;
+  const durationMs = HANDOFF_ARTIFACT[2];
   for (let i = 0; i + 3 < samples.length; i += 2) {
     const a = samples[i + 1]!;
     const b = samples[i + 3]!;

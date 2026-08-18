@@ -23,11 +23,12 @@ import { compileSpringLinear } from '../src/compositor/index.js';
 import { stagger } from '../src/stagger/index.js';
 import {
   compileSpringExecutionArtifactUnchecked,
+  compileSpringExecutionArtifactTupleUnchecked,
   DEFAULT_TOLERANCE,
 } from '../src/compositor/curve.js';
 import { sampleSerializedSpring } from '../src/compositor/sample.js';
 import { MotionParamError } from '../src/errors.js';
-import { settleTimeUpperBound, type SpringParams } from '../src/spring.js';
+import { type SpringParams } from '../src/spring.js';
 import { easeOut } from '../src/easing/index.js';
 
 const SPRING: SpringParams = { mass: 1, stiffness: 170, damping: 26 };
@@ -40,7 +41,7 @@ function executionValue(tMs: number): number {
   );
   return sampleSerializedSpring(
     artifact.samples,
-    settleTimeUpperBound(SPRING, 0) * 1000,
+    compileSpringExecutionArtifactTupleUnchecked(SPRING, 0, DEFAULT_TOLERANCE)[2],
     tMs,
   ).value * 100;
 }

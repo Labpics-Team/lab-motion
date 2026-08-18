@@ -43,11 +43,12 @@ import * as animateApi from '../src/animate/index.js';
 import { readCompositorSpring } from '../src/compositor/index.js';
 import {
   compileSpringExecutionArtifactUnchecked,
+  compileSpringExecutionArtifactTupleUnchecked,
   DEFAULT_TOLERANCE,
 } from '../src/compositor/curve.js';
 import { sampleSerializedSpring } from '../src/compositor/sample.js';
 import { linear } from '../src/easing/index.js';
-import { settleTimeUpperBound, type SpringParams } from '../src/spring.js';
+import { type SpringParams } from '../src/spring.js';
 import {
   fakeEl,
   makeClock,
@@ -68,7 +69,7 @@ function executionProgress(tMs: number): number {
   );
   return sampleSerializedSpring(
     artifact.samples,
-    settleTimeUpperBound(SPRING, 0) * 1000,
+    compileSpringExecutionArtifactTupleUnchecked(SPRING, 0, DEFAULT_TOLERANCE)[2],
     tMs,
   ).value;
 }

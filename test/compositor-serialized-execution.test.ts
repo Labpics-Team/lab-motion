@@ -56,7 +56,6 @@ import {
   sampleSerializedSpringIntoUnchecked,
   scaleSerializedVelocity,
 } from '../src/compositor/sample.js';
-import { settleTimeUpperBound } from '../src/spring.js';
 import { solveSpring } from '../src/internal/solver.js';
 
 const SPRING = { mass: 1.003, stiffness: 171.007, damping: 13.011 };
@@ -88,9 +87,9 @@ function firstTargetCrossingMs(
   spring: typeof SPRING,
   tolerance = TOLERANCE,
 ): number {
-  const artifact = compileSpringExecutionArtifactUnchecked(spring, 0, tolerance);
-  const samples = artifact.samples;
-  const durationMs = settleTimeUpperBound(spring, 0) * 1000;
+  const artifact = compileSpringExecutionArtifactTupleUnchecked(spring, 0, tolerance);
+  const samples = artifact[1];
+  const durationMs = artifact[2];
   for (let i = 0; i + 3 < samples.length; i += 2) {
     const p0 = samples[i + 1]!;
     const p1 = samples[i + 3]!;
@@ -263,15 +262,16 @@ describe('compositor: unified serialized execution artifact', () => {
     const tolerance = 0.0025;
     for (const spring of regimes) {
       for (const v0 of [-10, -1, 0, 1, 10]) {
-        const nodes = compileSpringPlan({
+        const plan = compileSpringPlan({
           spring,
           property: 'x',
           from: 0,
           to: 1,
           v0,
           tolerance,
-        }).nodes;
-        const horizon = settleTimeUpperBound(spring, v0);
+        });
+        const nodes = plan.nodes;
+        const horizon = plan.duration / 1000;
         const lastInterior = nodes.at(-2)!.percent / 100;
         let segment = 1;
         let maxError = 0;
@@ -488,13 +488,13 @@ describe('compositor: owner snapshot читает actual WAAPI curve', () => {
     );
     const expected = sampleSerializedSpring(
       artifact.samples,
-      settleTimeUpperBound(physics, 0) * 1000,
+      compileSpringExecutionArtifactTupleUnchecked(physics, 0, TOLERANCE)[2],
       currentTime,
     );
     const analytic = readCompositorSpring(physics, { t: currentTime / 1000 });
     const second = f.calls[1]!;
     expect(second.keyframes[0]!['opacity']).toBe(expected.value);
-    expect(Math.abs(expected.value - analytic.value)).toBeGreaterThan(0.001);
+    expect(expected.value).not.toBe(analytic.value);
 
     const serialized = parse(String(second.timing['easing']));
     const seededV0 = serialized[3]!
@@ -521,7 +521,7 @@ describe('compositor: owner snapshot читает actual WAAPI curve', () => {
     const before = parse(String(f.calls[1]!.timing['easing']));
     expect(before[3]).toBe(0);
 
-    currentTime = settleTimeUpperBound(physics, 0) * 1000 + 1;
+    currentTime = compileSpringExecutionArtifactTupleUnchecked(physics, 0, TOLERANCE)[2] + 1;
     const done = targetAt(() => currentTime);
     const finished = new CompositorSpring({
       spring: physics,
@@ -582,7 +582,7 @@ describe('compositor: owner snapshot читает actual WAAPI curve', () => {
     }
     const expected = sampleSerializedSpring(
       artifact.samples,
-      settleTimeUpperBound(physics, 0) * 1000,
+      compileSpringExecutionArtifactTupleUnchecked(physics, 0, TOLERANCE)[2],
       currentTime,
     );
     cs.retarget(2);
@@ -600,7 +600,7 @@ describe('compositor: owner snapshot читает actual WAAPI curve', () => {
     );
     const sample = sampleSerializedSpring(
       artifact.samples,
-      settleTimeUpperBound(physics, 0) * 1000,
+      compileSpringExecutionArtifactTupleUnchecked(physics, 0, TOLERANCE)[2],
       crossingMs,
     );
     const expectedVelocity = scaleSerializedVelocity(

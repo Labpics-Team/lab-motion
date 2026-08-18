@@ -37,23 +37,8 @@ type SpringFill = 'none' | 'forwards' | 'backwards' | 'both';
 type SpringComposite = 'replace' | 'add' | 'accumulate';
 type SpringFormat = ((v: number) => string | number) | undefined;
 
-function endpointKeyframes(
-  property: string,
-  from: number,
-  to: number,
-  format: SpringFormat,
-): Record<string, string | number>[] {
-  return [
-    {
-      offset: 0,
-      [property]: format == null ? from : format(from),
-    },
-    {
-      offset: 1,
-      [property]: format == null ? to : format(to),
-    },
-  ];
-}
+// Края explicitKeyframes читают from/to напрямую; значения здесь не нужны.
+const ENDPOINT_SAMPLES = new Float64Array(4);
 
 function explicitKeyframes(
   property: string,
@@ -66,7 +51,6 @@ function explicitKeyframes(
   const frames = new Array<Record<string, string | number>>(count);
   const last = count - 1;
   for (let i = 0; i <= last; i++) {
-    const offset = samples[i * 2]! / 100;
     const progress = samples[i * 2 + 1]!;
     // Края присваиваются напрямую: даже устойчивая взвешенная формула на p=1
     // может потерять младшие биты исходного конечного значения.
@@ -80,7 +64,7 @@ function explicitKeyframes(
     // вышедшего за представимый диапазон; CSS-safe политика снапает его в цель.
     const value = Number.isFinite(raw) ? raw : to;
     frames[i] = {
-      offset: i === 0 ? 0 : i === last ? 1 : offset,
+      offset: i === 0 ? 0 : i === last ? 1 : samples[i * 2]! / 100,
       [property]: format == null ? value : format(value),
     };
   }
@@ -131,13 +115,10 @@ export function compileSpringRuntimeExecutionTupleUnchecked(
     tolerance,
   );
   const explicit = requiresExplicitSpringKeyframes();
-  const easing = explicit ? 'linear' : artifact[0];
   const samples = artifact[1];
   return [
-    explicit
-      ? explicitKeyframes(property, from, to, format, samples)
-      : endpointKeyframes(property, from, to, format),
-    easing,
+    explicitKeyframes(property, from, to, format, explicit ? samples : ENDPOINT_SAMPLES),
+    explicit ? 'linear' : artifact[0],
     artifact[2],
     fill ?? 'both',
     composite ?? 'replace',

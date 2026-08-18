@@ -24,6 +24,7 @@ import {
 } from '../src/compositor/index.js';
 import {
   buildSpringNodes,
+  buildSpringNodesWithHorizon,
   baseGridSize,
   douglasPeuckerVertical,
 } from '../src/compositor/segmenter.js';
@@ -135,8 +136,7 @@ describe('compositor: граница ошибки кусочно-линейно�
   it('УЗЛЫ сегментера: макс. отклонение реконструкции от истинной кривой ≤ tolerance (интерьер)', () => {
     for (const params of [STIFF, BOUNCY, GENTLE, OVER]) {
       const tol = 0.002;
-      const nodes = buildSpringNodes(params, 0, tol);
-      const T = settleTimeUpperBound(params);
+      const [nodes, T] = buildSpringNodesWithHorizon(params, 0, tol);
       // Интерьер: до предпоследнего узла (хвост форсится в 1 — снап эндпоинта
       // ≤0.5% исключаем из ТОЧНОЙ границы, проверяется отдельно ниже).
       const lastInteriorTau = nodes[nodes.length - 2]!.percent / 100;
@@ -163,7 +163,7 @@ describe('compositor: граница ошибки кусочно-линейно�
   it('строка компилятора (округлённая) реконструирует истинную кривую в пределах бюджета+округление', () => {
     const tol = 0.003;
     const nodes = parseLinear(compileSpringLinear(BOUNCY, { tolerance: tol }));
-    const T = settleTimeUpperBound(BOUNCY);
+    const [, T] = buildSpringNodesWithHorizon(BOUNCY, 0, tol);
     let maxDev = 0;
     for (let k = 0; k <= 500; k++) {
       const tau = k / 500;
@@ -310,14 +310,14 @@ describe('compositor: readCompositorSpring — closed-form (value, velocity)', (
 // ─── compileSpringPlan: полный план ──────────────────────────────────────────
 
 describe('compositor: compileSpringPlan', () => {
-  it('два кейфрейма [from,to], easing=linear(), duration=settle·1000, defaults', () => {
+  it('два кейфрейма [from,to], easing=linear(), duration=compile horizon, defaults', () => {
     const plan = compileSpringPlan({ spring: STIFF, property: 'opacity', from: 0, to: 1 });
     expect(plan.keyframes).toEqual([
       { offset: 0, opacity: 0 },
       { offset: 1, opacity: 1 },
     ]);
     expect(plan.easing.startsWith('linear(')).toBe(true);
-    expect(plan.duration).toBeCloseTo(settleTimeUpperBound(STIFF) * 1000, 6);
+    expect(plan.duration).toBeCloseTo(buildSpringNodesWithHorizon(STIFF, 0, DEFAULT_TOLERANCE)[1] * 1000, 6);
     expect(plan.iterations).toBe(1);
     expect(plan.fill).toBe('both');
     expect(plan.composite).toBe('replace');

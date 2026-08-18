@@ -8,13 +8,14 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { animate } from '../src/animate/index.js';
 import {
   compileSpringExecutionArtifactUnchecked,
+  compileSpringExecutionArtifactTupleUnchecked,
   DEFAULT_TOLERANCE,
 } from '../src/compositor/curve.js';
 import { readCompositorSpring } from '../src/compositor/index.js';
 import { __resetDetectionCache } from '../src/compositor/detect.js';
 import { sampleSerializedSpring } from '../src/compositor/sample.js';
 import { MotionParamError } from '../src/errors.js';
-import { settleTimeUpperBound, type SpringParams } from '../src/spring.js';
+import { type SpringParams } from '../src/spring.js';
 import { spring } from '../src/tokens/index.js';
 import {
   fakeEl,
@@ -47,7 +48,7 @@ function executionSnapshot(
   );
   const sample = sampleSerializedSpring(
     artifact.samples,
-    settleTimeUpperBound(physics, 0) * 1000,
+    compileSpringExecutionArtifactTupleUnchecked(physics, 0, DEFAULT_TOLERANCE)[2],
     tMs,
   );
   return {
@@ -69,7 +70,7 @@ function firstSerializedTargetCrossingMs(physics: SpringParams): number {
     DEFAULT_TOLERANCE,
   );
   const samples = artifact.samples;
-  const durationMs = settleTimeUpperBound(physics, 0) * 1000;
+  const durationMs = compileSpringExecutionArtifactTupleUnchecked(physics, 0, DEFAULT_TOLERANCE)[2];
   for (let i = 0; i + 3 < samples.length; i += 2) {
     const p0 = samples[i + 1]!;
     const p1 = samples[i + 3]!;

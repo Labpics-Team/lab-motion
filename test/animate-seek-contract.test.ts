@@ -8,11 +8,11 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { animate as animateFull } from '../src/animate/index.js';
 import {
   compileSpringExecutionArtifactUnchecked,
+  compileSpringExecutionArtifactTupleUnchecked,
   DEFAULT_TOLERANCE,
 } from '../src/compositor/curve.js';
 import { __resetDetectionCache } from '../src/compositor/detect.js';
 import { sampleSerializedSpring } from '../src/compositor/sample.js';
-import { settleTimeUpperBound } from '../src/spring.js';
 import {
   fakeEl,
   makeClock,
@@ -32,7 +32,7 @@ function executionValue(tMs: number): number {
   );
   return sampleSerializedSpring(
     artifact.samples,
-    settleTimeUpperBound(SPRING, 0) * 1000,
+    compileSpringExecutionArtifactTupleUnchecked(SPRING, 0, DEFAULT_TOLERANCE)[2],
     tMs,
   ).value * 100;
 }

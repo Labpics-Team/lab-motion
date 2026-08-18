@@ -203,6 +203,8 @@ export interface CompositorPlanOptions {
   readonly v0?: number;
   /** Толерантность (ед. прогресса). По умолчанию DEFAULT_TOLERANCE. */
   readonly tolerance?: number;
+  /** Макс. ошибка реконструкции в единицах numeric from/to до format. */
+  readonly maxValueError?: number;
   /** Fill. По умолчанию 'both'. */
   readonly fill?: 'none' | 'forwards' | 'backwards' | 'both';
   /** Composite. По умолчанию 'replace'. */
@@ -235,8 +237,12 @@ export function compileSpringPlan(options: CompositorPlanOptions): CompositorPla
   validateFinite(options.to);
   const v0 = options.v0 ?? 0;
   validateFinite(v0);
-  const tolerance = options.tolerance ?? DEFAULT_TOLERANCE;
+  let tolerance = options.tolerance ?? DEFAULT_TOLERANCE;
   validateTolerance(tolerance);
+  const maxValueError = options.maxValueError;
+  if (maxValueError !== undefined && !(maxValueError > 0 && maxValueError < 1 / 0)) throw new MotionParamError('LM172');
+  const span = Math.abs(options.to - options.from);
+  if (maxValueError && span) tolerance = Math.min(tolerance, maxValueError / span);
 
   // Публичная диагностика — свежий снимок защищённых сериализованных остановок:
   // это реально исполняемая браузером кривая, без второго источника истины.
@@ -481,9 +487,10 @@ export class CompositorSpring {
     if (typeof opts.property !== 'string' || opts.property.length === 0) {
       throw new MotionParamError('LM010');
     }
-    validateFinite(opts.from);
-    validateFinite(opts.to);
-    if (opts.tolerance !== undefined) validateTolerance(opts.tolerance);
+    validateFinite(this._from = opts.from);
+    validateFinite(this._to = opts.to);
+    const tolerance = opts.tolerance ?? DEFAULT_TOLERANCE;
+    validateTolerance(tolerance);
     const delay = opts.delay ?? 0;
     if (!Number.isFinite(delay) || delay < 0) {
       throw new MotionParamError('LM013');
@@ -491,7 +498,7 @@ export class CompositorSpring {
 
     this._spring = opts.spring;
     this._property = opts.property;
-    this._tolerance = opts.tolerance ?? DEFAULT_TOLERANCE;
+    this._tolerance = tolerance;
     this._fill = opts.fill ?? 'both';
     this._composite = opts.composite ?? 'replace';
     this._format = opts.format ?? Number;
@@ -501,8 +508,6 @@ export class CompositorSpring {
     this._delay = delay;
     this._setTimer = opts.setTimer ?? defaultSetTimer;
     this._now = opts.now ?? defaultNow;
-    this._from = opts.from;
-    this._to = opts.to;
     // Детекция тира — единственное обращение к среде в конструкторе (SSR-safe),
     // один раз. matchMedia (reduce) имеет высший precedence над WAAPI/linear().
     this._tier = resolveCompositorTierCodeFromInputs(
