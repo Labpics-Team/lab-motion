@@ -192,3 +192,58 @@ describe('validateSpringPhysics ≡ физическая часть validateSpri
     );
   });
 });
+
+/**
+ * Boundary fuzz #230: края домена (M→0, M→1, крошечные/огромные времена)
+ * обязаны давать либо конечные параметры, либо MotionParamError — никогда
+ * NaN/Infinity в результате (класс «молча неверно»).
+ */
+describe('boundary fuzz: края домена без NaN/Infinity (#230)', () => {
+  it('springFromPeak: сетка краёв overshoot × timeToPeak', () => {
+    for (const mp of [1e-12, 1e-6, 0.001, 0.5, 0.999, 1 - 1e-12]) {
+      for (const tp of [1e-9, 1e-3, 1, 1e3, 1e9]) {
+        let p: SpringParams;
+        try {
+          p = springFromPeak({ timeToPeak: tp, overshoot: mp });
+        } catch (e) {
+          expect(e).toBeInstanceOf(MotionParamError);
+          continue;
+        }
+        expect(Number.isFinite(p.stiffness)).toBe(true);
+        expect(Number.isFinite(p.damping)).toBe(true);
+        expect(p.stiffness).toBeGreaterThan(0);
+        expect(p.damping).toBeGreaterThanOrEqual(0);
+      }
+    }
+  });
+
+  it('springFromOscillation: сетка краёв period × halfLife', () => {
+    for (const period of [1e-9, 1e-3, 1, 1e3, 1e9]) {
+      for (const halfLife of [1e-9, 1e-3, 1, 1e3, 1e9]) {
+        let p: SpringParams;
+        try {
+          p = springFromOscillation({ period, halfLife });
+        } catch (e) {
+          expect(e).toBeInstanceOf(MotionParamError);
+          continue;
+        }
+        expect(Number.isFinite(p.stiffness)).toBe(true);
+        expect(Number.isFinite(p.damping)).toBe(true);
+      }
+    }
+  });
+
+  it('round-trip через (ω₀, ζ) и сырые (m,k,c) на сетке домена', () => {
+    for (const mp of [0.01, 0.08, 0.3, 0.7]) {
+      for (const tp of [0.05, 0.22, 2]) {
+        const p = springFromPeak({ timeToPeak: tp, overshoot: mp });
+        const omega0 = Math.sqrt(p.stiffness / p.mass);
+        const zeta = p.damping / (2 * p.mass * omega0);
+        const omegaD = omega0 * Math.sqrt(1 - zeta * zeta);
+        // Прямые наблюдаемые из (ω₀, ζ): t_peak = π/ωd; overshoot = exp(−ζπ/√(1−ζ²))
+        expect(Math.PI / omegaD).toBeCloseTo(tp, 10);
+        expect(Math.exp((-zeta * Math.PI) / Math.sqrt(1 - zeta * zeta))).toBeCloseTo(mp, 10);
+      }
+    }
+  });
+});
