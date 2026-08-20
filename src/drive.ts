@@ -213,21 +213,21 @@ export function drive(opts: DriveOptions): Promise<void> {
     // Single-flight guard: prevents two concurrent tick chains from mutating shared
     // state (frameCount, elapsedSeconds, maxEmittedToward) simultaneously.
     // Root cause of Finding 3: when handle===0 both scheduleFrame(tick) and
-    // setTimeout(tick,0) fire — if the injected clock returns 0 AND later delivers
-    // its callback (e.g. a draining clock whose scheduler happens to return 0 as a
-    // valid handle), two independent tick loops run, double-emitting and double-
-    // advancing the clock. The `settled` guard only blocks AFTER convergence, not
-    // concurrent in-flight ticks. tickActive makes the tick body re-entrant-safe:
-    // whichever invocation arrives second yields immediately and the active chain
-    // reschedules itself normally.
+    // Срабатывание setTimeout(tick,0) — если внедрённые часы возвращают 0 И позже
+    // доставляют свой колбэк (например, дренирующие часы, чей планировщик
+    // возвращает 0 как валидный дескриптор), запускаются два независимых цикла
+    // tick, дублируя эмиссию и продвижение часов. Страж `settled` блокирует
+    // ТОЛЬКО ПОСЛЕ сходимости, не одновременные in-flight тики. tickActive делает
+    // тело tick реентерабельным: второе прибывшее выполнение немедленно уступает,
+    // а активная цепочка перепланирует себя штатно.
     let tickActive = false;
 
-    // tick() is the single frame body for both the rAF path and the setTimeout
-    // fallback path. There is no duplicate — both paths invoke the same function.
+    // tick() — единое тело кадра для rAF-пути и setTimeout-фоллбека. Дубликата
+    // нет — оба пути вызывают одну и ту же функцию.
     function tick(ts?: number): void {
       if (settled) return;
-      // Single-flight: if a tick is already executing or scheduled to execute,
-      // drop this duplicate invocation. The active chain will reschedule itself.
+      // Single-flight: если tick уже выполняется или запланирован к выполнению,
+      // отбрасываем этот дублирующий вызов. Активная цепочка перепланирует себя.
       if (tickActive) return;
       tickActive = true;
       frameCount++;
@@ -246,29 +246,29 @@ export function drive(opts: DriveOptions): Promise<void> {
       // projection/driver): при v0Normalized=0 формы бит-в-бит равны прежнему
       // springUnchecked-пути. Стражи конечности — на cv ниже (политика этого
       // модуля: снап в `to`, как MotionValue._tick).
-      // spring params already validated synchronously at drive() entry above.
+      // Параметры пружины уже валидированы синхронно на входе drive() выше.
       const result = solveSpring(opts.spring, elapsedSeconds, v0Normalized, solved);
       const rawValue = from + result.value * range;
-      // bounded=true (default): CSS-safe clamp to [from, to]. bounded=false:
-      // honest trajectory — overshoot is the point, no clamp.
+      // bounded=true (по умолчанию): CSS-безопасный clamp в [from, to]. bounded=false:
+      // честная траектория — перелёт это суть, без clamp.
       const cv = bounded ? Math.max(lo, Math.min(hi, rawValue)) : rawValue;
-      // absRange > 0 guaranteed by the from===to early-exit above.
+      // absRange > 0 гарантировано ранним выходом from===to выше.
       const absRange = Math.abs(range);
 
-      // Convergence:
-      // 1) Visual-saturation early-exit — once the monotone emitter has committed
-      //    to `to` (maxEmittedToward === to), no value distinct from `to` can ever
-      //    be emitted; the raw velocity tail beyond the clamp boundary is invisible
-      //    (holding the Promise for it broke the resolution contract: an accepted
-      //    underdamped spring at the floor zeta=0.2, omega0=2.0 kept it pending
-      //    ~3.9s after visual completion).
-      // 2) The threshold is range-independent: the position term is divided by
-      //    absRange; velocity from solveSpring is already in normalized
-      //    progress-space, so it is compared to the threshold directly.
-      // The visual-saturation early-exit (maxEmittedToward === to) is a property
-      // of the MONOTONE emitter only: with the clamp off, values legitimately
-      // pass through `to` while the spring still carries velocity, so the
-      // threshold test is the sole convergence criterion there.
+      // Сходимость:
+      // 1) Ранний выход по визуальному насыщению — когда монотонный эмиттер
+      //    зафиксировал `to` (maxEmittedToward === to), никакое отличное от `to`
+      //    значение больше не может быть эмитнуто; сырой хвост скорости за
+      //    границей clamp невидим (удержание Promise для него нарушало контракт
+      //    разрешения: принятая недодемпфированная пружина на нижнем пределе
+      //    zeta=0.2, omega0=2.0 держала его pending ~3.9с после визуального завершения).
+      // 2) Порог не зависит от диапазона: позиционный член делится на absRange;
+      //    скорость из solveSpring уже в нормализованном прогресс-пространстве,
+      //    поэтому сравнивается с порогом напрямую.
+      // Ранний выход по визуальному насыщению (maxEmittedToward === to) — свойство
+      // ТОЛЬКО монотонного эмиттера: без clamp значения легитимно проходят через
+      // `to`, пока пружина ещё несёт скорость, поэтому проверка порога —
+      // единственный критерий сходимости там.
       const converged =
         (bounded && maxEmittedToward === to) ||
         (Math.abs(cv - to) / absRange < CONVERGENCE_THRESHOLD &&
@@ -284,25 +284,25 @@ export function drive(opts: DriveOptions): Promise<void> {
       }
 
       if (bounded) {
-        // Monotonize: for positive range, never emit below the running maximum.
-        // For negative range, never emit above the running minimum.
-        // This absorbs underdamped oscillation after the spring passes `to`.
+        // Монотонизация: для положительного диапазона никогда не эмитить ниже
+        // текущего максимума. Для отрицательного — никогда не выше текущего
+        // минимума. Это поглощает недодемпфированные колебания после прохода `to`.
         const monotoneValue =
           range >= 0 ? Math.max(cv, maxEmittedToward) : Math.min(cv, maxEmittedToward);
         maxEmittedToward = monotoneValue;
         onStep(monotoneValue);
       } else {
-        // Honest spring: emit the trajectory as solved, bounce included.
+        // Честная пружина: эмитим траекторию как решена, включая отскок.
         onStep(cv);
       }
 
-      // Release the single-flight lock before rescheduling so the next tick
-      // invocation (from either path) is not immediately dropped.
+      // Снимаем single-flight блокировку перед перепланированием, чтобы следующий
+      // вызов tick (из любого пути) не был немедленно отброшен.
       tickActive = false;
 
-      // Reschedule via the same mechanism that is currently active.
-      // useTimeoutFallback is set to true before tick() ever fires when the
-      // bootstrap call returned handle=0 (non-draining step-clock convention).
+      // Перепланируем через тот же механизм, который сейчас активен.
+      // useTimeoutFallback выставляется в true до первого срабатывания tick(),
+      // когда bootstrap-вызов вернул handle=0 (конвенция недренирующих часов).
       if (useTimeoutFallback) {
         setTimeout(tick, 0);
       } else {
@@ -310,15 +310,12 @@ export function drive(opts: DriveOptions): Promise<void> {
       }
     }
 
-    // Bootstrap — inspect the handle returned by the FIRST scheduleFrame call.
-    // If the injected clock returns 0 without invoking its callback (the
-    // documented non-draining step-clock convention), install a setTimeout(0)
-    // fallback NOW — before tick() has ever run — so the Promise always resolves.
-    // This is the fix for the deadlock: the bootstrap handle was previously
-    // discarded, so the handle=0 detection inside tick() was never reached.
-    //
-    // useTimeoutFallback is set before setTimeout fires, so tick() always reads
-    // the correct scheduler on its first (and every subsequent) invocation.
+    // Bootstrap — проверяем дескриптор, возвращённый ПЕРВЫМ вызовом scheduleFrame.
+    // Если внедрённые часы возвращают 0 без вызова колбэка (документированная
+    // конвенция недренирующих пошаговых часов), устанавливаем фоллбек setTimeout(0)
+    // СЕЙЧАС — до первого запуска tick(), чтобы промис разрешился в любом случае.
+    // useTimeoutFallback выставляется до срабатывания setTimeout, поэтому tick()
+    // всегда читает корректный планировщик на первом и всех последующих вызовах.
     let useTimeoutFallback = false;
     if (scheduleFrame(tick) === 0) {
       useTimeoutFallback = true;
