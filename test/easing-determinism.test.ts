@@ -85,8 +85,12 @@ describe('easing determinism — NE4', () => {
     assertDeterministic('normalizeEasing(linear)', normalizeEasing(linear));
   });
 
-  it('normalizeEasing(hostile t=>Math.random()) is NOT asserted deterministic — purity test is per-function', () => {
-    expect(true).toBe(true);
+  it('normalizeEasing(hostile t=>Math.random()) returns a callable easing without throwing', () => {
+    const hostile = normalizeEasing((t: number) => Math.random());
+    expect(typeof hostile).toBe('function');
+    expect(() => hostile(0)).not.toThrow();
+    expect(() => hostile(0.5)).not.toThrow();
+    expect(() => hostile(1)).not.toThrow();
   });
 
   it('linear has no DOM/clock/window references — pure static import check', () => {

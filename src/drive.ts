@@ -314,9 +314,6 @@ export function drive(opts: DriveOptions): Promise<void> {
     // If the injected clock returns 0 without invoking its callback (the
     // documented non-draining step-clock convention), install a setTimeout(0)
     // fallback NOW — before tick() has ever run — so the Promise always resolves.
-    // This is the fix for the deadlock: the bootstrap handle was previously
-    // discarded, so the handle=0 detection inside tick() was never reached.
-    //
     // useTimeoutFallback is set before setTimeout fires, so tick() always reads
     // the correct scheduler on its first (and every subsequent) invocation.
     let useTimeoutFallback = false;

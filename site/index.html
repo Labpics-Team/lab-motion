@@ -1,0 +1,193 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width" />
+    <meta name="description" content="Lab Motion — a headless, compositor-first motion kernel for product interfaces." />
+    <meta name="referrer" content="no-referrer" />
+    <meta
+      http-equiv="Content-Security-Policy"
+      content="default-src 'self'; base-uri 'self'; connect-src 'none'; font-src 'self'; form-action 'none'; img-src 'self' data:; object-src 'none'; script-src 'self'; style-src 'self'"
+    />
+    <title>Lab Motion — motion that survives interruption</title>
+    <link rel="stylesheet" href="/src/styles/site.css" />
+  </head>
+  <body>
+    <a class="skip-link" href="#content">Skip to content</a>
+    <header class="site-header">
+      <a class="brand" href="./" aria-label="Lab Motion home">
+        <span class="brand-mark" aria-hidden="true"></span>
+        <span>lab motion</span>
+      </a>
+      <button class="motion-toggle" type="button" data-action="toggle-motion" aria-pressed="false">
+        Reduce motion
+      </button>
+      <nav aria-label="Primary navigation">
+        <a href="#proofs">Live proofs</a>
+        <a href="#api">API</a>
+        <a href="https://github.com/Labpics-Team/lab-motion">GitHub</a>
+      </nav>
+    </header>
+
+    <main id="content">
+      <section class="hero section-shell" aria-labelledby="hero-title">
+        <div class="hero-copy">
+          <p class="eyebrow"><span class="status-dot" aria-hidden="true"></span> Headless motion kernel</p>
+          <h1 id="hero-title">Motion that survives interruption.</h1>
+          <p class="hero-lede">
+            Physics-first transitions for product interfaces. Smooth retargets, compositor routing, and a small
+            public surface you can test instead of trusting.
+          </p>
+          <div class="hero-actions">
+            <a class="button button-primary" href="#proofs">Try the live proofs</a>
+            <a class="button button-quiet" href="#api">Read the one-liner API</a>
+          </div>
+          <p class="hero-note" data-site-status aria-live="polite">Animations are live. Use the control above to preview reduced motion.</p>
+        </div>
+        <div class="hero-stage" role="img" aria-label="Live spring preview">
+          <div class="stage-grid" aria-hidden="true"></div>
+          <div class="stage-caption" aria-hidden="true">spring / autonomous / retargetable</div>
+          <div class="hero-orbit orbit-a" aria-hidden="true"></div>
+          <div class="hero-orbit orbit-b" aria-hidden="true"></div>
+          <div class="hero-orb" data-preview="hero-orb" aria-hidden="true"></div>
+        </div>
+      </section>
+
+      <section id="proofs" class="section-shell section-block" aria-labelledby="proofs-title">
+        <div class="section-heading">
+          <p class="eyebrow">Three contracts, visible</p>
+          <h2 id="proofs-title">Feel the behavior before reading the source.</h2>
+          <p>Each preview uses the public <code>@labpics/motion/animate</code> entry. The controls are intentionally plain so the motion stays the subject.</p>
+        </div>
+
+        <div class="proof-grid">
+          <article class="proof-card proof-card-wide" data-card="spring">
+            <div class="card-heading">
+              <div>
+                <p class="card-kicker">01 / analytic spring</p>
+                <h3>A physical settle, not a canned curve.</h3>
+              </div>
+              <span class="card-state" data-state role="status">ready</span>
+            </div>
+            <div class="preview-canvas spring-canvas" role="img" aria-label="Spring animation preview">
+              <div class="track-line" aria-hidden="true"></div>
+              <div class="spring-object" data-preview="spring-object" aria-hidden="true"></div>
+              <span class="track-label track-label-start" aria-hidden="true">from</span>
+              <span class="track-label track-label-end" aria-hidden="true">to</span>
+            </div>
+            <div class="card-footer">
+              <p>Closed-form spring sampling keeps the endpoint exact and the path inspectable.</p>
+              <button class="button button-small" type="button" data-action="replay-spring">Replay</button>
+            </div>
+          </article>
+
+          <article class="proof-card" data-card="stagger">
+            <div class="card-heading">
+              <div>
+                <p class="card-kicker">02 / shared clock</p>
+                <h3>Stagger without a scheduler pile-up.</h3>
+              </div>
+              <span class="card-state" data-state role="status">ready</span>
+            </div>
+            <div class="preview-canvas stagger-canvas" role="img" aria-label="Staggered dots animation preview">
+              <div class="stagger-grid">
+                <span class="stagger-item" data-stagger-item="0" aria-hidden="true"></span>
+                <span class="stagger-item" data-stagger-item="1" aria-hidden="true"></span>
+                <span class="stagger-item" data-stagger-item="2" aria-hidden="true"></span>
+                <span class="stagger-item" data-stagger-item="3" aria-hidden="true"></span>
+                <span class="stagger-item" data-stagger-item="4" aria-hidden="true"></span>
+                <span class="stagger-item" data-stagger-item="5" aria-hidden="true"></span>
+                <span class="stagger-item" data-stagger-item="6" aria-hidden="true"></span>
+                <span class="stagger-item" data-stagger-item="7" aria-hidden="true"></span>
+                <span class="stagger-item" data-stagger-item="8" aria-hidden="true"></span>
+                <span class="stagger-item" data-stagger-item="9" aria-hidden="true"></span>
+                <span class="stagger-item" data-stagger-item="10" aria-hidden="true"></span>
+                <span class="stagger-item" data-stagger-item="11" aria-hidden="true"></span>
+                <span class="stagger-item" data-stagger-item="12" aria-hidden="true"></span>
+                <span class="stagger-item" data-stagger-item="13" aria-hidden="true"></span>
+                <span class="stagger-item" data-stagger-item="14" aria-hidden="true"></span>
+              </div>
+            </div>
+            <div class="card-footer">
+              <p>One public call, one coordinated surface, predictable handoff.</p>
+              <button class="button button-small" type="button" data-action="replay-stagger">Replay</button>
+            </div>
+          </article>
+
+          <article class="proof-card" data-card="retarget">
+            <div class="card-heading">
+              <div>
+                <p class="card-kicker">03 / C¹ handoff</p>
+                <h3>Change the target mid-flight.</h3>
+              </div>
+              <span class="card-state" data-state role="status">ready</span>
+            </div>
+            <div class="preview-canvas retarget-canvas" role="img" aria-label="Retargetable object animation preview">
+              <div class="retarget-track" aria-hidden="true"></div>
+              <div class="retarget-object" data-preview="retarget-object" aria-hidden="true"></div>
+              <span class="retarget-marker marker-left" aria-hidden="true"></span>
+              <span class="retarget-marker marker-right" aria-hidden="true"></span>
+            </div>
+            <div class="card-footer card-footer-stack">
+              <p data-retarget-copy>Start a transition, then redirect it without a teleport.</p>
+              <div class="button-row">
+                <button class="button button-small" type="button" data-action="retarget">Retarget</button>
+                <button class="button button-small button-quiet" type="button" data-action="reset-retarget">Reset</button>
+              </div>
+            </div>
+          </article>
+        </div>
+      </section>
+
+      <section id="api" class="section-shell section-block api-block" aria-labelledby="api-title">
+        <div class="api-copy">
+          <p class="eyebrow">Small surface, deep behavior</p>
+          <h2 id="api-title">The first useful call stays readable.</h2>
+          <p>Use the same facade for a spring, a tween, a stagger, or an interruption. The package keeps framework bindings optional and the motion core headless.</p>
+          <a class="text-link" href="https://github.com/Labpics-Team/lab-motion/blob/main/docs/api.md">Open the API reference <span aria-hidden="true">↗</span></a>
+        </div>
+        <div class="code-card">
+          <div class="code-card-bar"><span>motion.ts</span><button class="copy-button" type="button" data-copy>Copy</button></div>
+          <pre><code data-copy-source><span class="syntax-keyword">import</span> &#123; animate &#125; <span class="syntax-keyword">from</span> <span class="syntax-string">'@labpics/motion/animate'</span>;
+
+<span class="syntax-keyword">await</span> animate(<span class="syntax-string">'.card'</span>, &#123; x: <span class="syntax-number">240</span>, opacity: <span class="syntax-number">1</span> &#125;, &#123;
+  spring: &#123; mass: <span class="syntax-number">1</span>, stiffness: <span class="syntax-number">170</span>, damping: <span class="syntax-number">26</span> &#125;,
+  stagger: <span class="syntax-number">40</span>,
+&#125;).finished;</code></pre>
+          <p class="copy-status" data-copy-status aria-live="polite"></p>
+        </div>
+      </section>
+
+      <section class="section-shell section-block proof-note" aria-labelledby="evidence-title">
+        <div>
+          <p class="eyebrow">Proof, not promises</p>
+          <h2 id="evidence-title">Measure the trade-off that matters to your interface.</h2>
+        </div>
+        <div class="evidence-grid">
+          <a class="evidence-link" href="https://github.com/Labpics-Team/lab-motion/blob/main/docs/benchmark.md">
+            <span class="evidence-label">Benchmarks</span>
+            <span>Reproducible scenarios, platform controls, and known limits.</span>
+            <span aria-hidden="true">↗</span>
+          </a>
+          <a class="evidence-link" href="https://github.com/Labpics-Team/lab-motion/blob/main/docs/architecture.md">
+            <span class="evidence-label">Architecture</span>
+            <span>Domain, scheduler, compositor, and binding boundaries.</span>
+            <span aria-hidden="true">↗</span>
+          </a>
+          <a class="evidence-link" href="https://github.com/Labpics-Team/lab-motion/blob/main/SECURITY.md">
+            <span class="evidence-label">Security</span>
+            <span>Supply-chain and public-package release contracts.</span>
+            <span aria-hidden="true">↗</span>
+          </a>
+        </div>
+      </section>
+    </main>
+
+    <footer class="site-footer section-shell">
+      <span>Lab Motion by Labpics</span>
+      <span>Built for interfaces that change their mind.</span>
+    </footer>
+
+    <script type="module" src="/src/scripts/main.js"></script>
+  </body>
+</html>
