@@ -140,7 +140,7 @@ export interface NanoLoweringPlan {
 
 const NANO_SOURCE = '@labpics/motion/nano';
 export const COMPILED_IMPORT_SOURCE = '@labpics/motion/compiler/runtime';
-export const COMPILED_IMPORT_NAME = 'animateCompiled';
+const COMPILED_IMPORT_NAME = 'animateCompiled';
 const IMPORT_LOCAL = '__labMotionNanoCompiled';
 
 function walk(node: unknown, visit: (node: AstNode, parent: AstNode | undefined) => void, parent?: AstNode): void {
@@ -490,7 +490,7 @@ export function lowerSurfaceCall(input: SurfaceCallInput): SurfaceLoweringResult
 // ─── Surface lowering: build-time сертификат и план байтовых правок ──────────
 
 export const SURFACE_IMPORT_SOURCE = '@labpics/motion/compiler/surface';
-export const SURFACE_IMPORT_NAME = 'runSurface';
+const SURFACE_IMPORT_NAME = 'runSurface';
 const SURFACE_LOCAL = '__labMotionSurface';
 const ANIMATE_SOURCE = '@labpics/motion/animate';
 
@@ -536,7 +536,7 @@ export function surfaceArtifactLiteral(program: SurfaceProgram): string | undefi
  * разные значения на одной позиции — разрыв, который не является доменным
  * контрактом поверхности.
  */
-export function hasConflictingAdjacentStops(cssLinear: string): boolean {
+function hasConflictingAdjacentStops(cssLinear: string): boolean {
   let previous: readonly string[] = [];
   for (const stop of cssLinear.slice(cssLinear.indexOf('(') + 1, -1).split(',')) {
     const pair = stop.trim().split(' ');
