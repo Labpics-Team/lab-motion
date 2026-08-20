@@ -42,7 +42,7 @@ const TRANSFORM_IDENTITY: Readonly<Record<string, number>> = {
  * (а не `key in`) отсекает УНАСЛЕДОВАННЫЕ constructor/toString/__proto__: они
  * функции/объект, не число — иначе классифицировались бы как transform-канал.
  */
-function isTransformKey(key: string): boolean {
+export function isTransformKey(key: string): boolean {
   return typeof TRANSFORM_IDENTITY[key] === 'number';
 }
 
@@ -410,7 +410,7 @@ export interface AnimatableElement {
 }
 
 /** Читает текущее значение свойства: inline → computed (если среда умеет). */
-function readStyleValue(el: AnimatableElement, cssName: string): string {
+export function readStyleValue(el: AnimatableElement, cssName: string): string {
   try {
     const inline = el.style.getPropertyValue(cssName);
     if (inline !== '') return inline;
@@ -474,6 +474,20 @@ function interpolateParsed(from: ValueAST, to: ValueAST, p: number): string | nu
 /** Значение CSS-канала при прогрессе p. */
 export function cssAt(ch: CssChannel, p: number): string | number {
   return interpolateParsed(ch._fromAst, ch._toAst, p);
+}
+
+/**
+ * SSOT сериализации узкой numeric-поверхности. Вызов допустим только после
+ * доказанной topology: transform содержит ровно `x` без residual-каналов,
+ * иначе нужен общий buildTransform.
+ */
+export function formatSingleNumericSurface(
+  transformX: boolean,
+  value: number,
+): string {
+  return transformX
+    ? value === 0 ? 'none' : `translateX(${value}px)`
+    : String(value);
 }
 
 // ─── Привязка группы к элементу (from-резолв + подхват прерывания) ───────────
