@@ -130,9 +130,9 @@ pre { overflow-x: auto; margin: 0; padding: 1.2rem; color: #d8e3de; font-size: c
 html[data-motion="reduced"] { scroll-behavior: auto; }
 html[data-motion="reduced"] *,
 html[data-motion="reduced"] *::before,
-html[data-motion="reduced"] *::after { animation-duration: .001ms !important; animation-iteration-count: 1 !important; transition-duration: .001ms !important; scroll-behavior: auto !important; }
+html[data-motion="reduced"] *::after { animation: none !important; transition: none !important; scroll-behavior: auto !important; }
 @media (prefers-reduced-motion: reduce) {
-  *, *::before, *::after { animation-duration: .001ms !important; animation-iteration-count: 1 !important; transition-duration: .001ms !important; scroll-behavior: auto !important; }
+  *, *::before, *::after { animation: none !important; transition: none !important; scroll-behavior: auto !important; }
 }
 
 @media (max-width: 860px) {
