@@ -149,7 +149,7 @@ html[data-motion="reduced"] *::after { animation-duration: .001ms !important; an
   .site-header { flex-wrap: wrap; }
   nav { width: 100%; justify-content: space-between; gap: .5rem; }
   .hero { padding: 3.5rem 0 4.5rem; }
-  h1 { font-size: clamp(3.25rem, 17vw, 5.5rem); }
+  h1 { overflow-wrap: anywhere; font-size: clamp(3.25rem, 17vw, 5.5rem); }
   .hero-stage { min-height: 300px; }
   .section-block { padding: 4.5rem 0; }
   .card-footer, .site-footer { align-items: flex-start; flex-direction: column; }
