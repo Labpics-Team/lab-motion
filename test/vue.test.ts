@@ -469,13 +469,12 @@ describe('vMotion directive — mounted lifecycle', () => {
 
     // After unmount, setting a new target should not be possible; the mv is destroyed.
     // We verify via the updated hook — it should be a no-op after unmount.
-    const countBefore = 0; // element style cleared by unmount
+    const styleAfterUnmount = el.style.cssText;
     vMotion.updated!(el as Element, {
       value: { target: 99, property: 'opacity', requestFrame: clock.requestFrame },
     } as any, null as any, null as any);
     clock.drainAll();
-    // No assertion about exact count — just verify no throw and it's safe.
-    expect(true).toBe(true); // structural: no crash
+    expect(el.style.cssText).toBe(styleAfterUnmount);
   });
 });
 
