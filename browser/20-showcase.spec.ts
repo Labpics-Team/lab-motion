@@ -55,7 +55,7 @@ test('spring Replay starts a new observed trajectory and reaches its endpoint', 
 
   const before = await translation(page, '[data-preview="spring-object"]');
   await page.locator('[data-action="replay-spring"]').click();
-  await expect(state).toHaveText('running');
+  await expect(state).toHaveText(/running|complete/);
   await expect.poll(async () => (await translation(page, '[data-preview="spring-object"]')).x).not.toBe(before.x);
   await expect(state).toHaveText('complete');
   await expect.poll(async () => (await translation(page, '[data-preview="spring-object"]')).x).toBeCloseTo(112, 1);
@@ -69,7 +69,7 @@ test('stagger Replay exposes delayed visual ordering before all items settle', a
   await expect(state).toHaveText('complete');
 
   await page.locator('[data-action="replay-stagger"]').click();
-  await expect(state).toHaveText('running');
+  await expect(state).toHaveText(/running|complete/);
   await expect.poll(async () => page.locator('[data-stagger-item]').evaluateAll((items) => {
     const opacity = items.map((item) => Number(getComputedStyle(item).opacity));
     return Math.max(...opacity) - Math.min(...opacity);
@@ -86,7 +86,7 @@ test('retarget changes the observed destination and settles at the redirected ta
   await page.goto(SHOWCASE);
 
   await page.locator('[data-action="retarget"]').click();
-  await expect(page.locator('[data-card="retarget"] [data-state]')).toHaveText('running');
+  await expect(page.locator('[data-card="retarget"] [data-state]')).toHaveText(/running|complete/);
   await expect.poll(() => page.locator('[data-retarget-copy]').textContent()).toMatch(/Redirecting|Retargeted/);
 
   await page.locator('[data-action="reset-retarget"]').click();

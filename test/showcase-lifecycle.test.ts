@@ -148,14 +148,21 @@ describe('showcase lifecycle ownership', () => {
     let resolveFinished!: () => void;
     const finished = new Promise<void>((resolve) => { resolveFinished = resolve; });
     animateMock.mockImplementationOnce(() => {
+      const value: Controls = { cancel: vi.fn(), finished: new Promise<void>(() => {}) };
+      controls.push(value);
+      return value;
+    });
+    animateMock.mockImplementationOnce(() => {
       const value: Controls = { cancel: vi.fn(), finished };
       controls.push(value);
       return value;
     });
     const { installShowcase } = await import('../site/src/scripts/showcase.js');
     activeDispose = installShowcase();
+    expect(document.querySelector('[data-card="spring"] [data-state]')?.textContent).toBe('running');
     activeDispose();
     resolveFinished();
+    await finished;
     await Promise.resolve();
     expect(document.querySelector('[data-card="spring"] [data-state]')?.textContent).toBe('running');
   });
