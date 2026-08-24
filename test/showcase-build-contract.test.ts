@@ -13,6 +13,10 @@ const siteHtml = readFileSync(
   new URL('../site/index.html', import.meta.url),
   'utf8',
 );
+const browserWorkflow = readFileSync(
+  new URL('../.github/workflows/browser.yml', import.meta.url),
+  'utf8',
+);
 const pkg = JSON.parse(
   readFileSync(new URL('../package.json', import.meta.url), 'utf8'),
 ) as {
@@ -32,6 +36,14 @@ describe('showcase build contract', () => {
     expect(viteConfig).toContain("base: './'");
     expect(viteConfig).toContain('modulePreload: { polyfill: false }');
     expect(pkg.devDependencies.astro).toBeUndefined();
+  });
+
+  it('produces the showcase artifact before browser conformance runs', () => {
+    const producer = browserWorkflow.indexOf('run: pnpm site:build');
+    const consumer = browserWorkflow.indexOf('run: pnpm exec playwright test');
+
+    expect(producer).toBeGreaterThan(-1);
+    expect(consumer).toBeGreaterThan(producer);
   });
 
   it('keeps the zero-connect CSP compatible with the generated bootstrap', () => {

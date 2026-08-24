@@ -64,9 +64,10 @@ jobs:
       - name: Typecheck browser specs
         run: pnpm typecheck:browser
 
-      # Спеки грузят СОБРАННЫЙ dist — билд обязателен до прогона.
-      - name: Build
-        run: pnpm build
+      # Спеки грузят СОБРАННЫЕ library dist и showcase site/dist — канонический
+      # producer обязан завершиться до Playwright в каждом движке матрицы.
+      - name: Build library and showcase
+        run: pnpm site:build
 
       - name: Run conformance (${{ matrix.browser }})
         run: pnpm exec playwright test --project=${{ matrix.browser }}
