@@ -509,7 +509,7 @@
     "typecheck:native": "tsgo --noEmit",
     "check:native-gate": "node scripts/check-native-gate.mjs",
     "site:build": "pnpm build && vite build --config site/vite.config.mjs site",
-    "site:preview": "vite preview --config site/vite.config.mjs site/dist"
+    "site:preview": "vite preview --config site/vite.config.mjs site"
   },
   "peerDependencies": {
     "@angular/core": ">=16.0.0",

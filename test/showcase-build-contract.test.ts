@@ -37,6 +37,7 @@ describe('showcase build contract', () => {
   it('builds the public package before compiling the static consumer', () => {
     expect(pkg.scripts['site:build']).toBe('pnpm build && vite build --config site/vite.config.mjs site');
     expect(pkg.scripts['site:build']).not.toContain('/site/dist');
+    expect(pkg.scripts['site:preview']).toBe('vite preview --config site/vite.config.mjs site');
     expect(viteConfig).toContain("base: './'");
     expect(viteConfig).toContain('modulePreload: { polyfill: false }');
     expect(pkg.devDependencies.astro).toBeUndefined();
