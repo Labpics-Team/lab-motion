@@ -557,7 +557,7 @@
     "@types/react": "18.3.12",
     "@typescript/native-preview": "7.0.0-dev.20260707.2",
     "esbuild": "0.28.1",
-    "jsdom": "29.1.1",
+    "jsdom": "30.0.1",
     "lit": "3.3.3",
     "pako": "3.0.1",
     "preact": "10.29.7",
