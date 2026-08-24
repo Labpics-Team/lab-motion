@@ -69,7 +69,6 @@ bottom sheet) — в [docs/recipes.md](docs/recipes.md).
 `@labpics/motion/animate`, без внутренних путей.
 
 ```bash
-pnpm build
 pnpm site:build
 pnpm site:preview   # отдаёт site/dist на локальном сервере
 ```
