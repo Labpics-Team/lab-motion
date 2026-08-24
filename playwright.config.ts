@@ -64,9 +64,10 @@ export default defineConfig({
 
   // Zero-dep статический сервер отдаёт repo-root по http — модульные import из
   // dist резолвятся по origin (file:// упёрлось бы в module-CORS Chromium).
+  // Readiness проверяет showcase-артефакт, который потребляют новые browser-спеки.
   webServer: {
     command: `node browser/fixtures/server.mjs ${PORT}`,
-    url: `${BASE_URL}/browser/fixtures/harness.html`,
+    url: `${BASE_URL}/site/dist/index.html`,
     // Не переиспользуем уже поднятый сервер по умолчанию: чужой checkout мог бы
     // отдавать ДРУГОЙ dist по тому же URL и молча исказить результат. Опт-ин
     // PW_REUSE_SERVER=1 для локального итеративного цикла.

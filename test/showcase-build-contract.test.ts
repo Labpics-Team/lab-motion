@@ -17,6 +17,10 @@ const browserWorkflow = readFileSync(
   new URL('../.github/workflows/browser.yml', import.meta.url),
   'utf8',
 );
+const playwrightConfig = readFileSync(
+  new URL('../playwright.config.ts', import.meta.url),
+  'utf8',
+);
 const pkg = JSON.parse(
   readFileSync(new URL('../package.json', import.meta.url), 'utf8'),
 ) as {
@@ -44,6 +48,11 @@ describe('showcase build contract', () => {
 
     expect(producer).toBeGreaterThan(-1);
     expect(consumer).toBeGreaterThan(producer);
+  });
+
+  it('readiness proves the built showcase route is available', () => {
+    expect(playwrightConfig).toContain("url: `${BASE_URL}/site/dist/index.html`");
+    expect(playwrightConfig).not.toContain("url: `${BASE_URL}/browser/fixtures/harness.html`");
   });
 
   it('keeps the zero-connect CSP compatible with the generated bootstrap', () => {
