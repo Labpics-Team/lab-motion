@@ -17,4 +17,3 @@ test('forced reduced motion creates no native animations', async ({ page }) => {
 
   expect(await page.evaluate(nativeAnimations)).toEqual([]);
 });
-
