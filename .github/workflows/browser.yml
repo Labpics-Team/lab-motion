@@ -27,7 +27,7 @@ env:
 jobs:
   conformance:
     name: ${{ matrix.browser }}
-    runs-on: ubuntu-latest
+    runs-on: self-hosted
     timeout-minutes: 25
     strategy:
       fail-fast: false

@@ -24,7 +24,7 @@ env:
 jobs:
   verify:
     name: typecheck · build · test · fuzz · size · package
-    runs-on: ubuntu-latest
+    runs-on: self-hosted
     timeout-minutes: 25
 
     steps:
@@ -153,7 +153,7 @@ jobs:
   node-floor:
     name: consumer contract · Node ${{ matrix.node }}
     needs: [verify]
-    runs-on: ubuntu-latest
+    runs-on: self-hosted
     timeout-minutes: 20
     strategy:
       fail-fast: false
