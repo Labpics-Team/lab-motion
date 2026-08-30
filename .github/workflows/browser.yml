@@ -1,86 +1,87 @@
 name: Browser conformance
 
-# Browser matrix (issue #102, фаза D): сверка СОБРАННОГО dist с реальным
-# поведением трёх движков (Chromium/Firefox/WebKit). Гейт запускается для каждого
-# PR: required check не должен исчезать из-за paths-фильтра. Артефакты
-# (trace/video) выгружаются только при сбое.
+# Browser matrix ( issue #102, фаза D): сверка СОБ� �АННОГО dist с реальным
+# по ведением трёх движков (Chr omium/Firefox/WebKit). Гейт запуск� �ется для каждого
+# PR: require d check не должен исчезать и з-за paths-фильтра. Артефак� �ы
+# (trace/video) выгружаются т олько при сбое.
 
 on:
   push:
-    branches: ["main"]
+     branches: ["main"]
   pull_request:
-    branches: ["main"]
+    branch es: ["main"]
   merge_group:
-  workflow_dispatch:
+  workflow_dispat ch:
 
 permissions:
   contents: read
 
-concurrency:
-  group: browser-${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
-  cancel-in-progress: ${{ github.ref != 'refs/heads/main' }}
+concurren cy:
+  group: browser-${{ github.workflow }}-$ {{ github.event.pull_request.number || github .ref }}
+  cancel-in-progress: ${{ github.ref  != 'refs/heads/main' }}
 
 env:
-  COREPACK_ENABLE_DOWNLOAD_PROMPT: "0"
-  COREPACK_DEFAULT_TO_LATEST: "0"
+  COREPACK_ENAB LE_DOWNLOAD_PROMPT: "0"
+  COREPACK_DEFAULT_TO _LATEST: "0"
 
 jobs:
   conformance:
-    name: ${{ matrix.browser }}
-    runs-on: self-hosted
+    name:  ${{ matrix.browser }}
+    runs-on: self-hoste d
     timeout-minutes: 25
     strategy:
-      fail-fast: false
+       fail-fast: false
       matrix:
-        browser: [chromium, firefox, webkit]
+        brows er: [chromium, firefox, webkit]
 
     steps:
-      - name: Checkout
-        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+       - name: Checkout
+        uses: actions/c heckout@3d3c42e5aac5ba805825da76410c181273ba9 0b1 # v7
         with:
-          # Токен не нужен после checkout (пуша нет) — не оставляем его на диске
-          # перед pnpm install (postinstall-скрипты третьих сторон). SAST: artipacked.
-          persist-credentials: false
+          # Токен  не нужен после checkout (пуш� � нет) — не оставляем его  на диске
+          # перед pnpm i nstall (postinstall-скрипты треть их сторон). SAST: artipacked.
+           persist-credentials: false
 
-      - name: Setup Node
-        uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v6
-        with:
+      - name:  Setup Node
+        uses: actions/setup-node@8 20762786026740c76f36085b0efc47a31fe5020 # v6
+         with:
           node-version: "24"
 
-      - name: Activate pinned pnpm
-        run: |
+       - name: Activate pinned pnpm
+        run : |
           corepack enable
-          corepack install --global pnpm@11.11.0
+          corep ack install --global pnpm@11.11.0
 
-      - name: Install dependencies
-        run: pnpm install --frozen-lockfile
+      - na me: Install dependencies
+        run: pnpm in stall --frozen-lockfile
 
-      # Устанавливаем ТОЛЬКО нужный движок матрицы (+ системные зависимости).
-      - name: Install Playwright browser
-        run: pnpm exec playwright install --with-deps ${{ matrix.browser }}
+      # Устана вливаем ТОЛЬКО нужный дв ижок матрицы (+ системные  зависимости).
+      - name: Insta ll Playwright browser
+        run: pnpm exec  playwright install --with-deps ${{ matrix.bro wser }}
 
-      # Типопроверка browser-спеков (отдельный tsconfig: DOM lib + /dist/*→src/*
-      # path-mapping) — специфичный tsc не входит в основной `pnpm typecheck`.
+      # Типопроверка bro wser-спеков (отдельный tsconfi g: DOM lib + /dist/*→src/*
+      # path-map ping) — специфичный tsc не в� �одит в основной `pnpm typecheck `.
       - name: Typecheck browser specs
-        run: pnpm typecheck:browser
+         run: pnpm typecheck:browser
 
-      # Спеки грузят СОБРАННЫЕ library dist и showcase site/dist — канонический
-      # producer обязан завершиться до Playwright в каждом движке матрицы.
-      - name: Build library and showcase
-        run: pnpm site:build
+      # Сп еки грузят СОБРАННЫЕ librar y dist и showcase site/dist — канони ческий
+      # producer обязан з авершиться до Playwright в ка� �дом движке матрицы.
+      -  name: Build library and showcase
+        run:  pnpm site:build
 
-      - name: Run conformance (${{ matrix.browser }})
-        run: pnpm exec playwright test --project=${{ matrix.browser }}
+      - name: Run conforman ce (${{ matrix.browser }})
+        run: pnpm  exec playwright test --project=${{ matrix.bro wser }}
 
-      # Trace/video/screenshot пишутся только on-failure (playwright.config) —
-      # выгружаем их лишь когда шаг упал.
-      - name: Upload failure artifacts
-        if: failure()
-        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
+      # Trace/video/screenshot пи� �утся только on-failure (playwright .config) —
+      # выгружаем их  лишь когда шаг упал.
+      -  name: Upload failure artifacts
+        if: fa ilure()
+        uses: actions/upload-artifact @043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v 7
         with:
-          name: browser-conformance-${{ matrix.browser }}-${{ github.run_id }}
+          name: browser-confo rmance-${{ matrix.browser }}-${{ github.run_i d }}
           path: |
-            test-results/
+            test-resul ts/
             playwright-report/
-          if-no-files-found: ignore
-          retention-days: 7
+           if-no-files-found: ignore
+          retention -days: 7
+ 
