@@ -19,7 +19,7 @@ env:
 jobs:
   core:
     name: critical numerical core
-    runs-on: ubuntu-latest
+    runs-on: self-hosted
     timeout-minutes: 60
     permissions:
       contents: read
@@ -63,7 +63,7 @@ jobs:
     name: Report scheduled mutation failure
     needs: [core]
     if: always() && github.event_name == 'schedule' && needs.core.result != 'success'
-    runs-on: ubuntu-latest
+    runs-on: self-hosted
     timeout-minutes: 5
     permissions:
       issues: write

@@ -24,7 +24,7 @@ jobs:
   # Сначала фиксируем намерение релиза без права менять репозиторий.
   resolve:
     if: github.repository == 'Labpics-Team/lab-motion'
-    runs-on: ubuntu-latest
+    runs-on: self-hosted
     timeout-minutes: 5
     permissions:
       contents: read
@@ -86,7 +86,7 @@ jobs:
     if: >-
       github.repository == 'Labpics-Team/lab-motion' && !cancelled() &&
       needs.resolve.result == 'success'
-    runs-on: ubuntu-latest
+    runs-on: self-hosted
     timeout-minutes: 45
     permissions:
       contents: read
@@ -239,7 +239,7 @@ jobs:
       github.repository == 'Labpics-Team/lab-motion' && !cancelled() &&
       needs.resolve.result == 'success' && needs.verify.result == 'success' &&
       needs.tag.result == 'success'
-    runs-on: ubuntu-latest
+    runs-on: self-hosted
     timeout-minutes: 10
     environment: npm
     permissions:
@@ -647,7 +647,7 @@ jobs:
     if: >-
       github.repository == 'Labpics-Team/lab-motion' && !cancelled() &&
       needs.resolve.result == 'success' && needs.verify.result == 'success'
-    runs-on: ubuntu-latest
+    runs-on: self-hosted
     timeout-minutes: 5
     permissions:
       contents: write
@@ -727,7 +727,7 @@ jobs:
     if: >-
       github.repository == 'Labpics-Team/lab-motion' && !cancelled() &&
       needs.publish.result == 'success' && needs.tag.result == 'success'
-    runs-on: ubuntu-latest
+    runs-on: self-hosted
     timeout-minutes: 10
     permissions:
       contents: write
