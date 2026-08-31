@@ -1,0 +1,111 @@
+name: CI
+
+# Org-wide merge gate. Job name is the single required check: "CI".
+# It does not replace repo tests. It waits for other GitHub Actions
+# checks on the PR head SHA and fails if any of them failed.
+# New test jobs become part of the gate automatically.
+
+on:
+  pull_request:
+
+concurrency:
+  group: ci-gate-${{ github.repository }}-${{ github.event.pull_request.number }}
+  cancel-in-progress: true
+
+permissions:
+  checks: read
+  actions: read
+  contents: read
+
+jobs:
+  gate:
+    name: CI
+    runs-on: ubuntu-latest
+    timeout-minutes: 90
+    steps:
+      - name: Await other GitHub Actions checks
+        env:
+          GH_TOKEN: ${{ github.token }}
+          REPO: ${{ github.repository }}
+          SHA: ${{ github.event.pull_request.head.sha }}
+          SELF_NAME: CI
+        run: |
+          python3 - <<'PY'
+          import json, os, sys, time, urllib.error, urllib.request
+
+          token = os.environ["GH_TOKEN"]
+          repo = os.environ["REPO"]
+          sha = os.environ["SHA"]
+          self_name = os.environ["SELF_NAME"]
+          api = "https://api.github.com"
+
+          def req(url):
+              r = urllib.request.Request(url, headers={
+                  "Authorization": f"Bearer {token}",
+                  "Accept": "application/vnd.github+json",
+                  "X-GitHub-Api-Version": "2022-11-28",
+                  "User-Agent": "labpics-ci-gate",
+              })
+              with urllib.request.urlopen(r) as resp:
+                  return json.load(resp)
+
+          def check_runs():
+              out = []
+              page = 1
+              while True:
+                  url = f"{api}/repos/{repo}/commits/{sha}/check-runs?per_page=100&page={page}"
+                  data = req(url)
+                  out.extend(data.get("check_runs") or [])
+                  if len(data.get("check_runs") or []) < 100:
+                      break
+                  page += 1
+                  if page > 20:
+                      break
+              return out
+
+          def relevant(runs):
+              kept = []
+              for c in runs:
+                  name = c.get("name") or ""
+                  if name == self_name:
+                      continue
+                  app = (c.get("app") or {}).get("slug")
+                  if app != "github-actions":
+                      continue
+                  kept.append(c)
+              return kept
+
+          grace = 90
+          timeout = 85 * 60
+          started = time.time()
+          while True:
+              elapsed = time.time() - started
+              runs = relevant(check_runs())
+              pending = [c for c in runs if c.get("status") != "completed"]
+              failed = [
+                  c for c in runs
+                  if c.get("status") == "completed"
+                  and c.get("conclusion") not in ("success", "skipped", "neutral")
+              ]
+              print(
+                  f"elapsed={int(elapsed)}s others={len(runs)} "
+                  f"pending={len(pending)} failed={len(failed)}",
+                  flush=True,
+              )
+              for c in failed:
+                  print(f"FAIL {c.get('name')} conclusion={c.get('conclusion')}", flush=True)
+              if failed:
+                  sys.exit(1)
+              if not pending and runs:
+                  print("all other GitHub Actions checks passed", flush=True)
+                  sys.exit(0)
+              if not pending and not runs and elapsed >= grace:
+                  print("no other GitHub Actions checks on this SHA; gate green", flush=True)
+                  sys.exit(0)
+              if elapsed >= timeout:
+                  print("timeout waiting for other checks", flush=True)
+                  for c in pending:
+                      print(f"PENDING {c.get('name')} status={c.get('status')}", flush=True)
+                  sys.exit(1)
+              time.sleep(15)
+          PY
