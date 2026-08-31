@@ -1,9 +1,9 @@
 name: CI
 
-# Org-wide merge gate. Job name is the single required check: "CI".
-# It does not replace repo tests. It waits for other GitHub Actions
-# checks on the PR head SHA and fails if any of them failed.
-# New test jobs become part of the gate automatically.
+# Org-wide merge gate. The job display name "CI" is the only required check.
+# It waits for other pull_request workflow runs on this SHA, including jobs
+# that are still queued. New test workflows are included automatically if
+# they run on pull_request. Scheduled-only jobs are not part of the PR gate.
 
 on:
   pull_request:
@@ -13,8 +13,8 @@ concurrency:
   cancel-in-progress: true
 
 permissions:
-  checks: read
   actions: read
+  checks: read
   contents: read
 
 jobs:
@@ -23,20 +23,18 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 90
     steps:
-      - name: Await other GitHub Actions checks
+      - name: Await other pull_request workflow runs
         env:
           GH_TOKEN: ${{ github.token }}
           REPO: ${{ github.repository }}
           SHA: ${{ github.event.pull_request.head.sha }}
-          SELF_NAME: CI
         run: |
           python3 - <<'PY'
-          import json, os, sys, time, urllib.error, urllib.request
+          import json, os, sys, time, urllib.request
 
           token = os.environ["GH_TOKEN"]
           repo = os.environ["REPO"]
           sha = os.environ["SHA"]
-          self_name = os.environ["SELF_NAME"]
           api = "https://api.github.com"
 
           def req(url):
@@ -49,63 +47,66 @@ jobs:
               with urllib.request.urlopen(r) as resp:
                   return json.load(resp)
 
-          def check_runs():
-              out = []
-              page = 1
-              while True:
-                  url = f"{api}/repos/{repo}/commits/{sha}/check-runs?per_page=100&page={page}"
-                  data = req(url)
-                  out.extend(data.get("check_runs") or [])
-                  if len(data.get("check_runs") or []) < 100:
-                      break
-                  page += 1
-                  if page > 20:
-                      break
-              return out
-
-          def relevant(runs):
-              kept = []
-              for c in runs:
-                  name = c.get("name") or ""
-                  if name == self_name:
+          def workflow_runs():
+              url = (
+                  f"{api}/repos/{repo}/actions/runs"
+                  f"?head_sha={sha}&event=pull_request&per_page=100"
+              )
+              data = req(url)
+              runs = []
+              for run in data.get("workflow_runs") or []:
+                  path = run.get("path") or ""
+                  if path.endswith("ci-gate.yml"):
                       continue
-                  app = (c.get("app") or {}).get("slug")
-                  if app != "github-actions":
-                      continue
-                  kept.append(c)
-              return kept
+                  runs.append(run)
+              return runs
 
-          grace = 90
-          timeout = 85 * 60
+          ok = {"success", "skipped", "neutral"}
+          pending = {"queued", "in_progress", "waiting", "requested", "pending"}
           started = time.time()
+          empty_polls = 0
+          timeout = 85 * 60
+
           while True:
-              elapsed = time.time() - started
-              runs = relevant(check_runs())
-              pending = [c for c in runs if c.get("status") != "completed"]
+              elapsed = int(time.time() - started)
+              runs = workflow_runs()
+              incomplete = [r for r in runs if (r.get("status") or "") in pending]
               failed = [
-                  c for c in runs
-                  if c.get("status") == "completed"
-                  and c.get("conclusion") not in ("success", "skipped", "neutral")
+                  r for r in runs
+                  if r.get("status") == "completed"
+                  and (r.get("conclusion") or "") not in ok
               ]
               print(
-                  f"elapsed={int(elapsed)}s others={len(runs)} "
-                  f"pending={len(pending)} failed={len(failed)}",
+                  f"elapsed={elapsed}s peers={len(runs)} "
+                  f"pending={len(incomplete)} failed={len(failed)}",
                   flush=True,
               )
-              for c in failed:
-                  print(f"FAIL {c.get('name')} conclusion={c.get('conclusion')}", flush=True)
+              for r in failed:
+                  print(
+                      f"FAIL {r.get('name')} conclusion={r.get('conclusion')} "
+                      f"path={r.get('path')}",
+                      flush=True,
+                  )
               if failed:
                   sys.exit(1)
-              if not pending and runs:
-                  print("all other GitHub Actions checks passed", flush=True)
+              if runs and not incomplete:
+                  print("all other pull_request workflows completed green", flush=True)
                   sys.exit(0)
-              if not pending and not runs and elapsed >= grace:
-                  print("no other GitHub Actions checks on this SHA; gate green", flush=True)
+              if not runs:
+                  empty_polls += 1
+              else:
+                  empty_polls = 0
+              if empty_polls >= 8 and elapsed >= 120:
+                  print("no other pull_request workflows registered; gate green", flush=True)
                   sys.exit(0)
               if elapsed >= timeout:
-                  print("timeout waiting for other checks", flush=True)
-                  for c in pending:
-                      print(f"PENDING {c.get('name')} status={c.get('status')}", flush=True)
+                  print("timeout waiting for other workflows", flush=True)
+                  for r in incomplete:
+                      print(
+                          f"PENDING {r.get('name')} status={r.get('status')} "
+                          f"path={r.get('path')}",
+                          flush=True,
+                      )
                   sys.exit(1)
               time.sleep(15)
           PY
