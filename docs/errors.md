@@ -184,3 +184,4 @@
 | `LM170` | reserved | Код зарезервирован параллельной spring-работой | Не использовать вне назначенного контракта | reserved |
 | `LM171` | reserved | Код зарезервирован параллельной spring-работой | Не использовать вне назначенного контракта | reserved |
 | `LM172` | compositor value error | Некорректный абсолютный бюджет ошибки реконструкции | Передать положительный конечный maxValueError в единицах numeric from/to | active |
+| `LM173` | animate layout | Опция layout:'project' передана без зарегистрированного surface-роутера: базовый фасад намеренно не тащит full-capability граф Future Layout | Импортировать '@labpics/motion/animate/layout' один раз на приложение | active |

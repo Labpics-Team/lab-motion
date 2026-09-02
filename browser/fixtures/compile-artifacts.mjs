@@ -27,6 +27,9 @@ const OUT = resolve(ROOT, 'browser', '.artifacts');
 const TMP = resolve(OUT, '.tmp');
 
 const ALIAS = {
+  // Длинный субпуть первым: rollup-аляс матчит по границе иначе схлопнет
+  // '@labpics/motion/animate/layout' в короткий ключ.
+  '@labpics/motion/animate/layout': resolve(DIST, 'animate/layout/index.js'),
   '@labpics/motion/nano': resolve(DIST, 'nano/index.js'),
   '@labpics/motion/compiler/runtime': resolve(DIST, 'compiler/runtime/index.js'),
   '@labpics/motion/animate': resolve(DIST, 'animate/index.js'),
@@ -41,6 +44,14 @@ export function play(el) { return animate(el, { opacity: 0.5 }); }`;
 // финал (ширина, стили движка, отсутствие residual-стилей) через DOM, без
 // чтения возвращаемого значения.
 const SURFACE_FIXTURE = `import { animate } from '@labpics/motion/animate';
+export function play(el) { animate(el, { width: [240, 360] }, { layout: 'project' }); }
+export function playList(list) { animate(list, { width: [240, 360] }, { layout: 'project' }); }`;
+// Runtime-ветка (uncompiled) — контракт opt-in маршрутизатора: без регистрации
+// './animate/layout' layout:'project' отказывается типизированным LM173.
+// Compiled-ветка этот импорт не несёт: executor заменяет вызов ещё до того,
+// как seed-модули роутера стали бы graph-входами.
+const SURFACE_RUNTIME_FIXTURE = `import { animate } from '@labpics/motion/animate';
+import '@labpics/motion/animate/layout';
 export function play(el) { animate(el, { width: [240, 360] }, { layout: 'project' }); }
 export function playList(list) { animate(list, { width: [240, 360] }, { layout: 'project' }); }`;
 // Return-форма обязана остаться не-lowered — positive control границы
@@ -88,7 +99,7 @@ export default async function globalSetup() {
     const compiled = await bundle(motionCompiler, NANO_FIXTURE, true);
     const uncompiled = await bundle(motionCompiler, NANO_FIXTURE, false);
     const surfaceCompiled = await bundle(motionCompiler, SURFACE_FIXTURE, true);
-    const surfaceUncompiled = await bundle(motionCompiler, SURFACE_FIXTURE, false);
+    const surfaceUncompiled = await bundle(motionCompiler, SURFACE_RUNTIME_FIXTURE, false);
     // Санити globalSetup: бандлы самодостаточны (браузер грузит их как есть) и
     // несут ожидаемую форму — иначе спека упала бы позже с мутным import-сбоем.
     assertSelfContained(compiled, 'nano compiled');

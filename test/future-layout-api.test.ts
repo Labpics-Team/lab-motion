@@ -16,6 +16,7 @@
  */
 
 import { describe, expect, it } from 'vitest';
+import '../src/animate/layout/index.js';
 import * as animateMod from '../src/animate/index.js';
 import { MotionParamError } from '../src/errors.js';
 import { fakeEl, makeClock, pickAnimate } from './animate-facade-helpers.js';

@@ -109,7 +109,16 @@ export const SUBPATH_GATE_BYTES = 4608;
 // типизированную LM168 вместо молчаливого no-op (+stop=cancel). Ужимать до
 // подъёма нечего: каждый байт — закон контракта (изоляция документов,
 // типизированная ошибка). Факт 15 552 B gz; люфт ~0.3% — тот же класс.
-export const FULL_ANIMATE_GATE_BYTES = 15_600;
+// 2026-09-02 (первое СНИЖЕНИЕ рэтчета): 15 600 → 12 000 — Future Layout стал
+// opt-in субпутём ./animate/layout: базовый фасад делегирует layout:'project'
+// через surface-router seam, не тащит граф transaction/artifact/coordinator/
+// observer (~58 KB source) в consumer-бандл. Типовой one-liner дешевеет с
+// 15 520 до 11 965 B gz (−23%); потребитель layout:'project' платит только
+// отдельный субпуть за ту же capability, без переноса стоимости в ядро.
+// Контрактная деградация отсутствует: без регистрации LM173 (typed, не silent).
+// Shipped-замыкание 11 685 B gz; люфт ~0.3% — прежний класс рэтчета, теперь
+// вниз.
+export const FULL_ANIMATE_GATE_BYTES = 12_000;
 
 // Consumer-rebundle ядра после стабильных кодов ошибок и изоляции listener-
 // сбоев. Физический shipped-граф при этом уменьшился и по-прежнему ограничен
@@ -158,7 +167,9 @@ export const COMPOSITOR_CAPABILITY_GATE_BYTES = 6600;
 // pseudo-tree представления (adversarial BLOCKER), см. третий шаг
 // FULL_ANIMATE_GATE_BYTES. Факт 17 410 B gz; люфт ~0.5% по той же причине
 // хрупкости 32KB-окна gzip. Подъём по делегации Даниила.
-export const ANIMATE_COMPOSITOR_MIXED_GATE_BYTES = 17_500;
+// 2026-09-02: 17 500 → 12 640 — future-layout opt-in (см. FULL_ANIMATE_GATE_BYTES).
+// Факт 12 581 B gz; люфт ~0.5% — тот же класс, вниз.
+export const ANIMATE_COMPOSITOR_MIXED_GATE_BYTES = 12_640;
 
 // Точечные (bespoke) пороги субпутей — жёстче общего SUBPATH_GATE_BYTES там, где
 // это осмысленно. ./utils — семь чистых скалярных примитивов + сегментный движок;
@@ -246,6 +257,11 @@ export const BESPOKE_SUBPATH_GATES = {
   //   ./compositor: порог ОТ ФАКТА, не суммой хотелок). Поднимать только
   //   осознанно; сам этот подъём — часть переноса PR#79, подсвечен в PR.
   './presets': 5600,
+  // Opt-in субпуть Future Layout (2026-09-02): регистрирует Surface-роутер
+  // фасада. sideEffects-запись защищает от tree-shake; shipped-замыкание несёт
+  // transaction/artifact/coordinator/observer целиком, как раньше нёс ./animate.
+  // Факт 5 800 B gz; люфт ~0.5% — рэтчет от факта, не общий зонт 4608.
+  './animate/layout': 5830,
   // ./animate — одно-строчный DOM-фасад. Порог выше
   // общего 4608 НЕ потому, что фасад «раздут», а потому, что при splitting:false
   // самодостаточный субпуть НЕСЁТ КОПИИ композируемых подсистем (общий порог
