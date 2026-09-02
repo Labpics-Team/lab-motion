@@ -3,191 +3,190 @@ name: CI
 on:
   push:
     branches: ["main"]
-   pull_request:
+  pull_request:
     branches: ["main"]
-  merg e_group:
+  merge_group:
   workflow_dispatch:
 
 permissions:
-   contents: read
+  contents: read
 
 concurrency:
-  group: ci-${{  github.workflow }}-${{ github.event.pull_req uest.number || github.ref }}
-  # push в main  не отменяем: каждый merge-к оммит обязан получить за вершённый
-  # прогон (инач е красный промежуточный  main живёт незамеченным, bis ect ломается).
-  cancel-in-progress:  ${{ github.ref != 'refs/heads/main' }}
+  group: ci-${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
+  # push в main не отменяем: каждый merge-коммит обязан получить завершённый
+  # прогон (иначе красный промежуточный main живёт незамеченным, bisect ломается).
+  cancel-in-progress: ${{ github.ref != 'refs/heads/main' }}
 
 env:
-   COREPACK_ENABLE_DOWNLOAD_PROMPT: "0"
-  CORE PACK_DEFAULT_TO_LATEST: "0"
+  COREPACK_ENABLE_DOWNLOAD_PROMPT: "0"
+  COREPACK_DEFAULT_TO_LATEST: "0"
 
 jobs:
   verify:
-     name: typecheck · build · test · fuzz  · size · package
+    name: typecheck · build · test · fuzz · size · package
     runs-on: ubuntu-latest
-     timeout-minutes: 25
-
-    steps:
-      - na me: Checkout
-        uses: actions/checkout@3 d3c42e5aac5ba805825da76410c181273ba90b1 # v7
-         with:
-          persist-credentials:  false
-          # docs-facts сверяет � �айты с immutable ревизией за  пределами HEAD.
-          fetch-dept h: 0
-
-      # Бинарник и его dige st зафиксированы, чтобы в� �лидация workflow не зависел� � от mutable action.
-      - name: GitHub A ctions contract
-        shell: bash
-        e nv:
-          ACTIONLINT_VERSION: 1.7.12
-           ACTIONLINT_ARCHIVE_SHA256: 8aca8db96f1b 94770f1b0d72b6dddcb1ebb8123cb3712530b08cc387b 349a3d8
-        run: |
-          archive="$RU NNER_TEMP/actionlint.tar.gz"
-          instal l_dir="$RUNNER_TEMP/actionlint"
-          cur l --proto '=https' --tlsv1.2 --fail --locatio n --silent --show-error \
-            "https: //github.com/rhysd/actionlint/releases/downlo ad/v${ACTIONLINT_VERSION}/actionlint_${ACTION LINT_VERSION}_linux_amd64.tar.gz" \
-             --output "$archive"
-          printf '%s   %s\n' "$ACTIONLINT_ARCHIVE_SHA256" "$archive"  | sha256sum --check --status -
-          mkd ir "$install_dir"
-          tar -xzf "$archiv e" -C "$install_dir"
-          "$install_dir/ actionlint"
-
-      - name: Setup Node
-         uses: actions/setup-node@820762786026740c76f 36085b0efc47a31fe5020 # v6
-        with:
-           node-version: "24"
-
-      - name: Activ ate pinned pnpm
-        run: |
-          core pack enable
-          corepack install --glob al pnpm@11.11.0
-
-      - name: Install depend encies
-        run: pnpm install --frozen-loc kfile
-
-      - name: Static contract
-         run: pnpm check:static
-
-      # Нативн� �й TypeScript — обязательный m erge-гейт (бриф D3), но отдел� �ным
-      # шагом, а не внут� �и check:static: его отказ долж� �н быть виден как свой
-       # красный чек, а release.yml зо вёт check:static и не обязан за висеть от
-      # preview-компи� �ятора. Согласованность � �ага с package.json стережёт
-       # check:native-gate — выпадение  native-скрипта из CI ловится  тестом.
-      - name: Native typecheck  (TS7)
-        run: pnpm typecheck:native
-
-       - name: Build
-        run: pnpm build
-
-       - name: Factual documentation drift
-         run: node scripts/check-docs-facts.mjs
-
-       - name: Structural documentation drift
-         run: node scripts/check-docs-drift.mjs
-
-       - name: Repository issue forms contract 
-        run: node scripts/check-issue-forms. mjs
-
-      - name: Release contract smoke
-         shell: bash
-        run: |
-          ver sion="$(node -p "require('./package.json').ve rsion")"
-          node scripts/check-release .mjs "v${version}" --validate-stored-date
-
-       - name: Vitest
-        id: vitest
-         shell: bash
-        run: |
-          set +e
-           pnpm vitest run 2>&1 | tee vitest.l og
-          status=${PIPESTATUS[0]}
-           exit "$status"
-
-      - name: Upload Vitest  diagnostics
-        if: steps.vitest.outcome  == 'failure'
-        uses: actions/upload-ar tifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a 0a # v7
-        with:
-          name: vitest- diagnostics-${{ github.run_id }}
-          pa th: vitest.log
-          if-no-files-found: e rror
-          retention-days: 7
-
-      # Г� �об вместо ручного списк� �: новый test/*-finiteness-fuzz.test.ts  попадает в
-      # гейт авто матически (класс дрейфа � �забытый файл в трёх копи ях списка» закрыт;
-      # н� �ходка ревью #101 — потеря  projection-fuzz при наивном раз� �ешении конфликта).
-      - na me: Fuzz · finiteness gate (virtual-time, se eded LCG, zero-dep)
-        run: pnpm vitest  run --reporter=verbose test/*finiteness-fuzz. test.ts
-
-      - name: Size gate
-        run:  pnpm size
-
-      - name: Pack smoke
-         run: pnpm pack:smoke
-
-      - name: Consumer  compatibility
-        run: pnpm pack:compat
-
-       # Приёмка компиляторн ого среза (#208): реальный Vi te-build fixture'а с
-      # плагино м и без — доказывает эли� �инацию solver/parser/compiler из б� �ндла
-      # потребителя и � �трого меньший вес. dist уж� � собран шагом Build выше.
-       - name: Compiler lowering acceptance
-         run: pnpm acceptance:compiler
-
-      # Exa ct Node-floor job не может запус� �ать pnpm 11 (его собственны� � floor
-      # выше потребител ьского). Собираем кандид� �т на Node 24 и передаём байт ы.
-      - name: Pack Node-floor candidate
-         run: |
-          mkdir node-floor-arti fact
-          pnpm pack --pack-destination n ode-floor-artifact
-
-      - name: Upload Node -floor candidate
-        uses: actions/upload -artifact@043fb46d1a93c77aae656e7c1c64a875d1f c6a0a # v7
-        with:
-          name: node -floor-package-${{ github.sha }}-${{ github.r un_id }}
-          path: node-floor-artifact/ *.tgz
-          if-no-files-found: error
-           retention-days: 1
-          compression -level: 0
-          overwrite: false
-
-  node- floor:
-    name: consumer contract · Node ${ { matrix.node }}
-    needs: [verify]
-    runs -on: self-hosted
-    timeout-minutes: 20
-     strategy:
-      fail-fast: false
-      matrix :
-        node: ["22.0.0", "24"]
-
-    permiss ions:
-      actions: read
-      contents: rea d
+    timeout-minutes: 25
 
     steps:
       - name: Checkout
-         uses: actions/checkout@3d3c42e5aac5ba805825da 76410c181273ba90b1 # v7
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
         with:
-           persist-credentials: false
+          persist-credentials: false
+          # docs-facts сверяет байты с immutable ревизией за пределами HEAD.
+          fetch-depth: 0
 
-      - name:  Setup Node
-        uses: actions/setup-node@8 20762786026740c76f36085b0efc47a31fe5020 # v6
-         with:
-          node-version: ${{ mat rix.node }}
-
-      - name: Download Node-floo r candidate
-        uses: actions/download-ar tifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e 7c # v8
-        with:
-          name: node-fl oor-package-${{ github.sha }}-${{ github.run_ id }}
-          path: node-floor-artifact
-           digest-mismatch: error
-
-      - name:  Exact runtime consumer smoke
-        shell: b ash
+      # Бинарник и его digest зафиксированы, чтобы валидация workflow не зависела от mutable action.
+      - name: GitHub Actions contract
+        shell: bash
+        env:
+          ACTIONLINT_VERSION: 1.7.12
+          ACTIONLINT_ARCHIVE_SHA256: 8aca8db96f1b94770f1b0d72b6dddcb1ebb8123cb3712530b08cc387b349a3d8
         run: |
-          shopt -s nullglo b
-          archives=(node-floor-artifact/*.t gz)
+          archive="$RUNNER_TEMP/actionlint.tar.gz"
+          install_dir="$RUNNER_TEMP/actionlint"
+          curl --proto '=https' --tlsv1.2 --fail --location --silent --show-error \
+            "https://github.com/rhysd/actionlint/releases/download/v${ACTIONLINT_VERSION}/actionlint_${ACTIONLINT_VERSION}_linux_amd64.tar.gz" \
+            --output "$archive"
+          printf '%s  %s\n' "$ACTIONLINT_ARCHIVE_SHA256" "$archive" | sha256sum --check --status -
+          mkdir "$install_dir"
+          tar -xzf "$archive" -C "$install_dir"
+          "$install_dir/actionlint"
+
+      - name: Setup Node
+        uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v6
+        with:
+          node-version: "24"
+
+      - name: Activate pinned pnpm
+        run: |
+          corepack enable
+          corepack install --global pnpm@11.11.0
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Static contract
+        run: pnpm check:static
+
+      # Нативный TypeScript — обязательный merge-гейт (бриф D3), но отдельным
+      # шагом, а не внутри check:static: его отказ должен быть виден как свой
+      # красный чек, а release.yml зовёт check:static и не обязан зависеть от
+      # preview-компилятора. Согласованность шага с package.json стережёт
+      # check:native-gate — выпадение native-скрипта из CI ловится тестом.
+      - name: Native typecheck (TS7)
+        run: pnpm typecheck:native
+
+      - name: Build
+        run: pnpm build
+
+      - name: Factual documentation drift
+        run: node scripts/check-docs-facts.mjs
+
+      - name: Structural documentation drift
+        run: node scripts/check-docs-drift.mjs
+
+      - name: Repository issue forms contract
+        run: node scripts/check-issue-forms.mjs
+
+      - name: Release contract smoke
+        shell: bash
+        run: |
+          version="$(node -p "require('./package.json').version")"
+          node scripts/check-release.mjs "v${version}" --validate-stored-date
+
+      - name: Vitest
+        id: vitest
+        shell: bash
+        run: |
+          set +e
+          pnpm vitest run 2>&1 | tee vitest.log
+          status=${PIPESTATUS[0]}
+          exit "$status"
+
+      - name: Upload Vitest diagnostics
+        if: steps.vitest.outcome == 'failure'
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
+        with:
+          name: vitest-diagnostics-${{ github.run_id }}
+          path: vitest.log
+          if-no-files-found: error
+          retention-days: 7
+
+      # Глоб вместо ручного списка: новый test/*-finiteness-fuzz.test.ts попадает в
+      # гейт автоматически (класс дрейфа «забытый файл в трёх копиях списка» закрыт;
+      # находка ревью #101 — потеря projection-fuzz при наивном разрешении конфликта).
+      - name: Fuzz · finiteness gate (virtual-time, seeded LCG, zero-dep)
+        run: pnpm vitest run --reporter=verbose test/*finiteness-fuzz.test.ts
+
+      - name: Size gate
+        run: pnpm size
+
+      - name: Pack smoke
+        run: pnpm pack:smoke
+
+      - name: Consumer compatibility
+        run: pnpm pack:compat
+
+      # Приёмка компиляторного среза (#208): реальный Vite-build fixture'а с
+      # плагином и без — доказывает элиминацию solver/parser/compiler из бандла
+      # потребителя и строго меньший вес. dist уже собран шагом Build выше.
+      - name: Compiler lowering acceptance
+        run: pnpm acceptance:compiler
+
+      # Exact Node-floor job не может запускать pnpm 11 (его собственный floor
+      # выше потребительского). Собираем кандидат на Node 24 и передаём байты.
+      - name: Pack Node-floor candidate
+        run: |
+          mkdir node-floor-artifact
+          pnpm pack --pack-destination node-floor-artifact
+
+      - name: Upload Node-floor candidate
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
+        with:
+          name: node-floor-package-${{ github.sha }}-${{ github.run_id }}
+          path: node-floor-artifact/*.tgz
+          if-no-files-found: error
+          retention-days: 1
+          compression-level: 0
+          overwrite: false
+
+  node-floor:
+    name: consumer contract · Node ${{ matrix.node }}
+    needs: [verify]
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    strategy:
+      fail-fast: false
+      matrix:
+        node: ["22.0.0", "24"]
+
+    permissions:
+      actions: read
+      contents: read
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          persist-credentials: false
+
+      - name: Setup Node
+        uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v6
+        with:
+          node-version: ${{ matrix.node }}
+
+      - name: Download Node-floor candidate
+        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8
+        with:
+          name: node-floor-package-${{ github.sha }}-${{ github.run_id }}
+          path: node-floor-artifact
+          digest-mismatch: error
+
+      - name: Exact runtime consumer smoke
+        shell: bash
+        run: |
+          shopt -s nullglob
+          archives=(node-floor-artifact/*.tgz)
           [[ ${#archives[@]} -eq 1 ]] \
-             || { echo "::error::ожидалс я ровно один tgz, найдено: $ {#archives[@]}"; exit 1; }
-          node scr ipts/pack-smoke.mjs "${archives[0]}"
- 
+            || { echo "::error::ожидался ровно один tgz, найдено: ${#archives[@]}"; exit 1; }
+          node scripts/pack-smoke.mjs "${archives[0]}"
