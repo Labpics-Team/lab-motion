@@ -44,10 +44,7 @@ import {
   type SpringExecutionArtifactTuple,
 } from '../compositor/curve.js';
 import { MotionParamError } from '../errors.js';
-import {
-  tryRouteSurfaceTransition,
-  type SurfaceRouteControls,
-} from '../future-layout/route.js';
+import type { SurfaceRouteControls } from '../future-layout/route.js';
 import {
   DEFAULT_DURATION_MS,
   DEFAULT_SPRING,
@@ -76,6 +73,7 @@ import {
   type RequestFrameFn,
 } from './main-unit.js';
 import { surfaceBatchFor, type SurfaceBatch } from './surface-batch.js';
+import { routeSurface } from './surface-router.js';
 import {
   collectBoundedArrayLike,
   requireAnimateOptions,
@@ -346,14 +344,15 @@ export function animate(
   props: AnimateProps,
   options: AnimateOptions = {},
 ): AnimateControls {
-  // Future Layout (явный layout:'project'): консервативный маршрутизатор —
-  // сомнение оставляет обычный runtime path без подмены семантики.
-  const surfaceRoute: SurfaceRouteControls | undefined = tryRouteSurfaceTransition(
+  // Future Layout (явный layout:'project'): роутер регистрируется субпутём
+  // ./animate/layout; сомнение оставляет обычный runtime path без подмены
+  // семантики, а отсутствие регистрации — типизированный LM173.
+  const surface: SurfaceRouteControls | undefined = routeSurface(
     target,
     props as unknown as Record<string, unknown>,
-    options as unknown as Record<string, unknown>,
+    options,
   );
-  if (surfaceRoute !== undefined) return surfaceRoute;
+  if (surface !== undefined) return surface;
 
   // 1. Options — первая граница: остальные входы могут быть hostile getters.
   options = requireAnimateOptions(options);

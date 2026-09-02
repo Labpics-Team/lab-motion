@@ -111,11 +111,11 @@ pnpm site:preview   # отдаёт site/dist на локальном серве�
 ## Карта пакета
 
 Импорт — `@labpics/motion` (ядро) или `@labpics/motion/<субпуть>`.
-Корневой экспорт + 41 субпутей (входов `exports` в `package.json` — 42):
+Корневой экспорт + 42 субпутей (входов `exports` в `package.json` — 43):
 
 | Группа | Субпути |
 | --- | --- |
-| Ядро анимации | `./nano` (WAAPI ≤ 1 КБ), `./animate` (one-liner фасад), `./frame`, `./driver`, `./compositor`, `./compositor/stagger`, `./waapi`, `./auto` |
+| Ядро анимации | `./nano` (WAAPI ≤ 1 КБ), `./animate` (one-liner фасад), `./animate/layout` (opt-in Future Layout), `./frame`, `./driver`, `./compositor`, `./compositor/stagger`, `./waapi`, `./auto` |
 | Значения и физика | `./value`, `./spring`, `./decay`, `./easing`, `./keyframes`, `./stagger`, `./timeline`, `./presets`, `./tokens`, `./utils` |
 | Доменные эффекты | `./flip`, `./projection`, `./smart`, `./gestures`, `./behaviors`, `./scroll`, `./in-view`, `./presence`, `./svg`, `./svg-morph`, `./a11y`, `./surface` (приватный executor compiled-поверхности) |
 | Биндинги | `./react`, `./preact`, `./vue`, `./svelte`, `./solid`, `./angular`, `./qwik`, `./lit`, `./wc` |
@@ -200,7 +200,7 @@ springFromDurationBounce(0.35, 0); // восприятие (duration, bounce) �
 | Раздел | Что внутри |
 | --- | --- |
 | [Рецепты](docs/recipes.md) | Runnable-интеграции: drag, FLIP, presence, скролл, bottom sheet |
-| [Справочник API](docs/api.md) | Все 41 субпуть: что даёт каждый вход |
+| [Справочник API](docs/api.md) | Все 42 субпути: что даёт каждый вход |
 | [Архитектура](docs/architecture.md) | Слои движка, фазовая модель, инварианты, отвергнутые пути |
 | [Compositor](docs/compositor.md) | WAAPI-план, ретаргет, хендофф, fallback-матрица, поддержка браузеров |
 | [Projection](docs/projection.md) | Вложенный FLIP: дерево узлов, C¹-перехваты, не-цели v1 |

@@ -58,6 +58,9 @@ function metadata() {
       './dist/lit/index.cjs',
       './dist/wc/index.js',
       './dist/wc/index.cjs',
+      './dist/animate/layout/index.js',
+      './dist/animate/layout/index.cjs',
+      './src/animate/layout/index.ts',
     ],
     scripts: { build: 'tsup' },
     peerDependencies: {

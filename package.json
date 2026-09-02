@@ -426,6 +426,16 @@
         "default": "./dist/nano/index.cjs"
       }
     },
+    "./animate/layout": {
+      "import": {
+        "types": "./dist/animate/layout/index.d.ts",
+        "default": "./dist/animate/layout/index.js"
+      },
+      "require": {
+        "types": "./dist/animate/layout/index.d.cts",
+        "default": "./dist/animate/layout/index.cjs"
+      }
+    },
     "./compiler/vite": {
       "import": {
         "types": "./dist/compiler/vite/index.d.ts",
@@ -481,7 +491,10 @@
     "./dist/lit/index.js",
     "./dist/lit/index.cjs",
     "./dist/wc/index.js",
-    "./dist/wc/index.cjs"
+    "./dist/wc/index.cjs",
+    "./dist/animate/layout/index.js",
+    "./dist/animate/layout/index.cjs",
+    "./src/animate/layout/index.ts"
   ],
   "scripts": {
     "build": "tsup && node scripts/emit-declarations.mjs",

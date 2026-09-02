@@ -15,6 +15,7 @@
  */
 
 import { describe, expect, it } from 'vitest';
+import '../src/animate/layout/index.js';
 import * as animateMod from '../src/animate/index.js';
 import * as surface from '../src/future-layout/index.js';
 import { makeClock, pickAnimate } from './animate-facade-helpers.js';
