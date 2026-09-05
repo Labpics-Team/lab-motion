@@ -4,7 +4,7 @@ on:
   workflow_dispatch:
     inputs:
       version:
-        description: "Версия x.y.z — тег v<version> будет создан из HEAD main"
+        description: "Версия x.y.z — новый тег из HEAD main; rerun проверяет существующий тег"
         required: true
         type: string
 
@@ -36,6 +36,7 @@ jobs:
     steps:
       - name: Resolve and validate version
         id: resolve
+        shell: bash
         env:
           INPUT_VERSION: ${{ inputs.version }}
           GH_TOKEN: ${{ github.token }}
@@ -72,10 +73,13 @@ jobs:
               echo "::warning::$RELEASE_TAG уже существует на $TAG_SOURCE_SHA; релиз сверяется с тегом вместо HEAD main $GITHUB_SHA"
             fi
             SOURCE_SHA="$TAG_SOURCE_SHA"
+            RELEASE_DATE=--validate-stored-date
+          else
+            RELEASE_DATE=$(date -u +%F)
           fi
           {
             echo "release_tag=$RELEASE_TAG"
-            echo "release_date=$(date -u +%F)"
+            echo "release_date=$RELEASE_DATE"
             echo "version=$VERSION"
             echo "source_sha=$SOURCE_SHA"
           } >> "$GITHUB_OUTPUT"
@@ -94,6 +98,8 @@ jobs:
       RELEASE_TAG: ${{ needs.resolve.outputs.release_tag }}
       RELEASE_DATE: ${{ needs.resolve.outputs.release_date }}
       EXPECTED_SOURCE_SHA: ${{ needs.resolve.outputs.source_sha }}
+      # v0.3.0 первым содержит полный protocol нынешнего verify-job.
+      RELEASE_REPLAY_PROTOCOL_BASE: 851a37c9ff53beb3f46f466c0d1f1e92130fb46d
     outputs:
       source_sha: ${{ steps.source.outputs.source_sha }}
       artifact_name: ${{ steps.source.outputs.artifact_name }}
@@ -111,6 +117,22 @@ jobs:
           fetch-depth: 0
           persist-credentials: false
 
+      # Проверяем source и совместимость protocol до setup/install/build.
+      - name: Verify release source
+        id: source
+        shell: bash
+        run: |
+          git fetch origin main --quiet
+          SOURCE_SHA=$(git rev-parse HEAD)
+          [[ "$SOURCE_SHA" == "$EXPECTED_SOURCE_SHA" ]] \
+            || { echo "::error::извлечён $SOURCE_SHA вместо ожидаемого $EXPECTED_SOURCE_SHA"; exit 1; }
+          git merge-base --is-ancestor "$SOURCE_SHA" origin/main \
+            || { echo "::error::релизный коммит находится вне main"; exit 1; }
+          git merge-base --is-ancestor "$RELEASE_REPLAY_PROTOCOL_BASE" "$SOURCE_SHA" \
+            || { echo "::error::$RELEASE_TAG использует неподдерживаемый release protocol до v0.3.0; текущий workflow не пересобирает, не переподписывает и не публикует этот исторический тег"; exit 1; }
+          echo "source_sha=$SOURCE_SHA" >> "$GITHUB_OUTPUT"
+          echo "artifact_name=npm-package-$SOURCE_SHA-$GITHUB_RUN_ID-$GITHUB_RUN_ATTEMPT" >> "$GITHUB_OUTPUT"
+
       - name: Setup Node
         uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
         with:
@@ -121,19 +143,6 @@ jobs:
         run: |
           corepack enable
           corepack install --global pnpm@11.11.0
-
-      # Проверяем фактически извлечённый коммит до появления релизного тега.
-      - name: Verify release source
-        id: source
-        run: |
-          git fetch origin main --quiet
-          SOURCE_SHA=$(git rev-parse HEAD)
-          [[ "$SOURCE_SHA" == "$EXPECTED_SOURCE_SHA" ]] \
-            || { echo "::error::извлечён $SOURCE_SHA вместо ожидаемого $EXPECTED_SOURCE_SHA"; exit 1; }
-          git merge-base --is-ancestor "$SOURCE_SHA" origin/main \
-            || { echo "::error::релизный коммит находится вне main"; exit 1; }
-          echo "source_sha=$SOURCE_SHA" >> "$GITHUB_OUTPUT"
-          echo "artifact_name=npm-package-$SOURCE_SHA-$GITHUB_RUN_ID-$GITHUB_RUN_ATTEMPT" >> "$GITHUB_OUTPUT"
 
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
