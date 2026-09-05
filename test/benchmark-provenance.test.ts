@@ -24,6 +24,7 @@ import {
   readCheckoutState,
   revisionFingerprint,
   sha256File,
+  sha256Bytes,
 } from '../bench/compare/provenance.mjs';
 
 vi.mock('node:child_process', async (importOriginal) => {
@@ -209,6 +210,17 @@ describe('benchmark provenance', { timeout: 30_000 }, () => {
     expect(canonical).toBe('6c85545764a91d47528b8eb7f790ee2525371bfb9341e8d8c8c42f31c8b39ae0');
     expect(state.trackedRevisionSha256).toBe(canonical);
     expect(() => prepareBenchmarkCheckout({ ...f.prepare, build() {} })).not.toThrow();
+  });
+
+  it('captures canonical input hashes from a verified CRLF checkout', () => {
+    const f = checkoutFixture(true);
+    const prepared = prepareBenchmarkCheckout({ ...f.prepare, build() {} });
+    expect(readFileSync(path.join(f.root, 'package.json'), 'utf8')).toContain('\r\n');
+    const canonical = sha256Bytes(Buffer.from(f.git(['show', 'HEAD:package.json'])));
+    expect(prepared.worktreeSha256).toBe(prepared.trackedRevisionSha256);
+    expect(prepared.inputs['root/package.json']).toBe(canonical);
+    expect(prepared.inputs['bench/package.json']).toBe(canonical);
+    expect(canonical).not.toBe(sha256File(path.join(f.root, 'package.json')));
   });
 
   it.each(['build', 'run'])('rejects hidden source mutations after %s', (phase) => {

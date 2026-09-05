@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { execFileSync } from 'node:child_process';
-import { cpSync, existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync } from 'node:fs';
+import { cpSync, existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { dirname, join, resolve } from 'node:path';
 import { pathToFileURL } from 'node:url';
@@ -36,6 +36,7 @@ import {
   validateBenchmarkReportForPublication,
 } from '../bench/compare/report-contract.mjs';
 import { S5_MOTION_CONTRACT } from '../bench/compare/motion-conformance.mjs';
+import { revisionFingerprint, sha256Bytes } from '../bench/compare/provenance.mjs';
 
 const START = ['lab', 'motion', 'gsap', 'anime'];
 const FREEZE = [
@@ -476,8 +477,240 @@ function motionFixture() {
   for (const id of FREEZE) {
     report.payload.results[id].raw.freeze = Array.from({ length: 8 }, () => motionFreezeRun(id));
   }
-  return refreshMotionReport(report);
+  return { ...refreshMotionReport(report), revisionInputs: structuredClone(report.payload.provenance.inputs) };
 }
+
+const REVISION_INPUTS = {
+  'root/package.json': 'package.json',
+  'root/pnpm-lock.yaml': 'pnpm-lock.yaml',
+  'root/pnpm-workspace.yaml': 'pnpm-workspace.yaml',
+  'root/scripts/compression-policy.mjs': 'scripts/compression-policy.mjs',
+  'root/scripts/compression-oracle.mjs': 'scripts/compression-oracle.mjs',
+  'bench/package.json': 'bench/compare/package.json',
+  'bench/pnpm-lock.yaml': 'bench/compare/pnpm-lock.yaml',
+  'bench/pnpm-workspace.yaml': 'bench/compare/pnpm-workspace.yaml',
+  'bench/bench.mjs': 'bench/compare/bench.mjs',
+  'bench/methodology.mjs': 'bench/compare/methodology.mjs',
+  'bench/provenance.mjs': 'bench/compare/provenance.mjs',
+  'bench/report-contract.mjs': 'bench/compare/report-contract.mjs',
+  'bench/motion-conformance.mjs': 'bench/compare/motion-conformance.mjs',
+  'bench/input-manifest.mjs': 'bench/compare/input-manifest.mjs',
+  ...Object.fromEntries([
+    'lab', 'motion', 'gsap', 'anime', 'waapi-control', 'lab-spring', 'motion-mini', 'anime-waapi',
+  ].map((name) => [`bench/entries/${name}.entry.mjs`, `bench/compare/entries/${name}.entry.mjs`])),
+};
+
+function withRevisionReport(run: (fixture: {
+  report: ReturnType<typeof motionFixture>;
+  root: string;
+  git: (args: string[]) => Buffer;
+  verify: () => void;
+  verifyPublication: () => void;
+  verifyRevision: () => void;
+}) => void, { absent = [], nonRegular }: { absent?: string[]; nonRegular?: string } = {}) {
+  const root = mkdtempSync(join(tmpdir(), 'lab-motion-report-inputs-'));
+  try {
+    const report = motionFixture();
+    const files = [...Object.values(REVISION_INPUTS), 'scripts/check-docs-facts.mjs', 'scripts/git-path-list.mjs'];
+    for (const file of files) {
+      if (absent.includes(file)) continue;
+      mkdirSync(dirname(join(root, file)), { recursive: true });
+      cpSync(resolve(file), join(root, file));
+    }
+    const packageMetadata = { ...report.rootPackage, repository: { url: 'git+https://github.com/Labpics-Team/lab-motion.git' } };
+    writeFileSync(join(root, 'package.json'), JSON.stringify(packageMetadata));
+    writeFileSync(join(root, 'bench/compare/package.json'), JSON.stringify(report.benchmarkPackage));
+    writeFileSync(join(root, 'README.md'), 'pnpm add @labpics/motion\n');
+    mkdirSync(join(root, 'docs'));
+    writeFileSync(join(root, 'docs/benchmark.md'), benchmarkNoReportStatement(packageMetadata));
+    const env = Object.fromEntries(Object.entries(process.env).filter(([key]) => !key.startsWith('GIT_')));
+    Object.assign(env, {
+      GIT_CONFIG_GLOBAL: join(root, 'no-global-config'), GIT_CONFIG_SYSTEM: join(root, 'no-system-config'),
+      GIT_CONFIG_NOSYSTEM: '1', GIT_ATTR_NOSYSTEM: '1', GIT_TEMPLATE_DIR: join(root, 'no-template'),
+    });
+    const git = (args: string[]) => execFileSync('git', ['--no-replace-objects', ...args], {
+      cwd: root, env, stdio: ['ignore', 'pipe', 'pipe'], timeout: 10_000,
+    });
+    git(['init', '--quiet']);
+    git(['config', 'core.autocrlf', 'false']);
+    git(['add', '.']);
+    if (nonRegular !== undefined) {
+      const object = git(['hash-object', nonRegular]).toString().trim();
+      git(['update-index', '--cacheinfo', `120000,${object},${nonRegular}`]);
+    }
+    git(['-c', 'user.name=Benchmark fixture', '-c', 'user.email=benchmark@example.invalid',
+      '-c', `core.hooksPath=${join(root, 'no-hooks')}`, 'commit', '--quiet', '-m', 'report inputs']);
+    const revision = git(['rev-parse', 'HEAD']).toString().trim();
+    const provenance = report.payload.provenance;
+    Object.assign(provenance, {
+      revision, shortRevision: revision.slice(0, 12), revisionLabel: revision.slice(0, 12),
+      worktreeSha256: revisionFingerprint(root, revision),
+      inputs: Object.fromEntries(Object.entries(REVISION_INPUTS).filter(([, file]) => !absent.includes(file))
+        .map(([label, file]) => [label, sha256Bytes(git(['show', `${revision}:${file}`]))])),
+    });
+    report.payload.generatedAt = new Date().toISOString();
+    report.now = Date.parse(report.payload.generatedAt);
+    report.stem = `${report.payload.generatedAt.slice(0, 10)}-${provenance.shortRevision}-${provenance.distRuntime.sha256.slice(0, 12)}`;
+    report.payload.companion.markdownFile = `${report.stem}.md`;
+    mkdirSync(join(root, 'bench/compare/results'));
+    writeFileSync(join(root, 'docs/benchmark.md'), `https://github.com/Labpics-Team/lab-motion/blob/v0.3.0/bench/compare/results/${report.stem}.md`);
+    report.revisionInputs = structuredClone(provenance.inputs);
+    const writePair = () => {
+      report.payload.environment = renderBenchmarkEnvironment(report.payload);
+      renderMotionPair(report);
+      writeFileSync(join(root, `bench/compare/results/${report.stem}.md`), report.markdown);
+      writeFileSync(join(root, `bench/compare/results/${report.stem}.json`), JSON.stringify(report.payload));
+    };
+    const verifyPublication = () => { writePair(); validateBenchmarkReportForPublication(report); };
+    const verifyRevision = () => {
+      writePair();
+      const output = execFileSync(process.execPath, ['scripts/check-docs-facts.mjs'], {
+        cwd: root, env, encoding: 'utf8', stdio: ['ignore', 'pipe', 'pipe'], timeout: 20_000,
+      });
+      expect(output).toContain('docs-facts: check PASS');
+    };
+    const verify = () => { verifyPublication(); verifyRevision(); };
+    run({ report, root, git, verify, verifyPublication, verifyRevision });
+  } finally {
+    rmSync(root, { recursive: true, force: true });
+  }
+}
+
+describe('publication and Git revision input attestation', { timeout: 30_000 }, () => {
+  it('rejects omitted workspace inputs even with canonical Markdown and companion SHA', () => {
+    withRevisionReport(({ report, verify }) => {
+      verify();
+      delete report.payload.provenance.inputs['root/pnpm-workspace.yaml'];
+      delete report.payload.provenance.inputs['bench/pnpm-workspace.yaml'];
+      expect(verify).toThrow();
+    });
+  });
+
+  it.each([
+    'bench/input-manifest.mjs',
+    ...Object.keys(REVISION_INPUTS).filter((label) => label.includes('/entries/')),
+  ])(
+    'rejects a forged %s hash in both publication and revision validators', (label) => {
+    withRevisionReport(({ report, verify, verifyPublication, verifyRevision }) => {
+      verify();
+      report.payload.provenance.inputs[label] = SHA('f');
+      expect(verifyPublication).toThrow(/Git revision/);
+      expect(verifyRevision).toThrow(/Git revision/);
+    });
+  });
+
+  it.each(['root/pnpm-workspace.yaml', 'bench/pnpm-workspace.yaml'].flatMap((label) =>
+    ['omit', 'mismatch'].map((fault) => ({ label, fault }))))('rejects $fault of $label', ({ label, fault }) => {
+    withRevisionReport(({ report, verify, verifyPublication, verifyRevision }) => {
+      verify();
+      if (fault === 'omit') delete report.payload.provenance.inputs[label];
+      else report.payload.provenance.inputs[label] = SHA('f');
+      expect(verifyPublication).toThrow(/Git revision/);
+      expect(verifyRevision).toThrow(/Git revision/);
+    });
+  });
+
+  it('the release reader enforces motion admission, not only revision input hashes', () => {
+    withRevisionReport(({ report, verify, verifyRevision }) => {
+      verify();
+      report.payload.results['motion-mini'].raw.freeze[0].evidence.blocked = freeze25To65();
+      refreshMotionReport(report);
+      expect(verifyRevision).toThrow(/motion-mini.blocked = fail/);
+    });
+  });
+
+  it.each([
+    { label: 'root/pnpm-workspace.yaml', file: 'pnpm-workspace.yaml' },
+    { label: 'bench/pnpm-workspace.yaml', file: 'bench/compare/pnpm-workspace.yaml' },
+  ])('accepts an absent $label only when the declared Git revision also lacks it', ({ label, file }) => {
+    withRevisionReport(({ report, verify, verifyPublication, verifyRevision }) => {
+      verify();
+      report.payload.provenance.inputs[label] = SHA('f');
+      expect(verifyPublication).toThrow(/Git revision/);
+      expect(verifyRevision).toThrow(/Git revision/);
+    }, { absent: [file] });
+  });
+
+  it.each(['absent', 'non-regular'])('rejects an %s required entry in the actual revision', (boundary) => {
+    const file = 'bench/compare/entries/lab.entry.mjs';
+    withRevisionReport(({ report, verifyRevision }) => {
+      report.payload.provenance.inputs['bench/entries/lab.entry.mjs'] = SHA('f');
+      expect(verifyRevision).toThrow(/input bench\/entries\/lab.entry.mjs не является обычным файлом Git revision/);
+    }, boundary === 'absent' ? { absent: [file] } : { nonRegular: file });
+  });
+
+  it('rejects unsupported declared inputs and unsupported revision schemas', () => {
+    withRevisionReport(({ report, verify, verifyPublication, verifyRevision }) => {
+      verify();
+      report.payload.provenance.inputs['bench/unknown-build-input.mjs'] = SHA('f');
+      expect(verifyPublication).toThrow(/неподдерживаемый input/);
+      expect(verifyRevision).toThrow(/неподдерживаемый input/);
+      delete report.payload.provenance.inputs['bench/unknown-build-input.mjs'];
+      report.payload.schema = 11;
+      expect(verifyPublication).toThrow(/schema 11/);
+      expect(verifyRevision).toThrow(/schema 11/);
+    });
+  });
+
+  it('ignores replacement refs when proving revision ancestry and changed paths', () => {
+    withRevisionReport(({ report, root, git, verifyRevision }) => {
+      const tree = git(['rev-parse', 'HEAD^{tree}']).toString().trim();
+      const identity = ['-c', 'user.name=Benchmark fixture', '-c', 'user.email=benchmark@example.invalid'];
+      const unrelated = git([...identity, 'commit-tree', tree, '-m', 'unrelated report revision']).toString().trim();
+      const replacement = git([
+        ...identity, 'commit-tree', tree, '-p', unrelated, '-m', 'replacement descendant',
+      ]).toString().trim();
+      git(['replace', 'HEAD', replacement]);
+
+      Object.assign(report.payload.provenance, {
+        revision: unrelated,
+        shortRevision: unrelated.slice(0, 12),
+        revisionLabel: unrelated.slice(0, 12),
+        worktreeSha256: revisionFingerprint(root, unrelated),
+      });
+      report.payload.generatedAt = new Date(Date.now() + 2_000).toISOString();
+      report.now = Date.parse(report.payload.generatedAt);
+      report.stem = `${report.payload.generatedAt.slice(0, 10)}-${unrelated.slice(0, 12)}-${report.payload.provenance.distRuntime.sha256.slice(0, 12)}`;
+      report.payload.companion.markdownFile = `${report.stem}.md`;
+      writeFileSync(
+        join(root, 'docs/benchmark.md'),
+        `https://github.com/Labpics-Team/lab-motion/blob/v0.3.0/bench/compare/results/${report.stem}.md`,
+      );
+
+      expect(verifyRevision).toThrow(/предком HEAD/);
+    });
+  });
+
+  it('does not let replacement refs hide executable changes after the report revision', () => {
+    withRevisionReport(({ report, root, git, verifyRevision }) => {
+      const revision = report.payload.provenance.revision;
+      const revisionTree = git(['rev-parse', `${revision}^{tree}`]).toString().trim();
+      writeFileSync(join(root, 'unexpected-runtime.mjs'), 'export const changed = true;\n');
+      git(['add', 'unexpected-runtime.mjs']);
+      git(['-c', 'user.name=Benchmark fixture', '-c', 'user.email=benchmark@example.invalid',
+        '-c', `core.hooksPath=${join(root, 'no-hooks')}`, 'commit', '--quiet', '-m', 'unexpected runtime change']);
+      const identity = ['-c', 'user.name=Benchmark fixture', '-c', 'user.email=benchmark@example.invalid'];
+      const replacement = git([
+        ...identity, 'commit-tree', revisionTree, '-p', revision, '-m', 'replacement without change',
+      ]).toString().trim();
+      git(['replace', 'HEAD', replacement]);
+
+      expect(verifyRevision).toThrow(/unexpected-runtime\.mjs/);
+    });
+  });
+
+  it('keeps schema 9/10 additional inputs readable while publication requires revision inputs', () => {
+    for (const readable of [fixture(), motionFixture()]) {
+      readable.payload.provenance.inputs['legacy/custom-input.mjs'] = SHA('f');
+      renderMotionPair(readable);
+      expect(() => validateBenchmarkReportPair(readable)).not.toThrow();
+    }
+    const report = motionFixture();
+    expect(() => validateBenchmarkReportPair(report)).not.toThrow();
+    expect(() => validateBenchmarkReportForPublication({ ...report, revisionInputs: undefined }))
+      .toThrow(/отсутствует объект input SHA-256/);
+  });
+});
 
 function freeze25To65(): MotionPoint[] {
   return linearMotionPoints().map((point) => point.t >= 0.6 && point.t <= 1.54
@@ -497,12 +730,6 @@ describe('schema 10 motion conformance admission', () => {
     expect(() => validateBenchmarkReportForPublication({
       ...report, motionRequirements: { baseline: ['lab'], blocked: [] },
     })).toThrow(/motion-mini\.blocked = fail/);
-  });
-
-  it('CI и release reader используют обязательный допуск публикации', () => {
-    const reader = readFileSync('scripts/check-docs-facts.mjs', 'utf8');
-    expect(reader).toContain('validateBenchmarkReportForPublication({ stem, markdown, payload, rootPackage, benchmarkPackage })');
-    expect(reader).not.toContain('validateBenchmarkReportPair(');
   });
 
   it('принимает полный отчёт с 8 × 8 траекториями и независимой пружиной', () => {
@@ -622,7 +849,7 @@ describe('schema 10 motion conformance admission', () => {
     const report = motionFixture();
     delete report.payload.provenance.inputs['bench/motion-conformance.mjs'];
     renderMotionPair(report);
-    expect(() => validateBenchmarkReportPair(report)).toThrow(/motion conformance input/);
+    expect(() => validateBenchmarkReportPair(report)).toThrow(/input bench\/motion-conformance.mjs/);
   });
 
   it.each([
@@ -1101,6 +1328,7 @@ describe('benchmark documentation evidence state', () => {
       const files = [
         'bench/compare/report-contract.mjs',
         'bench/compare/provenance.mjs',
+        'bench/compare/input-manifest.mjs',
         'bench/compare/methodology.mjs',
         'bench/compare/motion-conformance.mjs',
         'scripts/compression-oracle.mjs',

@@ -9,9 +9,10 @@ import {
 } from '../bench/compare/report-contract.mjs';
 import {
   revisionFingerprint,
-  sha256Bytes,
+  readBenchmarkRevisionInputs,
 } from '../bench/compare/provenance.mjs';
-import { listChangedGitPaths } from './git-path-list.mjs';
+import { assertBenchmarkRevisionInputs } from '../bench/compare/input-manifest.mjs';
+import { parseNulDelimitedGitPaths } from './git-path-list.mjs';
 
 const write = process.argv.includes('--write');
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
@@ -45,48 +46,31 @@ function fail(message) {
 }
 
 function git(args, encoding = 'utf8') {
-  return execFileSync('git', args, { cwd: ROOT, encoding });
+  return execFileSync('git', ['--no-replace-objects', ...args], { cwd: ROOT, encoding });
 }
 
 function validateRevision(payload, stem) {
   const { revision, worktreeSha256 } = payload.provenance;
   try {
     git(['cat-file', '-e', `${revision}^{commit}`]);
-    execFileSync('git', ['merge-base', '--is-ancestor', revision, 'HEAD'], { cwd: ROOT });
+    git(['merge-base', '--is-ancestor', revision, 'HEAD']);
   } catch {
     throw new Error(`revision ${revision} не является доступным предком HEAD`);
   }
   if (revisionFingerprint(ROOT, revision) !== worktreeSha256) {
     throw new Error('dirty:false не подтверждается байтами Git revision');
   }
-  const changed = listChangedGitPaths(ROOT, `${revision}..HEAD`);
+  const changed = parseNulDelimitedGitPaths(
+    git(['diff', '--name-only', '-z', '--end-of-options', `${revision}..HEAD`, '--']),
+  );
   assertAllowedPostReportChanges(changed, stem);
   const commitTime = Date.parse(git(['show', '-s', '--format=%cI', revision]).trim());
   if (!Number.isFinite(commitTime) || commitTime > Date.parse(payload.generatedAt)) {
     throw new Error('generatedAt раньше времени коммита');
   }
-  const historicalInputs = {
-    'root/package.json': 'package.json',
-    'root/pnpm-lock.yaml': 'pnpm-lock.yaml',
-    'root/scripts/compression-policy.mjs': 'scripts/compression-policy.mjs',
-    'root/scripts/compression-oracle.mjs': 'scripts/compression-oracle.mjs',
-    'bench/package.json': 'bench/compare/package.json',
-    'bench/pnpm-lock.yaml': 'bench/compare/pnpm-lock.yaml',
-    'bench/bench.mjs': 'bench/compare/bench.mjs',
-    'bench/methodology.mjs': 'bench/compare/methodology.mjs',
-    'bench/provenance.mjs': 'bench/compare/provenance.mjs',
-    'bench/report-contract.mjs': 'bench/compare/report-contract.mjs',
-    ...(payload.schema === 10
-      ? { 'bench/motion-conformance.mjs': 'bench/compare/motion-conformance.mjs' }
-      : {}),
-  };
-  for (const [label, file] of Object.entries(historicalInputs)) {
-    const bytes = git(['show', `${revision}:${file}`], 'buffer');
-    const hash = sha256Bytes(bytes);
-    if (payload.provenance.inputs[label] !== hash) {
-      throw new Error(`${label} SHA-256 не совпадает с Git revision`);
-    }
-  }
+  const revisionInputs = readBenchmarkRevisionInputs(ROOT, revision, payload.schema);
+  assertBenchmarkRevisionInputs(payload.provenance.inputs, revisionInputs, payload.schema);
+  return revisionInputs;
 }
 
 function pairedReportNames() {
@@ -147,8 +131,8 @@ try {
       throw new Error(`${stem}.json: невалидный JSON (${error?.message ?? String(error)})`);
     }
     const benchmarkPackage = JSON.parse(readFileSync(benchmarkPackagePath, 'utf8'));
-    validateBenchmarkReportForPublication({ stem, markdown, payload, rootPackage, benchmarkPackage });
-    validateRevision(payload, stem);
+    const revisionInputs = validateRevision(payload, stem);
+    validateBenchmarkReportForPublication({ stem, markdown, payload, rootPackage, benchmarkPackage, revisionInputs });
   }
 } catch (error) {
   fail(error?.message ?? String(error));

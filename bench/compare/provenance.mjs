@@ -17,6 +17,7 @@ import {
   realpathSync,
 } from 'node:fs';
 import path from 'node:path';
+import { benchmarkInputManifest } from './input-manifest.mjs';
 
 const RUNTIME_FILE = /\.(?:c?js|mjs)$/;
 
@@ -191,7 +192,7 @@ function quoteGitPath(name) {
 }
 
 /** Тот же fingerprint для clean Git-коммита: dirty:false становится проверяемым фактом. */
-export function revisionFingerprint(root, revision, { verifyWorkingTree = false } = {}) {
+function revisionEntries(root, revision) {
   if (!/^[0-9a-f]{40}$/.test(revision)) throw new Error('provenance: некорректный revision');
   const raw = git(root, ['ls-tree', '-r', '-z', revision], 'buffer');
   const entries = raw.toString('utf8').split('\0').filter(Boolean).map((entry) => {
@@ -200,6 +201,28 @@ export function revisionFingerprint(root, revision, { verifyWorkingTree = false 
     return { mode, type, object, name: entry.slice(tab + 1) };
   }).sort((a, b) => a.name < b.name ? -1 : a.name > b.name ? 1 : 0);
   if (entries.length === 0) throw new Error('provenance: revision не содержит файлов');
+  return entries;
+}
+
+function revisionInputHashes(root, revision, inputs) {
+  const entries = revisionEntries(root, revision);
+  const selected = inputs.flatMap(({ label, file, optional }) => {
+    const entry = entries.find(({ name }) => name === file);
+    if (entry === undefined && optional) return [];
+    if (entry === undefined || entry.type !== 'blob' || !['100644', '100755'].includes(entry.mode)) {
+      throw new Error(`provenance: input ${label} не является обычным файлом Git revision`);
+    }
+    return [{ ...entry, label }];
+  });
+  return Object.fromEntries(Array.from(readRevisionObjects(root, selected), ({ entry, content }) => [entry.label, sha256Bytes(content)]));
+}
+
+export function readBenchmarkRevisionInputs(root, revision, schema) {
+  return revisionInputHashes(root, revision, benchmarkInputManifest(schema));
+}
+
+export function revisionFingerprint(root, revision, { verifyWorkingTree = false } = {}) {
+  const entries = revisionEntries(root, revision);
   const normalized = [];
   const hash = createHash('sha256');
   for (const { entry, content: expected } of readRevisionObjects(root, entries)) {
@@ -260,7 +283,8 @@ export function readCheckoutState(root) {
     revisionLabel: `${shortRevision}${dirty ? '-dirty' : ''}`,
     dirty,
     trackedRevisionSha256,
-    worktreeSha256: worktreeFingerprint(root),
+    // Clean checkout использует канонические Git-байты: CRLF checkout и release reader получают один hash.
+    worktreeSha256: trackedRevisionSha256 ?? worktreeFingerprint(root),
   };
 }
 
@@ -391,15 +415,20 @@ export function buildCurrentCheckout(root) {
   }
 }
 
-function inputHashes(root, benchDirectory, requiredInputs = []) {
+function inputHashes(root, benchDirectory, requiredInputs, checkout) {
+  const manifest = benchmarkInputManifest(10);
+  const resolveInput = ({ label, file }) => label.startsWith('bench/')
+    ? path.join(benchDirectory, file.slice('bench/compare/'.length)) : path.join(root, file);
   const candidates = [
-    ['root/package.json', path.join(root, 'package.json'), true],
-    ['root/pnpm-lock.yaml', path.join(root, 'pnpm-lock.yaml'), true],
-    ['root/pnpm-workspace.yaml', path.join(root, 'pnpm-workspace.yaml'), false],
-    ['bench/package.json', path.join(benchDirectory, 'package.json'), true],
-    ['bench/pnpm-lock.yaml', path.join(benchDirectory, 'pnpm-lock.yaml'), true],
-    ['bench/pnpm-workspace.yaml', path.join(benchDirectory, 'pnpm-workspace.yaml'), false],
-    ...requiredInputs.map(([label, file]) => [label, file, true]),
+    ...manifest.filter(({ captureByDefault }) => captureByDefault)
+      .map((input) => [input.label, resolveInput(input), !input.optional]),
+    ...requiredInputs.map(([label, file]) => {
+      const input = manifest.find((entry) => entry.label === label);
+      if (input !== undefined && path.resolve(file) !== path.resolve(resolveInput(input))) {
+        throw new Error(`provenance: обязательный input ${label} имеет неверный путь: ${file}`);
+      }
+      return [label, file, true];
+    }),
   ];
   const hashes = {};
   for (const [label, file, required] of candidates) {
@@ -408,6 +437,12 @@ function inputHashes(root, benchDirectory, requiredInputs = []) {
       continue;
     }
     hashes[label] = sha256File(file);
+  }
+  if (checkout.trackedRevisionSha256 !== undefined) {
+    // Clean-checkout уже проверен с Git-нормализацией: publish input SHA относится к каноническим blob-байтам.
+    return revisionInputHashes(root, checkout.revision, candidates.map(([label, file, required]) => ({
+      label, file: path.relative(root, file).split(path.sep).join('/'), optional: !required,
+    })));
   }
   return hashes;
 }
@@ -456,7 +491,7 @@ export function prepareBenchmarkCheckout({
   return {
     ...checkout,
     builtAt: new Date().toISOString(),
-    inputs: inputHashes(root, benchDirectory, [...requiredInputs, ...requiredEntries]),
+    inputs: inputHashes(root, benchDirectory, [...requiredInputs, ...requiredEntries], checkout),
     distRuntime: hashFileTree(path.join(root, 'dist'), (file) => RUNTIME_FILE.test(file)),
     environment,
   };

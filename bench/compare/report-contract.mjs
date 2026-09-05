@@ -2,6 +2,7 @@ import { createHash } from 'node:crypto';
 import { isDeepStrictEqual } from 'node:util';
 import { CANONICAL_GZIP_PACKAGE } from '../../scripts/compression-policy.mjs';
 import { formatProvenanceMarkdown, isExactPackageVersion } from './provenance.mjs';
+import { assertBenchmarkInputHashes, assertBenchmarkRevisionInputs } from './input-manifest.mjs';
 import {
   evaluateFreezeConformance,
   evaluateTrajectoryConformance,
@@ -770,7 +771,9 @@ export function renderBenchmarkMarkdown(payload) {
 /** Проверяет не формат, а воспроизводимость опубликованных чисел. */
 /** Публикуемые доказательства не могут ослабить обязательные требования S5. */
 export function validateBenchmarkReportForPublication(input) {
-  return validateBenchmarkReportPair({ ...input, motionRequirements: S5_MOTION_REQUIREMENTS });
+  const result = validateBenchmarkReportPair({ ...input, motionRequirements: S5_MOTION_REQUIREMENTS });
+  assertBenchmarkRevisionInputs(input.payload.provenance.inputs, input.revisionInputs, input.payload.schema);
+  return result;
 }
 
 export function validateBenchmarkReportPair({
@@ -836,29 +839,9 @@ export function validateBenchmarkReportPair({
   if (!markdown.includes('p99 не публикуется')) fail('Markdown выдаёт малую выборку за p99');
 
   const inputs = provenance.inputs;
-  if (payload.schema === 10) assertSha(inputs?.['bench/motion-conformance.mjs'], 'motion conformance input');
-  for (const name of [
-    'root/package.json',
-    'root/pnpm-lock.yaml',
-    'root/scripts/compression-policy.mjs',
-    'root/scripts/compression-oracle.mjs',
-    'bench/package.json',
-    'bench/pnpm-lock.yaml',
-    'bench/bench.mjs',
-    'bench/methodology.mjs',
-    'bench/provenance.mjs',
-    'bench/report-contract.mjs',
-    'bench/entries/lab.entry.mjs',
-    'bench/entries/motion.entry.mjs',
-    'bench/entries/gsap.entry.mjs',
-    'bench/entries/anime.entry.mjs',
-    'bench/entries/waapi-control.entry.mjs',
-    'bench/entries/lab-spring.entry.mjs',
-    'bench/entries/motion-mini.entry.mjs',
-    'bench/entries/anime-waapi.entry.mjs',
-  ]) {
-    assertSha(inputs?.[name], `input ${name}`);
-  }
+  // Старые schema 9/10 могли содержать дополнительные диагностические hashes.
+  // Они остаются читаемыми; публикационная граница ниже сверяет точный Git-манифест.
+  assertBenchmarkInputHashes(inputs, payload.schema, { allowUnknown: true });
   const environment = provenance.environment;
   if (!/^v24\./.test(environment?.node ?? '')) fail('publish-отчёт требует Node 24');
   const expectedPnpm = /^pnpm@(\d+\.\d+\.\d+)$/.exec(rootPackage.packageManager ?? '')?.[1];
