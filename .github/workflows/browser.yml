@@ -2,16 +2,11 @@ name: Browser conformance
 
 # Browser matrix (issue #102, фаза D): сверка СОБРАННОГО dist с реальным
 # поведением трёх движков (Chromium/Firefox/WebKit). Гейт запускается для каждого
-# PR: required check не должен исчезать из-за paths-фильтра. Артефакты
+# PR через граф ci.yml; результат входит в общий required check. Артефакты
 # (trace/video) выгружаются только при сбое.
 
 on:
-  push:
-    branches: ["main"]
-  pull_request:
-    branches: ["main"]
-  merge_group:
-  workflow_dispatch:
+  workflow_call:
 
 permissions:
   contents: read

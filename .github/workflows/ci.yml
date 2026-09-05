@@ -4,7 +4,6 @@ on:
   push:
     branches: ["main"]
   pull_request:
-    branches: ["main"]
   merge_group:
   workflow_dispatch:
 
@@ -104,7 +103,7 @@ jobs:
           exit "$status"
 
       - name: Upload Vitest diagnostics
-        if: steps.vitest.outcome == 'failure'
+        if: failure() && steps.vitest.outcome == 'failure'
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
         with:
           name: vitest-diagnostics-${{ github.run_id }}
@@ -190,3 +189,26 @@ jobs:
           [[ ${#archives[@]} -eq 1 ]] \
             || { echo "::error::ожидался ровно один tgz, найдено: ${#archives[@]}"; exit 1; }
           node scripts/pack-smoke.mjs "${archives[0]}"
+
+  browser-static:
+    uses: ./.github/workflows/browser.yml
+
+  CI:
+    name: CI
+    if: ${{ always() }}
+    needs: [verify, node-floor, browser-static]
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    permissions: {}
+    steps:
+      - name: Require every candidate check
+        shell: bash
+        env:
+          VERIFY_RESULT: ${{ needs.verify.result }}
+          NODE_FLOOR_RESULT: ${{ needs.node-floor.result }}
+          BROWSER_RESULT: ${{ needs.browser-static.result }}
+        run: |
+          set -euo pipefail
+          [[ "$VERIFY_RESULT" == success ]]
+          [[ "$NODE_FLOOR_RESULT" == success ]]
+          [[ "$BROWSER_RESULT" == success ]]
