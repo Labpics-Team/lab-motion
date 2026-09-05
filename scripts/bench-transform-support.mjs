@@ -24,7 +24,7 @@ export const TRANSFORM_PAIR_PROFILE = Object.freeze({
   clockOriginMs: 1_000_000,
   successorGapMs: 16,
   oracleAbsoluteTolerance: 1e-10,
-  statistics: 'empirical nearest-rank p50/p95/p99; no confidence bounds or tail guarantee',
+  statistics: 'descriptive marginal nearest-rank p50/p95/p99 plus paired block contrasts; no confidence bounds, comparative proof or tail guarantee',
 });
 
 const KEYS = Object.keys(INITIAL);

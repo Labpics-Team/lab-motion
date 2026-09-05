@@ -38,7 +38,9 @@ export function makeTransformPairPlan() {
   for (const lifecycle of profile.lifecycles) for (const channels of profile.channels) for (const count of profile.counts) {
     const spec = { lifecycle, channels, count };
     for (const [phase, rounds] of [['warmup', profile.warmupRounds], ['measurement', profile.rounds]]) {
-      const orders = makeRoundRobinOrders(IDS, rounds, (profile.seed + caseIndex) >>> 0);
+      const firstBlock = makeRoundRobinOrders(IDS, 2, (profile.seed + caseIndex) >>> 0);
+      // Чередование ABBA/BAAB даёт каждому участнику две внешних и две внутренних позиции.
+      const orders = Array.from({ length: rounds }, (_, round) => firstBlock[(round + Math.floor(round / 2)) % 2]);
       assertBalancedRunBlocks('transform pair', orders, IDS);
       for (let round = 0; round < rounds; round++) plan.push({
         case: spec, phase, round, block: `${caseIndex}:${phase}:${Math.floor(round / 2)}`, order: orders[round],
@@ -88,6 +90,34 @@ function summarize(samples) {
   };
 }
 
+function pairedBlocks(rounds) {
+  if (rounds.length !== TRANSFORM_PAIR_PROFILE.rounds) throw new Error('transform pair: неполные измерительные блоки');
+  const blocks = [];
+  for (let index = 0; index < rounds.length; index += 2) {
+    const first = rounds[index];
+    const second = rounds[index + 1];
+    if (first.block !== second.block || first.round + 1 !== second.round ||
+        first.order[0] !== second.order[1] || first.order[1] !== second.order[0]) {
+      throw new Error('transform pair: нарушена парность ABBA/BAAB');
+    }
+    const contrast = (read) => ((read(first.samples.candidate) - read(first.samples.baseline)) +
+      (read(second.samples.candidate) - read(second.samples.baseline))) / 2;
+    const frames = first.samples.baseline.frameNs.length;
+    if ([first, second].some((round) => IDS.some((id) => round.samples[id].frameNs.length !== frames))) {
+      throw new Error('transform pair: форма кадров парного блока различается');
+    }
+    blocks.push({
+      block: first.block, rounds: [first.round, second.round], order: [...first.order, ...second.order],
+      candidateMinusBaselineNs: {
+        operation: contrast((sample) => sample.operationNs),
+        frames: Array.from({ length: frames }, (_, frame) => contrast((sample) => sample.frameNs[frame])),
+        cancelDrain: contrast((sample) => sample.cancelDrainNs),
+      },
+    });
+  }
+  return blocks;
+}
+
 /** Внедряемые зависимости нужны герметичному тесту порядка build→import→measure→verify. */
 export async function runTransformPair(inputRoots, dependencies = {}) {
   const roots = resolvePair(inputRoots);
@@ -121,16 +151,20 @@ export async function runTransformPair(inputRoots, dependencies = {}) {
     assertFileHashesUnchanged(harness);
   }
   const summary = [];
+  const paired = [];
   for (const entry of plan.filter((item) => item.phase === 'measurement' && item.round === 0)) {
     const matching = raw.filter((item) => item.phase === 'measurement' &&
       item.case.lifecycle === entry.case.lifecycle && item.case.channels === entry.case.channels && item.case.count === entry.case.count);
     summary.push({ case: entry.case, ...Object.fromEntries(IDS.map((id) => [id, summarize(matching.map((item) => item.samples[id]))])) });
+    paired.push({ case: entry.case, blocks: pairedBlocks(matching) });
   }
   return {
-    schemaVersion: 1, profile: TRANSFORM_PAIR_PROFILE, seed: TRANSFORM_PAIR_PROFILE.seed,
+    schemaVersion: 2, profile: TRANSFORM_PAIR_PROFILE, seed: TRANSFORM_PAIR_PROFILE.seed,
     provenance, harness, roots,
     environment: { platform: platform(), release: release(), arch: arch(), cpu: cpus()[0]?.model, logicalCpus: cpus().length, execArgv: process.execArgv },
-    raw, summary,
+    raw, summary, paired,
+    summaryInterpretation: 'descriptive marginal empirical quantiles; not comparative proof',
+    pairedInterpretation: 'per-block mean(candidate) minus mean(baseline), paired by frame index; cancels additive linear drift over four execution positions, not arbitrary wall-clock drift; no confidence or admission claim',
   };
 }
 

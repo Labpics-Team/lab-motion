@@ -9,6 +9,7 @@ import {
   runTransformLifecycleSample,
 } from '../scripts/bench-transform-support.mjs';
 import { makeTransformPairPlan, parseTransformPairArgs, runTransformPair } from '../scripts/bench-transform-pair.mjs';
+import { summarizeDistribution } from '../scripts/bench-support.mjs';
 
 describe('paired public transform lifecycle screening', () => {
   it('fixes the workload and balances AB/BA within every paired block', () => {
@@ -22,6 +23,51 @@ describe('paired public transform lifecycle screening', () => {
       expect(first.block).toBe(second.block);
       expect(first.case).toEqual(second.case);
       expect(first.order).toEqual([...second.order].reverse());
+    }
+    for (const first of plan.filter((entry) => entry.phase === 'measurement' && entry.round === 0)) {
+      const blockStarts = plan.filter((entry) => entry.phase === 'measurement' && entry.round % 2 === 0 &&
+        entry.case.lifecycle === first.case.lifecycle && entry.case.count === first.case.count && entry.case.channels === first.case.channels);
+      expect(blockStarts.filter((entry) => entry.order[0] === 'baseline')).toHaveLength(2);
+      expect(blockStarts.filter((entry) => entry.order[0] === 'candidate')).toHaveLength(2);
+    }
+  });
+
+  it('reproduces the marginal-quantile false difference from a linear invocation drift', () => {
+    const orders = Array.from({ length: 8 }, (_, round) => round % 2 === 0
+      ? ['candidate', 'baseline'] : ['baseline', 'candidate']);
+    const observations: Record<string, number[]> = { baseline: [], candidate: [] };
+    let cost = 4;
+    for (const order of orders) for (const id of order) observations[id]!.push(++cost);
+    expect(summarizeDistribution(observations.baseline)).toEqual({ p50: 11, p95: 19, p99: 19 });
+    expect(summarizeDistribution(observations.candidate)).toEqual({ p50: 12, p95: 20, p99: 20 });
+  });
+
+  it.each([0, 7])('separates linear drift from a constant candidate penalty of %i ns', async (penalty) => {
+    const directory = mkdtempSync(path.join(tmpdir(), 'lab-motion-pair-drift-'));
+    try {
+      const roots = { baseline: path.join(directory, 'baseline'), candidate: path.join(directory, 'candidate') };
+      mkdirSync(roots.baseline);
+      mkdirSync(roots.candidate);
+      const candidate = () => {};
+      const baseline = () => {};
+      let cost = 0;
+      const report = await runTransformPair(roots, {
+        prepare: () => ({}), verify: () => {},
+        load: async (root: string) => root === roots.candidate ? candidate : baseline,
+        measure: async ({ animate: implementation }: { animate: () => void }) => {
+          const value = ++cost + (implementation === candidate ? penalty : 0);
+          return { operationNs: value, frameNs: [value, value * 2], cancelDrainNs: value * 3, semantic: { valid: true } };
+        },
+      });
+      expect(report.paired).toHaveLength(18);
+      for (const entry of report.paired) {
+        expect(entry.blocks).toHaveLength(4);
+        for (const block of entry.blocks) {
+          expect(block.candidateMinusBaselineNs).toEqual({ operation: penalty, frames: [penalty, penalty * 2], cancelDrain: penalty * 3 });
+        }
+      }
+    } finally {
+      rmSync(directory, { recursive: true, force: true });
     }
   });
 
