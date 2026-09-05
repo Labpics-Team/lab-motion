@@ -94,11 +94,19 @@ function gitOutput(args: string[], cwd = repositoryRoot): string {
 
 function withCheckout<T>(ref: string, run: (workspace: string) => T): T {
   const fixture = mkdtempSync(join(tmpdir(), 'labmotion-release-checkout-'));
+  const origin = join(fixture, 'origin.git');
   const workspace = join(fixture, 'repo');
   try {
+    // CI может не иметь local main: authority fixture задаётся её собственным ref.
+    gitOutput(['init', '--bare', '--quiet', origin]);
+    gitOutput(['fetch', '--quiet', '--no-tags', repositoryRoot,
+      `refs/tags/${supportedReplayTag}:refs/tags/${supportedReplayTag}`,
+      `refs/tags/${unsupportedReplayTag}:refs/tags/${unsupportedReplayTag}`], origin);
+    gitOutput(['update-ref', 'refs/heads/main', releaseReplayProtocolBase], origin);
+    gitOutput(['symbolic-ref', 'HEAD', 'refs/heads/main'], origin);
     const clone = spawnSync(
       'git',
-      ['clone', '--quiet', '--no-checkout', repositoryRoot, workspace],
+      ['clone', '--quiet', '--no-checkout', origin, workspace],
       { encoding: 'utf8' },
     );
     if (clone.status !== 0) throw new Error(`git clone: ${clone.stderr}`);
@@ -402,6 +410,13 @@ describe('release workflow: граница тега и npm OIDC', () => {
       });
     },
   );
+
+  it('fixture объявляет только собственный main, независимо от веток запускающего checkout', { timeout: 15000 }, () => {
+    withCheckout(supportedReplayTag, (workspace) => {
+      expect(gitOutput(['ls-remote', '--heads', 'origin'], workspace))
+        .toBe(`${releaseReplayProtocolBase}\trefs/heads/main`);
+    });
+  });
 
   it('исполняет replay на настоящем v0.3.0 checkout и его сохранённой дате', { timeout: 15000 }, () => {
     expect(gitOutput(['rev-parse', `${supportedReplayTag}^{}`])).toBe(releaseReplayProtocolBase);
