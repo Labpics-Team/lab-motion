@@ -3,12 +3,18 @@ import { isDeepStrictEqual } from 'node:util';
 import { CANONICAL_GZIP_PACKAGE } from '../../scripts/compression-policy.mjs';
 import { formatProvenanceMarkdown, isExactPackageVersion } from './provenance.mjs';
 import {
+  evaluateFreezeConformance,
+  evaluateTrajectoryConformance,
+  S5_MOTION_CONTRACT,
+} from './motion-conformance.mjs';
+import {
   applyHolmCorrection,
   assertBalancedRunBlocks,
   assertFreezeMatrix,
   assertRealmClockUncertainty,
   assertWarmStartMeasurement,
   BENCHMARK_TIMER_ISOLATION_POLICY,
+  deriveCdpStartClock,
   deriveFirstPresentedElapsedMs,
   deriveFirstPresentedUncertaintyMs,
   deriveRealmClockUncertainty,
@@ -71,6 +77,100 @@ const CLAIM_METRICS = Object.freeze([
     rawScenario: 'firstPresented',
   },
 ]);
+
+/** Нормальное движение обязательно у всех; блокировку — у заявленных native-путей. */
+export const S5_MOTION_REQUIREMENTS = Object.freeze({
+  baseline: FREEZE_IDS,
+  blocked: Object.freeze(['waapi-ctl', 'lab-spring', 'motion-mini', 'anime-waapi']),
+});
+
+function aggregateConformance(verdicts) {
+  if (verdicts.includes('fail')) return 'fail';
+  if (verdicts.length === 0 || verdicts.includes('inconclusive')) return 'inconclusive';
+  return 'pass';
+}
+
+function qualifyMotionCapture(run, mode) {
+  const evidence = run?.evidence;
+  const target = evidence?.[mode];
+  const witness = evidence?.[`${mode}Witness`];
+  if (!Array.isArray(target) || !Array.isArray(witness) || target.length !== witness.length ||
+    witness.length !== run.rawFrames?.[mode] ||
+    target.some((point, index) => point?.t !== witness[index]?.t)) {
+    return { verdict: 'inconclusive', reason: 'unpaired-frame-observations', uncertaintyMs: null };
+  }
+  let clock;
+  try {
+    const input = evidence?.[`${mode}Clock`];
+    clock = deriveCdpStartClock(`S5 ${mode}`, input?.startClock, input?.timerEvidence);
+  } catch {
+    return { verdict: 'inconclusive', reason: 'unverified-cdp-start-clock', uncertaintyMs: null };
+  }
+  // IEEE-754 epoch timestamps добавляют собственное округление сверх page timer.
+  const uncertaintyMs = clock.markerToApiUpperMs + 8 * Number.EPSILON * clock.startedAtSeconds * 1000;
+  return {
+    verdict: uncertaintyMs <= S5_MOTION_CONTRACT.timeToleranceMs ? 'pass' : 'inconclusive',
+    reason: uncertaintyMs <= S5_MOTION_CONTRACT.timeToleranceMs ? 'paired-frames-and-clock' : 'clock-uncertainty-exceeds-contract',
+    uncertaintyMs,
+  };
+}
+
+/** Ожидание выводится из сценария; совпадение с другим запуском не доказывает качество. */
+export function createBenchmarkMotionConformance(results) {
+  return Object.fromEntries(FREEZE_IDS.map((id) => {
+    const input = results?.[id]?.raw?.freeze;
+    if (!Array.isArray(input)) fail(`${id}: нет motion conformance evidence`);
+    const runs = input.map((run) => {
+      const capture = { baseline: qualifyMotionCapture(run, 'baseline'), blocked: qualifyMotionCapture(run, 'blocked') };
+      const uncertainty = {
+        baseline: capture.baseline.uncertaintyMs ?? NaN,
+        blocked: capture.blocked.uncertaintyMs ?? NaN,
+      };
+      return {
+        ...evaluateFreezeConformance(id, run, uncertainty),
+        capture,
+        witness: {
+          baseline: evaluateTrajectoryConformance(run.evidence?.baselineWitness, 'linear', uncertainty.baseline),
+          blocked: evaluateTrajectoryConformance(run.evidence?.blockedWitness, 'linear', uncertainty.blocked),
+        },
+      };
+    });
+    const qualified = (mode) => aggregateConformance(runs.map((run) => (
+      run.capture[mode].verdict === 'pass' && run.witness[mode].verdict === 'pass' ? run[mode].verdict : 'inconclusive'
+    )));
+    return [id, {
+      baseline: qualified('baseline'),
+      blocked: qualified('blocked'),
+      capture: runs.length > 0 && runs.every((run) => (
+        run.capture.baseline.verdict === 'pass' && run.capture.blocked.verdict === 'pass' &&
+        run.witness.baseline.verdict === 'pass' && run.witness.blocked.verdict === 'pass'
+      )) ? 'pass' : 'inconclusive',
+      runs,
+    }];
+  }));
+}
+
+function requireMotionConformance(payload, requirements) {
+  if (requirements === undefined) return;
+  if (payload.schema !== 10) fail('motion conformance требует schema 10; legacy-отчёт не доказывает качество');
+  if (
+    requirements === null || typeof requirements !== 'object' ||
+    !isDeepStrictEqual(Object.keys(requirements).sort(), ['baseline', 'blocked']) ||
+    !Array.isArray(requirements.baseline) || !Array.isArray(requirements.blocked) ||
+    requirements.baseline.length + requirements.blocked.length === 0
+  ) fail('motion conformance: требования должны называть проверяемые пути');
+  for (const mode of ['baseline', 'blocked']) {
+    const ids = requirements[mode];
+    if (new Set(ids).size !== ids.length) fail('motion conformance: повтор участника');
+    for (const id of ids) {
+      if (!FREEZE_IDS.includes(id)) fail('motion conformance: неизвестный участник');
+      const result = payload.motionConformance[id];
+      if (result[mode] !== 'pass') {
+        fail(`motion conformance: ${id}.${mode} = ${result[mode]}; capture = ${result.capture}`);
+      }
+    }
+  }
+}
 
 function fail(message) {
   throw new Error(`benchmark report: ${message}`);
@@ -537,6 +637,30 @@ export function renderBenchmarkMarkdown(payload) {
     ['Финальная x, p50 px', (result) => result.summary.freeze.finalX.p50.toFixed(1)],
   ];
   const verdictLabel = (verdict) => verdict === 'win' ? 'победа' : 'неопределённо';
+  const motionLabel = (verdict) => ({
+    pass: 'соответствует', fail: 'не соответствует', inconclusive: 'недостаточно данных',
+  })[verdict];
+  const motionSection = payload.schema === 10 ? [
+    '### Независимый контракт движения',
+    '',
+    `Контракт: \`${S5_MOTION_CONTRACT.id}\`; ${S5_MOTION_CONTRACT.distancePx} px / ${S5_MOTION_CONTRACT.durationMs} мс. Допуски: позиция ${S5_MOTION_CONTRACT.positionTolerancePx} px, время ±${S5_MOTION_CONTRACT.timeToleranceMs} мс, разрыв наблюдения ≤${S5_MOTION_CONTRACT.maxObservationGapMs} мс.`,
+    'Это объявленные пределы данного сценария, не доказательство абсолютной плавности. Линейное движение',
+    'сверяется с уравнением времени, пружина — с независимым решением ОДУ; собственный baseline не служит эталоном.',
+    'Зелёный native-свидетель снимается в том же кадре и обеспечивает наблюдение неподвижной красной цели.',
+    'CDP start marker связывается с часами этого page realm; измеренная неопределённость вычитается из временного допуска.',
+    '',
+    '| Путь | Запись кадров | Без блокировки | С блокировкой |',
+    '|---|---|---|---|',
+    ...ids.map((id) => {
+      const result = payload.motionConformance[id];
+      return `| ${id} | ${motionLabel(result.capture)} | ${motionLabel(result.baseline)} | ${motionLabel(result.blocked)} |`;
+    }),
+    '',
+    'Приём отчёта подтверждает достоверность его данных, не выполнение требований движения.',
+    'Любой неуспешный прогон препятствует соответствующему утверждению; медиана не скрывает нарушение.',
+    'Наблюдения с пробелами не дополняются вымышленными кадрами. Поведение между захваченными кадрами и input→photon не доказаны.',
+    '',
+  ] : [];
   const claimRows = payload.claims.performance.map((claim) => [
     claim.metric,
     claim.competitor,
@@ -599,6 +723,7 @@ export function renderBenchmarkMarkdown(payload) {
     '',
     '## S5: freeze main thread',
     '',
+    ...motionSection,
     ...table('Linear full API пути', startIds, freezeMetrics),
     ...table('Linear native пути и платформенный контроль', ['waapi-ctl', 'motion-mini', 'anime-waapi'], freezeMetrics),
     ...table('Lab spring→WAAPI путь', ['lab-spring'], freezeMetrics),
@@ -631,7 +756,9 @@ export function renderBenchmarkMarkdown(payload) {
     '- API-return не равен полной стоимости: lazy-работу отражает отдельный first-presented screencast metric.',
     '- Нулевой/null cold API-return прерывает отчёт, а не становится «н/д» или победным нулём.',
     '- GSAP после лага не прыгает (lag smoothing), а доигрывает сдвинутый таймлайн — поэтому его',
-    '  финальная позиция снимается с запасом +700мс; это поведение, а не дефект.',
+    payload.schema === 10
+      ? '  финальная позиция снимается с запасом +700мс. Это не освобождает путь от проверки wall-clock контракта S5.'
+      : '  финальная позиция снимается с запасом +700мс; это поведение, а не дефект.',
     '- Headed Chromium и screencast — один браузерный контур, не универсальный рейтинг браузеров.',
     '- S6 исключает legal comments одинаково у всех и измеряет executable payload, не лицензионные файлы npm.',
     '',
@@ -641,6 +768,11 @@ export function renderBenchmarkMarkdown(payload) {
 }
 
 /** Проверяет не формат, а воспроизводимость опубликованных чисел. */
+/** Публикуемые доказательства не могут ослабить обязательные требования S5. */
+export function validateBenchmarkReportForPublication(input) {
+  return validateBenchmarkReportPair({ ...input, motionRequirements: S5_MOTION_REQUIREMENTS });
+}
+
 export function validateBenchmarkReportPair({
   stem,
   markdown,
@@ -648,8 +780,17 @@ export function validateBenchmarkReportPair({
   rootPackage,
   benchmarkPackage,
   now = Date.now(),
+  motionRequirements,
 }) {
-  if (payload?.schema !== 9) fail(`schema ${String(payload?.schema)} не поддержана`);
+  if (payload?.schema !== 9 && payload?.schema !== 10) fail(`schema ${String(payload?.schema)} не поддержана`);
+  if (payload.schema === 10) {
+    if (!isDeepStrictEqual(payload.motionContract, S5_MOTION_CONTRACT)) {
+      fail('motion conformance: контракт изменён');
+    }
+    if (!isDeepStrictEqual(payload.motionConformance, createBenchmarkMotionConformance(payload.results))) {
+      fail('motion conformance не пересчитывается из траекторий');
+    }
+  }
   if (
     payload.package?.name !== rootPackage.name ||
     payload.package?.version !== rootPackage.version
@@ -695,6 +836,7 @@ export function validateBenchmarkReportPair({
   if (!markdown.includes('p99 не публикуется')) fail('Markdown выдаёт малую выборку за p99');
 
   const inputs = provenance.inputs;
+  if (payload.schema === 10) assertSha(inputs?.['bench/motion-conformance.mjs'], 'motion conformance input');
   for (const name of [
     'root/package.json',
     'root/pnpm-lock.yaml',
@@ -853,6 +995,7 @@ export function validateBenchmarkReportPair({
     scenarioManifest: warmCalibration.scenarioManifest,
   });
   if (!isDeepStrictEqual(payload.claims, expectedClaims)) fail('claims не пересчитываются из raw-кластеров');
+  requireMotionConformance(payload, motionRequirements);
   return payload;
 }
 
