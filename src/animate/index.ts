@@ -564,6 +564,7 @@ export function animate(
   maybeComplete();
 
   // 5. Агрегированные контролы (пустой список целей → уже разрешённый no-op).
+  let seekGeneration = 0;
   const cancel = (): void => {
     for (const u of units) u.cancel();
   };
@@ -576,7 +577,12 @@ export function animate(
       for (const u of units) u.pause();
     },
     seek(tMs: number): void {
-      for (const u of units) u.seek(tMs);
+      if (!Number.isFinite(tMs)) return;
+      const generation = ++seekGeneration;
+      for (const unit of units) {
+        unit.seek(tMs);
+        if (generation < seekGeneration) return;
+      }
     },
     cancel,
     stop: cancel,

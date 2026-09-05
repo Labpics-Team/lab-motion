@@ -1,6 +1,7 @@
 /** Main-thread executor одной CSS-поверхности внутри общего SurfaceBatch. */
 
 import { scaleSerializedVelocity } from '../compositor/sample.js';
+import { MotionParamError } from '../errors.js';
 import { CONVERGENCE_THRESHOLD, FIXED_DT_S, MAX_FRAMES } from '../internal/constants.js';
 import { finiteOrZero } from '../internal/finite.js';
 import {
@@ -54,8 +55,8 @@ export class MainUnit implements GroupOwner, SurfaceUnit {
   private _paused: boolean;
   private _active = false;
   private _converged = false;
-  /** Монотонные часы unit; seek двигает только локальную координату. */
-  private _logicalMs = 0;
+  /** Любой seek/terminal аннулирует продолжения, начатые в прошлом поколении. */
+  private _generation = 0;
   /** logical − anchor, сохранённое отдельно от больших абсолютных timestamps. */
   private _phaseMs: number;
   private _tMs = 0;
@@ -90,13 +91,11 @@ export class MainUnit implements GroupOwner, SurfaceUnit {
     const o = this._o!;
     const channel = o._bound._numeric.find((item) => item._key === key);
     if (channel !== undefined) {
-      // Во время host-write снимок обязан отдать применяемое поколение (#196):
-      // hostile setter уже сделал значение видимым до возврата.
       const writing = this._writing;
       let velocity = this._active ? (writing ? channel._velocity : channel._renderedVelocity) : 0;
       if (this._active && o._mode._type === 'tween') {
         const sampled = (channel._to - channel._from) *
-          this._tweenDerivative(this._liveTweenK());
+          this._tweenDerivative(writing ? this._tweenK : this._renderedTweenK);
         velocity = finiteOrZero(sampled);
       }
       return { _value: writing ? channel._value : channel._renderedValue, _velocity: velocity };
@@ -113,14 +112,9 @@ export class MainUnit implements GroupOwner, SurfaceUnit {
     const dpdt = !this._active
       ? 0
       : this._o!._mode._type === 'tween'
-        ? this._tweenDerivative(this._liveTweenK())
+        ? this._tweenDerivative(writing ? this._tweenK : this._renderedTweenK)
         : writing ? channel._dpdt : channel._renderedDpdt;
     return { ...channel, _dpdt: dpdt, _css: writing ? channel._css : channel._renderedCss };
-  }
-
-  /** k текущего поколения: во время host-write — применяемый, иначе rendered. */
-  private _liveTweenK(): number {
-    return this._writing ? this._tweenK : this._renderedTweenK;
   }
 
   _numericKeys(): readonly string[] {
@@ -160,13 +154,17 @@ export class MainUnit implements GroupOwner, SurfaceUnit {
 
   seek(tMs: number): void {
     if (this._done || this._o!._record._transition || !Number.isFinite(tMs)) return;
+    this._generation++;
     const localMs = Math.max(0, tMs);
     this._active = true;
+    this._converged = false;
     this._tMs = localMs;
     // Seek двигает anchor через локальную координату; logical-часы не откатываются.
     this._phaseMs = localMs;
     this._lastTs = undefined;
-    if (this._compute()) this._settle();
+    const converged = this._compute();
+    if (converged === undefined) return;
+    if (converged) this._settle();
     else this._write();
   }
 
@@ -190,7 +188,6 @@ export class MainUnit implements GroupOwner, SurfaceUnit {
       }
     }
     if (dt < 0) dt = 0;
-    this._logicalMs += dt;
     // Signed phase эквивалентна logical-anchor, но не вычитает два почти равных
     // MAX-числа после seek. Пересечение delay сохраняет весь frame-overshoot.
     this._phaseMs += dt;
@@ -198,10 +195,11 @@ export class MainUnit implements GroupOwner, SurfaceUnit {
     this._tMs = Math.max(0, this._phaseMs);
     if (this._active) {
       this._frames++;
-      if (
-        this._compute() ||
-        (this._frames >= MAX_FRAMES && this._tMs <= 0)
-      ) this._converged = true;
+      const converged = this._compute();
+      if (converged !== undefined) {
+        this._converged = converged ||
+          (this._frames >= MAX_FRAMES && this._tMs <= 0);
+      }
     }
   }
 
@@ -223,13 +221,15 @@ export class MainUnit implements GroupOwner, SurfaceUnit {
     this._o!._onRollback?.();
   }
 
-  private _compute(): boolean {
+  private _compute(): boolean | undefined {
     const o = this._o!;
     const bound = o._bound;
     if (o._mode._type === 'tween') {
       if (this._tMs >= o._mode._durationMs) return true;
       const k = this._tMs / o._mode._durationMs;
+      const generation = this._generation;
       const eased = o._mode._ease(k);
+      if (generation < this._generation) return undefined;
       const progress = Number.isFinite(eased) ? eased : k;
       this._tweenK = k;
       this._tweenDpdt = NaN;
@@ -285,15 +285,15 @@ export class MainUnit implements GroupOwner, SurfaceUnit {
     return converged;
   }
 
-  private _tweenDerivative(k = this._tweenK): number {
+  private _tweenDerivative(k: number): number {
     if (k === this._tweenK && !Number.isNaN(this._tweenDpdt)) return this._tweenDpdt;
-    const mode = this._o!._mode;
-    if (mode._type !== 'tween') return 0;
+    const generation = this._generation;
+    const mode = this._o!._mode as Extract<MotionMode, { _type: 'tween' }>;
     const k0 = k > EASE_DERIV_H ? k - EASE_DERIV_H : 0;
     const k1 = k + EASE_DERIV_H < 1 ? k + EASE_DERIV_H : 1;
-    const raw = ((mode._ease(k1) - mode._ease(k0)) * 1000) /
-      ((k1 - k0) * mode._durationMs);
-    const value = finiteOrZero(raw);
+    const value = finiteOrZero(((mode._ease(k1) - mode._ease(k0)) * 1000) /
+      ((k1 - k0) * mode._durationMs));
+    if (generation < this._generation) throw new MotionParamError('LM157');
     if (k === this._tweenK) this._tweenDpdt = value;
     return value;
   }
@@ -330,6 +330,8 @@ export class MainUnit implements GroupOwner, SurfaceUnit {
 
   private _settle(): void {
     if (this._done) return;
+    const generation = this._generation;
+    const wasPaused = this._paused;
     const bound = this._o!._bound;
     for (const channel of bound._numeric) {
       channel._value = channel._to;
@@ -347,9 +349,10 @@ export class MainUnit implements GroupOwner, SurfaceUnit {
     // который capture и запросит) публикует скорость покоя без второй записи.
     this._tweenDpdt = 0;
     this._write();
-    // Реентрантный successor внутри settle-записи уже потребил финальное
-    // поколение и терминализировал unit: старый owner молча уступает (#196).
-    if (this._done) return;
+    if (generation < this._generation) return;
+    // Только новая pause из host-setter откладывает terminal lifecycle;
+    // seek уже paused сохраняет прежнее синхронное завершение.
+    if (!wasPaused && this._paused) return;
     this._writeBack();
     this._finish(true);
   }
@@ -376,6 +379,7 @@ export class MainUnit implements GroupOwner, SurfaceUnit {
 
   private _finish(natural: boolean): void {
     if (this._done) return;
+    this._generation++;
     this._done = true;
     const o = this._o!;
     o._batch._remove(this, this._paused);
