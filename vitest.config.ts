@@ -1,9 +1,10 @@
 import { defineConfig } from 'vitest/config';
 
-/** Эти fixtures порождают Git/esbuild-процессы и измеренно конфликтуют под высокой конкуренцией. */
+/** Git, сборщик и проверка самого раннера не конкурируют с параллельным набором. */
 const processFixtures = [
   'test/git-path-list.test.ts',
   'test/size-gate-autoderive.test.ts',
+  'test/test-runner-policy.test.ts',
 ];
 
 export default defineConfig({

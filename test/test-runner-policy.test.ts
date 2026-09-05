@@ -10,10 +10,11 @@ const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '..');
 const PROCESS_FIXTURES = [
   'test/git-path-list.test.ts',
   'test/size-gate-autoderive.test.ts',
+  'test/test-runner-policy.test.ts',
 ] as const;
 const STRYKER_EXCLUDED = 'test/perf-hot-path.test.ts';
 
-interface InspectedConfig {
+type InspectedConfig = {
   root: { maxWorkers: number | string | null };
   projects: Array<{
     name: string;
@@ -23,7 +24,7 @@ interface InspectedConfig {
     exclude: string[];
   }>;
   files: Array<{ file: string; projectName: string }>;
-}
+};
 
 function slash(path: string): string {
   return path.replaceAll('\\', '/');
