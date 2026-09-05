@@ -67,7 +67,9 @@ function checkoutFixture(autocrlf = false) {
   const source = path.join(directory, 'source');
   const root = path.join(directory, 'checkout');
   mkdirSync(source);
-  const git = (cwd: string, args: string[]) => execFileSync('git', args, { cwd, encoding: 'utf8', stdio: ['ignore', 'pipe', 'pipe'] });
+  const git = (cwd: string, args: string[]) => execFileSync('git', args, {
+    cwd, encoding: 'utf8', stdio: ['ignore', 'pipe', 'pipe'], timeout: 10_000,
+  });
   git(source, ['init', '--quiet']);
   git(source, ['config', 'core.autocrlf', 'false']);
   writeFileSync(path.join(source, '.gitignore'), 'dist/\n');
@@ -87,7 +89,8 @@ function checkoutFixture(autocrlf = false) {
   } };
 }
 
-describe('benchmark provenance', () => {
+// Реальные Git-процессы конкурируют с полным набором тестов; это watchdog, не бюджет бенчмарка.
+describe('benchmark provenance', { timeout: 30_000 }, () => {
   it.each(['--assume-unchanged', '--skip-worktree'])('rejects hidden source bytes before build: %s', (flag) => {
     const f = checkoutFixture();
     const revision = f.git(['rev-parse', 'HEAD']).trim();
