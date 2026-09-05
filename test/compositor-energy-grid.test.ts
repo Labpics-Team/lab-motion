@@ -5,18 +5,8 @@ import {
   tryBuildAdaptiveSpringGrid,
   tryBuildSpringNodes,
 } from '../src/compositor/segmenter.js';
-import { CONVERGENCE_THRESHOLD } from '../src/internal/constants.js';
 import { solveSpring } from '../src/internal/solver.js';
-import { settleTimeUpperBound, type SpringParams } from '../src/spring.js';
-
-function horizon(params: SpringParams, v0: number, tolerance: number): number {
-  const settle = settleTimeUpperBound(params, v0);
-  const omega2 = params.stiffness / params.mass;
-  const alpha = params.damping / (2 * params.mass);
-  const delta = omega2 - alpha * alpha;
-  const rate = delta >= 0 ? alpha : omega2 / (alpha + Math.sqrt(-delta));
-  return settle + Math.max(0, Math.log(CONVERGENCE_THRESHOLD * 16 / tolerance)) / rate;
-}
+import type { SpringParams } from '../src/spring.js';
 
 function lerpAt(xs: readonly number[], ys: readonly number[], x: number): number {
   let hi = 1;
@@ -37,9 +27,11 @@ describe('compositor local-energy grid regression', () => {
       const params: SpringParams = { mass: 1, stiffness: 100, damping: 20 * zeta };
       for (const v0 of v0s) {
         for (const tolerance of tolerances) {
-          const T = horizon(params, v0, tolerance);
+          const built = tryBuildSpringNodes(params, v0, tolerance);
+          expect(built, `ζ=${zeta} v0=${v0} tol=${tolerance}`).toBeDefined();
+          const T = built![1];
           const grid = tryBuildAdaptiveSpringGrid(params, v0, tolerance, T);
-          expect(grid, `ζ=${zeta} v0=${v0} tol=${tolerance}`).toBeDefined();
+          expect(grid, `grid ζ=${zeta} v0=${v0} tol=${tolerance}`).toBeDefined();
           const [xs, ys] = grid!;
           let worst = 0;
           for (let i = 1; i < xs.length; i++) {
@@ -61,9 +53,10 @@ describe('compositor local-energy grid regression', () => {
     for (const zeta of zetas) {
       const params: SpringParams = { mass: 1, stiffness: 100, damping: 20 * zeta };
       for (const tolerance of tolerances) {
-        const T = horizon(params, 0, tolerance);
+        const built = tryBuildSpringNodes(params, 0, tolerance);
+        expect(built).toBeDefined();
+        const [nodes, T] = built!;
         const [xs, ys] = tryBuildAdaptiveSpringGrid(params, 0, tolerance, T)!;
-        const nodes = tryBuildSpringNodes(params, 0, tolerance)![0];
         const keptXs = nodes.map((node) => node.percent / 100);
         const keptYs = nodes.map((node, i) =>
           i === nodes.length - 1 ? ys[ys.length - 1]! : node.progress);
