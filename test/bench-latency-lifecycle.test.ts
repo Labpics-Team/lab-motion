@@ -320,6 +320,51 @@ describe('жизненный цикл latency-стенда handoff', () => {
     },
   );
 
+  it('отвергает finite explicit stops с бесконечной производной oracle', () => {
+    expect(() => measureFakeHandoff(SETUP_EFFECTS, HANDOFF_EFFECTS, {
+      createLive: () => ({ value: 0, velocity: 187.28074645403436, destroy() {} }),
+      donorPlan: {
+        keyframes: [
+          { offset: 0, x: 0 },
+          { offset: 0.16, x: 0 },
+          { offset: 0.16000000000000003, x: Number.MAX_VALUE },
+          { offset: 1, x: 100 },
+        ],
+        timing: TEST_EXPLICIT_TIMING,
+      },
+    })).toThrow(/donor/i);
+  });
+
+  it('отвергает унаследованный WebIDL timing modifier', () => {
+    const previous = Object.getOwnPropertyDescriptor(Object.prototype, 'timeline');
+
+    expect(() => {
+      try {
+        Object.defineProperty(Object.prototype, 'timeline', {
+          configurable: true,
+          value: null,
+        });
+        measureFakeHandoff(SETUP_EFFECTS, HANDOFF_EFFECTS);
+      } finally {
+        if (previous) Object.defineProperty(Object.prototype, 'timeline', previous);
+        else Reflect.deleteProperty(Object.prototype, 'timeline');
+      }
+    }).toThrow(/donor/i);
+  });
+
+  it.each([
+    ['NBSP вместо CSS whitespace', TEST_DONOR_EASING.replaceAll(' ', '\u00a0'), EXPECTED_FAKE_LIVE],
+    ['hex-числа', 'linear(0x0 0x0%,0x1 0x64%)', { value: 16, velocity: 1_000 }],
+  ] as const)('отвергает неэмитируемый linear(): %s', (_label, easing, live) => {
+    expect(() => measureFakeHandoff(SETUP_EFFECTS, HANDOFF_EFFECTS, {
+      createLive: () => ({ ...live, destroy() {} }),
+      donorPlan: {
+        keyframes: TEST_DONOR_KEYFRAMES,
+        timing: { ...TEST_DONOR_TIMING, easing },
+      },
+    })).toThrow(/donor/i);
+  });
+
   it('не принимает эффекты setup за эффекты timed handoff', () => {
     expect(() => measureFakeHandoff(
       { animations: 1, cancels: 1, frameRequests: 1 },

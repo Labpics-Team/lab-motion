@@ -12,6 +12,18 @@ const DONOR_TIMING_FIELDS = new Set([
   'composite',
   'iterationComposite',
 ]);
+const DONOR_WEBIDL_TIMING_FIELDS = [
+  ...DONOR_TIMING_FIELDS,
+  'id',
+  'timeline',
+  'rangeStart',
+  'rangeEnd',
+  'pseudoElement',
+];
+const EMITTED_CSS_NUMBER = '-?(?:0|[1-9]\\d*)(?:\\.\\d+)?(?:e[+-]?\\d+)?';
+const DONOR_LINEAR_STOP = new RegExp(
+  `^[\\t\\n\\f\\r ]*(${EMITTED_CSS_NUMBER})[\\t\\n\\f\\r ]+(${EMITTED_CSS_NUMBER})%[\\t\\n\\f\\r ]*$`,
+);
 
 function readDonorFrame(frame, property) {
   if (
@@ -41,6 +53,7 @@ function captureDonorExecution(keyframes, timing, property, from, to) {
     typeof timing !== 'object' ||
     Object.getPrototypeOf(timing) !== Object.prototype ||
     Reflect.ownKeys(timing).some((key) => !DONOR_TIMING_FIELDS.has(key)) ||
+    DONOR_WEBIDL_TIMING_FIELDS.some((key) => key in timing && !Object.hasOwn(timing, key)) ||
     !Array.isArray(keyframes) ||
     keyframes.length < 2 ||
     !Number.isFinite(timing.duration) ||
@@ -78,13 +91,17 @@ function captureDonorExecution(keyframes, timing, property, from, to) {
       throw new Error('handoff benchmark: CSS donor keyframes не соответствуют профилю');
     }
     stops = easing.slice(7, -1).split(',').map((entry) => {
-      const [rawProgress, rawPercent, ...rest] = entry.trim().split(/\s+/);
-      if (rest.length > 0 || !rawPercent?.endsWith('%')) {
+      const match = DONOR_LINEAR_STOP.exec(entry);
+      if (match === null) {
         throw new Error('handoff benchmark: donor linear() не соответствует профилю');
       }
-      const progress = Number(rawProgress);
+      const progress = Number(match[1]);
+      const percent = Number(match[2]);
+      if (!Number.isFinite(progress) || !Number.isFinite(percent)) {
+        throw new Error('handoff benchmark: donor linear() не соответствует профилю');
+      }
       return {
-        offset: Number(rawPercent.slice(0, -1)) / 100,
+        offset: percent / 100,
         value: (1 - progress) * from + progress * to,
       };
     });
@@ -123,9 +140,14 @@ function sampleDonorExecution(execution, elapsedMs) {
   const next = stops[right];
   const span = next.offset - left.offset;
   const q = (offset - left.offset) / span;
+  const value = (1 - q) * left.value + q * next.value;
+  const velocity = (next.value - left.value) / (span * durationMs / 1_000);
+  if (!Number.isFinite(value) || !Number.isFinite(velocity)) {
+    throw new Error('handoff benchmark: donor snapshot не соответствует профилю');
+  }
   return Object.freeze({
-    value: (1 - q) * left.value + q * next.value,
-    velocity: (next.value - left.value) / (span * durationMs / 1_000),
+    value,
+    velocity,
   });
 }
 
