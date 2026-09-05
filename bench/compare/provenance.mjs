@@ -155,16 +155,45 @@ function worktreeFingerprint(root) {
 }
 
 /** Тот же fingerprint для clean Git-коммита: dirty:false становится проверяемым фактом. */
-export function revisionFingerprint(root, revision) {
+export function revisionFingerprint(root, revision, { verifyWorkingTree = false } = {}) {
   if (!/^[0-9a-f]{40}$/.test(revision)) throw new Error('provenance: некорректный revision');
-  const raw = git(root, ['ls-tree', '-r', '-z', '--name-only', revision], 'buffer');
-  const names = raw.toString('utf8').split('\0').filter(Boolean).sort();
-  if (names.length === 0) throw new Error('provenance: revision не содержит файлов');
+  const raw = git(root, ['ls-tree', '-r', '-z', revision], 'buffer');
+  const entries = raw.toString('utf8').split('\0').filter(Boolean).map((entry) => {
+    const tab = entry.indexOf('\t');
+    const [mode, type, object] = entry.slice(0, tab).split(' ');
+    return { mode, type, object, name: entry.slice(tab + 1) };
+  }).sort((a, b) => a.name < b.name ? -1 : a.name > b.name ? 1 : 0);
+  if (entries.length === 0) throw new Error('provenance: revision не содержит файлов');
   const hash = createHash('sha256');
-  for (const name of names) {
+  for (const { name, mode, type, object } of entries) {
+    const expected = git(root, ['show', `${revision}:${name}`], 'buffer');
+    if (verifyWorkingTree) {
+      const file = path.join(root, name);
+      if (type !== 'blob' || !['100644', '100755'].includes(mode) || !existsSync(file) || !lstatSync(file).isFile()) {
+        throw new Error(`provenance: tracked ${name} не является обычным файлом declared revision`);
+      }
+      const actual = readFileSync(file);
+      if (!actual.equals(expected)) {
+        // Разрешена Git-нормализация переводов строк; произвольные clean-фильтры
+        // могли бы скрыть другой исполняемый код за тем же blob ID.
+        const attributes = git(root, ['check-attr', '-z', 'filter', 'ident', 'working-tree-encoding', '--', name], 'buffer')
+          .toString('utf8').split('\0');
+        for (let index = 2; index < attributes.length; index += 3) {
+          if (!['unspecified', 'unset'].includes(attributes[index])) {
+            throw new Error(`provenance: tracked ${name} использует неподдерживаемое преобразование revision`);
+          }
+        }
+        const actualObject = execFileSync('git', ['hash-object', `--path=${name}`, '--stdin'], {
+          cwd: root, input: actual, encoding: 'utf8',
+        }).trim();
+        if (actualObject !== object) {
+          throw new Error(`provenance: tracked ${name} не совпадает с declared revision ${revision}`);
+        }
+      }
+    }
     hash.update(name);
     hash.update('\0');
-    hash.update(git(root, ['show', `${revision}:${name}`], 'buffer'));
+    hash.update(expected);
     hash.update('\0');
   }
   return hash.digest('hex');
@@ -175,11 +204,14 @@ export function readCheckoutState(root) {
   const shortRevision = git(root, ['rev-parse', '--short=12', 'HEAD']).trim();
   const status = git(root, ['status', '--porcelain=v1', '--untracked-files=all']);
   const dirty = status.trim().length > 0;
+  // Assume-unchanged/skip-worktree исключают файл из status, но не из доказательства байтов.
+  const trackedRevisionSha256 = dirty ? undefined : revisionFingerprint(root, revision, { verifyWorkingTree: true });
   return {
     revision,
     shortRevision,
     revisionLabel: `${shortRevision}${dirty ? '-dirty' : ''}`,
     dirty,
+    trackedRevisionSha256,
     worktreeSha256: worktreeFingerprint(root),
   };
 }

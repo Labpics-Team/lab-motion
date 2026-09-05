@@ -8,6 +8,7 @@ import {
 } from 'node:fs';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
+import { execFileSync } from 'node:child_process';
 import { afterEach, describe, expect, it } from 'vitest';
 import {
   assertBenchmarkExportSurface,
@@ -18,6 +19,8 @@ import {
   hashFileTree,
   prepareBenchmarkCheckout,
   captureBenchmarkEnvironment,
+  readCheckoutState,
+  revisionFingerprint,
   sha256File,
 } from '../bench/compare/provenance.mjs';
 
@@ -58,7 +61,100 @@ function fixture() {
   return { root, benchDirectory, distDirectory, state };
 }
 
+function checkoutFixture(autocrlf = false) {
+  const directory = mkdtempSync(path.join(tmpdir(), 'lab-motion-tracked-proof-'));
+  cleanup.push(directory);
+  const source = path.join(directory, 'source');
+  const root = path.join(directory, 'checkout');
+  mkdirSync(source);
+  const git = (cwd: string, args: string[]) => execFileSync('git', args, { cwd, encoding: 'utf8', stdio: ['ignore', 'pipe', 'pipe'] });
+  git(source, ['init', '--quiet']);
+  git(source, ['config', 'core.autocrlf', 'false']);
+  writeFileSync(path.join(source, '.gitignore'), 'dist/\n');
+  writeFileSync(path.join(source, 'package.json'), JSON.stringify({ name: 'fixture', exports: { './animate': './dist/animate/index.js' } }) + '\n');
+  writeFileSync(path.join(source, 'pnpm-lock.yaml'), 'fixture-lock\n');
+  writeFileSync(path.join(source, 'source.js'), 'export const value = 1;\n');
+  writeFileSync(path.join(source, 'binary.bin'), Buffer.from([0, 10, 1]));
+  git(source, ['add', '.']);
+  git(source, ['-c', 'user.name=Benchmark test', '-c', 'user.email=benchmark@example.invalid',
+    '-c', `core.hooksPath=${path.join(directory, 'no-hooks')}`, 'commit', '--quiet', '-m', 'fixture']);
+  git(directory, ['clone', '--quiet', '--no-hardlinks', '--config', `core.autocrlf=${autocrlf}`, source, root]);
+  mkdirSync(path.join(root, 'dist', 'animate'), { recursive: true });
+  writeFileSync(path.join(root, 'dist', 'animate', 'index.js'), 'runtime');
+  return { root, git: (args: string[]) => git(root, args), prepare: {
+    root, benchDirectory: root, requiredDist: ['dist/animate/index.js'],
+    captureEnvironment: () => ({ node: 'v24.0.0', pnpm: '11.11.0', packages: {} }),
+  } };
+}
+
 describe('benchmark provenance', () => {
+  it.each(['--assume-unchanged', '--skip-worktree'])('rejects hidden source bytes before build: %s', (flag) => {
+    const f = checkoutFixture();
+    const revision = f.git(['rev-parse', 'HEAD']).trim();
+    f.git(['update-index', flag, '--', 'source.js']);
+    writeFileSync(path.join(f.root, 'source.js'), 'export const value = 2;\n');
+    expect(f.git(['status', '--porcelain'])).toBe('');
+    expect(f.git(['rev-parse', 'HEAD']).trim()).toBe(revision);
+    let builds = 0;
+    expect(() => prepareBenchmarkCheckout({ ...f.prepare, build: () => { builds++; } }))
+      .toThrow(/tracked|revision|коммит/);
+    expect(builds).toBe(0);
+  });
+
+  it('accepts actual CRLF checkouts while retaining the committed canonical fingerprint', () => {
+    const f = checkoutFixture(true);
+    expect(f.git(['ls-files', '--eol', '--', 'source.js'])).toContain('w/crlf');
+    const state = readCheckoutState(f.root);
+    expect(state.dirty).toBe(false);
+    const canonical = revisionFingerprint(f.root, state.revision);
+    // Отпечаток исходной LF-фикстуры закрепляет совместимость формата, не CRLF-байты clone.
+    expect(canonical).toBe('6c85545764a91d47528b8eb7f790ee2525371bfb9341e8d8c8c42f31c8b39ae0');
+    expect(state.trackedRevisionSha256).toBe(canonical);
+    expect(() => prepareBenchmarkCheckout({ ...f.prepare, build() {} })).not.toThrow();
+  });
+
+  it.each(['build', 'run'])('rejects hidden source mutations after %s', (phase) => {
+    const f = checkoutFixture(true);
+    f.git(['update-index', '--skip-worktree', '--', 'source.js']);
+    const mutate = () => writeFileSync(path.join(f.root, 'source.js'), 'export const value = 2;\r\n');
+    if (phase === 'build') {
+      expect(() => prepareBenchmarkCheckout({ ...f.prepare, build: mutate })).toThrow(/tracked|revision|коммит|checkout/);
+    } else {
+      const prepared = prepareBenchmarkCheckout({ ...f.prepare, build() {} });
+      mutate();
+      expect(() => assertCheckoutUnchanged(f.root, prepared)).toThrow(/tracked|revision|коммит|checkout/);
+    }
+    expect(f.git(['status', '--porcelain'])).toBe('');
+  });
+
+  it('does not normalize binary changes as legitimate CRLF conversion', () => {
+    const f = checkoutFixture(true);
+    f.git(['update-index', '--assume-unchanged', '--', 'binary.bin']);
+    writeFileSync(path.join(f.root, 'binary.bin'), Buffer.from([0, 13, 10, 1]));
+    expect(f.git(['status', '--porcelain'])).toBe('');
+    expect(() => prepareBenchmarkCheckout({ ...f.prepare, build() {} })).toThrow(/tracked|revision|коммит/);
+  });
+
+  it('rejects a missing skip-worktree source instead of omitting it from the fingerprint', () => {
+    const f = checkoutFixture();
+    f.git(['update-index', '--skip-worktree', '--', 'source.js']);
+    unlinkSync(path.join(f.root, 'source.js'));
+    expect(f.git(['status', '--porcelain'])).toBe('');
+    let builds = 0;
+    expect(() => prepareBenchmarkCheckout({ ...f.prepare, build: () => { builds++; } })).toThrow(/tracked.*source.js/);
+    expect(builds).toBe(0);
+  });
+
+  it('does not trust a lossy custom clean filter to prove the committed source', () => {
+    const f = checkoutFixture();
+    f.git(['config', 'filter.mask.clean', 'git show HEAD:source.js']);
+    writeFileSync(path.join(f.root, '.git', 'info', 'attributes'), 'source.js filter=mask\n');
+    f.git(['update-index', '--assume-unchanged', '--', 'source.js']);
+    writeFileSync(path.join(f.root, 'source.js'), 'export const value = 999;\n');
+    expect(f.git(['status', '--porcelain'])).toBe('');
+    expect(() => prepareBenchmarkCheckout({ ...f.prepare, build() {} })).toThrow(/неподдерживаемое преобразование/);
+  });
+
   it('rejects requiredDist and benchmark entries outside published exports', () => {
     const f = fixture();
     writeFileSync(path.join(f.root, 'package.json'), JSON.stringify({
