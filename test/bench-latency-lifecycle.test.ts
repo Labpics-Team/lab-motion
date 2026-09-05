@@ -1,6 +1,9 @@
 import { readFileSync } from 'node:fs';
 import { describe, expect, it } from 'vitest';
-import { CompositorSpring } from '../src/compositor/index.js';
+import {
+  CompositorSpring,
+  type CompositorSpringOptions,
+} from '../src/compositor/index.js';
 import {
   createCompositorHandoffLatencyScenario,
   measureCompositorHandoffLatency,
@@ -14,7 +17,20 @@ const HANDOFF_EFFECTS = { animations: 0, cancels: 1, frameRequests: 1 } as const
 const EXPECTED_FAKE_LIVE = { value: 3.2, velocity: 200 } as const;
 const TEST_DONOR_EASING = 'linear(0 0%, 0.02 10%, 0.04 20%, 1 100%)';
 const TEST_DONOR_KEYFRAMES = [{ offset: 0, x: 0 }, { offset: 1, x: 100 }] as const;
-const TEST_DONOR_TIMING = { duration: 100, easing: TEST_DONOR_EASING } as const;
+const TEST_DONOR_TIMING = {
+  duration: 100,
+  easing: TEST_DONOR_EASING,
+  iterations: 1,
+  fill: 'both',
+  composite: 'replace',
+} as const;
+const TEST_EXPLICIT_KEYFRAMES = [
+  { offset: 0, x: 0, easing: 'linear' },
+  { offset: 0.1, x: 2, easing: 'linear' },
+  { offset: 0.2, x: 4, easing: 'linear' },
+  { offset: 1, x: 100, easing: 'linear' },
+] as const;
+const TEST_EXPLICIT_TIMING = { ...TEST_DONOR_TIMING, easing: 'linear' } as const;
 
 type EffectCounts = Readonly<{
   animations: number;
@@ -36,6 +52,10 @@ type FakeCompositorOptions = Readonly<{
 type FakeControllerBehavior = Readonly<{
   createLive?: () => unknown;
   destroyError?: Error;
+  donorPlan?: Readonly<{
+    keyframes: readonly Record<string, string | number>[];
+    timing: Readonly<Record<string, unknown>>;
+  }>;
   handoffClockReads?: number;
   handoffDonorReads?: number;
   onControllerDestroy?: () => void;
@@ -55,9 +75,13 @@ function createFakeCompositorSpring(
 
     private apply(effects: EffectCounts) {
       for (let index = 0; index < effects.animations; index++) {
+        const plan = behavior.donorPlan ?? {
+          keyframes: TEST_DONOR_KEYFRAMES,
+          timing: TEST_DONOR_TIMING,
+        };
         this.animations.push(this.options.target.animate(
-          TEST_DONOR_KEYFRAMES,
-          TEST_DONOR_TIMING,
+          plan.keyframes,
+          plan.timing,
         ));
       }
       const donor = this.animations[0];
@@ -125,6 +149,45 @@ function createScenario() {
   });
 }
 
+type DonorPlanMutation = (
+  keyframes: Record<string, string | number>[],
+  timing: object,
+) => readonly [keyframes: Record<string, string | number>[], timing: object];
+
+function createPlanMutatingCompositorSpring(mutate: DonorPlanMutation) {
+  return class PlanMutatingCompositorSpring extends CompositorSpring {
+    constructor(options: CompositorSpringOptions) {
+      const target = options.target!;
+      super({
+        ...options,
+        target: {
+          animate(keyframes, timing) {
+            const [mutatedKeyframes, mutatedTiming] = mutate(keyframes, timing);
+            return target.animate(mutatedKeyframes, mutatedTiming);
+          },
+        },
+      });
+    }
+  };
+}
+
+function measureRealHandoff(Implementation: typeof CompositorSpring) {
+  let nowNs = 0n;
+  return measureCompositorHandoffLatency({
+    CompositorSpring: Implementation,
+    spring: SPRING,
+    property: 'x',
+    from: 0,
+    to: 100,
+    initialNow: 1_000,
+    elapsedMs: 16,
+    nowNs: () => ++nowNs,
+    warmup: 0,
+    iters: 1,
+    runs: 1,
+  });
+}
+
 describe('жизненный цикл latency-стенда handoff', () => {
   it('исполняет CLI-entrypoint с одним op внутри измеряемого окна', () => {
     const phases: string[] = [];
@@ -162,6 +225,100 @@ describe('жизненный цикл latency-стенда handoff', () => {
       'setup', 'clock', 'op', 'clock', 'verify', 'teardown',
     ]);
   });
+
+  it('принимает explicit-linear donor с полным набором линейных stops', () => {
+    expect(measureFakeHandoff(SETUP_EFFECTS, HANDOFF_EFFECTS, {
+      donorPlan: {
+        keyframes: TEST_EXPLICIT_KEYFRAMES,
+        timing: TEST_EXPLICIT_TIMING,
+      },
+    })).toEqual({
+      label: 'CompositorSpring.handoffToLive (read+cancel+build)',
+      p50: 1,
+      p95: 1,
+      p99: 1,
+    });
+  });
+
+  it('принимает два неявно размещённых endpoint keyframes для CSS linear()', () => {
+    expect(measureFakeHandoff(SETUP_EFFECTS, HANDOFF_EFFECTS, {
+      donorPlan: {
+        keyframes: [{ x: 0 }, { x: 100 }],
+        timing: TEST_DONOR_TIMING,
+      },
+    })).toEqual({
+      label: 'CompositorSpring.handoffToLive (read+cancel+build)',
+      p50: 1,
+      p95: 1,
+      p99: 1,
+    });
+  });
+
+  it('отвергает нелинейный segment easing explicit-linear donor', () => {
+    expect(() => measureFakeHandoff(SETUP_EFFECTS, HANDOFF_EFFECTS, {
+      donorPlan: {
+        keyframes: TEST_EXPLICIT_KEYFRAMES.map((frame, index) => (
+          index === 1 ? { ...frame, easing: 'steps(1)' } : frame
+        )),
+        timing: TEST_EXPLICIT_TIMING,
+      },
+    })).toThrow(/donor/i);
+  });
+
+  it.each([
+    ['keyframe easing', (keyframes, timing) => [
+      keyframes.map((frame) => ({ ...frame, easing: 'steps(1)' })),
+      timing,
+    ]],
+    ['keyframe composite', (keyframes, timing) => [
+      keyframes.map((frame) => ({ ...frame, composite: 'add' })),
+      timing,
+    ]],
+    ['timing direction', (keyframes, timing) => [
+      keyframes,
+      { ...timing, direction: 'reverse' },
+    ]],
+    ['timing iterations', (keyframes, timing) => [
+      keyframes,
+      { ...timing, iterations: 2 },
+    ]],
+    ['timing iterationStart', (keyframes, timing) => [
+      keyframes,
+      { ...timing, iterationStart: 0.5 },
+    ]],
+    ['timing endDelay', (keyframes, timing) => [
+      keyframes,
+      { ...timing, endDelay: 100 },
+    ]],
+    ['timing composite', (keyframes, timing) => [
+      keyframes,
+      { ...timing, composite: 'add' },
+    ]],
+    ['timing fill', (keyframes, timing) => [
+      keyframes,
+      { ...timing, fill: 'none' },
+    ]],
+    ['timing timeline', (keyframes, timing) => [
+      keyframes,
+      { ...timing, timeline: {} },
+    ]],
+    ['лишний CSS keyframe', (keyframes, timing) => [
+      [keyframes[0]!, { ...keyframes[0]!, offset: 0.5 }, keyframes.at(-1)!],
+      timing,
+    ]],
+    ['неполный CSS offset range', (keyframes, timing) => [
+      keyframes.map((frame, index) => (
+        index === keyframes.length - 1 ? { ...frame, offset: 0.75 } : frame
+      )),
+      timing,
+    ]],
+  ] satisfies ReadonlyArray<readonly [string, DonorPlanMutation]>)(
+    'отвергает modifier-counterfeit: %s',
+    (_label, mutate) => {
+      expect(() => measureRealHandoff(createPlanMutatingCompositorSpring(mutate)))
+        .toThrow(/donor/i);
+    },
+  );
 
   it('не принимает эффекты setup за эффекты timed handoff', () => {
     expect(() => measureFakeHandoff(
@@ -311,6 +468,92 @@ describe('жизненный цикл latency-стенда handoff', () => {
       expect(teardownResult).toBe(failurePoint === 'вторые часы' ? 'live' : undefined);
     },
   );
+
+  it('вызывает teardown, даже если teardown-observer бросает', () => {
+    const phaseError = new Error('teardown observer failed');
+    let caught: unknown;
+    let teardownCalls = 0;
+    let nowNs = 0n;
+
+    try {
+      measureLatency('observer failure', {
+        op: () => 'live',
+        nowNs: () => ++nowNs,
+        onPhase(phase: string) {
+          if (phase === 'teardown') throw phaseError;
+        },
+        teardown() {
+          teardownCalls++;
+        },
+        warmup: 0,
+        iters: 1,
+        runs: 1,
+      });
+    } catch (error) {
+      caught = error;
+    }
+
+    expect(caught).toBe(phaseError);
+    expect(teardownCalls).toBe(1);
+  });
+
+  it('сохраняет observer-ошибку первой, если teardown тоже падает', () => {
+    const phaseError = new Error('teardown observer failed');
+    const teardownError = new Error('teardown failed');
+    let caught: unknown;
+    let nowNs = 0n;
+
+    try {
+      measureLatency('double cleanup failure', {
+        op: () => 'live',
+        nowNs: () => ++nowNs,
+        onPhase(phase: string) {
+          if (phase === 'teardown') throw phaseError;
+        },
+        teardown() {
+          throw teardownError;
+        },
+        warmup: 0,
+        iters: 1,
+        runs: 1,
+      });
+    } catch (error) {
+      caught = error;
+    }
+
+    expect(caught).toBeInstanceOf(AggregateError);
+    expect((caught as AggregateError).errors).toEqual([phaseError, teardownError]);
+  });
+
+  it('сохраняет op-ошибку при отказе teardown-observer и всё равно чистит', () => {
+    const opError = new Error('op failed');
+    const phaseError = new Error('teardown observer failed');
+    let caught: unknown;
+    let teardownCalls = 0;
+
+    try {
+      measureLatency('op and observer failure', {
+        op() {
+          throw opError;
+        },
+        onPhase(phase: string) {
+          if (phase === 'teardown') throw phaseError;
+        },
+        teardown() {
+          teardownCalls++;
+        },
+        warmup: 1,
+        iters: 1,
+        runs: 1,
+      });
+    } catch (error) {
+      caught = error;
+    }
+
+    expect(caught).toBeInstanceOf(AggregateError);
+    expect((caught as AggregateError).errors).toEqual([opError, phaseError]);
+    expect(teardownCalls).toBe(1);
+  });
 
   it('освобождает controller, если start бросает после захвата host-effect', () => {
     const startError = new Error('start failed');

@@ -1,27 +1,82 @@
 const systemNowNs = process.hrtime.bigint;
 
-function captureDonorExecution(keyframes, timing, property, from, to) {
-  const durationMs = timing?.duration;
-  const easing = timing?.easing;
+const DONOR_TIMING_FIELDS = new Set([
+  'duration',
+  'easing',
+  'delay',
+  'endDelay',
+  'fill',
+  'iterationStart',
+  'iterations',
+  'direction',
+  'composite',
+  'iterationComposite',
+]);
+
+function readDonorFrame(frame, property) {
   if (
+    frame === null ||
+    typeof frame !== 'object' ||
+    Object.getPrototypeOf(frame) !== Object.prototype ||
+    Reflect.ownKeys(frame).some((key) => (
+      typeof key !== 'string' ||
+      (key !== property && key !== 'offset' && key !== 'easing' && key !== 'composite')
+    )) ||
+    !Number.isFinite(frame[property]) ||
+    (frame.easing !== undefined && frame.easing !== 'linear') ||
+    (frame.composite !== undefined && frame.composite !== 'replace')
+  ) {
+    throw new Error('handoff benchmark: donor keyframe не соответствует профилю');
+  }
+  return {
+    hasOffset: Object.hasOwn(frame, 'offset'),
+    offset: frame.offset,
+    value: frame[property],
+  };
+}
+
+function captureDonorExecution(keyframes, timing, property, from, to) {
+  if (
+    timing === null ||
+    typeof timing !== 'object' ||
+    Object.getPrototypeOf(timing) !== Object.prototype ||
+    Reflect.ownKeys(timing).some((key) => !DONOR_TIMING_FIELDS.has(key)) ||
     !Array.isArray(keyframes) ||
     keyframes.length < 2 ||
-    !Number.isFinite(durationMs) ||
-    durationMs <= 0 ||
-    (timing.delay !== undefined && timing.delay !== 0)
+    !Number.isFinite(timing.duration) ||
+    timing.duration <= 0 ||
+    timing.iterations !== 1 ||
+    timing.fill !== 'both' ||
+    timing.composite !== 'replace' ||
+    (timing.delay !== undefined && timing.delay !== 0) ||
+    (timing.endDelay !== undefined && timing.endDelay !== 0) ||
+    (timing.iterationStart !== undefined && timing.iterationStart !== 0) ||
+    (timing.direction !== undefined && timing.direction !== 'normal') ||
+    (timing.iterationComposite !== undefined && timing.iterationComposite !== 'replace')
   ) {
     throw new Error('handoff benchmark: donor execution не соответствует профилю');
   }
-  const first = keyframes[0]?.[property];
-  const last = keyframes[keyframes.length - 1]?.[property];
-  if (first !== from || last !== to) {
+  const durationMs = timing.duration;
+  const easing = timing.easing;
+  const frames = keyframes.map((frame) => readDonorFrame(frame, property));
+  const first = frames[0];
+  const last = frames[frames.length - 1];
+  if (first.value !== from || last.value !== to) {
     throw new Error('handoff benchmark: donor endpoints не соответствуют профилю');
   }
 
   let stops;
   if (easing === 'linear') {
-    stops = keyframes.map((frame) => ({ offset: frame.offset, value: frame[property] }));
+    if (frames.some((frame) => !frame.hasOffset)) {
+      throw new Error('handoff benchmark: explicit donor offsets не соответствуют профилю');
+    }
+    stops = frames.map((frame) => ({ offset: frame.offset, value: frame.value }));
   } else if (typeof easing === 'string' && easing.startsWith('linear(') && easing.endsWith(')')) {
+    const implicitOffsets = !first.hasOffset && !last.hasOffset;
+    const endpointOffsets = first.hasOffset && first.offset === 0 && last.hasOffset && last.offset === 1;
+    if (frames.length !== 2 || (!implicitOffsets && !endpointOffsets)) {
+      throw new Error('handoff benchmark: CSS donor keyframes не соответствуют профилю');
+    }
     stops = easing.slice(7, -1).split(',').map((entry) => {
       const [rawProgress, rawPercent, ...rest] = entry.trim().split(/\s+/);
       if (rest.length > 0 || !rawPercent?.endsWith('%')) {
@@ -115,8 +170,26 @@ export function measureLatency(label, {
   };
   const cleanup = (result, arg) => {
     if (teardown) {
-      onPhase?.('teardown');
-      teardown(result, arg);
+      let phaseFailed = false;
+      let phaseError;
+      try {
+        onPhase?.('teardown');
+      } catch (error) {
+        phaseFailed = true;
+        phaseError = error;
+      }
+      try {
+        teardown(result, arg);
+      } catch (teardownError) {
+        if (phaseFailed) {
+          throw new AggregateError(
+            [phaseError, teardownError],
+            'latency benchmark: teardown observer и teardown завершились ошибкой',
+          );
+        }
+        throw teardownError;
+      }
+      if (phaseFailed) throw phaseError;
     }
   };
   const fail = (error, result, arg) => {
