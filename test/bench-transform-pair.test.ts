@@ -108,6 +108,48 @@ describe('paired public transform lifecycle screening', () => {
     expect(sample.semantic.targetTraceHashes).toHaveLength(count);
   });
 
+  it('accepts real animate when donor and successor share one host callback', async () => {
+    const direct = await runTransformLifecycleSample({ animate, count: 1, lifecycle: 'live', channels: 7 });
+    type FrameCallback = Parameters<NonNullable<AnimateOptions['requestFrame']>>[0];
+    let queue: FrameCallback[] = [];
+    let scheduled = false;
+    let logicalRequests = 0;
+    let largestBatch = 0;
+    const coalesced: typeof animate = (targets, props, options) => animate(targets, props, {
+      ...options,
+      requestFrame(callback) {
+        queue.push(callback);
+        largestBatch = Math.max(largestBatch, queue.length);
+        if (!scheduled) {
+          scheduled = true;
+          options!.requestFrame!((timestamp) => {
+            const current = queue;
+            queue = [];
+            scheduled = false;
+            for (const queued of current) queued(timestamp);
+          });
+        }
+        return ++logicalRequests;
+      },
+    });
+    let ticks = 0n;
+    const shared = await runTransformLifecycleSample({
+      animate: coalesced, count: 1, lifecycle: 'live', channels: 7, nowNs: () => ++ticks,
+    });
+    expect(largestBatch).toBeGreaterThan(1);
+    expect(shared.semantic.targetTraceHashes).toEqual(direct.semantic.targetTraceHashes);
+    expect(shared.semantic.requests).toBeLessThan(direct.semantic.requests);
+    expect(shared.semantic.executions).toBe(shared.semantic.requests);
+    expect(shared.semantic.pending).toBe(0);
+    expect(shared.semantic.finished).toBe(true);
+    expect(shared.semantic.onCompleteCalls).toBe(0);
+    expect(shared.operationNs).toBe(1);
+    expect(shared.frameNs).toEqual(TRANSFORM_PAIR_PROFILE.frameOffsetsMs.map(() => 1));
+    expect(shared.cancelDrainNs).toBe(1);
+    expect(queue).toHaveLength(0);
+    expect(scheduled).toBe(false);
+  });
+
   it('uses an independent residual/pickup oracle with explicit checkpoints', () => {
     expect(expectedTransformValues('fresh', 1, 0)).toEqual({ x: 0, y: 0, scaleX: 1, scaleY: 1, rotate: 0, skewX: 0, skewY: 0 });
     expect(expectedTransformValues('live', 1, 0)).toEqual({ x: 16, y: 8, scaleX: 1.25, scaleY: 1.5, rotate: 8, skewX: 2, skewY: 4 });
@@ -213,6 +255,102 @@ describe('paired public transform lifecycle screening', () => {
       expect((error as AggregateError).errors).toEqual([measurementError, cleanupError]);
     }
     expect(cancels).toBe(1);
+  });
+
+  it('retains the primary and both live cancellation failures while draining and resolving finished', async () => {
+    const primary = new Error('measurement clock');
+    const successorError = new Error('successor cancel');
+    const donorError = new Error('donor cancel');
+    const cancelled: string[] = [];
+    const finished = new Set<string>();
+    let calls = 0;
+    let ticks = 0;
+    let cleanupDrains = 0;
+    const sabotage: typeof animate = (targets, props, options) => {
+      const role = ++calls === 1 ? 'donor' : 'successor';
+      const controls = animate(targets, props, {
+        ...options,
+        requestFrame: (callback) => options!.requestFrame!((timestamp) => {
+          if (cancelled.length > 0) cleanupDrains++;
+          callback(timestamp);
+        }),
+      });
+      void controls.finished.then(() => { finished.add(role); });
+      return {
+        ...controls,
+        cancel() {
+          cancelled.push(role);
+          controls.cancel();
+          throw role === 'donor' ? donorError : successorError;
+        },
+      };
+    };
+    try {
+      await runTransformLifecycleSample({
+        animate: sabotage, count: 1, lifecycle: 'live', channels: 7,
+        nowNs: () => { if (++ticks === 2) throw primary; return 0n; },
+      });
+      expect.fail('all failures must be reported');
+    } catch (error) {
+      expect(error).toBeInstanceOf(AggregateError);
+      expect((error as AggregateError).errors).toEqual([primary, successorError, donorError]);
+    }
+    expect(cancelled).toEqual(['successor', 'donor']);
+    expect(cleanupDrains).toBeGreaterThan(0);
+    expect([...finished].sort()).toEqual(['donor', 'successor']);
+  });
+
+  it.each([
+    { role: 'donor', reason: new Error('donor finished') },
+    { role: 'donor', reason: undefined },
+    { role: 'successor', reason: new Error('successor finished') },
+    { role: 'successor', reason: undefined },
+  ])('observes rejected $role finished and preserves its reason: $reason', async ({ role, reason }) => {
+    let calls = 0;
+    const sabotage: typeof animate = (targets, props, options) => {
+      const owner = ++calls === 1 ? 'donor' : 'successor';
+      const controls = animate(targets, props, options);
+      return owner === role ? { ...controls, finished: Promise.reject(reason) } : controls;
+    };
+    try {
+      await runTransformLifecycleSample({ animate: sabotage, count: 1, lifecycle: 'live', channels: 7 });
+      expect.fail('rejected finished must invalidate the sample');
+    } catch (error) {
+      expect(error).toBeInstanceOf(AggregateError);
+      expect((error as AggregateError).errors).toEqual([reason]);
+    }
+  });
+
+  it('keeps throw undefined, both cancellation errors and a rejected successor finished', async () => {
+    const successorError = new Error('successor cancel');
+    const donorError = new Error('donor cancel');
+    let calls = 0;
+    let ticks = 0;
+    const cancelled: string[] = [];
+    const sabotage: typeof animate = (targets, props, options) => {
+      const role = ++calls === 1 ? 'donor' : 'successor';
+      const controls = animate(targets, props, options);
+      return {
+        ...controls,
+        finished: role === 'successor' ? Promise.reject(undefined) : controls.finished,
+        cancel() {
+          cancelled.push(role);
+          controls.cancel();
+          throw role === 'successor' ? successorError : donorError;
+        },
+      };
+    };
+    try {
+      await runTransformLifecycleSample({
+        animate: sabotage, count: 1, lifecycle: 'live', channels: 7,
+        nowNs: () => { if (++ticks === 2) throw undefined; return 0n; },
+      });
+      expect.fail('all failures must be retained');
+    } catch (error) {
+      expect(error).toBeInstanceOf(AggregateError);
+      expect((error as AggregateError).errors).toEqual([undefined, successorError, donorError, undefined]);
+    }
+    expect(cancelled).toEqual(['successor', 'donor']);
   });
 
   it.each(['reversed-order', 'split-skew'] as const)('rejects %s even when every channel value is unchanged', async (fault) => {

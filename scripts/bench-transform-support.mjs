@@ -41,7 +41,9 @@ export function expectedTransformValues(lifecycle, channels, offsetMs) {
       !TRANSFORM_PAIR_PROFILE.frameOffsetsMs.includes(offsetMs)) {
     throw new Error('transform oracle: вход вне фиксированного профиля');
   }
-  const from = lifecycle === 'fresh' ? INITIAL : interpolate(INITIAL, PREVIOUS, lifecycle === 'live' ? 0.25 : 1);
+  const previousProgress = lifecycle === 'live'
+    ? TRANSFORM_PAIR_PROFILE.previousLiveOffsetsMs.at(-1) / TRANSFORM_PAIR_PROFILE.durationMs : 1;
+  const from = lifecycle === 'fresh' ? INITIAL : interpolate(INITIAL, PREVIOUS, previousProgress);
   const to = channels === 7 ? DESTINATION : { ...from, x: DESTINATION.x };
   return interpolate(from, to, offsetMs / TRANSFORM_PAIR_PROFILE.durationMs);
 }
@@ -105,6 +107,8 @@ async function flushReactions() {
   for (let i = 0; i < 8; i++) await Promise.resolve();
 }
 
+/** @typedef {{ status: 'pending' } | { status: 'fulfilled' } | { status: 'rejected', reason: unknown }} FinishedState */
+
 export async function runTransformLifecycleSample({ animate, count, lifecycle, channels, nowNs = () => process.hrtime.bigint() }) {
   const profile = TRANSFORM_PAIR_PROFILE;
   if (typeof animate !== 'function' || !profile.counts.includes(count) ||
@@ -115,7 +119,7 @@ export async function runTransformLifecycleSample({ animate, count, lifecycle, c
   const frames = profile.frameOffsetsMs.length;
   const setupOffsets = lifecycle === 'settled' ? profile.previousSettledOffsetsMs : profile.previousLiveOffsetsMs;
   const slots = Array.from({ length: count }, () => ({
-    value: '', setup: new Array(3), setupWrites: new Uint32Array(3),
+    value: '', setup: new Array(setupOffsets.length), setupWrites: new Uint32Array(setupOffsets.length),
     values: new Array(frames), writes: new Uint32Array(frames), outsideWrites: 0,
   }));
   let phase = 'outside';
@@ -133,8 +137,10 @@ export async function runTransformLifecycleSample({ animate, count, lifecycle, c
   const previousProps = Object.fromEntries(KEYS.map((key) => [key, [INITIAL[key], PREVIOUS[key]]]));
   let previousCompleteCalls = 0;
   let onCompleteCalls = 0;
-  let previousFinished = false;
-  let finished = false;
+  /** @type {FinishedState} */
+  let previousFinished = { status: 'pending' };
+  /** @type {FinishedState} */
+  let finished = { status: 'pending' };
   let previous;
   let controls;
   let timestamp = profile.clockOriginMs;
@@ -146,23 +152,44 @@ export async function runTransformLifecycleSample({ animate, count, lifecycle, c
   const requirePending = (expected, label) => {
     if (pending() !== expected) throw new Error(`transform scheduler: ${label} pending=${pending()}, ожидалось ${expected}`);
   };
+  const requireLive = (label) => {
+    if (pending() <= 0) throw new Error(`transform scheduler: ${label} отсутствует следующий callback`);
+  };
   const frameNs = new Array(frames);
+  const cleanupErrors = [];
+  const recordedFailure = Symbol('recorded lifecycle failure');
+  const requireNoRecordedFailures = () => {
+    if (cleanupErrors.length || previousFinished.status === 'rejected' || finished.status === 'rejected') {
+      throw recordedFailure;
+    }
+  };
+  const observeFinished = (owner, accept) => {
+    try {
+      void owner.finished.then(
+        () => { accept({ status: 'fulfilled' }); },
+        (reason) => { accept({ status: 'rejected', reason }); },
+      );
+    } catch (reason) {
+      accept({ status: 'rejected', reason });
+    }
+  };
   let cleanupStarted = false;
   const cleanup = async () => {
     cleanupStarted = true;
     phase = 'outside';
-    try { controls?.cancel(); } finally {
-      try { previous?.cancel(); } finally {
-        for (let drain = 0; drain < 4 && pending() > 0; drain++) clock.step(timestamp + profile.durationMs * (4 + drain));
-        await flushReactions();
-      }
+    // Каждый владелец и drain получают попытку очистки; throw undefined тоже сохраняется.
+    try { controls?.cancel(); } catch (error) { cleanupErrors.push(error); }
+    try { previous?.cancel(); } catch (error) { cleanupErrors.push(error); }
+    for (let drain = 0; drain < 4 && pending() > 0; drain++) {
+      try { clock.step(timestamp + profile.durationMs * (4 + drain)); } catch (error) { cleanupErrors.push(error); }
     }
+    await flushReactions();
   };
   try {
     if (lifecycle !== 'fresh') {
       previous = animate(targets, previousProps, { ...options, onComplete: () => { previousCompleteCalls++; } });
-      void previous.finished.then(() => { previousFinished = true; });
-      requirePending(1, 'setup start');
+      observeFinished(previous, (state) => { previousFinished = state; });
+      requireLive('setup start');
       phase = 'setup';
       for (index = 0; index < setupOffsets.length; index++) {
         timestamp = profile.clockOriginMs + setupOffsets[index];
@@ -170,7 +197,8 @@ export async function runTransformLifecycleSample({ animate, count, lifecycle, c
       }
       phase = 'outside';
       await flushReactions();
-      if (previousFinished !== (lifecycle === 'settled') || previousCompleteCalls !== (lifecycle === 'settled' ? 1 : 0)) {
+      requireNoRecordedFailures();
+      if ((previousFinished.status === 'fulfilled') !== (lifecycle === 'settled') || previousCompleteCalls !== (lifecycle === 'settled' ? 1 : 0)) {
         throw new Error('transform: setup finished/onComplete нарушен');
       }
       for (let target = 0; target < count; target++) {
@@ -179,18 +207,23 @@ export async function runTransformLifecycleSample({ animate, count, lifecycle, c
           checkValues(slots[target].setup[frame], interpolate(INITIAL, PREVIOUS, setupOffsets[frame] / profile.durationMs), `setup target ${target} frame ${frame}`);
         }
       }
-      // После естественного завершения допустим единственный уже поставленный callback.
+      // После естественного завершения один drain очищает уже поставленные callbacks.
       if (lifecycle === 'settled') clock.step(timestamp + 1);
-      requirePending(lifecycle === 'live' ? 1 : 0, 'setup end');
+      if (lifecycle === 'live') requireLive('setup end');
+      else requirePending(0, 'setup end');
       timestamp += profile.successorGapMs;
     }
     const operationBefore = nowNs();
     controls = animate(targets, props, options);
-    const operationNs = Number(nowNs() - operationBefore);
-    void controls.finished.then(() => { finished = true; });
-    requirePending(lifecycle === 'live' ? 2 : 1, 'operation');
+    let operationNs;
+    try { operationNs = Number(nowNs() - operationBefore); } finally {
+      // Observer не входит в operation timing, но нужен даже при отказе часов.
+      observeFinished(controls, (state) => { finished = state; });
+    }
+    requireLive('operation');
     await flushReactions();
-    if (finished || onCompleteCalls !== 0 || (lifecycle !== 'fresh' && !previousFinished)) {
+    requireNoRecordedFailures();
+    if (finished.status === 'fulfilled' || onCompleteCalls !== 0 || (lifecycle !== 'fresh' && previousFinished.status !== 'fulfilled')) {
       throw new Error('transform: handoff finished/onComplete нарушен');
     }
     phase = 'frames';
@@ -198,17 +231,19 @@ export async function runTransformLifecycleSample({ animate, count, lifecycle, c
       const before = nowNs();
       clock.step(timestamp + profile.frameOffsetsMs[index]);
       frameNs[index] = Number(nowNs() - before);
-      requirePending(1, `frame ${index}`);
+      requireLive(`frame ${index}`);
     }
     phase = 'outside';
     await flushReactions();
-    if (finished || onCompleteCalls !== 0) throw new Error('transform: преждевременный finished/onComplete');
+    requireNoRecordedFailures();
+    if (finished.status === 'fulfilled' || onCompleteCalls !== 0) throw new Error('transform: преждевременный finished/onComplete');
     const cancelBefore = nowNs();
     controls.cancel();
     clock.step(timestamp + profile.durationMs);
     const cancelDrainNs = Number(nowNs() - cancelBefore);
     await flushReactions();
-    if (!finished || onCompleteCalls !== 0 || previousCompleteCalls !== (lifecycle === 'settled' ? 1 : 0)) {
+    requireNoRecordedFailures();
+    if (finished.status !== 'fulfilled' || onCompleteCalls !== 0 || previousCompleteCalls !== (lifecycle === 'settled' ? 1 : 0)) {
       throw new Error('transform: cancel finished/onComplete нарушен');
     }
     requirePending(0, 'cancel drain');
@@ -217,8 +252,9 @@ export async function runTransformLifecycleSample({ animate, count, lifecycle, c
     clock.step(timestamp + profile.durationMs * 3);
     // PASS относится к состоянию после всех эффектов, включая повторную отмену обоих владельцев.
     await cleanup();
+    requireNoRecordedFailures();
     requirePending(0, 'cleanup');
-    if (!finished || onCompleteCalls !== 0 || previousCompleteCalls !== (lifecycle === 'settled' ? 1 : 0)) {
+    if (finished.status !== 'fulfilled' || onCompleteCalls !== 0 || previousCompleteCalls !== (lifecycle === 'settled' ? 1 : 0)) {
       throw new Error('transform: cleanup finished/onComplete нарушен');
     }
     if (clock.executions !== idleExecutions) throw new Error('transform scheduler: stale idle callback');
@@ -235,16 +271,18 @@ export async function runTransformLifecycleSample({ animate, count, lifecycle, c
       throw new Error('transform: некорректный timing');
     }
     return { operationNs, frameNs, cancelDrainNs, semantic: {
-      valid: true, targets: count, frames, targetTraceHashes, finished, onCompleteCalls,
-      previousFinished: lifecycle === 'fresh' ? null : previousFinished, previousCompleteCalls,
+      valid: true, targets: count, frames, targetTraceHashes, finished: finished.status === 'fulfilled', onCompleteCalls,
+      previousFinished: lifecycle === 'fresh' ? null : previousFinished.status === 'fulfilled', previousCompleteCalls,
       requests: clock.requests, executions: clock.executions, pending: pending(),
     } };
   } catch (error) {
-    if (!cleanupStarted) {
-      try { await cleanup(); } catch (cleanupError) {
-        throw new AggregateError([error, cleanupError], 'transform: sample и cleanup завершились ошибкой');
-      }
+    if (!cleanupStarted) await cleanup();
+    const errors = error === recordedFailure ? [] : [error];
+    errors.push(...cleanupErrors);
+    for (const state of [previousFinished, finished]) {
+      if (state.status === 'rejected') errors.push(state.reason);
     }
-    throw error;
+    if (error !== recordedFailure && errors.length === 1) throw error;
+    throw new AggregateError(errors, 'transform: sample и cleanup завершились ошибкой');
   }
 }
