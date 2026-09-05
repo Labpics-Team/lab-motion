@@ -322,6 +322,85 @@ function countHotMapAllocations(run: () => void): number {
   return allocations;
 }
 
+describe('bindGroup: fresh transform allocation ceiling', () => {
+  it.each([
+    { x: 240 },
+    { x: [0, 240], rotate: [0, 90] },
+    { x: 2, y: 3, scale: 2, rotate: 45, skewX: 4, skewY: 5 },
+  ])('не создаёт Set для отсутствующего остаточного состояния: %j', (props) => {
+    const el: WaapiTarget = {
+      style: { getPropertyValue: () => '', setProperty() {} },
+      animate: () => ({ cancel() {} }),
+    };
+    const record: GroupRecord = {
+      _owner: undefined,
+      _transition: false,
+      _numeric: new Map(),
+      _cssValue: undefined,
+    };
+    const specs = parseProps(props);
+    const NativeSet = globalThis.Set;
+    let sets = 0;
+    class CountingSet<T> extends NativeSet<T> {
+      constructor(values?: Iterable<T> | null) {
+        super(values);
+        sets++;
+      }
+    }
+    let bound: BoundGroup;
+    globalThis.Set = CountingSet;
+    try {
+      bound = bindGroup(el, 'transform', specs, record);
+    } finally {
+      globalThis.Set = NativeSet;
+    }
+    expect(sets).toBe(0);
+    expect(bound._residuals.size).toBe(0);
+    expect(bound._numeric.map((channel) => channel._key)).toEqual(specs.map((spec) => spec._key));
+    expect(bound._transform).toBeDefined();
+  });
+
+  it('сохраняет residual-порядок и один снимок для всех подмножеств каналов', () => {
+    const keys = ['x', 'y', 'scaleX', 'scaleY', 'rotate', 'skewX', 'skewY'];
+    const el: WaapiTarget = {
+      style: { getPropertyValue: () => '', setProperty() {} },
+      animate: () => ({ cancel() {} }),
+    };
+    for (let mask = 0; mask < 128; mask++) {
+      const storedKeys = keys.filter((_, index) => (mask & (1 << index)) !== 0);
+      const liveKeys = keys.filter((_, index) => ((mask * 37) & (1 << index)) !== 0).reverse();
+      for (const withOwner of [false, true]) {
+        let captures = 0;
+        const reads: string[] = [];
+        const record: GroupRecord = {
+          _transition: false,
+          _cssValue: undefined,
+          _numeric: new Map(storedKeys.map((key) => [key, { _value: 2, _velocity: 0 }])),
+          _owner: withOwner ? {
+            _capture: () => { captures++; },
+            _captureNum: (key) => {
+              reads.push(key);
+              return liveKeys.includes(key) ? { _value: 3, _velocity: 4 } : undefined;
+            },
+            _captureCss: () => undefined,
+            _numericKeys: () => liveKeys,
+            _supersede() {},
+          } : undefined,
+        };
+        const animated = keys.filter((_, index) => ((mask * 53) & (1 << index)) !== 0);
+        const specs = parseProps(Object.fromEntries(animated.map((key) => [key, [0, 10]])));
+        const bound = bindGroup(el, 'transform', specs, record);
+        const expected = [...new Set([...storedKeys, ...(withOwner ? liveKeys : [])])]
+          .filter((key) => !animated.includes(key))
+          .map((key) => [key, withOwner && liveKeys.includes(key) ? 3 : 2]);
+        expect([...bound._residuals], `mask=${mask}, owner=${withOwner}`).toEqual(expected);
+        expect(captures).toBe(withOwner ? 1 : 0);
+        expect(reads).toEqual(withOwner ? expected.map(([key]) => key) : []);
+      }
+    }
+  });
+});
+
 describe.each([1, 1000])('transform Map/state evidence: N=$samples', (samples) => {
   it('MainUnit пишет реальные кадры в один BoundGroup._transform', () => {
     let styleWrites = 0;
