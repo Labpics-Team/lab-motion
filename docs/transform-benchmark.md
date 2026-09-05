@@ -1,5 +1,7 @@
 # Парное измерение transform через публичный API
 
+> Роль: справка — исполнимый контракт парного transform-бенчмарка, его профиля, provenance и границ интерпретации.
+
 `scripts/bench-transform-pair.mjs` сравнивает два чистых checkout через
 `dist/animate/index.js`. Область измерения — движок в Node: линейный tween,
 ручные часы кадров и объекты с `style.setProperty`. DOM, браузерная отрисовка,
