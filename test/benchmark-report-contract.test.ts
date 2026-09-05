@@ -26,12 +26,15 @@ import {
   assertAllowedPostReportChanges,
   benchmarkNoReportStatement,
   createBenchmarkClaims,
+  createBenchmarkMotionConformance,
   parseBenchmarkDocumentationState,
   renderBenchmarkMarkdown,
   renderBenchmarkEnvironment,
   sha256Text,
+  S5_MOTION_REQUIREMENTS,
   validateBenchmarkReportPair,
 } from '../bench/compare/report-contract.mjs';
+import { S5_MOTION_CONTRACT } from '../bench/compare/motion-conformance.mjs';
 
 const START = ['lab', 'motion', 'gsap', 'anime'];
 const FREEZE = [
@@ -347,7 +350,437 @@ function fixture(startRuns = 20, warmCalls: Partial<Record<keyof typeof START_SC
   return { stem, markdown, payload, rootPackage, benchmarkPackage, now: Date.parse(generatedAt) };
 }
 
+type MotionPoint = { t: number; x: number };
+type MotionClock = {
+  startClock: ReturnType<typeof startClock>;
+  timerEvidence: ReturnType<typeof timerEvidence>;
+};
+type MotionEvidence = {
+  baseline: MotionPoint[];
+  blocked: MotionPoint[];
+  baselineWitness?: MotionPoint[];
+  blockedWitness?: MotionPoint[];
+  baselineClock?: MotionClock;
+  blockedClock?: MotionClock;
+  grid: number[];
+};
+type MotionFreezeRun = {
+  valid: boolean;
+  score: number | null;
+  samples: number;
+  movement: ReturnType<typeof movementStats>;
+  baselineMovement: ReturnType<typeof movementStats>;
+  finalX: number;
+  baselineFinalX: number;
+  blockStart: number;
+  blockEnd: number;
+  rawFrames: { baseline: number; blocked: number };
+  evidence: MotionEvidence;
+};
+
+const linearMotionPoints = (): MotionPoint[] => Array.from(
+  { length: 121 }, (_, index) => ({ t: index / 50, x: index * 5 }),
+);
+
+// Независимая численная фикстура исходного ОДУ; production solver не импортируется.
+function springMotionPoints(): MotionPoint[] {
+  const points = [{ t: 0, x: 0 }];
+  const step = 0.0005;
+  const acceleration = (x: number, velocity: number) => 40 * (600 - x) - 8 * velocity;
+  let x = 0;
+  let velocity = 0;
+  for (let tick = 1; tick <= 4800; tick++) {
+    const dx1 = velocity;
+    const dv1 = acceleration(x, velocity);
+    const dx2 = velocity + dv1 * step / 2;
+    const dv2 = acceleration(x + dx1 * step / 2, dx2);
+    const dx3 = velocity + dv2 * step / 2;
+    const dv3 = acceleration(x + dx2 * step / 2, dx3);
+    const dx4 = velocity + dv3 * step;
+    const dv4 = acceleration(x + dx3 * step, dx4);
+    x += step * (dx1 + 2 * dx2 + 2 * dx3 + dx4) / 6;
+    velocity += step * (dv1 + 2 * dv2 + 2 * dv3 + dv4) / 6;
+    if (tick % 40 === 0) points.push({ t: tick / 2000, x });
+  }
+  return points;
+}
+
+function motionFreezeRun(id: string): MotionFreezeRun {
+  const baseline = id === 'lab-spring' ? springMotionPoints() : linearMotionPoints();
+  const evidence: MotionEvidence = {
+    baseline,
+    blocked: structuredClone(baseline),
+    baselineWitness: linearMotionPoints(),
+    blockedWitness: linearMotionPoints(),
+    baselineClock: { startClock: startClock(), timerEvidence: timerEvidence() },
+    blockedClock: { startClock: startClock(), timerEvidence: timerEvidence() },
+    grid: baseline.filter((point) => point.t >= 0.38 && point.t <= 1.12).map((point) => point.t),
+  };
+  const run: MotionFreezeRun = {
+    valid: false, score: 0, samples: 0,
+    movement: movementStats([]), baselineMovement: movementStats([]),
+    finalX: baseline[baseline.length - 1]!.x,
+    baselineFinalX: baseline[baseline.length - 1]!.x,
+    blockStart: 0.3, blockEnd: 1.2,
+    rawFrames: { baseline: baseline.length, blocked: baseline.length },
+    evidence,
+  };
+  refreshMotionRun(run);
+  return run;
+}
+
+function refreshMotionRun(run: MotionFreezeRun) {
+  const scored = scoreAgainstBaseline(run.evidence.blocked, run.evidence.baseline, run.evidence.grid);
+  const inWindow = (point: MotionPoint) => point.t >= run.blockStart + 0.08
+    && point.t <= run.blockEnd - 0.08;
+  run.score = scored.score;
+  run.samples = scored.samples;
+  run.movement = movementStats(run.evidence.blocked.filter(inWindow));
+  run.baselineMovement = movementStats(run.evidence.baseline.filter(inWindow));
+  run.rawFrames = { baseline: run.evidence.baseline.length, blocked: run.evidence.blocked.length };
+  run.valid = Math.abs(run.baselineFinalX - 600) <= 2 && Math.abs(run.finalX - 600) <= 2
+    && Number.isFinite(run.score) && run.samples >= 5
+    && run.baselineMovement.distinctPositions >= 5 && run.baselineMovement.totalAdvancement >= 10;
+}
+
+function renderMotionPair(report: ReturnType<typeof fixture>) {
+  report.markdown = renderBenchmarkMarkdown(report.payload);
+  report.payload.companion.markdownSha256 = sha256Text(report.markdown);
+}
+
+function refreshMotionReport(report: ReturnType<typeof fixture>) {
+  for (const id of FREEZE) {
+    const result = report.payload.results[id];
+    const runs: MotionFreezeRun[] = result.raw.freeze;
+    runs.forEach(refreshMotionRun);
+    result.summary.freeze = {
+      score: summarizeMedianSamples(runs.map((run) => run.score)),
+      frames: summarizeMedianSamples(runs.map((run) => run.movement.frames)),
+      distinct: summarizeMedianSamples(runs.map((run) => run.movement.distinctPositions)),
+      net: summarizeMedianSamples(runs.map((run) => run.movement.netAdvancement)),
+      total: summarizeMedianSamples(runs.map((run) => run.movement.totalAdvancement)),
+      finalX: summarizeMedianSamples(runs.map((run) => run.finalX)),
+    };
+  }
+  report.payload.motionConformance = createBenchmarkMotionConformance(report.payload.results);
+  renderMotionPair(report);
+  return report;
+}
+
+function motionFixture() {
+  const report = fixture();
+  report.payload.schema = 10;
+  report.payload.motionContract = structuredClone(S5_MOTION_CONTRACT);
+  report.payload.provenance.inputs['bench/motion-conformance.mjs'] = SHA('a');
+  for (const id of FREEZE) {
+    report.payload.results[id].raw.freeze = Array.from({ length: 8 }, () => motionFreezeRun(id));
+  }
+  return refreshMotionReport(report);
+}
+
+function freeze25To65(): MotionPoint[] {
+  return linearMotionPoints().map((point) => point.t >= 0.6 && point.t <= 1.54
+    ? { ...point, x: 150 } : point);
+}
+
+describe('schema 10 motion conformance admission', () => {
+  it('принимает полный отчёт с 8 × 8 траекториями и независимой пружиной', () => {
+    const report = motionFixture();
+    expect(() => validateBenchmarkReportPair(report)).not.toThrow();
+    expect(() => validateBenchmarkReportPair({
+      ...report, motionRequirements: S5_MOTION_REQUIREMENTS,
+    })).not.toThrow();
+    expect(Object.keys(report.payload.motionConformance)).toEqual(FREEZE);
+    for (const id of FREEZE) {
+      const conformance = report.payload.motionConformance[id];
+      expect(conformance).toMatchObject({ baseline: 'pass', blocked: 'pass', capture: 'pass' });
+      expect(conformance.runs).toHaveLength(8);
+      for (const run of conformance.runs) {
+        expect(run.baseline.samples).toBe(121);
+        expect(run.blocked.samples).toBe(121);
+      }
+    }
+    expect(report.payload.motionConformance['lab-spring'].runs[0].baseline.maxErrorPx)
+      .toBeLessThan(0.000001);
+    expect(report.markdown).toContain('Независимый контракт движения');
+    expect(report.markdown).toContain('не выполнение требований движения');
+    expect(report.payload.companion.markdownSha256).toBe(sha256Text(report.markdown));
+  });
+
+  it('фиксирует scoped требования: baseline для всех и blocked для четырёх native-путей', () => {
+    expect(S5_MOTION_REQUIREMENTS).toEqual({
+      baseline: FREEZE, blocked: ['waapi-ctl', 'lab-spring', 'motion-mini', 'anime-waapi'],
+    });
+    expect(Object.isFrozen(S5_MOTION_REQUIREMENTS)).toBe(true);
+    expect(Object.isFrozen(S5_MOTION_REQUIREMENTS.baseline)).toBe(true);
+    expect(Object.isFrozen(S5_MOTION_REQUIREMENTS.blocked)).toBe(true);
+  });
+
+  it('сохраняет наблюдаемое JS-зависание как валидную диагностику, отклоняя blocked quality claim', () => {
+    const report = motionFixture();
+    const run = report.payload.results.lab.raw.freeze[0];
+    run.evidence.blocked = linearMotionPoints().map((point) => point.t >= 0.3 && point.t <= 1.2
+      ? { ...point, x: 75 } : point);
+    refreshMotionReport(report);
+    expect(run.valid).toBe(true);
+    expect(() => validateBenchmarkReportPair(report)).not.toThrow();
+    expect(report.payload.motionConformance.lab).toMatchObject({
+      baseline: 'pass', blocked: 'fail', capture: 'pass',
+    });
+    expect(() => validateBenchmarkReportPair({
+      ...report, motionRequirements: { baseline: ['lab'], blocked: ['lab'] },
+    })).toThrow(/motion conformance: lab\.blocked = fail/);
+    expect(() => validateBenchmarkReportPair({
+      ...report, motionRequirements: S5_MOTION_REQUIREMENTS,
+    })).not.toThrow();
+  });
+
+  it('отклоняет одинаковое неверное движение baseline и blocked при score 100 и valid=true', () => {
+    const report = motionFixture();
+    for (const run of report.payload.results.lab.raw.freeze) {
+      run.evidence.baseline = freeze25To65();
+      run.evidence.blocked = freeze25To65();
+    }
+    refreshMotionReport(report);
+    expect(report.payload.results.lab.summary.freeze.score.p50).toBe(100);
+    expect(report.payload.results.lab.raw.freeze.every((run: { valid: boolean }) => run.valid)).toBe(true);
+    expect(() => validateBenchmarkReportPair(report)).not.toThrow();
+    expect(report.payload.motionConformance.lab).toMatchObject({
+      baseline: 'fail', blocked: 'fail', capture: 'pass',
+    });
+    expect(() => validateBenchmarkReportPair({
+      ...report, motionRequirements: S5_MOTION_REQUIREMENTS,
+    })).toThrow(/motion conformance: lab\.baseline = fail/);
+  });
+
+  it('один плохой native-прогон не исчезает за медианой score 100', () => {
+    const report = motionFixture();
+    report.payload.results['motion-mini'].raw.freeze[7].evidence.blocked = freeze25To65();
+    refreshMotionReport(report);
+    expect(report.payload.results['motion-mini'].summary.freeze.score.p50).toBe(100);
+    expect(report.payload.motionConformance['motion-mini'].runs.filter(
+      (run: { blocked: { verdict: string } }) => run.blocked.verdict === 'pass',
+    )).toHaveLength(7);
+    expect(() => validateBenchmarkReportPair(report)).not.toThrow();
+    expect(() => validateBenchmarkReportPair({
+      ...report, motionRequirements: S5_MOTION_REQUIREMENTS,
+    })).toThrow(/motion conformance: motion-mini\.blocked = fail/);
+  });
+
+  it('не принимает подделанный cached PASS даже с каноническими Markdown и SHA', () => {
+    const report = motionFixture();
+    report.payload.results['motion-mini'].raw.freeze[0].evidence.blocked = freeze25To65();
+    refreshMotionReport(report);
+    const forged = report.payload.motionConformance['motion-mini'];
+    forged.blocked = 'pass';
+    forged.runs[0].blocked.verdict = 'pass';
+    forged.runs[0].blocked.reason = 'within-s5-motion-contract';
+    renderMotionPair(report);
+    expect(report.payload.companion.markdownSha256).toBe(sha256Text(report.markdown));
+    expect(() => validateBenchmarkReportPair(report)).toThrow(/motion conformance не пересчитывается/);
+  });
+
+  it.each([
+    ['positionTolerancePx', 600], ['timeToleranceMs', 2400], ['maxObservationGapMs', 2400],
+    ['distancePx', 150], ['durationMs', 9600], ['id', 's5-motion-v2'],
+  ])('отклоняет подмену motion manifest: %s', (field, value) => {
+    const report = motionFixture();
+    report.payload.motionContract[field] = value;
+    renderMotionPair(report);
+    expect(() => validateBenchmarkReportPair(report)).toThrow(/motion conformance: контракт изменён/);
+  });
+
+  it('отклоняет подмену вложенных параметров пружины', () => {
+    const report = motionFixture();
+    report.payload.motionContract.spring.damping = 800;
+    renderMotionPair(report);
+    expect(() => validateBenchmarkReportPair(report)).toThrow(/motion conformance: контракт изменён/);
+  });
+
+  it('требует provenance независимого oracle, даже если вердикты пересчитываются', () => {
+    const report = motionFixture();
+    delete report.payload.provenance.inputs['bench/motion-conformance.mjs'];
+    renderMotionPair(report);
+    expect(() => validateBenchmarkReportPair(report)).toThrow(/motion conformance input/);
+  });
+
+  it.each([
+    ['empty', { baseline: [], blocked: [] }],
+    ['unknown participant', { baseline: ['unknown'], blocked: [] }],
+    ['inherited participant', { baseline: ['toString'], blocked: [] }],
+    ['duplicate participant', { baseline: ['lab', 'lab'], blocked: [] }],
+    ['missing mode', { baseline: ['lab'] }],
+    ['extra mode', { baseline: ['lab'], blocked: [], other: ['lab'] }],
+    ['scalar list', { baseline: 'lab', blocked: [] }],
+    ['null', null],
+  ])('отклоняет неоднозначные требования %s', (_label, motionRequirements) => {
+    const report = motionFixture();
+    expect(() => validateBenchmarkReportPair({ ...report, motionRequirements }))
+      .toThrow(/motion conformance/);
+  });
+
+  it.each(['baseline', 'blocked'] as const)('без %s witness движение остаётся inconclusive', (mode) => {
+    const report = motionFixture();
+    delete report.payload.results['motion-mini'].raw.freeze[0].evidence[`${mode}Witness`];
+    refreshMotionReport(report);
+    const conformance = report.payload.motionConformance['motion-mini'];
+    expect(conformance.capture).toBe('inconclusive');
+    expect(conformance[mode]).toBe('inconclusive');
+    expect(conformance.runs[0].witness[mode].verdict).toBe('inconclusive');
+    expect(() => validateBenchmarkReportPair(report)).not.toThrow();
+    expect(() => validateBenchmarkReportPair({
+      ...report, motionRequirements: S5_MOTION_REQUIREMENTS,
+    })).toThrow(new RegExp(`motion-mini\\.${mode} = inconclusive`));
+  });
+
+  it('не квалифицирует неподвижный witness, хотя целевая траектория правильная', () => {
+    const report = motionFixture();
+    report.payload.results['motion-mini'].raw.freeze[0].evidence.blockedWitness = linearMotionPoints()
+      .map((point) => ({ ...point, x: 0 }));
+    refreshMotionReport(report);
+    expect(report.payload.motionConformance['motion-mini']).toMatchObject({
+      blocked: 'inconclusive', capture: 'inconclusive',
+    });
+    expect(() => validateBenchmarkReportPair(report)).not.toThrow();
+    expect(() => validateBenchmarkReportPair({
+      ...report, motionRequirements: S5_MOTION_REQUIREMENTS,
+    })).toThrow(/motion-mini\.blocked = inconclusive/);
+  });
+
+  it('не достраивает пропущенные кадры из верных редких положений цели и witness', () => {
+    const report = motionFixture();
+    const run = report.payload.results['motion-mini'].raw.freeze[0];
+    run.evidence.blocked = linearMotionPoints().filter((_point, index) => index % 4 === 0);
+    run.evidence.blockedWitness = structuredClone(run.evidence.blocked);
+    refreshMotionReport(report);
+    expect(report.payload.motionConformance['motion-mini']).toMatchObject({
+      blocked: 'inconclusive', capture: 'inconclusive',
+    });
+    expect(report.payload.motionConformance['motion-mini'].runs[0].blocked).toMatchObject({
+      verdict: 'inconclusive', reason: 'observation-gap-exceeds-contract', samples: 31,
+    });
+    expect(() => validateBenchmarkReportPair(report)).not.toThrow();
+    expect(() => validateBenchmarkReportPair({
+      ...report, motionRequirements: S5_MOTION_REQUIREMENTS,
+    })).toThrow(/motion-mini\.blocked = inconclusive/);
+  });
+
+  it('не подставляет witness из других кадров при правильных отдельных траекториях', () => {
+    const report = motionFixture();
+    report.payload.results['motion-mini'].raw.freeze[0].evidence.blockedWitness = linearMotionPoints()
+      .map((point) => ({ ...point, t: point.t + 0.001 }));
+    refreshMotionReport(report);
+    expect(report.payload.motionConformance['motion-mini']).toMatchObject({
+      blocked: 'inconclusive', capture: 'inconclusive',
+    });
+    expect(() => validateBenchmarkReportPair(report)).not.toThrow();
+    expect(() => validateBenchmarkReportPair({
+      ...report, motionRequirements: S5_MOTION_REQUIREMENTS,
+    })).toThrow(/motion-mini\.blocked = inconclusive/);
+  });
+
+  it('не удаляет одинаковые кадры из обеих сеток при сохранённом счётчике захвата', () => {
+    const report = motionFixture();
+    const run = report.payload.results['motion-mini'].raw.freeze[0];
+    run.evidence.blocked = linearMotionPoints().filter((_point, index) => index % 2 === 0);
+    run.evidence.blockedWitness = structuredClone(run.evidence.blocked);
+    refreshMotionReport(report);
+    run.rawFrames.blocked = 121;
+    report.payload.motionConformance = createBenchmarkMotionConformance(report.payload.results);
+    renderMotionPair(report);
+    expect(report.payload.motionConformance['motion-mini'].blocked).toBe('inconclusive');
+    expect(() => validateBenchmarkReportPair({ ...report, motionRequirements: S5_MOTION_REQUIREMENTS }))
+      .toThrow(/motion-mini\.blocked = inconclusive/);
+  });
+
+  it.each(['baseline', 'blocked'] as const)('требует отдельную привязку часов %s', (mode) => {
+    const report = motionFixture();
+    delete report.payload.results['motion-mini'].raw.freeze[0].evidence[`${mode}Clock`];
+    refreshMotionReport(report);
+    const conformance = report.payload.motionConformance['motion-mini'];
+    expect(conformance.capture).toBe('inconclusive');
+    expect(conformance[mode]).toBe('inconclusive');
+    expect(() => validateBenchmarkReportPair(report)).not.toThrow();
+    expect(() => validateBenchmarkReportPair({
+      ...report, motionRequirements: S5_MOTION_REQUIREMENTS,
+    })).toThrow(new RegExp(`motion-mini\\.${mode} = inconclusive`));
+  });
+
+  it('28 мс между CDP marker и API не проходят как допустимый сдвиг движения', () => {
+    const report = motionFixture();
+    const clock = report.payload.results['motion-mini'].raw.freeze[0].evidence.blockedClock.startClock;
+    clock.pageApiNowMs = clock.pageBeforeNowMs + 28;
+    refreshMotionReport(report);
+    expect(report.payload.motionConformance['motion-mini']).toMatchObject({
+      blocked: 'inconclusive', capture: 'inconclusive',
+    });
+    expect(() => validateBenchmarkReportPair(report)).not.toThrow();
+    expect(() => validateBenchmarkReportPair({
+      ...report, motionRequirements: S5_MOTION_REQUIREMENTS,
+    })).toThrow(/motion-mini\.blocked = inconclusive/);
+  });
+
+  it('не принимает CDP marker другого realm даже при малом численном интервале', () => {
+    const report = motionFixture();
+    report.payload.results['motion-mini'].raw.freeze[0].evidence.blockedClock
+      .timerEvidence.probes[1].timeOriginMs += 1;
+    refreshMotionReport(report);
+    expect(report.payload.motionConformance['motion-mini']).toMatchObject({
+      blocked: 'inconclusive', capture: 'inconclusive',
+    });
+    expect(() => validateBenchmarkReportPair({
+      ...report, motionRequirements: S5_MOTION_REQUIREMENTS,
+    })).toThrow(/motion-mini\.blocked = inconclusive/);
+  });
+
+  it('измеренная неопределённость расходует временной бюджет движения', () => {
+    const report = motionFixture();
+    const run = report.payload.results['motion-mini'].raw.freeze[0];
+    run.evidence.blocked = linearMotionPoints().map((point) => point.t === 1.2
+      ? { ...point, x: point.x + 7 } : point);
+    refreshMotionReport(report);
+    expect(() => validateBenchmarkReportPair({
+      ...report, motionRequirements: S5_MOTION_REQUIREMENTS,
+    })).not.toThrow();
+    run.evidence.blockedClock.startClock.pageApiNowMs =
+      run.evidence.blockedClock.startClock.pageBeforeNowMs + 10;
+    refreshMotionReport(report);
+    expect(report.payload.motionConformance['motion-mini']).toMatchObject({
+      blocked: 'fail', capture: 'pass',
+    });
+    expect(() => validateBenchmarkReportPair(report)).not.toThrow();
+    expect(() => validateBenchmarkReportPair({
+      ...report, motionRequirements: S5_MOTION_REQUIREMENTS,
+    })).toThrow(/motion-mini\.blocked = fail/);
+  });
+
+  it.each(['retained null', 'dropped frames'])('потеря красной цели через кадр: %s', (representation) => {
+    const report = motionFixture();
+    const run = report.payload.results['motion-mini'].raw.freeze[0];
+    run.evidence.blocked = representation === 'retained null'
+      ? linearMotionPoints().map((point, index) => index % 2 === 0 ? point : { ...point, x: null })
+      : linearMotionPoints().filter((_point, index) => index % 2 === 0);
+    refreshMotionReport(report);
+    expect(report.payload.motionConformance['motion-mini'].blocked).toBe('inconclusive');
+    if (representation === 'dropped frames') {
+      expect(report.payload.motionConformance['motion-mini'].capture).toBe('inconclusive');
+    }
+    expect(() => validateBenchmarkReportPair({
+      ...report, motionRequirements: S5_MOTION_REQUIREMENTS,
+    })).toThrow(/motion-mini\.blocked = inconclusive/);
+  });
+});
+
 describe('paired comparative benchmark report', () => {
+  it('не выдаёт достоверность старого отчёта за соответствие контракту движения', () => {
+    const report = fixture();
+    expect(() => validateBenchmarkReportPair(report)).not.toThrow();
+    expect(() => validateBenchmarkReportPair({
+      ...report,
+      motionRequirements: { baseline: ['motion-mini'], blocked: ['motion-mini'] },
+    })).toThrow(/motion conformance/i);
+  });
+
   it('accepts a clean paired report whose summaries and freeze evidence recompute', () => {
     expect(() => validateBenchmarkReportPair(fixture())).not.toThrow();
     expect(() => validateBenchmarkReportPair(fixture(40))).not.toThrow();
@@ -635,6 +1068,7 @@ describe('benchmark documentation evidence state', () => {
         'bench/compare/report-contract.mjs',
         'bench/compare/provenance.mjs',
         'bench/compare/methodology.mjs',
+        'bench/compare/motion-conformance.mjs',
         'scripts/compression-oracle.mjs',
         'scripts/compression-policy.mjs',
       ];

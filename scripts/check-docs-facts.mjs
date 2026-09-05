@@ -76,6 +76,9 @@ function validateRevision(payload, stem) {
     'bench/methodology.mjs': 'bench/compare/methodology.mjs',
     'bench/provenance.mjs': 'bench/compare/provenance.mjs',
     'bench/report-contract.mjs': 'bench/compare/report-contract.mjs',
+    ...(payload.schema === 10
+      ? { 'bench/motion-conformance.mjs': 'bench/compare/motion-conformance.mjs' }
+      : {}),
   };
   for (const [label, file] of Object.entries(historicalInputs)) {
     const bytes = git(['show', `${revision}:${file}`], 'buffer');

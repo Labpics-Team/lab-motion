@@ -75,8 +75,11 @@ import {
   renderBenchmarkMarkdown,
   renderBenchmarkEnvironment,
   createBenchmarkClaims,
+  createBenchmarkMotionConformance,
+  S5_MOTION_REQUIREMENTS,
   validateBenchmarkReportPair,
 } from './report-contract.mjs';
+import { S5_MOTION_CONTRACT } from './motion-conformance.mjs';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const ROOT = path.resolve(__dirname, '..', '..');
@@ -172,9 +175,10 @@ const PAGE_HTML = `<!DOCTYPE html><html><head><meta charset="utf-8"><style>
   body { margin: 0; background: #ffffff; }
   .box { position: absolute; left: 0; top: 0; width: 10px; height: 10px; background: #0000ff; }
   #probe { position: absolute; left: 0; top: 20px; width: 30px; height: 30px; background: #ff0000; }
+  #capture-witness { position: absolute; left: 0; top: 80px; width: 8px; height: 8px; background: #00ff00; }
 </style></head><body></body></html>`;
 
-async function startBenchmarkOrigin() {
+export async function startBenchmarkOrigin() {
   const server = createServer((_request, response) => {
     response.writeHead(200, {
       'content-type': 'text/html; charset=utf-8',
@@ -500,22 +504,26 @@ async function runSemanticStartCheck(page, scenario, calls) {
 
 // ─── сценарий S5: freeze-continuity (визуальный) ─────────────────────────────
 
-function redLeftEdge(pngBuf) {
+function colorLeftEdge(pngBuf, channel) {
   // Полный скан: кадры скринкаста — целый вьюпорт (возможен и letterbox),
-  // привязываться к конкретной строке нельзя. Ищем левейший красный пиксель.
+  // привязываться к конкретной строке нельзя. Ищем левейший пиксель канала.
   const img = PNG.sync.read(pngBuf);
   let left = null;
   for (let y = 0; y < img.height; y++) {
     for (let x = 0; x < img.width; x++) {
       if (left !== null && x >= left) break;
       const i = (img.width * y + x) << 2;
-      if (img.data[i] > 180 && img.data[i + 1] < 120 && img.data[i + 2] < 120) {
+      if (img.data[i + channel] > 180 && img.data[i + 1 - channel] < 120 && img.data[i + 2] < 120) {
         left = x;
         break;
       }
     }
   }
   return left;
+}
+
+function redLeftEdge(pngBuf) {
+  return colorLeftEdge(pngBuf, 0);
 }
 
 async function waitForBaselineFrame(frames) {
@@ -536,9 +544,10 @@ async function waitForBaselineFrame(frames) {
 
 let cdpStartSequence = 0;
 
-async function startWithCdpClock(page, cdp, scenario) {
+async function readCdpStartClock(page, cdp, startPage, config) {
   const token = `lab-motion-start-${++cdpStartSequence}`;
   let timeout;
+  let removeListener = () => {};
   const eventPromise = new Promise((resolve, reject) => {
     const onConsole = (event) => {
       const cdpToken = event.args?.[0]?.value;
@@ -548,12 +557,32 @@ async function startWithCdpClock(page, cdp, scenario) {
       resolve({ cdpToken, cdpRuntimeTimestampMs: event.timestamp });
     };
     cdp.on('Runtime.consoleAPICalled', onConsole);
+    removeListener = () => cdp.off('Runtime.consoleAPICalled', onConsole);
     timeout = setTimeout(() => {
       cdp.off('Runtime.consoleAPICalled', onConsole);
-      reject(new Error('first presented: CDP start marker timeout'));
+      reject(new Error('CDP start marker timeout'));
     }, 2_000);
   });
-  const pageClock = await page.evaluate(({ clockToken, config }) => {
+  try {
+    const [pageClock, marker] = await Promise.all([
+      page.evaluate(startPage, { clockToken: token, config }), eventPromise,
+    ]);
+    return {
+      token,
+      cdpClockDomain: 'TimeSinceEpoch',
+      runtimeTimestampUnit: 'milliseconds',
+      frameTimestampUnit: 'seconds',
+      ...pageClock,
+      ...marker,
+    };
+  } finally {
+    clearTimeout(timeout);
+    removeListener();
+  }
+}
+
+async function startWithCdpClock(page, cdp, scenario) {
+  return readCdpStartClock(page, cdp, ({ clockToken, config }) => {
     const element = document.getElementById('probe');
     const pageTimeOriginMs = performance.timeOrigin;
     const pageBeforeNowMs = performance.now();
@@ -565,15 +594,7 @@ async function startWithCdpClock(page, cdp, scenario) {
       config.durationMs,
     );
     return { pageTimeOriginMs, pageBeforeNowMs, pageApiNowMs };
-  }, { clockToken: token, config: scenario });
-  return {
-    token,
-    cdpClockDomain: 'TimeSinceEpoch',
-    runtimeTimestampUnit: 'milliseconds',
-    frameTimestampUnit: 'seconds',
-    ...pageClock,
-    ...await eventPromise,
-  };
+  }, scenario);
 }
 
 /** Cold S1: CDP marker перед API → первый сдвинувшийся compositor-пиксель. */
@@ -630,14 +651,16 @@ async function runFirstPresented(browser, adapterPath, scenario, pageUrl) {
   };
 }
 
-const FREEZE_PX = 600;
-const FREEZE_DURATION_MS = 2400;
+const FREEZE_PX = S5_MOTION_CONTRACT.distancePx;
+const FREEZE_DURATION_MS = S5_MOTION_CONTRACT.durationMs;
 const BLOCK_AT_MS = 300;
 const BLOCK_MS = 900;
 
-async function captureTrajectory(browser, adapterPath, blocked, pageUrl) {
+export async function captureTrajectory(browser, adapterPath, blocked, pageUrl) {
   const { context, page } = await newPage(browser, adapterPath, pageUrl);
   const cdp = await context.newCDPSession(page);
+  await cdp.send('Runtime.enable');
+  const timerBefore = await measurePageTimerProbe(page, 'before');
   const frames = [];
   let screencastActive = false;
   const stopScreencast = async () => {
@@ -646,11 +669,15 @@ async function captureTrajectory(browser, adapterPath, blocked, pageUrl) {
     await cdp.send('Page.stopScreencast').catch(() => {});
   };
   try {
-    await page.evaluate(() => {
+    await page.evaluate(({ adapter, blocked }) => {
       const p = document.createElement('div');
       p.id = 'probe';
       document.body.appendChild(p);
-    });
+      const witness = document.createElement('div');
+      witness.id = 'capture-witness';
+      document.body.appendChild(witness);
+      document.title = `S5 ${adapter}: ${blocked ? 'блокировка 900 мс' : 'без блокировки'}`;
+    }, { adapter: path.basename(adapterPath), blocked });
 
     // Кадры забираем скринкастом: компоситор пушит их сам, main-thread страницы
     // не участвует. Одиночный Page.captureScreenshot при мёртвом main стопорится
@@ -668,12 +695,24 @@ async function captureTrajectory(browser, adapterPath, blocked, pageUrl) {
     // Предстартовый пиксель даёт честную точку удержания, не синтезируя движение.
     await waitForBaselineFrame(frames);
 
-    // Epoch фиксируется в page realm рядом с API-вызовом: RTT Node↔page не входит.
-    const startedAt = await page.evaluate(({ px, duration, shouldBlock, blockAt, blockMs }) => {
+    // Runtime marker и кадры имеют один CDP clock domain; page realm ограничивает
+    // задержку marker→API. RTT Node↔page не входит в начало траектории.
+    const startClock = await readCdpStartClock(page, cdp, ({ clockToken, config }) => {
+      const { px, duration, shouldBlock, blockAt, blockMs } = config;
       const el = document.getElementById('probe');
       const epoch = () => (performance.timeOrigin + performance.now()) / 1000;
+      const pageTimeOriginMs = performance.timeOrigin;
+      const pageBeforeNowMs = performance.now();
+      console.debug(clockToken);
       const start = epoch();
       window.__benchTiming = { startedAt: start, blockStartedAt: null, blockEndedAt: null };
+      // Свидетель создаёт visual damage даже при неподвижной/завершённой цели.
+      // Его пиксели в том же кадре проверяют, что запись не подменяет фриз пропуском.
+      window.__witness = document.getElementById('capture-witness').animate(
+        [{ transform: 'translateX(0px)' }, { transform: `translateX(${px}px)` }],
+        { duration, easing: 'linear', fill: 'forwards' },
+      );
+      const pageApiNowMs = performance.now();
       window.__c = window.__adapterModule.start([el], px, duration);
       if (shouldBlock) setTimeout(() => {
         window.__benchTiming.blockStartedAt = epoch();
@@ -681,7 +720,7 @@ async function captureTrajectory(browser, adapterPath, blocked, pageUrl) {
         while (performance.now() < end) { /* реальная блокировка main-thread */ }
         window.__benchTiming.blockEndedAt = epoch();
       }, blockAt);
-      return start;
+      return { pageTimeOriginMs, pageBeforeNowMs, pageApiNowMs };
     }, {
       px: FREEZE_PX,
       duration: FREEZE_DURATION_MS,
@@ -689,10 +728,10 @@ async function captureTrajectory(browser, adapterPath, blocked, pageUrl) {
       blockAt: BLOCK_AT_MS,
       blockMs: BLOCK_MS,
     });
+    const startedAt = startClock.cdpRuntimeTimestampMs / 1000;
 
     // Ждём: анимация + блок + запас на lagSmoothing-подобное продление (GSAP
-    // после лага честно доигрывает сдвинутый таймлайн, а не прыгает — это
-    // валидное поведение, ему нужно время).
+    // после лага доигрывает сдвинутый таймлайн; endpoint не заменяет S5-контракт).
     await new Promise((r) => setTimeout(
       r,
       FREEZE_DURATION_MS + (blocked ? BLOCK_MS : 0) + 700,
@@ -705,13 +744,26 @@ async function captureTrajectory(browser, adapterPath, blocked, pageUrl) {
         timing: window.__benchTiming,
       };
     });
+    const clock = {
+      startClock,
+      timerEvidence: {
+        crossOriginIsolated: await page.evaluate(() => globalThis.crossOriginIsolated),
+        probes: [timerBefore, await measurePageTimerProbe(page, 'after')],
+      },
+    };
 
     const decoded = frames
       .map((f) => ({ t: f.ts - startedAt, x: redLeftEdge(Buffer.from(f.data, 'base64')) }))
       .filter((f) => Number.isFinite(f.t) && f.x !== null)
       .sort((a, b) => a.t - b.t);
+    const witness = frames
+      .map((f) => ({ t: f.ts - startedAt, x: colorLeftEdge(Buffer.from(f.data, 'base64'), 1) }))
+      // Пропавший пиксель — исход захваченного кадра, не повод удалить кадр.
+      .sort((a, b) => a.t - b.t);
     return {
       decoded,
+      witness,
+      clock,
       finalX: terminal.finalX,
       timing: terminal.timing,
       rawFrames: frames.length,
@@ -736,6 +788,10 @@ async function runFreezePair(browser, adapterPath, blockedFirst, pageUrl) {
     for (let t = windowStart; t <= windowEnd; t += 0.1) grid.push(t);
   }
   const evidence = createFreezeEvidence(blocked.decoded, baseline.decoded, grid);
+  evidence.baselineWitness = baseline.witness;
+  evidence.blockedWitness = blocked.witness;
+  evidence.baselineClock = baseline.clock;
+  evidence.blockedClock = blocked.clock;
   const scored = scoreAgainstBaseline(evidence.blocked, evidence.baseline, evidence.grid);
   const blockedWindow = blocked.decoded.filter((f) => f.t >= windowStart && f.t <= windowEnd);
   const baselineWindow = baseline.decoded.filter((f) => f.t >= windowStart && f.t <= windowEnd);
@@ -786,6 +842,7 @@ async function main() {
       ['bench/methodology.mjs', path.join(__dirname, 'methodology.mjs')],
       ['bench/provenance.mjs', path.join(__dirname, 'provenance.mjs')],
       ['bench/report-contract.mjs', path.join(__dirname, 'report-contract.mjs')],
+      ['bench/motion-conformance.mjs', path.join(__dirname, 'motion-conformance.mjs')],
     ],
     requiredEntries: ENTRY_INPUTS,
   });
@@ -1004,7 +1061,8 @@ async function main() {
   const ids = LIBS.map((l) => l.id);
   const stem = `${generatedAt.slice(0, 10)}-${provenance.revisionLabel}-${provenance.distRuntime.sha256.slice(0, 12)}`;
   const rawPayload = {
-    schema: 9,
+    schema: 10,
+    motionContract: S5_MOTION_CONTRACT,
     package: { name: rootPkg.name, version: rootPkg.version },
     generatedAt,
     companion: { markdownFile: `${stem}.md`, markdownSha256: '' },
@@ -1044,6 +1102,7 @@ async function main() {
     scenarioManifest,
   });
   rawPayload.environment = renderBenchmarkEnvironment(rawPayload);
+  rawPayload.motionConformance = createBenchmarkMotionConformance(rawPayload.results);
   console.log('=== Честный сравнительный бенчмарк ===');
   rawPayload.environment.forEach((line) => console.log(line));
   const md = renderBenchmarkMarkdown(rawPayload);
@@ -1084,6 +1143,12 @@ async function main() {
   console.log(`\n${md}`);
   console.log(`Отчёт: ${outPath}`);
   console.log(`Raw: ${rawPath}`);
+  // Плохое измерение сохранено как evidence; успешный exit требует отдельного контракта.
+  validateBenchmarkReportPair({
+    stem, markdown: md, payload: rawPayload, rootPackage: rootPkg,
+    benchmarkPackage: JSON.parse(readFileSync(path.join(__dirname, 'package.json'), 'utf8')),
+    now: Date.parse(generatedAt), motionRequirements: S5_MOTION_REQUIREMENTS,
+  });
 }
 
 const isDirectRun = process.argv[1] && path.resolve(process.argv[1]) === fileURLToPath(import.meta.url);
