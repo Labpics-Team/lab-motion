@@ -147,6 +147,17 @@ export async function runTransformLifecycleSample({ animate, count, lifecycle, c
     if (pending() !== expected) throw new Error(`transform scheduler: ${label} pending=${pending()}, ожидалось ${expected}`);
   };
   const frameNs = new Array(frames);
+  let cleanupStarted = false;
+  const cleanup = async () => {
+    cleanupStarted = true;
+    phase = 'outside';
+    try { controls?.cancel(); } finally {
+      try { previous?.cancel(); } finally {
+        for (let drain = 0; drain < 4 && pending() > 0; drain++) clock.step(timestamp + profile.durationMs * (4 + drain));
+        await flushReactions();
+      }
+    }
+  };
   try {
     if (lifecycle !== 'fresh') {
       previous = animate(targets, previousProps, { ...options, onComplete: () => { previousCompleteCalls++; } });
@@ -204,6 +215,12 @@ export async function runTransformLifecycleSample({ animate, count, lifecycle, c
     const idleExecutions = clock.executions;
     clock.step(timestamp + profile.durationMs * 2);
     clock.step(timestamp + profile.durationMs * 3);
+    // PASS относится к состоянию после всех эффектов, включая повторную отмену обоих владельцев.
+    await cleanup();
+    requirePending(0, 'cleanup');
+    if (!finished || onCompleteCalls !== 0 || previousCompleteCalls !== (lifecycle === 'settled' ? 1 : 0)) {
+      throw new Error('transform: cleanup finished/onComplete нарушен');
+    }
     if (clock.executions !== idleExecutions) throw new Error('transform scheduler: stale idle callback');
     const targetTraceHashes = slots.map((slot, target) => {
       if (slot.outsideWrites !== 0) throw new Error(`transform: target ${target} запись вне кадра`);
@@ -222,14 +239,12 @@ export async function runTransformLifecycleSample({ animate, count, lifecycle, c
       previousFinished: lifecycle === 'fresh' ? null : previousFinished, previousCompleteCalls,
       requests: clock.requests, executions: clock.executions, pending: pending(),
     } };
-  } finally {
-    // Даже отвергнутый sample освобождает оба владельца и очередь, без глобальных швов.
-    phase = 'outside';
-    try { controls?.cancel(); } finally {
-      try { previous?.cancel(); } finally {
-        for (let drain = 0; drain < 4 && pending() > 0; drain++) clock.step(timestamp + profile.durationMs * (4 + drain));
-        await flushReactions();
+  } catch (error) {
+    if (!cleanupStarted) {
+      try { await cleanup(); } catch (cleanupError) {
+        throw new AggregateError([error, cleanupError], 'transform: sample и cleanup завершились ошибкой');
       }
     }
+    throw error;
   }
 }

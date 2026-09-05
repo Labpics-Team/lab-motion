@@ -120,6 +120,55 @@ describe('paired public transform lifecycle screening', () => {
       .rejects.toThrow(/target 99 frame 2/);
   });
 
+  it.each(['successor-write', 'donor-write', 'successor-callback'] as const)(
+    'rejects effects from final cleanup before returning a valid sample: %s', async (fault) => {
+      let calls = 0;
+      const sabotage: typeof animate = (targets, props, options) => {
+        const isDonor = ++calls === 1;
+        const controls = animate(targets, props, options);
+        let cancels = 0;
+        return {
+          ...controls,
+          cancel() {
+            controls.cancel();
+            const finalCleanup = isDonor ? ++cancels === 1 : ++cancels === 2;
+            if (!finalCleanup) return;
+            if (fault === 'successor-callback' && !isDonor) options!.requestFrame!(() => {});
+            if ((fault === 'donor-write' && isDonor) || (fault === 'successor-write' && !isDonor)) {
+              if (typeof targets !== 'string' && 'length' in targets) {
+                targets[0]!.style.setProperty('transform', 'translateX(999px)');
+              }
+            }
+          },
+        };
+      };
+      await expect(runTransformLifecycleSample({ animate: sabotage, count: 1, lifecycle: 'live', channels: 1 }))
+        .rejects.toThrow(/transform/);
+    },
+  );
+
+  it('retains both measurement and cleanup failures without returning a sample', async () => {
+    const measurementError = new Error('measurement clock');
+    const cleanupError = new Error('cleanup cancel');
+    let ticks = 0;
+    let cancels = 0;
+    const sabotage: typeof animate = (targets, props, options) => {
+      const controls = animate(targets, props, options);
+      return { ...controls, cancel() { cancels++; controls.cancel(); throw cleanupError; } };
+    };
+    try {
+      await runTransformLifecycleSample({
+        animate: sabotage, count: 1, lifecycle: 'fresh', channels: 1,
+        nowNs: () => { if (++ticks === 2) throw measurementError; return 0n; },
+      });
+      expect.fail('measurement must reject');
+    } catch (error) {
+      expect(error).toBeInstanceOf(AggregateError);
+      expect((error as AggregateError).errors).toEqual([measurementError, cleanupError]);
+    }
+    expect(cancels).toBe(1);
+  });
+
   it.each(['reversed-order', 'split-skew'] as const)('rejects %s even when every channel value is unchanged', async (fault) => {
     const clean = await runTransformLifecycleSample({ animate, count: 1, lifecycle: 'live', channels: 7 });
     expect(clean.semantic.valid).toBe(true);
