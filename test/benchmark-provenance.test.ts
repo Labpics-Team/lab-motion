@@ -191,6 +191,23 @@ describe('benchmark provenance', () => {
     expect(() => prepareBenchmarkCheckout({ ...f.prepare, build() {} })).toThrow(/clean checkout|tracked|revision/);
   });
 
+  it('accepts Git-clean mixed LF/CRLF source without accepting changed code', () => {
+    const f = checkoutFixture(true);
+    const name = 'mixed файл.js';
+    const file = path.join(f.root, name);
+    writeFileSync(file, 'const one = 1;\nconst two = 2;\n');
+    f.git(['add', '--', name]);
+    f.git(['-c', 'user.name=Benchmark test', '-c', 'user.email=benchmark@example.invalid',
+      '-c', `core.hooksPath=${path.join(f.root, 'no-hooks')}`, 'commit', '--quiet', '-m', 'mixed fixture']);
+    writeFileSync(file, 'const one = 1;\r\nconst two = 2;\n');
+    f.git(['add', '--renormalize', '--', name]);
+    expect(f.git(['status', '--porcelain'])).toBe('');
+    expect(() => prepareBenchmarkCheckout({ ...f.prepare, build() {} })).not.toThrow();
+    f.git(['update-index', '--assume-unchanged', '--', name]);
+    writeFileSync(file, 'const one = 9;\r\nconst two = 2;\n');
+    expect(() => prepareBenchmarkCheckout({ ...f.prepare, build() {} })).toThrow(/tracked mixed файл.js/);
+  });
+
   it('rejects requiredDist and benchmark entries outside published exports', () => {
     const f = fixture();
     writeFileSync(path.join(f.root, 'package.json'), JSON.stringify({
