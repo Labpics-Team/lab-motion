@@ -105,7 +105,7 @@ const results = [];
       op: () => handoffToLive({
         spring: SPRING, value: snap.value, velocity: snap.velocity, target: 100, requestFrame: noopRF,
       }),
-      teardown: (mv) => mv.destroy(),
+      teardown: (mv) => mv?.destroy(),
     }),
   );
 }
@@ -113,7 +113,7 @@ const results = [];
 // ── D. CompositorSpring.handoffToLive — ПОЛНЫЙ хендофф: read + cancel + build ──
 // Handoff передаёт live-owner вызывающему и необратимо переводит controller из
 // compositor-пути. Поэтому каждый sample получает новый controller (ВНЕ тайминга);
-// teardown проверяет реальные animate/cancel/requestFrame effects и ловит no-op.
+// verify после тайминга сверяет эффекты handoff, teardown освобождает live-owner.
 results.push(
   measureCompositorHandoffLatency({
     CompositorSpring,

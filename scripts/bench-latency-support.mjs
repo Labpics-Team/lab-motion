@@ -31,18 +31,33 @@ export function measureLatency(label, {
     const sorted = [...values].sort((a, b) => a - b);
     return sorted[sorted.length >> 1];
   };
-  const finish = (result, arg) => {
+  const cleanup = (result, arg) => {
+    if (teardown) {
+      onPhase?.('teardown');
+      teardown(result, arg);
+    }
+  };
+  const fail = (error, result, arg) => {
     try {
-      if (verify) {
+      cleanup(result, arg);
+    } catch (cleanupError) {
+      throw new AggregateError(
+        [error, cleanupError],
+        'latency benchmark: операция и teardown завершились ошибкой',
+      );
+    }
+    throw error;
+  };
+  const finish = (result, arg) => {
+    if (verify) {
+      try {
         onPhase?.('verify');
         verify(result, arg);
-      }
-    } finally {
-      if (teardown) {
-        onPhase?.('teardown');
-        teardown(result, arg);
+      } catch (error) {
+        fail(error, result, arg);
       }
     }
+    cleanup(result, arg);
   };
   const prepare = (index) => {
     if (!setup) return undefined;
@@ -58,7 +73,12 @@ export function measureLatency(label, {
 
   for (let index = 0; index < warmup; index++) {
     const arg = prepare(index);
-    const result = operate(arg);
+    let result;
+    try {
+      result = operate(arg);
+    } catch (error) {
+      fail(error, result, arg);
+    }
     finish(result, arg);
   }
 
@@ -70,10 +90,16 @@ export function measureLatency(label, {
     const samples = new Float64Array(iters);
     for (let index = 0; index < iters; index++) {
       const arg = prepare(index);
-      const startedAt = nowNs();
-      const result = operate(arg);
-      const finishedAt = nowNs();
-      const elapsed = Number(finishedAt - startedAt);
+      let result;
+      let elapsed;
+      try {
+        const startedAt = nowNs();
+        result = operate(arg);
+        const finishedAt = nowNs();
+        elapsed = Number(finishedAt - startedAt);
+      } catch (error) {
+        fail(error, result, arg);
+      }
       finish(result, arg);
       if (!Number.isFinite(elapsed) || elapsed < 0) {
         throw new Error('latency benchmark: часы вернули некорректный интервал');
@@ -92,7 +118,7 @@ export function measureLatency(label, {
   return { label, p50: median(p50s), p95: median(p95s), p99: median(p99s) };
 }
 
-/** Создаёт ровно один compositor→live sample и проверяет его host-effects. */
+/** Создаёт один compositor→live sample и сверяет точные host-effects его фаз. */
 function createCompositorHandoffLatencySample({
   CompositorSpring,
   spring,
@@ -121,6 +147,7 @@ function createCompositorHandoffLatencySample({
     requestFrame: () => ++frameRequests,
   });
   controller.start();
+  const setupEffects = { animations, cancels, frameRequests };
 
   return {
     controller,
@@ -129,11 +156,18 @@ function createCompositorHandoffLatencySample({
         throw new Error('handoff benchmark: lifecycle sample повторно использован');
       }
       verified = true;
-      const evidence = { animations, cancels, frameRequests };
+      const handoffEffects = {
+        animations: animations - setupEffects.animations,
+        cancels: cancels - setupEffects.cancels,
+        frameRequests: frameRequests - setupEffects.frameRequests,
+      };
       if (
-        animations !== 1 ||
-        cancels !== 1 ||
-        frameRequests !== 1 ||
+        setupEffects.animations !== 1 ||
+        setupEffects.cancels !== 0 ||
+        setupEffects.frameRequests !== 0 ||
+        handoffEffects.animations !== 0 ||
+        handoffEffects.cancels !== 1 ||
+        handoffEffects.frameRequests !== 1 ||
         !live ||
         typeof live.destroy !== 'function' ||
         !Number.isFinite(live.value) ||
@@ -141,10 +175,12 @@ function createCompositorHandoffLatencySample({
       ) {
         throw new Error(
           `handoff benchmark: не выполнен полный lifecycle ` +
-          `(animate=${animations}, cancel=${cancels}, requestFrame=${frameRequests})`,
+          `(setup: animate=${setupEffects.animations}, cancel=${setupEffects.cancels}, ` +
+          `requestFrame=${setupEffects.frameRequests}; handoff: animate=${handoffEffects.animations}, ` +
+          `cancel=${handoffEffects.cancels}, requestFrame=${handoffEffects.frameRequests})`,
         );
       }
-      return evidence;
+      return handoffEffects;
     },
   };
 }
@@ -181,8 +217,12 @@ export function createCompositorHandoffLatencyScenario({
     verify(live, sample) {
       return sample.verify(live);
     },
-    teardown(live, _sample) {
-      live.destroy();
+    teardown(live, sample) {
+      if (live && typeof live.destroy === 'function') {
+        live.destroy();
+      } else {
+        sample.controller.destroy();
+      }
     },
   };
 }
