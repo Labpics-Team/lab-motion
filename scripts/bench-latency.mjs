@@ -28,6 +28,7 @@ import {
   assertCheckoutUnchanged,
   prepareBenchmarkCheckout,
 } from '../bench/compare/provenance.mjs';
+import { createCompositorHandoffLatencySample } from './bench-latency-support.mjs';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const pkgRoot = resolve(__dirname, '..');
@@ -63,7 +64,7 @@ const noopRF = () => 1;
  * Перцентильный замер: warmup прогонов, затем `iters` ИНДИВИДУАЛЬНО таймленных
  * операций (hrtime.bigint, нс). Повторяется `runs` раз; возвращается медиана
  * каждого перцентиля по прогонам. `setup(i)` (вне тайминга) готовит состояние и
- * возвращает аргумент; `op(arg)` — измеряемое действие; `teardown(r)` (вне
+ * возвращает аргумент; `op(arg)` — измеряемое действие; `teardown(r, arg)` (вне
  * тайминга) убирает за собой (destroy live-значения и т.п.).
  */
 function measureLatency(label, { setup, op, teardown, iters = 2000, warmup = 500, runs = 5 }) {
@@ -77,7 +78,7 @@ function measureLatency(label, { setup, op, teardown, iters = 2000, warmup = 500
   for (let i = 0; i < warmup; i++) {
     const arg = setup ? setup(i) : undefined;
     const r = op(arg);
-    if (teardown) teardown(r);
+    if (teardown) teardown(r, arg);
   }
 
   const p50s = [], p95s = [], p99s = [], meds = [];
@@ -89,7 +90,7 @@ function measureLatency(label, { setup, op, teardown, iters = 2000, warmup = 500
       const r = op(arg);
       const t1 = process.hrtime.bigint();
       samples[i] = Number(t1 - t0); // нс
-      if (teardown) teardown(r);
+      if (teardown) teardown(r, arg);
     }
     const sorted = [...samples].sort((a, b) => a - b);
     p50s.push(nearestRank(sorted, 50));
@@ -148,18 +149,30 @@ const results = [];
 }
 
 // ── D. CompositorSpring.handoffToLive — ПОЛНЫЙ хендофф: read + cancel + build ──
-// Контроллер пере-вооружается start() каждую итерацию (ВНЕ тайминга); таймится
-// только сам хендофф из полёта.
+// Handoff передаёт live-owner вызывающему и необратимо переводит controller из
+// compositor-пути. Поэтому каждый sample получает новый controller (ВНЕ тайминга);
+// teardown проверяет реальные animate/cancel/requestFrame effects и ловит no-op.
 {
   let now = 1000;
-  const cs = new CompositorSpring({
-    spring: SPRING, property: 'x', from: 0, to: 100, target: fakeEl(), now: () => now, requestFrame: noopRF,
-  });
   results.push(
     measureLatency('CompositorSpring.handoffToLive (read+cancel+build)', {
-      setup: () => { cs.start(); now += 16; },
-      op: () => cs.handoffToLive(),
-      teardown: (mv) => mv.destroy(),
+      setup: () => {
+        const sample = createCompositorHandoffLatencySample({
+          CompositorSpring,
+          spring: SPRING,
+          property: 'x',
+          from: 0,
+          to: 100,
+          now: () => now,
+        });
+        now += 16;
+        return sample;
+      },
+      op: (sample) => sample.controller.handoffToLive(),
+      teardown: (mv, sample) => {
+        sample.verify(mv);
+        mv.destroy();
+      },
     }),
   );
 }
