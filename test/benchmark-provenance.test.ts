@@ -151,8 +151,44 @@ describe('benchmark provenance', () => {
     writeFileSync(path.join(f.root, '.git', 'info', 'attributes'), 'source.js filter=mask\n');
     f.git(['update-index', '--assume-unchanged', '--', 'source.js']);
     writeFileSync(path.join(f.root, 'source.js'), 'export const value = 999;\n');
+    const altered = f.git(['hash-object', '-w', '--no-filters', '--', 'source.js']).trim();
+    f.git(['config', 'filter.mask.smudge', `git cat-file blob ${altered}`]);
+    expect(f.git(['cat-file', '--filters', 'HEAD:source.js'])).toBe('export const value = 999;\n');
     expect(f.git(['status', '--porcelain'])).toBe('');
     expect(() => prepareBenchmarkCheckout({ ...f.prepare, build() {} })).toThrow(/неподдерживаемое преобразование/);
+  });
+
+  it('preserves path identity for CRLF files with spaces in the object batch', () => {
+    const f = checkoutFixture(true);
+    const file = path.join(f.root, 'with space.js');
+    writeFileSync(file, 'export const space = 1;\n');
+    f.git(['add', '--', 'with space.js']);
+    f.git(['-c', 'user.name=Benchmark test', '-c', 'user.email=benchmark@example.invalid',
+      '-c', `core.hooksPath=${path.join(f.root, 'no-hooks')}`, 'commit', '--quiet', '-m', 'space fixture']);
+    writeFileSync(file, 'export const space = 1;\r\n');
+    f.git(['add', '--renormalize', '--', 'with space.js']);
+    expect(f.git(['show', 'HEAD:with space.js'])).toBe('export const space = 1;\n');
+    expect(f.git(['config', '--get', 'core.autocrlf']).trim()).toBe('true');
+    expect(f.git(['status', '--porcelain'])).toBe('');
+    expect(() => prepareBenchmarkCheckout({ ...f.prepare, build() {} })).not.toThrow();
+    f.git(['update-index', '--assume-unchanged', '--', 'with space.js']);
+    writeFileSync(file, 'export const space = 2;\r\n');
+    expect(() => prepareBenchmarkCheckout({ ...f.prepare, build() {} })).toThrow(/tracked with space.js/);
+  });
+
+  it('ignores replacement refs when proving the declared commit bytes', () => {
+    const f = checkoutFixture();
+    const original = f.git(['rev-parse', 'HEAD']).trim();
+    writeFileSync(path.join(f.root, 'source.js'), 'export const value = 999;\n');
+    f.git(['add', '--', 'source.js']);
+    f.git(['-c', 'user.name=Benchmark test', '-c', 'user.email=benchmark@example.invalid',
+      '-c', `core.hooksPath=${path.join(f.root, 'no-hooks')}`, 'commit', '--quiet', '-m', 'replacement fixture']);
+    const replacement = f.git(['rev-parse', 'HEAD']).trim();
+    f.git(['update-ref', 'HEAD', original]);
+    f.git(['replace', original, replacement]);
+    expect(f.git(['status', '--porcelain'])).toBe('');
+    expect(revisionFingerprint(f.root, original)).toBe('6c85545764a91d47528b8eb7f790ee2525371bfb9341e8d8c8c42f31c8b39ae0');
+    expect(() => prepareBenchmarkCheckout({ ...f.prepare, build() {} })).toThrow(/clean checkout|tracked|revision/);
   });
 
   it('rejects requiredDist and benchmark entries outside published exports', () => {

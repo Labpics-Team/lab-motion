@@ -135,7 +135,7 @@ export function hashFileTree(directory, accept = () => true) {
 }
 
 function git(root, args, encoding = 'utf8') {
-  return execFileSync('git', args, { cwd: root, encoding });
+  return execFileSync('git', ['--no-replace-objects', ...args], { cwd: root, encoding });
 }
 
 /** Отпечаток всех tracked/untracked, но не ignored файлов checkout. */
@@ -154,6 +154,29 @@ function worktreeFingerprint(root) {
   return hash.digest('hex');
 }
 
+function readRevisionObjects(root, entries, filters = false) {
+  const bytes = execFileSync('git', ['--no-replace-objects', 'cat-file', '--batch', '-Z', ...(filters ? ['--filters'] : [])], {
+    cwd: root, maxBuffer: 256 * 1024 * 1024,
+    input: entries.map(({ object, name }) => `${object}${filters ? ` ${name}` : ''}\0`).join(''),
+  });
+  let offset = 0;
+  const objects = entries.map((entry) => {
+    const end = bytes.indexOf(0, offset);
+    const [object, type, rawSize] = bytes.subarray(offset, end).toString('utf8').split(' ');
+    const size = Number(rawSize);
+    // --filters оставляет исходный objectsize в заголовке. После запрета
+    // бинарных различий и custom-фильтров преобразованный текст не содержит NUL.
+    const contentEnd = filters ? bytes.indexOf(0, end + 1) : end + 1 + size;
+    if (end < offset || object !== entry.object || type !== entry.type || !Number.isSafeInteger(size) || size < 0 ||
+        contentEnd < end + 1 || bytes[contentEnd] !== 0) throw new Error('provenance: некорректный пакет объектов revision');
+    const content = bytes.subarray(end + 1, contentEnd);
+    offset = contentEnd + 1;
+    return content;
+  });
+  if (offset !== bytes.length) throw new Error('provenance: лишние байты пакета объектов revision');
+  return objects;
+}
+
 /** Тот же fingerprint для clean Git-коммита: dirty:false становится проверяемым фактом. */
 export function revisionFingerprint(root, revision, { verifyWorkingTree = false } = {}) {
   if (!/^[0-9a-f]{40}$/.test(revision)) throw new Error('provenance: некорректный revision');
@@ -164,9 +187,13 @@ export function revisionFingerprint(root, revision, { verifyWorkingTree = false 
     return { mode, type, object, name: entry.slice(tab + 1) };
   }).sort((a, b) => a.name < b.name ? -1 : a.name > b.name ? 1 : 0);
   if (entries.length === 0) throw new Error('provenance: revision не содержит файлов');
+  const objects = readRevisionObjects(root, entries);
+  const normalized = [];
   const hash = createHash('sha256');
-  for (const { name, mode, type, object } of entries) {
-    const expected = git(root, ['show', `${revision}:${name}`], 'buffer');
+  for (let index = 0; index < entries.length; index++) {
+    const entry = entries[index];
+    const { name, mode, type } = entry;
+    const expected = objects[index];
     if (verifyWorkingTree) {
       const file = path.join(root, name);
       if (type !== 'blob' || !['100644', '100755'].includes(mode) || !existsSync(file) || !lstatSync(file).isFile()) {
@@ -174,27 +201,34 @@ export function revisionFingerprint(root, revision, { verifyWorkingTree = false 
       }
       const actual = readFileSync(file);
       if (!actual.equals(expected)) {
-        // Разрешена Git-нормализация переводов строк; произвольные clean-фильтры
-        // могли бы скрыть другой исполняемый код за тем же blob ID.
-        const attributes = git(root, ['check-attr', '-z', 'filter', 'ident', 'working-tree-encoding', '--', name], 'buffer')
-          .toString('utf8').split('\0');
-        for (let index = 2; index < attributes.length; index += 3) {
-          if (!['unspecified', 'unset'].includes(attributes[index])) {
-            throw new Error(`provenance: tracked ${name} использует неподдерживаемое преобразование revision`);
-          }
+        if (actual.includes(0) || expected.includes(0)) {
+          throw new Error(`provenance: tracked ${name} содержит бинарное отличие от revision`);
         }
-        const actualObject = execFileSync('git', ['hash-object', `--path=${name}`, '--stdin'], {
-          cwd: root, input: actual, encoding: 'utf8',
-        }).trim();
-        if (actualObject !== object) {
-          throw new Error(`provenance: tracked ${name} не совпадает с declared revision ${revision}`);
-        }
+        normalized.push({ entry, actual });
       }
     }
     hash.update(name);
     hash.update('\0');
     hash.update(expected);
     hash.update('\0');
+  }
+  if (normalized.length > 0) {
+    // Проверка атрибутов предшествует --filters: произвольный clean/smudge
+    // способен скрыть другой код, а его запуск сам по себе является эффектом.
+    const attributes = execFileSync('git', ['--no-replace-objects', 'check-attr', '-z', '--stdin', 'filter', 'ident', 'working-tree-encoding'], {
+      cwd: root, input: normalized.map(({ entry }) => `${entry.name}\0`).join(''), encoding: 'utf8',
+    }).split('\0');
+    for (let index = 2; index < attributes.length; index += 3) {
+      if (!['unspecified', 'unset'].includes(attributes[index])) {
+        throw new Error(`provenance: tracked ${attributes[index - 2]} использует неподдерживаемое преобразование revision`);
+      }
+    }
+    const converted = readRevisionObjects(root, normalized.map(({ entry }) => entry), true);
+    for (let index = 0; index < normalized.length; index++) {
+      if (!normalized[index].actual.equals(converted[index])) {
+        throw new Error(`provenance: tracked ${normalized[index].entry.name} не совпадает с declared revision ${revision}`);
+      }
+    }
   }
   return hash.digest('hex');
 }
