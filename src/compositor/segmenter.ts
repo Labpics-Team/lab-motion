@@ -1,10 +1,10 @@
 /**
- * compositor/segmenter.ts — certified spring → CSS linear() sampling.
+ * compositor/segmenter.ts — сертифицированное преобразование пружины в CSS linear().
  *
- * Representability остаётся прежним O(1) global worst-case контрактом: он
- * решает, может ли compositor вообще принять spring до supersede. Внутри уже
- * принятого бюджета фактическая сетка строится локальным certified-шагом, чтобы
- * не оплачивать worst-case curvature на спокойном хвосте.
+ * Представимость остаётся прежним O(1)-контрактом по глобальной оценке худшего
+ * случая: он решает, может ли compositor принять spring до supersede. Внутри
+ * уже принятого бюджета фактическая сетка строится локальным сертифицированным
+ * шагом, чтобы не пересэмплировать спокойный хвост по стартовой кривизне.
  */
 
 import { MotionParamError } from '../errors.js';
@@ -25,7 +25,7 @@ const BASE_GRID_MIN = 32;
 export const BASE_GRID_MAX = 4096;
 const gridSample = { value: 0, velocity: 0 };
 
-/** Канонический horizon текущего main; local grid его не меняет. */
+/** Канонический горизонт текущего main; локальная сетка его не меняет. */
 function springCompileHorizon(
   params: SpringParams,
   v0: number,
@@ -40,9 +40,9 @@ function springCompileHorizon(
 }
 
 /**
- * Существующий fail-closed preflight. Это граница наблюдаемого поведения, а не
- * фактическое число samples adaptive grid: её нельзя расширять как побочный
- * эффект оптимизации sampling.
+ * Существующая предварительная fail-closed проверка. Это граница наблюдаемого
+ * поведения, а не число узлов адаптивной сетки: оптимизация sampling не имеет
+ * права незаметно расширять допустимую поверхность compositor.
  */
 function requiredGridSize(
   params: SpringParams,
@@ -59,12 +59,12 @@ function requiredGridSize(
 }
 
 /**
- * Строит variable-step grid с собственной piecewise-linear ошибкой <= tol/2.
- * Вызывается только после прежнего O(1) representability preflight.
+ * Строит сетку с переменным шагом и собственной ошибкой линейной интерполяции
+ * <= tolerance/2. Вызывается только после прежней O(1)-границы представимости.
  *
  * u=ω₀t, y=x−1, w=dy/du. E=(y²+w²)/2 невозрастает, поэтому
  * sqrt(1+4ζ²)·hypot(y,w) ограничивает будущую |y''|. Для ζ>=1 используются
- * более тесные certified bounds. Шаг h выводится из M h²/8 <= tol/2.
+ * более тесные сертифицированные границы. Шаг выводится из M·h²/8 <= tolerance/2.
  */
 export function tryBuildAdaptiveSpringGrid(
   params: SpringParams,
@@ -85,11 +85,21 @@ export function tryBuildAdaptiveSpringGrid(
   const omegaT = omega0 * settle;
   const capTau = 1 / BASE_GRID_MIN;
 
+  if (
+    !Number.isFinite(omega0)
+    || !(omega0 > 0)
+    || !Number.isFinite(zeta)
+    || !Number.isFinite(kappa)
+    || !Number.isFinite(omegaT)
+    || !(omegaT > 0)
+  ) return undefined;
+
   const xs: number[] = [0];
   const ys: number[] = [0];
   let tau = 0;
   let y = -1;
   let w = v0 / omega0;
+  if (!Number.isFinite(w)) return undefined;
 
   while (tau < 1) {
     let bound = kappa * Math.hypot(y, w);
@@ -97,36 +107,39 @@ export function tryBuildAdaptiveSpringGrid(
     if (poleGap > 0) {
       const b = -(w + lambdaS * y) / poleGap;
       const a = y - b;
-      bound = Math.min(
-        bound,
-        Math.abs(a) * lambdaS * lambdaS + Math.abs(b) * lambdaF * lambdaF,
-      );
+      const modal = Math.abs(a) * lambdaS * lambdaS + Math.abs(b) * lambdaF * lambdaF;
+      if (!Number.isFinite(modal)) return undefined;
+      bound = Math.min(bound, modal);
     } else if (delta === 0) {
-      bound = Math.min(
-        bound,
-        Math.abs(y + 2 * w) + Math.abs(w + y) / Math.E,
-      );
+      const critical = Math.abs(y + 2 * w) + Math.abs(w + y) / Math.E;
+      if (!Number.isFinite(critical)) return undefined;
+      bound = Math.min(bound, critical);
     }
 
+    if (!Number.isFinite(bound) || bound < 0) return undefined;
     const step = bound > 0
       ? Math.min(capTau, 2 * Math.sqrt(tolerance / bound) / omegaT)
       : capTau;
+    if (!Number.isFinite(step) || !(step > 0)) return undefined;
 
     if (tau === 0) {
       const anchorTau = step / 4;
+      const anchor = v0 * anchorTau * settle;
+      if (!Number.isFinite(anchorTau) || !Number.isFinite(anchor)) return undefined;
       xs.push(anchorTau);
-      ys.push(v0 * anchorTau * settle);
+      ys.push(anchor);
     }
 
     const next = Math.min(tau + step, 1);
-    if (next === tau || xs.length > BASE_GRID_MAX) return undefined;
+    if (!Number.isFinite(next) || next === tau || xs.length > BASE_GRID_MAX) return undefined;
 
     const sampled = solveSpring(params, next * settle, v0, gridSample);
-    const value = Number.isFinite(sampled.value) ? sampled.value : 1;
+    if (!Number.isFinite(sampled.value) || !Number.isFinite(sampled.velocity)) return undefined;
     xs.push(next);
-    ys.push(value);
-    y = value - 1;
-    w = Number.isFinite(sampled.velocity) ? sampled.velocity / omega0 : 0;
+    ys.push(sampled.value);
+    y = sampled.value - 1;
+    w = sampled.velocity / omega0;
+    if (!Number.isFinite(y) || !Number.isFinite(w)) return undefined;
     tau = next;
   }
 
@@ -134,8 +147,8 @@ export function tryBuildAdaptiveSpringGrid(
 }
 
 /**
- * Историческое имя: возвращает representability budget, а не число фактических
- * adaptive samples. Это сохраняет существующий fail-closed контракт.
+ * Историческое имя: возвращает бюджет представимости, а не число фактических
+ * адаптивных интервалов. Это сохраняет существующий fail-closed контракт.
  */
 export function baseGridSize(
   params: SpringParams,
@@ -150,7 +163,7 @@ export function baseGridSize(
   return required;
 }
 
-/** O(1) preflight до supersede — поведение и стоимость текущего main сохранены. */
+/** O(1)-проверка до supersede — поведение и стоимость текущего main сохранены. */
 export function fitsSpringCurveBudget(
   params: SpringParams,
   v0: number,
@@ -169,7 +182,7 @@ export function assertSpringCurveBudget(
   baseGridSize(params, springCompileHorizon(params, v0, tolerance), tolerance, v0);
 }
 
-/** Vertical Douglas–Peucker для функции-графика со строго растущими xs. */
+/** Вертикальный алгоритм Дугласа–Пекера для функции со строго растущими xs. */
 export function douglasPeuckerVertical(
   xs: readonly number[],
   ys: readonly number[],
