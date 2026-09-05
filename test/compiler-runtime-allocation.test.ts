@@ -35,10 +35,10 @@ describe('compiled Nano runtime — call-scoped allocation contract', () => {
 
     expect(firstCalls).toHaveLength(1_000);
     expect(secondCalls).toHaveLength(1_000);
-    expect(new Set(firstCalls.map(({ frame }) => frame))).toHaveLength(1);
-    expect(new Set(firstCalls.map(({ timing }) => timing))).toHaveLength(1);
-    expect(new Set(secondCalls.map(({ frame }) => frame))).toHaveLength(1);
-    expect(new Set(secondCalls.map(({ timing }) => timing))).toHaveLength(1);
+    expect(new Set(firstCalls.map(({ frame }) => frame)).size).toBe(1);
+    expect(new Set(firstCalls.map(({ timing }) => timing)).size).toBe(1);
+    expect(new Set(secondCalls.map(({ frame }) => frame)).size).toBe(1);
+    expect(new Set(secondCalls.map(({ timing }) => timing)).size).toBe(1);
     expect(firstCalls[0]!.frame).not.toBe(secondCalls[0]!.frame);
     expect(firstCalls[0]!.timing).not.toBe(secondCalls[0]!.timing);
   });
