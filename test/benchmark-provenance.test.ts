@@ -9,7 +9,7 @@ import {
 import { tmpdir } from 'node:os';
 import path from 'node:path';
 import { execFileSync } from 'node:child_process';
-import { afterEach, describe, expect, it } from 'vitest';
+import { afterEach, describe, expect, it, vi } from 'vitest';
 import {
   assertBenchmarkExportSurface,
   assertFileHashesUnchanged,
@@ -24,11 +24,36 @@ import {
   sha256File,
 } from '../bench/compare/provenance.mjs';
 
+vi.mock('node:child_process', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('node:child_process')>();
+  return { ...actual, execFileSync: vi.fn(actual.execFileSync) };
+});
+
 const cleanup: string[] = [];
 
+function isolateGitEnvironment() {
+  const directory = mkdtempSync(path.join(tmpdir(), 'lab-motion-git-environment-'));
+  cleanup.push(directory);
+  // Изоляция охватывает и fixture, и production-helper, который читает её checkout.
+  for (const key of Object.keys(process.env)) {
+    if (key.startsWith('GIT_')) vi.stubEnv(key, undefined);
+  }
+  vi.stubEnv('GIT_CONFIG_GLOBAL', path.join(directory, 'no-global-config'));
+  vi.stubEnv('GIT_CONFIG_SYSTEM', path.join(directory, 'no-system-config'));
+  vi.stubEnv('GIT_CONFIG_NOSYSTEM', '1');
+  vi.stubEnv('GIT_ATTR_NOSYSTEM', '1');
+  vi.stubEnv('GIT_TERMINAL_PROMPT', '0');
+  vi.stubEnv('GIT_TEMPLATE_DIR', directory);
+}
+
 afterEach(() => {
-  for (const directory of cleanup.splice(0)) {
-    rmSync(directory, { recursive: true, force: true });
+  try {
+    for (const directory of cleanup.splice(0)) {
+      rmSync(directory, { recursive: true, force: true });
+    }
+  } finally {
+    vi.restoreAllMocks();
+    vi.unstubAllEnvs();
   }
 });
 
@@ -62,6 +87,7 @@ function fixture() {
 }
 
 function checkoutFixture(autocrlf = false) {
+  isolateGitEnvironment();
   const directory = mkdtempSync(path.join(tmpdir(), 'lab-motion-tracked-proof-'));
   cleanup.push(directory);
   const source = path.join(directory, 'source');
@@ -91,6 +117,29 @@ function checkoutFixture(autocrlf = false) {
 
 // Реальные Git-процессы конкурируют с полным набором тестов; это watchdog, не бюджет бенчмарка.
 describe('benchmark provenance', { timeout: 30_000 }, () => {
+  it('isolates the real checkout from a hostile global attributes file', () => {
+    const directory = mkdtempSync(path.join(tmpdir(), 'lab-motion-hostile-git-'));
+    cleanup.push(directory);
+    const attributes = path.join(directory, 'attributes');
+    const config = path.join(directory, 'gitconfig');
+    writeFileSync(attributes, 'source.js -text\n');
+    writeFileSync(config, `[core]\nattributesFile = "${attributes.replaceAll('\\', '/')}"\n`);
+    vi.stubEnv('GIT_CONFIG_GLOBAL', config);
+    const f = checkoutFixture(true);
+    expect(f.git(['ls-files', '--eol', '--', 'source.js'])).toContain('w/crlf');
+    expect(() => prepareBenchmarkCheckout({ ...f.prepare, build() {} })).not.toThrow();
+  });
+
+  it('uses the portable OID-only batch protocol without requiring Git -Z', () => {
+    const f = checkoutFixture();
+    const exec = vi.mocked(execFileSync);
+    exec.mockClear();
+    expect(readCheckoutState(f.root).trackedRevisionSha256)
+      .toBe('6c85545764a91d47528b8eb7f790ee2525371bfb9341e8d8c8c42f31c8b39ae0');
+    expect(exec).toHaveBeenCalledWith('git', ['--no-replace-objects', 'cat-file', '--batch'],
+      expect.objectContaining({ input: expect.stringMatching(/^(?:[a-f0-9]{40}\n)+$/) }));
+  });
+
   it.each(['--assume-unchanged', '--skip-worktree'])('rejects hidden source bytes before build: %s', (flag) => {
     const f = checkoutFixture();
     const revision = f.git(['rev-parse', 'HEAD']).trim();
@@ -151,6 +200,7 @@ describe('benchmark provenance', { timeout: 30_000 }, () => {
   it('does not trust a lossy custom clean filter to prove the committed source', () => {
     const f = checkoutFixture();
     f.git(['config', 'filter.mask.clean', 'git show HEAD:source.js']);
+    mkdirSync(path.join(f.root, '.git', 'info'), { recursive: true });
     writeFileSync(path.join(f.root, '.git', 'info', 'attributes'), 'source.js filter=mask\n');
     f.git(['update-index', '--assume-unchanged', '--', 'source.js']);
     writeFileSync(path.join(f.root, 'source.js'), 'export const value = 999;\n');
@@ -177,6 +227,23 @@ describe('benchmark provenance', { timeout: 30_000 }, () => {
     f.git(['update-index', '--assume-unchanged', '--', 'with space.js']);
     writeFileSync(file, 'export const space = 2;\r\n');
     expect(() => prepareBenchmarkCheckout({ ...f.prepare, build() {} })).toThrow(/tracked with space.js/);
+  });
+
+  it.skipIf(process.platform === 'win32')('preserves quotes, backslashes and newlines in Git-normalized paths', () => {
+    const f = checkoutFixture(true);
+    const name = 'quote" backslash\\ newline\nю.js';
+    const file = path.join(f.root, name);
+    writeFileSync(file, 'export const quoted = 1;\n');
+    f.git(['add', '--', name]);
+    f.git(['-c', 'user.name=Benchmark test', '-c', 'user.email=benchmark@example.invalid',
+      '-c', `core.hooksPath=${path.join(f.root, 'no-hooks')}`, 'commit', '--quiet', '-m', 'quoted path fixture']);
+    writeFileSync(file, 'export const quoted = 1;\r\n');
+    f.git(['add', '--renormalize', '--', name]);
+    expect(f.git(['status', '--porcelain'])).toBe('');
+    expect(() => prepareBenchmarkCheckout({ ...f.prepare, build() {} })).not.toThrow();
+    f.git(['update-index', '--assume-unchanged', '--', name]);
+    writeFileSync(file, 'export const quoted = 2;\r\n');
+    expect(() => prepareBenchmarkCheckout({ ...f.prepare, build() {} })).toThrow(/не совпадает/);
   });
 
   it('ignores replacement refs when proving the declared commit bytes', () => {

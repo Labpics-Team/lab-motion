@@ -155,18 +155,19 @@ function worktreeFingerprint(root) {
 }
 
 function readRevisionObjects(root, entries) {
-  const bytes = execFileSync('git', ['--no-replace-objects', 'cat-file', '--batch', '-Z'], {
+  // Вход содержит только OID; LF безопасен для заголовков, содержимое читается по размеру.
+  const bytes = execFileSync('git', ['--no-replace-objects', 'cat-file', '--batch'], {
     cwd: root, maxBuffer: 256 * 1024 * 1024,
-    input: entries.map(({ object }) => `${object}\0`).join(''),
+    input: entries.map(({ object }) => `${object}\n`).join(''),
   });
   let offset = 0;
   const objects = entries.map((entry) => {
-    const end = bytes.indexOf(0, offset);
+    const end = bytes.indexOf(10, offset);
     const [object, type, rawSize] = bytes.subarray(offset, end).toString('utf8').split(' ');
     const size = Number(rawSize);
     const contentEnd = end + 1 + size;
     if (end < offset || object !== entry.object || type !== entry.type || !Number.isSafeInteger(size) || size < 0 ||
-        contentEnd < end + 1 || bytes[contentEnd] !== 0) throw new Error('provenance: некорректный пакет объектов revision');
+        contentEnd < end + 1 || bytes[contentEnd] !== 10) throw new Error('provenance: некорректный пакет объектов revision');
     const content = bytes.subarray(end + 1, contentEnd);
     offset = contentEnd + 1;
     return content;
