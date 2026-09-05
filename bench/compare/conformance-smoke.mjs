@@ -37,6 +37,7 @@ function buildAdapters(temporaryDirectory) {
   for (const [id, entry] of [
     ['lab', 'lab.entry.mjs'],
     ['waapi-ctl', 'waapi-control.entry.mjs'],
+    ['lab-spring', 'lab-spring.entry.mjs'],
     ['injected-native-freeze', null],
   ]) {
     const outfile = path.join(temporaryDirectory, `${id}.iife.js`);
@@ -136,6 +137,7 @@ async function main() {
     for (const scenario of [
       { label: 'lab-js', participant: 'lab', adapter: 'lab', expected: { baseline: 'pass', blocked: 'fail' } },
       { label: 'native-control', participant: 'waapi-ctl', adapter: 'waapi-ctl', expected: { baseline: 'pass', blocked: 'pass' } },
+      { label: 'lab-spring', participant: 'lab-spring', adapter: 'lab-spring', expected: { baseline: 'pass', blocked: 'pass' } },
       { label: 'injected-native-freeze', participant: 'waapi-ctl', adapter: 'injected-native-freeze', expected: { baseline: 'fail' } },
     ]) {
       errors.push(...await recordScenario(browser, origin, scenario, adapters[scenario.adapter]));
@@ -162,7 +164,7 @@ async function main() {
     }
   }
   if (errors.length > 0) throw new AggregateError(errors, 'S5 conformance smoke не пройден');
-  console.log('PASS: пять реальных записей подтвердили ожидаемые вердикты S5; один запуск, без performance claims.');
+  console.log('PASS: семь реальных записей подтвердили ожидаемые вердикты S5; один запуск, без performance claims.');
 }
 
 main().catch((error) => {
