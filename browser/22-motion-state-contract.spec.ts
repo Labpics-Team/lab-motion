@@ -49,6 +49,7 @@ for (const firstMs of [40, 120, 260]) {
           ease: (t: number) => t,
           requestFrame: (callback) => callbacks.push(callback),
         });
+        const mainImmediate = read();
         middle.pause();
         middle.seek(0);
         counts.push(el.getAnimations().length);
@@ -57,6 +58,7 @@ for (const firstMs of [40, 120, 260]) {
         const mainEnd = read();
 
         const last = animate(el, { x: 450 }, nativeOptions);
+        const nativeImmediate = read();
         counts.push(el.getAnimations().length);
         const finalEffect = el.getAnimations()[0]!;
         finalEffect.pause();
@@ -69,10 +71,25 @@ for (const firstMs of [40, 120, 260]) {
 
         // Терминальные владельцы и уже поставленные callbacks не воскресают.
         const beforeStale = read();
-        const staleStates: Array<{ x: number; count: number; sameEffect: boolean }> = [];
-        const observeStale = () => staleStates.push({
-          x: read(), count: el.getAnimations().length, sameEffect: el.getAnimations()[0] === finalEffect,
+        const ownedState = () => ({
+          x: read(),
+          inlineStyle: el.getAttribute('style'),
+          scheduledCallbacks: callbacks.length,
+          effectCreations,
+          effects: el.getAnimations().map((effect) => ({
+            sameEffect: effect === finalEffect,
+            currentTime: effect.currentTime,
+            startTime: effect.startTime,
+            playbackRate: effect.playbackRate,
+            playState: effect.playState,
+            pending: effect.pending,
+            timing: effect.effect!.getTiming(),
+            keyframes: (effect.effect as KeyframeEffect).getKeyframes(),
+          })),
         });
+        const ownedBeforeStale = ownedState();
+        const staleStates: ReturnType<typeof ownedState>[] = [];
+        const observeStale = () => staleStates.push(ownedState());
         for (const stale of [first, middle]) {
           stale.play();
           observeStale();
@@ -90,18 +107,19 @@ for (const firstMs of [40, 120, 260]) {
         last.cancel();
         counts.push(el.getAnimations().length);
         const cancelled = read();
-        const cancelledStates: Array<{ x: number; count: number }> = [];
+        const ownedAfterCancel = ownedState();
+        const cancelledStates: ReturnType<typeof ownedState>[] = [];
         for (const callback of [...callbacks]) {
           callback(20_000);
-          cancelledStates.push({ x: read(), count: el.getAnimations().length });
+          cancelledStates.push(ownedState());
         }
         const afterCancel = read();
         await Promise.all([first.finished, middle.finished, last.finished]);
         el.remove();
         return {
-          beforeMain, mainStart, mainEnd, nativeStart, samples,
+          beforeMain, mainImmediate, mainStart, mainEnd, nativeImmediate, nativeStart, samples,
           counts, completed, beforeStale, afterStale, sameEffect, cancelled, afterCancel,
-          staleStates, cancelledStates, effectCreations,
+          staleStates, cancelledStates, effectCreations, ownedBeforeStale, ownedAfterCancel,
         };
       }, { firstMs, tweenMs });
 
@@ -116,9 +134,11 @@ for (const firstMs of [40, 120, 260]) {
 
       expect(Math.abs(result.beforeMain - handoff)).toBeLessThanOrEqual(firstBudget);
       expect(Math.abs(result.mainStart - handoff)).toBeLessThanOrEqual(firstBudget);
+      expect(Math.abs(result.mainImmediate - result.beforeMain)).toBeLessThanOrEqual(0.05);
       expect(Math.abs(result.mainStart - result.beforeMain)).toBeLessThanOrEqual(0.05);
       expect(Math.abs(result.mainEnd - tweenEnd)).toBeLessThanOrEqual(tweenBudget);
       expect(Math.abs(result.nativeStart - result.mainEnd)).toBeLessThanOrEqual(0.05);
+      expect(Math.abs(result.nativeImmediate - result.mainEnd)).toBeLessThanOrEqual(0.05);
       for (const sample of result.samples) {
         const seconds = sample.ms / 1000;
         const decay = Math.exp(-10 * seconds);
@@ -137,10 +157,10 @@ for (const firstMs of [40, 120, 260]) {
       expect(result.effectCreations).toBe(2);
       expect(result.staleStates.length).toBeGreaterThanOrEqual(6);
       for (const state of result.staleStates) {
-        expect(state).toEqual({ x: result.beforeStale, count: 1, sameEffect: true });
+        expect(state).toEqual(result.ownedBeforeStale);
       }
       for (const state of result.cancelledStates) {
-        expect(state).toEqual({ x: result.cancelled, count: 0 });
+        expect(state).toEqual(result.ownedAfterCancel);
       }
       expect(result.afterStale).toBe(result.beforeStale);
       expect(result.afterCancel).toBe(result.cancelled);
