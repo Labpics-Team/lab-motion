@@ -7,6 +7,8 @@ import { describe, expect, it } from 'vitest';
 import { parse, stringify } from 'yaml';
 
 type Step = {
+  uses?: string;
+  with?: Record<string, unknown>;
   name?: string;
   id?: string;
   run?: string;
@@ -97,6 +99,112 @@ const floorCommand = 'shopt -s nullglob\narchives=(node-floor-artifact/*.tgz)\n'
   + '  || { echo "::error::ожидался ровно один tgz, найдено: ${#archives[@]}"; exit 1; }\n'
   + 'node scripts/pack-smoke.mjs "${archives[0]}"';
 
+// Порядок и inputs actions задают реальную ОС, Node и передачу проверенного архива.
+const requiredActions = {
+  "verify": [
+    {
+      "index": 0,
+      "name": "Checkout",
+      "uses": "actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1",
+      "with": {
+        "persist-credentials": false,
+        "fetch-depth": 0
+      }
+    },
+    {
+      "index": 2,
+      "name": "Setup Node",
+      "uses": "actions/setup-node@820762786026740c76f36085b0efc47a31fe5020",
+      "with": {
+        "node-version": "24"
+      }
+    },
+    {
+      "index": 13,
+      "name": "Upload Vitest diagnostics",
+      "if": "failure() && steps.vitest.outcome == 'failure'",
+      "uses": "actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a",
+      "with": {
+        "name": "vitest-diagnostics-${{ github.run_id }}",
+        "path": "vitest.log",
+        "if-no-files-found": "error",
+        "retention-days": 7
+      }
+    },
+    {
+      "index": 20,
+      "name": "Upload Node-floor candidate",
+      "uses": "actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a",
+      "with": {
+        "name": "node-floor-package-${{ github.sha }}-${{ github.run_id }}",
+        "path": "node-floor-artifact/*.tgz",
+        "if-no-files-found": "error",
+        "retention-days": 1,
+        "compression-level": 0,
+        "overwrite": false
+      }
+    }
+  ],
+  "floor": [
+    {
+      "index": 0,
+      "name": "Checkout",
+      "uses": "actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1",
+      "with": {
+        "persist-credentials": false
+      }
+    },
+    {
+      "index": 1,
+      "name": "Setup Node",
+      "uses": "actions/setup-node@820762786026740c76f36085b0efc47a31fe5020",
+      "with": {
+        "node-version": "${{ matrix.node }}"
+      }
+    },
+    {
+      "index": 2,
+      "name": "Download Node-floor candidate",
+      "uses": "actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c",
+      "with": {
+        "name": "node-floor-package-${{ github.sha }}-${{ github.run_id }}",
+        "path": "node-floor-artifact",
+        "digest-mismatch": "error"
+      }
+    }
+  ],
+  "conformance": [
+    {
+      "index": 0,
+      "name": "Checkout",
+      "uses": "actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1",
+      "with": {
+        "persist-credentials": false
+      }
+    },
+    {
+      "index": 1,
+      "name": "Setup Node",
+      "uses": "actions/setup-node@820762786026740c76f36085b0efc47a31fe5020",
+      "with": {
+        "node-version": "24"
+      }
+    },
+    {
+      "index": 8,
+      "name": "Upload failure artifacts",
+      "if": "failure()",
+      "uses": "actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a",
+      "with": {
+        "name": "browser-conformance-${{ matrix.browser }}-${{ github.run_id }}",
+        "path": "test-results/\nplaywright-report/\n",
+        "if-no-files-found": "ignore",
+        "retention-days": 7
+      }
+    }
+  ]
+};
+
 function step(job: Job, name: string): Step {
   const found = job.steps?.find((item) => item.name === name);
   if (!found) throw new Error(`Нет обязательного шага ${name}`);
@@ -152,6 +260,10 @@ function assertNativeGraph(files: Map<string, string>) {
     ACTIONLINT_VERSION: '1.7.12',
     ACTIONLINT_ARCHIVE_SHA256: '8aca8db96f1b94770f1b0d72b6dddcb1ebb8123cb3712530b08cc387b349a3d8',
   });
+  for (const [name, job] of Object.entries({ verify, floor, conformance })) {
+    expect(job.steps!.map((item, index) => ({ index, ...item })).filter((item) => item.uses))
+      .toEqual(requiredActions[name as keyof typeof requiredActions]);
+  }
   assertCommands(verify, verifyCommands);
   assertCommands(floor, [floorCommand]);
   assertCommands(conformance, browserCommands);
@@ -191,6 +303,12 @@ describe('нативный граф CI', () => {
     ['игнорирование browser caller', 'ci.yml', (w: Workflow) => { w.jobs['browser-static']!['continue-on-error'] = true; }],
     ['другой browser worker', 'ci.yml', (w: Workflow) => { w.jobs['browser-static']!.uses = './.github/workflows/release.yml'; }],
     ['нет Node floor', 'ci.yml', (w: Workflow) => { w.jobs['node-floor']!.strategy!.matrix.node = ['24']; }],
+    ['подмена Node floor настройкой Node 24', 'ci.yml', (w: Workflow) => {
+      step(w.jobs['node-floor']!, 'Setup Node').with!['node-version'] = '24';
+    }],
+    ['пропуск browser Setup Node', 'browser.yml', (w: Workflow) => {
+      step(w.jobs.conformance!, 'Setup Node').if = false;
+    }],
     ['скрытые diagnostics', 'ci.yml', (w: Workflow) => {
       step(w.jobs.verify!, 'Upload Vitest diagnostics').if = "steps.vitest.outcome == 'failure'";
     }],
@@ -240,6 +358,36 @@ describe('нативный граф CI', () => {
         else target['continue-on-error'] = true;
         files.set(file, stringify(workflow));
         expect(() => assertNativeGraph(files), `${jobId}: ${command}; ${mutation}`).toThrow();
+      }
+    }
+  });
+
+  it.each([
+    ['ci.yml', 'verify'],
+    ['ci.yml', 'node-floor'],
+    ['browser.yml', 'conformance'],
+  ] as const)('%s/%s сохраняет настройку каждого action', (file, jobId) => {
+    const original = sources();
+    assertNativeGraph(original);
+    const steps = (parse(original.get(file)!) as Workflow).jobs[jobId]!.steps!;
+    for (const [index, item] of steps.entries()) {
+      if (!item.uses) continue;
+      for (const mutation of ['remove', 'uses', 'with', 'if', 'continue-on-error', 'order'] as const) {
+        const files = new Map(original);
+        const workflow = parse(files.get(file)!) as Workflow;
+        const actions = workflow.jobs[jobId]!.steps!;
+        const target = actions[index]!;
+        if (mutation === 'remove') actions.splice(index, 1);
+        else if (mutation === 'uses') target.uses = target.uses!.split('@')[0] + '@main';
+        else if (mutation === 'with') target.with = { ...target.with, 'unexpected-input': true };
+        else if (mutation === 'if') target.if = false;
+        else if (mutation === 'continue-on-error') target['continue-on-error'] = true;
+        else {
+          actions.splice(index, 1);
+          actions.splice(index === 0 ? 1 : 0, 0, target);
+        }
+        files.set(file, stringify(workflow));
+        expect(() => assertNativeGraph(files), `${jobId}: ${item.uses}; ${mutation}`).toThrow();
       }
     }
   });
