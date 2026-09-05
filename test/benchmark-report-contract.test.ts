@@ -668,6 +668,19 @@ describe('schema 10 motion conformance admission', () => {
     })).toThrow(/motion-mini\.blocked = inconclusive/);
   });
 
+  it('не нормализует общий поздний native-старт по Animation.startTime', () => {
+    const report = motionFixture();
+    const run = report.payload.results['motion-mini'].raw.freeze[0];
+    const delayed = linearMotionPoints().map((point) => ({ ...point, x: Math.max(0, point.x - 25) }));
+    run.evidence.blocked = delayed;
+    run.evidence.blockedWitness = structuredClone(delayed);
+    refreshMotionReport(report);
+    expect(report.payload.motionConformance['motion-mini']).toMatchObject({
+      blocked: 'inconclusive', capture: 'inconclusive',
+    });
+    expect(() => validateBenchmarkReportForPublication(report)).toThrow(/motion-mini\.blocked = inconclusive/);
+  });
+
   it('не достраивает пропущенные кадры из верных редких положений цели и witness', () => {
     const report = motionFixture();
     const run = report.payload.results['motion-mini'].raw.freeze[0];

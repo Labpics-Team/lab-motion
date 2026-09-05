@@ -676,7 +676,12 @@ export async function captureTrajectory(browser, adapterPath, blocked, pageUrl) 
       const witness = document.createElement('div');
       witness.id = 'capture-witness';
       document.body.appendChild(witness);
-      document.title = `S5 ${adapter}: ${blocked ? 'блокировка 900 мс' : 'без блокировки'}`;
+      const expected = adapter.includes('lab-spring') ? 'пружина' : 'линейное движение';
+      const legend = document.createElement('div');
+      legend.style.cssText = 'position:absolute;left:8px;top:112px;color:#444;font:13px sans-serif;white-space:pre-line';
+      legend.textContent = `Красный: проверяемый путь, ожидается ${expected}.\nЗелёный: линейный свидетель записи, не эталон красного.`;
+      document.body.appendChild(legend);
+      document.title = `S5 ${adapter} (${expected}): ${blocked ? 'блокировка 900 мс' : 'без блокировки'}`;
     }, { adapter: path.basename(adapterPath), blocked });
 
     // Кадры забираем скринкастом: компоситор пушит их сам, main-thread страницы
@@ -708,6 +713,7 @@ export async function captureTrajectory(browser, adapterPath, blocked, pageUrl) 
       window.__benchTiming = { startedAt: start, blockStartedAt: null, blockEndedAt: null };
       // Свидетель создаёт visual damage даже при неподвижной/завершённой цели.
       // Его пиксели в том же кадре проверяют, что запись не подменяет фриз пропуском.
+      // Нулевая точка — API, не поздний Animation.startTime: startup расходует бюджет S5.
       window.__witness = document.getElementById('capture-witness').animate(
         [{ transform: 'translateX(0px)' }, { transform: `translateX(${px}px)` }],
         { duration, easing: 'linear', fill: 'forwards' },
