@@ -17,6 +17,12 @@ for (const firstMs of [40, 120, 260]) {
         const el = document.createElement('div');
         el.style.cssText = 'position:absolute;width:10px;height:10px;transform:translateX(0px)';
         document.body.appendChild(el);
+        const hostAnimate = el.animate.bind(el);
+        let effectCreations = 0;
+        el.animate = (...args: Parameters<Element['animate']>) => {
+          effectCreations++;
+          return hostAnimate(...args);
+        };
         const read = () => new DOMMatrixReadOnly(getComputedStyle(el).transform).e;
         const callbacks: Array<(ts?: number) => void> = [];
         let completed = 0;
@@ -63,24 +69,39 @@ for (const firstMs of [40, 120, 260]) {
 
         // Терминальные владельцы и уже поставленные callbacks не воскресают.
         const beforeStale = read();
+        const staleStates: Array<{ x: number; count: number; sameEffect: boolean }> = [];
+        const observeStale = () => staleStates.push({
+          x: read(), count: el.getAnimations().length, sameEffect: el.getAnimations()[0] === finalEffect,
+        });
         for (const stale of [first, middle]) {
           stale.play();
+          observeStale();
           stale.seek(300);
+          observeStale();
           stale.cancel();
+          observeStale();
         }
-        for (const callback of [...callbacks]) callback(10_000);
+        for (const callback of [...callbacks]) {
+          callback(10_000);
+          observeStale();
+        }
         const afterStale = read();
         const sameEffect = el.getAnimations().length === 1 && el.getAnimations()[0] === finalEffect;
         last.cancel();
         counts.push(el.getAnimations().length);
         const cancelled = read();
-        for (const callback of [...callbacks]) callback(20_000);
+        const cancelledStates: Array<{ x: number; count: number }> = [];
+        for (const callback of [...callbacks]) {
+          callback(20_000);
+          cancelledStates.push({ x: read(), count: el.getAnimations().length });
+        }
         const afterCancel = read();
         await Promise.all([first.finished, middle.finished, last.finished]);
         el.remove();
         return {
           beforeMain, mainStart, mainEnd, nativeStart, samples,
           counts, completed, beforeStale, afterStale, sameEffect, cancelled, afterCancel,
+          staleStates, cancelledStates, effectCreations,
         };
       }, { firstMs, tweenMs });
 
@@ -113,6 +134,14 @@ for (const firstMs of [40, 120, 260]) {
       }
       expect(result.counts).toEqual([1, 0, 1, 0]);
       expect(result.sameEffect).toBe(true);
+      expect(result.effectCreations).toBe(2);
+      expect(result.staleStates.length).toBeGreaterThanOrEqual(6);
+      for (const state of result.staleStates) {
+        expect(state).toEqual({ x: result.beforeStale, count: 1, sameEffect: true });
+      }
+      for (const state of result.cancelledStates) {
+        expect(state).toEqual({ x: result.cancelled, count: 0 });
+      }
       expect(result.afterStale).toBe(result.beforeStale);
       expect(result.afterCancel).toBe(result.cancelled);
       expect(result.completed).toBe(0);
