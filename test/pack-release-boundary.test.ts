@@ -8,8 +8,10 @@ describe('packed release boundary', () => {
   it('ships every referenced support document', () => {
     expect(pkg.files).toContain('docs/errors.md');
     expect(pkg.files).toContain('docs/benchmark.md');
+    expect(pkg.files).toContain('docs/motion-conformance.md');
     expect(pkg.files).toContain('docs/recipes.md');
     expect(smoke).toContain("'docs/benchmark.md'");
+    expect(smoke).toContain("'docs/motion-conformance.md'");
     expect(smoke).toContain("'docs/recipes.md'");
     expect(smoke).toContain("readFileSync(installedRecipes, 'utf8') !== readFileSync");
     expect(smoke).toContain("readFileSync(installedBenchmark, 'utf8') !== readFileSync");
