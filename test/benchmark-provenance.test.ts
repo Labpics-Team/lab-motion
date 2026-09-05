@@ -2,6 +2,7 @@ import {
   mkdirSync,
   mkdtempSync,
   rmSync,
+  readFileSync,
   symlinkSync,
   unlinkSync,
   writeFileSync,
@@ -9,6 +10,7 @@ import {
 import { tmpdir } from 'node:os';
 import path from 'node:path';
 import { execFileSync } from 'node:child_process';
+import { createHash } from 'node:crypto';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import {
   assertBenchmarkExportSurface,
@@ -138,6 +140,28 @@ describe('benchmark provenance', { timeout: 30_000 }, () => {
       .toBe('6c85545764a91d47528b8eb7f790ee2525371bfb9341e8d8c8c42f31c8b39ae0');
     expect(exec).toHaveBeenCalledWith('git', ['--no-replace-objects', 'cat-file', '--batch'],
       expect.objectContaining({ input: expect.stringMatching(/^(?:[a-f0-9]{40}\n)+$/) }));
+  });
+
+  it('hashes successive bounded object batches without retaining the whole revision output', () => {
+    const f = checkoutFixture();
+    for (let index = 0; index < 128; index++) {
+      writeFileSync(path.join(f.root, `entry-${index}.txt`), `payload ${index}\n`);
+    }
+    f.git(['add', '.']);
+    f.git(['-c', 'user.name=Benchmark test', '-c', 'user.email=benchmark@example.invalid',
+      '-c', `core.hooksPath=${path.join(f.root, 'no-hooks')}`, 'commit', '--quiet', '-m', 'multiple batches']);
+    const expected = createHash('sha256');
+    for (const name of f.git(['ls-files', '-z']).split('\0').filter(Boolean).sort()) {
+      expected.update(name).update('\0').update(readFileSync(path.join(f.root, name))).update('\0');
+    }
+    const exec = vi.mocked(execFileSync);
+    exec.mockClear();
+    expect(readCheckoutState(f.root).trackedRevisionSha256).toBe(expected.digest('hex'));
+    const batches = exec.mock.calls.filter(([, args]) => args?.includes('cat-file'));
+    expect(batches).toHaveLength(2);
+    for (const [, , options] of batches) {
+      expect(String(options?.input).trim().split('\n').length).toBeLessThanOrEqual(128);
+    }
   });
 
   it.each(['--assume-unchanged', '--skip-worktree'])('rejects hidden source bytes before build: %s', (flag) => {

@@ -154,26 +154,29 @@ function worktreeFingerprint(root) {
   return hash.digest('hex');
 }
 
-function readRevisionObjects(root, entries) {
-  // Вход содержит только OID; LF безопасен для заголовков, содержимое читается по размеру.
-  const bytes = execFileSync('git', ['--no-replace-objects', 'cat-file', '--batch'], {
-    cwd: root, maxBuffer: 256 * 1024 * 1024,
-    input: entries.map(({ object }) => `${object}\n`).join(''),
-  });
-  let offset = 0;
-  const objects = entries.map((entry) => {
-    const end = bytes.indexOf(10, offset);
-    const [object, type, rawSize] = bytes.subarray(offset, end).toString('utf8').split(' ');
-    const size = Number(rawSize);
-    const contentEnd = end + 1 + size;
-    if (end < offset || object !== entry.object || type !== entry.type || !Number.isSafeInteger(size) || size < 0 ||
-        contentEnd < end + 1 || bytes[contentEnd] !== 10) throw new Error('provenance: некорректный пакет объектов revision');
-    const content = bytes.subarray(end + 1, contentEnd);
-    offset = contentEnd + 1;
-    return content;
-  });
-  if (offset !== bytes.length) throw new Error('provenance: лишние байты пакета объектов revision');
-  return objects;
+function* readRevisionObjects(root, entries) {
+  // Потребитель хеширует пакет до следующего чтения, не удерживая все blob-байты revision.
+  for (let start = 0; start < entries.length; start += 128) {
+    const batch = entries.slice(start, start + 128);
+    // Вход содержит только OID; LF безопасен для заголовков, содержимое читается по размеру.
+    const bytes = execFileSync('git', ['--no-replace-objects', 'cat-file', '--batch'], {
+      cwd: root, maxBuffer: 256 * 1024 * 1024,
+      input: batch.map(({ object }) => `${object}\n`).join(''),
+    });
+    let offset = 0;
+    for (const entry of batch) {
+      const end = bytes.indexOf(10, offset);
+      const [object, type, rawSize] = bytes.subarray(offset, end).toString('utf8').split(' ');
+      const size = Number(rawSize);
+      const contentEnd = end + 1 + size;
+      if (end < offset || object !== entry.object || type !== entry.type || !Number.isSafeInteger(size) || size < 0 ||
+          contentEnd < end + 1 || bytes[contentEnd] !== 10) throw new Error('provenance: некорректный пакет объектов revision');
+      const content = bytes.subarray(end + 1, contentEnd);
+      offset = contentEnd + 1;
+      yield { entry, content };
+    }
+    if (offset !== bytes.length) throw new Error('provenance: лишние байты пакета объектов revision');
+  }
 }
 
 function quoteGitPath(name) {
@@ -193,13 +196,10 @@ export function revisionFingerprint(root, revision, { verifyWorkingTree = false 
     return { mode, type, object, name: entry.slice(tab + 1) };
   }).sort((a, b) => a.name < b.name ? -1 : a.name > b.name ? 1 : 0);
   if (entries.length === 0) throw new Error('provenance: revision не содержит файлов');
-  const objects = readRevisionObjects(root, entries);
   const normalized = [];
   const hash = createHash('sha256');
-  for (let index = 0; index < entries.length; index++) {
-    const entry = entries[index];
+  for (const { entry, content: expected } of readRevisionObjects(root, entries)) {
     const { name, mode, type } = entry;
-    const expected = objects[index];
     if (verifyWorkingTree) {
       const file = path.join(root, name);
       if (type !== 'blob' || !['100644', '100755'].includes(mode) || !existsSync(file) || !lstatSync(file).isFile()) {
@@ -210,7 +210,7 @@ export function revisionFingerprint(root, revision, { verifyWorkingTree = false 
         if (actual.includes(0) || expected.includes(0)) {
           throw new Error(`provenance: tracked ${name} содержит бинарное отличие от revision`);
         }
-        normalized.push({ entry, actual });
+        normalized.push({ entry, actualSha256: sha256Bytes(actual) });
       }
     }
     hash.update(name);
@@ -235,7 +235,7 @@ export function revisionFingerprint(root, revision, { verifyWorkingTree = false 
     if (converted.length !== normalized.length) throw new Error('provenance: неполный пакет нормализованных tracked-файлов');
     for (let index = 0; index < normalized.length; index++) {
       if (normalized[index].entry.object !== converted[index] ||
-          !readFileSync(path.join(root, normalized[index].entry.name)).equals(normalized[index].actual)) {
+          sha256File(path.join(root, normalized[index].entry.name)) !== normalized[index].actualSha256) {
         throw new Error(`provenance: tracked ${normalized[index].entry.name} не совпадает с declared revision ${revision}`);
       }
     }
