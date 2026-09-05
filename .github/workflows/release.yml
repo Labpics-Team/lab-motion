@@ -2,794 +2,793 @@ name: Release
 
 on:
   workflow_dispatch:
-    i nputs:
+    inputs:
       version:
-        description: "� �ерсия x.y.z — тег v<version> бу� �ет создан из HEAD main"
-        re quired: true
+        description: "Версия x.y.z — тег v<version> будет создан из HEAD main"
+        required: true
         type: string
 
-# Кажд ый job объявляет только со бственные полномочия.
-perm issions: {}
+# Каждый job объявляет только собственные полномочия.
+permissions: {}
 
 concurrency:
-  # Весь пак ет имеет одну очередь: ра зные версии не должны го� �яться за npm latest.
-  group: release -labpics-motion
+  # Весь пакет имеет одну очередь: разные версии не должны гоняться за npm latest.
+  group: release-labpics-motion
   cancel-in-progress: false
 
- env:
+env:
   COREPACK_ENABLE_DOWNLOAD_PROMPT: "0"
-   COREPACK_DEFAULT_TO_LATEST: "0"
+  COREPACK_DEFAULT_TO_LATEST: "0"
 
 jobs:
-  # � �начала фиксируем намере ние релиза без права мен� �ть репозиторий.
+  # Сначала фиксируем намерение релиза без права менять репозиторий.
   resolve:
-     if: github.repository == 'Labpics-Team/lab-mo tion'
+    if: github.repository == 'Labpics-Team/lab-motion'
     runs-on: ubuntu-latest
-    timeout-mi nutes: 5
+    timeout-minutes: 5
     permissions:
-      contents: rea d
+      contents: read
     outputs:
-      release_tag: ${{ steps.r esolve.outputs.release_tag }}
-      release_d ate: ${{ steps.resolve.outputs.release_date } }
-      version: ${{ steps.resolve.outputs.ve rsion }}
-      source_sha: ${{ steps.resolve. outputs.source_sha }}
+      release_tag: ${{ steps.resolve.outputs.release_tag }}
+      release_date: ${{ steps.resolve.outputs.release_date }}
+      version: ${{ steps.resolve.outputs.version }}
+      source_sha: ${{ steps.resolve.outputs.source_sha }}
     steps:
-      - name : Resolve and validate version
-        id: re solve
+      - name: Resolve and validate version
+        id: resolve
         env:
-          INPUT_VERSION: $ {{ inputs.version }}
-          GH_TOKEN: ${{  github.token }}
+          INPUT_VERSION: ${{ inputs.version }}
+          GH_TOKEN: ${{ github.token }}
         run: |
-          VERS ION="$INPUT_VERSION"
-          [[ "$GITHUB_RE F" == "refs/heads/main" ]] \
-            || {  echo "::error::релиз разрешён � �олько ручным запуском с  main, получено: $GITHUB_REF"; exit 1;  }
-          [[ "$VERSION" =~ ^[0-9]+\.[0-9]+ \.[0-9]+$ ]] \
-            || { echo "::error ::version обязана быть x.y.z, по лучено: $VERSION"; exit 1; }
-           RELEASE_TAG="v$VERSION"
-          SOURCE_SHA= "$GITHUB_SHA"
-          # Повторный  диспатч после сбоя downstream -job: существующий тег —
-           # источник истины рел иза (теги v*.*.* неизменяем� � ruleset).
-          # HEAD main мог уй ти вперёд: расхождение с  тегом — не ошибка, а rerun.
-           TAG_REF=$(gh api "repos/$GITHUB_REPO SITORY/git/ref/tags/$RELEASE_TAG" \
-             --jq '[.object.type, .object.sha] | @tsv'  2>/dev/null || true)
-          if [[ -n "$TAG _REF" ]]; then
-            read -r OBJECT_TYP E OBJECT_SHA <<< "$TAG_REF"
-            for _  in {1..8}; do
-              if [[ "$OBJECT_T YPE" == "commit" ]]; then
-                TAG _SOURCE_SHA="$OBJECT_SHA"
-                bre ak
+          VERSION="$INPUT_VERSION"
+          [[ "$GITHUB_REF" == "refs/heads/main" ]] \
+            || { echo "::error::релиз разрешён только ручным запуском с main, получено: $GITHUB_REF"; exit 1; }
+          [[ "$VERSION" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]] \
+            || { echo "::error::version обязана быть x.y.z, получено: $VERSION"; exit 1; }
+          RELEASE_TAG="v$VERSION"
+          SOURCE_SHA="$GITHUB_SHA"
+          # Повторный диспатч после сбоя downstream-job: существующий тег —
+          # источник истины релиза (теги v*.*.* неизменяемы ruleset).
+          # HEAD main мог уйти вперёд: расхождение с тегом — не ошибка, а rerun.
+          TAG_REF=$(gh api "repos/$GITHUB_REPOSITORY/git/ref/tags/$RELEASE_TAG" \
+            --jq '[.object.type, .object.sha] | @tsv' 2>/dev/null || true)
+          if [[ -n "$TAG_REF" ]]; then
+            read -r OBJECT_TYPE OBJECT_SHA <<< "$TAG_REF"
+            for _ in {1..8}; do
+              if [[ "$OBJECT_TYPE" == "commit" ]]; then
+                TAG_SOURCE_SHA="$OBJECT_SHA"
+                break
               fi
-              [[ "$OBJECT _TYPE" == "tag" ]] \
-                || { ech o "::error::$RELEASE_TAG указывает � �а недопустимый объект $OB JECT_TYPE"; exit 1; }
-              read -r O BJECT_TYPE OBJECT_SHA < <(
-                gh  api "repos/$GITHUB_REPOSITORY/git/tags/$OBJE CT_SHA" \
-                  --jq '[.object.ty pe, .object.sha] | @tsv'
+              [[ "$OBJECT_TYPE" == "tag" ]] \
+                || { echo "::error::$RELEASE_TAG указывает на недопустимый объект $OBJECT_TYPE"; exit 1; }
+              read -r OBJECT_TYPE OBJECT_SHA < <(
+                gh api "repos/$GITHUB_REPOSITORY/git/tags/$OBJECT_SHA" \
+                  --jq '[.object.type, .object.sha] | @tsv'
               )
-             done
-            [[ -n "${TAG_SOURCE_ SHA:-}" ]] \
-              || { echo "::error ::$RELEASE_TAG не раскрывается  в commit"; exit 1; }
-            if [[ "$TAG _SOURCE_SHA" != "$GITHUB_SHA" ]]; then
-               echo "::warning::$RELEASE_TAG уже  существует на $TAG_SOURCE_SHA; р елиз сверяется с тегом в� �есто HEAD main $GITHUB_SHA"
-             fi
+            done
+            [[ -n "${TAG_SOURCE_SHA:-}" ]] \
+              || { echo "::error::$RELEASE_TAG не раскрывается в commit"; exit 1; }
+            if [[ "$TAG_SOURCE_SHA" != "$GITHUB_SHA" ]]; then
+              echo "::warning::$RELEASE_TAG уже существует на $TAG_SOURCE_SHA; релиз сверяется с тегом вместо HEAD main $GITHUB_SHA"
+            fi
             SOURCE_SHA="$TAG_SOURCE_SHA"
-           fi
+          fi
           {
-            echo "rel ease_tag=$RELEASE_TAG"
-            echo "rele ase_date=$(date -u +%F)"
-            echo "ve rsion=$VERSION"
-            echo "source_sha= $SOURCE_SHA"
+            echo "release_tag=$RELEASE_TAG"
+            echo "release_date=$(date -u +%F)"
+            echo "version=$VERSION"
+            echo "source_sha=$SOURCE_SHA"
           } >> "$GITHUB_OUTPUT"
- 
+
   verify:
-    name: Verify and seal npm pack age
+    name: Verify and seal npm package
     needs: [resolve]
     if: >-
-      git hub.repository == 'Labpics-Team/lab-motion' & & !cancelled() &&
-      needs.resolve.result  == 'success'
+      github.repository == 'Labpics-Team/lab-motion' && !cancelled() &&
+      needs.resolve.result == 'success'
     runs-on: ubuntu-latest
-    tim eout-minutes: 45
+    timeout-minutes: 45
     permissions:
-      conte nts: read
+      contents: read
     env:
-      RELEASE_TAG: ${{ nee ds.resolve.outputs.release_tag }}
-      RELEA SE_DATE: ${{ needs.resolve.outputs.release_da te }}
-      EXPECTED_SOURCE_SHA: ${{ needs.re solve.outputs.source_sha }}
+      RELEASE_TAG: ${{ needs.resolve.outputs.release_tag }}
+      RELEASE_DATE: ${{ needs.resolve.outputs.release_date }}
+      EXPECTED_SOURCE_SHA: ${{ needs.resolve.outputs.source_sha }}
     outputs:
-       source_sha: ${{ steps.source.outputs.source _sha }}
-      artifact_name: ${{ steps.source .outputs.artifact_name }}
-      tarball_name:  ${{ steps.seal.outputs.tarball_name }}
-       tarball_sha256: ${{ steps.seal.outputs.tarba ll_sha256 }}
-      package_identity: ${{ step s.seal.outputs.package_identity }}
-      arti fact_id: ${{ steps.upload.outputs.artifact-id  }}
-      artifact_digest: ${{ steps.upload.o utputs.artifact-digest }}
+      source_sha: ${{ steps.source.outputs.source_sha }}
+      artifact_name: ${{ steps.source.outputs.artifact_name }}
+      tarball_name: ${{ steps.seal.outputs.tarball_name }}
+      tarball_sha256: ${{ steps.seal.outputs.tarball_sha256 }}
+      package_identity: ${{ steps.seal.outputs.package_identity }}
+      artifact_id: ${{ steps.upload.outputs.artifact-id }}
+      artifact_digest: ${{ steps.upload.outputs.artifact-digest }}
 
     steps:
-      -  name: Checkout
-        uses: actions/checkou t@3d3c42e5aac5ba805825da76410c181273ba90b1 #  v7.0.1
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
-          ref: ${{ needs .resolve.outputs.source_sha }}
-          fetc h-depth: 0
-          persist-credentials: fal se
+          ref: ${{ needs.resolve.outputs.source_sha }}
+          fetch-depth: 0
+          persist-credentials: false
 
       - name: Setup Node
-        uses: ac tions/setup-node@820762786026740c76f36085b0ef c47a31fe5020 # v7.0.0
+        uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
         with:
-           node-version: "24"
-          package-manager -cache: false
-
-      - name: Activate pinned  pnpm
-        run: |
-          corepack enable 
-          corepack install --global pnpm@11. 11.0
-
-      # Проверяем фактич ески извлечённый коммит  до появления релизного т ега.
-      - name: Verify release source
-         id: source
-        run: |
-          gi t fetch origin main --quiet
-          SOURCE_ SHA=$(git rev-parse HEAD)
-          [[ "$SOUR CE_SHA" == "$EXPECTED_SOURCE_SHA" ]] \
-             || { echo "::error::извлечён $S OURCE_SHA вместо ожидаемого $ EXPECTED_SOURCE_SHA"; exit 1; }
-          git  merge-base --is-ancestor "$SOURCE_SHA" origi n/main \
-            || { echo "::error::ре лизный коммит находится  вне main"; exit 1; }
-          echo "sourc e_sha=$SOURCE_SHA" >> "$GITHUB_OUTPUT"
-           echo "artifact_name=npm-package-$SOURCE_S HA-$GITHUB_RUN_ID-$GITHUB_RUN_ATTEMPT" >> "$G ITHUB_OUTPUT"
-
-      - name: Install dependen cies
-        run: pnpm install --frozen-lockf ile
-
-      - name: Static contract
-        ru n: pnpm check:static
-
-      - name: Verify re lease identity
-        run: node scripts/chec k-release.mjs "$RELEASE_TAG" "$RELEASE_DATE"
- 
-      - name: Issue forms schema
-        run : node scripts/check-issue-forms.mjs
-
-      -  name: Build
-        run: pnpm build
-
-      -  name: Install browser conformance engines
-         run: pnpm exec playwright install --wit h-deps chromium firefox webkit
-
-      - name:  Browser conformance
-        run: pnpm test:b rowser:all
-
-      - name: Factual documentati on drift
-        run: node scripts/check-docs -facts.mjs
-
-      - name: Test
-        run: p npm test
-
-      - name: Fuzz finiteness gate
-         run: pnpm vitest run --reporter=verbo se test/*finiteness-fuzz.test.ts
-
-      - nam e: Size gate
-        run: pnpm size
-
-      #  Кандидат создаётся один  раз. Все следующие прове� �ки читают именно его;
-       # повторная упаковка пер ед publish запрещена.
-      - name : Pack release candidate once
-        id: pac k
-        shell: bash
-        run: |
-           mkdir release-artifact
-          pnpm pack  --pack-destination release-artifact
-           shopt -s nullglob
-          archives=(releas e-artifact/*.tgz)
-          [[ ${#archives[@] } -eq 1 ]] \
-            || { echo "::error:: ожидался ровно один tgz, н� �йдено: ${#archives[@]}"; exit 1; }
-           echo "tarball_name=$(basename "${archiv es[0]}")" >> "$GITHUB_OUTPUT"
-
-      - name:  Pack smoke on release candidate
-        env:
-           TARBALL: release-artifact/${{ steps .pack.outputs.tarball_name }}
-        run: no de scripts/pack-smoke.mjs "$TARBALL"
-
-      -  name: Consumer compatibility on release cand idate
-        env:
-          TARBALL: release -artifact/${{ steps.pack.outputs.tarball_name  }}
-        run: node scripts/pack-compat.mjs  "$TARBALL"
-
-      # pnpm 11 сам треб� �ет более новый patch Node 22, п оэтому floor-проверка
-      # � �олучает уже собранный tgz  и исполняет только consumer  runtime.
-      - name: Setup exact consumer N ode floor
-        uses: actions/setup-node@82 0762786026740c76f36085b0efc47a31fe5020 # v7.0 .0
-        with:
-          node-version: "22. 0.0"
+          node-version: "24"
           package-manager-cache: false
 
-       - name: Exact Node 22.0 artifact smoke
-         env:
-          TARBALL: release-artif act/${{ steps.pack.outputs.tarball_name }}
-         run: node scripts/pack-smoke.mjs "$TARB ALL"
+      - name: Activate pinned pnpm
+        run: |
+          corepack enable
+          corepack install --global pnpm@11.11.0
 
-      # После consumer-гейто� � фиксируем идентичность  ровно тех байтов, которы е
-      # upload-artifact передаст p ublish-job.
-      - name: Seal release artifa ct identity
+      # Проверяем фактически извлечённый коммит до появления релизного тега.
+      - name: Verify release source
+        id: source
+        run: |
+          git fetch origin main --quiet
+          SOURCE_SHA=$(git rev-parse HEAD)
+          [[ "$SOURCE_SHA" == "$EXPECTED_SOURCE_SHA" ]] \
+            || { echo "::error::извлечён $SOURCE_SHA вместо ожидаемого $EXPECTED_SOURCE_SHA"; exit 1; }
+          git merge-base --is-ancestor "$SOURCE_SHA" origin/main \
+            || { echo "::error::релизный коммит находится вне main"; exit 1; }
+          echo "source_sha=$SOURCE_SHA" >> "$GITHUB_OUTPUT"
+          echo "artifact_name=npm-package-$SOURCE_SHA-$GITHUB_RUN_ID-$GITHUB_RUN_ATTEMPT" >> "$GITHUB_OUTPUT"
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Static contract
+        run: pnpm check:static
+
+      - name: Verify release identity
+        run: node scripts/check-release.mjs "$RELEASE_TAG" "$RELEASE_DATE"
+
+      - name: Issue forms schema
+        run: node scripts/check-issue-forms.mjs
+
+      - name: Build
+        run: pnpm build
+
+      - name: Install browser conformance engines
+        run: pnpm exec playwright install --with-deps chromium firefox webkit
+
+      - name: Browser conformance
+        run: pnpm test:browser:all
+
+      - name: Factual documentation drift
+        run: node scripts/check-docs-facts.mjs
+
+      - name: Test
+        run: pnpm test
+
+      - name: Fuzz finiteness gate
+        run: pnpm vitest run --reporter=verbose test/*finiteness-fuzz.test.ts
+
+      - name: Size gate
+        run: pnpm size
+
+      # Кандидат создаётся один раз. Все следующие проверки читают именно его;
+      # повторная упаковка перед publish запрещена.
+      - name: Pack release candidate once
+        id: pack
+        shell: bash
+        run: |
+          mkdir release-artifact
+          pnpm pack --pack-destination release-artifact
+          shopt -s nullglob
+          archives=(release-artifact/*.tgz)
+          [[ ${#archives[@]} -eq 1 ]] \
+            || { echo "::error::ожидался ровно один tgz, найдено: ${#archives[@]}"; exit 1; }
+          echo "tarball_name=$(basename "${archives[0]}")" >> "$GITHUB_OUTPUT"
+
+      - name: Pack smoke on release candidate
+        env:
+          TARBALL: release-artifact/${{ steps.pack.outputs.tarball_name }}
+        run: node scripts/pack-smoke.mjs "$TARBALL"
+
+      - name: Consumer compatibility on release candidate
+        env:
+          TARBALL: release-artifact/${{ steps.pack.outputs.tarball_name }}
+        run: node scripts/pack-compat.mjs "$TARBALL"
+
+      # pnpm 11 сам требует более новый patch Node 22, поэтому floor-проверка
+      # получает уже собранный tgz и исполняет только consumer runtime.
+      - name: Setup exact consumer Node floor
+        uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version: "22.0.0"
+          package-manager-cache: false
+
+      - name: Exact Node 22.0 artifact smoke
+        env:
+          TARBALL: release-artifact/${{ steps.pack.outputs.tarball_name }}
+        run: node scripts/pack-smoke.mjs "$TARBALL"
+
+      # После consumer-гейтов фиксируем идентичность ровно тех байтов, которые
+      # upload-artifact передаст publish-job.
+      - name: Seal release artifact identity
         id: seal
         env:
-           SOURCE_SHA: ${{ steps.source.outputs.s ource_sha }}
-          TARBALL: release-artif act/${{ steps.pack.outputs.tarball_name }}
-         run: |
-          node scripts/check-rel ease-artifact.mjs \
-            "$TARBALL" "$ RELEASE_TAG" "$SOURCE_SHA" \
-            rele ase-artifact/release-manifest.json >> "$GITHU B_OUTPUT"
+          SOURCE_SHA: ${{ steps.source.outputs.source_sha }}
+          TARBALL: release-artifact/${{ steps.pack.outputs.tarball_name }}
+        run: |
+          node scripts/check-release-artifact.mjs \
+            "$TARBALL" "$RELEASE_TAG" "$SOURCE_SHA" \
+            release-artifact/release-manifest.json >> "$GITHUB_OUTPUT"
 
-      - name: Upload sealed packag e
+      - name: Upload sealed package
         id: upload
-        uses: actions/up load-artifact@043fb46d1a93c77aae656e7c1c64a87 5d1fc6a0a # v7.0.1
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
-          na me: ${{ steps.source.outputs.artifact_name }} 
+          name: ${{ steps.source.outputs.artifact_name }}
           path: release-artifact/
-           if-no-files-found: error
-          retention- days: 7
+          if-no-files-found: error
+          retention-days: 7
           compression-level: 0
-           overwrite: false
-          include-hidden -files: false
+          overwrite: false
+          include-hidden-files: false
 
   publish:
-    name: Publish s ealed npm package
+    name: Publish sealed npm package
     concurrency:
-      grou p: npm-publish-${{ needs.resolve.outputs.rele ase_tag }}
+      group: npm-publish-${{ needs.resolve.outputs.release_tag }}
       cancel-in-progress: false
-     needs: [resolve, verify, tag]
+    needs: [resolve, verify, tag]
     if: >-
-       github.repository == 'Labpics-Team/lab-mo tion' && !cancelled() &&
-      needs.resolve. result == 'success' && needs.verify.result ==  'success' &&
-      needs.tag.result == 'succ ess'
+      github.repository == 'Labpics-Team/lab-motion' && !cancelled() &&
+      needs.resolve.result == 'success' && needs.verify.result == 'success' &&
+      needs.tag.result == 'success'
     runs-on: ubuntu-latest
-    timeout-min utes: 10
+    timeout-minutes: 10
     environment: npm
-    permissions :
+    permissions:
       actions: read
       contents: read
-       id-token: write
+      id-token: write
     env:
-      RELEASE_TA G: ${{ needs.resolve.outputs.release_tag }}
-       EXPECTED_SOURCE_SHA: ${{ needs.verify.ou tputs.source_sha }}
-      EXPECTED_TARBALL_NA ME: ${{ needs.verify.outputs.tarball_name }}
-       EXPECTED_TARBALL_SHA256: ${{ needs.veri fy.outputs.tarball_sha256 }}
-      EXPECTED_P ACKAGE_IDENTITY: ${{ needs.verify.outputs.pac kage_identity }}
-      EXPECTED_ARTIFACT_ID:  ${{ needs.verify.outputs.artifact_id }}
-       EXPECTED_ARTIFACT_NAME: ${{ needs.verify.out puts.artifact_name }}
-      EXPECTED_ARTIFACT _DIGEST: ${{ needs.verify.outputs.artifact_di gest }}
+      RELEASE_TAG: ${{ needs.resolve.outputs.release_tag }}
+      EXPECTED_SOURCE_SHA: ${{ needs.verify.outputs.source_sha }}
+      EXPECTED_TARBALL_NAME: ${{ needs.verify.outputs.tarball_name }}
+      EXPECTED_TARBALL_SHA256: ${{ needs.verify.outputs.tarball_sha256 }}
+      EXPECTED_PACKAGE_IDENTITY: ${{ needs.verify.outputs.package_identity }}
+      EXPECTED_ARTIFACT_ID: ${{ needs.verify.outputs.artifact_id }}
+      EXPECTED_ARTIFACT_NAME: ${{ needs.verify.outputs.artifact_name }}
+      EXPECTED_ARTIFACT_DIGEST: ${{ needs.verify.outputs.artifact_digest }}
 
     steps:
-      - name: Setup Node  for npm trusted publishing
-        uses: acti ons/setup-node@820762786026740c76f36085b0efc4 7a31fe5020 # v7.0.0
+      - name: Setup Node for npm trusted publishing
+        uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
         with:
-          n ode-version: "24"
-          registry-url: htt ps://registry.npmjs.org
-          package-man ager-cache: false
+          node-version: "24"
+          registry-url: https://registry.npmjs.org
+          package-manager-cache: false
 
-      - name: Download sea led package by artifact ID
-        uses: acti ons/download-artifact@3e5f45b2cfb9172054b4087 a40e8e0b5a5461e7c # v8.0.1
+      - name: Download sealed package by artifact ID
+        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
         with:
-           artifact-ids: ${{ needs.verify.outputs. artifact_id }}
-          path: release-artifa ct
+          artifact-ids: ${{ needs.verify.outputs.artifact_id }}
+          path: release-artifact
           merge-multiple: true
-          d igest-mismatch: error
+          digest-mismatch: error
 
-      # Хеш арх� �ва GitHub защищает транспо� �т, хеш tgz — публикуемые б айты.
-      - name: Verify artifact trans port, digest and identity
-        shell: bash 
-        env:
-          GH_TOKEN: ${{ github. token }}
-        run: |
-          [[ "$EXPECT ED_ARTIFACT_ID" =~ ^[0-9]+$ ]] \
-             || { echo "::error::некорректный  идентификатор артефакта "; exit 1; }
-          [[ "$EXPECTED_ARTIFACT _DIGEST" =~ ^[0-9a-f]{64}$ ]] \
-            | | { echo "::error::некорректный � �еш артефакта"; exit 1; }
-           IFS=$'\t' read -r API_DIGEST API_NAME < <(
-             gh api "repos/$GITHUB_REPOSITORY/ actions/artifacts/$EXPECTED_ARTIFACT_ID" \
-               --jq '[.digest // "", .name // "" ] | @tsv'
-          )
-          [[ "${API_DIG EST#sha256:}" == "$EXPECTED_ARTIFACT_DIGEST"  ]] \
-            || { echo "::error::хеш � �ртефакта в API не совпада� �т с выходом verify job"; exit 1; }
-           [[ "$API_NAME" == "$EXPECTED_ARTIFA CT_NAME" ]] \
-            || { echo "::error: :имя артефакта в API не сов падает с выходом verify job"; e xit 1; }
-
-          mapfile -t files < <(find  release-artifact -type f -print | sort)
-           [[ ${#files[@]} -eq 2 ]] \
-             || { echo "::error::артефакт обяз ан содержать ровно tgz и м� �нифест"; exit 1; }
-          [[ -z "$( find release-artifact -type l -print -quit)"  ]] \
-            || { echo "::error::арте факт не должен содержать  ссылки"; exit 1; }
-          [[ ! -L r elease-artifact/release-manifest.json ]] \
-             || { echo "::error::манифес� � не может быть ссылкой"; e xit 1; }
-          TARBALL="release-artifact/ $EXPECTED_TARBALL_NAME"
-          [[ -f "$TAR BALL" && ! -L "$TARBALL" ]] \
-            ||  { echo "::error::ожидаемый tgz от� �утствует или является с� �ылкой"; exit 1; }
-          ACTUAL_SHA2 56=$(sha256sum "$TARBALL" | cut -d' ' -f1)
-           [[ "$ACTUAL_SHA256" == "$EXPECTED_TAR BALL_SHA256" ]] \
-            || { echo "::er ror::SHA-256 tgz не совпадает с � �роверенным"; exit 1; }
-
-           node --input-type=module <<'NODE'
-          i mport { readFileSync } from 'node:fs';
-
-           const fail = (message) => {
-             console.error(`::error::${message}`);
-             process.exit(1);
-          };
-           const manifest = JSON.parse(readFileSync('rel ease-artifact/release-manifest.json', 'utf8') );
-          if (manifest.schema !== 1) fail( 'неподдерживаемая схема  release-манифеста');
-          if (m anifest.release?.tag !== process.env.RELEASE_ TAG) fail('тег манифеста не с� �впадает');
-          if (manifest.rel ease?.sourceSha !== process.env.EXPECTED_SOUR CE_SHA) fail('source SHA манифеста � �е совпадает');
-          if (manif est.package?.identity !== process.env.EXPECTE D_PACKAGE_IDENTITY) fail('идентично� �ть пакета не совпадает'); 
-          if (manifest.artifact?.file !== pr ocess.env.EXPECTED_TARBALL_NAME) fail('имя  tgz манифеста не совпадае т');
-          if (manifest.artifact?.sha256  !== process.env.EXPECTED_TARBALL_SHA256) fai l('digest tgz манифеста не сов� �адает');
-          NODE
-
-      - name:  Verify npm supports trusted publishing
-         shell: bash
-        run: |
-          node - -input-type=module <<'NODE'
-          import  { execFileSync } from 'node:child_process';
-           const raw = execFileSync('npm', ['-- version'], { encoding: 'utf8' }).trim();
-           const [major, minor, patch] = raw.split ('.').map(Number);
-          const supported  = major > 11 || (major === 11 && (minor > 5 | | (minor === 5 && patch >= 1)));
-          if  (!supported) {
-            console.error(`np m ${raw} не поддерживает truste d publishing; требуется >= 11.5.1`); 
-            process.exit(1);
-          }
-           console.log(`npm ${raw}: trusted publi shing поддержан`);
-          NODE
-
-       # Tag-job уже зафиксирова� � ref без OIDC. Перед публика� �ией
-      # повторно читаем  серверное состояние и п� �инимаем только наш SHA.
-       - name: Verify locked release tag binding
-         shell: bash
-        env:
-          GH_ TOKEN: ${{ github.token }}
-        run: |
-           OWNER="${GITHUB_REPOSITORY%%/*}"
-           REPOSITORY_NAME="${GITHUB_REPOSITORY#*/} "
-          EXISTING_REF=$(
-            # $ow ner/$name/$qualifiedName ниже прина� �лежат GraphQL, а не shell.
-             # shellcheck disable=SC2016
-            gh  api graphql \
-              -f query='query( $owner: String!, $name: String!, $qualifiedNa me: String!) {
-                repository(own er: $owner, name: $name) {
-                   ref(qualifiedName: $qualifiedName) { target {  __typename oid } }
-                }
-               }' \
-              -F owner="$OWNER" \ 
-              -F name="$REPOSITORY_NAME" \
-               -F qualifiedName="refs/tags/$REL EASE_TAG" \
-              --jq '(.data.reposi tory.ref.target // empty) | [.__typename, .oi d] | @tsv'
-          )
-          if [[ -z "$E XISTING_REF" ]]; then
-            echo "::err or::$RELEASE_TAG не создан tag-job"
-             exit 1
-          fi
-
-          rea d -r OBJECT_TYPE OBJECT_SHA <<< "$EXISTING_RE F"
-          case "$OBJECT_TYPE" in
-             Commit) OBJECT_TYPE=commit ;;
-             Tag) OBJECT_TYPE=tag ;;
-          esac
-           for _ in {1..8}; do
-            if [[ "$O BJECT_TYPE" == "commit" ]]; then
-               EXISTING="$OBJECT_SHA"
-              break
-             fi
-            [[ "$OBJECT_TYPE"  == "tag" ]] \
-              || { echo "::erro r::тег указывает на недоп� �стимый объект $OBJECT_TYPE"; exi t 1; }
-            read -r OBJECT_TYPE OBJECT _SHA < <(
-              gh api "repos/$GITHUB _REPOSITORY/git/tags/$OBJECT_SHA" \
-                 --jq '[.object.type, .object.sha] | @t sv'
-            )
-          done
-          [[  -n "${EXISTING:-}" ]] \
-            || { ech o "::error::не удалось раскры� �ь $RELEASE_TAG до commit"; exit 1; }
-           [[ "$EXISTING" == "$EXPECTED_SOURCE_SHA " ]] \
-            || { echo "::error::$RELEA SE_TAG уже указывает на $EXISTI NG"; exit 1; }
-          echo "$RELEASE_TAG � �же указывает на провере� �ный коммит"
-
-      - name: Publish  or reconcile verified tarball through npm OID C
-        env:
-          TARBALL: ./release-a rtifact/${{ needs.verify.outputs.tarball_name  }}
-        run: |
-          node --input-typ e=module <<'NODE'
-          import { execFile Sync } from 'node:child_process';
-          i mport { createHash } from 'node:crypto';
-           import { readFileSync } from 'node:fs'; 
-          import { setTimeout as delay } fro m 'node:timers/promises';
-
-          const fa il = (message) => {
-            throw new Err or(message);
-          };
-          const ide ntity = process.env.EXPECTED_PACKAGE_IDENTITY ;
-          const separator = identity.lastIn dexOf('@');
-          if (separator <= 0) fai l(`некорректная идентичн� �сть пакета: ${identity}`);
-           const name = identity.slice(0, separator);
-           const version = identity.slice(sepa rator + 1);
-          const integrity = `sha5 12-${createHash('sha512')
-            .update (readFileSync(process.env.TARBALL))
-             .digest('base64')}`;
-          const prove nanceType = 'https://slsa.dev/provenance/v1'; 
-          const packageUrl = `https://regist ry.npmjs.org/${encodeURIComponent(name)}`;
-           const registryUrl = `${packageUrl}/${ encodeURIComponent(version)}`;
-
-          fun ction stableVersion(value, label) {
-             const match = /^(\d+)\.(\d+)\.(\d+)$/.exec (value);
-            if (!match) fail(`${labe l} не является стабильной  версией x.y.z: ${String(value)}`);
-             return match.slice(1).map((part) =>  BigInt(part));
-          }
-
-          functi on compareVersions(left, right) {
-             for (let index = 0; index < left.length; ind ex++) {
-              if (left[index] < right [index]) return -1;
-              if (left[in dex] > right[index]) return 1;
-            }
-             return 0;
-          }
-
-           const candidate = stableVersion(version, 'к� �ндидат');
-
-          async function lo okupLatest() {
-            const response = a wait fetch(`${packageUrl}?latest=${Date.now() }`, {
-              cache: 'no-store',
-               headers: { accept: 'application/json'  },
-            });
-            if (response. status === 404) return null;
-            if ( !response.ok) fail(`npm packument ответ� �л ${response.status}`);
-            const p ackument = await response.json();
-             const raw = packument['dist-tags']?.latest;
-             if (typeof raw !== 'string') fail ('npm packument не содержит dist-ta gs.latest');
-            return { raw, parsed : stableVersion(raw, 'npm latest') };
-           }
-
-          async function lookupVersion( ) {
-            const response = await fetch( `${registryUrl}?reconcile=${Date.now()}`, {
-               cache: 'no-store',
-               headers: { accept: 'application/json' },
-             });
-            if (response.status  === 404) return null;
-            if (!respon se.ok) fail(`npm registry ответил ${re sponse.status}`);
-            return response .json();
-          }
-
-          function asse rtPublishPreflight(latest) {
-            if ( latest === null) return;
-            if (comp areVersions(candidate, latest.parsed) <= 0) { 
-              fail(`новый кандид� �т ${version} должен быть стро го выше npm latest ${latest.raw} и н� � может откатить npm latest`);
-             }
-          }
-
-          async fun ction reconcile(attempts, mode) {
-             if (mode !== 'idempotent' && mode !== 'publi shed') fail(`неизвестный режи� � reconcile: ${mode}`);
-            for (let  attempt = 1; attempt <= attempts; attempt++)  {
-              const [metadata, latest] = aw ait Promise.all([lookupVersion(), lookupLates t()]);
-              if (metadata !== null) { 
-                const published = metadata.d ist?.integrity;
-                if (published  !== integrity) {
-                  fail(`в� �рсия уже существует с др угим integrity: ${String(published)}`);
-                 }
-                const proven anceReady =
-                  metadata.dist?. attestations?.provenance?.predicateType === p rovenanceType &&
-                  typeof met adata.dist?.attestations?.url === 'string';
-                 if (latest !== null) {
-                   const comparison = compareVersions (latest.parsed, candidate);
-                   if (mode === 'published') {
-                     if (comparison >= 0 && provenanceReady) { 
-                      if (comparison > 0) {
-                         console.log(
-                           `${identity}: моното� �ная конкурентная публик ация подняла npm latest ` +
-                           `до ${latest.raw}; ка ндидат ${version} проверен и � �е требует retag`,
-                         );
-                      }
-                       return true;
-                    }
-                   }
-                  if (mod e === 'idempotent') {
-                    if  (comparison < 0) {
-                      fail (`idempotent latest ниже кандидат а: ${latest.raw} < ${version}`);
-                     }
-                    if (provenance Ready) return true;
-                  }
-                 }
-              }
-              if  (attempt < attempts) await delay(5_000);
-             }
-            return false;
-           }
-
-          const existing = await lookupV ersion();
-          if (existing !== null) {
-             if (await reconcile(12, 'idempote nt')) {
-              console.log(`${identity } уже опубликован с прове ренными байтами, provenance и  latest не ниже кандидата`);
-               process.exit(0);
-            }
-             fail(`${identity}: idempotent regis try state не подтвердился`);
-           }
-
-          await assertPublishPrefl ight(await lookupLatest());
-
-          let pu blishError;
-          try {
-            execF ileSync(
-              'npm',
-              [ 'publish', process.env.TARBALL, '--registry=h ttps://registry.npmjs.org', '--tag', 'latest' , '--access', 'public', '--provenance', '--ig nore-scripts'],
-              { stdio: 'inher it' },
-            );
-          } catch (erro r) {
-            publishError = error;
-           }
-
-          if (await reconcile(12, 'pub lished')) {
-            console.log(`${identi ty}: registry integrity, provenance и мон отонный latest подтвержден� �`);
-            process.exit(0);
-          } 
-          if (publishError) throw publishErr or;
-          fail(`${identity}: registry н� � подтвердил integrity, provenance  и монотонный latest после npm  publish`);
-          NODE
-
-      - name: Ver ify registry provenance statement and signatu res
-        env:
-          EXPECTED_RUN_SHA:  ${{ github.sha }}
-          GH_TOKEN: ${{ git hub.token }}
-          TARBALL: ./release-art ifact/${{ needs.verify.outputs.tarball_name } }
-        run: |
-          node --input-type= module <<'NODE'
-          import { execFileSy nc } from 'node:child_process';
-          imp ort { createHash } from 'node:crypto';
-           import { mkdtempSync, readFileSync, rmSyn c, writeFileSync } from 'node:fs';
-           import { tmpdir } from 'node:os';
-          i mport { join } from 'node:path';
-
-          c onst fail = (message) => { throw new Error(me ssage); };
-          const identity = process .env.EXPECTED_PACKAGE_IDENTITY;
-          con st separator = identity.lastIndexOf('@');
-           const name = identity.slice(0, separat or);
-          const version = identity.slice (separator + 1);
-          const sha512 = cre ateHash('sha512').update(readFileSync(process .env.TARBALL)).digest('hex');
-          const  versionUrl = `https://registry.npmjs.org/${e ncodeURIComponent(name)}/${encodeURIComponent (version)}`;
-          const metadataResponse  = await fetch(`${versionUrl}?provenance=${Da te.now()}`, { cache: 'no-store' });
-           if (!metadataResponse.ok) fail(`metadata pro venance: HTTP ${metadataResponse.status}`);
-           const metadata = await metadataRespo nse.json();
-          const attestationUrl =  metadata.dist?.attestations?.url;
-          i f (metadata.dist?.attestations?.provenance?.p redicateType !== 'https://slsa.dev/provenance /v1') {
-            fail('registry metadata � �е подтверждает SLSA provenance  v1');
-          }
-          const parsedUrl =  new URL(attestationUrl);
-          if (parse dUrl.origin !== 'https://registry.npmjs.org')  {
-            fail(`недоверенный  endpoint attestations: ${parsedUrl.origin}`) ;
-          }
-          // registry мате� �иализует attestation bundle асин хронно: metadata уже
-          // с сылается на endpoint, которы� � первые минуты отвечает  404 (падение
-          // run 30901712 886 через 1.2s после publish). Retr y только на 404;
-          // ост� �льные статусы fail-closed нем едленно.
-          let attestationResp onse;
-          for (let attempt = 1; attempt  <= 16; attempt++) {
-            attestationR esponse = await fetch(parsedUrl, { cache: 'no -store' });
-            if (attestationRespon se.ok || attestationResponse.status !== 404)  break;
-            await new Promise((resolve ) => { setTimeout(resolve, 15000); });
-           }
-          if (!attestationResponse.ok)  fail(`attestations: HTTP ${attestationRespons e.status}`);
-          const collection = awa it attestationResponse.json();
-          cons t attestation = collection.attestations?.find (
-            (item) => item.predicateType == = 'https://slsa.dev/provenance/v1',
-           );
-          if (!attestation?.bundle?.dsseE nvelope?.payload) fail('SLSA attestation от сутствует');
-          const stateme nt = JSON.parse(
-            Buffer.from(atte station.bundle.dsseEnvelope.payload, 'base64' ).toString('utf8'),
-          );
-          co nst expectedSubject = `pkg:npm/${name.replace (/^@/, '%40')}@${version}`;
-          const s ubject = statement.subject?.find((item) => it em.name === expectedSubject);
-          if (s ubject?.digest?.sha512 !== sha512) fail('subj ect digest provenance не совпадает  с tgz');
-
-          const definition = stat ement.predicate?.buildDefinition;
-          c onst workflow = definition?.externalParameter s?.workflow;
-          if (workflow?.reposito ry !== 'https://github.com/Labpics-Team/lab-m otion') {
-            fail('provenance ука зывает на другой репозит орий');
-          }
-          if (workflo w?.path !== '.github/workflows/release.yml' | | workflow?.ref !== 'refs/heads/main') {
-             fail('provenance указывает � �а другой workflow/ref');
-          }
-           // OIDC-provenance привязан  к workflow-run: gitCommit — SHA рана, 
-          // подписавшего пак ет. При idempotent-rerun это ранн ий диспатч
-          // (run 3090171 2886: пакет подписан на 0d4534 c8, github.sha уже новее),
-           // поэтому точное равенст во нежизнеспособно. Инва риант fail-closed:
-          // gitCommi t == github.sha текущего рана и� �и его предок по main;
-           // подпись diverged/чужого ко� �мита отвергается. Байты  дерева источника
-          //  связаны с пакетом через s ubject sha512 выше.
-          const prove nanceSha = definition?.resolvedDependencies?. find(
-            (item) => typeof item.diges t?.gitCommit === 'string'
-              && ty peof item.uri === 'string'
-              && i tem.uri.startsWith('git+https://github.com/La bpics-Team/lab-motion@'),
-          )?.digest ?.gitCommit;
-          if (!provenanceSha) fa il('provenance не содержит gitCommi t нашего репозитория');
-           const compareResponse = await fetch(
-             `https://api.github.com/repos/Labpi cs-Team/lab-motion/compare/${process.env.EXPE CTED_RUN_SHA}...${provenanceSha}`,
-             {
-              headers: {
-                 accept: 'application/vnd.github+json',
-                 authorization: `Bearer ${process.en v.GH_TOKEN}`,
-              },
-               cache: 'no-store',
-            },
-          ) ;
-          if (!compareResponse.ok) fail(`co mpare provenance SHA: HTTP ${compareResponse. status}`);
-          const compare = await co mpareResponse.json();
-          if (compare.s tatus !== 'identical' && compare.status !== ' behind') {
-            fail(`provenance SHA $ {provenanceSha} вне линии main: ${com pare.status}`);
-          }
-          if (sta tement.predicate?.runDetails?.builder?.id !==  'https://github.com/actions/runner/github-ho sted') {
-            fail('provenance соз� �ан не GitHub-hosted runner');
-           }
-          const invocation = statement.pred icate?.runDetails?.metadata?.invocationId;
-           if (!invocation?.startsWith('https:// github.com/Labpics-Team/lab-motion/actions/ru ns/')) {
-            fail('provenance invocat ion относится к другому ре позиторию');
-          }
-
-           // npm CLI криптографически � �роверяет registry- и SLSA-подп� �си;
-          // разбор выше д� �полнительно связывает st atement с нашим SHA/workflow.
-           const audit = mkdtempSync(join(tmpdir(), 'la bmotion-provenance-'));
-          try {
-             writeFileSync(join(audit, 'package.jso n'), JSON.stringify({ name: 'provenance-audit ', private: true }));
-            execFileSyn c(
-              'npm',
-              ['insta ll', '--ignore-scripts', '--no-audit', '--no- fund', '--registry=https://registry.npmjs.org ', identity],
-              { cwd: audit, std io: 'inherit' },
-            );
-            e xecFileSync('npm', ['audit', 'signatures'], {  cwd: audit, stdio: 'inherit' });
-          }  finally {
-            rmSync(audit, { recurs ive: true, force: true });
-          }
-           console.log(`${identity}: provenance пр ивязан к проверенному sour ce и подписи валидны`);
-           NODE
-
-  tag:
-    name: Create verified re lease tag
-    needs: [resolve, verify]
-    if : >-
-      github.repository == 'Labpics-Team /lab-motion' && !cancelled() &&
-      needs.r esolve.result == 'success' && needs.verify.re sult == 'success'
-    runs-on: ubuntu-latest
-     timeout-minutes: 5
-    permissions:
-      c ontents: write
-    env:
-      RELEASE_TAG: ${ { needs.resolve.outputs.release_tag }}
-       EXPECTED_SOURCE_SHA: ${{ needs.verify.outputs .source_sha }}
-
-    steps:
-      # После  всех гейтов, но до выдач� � OIDC, фиксируем точный ref.
-       # Сбой npm оставит пров� �ренный тег, который безо пасно переиспользует rerun .
-      - name: Create or verify tag idempote ntly
+      # Хеш архива GitHub защищает транспорт, хеш tgz — публикуемые байты.
+      - name: Verify artifact transport, digest and identity
         shell: bash
         env:
-           GH_TOKEN: ${{ github.token }}
-        run:  |
-          OWNER="${GITHUB_REPOSITORY%%/*}" 
-          REPOSITORY_NAME="${GITHUB_REPOSITO RY#*/}"
-          EXISTING_REF=$(
-             # $owner/$name/$qualifiedName ниже пр� �надлежат GraphQL, а не shell.
-             # shellcheck disable=SC2016
-             gh api graphql \
-              -f query=' query($owner: String!, $name: String!, $quali fiedName: String!) {
-                reposito ry(owner: $owner, name: $name) {
-                   ref(qualifiedName: $qualifiedName) { ta rget { __typename oid } }
-                }
-               }' \
-              -F owner="$OW NER" \
-              -F name="$REPOSITORY_NAM E" \
-              -F qualifiedName="refs/tag s/$RELEASE_TAG" \
-              --jq '(.data. repository.ref.target // empty) | [.__typenam e, .oid] | @tsv'
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          [[ "$EXPECTED_ARTIFACT_ID" =~ ^[0-9]+$ ]] \
+            || { echo "::error::некорректный идентификатор артефакта"; exit 1; }
+          [[ "$EXPECTED_ARTIFACT_DIGEST" =~ ^[0-9a-f]{64}$ ]] \
+            || { echo "::error::некорректный хеш артефакта"; exit 1; }
+          IFS=$'\t' read -r API_DIGEST API_NAME < <(
+            gh api "repos/$GITHUB_REPOSITORY/actions/artifacts/$EXPECTED_ARTIFACT_ID" \
+              --jq '[.digest // "", .name // ""] | @tsv'
           )
-          if [[  -z "$EXISTING_REF" ]]; then
-            # К� �нкурентный job мог создат ь ref после lookup. В любом ис� �оде
-            # create перечиты ваем серверное состояни� � и принимаем только наш S HA.
-            if ! gh api "repos/$GITHUB_RE POSITORY/git/refs" \
-              -f ref="re fs/tags/$RELEASE_TAG" -f sha="$EXPECTED_SOURC E_SHA"; then
-              echo "::warning::� �оздание $RELEASE_TAG не подтв� �рждено; проверяем итого� �ый ref"
-            fi
-            # refs  API не гарантирует read-after-wr ite: свежий ref может
-             # читаться как 404 с реплик и (падение run 30892921662). Огра ниченный
-            # retry сохр аняет fail-closed: после исчер пания попыток шаг падает .
-            for _ in {1..5}; do
-               if EXISTING_REF=$(gh api "repos/$GITHUB_RE POSITORY/git/ref/tags/$RELEASE_TAG" \
-                 --jq '[.object.type, .object.sha] |  @tsv' 2>/dev/null); then
-                brea k
-              fi
-              sleep 0.5
-             done
-            [[ -n "$EXISTING_R EF" ]] \
-              || { echo "::error::$R ELEASE_TAG создан, но не читае тся после повторных попы ток"; exit 1; }
+          [[ "${API_DIGEST#sha256:}" == "$EXPECTED_ARTIFACT_DIGEST" ]] \
+            || { echo "::error::хеш артефакта в API не совпадает с выходом verify job"; exit 1; }
+          [[ "$API_NAME" == "$EXPECTED_ARTIFACT_NAME" ]] \
+            || { echo "::error::имя артефакта в API не совпадает с выходом verify job"; exit 1; }
+
+          mapfile -t files < <(find release-artifact -type f -print | sort)
+          [[ ${#files[@]} -eq 2 ]] \
+            || { echo "::error::артефакт обязан содержать ровно tgz и манифест"; exit 1; }
+          [[ -z "$(find release-artifact -type l -print -quit)" ]] \
+            || { echo "::error::артефакт не должен содержать ссылки"; exit 1; }
+          [[ ! -L release-artifact/release-manifest.json ]] \
+            || { echo "::error::манифест не может быть ссылкой"; exit 1; }
+          TARBALL="release-artifact/$EXPECTED_TARBALL_NAME"
+          [[ -f "$TARBALL" && ! -L "$TARBALL" ]] \
+            || { echo "::error::ожидаемый tgz отсутствует или является ссылкой"; exit 1; }
+          ACTUAL_SHA256=$(sha256sum "$TARBALL" | cut -d' ' -f1)
+          [[ "$ACTUAL_SHA256" == "$EXPECTED_TARBALL_SHA256" ]] \
+            || { echo "::error::SHA-256 tgz не совпадает с проверенным"; exit 1; }
+
+          node --input-type=module <<'NODE'
+          import { readFileSync } from 'node:fs';
+
+          const fail = (message) => {
+            console.error(`::error::${message}`);
+            process.exit(1);
+          };
+          const manifest = JSON.parse(readFileSync('release-artifact/release-manifest.json', 'utf8'));
+          if (manifest.schema !== 1) fail('неподдерживаемая схема release-манифеста');
+          if (manifest.release?.tag !== process.env.RELEASE_TAG) fail('тег манифеста не совпадает');
+          if (manifest.release?.sourceSha !== process.env.EXPECTED_SOURCE_SHA) fail('source SHA манифеста не совпадает');
+          if (manifest.package?.identity !== process.env.EXPECTED_PACKAGE_IDENTITY) fail('идентичность пакета не совпадает');
+          if (manifest.artifact?.file !== process.env.EXPECTED_TARBALL_NAME) fail('имя tgz манифеста не совпадает');
+          if (manifest.artifact?.sha256 !== process.env.EXPECTED_TARBALL_SHA256) fail('digest tgz манифеста не совпадает');
+          NODE
+
+      - name: Verify npm supports trusted publishing
+        shell: bash
+        run: |
+          node --input-type=module <<'NODE'
+          import { execFileSync } from 'node:child_process';
+          const raw = execFileSync('npm', ['--version'], { encoding: 'utf8' }).trim();
+          const [major, minor, patch] = raw.split('.').map(Number);
+          const supported = major > 11 || (major === 11 && (minor > 5 || (minor === 5 && patch >= 1)));
+          if (!supported) {
+            console.error(`npm ${raw} не поддерживает trusted publishing; требуется >= 11.5.1`);
+            process.exit(1);
+          }
+          console.log(`npm ${raw}: trusted publishing поддержан`);
+          NODE
+
+      # Tag-job уже зафиксировал ref без OIDC. Перед публикацией
+      # повторно читаем серверное состояние и принимаем только наш SHA.
+      - name: Verify locked release tag binding
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          OWNER="${GITHUB_REPOSITORY%%/*}"
+          REPOSITORY_NAME="${GITHUB_REPOSITORY#*/}"
+          EXISTING_REF=$(
+            # $owner/$name/$qualifiedName ниже принадлежат GraphQL, а не shell.
+            # shellcheck disable=SC2016
+            gh api graphql \
+              -f query='query($owner: String!, $name: String!, $qualifiedName: String!) {
+                repository(owner: $owner, name: $name) {
+                  ref(qualifiedName: $qualifiedName) { target { __typename oid } }
+                }
+              }' \
+              -F owner="$OWNER" \
+              -F name="$REPOSITORY_NAME" \
+              -F qualifiedName="refs/tags/$RELEASE_TAG" \
+              --jq '(.data.repository.ref.target // empty) | [.__typename, .oid] | @tsv'
+          )
+          if [[ -z "$EXISTING_REF" ]]; then
+            echo "::error::$RELEASE_TAG не создан tag-job"
+            exit 1
           fi
 
-          re ad -r OBJECT_TYPE OBJECT_SHA <<< "$EXISTING_R EF"
+          read -r OBJECT_TYPE OBJECT_SHA <<< "$EXISTING_REF"
           case "$OBJECT_TYPE" in
-             Commit) OBJECT_TYPE=commit ;;
-             Tag) OBJECT_TYPE=tag ;;
+            Commit) OBJECT_TYPE=commit ;;
+            Tag) OBJECT_TYPE=tag ;;
           esac
-           for _ in {1..8}; do
-            if [[ "$ OBJECT_TYPE" == "commit" ]]; then
-               EXISTING="$OBJECT_SHA"
-              break 
+          for _ in {1..8}; do
+            if [[ "$OBJECT_TYPE" == "commit" ]]; then
+              EXISTING="$OBJECT_SHA"
+              break
             fi
-            [[ "$OBJECT_TYPE"  == "tag" ]] \
-              || { echo "::err or::тег указывает на недоп устимый объект $OBJECT_TYPE"; ex it 1; }
-            read -r OBJECT_TYPE OBJEC T_SHA < <(
-              gh api "repos/$GITHU B_REPOSITORY/git/tags/$OBJECT_SHA" \
-                 --jq '[.object.type, .object.sha] | @ tsv'
+            [[ "$OBJECT_TYPE" == "tag" ]] \
+              || { echo "::error::тег указывает на недопустимый объект $OBJECT_TYPE"; exit 1; }
+            read -r OBJECT_TYPE OBJECT_SHA < <(
+              gh api "repos/$GITHUB_REPOSITORY/git/tags/$OBJECT_SHA" \
+                --jq '[.object.type, .object.sha] | @tsv'
             )
           done
-          [ [ "${EXISTING:-}" == "$EXPECTED_SOURCE_SHA" ] ] \
-            || { echo "::error::$RELEASE_ TAG указывает на ${EXISTING:-unkno wn}"; exit 1; }
-          echo "$RELEASE_TAG  зафиксирован на провере� �ном коммите"
+          [[ -n "${EXISTING:-}" ]] \
+            || { echo "::error::не удалось раскрыть $RELEASE_TAG до commit"; exit 1; }
+          [[ "$EXISTING" == "$EXPECTED_SOURCE_SHA" ]] \
+            || { echo "::error::$RELEASE_TAG уже указывает на $EXISTING"; exit 1; }
+          echo "$RELEASE_TAG уже указывает на проверенный коммит"
 
-  github-release:
-     name: GitHub Release
-    needs: [resolve, p ublish, tag]
-    if: >-
-      github.reposito ry == 'Labpics-Team/lab-motion' && !cancelled () &&
-      needs.publish.result == 'success'  && needs.tag.result == 'success'
-    runs-on : self-hosted
-    timeout-minutes: 10
-    per missions:
-      contents: write
-    env:
-       RELEASE_TAG: ${{ needs.resolve.outputs.rele ase_tag }}
-      EXPECTED_SOURCE_SHA: ${{ nee ds.resolve.outputs.source_sha }}
-
-    steps:
-       - name: Create immutable release record 
+      - name: Publish or reconcile verified tarball through npm OIDC
         env:
-          GH_TOKEN: ${{ github. token }}
+          TARBALL: ./release-artifact/${{ needs.verify.outputs.tarball_name }}
         run: |
-          TAG_REF=$(g h api "repos/$GITHUB_REPOSITORY/git/ref/tags/ $RELEASE_TAG" \
-            --jq '[.object.ty pe, .object.sha] | @tsv')
-          read -r O BJECT_TYPE OBJECT_SHA <<< "$TAG_REF"
-           for _ in {1..8}; do
-            if [[ "$OBJ ECT_TYPE" == "commit" ]]; then
-               TAG_SOURCE_SHA="$OBJECT_SHA"
-              br eak
-            fi
-            [[ "$OBJECT_TY PE" == "tag" ]] \
-              || { echo ":: error::тег указывает на нед� �пустимый объект $OBJECT_TYPE";  exit 1; }
-            read -r OBJECT_TYPE OB JECT_SHA < <(
-              gh api "repos/$GI THUB_REPOSITORY/git/tags/$OBJECT_SHA" \
-                 --jq '[.object.type, .object.sha]  | @tsv'
-            )
-          done
-           [[ "${TAG_SOURCE_SHA:-}" == "$EXPECTED_SOUR CE_SHA" ]] \
-            || { echo "::error:: $RELEASE_TAG указывает на ${TAG_SO URCE_SHA:-unknown}"; exit 1; }
+          node --input-type=module <<'NODE'
+          import { execFileSync } from 'node:child_process';
+          import { createHash } from 'node:crypto';
+          import { readFileSync } from 'node:fs';
+          import { setTimeout as delay } from 'node:timers/promises';
 
-          OWN ER="${GITHUB_REPOSITORY%%/*}"
-          REPOS ITORY_NAME="${GITHUB_REPOSITORY#*/}"
-           lookup_release() {
-            # $owner/$na me/$tagName ниже принадлежат G raphQL, а не shell.
-            # shellche ck disable=SC2016
-            gh api graphql  \
-              -f query='query($owner: Strin g!, $name: String!, $tagName: String!) {
-                 repository(owner: $owner, name: $ name) {
-                  release(tagName: $t agName) { tagName isDraft isPrerelease }
-                 }
-              }' \
-               -F owner="$OWNER" \
-              -F name=" $REPOSITORY_NAME" \
-              -F tagName= "$RELEASE_TAG" \
-              --jq '(.data.r epository.release // empty) | [.tagName, .isD raft, .isPrerelease] | @tsv'
+          const fail = (message) => {
+            throw new Error(message);
+          };
+          const identity = process.env.EXPECTED_PACKAGE_IDENTITY;
+          const separator = identity.lastIndexOf('@');
+          if (separator <= 0) fail(`некорректная идентичность пакета: ${identity}`);
+          const name = identity.slice(0, separator);
+          const version = identity.slice(separator + 1);
+          const integrity = `sha512-${createHash('sha512')
+            .update(readFileSync(process.env.TARBALL))
+            .digest('base64')}`;
+          const provenanceType = 'https://slsa.dev/provenance/v1';
+          const packageUrl = `https://registry.npmjs.org/${encodeURIComponent(name)}`;
+          const registryUrl = `${packageUrl}/${encodeURIComponent(version)}`;
+
+          function stableVersion(value, label) {
+            const match = /^(\d+)\.(\d+)\.(\d+)$/.exec(value);
+            if (!match) fail(`${label} не является стабильной версией x.y.z: ${String(value)}`);
+            return match.slice(1).map((part) => BigInt(part));
           }
 
-           EXISTING=$(lookup_release)
-          i f [[ -z "$EXISTING" ]]; then
-            # М ежду lookup и create релиз мог � �оявиться в параллельном  job.
-            # Ошибка create до� �устима только если повт� �рное чтение докажет ито� �.
-            if ! gh release create "$RELEA SE_TAG" \
-              --repo "$GITHUB_REPOS ITORY" \
-              --verify-tag \
-               --generate-notes \
-              --tit le "$RELEASE_TAG"; then
-              echo ": :warning::создание GitHub Release н� � подтверждено; проверяе� � итоговое состояние"
-             fi
-            EXISTING=$(lookup_releas e)
+          function compareVersions(left, right) {
+            for (let index = 0; index < left.length; index++) {
+              if (left[index] < right[index]) return -1;
+              if (left[index] > right[index]) return 1;
+            }
+            return 0;
+          }
+
+          const candidate = stableVersion(version, 'кандидат');
+
+          async function lookupLatest() {
+            const response = await fetch(`${packageUrl}?latest=${Date.now()}`, {
+              cache: 'no-store',
+              headers: { accept: 'application/json' },
+            });
+            if (response.status === 404) return null;
+            if (!response.ok) fail(`npm packument ответил ${response.status}`);
+            const packument = await response.json();
+            const raw = packument['dist-tags']?.latest;
+            if (typeof raw !== 'string') fail('npm packument не содержит dist-tags.latest');
+            return { raw, parsed: stableVersion(raw, 'npm latest') };
+          }
+
+          async function lookupVersion() {
+            const response = await fetch(`${registryUrl}?reconcile=${Date.now()}`, {
+              cache: 'no-store',
+              headers: { accept: 'application/json' },
+            });
+            if (response.status === 404) return null;
+            if (!response.ok) fail(`npm registry ответил ${response.status}`);
+            return response.json();
+          }
+
+          function assertPublishPreflight(latest) {
+            if (latest === null) return;
+            if (compareVersions(candidate, latest.parsed) <= 0) {
+              fail(`новый кандидат ${version} должен быть строго выше npm latest ${latest.raw} и не может откатить npm latest`);
+            }
+          }
+
+          async function reconcile(attempts, mode) {
+            if (mode !== 'idempotent' && mode !== 'published') fail(`неизвестный режим reconcile: ${mode}`);
+            for (let attempt = 1; attempt <= attempts; attempt++) {
+              const [metadata, latest] = await Promise.all([lookupVersion(), lookupLatest()]);
+              if (metadata !== null) {
+                const published = metadata.dist?.integrity;
+                if (published !== integrity) {
+                  fail(`версия уже существует с другим integrity: ${String(published)}`);
+                }
+                const provenanceReady =
+                  metadata.dist?.attestations?.provenance?.predicateType === provenanceType &&
+                  typeof metadata.dist?.attestations?.url === 'string';
+                if (latest !== null) {
+                  const comparison = compareVersions(latest.parsed, candidate);
+                  if (mode === 'published') {
+                    if (comparison >= 0 && provenanceReady) {
+                      if (comparison > 0) {
+                        console.log(
+                          `${identity}: монотонная конкурентная публикация подняла npm latest ` +
+                          `до ${latest.raw}; кандидат ${version} проверен и не требует retag`,
+                        );
+                      }
+                      return true;
+                    }
+                  }
+                  if (mode === 'idempotent') {
+                    if (comparison < 0) {
+                      fail(`idempotent latest ниже кандидата: ${latest.raw} < ${version}`);
+                    }
+                    if (provenanceReady) return true;
+                  }
+                }
+              }
+              if (attempt < attempts) await delay(5_000);
+            }
+            return false;
+          }
+
+          const existing = await lookupVersion();
+          if (existing !== null) {
+            if (await reconcile(12, 'idempotent')) {
+              console.log(`${identity} уже опубликован с проверенными байтами, provenance и latest не ниже кандидата`);
+              process.exit(0);
+            }
+            fail(`${identity}: idempotent registry state не подтвердился`);
+          }
+
+          await assertPublishPreflight(await lookupLatest());
+
+          let publishError;
+          try {
+            execFileSync(
+              'npm',
+              ['publish', process.env.TARBALL, '--registry=https://registry.npmjs.org', '--tag', 'latest', '--access', 'public', '--provenance', '--ignore-scripts'],
+              { stdio: 'inherit' },
+            );
+          } catch (error) {
+            publishError = error;
+          }
+
+          if (await reconcile(12, 'published')) {
+            console.log(`${identity}: registry integrity, provenance и монотонный latest подтверждены`);
+            process.exit(0);
+          }
+          if (publishError) throw publishError;
+          fail(`${identity}: registry не подтвердил integrity, provenance и монотонный latest после npm publish`);
+          NODE
+
+      - name: Verify registry provenance statement and signatures
+        env:
+          EXPECTED_RUN_SHA: ${{ github.sha }}
+          GH_TOKEN: ${{ github.token }}
+          TARBALL: ./release-artifact/${{ needs.verify.outputs.tarball_name }}
+        run: |
+          node --input-type=module <<'NODE'
+          import { execFileSync } from 'node:child_process';
+          import { createHash } from 'node:crypto';
+          import { mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
+          import { tmpdir } from 'node:os';
+          import { join } from 'node:path';
+
+          const fail = (message) => { throw new Error(message); };
+          const identity = process.env.EXPECTED_PACKAGE_IDENTITY;
+          const separator = identity.lastIndexOf('@');
+          const name = identity.slice(0, separator);
+          const version = identity.slice(separator + 1);
+          const sha512 = createHash('sha512').update(readFileSync(process.env.TARBALL)).digest('hex');
+          const versionUrl = `https://registry.npmjs.org/${encodeURIComponent(name)}/${encodeURIComponent(version)}`;
+          const metadataResponse = await fetch(`${versionUrl}?provenance=${Date.now()}`, { cache: 'no-store' });
+          if (!metadataResponse.ok) fail(`metadata provenance: HTTP ${metadataResponse.status}`);
+          const metadata = await metadataResponse.json();
+          const attestationUrl = metadata.dist?.attestations?.url;
+          if (metadata.dist?.attestations?.provenance?.predicateType !== 'https://slsa.dev/provenance/v1') {
+            fail('registry metadata не подтверждает SLSA provenance v1');
+          }
+          const parsedUrl = new URL(attestationUrl);
+          if (parsedUrl.origin !== 'https://registry.npmjs.org') {
+            fail(`недоверенный endpoint attestations: ${parsedUrl.origin}`);
+          }
+          // registry материализует attestation bundle асинхронно: metadata уже
+          // ссылается на endpoint, который первые минуты отвечает 404 (падение
+          // run 30901712886 через 1.2s после publish). Retry только на 404;
+          // остальные статусы fail-closed немедленно.
+          let attestationResponse;
+          for (let attempt = 1; attempt <= 16; attempt++) {
+            attestationResponse = await fetch(parsedUrl, { cache: 'no-store' });
+            if (attestationResponse.ok || attestationResponse.status !== 404) break;
+            await new Promise((resolve) => { setTimeout(resolve, 15000); });
+          }
+          if (!attestationResponse.ok) fail(`attestations: HTTP ${attestationResponse.status}`);
+          const collection = await attestationResponse.json();
+          const attestation = collection.attestations?.find(
+            (item) => item.predicateType === 'https://slsa.dev/provenance/v1',
+          );
+          if (!attestation?.bundle?.dsseEnvelope?.payload) fail('SLSA attestation отсутствует');
+          const statement = JSON.parse(
+            Buffer.from(attestation.bundle.dsseEnvelope.payload, 'base64').toString('utf8'),
+          );
+          const expectedSubject = `pkg:npm/${name.replace(/^@/, '%40')}@${version}`;
+          const subject = statement.subject?.find((item) => item.name === expectedSubject);
+          if (subject?.digest?.sha512 !== sha512) fail('subject digest provenance не совпадает с tgz');
+
+          const definition = statement.predicate?.buildDefinition;
+          const workflow = definition?.externalParameters?.workflow;
+          if (workflow?.repository !== 'https://github.com/Labpics-Team/lab-motion') {
+            fail('provenance указывает на другой репозиторий');
+          }
+          if (workflow?.path !== '.github/workflows/release.yml' || workflow?.ref !== 'refs/heads/main') {
+            fail('provenance указывает на другой workflow/ref');
+          }
+          // OIDC-provenance привязан к workflow-run: gitCommit — SHA рана,
+          // подписавшего пакет. При idempotent-rerun это ранний диспатч
+          // (run 30901712886: пакет подписан на 0d4534c8, github.sha уже новее),
+          // поэтому точное равенство нежизнеспособно. Инвариант fail-closed:
+          // gitCommit == github.sha текущего рана или его предок по main;
+          // подпись diverged/чужого коммита отвергается. Байты дерева источника
+          // связаны с пакетом через subject sha512 выше.
+          const provenanceSha = definition?.resolvedDependencies?.find(
+            (item) => typeof item.digest?.gitCommit === 'string'
+              && typeof item.uri === 'string'
+              && item.uri.startsWith('git+https://github.com/Labpics-Team/lab-motion@'),
+          )?.digest?.gitCommit;
+          if (!provenanceSha) fail('provenance не содержит gitCommit нашего репозитория');
+          const compareResponse = await fetch(
+            `https://api.github.com/repos/Labpics-Team/lab-motion/compare/${process.env.EXPECTED_RUN_SHA}...${provenanceSha}`,
+            {
+              headers: {
+                accept: 'application/vnd.github+json',
+                authorization: `Bearer ${process.env.GH_TOKEN}`,
+              },
+              cache: 'no-store',
+            },
+          );
+          if (!compareResponse.ok) fail(`compare provenance SHA: HTTP ${compareResponse.status}`);
+          const compare = await compareResponse.json();
+          if (compare.status !== 'identical' && compare.status !== 'behind') {
+            fail(`provenance SHA ${provenanceSha} вне линии main: ${compare.status}`);
+          }
+          if (statement.predicate?.runDetails?.builder?.id !== 'https://github.com/actions/runner/github-hosted') {
+            fail('provenance создан не GitHub-hosted runner');
+          }
+          const invocation = statement.predicate?.runDetails?.metadata?.invocationId;
+          if (!invocation?.startsWith('https://github.com/Labpics-Team/lab-motion/actions/runs/')) {
+            fail('provenance invocation относится к другому репозиторию');
+          }
+
+          // npm CLI криптографически проверяет registry- и SLSA-подписи;
+          // разбор выше дополнительно связывает statement с нашим SHA/workflow.
+          const audit = mkdtempSync(join(tmpdir(), 'labmotion-provenance-'));
+          try {
+            writeFileSync(join(audit, 'package.json'), JSON.stringify({ name: 'provenance-audit', private: true }));
+            execFileSync(
+              'npm',
+              ['install', '--ignore-scripts', '--no-audit', '--no-fund', '--registry=https://registry.npmjs.org', identity],
+              { cwd: audit, stdio: 'inherit' },
+            );
+            execFileSync('npm', ['audit', 'signatures'], { cwd: audit, stdio: 'inherit' });
+          } finally {
+            rmSync(audit, { recursive: true, force: true });
+          }
+          console.log(`${identity}: provenance привязан к проверенному source и подписи валидны`);
+          NODE
+
+  tag:
+    name: Create verified release tag
+    needs: [resolve, verify]
+    if: >-
+      github.repository == 'Labpics-Team/lab-motion' && !cancelled() &&
+      needs.resolve.result == 'success' && needs.verify.result == 'success'
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    permissions:
+      contents: write
+    env:
+      RELEASE_TAG: ${{ needs.resolve.outputs.release_tag }}
+      EXPECTED_SOURCE_SHA: ${{ needs.verify.outputs.source_sha }}
+
+    steps:
+      # После всех гейтов, но до выдачи OIDC, фиксируем точный ref.
+      # Сбой npm оставит проверенный тег, который безопасно переиспользует rerun.
+      - name: Create or verify tag idempotently
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          OWNER="${GITHUB_REPOSITORY%%/*}"
+          REPOSITORY_NAME="${GITHUB_REPOSITORY#*/}"
+          EXISTING_REF=$(
+            # $owner/$name/$qualifiedName ниже принадлежат GraphQL, а не shell.
+            # shellcheck disable=SC2016
+            gh api graphql \
+              -f query='query($owner: String!, $name: String!, $qualifiedName: String!) {
+                repository(owner: $owner, name: $name) {
+                  ref(qualifiedName: $qualifiedName) { target { __typename oid } }
+                }
+              }' \
+              -F owner="$OWNER" \
+              -F name="$REPOSITORY_NAME" \
+              -F qualifiedName="refs/tags/$RELEASE_TAG" \
+              --jq '(.data.repository.ref.target // empty) | [.__typename, .oid] | @tsv'
+          )
+          if [[ -z "$EXISTING_REF" ]]; then
+            # Конкурентный job мог создать ref после lookup. В любом исходе
+            # create перечитываем серверное состояние и принимаем только наш SHA.
+            if ! gh api "repos/$GITHUB_REPOSITORY/git/refs" \
+              -f ref="refs/tags/$RELEASE_TAG" -f sha="$EXPECTED_SOURCE_SHA"; then
+              echo "::warning::создание $RELEASE_TAG не подтверждено; проверяем итоговый ref"
+            fi
+            # refs API не гарантирует read-after-write: свежий ref может
+            # читаться как 404 с реплики (падение run 30892921662). Ограниченный
+            # retry сохраняет fail-closed: после исчерпания попыток шаг падает.
+            for _ in {1..5}; do
+              if EXISTING_REF=$(gh api "repos/$GITHUB_REPOSITORY/git/ref/tags/$RELEASE_TAG" \
+                --jq '[.object.type, .object.sha] | @tsv' 2>/dev/null); then
+                break
+              fi
+              sleep 0.5
+            done
+            [[ -n "$EXISTING_REF" ]] \
+              || { echo "::error::$RELEASE_TAG создан, но не читается после повторных попыток"; exit 1; }
           fi
-          IFS=$'\t' read -r A CTUAL_TAG IS_DRAFT IS_PRERELEASE <<< "$EXISTI NG"
-          [[ "$ACTUAL_TAG" == "$RELEASE_T AG" && "$IS_DRAFT" == "false" && "$IS_PRERELE ASE" == "false" ]] \
-            || { echo ": :error::существующий GitHub Relea se имеет неверное состоян ие"; exit 1; }
-          echo "GitHub Relea se $RELEASE_TAG подтверждён"
- 
+
+          read -r OBJECT_TYPE OBJECT_SHA <<< "$EXISTING_REF"
+          case "$OBJECT_TYPE" in
+            Commit) OBJECT_TYPE=commit ;;
+            Tag) OBJECT_TYPE=tag ;;
+          esac
+          for _ in {1..8}; do
+            if [[ "$OBJECT_TYPE" == "commit" ]]; then
+              EXISTING="$OBJECT_SHA"
+              break
+            fi
+            [[ "$OBJECT_TYPE" == "tag" ]] \
+              || { echo "::error::тег указывает на недопустимый объект $OBJECT_TYPE"; exit 1; }
+            read -r OBJECT_TYPE OBJECT_SHA < <(
+              gh api "repos/$GITHUB_REPOSITORY/git/tags/$OBJECT_SHA" \
+                --jq '[.object.type, .object.sha] | @tsv'
+            )
+          done
+          [[ "${EXISTING:-}" == "$EXPECTED_SOURCE_SHA" ]] \
+            || { echo "::error::$RELEASE_TAG указывает на ${EXISTING:-unknown}"; exit 1; }
+          echo "$RELEASE_TAG зафиксирован на проверенном коммите"
+
+  github-release:
+    name: GitHub Release
+    needs: [resolve, publish, tag]
+    if: >-
+      github.repository == 'Labpics-Team/lab-motion' && !cancelled() &&
+      needs.publish.result == 'success' && needs.tag.result == 'success'
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      contents: write
+    env:
+      RELEASE_TAG: ${{ needs.resolve.outputs.release_tag }}
+      EXPECTED_SOURCE_SHA: ${{ needs.resolve.outputs.source_sha }}
+
+    steps:
+      - name: Create immutable release record
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          TAG_REF=$(gh api "repos/$GITHUB_REPOSITORY/git/ref/tags/$RELEASE_TAG" \
+            --jq '[.object.type, .object.sha] | @tsv')
+          read -r OBJECT_TYPE OBJECT_SHA <<< "$TAG_REF"
+          for _ in {1..8}; do
+            if [[ "$OBJECT_TYPE" == "commit" ]]; then
+              TAG_SOURCE_SHA="$OBJECT_SHA"
+              break
+            fi
+            [[ "$OBJECT_TYPE" == "tag" ]] \
+              || { echo "::error::тег указывает на недопустимый объект $OBJECT_TYPE"; exit 1; }
+            read -r OBJECT_TYPE OBJECT_SHA < <(
+              gh api "repos/$GITHUB_REPOSITORY/git/tags/$OBJECT_SHA" \
+                --jq '[.object.type, .object.sha] | @tsv'
+            )
+          done
+          [[ "${TAG_SOURCE_SHA:-}" == "$EXPECTED_SOURCE_SHA" ]] \
+            || { echo "::error::$RELEASE_TAG указывает на ${TAG_SOURCE_SHA:-unknown}"; exit 1; }
+
+          OWNER="${GITHUB_REPOSITORY%%/*}"
+          REPOSITORY_NAME="${GITHUB_REPOSITORY#*/}"
+          lookup_release() {
+            # $owner/$name/$tagName ниже принадлежат GraphQL, а не shell.
+            # shellcheck disable=SC2016
+            gh api graphql \
+              -f query='query($owner: String!, $name: String!, $tagName: String!) {
+                repository(owner: $owner, name: $name) {
+                  release(tagName: $tagName) { tagName isDraft isPrerelease }
+                }
+              }' \
+              -F owner="$OWNER" \
+              -F name="$REPOSITORY_NAME" \
+              -F tagName="$RELEASE_TAG" \
+              --jq '(.data.repository.release // empty) | [.tagName, .isDraft, .isPrerelease] | @tsv'
+          }
+
+          EXISTING=$(lookup_release)
+          if [[ -z "$EXISTING" ]]; then
+            # Между lookup и create релиз мог появиться в параллельном job.
+            # Ошибка create допустима только если повторное чтение докажет итог.
+            if ! gh release create "$RELEASE_TAG" \
+              --repo "$GITHUB_REPOSITORY" \
+              --verify-tag \
+              --generate-notes \
+              --title "$RELEASE_TAG"; then
+              echo "::warning::создание GitHub Release не подтверждено; проверяем итоговое состояние"
+            fi
+            EXISTING=$(lookup_release)
+          fi
+          IFS=$'\t' read -r ACTUAL_TAG IS_DRAFT IS_PRERELEASE <<< "$EXISTING"
+          [[ "$ACTUAL_TAG" == "$RELEASE_TAG" && "$IS_DRAFT" == "false" && "$IS_PRERELEASE" == "false" ]] \
+            || { echo "::error::существующий GitHub Release имеет неверное состояние"; exit 1; }
+          echo "GitHub Release $RELEASE_TAG подтверждён"

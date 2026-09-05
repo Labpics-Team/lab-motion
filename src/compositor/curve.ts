@@ -84,11 +84,11 @@ function emitArtifact(
   tolerance: number,
   durationMs: number,
 ): SpringExecutionArtifactTuple {
-  // Raw-кривая доказанно занимает ≤13/16 tolerance. Ещё 1/8 делим поровну:
-  // округление progress ≤tol/16 и сдвиг времени ≤tol/16. Для кусочно-
-  // линейной функции с максимальным наклоном L
-  // time-rounding эквивалентен монотонной перепараметризации и даёт ошибку
-  // ≤L·max|Δpercent|. minGap не позволяет соседним stops схлопнуться.
+  // Raw-кривая после local grid + RDP занимает <=7/8 tolerance. Последнюю 1/8
+  // делим поровну: округление progress <=tol/16 и сдвиг времени <=tol/16.
+  // Для кусочно-линейной функции с максимальным наклоном L time-rounding
+  // эквивалентен монотонной перепараметризации и даёт ошибку
+  // <=L·max|Δpercent|. minGap не позволяет соседним stops схлопнуться.
   let maxSlope = 0;
   let minGap = 100;
   for (let i = 1; i < nodes.length; i++) {
