@@ -1,9 +1,10 @@
 /**
  * compositor/segmenter.ts — certified spring → CSS linear() sampling.
  *
- * Базовая сетка локальная: каждый шаг выводится из бонда кривизны текущего
- * безразмерного состояния. Это снимает global worst-case oversampling без
- * изменения действующего reconstruction tolerance.
+ * Representability остаётся прежним O(1) global worst-case контрактом: он
+ * решает, может ли compositor вообще принять spring до supersede. Внутри уже
+ * принятого бюджета фактическая сетка строится локальным certified-шагом, чтобы
+ * не оплачивать worst-case curvature на спокойном хвосте.
  */
 
 import { MotionParamError } from '../errors.js';
@@ -19,11 +20,12 @@ export interface SpringNode {
   readonly percent: number;
 }
 
+const BASE_GRID_FLOOR = 24;
 const BASE_GRID_MIN = 32;
 export const BASE_GRID_MAX = 4096;
 const gridSample = { value: 0, velocity: 0 };
 
-/** Канонический horizon текущего main; меняется только расположение samples. */
+/** Канонический horizon текущего main; local grid его не меняет. */
 function springCompileHorizon(
   params: SpringParams,
   v0: number,
@@ -38,12 +40,31 @@ function springCompileHorizon(
 }
 
 /**
+ * Существующий fail-closed preflight. Это граница наблюдаемого поведения, а не
+ * фактическое число samples adaptive grid: её нельзя расширять как побочный
+ * эффект оптимизации sampling.
+ */
+function requiredGridSize(
+  params: SpringParams,
+  settle: number,
+  tolerance: number,
+  v0: number,
+): number {
+  const omega0 = Math.sqrt(params.stiffness / params.mass);
+  const curvature = settle * settle
+    * (omega0 + params.damping / params.mass)
+    * Math.hypot(v0, omega0);
+  const raw = Math.sqrt(curvature / (2 * tolerance));
+  return Math.max(BASE_GRID_MIN, Math.ceil(raw) + BASE_GRID_FLOOR);
+}
+
+/**
  * Строит variable-step grid с собственной piecewise-linear ошибкой <= tol/2.
- * undefined означает, что кривая не представима в BASE_GRID_MAX.
+ * Вызывается только после прежнего O(1) representability preflight.
  *
- * u=ω₀t, y=x−1, w=dy/du. Энергия делает hypot(y,w) невозрастающей, поэтому
- * sqrt(1+4ζ²)·hypot(y,w) ограничивает будущую |y''|. Для critical/overdamped
- * используются более тесные certified-бонды.
+ * u=ω₀t, y=x−1, w=dy/du. E=(y²+w²)/2 невозрастает, поэтому
+ * sqrt(1+4ζ²)·hypot(y,w) ограничивает будущую |y''|. Для ζ>=1 используются
+ * более тесные certified bounds. Шаг h выводится из M h²/8 <= tol/2.
  */
 export function tryBuildAdaptiveSpringGrid(
   params: SpringParams,
@@ -87,16 +108,14 @@ export function tryBuildAdaptiveSpringGrid(
       );
     }
 
-    // M h²/8 <= tol/2, после перевода из u в нормализованное τ.
     const step = bound > 0
       ? Math.min(capTau, 2 * Math.sqrt(tolerance / bound) / omegaT)
       : capTau;
 
     if (tau === 0) {
-      // Защищённый anchor сохраняет физический initial slope в artifact.
       const anchorTau = step / 4;
       xs.push(anchorTau);
-      ys.push(v0 * ((anchorTau * 100) / 100 * settle));
+      ys.push(v0 * anchorTau * settle);
     }
 
     const next = Math.min(tau + step, 1);
@@ -114,25 +133,32 @@ export function tryBuildAdaptiveSpringGrid(
   return [xs, ys];
 }
 
-/** Фактическое число интервалов certified adaptive grid. */
+/**
+ * Историческое имя: возвращает representability budget, а не число фактических
+ * adaptive samples. Это сохраняет существующий fail-closed контракт.
+ */
 export function baseGridSize(
   params: SpringParams,
   settle: number,
   tolerance: number,
   v0 = 0,
 ): number {
-  const grid = tryBuildAdaptiveSpringGrid(params, v0, tolerance, settle);
-  if (grid === undefined) throw new MotionParamError('LM016');
-  return grid[0].length - 1;
+  const required = requiredGridSize(params, settle, tolerance, v0);
+  if (!Number.isSafeInteger(required) || required > BASE_GRID_MAX) {
+    throw new MotionParamError('LM016');
+  }
+  return required;
 }
 
+/** O(1) preflight до supersede — поведение и стоимость текущего main сохранены. */
 export function fitsSpringCurveBudget(
   params: SpringParams,
   v0: number,
   tolerance: number,
 ): boolean {
   const settle = springCompileHorizon(params, v0, tolerance);
-  return tryBuildAdaptiveSpringGrid(params, v0, tolerance, settle) !== undefined;
+  const required = requiredGridSize(params, settle, tolerance, v0);
+  return Number.isSafeInteger(required) && required <= BASE_GRID_MAX;
 }
 
 export function assertSpringCurveBudget(
@@ -140,9 +166,7 @@ export function assertSpringCurveBudget(
   v0: number,
   tolerance: number,
 ): void {
-  if (!fitsSpringCurveBudget(params, v0, tolerance)) {
-    throw new MotionParamError('LM016');
-  }
+  baseGridSize(params, springCompileHorizon(params, v0, tolerance), tolerance, v0);
 }
 
 /** Vertical Douglas–Peucker для функции-графика со строго растущими xs. */
@@ -218,10 +242,12 @@ export function tryBuildSpringNodes(
   tolerance: number,
 ): [nodes: SpringNode[], horizon: number] | undefined {
   const settle = springCompileHorizon(params, v0, tolerance);
+  const required = requiredGridSize(params, settle, tolerance, v0);
+  if (!Number.isSafeInteger(required) || required > BASE_GRID_MAX) return undefined;
+
   const grid = tryBuildAdaptiveSpringGrid(params, v0, tolerance, settle);
   if (grid === undefined) return undefined;
 
-  // grid <= tol/2, RDP <= 3tol/8, serialization <= tol/8.
   const kept = douglasPeuckerVertical(
     grid[0],
     grid[1],
