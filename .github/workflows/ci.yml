@@ -104,7 +104,7 @@ jobs:
           exit "$status"
 
       - name: Upload Vitest diagnostics
-        if: steps.vitest.outcome == 'failure'
+        if: failure() && steps.vitest.outcome == 'failure'
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
         with:
           name: vitest-diagnostics-${{ github.run_id }}
