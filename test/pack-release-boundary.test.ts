@@ -27,6 +27,7 @@ describe('packed release boundary', () => {
     const links = [...document.matchAll(/\[контракт движения\]\(([^)]+)\)/g)];
     expect(links).toHaveLength(1);
     const target = posix.normalize(posix.join('docs', links[0]![1]!));
+    expect(target).toBe('docs/motion-conformance.md');
     expect(pkg.files).toContain(target);
     expect(readFileSync(new URL(`../${target}`, import.meta.url), 'utf8').length).toBeGreaterThan(0);
   });
