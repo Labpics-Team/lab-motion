@@ -25,6 +25,7 @@ for (const firstMs of [40, 120, 260]) {
         };
         const read = () => new DOMMatrixReadOnly(getComputedStyle(el).transform).e;
         const callbacks: Array<(ts?: number) => void> = [];
+        const timers: Array<{ callback: () => void; cancelCalls: number }> = [];
         let completed = 0;
         const common = {
           matchMedia: () => ({ matches: false }),
@@ -34,7 +35,11 @@ for (const firstMs of [40, 120, 260]) {
           ...common,
           spring: { mass: 1, stiffness: 100, damping: 20 },
           now: () => 0,
-          setTimer: () => () => {},
+          setTimer: (callback: () => void) => {
+            const timer = { callback, cancelCalls: 0 };
+            timers.push(timer);
+            return () => { timer.cancelCalls++; };
+          },
         };
         const first = animate(el, { x: [0, 200] }, nativeOptions);
         const counts = [el.getAnimations().length];
@@ -75,6 +80,7 @@ for (const firstMs of [40, 120, 260]) {
           x: read(),
           inlineStyle: el.getAttribute('style'),
           scheduledCallbacks: callbacks.length,
+          timers: timers.map(({ cancelCalls }) => cancelCalls),
           effectCreations,
           effects: el.getAnimations().map((effect) => ({
             sameEffect: effect === finalEffect,
@@ -102,6 +108,11 @@ for (const firstMs of [40, 120, 260]) {
           callback(10_000);
           observeStale();
         }
+        // Отменённый таймер мог уже попасть в очередь браузера до отмены.
+        for (const timer of timers.filter(({ cancelCalls }) => cancelCalls > 0)) {
+          timer.callback();
+          observeStale();
+        }
         const afterStale = read();
         const sameEffect = el.getAnimations().length === 1 && el.getAnimations()[0] === finalEffect;
         last.cancel();
@@ -111,6 +122,10 @@ for (const firstMs of [40, 120, 260]) {
         const cancelledStates: ReturnType<typeof ownedState>[] = [];
         for (const callback of [...callbacks]) {
           callback(20_000);
+          cancelledStates.push(ownedState());
+        }
+        for (const timer of [...timers]) {
+          timer.callback();
           cancelledStates.push(ownedState());
         }
         const afterCancel = read();
@@ -155,6 +170,8 @@ for (const firstMs of [40, 120, 260]) {
       expect(result.counts).toEqual([1, 0, 1, 0]);
       expect(result.sameEffect).toBe(true);
       expect(result.effectCreations).toBe(2);
+      expect(result.ownedBeforeStale.timers).toEqual([1, 0]);
+      expect(result.ownedAfterCancel.timers).toEqual([1, 1]);
       expect(result.staleStates.length).toBeGreaterThanOrEqual(6);
       for (const state of result.staleStates) {
         expect(state).toEqual(result.ownedBeforeStale);
