@@ -166,7 +166,11 @@ function* readRevisionObjects(root, entries) {
     let offset = 0;
     for (const entry of batch) {
       const end = bytes.indexOf(10, offset);
-      const [object, type, rawSize] = bytes.subarray(offset, end).toString('utf8').split(' ');
+      const header = /^([0-9a-f]{40}) (blob|tree|commit|tag) (0|[1-9]\d*)$/.exec(
+        bytes.subarray(offset, end).toString('utf8'),
+      );
+      if (end < offset || header === null) throw new Error('provenance: некорректный пакет объектов revision');
+      const [, object, type, rawSize] = header;
       const size = Number(rawSize);
       const contentEnd = end + 1 + size;
       if (end < offset || object !== entry.object || type !== entry.type || !Number.isSafeInteger(size) || size < 0 ||

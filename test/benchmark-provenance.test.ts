@@ -54,7 +54,7 @@ afterEach(() => {
       rmSync(directory, { recursive: true, force: true });
     }
   } finally {
-    vi.restoreAllMocks();
+    vi.resetAllMocks();
     vi.unstubAllEnvs();
   }
 });
@@ -163,6 +163,28 @@ describe('benchmark provenance', { timeout: 30_000 }, () => {
       expect(String(options?.input).trim().split('\n').length).toBeLessThanOrEqual(128);
     }
   });
+
+  it.each(['extra-field', 'exponent-size', 'empty-size', 'CR-size'] as const)(
+    'rejects a malformed Git object header: %s', (fault) => {
+      const f = checkoutFixture();
+      const revision = f.git(['rev-parse', 'HEAD']).trim();
+      const exec = vi.mocked(execFileSync);
+      const execute = exec.getMockImplementation()!;
+      exec.mockImplementation((...args) => {
+        const result = execute(...args);
+        if (!Buffer.isBuffer(result) || !Array.isArray(args[1]) || !args[1].includes('--batch')) return result;
+        const end = result.indexOf(10);
+        const [object, type, rawSize] = result.subarray(0, end).toString('utf8').split(' ');
+        const suffix = fault === 'extra-field' ? `${rawSize} EXTRA`
+          : fault === 'exponent-size' ? `${rawSize}e0`
+          : fault === 'CR-size' ? `${rawSize}\r` : '';
+        const remaining = fault === 'empty-size'
+          ? result.subarray(end + 1 + Number(rawSize)) : result.subarray(end + 1);
+        return Buffer.concat([Buffer.from(`${object} ${type} ${suffix}\n`), remaining]);
+      });
+      expect(() => revisionFingerprint(f.root, revision)).toThrow(/пакет объектов/);
+    },
+  );
 
   it.each(['--assume-unchanged', '--skip-worktree'])('rejects hidden source bytes before build: %s', (flag) => {
     const f = checkoutFixture();
