@@ -11,6 +11,10 @@ const SPRING = { mass: 1, stiffness: 170, damping: 26 };
 const NO_EFFECTS = { animations: 0, cancels: 0, frameRequests: 0 } as const;
 const SETUP_EFFECTS = { animations: 1, cancels: 0, frameRequests: 0 } as const;
 const HANDOFF_EFFECTS = { animations: 0, cancels: 1, frameRequests: 1 } as const;
+const EXPECTED_FAKE_LIVE = { value: 3.2, velocity: 200 } as const;
+const TEST_DONOR_EASING = 'linear(0 0%, 0.02 10%, 0.04 20%, 1 100%)';
+const TEST_DONOR_KEYFRAMES = [{ offset: 0, x: 0 }, { offset: 1, x: 100 }] as const;
+const TEST_DONOR_TIMING = { duration: 100, easing: TEST_DONOR_EASING } as const;
 
 type EffectCounts = Readonly<{
   animations: number;
@@ -19,25 +23,42 @@ type EffectCounts = Readonly<{
 }>;
 
 type FakeCompositorOptions = Readonly<{
-  target: { animate(): { cancel(): void } };
+  target: {
+    animate(
+      keyframes: readonly Record<string, string | number>[],
+      timing: Readonly<Record<string, unknown>>,
+    ): { readonly currentTime?: number | null; cancel(): void };
+  };
+  now: () => number;
   requestFrame: () => number;
+}>;
+
+type FakeControllerBehavior = Readonly<{
+  createLive?: () => unknown;
+  destroyError?: Error;
+  handoffClockReads?: number;
+  handoffDonorReads?: number;
+  onControllerDestroy?: () => void;
+  onLiveDestroy?: () => void;
+  startError?: Error;
 }>;
 
 function createFakeCompositorSpring(
   setupEffects: EffectCounts,
   handoffEffects: EffectCounts,
-  onLiveDestroy: () => void = () => {},
-  createLive?: () => unknown,
-  onControllerDestroy: () => void = () => {},
+  behavior: FakeControllerBehavior = {},
 ) {
   return class FakeCompositorSpring {
-    private readonly animations: Array<{ cancel(): void }> = [];
+    private readonly animations: Array<{ readonly currentTime?: number | null; cancel(): void }> = [];
 
     constructor(private readonly options: FakeCompositorOptions) {}
 
     private apply(effects: EffectCounts) {
       for (let index = 0; index < effects.animations; index++) {
-        this.animations.push(this.options.target.animate());
+        this.animations.push(this.options.target.animate(
+          TEST_DONOR_KEYFRAMES,
+          TEST_DONOR_TIMING,
+        ));
       }
       const donor = this.animations[0];
       if (effects.cancels > 0 && !donor) {
@@ -48,16 +69,25 @@ function createFakeCompositorSpring(
     }
 
     start() {
+      this.options.now();
       this.apply(setupEffects);
+      if (behavior.startError) throw behavior.startError;
     }
 
     handoffToLive() {
+      for (let index = 0; index < (behavior.handoffClockReads ?? 1); index++) this.options.now();
+      for (let index = 0; index < (behavior.handoffDonorReads ?? 1); index++) {
+        void this.animations[0]?.currentTime;
+      }
       this.apply(handoffEffects);
-      return createLive ? createLive() : { value: 0, velocity: 0, destroy: onLiveDestroy };
+      return behavior.createLive
+        ? behavior.createLive()
+        : { ...EXPECTED_FAKE_LIVE, destroy: behavior.onLiveDestroy ?? (() => {}) };
     }
 
     destroy() {
-      onControllerDestroy();
+      behavior.onControllerDestroy?.();
+      if (behavior.destroyError) throw behavior.destroyError;
     }
   };
 }
@@ -65,11 +95,11 @@ function createFakeCompositorSpring(
 function measureFakeHandoff(
   setupEffects: EffectCounts,
   handoffEffects: EffectCounts,
-  onDestroy?: () => void,
+  behavior?: FakeControllerBehavior,
 ) {
   let nowNs = 0n;
   return measureCompositorHandoffLatency({
-    CompositorSpring: createFakeCompositorSpring(setupEffects, handoffEffects, onDestroy),
+    CompositorSpring: createFakeCompositorSpring(setupEffects, handoffEffects, behavior),
     spring: SPRING,
     property: 'x',
     from: 0,
@@ -140,6 +170,27 @@ describe('жизненный цикл latency-стенда handoff', () => {
     )).toThrow(/lifecycle/i);
   });
 
+  it('не принимает host-effects без чтения и корректного donor-state', () => {
+    expect(() => measureFakeHandoff(SETUP_EFFECTS, HANDOFF_EFFECTS, {
+      createLive: () => ({ value: 0, velocity: 0, destroy() {} }),
+      handoffDonorReads: 0,
+    })).toThrow(/donor|snapshot/i);
+  });
+
+  it.each([
+    ['неверную конечную позицию', { value: 0, velocity: EXPECTED_FAKE_LIVE.velocity }, {}, /snapshot/i],
+    ['неверную конечную скорость', { value: EXPECTED_FAKE_LIVE.value, velocity: 0 }, {}, /snapshot/i],
+    ['пропущенное чтение donor clock', EXPECTED_FAKE_LIVE, { handoffClockReads: 0 }, /donor clock/i],
+    ['лишнее чтение donor clock', EXPECTED_FAKE_LIVE, { handoffClockReads: 2 }, /donor clock/i],
+    ['пропущенное чтение donor animation', EXPECTED_FAKE_LIVE, { handoffDonorReads: 0 }, /donor animation/i],
+    ['лишнее чтение donor animation', EXPECTED_FAKE_LIVE, { handoffDonorReads: 2 }, /donor animation/i],
+  ] as const)('отвергает %s при правильных host-effects', (_label, state, behavior, error) => {
+    expect(() => measureFakeHandoff(SETUP_EFFECTS, HANDOFF_EFFECTS, {
+      createLive: () => ({ ...state, destroy() {} }),
+      ...behavior,
+    })).toThrow(error);
+  });
+
   it.each([
     ['без cancel', { animations: 0, cancels: 0, frameRequests: 1 }],
     ['с лишним cancel', { animations: 0, cancels: 2, frameRequests: 1 }],
@@ -150,7 +201,9 @@ describe('жизненный цикл latency-стенда handoff', () => {
     'отвергает timed handoff %s и всё равно освобождает live-owner',
     (_label, effects) => {
       let destroys = 0;
-      expect(() => measureFakeHandoff(SETUP_EFFECTS, effects, () => destroys++))
+      expect(() => measureFakeHandoff(SETUP_EFFECTS, effects, {
+        onLiveDestroy: () => destroys++,
+      }))
         .toThrow(/handoff: animate=/i);
       expect(destroys).toBe(1);
     },
@@ -163,7 +216,7 @@ describe('жизненный цикл latency-стенда handoff', () => {
       CompositorSpring: createFakeCompositorSpring(
         SETUP_EFFECTS,
         HANDOFF_EFFECTS,
-        () => destroys++,
+        { onLiveDestroy: () => destroys++ },
       ),
       spring: SPRING,
       property: 'x',
@@ -189,9 +242,10 @@ describe('жизненный цикл latency-стенда handoff', () => {
     const FakeCompositorSpring = createFakeCompositorSpring(
       SETUP_EFFECTS,
       HANDOFF_EFFECTS,
-      () => {},
-      createLive,
-      () => controllerDestroys++,
+      {
+        createLive,
+        onControllerDestroy: () => controllerDestroys++,
+      },
     );
 
     expect(() => measureCompositorHandoffLatency({
@@ -257,6 +311,71 @@ describe('жизненный цикл latency-стенда handoff', () => {
       expect(teardownResult).toBe(failurePoint === 'вторые часы' ? 'live' : undefined);
     },
   );
+
+  it('освобождает controller, если start бросает после захвата host-effect', () => {
+    const startError = new Error('start failed');
+    let controllerDestroys = 0;
+
+    expect(() => measureFakeHandoff(SETUP_EFFECTS, HANDOFF_EFFECTS, {
+      onControllerDestroy: () => controllerDestroys++,
+      startError,
+    })).toThrow(startError);
+    expect(controllerDestroys).toBe(1);
+  });
+
+  it('сохраняет start-ошибку, если cleanup частичного controller тоже падает', () => {
+    const startError = new Error('start failed');
+    const cleanupError = new Error('destroy failed');
+    let caught: unknown;
+
+    try {
+      measureFakeHandoff(SETUP_EFFECTS, HANDOFF_EFFECTS, {
+        destroyError: cleanupError,
+        startError,
+      });
+    } catch (error) {
+      caught = error;
+    }
+
+    expect(caught).toBeInstanceOf(AggregateError);
+    expect((caught as AggregateError).errors).toEqual([startError, cleanupError]);
+  });
+
+  it('сохраняет границу constructor: не чистит объект, который не был опубликован', () => {
+    const constructorError = new Error('constructor failed');
+    let destroys = 0;
+    let caught: unknown;
+    class ThrowingCompositorSpring {
+      constructor() {
+        throw constructorError;
+      }
+
+      destroy() {
+        destroys++;
+      }
+    }
+
+    try {
+      measureCompositorHandoffLatency({
+        CompositorSpring: ThrowingCompositorSpring,
+        spring: SPRING,
+        property: 'x',
+        from: 0,
+        to: 100,
+        initialNow: 1_000,
+        elapsedMs: 16,
+        nowNs: () => 1n,
+        warmup: 0,
+        iters: 1,
+        runs: 1,
+      });
+    } catch (error) {
+      caught = error;
+    }
+
+    expect(caught).toBe(constructorError);
+    expect(destroys).toBe(0);
+  });
 
   it('отвергает прежний setup с повторным использованием controller', () => {
     const scenario = createScenario();

@@ -1,5 +1,87 @@
 const systemNowNs = process.hrtime.bigint;
 
+function captureDonorExecution(keyframes, timing, property, from, to) {
+  const durationMs = timing?.duration;
+  const easing = timing?.easing;
+  if (
+    !Array.isArray(keyframes) ||
+    keyframes.length < 2 ||
+    !Number.isFinite(durationMs) ||
+    durationMs <= 0 ||
+    (timing.delay !== undefined && timing.delay !== 0)
+  ) {
+    throw new Error('handoff benchmark: donor execution не соответствует профилю');
+  }
+  const first = keyframes[0]?.[property];
+  const last = keyframes[keyframes.length - 1]?.[property];
+  if (first !== from || last !== to) {
+    throw new Error('handoff benchmark: donor endpoints не соответствуют профилю');
+  }
+
+  let stops;
+  if (easing === 'linear') {
+    stops = keyframes.map((frame) => ({ offset: frame.offset, value: frame[property] }));
+  } else if (typeof easing === 'string' && easing.startsWith('linear(') && easing.endsWith(')')) {
+    stops = easing.slice(7, -1).split(',').map((entry) => {
+      const [rawProgress, rawPercent, ...rest] = entry.trim().split(/\s+/);
+      if (rest.length > 0 || !rawPercent?.endsWith('%')) {
+        throw new Error('handoff benchmark: donor linear() не соответствует профилю');
+      }
+      const progress = Number(rawProgress);
+      return {
+        offset: Number(rawPercent.slice(0, -1)) / 100,
+        value: (1 - progress) * from + progress * to,
+      };
+    });
+  } else {
+    throw new Error('handoff benchmark: donor easing не соответствует профилю');
+  }
+
+  for (let index = 0; index < stops.length; index++) {
+    const stop = stops[index];
+    if (
+      !Number.isFinite(stop?.offset) ||
+      !Number.isFinite(stop?.value) ||
+      (index > 0 && stop.offset <= stops[index - 1].offset)
+    ) {
+      throw new Error('handoff benchmark: donor stops не соответствуют профилю');
+    }
+  }
+  if (stops[0].offset !== 0 || stops[stops.length - 1].offset !== 1) {
+    throw new Error('handoff benchmark: donor диапазон не соответствует профилю');
+  }
+  return Object.freeze({
+    durationMs,
+    stops: Object.freeze(stops.map((stop) => Object.freeze({ ...stop }))),
+  });
+}
+
+function sampleDonorExecution(execution, elapsedMs) {
+  const { durationMs, stops } = execution;
+  if (!Number.isFinite(elapsedMs) || elapsedMs < 0 || elapsedMs >= durationMs) {
+    throw new Error('handoff benchmark: elapsed не соответствует donor-профилю');
+  }
+  const offset = elapsedMs / durationMs;
+  let right = 1;
+  while (right < stops.length - 1 && stops[right].offset <= offset) right++;
+  const left = stops[right - 1];
+  const next = stops[right];
+  const span = next.offset - left.offset;
+  const q = (offset - left.offset) / span;
+  return Object.freeze({
+    value: (1 - q) * left.value + q * next.value,
+    velocity: (next.value - left.value) / (span * durationMs / 1_000),
+  });
+}
+
+function matchesFiniteOracle(actual, expected) {
+  if (!Number.isFinite(actual)) return false;
+  // В выбранной interior-точке оба независимых affine-пути вместе делают <32
+  // Binary64-операций; 64 epsilon оставляют запас на их различную группировку.
+  const floatingBound = 64 * Number.EPSILON * Math.max(1, Math.abs(actual), Math.abs(expected));
+  return Math.abs(actual - expected) <= floatingBound;
+}
+
 /**
  * Перцентильный runner: setup/verify/teardown находятся вне измеряемого окна,
  * внутри остаётся только op. Один runner обслуживает CLI и lifecycle-тесты.
@@ -126,28 +208,61 @@ function createCompositorHandoffLatencySample({
   from,
   to,
   now,
+  elapsedMs,
 }) {
   let animations = 0;
   let cancels = 0;
   let frameRequests = 0;
+  let clockReads = 0;
+  let donorReads = 0;
   let verified = false;
+  let donorExecution;
 
   const controller = new CompositorSpring({
     spring,
     property,
     from,
     to,
-    now,
+    now: () => {
+      clockReads++;
+      return now();
+    },
     target: {
-      animate() {
+      animate(keyframes, timing) {
         animations++;
-        return { cancel() { cancels++; } };
+        donorExecution ??= captureDonorExecution(keyframes, timing, property, from, to);
+        return {
+          get currentTime() {
+            donorReads++;
+            return elapsedMs;
+          },
+          cancel() { cancels++; },
+        };
       },
     },
     requestFrame: () => ++frameRequests,
   });
-  controller.start();
+  let expectedLive;
+  try {
+    controller.start();
+    if (!donorExecution) {
+      throw new Error('handoff benchmark: setup не опубликовал donor execution');
+    }
+    expectedLive = sampleDonorExecution(donorExecution, elapsedMs);
+  } catch (error) {
+    try {
+      controller.destroy();
+    } catch (cleanupError) {
+      throw new AggregateError(
+        [error, cleanupError],
+        'handoff benchmark: setup и cleanup завершились ошибкой',
+      );
+    }
+    throw error;
+  }
   const setupEffects = { animations, cancels, frameRequests };
+  const setupClockReads = clockReads;
+  const setupDonorReads = donorReads;
 
   return {
     controller,
@@ -161,23 +276,45 @@ function createCompositorHandoffLatencySample({
         cancels: cancels - setupEffects.cancels,
         frameRequests: frameRequests - setupEffects.frameRequests,
       };
+      const handoffClockReads = clockReads - setupClockReads;
+      const handoffDonorReads = donorReads - setupDonorReads;
       if (
         setupEffects.animations !== 1 ||
         setupEffects.cancels !== 0 ||
         setupEffects.frameRequests !== 0 ||
         handoffEffects.animations !== 0 ||
         handoffEffects.cancels !== 1 ||
-        handoffEffects.frameRequests !== 1 ||
-        !live ||
-        typeof live.destroy !== 'function' ||
-        !Number.isFinite(live.value) ||
-        !Number.isFinite(live.velocity)
+        handoffEffects.frameRequests !== 1
       ) {
         throw new Error(
           `handoff benchmark: не выполнен полный lifecycle ` +
           `(setup: animate=${setupEffects.animations}, cancel=${setupEffects.cancels}, ` +
           `requestFrame=${setupEffects.frameRequests}; handoff: animate=${handoffEffects.animations}, ` +
           `cancel=${handoffEffects.cancels}, requestFrame=${handoffEffects.frameRequests})`,
+        );
+      }
+      if (setupClockReads !== 1 || handoffClockReads !== 1) {
+        throw new Error(
+          `handoff benchmark: не выполнен полный lifecycle ` +
+          `(donor clock: setup=${setupClockReads}, handoff=${handoffClockReads})`,
+        );
+      }
+      if (setupDonorReads !== 0 || handoffDonorReads !== 1) {
+        throw new Error(
+          `handoff benchmark: не выполнен полный lifecycle ` +
+          `(donor animation: setup=${setupDonorReads}, handoff=${handoffDonorReads})`,
+        );
+      }
+      if (
+        !live ||
+        typeof live.destroy !== 'function' ||
+        !matchesFiniteOracle(live.value, expectedLive.value) ||
+        !matchesFiniteOracle(live.velocity, expectedLive.velocity)
+      ) {
+        throw new Error(
+          `handoff benchmark: не выполнен полный lifecycle (live snapshot: ` +
+          `value=${live?.value}/${expectedLive.value}, ` +
+          `velocity=${live?.velocity}/${expectedLive.velocity})`,
         );
       }
       return handoffEffects;
@@ -206,6 +343,7 @@ export function createCompositorHandoffLatencyScenario({
         from,
         to,
         now: () => now,
+        elapsedMs,
       });
       now += elapsedMs;
       nextStart += elapsedMs;
