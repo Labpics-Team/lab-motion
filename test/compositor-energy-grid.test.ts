@@ -16,7 +16,7 @@ function lerpAt(xs: readonly number[], ys: readonly number[], x: number): number
   return ys[hi - 1]! + ((ys[hi]! - ys[hi - 1]!) * (x - x0)) / (x1 - x0);
 }
 
-describe('compositor local-energy grid regression', () => {
+describe('compositor: локальная энергетическая сетка', () => {
   const zetas = [0.05, 0.3, 0.5, 1, 2, 5] as const;
   const v0s = [0, 3, -3] as const;
   const tolerances = [1 / 400, 1e-3, 2.5e-4] as const;
@@ -54,11 +54,10 @@ describe('compositor local-energy grid regression', () => {
       }
     }
     expect(checked).toBeGreaterThan(20);
-    // Positive control против пустого/чрезмерно консервативного corpus.
     expect(worstRatio).toBeGreaterThan(0.1);
   });
 
-  it('RDP расходует не больше 3tolerance/8 поверх adaptive grid', () => {
+  it('RDP расходует не больше 3tolerance/8 поверх адаптивной сетки', () => {
     let checked = 0;
     for (const zeta of zetas) {
       const params: SpringParams = { mass: 1, stiffness: 100, damping: 20 * zeta };
@@ -82,7 +81,7 @@ describe('compositor local-energy grid regression', () => {
     expect(checked).toBeGreaterThan(5);
   });
 
-  it('сокращает pre-RDP работу без расширения representability boundary', () => {
+  it('сокращает число исходных интервалов без расширения границы представимости', () => {
     let globalIntervals = 0;
     let adaptiveIntervals = 0;
     let checked = 0;
@@ -103,10 +102,22 @@ describe('compositor local-energy grid regression', () => {
     expect(checked).toBeGreaterThan(5);
     expect(adaptiveIntervals).toBeLessThan(globalIntervals / 2);
 
-    // Существующий внешний контрпример остаётся fail-closed: оптимизация sampling
-    // не превращается в незаявленное расширение публичной семантики.
     const under: SpringParams = { mass: 1, stiffness: 100, damping: 10 };
     expect(fitsSpringCurveBudget(under, 10_000, 1 / 400)).toBe(false);
     expect(tryBuildSpringNodes(under, 10_000, 1 / 400)).toBeUndefined();
+  });
+
+  it('не сертифицирует нечисловое состояние через скрытую подстановку', () => {
+    const under: SpringParams = { mass: 1, stiffness: 100, damping: 10 };
+    expect(tryBuildAdaptiveSpringGrid(under, Number.MAX_VALUE, 1 / 400, 1))
+      .toBeUndefined();
+    expect(tryBuildAdaptiveSpringGrid(under, 0, 1 / 400, Infinity))
+      .toBeUndefined();
+
+    // Положительный контроль: тот же seam строит обычную конечную сетку.
+    const ordinary = tryBuildSpringNodes(under, 0, 1 / 400);
+    expect(ordinary).toBeDefined();
+    expect(tryBuildAdaptiveSpringGrid(under, 0, 1 / 400, ordinary![1]))
+      .toBeDefined();
   });
 });
