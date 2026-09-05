@@ -52,10 +52,20 @@ function readTransform(text) {
   if (text === 'none') return state;
   if (typeof text !== 'string' || text.length === 0) throw new Error('transform: отсутствует CSS');
   let end = 0;
+  let previousStage = -1;
   const seen = new Set();
   for (const token of text.matchAll(/([A-Za-z]+)\(([^)]*)\)/g)) {
     if (text.slice(end, token.index).trim()) throw new Error('transform: посторонний CSS');
     end = token.index + token[0].length;
+    // Порядок CSS-функций меняет матрицу даже при тех же числах каналов.
+    const stage = token[1].startsWith('translate') ? 0
+      : token[1].startsWith('scale') ? 1
+      : token[1] === 'rotate' ? 2
+      : token[1].startsWith('skew') ? 3 : -1;
+    if (stage < previousStage || stage < 0 || (stage === 3 && previousStage === 3)) {
+      throw new Error('transform: нарушен порядок transform или совместная skew-форма');
+    }
+    previousStage = stage;
     const args = token[2].split(',').map((value) => value.trim());
     const assign = (key, input, unit) => {
       if (seen.has(key)) throw new Error('transform: повторный канал');

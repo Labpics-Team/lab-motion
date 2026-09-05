@@ -120,6 +120,27 @@ describe('paired public transform lifecycle screening', () => {
       .rejects.toThrow(/target 99 frame 2/);
   });
 
+  it.each(['reversed-order', 'split-skew'] as const)('rejects %s even when every channel value is unchanged', async (fault) => {
+    const clean = await runTransformLifecycleSample({ animate, count: 1, lifecycle: 'live', channels: 7 });
+    expect(clean.semantic.valid).toBe(true);
+    let calls = 0;
+    const sabotage: typeof animate = (targets, props, options) => {
+      if (++calls === 2 && typeof targets !== 'string' && 'length' in targets) {
+        for (const target of Array.from(targets)) {
+          const write = target.style.setProperty.bind(target.style);
+          target.style.setProperty = (property, value) => {
+            write(property, fault === 'reversed-order'
+              ? value.match(/[A-Za-z]+\([^)]*\)/g)!.reverse().join(' ')
+              : value.replace(/skew\(([^,]+), ([^)]+)\)/, 'skewX($1) skewY($2)'));
+          };
+        }
+      }
+      return animate(targets, props, options);
+    };
+    await expect(runTransformLifecycleSample({ animate: sabotage, count: 1, lifecycle: 'live', channels: 7 }))
+      .rejects.toThrow(/transform/);
+  });
+
   it('pins both builds before importing/timing and rejects final provenance drift', async () => {
     const root = mkdtempSync(path.join(tmpdir(), 'lab-motion-pair-test-'));
     try {
