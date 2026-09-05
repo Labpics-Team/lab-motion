@@ -5,7 +5,7 @@ import { fileURLToPath } from 'node:url';
 import {
   assertAllowedPostReportChanges,
   parseBenchmarkDocumentationState,
-  validateBenchmarkReportPair,
+  validateBenchmarkReportForPublication,
 } from '../bench/compare/report-contract.mjs';
 import {
   revisionFingerprint,
@@ -147,7 +147,7 @@ try {
       throw new Error(`${stem}.json: невалидный JSON (${error?.message ?? String(error)})`);
     }
     const benchmarkPackage = JSON.parse(readFileSync(benchmarkPackagePath, 'utf8'));
-    validateBenchmarkReportPair({ stem, markdown, payload, rootPackage, benchmarkPackage });
+    validateBenchmarkReportForPublication({ stem, markdown, payload, rootPackage, benchmarkPackage });
     validateRevision(payload, stem);
   }
 } catch (error) {

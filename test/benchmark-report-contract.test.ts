@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { execFileSync } from 'node:child_process';
-import { cpSync, existsSync, mkdirSync, mkdtempSync, rmSync } from 'node:fs';
+import { cpSync, existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { dirname, join, resolve } from 'node:path';
 import { pathToFileURL } from 'node:url';
@@ -33,6 +33,7 @@ import {
   sha256Text,
   S5_MOTION_REQUIREMENTS,
   validateBenchmarkReportPair,
+  validateBenchmarkReportForPublication,
 } from '../bench/compare/report-contract.mjs';
 import { S5_MOTION_CONTRACT } from '../bench/compare/motion-conformance.mjs';
 
@@ -484,6 +485,26 @@ function freeze25To65(): MotionPoint[] {
 }
 
 describe('schema 10 motion conformance admission', () => {
+  it('публикация требует качества и не позволяет ослабить требования вызывающему', () => {
+    const report = motionFixture();
+    expect(() => validateBenchmarkReportForPublication(report)).not.toThrow();
+    expect(() => validateBenchmarkReportForPublication(fixture())).toThrow(/motion conformance/);
+    report.payload.results['motion-mini'].raw.freeze[0].evidence.blocked = freeze25To65();
+    refreshMotionReport(report);
+    expect(() => validateBenchmarkReportPair(report)).not.toThrow();
+    expect(() => validateBenchmarkReportForPublication({ ...report, motionRequirements: undefined }))
+      .toThrow(/motion-mini\.blocked = fail/);
+    expect(() => validateBenchmarkReportForPublication({
+      ...report, motionRequirements: { baseline: ['lab'], blocked: [] },
+    })).toThrow(/motion-mini\.blocked = fail/);
+  });
+
+  it('CI и release reader используют обязательный допуск публикации', () => {
+    const reader = readFileSync('scripts/check-docs-facts.mjs', 'utf8');
+    expect(reader).toContain('validateBenchmarkReportForPublication({ stem, markdown, payload, rootPackage, benchmarkPackage })');
+    expect(reader).not.toContain('validateBenchmarkReportPair(');
+  });
+
   it('принимает полный отчёт с 8 × 8 траекториями и независимой пружиной', () => {
     const report = motionFixture();
     expect(() => validateBenchmarkReportPair(report)).not.toThrow();

@@ -768,6 +768,11 @@ export function renderBenchmarkMarkdown(payload) {
 }
 
 /** Проверяет не формат, а воспроизводимость опубликованных чисел. */
+/** Публикуемые доказательства не могут ослабить обязательные требования S5. */
+export function validateBenchmarkReportForPublication(input) {
+  return validateBenchmarkReportPair({ ...input, motionRequirements: S5_MOTION_REQUIREMENTS });
+}
+
 export function validateBenchmarkReportPair({
   stem,
   markdown,
