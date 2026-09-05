@@ -1,11 +1,7 @@
 /**
- * 03-compositor-spring.spec.ts — матрица #102, пункт (2, WAAPI-tier поведение):
- * реальная compositor-Animation vs АНАЛИТИЧЕСКОЕ предсказание солвера пакета.
- *
- * Ключевой принцип #102: не «просто не NaN», а сверка НАБЛЮДАЕМОГО значения
- * реальной Element.animate() (компилятор compileSpringPlan → нативный WAAPI, вся
- * пружина в CSS linear()-easing) с readCompositorSpring (точная замкнутая форма
- * solveSpring) в ОБОСНОВАННОМ допуске.
+ * Реальная compositor-Animation сверяется с независимым интегрированием ОДУ.
+ * Численный оракул не использует аналитический солвер или сэмплер пакета;
+ * общая ошибка compiler/reader поэтому не становится эталоном.
  *
  * Обоснование допуска: linear()-строка — кусочно-линейная реконструкция кривой с
  * бюджетом ошибки tolerance (DEFAULT_TOLERANCE = 1/400 в единицах прогресса). При
@@ -19,6 +15,7 @@
  */
 
 import { expect, test } from './fixtures/harness';
+import { integrateSpringPositions } from './fixtures/spring-ode';
 
 /** Парсит translateX из computed 'matrix(a,b,c,d,e,f)' (e = tx). */
 function txOf(matrix: string): number {
@@ -28,11 +25,16 @@ function txOf(matrix: string): number {
   return parts[4];
 }
 
-for (const seed of [{ label: 'от покоя (v0=0)', v0: 0 }, { label: 'ретаргет-сев (v0=6)', v0: 6 }]) {
-  test(`compositor translateX совпадает с solveSpring в допуске — ${seed.label}`, async ({
+const cases = [
+  { mass: 1, stiffness: 180, damping: 12 },
+  { mass: 1, stiffness: 100, damping: 20 },
+  { mass: 1, stiffness: 100, damping: 30 },
+].flatMap((spring) => [0, 6].map((v0) => ({ spring, v0 })));
+
+for (const { spring, v0 } of cases) {
+  test(`compositor соответствует ОДУ: k=${spring.stiffness}, c=${spring.damping}, v0=${v0}`, async ({
     page,
   }) => {
-    const spring = { mass: 1, stiffness: 180, damping: 12 }; // underdamped, overshoot
     const from = 0;
     const to = 200;
 
@@ -65,42 +67,38 @@ for (const seed of [{ label: 'от покоя (v0=0)', v0: 0 }, { label: 'рет
 
         const durMs = plan.duration;
         const fractions = [0, 0.1, 0.25, 0.5, 0.75, 1];
-        const out: { tMs: number; observed: number; analytic: number }[] = [];
+        const out: { tMs: number; observed: string }[] = [];
         for (const f of fractions) {
           const tMs = f * durMs;
           anim.currentTime = tMs;
           const observed = getComputedStyle(el).transform;
-          const read = compositor.readCompositorSpring(spring, {
-            from,
-            to,
-            v0,
-            t: tMs / 1000,
-          });
-          out.push({ tMs, observed: observed as unknown as number, analytic: read.value });
+          out.push({ tMs, observed });
         }
         anim.cancel();
         el.remove();
         return { durMs, samples: out };
       },
-      { spring, from, to, v0: seed.v0 },
+      { spring, from, to, v0 },
     );
 
     const amplitude = Math.abs(to - from);
     // Теоретический порог: ×2 reconstruction-budget + 0.1px matrix-округление.
     const budget = (amplitude / 400) * 2 + 0.1;
 
-    for (const s of samples.samples) {
-      const observed = txOf(s.observed as unknown as string);
+    const normalized = integrateSpringPositions(spring, v0, samples.samples.map(({ tMs }) => tMs / 1000));
+    for (const [index, s] of samples.samples.entries()) {
+      const observed = txOf(s.observed);
+      const expected = from + (to - from) * normalized[index]!;
       expect(Number.isFinite(observed), `tx не число при t=${s.tMs}: ${s.observed}`).toBe(true);
       expect(
-        Math.abs(observed - s.analytic),
-        `t=${s.tMs}ms observed=${observed} analytic=${s.analytic} budget=${budget}`,
+        Math.abs(observed - expected),
+        `t=${s.tMs}ms observed=${observed} ode=${expected} budget=${budget}`,
       ).toBeLessThanOrEqual(budget);
     }
 
     // Края точны: старт = from, финал (fill:both, currentTime=duration) = to.
-    const first = txOf(samples.samples[0].observed as unknown as string);
-    const last = txOf(samples.samples[samples.samples.length - 1].observed as unknown as string);
+    const first = txOf(samples.samples[0]!.observed);
+    const last = txOf(samples.samples.at(-1)!.observed);
     expect(Math.abs(first - from)).toBeLessThanOrEqual(0.05);
     expect(Math.abs(last - to)).toBeLessThanOrEqual(0.05);
   });
@@ -142,19 +140,14 @@ test('underdamped-пружина реально уходит в overshoot за t
     }
     anim.cancel();
     el.remove();
-    // Аналитический пик по солверу (столь же плотный скан).
-    let analyticMax = -Infinity;
-    for (let i = 0; i <= steps; i++) {
-      const t = (i / steps) * (plan.duration / 1000);
-      const v = compositor.readCompositorSpring(spring, { from, to, t }).value;
-      if (v > analyticMax) analyticMax = v;
-    }
-    return { observedMax, analyticMax, to };
+    return { observedMax, to };
   });
-  // Реальный overshoot: пик строго выше to у обоих — и они согласованы.
+  // При v0=0 первый максимум ОДУ достигается в π/√(k/m − (c/2m)²).
+  const alpha = 4;
+  const omega = Math.sqrt(220 - alpha * alpha);
+  const expectedMax = 100 * (1 + Math.exp(-alpha * Math.PI / omega));
   expect(r.observedMax).toBeGreaterThan(r.to);
-  expect(r.analyticMax).toBeGreaterThan(r.to);
-  expect(Math.abs(r.observedMax - r.analyticMax)).toBeLessThanOrEqual(1.0);
+  expect(Math.abs(r.observedMax - expectedMax)).toBeLessThanOrEqual(1.0);
 });
 
 test('production-план выбирает residency-safe форму для каждого движка', async ({
