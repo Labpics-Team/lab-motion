@@ -1,0 +1,74 @@
+name: Workspace paired evidence
+on:
+  push:
+    branches: [research/workspace-admission-20260906]
+    paths:
+      - .github/workflows/workspace-admission.yml
+      - bench/research/workspace-admission/**
+permissions:
+  contents: read
+jobs:
+  paired:
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    strategy:
+      fail-fast: false
+      matrix:
+        replicate: [1, 2]
+    env:
+      COREPACK_ENABLE_DOWNLOAD_PROMPT: "0"
+      COREPACK_DEFAULT_TO_LATEST: "0"
+    steps:
+      - name: Checkout evidence protocol
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+      - name: Setup fixed Node
+        uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020
+        with:
+          node-version: "24.20.0"
+      - name: Build exact baseline and candidate
+        shell: bash
+        run: |
+          set -euo pipefail
+          corepack enable
+          corepack install --global pnpm@11.11.0
+          work="$RUNNER_TEMP/workspace"
+          mkdir -p "$work"/{tools,proof,evidence,baseline-package,borrowed-package}
+          cp "$(command -v node)" "$work/tools/node"
+          cp bench/research/workspace-admission/{run.py,worker.mjs} "$work/proof/"
+          git worktree add --detach "$RUNNER_TEMP/base" 6c5240552df90e9b701daef2ddd7644fdd6360e1
+          git worktree add --detach "$RUNNER_TEMP/candidate" 0fc8f06d93df90fb61c156e197e5990a59c64c44
+          cmp "$RUNNER_TEMP/base/scripts/bench-support.mjs" "$RUNNER_TEMP/candidate/scripts/bench-support.mjs"
+          cp "$RUNNER_TEMP/base/scripts/bench-support.mjs" "$work/proof/"
+          for pair in base:baseline-package candidate:borrowed-package; do
+            src="${pair%%:*}"; dest="${pair##*:}"
+            (cd "$RUNNER_TEMP/$src" && pnpm install --frozen-lockfile && pnpm build && pnpm pack --pack-destination "$work/$dest" && git diff --exit-code)
+            tar -xzf "$work/$dest/labpics-motion-0.3.0.tgz" -C "$work/$dest"
+          done
+          { uname -a; lscpu; node --version; pnpm --version; python3 --version; } > "$work/evidence/environment.txt"
+          git rev-parse HEAD > "$work/evidence/protocol-commit.txt"
+          printf '%s\n' 6c5240552df90e9b701daef2ddd7644fdd6360e1 0fc8f06d93df90fb61c156e197e5990a59c64c44 > "$work/evidence/source-commits.txt"
+          (cd "$work" && sha256sum baseline-package/*.tgz borrowed-package/*.tgz proof/* tools/node) > "$work/evidence/SHA256SUMS"
+      - name: Fixed controls and candidate blocks
+        shell: bash
+        run: |
+          set -euo pipefail
+          cd "$RUNNER_TEMP/workspace/proof"
+          python3 run.py positive 2
+          python3 run.py AA 4
+          python3 run.py AB 24
+      - name: Preserve all evidence, including failed or incomplete runs
+        if: always()
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
+        with:
+          name: workspace-paired-${{ matrix.replicate }}-${{ github.run_id }}
+          path: |
+            ${{ runner.temp }}/workspace/evidence
+            ${{ runner.temp }}/workspace/proof/*.py
+            ${{ runner.temp }}/workspace/proof/*.mjs
+            ${{ runner.temp }}/workspace/baseline-package/*.tgz
+            ${{ runner.temp }}/workspace/borrowed-package/*.tgz
+          if-no-files-found: error
+          retention-days: 90
