@@ -1,0 +1,62 @@
+name: Cohort research snapshot
+
+on:
+  push:
+    branches: [research/cohort-proof-source-20260906]
+    paths: [.github/workflows/cohort-research-snapshot.yml]
+
+permissions:
+  contents: read
+
+jobs:
+  snapshot:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    env:
+      COREPACK_ENABLE_DOWNLOAD_PROMPT: "0"
+      COREPACK_DEFAULT_TO_LATEST: "0"
+      COREPACK_HOME: /tmp/cohort-corepack
+    steps:
+      - name: Checkout immutable research revision
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          persist-credentials: false
+          fetch-depth: 0
+      - name: Setup Node
+        uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020
+        with:
+          node-version: "24"
+      - name: Activate locked package manager
+        run: |
+          corepack enable
+          corepack install --global pnpm@11.11.0
+      - name: Install locked dependencies
+        run: pnpm install --frozen-lockfile
+      - name: Package source and tools without credentials or host configuration
+        shell: bash
+        run: |
+          set -euo pipefail
+          out="$RUNNER_TEMP/cohort-snapshot"
+          mkdir -p "$out/tools"
+          git status --porcelain
+          test -z "$(git status --porcelain)"
+          git rev-parse HEAD HEAD:src > "$out/revisions.txt"
+          git bundle create "$out/repo.bundle" HEAD --tags
+          git bundle verify "$out/repo.bundle"
+          tar -czf "$out/node-modules.tar.gz" node_modules
+          cp "$(command -v node)" "$out/tools/node"
+          cp -a "$COREPACK_HOME/v1/pnpm/11.11.0" "$out/tools/pnpm"
+          node --version > "$out/tool-versions.txt"
+          pnpm --version >> "$out/tool-versions.txt"
+          tar -czf "$out/tools.tar.gz" -C "$out" tools
+          rm -rf "$out/tools"
+          (cd "$out" && sha256sum repo.bundle node-modules.tar.gz tools.tar.gz > SHA256SUMS)
+      - name: Upload reproducible laboratory inputs
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
+        with:
+          name: cohort-source-${{ github.sha }}
+          path: ${{ runner.temp }}/cohort-snapshot
+          if-no-files-found: error
+          retention-days: 2
+          compression-level: 0
+          overwrite: false
