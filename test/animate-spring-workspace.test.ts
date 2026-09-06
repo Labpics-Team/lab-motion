@@ -1,8 +1,9 @@
-/** Общий синхронный workspace не хранит промежуточный sample на каждой поверхности. */
+/** Численный модуль владеет scratch; batch выдаёт только readonly-базис. */
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { animate } from '../src/animate/index.js';
 import { SurfaceBatch, type SurfaceUnit } from '../src/animate/surface-batch.js';
 import * as readers from '../src/internal/read-spring.js';
+import * as channels from '../src/animate/channels.js';
 import { sampleSpringBasisUnchecked } from '../src/internal/solver.js';
 import { fakeEl, makeClock } from './animate-facade-helpers.js';
 
@@ -14,17 +15,19 @@ const springs = [
 
 afterEach(() => vi.restoreAllMocks());
 
-describe('animate: batch-owned spring workspace', () => {
-  it('не удерживает неиспользуемый per-unit buffer, включая tween и завершённые controls', () => {
+describe('animate: borrowed numeric projection', () => {
+  it('сохраняет бюджет прямых object-ссылок живых и завершённых MainUnit', () => {
     const units: SurfaceUnit[] = [];
     const add = SurfaceBatch.prototype._add;
     vi.spyOn(SurfaceBatch.prototype, '_add').mockImplementation(function (unit, paused) {
       units.push(unit);
       return add.call(this, unit, paused);
     });
-    const objects = (unit: SurfaceUnit): object[] => Object.values(unit).filter(
-      (value): value is object => value !== null && typeof value === 'object',
-    );
+    // Структурный ratchet прямых собственных ссылок, не оценка всей retained heap.
+    // Symbols/non-enumerable входят; замыкания и native/private slots — отдельный heap-proof.
+    const objects = (unit: SurfaceUnit): object[] => Reflect.ownKeys(unit)
+      .map((key) => Object.getOwnPropertyDescriptor(unit, key)?.value)
+      .filter((value): value is object => value !== null && typeof value === 'object');
     for (const count of [1, 1000]) {
       for (const mode of [{ spring: springs[0] }, { duration: 1000 }]) {
         units.length = 0;
@@ -37,7 +40,7 @@ describe('animate: batch-owned spring workspace', () => {
         try {
           expect(units).toHaveLength(count * 2);
           // Единственный объект unit — его options с owner-state. Временный
-          // результат принадлежит batch, даже если никто его не использует.
+          // результат принадлежит численному модулю, даже если никто его не использует.
           for (const unit of units) expect(objects(unit)).toHaveLength(1);
           clock.step(16);
           clock.step(16);
@@ -53,24 +56,31 @@ describe('animate: batch-owned spring workspace', () => {
   });
 
   for (const spring of springs) {
-    it(`все проекции используют workspace batch: damping=${spring.damping}`, () => {
+    it(`все проекции используют один scratch без изменения коэффициентов: damping=${spring.damping}`, () => {
       const outputs = new Set<object>();
       const bases = new Set<object>();
-      let aliased = true;
+      let separate = true;
+      let coefficientsIntact = true;
       const read = readers.readSpringFromBasisUnchecked;
       const sample = readers.sampleSpringFromBasisUnchecked;
       const observe = (basis: object, out: object): void => {
         bases.add(basis);
         outputs.add(out);
-        aliased &&= out === basis;
+        separate &&= out !== basis;
       };
-      vi.spyOn(readers, 'readSpringFromBasisUnchecked').mockImplementation((basis, from, to, v0, out) => {
+      vi.spyOn(readers, 'readSpringFromBasisUnchecked').mockImplementation((basis, from, to, v0) => {
+        const coefficients = { ...basis };
+        const out = read(basis, from, to, v0);
+        coefficientsIntact &&= Object.keys(coefficients).every((key) => Object.is(basis[key as keyof typeof basis], coefficients[key as keyof typeof basis]));
         observe(basis, out);
-        return read(basis, from, to, v0, out);
+        return out;
       });
-      vi.spyOn(readers, 'sampleSpringFromBasisUnchecked').mockImplementation((basis, v0, out) => {
+      vi.spyOn(readers, 'sampleSpringFromBasisUnchecked').mockImplementation((basis, v0) => {
+        const coefficients = { ...basis };
+        const out = sample(basis, v0);
+        coefficientsIntact &&= Object.keys(coefficients).every((key) => Object.is(basis[key as keyof typeof basis], coefficients[key as keyof typeof basis]));
         observe(basis, out);
-        return sample(basis, v0, out);
+        return out;
       });
       const clock = makeClock();
       const targets = Array.from({ length: 100 }, () => fakeEl({ width: '1px' }));
@@ -88,7 +98,8 @@ describe('animate: batch-owned spring workspace', () => {
             new Set(['transform', 'opacity', 'width']),
           );
         }
-        expect(aliased).toBe(true);
+        expect(separate).toBe(true);
+        expect(coefficientsIntact).toBe(true);
         expect(bases.size).toBe(1);
         expect(outputs.size).toBe(1);
         expect(readers.readSpringFromBasisUnchecked).toHaveBeenCalled();
@@ -100,18 +111,22 @@ describe('animate: batch-owned spring workspace', () => {
     });
   }
 
-  it('разные batch не делят mutable workspace даже при реентрантном host-write', () => {
+  it('заимствование заканчивается до реентрантного host-write в другой batch', () => {
     const bases = new Set<object>();
-    let aliased = true;
+    const outputs = new Set<object>();
+    let separate = true;
     const read = readers.readSpringFromBasisUnchecked;
-    vi.spyOn(readers, 'readSpringFromBasisUnchecked').mockImplementation((basis, from, to, v0, out) => {
+    vi.spyOn(readers, 'readSpringFromBasisUnchecked').mockImplementation((basis, from, to, v0) => {
+      const out = read(basis, from, to, v0);
       bases.add(basis);
-      aliased &&= out === basis;
-      return read(basis, from, to, v0, out);
+      outputs.add(out);
+      separate &&= out !== basis;
+      return out;
     });
     const leftClock = makeClock();
     const rightClock = makeClock();
-    const right = animate(fakeEl().el, { x: [0, 300] }, {
+    const rightTarget = fakeEl();
+    const right = animate(rightTarget.el, { x: [0, 300] }, {
       spring: springs[2], requestFrame: rightClock.requestFrame,
     });
     const leftTarget = fakeEl();
@@ -131,8 +146,16 @@ describe('animate: batch-owned spring workspace', () => {
       leftClock.step(16);
       leftClock.step(16);
       expect(reentered).toBe(true);
-      expect(aliased).toBe(true);
+      expect(separate).toBe(true);
+      expect(outputs.size).toBe(1);
       expect(bases.size).toBe(2);
+      const x = (target: ReturnType<typeof fakeEl>): number => Number(
+        /translateX\(([^p]+)px\)/.exec(target.el.style.getPropertyValue('transform'))?.[1] ?? 0,
+      );
+      const expectedLeft = readers.sampleSpringUnchecked(springs[0]!, 0, 0.016).value * 100;
+      const expectedRight = readers.sampleSpringUnchecked(springs[2]!, 0, 0.037).value * 300;
+      expect(x(leftTarget)).toBeCloseTo(expectedLeft, 11);
+      expect(x(rightTarget)).toBeCloseTo(expectedRight, 11);
     } finally {
       left.cancel();
       right.cancel();
@@ -141,27 +164,64 @@ describe('animate: batch-owned spring workspace', () => {
     }
   });
 
-  it('проекция в тот же объект сохраняет коэффициенты и точный отдельный результат', () => {
-    const workspace = {
-      _value: 0, _valueV0: 0, _velocity: 0, _velocityV0: 0, value: 0, velocity: 0,
-    };
-    const separate = { value: 0, velocity: 0 };
+  it('снимает оба скаляра до форматирования с injected numerical reentry', () => {
+    const cssAt = channels.cssAt;
+    vi.spyOn(channels, 'cssAt').mockImplementation((channel, progress) => {
+      const rendered = cssAt(channel, progress);
+      // Fault injection: соседний вызов численного модуля не должен сделать
+      // текущую кривую settled. Это не публичный callback форматтера.
+      readers.sampleSpringFromBasisUnchecked({
+        _value: 1, _valueV0: 0, _velocity: 0, _velocityV0: 0,
+      }, 0);
+      return rendered;
+    });
+    const target = fakeEl({ width: '0px' });
+    const clock = makeClock();
+    const complete = vi.fn();
+    const control = animate(target.el, { width: ['0px', '100px'] }, {
+      spring: springs[1], requestFrame: clock.requestFrame, onComplete: complete,
+    });
+    try {
+      clock.step(0);
+      clock.step(16);
+      const value = parseFloat(target.el.style.getPropertyValue('width'));
+      expect(value).toBeGreaterThan(0);
+      expect(value).toBeLessThan(100);
+      expect(complete).not.toHaveBeenCalled();
+    } finally {
+      control.cancel();
+      clock.step(32);
+    }
+  });
+
+  it('сохраняет битовый результат прежней проекции и не меняет readonly-базис', () => {
+    const shared = { _value: 0, _valueV0: 0, _velocity: 0, _velocityV0: 0 };
+    const finite = (value: number, fallback: number): number => Number.isFinite(value) ? value : fallback;
+    const outputs = new Set<object>();
     for (const spring of springs) {
       for (const t of [0, Number.MIN_VALUE, 1e-200, 0.001, 0.3, 10, Infinity, NaN]) {
-        sampleSpringBasisUnchecked(spring, t, workspace);
-        const coefficients = [workspace._value, workspace._valueV0, workspace._velocity, workspace._velocityV0];
+        sampleSpringBasisUnchecked(spring, t, shared);
+        const coefficients = Object.freeze({ ...shared });
         for (const v0 of [-Number.MAX_VALUE, -3, -0, 0, 7, Number.MAX_VALUE]) {
-          readers.sampleSpringFromBasisUnchecked(workspace, v0, separate);
-          readers.sampleSpringFromBasisUnchecked(workspace, v0, workspace);
-          expect(Object.is(workspace.value, separate.value)).toBe(true);
-          expect(Object.is(workspace.velocity, separate.velocity)).toBe(true);
-          readers.readSpringFromBasisUnchecked(workspace, -120, 340, v0, separate);
-          readers.readSpringFromBasisUnchecked(workspace, -120, 340, v0, workspace);
-          expect(Object.is(workspace.value, separate.value)).toBe(true);
-          expect(Object.is(workspace.velocity, separate.velocity)).toBe(true);
-          expect([workspace._value, workspace._valueV0, workspace._velocity, workspace._velocityV0]).toEqual(coefficients);
+          const value = finite(coefficients._value + v0 * coefficients._valueV0, 1);
+          const velocity = finite(coefficients._velocity + v0 * coefficients._velocityV0, 0);
+          const sample = readers.sampleSpringFromBasisUnchecked(coefficients, v0);
+          outputs.add(sample);
+          expect(Object.is(sample.value, value)).toBe(true);
+          expect(Object.is(sample.velocity, velocity)).toBe(true);
+          for (const [from, to] of [[-120, 340], [-Number.MAX_VALUE, Number.MAX_VALUE], [-0, 0]]) {
+            const range = to! - from!;
+            const expectedValue = finite(from! + value * range, to!);
+            const expectedVelocity = finite(velocity * range, 0);
+            const state = readers.readSpringFromBasisUnchecked(coefficients, from!, to!, v0);
+            outputs.add(state);
+            expect(Object.is(state.value, expectedValue)).toBe(true);
+            expect(Object.is(state.velocity, expectedVelocity)).toBe(true);
+          }
+          expect(coefficients).toEqual(shared);
         }
       }
     }
+    expect(outputs.size).toBe(1);
   });
 });

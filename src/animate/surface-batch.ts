@@ -1,7 +1,7 @@
 /** Один aggregate scheduler: все compute, затем все DOM-write. */
 
 import { createFrameLoop, frame as defaultFrame, type FrameLoop } from '../frame/index.js';
-import type { SpringWorkspace } from '../internal/solver.js';
+import type { MutableSpringBasis } from '../internal/solver.js';
 import { sampleSpringBasisUnchecked } from '../internal/solver.js';
 import type { RequestFrameFn } from '../motion-value.js';
 import type { SpringParams } from '../spring.js';
@@ -19,14 +19,11 @@ export interface SurfaceUnit {
 export class SurfaceBatch {
   private readonly _frame: FrameLoop;
   private readonly _units: Array<SurfaceUnit | undefined> = [];
-  // Все проекции потребляются до host-write; ни один Unit не удерживает scratch.
-  private readonly _basis: SpringWorkspace = {
+  private readonly _basis: MutableSpringBasis = {
     _value: 0,
     _valueV0: 0,
     _velocity: 0,
     _velocityV0: 0,
-    value: 0,
-    velocity: 0,
   };
   private _basisSpring: SpringParams | undefined;
   private _basisTime = NaN;
@@ -96,7 +93,7 @@ export class SurfaceBatch {
     if (this._units.length === this._holes) this._resetStorage();
   }
 
-  _springBasis(spring: SpringParams, t: number): SpringWorkspace {
+  _springBasis(spring: SpringParams, t: number): Readonly<MutableSpringBasis> {
     const cached = this._basisSpring;
     if (
       t !== this._basisTime ||

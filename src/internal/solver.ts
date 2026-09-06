@@ -12,14 +12,12 @@
  */
 import { type SpringParams } from './types.js';
 
-/** Базис пружины и временная проекция канала одного batch. */
-export interface SpringWorkspace {
+/** Коэффициенты линейного решения по начальной скорости. */
+export interface MutableSpringBasis {
   _value: number;
   _valueV0: number;
   _velocity: number;
   _velocityV0: number;
-  value: number;
-  velocity: number;
 }
 
 export function solveSpring(
@@ -27,7 +25,7 @@ export function solveSpring(
   t: number,
   v0: number,
   out?: { value: number; velocity: number },
-  basis?: SpringWorkspace,
+  basis?: MutableSpringBasis,
 ): { value: number; velocity: number } {
   const { mass: m, stiffness: k, damping: c } = params;
   let value: number;
@@ -112,16 +110,19 @@ export function solveSpring(
   return out;
 }
 
+const basisSample = { value: 0, velocity: 0 };
+
 /**
- * Один solve заполняет workspace. Проекция меняет value/velocity,
- * но не коэффициенты; её результат потребляется до следующего compute.
+ * Строит линейный по v0 базис тем же физическим ядром. Внутренний output-seam
+ * дописывает производные коэффициенты из уже посчитанных exp/sin/cos, поэтому
+ * пакет каналов платит ровно за один solve без второй копии трёх режимов.
  */
 export function sampleSpringBasisUnchecked(
   params: SpringParams,
   t: number,
-  out: SpringWorkspace,
-): SpringWorkspace {
-  solveSpring(params, t, 0, out, out);
+  out: MutableSpringBasis,
+): MutableSpringBasis {
+  solveSpring(params, t, 0, basisSample, out);
   return out;
 }
 
