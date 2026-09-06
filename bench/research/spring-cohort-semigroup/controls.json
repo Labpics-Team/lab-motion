@@ -1,0 +1,12 @@
+{
+  "cfg": {"n":2,"stagger":99,"spring":{"mass":1,"stiffness":400,"damping":800},"times":[0,100]},
+  "anchor": {"p":0.048204721365630365,"H":0.0011904886192968425,"T":0.476195447718737,"J":-0.0005956168031044125},
+  "baselineWitness": {"p":0.015582570031802412,"T":27.531735545939117},
+  "reverseWitness": {"p":-110063752768284260000,"T":87960930222080000},
+  "forwardWitness": {"p":0.015582570031802412,"T":27.531735545939117},
+  "reverse": {"maxPosition":110063752768284260000,"maxVelocity":87960930222079970,"topology":0},
+  "forward": {"maxPosition":1.0658141036401503e-14,"maxVelocity":0,"topology":0},
+  "sabotage": {"maxPosition":102.18709015643915,"maxVelocity":412.4774361711347,"topology":0},
+  "simplification": {"oneSlot":[{"direct":60,"transport":5298,"stepSolves":1279,"subnormal":0}],"twoSlots":[{"direct":60,"transport":5298,"stepSolves":737,"subnormal":0}]},
+  "scope": "Lossless selected scalar fields from the full controls.json; journals are retained in the user evidence archive. Not a replacement for full primary data."
+}
