@@ -15,7 +15,7 @@ afterEach(() => vi.restoreAllMocks());
 
 describe('animate: batch-owned spring workspace', () => {
   for (const spring of springs) {
-    it(`не создаёт отдельные output-объекты на поверхности: damping=${spring.damping}`, () => {
+    it(`все проекции используют workspace batch: damping=${spring.damping}`, () => {
       const outputs = new Set<object>();
       const bases = new Set<object>();
       let aliased = true;
@@ -35,14 +35,21 @@ describe('animate: batch-owned spring workspace', () => {
         return sample(basis, v0, out);
       });
       const clock = makeClock();
-      const targets = Array.from({ length: 100 }, () => fakeEl({ width: '1px' }).el);
-      const controls = animate(targets, {
+      const targets = Array.from({ length: 100 }, () => fakeEl({ width: '1px' }));
+      const controls = animate(targets.map((target) => target.el), {
         x: [0, 100], y: [30, -70], opacity: [1, 0.4], width: ['1px', '101px'],
       }, { spring, stagger: 0.05, requestFrame: clock.requestFrame });
       try {
         clock.step(16);
         clock.step(16);
         clock.step(16);
+        // gap — 0.05 ms; после второго кадра активны все 100 целей.
+        // Проверяется факт каждой записи, а не только ожидаемый ход часов.
+        for (const target of targets) {
+          expect(new Set(target.writes.map((write) => write.prop))).toEqual(
+            new Set(['transform', 'opacity', 'width']),
+          );
+        }
         expect(aliased).toBe(true);
         expect(bases.size).toBe(1);
         expect(outputs.size).toBe(1);
