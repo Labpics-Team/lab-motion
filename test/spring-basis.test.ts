@@ -8,7 +8,7 @@ import {
 } from '../src/internal/read-spring.js';
 import {
   sampleSpringBasisUnchecked,
-  type MutableSpringBasis,
+  type SpringWorkspace,
 } from '../src/internal/solver.js';
 import { readSpringUnchecked, sampleSpringUnchecked } from '../src/internal/read-spring.js';
 import type { SpringParams } from '../src/spring.js';
@@ -20,8 +20,8 @@ const SPRINGS: readonly SpringParams[] = [
   { mass: 1, stiffness: 170, damping: 40 },
 ];
 
-function basis(): MutableSpringBasis {
-  return { _value: 0, _valueV0: 0, _velocity: 0, _velocityV0: 0 };
+function basis(): SpringWorkspace {
+  return { _value: 0, _valueV0: 0, _velocity: 0, _velocityV0: 0, value: 0, velocity: 0 };
 }
 
 function close(actual: number, expected: number, context?: string): void {

@@ -70,7 +70,6 @@ export class MainUnit implements GroupOwner, SurfaceUnit {
    * rendered-снапшот фиксируется только после успешного возврата setter-а.
    */
   private _writing = false;
-  private readonly _snap = { value: 0, velocity: 0 };
 
   constructor(options: MainUnitOptions) {
     this._o = options;
@@ -247,16 +246,16 @@ export class MainUnit implements GroupOwner, SurfaceUnit {
       if (!Number.isFinite(range)) {
         // Нормализованный базис остаётся конечным даже когда физический span
         // переполняется; взвешенная позиция сохраняет представимый MAX ↔ -MAX.
-        sampleSpringFromBasisUnchecked(basis, channel._v0, this._snap);
-        channel._value = channelAt(channel, this._snap.value);
+        sampleSpringFromBasisUnchecked(basis, channel._v0, basis);
+        channel._value = channelAt(channel, basis.value);
         channel._velocity = scaleSerializedVelocity(
-          this._snap.velocity,
+          basis.velocity,
           channel._from,
           channel._solverTo,
         );
         converged = converged &&
-          Math.abs(this._snap.value - 1) < CONVERGENCE_THRESHOLD &&
-          Math.abs(this._snap.velocity) < CONVERGENCE_THRESHOLD;
+          Math.abs(basis.value - 1) < CONVERGENCE_THRESHOLD &&
+          Math.abs(basis.velocity) < CONVERGENCE_THRESHOLD;
         continue;
       }
       readSpringFromBasisUnchecked(
@@ -264,23 +263,23 @@ export class MainUnit implements GroupOwner, SurfaceUnit {
         channel._from,
         channel._solverTo,
         channel._v0,
-        this._snap,
+        basis,
       );
-      channel._value = this._snap.value;
-      channel._velocity = this._snap.velocity;
+      channel._value = basis.value;
+      channel._velocity = basis.velocity;
       const scale = Math.max(Math.abs(range), RANGE_EPSILON);
       converged = converged &&
-        Math.abs(this._snap.value - channel._solverTo) / scale < CONVERGENCE_THRESHOLD &&
-        Math.abs(this._snap.velocity) / scale < CONVERGENCE_THRESHOLD;
+        Math.abs(basis.value - channel._solverTo) / scale < CONVERGENCE_THRESHOLD &&
+        Math.abs(basis.velocity) / scale < CONVERGENCE_THRESHOLD;
     }
     const css = bound._css;
     if (css !== undefined) {
-      sampleSpringFromBasisUnchecked(basis, css._v0, this._snap);
-      css._dpdt = this._snap.velocity;
-      css._css = cssAt(css, this._snap.value);
+      sampleSpringFromBasisUnchecked(basis, css._v0, basis);
+      css._dpdt = basis.velocity;
+      css._css = cssAt(css, basis.value);
       converged = converged &&
-        Math.abs(this._snap.value - 1) < CONVERGENCE_THRESHOLD &&
-        Math.abs(this._snap.velocity) < CONVERGENCE_THRESHOLD;
+        Math.abs(basis.value - 1) < CONVERGENCE_THRESHOLD &&
+        Math.abs(basis.velocity) < CONVERGENCE_THRESHOLD;
     }
     return converged;
   }

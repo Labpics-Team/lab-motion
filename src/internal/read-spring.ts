@@ -7,7 +7,7 @@
  * сбой скорости → покой, переполнение денормализации → цель/покой.
  */
 
-import { solveSpring, type MutableSpringBasis } from './solver.js';
+import { solveSpring, type SpringWorkspace } from './solver.js';
 import { finiteOr } from './finite.js';
 import type { SpringParams } from './types.js';
 
@@ -27,7 +27,7 @@ const scratch: MutableSpringState = { value: 0, velocity: 0 };
 
 /** @internal Восстанавливает нормализованный канал из общего базиса. */
 export function sampleSpringFromBasisUnchecked(
-  basis: MutableSpringBasis,
+  basis: SpringWorkspace,
   v0: number,
   out: MutableSpringState,
 ): MutableSpringState {
@@ -40,7 +40,7 @@ export function sampleSpringFromBasisUnchecked(
 
 /** @internal Денормализует канал из общего базиса с единой finite-политикой. */
 export function readSpringFromBasisUnchecked(
-  basis: MutableSpringBasis,
+  basis: SpringWorkspace,
   from: number,
   to: number,
   v0: number,
