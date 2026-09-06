@@ -1,6 +1,7 @@
 /** Общий синхронный workspace не хранит промежуточный sample на каждой поверхности. */
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { animate } from '../src/animate/index.js';
+import { SurfaceBatch, type SurfaceUnit } from '../src/animate/surface-batch.js';
 import * as readers from '../src/internal/read-spring.js';
 import { sampleSpringBasisUnchecked } from '../src/internal/solver.js';
 import { fakeEl, makeClock } from './animate-facade-helpers.js';
@@ -14,6 +15,43 @@ const springs = [
 afterEach(() => vi.restoreAllMocks());
 
 describe('animate: batch-owned spring workspace', () => {
+  it('не удерживает неиспользуемый per-unit buffer, включая tween и завершённые controls', () => {
+    const units: SurfaceUnit[] = [];
+    const add = SurfaceBatch.prototype._add;
+    vi.spyOn(SurfaceBatch.prototype, '_add').mockImplementation(function (unit, paused) {
+      units.push(unit);
+      return add.call(this, unit, paused);
+    });
+    const objects = (unit: SurfaceUnit): object[] => Object.values(unit).filter(
+      (value): value is object => value !== null && typeof value === 'object',
+    );
+    for (const count of [1, 1000]) {
+      for (const mode of [{ spring: springs[0] }, { duration: 1000 }]) {
+        units.length = 0;
+        const clock = makeClock();
+        const controls = animate(
+          Array.from({ length: count }, () => fakeEl().el),
+          { x: [0, 100], opacity: [1, 0.4] },
+          { ...mode, requestFrame: clock.requestFrame },
+        );
+        try {
+          expect(units).toHaveLength(count * 2);
+          // Единственный объект unit — его options с owner-state. Временный
+          // результат принадлежит batch, даже если никто его не использует.
+          for (const unit of units) expect(objects(unit)).toHaveLength(1);
+          clock.step(16);
+          clock.step(16);
+          for (const unit of units) expect(objects(unit)).toHaveLength(1);
+        } finally {
+          controls.cancel();
+          clock.step(16);
+        }
+        // Сами controls ещё удерживаются: cleanup не зависит от их GC.
+        for (const unit of units) expect(objects(unit)).toHaveLength(0);
+      }
+    }
+  });
+
   for (const spring of springs) {
     it(`все проекции используют workspace batch: damping=${spring.damping}`, () => {
       const outputs = new Set<object>();

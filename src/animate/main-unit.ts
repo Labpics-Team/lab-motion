@@ -54,9 +54,7 @@ export class MainUnit implements GroupOwner, SurfaceUnit {
   private _paused: boolean;
   private _active = false;
   private _converged = false;
-  /** Монотонные часы unit; seek двигает только локальную координату. */
-  private _logicalMs = 0;
-  /** logical − anchor, сохранённое отдельно от больших абсолютных timestamps. */
+  /** Локальная фаза, не требующая вычитания больших абсолютных timestamps. */
   private _phaseMs: number;
   private _tMs = 0;
   private _lastTs: number | undefined;
@@ -162,7 +160,7 @@ export class MainUnit implements GroupOwner, SurfaceUnit {
     const localMs = Math.max(0, tMs);
     this._active = true;
     this._tMs = localMs;
-    // Seek двигает anchor через локальную координату; logical-часы не откатываются.
+    // Seek задаёт локальную фазу без восстановления абсолютного timestamp.
     this._phaseMs = localMs;
     this._lastTs = undefined;
     if (this._compute()) this._settle();
@@ -189,9 +187,8 @@ export class MainUnit implements GroupOwner, SurfaceUnit {
       }
     }
     if (dt < 0) dt = 0;
-    this._logicalMs += dt;
-    // Signed phase эквивалентна logical-anchor, но не вычитает два почти равных
-    // MAX-числа после seek. Пересечение delay сохраняет весь frame-overshoot.
+    // Фаза накапливает dt напрямую, без вычитания двух почти равных MAX-чисел
+    // после seek. Пересечение delay сохраняет весь frame-overshoot.
     this._phaseMs += dt;
     if (this._phaseMs >= 0) this._active = true;
     this._tMs = Math.max(0, this._phaseMs);
