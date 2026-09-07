@@ -39,6 +39,10 @@ export function springLinear(input?: NanoSpring): [number, string] {
       ? (t: number) => 1 - Math.exp(-w * t) * (1 + w * t)
       : (t: number) => 1
         - (fast * Math.exp(-slow * t) + slow * Math.exp(fast * t)) / (fast + slow);
+  const velocity = critical
+    ? (t: number) => Math.exp(-w * t) * w * w * t
+    : (t: number) => w * w / (-fast - slow)
+      * (Math.exp(-slow * t) - Math.exp(fast * t));
 
   // ε=1e-3 — тот же физический settle-допуск, что у runtime пакета. Для
   // осцилляций длительность выводится из строгих огибающих позиции и скорости;
@@ -51,10 +55,6 @@ export function springLinear(input?: NanoSpring): [number, string] {
       )
     : 0;
   if (!under) {
-    const velocity = critical
-      ? (t: number) => Math.exp(-w * t) * w * w * t
-      : (t: number) => w * w / (-fast - slow)
-        * (Math.exp(-slow * t) - Math.exp(fast * t));
     const step = 1 / (30 * slow);
     do duration += step;
     while (1 - sample(duration) > epsilon || velocity(duration) / 30 > epsilon);
