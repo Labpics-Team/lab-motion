@@ -28,7 +28,7 @@ const CURVE_REGIMES = [
 ] as const;
 
 function parseLinear(linear: string): { progress: number; percent: number }[] {
-  return linear.slice(7, -1).split(', ').map((stop) => {
+  return linear.slice(7, -1).split(',').map((stop) => {
     const [progress, percent] = stop.split(' ');
     return {
       progress: Number(progress),

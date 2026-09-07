@@ -63,7 +63,7 @@ const TOLERANCE = 0.0025;
 
 function parse(linear: string): number[] {
   const flat: number[] = [];
-  for (const token of linear.slice(7, -1).split(', ')) {
+  for (const token of linear.slice(7, -1).split(',')) {
     const [progress, percent] = token.split(' ');
     flat.push(Number(percent!.slice(0, -1)), Number(progress));
   }

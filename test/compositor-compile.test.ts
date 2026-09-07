@@ -44,7 +44,7 @@ function parseLinear(s: string): { progress: number; percent: number }[] {
   expect(s.endsWith(')')).toBe(true);
   return s
     .slice(7, -1)
-    .split(', ')
+    .split(',')
     .map((tok) => {
       const [p, pct] = tok.split(' ');
       return { progress: Number(p), percent: Number(pct!.replace('%', '')) };

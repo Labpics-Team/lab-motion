@@ -58,7 +58,7 @@ function executionSnapshot(
 }
 
 function firstSlope(linear: string, durationMs: number): number {
-  const [, stop] = linear.slice(7, -1).split(', ');
+  const [, stop] = linear.slice(7, -1).split(',');
   const [progress, percent] = stop!.split(' ');
   return Number(progress) / (Number(percent!.slice(0, -1)) / 100 * durationMs / 1000);
 }
