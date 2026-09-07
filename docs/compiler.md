@@ -42,17 +42,19 @@ hoisted-импорт исполнителя не отображается (эт�
 
 ## Аллокационный предел executor
 
-У пониженного вызова `frame` и `timing` неизменны для всех целей. Executor
-создаёт по одному host-словарю на вызов и передаёт эти snapshots каждому
-нативному `Element.animate()`: author-side цена конфигурации стала `O(1)`, а не
-`O(targets)`. Между вызовами snapshots не разделяются — это сохраняет
-изоляцию при перекрывающихся и reentrant-вызовах. Такое переиспользование
-принадлежит только platform-trusted Nano-пути: hostile/polyfill host остаётся
-обязанностью полного `./animate`.
+У пониженного вызова timing неизменен для всех целей. Executor создаёт один
+`KeyframeAnimationOptions` на вызов и передаёт этот snapshot каждому нативному
+`Element.animate()`: для `N` целей timing-конфигурация стоит одну author-side
+аллокацию вместо `N`. Между вызовами snapshot не разделяется — это сохраняет
+изоляцию при перекрывающихся и reentrant-вызовах. Одноэлементный frame остаётся
+локальным цели: попытка вынести и его увеличила shipped `./compiler/runtime`
+выше жёсткого размерного рэтчета и была отброшена simplicity pass.
 
+Такое переиспользование принадлежит только platform-trusted Nano-пути:
+hostile/polyfill host остаётся обязанностью полного `./animate`.
 Исполняемый контракт — `test/compiler-runtime-allocation.test.ts`: прежняя
-mapper-local реализация даёт 1000 разных `frame` и `timing`, текущая обязана
-дать по одной identity внутри вызова и новые identities в следующем вызове.
+mapper-local реализация даёт 1000 разных timing identities, текущая обязана
+дать одну identity внутри вызова и новую identity в следующем вызове.
 
 ## Гарантии
 
