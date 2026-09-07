@@ -118,7 +118,8 @@ function emitArtifact(
     const percent = i === 1 || percentDigits > 100
         ? String(node.percent)
         : roundShortest(node.percent, percentDigits);
-    out += (i === 0 ? '' : ', ') + progress + ' ' + percent + '%';
+    out += (i === 0 ? '' : ', ') + progress
+      + (i === 0 || i === nodes.length - 1 ? '' : ' ' + percent + '%');
     // Number(token) моделирует CSS parser один раз на cold compile. TypedArray
     // не совпадает по identity с caller-owned raw nodes и не выходит host-коду.
     samples[i * 2] = +percent;
