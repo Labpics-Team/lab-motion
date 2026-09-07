@@ -2,78 +2,77 @@ name: Mutation
 
 on:
   schedule:
-    - cron: " 17 3 * * 1"
+    - cron: "17 3 * * 1"
   workflow_dispatch:
 
-# Кажд� �й job объявляет только со� �ственные полномочия.
-permi ssions: {}
+# Каждый job объявляет только собственные полномочия.
+permissions: {}
 
 concurrency:
-  group: mutation-${ { github.ref }}
+  group: mutation-${{ github.ref }}
   cancel-in-progress: true
 
-e nv:
+env:
   COREPACK_ENABLE_DOWNLOAD_PROMPT: "0"
-   COREPACK_DEFAULT_TO_LATEST: "0"
+  COREPACK_DEFAULT_TO_LATEST: "0"
 
 jobs:
-  core :
+  core:
     name: critical numerical core
-    runs- on: self-hosted
+    runs-on: ubuntu-latest
     timeout-minutes: 60
-    p ermissions:
+    permissions:
       contents: read
 
     steps:
-       - name: Checkout
-        uses: actions/ checkout@3d3c42e5aac5ba805825da76410c181273ba 90b1 # v7.0.1
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
-          persist -credentials: false
+          persist-credentials: false
 
-      - name: Setup Node 
-        uses: actions/setup-node@82076278602 6740c76f36085b0efc47a31fe5020 # v7.0.0
-         with:
+      - name: Setup Node
+        uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
           node-version: "24"
 
-      -  name: Activate pinned pnpm
+      - name: Activate pinned pnpm
         run: |
-           corepack enable
-          corepack in stall --global pnpm@11.11.0
+          corepack enable
+          corepack install --global pnpm@11.11.0
 
-      - name: In stall dependencies
-        run: pnpm install  --frozen-lockfile
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
 
       - name: Build
-         run: pnpm build
+        run: pnpm build
 
-      - name: Mutation gat e
+      - name: Mutation gate
         run: pnpm mutation
 
-      - name: U pload mutation report
+      - name: Upload mutation report
         if: always()
-         uses: actions/upload-artifact@043fb46d1 a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
-         with:
-          name: mutation-report-${{  github.run_id }}
-          path: reports/mut ation/
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: mutation-report-${{ github.run_id }}
+          path: reports/mutation/
           if-no-files-found: ignore
-           retention-days: 14
+          retention-days: 14
 
-  # Право з аписи issues существует тол ько в job без кода репозит� �рия и зависимостей.
-  report -failure:
-    name: Report scheduled mutation  failure
+  # Право записи issues существует только в job без кода репозитория и зависимостей.
+  report-failure:
+    name: Report scheduled mutation failure
     needs: [core]
-    if: always() & & github.event_name == 'schedule' && needs.co re.result != 'success'
-    runs-on: self-host ed
+    if: always() && github.event_name == 'schedule' && needs.core.result != 'success'
+    runs-on: ubuntu-latest
     timeout-minutes: 5
     permissions:
-       issues: write
+      issues: write
     steps:
-      - name: Cr eate failure issue
+      - name: Create failure issue
         env:
-          GH_ TOKEN: ${{ github.token }}
+          GH_TOKEN: ${{ github.token }}
         run: |
-           title="mutation: ночной прог он красный ($(date -u +%F))"
-           gh issue create --repo "$GITHUB_REPOSITORY " --title "$title" \
-            --label "typ e:hardening,priority:P1" \
-            --body  "Ночной mutation-прогон не з� �вершился успешно: $GITHUB_SER VER_URL/$GITHUB_REPOSITORY/actions/runs/$GITH UB_RUN_ID — требуется разобр ать причину до ослаблени я mutation-гейта."
- 
+          title="mutation: ночной прогон красный ($(date -u +%F))"
+          gh issue create --repo "$GITHUB_REPOSITORY" --title "$title" \
+            --label "type:hardening,priority:P1" \
+            --body "Ночной mutation-прогон не завершился успешно: $GITHUB_SERVER_URL/$GITHUB_REPOSITORY/actions/runs/$GITHUB_RUN_ID — требуется разобрать причину до ослабления mutation-гейта."
