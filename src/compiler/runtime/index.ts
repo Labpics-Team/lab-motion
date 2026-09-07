@@ -29,16 +29,15 @@ export function animateCompiled(target: NanoTarget, artifact: CompiledNanoCall):
     : 'animate' in target ? [target] : target;
   const reduced = typeof matchMedia !== 'undefined'
     && matchMedia('(prefers-reduced-motion: reduce)').matches;
-  const timing: KeyframeAnimationOptions = {
-    duration: reduced ? 0 : artifact.d,
-    easing: reduced ? 'linear' : artifact.e,
-    delay: 0,
-    fill: 'both',
-  };
-  const animations = Array.from(
-    source,
-    (element) => element.animate({ opacity: artifact.o }, timing),
-  ) as NanoControls;
+  const animations = Array.from(source, (element) => {
+    const animation = element.animate({ opacity: artifact.o }, {
+      duration: reduced ? 0 : artifact.d,
+      easing: reduced ? 'linear' : artifact.e,
+      delay: 0,
+      fill: 'both',
+    });
+    return animation;
+  }) as NanoControls;
   animations.finished = Promise.all(animations.map((animation) => new Promise<Animation>((resolve, reject) => {
     animation.finished.catch(reject);
     animation.addEventListener('finish', () => {
