@@ -10,21 +10,20 @@
  *   VC2. SSR-safe.
  *   VC3. Zero runtime deps.
  *
- * Канонические формулы:
- *   RGB-смешение (default 'linear'): приближённо-линейный свет
- *     ch(t) = √(a²·(1−t) + b²·t) — γ=2-аппроксимация sRGB EOTF, класс
- *     mixLinearColor (popmotion/framer-motion). Кодированные каналы sRGB —
- *     НЕ свет: их lerp темнит середину (red→blue @0.5 = грязный #800080);
- *     физически свет складывается в линейном пространстве (дыра C аудита
- *     2026-07-03). Точная EOTF — кусочная (γ≈2.4 + линейный хвост); γ=2
- *     выбрана сознательно: sqrt — одна FPU-операция на канал на кадр, а
- *     отличие от точной кривой на midpoint ≤ 3/255 — под порогом различимости
- *     в движении. Это ДЕКЛАРИРОВАННЫЙ размен, не «точный linear-light».
- *   RGB-смешение ('srgb', легаси): линейный lerp кодированных каналов
- *     (CSS Color 4 §13.1, legacy-поведение srgb-интерполяции).
- *   Alpha: ВСЕГДА линейный lerp — альфа есть покрытие, не свет.
- *   HSL-интерполяция: линейное смешение H,S,L с wraparound для hue
- *   HSL↔RGB: W3C CSS Color 3 §4.2.4 / MDN
+ * Контракт интерполяции:
+ *   RGB default 'linear' — имя режима γ=2, а не CSS srgb-linear:
+ *     ch(t) = √(a²·(1−t) + b²·t) в кодированных каналах [0,255].
+ *     Это аппроксимация; точная sRGB EOTF кусочная. Гарантии близости
+ *     к ней или визуальной неразличимости нет. Численный оракул и область
+ *     проверки: test/value-color-precision.test.ts.
+ *   'srgb' — линейный lerp кодированных каналов, не линейного света.
+ *   Alpha интерполируется отдельно; каналы не premultiplied.
+ *   HSL×HSL — линейные H,S,L и кратчайший путь hue независимо от space.
+ *   HSL↔RGB: W3C CSS Color 3 §4.2.4.
+ *
+ * Модуль исполняет переход заданных значений, не выбирает палитру и не
+ * удостоверяет контраст/читаемость промежуточных цветов. Граница с Lab Colors:
+ * docs/adr/0003-color-interpolation-contract.md.
  */
 
 import { clampFinite } from './units.js';
@@ -131,9 +130,9 @@ export type ColorMixSpace = 'linear' | 'srgb';
 /** Опции интерполяции цвета. */
 export interface ColorMixOptions {
   /**
-   * 'linear' (default) — приближённо-линейный свет: √(a²(1−t)+b²t) по
-   * каналам (провенанс в шапке модуля). 'srgb' — легаси lerp кодированных
-   * каналов (CSS Color 4 §13.1) для потребителей, пиннивших старый вывод.
+   * 'linear' (default) — γ=2: √(a²(1−t)+b²t), НЕ точный CSS srgb-linear.
+   * 'srgb' — lerp кодированных sRGB-каналов. Для HSL×HSL опция не применяется.
+   * Ни один режим не удостоверяет контраст или читаемость цветового пути.
    */
   readonly space?: ColorMixSpace | undefined;
 }
@@ -169,7 +168,8 @@ export function interpolateColor(
 
 /**
  * Удобная обёртка: смешать два CSS-цвета (строки) при прогрессе t.
- * Возвращает `from` строку если парсинг провалился (безопасный фоллбек).
+ * При нераспознанном формате возвращает from для t < 0.5, иначе to.
+ * Этот дискретный переход не означает поддержку интерполяции формата.
  */
 export function mixColor(
   fromStr: string,
@@ -194,7 +194,7 @@ function interpolateRgb(from: ParsedColor, to: ParsedColor, t: number, linear: b
   const r = clamp255(clampFinite(mix(from.r, to.r)));
   const g = clamp255(clampFinite(mix(from.g, to.g)));
   const b = clamp255(clampFinite(mix(from.b, to.b)));
-  // Alpha — покрытие, не свет: всегда линейный lerp.
+  // Alpha интерполируется отдельно от непредумноженных цветовых каналов.
   const a = clamp01(clampFinite(from.a + (to.a - from.a) * t));
   const ri = Math.round(r);
   const gi = Math.round(g);
@@ -267,7 +267,7 @@ function hueToRgb(p: number, q: number, t: number): number {
 /**
  * Преобразует RGB в HSL.
  * r,g,b ∈ [0,255]
- * Возвращает h ∈ [0,360), s ∈ [0,1], l ∈ [0,1].
+ * Возвращает h ∈ [0,360), s ∈ [0,1].
  *
  * Канонический источник: W3C CSS Color 3 §4.2.4
  */
