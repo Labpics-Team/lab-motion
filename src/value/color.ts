@@ -267,7 +267,7 @@ function hueToRgb(p: number, q: number, t: number): number {
 /**
  * Преобразует RGB в HSL.
  * r,g,b ∈ [0,255]
- * Возвращает h ∈ [0,360), s ∈ [0,1].
+ * Возвращает h ∈ [0,360), s ∈ [0,1], l ∈ [0,1].
  *
  * Канонический источник: W3C CSS Color 3 §4.2.4
  */
