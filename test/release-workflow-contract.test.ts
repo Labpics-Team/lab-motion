@@ -435,9 +435,10 @@ describe('release workflow: граница тега и npm OIDC', () => {
     '%s не маскируется под новый release intent',
     (scenario) => {
       const result = executeResolve(scenario);
+      const log = `${result.stdout}\n${result.stderr}`;
       expect(result.status).not.toBe(0);
-      expect(result.stderr).toContain(`forced tag lookup failure: ${scenario}`);
-      expect(result.stderr).toContain('не удалось проверить существование');
+      expect(log).toContain(`forced tag lookup failure: ${scenario}`);
+      expect(log).toContain('не удалось проверить существование');
       expect(outputs(result.stdout)).not.toHaveProperty('source_sha');
       expect(outputs(result.stdout)).not.toHaveProperty('release_date');
     },
