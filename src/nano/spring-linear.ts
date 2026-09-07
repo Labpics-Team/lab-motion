@@ -3,8 +3,8 @@
  * длительность и CSS linear()-строка. Общий шов для runtime ./nano и
  * build-time compiler-lowering (#208): компилятор потребляет ровно тот же
  * канонический артефакт, что уходит браузеру, поэтому обе стороны совпадают
- * бит-в-бит по построению. Тело функции — байт-в-байт прежний nano-код:
- * любое изменение здесь меняет и runtime, и compiled поведение сразу.
+ * бит-в-бит по построению. Тело функции — канонический nano-код: любое
+ * изменение здесь меняет и runtime, и compiled поведение сразу.
  */
 
 import { BASE_GRID_MAX } from '../compositor/segmenter.js';
@@ -52,24 +52,22 @@ export function springLinear(input?: NanoSpring): [number, string] {
     : 0;
   if (!under) {
     const step = 1 / (30 * slow);
-    if (critical) {
-      do {
-        duration += step;
+    let gap = 0;
+    let speed = 0;
+    do {
+      duration += step;
+      if (critical) {
         const e = Math.exp(-w * duration);
-        // Сохраняем прежний порядок binary64 для position-gap; тот же e
-        // одновременно обслуживает velocity, поэтому второй closure не нужен.
-        if (!(1 - (1 - e * (1 + w * duration)) > epsilon
-          || e * w * w * duration / 30 > epsilon)) break;
-      } while (true);
-    } else {
-      do {
-        duration += step;
+        // Порядок операций у position-gap совпадает с прежним 1-sample(t).
+        gap = 1 - (1 - e * (1 + w * duration));
+        speed = e * w * w * duration;
+      } else {
         const es = Math.exp(-slow * duration);
         const ef = Math.exp(fast * duration);
-        if (!(1 - (1 - (fast * es + slow * ef) / (fast + slow)) > epsilon
-          || w * w / (-fast - slow) * (es - ef) / 30 > epsilon)) break;
-      } while (true);
-    }
+        gap = 1 - (1 - (fast * es + slow * ef) / (fast + slow));
+        speed = w * w / (-fast - slow) * (es - ef);
+      }
+    } while (gap > epsilon || speed / 30 > epsilon);
   }
   if (!Number.isFinite(duration)) throw new RangeError('spring is not representable');
 
