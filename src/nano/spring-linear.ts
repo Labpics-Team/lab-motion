@@ -39,12 +39,6 @@ export function springLinear(input?: NanoSpring): [number, string] {
       ? (t: number) => 1 - Math.exp(-w * t) * (1 + w * t)
       : (t: number) => 1
         - (fast * Math.exp(-slow * t) + slow * Math.exp(fast * t)) / (fast + slow);
-  const velocity = under
-    ? (t: number) => Math.exp(-a * t) * w * w / d * Math.sin(d * t)
-    : critical
-      ? (t: number) => Math.exp(-w * t) * w * w * t
-      : (t: number) => w * w / (-fast - slow)
-        * (Math.exp(-slow * t) - Math.exp(fast * t));
 
   // ε=1e-3 — тот же физический settle-допуск, что у runtime пакета. Для
   // осцилляций длительность выводится из строгих огибающих позиции и скорости;
@@ -58,8 +52,24 @@ export function springLinear(input?: NanoSpring): [number, string] {
     : 0;
   if (!under) {
     const step = 1 / (30 * slow);
-    do duration += step;
-    while (1 - sample(duration) > epsilon || velocity(duration) / 30 > epsilon);
+    if (critical) {
+      do {
+        duration += step;
+        const e = Math.exp(-w * duration);
+        // Сохраняем прежний порядок binary64 для position-gap; тот же e
+        // одновременно обслуживает velocity, поэтому второй closure не нужен.
+        if (!(1 - (1 - e * (1 + w * duration)) > epsilon
+          || e * w * w * duration / 30 > epsilon)) break;
+      } while (true);
+    } else {
+      do {
+        duration += step;
+        const es = Math.exp(-slow * duration);
+        const ef = Math.exp(fast * duration);
+        if (!(1 - (1 - (fast * es + slow * ef) / (fast + slow)) > epsilon
+          || w * w / (-fast - slow) * (es - ef) / 30 > epsilon)) break;
+      } while (true);
+    }
   }
   if (!Number.isFinite(duration)) throw new RangeError('spring is not representable');
 
