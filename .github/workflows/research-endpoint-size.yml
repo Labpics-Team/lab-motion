@@ -39,11 +39,11 @@ jobs:
           set -euo pipefail
           measure_dist() {
             local out="$1"
-            node --input-type=module "$out" <<'NODE'
-          import { readdirSync, readFileSync, statSync } from 'node:fs';
+            node --input-type=module - "$out" <<'NODE'
+          import { readdirSync, readFileSync, statSync, writeFileSync } from 'node:fs';
           import { join, relative } from 'node:path';
           import { canonicalGzip, observationalBrotli } from './scripts/compression-oracle.mjs';
-          const out = process.argv[1];
+          const out = process.argv[2];
           const files = [];
           const walk = (dir) => {
             for (const name of readdirSync(dir)) {
@@ -58,7 +58,7 @@ jobs:
             const b = readFileSync(path);
             return [relative('.', path), b.length, canonicalGzip(b).length, observationalBrotli(b).length].join('\t');
           });
-          await import('node:fs').then(({ writeFileSync }) => writeFileSync(out, rows.join('\n') + '\n'));
+          writeFileSync(out, rows.join('\n') + '\n');
           NODE
           }
 
