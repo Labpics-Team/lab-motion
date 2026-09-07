@@ -32,6 +32,15 @@ const releases = readFileSync(new URL('../docs/RELEASES.md', import.meta.url), '
   '\n',
 );
 
+type ResolveScenario =
+  | 'absent'
+  | 'direct'
+  | 'annotated'
+  | 'api-401'
+  | 'api-403'
+  | 'api-500'
+  | 'network';
+
 function namedStep(source: string, stepName: string): string {
   const lines = source.split('\n');
   const start = lines.findIndex((line) => line === `      - name: ${stepName}`);
@@ -125,18 +134,22 @@ function withCheckout<T>(ref: string, run: (workspace: string) => T): T {
 const taggedSourceSha = gitOutput(['rev-parse', `${supportedReplayTag}^{}`]);
 const mainSourceSha = gitOutput(['rev-parse', 'HEAD']);
 
-function executeResolve(scenario: 'absent' | 'direct' | 'annotated') {
+function executeResolve(scenario: ResolveScenario) {
   const script = `
 GITHUB_OUTPUT=$(mktemp)
 trap 'rm -f "$GITHUB_OUTPUT"' EXIT
 export GITHUB_OUTPUT
 gh() {
   [[ "$1" == "api" ]] || return 90
-  if [[ "$2" == "repos/$GITHUB_REPOSITORY/git/ref/tags/$EXPECTED_TAG" ]]; then
+  if [[ "$2" == "repos/$GITHUB_REPOSITORY/git/matching-refs/tags/$EXPECTED_TAG" ]]; then
     case "$GH_SCENARIO" in
-      absent) return 1 ;;
+      absent) return 0 ;;
       direct) printf 'commit\\t%s\\n' "$TAGGED_SOURCE_SHA" ;;
       annotated) printf 'tag\\tannotated-object\\n' ;;
+      api-401|api-403|api-500|network)
+        printf 'forced tag lookup failure: %s\\n' "$GH_SCENARIO" >&2
+        return 1
+        ;;
       *) return 91 ;;
     esac
     return 0
@@ -387,6 +400,13 @@ describe('release workflow: граница тега и npm OIDC', () => {
     expect(verify.indexOf(check)).toBeLessThan(verify.indexOf(pack));
   });
 
+  it('tag lookup различает подтверждённое отсутствие и ошибку API', () => {
+    const resolve = stepRun('resolve', 'Resolve and validate version');
+    expect(resolve).toContain('git/matching-refs/tags/$RELEASE_TAG');
+    expect(resolve).toContain('не удалось проверить существование $RELEASE_TAG');
+    expect(resolve).not.toContain('2>/dev/null || true');
+  });
+
   it('первый release intent сохраняет текущую UTC-дату и HEAD main', () => {
     const result = executeResolve('absent');
     expect(result.status, `${result.stdout}\n${result.stderr}`).toBe(0);
@@ -408,6 +428,18 @@ describe('release workflow: граница тега и npm OIDC', () => {
         release_date: '--validate-stored-date',
         source_sha: taggedSourceSha,
       });
+    },
+  );
+
+  it.each(['api-401', 'api-403', 'api-500', 'network'] as const)(
+    '%s не маскируется под новый release intent',
+    (scenario) => {
+      const result = executeResolve(scenario);
+      expect(result.status).not.toBe(0);
+      expect(result.stderr).toContain(`forced tag lookup failure: ${scenario}`);
+      expect(result.stderr).toContain('не удалось проверить существование');
+      expect(outputs(result.stdout)).not.toHaveProperty('source_sha');
+      expect(outputs(result.stdout)).not.toHaveProperty('release_date');
     },
   );
 
@@ -511,6 +543,9 @@ describe('release workflow: граница тега и npm OIDC', () => {
   });
 
   it('синхронизирует документ с границей reviewer и tag-job', () => {
+    expect(releases).toContain('> Роль: практическое руководство');
+    expect(releases).toContain('дату секции этой версии в `CHANGELOG.md`');
+    expect(releases).not.toContain('сохранённую в теге дату');
     expect(releases).toContain('Тег фиксируется до ожидания environment approval');
     expect(releases).toContain('required reviewer разрешает\nтолько npm-публикацию');
     expect(releases).toContain('source — коммит `v0.3.0` или его\nпотомок в `main`');
