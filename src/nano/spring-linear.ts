@@ -24,21 +24,23 @@ export function springLinear(input?: NanoSpring): [number, string] {
     throw new RangeError('spring parameters must be finite and positive');
   }
   const w = Math.sqrt(k / m);
+  const w2 = w * w;
   // Сначала нормализуем ОДУ по mass: `2*m` само переполняется при конечных
   // scale-equivalent m/k/c и не должно менять физику той же системы.
   const a = c / m / 2;
-  const d = Math.sqrt(Math.abs(w * w - a * a));
+  const d = Math.sqrt(Math.abs(w2 - a * a));
   const critical = d <= w * Math.sqrt(Number.EPSILON);
   const under = a < w && !critical;
-  const slow = under ? 0 : critical ? w : w * w / (a + d);
+  const slow = under ? 0 : critical ? w : w2 / (a + d);
   const fast = under || critical ? 0 : -a - d;
+  const poles = fast + slow;
   const sample = under
     ? (t: number) => 1 - Math.exp(-a * t)
       * (Math.cos(d * t) + a / d * Math.sin(d * t))
     : critical
       ? (t: number) => 1 - Math.exp(-w * t) * (1 + w * t)
       : (t: number) => 1
-        - (fast * Math.exp(-slow * t) + slow * Math.exp(fast * t)) / (fast + slow);
+        - (fast * Math.exp(-slow * t) + slow * Math.exp(fast * t)) / poles;
 
   // ε=1e-3 — тот же физический settle-допуск, что у runtime пакета. Для
   // осцилляций длительность выводится из строгих огибающих позиции и скорости;
@@ -47,7 +49,7 @@ export function springLinear(input?: NanoSpring): [number, string] {
   let duration = under
     ? Math.max(
         Math.log(w / d / epsilon) / a,
-        Math.log(w * w / d / (30 * epsilon)) / a,
+        Math.log(w2 / d / (30 * epsilon)) / a,
       )
     : 0;
   if (!under) {
@@ -58,14 +60,13 @@ export function springLinear(input?: NanoSpring): [number, string] {
       duration += step;
       if (critical) {
         const e = Math.exp(-w * duration);
-        // Порядок операций у position-gap совпадает с прежним 1-sample(t).
-        gap = 1 - (1 - e * (1 + w * duration));
-        speed = e * w * w * duration;
+        gap = e * (1 + w * duration);
+        speed = e * w2 * duration;
       } else {
         const es = Math.exp(-slow * duration);
         const ef = Math.exp(fast * duration);
-        gap = 1 - (1 - (fast * es + slow * ef) / (fast + slow));
-        speed = w * w / (-fast - slow) * (es - ef);
+        gap = (fast * es + slow * ef) / poles;
+        speed = -w2 / poles * (es - ef);
       }
     } while (gap > epsilon || speed / 30 > epsilon);
   }
