@@ -9,17 +9,20 @@ permissions:
 env:
   COREPACK_ENABLE_DOWNLOAD_PROMPT: "0"
   COREPACK_DEFAULT_TO_LATEST: "0"
+  BASE_SHA: 3ec1c94ce4acd18a5b2ed3ac83ad92728bb1e55e
+  CANDIDATE_SHA: 4c5c89ff9a7569083e812a98c43206c3bdb87a76
 
 jobs:
   size-falsifier:
     if: github.head_ref == 'research/omit-linear-endpoint-positions-20260907'
     runs-on: ubuntu-latest
-    timeout-minutes: 10
+    timeout-minutes: 15
     steps:
-      - name: Checkout exact candidate
+      - name: Checkout history
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
         with:
           persist-credentials: false
+          fetch-depth: 0
       - name: Setup Node
         uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v6
         with:
@@ -30,7 +33,63 @@ jobs:
           corepack install --global pnpm@11.11.0
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
-      - name: Build
-        run: pnpm build
-      - name: Canonical protected size gate
-        run: pnpm size
+      - name: Paired exact base and candidate
+        shell: bash
+        run: |
+          set -euo pipefail
+          measure_dist() {
+            local out="$1"
+            node --input-type=module "$out" <<'NODE'
+          import { readdirSync, readFileSync, statSync } from 'node:fs';
+          import { join, relative } from 'node:path';
+          import { canonicalGzip, observationalBrotli } from './scripts/compression-oracle.mjs';
+          const out = process.argv[1];
+          const files = [];
+          const walk = (dir) => {
+            for (const name of readdirSync(dir)) {
+              const path = join(dir, name);
+              if (statSync(path).isDirectory()) walk(path);
+              else if (/\.(?:js|cjs)$/.test(name)) files.push(path);
+            }
+          };
+          walk('dist');
+          files.sort();
+          const rows = files.map((path) => {
+            const b = readFileSync(path);
+            return [relative('.', path), b.length, canonicalGzip(b).length, observationalBrotli(b).length].join('\t');
+          });
+          await import('node:fs').then(({ writeFileSync }) => writeFileSync(out, rows.join('\n') + '\n'));
+          NODE
+          }
+
+          git checkout --detach "$BASE_SHA"
+          pnpm build >/tmp/base-build.log
+          (pnpm size > /tmp/base-size.txt 2>&1 || true)
+          measure_dist /tmp/base-dist.tsv
+
+          git checkout --detach "$CANDIDATE_SHA"
+          pnpm build >/tmp/candidate-build.log
+          (pnpm size > /tmp/candidate-size.txt 2>&1 || true)
+          measure_dist /tmp/candidate-dist.tsv
+
+          echo '=== DIST DELTA raw/gzip/brotli (base -> candidate) ==='
+          node --input-type=module <<'NODE'
+          import { readFileSync } from 'node:fs';
+          const read = (p) => new Map(readFileSync(p, 'utf8').trim().split('\n').filter(Boolean).map((line) => {
+            const [name, raw, gz, br] = line.split('\t');
+            return [name, [Number(raw), Number(gz), Number(br)]];
+          }));
+          const a = read('/tmp/base-dist.tsv');
+          const b = read('/tmp/candidate-dist.tsv');
+          for (const [name, av] of a) {
+            const bv = b.get(name);
+            if (!bv) continue;
+            const d = bv.map((v, i) => v - av[i]);
+            if (d.some(Boolean)) console.log(`${name}\t${av.join('/')} -> ${bv.join('/')}\tdelta ${d.join('/')}`);
+          }
+          NODE
+
+          echo '=== BASE CANONICAL SIZE ==='
+          cat /tmp/base-size.txt
+          echo '=== CANDIDATE CANONICAL SIZE ==='
+          cat /tmp/candidate-size.txt
