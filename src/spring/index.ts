@@ -119,7 +119,9 @@ function easingHorizon(z: number): number {
   while (deviation(hi) > CONVERGENCE_THRESHOLD && hi < CEILING) hi *= 2;
   if (deviation(hi) > CONVERGENCE_THRESHOLD) throw new MotionParamError('LM169');
   let lo = 0;
-  for (let i = 0; i < 80; i++) {
+  // 53 — предел представимости binary64; 60 оставляет семь запасных шагов и
+  // сохраняет фактический gzip/Brotli artifact, удаляя 20 пустых итераций.
+  for (let i = 0; i < 60; i++) {
     const mid = (lo + hi) / 2;
     if (deviation(mid) > CONVERGENCE_THRESHOLD) lo = mid;
     else hi = mid;
