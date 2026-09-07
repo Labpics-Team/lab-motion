@@ -563,11 +563,11 @@ export function bindGroup(
     // Каждый остаточный канал уже принадлежит записи либо живому владельцу.
     // До публикации нового владельца `_supersede()` фиксирует его каналы,
     // поэтому отдельное копирование при завершении не нужно: это инвариант реестра.
-    const known = owner
-      ? new Set([...rec._numeric.keys(), ...owner._numericKeys()])
-      : rec._numeric.keys();
+    const animated = new Set(specs.map((s) => s._key));
+    const known = new Set<string>(rec._numeric.keys());
+    if (owner) for (const k of owner._numericKeys()) known.add(k);
     for (const key of known) {
-      if (specs.some((spec) => spec._key === key)) continue;
+      if (animated.has(key)) continue;
       const snap = owner?._captureNum(key) ?? rec._numeric.get(key);
       if (snap) residuals.set(key, snap._value);
     }
