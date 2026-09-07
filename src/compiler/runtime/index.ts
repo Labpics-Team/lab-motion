@@ -29,7 +29,6 @@ export function animateCompiled(target: NanoTarget, artifact: CompiledNanoCall):
     : 'animate' in target ? [target] : target;
   const reduced = typeof matchMedia !== 'undefined'
     && matchMedia('(prefers-reduced-motion: reduce)').matches;
-  const frame: PropertyIndexedKeyframes = { opacity: artifact.o };
   const timing: KeyframeAnimationOptions = {
     duration: reduced ? 0 : artifact.d,
     easing: reduced ? 'linear' : artifact.e,
@@ -38,7 +37,7 @@ export function animateCompiled(target: NanoTarget, artifact: CompiledNanoCall):
   };
   const animations = Array.from(
     source,
-    (element) => element.animate(frame, timing),
+    (element) => element.animate({ opacity: artifact.o }, timing),
   ) as NanoControls;
   animations.finished = Promise.all(animations.map((animation) => new Promise<Animation>((resolve, reject) => {
     animation.finished.catch(reject);
