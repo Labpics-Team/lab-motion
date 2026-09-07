@@ -23,7 +23,7 @@ function target(calls: AnimateCall[]): Element {
 }
 
 describe('compiled Nano runtime — call-scoped allocation contract', () => {
-  it('переиспользует frame/timing внутри вызова и не делит snapshots между вызовами', () => {
+  it('переиспользует target-invariant timing внутри вызова и не делит его между вызовами', () => {
     const artifact = { o: 0.5, d: 120, e: 'linear' } as const;
     const firstCalls: AnimateCall[] = [];
     const secondCalls: AnimateCall[] = [];
@@ -35,11 +35,8 @@ describe('compiled Nano runtime — call-scoped allocation contract', () => {
 
     expect(firstCalls).toHaveLength(1_000);
     expect(secondCalls).toHaveLength(1_000);
-    expect(new Set(firstCalls.map(({ frame }) => frame)).size).toBe(1);
     expect(new Set(firstCalls.map(({ timing }) => timing)).size).toBe(1);
-    expect(new Set(secondCalls.map(({ frame }) => frame)).size).toBe(1);
     expect(new Set(secondCalls.map(({ timing }) => timing)).size).toBe(1);
-    expect(firstCalls[0]!.frame).not.toBe(secondCalls[0]!.frame);
     expect(firstCalls[0]!.timing).not.toBe(secondCalls[0]!.timing);
   });
 });
