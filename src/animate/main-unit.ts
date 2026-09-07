@@ -54,11 +54,8 @@ export class MainUnit implements GroupOwner, SurfaceUnit {
   private _paused: boolean;
   private _active = false;
   private _converged = false;
-  /** Монотонные часы unit; seek двигает только локальную координату. */
-  private _logicalMs = 0;
-  /** logical − anchor, сохранённое отдельно от больших абсолютных timestamps. */
+  /** Локальная фаза, не требующая вычитания больших абсолютных timestamps. */
   private _phaseMs: number;
-  private _tMs = 0;
   private _lastTs: number | undefined;
   private _frames = 0;
   private _tweenK = 0;
@@ -70,7 +67,6 @@ export class MainUnit implements GroupOwner, SurfaceUnit {
    * rendered-снапшот фиксируется только после успешного возврата setter-а.
    */
   private _writing = false;
-  private readonly _snap = { value: 0, velocity: 0 };
 
   constructor(options: MainUnitOptions) {
     this._o = options;
@@ -162,8 +158,7 @@ export class MainUnit implements GroupOwner, SurfaceUnit {
     if (this._done || this._o!._record._transition || !Number.isFinite(tMs)) return;
     const localMs = Math.max(0, tMs);
     this._active = true;
-    this._tMs = localMs;
-    // Seek двигает anchor через локальную координату; logical-часы не откатываются.
+    // Seek задаёт локальную фазу без восстановления абсолютного timestamp.
     this._phaseMs = localMs;
     this._lastTs = undefined;
     if (this._compute()) this._settle();
@@ -190,17 +185,15 @@ export class MainUnit implements GroupOwner, SurfaceUnit {
       }
     }
     if (dt < 0) dt = 0;
-    this._logicalMs += dt;
-    // Signed phase эквивалентна logical-anchor, но не вычитает два почти равных
-    // MAX-числа после seek. Пересечение delay сохраняет весь frame-overshoot.
+    // Фаза накапливает dt напрямую, без вычитания двух почти равных MAX-чисел
+    // после seek. Пересечение delay сохраняет весь frame-overshoot.
     this._phaseMs += dt;
     if (this._phaseMs >= 0) this._active = true;
-    this._tMs = Math.max(0, this._phaseMs);
     if (this._active) {
       this._frames++;
       if (
         this._compute() ||
-        (this._frames >= MAX_FRAMES && this._tMs <= 0)
+        (this._frames >= MAX_FRAMES && this._phaseMs <= 0)
       ) this._converged = true;
     }
   }
@@ -227,8 +220,8 @@ export class MainUnit implements GroupOwner, SurfaceUnit {
     const o = this._o!;
     const bound = o._bound;
     if (o._mode._type === 'tween') {
-      if (this._tMs >= o._mode._durationMs) return true;
-      const k = this._tMs / o._mode._durationMs;
+      if (this._phaseMs >= o._mode._durationMs) return true;
+      const k = this._phaseMs / o._mode._durationMs;
       const eased = o._mode._ease(k);
       const progress = Number.isFinite(eased) ? eased : k;
       this._tweenK = k;
@@ -240,47 +233,46 @@ export class MainUnit implements GroupOwner, SurfaceUnit {
       return false;
     }
 
-    const basis = o._batch._springBasis(o._mode._spring, this._tMs / 1000);
+    const basis = o._batch._springBasis(o._mode._spring, this._phaseMs / 1000);
     let converged = true;
     for (const channel of bound._numeric) {
       const range = channel._solverTo - channel._from;
       if (!Number.isFinite(range)) {
         // Нормализованный базис остаётся конечным даже когда физический span
         // переполняется; взвешенная позиция сохраняет представимый MAX ↔ -MAX.
-        sampleSpringFromBasisUnchecked(basis, channel._v0, this._snap);
-        channel._value = channelAt(channel, this._snap.value);
+        const { value, velocity } = sampleSpringFromBasisUnchecked(basis, channel._v0);
+        channel._value = channelAt(channel, value);
         channel._velocity = scaleSerializedVelocity(
-          this._snap.velocity,
+          velocity,
           channel._from,
           channel._solverTo,
         );
         converged = converged &&
-          Math.abs(this._snap.value - 1) < CONVERGENCE_THRESHOLD &&
-          Math.abs(this._snap.velocity) < CONVERGENCE_THRESHOLD;
+          Math.abs(value - 1) < CONVERGENCE_THRESHOLD &&
+          Math.abs(velocity) < CONVERGENCE_THRESHOLD;
         continue;
       }
-      readSpringFromBasisUnchecked(
+      const { value, velocity } = readSpringFromBasisUnchecked(
         basis,
         channel._from,
         channel._solverTo,
         channel._v0,
-        this._snap,
       );
-      channel._value = this._snap.value;
-      channel._velocity = this._snap.velocity;
+      channel._value = value;
+      channel._velocity = velocity;
       const scale = Math.max(Math.abs(range), RANGE_EPSILON);
       converged = converged &&
-        Math.abs(this._snap.value - channel._solverTo) / scale < CONVERGENCE_THRESHOLD &&
-        Math.abs(this._snap.velocity) / scale < CONVERGENCE_THRESHOLD;
+        Math.abs(value - channel._solverTo) / scale < CONVERGENCE_THRESHOLD &&
+        Math.abs(velocity) / scale < CONVERGENCE_THRESHOLD;
     }
     const css = bound._css;
     if (css !== undefined) {
-      sampleSpringFromBasisUnchecked(basis, css._v0, this._snap);
-      css._dpdt = this._snap.velocity;
-      css._css = cssAt(css, this._snap.value);
+      const { value, velocity } = sampleSpringFromBasisUnchecked(basis, css._v0);
+      css._dpdt = velocity;
+      css._css = cssAt(css, value);
       converged = converged &&
-        Math.abs(this._snap.value - 1) < CONVERGENCE_THRESHOLD &&
-        Math.abs(this._snap.velocity) < CONVERGENCE_THRESHOLD;
+        Math.abs(value - 1) < CONVERGENCE_THRESHOLD &&
+        Math.abs(velocity) < CONVERGENCE_THRESHOLD;
     }
     return converged;
   }
