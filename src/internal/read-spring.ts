@@ -25,33 +25,30 @@ export interface MutableSpringState {
  */
 const scratch: MutableSpringState = { value: 0, velocity: 0 };
 
-/** @internal Восстанавливает нормализованный канал из общего базиса. */
+/** @internal Заимствованный результат действителен до следующего вызова этого модуля. */
 export function sampleSpringFromBasisUnchecked(
-  basis: MutableSpringBasis,
+  basis: Readonly<MutableSpringBasis>,
   v0: number,
-  out: MutableSpringState,
-): MutableSpringState {
+): Readonly<MutableSpringState> {
   const value = finiteOr(basis._value + v0 * basis._valueV0, 1);
   const velocity = finiteOr(basis._velocity + v0 * basis._velocityV0, 0);
-  out.value = value;
-  out.velocity = velocity;
-  return out;
+  scratch.value = value;
+  scratch.velocity = velocity;
+  return scratch;
 }
 
-/** @internal Денормализует канал из общего базиса с единой finite-политикой. */
+/** @internal Та же finite-политика; заимствованный результат потребляется до host-call. */
 export function readSpringFromBasisUnchecked(
-  basis: MutableSpringBasis,
+  basis: Readonly<MutableSpringBasis>,
   from: number,
   to: number,
   v0: number,
-  out: MutableSpringState,
-): MutableSpringState {
-  const normalizedValue = finiteOr(basis._value + v0 * basis._valueV0, 1);
-  const normalizedVelocity = finiteOr(basis._velocity + v0 * basis._velocityV0, 0);
+): Readonly<MutableSpringState> {
+  sampleSpringFromBasisUnchecked(basis, v0);
   const range = to - from;
-  out.value = finiteOr(from + normalizedValue * range, to);
-  out.velocity = finiteOr(normalizedVelocity * range, 0);
-  return out;
+  scratch.value = finiteOr(from + scratch.value * range, to);
+  scratch.velocity = finiteOr(scratch.velocity * range, 0);
+  return scratch;
 }
 
 /** @internal Входы обязаны быть проверены на внешней границе. */

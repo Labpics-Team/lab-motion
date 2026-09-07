@@ -93,7 +93,7 @@ export class SurfaceBatch {
     if (this._units.length === this._holes) this._resetStorage();
   }
 
-  _springBasis(spring: SpringParams, t: number): MutableSpringBasis {
+  _springBasis(spring: SpringParams, t: number): Readonly<MutableSpringBasis> {
     const cached = this._basisSpring;
     if (
       t !== this._basisTime ||
