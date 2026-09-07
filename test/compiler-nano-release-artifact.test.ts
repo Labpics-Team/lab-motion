@@ -40,7 +40,8 @@ export function run(a,b,c,d,e,f,g,h) {
     const baseline = planNanoOpacityLowering(ast, code, nanoArtifactLiteral);
     const candidate = planNanoOpacityLowering(ast, code, nanoDefaultArtifactLiteral);
     expect(candidate).toEqual(baseline);
-    expect(candidate?.edits).toHaveLength(8);
+    // Each static call contributes a target-expression edit plus the call edit.
+    expect(candidate?.edits).toHaveLength(16);
 
     // Deliberate positive performance control: same lowering, but each artifact
     // performs one additional canonical package-build proof. If this cannot be
