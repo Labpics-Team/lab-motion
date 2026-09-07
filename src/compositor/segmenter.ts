@@ -305,9 +305,6 @@ function buildSpringNodesAtHorizon(
   const count = intervals + 2;
   const xs = new Array<number>(count);
   const ys = new Array<number>(count);
-  // Инварианты пружины (omega0/zeta/omegaD/A/B) петле-инвариантны на всей сетке
-  // (params/v0 фиксированы) → считаем их ОДИН раз фабрикой, а не на каждый узел.
-  // Значение бит-в-бит равно solveSpring(...).value (см. makeSpringValueSampler).
   const sampleValue = makeSpringValueSampler(params, v0);
   xs[0] = ys[0] = 0;
   const tangentTau = 0.5 / intervals;
@@ -315,15 +312,41 @@ function buildSpringNodesAtHorizon(
   // Считаем через тот же percent→offset, который использует WebKit execution:
   // после shortest-roundtrip CSS и keyframes делят один физический slope.
   ys[1] = v0 * ((tangentTau * 100) / 100 * T);
-  for (let i = 1; i <= intervals; i++) {
-    const tau = i / intervals; // ∈ [0, 1]
+
+  // На равномерной сетке y=x−1 удовлетворяет точной second-order recurrence
+  // y[n+2]=(q1+q2)y[n+1]−q1q2·y[n]. Один аналитический seed сохраняет тот же
+  // solver SSOT; дальше grid больше не платит exp/sin/cos на каждый узел.
+  const h = T / intervals;
+  const omega2 = params.stiffness / params.mass;
+  const alpha = params.damping / (2 * params.mass);
+  const delta = omega2 - alpha * alpha;
+  let sum: number;
+  let product: number;
+  if (delta >= 0) {
+    const q = Math.exp(-alpha * h);
+    sum = 2 * q * Math.cos(Math.sqrt(delta) * h);
+    product = q * q;
+  } else {
+    const root = Math.sqrt(-delta);
+    const q1 = Math.exp((-omega2 / (alpha + root)) * h);
+    const q2 = Math.exp((-alpha - root) * h);
+    sum = q1 + q2;
+    product = q1 * q2;
+  }
+
+  xs[2] = 1 / intervals;
+  let prev = -1;
+  let curr = sampleValue(h) - 1;
+  if (!Number.isFinite(curr + 1)) curr = 0;
+  ys[2] = curr + 1;
+  for (let i = 2; i <= intervals; i++) {
+    const tau = i / intervals;
     const index = i + 1;
     xs[index] = tau;
-    // Финитный страж (не-конечное → цель 1, зеркалит motion-value; для валидных
-    // params не срабатывает — покрыто finiteness-fuzz; инвариант «в CSS никогда
-    // не NaN/∞») заинлайнен в цикл — минус кадр вызова на КАЖДЫЙ узел сетки
-    // (доминирующий путь cold-compile). Тот же Number.isFinite(v)?v:1, бит-в-бит.
-    const v = sampleValue(tau * T);
+    const next = sum * curr - product * prev;
+    prev = curr;
+    const v = next + 1;
+    curr = Number.isFinite(v) ? next : 0;
     ys[index] = Number.isFinite(v) ? v : 1;
   }
 
