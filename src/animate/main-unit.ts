@@ -45,18 +45,20 @@ export interface MainUnitOptions {
 
 const FIXED_DT_MS = FIXED_DT_S * 1000;
 const EASE_DERIV_H = 1e-3;
+const CLOCK_ACTIVE = 1;
+const CLOCK_FRESH = 2;
 
-/** Unit хранит семантику группы; scheduler и spring-basis принадлежат aggregate. */
+/** Unit хранит семантику группы; scheduler, clock и spring-basis принадлежат aggregate. */
 export class MainUnit implements GroupOwner, SurfaceUnit {
   _batchSlot = -1;
   private _o: MainUnitOptions | undefined;
   private _done = false;
   private _paused: boolean;
-  private _active = false;
+  /** bit 0 = уже активирован; bit 1 = следующий конечный timestamp только якорит unit. */
+  private _clock = CLOCK_FRESH;
   private _converged = false;
   /** Локальная фаза, не требующая вычитания больших абсолютных timestamps. */
   private _phaseMs: number;
-  private _lastTs: number | undefined;
   private _frames = 0;
   private _tweenK = 0;
   private _renderedTweenK = 0;
@@ -89,8 +91,9 @@ export class MainUnit implements GroupOwner, SurfaceUnit {
       // Во время host-write снимок обязан отдать применяемое поколение (#196):
       // hostile setter уже сделал значение видимым до возврата.
       const writing = this._writing;
-      let velocity = this._active ? (writing ? channel._velocity : channel._renderedVelocity) : 0;
-      if (this._active && o._mode._type === 'tween') {
+      const active = (this._clock & CLOCK_ACTIVE) !== 0;
+      let velocity = active ? (writing ? channel._velocity : channel._renderedVelocity) : 0;
+      if (active && o._mode._type === 'tween') {
         const sampled = (channel._to - channel._from) *
           this._tweenDerivative(this._liveTweenK());
         velocity = finiteOrZero(sampled);
@@ -106,7 +109,7 @@ export class MainUnit implements GroupOwner, SurfaceUnit {
     const channel = this._o!._bound._css;
     if (channel === undefined || channel._key !== key) return undefined;
     const writing = this._writing;
-    const dpdt = !this._active
+    const dpdt = (this._clock & CLOCK_ACTIVE) === 0
       ? 0
       : this._o!._mode._type === 'tween'
         ? this._tweenDerivative(this._liveTweenK())
@@ -138,7 +141,7 @@ export class MainUnit implements GroupOwner, SurfaceUnit {
 
   play(): void {
     if (this._done || !this._paused || this._o!._record._transition) return;
-    this._lastTs = undefined;
+    this._clock |= CLOCK_FRESH;
     this._paused = false;
     try {
       this._o!._batch._activate(this);
@@ -157,10 +160,9 @@ export class MainUnit implements GroupOwner, SurfaceUnit {
   seek(tMs: number): void {
     if (this._done || this._o!._record._transition || !Number.isFinite(tMs)) return;
     const localMs = Math.max(0, tMs);
-    this._active = true;
+    this._clock |= CLOCK_ACTIVE | CLOCK_FRESH;
     // Seek задаёт локальную фазу без восстановления абсолютного timestamp.
     this._phaseMs = localMs;
-    this._lastTs = undefined;
     if (this._compute()) this._settle();
     else this._write();
   }
@@ -170,26 +172,26 @@ export class MainUnit implements GroupOwner, SurfaceUnit {
     this._batchAbort();
   }
 
-  _updateStep(ts: number | undefined): void {
+  _updateStep(dt: number | undefined, timestampFinite: boolean): void {
     if (this._done || this._paused || this._o!._record._transition) return;
-    let dt: number;
-    if (ts === undefined || !Number.isFinite(ts)) {
-      dt = FIXED_DT_MS;
-      this._lastTs = undefined;
-    } else {
-      dt = this._lastTs === undefined ? 0 : ts - this._lastTs;
-      this._lastTs = ts;
-      if (!Number.isFinite(dt)) {
-        dt = FIXED_DT_MS;
-        this._lastTs = undefined;
-      }
-    }
-    if (dt < 0) dt = 0;
+    let step: number;
+    if (!timestampFinite) {
+      step = FIXED_DT_MS;
+      this._clock |= CLOCK_FRESH;
+    } else if ((this._clock & CLOCK_FRESH) !== 0) {
+      step = 0;
+      this._clock &= ~CLOCK_FRESH;
+    } else if (dt === undefined) {
+      // Разность двух конечных IEEE timestamps переполнилась: current frame
+      // использует fixed-step, следующий конечный timestamp снова только anchor.
+      step = FIXED_DT_MS;
+      this._clock |= CLOCK_FRESH;
+    } else step = dt;
     // Фаза накапливает dt напрямую, без вычитания двух почти равных MAX-чисел
     // после seek. Пересечение delay сохраняет весь frame-overshoot.
-    this._phaseMs += dt;
-    if (this._phaseMs >= 0) this._active = true;
-    if (this._active) {
+    this._phaseMs += step;
+    if (this._phaseMs >= 0) this._clock |= CLOCK_ACTIVE;
+    if ((this._clock & CLOCK_ACTIVE) !== 0) {
       this._frames++;
       if (
         this._compute() ||
@@ -201,7 +203,7 @@ export class MainUnit implements GroupOwner, SurfaceUnit {
   _renderStep(): void {
     if (this._done || this._paused || this._o!._record._transition) return;
     if (this._converged) this._settle();
-    else if (this._active) this._write();
+    else if ((this._clock & CLOCK_ACTIVE) !== 0) this._write();
   }
 
   _batchAbort(): void {
