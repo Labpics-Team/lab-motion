@@ -571,10 +571,10 @@ jobs:
           if (parsedUrl.origin !== 'https://registry.npmjs.org') {
             fail(`недоверенный endpoint attestations: ${parsedUrl.origin}`);
           }
-          # registry материализует attestation bundle асинхронно: metadata уже
-          # ссылается на endpoint, который первые минуты отвечает 404 (падение
-          # run 30901712886 через 1.2s после publish). Retry только на 404;
-          # остальные статусы fail-closed немедленно.
+          // registry материализует attestation bundle асинхронно: metadata уже
+          // ссылается на endpoint, который первые минуты отвечает 404 (падение
+          // run 30901712886 через 1.2s после publish). Retry только на 404;
+          // остальные статусы fail-closed немедленно.
           let attestationResponse;
           for (let attempt = 1; attempt <= 16; attempt++) {
             attestationResponse = await fetch(parsedUrl, { cache: 'no-store' });
@@ -602,13 +602,13 @@ jobs:
           if (workflow?.path !== '.github/workflows/release.yml' || workflow?.ref !== 'refs/heads/main') {
             fail('provenance указывает на другой workflow/ref');
           }
-          # OIDC-provenance привязан к workflow-run: gitCommit — SHA рана,
-          # подписавшего пакет. При idempotent-rerun это ранний диспатч
-          # (run 30901712886: пакет подписан на 0d4534c8, github.sha уже новее),
-          # поэтому точное равенство нежизнеспособно. Инвариант fail-closed:
-          # gitCommit == github.sha текущего рана или его предок по main;
-          # подпись diverged/чужого коммита отвергается. Байты дерева источника
-          # связаны с пакетом через subject sha512 выше.
+          // OIDC-provenance привязан к workflow-run: gitCommit — SHA рана,
+          // подписавшего пакет. При idempotent-rerun это ранний диспатч
+          // (run 30901712886: пакет подписан на 0d4534c8, github.sha уже новее),
+          // поэтому точное равенство нежизнеспособно. Инвариант fail-closed:
+          // gitCommit == github.sha текущего рана или его предок по main;
+          // подпись diverged/чужого коммита отвергается. Байты дерева источника
+          // связаны с пакетом через subject sha512 выше.
           const provenanceSha = definition?.resolvedDependencies?.find(
             (item) => typeof item.digest?.gitCommit === 'string'
               && typeof item.uri === 'string'
@@ -638,8 +638,8 @@ jobs:
             fail('provenance invocation относится к другому репозиторию');
           }
 
-          # npm CLI криптографически проверяет registry- и SLSA-подписи;
-          # разбор выше дополнительно связывает statement с нашим SHA/workflow.
+          // npm CLI криптографически проверяет registry- и SLSA-подписи;
+          // разбор выше дополнительно связывает statement с нашим SHA/workflow.
           const audit = mkdtempSync(join(tmpdir(), 'labmotion-provenance-'));
           try {
             writeFileSync(join(audit, 'package.json'), JSON.stringify({ name: 'provenance-audit', private: true }));
