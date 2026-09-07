@@ -1,0 +1,64 @@
+name: research-tight-separators
+
+on:
+  push:
+    branches: ["perf/compositor-tight-linear-separators"]
+
+permissions:
+  contents: write
+
+jobs:
+  patch:
+    if: github.actor != 'github-actions[bot]'
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          persist-credentials: true
+      - name: Apply exact test-oracle update
+        shell: bash
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+
+          paths = [
+              Path('test/compositor-compile.test.ts'),
+              Path('test/compositor-velocity-budget.test.ts'),
+              Path('test/animate-waapi-lifecycle.test.ts'),
+              Path('test/compositor-serialized-execution.test.ts'),
+          ]
+          old = ".split(', ')"
+          new = ".split(',')"
+          for path in paths:
+              text = path.read_text()
+              count = text.count(old)
+              if count != 1:
+                  raise SystemExit(f'{path}: expected exactly one {old!r}, found {count}')
+              path.write_text(text.replace(old, new))
+          PY
+          cat > test/compositor-tight-linear-separators.test.ts <<'EOF'
+          import { describe, expect, it } from 'vitest';
+          import { compileSpringLinear } from '../src/compositor/index.js';
+
+          describe('compositor: canonical linear() separators', () => {
+            it('emits no optional whitespace between stops', () => {
+              const easing = compileSpringLinear({ mass: 1, stiffness: 170, damping: 26 });
+              expect(easing).toMatch(/^linear\([^)]+\)$/);
+              expect(easing).not.toContain(', ');
+              expect(easing.split(',').length).toBeGreaterThan(2);
+            });
+          });
+          EOF
+          rm .github/workflows/research-tight-separators.yml
+          git diff --check
+          git add test/compositor-compile.test.ts \
+                  test/compositor-velocity-budget.test.ts \
+                  test/animate-waapi-lifecycle.test.ts \
+                  test/compositor-serialized-execution.test.ts \
+                  test/compositor-tight-linear-separators.test.ts \
+                  .github/workflows/research-tight-separators.yml
+          git config user.name 'labpics-research-bot'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git commit -m 'test(compositor): pin tight linear separators'
+          git push origin HEAD:perf/compositor-tight-linear-separators
