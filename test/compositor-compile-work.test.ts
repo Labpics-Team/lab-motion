@@ -78,7 +78,7 @@ function emit(nodes: readonly SpringNode[], tolerance = 1 / 400): string {
       ? String(node.percent)
       : roundShortest(node.percent, percentDigits);
     out += `${progress} ${percent}%`;
-    if (i < nodes.length - 1) out += ', ';
+    if (i < nodes.length - 1) out += ',';
   }
   return `${out})`;
 }
