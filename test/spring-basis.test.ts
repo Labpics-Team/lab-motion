@@ -33,20 +33,18 @@ afterEach(() => vi.restoreAllMocks());
 
 describe('shared analytic spring basis', () => {
   it('воспроизводит value/velocity всех режимов при разных v0 и t', () => {
-    const state = { value: 0, velocity: 0 };
-    const normalized = { value: 0, velocity: 0 };
     const shared = basis();
     for (const spring of SPRINGS) {
       for (const t of [0, Number.MIN_VALUE, 1 / 240, 0.017, 0.3, 2, 32]) {
         sampleSpringBasisUnchecked(spring, t, shared);
         for (const v0 of [-100, -3, -0, 0, 2.5, 100]) {
           const expected = sampleSpringUnchecked(spring, v0, t);
-          sampleSpringFromBasisUnchecked(shared, v0, normalized);
+          const normalized = sampleSpringFromBasisUnchecked(shared, v0);
           close(normalized.value, expected.value);
           close(normalized.velocity, expected.velocity);
 
           const ranged = readSpringUnchecked(spring, -120, 340, v0, t);
-          readSpringFromBasisUnchecked(shared, -120, 340, v0, state);
+          const state = readSpringFromBasisUnchecked(shared, -120, 340, v0);
           close(state.value, ranged.value);
           close(state.velocity, ranged.velocity);
         }
@@ -56,23 +54,21 @@ describe('shared analytic spring basis', () => {
 
   it('сохраняет точные начальные условия и finite-policy на IEEE-754 краях', () => {
     const shared = basis();
-    const out = { value: 0, velocity: 0 };
     for (const spring of SPRINGS) {
       sampleSpringBasisUnchecked(spring, 0, shared);
       for (const v0 of [-100, -0, 0, 100]) {
-        sampleSpringFromBasisUnchecked(shared, v0, out);
+        const out = sampleSpringFromBasisUnchecked(shared, v0);
         expect(out.value).toBe(0);
         expect(out.velocity).toBe(v0);
       }
       for (const t of [Number.MIN_VALUE, 1 / 240, 32, Infinity, NaN]) {
         sampleSpringBasisUnchecked(spring, t, shared);
         for (const v0 of [-Number.MAX_VALUE, Number.MAX_VALUE]) {
-          readSpringFromBasisUnchecked(
+          const out = readSpringFromBasisUnchecked(
             shared,
             -Number.MAX_VALUE,
             Number.MAX_VALUE,
             v0,
-            out,
           );
           expect(Number.isFinite(out.value)).toBe(true);
           expect(Number.isFinite(out.velocity)).toBe(true);
@@ -83,12 +79,11 @@ describe('shared analytic spring basis', () => {
 
   it('сохраняет независимый физический предел при субнормальном времени и предельной скорости', () => {
     const shared = basis();
-    const actual = { value: 0, velocity: 0 };
     for (const spring of SPRINGS) {
       for (const t of [Number.MIN_VALUE, 1e-300, 1e-200, 1e-16]) {
         sampleSpringBasisUnchecked(spring, t, shared);
         for (const v0 of [-Number.MAX_VALUE, Number.MAX_VALUE]) {
-          sampleSpringFromBasisUnchecked(shared, v0, actual);
+          const actual = sampleSpringFromBasisUnchecked(shared, v0);
           const context = `spring=${JSON.stringify(spring)}, t=${t}, v0=${v0}`;
           expect(Number.isFinite(actual.value), `value finite: ${context}`).toBe(true);
           expect(Number.isFinite(actual.velocity), `velocity finite: ${context}`).toBe(true);
