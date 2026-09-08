@@ -1,9 +1,9 @@
 # Превью движения
 
-Короткий немой этюд: круг превращается в сетку, затем в волну и возвращается.
+Видео без звука: круг превращается в сетку, затем в волну и возвращается через сетку к кругу.
 Позиции семплируются публичной функцией `spring`; это офлайн-рендер движения,
 а не запись браузера или демонстрация compositor-производительности.
-Цвета взяты из существующей витрины. Видео запускается только по нажатию.
+Белый фон, серые точки и одна синяя точка, за которой можно следить. Видео запускается только по нажатию.
 
 ## Пересобрать
 
@@ -13,7 +13,7 @@
 ```sh
 pnpm build
 node scripts/render-readme-preview.mjs /tmp/lab-motion-preview
-ffmpeg -y -framerate 30 -i /tmp/lab-motion-preview/%04d.svg -c:v libx264 -crf 26 -pix_fmt yuv420p -movflags +faststart site/public/media/motion-preview.mp4
+ffmpeg -y -framerate 30 -i /tmp/lab-motion-preview/%04d.svg -c:v libx264 -crf 23 -pix_fmt yuv420p -movflags +faststart site/public/media/motion-preview.mp4
 cp /tmp/lab-motion-preview/poster.svg site/public/media/motion-poster.svg
 ```
 
