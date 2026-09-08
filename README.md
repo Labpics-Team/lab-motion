@@ -8,7 +8,7 @@
 [![CI](https://github.com/Labpics-Team/lab-motion/actions/workflows/ci.yml/badge.svg)](https://github.com/Labpics-Team/lab-motion/actions/workflows/ci.yml)
 [![license](https://img.shields.io/npm/l/%40labpics%2Fmotion)](LICENSE)
 
-[![Lab Motion: анимации на пружинах](site/public/media/motion-poster.svg)](site/public/media/motion-preview.mp4)
+[![Пружина из движущихся кругов — превью Lab Motion](site/public/media/motion-poster.svg)](site/public/media/motion-preview.mp4)
 
 [Смотреть превью](site/public/media/motion-preview.mp4) · [Запустить живую витрину](#живая-витрина)
 
@@ -225,3 +225,4 @@ springFromDurationBounce(0.35, 0); // восприятие (duration, bounce) �
 ## Лицензия
 
 MIT
+
