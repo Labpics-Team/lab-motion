@@ -157,3 +157,5 @@ html[data-motion="reduced"] *::after { animation: none !important; transition: n
   .evidence-grid { grid-template-columns: 1fr; }
   .evidence-link { min-height: 100px; }
 }
+
+.motion-film { display: block; width: 100%; height: auto; aspect-ratio: 16 / 9; border-radius: var(--radius-lg); }
