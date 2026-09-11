@@ -166,51 +166,42 @@ export function douglasPeuckerVertical(
 ): number[] {
   const n = xs.length;
   if (n <= 2) return n === 2 ? [0, 1] : n === 1 ? [0] : [];
-  const keep = new Uint8Array(n);
-  keep[0] = keep[n - 1] = 1;
-  // Стек интервалов [i, j] (индексы), i<j. Защищённый interior-узел делит
-  // задачу до первого скана: последующая хорда физически не может его удалить.
-  const hasProtected = protectedIndex > 0 && protectedIndex < n - 1;
-  if (hasProtected) keep[protectedIndex] = 1;
-  const stack: number[] = hasProtected
-    ? [0, protectedIndex, protectedIndex, n - 1]
-    : [0, n - 1];
+  // Правые половины обходятся первыми, как в прежнем DFS. Выданный endpoint
+  // становится правой границей следующего интервала: хранить её в стеке
+  // повторно не нужно. Порядок DFS сохраняет прежнюю глубину стека даже
+  // для перекошенного дерева; bitmap по всей сетке также не требуется.
+  const out = [n - 1];
+  const stack = protectedIndex > 0 && protectedIndex < n - 1
+    ? [0, protectedIndex]
+    : [0];
+  let j = n - 1;
   while (stack.length > 0) {
-    const j = stack.pop()!;
     const i = stack.pop()!;
-    if (j <= i + 1) continue; // нет внутренних точек
-    const xi = xs[i]!;
-    const yi = ys[i]!;
-    const dx = xs[j]! - xi;
-    const dy = ys[j]! - yi;
-    // dx>0 гарантирован предусловием (xs строго возрастают) ⇒ прежний per-точечный
-    // страж `dx===0?yi:` — мёртвая ветка. Снят: минус ветвление на КАЖДОЙ точке
-    // скана (RDP — ~15% cold-compile). Наклон хорды slope=dy/dx петле-инвариантен →
-    // считаем ОДИН раз, снимая деление с каждой точки (деление → умножение).
-    // NB: lineY = yi+slope·Δx НЕ бит-идентичен прежнему yi+(dy·Δx)/dx (порядок
-    // деления/умножения меняет последний ULP), но НАБОР оставленных индексов —
-    // идентичен: сравнение argmax/порога устойчиво к суб-ULP сдвигу отклонения.
-    // Зафиксировано дифф-тестом (kept-индексы new≡old на всех режимах × сетках):
-    // test/compositor-cold-compile-differential.test.ts.
-    const slope = dy / dx;
-    let maxDev = -1;
-    let idx = -1;
-    for (let k = i + 1; k < j; k++) {
-      const lineY = yi + slope * (xs[k]! - xi);
-      const dev = Math.abs(ys[k]! - lineY);
-      if (dev > maxDev) {
-        maxDev = dev;
-        idx = k;
+    if (j > i + 1) {
+      const xi = xs[i]!;
+      const yi = ys[i]!;
+      const slope = (ys[j]! - yi) / (xs[j]! - xi);
+      let maxDev = -1;
+      let idx = -1;
+      for (let k = i + 1; k < j; k++) {
+        const lineY = yi + slope * (xs[k]! - xi);
+        const dev = Math.abs(ys[k]! - lineY);
+        if (dev > maxDev) {
+          maxDev = dev;
+          idx = k;
+        }
+      }
+      if (maxDev > eps) {
+        stack.push(i, idx);
+        continue;
       }
     }
-    if (maxDev > eps) {
-      keep[idx] = 1;
-      stack.push(i, idx, idx, j);
-    }
+    out.push(i);
+    j = i;
   }
-  const out: number[] = [];
-  for (let k = 0; k < n; k++) if (keep[k] === 1) out.push(k);
-  return out;
+  // Только K сохранённых индексов, не N ячеек исходной сетки. reverse
+  // меняет тот же выходной массив без второй аллокации.
+  return out.reverse();
 }
 
 /**
