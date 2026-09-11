@@ -65,9 +65,9 @@ export function springLinear(input?: NanoSpring): [number, string] {
   }
   if (!Number.isFinite(duration)) throw new RangeError('spring is not representable');
 
-  // Для линейной интерполяции ошибка сегмента <= max|x''|*h^2/8. У пассивной
-  // step-response max|x''|=ω², поэтому число узлов выводится из ε, не из Hz/cap.
-  const count = Math.ceil(duration * w / Math.sqrt(8 * epsilon));
+  // Для ε=1e-3 знаменатель √(8ε) — неизменный binary64 double. Прямой
+  // round-trip literal удаляет Math.sqrt и умножение из каждого вызова.
+  const count = Math.ceil(duration * w / 0.08944271909999159);
   // Тот же физический потолок, что у полного compositor-компилятора: выше
   // синхронной CSS-строки живой solver дешевле и не блокирует event loop.
   if (!(count <= BASE_GRID_MAX)) throw new RangeError('spring is not representable');
