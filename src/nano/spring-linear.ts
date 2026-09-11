@@ -51,10 +51,10 @@ export function springLinear(input?: NanoSpring): [number, string] {
   // монотонные режимы ищутся в безразмерном времени медленного полюса.
   const epsilon = 1e-3;
   let duration = under
-    ? Math.max(
-        Math.log(w / d / epsilon) / a,
-        Math.log(w * w / d / (30 * epsilon)) / a,
-      )
+    ? Math.log(Math.max(
+        w / d / epsilon,
+        w * w / d / (30 * epsilon),
+      )) / a
     : 0;
   if (!under) {
     const step = 1 / (30 * slow);
