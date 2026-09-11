@@ -1,0 +1,76 @@
+name: Research event map
+
+on:
+  pull_request:
+    paths:
+      - src/compiler/vite/index.ts
+      - test/compiler-source-map.test.ts
+      - scripts/research-event-map.mjs
+      - .github/workflows/research-event-map.yml
+
+permissions:
+  contents: read
+
+concurrency:
+  group: research-event-map-${{ github.event.pull_request.number }}
+  cancel-in-progress: true
+
+jobs:
+  proof:
+    if: github.head_ref == 'perf/compiler-event-map-20260911'
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    steps:
+      - name: Candidate exact head
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          ref: ${{ github.event.pull_request.head.sha }}
+          path: candidate
+          fetch-depth: 0
+          persist-credentials: false
+      - name: Scientific base
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          ref: ecfa6beb90bb116b47f1641d8edbeac0b2d9bb9f
+          path: base
+          fetch-depth: 0
+          persist-credentials: false
+      - name: Node
+        uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v6
+        with:
+          node-version: '24'
+      - name: Pinned package manager
+        run: |
+          corepack enable
+          corepack install --global pnpm@11.11.0
+      - name: Same frozen dependencies
+        run: |
+          (cd base && pnpm install --frozen-lockfile)
+          (cd candidate && pnpm install --frozen-lockfile)
+      - name: Canonical base build and size
+        working-directory: base
+        run: |
+          pnpm build
+          pnpm size | tee ../base-size.log
+      - name: Canonical candidate build and size
+        working-directory: candidate
+        run: |
+          pnpm build
+          pnpm size | tee ../candidate-size.log
+      - name: Independent positional oracle
+        working-directory: candidate
+        run: pnpm exec vitest run test/compiler-source-map.test.ts
+      - name: Paired proof and deliberate controls
+        working-directory: candidate
+        run: node scripts/research-event-map.mjs ../base
+      - name: Evidence
+        if: always()
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
+        with:
+          name: event-map-proof-${{ github.event.pull_request.head.sha }}
+          path: |
+            candidate/reports/event-map/
+            base-size.log
+            candidate-size.log
+          if-no-files-found: error
+          retention-days: 30
