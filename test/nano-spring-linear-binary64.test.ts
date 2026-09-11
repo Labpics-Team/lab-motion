@@ -58,6 +58,19 @@ describe('nano springLinear: binary64 underdamped envelope', () => {
     expectBitExact(input);
   });
 
+  it('2^-26 бит-в-бит равен sqrt(EPSILON) и различает критическую границу', () => {
+    const root = 2 ** -26;
+    expect(Object.is(root, Math.sqrt(Number.EPSILON))).toBe(true);
+
+    // Один ULP ниже a=w даёт d между правильным корнем и намеренно удвоенным
+    // порогом: 2^-25 ошибочно классифицировал бы этот underdamped случай critical.
+    const a = 1 - Number.EPSILON;
+    const d = Math.sqrt(1 - a * a);
+    expect(d).toBeGreaterThan(root);
+    expect(d).toBeLessThan(2 ** -25);
+    expectBitExact({ mass: 1, stiffness: 1, damping: 2 * a });
+  });
+
   it('держит seeded-класс обоих settle bounds без расхождений', () => {
     let seed = 0x6e61_6e6f;
     const random = () => (seed = (Math.imul(seed, 1_664_525) + 1_013_904_223) >>> 0)
