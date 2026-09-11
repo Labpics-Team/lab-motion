@@ -84,12 +84,13 @@ describe('nano springLinear: binary64 underdamped envelope', () => {
     expect(velocityBoundCases).toBeGreaterThan(0);
   });
 
-  it('positive control ловит малое изменение длительности и артефакта', () => {
+  it('positive controls ловят exact-duration и артефактный sabotage', () => {
     const input = { mass: 1, stiffness: 170, damping: 26 } satisfies NanoSpring;
     const actual = springLinear(input);
-    const sabotaged = referenceUnderdamped(input, 1 + 1e-12);
+    const durationSabotage = referenceUnderdamped(input, 1 + 1e-12);
+    const artifactSabotage = referenceUnderdamped(input, 1.001);
 
-    expect(Object.is(sabotaged[0], actual[0])).toBe(false);
-    expect(sabotaged[1]).not.toBe(actual[1]);
+    expect(Object.is(durationSabotage[0], actual[0])).toBe(false);
+    expect(artifactSabotage[1]).not.toBe(actual[1]);
   });
 });
