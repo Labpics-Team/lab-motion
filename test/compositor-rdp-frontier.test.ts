@@ -63,6 +63,7 @@ describe('RDP: монотонный фронтир без bitmap исходно�
     expect(douglasPeuckerVertical(xs, ys, 1)).toEqual([0, 3]);
     expect(douglasPeuckerVertical(xs, ys, 1 - Number.EPSILON)).toEqual([0, 1, 3]);
     // Последний argmax дал бы [0, 2, 3], equality-split добавил бы лишнюю точку.
+    expect(reference(xs, ys, 1 - Number.EPSILON)).toEqual([0, 1, 3]);
     expect(reference(xs, ys, 1 - Number.EPSILON)).not.toEqual([0, 2, 3]);
   });
 
