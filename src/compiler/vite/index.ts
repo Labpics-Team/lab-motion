@@ -21,7 +21,7 @@ import {
   type NanoLoweringEdit,
   type NanoLoweringPlan,
 } from '../core.js';
-import { nanoDefaultArtifactLiteral } from '../nano-default-artifact.js';
+import { nanoCompactArtifactLiteral } from '../nano-default-artifact.js';
 
 interface TransformResult {
   readonly code: string;
@@ -181,7 +181,7 @@ export function motionCompiler(): MotionCompilerPlugin {
       // только полностью статическим, а вложенный вызов в аргументе делает
       // его динамическим (консервативный отказ).
       const plans = [
-        planNanoOpacityLowering(ast, code, nanoDefaultArtifactLiteral),
+        planNanoOpacityLowering(ast, code, nanoCompactArtifactLiteral),
         planSurfaceLowering(ast, code),
       ].filter((plan): plan is NanoLoweringPlan => plan !== undefined);
       if (plans.length === 0) return undefined;
