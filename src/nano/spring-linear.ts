@@ -24,15 +24,18 @@ export function springLinear(input?: NanoSpring): [number, string] {
     throw new RangeError('spring parameters must be finite and positive');
   }
   const w = Math.sqrt(k / m);
+  // Кэшируем именно округлённое binary64 ω², а не k/m: после sqrt квадрат
+  // может отличаться на ULP, а весь старый контракт повторно использовал w*w.
+  const q = w * w;
   // Сначала нормализуем ОДУ по mass: `2*m` само переполняется при конечных
   // scale-equivalent m/k/c и не должно менять физику той же системы.
   const a = c / m / 2;
-  const d = Math.sqrt(Math.abs(w * w - a * a));
+  const d = Math.sqrt(Math.abs(q - a * a));
   // Number.EPSILON = 2^-52 в binary64, поэтому его положительный корень
   // представим точно как 2^-26 и не требует отдельного Math.sqrt на вызов.
   const critical = d <= w * 2 ** -26;
   const under = a < w && !critical;
-  const slow = under ? 0 : critical ? w : w * w / (a + d);
+  const slow = under ? 0 : critical ? w : q / (a + d);
   const fast = under || critical ? 0 : -a - d;
   const sample = under
     ? (t: number) => 1 - Math.exp(-a * t)
@@ -42,10 +45,10 @@ export function springLinear(input?: NanoSpring): [number, string] {
       : (t: number) => 1
         - (fast * Math.exp(-slow * t) + slow * Math.exp(fast * t)) / (fast + slow);
   const velocity = under
-    ? (t: number) => Math.exp(-a * t) * w * w / d * Math.sin(d * t)
+    ? (t: number) => Math.exp(-a * t) * q / d * Math.sin(d * t)
     : critical
-      ? (t: number) => Math.exp(-w * t) * w * w * t
-      : (t: number) => w * w / (-fast - slow)
+      ? (t: number) => Math.exp(-w * t) * q * t
+      : (t: number) => q / (-fast - slow)
         * (Math.exp(-slow * t) - Math.exp(fast * t));
 
   // ε=1e-3 — тот же физический settle-допуск, что у runtime пакета. Для
@@ -55,7 +58,7 @@ export function springLinear(input?: NanoSpring): [number, string] {
   let duration = under
     ? Math.log(Math.max(
         w / d / epsilon,
-        w * w / d / (30 * epsilon),
+        q / d / (30 * epsilon),
       )) / a
     : 0;
   if (!under) {
