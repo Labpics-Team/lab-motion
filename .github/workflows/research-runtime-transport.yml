@@ -1,0 +1,44 @@
+name: Research runtime transport
+on:
+  push:
+    branches: [research/runtime-lifetime-proof-20260911]
+permissions:
+  contents: read
+jobs:
+  snapshot:
+    runs-on: ubuntu-latest
+    timeout-minutes: 12
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          ref: 5f375cff2e978914cfb6ffed4c0ae2d573d1415f
+          fetch-depth: 0
+          persist-credentials: false
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020
+        with:
+          node-version: '24.20.0'
+      - name: Exact dependencies
+        run: |
+          corepack enable
+          corepack install --global pnpm@11.11.0
+          pnpm install --frozen-lockfile
+      - name: Read-only source and toolchain snapshot
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir transport
+          test "$(git rev-parse HEAD)" = 5f375cff2e978914cfb6ffed4c0ae2d573d1415f
+          git branch transport-base HEAD
+          git bundle create transport/repository.bundle transport-base
+          tar -czf transport/dependencies.tgz node_modules
+          cp "$(command -v node)" transport/node
+          node -p 'JSON.stringify({versions:process.versions,platform:process.platform,arch:process.arch})' > transport/environment.json
+          sha256sum transport/* > transport/SHA256SUMS
+          du -sh transport/*
+      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
+        with:
+          name: runtime-source-toolchain
+          path: transport/*
+          compression-level: 0
+          if-no-files-found: error
+          retention-days: 1
