@@ -145,16 +145,27 @@ function worktreeFingerprint(root) {
   const hash = createHash('sha256');
   for (const name of names) {
     const file = path.join(root, name);
-    if (!existsSync(file)) continue;
+    const stat = lstatSync(file, { throwIfNoEntry: false });
+    if (stat === undefined) continue;
     hash.update(name);
     hash.update('\0');
-    hash.update(readFileSync(file));
+    if (stat.isSymbolicLink()) hash.update(readlinkSync(file, { encoding: 'buffer' }));
+    else if (stat.isFile()) hash.update(readFileSync(file));
+    else continue;
     hash.update('\0');
   }
   return hash.digest('hex');
 }
 
 function* readRevisionObjects(root, entries) {
+  for (const entry of entries) {
+    if (entry.mode === '160000' && entry.type === 'commit') {
+      throw new Error(`provenance: submodule ${entry.name} не поддерживается в declared revision`);
+    }
+    if (entry.type !== 'blob' || !['100644', '100755', '120000'].includes(entry.mode)) {
+      throw new Error(`provenance: tracked ${entry.name} имеет неподдерживаемый Git mode/type ${entry.mode} ${entry.type}`);
+    }
+  }
   // Потребитель хеширует пакет до следующего чтения, не удерживая все blob-байты revision.
   for (let start = 0; start < entries.length; start += 128) {
     const batch = entries.slice(start, start + 128);
@@ -166,14 +177,15 @@ function* readRevisionObjects(root, entries) {
     let offset = 0;
     for (const entry of batch) {
       const end = bytes.indexOf(10, offset);
+      if (end === -1) throw new Error('provenance: некорректный пакет объектов revision');
       const header = /^([0-9a-f]{40}) (blob|tree|commit|tag) (0|[1-9]\d*)$/.exec(
         bytes.subarray(offset, end).toString('utf8'),
       );
-      if (end < offset || header === null) throw new Error('provenance: некорректный пакет объектов revision');
+      if (header === null) throw new Error('provenance: некорректный пакет объектов revision');
       const [, object, type, rawSize] = header;
       const size = Number(rawSize);
       const contentEnd = end + 1 + size;
-      if (end < offset || object !== entry.object || type !== entry.type || !Number.isSafeInteger(size) || size < 0 ||
+      if (object !== entry.object || type !== entry.type || !Number.isSafeInteger(size) || size < 0 ||
           contentEnd < end + 1 || bytes[contentEnd] !== 10) throw new Error('provenance: некорректный пакет объектов revision');
       const content = bytes.subarray(end + 1, contentEnd);
       offset = contentEnd + 1;
@@ -206,15 +218,26 @@ export function revisionFingerprint(root, revision, { verifyWorkingTree = false 
     const { name, mode, type } = entry;
     if (verifyWorkingTree) {
       const file = path.join(root, name);
-      if (type !== 'blob' || !['100644', '100755'].includes(mode) || !existsSync(file) || !lstatSync(file).isFile()) {
-        throw new Error(`provenance: tracked ${name} не является обычным файлом declared revision`);
-      }
-      const actual = readFileSync(file);
-      if (!actual.equals(expected)) {
-        if (actual.includes(0) || expected.includes(0)) {
-          throw new Error(`provenance: tracked ${name} содержит бинарное отличие от revision`);
+      const stat = lstatSync(file, { throwIfNoEntry: false });
+      if (mode === '120000') {
+        if (type !== 'blob' || stat === undefined || !stat.isSymbolicLink()) {
+          throw new Error(`provenance: tracked ${name} не является symlink declared revision`);
         }
-        normalized.push({ entry, actualSha256: sha256Bytes(actual) });
+        const actual = readlinkSync(file, { encoding: 'buffer' });
+        if (!actual.equals(expected)) {
+          throw new Error(`provenance: tracked symlink ${name} не совпадает с declared revision ${revision}`);
+        }
+      } else {
+        if (type !== 'blob' || !['100644', '100755'].includes(mode) || stat === undefined || !stat.isFile()) {
+          throw new Error(`provenance: tracked ${name} не является обычным файлом declared revision`);
+        }
+        const actual = readFileSync(file);
+        if (!actual.equals(expected)) {
+          if (actual.includes(0) || expected.includes(0)) {
+            throw new Error(`provenance: tracked ${name} содержит бинарное отличие от revision`);
+          }
+          normalized.push({ entry, actualSha256: sha256Bytes(actual) });
+        }
       }
     }
     hash.update(name);
