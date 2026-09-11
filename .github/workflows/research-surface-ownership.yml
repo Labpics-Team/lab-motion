@@ -1,0 +1,62 @@
+name: Research surface ownership proof
+on:
+  push:
+    branches: [research/surface-ownership-proof-20260911]
+permissions:
+  contents: read
+jobs:
+  proof:
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          path: carrier
+          persist-credentials: false
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          path: motion-macro-base
+          ref: 5f375cff2e978914cfb6ffed4c0ae2d573d1415f
+          fetch-depth: 0
+          persist-credentials: false
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          path: motion-pass
+          ref: 0fbe224c697173af5a12c41aa03b847064cec692
+          fetch-depth: 0
+          persist-credentials: false
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020
+        with:
+          node-version: '24.20.0'
+      - name: Prepare fixed evidence plane
+        shell: bash
+        run: |
+          corepack enable
+          corepack install --global pnpm@11.11.0
+          mkdir motion-macro-evidence
+          cp carrier/research/surface-proof/*.mjs motion-macro-evidence/
+          for side in motion-macro-base motion-pass; do
+            git -C "$side" rev-parse HEAD >> motion-macro-evidence/heads.txt
+            git -C "$side" status --porcelain >> motion-macro-evidence/status-before.txt
+            (cd "$side" && pnpm install --frozen-lockfile && pnpm build && pnpm size) > "motion-macro-evidence/$side-build-size.log" 2>&1
+          done
+          node motion-macro-evidence/prepare.mjs > motion-macro-evidence/prepare.log
+      - name: Fixed 512-block remaining proof
+        shell: bash
+        run: node motion-macro-evidence/timing.mjs > motion-macro-evidence/timing.log 2>&1
+      - name: Read back immutable inputs
+        if: always()
+        shell: bash
+        run: |
+          for side in motion-macro-base motion-pass; do
+            git -C "$side" diff --exit-code
+            git -C "$side" status --porcelain >> motion-macro-evidence/status-after.txt
+          done
+      - name: Preserve complete evidence
+        if: always()
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
+        with:
+          name: surface-ownership-proof-${{ github.sha }}
+          path: motion-macro-evidence/
+          if-no-files-found: error
+          retention-days: 7
