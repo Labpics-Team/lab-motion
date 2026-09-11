@@ -4,10 +4,10 @@ import { solveSpring } from '../src/internal/solver.js';
 import { settleTimeUpperBound, type SpringParams } from '../src/spring.js';
 
 /**
- * До ordered-frontier refactor RDP отмечал сохранённые индексы bitmap'ом,
+ * До рефакторинга на монотонный фронтир RDP отмечал сохранённые индексы bitmap,
  * хранил обе границы каждого отложенного интервала и в конце сканировал всю
- * исходную сетку. Это независимый characterization oracle именно для смены
- * traversal/state representation: формула отклонения намеренно та же.
+ * исходную сетку. Это независимый эталон смены представления состояния:
+ * формула отклонения намеренно оставлена прежней.
  */
 function bitmapReference(
   xs: readonly number[],
@@ -61,15 +61,15 @@ function rng(seed: number): () => number {
   };
 }
 
-describe('compositor RDP: ordered frontier ≡ bitmap representation', () => {
-  it('protected tangent остаётся обязательной даже на идеально прямой кривой', () => {
+describe('RDP композитора: монотонный фронтир эквивалентен bitmap', () => {
+  it('защищённая касательная обязательна даже на идеально прямой кривой', () => {
     const xs = [0, 0.25, 0.5, 0.75, 1];
     const ys = xs.map((x) => 1 + 2 * x);
     expect(douglasPeuckerVertical(xs, ys, 1e-12, 2)).toEqual([0, 2, 4]);
     expect(douglasPeuckerVertical(xs, ys, 1e-12)).toEqual([0, 4]);
   });
 
-  it('seeded non-uniform corpus сохраняет exact kept-indices с/без protected node', () => {
+  it('детерминированный неравномерный корпус сохраняет точные индексы с защищённым узлом и без него', () => {
     const random = rng(0x52d0_2026);
     let checks = 0;
     for (let caseIndex = 0; caseIndex < 1800; caseIndex++) {
@@ -97,7 +97,7 @@ describe('compositor RDP: ordered frontier ≡ bitmap representation', () => {
     expect(checks).toBe(1800);
   });
 
-  it('production spring grids с half-step anchor остаются exact', () => {
+  it('производственные пружинные сетки с промежуточной опорой остаются точными', () => {
     const random = rng(0x228_2026);
     let checks = 0;
     for (let caseIndex = 0; caseIndex < 240; caseIndex++) {
