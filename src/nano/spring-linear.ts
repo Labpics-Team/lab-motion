@@ -28,7 +28,9 @@ export function springLinear(input?: NanoSpring): [number, string] {
   // scale-equivalent m/k/c и не должно менять физику той же системы.
   const a = c / m / 2;
   const d = Math.sqrt(Math.abs(w * w - a * a));
-  const critical = d <= w * Math.sqrt(Number.EPSILON);
+  // Number.EPSILON = 2^-52 в binary64, поэтому его положительный корень
+  // представим точно как 2^-26 и не требует отдельного Math.sqrt на вызов.
+  const critical = d <= w * 2 ** -26;
   const under = a < w && !critical;
   const slow = under ? 0 : critical ? w : w * w / (a + d);
   const fast = under || critical ? 0 : -a - d;
