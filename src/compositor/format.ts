@@ -18,12 +18,16 @@
  * Тождество roundShortest(x,d) === String(Number(x.toFixed(d))) зафиксировано
  * дифф-тестом (фазз по x, обе точности d): compositor-cold-compile-differential.
  *
- * ПРЕДУСЛОВИЕ: d ≥ 1 (эмиссия зовёт d=4 и d=3). При d=0 у toFixed нет точки, и
- * regex `\.?0+$` съел бы ЦЕЛЫЕ хвостовые нули (roundShortest(100,0)→«1»), что с
- * String(Number) не совпадает — но такой вызов не существует и не нужен.
+ * ПРЕДУСЛОВИЕ: d ≥ 1 (эмиссия зовёт d=4 и d=3), поэтому у фикс-строки всегда
+ * есть десятичная точка. Хвост снимается одним обратным проходом без regex;
+ * при d=0 этот внутренний контракт не определён и такой вызов не существует.
  * @internal — экспорт только для дифф-теста, не часть публичного API ./compositor.
  */
 export function roundShortest(x: number, d: number): string {
-  const s = x.toFixed(d).replace(/\.?0+$/, '');
+  let s = x.toFixed(d);
+  let end = s.length;
+  while (s.charCodeAt(end - 1) === 48) end--;
+  if (s.charCodeAt(end - 1) === 46) end--;
+  s = s.slice(0, end);
   return s === '-0' ? '0' : s;
 }
