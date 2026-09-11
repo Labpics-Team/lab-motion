@@ -41,9 +41,9 @@ jobs:
             (cd "$side" && pnpm install --frozen-lockfile && pnpm build && pnpm size) > "motion-macro-evidence/$side-build-size.log" 2>&1
           done
           node motion-macro-evidence/prepare.mjs > motion-macro-evidence/prepare.log
-      - name: Fixed 512-block remaining proof
+      - name: Separate ownership of GC debt
         shell: bash
-        run: node motion-macro-evidence/timing.mjs > motion-macro-evidence/timing.log 2>&1
+        run: node motion-macro-evidence/owned-timing.mjs > motion-macro-evidence/owned-timing.log 2>&1
       - name: Read back immutable inputs
         if: always()
         shell: bash
