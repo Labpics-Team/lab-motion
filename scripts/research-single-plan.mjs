@@ -71,15 +71,20 @@ try {
   }
   writeFileSync(join(output,'characterization.json'),JSON.stringify(full,null,2));
   console.log('GOLDENS',JSON.stringify(report.goldens));
-  // Дополнительные положительные входы: внешний корпус преимущественно проверял отказы.
-  let positive = 0;
+  // Исходные parenthesized/negative входы сохранены как обязательные отказы.
+  // core.ts требует Literal и тривиа ровно "(" перед target; это не положительный домен.
+  let positive = 0, declined = 0;
   for (const count of [1,2,8,32,128]) for (const opacity of [-1,-0,0.25,0.5,1,2]) for (const newline of ['\n','\r\n']) {
-    const calls = Array.from({length:count},(_,i)=>`animate((sideEffect(${i}), card${i}), {opacity:${opacity}});`).join(newline);
-    const code = `import {animate} from '${NANO}';${newline}`+calls;
-    const ast = await parseAstAsync(code); const a = apply(baseline,ast,code);
-    assert.ok(a); assert.deepEqual(apply(candidate,ast,code),a); positive++;
+    for (const parenthesized of [true,false]) {
+      const calls = Array.from({length:count},(_,i)=>`animate(${parenthesized ? `(sideEffect(${i}), card${i})` : `resolveTarget(${i})`}, {opacity:${opacity}});`).join(newline);
+      const code = `import {animate} from '${NANO}';${newline}`+calls;
+      const ast = await parseAstAsync(code); const a = apply(baseline,ast,code);
+      if (parenthesized || opacity < 0) { assert.equal(a,undefined); declined++; }
+      else { assert.ok(a); positive++; }
+      assert.deepEqual(apply(candidate,ast,code),a);
+    }
   }
-  report.additionalPositiveDifferential = { cases:positive,mismatches:0 };
+  report.additionalDifferential = { positive,declined,mismatches:0 };
   save();
   const parseUrl = pathToFileURL(join(root,'node_modules/vite/dist/node/index.js')).href;
   const child = `import {performance} from 'node:perf_hooks';

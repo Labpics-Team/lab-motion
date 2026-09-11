@@ -1,4 +1,5 @@
 import { spawnSync } from 'node:child_process';
+import { createHash } from 'node:crypto';
 import { describe, expect, it } from 'vitest';
 import { parseAstAsync } from 'vite';
 import {
@@ -20,6 +21,47 @@ function transform(ast: AstNode, code: string) {
     parse: () => ast,
     warn: (message: string) => { throw new Error(message); },
   }, code, '/app/module.js');
+}
+
+// Characterization получен из immutable baseline 80264dc5, НЕ из кандидата:
+// run 34570770910 / artifact 10187698120, characterization.json.
+// Полные code/map защищены SHA256 без копий большого CSS-артефакта в тесте;
+// mappings сохранён явно, чтобы ошибка сегментов давала читаемый diff.
+const GOLDENS = {
+  'animate-surface-0': {
+    code: 'bfd6ea216b8baaba9dcc84a2ba946b9e959c264c1fdbcab18883176f380b7bcc',
+    mappings: 'AAAA;AACA;AACA,wBAAQ,IAAI,mwBAAiB;AAC7B;;;',
+    map: '375526f2bb47ca76cb821950166e24515e75ffb380b79cac47e2644437609290',
+  },
+  'animate-surface-1': {
+    code: 'e565adbcf4df90a57e46f11971d3530579cfb7c37ab60420942127b17f6437b9',
+    mappings: 'AAAA;AACA;AACA,wBAAQ,IAAI,mwBAAiB;AAC7B;;;',
+    map: 'c887245d88ed62b666ca4348c9ac6cb7054446530bdffe4a230a2d4d143aee79',
+  },
+  'nano-animate-0': {
+    code: '82052a25f810c6b50de4435adb85d0d439627673461eb5bb2e2854ca932b2e48',
+    mappings: 'AAAA;AACA;AACA;AACA,mBAAQ,KAAK,ijIAA+C;;;',
+    map: '5bf2b56c118076441536609f2632cf9ca052c60b43bcd31d9deaafcbfb55ac62',
+  },
+  'nano-animate-1': {
+    code: '2d8d8778a5f0ce37a91894a3c804ac668a183600e071e18cfb0115df0dd54672',
+    mappings: 'AAAA;AACA;AACA;AACA,mBAAQ,KAAK,ijIAA+C;;;',
+    map: '6f07f102a1abed501f6e73c55846567cb00a3eba99b8449f182b00dbd6566ad5',
+  },
+  nested: {
+    code: '799ada9a37ce604cbc3cadcd2c73bfe44f2df19e49b280b6905611a78714516f',
+    mappings: 'AAAA;AACA,wBAAQ,wBAAQ,IAAI,qwBAAmB,mwBAAiB;;;',
+    map: '374f369b966ba23aaabbda1e2d9c63d76c73618bfd0d9fe769f5370d8c4c908f',
+  },
+};
+const sha256 = (text: string): string => createHash('sha256').update(text).digest('hex');
+function assertExact(
+  result: NonNullable<ReturnType<typeof transform>>,
+  expected: { code: string; mappings: string; map: string },
+): void {
+  expect(sha256(result.code)).toBe(expected.code);
+  expect(result.map.mappings).toBe(expected.mappings);
+  expect(sha256(JSON.stringify(result.map))).toBe(expected.map);
 }
 
 describe('единственный применимый lowering-план', () => {
@@ -48,7 +90,7 @@ describe('единственный применимый lowering-план', () =
         `import { animate as ${nano} } from '${NANO}';`,
         `import { animate as ${surface} } from '${SURFACE}';`,
       ];
-      for (const ordered of [imports, [...imports].reverse()]) {
+      for (const [index, ordered] of [imports, [...imports].reverse()].entries()) {
         const code = ordered.join('\n') + '\n' + BODY;
         const ast = await parseAstAsync(code) as unknown as AstNode;
         const plans = [
@@ -65,6 +107,7 @@ describe('единственный применимый lowering-план', () =
           expect(result!.code).toContain(`from "@labpics/motion${expectedSource}";`);
           expect(result!.map.mappings.split(';').length).toBe(result!.code.split('\n').length);
           expect(result!.map.mappings.split(';').slice(-2)).toEqual(['', '']);
+          assertExact(result!, GOLDENS[`${nano}-${surface}-${index}` as keyof typeof GOLDENS]);
         }
       }
     }
@@ -80,6 +123,7 @@ describe('единственный применимый lowering-план', () =
     const result = transform(ast, code);
     expect(result).toBeDefined();
     expect(result!.code.match(/__labMotionNanoCompiled\(/g)).toHaveLength(2);
+    assertExact(result!, GOLDENS.nested);
     expect(traversals).toBeGreaterThan(0);
     expect(traversals).toBeLessThanOrEqual(2);
 
@@ -87,5 +131,12 @@ describe('единственный применимый lowering-план', () =
     const before = traversals;
     expect(planSurfaceLowering(ast, code)).toBeUndefined();
     expect(traversals).toBe(before + 1);
+
+    // Оба мутанта сохраняют число строк/вызовов, но точный oracle обязан их ловить.
+    expect(() => assertExact({ ...result!, code: result!.code.replace('card', 'panel') }, GOLDENS.nested)).toThrow();
+    expect(() => assertExact({
+      ...result!,
+      map: { ...result!.map, mappings: result!.map.mappings.replace('wBAAQ', 'yBAAQ') },
+    }, GOLDENS.nested)).toThrow();
   });
 });
