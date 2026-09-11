@@ -5,7 +5,7 @@
  * парсит модуль штатным `this.parse` (acorn Rollup), передаёт ESTree ядру
  * (§13.5: ядро parse-независимо) и применяет байтовые правки.
  *
- * Sourcemap строится двухуказательным проходом по отсортированным правкам:
+ * Sourcemap строится по границам правок и LF, без посимвольного JS-прохода:
  * сохранённые байты исходника идут сегмент-в-сегмент (включая многострочные
  * вызовы, чьи правки СХЛОПЫВАЮТ строки), замена целиком отображается в начало
  * своей правки, а дописанный в конец hoisted-импорт executor остаётся
@@ -96,12 +96,13 @@ function buildMap(
     previousLine = originalLine;
     previousColumn = originalColumn;
   };
-  /** Продвинуть исходник; kept=true синхронно продвигает generated-позицию. */
+  /** Продвинуть непустой диапазон; kept=true синхронно двигает generated-позицию. */
   const advance = (from: number, to: number, kept: boolean): void => {
+    if (from >= to) return;
+    if (kept) segment();
     let cursor = from;
-    for (;;) {
-      const newline = code.indexOf('\n', cursor);
-      if (newline < 0 || newline >= to) break;
+    let newline: number;
+    while ((newline = code.indexOf('\n', cursor)) >= 0 && newline < to) {
       if (kept) {
         genColumn += newline - cursor;
         mappings += ';';
@@ -120,19 +121,13 @@ function buildMap(
   };
   let cursor = 0;
   for (const edit of edits) {
-    if (cursor < edit.start) {
-      segment();
-      advance(cursor, edit.start, true);
-    }
+    advance(cursor, edit.start, true);
     segment();
     genColumn += edit.replacement.length;
     advance(edit.start, edit.end, false);
     cursor = edit.end;
   }
-  if (cursor < code.length) {
-    segment();
-    advance(cursor, code.length, true);
-  }
+  advance(cursor, code.length, true);
   // Хвост '\nimport ...;\n': обе новые generated-строки не имеют source mapping.
   mappings += ';;';
   return {
