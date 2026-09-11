@@ -71,6 +71,18 @@ describe('nano springLinear: binary64 underdamped envelope', () => {
     expectBitExact({ mass: 1, stiffness: 1, damping: 2 * a });
   });
 
+  it('литерал корня сетки бит-в-бит равен старой формуле и ловит сдвиг на ULP', () => {
+    const root = Math.sqrt(8 * EPSILON);
+    const literal = 0.08944271909999159;
+    expect(Object.is(literal, root)).toBe(true);
+
+    // Один соседний double уже способен изменить ceil на целой границе grid.
+    const lowerNeighbor = 0.08944271909999157;
+    expect(Object.is(lowerNeighbor, root)).toBe(false);
+    expect(Math.ceil(root * 107 / literal)).toBe(107);
+    expect(Math.ceil(root * 107 / lowerNeighbor)).toBe(108);
+  });
+
   it('держит seeded-класс обоих settle bounds без расхождений', () => {
     let seed = 0x6e61_6e6f;
     const random = () => (seed = (Math.imul(seed, 1_664_525) + 1_013_904_223) >>> 0)
