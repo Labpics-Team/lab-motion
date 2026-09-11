@@ -3,7 +3,7 @@ import { douglasPeuckerVertical } from '../src/compositor/segmenter.js';
 
 /**
  * Независимое рекурсивное определение RDP: объединяет упорядоченные половины.
- * Не знает о production-стеке, bitmap или направлении обхода.
+ * Не знает о производственном стеке, bitmap или направлении обхода.
  */
 function reference(xs: readonly number[], ys: readonly number[], eps: number, anchor = -1): number[] {
   if (xs.length === 0) return [];
@@ -54,7 +54,7 @@ describe('RDP: монотонный фронтир без bitmap исходно�
     }
   });
 
-  it('сохраняет концы, строгий threshold и первый argmax при равных отклонениях', () => {
+  it('сохраняет концы, строгий порог и первый максимум при равных отклонениях', () => {
     expect(douglasPeuckerVertical([], [], 0)).toEqual([]);
     expect(douglasPeuckerVertical([0], [1], 0)).toEqual([0]);
     expect(douglasPeuckerVertical([0, 1], [2, 3], 0)).toEqual([0, 1]);
@@ -62,9 +62,8 @@ describe('RDP: монотонный фронтир без bitmap исходно�
     const ys = [0, 1, 1, 0];
     expect(douglasPeuckerVertical(xs, ys, 1)).toEqual([0, 3]);
     expect(douglasPeuckerVertical(xs, ys, 1 - Number.EPSILON)).toEqual([0, 1, 3]);
-    // Последний argmax дал бы [0, 2, 3], equality-split добавил бы лишнюю точку.
+    // Последний максимум дал бы [0, 2, 3], а разделение при равенстве добавило бы лишнюю точку.
     expect(reference(xs, ys, 1 - Number.EPSILON)).toEqual([0, 1, 3]);
-    expect(reference(xs, ys, 1 - Number.EPSILON)).not.toEqual([0, 2, 3]);
   });
 
   it('защищённый узел разделяет независимые области даже на прямой', () => {
@@ -75,7 +74,7 @@ describe('RDP: монотонный фронтир без bitmap исходно�
     }
   });
 
-  it('не выделяет bitmap; положительный контроль действительно видит typed allocation', () => {
+  it('не выделяет bitmap; положительный контроль видит выделение Uint8Array', () => {
     const Native = Uint8Array;
     let allocations = 0;
     const observed = new Proxy(Native, {
