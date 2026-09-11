@@ -53,9 +53,9 @@ jobs:
           (cd base && pnpm size) | tee base-size.log
           (cd candidate && pnpm size) | tee candidate-size.log
           (cd candidate && pnpm exec vitest run test/compiler-source-map.test.ts)
-      - name: Full proof and calibrated remaining dimensions
+      - name: Full proof from verified archived blob
         working-directory: candidate
-        run: node scripts/research-map-owner.mjs ../base ../rejected
+        run: node scripts/research-owner-run.mjs ../base ../rejected
       - name: Preserve all evidence
         if: always()
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
