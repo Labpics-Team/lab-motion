@@ -63,69 +63,78 @@ function vlq(value: number): string {
 }
 
 /**
- * Карта меняется только на границах строк и правок. Один монотонный курсор
- * LF заменяет посимвольный JS-обход; плоский буфер сегментов материализует
- * строку одним join, не удерживая цепочку конкатенаций в результате.
- * Построение текста остаётся за applyEdits и не смешивается с обходом карты.
+ * Точная карта версии 3 для applyEdits того же списка правок: генерируемый и
+ * исходный курсоры идут парой; правка продвигает исходный курсор (возможно,
+ * через строки — многострочный вызов), а генерируемый — на длину замены.
+ * Замены не содержат '\n' по построению (артефакт-литерал одной строкой) —
+ * нарушение равно ошибке сборки, не тихой порче карты.
  */
 function buildMap(
   code: string,
   edits: readonly NanoLoweringEdit[],
   id: string,
 ): TransformResult['map'] {
-  const mappings: string[] = [];
-  let separator = '';
+  for (const edit of edits) {
+    if (edit.replacement.includes('\n')) {
+      throw new Error('lab-motion compiler: замена не может содержать перевод строки');
+    }
+  }
+  const groups: string[][] = [[]];
   let genColumn = 0;
   let originalLine = 0;
   let originalColumn = 0;
   let previousGenColumn = 0;
   let previousLine = 0;
   let previousColumn = 0;
-  let lineEnd = code.indexOf('\n');
   const segment = (): void => {
-    mappings.push(separator + vlq(genColumn - previousGenColumn) + vlq(0)
-      + vlq(originalLine - previousLine) + vlq(originalColumn - previousColumn));
-    separator = ',';
+    groups.at(-1)!.push(
+      vlq(genColumn - previousGenColumn) + vlq(0) +
+      vlq(originalLine - previousLine) + vlq(originalColumn - previousColumn),
+    );
     previousGenColumn = genColumn;
     previousLine = originalLine;
     previousColumn = originalColumn;
   };
-  /** Удалённый диапазон меняет только исходные координаты, не строку результата. */
-  const advance = (from: number, to: number, keep: boolean): void => {
-    if (keep && from < to) segment();
-    while (lineEnd >= 0 && lineEnd < to) {
-      if (keep) {
-        mappings.push(';');
-        separator = '';
+  /** Пройти сохранённый диапазон исходника: оба курсора синхронно. */
+  const keep = (from: number, to: number): void => {
+    if (from < to) segment();
+    for (let index = from; index < to; index++) {
+      if (code.charCodeAt(index) === 10) {
+        groups.push([]);
         genColumn = 0;
         previousGenColumn = 0;
+        originalLine++;
+        originalColumn = 0;
+        if (index + 1 < to) segment();
+      } else {
+        genColumn++;
+        originalColumn++;
       }
-      originalLine++;
-      originalColumn = 0;
-      from = lineEnd + 1;
-      if (keep && from < to) segment();
-      lineEnd = code.indexOf('\n', from);
     }
-    originalColumn += to - from;
-    if (keep) genColumn += to - from;
+  };
+  /** Пройти правку: исходный курсор до edit.end, замена — в генерируемый. */
+  const splice = (edit: NanoLoweringEdit): void => {
+    segment();
+    genColumn += edit.replacement.length;
+    for (let index = edit.start; index < edit.end; index++) {
+      if (code.charCodeAt(index) === 10) {
+        originalLine++;
+        originalColumn = 0;
+      } else originalColumn++;
+    }
   };
   let cursor = 0;
   for (const edit of edits) {
-    if (edit.replacement.includes('\n')) {
-      throw new Error('lab-motion compiler: замена не может содержать перевод строки');
-    }
-    advance(cursor, edit.start, true);
-    segment();
-    genColumn += edit.replacement.length;
-    advance(edit.start, edit.end, false);
+    keep(cursor, edit.start);
+    splice(edit);
     cursor = edit.end;
   }
-  advance(cursor, code.length, true);
-  // Хвост '\nimport ...;\n': две новые группы не отображаются в исходник.
-  mappings.push(';;');
+  keep(cursor, code.length);
+  // Хвост '\nimport ...;\n': обе новые группы не отображаются в исходник.
+  groups.push([], []);
   return {
     version: 3,
-    mappings: mappings.join(''),
+    mappings: groups.map((group) => group.join(',')).join(';'),
     sources: [id],
     sourcesContent: [code],
     names: [],
