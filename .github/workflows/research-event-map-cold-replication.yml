@@ -1,0 +1,69 @@
+name: Source map owner proof
+
+on:
+  push:
+    branches: ['research/event-map-cold-replication-20260911']
+
+permissions:
+  contents: read
+
+defaults:
+  run:
+    shell: bash
+
+jobs:
+  proof:
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    steps:
+      - name: Exact evidence head
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          path: candidate
+          fetch-depth: 0
+          persist-credentials: false
+      - name: Scientific base
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          ref: ecfa6beb90bb116b47f1641d8edbeac0b2d9bb9f
+          path: base
+          fetch-depth: 0
+          persist-credentials: false
+      - name: Rejected positive control
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          ref: 5d3c1b8857606354cc1662e1c2ed0165a458439d
+          path: rejected
+          persist-credentials: false
+      - name: Node
+        uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v6
+        with:
+          node-version: '24'
+      - name: Pinned package manager
+        run: |
+          corepack enable
+          corepack install --global pnpm@11.11.0
+      - name: Frozen canonical builds
+        run: |
+          (cd base && pnpm install --frozen-lockfile && pnpm build)
+          (cd candidate && pnpm install --frozen-lockfile && pnpm build)
+          (cd rejected && pnpm install --frozen-lockfile && pnpm build)
+      - name: Canonical sizes and oracle
+        run: |
+          (cd base && pnpm size) | tee base-size.log
+          (cd candidate && pnpm size) | tee candidate-size.log
+          (cd candidate && pnpm exec vitest run test/compiler-source-map.test.ts)
+      - name: Full proof and calibrated remaining dimensions
+        working-directory: candidate
+        run: node scripts/research-map-owner.mjs ../base ../rejected
+      - name: Preserve all evidence
+        if: always()
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
+        with:
+          name: map-owner-proof-${{ github.sha }}
+          path: |
+            candidate/reports/event-map/
+            base-size.log
+            candidate-size.log
+          if-no-files-found: error
+          retention-days: 30
