@@ -123,11 +123,11 @@ export function tryCompileSurfaceArtifact(
     return undefined;
   }
 
-  // Один stop задаёт общую позицию обеих кривых. join материализует строки
-  // перед возвратом вместо удержания цепочки промежуточных конкатенаций.
+  // Общая позиция узла сериализуется один раз для обеих кривых. Прежняя
+  // форма возврата не переносит полное чтение CSS в построение артефакта.
   const blendSamples: number[] = [];
-  const reciprocalStops: string[] = [];
-  const blendStops: string[] = [];
+  let reciprocalEasing = 'linear(';
+  let blendEasing = 'linear(';
   const stopCount = reciprocal.length / 2;
   for (let i = 0; i < stopCount; i++) {
     const percent = reciprocal[i * 2];
@@ -135,12 +135,12 @@ export function tryCompileSurfaceArtifact(
     const x = percent / 100;
     const a = (3 - 2 * x) * x * x;
     blendSamples.push(a);
-    const position = ` ${percent}%`;
-    reciprocalStops.push(q + position);
-    blendStops.push(a + position);
+    const position = ` ${percent}%${i < stopCount - 1 ? ', ' : ''}`;
+    reciprocalEasing += q + position;
+    blendEasing += a + position;
   }
-  const reciprocalEasing = `linear(${reciprocalStops.join(', ')})`;
-  const blendEasing = `linear(${blendStops.join(', ')})`;
+  reciprocalEasing += ')';
+  blendEasing += ')';
 
   return {
     easing,
