@@ -20,6 +20,7 @@ import {
   DEFAULT_TOLERANCE,
   validateTolerance,
   type SpringSerializedSamples,
+  type SpringExecutionArtifactTuple,
 } from '../compositor/curve.js';
 
 /** V1 acceptance budget движущейся границы и сопряжения, CSS px. */
@@ -91,8 +92,12 @@ export function tryCompileSurfaceArtifact(
     };
   }
 
-  const tuple = tryCompileSpringTuple(spring, tolerance, initialVelocity);
-  if (tuple === undefined) return undefined;
+  let tuple: SpringExecutionArtifactTuple;
+  try {
+    tuple = compileSpringExecutionArtifactTupleUnchecked(spring, initialVelocity, tolerance);
+  } catch {
+    return undefined;
+  }
   const easing = tuple[0];
   const samples = tuple[1];
   const durationMs = tuple[2];
@@ -118,10 +123,11 @@ export function tryCompileSurfaceArtifact(
     return undefined;
   }
 
-  // Один проход: Q-stops → обе linear()-строки (reciprocal и blend A).
+  // Один stop задаёт общую позицию обеих кривых. join материализует строки
+  // перед возвратом вместо удержания цепочки промежуточных конкатенаций.
   const blendSamples: number[] = [];
-  let reciprocalEasing = 'linear(';
-  let blendEasing = 'linear(';
+  const reciprocalStops: string[] = [];
+  const blendStops: string[] = [];
   const stopCount = reciprocal.length / 2;
   for (let i = 0; i < stopCount; i++) {
     const percent = reciprocal[i * 2];
@@ -129,12 +135,12 @@ export function tryCompileSurfaceArtifact(
     const x = percent / 100;
     const a = (3 - 2 * x) * x * x;
     blendSamples.push(a);
-    const separator = i < stopCount - 1 ? ', ' : '';
-    reciprocalEasing += `${q} ${percent}%${separator}`;
-    blendEasing += `${a} ${percent}%${separator}`;
+    const position = ` ${percent}%`;
+    reciprocalStops.push(q + position);
+    blendStops.push(a + position);
   }
-  reciprocalEasing += ')';
-  blendEasing += ')';
+  const reciprocalEasing = `linear(${reciprocalStops.join(', ')})`;
+  const blendEasing = `linear(${blendStops.join(', ')})`;
 
   return {
     easing,
@@ -148,19 +154,6 @@ export function tryCompileSurfaceArtifact(
     fromWidth,
     toWidth,
   };
-}
-
-function tryCompileSpringTuple(
-  spring: SpringParams,
-  tolerance: number,
-  v0: number,
-): [string, SpringSerializedSamples, number] | undefined {
-  try {
-    const tuple = compileSpringExecutionArtifactTupleUnchecked(spring, v0, tolerance);
-    return [tuple[0], tuple[1], tuple[2]];
-  } catch {
-    return undefined;
-  }
 }
 
 /**
@@ -194,28 +187,26 @@ function buildReciprocalUnchecked(
   };
   const qAt = (w: number): number => (1 / w - 1 / fromWidth) / delta;
 
-  // err-bound на сегменте [a,b] (percent): W линеен, β = ΔW/h.
-  const segmentErrorPx = (percentA: number, percentB: number, i: number): number => {
-    const h = percentB - percentA;
-    const wA = widthAt(percentA, i);
-    const wB = widthAt(percentB, i);
-    const beta = Math.abs(wB - wA) / h;
-    const wMin = Math.min(wA, wB);
-    if (wMin <= 0) return Number.POSITIVE_INFINITY;
-    const maxW = Math.max(wA, wB);
-    const contentW = Math.max(fromWidth, toWidth);
-    const qErr = (h * h / 8) * (2 * beta * beta) / (wMin * wMin * wMin) / Math.abs(delta);
-    return maxW * contentW * Math.abs(delta) * qErr;
-  };
-
-  const out: number[] = [];
+  // Общая граница и её ширина принадлежат предыдущему сегменту. Это исключает
+  // повторные вычисления ширины и вторую копию точки в Q, A и обеих CSS-строках.
+  let a = 0;
+  let wA = fromWidth;
+  // P(0)=0 ⇒ W(0)=fromWidth ⇒ Q(0)=0/Δ; деление сохраняет прежний -0.
+  const out: number[] = [a, 0 / delta];
   for (let i = 0; i < count - 1; i++) {
-    let a = samples[i * 2];
-    out.push(a, qAt(widthAt(a, i)));
     const stack: number[] = [samples[(i + 1) * 2]];
     while (stack.length > 0) {
       const b = stack.pop()!;
-      if (segmentErrorPx(a, b, i) > budgetPx) {
+      // Левый конец уже проверен. Правый вычисляется один раз для сертификата,
+      // Q и следующего интервала; арифметика прежнего бонда не переставляется.
+      const wB = widthAt(b, i);
+      const h = b - a;
+      const beta = Math.abs(wB - wA) / h;
+      const wMin = Math.min(wA, wB);
+      const maxW = Math.max(wA, wB);
+      const contentW = Math.max(fromWidth, toWidth);
+      const qErr = (h * h / 8) * (2 * beta * beta) / (wMin * wMin * wMin) / Math.abs(delta);
+      if (wMin <= 0 || maxW * contentW * Math.abs(delta) * qErr > budgetPx) {
         const mid = (a + b) / 2;
         // Дальше делить некуда, а бюджет не выполнен: доказательство
         // невозможно в double — fail-closed до крупных аллокаций.
@@ -223,9 +214,11 @@ function buildReciprocalUnchecked(
         stack.push(b, mid);
         continue;
       }
-      if (out.length / 2 >= RECIPROCAL_MAX_STOPS) return undefined;
-      out.push(b, qAt(widthAt(b, i)));
+      // i общих границ больше не храним, но прежний admission-cap сохраняем.
+      if (out.length / 2 + i >= RECIPROCAL_MAX_STOPS) return undefined;
+      out.push(b, qAt(wB));
       a = b;
+      wA = wB;
     }
   }
   return Float64Array.from(out);
