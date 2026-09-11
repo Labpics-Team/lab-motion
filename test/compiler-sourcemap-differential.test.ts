@@ -137,4 +137,39 @@ describe('compiler sourcemap — boundary/LF representation', () => {
     const { plan, result } = await lowered(code, id);
     expect(result.map).toEqual(characterMap(code, plan.edits, id));
   });
+
+  it('сканирует LF монотонно и не возвращается к посимвольному JS-проходу', async () => {
+    const calls = Array.from({ length: 24 }, () => 'animate(card, { opacity: 1 });').join(' ');
+    const code = `import { animate } from '${NANO}';\n/*${'z'.repeat(16_384)}*/\nconst card = {};\n${calls}\n`;
+    const ast = await parseAstAsync(code) as unknown as AstNode;
+    const nativeIndexOf = String.prototype.indexOf;
+    const nativeCharCodeAt = String.prototype.charCodeAt;
+    let newlineSearches = 0;
+    let codeUnitReads = 0;
+    String.prototype.indexOf = function indexOf(searchString: string, position?: number): number {
+      if (String(this) === code && searchString === '\n') newlineSearches++;
+      return nativeIndexOf.call(this, searchString, position);
+    };
+    String.prototype.charCodeAt = function charCodeAt(index: number): number {
+      if (String(this) === code) codeUnitReads++;
+      return nativeCharCodeAt.call(this, index);
+    };
+    try {
+      // Положительный контроль: счётчик действительно видит запрещённый класс работы.
+      code.charCodeAt(0);
+      expect(codeUnitReads).toBe(1);
+      codeUnitReads = 0;
+
+      const result = motionCompiler().transform.call({
+        parse: () => ast,
+        warn: (message: string) => { throw new Error(message); },
+      }, code, '/app/scan-law.js');
+      expect(result).toBeDefined();
+    } finally {
+      String.prototype.indexOf = nativeIndexOf;
+      String.prototype.charCodeAt = nativeCharCodeAt;
+    }
+    expect(codeUnitReads).toBe(0);
+    expect(newlineSearches).toBe(code.split('\n').length);
+  });
 });
