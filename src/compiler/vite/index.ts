@@ -96,13 +96,16 @@ function buildMap(
     previousLine = originalLine;
     previousColumn = originalColumn;
   };
+  // Курсор LF общий для всех последовательных диапазонов: один и тот же
+  // хвост исходника не сканируется повторно на каждой границе правки.
+  let nextNewline = code.indexOf('\n');
   /** Продвинуть непустой диапазон; kept=true синхронно двигает generated-позицию. */
   const advance = (from: number, to: number, kept: boolean): void => {
     if (from >= to) return;
     if (kept) segment();
     let cursor = from;
-    let newline: number;
-    while ((newline = code.indexOf('\n', cursor)) >= 0 && newline < to) {
+    while (nextNewline >= 0 && nextNewline < to) {
+      const newline = nextNewline;
       if (kept) {
         genColumn += newline - cursor;
         mappings += ';';
@@ -113,6 +116,7 @@ function buildMap(
       originalLine++;
       originalColumn = 0;
       cursor = newline + 1;
+      nextNewline = code.indexOf('\n', cursor);
       if (kept && cursor < to) segment();
     }
     const tail = to - cursor;
