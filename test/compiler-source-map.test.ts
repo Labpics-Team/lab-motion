@@ -156,14 +156,17 @@ describe('карта правок совпадает с независимыми
   it('positive controls ловят внутренний сегмент, текст и потерю unmapped-хвоста', async () => {
     const { actual, expected } = await observed(`${nanoImport}\nanimate(\nel,\n{ opacity: 1 }\n);\n`);
     expect(actual).toEqual(expected);
-    const damaged = structuredClone(actual!);
-    const comma = damaged.map.mappings.indexOf(',');
+    const mappings = actual!.map.mappings;
+    const comma = mappings.indexOf(',');
     expect(comma).toBeGreaterThanOrEqual(0);
     const at = comma + 1;
-    const replacement = damaged.map.mappings[at] === 'A' ? 'C' : 'A';
-    damaged.map.mappings = damaged.map.mappings.slice(0, at) + replacement + damaged.map.mappings.slice(at + 1);
+    const replacement = mappings[at] === 'A' ? 'C' : 'A';
+    const damaged = { ...actual, map: { ...actual!.map,
+      mappings: mappings.slice(0, at) + replacement + mappings.slice(at + 1),
+    } };
     expect(damaged).not.toEqual(expected);
-    expect({ ...actual, code: actual!.code.replace('el', 'other') }).not.toEqual(expected);
-    expect({ ...actual, map: { ...actual!.map, mappings: actual!.map.mappings.slice(0, -1) } }).not.toEqual(expected);
+    expect(actual!.code).toContain('Compiled(el');
+    expect({ ...actual, code: actual!.code.replace('Compiled(el', 'Compiled(other') }).not.toEqual(expected);
+    expect({ ...actual, map: { ...actual!.map, mappings: mappings.slice(0, -1) } }).not.toEqual(expected);
   });
 });

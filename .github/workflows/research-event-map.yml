@@ -5,11 +5,15 @@ on:
     paths:
       - src/compiler/vite/index.ts
       - test/compiler-source-map.test.ts
-      - scripts/research-event-map.mjs
+      - scripts/research-event-map-cold.mjs
       - .github/workflows/research-event-map.yml
 
 permissions:
   contents: read
+
+defaults:
+  run:
+    shell: bash
 
 concurrency:
   group: research-event-map-${{ github.event.pull_request.number }}
@@ -60,14 +64,14 @@ jobs:
       - name: Independent positional oracle
         working-directory: candidate
         run: pnpm exec vitest run test/compiler-source-map.test.ts
-      - name: Paired proof and deliberate controls
+      - name: Only remaining cold and build proof
         working-directory: candidate
-        run: node scripts/research-event-map.mjs ../base
+        run: node scripts/research-event-map-cold.mjs ../base
       - name: Evidence
         if: always()
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
         with:
-          name: event-map-proof-${{ github.event.pull_request.head.sha }}
+          name: event-map-cold-${{ github.event.pull_request.head.sha }}
           path: |
             candidate/reports/event-map/
             base-size.log
