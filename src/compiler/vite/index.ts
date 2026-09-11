@@ -173,8 +173,8 @@ export function motionCompiler(): MotionCompilerPlugin {
         return undefined;
       }
       const ast = program as AstNode;
-      // Оба planner требуют direct import с одним local BindingName animate.
-      // Валидный ESM не может объявить его дважды, поэтому план максимум один;
+      // Оба планировщика требуют прямой импорт с одним локальным именем `animate`.
+      // Валидный ESM не может объявить его дважды, поэтому применим максимум один план;
       // его правки уже отсортированы ядром, в том числе для вложенных вызовов.
       const plan = planNanoOpacityLowering(ast, code, nanoDefaultArtifactLiteral)
         ?? planSurfaceLowering(ast, code);
