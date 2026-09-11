@@ -2,13 +2,16 @@ import {
   mkdirSync,
   mkdtempSync,
   rmSync,
+  readFileSync,
   symlinkSync,
   unlinkSync,
   writeFileSync,
 } from 'node:fs';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
-import { afterEach, describe, expect, it } from 'vitest';
+import { execFileSync } from 'node:child_process';
+import { createHash } from 'node:crypto';
+import { afterEach, describe, expect, it, vi } from 'vitest';
 import {
   assertBenchmarkExportSurface,
   assertFileHashesUnchanged,
@@ -18,14 +21,41 @@ import {
   hashFileTree,
   prepareBenchmarkCheckout,
   captureBenchmarkEnvironment,
+  readCheckoutState,
+  revisionFingerprint,
   sha256File,
 } from '../bench/compare/provenance.mjs';
 
+vi.mock('node:child_process', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('node:child_process')>();
+  return { ...actual, execFileSync: vi.fn(actual.execFileSync) };
+});
+
 const cleanup: string[] = [];
 
+function isolateGitEnvironment() {
+  const directory = mkdtempSync(path.join(tmpdir(), 'lab-motion-git-environment-'));
+  cleanup.push(directory);
+  // Изоляция охватывает и fixture, и production-helper, который читает её checkout.
+  for (const key of Object.keys(process.env)) {
+    if (key.startsWith('GIT_')) vi.stubEnv(key, undefined);
+  }
+  vi.stubEnv('GIT_CONFIG_GLOBAL', path.join(directory, 'no-global-config'));
+  vi.stubEnv('GIT_CONFIG_SYSTEM', path.join(directory, 'no-system-config'));
+  vi.stubEnv('GIT_CONFIG_NOSYSTEM', '1');
+  vi.stubEnv('GIT_ATTR_NOSYSTEM', '1');
+  vi.stubEnv('GIT_TERMINAL_PROMPT', '0');
+  vi.stubEnv('GIT_TEMPLATE_DIR', directory);
+}
+
 afterEach(() => {
-  for (const directory of cleanup.splice(0)) {
-    rmSync(directory, { recursive: true, force: true });
+  try {
+    for (const directory of cleanup.splice(0)) {
+      rmSync(directory, { recursive: true, force: true });
+    }
+  } finally {
+    vi.resetAllMocks();
+    vi.unstubAllEnvs();
   }
 });
 
@@ -58,7 +88,242 @@ function fixture() {
   return { root, benchDirectory, distDirectory, state };
 }
 
-describe('benchmark provenance', () => {
+function checkoutFixture(autocrlf = false) {
+  isolateGitEnvironment();
+  const directory = mkdtempSync(path.join(tmpdir(), 'lab-motion-tracked-proof-'));
+  cleanup.push(directory);
+  const source = path.join(directory, 'source');
+  const root = path.join(directory, 'checkout');
+  mkdirSync(source);
+  const git = (cwd: string, args: string[]) => execFileSync('git', args, {
+    cwd, encoding: 'utf8', stdio: ['ignore', 'pipe', 'pipe'], timeout: 10_000,
+  });
+  git(source, ['init', '--quiet']);
+  git(source, ['config', 'core.autocrlf', 'false']);
+  writeFileSync(path.join(source, '.gitignore'), 'dist/\n');
+  writeFileSync(path.join(source, 'package.json'), JSON.stringify({ name: 'fixture', exports: { './animate': './dist/animate/index.js' } }) + '\n');
+  writeFileSync(path.join(source, 'pnpm-lock.yaml'), 'fixture-lock\n');
+  writeFileSync(path.join(source, 'source.js'), 'export const value = 1;\n');
+  writeFileSync(path.join(source, 'binary.bin'), Buffer.from([0, 10, 1]));
+  git(source, ['add', '.']);
+  git(source, ['-c', 'user.name=Benchmark test', '-c', 'user.email=benchmark@example.invalid',
+    '-c', `core.hooksPath=${path.join(directory, 'no-hooks')}`, 'commit', '--quiet', '-m', 'fixture']);
+  git(directory, ['clone', '--quiet', '--no-hardlinks', '--config', `core.autocrlf=${autocrlf}`, source, root]);
+  mkdirSync(path.join(root, 'dist', 'animate'), { recursive: true });
+  writeFileSync(path.join(root, 'dist', 'animate', 'index.js'), 'runtime');
+  return { root, git: (args: string[]) => git(root, args), prepare: {
+    root, benchDirectory: root, requiredDist: ['dist/animate/index.js'],
+    captureEnvironment: () => ({ node: 'v24.0.0', pnpm: '11.11.0', packages: {} }),
+  } };
+}
+
+// Реальные Git-процессы конкурируют с полным набором тестов; это watchdog, не бюджет бенчмарка.
+describe('benchmark provenance', { timeout: 30_000 }, () => {
+  it('isolates the real checkout from a hostile global attributes file', () => {
+    const directory = mkdtempSync(path.join(tmpdir(), 'lab-motion-hostile-git-'));
+    cleanup.push(directory);
+    const attributes = path.join(directory, 'attributes');
+    const config = path.join(directory, 'gitconfig');
+    writeFileSync(attributes, 'source.js -text\n');
+    writeFileSync(config, `[core]\nattributesFile = "${attributes.replaceAll('\\', '/')}"\n`);
+    vi.stubEnv('GIT_CONFIG_GLOBAL', config);
+    const f = checkoutFixture(true);
+    expect(f.git(['ls-files', '--eol', '--', 'source.js'])).toContain('w/crlf');
+    expect(() => prepareBenchmarkCheckout({ ...f.prepare, build() {} })).not.toThrow();
+  });
+
+  it('uses the portable OID-only batch protocol without requiring Git -Z', () => {
+    const f = checkoutFixture();
+    const exec = vi.mocked(execFileSync);
+    exec.mockClear();
+    expect(readCheckoutState(f.root).trackedRevisionSha256)
+      .toBe('6c85545764a91d47528b8eb7f790ee2525371bfb9341e8d8c8c42f31c8b39ae0');
+    expect(exec).toHaveBeenCalledWith('git', ['--no-replace-objects', 'cat-file', '--batch'],
+      expect.objectContaining({ input: expect.stringMatching(/^(?:[a-f0-9]{40}\n)+$/) }));
+  });
+
+  it('hashes successive bounded object batches without retaining the whole revision output', () => {
+    const f = checkoutFixture();
+    for (let index = 0; index < 128; index++) {
+      writeFileSync(path.join(f.root, `entry-${index}.txt`), `payload ${index}\n`);
+    }
+    f.git(['add', '.']);
+    f.git(['-c', 'user.name=Benchmark test', '-c', 'user.email=benchmark@example.invalid',
+      '-c', `core.hooksPath=${path.join(f.root, 'no-hooks')}`, 'commit', '--quiet', '-m', 'multiple batches']);
+    const expected = createHash('sha256');
+    for (const name of f.git(['ls-files', '-z']).split('\0').filter(Boolean).sort()) {
+      expected.update(name).update('\0').update(readFileSync(path.join(f.root, name))).update('\0');
+    }
+    const exec = vi.mocked(execFileSync);
+    exec.mockClear();
+    expect(readCheckoutState(f.root).trackedRevisionSha256).toBe(expected.digest('hex'));
+    const batches = exec.mock.calls.filter(([, args]) => args?.includes('cat-file'));
+    expect(batches).toHaveLength(2);
+    for (const [, , options] of batches) {
+      expect(String(options?.input).trim().split('\n').length).toBeLessThanOrEqual(128);
+    }
+  });
+
+  it.each(['extra-field', 'exponent-size', 'empty-size', 'CR-size'] as const)(
+    'rejects a malformed Git object header: %s', (fault) => {
+      const f = checkoutFixture();
+      const revision = f.git(['rev-parse', 'HEAD']).trim();
+      const exec = vi.mocked(execFileSync);
+      const execute = exec.getMockImplementation()!;
+      exec.mockImplementation((...args) => {
+        const result = execute(...args);
+        if (!Buffer.isBuffer(result) || !Array.isArray(args[1]) || !args[1].includes('--batch')) return result;
+        const end = result.indexOf(10);
+        const [object, type, rawSize] = result.subarray(0, end).toString('utf8').split(' ');
+        const suffix = fault === 'extra-field' ? `${rawSize} EXTRA`
+          : fault === 'exponent-size' ? `${rawSize}e0`
+          : fault === 'CR-size' ? `${rawSize}\r` : '';
+        const remaining = fault === 'empty-size'
+          ? result.subarray(end + 1 + Number(rawSize)) : result.subarray(end + 1);
+        return Buffer.concat([Buffer.from(`${object} ${type} ${suffix}\n`), remaining]);
+      });
+      expect(() => revisionFingerprint(f.root, revision)).toThrow(/пакет объектов/);
+    },
+  );
+
+  it.each(['--assume-unchanged', '--skip-worktree'])('rejects hidden source bytes before build: %s', (flag) => {
+    const f = checkoutFixture();
+    const revision = f.git(['rev-parse', 'HEAD']).trim();
+    f.git(['update-index', flag, '--', 'source.js']);
+    writeFileSync(path.join(f.root, 'source.js'), 'export const value = 2;\n');
+    expect(f.git(['status', '--porcelain'])).toBe('');
+    expect(f.git(['rev-parse', 'HEAD']).trim()).toBe(revision);
+    let builds = 0;
+    expect(() => prepareBenchmarkCheckout({ ...f.prepare, build: () => { builds++; } }))
+      .toThrow(/tracked|revision|коммит/);
+    expect(builds).toBe(0);
+  });
+
+  it('accepts actual CRLF checkouts while retaining the committed canonical fingerprint', () => {
+    const f = checkoutFixture(true);
+    expect(f.git(['ls-files', '--eol', '--', 'source.js'])).toContain('w/crlf');
+    const state = readCheckoutState(f.root);
+    expect(state.dirty).toBe(false);
+    const canonical = revisionFingerprint(f.root, state.revision);
+    // Отпечаток исходной LF-фикстуры закрепляет совместимость формата, не CRLF-байты clone.
+    expect(canonical).toBe('6c85545764a91d47528b8eb7f790ee2525371bfb9341e8d8c8c42f31c8b39ae0');
+    expect(state.trackedRevisionSha256).toBe(canonical);
+    expect(() => prepareBenchmarkCheckout({ ...f.prepare, build() {} })).not.toThrow();
+  });
+
+  it.each(['build', 'run'])('rejects hidden source mutations after %s', (phase) => {
+    const f = checkoutFixture(true);
+    f.git(['update-index', '--skip-worktree', '--', 'source.js']);
+    const mutate = () => writeFileSync(path.join(f.root, 'source.js'), 'export const value = 2;\r\n');
+    if (phase === 'build') {
+      expect(() => prepareBenchmarkCheckout({ ...f.prepare, build: mutate })).toThrow(/tracked|revision|коммит|checkout/);
+    } else {
+      const prepared = prepareBenchmarkCheckout({ ...f.prepare, build() {} });
+      mutate();
+      expect(() => assertCheckoutUnchanged(f.root, prepared)).toThrow(/tracked|revision|коммит|checkout/);
+    }
+    expect(f.git(['status', '--porcelain'])).toBe('');
+  });
+
+  it('does not normalize binary changes as legitimate CRLF conversion', () => {
+    const f = checkoutFixture(true);
+    f.git(['update-index', '--assume-unchanged', '--', 'binary.bin']);
+    writeFileSync(path.join(f.root, 'binary.bin'), Buffer.from([0, 13, 10, 1]));
+    expect(f.git(['status', '--porcelain'])).toBe('');
+    expect(() => prepareBenchmarkCheckout({ ...f.prepare, build() {} })).toThrow(/tracked|revision|коммит/);
+  });
+
+  it('rejects a missing skip-worktree source instead of omitting it from the fingerprint', () => {
+    const f = checkoutFixture();
+    f.git(['update-index', '--skip-worktree', '--', 'source.js']);
+    unlinkSync(path.join(f.root, 'source.js'));
+    expect(f.git(['status', '--porcelain'])).toBe('');
+    let builds = 0;
+    expect(() => prepareBenchmarkCheckout({ ...f.prepare, build: () => { builds++; } })).toThrow(/tracked.*source.js/);
+    expect(builds).toBe(0);
+  });
+
+  it('does not trust a lossy custom clean filter to prove the committed source', () => {
+    const f = checkoutFixture();
+    f.git(['config', 'filter.mask.clean', 'git show HEAD:source.js']);
+    mkdirSync(path.join(f.root, '.git', 'info'), { recursive: true });
+    writeFileSync(path.join(f.root, '.git', 'info', 'attributes'), 'source.js filter=mask\n');
+    f.git(['update-index', '--assume-unchanged', '--', 'source.js']);
+    writeFileSync(path.join(f.root, 'source.js'), 'export const value = 999;\n');
+    const altered = f.git(['hash-object', '-w', '--no-filters', '--', 'source.js']).trim();
+    f.git(['config', 'filter.mask.smudge', `git cat-file blob ${altered}`]);
+    expect(f.git(['cat-file', '--filters', 'HEAD:source.js'])).toBe('export const value = 999;\n');
+    expect(f.git(['status', '--porcelain'])).toBe('');
+    expect(() => prepareBenchmarkCheckout({ ...f.prepare, build() {} })).toThrow(/неподдерживаемое преобразование/);
+  });
+
+  it('preserves path identity for CRLF files with spaces in the object batch', () => {
+    const f = checkoutFixture(true);
+    const file = path.join(f.root, 'with space.js');
+    writeFileSync(file, 'export const space = 1;\n');
+    f.git(['add', '--', 'with space.js']);
+    f.git(['-c', 'user.name=Benchmark test', '-c', 'user.email=benchmark@example.invalid',
+      '-c', `core.hooksPath=${path.join(f.root, 'no-hooks')}`, 'commit', '--quiet', '-m', 'space fixture']);
+    writeFileSync(file, 'export const space = 1;\r\n');
+    f.git(['add', '--renormalize', '--', 'with space.js']);
+    expect(f.git(['show', 'HEAD:with space.js'])).toBe('export const space = 1;\n');
+    expect(f.git(['config', '--get', 'core.autocrlf']).trim()).toBe('true');
+    expect(f.git(['status', '--porcelain'])).toBe('');
+    expect(() => prepareBenchmarkCheckout({ ...f.prepare, build() {} })).not.toThrow();
+    f.git(['update-index', '--assume-unchanged', '--', 'with space.js']);
+    writeFileSync(file, 'export const space = 2;\r\n');
+    expect(() => prepareBenchmarkCheckout({ ...f.prepare, build() {} })).toThrow(/tracked with space.js/);
+  });
+
+  it.skipIf(process.platform === 'win32')('preserves quotes, backslashes and newlines in Git-normalized paths', () => {
+    const f = checkoutFixture(true);
+    const name = 'quote" backslash\\ newline\nю.js';
+    const file = path.join(f.root, name);
+    writeFileSync(file, 'export const quoted = 1;\n');
+    f.git(['add', '--', name]);
+    f.git(['-c', 'user.name=Benchmark test', '-c', 'user.email=benchmark@example.invalid',
+      '-c', `core.hooksPath=${path.join(f.root, 'no-hooks')}`, 'commit', '--quiet', '-m', 'quoted path fixture']);
+    writeFileSync(file, 'export const quoted = 1;\r\n');
+    f.git(['add', '--renormalize', '--', name]);
+    expect(f.git(['status', '--porcelain'])).toBe('');
+    expect(() => prepareBenchmarkCheckout({ ...f.prepare, build() {} })).not.toThrow();
+    f.git(['update-index', '--assume-unchanged', '--', name]);
+    writeFileSync(file, 'export const quoted = 2;\r\n');
+    expect(() => prepareBenchmarkCheckout({ ...f.prepare, build() {} })).toThrow(/не совпадает/);
+  });
+
+  it('ignores replacement refs when proving the declared commit bytes', () => {
+    const f = checkoutFixture();
+    const original = f.git(['rev-parse', 'HEAD']).trim();
+    writeFileSync(path.join(f.root, 'source.js'), 'export const value = 999;\n');
+    f.git(['add', '--', 'source.js']);
+    f.git(['-c', 'user.name=Benchmark test', '-c', 'user.email=benchmark@example.invalid',
+      '-c', `core.hooksPath=${path.join(f.root, 'no-hooks')}`, 'commit', '--quiet', '-m', 'replacement fixture']);
+    const replacement = f.git(['rev-parse', 'HEAD']).trim();
+    f.git(['update-ref', 'HEAD', original]);
+    f.git(['replace', original, replacement]);
+    expect(f.git(['status', '--porcelain'])).toBe('');
+    expect(revisionFingerprint(f.root, original)).toBe('6c85545764a91d47528b8eb7f790ee2525371bfb9341e8d8c8c42f31c8b39ae0');
+    expect(() => prepareBenchmarkCheckout({ ...f.prepare, build() {} })).toThrow(/clean checkout|tracked|revision/);
+  });
+
+  it('accepts Git-clean mixed LF/CRLF source without accepting changed code', () => {
+    const f = checkoutFixture(true);
+    const name = 'mixed файл.js';
+    const file = path.join(f.root, name);
+    writeFileSync(file, 'const one = 1;\nconst two = 2;\n');
+    f.git(['add', '--', name]);
+    f.git(['-c', 'user.name=Benchmark test', '-c', 'user.email=benchmark@example.invalid',
+      '-c', `core.hooksPath=${path.join(f.root, 'no-hooks')}`, 'commit', '--quiet', '-m', 'mixed fixture']);
+    writeFileSync(file, 'const one = 1;\r\nconst two = 2;\n');
+    f.git(['add', '--renormalize', '--', name]);
+    expect(f.git(['status', '--porcelain'])).toBe('');
+    expect(() => prepareBenchmarkCheckout({ ...f.prepare, build() {} })).not.toThrow();
+    f.git(['update-index', '--assume-unchanged', '--', name]);
+    writeFileSync(file, 'const one = 9;\r\nconst two = 2;\n');
+    expect(() => prepareBenchmarkCheckout({ ...f.prepare, build() {} })).toThrow(/tracked mixed файл.js/);
+  });
+
   it('rejects requiredDist and benchmark entries outside published exports', () => {
     const f = fixture();
     writeFileSync(path.join(f.root, 'package.json'), JSON.stringify({
