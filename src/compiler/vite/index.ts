@@ -63,11 +63,11 @@ function vlq(value: number): string {
 }
 
 /**
- * Точная карта версии 3 для applyEdits того же списка правок: генерируемый и
- * исходный курсоры идут парой; правка продвигает исходный курсор (возможно,
- * через строки — многострочный вызов), а генерируемый — на длину замены.
- * Замены не содержат '\n' по построению (артефакт-литерал одной строкой) —
- * нарушение равно ошибке сборки, не тихой порче карты.
+ * Точная карта версии 3 для applyEdits того же списка правок. Карте важны
+ * только границы правок и LF: остальные символы меняют лишь колонку, поэтому
+ * диапазоны продвигаются арифметически между найденными переводами строк.
+ * Замены не содержат '\n' по построению — нарушение равно ошибке сборки, не
+ * тихой порче карты.
  */
 function buildMap(
   code: string,
@@ -79,7 +79,8 @@ function buildMap(
       throw new Error('lab-motion compiler: замена не может содержать перевод строки');
     }
   }
-  const groups: string[][] = [[]];
+  let mappings = '';
+  let separator = '';
   let genColumn = 0;
   let originalLine = 0;
   let originalColumn = 0;
@@ -87,54 +88,56 @@ function buildMap(
   let previousLine = 0;
   let previousColumn = 0;
   const segment = (): void => {
-    groups.at(-1)!.push(
-      vlq(genColumn - previousGenColumn) + vlq(0) +
-      vlq(originalLine - previousLine) + vlq(originalColumn - previousColumn),
-    );
+    // sourceIndex всегда 0 и не меняется: VLQ(0) === 'A'.
+    mappings += separator + vlq(genColumn - previousGenColumn) + 'A'
+      + vlq(originalLine - previousLine) + vlq(originalColumn - previousColumn);
+    separator = ',';
     previousGenColumn = genColumn;
     previousLine = originalLine;
     previousColumn = originalColumn;
   };
-  /** Пройти сохранённый диапазон исходника: оба курсора синхронно. */
-  const keep = (from: number, to: number): void => {
-    if (from < to) segment();
-    for (let index = from; index < to; index++) {
-      if (code.charCodeAt(index) === 10) {
-        groups.push([]);
+  /** Продвинуть исходник; kept=true синхронно продвигает generated-позицию. */
+  const advance = (from: number, to: number, kept: boolean): void => {
+    let cursor = from;
+    for (;;) {
+      const newline = code.indexOf('\n', cursor);
+      if (newline < 0 || newline >= to) break;
+      if (kept) {
+        genColumn += newline - cursor;
+        mappings += ';';
+        separator = '';
         genColumn = 0;
         previousGenColumn = 0;
-        originalLine++;
-        originalColumn = 0;
-        if (index + 1 < to) segment();
-      } else {
-        genColumn++;
-        originalColumn++;
       }
+      originalLine++;
+      originalColumn = 0;
+      cursor = newline + 1;
+      if (kept && cursor < to) segment();
     }
-  };
-  /** Пройти правку: исходный курсор до edit.end, замена — в генерируемый. */
-  const splice = (edit: NanoLoweringEdit): void => {
-    segment();
-    genColumn += edit.replacement.length;
-    for (let index = edit.start; index < edit.end; index++) {
-      if (code.charCodeAt(index) === 10) {
-        originalLine++;
-        originalColumn = 0;
-      } else originalColumn++;
-    }
+    const tail = to - cursor;
+    originalColumn += tail;
+    if (kept) genColumn += tail;
   };
   let cursor = 0;
   for (const edit of edits) {
-    keep(cursor, edit.start);
-    splice(edit);
+    if (cursor < edit.start) {
+      segment();
+      advance(cursor, edit.start, true);
+    }
+    segment();
+    genColumn += edit.replacement.length;
+    advance(edit.start, edit.end, false);
     cursor = edit.end;
   }
-  keep(cursor, code.length);
-  // Хвост '\nimport ...;\n': обе новые группы не отображаются в исходник.
-  groups.push([], []);
+  if (cursor < code.length) {
+    segment();
+    advance(cursor, code.length, true);
+  }
+  // Хвост '\nimport ...;\n': обе новые generated-строки не имеют source mapping.
+  mappings += ';;';
   return {
     version: 3,
-    mappings: groups.map((group) => group.join(',')).join(';'),
+    mappings,
     sources: [id],
     sourcesContent: [code],
     names: [],
