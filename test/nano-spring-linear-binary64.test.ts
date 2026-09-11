@@ -71,6 +71,17 @@ describe('nano springLinear: binary64 underdamped envelope', () => {
     expectBitExact({ mass: 1, stiffness: 1, damping: 2 * a });
   });
 
+  it('сохраняет округлённое w*w, а не подменяет его исходным k/m', () => {
+    const input = { mass: 1, stiffness: 902, damping: 60 } satisfies NanoSpring;
+    const ratio = input.stiffness / input.mass;
+    const roundedSquare = Math.sqrt(ratio) ** 2;
+
+    // sqrt → square уже округлился на один ULP: именно это значение исторически
+    // использует формула, и замена кэша на k/m изменила бы duration bit-pattern.
+    expect(Object.is(roundedSquare, ratio)).toBe(false);
+    expectBitExact(input);
+  });
+
   it('держит seeded-класс обоих settle bounds без расхождений', () => {
     let seed = 0x6e61_6e6f;
     const random = () => (seed = (Math.imul(seed, 1_664_525) + 1_013_904_223) >>> 0)
