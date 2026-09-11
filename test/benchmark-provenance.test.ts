@@ -44,15 +44,23 @@ function isolateGitEnvironment() {
   vi.stubEnv('GIT_CONFIG_SYSTEM', path.join(directory, 'no-system-config'));
   vi.stubEnv('GIT_CONFIG_NOSYSTEM', '1');
   vi.stubEnv('GIT_ATTR_NOSYSTEM', '1');
+  vi.stubEnv('HOME', directory);
+  vi.stubEnv('XDG_CONFIG_HOME', path.join(directory, 'xdg'));
   vi.stubEnv('GIT_TERMINAL_PROMPT', '0');
   vi.stubEnv('GIT_TEMPLATE_DIR', directory);
 }
 
 afterEach(() => {
+  let firstCleanupError: unknown;
   try {
     for (const directory of cleanup.splice(0)) {
-      rmSync(directory, { recursive: true, force: true });
+      try {
+        rmSync(directory, { recursive: true, force: true, maxRetries: 3, retryDelay: 10 });
+      } catch (error) {
+        firstCleanupError ??= error;
+      }
     }
+    if (firstCleanupError !== undefined) throw firstCleanupError;
   } finally {
     vi.resetAllMocks();
     vi.unstubAllEnvs();
@@ -119,17 +127,20 @@ function checkoutFixture(autocrlf = false) {
 
 // Реальные Git-процессы конкурируют с полным набором тестов; это watchdog, не бюджет бенчмарка.
 describe('benchmark provenance', { timeout: 30_000 }, () => {
-  it('isolates the real checkout from a hostile global attributes file', () => {
+  it('fails closed when a hostile global attributes file changes Git normalization', () => {
     const directory = mkdtempSync(path.join(tmpdir(), 'lab-motion-hostile-git-'));
     cleanup.push(directory);
     const attributes = path.join(directory, 'attributes');
     const config = path.join(directory, 'gitconfig');
     writeFileSync(attributes, 'source.js -text\n');
     writeFileSync(config, `[core]\nattributesFile = "${attributes.replaceAll('\\', '/')}"\n`);
-    vi.stubEnv('GIT_CONFIG_GLOBAL', config);
     const f = checkoutFixture(true);
+    vi.stubEnv('GIT_CONFIG_GLOBAL', config);
+    expect(f.git(['config', '--get', 'core.attributesFile']).trim())
+      .toBe(attributes.replaceAll('\\', '/'));
     expect(f.git(['ls-files', '--eol', '--', 'source.js'])).toContain('w/crlf');
-    expect(() => prepareBenchmarkCheckout({ ...f.prepare, build() {} })).not.toThrow();
+    expect(() => prepareBenchmarkCheckout({ ...f.prepare, build() {} }))
+      .toThrow(/clean checkout|tracked|revision/);
   });
 
   it('uses the portable OID-only batch protocol without requiring Git -Z', () => {
@@ -186,6 +197,18 @@ describe('benchmark provenance', { timeout: 30_000 }, () => {
     },
   );
 
+  it('rejects gitlink entries before reading them as file bytes', () => {
+    const f = checkoutFixture();
+    const parent = f.git(['rev-parse', 'HEAD']).trim();
+    f.git(['update-index', '--add', '--cacheinfo', '160000', parent, 'vendor']);
+    const tree = f.git(['write-tree']).trim();
+    const revision = f.git([
+      '-c', 'user.name=Benchmark test', '-c', 'user.email=benchmark@example.invalid',
+      'commit-tree', tree, '-p', parent, '-m', 'gitlink fixture',
+    ]).trim();
+    expect(() => revisionFingerprint(f.root, revision)).toThrow(/submodule vendor/);
+  });
+
   it.each(['--assume-unchanged', '--skip-worktree'])('rejects hidden source bytes before build: %s', (flag) => {
     const f = checkoutFixture();
     const revision = f.git(['rev-parse', 'HEAD']).trim();
@@ -209,6 +232,25 @@ describe('benchmark provenance', { timeout: 30_000 }, () => {
     expect(canonical).toBe('6c85545764a91d47528b8eb7f790ee2525371bfb9341e8d8c8c42f31c8b39ae0');
     expect(state.trackedRevisionSha256).toBe(canonical);
     expect(() => prepareBenchmarkCheckout({ ...f.prepare, build() {} })).not.toThrow();
+  });
+
+  it.skipIf(process.platform === 'win32')('proves tracked symlink bytes without following the target', () => {
+    const f = checkoutFixture();
+    const target = path.join(path.dirname(f.root), 'external-target.js');
+    const link = path.join(f.root, 'linked.js');
+    writeFileSync(target, 'external payload v1\n');
+    symlinkSync(path.relative(f.root, target), link);
+    f.git(['add', '--', 'linked.js']);
+    f.git(['-c', 'user.name=Benchmark test', '-c', 'user.email=benchmark@example.invalid',
+      '-c', `core.hooksPath=${path.join(f.root, 'no-hooks')}`, 'commit', '--quiet', '-m', 'symlink fixture']);
+    const before = readCheckoutState(f.root);
+    expect(before.dirty).toBe(false);
+    expect(before.trackedRevisionSha256).toBe(revisionFingerprint(f.root, before.revision));
+    writeFileSync(target, 'external payload v2\n');
+    const after = readCheckoutState(f.root);
+    expect(after.dirty).toBe(false);
+    expect(after.trackedRevisionSha256).toBe(before.trackedRevisionSha256);
+    expect(after.worktreeSha256).toBe(before.worktreeSha256);
   });
 
   it.each(['build', 'run'])('rejects hidden source mutations after %s', (phase) => {
