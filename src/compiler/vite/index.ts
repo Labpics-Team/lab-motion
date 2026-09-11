@@ -63,18 +63,16 @@ function vlq(value: number): string {
 }
 
 /**
- * Один проход по правкам владеет и текстом, и картой. Курсор LF движется
- * монотонно: внутри строки координаты сдвигаются длиной диапазона, без
- * посимвольного JS-цикла. Плоский буфер и один join заменяют матрицу строк
- * без накопления цепочки конкатенаций в возвращаемой карте.
+ * Карта меняется только на границах строк и правок. Один монотонный курсор
+ * LF заменяет посимвольный JS-обход; плоский буфер сегментов материализует
+ * строку одним join, не удерживая цепочку конкатенаций в результате.
+ * Построение текста остаётся за applyEdits и не смешивается с обходом карты.
  */
-function applyEdits(
+function buildMap(
   code: string,
   edits: readonly NanoLoweringEdit[],
   id: string,
-  importLine: string,
-): TransformResult {
-  let out = '';
+): TransformResult['map'] {
   const mappings: string[] = [];
   let separator = '';
   let genColumn = 0;
@@ -116,7 +114,6 @@ function applyEdits(
     if (edit.replacement.includes('\n')) {
       throw new Error('lab-motion compiler: замена не может содержать перевод строки');
     }
-    out += code.slice(cursor, edit.start) + edit.replacement;
     advance(cursor, edit.start, true);
     segment();
     genColumn += edit.replacement.length;
@@ -127,15 +124,22 @@ function applyEdits(
   // Хвост '\nimport ...;\n': две новые группы не отображаются в исходник.
   mappings.push(';;');
   return {
-    code: out + code.slice(cursor) + importLine,
-    map: {
-      version: 3,
-      mappings: mappings.join(''),
-      sources: [id],
-      sourcesContent: [code],
-      names: [],
-    },
+    version: 3,
+    mappings: mappings.join(''),
+    sources: [id],
+    sourcesContent: [code],
+    names: [],
   };
+}
+
+function applyEdits(code: string, edits: readonly NanoLoweringEdit[]): string {
+  let out = '';
+  let cursor = 0;
+  for (const edit of edits) {
+    out += code.slice(cursor, edit.start) + edit.replacement;
+    cursor = edit.end;
+  }
+  return out + code.slice(cursor);
 }
 
 /** Быстрый отсев до парсинга: модуль вообще не упоминает целевые субпути. */
@@ -166,8 +170,10 @@ export function motionCompiler(): MotionCompilerPlugin {
       const plan = planNanoOpacityLowering(ast, code, nanoDefaultArtifactLiteral)
         ?? planSurfaceLowering(ast, code);
       if (plan === undefined) return undefined;
-      return applyEdits(code, plan.edits, id,
-        `\nimport { ${plan.importName} as ${plan.importLocal} } from ${JSON.stringify(plan.importSource)};\n`);
+      const edits = plan.edits;
+      const transformed = applyEdits(code, edits)
+        + `\nimport { ${plan.importName} as ${plan.importLocal} } from ${JSON.stringify(plan.importSource)};\n`;
+      return { code: transformed, map: buildMap(code, edits, id) };
     },
   };
 }
