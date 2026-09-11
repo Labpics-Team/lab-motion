@@ -65,7 +65,8 @@ function vlq(value: number): string {
 /**
  * Один проход по правкам владеет и текстом, и картой. Курсор LF движется
  * монотонно: внутри строки координаты сдвигаются длиной диапазона, без
- * посимвольного JS-цикла. Карта сразу пишется в wire-строку, без матрицы строк.
+ * посимвольного JS-цикла. Плоский буфер и один join заменяют матрицу строк
+ * без накопления цепочки конкатенаций в возвращаемой карте.
  */
 function applyEdits(
   code: string,
@@ -74,7 +75,7 @@ function applyEdits(
   importLine: string,
 ): TransformResult {
   let out = '';
-  let mappings = '';
+  const mappings: string[] = [];
   let separator = '';
   let genColumn = 0;
   let originalLine = 0;
@@ -84,8 +85,8 @@ function applyEdits(
   let previousColumn = 0;
   let lineEnd = code.indexOf('\n');
   const segment = (): void => {
-    mappings += separator + vlq(genColumn - previousGenColumn) + vlq(0)
-      + vlq(originalLine - previousLine) + vlq(originalColumn - previousColumn);
+    mappings.push(separator + vlq(genColumn - previousGenColumn) + vlq(0)
+      + vlq(originalLine - previousLine) + vlq(originalColumn - previousColumn));
     separator = ',';
     previousGenColumn = genColumn;
     previousLine = originalLine;
@@ -96,7 +97,7 @@ function applyEdits(
     if (keep && from < to) segment();
     while (lineEnd >= 0 && lineEnd < to) {
       if (keep) {
-        mappings += ';';
+        mappings.push(';');
         separator = '';
         genColumn = 0;
         previousGenColumn = 0;
@@ -123,12 +124,13 @@ function applyEdits(
     cursor = edit.end;
   }
   advance(cursor, code.length, true);
+  // Хвост '\nimport ...;\n': две новые группы не отображаются в исходник.
+  mappings.push(';;');
   return {
     code: out + code.slice(cursor) + importLine,
     map: {
       version: 3,
-      // Хвост '\nimport ...;\n': две новые группы не отображаются в исходник.
-      mappings: mappings + ';;',
+      mappings: mappings.join(''),
       sources: [id],
       sourcesContent: [code],
       names: [],
