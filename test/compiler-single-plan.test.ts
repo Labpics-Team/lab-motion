@@ -23,10 +23,10 @@ function transform(ast: AstNode, code: string) {
   }, code, '/app/module.js');
 }
 
-// Characterization получен из immutable baseline 80264dc5, НЕ из кандидата:
-// run 34570770910 / artifact 10187698120, characterization.json.
+// Эталон получен из неизменяемой базы 80264dc5, а не из кандидата:
+// прогон 34570770910 / артефакт 10187698120, characterization.json.
 // Полные code/map защищены SHA256 без копий большого CSS-артефакта в тесте;
-// mappings сохранён явно, чтобы ошибка сегментов давала читаемый diff.
+// mappings сохранён явно, чтобы ошибка сегментов давала читаемое различие.
 const GOLDENS = {
   'animate-surface-0': {
     code: 'bfd6ea216b8baaba9dcc84a2ba946b9e959c264c1fdbcab18883176f380b7bcc',
@@ -64,8 +64,8 @@ function assertExact(
   expect(sha256(JSON.stringify(result.map))).toBe(expected.map);
 }
 
-describe('единственный применимый lowering-план', () => {
-  it('оба direct imports с local animate отвергаются независимым ESM-парсером', () => {
+describe('единственный применимый план lowering', () => {
+  it('два прямых импорта с локальным именем animate отвергаются независимым ESM-парсером', () => {
     const code = `import { animate } from '${NANO}';\nimport { animate } from '${SURFACE}';\n`;
     const invalid = spawnSync(process.execPath, ['--input-type=module', '--check'], {
       input: code,
@@ -118,7 +118,7 @@ describe('единственный применимый lowering-план', () =
     const parsed = await parseAstAsync(code) as unknown as AstNode;
     const body = parsed.body;
     let traversals = 0;
-    // Чтение корневого body наблюдает полный проход, не wall-clock/JIT.
+    // Чтение корневого body наблюдает полный проход, а не время выполнения или работу JIT.
     const ast: AstNode = { ...parsed, get body() { traversals++; return body; } };
     const result = transform(ast, code);
     expect(result).toBeDefined();
@@ -127,12 +127,12 @@ describe('единственный применимый lowering-план', () =
     expect(traversals).toBeGreaterThan(0);
     expect(traversals).toBeLessThanOrEqual(2);
 
-    // Положительный контроль: действительно лишний planner виден тому же счётчику.
+    // Положительный контроль: действительно лишний планировщик виден тому же счётчику.
     const before = traversals;
     expect(planSurfaceLowering(ast, code)).toBeUndefined();
     expect(traversals).toBe(before + 1);
 
-    // Оба мутанта сохраняют число строк/вызовов, но точный oracle обязан их ловить.
+    // Оба мутанта сохраняют число строк/вызовов, но точный оракул обязан их ловить.
     expect(() => assertExact({ ...result!, code: result!.code.replace('card', 'panel') }, GOLDENS.nested)).toThrow();
     expect(() => assertExact({
       ...result!,
