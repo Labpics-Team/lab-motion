@@ -6,7 +6,7 @@ import {join} from 'node:path';
 import {createHash} from 'node:crypto';
 import {execFileSync} from 'node:child_process';
 import {canonicalGzip as gz,observationalBrotli as br} from '../motion-pass/scripts/compression-oracle.mjs';
-const roots=[['base',fileURLToPath(new URL('../motion-macro-base',import.meta.url)),'5f375cff2e978914cfb6ffed4c0ae2d573d1415f'],['candidate',fileURLToPath(new URL('../motion-pass',import.meta.url)),'0fbe224c697173af5a12c41aa03b847064cec692']];
+const roots=[['base',fileURLToPath(new URL('../motion-macro-base',import.meta.url)),'5f375cff2e978914cfb6ffed4c0ae2d573d1415f'],['candidate',fileURLToPath(new URL('../motion-pass',import.meta.url)),'45418c4ba9826a7701cd86b17a29061a62daeaf7']];
 const hashes=[];
 for(const [label,root,sha] of roots){
  if(execFileSync('git',['rev-parse','HEAD'],{cwd:root,encoding:'utf8'}).trim()!==sha)throw Error('wrong SHA');
