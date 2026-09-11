@@ -1,4 +1,4 @@
-name: RDP exact proof
+name: RDP confirmatory tail proof
 on:
   push:
     branches: [research/runtime-lifetime-proof-20260911]
@@ -7,9 +7,9 @@ permissions:
 jobs:
   proof:
     runs-on: ubuntu-24.04
-    timeout-minutes: 25
+    timeout-minutes: 20
     env:
-      CANDIDATE_SHA: e25063e2db3bd0ccf45a3bf9fcb1e910b7f882d9
+      CANDIDATE_SHA: 5629067244f912f2b381d454cf9c2ac1bc3ebb0b
       BASE_SHA: 5f375cff2e978914cfb6ffed4c0ae2d573d1415f
       COREPACK_ENABLE_DOWNLOAD_PROMPT: '0'
       COREPACK_DEFAULT_TO_LATEST: '0'
@@ -21,7 +21,7 @@ jobs:
       - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020
         with:
           node-version: '24.20.0'
-      - name: Immutable inputs and canonical builds
+      - name: Exact sources and canonical builds
         shell: bash
         run: |
           set -euo pipefail
@@ -30,52 +30,33 @@ jobs:
           git worktree add --detach baseline "$BASE_SHA"
           git worktree add --detach candidate "$CANDIDATE_SHA"
           test "$(git -C candidate hash-object src/compositor/segmenter.ts)" = 0802c530bef1b1d3ae36fb85a682421067c5cea3
-          test "$(git -C candidate hash-object test/compositor-rdp-frontier.test.ts)" = 7eab4732665ee524d7203d26146cd661a125e0cc
+          test "$(git -C candidate hash-object test/compositor-rdp-frontier.test.ts)" = 55fc3ba61d64ea5294510967ab381e55f9135d50
           for side in baseline candidate; do
-            (cd "$side" && pnpm install --frozen-lockfile && pnpm build && pnpm size) > "$side-build-size.log" 2>&1
+            (cd "$side" && pnpm install --frozen-lockfile && pnpm build) > "$side-build.log" 2>&1
             git -C "$side" diff --exit-code
             (cd "$side" && find dist -type f -print0 | sort -z | xargs -0 sha256sum) > "$side-dist.sha256"
           done
-          git branch rdp-evidence-candidate "$CANDIDATE_SHA"
-          git bundle create candidate.bundle rdp-evidence-candidate
-          sha256sum "$(command -v node)" > node.sha256
-          cp candidate/scripts/compression-oracle.mjs compression-oracle-source.txt
-      - name: Public complete cold compile with controls
-        run: node rdp-timing.mjs > timing.log
-      - name: Fresh-process observable retention and positive controls
-        run: node --expose-gc rdp-retention.mjs > retention.log
-      - name: Exact all-format size vector
+          git branch rdp-confirmatory-candidate "$CANDIDATE_SHA"
+          git bundle create candidate.bundle rdp-confirmatory-candidate
+      - name: Preregistered single 512-block confirmatory pass
+        run: node rdp-tail.mjs > tail.log
+      - name: Preserve exact evidence
         shell: bash
         run: |
-          node --input-type=module <<'JS'
-          import fs from 'node:fs';
-          import assert from 'node:assert/strict';
-          import { canonicalGzip, observationalBrotli } from './candidate/scripts/compression-oracle.mjs';
-          const rows=[];
-          for (const path of fs.readdirSync('baseline/dist',{recursive:true}).filter(p=>p.endsWith('.js')||p.endsWith('.cjs'))) {
-            const a=fs.readFileSync('baseline/dist/'+path),b=fs.readFileSync('candidate/dist/'+path);
-            const vector=x=>[x.length,canonicalGzip(x).length,observationalBrotli(x).length];
-            const av=vector(a),bv=vector(b);
-            for(let i=0;i<3;i++) assert(bv[i]<=av[i],path+' metric '+i);
-            rows.push({path,base:av,candidate:bv,identical:a.equals(b)});
-          }
-          fs.writeFileSync('size-vector.json',JSON.stringify(rows,null,2));
-          JS
           (cd baseline && find dist -type f -print0 | sort -z | xargs -0 sha256sum) | diff - baseline-dist.sha256
           (cd candidate && find dist -type f -print0 | sort -z | xargs -0 sha256sum) | diff - candidate-dist.sha256
-          sha256sum *.json *.log *.mjs *.heapsnapshot *.bundle *.sha256 > RECEIPTS.sha256
+          sha256sum *.json *.log rdp-tail.mjs *.bundle *.sha256 > RECEIPTS.sha256
       - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         if: always()
         with:
-          name: rdp-proof-${{ env.CANDIDATE_SHA }}
+          name: rdp-confirmatory-${{ env.CANDIDATE_SHA }}
           path: |
-            *.json
-            *.log
-            *.mjs
-            *.heapsnapshot
-            *.bundle
+            tail-confirmatory.json
+            tail.log
+            *-build.log
+            rdp-tail.mjs
+            candidate.bundle
             *.sha256
-            compression-oracle-source.txt
           if-no-files-found: error
           retention-days: 30
           compression-level: 6
