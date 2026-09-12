@@ -30,13 +30,22 @@ jobs:
       - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020
         with:
           node-version: '24.20.0'
-      - name: Frozen toolchain обеих сторон
+      - name: Одна физическая frozen toolchain при равных dependency inputs
         run: |
           set -euo pipefail
+          cmp baseline/pnpm-lock.yaml candidate/pnpm-lock.yaml
+          node --input-type=module <<'JS'
+          import assert from 'node:assert/strict';
+          import {readFileSync} from 'node:fs';
+          const a=JSON.parse(readFileSync('baseline/package.json'));
+          const b=JSON.parse(readFileSync('candidate/package.json'));
+          for(const key of ['dependencies','devDependencies','optionalDependencies','peerDependencies','packageManager']) assert.deepEqual(a[key],b[key],key);
+          JS
           corepack enable
           corepack install --global pnpm@11.11.0
           pnpm --dir baseline install --frozen-lockfile
-          pnpm --dir candidate install --frozen-lockfile
+          test ! -e candidate/node_modules
+          ln -s "$PWD/baseline/node_modules" candidate/node_modules
       - name: Единственный пререгистрированный public comparison
         shell: bash
         run: |
