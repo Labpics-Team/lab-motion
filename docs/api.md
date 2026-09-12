@@ -113,7 +113,7 @@ await moves.finished;
 
 | Импорт | Что даёт |
 |---|---|
-| `…/waapi` | Низкоуровневый мост: `compileWaapi`/`animateWaapi` (кейфреймы движка → нативный `Element.animate`), `easingToLinear` (любой easing → CSS `linear()`), `supportsWaapi` |
+| `…/waapi` | Низкоуровневый native-мост: `compileWaapi`/`animateWaapi`; `animateScrollWaapi` отдаёт scroll-progress → property нативному `ScrollTimeline` без собственного покадрового JS и без скрытого fallback; `supportsWaapi`/`supportsScrollTimeline` — capability probes |
 | `…/compositor` | Базовый compositor-компилятор: `compileSpringLinear`, `compileSpringPlan`, `CompositorSpring`, ретаргет, хендофф и fallback-матрица. Подробно — [compositor.md](compositor.md) |
 | `…/compositor/stagger` | Самодостаточный групповой compositor-фасад: `compileStaggerPlan`, `CompositorStaggerGroup` и связанные `compileSpringPlan`/`CompositorSpring` из одного entry |
 | `…/tokens` | Motion-токены: `duration`, `easing`, `spring`, `staggerGap`, `distanceScale`. Подробно — [tokens.md](tokens.md) |
