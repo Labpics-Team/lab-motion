@@ -35,7 +35,7 @@
   выполняется один раз при построении.
 
 ### Добавлено
-- `animateScrollWaapi` в `./waapi`: нативная scroll-progress шкала через `ScrollTimeline`; на поддерживаемом host нет scroll-listener/rAF Lab Motion, на неподдерживаемом путь возвращает `undefined` без скрытой JS-эмуляции.
+- `animateScrollWaapi` / `animateViewWaapi` в `./waapi`: нативные scroll/view-progress шкалы через `ScrollTimeline`/`ViewTimeline`; на поддерживаемом host нет scroll-listener/rAF Lab Motion, на неподдерживаемом путь возвращает `undefined` без скрытой JS-эмуляции.
 - Код `LM169`: `springAsEasing` получила пружину без затухания, у которой финитной
   проекции на [0,1] не существует.
 - `compileSpringPlan` принимает `maxValueError`: абсолютный
