@@ -193,6 +193,47 @@ function bindsName(node: AstNode, parent: AstNode | undefined, name: string): bo
 }
 
 /**
+ * ImportDeclaration принадлежит Program.body: чужой планировщик не должен
+ * обходить вложенные выражения. После доказанного импорта общий проход
+ * сохраняет консервативную проверку затенения и коллизии executor-биндинга.
+ */
+function canLowerImport(program: AstNode, sourceName: string, importLocal: string): boolean {
+  let importedPlain = false;
+  const importNodes = new Set<AstNode>();
+  for (const node of program.body as AstNode[]) {
+    if (node.type !== 'ImportDeclaration') continue;
+    const source = node.source as AstNode | undefined;
+    if (source?.value !== sourceName) continue;
+    for (const spec of (node.specifiers as AstNode[] | undefined) ?? []) {
+      importNodes.add(spec);
+      if (
+        spec.type === 'ImportSpecifier' &&
+        (spec.imported as AstNode).type === 'Identifier' &&
+        (spec.imported as AstNode).name === 'animate' &&
+        (spec.local as AstNode).name === 'animate'
+      ) {
+        importedPlain = true;
+      }
+    }
+  }
+  if (!importedPlain) return false;
+
+  let doubt = false;
+  walk(program, (node, parent) => {
+    if (node.type === 'Identifier' && node.name === importLocal) doubt = true;
+    if (
+      node.name === 'animate' &&
+      !importNodes.has(parent as AstNode) &&
+      parent?.type !== 'ImportSpecifier' &&
+      bindsName(node, parent, 'animate')
+    ) {
+      doubt = true;
+    }
+  });
+  return !doubt;
+}
+
+/**
  * Планирует lowering модуля. undefined — трансформировать нечего либо
  * консервативный отказ целиком (shadowing/коллизия локального имени).
  *
@@ -207,40 +248,7 @@ export function planNanoOpacityLowering(
   code: string,
   artifactLiteral: (opacity: number) => string,
 ): NanoLoweringPlan | undefined {
-  let importedPlain = false;
-  const importNodes = new Set<AstNode>();
-  let doubt = false;
-  let localNameCollision = false;
-
-  walk(program, (node, parent) => {
-    if (node.type === 'ImportDeclaration') {
-      const source = node.source as AstNode | undefined;
-      if (source?.value === NANO_SOURCE) {
-        for (const spec of (node.specifiers as AstNode[] | undefined) ?? []) {
-          importNodes.add(spec);
-          if (
-            spec.type === 'ImportSpecifier' &&
-            (spec.imported as AstNode).type === 'Identifier' &&
-            (spec.imported as AstNode).name === 'animate' &&
-            (spec.local as AstNode).name === 'animate'
-          ) {
-            importedPlain = true;
-          }
-        }
-      }
-    }
-    if (node.type === 'Identifier' && node.name === IMPORT_LOCAL) localNameCollision = true;
-    if (
-      node.name === 'animate' &&
-      !importNodes.has(parent as AstNode) &&
-      parent?.type !== 'ImportSpecifier' &&
-      bindsName(node, parent, 'animate')
-    ) {
-      doubt = true; // локальное объявление затеняет импорт где-то в модуле
-    }
-  });
-
-  if (!importedPlain || doubt || localNameCollision) return undefined;
+  if (!canLowerImport(program, NANO_SOURCE, IMPORT_LOCAL)) return undefined;
 
   const edits: NanoLoweringEdit[] = [];
   let runtimeCalls = 0;
@@ -609,40 +617,7 @@ export function planSurfaceLowering(
   program: AstNode,
   code: string,
 ): NanoLoweringPlan | undefined {
-  let importedPlain = false;
-  const importNodes = new Set<AstNode>();
-  let doubt = false;
-  let localNameCollision = false;
-
-  walk(program, (node, parent) => {
-    if (node.type === 'ImportDeclaration') {
-      const source = node.source as AstNode | undefined;
-      if (source?.value === ANIMATE_SOURCE) {
-        for (const spec of (node.specifiers as AstNode[] | undefined) ?? []) {
-          importNodes.add(spec);
-          if (
-            spec.type === 'ImportSpecifier' &&
-            (spec.imported as AstNode).type === 'Identifier' &&
-            (spec.imported as AstNode).name === 'animate' &&
-            (spec.local as AstNode).name === 'animate'
-          ) {
-            importedPlain = true;
-          }
-        }
-      }
-    }
-    if (node.type === 'Identifier' && node.name === SURFACE_LOCAL) localNameCollision = true;
-    if (
-      node.name === 'animate' &&
-      !importNodes.has(parent as AstNode) &&
-      parent?.type !== 'ImportSpecifier' &&
-      bindsName(node, parent, 'animate')
-    ) {
-      doubt = true;
-    }
-  });
-
-  if (!importedPlain || doubt || localNameCollision) return undefined;
+  if (!canLowerImport(program, ANIMATE_SOURCE, SURFACE_LOCAL)) return undefined;
 
   const edits: NanoLoweringEdit[] = [];
   let runtimeCalls = 0;
