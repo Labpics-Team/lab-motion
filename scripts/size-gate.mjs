@@ -166,6 +166,8 @@ export const ANIMATE_COMPOSITOR_MIXED_GATE_BYTES = 17_500;
 // раздуванию прятаться под щедрым общим зонтом 4608 (тот же класс, что ловит
 // CORE_GATE_BYTES для ядра). Поднимать только осознанно.
 export const BESPOKE_SUBPATH_GATES = {
+  // Первый артефакт optional reorder; ни один прежний entry не финансирует его.
+  './behaviors/reorder': 1518,
   './utils': 1400,
   // Build-tool entry (#208): Vite-адаптер lowering НАМЕРЕННО несёт канонический
   // MotionProgram V1 parser + nano spring SSOT — это цена доверенного артефакта
@@ -291,6 +293,11 @@ export const BESPOKE_SUBPATH_GATES = {
  * равен gate). `%DIST%` подставляется абсолютным путём dist/index.js.
  */
 export const IMPORT_COST_SCENARIOS = [
+  {
+    name: 'reorder-controlled',
+    code: `import {createReorder} from '%DIST%/../behaviors/reorder/index.js'; console.log(createReorder({items:[],onReorder:console.log}));`,
+    gate: 1522, // Первый измеренный consumer: initial = total, без дополнительного chunk.
+  },
   {
     name: 'nano spring-to',
     code: `import { animate } from '%DIST%/../nano/index.js'; console.log(animate('.hero', { translate: '240px', opacity: 1 }).length);`,

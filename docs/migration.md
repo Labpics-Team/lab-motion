@@ -51,3 +51,16 @@ CSS-стилей. Низкоуровневые субпути не объеди�
 `time/speed/duration` getters, `reverse`, `complete` и `restart`. Публичного
 API регистрации произвольных кодеков или адаптеров целей пакет не
 предоставляет.
+
+## Контролируемая перестановка вместо собственного sortable resolver
+
+Для list/grid используйте `createReorder` из `@labpics/motion/behaviors/reorder`.
+`onReorder` предлагает новый порядок, который обязан принять владелец данных,
+после чего передать новый snapshot через `update`. Это сохраняет привычную
+controlled-модель values/onReorder, но не копирует React `Reorder.Group`.
+
+Resolver headless: вместо wrapper-компонентов получает stable keys и измеренную
+geometry. Для pointer/keyboard + layout используйте [проверяемый рецепт](recipes.md#перестановка-списка-или-сетки).
+Нет неявного drag-follow, автопрокрутки, cross-list transfer или virtualizer.
+Неизмеренные ячейки не угадываются. Native TypeError/RangeError относятся к
+структуре snapshot; ошибки физики внешнего projection сохраняют свой контракт.
