@@ -1,4 +1,4 @@
-name: Surface task-turn Pareto proof
+name: Surface fixed-size holdout proof
 on:
   push:
     branches: [research/surface-no-reparse-phase-20260912-9f6c]
@@ -8,7 +8,7 @@ permissions:
 jobs:
   proof:
     runs-on: ubuntu-24.04
-    timeout-minutes: 25
+    timeout-minutes: 55
     outputs:
       candidate_sha: ${{ steps.freeze.outputs.candidate_sha }}
       admission: ${{ steps.timing.outputs.admission }}
@@ -24,7 +24,7 @@ jobs:
         uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020
         with:
           node-version: '24.20.0'
-      - name: Download immutable build and control inputs
+      - name: Download immutable build inputs
         uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c
         with:
           artifact-ids: '10292153698'
@@ -33,13 +33,23 @@ jobs:
           run-id: '34676904520'
           path: seed/evidence
           digest-mismatch: error
-      - name: Freeze exact source commit before any timing
+      - name: Download sealed source and task-turn protocol
+        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c
+        with:
+          artifact-ids: '10292754360'
+          github-token: ${{ github.token }}
+          repository: Labpics-Team/lab-motion
+          run-id: '34677829239'
+          path: previous/evidence
+          digest-mismatch: error
+      - name: Verify exact source and inputs before holdout
         id: freeze
         shell: bash
         run: |
           set -euo pipefail
           mkdir -p evidence seed/source
           (cd seed && sha256sum --check evidence/manifest.sha256)
+          (cd previous && sha256sum --check evidence/manifest.sha256)
           printf '%s  %s\n' '89af8424dd53e560b1933f87ba650d8bf57c83ca5a04600eefb31f416aabbae7' "$(command -v node)" | sha256sum --check
           tar -xzf seed/evidence/built-entries.tar.gz -C seed/evidence
           tar -xzf seed/evidence/base-source.tar.gz -C seed/source
@@ -47,45 +57,42 @@ jobs:
           cp seed/source/package.json seed/evidence/candidate/package.json
           cp -R seed/source/bench seed/evidence/baseline/bench
           (cd seed/evidence && sha256sum --check compiler-dist.sha256)
-          git -C harness worktree add --detach "$PWD/candidate-source" 6008d916ac053bc104050d9c75aad69b04d4a878
-          git -C candidate-source apply "$PWD/harness/.research/surface-no-reparse.patch"
-          git -C candidate-source diff --check
-          git -C candidate-source add src/compiler/core.ts test/future-layout-domain-fuzz.test.ts
-          tree=$(git -C candidate-source write-tree)
-          test "$tree" = '38857ff4219223aa62819de72bcc542dd448f098'
-          git -C candidate-source -c user.name='github-actions[bot]' -c user.email='41898282+github-actions[bot]@users.noreply.github.com' commit -m 'perf(compiler): remove reparsing of certified Surface curves'
-          head=$(git -C candidate-source rev-parse HEAD)
-          test "$(git -C candidate-source rev-parse HEAD^{tree})" = "$tree"
-          git -C candidate-source bundle create "$PWD/evidence/candidate.bundle" HEAD ^6008d916ac053bc104050d9c75aad69b04d4a878
-          printf '%s\n' "$head" > evidence/candidate-sha.txt
-          printf '%s\n' "$tree" > evidence/candidate-tree.txt
+          git -C harness bundle verify "$PWD/previous/evidence/candidate.bundle"
+          git -C harness fetch "$PWD/previous/evidence/candidate.bundle" HEAD
+          head=$(git -C harness rev-parse FETCH_HEAD)
+          test "$head" = 'b3196727d4df97f90d7a587e1e6f7e6e7b1d7024'
+          test "$(git -C harness rev-parse FETCH_HEAD^{tree})" = '38857ff4219223aa62819de72bcc542dd448f098'
+          test "$(git -C harness rev-parse FETCH_HEAD^)" = '6008d916ac053bc104050d9c75aad69b04d4a878'
+          cp previous/evidence/candidate.bundle evidence/candidate.bundle
+          cp previous/evidence/candidate-sha.txt evidence/candidate-sha.txt
+          cp previous/evidence/candidate-tree.txt evidence/candidate-tree.txt
+          cp previous/evidence/surface-turn-worker.mjs evidence/surface-turn-worker.mjs
+          cp previous/evidence/turn-characterization.json evidence/turn-characterization.json
           printf '%s\n' "$GITHUB_SHA" > evidence/carrier-sha.txt
           printf 'candidate_sha=%s\n' "$head" >> "$GITHUB_OUTPUT"
-          cp seed/evidence/compiler-dist.sha256 evidence/compiler-dist.sha256
-          cp seed/evidence/base-sha.txt evidence/base-sha.txt
-          cp seed/evidence/base-size.log evidence/base-size.log
-          cp seed/evidence/candidate-size.log evidence/candidate-size.log
-          cp seed/evidence/targeted-tests.log evidence/targeted-tests.log
-          cp seed/evidence/compiler-acceptance.log evidence/compiler-acceptance.log
+          for receipt in compiler-dist.sha256 base-sha.txt base-size.log candidate-size.log targeted-tests.log compiler-acceptance.log; do
+            cp "seed/evidence/$receipt" "evidence/$receipt"
+          done
+          EVIDENCE_DIR="$PWD/evidence" node harness/.research/surface-holdout-prepare.mjs | tee evidence/holdout-policy.log
           sha256sum harness/.research/* > evidence/research-inputs.sha256
           node -p 'JSON.stringify({versions:process.versions,execArgv:process.execArgv,platform:process.platform,arch:process.arch})' > evidence/runtime.json
           lscpu > evidence/cpu.txt
-      - name: Prove task-turn contract and independent public equivalence
+          uname -a > evidence/kernel.txt
+      - name: Reconfirm public equivalence on the fixed host
         shell: bash
         run: |
           set -euo pipefail
-          SEED_DIR="$PWD/seed/evidence" EVIDENCE_DIR="$PWD/evidence" node harness/.research/surface-turn-prepare.mjs | tee evidence/turn-characterization.log
           EVIDENCE_ROOT="$PWD/seed/evidence" node harness/.research/surface-equivalence.mjs | tee evidence/independent-equivalence.log
           cp seed/evidence/independent-equivalence.json evidence/independent-equivalence.json
-      - name: One preregistered calibration and conditional candidate pass
+      - name: Fixed 256-cluster holdout and conditional candidate pass
         id: timing
         shell: bash
         run: |
           set -euo pipefail
           find seed/evidence/baseline seed/evidence/candidate -type f -print0 | sort -z | xargs -0 sha256sum > evidence/inputs-before.sha256
-          sha256sum seed/evidence/acorn.mjs evidence/surface-turn-worker.mjs > evidence/timing-inputs.sha256
+          sha256sum seed/evidence/acorn.mjs evidence/surface-turn-worker.mjs evidence/surface-holdout-runner.mjs > evidence/timing-inputs.sha256
           BASE_ROOT="$PWD/seed/evidence/baseline" CANDIDATE_ROOT="$PWD/seed/evidence/candidate" ACORN_PATH="$PWD/seed/evidence/acorn.mjs" \
-            WORKER_PATH="$PWD/evidence/surface-turn-worker.mjs" EVIDENCE_DIR="$PWD/evidence" node harness/.research/surface-fresh-isolate.mjs | tee evidence/timing.log
+            WORKER_PATH="$PWD/evidence/surface-turn-worker.mjs" EVIDENCE_DIR="$PWD/evidence" node evidence/surface-holdout-runner.mjs | tee evidence/timing.log
           find seed/evidence/baseline seed/evidence/candidate -type f -print0 | sort -z | xargs -0 sha256sum > evidence/inputs-after.sha256
           cmp evidence/inputs-before.sha256 evidence/inputs-after.sha256
           sha256sum --check evidence/timing-inputs.sha256
@@ -96,11 +103,11 @@ jobs:
         run: |
           mkdir -p evidence
           find evidence -maxdepth 1 -type f ! -name manifest.sha256 -print0 | sort -z | xargs -0 sha256sum > evidence/manifest.sha256
-      - name: Upload exact source and proof receipt
+      - name: Upload complete holdout and exact source
         if: always()
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         with:
-          name: surface-turn-proof-${{ github.sha }}
+          name: surface-holdout-proof-${{ github.sha }}
           path: evidence
           if-no-files-found: error
           retention-days: 30
@@ -121,7 +128,7 @@ jobs:
       - name: Download admitted immutable candidate
         uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c
         with:
-          name: surface-turn-proof-${{ github.sha }}
+          name: surface-holdout-proof-${{ github.sha }}
           path: evidence
           digest-mismatch: error
       - name: Publish only the owned candidate branch, never main
