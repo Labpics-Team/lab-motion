@@ -1,39 +1,38 @@
 import assert from 'node:assert/strict';
-import {readFileSync} from 'node:fs';
-const [dir]=process.argv.slice(2);
-const read=name=>JSON.parse(readFileSync(`${dir}/${name}.json`,'utf8'));
-const q=(xs,p)=>{const a=[...xs].sort((x,y)=>x-y),i=(a.length-1)*p,l=Math.floor(i),h=Math.ceil(i);return a[l]+(a[h]-a[l])*(i-l);};
-const median=xs=>q(xs,.5);
-let seed=0x5eed1234;const rand=()=>((seed=(Math.imul(seed,1664525)+1013904223)>>>0)/2**32);
-function bootstrapMedianCI(xs){const boots=[];for(let b=0;b<20000;b++){const s=[];for(let i=0;i<xs.length;i++)s.push(xs[Math.floor(rand()*xs.length)]);boots.push(median(s));}return{p50:median(xs),lo:q(boots,.025),hi:q(boots,.975)};}
-function summarize(file){
- const cells=new Map();
- for(const block of file.rows){
-  for(const path of ['main','waapi'])for(const rowA of block.base[path].rows){
-   const rowB=block.candidate[path].rows.find(x=>x.motion===rowA.motion&&x.count===rowA.count);assert(rowB);
-   for(const metric of Object.keys(rowA.samples[0])){
-    const key=`${path}/${rowA.motion}/${rowA.count}/${metric}`;
-    const a=median(rowA.samples.map(x=>x[metric])),b=median(rowB.samples.map(x=>x[metric]));
-    (cells.get(key)??cells.set(key,[]).get(key)).push(b/a);
-   }
+import {readFileSync,writeFileSync,mkdirSync} from 'node:fs';
+import {resolve} from 'node:path';
+import {pathToFileURL} from 'node:url';
+// node analyze.mjs <exact-repo> <artifact/paired> <output> <aa|double|ab> <main|waapi> <profile-index>
+const [root,input,out,kind,engine,indexText]=process.argv.slice(2),index=Number(indexText);
+const {pairedClusterBootstrap,evaluatePerformanceClaim}=await import(pathToFileURL(resolve(root,'bench/compare/methodology.mjs')));
+const raw=JSON.parse(readFileSync(`${input}/${kind}.json`,'utf8'));
+const expected={aa:8,double:4,ab:16}[kind];
+assert.equal(raw.blocks,expected);assert.equal(raw.rows.length,expected);
+for(const row of raw.rows)assert.deepEqual(row.order,row.run%2?['candidate','base']:['base','candidate']);
+const result=[];
+const first=raw.rows[0].base[engine].rows[index];
+for(const metric of Object.keys(first.samples[0])){
+ const clusters=id=>raw.rows.map(row=>{
+  const participant=row[id][engine],profile=participant.rows[index];
+  assert.equal(profile.motion,first.motion);assert.equal(profile.count,first.count);assert.equal(profile.samples.length,80);
+  assert.equal(participant.multiplier,kind==='double'&&id==='candidate'?2:1);
+  if(engine==='main'){
+   assert.equal(profile.semantic.lastValueHash,row.base[engine].rows[index].semantic.lastValueHash);
+   assert.equal(profile.semantic.totalWrites,60*profile.count);
   }
- }
- return Object.fromEntries([...cells].map(([k,v])=>[k,bootstrapMedianCI(v)]));
+  return {run:row.run,samples:profile.samples.map(s=>s[metric]),semantic:profile.semantic.valid};
+ });
+ const evidence=pairedClusterBootstrap(clusters('candidate'),clusters('base'),{seed:20260912,iterations:10000});
+ // Внутренние наблюдения не усредняются в медианы пар: SSOT сохраняет
+ // настоящий p95 и ресэмплирует целые парные run-кластеры.
+ const admission=evaluatePerformanceClaim(evidence,{absoluteThreshold:0,holmAccepted:false});
+ result.push({kind,engine,motion:first.motion,count:first.count,metric,...evidence,
+  p95NonInferiority:admission.gates.p95NonInferiority,
+  aaP50Resolved:evidence.p50.low>=.95&&evidence.p50.high<=1.05,
+  aaP95Resolved:evidence.p95.low>=.95&&evidence.p95.high<=1.05,
+  p50ExcludesZeroRegression:evidence.p50.low>1,
+  p95ExtraWorkDetected:evidence.p95.low>1.5,
+  p50ExtraWorkDetected:evidence.p50.low>1.5});
 }
-const aa=summarize(read('aa')),double=summarize(read('double')),ab=summarize(read('ab'));
-// Product policy mirrors docs/benchmark.md: <=5% p95 non-inferiority. Because
-// this Node micro-harness runs on a shared runner, it may be used as a blocking
-// proof only when its A/A controls themselves resolve that band. A large 2x-work
-// control must also be detected, otherwise a green result would be tautological.
-const verdict={pass:true,cells:{}};
-for(const key of Object.keys(ab)){
- const baselineResolution=aa[key];const positive=double[key];const candidate=ab[key];
- const resolvable=baselineResolution.lo>=.95&&baselineResolution.hi<=1.05;
- const detectsLargeRegression=positive.lo>1.5;
- const nonInferior=candidate.hi<=1.05;
- const pass=resolvable&&detectsLargeRegression&&nonInferior;
- verdict.cells[key]={aa:baselineResolution,doubleWork:positive,candidate,resolvable,detectsLargeRegression,nonInferior,pass};
- verdict.pass&&=pass;
-}
-console.log(JSON.stringify(verdict,null,2));
-if(!verdict.pass)process.exitCode=1;
+mkdirSync(out,{recursive:true});writeFileSync(`${out}/${kind}-${engine}-${index}.json`,JSON.stringify(result,null,2));
+for(const row of result)console.log(JSON.stringify(row));
