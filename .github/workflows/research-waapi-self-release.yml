@@ -24,7 +24,7 @@ jobs:
       - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v6
         with:
           node-version: '24.20.0'
-      - name: Materialize immutable base and minimal candidate
+      - name: Materialize immutable base and simplest self-release candidate
         shell: bash
         run: |
           set -euo pipefail
@@ -39,15 +39,9 @@ jobs:
           p=Path(sys.argv[1]);s=p.read_text()
           old='private readonly _o: WaapiUnitOptions;'
           assert s.count(old)==1
-          s=s.replace(old,'private _o: WaapiUnitOptions | undefined;',1)
-          s=s.replace('this._o.','this._o!.')
-          s=s.replace('const o = this._o;','const o = this._o!;')
-          old_commit='''  _commit(): void {\n    if (\n      this._o!._record._owner !== this ||'''
-          new_commit='''  _commit(): void {\n    if (\n      this._done ||\n      this._o!._record._owner !== this ||'''
-          assert s.count(old_commit)==1
-          s=s.replace(old_commit,new_commit,1)
-          old_finish='''  private _finish(natural: boolean): void {\n    if (this._done) return;\n    this._done = true;\n    if (this._o!._record._owner === this) this._o!._record._owner = undefined;\n    this._o!._onDone(natural);\n  }'''
-          new_finish='''  private _finish(natural: boolean): void {\n    if (this._done) return;\n    this._done = true;\n    const o = this._o!;\n    if (o._record._owner === this) o._record._owner = undefined;\n    this._o = undefined;\n    o._onDone(natural);\n  }'''
+          s=s.replace(old,'private _o: WaapiUnitOptions;',1)
+          old_finish='''  private _finish(natural: boolean): void {\n    if (this._done) return;\n    this._done = true;\n    if (this._o._record._owner === this) this._o._record._owner = undefined;\n    this._o._onDone(natural);\n  }'''
+          new_finish='''  private _finish(natural: boolean): void {\n    if (this._done) return;\n    this._done = true;\n    const o = this._o;\n    if (o._record._owner === this) o._record._owner = undefined;\n    this._o = undefined!;\n    o._onDone(natural);\n  }'''
           assert s.count(old_finish)==1
           s=s.replace(old_finish,new_finish,1)
           p.write_text(s)
@@ -86,8 +80,7 @@ jobs:
         run: node research/waapi-self-release/analyze.mjs "$RUNNER_TEMP/base" evidence/paired evidence/analysis.json
       - name: Seal evidence
         if: always()
-        run: |
-          find evidence -type f ! -name SHA256SUMS -print0 | sort -z | xargs -0 sha256sum > evidence/SHA256SUMS
+        run: find evidence -type f ! -name SHA256SUMS -print0 | sort -z | xargs -0 sha256sum > evidence/SHA256SUMS
       - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
         if: always()
         with:
