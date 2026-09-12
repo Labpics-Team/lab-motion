@@ -1,0 +1,103 @@
+name: Surface no-reparse proof
+on:
+  push:
+    branches: [research/surface-no-reparse-proof-20260912]
+permissions:
+  contents: read
+jobs:
+  proof:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 45
+    steps:
+      - name: Checkout evidence carrier
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          ref: ${{ github.sha }}
+          path: harness
+          fetch-depth: 0
+          persist-credentials: false
+      - name: Checkout exact base
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          ref: 6008d916ac053bc104050d9c75aad69b04d4a878
+          path: baseline
+          fetch-depth: 0
+          persist-credentials: false
+      - name: Checkout exact candidate source base
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          ref: 6008d916ac053bc104050d9c75aad69b04d4a878
+          path: candidate
+          fetch-depth: 0
+          persist-credentials: false
+      - name: Setup exact Node
+        uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020
+        with:
+          node-version: '24.20.0'
+      - name: Freeze candidate and dependency plane
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p evidence
+          printf '%s\n' "${GITHUB_SHA}" > evidence/carrier-sha.txt
+          printf '%s\n' '6008d916ac053bc104050d9c75aad69b04d4a878' > evidence/base-sha.txt
+          cmp baseline/package.json candidate/package.json
+          cmp baseline/pnpm-lock.yaml candidate/pnpm-lock.yaml
+          git -C candidate apply --check "$PWD/harness/.research/surface-no-reparse.patch"
+          git -C candidate apply "$PWD/harness/.research/surface-no-reparse.patch"
+          git -C candidate diff --check
+          git -C candidate add src/compiler/core.ts test/future-layout-domain-fuzz.test.ts
+          tree=$(git -C candidate write-tree)
+          printf '%s\n' "$tree" | tee evidence/candidate-tree.txt
+          test "$tree" = '38857ff4219223aa62819de72bcc542dd448f098'
+          git -C candidate diff --cached --binary > evidence/candidate.patch
+          sha256sum harness/.research/surface-no-reparse.patch harness/.research/surface-fresh-isolate.mjs harness/.research/surface-fresh-isolate-worker.mjs > evidence/research-inputs.sha256
+          node --version | tee evidence/node-version.txt
+          node -p 'process.versions.v8' | tee evidence/v8-version.txt
+          corepack enable
+          corepack install --global pnpm@11.11.0
+          pnpm --version | tee evidence/pnpm-version.txt
+          pnpm --dir baseline install --frozen-lockfile
+          test ! -e candidate/node_modules
+          ln -s "$PWD/baseline/node_modules" candidate/node_modules
+      - name: Build exact base and candidate
+        shell: bash
+        run: |
+          set -euo pipefail
+          pnpm --dir baseline build > evidence/base-build.log 2>&1
+          pnpm --dir candidate build > evidence/candidate-build.log 2>&1
+          sha256sum baseline/dist/compiler/vite/index.js candidate/dist/compiler/vite/index.js > evidence/compiler-dist.sha256
+      - name: Candidate semantic and deterministic gates
+        shell: bash
+        run: |
+          set -euo pipefail
+          pnpm --dir candidate exec vitest run --reporter=dot test/future-layout-domain-fuzz.test.ts test/compiler-surface-lowering.test.ts | tee evidence/targeted-tests.log
+          (cd baseline && node scripts/size-gate.mjs) | tee evidence/base-size.log
+          (cd candidate && node scripts/size-gate.mjs) | tee evidence/candidate-size.log
+          (cd candidate && node scripts/compiler-acceptance.mjs) | tee evidence/compiler-acceptance.log
+      - name: Preregistered fresh-isolate calibration and conditional candidate timing
+        shell: bash
+        run: |
+          set -euo pipefail
+          ACORN_PATH=$(find "$PWD/baseline/node_modules/.pnpm" -path '*/node_modules/acorn/dist/acorn.mjs' -print -quit)
+          test -n "$ACORN_PATH"
+          BASE_ROOT="$PWD/baseline" \
+          CANDIDATE_ROOT="$PWD/candidate" \
+          ACORN_PATH="$ACORN_PATH" \
+          WORKER_PATH="$PWD/harness/.research/surface-fresh-isolate-worker.mjs" \
+          EVIDENCE_DIR="$PWD/evidence" \
+          node harness/.research/surface-fresh-isolate.mjs | tee evidence/timing.log
+      - name: Evidence manifest
+        if: always()
+        shell: bash
+        run: |
+          set -euo pipefail
+          find evidence -maxdepth 1 -type f -print0 | sort -z | xargs -0 sha256sum > evidence/manifest.sha256
+      - name: Upload immutable evidence
+        if: always()
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
+        with:
+          name: surface-no-reparse-${{ github.sha }}
+          path: evidence
+          if-no-files-found: error
+          retention-days: 30
