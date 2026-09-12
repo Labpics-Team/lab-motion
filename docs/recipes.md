@@ -211,27 +211,63 @@ document.querySelector('.expand')?.addEventListener('click', () => sheet.snapTo(
 
 ## Каскад состояний взаимодействия без гонок
 
-Когда hover, press, selected, drag и exit могут действовать одновременно, не возвращайте свойство вручную в «default» из каждого обработчика. Создайте слои один раз в порядке приоритета и меняйте только соответствующий слой:
+Hover и press не должны вручную возвращать scale в «default». Держите отдельные
+слои намерений и один исполнитель движения. Этот браузерный адаптер принимает
+уже распознанные состояния приложения; pointer/keyboard-распознавание ему не
+принадлежит. При reduced-motion цель меняется сразу, результат сохраняется.
 
 ```ts
+import { MotionValue } from '@labpics/motion';
 import { createStateCascade } from '@labpics/motion/behaviors';
 
-const state = createStateCascade<{ scale: number; opacity: number; background: string }>();
-const base = state.createLayer({ scale: 1, opacity: 1, background: 'var(--surface)' });
-const selected = state.createLayer();
-const hover = state.createLayer();
-const press = state.createLayer();
-const exit = state.createLayer();
-
-state.subscribe(({ changed, removed }) => {
-  // Передайте только effective delta своему renderer/animate owner.
-  // Изменение base под активным press сюда не попадёт.
-});
-
-hover.set({ scale: 1.03 });
-press.set({ scale: 0.97 });
-hover.clear(); // scale остаётся 0.97: им ещё владеет press
-press.clear(); // раскрывается актуальный scale из base
+export function bindInteractionScale(element: HTMLElement) {
+  const state = createStateCascade<{ scale: number }>();
+  state.createLayer({ scale: 1 }); // Постоянный base: scale не исчезает.
+  const hover = state.createLayer();
+  const press = state.createLayer(); // Выше hover только для своих свойств.
+  const value = new MotionValue({
+    initial: 1,
+    spring: { mass: 1, stiffness: 200, damping: 26 },
+  });
+  const media = window.matchMedia('(prefers-reduced-motion: reduce)');
+  const original = element.style.getPropertyValue('scale');
+  const priority = element.style.getPropertyPriority('scale');
+  const render = (scale: number) => element.style.setProperty('scale', String(scale));
+  const offValue = value.onChange(render);
+  render(1);
+  const apply = (target: number) => {
+    if (media.matches) value.snap(target);
+    else value.setTarget(target);
+  };
+  const offState = state.subscribe(({ changed }) => {
+    if (Object.hasOwn(changed, 'scale')) apply(changed.scale!);
+  });
+  const onPreference = () => apply(state.get('scale')!);
+  media.addEventListener('change', onPreference);
+  let disposed = false;
+  return {
+    setHovered(active: boolean) { if (active) hover.set({ scale: 1.03 }); else hover.clear(); },
+    setPressed(active: boolean) { if (active) press.set({ scale: 0.97 }); else press.clear(); },
+    destroy() {
+      if (disposed) return;
+      disposed = true;
+      media.removeEventListener('change', onPreference);
+      offState();
+      offValue();
+      state.destroy();
+      value.destroy();
+      if (original) element.style.setProperty('scale', original, priority);
+      else element.style.removeProperty('scale');
+    },
+  };
+}
 ```
 
-Позднее созданный слой приоритетнее, но только для ключей, которые он действительно задаёт. Поэтому `selected` может владеть цветом одновременно с `hover`, который владеет scale. `clear()` не знает «куда вернуть» значение: каскад вычисляет следующего действующего владельца. Динамическое gesture-состояние приложения остаётся у приложения; cascade решает только визуальное ownership.
+`setHovered(false)` при активном press сохраняет scale 0.97. Снятие press
+раскрывает актуальный hover или base. Передавать одинаковый эффективный target
+исполнителю повторно не требуется — каскад не публикует такой delta. Адаптер
+владеет inline `scale` до destroy; другие writer-ы этого свойства одновременно
+не подключаются. Распознавание hover/press и жизненный цикл компонента остаются
+у приложения. Для более сложного сценария другие слои могут независимо владеть
+opacity или цветом. Полный контракт доставки, ошибок и lifetime —
+[behaviors.md](behaviors.md).
