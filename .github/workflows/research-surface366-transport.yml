@@ -1,64 +1,86 @@
-name: Surface 366 terminal receipt object transport
+name: Surface 366 fixed boundary qualification
 on:
   push:
     branches: [research/surface366-transport-20260912]
 permissions:
-  contents: write
+  contents: read
 jobs:
-  transport:
+  qualify:
     runs-on: ubuntu-24.04
-    timeout-minutes: 10
+    timeout-minutes: 60
+    env:
+      COREPACK_ENABLE_DOWNLOAD_PROMPT: '0'
+      COREPACK_DEFAULT_TO_LATEST: '0'
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
         with:
-          path: carrier
+          ref: 09ece9a91fa88f7ddcbea0425f4551db49ad6a0f
+          path: harness
+          fetch-depth: 0
           persist-credentials: false
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
         with:
-          ref: 5105ffec63f4e35bd780345178a013223295822a
-          path: source
+          ref: 7d09c6dc5a496a24efa3682c8cbb8c827b9f2ba7
+          path: base
+          fetch-depth: 0
           persist-credentials: false
-      - name: Reconstruct locally verified patch
-        shell: bash
-        run: |
-          set -euo pipefail
-          python3 - <<'PY'
-          import base64, hashlib, lzma
-          from pathlib import Path
-          data = lzma.decompress(base64.b64decode(Path('carrier/research-surface366-transfer.xz.b64').read_bytes()))
-          assert hashlib.sha256(data).hexdigest() == 'f181ac8a72b0e20faa17eae76666d2cb22ac22b02abf0bc7ae63ef43846e320f'
-          Path('transfer.patch').write_bytes(data)
-          PY
-          cd source
-          git apply --check ../transfer.patch
-          git apply ../transfer.patch
-      - name: Publish only verified content objects, never refs
-        shell: bash
-        env:
-          GH_TOKEN: ${{ github.token }}
-        run: |
-          set -euo pipefail
-          mkdir -p "$RUNNER_TEMP/object-receipt"
-          python3 - <<'PY'
-          import base64, json, os, subprocess
-          from pathlib import Path
-          files = {'docs/surface-benchmark.md':'0ee359977c59e3cc1acbf3fc5204f18121451c88','scripts/bench-surface-pair.mjs':'fe047628de9ff31f5591a1f832a6a51c873a76b7','test/bench-surface-pair.test.ts':'d836692706b14fded95a370bad703ea9ea20cea6'}
-          changed = subprocess.check_output(['git','-C','source','diff','--name-only'],text=True).splitlines()
-          assert sorted(changed) == sorted(files)
-          receipts = []
-          for name, expected in files.items():
-              data = Path('source', name).read_bytes()
-              assert subprocess.check_output(['git','hash-object','--stdin'],input=data).decode().strip() == expected
-              payload = json.dumps({'content':base64.b64encode(data).decode(),'encoding':'base64'}).encode()
-              result = json.loads(subprocess.check_output(['gh','api','--method','POST','repos/'+os.environ['GITHUB_REPOSITORY']+'/git/blobs','--input','-'],input=payload))
-              assert result['sha'] == expected
-              receipts.append({'path':name,'sha':expected})
-          Path(os.environ['RUNNER_TEMP'],'object-receipt','published.json').write_text(json.dumps({'blobs':receipts,'refWrites':0},indent=2))
-          print(json.dumps(receipts))
-          PY
-      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
         with:
-          name: surface366-terminal-objects-${{ github.sha }}
-          path: ${{ runner.temp }}/object-receipt
+          ref: 93278bf9b540f93521c7bd4c02f68db458e5db7a
+          path: candidate
+          fetch-depth: 0
+          persist-credentials: false
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020
+        with:
+          node-version: '24.20.0'
+          package-manager-cache: false
+      - name: Frozen tools and exact sources
+        shell: bash
+        run: |
+          set -euo pipefail
+          corepack enable
+          corepack install --global pnpm@11.11.0
+          node --input-type=module <<'JS'
+          import {readFileSync} from 'node:fs';
+          import assert from 'node:assert/strict';
+          const base = JSON.parse(readFileSync('base/package.json'));
+          for (const root of ['candidate','harness']) {
+            const p = JSON.parse(readFileSync(root+'/package.json'));
+            assert.deepEqual(readFileSync('base/pnpm-lock.yaml'),readFileSync(root+'/pnpm-lock.yaml'));
+            for (const k of ['dependencies','devDependencies','optionalDependencies','peerDependencies','packageManager']) assert.deepEqual(base[k],p[k]);
+          }
+          JS
+          cd base
+          pnpm install --frozen-lockfile
+          cd ..
+          ln -s "$PWD/base/node_modules" candidate/node_modules
+          ln -s "$PWD/base/node_modules" harness/node_modules
+          mkdir "$RUNNER_TEMP/qualification"
+          for dir in base candidate harness; do git -C "$dir" rev-parse HEAD; test -z "$(git -C "$dir" status --porcelain)"; done
+      - name: One calibrated public pair, preserve UNPROVEN
+        shell: bash
+        run: |
+          set -euo pipefail
+          set +e
+          node harness/scripts/bench-surface-pair.mjs --base "$PWD/base" --candidate "$PWD/candidate" --out "$RUNNER_TEMP/qualification/report" > "$RUNNER_TEMP/qualification/run.log" 2>&1
+          status=$?
+          set -e
+          printf '%s\n' "$status" > "$RUNNER_TEMP/qualification/exit-status.txt"
+          tail -n 8 "$RUNNER_TEMP/qualification/run.log"
+          test "$status" = 0 || test "$status" = 2
+      - name: Independent raw replay
+        shell: bash
+        run: |
+          set -euo pipefail
+          node harness/scripts/bench-surface-pair.mjs --verify "$RUNNER_TEMP/qualification/report" > "$RUNNER_TEMP/qualification/replay.json"
+          cat "$RUNNER_TEMP/qualification/replay.json"
+          node -p 'JSON.stringify({versions:process.versions,platform:process.platform,arch:process.arch})' > "$RUNNER_TEMP/qualification/environment.json"
+          sha256sum harness/scripts/bench-surface-pair.mjs harness/scripts/bench-surface-support.mjs > "$RUNNER_TEMP/qualification/harness.sha256"
+      - name: Preserve all results including failure
+        if: always()
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
+        with:
+          name: surface366-qualification-${{ github.sha }}
+          path: ${{ runner.temp }}/qualification
           if-no-files-found: error
-          retention-days: 7
+          retention-days: 30
