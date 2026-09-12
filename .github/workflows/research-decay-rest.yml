@@ -1,0 +1,201 @@
+name: Decay rest specialization research
+on:
+  push:
+    branches: [research/decay-rest-specialization-20260912-r9]
+    paths: [.github/workflows/research-decay-rest.yml]
+permissions: {}
+env:
+  BASE: 93278bf9b540f93521c7bd4c02f68db458e5db7a
+  CANDIDATE_BRANCH: perf/behaviors-decay-rest-20260912
+  COREPACK_ENABLE_DOWNLOAD_PROMPT: '0'
+  COREPACK_DEFAULT_TO_LATEST: '0'
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    permissions:
+      contents: write
+    outputs:
+      candidate: ${{ steps.commit.outputs.candidate }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          ref: ${{ env.BASE }}
+          fetch-depth: 0
+          persist-credentials: false
+      - name: Materialize only the preregistered product slice
+        id: commit
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 - <<'PY'
+          from pathlib import Path
+
+          def replace(path, old, new, count=1):
+              p=Path(path); s=p.read_text()
+              assert s.count(old)==count, (path,s.count(old),old)
+              p.write_text(s.replace(old,new,count))
+
+          p=Path('src/decay.ts'); s=p.read_text()
+          marker='// ─── createDecay ──────────────────────────────────────────────────────────────\n'
+          assert s.count(marker)==1
+          helper="""/**\n * Точка покоя default decay без построения sampling-модели. Внутренняя\n * специализация того же домена: guards, defaults и IEEE-порядок общие с\n * createDecay. Не сворачивать DEFAULT_POWER * DEFAULT_TIME_CONSTANT заранее.\n */\nexport function projectDefaultDecayRest(from: number, velocity: number): number {\n  if (!Number.isFinite(from)) throw new MotionParamError('LM021');\n  if (!Number.isFinite(velocity)) throw new MotionParamError('LM022');\n  const amplitude = clampAmplitude(DEFAULT_POWER * velocity * DEFAULT_TIME_CONSTANT);\n  return finiteOr(from + amplitude, amplitude > 0 ? Number.MAX_VALUE : -Number.MAX_VALUE);\n}\n\n"""
+          p.write_text(s.replace(marker,helper+marker,1))
+
+          replace('src/behaviors/index.ts',
+            ' *   ../decay createDecay — ПРОЕКЦИЯ момента: `.rest` = куда прилетел бы элемент',
+            ' *   ../decay projectDefaultDecayRest — та же точка покоя default decay')
+          replace('src/behaviors/index.ts',
+            "import { createDecay } from '../decay.js';",
+            "import { projectDefaultDecayRest } from '../decay.js';")
+          replace('src/behaviors/index.ts',
+            '  const landing = createDecay({ from: value, velocity }).rest;',
+            '  const landing = projectDefaultDecayRest(value, velocity);')
+          replace('src/behaviors/index.ts',
+            '      const landing = createDecay({ from: base.state.value, velocity: posVel }).rest;',
+            '      const landing = projectDefaultDecayRest(base.state.value, posVel);')
+
+          p=Path('test/decay-rest-projection.test.ts')
+          p.write_text("""import { describe, expect, it } from 'vitest';\nimport { createDecay, projectDefaultDecayRest } from '../src/decay.js';\nimport { lcg } from './projection-helpers.js';\n\ndescribe('default decay rest без полной sampling-модели', () => {\n  it('сохраняет exact endpoints и IEEE-порядок', () => {\n    expect(projectDefaultDecayRest(10, 0)).toBe(10);\n    expect(projectDefaultDecayRest(0, 100)).toBe(28);\n    expect(projectDefaultDecayRest(0, -100)).toBe(-28);\n    expect(Object.is(projectDefaultDecayRest(0, 9 * Number.MIN_VALUE), 2 * Number.MIN_VALUE)).toBe(true);\n    expect(Object.is(projectDefaultDecayRest(0, -9 * Number.MIN_VALUE), -2 * Number.MIN_VALUE)).toBe(true);\n    expect(Object.is(projectDefaultDecayRest(-0, -0), -0)).toBe(true);\n    expect(projectDefaultDecayRest(Number.MAX_VALUE, Number.MAX_VALUE)).toBe(Number.MAX_VALUE);\n    expect(projectDefaultDecayRest(-Number.MAX_VALUE, -Number.MAX_VALUE)).toBe(-Number.MAX_VALUE);\n  });\n\n  it('Object.is parity на IEEE edges и 10000 seeded finite входов', () => {\n    const edges = [0, -0, Number.MIN_VALUE, -Number.MIN_VALUE, 1e-308, -1e-308, 1, -1, Number.MAX_VALUE, -Number.MAX_VALUE];\n    const check = (from: number, velocity: number) => {\n      expect(Object.is(projectDefaultDecayRest(from, velocity), createDecay({ from, velocity }).rest)).toBe(true);\n    };\n    for (const from of edges) for (const velocity of edges) check(from, velocity);\n    const random = lcg(0x1badb002);\n    const finite = () => (random() < 0.5 ? -1 : 1) * random() * 2 ** (Math.floor(random() * 2097) - 1074);\n    for (let i = 0; i < 10000; i++) check(finite(), finite());\n  });\n\n  it('сохраняет fail-fast codes и приоритет обязательных входов', () => {\n    for (const value of [NaN, Infinity, -Infinity]) {\n      expect(() => projectDefaultDecayRest(value, 0)).toThrow('LM021');\n      expect(() => projectDefaultDecayRest(0, value)).toThrow('LM022');\n      expect(() => projectDefaultDecayRest(value, value)).toThrow('LM021');\n    }\n  });\n});\n""")
+
+          p=Path('CHANGELOG.md'); s=p.read_text(); marker='### Изменено\n'
+          assert s.count(marker)==1
+          entry='- `./behaviors`: выбор snap/page использует скалярную проекцию default decay и больше не строит неиспользуемую sampling-модель; публичный `./decay` остаётся прежним.\n'
+          p.write_text(s.replace(marker,marker+entry,1))
+          PY
+          git diff --check
+          mapfile -t changed < <(git diff --name-only)
+          printf '%s\n' "${changed[@]}"
+          [[ ${#changed[@]} -eq 4 ]]
+          printf '%s\n' "${changed[@]}" | sort | diff -u - <(printf '%s\n' CHANGELOG.md src/behaviors/index.ts src/decay.ts test/decay-rest-projection.test.ts | sort)
+          git add -- "${changed[@]}"
+          git -c user.name='github-actions[bot]' -c user.email='41898282+github-actions[bot]@users.noreply.github.com' commit -m 'perf(behaviors): project default decay rest without sampling model'
+          candidate="$(git rev-parse HEAD)"
+          echo "candidate=$candidate" >> "$GITHUB_OUTPUT"
+      - name: Publish only the owned candidate branch
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          gh auth setup-git
+          git push origin HEAD:refs/heads/$CANDIDATE_BRANCH
+
+  evidence:
+    needs: publish
+    runs-on: ubuntu-latest
+    timeout-minutes: 35
+    permissions:
+      contents: read
+    env:
+      CANDIDATE: ${{ needs.publish.outputs.candidate }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          persist-credentials: false
+          fetch-depth: 0
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v6
+        with:
+          node-version: '24.20.0'
+      - name: Rebuild immutable base and candidate
+        run: |
+          set -euo pipefail
+          corepack enable
+          corepack install --global pnpm@11.11.0
+          mkdir -p evidence
+          git worktree add --detach "$RUNNER_TEMP/base" "$BASE"
+          git worktree add --detach "$RUNNER_TEMP/candidate" "$CANDIDATE"
+          for name in base candidate; do
+            (cd "$RUNNER_TEMP/$name" && pnpm install --frozen-lockfile && pnpm build) 2>&1 | tee "evidence/$name-build.log"
+            test -z "$(git -C "$RUNNER_TEMP/$name" status --porcelain)"
+          done
+          { printf 'base=%s\ncandidate=%s\n' "$BASE" "$CANDIDATE"; node --version; pnpm --version; uname -a; lscpu; } > evidence/environment.txt
+          git diff "$BASE" "$CANDIDATE" -- > evidence/candidate.diff
+      - name: Semantic and domain gates
+        run: |
+          cd "$RUNNER_TEMP/candidate"
+          pnpm vitest run test/decay-rest-projection.test.ts test/behaviors-property.test.ts test/behaviors-sheet.test.ts test/behaviors-carousel.test.ts test/behaviors-finiteness-fuzz.test.ts test/decay-differential.test.ts test/decay-finiteness-fuzz.test.ts test/decay-mutation-harden.test.ts test/decay-reduced-motion.test.ts
+          pnpm typecheck
+          pnpm typecheck:native
+      - name: Exact all-entry all-consumer size Pareto
+        run: |
+          cat > "$RUNNER_TEMP/size.mjs" <<'EOF'
+          import assert from 'node:assert/strict';
+          import {readFileSync,readdirSync,statSync,writeFileSync} from 'node:fs';
+          import {join} from 'node:path';
+          import {pathToFileURL} from 'node:url';
+          const [base,candidate,out]=process.argv.slice(2);
+          const gate=await import(pathToFileURL(`${candidate}/scripts/size-gate.mjs`));
+          const oracle=await import(pathToFileURL(`${candidate}/scripts/compression-oracle.mjs`));
+          const result={};
+          for(const [id,root] of [['base',base],['candidate',candidate]]){
+            const entries=gate.measureEntries(gate.deriveEntriesFromExports(JSON.parse(readFileSync(`${root}/package.json`,'utf8'))),root);
+            assert.equal(entries.hasWarnings,false,JSON.stringify(entries.rows.filter(x=>x.error||x.exceeded)));
+            const consumers=[];
+            for(const scenario of gate.IMPORT_COST_SCENARIOS){const row=await gate.measureScenario(scenario,`${root}/dist/index.js`);assert(!row.error,row.error);consumers.push(row);}
+            result[id]={entries,consumers};
+          }
+          const metricKeys=new Set(['rawBytes','gzipBytes','brotliBytes','initialRawBytes','initialGzipBytes','initialBrotliBytes','lazyRawBytes','lazyGzipBytes','lazyBrotliBytes','totalRawBytes','totalGzipBytes','totalBrotliBytes']);
+          function compare(b,c,path=''){
+            if(Array.isArray(b)){assert.equal(c.length,b.length,path);for(let i=0;i<b.length;i++)compare(b[i],c[i],`${path}[${i}]`);return;}
+            if(!b||typeof b!=='object')return;
+            for(const key of Object.keys(b)){
+              if(metricKeys.has(key)&&Number.isFinite(b[key])) assert(c[key]<=b[key],`${path}.${key}: ${b[key]} -> ${c[key]}`);
+              else if(b[key]&&typeof b[key]==='object') compare(b[key],c[key],`${path}.${key}`);
+            }
+          }
+          compare(result.base,result.candidate);
+          const walk=(root,p='')=>readdirSync(join(root,p),{withFileTypes:true}).flatMap(d=>d.isDirectory()?walk(root,join(p,d.name)):[join(p,d.name)]).sort();
+          const files=walk(`${base}/dist`);assert.deepEqual(walk(`${candidate}/dist`),files);result.changed=[];
+          for(const file of files){if(!/\.(?:js|cjs)$/.test(file))continue;const b=readFileSync(`${base}/dist/${file}`),c=readFileSync(`${candidate}/dist/${file}`);if(b.equals(c))continue;
+            const cost=x=>({rawBytes:x.length,gzipBytes:oracle.canonicalGzip(x).length,brotliBytes:oracle.observationalBrotli(x).length});
+            const row={file,base:cost(b),candidate:cost(c)};for(const k of Object.keys(row.base))assert(row.candidate[k]<=row.base[k],`${file}.${k}`);result.changed.push(row);
+          }
+          writeFileSync(out,JSON.stringify(result,null,2));
+          console.log(JSON.stringify({changed:result.changed,entries:result.base.entries.rows.length,consumers:result.base.consumers.length}));
+          EOF
+          node "$RUNNER_TEMP/size.mjs" "$RUNNER_TEMP/base" "$RUNNER_TEMP/candidate" evidence/size.json
+          for name in base candidate; do
+            (cd "$RUNNER_TEMP/$name" && pnpm pack --pack-destination "$RUNNER_TEMP/$name-pack" >/dev/null)
+            stat -c '%s' "$RUNNER_TEMP/$name-pack"/*.tgz > "evidence/$name-package-tgz-bytes.txt"
+          done
+          base_tgz=$(cat evidence/base-package-tgz-bytes.txt); cand_tgz=$(cat evidence/candidate-package-tgz-bytes.txt)
+          [[ "$cand_tgz" -le "$base_tgz" ]]
+      - name: Paired public release benchmark with A/A and 2x positive control
+        run: |
+          cat > "$RUNNER_TEMP/worker.mjs" <<'EOF'
+          import assert from 'node:assert/strict';import {pathToFileURL} from 'node:url';
+          const [root,multText='1']=process.argv.slice(2),mult=Number(multText);const {createBottomSheet,createCarousel}=await import(pathToFileURL(`${root}/behaviors/index.js`));
+          const reduce=()=>({matches:true});
+          function sheet(){let clock=0;const c=createBottomSheet({snapPoints:[0,80,160,240],initial:80,matchMedia:reduce});return()=>{clock+=.03;c.pointerDown({x:0,y:0,t:clock});c.pointerMove({x:0,y:17+(clock*100|0)%23,t:clock+.01});c.pointerUp({x:0,y:34+(clock*100|0)%31,t:clock+.02});return c.state.snapIndex+c.state.value;};}
+          function carousel(){let clock=0;const c=createCarousel({pageCount:7,pageSize:120,index:3,matchMedia:reduce});return()=>{clock+=.03;c.pointerDown({x:0,y:0,t:clock});c.pointerMove({x:-19-(clock*100|0)%27,y:0,t:clock+.01});c.pointerUp({x:-41-(clock*100|0)%37,y:0,t:clock+.02});return c.state.index+c.state.value;};}
+          const rows=[];for(const [name,make] of [['sheet-release',sheet],['carousel-release',carousel]]){const run=make();let hash=0;for(let i=0;i<20000;i++)hash+=run();const samples=[];for(let r=0;r<16;r++){const t=process.hrtime.bigint();for(let i=0;i<8000;i++)for(let k=0;k<mult;k++)hash+=run();samples.push(Number(process.hrtime.bigint()-t)/(8000*mult));}assert(Number.isFinite(hash));rows.push({name,samples,semantic:true,hash});}console.log(JSON.stringify({root,mult,rows}));
+          EOF
+          cat > "$RUNNER_TEMP/paired.mjs" <<'EOF'
+          import assert from 'node:assert/strict';import {execFileSync} from 'node:child_process';import {writeFileSync} from 'node:fs';import {pathToFileURL} from 'node:url';
+          const [base,cand,repo,out]=process.argv.slice(2);const {pairedClusterBootstrap}=await import(pathToFileURL(`${repo}/bench/compare/methodology.mjs`));
+          const worker=new URL('./worker.mjs',import.meta.url).pathname;
+          const exec=(root,mult='1')=>JSON.parse(execFileSync(process.execPath,[worker,root,mult],{encoding:'utf8',timeout:120000}));
+          const collect=(kind,blocks)=>{const pairs=[];for(let run=0;run<blocks;run++){const order=run%2?['candidate','base']:['base','candidate'];const row={run,order};for(const id of order){const root=kind==='aa'?base:(id==='base'?base:cand);const mult=kind==='double'&&id==='candidate'?'2':'1';row[id]=exec(root,mult);}pairs.push(row);console.log(`${kind} ${run+1}/${blocks}`);}return pairs;};
+          const corpus={aa:collect('aa',8),double:collect('double',8),ab:collect('ab',24)},analysis:{}};
+          for(const scenario of ['sheet-release','carousel-release']){corpus.analysis[scenario]={};for(const kind of ['aa','double','ab']){const pairs=corpus[kind];const clusters=id=>pairs.map(row=>({run:row.run,samples:row[id].rows.find(x=>x.name===scenario).samples,semantic:row[id].rows.find(x=>x.name===scenario).semantic}));const e=pairedClusterBootstrap(clusters('candidate'),clusters('base'),{seed:20260912,iterations:10000});corpus.analysis[scenario][kind]=e;}}
+          for(const scenario of Object.keys(corpus.analysis)){const x=corpus.analysis[scenario];assert(x.aa.p50.low<=1&&x.aa.p50.high>=1,`${scenario} A/A p50 unresolved`);assert(x.aa.p95.low<=1&&x.aa.p95.high>=1,`${scenario} A/A p95 unresolved`);assert(x.double.p50.low>1.5,`${scenario} 2x control not detected`);assert(x.ab.p95.high<=1.05,`${scenario} p95 regression`);}
+          writeFileSync(out,JSON.stringify(corpus,null,2));console.log(JSON.stringify(corpus.analysis,null,2));
+          EOF
+          cpu="$(python3 - <<'PY'
+          import os
+          print(min(os.sched_getaffinity(0)))
+          PY
+          )"
+          printf 'bench_cpu=%s\n' "$cpu" >> evidence/environment.txt
+          taskset -c "$cpu" node "$RUNNER_TEMP/paired.mjs" "$RUNNER_TEMP/base/dist" "$RUNNER_TEMP/candidate/dist" "$RUNNER_TEMP/candidate" evidence/paired.json
+      - name: Seal evidence
+        if: always()
+        run: find evidence -type f ! -name SHA256SUMS -print0 | sort -z | xargs -0 sha256sum > evidence/SHA256SUMS
+      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
+        if: always()
+        with:
+          name: decay-rest-${{ needs.publish.outputs.candidate }}-${{ github.run_id }}
+          path: evidence/
+          if-no-files-found: error
+          retention-days: 14
+          compression-level: 6
