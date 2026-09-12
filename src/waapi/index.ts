@@ -343,45 +343,30 @@ export type WaapiScrollCompileOptions = Omit<
   'duration' | 'repeat' | 'repeatType' | 'repeatDelay'
 > & { readonly fill?: WaapiCompiled['timing']['fill'] };
 
-type ScrollTimelineCtor = new (options: {
-  source: unknown;
-  axis?: WaapiScrollAxis;
-}) => unknown;
+type ProgressTimelineName = 'ScrollTimeline' | 'ViewTimeline';
+type ProgressTimelineCtor = new (options: Record<string, unknown>) => unknown;
 
-function scrollTimelineCtor(): ScrollTimelineCtor | undefined {
-  const ctor = (globalThis as { ScrollTimeline?: unknown }).ScrollTimeline;
-  return typeof ctor === 'function' ? ctor as ScrollTimelineCtor : undefined;
+function progressTimelineCtor(name: ProgressTimelineName): ProgressTimelineCtor | undefined {
+  const ctor = (globalThis as Record<string, unknown>)[name];
+  return typeof ctor === 'function' ? ctor as ProgressTimelineCtor : undefined;
 }
 
 /** Capability probe без UA-sniffing и без DOM-глобалов на import. */
 export function supportsScrollTimeline(): boolean {
-  return scrollTimelineCtor() !== undefined;
-}
-
-type ViewTimelineCtor = new (options: {
-  subject: unknown;
-  axis?: WaapiScrollAxis;
-}) => unknown;
-
-function viewTimelineCtor(): ViewTimelineCtor | undefined {
-  const ctor = (globalThis as { ViewTimeline?: unknown }).ViewTimeline;
-  return typeof ctor === 'function' ? ctor as ViewTimelineCtor : undefined;
+  return progressTimelineCtor('ScrollTimeline') !== undefined;
 }
 
 /** Capability probe view-progress timeline без UA-sniffing. */
 export function supportsViewTimeline(): boolean {
-  return viewTimelineCtor() !== undefined;
+  return progressTimelineCtor('ViewTimeline') !== undefined;
 }
 
 /** View и scroll используют один property compiler. */
 export type WaapiViewCompileOptions = WaapiScrollCompileOptions;
 
 /**
- * Отдать связь scroll progress → property браузеру целиком.
- *
- * Возвращает undefined, если target/ScrollTimeline недоступны. Скрытого
- * scroll-listener/rAF fallback нет: caller может явно выбрать headless ./scroll.
- * На native path после единственного commit Lab Motion не выполняет per-frame JS.
+ * Общий commit уже созданной progress timeline. Capability/fallback policy
+ * остаётся у публичных scroll/view адаптеров; здесь только property compiler.
  */
 function animateProgressWaapi(
   el: WaapiAnimatable,
@@ -418,7 +403,7 @@ export function animateScrollWaapi(
   scroll: WaapiScrollTimelineOptions,
 ): unknown | undefined {
   if (!supportsWaapi(el)) return undefined;
-  const Timeline = scrollTimelineCtor();
+  const Timeline = progressTimelineCtor('ScrollTimeline');
   if (!Timeline) return undefined;
   const timeline = new Timeline({ source: scroll.source, axis: scroll.axis ?? 'block' });
   return animateProgressWaapi(el, options, timeline);
@@ -434,7 +419,7 @@ export function animateViewWaapi(
   view: WaapiViewTimelineOptions,
 ): unknown | undefined {
   if (!supportsWaapi(el)) return undefined;
-  const Timeline = viewTimelineCtor();
+  const Timeline = progressTimelineCtor('ViewTimeline');
   if (!Timeline) return undefined;
   const timeline = new Timeline({ subject: view.subject, axis: view.axis ?? 'block' });
   return animateProgressWaapi(el, options, timeline, view.rangeStart, view.rangeEnd);
