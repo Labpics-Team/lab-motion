@@ -23,7 +23,7 @@ import {
   SURFACE_PAIR_POLICY,
 } from '../scripts/bench-surface-support.mjs';
 import { sha256File } from '../bench/compare/provenance.mjs';
-import { parseSurfaceBenchArgs, replaySurfaceReport } from '../scripts/bench-surface-pair.mjs';
+import { parseSurfaceBenchArgs, prepareSurfaceCheckouts, replaySurfaceReport } from '../scripts/bench-surface-pair.mjs';
 
 const temporary: string[] = [];
 afterEach(() => { for (const directory of temporary.splice(0)) rmSync(directory, { recursive: true, force: true }); });
@@ -307,4 +307,56 @@ describe('Surface: process boundary и raw readback', () => {
     persistRaw(); // Даже новый согласованный SHA не легализует неполный run.
     expect(() => replaySurfaceReport(directory)).toThrow('незавершённый raw journal');
   }, 30_000);
+});
+
+
+describe('Surface: единый владелец фаз подготовки toolchain', () => {
+  const tool = (sha256: string) => ({ terser: { version: 'pinned', files: 44, sha256 } });
+
+  it('не сравнивает промежуточные shims с settled runtime и хранит обе фазы', () => {
+    let phase = 'installed';
+    const events: string[] = [];
+    const snapshots: unknown[] = [];
+    const result = prepareSurfaceCheckouts({ base: 'A', candidate: 'B' }, {
+      capture: (root: string) => { events.push(`capture:${root}:${phase}`); return tool(phase); },
+      prepare: (root: string) => { events.push(`build:${root}`); if (root === 'B') phase = 'relocated'; return { root }; },
+      record: (snapshot: unknown) => snapshots.push(structuredClone(snapshot)),
+    });
+    expect(events).toEqual([
+      'capture:A:installed', 'build:A', 'capture:A:installed',
+      'capture:B:installed', 'build:B', 'capture:B:relocated',
+      'capture:A:relocated', 'capture:B:relocated',
+    ]);
+    expect(result.beforeBuild.base).toEqual(result.beforeBuild.candidate);
+    expect(result.afterBuild.base).not.toEqual(result.afterBuild.candidate);
+    expect(result.tools.base).toEqual(tool('relocated'));
+    expect(result.tools.candidate).toEqual(tool('relocated'));
+    expect(snapshots).toHaveLength(5);
+  });
+
+  it('различные входы реально запрещают вторую сборку, а не только timing', () => {
+    const built: string[] = [];
+    const snapshots: { phase: string; reason?: string }[] = [];
+    expect(() => prepareSurfaceCheckouts({ base: 'A', candidate: 'B' }, {
+      capture: (root: string) => tool(root), prepare: (root: string) => built.push(root),
+      record: (snapshot: { phase: string; reason?: string }) => snapshots.push(structuredClone(snapshot)),
+    })).toThrow('terser sha256 до build');
+    expect(built).toEqual(['A']);
+    expect(snapshots.at(-1)?.phase).toBe('INVALID');
+    expect(snapshots.at(-1)?.reason).toContain('terser sha256');
+  });
+
+  it('проверяет settled-различие и сохраняет отказ самой сборки', () => {
+    let builds = 0;
+    expect(() => prepareSurfaceCheckouts({ base: 'A', candidate: 'B' }, {
+      capture: (root: string) => tool(builds < 2 ? 'same' : root), prepare: () => ++builds,
+    })).toThrow('после обеих сборок');
+    const snapshots: { phase: string; reason?: string }[] = [];
+    expect(() => prepareSurfaceCheckouts({ base: 'A', candidate: null }, {
+      capture: () => tool('same'), prepare: () => { throw new Error('сломана сборка'); },
+      record: (snapshot: { phase: string; reason?: string }) => snapshots.push(structuredClone(snapshot)),
+    })).toThrow('сломана сборка');
+    expect(snapshots.map(s => s.phase)).toEqual(['before-base-build', 'INVALID']);
+    expect(snapshots.at(-1)?.reason).toContain('сломана сборка');
+  });
 });

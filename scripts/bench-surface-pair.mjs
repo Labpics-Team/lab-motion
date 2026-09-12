@@ -105,6 +105,45 @@ function installedTool(root, name) {
     ...hashFileTree(directory) };
 }
 
+/** Одинаковые фазы: входы до build и фактический runtime после ОБЕИХ сборок.
+ * pnpm может переписать абсолютные bin-shims общего node_modules при relocation.
+ * Промежуточные snapshots сохраняются, но не смешиваются с settled-фазой. */
+export function prepareSurfaceCheckouts(roots, {
+  prepare = root => prepareBenchmarkCheckout({ root, benchDirectory: root, requireClean: true,
+    requiredDist: ['dist/compiler/vite/index.js'], requiredRootPackages: ['typescript', 'esbuild', 'pako', 'tsup'] }),
+  capture = root => Object.fromEntries(['terser', 'typescript', 'esbuild', 'pako', 'tsup']
+    .map(name => [name, installedTool(root, name)])),
+  record = () => {},
+} = {}) {
+  const state = { prepared: {}, beforeBuild: {}, afterBuild: {}, tools: {} };
+  const same = (left, right, phase) => {
+    assert.deepEqual(Object.keys(right).sort(), Object.keys(left).sort(), `surface bench: инструменты ${phase}`);
+    for (const name of Object.keys(left)) {
+      for (const field of ['version', 'files', 'sha256']) {
+        assert.equal(left[name][field], right[name][field], `surface bench: ${name} ${field} ${phase}`);
+      }
+    }
+  };
+  try {
+    for (const [side, root] of Object.entries(roots)) {
+      if (!root) continue;
+      state.beforeBuild[side] = capture(root);
+      record({ phase: `before-${side}-build`, ...state });
+      if (side === 'candidate') same(state.beforeBuild.base, state.beforeBuild.candidate, 'до build');
+      state.prepared[side] = prepare(root);
+      state.afterBuild[side] = capture(root);
+      record({ phase: `after-${side}-build`, ...state });
+    }
+    for (const [side, root] of Object.entries(roots)) if (root) state.tools[side] = capture(root);
+    record({ phase: 'settled', ...state });
+    if (roots.candidate) same(state.tools.base, state.tools.candidate, 'после обеих сборок');
+    return state;
+  } catch (error) {
+    record({ phase: 'INVALID', reason: String(error?.message ?? error), ...state });
+    throw error;
+  }
+}
+
 async function execute(options) {
   assert.equal(Number(process.versions.node.split('.')[0]), 24, 'surface bench: требуется Node 24');
   assert.equal(process.execArgv.length, 0, 'surface bench: runtime flags не допускаются');
@@ -113,24 +152,18 @@ async function execute(options) {
   const journal = path.join(options.out, 'raw.jsonl');
   const write = (file, value) => writeFileSync(path.join(options.out, file), JSON.stringify(value, null, 2));
   const roots = { base: realpathSync(options.base), candidate: options.calibrateOnly ? null : realpathSync(options.candidate) };
-  const prepared = {};
-  const tools = {};
   const harnessState = readCheckoutState(ROOT);
   assert(!harnessState.dirty, 'surface bench: harness checkout должен быть clean');
   const trackedInputs = [SCRIPT, path.join(ROOT, 'scripts/bench-surface-support.mjs'),
     path.join(ROOT, 'bench/compare/methodology.mjs'), path.join(ROOT, 'bench/compare/provenance.mjs')];
   const harnessHashes = Object.fromEntries(trackedInputs.map(f => [f, { path: f, sha256: sha256File(f) }]));
-  for (const [side, root] of Object.entries(roots)) {
-    if (!root) continue;
-    prepared[side] = prepareBenchmarkCheckout({ root, benchDirectory: root, requireClean: true,
-      requiredDist: ['dist/compiler/vite/index.js'], requiredRootPackages: ['typescript', 'esbuild', 'pako', 'tsup'] });
-    tools[side] = Object.fromEntries(['terser', 'typescript', 'esbuild', 'pako', 'tsup'].map(name => [name, installedTool(root, name)]));
-  }
   if (roots.candidate) {
     assert.equal(sha256File(path.join(roots.base, 'pnpm-lock.yaml')), sha256File(path.join(roots.candidate, 'pnpm-lock.yaml')),
       'surface bench: разные toolchain lock, нужен отдельный эксперимент');
-    for (const name of Object.keys(tools.base)) assert.equal(tools.base[name].sha256, tools.candidate[name].sha256);
   }
+  const { prepared, beforeBuild, afterBuild, tools } = prepareSurfaceCheckouts(roots, {
+    record: snapshot => write('provisioning.json', snapshot),
+  });
   const require = createRequire(path.join(roots.base, 'package.json'));
   const ts = require('typescript');
   const probes = {};
@@ -143,7 +176,7 @@ async function execute(options) {
   probes.equal = path.join(options.out, 'equal-probe.mjs');
   writeFileSync(probes.equal, readFileSync(probes.base));
   const acorn = parserFor(roots.base);
-  const manifest = { schema: 1, calibrateOnly: options.calibrateOnly === true, harnessState, policy: SURFACE_PAIR_POLICY, roots, prepared, tools, probes,
+  const manifest = { schema: 1, calibrateOnly: options.calibrateOnly === true, harnessState, policy: SURFACE_PAIR_POLICY, roots, prepared, tools, buildTools: { beforeBuild, afterBuild }, probes,
     nodeExecutable: sha256File(process.execPath), versions: process.versions,
     cpu: os.cpus()[0]?.model, platform: process.platform, arch: process.arch, kernel: os.release(),
     acorn: { module: acorn.module, packageDirectory: acorn.packageDirectory,
