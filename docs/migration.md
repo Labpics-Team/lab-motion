@@ -51,3 +51,16 @@ CSS-стилей. Низкоуровневые субпути не объеди�
 `time/speed/duration` getters, `reverse`, `complete` и `restart`. Публичного
 API регистрации произвольных кодеков или адаптеров целей пакет не
 предоставляет.
+
+
+## Компонентные области
+
+Для локальных селекторов и совместной остановки используйте `createAnimateScope`
+из `./animate`: создавайте scope в setup/mount и вызывайте `scope.destroy()` при
+cleanup. В React область принадлежит конкретному запуску эффекта, в Solid — owner.
+[Полные runnable-примеры](recipes.md#анимации-принадлежащие-компоненту).
+
+Это не полная замена Motion `useAnimate`, Anime Scope или GSAP Context. В частности,
+`destroy` сохраняет текущую позу согласно Lab Motion cancel и не восстанавливает
+старые inline styles, как revert. Область не владеет произвольными listeners и
+не добавляет отсутствующие keyframes/sequences/playback возможности.

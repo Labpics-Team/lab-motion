@@ -395,6 +395,13 @@ export const IMPORT_COST_SCENARIOS = [
     gate: FULL_ANIMATE_GATE_BYTES,
   },
   {
+    name: 'animate component scope',
+    code: `import { createAnimateScope } from '%DIST%/../animate/index.js'; const s=createAnimateScope(document.querySelector('.panel')); s.animate('.item', { x:240, opacity:1 }); document.querySelector('.close').addEventListener('click',s.destroy);`,
+    // #376: первый проверенный consumer 15 593 B gzip; запас <0.7%.
+    // Это цена новой capability. Старые entry/consumer потолки не повышаются.
+    gate: 15_700,
+  },
+  {
     // ПРАВДА потребительской цены поведения + СТРАЖ переиспользования: одна
     // фабрика ./behaviors должна тянуть ТОЛЬКО срез velocity-tracker+decay+solver,
     // а не весь пакет. Если бы behaviors утянул ./compositor-компилятор или
