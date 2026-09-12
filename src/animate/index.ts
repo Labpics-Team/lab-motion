@@ -188,7 +188,7 @@ function releaseTransition(rec: GroupRecord, owner: GroupOwner | undefined): voi
   try { owner?._release?.(); } catch { /* owner уже терминализирован */ }
 }
 
-// ─── Дефолтные швы (читаются в вызове — SSR-safe) ────────────────────────────
+// ─── Дефолтные швы (читаются в вызове — SSR-safe импорт) ────────────────────────
 
 function defaultNow(): number {
   const perf = (globalThis as { performance?: { now?: () => number } }).performance;
@@ -434,39 +434,35 @@ export function animate(
   // текущего владельца этой записи вместо разрушения обоих прогонов.
   let protectedOwner: object | undefined;
   let mainBatch: SurfaceBatch | undefined;
-  const total = plan.length;
-  let done = 0;
-  let natural = 0;
-  let setupDone = false;
+  // Последний permit принадлежит commit-фазе: synchronous unit completion
+  // не может завершить aggregate до публикации всех owners и Promise.
+  let remaining = plan.length + 1;
+  let allNatural = true;
+  let activeOptions: AnimateOptions | undefined = options;
   let resolveFinished!: (value: void | PromiseLike<void>) => void;
-  // Наружу виден один lifecycle, поэтому один aggregate Promise заменяет N
-  // скрытых Unit-deferred и не превращает массовый start в GC-hot-path.
-  const maybeComplete = (): void => {
-    if (!setupDone || done !== total) return;
-    setupDone = false; // та же защёлка гасит повторную terminal-отчётность
+  const report = (natural: boolean): void => {
+    allNatural &&= natural;
+    if (--remaining !== 0) return;
+    // Terminal controls больше не владеют execution graph. Обнуляется и
+    // options: пользовательский callback может замыкать те же DOM-цели.
+    units.length = 0;
     mainBatch = undefined;
-    // Thenable-adoption даёт промежуточную Promise job: уже поставленная
-    // caller-микрозадача остаётся перед finished reactions.
+    // Thenable-adoption сохраняет прежний публичный microtask order.
     resolveFinished(ASYNC_FINISH);
-    if (natural === total) {
-      try { options.onComplete?.(); } catch (error) {
-        // Отчёт об ошибке callback не владеет lifecycle: hostile reporter не
-        // может спрятать controls или заменить natural completion.
+    if (allNatural) {
+      try { activeOptions!.onComplete?.(); } catch (error) {
+        // Host reporter не владеет завершением и освобождением ресурсов.
         try {
           (globalThis as { reportError?: (reason: unknown) => void }).reportError?.(error);
         } catch { /* best-effort отчёт host-у */ }
       }
     }
-  };
-  const report = (nat: boolean): void => {
-    done++;
-    if (nat) natural++;
-    maybeComplete();
+    activeOptions = undefined;
   };
   // Чистый compositor/reduced не создаёт main-state. WAAPI handoff и обычные
   // main slots одного aggregate делят kernel и исходный plan capacity.
   const getMainBatch = (): SurfaceBatch =>
-    mainBatch ??= surfaceBatchFor(options.requestFrame);
+    mainBatch ??= surfaceBatchFor(activeOptions!.requestFrame);
 
   // 4. Фаза commit в исходном target-major порядке. Владелец берётся из
   //    record ЗДЕСЬ, а не сохраняется в плане: повтор цели в списке обязан
@@ -560,8 +556,7 @@ export function animate(
   const finished = new INTRINSIC_PROMISE<void>((resolve) => {
     resolveFinished = resolve;
   });
-  setupDone = true;
-  maybeComplete();
+  report(true);
 
   // 5. Агрегированные контролы (пустой список целей → уже разрешённый no-op).
   const cancel = (): void => {
