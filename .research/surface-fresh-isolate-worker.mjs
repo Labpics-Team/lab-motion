@@ -62,8 +62,16 @@ function executeSurfaceBurst(op) {
   for (let i = 0; i < calls; i++) sink += op();
   blackhole += sink;
 }
-for (let i = 0; i < 128; i++) executeSurfaceBurst(opA);
-for (let i = 0; i < 128; i++) executeSurfaceBurst(opB);
+// 128 warm bursts per side, as before, but with the same position-balanced
+// ABBA/BAAB schedule as the measured phase. Sequential A×128 → B×128 made the
+// 512-item miss control a cache-residency experiment: B was always the most
+// recently touched working set, producing a false ~0.76 A/A ratio on the
+// immutable baseline. The balanced schedule preserves warm-up work and JIT
+// exposure while removing role-dependent starting state.
+const warmOrder = cluster % 2 ? [1, 0, 0, 1] : [0, 1, 1, 0];
+for (let round = 0; round < 64; round++) {
+  for (const side of warmOrder) executeSurfaceBurst(side === 0 ? opA : opB);
+}
 
 const clock = [];
 for (let i = 0; i < 256; i++) {
@@ -91,7 +99,7 @@ function timed(op) {
 }
 const samples = [[], []];
 const details = [];
-for (const side of cluster % 2 ? [1, 0, 0, 1] : [0, 1, 1, 0]) {
+for (const side of warmOrder) {
   const detail = timed(side === 0 ? opA : opB);
   samples[side].push(detail.ns);
   details.push({ side, ...detail });
