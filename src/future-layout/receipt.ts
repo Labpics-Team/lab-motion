@@ -54,7 +54,9 @@ function parseExplicitLinearSamples(css: string): Float64Array {
   const body = css.slice(7, -1);
   if (body.length === 0) throw new Error('surface receipt: пустая linear()-строка');
   const parts = body.split(',');
+  if (parts.length < 2) throw new Error('surface receipt: недостаточно linear()-stops');
   const out = new Float64Array(parts.length * 2);
+  let previousPercent = Number.NEGATIVE_INFINITY;
   for (let i = 0; i < parts.length; i++) {
     const tokens = parts[i]!.trim().split(/\s+/);
     if (tokens.length !== 2 || !tokens[1]!.endsWith('%')) {
@@ -65,8 +67,15 @@ function parseExplicitLinearSamples(css: string): Float64Array {
     if (!Number.isFinite(value) || !Number.isFinite(percent)) {
       throw new Error('surface receipt: нечисловой linear()-stop');
     }
+    if (percent < 0 || percent > 100 || percent <= previousPercent) {
+      throw new Error('surface receipt: позиции linear()-stops не возрастают');
+    }
     out[i * 2] = percent;
     out[i * 2 + 1] = value;
+    previousPercent = percent;
+  }
+  if (out[0] !== 0 || out[out.length - 2] !== 100) {
+    throw new Error('surface receipt: linear()-endpoints не 0/100');
   }
   return out;
 }
