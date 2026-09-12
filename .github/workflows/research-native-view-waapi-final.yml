@@ -1,0 +1,131 @@
+name: Native progress timeline simplicity proof
+
+on:
+  push:
+    branches: ["research/native-view-waapi-final-20260912"]
+
+permissions:
+  contents: write
+
+env:
+  COREPACK_ENABLE_DOWNLOAD_PROMPT: "0"
+  COREPACK_DEFAULT_TO_LATEST: "0"
+
+jobs:
+  verify:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v6
+        with:
+          node-version: "24.20.0"
+      - run: |
+          corepack enable
+          corepack install --global pnpm@11.11.0
+          pnpm install --frozen-lockfile
+
+      - name: Collapse duplicate capability machinery
+        shell: bash
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+          p = Path('src/waapi/index.ts')
+          s = p.read_text()
+
+          old = '''type ScrollTimelineCtor = new (options: {
+  source: unknown;
+  axis?: WaapiScrollAxis;
+}) => unknown;
+
+function scrollTimelineCtor(): ScrollTimelineCtor | undefined {
+  const ctor = (globalThis as { ScrollTimeline?: unknown }).ScrollTimeline;
+  return typeof ctor === 'function' ? ctor as ScrollTimelineCtor : undefined;
+}
+
+/** Capability probe без UA-sniffing и без DOM-глобалов на import. */
+export function supportsScrollTimeline(): boolean {
+  return scrollTimelineCtor() !== undefined;
+}
+
+type ViewTimelineCtor = new (options: {
+  subject: unknown;
+  axis?: WaapiScrollAxis;
+}) => unknown;
+
+function viewTimelineCtor(): ViewTimelineCtor | undefined {
+  const ctor = (globalThis as { ViewTimeline?: unknown }).ViewTimeline;
+  return typeof ctor === 'function' ? ctor as ViewTimelineCtor : undefined;
+}
+
+/** Capability probe view-progress timeline без UA-sniffing. */
+export function supportsViewTimeline(): boolean {
+  return viewTimelineCtor() !== undefined;
+}
+'''
+          new = '''type ProgressTimelineName = 'ScrollTimeline' | 'ViewTimeline';
+type ProgressTimelineCtor = new (options: Record<string, unknown>) => unknown;
+
+function progressTimelineCtor(name: ProgressTimelineName): ProgressTimelineCtor | undefined {
+  const ctor = (globalThis as Record<string, unknown>)[name];
+  return typeof ctor === 'function' ? ctor as ProgressTimelineCtor : undefined;
+}
+
+/** Capability probe без UA-sniffing и без DOM-глобалов на import. */
+export function supportsScrollTimeline(): boolean {
+  return progressTimelineCtor('ScrollTimeline') !== undefined;
+}
+
+/** Capability probe view-progress timeline без UA-sniffing. */
+export function supportsViewTimeline(): boolean {
+  return progressTimelineCtor('ViewTimeline') !== undefined;
+}
+'''
+          if s.count(old) != 1:
+              raise SystemExit(f'capability block drifted: {s.count(old)}')
+          s = s.replace(old, new, 1)
+
+          old_comment = '''/**
+ * Отдать связь scroll progress → property браузеру целиком.
+ *
+ * Возвращает undefined, если target/ScrollTimeline недоступны. Скрытого
+ * scroll-listener/rAF fallback нет: caller может явно выбрать headless ./scroll.
+ * На native path после единственного commit Lab Motion не выполняет per-frame JS.
+ */
+function animateProgressWaapi(
+'''
+          new_comment = '''/**
+ * Общий commit уже созданной progress timeline. Capability/fallback policy
+ * остаётся у публичных scroll/view адаптеров; здесь только property compiler.
+ */
+function animateProgressWaapi(
+'''
+          if s.count(old_comment) != 1:
+              raise SystemExit(f'helper comment drifted: {s.count(old_comment)}')
+          s = s.replace(old_comment, new_comment, 1)
+          s = s.replace("const Timeline = scrollTimelineCtor();", "const Timeline = progressTimelineCtor('ScrollTimeline');")
+          s = s.replace("const Timeline = viewTimelineCtor();", "const Timeline = progressTimelineCtor('ViewTimeline');")
+          if 'scrollTimelineCtor' in s or 'viewTimelineCtor' in s:
+              raise SystemExit('duplicate ctor helper survived')
+          p.write_text(s)
+          PY
+
+      - name: Verify same behavior with less mechanism
+        run: |
+          pnpm vitest run test/waapi-view-timeline.test.ts test/waapi-scroll-timeline.test.ts test/waapi-emit.test.ts
+          pnpm typecheck:native
+          pnpm build
+          pnpm size
+
+      - name: Commit only simplification
+        shell: bash
+        run: |
+          set -euo pipefail
+          test "$(git diff --name-only)" = "src/waapi/index.ts"
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add src/waapi/index.ts
+          git commit -m 'refactor(waapi): свести progress timeline capability к одному owner'
+          git push origin HEAD:research/native-view-waapi-final-20260912
