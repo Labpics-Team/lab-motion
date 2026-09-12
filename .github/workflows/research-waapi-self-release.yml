@@ -1,0 +1,98 @@
+name: WaapiUnit self-release research
+on:
+  push:
+    branches: [research/waapi-self-release-20260912-r9]
+    paths: [.github/workflows/research-waapi-self-release.yml]
+permissions:
+  contents: read
+concurrency:
+  group: research-waapi-self-release-20260912-r9
+  cancel-in-progress: false
+env:
+  COREPACK_ENABLE_DOWNLOAD_PROMPT: '0'
+  COREPACK_DEFAULT_TO_LATEST: '0'
+  BASE: 93278bf9b540f93521c7bd4c02f68db458e5db7a
+jobs:
+  evidence:
+    runs-on: ubuntu-latest
+    timeout-minutes: 40
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          persist-credentials: false
+          fetch-depth: 0
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v6
+        with:
+          node-version: '24.20.0'
+      - name: Materialize immutable base and minimal candidate
+        shell: bash
+        run: |
+          set -euo pipefail
+          corepack enable
+          corepack install --global pnpm@11.11.0
+          mkdir -p evidence
+          git worktree add --detach "$RUNNER_TEMP/base" "$BASE"
+          git worktree add --detach "$RUNNER_TEMP/candidate" "$BASE"
+          python3 - "$RUNNER_TEMP/candidate/src/animate/waapi-unit.ts" <<'PY'
+          from pathlib import Path
+          import sys
+          p=Path(sys.argv[1]);s=p.read_text()
+          old='private readonly _o: WaapiUnitOptions;'
+          assert s.count(old)==1
+          s=s.replace(old,'private _o: WaapiUnitOptions | undefined;',1)
+          s=s.replace('this._o.','this._o!.')
+          s=s.replace('const o = this._o;','const o = this._o!;')
+          old_commit='''  _commit(): void {\n    if (\n      this._o!._record._owner !== this ||'''
+          new_commit='''  _commit(): void {\n    if (\n      this._done ||\n      this._o!._record._owner !== this ||'''
+          assert s.count(old_commit)==1
+          s=s.replace(old_commit,new_commit,1)
+          old_finish='''  private _finish(natural: boolean): void {\n    if (this._done) return;\n    this._done = true;\n    if (this._o!._record._owner === this) this._o!._record._owner = undefined;\n    this._o!._onDone(natural);\n  }'''
+          new_finish='''  private _finish(natural: boolean): void {\n    if (this._done) return;\n    this._done = true;\n    const o = this._o!;\n    if (o._record._owner === this) o._record._owner = undefined;\n    this._o = undefined;\n    o._onDone(natural);\n  }'''
+          assert s.count(old_finish)==1
+          s=s.replace(old_finish,new_finish,1)
+          p.write_text(s)
+          PY
+          git -C "$RUNNER_TEMP/candidate" diff --check
+          git -C "$RUNNER_TEMP/candidate" diff -- src/animate/waapi-unit.ts > evidence/candidate.diff
+          test "$(git -C "$RUNNER_TEMP/candidate" diff --name-only | wc -l)" -eq 1
+          test "$(git -C "$RUNNER_TEMP/candidate" diff --name-only)" = src/animate/waapi-unit.ts
+          cp -r research/waapi-self-release evidence/harness
+          cpu="$(python3 -c 'import os; print(sorted(os.sched_getaffinity(0))[-1])')"
+          printf 'BENCH_CPU=%s\n' "$cpu" >> "$GITHUB_ENV"
+          { printf 'base=%s\ncarrier=%s\nbench_cpu=%s\n' "$BASE" "$GITHUB_SHA" "$cpu"; node --version; pnpm --version; uname -a; lscpu; } > evidence/environment.txt
+      - name: Install and build both sides with one pinned toolchain
+        run: |
+          set -euo pipefail
+          for side in base candidate; do
+            (cd "$RUNNER_TEMP/$side" && pnpm install --frozen-lockfile && pnpm build) 2>&1 | tee "evidence/$side-build.log"
+          done
+      - name: Candidate semantic/lifecycle admission
+        working-directory: ${{ runner.temp }}/candidate
+        run: |
+          pnpm typecheck
+          pnpm vitest run \
+            test/animate-waapi-lifecycle.test.ts \
+            test/animate-lifecycle-atomicity.test.ts \
+            test/animate-hostile-microtask.test.ts \
+            test/animate-surface-reentry-generation.test.ts \
+            test/animate-finished-allocation.test.ts \
+            test/animate-facade-compositor.test.ts \
+            test/animate-runtime-boundaries.test.ts
+      - name: Deterministic full protected size vector
+        run: node research/waapi-self-release/size.mjs "$RUNNER_TEMP/base" "$RUNNER_TEMP/candidate" evidence/size.json
+      - name: Paired reachability and latency corpus
+        run: taskset -c "$BENCH_CPU" node research/waapi-self-release/run.mjs "$RUNNER_TEMP/base/dist" "$RUNNER_TEMP/candidate/dist" evidence/paired
+      - name: Repository-policy analysis
+        run: node research/waapi-self-release/analyze.mjs "$RUNNER_TEMP/base" evidence/paired evidence/analysis.json
+      - name: Seal evidence
+        if: always()
+        run: |
+          find evidence -type f ! -name SHA256SUMS -print0 | sort -z | xargs -0 sha256sum > evidence/SHA256SUMS
+      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
+        if: always()
+        with:
+          name: waapi-self-release-${{ env.BASE }}-${{ github.run_id }}
+          path: evidence/
+          if-no-files-found: error
+          retention-days: 14
+          compression-level: 6
