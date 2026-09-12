@@ -1,13 +1,9 @@
 import assert from 'node:assert/strict';
-import { pathToFileURL } from 'node:url';
-import { resolve } from 'node:path';
-
-const root = resolve(process.argv[2] ?? '.');
-const { solveSpring } = await import(pathToFileURL(`${root}/dist/internal/solver.js`));
-const {
+import { solveSpring } from '../../src/internal/solver.js';
+import {
   compileSpringExecutionArtifactTupleUnchecked,
   clearSpringExecutionArtifactCacheUnchecked,
-} = await import(pathToFileURL(`${root}/dist/compositor/curve.js`));
+} from '../../src/compositor/curve.js';
 
 const TOL = 1 / 400;
 const BUDGET = TOL * 0.70;
@@ -24,6 +20,9 @@ function buildCubic(params, v0, durationMs) {
   const omega0 = Math.sqrt(params.stiffness / params.mass);
   const zeta = params.damping / (2 * params.mass * omega0);
   const U = durationMs / 1000 * omega0;
+  // В безразмерном времени u=ω₀t для y=x−1:
+  // y'''' = (1−4ζ²)y + 4ζ(1−2ζ²)y'. Energy norm H=hypot(y,y')
+  // не растёт, поэтому Cauchy-Schwarz даёт certified |y''''| bound.
   const a = 1 - 4 * zeta * zeta;
   const b = 4 * zeta * (1 - 2 * zeta * zeta);
   const coeff = Math.hypot(a, b);
@@ -43,7 +42,7 @@ function buildCubic(params, v0, durationMs) {
     if (U - u < Number.EPSILON * Math.max(1, U)) u = U;
   }
   if (knots.length >= 8192) throw new Error('cubic-cap');
-  // Same terminal contract as production: exact target/rest at finite horizon.
+  // Та же terminal discipline, что production linear artifact.
   knots.push([U, 1, 0]);
   return knots;
 }
@@ -116,8 +115,8 @@ for (const zeta of ZETAS) for (const v0 of V0S) {
   const linearStops = linear[1].length / 2;
   const linearStringBytes = Buffer.byteLength(linear[0]);
   const linearRetainedLower = linearStringBytes + linear[1].byteLength;
-  // Optimistic lower bound for a C1-sampleable cubic artifact: u,value,dX/du per knot.
-  // It excludes JS container/object overhead and any precomputed easing strings.
+  // Оптимистичный нижний предел C¹-sampleable cubic artifact: u,value,dx/du
+  // на knot. Не включает container overhead и easing-строки.
   const cubicRetainedLower = knots.length * 3 * 8;
   rows.push({
     zeta, v0, valid, durationMs,
@@ -136,6 +135,7 @@ for (const row of rows) {
 }
 const accepted = rows.filter(r => r.valid && r.maxErr <= TOL);
 const under = accepted.filter(r => r.zeta < 1);
+assert(accepted.length > 0 && under.length > 0, 'candidate accepted no representative rows');
 const median = xs => [...xs].sort((a,b)=>a-b)[Math.floor(xs.length/2)];
 const summary = {
   exactBase: process.env.BASE_SHA,
