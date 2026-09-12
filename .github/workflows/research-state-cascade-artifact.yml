@@ -1,0 +1,78 @@
+name: State cascade artifact Pareto
+on:
+  push:
+    branches: [research/state-cascade-artifact-pareto-20260912]
+    paths: [.github/workflows/research-state-cascade-artifact.yml]
+permissions:
+  contents: read
+concurrency:
+  group: research-state-cascade-artifact-pareto-20260912
+  cancel-in-progress: false
+env:
+  COREPACK_ENABLE_DOWNLOAD_PROMPT: '0'
+  COREPACK_DEFAULT_TO_LATEST: '0'
+  BASE: 93278bf9b540f93521c7bd4c02f68db458e5db7a
+  CANDIDATE: a164691a24eb1c92dfdf9aeb80af4594dfb30faa
+jobs:
+  artifact:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          persist-credentials: false
+          fetch-depth: 0
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v6
+        with:
+          node-version: '24.20.0'
+      - name: Build immutable base and candidate
+        run: |
+          set -euo pipefail
+          corepack enable
+          corepack install --global pnpm@11.11.0
+          mkdir -p evidence
+          git worktree add --detach "$RUNNER_TEMP/base" "$BASE"
+          git worktree add --detach "$RUNNER_TEMP/candidate" "$CANDIDATE"
+          for side in base candidate; do
+            cd "$RUNNER_TEMP/$side"
+            pnpm install --frozen-lockfile
+            pnpm build
+            mkdir -p "$RUNNER_TEMP/$side-pack"
+            pnpm pack --pack-destination "$RUNNER_TEMP/$side-pack" >/dev/null
+            tgz="$(find "$RUNNER_TEMP/$side-pack" -maxdepth 1 -name '*.tgz' -print -quit)"
+            mkdir -p "$RUNNER_TEMP/$side-unpack"
+            tar -xzf "$tgz" -C "$RUNNER_TEMP/$side-unpack"
+            tar --sort=name --mtime='@0' --owner=0 --group=0 --numeric-owner \
+              -cf "$RUNNER_TEMP/$side-payload.tar" -C "$RUNNER_TEMP/$side-unpack" package
+          done
+      - name: Measure full shipped package payload with repository compression SSOT
+        run: |
+          node --input-type=module <<'NODE' | tee evidence/package-size.json
+          import { readFileSync } from 'node:fs';
+          import { pathToFileURL } from 'node:url';
+          const candidate = process.env.RUNNER_TEMP + '/candidate';
+          const { canonicalGzip, observationalBrotli } = await import(pathToFileURL(candidate + '/scripts/compression-oracle.mjs'));
+          const measure = side => {
+            const bytes = readFileSync(process.env.RUNNER_TEMP + `/${side}-payload.tar`);
+            return { raw: bytes.length, gzip: canonicalGzip(bytes).length, brotli: observationalBrotli(bytes).length };
+          };
+          const base = measure('base');
+          const candidateSize = measure('candidate');
+          const delta = Object.fromEntries(Object.keys(base).map(k => [k, candidateSize[k] - base[k]]));
+          console.log(JSON.stringify({ base, candidate: candidateSize, delta }, null, 2));
+          if (Object.values(delta).some(v => v > 0)) process.exitCode = 42;
+          NODE
+      - name: Record exact source diff and environment
+        if: always()
+        run: |
+          git diff "$BASE" "$CANDIDATE" --stat > evidence/diff-stat.txt
+          git diff "$BASE" "$CANDIDATE" -- > evidence/candidate.diff
+          { printf 'base=%s\ncandidate=%s\n' "$BASE" "$CANDIDATE"; node --version; pnpm --version; uname -a; } > evidence/environment.txt
+          find evidence -type f ! -name SHA256SUMS -print0 | sort -z | xargs -0 sha256sum > evidence/SHA256SUMS
+      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
+        if: always()
+        with:
+          name: state-cascade-artifact-${{ env.CANDIDATE }}-${{ github.run_id }}
+          path: evidence/
+          if-no-files-found: error
+          retention-days: 14
