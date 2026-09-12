@@ -232,6 +232,7 @@ try {
     'package.json',
     'docs/errors.md',
     'docs/benchmark.md',
+    'docs/motion-conformance.md',
     'docs/recipes.md',
   ]) {
     if (!existsSync(join(installedRoot, file))) {
@@ -246,6 +247,12 @@ try {
     log('FAIL: docs/errors.md в артефакте расходится с каталогом исходников');
   }
   const installedBenchmark = join(installedRoot, 'docs', 'benchmark.md');
+  const installedMotionContract = join(installedRoot, 'docs', 'motion-conformance.md');
+  if (existsSync(installedMotionContract)
+    && readFileSync(installedMotionContract, 'utf8') !== readFileSync(join(ROOT, 'docs', 'motion-conformance.md'), 'utf8')) {
+    failed = true;
+    log('FAIL: docs/motion-conformance.md в артефакте расходится с контрактом исходников');
+  }
   if (existsSync(installedBenchmark)
     && readFileSync(installedBenchmark, 'utf8') !== readFileSync(join(ROOT, 'docs', 'benchmark.md'), 'utf8')) {
     failed = true;

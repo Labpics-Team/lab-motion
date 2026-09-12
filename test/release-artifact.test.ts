@@ -51,6 +51,7 @@ function releaseMetadata() {
       'dist',
       'docs/errors.md',
       'docs/benchmark.md',
+      'docs/motion-conformance.md',
       'docs/recipes.md',
       '!dist/**/*.map',
     ],
