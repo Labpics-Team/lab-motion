@@ -1,7 +1,7 @@
-name: Surface no-reparse proof
+name: Surface no-reparse phase proof
 on:
   push:
-    branches: [research/surface-no-reparse-proof-20260912]
+    branches: [research/surface-no-reparse-phase-20260912-9f6c]
 permissions:
   contents: read
 jobs:
@@ -39,7 +39,7 @@ jobs:
         run: |
           set -euo pipefail
           mkdir -p evidence
-          printf '%s\n' "${GITHUB_SHA}" > evidence/carrier-sha.txt
+          printf '%s\n' "$GITHUB_SHA" > evidence/carrier-sha.txt
           printf '%s\n' '6008d916ac053bc104050d9c75aad69b04d4a878' > evidence/base-sha.txt
           cmp baseline/package.json candidate/package.json
           cmp baseline/pnpm-lock.yaml candidate/pnpm-lock.yaml
@@ -51,9 +51,12 @@ jobs:
           printf '%s\n' "$tree" | tee evidence/candidate-tree.txt
           test "$tree" = '38857ff4219223aa62819de72bcc542dd448f098'
           git -C candidate diff --cached --binary > evidence/candidate.patch
-          sha256sum harness/.research/surface-no-reparse.patch harness/.research/surface-fresh-isolate.mjs harness/.research/surface-fresh-isolate-worker.mjs > evidence/research-inputs.sha256
+          sha256sum harness/.research/* > evidence/research-inputs.sha256
           node --version | tee evidence/node-version.txt
-          node -p 'process.versions.v8' | tee evidence/v8-version.txt
+          node -p 'JSON.stringify({versions:process.versions,platform:process.platform,arch:process.arch,execArgv:process.execArgv})' > evidence/runtime.json
+          uname -a > evidence/kernel.txt
+          lscpu > evidence/cpu.txt
+          sha256sum "$(command -v node)" > evidence/node-binary.sha256
           corepack enable
           corepack install --global pnpm@11.11.0
           pnpm --version | tee evidence/pnpm-version.txt
@@ -67,6 +70,8 @@ jobs:
           pnpm --dir baseline build > evidence/base-build.log 2>&1
           pnpm --dir candidate build > evidence/candidate-build.log 2>&1
           sha256sum baseline/dist/compiler/vite/index.js candidate/dist/compiler/vite/index.js > evidence/compiler-dist.sha256
+          git -C baseline archive --format=tar HEAD | gzip -n > evidence/base-source.tar.gz
+          tar -czf evidence/built-entries.tar.gz baseline/dist candidate/dist
       - name: Candidate semantic and deterministic gates
         shell: bash
         run: |
@@ -75,29 +80,43 @@ jobs:
           (cd baseline && node scripts/size-gate.mjs) | tee evidence/base-size.log
           (cd candidate && node scripts/size-gate.mjs) | tee evidence/candidate-size.log
           (cd candidate && node scripts/compiler-acceptance.mjs) | tee evidence/compiler-acceptance.log
-      - name: Preregistered fresh-isolate calibration and conditional candidate timing
+      - name: Baseline-only phase-path characterization and JIT attribution
         shell: bash
         run: |
           set -euo pipefail
           ACORN_PATH=$(find "$PWD/baseline/node_modules/.pnpm" -path '*/node_modules/acorn/dist/acorn.mjs' -print -quit)
           test -n "$ACORN_PATH"
-          BASE_ROOT="$PWD/baseline" \
-          CANDIDATE_ROOT="$PWD/candidate" \
-          ACORN_PATH="$ACORN_PATH" \
-          WORKER_PATH="$PWD/harness/.research/surface-fresh-isolate-worker.mjs" \
-          EVIDENCE_DIR="$PWD/evidence" \
-          node harness/.research/surface-fresh-isolate.mjs | tee evidence/timing.log
+          BASE_ROOT="$PWD/baseline" ACORN_PATH="$ACORN_PATH" EVIDENCE_DIR="$PWD/evidence" \
+            node harness/.research/surface-phase-proof.mjs | tee evidence/phase-proof.log
+      - name: Preregistered calibration and conditional candidate timing
+        shell: bash
+        run: |
+          set -euo pipefail
+          ACORN_PATH=$(find "$PWD/baseline/node_modules/.pnpm" -path '*/node_modules/acorn/dist/acorn.mjs' -print -quit)
+          test -n "$ACORN_PATH"
+          find baseline/node_modules baseline/dist candidate/dist -type f -print0 | sort -z | xargs -0 sha256sum > evidence/settled-inputs-before.sha256
+          sha256sum "$ACORN_PATH" evidence/surface-fixed-worker.mjs > evidence/timing-inputs.sha256
+          BASE_ROOT="$PWD/baseline" CANDIDATE_ROOT="$PWD/candidate" ACORN_PATH="$ACORN_PATH" \
+            WORKER_PATH="$PWD/evidence/surface-fixed-worker.mjs" EVIDENCE_DIR="$PWD/evidence" \
+            node harness/.research/surface-fresh-isolate.mjs | tee evidence/timing.log
+          find baseline/node_modules baseline/dist candidate/dist -type f -print0 | sort -z | xargs -0 sha256sum > evidence/settled-inputs-after.sha256
+          cmp evidence/settled-inputs-before.sha256 evidence/settled-inputs-after.sha256
+          sha256sum --check evidence/node-binary.sha256
+          cp "$ACORN_PATH" evidence/acorn.mjs
+          git -C baseline diff --exit-code
+          git -C candidate diff --exit-code
+          test "$(git -C candidate write-tree)" = '38857ff4219223aa62819de72bcc542dd448f098'
       - name: Evidence manifest
         if: always()
         shell: bash
         run: |
           set -euo pipefail
-          find evidence -maxdepth 1 -type f -print0 | sort -z | xargs -0 sha256sum > evidence/manifest.sha256
+          find evidence -maxdepth 1 -type f ! -name manifest.sha256 -print0 | sort -z | xargs -0 sha256sum > evidence/manifest.sha256
       - name: Upload immutable evidence
         if: always()
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         with:
-          name: surface-no-reparse-${{ github.sha }}
+          name: surface-no-reparse-phase-${{ github.sha }}
           path: evidence
           if-no-files-found: error
           retention-days: 30
