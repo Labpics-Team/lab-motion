@@ -1,0 +1,76 @@
+name: Terminal paired latency evidence
+on:
+  push:
+    branches: [research/mechanism-20260912-r4]
+    paths:
+      - .github/workflows/research-terminal-perf.yml
+      - research/terminal-ownership/perf-lite-*.mjs
+permissions:
+  contents: read
+concurrency:
+  group: research-terminal-perf
+  cancel-in-progress: false
+env:
+  COREPACK_ENABLE_DOWNLOAD_PROMPT: '0'
+  COREPACK_DEFAULT_TO_LATEST: '0'
+  BASE: 93278bf9b540f93521c7bd4c02f68db458e5db7a
+  CANDIDATE: 43e73632560b6b3b289b0243c122b3e6f4479e8d
+jobs:
+  paired-latency:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          persist-credentials: false
+          fetch-depth: 0
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v6
+        with:
+          node-version: '24.20.0'
+      - name: Build immutable participants with one pinned dependency graph
+        run: |
+          set -euo pipefail
+          corepack enable
+          corepack install --global pnpm@11.11.0
+          mkdir -p evidence/raw
+          git worktree add --detach "$RUNNER_TEMP/base" "$BASE"
+          git worktree add --detach "$RUNNER_TEMP/candidate" "$CANDIDATE"
+          for name in base candidate; do
+            (cd "$RUNNER_TEMP/$name" && pnpm install --frozen-lockfile && pnpm build) > "evidence/$name-build.log" 2>&1
+            git -C "$RUNNER_TEMP/$name" status --porcelain > "evidence/$name-status.txt"
+            test ! -s "evidence/$name-status.txt"
+          done
+          cpu="$(python3 - <<'PY'
+          import os
+          print(min(os.sched_getaffinity(0)))
+          PY
+          )"
+          printf 'BENCH_CPU=%s\n' "$cpu" >> "$GITHUB_ENV"
+          git archive "$CANDIDATE" | gzip -n > evidence/candidate-source.tar.gz
+          sha256sum "$RUNNER_TEMP/base/dist/animate/index.js" "$RUNNER_TEMP/candidate/dist/animate/index.js" > evidence/dist-sha256.txt
+          sha256sum "$(command -v node)" > evidence/node-sha256.txt
+          {
+            printf 'base=%s\ncandidate=%s\ncarrier=%s\nbench_cpu=%s\n' "$BASE" "$CANDIDATE" "$GITHUB_SHA" "$cpu"
+            node --version
+            pnpm --version
+            uname -a
+            lscpu
+          } > evidence/environment.txt
+      - name: Fixed AB BA A-A and positive-control clusters
+        run: |
+          set -euo pipefail
+          taskset -c "$BENCH_CPU" node research/terminal-ownership/perf-lite-run.mjs \
+            "$RUNNER_TEMP/base" "$RUNNER_TEMP/candidate" "$RUNNER_TEMP/candidate" evidence/raw
+      - name: Preregistered 5 percent non-inferiority gate
+        run: node research/terminal-ownership/perf-lite-analyze.mjs evidence/raw evidence/analysis.json
+      - name: Seal raw observations
+        if: always()
+        run: find evidence -type f ! -name SHA256SUMS -print0 | sort -z | xargs -0 sha256sum > evidence/SHA256SUMS
+      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
+        if: always()
+        with:
+          name: terminal-paired-latency-${{ env.CANDIDATE }}-${{ github.run_id }}
+          path: evidence/
+          if-no-files-found: error
+          retention-days: 14
+          compression-level: 6
