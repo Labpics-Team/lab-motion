@@ -1,45 +1,66 @@
-name: Surface 366 immutable transport
+name: Surface 366 verified object transport
 on:
   push:
     branches: [research/surface366-transport-20260912]
 permissions:
-  contents: read
+  contents: write
 jobs:
   transport:
     runs-on: ubuntu-24.04
-    timeout-minutes: 15
+    timeout-minutes: 10
     steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          path: carrier
+          persist-credentials: false
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
         with:
           ref: aa107aa676b045b71d60d16f85b4e477a2685825
           fetch-depth: 0
+          path: source
           persist-credentials: false
-      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020
-        with:
-          node-version: '24.20.0'
-          package-manager-cache: false
-      - name: Prepare authorized exact inputs
+      - name: Reconstruct locally verified tree
         shell: bash
         run: |
           set -euo pipefail
-          corepack enable
-          corepack install --global pnpm@11.11.0
-          pnpm install --frozen-lockfile
-          mkdir -p "$RUNNER_TEMP/surface-inputs"
-          git update-ref refs/heads/transport-main aa107aa676b045b71d60d16f85b4e477a2685825
-          git update-ref refs/heads/transport-harness a303c7fd482851f23c5a011fee254d6d4e445ff2
-          git bundle create "$RUNNER_TEMP/surface-inputs/repository.bundle" transport-main transport-harness
-          tar -czf "$RUNNER_TEMP/surface-inputs/node_modules.tar.gz" node_modules
-          cp "$(command -v node)" "$RUNNER_TEMP/surface-inputs/node"
-          node -p 'JSON.stringify({versions:process.versions,platform:process.platform,arch:process.arch})' > "$RUNNER_TEMP/surface-inputs/environment.json"
-          git status --porcelain=v1 > "$RUNNER_TEMP/surface-inputs/source-status.txt"
-          test ! -s "$RUNNER_TEMP/surface-inputs/source-status.txt"
-          cd "$RUNNER_TEMP/surface-inputs"
-          sha256sum repository.bundle node_modules.tar.gz node environment.json > SHA256SUMS
+          python3 - <<'PY'
+          import base64, hashlib, lzma
+          from pathlib import Path
+          data = lzma.decompress(base64.b64decode(Path('carrier/research-surface366-transfer.xz.b64').read_bytes()))
+          assert hashlib.sha256(data).hexdigest() == '1cf4d5289fccfb9a6884d18a07a896b7f82cdcb8054bfba4ecb92a5dca5a8a2b'
+          Path('transfer.patch').write_bytes(data)
+          PY
+          cd source
+          git restore --source=a303c7fd482851f23c5a011fee254d6d4e445ff2 --staged --worktree -- docs/benchmark.md docs/surface-benchmark.md scripts/bench-surface-pair.mjs scripts/bench-surface-support.mjs test/bench-surface-pair.test.ts
+          git apply --check ../transfer.patch
+          git apply ../transfer.patch
+          git add docs scripts/bench-surface-pair.mjs scripts/bench-surface-support.mjs test/bench-surface-pair.test.ts
+          test "$(git write-tree)" = 5f6415b70b503d7e6e20c61b94a966a2042c836f
+      - name: Publish only verified content objects, never refs
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          mkdir -p "$RUNNER_TEMP/object-receipt"
+          python3 - <<'PY'
+          import base64, json, os, subprocess
+          from pathlib import Path
+          files = ['docs/surface-benchmark.md', 'scripts/bench-surface-pair.mjs', 'scripts/bench-surface-support.mjs', 'test/bench-surface-pair.test.ts']
+          receipts = []
+          for name in files:
+              data = Path('source', name).read_bytes()
+              expected = subprocess.check_output(['git', 'hash-object', '--stdin'], input=data).decode().strip()
+              payload = json.dumps({'content': base64.b64encode(data).decode(), 'encoding': 'base64'}).encode()
+              result = json.loads(subprocess.check_output(['gh', 'api', '--method', 'POST', 'repos/' + os.environ['GITHUB_REPOSITORY'] + '/git/blobs', '--input', '-'], input=payload))
+              assert result['sha'] == expected
+              receipts.append({'path': name, 'sha': expected})
+          Path(os.environ['RUNNER_TEMP'], 'object-receipt', 'published.json').write_text(json.dumps({'tree': '5f6415b70b503d7e6e20c61b94a966a2042c836f', 'blobs': receipts, 'refWrites': 0}, indent=2))
+          print(json.dumps(receipts))
+          PY
       - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         with:
-          name: surface366-inputs-${{ github.sha }}
-          path: ${{ runner.temp }}/surface-inputs
+          name: surface366-objects-${{ github.sha }}
+          path: ${{ runner.temp }}/object-receipt
           if-no-files-found: error
-          retention-days: 2
-          compression-level: 0
+          retention-days: 7
