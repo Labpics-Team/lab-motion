@@ -19,7 +19,6 @@ import {
   planSurfaceLowering,
   type AstNode,
   type NanoLoweringEdit,
-  type NanoLoweringPlan,
 } from '../core.js';
 import { nanoDefaultArtifactLiteral } from '../nano-default-artifact.js';
 
@@ -74,7 +73,6 @@ function buildMap(
   code: string,
   edits: readonly NanoLoweringEdit[],
   id: string,
-  importCount: number,
 ): TransformResult['map'] {
   for (const edit of edits) {
     if (edit.replacement.includes('\n')) {
@@ -132,9 +130,8 @@ function buildMap(
     cursor = edit.end;
   }
   keep(cursor, code.length);
-  // Хвост: '\n' + N строк hoisted-импортов + '\n'. Каждый перевод строки
-  // открывает новую группу; импорты executor'ов не маппятся в исходник.
-  for (let i = 0; i <= importCount; i++) groups.push([]);
+  // Хвост '\nimport ...;\n': обе новые группы не отображаются в исходник.
+  groups.push([], []);
   return {
     version: 3,
     mappings: groups.map((group) => group.join(',')).join(';'),
@@ -176,23 +173,16 @@ export function motionCompiler(): MotionCompilerPlugin {
         return undefined;
       }
       const ast = program as AstNode;
-      // Два независимых плана: nano (2-арг opacity) и surface (3-арг
-      // layout:'project'). Правки не пересекаются: surface-вызов нижится
-      // только полностью статическим, а вложенный вызов в аргументе делает
-      // его динамическим (консервативный отказ).
-      const plans = [
-        planNanoOpacityLowering(ast, code, nanoDefaultArtifactLiteral),
-        planSurfaceLowering(ast, code),
-      ].filter((plan): plan is NanoLoweringPlan => plan !== undefined);
-      if (plans.length === 0) return undefined;
-      const edits = plans
-        .flatMap((plan) => plan.edits)
-        .sort((a, b) => a.start - b.start);
+      // Оба планировщика требуют прямой импорт с одним локальным именем `animate`.
+      // Валидный ESM не может объявить его дважды, поэтому применим максимум один план;
+      // его правки уже отсортированы ядром, в том числе для вложенных вызовов.
+      const plan = planNanoOpacityLowering(ast, code, nanoDefaultArtifactLiteral)
+        ?? planSurfaceLowering(ast, code);
+      if (plan === undefined) return undefined;
+      const edits = plan.edits;
       const transformed = applyEdits(code, edits)
-        + plans.map((plan) =>
-          `\nimport { ${plan.importName} as ${plan.importLocal} } from ${JSON.stringify(plan.importSource)};`).join('')
-        + '\n';
-      return { code: transformed, map: buildMap(code, edits, id, plans.length) };
+        + `\nimport { ${plan.importName} as ${plan.importLocal} } from ${JSON.stringify(plan.importSource)};\n`;
+      return { code: transformed, map: buildMap(code, edits, id) };
     },
   };
 }
