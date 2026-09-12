@@ -42,8 +42,12 @@ describe('surface receipt parser fail-closed positive controls', () => {
     expect(buildWithReciprocal('linear(0 nope%, 1 100%)')).toThrow('нечисловой linear()-stop');
   });
 
-  it('отвергает позицию вне 0..100', () => {
+  it('отвергает отрицательную позицию', () => {
     expect(buildWithReciprocal('linear(0 -1%, 1 100%)')).toThrow('позиции linear()-stops не возрастают');
+  });
+
+  it('отвергает позицию выше 100%', () => {
+    expect(buildWithReciprocal('linear(0 0%, 1 101%)')).toThrow('позиции linear()-stops не возрастают');
   });
 
   it('отвергает повторяющиеся позиции', () => {
