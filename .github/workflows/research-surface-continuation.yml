@@ -1,0 +1,33 @@
+name: Surface continuation evidence
+on:
+  push:
+    branches: [research/surface-continuation-20260912]
+permissions:
+  contents: read
+jobs:
+  snapshot:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          ref: 6008d916ac053bc104050d9c75aad69b04d4a878
+          fetch-depth: 0
+          persist-credentials: false
+      - name: Архивировать только Git-объекты и фактический source
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p "$RUNNER_TEMP/motion-snapshot"
+          git tag research-snapshot-exact HEAD
+          git bundle create "$RUNNER_TEMP/motion-snapshot/repository.bundle" research-snapshot-exact
+          git rev-parse HEAD HEAD^{tree} > "$RUNNER_TEMP/motion-snapshot/revision.txt"
+          git ls-tree -r HEAD > "$RUNNER_TEMP/motion-snapshot/tree.txt"
+          sha256sum "$RUNNER_TEMP/motion-snapshot/repository.bundle" > "$RUNNER_TEMP/motion-snapshot/sha256.txt"
+      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
+        with:
+          name: motion-source-6008d916
+          path: ${{ runner.temp }}/motion-snapshot
+          if-no-files-found: error
+          retention-days: 1
+          compression-level: 0
