@@ -21,7 +21,7 @@
  *   P10 driver-mv           driver-хендл → MotionValue (controls.velocity)
  *
  * ── ПРОВЕРКИ (столбцы матрицы) ───────────────────────────────────────────────
- *   C0      первый кадр приёмника = точка захвата (непрерывность позиции)
+ *   C0      состояние приёмника на границе = точка захвата (непрерывность позиции)
  *   C1      скорость унаследована (точно / в допуске с обоснованием)
  *   SIGN    знак скорости сохранён на стыке
  *   DEGEN   вырожденный вход стыка → скорость ровно 0 / инертный стык
@@ -328,10 +328,12 @@ const P1_TESTS: Partial<Record<CheckId, () => void | Promise<void>>> = {
   C0() {
     const { clock, mv, emits, grabValue, grabVelocity } = p1Vertical();
     expect(Math.abs(grabVelocity)).toBeGreaterThan(1); // ран живой
-    mv.setTarget(30);
     const n = emits.length;
-    clock.drain(1); // кадр elapsed=0 нового рана
-    expect(emits[n]).toBe(grabValue); // рождение ровно в точке захвата (бит-в-бит)
+    mv.setTarget(30);
+    expect(mv.value).toBe(grabValue); // C0 на границе, не пауза ещё на один кадр
+    expect(emits.length).toBe(n); // смена цели не является рендером
+    clock.drain(1);
+    expect(emits[n]).toBe(30); // за прошедший интервал достигнут clamp, а не t=0
     mv.destroy();
   },
   C1() {
@@ -340,10 +342,13 @@ const P1_TESTS: Partial<Record<CheckId, () => void | Promise<void>>> = {
     mv.setTarget(target2);
     const range2 = target2 - grabValue;
     const v0n = grabVelocity / range2; // та же нормировка, что smooth pickup
-    clock.drain(1);
-    // Бит-в-бит оракул: elapsed=0 → скорость = v0n·range2 (round-trip ≤ 1 ulp).
+    // Непрерывность начального условия проверяется до следующего кадра.
     expect(mv.velocity).toBe(solveSpring(STD, 0, v0n).velocity * range2);
     expect(mv.velocity / grabVelocity).toBeCloseTo(1, 10);
+    const previous = clock.stamps.at(-1)!;
+    clock.drain(1);
+    const dt = (clock.stamps.at(-1)! - previous) / 1000;
+    expect(mv.velocity).toBe(solveSpring(STD, dt, v0n).velocity * range2);
     mv.destroy();
   },
   SIGN() {
@@ -360,9 +365,17 @@ const P1_TESTS: Partial<Record<CheckId, () => void | Promise<void>>> = {
     const velocity = mv.velocity;
     const here = mv.value;
     mv.setTarget(here); // вырожденный range≈0 при живой скорости
-    clock.drain(1);
     expect(mv.value).toBe(here); // новый ран рождается в точке захвата
     expect(mv.velocity / velocity).toBeCloseTo(1, 10); // импульс не потерян
+    const previous = clock.stamps.at(-1)!;
+    clock.drain(1);
+    expect(mv.value).toBe(here); // визуальный clamp сохраняется, физика идёт
+    const dt = (clock.stamps.at(-1)! - previous) / 1000;
+    const w = Math.sqrt(STD.stiffness / STD.mass - (STD.damping / (2 * STD.mass)) ** 2);
+    const a = STD.damping / (2 * STD.mass);
+    // Независимое решение однородного ОДУ с y(0)=0 и y'(0)=velocity.
+    const expected = velocity * Math.exp(-a * dt) * (Math.cos(w * dt) - a / w * Math.sin(w * dt));
+    expect(mv.velocity).toBeCloseTo(expected, 8);
     mv.destroy();
   },
   NONFIN() {
@@ -2056,7 +2069,7 @@ const TESTS: Record<PairId, Partial<Record<CheckId, () => void | Promise<void>>>
 };
 
 const CHECK_TITLES: Record<CheckId, string> = {
-  C0: 'первый кадр приёмника = точка захвата',
+  C0: 'состояние приёмника на границе = точка захвата',
   C1: 'скорость унаследована',
   SIGN: 'знак скорости сохранён',
   DEGEN: 'вырожденный стык → ровно 0 / инертен',
