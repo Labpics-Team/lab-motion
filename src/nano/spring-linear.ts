@@ -3,8 +3,8 @@
  * длительность и CSS linear()-строка. Общий шов для runtime ./nano и
  * build-time compiler-lowering (#208): компилятор потребляет ровно тот же
  * канонический артефакт, что уходит браузеру, поэтому обе стороны совпадают
- * бит-в-бит по построению. Тело функции — байт-в-байт прежний nano-код:
- * любое изменение здесь меняет и runtime, и compiled поведение сразу.
+ * бит-в-бит по построению. Любое изменение здесь меняет и runtime, и compiled
+ * поведение сразу.
  */
 
 import { BASE_GRID_MAX } from '../compositor/segmenter.js';
@@ -28,7 +28,9 @@ export function springLinear(input?: NanoSpring): [number, string] {
   // scale-equivalent m/k/c и не должно менять физику той же системы.
   const a = c / m / 2;
   const d = Math.sqrt(Math.abs(w * w - a * a));
-  const critical = d <= w * Math.sqrt(Number.EPSILON);
+  // Number.EPSILON = 2^-52 в binary64, поэтому его положительный корень
+  // представим точно как 2^-26 и не требует отдельного Math.sqrt на вызов.
+  const critical = d <= w * 2 ** -26;
   const under = a < w && !critical;
   const slow = under ? 0 : critical ? w : w * w / (a + d);
   const fast = under || critical ? 0 : -a - d;
@@ -51,10 +53,10 @@ export function springLinear(input?: NanoSpring): [number, string] {
   // монотонные режимы ищутся в безразмерном времени медленного полюса.
   const epsilon = 1e-3;
   let duration = under
-    ? Math.max(
-        Math.log(w / d / epsilon) / a,
-        Math.log(w * w / d / (30 * epsilon)) / a,
-      )
+    ? Math.log(Math.max(
+        w / d / epsilon,
+        w * w / d / (30 * epsilon),
+      )) / a
     : 0;
   if (!under) {
     const step = 1 / (30 * slow);
