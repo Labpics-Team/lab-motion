@@ -2,13 +2,16 @@ import {
   mkdirSync,
   mkdtempSync,
   rmSync,
+  readFileSync,
   symlinkSync,
   unlinkSync,
   writeFileSync,
 } from 'node:fs';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
-import { afterEach, describe, expect, it } from 'vitest';
+import { execFileSync } from 'node:child_process';
+import { createHash } from 'node:crypto';
+import { afterEach, describe, expect, it, vi } from 'vitest';
 import {
   assertBenchmarkExportSurface,
   assertFileHashesUnchanged,
@@ -18,14 +21,49 @@ import {
   hashFileTree,
   prepareBenchmarkCheckout,
   captureBenchmarkEnvironment,
+  readCheckoutState,
+  revisionFingerprint,
   sha256File,
 } from '../bench/compare/provenance.mjs';
 
+vi.mock('node:child_process', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('node:child_process')>();
+  return { ...actual, execFileSync: vi.fn(actual.execFileSync) };
+});
+
 const cleanup: string[] = [];
 
+function isolateGitEnvironment() {
+  const directory = mkdtempSync(path.join(tmpdir(), 'lab-motion-git-environment-'));
+  cleanup.push(directory);
+  // Изоляция охватывает и fixture, и production-helper, который читает её checkout.
+  for (const key of Object.keys(process.env)) {
+    if (key.startsWith('GIT_')) vi.stubEnv(key, undefined);
+  }
+  vi.stubEnv('GIT_CONFIG_GLOBAL', path.join(directory, 'no-global-config'));
+  vi.stubEnv('GIT_CONFIG_SYSTEM', path.join(directory, 'no-system-config'));
+  vi.stubEnv('GIT_CONFIG_NOSYSTEM', '1');
+  vi.stubEnv('GIT_ATTR_NOSYSTEM', '1');
+  vi.stubEnv('HOME', directory);
+  vi.stubEnv('XDG_CONFIG_HOME', path.join(directory, 'xdg'));
+  vi.stubEnv('GIT_TERMINAL_PROMPT', '0');
+  vi.stubEnv('GIT_TEMPLATE_DIR', directory);
+}
+
 afterEach(() => {
-  for (const directory of cleanup.splice(0)) {
-    rmSync(directory, { recursive: true, force: true });
+  let firstCleanupError: unknown;
+  try {
+    for (const directory of cleanup.splice(0)) {
+      try {
+        rmSync(directory, { recursive: true, force: true, maxRetries: 3, retryDelay: 10 });
+      } catch (error) {
+        firstCleanupError ??= error;
+      }
+    }
+    if (firstCleanupError !== undefined) throw firstCleanupError;
+  } finally {
+    vi.resetAllMocks();
+    vi.unstubAllEnvs();
   }
 });
 
@@ -58,8 +96,277 @@ function fixture() {
   return { root, benchDirectory, distDirectory, state };
 }
 
-describe('benchmark provenance', () => {
-  it('rejects requiredDist and benchmark entries outside published exports', () => {
+function checkoutFixture(autocrlf = false) {
+  isolateGitEnvironment();
+  const directory = mkdtempSync(path.join(tmpdir(), 'lab-motion-tracked-proof-'));
+  cleanup.push(directory);
+  const source = path.join(directory, 'source');
+  const root = path.join(directory, 'checkout');
+  mkdirSync(source);
+  const git = (cwd: string, args: string[]) => execFileSync('git', args, {
+    cwd, encoding: 'utf8', stdio: ['ignore', 'pipe', 'pipe'], timeout: 10_000,
+  });
+  git(source, ['init', '--quiet']);
+  git(source, ['config', 'core.autocrlf', 'false']);
+  writeFileSync(path.join(source, '.gitignore'), 'dist/\n');
+  writeFileSync(path.join(source, 'package.json'), JSON.stringify({ name: 'fixture', exports: { './animate': './dist/animate/index.js' } }) + '\n');
+  writeFileSync(path.join(source, 'pnpm-lock.yaml'), 'fixture-lock\n');
+  writeFileSync(path.join(source, 'source.js'), 'export const value = 1;\n');
+  writeFileSync(path.join(source, 'binary.bin'), Buffer.from([0, 10, 1]));
+  git(source, ['add', '.']);
+  git(source, ['-c', 'user.name=Benchmark test', '-c', 'user.email=benchmark@example.invalid',
+    '-c', `core.hooksPath=${path.join(directory, 'no-hooks')}`, 'commit', '--quiet', '-m', 'fixture']);
+  git(directory, ['clone', '--quiet', '--no-hardlinks', '--config', `core.autocrlf=${autocrlf}`, source, root]);
+  mkdirSync(path.join(root, 'dist', 'animate'), { recursive: true });
+  writeFileSync(path.join(root, 'dist', 'animate', 'index.js'), 'runtime');
+  return { root, git: (args: string[]) => git(root, args), prepare: {
+    root, benchDirectory: root, requiredDist: ['dist/animate/index.js'],
+    captureEnvironment: () => ({ node: 'v24.0.0', pnpm: '11.11.0', packages: {} }),
+  } };
+}
+
+// Реальные Git-процессы конкурируют с полным набором тестов; это watchdog, не бюджет бенчмарка.
+describe('Происхождение измеряемого бенчмарком кода', { timeout: 30_000 }, () => {
+  it('отклоняет checkout, когда внешний attributes-файл меняет нормализацию Git', () => {
+    const directory = mkdtempSync(path.join(tmpdir(), 'lab-motion-hostile-git-'));
+    cleanup.push(directory);
+    const attributes = path.join(directory, 'attributes');
+    const config = path.join(directory, 'gitconfig');
+    writeFileSync(attributes, 'source.js -text\n');
+    writeFileSync(config, `[core]\nattributesFile = "${attributes.replaceAll('\\', '/')}"\n`);
+    const f = checkoutFixture(true);
+    vi.stubEnv('GIT_CONFIG_GLOBAL', config);
+    expect(f.git(['config', '--get', 'core.attributesFile']).trim())
+      .toBe(attributes.replaceAll('\\', '/'));
+    expect(f.git(['ls-files', '--eol', '--', 'source.js'])).toContain('w/crlf');
+    expect(() => prepareBenchmarkCheckout({ ...f.prepare, build() {} }))
+      .toThrow(/clean checkout|tracked|revision/);
+  });
+
+  it('использует переносимый пакетный протокол OID без требования Git -Z', () => {
+    const f = checkoutFixture();
+    const exec = vi.mocked(execFileSync);
+    exec.mockClear();
+    expect(readCheckoutState(f.root).trackedRevisionSha256)
+      .toBe('6c85545764a91d47528b8eb7f790ee2525371bfb9341e8d8c8c42f31c8b39ae0');
+    expect(exec).toHaveBeenCalledWith('git', ['--no-replace-objects', 'cat-file', '--batch'],
+      expect.objectContaining({ input: expect.stringMatching(/^(?:[a-f0-9]{40}\n)+$/) }));
+  });
+
+  it('хеширует ограниченные пакеты объектов без удержания всех байтов ревизии', () => {
+    const f = checkoutFixture();
+    for (let index = 0; index < 128; index++) {
+      writeFileSync(path.join(f.root, `entry-${index}.txt`), `payload ${index}\n`);
+    }
+    f.git(['add', '.']);
+    f.git(['-c', 'user.name=Benchmark test', '-c', 'user.email=benchmark@example.invalid',
+      '-c', `core.hooksPath=${path.join(f.root, 'no-hooks')}`, 'commit', '--quiet', '-m', 'multiple batches']);
+    const expected = createHash('sha256');
+    for (const name of f.git(['ls-files', '-z']).split('\0').filter(Boolean).sort()) {
+      expected.update(name).update('\0').update(readFileSync(path.join(f.root, name))).update('\0');
+    }
+    const exec = vi.mocked(execFileSync);
+    exec.mockClear();
+    expect(readCheckoutState(f.root).trackedRevisionSha256).toBe(expected.digest('hex'));
+    const batches = exec.mock.calls.filter(([, args]) => args?.includes('cat-file'));
+    expect(batches).toHaveLength(2);
+    for (const [, , options] of batches) {
+      expect(String(options?.input).trim().split('\n').length).toBeLessThanOrEqual(128);
+    }
+  });
+
+  it.each(['extra-field', 'exponent-size', 'empty-size', 'CR-size'] as const)(
+    'отклоняет повреждённый заголовок Git-объекта: %s', (fault) => {
+      const f = checkoutFixture();
+      const revision = f.git(['rev-parse', 'HEAD']).trim();
+      const exec = vi.mocked(execFileSync);
+      const execute = exec.getMockImplementation()!;
+      exec.mockImplementation((...args) => {
+        const result = execute(...args);
+        if (!Buffer.isBuffer(result) || !Array.isArray(args[1]) || !args[1].includes('--batch')) return result;
+        const end = result.indexOf(10);
+        const [object, type, rawSize] = result.subarray(0, end).toString('utf8').split(' ');
+        const suffix = fault === 'extra-field' ? `${rawSize} EXTRA`
+          : fault === 'exponent-size' ? `${rawSize}e0`
+          : fault === 'CR-size' ? `${rawSize}\r` : '';
+        const remaining = fault === 'empty-size'
+          ? result.subarray(end + 1 + Number(rawSize)) : result.subarray(end + 1);
+        return Buffer.concat([Buffer.from(`${object} ${type} ${suffix}\n`), remaining]);
+      });
+      expect(() => revisionFingerprint(f.root, revision)).toThrow(/пакет объектов/);
+    },
+  );
+
+  it('отклоняет gitlink до чтения его объекта как байтов файла', () => {
+    const f = checkoutFixture();
+    const parent = f.git(['rev-parse', 'HEAD']).trim();
+    f.git(['update-index', '--add', '--cacheinfo', '160000', parent, 'vendor']);
+    const tree = f.git(['write-tree']).trim();
+    const revision = f.git([
+      '-c', 'user.name=Benchmark test', '-c', 'user.email=benchmark@example.invalid',
+      'commit-tree', tree, '-p', parent, '-m', 'gitlink fixture',
+    ]).trim();
+    expect(() => revisionFingerprint(f.root, revision)).toThrow(/submodule vendor/);
+  });
+
+  it.each(['--assume-unchanged', '--skip-worktree'])('отклоняет скрытые изменения исходников до сборки: %s', (flag) => {
+    const f = checkoutFixture();
+    const revision = f.git(['rev-parse', 'HEAD']).trim();
+    f.git(['update-index', flag, '--', 'source.js']);
+    writeFileSync(path.join(f.root, 'source.js'), 'export const value = 2;\n');
+    expect(f.git(['status', '--porcelain'])).toBe('');
+    expect(f.git(['rev-parse', 'HEAD']).trim()).toBe(revision);
+    let builds = 0;
+    expect(() => prepareBenchmarkCheckout({ ...f.prepare, build: () => { builds++; } }))
+      .toThrow(/tracked|revision|коммит/);
+    expect(builds).toBe(0);
+  });
+
+  it('принимает настоящий CRLF checkout с каноническим отпечатком коммита', () => {
+    const f = checkoutFixture(true);
+    expect(f.git(['ls-files', '--eol', '--', 'source.js'])).toContain('w/crlf');
+    const state = readCheckoutState(f.root);
+    expect(state.dirty).toBe(false);
+    const canonical = revisionFingerprint(f.root, state.revision);
+    // Отпечаток исходной LF-фикстуры закрепляет совместимость формата, не CRLF-байты clone.
+    expect(canonical).toBe('6c85545764a91d47528b8eb7f790ee2525371bfb9341e8d8c8c42f31c8b39ae0');
+    expect(state.trackedRevisionSha256).toBe(canonical);
+    expect(() => prepareBenchmarkCheckout({ ...f.prepare, build() {} })).not.toThrow();
+  });
+
+  it.skipIf(process.platform === 'win32')('проверяет байты tracked symlink, не читая его цель', () => {
+    const f = checkoutFixture();
+    const target = path.join(path.dirname(f.root), 'external-target.js');
+    const link = path.join(f.root, 'linked.js');
+    writeFileSync(target, 'external payload v1\n');
+    symlinkSync(path.relative(f.root, target), link);
+    f.git(['add', '--', 'linked.js']);
+    f.git(['-c', 'user.name=Benchmark test', '-c', 'user.email=benchmark@example.invalid',
+      '-c', `core.hooksPath=${path.join(f.root, 'no-hooks')}`, 'commit', '--quiet', '-m', 'symlink fixture']);
+    const before = readCheckoutState(f.root);
+    expect(before.dirty).toBe(false);
+    expect(before.trackedRevisionSha256).toBe(revisionFingerprint(f.root, before.revision));
+    writeFileSync(target, 'external payload v2\n');
+    const after = readCheckoutState(f.root);
+    expect(after.dirty).toBe(false);
+    expect(after.trackedRevisionSha256).toBe(before.trackedRevisionSha256);
+    expect(after.worktreeSha256).toBe(before.worktreeSha256);
+  });
+
+  it.each(['build', 'run'])('отклоняет скрытую подмену исходников после фазы %s', (phase) => {
+    const f = checkoutFixture(true);
+    f.git(['update-index', '--skip-worktree', '--', 'source.js']);
+    const mutate = () => writeFileSync(path.join(f.root, 'source.js'), 'export const value = 2;\r\n');
+    if (phase === 'build') {
+      expect(() => prepareBenchmarkCheckout({ ...f.prepare, build: mutate })).toThrow(/tracked|revision|коммит|checkout/);
+    } else {
+      const prepared = prepareBenchmarkCheckout({ ...f.prepare, build() {} });
+      mutate();
+      expect(() => assertCheckoutUnchanged(f.root, prepared)).toThrow(/tracked|revision|коммит|checkout/);
+    }
+    expect(f.git(['status', '--porcelain'])).toBe('');
+  });
+
+  it('не принимает бинарное отличие за допустимое преобразование CRLF', () => {
+    const f = checkoutFixture(true);
+    f.git(['update-index', '--assume-unchanged', '--', 'binary.bin']);
+    writeFileSync(path.join(f.root, 'binary.bin'), Buffer.from([0, 13, 10, 1]));
+    expect(f.git(['status', '--porcelain'])).toBe('');
+    expect(() => prepareBenchmarkCheckout({ ...f.prepare, build() {} })).toThrow(/tracked|revision|коммит/);
+  });
+
+  it('отклоняет отсутствующий skip-worktree файл вместо исключения из отпечатка', () => {
+    const f = checkoutFixture();
+    f.git(['update-index', '--skip-worktree', '--', 'source.js']);
+    unlinkSync(path.join(f.root, 'source.js'));
+    expect(f.git(['status', '--porcelain'])).toBe('');
+    let builds = 0;
+    expect(() => prepareBenchmarkCheckout({ ...f.prepare, build: () => { builds++; } })).toThrow(/tracked.*source.js/);
+    expect(builds).toBe(0);
+  });
+
+  it('не доверяет пользовательскому clean-фильтру, скрывающему изменение исходника', () => {
+    const f = checkoutFixture();
+    f.git(['config', 'filter.mask.clean', 'git show HEAD:source.js']);
+    mkdirSync(path.join(f.root, '.git', 'info'), { recursive: true });
+    writeFileSync(path.join(f.root, '.git', 'info', 'attributes'), 'source.js filter=mask\n');
+    f.git(['update-index', '--assume-unchanged', '--', 'source.js']);
+    writeFileSync(path.join(f.root, 'source.js'), 'export const value = 999;\n');
+    const altered = f.git(['hash-object', '-w', '--no-filters', '--', 'source.js']).trim();
+    f.git(['config', 'filter.mask.smudge', `git cat-file blob ${altered}`]);
+    expect(f.git(['cat-file', '--filters', 'HEAD:source.js'])).toBe('export const value = 999;\n');
+    expect(f.git(['status', '--porcelain'])).toBe('');
+    expect(() => prepareBenchmarkCheckout({ ...f.prepare, build() {} })).toThrow(/неподдерживаемое преобразование/);
+  });
+
+  it('сохраняет идентичность CRLF-путей с пробелами при пакетном чтении объектов', () => {
+    const f = checkoutFixture(true);
+    const file = path.join(f.root, 'with space.js');
+    writeFileSync(file, 'export const space = 1;\n');
+    f.git(['add', '--', 'with space.js']);
+    f.git(['-c', 'user.name=Benchmark test', '-c', 'user.email=benchmark@example.invalid',
+      '-c', `core.hooksPath=${path.join(f.root, 'no-hooks')}`, 'commit', '--quiet', '-m', 'space fixture']);
+    writeFileSync(file, 'export const space = 1;\r\n');
+    f.git(['add', '--renormalize', '--', 'with space.js']);
+    expect(f.git(['show', 'HEAD:with space.js'])).toBe('export const space = 1;\n');
+    expect(f.git(['config', '--get', 'core.autocrlf']).trim()).toBe('true');
+    expect(f.git(['status', '--porcelain'])).toBe('');
+    expect(() => prepareBenchmarkCheckout({ ...f.prepare, build() {} })).not.toThrow();
+    f.git(['update-index', '--assume-unchanged', '--', 'with space.js']);
+    writeFileSync(file, 'export const space = 2;\r\n');
+    expect(() => prepareBenchmarkCheckout({ ...f.prepare, build() {} })).toThrow(/tracked with space.js/);
+  });
+
+  it.skipIf(process.platform === 'win32')('сохраняет кавычки, обратную косую черту и LF в нормализованных Git-путях', () => {
+    const f = checkoutFixture(true);
+    const name = 'quote" backslash\\ newline\nю.js';
+    const file = path.join(f.root, name);
+    writeFileSync(file, 'export const quoted = 1;\n');
+    f.git(['add', '--', name]);
+    f.git(['-c', 'user.name=Benchmark test', '-c', 'user.email=benchmark@example.invalid',
+      '-c', `core.hooksPath=${path.join(f.root, 'no-hooks')}`, 'commit', '--quiet', '-m', 'quoted path fixture']);
+    writeFileSync(file, 'export const quoted = 1;\r\n');
+    f.git(['add', '--renormalize', '--', name]);
+    expect(f.git(['status', '--porcelain'])).toBe('');
+    expect(() => prepareBenchmarkCheckout({ ...f.prepare, build() {} })).not.toThrow();
+    f.git(['update-index', '--assume-unchanged', '--', name]);
+    writeFileSync(file, 'export const quoted = 2;\r\n');
+    expect(() => prepareBenchmarkCheckout({ ...f.prepare, build() {} })).toThrow(/не совпадает/);
+  });
+
+  it('игнорирует replacement refs при проверке байтов заявленного коммита', () => {
+    const f = checkoutFixture();
+    const original = f.git(['rev-parse', 'HEAD']).trim();
+    writeFileSync(path.join(f.root, 'source.js'), 'export const value = 999;\n');
+    f.git(['add', '--', 'source.js']);
+    f.git(['-c', 'user.name=Benchmark test', '-c', 'user.email=benchmark@example.invalid',
+      '-c', `core.hooksPath=${path.join(f.root, 'no-hooks')}`, 'commit', '--quiet', '-m', 'replacement fixture']);
+    const replacement = f.git(['rev-parse', 'HEAD']).trim();
+    f.git(['update-ref', 'HEAD', original]);
+    f.git(['replace', original, replacement]);
+    expect(f.git(['status', '--porcelain'])).toBe('');
+    expect(revisionFingerprint(f.root, original)).toBe('6c85545764a91d47528b8eb7f790ee2525371bfb9341e8d8c8c42f31c8b39ae0');
+    expect(() => prepareBenchmarkCheckout({ ...f.prepare, build() {} })).toThrow(/clean checkout|tracked|revision/);
+  });
+
+  it('принимает Git-clean смешанный LF/CRLF, но отклоняет изменение кода', () => {
+    const f = checkoutFixture(true);
+    const name = 'mixed файл.js';
+    const file = path.join(f.root, name);
+    writeFileSync(file, 'const one = 1;\nconst two = 2;\n');
+    f.git(['add', '--', name]);
+    f.git(['-c', 'user.name=Benchmark test', '-c', 'user.email=benchmark@example.invalid',
+      '-c', `core.hooksPath=${path.join(f.root, 'no-hooks')}`, 'commit', '--quiet', '-m', 'mixed fixture']);
+    writeFileSync(file, 'const one = 1;\r\nconst two = 2;\n');
+    f.git(['add', '--renormalize', '--', name]);
+    expect(f.git(['status', '--porcelain'])).toBe('');
+    expect(() => prepareBenchmarkCheckout({ ...f.prepare, build() {} })).not.toThrow();
+    f.git(['update-index', '--assume-unchanged', '--', name]);
+    writeFileSync(file, 'const one = 9;\r\nconst two = 2;\n');
+    expect(() => prepareBenchmarkCheckout({ ...f.prepare, build() {} })).toThrow(/tracked mixed файл.js/);
+  });
+
+  it('отклоняет requiredDist и точки входа бенчмарка вне опубликованных exports', () => {
     const f = fixture();
     writeFileSync(path.join(f.root, 'package.json'), JSON.stringify({
       exports: {
@@ -96,7 +403,7 @@ describe('benchmark provenance', () => {
     })).toThrow(/bench\/entry\.mjs.*export.*animate\/native/i);
   });
 
-  it('runs the export-surface guard before an expensive benchmark build', () => {
+  it('проверяет exports до дорогой сборки бенчмарка', () => {
     const f = fixture();
     const entry = path.join(f.benchDirectory, 'entry.mjs');
     writeFileSync(entry, "import { springTo } from '../../dist/animate/native/index.js';\n");
@@ -169,7 +476,7 @@ describe('benchmark provenance', () => {
     })).toThrow(/сборка не создала обязательный файл/);
   });
 
-  it('pins caller-owned benchmark inputs without imposing comparative layout on other benches', () => {
+  it('закрепляет входы владельца бенчмарка без навязывания структуры остальным', () => {
     const f = fixture();
     expect(() => prepareBenchmarkCheckout({
       root: f.root,
@@ -188,7 +495,7 @@ describe('benchmark provenance', () => {
     })).toThrow(/missing\.mjs/);
   });
 
-  it('refuses a dirty checkout before build and a build that dirties tracked inputs', () => {
+  it('отклоняет dirty checkout до сборки и сборку, изменившую tracked-входы', () => {
     const f = fixture();
     let builds = 0;
     expect(() => prepareBenchmarkCheckout({
@@ -215,7 +522,7 @@ describe('benchmark provenance', () => {
     })).toThrow(/изменила checkout/);
   });
 
-  it('allows an explicitly diagnostic dirty run but still rejects mid-run mutation', () => {
+  it('разрешает явно диагностический dirty-прогон', () => {
     const f = fixture();
     const dirty = { ...f.state, dirty: true, revisionLabel: `${f.state.shortRevision}-dirty` };
     expect(() => prepareBenchmarkCheckout({
@@ -228,7 +535,7 @@ describe('benchmark provenance', () => {
     })).not.toThrow();
   });
 
-  it('pins Node/pnpm and hashes the actual installed benchmark packages', () => {
+  it('закрепляет Node/pnpm и хеширует установленные пакеты бенчмарка', () => {
     const f = fixture();
     writeFileSync(path.join(f.root, 'package.json'), JSON.stringify({ packageManager: 'pnpm@11.11.0' }));
     writeFileSync(path.join(f.benchDirectory, 'package.json'), JSON.stringify({
@@ -310,7 +617,7 @@ describe('benchmark provenance', () => {
       .toThrow(/pako.*измен/i);
   });
 
-  it('re-hashes generated runtime adapters after the benchmark', () => {
+  it('повторно хеширует сгенерированные runtime-адаптеры после бенчмарка', () => {
     const f = fixture();
     const adapter = path.join(f.root, 'adapter.iife.js');
     writeFileSync(adapter, 'runtime-v1');
