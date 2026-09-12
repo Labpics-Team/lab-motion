@@ -44,7 +44,7 @@ export interface SurfaceReceipt {
   readonly browserObservedMaximumPx?: number;
 }
 
-const EXPLICIT_LINEAR_NUMBER = /^[+-]?(?:\d+(?:\.\d*)?|\.\d+)(?:e[+-]?\d+)?$/i;
+const EXPLICIT_LINEAR_NUMBER = /^[+-]?(?:\d+(?:\.\d+)?|\.\d+)(?:e[+-]?\d+)?$/i;
 
 /** Diagnostics-only parser канонического explicit `linear(value percent%, …)`.
  * Runtime хранит только реально исполняемую CSS-строку; proof receipt платит за
