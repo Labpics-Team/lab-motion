@@ -53,8 +53,13 @@ try{
   });
   await collect();assert.equal(await page.evaluate(()=>window.active.weak.deref()!==undefined),true,'paused-owner positive control');
   await page.evaluate(async()=>{window.active.controls.cancel();await window.active.controls.finished;});await collect();
-  assert.equal(await page.evaluate(()=>window.active.weak.deref()!==undefined),false,'paused-owner release');
-  rows.push({run,id,empty,held,dropped,retained:held-empty,alive,droppedAlive});
+  // Базовая версия и здесь обязана воспроизвести исходное удержание: controls
+  // всё ещё сохранён. Требование release относится к кандидату, а не к baseline.
+  const pausedAfterCancel=await page.evaluate(()=>window.active.weak.deref()!==undefined);
+  assert.equal(pausedAfterCancel,id==='base','paused terminal differential');
+  await page.evaluate(()=>{window.active.controls=undefined;});await collect();
+  assert.equal(await page.evaluate(()=>window.active.weak.deref()!==undefined),false,'paused dropped-controls negative control');
+  rows.push({run,id,empty,held,dropped,retained:held-empty,alive,droppedAlive,pausedAfterCancel});
   await writeFile(`${out}/browser-memory.json`,JSON.stringify({browser:browser.version(),rows},null,2));
   console.log(JSON.stringify(rows.at(-1)));await page.close();
  }
