@@ -1,4 +1,4 @@
-name: Surface 366 verified object transport
+name: Surface 366 terminal receipt object transport
 on:
   push:
     branches: [research/surface366-transport-20260912]
@@ -15,11 +15,10 @@ jobs:
           persist-credentials: false
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
         with:
-          ref: aa107aa676b045b71d60d16f85b4e477a2685825
-          fetch-depth: 0
+          ref: 5105ffec63f4e35bd780345178a013223295822a
           path: source
           persist-credentials: false
-      - name: Reconstruct locally verified tree
+      - name: Reconstruct locally verified patch
         shell: bash
         run: |
           set -euo pipefail
@@ -27,15 +26,12 @@ jobs:
           import base64, hashlib, lzma
           from pathlib import Path
           data = lzma.decompress(base64.b64decode(Path('carrier/research-surface366-transfer.xz.b64').read_bytes()))
-          assert hashlib.sha256(data).hexdigest() == '1cf4d5289fccfb9a6884d18a07a896b7f82cdcb8054bfba4ecb92a5dca5a8a2b'
+          assert hashlib.sha256(data).hexdigest() == 'f181ac8a72b0e20faa17eae76666d2cb22ac22b02abf0bc7ae63ef43846e320f'
           Path('transfer.patch').write_bytes(data)
           PY
           cd source
-          git restore --source=a303c7fd482851f23c5a011fee254d6d4e445ff2 --staged --worktree -- docs/benchmark.md docs/surface-benchmark.md scripts/bench-surface-pair.mjs scripts/bench-surface-support.mjs test/bench-surface-pair.test.ts
           git apply --check ../transfer.patch
           git apply ../transfer.patch
-          git add docs scripts/bench-surface-pair.mjs scripts/bench-surface-support.mjs test/bench-surface-pair.test.ts
-          test "$(git write-tree)" = 5f6415b70b503d7e6e20c61b94a966a2042c836f
       - name: Publish only verified content objects, never refs
         shell: bash
         env:
@@ -46,21 +42,23 @@ jobs:
           python3 - <<'PY'
           import base64, json, os, subprocess
           from pathlib import Path
-          files = ['docs/surface-benchmark.md', 'scripts/bench-surface-pair.mjs', 'scripts/bench-surface-support.mjs', 'test/bench-surface-pair.test.ts']
+          files = {'docs/surface-benchmark.md':'0ee359977c59e3cc1acbf3fc5204f18121451c88','scripts/bench-surface-pair.mjs':'fe047628de9ff31f5591a1f832a6a51c873a76b7','test/bench-surface-pair.test.ts':'d836692706b14fded95a370bad703ea9ea20cea6'}
+          changed = subprocess.check_output(['git','-C','source','diff','--name-only'],text=True).splitlines()
+          assert sorted(changed) == sorted(files)
           receipts = []
-          for name in files:
+          for name, expected in files.items():
               data = Path('source', name).read_bytes()
-              expected = subprocess.check_output(['git', 'hash-object', '--stdin'], input=data).decode().strip()
-              payload = json.dumps({'content': base64.b64encode(data).decode(), 'encoding': 'base64'}).encode()
-              result = json.loads(subprocess.check_output(['gh', 'api', '--method', 'POST', 'repos/' + os.environ['GITHUB_REPOSITORY'] + '/git/blobs', '--input', '-'], input=payload))
+              assert subprocess.check_output(['git','hash-object','--stdin'],input=data).decode().strip() == expected
+              payload = json.dumps({'content':base64.b64encode(data).decode(),'encoding':'base64'}).encode()
+              result = json.loads(subprocess.check_output(['gh','api','--method','POST','repos/'+os.environ['GITHUB_REPOSITORY']+'/git/blobs','--input','-'],input=payload))
               assert result['sha'] == expected
-              receipts.append({'path': name, 'sha': expected})
-          Path(os.environ['RUNNER_TEMP'], 'object-receipt', 'published.json').write_text(json.dumps({'tree': '5f6415b70b503d7e6e20c61b94a966a2042c836f', 'blobs': receipts, 'refWrites': 0}, indent=2))
+              receipts.append({'path':name,'sha':expected})
+          Path(os.environ['RUNNER_TEMP'],'object-receipt','published.json').write_text(json.dumps({'blobs':receipts,'refWrites':0},indent=2))
           print(json.dumps(receipts))
           PY
       - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         with:
-          name: surface366-objects-${{ github.sha }}
+          name: surface366-terminal-objects-${{ github.sha }}
           path: ${{ runner.temp }}/object-receipt
           if-no-files-found: error
           retention-days: 7
