@@ -132,9 +132,10 @@ function clampAmplitude(ampRaw: number): number {
 }
 
 /**
- * Точка покоя default decay без построения sampling-модели. Внутренняя
- * специализация того же домена: guards, defaults и IEEE-порядок общие с
- * createDecay. Не сворачивать DEFAULT_POWER * DEFAULT_TIME_CONSTANT заранее.
+ * Точка покоя затухания с параметрами по умолчанию без построения модели
+ * сэмплирования. Внутренняя специализация того же домена: проверки, значения
+ * по умолчанию и порядок IEEE-754 общие с createDecay. Не сворачивать
+ * DEFAULT_POWER * DEFAULT_TIME_CONSTANT заранее.
  */
 export function projectDefaultDecayRest(from: number, velocity: number): number {
   if (!Number.isFinite(from)) throw new MotionParamError('LM021');
