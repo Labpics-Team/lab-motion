@@ -1,54 +1,72 @@
-name: Surface exact provisioning repair
+name: Surface public calibrated proof
 on:
   push:
     branches: [research/surface-provisioning-proof-yDNEKZ]
 permissions:
-  contents: write
+  contents: read
 jobs:
-  delivery:
+  proof:
     runs-on: ubuntu-24.04
-    timeout-minutes: 5
+    timeout-minutes: 60
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
         with:
-          path: carrier
+          ref: a303c7fd482851f23c5a011fee254d6d4e445ff2
+          path: harness
+          fetch-depth: 0
           persist-credentials: false
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
         with:
-          ref: 6076e9a4ec43ad49ae8245b48ba6bf24dbc10e51
-          path: harness
+          ref: 7d09c6dc5a496a24efa3682c8cbb8c827b9f2ba7
+          path: baseline
+          fetch-depth: 0
           persist-credentials: false
-      - name: Применить проверенный patch, проверить exact tree, создать только Git objects
-        env:
-          GH_TOKEN: ${{ github.token }}
-          RECEIPT: ${{ runner.temp }}/delivery.json
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          ref: 6008d916ac053bc104050d9c75aad69b04d4a878
+          path: candidate
+          fetch-depth: 0
+          persist-credentials: false
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020
+        with:
+          node-version: '24.20.0'
+      - name: Общая frozen toolchain при равных декларациях зависимостей
         run: |
           set -euo pipefail
-          test "$(git -C carrier hash-object .research/provisioning-repair.patch.gz)" = 848d7812f70489ef4dd097f1642bcdf1f9fe6620
-          gzip -dc carrier/.research/provisioning-repair.patch.gz > "$RUNNER_TEMP/repair.patch"
-          git -C harness apply --index "$RUNNER_TEMP/repair.patch"
-          test "$(git -C harness write-tree)" = 3b26c1c6f51857c7a8d37b13b4ebd13d29ba911e
-          cd harness
+          cmp baseline/pnpm-lock.yaml candidate/pnpm-lock.yaml
           node --input-type=module <<'JS'
           import assert from 'node:assert/strict';
-          import {readFileSync,writeFileSync} from 'node:fs';
-          import {execFileSync} from 'node:child_process';
-          async function post(suffix,body) {
-            const r=await fetch(`https://api.github.com/repos/Labpics-Team/lab-motion/git/${suffix}`,{method:'POST',headers:{Authorization:`Bearer ${process.env.GH_TOKEN}`,'Content-Type':'application/json'},body:JSON.stringify(body)});
-            assert.equal(r.status,201,`Git object status ${r.status}`);return r.json();
-          }
-          const paths=execFileSync('git',['diff','--cached','--name-only'],{encoding:'utf8'}).trim().split('\n');
-          assert.deepEqual(paths,['docs/surface-benchmark.md','scripts/bench-surface-pair.mjs','test/bench-surface-pair.test.ts']);
-          const tree=[];
-          for(const path of paths){const blob=await post('blobs',{content:readFileSync(path,'utf8'),encoding:'utf-8'});assert.equal(blob.sha,execFileSync('git',['hash-object',path],{encoding:'utf8'}).trim());tree.push({path,mode:'100644',type:'blob',sha:blob.sha});}
-          const t=await post('trees',{base_tree:'53d9cf55a2b0117b0d6c2aff3cb7b54893faaa9f',tree});
-          assert.equal(t.sha,'3b26c1c6f51857c7a8d37b13b4ebd13d29ba911e');
-          const c=await post('commits',{message:'test(perf): синхронизировать phases toolchain и сохранять ранний отказ',tree:t.sha,parents:['6076e9a4ec43ad49ae8245b48ba6bf24dbc10e51']});
-          const receipt={sha:c.sha,tree:t.sha,paths};writeFileSync(process.env.RECEIPT,JSON.stringify(receipt,null,2));console.log(JSON.stringify(receipt));
+          import {readFileSync} from 'node:fs';
+          const a=JSON.parse(readFileSync('baseline/package.json'));
+          const b=JSON.parse(readFileSync('candidate/package.json'));
+          for(const key of ['dependencies','devDependencies','optionalDependencies','peerDependencies','packageManager']) assert.deepEqual(a[key],b[key],key);
           JS
+          corepack enable
+          corepack install --global pnpm@11.11.0
+          pnpm --dir baseline install --frozen-lockfile
+          test ! -e candidate/node_modules
+          ln -s "$PWD/baseline/node_modules" candidate/node_modules
+      - name: Зарегистрированное сравнение с калибровкой до кандидата
+        shell: bash
+        run: |
+          set -euo pipefail
+          set +e
+          node harness/scripts/bench-surface-pair.mjs --base "$PWD/baseline" --candidate "$PWD/candidate" --out "$RUNNER_TEMP/surface-proof" 2>&1 | tee "$RUNNER_TEMP/surface-proof.log"
+          status=${PIPESTATUS[0]}
+          set -e
+          printf '%s\n' "$status" > "$RUNNER_TEMP/surface-proof-exit.txt"
+          if [[ -f "$RUNNER_TEMP/surface-proof/raw.sha256.json" ]]; then
+            node harness/scripts/bench-surface-pair.mjs --verify "$RUNNER_TEMP/surface-proof" | tee "$RUNNER_TEMP/surface-proof-replay.json"
+          fi
+          exit "$status"
       - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
+        if: always()
         with:
-          name: surface-provisioning-exact-delivery
-          path: ${{ runner.temp }}/delivery.json
+          name: surface-public-proof-${{ github.sha }}
+          path: |
+            ${{ runner.temp }}/surface-proof
+            ${{ runner.temp }}/surface-proof.log
+            ${{ runner.temp }}/surface-proof-exit.txt
+            ${{ runner.temp }}/surface-proof-replay.json
           if-no-files-found: error
-          retention-days: 1
+          retention-days: 30
