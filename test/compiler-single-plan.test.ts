@@ -127,10 +127,12 @@ describe('единственный применимый план lowering', () =
     expect(traversals).toBeGreaterThan(0);
     expect(traversals).toBeLessThanOrEqual(2);
 
-    // Положительный контроль: действительно лишний планировщик виден тому же счётчику.
+    // Положительный контроль должен проходить через реально применимый planner.
+    // После #343 чужой planner корректно отсеивается по import ownership до обхода AST,
+    // поэтому повторный Nano-план доказывает чувствительность того же счётчика к лишнему проходу.
     const before = traversals;
-    expect(planSurfaceLowering(ast, code)).toBeUndefined();
-    expect(traversals).toBe(before + 1);
+    expect(planNanoOpacityLowering(ast, code, nanoDefaultArtifactLiteral)).toBeDefined();
+    expect(traversals).toBeGreaterThan(before);
 
     // Оба мутанта сохраняют число строк/вызовов, но точный оракул обязан их ловить.
     expect(() => assertExact({ ...result!, code: result!.code.replace('card', 'panel') }, GOLDENS.nested)).toThrow();
