@@ -1,0 +1,32 @@
+name: Research materialization transport
+on:
+  push:
+    branches: [research/surface-materialization-evidence-20260912]
+permissions:
+  contents: read
+jobs:
+  transport:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          persist-credentials: false
+          fetch-depth: 0
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020
+        with:
+          node-version: '24.20.0'
+      - name: Immutable Git objects and pinned package-manager cache
+        run: |
+          mkdir transport
+          git bundle create transport/current.bundle --all
+          corepack pack pnpm@11.11.0 -o transport/corepack.tgz
+          git rev-parse HEAD > transport/carrier-sha.txt
+          node -p 'JSON.stringify({node:process.version,versions:process.versions})' > transport/environment.json
+          sha256sum transport/current.bundle transport/corepack.tgz > transport/SHA256SUMS
+      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
+        with:
+          name: materialization-git-toolchain
+          path: transport/
+          retention-days: 2
+          if-no-files-found: error
