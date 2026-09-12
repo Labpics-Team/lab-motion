@@ -44,6 +44,42 @@ export interface SurfaceReceipt {
   readonly browserObservedMaximumPx?: number;
 }
 
+/** Diagnostics-only parser канонического explicit `linear(value percent%, …)`.
+ * Runtime хранит только реально исполняемую CSS-строку; proof receipt платит за
+ * числовое представление только при явном построении диагностики. */
+function parseExplicitLinearSamples(css: string): Float64Array {
+  if (!css.startsWith('linear(') || !css.endsWith(')')) {
+    throw new Error('surface receipt: неканоническая linear()-строка');
+  }
+  const body = css.slice(7, -1);
+  if (body.length === 0) throw new Error('surface receipt: пустая linear()-строка');
+  const parts = body.split(',');
+  if (parts.length < 2) throw new Error('surface receipt: недостаточно linear()-stops');
+  const out = new Float64Array(parts.length * 2);
+  let previousPercent = Number.NEGATIVE_INFINITY;
+  for (let i = 0; i < parts.length; i++) {
+    const tokens = parts[i]!.trim().split(/\s+/);
+    if (tokens.length !== 2 || !tokens[1]!.endsWith('%')) {
+      throw new Error('surface receipt: stop без explicit percent');
+    }
+    const value = Number(tokens[0]);
+    const percent = Number(tokens[1]!.slice(0, -1));
+    if (!Number.isFinite(value) || !Number.isFinite(percent)) {
+      throw new Error('surface receipt: нечисловой linear()-stop');
+    }
+    if (percent < 0 || percent > 100 || percent <= previousPercent) {
+      throw new Error('surface receipt: позиции linear()-stops не возрастают');
+    }
+    out[i * 2] = percent;
+    out[i * 2 + 1] = value;
+    previousPercent = percent;
+  }
+  if (out[0] !== 0 || out[out.length - 2] !== 100) {
+    throw new Error('surface receipt: linear()-endpoints не 0/100');
+  }
+  return out;
+}
+
 /** Reciprocal-метрика receipts обязана совпадать с доказательством артефакта
  * (src/future-layout/artifact.ts): производственная ошибка сопряжения на
  * контенте шириной W_j — W(t)·W_j·|Δ|·|Q̂−Q|, Δ = 1/W1 − 1/W0; сертифицированный
@@ -110,7 +146,7 @@ function denseReciprocalMaximumPx(
   let maxError = 0;
   let qLo = 0;
   for (let probe = 0; probe <= 1000; probe++) {
-    const u = probe / 10; // percent 0..100
+    const u = probe / 10;
     while (qLo < qStopCount - 2 && reciprocalSamples[(qLo + 1) * 2]! <= u) qLo++;
     const p0 = reciprocalSamples[qLo * 2]!;
     const p1 = reciprocalSamples[(qLo + 1) * 2]!;
@@ -121,8 +157,6 @@ function denseReciprocalMaximumPx(
     const w = fromWidth + (toWidth - fromWidth) * progressAt(u);
     if (!(w > 0)) return Number.POSITIVE_INFINITY;
     const exact = (1 / w - 1 / fromWidth) / delta;
-    // Производственная ошибка: W(t)·W_content·|Δ|·|Q̂−Q| (W(t) — фактическая
-    // ширина в точке, не глобальный максимум).
     const errorPx = w * contentW * Math.abs(delta) * Math.abs(approx - exact);
     if (errorPx > maxError) maxError = errorPx;
   }
@@ -142,9 +176,19 @@ export function buildSurfaceReceipt(input: SurfaceReceiptInput): SurfaceReceipt 
     throw new Error('surface receipt: browserObservedMaximumPx вне бюджета/нефинитно (fail-closed)');
   }
   const generatedCss = artifact.easing + artifact.reciprocalEasing + artifact.blendEasing;
-  const certifiedBoundPx = certifiedReciprocalBoundPx(artifact.reciprocalSamples, fromWidth, toWidth);
+  const reciprocalSamples = parseExplicitLinearSamples(artifact.reciprocalEasing);
+  const blendSamples = parseExplicitLinearSamples(artifact.blendEasing);
+  if (reciprocalSamples.length !== blendSamples.length) {
+    throw new Error('surface receipt: Q/A stop-count расходится');
+  }
+  for (let i = 0; i < reciprocalSamples.length; i += 2) {
+    if (!Object.is(reciprocalSamples[i], blendSamples[i])) {
+      throw new Error('surface receipt: Q/A positions расходятся');
+    }
+  }
+  const certifiedBoundPx = certifiedReciprocalBoundPx(reciprocalSamples, fromWidth, toWidth);
   const denseMaximumPx = denseReciprocalMaximumPx(
-    artifact.reciprocalSamples,
+    reciprocalSamples,
     artifact.samples as Float64Array,
     fromWidth,
     toWidth,
@@ -155,8 +199,8 @@ export function buildSurfaceReceipt(input: SurfaceReceiptInput): SurfaceReceipt 
     fromWidth,
     toWidth,
     pStops: artifact.samples.length / 2,
-    qStops: artifact.reciprocalSamples.length / 2,
-    aStops: artifact.blendSamples.length,
+    qStops: reciprocalSamples.length / 2,
+    aStops: blendSamples.length / 2,
     durationMs: artifact.durationMs,
     generatedCssBytes: generatedCss.length,
     metric: 'surface-width-and-coupling-css-px',

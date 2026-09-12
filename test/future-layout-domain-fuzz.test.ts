@@ -59,28 +59,53 @@ function makeCase(rand: () => number, regime: number): Case {
   return { mass, stiffness, damping, w0, w1, v0 };
 }
 
+/** Независимо читает canonical execution `linear(value percent%, …)`.
+ * Это oracle, поэтому повреждённые числа/позиции не превращаются в NaN,
+ * который мог бы ложно пройти сравнение `err > maxErr`. */
+function explicitLinearSamples(css: string): Float64Array {
+  if (!css.startsWith('linear(') || !css.endsWith(')')) throw new Error('неканоническая linear()');
+  const parts = css.slice(7, -1).split(',');
+  if (parts.length < 2) throw new Error('недостаточно stops');
+  const out = new Float64Array(parts.length * 2);
+  let previousPercent = Number.NEGATIVE_INFINITY;
+  for (let i = 0; i < parts.length; i++) {
+    const tokens = parts[i]!.trim().split(/\s+/);
+    if (tokens.length !== 2 || !tokens[1]!.endsWith('%')) throw new Error('нет explicit percent');
+    const value = Number(tokens[0]);
+    const percent = Number(tokens[1]!.slice(0, -1));
+    if (!Number.isFinite(value) || !Number.isFinite(percent)) throw new Error('не finite');
+    if (percent < 0 || percent > 100 || percent <= previousPercent) throw new Error('позиции не возрастают');
+    out[i * 2] = percent;
+    out[i * 2 + 1] = value;
+    previousPercent = percent;
+  }
+  if (out[0] !== 0 || out[out.length - 2] !== 100) throw new Error('неполные endpoints');
+  return out;
+}
+
 /** Независимая плотная проверка coupling-bound между reciprocal stops. */
 function verifyCouplingBound(a: NonNullable<ReturnType<typeof tryCompileSurfaceArtifact>>): number {
   const delta = 1 / a.toWidth - 1 / a.fromWidth;
   const contentW = Math.max(a.fromWidth, a.toWidth);
   let maxErr = 0;
   const pCount = a.samples.length / 2;
-  const rCount = a.reciprocalSamples.length / 2;
+  const reciprocal = explicitLinearSamples(a.reciprocalEasing);
+  const rCount = reciprocal.length / 2;
   const qAt = (percent: number): number => {
     let lo = 0;
     let hi = rCount - 1;
     while (lo < hi) {
       const mid = (lo + hi) >>> 1;
-      if (a.reciprocalSamples[mid * 2] < percent) lo = mid + 1;
+      if (reciprocal[mid * 2] < percent) lo = mid + 1;
       else hi = mid;
     }
-    const idx = lo > 0 && a.reciprocalSamples[lo * 2] > percent ? lo - 1 : lo;
+    const idx = lo > 0 && reciprocal[lo * 2] > percent ? lo - 1 : lo;
     const next = Math.min(idx + 1, rCount - 1);
-    const x0 = a.reciprocalSamples[idx * 2];
-    const x1 = a.reciprocalSamples[next * 2];
-    if (x1 === x0) return a.reciprocalSamples[idx * 2 + 1];
-    const q0 = a.reciprocalSamples[idx * 2 + 1];
-    const q1 = a.reciprocalSamples[next * 2 + 1];
+    const x0 = reciprocal[idx * 2];
+    const x1 = reciprocal[next * 2];
+    if (x1 === x0) return reciprocal[idx * 2 + 1];
+    const q0 = reciprocal[idx * 2 + 1];
+    const q1 = reciprocal[next * 2 + 1];
     return q0 + (q1 - q0) * ((percent - x0) / (x1 - x0));
   };
   for (let i = 0; i < pCount - 1; i++) {
@@ -100,6 +125,12 @@ function verifyCouplingBound(a: NonNullable<ReturnType<typeof tryCompileSurfaceA
 }
 
 describe('fuzz: 10 000 seeded сопряжённых артефактов', () => {
+  it('positive controls: CSS oracle fail-closed на повреждённых числах и позициях', () => {
+    expect(() => explicitLinearSamples('linear(nope 0%, 1 100%)')).toThrow('не finite');
+    expect(() => explicitLinearSamples('linear(0 0%, 0.5 50%, 1 40%)')).toThrow('позиции не возрастают');
+    expect(() => explicitLinearSamples('linear(0 1%, 1 100%)')).toThrow('неполные endpoints');
+  });
+
   it('fail-closed позитивность, coupling budget, монотонность A, содержательный домен', () => {
     const rand = lcg(20260804);
     let accepted = 0;
@@ -137,11 +168,12 @@ describe('fuzz: 10 000 seeded сопряжённых артефактов', () =
       expect(artifact.minWidth).toBeCloseTo(minW, 12);
       expect(certifyPositivity(artifact, 0)).toBe(true);
 
-      // Монотонная A с точными endpoints.
-      expect(artifact.blendSamples[0]).toBe(0);
-      expect(artifact.blendSamples[artifact.blendSamples.length - 1]).toBe(1);
-      for (let i = 1; i < artifact.blendSamples.length; i++) {
-        expect(artifact.blendSamples[i]).toBeGreaterThanOrEqual(artifact.blendSamples[i - 1]);
+      // Монотонная A с точными endpoints — по фактически исполняемому CSS.
+      const blend = explicitLinearSamples(artifact.blendEasing);
+      expect(blend[1]).toBe(0);
+      expect(blend[blend.length - 1]).toBe(1);
+      for (let i = 3; i < blend.length; i += 2) {
+        expect(blend[i]).toBeGreaterThanOrEqual(blend[i - 2]);
       }
 
       // Ни один CSS-токен не несёт Infinity/NaN.
