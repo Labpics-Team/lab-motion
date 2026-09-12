@@ -85,9 +85,12 @@ const springs = [
 describe('единственная материализация сопряжённых кривых после допуска', () => {
   it('общая граница не создаёт вторую копию данных Q/A', () => {
     const a = tryCompileSurfaceArtifact(springs[0]!, 240, 360)!;
-    expect(a.reciprocalSamples.length / 2).toBe(33);
-    expect(a.blendSamples.length).toBe(33);
-    expect(Array.from(a.reciprocalSamples)).toEqual(uniqueKnots(a.reciprocalSamples));
+    const reciprocal = parseExplicit(a.reciprocalEasing);
+    const blend = parseExplicit(a.blendEasing);
+    expect(reciprocal.length / 2).toBe(33);
+    expect(blend.length / 2).toBe(33);
+    expect(reciprocal).toEqual(uniqueKnots(reciprocal));
+    expect(blend.filter((_, i) => i % 2 === 0)).toEqual(reciprocal.filter((_, i) => i % 2 === 0));
   });
 
   it('все подразделения и Q/A бит-точны относительно прежней траектории без дублей', () => {
@@ -113,14 +116,14 @@ describe('единственная материализация сопряжён
         expect(actual!.durationMs).toBe(tuple[2]);
         expect(actual!.minWidth).toBe(minW);
         const knots = uniqueKnots(expected);
-        expect(Array.from(actual!.reciprocalSamples)).toEqual(knots);
+        // CSS — фактически исполняемый SSOT. Number serialization нормализует -0,
+        // поэтому old numeric oracle нормализуется тем же наблюдаемым способом.
         expect(parseExplicit(actual!.reciprocalEasing)).toEqual(knots.map((v) => v + 0));
         const blend = knots.map((value, i) => i % 2 === 0 ? value : (() => {
           const x = knots[i - 1]! / 100;
           return (3 - 2 * x) * x * x;
         })());
         expect(parseExplicit(actual!.blendEasing)).toEqual(blend);
-        expect(actual!.blendSamples).toEqual(blend.filter((_, i) => i % 2 === 1));
         accepted++;
       }
     }
@@ -141,7 +144,7 @@ describe('единственная материализация сопряжён
         rejected++;
       } else {
         expect(actual).toBeDefined();
-        expect(Array.from(actual!.reciprocalSamples)).toEqual(uniqueKnots(old));
+        expect(parseExplicit(actual!.reciprocalEasing)).toEqual(uniqueKnots(old).map((v) => v + 0));
         accepted++;
       }
     }
@@ -152,15 +155,17 @@ describe('единственная материализация сопряжён
     expect(tryCompileSurfaceArtifact(spring, 1, 4096, undefined, 0.009)).toBeDefined();
   });
 
-  it('проекция не публикует ширину вместо Q и сохраняет знак нуля', () => {
+  it('execution Q не публикует ширину и не меняется после следующей компиляции', () => {
     for (const [w0, w1] of [[240, 360], [360, 240]]) {
       const a = tryCompileSurfaceArtifact(springs[0]!, w0!, w1!)!;
-      expect(Object.is(a.reciprocalSamples[1], 0 / (1 / w1! - 1 / w0!))).toBe(true);
-      expect(a.reciprocalSamples[a.reciprocalSamples.length - 1]).toBe(1);
-      expect(a.reciprocalSamples.buffer.byteLength).toBe(a.reciprocalSamples.length * 8);
-      const previous = Array.from(a.reciprocalSamples);
+      const reciprocal = parseExplicit(a.reciprocalEasing);
+      expect(reciprocal[1]).toBe(0);
+      expect(reciprocal[reciprocal.length - 1]).toBe(1);
+      expect(reciprocal[1]).not.toBe(w0);
+      const previous = a.reciprocalEasing;
       tryCompileSurfaceArtifact(springs[1]!, 80, 960);
-      expect(Array.from(a.reciprocalSamples)).toEqual(previous);
+      expect(a.reciprocalEasing).toBe(previous);
+      expect(parseExplicit(a.reciprocalEasing)).toEqual(reciprocal);
     }
   });
 

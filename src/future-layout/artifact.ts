@@ -41,10 +41,6 @@ export interface SurfaceExecutionArtifact {
   readonly blendEasing: string;
   /** [percent, progress, ...] serialized P (percent = точный CSS-токен). */
   readonly samples: SpringSerializedSamples;
-  /** [percent, Q, ...] serialized Q (включая subdivision-stops). */
-  readonly reciprocalSamples: Float64Array;
-  /** A в точках reciprocalSamples (монотонна, endpoints 0 и 1). */
-  readonly blendSamples: readonly number[];
   readonly durationMs: number;
   /** Минимум W(t) по serialized stops: линейность между stops не даёт ниже. */
   readonly minWidth: number;
@@ -83,8 +79,6 @@ export function tryCompileSurfaceArtifact(
       reciprocalEasing: DEGENERATE_EASING,
       blendEasing: DEGENERATE_EASING,
       samples: new Float64Array([0, 0, 100, 1]),
-      reciprocalSamples: new Float64Array([0, 0, 100, 1]),
-      blendSamples: [0, 1],
       durationMs: 0,
       minWidth: fromWidth,
       fromWidth,
@@ -129,7 +123,7 @@ export function tryCompileSurfaceArtifact(
   // Q'' = 2β²/(min(W)³·Δ), ошибка сопряжения ≤ max(W)·max(W0,W1)·|Δ|·h²·|Q''|/8.
   // Арифметика и логический cap сохраняются; пока допуск не завершён, Q не нужен.
   // Общая граница и её ширина принадлежат предыдущему сегменту. Это исключает
-  // повторные вычисления ширины и вторую копию точки в Q, A и обеих CSS-строках.
+  // повторные вычисления ширины и вторую копию точки в Q и обеих CSS-строках.
   let a = 0;
   let wA = fromWidth;
   // P(0)=0 ⇒ W(0)=fromWidth. Reciprocal вычисляется только после полного допуска.
@@ -163,36 +157,30 @@ export function tryCompileSurfaceArtifact(
     }
   }
 
-  // Общая позиция узла сериализуется один раз для обеих кривых. Прежняя
-  // форма возврата не переносит полное чтение CSS в построение артефакта.
-  // До допуска узлы хранят ширину: сертификат не использует Q. После допуска
-  // одна эмиссия вычисляет Q, пишет конечный буфер и сериализует обе кривые.
-  const blendSamples: number[] = [];
+  // Execution SSOT — две реально исполняемые CSS-кривые. До допуска узлы хранят
+  // ширину; после него одна эмиссия вычисляет Q и A. Диагностические массивы Q/A
+  // здесь не удерживаются: receipt при необходимости читает canonical CSS вне
+  // production-графа, поэтому runtime не платит за второе представление данных.
   let reciprocalEasing = 'linear(';
   let blendEasing = 'linear(';
   const stopCount = knots.length / 2;
   for (let i = 0; i < stopCount; i++) {
     const percent = knots[i * 2];
     const q = (1 / knots[i * 2 + 1] - 1 / fromWidth) / delta;
-    knots[i * 2 + 1] = q;
     const x = percent / 100;
-    const a = (3 - 2 * x) * x * x;
-    blendSamples.push(a);
+    const blend = (3 - 2 * x) * x * x;
     const position = ` ${percent}%${i < stopCount - 1 ? ', ' : ''}`;
     reciprocalEasing += q + position;
-    blendEasing += a + position;
+    blendEasing += blend + position;
   }
   reciprocalEasing += ')';
   blendEasing += ')';
-  const reciprocal = Float64Array.from(knots);
 
   return {
     easing,
     reciprocalEasing,
     blendEasing,
     samples,
-    reciprocalSamples: reciprocal,
-    blendSamples,
     durationMs,
     minWidth,
     fromWidth,

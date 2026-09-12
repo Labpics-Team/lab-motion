@@ -20,6 +20,18 @@ import {
 const SPRING = { mass: 1, stiffness: 170, damping: 26 };
 const UNDERDAMPED = { mass: 1, stiffness: 170, damping: 9 };
 
+/** Независимо читает canonical execution `linear(value percent%, …)`. */
+function explicitLinearPairs(css: string): readonly (readonly [number, number])[] {
+  expect(css.startsWith('linear(')).toBe(true);
+  expect(css.endsWith(')')).toBe(true);
+  return css.slice(7, -1).split(',').map((part) => {
+    const tokens = part.trim().split(/\s+/);
+    expect(tokens).toHaveLength(2);
+    expect(tokens[1]!.endsWith('%')).toBe(true);
+    return [Number(tokens[1]!.slice(0, -1)), Number(tokens[0])] as const;
+  });
+}
+
 describe('serialized stops и endpoints', () => {
   it('percents строго возрастают 0→100; progress стартует в 0', () => {
     const a = compileSurfaceArtifact(SPRING, 240, 360);
@@ -34,10 +46,9 @@ describe('serialized stops и endpoints', () => {
   });
 
   it('Q endpoints точны: 0 на старте, 1 в финале', () => {
-    const a = compileSurfaceArtifact(SPRING, 240, 360);
-    const m = a.reciprocalSamples.length / 2;
-    expect(a.reciprocalSamples[1]).toBeCloseTo(0, 12);
-    expect(a.reciprocalSamples[(m - 1) * 2 + 1]).toBeCloseTo(1, 12);
+    const pairs = explicitLinearPairs(compileSurfaceArtifact(SPRING, 240, 360).reciprocalEasing);
+    expect(pairs[0]![1]).toBeCloseTo(0, 12);
+    expect(pairs[pairs.length - 1]![1]).toBeCloseTo(1, 12);
   });
 });
 
@@ -45,11 +56,7 @@ describe('Q строится только из serialized P', () => {
   it('каждый reciprocal stop равен (1/W−1/W0)/(1/W1−1/W0) по serialized progress', () => {
     const a = compileSurfaceArtifact(SPRING, 240, 360);
     const delta = 1 / 360 - 1 / 240;
-    const qOfPercent = new Map<number, number>();
-    const n = a.reciprocalSamples.length / 2;
-    for (let i = 0; i < n; i++) {
-      qOfPercent.set(a.reciprocalSamples[i * 2], a.reciprocalSamples[i * 2 + 1]);
-    }
+    const qOfPercent = new Map(explicitLinearPairs(a.reciprocalEasing));
     // Все P-stops присутствуют в Q-сериализации (superset от subdivision):
     for (let i = 0; i < a.samples.length / 2; i++) {
       const percent = a.samples[i * 2];
@@ -79,10 +86,11 @@ describe('инвариант поверхности G·F_j·R_j = 1', () => {
 describe('монотонная blend A(t)', () => {
   it('строгая endpoints и неубывание на underdamped пружине', () => {
     const a = compileSurfaceArtifact(UNDERDAMPED, 240, 360);
-    expect(a.blendSamples[0]).toBe(0);
-    expect(a.blendSamples[a.blendSamples.length - 1]).toBe(1);
-    for (let i = 1; i < a.blendSamples.length; i++) {
-      expect(a.blendSamples[i]).toBeGreaterThanOrEqual(a.blendSamples[i - 1]);
+    const blend = explicitLinearPairs(a.blendEasing).map((pair) => pair[1]);
+    expect(blend[0]).toBe(0);
+    expect(blend[blend.length - 1]).toBe(1);
+    for (let i = 1; i < blend.length; i++) {
+      expect(blend[i]).toBeGreaterThanOrEqual(blend[i - 1]);
     }
     expect(/NaN|Infinity/.test(a.blendEasing)).toBe(false);
   });
