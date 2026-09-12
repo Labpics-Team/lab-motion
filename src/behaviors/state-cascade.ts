@@ -24,6 +24,12 @@ export interface StateCascade<T extends object> {
    * приоритетов не нужны: семантическое имя остаётся у handle потребителя.
    */
   createLayer(initial?: Readonly<Partial<T>>): StateCascadeLayer<T>;
+  /**
+   * Объединить синхронные изменения в один net patch. get/snapshot и результаты
+   * set/clear остаются текущими; подписчики получают только итог внешнего batch.
+   * Не rollback и не async-транзакция: принятые изменения доставляются и при throw.
+   */
+  batch(update: () => void): void;
   /** Эффективное значение одного свойства после каскада. */
   get<K extends StateKey<T>>(key: K): T[K] | undefined;
   /** Копия всей эффективной цели; own `undefined` сохраняется. */
@@ -59,6 +65,12 @@ function freezePatch<T extends object>(
   });
 }
 
+/** Общая политика ошибок: throw undefined не теряется, порядок причин сохраняется. */
+function throwErrors(errors: unknown[] | undefined): void {
+  if (errors?.length === 1) throw errors[0];
+  if (errors && errors.length > 1) throw new AggregateError(errors);
+}
+
 /**
  * Headless property cascade для одновременно активных визуальных намерений.
  * Позднее созданный слой имеет больший приоритет, но только для собственных
@@ -80,6 +92,7 @@ export function createStateCascade<
   const empty = freezePatch<T>(nullObject<Partial<T>>(), []);
   let destroyed = false;
   let notifying = false;
+  let batching = false;
   const notices = new Map<StateCascadePatch<T>, Listener[]>();
 
   // FIFO не позволяет вложенному set доставить новое значение раньше старого.
@@ -100,8 +113,7 @@ export function createStateCascade<
       }
     }
     notifying = false;
-    if (errors?.length === 1) throw errors[0];
-    if (errors && errors.length > 1) throw new AggregateError(errors);
+    throwErrors(errors);
     return patch;
   };
 
@@ -139,10 +151,29 @@ export function createStateCascade<
     }
 
     if (count === 0) return empty;
-    return publish(freezePatch(changed, removed));
+    const patch = freezePatch(changed, removed);
+    return batching ? patch : publish(patch);
   };
 
   return {
+    batch(update) {
+      if (destroyed) return;
+      // Локальный snapshot только внешней группы; постоянной копии состояния нет.
+      const before = batching ? undefined : cloneTarget(resolved);
+      batching = true;
+      let errors: unknown[] | undefined;
+      try { update(); } catch (error) { errors = [error]; }
+      if (before !== undefined) {
+        batching = false;
+        if (!destroyed) {
+          const affected = Object.assign(nullObject<Partial<T>>(), before, resolved);
+          resolved = before;
+          // Тот же resolver считает net delta из исходного снимка и нынешних слоёв.
+          try { recompute(affected); } catch (error) { (errors ??= []).push(error); }
+        }
+      }
+      throwErrors(errors);
+    },
     createLayer(initial) {
       // Сначала snapshot: исключение getter не создаёт недоступный caller слой.
       const snapshot = destroyed || initial === undefined ? undefined : cloneTarget(initial);

@@ -225,6 +225,7 @@ export function bindInteractionScale(element: HTMLElement) {
   state.createLayer({ scale: 1 }); // Постоянный base: scale не исчезает.
   const hover = state.createLayer();
   const press = state.createLayer(); // Выше hover только для своих свойств.
+  const drag = state.createLayer();
   const value = new MotionValue({
     initial: 1,
     spring: { mass: 1, stiffness: 200, damping: 26 },
@@ -248,6 +249,13 @@ export function bindInteractionScale(element: HTMLElement) {
   return {
     setHovered(active: boolean) { if (active) hover.set({ scale: 1.03 }); else hover.clear(); },
     setPressed(active: boolean) { if (active) press.set({ scale: 0.97 }); else press.clear(); },
+    setInteraction(input: { hovered: boolean; pressed: boolean; dragging: boolean }) {
+      state.batch(() => {
+        if (input.hovered) hover.set({ scale: 1.03 }); else hover.clear();
+        if (input.pressed) press.set({ scale: 0.97 }); else press.clear();
+        if (input.dragging) drag.set({ scale: 1.02 }); else drag.clear();
+      });
+    },
     destroy() {
       if (disposed) return;
       disposed = true;
@@ -262,6 +270,12 @@ export function bindInteractionScale(element: HTMLElement) {
   };
 }
 ```
+
+`setInteraction({ hovered: false, pressed: false, dragging: true })` передаёт
+полный распознанный снимок взаимодействия. Переход press → drag задаёт исполнителю
+сразу scale 1.02, не перезапуская его сначала к промежуточному base 1.
+Несколько синхронных изменений объединяются в один итоговый patch; промежуточные
+pointer-события для оценки скорости по-прежнему сохраняет распознаватель, не каскад.
 
 `setHovered(false)` при активном press сохраняет scale 0.97. Снятие press
 раскрывает актуальный hover или base. Передавать одинаковый эффективный target

@@ -124,3 +124,22 @@ describe('createStateCascade: property-level intent ownership', () => {
     expect(emissions).toBe(0);
   });
 });
+
+it('snapshot — отдельная frozen-копия с null prototype; вложенная identity сохраняется', () => {
+  const state = createStateCascade<{ x: number; payload: object }>();
+  const payload = { id: 1 };
+  const layer = state.createLayer({ x: 1, payload });
+  const snapshot = state.snapshot();
+  expect(Object.isFrozen(snapshot)).toBe(true);
+  expect(Object.getPrototypeOf(snapshot)).toBeNull();
+  expect(snapshot.payload).toBe(payload);
+  expect(Object.isFrozen(payload)).toBe(false);
+  expect(Reflect.set(snapshot, 'x', 9)).toBe(false);
+  expect(Reflect.deleteProperty(snapshot, 'x')).toBe(false);
+  expect(state.snapshot()).not.toBe(snapshot);
+  layer.set({ x: 2, payload });
+  expect(snapshot.x).toBe(1);
+  expect(state.get('x')).toBe(2);
+  state.destroy();
+  expect(snapshot.x).toBe(1);
+});

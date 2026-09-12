@@ -109,16 +109,33 @@ test('документированный адаптер: real reduced-motion, pr
       values.push(Number(getComputedStyle(element).scale));
       controls.setPressed(false);
       values.push(Number(getComputedStyle(element).scale));
+      // MutationObserver измеряет реальные записи DOM, не mock MotionValue.
+      controls.setPressed(true);
+      const mutations = new MutationObserver(() => {});
+      mutations.observe(element, { attributes: true, attributeFilter: ['style'] });
+      controls.setInteraction({ hovered: false, pressed: false, dragging: true });
+      const handoffWrites = mutations.takeRecords().length;
+      const dragging = Number(getComputedStyle(element).scale);
+      // Здоровый контроль: отдельные события по-прежнему вызывают отдельные записи.
+      controls.setInteraction({ hovered: false, pressed: false, dragging: false });
+      mutations.takeRecords();
+      controls.setHovered(true);
+      controls.setHovered(false);
+      const unbatchedWrites = mutations.takeRecords().length;
+      mutations.disconnect();
       controls.destroy();
       controls.destroy();
       controls.setHovered(true);
-      return { values, restored: element.style.getPropertyValue('scale'), priority: element.style.getPropertyPriority('scale') };
+      return { values, handoffWrites, unbatchedWrites, dragging, restored: element.style.getPropertyValue('scale'), priority: element.style.getPropertyPriority('scale') };
     } finally {
       element.remove();
       URL.revokeObjectURL(url);
     }
   }, code);
   expect(result.values).toEqual([1, 1.03, 0.97, 1]);
+  expect(result.handoffWrites).toBe(1);
+  expect(result.unbatchedWrites).toBe(2);
+  expect(result.dragging).toBe(1.02);
   expect(result.restored).toBe('1.2');
   expect(result.priority).toBe('important');
 });
