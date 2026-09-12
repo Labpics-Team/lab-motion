@@ -1,32 +1,106 @@
-name: Research materialization transport
+name: Research materialization proof
 on:
   push:
     branches: [research/surface-materialization-evidence-20260912]
 permissions:
   contents: read
 jobs:
-  transport:
-    runs-on: ubuntu-latest
-    timeout-minutes: 10
+  proof:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 60
+    env:
+      COREPACK_ENABLE_DOWNLOAD_PROMPT: '0'
+      COREPACK_DEFAULT_TO_LATEST: '0'
     steps:
-      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+      - name: Checkout measurement carrier
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
         with:
           persist-credentials: false
           fetch-depth: 0
-      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020
+          path: plane
+      - name: Checkout exact baseline
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          ref: f66efcc07c9921bcd2becb67712be7c702c1f694
+          persist-credentials: false
+          fetch-depth: 0
+          path: base
+      - name: Checkout exact candidate
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          ref: 936ad34f2f727385e3e2f76cf978f168b6838768
+          persist-credentials: false
+          fetch-depth: 0
+          path: candidate
+      - name: Setup exact Node
+        uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020
         with:
           node-version: '24.20.0'
-      - name: Immutable Git objects and pinned package-manager cache
+      - name: Activate pinned pnpm and record inputs
+        shell: bash
         run: |
-          mkdir transport
-          git bundle create transport/current.bundle --all
-          corepack pack pnpm@11.11.0 -o transport/corepack.tgz
-          git rev-parse HEAD > transport/carrier-sha.txt
-          node -p 'JSON.stringify({node:process.version,versions:process.versions})' > transport/environment.json
-          sha256sum transport/current.bundle transport/corepack.tgz > transport/SHA256SUMS
-      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
+          set -euo pipefail
+          corepack enable
+          corepack install --global pnpm@11.11.0
+          mkdir evidence
+          cp plane/scripts/research-materialization/*.mjs .
+          for file in *.mjs; do node --check "$file"; done
+          git -C base rev-parse HEAD HEAD^{tree} > evidence/base-sha.txt
+          git -C candidate rev-parse HEAD HEAD^{tree} > evidence/candidate-sha.txt
+          git -C candidate diff f66efcc07c9921bcd2becb67712be7c702c1f694 HEAD -- > evidence/candidate.patch
+          sha256sum base/package.json base/pnpm-lock.yaml candidate/package.json candidate/pnpm-lock.yaml > evidence/package-hashes.txt
+          sha256sum "$(command -v node)" > evidence/node-hash.txt
+          node -p 'JSON.stringify({node:process.version,versions:process.versions})' > evidence/environment.json
+          cp /proc/cpuinfo evidence/cpuinfo.txt
+          cp /proc/self/status evidence/process-status.txt
+          lscpu > evidence/lscpu.txt
+      - name: Unchanged build and canonical size on both sides
+        shell: bash
+        run: |
+          set -euo pipefail
+          for side in base candidate; do
+            (cd "$side" && pnpm install --frozen-lockfile) 2>&1 | tee "evidence/$side-install.log"
+            (cd "$side" && pnpm build) 2>&1 | tee "evidence/$side-build.log"
+            (cd "$side" && pnpm size) 2>&1 | tee "evidence/$side-size.log"
+          done
+          node size-proof.mjs 2>&1 | tee evidence/size-proof.log
+      - name: Exact emitted function and artifact differential
+        shell: bash
+        run: |
+          set -euo pipefail
+          node prepare-probes.mjs 2>&1 | tee evidence/probes.log
+          node differential.mjs 2>&1 | tee evidence/differential.log
+      - name: One preregistered 512-block paired confirmation
+        shell: bash
+        run: |
+          set -euo pipefail
+          allowed="$(awk '/Cpus_allowed_list/{print $2}' /proc/self/status)"
+          cpu="${allowed%%[,-]*}"
+          printf '%s\n' "$allowed" "$cpu" > evidence/affinity.txt
+          taskset -c "$cpu" node confirm.mjs 2>&1 | tee evidence/confirm.log
+      - name: Returned and consumed result ownership
+        shell: bash
+        run: |
+          set -euo pipefail
+          node heap.mjs 2>&1 | tee evidence/heap.log
+      - name: Preserve source and exact measured trees
+        if: always()
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p evidence/source
+          cp base/src/future-layout/artifact.ts evidence/source/base-artifact.ts
+          cp candidate/src/future-layout/artifact.ts evidence/source/candidate-artifact.ts
+          cp plane/scripts/research-materialization/*.mjs evidence/source/
+          if [ -f probe-manifest.json ]; then cp probe-manifest.json evidence/; fi
+          tar -czf evidence/dist-pair.tgz base/dist candidate/dist
+          git -C plane bundle create "${GITHUB_WORKSPACE}/evidence/source.bundle" --all
+          find evidence -type f ! -name SHA256SUMS -print0 | sort -z | xargs -0 sha256sum > evidence/SHA256SUMS
+      - name: Upload all evidence including failures
+        if: always()
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         with:
-          name: materialization-git-toolchain
-          path: transport/
-          retention-days: 2
+          name: surface-materialization-proof-${{ github.sha }}
+          path: evidence/
+          retention-days: 30
           if-no-files-found: error

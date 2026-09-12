@@ -1,0 +1,10 @@
+const [side,profile,countArg='256']=process.argv.slice(2),count=Number(countArg);
+const {__surfaceProbe:f}=await import(`./${side}/dist/compiler/vite/surface-probe.js`);
+const s={mass:1,stiffness:170,damping:26};
+const args={default:[s,240,360],under:[{...s,damping:9},240,360],over:[{mass:1,stiffness:100,damping:40},240,360],big:[s,1,4096],accept:[s,1,4096,undefined,.009],degenerate:[s,240,240]}[profile];
+let sink=0;const consume=a=>{for(const str of [a.easing,a.reciprocalEasing,a.blendEasing])for(let j=0;j<str.length;j++)sink+=str.charCodeAt(j);};
+for(let i=0;i<256;i++)consume(f(...args));
+const memory=()=>{for(let i=0;i<4;i++)global.gc();let m=process.memoryUsage();return{heap:m.heapUsed,buffer:m.arrayBuffers,total:m.heapUsed+m.arrayBuffers};};
+const before=memory();const held=[];for(let i=0;i<count;i++)held.push(f(...args));globalThis.__held=held;
+const returned=memory();for(const a of held)consume(a);const consumed=memory();
+console.log(JSON.stringify({side,profile,count,before,returned,consumed,returnedDelta:returned.total-before.total,consumedDelta:consumed.total-before.total,sink,keep:held.length}));
