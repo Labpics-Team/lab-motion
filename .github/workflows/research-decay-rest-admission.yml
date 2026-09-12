@@ -1,0 +1,27 @@
+name: Decay rest exact-head admission
+on:
+  push:
+    branches: [research/decay-rest-specialization-20260912-r9]
+    paths: [.github/workflows/research-decay-rest-admission.yml]
+permissions: {}
+env:
+  CANDIDATE: 9ff62d1df5afc68cb789c1fd6daae7bf41be258a
+  CANDIDATE_BRANCH: perf/behaviors-decay-rest-20260912
+jobs:
+  dispatch:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    permissions:
+      contents: read
+      actions: write
+    steps:
+      - name: Dispatch unchanged authoritative graphs on exact candidate
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          actual="$(gh api "repos/$GITHUB_REPOSITORY/git/ref/heads/$CANDIDATE_BRANCH" --jq .object.sha)"
+          [[ "$actual" == "$CANDIDATE" ]]
+          gh api --method POST "repos/$GITHUB_REPOSITORY/actions/workflows/ci.yml/dispatches" -f ref="$CANDIDATE_BRANCH"
+          gh api --method POST "repos/$GITHUB_REPOSITORY/actions/workflows/mutation.yml/dispatches" -f ref="$CANDIDATE_BRANCH"
+          printf 'ci+mutation dispatched on %s\n' "$CANDIDATE"
