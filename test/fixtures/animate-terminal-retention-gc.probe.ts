@@ -38,8 +38,8 @@ function setup(outcome: Outcome, capture: boolean): AnimateControls {
 for (const outcome of ['cancel', 'natural', 'synchronous', 'reduced'] as const) {
   for (const capture of [false, true]) await setup(outcome, capture).finished;
 }
-// Main-thread использует другой owner и отложенный rAF-drain, но тот же
-// закон terminal-агрегата. Очередь стенда не должна удерживать снятый batch.
+// Главный поток использует другого владельца и отложенное опустошение rAF, но тот же
+// закон завершения. Очередь стенда не должна удерживать снятый пакет.
 async function setupMain(natural: boolean, capture: boolean): Promise<void> {
   const el = target();
   refs.push({ name: `main/${natural}/${capture}`, weak: new WeakRef(el) });
@@ -65,7 +65,7 @@ for (const natural of [false, true]) {
 }
 assert.equal(pending.size, 0, 'сам стенд удержал завершённые таймеры');
 
-// Положительный контроль: GC не должен стирать достижимую цель активного owner.
+// Положительный контроль: GC не должен стирать достижимую цель активного владельца.
 const active = (() => {
   const el = target();
   const weak = new WeakRef(el);
@@ -84,7 +84,7 @@ for (const { name, weak } of refs) {
 }
 assert.equal(retained.length, 12);
 for (const controls of retained) {
-  // Завершённый handle остаётся полноценным no-op API, а не «уничтоженным» объектом.
+  // Завершённый объект управления сохраняет API, но его методы ничего не делают.
   controls.play(); controls.pause(); controls.seek(50); controls.cancel(); controls.stop();
   await controls.finished;
 }

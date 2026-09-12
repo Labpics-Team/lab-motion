@@ -434,8 +434,8 @@ export function animate(
   // текущего владельца этой записи вместо разрушения обоих прогонов.
   let protectedOwner: object | undefined;
   let mainBatch: SurfaceBatch | undefined;
-  // Последний permit принадлежит commit-фазе: synchronous unit completion
-  // не может завершить aggregate до публикации всех owners и Promise.
+  // Последний пропуск принадлежит фазе фиксации: синхронное завершение юнита
+  // не может завершить группу до публикации всех владельцев и Promise.
   let remaining = plan.length + 1;
   let allNatural = true;
   let activeOptions: AnimateOptions | undefined = options;
@@ -443,15 +443,15 @@ export function animate(
   const report = (natural: boolean): void => {
     allNatural &&= natural;
     if (--remaining !== 0) return;
-    // Terminal controls больше не владеют execution graph. Обнуляется и
-    // options: пользовательский callback может замыкать те же DOM-цели.
+    // Завершённые controls больше не владеют внутренним графом исполнения. Снимается и
+    // ссылка на параметры: пользовательский обработчик может замыкать те же DOM-цели.
     units.length = 0;
     mainBatch = undefined;
-    // Thenable-adoption сохраняет прежний публичный microtask order.
+    // Ассимиляция thenable сохраняет прежний публичный порядок микрозадач.
     resolveFinished(ASYNC_FINISH);
     if (allNatural) {
       try { activeOptions!.onComplete?.(); } catch (error) {
-        // Host reporter не владеет завершением и освобождением ресурсов.
+        // Средство отчётности среды не владеет завершением и освобождением ресурсов.
         try {
           (globalThis as { reportError?: (reason: unknown) => void }).reportError?.(error);
         } catch { /* best-effort отчёт host-у */ }
