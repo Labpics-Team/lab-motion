@@ -188,7 +188,7 @@ function releaseTransition(rec: GroupRecord, owner: GroupOwner | undefined): voi
   try { owner?._release?.(); } catch { /* owner уже терминализирован */ }
 }
 
-// ─── Дефолтные швы (читаются в вызове — SSR-safe импорт) ────────────────────────
+// ─── Дефолтные швы (читаются в вызове — SSR-safe) ────────────────────────────
 
 function defaultNow(): number {
   const perf = (globalThis as { performance?: { now?: () => number } }).performance;

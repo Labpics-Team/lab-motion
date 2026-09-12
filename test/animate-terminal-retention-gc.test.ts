@@ -8,7 +8,7 @@ import { describe, expect, it } from 'vitest';
 
 const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '..');
 
- describe('завершённые animate controls не владеют execution graph', () => {
+describe('завершённые animate controls не владеют execution graph', () => {
   for (const entry of ['source', 'esm', 'cjs'] as const) {
     it(`${entry}: release после natural/cancel/reduced и live-owner positive control`, async () => {
       const work = mkdtempSync(join(tmpdir(), 'labmotion-animate-gc-'));
