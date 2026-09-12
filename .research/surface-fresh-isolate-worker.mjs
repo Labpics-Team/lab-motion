@@ -3,6 +3,7 @@ import { pathToFileURL } from 'node:url';
 
 const {
   cluster, sideAPath, sideBPath, acornPath, scenario, calls, positiveControl = false,
+  traceDiagnostic = false,
 } = workerData;
 const { parse } = await import(pathToFileURL(acornPath).href);
 const aUrl = `${pathToFileURL(sideAPath).href}?bench=A-${cluster}`;
@@ -82,6 +83,9 @@ const order = cluster % 2 ? [1, 0, 0, 1] : [0, 1, 1, 0];
 // caller identity for the measured operation.
 for (let round = 0; round <= 64; round++) {
   const measured = round === 64;
+  if (traceDiagnostic && measured) {
+    process._rawDebug(`@@MEASURE_BEGIN@@ cluster=${cluster} order=${order.join('')}`);
+  }
   for (const side of order) {
     const resources = measured ? process.resourceUsage() : null;
     const cpu = measured ? process.cpuUsage() : null;
@@ -102,5 +106,11 @@ for (let round = 0; round <= 64; round++) {
     samples[side].push(detail.ns);
     details.push({ side, ...detail });
   }
+  if (traceDiagnostic && measured) {
+    process._rawDebug(`@@MEASURE_END@@ cluster=${cluster}`);
+  }
 }
-parentPort.postMessage({ cluster, samples, details, blackhole, clockMax: Math.max(...clock) });
+parentPort.postMessage({
+  cluster, samples, details, blackhole, clockMax: Math.max(...clock),
+  ...(traceDiagnostic ? { execArgv: process.execArgv } : {}),
+});
