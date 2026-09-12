@@ -1,0 +1,98 @@
+name: Decay rest timing receipt
+on:
+  push:
+    branches: [research/decay-rest-specialization-20260912-r9]
+    paths: [.github/workflows/research-decay-rest-timing2.yml]
+permissions:
+  contents: read
+env:
+  BASE: 93278bf9b540f93521c7bd4c02f68db458e5db7a
+  CANDIDATE: 9ff62d1df5afc68cb789c1fd6daae7bf41be258a
+  COREPACK_ENABLE_DOWNLOAD_PROMPT: '0'
+  COREPACK_DEFAULT_TO_LATEST: '0'
+jobs:
+  timing:
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          persist-credentials: false
+          fetch-depth: 0
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v6
+        with:
+          node-version: '24.20.0'
+      - name: Build immutable participants
+        run: |
+          set -euo pipefail
+          corepack enable
+          corepack install --global pnpm@11.11.0
+          mkdir -p evidence
+          git worktree add --detach "$RUNNER_TEMP/base" "$BASE"
+          git worktree add --detach "$RUNNER_TEMP/candidate" "$CANDIDATE"
+          for name in base candidate; do
+            (cd "$RUNNER_TEMP/$name" && pnpm install --frozen-lockfile && pnpm build) >/dev/null
+            test -z "$(git -C "$RUNNER_TEMP/$name" status --porcelain)"
+          done
+          { printf 'base=%s\ncandidate=%s\n' "$BASE" "$CANDIDATE"; node --version; pnpm --version; uname -a; lscpu; } > evidence/environment.txt
+      - name: Fixed paired public release timing
+        run: |
+          cat > "$RUNNER_TEMP/worker.mjs" <<'EOF'
+          import assert from 'node:assert/strict';
+          import {pathToFileURL} from 'node:url';
+          const [root,multText='1']=process.argv.slice(2), mult=Number(multText);
+          const {createBottomSheet,createCarousel}=await import(pathToFileURL(`${root}/behaviors/index.js`));
+          const reduce=()=>({matches:true});
+          function sheet(){let clock=0;const c=createBottomSheet({snapPoints:[0,80,160,240],initial:80,matchMedia:reduce});return()=>{clock+=.03;c.pointerDown({x:0,y:0,t:clock});c.pointerMove({x:0,y:17+(clock*100|0)%23,t:clock+.01});c.pointerUp({x:0,y:34+(clock*100|0)%31,t:clock+.02});return c.state.snapIndex+c.state.value;};}
+          function carousel(){let clock=0;const c=createCarousel({pageCount:7,pageSize:120,index:3,matchMedia:reduce});return()=>{clock+=.03;c.pointerDown({x:0,y:0,t:clock});c.pointerMove({x:-19-(clock*100|0)%27,y:0,t:clock+.01});c.pointerUp({x:-41-(clock*100|0)%37,y:0,t:clock+.02});return c.state.index+c.state.value;};}
+          const rows=[];
+          for(const [name,make] of [['sheet-release',sheet],['carousel-release',carousel]]){
+            const run=make();let hash=0;
+            for(let i=0;i<20000;i++)hash+=run();
+            const samples=[];
+            for(let r=0;r<16;r++){
+              const t=process.hrtime.bigint();
+              for(let i=0;i<8000;i++)for(let k=0;k<mult;k++)hash+=run();
+              samples.push(Number(process.hrtime.bigint()-t)/8000);
+            }
+            assert(Number.isFinite(hash));rows.push({name,samples,semantic:true,hash});
+          }
+          console.log(JSON.stringify({root,mult,rows}));
+          EOF
+          cat > "$RUNNER_TEMP/paired.mjs" <<'EOF'
+          import assert from 'node:assert/strict';
+          import {execFileSync} from 'node:child_process';
+          import {writeFileSync} from 'node:fs';
+          import {pathToFileURL} from 'node:url';
+          const [base,cand,repo,out]=process.argv.slice(2);
+          const {pairedClusterBootstrap}=await import(pathToFileURL(`${repo}/bench/compare/methodology.mjs`));
+          const worker=new URL('./worker.mjs',import.meta.url).pathname;
+          const exec=(root,mult='1')=>JSON.parse(execFileSync(process.execPath,[worker,root,mult],{encoding:'utf8',timeout:120000}));
+          const collect=(kind,blocks)=>{const pairs=[];for(let run=0;run<blocks;run++){const order=run%2?['candidate','base']:['base','candidate'];const row={run,order};for(const id of order){const root=kind==='aa'?base:(id==='base'?base:cand);const mult=kind==='double'&&id==='candidate'?'2':'1';row[id]=exec(root,mult);}pairs.push(row);console.log(`${kind} ${run+1}/${blocks}`);}return pairs;};
+          const corpus={aa:collect('aa',8),double:collect('double',8),ab:collect('ab',24),analysis:{}};
+          for(const scenario of ['sheet-release','carousel-release']){corpus.analysis[scenario]={};for(const kind of ['aa','double','ab']){const pairs=corpus[kind];const clusters=id=>pairs.map(row=>{const r=row[id].rows.find(x=>x.name===scenario);return{run:row.run,samples:r.samples,semantic:r.semantic};});corpus.analysis[scenario][kind]=pairedClusterBootstrap(clusters('candidate'),clusters('base'),{seed:20260912,iterations:10000});}}
+          writeFileSync(out,JSON.stringify(corpus,null,2));
+          console.log('ANALYSIS '+JSON.stringify(corpus.analysis));
+          const failures=[];
+          for(const scenario of Object.keys(corpus.analysis)){const x=corpus.analysis[scenario];if(!(x.aa.p50.low<=1&&x.aa.p50.high>=1))failures.push(`${scenario} A/A p50 unresolved`);if(!(x.aa.p95.low<=1&&x.aa.p95.high>=1))failures.push(`${scenario} A/A p95 unresolved`);if(!(x.double.p50.low>1.5))failures.push(`${scenario} deliberate 2x p50 undetected`);if(!(x.double.p95.low>1.5))failures.push(`${scenario} deliberate 2x p95 undetected`);if(!(x.ab.p95.high<=1.05))failures.push(`${scenario} p95 regression`);}
+          writeFileSync(out+'.verdict.json',JSON.stringify({pass:failures.length===0,failures},null,2));
+          assert.deepEqual(failures,[]);
+          EOF
+          cpu="$(python3 - <<'PY'
+          import os
+          print(min(os.sched_getaffinity(0)))
+          PY
+          )"
+          printf 'bench_cpu=%s\n' "$cpu" >> evidence/environment.txt
+          taskset -c "$cpu" node "$RUNNER_TEMP/paired.mjs" "$RUNNER_TEMP/base/dist" "$RUNNER_TEMP/candidate/dist" "$RUNNER_TEMP/candidate" evidence/paired.json
+      - name: Seal evidence
+        if: always()
+        run: find evidence -type f ! -name SHA256SUMS -print0 | sort -z | xargs -0 sha256sum > evidence/SHA256SUMS
+      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
+        if: always()
+        with:
+          name: decay-rest-timing2-${{ env.CANDIDATE }}-${{ github.run_id }}
+          path: evidence/
+          if-no-files-found: error
+          retention-days: 14
+          compression-level: 6
