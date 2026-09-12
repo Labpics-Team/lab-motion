@@ -1,0 +1,48 @@
+name: Deliver proven Surface no-reparse candidate
+
+on:
+  push:
+    branches: [research/deliver-surface-no-reparse-20260912]
+
+permissions:
+  contents: write
+
+jobs:
+  deliver:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    steps:
+      - name: Checkout immutable evidence carrier
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          ref: ${{ github.sha }}
+          path: harness
+          persist-credentials: false
+
+      - name: Checkout exact proven base
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          ref: 93278bf9b540f93521c7bd4c02f68db458e5db7a
+          path: candidate
+          fetch-depth: 0
+
+      - name: Materialize exact proven tree and push delivery branch
+        shell: bash
+        run: |
+          set -euo pipefail
+          git -C candidate apply --check "$PWD/harness/.research/surface-no-reparse.patch"
+          git -C candidate apply "$PWD/harness/.research/surface-no-reparse.patch"
+          git -C candidate diff --check
+          mapfile -t changed < <(git -C candidate diff --name-only)
+          test "${#changed[@]}" -eq 2
+          test "${changed[0]}" = 'src/compiler/core.ts'
+          test "${changed[1]}" = 'test/future-layout-domain-fuzz.test.ts'
+          git -C candidate add src/compiler/core.ts test/future-layout-domain-fuzz.test.ts
+          tree=$(git -C candidate write-tree)
+          printf 'materialized tree: %s\n' "$tree"
+          test "$tree" = '24ec7a478f018d17e309e9d02eac6be3d6f19bdd'
+          git -C candidate config user.name 'github-actions[bot]'
+          git -C candidate config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git -C candidate commit -m 'perf(compiler): убрать повторный Surface CSS reparse'
+          test "$(git -C candidate show -s --format=%T HEAD)" = '24ec7a478f018d17e309e9d02eac6be3d6f19bdd'
+          git -C candidate push origin HEAD:refs/heads/perf/surface-no-reparse-20260912
