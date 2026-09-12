@@ -1,0 +1,66 @@
+name: Decay rest scoped mutation proof
+on:
+  push:
+    branches: [research/decay-rest-specialization-20260912-r9]
+    paths: [.github/workflows/research-decay-rest-mutation.yml]
+permissions:
+  contents: read
+env:
+  COREPACK_ENABLE_DOWNLOAD_PROMPT: '0'
+  COREPACK_DEFAULT_TO_LATEST: '0'
+  CANDIDATE: 9ff62d1df5afc68cb789c1fd6daae7bf41be258a
+jobs:
+  oracle-positive-control:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          ref: ${{ env.CANDIDATE }}
+          persist-credentials: false
+          fetch-depth: 0
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v6
+        with:
+          node-version: '24.20.0'
+      - name: Install pinned toolchain
+        run: |
+          corepack enable
+          corepack install --global pnpm@11.11.0
+          pnpm install --frozen-lockfile
+      - name: Healthy oracle must pass
+        run: pnpm vitest run test/decay-rest-projection.test.ts
+      - name: Deliberate IEEE reassociation must be caught
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 - <<'PY'
+          from pathlib import Path
+          p=Path('src/decay.ts'); s=p.read_text()
+          old='DEFAULT_POWER * velocity * DEFAULT_TIME_CONSTANT'
+          new='DEFAULT_POWER * DEFAULT_TIME_CONSTANT * velocity'
+          assert s.count(old)==1
+          p.write_text(s.replace(old,new,1))
+          PY
+          if pnpm vitest run test/decay-rest-projection.test.ts > mutation.log 2>&1; then
+            cat mutation.log
+            echo 'oracle failed to catch deliberate reassociation' >&2
+            exit 1
+          fi
+          grep -E 'failed|FAIL|AssertionError|expected' mutation.log | head -20 || true
+          git diff --check
+          git checkout -- src/decay.ts
+          pnpm vitest run test/decay-rest-projection.test.ts
+      - name: Seal receipt
+        if: always()
+        run: |
+          mkdir -p evidence
+          cp mutation.log evidence/ 2>/dev/null || true
+          { printf 'candidate=%s\n' "$CANDIDATE"; node --version; pnpm --version; } > evidence/environment.txt
+          find evidence -type f ! -name SHA256SUMS -print0 | sort -z | xargs -0 sha256sum > evidence/SHA256SUMS
+      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
+        if: always()
+        with:
+          name: decay-rest-mutation-${{ env.CANDIDATE }}-${{ github.run_id }}
+          path: evidence/
+          if-no-files-found: error
+          retention-days: 14
