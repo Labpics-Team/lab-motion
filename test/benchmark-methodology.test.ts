@@ -661,7 +661,7 @@ describe('benchmark methodology fail-closed contracts', () => {
     );
     const screencastStarted = capture.indexOf("await cdp.send('Page.startScreencast'");
     const baselinePresented = capture.indexOf('await waitForBaselineFrame(frames)');
-    const animationStarted = capture.indexOf('const startedAt = await page.evaluate');
+    const animationStarted = capture.indexOf('const startClock = await readCdpStartClock');
     const cleanup = capture.indexOf('} finally {', baselinePresented);
     const screencastStopped = capture.indexOf('await stopScreencast()', cleanup);
     const contextClosed = capture.indexOf('await context.close()', cleanup);
