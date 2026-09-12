@@ -18,7 +18,7 @@ import {
 import { lcg } from './projection-helpers.js';
 
 const SEEDS = 10_000;
-const EXPLICIT_LINEAR_NUMBER = /^[+-]?(?:\d+(?:\.\d*)?|\.\d+)(?:e[+-]?\d+)?$/i;
+const EXPLICIT_LINEAR_NUMBER = /^[+-]?(?:\d+(?:\.\d+)?|\.\d+)(?:e[+-]?\d+)?$/i;
 
 interface Case {
   readonly mass: number;
@@ -134,6 +134,7 @@ describe('fuzz: 10 000 seeded сопряжённых артефактов', () =
   it('positive controls: CSS oracle fail-closed на повреждённых числах и позициях', () => {
     expect(() => explicitLinearSamples('linear(nope 0%, 1 100%)')).toThrow('не numeric token');
     expect(() => explicitLinearSamples('linear(0 %, 1 100%)')).toThrow('не numeric token');
+    expect(() => explicitLinearSamples('linear(0. 0%, 1 100%)')).toThrow('не numeric token');
     expect(() => explicitLinearSamples('linear(0 0%, 0.5 50%, 1 40%)')).toThrow('позиции не возрастают');
     expect(() => explicitLinearSamples('linear(0 1%, 1 100%)')).toThrow('неполные endpoints');
   });
