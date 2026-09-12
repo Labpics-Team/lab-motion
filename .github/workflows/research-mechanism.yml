@@ -5,96 +5,72 @@ on:
     paths: [.github/workflows/research-mechanism.yml]
 permissions: {}
 concurrency:
-  group: research-mechanism-review-fix
+  group: research-mechanism-final-seal
   cancel-in-progress: false
+env:
+  COREPACK_ENABLE_DOWNLOAD_PROMPT: '0'
+  COREPACK_DEFAULT_TO_LATEST: '0'
+  BASE: 93278bf9b540f93521c7bd4c02f68db458e5db7a
+  PRE_REVIEW: 5ef3bfde8b52a7f09f0a418415d7fb6669faf542
+  CANDIDATE: 43e73632560b6b3b289b0243c122b3e6f4479e8d
 jobs:
-  review-fix:
+  seal-and-dispatch:
     runs-on: ubuntu-latest
-    timeout-minutes: 5
+    timeout-minutes: 25
     permissions:
-      contents: write
+      contents: read
+      actions: write
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
         with:
-          ref: 5ef3bfde8b52a7f09f0a418415d7fb6669faf542
-          fetch-depth: 0
           persist-credentials: false
-      - name: Исправить подтверждённые замечания без исполнения зависимостей
-        shell: bash
+          fetch-depth: 0
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v6
+        with:
+          node-version: '24.20.0'
+      - name: Проверить неизменность исполняемого артефакта после замечаний ревью
         run: |
           set -euo pipefail
-          python3 - <<'PY'
-          from pathlib import Path
-
-          def replace(path, old, new, count=1):
-              p = Path(path)
-              s = p.read_text()
-              assert s.count(old) == count, (path, s.count(old), old)
-              p.write_text(s.replace(old, new, count))
-
-          replace('src/animate/index.ts',
-            '// Последний permit принадлежит commit-фазе: synchronous unit completion\n  // не может завершить aggregate до публикации всех owners и Promise.',
-            '// Последний пропуск принадлежит фазе фиксации: синхронное завершение юнита\n  // не может завершить группу до публикации всех владельцев и Promise.')
-          replace('src/animate/index.ts',
-            '// Terminal controls больше не владеют execution graph. Обнуляется и\n    // options: пользовательский callback может замыкать те же DOM-цели.',
-            '// Завершённые controls больше не владеют внутренним графом исполнения. Снимается и\n    // ссылка на параметры: пользовательский обработчик может замыкать те же DOM-цели.')
-          replace('src/animate/index.ts',
-            '// Thenable-adoption сохраняет прежний публичный microtask order.',
-            '// Ассимиляция thenable сохраняет прежний публичный порядок микрозадач.')
-          replace('src/animate/index.ts',
-            '// Host reporter не владеет завершением и освобождением ресурсов.',
-            '// Средство отчётности среды не владеет завершением и освобождением ресурсов.')
-
-          replace('CHANGELOG.md',
-            '- `./animate`: завершённые controls освобождают граф юнитов и ссылки на\n  пользовательские options, включая замкнутые callback-ами DOM-цели. Одна\n  completion-защёлка сохраняет порядок `finished`/`onComplete`, синхронный\n  commit и C¹-подхват; методы завершённого controls остаются no-op.\n',
-            '- `./animate`: завершённый объект управления освобождает внутренний граф\n  юнитов и ссылки на пользовательские параметры, включая DOM-цели в замыканиях\n  обработчиков. Единая защёлка сохраняет порядок `finished`/`onComplete`,\n  синхронную фазу фиксации и C¹-подхват; после завершения методы ничего не делают.\n')
-
-          replace('test/animate-terminal-retention-gc.test.ts',
-            "import { mkdtempSync, rmSync } from 'node:fs';",
-            "import { existsSync, mkdtempSync, rmSync } from 'node:fs';")
-          replace('test/animate-terminal-retention-gc.test.ts',
-            "describe('завершённые animate controls не владеют execution graph', () => {",
-            "describe('завершённый результат animate не удерживает внутренний граф', () => {")
-          replace('test/animate-terminal-retention-gc.test.ts',
-            "    it(`${entry}: release после natural/cancel/reduced и live-owner positive control`, async () => {\n      const work = mkdtempSync(join(tmpdir(), 'labmotion-animate-gc-'));",
-            "    it(`${entry}: освобождение после завершения и контроль живого владельца`, async () => {\n      const packed = entry === 'source'\n        ? undefined\n        : resolve(ROOT, `dist/animate/index.${entry === 'cjs' ? 'cjs' : 'js'}`);\n      if (packed !== undefined && !existsSync(packed)) {\n        throw new Error(`нет собранного артефакта ${packed}: выполните сборку перед тестом`);\n      }\n      const work = mkdtempSync(join(tmpdir(), 'labmotion-animate-gc-'));")
-          replace('test/animate-terminal-retention-gc.test.ts',
-            '          // Каждый формат исполняет РЕАЛЬНЫЙ dist, без повторной минификации:\n          // inlining может вернуть общий closure context и скрыто восстановить retention.',
-            '          // Каждый формат исполняет реальный собранный артефакт без повторной минификации:\n          // встраивание может вернуть общий контекст замыкания и снова скрыто удерживать цель.')
-          replace('test/animate-terminal-retention-gc.test.ts',
-            "                path: pathToFileURL(resolve(ROOT, `dist/animate/index.${entry === 'cjs' ? 'cjs' : 'js'}`)).href,",
-            '                path: pathToFileURL(packed!).href,')
-
-          replace('test/fixtures/animate-terminal-retention-gc.probe.ts',
-            '// Main-thread использует другой owner и отложенный rAF-drain, но тот же\n// закон terminal-агрегата. Очередь стенда не должна удерживать снятый batch.',
-            '// Главный поток использует другого владельца и отложенное опустошение rAF, но тот же\n// закон завершения. Очередь стенда не должна удерживать снятый пакет.')
-          replace('test/fixtures/animate-terminal-retention-gc.probe.ts',
-            '// Положительный контроль: GC не должен стирать достижимую цель активного owner.',
-            '// Положительный контроль: GC не должен стирать достижимую цель активного владельца.')
-          replace('test/fixtures/animate-terminal-retention-gc.probe.ts',
-            '// Завершённый handle остаётся полноценным no-op API, а не «уничтоженным» объектом.',
-            '// Завершённый объект управления сохраняет API, но его методы ничего не делают.')
-
-          PY
-          git diff --check
-          mapfile -t changed < <(git diff --name-only 5ef3bfde8b52a7f09f0a418415d7fb6669faf542)
-          printf '%s\n' "${changed[@]}"
-          [[ "${#changed[@]}" -eq 4 ]]
-          printf '%s\n' "${changed[@]}" | sort | diff -u - <(printf '%s\n' CHANGELOG.md src/animate/index.ts test/animate-terminal-retention-gc.test.ts test/fixtures/animate-terminal-retention-gc.probe.ts | sort)
-          git add -- "${changed[@]}"
-          git -c user.name='github-actions[bot]' -c user.email='41898282+github-actions[bot]@users.noreply.github.com' commit -m 'test(animate): замкнуть локальную проверку удержания'
-          git rev-parse HEAD > candidate-head.txt
-      - name: Опубликовать только ветку кандидата
+          corepack enable
+          corepack install --global pnpm@11.11.0
+          mkdir -p evidence
+          git worktree add --detach "$RUNNER_TEMP/pre" "$PRE_REVIEW"
+          git worktree add --detach "$RUNNER_TEMP/final" "$CANDIDATE"
+          for name in pre final; do
+            (cd "$RUNNER_TEMP/$name" && pnpm install --frozen-lockfile && pnpm build) > "evidence/$name-build.log" 2>&1
+          done
+          cmp "$RUNNER_TEMP/pre/dist/animate/index.js" "$RUNNER_TEMP/final/dist/animate/index.js"
+          cmp "$RUNNER_TEMP/pre/dist/animate/index.cjs" "$RUNNER_TEMP/final/dist/animate/index.cjs"
+          sha256sum "$RUNNER_TEMP/pre/dist/animate/index.js" "$RUNNER_TEMP/final/dist/animate/index.js" > evidence/animate-esm.sha256
+          sha256sum "$RUNNER_TEMP/pre/dist/animate/index.cjs" "$RUNNER_TEMP/final/dist/animate/index.cjs" > evidence/animate-cjs.sha256
+          cd "$RUNNER_TEMP/final"
+          pnpm vitest run test/animate-terminal-retention-gc.test.ts | tee "$GITHUB_WORKSPACE/evidence/gc-test.log"
+          pnpm size | tee "$GITHUB_WORKSPACE/evidence/size.log"
+          git status --porcelain > "$GITHUB_WORKSPACE/evidence/status.txt"
+          test ! -s "$GITHUB_WORKSPACE/evidence/status.txt"
+          {
+            printf 'base=%s\npre_review=%s\ncandidate=%s\n' "$BASE" "$PRE_REVIEW" "$CANDIDATE"
+            node --version
+            pnpm --version
+            uname -a
+          } > "$GITHUB_WORKSPACE/evidence/environment.txt"
+      - name: Запустить неизменённый authoritative CI на точной ревизии
         env:
           GH_TOKEN: ${{ github.token }}
+          REPO: Labpics-Team/lab-motion
         run: |
           set -euo pipefail
-          gh auth setup-git
-          git push origin HEAD:refs/heads/perf/terminal-aggregate-20260912
-          cat candidate-head.txt
+          actual="$(gh api "repos/$REPO/git/ref/heads/perf/terminal-aggregate-20260912" --jq .object.sha)"
+          [[ "$actual" == "$CANDIDATE" ]]
+          gh api --method POST "repos/$REPO/actions/workflows/ci.yml/dispatches" -f ref=perf/terminal-aggregate-20260912
+          printf 'dispatched exact candidate %s\n' "$CANDIDATE" | tee evidence/dispatch.txt
+      - name: Запечатать квитанции
+        if: always()
+        run: find evidence -type f ! -name SHA256SUMS -print0 | sort -z | xargs -0 sha256sum > evidence/SHA256SUMS
       - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
+        if: always()
         with:
-          name: terminal-review-fix-${{ github.run_id }}
-          path: candidate-head.txt
+          name: terminal-final-seal-${{ env.CANDIDATE }}-${{ github.run_id }}
+          path: evidence/
           if-no-files-found: error
-          retention-days: 7
+          retention-days: 14
