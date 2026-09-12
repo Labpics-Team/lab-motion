@@ -131,6 +131,19 @@ function clampAmplitude(ampRaw: number): number {
   return ampRaw > 0 ? Number.MAX_VALUE : -Number.MAX_VALUE;
 }
 
+/**
+ * Точка покоя затухания с параметрами по умолчанию без построения модели
+ * сэмплирования. Внутренняя специализация того же домена: проверки, значения
+ * по умолчанию и порядок IEEE-754 общие с createDecay. Не сворачивать
+ * DEFAULT_POWER * DEFAULT_TIME_CONSTANT заранее.
+ */
+export function projectDefaultDecayRest(from: number, velocity: number): number {
+  if (!Number.isFinite(from)) throw new MotionParamError('LM021');
+  if (!Number.isFinite(velocity)) throw new MotionParamError('LM022');
+  const amplitude = clampAmplitude(DEFAULT_POWER * velocity * DEFAULT_TIME_CONSTANT);
+  return finiteOr(from + amplitude, amplitude > 0 ? Number.MAX_VALUE : -Number.MAX_VALUE);
+}
+
 // ─── createDecay ──────────────────────────────────────────────────────────────
 
 /**
