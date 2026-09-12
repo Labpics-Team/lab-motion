@@ -60,8 +60,8 @@ const parentPort = { postMessage(row) {
 const marker = `globalThis.__phaseProbe.phase = 'measured'; writeSync(1, '__LM_TIMED__\\n');\n`;
 function standalone(source, kind) {
   let out = replaceOnce(source, "import { parentPort, workerData } from 'node:worker_threads';\n", prelude);
-  out = replaceOnce(out, kind === 'old' ? 'const clock = [];\n' : '  if (round === 64) {\n',
-    kind === 'old' ? marker + 'const clock = [];\n' : '  if (round === 64) {\n' + marker);
+  out = replaceOnce(out, kind === 'old' ? 'const clock = [];\n' : '\n  if (round === 64) {\n',
+    kind === 'old' ? marker + 'const clock = [];\n' : '\n  if (round === 64) {\n' + marker);
   return out;
 }
 const paths = {};
