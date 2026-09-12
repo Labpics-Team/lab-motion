@@ -126,8 +126,8 @@ function checkoutFixture(autocrlf = false) {
 }
 
 // Реальные Git-процессы конкурируют с полным набором тестов; это watchdog, не бюджет бенчмарка.
-describe('benchmark provenance', { timeout: 30_000 }, () => {
-  it('fails closed when a hostile global attributes file changes Git normalization', () => {
+describe('Происхождение измеряемого бенчмарком кода', { timeout: 30_000 }, () => {
+  it('отклоняет checkout, когда внешний attributes-файл меняет нормализацию Git', () => {
     const directory = mkdtempSync(path.join(tmpdir(), 'lab-motion-hostile-git-'));
     cleanup.push(directory);
     const attributes = path.join(directory, 'attributes');
@@ -143,7 +143,7 @@ describe('benchmark provenance', { timeout: 30_000 }, () => {
       .toThrow(/clean checkout|tracked|revision/);
   });
 
-  it('uses the portable OID-only batch protocol without requiring Git -Z', () => {
+  it('использует переносимый пакетный протокол OID без требования Git -Z', () => {
     const f = checkoutFixture();
     const exec = vi.mocked(execFileSync);
     exec.mockClear();
@@ -153,7 +153,7 @@ describe('benchmark provenance', { timeout: 30_000 }, () => {
       expect.objectContaining({ input: expect.stringMatching(/^(?:[a-f0-9]{40}\n)+$/) }));
   });
 
-  it('hashes successive bounded object batches without retaining the whole revision output', () => {
+  it('хеширует ограниченные пакеты объектов без удержания всех байтов ревизии', () => {
     const f = checkoutFixture();
     for (let index = 0; index < 128; index++) {
       writeFileSync(path.join(f.root, `entry-${index}.txt`), `payload ${index}\n`);
@@ -176,7 +176,7 @@ describe('benchmark provenance', { timeout: 30_000 }, () => {
   });
 
   it.each(['extra-field', 'exponent-size', 'empty-size', 'CR-size'] as const)(
-    'rejects a malformed Git object header: %s', (fault) => {
+    'отклоняет повреждённый заголовок Git-объекта: %s', (fault) => {
       const f = checkoutFixture();
       const revision = f.git(['rev-parse', 'HEAD']).trim();
       const exec = vi.mocked(execFileSync);
@@ -197,7 +197,7 @@ describe('benchmark provenance', { timeout: 30_000 }, () => {
     },
   );
 
-  it('rejects gitlink entries before reading them as file bytes', () => {
+  it('отклоняет gitlink до чтения его объекта как байтов файла', () => {
     const f = checkoutFixture();
     const parent = f.git(['rev-parse', 'HEAD']).trim();
     f.git(['update-index', '--add', '--cacheinfo', '160000', parent, 'vendor']);
@@ -209,7 +209,7 @@ describe('benchmark provenance', { timeout: 30_000 }, () => {
     expect(() => revisionFingerprint(f.root, revision)).toThrow(/submodule vendor/);
   });
 
-  it.each(['--assume-unchanged', '--skip-worktree'])('rejects hidden source bytes before build: %s', (flag) => {
+  it.each(['--assume-unchanged', '--skip-worktree'])('отклоняет скрытые изменения исходников до сборки: %s', (flag) => {
     const f = checkoutFixture();
     const revision = f.git(['rev-parse', 'HEAD']).trim();
     f.git(['update-index', flag, '--', 'source.js']);
@@ -222,7 +222,7 @@ describe('benchmark provenance', { timeout: 30_000 }, () => {
     expect(builds).toBe(0);
   });
 
-  it('accepts actual CRLF checkouts while retaining the committed canonical fingerprint', () => {
+  it('принимает настоящий CRLF checkout с каноническим отпечатком коммита', () => {
     const f = checkoutFixture(true);
     expect(f.git(['ls-files', '--eol', '--', 'source.js'])).toContain('w/crlf');
     const state = readCheckoutState(f.root);
@@ -234,7 +234,7 @@ describe('benchmark provenance', { timeout: 30_000 }, () => {
     expect(() => prepareBenchmarkCheckout({ ...f.prepare, build() {} })).not.toThrow();
   });
 
-  it.skipIf(process.platform === 'win32')('proves tracked symlink bytes without following the target', () => {
+  it.skipIf(process.platform === 'win32')('проверяет байты tracked symlink, не читая его цель', () => {
     const f = checkoutFixture();
     const target = path.join(path.dirname(f.root), 'external-target.js');
     const link = path.join(f.root, 'linked.js');
@@ -253,7 +253,7 @@ describe('benchmark provenance', { timeout: 30_000 }, () => {
     expect(after.worktreeSha256).toBe(before.worktreeSha256);
   });
 
-  it.each(['build', 'run'])('rejects hidden source mutations after %s', (phase) => {
+  it.each(['build', 'run'])('отклоняет скрытую подмену исходников после фазы %s', (phase) => {
     const f = checkoutFixture(true);
     f.git(['update-index', '--skip-worktree', '--', 'source.js']);
     const mutate = () => writeFileSync(path.join(f.root, 'source.js'), 'export const value = 2;\r\n');
@@ -267,7 +267,7 @@ describe('benchmark provenance', { timeout: 30_000 }, () => {
     expect(f.git(['status', '--porcelain'])).toBe('');
   });
 
-  it('does not normalize binary changes as legitimate CRLF conversion', () => {
+  it('не принимает бинарное отличие за допустимое преобразование CRLF', () => {
     const f = checkoutFixture(true);
     f.git(['update-index', '--assume-unchanged', '--', 'binary.bin']);
     writeFileSync(path.join(f.root, 'binary.bin'), Buffer.from([0, 13, 10, 1]));
@@ -275,7 +275,7 @@ describe('benchmark provenance', { timeout: 30_000 }, () => {
     expect(() => prepareBenchmarkCheckout({ ...f.prepare, build() {} })).toThrow(/tracked|revision|коммит/);
   });
 
-  it('rejects a missing skip-worktree source instead of omitting it from the fingerprint', () => {
+  it('отклоняет отсутствующий skip-worktree файл вместо исключения из отпечатка', () => {
     const f = checkoutFixture();
     f.git(['update-index', '--skip-worktree', '--', 'source.js']);
     unlinkSync(path.join(f.root, 'source.js'));
@@ -285,7 +285,7 @@ describe('benchmark provenance', { timeout: 30_000 }, () => {
     expect(builds).toBe(0);
   });
 
-  it('does not trust a lossy custom clean filter to prove the committed source', () => {
+  it('не доверяет пользовательскому clean-фильтру, скрывающему изменение исходника', () => {
     const f = checkoutFixture();
     f.git(['config', 'filter.mask.clean', 'git show HEAD:source.js']);
     mkdirSync(path.join(f.root, '.git', 'info'), { recursive: true });
@@ -299,7 +299,7 @@ describe('benchmark provenance', { timeout: 30_000 }, () => {
     expect(() => prepareBenchmarkCheckout({ ...f.prepare, build() {} })).toThrow(/неподдерживаемое преобразование/);
   });
 
-  it('preserves path identity for CRLF files with spaces in the object batch', () => {
+  it('сохраняет идентичность CRLF-путей с пробелами при пакетном чтении объектов', () => {
     const f = checkoutFixture(true);
     const file = path.join(f.root, 'with space.js');
     writeFileSync(file, 'export const space = 1;\n');
@@ -317,7 +317,7 @@ describe('benchmark provenance', { timeout: 30_000 }, () => {
     expect(() => prepareBenchmarkCheckout({ ...f.prepare, build() {} })).toThrow(/tracked with space.js/);
   });
 
-  it.skipIf(process.platform === 'win32')('preserves quotes, backslashes and newlines in Git-normalized paths', () => {
+  it.skipIf(process.platform === 'win32')('сохраняет кавычки, обратную косую черту и LF в нормализованных Git-путях', () => {
     const f = checkoutFixture(true);
     const name = 'quote" backslash\\ newline\nю.js';
     const file = path.join(f.root, name);
@@ -334,7 +334,7 @@ describe('benchmark provenance', { timeout: 30_000 }, () => {
     expect(() => prepareBenchmarkCheckout({ ...f.prepare, build() {} })).toThrow(/не совпадает/);
   });
 
-  it('ignores replacement refs when proving the declared commit bytes', () => {
+  it('игнорирует replacement refs при проверке байтов заявленного коммита', () => {
     const f = checkoutFixture();
     const original = f.git(['rev-parse', 'HEAD']).trim();
     writeFileSync(path.join(f.root, 'source.js'), 'export const value = 999;\n');
@@ -349,7 +349,7 @@ describe('benchmark provenance', { timeout: 30_000 }, () => {
     expect(() => prepareBenchmarkCheckout({ ...f.prepare, build() {} })).toThrow(/clean checkout|tracked|revision/);
   });
 
-  it('accepts Git-clean mixed LF/CRLF source without accepting changed code', () => {
+  it('принимает Git-clean смешанный LF/CRLF, но отклоняет изменение кода', () => {
     const f = checkoutFixture(true);
     const name = 'mixed файл.js';
     const file = path.join(f.root, name);
@@ -366,7 +366,7 @@ describe('benchmark provenance', { timeout: 30_000 }, () => {
     expect(() => prepareBenchmarkCheckout({ ...f.prepare, build() {} })).toThrow(/tracked mixed файл.js/);
   });
 
-  it('rejects requiredDist and benchmark entries outside published exports', () => {
+  it('отклоняет requiredDist и точки входа бенчмарка вне опубликованных exports', () => {
     const f = fixture();
     writeFileSync(path.join(f.root, 'package.json'), JSON.stringify({
       exports: {
@@ -403,7 +403,7 @@ describe('benchmark provenance', { timeout: 30_000 }, () => {
     })).toThrow(/bench\/entry\.mjs.*export.*animate\/native/i);
   });
 
-  it('runs the export-surface guard before an expensive benchmark build', () => {
+  it('проверяет exports до дорогой сборки бенчмарка', () => {
     const f = fixture();
     const entry = path.join(f.benchDirectory, 'entry.mjs');
     writeFileSync(entry, "import { springTo } from '../../dist/animate/native/index.js';\n");
@@ -476,7 +476,7 @@ describe('benchmark provenance', { timeout: 30_000 }, () => {
     })).toThrow(/сборка не создала обязательный файл/);
   });
 
-  it('pins caller-owned benchmark inputs without imposing comparative layout on other benches', () => {
+  it('закрепляет входы владельца бенчмарка без навязывания структуры остальным', () => {
     const f = fixture();
     expect(() => prepareBenchmarkCheckout({
       root: f.root,
@@ -495,7 +495,7 @@ describe('benchmark provenance', { timeout: 30_000 }, () => {
     })).toThrow(/missing\.mjs/);
   });
 
-  it('refuses a dirty checkout before build and a build that dirties tracked inputs', () => {
+  it('отклоняет dirty checkout до сборки и сборку, изменившую tracked-входы', () => {
     const f = fixture();
     let builds = 0;
     expect(() => prepareBenchmarkCheckout({
@@ -522,7 +522,7 @@ describe('benchmark provenance', { timeout: 30_000 }, () => {
     })).toThrow(/изменила checkout/);
   });
 
-  it('allows an explicitly diagnostic dirty run but still rejects mid-run mutation', () => {
+  it('разрешает явно диагностический dirty-прогон', () => {
     const f = fixture();
     const dirty = { ...f.state, dirty: true, revisionLabel: `${f.state.shortRevision}-dirty` };
     expect(() => prepareBenchmarkCheckout({
@@ -535,7 +535,7 @@ describe('benchmark provenance', { timeout: 30_000 }, () => {
     })).not.toThrow();
   });
 
-  it('pins Node/pnpm and hashes the actual installed benchmark packages', () => {
+  it('закрепляет Node/pnpm и хеширует установленные пакеты бенчмарка', () => {
     const f = fixture();
     writeFileSync(path.join(f.root, 'package.json'), JSON.stringify({ packageManager: 'pnpm@11.11.0' }));
     writeFileSync(path.join(f.benchDirectory, 'package.json'), JSON.stringify({
@@ -617,7 +617,7 @@ describe('benchmark provenance', { timeout: 30_000 }, () => {
       .toThrow(/pako.*измен/i);
   });
 
-  it('re-hashes generated runtime adapters after the benchmark', () => {
+  it('повторно хеширует сгенерированные runtime-адаптеры после бенчмарка', () => {
     const f = fixture();
     const adapter = path.join(f.root, 'adapter.iife.js');
     writeFileSync(adapter, 'runtime-v1');
