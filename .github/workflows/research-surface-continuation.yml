@@ -1,39 +1,64 @@
-name: Surface continuation evidence
+name: Surface exact tree delivery
 on:
   push:
     branches: [research/surface-continuation-20260912]
 permissions:
-  contents: read
+  contents: write
 jobs:
-  snapshot:
+  exact-tree:
     runs-on: ubuntu-latest
-    timeout-minutes: 10
+    timeout-minutes: 5
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
         with:
-          ref: 6008d916ac053bc104050d9c75aad69b04d4a878
-          fetch-depth: 0
           persist-credentials: false
-      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020
-        with:
-          node-version: '24.20.0'
-      - name: Восстановить ровно текущую цепочку инструментов
-        shell: bash
+      - name: Восстановить только пять проверенных blobs без изменения refs
+        env:
+          GH_TOKEN: ${{ github.token }}
+          RECEIPT: ${{ runner.temp }}/delivery.json
         run: |
-          set -euo pipefail
-          corepack enable
-          corepack install --global pnpm@11.11.0
-          pnpm install --frozen-lockfile
-          mkdir -p "$RUNNER_TEMP/motion-snapshot"
-          tar -czf "$RUNNER_TEMP/motion-snapshot/dependencies.tgz" node_modules
-          cp "$(command -v node)" "$RUNNER_TEMP/motion-snapshot/node"
-          node -p 'JSON.stringify(process.versions)' > "$RUNNER_TEMP/motion-snapshot/versions.json"
-          sha256sum package.json pnpm-lock.yaml > "$RUNNER_TEMP/motion-snapshot/inputs.sha256"
-          sha256sum "$RUNNER_TEMP/motion-snapshot/dependencies.tgz" "$RUNNER_TEMP/motion-snapshot/node" > "$RUNNER_TEMP/motion-snapshot/sha256.txt"
+          node --input-type=module <<'JS'
+          import assert from 'node:assert/strict';
+          import {readFileSync,writeFileSync} from 'node:fs';
+          import {createHash} from 'node:crypto';
+          const expected = {
+            'docs/benchmark.md': 'e378168d7fccfc012e925a438d5e3caadd17f597',
+            'docs/surface-benchmark.md': '160612237bcfdc1ae8ab1edbc3b0b528a7b5119d',
+            'scripts/bench-surface-pair.mjs': '7f21de574135c84579c296aa70e5b6457c98d935',
+            'scripts/bench-surface-support.mjs': 'd661d8322e1ab71eb3ee6f84103f0e19443ac12c',
+            'test/bench-surface-pair.test.ts': 'fb73f1726c150e9ca36a37faa058510ef42a78cb',
+          };
+          const contents = Object.entries(expected).map(([path,sha]) => {
+            let content = readFileSync(path,'utf8');
+            if (path === 'docs/benchmark.md') content = content.replace('одинаковую точной версии pnpm','одинаковую точную версию pnpm');
+            if (path === 'test/bench-surface-pair.test.ts') content = content.replace(/^ describe\(/gm,'describe(');
+            const data = Buffer.from(content);
+            const actual = createHash('sha1').update(Buffer.from(`blob ${data.length}\0`)).update(data).digest('hex');
+            assert.equal(actual,sha,`delivery drift ${path}`);
+            return {path,sha,content};
+          });
+          async function post(suffix,body) {
+            const response = await fetch(`https://api.github.com/repos/Labpics-Team/lab-motion/git/${suffix}`, {
+              method:'POST',headers:{Authorization:`Bearer ${process.env.GH_TOKEN}`,Accept:'application/vnd.github+json','Content-Type':'application/json'},body:JSON.stringify(body),
+            });
+            assert.equal(response.status,201,`Git object creation failed: ${response.status}`);
+            return response.json();
+          }
+          const entries=[];
+          for(const item of contents){
+            const blob=await post('blobs',{content:item.content,encoding:'utf-8'});
+            assert.equal(blob.sha,item.sha);
+            entries.push({path:item.path,mode:'100644',type:'blob',sha:blob.sha});
+          }
+          const tree=await post('trees',{base_tree:'b7aefd4aeedc58628073b6f09c78748ecadb5c0f',tree:entries});
+          assert.equal(tree.sha,'53d9cf55a2b0117b0d6c2aff3cb7b54893faaa9f');
+          const commit=await post('commits',{message:'test(perf): измерять публичный Surface через проверенный парный контур',tree:tree.sha,parents:['6008d916ac053bc104050d9c75aad69b04d4a878']});
+          writeFileSync(process.env.RECEIPT,JSON.stringify({sha:commit.sha,tree:tree.sha,files:expected},null,2));
+          console.log(JSON.stringify({sha:commit.sha,tree:tree.sha}));
+          JS
       - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         with:
-          name: motion-toolchain-6008d916
-          path: ${{ runner.temp }}/motion-snapshot
+          name: exact-surface-tree-delivery
+          path: ${{ runner.temp }}/delivery.json
           if-no-files-found: error
           retention-days: 1
-          compression-level: 0
