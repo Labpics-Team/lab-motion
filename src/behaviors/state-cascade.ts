@@ -1,22 +1,24 @@
 type StateRecord = Record<string, unknown>;
-type StateKey<T extends StateRecord> = Extract<keyof T, string>;
+type StateKey<T extends object> = Extract<keyof T, string>;
 
 /** Только реально изменившаяся эффективная поверхность. */
-export interface StateCascadePatch<T extends StateRecord> {
+export interface StateCascadePatch<T extends object> {
   readonly changed: Readonly<Partial<T>>;
   readonly removed: readonly StateKey<T>[];
 }
 
-export interface StateCascadeLayer<T extends StateRecord> {
+export interface StateCascadeLayer<T extends object> {
   /** Активен ли слой; пустой объект остаётся активным, но ничем не владеет. */
   readonly active: boolean;
   /** Shallow-snapshot новой цели слоя. Позднее созданный слой приоритетнее. */
   set(target: Readonly<Partial<T>>): StateCascadePatch<T>;
   /** Снять весь слой и раскрыть актуальные значения нижних владельцев. */
   clear(): StateCascadePatch<T>;
+  /** Навсегда снять слой, освободить ссылки и сделать handle инертным. */
+  destroy(): StateCascadePatch<T>;
 }
 
-export interface StateCascade<T extends StateRecord> {
+export interface StateCascade<T extends object> {
   /**
    * Создать слой поверх всех ранее созданных. Имена/глобальная таблица
    * приоритетов не нужны: семантическое имя остаётся у handle потребителя.
@@ -26,26 +28,28 @@ export interface StateCascade<T extends StateRecord> {
   get<K extends StateKey<T>>(key: K): T[K] | undefined;
   /** Копия всей эффективной цели; own `undefined` сохраняется. */
   snapshot(): Readonly<Partial<T>>;
-  /** События только при изменении эффективного результата, не скрытых слоёв. */
+  /**
+   * Синхронные effective deltas в порядке коммитов. Реентрантный commit сразу
+   * виден get/snapshot; его уведомление ждёт окончания текущего уведомления.
+   * Набор получателей фиксируется при commit. destroy пресекает всю доставку.
+   * Синхронные ошибки listeners выбрасываются после доставки (несколько — AggregateError).
+   */
   subscribe(listener: (patch: StateCascadePatch<T>) => void): () => void;
   /** Идемпотентно очистить состояние и сделать ранее выданные handles инертными. */
   destroy(): void;
 }
 
-const hasOwn = (value: object, key: string): boolean =>
-  Object.prototype.hasOwnProperty.call(value, key);
-
 function nullObject<T extends object>(): T {
   return Object.create(null) as T;
 }
 
-function cloneTarget<T extends StateRecord>(target: Readonly<Partial<T>>): Readonly<Partial<T>> {
+function cloneTarget<T extends object>(target: Readonly<Partial<T>>): Readonly<Partial<T>> {
   const copy = nullObject<Partial<T>>();
   for (const key of Object.keys(target) as StateKey<T>[]) copy[key] = target[key];
   return copy;
 }
 
-function freezePatch<T extends StateRecord>(
+function freezePatch<T extends object>(
   changed: Partial<T>,
   removed: StateKey<T>[],
 ): StateCascadePatch<T> {
@@ -62,36 +66,62 @@ function freezePatch<T extends StateRecord>(
  * одного намерения раскрывает свежее значение следующего владельца.
  */
 export function createStateCascade<
-  T extends StateRecord = StateRecord,
+  T extends object = StateRecord,
 >(): StateCascade<T> {
-  interface Slot { target: Readonly<Partial<T>> | undefined }
+  interface Slot {
+    _target: Readonly<Partial<T>> | undefined;
+    /** undefined — терминально отозванное право менять слой. */
+    _revision: number | undefined;
+  }
+  type Listener = (patch: StateCascadePatch<T>) => void;
   const layers: Slot[] = [];
-  const resolved = nullObject<Partial<T>>();
-  const listeners = new Set<(patch: StateCascadePatch<T>) => void>();
+  let resolved = nullObject<Partial<T>>();
+  const listeners = new Set<Listener>();
   const empty = freezePatch<T>(nullObject<Partial<T>>(), []);
   let destroyed = false;
+  let notifying = false;
+  const notices = new Map<StateCascadePatch<T>, Listener[]>();
 
-  const recompute = (inputKeys: readonly StateKey<T>[]): StateCascadePatch<T> => {
-    if (destroyed || inputKeys.length === 0) return empty;
-    const keys = new Set(inputKeys);
+  // FIFO не позволяет вложенному set доставить новое значение раньше старого.
+  // Уже доставленные сообщения не удерживаются до конца длинной цепочки.
+  const publish = (patch: StateCascadePatch<T>): StateCascadePatch<T> => {
+    if (listeners.size === 0) return patch;
+    notices.set(patch, [...listeners]);
+    if (notifying) return patch;
+
+    notifying = true;
+    let errors: unknown[] | undefined;
+    // Map сохраняет порядок добавления, включая записи из вложенных callbacks.
+    for (const [current, recipients] of notices) {
+      notices.delete(current);
+      for (const listener of recipients) {
+        if (destroyed) break;
+        try { listener(current); } catch (error) { (errors ??= []).push(error); }
+      }
+    }
+    notifying = false;
+    if (errors?.length === 1) throw errors[0];
+    if (errors && errors.length > 1) throw new AggregateError(errors);
+    return patch;
+  };
+
+  const recompute = (affected: Partial<T>): StateCascadePatch<T> => {
     const changed = nullObject<Partial<T>>();
     const removed: StateKey<T>[] = [];
     let count = 0;
 
-    for (const key of keys) {
-      let found = false;
-      let next: T[typeof key] | undefined;
+    for (const key in affected) {
+      let winner: Readonly<Partial<T>> | undefined;
       for (let i = layers.length - 1; i >= 0; i--) {
-        const target = layers[i]!.target;
-        if (target !== undefined && hasOwn(target, key)) {
-          next = target[key];
-          found = true;
+        const target = layers[i]!._target;
+        if (target !== undefined && Object.hasOwn(target, key)) {
+          winner = target;
           break;
         }
       }
 
-      const had = hasOwn(resolved, key);
-      if (!found) {
+      const had = Object.hasOwn(resolved, key);
+      if (!winner) {
         if (had) {
           delete resolved[key];
           removed.push(key);
@@ -100,6 +130,7 @@ export function createStateCascade<
         continue;
       }
 
+      const next = winner[key];
       if (!had || !Object.is(resolved[key], next)) {
         resolved[key] = next;
         changed[key] = next;
@@ -108,52 +139,60 @@ export function createStateCascade<
     }
 
     if (count === 0) return empty;
-    const patch = freezePatch(changed, removed);
-    // Snapshot listeners: reentrant subscribe/unsubscribe относится к следующему emit.
-    for (const listener of [...listeners]) listener(patch);
-    return patch;
+    return publish(freezePatch(changed, removed));
   };
-
-  const inertLayer = (): StateCascadeLayer<T> => ({
-    get active() { return false; },
-    set: () => empty,
-    clear: () => empty,
-  });
 
   return {
     createLayer(initial) {
-      if (destroyed) return inertLayer();
-      const slot: Slot = { target: undefined };
-      layers.push(slot);
+      // Сначала snapshot: исключение getter не создаёт недоступный caller слой.
+      const snapshot = destroyed || initial === undefined ? undefined : cloneTarget(initial);
+      const slot: Slot = { _target: undefined, _revision: destroyed ? undefined : 0 };
+      if (!destroyed) layers.push(slot);
+      const replace = (next: Readonly<Partial<T>> | undefined): StateCascadePatch<T> => {
+        const previous = slot._target;
+        slot._target = next;
+        // Own-key union без трёх промежуточных массивов и Set; значения уже сняты.
+        return recompute(Object.assign(nullObject<Partial<T>>(), previous, next));
+      };
       const layer: StateCascadeLayer<T> = {
-        get active() { return !destroyed && slot.target !== undefined; },
+        get active() { return slot._target !== undefined; },
         set(target) {
-          if (destroyed) return empty;
-          const previous = slot.target;
+          if (slot._revision === undefined) return empty;
+          const revision = slot._revision;
           const next = cloneTarget(target);
-          slot.target = next;
-          return recompute([
-            ...(previous ? Object.keys(previous) as StateKey<T>[] : []),
-            ...Object.keys(next) as StateKey<T>[],
-          ]);
+          // Getter может синхронно изменить или уничтожить тот же слой.
+          if (slot._revision !== revision) return empty;
+          slot._revision++; // Неудачное чтение входа не отзывает внешний valid commit.
+          return replace(next);
         },
         clear() {
-          if (destroyed || slot.target === undefined) return empty;
-          const previous = slot.target;
-          slot.target = undefined;
-          return recompute(Object.keys(previous) as StateKey<T>[]);
+          if (slot._revision === undefined) return empty;
+          slot._revision++;
+          return replace(undefined);
+        },
+        destroy() {
+          if (slot._revision === undefined) return empty;
+          slot._revision = undefined;
+          layers.splice(layers.indexOf(slot), 1);
+          return replace(undefined);
         },
       };
-      if (initial !== undefined) layer.set(initial);
+      if (!destroyed && snapshot !== undefined) {
+        try { replace(snapshot); } catch (error) {
+          // При отказе конструктора caller не получит handle: слой не осиротеет.
+          try { layer.destroy(); } catch (cleanupError) {
+            throw new AggregateError([error, cleanupError]);
+          }
+          throw error;
+        }
+      }
       return layer;
     },
     get(key) {
-      return hasOwn(resolved, key) ? resolved[key] : undefined;
+      return resolved[key];
     },
     snapshot() {
-      const copy = nullObject<Partial<T>>();
-      for (const key of Object.keys(resolved) as StateKey<T>[]) copy[key] = resolved[key];
-      return Object.freeze(copy);
+      return Object.freeze(cloneTarget(resolved));
     },
     subscribe(listener) {
       if (destroyed) return () => {};
@@ -164,9 +203,10 @@ export function createStateCascade<
       if (destroyed) return;
       destroyed = true;
       listeners.clear();
-      for (const layer of layers) layer.target = undefined;
+      notices.clear();
+      for (const layer of layers) { layer._target = undefined; layer._revision = undefined; }
       layers.length = 0;
-      for (const key of Object.keys(resolved)) delete (resolved as Record<string, unknown>)[key];
+      resolved = nullObject<Partial<T>>();
     },
   };
 }
