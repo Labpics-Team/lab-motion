@@ -1,0 +1,62 @@
+name: Mechanism research evidence
+on:
+  push:
+    branches: [research/mechanism-20260912-r4]
+permissions:
+  contents: read
+  issues: read
+  pull-requests: read
+concurrency:
+  group: research-mechanism-20260912-r4
+  cancel-in-progress: false
+env:
+  COREPACK_ENABLE_DOWNLOAD_PROMPT: '0'
+  COREPACK_DEFAULT_TO_LATEST: '0'
+  BASE_SHA: 93278bf9b540f93521c7bd4c02f68db458e5db7a
+jobs:
+  evidence:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          persist-credentials: false
+          fetch-depth: 0
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v6
+        with:
+          node-version: '24'
+      - name: Install pinned toolchain
+        run: |
+          corepack enable
+          corepack install --global pnpm@11.11.0
+          pnpm install --frozen-lockfile
+      - name: Capture immutable research inputs
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          mkdir -p research-inputs/history
+          git merge-base --is-ancestor "$BASE_SHA" HEAD
+          git archive "$BASE_SHA" | gzip -n > research-inputs/source.tar.gz
+          tar -czf research-inputs/dependencies.tar.gz node_modules
+          gzip -nc "$(command -v node)" > research-inputs/node.gz
+          {
+            printf 'base=%s\nhead=%s\n' "$BASE_SHA" "$(git rev-parse HEAD)"
+            node --version
+            pnpm --version
+            uname -a
+            lscpu
+          } > research-inputs/environment.txt
+          gh api --paginate 'repos/Labpics-Team/lab-motion/issues?state=open&per_page=100' > research-inputs/history/open-issues.json
+          gh api --paginate 'repos/Labpics-Team/lab-motion/pulls?state=open&per_page=100' > research-inputs/history/open-prs.json
+          for issue in 224 227 228 229 231 232 235 238 239 242 243 244; do
+            gh api --paginate "repos/Labpics-Team/lab-motion/issues/$issue/comments?per_page=100" > "research-inputs/history/$issue-comments.json"
+          done
+          (cd research-inputs && sha256sum source.tar.gz dependencies.tar.gz node.gz > SHA256SUMS)
+      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
+        with:
+          name: mechanism-inputs-${{ github.sha }}
+          path: research-inputs/
+          if-no-files-found: error
+          retention-days: 7
+          compression-level: 0
