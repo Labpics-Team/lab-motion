@@ -10,7 +10,7 @@ import path from 'node:path';
 import { spawnSync } from 'node:child_process';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 import {
-  assertCheckoutUnchanged, assertFileHashesUnchanged, assertInstalledPackageTreesUnchanged,
+  assertCheckoutUnchanged, assertFileHashesUnchanged, assertInstalledPackageTreesUnchanged, buildCurrentCheckout,
   hashFileTree, prepareBenchmarkCheckout, readCheckoutState, sha256File,
 } from '../bench/compare/provenance.mjs';
 import {
@@ -109,13 +109,14 @@ function installedTool(root, name) {
  * pnpm может переписать абсолютные bin-shims общего node_modules при relocation.
  * Промежуточные snapshots сохраняются, но не смешиваются с settled-фазой. */
 export function prepareSurfaceCheckouts(roots, {
-  prepare = root => prepareBenchmarkCheckout({ root, benchDirectory: root, requireClean: true,
+  prepare = (root, build) => prepareBenchmarkCheckout({ root, benchDirectory: root, requireClean: true, build,
     requiredDist: ['dist/compiler/vite/index.js'], requiredRootPackages: ['typescript', 'esbuild', 'pako', 'tsup'] }),
+  build = buildCurrentCheckout,
   capture = root => Object.fromEntries(['terser', 'typescript', 'esbuild', 'pako', 'tsup']
     .map(name => [name, installedTool(root, name)])),
   record = () => {},
 } = {}) {
-  const state = { prepared: {}, beforeBuild: {}, afterBuild: {}, tools: {} };
+  const state = { prepared: {}, beforePrepare: {}, beforeBuild: {}, afterBuild: {}, tools: {} };
   const same = (left, right, phase) => {
     assert.deepEqual(Object.keys(right).sort(), Object.keys(left).sort(), `surface bench: инструменты ${phase}`);
     for (const name of Object.keys(left)) {
@@ -125,14 +126,26 @@ export function prepareSurfaceCheckouts(roots, {
     }
   };
   try {
+    // Общий исходный snapshot не подменяет actual build boundary: preflight
+    // может запускать package-manager, который меняет ignored tool bytes.
+    for (const [side, root] of Object.entries(roots)) if (root) state.beforePrepare[side] = capture(root);
+    record({ phase: 'before-prepare', ...state });
+    if (roots.candidate) same(state.beforePrepare.base, state.beforePrepare.candidate, 'до подготовки');
     for (const [side, root] of Object.entries(roots)) {
       if (!root) continue;
-      state.beforeBuild[side] = capture(root);
-      record({ phase: `before-${side}-build`, ...state });
-      if (side === 'candidate') same(state.beforeBuild.base, state.beforeBuild.candidate, 'до build');
-      state.prepared[side] = prepare(root);
-      state.afterBuild[side] = capture(root);
-      record({ phase: `after-${side}-build`, ...state });
+      let invoked = false;
+      state.prepared[side] = prepare(root, buildRoot => {
+        assert.equal(buildRoot, root, 'surface bench: подготовка подменила build root');
+        assert(!invoked, 'surface bench: повтор build');
+        invoked = true;
+        state.beforeBuild[side] = capture(root);
+        record({ phase: `before-${side}-build`, ...state });
+        if (side === 'candidate') same(state.beforeBuild.base, state.beforeBuild.candidate, 'до build');
+        build(root);
+        state.afterBuild[side] = capture(root);
+        record({ phase: `after-${side}-build`, ...state });
+      });
+      assert(invoked, 'surface bench: подготовка не вызвала build');
     }
     for (const [side, root] of Object.entries(roots)) if (root) state.tools[side] = capture(root);
     record({ phase: 'settled', ...state });
@@ -161,7 +174,7 @@ async function execute(options) {
     assert.equal(sha256File(path.join(roots.base, 'pnpm-lock.yaml')), sha256File(path.join(roots.candidate, 'pnpm-lock.yaml')),
       'surface bench: разные toolchain lock, нужен отдельный эксперимент');
   }
-  const { prepared, beforeBuild, afterBuild, tools } = prepareSurfaceCheckouts(roots, {
+  const { prepared, beforePrepare, beforeBuild, afterBuild, tools } = prepareSurfaceCheckouts(roots, {
     record: snapshot => write('provisioning.json', snapshot),
   });
   const require = createRequire(path.join(roots.base, 'package.json'));
@@ -176,7 +189,7 @@ async function execute(options) {
   probes.equal = path.join(options.out, 'equal-probe.mjs');
   writeFileSync(probes.equal, readFileSync(probes.base));
   const acorn = parserFor(roots.base);
-  const manifest = { schema: 1, calibrateOnly: options.calibrateOnly === true, harnessState, policy: SURFACE_PAIR_POLICY, roots, prepared, tools, buildTools: { beforeBuild, afterBuild }, probes,
+  const manifest = { schema: 1, calibrateOnly: options.calibrateOnly === true, harnessState, policy: SURFACE_PAIR_POLICY, roots, prepared, tools, buildTools: { beforePrepare, beforeBuild, afterBuild }, probes,
     nodeExecutable: sha256File(process.execPath), versions: process.versions,
     cpu: os.cpus()[0]?.model, platform: process.platform, arch: process.arch, kernel: os.release(),
     acorn: { module: acorn.module, packageDirectory: acorn.packageDirectory,

@@ -141,6 +141,24 @@ describe('Surface: один batch call-site, виртуальный clock, ре�
     expect(parents.at(-1)).toBeUndefined();
   });
 
+  it('весь стек вызова операции совпадает между warm и timed фазами', () => {
+    const owners = new Set<string>();
+    const capture = () => {
+      const frames = new Error().stack!.split('\n');
+      const batch = frames.findIndex(line => /at (?:Module\.)?executeSurfaceBurst \(/.test(line));
+      expect(batch).toBeGreaterThan(0);
+      // Важен вызывающий helper код: две лексические позиции дают два feedback
+      // участка, даже когда внутренний кадр executeSurfaceBurst совпадает.
+      owners.add(frames[batch + 1]!);
+      return 1;
+    };
+    let time = 0n;
+    runSurfaceCluster([capture, capture], { id: 'phase-owner', calls: 2 }, 0, {
+      warmupBursts: 2, now: () => ++time, verify: surfaceBurstVerifier([[1], [1]]),
+    });
+    expect(owners.size).toBe(1);
+  });
+
   it('two-call control удваивает работу, но не знаменатель per-request метрики', () => {
     let time = 0n;
     const operation = () => { time += 10n; return 1; };
@@ -158,6 +176,9 @@ describe('Surface: один batch call-site, виртуальный clock, ре�
     verify(0, 4, 2);
     expect(() => verify(1, 0, 1)).toThrow('изменился результат');
     expect(() => surfaceBurstVerifier([[NaN], [1]])).toThrow();
+    for (const warmupBursts of [Infinity, NaN, 1.5, Number.MAX_SAFE_INTEGER]) {
+      expect(() => runSurfaceCluster([() => 1, () => 1], { id: 'bad', calls: 1 }, 0, { warmupBursts })).toThrow();
+    }
     expect(() => surfaceBurstVerifier([new Array(2), [1]])).toThrow();
     expect(() => runSurfaceCluster([() => 1, () => 1], { id: 'lost', calls: 2 }, 0, {
       now: () => 0n, warmupBursts: 1,
@@ -312,6 +333,7 @@ describe('Surface: process boundary и raw readback', () => {
 
 describe('Surface: единый владелец фаз подготовки toolchain', () => {
   const tool = (sha256: string) => ({ terser: { version: 'pinned', files: 44, sha256 } });
+  const prepare = (root: string, build: (root: string) => void) => { build(root); return { root }; };
 
   it('не сравнивает промежуточные shims с settled runtime и хранит обе фазы', () => {
     let phase = 'installed';
@@ -319,10 +341,11 @@ describe('Surface: единый владелец фаз подготовки too
     const snapshots: unknown[] = [];
     const result = prepareSurfaceCheckouts({ base: 'A', candidate: 'B' }, {
       capture: (root: string) => { events.push(`capture:${root}:${phase}`); return tool(phase); },
-      prepare: (root: string) => { events.push(`build:${root}`); if (root === 'B') phase = 'relocated'; return { root }; },
+      prepare, build: (root: string) => { events.push(`build:${root}`); if (root === 'B') phase = 'relocated'; },
       record: (snapshot: unknown) => snapshots.push(structuredClone(snapshot)),
     });
     expect(events).toEqual([
+      'capture:A:installed', 'capture:B:installed',
       'capture:A:installed', 'build:A', 'capture:A:installed',
       'capture:B:installed', 'build:B', 'capture:B:relocated',
       'capture:A:relocated', 'capture:B:relocated',
@@ -331,17 +354,17 @@ describe('Surface: единый владелец фаз подготовки too
     expect(result.afterBuild.base).not.toEqual(result.afterBuild.candidate);
     expect(result.tools.base).toEqual(tool('relocated'));
     expect(result.tools.candidate).toEqual(tool('relocated'));
-    expect(snapshots).toHaveLength(5);
+    expect(snapshots).toHaveLength(6);
   });
 
   it('различные входы реально запрещают вторую сборку, а не только timing', () => {
     const built: string[] = [];
     const snapshots: { phase: string; reason?: string }[] = [];
     expect(() => prepareSurfaceCheckouts({ base: 'A', candidate: 'B' }, {
-      capture: (root: string) => tool(root), prepare: (root: string) => built.push(root),
+      capture: (root: string) => tool(root), prepare, build: (root: string) => built.push(root),
       record: (snapshot: { phase: string; reason?: string }) => snapshots.push(structuredClone(snapshot)),
-    })).toThrow('terser sha256 до build');
-    expect(built).toEqual(['A']);
+    })).toThrow('terser sha256 до подготовки');
+    expect(built).toEqual([]);
     expect(snapshots.at(-1)?.phase).toBe('INVALID');
     expect(snapshots.at(-1)?.reason).toContain('terser sha256');
   });
@@ -349,14 +372,49 @@ describe('Surface: единый владелец фаз подготовки too
   it('проверяет settled-различие и сохраняет отказ самой сборки', () => {
     let builds = 0;
     expect(() => prepareSurfaceCheckouts({ base: 'A', candidate: 'B' }, {
-      capture: (root: string) => tool(builds < 2 ? 'same' : root), prepare: () => ++builds,
+      capture: (root: string) => tool(builds < 2 ? 'same' : root), prepare, build: () => ++builds,
     })).toThrow('после обеих сборок');
     const snapshots: { phase: string; reason?: string }[] = [];
     expect(() => prepareSurfaceCheckouts({ base: 'A', candidate: null }, {
-      capture: () => tool('same'), prepare: () => { throw new Error('сломана сборка'); },
+      capture: () => tool('same'), prepare, build: () => { throw new Error('сломана сборка'); },
       record: (snapshot: { phase: string; reason?: string }) => snapshots.push(structuredClone(snapshot)),
     })).toThrow('сломана сборка');
-    expect(snapshots.map(s => s.phase)).toEqual(['before-base-build', 'INVALID']);
+    expect(snapshots.map(s => s.phase)).toEqual(['before-prepare', 'before-base-build', 'INVALID']);
     expect(snapshots.at(-1)?.reason).toContain('сломана сборка');
   });
+});
+
+it('Surface: preflight не может подменить build-tool и скрыть его восстановлением', () => {
+  let bytes = 'A';
+  let built = 0;
+  const snapshots: { phase: string }[] = [];
+  const tool = () => ({ terser: { version: 'pinned', files: 1, sha256: bytes } });
+  expect(() => prepareSurfaceCheckouts({ base: 'base', candidate: 'candidate' }, {
+    capture: tool,
+    prepare: (root: string, build?: (root: string) => void) => {
+      if (root === 'candidate') bytes = 'B';
+      // Старый prepare игнорирует build injection: моделируем тот же реальный
+      // seam напрямую, чтобы контрпример был ложным PASS, а не TypeError.
+      if (build) build(root);
+      else built++;
+      bytes = 'A';
+      return { root };
+    },
+    build: () => { built++; },
+    record: (s: { phase: string }) => snapshots.push(structuredClone(s)),
+  })).toThrow('terser sha256 до build');
+  expect(built).toBe(1);
+  expect(snapshots.at(-1)?.phase).toBe('INVALID');
+});
+
+
+it('Surface: build boundary исполняется ровно один раз на заявленном checkout', () => {
+  const capture = () => ({ terser: { version: 'pinned', files: 1, sha256: 'same' } });
+  for (const [prepare, reason] of [
+    [() => ({}), 'не вызвала build'],
+    [(root: string, build: (root: string) => void) => { build(root); build(root); }, 'повтор build'],
+    [(_: string, build: (root: string) => void) => build('other'), 'подменила build root'],
+  ] as const) {
+    expect(() => prepareSurfaceCheckouts({ base: 'base' }, { capture, prepare, build: () => {} })).toThrow(reason);
+  }
 });

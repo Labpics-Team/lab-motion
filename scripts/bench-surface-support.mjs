@@ -105,30 +105,28 @@ export function runSurfaceCluster(operations, profile, cluster, {
 } = {}) {
   assert(Array.isArray(operations) && operations.length === 2 && operations.every(op => typeof op === 'function'));
   assert(Number.isSafeInteger(profile.calls) && profile.calls > 0);
-  assert(Number.isSafeInteger(warmupBursts) && warmupBursts >= 1);
+  assert(Number.isSafeInteger(warmupBursts) && warmupBursts >= 1 && Number.isSafeInteger(2 * warmupBursts + 4));
   assert(verify === undefined || typeof verify === 'function');
   assert.deepEqual(multipliers.map(x => x === 1 || x === 2), [true, true]);
-  // Одинаковая warmup-топология обоих участников, без GC/оптимизирующих flags.
+  // Одна лексическая точка вызова принадлежит обеим фазам. Два похожих цикла
+  // с общим helper не дают этого инварианта; состояние JIT он не гарантирует.
   let sink = 0;
   const order = pairedSurfaceOrder(cluster);
-  for (let burst = 0; burst < warmupBursts; burst++) {
-    for (let position = 0; position < 2; position++) {
-      const side = order[position];
-      const calls = profile.calls * multipliers[side];
-      const value = executeSurfaceBurst(operations[side], calls);
-      verify?.(side, value, calls);
-      sink += value;
-    }
-  }
   const samples = [];
-  for (const side of order) {
-    const started = now();
-    const value = executeSurfaceBurst(operations[side], profile.calls * multipliers[side]);
-    const elapsedNs = Number(now() - started);
-    verify?.(side, value, profile.calls * multipliers[side]);
+  const warmPositions = 2 * warmupBursts;
+  for (let position = 0; position < warmPositions + order.length; position++) {
+    const measured = position >= warmPositions;
+    const side = order[measured ? position - warmPositions : position % 2];
+    const calls = profile.calls * multipliers[side];
+    const started = measured ? now() : 0n;
+    const value = executeSurfaceBurst(operations[side], calls);
+    const elapsedNs = measured ? Number(now() - started) : 0;
+    verify?.(side, value, calls);
     sink += value;
-    assert(Number.isFinite(elapsedNs) && elapsedNs > 0 && Number.isFinite(value), 'surface bench: потерян sample');
-    samples.push({ side, elapsedNs, ns: elapsedNs / profile.calls, calls: profile.calls * multipliers[side] });
+    if (measured) {
+      assert(Number.isFinite(elapsedNs) && elapsedNs > 0 && Number.isFinite(value), 'surface bench: потерян sample');
+      samples.push({ side, elapsedNs, ns: elapsedNs / profile.calls, calls });
+    }
   }
   assert(Number.isFinite(sink));
   return { cluster, profile: profile.id, samples, sink, warmupBursts, multipliers, semantic: typeof verify === 'function' };
