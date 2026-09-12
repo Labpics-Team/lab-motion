@@ -135,7 +135,7 @@ export function hashFileTree(directory, accept = () => true) {
 }
 
 function git(root, args, encoding = 'utf8') {
-  return execFileSync('git', args, { cwd: root, encoding });
+  return execFileSync('git', ['--no-replace-objects', ...args], { cwd: root, encoding });
 }
 
 /** Отпечаток всех tracked/untracked, но не ignored файлов checkout. */
@@ -145,27 +145,127 @@ function worktreeFingerprint(root) {
   const hash = createHash('sha256');
   for (const name of names) {
     const file = path.join(root, name);
-    if (!existsSync(file)) continue;
+    const stat = lstatSync(file, { throwIfNoEntry: false });
+    if (stat === undefined) continue;
     hash.update(name);
     hash.update('\0');
-    hash.update(readFileSync(file));
+    if (stat.isSymbolicLink()) hash.update(readlinkSync(file, { encoding: 'buffer' }));
+    else if (stat.isFile()) hash.update(readFileSync(file));
+    else continue;
     hash.update('\0');
   }
   return hash.digest('hex');
 }
 
+function* readRevisionObjects(root, entries) {
+  for (const entry of entries) {
+    if (entry.mode === '160000' && entry.type === 'commit') {
+      throw new Error(`provenance: submodule ${entry.name} не поддерживается в declared revision`);
+    }
+    if (entry.type !== 'blob' || !['100644', '100755', '120000'].includes(entry.mode)) {
+      throw new Error(`provenance: tracked ${entry.name} имеет неподдерживаемый Git mode/type ${entry.mode} ${entry.type}`);
+    }
+  }
+  // Потребитель хеширует пакет до следующего чтения, не удерживая все blob-байты revision.
+  for (let start = 0; start < entries.length; start += 128) {
+    const batch = entries.slice(start, start + 128);
+    // Вход содержит только OID; LF безопасен для заголовков, содержимое читается по размеру.
+    const bytes = execFileSync('git', ['--no-replace-objects', 'cat-file', '--batch'], {
+      cwd: root, maxBuffer: 256 * 1024 * 1024,
+      input: batch.map(({ object }) => `${object}\n`).join(''),
+    });
+    let offset = 0;
+    for (const entry of batch) {
+      const end = bytes.indexOf(10, offset);
+      if (end === -1) throw new Error('provenance: некорректный пакет объектов revision');
+      const header = /^([0-9a-f]{40}) (blob|tree|commit|tag) (0|[1-9]\d*)$/.exec(
+        bytes.subarray(offset, end).toString('utf8'),
+      );
+      if (header === null) throw new Error('provenance: некорректный пакет объектов revision');
+      const [, object, type, rawSize] = header;
+      const size = Number(rawSize);
+      const contentEnd = end + 1 + size;
+      if (object !== entry.object || type !== entry.type || !Number.isSafeInteger(size) || size < 0 ||
+          contentEnd < end + 1 || bytes[contentEnd] !== 10) throw new Error('provenance: некорректный пакет объектов revision');
+      const content = bytes.subarray(end + 1, contentEnd);
+      offset = contentEnd + 1;
+      yield { entry, content };
+    }
+    if (offset !== bytes.length) throw new Error('provenance: лишние байты пакета объектов revision');
+  }
+}
+
+function quoteGitPath(name) {
+  // --stdin-paths читает C-quoted пути; octal сохраняет UTF-8 и символы-разделители.
+  return `"${Array.from(Buffer.from(name), (byte) => byte === 34 || byte === 92
+    ? `\\${String.fromCharCode(byte)}`
+    : byte >= 32 && byte < 127 ? String.fromCharCode(byte) : `\\${byte.toString(8).padStart(3, '0')}`).join('')}"`;
+}
+
 /** Тот же fingerprint для clean Git-коммита: dirty:false становится проверяемым фактом. */
-export function revisionFingerprint(root, revision) {
+export function revisionFingerprint(root, revision, { verifyWorkingTree = false } = {}) {
   if (!/^[0-9a-f]{40}$/.test(revision)) throw new Error('provenance: некорректный revision');
-  const raw = git(root, ['ls-tree', '-r', '-z', '--name-only', revision], 'buffer');
-  const names = raw.toString('utf8').split('\0').filter(Boolean).sort();
-  if (names.length === 0) throw new Error('provenance: revision не содержит файлов');
+  const raw = git(root, ['ls-tree', '-r', '-z', revision], 'buffer');
+  const entries = raw.toString('utf8').split('\0').filter(Boolean).map((entry) => {
+    const tab = entry.indexOf('\t');
+    const [mode, type, object] = entry.slice(0, tab).split(' ');
+    return { mode, type, object, name: entry.slice(tab + 1) };
+  }).sort((a, b) => a.name < b.name ? -1 : a.name > b.name ? 1 : 0);
+  if (entries.length === 0) throw new Error('provenance: revision не содержит файлов');
+  const normalized = [];
   const hash = createHash('sha256');
-  for (const name of names) {
+  for (const { entry, content: expected } of readRevisionObjects(root, entries)) {
+    const { name, mode, type } = entry;
+    if (verifyWorkingTree) {
+      const file = path.join(root, name);
+      const stat = lstatSync(file, { throwIfNoEntry: false });
+      if (mode === '120000') {
+        if (type !== 'blob' || stat === undefined || !stat.isSymbolicLink()) {
+          throw new Error(`provenance: tracked ${name} не является symlink declared revision`);
+        }
+        const actual = readlinkSync(file, { encoding: 'buffer' });
+        if (!actual.equals(expected)) {
+          throw new Error(`provenance: tracked symlink ${name} не совпадает с declared revision ${revision}`);
+        }
+      } else {
+        if (type !== 'blob' || !['100644', '100755'].includes(mode) || stat === undefined || !stat.isFile()) {
+          throw new Error(`provenance: tracked ${name} не является обычным файлом declared revision`);
+        }
+        const actual = readFileSync(file);
+        if (!actual.equals(expected)) {
+          if (actual.includes(0) || expected.includes(0)) {
+            throw new Error(`provenance: tracked ${name} содержит бинарное отличие от revision`);
+          }
+          normalized.push({ entry, actualSha256: sha256Bytes(actual) });
+        }
+      }
+    }
     hash.update(name);
     hash.update('\0');
-    hash.update(git(root, ['show', `${revision}:${name}`], 'buffer'));
+    hash.update(expected);
     hash.update('\0');
+  }
+  if (normalized.length > 0) {
+    // Проверка атрибутов предшествует hash-object: произвольный clean/smudge
+    // способен скрыть другой код, а его запуск сам по себе является эффектом.
+    const attributes = execFileSync('git', ['--no-replace-objects', 'check-attr', '-z', '--stdin', 'filter', 'ident', 'working-tree-encoding'], {
+      cwd: root, input: normalized.map(({ entry }) => `${entry.name}\0`).join(''), encoding: 'utf8',
+    }).split('\0');
+    for (let index = 2; index < attributes.length; index += 3) {
+      if (!['unspecified', 'unset'].includes(attributes[index])) {
+        throw new Error(`provenance: tracked ${attributes[index - 2]} использует неподдерживаемое преобразование revision`);
+      }
+    }
+    const converted = execFileSync('git', ['--no-replace-objects', 'hash-object', '--stdin-paths'], {
+      cwd: root, input: normalized.map(({ entry }) => quoteGitPath(entry.name)).join('\n') + '\n', encoding: 'utf8',
+    }).trim().split(/\r?\n/);
+    if (converted.length !== normalized.length) throw new Error('provenance: неполный пакет нормализованных tracked-файлов');
+    for (let index = 0; index < normalized.length; index++) {
+      if (normalized[index].entry.object !== converted[index] ||
+          sha256File(path.join(root, normalized[index].entry.name)) !== normalized[index].actualSha256) {
+        throw new Error(`provenance: tracked ${normalized[index].entry.name} не совпадает с declared revision ${revision}`);
+      }
+    }
   }
   return hash.digest('hex');
 }
@@ -175,11 +275,14 @@ export function readCheckoutState(root) {
   const shortRevision = git(root, ['rev-parse', '--short=12', 'HEAD']).trim();
   const status = git(root, ['status', '--porcelain=v1', '--untracked-files=all']);
   const dirty = status.trim().length > 0;
+  // Assume-unchanged/skip-worktree исключают файл из status, но не из доказательства байтов.
+  const trackedRevisionSha256 = dirty ? undefined : revisionFingerprint(root, revision, { verifyWorkingTree: true });
   return {
     revision,
     shortRevision,
     revisionLabel: `${shortRevision}${dirty ? '-dirty' : ''}`,
     dirty,
+    trackedRevisionSha256,
     worktreeSha256: worktreeFingerprint(root),
   };
 }
