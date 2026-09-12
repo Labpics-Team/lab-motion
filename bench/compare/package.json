@@ -4,7 +4,8 @@
   "type": "module",
   "packageManager": "pnpm@11.11.0",
   "scripts": {
-    "bench": "node bench.mjs"
+    "bench": "node bench.mjs",
+    "test:conformance": "node conformance-smoke.mjs"
   },
   "devDependencies": {
     "animejs": "4.5.0",

@@ -5,7 +5,7 @@ import { fileURLToPath } from 'node:url';
 import {
   assertAllowedPostReportChanges,
   parseBenchmarkDocumentationState,
-  validateBenchmarkReportPair,
+  validateBenchmarkReportForPublication,
 } from '../bench/compare/report-contract.mjs';
 import {
   revisionFingerprint,
@@ -76,6 +76,9 @@ function validateRevision(payload, stem) {
     'bench/methodology.mjs': 'bench/compare/methodology.mjs',
     'bench/provenance.mjs': 'bench/compare/provenance.mjs',
     'bench/report-contract.mjs': 'bench/compare/report-contract.mjs',
+    ...(payload.schema === 10
+      ? { 'bench/motion-conformance.mjs': 'bench/compare/motion-conformance.mjs' }
+      : {}),
   };
   for (const [label, file] of Object.entries(historicalInputs)) {
     const bytes = git(['show', `${revision}:${file}`], 'buffer');
@@ -144,7 +147,7 @@ try {
       throw new Error(`${stem}.json: невалидный JSON (${error?.message ?? String(error)})`);
     }
     const benchmarkPackage = JSON.parse(readFileSync(benchmarkPackagePath, 'utf8'));
-    validateBenchmarkReportPair({ stem, markdown, payload, rootPackage, benchmarkPackage });
+    validateBenchmarkReportForPublication({ stem, markdown, payload, rootPackage, benchmarkPackage });
     validateRevision(payload, stem);
   }
 } catch (error) {
