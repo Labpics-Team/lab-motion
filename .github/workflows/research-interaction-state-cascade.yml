@@ -1,0 +1,423 @@
+name: Interaction state cascade delivery
+
+on:
+  push:
+    branches: ["feat/interaction-state-cascade-20260912"]
+
+permissions:
+  contents: write
+
+env:
+  COREPACK_ENABLE_DOWNLOAD_PROMPT: "0"
+  COREPACK_DEFAULT_TO_LATEST: "0"
+
+jobs:
+  red-green:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v6
+        with:
+          node-version: "24.20.0"
+      - run: |
+          corepack enable
+          corepack install --global pnpm@11.11.0
+          pnpm install --frozen-lockfile
+
+      - name: Add state-cascade oracle
+        shell: bash
+        run: |
+          cat > test/behaviors-state-cascade.test.ts <<'TS'
+          import { describe, expect, it } from 'vitest';
+          import { createStateCascade } from '../src/behaviors/index.js';
+
+          type Visual = {
+            scale: number;
+            opacity: number;
+            background: string;
+            x: number;
+          };
+
+          describe('createStateCascade: property-level intent ownership', () => {
+            it('hover → press → pointerleave → release возвращает hover/base по собственности свойства, не по порядку событий', () => {
+              const state = createStateCascade<Visual>();
+              const base = state.createLayer({ scale: 1, opacity: 1, background: 'neutral' });
+              const hover = state.createLayer();
+              const press = state.createLayer();
+
+              hover.set({ scale: 1.04 });
+              expect(state.get('scale')).toBe(1.04);
+              press.set({ scale: 0.96 });
+              expect(state.get('scale')).toBe(0.96);
+
+              // pointerleave пока press ещё активен: hover не должен украсть scale.
+              hover.clear();
+              expect(state.get('scale')).toBe(0.96);
+              press.clear();
+              expect(state.get('scale')).toBe(1);
+              expect(state.get('opacity')).toBe(1);
+              expect(base.active).toBe(true);
+            });
+
+            it('разные состояния одновременно владеют разными свойствами', () => {
+              const state = createStateCascade<Visual>();
+              state.createLayer({ scale: 1, opacity: 1, background: 'neutral' });
+              const selected = state.createLayer({ background: 'accent' });
+              const hover = state.createLayer({ scale: 1.03 });
+              expect(state.snapshot()).toEqual({ scale: 1.03, opacity: 1, background: 'accent' });
+              hover.clear();
+              expect(state.snapshot()).toEqual({ scale: 1, opacity: 1, background: 'accent' });
+              expect(selected.active).toBe(true);
+            });
+
+            it('обновление скрытого нижнего слоя не эмитит бесполезную работу, но становится актуальным после clear верхнего', () => {
+              const state = createStateCascade<Visual>();
+              const base = state.createLayer({ scale: 1 });
+              const press = state.createLayer({ scale: 0.9 });
+              let emissions = 0;
+              state.subscribe(() => { emissions++; });
+
+              for (let i = 0; i < 1000; i++) base.set({ scale: 1 + i / 1000 });
+              expect(emissions).toBe(0);
+              expect(state.get('scale')).toBe(0.9);
+
+              press.clear();
+              expect(emissions).toBe(1);
+              expect(state.get('scale')).toBeCloseTo(1.999, 12);
+            });
+
+            it('частичное обновление верхнего слоя освобождает удалённый ключ нижнему владельцу', () => {
+              const state = createStateCascade<Visual>();
+              state.createLayer({ scale: 1, opacity: 1 });
+              const exit = state.createLayer({ scale: 0.98, opacity: 0 });
+              expect(state.snapshot()).toEqual({ scale: 0.98, opacity: 0 });
+              exit.set({ opacity: 0.2 });
+              expect(state.snapshot()).toEqual({ scale: 1, opacity: 0.2 });
+            });
+
+            it('различает owned undefined и полное удаление свойства', () => {
+              type Maybe = { x: number | undefined };
+              const state = createStateCascade<Maybe>();
+              const base = state.createLayer({ x: 4 });
+              const top = state.createLayer({ x: undefined });
+              const own = state.snapshot();
+              expect(Object.hasOwn(own, 'x')).toBe(true);
+              expect(own.x).toBeUndefined();
+              top.clear();
+              expect(state.get('x')).toBe(4);
+              base.clear();
+              expect(Object.hasOwn(state.snapshot(), 'x')).toBe(false);
+            });
+
+            it('shallow-snapshot target не меняется от внешней мутации объекта', () => {
+              const state = createStateCascade<Visual>();
+              const target: Partial<Visual> = { scale: 1 };
+              state.createLayer(target);
+              target.scale = 9;
+              expect(state.get('scale')).toBe(1);
+            });
+
+            it('same-effective-value меняет ownership без ложного emit', () => {
+              const state = createStateCascade<Visual>();
+              const base = state.createLayer({ scale: 1 });
+              const hover = state.createLayer();
+              let emissions = 0;
+              state.subscribe(() => { emissions++; });
+              hover.set({ scale: 1 });
+              expect(emissions).toBe(0);
+              base.set({ scale: 2 });
+              expect(emissions).toBe(0);
+              hover.clear();
+              expect(emissions).toBe(1);
+              expect(state.get('scale')).toBe(2);
+            });
+
+            it('patch сообщает changed отдельно от removed', () => {
+              const state = createStateCascade<Visual>();
+              const layer = state.createLayer({ scale: 1, opacity: 1 });
+              const patch = layer.set({ scale: 2 });
+              expect(patch.changed).toEqual({ scale: 2 });
+              expect(patch.removed).toEqual(['opacity']);
+            });
+
+            it('destroy идемпотентен и делает старые layer handles инертными', () => {
+              const state = createStateCascade<Visual>();
+              const layer = state.createLayer({ scale: 1 });
+              let emissions = 0;
+              state.subscribe(() => { emissions++; });
+              state.destroy();
+              state.destroy();
+              layer.set({ scale: 2 });
+              layer.clear();
+              expect(state.snapshot()).toEqual({});
+              expect(layer.active).toBe(false);
+              expect(emissions).toBe(0);
+            });
+          });
+          TS
+
+      - name: RED on exact main
+        shell: bash
+        run: |
+          set +e
+          pnpm vitest run test/behaviors-state-cascade.test.ts > /tmp/red.log 2>&1
+          status=$?
+          set -e
+          cat /tmp/red.log
+          test "$status" -ne 0
+          grep -Eq 'createStateCascade|does not provide an export|is not a function' /tmp/red.log
+
+      - name: Implement minimal cascade
+        shell: bash
+        run: |
+          cat > src/behaviors/state-cascade.ts <<'TS'
+          type StateRecord = Record<string, unknown>;
+          type StateKey<T extends StateRecord> = Extract<keyof T, string>;
+
+          /** Только реально изменившаяся эффективная поверхность. */
+          export interface StateCascadePatch<T extends StateRecord> {
+            readonly changed: Readonly<Partial<T>>;
+            readonly removed: readonly StateKey<T>[];
+          }
+
+          export interface StateCascadeLayer<T extends StateRecord> {
+            /** Активен ли слой; пустой объект остаётся активным, но ничем не владеет. */
+            readonly active: boolean;
+            /** Shallow-snapshot новой цели слоя. Позднее созданный слой приоритетнее. */
+            set(target: Readonly<Partial<T>>): StateCascadePatch<T>;
+            /** Снять весь слой и раскрыть актуальные значения нижних владельцев. */
+            clear(): StateCascadePatch<T>;
+          }
+
+          export interface StateCascade<T extends StateRecord> {
+            /**
+             * Создать слой поверх всех ранее созданных. Имена/глобальная таблица
+             * приоритетов не нужны: семантическое имя остаётся у handle потребителя.
+             */
+            createLayer(initial?: Readonly<Partial<T>>): StateCascadeLayer<T>;
+            /** Эффективное значение одного свойства после каскада. */
+            get<K extends StateKey<T>>(key: K): T[K] | undefined;
+            /** Копия всей эффективной цели; own `undefined` сохраняется. */
+            snapshot(): Readonly<Partial<T>>;
+            /** События только при изменении эффективного результата, не скрытых слоёв. */
+            subscribe(listener: (patch: StateCascadePatch<T>) => void): () => void;
+            /** Идемпотентно очистить состояние и сделать ранее выданные handles инертными. */
+            destroy(): void;
+          }
+
+          const hasOwn = (value: object, key: string): boolean =>
+            Object.prototype.hasOwnProperty.call(value, key);
+
+          function nullObject<T extends object>(): T {
+            return Object.create(null) as T;
+          }
+
+          function cloneTarget<T extends StateRecord>(target: Readonly<Partial<T>>): Readonly<Partial<T>> {
+            const copy = nullObject<Partial<T>>();
+            for (const key of Object.keys(target) as StateKey<T>[]) copy[key] = target[key];
+            return copy;
+          }
+
+          function freezePatch<T extends StateRecord>(
+            changed: Partial<T>,
+            removed: StateKey<T>[],
+          ): StateCascadePatch<T> {
+            return Object.freeze({
+              changed: Object.freeze(changed),
+              removed: Object.freeze(removed),
+            });
+          }
+
+          /**
+           * Headless property cascade для одновременно активных визуальных намерений.
+           * Позднее созданный слой имеет больший приоритет, но только для собственных
+           * ключей. Поэтому press может владеть scale, selected — background, а снятие
+           * одного намерения раскрывает свежее значение следующего владельца.
+           */
+          export function createStateCascade<
+            T extends StateRecord = StateRecord,
+          >(): StateCascade<T> {
+            interface Slot { target: Readonly<Partial<T>> | undefined }
+            const layers: Slot[] = [];
+            const resolved = nullObject<Partial<T>>();
+            const listeners = new Set<(patch: StateCascadePatch<T>) => void>();
+            const empty = freezePatch<T>(nullObject<Partial<T>>(), []);
+            let destroyed = false;
+
+            const recompute = (inputKeys: readonly StateKey<T>[]): StateCascadePatch<T> => {
+              if (destroyed || inputKeys.length === 0) return empty;
+              const keys = new Set(inputKeys);
+              const changed = nullObject<Partial<T>>();
+              const removed: StateKey<T>[] = [];
+              let count = 0;
+
+              for (const key of keys) {
+                let found = false;
+                let next: T[typeof key] | undefined;
+                for (let i = layers.length - 1; i >= 0; i--) {
+                  const target = layers[i]!.target;
+                  if (target !== undefined && hasOwn(target, key)) {
+                    next = target[key];
+                    found = true;
+                    break;
+                  }
+                }
+
+                const had = hasOwn(resolved, key);
+                if (!found) {
+                  if (had) {
+                    delete resolved[key];
+                    removed.push(key);
+                    count++;
+                  }
+                  continue;
+                }
+
+                if (!had || !Object.is(resolved[key], next)) {
+                  resolved[key] = next;
+                  changed[key] = next;
+                  count++;
+                }
+              }
+
+              if (count === 0) return empty;
+              const patch = freezePatch(changed, removed);
+              // Snapshot listeners: reentrant subscribe/unsubscribe относится к следующему emit.
+              for (const listener of [...listeners]) listener(patch);
+              return patch;
+            };
+
+            const inertLayer = (): StateCascadeLayer<T> => ({
+              get active() { return false; },
+              set: () => empty,
+              clear: () => empty,
+            });
+
+            return {
+              createLayer(initial) {
+                if (destroyed) return inertLayer();
+                const slot: Slot = { target: undefined };
+                layers.push(slot);
+                const layer: StateCascadeLayer<T> = {
+                  get active() { return !destroyed && slot.target !== undefined; },
+                  set(target) {
+                    if (destroyed) return empty;
+                    const previous = slot.target;
+                    const next = cloneTarget(target);
+                    slot.target = next;
+                    return recompute([
+                      ...(previous ? Object.keys(previous) as StateKey<T>[] : []),
+                      ...Object.keys(next) as StateKey<T>[],
+                    ]);
+                  },
+                  clear() {
+                    if (destroyed || slot.target === undefined) return empty;
+                    const previous = slot.target;
+                    slot.target = undefined;
+                    return recompute(Object.keys(previous) as StateKey<T>[]);
+                  },
+                };
+                if (initial !== undefined) layer.set(initial);
+                return layer;
+              },
+              get(key) {
+                return hasOwn(resolved, key) ? resolved[key] : undefined;
+              },
+              snapshot() {
+                const copy = nullObject<Partial<T>>();
+                for (const key of Object.keys(resolved) as StateKey<T>[]) copy[key] = resolved[key];
+                return Object.freeze(copy);
+              },
+              subscribe(listener) {
+                if (destroyed) return () => {};
+                listeners.add(listener);
+                return () => { listeners.delete(listener); };
+              },
+              destroy() {
+                if (destroyed) return;
+                destroyed = true;
+                listeners.clear();
+                for (const layer of layers) layer.target = undefined;
+                layers.length = 0;
+                for (const key of Object.keys(resolved)) delete (resolved as Record<string, unknown>)[key];
+              },
+            };
+          }
+          TS
+
+          cat >> src/behaviors/index.ts <<'TS'
+
+          // ─── Property-level state cascade ────────────────────────────────────────
+          export { createStateCascade } from './state-cascade.js';
+          export type {
+            StateCascade,
+            StateCascadeLayer,
+            StateCascadePatch,
+          } from './state-cascade.js';
+          TS
+
+          python - <<'PY'
+          from pathlib import Path
+
+          p = Path('test/behaviors-api-surface-pin.test.ts')
+          s = p.read_text()
+          s = s.replace('Ровно 4 фабрики;', 'Ровно 5 runtime-фабрик;')
+          s = s.replace("  'createPullToRefresh',\n] as const;", "  'createPullToRefresh',\n  'createStateCascade',\n] as const;")
+          s = s.replace('экспортирует ровно 4 контрактных runtime-фабрики', 'экспортирует ровно 5 контрактных runtime-фабрик')
+          if "'createStateCascade'" not in s:
+            raise SystemExit('failed to update behaviors pin')
+          p.write_text(s)
+
+          p = Path('CHANGELOG.md')
+          s = p.read_text()
+          anchor = '### Добавлено\n'
+          line = '- `createStateCascade` в `./behaviors`: property-level каскад визуальных намерений; верхний активный слой владеет только своими ключами, скрытые изменения не эмитят работу, а снятие press/drag/exit раскрывает актуальный нижний target.\n'
+          if s.count(anchor) != 1:
+            raise SystemExit('unexpected changelog Added section')
+          p.write_text(s.replace(anchor, anchor + line, 1))
+
+          p = Path('docs/recipes.md')
+          s = p.read_text()
+          marker = '## Каскад состояний взаимодействия без гонок'
+          if marker not in s:
+            s += '''\n\n## Каскад состояний взаимодействия без гонок\n\nКогда hover, press, selected, drag и exit могут действовать одновременно, не возвращайте свойство вручную в «default» из каждого обработчика. Создайте слои один раз в порядке приоритета и меняйте только соответствующий слой:\n\n```ts\nimport { createStateCascade } from '@labpics/motion/behaviors';\n\nconst state = createStateCascade<{ scale: number; opacity: number; background: string }>();\nconst base = state.createLayer({ scale: 1, opacity: 1, background: 'var(--surface)' });\nconst selected = state.createLayer();\nconst hover = state.createLayer();\nconst press = state.createLayer();\nconst exit = state.createLayer();\n\nstate.subscribe(({ changed, removed }) => {\n  // Передайте только effective delta своему renderer/animate owner.\n  // Изменение base под активным press сюда не попадёт.\n});\n\nhover.set({ scale: 1.03 });\npress.set({ scale: 0.97 });\nhover.clear(); // scale остаётся 0.97: им ещё владеет press\npress.clear(); // раскрывается актуальный scale из base\n```\n\nПозднее созданный слой приоритетнее, но только для ключей, которые он действительно задаёт. Поэтому `selected` может владеть цветом одновременно с `hover`, который владеет scale. `clear()` не знает «куда вернуть» значение: каскад вычисляет следующего действующего владельца. Динамическое gesture-состояние приложения остаётся у приложения; cascade решает только визуальное ownership.\n'''
+          p.write_text(s)
+          PY
+
+      - name: GREEN behavior contracts
+        run: |
+          pnpm vitest run test/behaviors-state-cascade.test.ts test/behaviors-api-surface-pin.test.ts test/behaviors-*.test.ts
+          pnpm typecheck:native
+          pnpm build
+          pnpm size
+
+      - name: Commit exact owned slice
+        shell: bash
+        run: |
+          set -euo pipefail
+          rm .github/workflows/research-interaction-state-cascade.yml
+          git add -A
+          mapfile -t changed < <(git diff --cached --name-only)
+          printf 'staged paths:\n'; printf '  %s\n' "${changed[@]}"
+          for path in "${changed[@]}"; do
+            case "$path" in
+              .github/workflows/research-interaction-state-cascade.yml|\
+              CHANGELOG.md|\
+              docs/recipes.md|\
+              src/behaviors/index.ts|\
+              src/behaviors/state-cascade.ts|\
+              test/behaviors-api-surface-pin.test.ts|\
+              test/behaviors-state-cascade.test.ts) ;;
+              *) echo "unexpected staged path: $path" >&2; exit 1 ;;
+            esac
+          done
+          for required in CHANGELOG.md docs/recipes.md src/behaviors/index.ts src/behaviors/state-cascade.ts test/behaviors-api-surface-pin.test.ts test/behaviors-state-cascade.test.ts; do
+            printf '%s\n' "${changed[@]}" | grep -Fxq "$required" || { echo "missing $required" >&2; exit 1; }
+          done
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git commit -m 'feat(behaviors): разрешать визуальные состояния каскадом свойств'
+          git push origin HEAD:feat/interaction-state-cascade-20260912
