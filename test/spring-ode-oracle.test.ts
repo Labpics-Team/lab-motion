@@ -8,21 +8,29 @@ describe('независимое интегрирование m x″ + c x′ + 
     it(`согласуется с тремя элементарными решениями при v0=${v0}`, () => {
       const cases = [
         {
-          spring: { mass: 1, stiffness: 25, damping: 6 },
+          stiffness: 25,
+          damping: 6,
           exact: (t: number) => 1 - Math.exp(-3 * t) * (
             Math.cos(4 * t) + (3 - v0) / 4 * Math.sin(4 * t)
           ),
         },
         {
-          spring: { mass: 1, stiffness: 16, damping: 8 },
+          stiffness: 16,
+          damping: 8,
           exact: (t: number) => 1 + (-1 + (v0 - 4) * t) * Math.exp(-4 * t),
         },
         {
-          spring: { mass: 1, stiffness: 12, damping: 8 },
+          stiffness: 12,
+          damping: 8,
           exact: (t: number) => 1 + (v0 - 6) / 4 * Math.exp(-2 * t)
             + (2 - v0) / 4 * Math.exp(-6 * t),
         },
-      ];
+      ].flatMap(({ stiffness, damping, exact }) => [1, 2].map((mass) => ({
+        // Масштабирование m, k и c одним коэффициентом сохраняет точное решение.
+        // Поэтому m=2 делает удаление деления на mass наблюдаемой мутацией.
+        spring: { mass, stiffness: stiffness * mass, damping: damping * mass },
+        exact,
+      })));
       for (const { spring, exact } of cases) {
         const samples = integrateSpringPositions(spring, v0, times);
         const refined = integrateSpringPositions(spring, v0, times, 1 / 8192);

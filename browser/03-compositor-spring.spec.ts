@@ -29,6 +29,7 @@ const cases = [
   { mass: 1, stiffness: 180, damping: 12 },
   { mass: 1, stiffness: 100, damping: 20 },
   { mass: 1, stiffness: 100, damping: 30 },
+  { mass: 2, stiffness: 50, damping: 12 },
 ].flatMap((spring) => [0, 6].map((v0) => ({ spring, v0 })));
 
 for (const { spring, v0 } of cases) {
