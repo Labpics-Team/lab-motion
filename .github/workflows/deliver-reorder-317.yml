@@ -26,29 +26,36 @@ jobs:
           CARRIER: ${{ github.sha }}
         run: |
           set -euo pipefail
+          mkdir -p /tmp/reorder-receipt
           python3 - <<'PY'
           import base64,gzip,hashlib,os,pathlib,subprocess
           def git(*args):return subprocess.check_output(['git',*args]).strip()
+          def blob(data):return hashlib.sha1(b'blob '+str(len(data)).encode()+b'\0'+data).hexdigest()
           assert git('rev-parse','HEAD').decode()=='93278bf9b540f93521c7bd4c02f68db458e5db7a'
           assert not git('status','--porcelain')
-          encoded=b''.join(git('show',f'{os.environ["CARRIER"]}:.delivery/reorder/chunk{i}.b64') for i in range(8))
+          parts=[git('show',f'{os.environ["CARRIER"]}:.delivery/reorder/chunk{i}.b64') for i in range(8)]
+          # One observed transcription error, not normalization of product input.
+          # Both transport preimage and canonical original chunk are authenticated.
+          assert blob(parts[4])=='908147451dc6cbef58d84342003ad967d658e5a2'
+          assert parts[4].count(b'Gnb/zi9fVF')==1
+          parts[4]=parts[4].replace(b'Gnb/zi9fVF',b'Gnb/zi9pVF')
+          assert blob(parts[4])=='c23ff85f6cd80d4827a067661e8b2580c3582ff1'
+          encoded=b''.join(parts)
           assert len(encoded)==29028,len(encoded)
           patch=gzip.decompress(base64.b64decode(encoded,validate=True))
           assert len(patch)==73772,len(patch)
           assert hashlib.sha256(patch).hexdigest()=='c426cc802a0d42aa06ac20a7acda716304a1e7cb9e3f868a06e3290e0b4cb7f4'
-          pathlib.Path('/tmp/reorder.patch').write_bytes(patch)
-          subprocess.run(['git','apply','--check','/tmp/reorder.patch'],check=True)
-          subprocess.run(['git','apply','--index','/tmp/reorder.patch'],check=True)
+          pathlib.Path('/tmp/reorder-receipt/candidate.patch').write_bytes(patch)
+          subprocess.run(['git','apply','--check','/tmp/reorder-receipt/candidate.patch'],check=True)
+          subprocess.run(['git','apply','--index','/tmp/reorder-receipt/candidate.patch'],check=True)
           assert git('write-tree').decode()=='bd6e363d67b4f753310ef2431b67d964c3e7046d'
           paths=git('diff','--cached','--name-only').decode().splitlines()
           assert len(paths)==18 and not any(p.startswith(('.github/','.delivery/')) for p in paths),paths
           subprocess.run(['git','diff','--cached','--check'],check=True)
           PY
           git -c core.hooksPath=/dev/null -c user.name='github-actions[bot]' -c user.email='41898282+github-actions[bot]@users.noreply.github.com' commit -m 'feat(behaviors): controlled list and grid reorder with keyboard and projection (#317)'
-          mkdir -p /tmp/reorder-receipt
           git show --stat --oneline HEAD > /tmp/reorder-receipt/diff-stat.txt
           git archive HEAD | gzip -n > /tmp/reorder-receipt/candidate-source.tar.gz
-          cp /tmp/reorder.patch /tmp/reorder-receipt/candidate.patch
           printf 'base=%s\nhead=%s\ntree=%s\npatch_sha256=%s\ncarrier=%s\n' \
             93278bf9b540f93521c7bd4c02f68db458e5db7a "$(git rev-parse HEAD)" "$(git rev-parse HEAD^{tree})" \
             c426cc802a0d42aa06ac20a7acda716304a1e7cb9e3f868a06e3290e0b4cb7f4 "$CARRIER" > /tmp/reorder-receipt/receipt.txt
