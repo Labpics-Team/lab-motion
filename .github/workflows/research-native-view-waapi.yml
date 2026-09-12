@@ -1,0 +1,361 @@
+name: Native ViewTimeline WAAPI proof
+
+on:
+  push:
+    branches: ["research/native-view-waapi-20260912"]
+
+permissions:
+  contents: write
+
+env:
+  COREPACK_ENABLE_DOWNLOAD_PROMPT: "0"
+  COREPACK_DEFAULT_TO_LATEST: "0"
+
+jobs:
+  red-green:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v6
+        with:
+          node-version: "24.20.0"
+      - run: |
+          corepack enable
+          corepack install --global pnpm@11.11.0
+          pnpm install --frozen-lockfile
+
+      - name: Add ViewTimeline oracle
+        shell: bash
+        run: |
+          cat > test/waapi-view-timeline.test.ts <<'TS'
+          import { afterEach, describe, expect, it } from 'vitest';
+          import {
+            animateViewWaapi,
+            supportsViewTimeline,
+          } from '../src/waapi/index.js';
+
+          const host = globalThis as unknown as { ViewTimeline?: unknown };
+          const original = host.ViewTimeline;
+          afterEach(() => {
+            if (original === undefined) delete host.ViewTimeline;
+            else host.ViewTimeline = original;
+          });
+
+          describe('waapi: native ViewTimeline bridge', () => {
+            it('SSR/unsupported: fail-closed без host commit', () => {
+              delete host.ViewTimeline;
+              let commits = 0;
+              const el = { animate: () => { commits++; return {}; } };
+              expect(supportsViewTimeline()).toBe(false);
+              expect(animateViewWaapi(el, {
+                property: 'opacity', values: [0, 1],
+              }, { subject: {} })).toBeUndefined();
+              expect(commits).toBe(0);
+            });
+
+            it('коммитит один native view effect с range attachment без JS scheduler/listener', () => {
+              const subject = { id: 'subject' };
+              const timelines: unknown[] = [];
+              class FakeViewTimeline {
+                constructor(readonly options: unknown) { timelines.push(this); }
+              }
+              host.ViewTimeline = FakeViewTimeline;
+
+              const calls: Array<{ keyframes: unknown; timing: Record<string, unknown> }> = [];
+              const animation = { native: true };
+              const el = {
+                animate(keyframes: unknown, timing: object) {
+                  calls.push({ keyframes, timing: timing as Record<string, unknown> });
+                  return animation;
+                },
+              };
+
+              expect(supportsViewTimeline()).toBe(true);
+              const result = animateViewWaapi(el, {
+                property: 'opacity',
+                values: [0, 1],
+              }, {
+                subject,
+                axis: 'block',
+                rangeStart: 'cover 0%',
+                rangeEnd: 'cover 100%',
+              });
+
+              expect(result).toBe(animation);
+              expect(timelines).toHaveLength(1);
+              expect(calls).toHaveLength(1);
+              expect(calls[0]!.keyframes).toEqual([
+                { offset: 0, opacity: 0 },
+                { offset: 1, opacity: 1 },
+              ]);
+              expect(calls[0]!.timing['timeline']).toBe(timelines[0]);
+              expect(calls[0]!.timing['rangeStart']).toBe('cover 0%');
+              expect(calls[0]!.timing['rangeEnd']).toBe('cover 100%');
+              expect((timelines[0] as { options: unknown }).options).toEqual({ subject, axis: 'block' });
+            });
+
+            it('range отсутствует → не изобретает attachment policy', () => {
+              host.ViewTimeline = class {};
+              const calls: Array<Record<string, unknown>> = [];
+              const el = { animate: (_: unknown, timing: object) => { calls.push(timing as Record<string, unknown>); return {}; } };
+              animateViewWaapi(el, { property: 'opacity', values: [0, 1] }, { subject: {} });
+              expect(Object.hasOwn(calls[0]!, 'rangeStart')).toBe(false);
+              expect(Object.hasOwn(calls[0]!, 'rangeEnd')).toBe(false);
+            });
+          });
+          TS
+
+          cat > browser/25-native-view-timeline.spec.ts <<'TS'
+          import { expect, test } from './fixtures/harness';
+
+          test('native ViewTimeline: reveal следует view progress без listener/rAF Lab Motion', async ({ page }) => {
+            const result = await page.evaluate(async () => {
+              const { animateViewWaapi, supportsViewTimeline } = await import('/dist/waapi/index.js');
+              const scroller = document.createElement('div');
+              scroller.style.cssText = 'width:200px;height:200px;overflow:auto;position:relative';
+              const content = document.createElement('div');
+              content.style.cssText = 'height:1000px;position:relative';
+              const subject = document.createElement('div');
+              subject.style.cssText = 'position:absolute;top:400px;width:40px;height:100px;opacity:0';
+              content.append(subject);
+              scroller.append(content);
+              document.body.append(scroller);
+
+              let rafCalls = 0;
+              let scrollListeners = 0;
+              const nativeRaf = window.requestAnimationFrame;
+              const nativeAdd = scroller.addEventListener.bind(scroller);
+              window.requestAnimationFrame = ((...args: Parameters<typeof requestAnimationFrame>) => {
+                rafCalls++;
+                return nativeRaf(...args);
+              }) as typeof requestAnimationFrame;
+              scroller.addEventListener = ((type: string, ...args: unknown[]) => {
+                if (type === 'scroll') scrollListeners++;
+                return (nativeAdd as (...args: unknown[]) => void)(type, ...args);
+              }) as typeof scroller.addEventListener;
+
+              const supported = supportsViewTimeline();
+              const animation = animateViewWaapi(subject, {
+                property: 'opacity', values: [0, 1],
+              }, {
+                subject,
+                axis: 'block',
+                rangeStart: 'cover 0%',
+                rangeEnd: 'cover 100%',
+              }) as Animation | undefined;
+
+              window.requestAnimationFrame = nativeRaf;
+              scroller.addEventListener = nativeAdd as typeof scroller.addEventListener;
+
+              if (!supported) {
+                const unsupported = animation === undefined && rafCalls === 0 && scrollListeners === 0;
+                scroller.remove();
+                return { supported, unsupported, early: null, late: null, rafCalls, scrollListeners };
+              }
+
+              const settle = () => new Promise<void>(resolve => nativeRaf(() => nativeRaf(() => resolve())));
+              scroller.scrollTop = 200;
+              await settle();
+              const early = Number(getComputedStyle(subject).opacity);
+              scroller.scrollTop = 500;
+              await settle();
+              const late = Number(getComputedStyle(subject).opacity);
+              animation?.cancel();
+              scroller.remove();
+              return { supported, unsupported: false, early, late, rafCalls, scrollListeners };
+            });
+
+            expect(result.rafCalls).toBe(0);
+            expect(result.scrollListeners).toBe(0);
+            if (result.supported) {
+              expect(result.early).not.toBeNull();
+              expect(result.late).not.toBeNull();
+              expect(result.late!).toBeGreaterThan(result.early! + 0.5);
+            } else {
+              expect(result.unsupported).toBe(true);
+            }
+          });
+          TS
+
+      - name: RED on exact ScrollTimeline candidate
+        shell: bash
+        run: |
+          set +e
+          pnpm vitest run test/waapi-view-timeline.test.ts > /tmp/red.log 2>&1
+          status=$?
+          set -e
+          cat /tmp/red.log
+          test "$status" -ne 0
+          grep -Eq 'animateViewWaapi|supportsViewTimeline|does not provide an export|No matching export' /tmp/red.log
+
+      - name: Implement shared progress-timeline commit
+        shell: bash
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+          p = Path('src/waapi/index.ts')
+          s = p.read_text()
+          marker = '// ─── Native scroll progress timeline ────────────────────────────────────────'
+          if marker not in s:
+            raise SystemExit('native scroll section missing')
+          prefix, _ = s.split(marker, 1)
+          replacement = r'''// ─── Native progress timelines ──────────────────────────────────────────────
+
+/** Ось нативных ScrollTimeline/ViewTimeline. */
+export type WaapiScrollAxis = 'block' | 'inline' | 'x' | 'y';
+
+/** Параметры нативной scroll-progress шкалы. JS fallback намеренно отсутствует. */
+export interface WaapiScrollTimelineOptions {
+  readonly source: unknown;
+  readonly axis?: WaapiScrollAxis;
+}
+
+/** Параметры view-progress шкалы и optional attachment range эффекта. */
+export interface WaapiViewTimelineOptions {
+  readonly subject: unknown;
+  readonly axis?: WaapiScrollAxis;
+  readonly rangeStart?: string;
+  readonly rangeEnd?: string;
+}
+
+/**
+ * Scroll/view-linked effect использует progress timeline; wall-clock repeat/delay
+ * обычной WAAPI-анимации здесь не принадлежат контракту.
+ */
+export type WaapiScrollCompileOptions = Omit<
+  WaapiCompileOptions,
+  'duration' | 'repeat' | 'repeatType' | 'repeatDelay'
+> & { readonly fill?: WaapiCompiled['timing']['fill'] };
+
+/** View и scroll используют один property compiler и одну finite timeline policy. */
+export type WaapiViewCompileOptions = WaapiScrollCompileOptions;
+
+type ProgressTimelineCtor = new (options: Record<string, unknown>) => unknown;
+
+function timelineCtor(name: 'ScrollTimeline' | 'ViewTimeline'): ProgressTimelineCtor | undefined {
+  const ctor = (globalThis as Record<string, unknown>)[name];
+  return typeof ctor === 'function' ? ctor as ProgressTimelineCtor : undefined;
+}
+
+/** Capability probe без UA-sniffing и без DOM-глобалов на import. */
+export function supportsScrollTimeline(): boolean {
+  return timelineCtor('ScrollTimeline') !== undefined;
+}
+
+/** Capability probe view-progress timeline. */
+export function supportsViewTimeline(): boolean {
+  return timelineCtor('ViewTimeline') !== undefined;
+}
+
+function animateProgressWaapi(
+  el: WaapiAnimatable,
+  options: WaapiScrollCompileOptions,
+  timeline: unknown,
+  rangeStart?: string,
+  rangeEnd?: string,
+): unknown {
+  const { fill, property, values, times, easing, format, easingPoints } = options;
+  const compiled = compileWaapi({
+    property,
+    values,
+    ...(times === undefined ? {} : { times }),
+    ...(easing === undefined ? {} : { easing }),
+    ...(format === undefined ? {} : { format }),
+    ...(easingPoints === undefined ? {} : { easingPoints }),
+    // Finite progress timeline owns position; non-zero nominal duration keeps
+    // implementations that still require duration on a finite timeline active.
+    duration: 0.001,
+  });
+  return el.animate(compiled.keyframes, {
+    ...compiled.timing,
+    duration: 1,
+    iterations: 1,
+    direction: 'normal',
+    fill: fill ?? compiled.timing.fill,
+    timeline,
+    ...(rangeStart === undefined ? {} : { rangeStart }),
+    ...(rangeEnd === undefined ? {} : { rangeEnd }),
+  });
+}
+
+/**
+ * Отдать связь scroll progress → property браузеру целиком.
+ * Unsupported → undefined без скрытого listener/rAF fallback.
+ */
+export function animateScrollWaapi(
+  el: WaapiAnimatable,
+  options: WaapiScrollCompileOptions,
+  scroll: WaapiScrollTimelineOptions,
+): unknown | undefined {
+  if (!supportsWaapi(el)) return undefined;
+  const Timeline = timelineCtor('ScrollTimeline');
+  if (!Timeline) return undefined;
+  const timeline = new Timeline({ source: scroll.source, axis: scroll.axis ?? 'block' });
+  return animateProgressWaapi(el, options, timeline);
+}
+
+/**
+ * Отдать view progress → property браузеру целиком. `rangeStart/rangeEnd`
+ * передаются в attachment range Web Animations, а не эмулируются в JS.
+ */
+export function animateViewWaapi(
+  el: WaapiAnimatable,
+  options: WaapiViewCompileOptions,
+  view: WaapiViewTimelineOptions,
+): unknown | undefined {
+  if (!supportsWaapi(el)) return undefined;
+  const Timeline = timelineCtor('ViewTimeline');
+  if (!Timeline) return undefined;
+  const timeline = new Timeline({ subject: view.subject, axis: view.axis ?? 'block' });
+  return animateProgressWaapi(el, options, timeline, view.rangeStart, view.rangeEnd);
+}
+'''
+          p.write_text(prefix + marker + '\n\n' + replacement)
+          PY
+
+          python - <<'PY'
+          from pathlib import Path
+          p = Path('test/waapi-emit.test.ts')
+          s = p.read_text()
+          old = """      'animateScrollWaapi',\n      'animateWaapi',\n      'compileWaapi',\n      'easingToLinear',\n      'supportsScrollTimeline',\n      'supportsWaapi',\n"""
+          new = """      'animateScrollWaapi',\n      'animateViewWaapi',\n      'animateWaapi',\n      'compileWaapi',\n      'easingToLinear',\n      'supportsScrollTimeline',\n      'supportsViewTimeline',\n      'supportsWaapi',\n"""
+          if s.count(old) != 1:
+            raise SystemExit('waapi export pin drift')
+          p.write_text(s.replace(old, new, 1))
+
+          p = Path('docs/api.md')
+          s = p.read_text()
+          old = "| `…/waapi` | Низкоуровневый native-мост: `compileWaapi`/`animateWaapi`; `animateScrollWaapi` отдаёт scroll-progress → property нативному `ScrollTimeline` без собственного покадрового JS и без скрытого fallback; `supportsWaapi`/`supportsScrollTimeline` — capability probes |"
+          new = "| `…/waapi` | Низкоуровневый native-мост: `compileWaapi`/`animateWaapi`; `animateScrollWaapi` и `animateViewWaapi` отдают scroll/view-progress → property нативным `ScrollTimeline`/`ViewTimeline` без собственного покадрового JS и без скрытого fallback; capability probes явные |"
+          if s.count(old) != 1:
+            raise SystemExit('docs waapi row drift')
+          p.write_text(s.replace(old, new, 1))
+
+          p = Path('CHANGELOG.md')
+          s = p.read_text()
+          old = '- `animateScrollWaapi` в `./waapi`: нативная scroll-progress шкала через `ScrollTimeline`; на поддерживаемом host нет scroll-listener/rAF Lab Motion, на неподдерживаемом путь возвращает `undefined` без скрытой JS-эмуляции.\n'
+          new = '- `animateScrollWaapi` / `animateViewWaapi` в `./waapi`: нативные scroll/view-progress шкалы через `ScrollTimeline`/`ViewTimeline`; на поддерживаемом host нет scroll-listener/rAF Lab Motion, на неподдерживаемом путь возвращает `undefined` без скрытой JS-эмуляции.\n'
+          if s.count(old) != 1:
+            raise SystemExit('changelog scroll entry drift')
+          p.write_text(s.replace(old, new, 1))
+          PY
+
+      - name: GREEN unit + contracts
+        run: |
+          pnpm vitest run test/waapi-view-timeline.test.ts test/waapi-scroll-timeline.test.ts test/waapi-emit.test.ts
+          pnpm typecheck:native
+          pnpm build
+          pnpm size
+
+      - name: Commit research result
+        shell: bash
+        run: |
+          set -euo pipefail
+          git add src/waapi/index.ts test/waapi-view-timeline.test.ts test/waapi-emit.test.ts browser/25-native-view-timeline.spec.ts docs/api.md CHANGELOG.md
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git commit -m 'feat(waapi): добавить нативный view progress timeline'
+          git push origin HEAD:research/native-view-waapi-20260912
