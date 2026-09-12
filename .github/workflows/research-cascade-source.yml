@@ -1,0 +1,34 @@
+name: Cascade immutable source transport
+on:
+  push:
+    branches: ["research/cascade-source-20260913"]
+permissions:
+  contents: read
+jobs:
+  source:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          ref: a164691a24eb1c92dfdf9aeb80af4594dfb30faa
+          fetch-depth: 0
+          persist-credentials: false
+      - name: Export exact source without build or writes
+        shell: bash
+        run: |
+          set -euo pipefail
+          test "$(git rev-parse HEAD)" = a164691a24eb1c92dfdf9aeb80af4594dfb30faa
+          mkdir "$RUNNER_TEMP/cascade-source"
+          git bundle create "$RUNNER_TEMP/cascade-source/source.bundle" HEAD
+          git rev-parse HEAD HEAD^{tree} > "$RUNNER_TEMP/cascade-source/revision.txt"
+          cd "$RUNNER_TEMP/cascade-source"
+          sha256sum source.bundle revision.txt > SHA256SUMS
+      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
+        with:
+          name: cascade-source-a164691
+          path: ${{ runner.temp }}/cascade-source/
+          retention-days: 1
+          if-no-files-found: error
+          compression-level: 0
+          overwrite: false
