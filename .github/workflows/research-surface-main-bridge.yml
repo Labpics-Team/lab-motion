@@ -1,0 +1,123 @@
+name: Surface current-main byte bridge
+on:
+  push:
+    branches: [research/surface-no-reparse-bridge-20260912-9f6c]
+permissions:
+  contents: read
+  actions: read
+jobs:
+  bridge:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    steps:
+      - name: Checkout exact research carrier
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          ref: ${{ github.sha }}
+          path: harness
+          persist-credentials: false
+      - name: Checkout current exact baseline
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          ref: 93278bf9b540f93521c7bd4c02f68db458e5db7a
+          path: baseline
+          fetch-depth: 0
+          persist-credentials: false
+      - name: Checkout current exact candidate source base
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          ref: 93278bf9b540f93521c7bd4c02f68db458e5db7a
+          path: candidate
+          fetch-depth: 0
+          persist-credentials: false
+      - name: Setup exact Node
+        uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020
+        with:
+          node-version: '24.20.0'
+      - name: Download immutable measured entries
+        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c
+        with:
+          artifact-ids: '10292153698'
+          github-token: ${{ github.token }}
+          repository: Labpics-Team/lab-motion
+          run-id: '34676904520'
+          path: seed/evidence
+          digest-mismatch: error
+      - name: Freeze current candidate and unchanged build inputs
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p evidence
+          (cd seed && sha256sum --check evidence/manifest.sha256)
+          printf '%s  %s\n' '89af8424dd53e560b1933f87ba650d8bf57c83ca5a04600eefb31f416aabbae7' "$(command -v node)" | sha256sum --check
+          git -C baseline diff --exit-code 6008d916ac053bc104050d9c75aad69b04d4a878 HEAD -- package.json pnpm-lock.yaml tsup.config.ts .github/workflows
+          cmp baseline/package.json candidate/package.json
+          cmp baseline/pnpm-lock.yaml candidate/pnpm-lock.yaml
+          git -C candidate apply --check "$PWD/harness/.research/surface-no-reparse.patch"
+          git -C candidate apply "$PWD/harness/.research/surface-no-reparse.patch"
+          git -C candidate diff --check
+          git -C candidate add src/compiler/core.ts test/future-layout-domain-fuzz.test.ts
+          git -C candidate -c user.name='github-actions[bot]' -c user.email='41898282+github-actions[bot]@users.noreply.github.com' commit -m 'perf(compiler): remove reparsing of certified Surface curves'
+          git -C candidate rev-parse HEAD > evidence/candidate-sha.txt
+          git -C candidate rev-parse HEAD^{tree} > evidence/candidate-tree.txt
+          git -C candidate diff --binary HEAD^ HEAD > evidence/candidate.patch
+          git -C candidate bundle create "$PWD/evidence/candidate.bundle" HEAD ^93278bf9b540f93521c7bd4c02f68db458e5db7a
+          printf '%s\n' '93278bf9b540f93521c7bd4c02f68db458e5db7a' > evidence/base-sha.txt
+          printf '%s\n' "$GITHUB_SHA" > evidence/carrier-sha.txt
+          sha256sum harness/.research/surface-no-reparse.patch harness/.research/surface-equivalence.mjs > evidence/research-inputs.sha256
+          node -p 'JSON.stringify({versions:process.versions,execArgv:process.execArgv,platform:process.platform,arch:process.arch})' > evidence/runtime.json
+          corepack enable
+          corepack install --global pnpm@11.11.0
+          pnpm --dir baseline install --frozen-lockfile
+          test ! -e candidate/node_modules
+          ln -s "$PWD/baseline/node_modules" candidate/node_modules
+      - name: Build current baseline and candidate
+        shell: bash
+        run: |
+          set -euo pipefail
+          pnpm --dir baseline build > evidence/base-build.log 2>&1
+          pnpm --dir candidate build > evidence/candidate-build.log 2>&1
+          tar -xzf seed/evidence/built-entries.tar.gz -C seed/evidence
+          for side in baseline candidate; do
+            for extension in js cjs; do
+              cmp "seed/evidence/$side/dist/compiler/vite/index.$extension" "$side/dist/compiler/vite/index.$extension"
+            done
+          done
+          ACORN_PATH=$(find "$PWD/baseline/node_modules/.pnpm" -path '*/node_modules/acorn/dist/acorn.mjs' -print -quit)
+          test -n "$ACORN_PATH"
+          cmp "$ACORN_PATH" seed/evidence/acorn.mjs
+          cp "$ACORN_PATH" acorn.mjs
+          sha256sum baseline/dist/compiler/vite/index.js baseline/dist/compiler/vite/index.cjs candidate/dist/compiler/vite/index.js candidate/dist/compiler/vite/index.cjs acorn.mjs > evidence/compiler-byte-bridge.sha256
+          printf '%s\n' 'BYTE_IDENTITY_VERIFIED: current baseline/candidate ESM+CJS exactly match immutable measured entries; parser dependency also identical' > evidence/byte-bridge.txt
+      - name: Current-main semantics and protected deterministic gates
+        shell: bash
+        run: |
+          set -euo pipefail
+          pnpm --dir candidate check:static | tee evidence/static.log
+          pnpm --dir candidate typecheck | tee evidence/typecheck.log
+          pnpm --dir candidate exec vitest run --reporter=dot test/future-layout-domain-fuzz.test.ts test/compiler-surface-lowering.test.ts test/spring-ode-oracle.test.ts | tee evidence/targeted-tests.log
+          EVIDENCE_ROOT="$PWD" node harness/.research/surface-equivalence.mjs | tee evidence/independent-equivalence.log
+          cp independent-equivalence.json evidence/independent-equivalence.json
+          (cd baseline && node scripts/size-gate.mjs) | tee evidence/base-size.log
+          (cd candidate && node scripts/size-gate.mjs) | tee evidence/candidate-size.log
+          (cd candidate && node scripts/compiler-acceptance.mjs) | tee evidence/compiler-acceptance.log
+          git -C baseline diff --exit-code
+          git -C candidate diff --exit-code
+          test "$(git -C candidate rev-parse HEAD)" = "$(cat evidence/candidate-sha.txt)"
+          test "$(git -C candidate write-tree)" = "$(cat evidence/candidate-tree.txt)"
+          git -C baseline archive --format=tar HEAD | gzip -n > evidence/base-source.tar.gz
+          tar -czf evidence/built-entries.tar.gz baseline/dist candidate/dist
+      - name: Evidence manifest
+        if: always()
+        shell: bash
+        run: |
+          mkdir -p evidence
+          find evidence -maxdepth 1 -type f ! -name manifest.sha256 -print0 | sort -z | xargs -0 sha256sum > evidence/manifest.sha256
+      - name: Upload immutable current-main bridge
+        if: always()
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
+        with:
+          name: surface-main-bridge-${{ github.sha }}
+          path: evidence
+          if-no-files-found: error
+          retention-days: 30
