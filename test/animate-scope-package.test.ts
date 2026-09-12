@@ -45,6 +45,7 @@ it('новая public capability и её типы доступны через у
 
 it('scope вырезается из обычного animate consumer; использование scope — positive control', async () => {
   const file = join(root, 'dist/animate/index.js');
+  expect(existsSync(file), 'сначала pnpm build').toBe(true);
   const emit = async (name: string) => {
     const output = await build({ stdin: { contents: `import {${name}} from ${JSON.stringify(file)}; console.log(${name});`, resolveDir: root },
       bundle: true, minify: true, format: 'esm', platform: 'browser', write: false });
