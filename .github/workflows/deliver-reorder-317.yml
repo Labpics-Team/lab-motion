@@ -1,0 +1,94 @@
+name: Deliver controlled reorder 317
+on:
+  push:
+    branches: [delivery/reorder-317-20260913]
+    paths: [.github/workflows/deliver-reorder-317.yml]
+permissions: {}
+concurrency:
+  group: deliver-controlled-reorder-317
+  cancel-in-progress: false
+jobs:
+  seal:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    permissions:
+      contents: write
+    outputs:
+      head: ${{ steps.publish.outputs.head }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          ref: 93278bf9b540f93521c7bd4c02f68db458e5db7a
+          persist-credentials: false
+          fetch-depth: 0
+      - name: Verify immutable patch and resulting product tree
+        env:
+          CARRIER: ${{ github.sha }}
+        run: |
+          set -euo pipefail
+          python3 - <<'PY'
+          import base64,gzip,hashlib,os,pathlib,subprocess
+          def git(*args):return subprocess.check_output(['git',*args]).strip()
+          assert git('rev-parse','HEAD').decode()=='93278bf9b540f93521c7bd4c02f68db458e5db7a'
+          assert not git('status','--porcelain')
+          encoded=b''.join(git('show',f'{os.environ["CARRIER"]}:.delivery/reorder/chunk{i}.b64') for i in range(8))
+          assert len(encoded)==29028,len(encoded)
+          patch=gzip.decompress(base64.b64decode(encoded,validate=True))
+          assert len(patch)==73772,len(patch)
+          assert hashlib.sha256(patch).hexdigest()=='c426cc802a0d42aa06ac20a7acda716304a1e7cb9e3f868a06e3290e0b4cb7f4'
+          pathlib.Path('/tmp/reorder.patch').write_bytes(patch)
+          subprocess.run(['git','apply','--check','/tmp/reorder.patch'],check=True)
+          subprocess.run(['git','apply','--index','/tmp/reorder.patch'],check=True)
+          assert git('write-tree').decode()=='bd6e363d67b4f753310ef2431b67d964c3e7046d'
+          paths=git('diff','--cached','--name-only').decode().splitlines()
+          assert len(paths)==18 and not any(p.startswith(('.github/','.delivery/')) for p in paths),paths
+          subprocess.run(['git','diff','--cached','--check'],check=True)
+          PY
+          git -c core.hooksPath=/dev/null -c user.name='github-actions[bot]' -c user.email='41898282+github-actions[bot]@users.noreply.github.com' commit -m 'feat(behaviors): controlled list and grid reorder with keyboard and projection (#317)'
+          mkdir -p /tmp/reorder-receipt
+          git show --stat --oneline HEAD > /tmp/reorder-receipt/diff-stat.txt
+          git archive HEAD | gzip -n > /tmp/reorder-receipt/candidate-source.tar.gz
+          cp /tmp/reorder.patch /tmp/reorder-receipt/candidate.patch
+          printf 'base=%s\nhead=%s\ntree=%s\npatch_sha256=%s\ncarrier=%s\n' \
+            93278bf9b540f93521c7bd4c02f68db458e5db7a "$(git rev-parse HEAD)" "$(git rev-parse HEAD^{tree})" \
+            c426cc802a0d42aa06ac20a7acda716304a1e7cb9e3f868a06e3290e0b4cb7f4 "$CARRIER" > /tmp/reorder-receipt/receipt.txt
+      # No dependencies or repository scripts execute with write credentials.
+      - name: Publish only the new owned feature branch
+        id: publish
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          actual="$(gh api repos/Labpics-Team/lab-motion/git/ref/heads/main --jq .object.sha)"
+          [[ "$actual" == 93278bf9b540f93521c7bd4c02f68db458e5db7a ]]
+          gh auth setup-git
+          refs="$(git ls-remote --heads origin refs/heads/feat/controlled-reorder-317)"
+          [[ -z "$refs" ]]
+          git push origin HEAD:refs/heads/feat/controlled-reorder-317
+          echo "head=$(git rev-parse HEAD)" >> "$GITHUB_OUTPUT"
+          cat /tmp/reorder-receipt/receipt.txt
+      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
+        if: always()
+        with:
+          name: reorder-delivery-${{ github.run_id }}
+          path: /tmp/reorder-receipt/
+          if-no-files-found: error
+          retention-days: 14
+  authoritative-ci:
+    needs: seal
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    permissions:
+      contents: read
+      actions: write
+    steps:
+      - name: Dispatch unchanged product CI on the exact sealed branch
+        env:
+          GH_TOKEN: ${{ github.token }}
+          EXPECTED: ${{ needs.seal.outputs.head }}
+        run: |
+          set -euo pipefail
+          actual="$(gh api repos/Labpics-Team/lab-motion/git/ref/heads/feat/controlled-reorder-317 --jq .object.sha)"
+          [[ "$actual" == "$EXPECTED" ]]
+          gh api --method POST repos/Labpics-Team/lab-motion/actions/workflows/ci.yml/dispatches -f ref=feat/controlled-reorder-317
+          printf 'Original CI dispatched for %s\n' "$EXPECTED"
