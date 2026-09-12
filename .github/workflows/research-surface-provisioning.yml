@@ -1,0 +1,63 @@
+name: Surface provisioning diagnosis
+on:
+  push:
+    branches: [research/surface-provisioning-proof-yDNEKZ]
+permissions:
+  contents: read
+jobs:
+  diagnosis:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          ref: 7d09c6dc5a496a24efa3682c8cbb8c827b9f2ba7
+          path: baseline
+          persist-credentials: false
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          ref: 6008d916ac053bc104050d9c75aad69b04d4a878
+          path: candidate
+          persist-credentials: false
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020
+        with:
+          node-version: '24.20.0'
+      - name: Frozen dependencies
+        run: |
+          corepack enable
+          corepack install --global pnpm@11.11.0
+          cmp baseline/pnpm-lock.yaml candidate/pnpm-lock.yaml
+          pnpm --dir baseline install --frozen-lockfile
+          ln -s "$PWD/baseline/node_modules" candidate/node_modules
+      - name: Локализовать единственное расхождение до timing
+        env:
+          RECEIPT: ${{ runner.temp }}/provisioning.json
+        run: |
+          node --input-type=module <<'JS'
+          import {readdirSync,lstatSync,realpathSync,readFileSync,readlinkSync,writeFileSync} from 'node:fs';
+          import path from 'node:path';
+          import {execFileSync} from 'node:child_process';
+          import {hashFileTree,sha256File} from './baseline/bench/compare/provenance.mjs';
+          const stages=[];
+          function snapshot(stage){
+            const values={stage};
+            for(const side of ['baseline','candidate']){
+              const root=realpathSync(`${side}/node_modules/terser`);
+              const files={};
+              function walk(d){for(const n of readdirSync(d)){const p=path.join(d,n),s=lstatSync(p);if(s.isDirectory())walk(p);else files[path.relative(root,p)]=s.isSymbolicLink()?{target:readlinkSync(p)}:{sha:sha256File(p),...(p.includes('/.bin/')?{text:readFileSync(p,'utf8')}:{})};}}
+              walk(root);values[side]={root,tree:hashFileTree(root),files,nodeModules:realpathSync(`${side}/node_modules`)};
+            }
+            stages.push(values);
+          }
+          snapshot('installed');
+          execFileSync('pnpm',['--dir','baseline','run','build'],{stdio:'inherit'});snapshot('base-built');
+          execFileSync('pnpm',['--dir','candidate','run','build'],{stdio:'inherit'});snapshot('both-built');
+          writeFileSync(process.env.RECEIPT,JSON.stringify(stages,null,2));
+          console.log(JSON.stringify(stages.map(s=>({stage:s.stage,base:s.baseline.root,candidate:s.candidate.root,baseHash:s.baseline.tree.sha256,candidateHash:s.candidate.tree.sha256})),null,2));
+          JS
+      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
+        with:
+          name: surface-provisioning-diagnosis
+          path: ${{ runner.temp }}/provisioning.json
+          if-no-files-found: error
+          retention-days: 30
