@@ -128,6 +128,7 @@ describe('fuzz: 10 000 seeded сопряжённых артефактов', () =
   it('positive controls: CSS oracle fail-closed на повреждённых числах и позициях', () => {
     expect(() => explicitLinearSamples('linear(nope 0%, 1 100%)')).toThrow('не finite');
     expect(() => explicitLinearSamples('linear(0 0%, 0.5 50%, 1 40%)')).toThrow('позиции не возрастают');
+    expect(() => explicitLinearSamples('linear(0 0%, 0.5 50%, 0.5 50%, 1 100%)')).toThrow('позиции не возрастают');
     expect(() => explicitLinearSamples('linear(0 1%, 1 100%)')).toThrow('неполные endpoints');
   });
 
@@ -168,8 +169,16 @@ describe('fuzz: 10 000 seeded сопряжённых артефактов', () =
       expect(artifact.minWidth).toBeCloseTo(minW, 12);
       expect(certifyPositivity(artifact, 0)).toBe(true);
 
-      // Монотонная A с точными endpoints — по фактически исполняемому CSS.
+      // Все три фактически исполняемые кривые имеют строго возрастающие
+      // explicit positions. Это producer-инвариант, который позволяет compiler
+      // не reparsить уже сертифицированный artifact перед сериализацией.
+      const progress = explicitLinearSamples(artifact.easing);
+      const reciprocal = explicitLinearSamples(artifact.reciprocalEasing);
       const blend = explicitLinearSamples(artifact.blendEasing);
+      expect(progress.length).toBe(artifact.samples.length);
+      expect(reciprocal.length).toBeGreaterThanOrEqual(4);
+
+      // Монотонная A с точными endpoints — по фактически исполняемому CSS.
       expect(blend[1]).toBe(0);
       expect(blend[blend.length - 1]).toBe(1);
       for (let i = 3; i < blend.length; i += 2) {
