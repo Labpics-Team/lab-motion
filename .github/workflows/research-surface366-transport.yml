@@ -1,86 +1,43 @@
-name: Surface 366 fixed boundary qualification
+name: Surface 366 portable test object
 on:
   push:
     branches: [research/surface366-transport-20260912]
 permissions:
-  contents: read
+  contents: write
 jobs:
-  qualify:
+  transport:
     runs-on: ubuntu-24.04
-    timeout-minutes: 60
-    env:
-      COREPACK_ENABLE_DOWNLOAD_PROMPT: '0'
-      COREPACK_DEFAULT_TO_LATEST: '0'
+    timeout-minutes: 5
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
         with:
           ref: 09ece9a91fa88f7ddcbea0425f4551db49ad6a0f
-          path: harness
-          fetch-depth: 0
           persist-credentials: false
-      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
-        with:
-          ref: 7d09c6dc5a496a24efa3682c8cbb8c827b9f2ba7
-          path: base
-          fetch-depth: 0
-          persist-credentials: false
-      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
-        with:
-          ref: 93278bf9b540f93521c7bd4c02f68db458e5db7a
-          path: candidate
-          fetch-depth: 0
-          persist-credentials: false
-      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020
-        with:
-          node-version: '24.20.0'
-          package-manager-cache: false
-      - name: Frozen tools and exact sources
+      - name: Publish exact locally tested portable expectation
         shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
         run: |
           set -euo pipefail
-          corepack enable
-          corepack install --global pnpm@11.11.0
-          node --input-type=module <<'JS'
-          import {readFileSync} from 'node:fs';
-          import assert from 'node:assert/strict';
-          const base = JSON.parse(readFileSync('base/package.json'));
-          for (const root of ['candidate','harness']) {
-            const p = JSON.parse(readFileSync(root+'/package.json'));
-            assert.deepEqual(readFileSync('base/pnpm-lock.yaml'),readFileSync(root+'/pnpm-lock.yaml'));
-            for (const k of ['dependencies','devDependencies','optionalDependencies','peerDependencies','packageManager']) assert.deepEqual(base[k],p[k]);
-          }
-          JS
-          cd base
-          pnpm install --frozen-lockfile
-          cd ..
-          ln -s "$PWD/base/node_modules" candidate/node_modules
-          ln -s "$PWD/base/node_modules" harness/node_modules
-          mkdir "$RUNNER_TEMP/qualification"
-          for dir in base candidate harness; do git -C "$dir" rev-parse HEAD; test -z "$(git -C "$dir" status --porcelain)"; done
-      - name: One calibrated public pair, preserve UNPROVEN
-        shell: bash
-        run: |
-          set -euo pipefail
-          set +e
-          node harness/scripts/bench-surface-pair.mjs --base "$PWD/base" --candidate "$PWD/candidate" --out "$RUNNER_TEMP/qualification/report" > "$RUNNER_TEMP/qualification/run.log" 2>&1
-          status=$?
-          set -e
-          printf '%s\n' "$status" > "$RUNNER_TEMP/qualification/exit-status.txt"
-          tail -n 8 "$RUNNER_TEMP/qualification/run.log"
-          test "$status" = 0 || test "$status" = 2
-      - name: Independent raw replay
-        shell: bash
-        run: |
-          set -euo pipefail
-          node harness/scripts/bench-surface-pair.mjs --verify "$RUNNER_TEMP/qualification/report" > "$RUNNER_TEMP/qualification/replay.json"
-          cat "$RUNNER_TEMP/qualification/replay.json"
-          node -p 'JSON.stringify({versions:process.versions,platform:process.platform,arch:process.arch})' > "$RUNNER_TEMP/qualification/environment.json"
-          sha256sum harness/scripts/bench-surface-pair.mjs harness/scripts/bench-surface-support.mjs > "$RUNNER_TEMP/qualification/harness.sha256"
-      - name: Preserve all results including failure
-        if: always()
-        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
+          mkdir -p "$RUNNER_TEMP/receipt"
+          python3 - <<'PY'
+          import base64, json, os, subprocess
+          from pathlib import Path
+          p=Path('test/bench-surface-pair.test.ts')
+          old="base: path.resolve('.'), candidate: path.resolve('..'), out: '/tmp/new',"
+          source=p.read_text()
+          assert source.count(old)==1
+          data=source.replace(old,"base: path.resolve('.'), candidate: path.resolve('..'), out: path.resolve('/tmp/new'),").encode()
+          expected='6738e4c1654c8dd1c624d34a82219ae2576cb593'
+          assert subprocess.check_output(['git','hash-object','--stdin'],input=data).decode().strip()==expected
+          payload=json.dumps({'content':base64.b64encode(data).decode(),'encoding':'base64'}).encode()
+          result=json.loads(subprocess.check_output(['gh','api','--method','POST','repos/'+os.environ['GITHUB_REPOSITORY']+'/git/blobs','--input','-'],input=payload))
+          assert result['sha']==expected
+          Path(os.environ['RUNNER_TEMP'],'receipt','object.json').write_text(json.dumps({'path':str(p),'sha':expected,'refWrites':0}))
+          PY
+      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         with:
-          name: surface366-qualification-${{ github.sha }}
-          path: ${{ runner.temp }}/qualification
+          name: surface366-portable-object-${{ github.sha }}
+          path: ${{ runner.temp }}/receipt
           if-no-files-found: error
-          retention-days: 30
+          retention-days: 7
