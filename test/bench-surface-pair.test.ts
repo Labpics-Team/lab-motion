@@ -22,8 +22,8 @@ import {
   SURFACE_CALIBRATION_IDS,
   SURFACE_PAIR_POLICY,
 } from '../scripts/bench-surface-support.mjs';
-import { sha256File } from '../bench/compare/provenance.mjs';
-import { parseSurfaceBenchArgs, prepareSurfaceCheckouts, replaySurfaceReport } from '../scripts/bench-surface-pair.mjs';
+import { assertFileHashesUnchanged, sha256File } from '../bench/compare/provenance.mjs';
+import { finishSurfaceReport, parseSurfaceBenchArgs, prepareSurfaceCheckouts, replaySurfaceReport } from '../scripts/bench-surface-pair.mjs';
 
 const temporary: string[] = [];
 afterEach(() => { for (const directory of temporary.splice(0)) rmSync(directory, { recursive: true, force: true }); });
@@ -417,4 +417,52 @@ it('Surface: build boundary исполняется ровно один раз н
   ] as const) {
     expect(() => prepareSurfaceCheckouts({ base: 'base' }, { capture, prepare, build: () => {} })).toThrow(reason);
   }
+});
+
+
+describe('Surface: terminal receipt остаётся fail-closed при final mutation', () => {
+  it('сохраняет реальный probe-mismatch как INVALID и не поглощает отказ', () => {
+    const directory = mkdtempSync(path.join(tmpdir(), 'motion-surface-terminal-'));
+    temporary.push(directory);
+    const probe = path.join(directory, 'probe.mjs');
+    const journal = path.join(directory, 'raw.jsonl');
+    writeFileSync(probe, 'export const value = 1;');
+    const hashes = { [probe]: { path: probe, sha256: sha256File(probe) } };
+    const prefix = JSON.stringify({ type: 'cluster', observed: 123 }) + '\n';
+    writeFileSync(journal, prefix);
+    writeFileSync(probe, 'export const value = 2;');
+    expect(() => finishSurfaceReport(directory, 0,
+      { status: 'LATENCY_ADMISSION' }, () => assertFileHashesUnchanged(hashes))).toThrow();
+    const verdict = JSON.parse(readFileSync(path.join(directory, 'verdict.json'), 'utf8'));
+    expect(verdict.status).toBe('INVALID');
+    expect(verdict.reason).toContain('probe.mjs');
+    const raw = readFileSync(journal, 'utf8');
+    expect(raw.startsWith(prefix)).toBe(true);
+    expect(JSON.parse(raw.trimEnd().split('\n').at(-1)!)).toEqual({ type: 'end', verdict, completedComparisons: 0 });
+    expect(JSON.parse(readFileSync(path.join(directory, 'raw.sha256.json'), 'utf8')))
+      .toEqual({ sha256: sha256File(journal) });
+  });
+
+  it('сохраняет исходную ошибку и прежний INVALID, не изобретая успех', () => {
+    const directory = mkdtempSync(path.join(tmpdir(), 'motion-surface-terminal-'));
+    temporary.push(directory);
+    writeFileSync(path.join(directory, 'raw.jsonl'), '');
+    const failure = new Error('tool bytes changed');
+    let caught: unknown;
+    try {
+      finishSurfaceReport(directory, 2, { status: 'INVALID', reason: 'worker failed' }, () => { throw failure; });
+    } catch (error) { caught = error; }
+    expect(caught).toBe(failure);
+    const verdict = JSON.parse(readFileSync(path.join(directory, 'verdict.json'), 'utf8'));
+    expect(verdict.status).toBe('INVALID');
+    expect(verdict.reason).toContain('worker failed');
+    expect(verdict.reason).toContain('tool bytes changed');
+    // Positive control: при неизменных входах фактический verdict не подменяется.
+    writeFileSync(path.join(directory, 'raw.jsonl'), '');
+    const admitted = { status: 'CALIBRATED', reason: 'baseline-only' };
+    let verified = 0;
+    finishSurfaceReport(directory, 5, admitted, () => { verified++; });
+    expect(verified).toBe(1);
+    expect(JSON.parse(readFileSync(path.join(directory, 'verdict.json'), 'utf8'))).toEqual(admitted);
+  });
 });

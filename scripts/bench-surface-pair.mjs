@@ -259,20 +259,39 @@ async function execute(options) {
     verdict = { status: 'INVALID', reason: String(error?.message ?? error) };
     throw error;
   } finally {
-    for (const [side, root] of Object.entries(roots)) if (root) {
-      assertCheckoutUnchanged(root, prepared[side]);
-      assertInstalledPackageTreesUnchanged(root, Object.fromEntries(Object.entries(tools[side]).map(([name, value]) => [name, value])));
-    }
-    assert.deepEqual(readCheckoutState(ROOT), harnessState, 'surface bench: harness изменился');
-    assertFileHashesUnchanged(harnessHashes);
-    assertFileHashesUnchanged(manifest.probeHashes);
-    assert.equal(sha256File(acorn.module), manifest.acorn.sha256);
-    assert.deepEqual(hashFileTree(acorn.packageDirectory), manifest.acorn.packageTree);
-    write('verdict.json', verdict);
-    appendFileSync(journal, JSON.stringify({ type: 'end', verdict, completedComparisons: rows.length }) + '\n');
-    write('raw.sha256.json', { sha256: sha256File(journal) });
+    finishSurfaceReport(options.out, rows.length, verdict, () => {
+      for (const [side, root] of Object.entries(roots)) if (root) {
+        assertCheckoutUnchanged(root, prepared[side]);
+        assertInstalledPackageTreesUnchanged(root, Object.fromEntries(Object.entries(tools[side]).map(([name, value]) => [name, value])));
+      }
+      assert.deepEqual(readCheckoutState(ROOT), harnessState, 'surface bench: harness изменился');
+      assertFileHashesUnchanged(harnessHashes);
+      assertFileHashesUnchanged(manifest.probeHashes);
+      assert.equal(sha256File(acorn.module), manifest.acorn.sha256);
+      assert.deepEqual(hashFileTree(acorn.packageDirectory), manifest.acorn.packageTree);
+    });
   }
   if (verdict.status === 'UNPROVEN') process.exitCode = 2;
+}
+
+/** Терминальная запись принадлежит run даже при отказе final provenance. */
+export function finishSurfaceReport(directory, completedComparisons, verdict, verify) {
+  let finalVerdict = verdict;
+  try {
+    verify();
+  } catch (error) {
+    const reason = String(error?.message ?? error);
+    finalVerdict = { status: 'INVALID', reason: verdict.status === 'INVALID'
+      ? `${verdict.reason}; final provenance: ${reason}` : reason };
+    throw error;
+  } finally {
+    // Проверка всё ещё завершается отказом; terminal record сохраняет его
+    // вместо незавершённого журнала или преждевременного LATENCY_ADMISSION.
+    writeFileSync(path.join(directory, 'verdict.json'), JSON.stringify(finalVerdict, null, 2));
+    const journal = path.join(directory, 'raw.jsonl');
+    appendFileSync(journal, JSON.stringify({ type: 'end', verdict: finalVerdict, completedComparisons }) + '\n');
+    writeFileSync(path.join(directory, 'raw.sha256.json'), JSON.stringify({ sha256: sha256File(journal) }, null, 2));
+  }
 }
 
 /** Пересчитывает вывод из полных raw-кластеров, не доверяя summary/verdict. */
