@@ -62,16 +62,6 @@ function executeSurfaceBurst(op) {
   for (let i = 0; i < calls; i++) sink += op();
   blackhole += sink;
 }
-// 128 warm bursts per side, as before, but with the same position-balanced
-// ABBA/BAAB schedule as the measured phase. Sequential A×128 → B×128 made the
-// 512-item miss control a cache-residency experiment: B was always the most
-// recently touched working set, producing a false ~0.76 A/A ratio on the
-// immutable baseline. The balanced schedule preserves warm-up work and JIT
-// exposure while removing role-dependent starting state.
-const warmOrder = cluster % 2 ? [1, 0, 0, 1] : [0, 1, 1, 0];
-for (let round = 0; round < 64; round++) {
-  for (const side of warmOrder) executeSurfaceBurst(side === 0 ? opA : opB);
-}
 
 const clock = [];
 for (let i = 0; i < 256; i++) {
@@ -80,28 +70,37 @@ for (let i = 0; i < 256; i++) {
   do { u = process.hrtime.bigint(); } while (u === t);
   clock.push(Number(u - t));
 }
-function timed(op) {
-  const resources = process.resourceUsage();
-  const cpu = process.cpuUsage();
-  const start = process.hrtime.bigint();
-  executeSurfaceBurst(op);
-  const elapsed = Number(process.hrtime.bigint() - start);
-  const endCpu = process.cpuUsage(cpu);
-  const endResources = process.resourceUsage();
-  if (!(elapsed > 0 && Number.isFinite(blackhole))) throw new Error('invalid timing sample');
-  return {
-    ns: elapsed / calls,
-    elapsed,
-    cpuUs: endCpu.user + endCpu.system,
-    involuntary: endResources.involuntaryContextSwitches - resources.involuntaryContextSwitches,
-    voluntary: endResources.voluntaryContextSwitches - resources.voluntaryContextSwitches,
-  };
-}
 const samples = [[], []];
 const details = [];
-for (const side of warmOrder) {
-  const detail = timed(side === 0 ? opA : opB);
-  samples[side].push(detail.ns);
-  details.push({ side, ...detail });
+const order = cluster % 2 ? [1, 0, 0, 1] : [0, 1, 1, 0];
+// Warm-up and measured bursts cross the exact same lexical call-site below.
+// Earlier forms entered executeSurfaceBurst from separate warm/timed call-sites;
+// an independent public Surface control showed order-dependent phase behavior for
+// that topology. Keep the preregistered 128 warm bursts per side, ABBA/BAAB,
+// workloads, calls, fresh-worker isolation and thresholds unchanged. Only the
+// final round enables timing, so the phase boundary cannot create a second JIT
+// caller identity for the measured operation.
+for (let round = 0; round <= 64; round++) {
+  const measured = round === 64;
+  for (const side of order) {
+    const resources = measured ? process.resourceUsage() : null;
+    const cpu = measured ? process.cpuUsage() : null;
+    const start = measured ? process.hrtime.bigint() : 0n;
+    executeSurfaceBurst(side === 0 ? opA : opB);
+    if (!measured) continue;
+    const elapsed = Number(process.hrtime.bigint() - start);
+    const endCpu = process.cpuUsage(cpu);
+    const endResources = process.resourceUsage();
+    if (!(elapsed > 0 && Number.isFinite(blackhole))) throw new Error('invalid timing sample');
+    const detail = {
+      ns: elapsed / calls,
+      elapsed,
+      cpuUs: endCpu.user + endCpu.system,
+      involuntary: endResources.involuntaryContextSwitches - resources.involuntaryContextSwitches,
+      voluntary: endResources.voluntaryContextSwitches - resources.voluntaryContextSwitches,
+    };
+    samples[side].push(detail.ns);
+    details.push({ side, ...detail });
+  }
 }
 parentPort.postMessage({ cluster, samples, details, blackhole, clockMax: Math.max(...clock) });
