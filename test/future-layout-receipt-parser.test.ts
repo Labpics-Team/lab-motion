@@ -50,6 +50,10 @@ describe('surface receipt parser fail-closed positive controls', () => {
     expect(buildWithReciprocal('linear(0 0%, 0x1 100%)')).toThrow('нечисловой linear()-stop');
   });
 
+  it('отвергает decimal point без цифр после точки', () => {
+    expect(buildWithReciprocal('linear(0. 0%, 1 100%)')).toThrow('нечисловой linear()-stop');
+  });
+
   it('отвергает отрицательную позицию', () => {
     expect(buildWithReciprocal('linear(0 -1%, 1 100%)')).toThrow('позиции linear()-stops не возрастают');
   });
