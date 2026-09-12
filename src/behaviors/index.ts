@@ -21,7 +21,7 @@
  * Карта ПЕРЕИСПОЛЬЗОВАНИЯ (ничего не дублировано — импорты, не копии):
  *   ../gestures createVelocityTracker — оценка скорости указателя по окну
  *     сэмплов (тот же трекер, что питает createDrag; velocity на отпускании).
- *   ../decay createDecay — ПРОЕКЦИЯ момента: `.rest` = куда прилетел бы элемент
+ *   ../decay projectDefaultDecayRest — та же точка покоя, куда прилетел бы элемент
  *     под инерцией → выбор целевого snap/страницы по положению+скорости.
  *   ../internal/solver solveSpring — единый пружинный солвер (тот же, что ядро и
  *     smooth-pickup MotionValue): доводка value→target с наследованием velocity
@@ -68,7 +68,7 @@
  */
 
 import { createVelocityTracker } from '../gestures/index.js';
-import { createDecay } from '../decay.js';
+import { projectDefaultDecayRest } from '../decay.js';
 import { MotionParamError } from '../errors.js';
 import { solveSpring } from '../internal/solver.js';
 import { CONVERGENCE_THRESHOLD, FIXED_DT_S, MAX_FRAMES } from '../internal/constants.js';
@@ -428,7 +428,7 @@ export interface SheetController {
  * Скорость влияет монотонно (больше скорость → дальше проекция → дальний snap).
  */
 function _pickSnap(snaps: readonly number[], value: number, velocity: number): number {
-  const landing = createDecay({ from: value, velocity }).rest;
+  const landing = projectDefaultDecayRest(value, velocity);
   let best = 0;
   let bestDist = Infinity;
   for (let i = 0; i < snaps.length; i++) {
@@ -844,7 +844,7 @@ export function createCarousel(options: CarouselOptions): CarouselController {
       // Скорость в position-пространстве.
       const posVel = posDirSign * vAxis;
       // Проекция момента через ./decay → куда прилетела бы позиция.
-      const landing = createDecay({ from: base.state.value, velocity: posVel }).rest;
+      const landing = projectDefaultDecayRest(base.state.value, posVel);
       let target = Math.round(landing / pageSize);
       // Флик перелистывает минимум на страницу; доводка — максимум ±1 от старта свайпа.
       if (Math.abs(posVel) >= velThresh) target = swipeStartIndex + (posVel > 0 ? 1 : -1);
@@ -1044,3 +1044,11 @@ export function createPullToRefresh(options: PullOptions): PullController {
   if (options.onChange) ctrl.subscribe(options.onChange);
   return ctrl;
 }
+
+// ─── Property-level state cascade ────────────────────────────────────────
+export { createStateCascade } from './state-cascade.js';
+export type {
+  StateCascade,
+  StateCascadeLayer,
+  StateCascadePatch,
+} from './state-cascade.js';
