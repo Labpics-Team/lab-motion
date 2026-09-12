@@ -113,26 +113,25 @@ describe('единственный применимый план lowering', () =
     }
   });
 
-  it('успешный Nano не оплачивает третий полный обход AST', async () => {
+  it('успешный Nano не оплачивает проверку владения второго planner', async () => {
     const code = `import { animate } from '${NANO}';\nanimate(animate(card, { opacity: 0.5 }), { opacity: 1 });\n`;
     const parsed = await parseAstAsync(code) as unknown as AstNode;
     const body = parsed.body;
-    let traversals = 0;
-    // Чтение корневого body наблюдает полный проход, а не время выполнения или работу JIT.
-    const ast: AstNode = { ...parsed, get body() { traversals++; return body; } };
+    let bodyReads = 0;
+    // После #343 собственный planner читает Program.body трижды: быстрый import scan,
+    // проверка затенения и lowering walk. Вызов чужого Surface planner добавил бы
+    // ещё один import-ownership scan даже без полного обхода вложенного AST.
+    const ast: AstNode = { ...parsed, get body() { bodyReads++; return body; } };
     const result = transform(ast, code);
     expect(result).toBeDefined();
     expect(result!.code.match(/__labMotionNanoCompiled\(/g)).toHaveLength(2);
     assertExact(result!, GOLDENS.nested);
-    expect(traversals).toBeGreaterThan(0);
-    expect(traversals).toBeLessThanOrEqual(2);
+    expect(bodyReads).toBe(3);
 
-    // Положительный контроль должен проходить через реально применимый planner.
-    // После #343 чужой planner корректно отсеивается по import ownership до обхода AST,
-    // поэтому повторный Nano-план доказывает чувствительность того же счётчика к лишнему проходу.
-    const before = traversals;
-    expect(planNanoOpacityLowering(ast, code, nanoDefaultArtifactLiteral)).toBeDefined();
-    expect(traversals).toBeGreaterThan(before);
+    // Положительный контроль: лишняя проверка второго planner наблюдаема тем же probe.
+    const before = bodyReads;
+    expect(planSurfaceLowering(ast, code)).toBeUndefined();
+    expect(bodyReads).toBe(before + 1);
 
     // Оба мутанта сохраняют число строк/вызовов, но точный оракул обязан их ловить.
     expect(() => assertExact({ ...result!, code: result!.code.replace('card', 'panel') }, GOLDENS.nested)).toThrow();
