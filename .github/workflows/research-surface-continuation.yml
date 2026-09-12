@@ -14,19 +14,25 @@ jobs:
           ref: 6008d916ac053bc104050d9c75aad69b04d4a878
           fetch-depth: 0
           persist-credentials: false
-      - name: Архивировать только Git-объекты и фактический source
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020
+        with:
+          node-version: '24.20.0'
+      - name: Восстановить ровно текущую цепочку инструментов
         shell: bash
         run: |
           set -euo pipefail
+          corepack enable
+          corepack install --global pnpm@11.11.0
+          pnpm install --frozen-lockfile
           mkdir -p "$RUNNER_TEMP/motion-snapshot"
-          git tag research-snapshot-exact HEAD
-          git bundle create "$RUNNER_TEMP/motion-snapshot/repository.bundle" research-snapshot-exact
-          git rev-parse HEAD HEAD^{tree} > "$RUNNER_TEMP/motion-snapshot/revision.txt"
-          git ls-tree -r HEAD > "$RUNNER_TEMP/motion-snapshot/tree.txt"
-          sha256sum "$RUNNER_TEMP/motion-snapshot/repository.bundle" > "$RUNNER_TEMP/motion-snapshot/sha256.txt"
+          tar -czf "$RUNNER_TEMP/motion-snapshot/dependencies.tgz" node_modules
+          cp "$(command -v node)" "$RUNNER_TEMP/motion-snapshot/node"
+          node -p 'JSON.stringify(process.versions)' > "$RUNNER_TEMP/motion-snapshot/versions.json"
+          sha256sum package.json pnpm-lock.yaml > "$RUNNER_TEMP/motion-snapshot/inputs.sha256"
+          sha256sum "$RUNNER_TEMP/motion-snapshot/dependencies.tgz" "$RUNNER_TEMP/motion-snapshot/node" > "$RUNNER_TEMP/motion-snapshot/sha256.txt"
       - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         with:
-          name: motion-source-6008d916
+          name: motion-toolchain-6008d916
           path: ${{ runner.temp }}/motion-snapshot
           if-no-files-found: error
           retention-days: 1
