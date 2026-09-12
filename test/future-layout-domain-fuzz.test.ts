@@ -18,6 +18,7 @@ import {
 import { lcg } from './projection-helpers.js';
 
 const SEEDS = 10_000;
+const EXPLICIT_LINEAR_NUMBER = /^[+-]?(?:\d+(?:\.\d*)?|\.\d+)(?:e[+-]?\d+)?$/i;
 
 interface Case {
   readonly mass: number;
@@ -71,8 +72,13 @@ function explicitLinearSamples(css: string): Float64Array {
   for (let i = 0; i < parts.length; i++) {
     const tokens = parts[i]!.trim().split(/\s+/);
     if (tokens.length !== 2 || !tokens[1]!.endsWith('%')) throw new Error('нет explicit percent');
-    const value = Number(tokens[0]);
-    const percent = Number(tokens[1]!.slice(0, -1));
+    const valueToken = tokens[0]!;
+    const percentToken = tokens[1]!.slice(0, -1);
+    if (!EXPLICIT_LINEAR_NUMBER.test(valueToken) || !EXPLICIT_LINEAR_NUMBER.test(percentToken)) {
+      throw new Error('не numeric token');
+    }
+    const value = Number(valueToken);
+    const percent = Number(percentToken);
     if (!Number.isFinite(value) || !Number.isFinite(percent)) throw new Error('не finite');
     if (percent < 0 || percent > 100 || percent <= previousPercent) throw new Error('позиции не возрастают');
     out[i * 2] = percent;
@@ -126,7 +132,8 @@ function verifyCouplingBound(a: NonNullable<ReturnType<typeof tryCompileSurfaceA
 
 describe('fuzz: 10 000 seeded сопряжённых артефактов', () => {
   it('positive controls: CSS oracle fail-closed на повреждённых числах и позициях', () => {
-    expect(() => explicitLinearSamples('linear(nope 0%, 1 100%)')).toThrow('не finite');
+    expect(() => explicitLinearSamples('linear(nope 0%, 1 100%)')).toThrow('не numeric token');
+    expect(() => explicitLinearSamples('linear(0 %, 1 100%)')).toThrow('не numeric token');
     expect(() => explicitLinearSamples('linear(0 0%, 0.5 50%, 1 40%)')).toThrow('позиции не возрастают');
     expect(() => explicitLinearSamples('linear(0 1%, 1 100%)')).toThrow('неполные endpoints');
   });
