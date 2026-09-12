@@ -1,0 +1,58 @@
+name: Cubic Hermite frontier probe
+on:
+  push:
+    branches: [research/cubic-hermite-20260912]
+    paths:
+      - research/cubic-hermite/**
+      - .github/workflows/research-cubic-hermite.yml
+permissions:
+  contents: read
+env:
+  COREPACK_ENABLE_DOWNLOAD_PROMPT: '0'
+  COREPACK_DEFAULT_TO_LATEST: '0'
+  BASE_SHA: 93278bf9b540f93521c7bd4c02f68db458e5db7a
+jobs:
+  probe:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          ref: ${{ env.BASE_SHA }}
+          persist-credentials: false
+          fetch-depth: 0
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v6
+        with:
+          node-version: '24.20.0'
+      - name: Install pinned toolchain and build exact base
+        run: |
+          set -euo pipefail
+          corepack enable
+          corepack install --global pnpm@11.11.0
+          pnpm install --frozen-lockfile
+          pnpm build
+      - name: Restore immutable research probe only
+        run: |
+          set -euo pipefail
+          git show origin/research/cubic-hermite-20260912:research/cubic-hermite/probe.mjs > "$RUNNER_TEMP/probe.mjs"
+          mkdir -p evidence
+          {
+            printf 'base=%s\nprobe_carrier=%s\n' "$BASE_SHA" "${GITHUB_SHA}"
+            node --version
+            pnpm --version
+            uname -a
+            lscpu
+          } > evidence/environment.txt
+          sha256sum "$RUNNER_TEMP/probe.mjs" > evidence/probe.sha256
+      - name: Run representation/error probe
+        run: node "$RUNNER_TEMP/probe.mjs" "$GITHUB_WORKSPACE" > evidence/probe.json
+      - name: Seal evidence
+        if: always()
+        run: find evidence -type f ! -name SHA256SUMS -print0 | sort -z | xargs -0 sha256sum > evidence/SHA256SUMS
+      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
+        if: always()
+        with:
+          name: cubic-hermite-frontier-${{ env.BASE_SHA }}-${{ github.run_id }}
+          path: evidence/
+          if-no-files-found: error
+          retention-days: 14
