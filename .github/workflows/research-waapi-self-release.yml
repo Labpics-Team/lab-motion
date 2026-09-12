@@ -24,7 +24,7 @@ jobs:
       - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v6
         with:
           node-version: '24.20.0'
-      - name: Materialize immutable base and simplest self-release candidate
+      - name: Materialize immutable base and fused-liveness candidate
         shell: bash
         run: |
           set -euo pipefail
@@ -37,15 +37,27 @@ jobs:
           from pathlib import Path
           import sys
           p=Path(sys.argv[1]);s=p.read_text()
-          old='private readonly _o: WaapiUnitOptions;'
+          old='''  private readonly _o: WaapiUnitOptions;\n  private _done = false;'''
           assert s.count(old)==1
-          s=s.replace(old,'private _o: WaapiUnitOptions;',1)
+          s=s.replace(old,'  private _o: WaapiUnitOptions | undefined;',1)
+          old='''  _supersede(replacement?: () => void): void {\n    if (this._done) {\n      return;\n    }'''
+          assert s.count(old)==1
+          s=s.replace(old,'''  _supersede(replacement?: () => void): void {\n    if (this._o === undefined) return;''',1)
+          assert s.count('this._done ||')==4
+          s=s.replace('this._done ||','this._o === undefined ||')
+          old_commit='''  _commit(): void {\n    if (\n      this._o._record._owner !== this ||'''
+          assert s.count(old_commit)==1
+          s=s.replace(old_commit,'''  _commit(): void {\n    if (\n      this._o === undefined ||\n      this._o._record._owner !== this ||''',1)
           old_finish='''  private _finish(natural: boolean): void {\n    if (this._done) return;\n    this._done = true;\n    if (this._o._record._owner === this) this._o._record._owner = undefined;\n    this._o._onDone(natural);\n  }'''
-          new_finish='''  private _finish(natural: boolean): void {\n    if (this._done) return;\n    this._done = true;\n    const o = this._o;\n    if (o._record._owner === this) o._record._owner = undefined;\n    this._o = undefined!;\n    o._onDone(natural);\n  }'''
+          new_finish='''  private _finish(natural: boolean): void {\n    const o = this._o;\n    if (o === undefined) return;\n    if (o._record._owner === this) o._record._owner = undefined;\n    this._o = undefined;\n    o._onDone(natural);\n  }'''
           assert s.count(old_finish)==1
           s=s.replace(old_finish,new_finish,1)
+          # Active-only private paths keep the same runtime JS; non-null assertions
+          # exist solely because terminal state is now represented by `_o` absence.
+          s=s.replace('this._o.','this._o!.')
           p.write_text(s)
           PY
+          ! grep -q '_done' "$RUNNER_TEMP/candidate/src/animate/waapi-unit.ts"
           git -C "$RUNNER_TEMP/candidate" diff --check
           git -C "$RUNNER_TEMP/candidate" diff -- src/animate/waapi-unit.ts > evidence/candidate.diff
           test "$(git -C "$RUNNER_TEMP/candidate" diff --name-only | wc -l)" -eq 1
