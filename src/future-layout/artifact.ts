@@ -20,6 +20,7 @@ import {
   DEFAULT_TOLERANCE,
   validateTolerance,
   type SpringSerializedSamples,
+  type SpringExecutionArtifactTuple,
 } from '../compositor/curve.js';
 
 /** V1 acceptance budget движущейся границы и сопряжения, CSS px. */
@@ -91,8 +92,12 @@ export function tryCompileSurfaceArtifact(
     };
   }
 
-  const tuple = tryCompileSpringTuple(spring, tolerance, initialVelocity);
-  if (tuple === undefined) return undefined;
+  let tuple: SpringExecutionArtifactTuple;
+  try {
+    tuple = compileSpringExecutionArtifactTupleUnchecked(spring, initialVelocity, tolerance);
+  } catch {
+    return undefined;
+  }
   const easing = tuple[0];
   const samples = tuple[1];
   const durationMs = tuple[2];
@@ -107,31 +112,77 @@ export function tryCompileSurfaceArtifact(
   // неограничен — native plan не запускается, Infinity/NaN в CSS не попадает.
   if (!(minWidth > 0)) return undefined;
 
-  const reciprocal = buildReciprocalUnchecked(
-    samples,
-    fromWidth,
-    toWidth,
-    couplingBudgetPx,
-  );
-  if (reciprocal === undefined) {
-    // Бюджет недостижим в потолке stops: fail-closed без крупной аллокации.
-    return undefined;
+  const delta = 1 / toWidth - 1 / fromWidth;
+  // Fail-closed: без двух stops и без представимого ненулевого Δ доказательство
+  // невозможно, а сериализация дала бы невалидный `linear()` или NaN-токены.
+  if (count < 2 || !Number.isFinite(delta) || delta === 0) return undefined;
+  const widthAt = (percent: number, i: number): number => {
+    const x0 = samples[i * 2];
+    const p0 = samples[i * 2 + 1];
+    const x1 = samples[(i + 1) * 2];
+    const p1 = samples[(i + 1) * 2 + 1];
+    const q = (percent - x0) / (x1 - x0);
+    return fromWidth + (toWidth - fromWidth) * ((1 - q) * p0 + q * p1);
+  };
+
+  // Для линейной W на интервале h прежний непрерывный бонд:
+  // Q'' = 2β²/(min(W)³·Δ), ошибка сопряжения ≤ max(W)·max(W0,W1)·|Δ|·h²·|Q''|/8.
+  // Арифметика и логический cap сохраняются; пока допуск не завершён, Q не нужен.
+  // Общая граница и её ширина принадлежат предыдущему сегменту. Это исключает
+  // повторные вычисления ширины и вторую копию точки в Q, A и обеих CSS-строках.
+  let a = 0;
+  let wA = fromWidth;
+  // P(0)=0 ⇒ W(0)=fromWidth. Reciprocal вычисляется только после полного допуска.
+  const knots: number[] = [a, wA];
+  for (let i = 0; i < count - 1; i++) {
+    const stack: number[] = [samples[(i + 1) * 2]];
+    while (stack.length > 0) {
+      const b = stack.pop()!;
+      // Левый конец уже проверен. Правый вычисляется один раз для сертификата,
+      // Q и следующего интервала; арифметика прежнего бонда не переставляется.
+      const wB = widthAt(b, i);
+      const h = b - a;
+      const beta = Math.abs(wB - wA) / h;
+      const wMin = Math.min(wA, wB);
+      const maxW = Math.max(wA, wB);
+      const contentW = Math.max(fromWidth, toWidth);
+      const qErr = (h * h / 8) * (2 * beta * beta) / (wMin * wMin * wMin) / Math.abs(delta);
+      if (wMin <= 0 || maxW * contentW * Math.abs(delta) * qErr > couplingBudgetPx) {
+        const mid = (a + b) / 2;
+        // Дальше делить некуда, а бюджет не выполнен: доказательство
+        // невозможно в double — fail-closed до крупных аллокаций.
+        if (mid === a || mid === b) return undefined;
+        stack.push(b, mid);
+        continue;
+      }
+      // i общих границ больше не храним, но прежний admission-cap сохраняем.
+      if (knots.length / 2 + i >= RECIPROCAL_MAX_STOPS) return undefined;
+      knots.push(b, wB);
+      a = b;
+      wA = wB;
+    }
   }
 
-  // Один проход: Q-stops → обе linear()-строки (reciprocal и blend A).
+  // Общая позиция узла сериализуется один раз для обеих кривых. Прежняя
+  // форма возврата не переносит полное чтение CSS в построение артефакта.
+  // До допуска узлы хранят ширину: сертификат не использует Q. После допуска
+  // одна эмиссия вычисляет Q, пишет конечный буфер и сериализует обе кривые.
+  const reciprocal = new Float64Array(knots.length);
   const blendSamples: number[] = [];
   let reciprocalEasing = 'linear(';
   let blendEasing = 'linear(';
   const stopCount = reciprocal.length / 2;
   for (let i = 0; i < stopCount; i++) {
-    const percent = reciprocal[i * 2];
-    const q = reciprocal[i * 2 + 1];
+    const percent = knots[i * 2];
+    const q = (1 / knots[i * 2 + 1] - 1 / fromWidth) / delta;
+    reciprocal[i * 2] = percent;
+    reciprocal[i * 2 + 1] = q;
     const x = percent / 100;
     const a = (3 - 2 * x) * x * x;
     blendSamples.push(a);
-    const separator = i < stopCount - 1 ? ', ' : '';
-    reciprocalEasing += `${q} ${percent}%${separator}`;
-    blendEasing += `${a} ${percent}%${separator}`;
+    const position = ` ${percent}%${i < stopCount - 1 ? ', ' : ''}`;
+    reciprocalEasing += q + position;
+    blendEasing += a + position;
   }
   reciprocalEasing += ')';
   blendEasing += ')';
@@ -148,85 +199,4 @@ export function tryCompileSurfaceArtifact(
     fromWidth,
     toWidth,
   };
-}
-
-function tryCompileSpringTuple(
-  spring: SpringParams,
-  tolerance: number,
-  v0: number,
-): [string, SpringSerializedSamples, number] | undefined {
-  try {
-    const tuple = compileSpringExecutionArtifactTupleUnchecked(spring, v0, tolerance);
-    return [tuple[0], tuple[1], tuple[2]];
-  } catch {
-    return undefined;
-  }
-}
-
-/**
- * Непрерывное доказательство reciprocal (спека «НЕПРЕРЫВНОЕ ДОКАЗАТЕЛЬСТВО
- * RECIPROCAL»): на сегменте serialized P ширина линейна W(u)=α+βu, Q — функция
- * от 1/W; линейная интерполяция Q между stops даёт ошибку
- * |Q̂−Q| ≤ (h²/8)·max|Q''|, Q''(u) = 2β²/(W(u)³·Δ), Δ = 1/W1 − 1/W0.
- * Продукционная ошибка сопряжения на контенте шириной W_j:
- * W(t)·W_j·|Δ|·|Q̂−Q| — субдивидим, пока она ≤ budget, с учётом того, что
- * serialized-токены Q не округляются (String(double) — точный roundtrip).
- * Возвращает undefined при превышении RECIPROCAL_MAX_STOPS (fail-closed).
- */
-function buildReciprocalUnchecked(
-  samples: SpringSerializedSamples,
-  fromWidth: number,
-  toWidth: number,
-  budgetPx: number,
-): Float64Array | undefined {
-  const count = samples.length / 2;
-  const delta = 1 / toWidth - 1 / fromWidth;
-  // Fail-closed: без двух stops и без представимого ненулевого Δ доказательство
-  // невозможно, а сериализация дала бы невалидный `linear()` или NaN-токены.
-  if (count < 2 || !Number.isFinite(delta) || delta === 0) return undefined;
-  const widthAt = (percent: number, i: number): number => {
-    const x0 = samples[i * 2];
-    const p0 = samples[i * 2 + 1];
-    const x1 = samples[(i + 1) * 2];
-    const p1 = samples[(i + 1) * 2 + 1];
-    const q = (percent - x0) / (x1 - x0);
-    return fromWidth + (toWidth - fromWidth) * ((1 - q) * p0 + q * p1);
-  };
-  const qAt = (w: number): number => (1 / w - 1 / fromWidth) / delta;
-
-  // err-bound на сегменте [a,b] (percent): W линеен, β = ΔW/h.
-  const segmentErrorPx = (percentA: number, percentB: number, i: number): number => {
-    const h = percentB - percentA;
-    const wA = widthAt(percentA, i);
-    const wB = widthAt(percentB, i);
-    const beta = Math.abs(wB - wA) / h;
-    const wMin = Math.min(wA, wB);
-    if (wMin <= 0) return Number.POSITIVE_INFINITY;
-    const maxW = Math.max(wA, wB);
-    const contentW = Math.max(fromWidth, toWidth);
-    const qErr = (h * h / 8) * (2 * beta * beta) / (wMin * wMin * wMin) / Math.abs(delta);
-    return maxW * contentW * Math.abs(delta) * qErr;
-  };
-
-  const out: number[] = [];
-  for (let i = 0; i < count - 1; i++) {
-    let a = samples[i * 2];
-    out.push(a, qAt(widthAt(a, i)));
-    const stack: number[] = [samples[(i + 1) * 2]];
-    while (stack.length > 0) {
-      const b = stack.pop()!;
-      if (segmentErrorPx(a, b, i) > budgetPx) {
-        const mid = (a + b) / 2;
-        // Дальше делить некуда, а бюджет не выполнен: доказательство
-        // невозможно в double — fail-closed до крупных аллокаций.
-        if (mid === a || mid === b) return undefined;
-        stack.push(b, mid);
-        continue;
-      }
-      if (out.length / 2 >= RECIPROCAL_MAX_STOPS) return undefined;
-      out.push(b, qAt(widthAt(b, i)));
-      a = b;
-    }
-  }
-  return Float64Array.from(out);
 }
