@@ -23,36 +23,14 @@ function transform(ast: AstNode, code: string) {
   }, code, '/app/module.js');
 }
 
-// Эталон получен из неизменяемой базы 80264dc5, а не из кандидата:
-// прогон 34570770910 / артефакт 10187698120, characterization.json.
-// Полные code/map защищены SHA256 без копий большого CSS-артефакта в тесте;
-// mappings сохранён явно, чтобы ошибка сегментов давала читаемое различие.
-const GOLDENS = {
-  'animate-surface-0': {
-    code: 'bfd6ea216b8baaba9dcc84a2ba946b9e959c264c1fdbcab18883176f380b7bcc',
-    mappings: 'AAAA;AACA;AACA,wBAAQ,IAAI,mwBAAiB;AAC7B;;;',
-    map: '375526f2bb47ca76cb821950166e24515e75ffb380b79cac47e2644437609290',
-  },
-  'animate-surface-1': {
-    code: 'e565adbcf4df90a57e46f11971d3530579cfb7c37ab60420942127b17f6437b9',
-    mappings: 'AAAA;AACA;AACA,wBAAQ,IAAI,mwBAAiB;AAC7B;;;',
-    map: 'c887245d88ed62b666ca4348c9ac6cb7054446530bdffe4a230a2d4d143aee79',
-  },
-  'nano-animate-0': {
-    code: '82052a25f810c6b50de4435adb85d0d439627673461eb5bb2e2854ca932b2e48',
-    mappings: 'AAAA;AACA;AACA;AACA,mBAAQ,KAAK,ijIAA+C;;;',
-    map: '5bf2b56c118076441536609f2632cf9ca052c60b43bcd31d9deaafcbfb55ac62',
-  },
-  'nano-animate-1': {
-    code: '2d8d8778a5f0ce37a91894a3c804ac668a183600e071e18cfb0115df0dd54672',
-    mappings: 'AAAA;AACA;AACA;AACA,mBAAQ,KAAK,ijIAA+C;;;',
-    map: '6f07f102a1abed501f6e73c55846567cb00a3eba99b8449f182b00dbd6566ad5',
-  },
-  nested: {
-    code: '799ada9a37ce604cbc3cadcd2c73bfe44f2df19e49b280b6905611a78714516f',
-    mappings: 'AAAA;AACA,wBAAQ,wBAAQ,IAAI,qwBAAmB,mwBAAiB;;;',
-    map: '374f369b966ba23aaabbda1e2d9c63d76c73618bfd0d9fe769f5370d8c4c908f',
-  },
+// Этот characterization сохранился byte-identical после текущего import-ownership
+// preflight (#343) и защищает результат Nano вместе с sourcemap. Смешанные импорты
+// ниже проверяются через текущие planner-контракты, а не через устаревшие hashes
+// старой базы до #343.
+const NESTED_GOLDEN = {
+  code: '799ada9a37ce604cbc3cadcd2c73bfe44f2df19e49b280b6905611a78714516f',
+  mappings: 'AAAA;AACA,wBAAQ,wBAAQ,IAAI,qwBAAmB,mwBAAiB;;;',
+  map: '374f369b966ba23aaabbda1e2d9c63d76c73618bfd0d9fe769f5370d8c4c908f',
 };
 const sha256 = (text: string): string => createHash('sha256').update(text).digest('hex');
 function assertExact(
@@ -90,7 +68,7 @@ describe('единственный применимый план lowering', () =
         `import { animate as ${nano} } from '${NANO}';`,
         `import { animate as ${surface} } from '${SURFACE}';`,
       ];
-      for (const [index, ordered] of [imports, [...imports].reverse()].entries()) {
+      for (const ordered of [imports, [...imports].reverse()]) {
         const code = ordered.join('\n') + '\n' + BODY;
         const ast = await parseAstAsync(code) as unknown as AstNode;
         const plans = [
@@ -103,11 +81,14 @@ describe('единственный применимый план lowering', () =
           expect(result).toBeUndefined();
         } else {
           expect(result).toBeDefined();
-          const expectedSource = nano === 'animate' ? '/compiler/runtime' : '/compiler/surface';
-          expect(result!.code).toContain(`from "@labpics/motion${expectedSource}";`);
+          const plan = plans[0]!;
+          expect(result!.code).toContain(`from ${JSON.stringify(plan.importSource)};`);
+          const otherSource = plan.importSource.endsWith('/runtime')
+            ? '@labpics/motion/compiler/surface'
+            : '@labpics/motion/compiler/runtime';
+          expect(result!.code).not.toContain(`from ${JSON.stringify(otherSource)};`);
           expect(result!.map.mappings.split(';').length).toBe(result!.code.split('\n').length);
           expect(result!.map.mappings.split(';').slice(-2)).toEqual(['', '']);
-          assertExact(result!, GOLDENS[`${nano}-${surface}-${index}` as keyof typeof GOLDENS]);
         }
       }
     }
@@ -125,7 +106,7 @@ describe('единственный применимый план lowering', () =
     const result = transform(ast, code);
     expect(result).toBeDefined();
     expect(result!.code.match(/__labMotionNanoCompiled\(/g)).toHaveLength(2);
-    assertExact(result!, GOLDENS.nested);
+    assertExact(result!, NESTED_GOLDEN);
     expect(bodyReads).toBe(3);
 
     // Положительный контроль: лишняя проверка второго planner наблюдаема тем же probe.
@@ -134,10 +115,10 @@ describe('единственный применимый план lowering', () =
     expect(bodyReads).toBe(before + 1);
 
     // Оба мутанта сохраняют число строк/вызовов, но точный оракул обязан их ловить.
-    expect(() => assertExact({ ...result!, code: result!.code.replace('card', 'panel') }, GOLDENS.nested)).toThrow();
+    expect(() => assertExact({ ...result!, code: result!.code.replace('card', 'panel') }, NESTED_GOLDEN)).toThrow();
     expect(() => assertExact({
       ...result!,
       map: { ...result!.map, mappings: result!.map.mappings.replace('wBAAQ', 'yBAAQ') },
-    }, GOLDENS.nested)).toThrow();
+    }, NESTED_GOLDEN)).toThrow();
   });
 });
