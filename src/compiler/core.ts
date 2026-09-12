@@ -525,12 +525,12 @@ export function surfaceArtifactLiteral(program: SurfaceProgram): string | undefi
     program.spring?.velocity ?? 0,
   );
   if (artifact === undefined) return undefined;
-  // P, Q и blend A сериализуются из ОДНОГО SSOT (tryCompileSurfaceArtifact).
-  // Их producers эмитят строго возрастающие explicit positions: P сохраняет
-  // порядок unique adaptive samples, Q/A проходят по тем же границам и
-  // subdivision-midpoint допускается только строго внутри интервала. Поэтому
-  // повторный O(stops) parse трёх уже сертифицированных CSS-строк здесь не
-  // добавляет fail-closed защиты; это свойство держит producer-domain fuzz.
+  // P, Q и смесь A сериализуются из ОДНОГО SSOT (tryCompileSurfaceArtifact).
+  // Их производители эмитят строго возрастающие явные позиции: P сохраняет
+  // порядок уникальных адаптивных отсчётов, Q/A проходят по тем же границам,
+  // а середина подразделения допускается только строго внутри интервала.
+  // Поэтому повторный O(stops) разбор трёх уже сертифицированных CSS-строк
+  // не добавляет защиты с отказом при сомнении; инвариант держит доменная проверка.
   return `{w0:${program.fromWidth},w1:${program.toWidth},d:${artifact.durationMs},`
     + `p:${JSON.stringify(artifact.easing)},q:${JSON.stringify(artifact.reciprocalEasing)},`
     + `a:${JSON.stringify(artifact.blendEasing)}}`;

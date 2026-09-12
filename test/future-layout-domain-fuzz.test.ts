@@ -170,8 +170,8 @@ describe('fuzz: 10 000 seeded сопряжённых артефактов', () =
       expect(certifyPositivity(artifact, 0)).toBe(true);
 
       // Все три фактически исполняемые кривые имеют строго возрастающие
-      // explicit positions. Это producer-инвариант, который позволяет compiler
-      // не reparsить уже сертифицированный artifact перед сериализацией.
+      // явные позиции. Это инвариант производителя, позволяющий компилятору
+      // не разбирать повторно уже сертифицированный артефакт перед сериализацией.
       const progress = explicitLinearSamples(artifact.easing);
       const reciprocal = explicitLinearSamples(artifact.reciprocalEasing);
       const blend = explicitLinearSamples(artifact.blendEasing);
