@@ -48,12 +48,41 @@ jobs:
           pnpm build
           pnpm size
       - name: Commit only owned slice and clean carriers
+        shell: bash
         run: |
+          set -euo pipefail
           rm .github/workflows/research-native-scroll-waapi.yml
           rm .github/workflows/research-native-scroll-waapi-deliver.yml
-          expected="$(printf '%s\n' .github/workflows/research-native-scroll-waapi-deliver.yml .github/workflows/research-native-scroll-waapi.yml CHANGELOG.md browser/24-native-scroll-timeline.spec.ts docs/api.md src/waapi/index.ts test/waapi-emit.test.ts test/waapi-scroll-timeline.test.ts | sort)"
-          actual="$(git diff --name-only | sort)"
-          test "$actual" = "$expected"
+
+          mapfile -t changed < <(git diff --name-only)
+          printf 'changed paths:\n'; printf '  %s\n' "${changed[@]}"
+          for path in "${changed[@]}"; do
+            case "$path" in
+              .github/workflows/research-native-scroll-waapi.yml|\
+              .github/workflows/research-native-scroll-waapi-deliver.yml|\
+              CHANGELOG.md|\
+              browser/24-native-scroll-timeline.spec.ts|\
+              docs/api.md|\
+              src/waapi/index.ts|\
+              test/waapi-emit.test.ts|\
+              test/waapi-scroll-timeline.test.ts) ;;
+              *) echo "unexpected changed path: $path" >&2; exit 1 ;;
+            esac
+          done
+
+          for required in \
+            CHANGELOG.md \
+            browser/24-native-scroll-timeline.spec.ts \
+            docs/api.md \
+            src/waapi/index.ts \
+            test/waapi-emit.test.ts \
+            test/waapi-scroll-timeline.test.ts; do
+            printf '%s\n' "${changed[@]}" | grep -Fxq "$required" || {
+              echo "missing required product path: $required" >&2
+              exit 1
+            }
+          done
+
           git config user.name 'github-actions[bot]'
           git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
           git add -A
