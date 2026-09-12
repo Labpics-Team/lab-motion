@@ -1,0 +1,74 @@
+name: Fix Surface comment style on proven candidate
+
+on:
+  push:
+    branches: [research/style-surface-no-reparse-20260912]
+
+permissions:
+  contents: write
+
+jobs:
+  fix:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    steps:
+      - name: Checkout exact PR head
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          ref: perf/surface-no-reparse-20260912
+          path: candidate
+          fetch-depth: 0
+
+      - name: Setup exact Node
+        uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v6
+        with:
+          node-version: '24.20.0'
+
+      - name: Prove executable identity across comment-only repair and push
+        shell: bash
+        run: |
+          set -euo pipefail
+          test "$(git -C candidate rev-parse HEAD)" = '8fea397b6ff5ef8269b727234031b1eb953e8498'
+          corepack enable
+          corepack install --global pnpm@11.11.0
+          pnpm --dir candidate install --frozen-lockfile
+          pnpm --dir candidate build >/tmp/build-before.log 2>&1
+          before=$(sha256sum candidate/dist/compiler/vite/index.js | cut -d' ' -f1)
+
+          python3 - <<'PY'
+          from pathlib import Path
+
+          core = Path('candidate/src/compiler/core.ts')
+          text = core.read_text()
+          old = '''  // P, Q и blend A сериализуются из ОДНОГО SSOT (tryCompileSurfaceArtifact).\n  // Их producers эмитят строго возрастающие explicit positions: P сохраняет\n  // порядок unique adaptive samples, Q/A проходят по тем же границам и\n  // subdivision-midpoint допускается только строго внутри интервала. Поэтому\n  // повторный O(stops) parse трёх уже сертифицированных CSS-строк здесь не\n  // добавляет fail-closed защиты; это свойство держит producer-domain fuzz.\n'''
+          new = '''  // P, Q и смесь A сериализуются из ОДНОГО SSOT (tryCompileSurfaceArtifact).\n  // Их производители эмитят строго возрастающие явные позиции: P сохраняет\n  // порядок уникальных адаптивных отсчётов, Q/A проходят по тем же границам,\n  // а середина подразделения допускается только строго внутри интервала.\n  // Поэтому повторный O(stops) разбор трёх уже сертифицированных CSS-строк\n  // не добавляет защиты с отказом при сомнении; инвариант держит доменная проверка.\n'''
+          if text.count(old) != 1:
+              raise SystemExit('core comment block is not exact')
+          core.write_text(text.replace(old, new))
+
+          test = Path('candidate/test/future-layout-domain-fuzz.test.ts')
+          text = test.read_text()
+          old = '''      // Все три фактически исполняемые кривые имеют строго возрастающие\n      // explicit positions. Это producer-инвариант, который позволяет compiler\n      // не reparsить уже сертифицированный artifact перед сериализацией.\n'''
+          new = '''      // Все три фактически исполняемые кривые имеют строго возрастающие\n      // явные позиции. Это инвариант производителя, позволяющий компилятору\n      // не разбирать повторно уже сертифицированный артефакт перед сериализацией.\n'''
+          if text.count(old) != 1:
+              raise SystemExit('test comment block is not exact')
+          test.write_text(text.replace(old, new))
+          PY
+
+          git -C candidate diff --check
+          mapfile -t changed < <(git -C candidate diff --name-only)
+          test "${#changed[@]}" -eq 2
+          test "${changed[0]}" = 'src/compiler/core.ts'
+          test "${changed[1]}" = 'test/future-layout-domain-fuzz.test.ts'
+
+          rm -rf candidate/dist candidate/site/dist
+          pnpm --dir candidate build >/tmp/build-after.log 2>&1
+          after=$(sha256sum candidate/dist/compiler/vite/index.js | cut -d' ' -f1)
+          printf 'compiler/vite before=%s after=%s\n' "$before" "$after"
+          test "$before" = "$after"
+
+          git -C candidate config user.name 'github-actions[bot]'
+          git -C candidate config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git -C candidate add src/compiler/core.ts test/future-layout-domain-fuzz.test.ts
+          git -C candidate commit -m 'style(compiler): русифицировать комментарии Surface-инварианта'
+          git -C candidate push origin HEAD:refs/heads/perf/surface-no-reparse-20260912
