@@ -4,59 +4,68 @@ on:
     branches: [research/mechanism-20260912-r4]
 permissions:
   contents: read
-  issues: read
-  pull-requests: read
 concurrency:
   group: research-mechanism-20260912-r4
   cancel-in-progress: false
-env:
-  COREPACK_ENABLE_DOWNLOAD_PROMPT: '0'
-  COREPACK_DEFAULT_TO_LATEST: '0'
-  BASE_SHA: 93278bf9b540f93521c7bd4c02f68db458e5db7a
 jobs:
-  evidence:
+  seal:
     runs-on: ubuntu-latest
-    timeout-minutes: 20
+    timeout-minutes: 5
+    permissions:
+      contents: write
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
         with:
-          persist-credentials: false
+          ref: 81910d8308a3e1f631717f6b9f7542c386395e54
           fetch-depth: 0
-      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v6
-        with:
-          node-version: '24'
-      - name: Install pinned toolchain
+          persist-credentials: false
+      # No dependencies or repository scripts execute with write credentials.
+      # Only four exact, locally verified blobs may be published to our own branch.
+      - name: Normalize transfer and record consumer-visible change
+        shell: bash
         run: |
-          corepack enable
-          corepack install --global pnpm@11.11.0
-          pnpm install --frozen-lockfile
-      - name: Capture immutable research inputs
+          set -euo pipefail
+          python3 - <<'PY'
+          from pathlib import Path
+          import subprocess
+          p=Path('src/animate/index.ts')
+          s=p.read_text()
+          old='// ─── Дефолтные швы (читаются в вызове — SSR-safe импорт) ────────────────────────'
+          new='// ─── Дефолтные швы (читаются в вызове — SSR-safe) ────────────────────────────'
+          assert s.count(old)==1
+          p.write_text(s.replace(old,new,1))
+          p=Path('test/animate-terminal-retention-gc.test.ts')
+          s=p.read_text(); assert s.count('\n describe(')==1
+          p.write_text(s.replace('\n describe(', '\ndescribe(',1))
+          p=Path('CHANGELOG.md');s=p.read_text();needle='### Изменено\n'
+          assert s.count(needle)==1
+          entry='- `./animate`: завершённые controls освобождают граф юнитов и ссылки на\n  пользовательские options, включая замкнутые callback-ами DOM-цели. Одна\n  completion-защёлка сохраняет порядок `finished`/`onComplete`, синхронный\n  commit и C¹-подхват; методы завершённого controls остаются no-op.\n'
+          p.write_text(s.replace(needle,needle+entry,1))
+          expected={
+            'src/animate/index.ts':'9a0d6116c9c3761b10f8255d33cccd75987c03c8',
+            'test/animate-terminal-retention-gc.test.ts':'31d1cb3410231ee95500aebf87c299bf992709ae',
+            'test/fixtures/animate-terminal-retention-gc.probe.ts':'a2819eea060ae9232456bd5a92f888218ccd628e',
+            'CHANGELOG.md':'2a0cbbc891b719cbe1f6f5372a0c2d60ae11a9ef',
+          }
+          for path,sha in expected.items():
+            assert subprocess.check_output(['git','hash-object',path],text=True).strip()==sha, path
+          subprocess.run(['git','add','--',*expected],check=True)
+          changed=subprocess.check_output(['git','diff','--cached','--name-only','93278bf9b540f93521c7bd4c02f68db458e5db7a'],text=True).splitlines()
+          assert sorted(changed)==sorted(expected), changed
+          PY
+          git -c user.name='github-actions[bot]' -c user.email='41898282+github-actions[bot]@users.noreply.github.com' commit -m 'perf(animate): seal terminal ownership slice and consumer changelog'
+          git rev-parse HEAD > candidate-head.txt
+      - name: Publish only owned candidate branch
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
           set -euo pipefail
-          mkdir -p research-inputs/history
-          git merge-base --is-ancestor "$BASE_SHA" HEAD
-          git archive "$BASE_SHA" | gzip -n > research-inputs/source.tar.gz
-          tar -czf research-inputs/dependencies.tar.gz node_modules
-          gzip -nc "$(command -v node)" > research-inputs/node.gz
-          {
-            printf 'base=%s\nhead=%s\n' "$BASE_SHA" "$(git rev-parse HEAD)"
-            node --version
-            pnpm --version
-            uname -a
-            lscpu
-          } > research-inputs/environment.txt
-          gh api --paginate 'repos/Labpics-Team/lab-motion/issues?state=open&per_page=100' > research-inputs/history/open-issues.json
-          gh api --paginate 'repos/Labpics-Team/lab-motion/pulls?state=open&per_page=100' > research-inputs/history/open-prs.json
-          for issue in 224 227 228 229 231 232 235 238 239 242 243 244; do
-            gh api --paginate "repos/Labpics-Team/lab-motion/issues/$issue/comments?per_page=100" > "research-inputs/history/$issue-comments.json"
-          done
-          (cd research-inputs && sha256sum source.tar.gz dependencies.tar.gz node.gz > SHA256SUMS)
+          gh auth setup-git
+          git push origin HEAD:refs/heads/perf/terminal-aggregate-20260912
+          cat candidate-head.txt
       - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
         with:
-          name: mechanism-inputs-${{ github.sha }}
-          path: research-inputs/
+          name: terminal-candidate-head-${{ github.run_id }}
+          path: candidate-head.txt
           if-no-files-found: error
           retention-days: 7
-          compression-level: 0
