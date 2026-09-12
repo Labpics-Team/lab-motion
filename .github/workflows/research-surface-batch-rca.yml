@@ -1,0 +1,90 @@
+name: Surface batch exact RCA
+
+on:
+  push:
+    branches: [research/surface-no-reparse-batch-rca-20260912]
+
+permissions:
+  contents: read
+
+jobs:
+  rca:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    steps:
+      - name: Checkout diagnostic carrier
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          ref: ${{ github.sha }}
+          path: harness
+          fetch-depth: 0
+          persist-credentials: false
+
+      - name: Checkout exact scientific base
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          ref: 6008d916ac053bc104050d9c75aad69b04d4a878
+          path: baseline
+          fetch-depth: 0
+          persist-credentials: false
+
+      - name: Setup exact Node
+        uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v6
+        with:
+          node-version: '24.20.0'
+
+      - name: Build immutable baseline
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p evidence
+          printf '%s\n' "$GITHUB_SHA" > evidence/carrier-sha.txt
+          printf '%s\n' '6008d916ac053bc104050d9c75aad69b04d4a878' > evidence/base-sha.txt
+          node --version | tee evidence/node-version.txt
+          node -p 'process.versions.v8' | tee evidence/v8-version.txt
+          node --v8-options | grep -E -- '--trace-(gc|opt|deopt)' > evidence/trace-flags.txt
+          corepack enable
+          corepack install --global pnpm@11.11.0
+          pnpm --version | tee evidence/pnpm-version.txt
+          pnpm --dir baseline install --frozen-lockfile
+          pnpm --dir baseline build > evidence/base-build.log 2>&1
+          sha256sum baseline/dist/compiler/vite/index.js \
+            harness/.research/surface-fresh-isolate-worker.mjs \
+            harness/.research/surface-batch-trace-driver.mjs \
+            > evidence/inputs.sha256
+          uname -a > evidence/uname.txt
+          lscpu > evidence/lscpu.txt
+
+      - name: Preregistered baseline-only batch traces
+        shell: bash
+        run: |
+          set -euo pipefail
+          ACORN_PATH=$(find "$PWD/baseline/node_modules/.pnpm" -path '*/node_modules/acorn/dist/acorn.mjs' -print -quit)
+          test -n "$ACORN_PATH"
+          for cluster in $(seq 0 15); do
+            BASE_ROOT="$PWD/baseline" \
+            ACORN_PATH="$ACORN_PATH" \
+            WORKER_PATH="$PWD/harness/.research/surface-fresh-isolate-worker.mjs" \
+            node --trace-gc --trace-opt --trace-deopt \
+              harness/.research/surface-batch-trace-driver.mjs "$cluster" \
+              > "evidence/trace-${cluster}.log" 2>&1
+            grep -q '@@MEASURE_BEGIN@@' "evidence/trace-${cluster}.log"
+            grep -q '@@MEASURE_END@@' "evidence/trace-${cluster}.log"
+            grep -q '@@RESULT@@' "evidence/trace-${cluster}.log"
+          done
+
+      - name: Evidence manifest
+        if: always()
+        shell: bash
+        run: |
+          set -euo pipefail
+          find evidence -maxdepth 1 -type f -print0 | sort -z | xargs -0 sha256sum > evidence/manifest.sha256
+
+      - name: Upload immutable RCA evidence
+        if: always()
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
+        with:
+          name: surface-batch-rca-${{ github.sha }}
+          path: evidence
+          if-no-files-found: error
+          retention-days: 30
