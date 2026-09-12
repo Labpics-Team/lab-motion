@@ -1,0 +1,64 @@
+name: Decay rest review fix
+on:
+  push:
+    branches: [research/decay-rest-specialization-20260912-r9]
+    paths: [.github/workflows/research-decay-rest-review-fix.yml]
+permissions: {}
+env:
+  CANDIDATE: 9ff62d1df5afc68cb789c1fd6daae7bf41be258a
+jobs:
+  fix:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          ref: ${{ env.CANDIDATE }}
+          fetch-depth: 0
+          persist-credentials: false
+      - name: Apply documentation-only finding without executing repository code
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 - <<'PY'
+          from pathlib import Path
+          def replace(path, old, new):
+              p=Path(path); s=p.read_text(); assert s.count(old)==1, (path, s.count(old)); p.write_text(s.replace(old,new,1))
+          replace('src/decay.ts',
+            '''/**\n * Точка покоя default decay без построения sampling-модели. Внутренняя\n * специализация того же домена: guards, defaults и IEEE-порядок общие с\n * createDecay. Не сворачивать DEFAULT_POWER * DEFAULT_TIME_CONSTANT заранее.\n */''',
+            '''/**\n * Точка покоя затухания с параметрами по умолчанию без построения модели\n * сэмплирования. Внутренняя специализация того же домена: проверки, значения\n * по умолчанию и порядок IEEE-754 общие с createDecay. Не сворачивать\n * DEFAULT_POWER * DEFAULT_TIME_CONSTANT заранее.\n */''')
+          replace('CHANGELOG.md',
+            '- `./behaviors`: выбор snap/page использует скалярную проекцию default decay и больше не строит неиспользуемую sampling-модель; публичный `./decay` остаётся прежним.',
+            '- `./behaviors`: выбор точки фиксации и страницы использует скалярную проекцию затухания с параметрами по умолчанию и больше не строит неиспользуемую модель сэмплирования; публичный `./decay` остаётся прежним.')
+          PY
+          git diff --check
+          mapfile -t changed < <(git diff --name-only "$CANDIDATE")
+          [[ ${#changed[@]} -eq 2 ]]
+          printf '%s\n' "${changed[@]}" | sort | diff -u - <(printf '%s\n' CHANGELOG.md src/decay.ts | sort)
+          # Prove executable source tokens did not change: strip comments from both
+          # revisions using TypeScript lexical output would require deps, so fail-closed
+          # on exact patch: src/decay delta must contain only comment lines.
+          git diff --unified=0 "$CANDIDATE" -- src/decay.ts > /tmp/decay.diff
+          if grep -E '^[+-][^+-]' /tmp/decay.diff | grep -Ev '^[+-][[:space:]]*\*|^[+-][[:space:]]*/\*|^[+-][[:space:]]*\*/' ; then
+            echo 'non-comment source delta detected' >&2; exit 1
+          fi
+          git add CHANGELOG.md src/decay.ts
+          git -c user.name='github-actions[bot]' -c user.email='41898282+github-actions[bot]@users.noreply.github.com' commit -m 'docs(behaviors): привести описание decay-проекции к русскому контракту'
+          git rev-parse HEAD > candidate-head.txt
+      - name: Publish only candidate branch
+        env:
+          GH_TOKEN: ${{ github.token }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          gh auth setup-git
+          git push --force-with-lease=refs/heads/perf/behaviors-decay-rest-20260912:${CANDIDATE} origin HEAD:refs/heads/perf/behaviors-decay-rest-20260912
+          cat candidate-head.txt
+      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
+        with:
+          name: decay-rest-review-fix-${{ github.run_id }}
+          path: candidate-head.txt
+          if-no-files-found: error
+          retention-days: 7
