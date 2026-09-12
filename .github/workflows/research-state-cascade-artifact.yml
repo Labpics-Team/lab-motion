@@ -46,7 +46,9 @@ jobs:
               -cf "$RUNNER_TEMP/$side-payload.tar" -C "$RUNNER_TEMP/$side-unpack" package
           done
       - name: Measure full shipped package payload with repository compression SSOT
+        shell: bash
         run: |
+          set -o pipefail
           node --input-type=module <<'NODE' | tee evidence/package-size.json
           import { readFileSync } from 'node:fs';
           import { pathToFileURL } from 'node:url';
