@@ -1044,3 +1044,11 @@ export function createPullToRefresh(options: PullOptions): PullController {
   if (options.onChange) ctrl.subscribe(options.onChange);
   return ctrl;
 }
+
+// ─── Property-level state cascade ────────────────────────────────────────
+export { createStateCascade } from './state-cascade.js';
+export type {
+  StateCascade,
+  StateCascadeLayer,
+  StateCascadePatch,
+} from './state-cascade.js';

@@ -207,3 +207,31 @@ el.addEventListener('pointercancel', () => sheet.pointerCancel());
 // программно раскрыть до верхнего snap (единый clock, C¹ из текущей скорости):
 document.querySelector('.expand')?.addEventListener('click', () => sheet.snapTo(2));
 ```
+
+
+## Каскад состояний взаимодействия без гонок
+
+Когда hover, press, selected, drag и exit могут действовать одновременно, не возвращайте свойство вручную в «default» из каждого обработчика. Создайте слои один раз в порядке приоритета и меняйте только соответствующий слой:
+
+```ts
+import { createStateCascade } from '@labpics/motion/behaviors';
+
+const state = createStateCascade<{ scale: number; opacity: number; background: string }>();
+const base = state.createLayer({ scale: 1, opacity: 1, background: 'var(--surface)' });
+const selected = state.createLayer();
+const hover = state.createLayer();
+const press = state.createLayer();
+const exit = state.createLayer();
+
+state.subscribe(({ changed, removed }) => {
+  // Передайте только effective delta своему renderer/animate owner.
+  // Изменение base под активным press сюда не попадёт.
+});
+
+hover.set({ scale: 1.03 });
+press.set({ scale: 0.97 });
+hover.clear(); // scale остаётся 0.97: им ещё владеет press
+press.clear(); // раскрывается актуальный scale из base
+```
+
+Позднее созданный слой приоритетнее, но только для ключей, которые он действительно задаёт. Поэтому `selected` может владеть цветом одновременно с `hover`, который владеет scale. `clear()` не знает «куда вернуть» значение: каскад вычисляет следующего действующего владельца. Динамическое gesture-состояние приложения остаётся у приложения; cascade решает только визуальное ownership.
