@@ -1,0 +1,46 @@
+name: Continuous follow exact tree transport
+on:
+  push:
+    branches: [research/continuous-follow-delivery-20260912]
+permissions:
+  contents: write
+jobs:
+  transport:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          ref: 93278bf9b540f93521c7bd4c02f68db458e5db7a
+          persist-credentials: false
+      - name: Verify patch and create only immutable Git tree, never update refs
+        env:
+          GH_TOKEN: ${{ github.token }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 - <<'PY'
+          import os, json, urllib.request, base64, gzip, hashlib, subprocess
+          root = 'https://api.github.com/repos/Labpics-Team/lab-motion'
+          def api(path, data=None):
+              request = urllib.request.Request(root + path, data=None if data is None else json.dumps(data).encode(), headers={'Authorization': 'Bearer ' + os.environ['GH_TOKEN'], 'Accept': 'application/vnd.github+json', 'Content-Type': 'application/json', 'X-GitHub-Api-Version': '2022-11-28'})
+              with urllib.request.urlopen(request) as response:
+                  return json.load(response)
+          def git(*args):
+              return subprocess.check_output(['git', *args]).decode().strip()
+          base = '93278bf9b540f93521c7bd4c02f68db458e5db7a'
+          expected = '38d27fbed1d5d01916b5d454a13a3623f7d154ba'
+          assert git('rev-parse', 'HEAD') == base
+          raw = api('/git/blobs/2a5baa204cca246f23e5437a85a39a939c164be4')
+          patch = gzip.decompress(base64.b64decode(raw['content']))
+          assert hashlib.sha256(patch).hexdigest() == 'ca931f1c28fd5105b256390dd0a0fb691352deba1e4439caeb6117637bb09b24'
+          subprocess.run(['git', 'apply', '--check', '-'], input=patch, check=True)
+          subprocess.run(['git', 'apply', '--index', '-'], input=patch, check=True)
+          assert git('write-tree') == expected
+          paths = git('diff', '--cached', '--name-only').splitlines()
+          assert paths == ['CHANGELOG.md', 'browser/23-motion-value-follow.spec.ts', 'docs/api.md', 'docs/migration.md', 'docs/recipes.md', 'src/motion-value.ts', 'test/continuity-differential-matrix.test.ts', 'test/motion-value-follow.test.ts', 'test/motion-value-velocity-read.test.ts', 'test/motion-value.test.ts']
+          entries = [{'path': path, 'mode': '100644', 'type': 'blob', 'content': open(path, encoding='utf-8').read()} for path in paths]
+          tree = api('/git/trees', {'base_tree': '2f2257ab4a5a889517bd5e6aa2a66ae588fe2c65', 'tree': entries})
+          assert tree['sha'] == expected, tree['sha']
+          print(json.dumps({'base': base, 'tree': tree['sha'], 'paths': paths, 'refWrites': 0}))
+          PY
