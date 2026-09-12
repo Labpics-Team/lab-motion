@@ -236,7 +236,7 @@ export function bindInteractionScale(element: HTMLElement) {
   const offValue = value.onChange(render);
   render(1);
   const apply = (target: number) => {
-    if (media.matches) value.snap(target);
+    if (media.matches) value.snapTo(target);
     else value.setTarget(target);
   };
   const offState = state.subscribe(({ changed }) => {
