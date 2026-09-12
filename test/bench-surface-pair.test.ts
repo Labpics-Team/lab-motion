@@ -244,7 +244,7 @@ describe('Surface: отсутствие доказательства не ста
 
   it('CLI не принимает дубликаты, runtime knobs или неоднозначную калибровку', () => {
     expect(parseSurfaceBenchArgs(['--base', '.', '--candidate', '..', '--out', '/tmp/new'])).toEqual({
-      base: path.resolve('.'), candidate: path.resolve('..'), out: '/tmp/new',
+      base: path.resolve('.'), candidate: path.resolve('..'), out: path.resolve('/tmp/new'),
     });
     expect(parseSurfaceBenchArgs(['--base', '.', '--out', '/tmp/new', '--calibrate-only']).calibrateOnly).toBe(true);
     for (const args of [
