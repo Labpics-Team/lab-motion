@@ -1,0 +1,45 @@
+name: Surface 366 immutable transport
+on:
+  push:
+    branches: [research/surface366-transport-20260912]
+permissions:
+  contents: read
+jobs:
+  transport:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          ref: aa107aa676b045b71d60d16f85b4e477a2685825
+          fetch-depth: 0
+          persist-credentials: false
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020
+        with:
+          node-version: '24.20.0'
+          package-manager-cache: false
+      - name: Prepare authorized exact inputs
+        shell: bash
+        run: |
+          set -euo pipefail
+          corepack enable
+          corepack install --global pnpm@11.11.0
+          pnpm install --frozen-lockfile
+          mkdir -p "$RUNNER_TEMP/surface-inputs"
+          git update-ref refs/heads/transport-main aa107aa676b045b71d60d16f85b4e477a2685825
+          git update-ref refs/heads/transport-harness a303c7fd482851f23c5a011fee254d6d4e445ff2
+          git bundle create "$RUNNER_TEMP/surface-inputs/repository.bundle" transport-main transport-harness
+          tar -czf "$RUNNER_TEMP/surface-inputs/node_modules.tar.gz" node_modules
+          cp "$(command -v node)" "$RUNNER_TEMP/surface-inputs/node"
+          node -p 'JSON.stringify({versions:process.versions,platform:process.platform,arch:process.arch})' > "$RUNNER_TEMP/surface-inputs/environment.json"
+          git status --porcelain=v1 > "$RUNNER_TEMP/surface-inputs/source-status.txt"
+          test ! -s "$RUNNER_TEMP/surface-inputs/source-status.txt"
+          cd "$RUNNER_TEMP/surface-inputs"
+          sha256sum repository.bundle node_modules.tar.gz node environment.json > SHA256SUMS
+      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
+        with:
+          name: surface366-inputs-${{ github.sha }}
+          path: ${{ runner.temp }}/surface-inputs
+          if-no-files-found: error
+          retention-days: 2
+          compression-level: 0
