@@ -3,26 +3,75 @@ on:
   push:
     branches: [research/mechanism-20260912-r4]
     paths: [.github/workflows/research-mechanism.yml]
-permissions: {}
+permissions:
+  contents: read
 concurrency:
   group: research-mechanism-20260912-r4
   cancel-in-progress: false
+env:
+  COREPACK_ENABLE_DOWNLOAD_PROMPT: '0'
+  COREPACK_DEFAULT_TO_LATEST: '0'
+  BASE: 93278bf9b540f93521c7bd4c02f68db458e5db7a
+  CANDIDATE: 5ef3bfde8b52a7f09f0a418415d7fb6669faf542
 jobs:
-  authoritative-ci:
+  paired-evidence:
     runs-on: ubuntu-latest
-    timeout-minutes: 5
-    permissions:
-      contents: read
-      actions: write
+    timeout-minutes: 45
     steps:
-      - name: Dispatch unchanged authoritative graph on exact owned candidate
-        env:
-          GH_TOKEN: ${{ github.token }}
-          REPO: Labpics-Team/lab-motion
-          CANDIDATE: 5ef3bfde8b52a7f09f0a418415d7fb6669faf542
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          persist-credentials: false
+          fetch-depth: 0
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v6
+        with:
+          node-version: '24.20.0'
+      - name: Build both immutable participants with one pinned toolchain
         run: |
           set -euo pipefail
-          actual="$(gh api "repos/$REPO/git/ref/heads/perf/terminal-aggregate-20260912" --jq .object.sha)"
-          [[ "$actual" == "$CANDIDATE" ]]
-          gh api --method POST "repos/$REPO/actions/workflows/ci.yml/dispatches" -f ref=perf/terminal-aggregate-20260912
-          printf 'Dispatched original ci.yml on exact head %s\n' "$CANDIDATE"
+          corepack enable
+          corepack install --global pnpm@11.11.0
+          mkdir -p evidence
+          git worktree add --detach "$RUNNER_TEMP/base" "$BASE"
+          git worktree add --detach "$RUNNER_TEMP/candidate" "$CANDIDATE"
+          for name in base candidate; do
+            (cd "$RUNNER_TEMP/$name" && pnpm install --frozen-lockfile && pnpm build) 2>&1 | tee "evidence/$name-build.log"
+            git -C "$RUNNER_TEMP/$name" status --porcelain > "evidence/$name-status.txt"
+            test ! -s "evidence/$name-status.txt"
+          done
+          git diff "$BASE" "$CANDIDATE" -- > evidence/candidate.diff
+          git archive "$CANDIDATE" | gzip -n > evidence/candidate-source.tar.gz
+          cp -r research/terminal-ownership evidence/harness
+          cpu="$(python3 -c 'import os; print(max(os.sched_getaffinity(0)))')"
+          printf 'BENCH_CPU=%s\n' "$cpu" >> "$GITHUB_ENV"
+          {
+            printf 'base=%s\ncandidate=%s\ncarrier=%s\n' "$BASE" "$CANDIDATE" "$GITHUB_SHA"
+            node --version
+            pnpm --version
+            uname -a
+            lscpu
+            taskset -pc $$
+            printf 'benchmark pinned CPU=%s\n' "$cpu"
+            sha256sum "$(command -v node)"
+          } > evidence/environment.txt
+      - name: Every entry consumer and shipped-format Pareto
+        run: node research/terminal-ownership/size.mjs "$RUNNER_TEMP/base" "$RUNNER_TEMP/candidate" evidence/size.json
+      - name: Independent terminal reachability on actual candidate outputs
+        run: |
+          cd "$RUNNER_TEMP/candidate"
+          pnpm vitest run test/animate-terminal-retention-gc.test.ts
+      - name: Fixed paired memory A-A positive-work and candidate latency corpus
+        run: |
+          taskset -c "$BENCH_CPU" node research/terminal-ownership/run.mjs \
+            "$RUNNER_TEMP/base/dist" "$RUNNER_TEMP/candidate/dist" "$RUNNER_TEMP/candidate" evidence/paired
+      - name: Seal immutable inputs and raw observations
+        if: always()
+        run: |
+          find evidence -type f ! -name SHA256SUMS -print0 | sort -z | xargs -0 sha256sum > evidence/SHA256SUMS
+      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
+        if: always()
+        with:
+          name: terminal-pareto-${{ env.CANDIDATE }}-${{ github.run_id }}
+          path: evidence/
+          if-no-files-found: error
+          retention-days: 14
+          compression-level: 6
