@@ -53,9 +53,10 @@ jobs:
           set -euo pipefail
           rm .github/workflows/research-native-scroll-waapi.yml
           rm .github/workflows/research-native-scroll-waapi-deliver.yml
+          git add -A
 
-          mapfile -t changed < <(git diff --name-only)
-          printf 'changed paths:\n'; printf '  %s\n' "${changed[@]}"
+          mapfile -t changed < <(git diff --cached --name-only)
+          printf 'staged paths:\n'; printf '  %s\n' "${changed[@]}"
           for path in "${changed[@]}"; do
             case "$path" in
               .github/workflows/research-native-scroll-waapi.yml|\
@@ -66,7 +67,7 @@ jobs:
               src/waapi/index.ts|\
               test/waapi-emit.test.ts|\
               test/waapi-scroll-timeline.test.ts) ;;
-              *) echo "unexpected changed path: $path" >&2; exit 1 ;;
+              *) echo "unexpected staged path: $path" >&2; exit 1 ;;
             esac
           done
 
@@ -85,6 +86,5 @@ jobs:
 
           git config user.name 'github-actions[bot]'
           git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
-          git add -A
           git commit -m 'feat(waapi): отдать scroll progress нативному timeline'
           git push origin HEAD:feat/native-scroll-waapi-20260912
