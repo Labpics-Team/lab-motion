@@ -55,8 +55,7 @@ jobs:
             '      const landing = createDecay({ from: base.state.value, velocity: posVel }).rest;',
             '      const landing = projectDefaultDecayRest(base.state.value, posVel);')
 
-          p=Path('test/decay-rest-projection.test.ts')
-          p.write_text("""import { describe, expect, it } from 'vitest';\nimport { createDecay, projectDefaultDecayRest } from '../src/decay.js';\nimport { lcg } from './projection-helpers.js';\n\ndescribe('default decay rest без полной sampling-модели', () => {\n  it('сохраняет exact endpoints и IEEE-порядок', () => {\n    expect(projectDefaultDecayRest(10, 0)).toBe(10);\n    expect(projectDefaultDecayRest(0, 100)).toBe(28);\n    expect(projectDefaultDecayRest(0, -100)).toBe(-28);\n    expect(Object.is(projectDefaultDecayRest(0, 9 * Number.MIN_VALUE), 2 * Number.MIN_VALUE)).toBe(true);\n    expect(Object.is(projectDefaultDecayRest(0, -9 * Number.MIN_VALUE), -2 * Number.MIN_VALUE)).toBe(true);\n    expect(Object.is(projectDefaultDecayRest(-0, -0), -0)).toBe(true);\n    expect(projectDefaultDecayRest(Number.MAX_VALUE, Number.MAX_VALUE)).toBe(Number.MAX_VALUE);\n    expect(projectDefaultDecayRest(-Number.MAX_VALUE, -Number.MAX_VALUE)).toBe(-Number.MAX_VALUE);\n  });\n\n  it('Object.is parity на IEEE edges и 10000 seeded finite входов', () => {\n    const edges = [0, -0, Number.MIN_VALUE, -Number.MIN_VALUE, 1e-308, -1e-308, 1, -1, Number.MAX_VALUE, -Number.MAX_VALUE];\n    const check = (from: number, velocity: number) => {\n      expect(Object.is(projectDefaultDecayRest(from, velocity), createDecay({ from, velocity }).rest)).toBe(true);\n    };\n    for (const from of edges) for (const velocity of edges) check(from, velocity);\n    const random = lcg(0x1badb002);\n    const finite = () => (random() < 0.5 ? -1 : 1) * random() * 2 ** (Math.floor(random() * 2097) - 1074);\n    for (let i = 0; i < 10000; i++) check(finite(), finite());\n  });\n\n  it('сохраняет fail-fast codes и приоритет обязательных входов', () => {\n    for (const value of [NaN, Infinity, -Infinity]) {\n      expect(() => projectDefaultDecayRest(value, 0)).toThrow('LM021');\n      expect(() => projectDefaultDecayRest(0, value)).toThrow('LM022');\n      expect(() => projectDefaultDecayRest(value, value)).toThrow('LM021');\n    }\n  });\n});\n""")
+          Path('test/decay-rest-projection.test.ts').write_text("""import { describe, expect, it } from 'vitest';\nimport { createDecay, projectDefaultDecayRest } from '../src/decay.js';\nimport { lcg } from './projection-helpers.js';\n\ndescribe('default decay rest без полной sampling-модели', () => {\n  it('сохраняет exact endpoints и IEEE-порядок', () => {\n    expect(projectDefaultDecayRest(10, 0)).toBe(10);\n    expect(projectDefaultDecayRest(0, 100)).toBe(28);\n    expect(projectDefaultDecayRest(0, -100)).toBe(-28);\n    expect(Object.is(projectDefaultDecayRest(0, 9 * Number.MIN_VALUE), 2 * Number.MIN_VALUE)).toBe(true);\n    expect(Object.is(projectDefaultDecayRest(0, -9 * Number.MIN_VALUE), -2 * Number.MIN_VALUE)).toBe(true);\n    expect(Object.is(projectDefaultDecayRest(-0, -0), -0)).toBe(true);\n    expect(projectDefaultDecayRest(Number.MAX_VALUE, Number.MAX_VALUE)).toBe(Number.MAX_VALUE);\n    expect(projectDefaultDecayRest(-Number.MAX_VALUE, -Number.MAX_VALUE)).toBe(-Number.MAX_VALUE);\n  });\n\n  it('Object.is parity на IEEE edges и 10000 seeded finite входов', () => {\n    const edges = [0, -0, Number.MIN_VALUE, -Number.MIN_VALUE, 1e-308, -1e-308, 1, -1, Number.MAX_VALUE, -Number.MAX_VALUE];\n    const check = (from: number, velocity: number) => {\n      expect(Object.is(projectDefaultDecayRest(from, velocity), createDecay({ from, velocity }).rest)).toBe(true);\n    };\n    for (const from of edges) for (const velocity of edges) check(from, velocity);\n    const random = lcg(0x1badb002);\n    const finite = () => (random() < 0.5 ? -1 : 1) * random() * 2 ** (Math.floor(random() * 2097) - 1074);\n    for (let i = 0; i < 10000; i++) check(finite(), finite());\n  });\n\n  it('сохраняет fail-fast codes и приоритет обязательных входов', () => {\n    for (const value of [NaN, Infinity, -Infinity]) {\n      expect(() => projectDefaultDecayRest(value, 0)).toThrow('LM021');\n      expect(() => projectDefaultDecayRest(0, value)).toThrow('LM022');\n      expect(() => projectDefaultDecayRest(value, value)).toThrow('LM021');\n    }\n  });\n});\n""")
 
           p=Path('CHANGELOG.md'); s=p.read_text(); marker='### Изменено\n'
           assert s.count(marker)==1
@@ -64,11 +63,11 @@ jobs:
           p.write_text(s.replace(marker,marker+entry,1))
           PY
           git diff --check
-          mapfile -t changed < <(git diff --name-only)
-          printf '%s\n' "${changed[@]}"
-          [[ ${#changed[@]} -eq 4 ]]
-          printf '%s\n' "${changed[@]}" | sort | diff -u - <(printf '%s\n' CHANGELOG.md src/behaviors/index.ts src/decay.ts test/decay-rest-projection.test.ts | sort)
-          git add -- "${changed[@]}"
+          expected=(CHANGELOG.md src/behaviors/index.ts src/decay.ts test/decay-rest-projection.test.ts)
+          mapfile -t actual < <(git status --porcelain=v1 | sed -E 's/^.. //' | sort)
+          mapfile -t wanted < <(printf '%s\n' "${expected[@]}" | sort)
+          [[ "${actual[*]}" == "${wanted[*]}" ]] || { printf 'unexpected candidate paths\nactual:\n%s\nwanted:\n%s\n' "${actual[*]}" "${wanted[*]}"; exit 1; }
+          git add -- "${expected[@]}"
           git -c user.name='github-actions[bot]' -c user.email='41898282+github-actions[bot]@users.noreply.github.com' commit -m 'perf(behaviors): project default decay rest without sampling model'
           candidate="$(git rev-parse HEAD)"
           echo "candidate=$candidate" >> "$GITHUB_OUTPUT"
@@ -78,7 +77,7 @@ jobs:
         run: |
           set -euo pipefail
           gh auth setup-git
-          git push origin HEAD:refs/heads/$CANDIDATE_BRANCH
+          git push --force-with-lease=refs/heads/$CANDIDATE_BRANCH:$BASE origin HEAD:refs/heads/$CANDIDATE_BRANCH
 
   evidence:
     needs: publish
@@ -120,7 +119,7 @@ jobs:
         run: |
           cat > "$RUNNER_TEMP/size.mjs" <<'EOF'
           import assert from 'node:assert/strict';
-          import {readFileSync,readdirSync,statSync,writeFileSync} from 'node:fs';
+          import {readFileSync,readdirSync,writeFileSync} from 'node:fs';
           import {join} from 'node:path';
           import {pathToFileURL} from 'node:url';
           const [base,candidate,out]=process.argv.slice(2);
@@ -155,6 +154,7 @@ jobs:
           EOF
           node "$RUNNER_TEMP/size.mjs" "$RUNNER_TEMP/base" "$RUNNER_TEMP/candidate" evidence/size.json
           for name in base candidate; do
+            mkdir -p "$RUNNER_TEMP/$name-pack"
             (cd "$RUNNER_TEMP/$name" && pnpm pack --pack-destination "$RUNNER_TEMP/$name-pack" >/dev/null)
             stat -c '%s' "$RUNNER_TEMP/$name-pack"/*.tgz > "evidence/$name-package-tgz-bytes.txt"
           done
