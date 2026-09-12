@@ -326,6 +326,14 @@ export interface WaapiScrollTimelineOptions {
   readonly axis?: WaapiScrollAxis;
 }
 
+/** View-progress subject + optional Web Animations attachment range. */
+export interface WaapiViewTimelineOptions {
+  readonly subject: unknown;
+  readonly axis?: WaapiScrollAxis;
+  readonly rangeStart?: string;
+  readonly rangeEnd?: string;
+}
+
 /**
  * Scroll-linked эффект использует весь progress timeline; time/repeat-параметры
  * обычной WAAPI-анимации здесь не принадлежат контракту.
@@ -335,37 +343,38 @@ export type WaapiScrollCompileOptions = Omit<
   'duration' | 'repeat' | 'repeatType' | 'repeatDelay'
 > & { readonly fill?: WaapiCompiled['timing']['fill'] };
 
-type ScrollTimelineCtor = new (options: {
-  source: unknown;
-  axis?: WaapiScrollAxis;
-}) => unknown;
+type ProgressTimelineName = 'ScrollTimeline' | 'ViewTimeline';
+type ProgressTimelineCtor = new (options: Record<string, unknown>) => unknown;
 
-function scrollTimelineCtor(): ScrollTimelineCtor | undefined {
-  const ctor = (globalThis as { ScrollTimeline?: unknown }).ScrollTimeline;
-  return typeof ctor === 'function' ? ctor as ScrollTimelineCtor : undefined;
+function progressTimelineCtor(name: ProgressTimelineName): ProgressTimelineCtor | undefined {
+  const ctor = (globalThis as Record<string, unknown>)[name];
+  return typeof ctor === 'function' ? ctor as ProgressTimelineCtor : undefined;
 }
 
 /** Capability probe без UA-sniffing и без DOM-глобалов на import. */
 export function supportsScrollTimeline(): boolean {
-  return scrollTimelineCtor() !== undefined;
+  return progressTimelineCtor('ScrollTimeline') !== undefined;
 }
 
+/** Capability probe view-progress timeline без UA-sniffing. */
+export function supportsViewTimeline(): boolean {
+  return progressTimelineCtor('ViewTimeline') !== undefined;
+}
+
+/** View и scroll используют один property compiler. */
+export type WaapiViewCompileOptions = WaapiScrollCompileOptions;
+
 /**
- * Отдать связь scroll progress → property браузеру целиком.
- *
- * Возвращает undefined, если target/ScrollTimeline недоступны. Скрытого
- * scroll-listener/rAF fallback нет: caller может явно выбрать headless ./scroll.
- * На native path после единственного commit Lab Motion не выполняет per-frame JS.
+ * Общий commit уже созданной progress timeline. Capability/fallback policy
+ * остаётся у публичных scroll/view адаптеров; здесь только property compiler.
  */
-export function animateScrollWaapi(
+function animateProgressWaapi(
   el: WaapiAnimatable,
   options: WaapiScrollCompileOptions,
-  scroll: WaapiScrollTimelineOptions,
-): unknown | undefined {
-  if (!supportsWaapi(el)) return undefined;
-  const Timeline = scrollTimelineCtor();
-  if (!Timeline) return undefined;
-
+  timeline: unknown,
+  rangeStart?: string,
+  rangeEnd?: string,
+): unknown {
   const { fill, property, values, times, easing, format, easingPoints } = options;
   const compiled = compileWaapi({
     property,
@@ -374,11 +383,8 @@ export function animateScrollWaapi(
     ...(easing === undefined ? {} : { easing }),
     ...(format === undefined ? {} : { format }),
     ...(easingPoints === undefined ? {} : { easingPoints }),
-    // MDN/Web Animations uses a non-zero nominal duration with progress timelines;
-    // timeline progress, not wall time, owns the actual animation position.
     duration: 0.001,
   });
-  const timeline = new Timeline({ source: scroll.source, axis: scroll.axis ?? 'block' });
   return el.animate(compiled.keyframes, {
     ...compiled.timing,
     duration: 1,
@@ -386,5 +392,35 @@ export function animateScrollWaapi(
     direction: 'normal',
     fill: fill ?? compiled.timing.fill,
     timeline,
+    ...(rangeStart === undefined ? {} : { rangeStart }),
+    ...(rangeEnd === undefined ? {} : { rangeEnd }),
   });
+}
+
+export function animateScrollWaapi(
+  el: WaapiAnimatable,
+  options: WaapiScrollCompileOptions,
+  scroll: WaapiScrollTimelineOptions,
+): unknown | undefined {
+  if (!supportsWaapi(el)) return undefined;
+  const Timeline = progressTimelineCtor('ScrollTimeline');
+  if (!Timeline) return undefined;
+  const timeline = new Timeline({ source: scroll.source, axis: scroll.axis ?? 'block' });
+  return animateProgressWaapi(el, options, timeline);
+}
+
+/**
+ * Отдать view progress → property браузеру целиком. Attachment range
+ * передаётся самому Web Animations effect, не пересчитывается в JS.
+ */
+export function animateViewWaapi(
+  el: WaapiAnimatable,
+  options: WaapiViewCompileOptions,
+  view: WaapiViewTimelineOptions,
+): unknown | undefined {
+  if (!supportsWaapi(el)) return undefined;
+  const Timeline = progressTimelineCtor('ViewTimeline');
+  if (!Timeline) return undefined;
+  const timeline = new Timeline({ subject: view.subject, axis: view.axis ?? 'block' });
+  return animateProgressWaapi(el, options, timeline, view.rangeStart, view.rangeEnd);
 }
