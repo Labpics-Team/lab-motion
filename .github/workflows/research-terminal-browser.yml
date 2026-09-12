@@ -9,8 +9,23 @@ env:
   COREPACK_ENABLE_DOWNLOAD_PROMPT: '0'
   COREPACK_DEFAULT_TO_LATEST: '0'
   BASE: 93278bf9b540f93521c7bd4c02f68db458e5db7a
-  CANDIDATE: 5ef3bfde8b52a7f09f0a418415d7fb6669faf542
+  CANDIDATE: 43e73632560b6b3b289b0243c122b3e6f4479e8d
 jobs:
+  exact-ci:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    permissions:
+      contents: read
+      actions: write
+    steps:
+      - name: Dispatch unchanged authoritative graph on exact reviewed candidate
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          actual="$(gh api repos/Labpics-Team/lab-motion/git/ref/heads/perf/terminal-aggregate-20260912 --jq .object.sha)"
+          [[ "$actual" == "$CANDIDATE" ]]
+          gh api --method POST repos/Labpics-Team/lab-motion/actions/workflows/ci.yml/dispatches -f ref=perf/terminal-aggregate-20260912
   native-retention:
     runs-on: ubuntu-latest
     timeout-minutes: 20
@@ -30,9 +45,13 @@ jobs:
           mkdir -p evidence
           git worktree add --detach "$RUNNER_TEMP/base" "$BASE"
           git worktree add --detach "$RUNNER_TEMP/candidate" "$CANDIDATE"
-          for name in base candidate; do
+          git worktree add --detach "$RUNNER_TEMP/measured" 5ef3bfde8b52a7f09f0a418415d7fb6669faf542
+          for name in base candidate measured; do
             (cd "$RUNNER_TEMP/$name" && pnpm install --frozen-lockfile && pnpm build) 2>&1 | tee "evidence/$name-build.log"
           done
+          diff -qr "$RUNNER_TEMP/measured/dist" "$RUNNER_TEMP/candidate/dist" | tee evidence/shipped-byte-identity.txt
+          git diff 5ef3bfde8b52a7f09f0a418415d7fb6669faf542 "$CANDIDATE" -- > evidence/review-delta.diff
+          git archive "$CANDIDATE" | gzip -n > evidence/candidate-source.tar.gz
           (cd "$RUNNER_TEMP/candidate" && pnpm exec playwright install --with-deps chromium)
           cp research/terminal-ownership/browser.mjs evidence/browser.mjs
           { printf 'base=%s\ncandidate=%s\n' "$BASE" "$CANDIDATE"; node --version; uname -a; lscpu; } > evidence/environment.txt
