@@ -1,0 +1,26 @@
+name: Decay rest final exact-head CI
+on:
+  push:
+    branches: [research/decay-rest-specialization-20260912-r9]
+    paths: [.github/workflows/research-decay-rest-final-ci.yml]
+permissions: {}
+env:
+  CANDIDATE: 4a912d5a90fa37499f0b11eb2304fa9d97140947
+  CANDIDATE_BRANCH: perf/behaviors-decay-rest-20260912
+jobs:
+  dispatch:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    permissions:
+      contents: read
+      actions: write
+    steps:
+      - name: Dispatch unchanged authoritative graph on exact reviewed candidate
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          actual="$(gh api "repos/$GITHUB_REPOSITORY/git/ref/heads/$CANDIDATE_BRANCH" --jq .object.sha)"
+          [[ "$actual" == "$CANDIDATE" ]]
+          gh api --method POST "repos/$GITHUB_REPOSITORY/actions/workflows/ci.yml/dispatches" -f ref="$CANDIDATE_BRANCH"
+          printf 'ci dispatched on %s\n' "$CANDIDATE"
