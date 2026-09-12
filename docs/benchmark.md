@@ -165,7 +165,7 @@ pnpm install --frozen-lockfile
 pnpm bench
 ```
 
-Publish-прогон требует чистый commit, Node 24 и одинаковую точной версии pnpm в
+Publish-прогон требует чистый commit, Node 24 и одинаковую точную версию pnpm в
 корневом и benchmark `packageManager`. Стенд проверяет версии, хеширует фактически
 установленные vendor-пакеты, Node executable, dist, адаптеры и browser binary, а
 после прогона повторно проверяет runtime-артефакты.
@@ -181,12 +181,6 @@ S1–S4 используют не менее 20 позиционно-сбала�
 прикладывается к release issue или CI artifact, а не к Git-дереву.
 Релизный workflow сам этот стенд не запускает, поэтому без приложенного каталога текущего
 WebKit-доказательства нет.
-
-## Парный Surface compiler
-
-[Surface-стенд](surface-benchmark.md) измеряет полный публичный Vite transform
-на двух чистых checkout. Его baseline-only калибровка предшествует candidate
-замерам; cache-miss и полное чтение code/map не подменяют cold application startup.
 
 ## Потолок main-thread пути
 
