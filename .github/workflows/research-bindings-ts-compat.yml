@@ -48,10 +48,14 @@ jobs:
           test "$status" -ne 0
           grep -F "Cannot find name 'NoInfer'" "$tmp/tsc.log"
       - name: Candidate GREEN and inference controls
+        env:
+          GH_TOKEN: ${{ github.token }}
         shell: bash
         run: |
           set -euo pipefail
-          git apply proofs/noinfer-removal.patch
+          gh api 'repos/Labpics-Team/lab-motion/contents/proofs/noinfer-removal.patch?ref=research/semantic-binding-delivery-20260913' --jq .content | tr -d '\n' | base64 -d > "$RUNNER_TEMP/noinfer-removal.patch"
+          echo 'aac85f512f6040110549c6eeedde80bd1302457f074afc5a68d04b4f2dc274b6  '"$RUNNER_TEMP/noinfer-removal.patch" | sha256sum --check
+          git apply "$RUNNER_TEMP/noinfer-removal.patch"
           git diff --check
           test "$(git diff --name-only | sort)" = $'src/bindings/index.ts\ntest/semantic-motion-binding-consumer.test.ts'
           pnpm build
@@ -81,7 +85,7 @@ jobs:
           TS
           npm exec --yes --package=typescript@5.3.3 -- tsc --noEmit --strict --module NodeNext --target ES2022 --skipLibCheck false "$tmp/consumer.ts"
           ! grep -R "NoInfer" "$tmp/node_modules/@labpics/motion/dist/bindings/index.d.ts"
-          sha256sum proofs/noinfer-removal.patch > "$RUNNER_TEMP/ts53-proof.txt"
+          sha256sum "$RUNNER_TEMP/noinfer-removal.patch" > "$RUNNER_TEMP/ts53-proof.txt"
       - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         with:
           name: bindings-ts53-proof
