@@ -169,9 +169,13 @@ jobs:
             printf 'stop\n' > "$stop"
             if ! wait "$pid"; then transport_fail 76 child-exit "$profile" "$phase" "$run" "$side" "$out" "$log"; return 76; fi
 
-            local ir
-            if ! ir="$(awk '$1 == "summary:" { if (NF != 2) exit 2; print $2 }' "$out")"; then transport_fail 77 summary-shape "$profile" "$phase" "$run" "$side" "$out" "$log"; return 77; fi
-            if ! [[ "$ir" =~ ^[0-9]+$ ]] || (( ir <= 0 )); then transport_fail 78 summary-value "$profile" "$phase" "$run" "$side" "$out" "$log"; return 78; fi
+            local events ir collected
+            events="$(awk '$1 == "events:" { if (NF != 2 || seen++) exit 2; print $2 } END { if (!seen) exit 3 }' "$out")" || { transport_fail 77 events-shape "$profile" "$phase" "$run" "$side" "$out" "$log"; return 77; }
+            [[ "$events" == Ir ]] || { transport_fail 78 events-value "$profile" "$phase" "$run" "$side" "$out" "$log"; return 78; }
+            ir="$(awk '$1 == "totals:" { if (NF != 2 || seen++) exit 2; print $2 } END { if (!seen) exit 3 }' "$out")" || { transport_fail 79 totals-shape "$profile" "$phase" "$run" "$side" "$out" "$log"; return 79; }
+            [[ "$ir" =~ ^[0-9]+$ ]] && (( ir > 0 )) || { transport_fail 80 totals-value "$profile" "$phase" "$run" "$side" "$out" "$log"; return 80; }
+            collected="$(awk '/^==[0-9]+== Collected : / { if (NF != 5 || seen++) exit 2; print $5 } END { if (!seen) exit 3 }' "$log")" || { transport_fail 81 collected-shape "$profile" "$phase" "$run" "$side" "$out" "$log"; return 81; }
+            [[ "$collected" =~ ^[0-9]+$ ]] && [[ "$collected" == "$ir" ]] || { transport_fail 82 totals-collected-mismatch "$profile" "$phase" "$run" "$side" "$out" "$log"; return 82; }
 
             if ! python3 - "$receipt" "$profile" "$phase" "$run" "$side" "$impl" "$factor" "$nominal" "$ir" "$out" >> "$raw" <<'PY'
           import hashlib, json, math, pathlib, sys
@@ -194,7 +198,7 @@ jobs:
               'profileSha256': hashlib.sha256(p.read_bytes()).hexdigest(),
           }, separators=(',', ':')))
           PY
-            then transport_fail 79 receipt-validate "$profile" "$phase" "$run" "$side" "$out" "$log"; return 79; fi
+            then transport_fail 83 receipt-validate "$profile" "$phase" "$run" "$side" "$out" "$log"; return 83; fi
           }
 
           pair() {
@@ -215,8 +219,8 @@ jobs:
             for run in $(seq 0 5); do pair "$profile" positive "$run" base 1 base 2 "$nominal" || return $?; done
           }
 
-          if ! collect_controls setup3-default 10000; then rc=$?; block_result "callgrind-control-or-workload-execution-failed" "$rc"; exit 0; fi
-          if ! collect_controls seek3-default 500000; then rc=$?; block_result "callgrind-control-or-workload-execution-failed" "$rc"; exit 0; fi
+          if collect_controls setup3-default 10000; then :; else rc=$?; block_result "callgrind-control-or-workload-execution-failed" "$rc"; exit 0; fi
+          if collect_controls seek3-default 500000; then :; else rc=$?; block_result "callgrind-control-or-workload-execution-failed" "$rc"; exit 0; fi
 
           node "$harness" controls "$raw" "$controls"
           cat "$controls"
@@ -230,10 +234,10 @@ jobs:
           }
 
           if admitted setup3-default; then
-            if ! collect_ab setup3-default 10000; then rc=$?; block_result "callgrind-ab-execution-failed" "$rc"; exit 0; fi
+            if collect_ab setup3-default 10000; then :; else rc=$?; block_result "callgrind-ab-execution-failed" "$rc"; exit 0; fi
           fi
           if admitted seek3-default; then
-            if ! collect_ab seek3-default 500000; then rc=$?; block_result "callgrind-ab-execution-failed" "$rc"; exit 0; fi
+            if collect_ab seek3-default 500000; then :; else rc=$?; block_result "callgrind-ab-execution-failed" "$rc"; exit 0; fi
           fi
 
           node "$harness" final "$raw" "$result"
