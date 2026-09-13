@@ -1,4 +1,4 @@
-name: Managed presence follow-up delivery
+name: Managed presence commit-boundary delivery
 on:
   push:
     branches: [research/managed-presence-delivery-20260913]
@@ -11,7 +11,7 @@ jobs:
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
         with:
-          ref: 51c72c0de78c5466ed8dd453cf6947652f957cc5
+          ref: 12590d024ef3789ce5a5dabdb115af243131d2ea
           fetch-depth: 1
           persist-credentials: false
       - name: Authenticate and create immutable candidate only
@@ -22,23 +22,23 @@ jobs:
           set -euo pipefail
           python3 - <<'PY'
           import subprocess,json,base64,pathlib,hashlib
-          base='51c72c0de78c5466ed8dd453cf6947652f957cc5'
-          expected='57475df21cb3166c64dc1f77c0aac902115581ad'
+          base='12590d024ef3789ce5a5dabdb115af243131d2ea'
+          expected='2327003f708de8e4b251219fac641f8c8ca04a1e'
           repo='repos/Labpics-Team/lab-motion'
           def git(*args): return subprocess.check_output(['git',*args],text=True).strip()
           def get(route): return json.loads(subprocess.check_output(['gh','api',repo+route],text=True))
           def post(route,payload):
             return json.loads(subprocess.check_output(['gh','api','--method','POST',repo+route,'--input','-'],input=json.dumps(payload,ensure_ascii=False),text=True))
           assert git('rev-parse','HEAD')==base
-          patch=base64.b64decode(get('/git/blobs/31a8911dd741aade8382040d4e8136266c0cdc19')['content'])
-          assert hashlib.sha256(patch).hexdigest()=='ae5a9991f4dfd9eaff6ad8d8d0ccb0007a58fcd4208de0ac51b0697f5265e793'
+          patch=base64.b64decode(get('/git/blobs/f70cdaf8975c090c83fcefa191db7831be016f83')['content'])
+          assert hashlib.sha256(patch).hexdigest()=='aafa19821a71b14b13edfc8461bc36482fd010576765c6c58d7339620e45fa32'
           subprocess.run(['git','apply','--index','-'],input=patch,check=True)
           assert git('write-tree')==expected
-          paths=['docs/recipes.md','src/presence/transition.ts','test/presence-transition.test.ts']
+          paths=['src/presence/transition.ts','test/presence-transition.test.ts']
           assert git('diff','--cached','--name-only').splitlines()==paths
           tree=post('/git/trees',{'base_tree':git('rev-parse','HEAD^{tree}'),'tree':[{'path':p,'mode':'100644','type':'blob','content':pathlib.Path(p).read_text()} for p in paths]})
           assert tree['sha']==expected
-          commit=post('/git/commits',{'message':'fix(presence): завершать очистку группы и исполнять корректный диалог','tree':expected,'parents':[base]})
-          ref=post('/git/refs',{'ref':'refs/heads/research/presence-followup-20260913','sha':commit['sha']})
+          commit=post('/git/commits',{'message':'fix(presence): не публиковать уход до завершения отмены','tree':expected,'parents':[base]})
+          ref=post('/git/refs',{'ref':'refs/heads/research/presence-commit-boundary-20260913','sha':commit['sha']})
           print(json.dumps({'base':base,'tree':expected,'head':commit['sha'],'ref':ref['ref'],'paths':paths},ensure_ascii=False))
           PY
