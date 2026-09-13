@@ -6,6 +6,63 @@
 > [projection.md](projection.md), [smart.md](smart.md),
 > [behaviors.md](behaviors.md)).
 
+## Карточка загрузки: одна модель, разные движения
+
+Приложение владеет `status`, `progress` и `pressed`, а не фазами твинов. Три
+визуальные роли привязываются один раз. Прогресс не перезапускает нажатие или
+индикатор завершения; меняется только его собственная роль.
+
+```typescript
+import { animate } from '@labpics/motion/animate';
+import { createMotionBinding } from '@labpics/motion/bindings';
+
+export interface UploadMotionModel {
+  readonly pressed: boolean;
+  readonly status: 'idle' | 'uploading' | 'complete';
+  readonly progress: number;
+}
+
+export function bindUploadMotion(
+  parts: { surface: HTMLElement; progress: HTMLElement; complete: HTMLElement },
+) {
+  const spring = { mass: 1, stiffness: 240, damping: 28 };
+  return createMotionBinding(
+    (model: UploadMotionModel) => ({
+      surface: { scale: model.pressed ? 0.97 : 1 },
+      progress: { scaleX: Math.max(0, Math.min(1, model.progress)) },
+      complete: { opacity: model.status === 'complete' ? 1 : 0 },
+    }),
+    {
+      surface: goal => animate(parts.surface, goal, { spring }),
+      progress: goal => animate(parts.progress, goal, { spring }),
+      complete: goal => animate(parts.complete, goal, { spring }),
+    },
+  );
+}
+```
+
+У прогресс-полосы задайте CSS `transform-origin: left center`. Передайте фактическую
+модель через `view.update(model)` после монтирования и вызывайте `view.destroy()`
+при размонтировании. Доступные текст, `aria-busy`, `aria-valuenow`, обработку
+клавиатуры и изменение бизнес-данных оставьте компоненту. Системное уменьшенное
+движение обрабатывает обычный `animate`, без второй политики в привязке.
+
+В Solid уже существующий сигнал и его batch остаются владельцами данных:
+
+```typescript
+import { createEffect, onCleanup } from 'solid-js';
+
+// view создан после монтирования; model — аксессор существующего сигнала.
+createEffect(() => view.update(model()));
+onCleanup(view.destroy);
+```
+
+Меняйте чистый рецепт, а не модель приложения: например, стиль нажатия можно
+сделать спокойнее, не переименовывая `pressed` во всём продукте. Общая привязка
+не требует контекста, provider или дополнительного store. Цели описывают состояние,
+а повторяемые события (shake/replay) остаются отдельными явными действиями.
+[Полные правила владения и ошибок](bindings.md).
+
 ## Drag с инерцией
 
 ```typescript
