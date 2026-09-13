@@ -48,7 +48,7 @@ jobs:
           pnpm check:static
           pnpm typecheck:native
 
-      - name: Build
+      - name: Build candidate
         run: pnpm build
 
       - name: Focused semantic and ownership oracles
@@ -62,8 +62,53 @@ jobs:
           test/compositor-error-bound.test.ts
           test/compositor-velocity-budget.test.ts
 
-      - name: Canonical protected size vector
-        run: pnpm size
+      - name: Candidate canonical protected size vector
+        run: |
+          echo '=== CANDIDATE SIZE ==='
+          pnpm size
+          cp -a dist /tmp/candidate-dist
+
+      - name: Exact-base paired size vector
+        shell: bash
+        run: |
+          set -euo pipefail
+          BASE=93278bf9b540f93521c7bd4c02f68db458e5db7a
+          git worktree add --detach /tmp/lab-motion-base "$BASE"
+          ln -s "$GITHUB_WORKSPACE/node_modules" /tmp/lab-motion-base/node_modules
+          pnpm --dir /tmp/lab-motion-base build
+          echo '=== EXACT BASE SIZE ==='
+          pnpm --dir /tmp/lab-motion-base size
+          BASE_DIR=/tmp/lab-motion-base CANDIDATE_DIST=/tmp/candidate-dist node --input-type=module <<'NODE'
+          import { readdirSync, readFileSync } from 'node:fs';
+          import { join, relative } from 'node:path';
+          import { canonicalGzip, observationalBrotli } from './scripts/compression-oracle.mjs';
+
+          const baseDir = process.env.BASE_DIR + '/dist';
+          const candidateDir = process.env.CANDIDATE_DIST;
+          const files = [];
+          function walk(root, dir = root) {
+            for (const entry of readdirSync(dir, { withFileTypes: true })) {
+              const path = join(dir, entry.name);
+              if (entry.isDirectory()) walk(root, path);
+              else if (/\.(?:js|cjs)$/.test(entry.name)) files.push(relative(root, path));
+            }
+          }
+          walk(baseDir);
+          let regressions = 0;
+          console.log('=== EXACT DIST DELTAS candidate-base (raw/gzip/brotli bytes) ===');
+          for (const file of files.sort()) {
+            const base = readFileSync(join(baseDir, file));
+            const candidate = readFileSync(join(candidateDir, file));
+            const delta = [
+              candidate.length - base.length,
+              canonicalGzip(candidate).length - canonicalGzip(base).length,
+              observationalBrotli(candidate).length - observationalBrotli(base).length,
+            ];
+            if (delta.some(Boolean)) console.log(`${file}: ${delta.join('/')}`);
+            if (delta.some((value) => value > 0)) regressions++;
+          }
+          console.log(`protected-dist-files-with-any-positive-delta=${regressions}`);
+          NODE
 
       - name: Commit admitted source candidate
         shell: bash
