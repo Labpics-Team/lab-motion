@@ -1,0 +1,107 @@
+name: Research implicit identity browser v15
+
+on:
+  push:
+    branches: ["research/implicit-identity-browser-v15-20260913"]
+
+permissions:
+  contents: read
+
+env:
+  COREPACK_ENABLE_DOWNLOAD_PROMPT: "0"
+  COREPACK_DEFAULT_TO_LATEST: "0"
+  BASE_SHA: 93278bf9b540f93521c7bd4c02f68db458e5db7a
+  CANDIDATE_SHA: 0b01ae2b34db2b78c11acf9c4242e73538717c95
+  BASE_ENTRY_SHA256: 8f3ef89364b35b9fb8fb4277e99709a26cefa827f88611587265d3fb40465ff7
+  CANDIDATE_ENTRY_SHA256: 4f58d7f47bc7767d336b2771990f64fa52e4dd1df0f550fff30bdfc7ff1035be
+
+jobs:
+  browser-proof:
+    name: ${{ matrix.browser }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    strategy:
+      fail-fast: false
+      matrix:
+        browser: [chromium, firefox, webkit]
+
+    steps:
+      - name: Checkout research carrier
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+
+      - name: Setup exact Node
+        uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v6
+        with:
+          node-version: "24.20.0"
+
+      - name: Activate pinned pnpm
+        run: |
+          corepack enable
+          corepack install --global pnpm@11.11.0
+          test "$(node --version)" = "v24.20.0"
+          test "$(pnpm --version)" = "11.11.0"
+
+      - name: Install repository dependencies
+        run: pnpm install --frozen-lockfile --prefer-offline
+
+      - name: Install exact Playwright browser
+        run: pnpm exec playwright install --with-deps ${{ matrix.browser }}
+
+      - name: Reconstruct exact product artifacts
+        shell: bash
+        run: |
+          set -euo pipefail
+          git fetch --no-tags origin refs/pull/380/head
+          git cat-file -e "${BASE_SHA}^{commit}"
+          git cat-file -e "${CANDIDATE_SHA}^{commit}"
+          base="$RUNNER_TEMP/lm-base"
+          candidate="$RUNNER_TEMP/lm-candidate"
+          git worktree add --detach "$base" "$BASE_SHA"
+          git worktree add --detach "$candidate" "$CANDIDATE_SHA"
+          for dir in "$base" "$candidate"; do
+            pnpm --dir "$dir" install --frozen-lockfile --prefer-offline
+            pnpm --dir "$dir" build
+          done
+          printf '%s  %s\n' "$BASE_ENTRY_SHA256" "$base/dist/keyframes/index.js" | sha256sum --check --status -
+          printf '%s  %s\n' "$CANDIDATE_ENTRY_SHA256" "$candidate/dist/keyframes/index.js" | sha256sum --check --status -
+          printf 'base=%s\ncandidate=%s\n' "$base/dist/keyframes/index.js" "$candidate/dist/keyframes/index.js" >> "$GITHUB_ENV"
+          {
+            echo "node=$(node --version)"
+            echo "pnpm=$(pnpm --version)"
+            echo "kernel=$(uname -srvm)"
+            echo "runner=${RUNNER_NAME:-unknown}"
+            echo "arch=$(uname -m)"
+            echo "browser=${{ matrix.browser }}"
+            echo "base=$BASE_SHA"
+            echo "candidate=$CANDIDATE_SHA"
+            echo "carrier=$GITHUB_SHA"
+            sha256sum "$base/dist/keyframes/index.js" "$candidate/dist/keyframes/index.js"
+          } > "browser-v15-${{ matrix.browser }}-environment.txt"
+
+      - name: Calibrate real-browser plane and conditionally compare
+        shell: bash
+        run: |
+          set -euo pipefail
+          prefix="browser-v15-${{ matrix.browser }}"
+          node scripts/research-implicit-identity-browser-v15.mjs \
+            "${{ matrix.browser }}" "$base" "$candidate" "$prefix"
+          test -s "$prefix-result.json"
+          node -e 'const r=require(`./${process.argv[1]}-result.json`); if (!r.verdict) process.exit(1); console.log(`scientific verdict=${r.verdict}`)' "$prefix"
+          sha256sum "$prefix-raw.jsonl" "$prefix-controls.json" "$prefix-result.json" "$prefix-environment.txt" > "$prefix-SHA256SUMS"
+
+      - name: Upload sealed v15 evidence
+        if: always()
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
+        with:
+          name: implicit-identity-browser-v15-${{ matrix.browser }}
+          path: |
+            browser-v15-${{ matrix.browser }}-raw.jsonl
+            browser-v15-${{ matrix.browser }}-controls.json
+            browser-v15-${{ matrix.browser }}-result.json
+            browser-v15-${{ matrix.browser }}-environment.txt
+            browser-v15-${{ matrix.browser }}-SHA256SUMS
+          if-no-files-found: warn
+          retention-days: 30
