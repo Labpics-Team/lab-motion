@@ -124,11 +124,13 @@ function ratios(rows, profile, phase, expectedRuns) {
       denominator = one(phaseRows, (row) => row.run === run && row.side === 'a', `${profile}/${phase}/${run}/a`);
       numerator = one(phaseRows, (row) => row.run === run && row.side === 'b', `${profile}/${phase}/${run}/b`);
     }
-    const num = numerator.ir / (numerator.nominal * numerator.factor);
-    const den = denominator.ir / (denominator.nominal * denominator.factor);
+    // Divide by the frozen nominal unit, not actual=factor*nominal. The positive
+    // control must preserve the deliberate 2× measured-work signal.
+    const num = numerator.ir / numerator.nominal;
+    const den = denominator.ir / denominator.nominal;
     const ratio = num / den;
     if (!Number.isFinite(ratio) || ratio <= 0) fail(`${profile}/${phase}/${run}: invalid ratio`);
-    return { run, ratio, numeratorIrPerOperation: num, denominatorIrPerOperation: den };
+    return { run, ratio, numeratorIrPerNominal: num, denominatorIrPerNominal: den };
   });
 }
 
