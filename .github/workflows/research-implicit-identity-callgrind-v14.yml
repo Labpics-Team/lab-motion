@@ -174,7 +174,7 @@ jobs:
             [[ "$events" == Ir ]] || { transport_fail 78 events-value "$profile" "$phase" "$run" "$side" "$out" "$log"; return 78; }
             ir="$(awk '$1 == "totals:" { if (NF != 2 || seen++) exit 2; print $2 } END { if (!seen) exit 3 }' "$out")" || { transport_fail 79 totals-shape "$profile" "$phase" "$run" "$side" "$out" "$log"; return 79; }
             [[ "$ir" =~ ^[0-9]+$ ]] && (( ir > 0 )) || { transport_fail 80 totals-value "$profile" "$phase" "$run" "$side" "$out" "$log"; return 80; }
-            collected="$(awk '/^==[0-9]+== Collected : / { if (NF != 5 || seen++) exit 2; print $5 } END { if (!seen) exit 3 }' "$log")" || { transport_fail 81 collected-shape "$profile" "$phase" "$run" "$side" "$out" "$log"; return 81; }
+            collected="$(awk '/^==[0-9]+== Collected : / { if (NF != 4 || seen++) exit 2; print $4 } END { if (!seen) exit 3 }' "$log")" || { transport_fail 81 collected-shape "$profile" "$phase" "$run" "$side" "$out" "$log"; return 81; }
             [[ "$collected" =~ ^[0-9]+$ ]] && [[ "$collected" == "$ir" ]] || { transport_fail 82 totals-collected-mismatch "$profile" "$phase" "$run" "$side" "$out" "$log"; return 82; }
 
             if ! python3 - "$receipt" "$profile" "$phase" "$run" "$side" "$impl" "$factor" "$nominal" "$ir" "$out" >> "$raw" <<'PY'
