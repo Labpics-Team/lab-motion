@@ -9,7 +9,7 @@
  */
 
 import { MotionParamError } from '../errors.js';
-import { settleTimeUpperBound, type SpringParams } from '../spring.js';
+import { type SpringParams } from '../spring.js';
 import {
   DEFAULT_CACHE_CAPACITY,
   clearSpringLinearCache,
@@ -21,9 +21,9 @@ import {
 import { roundShortest } from './format.js';
 import {
   assertSpringCurveBudget,
-  buildRestingSpringNodesWithHorizon,
-  tryBuildSpringNodes,
-  type SpringNode,
+  buildRestingSpringCurve,
+  tryBuildSpringCurve,
+  type SpringCurveGrid,
 } from './segmenter.js';
 
 export const DEFAULT_TOLERANCE: number = 1 / 400;
@@ -80,10 +80,11 @@ export function validateTolerance(tolerance: number): void {
 }
 
 function emitArtifact(
-  nodes: readonly SpringNode[],
+  curve: SpringCurveGrid,
   tolerance: number,
-  durationMs: number,
 ): SpringExecutionArtifactTuple {
+  const [xs, ys, kept, horizon] = curve;
+  const last = kept.length - 1;
   // Raw-кривая доказанно занимает ≤13/16 tolerance. Ещё 1/8 делим поровну:
   // округление progress ≤tol/16 и сдвиг времени ≤tol/16. Для кусочно-
   // линейной функции с максимальным наклоном L
@@ -91,13 +92,18 @@ function emitArtifact(
   // ≤L·max|Δpercent|. minGap не позволяет соседним stops схлопнуться.
   let maxSlope = 0;
   let minGap = 100;
-  for (let i = 1; i < nodes.length; i++) {
-    const a = nodes[i - 1]!;
-    const b = nodes[i]!;
-    const gap = b.percent - a.percent;
-    const slope = Math.abs((b.progress - a.progress) / gap);
+  let previousPercent = xs[kept[0]!]! * 100;
+  let previousProgress = ys[kept[0]!]!;
+  for (let i = 1; i <= last; i++) {
+    const k = kept[i]!;
+    const progress = i === last ? 1 : ys[k]!;
+    const percent = xs[k]! * 100;
+    const gap = percent - previousPercent;
+    const slope = Math.abs((progress - previousProgress) / gap);
     if (slope > maxSlope) maxSlope = slope;
     if (gap < minGap) minGap = gap;
+    previousPercent = percent;
+    previousProgress = progress;
   }
   const progressDigits = Math.max(4, Math.ceil(Math.log10(8 / tolerance)));
   const percentDigits = Math.max(
@@ -105,47 +111,42 @@ function emitArtifact(
     Math.ceil(Math.log10(8 * maxSlope / tolerance)),
     Math.ceil(Math.log10(2 / minGap)),
   );
-  const samples = new Float64Array(nodes.length * 2);
+  const samples = new Float64Array(kept.length * 2);
   let out = 'linear(';
-  for (let i = 0; i < nodes.length; i++) {
-    const node = nodes[i]!;
+  for (let i = 0; i <= last; i++) {
+    const k = kept[i]!;
+    const rawProgress = i === last ? 1 : ys[k]!;
+    const rawPercent = xs[k]! * 100;
     // Первый interior-stop — защищённая физическая касательная. Обычное
     // округление 4/3 меняло её slope на десятки процентов; shortest roundtrip
     // сохраняет оба double и тем самым v0 до машинной точности.
     const progress = i === 1 || progressDigits > 100
-      ? String(node.progress)
-      : roundShortest(node.progress, progressDigits);
+      ? String(rawProgress)
+      : roundShortest(rawProgress, progressDigits);
     const percent = i === 1 || percentDigits > 100
-        ? String(node.percent)
-        : roundShortest(node.percent, percentDigits);
+        ? String(rawPercent)
+        : roundShortest(rawPercent, percentDigits);
     out += (i === 0 ? '' : ', ') + progress + ' ' + percent + '%';
     // Number(token) моделирует CSS parser один раз на cold compile. TypedArray
-    // не совпадает по identity с caller-owned raw nodes и не выходит host-коду.
+    // не совпадает по identity с grid/RDP state и не выходит host-коду.
     samples[i * 2] = +percent;
     samples[i * 2 + 1] = +progress;
   }
-  return [out + ')', samples, durationMs];
+  return [out + ')', samples, horizon * 1000];
 }
 
-/**
- * Валидированная кривая → единый execution artifact. На hit возвращается тот же
- * защищённый объект до построения grid/RDP; prebuiltNodes не удерживаются.
- */
+/** Валидированная кривая → единый execution artifact. */
 export function compileSpringExecutionArtifactTupleUnchecked(
   spring: SpringParams,
   v0: number,
   tolerance: number,
   cache: SpringLinearCache<SpringExecutionArtifactTuple> = sharedCache,
-  prebuiltNodes?: readonly SpringNode[],
-  prebuiltDurationMs?: number,
 ): SpringExecutionArtifactTuple {
   const artifact = tryCompileSpringExecutionArtifactTupleUnchecked(
     spring,
     v0,
     tolerance,
     cache,
-    prebuiltNodes,
-    prebuiltDurationMs,
   );
   if (!artifact) {
     // Ошибочный public compile остаётся fail-fast; production preflight читает
@@ -164,8 +165,6 @@ export function tryCompileSpringExecutionArtifactTupleUnchecked(
   v0: number,
   tolerance: number,
   cache: SpringLinearCache<SpringExecutionArtifactTuple> = sharedCache,
-  prebuiltNodes?: readonly SpringNode[],
-  prebuiltDurationMs?: number,
 ): SpringExecutionArtifactTuple | undefined {
   const { mass, stiffness, damping } = spring;
   // Единственный production-consumer: inline оставляет functional core отдельно
@@ -179,19 +178,9 @@ export function tryCompileSpringExecutionArtifactTupleUnchecked(
     tolerance,
   );
   if (hit) return hit;
-  let nodes = prebuiltNodes;
-  let durationMs = prebuiltDurationMs;
-  if (nodes === undefined) {
-    const build = tryBuildSpringNodes(spring, v0, tolerance);
-    if (!build) return;
-    nodes = build[0];
-    durationMs = build[1] * 1000;
-  }
-  const artifact = emitArtifact(
-    nodes,
-    tolerance,
-    durationMs ?? settleTimeUpperBound(spring, v0) * 1000,
-  );
+  const curve = tryBuildSpringCurve(spring, v0, tolerance);
+  if (!curve) return;
+  const artifact = emitArtifact(curve, tolerance);
   /* @__INLINE__ */ storeSpringLinearCache(
     cache,
     mass,
@@ -213,16 +202,12 @@ export function compileSpringExecutionArtifactUnchecked(
   v0: number,
   tolerance: number,
   cache: SpringLinearCache<SpringExecutionArtifactTuple> = sharedCache,
-  prebuiltNodes?: readonly SpringNode[],
-  prebuiltDurationMs?: number,
 ): SpringExecutionArtifact {
   const artifact = compileSpringExecutionArtifactTupleUnchecked(
     spring,
     v0,
     tolerance,
     cache,
-    prebuiltNodes,
-    prebuiltDurationMs,
   );
   return artifact[3] ??= { easing: artifact[0], samples: artifact[1] };
 }
@@ -233,16 +218,12 @@ export function compileSpringEasingUnchecked(
   v0: number,
   tolerance: number,
   cache: SpringLinearCache<SpringExecutionArtifactTuple> = sharedCache,
-  prebuiltNodes?: readonly SpringNode[],
-  prebuiltDurationMs?: number,
 ): string {
   return compileSpringExecutionArtifactTupleUnchecked(
     spring,
     v0,
     tolerance,
     cache,
-    prebuiltNodes,
-    prebuiltDurationMs,
   )[0];
 }
 
@@ -262,8 +243,8 @@ export function compileRestingSpringExecutionArtifactTupleUnchecked(
       && entry[3] === tolerance
     ) return entry[4];
   }
-  const build = buildRestingSpringNodesWithHorizon(spring, tolerance);
-  const artifact = emitArtifact(build[0], tolerance, build[1] * 1000);
+  const curve = buildRestingSpringCurve(spring, tolerance);
+  const artifact = emitArtifact(curve, tolerance);
   restingCache.push([mass, stiffness, damping, tolerance, artifact]);
   if (restingCache.length > RESTING_CACHE_CAPACITY) restingCache.shift();
   return artifact;

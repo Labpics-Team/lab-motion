@@ -25,9 +25,9 @@ vi.mock('../src/compositor/segmenter.js', async (importOriginal) => {
       work.builds++;
       return actual.buildSpringNodesWithHorizon(...args);
     },
-    tryBuildSpringNodes(...args: Parameters<typeof actual.tryBuildSpringNodes>) {
+    tryBuildSpringCurve(...args: Parameters<typeof actual.tryBuildSpringCurve>) {
       work.builds++;
-      return actual.tryBuildSpringNodes(...args);
+      return actual.tryBuildSpringCurve(...args);
     },
   };
 });

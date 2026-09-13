@@ -47,6 +47,14 @@ export interface SpringNode {
   readonly percent: number;
 }
 
+/** Компактный внутренний результат grid+RDP без materialization узлов. */
+export type SpringCurveGrid = readonly [
+  xs: readonly number[],
+  ys: readonly number[],
+  kept: readonly number[],
+  horizon: number,
+];
+
 // ─── Плотность базовой сетки (из бонда кривизны, не из числа осцилляций) ─────
 //
 // Ошибка реконструкции = (ошибка RDP на узлах сетки) + (кусочно-линейная ошибка
@@ -230,61 +238,80 @@ export function buildSpringNodesWithHorizon(
   tolerance: number,
 ): [nodes: SpringNode[], horizon: number] {
   const settle = springCompileHorizon(params, v0, tolerance);
-  return [
-    buildSpringNodesAtHorizon(
-      params,
-      v0,
-      tolerance,
-      settle,
-      baseGridSize(params, settle, tolerance, v0),
-    ),
+  const curve = buildSpringCurveAtHorizon(
+    params,
+    v0,
+    tolerance,
     settle,
-  ];
+    baseGridSize(params, settle, tolerance, v0),
+  );
+  return [materializeSpringNodes(curve), curve[3]];
+}
+
+function materializeSpringNodes(curve: SpringCurveGrid): SpringNode[] {
+  const [xs, ys, kept] = curve;
+  return kept.map((k, n): SpringNode => ({
+    progress: n === kept.length - 1 ? 1 : ys[k]!,
+    percent: xs[k]! * 100,
+  }));
 }
 
 /**
- * Production compile-as-preflight: безопасная кривая сразу строится и готова к
- * кэшированию; over-cap возвращает undefined до сетки/RDP и до смены owner.
+ * Production compile-as-preflight сохраняет уже существующие grid/RDP-массивы
+ * до сериализации и не строит промежуточные SpringNode-объекты.
  */
+export function tryBuildSpringCurve(
+  params: SpringParams,
+  v0: number,
+  tolerance: number,
+): SpringCurveGrid | undefined {
+  const settle = springCompileHorizon(params, v0, tolerance);
+  const intervals = requiredGridSize(params, settle, tolerance, v0);
+  if (!Number.isSafeInteger(intervals) || intervals > BASE_GRID_MAX) return undefined;
+  return buildSpringCurveAtHorizon(params, v0, tolerance, settle, intervals);
+}
+
+/** Совместимый диагностический seam; production execution его не вызывает. */
 export function tryBuildSpringNodes(
   params: SpringParams,
   v0: number,
   tolerance: number,
 ): [nodes: SpringNode[], horizon: number] | undefined {
-  const settle = springCompileHorizon(params, v0, tolerance);
-  const intervals = requiredGridSize(params, settle, tolerance, v0);
-  if (!Number.isSafeInteger(intervals) || intervals > BASE_GRID_MAX) return undefined;
-  return [
-    buildSpringNodesAtHorizon(params, v0, tolerance, settle, intervals),
-    settle,
-  ];
+  const curve = tryBuildSpringCurve(params, v0, tolerance);
+  return curve === undefined ? undefined : [materializeSpringNodes(curve), curve[3]];
 }
 
-/** Specialized v0=0 nodes + тот же horizon для native artifact. */
+/** Specialized v0=0 compact grid + тот же horizon для native artifact. */
+export function buildRestingSpringCurve(
+  params: SpringParams,
+  tolerance: number,
+): SpringCurveGrid {
+  const settle = springCompileHorizon(params, 0, tolerance);
+  return buildSpringCurveAtHorizon(
+    params,
+    0,
+    tolerance,
+    settle,
+    baseGridSize(params, settle, tolerance),
+  );
+}
+
+/** Совместимый диагностический v0=0 seam. */
 export function buildRestingSpringNodesWithHorizon(
   params: SpringParams,
   tolerance: number,
 ): [nodes: SpringNode[], horizon: number] {
-  const settle = springCompileHorizon(params, 0, tolerance);
-  return [
-    buildSpringNodesAtHorizon(
-      params,
-      0,
-      tolerance,
-      settle,
-      baseGridSize(params, settle, tolerance),
-    ),
-    settle,
-  ];
+  const curve = buildRestingSpringCurve(params, tolerance);
+  return [materializeSpringNodes(curve), curve[3]];
 }
 
-function buildSpringNodesAtHorizon(
+function buildSpringCurveAtHorizon(
   params: SpringParams,
   v0: number,
   tolerance: number,
   settle: number,
   intervals: number,
-): SpringNode[] {
+): SpringCurveGrid {
   // Валидный набор params всегда оседает в бюджет (гарантия validateSpringForFrameLoop),
   // так что settle конечно; на всякий случай — деградация к малой ненулевой шкале.
   const T = Number.isFinite(settle) && settle > 0 ? settle : 1;
@@ -321,8 +348,5 @@ function buildSpringNodesAtHorizon(
   // eps = tolerance/2: вторая половина бюджета — под дискретизацию базовой сетки
   // (baseGridSize её и гарантирует ≤ tol/2) ⇒ суммарная реконструкция ≤ tolerance.
   const kept = douglasPeuckerVertical(xs, ys, tolerance / 2, 1);
-  return kept.map((k, n): SpringNode => ({
-    progress: n === kept.length - 1 ? 1 : ys[k]!,
-    percent: xs[k]! * 100,
-  }));
+  return [xs, ys, kept, settle];
 }

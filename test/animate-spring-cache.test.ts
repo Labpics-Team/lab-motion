@@ -6,9 +6,9 @@ vi.mock('../src/compositor/segmenter.js', async (importOriginal) => {
   const actual = await importOriginal<typeof import('../src/compositor/segmenter.js')>();
   return {
     ...actual,
-    tryBuildSpringNodes(...args: Parameters<typeof actual.tryBuildSpringNodes>) {
+    tryBuildSpringCurve(...args: Parameters<typeof actual.tryBuildSpringCurve>) {
       work.builds++;
-      return actual.tryBuildSpringNodes(...args);
+      return actual.tryBuildSpringCurve(...args);
     },
   };
 });
