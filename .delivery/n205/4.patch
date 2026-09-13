@@ -1,0 +1,182 @@
+diff --git a/src/animate/waapi-unit.ts b/src/animate/waapi-unit.ts
+index edf9ff6..85ea455 100644
+--- a/src/animate/waapi-unit.ts
++++ b/src/animate/waapi-unit.ts
+@@ -4 +4 @@
+- * Условие маршрута (решает фасад): spring-режим + compositor-eligible группа
++ * Условие маршрута (решает фасад): spring либо linear N-track + compositor-eligible группа
+@@ -44,0 +45 @@ import {
++  mixChannel,
+@@ -54,0 +56,2 @@ import {
++import type { KeyframeArtifact } from './keyframe-native.js';
++import { sampleTrack, trackVelocity } from './keyframe-track.js';
+@@ -93 +96 @@ export interface WaapiUnitOptions {
+-  readonly _spring: SpringParams;
++  readonly _spring: SpringParams | undefined;
+@@ -100,2 +103,2 @@ export interface WaapiUnitOptions {
+-  /** Plan-фаза уже доказала и скомпилировала exact WAAPI-кривую. */
+-  readonly _artifact: SpringExecutionArtifactTuple;
++  /** Plan-фаза уже доказала native-представимость пружины либо linear track. */
++  readonly _artifact: SpringExecutionArtifactTuple | KeyframeArtifact;
+@@ -120,0 +124 @@ export class WaapiUnit implements GroupOwner {
++  private _trackTime = 0;
+@@ -239 +243 @@ export class WaapiUnit implements GroupOwner {
+-      this._emit(0, artifact);
++      this._emit('_frames' in artifact ? -this._trackTime : 0, artifact);
+@@ -263,0 +268,2 @@ export class WaapiUnit implements GroupOwner {
++    const track = '_frames' in artifact;
++    const terminal = track && this._trackTime >= this._durationMs;
+@@ -267 +273 @@ export class WaapiUnit implements GroupOwner {
+-      if (wasPaused) this._holdInline();
++      if (wasPaused || track) this._holdInline();
+@@ -270 +276 @@ export class WaapiUnit implements GroupOwner {
+-      if (!wasPaused) this._emit(0, artifact);
++      if (!wasPaused && !terminal) this._emit(track ? -this._trackTime : 0, artifact);
+@@ -272,2 +278,2 @@ export class WaapiUnit implements GroupOwner {
+-    if (wasPaused) return;
+-    this._commit();
++    if (terminal) this._complete();
++    else if (!wasPaused) this._commit();
+@@ -296 +302,4 @@ export class WaapiUnit implements GroupOwner {
+-  private _emit(delayMs: number, artifact: SpringExecutionArtifactTuple): void {
++  private _emit(delayMs: number, artifact: SpringExecutionArtifactTuple | KeyframeArtifact): void {
++    // Огромный отрицательный host clock может сделать оставшийся delay
++    // непредставимым. Отказ до host-effects сохраняет retryable paused owner.
++    if (!Number.isFinite(delayMs)) throw new MotionParamError('LM139');
+@@ -298,13 +307,20 @@ export class WaapiUnit implements GroupOwner {
+-    const explicit = requiresExplicitSpringKeyframes();
+-    const samples = artifact[1];
+-    const durationMs = artifact[2];
+-    const count = explicit ? samples.length / 2 : 2;
+-    const frames = new Array<Record<string, string | number>>(count);
+-    const stride = explicit ? 2 : samples.length - 2;
+-    for (let i = 0; i < count; i++) {
+-      const sample = i * stride;
+-      const progress = samples[sample + 1]!;
+-      frames[i] = {
+-        offset: samples[sample]! / 100,
+-        [o._group]: this._valueAt(progress),
+-      };
++    let frames: Record<string, string | number>[];
++    let durationMs: number;
++    let easing = 'linear';
++    if ('_frames' in artifact) {
++      frames = artifact._frames;
++      durationMs = artifact._durationMs;
++      this._trackTime = -delayMs;
++    } else {
++      const explicit = requiresExplicitSpringKeyframes();
++      const samples = artifact[1];
++      durationMs = artifact[2];
++      const count = explicit ? samples.length / 2 : 2;
++      frames = new Array<Record<string, string | number>>(count);
++      const stride = explicit ? 2 : samples.length - 2;
++      for (let i = 0; i < count; i++) {
++        const sample = i * stride;
++        frames[i] = { offset: samples[sample]! / 100, [o._group]: this._valueAt(samples[sample + 1]!) };
++      }
++      this._samples = samples;
++      easing = explicit ? 'linear' : artifact[0];
+@@ -314 +329,0 @@ export class WaapiUnit implements GroupOwner {
+-    this._samples = samples;
+@@ -319 +334 @@ export class WaapiUnit implements GroupOwner {
+-        easing: explicit ? 'linear' : artifact[0],
++        easing,
+@@ -323 +338 @@ export class WaapiUnit implements GroupOwner {
+-        ...(delayMs > 0 ? { delay: delayMs } : {}),
++        ...(delayMs !== 0 ? { delay: delayMs } : {}),
+@@ -355 +370 @@ export class WaapiUnit implements GroupOwner {
+-  private _valueAt(p: number): string | number {
++  private _valueAt(p?: number): string | number {
+@@ -359 +374 @@ export class WaapiUnit implements GroupOwner {
+-      for (const ch of o._numeric) state[ch._key] = channelAt(ch, p);
++      for (const ch of o._numeric) state[ch._key] = p === undefined ? ch._value : channelAt(ch, p);
+@@ -362 +377,2 @@ export class WaapiUnit implements GroupOwner {
+-    return channelAt(o._numeric[0]!, p);
++    const ch = o._numeric[0]!;
++    return p === undefined ? ch._value : channelAt(ch, p);
+@@ -366,0 +383,12 @@ export class WaapiUnit implements GroupOwner {
++    if ('_frames' in this._o._artifact) {
++      // После authored конца состояние постоянно; огромный конечный clock
++      // не должен превратить сдвиг следующего replay в -Infinity.
++      this._trackTime = Math.min(currentTimeMs - delayMs, this._durationMs);
++      const p = this._trackTime / this._durationMs;
++      for (const ch of this._o._numeric) {
++        ch._value = sampleTrack(ch._track!, p, mixChannel);
++        const sample = trackVelocity(ch._track!, p, this._durationMs);
++        ch._velocity = scaleSerializedVelocity(sample._dpdt, sample._from, sample._to);
++      }
++      return;
++    }
+@@ -383,0 +412 @@ export class WaapiUnit implements GroupOwner {
++    if (this._paused && '_frames' in this._o._artifact) return;
+@@ -407 +436 @@ export class WaapiUnit implements GroupOwner {
+-  private _tryReseedFromSnapshot(): SpringExecutionArtifactTuple | undefined {
++  private _tryReseedFromSnapshot(): SpringExecutionArtifactTuple | KeyframeArtifact | undefined {
+@@ -408,0 +438 @@ export class WaapiUnit implements GroupOwner {
++    if ('_frames' in o._artifact) return o._artifact;
+@@ -413 +443 @@ export class WaapiUnit implements GroupOwner {
+-      o._spring,
++      o._spring!,
+@@ -450 +480 @@ export class WaapiUnit implements GroupOwner {
+-          _mode: { _type: 'spring', _spring: o._spring },
++          _mode: { _type: 'spring', _spring: o._spring! },
+@@ -471,8 +501 @@ export class WaapiUnit implements GroupOwner {
+-    const o = this._o;
+-    if (o._group === 'transform') {
+-      const state = o._transform!;
+-      for (const ch of o._numeric) state[ch._key] = ch._value;
+-      o._el.style.setProperty('transform', buildTransform(state));
+-    } else {
+-      o._el.style.setProperty(o._group, String(o._numeric[0]!._value));
+-    }
++    this._o._el.style.setProperty(this._o._group, String(this._valueAt()));
+diff --git a/src/errors.ts b/src/errors.ts
+index f17d746..ade900c 100644
+--- a/src/errors.ts
++++ b/src/errors.ts
+@@ -17 +17 @@ const MOTION_PARAM_ERROR_CODE = /^LM\d{3}$/;
+-export const LAST_MOTION_PARAM_ERROR_CODE: MotionParamErrorCode = 'LM172';
++export const LAST_MOTION_PARAM_ERROR_CODE: MotionParamErrorCode = 'LM173';
+diff --git a/src/internal/keyframe-position.ts b/src/internal/keyframe-position.ts
+new file mode 100644
+index 0000000..3adce58
+--- /dev/null
++++ b/src/internal/keyframe-position.ts
+@@ -0,0 +1,15 @@
++/** Правый сегмент неубывающей шкалы; caller отдельно обрабатывает endpoints. */
++export function keyframeSegment(times: readonly number[], p: number): number {
++  let segment = 0;
++  let high = times.length - 1;
++  if (high > 9) {
++    while (high - segment > 1) {
++      const middle = (segment + high) >>> 1;
++      if (p < times[middle]!) high = middle;
++      else segment = middle;
++    }
++  } else {
++    while (p >= times[segment + 1]!) segment++;
++  }
++  return segment;
++}
+diff --git a/src/internal/sample-keyframes.ts b/src/internal/sample-keyframes.ts
+index 206c0f5..798faf7 100644
+--- a/src/internal/sample-keyframes.ts
++++ b/src/internal/sample-keyframes.ts
+@@ -0,0 +1,2 @@
++import { keyframeSegment } from './keyframe-position.js';
++
+@@ -20,12 +22 @@ export function sampleKeyframesUnchecked(
+-  let segment = 0;
+-  if (n > 10) {
+-    let high = n - 1;
+-    while (high - segment > 1) {
+-      const middle = (segment + high) >>> 1;
+-      if (p < times[middle]!) high = middle;
+-      else segment = middle;
+-    }
+-  } else {
+-    // p < times[last] from the endpoint guard, so the sentinel stops the scan.
+-    while (p >= times[segment + 1]!) segment++;
+-  }
++  const segment = keyframeSegment(times, p);
