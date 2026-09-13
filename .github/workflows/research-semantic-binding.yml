@@ -1,46 +1,35 @@
-name: Semantic binding acceptance delivery
+name: Semantic binding source readback
 on:
   push:
     branches: [research/semantic-binding-delivery-20260913]
 permissions:
-  contents: write
+  contents: read
 jobs:
-  deliver:
+  source:
     runs-on: ubuntu-latest
     timeout-minutes: 5
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
         with:
-          ref: 4dbd72b82782756e7fee97e1ebb7d01a685a67ca
-          fetch-depth: 1
+          ref: 38742c875c013c42cd10d1119702f971067e7d14
+          fetch-depth: 0
           persist-credentials: false
-      - name: Verify readable patches and publish only a new candidate branch
-        env:
-          GH_TOKEN: ${{ github.token }}
+      - name: Export immutable source
         shell: bash
         run: |
           set -euo pipefail
-          python3 - <<'PY'
-          import subprocess,json,base64,hashlib,pathlib
-          repo='repos/Labpics-Team/lab-motion'
-          base='4dbd72b82782756e7fee97e1ebb7d01a685a67ca'
-          expected='2874ed1c7ce3c100e1d3b3f14000e37d09594097'
-          def git(*args): return subprocess.check_output(['git',*args],text=True).strip()
-          def get(route): return json.loads(subprocess.check_output(['gh','api',repo+route],text=True))
-          def post(route,payload):
-            return json.loads(subprocess.check_output(['gh','api','--method','POST',repo+route,'--input','-'],input=json.dumps(payload,ensure_ascii=False),text=True))
-          assert git('rev-parse','HEAD')==base
-          patches=['7d4d81a0c1134f34f3e9184d10a92da6671a8c19','2c9eddd8505081d7a76511e45fc1c91f3cc7f99a','08b178f8ea6a154851bcbbda8438bab2993cf27c','8554e01f3e30ab789f9a26556a02d959eb13c305','4cf9180b143fd5eb5db3e84d531c2dca835175e0']
-          for sha in patches:
-            patch=base64.b64decode(get('/git/blobs/'+sha)['content'])
-            assert hashlib.sha1(b'blob '+str(len(patch)).encode()+b'\0'+patch).hexdigest()==sha
-            subprocess.run(['git','apply','--index','-'],input=patch,check=True)
-          assert git('write-tree')==expected
-          paths=['CHANGELOG.md','browser/semantic-motion-binding.spec.ts','docs/bindings.md','docs/errors.md','docs/recipes.md','scripts/check-binding-mutations.mjs','scripts/release-metadata.mjs','src/bindings/index.ts','test/release-artifact.test.ts','test/release-metadata.test.ts','test/semantic-motion-binding-consumer.test.ts','test/semantic-motion-binding-mutation.test.ts','test/semantic-motion-binding.test.ts']
-          assert git('diff','--cached','--name-only').splitlines()==paths
-          tree=post('/git/trees',{'base_tree':git('rev-parse','HEAD^{tree}'),'tree':[{'path':p,'mode':'100644','type':'blob','content':pathlib.Path(p).read_text()} for p in paths]})
-          assert tree['sha']==expected
-          commit=post('/git/commits',{'message':'feat(bindings): независимая навигация и полная приёмка семантических целей','tree':expected,'parents':[base]})
-          ref=post('/git/refs',{'ref':'refs/heads/research/binding-acceptance-20260913','sha':commit['sha']})
-          print(json.dumps({'base':base,'head':commit['sha'],'tree':expected,'ref':ref['ref'],'paths':paths},ensure_ascii=False))
-          PY
+          test "$(git rev-parse HEAD)" = 38742c875c013c42cd10d1119702f971067e7d14
+          test "$(git rev-parse HEAD^{tree})" = 2874ed1c7ce3c100e1d3b3f14000e37d09594097
+          mkdir "$RUNNER_TEMP/binding-source"
+          git bundle create "$RUNNER_TEMP/binding-source/source.bundle" HEAD
+          git rev-parse HEAD HEAD^{tree} > "$RUNNER_TEMP/binding-source/revision.txt"
+          cd "$RUNNER_TEMP/binding-source"
+          sha256sum source.bundle revision.txt > SHA256SUMS
+      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
+        with:
+          name: binding-source-38742c8
+          path: ${{ runner.temp }}/binding-source/
+          retention-days: 1
+          compression-level: 0
+          if-no-files-found: error
+          overwrite: false
