@@ -1,81 +1,33 @@
-name: Presence immutable tree delivery
+name: Presence current candidate source
 on:
   push:
     branches: ["research/presence-delivery-381"]
 permissions:
   contents: read
 jobs:
-  deliver-tree:
+  export-source:
     runs-on: ubuntu-latest
-    permissions:
-      contents: write
     timeout-minutes: 5
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
         with:
-          ref: 93278bf9b540f93521c7bd4c02f68db458e5db7a
+          ref: 9d2da978dcdbab8ae9f28a7b0a7fde5c6ce58f9e
           fetch-depth: 0
           persist-credentials: false
-      - name: Materialize only verified product paths and publish Git tree without refs
+      - name: Export immutable source without writes
         shell: bash
-        env:
-          GH_TOKEN: ${{ github.token }}
         run: |
           set -euo pipefail
-          python3 - <<'PY'
-          import os,json,base64,hashlib,pathlib,subprocess
-          root=pathlib.Path.cwd()
-          evidence=pathlib.Path(os.environ['RUNNER_TEMP'])/'presence-evidence'
-          evidence.mkdir()
-          git=lambda *args:subprocess.check_output(['git',*args],text=True).strip()
-          assert git('rev-parse','HEAD')=='93278bf9b540f93521c7bd4c02f68db458e5db7a'
-          assert git('rev-parse','HEAD^{tree}')=='2f2257ab4a5a889517bd5e6aa2a66ae588fe2c65'
-          def blob(sha):
-            raw=subprocess.check_output(['gh','api','repos/Labpics-Team/lab-motion/git/blobs/'+sha])
-            b=base64.b64decode(json.loads(raw)['content'])
-            assert hashlib.sha1(b'blob '+str(len(b)).encode()+b'\0'+b).hexdigest()==sha
-            return b.decode()
-          def append(path,sha):
-            p=root/path;p.write_text(p.read_text()+blob(sha))
-          def replace(path,old,new):
-            p=root/path;text=p.read_text();assert text.count(old)==1,(path,old)
-            p.write_text(text.replace(old,new))
-          append('src/presence/index.ts','5b44c3344900c8a1f980ca0f4b2be7bbfd2a8c4c')
-          append('docs/recipes.md','816e5da1b07ed5195480fb00ef3c1822941d62f2')
-          files={
-            'test/presence-transition.test.ts':'4987052adb6a2d57229d506f3155ceb74b9b3eee',
-            'test/presence-transition-consumer.test.ts':'c3364bff2225ad018a211220a0eb98282e7848f0',
-            'browser/presence-transition.spec.ts':'10b86df1bba6f380fd337803173b19fbc2e1bd2b',
-            'docs/presence.md':'0dde83207a721d815d7c1a63c9a727e48471edd6',
-          }
-          for path,sha in files.items():
-            p=root/path;assert not p.exists();p.write_text(blob(sha))
-          replace('test/presence.test.ts',"['createPresence', 'swapPresence']","['createPresence', 'createPresenceTransition', 'swapPresence']")
-          replace('docs/api.md','Enter/exit lifecycle: «доиграй exit-анимацию → потом убирай из DOM», прерывания, `swapPresence` (wait/sync)','[Управляемый enter/exit](presence.md): `createPresenceTransition`, группа исполнителей и отменяемый уход; низкоуровневые `createPresence`, `swapPresence`')
-          replace('package.json','    "docs/recipes.md",','    "docs/recipes.md",\n    "docs/presence.md",')
-          replace('CHANGELOG.md','## [Unreleased]\n\n','## [Unreleased]\n\n### Добавлено\n\n- `./presence`: `createPresenceTransition` — одна цель видимости, группа анимаций, отмена устаревшего ухода и наблюдаемый результат; готовый рецепт нативного диалога.\n\n')
-          paths=sorted([*files,'src/presence/index.ts','docs/recipes.md','test/presence.test.ts','docs/api.md','package.json','CHANGELOG.md'])
-          subprocess.run(['git','add','--',*paths],check=True)
-          assert git('diff','--cached','--name-only').splitlines()==paths
-          subprocess.run(['git','diff','--cached','--check'],check=True)
-          expected='1d88c8cf85b195073932cada48f9c71412ddd673'
-          assert git('write-tree')==expected
-          payload={'base_tree':git('rev-parse','HEAD^{tree}'),'tree':[{'path':p,'mode':'100644','type':'blob','content':(root/p).read_text()} for p in paths]}
-          payload_file=evidence/'tree-request.json';payload_file.write_text(json.dumps(payload))
-          out=subprocess.check_output(['gh','api','--method','POST','repos/Labpics-Team/lab-motion/git/trees','--input',str(payload_file)],text=True)
-          (evidence/'tree-response.json').write_text(out)
-          assert json.loads(out)['sha']==expected
-          (evidence/'candidate.patch').write_text(subprocess.check_output(['git','diff','--cached','--binary'],text=True))
-          (evidence/'receipt.json').write_text(json.dumps({'base':git('rev-parse','HEAD'),'tree':expected,'paths':paths,'objectsOnly':True,'refsWritten':False},indent=2))
-          payload_file.unlink()
-          for p in list(evidence.iterdir()):
-            if p.is_file():print(hashlib.sha256(p.read_bytes()).hexdigest(),p.name)
-          PY
+          test "$(git rev-parse HEAD)" = 9d2da978dcdbab8ae9f28a7b0a7fde5c6ce58f9e
+          mkdir "$RUNNER_TEMP/presence-source"
+          git bundle create "$RUNNER_TEMP/presence-source/source.bundle" HEAD
+          git rev-parse HEAD HEAD^{tree} > "$RUNNER_TEMP/presence-source/revision.txt"
+          cd "$RUNNER_TEMP/presence-source"
+          sha256sum source.bundle revision.txt > SHA256SUMS
       - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
-        if: ${{ always() }}
         with:
-          name: presence-tree-delivery
-          path: ${{ runner.temp }}/presence-evidence/
+          name: presence-current-source-9d2da978
+          path: ${{ runner.temp }}/presence-source/
           retention-days: 7
           if-no-files-found: error
           compression-level: 0
