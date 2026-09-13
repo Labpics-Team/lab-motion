@@ -59,6 +59,7 @@ import { scheduleStagger } from '../stagger/scheduler.js';
 import { buildTransform } from '../value/transform.js';
 import {
   bindGroup,
+  configureTracks,
   cssAt,
   groupRecord,
   parseProps,
@@ -83,6 +84,9 @@ import {
 } from './targets.js';
 import { WaapiUnit, type WaapiTarget } from './waapi-unit.js';
 
+import { nativeKeyframeArtifact, type KeyframeArtifact } from './keyframe-native.js';
+import { snapshotTrackArray, MAX_TRACK_STOPS, type TrackEase } from './keyframe-track.js';
+
 // ─── Публичные типы ──────────────────────────────────────────────────────────
 
 export type { AnimatableElement };
@@ -94,11 +98,12 @@ export type AnimateTarget =
   | ArrayLike<AnimatableElement>
   | readonly AnimatableElement[];
 
-/** Значение канала: цель или пара [from, to] (явный from отключает подхват). */
+/** Цель, пара [from, to] либо массив N>=3. Первый authored stop отключает
+ * подхват входной скорости; последующий spring наследует скорость track. */
 export type AnimatePropValue =
   | number
   | string
-  | readonly [number | string, number | string];
+  | readonly (number | string)[];
 
 /** Каналы движения: transform-шортхенды, opacity, любые CSS-свойства. */
 export type AnimateProps = Record<string, AnimatePropValue>;
@@ -109,8 +114,11 @@ export interface AnimateOptions {
   readonly spring?: SpringParams | undefined;
   /** Длительность tween (мс). Задана → режим tween (дефолт ease: standard). */
   readonly duration?: number | undefined;
-  /** Изинг tween t∈[0,1]→прогресс. Задан без duration → duration.base. */
-  readonly ease?: ((t: number) => number) | undefined;
+  /** Easing t∈[0,1]→прогресс. Для track — общий либо N−1 функций по сегментам.
+   * Задан без duration → duration.base. Строки и cubic-bezier tuples не принимаются. */
+  readonly ease?: TrackEase;
+  /** Доли авторских keyframes; одна общая topology для всех свойств. */
+  readonly times?: readonly number[] | undefined;
   /** Задержка старта (мс, ≥ 0) — всем целям. */
   readonly delay?: number | undefined;
   /** Каскад для многих целей: число = gap (мс) или конфиг ./stagger. */
@@ -203,10 +211,11 @@ function defaultSetTimer(cb: () => void, ms: number): () => void {
 
 // ─── Разбор опций ────────────────────────────────────────────────────────────
 
-function resolveMode(options: AnimateOptions): MotionMode {
-  const input = options.spring;
-  const durationInput = options.duration;
-  const easeInput = options.ease;
+function resolveMode(
+  input: SpringParams | undefined,
+  durationInput: number | undefined,
+  easeInput: ((t: number) => number) | undefined,
+): MotionMode {
   const hasSpring = input !== undefined;
   const hasTween = durationInput !== undefined || easeInput !== undefined;
   if (hasSpring && hasTween) {
@@ -325,7 +334,7 @@ type PlannedGroup = readonly [
   bound: BoundGroup,
   delayMs: number,
   /** Tier 3 — reduced, undefined — main, tuple — compositor. */
-  execution: SpringExecutionArtifactTuple | Extract<CompositorTierCode, 3> | undefined,
+  execution: SpringExecutionArtifactTuple | KeyframeArtifact | Extract<CompositorTierCode, 3> | undefined,
 ];
 
 // ─── animate ─────────────────────────────────────────────────────────────────
@@ -358,12 +367,30 @@ export function animate(
   // 1. Options — первая граница: остальные входы могут быть hostile getters.
   options = requireAnimateOptions(options);
   // Остальная валидация — вся ДО побочных эффектов (ноль записей при броске).
-  const mode = resolveMode(options);
+  const springInput = options.spring;
+  const durationInput = options.duration;
+  const easeInput = options.ease;
+  const multipleEase = Array.isArray(easeInput);
+  if (multipleEase && springInput !== undefined) throw new MotionParamError('LM136');
+  let mode = resolveMode(springInput, durationInput, multipleEase ? undefined : easeInput as ((t: number) => number) | undefined);
+  const timesInput = options.times;
+  const times = timesInput === undefined ? undefined : snapshotTrackArray(timesInput) as number[];
+  const ease = multipleEase ? snapshotTrackArray(easeInput) as Array<(t: number) => number> : easeInput;
+  if (Array.isArray(ease) && ease.some((fn) => typeof fn !== 'function')) throw new MotionParamError('LM138');
   const baseDelay = resolveDelay(options.delay);
   const staggerInput = options.stagger;
   if (typeof staggerInput === 'number') resolveDelay(staggerInput);
   const specs = parseProps(requireAnimateProps(props));
+  let trackStops = 0;
+  if (times !== undefined || multipleEase || specs.some((spec) => spec._track !== undefined)) {
+    if (springInput !== undefined) throw new MotionParamError('LM136');
+    trackStops = configureTracks(specs, times, ease);
+    mode = { _type: 'keyframes', _durationMs: durationInput ?? DEFAULT_DURATION_MS };
+  }
   const els = resolveTargets(target);
+  if (trackStops * els.length > MAX_TRACK_STOPS) {
+    throw new MotionParamError('LM173');
+  }
   let targetDelays: number[] | undefined;
   if (staggerInput !== undefined) {
     targetDelays = typeof staggerInput === 'number'
@@ -412,6 +439,8 @@ export function animate(
       const v0 = sharedV0(bound._numeric);
       const execution = tier === 3
         ? tier
+        : tier === 0 && mode._type === 'keyframes'
+          ? nativeKeyframeArtifact(bound, group, mode._durationMs)
         : tier === 0 &&
           mode._type === 'spring' &&
           (group === 'transform' || group === 'opacity') &&
@@ -502,7 +531,7 @@ export function animate(
             _numeric: bound._numeric,
             _residuals: bound._residuals,
             _transform: bound._transform,
-            _spring: (mode as Extract<MotionMode, { _type: 'spring' }>)._spring,
+            _spring: mode._type === 'spring' ? mode._spring : undefined,
             _delayMs: delayMs,
             _now: now,
             _setTimer: setTimer,

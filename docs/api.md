@@ -32,7 +32,7 @@ export-ветки) и `pnpm pack:compat` (TypeScript/Vite, SSR, tree shaking, т
 | `…/driver` | Scrubbable-контроллер: `play/pause/reverse/seek/timeScale/progress` + thenable |
 | `…/frame` | Единый frame-шедулер: `createFrameLoop` / синглтон `frame` — один rAF на кадр, фазы read→update→render против layout-thrash, SSR-safe; `asRequestFrame(loop)` сажает `MotionValue`/`drive` на общий кадр. **Биндинги используют его по умолчанию** (как shared-ticker у Framer Motion/GSAP); инжекция своего `requestFrame` переопределяет |
 | `…/nano` | **Platform-trusted WAAPI to-only ≤ 1 КБ gzip**: spring/tween, `delay`/`stagger`, reduced-motion, сами `Animation` как контролы; полный контракт и границы — ниже |
-| `…/animate` | Фасад-one-liner: `animate(target, props, options)` — цели по каналам (`x`/`y`/`scale`/`rotate`, `opacity`, CSS-свойства), режим `{ spring }` или `{ duration, ease }`, `delay`/`stagger`, контролы `{ finished, play, pause, seek, cancel, stop }`. Это базовый single-transition DX-срез; ядро от него не растёт |
+| `…/animate` | Фасад-one-liner: `animate(target, props, options)` — цели по каналам (`x`/`y`/`scale`/`rotate`, `opacity`, CSS-свойства), режим `{ spring }` или `{ duration, ease }`, `delay`/`stagger`, контролы `{ finished, play, pause, seek, cancel, stop }`. Массивы N>=3, `times` и per-segment `ease` используют тот же lifecycle; ядро от фасада не растёт |
 
 ### Пример: scrub-контроллер
 
@@ -165,3 +165,71 @@ try {
 код `LM000`. Для `instanceof` импортируйте constructor из того же физического
 entry, что и проверяемую функцию: корневой entry намеренно не связывает
 независимые bundle-графы.
+
+## Многоточечные переходы в `./animate`
+
+```typescript
+import { animate } from '@labpics/motion/animate';
+import { easeOut, linear, easeIn } from '@labpics/motion/easing';
+
+const run = animate(element, {
+  x: [0, 120, -40, 0],
+  opacity: [0, 1, 1, 0],
+}, { duration: 800, times: [0, .25, .75, 1], ease: [easeOut, linear, easeIn] });
+run.pause();
+run.seek(400); // миллисекунды активного track; пауза сохраняется
+run.play();
+await run.finished;
+```
+
+Значение свойства — конечная цель, пара `[from, to]` или массив из N≥3 stops.
+Поддержаны прежние numeric/transform/CSS codecs; массив не меняет смысл CSS-юнитов
+или цветов. Первый stop явный: входная скорость старого движения не изменяет
+авторскую траекторию. Последующее пружинное перенаправление, напротив, получает
+текущее значение и скорость выбранного сегмента.
+
+Без `times` позиции распределены равномерно. С общей `times` или `ease[]` каждый
+канал имеет одну authored topology N; scalar и pair означают N=2. Без общей
+metadata разные свойства могут иметь разные N. Один `ease` применяется к каждому
+сегменту, массив функций имеет N−1 элементов. N-track без easing линеен; без
+`duration` используется прежний `duration.base` (200 мс). Обычная from/to-пара без
+metadata сохраняет прежний spring/tween выбор и standard easing.
+
+`times` не убывают, начинаются с 0 и заканчиваются 1. Точный interior duplicate
+выбирает правый stop и правый ненулевой интервал; endpoints p≤0/p≥1 возвращают
+именно первый/последний stop, до easing. Поэтому authored jump не называется C¹.
+На гладком сегменте native linear slope точен, производная произвольной JS easing
+оценивается существующей ограниченной разностью full-animate. Разность никогда
+не пересекает соседний скачок. Не-конечный результат easing заменяется линейным прогрессом. Не-конечная
+оценка производной заменяется нулём, как в прежнем tween; эти проверки относятся
+к своим точкам sampling. На terminal pose скорость нулевая.
+
+Explicit `spring` несовместим с N-track (`LM136`). Массивы — dense own slots;
+длина и элементы считываются до selector/layout/host writes. Бюджет — 100000
+входных stops и 100000 expanded stops `targets × channels`; `scale` раскрывается
+в две оси. Metadata arrays тоже bounded. Sparse, сверхлимитные или недопустимые
+массивы дают `LM173`; несовпадение topology, невалидные offsets/easing используют
+коды из [каталога ошибок](errors.md). При пустых props metadata всё ещё проверяется.
+
+Linear numeric transform/opacity surfaces с переносимой одинаковой function-list
+исполняются одной WAAPI Animation на поверхность, без собственного rAF в steady
+state. JS easing, повторные offsets, несовместимые transform lists и CSS codecs
+остаются на существующем SurfaceBatch, не на втором scheduler. Capability является
+деталью исполнения; hardware/compositor residency любого свойства не обещается.
+Объединение шкал также bounded: если native data превысили бы 100000
+значений `offsets × channels`, используется исходный sampler без expansion.
+При непредставимом оставшемся delay от огромного отрицательного native clock
+`play()` выдаёт `LM139` до host-effects; paused run можно восстановить `seek()`.
+
+`delay`, `stagger`, `play/pause/seek/cancel/stop`, один `finished` и один natural
+`onComplete` сохраняются. Native pause/play и seek продолжают исходный authored
+track, не создают новую пружину. Cancel сохраняет текущую позу, а не возвращает
+первый stop. После завершения controls инертны; replay — новый `animate`.
+Reduced motion публикует последний stop без rAF/WAAPI reservation и игнорирует
+задержки. Реентрантные seek/pause/cancel отзывают старое вычисление; derivative
+capture использует reservation того же owner и не допускает его вложенную замену.
+
+Это runtime-контракт. Существующий compiler не понижает новые N-вызовы: при
+сомнении сохраняется обычный runtime, а не другая трактовка tracks. Wire MotionProgram
+остаётся versioned; JS functions и прочие невыразимые формы не объявляются portable.
+Repeat, per-property transition objects и sequences этим API не добавляются.

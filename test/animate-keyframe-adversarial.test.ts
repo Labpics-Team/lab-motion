@@ -1,0 +1,173 @@
+import { describe, expect, it, vi } from 'vitest';
+import { animate, type AnimateControls } from '../src/animate/index.js';
+import { groupRecord } from '../src/animate/channels.js';
+import { fakeEl, makeClock, makeTimer, translateXSeries } from './animate-facade-helpers.js';
+
+const lastX = (f: ReturnType<typeof fakeEl>) => translateXSeries(f.writes).at(-1);
+const linear = (t: number) => t;
+
+describe('N-keyframes: hostile callbacks и terminal generation', () => {
+  it('easing cancel не публикует устаревший кадр и не разыменовывает освобождённый owner', async () => {
+    const f = fakeEl(); let c: AnimateControls; let fired = false;
+    c = animate(f.el, { x: [0, 100, 0] }, { duration: 1000, requestFrame: () => 1,
+      ease: t => { if (!fired) { fired = true; c.cancel(); } return t; } });
+    expect(() => c.seek(250)).not.toThrow();
+    await c.finished;
+    expect(f.writes).toHaveLength(0);
+  });
+  it('новый seek из easing побеждает старое вычисление всех каналов', () => {
+    const f = fakeEl(); let c: AnimateControls; let fired = false;
+    c = animate(f.el, { x: [0, 100, 0], rotate: [0, 90, 0] }, { duration: 1000, requestFrame: () => 1,
+      ease: t => { if (!fired) { fired = true; c.seek(750); } return t; } });
+    c.seek(100);
+    expect(f.writes.filter(w => w.prop === 'transform').map(w => w.value)).toEqual(['translateX(50px) rotate(45deg)']);
+    c.cancel();
+  });
+  it('easing successor сохраняет последнее опубликованное состояние и не получает stale repair', () => {
+    const f = fakeEl(); let c: AnimateControls; let next: AnimateControls | undefined;
+    let enabled = false; let fired = false;
+    c = animate(f.el, { x: [0, 100, 0] }, { duration: 1000, requestFrame: () => 1,
+      ease: t => {
+        if (enabled && !fired) { fired = true; next = animate(f.el, { x: 200 }, { duration: 1000, ease: linear, requestFrame: () => 1 }); next.seek(500); }
+        return t;
+      } });
+    c.seek(100); expect(lastX(f)).toBe(20); enabled = true;
+    expect(() => c.seek(250)).not.toThrow(); expect(lastX(f)).toBe(110);
+    const count = f.writes.length; c.seek(700); expect(f.writes).toHaveLength(count); next!.cancel();
+  });
+  it.each(['x', 'width'] as const)('settle host reentry получает нулевую скорость %s', channel => {
+    const f = fakeEl(); let velocity: number | undefined;
+    const original = f.el.style.setProperty;
+    const c = animate(f.el, channel === 'x' ? { x: [0, 100, 200] } : { width: ['0px', '100px', '200px'] }, { duration: 1000, requestFrame: () => 1 });
+    c.seek(250);
+    f.el.style.setProperty = (key, value) => {
+      original(key, value);
+      const owner = groupRecord(f.el, channel === 'x' ? 'transform' : 'width')._owner!;
+      velocity = channel === 'x' ? owner._captureNum('x')!._velocity : owner._captureCss!('width')!._dpdt;
+    };
+    c.seek(1000); expect(velocity).toBe(0);
+  });
+  it('pause из easing сохраняет последнее опубликованное поколение', () => {
+    const f = fakeEl(), clock = makeClock(); let c: AnimateControls; let fired = false;
+    c = animate(f.el, { x: [0, 100, 0] }, { duration: 1000, requestFrame: clock.requestFrame,
+      ease: t => { if (t > 0 && !fired) { fired = true; c.pause(); } return t; } });
+    clock.step(0); const count = f.writes.length; clock.step(100);
+    expect(f.writes).toHaveLength(count); expect(groupRecord(f.el, 'transform')._owner!._captureNum('x')!._value).toBe(0); c.cancel();
+  });
+  it('ошибка custom ease в кадре завершает run и не публикует частичную поверхность', async () => {
+    const f = fakeEl(), clock = makeClock(); const error = new Error('segment failed');
+    const c = animate(f.el, { x: [0, 100, 0], y: [0, 50, 0] }, { duration: 1000, requestFrame: clock.requestFrame, ease: () => { throw error; } });
+    clock.step(0); const count = f.writes.length; clock.step(100); await c.finished; expect(f.writes).toHaveLength(count);
+  });
+  it('metadata валидна даже при пустых props; отказ происходит до selector', () => {
+    const query = vi.fn(() => []); vi.stubGlobal('document', { querySelectorAll: query });
+    try { expect(() => animate('.item', {}, { times: [0, NaN, 1] })).toThrow('LM036'); expect(query).not.toHaveBeenCalled(); }
+    finally { vi.unstubAllGlobals(); }
+  });
+  it('cap проверяется до чтения элементов и до selector', () => {
+    const query = vi.fn(() => []), read = vi.fn(() => 0); vi.stubGlobal('document', { querySelectorAll: query });
+    const values = new Array(100001); Object.defineProperty(values, '0', { get: read });
+    try { expect(() => animate('.item', { x: values })).toThrow('LM173'); expect(read).not.toHaveBeenCalled(); expect(query).not.toHaveBeenCalled(); }
+    finally { vi.unstubAllGlobals(); }
+  });
+  it('native pause в delay и seek на паузе сохраняют authored время, а не новую пружину', async () => {
+    const f = fakeEl({}, true), timer = makeTimer(); let time = 100;
+    const original = f.el.animate!; f.el.animate = (...args) => ({ ...original(...args), get currentTime() { return time; } });
+    const c = animate(f.el, { x: [0, 100, 0] }, { duration: 1000, delay: 300, now: () => 0, setTimer: timer.setTimer });
+    c.pause(); expect(lastX(f)).toBe(0); c.play(); expect(f.animateCalls.at(-1)!.timing.delay).toBe(200);
+    time = 250; c.pause(); expect(lastX(f)).toBe(10); c.seek(750); expect(lastX(f)).toBe(50);
+    c.play(); expect(f.animateCalls.at(-1)!.timing.delay).toBe(-750); c.pause(); c.seek(1000); await c.finished;
+    expect(lastX(f)).toBe(0); expect(timer.pending()).toHaveLength(0);
+  });
+});
+
+describe('общий tween executor: исходная pair-семантика и callbacks', () => {
+  it('pair easing cancel прекращает публикацию без разыменования освобождённого owner', async () => {
+    const f = fakeEl(); let c: AnimateControls; let fired = false;
+    c = animate(f.el, { x: [0, 100] }, { duration: 1000, requestFrame: () => 1,
+      ease: t => { if (!fired) { fired = true; c.cancel(); } return t; } });
+    expect(() => c.seek(250)).not.toThrow(); await c.finished;
+    expect(f.writes).toHaveLength(0);
+  });
+  it('pair easing nested seek побеждает старый sample', () => {
+    const f = fakeEl(); let c: AnimateControls; let fired = false;
+    c = animate(f.el, { x: [0, 100], rotate: [0, 90] }, { duration: 1000, requestFrame: () => 1,
+      ease: t => { if (!fired) { fired = true; c.seek(750); } return t; } });
+    c.seek(100);
+    expect(f.writes.map(w => w.value)).toEqual(['translateX(75px) rotate(67.5deg)']); c.cancel();
+  });
+  it('общий cap нескольких tracks проверяется до чтения следующего массива', () => {
+    const read = vi.fn(() => 1), f = fakeEl();
+    const x = Array(60000).fill(0), y = Array(60000).fill(0);
+    Object.defineProperty(y, '0', { get: read });
+    expect(() => animate(f.el, { x, y }, { duration: 1000 })).toThrow('LM173');
+    expect(read).not.toHaveBeenCalled(); expect(f.writes).toHaveLength(0);
+  });
+  it('target×track cap действует до layout read и первого native effect', () => {
+    const targets = Array.from({ length: 101 }, () => fakeEl({}, true));
+    const read = vi.fn(() => '');
+    for (const f of targets) f.el.style.getPropertyValue = read;
+    expect(() => animate(targets.map(f => f.el), { x: Array(1000).fill(0) }, { duration: 1000 })).toThrow('LM173');
+    expect(read).not.toHaveBeenCalled();
+    expect(targets.every(f => f.animateCalls.length === 0)).toBe(true);
+  });
+  it('host не может переписать original artifact для будущего play', () => {
+    const f = fakeEl({}, true), timer = makeTimer();
+    const c = animate(f.el, { x: [0, 100, 0] }, { duration: 1000, setTimer: timer.setTimer });
+    const frames = f.animateCalls[0]!.keyframes;
+    expect(Object.isFrozen(frames) && frames.every(Object.isFrozen)).toBe(true);
+    expect(() => { frames[1]!.transform = 'translateX(999px)'; }).toThrow(TypeError);
+    c.pause(); c.play(); expect(f.animateCalls[1]!.keyframes).toBe(frames); c.cancel();
+  });
+  it('поздний native setup failure сохраняет живого предыдущего owner и отменяет созданные units', async () => {
+    const first = fakeEl({}, true), second = fakeEl({}, true), timer = makeTimer();
+    const previous = animate(second.el, { x: [0, 100, 0] }, { duration: 1000, setTimer: timer.setTimer });
+    const owner = groupRecord(second.el, 'transform')._owner;
+    const error = new Error('second host setup failed');
+    second.el.animate = () => { throw error; };
+    expect(() => animate([first.el, second.el], { x: [0, 40, 0] }, { duration: 1000, setTimer: timer.setTimer })).toThrow(error);
+    expect(first.cancels).toBe(1); expect(groupRecord(second.el, 'transform')._owner).toBe(owner);
+    expect(second.cancels).toBe(0); previous.cancel(); await previous.finished; expect(timer.pending()).toHaveLength(0);
+  });
+});
+
+it('вложенный seek другого surface отзывает ещё не опубликованный terminal frame', () => {
+  const f = fakeEl(), g = fakeEl(), clock = makeClock();
+  // Только default scheduler общий между вызовами. Два явно injected clock
+  // создают независимые batch и не воспроизводят update→render interleaving.
+  vi.stubGlobal('requestAnimationFrame', clock.requestFrame);
+  let first: AnimateControls | undefined, second: AnimateControls | undefined;
+  try {
+    first = animate(f.el, { x: [0, 100, 0] }, { duration: 1000 });
+    let acted = false;
+    second = animate(g.el, { y: [0, 10, 0] }, { duration: 3000,
+      ease: t => { if (t > 0 && !acted) { acted = true; first!.seek(250); } return t; } });
+    clock.step(0); clock.step(1000);
+    expect(acted).toBe(true);
+    expect(lastX(f)).toBe(50);
+    expect(groupRecord(f.el, 'transform')._owner).toBeDefined();
+  } finally { first?.cancel(); second?.cancel(); vi.unstubAllGlobals(); }
+});
+
+it('native authored replay не эмитит Infinity delay после конечного огромного времени', () => {
+  const f = fakeEl({}, true), timer = makeTimer(); let time = 0;
+  const original = f.el.animate!;
+  f.el.animate = (...args) => ({ ...original(...args), get currentTime() { return time; } });
+  const c = animate(f.el, { x: [0, 100, 0] }, { duration: Number.MAX_VALUE, setTimer: timer.setTimer, now: () => 0 });
+  c.seek(Number.MAX_VALUE / 2);
+  time = Number.MAX_VALUE;
+  c.pause(); c.play();
+  expect(f.animateCalls.every(call => call.timing.delay === undefined || Number.isFinite(call.timing.delay))).toBe(true);
+  c.cancel();
+});
+
+it('непредставимый remaining delay отклонён до host, paused owner можно восстановить seek', () => {
+  const f = fakeEl({}, true), timer = makeTimer(); let time = -Number.MAX_VALUE;
+  const original = f.el.animate!;
+  f.el.animate = (...args) => ({ ...original(...args), get currentTime() { return time; } });
+  const c = animate(f.el, { x: [0, 100, 0] }, { duration: 1000, delay: Number.MAX_VALUE, setTimer: timer.setTimer, now: () => 0 });
+  c.pause(); const count = f.animateCalls.length;
+  expect(() => c.play()).toThrow('LM139'); expect(f.animateCalls).toHaveLength(count);
+  c.seek(250); time = 0; c.play(); expect(f.animateCalls).toHaveLength(count + 1);
+  expect(f.animateCalls.at(-1)!.timing.delay).toBe(-250); c.cancel();
+});

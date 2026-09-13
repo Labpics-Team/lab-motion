@@ -35,6 +35,10 @@
   выполняется один раз при построении.
 
 ### Добавлено
+
+- `./animate`: многоточечные tracks, `times` и per-segment easing с едиными
+  controls/ownership, нативными linear surfaces и общим main-thread batch.
+  Массивы входа снимаются до DOM; reduced motion сразу публикует последний stop.
 - Код `LM169`: `springAsEasing` получила пружину без затухания, у которой финитной
   проекции на [0,1] не существует.
 - `compileSpringPlan` принимает `maxValueError`: абсолютный

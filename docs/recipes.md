@@ -207,3 +207,30 @@ el.addEventListener('pointercancel', () => sheet.pointerCancel());
 // программно раскрыть до верхнего snap (единый clock, C¹ из текущей скорости):
 document.querySelector('.expand')?.addEventListener('click', () => sheet.snapTo(2));
 ```
+
+## Многоточечный акцент
+
+Один вызов описывает весь акцент; разное число точек у x и opacity разрешено,
+потому что общей metadata `times/ease[]` нет. Повторный вызов на том же элементе
+прерывает прежний run через существующий owner. Сохраните возвращённый controls
+и отмените его в cleanup компонента. Предпочтение reduced motion наследуется из
+`animate`: останется конечная поза без движения и задержки.
+
+<!-- animate-keyframe-recipe:start -->
+```typescript
+import { animate, type AnimateControls } from '@labpics/motion/animate';
+
+export function playAttention(button: HTMLButtonElement): AnimateControls {
+  return animate(button, {
+    x: [0, -12, 10, -6, 0],
+    opacity: [.6, 1, 1],
+  }, { duration: 360 });
+}
+```
+<!-- animate-keyframe-recipe:end -->
+
+Переход с общей неравномерной шкалой и разными easing — в
+[справке N-tracks](api.md#многоточечные-переходы-в-animate). Этот рецепт не создаёт
+собственных listeners, scope или scheduler. `controls.cancel()` сохраняет текущую
+позу, а не восстанавливает прежние стили. Компонентный scope может владеть такими
+вызовами только в версии пакета, где он опубликован.

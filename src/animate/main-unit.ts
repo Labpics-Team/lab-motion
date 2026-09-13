@@ -2,6 +2,7 @@
 
 import { scaleSerializedVelocity } from '../compositor/sample.js';
 import { CONVERGENCE_THRESHOLD, FIXED_DT_S, MAX_FRAMES } from '../internal/constants.js';
+import { MotionParamError } from '../errors.js';
 import { finiteOrZero } from '../internal/finite.js';
 import {
   readSpringFromBasisUnchecked,
@@ -14,6 +15,8 @@ import {
   RANGE_EPSILON,
   channelAt,
   cssAt,
+  mixChannel,
+  interpolateParsed,
   type AnimatableElement,
   type BoundGroup,
   type ChannelSnapshot,
@@ -22,9 +25,11 @@ import {
   type GroupOwner,
   type GroupRecord,
 } from './channels.js';
+import { sampleTrack, trackVelocity, easingRate, type KeyframeTrack } from './keyframe-track.js';
 import { SurfaceBatch, type SurfaceUnit } from './surface-batch.js';
 
 export type MotionMode =
+  | { readonly _type: 'keyframes'; readonly _durationMs: number }
   | { readonly _type: 'spring'; readonly _spring: SpringParams }
   | { readonly _type: 'tween'; readonly _durationMs: number; readonly _ease: (t: number) => number };
 
@@ -44,7 +49,6 @@ export interface MainUnitOptions {
 }
 
 const FIXED_DT_MS = FIXED_DT_S * 1000;
-const EASE_DERIV_H = 1e-3;
 
 /** Unit хранит семантику группы; scheduler и spring-basis принадлежат aggregate. */
 export class MainUnit implements GroupOwner, SurfaceUnit {
@@ -58,6 +62,9 @@ export class MainUnit implements GroupOwner, SurfaceUnit {
   private _phaseMs: number;
   private _lastTs: number | undefined;
   private _frames = 0;
+  /** Право завершить вычисление отзывается вложенным seek/pause/play. */
+  private _revision = 0;
+  private _pendingWrite = false;
   private _tweenK = 0;
   private _renderedTweenK = 0;
   private _tweenDpdt = NaN;
@@ -90,6 +97,10 @@ export class MainUnit implements GroupOwner, SurfaceUnit {
       // hostile setter уже сделал значение видимым до возврата.
       const writing = this._writing;
       let velocity = this._active ? (writing ? channel._velocity : channel._renderedVelocity) : 0;
+      if (this._active && o._mode._type === 'keyframes') {
+        const sample = this._trackSnapshot(channel._track!, o._mode._durationMs);
+        velocity = scaleSerializedVelocity(sample._dpdt, sample._from, sample._to);
+      }
       if (this._active && o._mode._type === 'tween') {
         const sampled = (channel._to - channel._from) *
           this._tweenDerivative(this._liveTweenK());
@@ -106,12 +117,26 @@ export class MainUnit implements GroupOwner, SurfaceUnit {
     const channel = this._o!._bound._css;
     if (channel === undefined || channel._key !== key) return undefined;
     const writing = this._writing;
+    if (this._o!._mode._type === 'keyframes') {
+      const sample = this._trackSnapshot(channel._track!, this._o!._mode._durationMs);
+      return { ...channel, _fromAst: sample._from, _toAst: sample._to,
+        _dpdt: this._active ? sample._dpdt : 0, _css: writing ? channel._css : channel._renderedCss };
+    }
     const dpdt = !this._active
       ? 0
       : this._o!._mode._type === 'tween'
         ? this._tweenDerivative(this._liveTweenK())
         : writing ? channel._dpdt : channel._renderedDpdt;
     return { ...channel, _dpdt: dpdt, _css: writing ? channel._css : channel._renderedCss };
+  }
+
+  /** Как native capture: пользовательский derivative не меняет захватываемый owner. */
+  private _trackSnapshot<T>(track: KeyframeTrack<T>, duration: number): ReturnType<typeof trackVelocity<T>> {
+    const rec = this._o!._record;
+    if (rec._transition) throw new MotionParamError('LM157');
+    rec._transition = true;
+    try { return trackVelocity(track, this._liveTweenK(), duration); }
+    finally { rec._transition = false; }
   }
 
   /** k текущего поколения: во время host-write — применяемый, иначе rendered. */
@@ -138,6 +163,7 @@ export class MainUnit implements GroupOwner, SurfaceUnit {
 
   play(): void {
     if (this._done || !this._paused || this._o!._record._transition) return;
+    this._revision++;
     this._lastTs = undefined;
     this._paused = false;
     try {
@@ -150,6 +176,7 @@ export class MainUnit implements GroupOwner, SurfaceUnit {
 
   pause(): void {
     if (this._done || this._paused || this._o!._record._transition) return;
+    this._revision++;
     this._paused = true;
     this._o!._batch._deactivate(this);
   }
@@ -160,8 +187,12 @@ export class MainUnit implements GroupOwner, SurfaceUnit {
     this._active = true;
     // Seek задаёт локальную фазу без восстановления абсолютного timestamp.
     this._phaseMs = localMs;
+    // Вложенный seek отзывает terminal-решение update-фазы до render.
+    this._converged = false;
     this._lastTs = undefined;
-    if (this._compute()) this._settle();
+    const result = this._compute();
+    if (result === undefined) return;
+    if (result) this._settle();
     else this._write();
   }
 
@@ -191,17 +222,15 @@ export class MainUnit implements GroupOwner, SurfaceUnit {
     if (this._phaseMs >= 0) this._active = true;
     if (this._active) {
       this._frames++;
-      if (
-        this._compute() ||
-        (this._frames >= MAX_FRAMES && this._phaseMs <= 0)
-      ) this._converged = true;
+      const result = this._compute();
+      if (result !== undefined && (result || (this._frames >= MAX_FRAMES && this._phaseMs <= 0))) this._converged = true;
     }
   }
 
   _renderStep(): void {
     if (this._done || this._paused || this._o!._record._transition) return;
     if (this._converged) this._settle();
-    else if (this._active) this._write();
+    else if (this._active && (this._o!._mode._type === 'spring' || this._pendingWrite)) this._write();
   }
 
   _batchAbort(): void {
@@ -216,20 +245,30 @@ export class MainUnit implements GroupOwner, SurfaceUnit {
     this._o!._onRollback?.();
   }
 
-  private _compute(): boolean {
+  private _compute(): boolean | undefined {
     const o = this._o!;
     const bound = o._bound;
-    if (o._mode._type === 'tween') {
+    if (o._mode._type !== 'spring') {
       if (this._phaseMs >= o._mode._durationMs) return true;
       const k = this._phaseMs / o._mode._durationMs;
-      const eased = o._mode._ease(k);
+      const revision = ++this._revision;
+      this._pendingWrite = false;
+      const eased = o._mode._type === 'tween' ? o._mode._ease(k) : k;
+      if (this._done || revision !== this._revision) return;
       const progress = Number.isFinite(eased) ? eased : k;
       this._tweenK = k;
       this._tweenDpdt = NaN;
       for (const channel of bound._numeric) {
-        channel._value = channelAt(channel, progress);
+        const value = channel._track ? sampleTrack(channel._track, k, mixChannel) : channelAt(channel, progress);
+        if (this._done || revision !== this._revision) return;
+        channel._value = value;
       }
-      if (bound._css !== undefined) bound._css._css = cssAt(bound._css, progress);
+      if (bound._css) {
+        const value = bound._css._track ? sampleTrack(bound._css._track, k, interpolateParsed) : cssAt(bound._css, progress);
+        if (this._done || revision !== this._revision) return;
+        bound._css._css = value;
+      }
+      this._pendingWrite = true;
       return false;
     }
 
@@ -281,11 +320,12 @@ export class MainUnit implements GroupOwner, SurfaceUnit {
     if (k === this._tweenK && !Number.isNaN(this._tweenDpdt)) return this._tweenDpdt;
     const mode = this._o!._mode;
     if (mode._type !== 'tween') return 0;
-    const k0 = k > EASE_DERIV_H ? k - EASE_DERIV_H : 0;
-    const k1 = k + EASE_DERIV_H < 1 ? k + EASE_DERIV_H : 1;
-    const raw = ((mode._ease(k1) - mode._ease(k0)) * 1000) /
-      ((k1 - k0) * mode._durationMs);
-    const value = finiteOrZero(raw);
+    const rec = this._o!._record;
+    if (rec._transition) throw new MotionParamError('LM157');
+    rec._transition = true;
+    let value: number;
+    try { value = easingRate(mode._ease, k, mode._durationMs); }
+    finally { rec._transition = false; }
     if (k === this._tweenK) this._tweenDpdt = value;
     return value;
   }
@@ -297,6 +337,7 @@ export class MainUnit implements GroupOwner, SurfaceUnit {
     // successor внутри setter-а видит применяемые значения через _writing,
     // а бросок хоста откатывает поколение (rendered остаётся последним
     // успешным) без stale repair-записи после потери lease.
+    this._pendingWrite = false;
     this._writing = true;
     try {
       if (o._group === 'transform') {
@@ -337,6 +378,7 @@ export class MainUnit implements GroupOwner, SurfaceUnit {
     // capture на settle-записи считал бы производную ПРОШЛОГО поколения при
     // финальном значении. Ноль в кэше производной (ключ — текущий _tweenK,
     // который capture и запросит) публикует скорость покоя без второй записи.
+    this._tweenK = 1;
     this._tweenDpdt = 0;
     this._write();
     // Реентрантный successor внутри settle-записи уже потребил финальное
