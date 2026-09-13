@@ -1,0 +1,213 @@
+diff --git a/src/animate/channels.ts b/src/animate/channels.ts
+index ddca473..95e21c4 100644
+--- a/src/animate/channels.ts
++++ b/src/animate/channels.ts
+@@ -15,0 +16 @@
++import { makeTrack, trackTimes, snapshotTrackArray, MAX_TRACK_STOPS, type KeyframeTrack, type TrackEase } from './keyframe-track.js';
+@@ -61,0 +63 @@ export interface NumericChannelSpec {
++  _track?: KeyframeTrack<number>;
+@@ -70,0 +73 @@ export interface CssChannelSpec {
++  _track?: KeyframeTrack<ValueAST>;
+@@ -105,0 +109 @@ export function parseProps(props: Record<string, unknown>): ChannelSpec[] {
++  let remaining = MAX_TRACK_STOPS;
+@@ -111,4 +115,2 @@ export function parseProps(props: Record<string, unknown>): ChannelSpec[] {
+-    const pair = Array.isArray(raw) ? raw : undefined;
+-    if (pair && pair.length !== 2) {
+-      throw new MotionParamError('LM141');
+-    }
++    const pair = Array.isArray(raw) ? snapshotTrackArray(raw, remaining, 2) : undefined;
++    remaining -= pair?.length ?? 0;
+@@ -117,2 +119,4 @@ export function parseProps(props: Record<string, unknown>): ChannelSpec[] {
+-      const explicitFrom = pair ? requireFinite(pair[0]) : undefined;
+-      const to = requireFinite(pair ? pair[1] : raw);
++      const values = pair?.map(requireFinite);
++      const explicitFrom = values?.[0];
++      const to = values ? values[values.length - 1]! : requireFinite(raw);
++      const track = values && values.length > 2 ? makeTrack(values) : undefined;
+@@ -125 +129 @@ export function parseProps(props: Record<string, unknown>): ChannelSpec[] {
+-          specs.push({ _kind: 'num', _key: 'scaleX', _group: group, _explicitFrom: explicitFrom, _to: to });
++          specs.push({ _kind: 'num', _key: 'scaleX', _group: group, _explicitFrom: explicitFrom, _to: to, _track: track });
+@@ -128 +132 @@ export function parseProps(props: Record<string, unknown>): ChannelSpec[] {
+-          specs.push({ _kind: 'num', _key: 'scaleY', _group: group, _explicitFrom: explicitFrom, _to: to });
++          specs.push({ _kind: 'num', _key: 'scaleY', _group: group, _explicitFrom: explicitFrom, _to: to, _track: track });
+@@ -131 +135 @@ export function parseProps(props: Record<string, unknown>): ChannelSpec[] {
+-        specs.push({ _kind: 'num', _key: key, _group: group, _explicitFrom: explicitFrom, _to: to });
++        specs.push({ _kind: 'num', _key: key, _group: group, _explicitFrom: explicitFrom, _to: to, _track: track });
+@@ -133,0 +138 @@ export function parseProps(props: Record<string, unknown>): ChannelSpec[] {
++      const values = pair?.map(parseCssValue);
+@@ -138,2 +143,3 @@ export function parseProps(props: Record<string, unknown>): ChannelSpec[] {
+-        _explicitFrom: pair ? parseCssValue(pair[0]) : undefined,
+-        _to: parseCssValue(pair ? pair[1] : raw),
++        _explicitFrom: values?.[0],
++        _to: values ? values[values.length - 1]! : parseCssValue(raw),
++        _track: values && values.length > 2 ? makeTrack(values) : undefined,
+@@ -145,0 +152,16 @@ export function parseProps(props: Record<string, unknown>): ChannelSpec[] {
++/** Общая authored topology нужна только при общей times/ease[]. */
++export function configureTracks(specs: ChannelSpec[], times: readonly number[] | undefined, ease: TrackEase): number {
++  if (times !== undefined) {
++    trackTimes(times.length, times);
++    if (Array.isArray(ease) && ease.length !== times.length - 1) throw new MotionParamError('LM040');
++  }
++  let stops = 0;
++  for (const spec of specs) {
++    stops += spec._track?._values.length ?? 2;
++    if (stops > MAX_TRACK_STOPS) throw new MotionParamError('LM173');
++    // Discriminated spec гарантирует однородность values; mapping не меняет codec.
++    spec._track = makeTrack<number | ValueAST>(spec._track?._values ?? [spec._explicitFrom ?? spec._to, spec._to], times ?? spec._track?._times, ease) as NonNullable<ChannelSpec['_track']>;
++  }
++  return stops;
++}
++
+@@ -149,0 +172 @@ export interface NumericChannel {
++  _track?: KeyframeTrack<number>;
+@@ -165,0 +189 @@ export interface CssChannel {
++  _track?: KeyframeTrack<ValueAST>;
+@@ -235,0 +260,4 @@ export function channelAt(channel: NumericChannel, progress: number): number {
++  return mixChannel(channel._from, channel._to, progress);
++}
++
++export function mixChannel(from: number, to: number, progress: number): number {
+@@ -238 +266 @@ export function channelAt(channel: NumericChannel, progress: number): number {
+-  if (progress === 1) return channel._to;
++  if (progress === 1) return to;
+@@ -241,3 +269,3 @@ export function channelAt(channel: NumericChannel, progress: number): number {
+-  if (progress === 0 || channel._from === channel._to) return channel._from;
+-  const value = (1 - progress) * channel._from + progress * channel._to;
+-  return Number.isFinite(value) ? value : channel._to;
++  if (progress === 0 || from === to) return from;
++  const value = (1 - progress) * from + progress * to;
++  return Number.isFinite(value) ? value : to;
+@@ -450 +478 @@ function createTransformState(
+-function interpolateParsed(from: ValueAST, to: ValueAST, p: number): string | number {
++export function interpolateParsed(from: ValueAST, to: ValueAST, p: number): string | number {
+@@ -529 +557,4 @@ export function bindGroup(
+-      numeric.push(numericChannel(spec._key, from, spec._to, velocity));
++      const channel = numericChannel(spec._key, from, spec._to, velocity);
++      if (spec._track) channel._track = spec._explicitFrom === undefined
++        ? { ...spec._track, _values: [from, spec._to] } : spec._track;
++      numeric.push(channel);
+@@ -545,0 +577,2 @@ export function bindGroup(
++        _track: spec._track && (spec._explicitFrom === undefined
++          ? { ...spec._track, _values: [fromAst, spec._to] } : spec._track),
+diff --git a/src/animate/index.ts b/src/animate/index.ts
+index 51eb2c5..f8fd995 100644
+--- a/src/animate/index.ts
++++ b/src/animate/index.ts
+@@ -61,0 +62 @@ import {
++  configureTracks,
+@@ -85,0 +87,3 @@ import { WaapiUnit, type WaapiTarget } from './waapi-unit.js';
++import { nativeKeyframeArtifact, type KeyframeArtifact } from './keyframe-native.js';
++import { snapshotTrackArray, MAX_TRACK_STOPS, type TrackEase } from './keyframe-track.js';
++
+@@ -97 +101,2 @@ export type AnimateTarget =
+-/** Значение канала: цель или пара [from, to] (явный from отключает подхват). */
++/** Цель, пара [from, to] либо массив N>=3. Первый authored stop отключает
++ * подхват входной скорости; последующий spring наследует скорость track. */
+@@ -101 +106 @@ export type AnimatePropValue =
+-  | readonly [number | string, number | string];
++  | readonly (number | string)[];
+@@ -112,2 +117,5 @@ export interface AnimateOptions {
+-  /** Изинг tween t∈[0,1]→прогресс. Задан без duration → duration.base. */
+-  readonly ease?: ((t: number) => number) | undefined;
++  /** Easing t∈[0,1]→прогресс. Для track — общий либо N−1 функций по сегментам.
++   * Задан без duration → duration.base. Строки и cubic-bezier tuples не принимаются. */
++  readonly ease?: TrackEase;
++  /** Доли авторских keyframes; одна общая topology для всех свойств. */
++  readonly times?: readonly number[] | undefined;
+@@ -206,4 +214,5 @@ function defaultSetTimer(cb: () => void, ms: number): () => void {
+-function resolveMode(options: AnimateOptions): MotionMode {
+-  const input = options.spring;
+-  const durationInput = options.duration;
+-  const easeInput = options.ease;
++function resolveMode(
++  input: SpringParams | undefined,
++  durationInput: number | undefined,
++  easeInput: ((t: number) => number) | undefined,
++): MotionMode {
+@@ -328 +337 @@ type PlannedGroup = readonly [
+-  execution: SpringExecutionArtifactTuple | Extract<CompositorTierCode, 3> | undefined,
++  execution: SpringExecutionArtifactTuple | KeyframeArtifact | Extract<CompositorTierCode, 3> | undefined,
+@@ -361 +370,10 @@ export function animate(
+-  const mode = resolveMode(options);
++  const springInput = options.spring;
++  const durationInput = options.duration;
++  const easeInput = options.ease;
++  const multipleEase = Array.isArray(easeInput);
++  if (multipleEase && springInput !== undefined) throw new MotionParamError('LM136');
++  let mode = resolveMode(springInput, durationInput, multipleEase ? undefined : easeInput as ((t: number) => number) | undefined);
++  const timesInput = options.times;
++  const times = timesInput === undefined ? undefined : snapshotTrackArray(timesInput) as number[];
++  const ease = multipleEase ? snapshotTrackArray(easeInput) as Array<(t: number) => number> : easeInput;
++  if (Array.isArray(ease) && ease.some((fn) => typeof fn !== 'function')) throw new MotionParamError('LM138');
+@@ -365,0 +384,6 @@ export function animate(
++  let trackStops = 0;
++  if (times !== undefined || multipleEase || specs.some((spec) => spec._track !== undefined)) {
++    if (springInput !== undefined) throw new MotionParamError('LM136');
++    trackStops = configureTracks(specs, times, ease);
++    mode = { _type: 'keyframes', _durationMs: durationInput ?? DEFAULT_DURATION_MS };
++  }
+@@ -366,0 +391,3 @@ export function animate(
++  if (trackStops * els.length > MAX_TRACK_STOPS) {
++    throw new MotionParamError('LM173');
++  }
+@@ -414,0 +442,2 @@ export function animate(
++        : tier === 0 && mode._type === 'keyframes'
++          ? nativeKeyframeArtifact(bound, group, mode._durationMs)
+@@ -505 +534 @@ export function animate(
+-            _spring: (mode as Extract<MotionMode, { _type: 'spring' }>)._spring,
++            _spring: mode._type === 'spring' ? mode._spring : undefined,
+diff --git a/src/animate/keyframe-native.ts b/src/animate/keyframe-native.ts
+new file mode 100644
+index 0000000..5cb2923
+--- /dev/null
++++ b/src/animate/keyframe-native.ts
+@@ -0,0 +1,49 @@
++/** Native lowering только доказуемо линейных numeric surfaces. */
++import { buildTransform } from '../value/transform.js';
++import { mixChannel, type BoundGroup } from './channels.js';
++import { sampleTrack, MAX_TRACK_STOPS } from './keyframe-track.js';
++
++export interface KeyframeArtifact {
++  readonly _frames: Record<string, string | number>[];
++  readonly _durationMs: number;
++}
++
++export function nativeKeyframeArtifact(bound: BoundGroup, group: string, durationMs: number): KeyframeArtifact | undefined {
++  if (bound._css || (group !== 'transform' && group !== 'opacity')) return undefined;
++  const offsets = new Set<number>();
++  for (const ch of bound._numeric) {
++    const track = ch._track!;
++    // Произвольную JS-функцию нельзя сертифицировать конечным sampling.
++    if (track._ease !== undefined) return undefined;
++    for (let i = 0; i < track._times.length; i++) {
++      const t = track._times[i]!;
++      // Endpoint-pin и zero-width jump оставляем точному shared sampler.
++      if (i && (t <= track._times[i - 1]! || !Number.isFinite(track._values[i]! - track._values[i - 1]!))) return undefined;
++      offsets.add(t);
++    }
++  }
++  // Объединение различных topology не должно квадратично раздувать native data.
++  // Точный sampler хранит исходные tracks без этой Cartesian expansion.
++  if (offsets.size * bound._numeric.length > MAX_TRACK_STOPS) return undefined;
++  const frames: KeyframeArtifact['_frames'] = [];
++  let signature = '';
++  for (const offset of [...offsets].sort((a, b) => a - b)) {
++    let value: string | number;
++    if (group === 'transform') {
++      const state = bound._transform!;
++      for (const ch of bound._numeric) state[ch._key] = sampleTrack(ch._track!, offset, mixChannel);
++      value = buildTransform(state);
++      // Разные function-lists заставляют WAAPI перейти к matrix decomposition;
++      // это уже не независимая интерполяция осей. 'none' — законная identity.
++      const shape = value === 'none' ? '' : value.replace(/\([^)]*\)/g, '');
++      if (signature && shape && signature !== shape) return undefined;
++      signature ||= shape;
++    } else value = sampleTrack(bound._numeric[0]!._track!, offset, mixChannel);
++    frames.push({ offset, [group]: value });
++  }
++  // Повторный play использует тот же owned artifact: duck-host не может
++  // незаметно переписать authored track через полученный keyframe-массив.
++  for (const frame of frames) Object.freeze(frame);
++  Object.freeze(frames);
++  return { _frames: frames, _durationMs: durationMs };
++}
