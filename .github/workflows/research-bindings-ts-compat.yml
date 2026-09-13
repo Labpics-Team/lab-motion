@@ -33,9 +33,11 @@ jobs:
           test "$(git diff --cached --name-only | sort)" = $'src/bindings/index.ts\ntest/semantic-motion-binding-consumer.test.ts'
           pnpm build
           pnpm exec vitest run test/semantic-motion-binding-consumer.test.ts test/semantic-motion-binding-runtime.test.ts
-          tree="$(git write-tree)"
           current="$(gh api repos/Labpics-Team/lab-motion/git/ref/heads/feat/semantic-motion-bindings-383 --jq .object.sha)"
           test "$current" = 347d7bc1f27bd82a9ad212c1f72e1043346dd25c
+          base_tree="$(gh api repos/Labpics-Team/lab-motion/git/commits/347d7bc1f27bd82a9ad212c1f72e1043346dd25c --jq .tree.sha)"
+          jq -n --arg base "$base_tree" --rawfile source src/bindings/index.ts --rawfile testfile test/semantic-motion-binding-consumer.test.ts '{base_tree:$base,tree:[{path:"src/bindings/index.ts",mode:"100644",type:"blob",content:$source},{path:"test/semantic-motion-binding-consumer.test.ts",mode:"100644",type:"blob",content:$testfile}]}' > "$RUNNER_TEMP/tree.json"
+          tree="$(gh api --method POST repos/Labpics-Team/lab-motion/git/trees --input "$RUNNER_TEMP/tree.json" --jq .sha)"
           payload="$(jq -n --arg message 'fix(bindings): не требовать NoInfer в публичных типах' --arg tree "$tree" --arg parent 347d7bc1f27bd82a9ad212c1f72e1043346dd25c '{message:$message,tree:$tree,parents:[$parent]}')"
           commit="$(printf '%s' "$payload" | gh api --method POST repos/Labpics-Team/lab-motion/git/commits --input - --jq .sha)"
           refpayload="$(jq -n --arg ref 'refs/heads/research/bindings-noinfer-final-20260913' --arg sha "$commit" '{ref:$ref,sha:$sha}')"
