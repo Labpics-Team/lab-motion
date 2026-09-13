@@ -133,25 +133,31 @@ export function createPresenceTransition(options: PresenceTransitionOptions = {}
       const list = returned === undefined ? [] : Array.isArray(returned) ? returned : [returned];
       const length = list.length;
       if (length > 10_000) throw new RangeError('Слишком много анимаций присутствия');
+      const admissionErrors: unknown[] = [];
       for (let i = 0; i < length; i++) {
-        if (!Object.hasOwn(list, i)) throw new TypeError('Группа присутствия не должна содержать пропуски');
-        const animation: PresenceAnimation = list[i];
-        if (!animation || typeof animation !== 'object') throw new TypeError('Ожидаются controls анимации');
-        if (phase.effects.has(animation)) continue;
-        const stop = animation.cancel;
-        if (typeof stop !== 'function') throw new TypeError('У анимации отсутствует cancel');
-        const sink: Sink = {};
-        phase.effects.set(animation, { cancel: () => stop.call(animation), sink });
-        const completion = animation.finished;
-        if (!completion || typeof completion.then !== 'function') throw new TypeError('У анимации отсутствует finished');
-        if (!phase.ended) sink.notify = (failed, error) => {
-          if (failed) { fail(phase, error); return; }
-          phase.effects.delete(animation);
-          sink.notify = undefined;
-          complete(phase);
-        };
-        observe(completion, sink);
+        try {
+          if (!Object.hasOwn(list, i)) throw new TypeError('Группа присутствия не должна содержать пропуски');
+          const animation: PresenceAnimation = list[i];
+          if (!animation || typeof animation !== 'object') throw new TypeError('Ожидаются controls анимации');
+          if (phase.effects.has(animation)) continue;
+          const stop = animation.cancel;
+          if (typeof stop !== 'function') throw new TypeError('У анимации отсутствует cancel');
+          const sink: Sink = {};
+          phase.effects.set(animation, { cancel: () => stop.call(animation), sink });
+          const completion = animation.finished;
+          if (!completion || typeof completion.then !== 'function') throw new TypeError('У анимации отсутствует finished');
+          if (!phase.ended) sink.notify = (failed, error) => {
+            if (failed) { fail(phase, error); return; }
+            phase.effects.delete(animation);
+            sink.notify = undefined;
+            complete(phase);
+          };
+          observe(completion, sink);
+        } catch (error) { admissionErrors.push(error); }
       }
+      // Группа уже возвращена фабрикой: сбой одного getter не бросает
+      // остальных переданных исполнителей без попытки принять и отменить их.
+      if (admissionErrors.length) throw combine(admissionErrors);
       if (phase.ended) {
         const errors = cancel(phase);
         if (errors.length) throw combine(errors);

@@ -78,7 +78,8 @@ export function bindAnimatedDialog(dialog: HTMLDialogElement) {
     initiallyPresent: dialog.open,
     enter: () => {
       if (!dialog.open) {
-        animate(panel, { opacity: 0, y: 12 }, { duration: 0 });
+        panel.style.opacity = '0';
+        panel.style.transform = 'translateY(12px)';
         dialog.showModal();
       }
       return animate(panel, { opacity: 1, y: 0 }, { spring });

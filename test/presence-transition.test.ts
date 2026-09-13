@@ -245,3 +245,13 @@ it('реентрантный getter фабрики не запускает уж�
   expect((await p.setPresent(true)).status).toBe('superseded');
   expect(stale).not.toHaveBeenCalled(); expect(p.state).toBe('gone');
 });
+
+it('сбой чтения одного участника не оставляет остальные возвращённые анимации бесхозными', async () => {
+  const a = deferred(), b = deferred(), c = deferred(); const error = new Error('finished getter');
+  const broken = { cancel: b.cancel, get finished(): Promise<void> { throw error; } };
+  const p = create({ enter: () => [a, broken, c] });
+  expect(() => p.setPresent(true)).toThrow(error);
+  expect(await p.finished).toEqual({ status: 'failed', present: true, error });
+  expect(a.cancel).toHaveBeenCalledOnce(); expect(b.cancel).toHaveBeenCalledOnce();
+  expect(c.cancel).toHaveBeenCalledOnce();
+});
