@@ -1,4 +1,4 @@
-name: Managed presence immutable delivery
+name: Managed presence follow-up delivery
 on:
   push:
     branches: [research/managed-presence-delivery-20260913]
@@ -11,123 +11,34 @@ jobs:
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
         with:
-          ref: 93278bf9b540f93521c7bd4c02f68db458e5db7a
+          ref: 51c72c0de78c5466ed8dd453cf6947652f957cc5
           fetch-depth: 1
           persist-credentials: false
-      - name: Reconstruct reviewed product tree and create new branch only
+      - name: Authenticate and create immutable candidate only
         env:
           GH_TOKEN: ${{ github.token }}
         shell: bash
         run: |
           set -euo pipefail
           python3 - <<'PY'
-          import subprocess,json,base64,pathlib
-          base='93278bf9b540f93521c7bd4c02f68db458e5db7a'
-          expected='e15084087d6cd94f2079f019d632bdfec456e853'
+          import subprocess,json,base64,pathlib,hashlib
+          base='51c72c0de78c5466ed8dd453cf6947652f957cc5'
+          expected='57475df21cb3166c64dc1f77c0aac902115581ad'
           repo='repos/Labpics-Team/lab-motion'
           def git(*args): return subprocess.check_output(['git',*args],text=True).strip()
           def get(route): return json.loads(subprocess.check_output(['gh','api',repo+route],text=True))
           def post(route,payload):
             return json.loads(subprocess.check_output(['gh','api','--method','POST',repo+route,'--input','-'],input=json.dumps(payload,ensure_ascii=False),text=True))
           assert git('rev-parse','HEAD')==base
-          blobs={
-            'src/presence/transition.ts':'b0425b84b1540ab1857984082e222c65e92deddd',
-            'test/presence-transition.test.ts':'3c27e74b7ed76177246b6c821771c28cd70df611',
-            'test/presence-transition-consumer.test.ts':'2eb220ca1ae0a97c10de8d900aac9b6fcce15511',
-            'test/presence-transition-retention.test.ts':'8a142d7b90d59ec264b5785a9eae11346e62d19f',
-            'browser/presence-transition.spec.ts':'5b42d613efd8020c687e7baf0e8c6b7149061bda',
-            'docs/presence.md':'b9ab061cc543148ed42e4b8ae8f033f0721bd08e',
-          }
-          for path,sha in blobs.items():
-            p=pathlib.Path(path);p.parent.mkdir(parents=True,exist_ok=True)
-            p.write_bytes(base64.b64decode(get('/git/blobs/'+sha)['content']))
-            assert git('hash-object',path)==sha
-          pathlib.Path('src/presence/machine.ts').write_bytes(pathlib.Path('src/presence/index.ts').read_bytes())
-          pathlib.Path('src/presence/index.ts').write_text('''/** Присутствие: ручная машина фаз и управляемый жизненный цикл исполнителей. */
-          export { createPresence, swapPresence } from './machine.js';
-          export type {
-            PresenceState, PresenceSnapshot, PresencePhaseStart, PresenceOptions,
-            PresenceControls, SwapPresenceOptions,
-          } from './machine.js';
-          export { createPresenceTransition } from './transition.js';
-          export type {
-            PresenceAnimation, PresenceTransitionOptions, PresenceTransitionControls,
-            PresenceTransitionResult,
-          } from './transition.js';
-          ''')
-          def replace(path,old,new):
-            p=pathlib.Path(path);s=p.read_text();assert s.count(old)==1,(path,old);p.write_text(s.replace(old,new))
-          replace('CHANGELOG.md','## [Unreleased]\n\n','''## [Unreleased]
-
-          ### Добавлено
-          - Управляемое присутствие: `createPresenceTransition` связывает одну цель видимости
-            с группой анимаций, отменяет устаревший уход и освобождает исполнителей при очистке.
-            Рабочий пример диалога поддерживает повторное открытие и Escape без ручного `done`.
-
-          ''')
-          replace('docs/api.md','| `…/presence` | Enter/exit lifecycle: «доиграй exit-анимацию → потом убирай из DOM», прерывания, `swapPresence` (wait/sync) |','| `…/presence` | [Управляемый вход/выход](presence.md): `createPresenceTransition`, группа исполнителей и одна цель видимости; ручной `createPresence`, `swapPresence` (wait/sync) |')
-          recipe='''## Диалог с прерываемым закрытием
-
-          Диалог содержит `[data-panel]` и сам хранит доступность, фокус и модальность через
-          нативный `<dialog>`. Адаптер вызывается после монтирования. Кнопка открытия вызывает
-          `binding.setPresent(true)`, кнопка закрытия — `binding.setPresent(false)`;
-          при размонтировании нужен `binding.destroy()`. Повторное открытие во время ухода
-          не сбрасывает позу и не позволяет старому завершению закрыть диалог.
-
-          ```typescript
-          import { animate } from '@labpics/motion/animate';
-          import { createPresenceTransition } from '@labpics/motion/presence';
-
-          export function bindAnimatedDialog(dialog: HTMLDialogElement) {
-            const panel = dialog.querySelector<HTMLElement>('[data-panel]');
-            if (!panel) throw new TypeError('В диалоге отсутствует [data-panel]');
-            const spring = { mass: 1, stiffness: 240, damping: 28 };
-            const presence = createPresenceTransition({
-              initiallyPresent: dialog.open,
-              enter: () => {
-                if (!dialog.open) {
-                  animate(panel, { opacity: 0, y: 12 }, { duration: 0 });
-                  dialog.showModal();
-                }
-                return animate(panel, { opacity: 1, y: 0 }, { spring });
-              },
-              exit: () => animate(panel, { opacity: 0, y: 12 }, { spring }),
-              onGone: () => dialog.close(),
-            });
-            const onCancel = (event: Event) => {
-              event.preventDefault();
-              presence.setPresent(false);
-            };
-            dialog.addEventListener('cancel', onCancel);
-            return {
-              setPresent: presence.setPresent,
-              get state() { return presence.state; },
-              get finished() { return presence.finished; },
-              destroy() {
-                dialog.removeEventListener('cancel', onCancel);
-                try { presence.destroy(); } finally { dialog.close(); }
-              },
-            };
-          }
-          ```
-
-          Не вызывайте `dialog.close()` и не удаляйте узел раньше `onGone`: тогда браузер
-          не сможет показать выходную анимацию. Escape проходит ту же фазу ухода. Уменьшенное
-          движение обрабатывает `animate`; фокус возвращает сам `dialog.close()`. Для нескольких
-          независимых анимаций фазы верните массив controls: удаление дождётся всей группы.
-          [Точный контракт и исходы ошибок](presence.md).
-
-          '''
-          replace('docs/recipes.md','## Появление/уход (presence)\n',recipe+'## Появление/уход (presence)\n')
-          replace('docs/recipes.md','const p = createPresence({\n  onExitStart: (done) => {','const p = createPresence({\n  initiallyPresent: true,\n  onExitStart: (done) => {')
-          replace('test/presence.test.ts',"['createPresence', 'swapPresence']","['createPresence', 'createPresenceTransition', 'swapPresence']")
-          paths=sorted([*blobs,'src/presence/machine.ts','src/presence/index.ts','CHANGELOG.md','docs/api.md','docs/recipes.md','test/presence.test.ts'])
-          subprocess.check_call(['git','add','--',*paths])
-          assert git('write-tree')==expected,git('write-tree')
+          patch=base64.b64decode(get('/git/blobs/31a8911dd741aade8382040d4e8136266c0cdc19')['content'])
+          assert hashlib.sha256(patch).hexdigest()=='ae5a9991f4dfd9eaff6ad8d8d0ccb0007a58fcd4208de0ac51b0697f5265e793'
+          subprocess.run(['git','apply','--index','-'],input=patch,check=True)
+          assert git('write-tree')==expected
+          paths=['docs/recipes.md','src/presence/transition.ts','test/presence-transition.test.ts']
           assert git('diff','--cached','--name-only').splitlines()==paths
           tree=post('/git/trees',{'base_tree':git('rev-parse','HEAD^{tree}'),'tree':[{'path':p,'mode':'100644','type':'blob','content':pathlib.Path(p).read_text()} for p in paths]})
           assert tree['sha']==expected
-          commit=post('/git/commits',{'message':'feat(presence): управляемый вход и уход без ручной координации','tree':expected,'parents':[base]})
-          ref=post('/git/refs',{'ref':'refs/heads/feat/managed-presence-381','sha':commit['sha']})
+          commit=post('/git/commits',{'message':'fix(presence): завершать очистку группы и исполнять корректный диалог','tree':expected,'parents':[base]})
+          ref=post('/git/refs',{'ref':'refs/heads/research/presence-followup-20260913','sha':commit['sha']})
           print(json.dumps({'base':base,'tree':expected,'head':commit['sha'],'ref':ref['ref'],'paths':paths},ensure_ascii=False))
           PY
