@@ -1,48 +1,35 @@
-name: Semantic binding immutable delivery
+name: Semantic binding source receipt
 on:
   push:
     branches: [research/semantic-binding-delivery-20260913]
 permissions:
-  contents: write
+  contents: read
 jobs:
-  deliver:
+  source:
     runs-on: ubuntu-latest
     timeout-minutes: 5
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
         with:
-          ref: 93278bf9b540f93521c7bd4c02f68db458e5db7a
-          fetch-depth: 1
+          ref: 4dbd72b82782756e7fee97e1ebb7d01a685a67ca
+          fetch-depth: 0
           persist-credentials: false
-      - name: Verify exact patch and create product branch only
-        env:
-          GH_TOKEN: ${{ github.token }}
+      - name: Export immutable source without executing product code
         shell: bash
         run: |
           set -euo pipefail
-          python3 - <<'PY'
-          import subprocess,json,base64,gzip,hashlib,pathlib
-          repo='repos/Labpics-Team/lab-motion'
-          base='93278bf9b540f93521c7bd4c02f68db458e5db7a'
-          expected='13d75e1e9c9a834cad6449469832410bd8ba115a'
-          def git(*args): return subprocess.check_output(['git',*args],text=True).strip()
-          def get(route): return json.loads(subprocess.check_output(['gh','api',repo+route],text=True))
-          def post(route,payload):
-            return json.loads(subprocess.check_output(['gh','api','--method','POST',repo+route,'--input','-'],input=json.dumps(payload,ensure_ascii=False),text=True))
-          assert git('rev-parse','HEAD')==base
-          chunks=['634ffc699ea432fc7c909a98ce8af5d9134f151e','9e1f5338434b9cabdc5b1095bb34a607b7a38248','567b9a2edd3ebcb3cc24202d6c1aecdd7f3a048e','ed4b9b4b290ace8a17bff39ac292183f8a82a34d']
-          encoded=b''.join(base64.b64decode(get('/git/blobs/'+sha)['content']) for sha in chunks)
-          compressed=base64.b64decode(encoded,validate=True)
-          assert hashlib.sha256(compressed).hexdigest()=='8120d55c6d1c47d579fd53dbe661aec6c03c3474e26843b7e85cfd31857018c8'
-          patch=gzip.decompress(compressed)
-          assert hashlib.sha256(patch).hexdigest()=='9ae1419982a33650e98600e5ed6383cf424668fe32fdaec042482bc33b9b9945'
-          subprocess.run(['git','apply','--index','-'],input=patch,check=True)
-          assert git('write-tree')==expected
-          paths=['CHANGELOG.md','README.md','browser/semantic-motion-binding.spec.ts','docs/NAMING.md','docs/api.md','docs/bindings.md','docs/errors.md','docs/recipes.md','package.json','src/bindings/index.ts','src/errors.ts','test/readme-facts.test.ts','test/semantic-motion-binding-consumer.test.ts','test/semantic-motion-binding.test.ts']
-          assert git('diff','--cached','--name-only').splitlines()==paths
-          tree=post('/git/trees',{'base_tree':git('rev-parse','HEAD^{tree}'),'tree':[{'path':p,'mode':'100644','type':'blob','content':pathlib.Path(p).read_text()} for p in paths]})
-          assert tree['sha']==expected
-          commit=post('/git/commits',{'message':'feat(bindings): связать смысл компонента с движением без второго store','tree':expected,'parents':[base]})
-          ref=post('/git/refs',{'ref':'refs/heads/feat/semantic-motion-bindings-383','sha':commit['sha']})
-          print(json.dumps({'base':base,'head':commit['sha'],'tree':expected,'ref':ref['ref'],'paths':paths},ensure_ascii=False))
-          PY
+          test "$(git rev-parse HEAD)" = 4dbd72b82782756e7fee97e1ebb7d01a685a67ca
+          test "$(git rev-parse HEAD^{tree})" = 13d75e1e9c9a834cad6449469832410bd8ba115a
+          mkdir "$RUNNER_TEMP/binding-source"
+          git bundle create "$RUNNER_TEMP/binding-source/source.bundle" HEAD --tags
+          git rev-parse HEAD HEAD^{tree} > "$RUNNER_TEMP/binding-source/revision.txt"
+          cd "$RUNNER_TEMP/binding-source"
+          sha256sum source.bundle revision.txt > SHA256SUMS
+      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
+        with:
+          name: semantic-binding-source-4dbd72b
+          path: ${{ runner.temp }}/binding-source/
+          retention-days: 7
+          compression-level: 0
+          if-no-files-found: error
+          overwrite: false
