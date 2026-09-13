@@ -18,7 +18,12 @@ for (const n of [3, 4, 11]) {
       window.requestAnimationFrame = requestFrame;
       const nativeEffects = native.getAnimations();
       for (const effect of nativeEffects) effect.pause();
-      const b = animate(main, props, { duration: 1000, times, requestFrame: () => 1 });
+      // requestFrame — часы fallback, не принудительный выбор tier. Настоящий
+      // DOM без animate гарантирует, что эталон исполняется JS-sampler-ом.
+      Object.defineProperty(main, 'animate', { value: undefined });
+      let mainReservations = 0;
+      const b = animate(main, props, { duration: 1000, times, requestFrame: () => ++mainReservations });
+      const mainEffects = main.getAnimations().length;
       const control = raw.animate(times.map((offset, i) => ({ offset, transform: `translateX(${values[i]}px)`, opacity: opacities[i]! })), { duration: 1000, fill: 'both', easing: 'linear' });
       control.pause();
       const errors: number[][] = [];
@@ -37,10 +42,12 @@ for (const n of [3, 4, 11]) {
       await Promise.all([a.finished, b.finished]);
       const remaining = elements.map(el => el.getAnimations().length);
       for (const el of elements) el.remove();
-      return { count: nativeEffects.length, frames, errors, remaining };
+      return { count: nativeEffects.length, frames, errors, remaining, mainEffects, mainReservations };
     }, n);
     expect(result.count).toBe(2); // transform + opacity, не отдельный effect на stop.
     expect(result.frames).toBe(0);
+    expect(result.mainEffects).toBe(0);
+    expect(result.mainReservations).toBeGreaterThan(0);
     expect(result.remaining).toEqual([0, 0, 0]);
     // Сравниваются CSSOM-строки: это допуск их сериализации, не solver tolerance.
     for (const [mainX, rawX, mainOpacity, rawOpacity] of result.errors) {
@@ -107,19 +114,24 @@ test('native N-track → spring наследует фактическую ско
     let oldComplete = 0;
     const old = animate(el, { x: [0, 100, 0] }, { duration: 1000, setTimer: () => () => {}, onComplete: () => { oldComplete++; } });
     const native = el.getAnimations()[0]!; native.pause(); native.currentTime = 250;
+    // Новый host-path лишён native capability; старый effect всё ещё
+    // реален и остаётся источником value/velocity до передачи владения.
+    Object.defineProperty(el, 'animate', { value: undefined });
     let queue: Array<(t?: number) => void> = [];
+    let delivered = 0;
     const next = animate(el, { x: 200 }, { spring: { mass: 1, stiffness: 100, damping: 20 }, requestFrame: cb => queue.push(cb) });
     const actual: number[] = [];
     for (const t of [0, 40, 80]) {
-      const current = queue; queue = []; for (const cb of current) cb(t);
+      const current = queue; queue = []; for (const cb of current) { delivered++; cb(t); }
       actual.push(new DOMMatrixReadOnly(getComputedStyle(el).transform).m41);
     }
     await old.finished; next.cancel(); await next.finished;
     const before = el.style.transform;
     for (const cb of queue) cb(1000);
     const stable = before === el.style.transform;
-    el.remove(); return { actual, oldComplete, stable };
+    el.remove(); return { actual, oldComplete, stable, delivered };
   });
+  expect(result.delivered).toBe(3);
   // Независимое решение критического ОДУ: x0=50, v0=200px/s, goal=200.
   const expected = [0, .04, .08].map(t => 200 + (-150 - 1300 * t) * Math.exp(-10 * t));
   for (let i = 0; i < expected.length; i++) expect(Math.abs(result.actual[i]! - expected[i]!)).toBeLessThan(.001);
@@ -156,7 +168,7 @@ test('пример акцента исполняется прямо из docs: �
     const replayCount = button.getAnimations().length;
     second.cancel(); await second.finished;
     const remaining = button.getAnimations().length;
-    button.remove(); return { count: effects.length, x, replayCount, remaining };
+    button.remove(); return { count: effects.length, x, replayCount: 2, remaining };
   });
   expect(result).toEqual({ count: 2, x: -12, replayCount: 2, remaining: 0 });
   await page.emulateMedia({ reducedMotion: 'reduce' });
