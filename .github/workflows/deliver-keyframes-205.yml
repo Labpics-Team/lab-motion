@@ -1,0 +1,95 @@
+name: Deliver N-keyframes 205
+on:
+  push:
+    branches: [delivery/n-keyframes-205-20260913]
+    paths: [.github/workflows/deliver-keyframes-205.yml]
+permissions: {}
+concurrency:
+  group: deliver-n-keyframes-205
+  cancel-in-progress: false
+jobs:
+  seal:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    permissions:
+      contents: write
+    outputs:
+      head: ${{ steps.publish.outputs.head }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          ref: 93278bf9b540f93521c7bd4c02f68db458e5db7a
+          fetch-depth: 0
+          persist-credentials: false
+      - name: Authenticate inspectable patches before any product publication
+        env:
+          CARRIER: ${{ github.sha }}
+        run: |
+          set -euo pipefail
+          python3 - <<'PY'
+          from pathlib import Path
+          import hashlib, subprocess, os
+          base='93278bf9b540f93521c7bd4c02f68db458e5db7a'
+          hashes=['3b6a2f559952f0868a516f4bac84c3cd573d18d4501060eb358f7a42f3ebfe6d','98e8beceae3c5d6a45f824310f9cfcc32dc698bd6f24a020d9f135755ca4ba65','82d4395338e7209e661504ce3e463a29790c36c8afbd55021870f5b677d602b8','03faddff4ae6fc13a70c7bdd672f2715c03042e0d0097f2d08cf2a4ebbc44b09','0e41bd61784f3bc921739d841085333f39f2e23e7dad4750d4601e5bce555e30','76d13f24478e94ae60e62b4cf09187a1c213ed3d4204a4df996041d733b2e19a','be4df7d2bfa2455c5680333e6a2a1ece79bee7f15b0cbfb443cde0b87b2fb805','2db696691e4c58e35c52c951d21b6e74eea9af42bda998c842fdd4cd3d78c09d']
+          def git(*args):return subprocess.check_output(['git',*args])
+          assert git('rev-parse','HEAD').decode().strip()==base
+          assert not git('status','--porcelain').strip()
+          chunks=[]
+          for i,digest in enumerate(hashes):
+              chunk=git('show',f'{os.environ["CARRIER"]}:.delivery/n205/{i}.patch')
+              actual=hashlib.sha256(chunk).hexdigest()
+              assert actual==digest,(i,actual,digest)
+              chunks.append(chunk)
+          patch=b''.join(chunks)
+          assert hashlib.sha256(patch).hexdigest()=='aaf40137f1a8f530a64a0e9a94df44f2a4a94271cdda99304f876e8df4c191f7'
+          out=Path('/tmp/n205-receipt');out.mkdir()
+          path=out/'candidate.patch';path.write_bytes(patch)
+          subprocess.run(['git','apply','--unidiff-zero','--check',str(path)],check=True)
+          subprocess.run(['git','apply','--unidiff-zero','--index',str(path)],check=True)
+          assert git('write-tree').decode().strip()=='8c6bd8e76113ebceec0dfd9705df8e93b2cb4e07'
+          paths=git('diff','--cached','--name-only').decode().splitlines()
+          assert len(paths)==21 and all(not p.startswith(('.github/','.delivery/')) for p in paths)
+          assert not any(p in paths for p in ['package.json','pnpm-lock.yaml','scripts/size-gate.mjs','tsup.config.ts'])
+          subprocess.run(['git','diff','--cached','--check'],check=True)
+          PY
+          git -c core.hooksPath=/dev/null -c user.name='github-actions[bot]' -c user.email='41898282+github-actions[bot]@users.noreply.github.com' commit -m 'feat(animate): N-keyframe tracks with shared ownership and native execution (#205)'
+          git archive HEAD | gzip -n > /tmp/n205-receipt/source.tar.gz
+          { git rev-parse HEAD HEAD^{tree}; git show --stat --oneline HEAD; } > /tmp/n205-receipt/receipt.txt
+      # The write-credential job never installs dependencies or executes product scripts.
+      - name: Publish only the new owned feature branch
+        id: publish
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          [[ "$(gh api repos/Labpics-Team/lab-motion/git/ref/heads/main --jq .object.sha)" == 93278bf9b540f93521c7bd4c02f68db458e5db7a ]]
+          gh auth setup-git
+          refs="$(git ls-remote --heads origin refs/heads/feat/animate-n-keyframes-205)"
+          [[ -z "$refs" ]]
+          git push origin HEAD:refs/heads/feat/animate-n-keyframes-205
+          echo "head=$(git rev-parse HEAD)" >> "$GITHUB_OUTPUT"
+          cat /tmp/n205-receipt/receipt.txt
+      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
+        if: always()
+        with:
+          name: n205-delivery-${{ github.run_id }}
+          path: /tmp/n205-receipt/
+          if-no-files-found: error
+          retention-days: 14
+  authoritative-ci:
+    needs: seal
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    permissions:
+      contents: read
+      actions: write
+    steps:
+      - name: Dispatch unchanged authoritative CI for the exact sealed participant
+        env:
+          GH_TOKEN: ${{ github.token }}
+          EXPECTED: ${{ needs.seal.outputs.head }}
+        run: |
+          set -euo pipefail
+          [[ "$(gh api repos/Labpics-Team/lab-motion/git/ref/heads/feat/animate-n-keyframes-205 --jq .object.sha)" == "$EXPECTED" ]]
+          gh api --method POST repos/Labpics-Team/lab-motion/actions/workflows/ci.yml/dispatches -f ref=feat/animate-n-keyframes-205
+          printf 'Original CI dispatched for %s\n' "$EXPECTED"
