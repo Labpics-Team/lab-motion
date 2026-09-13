@@ -46,6 +46,7 @@ console.log('semantic-binding-consumer: PASS');
     const navigation = docs.match(/```typescript\n([^`]*?export function bindNavigationMotion[^]*?)\n```/)?.[1];
     expect(navigation).toBeTruthy(); writeFileSync(join(work, 'navigation.ts'), navigation!);
     expect(readFileSync(join(installed, 'docs/bindings.md'), 'utf8')).toContain('createMotionBinding');
+    expect(readFileSync(join(installed, 'dist/bindings/index.d.ts'), 'utf8')).not.toContain('NoInfer');
     writeFileSync(join(work, 'consumer.ts'), `
 import {createMotionBinding, type MotionBindingControls} from '@labpics/motion/bindings';
 import {animate} from '@labpics/motion/animate';
@@ -62,6 +63,12 @@ const view: MotionBindingControls<Model> = createMotionBinding(project, {
 view.update({pressed:false,progress:.25});
 // @ts-expect-error semantic input requires progress
 view.update({pressed:false});
+// Port inference comes only from the projected role shape, without a public NoInfer dependency.
+createMotionBinding((n: number) => ({only: {x: n}}), {only: goal => {
+  const x: number = goal.x; void x;
+  // @ts-expect-error a port cannot invent a property absent from the projected role
+  goal.y;
+}});
 // @ts-expect-error a missing port is not optional
 createMotionBinding(project, {panel: goal => animate(document.body, goal)});
 // @ts-expect-error a misspelled port must not silently go unused

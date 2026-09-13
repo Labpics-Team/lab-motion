@@ -43,7 +43,7 @@ function combine(errors: readonly unknown[]): unknown {
  */
 export function createMotionBinding<Model, Goals extends MotionBindingGoals>(
   project: (model: Model) => Goals,
-  targets: MotionBindingTargets<NoInfer<Goals>>,
+  targets: MotionBindingTargets<Goals>,
 ): MotionBindingControls<Model> {
   if (typeof project !== 'function' || !record(targets)) throw new MotionParamError('LM173');
   let roles = Object.keys(targets);
