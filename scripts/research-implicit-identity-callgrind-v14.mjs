@@ -165,30 +165,6 @@ function summarizeControls(rows) {
   return output;
 }
 
-function finalize(rows) {
-  const output = summarizeControls(rows);
-  let verdict = 'PASS-TAKEN-PATH';
-  for (const profile of PROFILES) {
-    const state = output.profiles[profile];
-    if (!state.admitted) {
-      state.verdict = 'UNPROVEN-CALIBRATION';
-      if (verdict !== 'NO-GO-CALLGRIND') verdict = 'UNPROVEN-CALIBRATION';
-      continue;
-    }
-    const ab = ratios(rows, profile, 'ab', AB_RUNS);
-    const mean = geometricMean(ab.map(({ ratio }) => ratio));
-    const pass = ab.every(({ ratio }) => ratio <= BAND_HIGH) && mean <= BAND_HIGH;
-    state.ab = ab;
-    state.abGeometricMean = mean;
-    state.verdict = pass ? 'PASS' : 'NO-GO-CALLGRIND';
-    if (!pass) verdict = 'NO-GO-CALLGRIND';
-  }
-  output.verdict = verdict;
-  output.rawRows = rows.length;
-  output.rawSha256 = crypto.createHash('sha256').update(fs.readFileSync(process.argv[3] ?? '')).digest('hex');
-  return output;
-}
-
 function writeJson(path, value) {
   fs.writeFileSync(path, `${JSON.stringify(value, null, 2)}\n`);
 }
