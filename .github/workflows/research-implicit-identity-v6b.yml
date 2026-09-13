@@ -1,0 +1,85 @@
+name: Implicit identity candidate null v6b
+
+on:
+  push:
+    branches:
+      - research/implicit-identity-candidate-null-v6b-20260913
+
+permissions:
+  contents: read
+
+jobs:
+  candidate-null:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    steps:
+      - name: Checkout proof carrier
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          persist-credentials: false
+
+      - name: Checkout exact candidate
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          ref: 0b01ae2b34db2b78c11acf9c4242e73538717c95
+          path: candidate
+          persist-credentials: false
+
+      - name: Checkout exact v5 carrier
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          ref: 52a5d84234af620c6a167516e665933321c863ef
+          path: v5carrier
+          persist-credentials: false
+
+      - name: Setup Node
+        uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020
+        with:
+          node-version: 24.20.0
+          check-latest: false
+
+      - name: Build immutable candidate
+        shell: bash
+        run: |
+          set -euo pipefail
+          corepack enable
+          corepack install --global pnpm@11.11.0
+          test "$(git -C candidate rev-parse HEAD)" = 0b01ae2b34db2b78c11acf9c4242e73538717c95
+          test "$(git -C candidate rev-parse HEAD^{tree})" = 69fc191b8f7c9e3503e1c1b64b280c00eb219311
+          test "$(git -C v5carrier rev-parse HEAD)" = 52a5d84234af620c6a167516e665933321c863ef
+          (cd candidate && pnpm install --frozen-lockfile && pnpm build)
+          printf '%s  %s\n' \
+            4f58d7f47bc7767d336b2771990f64fa52e4dd1df0f550fff30bdfc7ff1035be candidate/dist/keyframes/index.js \
+            | sha256sum --check
+
+      - name: Candidate-specific null
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p evidence
+          node -p 'JSON.stringify({versions:process.versions,platform:process.platform,arch:process.arch})' > evidence/environment.json
+          lscpu > evidence/cpu.txt
+          git rev-parse HEAD > evidence/carrier-sha.txt
+          sha256sum \
+            research/implicit-identity-v6b/candidate-null.mjs \
+            v5carrier/research/implicit-identity-v5/measure-pair.mjs \
+            candidate/dist/keyframes/index.js \
+            > evidence/protocol-sha256.txt
+          node research/implicit-identity-v6b/candidate-null.mjs 2>&1 | tee evidence/candidate-null-v6b.log
+
+      - name: Immutable evidence manifest
+        if: always()
+        shell: bash
+        run: |
+          set -euo pipefail
+          find evidence -type f ! -name SHA256SUMS -print0 | sort -z | xargs -0 sha256sum > evidence/SHA256SUMS
+
+      - name: Upload evidence
+        if: always()
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
+        with:
+          name: implicit-identity-candidate-null-v6b
+          path: evidence/
+          retention-days: 7
+          compression-level: 0
+          if-no-files-found: error
