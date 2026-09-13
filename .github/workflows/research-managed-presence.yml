@@ -119,7 +119,7 @@ jobs:
 
           '''
           replace('docs/recipes.md','## Появление/уход (presence)\n',recipe+'## Появление/уход (presence)\n')
-          replace('docs/recipes.md','const p = createPresence({\n','const p = createPresence({\n  initiallyPresent: true,\n')
+          replace('docs/recipes.md','const p = createPresence({\n  onExitStart: (done) => {','const p = createPresence({\n  initiallyPresent: true,\n  onExitStart: (done) => {')
           replace('test/presence.test.ts',"['createPresence', 'swapPresence']","['createPresence', 'createPresenceTransition', 'swapPresence']")
           paths=sorted([*blobs,'src/presence/machine.ts','src/presence/index.ts','CHANGELOG.md','docs/api.md','docs/recipes.md','test/presence.test.ts'])
           subprocess.check_call(['git','add','--',*paths])
