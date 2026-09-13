@@ -89,6 +89,7 @@ jobs:
           controls="$GITHUB_WORKSPACE/callgrind-controls.json"
           result="$GITHUB_WORKSPACE/callgrind-result.json"
           profiles_dir="$GITHUB_WORKSPACE/callgrind-profiles"
+          failure="$GITHUB_WORKSPACE/callgrind-transport-failure.json"
           mkdir -p "$profiles_dir"
           : > "$raw"
 
@@ -104,8 +105,20 @@ jobs:
           echo "cpu_pinned=$cpu" >> callgrind-environment.txt
 
           block_result() {
-            local reason="$1"
-            printf '{"schema":1,"verdict":"BLOCKED-CALLGRIND","reason":"%s"}\n' "$reason" > "$result"
+            local reason="$1" rc="${2:-0}"
+            printf '{"schema":1,"verdict":"BLOCKED-CALLGRIND","reason":"%s","rc":%s}\n' "$reason" "$rc" > "$result"
+          }
+          transport_fail() {
+            local rc="$1" stage="$2" profile="$3" phase="$4" run="$5" side="$6" out="$7" log="$8"
+            python3 - "$rc" "$stage" "$profile" "$phase" "$run" "$side" "$out" "$log" > "$failure" <<'PY'
+          import hashlib, json, pathlib, sys
+          rc, stage, profile, phase, run, side, out, log = sys.argv[1:]
+          def info(path):
+              p = pathlib.Path(path)
+              return None if not p.exists() else {"path": p.name, "bytes": p.stat().st_size, "sha256": hashlib.sha256(p.read_bytes()).hexdigest()}
+          print(json.dumps({"schema":1,"rc":int(rc),"stage":stage,"profile":profile,"phase":phase,"run":int(run),"side":side,"out":info(out),"log":info(log)}, separators=(',', ':')))
+          PY
+            return "$rc"
           }
 
           run_one() {
@@ -137,28 +150,30 @@ jobs:
               if (( waited > 9000 )); then
                 kill "$pid" 2>/dev/null || true
                 wait "$pid" 2>/dev/null || true
+                transport_fail 71 ready-timeout "$profile" "$phase" "$run" "$side" "$out" "$log"
                 return 71
               fi
             done
             if [[ ! -s "$ready" ]]; then
               wait "$pid" || true
+              transport_fail 72 ready-missing "$profile" "$phase" "$run" "$side" "$out" "$log"
               return 72
             fi
 
-            callgrind_control -i on "$pid" >/dev/null || return 73
-            callgrind_control -z "$pid" >/dev/null || return 74
+            if ! callgrind_control -i on "$pid" >/dev/null; then transport_fail 73 instrumentation-on "$profile" "$phase" "$run" "$side" "$out" "$log"; return 73; fi
+            if ! callgrind_control -z "$pid" >/dev/null; then transport_fail 74 zero "$profile" "$phase" "$run" "$side" "$out" "$log"; return 74; fi
             printf 'go\n' > "$start"
             local receipt
             IFS= read -r receipt < "$done"
-            callgrind_control -i off "$pid" >/dev/null || return 75
+            if ! callgrind_control -i off "$pid" >/dev/null; then transport_fail 75 instrumentation-off "$profile" "$phase" "$run" "$side" "$out" "$log"; return 75; fi
             printf 'stop\n' > "$stop"
-            wait "$pid" || return 76
+            if ! wait "$pid"; then transport_fail 76 child-exit "$profile" "$phase" "$run" "$side" "$out" "$log"; return 76; fi
 
             local ir
-            ir="$(awk '$1 == "summary:" { if (NF != 2) exit 2; print $2 }' "$out")" || return 77
-            if ! [[ "$ir" =~ ^[0-9]+$ ]] || (( ir <= 0 )); then return 78; fi
+            if ! ir="$(awk '$1 == "summary:" { if (NF != 2) exit 2; print $2 }' "$out")"; then transport_fail 77 summary-shape "$profile" "$phase" "$run" "$side" "$out" "$log"; return 77; fi
+            if ! [[ "$ir" =~ ^[0-9]+$ ]] || (( ir <= 0 )); then transport_fail 78 summary-value "$profile" "$phase" "$run" "$side" "$out" "$log"; return 78; fi
 
-            python3 - "$receipt" "$profile" "$phase" "$run" "$side" "$impl" "$factor" "$nominal" "$ir" "$out" >> "$raw" <<'PY'
+            if ! python3 - "$receipt" "$profile" "$phase" "$run" "$side" "$impl" "$factor" "$nominal" "$ir" "$out" >> "$raw" <<'PY'
           import hashlib, json, math, pathlib, sys
           receipt_s, profile, phase, run, side, impl, factor, nominal, ir, out = sys.argv[1:]
           receipt = json.loads(receipt_s)
@@ -179,30 +194,29 @@ jobs:
               'profileSha256': hashlib.sha256(p.read_bytes()).hexdigest(),
           }, separators=(',', ':')))
           PY
+            then transport_fail 79 receipt-validate "$profile" "$phase" "$run" "$side" "$out" "$log"; return 79; fi
           }
 
           pair() {
             local profile="$1" phase="$2" run="$3" impl_a="$4" factor_a="$5" impl_b="$6" factor_b="$7" nominal="$8"
             if (( run % 2 == 0 )); then
-              run_one "$profile" "$phase" "$run" a "$impl_a" "$factor_a" "$nominal"
-              run_one "$profile" "$phase" "$run" b "$impl_b" "$factor_b" "$nominal"
+              run_one "$profile" "$phase" "$run" a "$impl_a" "$factor_a" "$nominal" || return $?
+              run_one "$profile" "$phase" "$run" b "$impl_b" "$factor_b" "$nominal" || return $?
             else
-              run_one "$profile" "$phase" "$run" b "$impl_b" "$factor_b" "$nominal"
-              run_one "$profile" "$phase" "$run" a "$impl_a" "$factor_a" "$nominal"
+              run_one "$profile" "$phase" "$run" b "$impl_b" "$factor_b" "$nominal" || return $?
+              run_one "$profile" "$phase" "$run" a "$impl_a" "$factor_a" "$nominal" || return $?
             fi
           }
 
           collect_controls() {
-            local profile="$1" nominal="$2"
-            for run in $(seq 0 5); do pair "$profile" null-base "$run" base 1 base 1 "$nominal"; done
-            for run in $(seq 0 5); do pair "$profile" null-candidate "$run" candidate 1 candidate 1 "$nominal"; done
-            for run in $(seq 0 5); do pair "$profile" positive "$run" base 1 base 2 "$nominal"; done
+            local profile="$1" nominal="$2" run
+            for run in $(seq 0 5); do pair "$profile" null-base "$run" base 1 base 1 "$nominal" || return $?; done
+            for run in $(seq 0 5); do pair "$profile" null-candidate "$run" candidate 1 candidate 1 "$nominal" || return $?; done
+            for run in $(seq 0 5); do pair "$profile" positive "$run" base 1 base 2 "$nominal" || return $?; done
           }
 
-          if ! collect_controls setup3-default 10000 || ! collect_controls seek3-default 500000; then
-            block_result "callgrind-control-or-workload-execution-failed"
-            exit 0
-          fi
+          if ! collect_controls setup3-default 10000; then rc=$?; block_result "callgrind-control-or-workload-execution-failed" "$rc"; exit 0; fi
+          if ! collect_controls seek3-default 500000; then rc=$?; block_result "callgrind-control-or-workload-execution-failed" "$rc"; exit 0; fi
 
           node "$harness" controls "$raw" "$controls"
           cat "$controls"
@@ -211,15 +225,15 @@ jobs:
             node -e 'const x=require(process.argv[1]); process.exit(x.profiles[process.argv[2]].admitted ? 0 : 1)' "$controls" "$1"
           }
           collect_ab() {
-            local profile="$1" nominal="$2"
-            for run in $(seq 0 7); do pair "$profile" ab "$run" base 1 candidate 1 "$nominal"; done
+            local profile="$1" nominal="$2" run
+            for run in $(seq 0 7); do pair "$profile" ab "$run" base 1 candidate 1 "$nominal" || return $?; done
           }
 
           if admitted setup3-default; then
-            if ! collect_ab setup3-default 10000; then block_result "callgrind-ab-execution-failed"; exit 0; fi
+            if ! collect_ab setup3-default 10000; then rc=$?; block_result "callgrind-ab-execution-failed" "$rc"; exit 0; fi
           fi
           if admitted seek3-default; then
-            if ! collect_ab seek3-default 500000; then block_result "callgrind-ab-execution-failed"; exit 0; fi
+            if ! collect_ab seek3-default 500000; then rc=$?; block_result "callgrind-ab-execution-failed" "$rc"; exit 0; fi
           fi
 
           node "$harness" final "$raw" "$result"
@@ -247,9 +261,11 @@ jobs:
             callgrind-controls.json
             callgrind-raw.jsonl
             callgrind-environment.txt
+            callgrind-transport-failure.json
             callgrind-SHA256SUMS
             callgrind-profile-SHA256SUMS
             callgrind-profiles.tar.zst
+            callgrind-profiles/**
           if-no-files-found: warn
           retention-days: 30
           compression-level: 0
