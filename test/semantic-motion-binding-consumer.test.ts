@@ -1,8 +1,16 @@
 import { execFileSync } from 'node:child_process';
-import { mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
+import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join, resolve } from 'node:path';
-import { expect, it } from 'vitest';
+import { beforeAll, expect, it } from 'vitest';
+
+// Пакетные проверки принимают уже собранный артефакт, не пересобирают общий
+// dist параллельно с другими тестами. Канонический порядок: pnpm build → pnpm test.
+beforeAll(() => {
+  for (const file of ['index.js', 'index.cjs', 'index.d.ts', 'index.d.cts']) {
+    expect(existsSync(`dist/bindings/${file}`), `Сначала выполните pnpm build: отсутствует dist/bindings/${file}`).toBe(true);
+  }
+});
 
 it('упакованный потребитель: ESM/CJS/SSR, literal recipe и TS5/6 типы', () => {
   const work = mkdtempSync(join(tmpdir(), 'semantic-binding-consumer-'));
@@ -35,6 +43,8 @@ console.log('semantic-binding-consumer: PASS');
     const docs = readFileSync('docs/recipes.md', 'utf8');
     const recipe = docs.match(/```typescript\n([^`]*?export function bindUploadMotion[^]*?)\n```/)?.[1];
     expect(recipe).toBeTruthy(); writeFileSync(join(work, 'recipe.ts'), recipe!);
+    const navigation = docs.match(/```typescript\n([^`]*?export function bindNavigationMotion[^]*?)\n```/)?.[1];
+    expect(navigation).toBeTruthy(); writeFileSync(join(work, 'navigation.ts'), navigation!);
     expect(readFileSync(join(installed, 'docs/bindings.md'), 'utf8')).toContain('createMotionBinding');
     writeFileSync(join(work, 'consumer.ts'), `
 import {createMotionBinding, type MotionBindingControls} from '@labpics/motion/bindings';
@@ -62,7 +72,7 @@ createMotionBinding((n: number) => ({a: {x:[0,n]}}), {a: () => {}});
 createMotionBinding((n: number) => ({a: {x:n}}), {a: async () => ({cancel(){}})});
 `);
     for (const compiler of ['typescript', 'typescript5']) {
-      execFileSync(process.execPath, [resolve(`node_modules/${compiler}/bin/tsc`), '--noEmit', '--strict', '--module', 'NodeNext', '--target', 'ES2022', '--skipLibCheck', 'false', join(work, 'consumer.ts'), join(work, 'recipe.ts')], { cwd: work, encoding: 'utf8', timeout: 30_000 });
+      execFileSync(process.execPath, [resolve(`node_modules/${compiler}/bin/tsc`), '--noEmit', '--strict', '--module', 'NodeNext', '--target', 'ES2022', '--skipLibCheck', 'false', join(work, 'consumer.ts'), join(work, 'recipe.ts'), join(work, 'navigation.ts')], { cwd: work, encoding: 'utf8', timeout: 30_000 });
     }
   } finally { rmSync(work, { recursive: true, force: true }); }
 }, 60_000);

@@ -86,13 +86,24 @@ export function createMotionBinding<Model, Goals extends MotionBindingGoals>(
     return release([...owned, ...retired]);
   }
 
+  function hasKeys(value: object, keys: readonly string[]): boolean {
+    for (const key of keys) {
+      const own = Object.hasOwn(value, key);
+      // Proxy descriptor — такая же пользовательская граница, как getter.
+      if (state !== 'active') return true;
+      if (!own) return false;
+    }
+    return true;
+  }
+
   function snapshot(value: unknown): readonly MotionBindingGoal[] | undefined {
     if (!record(value)) throw new MotionParamError('LM174');
     const names = Object.keys(value);
     if (state !== 'active') return;
-    if (names.length !== roles.length || roles.some(role => !Object.hasOwn(value, role))) {
+    if (names.length !== roles.length || !hasKeys(value, roles)) {
       throw new MotionParamError('LM174');
     }
+    if (state !== 'active') return;
     let count = roles.length;
     const keys: string[][] = [];
     const goals: MotionBindingGoal[] = [];
@@ -105,9 +116,10 @@ export function createMotionBinding<Model, Goals extends MotionBindingGoals>(
       count += names.length;
       if (!names.length || count > MAX_ITEMS) throw new MotionParamError('LM174');
       const expected = propertyKeys?.[i];
-      if (expected && (names.length !== expected.length || expected.some(key => !Object.hasOwn(input, key)))) {
+      if (expected && (names.length !== expected.length || !hasKeys(input, expected))) {
         throw new MotionParamError('LM174');
       }
+      if (state !== 'active') return;
       const goal: Record<string, number | string> = Object.create(null);
       for (const key of names) {
         const value = input[key];

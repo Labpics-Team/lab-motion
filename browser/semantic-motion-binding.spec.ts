@@ -54,14 +54,26 @@ test('reduce: конечные стили без собственного rAF и
     try {
       view.update({ pressed: true, progress: 0.75, status: 'complete' });
       const surface = document.getElementById('surface')!, progress = document.getElementById('progress')!, complete = document.getElementById('complete')!;
-      const result = { calls, animations: document.getAnimations().length,
+      // DOMMatrix Firefox хранит scale с иной точностью. Эталон — независимый
+      // CSS того же host, не округление ожидаемого .97 и не расширение допуска.
+      const reference = document.createElement('div');
+      reference.style.transform = 'scale(0.97)';
+      document.body.append(reference);
+      const expectedScale = new DOMMatrix(getComputedStyle(reference).transform).m11;
+      reference.style.transform = 'scale(0.96)';
+      const wrongScale = new DOMMatrix(getComputedStyle(reference).transform).m11;
+      reference.remove();
+      const result = { calls, animations: document.getAnimations().length, expectedScale, wrongScale,
         scale: new DOMMatrix(getComputedStyle(surface).transform).m11,
         progress: new DOMMatrix(getComputedStyle(progress).transform).m11,
         complete: Number(getComputedStyle(complete).opacity) };
       view.destroy(); return result;
     } finally { window.requestAnimationFrame = raf; }
   });
-  expect(result).toEqual({ calls: 0, animations: 0, scale: 0.97, progress: 0.75, complete: 1 });
+  const { scale, expectedScale, wrongScale, ...rest } = result;
+  expect(rest).toEqual({ calls: 0, animations: 0, progress: 0.75, complete: 1 });
+  expect(scale).toBe(expectedScale);
+  expect(scale).not.toBe(wrongScale);
 });
 
 test('совпадает с прямым animate при pickup; cancel-before-start действительно отличается', async ({ page }) => {
@@ -170,4 +182,73 @@ test('Solid: штатные signal/batch/cleanup без второго store и�
   }, solidConsumer);
   expect(result).toEqual({initial:[1,1],batched:[2,2],unchanged:[2,2],
     destroyed:{writes:[2,2],cancels:4,state:'destroyed'},late:[2,2]});
+});
+
+const navigationRecipe = docs.match(/```typescript\n([^`]*?export function bindNavigationMotion[^]*?)\n```/)?.[1];
+if (!navigationRecipe) throw new Error('Отсутствует исполняемый рецепт bindNavigationMotion');
+const navigationCode = transformSync(navigationRecipe, { loader: 'ts', format: 'esm', target: 'es2022' }).code;
+
+for (const direction of ['ltr', 'rtl']) test(`навигация: фокус не перезапускает выбор, геометрия обновляется (${direction})`, async ({ page }) => {
+  await page.evaluate(async ({ source, direction }) => {
+    document.body.innerHTML = `<nav style="position:relative;display:flex;gap:8px;width:360px;direction:${direction}">
+      <button data-key="a" style="width:100px">Обзор</button>
+      <button data-key="b" style="width:120px">Проекты</button>
+      <i id="selection" style="position:absolute;left:0;bottom:0;width:1px;height:3px;transform-origin:left center;pointer-events:none"></i>
+      <i id="focus" style="position:absolute;left:0;top:0;width:1px;height:2px;transform-origin:left center;pointer-events:none"></i>
+    </nav>`;
+    const text = source.replaceAll('@labpics/motion/animate', location.origin + '/dist/animate/index.js')
+      .replaceAll('@labpics/motion/bindings', location.origin + '/dist/bindings/index.js');
+    const url = URL.createObjectURL(new Blob([text], { type: 'text/javascript' }));
+    const { bindNavigationMotion } = await import(url); URL.revokeObjectURL(url);
+    const selection = document.getElementById('selection')!, focus = document.getElementById('focus')!;
+    const view = bindNavigationMotion({ selection, focus });
+    let selected = 'a', focused: string | null = null;
+    const buttons = [...document.querySelectorAll<HTMLButtonElement>('button')];
+    const update = () => view.update({ selected, focused,
+      items: buttons.map(button => ({ key: button.dataset.key!, x: button.offsetLeft, width: button.offsetWidth })),
+    });
+    for (const button of buttons) {
+      button.addEventListener('focus', () => { focused = button.dataset.key!; update(); });
+      button.addEventListener('blur', () => { focused = null; update(); });
+      button.addEventListener('click', () => {
+        selected = button.dataset.key!;
+        for (const item of buttons) item.setAttribute('aria-current', item === button ? 'page' : 'false');
+        update();
+      });
+    }
+    update();
+    const before = selection.getAnimations()[0];
+    if (!before) throw new Error('Контроль должен создать native selection');
+    before.pause(); before.currentTime = 40;
+    (window as unknown as { navigation: unknown }).navigation = { view, update, before };
+  }, { source: navigationCode, direction });
+  await page.getByRole('button', { name: 'Проекты' }).focus();
+  expect(await page.evaluate(() => {
+    const n = (window as unknown as { navigation: { before: Animation } }).navigation;
+    return document.getElementById('selection')!.getAnimations()[0] === n.before;
+  })).toBe(true);
+  await page.getByRole('button', { name: 'Проекты' }).press('Space');
+  await expect(page.getByRole('button', { name: 'Проекты' })).toHaveAttribute('aria-current', 'page');
+  const result = await page.evaluate(() => {
+    const n = (window as unknown as { navigation: { before: Animation; update(): void; view: { destroy(): void } } }).navigation;
+    const selection = document.getElementById('selection')!, focus = document.getElementById('focus')!;
+    const changed = selection.getAnimations()[0] !== n.before;
+    const button = document.querySelector<HTMLButtonElement>('[data-key=b]')!;
+    button.style.width = '160px'; n.update();
+    const expected = [button.offsetLeft, button.offsetWidth];
+    for (const el of [selection, focus]) for (const effect of el.getAnimations()) {
+      effect.pause(); effect.currentTime = Number(effect.effect!.getComputedTiming().endTime);
+    }
+    const actual = [selection, focus].map(el => {
+      const matrix = new DOMMatrix(getComputedStyle(el).transform);
+      return [matrix.m41, matrix.m11];
+    });
+    const focused = document.activeElement === button;
+    n.view.destroy();
+    return { changed, expected, actual, focused, remaining: [selection, focus].map(el => el.getAnimations().length) };
+  });
+  expect(result.changed).toBe(true);
+  expect(result.actual).toEqual([result.expected, result.expected]);
+  expect(result.focused).toBe(true);
+  expect(result.remaining).toEqual([0, 0]);
 });

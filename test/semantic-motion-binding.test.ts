@@ -261,3 +261,65 @@ it('предел общего снимка проверяется до чтен�
   expect(getter).not.toHaveBeenCalled(); expect(write).not.toHaveBeenCalled();
   view.destroy();
 });
+
+it('отзыв во время проверки принадлежности поля прекращает чтение его значения', () => {
+  let view: bindings.MotionBindingControls<number>;
+  let descriptors = 0, reads = 0;
+  const target = new Proxy({ x: 2, y: 3 }, {
+    getOwnPropertyDescriptor(object, key) {
+      if (++descriptors === 3) view.destroy();
+      return Reflect.getOwnPropertyDescriptor(object, key);
+    },
+    get(object, key) { reads++; return Reflect.get(object, key); },
+  });
+  const port = vi.fn(handle);
+  view = create((n: number) => ({ panel: n === 1 ? { x: n, y: n + 1 } : target }), { panel: port });
+  view.update(1);
+  view.update(2);
+  expect(view.state).toBe('destroyed');
+  expect(reads).toBe(0);
+  expect(descriptors).toBe(3);
+  expect(port).toHaveBeenCalledOnce();
+  expect(port.mock.results[0]!.value.cancel).toHaveBeenCalledOnce();
+});
+
+it.each([null, undefined, 1, 'project', {}])('LM173: некорректная проекция %s не читает порты', project => {
+  const read = vi.fn();
+  const targets = { get panel() { read(); return () => {}; } };
+  expect(() => create(project as never, targets)).toThrow(expect.objectContaining({ code: 'LM173' }));
+  expect(read).not.toHaveBeenCalled();
+});
+
+it.each([null, undefined, [], {}, { panel: 1 }])('LM173: некорректная карта портов %s', targets => {
+  const project = vi.fn(() => ({ panel: { x: 1 } }));
+  expect(() => create(project, targets as never)).toThrow(expect.objectContaining({ code: 'LM173' }));
+  expect(project).not.toHaveBeenCalled();
+});
+
+it('LM173: переполненная карта портов отвергается до чтения функций', () => {
+  const targets: Record<string, unknown> = Object.create(null);
+  const read = vi.fn();
+  for (let i = 0; i <= 10_000; i++) Object.defineProperty(targets, `r${i}`, { enumerable: true, get: read });
+  expect(() => create(() => ({ panel: { x: 1 } }), targets as never)).toThrow(expect.objectContaining({ code: 'LM173' }));
+  expect(read).not.toHaveBeenCalled();
+});
+
+it.each([null, 3, 'handle', {}, { cancel: 1 }, Promise.resolve()])('LM173: неверный ресурс %s не оставляет старых владельцев', result => {
+  const a = handle(), b = handle(), next = handle();
+  const view = create((n: number) => ({ a: { x: n }, b: { x: n } }), {
+    a: goal => goal.x === 1 ? a : next,
+    b: goal => goal.x === 1 ? b : result as never,
+  });
+  view.update(1);
+  expect(() => view.update(2)).toThrow(expect.objectContaining({ code: 'LM173' }));
+  expect(view.state).toBe('failed');
+  for (const h of [a, b, next]) expect(h.cancel).toHaveBeenCalledOnce();
+  view.destroy();
+});
+
+it('порт без ресурса и callable handle остаются разрешёнными соседями LM173', () => {
+  const stop = vi.fn(); const resource = Object.assign(() => {}, { cancel: stop });
+  const view = create((n: number) => ({ a: { x: n }, b: { x: n } }), { a: () => {}, b: () => resource });
+  view.update(1); view.update(2); expect(stop).not.toHaveBeenCalled();
+  view.destroy(); expect(stop).toHaveBeenCalledOnce();
+});

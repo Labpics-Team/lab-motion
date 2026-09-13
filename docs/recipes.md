@@ -43,7 +43,7 @@ export function bindUploadMotion(
 
 У прогресс-полосы задайте CSS `transform-origin: left center`. Передайте фактическую
 модель через `view.update(model)` после монтирования и вызывайте `view.destroy()`
-при размонтировании. Доступные текст, `aria-busy`, `aria-valuenow`, обработку
+при размонтировании. Доступный текст, атрибуты `aria-busy` и `aria-valuenow`, обработку
 клавиатуры и изменение бизнес-данных оставьте компоненту. Системное уменьшенное
 движение обрабатывает обычный `animate`, без второй политики в привязке.
 
@@ -62,6 +62,62 @@ onCleanup(view.destroy);
 не требует контекста, provider или дополнительного store. Цели описывают состояние,
 а повторяемые события (shake/replay) остаются отдельными явными действиями.
 [Полные правила владения и ошибок](bindings.md).
+
+## Навигация: выбор и клавиатурный фокус независимы
+
+> Роль: практика — два индикатора одной навигации без смешивания выбранной страницы
+> и временного фокуса. Оба элемента имеют CSS `width: 1px; transform-origin: left center`
+> и абсолютное положение `left: 0` в общем контейнере; они не перехватывают события.
+
+Приложение владеет ключом выбранной страницы и фокусом. DOM-адаптер передаёт
+измеренные позиции пунктов относительно контейнера: новые измерения после resize
+или изменения текста — обычный update, не пересоздание привязки. Рецепт связывает
+эти данные с движением, не хранит вторую копию порядка или активной страницы.
+
+```typescript
+import { animate } from '@labpics/motion/animate';
+import { createMotionBinding } from '@labpics/motion/bindings';
+
+interface NavigationMotionModel {
+  selected: string;
+  focused: string | null;
+  items: readonly { key: string; x: number; width: number }[];
+}
+
+export function bindNavigationMotion(targets: {
+  selection: HTMLElement;
+  focus: HTMLElement;
+}) {
+  const spring = { mass: 1, stiffness: 280, damping: 30 };
+  return createMotionBinding(
+    (model: NavigationMotionModel) => {
+      const selected = model.items.find(item => item.key === model.selected);
+      const focused = model.focused === null ? selected
+        : model.items.find(item => item.key === model.focused);
+      if (!selected || !focused) throw new RangeError('Пункт отсутствует в измеренной навигации');
+      return {
+        selection: { x: selected.x, scaleX: selected.width },
+        focus: { x: focused.x, scaleX: focused.width, opacity: model.focused === null ? 0 : 1 },
+      };
+    },
+    {
+      selection: goal => animate(targets.selection, goal, { spring }),
+      focus: goal => animate(targets.focus, goal, { spring }),
+    },
+  );
+}
+```
+
+На focus/blur меняйте только `focused`, на принятую навигацию — `selected`.
+Перемещение клавиатурного фокуса не перезапускает движение выбора. Переход на другую
+страницу не требует знать названия анимаций; ширина индикатора меняется через scale,
+не через покадровый layout. Для RTL передавайте фактические физические позиции:
+порядок текста или массива не подменяет геометрию браузера.
+
+Измеряйте неанимируемые пункты, не сами индикаторы. Ключи пунктов уникальны,
+ширины положительны. Семантика ссылок/кнопок, `aria-current`, видимый focus outline,
+обработка ввода и уведомление о resize остаются у компонента. Декоративный индикатор
+не заменяет доступный фокус. При размонтировании вызовите `view.destroy()`.
 
 ## Drag с инерцией
 
