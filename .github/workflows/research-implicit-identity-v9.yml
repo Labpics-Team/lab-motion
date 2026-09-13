@@ -1,0 +1,108 @@
+name: Research implicit identity matched v9
+
+on:
+  push:
+    branches: ["research/implicit-identity-matched-v9-20260913"]
+
+permissions:
+  contents: read
+
+env:
+  COREPACK_ENABLE_DOWNLOAD_PROMPT: "0"
+  COREPACK_DEFAULT_TO_LATEST: "0"
+
+jobs:
+  proof:
+    runs-on: ubuntu-latest
+    timeout-minutes: 35
+    steps:
+      - name: Checkout carrier
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+
+      - name: Setup exact Node
+        uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v6
+        with:
+          node-version: "24.20.0"
+
+      - name: Activate pinned pnpm
+        run: |
+          corepack enable
+          corepack install --global pnpm@11.11.0
+          pnpm --version
+          node --version
+
+      - name: Install frozen dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Preserve frozen v9 harness
+        run: |
+          cp research/implicit-identity-v9-child.mjs "$RUNNER_TEMP/v9-child.mjs"
+          cp research/implicit-identity-v9-runner.mjs "$RUNNER_TEMP/v9-runner.mjs"
+          sha256sum "$RUNNER_TEMP/v9-child.mjs" "$RUNNER_TEMP/v9-runner.mjs" > "$RUNNER_TEMP/v9-harness.sha256"
+
+      - name: Build exact base artifact
+        run: |
+          git checkout --detach 93278bf9b540f93521c7bd4c02f68db458e5db7a
+          rm -rf dist
+          pnpm build
+          mkdir -p "$RUNNER_TEMP/base-dist"
+          cp -a dist/. "$RUNNER_TEMP/base-dist/"
+          test -f "$RUNNER_TEMP/base-dist/keyframes/index.js"
+          sha256sum "$RUNNER_TEMP/base-dist/keyframes/index.js" > "$RUNNER_TEMP/base-entry.sha256"
+
+      - name: Build exact candidate artifact
+        run: |
+          git checkout --detach 0b01ae2b34db2b78c11acf9c4242e73538717c95
+          rm -rf dist
+          pnpm build
+          mkdir -p "$RUNNER_TEMP/candidate-dist"
+          cp -a dist/. "$RUNNER_TEMP/candidate-dist/"
+          test -f "$RUNNER_TEMP/candidate-dist/keyframes/index.js"
+          sha256sum "$RUNNER_TEMP/candidate-dist/keyframes/index.js" > "$RUNNER_TEMP/candidate-entry.sha256"
+
+      - name: Freeze execution environment
+        run: |
+          allowed="$(awk '/Cpus_allowed_list/ {print $2}' /proc/self/status)"
+          first="${allowed%%,*}"
+          first="${first%%-*}"
+          test -n "$first"
+          echo "V9_PIN_CPU=$first" >> "$GITHUB_ENV"
+          {
+            echo "carrier=$GITHUB_SHA"
+            echo "runner_os=$RUNNER_OS"
+            echo "runner_arch=$RUNNER_ARCH"
+            echo "node=$(node --version)"
+            echo "pnpm=$(pnpm --version)"
+            echo "cpu_allowed=$allowed"
+            echo "pin_cpu=$first"
+            uname -a
+            cat "$RUNNER_TEMP/v9-harness.sha256"
+            cat "$RUNNER_TEMP/base-entry.sha256"
+            cat "$RUNNER_TEMP/candidate-entry.sha256"
+          } > "$RUNNER_TEMP/v9-provenance.txt"
+
+      - name: Execute preregistered proof
+        env:
+          V9_CHILD: ${{ runner.temp }}/v9-child.mjs
+          V9_BASE_ENTRY: ${{ runner.temp }}/base-dist/keyframes/index.js
+          V9_CANDIDATE_ENTRY: ${{ runner.temp }}/candidate-dist/keyframes/index.js
+          V9_OUT: ${{ runner.temp }}/v9-result.json
+        run: node "$RUNNER_TEMP/v9-runner.mjs" | tee "$RUNNER_TEMP/v9-summary.txt"
+
+      - name: Upload sealed evidence
+        if: always()
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: implicit-identity-v9-${{ github.run_id }}
+          path: |
+            ${{ runner.temp }}/v9-result.json
+            ${{ runner.temp }}/v9-summary.txt
+            ${{ runner.temp }}/v9-provenance.txt
+            ${{ runner.temp }}/v9-harness.sha256
+            ${{ runner.temp }}/base-entry.sha256
+            ${{ runner.temp }}/candidate-entry.sha256
+          if-no-files-found: error
+          retention-days: 30
