@@ -1,8 +1,8 @@
-name: Research implicit identity PMU v13
+name: Research implicit identity PMU v13 self-hosted
 
 on:
   push:
-    branches: ["research/implicit-identity-pmu-v13-20260913"]
+    branches: ["research/implicit-identity-pmu-v13-selfhosted-20260913"]
 
 permissions:
   contents: read
@@ -17,7 +17,7 @@ env:
 
 jobs:
   pmu-proof:
-    runs-on: ubuntu-latest
+    runs-on: self-hosted
     timeout-minutes: 35
     steps:
       - name: Checkout research carrier
@@ -98,7 +98,6 @@ jobs:
           if ! perf stat --no-big-num -x ';' -e instructions:u -e cycles:u -o "$pmu_probe" -- true; then
             python3 - <<'PY'
           import json, pathlib
-          probe = pathlib.Path("/tmp")
           pathlib.Path("pmu-result.json").write_text(json.dumps({
               "schema": 1,
               "verdict": "BLOCKED-PMU",
@@ -200,8 +199,6 @@ jobs:
                   raise SystemExit(f'non-numeric perf counter {key}: {count_s!r}')
               if not math.isfinite(count) or count <= 0:
                   raise SystemExit(f'non-positive perf counter {key}: {count!r}')
-              # With two generic hardware events on x86 the counters should not multiplex.
-              # If perf emits an explicit running percentage, require effectively full time.
               if len(parts) >= 5 and parts[4].strip().endswith('%'):
                   pct = float(parts[4].strip().rstrip('%'))
                   if pct < 99.9:
