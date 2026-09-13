@@ -1,0 +1,139 @@
+diff --git a/docs/api.md b/docs/api.md
+index fa2cc21..ccb2b44 100644
+--- a/docs/api.md
++++ b/docs/api.md
+@@ -35 +35 @@ export-ветки) и `pnpm pack:compat` (TypeScript/Vite, SSR, tree shaking, т
+-| `…/animate` | Фасад-one-liner: `animate(target, props, options)` — цели по каналам (`x`/`y`/`scale`/`rotate`, `opacity`, CSS-свойства), режим `{ spring }` или `{ duration, ease }`, `delay`/`stagger`, контролы `{ finished, play, pause, seek, cancel, stop }`. Это базовый single-transition DX-срез; ядро от него не растёт |
++| `…/animate` | Фасад-one-liner: `animate(target, props, options)` — цели по каналам (`x`/`y`/`scale`/`rotate`, `opacity`, CSS-свойства), режим `{ spring }` или `{ duration, ease }`, `delay`/`stagger`, контролы `{ finished, play, pause, seek, cancel, stop }`. Массивы N>=3, `times` и per-segment `ease` используют тот же lifecycle; ядро от фасада не растёт |
+@@ -167,0 +168,68 @@ entry, что и проверяемую функцию: корневой entry 
++
++## Многоточечные переходы в `./animate`
++
++```typescript
++import { animate } from '@labpics/motion/animate';
++import { easeOut, linear, easeIn } from '@labpics/motion/easing';
++
++const run = animate(element, {
++  x: [0, 120, -40, 0],
++  opacity: [0, 1, 1, 0],
++}, { duration: 800, times: [0, .25, .75, 1], ease: [easeOut, linear, easeIn] });
++run.pause();
++run.seek(400); // миллисекунды активного track; пауза сохраняется
++run.play();
++await run.finished;
++```
++
++Значение свойства — конечная цель, пара `[from, to]` или массив из N≥3 stops.
++Поддержаны прежние numeric/transform/CSS codecs; массив не меняет смысл CSS-юнитов
++или цветов. Первый stop явный: входная скорость старого движения не изменяет
++авторскую траекторию. Последующее пружинное перенаправление, напротив, получает
++текущее значение и скорость выбранного сегмента.
++
++Без `times` позиции распределены равномерно. С общей `times` или `ease[]` каждый
++канал имеет одну authored topology N; scalar и pair означают N=2. Без общей
++metadata разные свойства могут иметь разные N. Один `ease` применяется к каждому
++сегменту, массив функций имеет N−1 элементов. N-track без easing линеен; без
++`duration` используется прежний `duration.base` (200 мс). Обычная from/to-пара без
++metadata сохраняет прежний spring/tween выбор и standard easing.
++
++`times` не убывают, начинаются с 0 и заканчиваются 1. Точный interior duplicate
++выбирает правый stop и правый ненулевой интервал; endpoints p≤0/p≥1 возвращают
++именно первый/последний stop, до easing. Поэтому authored jump не называется C¹.
++На гладком сегменте native linear slope точен, производная произвольной JS easing
++оценивается существующей ограниченной разностью full-animate. Разность никогда
++не пересекает соседний скачок. Не-конечный результат easing заменяется линейным прогрессом. Не-конечная
++оценка производной заменяется нулём, как в прежнем tween; эти проверки относятся
++к своим точкам sampling. На terminal pose скорость нулевая.
++
++Explicit `spring` несовместим с N-track (`LM136`). Массивы — dense own slots;
++длина и элементы считываются до selector/layout/host writes. Бюджет — 100000
++входных stops и 100000 expanded stops `targets × channels`; `scale` раскрывается
++в две оси. Metadata arrays тоже bounded. Sparse, сверхлимитные или недопустимые
++массивы дают `LM173`; несовпадение topology, невалидные offsets/easing используют
++коды из [каталога ошибок](errors.md). При пустых props metadata всё ещё проверяется.
++
++Linear numeric transform/opacity surfaces с переносимой одинаковой function-list
++исполняются одной WAAPI Animation на поверхность, без собственного rAF в steady
++state. JS easing, повторные offsets, несовместимые transform lists и CSS codecs
++остаются на существующем SurfaceBatch, не на втором scheduler. Capability является
++деталью исполнения; hardware/compositor residency любого свойства не обещается.
++Объединение шкал также bounded: если native data превысили бы 100000
++значений `offsets × channels`, используется исходный sampler без expansion.
++При непредставимом оставшемся delay от огромного отрицательного native clock
++`play()` выдаёт `LM139` до host-effects; paused run можно восстановить `seek()`.
++
++`delay`, `stagger`, `play/pause/seek/cancel/stop`, один `finished` и один natural
++`onComplete` сохраняются. Native pause/play и seek продолжают исходный authored
++track, не создают новую пружину. Cancel сохраняет текущую позу, а не возвращает
++первый stop. После завершения controls инертны; replay — новый `animate`.
++Reduced motion публикует последний stop без rAF/WAAPI reservation и игнорирует
++задержки. Реентрантные seek/pause/cancel отзывают старое вычисление; derivative
++capture использует reservation того же owner и не допускает его вложенную замену.
++
++Это runtime-контракт. Существующий compiler не понижает новые N-вызовы: при
++сомнении сохраняется обычный runtime, а не другая трактовка tracks. Wire MotionProgram
++остаётся versioned; JS functions и прочие невыразимые формы не объявляются portable.
++Repeat, per-property transition objects и sequences этим API не добавляются.
+diff --git a/docs/errors.md b/docs/errors.md
+index 4584cd3..baba8b1 100644
+--- a/docs/errors.md
++++ b/docs/errors.md
+@@ -155 +155 @@
+-| `LM141` | animate pair | Некорректная пара from и to | Передать массив ровно из двух значений | active |
++| `LM141` | animate keyframe values | Менее двух опорных значений | Передать массив минимум из двух значений | active |
+@@ -186,0 +187 @@
++| `LM173` | animate keyframe arrays | Некорректный, разреженный или чрезмерный массив | Использовать собственные элементы массива, от 1 до 100000 | active |
+diff --git a/docs/migration.md b/docs/migration.md
+index 3b61666..c524c01 100644
+--- a/docs/migration.md
++++ b/docs/migration.md
+@@ -7 +7 @@
+-одиночных переходов CSS-стилей DOM- и SVG-элементов. Таблицы — карта переноса
++одиночных и многоточечных переходов CSS-стилей DOM- и SVG-элементов. Таблицы — карта переноса
+@@ -16,0 +17 @@ lifecycle. Полный целевой пользовательский охва
++| `animate(el, { x: [0, 100, 0] }, { duration: 0.4, times: [0, .25, 1] })` | `animate(el, { x: [0, 100, 0] }, { duration: 400, times: [0, .25, 1] })` | N-track, время в мс; scalar/per-segment easing — функции из `./easing` |
+@@ -41 +42 @@ lifecycle. Полный целевой пользовательский охва
+-`./animate` объединяет одним lifecycle только from/to-переходы поддерживаемых
++`./animate` объединяет одним lifecycle from/to и N-keyframe tracks поддерживаемых
+@@ -43 +44,5 @@ CSS-стилей и transform-шортхендов: spring/tween, delay/stagger
+-`finished/play/pause/seek/cancel/stop`.
++`finished/play/pause/seek/cancel/stop`. `times` и массив N−1 easing-функций относятся
++к отдельным сегментам, не к параметрам отдельного свойства. Без явного duration
++N-track использует Lab Motion `duration.base` 200 мс, не default другого пакета.
++Не предполагается совпадение easing, endpoint duplicate и cancellation semantics;
++точная справка — [многоточечные переходы](api.md#многоточечные-переходы-в-animate).
+@@ -45 +50 @@ CSS-стилей и transform-шортхендов: spring/tween, delay/stagger
+-Не объединены: N-keyframes и offsets, per-segment и per-property transitions,
++Не объединены: per-property transition objects,
+diff --git a/docs/recipes.md b/docs/recipes.md
+index abc30d0..385b8fc 100644
+--- a/docs/recipes.md
++++ b/docs/recipes.md
+@@ -209,0 +210,27 @@ document.querySelector('.expand')?.addEventListener('click', () => sheet.snapTo(
++
++## Многоточечный акцент
++
++Один вызов описывает весь акцент; разное число точек у x и opacity разрешено,
++потому что общей metadata `times/ease[]` нет. Повторный вызов на том же элементе
++прерывает прежний run через существующий owner. Сохраните возвращённый controls
++и отмените его в cleanup компонента. Предпочтение reduced motion наследуется из
++`animate`: останется конечная поза без движения и задержки.
++
++<!-- animate-keyframe-recipe:start -->
++```typescript
++import { animate, type AnimateControls } from '@labpics/motion/animate';
++
++export function playAttention(button: HTMLButtonElement): AnimateControls {
++  return animate(button, {
++    x: [0, -12, 10, -6, 0],
++    opacity: [.6, 1, 1],
++  }, { duration: 360 });
++}
++```
++<!-- animate-keyframe-recipe:end -->
++
++Переход с общей неравномерной шкалой и разными easing — в
++[справке N-tracks](api.md#многоточечные-переходы-в-animate). Этот рецепт не создаёт
++собственных listeners, scope или scheduler. `controls.cancel()` сохраняет текущую
++позу, а не восстанавливает прежние стили. Компонентный scope может владеть такими
++вызовами только в версии пакета, где он опубликован.
