@@ -1,0 +1,86 @@
+name: Implicit identity matched-warm v3
+on:
+  push:
+    branches: ["research/implicit-identity-v3-20260913"]
+permissions:
+  contents: read
+jobs:
+  qualify:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          ref: 93278bf9b540f93521c7bd4c02f68db458e5db7a
+          fetch-depth: 0
+          persist-credentials: false
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020
+        with:
+          node-version: '24.20.0'
+      - name: Restore exact candidate and preregistered proof
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          mkdir -p "$RUNNER_TEMP/proof/evidence"
+          ln -s "$GITHUB_WORKSPACE" "$RUNNER_TEMP/proof/repo"
+          gh api repos/Labpics-Team/lab-motion/git/blobs/51b98fcae4590a2865348f36ff7d2b3d1c181d03 > "$RUNNER_TEMP/proof/payload.json"
+          gh api repos/Labpics-Team/lab-motion/git/blobs/6906ca461c9eecfafec236d00380d6729bd91dad > "$RUNNER_TEMP/proof/child.json"
+          gh api repos/Labpics-Team/lab-motion/git/blobs/698caf7a75022b159a77404d15832c4193d62290 > "$RUNNER_TEMP/proof/qualify.json"
+          python3 - <<'PY'
+          import os,json,base64,gzip,hashlib,pathlib
+          root=pathlib.Path(os.environ['RUNNER_TEMP'])/'proof'
+          decode=lambda p:base64.b64decode(json.loads((root/p).read_text())['content'])
+          b=decode('payload.json')
+          assert hashlib.sha256(b).hexdigest()=='ce5a9749fd40b95e3732ad1751c3b7c31f0a0ec91435e8e1f945bb2283474f5e'
+          payload=json.loads(gzip.decompress(b))
+          assert set(payload)=={'candidate.patch','measure-child.mjs','qualify.mjs','sizes.mjs'}
+          for file,name,digest in [('child.json','measure-child.mjs','9ad7f9bbbbf37395c42b64fd4c42b0f9a69271b1210331cdba209aa92396adb3'),('qualify.json','qualify.mjs','990b573dda108f763400856ab4bcff43d874744315393b374377b6fda73a1050')]:
+            data=decode(file)
+            assert hashlib.sha256(data).hexdigest()==digest
+            payload[name]=data.decode()
+          for name,content in payload.items(): (root/'evidence'/name).write_text(content)
+          PY
+      - name: Exact base and unchanged candidate
+        shell: bash
+        run: |
+          set -euo pipefail
+          corepack enable
+          corepack install --global pnpm@11.11.0
+          pnpm install --frozen-lockfile
+          test "$(git rev-parse HEAD)" = 93278bf9b540f93521c7bd4c02f68db458e5db7a
+          pnpm build > "$RUNNER_TEMP/proof/evidence/base-build.log" 2>&1
+          cp -a dist "$RUNNER_TEMP/proof/base-dist"
+          git apply --index "$RUNNER_TEMP/proof/evidence/candidate.patch"
+          test "$(git write-tree)" = 69fc191b8f7c9e3503e1c1b64b280c00eb219311
+          pnpm build > "$RUNNER_TEMP/proof/evidence/candidate-build.log" 2>&1
+          cp -a dist "$RUNNER_TEMP/proof/candidate-dist"
+          cd "$RUNNER_TEMP/proof/evidence"
+          node sizes.mjs > sizes.log
+          printf '%s  %s\n' 8f3ef89364b35b9fb8fb4277e99709a26cefa827f88611587265d3fb40465ff7 ../base-dist/keyframes/index.js 4f58d7f47bc7767d336b2771990f64fa52e4dd1df0f550fff30bdfc7ff1035be ../candidate-dist/keyframes/index.js | sha256sum --check
+          node -p 'JSON.stringify({versions:process.versions,platform:process.platform,arch:process.arch})' > environment.json
+          lscpu > cpu.txt
+          sha256sum measure-child.mjs qualify.mjs ../repo/bench/compare/methodology.mjs ../base-dist/keyframes/index.js ../candidate-dist/keyframes/index.js > protocol-sha256.txt
+      - name: One matched-warm qualification and conditional candidate
+        shell: bash
+        run: |
+          set -euo pipefail
+          cd "$RUNNER_TEMP/proof/evidence"
+          node qualify.mjs > qualification.log 2>&1
+          cat qualification.log
+      - name: Immutable evidence
+        if: ${{ always() }}
+        shell: bash
+        run: |
+          cd "$RUNNER_TEMP/proof/evidence"
+          find . -type f ! -name SHA256SUMS -print0 | sort -z | xargs -0 sha256sum > SHA256SUMS
+      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
+        if: ${{ always() }}
+        with:
+          name: implicit-identity-qualification-v3
+          path: ${{ runner.temp }}/proof/evidence/
+          retention-days: 7
+          compression-level: 0
+          if-no-files-found: error
+          overwrite: false
