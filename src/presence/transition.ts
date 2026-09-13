@@ -41,6 +41,7 @@ interface Effect { cancel: () => void; sink: Sink }
 interface Phase {
   present: boolean;
   ended: boolean;
+  ready: boolean;
   done?: () => void;
   effects: Map<PresenceAnimation, Effect>;
   resolve: (result: PresenceTransitionResult) => void;
@@ -108,7 +109,7 @@ export function createPresenceTransition(options: PresenceTransitionOptions = {}
   }
 
   function complete(phase: Phase): void {
-    if (phase.ended || current !== phase || phase.effects.size !== 0) return;
+    if (!phase.ready || phase.ended || current !== phase || phase.effects.size !== 0) return;
     const done = phase.done;
     // Терминальный callback может тут же открыть встречную фазу: завершённая
     // фаза при этом не становится superseded задним числом.
@@ -161,7 +162,7 @@ export function createPresenceTransition(options: PresenceTransitionOptions = {}
       if (phase.ended) {
         const errors = cancel(phase);
         if (errors.length) throw combine(errors);
-      } else complete(phase);
+      }
     } catch (error) {
       fail(phase, error);
       // Даже устаревшая фабрика могла вернуть ресурсы после nested destroy.
@@ -180,13 +181,16 @@ export function createPresenceTransition(options: PresenceTransitionOptions = {}
       if (previous) end(previous, { status: 'superseded', present: previous.present });
       let resolve!: Phase['resolve'];
       const promise = new Promise<PresenceTransitionResult>(yes => { resolve = yes; });
-      const phase: Phase = { present, ended: false, effects: new Map(), resolve };
+      const phase: Phase = { present, ended: false, ready: false, effects: new Map(), resolve };
       current = phase;
       finished = promise;
       const errors: unknown[] = [];
       try { present ? machine.enter() : machine.exit(); } catch (error) { errors.push(error); }
       if (previous) errors.push(...cancel(previous));
       if (errors.length) { const error = combine(errors); fail(phase, error); throw error; }
+      // Даже пустая фаза завершается только после регистрации и отмены предшественника.
+      phase.ready = true;
+      complete(phase);
       return promise;
     },
     destroy(): void {

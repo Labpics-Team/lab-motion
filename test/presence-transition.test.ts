@@ -255,3 +255,14 @@ it('сбой чтения одного участника не оставляе�
   expect(a.cancel).toHaveBeenCalledOnce(); expect(b.cancel).toHaveBeenCalledOnce();
   expect(c.cancel).toHaveBeenCalledOnce();
 });
+
+it('мгновенный уход не разрешает удаление, пока отмена прежней фазы может отказать', async () => {
+  const a = deferred(), gone = vi.fn(), error = new Error('previous cancel');
+  a.cancel.mockImplementation(() => { throw error; });
+  const p = create({ enter: () => a, onGone: gone });
+  p.setPresent(true);
+  expect(() => p.setPresent(false)).toThrow(error);
+  expect(gone).not.toHaveBeenCalled();
+  expect(await p.finished).toEqual({ status: 'failed', present: false, error });
+  expect(p.state).toBe('failed');
+});
