@@ -1,0 +1,192 @@
+diff --git a/src/animate/keyframe-track.ts b/src/animate/keyframe-track.ts
+new file mode 100644
+index 0000000..d38b232
+--- /dev/null
++++ b/src/animate/keyframe-track.ts
+@@ -0,0 +1,83 @@
++/** Данные авторского track: никакого DOM, owner, scheduler или повторного solver. */
++import { MotionParamError } from '../errors.js';
++import { keyframeSegment } from '../internal/keyframe-position.js';
++
++export type TrackEasing = (t: number) => number;
++export type TrackEase = TrackEasing | readonly TrackEasing[] | undefined;
++export const MAX_TRACK_STOPS = 100_000;
++
++export interface KeyframeTrack<T> {
++  readonly _values: readonly T[];
++  readonly _times: readonly number[];
++  readonly _ease: TrackEase;
++}
++
++/** Фиксированная длина, own slots и единственное чтение каждого getter. */
++export function snapshotTrackArray(source: unknown, maximum: number = MAX_TRACK_STOPS, minimum: number = 1): unknown[] {
++  if (!Array.isArray(source)) throw new MotionParamError('LM173');
++  const n = source.length;
++  if (minimum === 2 && n < 2) throw new MotionParamError('LM141');
++  if (!Number.isSafeInteger(n) || n < minimum || n > maximum) throw new MotionParamError('LM173');
++  const result = new Array<unknown>(n);
++  for (let i = 0; i < n; i++) {
++    // Дырка не превращается в легальный stop через Array.prototype.
++    if (!Object.hasOwn(source, i)) throw new MotionParamError('LM173');
++    result[i] = source[i];
++  }
++  return result;
++}
++
++export function trackTimes(n: number, times: readonly number[] | undefined): readonly number[] {
++  if (times === undefined) return Array.from({ length: n }, (_, i) => i / (n - 1));
++  if (times.length !== n) throw new MotionParamError('LM035');
++  for (let i = 0; i < n; i++) {
++    if (!Number.isFinite(times[i])) throw new MotionParamError('LM036');
++    if (i && times[i]! < times[i - 1]!) throw new MotionParamError('LM037');
++  }
++  if (times[0] !== 0) throw new MotionParamError('LM038');
++  if (times[n - 1] !== 1) throw new MotionParamError('LM039');
++  return times;
++}
++
++export function makeTrack<T>(values: readonly T[], times?: readonly number[], ease?: TrackEase): KeyframeTrack<T> {
++  if (Array.isArray(ease) && ease.length !== values.length - 1) throw new MotionParamError('LM040');
++  return { _values: values, _times: trackTimes(values.length, times), _ease: ease };
++}
++
++function easingAt(ease: TrackEase, segment: number): TrackEasing | undefined {
++  return typeof ease === 'function' ? ease : ease?.[segment];
++}
++
++/** Только выбор сегмента общий с ./keyframes; codecs принадлежат потребителю. */
++export function sampleTrack<T, R>(track: KeyframeTrack<T>, p: number, mix: (a: T, b: T, p: number) => R): R {
++  const values = track._values;
++  const last = values.length - 1;
++  if (p <= 0) return mix(values[0]!, values[0]!, 0);
++  if (p >= 1) return mix(values[last]!, values[last]!, 1);
++  const s = keyframeSegment(track._times, p);
++  const from = values[s]!, to = values[s + 1]!;
++  const local = (p - track._times[s]!) / (track._times[s + 1]! - track._times[s]!);
++  const eased = easingAt(track._ease, s)?.(local) ?? local;
++  return mix(from, to, Number.isFinite(eased) ? eased : local);
++}
++
++/** Ограниченная разность: прежний binary64 порядок full-animate tween. */
++export function easingRate(ease: TrackEasing, p: number, duration: number): number {
++  const low = Math.max(0, p - 1e-3), high = Math.min(1, p + 1e-3);
++  const raw = ((ease(high) - ease(low)) * 1000) / ((high - low) * duration);
++  return Number.isFinite(raw) ? raw : 0;
++}
++
++/** Производная внутри одного правого сегмента, никогда сквозь zero-width jump. */
++export function trackVelocity<T>(track: KeyframeTrack<T>, p: number, durationMs: number): { _from: T; _to: T; _dpdt: number } {
++  const times = track._times;
++  const s = p >= 1 ? times.length - 2 : keyframeSegment(times, Math.max(0, p));
++  const width = times[s + 1]! - times[s]!;
++  let rate = 0;
++  if (p >= 0 && p < 1 && width > 0 && !(p === 0 && times[1] === 0)) {
++    const local = (p - times[s]!) / width;
++    const ease = easingAt(track._ease, s);
++    rate = ease ? easingRate(ease, local, durationMs * width) : (1000 / durationMs) / width;
++  }
++  return { _from: track._values[s]!, _to: track._values[s + 1]!, _dpdt: Number.isFinite(rate) ? rate : 0 };
++}
+diff --git a/src/animate/main-unit.ts b/src/animate/main-unit.ts
+index b894e6c..a9b37dc 100644
+--- a/src/animate/main-unit.ts
++++ b/src/animate/main-unit.ts
+@@ -4,0 +5 @@ import { CONVERGENCE_THRESHOLD, FIXED_DT_S, MAX_FRAMES } from '../internal/const
++import { MotionParamError } from '../errors.js';
+@@ -16,0 +18,2 @@ import {
++  mixChannel,
++  interpolateParsed,
+@@ -24,0 +28 @@ import {
++import { sampleTrack, trackVelocity, easingRate, type KeyframeTrack } from './keyframe-track.js';
+@@ -27,0 +32 @@ export type MotionMode =
++  | { readonly _type: 'keyframes'; readonly _durationMs: number }
+@@ -47 +51,0 @@ const FIXED_DT_MS = FIXED_DT_S * 1000;
+-const EASE_DERIV_H = 1e-3;
+@@ -60,0 +65,3 @@ export class MainUnit implements GroupOwner, SurfaceUnit {
++  /** Право завершить вычисление отзывается вложенным seek/pause/play. */
++  private _revision = 0;
++  private _pendingWrite = false;
+@@ -92,0 +100,4 @@ export class MainUnit implements GroupOwner, SurfaceUnit {
++      if (this._active && o._mode._type === 'keyframes') {
++        const sample = this._trackSnapshot(channel._track!, o._mode._durationMs);
++        velocity = scaleSerializedVelocity(sample._dpdt, sample._from, sample._to);
++      }
+@@ -108,0 +120,5 @@ export class MainUnit implements GroupOwner, SurfaceUnit {
++    if (this._o!._mode._type === 'keyframes') {
++      const sample = this._trackSnapshot(channel._track!, this._o!._mode._durationMs);
++      return { ...channel, _fromAst: sample._from, _toAst: sample._to,
++        _dpdt: this._active ? sample._dpdt : 0, _css: writing ? channel._css : channel._renderedCss };
++    }
+@@ -116,0 +133,9 @@ export class MainUnit implements GroupOwner, SurfaceUnit {
++  /** Как native capture: пользовательский derivative не меняет захватываемый owner. */
++  private _trackSnapshot<T>(track: KeyframeTrack<T>, duration: number): ReturnType<typeof trackVelocity<T>> {
++    const rec = this._o!._record;
++    if (rec._transition) throw new MotionParamError('LM157');
++    rec._transition = true;
++    try { return trackVelocity(track, this._liveTweenK(), duration); }
++    finally { rec._transition = false; }
++  }
++
+@@ -140,0 +166 @@ export class MainUnit implements GroupOwner, SurfaceUnit {
++    this._revision++;
+@@ -152,0 +179 @@ export class MainUnit implements GroupOwner, SurfaceUnit {
++    this._revision++;
+@@ -162,0 +190,2 @@ export class MainUnit implements GroupOwner, SurfaceUnit {
++    // Вложенный seek отзывает terminal-решение update-фазы до render.
++    this._converged = false;
+@@ -164 +193,3 @@ export class MainUnit implements GroupOwner, SurfaceUnit {
+-    if (this._compute()) this._settle();
++    const result = this._compute();
++    if (result === undefined) return;
++    if (result) this._settle();
+@@ -194,4 +225,2 @@ export class MainUnit implements GroupOwner, SurfaceUnit {
+-      if (
+-        this._compute() ||
+-        (this._frames >= MAX_FRAMES && this._phaseMs <= 0)
+-      ) this._converged = true;
++      const result = this._compute();
++      if (result !== undefined && (result || (this._frames >= MAX_FRAMES && this._phaseMs <= 0))) this._converged = true;
+@@ -204 +233 @@ export class MainUnit implements GroupOwner, SurfaceUnit {
+-    else if (this._active) this._write();
++    else if (this._active && (this._o!._mode._type === 'spring' || this._pendingWrite)) this._write();
+@@ -219 +248 @@ export class MainUnit implements GroupOwner, SurfaceUnit {
+-  private _compute(): boolean {
++  private _compute(): boolean | undefined {
+@@ -222 +251 @@ export class MainUnit implements GroupOwner, SurfaceUnit {
+-    if (o._mode._type === 'tween') {
++    if (o._mode._type !== 'spring') {
+@@ -225 +254,4 @@ export class MainUnit implements GroupOwner, SurfaceUnit {
+-      const eased = o._mode._ease(k);
++      const revision = ++this._revision;
++      this._pendingWrite = false;
++      const eased = o._mode._type === 'tween' ? o._mode._ease(k) : k;
++      if (this._done || revision !== this._revision) return;
+@@ -230 +262,8 @@ export class MainUnit implements GroupOwner, SurfaceUnit {
+-        channel._value = channelAt(channel, progress);
++        const value = channel._track ? sampleTrack(channel._track, k, mixChannel) : channelAt(channel, progress);
++        if (this._done || revision !== this._revision) return;
++        channel._value = value;
++      }
++      if (bound._css) {
++        const value = bound._css._track ? sampleTrack(bound._css._track, k, interpolateParsed) : cssAt(bound._css, progress);
++        if (this._done || revision !== this._revision) return;
++        bound._css._css = value;
+@@ -232 +271 @@ export class MainUnit implements GroupOwner, SurfaceUnit {
+-      if (bound._css !== undefined) bound._css._css = cssAt(bound._css, progress);
++      this._pendingWrite = true;
+@@ -284,5 +323,6 @@ export class MainUnit implements GroupOwner, SurfaceUnit {
+-    const k0 = k > EASE_DERIV_H ? k - EASE_DERIV_H : 0;
+-    const k1 = k + EASE_DERIV_H < 1 ? k + EASE_DERIV_H : 1;
+-    const raw = ((mode._ease(k1) - mode._ease(k0)) * 1000) /
+-      ((k1 - k0) * mode._durationMs);
+-    const value = finiteOrZero(raw);
++    const rec = this._o!._record;
++    if (rec._transition) throw new MotionParamError('LM157');
++    rec._transition = true;
++    let value: number;
++    try { value = easingRate(mode._ease, k, mode._durationMs); }
++    finally { rec._transition = false; }
+@@ -299,0 +340 @@ export class MainUnit implements GroupOwner, SurfaceUnit {
++    this._pendingWrite = false;
+@@ -339,0 +381 @@ export class MainUnit implements GroupOwner, SurfaceUnit {
++    this._tweenK = 1;
