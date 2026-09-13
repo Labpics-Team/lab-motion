@@ -196,10 +196,24 @@ for (const direction of ['ltr', 'rtl']) test(`навигация: фокус н�
       <i id="selection" style="position:absolute;left:0;bottom:0;width:1px;height:3px;transform-origin:left center;pointer-events:none"></i>
       <i id="focus" style="position:absolute;left:0;top:0;width:1px;height:2px;transform-origin:left center;pointer-events:none"></i>
     </nav>`;
-    const text = source.replaceAll('@labpics/motion/animate', location.origin + '/dist/animate/index.js')
+    // Прозрачный наблюдатель сохраняет настоящие публичные controls. После
+    // прерывания оси могут иметь разные скорости и законно перейти с WAAPI
+    // на MainUnit: getAnimations() не является часами всего движения.
+    const trackedUrl = URL.createObjectURL(new Blob([`
+      import { animate as original } from '${location.origin}/dist/animate/index.js';
+      export const controls = [];
+      export function animate(...args) {
+        const control = original(...args);
+        controls.push(control);
+        return control;
+      }
+    `], { type: 'text/javascript' }));
+    const { controls } = await import(trackedUrl);
+    const text = source.replaceAll('@labpics/motion/animate', trackedUrl)
       .replaceAll('@labpics/motion/bindings', location.origin + '/dist/bindings/index.js');
     const url = URL.createObjectURL(new Blob([text], { type: 'text/javascript' }));
-    const { bindNavigationMotion } = await import(url); URL.revokeObjectURL(url);
+    const { bindNavigationMotion } = await import(url);
+    URL.revokeObjectURL(url); URL.revokeObjectURL(trackedUrl);
     const selection = document.getElementById('selection')!, focus = document.getElementById('focus')!;
     const view = bindNavigationMotion({ selection, focus });
     let selected = 'a', focused: string | null = null;
@@ -220,7 +234,7 @@ for (const direction of ['ltr', 'rtl']) test(`навигация: фокус н�
     const before = selection.getAnimations()[0];
     if (!before) throw new Error('Контроль должен создать native selection');
     before.pause(); before.currentTime = 40;
-    (window as unknown as { navigation: unknown }).navigation = { view, update, before };
+    (window as unknown as { navigation: unknown }).navigation = { view, update, before, controls };
   }, { source: navigationCode, direction });
   await page.getByRole('button', { name: 'Проекты' }).focus();
   expect(await page.evaluate(() => {
@@ -230,15 +244,15 @@ for (const direction of ['ltr', 'rtl']) test(`навигация: фокус н�
   await page.getByRole('button', { name: 'Проекты' }).press('Space');
   await expect(page.getByRole('button', { name: 'Проекты' })).toHaveAttribute('aria-current', 'page');
   const result = await page.evaluate(() => {
-    const n = (window as unknown as { navigation: { before: Animation; update(): void; view: { destroy(): void } } }).navigation;
+    const n = (window as unknown as { navigation: { before: Animation; controls: Array<{ pause(): void; seek(tMs: number): void }>; update(): void; view: { destroy(): void } } }).navigation;
     const selection = document.getElementById('selection')!, focus = document.getElementById('focus')!;
     const changed = selection.getAnimations()[0] !== n.before;
     const button = document.querySelector<HTMLButtonElement>('[data-key=b]')!;
     button.style.width = '160px'; n.update();
     const expected = [button.offsetLeft, button.offsetWidth];
-    for (const el of [selection, focus]) for (const effect of el.getAnimations()) {
-      effect.pause(); effect.currentTime = Number(effect.effect!.getComputedTiming().endTime);
-    }
+    // Общие публичные часы для native и JS. Отозванные controls инертны;
+    // реальные текущие исполнители обеих ролей достигают той же цели.
+    for (const control of n.controls) { control.pause(); control.seek(10_000); }
     const actual = [selection, focus].map(el => {
       const matrix = new DOMMatrix(getComputedStyle(el).transform);
       return [matrix.m41, matrix.m11];
