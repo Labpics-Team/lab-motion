@@ -1,0 +1,285 @@
+name: Research implicit identity PMU v13
+
+on:
+  push:
+    branches: ["research/implicit-identity-pmu-v13-20260913"]
+
+permissions:
+  contents: read
+
+env:
+  COREPACK_ENABLE_DOWNLOAD_PROMPT: "0"
+  COREPACK_DEFAULT_TO_LATEST: "0"
+  BASE_SHA: 93278bf9b540f93521c7bd4c02f68db458e5db7a
+  CANDIDATE_SHA: 0b01ae2b34db2b78c11acf9c4242e73538717c95
+  BASE_ENTRY_SHA256: 8f3ef89364b35b9fb8fb4277e99709a26cefa827f88611587265d3fb40465ff7
+  CANDIDATE_ENTRY_SHA256: 4f58d7f47bc7767d336b2771990f64fa52e4dd1df0f550fff30bdfc7ff1035be
+
+jobs:
+  pmu-proof:
+    runs-on: ubuntu-latest
+    timeout-minutes: 35
+    steps:
+      - name: Checkout research carrier
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+
+      - name: Setup exact Node
+        uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v6
+        with:
+          node-version: "24.20.0"
+
+      - name: Activate pinned pnpm
+        run: |
+          corepack enable
+          corepack install --global pnpm@11.11.0
+          test "$(node --version)" = "v24.20.0"
+          test "$(pnpm --version)" = "11.11.0"
+
+      - name: Reconstruct exact product artifacts
+        shell: bash
+        run: |
+          set -euo pipefail
+          git fetch --no-tags origin refs/pull/380/head
+          git cat-file -e "${BASE_SHA}^{commit}"
+          git cat-file -e "${CANDIDATE_SHA}^{commit}"
+          base="$RUNNER_TEMP/lm-base"
+          candidate="$RUNNER_TEMP/lm-candidate"
+          git worktree add --detach "$base" "$BASE_SHA"
+          git worktree add --detach "$candidate" "$CANDIDATE_SHA"
+          for dir in "$base" "$candidate"; do
+            pnpm --dir "$dir" install --frozen-lockfile --prefer-offline
+            pnpm --dir "$dir" build
+          done
+          printf '%s  %s\n' "$BASE_ENTRY_SHA256" "$base/dist/keyframes/index.js" | sha256sum --check --status -
+          printf '%s  %s\n' "$CANDIDATE_ENTRY_SHA256" "$candidate/dist/keyframes/index.js" | sha256sum --check --status -
+          printf 'base=%s\ncandidate=%s\n' "$base/dist/keyframes/index.js" "$candidate/dist/keyframes/index.js" >> "$GITHUB_ENV"
+          {
+            echo "node=$(node --version)"
+            echo "pnpm=$(pnpm --version)"
+            echo "kernel=$(uname -srvm)"
+            echo "runner=${RUNNER_NAME:-unknown}"
+            echo "arch=$(uname -m)"
+            echo "base=$BASE_SHA"
+            echo "candidate=$CANDIDATE_SHA"
+            echo "carrier=$GITHUB_SHA"
+            sha256sum "$base/dist/keyframes/index.js" "$candidate/dist/keyframes/index.js"
+          } > pmu-environment.txt
+
+      - name: Qualify PMU and collect controls plus conditional A/B
+        id: proof
+        shell: bash
+        run: |
+          set -euo pipefail
+          harness="$GITHUB_WORKSPACE/scripts/research-implicit-identity-pmu-v13.mjs"
+          raw="$GITHUB_WORKSPACE/pmu-raw.jsonl"
+          controls="$GITHUB_WORKSPACE/pmu-controls.json"
+          result="$GITHUB_WORKSPACE/pmu-result.json"
+          : > "$raw"
+
+          if ! command -v perf >/dev/null 2>&1; then
+            sudo apt-get update
+            sudo apt-get install -y linux-tools-common linux-tools-generic || true
+          fi
+          if ! command -v perf >/dev/null 2>&1; then
+            printf '{"schema":1,"verdict":"BLOCKED-PMU","reason":"perf-not-installed"}\n' > "$result"
+            exit 0
+          fi
+
+          echo "perf=$(perf version)" >> pmu-environment.txt
+          echo "perf_event_paranoid_before=$(cat /proc/sys/kernel/perf_event_paranoid 2>/dev/null || echo unavailable)" >> pmu-environment.txt
+          pmu_probe="$RUNNER_TEMP/pmu-probe.txt"
+          if ! perf stat --no-big-num -x ';' -e instructions:u -e cycles:u -o "$pmu_probe" -- true; then
+            sudo sysctl -w kernel.perf_event_paranoid=1 || sudo sysctl -w kernel.perf_event_paranoid=0 || true
+          fi
+          echo "perf_event_paranoid_after=$(cat /proc/sys/kernel/perf_event_paranoid 2>/dev/null || echo unavailable)" >> pmu-environment.txt
+          if ! perf stat --no-big-num -x ';' -e instructions:u -e cycles:u -o "$pmu_probe" -- true; then
+            python3 - <<'PY'
+          import json, pathlib
+          probe = pathlib.Path("/tmp")
+          pathlib.Path("pmu-result.json").write_text(json.dumps({
+              "schema": 1,
+              "verdict": "BLOCKED-PMU",
+              "reason": "hardware-events-unavailable-after-safe-sysctl-attempt",
+          }, indent=2) + "\n")
+          PY
+            cp "$pmu_probe" pmu-probe.txt || true
+            exit 0
+          fi
+          cp "$pmu_probe" pmu-probe.txt
+
+          allowed="$(awk '/Cpus_allowed_list:/ {print $2}' /proc/self/status)"
+          first="${allowed%%,*}"
+          first="${first%%-*}"
+          if ! [[ "$first" =~ ^[0-9]+$ ]]; then
+            printf '{"schema":1,"verdict":"BLOCKED-PMU","reason":"cannot-resolve-allowed-cpu","allowed":"%s"}\n' "$allowed" > "$result"
+            exit 0
+          fi
+          cpu="$first"
+          echo "cpu_allowed=$allowed" >> pmu-environment.txt
+          echo "cpu_pinned=$cpu" >> pmu-environment.txt
+
+          run_one() {
+            local profile="$1" phase="$2" run="$3" side="$4" impl="$5" factor="$6" nominal="$7"
+            local entry="$base"
+            if [[ "$impl" == candidate ]]; then entry="$candidate"; fi
+            local dir="$RUNNER_TEMP/pmu-${profile}-${phase}-${run}-${side}"
+            mkdir -p "$dir"
+            local ctl="$dir/ctl" ack="$dir/ack" start="$dir/start" done="$dir/done" stop="$dir/stop"
+            local ready="$dir/ready.json" stats="$dir/perf.csv" stdout="$dir/stdout.log" stderr="$dir/stderr.log"
+            mkfifo "$ctl" "$ack" "$start" "$done" "$stop"
+            exec {ctl_fd}<>"$ctl"
+            exec {ack_fd}<>"$ack"
+
+            taskset -c "$cpu" perf stat -D -1 --no-big-num -x ';' \
+              -e instructions:u -e cycles:u \
+              --control "fd:${ctl_fd},${ack_fd}" -o "$stats" -- \
+              taskset -c "$cpu" node "$harness" workload "$entry" "$profile" "$nominal" "$factor" \
+                "$ready" "$start" "$done" "$stop" >"$stdout" 2>"$stderr" &
+            local perf_pid=$!
+
+            local waited=0
+            while [[ ! -s "$ready" ]] && kill -0 "$perf_pid" 2>/dev/null; do
+              sleep 0.02
+              waited=$((waited + 1))
+              if (( waited > 3000 )); then
+                kill "$perf_pid" 2>/dev/null || true
+                wait "$perf_pid" 2>/dev/null || true
+                return 71
+              fi
+            done
+            if [[ ! -s "$ready" ]]; then
+              wait "$perf_pid" || true
+              return 72
+            fi
+
+            printf 'enable\n' >&"$ctl_fd"
+            local ack_line
+            IFS= read -r ack_line <&"$ack_fd"
+            [[ "$ack_line" == ack ]] || return 73
+            printf 'go\n' > "$start"
+            local receipt
+            IFS= read -r receipt < "$done"
+            printf 'disable\n' >&"$ctl_fd"
+            IFS= read -r ack_line <&"$ack_fd"
+            [[ "$ack_line" == ack ]] || return 74
+            printf 'stop\n' > "$stop"
+            wait "$perf_pid" || return 75
+            exec {ctl_fd}>&-
+            exec {ack_fd}>&-
+
+            python3 - "$stats" "$receipt" "$profile" "$phase" "$run" "$side" "$impl" "$factor" "$nominal" >> "$raw" <<'PY'
+          import json, math, pathlib, sys
+          stats, receipt_s, profile, phase, run, side, impl, factor, nominal = sys.argv[1:]
+          receipt = json.loads(receipt_s)
+          factor_i = int(factor); nominal_i = int(nominal)
+          if receipt.get('factor') != factor_i or receipt.get('nominal') != nominal_i or receipt.get('actual') != factor_i * nominal_i:
+              raise SystemExit('workload receipt cardinality mismatch')
+          if not math.isfinite(receipt.get('sink', float('nan'))) or receipt.get('callbacks', 0) <= 0:
+              raise SystemExit('workload semantic receipt invalid')
+          counts = {}
+          seen = set()
+          for raw_line in pathlib.Path(stats).read_text().splitlines():
+              line = raw_line.strip()
+              if not line or line.startswith('#'):
+                  continue
+              parts = line.split(';')
+              if len(parts) < 3:
+                  continue
+              count_s, event = parts[0].strip(), parts[2].strip()
+              key = event.replace(':u', '')
+              if key not in ('instructions', 'cycles'):
+                  continue
+              if key in seen or '<not' in count_s.lower():
+                  raise SystemExit(f'invalid/duplicate perf counter {key}: {count_s!r}')
+              try:
+                  count = float(count_s)
+              except ValueError:
+                  raise SystemExit(f'non-numeric perf counter {key}: {count_s!r}')
+              if not math.isfinite(count) or count <= 0:
+                  raise SystemExit(f'non-positive perf counter {key}: {count!r}')
+              # With two generic hardware events on x86 the counters should not multiplex.
+              # If perf emits an explicit running percentage, require effectively full time.
+              if len(parts) >= 5 and parts[4].strip().endswith('%'):
+                  pct = float(parts[4].strip().rstrip('%'))
+                  if pct < 99.9:
+                      raise SystemExit(f'multiplexed perf counter {key}: {pct}%')
+              counts[key] = count
+              seen.add(key)
+          if seen != {'instructions', 'cycles'}:
+              raise SystemExit(f'missing perf counters: {sorted({"instructions","cycles"} - seen)}')
+          print(json.dumps({
+              'profile': profile, 'phase': phase, 'run': int(run), 'side': side,
+              'impl': impl, 'factor': factor_i, 'nominal': nominal_i,
+              'instructions': counts['instructions'], 'cycles': counts['cycles'],
+              'actual': receipt['actual'], 'callbacks': receipt['callbacks'], 'sink': receipt['sink'],
+              'statsSha256': __import__('hashlib').sha256(pathlib.Path(stats).read_bytes()).hexdigest(),
+          }, separators=(',', ':')))
+          PY
+          }
+
+          pair() {
+            local profile="$1" phase="$2" run="$3" impl_a="$4" factor_a="$5" impl_b="$6" factor_b="$7" nominal="$8"
+            if (( run % 2 == 0 )); then
+              run_one "$profile" "$phase" "$run" a "$impl_a" "$factor_a" "$nominal"
+              run_one "$profile" "$phase" "$run" b "$impl_b" "$factor_b" "$nominal"
+            else
+              run_one "$profile" "$phase" "$run" b "$impl_b" "$factor_b" "$nominal"
+              run_one "$profile" "$phase" "$run" a "$impl_a" "$factor_a" "$nominal"
+            fi
+          }
+
+          collect_controls() {
+            local profile="$1" nominal="$2"
+            for run in $(seq 0 15); do pair "$profile" null-base "$run" base 1 base 1 "$nominal"; done
+            for run in $(seq 0 15); do pair "$profile" null-candidate "$run" candidate 1 candidate 1 "$nominal"; done
+            for run in $(seq 0 7); do pair "$profile" positive "$run" base 1 base 2 "$nominal"; done
+          }
+
+          if ! collect_controls setup3-default 10000 || ! collect_controls seek3-default 500000; then
+            printf '{"schema":1,"verdict":"BLOCKED-PMU","reason":"perf-control-or-workload-execution-failed"}\n' > "$result"
+            exit 0
+          fi
+
+          node "$harness" controls "$raw" "$controls"
+          cat "$controls"
+
+          admitted() {
+            node -e 'const x=require(process.argv[1]); process.exit(x.profiles[process.argv[2]].admitted ? 0 : 1)' "$controls" "$1"
+          }
+          collect_ab() {
+            local profile="$1" nominal="$2"
+            for run in $(seq 0 15); do pair "$profile" ab "$run" base 1 candidate 1 "$nominal"; done
+          }
+
+          if admitted setup3-default; then collect_ab setup3-default 10000; fi
+          if admitted seek3-default; then collect_ab seek3-default 500000; fi
+
+          node "$harness" final "$raw" "$result"
+          cat "$result"
+          sha256sum "$raw" "$controls" "$result" pmu-environment.txt > pmu-SHA256SUMS
+
+      - name: Verify research receipt exists
+        if: always()
+        shell: bash
+        run: |
+          set -euo pipefail
+          test -s pmu-result.json
+          node -e 'const r=require("./pmu-result.json"); if (!r.verdict) process.exit(1); console.log(`scientific verdict=${r.verdict}`)'
+
+      - name: Upload sealed v13 evidence
+        if: always()
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
+        with:
+          name: implicit-identity-pmu-v13
+          path: |
+            pmu-result.json
+            pmu-controls.json
+            pmu-raw.jsonl
+            pmu-environment.txt
+            pmu-probe.txt
+            pmu-SHA256SUMS
+          if-no-files-found: warn
+          retention-days: 30
