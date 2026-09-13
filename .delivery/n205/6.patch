@@ -1,0 +1,167 @@
+diff --git a/test/animate-keyframe-package.test.ts b/test/animate-keyframe-package.test.ts
+new file mode 100644
+index 0000000..150e63b
+--- /dev/null
++++ b/test/animate-keyframe-package.test.ts
+@@ -0,0 +1,59 @@
++import { execFileSync } from 'node:child_process';
++import { existsSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs';
++import { dirname, join, resolve } from 'node:path';
++import { fileURLToPath } from 'node:url';
++import ts from 'typescript';
++import { expect, it } from 'vitest';
++
++const root = resolve(dirname(fileURLToPath(import.meta.url)), '..');
++
++it('N-tracks: реальные package exports, readonly types, ESM/CJS и SSR без globals', () => {
++  expect(existsSync(join(root, 'dist/animate/index.d.ts')), 'сначала pnpm build').toBe(true);
++  const dir = mkdtempSync(join(root, '.keyframe-types-'));
++  try {
++    const source = `
++      import { animate, type AnimateOptions, type AnimateProps, type AnimateControls } from '@labpics/motion/animate';
++      const el = document.createElement('div');
++      const options: AnimateOptions = { duration: 800, times: [0, .25, .75, 1] as const, ease: [t => t*t, t => t, t => 1-(1-t)**2] as const };
++      const props: AnimateProps = { x: [0, 120, -40, 0] as const, opacity: [0, 1, 1, 0] as const };
++      const result: AnimateControls = animate(el, props, options);
++      result.pause(); result.seek(400); result.play(); result.stop(); void result.finished;
++      animate(el, { width: ['0px', '10px', '0px'], color: ['#000', '#fff', '#000'] }, { duration: 1000 });
++      // @ts-expect-error segment easing обязан быть функцией
++      animate(el, props, { ease: ['linear', 'linear', 'linear'] });
++      // @ts-expect-error metadata не является property-transition объектом
++      animate(el, { x: { to: [0, 1, 0], duration: 200 } });
++      // @ts-expect-error times должны быть числами
++      animate(el, props, { times: [0, '.25', .75, 1] });
++    `;
++    const file = join(dir, 'consumer.mts');
++    writeFileSync(file, source);
++    const program = ts.createProgram([file], {
++      noEmit: true, strict: true, module: ts.ModuleKind.NodeNext,
++      moduleResolution: ts.ModuleResolutionKind.NodeNext, target: ts.ScriptTarget.ES2022,
++      types: ['node'], lib: ['lib.es2022.d.ts', 'lib.dom.d.ts'],
++    });
++    expect(ts.getPreEmitDiagnostics(program).map(d => ts.flattenDiagnosticMessageText(d.messageText, '\n'))).toEqual([]);
++    const body = `
++      assert.equal(typeof globalThis.document, 'undefined');
++      const writes=[];
++      const el={style:{getPropertyValue(){return ''},setProperty(k,v){writes.push([k,v])}}};
++      const c=animate(el,{x:[0,100,0],width:['0px','200px','0px']},{duration:1000,requestFrame(){return 1}});
++      c.seek(250);
++      assert.deepEqual(writes,[['transform','translateX(50px)'],['width','100px']]);
++      c.pause();c.seek(750);c.cancel();
++      c.finished.then(()=>console.log('keyframe-package: PASS'));
++    `;
++    for (const mode of ['module', 'commonjs']) {
++      const prelude = mode === 'module'
++        ? `import assert from 'node:assert/strict';import {animate} from '@labpics/motion/animate';`
++        : `const assert=require('node:assert/strict');const {animate}=require('@labpics/motion/animate');`;
++      const output = execFileSync(process.execPath, [`--input-type=${mode}`, '-e', prelude + body], {
++        cwd: root, encoding: 'utf8', timeout: 30_000,
++      });
++      expect(output).toContain('keyframe-package: PASS');
++    }
++  } finally {
++    rmSync(dir, { recursive: true, force: true });
++  }
++});
+diff --git a/test/animate-keyframe-property.test.ts b/test/animate-keyframe-property.test.ts
+new file mode 100644
+index 0000000..8690dad
+--- /dev/null
++++ b/test/animate-keyframe-property.test.ts
+@@ -0,0 +1,96 @@
++import { describe, expect, it } from 'vitest';
++import { animate } from '../src/animate/index.js';
++import { groupRecord } from '../src/animate/channels.js';
++import { sampleKeyframes } from '../src/keyframes/index.js';
++import { parseMotionProgramV1 } from '../src/internal/motion-program.js';
++import { evaluateMotionProgramSegmentsV1, evaluateMotionProgramScheduleV1, resolveMotionProgramSegmentsV1 } from '../scripts/motion-program-semantics.js';
++import { minimalProgramInput } from './motion-program-v1.fixtures.js';
++import { fakeEl, translateXSeries } from './animate-facade-helpers.js';
++
++const linear = (t: number): number => t;
++
++/** Простой O(N) эталон: последний завершённый интервал и следующий непустой.
++ * Не импортирует production locator, mix, sampler или derivative. */
++function reference(values: readonly number[], times: readonly number[], p: number): [number, number] {
++  if (p <= 0) return [values[0]!, times[1] === 0 ? 0 : (values[1]! - values[0]!) / times[1]!];
++  if (p >= 1) return [values.at(-1)!, 0];
++  let i = 0;
++  for (let j = 1; j < times.length - 1; j++) if (times[j]! <= p) i = j;
++  const span = times[i + 1]! - times[i]!;
++  const delta = values[i + 1]! - values[i]!;
++  return [values[i]! + delta * (p - times[i]!) / span, delta / span];
++}
++
++describe('N-keyframes: независимые позиции, производная и portable semantics', () => {
++  it('seeded N=3/4/11: 12000 перемоток, дубликаты и обратный порядок seek', () => {
++    let seed = 0x51de;
++    const random = (): number => { seed = (Math.imul(seed, 1664525) + 1013904223) >>> 0; return seed / 2 ** 32; };
++    for (let run = 0; run < 1000; run++) {
++      const n = [3, 4, 11][run % 3]!;
++      const values = Array.from({ length: n }, () => Math.floor(random() * 2001) - 1000);
++      const times = [0, ...Array.from({ length: n - 2 }, () => Math.floor(random() * 16) / 16).sort((a, b) => a - b), 1];
++      const f = fakeEl();
++      const controls = animate(f.el, { x: values }, { duration: 1000, times, requestFrame: () => 1 });
++      for (let step = 0; step < 12; step++) {
++        const p = step < times.length - 1 ? times[step]! : random();
++        controls.seek(p * 1000);
++        const [value, velocity] = reference(values, times, p);
++        const actual = groupRecord(f.el, 'transform')._owner!._captureNum('x')!;
++        // Четыре арифметических операции эталона и взвешенной реализации:
++        // допуск << 1e-9 px на этом ограниченном целочисленном корпусе.
++        expect(Math.abs(actual._value - value)).toBeLessThanOrEqual(2e-10);
++        expect(Math.abs(actual._velocity - velocity)).toBeLessThanOrEqual(2e-8);
++        expect(sampleKeyframes(values, times, Array(n - 1).fill(linear), p)).toBeCloseTo(value, 9);
++      }
++      controls.cancel();
++    }
++  });
++
++  it('локальная квадратичная производная не пересекает authored jump', () => {
++    const f = fakeEl();
++    const controls = animate(f.el, { x: [0, 100, 40, 200] }, {
++      duration: 1000, times: [0, .25, .25, 1], ease: [t => t * t, linear, t => t * t], requestFrame: () => 1,
++    });
++    controls.seek(625); // local t=0.5, Δ=160, span=.75s
++    const snapshot = groupRecord(f.el, 'transform')._owner!._captureNum('x')!;
++    expect(snapshot._value).toBe(80);
++    expect(snapshot._velocity).toBeCloseTo(160 / .75, 8);
++    controls.cancel();
++  });
++
++  it('existing MotionProgram V1 выражает uneven/zero-width track без нового IR', () => {
++    const values = [0, 100, 40, 200], times = [0, .25, .25, 1];
++    const input = minimalProgramInput();
++    const track = (input[5] as unknown[][])[0]!;
++    track[2] = 1000;
++    // V1 хранит непустые интервалы; interior jump — разрыв между их operands,
++    // а не запрещённый segment нулевой длины. Это public wire contract parser-а.
++    track[7] = values.slice(0, -1).flatMap((from, i) => times[i] === times[i + 1] ? [] : [[times[i], times[i + 1], [1, [0, from]], [1, [0, values[i + 1]]], 0, 0]]);
++    const parsed = parseMotionProgramV1(input);
++    const f = fakeEl();
++    const controls = animate(f.el, { x: values }, { duration: 1000, times, requestFrame: () => 1 });
++    for (const p of [0, .125, .25 - Number.EPSILON, .25, .25 + Number.EPSILON, .625, .99]) {
++      controls.seek(p * 1000);
++      const authored = parsed[5][0]!;
++      const programValue = evaluateMotionProgramSegmentsV1(authored[7], resolveMotionProgramSegmentsV1(authored[7]), parsed[3], evaluateMotionProgramScheduleV1(authored, p * 1000));
++      expect(translateXSeries(f.writes).at(-1)).toBeCloseTo((programValue as readonly number[])[1]!, 10);
++    }
++    controls.cancel();
++  });
++
++  it('IEEE endpoints и overflow-span: никакого NaN, infinity или потери точных краёв', () => {
++    for (const values of [[-0, 1, 0], [0, -1, -0], [Number.MAX_VALUE, -Number.MAX_VALUE, Number.MAX_VALUE], [0, 9 * Number.MIN_VALUE, Number.MIN_VALUE]]) {
++      const f = fakeEl();
++      const c = animate(f.el, { x: values }, { duration: 1000, requestFrame: () => 1 });
++      c.seek(0);
++      expect(Object.is(groupRecord(f.el, 'transform')._owner!._captureNum('x')!._value, values[0])).toBe(true);
++      for (const t of [250, 500, 750]) {
++        c.seek(t);
++        const snapshot = groupRecord(f.el, 'transform')._owner!._captureNum('x')!;
++        expect(Number.isFinite(snapshot._value) && Number.isFinite(snapshot._velocity)).toBe(true);
++      }
++      c.seek(1000);
++      expect(Object.is(groupRecord(f.el, 'transform')._numeric.get('x')!._value, values[2])).toBe(true);
++    }
++  });
++});
