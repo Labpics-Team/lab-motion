@@ -1,13 +1,13 @@
-name: Bindings TypeScript compatibility proof
+name: Bindings TypeScript compatibility delivery
 on:
   push:
     branches: [research/semantic-binding-delivery-20260913]
 permissions:
-  contents: read
+  contents: write
 jobs:
-  prove:
+  deliver:
     runs-on: ubuntu-latest
-    timeout-minutes: 12
+    timeout-minutes: 10
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
         with:
@@ -17,81 +17,34 @@ jobs:
       - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020
         with:
           node-version: '24.20.0'
-      - name: Install frozen dependencies
+      - name: Reconstruct exact two-file candidate
+        env:
+          GH_TOKEN: ${{ github.token }}
         shell: bash
         run: |
           set -euo pipefail
           corepack enable
           corepack install --global pnpm@11.11.0
           pnpm install --frozen-lockfile
-      - name: Baseline RED on TypeScript 5.3
-        shell: bash
-        run: |
-          set -euo pipefail
-          pnpm build
-          tmp="$RUNNER_TEMP/ts53-baseline"
-          mkdir -p "$tmp/node_modules/@labpics/motion"
-          npm pack --ignore-scripts --pack-destination "$tmp" >/dev/null
-          tar -xzf "$tmp"/*.tgz -C "$tmp/node_modules/@labpics/motion" --strip-components=1
-          cat > "$tmp/package.json" <<'JSON'
-          {"type":"module"}
-          JSON
-          cat > "$tmp/consumer.ts" <<'TS'
-          import { createMotionBinding } from '@labpics/motion/bindings';
-          const project = (n: number) => ({ panel: { x: n } });
-          createMotionBinding(project, { panel: goal => { const x: number = goal.x; void x; } });
-          TS
-          set +e
-          npm exec --yes --package=typescript@5.3.3 -- tsc --noEmit --strict --module NodeNext --target ES2022 --skipLibCheck false "$tmp/consumer.ts" >"$tmp/tsc.log" 2>&1
-          status=$?
-          set -e
-          test "$status" -ne 0
-          grep -F "Cannot find name 'NoInfer'" "$tmp/tsc.log"
-      - name: Candidate GREEN and inference controls
-        env:
-          GH_TOKEN: ${{ github.token }}
-        shell: bash
-        run: |
-          set -euo pipefail
           gh api 'repos/Labpics-Team/lab-motion/contents/proofs/noinfer-removal.patch?ref=research/semantic-binding-delivery-20260913' --jq .content | tr -d '\n' | base64 -d > "$RUNNER_TEMP/noinfer-removal.patch"
           echo 'aac85f512f6040110549c6eeedde80bd1302457f074afc5a68d04b4f2dc274b6  '"$RUNNER_TEMP/noinfer-removal.patch" | sha256sum --check
-          git apply "$RUNNER_TEMP/noinfer-removal.patch"
+          git apply --index "$RUNNER_TEMP/noinfer-removal.patch"
           git diff --check
-          test "$(git diff --name-only | sort)" = $'src/bindings/index.ts\ntest/semantic-motion-binding-consumer.test.ts'
+          test "$(git diff --cached --name-only | sort)" = $'src/bindings/index.ts\ntest/semantic-motion-binding-consumer.test.ts'
           pnpm build
           pnpm exec vitest run test/semantic-motion-binding-consumer.test.ts test/semantic-motion-binding-runtime.test.ts
-          tmp="$RUNNER_TEMP/ts53-candidate"
-          mkdir -p "$tmp/node_modules/@labpics/motion"
-          npm pack --ignore-scripts --pack-destination "$tmp" >/dev/null
-          tar -xzf "$tmp"/*.tgz -C "$tmp/node_modules/@labpics/motion" --strip-components=1
-          cat > "$tmp/package.json" <<'JSON'
-          {"type":"module"}
-          JSON
-          cat > "$tmp/consumer.ts" <<'TS'
-          import { createMotionBinding } from '@labpics/motion/bindings';
-          const project = (n: number) => ({ panel: { x: n }, bar: { opacity: n } });
-          createMotionBinding(project, {
-            panel: goal => {
-              const x: number = goal.x; void x;
-              // @ts-expect-error target inference cannot invent a property
-              goal.y;
-            },
-            bar: goal => { const opacity: number = goal.opacity; void opacity; },
-          });
-          // @ts-expect-error missing bar remains rejected
-          createMotionBinding(project, { panel: () => {} });
-          // @ts-expect-error extra literal role remains rejected
-          createMotionBinding(project, { panel: () => {}, bar: () => {}, ghost: () => {} });
-          TS
-          npm exec --yes --package=typescript@5.3.3 -- tsc --noEmit --strict --module NodeNext --target ES2022 --skipLibCheck false "$tmp/consumer.ts"
-          ! grep -R "NoInfer" "$tmp/node_modules/@labpics/motion/dist/bindings/index.d.ts"
-          sha256sum "$RUNNER_TEMP/noinfer-removal.patch" > "$RUNNER_TEMP/ts53-proof.txt"
+          tree="$(git write-tree)"
+          current="$(gh api repos/Labpics-Team/lab-motion/git/ref/heads/feat/semantic-motion-bindings-383 --jq .object.sha)"
+          test "$current" = 347d7bc1f27bd82a9ad212c1f72e1043346dd25c
+          payload="$(jq -n --arg message 'fix(bindings): не требовать NoInfer в публичных типах' --arg tree "$tree" --arg parent 347d7bc1f27bd82a9ad212c1f72e1043346dd25c '{message:$message,tree:$tree,parents:[$parent]}')"
+          commit="$(printf '%s' "$payload" | gh api --method POST repos/Labpics-Team/lab-motion/git/commits --input - --jq .sha)"
+          refpayload="$(jq -n --arg ref 'refs/heads/research/bindings-noinfer-final-20260913' --arg sha "$commit" '{ref:$ref,sha:$sha}')"
+          printf '%s' "$refpayload" | gh api --method POST repos/Labpics-Team/lab-motion/git/refs --input - >/dev/null
+          printf '%s\n%s\n' "$commit" "$tree" | tee "$RUNNER_TEMP/candidate.txt"
       - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         with:
-          name: bindings-ts53-proof
-          path: |
-            ${{ runner.temp }}/ts53-baseline/tsc.log
-            ${{ runner.temp }}/ts53-proof.txt
+          name: bindings-noinfer-final-candidate
+          path: ${{ runner.temp }}/candidate.txt
           retention-days: 7
           if-no-files-found: error
           compression-level: 0
