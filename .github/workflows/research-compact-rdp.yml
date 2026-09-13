@@ -1,0 +1,86 @@
+name: Research compact RDP emitter
+
+on:
+  pull_request:
+    branches: ["main"]
+
+permissions:
+  contents: write
+
+concurrency:
+  group: research-compact-rdp-${{ github.event.pull_request.number }}
+  cancel-in-progress: true
+
+jobs:
+  evidence:
+    if: ${{ github.head_ref == 'research/compositor-compact-rdp-emitter' }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    steps:
+      - name: Checkout research branch
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          ref: ${{ github.head_ref }}
+          fetch-depth: 0
+          persist-credentials: true
+
+      - name: Setup Node
+        uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v6
+        with:
+          node-version: "24"
+
+      - name: Activate pinned pnpm
+        run: |
+          corepack enable
+          corepack install --global pnpm@11.11.0
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Apply preregistered candidate
+        run: node scripts/research-compact-rdp.mjs
+
+      - name: Diff integrity
+        run: git diff --check
+
+      - name: Static and native types
+        run: |
+          pnpm check:static
+          pnpm typecheck:native
+
+      - name: Build
+        run: pnpm build
+
+      - name: Focused semantic and ownership oracles
+        run: >-
+          pnpm vitest run
+          test/animate-spring-cache.test.ts
+          test/compositor-compile-work.test.ts
+          test/compositor-webkit-execution.test.ts
+          test/compositor-serialized-execution.test.ts
+          test/compositor-compile.test.ts
+          test/compositor-error-bound.test.ts
+          test/compositor-velocity-budget.test.ts
+
+      - name: Canonical protected size vector
+        run: pnpm size
+
+      - name: Commit admitted source candidate
+        shell: bash
+        run: |
+          set -euo pipefail
+          if git diff --quiet -- src test; then
+            echo "candidate already materialized"
+            exit 0
+          fi
+          git config user.name "lab-motion-research"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add \
+            src/compositor/segmenter.ts \
+            src/compositor/curve.ts \
+            test/animate-spring-cache.test.ts \
+            test/compositor-compile-work.test.ts \
+            test/compositor-webkit-execution.test.ts \
+            test/compositor-serialized-execution.test.ts
+          git commit -m "perf(compositor): serialize RDP grid without transient nodes"
+          git push origin HEAD:${{ github.head_ref }}
