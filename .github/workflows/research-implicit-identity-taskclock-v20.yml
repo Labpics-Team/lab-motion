@@ -1,0 +1,123 @@
+name: Research implicit identity task-clock v20
+
+on:
+  push:
+    branches: ["research/implicit-identity-taskclock-v20-20260913"]
+
+permissions:
+  contents: read
+
+env:
+  COREPACK_ENABLE_DOWNLOAD_PROMPT: "0"
+  COREPACK_DEFAULT_TO_LATEST: "0"
+  BASE_SHA: 93278bf9b540f93521c7bd4c02f68db458e5db7a
+  CANDIDATE_SHA: 0b01ae2b34db2b78c11acf9c4242e73538717c95
+  BASE_ENTRY_SHA256: 8f3ef89364b35b9fb8fb4277e99709a26cefa827f88611587265d3fb40465ff7
+  CANDIDATE_ENTRY_SHA256: 4f58d7f47bc7767d336b2771990f64fa52e4dd1df0f550fff30bdfc7ff1035be
+
+jobs:
+  task-clock:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    steps:
+      - name: Checkout research carrier
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+
+      - name: Setup exact Node
+        uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v6
+        with:
+          node-version: "24.20.0"
+
+      - name: Activate pinned pnpm
+        run: |
+          corepack enable
+          corepack install --global pnpm@11.11.0
+          test "$(node --version)" = "v24.20.0"
+          test "$(pnpm --version)" = "11.11.0"
+
+      - name: Reconstruct exact product artifacts
+        shell: bash
+        run: |
+          set -euo pipefail
+          git fetch --no-tags origin refs/pull/380/head
+          git cat-file -e "${BASE_SHA}^{commit}"
+          git cat-file -e "${CANDIDATE_SHA}^{commit}"
+          base_dir="$RUNNER_TEMP/lm-base-v20"
+          candidate_dir="$RUNNER_TEMP/lm-candidate-v20"
+          git worktree add --detach "$base_dir" "$BASE_SHA"
+          git worktree add --detach "$candidate_dir" "$CANDIDATE_SHA"
+          for dir in "$base_dir" "$candidate_dir"; do
+            pnpm --dir "$dir" install --frozen-lockfile --prefer-offline
+            pnpm --dir "$dir" build
+          done
+          base_entry="$base_dir/dist/keyframes/index.js"
+          candidate_entry="$candidate_dir/dist/keyframes/index.js"
+          printf '%s  %s\n' "$BASE_ENTRY_SHA256" "$base_entry" | sha256sum --check --status -
+          printf '%s  %s\n' "$CANDIDATE_ENTRY_SHA256" "$candidate_entry" | sha256sum --check --status -
+          printf 'base_entry=%s\ncandidate_entry=%s\n' "$base_entry" "$candidate_entry" >> "$GITHUB_ENV"
+
+      - name: Record environment and enable software perf access
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p evidence-v20
+          before="$(cat /proc/sys/kernel/perf_event_paranoid)"
+          sudo sysctl -w kernel.perf_event_paranoid=1
+          after="$(cat /proc/sys/kernel/perf_event_paranoid)"
+          allowed="$(awk '/^Cpus_allowed_list:/ {print $2}' /proc/self/status)"
+          cpu="${allowed%%,*}"
+          cpu="${cpu%%-*}"
+          [[ "$cpu" =~ ^[0-9]+$ ]]
+          printf 'RESEARCH_CPU=%s\n' "$cpu" >> "$GITHUB_ENV"
+          {
+            echo "node=$(node --version)"
+            echo "v8=$(node -p 'process.versions.v8')"
+            echo "pnpm=$(pnpm --version)"
+            echo "kernel=$(uname -srvm)"
+            echo "arch=$(uname -m)"
+            echo "runner=${RUNNER_NAME:-unknown}"
+            echo "carrier=$GITHUB_SHA"
+            echo "base=$BASE_SHA"
+            echo "candidate=$CANDIDATE_SHA"
+            echo "perf_event_paranoid_before=$before"
+            echo "perf_event_paranoid_after=$after"
+            echo "cpus_allowed_list=$allowed"
+            echo "research_cpu=$cpu"
+            perf --version
+            sha256sum "$base_entry" "$candidate_entry" scripts/research-implicit-identity-taskclock-v20.mjs
+          } > evidence-v20/environment.txt
+
+      - name: Run preregistered task-clock experiment
+        id: experiment
+        shell: bash
+        run: |
+          set +e
+          RESEARCH_CPU="$RESEARCH_CPU" node --allow-natives-syntax scripts/research-implicit-identity-taskclock-v20.mjs \
+            "$base_entry" "$candidate_entry" evidence-v20 | tee evidence-v20/stdout.txt
+          status=${PIPESTATUS[0]}
+          echo "exit_status=$status" | tee evidence-v20/exit-status.txt
+          exit 0
+
+      - name: Seal evidence
+        if: always()
+        shell: bash
+        run: |
+          set -euo pipefail
+          test -f evidence-v20/result.json
+          find evidence-v20 -maxdepth 1 -type f ! -name SHA256SUMS -print0 | sort -z | xargs -0 sha256sum > evidence-v20/SHA256SUMS
+          sha256sum --check evidence-v20/SHA256SUMS
+          cat evidence-v20/result.json
+
+      - name: Upload sealed evidence
+        if: always()
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
+        with:
+          name: implicit-identity-taskclock-v20-${{ github.sha }}
+          path: evidence-v20
+          if-no-files-found: error
+          retention-days: 30
+          compression-level: 0
+          overwrite: false
