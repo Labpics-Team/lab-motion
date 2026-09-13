@@ -4,7 +4,7 @@
 > `@labpics/motion/animate`, с честными границами объединённого.
 
 `./animate` даёт похожую one-liner форму для перечисленного ниже подмножества
-одиночных переходов CSS-стилей DOM- и SVG-элементов. Таблицы — карта переноса
+одиночных и многоточечных переходов CSS-стилей DOM- и SVG-элементов. Таблицы — карта переноса
 конкретных вызовов, а не утверждение о совпадении возможностей, поведения или
 lifecycle. Полный целевой пользовательский охват ведётся в
 [roadmap #106](https://github.com/Labpics-Team/lab-motion/issues/106).
@@ -14,6 +14,7 @@ lifecycle. Полный целевой пользовательский охва
 | Motion JS | `@labpics/motion/animate` | Заметка |
 |---|---|---|
 | `animate(el, { x: 100 })` | `animate(el, { x: 100 })` | совпадает этот `x/y`-срез; у Motion набор transform-осей шире |
+| `animate(el, { x: [0, 100, 0] }, { duration: 0.4, times: [0, .25, 1] })` | `animate(el, { x: [0, 100, 0] }, { duration: 400, times: [0, .25, 1] })` | N-track, время в мс; scalar/per-segment easing — функции из `./easing` |
 | `animate(el, { opacity: [0, 1] })` | `animate(el, { opacity: [0, 1] })` | пара `[from, to]` — тот же смысл |
 | `animate(el, { x: 100 }, { type: 'spring', stiffness: 200 })` | `animate(el, { x: 100 }, { spring: { mass: 1, stiffness: 200, damping: 20 } })` | пружина как `SpringParams` |
 | `animate(el, { x: 100 }, { duration: 0.3 })` | `animate(el, { x: 100 }, { duration: 300 })` | **мс, не секунды** |
@@ -38,11 +39,15 @@ lifecycle. Полный целевой пользовательский охва
 
 ## Границы объединённого
 
-`./animate` объединяет одним lifecycle только from/to-переходы поддерживаемых
+`./animate` объединяет одним lifecycle from/to и N-keyframe tracks поддерживаемых
 CSS-стилей и transform-шортхендов: spring/tween, delay/stagger и контролы
-`finished/play/pause/seek/cancel/stop`.
+`finished/play/pause/seek/cancel/stop`. `times` и массив N−1 easing-функций относятся
+к отдельным сегментам, не к параметрам отдельного свойства. Без явного duration
+N-track использует Lab Motion `duration.base` 200 мс, не default другого пакета.
+Не предполагается совпадение easing, endpoint duplicate и cancellation semantics;
+точная справка — [многоточечные переходы](api.md#многоточечные-переходы-в-animate).
 
-Не объединены: N-keyframes и offsets, per-segment и per-property transitions,
+Не объединены: per-property transition objects,
 repeat/reverse/mirror/repeatDelay, inertia/decay, sequences/timeline,
 value/object targets, HTML/SVG attributes и path-specific SVG-каналы.
 `SVGElement` при этом уже является допустимой целью для поддерживаемых

@@ -1,3 +1,4 @@
+import { buildKeyframeRecipe } from './keyframe-recipe.mjs';
 /**
  * compile-artifacts.mjs — playwright globalSetup для 17-compiler-nano.spec и
  * 19-surface-compiler.spec.
@@ -85,6 +86,7 @@ export default async function globalSetup() {
   rmSync(OUT, { recursive: true, force: true });
   mkdirSync(TMP, { recursive: true });
   try {
+    await buildKeyframeRecipe(ROOT, OUT);
     const compiled = await bundle(motionCompiler, NANO_FIXTURE, true);
     const uncompiled = await bundle(motionCompiler, NANO_FIXTURE, false);
     const surfaceCompiled = await bundle(motionCompiler, SURFACE_FIXTURE, true);

@@ -1,7 +1,7 @@
 /**
  * animate/waapi-unit.ts — compositor-движок одной группы каналов ./animate.
  *
- * Условие маршрута (решает фасад): spring-режим + compositor-eligible группа
+ * Условие маршрута (решает фасад): spring либо linear N-track + compositor-eligible группа
  * (transform | opacity) + tier 'compositor' (resolveCompositorTier). Один юнит =
  * ОДНА нативная Animation: Chromium/Firefox получают два кадра + linear(),
  * WebKit — явные кадры той же кривой + обычный linear. Устойчивый режим — ноль
@@ -42,6 +42,7 @@ import type { SpringParams } from '../spring.js';
 import { buildTransform } from '../value/transform.js';
 import {
   channelAt,
+  mixChannel,
   rebaseNumericChannels,
   sharedV0,
   type AnimatableElement,
@@ -52,6 +53,8 @@ import {
   type GroupRecord,
   type NumericChannel,
 } from './channels.js';
+import type { KeyframeArtifact } from './keyframe-native.js';
+import { sampleTrack, trackVelocity } from './keyframe-track.js';
 import { MainUnit } from './main-unit.js';
 import { SurfaceBatch } from './surface-batch.js';
 
@@ -90,15 +93,15 @@ export interface WaapiUnitOptions {
   readonly _numeric: NumericChannel[];
   readonly _residuals: Map<string, number>;
   readonly _transform: Record<string, number> | undefined;
-  readonly _spring: SpringParams;
+  readonly _spring: SpringParams | undefined;
   readonly _delayMs: number;
   readonly _now: () => number;
   readonly _setTimer: SetTimerFn;
   /** Один lazy getter: чистый WAAPI не создаёт main kernel. */
   readonly _getBatch: () => SurfaceBatch;
   readonly _onDone: (natural: boolean) => void;
-  /** Plan-фаза уже доказала и скомпилировала exact WAAPI-кривую. */
-  readonly _artifact: SpringExecutionArtifactTuple;
+  /** Plan-фаза уже доказала native-представимость пружины либо linear track. */
+  readonly _artifact: SpringExecutionArtifactTuple | KeyframeArtifact;
 }
 
 /** Compositor-прогон группы: Element.animate + piecewise-прерывания. */
@@ -118,6 +121,7 @@ export class WaapiUnit implements GroupOwner {
   private _timerCancel: (() => void) | undefined;
   /** Natural wake может опередить публикацию owner. */
   private _pendingNatural = false;
+  private _trackTime = 0;
   private _startTime = 0;
   private _startDelay = 0;
   private _durationMs = 0;
@@ -236,7 +240,7 @@ export class WaapiUnit implements GroupOwner {
     this._transaction(() => {
       // До успешной установки effect wrapper остаётся paused: это отличает
       // повторяемый replay от active seek, уже снявшего прежний effect.
-      this._emit(0, artifact);
+      this._emit('_frames' in artifact ? -this._trackTime : 0, artifact);
       this._paused = false;
     });
     this._commit();
@@ -261,16 +265,18 @@ export class WaapiUnit implements GroupOwner {
       this._handoffToLive(wasPaused);
       return;
     }
+    const track = '_frames' in artifact;
+    const terminal = track && this._trackTime >= this._durationMs;
     this._transaction(() => {
       // Paused effect уже снят, но hold всё равно предшествует любому cleanup:
       // hostile style не должен терминализировать wrapper реентрантно.
-      if (wasPaused) this._holdInline();
+      if (wasPaused || track) this._holdInline();
       this._clearTimer();
       this._cancelAnim();
-      if (!wasPaused) this._emit(0, artifact);
+      if (!wasPaused && !terminal) this._emit(track ? -this._trackTime : 0, artifact);
     });
-    if (wasPaused) return;
-    this._commit();
+    if (terminal) this._complete();
+    else if (!wasPaused) this._commit();
   }
 
   /** Стоп в текущей позиции: инлайн-фиксация ДО cancel (без отката к базе). */
@@ -293,34 +299,43 @@ export class WaapiUnit implements GroupOwner {
   // ── Приватное ─────────────────────────────────────────────────────────────
 
   /** Коммит плана в Element.animate (канон _emitCompositor CompositorSpring). */
-  private _emit(delayMs: number, artifact: SpringExecutionArtifactTuple): void {
+  private _emit(delayMs: number, artifact: SpringExecutionArtifactTuple | KeyframeArtifact): void {
+    // Огромный отрицательный host clock может сделать оставшийся delay
+    // непредставимым. Отказ до host-effects сохраняет retryable paused owner.
+    if (!Number.isFinite(delayMs)) throw new MotionParamError('LM139');
     const o = this._o;
-    const explicit = requiresExplicitSpringKeyframes();
-    const samples = artifact[1];
-    const durationMs = artifact[2];
-    const count = explicit ? samples.length / 2 : 2;
-    const frames = new Array<Record<string, string | number>>(count);
-    const stride = explicit ? 2 : samples.length - 2;
-    for (let i = 0; i < count; i++) {
-      const sample = i * stride;
-      const progress = samples[sample + 1]!;
-      frames[i] = {
-        offset: samples[sample]! / 100,
-        [o._group]: this._valueAt(progress),
-      };
+    let frames: Record<string, string | number>[];
+    let durationMs: number;
+    let easing = 'linear';
+    if ('_frames' in artifact) {
+      frames = artifact._frames;
+      durationMs = artifact._durationMs;
+      this._trackTime = -delayMs;
+    } else {
+      const explicit = requiresExplicitSpringKeyframes();
+      const samples = artifact[1];
+      durationMs = artifact[2];
+      const count = explicit ? samples.length / 2 : 2;
+      frames = new Array<Record<string, string | number>>(count);
+      const stride = explicit ? 2 : samples.length - 2;
+      for (let i = 0; i < count; i++) {
+        const sample = i * stride;
+        frames[i] = { offset: samples[sample]! / 100, [o._group]: this._valueAt(samples[sample + 1]!) };
+      }
+      this._samples = samples;
+      easing = explicit ? 'linear' : artifact[0];
     }
     this._startDelay = delayMs;
     this._durationMs = durationMs;
-    this._samples = samples;
     try {
       this._startTime = o._now();
       this._anim = o._el.animate(frames, {
         duration: durationMs,
-        easing: explicit ? 'linear' : artifact[0],
+        easing,
         iterations: 1,
         fill: 'both',
         composite: 'replace',
-        ...(delayMs > 0 ? { delay: delayMs } : {}),
+        ...(delayMs !== 0 ? { delay: delayMs } : {}),
       });
       const deadline = delayMs + durationMs;
       const verify = deadline > MAX_TIMER_MS;
@@ -352,18 +367,31 @@ export class WaapiUnit implements GroupOwner {
   }
 
   /** Строка/число группы при прогрессе p (края — точные from/to каналов). */
-  private _valueAt(p: number): string | number {
+  private _valueAt(p?: number): string | number {
     const o = this._o;
     if (o._group === 'transform') {
       const state = o._transform!;
-      for (const ch of o._numeric) state[ch._key] = channelAt(ch, p);
+      for (const ch of o._numeric) state[ch._key] = p === undefined ? ch._value : channelAt(ch, p);
       return buildTransform(state);
     }
-    return channelAt(o._numeric[0]!, p);
+    const ch = o._numeric[0]!;
+    return p === undefined ? ch._value : channelAt(ch, p);
   }
 
   /** Снимок каналов при времени WAAPI (мс) из actual serialized curve. */
   private _snapshotAt(currentTimeMs: number, delayMs = 0): void {
+    if ('_frames' in this._o._artifact) {
+      // После authored конца состояние постоянно; огромный конечный clock
+      // не должен превратить сдвиг следующего replay в -Infinity.
+      this._trackTime = Math.min(currentTimeMs - delayMs, this._durationMs);
+      const p = this._trackTime / this._durationMs;
+      for (const ch of this._o._numeric) {
+        ch._value = sampleTrack(ch._track!, p, mixChannel);
+        const sample = trackVelocity(ch._track!, p, this._durationMs);
+        ch._velocity = scaleSerializedVelocity(sample._dpdt, sample._from, sample._to);
+      }
+      return;
+    }
     const r = sampleSerializedSpringIntoUnchecked(
       this._samples!,
       this._durationMs,
@@ -381,6 +409,7 @@ export class WaapiUnit implements GroupOwner {
 
   /** Нативный currentTime побеждает drifted JS clock, но не требует layout. */
   private _syncSnapshot(): void {
+    if (this._paused && '_frames' in this._o._artifact) return;
     this._snapshotAt(this._elapsed(false), this._startDelay);
   }
 
@@ -404,13 +433,14 @@ export class WaapiUnit implements GroupOwner {
    * Пере-сев кривой из снимка: каналы продолжают from=значение снимка.
    * Разошедшиеся v0 не сжимаются в одну кривую — caller переведёт группу в live.
    */
-  private _tryReseedFromSnapshot(): SpringExecutionArtifactTuple | undefined {
+  private _tryReseedFromSnapshot(): SpringExecutionArtifactTuple | KeyframeArtifact | undefined {
     const o = this._o;
+    if ('_frames' in o._artifact) return o._artifact;
     const rebased = rebaseNumericChannels(o._numeric);
     const v0 = sharedV0(rebased);
     if (v0 === undefined) return undefined;
     const artifact = tryCompileSpringExecutionArtifactTupleUnchecked(
-      o._spring,
+      o._spring!,
       v0,
       DEFAULT_TOLERANCE,
     );
@@ -447,7 +477,7 @@ export class WaapiUnit implements GroupOwner {
             _residuals: o._residuals,
             _transform: o._transform,
           },
-          _mode: { _type: 'spring', _spring: o._spring },
+          _mode: { _type: 'spring', _spring: o._spring! },
           _delayMs: 0,
           _batch: batch,
           _onDone: (natural) => this._finish(natural),
@@ -468,14 +498,7 @@ export class WaapiUnit implements GroupOwner {
 
   /** Инлайн-фиксация текущего значения (перед cancel — без миганья к базе). */
   private _holdInline(): void {
-    const o = this._o;
-    if (o._group === 'transform') {
-      const state = o._transform!;
-      for (const ch of o._numeric) state[ch._key] = ch._value;
-      o._el.style.setProperty('transform', buildTransform(state));
-    } else {
-      o._el.style.setProperty(o._group, String(o._numeric[0]!._value));
-    }
+    this._o._el.style.setProperty(this._o._group, String(this._valueAt()));
   }
 
   private _cancelAnim(): void {

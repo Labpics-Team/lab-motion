@@ -13,6 +13,7 @@
  * buildTransform/interpolate), детерминизм (никаких глобальных часов).
  */
 
+import { makeTrack, trackTimes, snapshotTrackArray, MAX_TRACK_STOPS, type KeyframeTrack, type TrackEase } from './keyframe-track.js';
 import { MotionParamError } from '../errors.js';
 import { interpolateColor } from '../value/color.js';
 import type { ValueAST } from '../value/parse.js';
@@ -59,6 +60,7 @@ export interface NumericChannelSpec {
   /** Явный from из пары [from, to]; undefined — резолв из реестра/стиля. */
   readonly _explicitFrom: number | undefined;
   readonly _to: number;
+  _track?: KeyframeTrack<number>;
 }
 
 /** CSS-канал (цвет/юниты через ./value): физика в прогресс-пространстве [0..1]. */
@@ -68,6 +70,7 @@ export interface CssChannelSpec {
   readonly _group: GroupKey;
   readonly _explicitFrom: ValueAST | undefined;
   readonly _to: ValueAST;
+  _track?: KeyframeTrack<ValueAST>;
 }
 
 export type ChannelSpec = NumericChannelSpec | CssChannelSpec;
@@ -103,50 +106,70 @@ function parseCssValue(v: unknown): ValueAST {
 export function parseProps(props: Record<string, unknown>): ChannelSpec[] {
   const specs: ChannelSpec[] = [];
   const keys = Object.keys(props);
+  let remaining = MAX_TRACK_STOPS;
   for (const key of keys) {
     const raw = props[key];
     if (key === 'transform') {
       throw new MotionParamError('LM140');
     }
-    const pair = Array.isArray(raw) ? raw : undefined;
-    if (pair && pair.length !== 2) {
-      throw new MotionParamError('LM141');
-    }
+    const pair = Array.isArray(raw) ? snapshotTrackArray(raw, remaining, 2) : undefined;
+    remaining -= pair?.length ?? 0;
     if (isTransformKey(key) || key === 'opacity') {
       const group: GroupKey = key === 'opacity' ? 'opacity' : 'transform';
-      const explicitFrom = pair ? requireFinite(pair[0]) : undefined;
-      const to = requireFinite(pair ? pair[1] : raw);
+      const values = pair?.map(requireFinite);
+      const explicitFrom = values?.[0];
+      const to = values ? values[values.length - 1]! : requireFinite(raw);
+      const track = values && values.length > 2 ? makeTrack(values) : undefined;
       // Full-движок хранит scale как две независимые физические оси. Равные
       // значения всё равно сериализуются в компактный scale(N), зато переход
       // uniform↔axial не меняет представление: обе позиции и pickup-скорость
       // перехватываемого канала остаются явными.
       if (key === 'scale') {
         if (!keys.includes('scaleX')) {
-          specs.push({ _kind: 'num', _key: 'scaleX', _group: group, _explicitFrom: explicitFrom, _to: to });
+          specs.push({ _kind: 'num', _key: 'scaleX', _group: group, _explicitFrom: explicitFrom, _to: to, _track: track });
         }
         if (!keys.includes('scaleY')) {
-          specs.push({ _kind: 'num', _key: 'scaleY', _group: group, _explicitFrom: explicitFrom, _to: to });
+          specs.push({ _kind: 'num', _key: 'scaleY', _group: group, _explicitFrom: explicitFrom, _to: to, _track: track });
         }
       } else {
-        specs.push({ _kind: 'num', _key: key, _group: group, _explicitFrom: explicitFrom, _to: to });
+        specs.push({ _kind: 'num', _key: key, _group: group, _explicitFrom: explicitFrom, _to: to, _track: track });
       }
     } else {
+      const values = pair?.map(parseCssValue);
       specs.push({
         _kind: 'css',
         _key: key,
         _group: camelToKebab(key),
-        _explicitFrom: pair ? parseCssValue(pair[0]) : undefined,
-        _to: parseCssValue(pair ? pair[1] : raw),
+        _explicitFrom: values?.[0],
+        _to: values ? values[values.length - 1]! : parseCssValue(raw),
+        _track: values && values.length > 2 ? makeTrack(values) : undefined,
       });
     }
   }
   return specs;
 }
 
+/** Общая authored topology нужна только при общей times/ease[]. */
+export function configureTracks(specs: ChannelSpec[], times: readonly number[] | undefined, ease: TrackEase): number {
+  if (times !== undefined) {
+    trackTimes(times.length, times);
+    if (Array.isArray(ease) && ease.length !== times.length - 1) throw new MotionParamError('LM040');
+  }
+  let stops = 0;
+  for (const spec of specs) {
+    stops += spec._track?._values.length ?? 2;
+    if (stops > MAX_TRACK_STOPS) throw new MotionParamError('LM173');
+    // Discriminated spec гарантирует однородность values; mapping не меняет codec.
+    spec._track = makeTrack<number | ValueAST>(spec._track?._values ?? [spec._explicitFrom ?? spec._to, spec._to], times ?? spec._track?._times, ease) as NonNullable<ChannelSpec['_track']>;
+  }
+  return stops;
+}
+
 // ─── Привязанные каналы (живое состояние прогона) ────────────────────────────
 
 /** Числовой канал в полёте: from/to/v0 + последнее эмитнутое состояние. */
 export interface NumericChannel {
+  _track?: KeyframeTrack<number>;
   readonly _key: string;
   readonly _from: number;
   readonly _to: number;
@@ -163,6 +186,7 @@ export interface NumericChannel {
 
 /** CSS-канал в полёте: прогресс-пространство + последняя эмитнутая строка. */
 export interface CssChannel {
+  _track?: KeyframeTrack<ValueAST>;
   readonly _key: string;
   readonly _fromAst: ValueAST;
   readonly _toAst: ValueAST;
@@ -233,14 +257,18 @@ function numericChannel(
 
 /** Устойчивая позиция канала: взвешенная форма не переполняет MAX ↔ -MAX. */
 export function channelAt(channel: NumericChannel, progress: number): number {
+  return mixChannel(channel._from, channel._to, progress);
+}
+
+export function mixChannel(from: number, to: number, progress: number): number {
   // Границы возвращают именно public operands: взвешенная форма и `===`
   // стирают знак IEEE -0, который является частью точного endpoint-контракта.
-  if (progress === 1) return channel._to;
+  if (progress === 1) return to;
   // Точный static-span — константа, а не две равные IEEE-слагаемые: у MAX
   // взвешенная форма может округлиться в nextDown и изобрести движение/C1.
-  if (progress === 0 || channel._from === channel._to) return channel._from;
-  const value = (1 - progress) * channel._from + progress * channel._to;
-  return Number.isFinite(value) ? value : channel._to;
+  if (progress === 0 || from === to) return from;
+  const value = (1 - progress) * from + progress * to;
+  return Number.isFinite(value) ? value : to;
 }
 
 /**
@@ -447,7 +475,7 @@ function createTransformState(
 }
 
 /** Интерполяция AST, уже прошедшего parse-границу фасада. */
-function interpolateParsed(from: ValueAST, to: ValueAST, p: number): string | number {
+export function interpolateParsed(from: ValueAST, to: ValueAST, p: number): string | number {
   if (from.kind === 'color' && to.kind === 'color') {
     return interpolateColor(from, to, p);
   }
@@ -526,7 +554,10 @@ export function bindGroup(
           from = Number.isFinite(read) ? read : 1; // opacity: дефолт браузера
         }
       }
-      numeric.push(numericChannel(spec._key, from, spec._to, velocity));
+      const channel = numericChannel(spec._key, from, spec._to, velocity);
+      if (spec._track) channel._track = spec._explicitFrom === undefined
+        ? { ...spec._track, _values: [from, spec._to] } : spec._track;
+      numeric.push(channel);
     } else {
       let fromAst: ValueAST;
       let v0 = 0;
@@ -543,6 +574,8 @@ export function bindGroup(
       }
       const initialCss = interpolateParsed(fromAst, spec._to, 0);
       css = {
+        _track: spec._track && (spec._explicitFrom === undefined
+          ? { ...spec._track, _values: [fromAst, spec._to] } : spec._track),
         _key: spec._key,
         _fromAst: fromAst,
         _toAst: spec._to,
