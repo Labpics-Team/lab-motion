@@ -1,0 +1,254 @@
+name: research emitter metrics fusion
+
+on:
+  push:
+    branches:
+      - research/emitter-metrics-fusion-20260914
+
+permissions:
+  contents: read
+
+jobs:
+  evidence:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 1
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 11.11.0
+          run_install: false
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24.20.0
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - name: Baseline build and exact public corpus
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p evidence /tmp/lm-base
+          printf '%s\n' "$(git rev-parse HEAD)" > evidence/carrier-sha.txt
+          printf '%s\n' "$(git rev-parse HEAD^)" > evidence/base-sha.txt
+          node --version > evidence/node.txt
+          pnpm --version > evidence/pnpm.txt
+          pnpm build
+          cp -a dist /tmp/lm-base/dist
+          node --input-type=module <<'JS' > evidence/base-oracle.json
+          import { pathToFileURL } from 'node:url';
+          const m = await import(pathToFileURL(process.cwd() + '/dist/compositor/index.js').href + '?base');
+          const masses = [0.1, 0.5, 1, 2, 8];
+          const omegas = [2, 5, 13, 30];
+          const zetas = [0.05, 0.2, 0.7, 1, 2, 5];
+          const v0s = [-12, -3, 0, 2, 9];
+          const tolerances = [1/200, 1/400, 1/1000];
+          const out = [];
+          for (const mass of masses) for (const omega of omegas) for (const zeta of zetas) for (const v0 of v0s) for (const tolerance of tolerances) {
+            const stiffness = mass * omega * omega;
+            const damping = 2 * zeta * Math.sqrt(stiffness * mass);
+            const spring = { mass, stiffness, damping };
+            try {
+              const linear = m.compileSpringLinear(spring, { v0, tolerance });
+              const plan = m.compileSpringPlan({ spring, property: 'opacity', from: 0, to: 1, v0, tolerance });
+              out.push({ok:true,mass,omega,zeta,v0,tolerance,linear,duration:plan.duration,nodes:plan.nodes});
+            } catch (e) {
+              out.push({ok:false,mass,omega,zeta,v0,tolerance,name:e?.name,message:e?.message});
+            }
+          }
+          console.log(JSON.stringify(out));
+          JS
+      - name: Apply exact fusion candidate
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 <<'PY'
+          from pathlib import Path
+
+          p = Path('src/compositor/segmenter.ts')
+          s = p.read_text()
+          old = '''export function buildSpringNodesWithHorizon(\n  params: SpringParams,\n  v0: number,\n  tolerance: number,\n): [nodes: SpringNode[], horizon: number] {\n  const settle = springCompileHorizon(params, v0, tolerance);\n  return [\n    buildSpringNodesAtHorizon(\n      params,\n      v0,\n      tolerance,\n      settle,\n      baseGridSize(params, settle, tolerance, v0),\n    ),\n    settle,\n  ];\n}'''
+          new = '''export function buildSpringNodesWithHorizon(\n  params: SpringParams,\n  v0: number,\n  tolerance: number,\n): [nodes: SpringNode[], horizon: number, maxSlope: number, minGap: number] {\n  const settle = springCompileHorizon(params, v0, tolerance);\n  const build = buildSpringNodesAtHorizon(\n    params,\n    v0,\n    tolerance,\n    settle,\n    baseGridSize(params, settle, tolerance, v0),\n  );\n  return [build[0], settle, build[1], build[2]];\n}'''
+          assert s.count(old) == 1, 'buildSpringNodesWithHorizon shape drift'
+          s = s.replace(old, new)
+
+          old = '''export function tryBuildSpringNodes(\n  params: SpringParams,\n  v0: number,\n  tolerance: number,\n): [nodes: SpringNode[], horizon: number] | undefined {\n  const settle = springCompileHorizon(params, v0, tolerance);\n  const intervals = requiredGridSize(params, settle, tolerance, v0);\n  if (!Number.isSafeInteger(intervals) || intervals > BASE_GRID_MAX) return undefined;\n  return [\n    buildSpringNodesAtHorizon(params, v0, tolerance, settle, intervals),\n    settle,\n  ];\n}'''
+          new = '''export function tryBuildSpringNodes(\n  params: SpringParams,\n  v0: number,\n  tolerance: number,\n): [nodes: SpringNode[], horizon: number, maxSlope: number, minGap: number] | undefined {\n  const settle = springCompileHorizon(params, v0, tolerance);\n  const intervals = requiredGridSize(params, settle, tolerance, v0);\n  if (!Number.isSafeInteger(intervals) || intervals > BASE_GRID_MAX) return undefined;\n  const build = buildSpringNodesAtHorizon(params, v0, tolerance, settle, intervals);\n  return [build[0], settle, build[1], build[2]];\n}'''
+          assert s.count(old) == 1, 'tryBuildSpringNodes shape drift'
+          s = s.replace(old, new)
+
+          old = '''export function buildRestingSpringNodesWithHorizon(\n  params: SpringParams,\n  tolerance: number,\n): [nodes: SpringNode[], horizon: number] {\n  const settle = springCompileHorizon(params, 0, tolerance);\n  return [\n    buildSpringNodesAtHorizon(\n      params,\n      0,\n      tolerance,\n      settle,\n      baseGridSize(params, settle, tolerance),\n    ),\n    settle,\n  ];\n}'''
+          new = '''export function buildRestingSpringNodesWithHorizon(\n  params: SpringParams,\n  tolerance: number,\n): [nodes: SpringNode[], horizon: number, maxSlope: number, minGap: number] {\n  const settle = springCompileHorizon(params, 0, tolerance);\n  const build = buildSpringNodesAtHorizon(\n    params,\n    0,\n    tolerance,\n    settle,\n    baseGridSize(params, settle, tolerance),\n  );\n  return [build[0], settle, build[1], build[2]];\n}'''
+          assert s.count(old) == 1, 'buildRestingSpringNodesWithHorizon shape drift'
+          s = s.replace(old, new)
+
+          old = '''): SpringNode[] {\n  // Валидный набор params всегда оседает в бюджет'''
+          new = '''): [nodes: SpringNode[], maxSlope: number, minGap: number] {\n  // Валидный набор params всегда оседает в бюджет'''
+          assert s.count(old) == 1, 'buildSpringNodesAtHorizon return shape drift'
+          s = s.replace(old, new)
+
+          old = '''  const kept = douglasPeuckerVertical(xs, ys, tolerance / 2, 1);\n  return kept.map((k, n): SpringNode => ({\n    progress: n === kept.length - 1 ? 1 : ys[k]!,\n    percent: xs[k]! * 100,\n  }));\n}'''
+          new = '''  const kept = douglasPeuckerVertical(xs, ys, tolerance / 2, 1);\n  let maxSlope = 0;\n  let minGap = 100;\n  let previous: SpringNode | undefined;\n  const nodes = kept.map((k, n): SpringNode => {\n    const node = {\n      progress: n === kept.length - 1 ? 1 : ys[k]!,\n      percent: xs[k]! * 100,\n    };\n    if (previous) {\n      const gap = node.percent - previous.percent;\n      const slope = Math.abs((node.progress - previous.progress) / gap);\n      if (slope > maxSlope) maxSlope = slope;\n      if (gap < minGap) minGap = gap;\n    }\n    previous = node;\n    return node;\n  });\n  return [nodes, maxSlope, minGap];\n}'''
+          assert s.count(old) == 1, 'kept materialization shape drift'
+          p.write_text(s.replace(old, new))
+
+          p = Path('src/compositor/curve.ts')
+          s = p.read_text()
+          old = "import { settleTimeUpperBound, type SpringParams } from '../spring.js';"
+          new = "import { type SpringParams } from '../spring.js';"
+          assert s.count(old) == 1, 'settle import drift'
+          s = s.replace(old, new)
+
+          old = '''function emitArtifact(\n  nodes: readonly SpringNode[],\n  tolerance: number,\n  durationMs: number,\n): SpringExecutionArtifactTuple {'''
+          new = '''function emitArtifact(\n  nodes: readonly SpringNode[],\n  tolerance: number,\n  durationMs: number,\n  maxSlope: number,\n  minGap: number,\n): SpringExecutionArtifactTuple {'''
+          assert s.count(old) == 1, 'emit signature drift'
+          s = s.replace(old, new)
+
+          old = '''  let maxSlope = 0;\n  let minGap = 100;\n  for (let i = 1; i < nodes.length; i++) {\n    const a = nodes[i - 1]!;\n    const b = nodes[i]!;\n    const gap = b.percent - a.percent;\n    const slope = Math.abs((b.progress - a.progress) / gap);\n    if (slope > maxSlope) maxSlope = slope;\n    if (gap < minGap) minGap = gap;\n  }\n'''
+          assert s.count(old) == 1, 'emit prepass drift'
+          s = s.replace(old, '')
+
+          # Simplicity pass: the prebuilt-node seam has no caller on current main;
+          # deleting it makes the private boundary single-owner instead of carrying a fallback scan.
+          for signature in [
+          '''export function compileSpringExecutionArtifactTupleUnchecked(\n  spring: SpringParams,\n  v0: number,\n  tolerance: number,\n  cache: SpringLinearCache<SpringExecutionArtifactTuple> = sharedCache,\n  prebuiltNodes?: readonly SpringNode[],\n  prebuiltDurationMs?: number,\n): SpringExecutionArtifactTuple {''',
+          '''export function tryCompileSpringExecutionArtifactTupleUnchecked(\n  spring: SpringParams,\n  v0: number,\n  tolerance: number,\n  cache: SpringLinearCache<SpringExecutionArtifactTuple> = sharedCache,\n  prebuiltNodes?: readonly SpringNode[],\n  prebuiltDurationMs?: number,\n): SpringExecutionArtifactTuple | undefined {''',
+          '''export function compileSpringExecutionArtifactUnchecked(\n  spring: SpringParams,\n  v0: number,\n  tolerance: number,\n  cache: SpringLinearCache<SpringExecutionArtifactTuple> = sharedCache,\n  prebuiltNodes?: readonly SpringNode[],\n  prebuiltDurationMs?: number,\n): SpringExecutionArtifact {''',
+          '''export function compileSpringEasingUnchecked(\n  spring: SpringParams,\n  v0: number,\n  tolerance: number,\n  cache: SpringLinearCache<SpringExecutionArtifactTuple> = sharedCache,\n  prebuiltNodes?: readonly SpringNode[],\n  prebuiltDurationMs?: number,\n): string {''']:
+              assert s.count(signature) == 1, 'private compile signature drift'
+              s = s.replace(signature, signature.replace('  prebuiltNodes?: readonly SpringNode[],\n  prebuiltDurationMs?: number,\n', ''))
+
+          old = '''    cache,\n    prebuiltNodes,\n    prebuiltDurationMs,\n  );'''
+          assert s.count(old) == 3, f'forwarding shape drift: {s.count(old)}'
+          s = s.replace(old, '''    cache,\n  );''')
+
+          old = '''  let nodes = prebuiltNodes;\n  let durationMs = prebuiltDurationMs;\n  if (nodes === undefined) {\n    const build = tryBuildSpringNodes(spring, v0, tolerance);\n    if (!build) return;\n    nodes = build[0];\n    durationMs = build[1] * 1000;\n  }\n  const artifact = emitArtifact(\n    nodes,\n    tolerance,\n    durationMs ?? settleTimeUpperBound(spring, v0) * 1000,\n  );'''
+          new = '''  const build = tryBuildSpringNodes(spring, v0, tolerance);\n  if (!build) return;\n  const artifact = emitArtifact(\n    build[0],\n    tolerance,\n    build[1] * 1000,\n    build[2],\n    build[3],\n  );'''
+          assert s.count(old) == 1, 'compile miss shape drift'
+          s = s.replace(old, new)
+
+          old = '''  const artifact = emitArtifact(build[0], tolerance, build[1] * 1000);'''
+          new = '''  const artifact = emitArtifact(\n    build[0],\n    tolerance,\n    build[1] * 1000,\n    build[2],\n    build[3],\n  );'''
+          assert s.count(old) == 1, 'resting emit shape drift'
+          p.write_text(s.replace(old, new))
+          PY
+          git diff --check
+          git diff > evidence/candidate.patch
+          sha256sum evidence/candidate.patch > evidence/candidate-patch.sha256
+      - name: Candidate semantic gates and build
+        shell: bash
+        run: |
+          set -euo pipefail
+          pnpm typecheck
+          pnpm vitest run test/compositor-compile.test.ts test/compositor-compile-work.test.ts test/compositor-serialized-execution.test.ts test/compositor-error-bound.test.ts test/compositor-velocity-budget.test.ts test/compositor-cache.test.ts
+          pnpm build
+          node --input-type=module <<'JS' > evidence/candidate-oracle.json
+          import { pathToFileURL } from 'node:url';
+          const m = await import(pathToFileURL(process.cwd() + '/dist/compositor/index.js').href + '?candidate');
+          const masses = [0.1, 0.5, 1, 2, 8];
+          const omegas = [2, 5, 13, 30];
+          const zetas = [0.05, 0.2, 0.7, 1, 2, 5];
+          const v0s = [-12, -3, 0, 2, 9];
+          const tolerances = [1/200, 1/400, 1/1000];
+          const out = [];
+          for (const mass of masses) for (const omega of omegas) for (const zeta of zetas) for (const v0 of v0s) for (const tolerance of tolerances) {
+            const stiffness = mass * omega * omega;
+            const damping = 2 * zeta * Math.sqrt(stiffness * mass);
+            const spring = { mass, stiffness, damping };
+            try {
+              const linear = m.compileSpringLinear(spring, { v0, tolerance });
+              const plan = m.compileSpringPlan({ spring, property: 'opacity', from: 0, to: 1, v0, tolerance });
+              out.push({ok:true,mass,omega,zeta,v0,tolerance,linear,duration:plan.duration,nodes:plan.nodes});
+            } catch (e) {
+              out.push({ok:false,mass,omega,zeta,v0,tolerance,name:e?.name,message:e?.message});
+            }
+          }
+          console.log(JSON.stringify(out));
+          JS
+          cmp evidence/base-oracle.json evidence/candidate-oracle.json
+      - name: Exact protected byte comparison
+        shell: bash
+        run: |
+          set -euo pipefail
+          node --input-type=module <<'JS' | tee evidence/bytes.json
+          import { readFileSync, readdirSync, statSync } from 'node:fs';
+          import { join, relative } from 'node:path';
+          import { canonicalGzip, observationalBrotli } from './scripts/compression-oracle.mjs';
+          const roots = ['/tmp/lm-base/dist', process.cwd() + '/dist'];
+          function walk(root, dir=root, out=[]) {
+            for (const name of readdirSync(dir)) {
+              const p = join(dir,name); const st=statSync(p);
+              if (st.isDirectory()) walk(root,p,out); else if (/\.(?:js|cjs)$/.test(name)) out.push(relative(root,p));
+            }
+            return out;
+          }
+          const files = [...new Set([...walk(roots[0]),...walk(roots[1])])].sort();
+          const rows=[]; let regressed=false;
+          for (const file of files) {
+            const a=readFileSync(join(roots[0],file)); const b=readFileSync(join(roots[1],file));
+            const base=[a.length, canonicalGzip(a).length, observationalBrotli(a).length];
+            const cand=[b.length, canonicalGzip(b).length, observationalBrotli(b).length];
+            const delta=cand.map((x,i)=>x-base[i]);
+            if (delta.some(x=>x>0)) regressed=true;
+            if (delta.some(x=>x!==0)) rows.push({file,base,candidate:cand,delta});
+          }
+          console.log(JSON.stringify({regressed,rows},null,2));
+          if (regressed) process.exitCode=42;
+          JS
+      - name: Calibrated cold-compile timing if byte-admitted
+        if: success()
+        shell: bash
+        run: |
+          set -euo pipefail
+          cat > /tmp/bench-side.mjs <<'JS'
+          import { pathToFileURL } from 'node:url';
+          const [dist, mult='1'] = process.argv.slice(2);
+          const m = await import(pathToFileURL(dist + '/compositor/index.js').href + '?' + Math.random());
+          const springs=[];
+          for (let i=0;i<192;i++) {
+            const mass=.4+(i%7)*.17, omega=4+(i%19)*1.1, zeta=.08+(i%11)*.17;
+            const stiffness=mass*omega*omega, damping=2*zeta*Math.sqrt(stiffness*mass);
+            springs.push({mass,stiffness,damping});
+          }
+          const compiler=m.createSpringLinearCache(1);
+          for (let i=0;i<64;i++) compiler.compile(springs[i%springs.length],{v0:(i%9)-4,tolerance:1/400});
+          const n=Number(mult); const t0=process.hrtime.bigint();
+          let sink=0;
+          for (let r=0;r<n;r++) for (let i=0;i<springs.length;i++) sink+=compiler.compile(springs[i],{v0:(i%9)-4,tolerance:1/400}).length;
+          const ns=Number(process.hrtime.bigint()-t0);
+          console.log(JSON.stringify({ns,sink}));
+          JS
+          cat > /tmp/bench-driver.mjs <<'JS'
+          import { execFileSync } from 'node:child_process';
+          const base='/tmp/lm-base/dist', cand=process.cwd()+'/dist';
+          const run=(p,m=1)=>JSON.parse(execFileSync(process.execPath,['/tmp/bench-side.mjs',p,String(m)],{encoding:'utf8'})).ns;
+          const nulls=[], controls=[], pairs=[];
+          for(let i=0;i<8;i++){ const a=run(base), b=run(base); nulls.push(b/a); }
+          for(let i=0;i<6;i++){ const a=run(base), b=run(base,2); controls.push(b/a); }
+          const nullMax=Math.max(...nulls.map(x=>Math.max(x,1/x)));
+          const controlMin=Math.min(...controls);
+          let admitted=nullMax<=1.05 && controlMin>=1.8;
+          if(admitted) for(let i=0;i<24;i++){
+            const first=i%2?cand:base, second=i%2?base:cand;
+            const x=run(first), y=run(second);
+            const b=i%2?y:x, c=i%2?x:y; pairs.push(c/b);
+          }
+          const sorted=[...pairs].sort((a,b)=>a-b); const median=sorted.length?sorted[Math.floor(sorted.length/2)]:null;
+          console.log(JSON.stringify({nulls,nullMax,controls,controlMin,admitted,pairs,median},null,2));
+          if(!admitted) process.exitCode=43;
+          JS
+          node /tmp/bench-driver.mjs | tee evidence/perf.json
+      - name: Hash evidence
+        if: always()
+        shell: bash
+        run: |
+          set -euo pipefail
+          find evidence -type f ! -name SHA256SUMS -print0 | sort -z | xargs -0 sha256sum > evidence/SHA256SUMS
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: emitter-metrics-fusion-evidence
+          path: evidence
+          if-no-files-found: error
+          retention-days: 30
