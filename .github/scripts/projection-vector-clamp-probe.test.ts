@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { createProjection } from '../../src/projection/index.js';
+import { createProjection } from '../src/projection/index.js';
 
 function clock() {
   const q: Array<(ts?: number) => void> = [];
@@ -27,8 +27,10 @@ describe('vector clamp probe', () => {
 
     let maxJump = 0;
     for (let i = 1; i < ys.length; i++) maxJump = Math.max(maxJump, Math.abs(ys[i]! - ys[i - 1]!));
-    for (const y of ys) expect(y).toBeGreaterThanOrEqual(-1e-9), expect(y).toBeLessThanOrEqual(100 + 1e-9);
-    // 240 Hz + this spring: a physically continuous path cannot teleport multiple px in one frame.
+    for (const y of ys) {
+      expect(y).toBeGreaterThanOrEqual(-1e-9);
+      expect(y).toBeLessThanOrEqual(100 + 1e-9);
+    }
     expect(maxJump).toBeLessThan(2);
     expect(ys.at(-1)).toBeCloseTo(100, 9);
   });
