@@ -1,0 +1,36 @@
+name: R11 review fix anchor diagnostics
+on:
+  push:
+    branches: [carrier/r11-review-fixes-20260914]
+permissions:
+  contents: read
+jobs:
+  diagnose:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+      - shell: bash
+        env:
+          BASE_HEAD: 954d19b05452d391d86e49fa7e84bb90b9813747
+        run: |
+          set -euo pipefail
+          git switch --detach "$BASE_HEAD"
+          python3 - <<'PY'
+          from pathlib import Path
+          reorder=Path('src/behaviors/reorder/index.ts').read_text()
+          docs=Path('docs/api.md').read_text()
+          motion=Path('test/motion-value.test.ts').read_text()
+          reorder_anchor="    if (to < 0 || to >= layout._slots.length || Number.isNaN(layout._slots[to]!._x)) return;\n    this._propose(session, from, to);\n"
+          count_anchor='Корневой экспорт + 42 субпути; неиспользуемые субпути вырезаются\n'
+          stale_animate="| `…/animate` | Фасад-one-liner: `animate(target, props, options)` — цели по каналам (`x`/`y`/`scale`/`rotate`, `opacity`, CSS-свойства), режим `{ spring }` или `{ duration, ease }`, `delay`/`stagger`, контролы `{ finished, play, pause, seek, cancel, stop }`. Это базовый single-transition DX-срез; ядро от него не растёт |\n"
+          motion_anchor='''    // Ретаргет начинается из последнего snapshot, не задерживает следующие часы.\n    // The NEXT tick (drain 1) will set _startTs = currentTs, elapsed=0 → position unchanged.\n    // The tick AFTER THAT (drain 2 total) will have elapsed=dt → shows actual movement.\n    mv.setTarget(200);\n\n    // Следующий кадр продолжает движение с унаследованной скоростью.\n    clock.drain(1);\n\n    // Drain frame N+2: this tick has elapsed=dt from the new run → actual spring movement.\n    clock.drain(1);\n    const idxAfter = values.length - 1;\n    // Velocity = delta between frame N+2 and N+1 (both post-retarget frames).\n'''
+          print('reorder_anchor', reorder.count(reorder_anchor))
+          print('docs_count_anchor', docs.count(count_anchor))
+          print('stale_animate', docs.count(stale_animate))
+          print('animate_rows', docs.count('| `…/animate` |'))
+          print('motion_anchor', motion.count(motion_anchor))
+          PY
