@@ -14,16 +14,26 @@ test('smart exit ghost does not reacquire focus lifetime after app removal', asy
     const root = document.getElementById('root')!;
     const gone = document.getElementById('gone') as HTMLButtonElement;
     const before = gone.getBoundingClientRect();
-    const capture = captureSmart(root);
+    const frames: Array<(ts?: number) => void> = [];
+    const capture = captureSmart(root, {
+      respectReducedMotion: false,
+      requestFrame: (cb) => { frames.push(cb); return frames.length; },
+      getComputedStyle: (el) => window.getComputedStyle(el as Element),
+      getScroll: () => ({ x: window.scrollX, y: window.scrollY }),
+    });
 
     gone.remove(); // app membership ended before visual exit lifetime
     const handle = capture.animate();
 
+    // Не исполняем queued frame: наблюдаем именно промежуток visual lifetime
+    // между ghost-reinsert и terminal cleanup, как в owner-level injected-clock tests.
     const observation = {
       oldWidth: before.width,
       oldHeight: before.height,
       exited: handle.plan.exited.includes('gone'),
       reinserted: root.contains(gone),
+      queuedFrames: frames.length,
+      playing: handle.playing,
       inertBeforeFocus: gone.inert,
       tabIndex: gone.tabIndex,
       acceptedFocus: false,
@@ -37,7 +47,7 @@ test('smart exit ghost does not reacquire focus lifetime after app removal', asy
   });
 
   console.log(`FOCUS_OBSERVATION=${JSON.stringify(result)}`);
-  if (!(result.oldWidth > 0 && result.oldHeight > 0 && result.exited && result.reinserted)) {
+  if (!(result.oldWidth > 0 && result.oldHeight > 0 && result.exited && result.reinserted && result.queuedFrames > 0 && result.playing)) {
     throw new Error(`POSITIVE_CONTROL_FAILED:${JSON.stringify(result)}`);
   }
   if (!result.inertBeforeFocus || result.acceptedFocus) {
