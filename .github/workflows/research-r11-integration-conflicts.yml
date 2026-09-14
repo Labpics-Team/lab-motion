@@ -1,0 +1,58 @@
+name: R11 integration conflict probe
+on:
+  push:
+    branches: [temp-never-used]
+permissions:
+  contents: read
+jobs:
+  probe:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Checkout exact graph
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+      - name: Probe pairwise conflicts
+        shell: bash
+        env:
+          MAIN: d830deaaa2e413d01689c50c1429efc5541a5000
+          WAVE_A: e5f5dc9df335daf52120fc78db7ec1fbaa1cfe8c
+          REORDER: c9e04facf615f4d29f75ee416172f46a5c52e562
+          WAAPI: 20f6dd280f0460273857a057ca6c9494453ec117
+          FOLLOW: fe46bf665db808b5070621d1f9a0a85f70aa3506
+          BINDING: 9fc229c07b55b4cd0bb4f840f8dc3b10c4bdf2a3
+        run: |
+          set -euo pipefail
+          for sha in "$MAIN" "$WAVE_A" "$REORDER" "$WAAPI" "$FOLLOW" "$BINDING"; do git cat-file -e "$sha^{commit}"; done
+          test "$(git merge-base "$WAVE_A" "$REORDER")" = "$MAIN"
+          test "$(git merge-base "$WAVE_A" "$WAAPI")" = "$MAIN"
+          test "$(git merge-base "$WAVE_A" "$FOLLOW")" = "$MAIN"
+          test "$(git merge-base "$WAVE_A" "$BINDING")" = "$MAIN"
+
+          git config user.name probe
+          git config user.email probe@invalid
+          probe_pair() {
+            local label="$1" left="$2" right="$3"
+            git merge --abort >/dev/null 2>&1 || true
+            git reset --hard "$left" >/dev/null
+            git clean -fd >/dev/null
+            echo "=== $label ==="
+            if git merge --no-ff --no-commit "$right" >/tmp/merge.log 2>&1; then
+              echo 'CLEAN'
+            else
+              cat /tmp/merge.log
+              echo 'CONFLICTS:'
+              git diff --name-only --diff-filter=U | sort
+            fi
+            git merge --abort >/dev/null 2>&1 || true
+          }
+
+          probe_pair 'waveA + reorder' "$WAVE_A" "$REORDER"
+          probe_pair 'waveA + waapi' "$WAVE_A" "$WAAPI"
+          probe_pair 'waveA + follow' "$WAVE_A" "$FOLLOW"
+          probe_pair 'waveA + binding' "$WAVE_A" "$BINDING"
+          probe_pair 'reorder + binding' "$REORDER" "$BINDING"
+          probe_pair 'reorder + follow' "$REORDER" "$FOLLOW"
+          probe_pair 'binding + follow' "$BINDING" "$FOLLOW"
