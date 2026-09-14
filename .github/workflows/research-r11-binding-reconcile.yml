@@ -1,0 +1,107 @@
+name: R11 binding error-catalog reconciliation
+on:
+  push:
+    branches: [please-ignore]
+permissions:
+  contents: write
+jobs:
+  reconcile:
+    runs-on: [self-hosted, Linux, X64]
+    timeout-minutes: 15
+    steps:
+      - name: Checkout carrier
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          fetch-depth: 0
+          persist-credentials: true
+      - name: Reconcile binding codes with Presence-owned catalog
+        shell: bash
+        env:
+          MAIN_SHA: d830deaaa2e413d01689c50c1429efc5541a5000
+          BINDING_SHA: 1ad3689f194a1d97d4d09171739acec9aaa4cf87
+          TARGET: integrate/r11-wave-c-384
+        run: |
+          set -euo pipefail
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git cat-file -e "$MAIN_SHA^{commit}"
+          git cat-file -e "$BINDING_SHA^{commit}"
+          git switch --detach "$MAIN_SHA"
+          if git merge --no-ff --no-commit "$BINDING_SHA"; then
+            :
+          else
+            mapfile -t conflicts < <(git diff --name-only --diff-filter=U | sort)
+            printf 'conflicts:\n%s\n' "${conflicts[*]}"
+            allowed='CHANGELOG.md docs/api.md docs/errors.md docs/recipes.md src/errors.ts'
+            for path in "${conflicts[@]}"; do
+              case " $allowed " in *" $path "*) ;; *) echo "unexpected conflict: $path" >&2; exit 41;; esac
+            done
+            for path in "${conflicts[@]}"; do
+              case "$path" in
+                src/errors.ts|docs/errors.md)
+                  git show ":2:$path" > "$path"
+                  git add "$path"
+                  ;;
+                *)
+                  git show ":2:$path" > "$RUNNER_TEMP/ours"
+                  git show ":1:$path" > "$RUNNER_TEMP/base"
+                  git show ":3:$path" > "$RUNNER_TEMP/theirs"
+                  git merge-file --union -p "$RUNNER_TEMP/ours" "$RUNNER_TEMP/base" "$RUNNER_TEMP/theirs" > "$path"
+                  git add "$path"
+                  ;;
+              esac
+            done
+          fi
+          test -z "$(git diff --name-only --diff-filter=U)"
+
+          python3 - <<'PY'
+          from pathlib import Path
+          import subprocess
+          main = 'd830deaaa2e413d01689c50c1429efc5541a5000'
+          changed = subprocess.check_output(['git','diff','--name-only',main], text=True).splitlines()
+          for name in changed:
+            if name in {'src/errors.ts','docs/errors.md'}: continue
+            p=Path(name)
+            if not p.is_file(): continue
+            try: s=p.read_text()
+            except UnicodeDecodeError: continue
+            t=s.replace('LM173','LM179').replace('LM174','LM180').replace('LM175','LM181')
+            if t != s: p.write_text(t)
+
+          errors=Path('src/errors.ts')
+          s=errors.read_text()
+          old="export const LAST_MOTION_PARAM_ERROR_CODE: MotionParamErrorCode = 'LM178';"
+          assert old in s
+          errors.write_text(s.replace(old, "export const LAST_MOTION_PARAM_ERROR_CODE: MotionParamErrorCode = 'LM181';", 1))
+
+          doc=Path('docs/errors.md')
+          s=doc.read_text()
+          assert '| `LM173` | presence intent |' in s and '| `LM178` | presence controls |' in s
+          assert 'LM179' not in s and 'LM180' not in s and 'LM181' not in s
+          tail=("\n| `LM179` | semantic binding | Некорректный рецепт, карта портов или возвращённый ресурс | Передать функцию проекции, непустую карту функций и controls с cancel либо void | active |"
+                "\n| `LM180` | semantic binding goals | Неполный или изменившийся набор ролей/свойств, неконечное число/неподдерживаемый тип цели либо превышение суммарного предела 10 000 ролей и свойств | Вернуть стабильную карту абсолютных конечных чисел и строк | active |"
+                "\n| `LM181` | semantic binding projection | Реентрантный update во время вычисления целей | Сделать проекцию чистой; менять модель вне проекции | active |")
+          doc.write_text(s.rstrip()+tail+'\n')
+          PY
+
+          git add -A
+          ! git grep -nE '^(<<<<<<<|=======|>>>>>>>)'
+          grep -q "LAST_MOTION_PARAM_ERROR_CODE.*LM181" src/errors.ts
+          for n in 173 174 175 176 177 178 179 180 181; do grep -q "LM$n" docs/errors.md; done
+          ! git grep -nE 'LM17[3-5]' -- src/bindings docs/bindings.md test/semantic-motion-binding\*.test.ts browser/semantic-motion-binding.spec.ts scripts/check-binding-mutations.mjs || { echo 'stale binding error code'; exit 42; }
+          grep -q 'LM179' src/bindings/index.ts
+          grep -q 'LM180' src/bindings/index.ts
+          grep -q 'LM181' src/bindings/index.ts
+          grep -q 'createPresenceTransition' docs/api.md
+          grep -q 'createMotionBinding' docs/api.md
+
+          corepack enable
+          corepack install --global pnpm@11.11.0
+          pnpm install --frozen-lockfile
+          pnpm vitest run test/error-catalog.test.ts test/semantic-motion-binding.test.ts test/semantic-motion-binding-runtime.test.ts test/semantic-motion-binding-consumer.test.ts
+          pnpm typecheck
+
+          git commit -m 'feat(bindings): reconcile binding errors with Presence catalog'
+          final="$(git rev-parse HEAD)"
+          git push origin "$final:refs/heads/$TARGET"
+          echo "binding_candidate=$final"
