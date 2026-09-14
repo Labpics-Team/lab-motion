@@ -103,6 +103,28 @@ jobs:
             mapfile -t conflicts < <(git diff --name-only --diff-filter=U | sort)
             for p in "${conflicts[@]}"; do
               case "$p" in
+                README.md)
+                  git show ':2:README.md' > README.md
+                  python3 - <<'PY'
+          from pathlib import Path
+          p=Path('README.md')
+          s=p.read_text()
+          count_old='Корневой экспорт + 42 субпутей (входов `exports` в `package.json` — 43):'
+          count_new='Корневой экспорт + 43 субпути (входов `exports` в `package.json` — 44):'
+          assert s.count(count_old)==1
+          s=s.replace(count_old,count_new,1)
+          row_old='| Доменные эффекты | `./flip`, `./projection`, `./smart`, `./gestures`, `./behaviors`, `./behaviors/reorder`, `./scroll`, `./in-view`, `./presence`, `./svg`, `./svg-morph`, `./a11y`, `./compiler/surface` (приватный executor compiled-поверхности) |'
+          row_new='| Доменные эффекты | `./bindings`, `./flip`, `./projection`, `./smart`, `./gestures`, `./behaviors`, `./behaviors/reorder`, `./scroll`, `./in-view`, `./presence`, `./svg`, `./svg-morph`, `./a11y`, `./compiler/surface` (приватный executor compiled-поверхности) |'
+          assert s.count(row_old)==1
+          s=s.replace(row_old,row_new,1)
+          api_old='| [Справочник API](docs/api.md) | Все 42 субпути: что даёт каждый вход |'
+          api_new='| [Справочник API](docs/api.md) | Все 43 субпути: что даёт каждый вход |'
+          assert s.count(api_old)==1
+          s=s.replace(api_old,api_new,1)
+          p.write_text(s)
+          PY
+                  git add README.md
+                  ;;
                 package.json)
                   git show ':2:package.json' > package.json
                   python3 - <<'PY'
@@ -156,6 +178,10 @@ jobs:
           grep -q 'reorder-controlled' scripts/size-gate.mjs
           grep -q 'animate component scope' scripts/size-gate.mjs
           grep -q '| экспорт-субпутей package.json | 44 |' docs/NAMING.md
+          grep -q 'Корневой экспорт + 43 субпути (входов `exports` в `package.json` — 44):' README.md
+          test "$(grep -c '^| Доменные эффекты |' README.md)" -eq 1
+          grep -q '`./bindings`.*`./behaviors/reorder`.*`./compiler/surface`' README.md
+          grep -q 'Все 43 субпути: что даёт каждый вход' README.md
           test -f src/behaviors/reorder/index.ts
           test -f src/bindings/index.ts
           test -f src/waapi/index.ts
