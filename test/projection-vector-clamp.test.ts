@@ -25,12 +25,13 @@ describe('projection vector retarget clamp contract', () => {
   it('clamp:true keeps a newly introduced axis between its pickup and target', () => {
     const clock = makeClock();
     const ys: number[] = [];
+    let targetY = 0;
     const controls = createProjection({
       clamp: true,
       spring: { mass: 1, stiffness: 200, damping: 14 },
       requestFrame: clock.requestFrame,
       onFrame(frames) {
-        ys.push(100 + frames[0]!.ty);
+        ys.push(targetY + frames[0]!.ty);
       },
     });
 
@@ -43,8 +44,9 @@ describe('projection vector retarget clamp contract', () => {
     ]);
     for (let i = 0; i < 20; i++) clock.step();
 
+    targetY = 100;
     controls.play([
-      { id: 'card', last: { x: 300, y: 100, width: 100, height: 100 } },
+      { id: 'card', last: { x: 300, y: targetY, width: 100, height: 100 } },
     ]);
     expect(ys.at(-1)).toBeCloseTo(0, 10);
 
@@ -64,12 +66,15 @@ describe('projection vector retarget clamp contract', () => {
   it('repeated play at a held clamp boundary uses the emitted box and cannot revive outward velocity', () => {
     const clock = makeClock();
     const ys: number[] = [];
+    let targetY = 0;
     const controls = createProjection({
       clamp: true,
       spring: { mass: 1, stiffness: 200, damping: 8 },
       requestFrame: clock.requestFrame,
       onFrame(frames) {
-        ys.push(100 + frames[0]!.ty);
+        // ProjectionFrame.ty is local to the current last/anchor. Reconstruct
+        // the page-space visual position against the target active for this run.
+        ys.push(targetY + frames[0]!.ty);
       },
     });
 
@@ -81,13 +86,15 @@ describe('projection vector retarget clamp contract', () => {
       },
     ]);
     for (let i = 0; i < 12; i++) clock.step();
+
+    targetY = 100;
     controls.play([
-      { id: 'card', last: { x: 320, y: 100, width: 100, height: 100 } },
+      { id: 'card', last: { x: 320, y: targetY, width: 100, height: 100 } },
     ]);
 
     // Stop while the visual output is pinned at the upper clamp edge but the
     // underlying spring is still live. This is the exact boundary where an
-    // unbounded reconstruction can diverge from what the user actually saw.
+    // unbounded reconstruction could diverge from what the user actually saw.
     let hitBoundary = false;
     for (let i = 0; i < 1200 && controls.playing; i++) {
       clock.step();
@@ -103,8 +110,9 @@ describe('projection vector retarget clamp contract', () => {
 
     // Retarget inward while the old visual is pinned. C0 says the synchronous
     // pickup frame is exactly the emitted boundary, not an unclamped hidden box.
+    targetY = 50;
     controls.play([
-      { id: 'card', last: { x: 360, y: 50, width: 100, height: 100 } },
+      { id: 'card', last: { x: 360, y: targetY, width: 100, height: 100 } },
     ]);
     expect(ys.at(-1)).toBeCloseTo(before, 10);
 
