@@ -3,29 +3,40 @@ on:
   push:
     branches: [carrier/r11-geometry-vector-fix-20260914]
 permissions:
-  contents: read
+  contents: write
 jobs:
-  probe:
+  materialize:
     runs-on: ubuntu-24.04
     timeout-minutes: 30
     steps:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
         with:
           fetch-depth: 0
-          persist-credentials: false
+          persist-credentials: true
       - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020
         with:
           node-version: "24"
-      - name: Measure exact contract baseline
+      - name: Materialize bounded vector retarget
         shell: bash
         env:
-          TARGET_SHA: e5833d01551f5f8e7cbd67850fe5d00c55751889
+          TARGET_BRANCH: geometry/r11-vector-retarget-20260914
+          TARGET_SHA: 5581f47aaf04b7b9df9930c745b4aabbbdf691cf
         run: |
           set -euo pipefail
+          cp .github/scripts/carrier-r11-geometry-clamp-fix.py /tmp/r11-geometry-clamp-fix.py
           git switch --detach "$TARGET_SHA"
           test "$(git rev-parse HEAD)" = "$TARGET_SHA"
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          python3 /tmp/r11-geometry-clamp-fix.py
           corepack enable
           corepack install --global pnpm@11.11.0
           pnpm install --frozen-lockfile
-          pnpm build
-          pnpm size
+          pnpm typecheck
+          pnpm vitest run test/projection-vector-clamp.test.ts test/projection-vector-retarget.test.ts test/projection-driver.test.ts test/projection-geometry.test.ts test/projection-finiteness-fuzz.test.ts test/motion-contract-v1.test.ts
+          git diff --check
+          git add src/projection/driver.ts src/projection/geometry.ts
+          git commit -m 'fix(projection): bound vector retarget under clamp'
+          final="$(git rev-parse HEAD)"
+          git push --force-with-lease="refs/heads/$TARGET_BRANCH:$TARGET_SHA" origin "$final:refs/heads/$TARGET_BRANCH"
+          printf 'bounded_head=%s\n' "$final"
