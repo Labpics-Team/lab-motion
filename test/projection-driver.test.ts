@@ -762,3 +762,25 @@ describe('projection/driver: единственная физическая frame
     expect(clock.pending()).toBe(0);
   });
 });
+
+describe('projection/driver: throwing requestFrame lifecycle', () => {
+  it('синхронный requestFrame error терминализирует run до повторного выброса', () => {
+    let captured: ((ts?: number) => void) | undefined;
+    const boom = new Error('frame boom');
+    const controls = createProjection({
+      requestFrame: (cb: (ts?: number) => void) => {
+        captured = cb;
+        throw boom;
+      },
+      onFrame: () => {},
+    });
+
+    expect(() => controls.play([{ id: 'a', first: F, last: L }])).toThrow(boom);
+    expect(controls.playing, 'RED requestFrame throw must cancel active run').toBe(false);
+    expect(controls.velocity).toBe(0);
+    const progress = controls.progress;
+    captured?.(16);
+    expect(controls.playing).toBe(false);
+    expect(controls.progress).toBe(progress);
+  });
+});

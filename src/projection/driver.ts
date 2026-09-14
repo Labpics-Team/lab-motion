@@ -297,6 +297,9 @@ export function createProjection(options?: ProjectionOptions): ProjectionControl
       frameReserved = false;
       clearPendingTick();
       clearFrameFallback();
+      generation++;
+      phase = 'canceled';
+      vHat = 0;
       throw error;
     }
     synchronous = false;
