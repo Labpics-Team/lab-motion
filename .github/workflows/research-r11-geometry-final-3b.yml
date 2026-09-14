@@ -1,0 +1,65 @@
+name: R11 geometry final carry compaction
+on:
+  push:
+    branches: [carrier/r11-geometry-final-3b-20260914]
+permissions:
+  contents: write
+jobs:
+  prove:
+    runs-on: ubuntu-latest
+    timeout-minutes: 35
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          fetch-depth: 0
+          persist-credentials: true
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020
+        with:
+          node-version: '24'
+      - run: corepack enable && corepack install --global pnpm@11.11.0
+      - run: pnpm install --frozen-lockfile
+      - name: Prove negative-zero equivalence, semantics and hard budget
+        shell: bash
+        run: |
+          set -euo pipefail
+          git switch --detach 3f697a889b74c042967ff27fa97a50605fb32a41
+          python3 - <<'PY'
+          from pathlib import Path
+          p=Path('src/projection/geometry.ts')
+          s=p.read_text()
+          old='return q === 0 || correction === 0 ? base : finite(base + correction * q) + 0;'
+          new='return q === 0 || correction === 0 ? base : finite(base + correction * q);'
+          assert s.count(old)==1
+          p.write_text(s.replace(old,new,1))
+          PY
+
+          # The changed branch executes only for non-zero q and correction. Exact
+          # cancellation of opposite non-zero finite operands produces +0; pin that
+          # output property over hostile finite samples instead of assuming it.
+          node --input-type=module <<'NODE'
+          const xs=[-Number.MAX_VALUE,-1e300,-1e9,-1,-Number.MIN_VALUE,0,Number.MIN_VALUE,1,1e9,1e300,Number.MAX_VALUE];
+          for(const base of xs) for(const q of xs) for(const c of xs){
+            if(q===0||c===0) continue;
+            const v=base+c*q;
+            if(Number.isFinite(v)&&v===0&&Object.is(v,-0)) throw new Error(`NEGATIVE_ZERO ${base} ${q} ${c}`);
+          }
+          console.log('CARRY_NEGATIVE_ZERO=PASS');
+          NODE
+
+          pnpm typecheck
+          pnpm vitest run \
+            test/projection-dom.test.ts \
+            test/projection-vector-retarget.test.ts \
+            test/projection-driver.test.ts \
+            test/projection-geometry.test.ts \
+            test/projection-finiteness-fuzz.test.ts \
+            test/motion-contract-v1.test.ts \
+            test/projection-api-surface-pin.test.ts
+          pnpm build >/dev/null
+          node scripts/size-gate.mjs 2>&1 | tee "$RUNNER_TEMP/size.log"
+          grep -E 'projection-dom-one-liner|projection-core-only|projection\s|size-gate:' "$RUNNER_TEMP/size.log" || true
+          git diff --check
+
+          git add src/projection/geometry.ts
+          git -c user.name='github-actions[bot]' -c user.email='41898282+github-actions[bot]@users.noreply.github.com' commit -m 'perf(projection): keep carry sign canonical by construction'
+          git push --force origin HEAD:refs/heads/research/r11-geometry-final-materialized-20260914
