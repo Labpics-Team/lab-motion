@@ -1,3 +1,4 @@
+import { MotionParamError } from '../errors.js';
 import { createPresence, type PresenceState } from './machine.js';
 
 /** Структурный контракт существующего исполнителя; подходит также native Animation. */
@@ -26,9 +27,18 @@ export interface PresenceTransitionOptions {
 }
 
 export interface PresenceTransitionControls {
-  /** Одинаковое намерение возвращает прежний Promise, не перезапускает движение. */
+  /**
+   * Одинаковое намерение возвращает прежний Promise, не перезапускает движение.
+   * В активном состоянии синхронно бросает при неверном аргументе, ошибке запуска
+   * фазы или отмены предшественника. После terminal-состояния возвращает текущий
+   * Promise без повторной проверки аргумента.
+   */
   setPresent(present: boolean): Promise<PresenceTransitionResult>;
-  /** Отменить принятых исполнителей. Не вызывает onGone и не делает revert. */
+  /**
+   * Отменить принятых исполнителей. Не вызывает onGone и не делает revert.
+   * Состояние и finished сначала становятся destroyed; ошибка cancel() после
+   * этого пробрасывается синхронно. Повторный вызов инертен.
+   */
   destroy(): void;
   readonly state: PresenceState | 'destroyed' | 'failed';
   readonly finished: Promise<PresenceTransitionResult>;
@@ -42,12 +52,18 @@ interface Phase {
   present: boolean;
   ended: boolean;
   ready: boolean;
+  destroyed: boolean;
   done?: () => void;
   effects: Map<PresenceAnimation, Effect>;
   resolve: (result: PresenceTransitionResult) => void;
 }
-function observe(finished: PromiseLike<unknown>, sink: Sink): void {
-  void Promise.resolve(finished).then(
+type PromiseThen = PromiseLike<unknown>['then'];
+function observe(finished: PromiseLike<unknown>, then: PromiseThen, sink: Sink): void {
+  // PromiseLike допускает stateful accessor then. Читаем его при admission ровно
+  // один раз, но сохраняем стандартную Promise once-semantics и исходный receiver.
+  void new Promise<unknown>((resolve, reject) => {
+    void then.call(finished, resolve, reject);
+  }).then(
     () => sink.notify?.(false),
     error => sink.notify?.(true, error),
   );
@@ -117,8 +133,18 @@ export function createPresenceTransition(options: PresenceTransitionOptions = {}
     phase.done = undefined;
     try {
       done?.();
+      if (phase.destroyed) {
+        phase.resolve(Object.freeze({ status: 'destroyed', present: phase.present }));
+        return;
+      }
       phase.resolve(Object.freeze({ status: 'finished', present: phase.present }));
     } catch (error) {
+      // destroy из terminal callback имеет приоритет над последующей ошибкой
+      // того же callback: контроллер уже необратимо уничтожен.
+      if (phase.destroyed) {
+        phase.resolve(Object.freeze({ status: 'destroyed', present: phase.present }));
+        return;
+      }
       if (current === phase) { terminal = 'failed'; config = undefined; }
       phase.resolve(Object.freeze({ status: 'failed', present: phase.present, error }));
     }
@@ -133,27 +159,29 @@ export function createPresenceTransition(options: PresenceTransitionOptions = {}
       const returned = factory?.();
       const list = returned === undefined ? [] : Array.isArray(returned) ? returned : [returned];
       const length = list.length;
-      if (length > 10_000) throw new RangeError('Слишком много анимаций присутствия');
+      if (length > 10_000) throw new MotionParamError('LM174');
       const admissionErrors: unknown[] = [];
       for (let i = 0; i < length; i++) {
         try {
-          if (!Object.hasOwn(list, i)) throw new TypeError('Группа присутствия не должна содержать пропуски');
+          if (!Object.hasOwn(list, i)) throw new MotionParamError('LM175');
           const animation: PresenceAnimation = list[i];
-          if (!animation || typeof animation !== 'object') throw new TypeError('Ожидаются controls анимации');
+          if (!animation || typeof animation !== 'object') throw new MotionParamError('LM176');
           if (phase.effects.has(animation)) continue;
           const stop = animation.cancel;
-          if (typeof stop !== 'function') throw new TypeError('У анимации отсутствует cancel');
+          if (typeof stop !== 'function') throw new MotionParamError('LM177');
           const sink: Sink = {};
           phase.effects.set(animation, { cancel: () => stop.call(animation), sink });
           const completion = animation.finished;
-          if (!completion || typeof completion.then !== 'function') throw new TypeError('У анимации отсутствует finished');
+          if (!completion) throw new MotionParamError('LM178');
+          const then = completion.then;
+          if (typeof then !== 'function') throw new MotionParamError('LM178');
           if (!phase.ended) sink.notify = (failed, error) => {
             if (failed) { fail(phase, error); return; }
             phase.effects.delete(animation);
             sink.notify = undefined;
             complete(phase);
           };
-          observe(completion, sink);
+          observe(completion, then, sink);
         } catch (error) { admissionErrors.push(error); }
       }
       // Группа уже возвращена фабрикой: сбой одного getter не бросает
@@ -165,23 +193,23 @@ export function createPresenceTransition(options: PresenceTransitionOptions = {}
       }
     } catch (error) {
       fail(phase, error);
-      // Даже устаревшая фабрика могла вернуть ресурсы после nested destroy.
-      cancel(phase);
-      throw error;
+      // Даже завершённая реентрантно фаза могла принять ресурс после destroy.
+      const leftover = cancel(phase);
+      throw leftover.length ? combine([error, ...leftover]) : error;
     }
   }
 
   return {
     setPresent(present): Promise<PresenceTransitionResult> {
       if (terminal) return finished;
-      if (typeof present !== 'boolean') throw new TypeError('Присутствие должно быть boolean');
+      if (typeof present !== 'boolean') throw new MotionParamError('LM173');
       if (present === wanted) return finished;
       wanted = present;
       const previous = current;
       if (previous) end(previous, { status: 'superseded', present: previous.present });
       let resolve!: Phase['resolve'];
       const promise = new Promise<PresenceTransitionResult>(yes => { resolve = yes; });
-      const phase: Phase = { present, ended: false, ready: false, effects: new Map(), resolve };
+      const phase: Phase = { present, ended: false, ready: false, destroyed: false, effects: new Map(), resolve };
       current = phase;
       finished = promise;
       const errors: unknown[] = [];
@@ -198,6 +226,7 @@ export function createPresenceTransition(options: PresenceTransitionOptions = {}
       terminal = 'destroyed';
       config = undefined;
       if (current) {
+        current.destroyed = true;
         end(current, { status: 'destroyed', present: current.present });
         const errors = cancel(current);
         if (errors.length) throw combine(errors);
