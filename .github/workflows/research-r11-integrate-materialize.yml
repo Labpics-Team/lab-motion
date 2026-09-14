@@ -60,7 +60,6 @@ jobs:
 
           git switch --detach "$WAVE_A"
 
-          # Reorder: exact pairwise conflict set already measured by run 34826326670.
           if git merge --no-ff --no-commit "$REORDER"; then
             echo 'expected WaveA/Reorder conflicts but merge was clean' >&2; exit 43
           fi
@@ -85,7 +84,6 @@ jobs:
           test -z "$(git diff --name-only --diff-filter=U)"
           git commit -m 'feat(integration): add controlled reorder to Wave A'
 
-          # Native progress timelines: only composition docs may conflict after Reorder.
           if git merge --no-ff --no-commit "$WAAPI"; then :; else
             assert_conflicts_allowed 'CHANGELOG.md docs/api.md'
             while IFS= read -r p; do union_file "$p"; done < <(git diff --name-only --diff-filter=U | sort)
@@ -93,7 +91,6 @@ jobs:
           test -z "$(git diff --name-only --diff-filter=U)"
           git commit -m 'feat(integration): add native progress timelines'
 
-          # Continuous MotionValue follow: no runtime overlap, docs may intersect.
           if git merge --no-ff --no-commit "$FOLLOW"; then :; else
             assert_conflicts_allowed 'CHANGELOG.md docs/api.md docs/migration.md docs/recipes.md'
             while IFS= read -r p; do union_file "$p"; done < <(git diff --name-only --diff-filter=U | sort)
@@ -101,7 +98,6 @@ jobs:
           test -z "$(git diff --name-only --diff-filter=U)"
           git commit -m 'feat(integration): add continuous MotionValue follow'
 
-          # Semantic binding: package/README/NAMING require explicit composition.
           if git merge --no-ff --no-commit "$BINDING"; then :; else
             assert_conflicts_allowed 'CHANGELOG.md README.md docs/NAMING.md docs/api.md docs/recipes.md package.json'
             mapfile -t conflicts < <(git diff --name-only --diff-filter=U | sort)
@@ -130,9 +126,21 @@ jobs:
             done
           fi
           test -z "$(git diff --name-only --diff-filter=U)"
+
+          # Both independent subpath additions make the factual export count 44.
+          python3 - <<'PY'
+          from pathlib import Path
+          p=Path('docs/NAMING.md')
+          s=p.read_text()
+          old='| экспорт-субпутей package.json | 43 |'
+          assert s.count(old)==1
+          assert '`./bindings`' in s
+          assert '`./behaviors/reorder`' in s
+          p.write_text(s.replace(old, '| экспорт-субпутей package.json | 44 |', 1))
+          PY
+          git add docs/NAMING.md
           git commit -m 'feat(integration): add semantic motion binding'
 
-          # Structural and semantic guards before paying for the suite.
           ! git grep -nE '^(<<<<<<<|=======|>>>>>>>)'
           node -e "JSON.parse(require('fs').readFileSync('package.json','utf8'))"
           test "$(grep -c "buildScopeRecipes" browser/fixtures/compile-artifacts.mjs)" -ge 2
@@ -147,6 +155,7 @@ jobs:
           grep -q 'LM181' docs/errors.md
           grep -q 'reorder-controlled' scripts/size-gate.mjs
           grep -q 'animate component scope' scripts/size-gate.mjs
+          grep -q '| экспорт-субпутей package.json | 44 |' docs/NAMING.md
           test -f src/behaviors/reorder/index.ts
           test -f src/bindings/index.ts
           test -f src/waapi/index.ts
