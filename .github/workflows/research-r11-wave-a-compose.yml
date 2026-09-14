@@ -40,7 +40,7 @@ jobs:
             :
           else
             mapfile -t conflicts < <(git diff --name-only --diff-filter=U | sort)
-            expected=(CHANGELOG.md docs/api.md docs/recipes.md)
+            expected=(docs/recipes.md)
             mapfile -t expected_sorted < <(printf '%s\n' "${expected[@]}" | sort)
             test "${conflicts[*]}" = "${expected_sorted[*]}" || {
               printf 'unexpected conflicts: %s\n' "${conflicts[*]}" >&2
