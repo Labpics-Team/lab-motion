@@ -121,6 +121,8 @@ function finiteDiv(num: number, den: number, fallback: number): number {
 
 /** Конечный lerp со схлопом −0 (P1). @internal — переиспользует driver (ребейз). */
 export function lerp1(a: number, b: number, t: number): number {
+  if (t === 0) return finite(a) + 0;
+  if (t === 1) return finite(b) + 0;
   return finite(finite(a) + (finite(b) - finite(a)) * t) + 0;
 }
 
