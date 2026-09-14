@@ -1,0 +1,166 @@
+name: R11 integration materialization
+on:
+  push:
+    branches: [carrier/r11-integrate-materialize-20260914]
+permissions:
+  contents: write
+jobs:
+  materialize:
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    steps:
+      - name: Checkout exact graph
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          fetch-depth: 0
+          persist-credentials: true
+      - name: Compose retained current-main candidates
+        shell: bash
+        env:
+          MAIN: d830deaaa2e413d01689c50c1429efc5541a5000
+          WAVE_A: e5f5dc9df335daf52120fc78db7ec1fbaa1cfe8c
+          REORDER: c9e04facf615f4d29f75ee416172f46a5c52e562
+          WAAPI: 20f6dd280f0460273857a057ca6c9494453ec117
+          FOLLOW: fe46bf665db808b5070621d1f9a0a85f70aa3506
+          BINDING: 9fc229c07b55b4cd0bb4f840f8dc3b10c4bdf2a3
+          TARGET: integrate/r11-combined-carrier
+        run: |
+          set -euo pipefail
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          for sha in "$MAIN" "$WAVE_A" "$REORDER" "$WAAPI" "$FOLLOW" "$BINDING"; do git cat-file -e "$sha^{commit}"; done
+          for sha in "$REORDER" "$WAAPI" "$FOLLOW" "$BINDING"; do test "$(git merge-base "$WAVE_A" "$sha")" = "$MAIN"; done
+
+          union_file() {
+            local path="$1"
+            git show ":2:$path" > "$RUNNER_TEMP/ours"
+            git show ":1:$path" > "$RUNNER_TEMP/base"
+            git show ":3:$path" > "$RUNNER_TEMP/theirs"
+            git merge-file --union -p "$RUNNER_TEMP/ours" "$RUNNER_TEMP/base" "$RUNNER_TEMP/theirs" > "$path"
+            git add "$path"
+          }
+
+          assert_conflicts_exact() {
+            local expected="$1"
+            mapfile -t actual < <(git diff --name-only --diff-filter=U | sort)
+            actual_join="$(printf '%s\n' "${actual[@]}" | paste -sd' ' -)"
+            test "$actual_join" = "$expected" || {
+              printf 'unexpected conflict set: [%s], expected [%s]\n' "$actual_join" "$expected" >&2
+              exit 41
+            }
+          }
+
+          assert_conflicts_allowed() {
+            local allowed="$1"
+            mapfile -t actual < <(git diff --name-only --diff-filter=U | sort)
+            for path in "${actual[@]}"; do
+              case " $allowed " in *" $path "*) ;; *) printf 'unexpected conflict: %s\n' "$path" >&2; exit 42;; esac
+            done
+          }
+
+          git switch --detach "$WAVE_A"
+
+          # Reorder: exact pairwise conflict set already measured by run 34826326670.
+          if git merge --no-ff --no-commit "$REORDER"; then
+            echo 'expected WaveA/Reorder conflicts but merge was clean' >&2; exit 43
+          fi
+          assert_conflicts_exact 'CHANGELOG.md browser/fixtures/compile-artifacts.mjs docs/behaviors.md docs/migration.md docs/recipes.md'
+          for p in CHANGELOG.md docs/behaviors.md docs/migration.md docs/recipes.md; do union_file "$p"; done
+          git show ':2:browser/fixtures/compile-artifacts.mjs' > browser/fixtures/compile-artifacts.mjs
+          python3 - <<'PY'
+          from pathlib import Path
+          p=Path('browser/fixtures/compile-artifacts.mjs')
+          s=p.read_text()
+          anchor="import { build } from 'vite';\n"
+          assert s.count(anchor)==1
+          if "buildReorderRecipe" not in s:
+              s=s.replace(anchor, anchor+"import { buildReorderRecipe } from './reorder-recipe.mjs';\n", 1)
+          anchor2="    writeFileSync(resolve(OUT, 'compiled.js'), compiled);\n"
+          assert s.count(anchor2)==1
+          if "await buildReorderRecipe(ROOT, OUT);" not in s:
+              s=s.replace(anchor2, "    await buildReorderRecipe(ROOT, OUT);\n"+anchor2, 1)
+          p.write_text(s)
+          PY
+          git add browser/fixtures/compile-artifacts.mjs
+          test -z "$(git diff --name-only --diff-filter=U)"
+          git commit -m 'feat(integration): add controlled reorder to Wave A'
+
+          # Native progress timelines: only composition docs may conflict after Reorder.
+          if git merge --no-ff --no-commit "$WAAPI"; then :; else
+            assert_conflicts_allowed 'CHANGELOG.md docs/api.md'
+            while IFS= read -r p; do union_file "$p"; done < <(git diff --name-only --diff-filter=U | sort)
+          fi
+          test -z "$(git diff --name-only --diff-filter=U)"
+          git commit -m 'feat(integration): add native progress timelines'
+
+          # Continuous MotionValue follow: no runtime overlap, docs may intersect.
+          if git merge --no-ff --no-commit "$FOLLOW"; then :; else
+            assert_conflicts_allowed 'CHANGELOG.md docs/api.md docs/migration.md docs/recipes.md'
+            while IFS= read -r p; do union_file "$p"; done < <(git diff --name-only --diff-filter=U | sort)
+          fi
+          test -z "$(git diff --name-only --diff-filter=U)"
+          git commit -m 'feat(integration): add continuous MotionValue follow'
+
+          # Semantic binding: package/README/NAMING require explicit composition.
+          if git merge --no-ff --no-commit "$BINDING"; then :; else
+            assert_conflicts_allowed 'CHANGELOG.md README.md docs/NAMING.md docs/api.md docs/recipes.md package.json'
+            mapfile -t conflicts < <(git diff --name-only --diff-filter=U | sort)
+            for p in "${conflicts[@]}"; do
+              case "$p" in
+                package.json)
+                  git show ':2:package.json' > package.json
+                  python3 - <<'PY'
+          from pathlib import Path
+          p=Path('package.json')
+          s=p.read_text()
+          old='''    "./behaviors/reorder": {\n      "import": {\n        "types": "./dist/behaviors/reorder/index.d.ts",\n        "default": "./dist/behaviors/reorder/index.js"\n      },\n      "require": {\n        "types": "./dist/behaviors/reorder/index.d.cts",\n        "default": "./dist/behaviors/reorder/index.cjs"\n      }\n    }\n  },\n'''
+          new='''    "./behaviors/reorder": {\n      "import": {\n        "types": "./dist/behaviors/reorder/index.d.ts",\n        "default": "./dist/behaviors/reorder/index.js"\n      },\n      "require": {\n        "types": "./dist/behaviors/reorder/index.d.cts",\n        "default": "./dist/behaviors/reorder/index.cjs"\n      }\n    },\n    "./bindings": {\n      "import": {\n        "types": "./dist/bindings/index.d.ts",\n        "default": "./dist/bindings/index.js"\n      },\n      "require": {\n        "types": "./dist/bindings/index.d.cts",\n        "default": "./dist/bindings/index.cjs"\n      }\n    }\n  },\n'''
+          assert s.count(old)==1
+          s=s.replace(old,new,1)
+          files='''    "docs/recipes.md",\n    "!dist/**/*.map"\n'''
+          files_new='''    "docs/recipes.md",\n    "!dist/**/*.map",\n    "docs/bindings.md"\n'''
+          assert s.count(files)==1
+          s=s.replace(files,files_new,1)
+          p.write_text(s)
+          PY
+                  git add package.json
+                  ;;
+                *) union_file "$p" ;;
+              esac
+            done
+          fi
+          test -z "$(git diff --name-only --diff-filter=U)"
+          git commit -m 'feat(integration): add semantic motion binding'
+
+          # Structural and semantic guards before paying for the suite.
+          ! git grep -nE '^(<<<<<<<|=======|>>>>>>>)'
+          node -e "JSON.parse(require('fs').readFileSync('package.json','utf8'))"
+          test "$(grep -c "buildScopeRecipes" browser/fixtures/compile-artifacts.mjs)" -ge 2
+          test "$(grep -c "buildReorderRecipe" browser/fixtures/compile-artifacts.mjs)" -ge 2
+          grep -q '"./behaviors/reorder"' package.json
+          grep -q '"./bindings"' package.json
+          grep -q 'docs/bindings.md' package.json
+          grep -q 'createAnimateScope' docs/api.md
+          grep -q 'createStateCascade' docs/api.md
+          grep -q 'animateScrollWaapi' docs/api.md
+          grep -q 'createMotionBinding' docs/api.md
+          grep -q 'LM181' docs/errors.md
+          grep -q 'reorder-controlled' scripts/size-gate.mjs
+          grep -q 'animate component scope' scripts/size-gate.mjs
+          test -f src/behaviors/reorder/index.ts
+          test -f src/bindings/index.ts
+          test -f src/waapi/index.ts
+          test -f src/motion-value.ts
+
+          corepack enable
+          corepack install --global pnpm@11.11.0
+          pnpm install --frozen-lockfile
+          pnpm build
+          node scripts/check-docs-drift.mjs
+          pnpm typecheck
+          pnpm test
+          node scripts/size-gate.mjs
+
+          final="$(git rev-parse HEAD)"
+          git push origin "$final:refs/heads/$TARGET"
+          printf 'combined_carrier=%s\n' "$final"
