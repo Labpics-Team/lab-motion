@@ -6,7 +6,7 @@ permissions:
   contents: write
 jobs:
   compose:
-    runs-on: [self-hosted, Linux, X64]
+    runs-on: ubuntu-latest
     timeout-minutes: 10
     steps:
       - name: Checkout carrier
