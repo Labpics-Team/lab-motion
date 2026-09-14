@@ -372,3 +372,71 @@ Cleanup **сохраняет текущую позу**, не восстанав�
 `revert`. Он также не отменяет новый переход, который другой scope или прямой
 `animate` уже сделал владельцем тех же свойств. После destroy создайте новую
 область для нового mount; не переиспользуйте старую.
+## Каскад состояний взаимодействия без гонок
+
+Наведение, нажатие и перетаскивание задают слои; масштабом управляет один
+`MotionValue`. Адаптер принимает уже распознанные состояния приложения.
+При предпочтении уменьшенного движения цель применяется сразу.
+
+```ts
+import { MotionValue } from '@labpics/motion';
+import { createStateCascade } from '@labpics/motion/behaviors';
+
+export function bindInteractionScale(element: HTMLElement) {
+  const state = createStateCascade<{ scale: number }>();
+  state.createLayer({ scale: 1 }); // Постоянный base: scale не исчезает.
+  const hover = state.createLayer();
+  const press = state.createLayer(); // Выше hover только для своих свойств.
+  const drag = state.createLayer();
+  const value = new MotionValue({
+    initial: 1,
+    spring: { mass: 1, stiffness: 200, damping: 26 },
+  });
+  const media = window.matchMedia('(prefers-reduced-motion: reduce)');
+  const original = element.style.getPropertyValue('scale');
+  const priority = element.style.getPropertyPriority('scale');
+  const render = (scale: number) => element.style.setProperty('scale', String(scale));
+  const offValue = value.onChange(render);
+  render(1);
+  const apply = (target: number) => {
+    if (media.matches) value.snapTo(target);
+    else value.setTarget(target);
+  };
+  const offState = state.subscribe(({ changed }) => {
+    if (Object.hasOwn(changed, 'scale')) apply(changed.scale!);
+  });
+  const onPreference = () => apply(state.get('scale')!);
+  media.addEventListener('change', onPreference);
+  let disposed = false;
+  return {
+    setHovered(active: boolean) { if (active) hover.set({ scale: 1.03 }); else hover.clear(); },
+    setPressed(active: boolean) { if (active) press.set({ scale: 0.97 }); else press.clear(); },
+    setInteraction(input: { hovered: boolean; pressed: boolean; dragging: boolean }) {
+      state.batch(() => {
+        if (input.hovered) hover.set({ scale: 1.03 }); else hover.clear();
+        if (input.pressed) press.set({ scale: 0.97 }); else press.clear();
+        if (input.dragging) drag.set({ scale: 1.02 }); else drag.clear();
+      });
+    },
+    destroy() {
+      if (disposed) return;
+      disposed = true;
+      media.removeEventListener('change', onPreference);
+      offState();
+      offValue();
+      state.destroy();
+      value.destroy();
+      if (original) element.style.setProperty('scale', original, priority);
+      else element.style.removeProperty('scale');
+    },
+  };
+}
+```
+
+`setHovered(false)` не отменяет активное нажатие. `setInteraction` группирует
+смену состояний: переход от нажатия к перетаскиванию сразу задаёт масштаб `1.02`,
+без промежуточной цели `1`. Историю указателя для оценки скорости хранит
+распознаватель, не каскад. Адаптер единолично владеет встроенным стилем `scale`
+до `destroy()`, который возвращает исходное значение и приоритет. Распознавание
+ввода и вызов очистки остаются у приложения.
+[Полный контракт](behaviors.md#каскад-визуальных-намерений).
