@@ -121,4 +121,59 @@ describe('projection vector retarget clamp contract', () => {
     clock.step();
     expect(ys.at(-1)!).toBeLessThanOrEqual(before + 1e-9);
   });
+
+  it('boxAt and repeated pickup share the emitted per-axis clamp state', () => {
+    const clock = makeClock();
+    let target = { x: 240, y: 0 };
+    let emitted = { x: 0, y: 0 };
+    const controls = createProjection({
+      clamp: true,
+      spring: { mass: 1, stiffness: 200, damping: 4 },
+      requestFrame: clock.requestFrame,
+      onFrame(frames) {
+        emitted = {
+          x: target.x + frames[0]!.tx,
+          y: target.y + frames[0]!.ty,
+        };
+      },
+    });
+
+    controls.play([
+      {
+        id: 'card',
+        first: { x: 0, y: 0, width: 100, height: 100 },
+        last: { x: target.x, y: target.y, width: 100, height: 100 },
+      },
+    ]);
+    clock.step(1000 / 120);
+    clock.step(1000 / 120);
+
+    const pickup = controls.boxAt('card')!;
+    target = { x: pickup.x + 5, y: pickup.y + 220 };
+    controls.play([
+      { id: 'card', last: { x: target.x, y: target.y, width: 100, height: 100 } },
+    ]);
+    clock.step(1000 / 120);
+
+    const before = { ...emitted };
+    const analytical = controls.boxAt('card')!;
+    expect(analytical.x).toBeCloseTo(before.x, 10);
+    expect(analytical.y).toBeCloseTo(before.y, 10);
+    // Non-vacuous witness: x is held at its upper pickup→target envelope while
+    // the hidden homogeneous state would otherwise continue outside it.
+    expect(before.x).toBeCloseTo(target.x, 10);
+
+    target = { x: before.x - 40, y: before.y + 20 };
+    controls.play([
+      { id: 'card', last: { x: target.x, y: target.y, width: 100, height: 100 } },
+    ]);
+    expect(emitted.x).toBeCloseTo(before.x, 10);
+    expect(emitted.y).toBeCloseTo(before.y, 10);
+
+    // A velocity hidden beyond the old clamp edge is not a visible boundary
+    // velocity. The next run may move inward, but cannot revive an outward kick.
+    clock.step(1000 / 120);
+    expect(emitted.x).toBeLessThanOrEqual(before.x + 1e-9);
+  });
+
 });

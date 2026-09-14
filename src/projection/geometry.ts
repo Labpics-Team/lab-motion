@@ -130,6 +130,27 @@ export function clamp01(x: number): number {
   return f < 0 ? 0 : f > 1 ? 1 : f;
 }
 
+/** Clamp a page-space position to its pickup→target envelope. @internal */
+export function boundPositionAxis(value: number, first: number, last: number): number {
+  const lo = Math.min(finite(first), finite(last));
+  const hi = Math.max(finite(first), finite(last));
+  return value < lo ? lo : value > hi ? hi : value;
+}
+
+/** Derivative of boundPositionAxis: hidden/outward motion at a boundary is zero. @internal */
+export function boundPositionVelocity(
+  value: number,
+  velocity: number,
+  first: number,
+  last: number,
+): number {
+  const lo = Math.min(finite(first), finite(last));
+  const hi = Math.max(finite(first), finite(last));
+  if (value < lo || value > hi) return 0;
+  if ((value === lo && velocity < 0) || (value === hi && velocity > 0)) return 0;
+  return finite(velocity) + 0;
+}
+
 // ─── Внутренние мутируемые формы (переиспользование без аллокаций) ───────────
 
 interface MutableRect {
@@ -517,8 +538,8 @@ function createProjectorCore(
         if (bx !== 0) v.x = finite(v.x + bx * q) + 0;
         if (by !== 0) v.y = finite(v.y + by * q) + 0;
         if (boundPositionBasis) {
-          v.x = Math.max(Math.min(v.x, Math.max(node.first.x, node.last.x)), Math.min(node.first.x, node.last.x));
-          v.y = Math.max(Math.min(v.y, Math.max(node.first.y, node.last.y)), Math.min(node.first.y, node.last.y));
+          v.x = boundPositionAxis(v.x, node.first.x, node.last.x);
+          v.y = boundPositionAxis(v.y, node.first.y, node.last.y);
         }
       }
 

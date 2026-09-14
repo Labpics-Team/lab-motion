@@ -57,6 +57,8 @@ import { solveSpring, type MutableSpringBasis } from '../internal/solver.js';
 import type { RequestFrameFn } from '../motion-value.js';
 import { type SpringParams, validateSpringForFrameLoop } from '../spring.js';
 import {
+  boundPositionAxis,
+  boundPositionVelocity,
   clamp01,
   createDriverProjector,
   finite,
@@ -156,12 +158,15 @@ function boxWithPositionBasis(
   pHat: number,
   correction: PositionCorrection | undefined,
   positionBasisValue: number,
+  bounded = false,
 ): FlipRect {
   const box = mixBox(src.first, src.last, pHat);
   if (correction === undefined || positionBasisValue === 0) return box;
+  const x = finite(box.x + correction.x * positionBasisValue) + 0;
+  const y = finite(box.y + correction.y * positionBasisValue) + 0;
   return {
-    x: finite(box.x + correction.x * positionBasisValue) + 0,
-    y: finite(box.y + correction.y * positionBasisValue) + 0,
+    x: bounded ? boundPositionAxis(x, src.first.x, src.last.x) : x,
+    y: bounded ? boundPositionAxis(y, src.first.y, src.last.y) : y,
     width: box.width,
     height: box.height,
   };
@@ -179,12 +184,13 @@ function rebaseNode(
   pHat: number,
   correction?: PositionCorrection,
   positionBasisValue = 0,
+  bounded = false,
 ): ProjectionNodeInit {
   const tc = clamp01(pHat);
   return {
     id,
     parent: target.parent,
-    first: boxWithPositionBasis(src, pHat, correction, positionBasisValue),
+    first: boxWithPositionBasis(src, pHat, correction, positionBasisValue, bounded),
     last: target.last,
     anchor: target.anchor,
     radii:
@@ -489,6 +495,7 @@ export function createProjection(options?: ProjectionOptions): ProjectionControl
             pPrev,
             prevPositionCorrections?.get(n.id),
             positionBasisPrev,
+            bounded,
           );
         }
         // first задан: узел структурно уже ProjectionNodeInit; геометрия читает
@@ -544,14 +551,26 @@ export function createProjection(options?: ProjectionOptions): ProjectionControl
           const old = prevById.get(node.id);
           if (old === undefined) continue;
           const oldCorrection = prevPositionCorrections?.get(node.id);
-          const oldVx = finite(
+          const oldBox = boxWithPositionBasis(
+            old,
+            pPrev,
+            oldCorrection,
+            positionBasisPrev,
+          );
+          const rawVx = finite(
             (old.last.x - old.first.x) * vPrev +
               (oldCorrection?.x ?? 0) * positionBasisVelocityPrev,
           );
-          const oldVy = finite(
+          const rawVy = finite(
             (old.last.y - old.first.y) * vPrev +
               (oldCorrection?.y ?? 0) * positionBasisVelocityPrev,
           );
+          const oldVx = bounded
+            ? boundPositionVelocity(oldBox.x, rawVx, old.first.x, old.last.x)
+            : rawVx;
+          const oldVy = bounded
+            ? boundPositionVelocity(oldBox.y, rawVy, old.first.y, old.last.y)
+            : rawVy;
           const correction = {
             x: finite(oldVx - (node.last.x - node.first.x) * v0) + 0,
             y: finite(oldVy - (node.last.y - node.first.y) * v0) + 0,
@@ -637,6 +656,7 @@ export function createProjection(options?: ProjectionOptions): ProjectionControl
             p0,
             flight.positionCorrectionById.get(n.id),
             positionBasisHat,
+            bounded,
           ),
         );
       }
@@ -675,6 +695,7 @@ export function createProjection(options?: ProjectionOptions): ProjectionControl
             pHat,
             flight?.positionCorrectionById.get(id),
             positionBasisHat,
+            bounded,
           );
     },
 
