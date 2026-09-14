@@ -67,27 +67,10 @@ jobs:
           from pathlib import Path
           p = Path('src/projection/driver.ts')
           s = p.read_text()
-          old = """    } catch (error) {
-              delivered = true;
-              frameReserved = false;
-              clearPendingTick();
-              clearFrameFallback();
-              throw error;
-            }
-          """
-          new = """    } catch (error) {
-              delivered = true;
-              frameReserved = false;
-              clearPendingTick();
-              clearFrameFallback();
-              generation++;
-              phase = 'canceled';
-              vHat = 0;
-              throw error;
-            }
-          """
-          if old not in s:
-              raise SystemExit('exact requestFrame catch anchor not found')
+          old = "      clearFrameFallback();\n      throw error;"
+          new = "      clearFrameFallback();\n      generation++;\n      phase = 'canceled';\n      vHat = 0;\n      throw error;"
+          if s.count(old) != 1:
+              raise SystemExit(f'unique requestFrame catch anchor count={s.count(old)}')
           p.write_text(s.replace(old, new, 1))
           PY
 
