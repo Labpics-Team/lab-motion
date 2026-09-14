@@ -1,0 +1,45 @@
+name: R11 geometry cost ablation
+on:
+  push:
+    branches: [carrier/r11-geometry-cost-ablation-20260914]
+permissions:
+  contents: read
+jobs:
+  measure:
+    strategy:
+      fail-fast: false
+      matrix:
+        variant: [baseline, pickup, residual, geometry, clamp]
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020
+        with:
+          node-version: '24'
+      - run: corepack enable && corepack install --global pnpm@11.11.0
+      - run: pnpm install --frozen-lockfile
+      - name: Measure ${{ matrix.variant }}
+        env:
+          VARIANT: ${{ matrix.variant }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          cp .github/research/r11_geometry_cost_ablation.py "$RUNNER_TEMP/ablate.py"
+          git show origin/carrier/r11-geometry-basis-ssot-20260914:.github/research/r11_geometry_basis_ssot.py > "$RUNNER_TEMP/ssot.py"
+          git show origin/carrier/r11-geometry-normalized-clamp-20260914:.github/research/r11_geometry_normalized_clamp.py > "$RUNNER_TEMP/normalized.py"
+          git switch --detach ff96d9906c221c57f1e70dc25f5ec3073e2ab9d3
+          python3 "$RUNNER_TEMP/ssot.py"
+          python3 "$RUNNER_TEMP/normalized.py"
+          python3 "$RUNNER_TEMP/ablate.py"
+          pnpm typecheck
+          pnpm build
+          set +e
+          node scripts/size-gate.mjs 2>&1 | tee "$RUNNER_TEMP/size.log"
+          set -e
+          grep -E 'projection-dom-one-liner|projection-core-only|projection\s' "$RUNNER_TEMP/size.log" || true
+          echo "VARIANT=$VARIANT"
+          git diff --check
