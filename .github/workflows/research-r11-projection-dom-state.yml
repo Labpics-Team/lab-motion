@@ -1,0 +1,43 @@
+name: R11 projection DOM state
+on:
+  push:
+    branches: [carrier/r11-projection-dom-state-20260914]
+permissions:
+  contents: read
+jobs:
+  measure:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020
+        with:
+          node-version: '24'
+      - run: corepack enable && corepack install --global pnpm@11.11.0
+      - run: pnpm install --frozen-lockfile
+      - name: Measure DOM ownership candidate
+        shell: bash
+        run: |
+          set -euo pipefail
+          cp .github/research/r11_projection_dom_state.py "$RUNNER_TEMP/dom.py"
+          git show origin/carrier/r11-geometry-shared-position-20260914:.github/research/r11_geometry_shared_position.py > "$RUNNER_TEMP/shared.py"
+          git show origin/carrier/r11-geometry-inline-state-20260914:.github/research/r11_geometry_clamp_search.test.ts > "$RUNNER_TEMP/clamp-search.test.ts"
+          git switch --detach 62d94f44c8b5207354d02a30fda7283034e7cdbe
+          python3 "$RUNNER_TEMP/shared.py"
+          python3 "$RUNNER_TEMP/dom.py"
+          cp "$RUNNER_TEMP/clamp-search.test.ts" test/research-projection-clamp-search.test.ts
+          pnpm typecheck
+          pnpm vitest run test/projection-dom.test.ts test/projection-vector-retarget.test.ts test/projection-vector-clamp.test.ts test/projection-driver.test.ts test/projection-geometry.test.ts test/projection-finiteness-fuzz.test.ts test/motion-contract-v1.test.ts test/projection-api-surface-pin.test.ts test/research-projection-clamp-search.test.ts
+          rm test/research-projection-clamp-search.test.ts
+          pnpm build
+          set +e
+          node scripts/size-gate.mjs 2>&1 | tee "$RUNNER_TEMP/size.log"
+          rc=${PIPESTATUS[0]}
+          set -e
+          grep -E 'projection-dom-one-liner|projection-core-only|projection\s|size-gate:' "$RUNNER_TEMP/size.log" || true
+          echo "SIZE_RC=$rc"
+          git diff --check
+          exit "$rc"
