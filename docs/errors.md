@@ -184,3 +184,9 @@
 | `LM170` | reserved | Код зарезервирован параллельной spring-работой | Не использовать вне назначенного контракта | reserved |
 | `LM171` | reserved | Код зарезервирован параллельной spring-работой | Не использовать вне назначенного контракта | reserved |
 | `LM172` | compositor value error | Некорректный абсолютный бюджет ошибки реконструкции | Передать положительный конечный maxValueError в единицах numeric from/to | active |
+| `LM173` | presence intent | `present` не является boolean | Передать `true` или `false` | active |
+| `LM174` | presence group | Группа содержит больше 10 000 controls | Сократить или разбить группу до 10 000 controls | active |
+| `LM175` | presence group | Группа содержит пропуск | Вернуть плотный массив controls | active |
+| `LM176` | presence controls | Элемент группы не является объектом controls | Вернуть controls `{ finished, cancel }` | active |
+| `LM177` | presence controls | `cancel` отсутствует или не является функцией | Вернуть вызываемый `cancel` | active |
+| `LM178` | presence controls | `finished` отсутствует или не предоставляет функцию `then` | Вернуть `PromiseLike` в `finished` | active |

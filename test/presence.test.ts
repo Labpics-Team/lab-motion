@@ -255,7 +255,7 @@ describe('presence: swapPresence — координация замены', () =>
 
 describe('presence-api-surface-pin', () => {
   it('ровно запиненный набор runtime-экспортов', () => {
-    expect(Object.keys(presence).sort()).toEqual(['createPresence', 'swapPresence']);
+    expect(Object.keys(presence).sort()).toEqual(['createPresence', 'createPresenceTransition', 'swapPresence']);
   });
 
   it('форма контроллера (исчерпывающе)', () => {

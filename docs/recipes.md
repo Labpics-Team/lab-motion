@@ -58,6 +58,60 @@ const first = el.getBoundingClientRect();
 fl.play(first, el.getBoundingClientRect()); // элемент «доезжает» пружиной
 ```
 
+## Диалог с прерываемым закрытием
+
+Диалог содержит `[data-panel]` и сам хранит доступность, фокус и модальность через
+нативный `<dialog>`. Адаптер вызывается после монтирования. Кнопка открытия вызывает
+`binding.setPresent(true)`, кнопка закрытия — `binding.setPresent(false)`;
+при размонтировании нужен `binding.destroy()`. Повторное открытие во время ухода
+не сбрасывает позу и не позволяет старому завершению закрыть диалог.
+
+```typescript
+import { animate } from '@labpics/motion/animate';
+import { createPresenceTransition } from '@labpics/motion/presence';
+
+export function bindAnimatedDialog(dialog: HTMLDialogElement) {
+  const panel = dialog.querySelector<HTMLElement>('[data-panel]');
+  if (!panel) throw new TypeError('В диалоге отсутствует [data-panel]');
+  const spring = { mass: 1, stiffness: 240, damping: 28 };
+  const presence = createPresenceTransition({
+    initiallyPresent: dialog.open,
+    enter: () => {
+      if (!dialog.open) {
+        panel.style.opacity = '0';
+        panel.style.transform = 'translateY(12px)';
+        dialog.showModal();
+      }
+      return animate(panel, { opacity: 1, y: 0 }, { spring });
+    },
+    exit: () => animate(panel, { opacity: 0, y: 12 }, { spring }),
+    onGone: () => dialog.close(),
+  });
+  const onCancel = (event: Event) => {
+    event.preventDefault();
+    presence.setPresent(false);
+  };
+  dialog.addEventListener('cancel', onCancel);
+  return {
+    setPresent: presence.setPresent,
+    get state() { return presence.state; },
+    get finished() { return presence.finished; },
+    destroy() {
+      dialog.removeEventListener('cancel', onCancel);
+      try { presence.destroy(); } finally { dialog.close(); }
+    },
+  };
+}
+```
+
+При обычном exit не вызывайте `dialog.close()` и не удаляйте узел раньше `onGone`:
+иначе браузер не сможет показать выходную анимацию. `destroy()` выше — отдельная
+граница размонтирования: он отзывает фазу, `onGone` при этом не вызывается, а диалог
+закрывается в `finally`. Escape проходит обычную фазу ухода. Уменьшенное движение
+обрабатывает `animate`; фокус возвращает сам `dialog.close()`. Для нескольких
+независимых анимаций фазы верните массив controls: удаление дождётся всей группы.
+[Точный контракт и исходы ошибок](presence.md).
+
 ## Появление/уход (presence)
 
 ```typescript
@@ -67,6 +121,7 @@ import { createPresence } from '@labpics/motion/presence';
 const el = document.querySelector('.toast') as HTMLElement;
 const spring = { mass: 1, stiffness: 200, damping: 24 };
 const p = createPresence({
+  initiallyPresent: true,
   onExitStart: (done) => {
     drive({ from: 1, to: 0, spring, onStep: (v) => { el.style.opacity = String(v); } }).then(done);
   },
