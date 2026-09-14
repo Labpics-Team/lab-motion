@@ -3,28 +3,40 @@ on:
   push:
     branches: [carrier/r11-geometry-vector-fix-20260914]
 permissions:
-  contents: read
+  contents: write
 jobs:
-  prove-red:
+  materialize:
     runs-on: ubuntu-24.04
-    timeout-minutes: 15
+    timeout-minutes: 30
     steps:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
         with:
           fetch-depth: 0
-          persist-credentials: false
+          persist-credentials: true
       - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020
         with:
           node-version: "24"
-      - name: Run exact vector cancellation witness
+      - name: Materialize vector hardening on exact RED head
         shell: bash
         env:
+          TARGET_BRANCH: geometry/r11-vector-retarget-20260914
           TARGET_SHA: 92731e6bf9e01531c423270e557531d7048c8a63
         run: |
           set -euo pipefail
+          cp .github/scripts/carrier-r11-geometry-hardening.py /tmp/r11-geometry-hardening.py
           git switch --detach "$TARGET_SHA"
           test "$(git rev-parse HEAD)" = "$TARGET_SHA"
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          python3 /tmp/r11-geometry-hardening.py
           corepack enable
           corepack install --global pnpm@11.11.0
           pnpm install --frozen-lockfile
-          pnpm vitest run test/projection-vector-retarget.test.ts
+          pnpm typecheck
+          pnpm vitest run test/projection-vector-retarget.test.ts test/projection-driver.test.ts test/projection-geometry.test.ts test/projection-finiteness-fuzz.test.ts test/motion-contract-v1.test.ts
+          git diff --check
+          git add src/projection/driver.ts src/projection/geometry.ts src/projection/index.ts
+          git commit -m 'fix(projection): close vector retarget cancellation'
+          final="$(git rev-parse HEAD)"
+          git push --force-with-lease="refs/heads/$TARGET_BRANCH:$TARGET_SHA" origin "$final:refs/heads/$TARGET_BRANCH"
+          printf 'hardening_head=%s\n' "$final"
