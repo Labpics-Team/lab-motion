@@ -1,7 +1,7 @@
 /**
  * test/behaviors-api-surface-pin.test.ts — пин публичной поверхности ./behaviors.
  * Класс: Б (contract pin). Пин в ОБЕ стороны (North-инвариант): пропавший И
- * лишний runtime-экспорт = красный. Ровно 4 фабрики; типы (BehaviorState,
+ * лишний runtime-экспорт = красный. Ровно 5 runtime-фабрик; типы (BehaviorState,
  * SheetController, …) стираются в рантайме и в Object.keys не попадают.
  *
  * RED PROOF (2026-07-10, заглушка src/behaviors `export {}`): «missing»-ассерт
@@ -19,10 +19,11 @@ const EXPECTED_EXPORTS = [
   'createCarousel',
   'createDragDismiss',
   'createPullToRefresh',
+  'createStateCascade',
 ] as const;
 
 describe('./behaviors public API surface pin (в обе стороны)', () => {
-  it('экспортирует ровно 4 контрактных runtime-фабрики — ни больше, ни меньше', () => {
+  it('экспортирует ровно 5 контрактных runtime-фабрик — ни больше, ни меньше', () => {
     const exported = new Set(Object.keys(behaviors));
     const expected = new Set<string>(EXPECTED_EXPORTS);
 
