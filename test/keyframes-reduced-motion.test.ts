@@ -17,18 +17,18 @@
  * ── RED PROOF (mutation 3) ───────────────────────────────────────────────────
  * Заменить `settle(lastValue)` → ничего не эмитить (hard-off):
  *   → steps.length===0 → RED.
+ *
+ * Query proof: shared seam returns true only for the canonical
+ * `(prefers-reduced-motion: reduce)` query, so querying another media feature
+ * takes the normal path and makes the reduced tests RED.
  */
 
 import { describe, expect, it } from 'vitest';
 import { keyframes } from '../src/keyframes/index.js';
+import { reducedMotionMedia } from './helpers/reduced-motion.js';
 
-function makeReduceMedia(): (query: string) => { matches: boolean } {
-  return () => ({ matches: true });
-}
-
-function makeNoReduceMedia(): (query: string) => { matches: boolean } {
-  return () => ({ matches: false });
-}
+const makeReduceMedia = () => reducedMotionMedia(true);
+const makeNoReduceMedia = () => reducedMotionMedia(false);
 
 function noRaf(): (cb: (ts?: number) => void) => number {
   return (_cb) => 0;
@@ -40,7 +40,7 @@ describe('keyframes — reduced-motion CHARACTER-switch', () => {
     const c = keyframes({
       values: [0, 50, 100],
       duration: 5,
-      repeat: 3, // repeat/direction must be IGNORED under reduce
+      repeat: 3,
       repeatType: 'reverse',
       matchMedia: makeReduceMedia(),
       requestFrame: noRaf(),
@@ -57,10 +57,9 @@ describe('keyframes — reduced-motion CHARACTER-switch', () => {
       values: [0, 100],
       duration: 5,
       matchMedia: makeNoReduceMedia(),
-      requestFrame: noRaf(), // non-draining → no tick fires synchronously or async in this test
+      requestFrame: noRaf(),
       onStep: (v) => steps.push(v),
     });
-    // Synchronously, before any scheduled frame fires, no step yet.
     expect(steps.length).toBe(0);
     c.cancel();
   });
@@ -96,7 +95,6 @@ describe('keyframes — reduced-motion CHARACTER-switch', () => {
         onStep: (v) => steps.push(v),
       }),
     ).not.toThrow();
-    // Non-reduced path: no synchronous emission before any frame fires.
     expect(steps.length).toBe(0);
   });
 
@@ -107,7 +105,6 @@ describe('keyframes — reduced-motion CHARACTER-switch', () => {
       duration: 1e-9,
       matchMedia: makeNoReduceMedia(),
       requestFrame: (cb) => {
-        // Drain synchronously so settle() runs within this test's microtask turn.
         cb(0);
         return 1;
       },
