@@ -6,6 +6,13 @@ def replace1(text: str, old: str, new: str, label: str) -> str:
     assert count == 1, f'{label}: expected 1, got {count}'
     return text.replace(old, new, 1)
 
+
+def replace_range(text: str, start: str, end: str, new: str, label: str) -> str:
+    assert text.count(start) == 1, f'{label} start count={text.count(start)}'
+    start_i = text.index(start)
+    end_i = text.index(end, start_i)
+    return text[:start_i] + new + text[end_i:]
+
 # 1) One internal type-owner for the driver→geometry vector state. Type-only export is
 # intentionally NOT re-exported from projection/index.ts, so public API stays unchanged.
 g = Path('src/projection/geometry.ts')
@@ -107,14 +114,11 @@ p.write_text(s)
 # 4) Module-level reference must not re-introduce a broader claim than the docs.
 i = Path('src/projection/index.ts')
 s = i.read_text()
-s = replace1(
+s = replace_range(
     s,
-    """ * Базовый visual box использует mix(F,L,P(t)); размеры
- * всегда остаются на этом общем scalar-path и флорятся ≥ 0. После changed-target
- * retarget page-space x/y могут иметь дополнительный однородный член u·Q(t),
-""",
-    """ * Базовый visual box использует mix(F,L,P(t)); размеры
- * всегда остаются на этом общем scalar-path и флорятся ≥ 0. В поддерживаемом
+    ' * всегда остаются на этом общем scalar-path и флорятся ≥ 0. После changed-target',
+    " * Q(0)=0, Q'(0)=1, чтобы сохранить собственную boundary velocity без второго",
+    """ * всегда остаются на этом общем scalar-path и флорятся ≥ 0. В поддерживаемом
  * changed-target domain с clamp:false page-space x/y могут иметь дополнительный
  * однородный член u·Q(t),
 """,
