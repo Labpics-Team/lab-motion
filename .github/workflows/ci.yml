@@ -22,9 +22,9 @@ env:
 
 jobs:
   verify:
-    name: typecheck · build · test · fuzz · size · package
+    name: typecheck · build · test · fuzz · mutation · size · package
     runs-on: ubuntu-latest
-    timeout-minutes: 25
+    timeout-minutes: 60
 
     steps:
       - name: Checkout
@@ -116,6 +116,12 @@ jobs:
       # находка ревью #101 — потеря projection-fuzz при наивном разрешении конфликта).
       - name: Fuzz · finiteness gate (virtual-time, seeded LCG, zero-dep)
         run: pnpm vitest run --reporter=verbose test/*finiteness-fuzz.test.ts
+
+      # Исторический phase-2b driver был оставлен ниже mutation-пола. Гейт мутирует
+      # весь src/driver.ts и использует capability-shaped suite; unknown killable
+      # survivor становится красным PR, а не новым комментарием в техдолге.
+      - name: Driver mutation gate
+        run: pnpm exec stryker run stryker.driver.config.mjs
 
       - name: Size gate
         run: pnpm size
