@@ -21,7 +21,7 @@ jobs:
       - name: Compose proven reductions and measure
         shell: bash
         env:
-          VARIANT: driver_ssot
+          VARIANT: combined
         run: |
           set -euo pipefail
           git show origin/carrier/r11-geometry-shared-position-20260914:.github/research/r11_geometry_shared_position.py > "$RUNNER_TEMP/shared.py"
