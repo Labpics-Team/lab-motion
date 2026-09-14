@@ -199,7 +199,7 @@ class Owner<K extends ReorderKey> implements ReorderController<K> {
       }
       default: throw new TypeError('reorder: unknown keyboard direction');
     }
-    if (to < 0 || to >= layout._slots.length || Number.isNaN(layout._slots[to]!._x)) return;
+    if (to === from || to < 0 || to >= layout._slots.length || Number.isNaN(layout._slots[to]!._x)) return;
     this._propose(session, from, to);
   }
 
