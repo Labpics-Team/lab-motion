@@ -169,6 +169,30 @@ it('синхронный thenable не завершает группу преж�
   b.finish(); await p.finished; expect(notify).toHaveBeenCalledOnce();
 });
 
+it('finished.then читается один раз, с исходным receiver и Promise once-semantics', async () => {
+  let reads = 0, receiverPreserved = false;
+  const late = new Error('late');
+  const finished = {
+    get then() {
+      if (++reads > 1) throw new Error('second then read');
+      return function (this: unknown, resolve: () => void, reject: (error: unknown) => void) {
+        receiverPreserved = this === finished;
+        resolve();
+        reject(late);
+        throw late;
+      };
+    },
+  };
+  const animation = { finished, cancel: vi.fn() } as unknown as presence.PresenceAnimation;
+  const p = create({ enter: () => animation });
+  const pending = p.setPresent(true);
+  expect(reads).toBe(1);
+  expect(await pending).toEqual({ status: 'finished', present: true });
+  expect(reads).toBe(1);
+  expect(receiverPreserved).toBe(true);
+  expect(animation.cancel).not.toHaveBeenCalled();
+});
+
 it('getter finished может уничтожить область; поздняя регистрация не воскрешает её', async () => {
   const d = deferred(); let p: PresenceTransitionControls;
   const handle = { cancel: d.cancel, get finished() { p.destroy(); return d.finished; } };
@@ -191,6 +215,15 @@ it('ошибка терминального callback не ломает ново�
   expect(p.state).toBe('exiting'); b.finish(); expect((await p.finished).status).toBe('finished');
 });
 
+it('destroy из terminal callback сохраняет терминальный destroyed даже при последующей ошибке callback', async () => {
+  const a = deferred(), error = new Error('callback after destroy'); let p: PresenceTransitionControls;
+  p = create({ enter: () => a, onPresent() { p.destroy(); throw error; } });
+  const pending = p.setPresent(true); a.finish();
+  expect(await pending).toEqual({ status: 'destroyed', present: true });
+  expect(p.state).toBe('destroyed');
+  expect(p.setPresent(false)).toBe(p.finished);
+});
+
 it('последний input побеждает даже из cancel предыдущей фазы', async () => {
   const a = deferred(), b = deferred(), c = deferred(); let p: PresenceTransitionControls; let enters = 0;
   a.cancel.mockImplementation(() => p.setPresent(true));
@@ -200,14 +233,46 @@ it('последний input побеждает даже из cancel преды�
   expect(p.state).toBe('entering'); c.finish(); expect((await p.finished).status).toBe('finished');
 });
 
-it('границы группы отвергают sparse и чрезмерный размер до traversal', () => {
+it('public presence input errors используют стабильные MotionParamError codes', () => {
+  expect(() => create().setPresent('yes' as unknown as boolean))
+    .toThrowError(expect.objectContaining({ name: 'MotionParamError', code: 'LM173' }));
+  expect(() => create({ enter: () => [null as unknown as presence.PresenceAnimation] }).setPresent(true))
+    .toThrowError(expect.objectContaining({ name: 'MotionParamError', code: 'LM176' }));
+  expect(() => create({ enter: () => [{ finished: Promise.resolve() } as unknown as presence.PresenceAnimation] }).setPresent(true))
+    .toThrowError(expect.objectContaining({ name: 'MotionParamError', code: 'LM177' }));
+  expect(() => create({ enter: () => [{ cancel() {}, finished: {} as PromiseLike<unknown> }] }).setPresent(true))
+    .toThrowError(expect.objectContaining({ name: 'MotionParamError', code: 'LM178' }));
+});
+
+it('границы группы используют стабильные коды и отвергают размер до traversal', () => {
   const a = deferred(); const sparse = [a, , a] as unknown as presence.PresenceAnimation[];
   const p = create({ enter: () => sparse });
-  expect(() => p.setPresent(true)).toThrow(TypeError); expect(a.cancel).toHaveBeenCalledOnce();
+  expect(() => p.setPresent(true))
+    .toThrowError(expect.objectContaining({ name: 'MotionParamError', code: 'LM175' }));
+  expect(a.cancel).toHaveBeenCalledOnce();
   const huge = new Array(10_001); let reads = 0;
   Object.defineProperty(huge, 0, { get() { reads++; return a; } });
-  expect(() => create({ enter: () => huge }).setPresent(true)).toThrow(RangeError);
+  expect(() => create({ enter: () => huge }).setPresent(true))
+    .toThrowError(expect.objectContaining({ name: 'MotionParamError', code: 'LM174' }));
   expect(reads).toBe(0);
+});
+
+it('ошибка после nested destroy сохраняет ошибки cleanup поздно принятого handle', async () => {
+  const factoryError = new Error('finished getter'), cleanupError = new Error('late cleanup');
+  let p: PresenceTransitionControls;
+  const animation = {
+    cancel() { throw cleanupError; },
+    get finished(): Promise<void> { throw factoryError; },
+  };
+  const list = new Array<presence.PresenceAnimation>(1);
+  Object.defineProperty(list, 0, { get() { p.destroy(); return animation; } });
+  p = create({ enter: () => list });
+  let thrown: unknown;
+  try { p.setPresent(true); } catch (error) { thrown = error; }
+  expect(thrown).toBeInstanceOf(AggregateError);
+  expect((thrown as AggregateError).errors).toEqual([factoryError, cleanupError]);
+  expect(await p.finished).toEqual({ status: 'destroyed', present: true });
+  expect(p.state).toBe('destroyed');
 });
 
 it('снимок исхода неизменяем, done не означает уничтожение', async () => {
