@@ -1,0 +1,58 @@
+name: R11 reorder size-neutral owner split
+on:
+  push:
+    branches: [carrier/r11-reorder-budget-fix-20260914]
+permissions:
+  contents: write
+jobs:
+  materialize:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          fetch-depth: 0
+          persist-credentials: true
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v6
+        with:
+          node-version: "24"
+      - run: corepack enable && corepack install --global pnpm@11.11.0
+      - run: pnpm install --frozen-lockfile
+      - name: Split pointer revoke from keyboard no-op
+        shell: bash
+        env:
+          BASE_HEAD: dfe6eb068ed4f7837c289e42363572ac104089b6
+          TARGET: integrate/r11-reorder-budget-carrier
+        run: |
+          set -euo pipefail
+          git switch --detach "$BASE_HEAD"
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          python3 - <<'PY'
+          from pathlib import Path
+          p=Path('src/behaviors/reorder/index.ts')
+          s=p.read_text()
+          move="    this._propose(session, from, to);\n  }\n\n  _step"
+          assert s.count(move)==1
+          s=s.replace(move, "    if (to === from) { this._proposal = undefined; return; }\n    this._propose(session, from, to);\n  }\n\n  _step", 1)
+          branch="    if (to === from) { this._proposal = undefined; return; }\n"
+          assert s.count(branch)==2
+          idx=s.rfind(branch)
+          s=s[:idx]+s[idx+len(branch):]
+          p.write_text(s)
+          PY
+
+          test "$(git diff --name-only)" = "src/behaviors/reorder/index.ts"
+          grep -q 'if (to === from || to < 0' src/behaviors/reorder/index.ts
+          test "$(grep -c 'if (to === from) { this._proposal = undefined; return; }' src/behaviors/reorder/index.ts)" -eq 1
+
+          pnpm vitest run test/reorder-keyboard-axis-noop.test.ts test/reorder.test.ts test/reorder-package.test.ts test/reorder-gc.test.ts
+          pnpm build
+          node scripts/size-gate.mjs
+          pnpm typecheck
+
+          git add src/behaviors/reorder/index.ts
+          git commit -m 'perf(reorder): keep keyboard no-op within existing budget'
+          final="$(git rev-parse HEAD)"
+          git push --force-with-lease origin "$final:refs/heads/$TARGET"
+          printf 'budget_fix_carrier=%s\n' "$final"
