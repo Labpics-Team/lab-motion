@@ -76,13 +76,6 @@ jobs:
 
           d = Path('src/projection/driver.ts')
           s = d.read_text()
-          s = sub1(
-              r'''(from './geometry\.js';)''',
-              r'''\1''',
-              s,
-              'geometry import exists',
-          )
-          # Insert the two internal owners into the existing named import without depending on ordering.
           import_start = s.index("import {")
           import_end = s.index("} from './geometry.js';", import_start)
           block = s[import_start:import_end]
@@ -96,13 +89,14 @@ jobs:
               '''function boxWithPositionBasis(src: VectorProjectionNode, pHat: number, q: number): FlipRect {
                 const box = mixBox(src.first, src.last, pHat);
                 if (q === 0) return box;
+                const out = box as { x: number; y: number };
                 const x = src._qx ?? 0;
                 const y = src._qy ?? 0;
-                if (x !== 0) box.x = finite(box.x + x * q) + 0;
-                if (y !== 0) box.y = finite(box.y + y * q) + 0;
+                if (x !== 0) out.x = finite(box.x + x * q) + 0;
+                if (y !== 0) out.y = finite(box.y + y * q) + 0;
                 if (src._qb === true) {
-                  box.x = boundPositionAxis(box.x, src.first.x, src.last.x);
-                  box.y = boundPositionAxis(box.y, src.first.y, src.last.y);
+                  out.x = boundPositionAxis(box.x, src.first.x, src.last.x);
+                  out.y = boundPositionAxis(box.y, src.first.y, src.last.y);
                 }
                 return box;
               }''',
