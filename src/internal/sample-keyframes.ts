@@ -1,6 +1,6 @@
 type Easing = (t: number) => number;
 
-/** Проверенный конечный progress; отсутствие easing означает идентичность. */
+/** Prevalidated hot path; missing easing is linear. */
 export function sampleKeyframesUnchecked(
   values: readonly number[],
   times: readonly number[],
