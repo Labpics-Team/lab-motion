@@ -1,0 +1,49 @@
+name: Carrier R11 motion contract review fix
+on:
+  push:
+    branches: [carrier/r11-motion-contract-review-fix-20260914]
+permissions:
+  contents: write
+jobs:
+  materialize:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          fetch-depth: 0
+          persist-credentials: true
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v6
+        with:
+          node-version: "24"
+      - run: corepack enable && corepack install --global pnpm@11.11.0
+      - run: pnpm install --frozen-lockfile
+      - name: Narrow geometry validity to the actual snapshot owner
+        shell: bash
+        env:
+          BASE_HEAD: be5a737b6394f688abba45c340cc30f2d2602fd6
+          TARGET: contract/r11-motion-contract-v1-20260914
+        run: |
+          set -euo pipefail
+          git switch --detach "$BASE_HEAD"
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          python3 - <<'PY'
+          from pathlib import Path
+          p=Path('docs/motion-contract.md')
+          s=p.read_text()
+          old='| **Geometry** | `./projection`, `./smart`, `./behaviors/reorder`; `current` | Геометрия является snapshot с собственной lifetime. Успешная новая capture/update инвалидирует решения, выведенные из предыдущего snapshot, даже если численные поля случайно совпали. | Proposal reorder current до `update`, stale сразу после успешного `update`. | Кэшировать proposal/projection по deep-equal rects и применять его после recapture. |'
+          new='| **Geometry** | `./behaviors/reorder`; `current`. `./projection` и `./smart` задают собственные snapshot-law | Геометрия имеет owner-defined snapshot lifetime. Для reorder успешный `update` инвалидирует proposal предыдущего snapshot. `SmartCapture` остаётся самостоятельным captured object: более поздний `captureSmart()` не отзывает старый capture глобально. | Proposal reorder current до `update`, stale сразу после успешного `update`; старый `SmartCapture` не объявляется stale только из-за нового capture. | Кэшировать reorder proposal после `update` или, наоборот, выдумать global-revocation всех старых `SmartCapture` при каждом новом capture. |'
+          assert s.count(old)==1, s.count(old)
+          p.write_text(s.replace(old,new,1))
+          PY
+          test "$(git diff --name-only)" = 'docs/motion-contract.md'
+          pnpm vitest run test/motion-contract-v1.test.ts test/reorder.test.ts test/smart-lifecycle.test.ts
+          pnpm typecheck
+          pnpm check:docs-drift
+          git diff --check
+          git add docs/motion-contract.md
+          git commit -m 'docs(contract): scope geometry validity to its owner'
+          final="$(git rev-parse HEAD)"
+          git push --force-with-lease origin "$final:refs/heads/$TARGET"
+          printf 'review_fix_head=%s\n' "$final"
