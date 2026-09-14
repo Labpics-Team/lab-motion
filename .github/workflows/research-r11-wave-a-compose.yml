@@ -1,0 +1,72 @@
+name: R11 Wave A exact composition carrier
+on:
+  push:
+    branches: [temp-never-used]
+permissions:
+  contents: write
+jobs:
+  compose:
+    runs-on: [self-hosted, Linux, X64]
+    timeout-minutes: 10
+    steps:
+      - name: Checkout carrier
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          fetch-depth: 0
+          persist-credentials: true
+      - name: Compose only admitted Wave A bridges
+        shell: bash
+        env:
+          MAIN_SHA: d830deaaa2e413d01689c50c1429efc5541a5000
+          SCOPE_SHA: 5438dafdcaac134713eebf82a679c394bbeb21ab
+          CASCADE_SHA: 7c1ef333ad9db34bf8dc957dad04c6ad0c46c9ef
+          COMPILER_SHA: e2358c2b73c8138cceedf9f0dac4945edda21e81
+          KEYFRAMES_SHA: a41692151684a04673f0266b4bacb4f916461a5c
+          TARGET: integrate/r11-wave-a-current-main
+        run: |
+          set -euo pipefail
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          for sha in "$MAIN_SHA" "$SCOPE_SHA" "$CASCADE_SHA" "$COMPILER_SHA" "$KEYFRAMES_SHA"; do
+            git cat-file -e "$sha^{commit}"
+          done
+          test "$(git rev-parse "$SCOPE_SHA^")" = "$MAIN_SHA"
+          test "$(git rev-parse "$CASCADE_SHA^")" = "$MAIN_SHA"
+          test "$(git rev-parse "$COMPILER_SHA^")" = "$MAIN_SHA"
+          test "$(git rev-parse "$KEYFRAMES_SHA^")" = "$MAIN_SHA"
+
+          git switch --detach "$SCOPE_SHA"
+          if git merge --no-ff --no-commit "$CASCADE_SHA"; then
+            :
+          else
+            mapfile -t conflicts < <(git diff --name-only --diff-filter=U | sort)
+            expected=(CHANGELOG.md docs/api.md docs/recipes.md)
+            mapfile -t expected_sorted < <(printf '%s\n' "${expected[@]}" | sort)
+            test "${conflicts[*]}" = "${expected_sorted[*]}" || {
+              printf 'unexpected conflicts: %s\n' "${conflicts[*]}" >&2
+              exit 41
+            }
+            for path in "${conflicts[@]}"; do
+              git show ":2:$path" > "$RUNNER_TEMP/ours"
+              git show ":1:$path" > "$RUNNER_TEMP/base"
+              git show ":3:$path" > "$RUNNER_TEMP/theirs"
+              git merge-file --union -p "$RUNNER_TEMP/ours" "$RUNNER_TEMP/base" "$RUNNER_TEMP/theirs" > "$path"
+              git add "$path"
+            done
+          fi
+          test -z "$(git diff --name-only --diff-filter=U)"
+          ! git grep -nE '^(<<<<<<<|=======|>>>>>>>)' -- CHANGELOG.md docs/api.md docs/recipes.md
+          grep -q 'createPresenceTransition' docs/api.md
+          grep -q 'createAnimateScope' docs/api.md
+          grep -q 'createStateCascade' docs/api.md
+          grep -q 'bindAnimatedDialog' docs/recipes.md
+          grep -q 'bindInteractionScale' docs/recipes.md
+          git commit -m 'feat(integration): compose scope and state cascade on Presence main'
+
+          git cherry-pick "$COMPILER_SHA"
+          git cherry-pick "$KEYFRAMES_SHA"
+          final="$(git rev-parse HEAD)"
+          git merge-base --is-ancestor "$MAIN_SHA" "$final"
+          test "$(git diff --name-only "$MAIN_SHA".."$final" | wc -l)" -gt 0
+          git push origin "$final:refs/heads/$TARGET"
+          printf 'combined=%s\n' "$final"
