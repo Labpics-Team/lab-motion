@@ -604,12 +604,12 @@ describe('MotionValue smooth-pickup (class C, invariant 4)', () => {
     // Spring must be actively moving at frame 8 (transient).
     expect(Math.abs(velBefore)).toBeGreaterThan(0.1);
 
-    // Retarget to 200. After this call, _startTs is reset to undefined and _elapsed=0.
+    // Ретаргет начинается из последнего snapshot, не задерживает следующие часы.
     // The NEXT tick (drain 1) will set _startTs = currentTs, elapsed=0 → position unchanged.
     // The tick AFTER THAT (drain 2 total) will have elapsed=dt → shows actual movement.
     mv.setTarget(200);
 
-    // Drain frame N+1: this tick sets _startTs, has elapsed=0, emits _from (unchanged).
+    // Следующий кадр продолжает движение с унаследованной скоростью.
     clock.drain(1);
 
     // Drain frame N+2: this tick has elapsed=dt from the new run → actual spring movement.

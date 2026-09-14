@@ -6,6 +6,44 @@
 > [projection.md](projection.md), [smart.md](smart.md),
 > [behaviors.md](behaviors.md)).
 
+## Слежение за указателем
+
+Один `MotionValue` обслуживает поток целей; новую анимацию на каждое событие
+создавать не нужно. Пространственному движению нужен `clamp: false`, чтобы не
+обрезать инерцию при смене направления. Политика reduced-motion сохраняет результат
+через `snapTo`, а завершение компонента снимает и значение, и обработчики.
+
+```typescript
+import { MotionValue } from '@labpics/motion';
+import { asRequestFrame } from '@labpics/motion/frame';
+
+const card = document.querySelector('.card') as HTMLElement;
+const reduced = window.matchMedia('(prefers-reduced-motion: reduce)');
+const x = new MotionValue({
+  initial: 0,
+  spring: { mass: 1, stiffness: 200, damping: 20 },
+  clamp: false,
+  requestFrame: asRequestFrame(),
+});
+x.onChange(value => { card.style.translate = `${value}px 0`; });
+let target = 0;
+const follow = () => reduced.matches ? x.snapTo(target) : x.setTarget(target);
+const move = (event: PointerEvent) => { target = event.clientX; follow(); };
+window.addEventListener('pointermove', move);
+reduced.addEventListener('change', follow);
+
+function dispose() {
+  window.removeEventListener('pointermove', move);
+  reduced.removeEventListener('change', follow);
+  x.destroy();
+}
+```
+
+Здесь `clientX` и `translate` намеренно иллюстрируют одну числовую ось. В продукте
+приведите координаты указателя к исходной позиции карточки один раз на границе
+измерения; не вызывайте `getBoundingClientRect()` на каждом событии без необходимости.
+`destroy()` останавливает эффект, но не отменяет внешние CSS-изменения приложения.
+
 ## Drag с инерцией
 
 ```typescript
