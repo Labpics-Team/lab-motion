@@ -29,6 +29,7 @@ jobs:
           git config user.name 'github-actions[bot]'
           git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
           python3 /tmp/r11-geometry-vector-fix.py
+          python3 -c "from pathlib import Path; p=Path('src/projection/driver.ts'); s=p.read_text(); old='const settle = (projector: Projector): void => {'; new='const settle = (projector: ProjectionDriverProjector): void => {'; assert s.count(old) == 1; p.write_text(s.replace(old, new, 1))"
           corepack enable
           corepack install --global pnpm@11.11.0
           pnpm install --frozen-lockfile
