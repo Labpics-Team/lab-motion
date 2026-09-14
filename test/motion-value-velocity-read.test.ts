@@ -227,16 +227,20 @@ describe('MotionValue.velocity — в полёте совпадает с ана�
     const range2 = newTarget - valueAt;
     const v0n = velBefore / range2;
 
-    // Первый тик нового рана: elapsed = 0 → solveSpring отдаёт velocity = v0 →
-    // денормализация v0n * range2 — C¹-непрерывность (round-trip ≤ 1 ulp).
-    const stampBase = clock.stamps.length;
-    clock.drain(1);
+    // C¹ действует на границе setTarget. Ожидание той же скорости СПУСТЯ кадр
+    // ошибочно закрепляло паузу часов (#369) и пропускало starvation.
+    expect(mv.value).toBe(valueAt);
+    expect(mv.velocity).toBe(velBefore);
     expect(mv.velocity).toBe(solveSpring(STD_SPRING, 0, v0n).velocity * range2);
     expect(mv.velocity / velBefore).toBeCloseTo(1, 10);
+    const stampBase = clock.stamps.length - 1;
+    clock.drain(1);
+    const firstElapsed = (clock.stamps[stampBase + 1] - clock.stamps[stampBase]) / 1000;
+    expect(mv.velocity).toBe(solveSpring(STD_SPRING, firstElapsed, v0n).velocity * range2);
 
-    // Дальше в полёте: бит-в-бит оракул нового рана с унаследованным v0.
+    // Дальше время нового рана считается от snapshot, а не от следующего тика.
     clock.drain(3);
-    const elapsed = (clock.stamps[stampBase + 3] - clock.stamps[stampBase]) / 1000;
+    const elapsed = (clock.stamps[stampBase + 4] - clock.stamps[stampBase]) / 1000;
     expect(mv.velocity).toBe(solveSpring(STD_SPRING, elapsed, v0n).velocity * range2);
     expect(mv.velocity).not.toBe(0);
     mv.destroy();

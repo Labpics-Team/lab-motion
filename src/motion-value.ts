@@ -151,8 +151,8 @@ export class MotionValue {
   /** Start velocity of the current run (normalized by range, for the solver). */
   declare private _v0Normalized: number;
   /** Elapsed seconds since the start of the current run. */
-  private _elapsed: number = 0;
-  /** Timestamp of the first frame in the current run. */
+  declare private _elapsed: number;
+  /** Начало текущей траектории в timestamp-координате инжектированного клока. */
   declare private _startTs: number | undefined;
 
   /** Whether a frame loop is currently active. */
@@ -165,7 +165,7 @@ export class MotionValue {
   private _useTimeoutFallback: boolean = false;
 
   /** Frame counter for the current run. */
-  private _frameCount: number = 0;
+  declare private _frameCount: number;
   /**
    * Bumped by stop()/snapTo() to invalidate any frame already handed to the
    * injected requestFrame seam. The seam contract (RequestFrameFn) has no
@@ -183,9 +183,9 @@ export class MotionValue {
   // ── Constructor ──────────────────────────────────────────────────────────
 
   constructor(opts: MotionValueOptions) {
-    // Цепочка присваиваний: value/from/target рождаются одним (проверенным)
-    // числом — и это дешевле трёх чтений opts.initial под гейтом ядра.
-    this._value = this._from = this._target = assertFinite(opts.initial);
+    // В покое существует только наблюдаемый snapshot. Поля траектории
+    // инициализирует setTarget до первого обращения к планировщику.
+    this._value = this._target = assertFinite(opts.initial);
     validateSpringForFrameLoop(opts.spring);
     this._spring = opts.spring;
     this._clamp = opts.clamp !== false;
@@ -249,13 +249,21 @@ export class MotionValue {
    * is smoothly carried over as the initial condition for the new run —
    * no discontinuity in the output sequence.
    *
+   * В активном движении origin берётся из последнего опубликованного кадра.
+   * Следующий timestamp учитывает время после него, а не начинает отсчёт снова.
+   * Повтор активной цели — no-op; пачка целей между кадрами оставляет последнюю.
+   * Без timestamp каждый callback по-прежнему продвигает FIXED_DT.
+   *
    * @param target - Finite target value.
    */
   setTarget(target: number): void {
     if (this._destroyed) return;
     assertFinite(target);
 
-    // Snap instantly if already at target with negligible velocity.
+    // Повтор цели сохраняет подготовленную траекторию и её часы. Проверка
+    // running важна: stop() не запрещает снова двигаться к той же цели.
+    if (this._running && target === this._target) return;
+
     if (target === this._value && Math.abs(this._velocity) < EPSILON) {
       this._target = target;
       return;
@@ -282,13 +290,18 @@ export class MotionValue {
     this._target = target;
     this._range = range;
     this._v0Normalized = v0Normalized;
+    // Новый origin принадлежит последнему опубликованному snapshot, а не
+    // будущему callback. Иначе поток setTarget перед каждым кадром навсегда
+    // держит elapsed=0. Глобальные часы не читаются; до первого кадра epoch нет.
+    this._startTs = this._running && this._startTs !== undefined
+      ? this._startTs + this._elapsed * 1000
+      : undefined;
     this._elapsed = 0;
-    this._startTs = undefined;
     this._frameCount = 0;
-    this._useTimeoutFallback = false;
 
     // ── Start frame loop (idempotent: only one loop runs at a time) ──────
     if (!this._running) {
+      this._useTimeoutFallback = false;
       this._running = true;
       this._schedule(this._generation);
     }
@@ -315,16 +328,16 @@ export class MotionValue {
    */
   stop(): void {
     this._running = false;
-    this._startTs = undefined;
-    this._elapsed = 0;
+    // Не сбрасываем неактивную траекторию: следующий setTarget — её единственный
+    // инициализатор. Поколение отсекает callback до любого чтения её полей.
     this._generation++; // invalidate any frame already scheduled by this run
   }
 
   /**
    * Instantly set the value to `target`, bypassing spring physics: halts any
-   * in-flight run and resyncs `_from`/`_target`/`_velocity` so a later
-   * setTarget() starts a fresh, correct run instead of resuming from stale
-   * mid-flight state. Backs the reduced-motion CHARACTER-switch in framework
+   * in-flight run and publishes the new value, target and zero velocity.
+   * A later setTarget() initializes its trajectory from that snapshot, never
+   * from inactive run parameters. Backs the reduced-motion CHARACTER-switch in framework
    * bindings (e.g. lit/controller.ts) — the value still reaches its target
    * (not hard-off), it just skips the spring frames. A no-op after destroy().
    *
@@ -342,13 +355,8 @@ export class MotionValue {
     if (!this._running && this._value === target && this._target === target) return;
     this._generation++; // invalidate any frame scheduled by the run being replaced
     this._running = false;
-    this._startTs = undefined;
-    this._elapsed = 0;
-    this._frameCount = 0;
     this._value = target;
-    this._from = target;
     this._target = target;
-    this._range = 0;
     this._velocity = 0;
     this._emit(target);
   }
