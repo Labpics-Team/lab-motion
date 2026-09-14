@@ -24,7 +24,6 @@
 
 /** Узел интрузивного LRU. Поля мутабельны ради переиспользования при вытеснении. */
 interface CacheNode<T> {
-  _hash: number;
   a: number;
   b: number;
   c: number;
@@ -128,12 +127,13 @@ export function storeSpringLinearCache<T>(
   } else {
     if (cache._map.size >= cache._capacity) {
       node = cache._tail!;
-      cache._map.delete(node._hash);
+      // Хеш — чистая функция уже хранимого exact-key. Не удерживаем его шестым
+      // числовым полем на каждом resident node: редкий full-miss пересчитывает
+      // старый map-key непосредственно перед удалением.
+      cache._map.delete(hash5(node.a, node.b, node.c, node.d, node.e));
       touch(cache, node);
-      node._hash = hash;
     } else {
       node = {
-        _hash: hash,
         a,
         b,
         c,
