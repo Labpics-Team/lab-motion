@@ -1,91 +1,66 @@
 import { describe, expect, it, vi } from 'vitest';
 import { drive } from '../src/index.js';
+import { REDUCED_MOTION_QUERY, reducedMotionMedia } from './helpers/reduced-motion.js';
 
 /**
  * Test: reduced-motion policy both states + node
- * Class: unit
+ * Class: unit + semantic seam contract
  * Invariant 4 — reduced-motion honoured at the API boundary, always.
  *
- * Strategy: inject a fake `matchMedia` into the drive() call so the test is
- * hermetic — no real browser globals required, no DOM, SSR-safe.
+ * The media query itself is part of the contract. A fake that returns the same
+ * `matches` value for every query is not a valid oracle: an implementation that
+ * accidentally asks for prefers-color-scheme would look correct. The shared
+ * helper is query-sensitive and these tests assert the observed query.
  *
- * The `drive()` API accepts an options object with an injected `matchMedia`
- * factory so tests can control the policy without touching globals.
- *
- * RED proof:
- *   `drive` is not exported from the placeholder. Import gives undefined →
- *   calling it throws TypeError → RED for the right reason.
- *
- * Mutation proof (for when implemented):
- *   Remove the matchMedia check in the driver → the reduce=true test fails
- *   because the driver runs the full loop instead of short-circuiting.
- *   Or hard-code `reduce = false` → both injection tests fail.
+ * Reduced motion is a CHARACTER-switch, not hard-off: drive must synchronously
+ * deliver exactly one terminal `to` value and schedule no frame loop.
  */
 
-/** Minimal matchMedia stub that returns a fixed `matches` value. */
-function stubMatchMedia(matches: boolean): (query: string) => MediaQueryList {
-  return (_query: string): MediaQueryList => ({
-    matches,
-    media: '',
-    onchange: null,
-    addListener: () => {},
-    removeListener: () => {},
-    addEventListener: () => {},
-    removeEventListener: () => {},
-    dispatchEvent: () => false,
-  });
-}
-
 describe('reduced-motion policy (invariant 4)', () => {
-  it('resolve to final value immediately when matchMedia reports prefers-reduced-motion: reduce', async () => {
-    const solverSpy = vi.fn();
+  it('queries the exact reduced-motion feature and emits exactly one terminal value', async () => {
+    const queries: string[] = [];
+    const onStep = vi.fn();
+    const requestFrame = vi.fn((_cb: () => void): number => 1);
 
-    await drive({
+    const done = drive({
       from: 0,
       to: 100,
-      matchMedia: stubMatchMedia(true), // prefers-reduced-motion: reduce
-      onStep: solverSpy,
+      matchMedia: reducedMotionMedia(true, queries),
+      onStep,
       spring: { mass: 1, stiffness: 100, damping: 10 },
+      requestFrame,
     });
 
-    // With reduce active, we expect 0 or 1 step call (final value, no loop).
-    // The solver loop must NOT be entered for multiple frames.
-    expect(solverSpy.mock.calls.length).toBeLessThanOrEqual(1);
-
-    // The only call (if any) must deliver the final `to` value.
-    if (solverSpy.mock.calls.length === 1) {
-      const [value] = solverSpy.mock.calls[0] as [number];
-      expect(value).toBe(100);
-    }
+    // CHARACTER-switch is synchronous at admission, before any await/microtask.
+    expect(queries).toEqual([REDUCED_MOTION_QUERY]);
+    expect(onStep.mock.calls).toEqual([[100]]);
+    expect(requestFrame).not.toHaveBeenCalled();
+    await done;
   });
 
-  it('enters multi-frame animation when matchMedia reports no preference (matches=false)', async () => {
+  it('enters multi-frame animation when the exact query reports no preference', async () => {
+    const queries: string[] = [];
     const stepValues: number[] = [];
 
     // Use a non-draining step clock (returns 0 without invoking its callback).
-    // The driver detects handle=0 at the bootstrap and switches to a setTimeout(0)
-    // fallback, which runs the animation to completion autonomously.
+    // drive switches to its liveness fallback and eventually completes.
     const stepClock = (_cb: () => void): number => 0;
 
-    // Await the completed animation — the setTimeout fallback resolves it.
     await drive({
       from: 0,
       to: 100,
-      matchMedia: stubMatchMedia(false), // no reduced-motion preference
+      matchMedia: reducedMotionMedia(false, queries),
       onStep: (v) => stepValues.push(v),
       spring: { mass: 1, stiffness: 100, damping: 10 },
       requestFrame: stepClock,
     });
 
-    // Key assertion: multi-frame animation was entered (not short-circuited like reduce=true).
-    // settle() emits the final `to` value; intermediate frames emit intermediate values.
-    // At minimum 2 steps: at least one intermediate + the final settle() call.
+    expect(queries).toEqual([REDUCED_MOTION_QUERY]);
     expect(stepValues.length).toBeGreaterThanOrEqual(2);
+    expect(stepValues.at(-1)).toBe(100);
   }, 5000);
 
   it('does NOT throw in node / no-matchMedia environment (SSR fault safety)', () => {
-    // Pass matchMedia: undefined — the driver must degrade gracefully (treat as reduce=false,
-    // but since we have no requestFrame, the driver must not throw synchronously).
     expect(() => {
       void drive({
         from: 0,
@@ -93,7 +68,6 @@ describe('reduced-motion policy (invariant 4)', () => {
         matchMedia: undefined,
         onStep: () => {},
         spring: { mass: 1, stiffness: 100, damping: 10 },
-        // Also no requestFrame — the driver must return a Promise without throwing.
         requestFrame: (_cb: () => void) => 0,
       });
     }).not.toThrow();
