@@ -262,3 +262,113 @@ el.addEventListener('pointercancel', () => sheet.pointerCancel());
 // программно раскрыть до верхнего snap (единый clock, C¹ из текущей скорости):
 document.querySelector('.expand')?.addEventListener('click', () => sheet.snapTo(2));
 ```
+
+## Анимации, принадлежащие компоненту
+
+`createAnimateScope` из `./animate` связывает локальные селекторы с одной уборкой.
+Каждый mount создаёт свою область. Строки выбирают потомков root, включая новые
+узлы при следующем вызове; для самого root передайте элемент явно. Переданный
+напрямую внешний элемент тоже допустим — область не является песочницей DOM.
+
+В примере компонент содержит кнопку `[data-replay]` и элемент `.motion-target`.
+Сохраните общий код в `card-motion.ts`. Нативная кнопка даёт мышь, touch и клавиатуру
+без отдельной реализации распознавания ввода. `prefers-reduced-motion` проверяется
+существующим `animate` при каждом запуске.
+
+<!-- recipe:animate-scope-vanilla -->
+```typescript
+import { createAnimateScope } from '@labpics/motion/animate';
+
+export function mountCardMotion(root: HTMLElement): () => void {
+  const button = root.querySelector<HTMLButtonElement>('[data-replay]');
+  if (!button) throw new Error('Компоненту нужна кнопка [data-replay]');
+  const scope = createAnimateScope(root);
+  const replay = () => {
+    scope.animate('.motion-target', { x: [0, 24], opacity: [0, 1] });
+  };
+  const dispose = () => {
+    button.removeEventListener('click', replay);
+    scope.destroy();
+  };
+  try {
+    button.addEventListener('click', replay);
+    replay();
+    return dispose;
+  } catch (error) {
+    try { dispose(); } catch { /* исходная ошибка setup остаётся причиной */ }
+    throw error;
+  }
+}
+```
+
+Для обычного DOM вызовите `const dispose = mountCardMotion(root)` после создания
+разметки, а перед удалением компонента — `dispose()`. Область учитывает анимации,
+но не произвольные listeners: их снимает владелец компонента, как в примере выше.
+
+### React: cleanup эффекта, а не render на каждый кадр
+
+`react-card.ts` использует тот же общий `card-motion.ts`. Область создаётся внутри
+эффекта: повторный setup в StrictMode получает новый lifecycle, а не уничтоженный
+объект из прошлого setup. Изменение DOM выполняет движок, React state на кадре нет.
+
+<!-- recipe:animate-scope-react -->
+```typescript
+import { createElement, useEffect, useRef } from 'react';
+import { mountCardMotion } from './card-motion.js';
+
+export function ScopedCard() {
+  const root = useRef<HTMLElement>(null);
+  useEffect(() => mountCardMotion(root.current!), []);
+  return createElement('section', { ref: root },
+    createElement('button', { 'data-replay': '', type: 'button' }, 'Повторить'),
+    createElement('div', { className: 'motion-target' }, 'Карточка'),
+  );
+}
+```
+
+### Solid: область живёт столько же, сколько owner
+
+`solid-card.ts` также импортирует `card-motion.ts`. Этот вариант без JSX возвращает
+обычный DOM-узел; компонент монтируется стандартным `render` из `solid-js/web`.
+Создание области откладывается до `onMount`, cleanup регистрируется у owner.
+
+<!-- recipe:animate-scope-solid -->
+```typescript
+import { onCleanup, onMount } from 'solid-js';
+import { mountCardMotion } from './card-motion.js';
+
+export function SolidScopedCard(): HTMLElement {
+  const root = document.createElement('section');
+  root.innerHTML = '<button data-replay type="button">Повторить</button>' +
+    '<div class="motion-target">Карточка</div>';
+  onMount(() => {
+    const dispose = mountCardMotion(root);
+    onCleanup(dispose);
+  });
+  return root;
+}
+```
+
+Для SSR используйте разметку компонента/JSX своего framework; эта конкретная
+Solid-фабрика создаёт DOM и вызывается только на клиенте. Импорт `./animate`
+сам по себе не читает DOM. React-пример допускает server render: эффект там
+не запускается.
+
+### Границы уборки
+
+`destroy()` сразу запрещает новые вызовы через эту область и пытается отменить
+все её незавершённые анимации, включая paused и delayed. Поздний handler получает
+завершённый no-op controls без чтения его входов. Естественно завершённые handles
+удаляются из учёта после `finished`; область не копит историю переходов.
+
+Если destroy вызван внутри синхронной host-транзакции, один финальный проход в
+микрозадаче повторяет отмену после снятия reservation. Кадровый цикл не добавляется.
+Для ожидания конкретного завершения используйте исходный `controls.finished`.
+Одна синхронная ошибка cleanup выбрасывается без замены, несколько — `AggregateError`;
+ошибки финального прохода сообщаются через доступный `globalThis.reportError`.
+У постоянно неисправного host отмена остаётся best-effort, а не обещанием отката.
+
+Cleanup **сохраняет текущую позу**, не восстанавливает стили до анимации. Это не
+`revert`. Он также не отменяет новый переход, который другой scope или прямой
+`animate` уже сделал владельцем тех же свойств. После destroy создайте новую
+область для нового mount; не переиспользуйте старую.

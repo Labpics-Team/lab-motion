@@ -24,6 +24,32 @@ Node ≥ 22; ESM и CJS, по-файловые декларации типов. 
 export-ветки) и `pnpm pack:compat` (TypeScript/Vite, SSR, tree shaking, точный
 минимальный Preact peer).
 
+
+## Область анимаций компонента
+
+`createAnimateScope(root): AnimateScope` — дополнительный экспорт `./animate`.
+`root` реализует `AnimateScopeRoot.querySelectorAll(selector): ArrayLike<unknown>`:
+подходят Element, Document и ShadowRoot. Неверный query-host даёт `TypeError`.
+Factory ничего не анимирует и не читает глобальный document.
+
+- `scope.animate(target, props, options?)` возвращает обычный `AnimateControls`.
+  Строка сначала разрешается относительно root, затем результат проходит защитную
+  границу полного animate. Selector errors остаются host errors; явные targets
+  проходят без query и не ограничиваются потомками root.
+- `scope.destroy()` отказывает новым запускам, отменяет учтённые handles и снимает
+  root. Вызовы после destroy возвращают завершённый no-op, не читая входы.
+  Повторный destroy бездействует. Незавершённый reentrant setup отменяется после
+  возврата controls; host reservation дренируется одной микрозадачей, без rAF.
+- `finished`, natural/onComplete, reduced motion и ownership сохраняют контракт
+  animate. Завершённые handles удаляются из учёта. Нет автоматического revert
+  стилей, удаления listeners или отмены чужого successor.
+- Синхронные cleanup errors: одна пробрасывается буквально, несколько дают
+  `AggregateError`; остаточные ошибки финального прохода передаются `reportError`
+  среды, если он доступен. Неисправный host не получает обещания полного rollback.
+
+Сценарии DOM, React и Solid с одним cleanup приведены в
+[рецептах компонентной области](recipes.md#анимации-принадлежащие-компоненту).
+
 ## Ядро и управление
 
 | Импорт | Что даёт |
@@ -32,7 +58,7 @@ export-ветки) и `pnpm pack:compat` (TypeScript/Vite, SSR, tree shaking, т
 | `…/driver` | Scrubbable-контроллер: `play/pause/reverse/seek/timeScale/progress` + thenable |
 | `…/frame` | Единый frame-шедулер: `createFrameLoop` / синглтон `frame` — один rAF на кадр, фазы read→update→render против layout-thrash, SSR-safe; `asRequestFrame(loop)` сажает `MotionValue`/`drive` на общий кадр. **Биндинги используют его по умолчанию** (как shared-ticker у Framer Motion/GSAP); инжекция своего `requestFrame` переопределяет |
 | `…/nano` | **Platform-trusted WAAPI to-only ≤ 1 КБ gzip**: spring/tween, `delay`/`stagger`, reduced-motion, сами `Animation` как контролы; полный контракт и границы — ниже |
-| `…/animate` | Фасад-one-liner: `animate(target, props, options)` — цели по каналам (`x`/`y`/`scale`/`rotate`, `opacity`, CSS-свойства), режим `{ spring }` или `{ duration, ease }`, `delay`/`stagger`, контролы `{ finished, play, pause, seek, cancel, stop }`. Это базовый single-transition DX-срез; ядро от него не растёт |
+| `…/animate` | Фасад-one-liner: `animate(target, props, options)` и `createAnimateScope(root)` — цели по каналам (`x`/`y`/`scale`/`rotate`, `opacity`, CSS-свойства), режим `{ spring }` или `{ duration, ease }`, `delay`/`stagger`, контролы `{ finished, play, pause, seek, cancel, stop }`. Это базовый single-transition DX-срез; ядро от него не растёт |
 
 ### Пример: scrub-контроллер
 

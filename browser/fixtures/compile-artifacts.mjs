@@ -17,6 +17,7 @@
  */
 
 import { build } from 'vite';
+import { buildScopeRecipes } from './scope-recipes.mjs';
 import { existsSync, mkdirSync, rmSync, writeFileSync } from 'node:fs';
 import { dirname, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -119,6 +120,7 @@ export default async function globalSetup() {
     writeFileSync(resolve(OUT, 'uncompiled.js'), uncompiled);
     writeFileSync(resolve(OUT, 'surface-compiled.js'), surfaceCompiled);
     writeFileSync(resolve(OUT, 'surface-uncompiled.js'), surfaceUncompiled);
+    await buildScopeRecipes(ROOT, OUT, TMP);
   } finally {
     rmSync(TMP, { recursive: true, force: true });
   }
