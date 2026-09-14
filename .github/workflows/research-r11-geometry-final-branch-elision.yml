@@ -1,0 +1,60 @@
+name: R11 geometry final branch elision
+on:
+  push:
+    branches: [carrier/r11-geometry-final-branch-elision-20260914]
+permissions:
+  contents: write
+jobs:
+  prove:
+    runs-on: ubuntu-latest
+    timeout-minutes: 35
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          fetch-depth: 0
+          persist-credentials: true
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020
+        with:
+          node-version: '24'
+      - run: corepack enable && corepack install --global pnpm@11.11.0
+      - run: pnpm install --frozen-lockfile
+      - name: Remove only the redundant q-zero branch and prove the full closure
+        shell: bash
+        run: |
+          set -euo pipefail
+          git show origin/carrier/r11-geometry-inline-state-20260914:.github/research/r11_geometry_clamp_search.test.ts > "$RUNNER_TEMP/clamp-search.test.ts"
+
+          # Candidate starts from the exact measured 5753 B source tree.
+          git switch --detach 3f697a889b74c042967ff27fa97a50605fb32a41
+          python3 - <<'PY'
+          from pathlib import Path
+          p = Path('src/projection/geometry.ts')
+          s = p.read_text()
+          old = '  return q === 0 || correction === 0 ? base : finite(base + correction * q) + 0;'
+          new = '  return correction === 0 ? base : finite(base + correction * q) + 0;'
+          assert s.count(old) == 1
+          p.write_text(s.replace(old, new, 1))
+          PY
+
+          cp "$RUNNER_TEMP/clamp-search.test.ts" test/research-projection-clamp-search.test.ts
+          pnpm typecheck
+          pnpm vitest run \
+            test/projection-dom.test.ts \
+            test/projection-vector-retarget.test.ts \
+            test/projection-driver.test.ts \
+            test/projection-geometry.test.ts \
+            test/projection-finiteness-fuzz.test.ts \
+            test/motion-contract-v1.test.ts \
+            test/projection-api-surface-pin.test.ts \
+            test/research-projection-clamp-search.test.ts
+          rm test/research-projection-clamp-search.test.ts
+          pnpm build >/dev/null
+
+          # Hard gate is unchanged. No threshold mutation is allowed here.
+          node scripts/size-gate.mjs 2>&1 | tee "$RUNNER_TEMP/size.log"
+          grep -E 'projection-dom-one-liner|projection-core-only|projection\s|size-gate:' "$RUNNER_TEMP/size.log" || true
+          git diff --check
+
+          git add src/projection/geometry.ts
+          git -c user.name='github-actions[bot]' -c user.email='41898282+github-actions[bot]@users.noreply.github.com' commit -m 'research: elide redundant projection basis zero branch'
+          git push --force origin HEAD:refs/heads/research/r11-geometry-final-materialized-20260914
