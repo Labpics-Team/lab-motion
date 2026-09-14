@@ -1,8 +1,8 @@
-name: Research implicit identity task-clock v20c
+name: Research implicit identity exact-head requalification
 
 on:
   push:
-    branches: ["research/implicit-identity-taskclock-v20c-20260913"]
+    branches: ["research/implicit-identity-exacthead-20260914"]
 
 permissions:
   contents: read
@@ -10,13 +10,11 @@ permissions:
 env:
   COREPACK_ENABLE_DOWNLOAD_PROMPT: "0"
   COREPACK_DEFAULT_TO_LATEST: "0"
-  BASE_SHA: 93278bf9b540f93521c7bd4c02f68db458e5db7a
-  CANDIDATE_SHA: 0b01ae2b34db2b78c11acf9c4242e73538717c95
-  BASE_ENTRY_SHA256: 8f3ef89364b35b9fb8fb4277e99709a26cefa827f88611587265d3fb40465ff7
-  CANDIDATE_ENTRY_SHA256: 4f58d7f47bc7767d336b2771990f64fa52e4dd1df0f550fff30bdfc7ff1035be
+  BASE_SHA: fe11daa407de396fad952be7679650f63dabd4dd
+  CANDIDATE_SHA: c875d9719ea9447400f5f6bc626325b68a47d8e2
 
 jobs:
-  task-clock:
+  exact-head:
     runs-on: ubuntu-24.04
     timeout-minutes: 30
     steps:
@@ -42,11 +40,11 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          git fetch --no-tags origin refs/pull/380/head
+          git fetch --no-tags origin main refs/pull/380/head
           git cat-file -e "${BASE_SHA}^{commit}"
           git cat-file -e "${CANDIDATE_SHA}^{commit}"
-          base_dir="$RUNNER_TEMP/lm-base-v20c"
-          candidate_dir="$RUNNER_TEMP/lm-candidate-v20c"
+          base_dir="$RUNNER_TEMP/lm-base-exacthead"
+          candidate_dir="$RUNNER_TEMP/lm-candidate-exacthead"
           git worktree add --detach "$base_dir" "$BASE_SHA"
           git worktree add --detach "$candidate_dir" "$CANDIDATE_SHA"
           for dir in "$base_dir" "$candidate_dir"; do
@@ -55,15 +53,81 @@ jobs:
           done
           base_entry="$base_dir/dist/keyframes/index.js"
           candidate_entry="$candidate_dir/dist/keyframes/index.js"
-          printf '%s  %s\n' "$BASE_ENTRY_SHA256" "$base_entry" | sha256sum --check --status -
-          printf '%s  %s\n' "$CANDIDATE_ENTRY_SHA256" "$candidate_entry" | sha256sum --check --status -
-          printf 'base_entry=%s\ncandidate_entry=%s\n' "$base_entry" "$candidate_entry" >> "$GITHUB_ENV"
+          printf 'base_dir=%s\ncandidate_dir=%s\nbase_entry=%s\ncandidate_entry=%s\n' \
+            "$base_dir" "$candidate_dir" "$base_entry" "$candidate_entry" >> "$GITHUB_ENV"
 
-      - name: Build and record direct task-clock helper
+      - name: Exact artifact Pareto gate
         shell: bash
         run: |
           set -euo pipefail
-          mkdir -p evidence-v20c
+          mkdir -p evidence-exacthead
+          cat > "$base_dir/.exact-size-compare.mjs" <<'EOF'
+          import { readFileSync, readdirSync, writeFileSync, appendFileSync } from 'node:fs';
+          import { join, relative } from 'node:path';
+          import { createHash } from 'node:crypto';
+          import { canonicalGzip, observationalBrotli } from './scripts/compression-oracle.mjs';
+
+          const [baseDir, candidateDir, outFile] = process.argv.slice(2);
+          const walk = (root, dir = root, out = []) => {
+            for (const ent of readdirSync(dir, { withFileTypes: true })) {
+              const p = join(dir, ent.name);
+              if (ent.isDirectory()) walk(root, p, out);
+              else if (/\.(?:js|cjs)$/.test(ent.name)) out.push(relative(root, p));
+            }
+            return out;
+          };
+          const baseDist = join(baseDir, 'dist');
+          const candidateDist = join(candidateDir, 'dist');
+          const a = walk(baseDist).sort();
+          const b = walk(candidateDist).sort();
+          const sameSet = JSON.stringify(a) === JSON.stringify(b);
+          const sha = (x) => createHash('sha256').update(x).digest('hex');
+          const rows = [];
+          let pass = sameSet;
+          if (sameSet) {
+            for (const path of a) {
+              const base = readFileSync(join(baseDist, path));
+              const candidate = readFileSync(join(candidateDist, path));
+              const row = {
+                path,
+                base: { raw: base.length, gzip: canonicalGzip(base).length, brotli: observationalBrotli(base).length, sha256: sha(base) },
+                candidate: { raw: candidate.length, gzip: canonicalGzip(candidate).length, brotli: observationalBrotli(candidate).length, sha256: sha(candidate) },
+              };
+              row.changed = row.base.sha256 !== row.candidate.sha256;
+              row.delta = {
+                raw: row.candidate.raw - row.base.raw,
+                gzip: row.candidate.gzip - row.base.gzip,
+                brotli: row.candidate.brotli - row.base.brotli,
+              };
+              row.pass = row.delta.raw <= 0 && row.delta.gzip <= 0 && row.delta.brotli <= 0;
+              if (!row.pass) pass = false;
+              rows.push(row);
+            }
+          }
+          const changed = rows.filter((x) => x.changed);
+          const result = {
+            schema: 1,
+            base: process.env.BASE_SHA,
+            candidate: process.env.CANDIDATE_SHA,
+            node: process.version,
+            sameSet,
+            totalEntries: rows.length,
+            changedEntries: changed.length,
+            pass,
+            verdict: pass ? 'PASS-SIZE-PARETO' : 'FAIL-SIZE-PARETO',
+            changed,
+          };
+          writeFileSync(outFile, JSON.stringify(result, null, 2) + '\n');
+          appendFileSync(process.env.GITHUB_ENV, `SIZE_PASS=${pass ? 'true' : 'false'}\n`);
+          console.log(JSON.stringify(result, null, 2));
+          EOF
+          (cd "$base_dir" && node .exact-size-compare.mjs "$base_dir" "$candidate_dir" "$GITHUB_WORKSPACE/evidence-exacthead/size-result.json")
+
+      - name: Build and record direct task-clock helper
+        if: env.SIZE_PASS == 'true'
+        shell: bash
+        run: |
+          set -euo pipefail
           before="$(cat /proc/sys/kernel/perf_event_paranoid)"
           sudo sysctl -w kernel.perf_event_paranoid=1
           after="$(cat /proc/sys/kernel/perf_event_paranoid)"
@@ -71,7 +135,7 @@ jobs:
           cpu="${allowed%%,*}"
           cpu="${cpu%%-*}"
           [[ "$cpu" =~ ^[0-9]+$ ]]
-          helper="$RUNNER_TEMP/taskclock-v20c"
+          helper="$RUNNER_TEMP/taskclock-exacthead"
           cc -std=c11 -O2 -Wall -Wextra -Werror scripts/research-taskclock-v20c.c -o "$helper"
           printf 'RESEARCH_CPU=%s\nTASKCLOCK_HELPER=%s\n' "$cpu" "$helper" >> "$GITHUB_ENV"
           {
@@ -93,35 +157,45 @@ jobs:
               scripts/research-taskclock-v20c.c \
               scripts/research-implicit-identity-taskclock-v20c.mjs \
               "$helper"
-          } > evidence-v20c/environment.txt
+          } > evidence-exacthead/environment.txt
 
       - name: Run preregistered direct task-clock experiment
+        if: env.SIZE_PASS == 'true'
         shell: bash
         run: |
           set +e
           RESEARCH_CPU="$RESEARCH_CPU" TASKCLOCK_HELPER="$TASKCLOCK_HELPER" \
             node --allow-natives-syntax scripts/research-implicit-identity-taskclock-v20c.mjs \
-            "$base_entry" "$candidate_entry" evidence-v20c | tee evidence-v20c/stdout.txt
+            "$base_entry" "$candidate_entry" evidence-exacthead | tee evidence-exacthead/stdout.txt
           status=${PIPESTATUS[0]}
-          echo "exit_status=$status" | tee evidence-v20c/exit-status.txt
+          echo "exit_status=$status" | tee evidence-exacthead/exit-status.txt
           exit 0
+
+      - name: Materialize size failure verdict
+        if: env.SIZE_PASS != 'true'
+        shell: bash
+        run: |
+          cp evidence-exacthead/size-result.json evidence-exacthead/result.json
+          printf 'task-clock skipped by preregistered size falsifier\n' > evidence-exacthead/task-clock-skipped.txt
 
       - name: Seal evidence
         if: always()
         shell: bash
         run: |
           set -euo pipefail
-          test -f evidence-v20c/result.json
-          find evidence-v20c -maxdepth 1 -type f ! -name SHA256SUMS -print0 | sort -z | xargs -0 sha256sum > evidence-v20c/SHA256SUMS
-          sha256sum --check evidence-v20c/SHA256SUMS
-          cat evidence-v20c/result.json
+          test -f evidence-exacthead/size-result.json
+          test -f evidence-exacthead/result.json
+          find evidence-exacthead -maxdepth 1 -type f ! -name SHA256SUMS -print0 | sort -z | xargs -0 sha256sum > evidence-exacthead/SHA256SUMS
+          sha256sum --check evidence-exacthead/SHA256SUMS
+          cat evidence-exacthead/size-result.json
+          cat evidence-exacthead/result.json
 
       - name: Upload sealed evidence
         if: always()
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
         with:
-          name: implicit-identity-taskclock-v20c-${{ github.sha }}
-          path: evidence-v20c
+          name: implicit-identity-exacthead-${{ github.sha }}
+          path: evidence-exacthead
           if-no-files-found: error
           retention-days: 30
           compression-level: 0
