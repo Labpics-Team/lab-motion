@@ -331,7 +331,23 @@ function isDegenerateBox(b: FlipRect): boolean {
  * ПЕРЕЯКОРИВАЮТСЯ к следующему невырожденному проецирующему предку (один раз);
  * finiteDiv остаётся вторым эшелоном (враждебный NaN в середине полёта).
  */
-export function createProjector(nodes: readonly ProjectionNodeInit[]): Projector {
+interface PositionBasisCorrection {
+  readonly x: number;
+  readonly y: number;
+}
+
+/** @internal Driver-only projector: same geometry owner, plus the homogeneous
+ * position basis used to preserve independent page-space x/y velocity. */
+export interface ProjectionDriverProjector extends Projector {
+  atBasis(p: number, positionBasisValue: number): readonly ProjectionFrame[];
+  readonly hasPositionBasis: boolean;
+}
+
+function createProjectorCore(
+  nodes: readonly ProjectionNodeInit[],
+  positionBasisById?: ReadonlyMap<string, PositionBasisCorrection>,
+  boundPositionBasis = false,
+): ProjectionDriverProjector {
   const count = nodes.length;
 
   // Валидация id (рано, с именем виновника).
@@ -360,6 +376,26 @@ export function createProjector(nodes: readonly ProjectionNodeInit[]): Projector
       )
     ) {
       throw new MotionParamError('LM081');
+    }
+  }
+
+  // Driver-only homogeneous position basis. Values are physical px/s
+  // corrections relative to the shared scalar progress velocity. Public
+  // createProjector never supplies them, so its old bit-path stays untouched.
+  let positionBasisX: Float64Array | undefined;
+  let positionBasisY: Float64Array | undefined;
+  let hasPositionBasis = false;
+  if (positionBasisById !== undefined && positionBasisById.size !== 0) {
+    positionBasisX = new Float64Array(count);
+    positionBasisY = new Float64Array(count);
+    for (let i = 0; i < count; i++) {
+      const correction = positionBasisById.get(nodes[i].id);
+      if (correction === undefined) continue;
+      const x = finite(correction.x);
+      const y = finite(correction.y);
+      positionBasisX[i] = x;
+      positionBasisY[i] = y;
+      if (x !== 0 || y !== 0) hasPositionBasis = true;
     }
   }
 
@@ -460,8 +496,9 @@ export function createProjector(nodes: readonly ProjectionNodeInit[]): Projector
   const v: MutableRect = { x: 0, y: 0, width: 0, height: 0 };
   const order: readonly string[] = orderIdx.map((i) => nodes[i].id);
 
-  const at = (p: number): readonly ProjectionFrame[] => {
+  const atBasis = (p: number, positionBasisValue: number): readonly ProjectionFrame[] => {
     const t = Number.isNaN(p) ? 0 : p; // санация p — паритет flipAtRaw (NaN → 0)
+    const q = finite(positionBasisValue);
     const tc = clamp01(t);
     for (let oi = 0; oi < orderIdx.length; oi++) {
       const i = orderIdx[oi];
@@ -471,10 +508,26 @@ export function createProjector(nodes: readonly ProjectionNodeInit[]): Projector
       const node = nodes[i];
       const frame = frames[oi];
       mixInto(node.first, node.last, t, v);
+      // Linear second-order spring solution: page position = scalar path + u·Q(t).
+      // Q(0)=0 and Q'(0)=1, so this preserves C0 while carrying only the
+      // independent x/y boundary velocity not representable by one scalar p.
+      if (q !== 0) {
+        const bx = positionBasisX?.[i] ?? 0;
+        const by = positionBasisY?.[i] ?? 0;
+        if (bx !== 0) v.x = finite(v.x + bx * q) + 0;
+        if (by !== 0) v.y = finite(v.y + by * q) + 0;
+        if (boundPositionBasis) {
+          v.x = Math.max(Math.min(v.x, Math.max(node.first.x, node.last.x)), Math.min(node.first.x, node.last.x));
+          v.y = Math.max(Math.min(v.y, Math.max(node.first.y, node.last.y)), Math.min(node.first.y, node.last.y));
+        }
+      }
 
       const a = liveAncestor[i];
       if (a === null) {
-        if (anchorIsLast[i]) {
+        if (
+          anchorIsLast[i] &&
+          (q === 0 || ((positionBasisX?.[i] ?? 0) === 0 && (positionBasisY?.[i] ?? 0) === 0))
+        ) {
           rootFlipInto(node.first, node.last, t, frame);
           // k корня = V.size ⊘ B.size = эмитированный s (k_A = 1) — бит-консистентно
           // с фактически применённым масштабом.
@@ -533,5 +586,21 @@ export function createProjector(nodes: readonly ProjectionNodeInit[]): Projector
     return frames; // ПЕРЕИСПОЛЬЗУЕМЫЙ массив — не удерживать ссылку
   };
 
-  return { at, order };
+  const at = (p: number): readonly ProjectionFrame[] => atBasis(p, 0);
+  return { at, atBasis, order, hasPositionBasis };
+}
+
+/** Public scalar projector. The returned shape intentionally stays unchanged. */
+export function createProjector(nodes: readonly ProjectionNodeInit[]): Projector {
+  const projector = createProjectorCore(nodes);
+  return { at: projector.at, order: projector.order };
+}
+
+/** @internal Projection driver seam for independent x/y boundary velocity. */
+export function createDriverProjector(
+  nodes: readonly ProjectionNodeInit[],
+  positionBasisById: ReadonlyMap<string, PositionBasisCorrection>,
+  bounded = false,
+): ProjectionDriverProjector {
+  return createProjectorCore(nodes, positionBasisById, bounded);
 }
