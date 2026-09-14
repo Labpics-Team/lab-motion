@@ -40,6 +40,11 @@
   выполняется один раз при построении.
 
 ### Добавлено
+- `./behaviors/reorder`: управляемая перестановка списков/сеток по stable key,
+  pointer/keyboard, RTL, атомарные snapshots и отзыв устаревших предложений.
+  Исполняемый компонентный рецепт использует существующий projection и cleanup.
+- DOM projection принимает нативные HTMLElement в TypeScript без пользовательского
+  cast: тип `getRootNode` допускает Node и структурный root; runtime не меняется.
 - Код `LM169`: `springAsEasing` получила пружину без затухания, у которой финитной
   проекции на [0,1] не существует.
 - `compileSpringPlan` принимает `maxValueError`: абсолютный

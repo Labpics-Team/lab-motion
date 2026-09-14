@@ -465,6 +465,16 @@
         "types": "./dist/behaviors/index.d.cts",
         "default": "./dist/behaviors/index.cjs"
       }
+    },
+    "./behaviors/reorder": {
+      "import": {
+        "types": "./dist/behaviors/reorder/index.d.ts",
+        "default": "./dist/behaviors/reorder/index.js"
+      },
+      "require": {
+        "types": "./dist/behaviors/reorder/index.d.cts",
+        "default": "./dist/behaviors/reorder/index.cjs"
+      }
     }
   },
   "files": [
