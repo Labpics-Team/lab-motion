@@ -4,7 +4,7 @@ p = Path('src/projection/geometry.ts')
 s = p.read_text()
 
 old = '''export function lerp1(a: number, b: number, t: number): number {\n  return finite(finite(a) + (finite(b) - finite(a)) * t) + 0;\n}\n'''
-new = '''export function lerp1(a: number, b: number, t: number): number {\n  const x = finite(a);\n  const y = finite(b);\n  if (t === 0) return x + 0;\n  if (t === 1) return y + 0;\n  const d = y - x;\n  return finite(Number.isFinite(d) ? x + d * t : x * (1 - t) + y * t) + 0;\n}\n'''
+new = '''export function lerp1(a: number, b: number, t: number): number {\n  const x = finite(a);\n  const y = finite(b);\n  if (t === 1) return y + 0;\n  const d = y - x;\n  return finite(Number.isFinite(d) ? x + d * t : x * (1 - t) + y * t) + 0;\n}\n'''
 assert s.count(old) == 1
 s = s.replace(old, new, 1)
 
