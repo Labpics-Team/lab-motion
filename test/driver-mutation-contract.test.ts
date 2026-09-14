@@ -19,13 +19,16 @@ describe('driver mutation admission contract', () => {
     expect(config.vitest?.configFile).toBe('vitest.stryker.driver.config.ts');
   });
 
-  it('runs the bounded gate on relevant PRs while keeping the broad core scheduled', () => {
-    const workflow = readFileSync(resolve('.github/workflows/mutation.yml'), 'utf8');
+  it('keeps one PR CI SSOT while requiring driver mutation on every candidate', () => {
+    const ci = readFileSync(resolve('.github/workflows/ci.yml'), 'utf8');
+    const scheduled = readFileSync(resolve('.github/workflows/mutation.yml'), 'utf8');
 
-    expect(workflow).toMatch(/pull_request:\s*\n\s+paths:/);
-    expect(workflow).toContain('"src/driver.ts"');
-    expect(workflow).toContain("if: github.event_name != 'pull_request'");
-    expect(workflow).toContain('pnpm exec stryker run stryker.driver.config.mjs');
-    expect(workflow).toContain('needs: [core, driver]');
+    expect(ci).toContain('pnpm exec stryker run stryker.driver.config.mjs');
+    expect(scheduled).not.toMatch(/\npull_request:/);
+    expect(scheduled).toContain('schedule:');
+    expect(scheduled).toContain('workflow_dispatch:');
+    expect(scheduled).toContain('pnpm exec stryker run stryker.driver.config.mjs');
+    expect(scheduled).toContain('needs: [core, driver]');
+    expect(scheduled).toContain('timeout-minutes: 120');
   });
 });
