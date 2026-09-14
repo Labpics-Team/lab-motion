@@ -1,0 +1,39 @@
+name: R11 smart focus lifetime RED
+on:
+  push:
+    branches: [research/r11-smart-focus-lifetime-red-20260914]
+permissions:
+  contents: read
+jobs:
+  chromium:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v6
+        with:
+          node-version: "24"
+      - run: corepack enable && corepack install --global pnpm@11.11.0
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm exec playwright install --with-deps chromium
+      - run: pnpm typecheck:browser
+      - run: pnpm site:build
+      - name: Expect focus-lifetime contract RED
+        shell: bash
+        run: |
+          set -euo pipefail
+          set +e
+          pnpm exec playwright test browser/research-smart-focus-lifetime.spec.ts --project=chromium 2>&1 | tee /tmp/focus-red.log
+          rc=${PIPESTATUS[0]}
+          set -e
+          if [ "$rc" -eq 0 ]; then
+            echo 'UNEXPECTED_GREEN: current smart already isolates ghost focus' >&2
+            exit 41
+          fi
+          grep -Eq 'Expected: true|Expected: false|inertBeforeFocus|acceptedFocus' /tmp/focus-red.log || {
+            echo 'RED_WRONG_REASON: expected focus/inert assertion was not observed' >&2
+            exit 42
+          }
+          echo 'FOCUS_LIFETIME_RED=CONFIRMED'
