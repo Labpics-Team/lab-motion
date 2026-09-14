@@ -249,6 +249,60 @@ export function createProjection(options?: ProjectionOptions): ProjectionControl
   /** Переиспользуемый выход солвера (ноль аллокаций на кадр). */
   const solved = { value: 0, velocity: 0 };
 
+
+  // Один controller владеет максимум одной физической frame-reservation.
+  // Повторный play/cancel/seek меняет только логический callback внутри неё:
+  // stale generation не оставляет второй rAF висеть рядом с новым полётом.
+  let pendingTick: ((ts?: number) => void) | null = null;
+  let frameReserved = false;
+  let frameFallback: ReturnType<typeof setTimeout> | null = null;
+
+  const clearFrameFallback = (): void => {
+    if (frameFallback === null) return;
+    clearTimeout(frameFallback);
+    frameFallback = null;
+  };
+
+  const clearPendingTick = (): void => {
+    pendingTick = null;
+  };
+
+  const scheduleFrame = (cb: (ts?: number) => void): void => {
+    pendingTick = cb;
+    if (frameReserved) return;
+    if (requestFrame === undefined) return;
+
+    frameReserved = true;
+    let synchronous = true;
+    let delivered = false;
+    const fire = (ts?: number): void => {
+      if (delivered) return;
+      if (synchronous) {
+        if (frameFallback === null) frameFallback = setTimeout(() => fire(undefined), 0);
+        return;
+      }
+      delivered = true;
+      clearFrameFallback();
+      frameReserved = false;
+      const latest = pendingTick;
+      pendingTick = null;
+      latest?.(ts);
+    };
+
+    let handle: number;
+    try {
+      handle = requestFrame(fire);
+    } catch (error) {
+      delivered = true;
+      frameReserved = false;
+      clearPendingTick();
+      clearFrameFallback();
+      throw error;
+    }
+    synchronous = false;
+    if (handle == 0 && frameFallback === null) frameFallback = setTimeout(() => fire(undefined), 0);
+  };
+
   /** Производная clamp(value): вне диапазона она нулевая, на границе зависит от направления. */
   const visibleVelocity = (value: number, velocity: number): number => {
     if (!bounded) return velocity + 0;
@@ -266,6 +320,7 @@ export function createProjection(options?: ProjectionOptions): ProjectionControl
       generation++;
       phase = 'canceled';
       vHat = 0;
+      clearPendingTick();
       throw error;
     }
   };
@@ -279,6 +334,7 @@ export function createProjection(options?: ProjectionOptions): ProjectionControl
    */
   const settle = (projector: Projector): void => {
     generation++;
+    clearPendingTick();
     const gen = generation;
     phase = 'rest';
     pHat = 1;
@@ -305,8 +361,7 @@ export function createProjection(options?: ProjectionOptions): ProjectionControl
         settle(projector);
         return;
       }
-      const handle = requestFrame(cb);
-      if (handle === 0) setTimeout(() => cb(undefined), 0); // non-draining шов (flip :258)
+      scheduleFrame(cb);
     };
 
     const tick = (ts?: number): void => {
@@ -431,6 +486,7 @@ export function createProjection(options?: ProjectionOptions): ProjectionControl
     cancel(): void {
       if (flight === null || phase === 'rest' || phase === 'canceled') return;
       generation++;
+      clearPendingTick();
       phase = 'canceled';
       vHat = 0;
     },
@@ -444,6 +500,7 @@ export function createProjection(options?: ProjectionOptions): ProjectionControl
     seek(p: number): void {
       if (flight === null) return;
       generation++; // пружина погашена
+      clearPendingTick();
       const raw = Number.isNaN(p) ? 0 : p;
       const pp = bounded ? clamp01(raw) : raw;
       phase = 'held'; // boxAt/pickup остаются аналитическими, автономных кадров нет

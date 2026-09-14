@@ -743,3 +743,22 @@ describe('projection/driver: clamp — дефолт FALSE (осознанное 
     expect(Math.max(...txs)).toBeLessThanOrEqual(0);
   });
 });
+
+
+describe('projection/driver: единственная физическая frame-reservation', () => {
+  it('mid-flight play заменяет stale callback, не добавляя второй pending rAF', () => {
+    const clock = makeClock();
+    const controls = createProjection({ requestFrame: clock.requestFrame, onFrame: () => {} });
+    controls.play([{ id: 'a', first: F, last: L }]);
+    expect(clock.pending()).toBe(1);
+
+    controls.play([{ id: 'a', last: { x: 300, y: 0, width: 100, height: 100 } }]);
+    expect(clock.pending()).toBe(1);
+
+    clock.step(16);
+    expect(clock.pending()).toBe(1);
+    controls.cancel();
+    clock.step(16);
+    expect(clock.pending()).toBe(0);
+  });
+});
