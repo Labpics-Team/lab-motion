@@ -1,0 +1,101 @@
+name: R11 projection throwing-requestFrame proof
+on:
+  push:
+    branches: [temp-never-used]
+permissions:
+  contents: write
+jobs:
+  prove-fix:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - name: Checkout carrier
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          fetch-depth: 0
+          persist-credentials: true
+      - name: RED then owner-level fix
+        shell: bash
+        env:
+          TARGET_BRANCH: integrate/r11-wave-b-378
+          TARGET_SHA: f0d61f6593b4041f14a28217f7a1f76bb4b2ad0e
+        run: |
+          set -euo pipefail
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          test "$(git rev-parse "origin/$TARGET_BRANCH")" = "$TARGET_SHA"
+          git switch --detach "$TARGET_SHA"
+
+          cat >> test/projection-driver.test.ts <<'EOF'
+
+          describe('projection/driver: throwing requestFrame lifecycle', () => {
+            it('синхронный requestFrame error терминализирует run до повторного выброса', () => {
+              let captured: ((ts?: number) => void) | undefined;
+              const boom = new Error('frame boom');
+              const controls = createProjection({
+                requestFrame: (cb: (ts?: number) => void) => {
+                  captured = cb;
+                  throw boom;
+                },
+                onFrame: () => {},
+              });
+
+              expect(() => controls.play([{ id: 'a', first: F, last: L }])).toThrow(boom);
+              expect(controls.playing, 'RED requestFrame throw must cancel active run').toBe(false);
+              expect(controls.velocity).toBe(0);
+              const progress = controls.progress;
+              captured?.(16);
+              expect(controls.playing).toBe(false);
+              expect(controls.progress).toBe(progress);
+            });
+          });
+          EOF
+
+          corepack enable
+          corepack install --global pnpm@11.11.0
+          pnpm install --frozen-lockfile
+
+          set +e
+          pnpm vitest run test/projection-driver.test.ts -t 'синхронный requestFrame error терминализирует run' > "$RUNNER_TEMP/red.log" 2>&1
+          red_status=$?
+          set -e
+          cat "$RUNNER_TEMP/red.log"
+          test "$red_status" -ne 0
+          grep -q 'RED requestFrame throw must cancel active run' "$RUNNER_TEMP/red.log"
+
+          python3 - <<'PY'
+          from pathlib import Path
+          p = Path('src/projection/driver.ts')
+          s = p.read_text()
+          old = """    } catch (error) {
+              delivered = true;
+              frameReserved = false;
+              clearPendingTick();
+              clearFrameFallback();
+              throw error;
+            }
+          """
+          new = """    } catch (error) {
+              delivered = true;
+              frameReserved = false;
+              clearPendingTick();
+              clearFrameFallback();
+              generation++;
+              phase = 'canceled';
+              vHat = 0;
+              throw error;
+            }
+          """
+          if old not in s:
+              raise SystemExit('exact requestFrame catch anchor not found')
+          p.write_text(s.replace(old, new, 1))
+          PY
+
+          pnpm vitest run test/projection-driver.test.ts test/projection-dom.test.ts test/reorder.test.ts
+          pnpm typecheck
+
+          git add src/projection/driver.ts test/projection-driver.test.ts
+          git commit -m 'fix(projection): cancel run when requestFrame throws'
+          final="$(git rev-parse HEAD)"
+          git push origin "$final:refs/heads/$TARGET_BRANCH"
+          echo "projection_fix=$final"
