@@ -1,18 +1,6 @@
 name: Mutation
 
 on:
-  # A relevant PR pays only for the bounded driver campaign. The broad numerical
-  # core remains scheduled/manual because it is intentionally much heavier.
-  pull_request:
-    paths:
-      - "src/driver.ts"
-      - "test/driver-*.test.ts"
-      - "test/reduced-motion-policy.test.ts"
-      - "test/reduce-short-circuits.test.ts"
-      - "test/helpers/reduced-motion.ts"
-      - "stryker.driver.config.mjs"
-      - "vitest.stryker.driver.config.ts"
-      - ".github/workflows/mutation.yml"
   schedule:
     - cron: "17 3 * * 1"
   workflow_dispatch:
@@ -31,11 +19,10 @@ env:
 jobs:
   core:
     name: critical numerical core
-    if: github.event_name != 'pull_request'
     runs-on: ubuntu-latest
-    # Последний exact-main run дошёл до прежнего 60m потолка и был cancelled,
-    # поэтому тот timeout не являлся доказательством test failure. Даём кампании
-    # закончиться; driver ниже идёт параллельно и не увеличивает critical path.
+    # Exact-main 34825551291 дошёл до прежнего 60m потолка и был cancelled,
+    # поэтому тот ceiling не являлся доказательством test failure. Threshold и
+    # mutate-scope не ослабляем; даём широкой кампании физически завершиться.
     timeout-minutes: 120
     permissions:
       contents: read
