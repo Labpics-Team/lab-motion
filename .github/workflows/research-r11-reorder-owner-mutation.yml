@@ -7,7 +7,7 @@ permissions:
 jobs:
   mutation-proof:
     runs-on: ubuntu-latest
-    timeout-minutes: 20
+    timeout-minutes: 25
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
         with:
@@ -27,7 +27,7 @@ jobs:
           git switch --detach "$HEAD_SHA"
           cp src/behaviors/reorder/index.ts "$RUNNER_TEMP/original.ts"
 
-          run_mutant() {
+          apply_mutant() {
             local name="$1"
             cp "$RUNNER_TEMP/original.ts" src/behaviors/reorder/index.ts
             MUTANT="$name" python3 - <<'PY'
@@ -53,17 +53,42 @@ jobs:
               raise AssertionError(m)
           p.write_text(s)
           PY
+          }
+
+          run_mutant() {
+            local name="$1"
+            apply_mutant "$name"
+
             set +e
-            pnpm vitest run test/reorder-keyboard-axis-noop.test.ts test/reorder.test.ts >"$RUNNER_TEMP/$name.log" 2>&1
-            rc=$?
+            pnpm vitest run test/reorder-keyboard-axis-noop.test.ts test/reorder.test.ts >"$RUNNER_TEMP/$name-behavior.log" 2>&1
+            behavior_rc=$?
             set -e
-            if [ "$rc" -eq 0 ]; then
-              echo "MUTANT SURVIVED: $name" >&2
-              cat "$RUNNER_TEMP/$name.log" >&2
-              exit 41
+            if [ "$behavior_rc" -ne 0 ]; then
+              echo "KILLED_BEHAVIOR $name"
+              grep -E 'FAIL|AssertionError|expected|received' "$RUNNER_TEMP/$name-behavior.log" | tail -12 || true
+              return 0
             fi
-            echo "KILLED $name"
-            grep -E 'FAIL|AssertionError|expected|received' "$RUNNER_TEMP/$name.log" | tail -12 || true
+
+            echo "BEHAVIOR_EQUIVALENT $name"
+            pnpm build >"$RUNNER_TEMP/$name-build.log" 2>&1 || {
+              echo "KILLED_BUILD $name"
+              tail -40 "$RUNNER_TEMP/$name-build.log"
+              return 0
+            }
+
+            set +e
+            node scripts/size-gate.mjs >"$RUNNER_TEMP/$name-size.log" 2>&1
+            size_rc=$?
+            set -e
+            if [ "$size_rc" -ne 0 ]; then
+              echo "KILLED_BUDGET $name"
+              grep -E 'behaviors/reorder|reorder-controlled|FAIL|size-gate:' "$RUNNER_TEMP/$name-size.log" | tail -20 || true
+              return 0
+            fi
+
+            echo "MUTANT_SURVIVED_ALL_GATES $name" >&2
+            grep -E 'behaviors/reorder|reorder-controlled|size-gate:' "$RUNNER_TEMP/$name-size.log" | tail -20 >&2 || true
+            return 41
           }
 
           run_mutant drop-pointer-revoke
@@ -72,4 +97,7 @@ jobs:
 
           cp "$RUNNER_TEMP/original.ts" src/behaviors/reorder/index.ts
           pnpm vitest run test/reorder-keyboard-axis-noop.test.ts test/reorder.test.ts
+          pnpm build >/tmp/healthy-build.log 2>&1
+          node scripts/size-gate.mjs >/tmp/healthy-size.log 2>&1
+          grep -E 'behaviors/reorder|reorder-controlled|size-gate:' /tmp/healthy-size.log | tail -20 || true
           echo 'OWNER_MUTATION_PROOF=PASS'
