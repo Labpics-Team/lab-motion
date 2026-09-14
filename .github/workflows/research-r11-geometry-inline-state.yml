@@ -1,0 +1,420 @@
+name: R11 geometry inline vector state
+on:
+  push:
+    branches: [carrier/r11-geometry-inline-state-20260914]
+permissions:
+  contents: write
+jobs:
+  measure:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          fetch-depth: 0
+          persist-credentials: true
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020
+        with:
+          node-version: '24'
+      - run: corepack enable && corepack install --global pnpm@11.11.0
+      - run: pnpm install --frozen-lockfile
+      - name: Materialize inline-node vector state on exact candidate
+        env:
+          HEAD_SHA: 425f027499623740b7fb0a2c8275d47ebd700cf8
+        shell: bash
+        run: |
+          set -euo pipefail
+          git switch --detach "$HEAD_SHA"
+          python3 - <<'PY'
+          from pathlib import Path
+
+          g = Path('src/projection/geometry.ts')
+          s = g.read_text()
+          old = '''interface PositionBasisCorrection {
+            readonly x: number;
+            readonly y: number;
+          }
+
+          /** @internal Driver-only projector: same geometry owner, plus the homogeneous
+           * position basis used to preserve independent page-space x/y velocity. */
+          export interface ProjectionDriverProjector extends Projector {
+            atBasis(p: number, positionBasisValue: number): readonly ProjectionFrame[];
+            readonly hasPositionBasis: boolean;
+          }
+
+          function createProjectorCore(
+            nodes: readonly ProjectionNodeInit[],
+            positionBasisById?: ReadonlyMap<string, PositionBasisCorrection>,
+            boundPositionBasis = false,
+          ): ProjectionDriverProjector {
+          '''
+          new = '''interface DriverProjectionNodeInit extends ProjectionNodeInit {
+            _qx?: number;
+            _qy?: number;
+            _qb?: true;
+          }
+
+          export function createProjector(nodes: readonly ProjectionNodeInit[]): Projector {
+          '''
+          assert s.count(old) == 1, s.count(old)
+          s = s.replace(old, new)
+
+          old = '''  // Driver-only homogeneous position basis. Values are physical px/s
+            // corrections relative to the shared scalar progress velocity. Public
+            // createProjector never supplies them, so its old bit-path stays untouched.
+            let positionBasisX: Float64Array | undefined;
+            let positionBasisY: Float64Array | undefined;
+            let hasPositionBasis = false;
+            if (positionBasisById !== undefined && positionBasisById.size !== 0) {
+              positionBasisX = new Float64Array(count);
+              positionBasisY = new Float64Array(count);
+              for (let i = 0; i < count; i++) {
+                const correction = positionBasisById.get(nodes[i].id);
+                if (correction === undefined) continue;
+                const x = finite(correction.x);
+                const y = finite(correction.y);
+                positionBasisX[i] = x;
+                positionBasisY[i] = y;
+                if (x !== 0 || y !== 0) hasPositionBasis = true;
+              }
+            }
+
+          '''
+          assert s.count(old) == 1, s.count(old)
+          s = s.replace(old, '')
+
+          old = '  const atBasis = (p: number, positionBasisValue: number): readonly ProjectionFrame[] => {\n'
+          new = '  const at = (p: number, positionBasisValue = 0): readonly ProjectionFrame[] => {\n'
+          assert s.count(old) == 1
+          s = s.replace(old, new)
+
+          old = '''      if (q !== 0) {
+                const bx = positionBasisX?.[i] ?? 0;
+                const by = positionBasisY?.[i] ?? 0;
+                if (bx !== 0) v.x = finite(v.x + bx * q) + 0;
+                if (by !== 0) v.y = finite(v.y + by * q) + 0;
+                if (boundPositionBasis) {
+                  v.x = Math.max(Math.min(v.x, Math.max(node.first.x, node.last.x)), Math.min(node.first.x, node.last.x));
+                  v.y = Math.max(Math.min(v.y, Math.max(node.first.y, node.last.y)), Math.min(node.first.y, node.last.y));
+                }
+              }
+
+              const a = liveAncestor[i];
+              if (a === null) {
+                if (
+                  anchorIsLast[i] &&
+                  (q === 0 || ((positionBasisX?.[i] ?? 0) === 0 && (positionBasisY?.[i] ?? 0) === 0))
+                ) {
+          '''
+          new = '''      const vectorNode = node as DriverProjectionNodeInit;
+              const bx = q === 0 ? 0 : (vectorNode._qx ?? 0);
+              const by = q === 0 ? 0 : (vectorNode._qy ?? 0);
+              if (bx !== 0) v.x = finite(v.x + bx * q) + 0;
+              if (by !== 0) v.y = finite(v.y + by * q) + 0;
+              if (q !== 0 && vectorNode._qb === true) {
+                v.x = Math.max(Math.min(v.x, Math.max(node.first.x, node.last.x)), Math.min(node.first.x, node.last.x));
+                v.y = Math.max(Math.min(v.y, Math.max(node.first.y, node.last.y)), Math.min(node.first.y, node.last.y));
+              }
+
+              const a = liveAncestor[i];
+              if (a === null) {
+                if (anchorIsLast[i] && bx === 0 && by === 0) {
+          '''
+          assert s.count(old) == 1, s.count(old)
+          s = s.replace(old, new)
+
+          old = '''  const at = (p: number): readonly ProjectionFrame[] => atBasis(p, 0);
+            return { at, atBasis, order, hasPositionBasis };
+          }
+
+          /** Public scalar projector. The returned shape intentionally stays unchanged. */
+          export function createProjector(nodes: readonly ProjectionNodeInit[]): Projector {
+            const projector = createProjectorCore(nodes);
+            return { at: projector.at, order: projector.order };
+          }
+
+          /** @internal Projection driver seam for independent x/y boundary velocity. */
+          export function createDriverProjector(
+            nodes: readonly ProjectionNodeInit[],
+            positionBasisById: ReadonlyMap<string, PositionBasisCorrection>,
+            bounded = false,
+          ): ProjectionDriverProjector {
+            return createProjectorCore(nodes, positionBasisById, bounded);
+          }
+          '''
+          new = '''  return { at, order };
+          }
+          '''
+          assert s.count(old) == 1, s.count(old)
+          s = s.replace(old, new)
+          g.write_text(s)
+
+          d = Path('src/projection/driver.ts')
+          s = d.read_text()
+          old = '''  createDriverProjector,
+            finite,
+            lerp1,
+            mixBox,
+            type BoxRadii,
+            type CornerRadius,
+            type ProjectionDriverProjector,
+            type ProjectionFrame,
+            type ProjectionNodeInit,
+          '''
+          new = '''  createProjector,
+            finite,
+            lerp1,
+            mixBox,
+            type BoxRadii,
+            type CornerRadius,
+            type ProjectionFrame,
+            type ProjectionNodeInit,
+            type Projector,
+          '''
+          assert s.count(old) == 1, s.count(old)
+          s = s.replace(old, new)
+
+          old = '''interface PositionCorrection {
+            readonly x: number;
+            readonly y: number;
+          }
+
+          const EMPTY_POSITION_CORRECTIONS: ReadonlyMap<string, PositionCorrection> = new Map();
+
+          function boxWithPositionBasis(
+            src: ProjectionNodeInit,
+            pHat: number,
+            correction: PositionCorrection | undefined,
+            positionBasisValue: number,
+          ): FlipRect {
+            const box = mixBox(src.first, src.last, pHat);
+            if (correction === undefined || positionBasisValue === 0) return box;
+            return {
+              x: finite(box.x + correction.x * positionBasisValue) + 0,
+              y: finite(box.y + correction.y * positionBasisValue) + 0,
+              width: box.width,
+              height: box.height,
+            };
+          }
+          '''
+          new = '''interface VectorProjectionNode extends ProjectionNodeInit {
+            _qx?: number;
+            _qy?: number;
+            _qb?: true;
+          }
+
+          function boxWithPositionBasis(src: VectorProjectionNode, pHat: number, q: number): FlipRect {
+            const box = mixBox(src.first, src.last, pHat);
+            if (q === 0) return box;
+            const x = src._qx ?? 0;
+            const y = src._qy ?? 0;
+            if (x === 0 && y === 0) return box;
+            return { ...box, x: finite(box.x + x * q) + 0, y: finite(box.y + y * q) + 0 };
+          }
+          '''
+          assert s.count(old) == 1, s.count(old)
+          s = s.replace(old, new)
+
+          old = '''  src: ProjectionNodeInit,
+            pHat: number,
+            correction?: PositionCorrection,
+            positionBasisValue = 0,
+          ): ProjectionNodeInit {
+          '''
+          new = '''  src: VectorProjectionNode,
+            pHat: number,
+            positionBasisValue = 0,
+          ): VectorProjectionNode {
+          '''
+          assert s.count(old) == 1
+          s = s.replace(old, new)
+          old = '    first: boxWithPositionBasis(src, pHat, correction, positionBasisValue),\n'
+          new = '    first: boxWithPositionBasis(src, pHat, positionBasisValue),\n'
+          assert s.count(old) == 1
+          s = s.replace(old, new)
+
+          old = '''  readonly byId: ReadonlyMap<string, ProjectionNodeInit>;
+            /** Physical x/y velocity correction relative to the shared scalar progress. */
+            readonly positionCorrectionById: ReadonlyMap<string, PositionCorrection>;
+            readonly projector: ProjectionDriverProjector;
+          '''
+          new = '''  readonly byId: ReadonlyMap<string, VectorProjectionNode>;
+            readonly projector: Projector;
+            readonly vector: boolean;
+          '''
+          assert s.count(old) == 1
+          s = s.replace(old, new)
+
+          s = s.replace('projector: ProjectionDriverProjector', 'projector: Projector')
+          assert 'ProjectionDriverProjector' not in s
+
+          old = '''    try {
+              onFrame?.(projector.atBasis(p, positionBasisValue));
+          '''
+          new = '''    try {
+              onFrame?.((projector.at as (p: number, q?: number) => readonly ProjectionFrame[])(p, positionBasisValue));
+          '''
+          assert s.count(old) == 1
+          s = s.replace(old, new)
+
+          old = '''  const startRun = (projector: Projector, v0: number): void => {
+          '''
+          new = '''  const startRun = (projector: Projector, v0: number, vector = false): void => {
+          '''
+          assert s.count(old) == 1
+          s = s.replace(old, new)
+          s = s.replace('positionBasisVelocityHat = projector.hasPositionBasis ? 1 : 0;', 'positionBasisVelocityHat = vector ? 1 : 0;')
+          s = s.replace('const q = projector.hasPositionBasis ? finite(springBasis._valueV0) : 0;', 'const q = vector ? finite(springBasis._valueV0) : 0;')
+          s = s.replace('const qVelocity = projector.hasPositionBasis ? finite(springBasis._velocityV0) : 0;', 'const qVelocity = vector ? finite(springBasis._velocityV0) : 0;')
+          s = s.replace('!projector.hasPositionBasis || (Math.abs(q) < REST && Math.abs(qVelocity) < REST);', '!vector || (Math.abs(q) < REST && Math.abs(qVelocity) < REST);')
+          assert 'hasPositionBasis' not in s
+
+          old = '''      const prevPositionCorrections =
+                phase !== 'rest' && flight !== null ? flight.positionCorrectionById : undefined;
+          '''
+          assert s.count(old) == 1
+          s = s.replace(old, '')
+
+          old = '''          return rebaseNode(
+                    n.id,
+                    n,
+                    old,
+                    pPrev,
+                    prevPositionCorrections?.get(n.id),
+                    positionBasisPrev,
+                  );
+          '''
+          new = '''          return rebaseNode(n.id, n, old, pPrev, positionBasisPrev);
+          '''
+          assert s.count(old) == 1, s.count(old)
+          s = s.replace(old, new)
+
+          old = '''      let mutablePositionCorrections: Map<string, PositionCorrection> | undefined;
+              if (prevById !== undefined) {
+                for (const node of resolved) {
+                  const old = prevById.get(node.id);
+                  if (old === undefined) continue;
+                  const oldCorrection = prevPositionCorrections?.get(node.id);
+                  const oldVx = finite(
+                    (old.last.x - old.first.x) * vPrev +
+                      (oldCorrection?.x ?? 0) * positionBasisVelocityPrev,
+                  );
+                  const oldVy = finite(
+                    (old.last.y - old.first.y) * vPrev +
+                      (oldCorrection?.y ?? 0) * positionBasisVelocityPrev,
+                  );
+                  const correction = {
+                    x: finite(oldVx - (node.last.x - node.first.x) * v0) + 0,
+                    y: finite(oldVy - (node.last.y - node.first.y) * v0) + 0,
+                  };
+                  if (correction.x !== 0 || correction.y !== 0) {
+                    (mutablePositionCorrections ??= new Map()).set(node.id, correction);
+                  }
+                }
+              }
+              const positionCorrectionById =
+                mutablePositionCorrections ?? EMPTY_POSITION_CORRECTIONS;
+
+              // Валидация дерева — рано, до любых эффектов, даже под reduce.
+              const projector = createDriverProjector(resolved, positionCorrectionById, bounded);
+          '''
+          new = '''      let vector = false;
+              if (prevById !== undefined) {
+                for (let i = 0; i < resolved.length; i++) {
+                  let node = resolved[i] as VectorProjectionNode;
+                  const old = prevById.get(node.id);
+                  if (old === undefined) continue;
+                  const oldVx = finite((old.last.x - old.first.x) * vPrev + (old._qx ?? 0) * positionBasisVelocityPrev);
+                  const oldVy = finite((old.last.y - old.first.y) * vPrev + (old._qy ?? 0) * positionBasisVelocityPrev);
+                  const x = finite(oldVx - (node.last.x - node.first.x) * v0) + 0;
+                  const y = finite(oldVy - (node.last.y - node.first.y) * v0) + 0;
+                  if (x !== 0 || y !== 0) {
+                    if (nodes[i].first !== undefined) node = resolved[i] = { ...node } as VectorProjectionNode;
+                    node._qx = x;
+                    node._qy = y;
+                    if (bounded) node._qb = true;
+                    vector = true;
+                  }
+                }
+              }
+
+              // Валидация дерева — рано, до любых эффектов, даже под reduce.
+              const projector = createProjector(resolved);
+          '''
+          assert s.count(old) == 1, s.count(old)
+          s = s.replace(old, new)
+
+          old = '''      const byId = new Map<string, ProjectionNodeInit>();
+              for (const node of resolved) byId.set(node.id, node);
+              flight = { byId, positionCorrectionById, projector, reduced };
+          '''
+          new = '''      const byId = new Map<string, VectorProjectionNode>();
+              for (const node of resolved) byId.set(node.id, node as VectorProjectionNode);
+              flight = { byId, projector, reduced, vector };
+          '''
+          assert s.count(old) == 1
+          s = s.replace(old, new)
+          old = '      startRun(projector, v0);\n'
+          new = '      startRun(projector, v0, vector);\n'
+          # one play call + one release call later; replace first only
+          assert s.count(old) == 2, s.count(old)
+          s = s.replace(old, new, 1)
+
+          old = '''        rebased.push(
+                  rebaseNode(
+                    n.id,
+                    n,
+                    n,
+                    p0,
+                    flight.positionCorrectionById.get(n.id),
+                    positionBasisHat,
+                  ),
+                );
+          '''
+          new = '''        rebased.push(rebaseNode(n.id, n, n, p0, positionBasisHat));
+          '''
+          assert s.count(old) == 1
+          s = s.replace(old, new)
+          old = '''      const positionCorrectionById = new Map<string, PositionCorrection>();
+              const projector = createDriverProjector(rebased, positionCorrectionById, bounded);
+              const byId = new Map<string, ProjectionNodeInit>();
+              for (const node of rebased) byId.set(node.id, node);
+              const reduced = flight.reduced;
+              flight = { byId, positionCorrectionById, projector, reduced };
+          '''
+          new = '''      const projector = createProjector(rebased);
+              const byId = new Map<string, VectorProjectionNode>();
+              for (const node of rebased) byId.set(node.id, node);
+              const reduced = flight.reduced;
+              flight = { byId, projector, reduced, vector: false };
+          '''
+          assert s.count(old) == 1
+          s = s.replace(old, new)
+
+          old = '''        : boxWithPositionBasis(
+                    node,
+                    pHat,
+                    flight?.positionCorrectionById.get(id),
+                    positionBasisHat,
+                  );
+          '''
+          new = '''        : boxWithPositionBasis(node, pHat, positionBasisHat);
+          '''
+          assert s.count(old) == 1
+          s = s.replace(old, new)
+
+          assert 'positionCorrectionById' not in s
+          assert 'PositionCorrection' not in s
+          assert 'createDriverProjector' not in s
+          d.write_text(s)
+          PY
+          pnpm typecheck
+          pnpm vitest run test/projection-vector-retarget.test.ts test/projection-vector-clamp.test.ts test/projection-driver.test.ts test/projection-geometry.test.ts test/motion-contract-v1.test.ts test/projection-api-surface-pin.test.ts
+          pnpm build
+          node scripts/size-gate.mjs 2>&1 | tee "$RUNNER_TEMP/size.log"
+          grep -E 'projection-dom-one-liner|projection-core-only|projection/index.js|size-gate:' "$RUNNER_TEMP/size.log" || true
+          git status --short
+          git diff --check
+          git add src/projection/driver.ts src/projection/geometry.ts
+          git -c user.name='github-actions[bot]' -c user.email='41898282+github-actions[bot]@users.noreply.github.com' commit -m 'research: inline projection vector state'
+          git push --force origin HEAD:research/r11-geometry-inline-state-20260914
