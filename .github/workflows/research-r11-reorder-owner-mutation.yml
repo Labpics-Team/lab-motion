@@ -1,0 +1,75 @@
+name: R11 reorder owner mutation proof
+on:
+  push:
+    branches: [research/r11-reorder-owner-mutation-20260914]
+permissions:
+  contents: read
+jobs:
+  mutation-proof:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v6
+        with:
+          node-version: "24"
+      - run: corepack enable && corepack install --global pnpm@11.11.0
+      - run: pnpm install --frozen-lockfile
+      - name: Kill ownership mutants on exact accepted candidate
+        shell: bash
+        env:
+          HEAD_SHA: 8c46eeb1b6ef894dafc501255bc27e84794e3a5e
+        run: |
+          set -euo pipefail
+          git switch --detach "$HEAD_SHA"
+          cp src/behaviors/reorder/index.ts "$RUNNER_TEMP/original.ts"
+
+          run_mutant() {
+            local name="$1"
+            cp "$RUNNER_TEMP/original.ts" src/behaviors/reorder/index.ts
+            MUTANT="$name" python3 - <<'PY'
+          import os
+          from pathlib import Path
+          p=Path('src/behaviors/reorder/index.ts')
+          s=p.read_text()
+          m=os.environ['MUTANT']
+          pointer="    if (to === from) { this._proposal = undefined; return; }\n    this._propose(session, from, to);\n"
+          keyboard="    if (to === from || to < 0 || to >= layout._slots.length || Number.isNaN(layout._slots[to]!._x)) return;\n"
+          marker="  private _propose(session: number, from: number, to: number): void {\n"
+          assert s.count(pointer)==1
+          assert s.count(keyboard)==1
+          assert s.count(marker)==1
+          if m == 'drop-pointer-revoke':
+              s=s.replace(pointer, "    if (to === from) return;\n    this._propose(session, from, to);\n", 1)
+          elif m == 'drop-keyboard-noop':
+              s=s.replace(keyboard, "    if (to < 0 || to >= layout._slots.length || Number.isNaN(layout._slots[to]!._x)) return;\n", 1)
+          elif m == 'generic-revoke':
+              s=s.replace(pointer, "    this._propose(session, from, to);\n", 1)
+              s=s.replace(marker, marker+"    if (to === from) { this._proposal = undefined; return; }\n", 1)
+          else:
+              raise AssertionError(m)
+          p.write_text(s)
+          PY
+            set +e
+            pnpm vitest run test/reorder-keyboard-axis-noop.test.ts test/reorder.test.ts >"$RUNNER_TEMP/$name.log" 2>&1
+            rc=$?
+            set -e
+            if [ "$rc" -eq 0 ]; then
+              echo "MUTANT SURVIVED: $name" >&2
+              cat "$RUNNER_TEMP/$name.log" >&2
+              exit 41
+            fi
+            echo "KILLED $name"
+            grep -E 'FAIL|AssertionError|expected|received' "$RUNNER_TEMP/$name.log" | tail -12 || true
+          }
+
+          run_mutant drop-pointer-revoke
+          run_mutant drop-keyboard-noop
+          run_mutant generic-revoke
+
+          cp "$RUNNER_TEMP/original.ts" src/behaviors/reorder/index.ts
+          pnpm vitest run test/reorder-keyboard-axis-noop.test.ts test/reorder.test.ts
+          echo 'OWNER_MUTATION_PROOF=PASS'
