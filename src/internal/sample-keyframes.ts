@@ -1,6 +1,6 @@
 type Easing = (t: number) => number;
 
-/** Prevalidated hot path; missing easing is linear. */
+/** Missing easing is linear. */
 export function sampleKeyframesUnchecked(
   values: readonly number[],
   times: readonly number[],
