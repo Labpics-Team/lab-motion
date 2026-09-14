@@ -66,8 +66,8 @@ s = replace1(
 s = replace1(
     s,
     '''          const oldVx = old._qb === true\n            ? finite(oldRx * visibleVelocity(pPrev + oldX * positionBasisPrev, vPrev + oldX * positionBasisVelocityPrev))\n            : finite(oldRx * vPrev + oldX * positionBasisVelocityPrev);\n          const oldVy = old._qb === true\n            ? finite(oldRy * visibleVelocity(pPrev + oldY * positionBasisPrev, vPrev + oldY * positionBasisVelocityPrev))\n            : finite(oldRy * vPrev + oldY * positionBasisVelocityPrev);''',
-    '''          const oldVx = finite(oldRx * visibleVelocity(\n            pPrev + oldX * positionBasisPrev,\n            vPrev + oldX * positionBasisVelocityPrev,\n          ));\n          const oldVy = finite(oldRy * visibleVelocity(\n            pPrev + oldY * positionBasisPrev,\n            vPrev + oldY * positionBasisVelocityPrev,\n          ));''',
-    'unify visible boundary velocity',
+    '''          const oldVx = bounded\n            ? finite(oldRx * visibleVelocity(pPrev + oldX * positionBasisPrev, vPrev + oldX * positionBasisVelocityPrev))\n            : finite(oldRx * vPrev + oldX * positionBasisVelocityPrev);\n          const oldVy = bounded\n            ? finite(oldRy * visibleVelocity(pPrev + oldY * positionBasisPrev, vPrev + oldY * positionBasisVelocityPrev))\n            : finite(oldRy * vPrev + oldY * positionBasisVelocityPrev);''',
+    'flight-owned coefficient units',
 )
 s = replace1(s, '            if (bounded) node._qb = true;\n', '', 'remove bounded marker write')
 projector_call = '''(createProjector as unknown as (\n        nodes: readonly ProjectionNodeInit[],\n        bounded: boolean,\n      ) => Projector)'''
