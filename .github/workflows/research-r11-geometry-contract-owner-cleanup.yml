@@ -1,0 +1,49 @@
+name: R11 geometry contract-owner cleanup
+on:
+  push:
+    branches: [carrier/r11-geometry-contract-owner-cleanup-20260914]
+permissions:
+  contents: write
+jobs:
+  prove:
+    runs-on: ubuntu-latest
+    timeout-minutes: 35
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          fetch-depth: 0
+          persist-credentials: true
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020
+        with:
+          node-version: '24'
+      - run: corepack enable && corepack install --global pnpm@11.11.0
+      - run: pnpm install --frozen-lockfile
+      - name: Materialize and prove zero-runtime contract cleanup
+        shell: bash
+        run: |
+          set -euo pipefail
+          cp .github/research/r11_geometry_contract_owner_cleanup.py "$RUNNER_TEMP/materialize.py"
+          git switch --detach 48e0689beb11f088313d91ef5e915b242a37372a
+          python3 "$RUNNER_TEMP/materialize.py"
+          git diff --check
+          pnpm typecheck
+          pnpm vitest run \
+            test/projection-api-surface-pin.test.ts \
+            test/projection-driver.test.ts \
+            test/projection-dom.test.ts \
+            test/projection-geometry.test.ts \
+            test/projection-vector-retarget.test.ts \
+            test/projection-vector-clamp.test.ts \
+            test/projection-finiteness-fuzz.test.ts \
+            test/motion-contract-v1.test.ts
+          pnpm build >/dev/null
+          if grep -R -q 'DriverProjectionNodeInit' dist/projection/index.d.ts dist/projection/index.d.cts; then
+            echo 'INTERNAL_TYPE_LEAKED_TO_PUBLIC_DECLARATION' >&2
+            exit 41
+          fi
+          echo 'PUBLIC_TYPE_SURFACE=UNCHANGED_INTERNAL_ONLY'
+          node scripts/size-gate.mjs 2>&1 | tee "$RUNNER_TEMP/size.log"
+          grep -E 'projection-dom-one-liner|projection-core-only|projection\s|size-gate:' "$RUNNER_TEMP/size.log" || true
+          git add docs/projection.md src/projection/driver.ts src/projection/geometry.ts src/projection/index.ts
+          git -c user.name='github-actions[bot]' -c user.email='41898282+github-actions[bot]@users.noreply.github.com' commit -m 'docs(projection): align vector-domain contract ownership'
+          git push --force origin HEAD:refs/heads/research/r11-geometry-contract-owner-materialized-20260914
