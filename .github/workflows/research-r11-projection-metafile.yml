@@ -1,0 +1,53 @@
+name: R11 projection metafile
+on:
+  push:
+    branches: [carrier/r11-projection-metafile-20260914]
+permissions:
+  contents: read
+jobs:
+  measure:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020
+        with:
+          node-version: '24'
+      - run: corepack enable && corepack install --global pnpm@11.11.0
+      - run: pnpm install --frozen-lockfile
+      - name: Attribute bundled bytes
+        shell: bash
+        run: |
+          set -euo pipefail
+          git show origin/carrier/r11-geometry-shared-position-20260914:.github/research/r11_geometry_shared_position.py > "$RUNNER_TEMP/shared.py"
+          git show origin/carrier/r11-projection-dom-state-20260914:.github/research/r11_projection_dom_state.py > "$RUNNER_TEMP/dom.py"
+          git switch --detach 62d94f44c8b5207354d02a30fda7283034e7cdbe
+          python3 "$RUNNER_TEMP/shared.py"
+          python3 "$RUNNER_TEMP/dom.py"
+          pnpm build >/dev/null
+          node --input-type=module <<'NODE'
+          import { build } from 'esbuild';
+          const result = await build({
+            stdin: {
+              contents: `import { createDomProjection } from './dist/projection/index.js'; const p = createDomProjection(); p.capture([]); p.play(); p.cancel(); console.log(p.playing);`,
+              resolveDir: process.cwd(),
+              sourcefile: 'projection-dom-one-liner.mjs',
+            },
+            bundle: true,
+            minify: true,
+            format: 'esm',
+            target: 'es2022',
+            treeShaking: true,
+            write: false,
+            metafile: true,
+          });
+          const output = Object.values(result.metafile.outputs)[0];
+          const rows = Object.entries(output.inputs)
+            .map(([path, v]) => [path, v.bytesInOutput])
+            .sort((a, b) => b[1] - a[1]);
+          console.log('TOTAL_RAW=' + result.outputFiles[0].contents.length);
+          for (const [path, bytes] of rows) console.log(`${bytes}\t${path}`);
+          NODE
