@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { createProjection } from '../../src/projection/index.js';
+import { createProjection } from '../src/projection/index.js';
 
 type Point = { x: number; y: number };
 
