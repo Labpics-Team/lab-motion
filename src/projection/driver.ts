@@ -57,16 +57,18 @@ import { solveSpring, type MutableSpringBasis } from '../internal/solver.js';
 import type { RequestFrameFn } from '../motion-value.js';
 import { type SpringParams, validateSpringForFrameLoop } from '../spring.js';
 import {
+  boundPositionAxis,
+  boundPositionVelocity,
   clamp01,
-  createDriverProjector,
+  createProjector,
   finite,
   lerp1,
   mixBox,
   type BoxRadii,
   type CornerRadius,
-  type ProjectionDriverProjector,
   type ProjectionFrame,
   type ProjectionNodeInit,
+  type Projector,
 } from './geometry.js';
 
 // ─── Публичные типы ──────────────────────────────────────────────────────────
@@ -144,28 +146,26 @@ function lerpRadii(a: BoxRadii, b: BoxRadii, t: number): BoxRadii {
   return out;
 }
 
-interface PositionCorrection {
-  readonly x: number;
-  readonly y: number;
+interface VectorProjectionNode extends ProjectionNodeInit {
+  _qx?: number;
+  _qy?: number;
+  _qb?: true;
 }
 
-const EMPTY_POSITION_CORRECTIONS: ReadonlyMap<string, PositionCorrection> = new Map();
-
-function boxWithPositionBasis(
-  src: ProjectionNodeInit,
-  pHat: number,
-  correction: PositionCorrection | undefined,
-  positionBasisValue: number,
-): FlipRect {
-  const box = mixBox(src.first, src.last, pHat);
-  if (correction === undefined || positionBasisValue === 0) return box;
-  return {
-    x: finite(box.x + correction.x * positionBasisValue) + 0,
-    y: finite(box.y + correction.y * positionBasisValue) + 0,
-    width: box.width,
-    height: box.height,
-  };
-}
+function boxWithPositionBasis(src: VectorProjectionNode, pHat: number, q: number): FlipRect {
+      const box = mixBox(src.first, src.last, pHat);
+      if (q === 0) return box;
+      const out = box as { x: number; y: number };
+      const x = src._qx ?? 0;
+      const y = src._qy ?? 0;
+      if (x !== 0) out.x = finite(box.x + x * q) + 0;
+      if (y !== 0) out.y = finite(box.y + y * q) + 0;
+      if (src._qb === true) {
+        out.x = boundPositionAxis(box.x, src.first.x, src.last.x);
+        out.y = boundPositionAxis(box.y, src.first.y, src.last.y);
+      }
+      return box;
+    }
 
 /**
  * Ребейз узла на текущем аналитическом visual box. Scalar channels use p̂;
@@ -175,16 +175,15 @@ function boxWithPositionBasis(
 function rebaseNode(
   id: string,
   target: Omit<ProjectionPlayNode, 'id'>,
-  src: ProjectionNodeInit,
+  src: VectorProjectionNode,
   pHat: number,
-  correction?: PositionCorrection,
   positionBasisValue = 0,
-): ProjectionNodeInit {
+): VectorProjectionNode {
   const tc = clamp01(pHat);
   return {
     id,
     parent: target.parent,
-    first: boxWithPositionBasis(src, pHat, correction, positionBasisValue),
+    first: boxWithPositionBasis(src, pHat, positionBasisValue),
     last: target.last,
     anchor: target.anchor,
     radii:
@@ -239,10 +238,9 @@ function prefersReducedMotion(
 
 interface Flight {
   /** Узлы полёта; Map сохраняет порядок вставки (= порядок resolved-входа). */
-  readonly byId: ReadonlyMap<string, ProjectionNodeInit>;
-  /** Physical x/y velocity correction relative to the shared scalar progress. */
-  readonly positionCorrectionById: ReadonlyMap<string, PositionCorrection>;
-  readonly projector: ProjectionDriverProjector;
+  readonly byId: ReadonlyMap<string, VectorProjectionNode>;
+  readonly projector: Projector;
+  readonly vector: boolean;
   /** Character-switch зафиксирован на play (§4.4: смена reduce в полёте не подхватывается). */
   readonly reduced: boolean;
 }
@@ -352,12 +350,12 @@ export function createProjection(options?: ProjectionOptions): ProjectionControl
 
   /** Исключение пользовательского callback не должно оставлять «играющий» зомби-run. */
   const emit = (
-    projector: ProjectionDriverProjector,
+    projector: Projector,
     p: number,
     positionBasisValue = 0,
   ): void => {
     try {
-      onFrame?.(projector.atBasis(p, positionBasisValue));
+      onFrame?.((projector.at as (p: number, q?: number) => readonly ProjectionFrame[])(p, positionBasisValue));
     } catch (error) {
       generation++;
       phase = 'canceled';
@@ -375,7 +373,7 @@ export function createProjection(options?: ProjectionOptions): ProjectionControl
    * Финальный onFrame может синхронно запустить/отменить новый run —
    * тогда старый onRest stale (гард по gen/phase).
    */
-  const settle = (projector: ProjectionDriverProjector): void => {
+  const settle = (projector: Projector): void => {
     generation++;
     clearPendingTick();
     const gen = generation;
@@ -389,14 +387,14 @@ export function createProjection(options?: ProjectionOptions): ProjectionControl
     if (gen === generation && phase === 'rest') onRest?.();
   };
 
-  const startRun = (projector: ProjectionDriverProjector, v0: number): void => {
+  const startRun = (projector: Projector, v0: number, vector = false): void => {
     generation++;
     const gen = generation;
     phase = 'active';
     pHat = 0;
     vHat = visibleVelocity(0, v0);
     positionBasisHat = 0;
-    positionBasisVelocityHat = projector.hasPositionBasis ? 1 : 0;
+    positionBasisVelocityHat = vector ? 1 : 0;
     progress = 0;
     let elapsed = 0;
     let lastTs: number | undefined;
@@ -431,10 +429,10 @@ export function createProjection(options?: ProjectionOptions): ProjectionControl
       solveSpring(params, elapsed, v0, solved, springBasis);
       const value = finite(solved.value);
       const velocity = finite(solved.velocity);
-      const q = projector.hasPositionBasis ? finite(springBasis._valueV0) : 0;
-      const qVelocity = projector.hasPositionBasis ? finite(springBasis._velocityV0) : 0;
+      const q = vector ? finite(springBasis._valueV0) : 0;
+      const qVelocity = vector ? finite(springBasis._velocityV0) : 0;
       const basisConverged =
-        !projector.hasPositionBasis || (Math.abs(q) < REST && Math.abs(qVelocity) < REST);
+        !vector || (Math.abs(q) < REST && Math.abs(qVelocity) < REST);
       const converged =
         (Math.abs(1 - value) < REST && Math.abs(velocity) < REST && basisConverged) ||
         frames >= MAX_FRAMES;
@@ -467,8 +465,6 @@ export function createProjection(options?: ProjectionOptions): ProjectionControl
     play(nodes: readonly ProjectionPlayNode[]): void {
       // Незавершённое состояние (active/held/canceled) остаётся аналитическим источником pickup.
       const prevById = phase !== 'rest' && flight !== null ? flight.byId : undefined;
-      const prevPositionCorrections =
-        phase !== 'rest' && flight !== null ? flight.positionCorrectionById : undefined;
       const pPrev = pHat;
       const vPrev = vHat;
       const positionBasisPrev = positionBasisHat;
@@ -482,14 +478,7 @@ export function createProjection(options?: ProjectionOptions): ProjectionControl
           if (old === undefined) {
             throw new MotionParamError('LM078');
           }
-          return rebaseNode(
-            n.id,
-            n,
-            old,
-            pPrev,
-            prevPositionCorrections?.get(n.id),
-            positionBasisPrev,
-          );
+          return rebaseNode(n.id, n, old, pPrev, positionBasisPrev);
         }
         // first задан: узел структурно уже ProjectionNodeInit; геометрия читает
         // поля по ссылкам в обоих вариантах — копия объекта ничего не защищала.
@@ -535,42 +524,37 @@ export function createProjection(options?: ProjectionOptions): ProjectionControl
         }
       }
 
-      // x/y carry their own physical boundary velocity while keeping the
-      // shared scalar progress for every existing non-position channel. The
-      // correction is zero for unchanged targets, preserving the old bit-path.
-      let mutablePositionCorrections: Map<string, PositionCorrection> | undefined;
+      // x/y carry their own physical boundary velocity while scalar channels share P(t).
+      let vector = false;
       if (prevById !== undefined) {
-        for (const node of resolved) {
+        for (let i = 0; i < resolved.length; i++) {
+          let node = resolved[i] as VectorProjectionNode;
           const old = prevById.get(node.id);
           if (old === undefined) continue;
-          const oldCorrection = prevPositionCorrections?.get(node.id);
-          const oldVx = finite(
-            (old.last.x - old.first.x) * vPrev +
-              (oldCorrection?.x ?? 0) * positionBasisVelocityPrev,
-          );
-          const oldVy = finite(
-            (old.last.y - old.first.y) * vPrev +
-              (oldCorrection?.y ?? 0) * positionBasisVelocityPrev,
-          );
-          const correction = {
-            x: finite(oldVx - (node.last.x - node.first.x) * v0) + 0,
-            y: finite(oldVy - (node.last.y - node.first.y) * v0) + 0,
-          };
-          if (correction.x !== 0 || correction.y !== 0) {
-            (mutablePositionCorrections ??= new Map()).set(node.id, correction);
+          const oldBox = boxWithPositionBasis(old, pPrev, positionBasisPrev);
+        const rawVx = finite((old.last.x - old.first.x) * vPrev + (old._qx ?? 0) * positionBasisVelocityPrev);
+        const rawVy = finite((old.last.y - old.first.y) * vPrev + (old._qy ?? 0) * positionBasisVelocityPrev);
+        const oldVx = old._qb === true ? boundPositionVelocity(oldBox.x, rawVx, old.first.x, old.last.x) : rawVx;
+        const oldVy = old._qb === true ? boundPositionVelocity(oldBox.y, rawVy, old.first.y, old.last.y) : rawVy;
+        const x = finite(oldVx - (node.last.x - node.first.x) * v0) + 0;
+          const y = finite(oldVy - (node.last.y - node.first.y) * v0) + 0;
+          if (x !== 0 || y !== 0) {
+            if (nodes[i].first !== undefined) node = resolved[i] = { ...node } as VectorProjectionNode;
+            node._qx = x;
+            node._qy = y;
+            if (bounded) node._qb = true;
+            vector = true;
           }
         }
       }
-      const positionCorrectionById =
-        mutablePositionCorrections ?? EMPTY_POSITION_CORRECTIONS;
 
       // Валидация дерева — рано, до любых эффектов, даже под reduce.
-      const projector = createDriverProjector(resolved, positionCorrectionById, bounded);
+      const projector = createProjector(resolved);
       const reduced = prefersReducedMotion(options?.matchMedia); // резолв ОДИН раз на play
 
-      const byId = new Map<string, ProjectionNodeInit>();
-      for (const node of resolved) byId.set(node.id, node);
-      flight = { byId, positionCorrectionById, projector, reduced };
+      const byId = new Map<string, VectorProjectionNode>();
+      for (const node of resolved) byId.set(node.id, node as VectorProjectionNode);
+      flight = { byId, projector, reduced, vector };
 
       if (reduced || resolved.length === 0) {
         // P4 character-switch и пустое дерево не требуют автономного кадра:
@@ -579,7 +563,7 @@ export function createProjection(options?: ProjectionOptions): ProjectionControl
         return;
       }
 
-      startRun(projector, v0);
+      startRun(projector, v0, vector);
     },
 
     cancel(): void {
@@ -629,23 +613,13 @@ export function createProjection(options?: ProjectionOptions): ProjectionControl
       // цели не менялись — теорема §2.3.2 даёт точный C¹ при v0 = v/(1−p_seek)).
       const rebased: ProjectionNodeInit[] = [];
       for (const n of flight.byId.values()) {
-        rebased.push(
-          rebaseNode(
-            n.id,
-            n,
-            n,
-            p0,
-            flight.positionCorrectionById.get(n.id),
-            positionBasisHat,
-          ),
-        );
+        rebased.push(rebaseNode(n.id, n, n, p0, positionBasisHat));
       }
-      const positionCorrectionById = new Map<string, PositionCorrection>();
-      const projector = createDriverProjector(rebased, positionCorrectionById, bounded);
-      const byId = new Map<string, ProjectionNodeInit>();
+      const projector = createProjector(rebased);
+      const byId = new Map<string, VectorProjectionNode>();
       for (const node of rebased) byId.set(node.id, node);
       const reduced = flight.reduced;
-      flight = { byId, positionCorrectionById, projector, reduced };
+      flight = { byId, projector, reduced, vector: false };
 
       if (reduced) {
         // Character-switch удержан: под reduce release снапает (без автономного полёта).
@@ -670,12 +644,7 @@ export function createProjection(options?: ProjectionOptions): ProjectionControl
       if (node === undefined) return undefined;
       return phase === 'rest'
         ? node.last
-        : boxWithPositionBasis(
-            node,
-            pHat,
-            flight?.positionCorrectionById.get(id),
-            positionBasisHat,
-          );
+        : boxWithPositionBasis(node, pHat, positionBasisHat);
     },
 
     get playing(): boolean {
