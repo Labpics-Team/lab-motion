@@ -80,6 +80,7 @@ const verifyCommands = [
     + 'node scripts/check-release.mjs "v${version}" --validate-stored-date',
   vitestCommand,
   'pnpm vitest run --reporter=verbose test/*finiteness-fuzz.test.ts',
+  'pnpm exec stryker run stryker.driver.config.mjs',
   'pnpm size',
   'pnpm pack:smoke',
   'pnpm pack:compat',
@@ -132,7 +133,7 @@ const requiredActions = {
       }
     },
     {
-      "index": 20,
+      "index": 21,
       "name": "Upload Node-floor candidate",
       "uses": "actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a",
       "with": {
