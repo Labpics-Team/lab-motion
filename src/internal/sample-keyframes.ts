@@ -1,6 +1,6 @@
 type Easing = (t: number) => number;
 
-/** Missing easing is linear. */
+/** Без easing — линейно. */
 export function sampleKeyframesUnchecked(
   values: readonly number[],
   times: readonly number[],
