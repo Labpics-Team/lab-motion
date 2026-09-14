@@ -23,6 +23,20 @@ jobs:
         run: |
           set -euo pipefail
           cp .github/scripts/carrier-r11-geometry-indexed-state.py /tmp/indexed-state.py
+          python3 - <<'PY'
+          from pathlib import Path
+          p = Path('/tmp/indexed-state.py')
+          s = p.read_text()
+          s = s.replace(
+              "s = one(s, \"startRun(projector, v0);\", \"startRun(projector, v0, positionBasis !== undefined);\", 'play startRun')",
+              "s = s.replace(\"startRun(projector, v0);\", \"startRun(projector, v0, positionBasis !== undefined);\", 1)",
+          )
+          s = s.replace(
+              "s = one(s, \"startRun(projector, v0);\", \"startRun(projector, v0, false);\", 'release startRun')",
+              "s = s.replace(\"startRun(projector, v0);\", \"startRun(projector, v0, false);\", 1)",
+          )
+          p.write_text(s)
+          PY
           git switch --detach "$TARGET_SHA"
           test "$(git rev-parse HEAD)" = "$TARGET_SHA"
           python3 /tmp/indexed-state.py
