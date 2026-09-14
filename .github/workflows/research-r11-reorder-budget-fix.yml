@@ -46,8 +46,10 @@ jobs:
           grep -q 'if (to === from || to < 0' src/behaviors/reorder/index.ts
           test "$(grep -c 'if (to === from) { this._proposal = undefined; return; }' src/behaviors/reorder/index.ts)" -eq 1
 
-          pnpm vitest run test/reorder-keyboard-axis-noop.test.ts test/reorder.test.ts test/reorder-package.test.ts test/reorder-gc.test.ts
+          # Source semantics first; artifact-dependent package/GC tests only after build.
+          pnpm vitest run test/reorder-keyboard-axis-noop.test.ts test/reorder.test.ts
           pnpm build
+          pnpm vitest run test/reorder-package.test.ts test/reorder-gc.test.ts
           node scripts/size-gate.mjs
           pnpm typecheck
 
