@@ -1,0 +1,107 @@
+name: R11 exact-head review fixes v2
+on:
+  push:
+    branches: [carrier/r11-review-fixes-20260914]
+permissions:
+  contents: write
+jobs:
+  materialize:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - name: Checkout exact graph
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          fetch-depth: 0
+          persist-credentials: true
+      - name: Apply verified findings and prove affected closure
+        shell: bash
+        env:
+          BASE_HEAD: 954d19b05452d391d86e49fa7e84bb90b9813747
+          TARGET: integrate/r11-review-fixes-carrier
+        run: |
+          set -euo pipefail
+          git cat-file -e "$BASE_HEAD^{commit}"
+          git switch --detach "$BASE_HEAD"
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+
+          python3 - <<'PY'
+          from pathlib import Path
+
+          p = Path('src/behaviors/reorder/index.ts')
+          s = p.read_text()
+          old = "    if (to < 0 || to >= layout._slots.length || Number.isNaN(layout._slots[to]!._x)) return;\n    this._propose(session, from, to);\n"
+          new = "    if (to === from || to < 0 || to >= layout._slots.length || Number.isNaN(layout._slots[to]!._x)) return;\n    this._propose(session, from, to);\n"
+          assert s.count(old) == 1
+          p.write_text(s.replace(old, new, 1))
+
+          p = Path('docs/api.md')
+          s = p.read_text()
+          old_count = 'Корневой экспорт + 42 субпути; неиспользуемые субпути вырезаются\n'
+          assert s.count(old_count) == 1
+          s = s.replace(old_count, 'Корневой экспорт + 43 субпути; неиспользуемые субпути вырезаются\n', 1)
+          stale = "| `…/animate` | Фасад-one-liner: `animate(target, props, options)` — цели по каналам (`x`/`y`/`scale`/`rotate`, `opacity`, CSS-свойства), режим `{ spring }` или `{ duration, ease }`, `delay`/`stagger`, контролы `{ finished, play, pause, seek, cancel, stop }`. Это базовый single-transition DX-срез; ядро от него не растёт |\n"
+          assert s.count(stale) == 1
+          s = s.replace(stale, '', 1)
+          assert s.count('| `…/animate` |') == 1
+          assert 'createAnimateScope(root)' in s
+          p.write_text(s)
+
+          p = Path('test/motion-value.test.ts')
+          s = p.read_text()
+          stale = '''    // Ретаргет начинается из последнего snapshot, не задерживает следующие часы.\n    // The NEXT tick (drain 1) will set _startTs = currentTs, elapsed=0 → position unchanged.\n    // The tick AFTER THAT (drain 2 total) will have elapsed=dt → shows actual movement.\n    mv.setTarget(200);\n\n    // Следующий кадр продолжает движение с унаследованной скоростью.\n    clock.drain(1);\n\n    // Drain frame N+2: this tick has elapsed=dt from the new run → actual spring movement.\n    clock.drain(1);\n    const idxAfter = values.length - 1;\n    // Velocity = delta between frame N+2 and N+1 (both post-retarget frames).\n'''
+          fresh = '''    // Ретаргет начинается из последнего опубликованного snapshot-origin.\n    // Поэтому первый post-retarget callback сразу учитывает прошедшее после snapshot время,\n    // а не создаёт новый elapsed=0 кадр.\n    mv.setTarget(200);\n\n    // Первый post-retarget кадр уже продолжает движение с унаследованной скоростью.\n    clock.drain(1);\n\n    // Второй post-retarget кадр даёт вторую точку для оценки скорости после перехвата.\n    clock.drain(1);\n    const idxAfter = values.length - 1;\n    // Velocity = delta между двумя последовательными post-retarget кадрами.\n'''
+          assert s.count(stale) == 1
+          p.write_text(s.replace(stale, fresh, 1))
+          PY
+
+          cat > test/reorder-keyboard-axis-noop.test.ts <<'EOF'
+          import { expect, it, vi } from 'vitest';
+          import { createReorder } from '../src/behaviors/reorder/index.js';
+
+          const row = () => ['a', 'b', 'c'].map((key, i) => ({
+            key,
+            rect: { x: i * 40, y: 0, width: 20, height: 20 },
+          }));
+
+          it('orthogonal keyboard no-op preserves the outstanding proposal', () => {
+            const onReorder = vi.fn();
+            const state = createReorder({ items: row(), axis: 'x', onReorder });
+            const session = state.start('a')!;
+
+            session.step('next');
+            expect(onReorder).toHaveBeenCalledTimes(1);
+            const proposal = onReorder.mock.calls[0]![1];
+            expect(state.isCurrent(proposal)).toBe(true);
+
+            session.step('up');
+
+            expect(onReorder).toHaveBeenCalledTimes(1);
+            expect(state.isCurrent(proposal)).toBe(true);
+          });
+          EOF
+          sed -i 's/^          //' test/reorder-keyboard-axis-noop.test.ts
+          git add -N test/reorder-keyboard-axis-noop.test.ts
+
+          test "$(git diff --name-only | sort | paste -sd' ' -)" = "docs/api.md src/behaviors/reorder/index.ts test/motion-value.test.ts test/reorder-keyboard-axis-noop.test.ts"
+          ! git grep -nE '^(<<<<<<<|=======|>>>>>>>)'
+          grep -q 'Корневой экспорт + 43 субпути' docs/api.md
+          test "$(grep -c '^| `…/animate` |' docs/api.md)" -eq 1
+          grep -q 'createAnimateScope(root)' docs/api.md
+          grep -q 'if (to === from || to < 0' src/behaviors/reorder/index.ts
+
+          corepack enable
+          corepack install --global pnpm@11.11.0
+          pnpm install --frozen-lockfile
+          pnpm vitest run test/reorder-keyboard-axis-noop.test.ts test/reorder.test.ts test/motion-value.test.ts test/readme-facts.test.ts
+          pnpm build
+          node scripts/check-docs-facts.mjs
+          node scripts/check-docs-drift.mjs
+          pnpm typecheck
+
+          git add docs/api.md src/behaviors/reorder/index.ts test/motion-value.test.ts test/reorder-keyboard-axis-noop.test.ts
+          git commit -m 'fix(integration): close exact-head review findings'
+          final="$(git rev-parse HEAD)"
+          git push --force-with-lease origin "$final:refs/heads/$TARGET"
+          printf 'review_fix_carrier=%s\n' "$final"
