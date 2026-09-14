@@ -475,6 +475,16 @@
         "types": "./dist/behaviors/reorder/index.d.cts",
         "default": "./dist/behaviors/reorder/index.cjs"
       }
+    },
+    "./bindings": {
+      "import": {
+        "types": "./dist/bindings/index.d.ts",
+        "default": "./dist/bindings/index.js"
+      },
+      "require": {
+        "types": "./dist/bindings/index.d.cts",
+        "default": "./dist/bindings/index.cjs"
+      }
     }
   },
   "files": [
@@ -483,7 +493,8 @@
     "docs/benchmark.md",
     "docs/motion-conformance.md",
     "docs/recipes.md",
-    "!dist/**/*.map"
+    "!dist/**/*.map",
+    "docs/bindings.md"
   ],
   "publishConfig": {
     "access": "public"

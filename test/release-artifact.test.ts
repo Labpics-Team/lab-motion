@@ -54,6 +54,7 @@ function releaseMetadata() {
       'docs/motion-conformance.md',
       'docs/recipes.md',
       '!dist/**/*.map',
+      'docs/bindings.md',
     ],
     publishConfig: { access: 'public' },
     sideEffects: [
