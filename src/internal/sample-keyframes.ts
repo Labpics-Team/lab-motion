@@ -40,7 +40,8 @@ export function sampleKeyframesUnchecked(
   // Keep this guard in the hot function: a separate one-use helper is inlined
   // by Terser as a per-sample FunctionExpression/IIFE in the shipped artifact.
   if (!Number.isFinite(eased)) {
-    eased = eased > 0 ? Number.MAX_VALUE : eased < 0 ? -Number.MAX_VALUE : 0;
+    if (Number.isNaN(eased)) eased = 0;
+    else eased = eased > 0 ? Number.MAX_VALUE : -Number.MAX_VALUE;
   }
   const value = from + (to - from) * eased;
   return Number.isFinite(value) ? value : to;
