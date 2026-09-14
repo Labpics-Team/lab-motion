@@ -57,6 +57,7 @@
   Исполняемый компонентный рецепт использует существующий projection и cleanup.
 - DOM projection принимает нативные HTMLElement в TypeScript без пользовательского
   cast: тип `getRootNode` допускает Node и структурный root; runtime не меняется.
+- `animateScrollWaapi` / `animateViewWaapi` в `./waapi`: нативные scroll/view-progress шкалы через `ScrollTimeline`/`ViewTimeline`; на поддерживаемом host нет scroll-listener/rAF Lab Motion, на неподдерживаемом путь возвращает `undefined` без скрытой JS-эмуляции.
 - Код `LM169`: `springAsEasing` получила пружину без затухания, у которой финитной
   проекции на [0,1] не существует.
 - `compileSpringPlan` принимает `maxValueError`: абсолютный
