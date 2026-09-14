@@ -132,7 +132,7 @@ export function clamp01(x: number): number {
 
 /** Driver-private page-position carry shared by analytic pickup and tree projection. @internal */
 export function carryPositionAxis(base: number, q: number, correction: number): number {
-  return q === 0 || correction === 0 ? base : finite(base + correction * q) + 0;
+  return correction === 0 ? base : finite(base + correction * q) + 0;
 }
 
 
