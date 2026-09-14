@@ -57,8 +57,6 @@ import { solveSpring, type MutableSpringBasis } from '../internal/solver.js';
 import type { RequestFrameFn } from '../motion-value.js';
 import { type SpringParams, validateSpringForFrameLoop } from '../spring.js';
 import {
-  boundPositionAxis,
-  boundPositionVelocity,
   clamp01,
   createProjector,
   finite,
@@ -153,19 +151,20 @@ interface VectorProjectionNode extends ProjectionNodeInit {
 }
 
 function boxWithPositionBasis(src: VectorProjectionNode, pHat: number, q: number): FlipRect {
-      const box = mixBox(src.first, src.last, pHat);
-      if (q === 0) return box;
-      const out = box as { x: number; y: number };
-      const x = src._qx ?? 0;
-      const y = src._qy ?? 0;
-      if (x !== 0) out.x = finite(box.x + x * q) + 0;
-      if (y !== 0) out.y = finite(box.y + y * q) + 0;
-      if (src._qb === true) {
-        out.x = boundPositionAxis(box.x, src.first.x, src.last.x);
-        out.y = boundPositionAxis(box.y, src.first.y, src.last.y);
-      }
-      return box;
-    }
+  const box = mixBox(src.first, src.last, pHat);
+  if (q === 0) return box;
+  const out = box as { x: number; y: number };
+  const x = src._qx ?? 0;
+  const y = src._qy ?? 0;
+  if (src._qb === true) {
+    if (x !== 0) out.x = lerp1(src.first.x, src.last.x, clamp01(pHat + x * q));
+    if (y !== 0) out.y = lerp1(src.first.y, src.last.y, clamp01(pHat + y * q));
+  } else {
+    if (x !== 0) out.x = finite(box.x + x * q) + 0;
+    if (y !== 0) out.y = finite(box.y + y * q) + 0;
+  }
+  return box;
+}
 
 /**
  * Ребейз узла на текущем аналитическом visual box. Scalar channels use p̂;
@@ -264,10 +263,6 @@ export function createProjection(options?: ProjectionOptions): ProjectionControl
   let pHat = 1;
   /** Производная видимого p последнего кадра. Покой/cancel = 0. */
   let vHat = 0;
-  /** Q(t), коэффициент физической начальной скорости для x/y. */
-  let positionBasisHat = 0;
-  /** Q'(t); нужен для повторного retarget без потери уже перенесённой скорости. */
-  let positionBasisVelocityHat = 0;
   /** Публичный прогресс — всегда [0,1]. */
   let progress = 1;
   /** Инвалидация кадров перехваченного полёта (класс stale-frame, flip :217-218). */
@@ -332,7 +327,7 @@ export function createProjection(options?: ProjectionOptions): ProjectionControl
       generation++;
       phase = 'canceled';
       vHat = 0;
-      positionBasisVelocityHat = 0;
+      springBasis._velocityV0 = 0;
       throw error;
     }
     synchronous = false;
@@ -360,7 +355,7 @@ export function createProjection(options?: ProjectionOptions): ProjectionControl
       generation++;
       phase = 'canceled';
       vHat = 0;
-      positionBasisVelocityHat = 0;
+      springBasis._velocityV0 = 0;
       clearPendingTick();
       throw error;
     }
@@ -380,8 +375,7 @@ export function createProjection(options?: ProjectionOptions): ProjectionControl
     phase = 'rest';
     pHat = 1;
     vHat = 0;
-    positionBasisHat = 0;
-    positionBasisVelocityHat = 0;
+    springBasis._valueV0 = springBasis._velocityV0 = 0;
     progress = 1;
     emit(projector, 1, 0); // финал — РОВНО p = 1 (точный identity)
     if (gen === generation && phase === 'rest') onRest?.();
@@ -393,8 +387,8 @@ export function createProjection(options?: ProjectionOptions): ProjectionControl
     phase = 'active';
     pHat = 0;
     vHat = visibleVelocity(0, v0);
-    positionBasisHat = 0;
-    positionBasisVelocityHat = vector ? 1 : 0;
+    springBasis._valueV0 = 0;
+    springBasis._velocityV0 = vector ? 1 : 0;
     progress = 0;
     let elapsed = 0;
     let lastTs: number | undefined;
@@ -448,10 +442,10 @@ export function createProjection(options?: ProjectionOptions): ProjectionControl
         (value === 1 && velocity <= 0);
       pHat = p;
       vHat = visibleVelocity(value, velocity);
-      positionBasisHat = basisVisible ? q : 0;
-      positionBasisVelocityHat = basisVisible ? qVelocity : 0;
+      springBasis._valueV0 = basisVisible ? q : 0;
+      springBasis._velocityV0 = basisVisible ? qVelocity : 0;
       progress = clamp01(p);
-      emit(projector, p, positionBasisHat);
+      emit(projector, p, springBasis._valueV0);
       // Callback мог синхронно перехватить run — не оставляем даже один stale request.
       if (gen === generation && phase === 'active') schedule(tick);
     };
@@ -467,8 +461,8 @@ export function createProjection(options?: ProjectionOptions): ProjectionControl
       const prevById = phase !== 'rest' && flight !== null ? flight.byId : undefined;
       const pPrev = pHat;
       const vPrev = vHat;
-      const positionBasisPrev = positionBasisHat;
-      const positionBasisVelocityPrev = positionBasisVelocityHat;
+      const positionBasisPrev = springBasis._valueV0;
+      const positionBasisVelocityPrev = springBasis._velocityV0;
 
       // C⁰ всех каналов: visual pickup — first' = V(p̂) аналитически (ноль
       // DOM-чтений), radii.first'/opacity.from' — тем же lerp'ом на clamp01(p̂).
@@ -531,13 +525,24 @@ export function createProjection(options?: ProjectionOptions): ProjectionControl
           let node = resolved[i] as VectorProjectionNode;
           const old = prevById.get(node.id);
           if (old === undefined) continue;
-          const oldBox = boxWithPositionBasis(old, pPrev, positionBasisPrev);
-        const rawVx = finite((old.last.x - old.first.x) * vPrev + (old._qx ?? 0) * positionBasisVelocityPrev);
-        const rawVy = finite((old.last.y - old.first.y) * vPrev + (old._qy ?? 0) * positionBasisVelocityPrev);
-        const oldVx = old._qb === true ? boundPositionVelocity(oldBox.x, rawVx, old.first.x, old.last.x) : rawVx;
-        const oldVy = old._qb === true ? boundPositionVelocity(oldBox.y, rawVy, old.first.y, old.last.y) : rawVy;
-        const x = finite(oldVx - (node.last.x - node.first.x) * v0) + 0;
-          const y = finite(oldVy - (node.last.y - node.first.y) * v0) + 0;
+          const oldX = old._qx ?? 0;
+          const oldY = old._qy ?? 0;
+          const oldRx = old.last.x - old.first.x;
+          const oldRy = old.last.y - old.first.y;
+          const oldVx = old._qb === true
+            ? finite(oldRx * visibleVelocity(pPrev + oldX * positionBasisPrev, vPrev + oldX * positionBasisVelocityPrev))
+            : finite(oldRx * vPrev + oldX * positionBasisVelocityPrev);
+          const oldVy = old._qb === true
+            ? finite(oldRy * visibleVelocity(pPrev + oldY * positionBasisPrev, vPrev + oldY * positionBasisVelocityPrev))
+            : finite(oldRy * vPrev + oldY * positionBasisVelocityPrev);
+          const rx = node.last.x - node.first.x;
+          const ry = node.last.y - node.first.y;
+          let x = finite(oldVx - rx * v0) + 0;
+          let y = finite(oldVy - ry * v0) + 0;
+          if (bounded) {
+            x = rx === 0 ? 0 : finite(x / rx) + 0;
+            y = ry === 0 ? 0 : finite(y / ry) + 0;
+          }
           if (x !== 0 || y !== 0) {
             if (nodes[i].first !== undefined) node = resolved[i] = { ...node } as VectorProjectionNode;
             node._qx = x;
@@ -572,7 +577,7 @@ export function createProjection(options?: ProjectionOptions): ProjectionControl
       clearPendingTick();
       phase = 'canceled';
       vHat = 0;
-      positionBasisVelocityHat = 0;
+      springBasis._velocityV0 = 0;
     },
 
     /**
@@ -590,8 +595,7 @@ export function createProjection(options?: ProjectionOptions): ProjectionControl
       phase = 'held'; // boxAt/pickup остаются аналитическими, автономных кадров нет
       pHat = pp;
       vHat = 0;
-      positionBasisHat = 0;
-      positionBasisVelocityHat = 0;
+      springBasis._valueV0 = springBasis._velocityV0 = 0;
       progress = clamp01(pp);
       emit(flight.projector, pp, 0);
     },
@@ -613,7 +617,7 @@ export function createProjection(options?: ProjectionOptions): ProjectionControl
       // цели не менялись — теорема §2.3.2 даёт точный C¹ при v0 = v/(1−p_seek)).
       const rebased: ProjectionNodeInit[] = [];
       for (const n of flight.byId.values()) {
-        rebased.push(rebaseNode(n.id, n, n, p0, positionBasisHat));
+        rebased.push(rebaseNode(n.id, n, n, p0, springBasis._valueV0));
       }
       const projector = createProjector(rebased);
       const byId = new Map<string, VectorProjectionNode>();
@@ -644,7 +648,7 @@ export function createProjection(options?: ProjectionOptions): ProjectionControl
       if (node === undefined) return undefined;
       return phase === 'rest'
         ? node.last
-        : boxWithPositionBasis(node, pHat, positionBasisHat);
+        : boxWithPositionBasis(node, pHat, springBasis._valueV0);
     },
 
     get playing(): boolean {

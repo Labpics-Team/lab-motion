@@ -130,21 +130,6 @@ export function clamp01(x: number): number {
   return f < 0 ? 0 : f > 1 ? 1 : f;
 }
 
-/** @internal Clamp page-space axis to pickup→target envelope. */
-export function boundPositionAxis(value: number, first: number, last: number): number {
-  const lo = Math.min(finite(first), finite(last));
-  const hi = Math.max(finite(first), finite(last));
-  return value < lo ? lo : value > hi ? hi : value;
-}
-
-/** @internal Derivative of boundPositionAxis. */
-export function boundPositionVelocity(value: number, velocity: number, first: number, last: number): number {
-  const lo = Math.min(finite(first), finite(last));
-  const hi = Math.max(finite(first), finite(last));
-  if (value < lo || value > hi) return 0;
-  if ((value == lo && velocity < 0) || (value == hi && velocity > 0)) return 0;
-  return finite(velocity) + 0;
-}
 
 // ─── Внутренние мутируемые формы (переиспользование без аллокаций) ───────────
 
@@ -501,12 +486,13 @@ export function createProjector(nodes: readonly ProjectionNodeInit[]): Projector
       const vectorNode = node as DriverProjectionNodeInit;
       const bx = q === 0 ? 0 : (vectorNode._qx ?? 0);
       const by = q === 0 ? 0 : (vectorNode._qy ?? 0);
-      if (bx !== 0) v.x = finite(v.x + bx * q) + 0;
-      if (by !== 0) v.y = finite(v.y + by * q) + 0;
-      if (q !== 0 && vectorNode._qb === true) {
-      v.x = boundPositionAxis(v.x, node.first.x, node.last.x);
-      v.y = boundPositionAxis(v.y, node.first.y, node.last.y);
-    }
+      if (vectorNode._qb === true) {
+        if (bx !== 0) v.x = lerp1(node.first.x, node.last.x, clamp01(t + bx * q));
+        if (by !== 0) v.y = lerp1(node.first.y, node.last.y, clamp01(t + by * q));
+      } else {
+        if (bx !== 0) v.x = finite(v.x + bx * q) + 0;
+        if (by !== 0) v.y = finite(v.y + by * q) + 0;
+      }
 
       const a = liveAncestor[i];
       if (a === null) {
