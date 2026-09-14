@@ -1,0 +1,139 @@
+name: R11 geometry inline clamp state
+on:
+  push:
+    branches: [carrier/r11-geometry-inline-clamp-20260914]
+permissions:
+  contents: write
+jobs:
+  measure:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          fetch-depth: 0
+          persist-credentials: true
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020
+        with:
+          node-version: '24'
+      - run: corepack enable && corepack install --global pnpm@11.11.0
+      - run: pnpm install --frozen-lockfile
+      - name: Materialize inline clamp candidate on exact source
+        env:
+          HEAD_SHA: 2757691a3cd1780bd7fdfa36c9edd0ebb0af56c2
+        shell: bash
+        run: |
+          set -euo pipefail
+          git show origin/carrier/r11-geometry-inline-state-20260914:.github/research/r11_geometry_inline_state.py > "$RUNNER_TEMP/inline.py"
+          git show origin/carrier/r11-geometry-inline-state-20260914:.github/research/r11_geometry_clamp_search.test.ts > "$RUNNER_TEMP/clamp-search.test.ts"
+          git switch --detach "$HEAD_SHA"
+          python3 "$RUNNER_TEMP/inline.py"
+          python3 - <<'PY'
+          from pathlib import Path
+          import re
+
+          def sub1(pattern, repl, text, label):
+              out, n = re.subn(pattern, repl, text, count=1, flags=re.S)
+              assert n == 1, f'{label}: {n}'
+              return out
+
+          g = Path('src/projection/geometry.ts')
+          s = g.read_text()
+          marker = '''export function clamp01(x: number): number {
+            const f = Number.isNaN(x) ? 0 : x;
+            return f < 0 ? 0 : f > 1 ? 1 : f;
+          }
+          '''
+          assert s.count(marker) == 1
+          helpers = marker + '''
+          /** @internal Clamp page-space axis to pickup→target envelope. */
+          export function boundPositionAxis(value: number, first: number, last: number): number {
+            const lo = Math.min(finite(first), finite(last));
+            const hi = Math.max(finite(first), finite(last));
+            return value < lo ? lo : value > hi ? hi : value;
+          }
+
+          /** @internal Derivative of boundPositionAxis. */
+          export function boundPositionVelocity(value: number, velocity: number, first: number, last: number): number {
+            const lo = Math.min(finite(first), finite(last));
+            const hi = Math.max(finite(first), finite(last));
+            if (value < lo || value > hi) return 0;
+            if ((value === lo && velocity < 0) || (value === hi && velocity > 0)) return 0;
+            return finite(velocity) + 0;
+          }
+          '''
+          s = s.replace(marker, helpers)
+          old = '''      if (q !== 0 && vectorNode._qb === true) {
+                v.x = Math.max(Math.min(v.x, Math.max(node.first.x, node.last.x)), Math.min(node.first.x, node.last.x));
+                v.y = Math.max(Math.min(v.y, Math.max(node.first.y, node.last.y)), Math.min(node.first.y, node.last.y));
+              }
+          '''
+          new = '''      if (q !== 0 && vectorNode._qb === true) {
+                v.x = boundPositionAxis(v.x, node.first.x, node.last.x);
+                v.y = boundPositionAxis(v.y, node.first.y, node.last.y);
+              }
+          '''
+          assert s.count(old) == 1
+          s = s.replace(old, new)
+          g.write_text(s)
+
+          d = Path('src/projection/driver.ts')
+          s = d.read_text()
+          s = s.replace('  clamp01,\n  createProjector,', '  boundPositionAxis,\n  boundPositionVelocity,\n  clamp01,\n  createProjector,')
+          assert s.count('boundPositionAxis,') == 1 and s.count('boundPositionVelocity,') == 1
+          old = '''function boxWithPositionBasis(src: VectorProjectionNode, pHat: number, q: number): FlipRect {
+            const box = mixBox(src.first, src.last, pHat);
+            if (q === 0) return box;
+            const x = src._qx ?? 0;
+            const y = src._qy ?? 0;
+            if (x === 0 && y === 0) return box;
+            return { ...box, x: finite(box.x + x * q) + 0, y: finite(box.y + y * q) + 0 };
+          }
+          '''
+          new = '''function boxWithPositionBasis(src: VectorProjectionNode, pHat: number, q: number): FlipRect {
+            const box = mixBox(src.first, src.last, pHat);
+            if (q === 0) return box;
+            const x = src._qx ?? 0;
+            const y = src._qy ?? 0;
+            if (x !== 0) box.x = finite(box.x + x * q) + 0;
+            if (y !== 0) box.y = finite(box.y + y * q) + 0;
+            if (src._qb === true) {
+              box.x = boundPositionAxis(box.x, src.first.x, src.last.x);
+              box.y = boundPositionAxis(box.y, src.first.y, src.last.y);
+            }
+            return box;
+          }
+          '''
+          assert s.count(old) == 1
+          s = s.replace(old, new)
+          old = '''          const oldVx = finite((old.last.x - old.first.x) * vPrev + (old._qx ?? 0) * positionBasisVelocityPrev);
+                  const oldVy = finite((old.last.y - old.first.y) * vPrev + (old._qy ?? 0) * positionBasisVelocityPrev);
+                  const x = finite(oldVx - (node.last.x - node.first.x) * v0) + 0;
+          '''
+          new = '''          const oldBox = boxWithPositionBasis(old, pPrev, positionBasisPrev);
+                  const rawVx = finite((old.last.x - old.first.x) * vPrev + (old._qx ?? 0) * positionBasisVelocityPrev);
+                  const rawVy = finite((old.last.y - old.first.y) * vPrev + (old._qy ?? 0) * positionBasisVelocityPrev);
+                  const oldVx = old._qb === true ? boundPositionVelocity(oldBox.x, rawVx, old.first.x, old.last.x) : rawVx;
+                  const oldVy = old._qb === true ? boundPositionVelocity(oldBox.y, rawVy, old.first.y, old.last.y) : rawVy;
+                  const x = finite(oldVx - (node.last.x - node.first.x) * v0) + 0;
+          '''
+          assert s.count(old) == 1
+          s = s.replace(old, new)
+          d.write_text(s)
+          PY
+          cp "$RUNNER_TEMP/clamp-search.test.ts" test/research-projection-clamp-search.test.ts
+          pnpm typecheck
+          pnpm vitest run test/projection-vector-retarget.test.ts test/projection-vector-clamp.test.ts test/projection-driver.test.ts test/projection-geometry.test.ts test/projection-finiteness-fuzz.test.ts test/motion-contract-v1.test.ts test/projection-api-surface-pin.test.ts test/research-projection-clamp-search.test.ts
+          rm test/research-projection-clamp-search.test.ts
+          pnpm build
+          set +e
+          node scripts/size-gate.mjs 2>&1 | tee "$RUNNER_TEMP/size.log"
+          size_rc=${PIPESTATUS[0]}
+          set -e
+          grep -E 'projection-dom-one-liner|projection-core-only|projection\s|size-gate:' "$RUNNER_TEMP/size.log" || true
+          echo "SIZE_RC=$size_rc"
+          git diff --check
+          git add src/projection/geometry.ts src/projection/driver.ts
+          git -c user.name='github-actions[bot]' -c user.email='41898282+github-actions[bot]@users.noreply.github.com' commit -m 'research: inline bounded projection state'
+          git push --force origin HEAD:refs/heads/research/r11-geometry-inline-clamp-20260914
+          exit "$size_rc"
