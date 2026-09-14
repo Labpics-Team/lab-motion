@@ -7,7 +7,7 @@
 > [NAMING.md](NAMING.md).
 
 Импорт — `@labpics/motion` (ядро) или `@labpics/motion/<субпуть>`.
-Корневой экспорт + 42 субпути; неиспользуемые субпути вырезаются
+Корневой экспорт + 43 субпути; неиспользуемые субпути вырезаются
 tree-shaking'ом: `sideEffects` — точный allowlist из двух авто-регистрирующих
 входов (`./lit`, `./wc`).
 
@@ -59,7 +59,6 @@ Factory ничего не анимирует и не читает глобаль
 | `…/frame` | Единый frame-шедулер: `createFrameLoop` / синглтон `frame` — один rAF на кадр, фазы read→update→render против layout-thrash, SSR-safe; `asRequestFrame(loop)` сажает `MotionValue`/`drive` на общий кадр. **Фреймворк-биндинги используют его по умолчанию** (как shared-ticker у Framer Motion/GSAP); инжекция своего `requestFrame` переопределяет |
 | `…/nano` | **Platform-trusted WAAPI to-only ≤ 1 КБ gzip**: spring/tween, `delay`/`stagger`, reduced-motion, сами `Animation` как контролы; полный контракт и границы — ниже |
 | `…/animate` | Фасад-one-liner: `animate(target, props, options)` и `createAnimateScope(root)` — цели по каналам (`x`/`y`/`scale`/`rotate`, `opacity`, CSS-свойства), режим `{ spring }` или `{ duration, ease }`, `delay`/`stagger`, контролы `{ finished, play, pause, seek, cancel, stop }`. Это базовый single-transition DX-срез; ядро от него не растёт |
-| `…/animate` | Фасад-one-liner: `animate(target, props, options)` — цели по каналам (`x`/`y`/`scale`/`rotate`, `opacity`, CSS-свойства), режим `{ spring }` или `{ duration, ease }`, `delay`/`stagger`, контролы `{ finished, play, pause, seek, cancel, stop }`. Это базовый single-transition DX-срез; ядро от него не растёт |
 | `…/bindings` | [Семантическая привязка](bindings.md): `createMotionBinding(project, targets)` связывает модель компонента с визуальными ролями; обновляет только изменившиеся цели, без второго store или кадрового цикла |
 
 ### Пример: scrub-контроллер
