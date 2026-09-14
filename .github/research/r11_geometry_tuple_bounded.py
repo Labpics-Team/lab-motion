@@ -70,6 +70,10 @@ s = sub1(
     'driver tuple box',
 )
 s = s.replace(
+    '  positionBasisValue = 0,\n): VectorProjectionNode {',
+    '  positionBasisValue = 0,\n  bounded = false,\n): VectorProjectionNode {',
+)
+s = s.replace(
     'first: boxWithPositionBasis(src, pHat, positionBasisValue),',
     'first: boxWithPositionBasis(src, pHat, positionBasisValue, bounded),',
 )
@@ -78,6 +82,10 @@ s = s.replace(
     "onFrame?.((projector.at as (p: number, q?: number, bounded?: boolean) => readonly ProjectionFrame[])(p, positionBasisValue, bounded));",
 )
 s = s.replace('(old._qx ?? 0)', '(old._q?.[0] ?? 0)').replace('(old._qy ?? 0)', '(old._q?.[1] ?? 0)')
+s = s.replace(
+    'return rebaseNode(n.id, n, old, pPrev, positionBasisPrev);',
+    'return rebaseNode(n.id, n, old, pPrev, positionBasisPrev, bounded);',
+)
 s = s.replace(
     'const oldBox = boxWithPositionBasis(old, pPrev, positionBasisPrev);',
     'const oldBox = boxWithPositionBasis(old, pPrev, positionBasisPrev, bounded);',
@@ -95,6 +103,14 @@ s = sub1(
     '            node._q = [x, y];',
     s,
     'tuple assign',
+)
+s = s.replace(
+    'rebased.push(rebaseNode(n.id, n, n, p0, positionBasisHat));',
+    'rebased.push(rebaseNode(n.id, n, n, p0, positionBasisHat, bounded));',
+)
+s = s.replace(
+    ': boxWithPositionBasis(node, pHat, positionBasisHat);',
+    ': boxWithPositionBasis(node, pHat, positionBasisHat, bounded);',
 )
 assert '._qx' not in s and '._qy' not in s and '._qb' not in s
 d.write_text(s)
