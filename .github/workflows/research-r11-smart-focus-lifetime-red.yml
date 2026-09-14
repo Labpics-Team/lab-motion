@@ -20,7 +20,7 @@ jobs:
       - run: pnpm exec playwright install --with-deps chromium
       - run: pnpm typecheck:browser
       - run: pnpm site:build
-      - name: Expect focus-lifetime contract RED
+      - name: Expect focus-lifetime contract RED for the exact reason
         shell: bash
         run: |
           set -euo pipefail
@@ -32,8 +32,16 @@ jobs:
             echo 'UNEXPECTED_GREEN: current smart already isolates ghost focus' >&2
             exit 41
           fi
-          grep -Eq 'Expected: true|Expected: false|inertBeforeFocus|acceptedFocus' /tmp/focus-red.log || {
-            echo 'RED_WRONG_REASON: expected focus/inert assertion was not observed' >&2
+          if grep -Fq 'POSITIVE_CONTROL_FAILED:' /tmp/focus-red.log; then
+            echo 'RED_WRONG_REASON: ghost protocol was not established' >&2
             exit 42
+          fi
+          grep -Fq 'FOCUS_LIFETIME_VIOLATION:' /tmp/focus-red.log || {
+            echo 'RED_WRONG_REASON: expected explicit focus-lifetime violation marker' >&2
+            exit 43
+          }
+          grep -Fq 'FOCUS_OBSERVATION=' /tmp/focus-red.log || {
+            echo 'RED_WRONG_REASON: observation receipt missing' >&2
+            exit 44
           }
           echo 'FOCUS_LIFETIME_RED=CONFIRMED'
