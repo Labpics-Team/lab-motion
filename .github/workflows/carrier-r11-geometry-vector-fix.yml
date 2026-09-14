@@ -7,37 +7,28 @@ permissions:
 jobs:
   materialize:
     runs-on: ubuntu-24.04
-    timeout-minutes: 30
+    timeout-minutes: 15
     steps:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
         with:
           fetch-depth: 0
           persist-credentials: true
-      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020
-        with:
-          node-version: "24"
-      - name: Materialize vector-retarget implementation
+      - name: Materialize geometry contract comment
         shell: bash
         env:
           TARGET_BRANCH: geometry/r11-vector-retarget-20260914
-          TARGET_SHA: 561f4d234e363ba40b553308cc43f40aebec51fd
+          TARGET_SHA: 9263e021ccf59d8a399aaf79d7800e2168548060
         run: |
           set -euo pipefail
-          cp .github/scripts/carrier-r11-geometry-vector-fix.py /tmp/r11-geometry-vector-fix.py
+          cp .github/scripts/carrier-r11-geometry-comment-fix.py /tmp/r11-geometry-comment-fix.py
           git switch --detach "$TARGET_SHA"
           test "$(git rev-parse HEAD)" = "$TARGET_SHA"
           git config user.name 'github-actions[bot]'
           git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
-          python3 /tmp/r11-geometry-vector-fix.py
-          python3 -c "from pathlib import Path; p=Path('src/projection/driver.ts'); s=p.read_text(); old='const settle = (projector: Projector): void => {'; new='const settle = (projector: ProjectionDriverProjector): void => {'; assert s.count(old) == 1; p.write_text(s.replace(old, new, 1))"
-          corepack enable
-          corepack install --global pnpm@11.11.0
-          pnpm install --frozen-lockfile
-          pnpm typecheck
-          pnpm vitest run test/projection-vector-retarget.test.ts test/projection-driver.test.ts test/projection-geometry.test.ts test/projection-finiteness-fuzz.test.ts test/motion-contract-v1.test.ts
+          python3 /tmp/r11-geometry-comment-fix.py
           git diff --check
-          git add src/projection/driver.ts src/projection/geometry.ts
-          git commit -m 'fix(projection): preserve vector retarget velocity'
+          git add src/projection/driver.ts
+          git commit -m 'docs(projection): align vector retarget contract'
           final="$(git rev-parse HEAD)"
           git push --force-with-lease="refs/heads/$TARGET_BRANCH:$TARGET_SHA" origin "$final:refs/heads/$TARGET_BRANCH"
-          printf 'implementation_head=%s\n' "$final"
+          printf 'comment_head=%s\n' "$final"
