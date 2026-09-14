@@ -59,16 +59,35 @@ s = replace1(
 )
 s = replace1(
     s,
+    '''        rebased.push(rebaseNode(n.id, n, n, p0, springBasis._valueV0));''',
+    '''        rebased.push(rebaseNode(n.id, n, n, p0, springBasis._valueV0, bounded));''',
+    'release bounded rebase call',
+)
+s = replace1(
+    s,
     '''          const oldVx = old._qb === true\n            ? finite(oldRx * visibleVelocity(pPrev + oldX * positionBasisPrev, vPrev + oldX * positionBasisVelocityPrev))\n            : finite(oldRx * vPrev + oldX * positionBasisVelocityPrev);\n          const oldVy = old._qb === true\n            ? finite(oldRy * visibleVelocity(pPrev + oldY * positionBasisPrev, vPrev + oldY * positionBasisVelocityPrev))\n            : finite(oldRy * vPrev + oldY * positionBasisVelocityPrev);''',
     '''          const oldVx = finite(oldRx * visibleVelocity(\n            pPrev + oldX * positionBasisPrev,\n            vPrev + oldX * positionBasisVelocityPrev,\n          ));\n          const oldVy = finite(oldRy * visibleVelocity(\n            pPrev + oldY * positionBasisPrev,\n            vPrev + oldY * positionBasisVelocityPrev,\n          ));''',
     'unify visible boundary velocity',
 )
 s = replace1(s, '            if (bounded) node._qb = true;\n', '', 'remove bounded marker write')
+projector_call = '''(createProjector as unknown as (\n        nodes: readonly ProjectionNodeInit[],\n        bounded: boolean,\n      ) => Projector)'''
 s = replace1(
     s,
     '''      const projector = createProjector(resolved);''',
-    '''      const projector = (createProjector as unknown as (\n        nodes: readonly ProjectionNodeInit[],\n        bounded: boolean,\n      ) => Projector)(resolved, bounded);''',
-    'pass flight bounded to projector',
+    f'''      const projector = {projector_call}(resolved, bounded);''',
+    'pass play flight bounded to projector',
+)
+s = replace1(
+    s,
+    '''      const projector = createProjector(rebased);''',
+    f'''      const projector = {projector_call}(rebased, bounded);''',
+    'pass release flight bounded to projector',
+)
+s = replace1(
+    s,
+    ''': boxWithPositionBasis(node, pHat, springBasis._valueV0);''',
+    ''': boxWithPositionBasis(node, pHat, springBasis._valueV0, bounded);''',
+    'boxAt bounded call',
 )
 assert '_qb' not in s
 d.write_text(s)
