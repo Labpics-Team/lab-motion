@@ -130,6 +130,12 @@ export function clamp01(x: number): number {
   return f < 0 ? 0 : f > 1 ? 1 : f;
 }
 
+/** Driver-private page-position carry shared by analytic pickup and tree projection. @internal */
+export function carryPositionAxis(base: number, q: number, correction: number): number {
+  return correction === 0 ? base : finite(base + correction * q) + 0;
+}
+
+
 // ─── Внутренние мутируемые формы (переиспользование без аллокаций) ───────────
 
 interface MutableRect {
@@ -331,6 +337,11 @@ function isDegenerateBox(b: FlipRect): boolean {
  * ПЕРЕЯКОРИВАЮТСЯ к следующему невырожденному проецирующему предку (один раз);
  * finiteDiv остаётся вторым эшелоном (враждебный NaN в середине полёта).
  */
+export interface DriverProjectionNodeInit extends ProjectionNodeInit {
+  _qx?: number;
+  _qy?: number;
+}
+
 export function createProjector(nodes: readonly ProjectionNodeInit[]): Projector {
   const count = nodes.length;
 
@@ -362,6 +373,7 @@ export function createProjector(nodes: readonly ProjectionNodeInit[]): Projector
       throw new MotionParamError('LM081');
     }
   }
+
 
   // Parent-ссылки (лес: у узла не больше одного родителя).
   const parentIdx: (number | null)[] = new Array(count);
@@ -460,8 +472,9 @@ export function createProjector(nodes: readonly ProjectionNodeInit[]): Projector
   const v: MutableRect = { x: 0, y: 0, width: 0, height: 0 };
   const order: readonly string[] = orderIdx.map((i) => nodes[i].id);
 
-  const at = (p: number): readonly ProjectionFrame[] => {
+  const at = (p: number, positionBasisValue = 0): readonly ProjectionFrame[] => {
     const t = Number.isNaN(p) ? 0 : p; // санация p — паритет flipAtRaw (NaN → 0)
+    const q = finite(positionBasisValue);
     const tc = clamp01(t);
     for (let oi = 0; oi < orderIdx.length; oi++) {
       const i = orderIdx[oi];
@@ -471,10 +484,18 @@ export function createProjector(nodes: readonly ProjectionNodeInit[]): Projector
       const node = nodes[i];
       const frame = frames[oi];
       mixInto(node.first, node.last, t, v);
+      // Linear second-order spring solution: page position = scalar path + u·Q(t).
+      // Q(0)=0 and Q'(0)=1, so this preserves C0 while carrying only the
+      // independent x/y boundary velocity not representable by one scalar p.
+      const vectorNode = node as DriverProjectionNodeInit;
+      const bx = q === 0 ? 0 : (vectorNode._qx ?? 0);
+      const by = q === 0 ? 0 : (vectorNode._qy ?? 0);
+      v.x = carryPositionAxis(v.x, q, bx);
+      v.y = carryPositionAxis(v.y, q, by);
 
       const a = liveAncestor[i];
       if (a === null) {
-        if (anchorIsLast[i]) {
+        if (anchorIsLast[i] && bx === 0 && by === 0) {
           rootFlipInto(node.first, node.last, t, frame);
           // k корня = V.size ⊘ B.size = эмитированный s (k_A = 1) — бит-консистентно
           // с фактически применённым масштабом.
