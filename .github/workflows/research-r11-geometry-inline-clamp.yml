@@ -58,67 +58,68 @@ jobs:
             const lo = Math.min(finite(first), finite(last));
             const hi = Math.max(finite(first), finite(last));
             if (value < lo || value > hi) return 0;
-            if ((value === lo && velocity < 0) || (value === hi && velocity > 0)) return 0;
+            if ((value == lo && velocity < 0) || (value == hi && velocity > 0)) return 0;
             return finite(velocity) + 0;
           }
           '''
           s = s.replace(marker, helpers)
-          old = '''      if (q !== 0 && vectorNode._qb === true) {
-                v.x = Math.max(Math.min(v.x, Math.max(node.first.x, node.last.x)), Math.min(node.first.x, node.last.x));
-                v.y = Math.max(Math.min(v.y, Math.max(node.first.y, node.last.y)), Math.min(node.first.y, node.last.y));
-              }
-          '''
-          new = '''      if (q !== 0 && vectorNode._qb === true) {
+          s = sub1(
+              r'''      if \(q !== 0 && vectorNode\._qb === true\) \{\n        v\.x = .*?;\n        v\.y = .*?;\n      \}''',
+              '''      if (q !== 0 && vectorNode._qb === true) {
                 v.x = boundPositionAxis(v.x, node.first.x, node.last.x);
                 v.y = boundPositionAxis(v.y, node.first.y, node.last.y);
-              }
-          '''
-          assert s.count(old) == 1
-          s = s.replace(old, new)
+              }''',
+              s,
+              'geometry bounded vector state',
+          )
           g.write_text(s)
 
           d = Path('src/projection/driver.ts')
           s = d.read_text()
-          s = s.replace('  clamp01,\n  createProjector,', '  boundPositionAxis,\n  boundPositionVelocity,\n  clamp01,\n  createProjector,')
-          assert s.count('boundPositionAxis,') == 1 and s.count('boundPositionVelocity,') == 1
-          old = '''function boxWithPositionBasis(src: VectorProjectionNode, pHat: number, q: number): FlipRect {
-            const box = mixBox(src.first, src.last, pHat);
-            if (q === 0) return box;
-            const x = src._qx ?? 0;
-            const y = src._qy ?? 0;
-            if (x === 0 && y === 0) return box;
-            return { ...box, x: finite(box.x + x * q) + 0, y: finite(box.y + y * q) + 0 };
-          }
-          '''
-          new = '''function boxWithPositionBasis(src: VectorProjectionNode, pHat: number, q: number): FlipRect {
-            const box = mixBox(src.first, src.last, pHat);
-            if (q === 0) return box;
-            const x = src._qx ?? 0;
-            const y = src._qy ?? 0;
-            if (x !== 0) box.x = finite(box.x + x * q) + 0;
-            if (y !== 0) box.y = finite(box.y + y * q) + 0;
-            if (src._qb === true) {
-              box.x = boundPositionAxis(box.x, src.first.x, src.last.x);
-              box.y = boundPositionAxis(box.y, src.first.y, src.last.y);
-            }
-            return box;
-          }
-          '''
-          assert s.count(old) == 1
-          s = s.replace(old, new)
-          old = '''          const oldVx = finite((old.last.x - old.first.x) * vPrev + (old._qx ?? 0) * positionBasisVelocityPrev);
-                  const oldVy = finite((old.last.y - old.first.y) * vPrev + (old._qy ?? 0) * positionBasisVelocityPrev);
-                  const x = finite(oldVx - (node.last.x - node.first.x) * v0) + 0;
-          '''
-          new = '''          const oldBox = boxWithPositionBasis(old, pPrev, positionBasisPrev);
+          s = sub1(
+              r'''(from './geometry\.js';)''',
+              r'''\1''',
+              s,
+              'geometry import exists',
+          )
+          # Insert the two internal owners into the existing named import without depending on ordering.
+          import_start = s.index("import {")
+          import_end = s.index("} from './geometry.js';", import_start)
+          block = s[import_start:import_end]
+          assert 'boundPositionAxis' not in block and 'boundPositionVelocity' not in block
+          block = block.replace('  clamp01,', '  boundPositionAxis,\n  boundPositionVelocity,\n  clamp01,')
+          assert 'boundPositionAxis' in block and 'boundPositionVelocity' in block
+          s = s[:import_start] + block + s[import_end:]
+
+          s = sub1(
+              r'''function boxWithPositionBasis\(src: VectorProjectionNode, pHat: number, q: number\): FlipRect \{.*?\n\}''',
+              '''function boxWithPositionBasis(src: VectorProjectionNode, pHat: number, q: number): FlipRect {
+                const box = mixBox(src.first, src.last, pHat);
+                if (q === 0) return box;
+                const x = src._qx ?? 0;
+                const y = src._qy ?? 0;
+                if (x !== 0) box.x = finite(box.x + x * q) + 0;
+                if (y !== 0) box.y = finite(box.y + y * q) + 0;
+                if (src._qb === true) {
+                  box.x = boundPositionAxis(box.x, src.first.x, src.last.x);
+                  box.y = boundPositionAxis(box.y, src.first.y, src.last.y);
+                }
+                return box;
+              }''',
+              s,
+              'driver bounded pickup helper',
+          )
+          s = sub1(
+              r'''          const oldVx = finite\(\(old\.last\.x - old\.first\.x\) \* vPrev \+ \(old\._qx \?\? 0\) \* positionBasisVelocityPrev\);\n          const oldVy = finite\(\(old\.last\.y - old\.first\.y\) \* vPrev \+ \(old\._qy \?\? 0\) \* positionBasisVelocityPrev\);\n          const x = finite\(oldVx - \(node\.last\.x - node\.first\.x\) \* v0\) \+ 0;''',
+              '''          const oldBox = boxWithPositionBasis(old, pPrev, positionBasisPrev);
                   const rawVx = finite((old.last.x - old.first.x) * vPrev + (old._qx ?? 0) * positionBasisVelocityPrev);
                   const rawVy = finite((old.last.y - old.first.y) * vPrev + (old._qy ?? 0) * positionBasisVelocityPrev);
                   const oldVx = old._qb === true ? boundPositionVelocity(oldBox.x, rawVx, old.first.x, old.last.x) : rawVx;
                   const oldVy = old._qb === true ? boundPositionVelocity(oldBox.y, rawVy, old.first.y, old.last.y) : rawVy;
-                  const x = finite(oldVx - (node.last.x - node.first.x) * v0) + 0;
-          '''
-          assert s.count(old) == 1
-          s = s.replace(old, new)
+                  const x = finite(oldVx - (node.last.x - node.first.x) * v0) + 0;''',
+              s,
+              'driver bounded boundary velocity',
+          )
           d.write_text(s)
           PY
           cp "$RUNNER_TEMP/clamp-search.test.ts" test/research-projection-clamp-search.test.ts
