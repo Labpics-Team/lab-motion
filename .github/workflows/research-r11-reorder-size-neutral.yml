@@ -1,0 +1,79 @@
+name: R11 reorder size-neutral no-op forms
+on:
+  push:
+    branches: [research/r11-reorder-size-neutral-20260914]
+permissions:
+  contents: read
+jobs:
+  compare:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v6
+        with:
+          node-version: "24"
+      - run: corepack enable && corepack install --global pnpm@11.11.0
+      - run: pnpm install --frozen-lockfile
+      - name: Compare equivalent forms
+        shell: bash
+        env:
+          BASE_HEAD: dfe6eb068ed4f7837c289e42363572ac104089b6
+        run: |
+          set -euo pipefail
+          for variant in control slot-guard sentinel split-owner; do
+            echo "=== VARIANT $variant ==="
+            git checkout "$BASE_HEAD" -- src/behaviors/reorder/index.ts
+            VARIANT="$variant" python3 - <<'PY'
+          import os
+          from pathlib import Path
+          p=Path('src/behaviors/reorder/index.ts')
+          s=p.read_text()
+          v=os.environ['VARIANT']
+          current="    if (to === from || to < 0 || to >= layout._slots.length || Number.isNaN(layout._slots[to]!._x)) return;\n"
+          assert s.count(current)==1
+          if v == 'control':
+              pass
+          elif v == 'slot-guard':
+              s=s.replace(current, "    if (to === from || !layout._slots[to] || Number.isNaN(layout._slots[to]!._x)) return;\n", 1)
+          elif v == 'sentinel':
+              assert s.count('    let to = from;\n')==1
+              s=s.replace('    let to = from;\n', '    let to = -1;\n', 1)
+              s=s.replace("      case 'previous': to--; break;", "      case 'previous': to = from - 1; break;", 1)
+              s=s.replace("      case 'next': to++; break;", "      case 'next': to = from + 1; break;", 1)
+              s=s.replace("if (axis === 'x' && horizontal) to += sign * (this._direction === 'rtl' ? -1 : 1);", "if (axis === 'x' && horizontal) to = from + sign * (this._direction === 'rtl' ? -1 : 1);", 1)
+              s=s.replace("else if (axis === 'y' && !horizontal) to += sign;", "else if (axis === 'y' && !horizontal) to = from + sign;", 1)
+              # Keep to===from: first/last on the current edge must also stay inert.
+          elif v == 'split-owner':
+              move="    this._propose(session, from, to);\n  }\n\n  _step"
+              assert s.count(move)==1
+              s=s.replace(move, "    if (to === from) { this._proposal = undefined; return; }\n    this._propose(session, from, to);\n  }\n\n  _step", 1)
+              prop="    if (to === from) { this._proposal = undefined; return; }\n"
+              assert s.count(prop)==2
+              # Remove the private _propose copy, leave the _move owner copy.
+              idx=s.rfind(prop)
+              s=s[:idx]+s[idx+len(prop):]
+          else:
+              raise AssertionError(v)
+          p.write_text(s)
+          PY
+
+            if pnpm vitest run test/reorder-keyboard-axis-noop.test.ts test/reorder.test.ts >/tmp/test-$variant.log 2>&1; then
+              echo "tests=PASS"
+            else
+              echo "tests=FAIL"
+              tail -80 /tmp/test-$variant.log
+              continue
+            fi
+
+            pnpm build >/tmp/build-$variant.log 2>&1
+            set +e
+            node scripts/size-gate.mjs >/tmp/size-$variant.log 2>&1
+            rc=$?
+            set -e
+            grep -E "behaviors/reorder|reorder-controlled|size-gate:" /tmp/size-$variant.log || true
+            echo "size_exit=$rc"
+          done
