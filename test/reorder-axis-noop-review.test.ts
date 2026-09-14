@@ -6,6 +6,7 @@ const row = () => ['a', 'b', 'c'].map((key, i) => ({
   rect: { x: i * 40, y: 0, width: 20, height: 20 },
 }));
 
+// Exact-head review regression: an unsupported axis key must be observationally inert.
 it('orthogonal keyboard no-op preserves the outstanding proposal', () => {
   const onReorder = vi.fn();
   const state = createReorder({ items: row(), axis: 'x', onReorder });
