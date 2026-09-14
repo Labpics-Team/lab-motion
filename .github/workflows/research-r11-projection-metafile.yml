@@ -24,7 +24,7 @@ jobs:
           set -euo pipefail
           git show origin/carrier/r11-geometry-shared-position-20260914:.github/research/r11_geometry_shared_position.py > "$RUNNER_TEMP/shared.py"
           git show origin/carrier/r11-projection-dom-state-20260914:.github/research/r11_projection_dom_state.py > "$RUNNER_TEMP/dom.py"
-          cat > "$RUNNER_TEMP/measure.mjs" <<'NODE'
+          cat > .r11-projection-measure.mjs <<'NODE'
           import { build } from 'esbuild';
           const label = process.argv[2];
           const result = await build({
@@ -49,8 +49,9 @@ jobs:
           for (const [path, bytes] of rows) console.log(`${bytes}\t${path}`);
           NODE
           git switch --detach e5833d01551f5f8e7cbd67850fe5d00c55751889
-          node "$RUNNER_TEMP/measure.mjs" BASELINE
+          node ./.r11-projection-measure.mjs BASELINE
           git switch --detach 62d94f44c8b5207354d02a30fda7283034e7cdbe
           python3 "$RUNNER_TEMP/shared.py"
           python3 "$RUNNER_TEMP/dom.py"
-          node "$RUNNER_TEMP/measure.mjs" CANDIDATE
+          node ./.r11-projection-measure.mjs CANDIDATE
+          rm .r11-projection-measure.mjs
