@@ -65,6 +65,7 @@ import {
   mixBox,
   type BoxRadii,
   type CornerRadius,
+  type DriverProjectionNodeInit,
   type ProjectionFrame,
   type ProjectionNodeInit,
   type Projector,
@@ -95,8 +96,9 @@ export interface ProjectionPlayNode extends Omit<ProjectionNodeInit, 'first'> {
 }
 
 export interface ProjectionControls {
-  /** Старт/перехват. Mid-flight: C⁰ по построению (first' = V(p̂) аналитически, ноль DOM),
-   *  C¹ по формуле §2.3.2. Generation-инвалидация кадров старого полёта. */
+  /** Старт/перехват. Mid-flight: C⁰ по построению (first' = V(p̂) аналитически, ноль DOM).
+   *  C¹ — в поддерживаемом vector-domain (`clamp:false`); bounded-режим сохраняет legacy scalar semantics.
+   *  Generation-инвалидация кадров старого полёта. */
   play(nodes: readonly ProjectionPlayNode[]): void;
   /** Замораживает текущее аналитическое состояние без финального эмита и onRest.
    *  Повторный play может подхватить его с нулевой скоростью. Идемпотентен. */
@@ -145,12 +147,7 @@ function lerpRadii(a: BoxRadii, b: BoxRadii, t: number): BoxRadii {
   return out;
 }
 
-interface VectorProjectionNode extends ProjectionNodeInit {
-  _qx?: number;
-  _qy?: number;
-}
-
-function boxWithPositionBasis(src: VectorProjectionNode, pHat: number, q: number): FlipRect {
+function boxWithPositionBasis(src: DriverProjectionNodeInit, pHat: number, q: number): FlipRect {
   const box = mixBox(src.first, src.last, pHat);
   const out = box as { x: number; y: number };
   out.x = carryPositionAxis(box.x, q, src._qx ?? 0);
@@ -166,10 +163,10 @@ function boxWithPositionBasis(src: VectorProjectionNode, pHat: number, q: number
 function rebaseNode(
   id: string,
   target: Omit<ProjectionPlayNode, 'id'>,
-  src: VectorProjectionNode,
+  src: DriverProjectionNodeInit,
   pHat: number,
   positionBasisValue = 0,
-): VectorProjectionNode {
+): DriverProjectionNodeInit {
   const tc = clamp01(pHat);
   return {
     id,
@@ -229,7 +226,7 @@ function prefersReducedMotion(
 
 interface Flight {
   /** Узлы полёта; Map сохраняет порядок вставки (= порядок resolved-входа). */
-  readonly byId: ReadonlyMap<string, VectorProjectionNode>;
+  readonly byId: ReadonlyMap<string, DriverProjectionNodeInit>;
   readonly projector: Projector;
   /** Character-switch зафиксирован на play (§4.4: смена reduce в полёте не подхватывается). */
   readonly reduced: boolean;
@@ -482,7 +479,7 @@ export function createProjection(options?: ProjectionOptions): ProjectionControl
           }
         };
         for (let i = 0; i < resolved.length; i++) {
-          let node = resolved[i] as VectorProjectionNode;
+          let node = resolved[i] as DriverProjectionNodeInit;
           const old = prevById.get(node.id);
           if (old === undefined) continue;
           const oldRx = old.last.x - old.first.x;
@@ -508,7 +505,7 @@ export function createProjection(options?: ProjectionOptions): ProjectionControl
             const oldY = old._qy ?? 0;
             const oldVx = finite(oldRx * vPrev + oldX * positionBasisVelocityPrev);
             const oldVy = finite(oldRy * vPrev + oldY * positionBasisVelocityPrev);
-            if (nodes[i].first !== undefined) node = resolved[i] = { ...node } as VectorProjectionNode;
+            if (nodes[i].first !== undefined) node = resolved[i] = { ...node } as DriverProjectionNodeInit;
             // Temporary physical velocities; finalized into residual coefficients after v0 is known.
             node._qx = oldVx;
             node._qy = oldVy;
@@ -519,7 +516,7 @@ export function createProjection(options?: ProjectionOptions): ProjectionControl
         }
         if (!bounded) {
           for (const raw of resolved) {
-            const node = raw as VectorProjectionNode;
+            const node = raw as DriverProjectionNodeInit;
             if (node._qx === undefined) continue;
             const rx = node.last.x - node.first.x;
             const ry = node.last.y - node.first.y;
@@ -536,8 +533,8 @@ export function createProjection(options?: ProjectionOptions): ProjectionControl
       const projector = createProjector(resolved);
       const reduced = prefersReducedMotion(options?.matchMedia); // резолв ОДИН раз на play
 
-      const byId = new Map<string, VectorProjectionNode>();
-      for (const node of resolved) byId.set(node.id, node as VectorProjectionNode);
+      const byId = new Map<string, DriverProjectionNodeInit>();
+      for (const node of resolved) byId.set(node.id, node as DriverProjectionNodeInit);
       flight = { byId, projector, reduced };
 
       if (reduced || resolved.length === 0) {
@@ -598,7 +595,7 @@ export function createProjection(options?: ProjectionOptions): ProjectionControl
         rebased.push(rebaseNode(n.id, n, n, p0, springBasis._valueV0));
       }
       const projector = createProjector(rebased);
-      const byId = new Map<string, VectorProjectionNode>();
+      const byId = new Map<string, DriverProjectionNodeInit>();
       for (const node of rebased) byId.set(node.id, node);
       const reduced = flight.reduced;
       flight = { byId, projector, reduced };

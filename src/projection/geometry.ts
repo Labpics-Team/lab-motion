@@ -337,7 +337,7 @@ function isDegenerateBox(b: FlipRect): boolean {
  * ПЕРЕЯКОРИВАЮТСЯ к следующему невырожденному проецирующему предку (один раз);
  * finiteDiv остаётся вторым эшелоном (враждебный NaN в середине полёта).
  */
-interface DriverProjectionNodeInit extends ProjectionNodeInit {
+export interface DriverProjectionNodeInit extends ProjectionNodeInit {
   _qx?: number;
   _qy?: number;
 }
