@@ -1,0 +1,206 @@
+name: R11 reorder projection frame ownership
+on:
+  push:
+    branches: [research/r11-reorder-frame-owner-20260914]
+permissions:
+  contents: write
+jobs:
+  patch-and-verify:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    steps:
+      - name: Checkout exact integration branch
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          ref: integrate/r11-wave-b-378
+          fetch-depth: 1
+      - name: Assert authority and patch frame owner
+        shell: bash
+        run: |
+          set -euo pipefail
+          test "$(git rev-parse HEAD)" = "06e870c6184ba39324957dbb1583c2d55f5c19a0"
+          python3 - <<'PY'
+          from pathlib import Path
+
+          driver = Path('src/projection/driver.ts')
+          text = driver.read_text()
+          marker = """  /** Переиспользуемый выход солвера (ноль аллокаций на кадр). */
+  const solved = { value: 0, velocity: 0 };
+"""
+          replacement = marker + """
+
+  // Один controller владеет максимум одной физической frame-reservation.
+  // Повторный play/cancel/seek меняет только логический callback внутри неё:
+  // stale generation не оставляет второй rAF висеть рядом с новым полётом.
+  let pendingTick: ((ts?: number) => void) | null = null;
+  let frameReserved = false;
+  let frameFallback: ReturnType<typeof setTimeout> | null = null;
+
+  const clearFrameFallback = (): void => {
+    if (frameFallback === null) return;
+    clearTimeout(frameFallback);
+    frameFallback = null;
+  };
+
+  const clearPendingTick = (): void => {
+    pendingTick = null;
+  };
+
+  const scheduleFrame = (cb: (ts?: number) => void): void => {
+    pendingTick = cb;
+    if (frameReserved) return;
+    if (requestFrame === undefined) return;
+
+    frameReserved = true;
+    let synchronous = true;
+    let delivered = false;
+    const fire = (ts?: number): void => {
+      if (delivered) return;
+      if (synchronous) {
+        if (frameFallback === null) frameFallback = setTimeout(() => fire(undefined), 0);
+        return;
+      }
+      delivered = true;
+      clearFrameFallback();
+      frameReserved = false;
+      const latest = pendingTick;
+      pendingTick = null;
+      latest?.(ts);
+    };
+
+    let handle: number;
+    try {
+      handle = requestFrame(fire);
+    } catch (error) {
+      delivered = true;
+      frameReserved = false;
+      clearPendingTick();
+      clearFrameFallback();
+      throw error;
+    }
+    synchronous = false;
+    if (handle === 0 && frameFallback === null) frameFallback = setTimeout(() => fire(undefined), 0);
+  };
+"""
+          if text.count(marker) != 1:
+              raise SystemExit('driver solved marker drifted')
+          text = text.replace(marker, replacement, 1)
+
+          old_schedule = """    const schedule = (cb: (ts?: number) => void): void => {
+      if (requestFrame === undefined) {
+        // Без шва и без rAF полёт невозможен честно — identity сразу (канон flip :251-256).
+        settle(projector);
+        return;
+      }
+      const handle = requestFrame(cb);
+      if (handle === 0) setTimeout(() => cb(undefined), 0); // non-draining шов (flip :258)
+    };
+"""
+          new_schedule = """    const schedule = (cb: (ts?: number) => void): void => {
+      if (requestFrame === undefined) {
+        // Без шва и без rAF полёт невозможен честно — identity сразу (канон flip :251-256).
+        settle(projector);
+        return;
+      }
+      scheduleFrame(cb);
+    };
+"""
+          if text.count(old_schedule) != 1:
+              raise SystemExit('driver schedule marker drifted')
+          text = text.replace(old_schedule, new_schedule, 1)
+
+          text = text.replace("""    } catch (error) {
+      generation++;
+      phase = 'canceled';
+      vHat = 0;
+      throw error;
+    }
+""", """    } catch (error) {
+      generation++;
+      phase = 'canceled';
+      vHat = 0;
+      clearPendingTick();
+      throw error;
+    }
+""", 1)
+          text = text.replace("""  const settle = (projector: Projector): void => {
+    generation++;
+""", """  const settle = (projector: Projector): void => {
+    generation++;
+    clearPendingTick();
+""", 1)
+          text = text.replace("""    cancel(): void {
+      if (flight === null || phase === 'rest' || phase === 'canceled') return;
+      generation++;
+      phase = 'canceled';
+      vHat = 0;
+""", """    cancel(): void {
+      if (flight === null || phase === 'rest' || phase === 'canceled') return;
+      generation++;
+      clearPendingTick();
+      phase = 'canceled';
+      vHat = 0;
+""", 1)
+          text = text.replace("""    seek(p: number): void {
+      if (flight === null) return;
+      generation++; // пружина погашена
+""", """    seek(p: number): void {
+      if (flight === null) return;
+      generation++; // пружина погашена
+      clearPendingTick();
+""", 1)
+          driver.write_text(text)
+
+          test = Path('test/projection-driver.test.ts')
+          t = test.read_text()
+          addition = """
+
+describe('projection/driver: единственная физическая frame-reservation', () => {
+  it('mid-flight play заменяет stale callback, не добавляя второй pending rAF', () => {
+    const clock = makeClock();
+    const controls = createProjection({ requestFrame: clock.requestFrame, onFrame: () => {} });
+    controls.play([{ id: 'a', first: F, last: L }]);
+    expect(clock.pending()).toBe(1);
+
+    controls.play([{ id: 'a', last: { x: 300, y: 0, width: 100, height: 100 } }]);
+    expect(clock.pending()).toBe(1);
+
+    clock.step(16);
+    expect(clock.pending()).toBe(1);
+    controls.cancel();
+    clock.step(16);
+    expect(clock.pending()).toBe(0);
+  });
+});
+"""
+          if "единственная физическая frame-reservation" in t:
+              raise SystemExit('regression test already exists')
+          test.write_text(t + addition)
+          PY
+          git diff --check
+      - name: Setup Node
+        uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020
+        with:
+          node-version: 24
+      - name: Install pinned dependencies
+        shell: bash
+        run: |
+          set -euo pipefail
+          corepack enable
+          corepack install --global pnpm@11.11.0
+          pnpm install --frozen-lockfile
+      - name: Verify affected closure
+        shell: bash
+        run: |
+          set -euo pipefail
+          pnpm exec vitest run test/projection-driver.test.ts test/projection-dom.test.ts test/reorder.test.ts
+          pnpm typecheck
+      - name: Commit exact fix to integration branch
+        shell: bash
+        run: |
+          set -euo pipefail
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add src/projection/driver.ts test/projection-driver.test.ts
+          git commit -m 'fix(projection): coalesce retarget frame reservation'
+          git push origin HEAD:integrate/r11-wave-b-378
