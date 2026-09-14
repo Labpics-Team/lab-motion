@@ -7,7 +7,7 @@ permissions:
 jobs:
   probe:
     runs-on: ubuntu-24.04
-    timeout-minutes: 15
+    timeout-minutes: 30
     steps:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
         with:
@@ -16,17 +16,16 @@ jobs:
       - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020
         with:
           node-version: "24"
-      - name: Probe clamp continuity on exact candidate
+      - name: Measure exact contract baseline
         shell: bash
         env:
-          TARGET_SHA: 3b28c893c3b5238abdb7bec0e5edf2e8ef268418
+          TARGET_SHA: e5833d01551f5f8e7cbd67850fe5d00c55751889
         run: |
           set -euo pipefail
-          cp .github/scripts/projection-vector-clamp-probe.test.ts /tmp/projection-vector-clamp-probe.test.ts
           git switch --detach "$TARGET_SHA"
           test "$(git rev-parse HEAD)" = "$TARGET_SHA"
-          cp /tmp/projection-vector-clamp-probe.test.ts test/projection-vector-clamp-probe.test.ts
           corepack enable
           corepack install --global pnpm@11.11.0
           pnpm install --frozen-lockfile
-          pnpm vitest run test/projection-vector-clamp-probe.test.ts
+          pnpm build
+          pnpm size
