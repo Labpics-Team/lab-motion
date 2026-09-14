@@ -20,7 +20,7 @@ jobs:
         shell: bash
         env:
           TARGET_BRANCH: geometry/r11-vector-retarget-20260914
-          TARGET_SHA: 5581f47aaf04b7b9df9930c745b4aabbbdf691cf
+          TARGET_SHA: 0f9874d09f1859c38b157e5622ac973a7b92d1ef
         run: |
           set -euo pipefail
           cp .github/scripts/carrier-r11-geometry-clamp-fix.py /tmp/r11-geometry-clamp-fix.py
