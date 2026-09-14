@@ -1,0 +1,42 @@
+name: R11 geometry compact vector state
+on:
+  push:
+    branches: [carrier/r11-geometry-inline-state-20260914]
+permissions:
+  contents: read
+jobs:
+  measure:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020
+        with:
+          node-version: '24'
+      - run: corepack enable && corepack install --global pnpm@11.11.0
+      - run: pnpm install --frozen-lockfile
+      - name: Materialize and measure exact compact candidate
+        env:
+          HEAD_SHA: 2757691a3cd1780bd7fdfa36c9edd0ebb0af56c2
+        shell: bash
+        run: |
+          set -euo pipefail
+          cp .github/research/r11_geometry_inline_state.py "$RUNNER_TEMP/inline.py"
+          cp .github/research/r11_geometry_compact_state.py "$RUNNER_TEMP/compact.py"
+          git switch --detach "$HEAD_SHA"
+          python3 "$RUNNER_TEMP/inline.py"
+          python3 "$RUNNER_TEMP/compact.py"
+          pnpm typecheck
+          pnpm vitest run test/projection-vector-retarget.test.ts test/projection-vector-clamp.test.ts test/projection-driver.test.ts test/projection-geometry.test.ts test/motion-contract-v1.test.ts test/projection-api-surface-pin.test.ts
+          pnpm build
+          set +e
+          node scripts/size-gate.mjs 2>&1 | tee "$RUNNER_TEMP/size.log"
+          size_rc=${PIPESTATUS[0]}
+          set -e
+          grep -E 'projection-dom-one-liner|projection-core-only|projection/index.js|size-gate:' "$RUNNER_TEMP/size.log" || true
+          echo "SIZE_RC=$size_rc"
+          git diff --check
+          exit "$size_rc"
