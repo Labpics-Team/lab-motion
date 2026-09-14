@@ -1,0 +1,28 @@
+name: R11 projection affine overflow RED
+on:
+  push:
+    branches: [carrier/r11-affine-overflow-red-20260914]
+permissions:
+  contents: read
+jobs:
+  red:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020
+        with:
+          node-version: '24'
+      - run: corepack enable && corepack install --global pnpm@11.11.0
+      - run: pnpm install --frozen-lockfile
+      - name: RED overflow oracle on endpoint-exact normalized candidate
+        shell: bash
+        run: |
+          set -euo pipefail
+          cp .github/research/r11_affine_overflow_red.test.ts "$RUNNER_TEMP/affine-overflow.test.ts"
+          git switch --detach db9e92b3
+          cp "$RUNNER_TEMP/affine-overflow.test.ts" test/research-affine-overflow.test.ts
+          pnpm vitest run test/research-affine-overflow.test.ts
