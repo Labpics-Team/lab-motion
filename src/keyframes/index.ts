@@ -141,10 +141,6 @@ const FIXED_DT_S = 1 / 60;
 /** Safety-cap кадров — идентичен timeline/index.ts MAX_FRAMES. */
 const MAX_FRAMES = 100_000;
 
-function linearEasing(t: number): number {
-  return t;
-}
-
 function prefersReducedMotion(
   matchMedia: ((query: string) => MatchMediaResult) | undefined,
 ): boolean {
@@ -183,7 +179,7 @@ export function sampleKeyframes(
   easings: readonly EasingFn[],
   p: number,
 ): number {
-  return sampleKeyframesUnchecked(values, times, easings, p);
+  return sampleKeyframesUnchecked(values, times, easings, Number.isFinite(p) ? p : p === Infinity ? 1 : 0);
 }
 
 // ─── Компиляция/валидация опций ──────────────────────────────────────────────
@@ -191,7 +187,7 @@ export function sampleKeyframes(
 interface CompiledKeyframes {
   readonly values: readonly number[];
   readonly times: readonly number[];
-  readonly easings: readonly EasingFn[];
+  readonly easings: readonly EasingFn[] | undefined;
   readonly duration: number;
   readonly repeat: number;
   readonly repeatType: RepeatDirection;
@@ -239,7 +235,7 @@ function compileKeyframes(opts: KeyframesOptions): CompiledKeyframes {
   }
 
   const segCount = n - 1;
-  let easings: readonly EasingFn[];
+  let easings: readonly EasingFn[] | undefined;
   if (Array.isArray(opts.easing)) {
     if (opts.easing.length !== segCount) {
       throw new MotionParamError('LM040');
@@ -254,7 +250,8 @@ function compileKeyframes(opts: KeyframesOptions): CompiledKeyframes {
     const fn = opts.easing;
     easings = new Array<EasingFn>(segCount).fill(fn);
   } else if (opts.easing === undefined) {
-    easings = new Array<EasingFn>(segCount).fill(linearEasing);
+    // Линейная идентичность не требует таблицы одинаковых функций.
+    easings = undefined;
   } else {
     throw new MotionParamError('LM163');
   }
