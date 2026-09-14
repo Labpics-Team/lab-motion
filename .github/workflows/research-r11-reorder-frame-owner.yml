@@ -23,6 +23,7 @@ jobs:
         run: |
           set -euo pipefail
           test "$(git rev-parse HEAD)" = "06e870c6184ba39324957dbb1583c2d55f5c19a0"
+          git fetch --no-tags --depth=1 origin 8c068e5a93f86157b32ac062f884166368f6b212
           git show 8c068e5a93f86157b32ac062f884166368f6b212:scripts/research-r11-reorder-frame-owner.py > /tmp/reorder-fix.py
           python3 /tmp/reorder-fix.py
           git diff --check
