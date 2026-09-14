@@ -98,6 +98,7 @@ jobs:
           corepack enable
           corepack install --global pnpm@11.11.0
           pnpm install --frozen-lockfile
+          pnpm build
           pnpm vitest run test/error-catalog.test.ts test/semantic-motion-binding.test.ts test/semantic-motion-binding-runtime.test.ts test/semantic-motion-binding-consumer.test.ts
           pnpm typecheck
 
