@@ -60,4 +60,57 @@ describe('projection vector retarget clamp contract', () => {
     }
     expect(ys.at(-1)).toBeCloseTo(100, 9);
   });
+
+  it('repeated play at a held clamp boundary uses the emitted box and cannot revive outward velocity', () => {
+    const clock = makeClock();
+    const ys: number[] = [];
+    const controls = createProjection({
+      clamp: true,
+      spring: { mass: 1, stiffness: 200, damping: 8 },
+      requestFrame: clock.requestFrame,
+      onFrame(frames) {
+        ys.push(100 + frames[0]!.ty);
+      },
+    });
+
+    controls.play([
+      {
+        id: 'card',
+        first: { x: 0, y: 0, width: 100, height: 100 },
+        last: { x: 240, y: 0, width: 100, height: 100 },
+      },
+    ]);
+    for (let i = 0; i < 12; i++) clock.step();
+    controls.play([
+      { id: 'card', last: { x: 320, y: 100, width: 100, height: 100 } },
+    ]);
+
+    // Stop while the visual output is pinned at the upper clamp edge but the
+    // underlying spring is still live. This is the exact boundary where an
+    // unbounded reconstruction can diverge from what the user actually saw.
+    let hitBoundary = false;
+    for (let i = 0; i < 1200 && controls.playing; i++) {
+      clock.step();
+      if (Math.abs((ys.at(-1) ?? NaN) - 100) < 1e-10 && controls.playing) {
+        hitBoundary = true;
+        break;
+      }
+    }
+    expect(hitBoundary).toBe(true);
+    const before = ys.at(-1)!;
+    expect(before).toBeCloseTo(100, 10);
+    expect(controls.boxAt('card')!.y).toBeCloseTo(before, 10);
+
+    // Retarget inward while the old visual is pinned. C0 says the synchronous
+    // pickup frame is exactly the emitted boundary, not an unclamped hidden box.
+    controls.play([
+      { id: 'card', last: { x: 360, y: 50, width: 100, height: 100 } },
+    ]);
+    expect(ys.at(-1)).toBeCloseTo(before, 10);
+
+    // The next frame must move inward or stay pinned. An outward velocity that
+    // was hidden behind the clamp must not be resurrected by the new run.
+    clock.step();
+    expect(ys.at(-1)!).toBeLessThanOrEqual(before + 1e-9);
+  });
 });
