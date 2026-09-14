@@ -1,0 +1,30 @@
+name: R11 geometry clamp state search
+on:
+  push:
+    branches: [carrier/r11-geometry-inline-state-20260914]
+permissions:
+  contents: read
+jobs:
+  search:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020
+        with:
+          node-version: '24'
+      - run: corepack enable && corepack install --global pnpm@11.11.0
+      - run: pnpm install --frozen-lockfile
+      - name: Search exact product candidate
+        env:
+          HEAD_SHA: 2757691a3cd1780bd7fdfa36c9edd0ebb0af56c2
+        shell: bash
+        run: |
+          set -euo pipefail
+          cp .github/research/r11_geometry_clamp_search.test.ts "$RUNNER_TEMP/clamp-search.test.ts"
+          git switch --detach "$HEAD_SHA"
+          cp "$RUNNER_TEMP/clamp-search.test.ts" test/research-projection-clamp-search.test.ts
+          pnpm vitest run test/research-projection-clamp-search.test.ts
