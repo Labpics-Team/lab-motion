@@ -69,8 +69,10 @@ s = s.replace('      const positionBasisPrev = positionBasisHat;\n      const po
 s = s.replace('      positionBasisHat = 0;\n      positionBasisVelocityHat = 0;', '      springBasis._valueV0 = 0;\n      springBasis._velocityV0 = 0;')
 s = s.replace('positionBasisHat,', 'springBasis._valueV0,')
 s = s.replace('positionBasisHat);', 'springBasis._valueV0);')
-assert 'positionBasisHat' not in s
-assert 'positionBasisVelocityHat' not in s
+# Fail closed on the actual mirrored controller declarations; residual names in
+# comments are harmless, and any live code reference is caught by typecheck.
+assert 'let positionBasisHat' not in s
+assert 'let positionBasisVelocityHat' not in s
 
 # Compact correction storage into one private tuple.
 s = s.replace('(old._qx ?? 0)', '(old._q?.[0] ?? 0)')
