@@ -166,6 +166,7 @@ class Owner<K extends ReorderKey> implements ReorderController<K> {
       const d = Math.hypot(axis === 'y' ? 0 : x - slot._x, axis === 'x' ? 0 : y - slot._y);
       if (d < best || d === best && i === from) { best = d; to = i; }
     }
+    if (to === from) { this._proposal = undefined; return; }
     this._propose(session, from, to);
   }
 
@@ -204,7 +205,6 @@ class Owner<K extends ReorderKey> implements ReorderController<K> {
   }
 
   private _propose(session: Session<K>, from: number, to: number): void {
-    if (to === from) { this._proposal = undefined; return; }
     if (this._proposal?.to === to) return;
     const slots = this._layout!._slots;
     // Одна вставка для pointer и keyboard. До изменения intent нет ни
