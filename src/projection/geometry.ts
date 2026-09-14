@@ -130,6 +130,11 @@ export function clamp01(x: number): number {
   return f < 0 ? 0 : f > 1 ? 1 : f;
 }
 
+/** Driver-private page-position carry shared by analytic pickup and tree projection. @internal */
+export function carryPositionAxis(base: number, q: number, correction: number): number {
+  return q === 0 || correction === 0 ? base : finite(base + correction * q) + 0;
+}
+
 
 // ─── Внутренние мутируемые формы (переиспользование без аллокаций) ───────────
 
@@ -335,7 +340,6 @@ function isDegenerateBox(b: FlipRect): boolean {
 interface DriverProjectionNodeInit extends ProjectionNodeInit {
   _qx?: number;
   _qy?: number;
-  _qb?: true;
 }
 
 export function createProjector(nodes: readonly ProjectionNodeInit[]): Projector {
@@ -486,13 +490,8 @@ export function createProjector(nodes: readonly ProjectionNodeInit[]): Projector
       const vectorNode = node as DriverProjectionNodeInit;
       const bx = q === 0 ? 0 : (vectorNode._qx ?? 0);
       const by = q === 0 ? 0 : (vectorNode._qy ?? 0);
-      if (vectorNode._qb === true) {
-        if (bx !== 0) v.x = lerp1(node.first.x, node.last.x, clamp01(t + bx * q));
-        if (by !== 0) v.y = lerp1(node.first.y, node.last.y, clamp01(t + by * q));
-      } else {
-        if (bx !== 0) v.x = finite(v.x + bx * q) + 0;
-        if (by !== 0) v.y = finite(v.y + by * q) + 0;
-      }
+      v.x = carryPositionAxis(v.x, q, bx);
+      v.y = carryPositionAxis(v.y, q, by);
 
       const a = liveAncestor[i];
       if (a === null) {

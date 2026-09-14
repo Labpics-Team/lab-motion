@@ -57,6 +57,7 @@ import { solveSpring, type MutableSpringBasis } from '../internal/solver.js';
 import type { RequestFrameFn } from '../motion-value.js';
 import { type SpringParams, validateSpringForFrameLoop } from '../spring.js';
 import {
+  carryPositionAxis,
   clamp01,
   createProjector,
   finite,
@@ -147,22 +148,13 @@ function lerpRadii(a: BoxRadii, b: BoxRadii, t: number): BoxRadii {
 interface VectorProjectionNode extends ProjectionNodeInit {
   _qx?: number;
   _qy?: number;
-  _qb?: true;
 }
 
 function boxWithPositionBasis(src: VectorProjectionNode, pHat: number, q: number): FlipRect {
   const box = mixBox(src.first, src.last, pHat);
-  if (q === 0) return box;
   const out = box as { x: number; y: number };
-  const x = src._qx ?? 0;
-  const y = src._qy ?? 0;
-  if (src._qb === true) {
-    if (x !== 0) out.x = lerp1(src.first.x, src.last.x, clamp01(pHat + x * q));
-    if (y !== 0) out.y = lerp1(src.first.y, src.last.y, clamp01(pHat + y * q));
-  } else {
-    if (x !== 0) out.x = finite(box.x + x * q) + 0;
-    if (y !== 0) out.y = finite(box.y + y * q) + 0;
-  }
+  out.x = carryPositionAxis(box.x, q, src._qx ?? 0);
+  out.y = carryPositionAxis(box.y, q, src._qy ?? 0);
   return box;
 }
 
@@ -239,7 +231,6 @@ interface Flight {
   /** Узлы полёта; Map сохраняет порядок вставки (= порядок resolved-входа). */
   readonly byId: ReadonlyMap<string, VectorProjectionNode>;
   readonly projector: Projector;
-  readonly vector: boolean;
   /** Character-switch зафиксирован на play (§4.4: смена reduce в полёте не подхватывается). */
   readonly reduced: boolean;
 }
@@ -263,8 +254,6 @@ export function createProjection(options?: ProjectionOptions): ProjectionControl
   let pHat = 1;
   /** Производная видимого p последнего кадра. Покой/cancel = 0. */
   let vHat = 0;
-  /** Публичный прогресс — всегда [0,1]. */
-  let progress = 1;
   /** Инвалидация кадров перехваченного полёта (класс stale-frame, flip :217-218). */
   let generation = 0;
   /** Переиспользуемый выход солвера (ноль аллокаций на кадр). */
@@ -376,7 +365,6 @@ export function createProjection(options?: ProjectionOptions): ProjectionControl
     pHat = 1;
     vHat = 0;
     springBasis._valueV0 = springBasis._velocityV0 = 0;
-    progress = 1;
     emit(projector, 1, 0); // финал — РОВНО p = 1 (точный identity)
     if (gen === generation && phase === 'rest') onRest?.();
   };
@@ -389,7 +377,6 @@ export function createProjection(options?: ProjectionOptions): ProjectionControl
     vHat = visibleVelocity(0, v0);
     springBasis._valueV0 = 0;
     springBasis._velocityV0 = vector ? 1 : 0;
-    progress = 0;
     let elapsed = 0;
     let lastTs: number | undefined;
     let frames = 0;
@@ -444,7 +431,6 @@ export function createProjection(options?: ProjectionOptions): ProjectionControl
       vHat = visibleVelocity(value, velocity);
       springBasis._valueV0 = basisVisible ? q : 0;
       springBasis._velocityV0 = basisVisible ? qVelocity : 0;
-      progress = clamp01(p);
       emit(projector, p, springBasis._valueV0);
       // Callback мог синхронно перехватить run — не оставляем даже один stale request.
       if (gen === generation && phase === 'active') schedule(tick);
@@ -479,10 +465,11 @@ export function createProjection(options?: ProjectionOptions): ProjectionControl
         return n as ProjectionNodeInit;
       });
 
-      // C¹: v0' по доминантному каналу ВСЕХ продолжающихся узлов (новые не участвуют —
-      // их px/s не определены). Паттерн доминантной проекции + normalizeV0.
+      // Scalar continuation remains available for every mode. Independent x/y
+      // velocity is admitted only for the supported unclamped 2D domain.
       let v0 = 0;
-      if (prevById !== undefined && vPrev !== 0) {
+      let vector = false;
+      if (prevById !== undefined) {
         let bestAbs = 0;
         let bestR = 0;
         let bestRp = 0;
@@ -494,15 +481,18 @@ export function createProjection(options?: ProjectionOptions): ProjectionControl
             bestRp = rNew;
           }
         };
-        for (const node of resolved) {
+        for (let i = 0; i < resolved.length; i++) {
+          let node = resolved[i] as VectorProjectionNode;
           const old = prevById.get(node.id);
           if (old === undefined) continue;
-          consider(old.last.x - old.first.x, node.last.x - node.first.x);
-          consider(old.last.y - old.first.y, node.last.y - node.first.y);
+          const oldRx = old.last.x - old.first.x;
+          const oldRy = old.last.y - old.first.y;
+          const rx = node.last.x - node.first.x;
+          const ry = node.last.y - node.first.y;
+          consider(oldRx, rx);
+          consider(oldRy, ry);
           consider(old.last.width - old.first.width, node.last.width - node.first.width);
           consider(old.last.height - old.first.height, node.last.height - node.first.height);
-          // Radii/opacity — полноправные каналы C¹ («всех каналов» — буквально):
-          // полёт только по радиусам/фейду не должен терять скорость на перехвате.
           if (old.radii !== undefined && node.radii !== undefined) {
             for (let c = 0; c < 4; c++) {
               consider(old.radii.last[c].x - old.radii.first[c].x, node.radii.last[c].x - node.radii.first[c].x);
@@ -512,43 +502,32 @@ export function createProjection(options?: ProjectionOptions): ProjectionControl
           if (old.opacity !== undefined && node.opacity !== undefined) {
             consider(old.opacity.to - old.opacity.from, node.opacity.to - node.opacity.from);
           }
+
+          if (!bounded) {
+            const oldX = old._qx ?? 0;
+            const oldY = old._qy ?? 0;
+            const oldVx = finite(oldRx * vPrev + oldX * positionBasisVelocityPrev);
+            const oldVy = finite(oldRy * vPrev + oldY * positionBasisVelocityPrev);
+            if (nodes[i].first !== undefined) node = resolved[i] = { ...node } as VectorProjectionNode;
+            // Temporary physical velocities; finalized into residual coefficients after v0 is known.
+            node._qx = oldVx;
+            node._qy = oldVy;
+          }
         }
         if (bestAbs > RANGE_EPSILON) {
           v0 = clampMagnitude(finite((vPrev * bestR) / bestRp), V0_CAP);
         }
-      }
-
-      // x/y carry their own physical boundary velocity while scalar channels share P(t).
-      let vector = false;
-      if (prevById !== undefined) {
-        for (let i = 0; i < resolved.length; i++) {
-          let node = resolved[i] as VectorProjectionNode;
-          const old = prevById.get(node.id);
-          if (old === undefined) continue;
-          const oldX = old._qx ?? 0;
-          const oldY = old._qy ?? 0;
-          const oldRx = old.last.x - old.first.x;
-          const oldRy = old.last.y - old.first.y;
-          const oldVx = old._qb === true
-            ? finite(oldRx * visibleVelocity(pPrev + oldX * positionBasisPrev, vPrev + oldX * positionBasisVelocityPrev))
-            : finite(oldRx * vPrev + oldX * positionBasisVelocityPrev);
-          const oldVy = old._qb === true
-            ? finite(oldRy * visibleVelocity(pPrev + oldY * positionBasisPrev, vPrev + oldY * positionBasisVelocityPrev))
-            : finite(oldRy * vPrev + oldY * positionBasisVelocityPrev);
-          const rx = node.last.x - node.first.x;
-          const ry = node.last.y - node.first.y;
-          let x = finite(oldVx - rx * v0) + 0;
-          let y = finite(oldVy - ry * v0) + 0;
-          if (bounded) {
-            x = rx === 0 ? 0 : finite(x / rx) + 0;
-            y = ry === 0 ? 0 : finite(y / ry) + 0;
-          }
-          if (x !== 0 || y !== 0) {
-            if (nodes[i].first !== undefined) node = resolved[i] = { ...node } as VectorProjectionNode;
+        if (!bounded) {
+          for (const raw of resolved) {
+            const node = raw as VectorProjectionNode;
+            if (node._qx === undefined) continue;
+            const rx = node.last.x - node.first.x;
+            const ry = node.last.y - node.first.y;
+            const x = finite(node._qx - rx * v0) + 0;
+            const y = finite((node._qy ?? 0) - ry * v0) + 0;
             node._qx = x;
             node._qy = y;
-            if (bounded) node._qb = true;
-            vector = true;
+            if (x !== 0 || y !== 0) vector = true;
           }
         }
       }
@@ -559,7 +538,7 @@ export function createProjection(options?: ProjectionOptions): ProjectionControl
 
       const byId = new Map<string, VectorProjectionNode>();
       for (const node of resolved) byId.set(node.id, node as VectorProjectionNode);
-      flight = { byId, projector, reduced, vector };
+      flight = { byId, projector, reduced };
 
       if (reduced || resolved.length === 0) {
         // P4 character-switch и пустое дерево не требуют автономного кадра:
@@ -596,7 +575,6 @@ export function createProjection(options?: ProjectionOptions): ProjectionControl
       pHat = pp;
       vHat = 0;
       springBasis._valueV0 = springBasis._velocityV0 = 0;
-      progress = clamp01(pp);
       emit(flight.projector, pp, 0);
     },
 
@@ -623,7 +601,7 @@ export function createProjection(options?: ProjectionOptions): ProjectionControl
       const byId = new Map<string, VectorProjectionNode>();
       for (const node of rebased) byId.set(node.id, node);
       const reduced = flight.reduced;
-      flight = { byId, projector, reduced, vector: false };
+      flight = { byId, projector, reduced };
 
       if (reduced) {
         // Character-switch удержан: под reduce release снапает (без автономного полёта).
@@ -655,7 +633,7 @@ export function createProjection(options?: ProjectionOptions): ProjectionControl
       return phase === 'active' || phase === 'held';
     },
     get progress(): number {
-      return progress;
+      return clamp01(pHat);
     },
     get velocity(): number {
       return vHat;
