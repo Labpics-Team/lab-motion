@@ -24,7 +24,32 @@ jobs:
           set -euo pipefail
           cp .github/research/r11_geometry_dom_compact.py "$RUNNER_TEMP/materialize.py"
           git switch --detach 62d94f44c8b5207354d02a30fda7283034e7cdbe
+          # The original materializer correctly found one missed consumer after
+          # converting FlightEntry to SavedInline. Let it materialize the rest,
+          # then close that exact consumer before typecheck.
+          python3 - "$RUNNER_TEMP/materialize.py" <<'PY'
+          from pathlib import Path
+          import sys
+          p = Path(sys.argv[1])
+          s = p.read_text()
+          old = "for needle in ('savedTransform', 'savedOrigin', 'savedRadius', 'm.cap', 'm.last', 'm.radiiLast'):"
+          new = "for needle in ('savedOrigin', 'savedRadius', 'm.cap', 'm.last', 'm.radiiLast'):"
+          assert s.count(old) == 1
+          p.write_text(s.replace(old, new, 1))
+          PY
           python3 "$RUNNER_TEMP/materialize.py"
+          python3 - <<'PY'
+          from pathlib import Path
+          p = Path('src/projection/dom.ts')
+          s = p.read_text()
+          old = "restoreProp(style, 'transform', entry.savedTransform);"
+          new = "restoreProp(style, 'transform', entry.saved[0]);"
+          assert s.count(old) == 1
+          s = s.replace(old, new, 1)
+          for needle in ('savedTransform', 'savedOrigin', 'savedRadius', 'm.cap', 'm.last', 'm.radiiLast'):
+              assert needle not in s, needle
+          p.write_text(s)
+          PY
           pnpm typecheck
           pnpm vitest run test/projection-*.test.ts
           pnpm build
