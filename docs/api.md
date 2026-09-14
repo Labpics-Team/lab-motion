@@ -7,7 +7,7 @@
 > [NAMING.md](NAMING.md).
 
 Импорт — `@labpics/motion` (ядро) или `@labpics/motion/<субпуть>`.
-Корневой экспорт + 41 субпуть; неиспользуемые субпути вырезаются
+Корневой экспорт + 42 субпути; неиспользуемые субпути вырезаются
 tree-shaking'ом: `sideEffects` — точный allowlist из двух авто-регистрирующих
 входов (`./lit`, `./wc`).
 
@@ -24,15 +24,43 @@ Node ≥ 22; ESM и CJS, по-файловые декларации типов. 
 export-ветки) и `pnpm pack:compat` (TypeScript/Vite, SSR, tree shaking, точный
 минимальный Preact peer).
 
+
+## Область анимаций компонента
+
+`createAnimateScope(root): AnimateScope` — дополнительный экспорт `./animate`.
+`root` реализует `AnimateScopeRoot.querySelectorAll(selector): ArrayLike<unknown>`:
+подходят Element, Document и ShadowRoot. Неверный query-host даёт `TypeError`.
+Factory ничего не анимирует и не читает глобальный document.
+
+- `scope.animate(target, props, options?)` возвращает обычный `AnimateControls`.
+  Строка сначала разрешается относительно root, затем результат проходит защитную
+  границу полного animate. Selector errors остаются host errors; явные targets
+  проходят без query и не ограничиваются потомками root.
+- `scope.destroy()` отказывает новым запускам, отменяет учтённые handles и снимает
+  root. Вызовы после destroy возвращают завершённый no-op, не читая входы.
+  Повторный destroy бездействует. Незавершённый reentrant setup отменяется после
+  возврата controls; host reservation дренируется одной микрозадачей, без rAF.
+- `finished`, natural/onComplete, reduced motion и ownership сохраняют контракт
+  animate. Завершённые handles удаляются из учёта. Нет автоматического revert
+  стилей, удаления listeners или отмены чужого successor.
+- Синхронные cleanup errors: одна пробрасывается буквально, несколько дают
+  `AggregateError`; остаточные ошибки финального прохода передаются `reportError`
+  среды, если он доступен. Неисправный host не получает обещания полного rollback.
+
+Сценарии DOM, React и Solid с одним cleanup приведены в
+[рецептах компонентной области](recipes.md#анимации-принадлежащие-компоненту).
+
 ## Ядро и управление
 
 | Импорт | Что даёт |
 |---|---|
 | `@labpics/motion` | `spring` (аналитический closed-form солвер), `tween`, `drive` (декларативный запуск), `MotionValue` (реактивное значение со smooth-pickup), `MotionParamError` |
 | `…/driver` | Scrubbable-контроллер: `play/pause/reverse/seek/timeScale/progress` + thenable |
-| `…/frame` | Единый frame-шедулер: `createFrameLoop` / синглтон `frame` — один rAF на кадр, фазы read→update→render против layout-thrash, SSR-safe; `asRequestFrame(loop)` сажает `MotionValue`/`drive` на общий кадр. **Биндинги используют его по умолчанию** (как shared-ticker у Framer Motion/GSAP); инжекция своего `requestFrame` переопределяет |
+| `…/frame` | Единый frame-шедулер: `createFrameLoop` / синглтон `frame` — один rAF на кадр, фазы read→update→render против layout-thrash, SSR-safe; `asRequestFrame(loop)` сажает `MotionValue`/`drive` на общий кадр. **Фреймворк-биндинги используют его по умолчанию** (как shared-ticker у Framer Motion/GSAP); инжекция своего `requestFrame` переопределяет |
 | `…/nano` | **Platform-trusted WAAPI to-only ≤ 1 КБ gzip**: spring/tween, `delay`/`stagger`, reduced-motion, сами `Animation` как контролы; полный контракт и границы — ниже |
+| `…/animate` | Фасад-one-liner: `animate(target, props, options)` и `createAnimateScope(root)` — цели по каналам (`x`/`y`/`scale`/`rotate`, `opacity`, CSS-свойства), режим `{ spring }` или `{ duration, ease }`, `delay`/`stagger`, контролы `{ finished, play, pause, seek, cancel, stop }`. Это базовый single-transition DX-срез; ядро от него не растёт |
 | `…/animate` | Фасад-one-liner: `animate(target, props, options)` — цели по каналам (`x`/`y`/`scale`/`rotate`, `opacity`, CSS-свойства), режим `{ spring }` или `{ duration, ease }`, `delay`/`stagger`, контролы `{ finished, play, pause, seek, cancel, stop }`. Это базовый single-transition DX-срез; ядро от него не растёт |
+| `…/bindings` | [Семантическая привязка](bindings.md): `createMotionBinding(project, targets)` связывает модель компонента с визуальными ролями; обновляет только изменившиеся цели, без второго store или кадрового цикла |
 
 ### Пример: scrub-контроллер
 
@@ -99,7 +127,7 @@ await moves.finished;
 | Импорт | Что даёт |
 |---|---|
 | `…/gestures` | `createPress` (tap + клавиатурный путь Enter/Space), `createHover`, `createPan`, `createDrag` (границы + rubber-band + инерция + reduced-motion) |
-| `…/behaviors` | Headless state machines типовых мобильных взаимодействий: `createBottomSheet`, `createDragDismiss`, `createCarousel`, `createPullToRefresh`. Единый контракт `BehaviorState { value, velocity, phase }`. Подробно — [behaviors.md](behaviors.md) |
+| `…/behaviors` | Headless state machines типовых мобильных взаимодействий: `createBottomSheet`, `createDragDismiss`, `createCarousel`, `createPullToRefresh`. Их общий контракт `BehaviorState { value, velocity, phase }`; отдельный `createStateCascade` разрешает цели конкурирующих визуальных намерений по свойствам. Подробно — [behaviors.md](behaviors.md) |
 | `…/scroll` | Headless-прогресс страницы/target-с-офсетами (семантика Motion), чистая in-view машина, скорость, scrub-клей к timeline |
 | `…/in-view` | Нативный `IntersectionObserver`-адаптер: selector/Element/список, custom root/margin/amount, one-shot либо парный enter/leave cleanup; возвращает idempotent `stop` |
 | `…/presence` | [Управляемый вход/выход](presence.md): `createPresenceTransition`, группа исполнителей и одна цель видимости; ручной `createPresence`, `swapPresence` (wait/sync) |
@@ -113,7 +141,7 @@ await moves.finished;
 
 | Импорт | Что даёт |
 |---|---|
-| `…/waapi` | Низкоуровневый мост: `compileWaapi`/`animateWaapi` (кейфреймы движка → нативный `Element.animate`), `easingToLinear` (любой easing → CSS `linear()`), `supportsWaapi` |
+| `…/waapi` | Низкоуровневый native-мост: `compileWaapi`/`animateWaapi`; `animateScrollWaapi`/`animateViewWaapi` отдают scroll/view-progress → property нативным progress timelines без собственного покадрового JS и без скрытого fallback; capability probes явные |
 | `…/compositor` | Базовый compositor-компилятор: `compileSpringLinear`, `compileSpringPlan`, `CompositorSpring`, ретаргет, хендофф и fallback-матрица. Подробно — [compositor.md](compositor.md) |
 | `…/compositor/stagger` | Самодостаточный групповой compositor-фасад: `compileStaggerPlan`, `CompositorStaggerGroup` и связанные `compileSpringPlan`/`CompositorSpring` из одного entry |
 | `…/tokens` | Motion-токены: `duration`, `easing`, `spring`, `staggerGap`, `distanceScale`. Подробно — [tokens.md](tokens.md) |
@@ -125,6 +153,25 @@ await moves.finished;
 | `…/compiler/vite` | `motionCompiler()` — Vite/Rollup-плагин build-time lowering статических вызовов `./nano` и `animate(..., { layout: 'project' })` (сертификация артефакта на сборке). Подробно — [compiler.md](compiler.md), [future-layout.md](future-layout.md) |
 | `…/compiler/runtime` | Исполнитель compiled-вызовов nano; импорт вставляет плагин, вручную не используется |
 | `…/surface` | Приватный executor compiled-поверхностей (≤1 KB gz); импорт вставляет плагин, вручную не используется |
+
+## Непрерывное слежение MotionValue
+
+`setTarget(target)` не создаёт новый объект анимации. В активном движении он
+перенаправляет существующее значение из последней опубликованной пары
+`value`/`velocity`, сохраняя временную координату этого снимка. Следующий кадр
+учитывает уже прошедший интервал; поток новых целей перед каждым кадром не
+останавливает движение. На самой границе `setTarget` значение и скорость не меняются.
+
+Повтор активной цели — no-op. Несколько разных целей между кадрами не эмитят
+промежуточные значения и не планируют дополнительные callbacks: действует последняя.
+Это не история pointer-сэмплов для оценки скорости жеста — её ведёт `./gestures`.
+
+До первого callback с timestamp начало времени неизвестно и определяется этим
+callback. После `stop()`/`snapTo()` следующий запуск получает новую epoch. Без
+timestamp каждый callback продвигает фиксированный шаг 1/60 секунды. Смешивание
+произвольных временных координат не заменяет согласованный клок приложения.
+Для нескольких значений используйте `asRequestFrame` из `./frame`; биндинги уже
+подключают его по умолчанию. Рецепт — [слежение за указателем](recipes.md#слежение-за-указателем).
 
 ## Биндинги
 
@@ -165,3 +212,58 @@ try {
 код `LM000`. Для `instanceof` импортируйте constructor из того же физического
 entry, что и проверяемую функцию: корневой entry намеренно не связывает
 независимые bundle-графы.
+
+## Управляемая перестановка `./behaviors/reorder`
+
+`createReorder({ items, axis?, direction?, onReorder })` — опциональный headless
+resolver. Не импортируется корнем, `./animate`, `./nano` или `./behaviors`.
+Типы: `ReorderKey`, `ReorderItem`, `ReorderOptions`, `ReorderController`,
+`ReorderSession`, `ReorderProposal`, `ReorderAxis`, `ReorderStep`.
+
+`items` — snapshot в подтверждённом порядке приложения: `{ key, rect? }`.
+Key — string или конечный number; сравнение Map/SameValueZero (0 и -0 один key).
+Неизмеренные и нулевые прямоугольники не являются drop targets. Координаты
+и размеры — конечные дробные числа с абсолютным значением не выше
+`Number.MAX_SAFE_INTEGER`; размеры неотрицательны, центр тоже в диапазоне.
+Размер snapshot до 100000, проверяется до индексных getters. Структурные ошибки
+дают `TypeError`, числовой envelope — `RangeError`; это не физические параметры
+и не новый численный код `MotionParamError`. Исключения getters/callback сохраняются.
+
+`axis` — `x`, `y`, `both` или `auto` (дефолт). Auto: одинаковый y центров → x,
+иначе одинаковый x → y, иначе both; в пустом snapshot both. Разновысокие карточки
+могут требовать явного axis. `direction` — ltr по умолчанию, rtl меняет logical
+порядок горизонтальной клавиатуры; в 2D стрелки выбирают геометрическую полуплоскость.
+
+`start(key)` возвращает session только для измеренного ненулевого slot.
+Новый допустимый start отзывает старую session; неизвестный key её не прерывает.
+`session.move({x,y})` получает **желаемый центр карточки**, не delta и не обязательно
+точку указателя. Выбирается ближайший центр slot в заданных осях. На равенстве
+побеждает собственный slot, затем первый в подтверждённом порядке. Приложение
+отвечает за bounds/scroll/перевод координат; resolver не выполняет DOM-read.
+
+`session.step` принимает previous/next/first/last и left/right/up/down. Logical
+шаг не перескакивает через неизмеренную соседнюю цель. В 2D физическая стрелка
+выбирает ближайший измеренный центр в открытой полуплоскости направления.
+Pointer и keyboard используют одну вставку перемещаемого key в индекс target.
+
+`onReorder(frozenKeys, frozenProposal)` вызывается только при новом предложении,
+**не подтверждает** порядок. Proposal содержит key/over/from/to. После принятия
+приложение вызывает `update(items)` с фактическим порядком и geometry. Update
+отзывает proposal, сохраняет session по key, отменяет её при исчезновении
+key/geometry. До async commit проверяйте `isCurrent(proposal)`: это проверка
+точной identity последнего предложения, не сравнение индексов старого массива.
+Возврат pointer в собственный slot тоже отзывает предложение.
+
+`session.end/cancel`, `controller.cancel` прекращают ввод без отката уже принятых
+данных. Callback throw отменяет только ту же session и пробрасывает исходную
+ошибку; созданная вложенным callback новая session не теряется. Input snapshot
+атомарен: успешный вложенный update выигрывает, неуспешный не отзывает внешний.
+`destroy` идемпотентен, освобождает snapshot/callback; stale session и вызовы
+update/start после него инертны. Завершённая session не удерживает owner.
+
+В resolver нет scheduler/animation/DOM/global registry. Snapshot стоит O(N),
+pointer scan O(N), unchanged intent не выделяет массив/Map и не вызывает
+callback. Новое предложение создаёт O(N) permutation; потребительская animation
+и DOM-перестановка оплачиваются отдельно.
+
+[Исполняемый list/grid-рецепт с projection, pointer, keyboard и cleanup](recipes.md#перестановка-списка-или-сетки).

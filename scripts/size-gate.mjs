@@ -166,6 +166,8 @@ export const ANIMATE_COMPOSITOR_MIXED_GATE_BYTES = 17_500;
 // раздуванию прятаться под щедрым общим зонтом 4608 (тот же класс, что ловит
 // CORE_GATE_BYTES для ядра). Поднимать только осознанно.
 export const BESPOKE_SUBPATH_GATES = {
+  // Первый артефакт optional reorder; ни один прежний entry не финансирует его.
+  './behaviors/reorder': 1518,
   './utils': 1400,
   // Build-tool entry (#208): Vite-адаптер lowering НАМЕРЕННО несёт канонический
   // MotionProgram V1 parser + nano spring SSOT — это цена доверенного артефакта
@@ -292,6 +294,11 @@ export const BESPOKE_SUBPATH_GATES = {
  */
 export const IMPORT_COST_SCENARIOS = [
   {
+    name: 'reorder-controlled',
+    code: `import {createReorder} from '%DIST%/../behaviors/reorder/index.js'; console.log(createReorder({items:[],onReorder:console.log}));`,
+    gate: 1522, // Первый измеренный consumer: initial = total, без дополнительного chunk.
+  },
+  {
     name: 'nano spring-to',
     code: `import { animate } from '%DIST%/../nano/index.js'; console.log(animate('.hero', { translate: '240px', opacity: 1 }).length);`,
     gate: NANO_GATE_BYTES,
@@ -393,6 +400,13 @@ export const IMPORT_COST_SCENARIOS = [
     // (собственный hard gate выше), перестройка фасада (эпик nano-core) получит
     // сценарий «animate без допов» с порогом от факта первой реализации.
     gate: FULL_ANIMATE_GATE_BYTES,
+  },
+  {
+    name: 'animate component scope',
+    code: `import { createAnimateScope } from '%DIST%/../animate/index.js'; const s=createAnimateScope(document.querySelector('.panel')); s.animate('.item', { x:240, opacity:1 }); document.querySelector('.close').addEventListener('click',s.destroy);`,
+    // #376: первый проверенный consumer 15 593 B gzip; запас <0.7%.
+    // Это цена новой capability. Старые entry/consumer потолки не повышаются.
+    gate: 15_700,
   },
   {
     // ПРАВДА потребительской цены поведения + СТРАЖ переиспользования: одна
