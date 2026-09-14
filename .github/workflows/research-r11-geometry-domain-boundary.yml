@@ -1,0 +1,94 @@
+name: R11 geometry contract-bounded domain
+on:
+  push:
+    branches: [carrier/r11-geometry-domain-boundary-20260914]
+permissions:
+  contents: read
+jobs:
+  measure:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020
+        with:
+          node-version: '24'
+      - run: corepack enable && corepack install --global pnpm@11.11.0
+      - run: pnpm install --frozen-lockfile
+      - name: Prove bounded parity, unbounded vector witnesses, and hard size
+        shell: bash
+        env:
+          VARIANT: driver_ssot
+        run: |
+          set -euo pipefail
+          cp .github/research/r11_geometry_domain_boundary.py "$RUNNER_TEMP/domain.py"
+          git show origin/carrier/r11-geometry-shared-position-20260914:.github/research/r11_geometry_shared_position.py > "$RUNNER_TEMP/shared.py"
+          git show origin/carrier/r11-projection-dom-state-20260914:.github/research/r11_projection_dom_state.py > "$RUNNER_TEMP/dom.py"
+          git show origin/carrier/r11-geometry-fused-retarget-20260914:.github/research/r11_geometry_fused_retarget.py > "$RUNNER_TEMP/fused.py"
+          git show origin/carrier/r11-projection-cleanup-matrix-20260914:.github/research/r11_projection_cleanup_matrix.py > "$RUNNER_TEMP/cleanup.py"
+          git show origin/carrier/r11-geometry-inline-state-20260914:.github/research/r11_geometry_clamp_search.test.ts > "$RUNNER_TEMP/clamp-search.test.ts"
+          cat > "$RUNNER_TEMP/bounded-parity.mjs" <<'NODE'
+          import { pathToFileURL } from 'node:url';
+          const { createProjection } = await import(pathToFileURL(process.cwd() + '/dist/projection/index.js').href + `?v=${Date.now()}`);
+          const q=[];
+          let now=0;
+          const requestFrame=(cb)=>{ q.push(cb); return q.length; };
+          const step=(dt=1000/120)=>{ now+=dt; const cb=q.shift(); if(!cb) throw new Error('missing frame'); cb(now); };
+          const out=[];
+          let controls;
+          const snap=(frames)=>out.push({
+            progress: controls.progress,
+            velocity: controls.velocity,
+            frames: frames.map(f=>JSON.parse(JSON.stringify(f))),
+          });
+          controls=createProjection({
+            clamp:true,
+            spring:{mass:1,stiffness:200,damping:4},
+            requestFrame,
+            onFrame:snap,
+          });
+          controls.play([{id:'card',first:{x:0,y:0,width:100,height:80},last:{x:240,y:0,width:120,height:90}}]);
+          step(); step();
+          controls.play([{id:'card',last:{x:20,y:220,width:90,height:110}}]);
+          step(); step();
+          controls.play([{id:'card',last:{x:-80,y:50,width:130,height:70}}]);
+          step();
+          controls.seek(0.25);
+          controls.release(1.2);
+          step(); step();
+          console.log(JSON.stringify(out));
+          NODE
+
+          # Exact legacy bounded behavior from the immutable motion-contract head.
+          git switch --detach e5833d01551f5f8e7cbd67850fe5d00c55751889
+          pnpm build >/dev/null
+          node "$RUNNER_TEMP/bounded-parity.mjs" > "$RUNNER_TEMP/baseline.json"
+
+          # Materialize the strongest proven geometry representation, then scope the
+          # new vector guarantee to the contract-supported unclamped 2D domain.
+          git switch --detach 62d94f44c8b5207354d02a30fda7283034e7cdbe
+          python3 "$RUNNER_TEMP/shared.py"
+          python3 "$RUNNER_TEMP/dom.py"
+          python3 "$RUNNER_TEMP/fused.py"
+          python3 "$RUNNER_TEMP/cleanup.py"
+          python3 "$RUNNER_TEMP/domain.py"
+          cp "$RUNNER_TEMP/clamp-search.test.ts" test/research-projection-clamp-search.test.ts
+          pnpm typecheck
+          pnpm vitest run test/projection-dom.test.ts test/projection-vector-retarget.test.ts test/projection-driver.test.ts test/projection-geometry.test.ts test/projection-finiteness-fuzz.test.ts test/motion-contract-v1.test.ts test/projection-api-surface-pin.test.ts test/research-projection-clamp-search.test.ts
+          rm test/research-projection-clamp-search.test.ts
+          pnpm build >/dev/null
+          node "$RUNNER_TEMP/bounded-parity.mjs" > "$RUNNER_TEMP/candidate.json"
+          cmp "$RUNNER_TEMP/baseline.json" "$RUNNER_TEMP/candidate.json"
+          echo BOUNDED_LEGACY_PARITY=PASS
+
+          set +e
+          node scripts/size-gate.mjs 2>&1 | tee "$RUNNER_TEMP/size.log"
+          rc=${PIPESTATUS[0]}
+          set -e
+          grep -E 'projection-dom-one-liner|projection-core-only|projection\s|size-gate:' "$RUNNER_TEMP/size.log" || true
+          echo "SIZE_RC=$rc"
+          git diff --check
+          exit "$rc"
