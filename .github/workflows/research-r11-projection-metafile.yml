@@ -27,12 +27,11 @@ jobs:
           git switch --detach 62d94f44c8b5207354d02a30fda7283034e7cdbe
           python3 "$RUNNER_TEMP/shared.py"
           python3 "$RUNNER_TEMP/dom.py"
-          pnpm build >/dev/null
           node --input-type=module <<'NODE'
           import { build } from 'esbuild';
           const result = await build({
             stdin: {
-              contents: `import { createDomProjection } from './dist/projection/index.js'; const p = createDomProjection(); p.capture([]); p.play(); p.cancel(); console.log(p.playing);`,
+              contents: `import { createDomProjection } from './src/projection/index.ts'; const p = createDomProjection(); p.capture([]); p.play(); p.cancel(); console.log(p.playing);`,
               resolveDir: process.cwd(),
               sourcefile: 'projection-dom-one-liner.mjs',
             },
