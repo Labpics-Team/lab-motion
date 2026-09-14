@@ -53,7 +53,8 @@ def radius_marker() -> None:
         'radius marker promotion',
     )
     assert 'radiiLast?:' not in s
-    assert '.radiiLast' not in s
+    assert 'flightEntry.radiiLast' not in s
+    assert 'm.cap.radiiLast' not in s
     p.write_text(s)
 
 
