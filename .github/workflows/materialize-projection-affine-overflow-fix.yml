@@ -1,0 +1,43 @@
+name: Materialize projection affine overflow fix
+on:
+  push:
+    branches: [carrier/projection-affine-overflow-fix-20260914]
+permissions:
+  contents: write
+jobs:
+  verify:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          fetch-depth: 0
+          persist-credentials: true
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020
+        with:
+          node-version: '24'
+      - run: corepack enable && corepack install --global pnpm@11.11.0
+      - run: pnpm install --frozen-lockfile
+      - name: Apply fix to exact delivery branch
+        shell: bash
+        run: |
+          set -euo pipefail
+          cp .github/research/materialize_projection_affine_overflow_fix.py "$RUNNER_TEMP/fix.py"
+          git switch --detach origin/fix/projection-affine-overflow-20260914
+          python3 "$RUNNER_TEMP/fix.py"
+          git diff --check
+      - name: Verify semantic class and repository gates
+        shell: bash
+        run: |
+          set -euo pipefail
+          pnpm typecheck
+          pnpm vitest run
+          pnpm build
+          node scripts/size-gate.mjs
+      - name: Push verified fix
+        shell: bash
+        run: |
+          set -euo pipefail
+          git add src/projection/geometry.ts
+          git -c user.name='github-actions[bot]' -c user.email='41898282+github-actions[bot]@users.noreply.github.com' commit -m 'fix(projection): make affine interpolation overflow-safe'
+          git push origin HEAD:refs/heads/fix/projection-affine-overflow-20260914
