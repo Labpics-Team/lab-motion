@@ -1,0 +1,89 @@
+name: R11 safe DOM tuple matrix
+on:
+  push:
+    branches: [carrier/r11-dom-tuples-20260915]
+permissions:
+  contents: read
+jobs:
+  measure:
+    strategy:
+      fail-fast: false
+      matrix:
+        variant: [base, saved, measured, both]
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    env:
+      VARIANT: ${{ matrix.variant }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020
+        with:
+          node-version: '24'
+      - run: corepack enable && corepack install --global pnpm@11.11.0
+      - run: pnpm install --frozen-lockfile
+      - name: Materialize exact safe baseline plus ${{ matrix.variant }} tuples
+        shell: bash
+        run: |
+          set -euo pipefail
+          cp .github/research/r11_affine_reconcile.py "$RUNNER_TEMP/reconcile.py"
+          cp .github/research/r11_safe_structural_matrix.py "$RUNNER_TEMP/safe.py"
+          cp .github/research/r11_flight_index_residual_matrix.py "$RUNNER_TEMP/residual.py"
+          cp .github/research/r11_pickup_shape_matrix.py "$RUNNER_TEMP/shape.py"
+          cp .github/research/r11_dom_tuple_matrix.py "$RUNNER_TEMP/tuple.py"
+          cp .github/research/r11_affine_projector.test.ts "$RUNNER_TEMP/projector-affine.test.ts"
+          cp .github/research/r11_safe_dom_state.test.ts "$RUNNER_TEMP/dom-state.test.ts"
+          git show origin/carrier/r11-geometry-shared-position-20260914:.github/research/r11_geometry_shared_position.py > "$RUNNER_TEMP/shared.py"
+          git show origin/carrier/r11-geometry-inline-state-20260914:.github/research/r11_geometry_clamp_search.test.ts > "$RUNNER_TEMP/clamp-search.test.ts"
+          git show origin/carrier/r11-normalized-clamp-endpoint-lerp-20260914:.github/research/r11_normalized_clamp_ieee_harden.test.ts > "$RUNNER_TEMP/ieee.test.ts"
+          git show origin/fix/projection-affine-overflow-20260914:test/projection-affine-overflow.test.ts > "$RUNNER_TEMP/affine.test.ts"
+          git switch --detach d87d45399797d8954b6decbeeaf3c57ec97345db
+          python3 "$RUNNER_TEMP/reconcile.py"
+          python3 "$RUNNER_TEMP/shared.py"
+          VARIANT=all_safe python3 "$RUNNER_TEMP/safe.py"
+          VARIANT=direct_inline python3 "$RUNNER_TEMP/residual.py"
+          VARIANT=rebase_both python3 "$RUNNER_TEMP/shape.py"
+          VARIANT="$VARIANT" python3 "$RUNNER_TEMP/tuple.py"
+          cp "$RUNNER_TEMP/projector-affine.test.ts" test/research-r11-affine-projector.test.ts
+          cp "$RUNNER_TEMP/dom-state.test.ts" test/research-r11-safe-dom-state.test.ts
+          cp "$RUNNER_TEMP/clamp-search.test.ts" test/research-projection-clamp-search.test.ts
+          cp "$RUNNER_TEMP/ieee.test.ts" test/research-normalized-clamp-ieee.test.ts
+          cp "$RUNNER_TEMP/affine.test.ts" test/research-affine-overflow.test.ts
+          git diff --check
+      - name: Semantic falsifiers
+        shell: bash
+        run: |
+          set -euo pipefail
+          pnpm typecheck
+          pnpm vitest run \
+            test/projection-dom.test.ts \
+            test/projection-vector-retarget.test.ts \
+            test/projection-vector-clamp.test.ts \
+            test/projection-driver.test.ts \
+            test/projection-geometry.test.ts \
+            test/projection-finiteness-fuzz.test.ts \
+            test/motion-contract-v1.test.ts \
+            test/projection-api-surface-pin.test.ts \
+            test/research-projection-clamp-search.test.ts \
+            test/research-normalized-clamp-ieee.test.ts \
+            test/research-affine-overflow.test.ts \
+            test/research-r11-affine-projector.test.ts \
+            test/research-r11-safe-dom-state.test.ts
+          rm test/research-projection-clamp-search.test.ts \
+             test/research-normalized-clamp-ieee.test.ts \
+             test/research-affine-overflow.test.ts \
+             test/research-r11-affine-projector.test.ts \
+             test/research-r11-safe-dom-state.test.ts
+          pnpm build
+      - name: Measure frozen consumer bytes
+        shell: bash
+        run: |
+          set -euo pipefail
+          set +e
+          node scripts/size-gate.mjs 2>&1 | tee "$RUNNER_TEMP/size.log"
+          rc=${PIPESTATUS[0]}
+          set -e
+          grep -E 'projection-dom-one-liner|projection-core-only|projection\s|size-gate:' "$RUNNER_TEMP/size.log" || true
+          echo "VARIANT=$VARIANT SIZE_RC=$rc"
