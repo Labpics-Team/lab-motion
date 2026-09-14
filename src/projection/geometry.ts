@@ -121,9 +121,12 @@ function finiteDiv(num: number, den: number, fallback: number): number {
 
 /** Конечный lerp со схлопом −0 (P1). @internal — переиспользует driver (ребейз). */
 export function lerp1(a: number, b: number, t: number): number {
-  if (t === 0) return finite(a) + 0;
-  if (t === 1) return finite(b) + 0;
-  return finite(finite(a) + (finite(b) - finite(a)) * t) + 0;
+  const x = finite(a);
+  const y = finite(b);
+  if (t === 0) return x + 0;
+  if (t === 1) return y + 0;
+  const d = y - x;
+  return finite(Number.isFinite(d) ? x + d * t : x * (1 - t) + y * t) + 0;
 }
 
 /** @internal */
@@ -151,10 +154,10 @@ interface MutableTransform {
 
 /** Покомпонентный lerp в out; p уже санирован (NaN→0). Размеры флорятся ≥ 0. */
 function mixInto(first: FlipRect, last: FlipRect, t: number, out: MutableRect): MutableRect {
-  out.x = finite(finite(first.x) + (finite(last.x) - finite(first.x)) * t) + 0;
-  out.y = finite(finite(first.y) + (finite(last.y) - finite(first.y)) * t) + 0;
-  const w = finite(finite(first.width) + (finite(last.width) - finite(first.width)) * t) + 0;
-  const h = finite(finite(first.height) + (finite(last.height) - finite(first.height)) * t) + 0;
+  out.x = lerp1(first.x, last.x, t);
+  out.y = lerp1(first.y, last.y, t);
+  const w = lerp1(first.width, last.width, t);
+  const h = lerp1(first.height, last.height, t);
   // Floor размеров: overshoot позиции честный, зеркалирование отрицательным scale — нет.
   out.width = w < 0 ? 0 : w;
   out.height = h < 0 ? 0 : h;
@@ -280,8 +283,8 @@ export function cornerRadiusAt(
   p: number,
 ): CornerRadius {
   const t = clamp01(p); // прогресс радиуса клампится: overshoot на радиус не транслируем
-  let rx = finite(finite(first.x) + (finite(last.x) - finite(first.x)) * t);
-  let ry = finite(finite(first.y) + (finite(last.y) - finite(first.y)) * t);
+  let rx = lerp1(first.x, last.x, t);
+  let ry = lerp1(first.y, last.y, t);
   if (rx < 0) rx = 0;
   if (ry < 0) ry = 0;
   // Живые вызовы ./flip: x/y-полуоси корректируются независимо (эллиптический угол).
