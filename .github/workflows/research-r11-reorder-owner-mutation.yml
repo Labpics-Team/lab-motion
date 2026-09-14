@@ -38,7 +38,7 @@ jobs:
           m=os.environ['MUTANT']
           pointer="    if (to === from) { this._proposal = undefined; return; }\n    this._propose(session, from, to);\n"
           keyboard="    if (to === from || to < 0 || to >= layout._slots.length || Number.isNaN(layout._slots[to]!._x)) return;\n"
-          marker="  private _propose(session: number, from: number, to: number): void {\n"
+          marker="  private _propose(session: Session<K>, from: number, to: number): void {\n"
           assert s.count(pointer)==1
           assert s.count(keyboard)==1
           assert s.count(marker)==1
