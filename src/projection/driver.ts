@@ -147,16 +147,15 @@ function lerpRadii(a: BoxRadii, b: BoxRadii, t: number): BoxRadii {
 interface VectorProjectionNode extends ProjectionNodeInit {
   _qx?: number;
   _qy?: number;
-  _qb?: true;
 }
 
-function boxWithPositionBasis(src: VectorProjectionNode, pHat: number, q: number): FlipRect {
+function boxWithPositionBasis(src: VectorProjectionNode, pHat: number, q: number, bounded: boolean): FlipRect {
   const box = mixBox(src.first, src.last, pHat);
   if (q === 0) return box;
   const out = box as { x: number; y: number };
   const x = src._qx ?? 0;
   const y = src._qy ?? 0;
-  if (src._qb === true) {
+  if (bounded) {
     if (x !== 0) out.x = lerp1(src.first.x, src.last.x, clamp01(pHat + x * q));
     if (y !== 0) out.y = lerp1(src.first.y, src.last.y, clamp01(pHat + y * q));
   } else {
@@ -177,12 +176,13 @@ function rebaseNode(
   src: VectorProjectionNode,
   pHat: number,
   positionBasisValue = 0,
+  bounded = false,
 ): VectorProjectionNode {
   const tc = clamp01(pHat);
   return {
     id,
     parent: target.parent,
-    first: boxWithPositionBasis(src, pHat, positionBasisValue),
+    first: boxWithPositionBasis(src, pHat, positionBasisValue, bounded),
     last: target.last,
     anchor: target.anchor,
     radii:
@@ -472,7 +472,7 @@ export function createProjection(options?: ProjectionOptions): ProjectionControl
           if (old === undefined) {
             throw new MotionParamError('LM078');
           }
-          return rebaseNode(n.id, n, old, pPrev, positionBasisPrev);
+          return rebaseNode(n.id, n, old, pPrev, positionBasisPrev, bounded);
         }
         // first задан: узел структурно уже ProjectionNodeInit; геометрия читает
         // поля по ссылкам в обоих вариантах — копия объекта ничего не защищала.
@@ -529,10 +529,10 @@ export function createProjection(options?: ProjectionOptions): ProjectionControl
           const oldY = old._qy ?? 0;
           const oldRx = old.last.x - old.first.x;
           const oldRy = old.last.y - old.first.y;
-          const oldVx = old._qb === true
+          const oldVx = bounded
             ? finite(oldRx * visibleVelocity(pPrev + oldX * positionBasisPrev, vPrev + oldX * positionBasisVelocityPrev))
             : finite(oldRx * vPrev + oldX * positionBasisVelocityPrev);
-          const oldVy = old._qb === true
+          const oldVy = bounded
             ? finite(oldRy * visibleVelocity(pPrev + oldY * positionBasisPrev, vPrev + oldY * positionBasisVelocityPrev))
             : finite(oldRy * vPrev + oldY * positionBasisVelocityPrev);
           const rx = node.last.x - node.first.x;
@@ -547,14 +547,16 @@ export function createProjection(options?: ProjectionOptions): ProjectionControl
             if (nodes[i].first !== undefined) node = resolved[i] = { ...node } as VectorProjectionNode;
             node._qx = x;
             node._qy = y;
-            if (bounded) node._qb = true;
             vector = true;
           }
         }
       }
 
       // Валидация дерева — рано, до любых эффектов, даже под reduce.
-      const projector = createProjector(resolved);
+      const projector = (createProjector as unknown as (
+        nodes: readonly ProjectionNodeInit[],
+        bounded: boolean,
+      ) => Projector)(resolved, bounded);
       const reduced = prefersReducedMotion(options?.matchMedia); // резолв ОДИН раз на play
 
       const byId = new Map<string, VectorProjectionNode>();
@@ -617,9 +619,12 @@ export function createProjection(options?: ProjectionOptions): ProjectionControl
       // цели не менялись — теорема §2.3.2 даёт точный C¹ при v0 = v/(1−p_seek)).
       const rebased: ProjectionNodeInit[] = [];
       for (const n of flight.byId.values()) {
-        rebased.push(rebaseNode(n.id, n, n, p0, springBasis._valueV0));
+        rebased.push(rebaseNode(n.id, n, n, p0, springBasis._valueV0, bounded));
       }
-      const projector = createProjector(rebased);
+      const projector = (createProjector as unknown as (
+        nodes: readonly ProjectionNodeInit[],
+        bounded: boolean,
+      ) => Projector)(rebased, bounded);
       const byId = new Map<string, VectorProjectionNode>();
       for (const node of rebased) byId.set(node.id, node);
       const reduced = flight.reduced;
@@ -648,7 +653,7 @@ export function createProjection(options?: ProjectionOptions): ProjectionControl
       if (node === undefined) return undefined;
       return phase === 'rest'
         ? node.last
-        : boxWithPositionBasis(node, pHat, springBasis._valueV0);
+        : boxWithPositionBasis(node, pHat, springBasis._valueV0, bounded);
     },
 
     get playing(): boolean {

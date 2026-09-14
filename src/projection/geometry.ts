@@ -335,10 +335,12 @@ function isDegenerateBox(b: FlipRect): boolean {
 interface DriverProjectionNodeInit extends ProjectionNodeInit {
   _qx?: number;
   _qy?: number;
-  _qb?: true;
 }
 
-export function createProjector(nodes: readonly ProjectionNodeInit[]): Projector {
+// Public declaration stays one-argument; the implementation's second argument is
+// an internal driver seam and is erased from the emitted declaration surface.
+export function createProjector(nodes: readonly ProjectionNodeInit[]): Projector;
+export function createProjector(nodes: readonly ProjectionNodeInit[], bounded = false): Projector {
   const count = nodes.length;
 
   // Валидация id (рано, с именем виновника).
@@ -486,7 +488,7 @@ export function createProjector(nodes: readonly ProjectionNodeInit[]): Projector
       const vectorNode = node as DriverProjectionNodeInit;
       const bx = q === 0 ? 0 : (vectorNode._qx ?? 0);
       const by = q === 0 ? 0 : (vectorNode._qy ?? 0);
-      if (vectorNode._qb === true) {
+      if (bounded) {
         if (bx !== 0) v.x = lerp1(node.first.x, node.last.x, clamp01(t + bx * q));
         if (by !== 0) v.y = lerp1(node.first.y, node.last.y, clamp01(t + by * q));
       } else {
