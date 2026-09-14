@@ -31,8 +31,8 @@ jobs:
         run: |
           set -euo pipefail
           pnpm typecheck
-          pnpm vitest run
           pnpm build
+          pnpm vitest run
           node scripts/size-gate.mjs
       - name: Push verified fix
         shell: bash
