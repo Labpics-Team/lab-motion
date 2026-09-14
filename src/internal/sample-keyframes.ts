@@ -1,19 +1,14 @@
 type Easing = (t: number) => number;
 
-/** Prevalidated, allocation-free keyframe hot path shared by headless runtimes. */
+/** Проверенный конечный progress; отсутствие easing означает идентичность. */
 export function sampleKeyframesUnchecked(
   values: readonly number[],
   times: readonly number[],
-  easings: readonly Easing[],
-  progress: number,
+  easings: readonly Easing[] | undefined,
+  p: number,
   mirrored = false,
 ): number {
   const n = values.length;
-  const p = Number.isFinite(progress)
-    ? progress
-    : progress === Infinity
-      ? 1
-      : 0;
   if (p <= times[0]!) return values[mirrored ? n - 1 : 0]!;
   if (p >= times[n - 1]!) return values[mirrored ? 0 : n - 1]!;
 
@@ -41,7 +36,7 @@ export function sampleKeyframesUnchecked(
   // Validated nondecreasing times plus right-biased lookup make this segment
   // strictly positive-width and local progress finite in [0, 1).
   const local = (p - start) / (end - start);
-  let eased = easings[segment]!(local);
+  let eased = easings ? easings[segment]!(local) : local;
   // Keep this guard in the hot function: a separate one-use helper is inlined
   // by Terser as a per-sample FunctionExpression/IIFE in the shipped artifact.
   if (!Number.isFinite(eased)) {
