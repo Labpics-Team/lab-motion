@@ -36,12 +36,10 @@ import {
 import {
   prefersReduced,
   resolveCompositorTierCodeFromCapability,
-  type CompositorTierCode,
 } from '../compositor/detect.js';
 import {
   DEFAULT_TOLERANCE,
   tryCompileSpringExecutionArtifactTupleUnchecked,
-  type SpringExecutionArtifactTuple,
 } from '../compositor/curve.js';
 import { MotionParamError } from '../errors.js';
 import {
@@ -81,7 +79,11 @@ import {
   requireAnimateOptions,
   requireAnimateProps,
 } from './targets.js';
-import { WaapiUnit, type WaapiTarget } from './waapi-unit.js';
+import {
+  WaapiUnit,
+  type WaapiTarget,
+  type WaapiUnitOptions,
+} from './waapi-unit.js';
 
 // ─── Публичные типы ──────────────────────────────────────────────────────────
 
@@ -314,19 +316,16 @@ function commitSnap(
   for (const ch of bound._numeric) rec._numeric.set(ch._key, { _value: ch._to, _velocity: 0 });
 }
 
-/**
- * Полностью прочитанная группа. Tuple остаётся внутри plan/read→commit границы,
- * поэтому package не платит за повторные runtime property-имена каждого entry.
- */
-type PlannedGroup = readonly [
+/** Main/reduced сохраняют tuple; compositor сразу хранит финальный owner-options. */
+type PlannedTuple = readonly [
   el: AnimatableElement,
   group: GroupKey,
   record: ReturnType<typeof groupRecord>,
   bound: BoundGroup,
   delayMs: number,
-  /** Tier 3 — reduced, undefined — main, tuple — compositor. */
-  execution: SpringExecutionArtifactTuple | Extract<CompositorTierCode, 3> | undefined,
+  reduced: 3 | undefined,
 ];
+type PlannedGroup = PlannedTuple | WaapiUnitOptions;
 
 // ─── animate ─────────────────────────────────────────────────────────────────
 
@@ -422,7 +421,25 @@ export function animate(
                 DEFAULT_TOLERANCE,
               )
             : undefined;
-      plan.push([el, group, rec, bound, delayMs, execution]);
+      if (execution && execution !== 3) {
+        plan.push({
+          _el: el as WaapiTarget,
+          _group: group,
+          _record: rec,
+          _numeric: bound._numeric,
+          _residuals: bound._residuals,
+          _transform: bound._transform,
+          _spring: (mode as Extract<MotionMode, { _type: 'spring' }>)._spring,
+          _delayMs: delayMs,
+          _now: now,
+          _setTimer: setTimer,
+          _getBatch: getMainBatch,
+          _onDone: report,
+          _artifact: execution,
+        });
+      } else {
+        plan.push([el, group, rec, bound, delayMs, execution]);
+      }
     }
   }
 
@@ -458,25 +475,29 @@ export function animate(
       }
     }
   };
-  const report = (nat: boolean): void => {
+  function report(nat: boolean): void {
     done++;
     if (nat) natural++;
     maybeComplete();
-  };
+  }
   // Чистый compositor/reduced не создаёт main-state. WAAPI handoff и обычные
   // main slots одного aggregate делят kernel и исходный plan capacity.
-  const getMainBatch = (): SurfaceBatch =>
-    mainBatch ??= surfaceBatchFor(options.requestFrame);
+  function getMainBatch(): SurfaceBatch {
+    return mainBatch ??= surfaceBatchFor(options.requestFrame);
+  }
 
   // 4. Фаза commit в исходном target-major порядке. Владелец берётся из
   //    record ЗДЕСЬ, а не сохраняется в плане: повтор цели в списке обязан
   //    прервать юнит, созданный предыдущей записью того же commit.
   try {
-    for (const [el, group, rec, bound, delayMs, execution] of plan) {
+    for (const entry of plan) {
+      const tuple = Array.isArray(entry) ? entry as PlannedTuple : undefined;
+      const rec = tuple === undefined ? (entry as WaapiUnitOptions)._record : tuple[2];
       const previous = rec._owner;
       if (rec._transition) throw new MotionParamError('LM157');
       rec._transition = true;
-      if (execution === 3) {
+      if (tuple !== undefined && tuple[5] === 3) {
+        const [el, group, , bound] = tuple;
         try {
           if (previous) previous._supersede(() => writeSnap(el, group, bound));
           else writeSnap(el, group, bound);
@@ -492,25 +513,10 @@ export function animate(
       }
       let unit: WaapiUnit | MainUnit;
       try {
-        // Compositor execution строится только из spring-mode в plan-фазе, поэтому второй
-        // runtime-discriminant здесь был бы дублированием того же решения.
-        if (execution) {
-          unit = new WaapiUnit({
-            _el: el as WaapiTarget,
-            _group: group,
-            _record: rec,
-            _numeric: bound._numeric,
-            _residuals: bound._residuals,
-            _transform: bound._transform,
-            _spring: (mode as Extract<MotionMode, { _type: 'spring' }>)._spring,
-            _delayMs: delayMs,
-            _now: now,
-            _setTimer: setTimer,
-            _getBatch: getMainBatch,
-            _onDone: report,
-            _artifact: execution,
-          });
+        if (tuple === undefined) {
+          unit = new WaapiUnit(entry as WaapiUnitOptions);
         } else {
+          const [el, group, , bound, delayMs] = tuple;
           unit = new MainUnit({
             _el: el,
             _group: group,
