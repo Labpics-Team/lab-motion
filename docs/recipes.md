@@ -440,3 +440,167 @@ export function bindInteractionScale(element: HTMLElement) {
 до `destroy()`, который возвращает исходное значение и приоритет. Распознавание
 ввода и вызов очистки остаются у приложения.
 [Полный контракт](behaviors.md#каскад-визуальных-намерений).
+## Перестановка списка или сетки
+
+Роль: how-to. `./behaviors/reorder` предлагает новый порядок по снимку геометрии.
+Приложение принимает предложение, переставляет свои данные/DOM и публикует новый
+снимок. `./projection` анимирует только подтверждённое изменение. Ни runtime
+`./animate`, ни новый scheduler для этого не нужны.
+
+Ниже один компонентный адаптер для горизонтального/вертикального списка и сетки,
+включая RTL. Перенос происходит между ячейками: это не свободный drag-follow,
+не автопрокрутка и не перенос между списками. Оболочка `<li>` никогда не получает
+transform; проецируется только внутренняя `.reorder-card`, поэтому координаты
+слотов остаются layout-координатами даже во время незавершённого полёта.
+
+```html
+<p id="sort-help">Пробел — выбрать; стрелки — переместить; Enter или Escape — закончить.
+  Также доступны кнопки «Раньше» и «Позже».</p>
+<ul id="tasks" aria-label="Порядок задач" aria-describedby="sort-help">
+  <li data-key="design"><div class="reorder-card">
+    <button type="button" data-grip aria-pressed="false" style="touch-action:none">Дизайн</button>
+    <button type="button" data-move="previous" aria-label="Дизайн: раньше">Раньше</button>
+    <button type="button" data-move="next" aria-label="Дизайн: позже">Позже</button>
+  </div></li>
+  <li data-key="build"><div class="reorder-card">
+    <button type="button" data-grip aria-pressed="false" style="touch-action:none">Разработка</button>
+    <button type="button" data-move="previous" aria-label="Разработка: раньше">Раньше</button>
+    <button type="button" data-move="next" aria-label="Разработка: позже">Позже</button>
+  </div></li>
+</ul>
+<p id="sort-status" role="status" aria-live="polite" aria-atomic="true"></p>
+```
+
+Прямые дочерние `<li>` имеют уникальные `data-key`, `.reorder-card` и `button[data-grip]`.
+Для grid достаточно CSS-сетки на `<ul>`; `dir="rtl"` меняет logical horizontal
+keyboard order. `touch-action:none` нужен только на ручке, остальная карточка
+не препятствует прокрутке. Кнопки раньше/позже дают альтернативу drag одним
+нажатием; это не замена проверки accessibility всего приложения.
+
+<!-- reorder-component-recipe:start -->
+```typescript
+import { createReorder, type ReorderSession, type ReorderStep } from '@labpics/motion/behaviors/reorder';
+import { createPan } from '@labpics/motion/gestures';
+import { createDomProjection } from '@labpics/motion/projection';
+
+export function mountReorder(root: HTMLElement, status: HTMLElement): () => void {
+  const win = root.ownerDocument.defaultView!;
+  const slots = new Map(Array.from(root.children, node => [(node as HTMLElement).dataset.key!, node as HTMLElement]));
+  const cards = Array.from(slots.values(), node => node.querySelector<HTMLElement>('.reorder-card')!);
+  // Единственный app-owned порядок. В reactive приложении здесь будет signal/store.
+  let keys = Array.from(slots.keys());
+  let disposed = false, dirty = false;
+  let session: ReorderSession | undefined;
+  let pointer: number | undefined;
+  let startX = 0, startY = 0;
+  const media = win.matchMedia('(prefers-reduced-motion: reduce)');
+  const projection = createDomProjection({ radius: false, matchMedia: () => media });
+  const measure = () => keys.map(key => ({ key, rect: slots.get(key)!.getBoundingClientRect() }));
+  const announce = (key: string) => {
+    const label = slots.get(key)!.querySelector('[data-grip]')!.textContent;
+    status.textContent = `${label}: ${keys.indexOf(key) + 1} из ${keys.length}`;
+  };
+  const state = createReorder({
+    items: measure(), direction: win.getComputedStyle(root).direction === 'rtl' ? 'rtl' : 'ltr',
+    onReorder(next, proposal) {
+      if (!state.isCurrent(proposal)) return;
+      const focused = root.ownerDocument.activeElement as HTMLElement | null;
+      projection.capture(cards);
+      keys = [...next];
+      root.append(...keys.map(key => slots.get(key)!));
+      state.update(measure()); dirty = false;
+      projection.play();
+      focused?.focus({ preventScroll: true });
+      announce(proposal.key);
+    },
+  });
+  const markDirty = () => { dirty = true; };
+  const refresh = () => { if (dirty) { state.update(measure()); dirty = false; } };
+  function finish(): void {
+    const captured = pointer; pointer = undefined;
+    session?.end(); session = undefined;
+    for (const node of slots.values()) node.querySelector('[data-grip]')!.setAttribute('aria-pressed', 'false');
+    if (captured !== undefined && root.hasPointerCapture(captured)) root.releasePointerCapture(captured);
+  }
+  const pan = createPan({
+    threshold: 4,
+    onPan(event) { refresh(); session?.move({ x: startX + event.dx, y: startY + event.dy }); },
+    onPanEnd: finish,
+  });
+  const point = (e: PointerEvent) => ({ x: e.clientX, y: e.clientY, t: e.timeStamp / 1000 });
+  const slotFor = (e: Event) => {
+    const node = (e.target as Element).closest<HTMLElement>('[data-key]');
+    return node?.parentElement === root ? node : undefined;
+  };
+  const listeners = new AbortController();
+  const listen = <E extends Event>(type: string, handler: (e: E) => void) => {
+    root.addEventListener(type, ((e: E) => {
+      if (disposed) return;
+      try { handler(e); } catch (error) { cleanup(); throw error; }
+    }) as EventListener, { signal: listeners.signal });
+  };
+  listen<PointerEvent>('pointerdown', e => {
+    const node = slotFor(e);
+    if (!node || !(e.target as Element).closest('[data-grip]') || e.button !== 0 || pointer !== undefined) return;
+    finish(); state.update(measure()); dirty = false;
+    session = state.start(node.dataset.key!);
+    if (!session) return;
+    const r = node.getBoundingClientRect(); startX = r.x + r.width / 2; startY = r.y + r.height / 2;
+    pointer = e.pointerId; root.setPointerCapture(pointer); pan.pointerDown(point(e));
+    node.querySelector<HTMLElement>('[data-grip]')!.focus({ preventScroll: true });
+    node.querySelector('[data-grip]')!.setAttribute('aria-pressed', 'true');
+  });
+  listen<PointerEvent>('pointermove', e => { if (e.pointerId === pointer) pan.pointerMove(point(e)); });
+  listen<PointerEvent>('pointerup', e => { if (e.pointerId === pointer) { pan.pointerUp(point(e)); finish(); } });
+  const cancelPointer = (e: PointerEvent) => { if (e.pointerId === pointer) { pan.pointerCancel(); finish(); } };
+  listen('pointercancel', cancelPointer); listen('lostpointercapture', cancelPointer);
+  const directions: Record<string, ReorderStep> = { ArrowLeft: 'left', ArrowRight: 'right', ArrowUp: 'up', ArrowDown: 'down', Home: 'first', End: 'last' };
+  listen<KeyboardEvent>('keydown', e => {
+    const node = slotFor(e);
+    if (!node || !(e.target as Element).matches('[data-grip]') || pointer !== undefined) return;
+    if (session?.active && state.activeKey !== node.dataset.key) finish();
+    if (e.key === ' ' || e.key === 'Enter') {
+      e.preventDefault(); if (e.repeat) return;
+      if (session?.active) finish();
+      else {
+        state.update(measure()); dirty = false; session = state.start(node.dataset.key!);
+        node.querySelector('[data-grip]')!.setAttribute('aria-pressed', String(!!session));
+        announce(node.dataset.key!);
+      }
+    } else if (e.key === 'Escape') { e.preventDefault(); finish(); }
+    else if (session?.active && directions[e.key]) { e.preventDefault(); refresh(); session.step(directions[e.key]!); }
+  });
+  listen<MouseEvent>('click', e => {
+    const node = slotFor(e), action = (e.target as Element).closest<HTMLElement>('[data-move]')?.dataset.move;
+    if (!node || (action !== 'previous' && action !== 'next')) return;
+    pan.pointerCancel(); finish(); state.update(measure()); dirty = false;
+    session = state.start(node.dataset.key!); session?.step(action); finish();
+  });
+  // Не выполняют layout-read: следующий ввод потребляет один свежий snapshot.
+  const resize = new ResizeObserver(markDirty); resize.observe(root);
+  for (const node of slots.values()) resize.observe(node);
+  win.addEventListener('scroll', markDirty, { capture: true, signal: listeners.signal });
+  const reduced = () => { if (media.matches) projection.cancel(); };
+  media.addEventListener('change', reduced);
+  function cleanup(): void {
+    if (disposed) return;
+    disposed = true; listeners.abort(); resize.disconnect(); media.removeEventListener('change', reduced);
+    pan.pointerCancel(); finish(); state.destroy(); projection.cancel();
+  }
+  return cleanup;
+}
+```
+<!-- reorder-component-recipe:end -->
+
+Вызывайте возвращённый cleanup из lifecycle владельца: `onCleanup` в Solid,
+cleanup `useEffect` в React или перед удалением vanilla-компонента. SSR не
+исполняет `mountReorder`: этот адаптер требует реального DOM. Каждый mount
+получает новый resolver; cleanup не откатывает уже принятый порядок данных.
+Новый состав коллекции в этом компактном рецепте требует remount; более общий
+consumer передаёт `state.update` по собственной stable-key модели.
+
+При async-проверке предложения до изменения store снова проверяйте
+`state.isCurrent(proposal)`. Любой новый snapshot, другой intent, конец session
+или destroy отзывает старое предложение. Нельзя принять stale permutation
+после внешнего изменения коллекции. Listener/ResizeObserver и focus/ARIA
+принадлежат компоненту, не headless resolver.

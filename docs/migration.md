@@ -64,3 +64,15 @@ cleanup. В React область принадлежит конкретному �
 `destroy` сохраняет текущую позу согласно Lab Motion cancel и не восстанавливает
 старые inline styles, как revert. Область не владеет произвольными listeners и
 не добавляет отсутствующие keyframes/sequences/playback возможности.
+## Контролируемая перестановка вместо собственного sortable resolver
+
+Для list/grid используйте `createReorder` из `@labpics/motion/behaviors/reorder`.
+`onReorder` предлагает новый порядок, который обязан принять владелец данных,
+после чего передать новый snapshot через `update`. Это сохраняет привычную
+controlled-модель values/onReorder, но не копирует React `Reorder.Group`.
+
+Resolver headless: вместо wrapper-компонентов получает stable keys и измеренную
+geometry. Для pointer/keyboard + layout используйте [проверяемый рецепт](recipes.md#перестановка-списка-или-сетки).
+Нет неявного drag-follow, автопрокрутки, cross-list transfer или virtualizer.
+Неизмеренные ячейки не угадываются. Native TypeError/RangeError относятся к
+структуре snapshot; ошибки физики внешнего projection сохраняют свой контракт.

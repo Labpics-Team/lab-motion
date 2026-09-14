@@ -7,7 +7,7 @@
 > [NAMING.md](NAMING.md).
 
 Импорт — `@labpics/motion` (ядро) или `@labpics/motion/<субпуть>`.
-Корневой экспорт + 41 субпуть; неиспользуемые субпути вырезаются
+Корневой экспорт + 42 субпути; неиспользуемые субпути вырезаются
 tree-shaking'ом: `sideEffects` — точный allowlist из двух авто-регистрирующих
 входов (`./lit`, `./wc`).
 
@@ -191,3 +191,58 @@ try {
 код `LM000`. Для `instanceof` импортируйте constructor из того же физического
 entry, что и проверяемую функцию: корневой entry намеренно не связывает
 независимые bundle-графы.
+
+## Управляемая перестановка `./behaviors/reorder`
+
+`createReorder({ items, axis?, direction?, onReorder })` — опциональный headless
+resolver. Не импортируется корнем, `./animate`, `./nano` или `./behaviors`.
+Типы: `ReorderKey`, `ReorderItem`, `ReorderOptions`, `ReorderController`,
+`ReorderSession`, `ReorderProposal`, `ReorderAxis`, `ReorderStep`.
+
+`items` — snapshot в подтверждённом порядке приложения: `{ key, rect? }`.
+Key — string или конечный number; сравнение Map/SameValueZero (0 и -0 один key).
+Неизмеренные и нулевые прямоугольники не являются drop targets. Координаты
+и размеры — конечные дробные числа с абсолютным значением не выше
+`Number.MAX_SAFE_INTEGER`; размеры неотрицательны, центр тоже в диапазоне.
+Размер snapshot до 100000, проверяется до индексных getters. Структурные ошибки
+дают `TypeError`, числовой envelope — `RangeError`; это не физические параметры
+и не новый численный код `MotionParamError`. Исключения getters/callback сохраняются.
+
+`axis` — `x`, `y`, `both` или `auto` (дефолт). Auto: одинаковый y центров → x,
+иначе одинаковый x → y, иначе both; в пустом snapshot both. Разновысокие карточки
+могут требовать явного axis. `direction` — ltr по умолчанию, rtl меняет logical
+порядок горизонтальной клавиатуры; в 2D стрелки выбирают геометрическую полуплоскость.
+
+`start(key)` возвращает session только для измеренного ненулевого slot.
+Новый допустимый start отзывает старую session; неизвестный key её не прерывает.
+`session.move({x,y})` получает **желаемый центр карточки**, не delta и не обязательно
+точку указателя. Выбирается ближайший центр slot в заданных осях. На равенстве
+побеждает собственный slot, затем первый в подтверждённом порядке. Приложение
+отвечает за bounds/scroll/перевод координат; resolver не выполняет DOM-read.
+
+`session.step` принимает previous/next/first/last и left/right/up/down. Logical
+шаг не перескакивает через неизмеренную соседнюю цель. В 2D физическая стрелка
+выбирает ближайший измеренный центр в открытой полуплоскости направления.
+Pointer и keyboard используют одну вставку перемещаемого key в индекс target.
+
+`onReorder(frozenKeys, frozenProposal)` вызывается только при новом предложении,
+**не подтверждает** порядок. Proposal содержит key/over/from/to. После принятия
+приложение вызывает `update(items)` с фактическим порядком и geometry. Update
+отзывает proposal, сохраняет session по key, отменяет её при исчезновении
+key/geometry. До async commit проверяйте `isCurrent(proposal)`: это проверка
+точной identity последнего предложения, не сравнение индексов старого массива.
+Возврат pointer в собственный slot тоже отзывает предложение.
+
+`session.end/cancel`, `controller.cancel` прекращают ввод без отката уже принятых
+данных. Callback throw отменяет только ту же session и пробрасывает исходную
+ошибку; созданная вложенным callback новая session не теряется. Input snapshot
+атомарен: успешный вложенный update выигрывает, неуспешный не отзывает внешний.
+`destroy` идемпотентен, освобождает snapshot/callback; stale session и вызовы
+update/start после него инертны. Завершённая session не удерживает owner.
+
+В resolver нет scheduler/animation/DOM/global registry. Snapshot стоит O(N),
+pointer scan O(N), unchanged intent не выделяет массив/Map и не вызывает
+callback. Новое предложение создаёт O(N) permutation; потребительская animation
+и DOM-перестановка оплачиваются отдельно.
+
+[Исполняемый list/grid-рецепт с projection, pointer, keyboard и cleanup](recipes.md#перестановка-списка-или-сетки).
