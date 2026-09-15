@@ -7,6 +7,9 @@ import {
   type GroupOwner,
   type GroupRecord,
 } from '../src/animate/channels.js';
+import { MainUnit } from '../src/animate/main-unit.js';
+import { SurfaceBatch } from '../src/animate/surface-batch.js';
+import type { FrameLoop } from '../src/frame/index.js';
 
 function countSetAllocations<T>(run: () => T): { readonly result: T; readonly allocations: number } {
   const NativeSet = globalThis.Set;
@@ -41,6 +44,16 @@ function record(owner?: GroupOwner): GroupRecord {
     _transition: false,
     _numeric: numeric,
     _cssValue: undefined,
+  };
+}
+
+function inertFrame(): FrameLoop {
+  const subscribe = (_cb: (ts?: number) => void): (() => void) => () => {};
+  return {
+    read: subscribe,
+    update: subscribe,
+    render: subscribe,
+    cancelAll() {},
   };
 }
 
@@ -84,5 +97,41 @@ describe('bindGroup transform key authority', () => {
     expect(bound._residuals.get('rotate')).toBe(42);
     expect(bound._residuals.get('skewX')).toBe(9);
     expect(bound._transform).toMatchObject({ x: 0, rotate: 42, skewX: 9 });
+  });
+
+  it('preserves a real MainUnit numeric and residual key surface', () => {
+    const rec = record();
+    const ownerBound = bindGroup(
+      element,
+      'transform',
+      parseProps({ x: [0, 100] }),
+      rec,
+    );
+    const owner = new MainUnit({
+      _el: element,
+      _group: 'transform',
+      _record: rec,
+      _bound: ownerBound,
+      _mode: { _type: 'tween', _durationMs: 1000, _ease: (t) => t },
+      _delayMs: 0,
+      _batch: new SurfaceBatch(inertFrame()),
+      _onDone() {},
+      _startPaused: true,
+    });
+    rec._owner = owner;
+
+    try {
+      const { result: bound, allocations } = countSetAllocations(() =>
+        bindGroup(element, 'transform', parseProps({ y: [0, 50] }), rec),
+      );
+
+      expect(allocations).toBe(1);
+      expect(bound._residuals.get('x')).toBe(0);
+      expect(bound._residuals.get('rotate')).toBe(30);
+      expect(bound._residuals.get('skewX')).toBe(5);
+      expect(bound._transform).toMatchObject({ y: 0, x: 0, rotate: 30, skewX: 5 });
+    } finally {
+      owner.cancel();
+    }
   });
 });
