@@ -1,0 +1,195 @@
+name: Research timeline label ownership
+
+on:
+  push:
+    branches: ["research/timeline-label-owner-fusion-r11"]
+
+permissions:
+  contents: read
+
+env:
+  COREPACK_ENABLE_DOWNLOAD_PROMPT: "0"
+  COREPACK_DEFAULT_TO_LATEST: "0"
+
+jobs:
+  probe:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v6
+        with:
+          node-version: "24"
+      - name: Activate pinned pnpm
+        run: |
+          corepack enable
+          corepack install --global pnpm@11.11.0
+      - name: Install
+        run: pnpm install --frozen-lockfile
+      - name: Build exact-base package and freeze bytes
+        shell: bash
+        run: |
+          set -euo pipefail
+          pnpm build
+          node --input-type=module <<'EOF'
+          import { readFileSync, writeFileSync } from 'node:fs';
+          import { canonicalGzip, observationalBrotli } from './scripts/compression-oracle.mjs';
+          const paths = ['dist/timeline/index.js', 'dist/timeline/index.cjs'];
+          const out = {};
+          for (const path of paths) {
+            const b = readFileSync(path);
+            out[path] = { raw: b.length, gzip: canonicalGzip(b).length, brotli: observationalBrotli(b).length };
+          }
+          writeFileSync('/tmp/base-bytes.json', JSON.stringify(out, null, 2));
+          console.log('BASE_BYTES', JSON.stringify(out));
+          EOF
+      - name: Apply preregistered candidate only
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 <<'PY'
+          from pathlib import Path
+          p = Path('src/timeline/index.ts')
+          s = p.read_text()
+          replacements = [
+            (
+              "function buildSegments(configs: readonly SegmentConfig[], initialLabels: Map<string, number> = new Map()): ComputedSegment[] {",
+              "function buildSegments(configs: readonly SegmentConfig[], labels: ReadonlyMap<string, number>): ComputedSegment[] {",
+            ),
+            (
+              "  const labels = new Map(initialLabels); // copy for this build\n\n",
+              "",
+            ),
+            (
+              "function resolvePosition(p: string, l: Map<string, number>, e: number, s: number): number {",
+              "function resolvePosition(p: string, l: ReadonlyMap<string, number>, e: number, s: number): number {",
+            ),
+            (
+              "  const initialLabels = new Map<string, number>();\n",
+              "  const _labels = new Map<string, number>();\n",
+            ),
+            (
+              "        initialLabels.set(k, v);",
+              "        _labels.set(k, v);",
+            ),
+            (
+              "  const segments = buildSegments(segConfigs, initialLabels);",
+              "  const segments = buildSegments(segConfigs, _labels);",
+            ),
+            (
+              "  /** Метки (имя -> время). Поддержка label() + seek('name') + позиций в at (шаг 2). */\n  const _labels = new Map<string, number>(initialLabels);\n\n",
+              "",
+            ),
+            (
+              "    label(name: string, at?: number | string): void {\n      if (!name || typeof name !== 'string') return;\n      let t: number;\n      if (at === undefined) {\n        t = _vt;\n      } else if (typeof at === 'number') {\n        t = Number.isFinite(at) ? Math.max(0, at) : _vt;\n      } else if (typeof at === 'string') {\n        t = _labels.has(at) ? _labels.get(at)! : _vt;\n      } else {\n        t = _vt;\n      }\n      _labels.set(name, t);\n    },",
+              "    label,",
+            ),
+          ]
+          for old, new in replacements:
+            n = s.count(old)
+            if n != 1:
+              raise SystemExit(f'expected exactly one replacement, found {n}: {old[:80]!r}')
+            s = s.replace(old, new)
+          p.write_text(s)
+          PY
+          cat > test/timeline-label-owner-research.test.ts <<'EOF'
+          import { describe, expect, it } from 'vitest';
+          import { createTimeline } from '../src/timeline/index.js';
+
+          const NativeMap = Map;
+
+          function countConstructionMaps(withLabels: boolean, positiveControl = false): number {
+            let count = 0;
+            class CountingMap<K, V> extends NativeMap<K, V> {
+              constructor(iterable?: Iterable<readonly [K, V]> | null) {
+                super(iterable as Iterable<readonly [K, V]> | undefined);
+                count++;
+              }
+            }
+            const descriptor = Object.getOwnPropertyDescriptor(globalThis, 'Map')!;
+            Object.defineProperty(globalThis, 'Map', { ...descriptor, value: CountingMap });
+            try {
+              if (positiveControl) new Map();
+              const tl = createTimeline({
+                segments: [{ from: 0, to: 1, duration: 1, ...(withLabels ? { at: 'origin' } : {}) }],
+                ...(withLabels ? { labels: { origin: 0 } } : {}),
+                requestFrame: () => 1,
+              });
+              tl.cancel();
+            } finally {
+              Object.defineProperty(globalThis, 'Map', descriptor);
+            }
+            return count;
+          }
+
+          describe('timeline label ownership allocation ceiling', () => {
+            it('keeps construction to one Map with and without initial labels', () => {
+              expect(countConstructionMaps(false)).toBeLessThanOrEqual(1);
+              expect(countConstructionMaps(true)).toBeLessThanOrEqual(1);
+            });
+
+            it('detects a deliberate extra retained-shape Map', () => {
+              const normal = countConstructionMaps(false);
+              expect(countConstructionMaps(false, true)).toBe(normal + 1);
+            });
+          });
+          EOF
+          git diff -- src/timeline/index.ts test/timeline-label-owner-research.test.ts | tee /tmp/candidate.diff
+          test "$(grep -c '^  const _labels = new Map<string, number>();$' src/timeline/index.ts)" -eq 1
+          test "$(grep -c '^  function label(name: string, at?: number | string): void {$' src/timeline/index.ts)" -eq 1
+          test "$(grep -c '^    label,$' src/timeline/index.ts)" -eq 1
+      - name: Targeted semantics and allocation oracle
+        shell: bash
+        run: |
+          set -euo pipefail
+          pnpm typecheck
+          pnpm vitest run test/timeline*.test.ts
+      - name: Build candidate and enforce strict packed Pareto
+        shell: bash
+        run: |
+          set -euo pipefail
+          pnpm build
+          node --input-type=module <<'EOF'
+          import { readFileSync, writeFileSync } from 'node:fs';
+          import { canonicalGzip, observationalBrotli } from './scripts/compression-oracle.mjs';
+          const base = JSON.parse(readFileSync('/tmp/base-bytes.json', 'utf8'));
+          const candidate = {};
+          let improved = false;
+          let nonRegression = true;
+          for (const path of Object.keys(base)) {
+            const b = readFileSync(path);
+            candidate[path] = { raw: b.length, gzip: canonicalGzip(b).length, brotli: observationalBrotli(b).length };
+            for (const key of ['raw', 'gzip', 'brotli']) {
+              if (candidate[path][key] > base[path][key]) nonRegression = false;
+              if (candidate[path][key] < base[path][key]) improved = true;
+            }
+          }
+          const result = { base, candidate, nonRegression, improved, baseSha: 'fe11daa407de396fad952be7679650f63dabd4dd', node: process.version };
+          writeFileSync('research-result.json', JSON.stringify(result, null, 2));
+          console.log('RESULT', JSON.stringify(result));
+          if (!nonRegression || !improved) process.exitCode = 42;
+          EOF
+      - name: Seal candidate source and diff
+        if: always()
+        shell: bash
+        run: |
+          sha256sum src/timeline/index.ts test/timeline-label-owner-research.test.ts /tmp/candidate.diff research-result.json 2>/dev/null || true
+          base64 -w0 src/timeline/index.ts > candidate-source.b64
+          base64 -w0 test/timeline-label-owner-research.test.ts > candidate-test.b64
+          cp /tmp/candidate.diff candidate.diff
+      - name: Upload immutable research receipt
+        if: always()
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
+        with:
+          name: timeline-label-owner-${{ github.sha }}-${{ github.run_id }}
+          path: |
+            research-result.json
+            candidate-source.b64
+            candidate-test.b64
+            candidate.diff
+          if-no-files-found: warn
+          retention-days: 7
+          compression-level: 0
