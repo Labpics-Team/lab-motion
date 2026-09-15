@@ -8,7 +8,7 @@ permissions:
   contents: read
 
 jobs:
-  q0-source:
+  q1-source:
     runs-on: ubuntu-latest
     timeout-minutes: 25
     steps:
@@ -59,7 +59,7 @@ jobs:
           "$qemu_bin" -help | grep -F -- '-plugin' | tee research-artifact/qemu-plugin-option.txt
           sha256sum "$qemu_bin" | tee research-artifact/qemu-binary.sha256
 
-      - name: Build frozen counter plugin and guest
+      - name: Build frozen instruction-marker counter and guest
         shell: bash
         run: |
           set -euo pipefail
@@ -72,47 +72,64 @@ jobs:
           #include <stdint.h>
           #include <inttypes.h>
           #include <stdio.h>
+          #include <string.h>
 
           QEMU_PLUGIN_EXPORT int qemu_plugin_version = QEMU_PLUGIN_VERSION;
 
           #define LM_MAX_VCPU 256u
-          #define LM_SENTINEL_PID 2147483647ULL
-          #define LM_X86_64_SYS_KILL 62
+          static const uint8_t START_MARKER[8] = {0x0f,0x1f,0x84,0x00,0xdf,0x9b,0x57,0x13};
+          static const uint8_t END_MARKER[8]   = {0x0f,0x1f,0x84,0x00,0xe0,0xac,0x68,0x24};
 
           static bool active[LM_MAX_VCPU];
           static uint64_t retired[LM_MAX_VCPU];
           static uint64_t windows[LM_MAX_VCPU];
+          static uint64_t starts[LM_MAX_VCPU];
+          static uint64_t ends[LM_MAX_VCPU];
 
-          static void on_tb_exec(unsigned int vcpu_index, void *userdata) {
+          static void on_start(unsigned int vcpu_index, void *userdata) {
+              (void)userdata;
+              if (vcpu_index >= LM_MAX_VCPU) return;
+              starts[vcpu_index]++;
+              retired[vcpu_index] = 0;
+              active[vcpu_index] = true;
+          }
+
+          static void on_end(unsigned int vcpu_index, void *userdata) {
+              (void)userdata;
+              if (vcpu_index >= LM_MAX_VCPU) return;
+              ends[vcpu_index]++;
+              active[vcpu_index] = false;
+              windows[vcpu_index]++;
+              char line[224];
+              snprintf(line, sizeof(line),
+                       "LM_QEMU_COUNT vcpu=%u window=%" PRIu64 " instructions=%" PRIu64
+                       " starts=%" PRIu64 " ends=%" PRIu64 "\n",
+                       vcpu_index, windows[vcpu_index], retired[vcpu_index],
+                       starts[vcpu_index], ends[vcpu_index]);
+              qemu_plugin_outs(line);
+          }
+
+          static void on_instruction(unsigned int vcpu_index, void *userdata) {
+              (void)userdata;
               if (vcpu_index < LM_MAX_VCPU && active[vcpu_index]) {
-                  retired[vcpu_index] += (uint64_t)(uintptr_t)userdata;
+                  retired[vcpu_index]++;
               }
           }
 
           static void on_tb_trans(qemu_plugin_id_t id, struct qemu_plugin_tb *tb) {
               (void)id;
-              size_t n = qemu_plugin_tb_n_insns(tb);
-              qemu_plugin_register_vcpu_tb_exec_cb(
-                  tb, on_tb_exec, QEMU_PLUGIN_CB_NO_REGS, (void *)(uintptr_t)n);
-          }
-
-          static void on_syscall(qemu_plugin_id_t id, unsigned int vcpu_index,
-                                 int64_t num, uint64_t a1, uint64_t a2,
-                                 uint64_t a3, uint64_t a4, uint64_t a5,
-                                 uint64_t a6, uint64_t a7, uint64_t a8) {
-              (void)id; (void)a2; (void)a3; (void)a4; (void)a5; (void)a6; (void)a7; (void)a8;
-              if (vcpu_index >= LM_MAX_VCPU || num != LM_X86_64_SYS_KILL || a1 != LM_SENTINEL_PID) return;
-              if (!active[vcpu_index]) {
-                  retired[vcpu_index] = 0;
-                  active[vcpu_index] = true;
-              } else {
-                  active[vcpu_index] = false;
-                  windows[vcpu_index]++;
-                  char line[192];
-                  snprintf(line, sizeof(line),
-                           "LM_QEMU_COUNT vcpu=%u window=%" PRIu64 " instructions=%" PRIu64 "\n",
-                           vcpu_index, windows[vcpu_index], retired[vcpu_index]);
-                  qemu_plugin_outs(line);
+              const size_t n = qemu_plugin_tb_n_insns(tb);
+              for (size_t i = 0; i < n; i++) {
+                  struct qemu_plugin_insn *insn = qemu_plugin_tb_get_insn(tb, i);
+                  const size_t size = qemu_plugin_insn_size(insn);
+                  const uint8_t *data = qemu_plugin_insn_data(insn);
+                  if (size == sizeof(START_MARKER) && memcmp(data, START_MARKER, sizeof(START_MARKER)) == 0) {
+                      qemu_plugin_register_vcpu_insn_exec_cb(insn, on_start, QEMU_PLUGIN_CB_NO_REGS, NULL);
+                  } else if (size == sizeof(END_MARKER) && memcmp(data, END_MARKER, sizeof(END_MARKER)) == 0) {
+                      qemu_plugin_register_vcpu_insn_exec_cb(insn, on_end, QEMU_PLUGIN_CB_NO_REGS, NULL);
+                  } else {
+                      qemu_plugin_register_vcpu_insn_exec_cb(insn, on_instruction, QEMU_PLUGIN_CB_NO_REGS, NULL);
+                  }
               }
           }
 
@@ -122,23 +139,25 @@ jobs:
               (void)argc; (void)argv;
               if (info->system_emulation) return -1;
               qemu_plugin_register_vcpu_tb_trans_cb(id, on_tb_trans);
-              qemu_plugin_register_vcpu_syscall_cb(id, on_syscall);
               return 0;
           }
           C
 
           cat > research-build/guest.c <<'C'
-          #define _GNU_SOURCE
-          #include <errno.h>
           #include <inttypes.h>
-          #include <limits.h>
           #include <stdint.h>
           #include <stdio.h>
           #include <stdlib.h>
-          #include <sys/syscall.h>
-          #include <unistd.h>
 
-          __attribute__((noinline)) static uint64_t work(uint64_t n) {
+          __attribute__((noinline,noclone)) static void marker_start(void) {
+              __asm__ volatile(".byte 0x0f,0x1f,0x84,0x00,0xdf,0x9b,0x57,0x13" ::: "memory");
+          }
+
+          __attribute__((noinline,noclone)) static void marker_end(void) {
+              __asm__ volatile(".byte 0x0f,0x1f,0x84,0x00,0xe0,0xac,0x68,0x24" ::: "memory");
+          }
+
+          __attribute__((noinline,noclone)) static uint64_t work(uint64_t n) {
               volatile uint64_t x = 0x9e3779b97f4a7c15ULL;
               for (uint64_t i = 0; i < n; i++) {
                   x = (x ^ (i + 0x517cc1b727220a95ULL)) + 0x94d049bb133111ebULL;
@@ -146,23 +165,14 @@ jobs:
               return x;
           }
 
-          static void marker(void) {
-              errno = 0;
-              long r = syscall(SYS_kill, INT_MAX, 0);
-              if (r != -1 || errno != ESRCH) {
-                  fprintf(stderr, "marker contract failed r=%ld errno=%d\n", r, errno);
-                  exit(70);
-              }
-          }
-
           int main(int argc, char **argv) {
               if (argc != 2) return 64;
               char *end = NULL;
               uint64_t n = strtoull(argv[1], &end, 10);
               if (!end || *end) return 65;
-              marker();
+              marker_start();
               uint64_t checksum = work(n);
-              marker();
+              marker_end();
               printf("LM_GUEST_META n=%" PRIu64 " checksum=%" PRIu64 "\n", n, checksum);
               return 0;
           }
@@ -173,10 +183,12 @@ jobs:
           gcc -O2 -fno-tree-vectorize -fno-unroll-loops \
             research-build/guest.c -o research-build/guest
           file research-build/window-plugin.so research-build/guest | tee research-artifact/binaries.txt
+          objdump -d research-build/guest | grep -A4 -B2 -E '13579bdf|2468ace0|df 9b 57 13|e0 ac 68 24' \
+            | tee research-artifact/marker-disassembly.txt
           sha256sum research-build/window-plugin.so research-build/guest \
             | tee research-artifact/binaries.sha256
 
-      - name: Acquire unchanged frozen Q0 controls
+      - name: Acquire frozen Q1 controls
         shell: bash
         run: |
           set -euo pipefail
@@ -193,15 +205,15 @@ jobs:
           root = pathlib.Path('research-artifact')
           def count(name):
               text=(root/f'{name}.log').read_text()
-              found=re.findall(r'LM_QEMU_COUNT vcpu=(\d+) window=(\d+) instructions=(\d+)', text)
+              found=re.findall(r'LM_QEMU_COUNT vcpu=(\d+) window=(\d+) instructions=(\d+) starts=(\d+) ends=(\d+)', text)
               if len(found) != 1:
                   raise SystemExit(f'{name}: expected exactly one count, got {found!r}')
-              vcpu, window, value=map(int, found[0])
-              if value <= 0 or window != 1:
+              vcpu, window, value, starts, ends=map(int, found[0])
+              if value <= 0 or window != 1 or starts != 1 or ends != 1:
                   raise SystemExit(f'{name}: invalid counter tuple {found[0]!r}')
               if 'LM_GUEST_META' not in text:
                   raise SystemExit(f'{name}: guest did not complete')
-              return {'vcpu':vcpu,'window':window,'instructions':value}
+              return {'vcpu':vcpu,'window':window,'instructions':value,'starts':starts,'ends':ends}
           za,zb,na,nb,tn=(count(x) for x in ('zero-a','zero-b','n-a','n-b','two-n'))
           z=(za['instructions']+zb['instructions'])/2
           wa=na['instructions']-z
@@ -229,11 +241,11 @@ jobs:
 
           sha256sum research-artifact/* | tee research-artifact/SHA256SUMS
 
-      - name: Upload immutable source-built Q0 evidence
+      - name: Upload immutable Q1 evidence
         if: always()
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
         with:
-          name: qemu-icount-source-q0-${{ github.sha }}-${{ github.run_id }}
+          name: qemu-icount-q1-${{ github.sha }}-${{ github.run_id }}
           path: research-artifact/
           if-no-files-found: error
           retention-days: 7
