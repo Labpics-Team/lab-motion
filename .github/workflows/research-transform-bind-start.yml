@@ -1,0 +1,59 @@
+name: Research transform bind start proof
+
+on:
+  push:
+    branches:
+      - autoresearch/transform-bind-start-proof-20260915
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  proof:
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22.16.0
+          cache: pnpm
+
+      - name: Enable pinned pnpm
+        run: corepack enable
+
+      - name: Install candidate dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Build exact candidate
+        run: pnpm build
+
+      - name: Materialize exact base
+        run: |
+          git worktree add --detach /tmp/lab-motion-base fe11daa407de396fad952be7679650f63dabd4dd
+          cd /tmp/lab-motion-base
+          corepack enable
+          pnpm install --frozen-lockfile --offline
+          pnpm build
+
+      - name: Verify exact source SHAs
+        run: |
+          test "$(git rev-parse df7aaced646116f34135083dbfbf62ee40265657)" = "df7aaced646116f34135083dbfbf62ee40265657"
+          test "$(git -C /tmp/lab-motion-base rev-parse HEAD)" = "fe11daa407de396fad952be7679650f63dabd4dd"
+          git diff --exit-code df7aaced646116f34135083dbfbf62ee40265657 -- src test/animate-bind-allocation.test.ts
+
+      - name: Run frozen start-cost and shipped-size proof
+        run: node --expose-gc scripts/research-transform-bind-start.mjs /tmp/lab-motion-base "$GITHUB_WORKSPACE" | tee /tmp/transform-bind-start-proof.log
+
+      - name: Upload immutable evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: transform-bind-start-proof-${{ github.sha }}
+          path: /tmp/transform-bind-start-proof.log
+          if-no-files-found: error
+          retention-days: 30
