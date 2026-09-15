@@ -167,12 +167,12 @@ export interface CssChannel {
   readonly _fromAst: ValueAST;
   readonly _toAst: ValueAST;
   /**
-   * Стартовая скорость прогресса (прогресс/с). Явная пара [from, to] — 0
-   * (покой, канон числовых каналов); перехват живого рана — проекция ṗ̂
-   * источника между прогресс-пространствами (projectCssV0, C¹-контракт #93).
+   * Стартовая скорость прогресса p/s. Явная пара [from, to] — 0
+   * (покой, канон числовых каналов); перехват живого рана — проекция p-hat
+   * источника между прогресс-пространствами (projectCssV0, C1-контракт #93).
    */
   readonly _v0: number;
-  /** Текущая производная прогресса ṗ (прогресс/с) — сырьё C¹-подхвата. */
+  /** Текущая производная прогресса p (прогресс/с) — сырьё C1-подхвата. */
   _dpdt: number;
   _css: string | number;
   _renderedDpdt: number;
@@ -560,14 +560,21 @@ export function bindGroup(
   // проекцией состояния (новый прогон x не сбрасывает прежний rotate).
   const residuals = new Map<string, number>();
   if (group === 'transform') {
-    // Каждый остаточный канал уже принадлежит записи либо живому владельцу.
-    // До публикации нового владельца `_supersede()` фиксирует его каналы,
-    // поэтому отдельное копирование при завершении не нужно: это инвариант реестра.
-    const animated = new Set(specs.map((s) => s._key));
-    const known = new Set<string>(rec._numeric.keys());
-    if (owner) for (const k of owner._numericKeys()) known.add(k);
+    // У активного owner его ключи уже замыкают всё transform-состояние:
+    // предыдущие residuals были включены в тот же owner при bind. Без owner
+    // единственный источник истины — settled registry. Домен ограничен восемью
+    // transform-шортхендами, поэтому bounded scan дешевле трёх контейнеров
+    // (specs.map + animated Set + known Set) и не меняет retained state.
+    const known = owner?._numericKeys() ?? rec._numeric.keys();
     for (const key of known) {
-      if (animated.has(key)) continue;
+      let animated = false;
+      for (const channel of numeric) {
+        if (channel._key === key) {
+          animated = true;
+          break;
+        }
+      }
+      if (animated) continue;
       const snap = owner?._captureNum(key) ?? rec._numeric.get(key);
       if (snap) residuals.set(key, snap._value);
     }
