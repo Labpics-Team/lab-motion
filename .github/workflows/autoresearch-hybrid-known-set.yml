@@ -1,0 +1,283 @@
+name: autoresearch hybrid known-set elision
+
+on:
+  push:
+    branches:
+      - autoresearch/hybrid-known-set-elision-r1
+
+permissions:
+  contents: write
+
+jobs:
+  prove:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24.20.0'
+      - name: Enable pnpm
+        run: |
+          corepack enable
+          corepack prepare pnpm@11.11.0 --activate
+          pnpm --version
+          node --version
+      - name: Install
+        run: pnpm install --frozen-lockfile
+      - name: Write exact bind probe
+        run: |
+          cat > test/.autoresearch-known-set.test.ts <<'EOF'
+          import { describe, expect, it } from 'vitest';
+          import {
+            bindGroup,
+            parseProps,
+            type AnimatableElement,
+            type ChannelSnapshot,
+            type GroupOwner,
+            type GroupRecord,
+          } from '../src/animate/channels.js';
+
+          function countSetAllocations<T>(run: () => T): { result: T; allocations: number; adds: number } {
+            const NativeSet = globalThis.Set;
+            let allocations = 0;
+            let adds = 0;
+            class CountingSet<V> extends NativeSet<V> {
+              constructor(values?: readonly V[] | null) {
+                super(values);
+                allocations++;
+              }
+              override add(value: V): this {
+                adds++;
+                return super.add(value);
+              }
+            }
+            (globalThis as { Set: SetConstructor }).Set = CountingSet as SetConstructor;
+            try {
+              return { result: run(), allocations, adds };
+            } finally {
+              (globalThis as { Set: SetConstructor }).Set = NativeSet;
+            }
+          }
+
+          const element: AnimatableElement = {
+            style: { getPropertyValue: () => '', setProperty() {} },
+          };
+
+          function record(owner?: GroupOwner): GroupRecord {
+            const numeric = new Map<string, ChannelSnapshot>();
+            numeric.set('rotate', { _value: 30, _velocity: 0 });
+            numeric.set('skewX', { _value: 5, _velocity: 0 });
+            return { _owner: owner, _transition: false, _numeric: numeric, _cssValue: undefined };
+          }
+
+          function liveOwner(): GroupOwner {
+            return {
+              _captureNum(key) {
+                if (key === 'rotate') return { _value: 42, _velocity: 7 };
+                if (key === 'skewX') return { _value: 9, _velocity: 3 };
+                return undefined;
+              },
+              _captureCss() { return undefined; },
+              _numericKeys() { return ['x', 'rotate', 'skewX']; },
+              _supersede() {},
+            };
+          }
+
+          describe('autoresearch known-set differential', () => {
+            it('positive control sees a direct Set', () => {
+              const proof = countSetAllocations(() => new Set(['x', 'y']));
+              expect(proof.allocations).toBe(1);
+              expect(proof.adds).toBe(2);
+            });
+
+            for (const live of [false, true] as const) {
+              it(`${live ? 'live' : 'settled'} transform bind preserves state and exposes Set work`, () => {
+                const owner = live ? liveOwner() : undefined;
+                const rec = record(owner);
+                const proof = countSetAllocations(() =>
+                  bindGroup(element, 'transform', parseProps({ x: [0, 100] }), rec),
+                );
+                const expected = Number(process.env.EXPECT_SETS);
+                expect(proof.allocations).toBe(expected);
+                expect(proof.result._residuals.get('rotate')).toBe(live ? 42 : 30);
+                expect(proof.result._residuals.get('skewX')).toBe(live ? 9 : 5);
+                expect(proof.result._transform).toMatchObject({ x: 0, rotate: live ? 42 : 30, skewX: live ? 9 : 5 });
+                console.log(`AUTORESEARCH ${live ? 'live' : 'settled'} sets=${proof.allocations} adds=${proof.adds}`);
+              });
+            }
+          });
+          EOF
+      - name: Base probe and base bytes
+        run: |
+          test "$(git rev-parse HEAD)" = "fe11daa407de396fad952be7679650f63dabd4dd" || exit 20
+          EXPECT_SETS=2 pnpm exec vitest run test/.autoresearch-known-set.test.ts --reporter=verbose | tee /tmp/base-probe.log
+          pnpm build
+          pnpm size | tee /tmp/base-size-gate.log
+          node --input-type=module <<'NODE' > /tmp/base-size.json
+          import { readFileSync } from 'node:fs';
+          import { canonicalGzip, observationalBrotli } from './scripts/compression-oracle.mjs';
+          const out = {};
+          for (const path of ['dist/animate/index.js', 'dist/animate/index.cjs']) {
+            const bytes = readFileSync(path);
+            out[path] = { raw: bytes.length, gzip: canonicalGzip(bytes).length, brotli: observationalBrotli(bytes).length };
+          }
+          console.log(JSON.stringify(out, null, 2));
+          NODE
+          cat /tmp/base-size.json
+      - name: Materialize runtime-only hybrid candidate
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+          p = Path('src/animate/channels.ts')
+          s = p.read_text()
+          old = """    // Каждый остаточный канал уже принадлежит записи либо живому владельцу.\n    // До публикации нового владельца `_supersede()` фиксирует его каналы,\n    // поэтому отдельное копирование при завершении не нужно: это инвариант реестра.\n    const animated = new Set(specs.map((s) => s._key));\n    const known = new Set<string>(rec._numeric.keys());\n    if (owner) for (const k of owner._numericKeys()) known.add(k);\n    for (const key of known) {\n      if (animated.has(key)) continue;\n"""
+          new = """    // Живой owner уже содержит полный transform-ключевой срез; без owner\n    // authority — settled registry. Не материализуем второй Set только затем,\n    // чтобы один раз пройти его в этом же bind.\n    const animated = new Set(specs.map((s) => s._key));\n    const known = owner?._numericKeys() ?? rec._numeric.keys();\n    for (const key of known) {\n      if (animated.has(key)) continue;\n"""
+          if s.count(old) != 1:
+              raise SystemExit(f'baseline block mismatch: {s.count(old)}')
+          p.write_text(s.replace(old, new))
+          PY
+          git diff -- src/animate/channels.ts
+      - name: Candidate probe and candidate bytes
+        run: |
+          EXPECT_SETS=1 pnpm exec vitest run test/.autoresearch-known-set.test.ts --reporter=verbose | tee /tmp/candidate-probe.log
+          pnpm build
+          pnpm size | tee /tmp/candidate-size-gate.log
+          node --input-type=module <<'NODE' > /tmp/candidate-size.json
+          import { readFileSync } from 'node:fs';
+          import { canonicalGzip, observationalBrotli } from './scripts/compression-oracle.mjs';
+          const out = {};
+          for (const path of ['dist/animate/index.js', 'dist/animate/index.cjs']) {
+            const bytes = readFileSync(path);
+            out[path] = { raw: bytes.length, gzip: canonicalGzip(bytes).length, brotli: observationalBrotli(bytes).length };
+          }
+          console.log(JSON.stringify(out, null, 2));
+          NODE
+          cat /tmp/candidate-size.json
+      - name: Frozen Pareto comparison
+        run: |
+          node --input-type=module <<'NODE'
+          import { readFileSync, writeFileSync } from 'node:fs';
+          const base = JSON.parse(readFileSync('/tmp/base-size.json', 'utf8'));
+          const candidate = JSON.parse(readFileSync('/tmp/candidate-size.json', 'utf8'));
+          let strict = false;
+          for (const path of Object.keys(base)) {
+            for (const metric of ['raw', 'gzip', 'brotli']) {
+              const b = base[path][metric];
+              const c = candidate[path][metric];
+              if (c > b) throw new Error(`${path} ${metric} regressed ${b} -> ${c}`);
+              if (c < b) strict = true;
+            }
+          }
+          if (!strict) throw new Error('no strict byte improvement');
+          writeFileSync('/tmp/verdict.json', JSON.stringify({ verdict: 'ADMITTED', base, candidate }, null, 2));
+          console.log(readFileSync('/tmp/verdict.json', 'utf8'));
+          NODE
+      - name: Add permanent regression oracle
+        run: |
+          rm test/.autoresearch-known-set.test.ts
+          cat > test/animate-bind-known-authority.test.ts <<'EOF'
+          import { describe, expect, it } from 'vitest';
+          import {
+            bindGroup,
+            parseProps,
+            type AnimatableElement,
+            type ChannelSnapshot,
+            type GroupOwner,
+            type GroupRecord,
+          } from '../src/animate/channels.js';
+
+          function countSetAllocations<T>(run: () => T): { readonly result: T; readonly allocations: number } {
+            const NativeSet = globalThis.Set;
+            let allocations = 0;
+            class CountingSet<V> extends NativeSet<V> {
+              constructor(values?: readonly V[] | null) {
+                super(values);
+                allocations++;
+              }
+            }
+            (globalThis as { Set: SetConstructor }).Set = CountingSet as SetConstructor;
+            try {
+              return { result: run(), allocations };
+            } finally {
+              (globalThis as { Set: SetConstructor }).Set = NativeSet;
+            }
+          }
+
+          const element: AnimatableElement = {
+            style: { getPropertyValue: () => '', setProperty() {} },
+          };
+
+          function record(owner?: GroupOwner): GroupRecord {
+            const numeric = new Map<string, ChannelSnapshot>();
+            numeric.set('rotate', { _value: 30, _velocity: 0 });
+            numeric.set('skewX', { _value: 5, _velocity: 0 });
+            return { _owner: owner, _transition: false, _numeric: numeric, _cssValue: undefined };
+          }
+
+          describe('bindGroup transform key authority', () => {
+            it('positive control detects direct Set construction', () => {
+              expect(countSetAllocations(() => new Set(['x'])).allocations).toBe(1);
+            });
+
+            it('does not materialize a second key Set for settled state', () => {
+              const proof = countSetAllocations(() =>
+                bindGroup(element, 'transform', parseProps({ x: [0, 100] }), record()),
+              );
+              expect(proof.allocations).toBeLessThanOrEqual(1);
+              expect(proof.result._residuals.get('rotate')).toBe(30);
+              expect(proof.result._residuals.get('skewX')).toBe(5);
+            });
+
+            it('uses the live owner as key authority without a union Set', () => {
+              const owner: GroupOwner = {
+                _captureNum(key) {
+                  if (key === 'rotate') return { _value: 42, _velocity: 7 };
+                  if (key === 'skewX') return { _value: 9, _velocity: 3 };
+                  return undefined;
+                },
+                _captureCss() { return undefined; },
+                _numericKeys() { return ['x', 'rotate', 'skewX']; },
+                _supersede() {},
+              };
+              const proof = countSetAllocations(() =>
+                bindGroup(element, 'transform', parseProps({ x: [0, 100] }), record(owner)),
+              );
+              expect(proof.allocations).toBeLessThanOrEqual(1);
+              expect(proof.result._residuals.get('rotate')).toBe(42);
+              expect(proof.result._residuals.get('skewX')).toBe(9);
+            });
+          });
+          EOF
+          pnpm exec vitest run test/animate-bind-known-authority.test.ts --reporter=verbose
+          pnpm check:static
+      - name: Commit admitted product candidate
+        run: |
+          git add src/animate/channels.ts test/animate-bind-known-authority.test.ts
+          git diff --cached --check
+          git diff --cached --binary > /tmp/product.patch
+          git reset --hard
+          git switch -C perf/animate-known-set-elision fe11daa407de396fad952be7679650f63dabd4dd
+          git apply --index /tmp/product.patch
+          git config user.name 'Labpics Autoresearch'
+          git config user.email 'actions@users.noreply.github.com'
+          git commit -m 'perf(animate): remove transient known-key Set'
+          git rev-parse HEAD | tee /tmp/candidate-sha.txt
+          git push --force origin HEAD:refs/heads/perf/animate-known-set-elision
+      - name: Upload immutable research receipt
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: hybrid-known-set-proof
+          path: |
+            /tmp/base-probe.log
+            /tmp/candidate-probe.log
+            /tmp/base-size.json
+            /tmp/candidate-size.json
+            /tmp/base-size-gate.log
+            /tmp/candidate-size-gate.log
+            /tmp/verdict.json
+            /tmp/candidate-sha.txt
+          if-no-files-found: warn
