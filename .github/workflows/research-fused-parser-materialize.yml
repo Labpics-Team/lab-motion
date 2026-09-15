@@ -1,0 +1,211 @@
+name: Research · materialize fused parser product candidate
+
+on:
+  push:
+    branches: ["research/fused-parser-fresh-callgrind-20260915"]
+
+permissions:
+  contents: write
+
+jobs:
+  materialize:
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    steps:
+      - name: Checkout carrier
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          fetch-depth: 0
+          persist-credentials: true
+
+      - name: Setup Node
+        uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v6
+        with:
+          node-version: "24"
+
+      - name: Activate pinned pnpm
+        run: |
+          corepack enable
+          corepack install --global pnpm@11.11.0
+
+      - name: Create exact product worktrees
+        shell: bash
+        run: |
+          set -euo pipefail
+          BASE=fe11daa407de396fad952be7679650f63dabd4dd
+          PRODUCT=perf/fuse-animate-prop-grouping-20260915
+          test "$(git rev-parse "$BASE^{commit}")" = "$BASE"
+          git worktree add --detach "$RUNNER_TEMP/base" "$BASE"
+          git worktree add --detach "$RUNNER_TEMP/product" "$BASE"
+          cd "$RUNNER_TEMP/product"
+          git switch -c "$PRODUCT"
+
+      - name: Apply smallest fused representation
+        shell: bash
+        run: |
+          set -euo pipefail
+          cd "$RUNNER_TEMP/product"
+          python3 - <<'PY'
+          from pathlib import Path
+
+          channels = Path('src/animate/channels.ts')
+          index = Path('src/animate/index.ts')
+          long_delay = Path('test/animate-waapi-long-delay.test.ts')
+          allocation = Path('test/transform-allocation-ceiling.test.ts')
+
+          c = channels.read_text()
+          old = """export function parseProps(props: Record<string, unknown>): ChannelSpec[] {\n  const specs: ChannelSpec[] = [];\n"""
+          if c.count(old) != 1:
+              raise SystemExit('channels parseProps precondition drift')
+          replacement = """function addSpec(groups: Map<GroupKey, ChannelSpec[]>, spec: ChannelSpec): void {\n  const list = groups.get(spec._group);\n  if (list) list.push(spec);\n  else groups.set(spec._group, [spec]);\n}\n\nexport function parseProps(props: Record<string, unknown>): Map<GroupKey, ChannelSpec[]> {\n  const groups = new Map<GroupKey, ChannelSpec[]>();\n"""
+          c = c.replace(old, replacement)
+          if c.count('specs.push(') != 4:
+              raise SystemExit(f'unexpected specs.push count: {c.count("specs.push(")}')
+          c = c.replace('specs.push(', 'addSpec(groups, ')
+          if c.count('return specs;') != 1:
+              raise SystemExit('return specs precondition drift')
+          c = c.replace('return specs;', 'return groups;')
+          channels.write_text(c)
+
+          s = index.read_text()
+          if s.count('  type ChannelSpec,\n') != 1:
+              raise SystemExit('ChannelSpec import precondition drift')
+          s = s.replace('  type ChannelSpec,\n', '')
+          start = s.find('// ─── Группировка спецификаций')
+          end = s.find('// ─── Снап (единая reduced-политика', start)
+          if start < 0 or end < 0 or 'function groupSpecs(' not in s[start:end]:
+              raise SystemExit('groupSpecs block drift')
+          s = s[:start] + s[end:]
+          old_parse = '  const specs = parseProps(requireAnimateProps(props));'
+          if s.count(old_parse) != 1:
+              raise SystemExit('animate parse call drift')
+          s = s.replace(old_parse, '  const groups = parseProps(requireAnimateProps(props));')
+          old_group = '  const groups = groupSpecs(specs);\n'
+          if s.count(old_group) != 1:
+              raise SystemExit('animate group call drift')
+          s = s.replace(old_group, '')
+          index.write_text(s)
+
+          t = long_delay.read_text()
+          needle = "      parseProps({ opacity: [0, 1] }),\n"
+          if t.count(needle) != 1:
+              raise SystemExit('long-delay parseProps seam drift')
+          t = t.replace(needle, "      parseProps({ opacity: [0, 1] }).get('opacity')!,\n")
+          long_delay.write_text(t)
+
+          t = allocation.read_text()
+          needle = "    parseProps({ x: [0, 240], rotate: [0, 90] }),\n"
+          if t.count(needle) != 1:
+              raise SystemExit('allocation parseProps seam drift')
+          t = t.replace(needle, "    parseProps({ x: [0, 240], rotate: [0, 90] }).get('transform')!,\n")
+          allocation.write_text(t)
+          PY
+
+          mapfile -t calls < <(git grep -n 'parseProps(' -- src test)
+          printf '%s\n' "${calls[@]}"
+          test "${#calls[@]}" -eq 4
+          git diff --check
+          git diff --stat
+
+      - name: Install exact dependencies
+        shell: bash
+        run: |
+          set -euo pipefail
+          for side in base product; do
+            cd "$RUNNER_TEMP/$side"
+            pnpm install --frozen-lockfile
+          done
+
+      - name: Build base and product
+        shell: bash
+        run: |
+          set -euo pipefail
+          cd "$RUNNER_TEMP/base"
+          pnpm build
+          cd "$RUNNER_TEMP/product"
+          pnpm build
+
+      - name: Measure exact shipped representations
+        shell: bash
+        run: |
+          set -euo pipefail
+          BASE_DIR="$RUNNER_TEMP/base" PRODUCT_DIR="$RUNNER_TEMP/product" node --input-type=module <<'NODE' | tee "$RUNNER_TEMP/size-evidence.json"
+          import { readFileSync } from 'node:fs';
+          import { resolve } from 'node:path';
+          import { canonicalGzip, observationalBrotli } from process.env.PRODUCT_DIR + '/scripts/compression-oracle.mjs';
+
+          const files = ['dist/animate/index.js', 'dist/animate/index.cjs'];
+          const result = {};
+          for (const file of files) {
+            const base = readFileSync(resolve(process.env.BASE_DIR, file));
+            const candidate = readFileSync(resolve(process.env.PRODUCT_DIR, file));
+            const measure = (bytes) => ({
+              raw: bytes.length,
+              gzip: canonicalGzip(bytes).length,
+              brotli: observationalBrotli(bytes).length,
+            });
+            const b = measure(base), c = measure(candidate);
+            result[file] = { base: b, candidate: c, delta: {
+              raw: c.raw - b.raw,
+              gzip: c.gzip - b.gzip,
+              brotli: c.brotli - b.brotli,
+            }};
+            if (!(c.raw < b.raw && c.gzip <= b.gzip && c.brotli <= b.brotli)) {
+              throw new Error(`${file}: shipped representation Pareto failed`);
+            }
+          }
+          console.log(JSON.stringify(result, null, 2));
+          NODE
+
+      - name: Run local protected gates
+        shell: bash
+        run: |
+          set -euo pipefail
+          cd "$RUNNER_TEMP/product"
+          pnpm check:static
+          pnpm test
+          pnpm size | tee "$RUNNER_TEMP/size-gate.txt"
+          pnpm pack:smoke
+          pnpm pack:compat
+          pnpm acceptance:compiler
+
+      - name: Commit and publish exact product candidate
+        id: publish
+        shell: bash
+        env:
+          PRODUCT_BRANCH: perf/fuse-animate-prop-grouping-20260915
+        run: |
+          set -euo pipefail
+          cd "$RUNNER_TEMP/product"
+          test "$(git diff --name-only | sort | tr '\n' ' ')" = "src/animate/channels.ts src/animate/index.ts test/animate-waapi-long-delay.test.ts test/transform-allocation-ceiling.test.ts "
+          git config user.name 'lab-motion research automation'
+          git config user.email '63733699+lemone112@users.noreply.github.com'
+          git add src/animate/channels.ts src/animate/index.ts test/animate-waapi-long-delay.test.ts test/transform-allocation-ceiling.test.ts
+          git commit -m 'perf(animate): fuse prop parsing with group ownership'
+          CANDIDATE=$(git rev-parse HEAD)
+          TREE=$(git rev-parse HEAD^{tree})
+          git push origin "HEAD:refs/heads/$PRODUCT_BRANCH"
+          printf 'candidate=%s\n' "$CANDIDATE" | tee "$RUNNER_TEMP/product-ref.txt"
+          printf 'tree=%s\n' "$TREE" | tee -a "$RUNNER_TEMP/product-ref.txt"
+          echo "candidate=$CANDIDATE" >> "$GITHUB_OUTPUT"
+
+      - name: Hash evidence
+        shell: bash
+        run: |
+          set -euo pipefail
+          cd "$RUNNER_TEMP"
+          sha256sum size-evidence.json size-gate.txt product-ref.txt | tee product-evidence.sha256
+
+      - name: Upload immutable product evidence
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
+        with:
+          name: fused-parser-product-${{ steps.publish.outputs.candidate }}-${{ github.run_id }}
+          path: |
+            ${{ runner.temp }}/size-evidence.json
+            ${{ runner.temp }}/size-gate.txt
+            ${{ runner.temp }}/product-ref.txt
+            ${{ runner.temp }}/product-evidence.sha256
+          if-no-files-found: error
+          retention-days: 30
+          compression-level: 0
+          overwrite: false
