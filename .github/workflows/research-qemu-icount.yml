@@ -1,0 +1,212 @@
+name: Research QEMU ICount
+
+on:
+  push:
+    branches: ["research/bindgroup-qemu-icount-20260915-r1"]
+
+permissions:
+  contents: read
+
+jobs:
+  q0:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          persist-credentials: false
+
+      - name: Install pinned execution-plane dependencies
+        shell: bash
+        run: |
+          set -euo pipefail
+          sudo apt-get update -qq
+          sudo apt-get install -y --no-install-recommends qemu-user gcc curl ca-certificates
+          mkdir -p research-artifact research-build
+          {
+            echo "runner_image=${ImageOS:-unknown}"
+            echo "qemu_package=$(dpkg-query -W -f='${Version}' qemu-user)"
+            qemu-x86_64 --version | head -n 1
+            gcc --version | head -n 1
+            uname -a
+          } | tee research-artifact/environment.txt
+
+      - name: Build exact-ABI counter and guest
+        shell: bash
+        run: |
+          set -euo pipefail
+          header_url='https://raw.githubusercontent.com/qemu/qemu/11aa0b1ff115b86160c4d37e7c37e6a6b13b77ea/include/qemu/qemu-plugin.h'
+          curl --proto '=https' --tlsv1.2 --fail --location --silent --show-error "$header_url" -o research-build/qemu-plugin.h
+          sha256sum research-build/qemu-plugin.h | tee research-artifact/qemu-plugin-header.sha256
+
+          cat > research-build/window-plugin.c <<'C'
+          #include "qemu-plugin.h"
+          #include <stdbool.h>
+          #include <stdint.h>
+          #include <inttypes.h>
+          #include <stdio.h>
+
+          QEMU_PLUGIN_EXPORT int qemu_plugin_version = QEMU_PLUGIN_VERSION;
+
+          #define LM_MAX_VCPU 256u
+          #define LM_SENTINEL_PID 2147483647ULL
+          #define LM_X86_64_SYS_KILL 62
+
+          static bool active[LM_MAX_VCPU];
+          static uint64_t retired[LM_MAX_VCPU];
+          static uint64_t windows[LM_MAX_VCPU];
+
+          static void on_tb_exec(unsigned int vcpu_index, void *userdata) {
+              if (vcpu_index < LM_MAX_VCPU && active[vcpu_index]) {
+                  retired[vcpu_index] += (uint64_t)(uintptr_t)userdata;
+              }
+          }
+
+          static void on_tb_trans(qemu_plugin_id_t id, struct qemu_plugin_tb *tb) {
+              (void)id;
+              size_t n = qemu_plugin_tb_n_insns(tb);
+              qemu_plugin_register_vcpu_tb_exec_cb(
+                  tb, on_tb_exec, QEMU_PLUGIN_CB_NO_REGS, (void *)(uintptr_t)n);
+          }
+
+          static void on_syscall(qemu_plugin_id_t id, unsigned int vcpu_index,
+                                 int64_t num, uint64_t a1, uint64_t a2,
+                                 uint64_t a3, uint64_t a4, uint64_t a5,
+                                 uint64_t a6, uint64_t a7, uint64_t a8) {
+              (void)id; (void)a2; (void)a3; (void)a4; (void)a5; (void)a6; (void)a7; (void)a8;
+              if (vcpu_index >= LM_MAX_VCPU || num != LM_X86_64_SYS_KILL || a1 != LM_SENTINEL_PID) return;
+              if (!active[vcpu_index]) {
+                  retired[vcpu_index] = 0;
+                  active[vcpu_index] = true;
+              } else {
+                  active[vcpu_index] = false;
+                  windows[vcpu_index]++;
+                  char line[192];
+                  snprintf(line, sizeof(line),
+                           "LM_QEMU_COUNT vcpu=%u window=%" PRIu64 " instructions=%" PRIu64 "\n",
+                           vcpu_index, windows[vcpu_index], retired[vcpu_index]);
+                  qemu_plugin_outs(line);
+              }
+          }
+
+          QEMU_PLUGIN_EXPORT int qemu_plugin_install(qemu_plugin_id_t id,
+                                                     const qemu_info_t *info,
+                                                     int argc, char **argv) {
+              (void)argc; (void)argv;
+              if (info->system_emulation) return -1;
+              qemu_plugin_register_vcpu_tb_trans_cb(id, on_tb_trans);
+              qemu_plugin_register_vcpu_syscall_cb(id, on_syscall);
+              return 0;
+          }
+          C
+
+          cat > research-build/guest.c <<'C'
+          #define _GNU_SOURCE
+          #include <errno.h>
+          #include <inttypes.h>
+          #include <limits.h>
+          #include <stdint.h>
+          #include <stdio.h>
+          #include <stdlib.h>
+          #include <sys/syscall.h>
+          #include <unistd.h>
+
+          __attribute__((noinline)) static uint64_t work(uint64_t n) {
+              volatile uint64_t x = 0x9e3779b97f4a7c15ULL;
+              for (uint64_t i = 0; i < n; i++) {
+                  x = (x ^ (i + 0x517cc1b727220a95ULL)) + 0x94d049bb133111ebULL;
+              }
+              return x;
+          }
+
+          static void marker(void) {
+              errno = 0;
+              long r = syscall(SYS_kill, INT_MAX, 0);
+              if (r != -1 || errno != ESRCH) {
+                  fprintf(stderr, "marker contract failed r=%ld errno=%d\n", r, errno);
+                  exit(70);
+              }
+          }
+
+          int main(int argc, char **argv) {
+              if (argc != 2) return 64;
+              char *end = NULL;
+              uint64_t n = strtoull(argv[1], &end, 10);
+              if (!end || *end) return 65;
+              marker();
+              uint64_t checksum = work(n);
+              marker();
+              printf("LM_GUEST_META n=%" PRIu64 " checksum=%" PRIu64 "\n", n, checksum);
+              return 0;
+          }
+          C
+
+          gcc -O2 -fPIC -shared -fvisibility=hidden -Iresearch-build \
+            research-build/window-plugin.c -o research-build/window-plugin.so
+          gcc -O2 -fno-tree-vectorize -fno-unroll-loops \
+            research-build/guest.c -o research-build/guest
+          file research-build/window-plugin.so research-build/guest | tee research-artifact/binaries.txt
+          sha256sum research-build/window-plugin.so research-build/guest \
+            | tee research-artifact/binaries.sha256
+
+      - name: Acquire frozen Q0 controls
+        shell: bash
+        run: |
+          set -euo pipefail
+          for spec in zero-a:0 zero-b:0 n-a:20000 n-b:20000 two-n:40000; do
+            name="${spec%%:*}"
+            n="${spec##*:}"
+            qemu-x86_64 -plugin ./research-build/window-plugin.so ./research-build/guest "$n" \
+              >"research-artifact/${name}.log" 2>&1
+          done
+
+          python3 - <<'PY'
+          import json, math, pathlib, re
+          root = pathlib.Path('research-artifact')
+          def count(name):
+              text=(root/f'{name}.log').read_text()
+              found=re.findall(r'LM_QEMU_COUNT vcpu=(\d+) window=(\d+) instructions=(\d+)', text)
+              if len(found) != 1:
+                  raise SystemExit(f'{name}: expected exactly one count, got {found!r}')
+              vcpu, window, value=map(int, found[0])
+              if value <= 0 or window != 1:
+                  raise SystemExit(f'{name}: invalid counter tuple {found[0]!r}')
+              if 'LM_GUEST_META' not in text:
+                  raise SystemExit(f'{name}: guest did not complete')
+              return {'vcpu':vcpu,'window':window,'instructions':value}
+          za,zb,na,nb,tn=(count(x) for x in ('zero-a','zero-b','n-a','n-b','two-n'))
+          z=(za['instructions']+zb['instructions'])/2
+          wa=na['instructions']-z
+          wb=nb['instructions']-z
+          w2=tn['instructions']-z
+          if min(wa,wb,w2) <= 0:
+              raise SystemExit(f'non-positive derived work: {wa=} {wb=} {w2=}')
+          zero_ratio=max(za['instructions'],zb['instructions'])/min(za['instructions'],zb['instructions'])
+          n_ratio=max(wa,wb)/min(wa,wb)
+          sensitivity=w2/math.sqrt(wa*wb)
+          result={
+              'zeroA':za,'zeroB':zb,'nA':na,'nB':nb,'twoN':tn,
+              'zeroBaseline':z,'derivedNA':wa,'derivedNB':wb,'derived2N':w2,
+              'zeroRatio':zero_ratio,'nDerivedRatio':n_ratio,'sensitivityRatio':sensitivity,
+          }
+          (root/'result.json').write_text(json.dumps(result,indent=2,sort_keys=True)+'\n')
+          print(json.dumps(result,indent=2,sort_keys=True))
+          if zero_ratio > 1.001:
+              raise SystemExit(f'zero null failed: {zero_ratio}')
+          if n_ratio > 1.001:
+              raise SystemExit(f'N null failed: {n_ratio}')
+          if not (1.99 <= sensitivity <= 2.01):
+              raise SystemExit(f'2x sensitivity failed: {sensitivity}')
+          PY
+
+          sha256sum research-artifact/* | tee research-artifact/SHA256SUMS
+
+      - name: Upload immutable Q0 evidence
+        if: always()
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
+        with:
+          name: qemu-icount-q0-${{ github.sha }}-${{ github.run_id }}
+          path: research-artifact/
+          if-no-files-found: error
+          retention-days: 7
+          compression-level: 0
