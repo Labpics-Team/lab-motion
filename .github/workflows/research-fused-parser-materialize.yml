@@ -132,8 +132,10 @@ jobs:
           BASE_DIR="$RUNNER_TEMP/base" PRODUCT_DIR="$RUNNER_TEMP/product" node --input-type=module <<'NODE' | tee "$RUNNER_TEMP/size-evidence.json"
           import { readFileSync } from 'node:fs';
           import { resolve } from 'node:path';
-          import { canonicalGzip, observationalBrotli } from process.env.PRODUCT_DIR + '/scripts/compression-oracle.mjs';
+          import { pathToFileURL } from 'node:url';
 
+          const oracleUrl = pathToFileURL(resolve(process.env.PRODUCT_DIR, 'scripts/compression-oracle.mjs')).href;
+          const { canonicalGzip, observationalBrotli } = await import(oracleUrl);
           const files = ['dist/animate/index.js', 'dist/animate/index.cjs'];
           const result = {};
           for (const file of files) {
