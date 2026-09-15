@@ -471,7 +471,7 @@ export function createTimeline(opts: TimelineOptions): TimelineControls {
     }
   }
 
-  function label(name: string, at?: number | string): void {
+  const label = (name: string, at?: number | string): void => {
     if (!name || typeof name !== 'string') return;
     let t: number;
     if (at === undefined) {
@@ -484,7 +484,7 @@ export function createTimeline(opts: TimelineOptions): TimelineControls {
       t = _vt;
     }
     _labels.set(name, t);
-  }
+  };
 
   // ── Frame loop ────────────────────────────────────────────────────────────
 

@@ -47,6 +47,16 @@ describe('timeline label ownership allocation ceiling', () => {
     tl.cancel();
   });
 
+  it('keeps the public label control non-constructable', () => {
+    const tl = createTimeline({
+      segments: [{ from: 0, to: 1, duration: 1 }],
+      requestFrame: () => 1,
+    });
+    expect(Object.hasOwn(tl.label, 'prototype')).toBe(false);
+    expect(() => Reflect.construct(tl.label as unknown as Function, [])).toThrow(TypeError);
+    tl.cancel();
+  });
+
   it('detects a deliberate extra retained-shape Map', () => {
     const normal = countConstructionMaps(false);
     expect(countConstructionMaps(false, true)).toBe(normal + 1);
