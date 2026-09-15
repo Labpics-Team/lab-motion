@@ -53,11 +53,15 @@ jobs:
           from pathlib import Path
           p = Path('src/timeline/index.ts')
           s = p.read_text()
-          old = "  const localT = (t - seg.startTime) / duration;"
-          new = "  const localT = t / duration;"
-          if s.count(old) != 1:
-            raise SystemExit('mutation target mismatch')
-          p.write_text(s.replace(old, new))
+          replacements = [
+            ("  if (t <= seg.startTime) return seg.from;", "  if (t <= 0) return seg.from;"),
+            ("  const localT = (t - seg.startTime) / duration;", "  const localT = t / duration;"),
+          ]
+          for old, new in replacements:
+            if s.count(old) != 1:
+              raise SystemExit(f'mutation target mismatch: {old!r}')
+            s = s.replace(old, new)
+          p.write_text(s)
           PY
           set +e
           pnpm vitest run test/timeline-label-owner-allocation.test.ts -t "runtime label mutation does not rewrite compiled segment positions" > /tmp/mutation.log 2>&1
