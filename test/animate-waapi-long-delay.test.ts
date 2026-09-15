@@ -596,7 +596,7 @@ describe('animate WAAPI: точный long-delay timer', () => {
     const bound = bindGroup(
       target.el,
       'opacity',
-      parseProps({ opacity: [0, 1] }),
+      parseProps({ opacity: [0, 1] }).get('opacity')!,
       record,
     );
     const onDone = vi.fn();
