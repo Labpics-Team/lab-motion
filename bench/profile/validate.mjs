@@ -99,6 +99,7 @@ export function validatePreregistration(profile = PROFILE_PREREGISTRATION) {
       invariant(!/throttle|emulat/i.test(String(cell.reason)), `${cell.id}: desktop emulation cannot substitute for hardware`);
     } else {
       invariant(cell.class === 'desktop-browser', `${cell.id}: unknown cell class`);
+      invariant(cell.platform === 'linux-ci-runner', `${cell.id}: desktop runner class drifted`);
       invariant(['chromium', 'firefox', 'webkit'].includes(cell.engine), `${cell.id}: unknown engine`);
       invariant(cell.availability === 'bind-from-inventory-receipt', `${cell.id}: exact browser build must come from receipt`);
     }
@@ -146,8 +147,13 @@ export function validateDesktopInventory(receipt, profile = PROFILE_PREREGISTRAT
   invariant(Array.isArray(receipt.browsers) && JSON.stringify(receipt.browsers.map(({ engine }) => engine)) === JSON.stringify(['chromium', 'firefox', 'webkit']), 'desktop receipt must bind exactly Chromium/Firefox/WebKit');
   for (const browser of receipt.browsers) {
     invariant(typeof browser.version === 'string' && browser.version.length > 0, `${browser.engine}: version missing`);
+    invariant(browser.playwrightVersion === profile.baseline.competitors.playwright, `${browser.engine}: Playwright provenance drifted`);
     invariant(SHA256.test(browser.executableSha256), `${browser.engine}: executable SHA-256 missing`);
+    invariant(browser.launchMode === 'headless', `${browser.engine}: launch mode drifted`);
     invariant(typeof browser.userAgent === 'string' && browser.userAgent.length > 0, `${browser.engine}: UA missing`);
+    invariant(typeof browser.platform === 'string' && browser.platform.length > 0, `${browser.engine}: platform missing`);
+    invariant(browser.devicePixelRatio === 2, `${browser.engine}: DPR drifted`);
+    invariant(browser.viewport?.width === 390 && browser.viewport?.height === 844, `${browser.engine}: viewport drifted`);
     invariant(browser.refreshTargetHz === 60, `${browser.engine}: refresh target drifted`);
   }
   invariant(receipt.mobileBindings === undefined, 'desktop receipt fabricated mobile hardware');
@@ -160,14 +166,17 @@ export function validateCalibrationReceipt(receipt, profile = PROFILE_PREREGISTR
   invariant(receipt.profileId === profile.profileId && receipt.baselineRevision === profile.baseline.revision, 'calibration provenance mismatch');
   invariant(typeof receipt.calibrationId === 'string' && receipt.calibrationId.length > 0, 'calibration identity missing');
   invariant(receipt.attempt === 1, 'same calibration identity may not repeat-to-green');
-  invariant(Array.isArray(receipt.raw?.aa) && receipt.raw.aa.length > 0, 'A/A raw clusters missing');
-  invariant(Array.isArray(receipt.raw?.deliberate2x) && receipt.raw.deliberate2x.length > 0, 'positive-control raw clusters missing');
+  invariant(Array.isArray(receipt.raw?.aa) && receipt.raw.aa.length === 3, 'A/A raw engine matrix missing');
+  invariant(Array.isArray(receipt.raw?.deliberate2x) && receipt.raw.deliberate2x.length === 3, 'positive-control raw engine matrix missing');
+  invariant(JSON.stringify(receipt.raw.aa.map(({ engine }) => engine)) === JSON.stringify(['chromium', 'firefox', 'webkit']), 'A/A engine provenance drifted');
+  invariant(JSON.stringify(receipt.raw.deliberate2x.map(({ engine }) => engine)) === JSON.stringify(['chromium', 'firefox', 'webkit']), 'positive-control engine provenance drifted');
   const [aaLow, aaHigh] = profile.calibration.aaNonInferiorityBand;
   invariant(Number.isFinite(receipt.aa?.lower95) && Number.isFinite(receipt.aa?.upper95), 'A/A interval missing');
   invariant(receipt.aa.lower95 >= aaLow && receipt.aa.upper95 <= aaHigh, 'A/A escaped non-inferiority band');
   invariant(receipt.deliberate2x?.workMultiplier === 2, 'positive control is not 2x work');
   invariant(Number.isFinite(receipt.deliberate2x.lower95) && receipt.deliberate2x.lower95 >= profile.calibration.deliberateWorkDetectedLower95Min, 'positive control unresolved');
   invariant(receipt.candidateSamples === 0, 'candidate data appeared before calibration admission');
+  invariant(receipt.status === 'PASS', 'calibration receipt is not admitted');
   return receipt;
 }
 

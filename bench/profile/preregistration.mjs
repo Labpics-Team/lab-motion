@@ -13,7 +13,7 @@ const unavailable = (id, platform, refreshHz, affectedMetrics) => Object.freeze(
 const desktop = (id, engine) => Object.freeze({
   id,
   class: 'desktop-browser',
-  platform: 'linux-self-hosted',
+  platform: 'linux-ci-runner',
   engine,
   refreshHz: 60,
   availability: 'bind-from-inventory-receipt',
@@ -149,7 +149,7 @@ export const PROFILE_PREREGISTRATION = Object.freeze({
       cpuThrottle: 'diagnostic-only, never substitutes for M-04/M-05 mobile evidence',
       viewport: 'scene-defined',
       dpr: 'scene-defined',
-      background: 'self-hosted runner exclusivity recorded in receipt',
+      background: 'runner identity is recorded in receipt; exclusivity is not assumed without explicit receipt evidence',
     }),
   }),
 

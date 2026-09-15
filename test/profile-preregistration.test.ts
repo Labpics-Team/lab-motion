@@ -19,8 +19,13 @@ const inventory = () => ({
   browsers: ['chromium', 'firefox', 'webkit'].map(engine => ({
     engine,
     version: 'fixture',
+    playwrightVersion: '1.61.1',
     executableSha256: hash,
+    launchMode: 'headless',
     userAgent: `fixture-${engine}`,
+    platform: 'Linux x86_64',
+    devicePixelRatio: 2,
+    viewport: { width: 390, height: 844 },
     refreshTargetHz: 60,
   })),
 });
@@ -31,10 +36,14 @@ const calibration = () => ({
   baselineRevision: PROFILE_PREREGISTRATION.baseline.revision,
   calibrationId: 'fixture-calibration-1',
   attempt: 1,
-  raw: { aa: [[1, 1]], deliberate2x: [[2, 2]] },
+  raw: {
+    aa: ['chromium', 'firefox', 'webkit'].map(engine => ({ engine })),
+    deliberate2x: ['chromium', 'firefox', 'webkit'].map(engine => ({ engine })),
+  },
   aa: { lower95: 0.99, upper95: 1.01 },
   deliberate2x: { workMultiplier: 2, lower95: 1.8 },
   candidateSamples: 0,
+  status: 'PASS',
 });
 
 describe('PROFILE-01 preregistration', () => {
