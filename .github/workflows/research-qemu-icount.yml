@@ -8,35 +8,63 @@ permissions:
   contents: read
 
 jobs:
-  q0:
+  q0-source:
     runs-on: ubuntu-latest
-    timeout-minutes: 15
+    timeout-minutes: 25
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
         with:
           persist-credentials: false
 
-      - name: Install pinned execution-plane dependencies
+      - name: Install source-build dependencies
         shell: bash
         run: |
           set -euo pipefail
           sudo apt-get update -qq
-          sudo apt-get install -y --no-install-recommends qemu-user gcc curl ca-certificates
+          sudo apt-get install -y --no-install-recommends \
+            gcc git python3 python3-venv ninja-build pkg-config \
+            libglib2.0-dev libpixman-1-dev zlib1g-dev curl ca-certificates
           mkdir -p research-artifact research-build
           {
             echo "runner_image=${ImageOS:-unknown}"
-            echo "qemu_package=$(dpkg-query -W -f='${Version}' qemu-user)"
-            qemu-x86_64 --version | head -n 1
             gcc --version | head -n 1
+            python3 --version
+            ninja --version
             uname -a
           } | tee research-artifact/environment.txt
 
-      - name: Build exact-ABI counter and guest
+      - name: Build pinned QEMU x86_64 linux-user with plugins
         shell: bash
         run: |
           set -euo pipefail
-          header_url='https://raw.githubusercontent.com/qemu/qemu/11aa0b1ff115b86160c4d37e7c37e6a6b13b77ea/include/qemu/qemu-plugin.h'
-          curl --proto '=https' --tlsv1.2 --fail --location --silent --show-error "$header_url" -o research-build/qemu-plugin.h
+          git clone --quiet --depth=1 --branch v8.2.2 https://github.com/qemu/qemu.git research-build/qemu-src
+          source_sha="$(git -C research-build/qemu-src rev-parse HEAD)"
+          [[ "$source_sha" == "11aa0b1ff115b86160c4d37e7c37e6a6b13b77ea" ]]
+          mkdir research-build/qemu-out
+          (
+            cd research-build/qemu-out
+            ../qemu-src/configure \
+              --target-list=x86_64-linux-user \
+              --enable-plugins \
+              --disable-docs \
+              --disable-download \
+              | tee ../../../research-artifact/qemu-configure.txt
+            ninja -j2 qemu-x86_64
+          )
+          qemu_bin="$PWD/research-build/qemu-out/qemu-x86_64"
+          {
+            echo "qemu_source_sha=$source_sha"
+            "$qemu_bin" --version | head -n 1
+            echo "configure=--target-list=x86_64-linux-user --enable-plugins --disable-docs --disable-download"
+          } | tee research-artifact/qemu-provenance.txt
+          "$qemu_bin" -help | grep -F -- '-plugin' | tee research-artifact/qemu-plugin-option.txt
+          sha256sum "$qemu_bin" | tee research-artifact/qemu-binary.sha256
+
+      - name: Build frozen counter plugin and guest
+        shell: bash
+        run: |
+          set -euo pipefail
+          cp research-build/qemu-src/include/qemu/qemu-plugin.h research-build/qemu-plugin.h
           sha256sum research-build/qemu-plugin.h | tee research-artifact/qemu-plugin-header.sha256
 
           cat > research-build/window-plugin.c <<'C'
@@ -149,14 +177,15 @@ jobs:
           sha256sum research-build/window-plugin.so research-build/guest \
             | tee research-artifact/binaries.sha256
 
-      - name: Acquire frozen Q0 controls
+      - name: Acquire unchanged frozen Q0 controls
         shell: bash
         run: |
           set -euo pipefail
+          qemu_bin="$PWD/research-build/qemu-out/qemu-x86_64"
           for spec in zero-a:0 zero-b:0 n-a:20000 n-b:20000 two-n:40000; do
             name="${spec%%:*}"
             n="${spec##*:}"
-            qemu-x86_64 -plugin ./research-build/window-plugin.so ./research-build/guest "$n" \
+            "$qemu_bin" -plugin ./research-build/window-plugin.so ./research-build/guest "$n" \
               >"research-artifact/${name}.log" 2>&1
           done
 
@@ -201,11 +230,11 @@ jobs:
 
           sha256sum research-artifact/* | tee research-artifact/SHA256SUMS
 
-      - name: Upload immutable Q0 evidence
+      - name: Upload immutable source-built Q0 evidence
         if: always()
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
         with:
-          name: qemu-icount-q0-${{ github.sha }}-${{ github.run_id }}
+          name: qemu-icount-source-q0-${{ github.sha }}-${{ github.run_id }}
           path: research-artifact/
           if-no-files-found: error
           retention-days: 7
