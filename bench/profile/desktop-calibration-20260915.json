@@ -1,0 +1,2276 @@
+{
+  "schemaVersion": 1,
+  "profileId": "r11-profile-20260915-v1",
+  "baselineRevision": "fe11daa407de396fad952be7679650f63dabd4dd",
+  "calibrationId": "desktop-controls-20260915-v1",
+  "attempt": 1,
+  "generatedAt": "2026-09-15T03:34:10.266Z",
+  "workload": {
+    "iterations": 5000000,
+    "deliberateMultiplier": 2,
+    "runBlocks": 20,
+    "samplesPerBlock": 3,
+    "samplingUnit": "run-block",
+    "order": "alternating paired order per run block"
+  },
+  "aa": {
+    "lower95": 0.9969635627530805,
+    "upper95": 1.0020408163265753
+  },
+  "deliberate2x": {
+    "workMultiplier": 2,
+    "lower95": 1.9969604863222326
+  },
+  "raw": {
+    "aa": [
+      {
+        "engine": "chromium",
+        "interval": {
+          "ratio": 1.0010204081633247,
+          "lower95": 0.9969635627530805,
+          "upper95": 1.0020408163265753
+        },
+        "clusters": {
+          "a": [
+            {
+              "run": 0,
+              "samples": [
+                99.5,
+                99.39999999999418,
+                99.40000000000873
+              ],
+              "semantic": true
+            },
+            {
+              "run": 1,
+              "samples": [
+                99.30000000000291,
+                99.30000000000291,
+                99.40000000000873
+              ],
+              "semantic": true
+            },
+            {
+              "run": 2,
+              "samples": [
+                99.5,
+                99.39999999999418,
+                99
+              ],
+              "semantic": true
+            },
+            {
+              "run": 3,
+              "samples": [
+                99.40000000000873,
+                99.40000000000873,
+                99.39999999999418
+              ],
+              "semantic": true
+            },
+            {
+              "run": 4,
+              "samples": [
+                98.5,
+                99.40000000000873,
+                99.5
+              ],
+              "semantic": true
+            },
+            {
+              "run": 5,
+              "samples": [
+                99.40000000000873,
+                99.5,
+                99.5
+              ],
+              "semantic": true
+            },
+            {
+              "run": 6,
+              "samples": [
+                99.5,
+                98.20000000001164,
+                98.19999999999709
+              ],
+              "semantic": true
+            },
+            {
+              "run": 7,
+              "samples": [
+                98.20000000001164,
+                98.20000000001164,
+                97.89999999999418
+              ],
+              "semantic": true
+            },
+            {
+              "run": 8,
+              "samples": [
+                98,
+                97.89999999999418,
+                97.90000000000873
+              ],
+              "semantic": true
+            },
+            {
+              "run": 9,
+              "samples": [
+                98,
+                98,
+                97.90000000000873
+              ],
+              "semantic": true
+            },
+            {
+              "run": 10,
+              "samples": [
+                98,
+                97.89999999999418,
+                97.89999999999418
+              ],
+              "semantic": true
+            },
+            {
+              "run": 11,
+              "samples": [
+                97.89999999999418,
+                97.89999999999418,
+                98
+              ],
+              "semantic": true
+            },
+            {
+              "run": 12,
+              "samples": [
+                98.10000000000582,
+                98,
+                98
+              ],
+              "semantic": true
+            },
+            {
+              "run": 13,
+              "samples": [
+                98.10000000000582,
+                98,
+                98.10000000000582
+              ],
+              "semantic": true
+            },
+            {
+              "run": 14,
+              "samples": [
+                98.20000000001164,
+                98.30000000000291,
+                98
+              ],
+              "semantic": true
+            },
+            {
+              "run": 15,
+              "samples": [
+                98,
+                97.90000000000873,
+                97.89999999999418
+              ],
+              "semantic": true
+            },
+            {
+              "run": 16,
+              "samples": [
+                98,
+                98,
+                97.90000000000873
+              ],
+              "semantic": true
+            },
+            {
+              "run": 17,
+              "samples": [
+                98,
+                100.89999999999418,
+                98
+              ],
+              "semantic": true
+            },
+            {
+              "run": 18,
+              "samples": [
+                98.10000000000582,
+                98,
+                97.89999999999418
+              ],
+              "semantic": true
+            },
+            {
+              "run": 19,
+              "samples": [
+                97.89999999999418,
+                98,
+                98.10000000000582
+              ],
+              "semantic": true
+            }
+          ],
+          "b": [
+            {
+              "run": 0,
+              "samples": [
+                99.60000000000582,
+                99.40000000000873,
+                99.59999999999127
+              ],
+              "semantic": true
+            },
+            {
+              "run": 1,
+              "samples": [
+                99.5,
+                99.40000000000873,
+                99.30000000000291
+              ],
+              "semantic": true
+            },
+            {
+              "run": 2,
+              "samples": [
+                99.5,
+                99.5,
+                99.5
+              ],
+              "semantic": true
+            },
+            {
+              "run": 3,
+              "samples": [
+                99.5,
+                99.5,
+                99.5
+              ],
+              "semantic": true
+            },
+            {
+              "run": 4,
+              "samples": [
+                99.5,
+                99.5,
+                99.80000000000291
+              ],
+              "semantic": true
+            },
+            {
+              "run": 5,
+              "samples": [
+                99.59999999999127,
+                99.5,
+                99.60000000000582
+              ],
+              "semantic": true
+            },
+            {
+              "run": 6,
+              "samples": [
+                122.10000000000582,
+                98.09999999999127,
+                98.30000000000291
+              ],
+              "semantic": true
+            },
+            {
+              "run": 7,
+              "samples": [
+                98.19999999999709,
+                98.29999999998836,
+                97.90000000000873
+              ],
+              "semantic": true
+            },
+            {
+              "run": 8,
+              "samples": [
+                97.89999999999418,
+                98,
+                98
+              ],
+              "semantic": true
+            },
+            {
+              "run": 9,
+              "samples": [
+                97.89999999999418,
+                97.89999999999418,
+                98
+              ],
+              "semantic": true
+            },
+            {
+              "run": 10,
+              "samples": [
+                98,
+                98,
+                97.89999999999418
+              ],
+              "semantic": true
+            },
+            {
+              "run": 11,
+              "samples": [
+                98,
+                98.10000000000582,
+                97.89999999999418
+              ],
+              "semantic": true
+            },
+            {
+              "run": 12,
+              "samples": [
+                98,
+                97.89999999999418,
+                98.10000000000582
+              ],
+              "semantic": true
+            },
+            {
+              "run": 13,
+              "samples": [
+                97.89999999999418,
+                97.90000000000873,
+                97.89999999999418
+              ],
+              "semantic": true
+            },
+            {
+              "run": 14,
+              "samples": [
+                97.89999999999418,
+                97.89999999999418,
+                98
+              ],
+              "semantic": true
+            },
+            {
+              "run": 15,
+              "samples": [
+                98,
+                98,
+                98.10000000000582
+              ],
+              "semantic": true
+            },
+            {
+              "run": 16,
+              "samples": [
+                97.89999999999418,
+                98,
+                98
+              ],
+              "semantic": true
+            },
+            {
+              "run": 17,
+              "samples": [
+                98,
+                97.90000000000873,
+                98
+              ],
+              "semantic": true
+            },
+            {
+              "run": 18,
+              "samples": [
+                97.89999999999418,
+                98,
+                98
+              ],
+              "semantic": true
+            },
+            {
+              "run": 19,
+              "samples": [
+                98,
+                97.90000000000873,
+                98.30000000000291
+              ],
+              "semantic": true
+            }
+          ]
+        }
+      },
+      {
+        "engine": "firefox",
+        "interval": {
+          "ratio": 1,
+          "lower95": 1,
+          "upper95": 1
+        },
+        "clusters": {
+          "a": [
+            {
+              "run": 0,
+              "samples": [
+                37,
+                35,
+                35
+              ],
+              "semantic": true
+            },
+            {
+              "run": 1,
+              "samples": [
+                36,
+                37,
+                35
+              ],
+              "semantic": true
+            },
+            {
+              "run": 2,
+              "samples": [
+                36,
+                35,
+                35
+              ],
+              "semantic": true
+            },
+            {
+              "run": 3,
+              "samples": [
+                35,
+                35,
+                35
+              ],
+              "semantic": true
+            },
+            {
+              "run": 4,
+              "samples": [
+                36,
+                36,
+                36
+              ],
+              "semantic": true
+            },
+            {
+              "run": 5,
+              "samples": [
+                36,
+                35,
+                34
+              ],
+              "semantic": true
+            },
+            {
+              "run": 6,
+              "samples": [
+                35,
+                36,
+                35
+              ],
+              "semantic": true
+            },
+            {
+              "run": 7,
+              "samples": [
+                34,
+                36,
+                36
+              ],
+              "semantic": true
+            },
+            {
+              "run": 8,
+              "samples": [
+                34,
+                35,
+                34
+              ],
+              "semantic": true
+            },
+            {
+              "run": 9,
+              "samples": [
+                36,
+                36,
+                34
+              ],
+              "semantic": true
+            },
+            {
+              "run": 10,
+              "samples": [
+                36,
+                36,
+                35
+              ],
+              "semantic": true
+            },
+            {
+              "run": 11,
+              "samples": [
+                35,
+                36,
+                36
+              ],
+              "semantic": true
+            },
+            {
+              "run": 12,
+              "samples": [
+                35,
+                35,
+                35
+              ],
+              "semantic": true
+            },
+            {
+              "run": 13,
+              "samples": [
+                35,
+                36,
+                35
+              ],
+              "semantic": true
+            },
+            {
+              "run": 14,
+              "samples": [
+                35,
+                34,
+                35
+              ],
+              "semantic": true
+            },
+            {
+              "run": 15,
+              "samples": [
+                35,
+                35,
+                35
+              ],
+              "semantic": true
+            },
+            {
+              "run": 16,
+              "samples": [
+                36,
+                35,
+                35
+              ],
+              "semantic": true
+            },
+            {
+              "run": 17,
+              "samples": [
+                34,
+                35,
+                35
+              ],
+              "semantic": true
+            },
+            {
+              "run": 18,
+              "samples": [
+                35,
+                36,
+                35
+              ],
+              "semantic": true
+            },
+            {
+              "run": 19,
+              "samples": [
+                36,
+                35,
+                35
+              ],
+              "semantic": true
+            }
+          ],
+          "b": [
+            {
+              "run": 0,
+              "samples": [
+                35,
+                35,
+                35
+              ],
+              "semantic": true
+            },
+            {
+              "run": 1,
+              "samples": [
+                35,
+                35,
+                35
+              ],
+              "semantic": true
+            },
+            {
+              "run": 2,
+              "samples": [
+                35,
+                35,
+                35
+              ],
+              "semantic": true
+            },
+            {
+              "run": 3,
+              "samples": [
+                35,
+                35,
+                36
+              ],
+              "semantic": true
+            },
+            {
+              "run": 4,
+              "samples": [
+                35,
+                35,
+                36
+              ],
+              "semantic": true
+            },
+            {
+              "run": 5,
+              "samples": [
+                35,
+                35,
+                37
+              ],
+              "semantic": true
+            },
+            {
+              "run": 6,
+              "samples": [
+                35,
+                35,
+                36
+              ],
+              "semantic": true
+            },
+            {
+              "run": 7,
+              "samples": [
+                36,
+                35,
+                35
+              ],
+              "semantic": true
+            },
+            {
+              "run": 8,
+              "samples": [
+                36,
+                35,
+                36
+              ],
+              "semantic": true
+            },
+            {
+              "run": 9,
+              "samples": [
+                35,
+                35,
+                36
+              ],
+              "semantic": true
+            },
+            {
+              "run": 10,
+              "samples": [
+                34,
+                35,
+                35
+              ],
+              "semantic": true
+            },
+            {
+              "run": 11,
+              "samples": [
+                35,
+                35,
+                35
+              ],
+              "semantic": true
+            },
+            {
+              "run": 12,
+              "samples": [
+                35,
+                36,
+                35
+              ],
+              "semantic": true
+            },
+            {
+              "run": 13,
+              "samples": [
+                35,
+                35,
+                35
+              ],
+              "semantic": true
+            },
+            {
+              "run": 14,
+              "samples": [
+                36,
+                36,
+                35
+              ],
+              "semantic": true
+            },
+            {
+              "run": 15,
+              "samples": [
+                35,
+                36,
+                34
+              ],
+              "semantic": true
+            },
+            {
+              "run": 16,
+              "samples": [
+                34,
+                34,
+                35
+              ],
+              "semantic": true
+            },
+            {
+              "run": 17,
+              "samples": [
+                36,
+                35,
+                35
+              ],
+              "semantic": true
+            },
+            {
+              "run": 18,
+              "samples": [
+                35,
+                35,
+                35
+              ],
+              "semantic": true
+            },
+            {
+              "run": 19,
+              "samples": [
+                37,
+                35,
+                35
+              ],
+              "semantic": true
+            }
+          ]
+        }
+      },
+      {
+        "engine": "webkit",
+        "interval": {
+          "ratio": 1,
+          "lower95": 1,
+          "upper95": 1
+        },
+        "clusters": {
+          "a": [
+            {
+              "run": 0,
+              "samples": [
+                16,
+                14,
+                15
+              ],
+              "semantic": true
+            },
+            {
+              "run": 1,
+              "samples": [
+                15,
+                16,
+                14
+              ],
+              "semantic": true
+            },
+            {
+              "run": 2,
+              "samples": [
+                14,
+                14,
+                15
+              ],
+              "semantic": true
+            },
+            {
+              "run": 3,
+              "samples": [
+                14,
+                14,
+                14
+              ],
+              "semantic": true
+            },
+            {
+              "run": 4,
+              "samples": [
+                14,
+                14,
+                14
+              ],
+              "semantic": true
+            },
+            {
+              "run": 5,
+              "samples": [
+                14,
+                14,
+                14
+              ],
+              "semantic": true
+            },
+            {
+              "run": 6,
+              "samples": [
+                13,
+                14,
+                14
+              ],
+              "semantic": true
+            },
+            {
+              "run": 7,
+              "samples": [
+                14,
+                15,
+                14
+              ],
+              "semantic": true
+            },
+            {
+              "run": 8,
+              "samples": [
+                14,
+                14,
+                14
+              ],
+              "semantic": true
+            },
+            {
+              "run": 9,
+              "samples": [
+                14,
+                14,
+                14
+              ],
+              "semantic": true
+            },
+            {
+              "run": 10,
+              "samples": [
+                14,
+                13,
+                13
+              ],
+              "semantic": true
+            },
+            {
+              "run": 11,
+              "samples": [
+                14,
+                14,
+                14
+              ],
+              "semantic": true
+            },
+            {
+              "run": 12,
+              "samples": [
+                14,
+                14,
+                14
+              ],
+              "semantic": true
+            },
+            {
+              "run": 13,
+              "samples": [
+                14,
+                14,
+                14
+              ],
+              "semantic": true
+            },
+            {
+              "run": 14,
+              "samples": [
+                14,
+                13,
+                13
+              ],
+              "semantic": true
+            },
+            {
+              "run": 15,
+              "samples": [
+                14,
+                14,
+                14
+              ],
+              "semantic": true
+            },
+            {
+              "run": 16,
+              "samples": [
+                14,
+                14,
+                14
+              ],
+              "semantic": true
+            },
+            {
+              "run": 17,
+              "samples": [
+                14,
+                14,
+                14
+              ],
+              "semantic": true
+            },
+            {
+              "run": 18,
+              "samples": [
+                14,
+                14,
+                14
+              ],
+              "semantic": true
+            },
+            {
+              "run": 19,
+              "samples": [
+                13,
+                14,
+                14
+              ],
+              "semantic": true
+            }
+          ],
+          "b": [
+            {
+              "run": 0,
+              "samples": [
+                14,
+                14,
+                14
+              ],
+              "semantic": true
+            },
+            {
+              "run": 1,
+              "samples": [
+                14,
+                16,
+                16
+              ],
+              "semantic": true
+            },
+            {
+              "run": 2,
+              "samples": [
+                14,
+                15,
+                14
+              ],
+              "semantic": true
+            },
+            {
+              "run": 3,
+              "samples": [
+                14,
+                14,
+                14
+              ],
+              "semantic": true
+            },
+            {
+              "run": 4,
+              "samples": [
+                14,
+                15,
+                15
+              ],
+              "semantic": true
+            },
+            {
+              "run": 5,
+              "samples": [
+                14,
+                14,
+                14
+              ],
+              "semantic": true
+            },
+            {
+              "run": 6,
+              "samples": [
+                15,
+                15,
+                15
+              ],
+              "semantic": true
+            },
+            {
+              "run": 7,
+              "samples": [
+                14,
+                14,
+                14
+              ],
+              "semantic": true
+            },
+            {
+              "run": 8,
+              "samples": [
+                14,
+                14,
+                14
+              ],
+              "semantic": true
+            },
+            {
+              "run": 9,
+              "samples": [
+                14,
+                14,
+                14
+              ],
+              "semantic": true
+            },
+            {
+              "run": 10,
+              "samples": [
+                13,
+                14,
+                14
+              ],
+              "semantic": true
+            },
+            {
+              "run": 11,
+              "samples": [
+                14,
+                14,
+                14
+              ],
+              "semantic": true
+            },
+            {
+              "run": 12,
+              "samples": [
+                14,
+                14,
+                14
+              ],
+              "semantic": true
+            },
+            {
+              "run": 13,
+              "samples": [
+                14,
+                14,
+                13
+              ],
+              "semantic": true
+            },
+            {
+              "run": 14,
+              "samples": [
+                14,
+                13,
+                14
+              ],
+              "semantic": true
+            },
+            {
+              "run": 15,
+              "samples": [
+                14,
+                14,
+                14
+              ],
+              "semantic": true
+            },
+            {
+              "run": 16,
+              "samples": [
+                14,
+                14,
+                14
+              ],
+              "semantic": true
+            },
+            {
+              "run": 17,
+              "samples": [
+                13,
+                13,
+                13
+              ],
+              "semantic": true
+            },
+            {
+              "run": 18,
+              "samples": [
+                14,
+                14,
+                14
+              ],
+              "semantic": true
+            },
+            {
+              "run": 19,
+              "samples": [
+                14,
+                13,
+                14
+              ],
+              "semantic": true
+            }
+          ]
+        }
+      }
+    ],
+    "deliberate2x": [
+      {
+        "engine": "chromium",
+        "interval": {
+          "ratio": 2,
+          "lower95": 1.9969604863222326,
+          "upper95": 2.0010204081633245
+        },
+        "clusters": {
+          "single": [
+            {
+              "run": 0,
+              "samples": [
+                99.60000000000582,
+                99.5,
+                99.5
+              ],
+              "semantic": true
+            },
+            {
+              "run": 1,
+              "samples": [
+                99.39999999999418,
+                99.30000000000291,
+                99.40000000000873
+              ],
+              "semantic": true
+            },
+            {
+              "run": 2,
+              "samples": [
+                99.40000000000873,
+                99.40000000000873,
+                99.5
+              ],
+              "semantic": true
+            },
+            {
+              "run": 3,
+              "samples": [
+                99.5,
+                99.39999999999418,
+                99.59999999999127
+              ],
+              "semantic": true
+            },
+            {
+              "run": 4,
+              "samples": [
+                99.5,
+                99.5,
+                99.40000000000873
+              ],
+              "semantic": true
+            },
+            {
+              "run": 5,
+              "samples": [
+                99.30000000000291,
+                99.69999999999709,
+                99.5
+              ],
+              "semantic": true
+            },
+            {
+              "run": 6,
+              "samples": [
+                120.5,
+                98.19999999999709,
+                98.19999999999709
+              ],
+              "semantic": true
+            },
+            {
+              "run": 7,
+              "samples": [
+                98.10000000000582,
+                98,
+                97.80000000000291
+              ],
+              "semantic": true
+            },
+            {
+              "run": 8,
+              "samples": [
+                98,
+                98,
+                98.09999999999127
+              ],
+              "semantic": true
+            },
+            {
+              "run": 9,
+              "samples": [
+                98,
+                98,
+                98
+              ],
+              "semantic": true
+            },
+            {
+              "run": 10,
+              "samples": [
+                97.89999999999418,
+                98,
+                98.10000000000582
+              ],
+              "semantic": true
+            },
+            {
+              "run": 11,
+              "samples": [
+                98.09999999999127,
+                98,
+                98
+              ],
+              "semantic": true
+            },
+            {
+              "run": 12,
+              "samples": [
+                98.09999999999127,
+                98,
+                98
+              ],
+              "semantic": true
+            },
+            {
+              "run": 13,
+              "samples": [
+                98,
+                98.10000000000582,
+                98
+              ],
+              "semantic": true
+            },
+            {
+              "run": 14,
+              "samples": [
+                98,
+                98,
+                98
+              ],
+              "semantic": true
+            },
+            {
+              "run": 15,
+              "samples": [
+                98,
+                98,
+                97.89999999999418
+              ],
+              "semantic": true
+            },
+            {
+              "run": 16,
+              "samples": [
+                98,
+                97.90000000000873,
+                97.89999999999418
+              ],
+              "semantic": true
+            },
+            {
+              "run": 17,
+              "samples": [
+                98,
+                98.09999999999127,
+                98
+              ],
+              "semantic": true
+            },
+            {
+              "run": 18,
+              "samples": [
+                98,
+                97.90000000000873,
+                98
+              ],
+              "semantic": true
+            },
+            {
+              "run": 19,
+              "samples": [
+                98,
+                98,
+                98
+              ],
+              "semantic": true
+            }
+          ],
+          "doubled": [
+            {
+              "run": 0,
+              "samples": [
+                198.89999999999418,
+                198.89999999999418,
+                198.6999999999971
+              ],
+              "semantic": true
+            },
+            {
+              "run": 1,
+              "samples": [
+                198.79999999998836,
+                198.79999999998836,
+                199.09999999999127
+              ],
+              "semantic": true
+            },
+            {
+              "run": 2,
+              "samples": [
+                199,
+                198.89999999999418,
+                199
+              ],
+              "semantic": true
+            },
+            {
+              "run": 3,
+              "samples": [
+                198.79999999998836,
+                198.8000000000029,
+                197.90000000000873
+              ],
+              "semantic": true
+            },
+            {
+              "run": 4,
+              "samples": [
+                199.20000000001164,
+                198.79999999998836,
+                199.09999999999127
+              ],
+              "semantic": true
+            },
+            {
+              "run": 5,
+              "samples": [
+                199.09999999999127,
+                199.1999999999971,
+                199.29999999998836
+              ],
+              "semantic": true
+            },
+            {
+              "run": 6,
+              "samples": [
+                196.29999999998836,
+                196.40000000000873,
+                196.39999999999418
+              ],
+              "semantic": true
+            },
+            {
+              "run": 7,
+              "samples": [
+                196.39999999999418,
+                196.29999999998836,
+                196.10000000000582
+              ],
+              "semantic": true
+            },
+            {
+              "run": 8,
+              "samples": [
+                196,
+                196,
+                195.90000000000873
+              ],
+              "semantic": true
+            },
+            {
+              "run": 9,
+              "samples": [
+                195.90000000000873,
+                195.89999999999418,
+                195.89999999999418
+              ],
+              "semantic": true
+            },
+            {
+              "run": 10,
+              "samples": [
+                196.10000000000582,
+                196.20000000001164,
+                195.89999999999418
+              ],
+              "semantic": true
+            },
+            {
+              "run": 11,
+              "samples": [
+                195.90000000000873,
+                195.90000000000873,
+                195.89999999999418
+              ],
+              "semantic": true
+            },
+            {
+              "run": 12,
+              "samples": [
+                196,
+                196,
+                196.29999999998836
+              ],
+              "semantic": true
+            },
+            {
+              "run": 13,
+              "samples": [
+                195.89999999999418,
+                195.8000000000029,
+                195.8000000000029
+              ],
+              "semantic": true
+            },
+            {
+              "run": 14,
+              "samples": [
+                195.8000000000029,
+                195.89999999999418,
+                195.8000000000029
+              ],
+              "semantic": true
+            },
+            {
+              "run": 15,
+              "samples": [
+                195.90000000000873,
+                195.89999999999418,
+                195.90000000000873
+              ],
+              "semantic": true
+            },
+            {
+              "run": 16,
+              "samples": [
+                196,
+                196.09999999999127,
+                196
+              ],
+              "semantic": true
+            },
+            {
+              "run": 17,
+              "samples": [
+                195.89999999999418,
+                195.90000000000873,
+                195.90000000000873
+              ],
+              "semantic": true
+            },
+            {
+              "run": 18,
+              "samples": [
+                196,
+                195.89999999999418,
+                196
+              ],
+              "semantic": true
+            },
+            {
+              "run": 19,
+              "samples": [
+                195.89999999999418,
+                195.89999999999418,
+                195.79999999998836
+              ],
+              "semantic": true
+            }
+          ]
+        }
+      },
+      {
+        "engine": "firefox",
+        "interval": {
+          "ratio": 2.0285714285714285,
+          "lower95": 2,
+          "upper95": 2.0285714285714285
+        },
+        "clusters": {
+          "single": [
+            {
+              "run": 0,
+              "samples": [
+                36,
+                34,
+                35
+              ],
+              "semantic": true
+            },
+            {
+              "run": 1,
+              "samples": [
+                35,
+                36,
+                36
+              ],
+              "semantic": true
+            },
+            {
+              "run": 2,
+              "samples": [
+                35,
+                35,
+                35
+              ],
+              "semantic": true
+            },
+            {
+              "run": 3,
+              "samples": [
+                35,
+                35,
+                35
+              ],
+              "semantic": true
+            },
+            {
+              "run": 4,
+              "samples": [
+                35,
+                36,
+                35
+              ],
+              "semantic": true
+            },
+            {
+              "run": 5,
+              "samples": [
+                35,
+                35,
+                35
+              ],
+              "semantic": true
+            },
+            {
+              "run": 6,
+              "samples": [
+                35,
+                35,
+                36
+              ],
+              "semantic": true
+            },
+            {
+              "run": 7,
+              "samples": [
+                35,
+                35,
+                35
+              ],
+              "semantic": true
+            },
+            {
+              "run": 8,
+              "samples": [
+                35,
+                35,
+                35
+              ],
+              "semantic": true
+            },
+            {
+              "run": 9,
+              "samples": [
+                35,
+                35,
+                36
+              ],
+              "semantic": true
+            },
+            {
+              "run": 10,
+              "samples": [
+                35,
+                35,
+                36
+              ],
+              "semantic": true
+            },
+            {
+              "run": 11,
+              "samples": [
+                35,
+                35,
+                35
+              ],
+              "semantic": true
+            },
+            {
+              "run": 12,
+              "samples": [
+                35,
+                35,
+                36
+              ],
+              "semantic": true
+            },
+            {
+              "run": 13,
+              "samples": [
+                35,
+                35,
+                35
+              ],
+              "semantic": true
+            },
+            {
+              "run": 14,
+              "samples": [
+                36,
+                35,
+                35
+              ],
+              "semantic": true
+            },
+            {
+              "run": 15,
+              "samples": [
+                35,
+                36,
+                35
+              ],
+              "semantic": true
+            },
+            {
+              "run": 16,
+              "samples": [
+                35,
+                36,
+                35
+              ],
+              "semantic": true
+            },
+            {
+              "run": 17,
+              "samples": [
+                35,
+                35,
+                35
+              ],
+              "semantic": true
+            },
+            {
+              "run": 18,
+              "samples": [
+                36,
+                35,
+                35
+              ],
+              "semantic": true
+            },
+            {
+              "run": 19,
+              "samples": [
+                35,
+                36,
+                36
+              ],
+              "semantic": true
+            }
+          ],
+          "doubled": [
+            {
+              "run": 0,
+              "samples": [
+                71,
+                71,
+                71
+              ],
+              "semantic": true
+            },
+            {
+              "run": 1,
+              "samples": [
+                70,
+                69,
+                70
+              ],
+              "semantic": true
+            },
+            {
+              "run": 2,
+              "samples": [
+                71,
+                71,
+                71
+              ],
+              "semantic": true
+            },
+            {
+              "run": 3,
+              "samples": [
+                71,
+                71,
+                70
+              ],
+              "semantic": true
+            },
+            {
+              "run": 4,
+              "samples": [
+                70,
+                69,
+                70
+              ],
+              "semantic": true
+            },
+            {
+              "run": 5,
+              "samples": [
+                71,
+                70,
+                71
+              ],
+              "semantic": true
+            },
+            {
+              "run": 6,
+              "samples": [
+                71,
+                70,
+                69
+              ],
+              "semantic": true
+            },
+            {
+              "run": 7,
+              "samples": [
+                71,
+                70,
+                70
+              ],
+              "semantic": true
+            },
+            {
+              "run": 8,
+              "samples": [
+                71,
+                71,
+                70
+              ],
+              "semantic": true
+            },
+            {
+              "run": 9,
+              "samples": [
+                70,
+                70,
+                71
+              ],
+              "semantic": true
+            },
+            {
+              "run": 10,
+              "samples": [
+                70,
+                75,
+                70
+              ],
+              "semantic": true
+            },
+            {
+              "run": 11,
+              "samples": [
+                70,
+                70,
+                70
+              ],
+              "semantic": true
+            },
+            {
+              "run": 12,
+              "samples": [
+                70,
+                71,
+                71
+              ],
+              "semantic": true
+            },
+            {
+              "run": 13,
+              "samples": [
+                72,
+                70,
+                71
+              ],
+              "semantic": true
+            },
+            {
+              "run": 14,
+              "samples": [
+                70,
+                70,
+                71
+              ],
+              "semantic": true
+            },
+            {
+              "run": 15,
+              "samples": [
+                70,
+                70,
+                71
+              ],
+              "semantic": true
+            },
+            {
+              "run": 16,
+              "samples": [
+                70,
+                71,
+                71
+              ],
+              "semantic": true
+            },
+            {
+              "run": 17,
+              "samples": [
+                71,
+                71,
+                71
+              ],
+              "semantic": true
+            },
+            {
+              "run": 18,
+              "samples": [
+                69,
+                71,
+                71
+              ],
+              "semantic": true
+            },
+            {
+              "run": 19,
+              "samples": [
+                71,
+                71,
+                70
+              ],
+              "semantic": true
+            }
+          ]
+        }
+      },
+      {
+        "engine": "webkit",
+        "interval": {
+          "ratio": 2,
+          "lower95": 2,
+          "upper95": 2
+        },
+        "clusters": {
+          "single": [
+            {
+              "run": 0,
+              "samples": [
+                17,
+                15,
+                14
+              ],
+              "semantic": true
+            },
+            {
+              "run": 1,
+              "samples": [
+                14,
+                18,
+                15
+              ],
+              "semantic": true
+            },
+            {
+              "run": 2,
+              "samples": [
+                15,
+                14,
+                15
+              ],
+              "semantic": true
+            },
+            {
+              "run": 3,
+              "samples": [
+                15,
+                14,
+                14
+              ],
+              "semantic": true
+            },
+            {
+              "run": 4,
+              "samples": [
+                14,
+                14,
+                14
+              ],
+              "semantic": true
+            },
+            {
+              "run": 5,
+              "samples": [
+                15,
+                14,
+                14
+              ],
+              "semantic": true
+            },
+            {
+              "run": 6,
+              "samples": [
+                14,
+                14,
+                14
+              ],
+              "semantic": true
+            },
+            {
+              "run": 7,
+              "samples": [
+                14,
+                14,
+                16
+              ],
+              "semantic": true
+            },
+            {
+              "run": 8,
+              "samples": [
+                13,
+                14,
+                14
+              ],
+              "semantic": true
+            },
+            {
+              "run": 9,
+              "samples": [
+                14,
+                13,
+                14
+              ],
+              "semantic": true
+            },
+            {
+              "run": 10,
+              "samples": [
+                14,
+                14,
+                14
+              ],
+              "semantic": true
+            },
+            {
+              "run": 11,
+              "samples": [
+                14,
+                14,
+                14
+              ],
+              "semantic": true
+            },
+            {
+              "run": 12,
+              "samples": [
+                14,
+                14,
+                14
+              ],
+              "semantic": true
+            },
+            {
+              "run": 13,
+              "samples": [
+                13,
+                13,
+                13
+              ],
+              "semantic": true
+            },
+            {
+              "run": 14,
+              "samples": [
+                14,
+                14,
+                14
+              ],
+              "semantic": true
+            },
+            {
+              "run": 15,
+              "samples": [
+                13,
+                13,
+                14
+              ],
+              "semantic": true
+            },
+            {
+              "run": 16,
+              "samples": [
+                14,
+                13,
+                13
+              ],
+              "semantic": true
+            },
+            {
+              "run": 17,
+              "samples": [
+                14,
+                14,
+                14
+              ],
+              "semantic": true
+            },
+            {
+              "run": 18,
+              "samples": [
+                14,
+                14,
+                13
+              ],
+              "semantic": true
+            },
+            {
+              "run": 19,
+              "samples": [
+                14,
+                13,
+                13
+              ],
+              "semantic": true
+            }
+          ],
+          "doubled": [
+            {
+              "run": 0,
+              "samples": [
+                29,
+                28,
+                29
+              ],
+              "semantic": true
+            },
+            {
+              "run": 1,
+              "samples": [
+                28,
+                30,
+                36
+              ],
+              "semantic": true
+            },
+            {
+              "run": 2,
+              "samples": [
+                28,
+                28,
+                28
+              ],
+              "semantic": true
+            },
+            {
+              "run": 3,
+              "samples": [
+                28,
+                29,
+                29
+              ],
+              "semantic": true
+            },
+            {
+              "run": 4,
+              "samples": [
+                29,
+                28,
+                28
+              ],
+              "semantic": true
+            },
+            {
+              "run": 5,
+              "samples": [
+                28,
+                28,
+                29
+              ],
+              "semantic": true
+            },
+            {
+              "run": 6,
+              "samples": [
+                28,
+                28,
+                28
+              ],
+              "semantic": true
+            },
+            {
+              "run": 7,
+              "samples": [
+                29,
+                28,
+                29
+              ],
+              "semantic": true
+            },
+            {
+              "run": 8,
+              "samples": [
+                28,
+                27,
+                27
+              ],
+              "semantic": true
+            },
+            {
+              "run": 9,
+              "samples": [
+                27,
+                28,
+                27
+              ],
+              "semantic": true
+            },
+            {
+              "run": 10,
+              "samples": [
+                28,
+                28,
+                27
+              ],
+              "semantic": true
+            },
+            {
+              "run": 11,
+              "samples": [
+                27,
+                27,
+                27
+              ],
+              "semantic": true
+            },
+            {
+              "run": 12,
+              "samples": [
+                27,
+                27,
+                27
+              ],
+              "semantic": true
+            },
+            {
+              "run": 13,
+              "samples": [
+                28,
+                28,
+                28
+              ],
+              "semantic": true
+            },
+            {
+              "run": 14,
+              "samples": [
+                29,
+                28,
+                27
+              ],
+              "semantic": true
+            },
+            {
+              "run": 15,
+              "samples": [
+                28,
+                28,
+                27
+              ],
+              "semantic": true
+            },
+            {
+              "run": 16,
+              "samples": [
+                27,
+                28,
+                28
+              ],
+              "semantic": true
+            },
+            {
+              "run": 17,
+              "samples": [
+                28,
+                28,
+                28
+              ],
+              "semantic": true
+            },
+            {
+              "run": 18,
+              "samples": [
+                27,
+                27,
+                28
+              ],
+              "semantic": true
+            },
+            {
+              "run": 19,
+              "samples": [
+                28,
+                28,
+                28
+              ],
+              "semantic": true
+            }
+          ]
+        }
+      }
+    ]
+  },
+  "candidateSamples": 0,
+  "status": "PASS"
+}

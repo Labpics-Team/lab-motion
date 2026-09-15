@@ -1,0 +1,60 @@
+{
+  "schemaVersion": 1,
+  "profileId": "r11-profile-20260915-v1",
+  "baselineRevision": "fe11daa407de396fad952be7679650f63dabd4dd",
+  "generatedAt": "2026-09-15T03:30:37.246Z",
+  "host": {
+    "platform": "linux",
+    "release": "6.17.0-1022-azure",
+    "arch": "x64",
+    "node": "v24.20.0",
+    "cpus": 4
+  },
+  "browsers": [
+    {
+      "engine": "chromium",
+      "version": "149.0.7827.55",
+      "playwrightVersion": "1.61.1",
+      "executableSha256": "2d18db9d8608b052b6a552ee00ec1e830f93692e928b65ecc67d693bd33fe801",
+      "launchMode": "headless",
+      "refreshTargetHz": 60,
+      "userAgent": "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) HeadlessChrome/149.0.7827.55 Safari/537.36",
+      "platform": "Linux x86_64",
+      "devicePixelRatio": 2,
+      "viewport": {
+        "width": 390,
+        "height": 844
+      }
+    },
+    {
+      "engine": "firefox",
+      "version": "151.0",
+      "playwrightVersion": "1.61.1",
+      "executableSha256": "934ffa962b3f73809e910303568df1c435b86a6c1abdbd54a70730242ea24868",
+      "launchMode": "headless",
+      "refreshTargetHz": 60,
+      "userAgent": "Mozilla/5.0 (X11; Linux x86_64; rv:151.0) Gecko/20100101 Firefox/151.0",
+      "platform": "Linux x86_64",
+      "devicePixelRatio": 2,
+      "viewport": {
+        "width": 390,
+        "height": 844
+      }
+    },
+    {
+      "engine": "webkit",
+      "version": "26.5",
+      "playwrightVersion": "1.61.1",
+      "executableSha256": "a85baad3d8c07173ac387a59b41500c382b21ed692afe0964d29aac247ccc63b",
+      "launchMode": "headless",
+      "refreshTargetHz": 60,
+      "userAgent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/26.5 Safari/605.1.15",
+      "platform": "Linux x86_64",
+      "devicePixelRatio": 2,
+      "viewport": {
+        "width": 390,
+        "height": 844
+      }
+    }
+  ]
+}
