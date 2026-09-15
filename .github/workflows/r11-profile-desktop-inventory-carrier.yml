@@ -1,0 +1,82 @@
+name: r11-profile-desktop-inventory-carrier
+
+on:
+  push:
+    branches:
+      - carrier/r11-profile-desktop-inventory-20260915
+
+permissions:
+  contents: write
+
+concurrency:
+  group: r11-profile-desktop-inventory-carrier
+  cancel-in-progress: false
+
+jobs:
+  capture:
+    runs-on: [self-hosted, Linux, X64]
+    timeout-minutes: 45
+    env:
+      SOURCE_HEAD: 0402dd4632c663214cde68ca2b529a0cf0726755
+      TARGET_BRANCH: research/r11-profile-prereg-20260915
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+
+      - name: Activate frozen pnpm
+        shell: bash
+        run: |
+          set -euo pipefail
+          corepack enable
+          corepack prepare pnpm@11.11.0 --activate
+          test "$(pnpm --version)" = "11.11.0"
+
+      - name: Reconstruct exact research head
+        shell: bash
+        run: |
+          set -euo pipefail
+          git fetch origin "$TARGET_BRANCH" --prune
+          test "$(git rev-parse "origin/$TARGET_BRANCH")" = "$SOURCE_HEAD"
+          git checkout -B "$TARGET_BRANCH" "$SOURCE_HEAD"
+          node bench/profile/validate.mjs
+
+      - name: Install exact compare toolchain and engines
+        shell: bash
+        run: |
+          set -euo pipefail
+          cd bench/compare
+          pnpm install --frozen-lockfile
+          pnpm exec playwright install --with-deps chromium firefox webkit
+
+      - name: Capture and validate desktop inventory
+        shell: bash
+        run: |
+          set -euo pipefail
+          node bench/profile/capture-desktop.mjs > bench/profile/desktop-inventory-20260915.json
+          node --input-type=module <<'NODE'
+          import { readFile } from 'node:fs/promises';
+          import { validateDesktopInventory } from './bench/profile/validate.mjs';
+          const receipt = JSON.parse(await readFile('./bench/profile/desktop-inventory-20260915.json', 'utf8'));
+          validateDesktopInventory(receipt);
+          console.log(JSON.stringify({ status: 'VALID', engines: receipt.browsers.map(x => `${x.engine}:${x.version}`) }));
+          NODE
+          git diff --check
+          test "$(git status --porcelain --untracked-files=all | wc -l)" -eq 1
+          git status --porcelain --untracked-files=all | grep -q '^?? bench/profile/desktop-inventory-20260915.json$'
+
+      - name: Publish immutable receipt to research branch
+        shell: bash
+        run: |
+          set -euo pipefail
+          git config user.name "labpics-profile-carrier"
+          git config user.email "actions@users.noreply.github.com"
+          git add bench/profile/desktop-inventory-20260915.json
+          git commit -m "bench(profile): bind desktop browser inventory"
+          test "$(git rev-list --count "$SOURCE_HEAD"..HEAD)" -eq 1
+          git push origin "HEAD:refs/heads/$TARGET_BRANCH"
+          echo "receipt_commit=$(git rev-parse HEAD)" >> "$GITHUB_STEP_SUMMARY"
