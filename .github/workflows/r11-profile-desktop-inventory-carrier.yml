@@ -12,28 +12,32 @@ concurrency:
   group: r11-profile-desktop-inventory-carrier
   cancel-in-progress: false
 
+env:
+  COREPACK_ENABLE_DOWNLOAD_PROMPT: "0"
+  COREPACK_DEFAULT_TO_LATEST: "0"
+
 jobs:
   capture:
-    runs-on: [self-hosted, Linux, X64]
+    runs-on: ubuntu-latest
     timeout-minutes: 45
     env:
       SOURCE_HEAD: 0402dd4632c663214cde68ca2b529a0cf0726755
       TARGET_BRANCH: research/r11-profile-prereg-20260915
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
         with:
           fetch-depth: 0
 
-      - uses: actions/setup-node@v4
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020
         with:
-          node-version: '22'
+          node-version: '24'
 
       - name: Activate frozen pnpm
         shell: bash
         run: |
           set -euo pipefail
           corepack enable
-          corepack prepare pnpm@11.11.0 --activate
+          corepack install --global pnpm@11.11.0
           test "$(pnpm --version)" = "11.11.0"
 
       - name: Reconstruct exact research head
