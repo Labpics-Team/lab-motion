@@ -1,0 +1,82 @@
+name: Bootstrap timeline label geometry oracle
+
+on:
+  push:
+    branches: ["perf/timeline-label-owner-fusion-20260915"]
+
+permissions:
+  contents: write
+
+env:
+  COREPACK_ENABLE_DOWNLOAD_PROMPT: "0"
+  COREPACK_DEFAULT_TO_LATEST: "0"
+
+jobs:
+  harden:
+    if: github.actor != 'github-actions[bot]'
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v6
+        with:
+          node-version: "24"
+      - name: Activate pinned pnpm
+        run: |
+          corepack enable
+          corepack install --global pnpm@11.11.0
+      - name: Install
+        run: pnpm install --frozen-lockfile
+      - name: Strengthen observable geometry oracle
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 <<'PY'
+          from pathlib import Path
+          p = Path('test/timeline-label-owner-allocation.test.ts')
+          s = p.read_text()
+          old = """  it('runtime label mutation does not rewrite compiled segment positions', () => {\n    const tl = createTimeline({\n      segments: [{ from: 0, to: 1, duration: 1, at: 'origin' }],\n      labels: { origin: 2 },\n      requestFrame: () => 1,\n    });\n    expect(tl.totalDuration).toBe(3);\n    tl.label('origin', 0);\n    expect(tl.totalDuration).toBe(3);\n    tl.seek('origin');\n    expect(tl.time).toBe(0);\n    tl.cancel();\n  });\n"""
+          new = """  it('runtime label mutation does not rewrite compiled segment positions', () => {\n    let value = Number.NaN;\n    const tl = createTimeline({\n      segments: [{ from: 0, to: 1, duration: 1, at: 'origin', onStep: (next) => { value = next; } }],\n      labels: { origin: 2 },\n      requestFrame: () => 1,\n    });\n    expect(tl.totalDuration).toBe(3);\n    tl.label('origin', 0);\n    expect(tl.totalDuration).toBe(3);\n    tl.seek(1);\n    expect(tl.time).toBe(1);\n    expect(value).toBe(0);\n    tl.seek('origin');\n    expect(tl.time).toBe(0);\n    tl.cancel();\n  });\n"""
+          if s.count(old) != 1:
+            raise SystemExit('geometry test block mismatch')
+          p.write_text(s.replace(old, new))
+          PY
+          pnpm vitest run test/timeline-label-owner-allocation.test.ts -t "runtime label mutation does not rewrite compiled segment positions"
+      - name: Prove geometry oracle catches wrong start-time ownership
+        shell: bash
+        run: |
+          set -euo pipefail
+          cp src/timeline/index.ts /tmp/index.ts
+          python3 <<'PY'
+          from pathlib import Path
+          p = Path('src/timeline/index.ts')
+          s = p.read_text()
+          old = "  const localT = (t - seg.startTime) / duration;"
+          new = "  const localT = t / duration;"
+          if s.count(old) != 1:
+            raise SystemExit('mutation target mismatch')
+          p.write_text(s.replace(old, new))
+          PY
+          set +e
+          pnpm vitest run test/timeline-label-owner-allocation.test.ts -t "runtime label mutation does not rewrite compiled segment positions" > /tmp/mutation.log 2>&1
+          rc=$?
+          set -e
+          cat /tmp/mutation.log
+          test "$rc" -ne 0
+          grep -F "runtime label mutation does not rewrite compiled segment positions" /tmp/mutation.log
+          mv /tmp/index.ts src/timeline/index.ts
+          pnpm vitest run test/timeline-label-owner-allocation.test.ts -t "runtime label mutation does not rewrite compiled segment positions"
+      - name: Verify test file and commit only oracle strengthening
+        shell: bash
+        run: |
+          set -euo pipefail
+          pnpm typecheck
+          pnpm vitest run test/timeline*.test.ts
+          git diff --exit-code -- src/timeline/index.ts
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add test/timeline-label-owner-allocation.test.ts
+          git commit -m 'test(timeline): observe compiled label geometry'
+          git push origin HEAD:perf/timeline-label-owner-fusion-20260915
