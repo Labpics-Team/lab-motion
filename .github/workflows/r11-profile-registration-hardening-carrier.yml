@@ -1,0 +1,126 @@
+name: r11-profile-registration-hardening-carrier
+
+on:
+  push:
+    branches:
+      - carrier/r11-profile-registration-hardening-20260915
+
+permissions:
+  contents: write
+
+env:
+  COREPACK_ENABLE_DOWNLOAD_PROMPT: "0"
+  COREPACK_DEFAULT_TO_LATEST: "0"
+
+jobs:
+  harden:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    env:
+      SOURCE_HEAD: ebf17520fcc4bcfce11e670846bc4a1a7f3aa6d1
+      TARGET_BRANCH: research/r11-profile-prereg-20260915
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          fetch-depth: 0
+
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020
+        with:
+          node-version: '24'
+
+      - name: Reconstruct exact research head
+        shell: bash
+        run: |
+          set -euo pipefail
+          git fetch origin "$TARGET_BRANCH" --prune
+          test "$(git rev-parse "origin/$TARGET_BRANCH")" = "$SOURCE_HEAD"
+          git checkout -B "$TARGET_BRANCH" "$SOURCE_HEAD"
+
+      - name: Materialize provenance hardening
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 - <<'PY'
+          from pathlib import Path
+
+          prereg = Path('bench/profile/preregistration.mjs')
+          p = prereg.read_text()
+          replacements = {
+            "platform: 'linux-self-hosted',": "platform: 'linux-ci-runner',",
+            "background: 'self-hosted runner exclusivity recorded in receipt',": "background: 'runner identity is recorded in receipt; exclusivity is not assumed without explicit receipt evidence',",
+          }
+          for old, new in replacements.items():
+            assert p.count(old) == 1, old
+            p = p.replace(old, new)
+          prereg.write_text(p)
+
+          validator = Path('bench/profile/validate.mjs')
+          v = validator.read_text()
+          old = """      invariant(cell.class === 'desktop-browser', `${cell.id}: unknown cell class`);\n      invariant(['chromium', 'firefox', 'webkit'].includes(cell.engine), `${cell.id}: unknown engine`);\n      invariant(cell.availability === 'bind-from-inventory-receipt', `${cell.id}: exact browser build must come from receipt`);"""
+          new = """      invariant(cell.class === 'desktop-browser', `${cell.id}: unknown cell class`);\n      invariant(cell.platform === 'linux-ci-runner', `${cell.id}: desktop runner class drifted`);\n      invariant(['chromium', 'firefox', 'webkit'].includes(cell.engine), `${cell.id}: unknown engine`);\n      invariant(cell.availability === 'bind-from-inventory-receipt', `${cell.id}: exact browser build must come from receipt`);"""
+          assert v.count(old) == 1
+          v = v.replace(old, new)
+
+          old = """    invariant(typeof browser.version === 'string' && browser.version.length > 0, `${browser.engine}: version missing`);\n    invariant(SHA256.test(browser.executableSha256), `${browser.engine}: executable SHA-256 missing`);\n    invariant(typeof browser.userAgent === 'string' && browser.userAgent.length > 0, `${browser.engine}: UA missing`);\n    invariant(browser.refreshTargetHz === 60, `${browser.engine}: refresh target drifted`);"""
+          new = """    invariant(typeof browser.version === 'string' && browser.version.length > 0, `${browser.engine}: version missing`);\n    invariant(browser.playwrightVersion === profile.baseline.competitors.playwright, `${browser.engine}: Playwright provenance drifted`);\n    invariant(SHA256.test(browser.executableSha256), `${browser.engine}: executable SHA-256 missing`);\n    invariant(browser.launchMode === 'headless', `${browser.engine}: launch mode drifted`);\n    invariant(typeof browser.userAgent === 'string' && browser.userAgent.length > 0, `${browser.engine}: UA missing`);\n    invariant(typeof browser.platform === 'string' && browser.platform.length > 0, `${browser.engine}: platform missing`);\n    invariant(browser.devicePixelRatio === 2, `${browser.engine}: DPR drifted`);\n    invariant(browser.viewport?.width === 390 && browser.viewport?.height === 844, `${browser.engine}: viewport drifted`);\n    invariant(browser.refreshTargetHz === 60, `${browser.engine}: refresh target drifted`);"""
+          assert v.count(old) == 1
+          v = v.replace(old, new)
+
+          old = """  invariant(Array.isArray(receipt.raw?.aa) && receipt.raw.aa.length > 0, 'A/A raw clusters missing');\n  invariant(Array.isArray(receipt.raw?.deliberate2x) && receipt.raw.deliberate2x.length > 0, 'positive-control raw clusters missing');"""
+          new = """  invariant(Array.isArray(receipt.raw?.aa) && receipt.raw.aa.length === 3, 'A/A raw engine matrix missing');\n  invariant(Array.isArray(receipt.raw?.deliberate2x) && receipt.raw.deliberate2x.length === 3, 'positive-control raw engine matrix missing');\n  invariant(JSON.stringify(receipt.raw.aa.map(({ engine }) => engine)) === JSON.stringify(['chromium', 'firefox', 'webkit']), 'A/A engine provenance drifted');\n  invariant(JSON.stringify(receipt.raw.deliberate2x.map(({ engine }) => engine)) === JSON.stringify(['chromium', 'firefox', 'webkit']), 'positive-control engine provenance drifted');"""
+          assert v.count(old) == 1
+          v = v.replace(old, new)
+
+          old = """  invariant(receipt.candidateSamples === 0, 'candidate data appeared before calibration admission');\n  return receipt;"""
+          new = """  invariant(receipt.candidateSamples === 0, 'candidate data appeared before calibration admission');\n  invariant(receipt.status === 'PASS', 'calibration receipt is not admitted');\n  return receipt;"""
+          assert v.count(old) == 1
+          v = v.replace(old, new)
+          validator.write_text(v)
+
+          test = Path('test/profile-preregistration.test.ts')
+          t = test.read_text()
+          old = """    version: 'fixture',\n    executableSha256: hash,\n    userAgent: `fixture-${engine}`,\n    refreshTargetHz: 60,"""
+          new = """    version: 'fixture',\n    playwrightVersion: '1.61.1',\n    executableSha256: hash,\n    launchMode: 'headless',\n    userAgent: `fixture-${engine}`,\n    platform: 'Linux x86_64',\n    devicePixelRatio: 2,\n    viewport: { width: 390, height: 844 },\n    refreshTargetHz: 60,"""
+          assert t.count(old) == 1
+          t = t.replace(old, new)
+          old = """  raw: { aa: [[1, 1]], deliberate2x: [[2, 2]] },\n  aa: { lower95: 0.99, upper95: 1.01 },\n  deliberate2x: { workMultiplier: 2, lower95: 1.8 },\n  candidateSamples: 0,"""
+          new = """  raw: {\n    aa: ['chromium', 'firefox', 'webkit'].map(engine => ({ engine })),\n    deliberate2x: ['chromium', 'firefox', 'webkit'].map(engine => ({ engine })),\n  },\n  aa: { lower95: 0.99, upper95: 1.01 },\n  deliberate2x: { workMultiplier: 2, lower95: 1.8 },\n  candidateSamples: 0,\n  status: 'PASS',"""
+          assert t.count(old) == 1
+          t = t.replace(old, new)
+          test.write_text(t)
+          PY
+
+          node bench/profile/validate.mjs
+          node --input-type=module <<'NODE'
+          import { readFile } from 'node:fs/promises';
+          import { validateDesktopInventory, validateCalibrationReceipt } from './bench/profile/validate.mjs';
+          validateDesktopInventory(JSON.parse(await readFile('./bench/profile/desktop-inventory-20260915.json', 'utf8')));
+          validateCalibrationReceipt(JSON.parse(await readFile('./bench/profile/desktop-calibration-20260915.json', 'utf8')));
+          NODE
+          git diff --check
+          mapfile -t changed < <(git diff --name-only | sort)
+          test "${#changed[@]}" -eq 3
+          test "${changed[0]}" = "bench/profile/preregistration.mjs"
+          test "${changed[1]}" = "bench/profile/validate.mjs"
+          test "${changed[2]}" = "test/profile-preregistration.test.ts"
+
+      - name: Install and run focused proof
+        shell: bash
+        run: |
+          set -euo pipefail
+          corepack enable
+          corepack install --global pnpm@11.11.0
+          pnpm install --frozen-lockfile
+          pnpm exec vitest run test/profile-preregistration.test.ts
+
+      - name: Publish hardened registration
+        shell: bash
+        run: |
+          set -euo pipefail
+          git config user.name "labpics-profile-carrier"
+          git config user.email "actions@users.noreply.github.com"
+          git add bench/profile/preregistration.mjs bench/profile/validate.mjs test/profile-preregistration.test.ts
+          git commit -m "bench(profile): harden registration provenance"
+          test "$(git rev-list --count "$SOURCE_HEAD"..HEAD)" -eq 1
+          git push origin "HEAD:refs/heads/$TARGET_BRANCH"
+          echo "candidate_head=$(git rev-parse HEAD)" >> "$GITHUB_STEP_SUMMARY"
