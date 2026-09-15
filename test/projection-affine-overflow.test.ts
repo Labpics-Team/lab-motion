@@ -7,19 +7,19 @@ function rect(x: number) {
   return { x, y: x, width: 10, height: 10 };
 }
 
-describe('projection affine interpolation overflow', () => {
-  it('keeps bit-exact endpoints after hostile finite subtraction', () => {
+describe('переполнение аффинной интерполяции projection', () => {
+  it('сохраняет точные конечные точки после враждебного конечного вычитания', () => {
     expect(lerp1(100, Number.MIN_VALUE, 1)).toBe(Number.MIN_VALUE);
     expect(lerp1(-100, -Number.MIN_VALUE, 1)).toBe(-Number.MIN_VALUE);
     expect(Object.is(lerp1(-0, 7, 0), 0)).toBe(true);
   });
 
-  it('keeps the mathematical midpoint when endpoint subtraction overflows', () => {
+  it('сохраняет математическую середину при переполнении разности концов', () => {
     expect(lerp1(M, -M, 0.5)).toBe(0);
     expect(lerp1(-M, M, 0.5)).toBe(0);
   });
 
-  it('mixBox inherits the same midpoint law on page-space coordinates', () => {
+  it('mixBox наследует тот же закон середины для координат page-space', () => {
     const a = mixBox(rect(M), rect(-M), 0.5);
     const b = mixBox(rect(-M), rect(M), 0.5);
     expect(a.x).toBe(0);
@@ -28,7 +28,7 @@ describe('projection affine interpolation overflow', () => {
     expect(b.y).toBe(0);
   });
 
-  it('stays finite and inside the convex hull for bounded progress', () => {
+  it('остаётся конечной и внутри выпуклой оболочки при ограниченном progress', () => {
     const values = [M, M / 2, 1e300, 1e200];
     for (const a of values) {
       for (const b of values) {
