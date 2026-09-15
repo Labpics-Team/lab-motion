@@ -1,0 +1,128 @@
+name: Research projection membership owner
+on:
+  push:
+    branches: [research/projection-measured-owner-20260916]
+permissions:
+  contents: read
+jobs:
+  evidence:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24.20.0'
+          cache: pnpm
+      - name: Activate pinned pnpm
+        run: |
+          corepack enable
+          corepack prepare pnpm@11.11.0 --activate
+      - name: Install
+        run: pnpm install --frozen-lockfile
+      - name: Baseline build and size
+        run: |
+          pnpm build
+          cp -a dist /tmp/base-dist
+          pnpm size | tee /tmp/base-size.txt
+      - name: Apply candidate
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+          p = Path('src/projection/dom.ts')
+          s = p.read_text()
+          old = '''      const measured: Measured[] = [];
+      const measuredIds = new Set<string>();
+      for (const cap of captured.values()) {
+'''
+          new = '''      const measured: Measured[] = [];
+      for (const cap of captured.values()) {
+'''
+          assert old in s
+          s = s.replace(old, new, 1)
+          old = '''        } catch {
+          continue; // узел исчез между capture и play — тихая деградация
+        }
+'''
+          new = '''        } catch {
+          captured.delete(cap.el);
+          continue; // узел исчез между capture и play — тихая деградация
+        }
+'''
+          assert old in s
+          s = s.replace(old, new, 1)
+          old = '''        measured.push({ cap, last, radiiLast });
+        measuredIds.add(cap.id);
+'''
+          new = '''        measured.push({ cap, last, radiiLast });
+'''
+          assert old in s
+          s = s.replace(old, new, 1)
+          old = '''            const entry = byEl.get(cursor);
+            terminal = entry !== undefined && measuredIds.has(entry.id) ? entry.id : memo;
+'''
+          new = '''            const entry = byEl.get(cursor);
+            terminal = entry !== undefined ? entry.id : memo;
+'''
+          assert old in s
+          s = s.replace(old, new, 1)
+          old = '''          const entry = byEl.get(node);
+          if (entry !== undefined && measuredIds.has(entry.id)) answer = entry.id;
+'''
+          new = '''          const entry = byEl.get(node);
+          if (entry !== undefined) answer = entry.id;
+'''
+          assert old in s
+          s = s.replace(old, new, 1)
+          p.write_text(s)
+          PY
+          git diff -- src/projection/dom.ts
+      - name: Structural falsifier
+        run: |
+          node --input-type=module <<'JS'
+          import { readFileSync } from 'node:fs';
+          const s = readFileSync('src/projection/dom.ts', 'utf8');
+          if (s.includes('measuredIds')) throw new Error('measurement membership Set still exists');
+          const n = (s.match(/new Set<DomProjectionElement>/g) ?? []).length;
+          if (n !== 1) throw new Error(`expected only ancestor-cycle Set in projection DOM, got ${n}`);
+          if (!s.includes('captured.delete(cap.el)')) throw new Error('failed LAST measurement is not removed from single owner');
+          console.log(JSON.stringify({measurementMembershipSet:0, ancestorCycleSet:n, failureDelete:true}));
+          JS
+      - name: Candidate checks
+        run: |
+          pnpm typecheck
+          pnpm exec vitest run test/projection-dom.test.ts test/projection-geometry.test.ts test/projection-driver.test.ts
+          rm -rf dist
+          pnpm build
+          pnpm size | tee /tmp/candidate-size.txt
+      - name: Exact dist raw/gzip/Brotli Pareto
+        run: |
+          node --input-type=module <<'JS'
+          import { readFileSync, readdirSync, statSync } from 'node:fs';
+          import { join, relative } from 'node:path';
+          import { canonicalGzip, observationalBrotli } from './scripts/compression-oracle.mjs';
+          const walk=(d,o=[])=>{for(const n of readdirSync(d)){const p=join(d,n);if(statSync(p).isDirectory())walk(p,o);else if(/\.(?:js|cjs)$/.test(n))o.push(p)}return o};
+          const rows=[];
+          for(const bp of walk('/tmp/base-dist')){
+            const rel=relative('/tmp/base-dist',bp); const cp=join('dist',rel);
+            let b,c; try { b=readFileSync(bp); c=readFileSync(cp); } catch { continue; }
+            if (Buffer.compare(b,c)===0) continue;
+            const base={raw:b.length,gzip:canonicalGzip(b).length,brotli:observationalBrotli(b).length};
+            const cand={raw:c.length,gzip:canonicalGzip(c).length,brotli:observationalBrotli(c).length};
+            const d={raw:cand.raw-base.raw,gzip:cand.gzip-base.gzip,brotli:cand.brotli-base.brotli};
+            rows.push({file:rel,base,candidate:cand,delta:d});
+          }
+          console.log('PARETO_JSON='+JSON.stringify(rows));
+          const bad=rows.filter(r=>r.delta.raw>0||r.delta.gzip>0||r.delta.brotli>0);
+          if(bad.length) throw new Error('protected dist regression: '+JSON.stringify(bad));
+          JS
+      - name: Patch receipt
+        if: always()
+        run: |
+          echo 'BASE=fe11daa407de396fad952be7679650f63dabd4dd'
+          git diff --check || true
+          git diff -- src/projection/dom.ts || true
+          echo '--- BASE SIZE ---'; cat /tmp/base-size.txt || true
+          echo '--- CANDIDATE SIZE ---'; cat /tmp/candidate-size.txt || true
