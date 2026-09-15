@@ -34,14 +34,18 @@ describe('timeline label ownership allocation ceiling', () => {
   });
 
   it('runtime label mutation does not rewrite compiled segment positions', () => {
+    let value = Number.NaN;
     const tl = createTimeline({
-      segments: [{ from: 0, to: 1, duration: 1, at: 'origin' }],
+      segments: [{ from: 0, to: 1, duration: 1, at: 'origin', onStep: (next) => { value = next; } }],
       labels: { origin: 2 },
       requestFrame: () => 1,
     });
     expect(tl.totalDuration).toBe(3);
     tl.label('origin', 0);
     expect(tl.totalDuration).toBe(3);
+    tl.seek(1);
+    expect(tl.time).toBe(1);
+    expect(value).toBe(0);
     tl.seek('origin');
     expect(tl.time).toBe(0);
     tl.cancel();
