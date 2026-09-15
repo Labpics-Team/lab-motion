@@ -560,12 +560,11 @@ export function bindGroup(
   // проекцией состояния (новый прогон x не сбрасывает прежний rotate).
   const residuals = new Map<string, number>();
   if (group === 'transform') {
-    // Каждый остаточный канал уже принадлежит записи либо живому владельцу.
-    // До публикации нового владельца `_supersede()` фиксирует его каналы,
-    // поэтому отдельное копирование при завершении не нужно: это инвариант реестра.
+    // Живой owner уже содержит полный transform-ключевой срез; без owner
+    // authority — settled registry. Второй Set не материализуем только затем,
+    // чтобы один раз пройти его в этом же bind.
     const animated = new Set(specs.map((s) => s._key));
-    const known = new Set<string>(rec._numeric.keys());
-    if (owner) for (const k of owner._numericKeys()) known.add(k);
+    const known = owner?._numericKeys() ?? rec._numeric.keys();
     for (const key of known) {
       if (animated.has(key)) continue;
       const snap = owner?._captureNum(key) ?? rec._numeric.get(key);
