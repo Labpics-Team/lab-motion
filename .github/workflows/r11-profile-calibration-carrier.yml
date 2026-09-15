@@ -1,0 +1,94 @@
+name: r11-profile-calibration-carrier
+
+on:
+  push:
+    branches:
+      - carrier/r11-profile-calibration-20260915
+
+permissions:
+  contents: write
+
+env:
+  COREPACK_ENABLE_DOWNLOAD_PROMPT: "0"
+  COREPACK_DEFAULT_TO_LATEST: "0"
+
+jobs:
+  calibrate:
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    env:
+      SOURCE_HEAD: 06e0cfa4c6e5be6b1a69340ead26853ca824e43d
+      TARGET_BRANCH: research/r11-profile-prereg-20260915
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          fetch-depth: 0
+
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020
+        with:
+          node-version: '24'
+
+      - name: Activate frozen pnpm
+        shell: bash
+        run: |
+          set -euo pipefail
+          corepack enable
+          corepack install --global pnpm@11.11.0
+          test "$(pnpm --version)" = "11.11.0"
+
+      - name: Reconstruct exact research head
+        shell: bash
+        run: |
+          set -euo pipefail
+          git fetch origin "$TARGET_BRANCH" --prune
+          test "$(git rev-parse "origin/$TARGET_BRANCH")" = "$SOURCE_HEAD"
+          git checkout -B "$TARGET_BRANCH" "$SOURCE_HEAD"
+          node bench/profile/validate.mjs
+          node --input-type=module <<'NODE'
+          import { readFile } from 'node:fs/promises';
+          import { validateDesktopInventory } from './bench/profile/validate.mjs';
+          const inventory = JSON.parse(await readFile('./bench/profile/desktop-inventory-20260915.json', 'utf8'));
+          validateDesktopInventory(inventory);
+          NODE
+
+      - name: Install exact compare toolchain and engines
+        shell: bash
+        run: |
+          set -euo pipefail
+          cd bench/compare
+          pnpm install --frozen-lockfile
+          pnpm exec playwright install --with-deps chromium firefox webkit
+
+      - name: Execute frozen A/A and deliberate-2x controls
+        shell: bash
+        run: |
+          set -euo pipefail
+          node bench/profile/calibrate-desktop.mjs > bench/profile/desktop-calibration-20260915.json
+          git diff --check
+          test "$(git status --porcelain --untracked-files=all | wc -l)" -eq 1
+          git status --porcelain --untracked-files=all | grep -q '^?? bench/profile/desktop-calibration-20260915.json$'
+
+      - name: Preserve calibration receipt before admission verdict
+        shell: bash
+        run: |
+          set -euo pipefail
+          git config user.name "labpics-profile-carrier"
+          git config user.email "actions@users.noreply.github.com"
+          git add bench/profile/desktop-calibration-20260915.json
+          git commit -m "bench(profile): record desktop calibration receipt"
+          test "$(git rev-list --count "$SOURCE_HEAD"..HEAD)" -eq 1
+          git push origin "HEAD:refs/heads/$TARGET_BRANCH"
+          echo "receipt_commit=$(git rev-parse HEAD)" >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Fail closed on invalid calibration
+        shell: bash
+        run: |
+          set -euo pipefail
+          node --input-type=module <<'NODE'
+          import { readFile } from 'node:fs/promises';
+          import { validateCalibrationReceipt } from './bench/profile/validate.mjs';
+          const receipt = JSON.parse(await readFile('./bench/profile/desktop-calibration-20260915.json', 'utf8'));
+          validateCalibrationReceipt(receipt);
+          if (receipt.status !== 'PASS') throw new Error(`PROFILE-01 calibration ${receipt.status}`);
+          console.log(JSON.stringify({ status: receipt.status, aa: receipt.aa, deliberate2x: receipt.deliberate2x }));
+          NODE
