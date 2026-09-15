@@ -35,9 +35,14 @@
  *
  * Математика (вывод — индукция по глубине, geometry.ts): узел несёт first F,
  * last L и anchor B (где ФАКТИЧЕСКИ стоит в layout; default B = L, у
- * кроссфейд-ghost'а B = F). Целевой инвариант: V_i(p) = mix(F_i, L_i, p)
- * покомпонентно, размеры флорятся ≥ 0. Кумулятивная карта «layout над узлом →
- * page» равна box-map ближайшего проецирующего предка A:
+ * кроссфейд-ghost'а B = F). Базовый visual box использует mix(F,L,P(t)); размеры
+ * всегда остаются на этом общем scalar-path и флорятся ≥ 0. В поддерживаемом
+ * changed-target domain с clamp:false page-space x/y могут иметь дополнительный
+ * однородный член u·Q(t),
+ * Q(0)=0, Q'(0)=1, чтобы сохранить собственную boundary velocity без второго
+ * clock/solver. Уже скорректированный V затем проходит ту же единственную
+ * parent-space карту. Кумулятивная карта «layout над узлом → page» равна box-map
+ * ближайшего проецирующего предка A:
  *   Φ_A(q) = V_A.pos + k_A ⊙ (q − B_A.pos),  k_A = V_A.size ⊘ B_A.size (ЛОКАЛЕН)
  *   s_c = (V_c.size ⊘ B_c.size) ⊘ k_A
  *   t_c = (V_c.pos − V_A.pos) ⊘ k_A − (B_c.pos − B_A.pos)
@@ -53,8 +58,9 @@
  *   P3. Детерминизм: время из ts кадра либо FIXED_DT = 1/60; бит-в-бит
  *       воспроизводимость; Math.random не существует для субпутя.
  *   P4. Reduced-motion = character-switch: снап identity без кадров (паритет F4 flip).
- *   P5. C⁰ всегда и C¹ по формулам driver.ts при прерывании; transform-origin
- *       потребителя — '0 0' (формулы выведены для верхнего-левого origin).
+ *   P5. C⁰ всегда; C¹ по формулам driver.ts только в поддерживаемом vector-domain
+ *       (clamp:false). Bounded clamp:true сохраняет legacy scalar semantics.
+ *       Transform-origin потребителя — '0 0' (формулы выведены для верхнего-левого origin).
  *
  * Clamp-дефолт: clamp: FALSE — честный overshoot (value-add: scale-correction +
  * floor размеров делают его безопасным). Осознанное отличие от легаси-дефолта
