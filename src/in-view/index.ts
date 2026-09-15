@@ -69,9 +69,7 @@ interface Owner {
   hostViolation: boolean;
   delivering: boolean;
   lease: ObserverLease | undefined;
-  readonly targets: Set<Element>;
-  readonly observed: Set<Element>;
-  readonly done: Set<Element>;
+  readonly active: Set<Element>;
   readonly leaves: Map<Element, InViewLeaveHandler>;
 }
 
@@ -282,9 +280,7 @@ function closeOwner(owner: Owner): Failure | undefined {
   owner.lease = undefined;
   const cleanups = [...owner.leaves.values()];
   owner.leaves.clear();
-  owner.targets.clear();
-  owner.observed.clear();
-  owner.done.clear();
+  owner.active.clear();
 
   let failure: Failure | undefined;
   if (lease !== undefined) {
@@ -319,9 +315,8 @@ function releaseOneShot(
   target: Element,
   current: Failure | undefined,
 ): Failure | undefined {
-  if (owner.phase !== 1 || owner.done.has(target)) return current;
-  owner.done.add(target);
-  owner.observed.delete(target);
+  if (owner.phase !== 1 || !owner.active.has(target)) return current;
+  owner.active.delete(target);
   const lease = owner.lease;
   if (lease === undefined) {
     closeOwner(owner);
@@ -333,7 +328,7 @@ function releaseOneShot(
     closeOwner(owner);
     return current ?? [hostError()];
   }
-  if (owner.observed.size === 0) {
+  if (owner.active.size === 0) {
     const closeFailure = closeOwner(owner);
     return current ?? closeFailure;
   }
@@ -375,7 +370,7 @@ function deliverEntries(
       failure = recordHostFailure(owner, failure);
       break;
     }
-    if (!owner.targets.has(target) || owner.done.has(target)) continue;
+    if (!owner.active.has(target)) continue;
 
     let isIntersecting: unknown;
     let ratio: unknown;
@@ -388,7 +383,7 @@ function deliverEntries(
     }
     // Getter мог реентрантно вызвать stop(): terminal запрещает любой поздний user callback.
     if (owner.phase !== 1) break;
-    if (!owner.targets.has(target) || owner.done.has(target)) continue;
+    if (!owner.active.has(target)) continue;
     if (
       typeof isIntersecting !== 'boolean' ||
       typeof ratio !== 'number' ||
@@ -504,9 +499,7 @@ export function inView(
     hostViolation: false,
     delivering: false,
     lease: undefined,
-    targets: new Set(targets),
-    observed: new Set(),
-    done: new Set(),
+    active: new Set(targets),
     leaves: new Map(),
   };
   const stop: InViewStop = () => {
@@ -524,7 +517,6 @@ export function inView(
     owner.lease = captureLease(host);
     if (owner.lease === undefined || owner.hostViolation) failHost(owner);
     for (const current of targets) {
-      owner.observed.add(current);
       Reflect.apply(owner.lease.observe, owner.lease.host, [current]);
       if (owner.hostViolation) failHost(owner);
     }
