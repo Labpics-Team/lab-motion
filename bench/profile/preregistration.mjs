@@ -30,9 +30,11 @@ const desktop = (id, engine) => Object.freeze({
  */
 export const PROFILE_PREREGISTRATION = Object.freeze({
   schemaVersion: 1,
+  profileId: 'r11-profile-20260915-v1',
   node: 'PROFILE-01',
   registeredAt: '2026-09-15',
-  candidateSamplesAllowed: false,
+  candidateSamplesObservedAtRegistration: false,
+  candidateAcquisitionGate: 'bound cell + powered design + PASS calibration receipt',
 
   baseline: Object.freeze({
     repository: 'Labpics-Team/lab-motion',
