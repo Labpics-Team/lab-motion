@@ -52,7 +52,8 @@ export const PROFILE_PREREGISTRATION = Object.freeze({
       gsap: '3.15.0',
       animejs: '4.5.0',
       playwright: '1.61.1',
-      esbuild: '0.27.4',
+      esbuild: '0.28.1',
+      pngjs: '7.0.0',
     }),
   }),
 
