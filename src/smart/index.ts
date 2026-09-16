@@ -184,11 +184,6 @@ interface _FlightNode {
   readonly ghostBox?: _Rect | undefined;
 }
 
-interface _GhostEntry {
-  readonly el: SmartElement;
-  readonly box: _Rect;
-}
-
 interface _ActiveRun {
   resolve(): void;
   setState(s: 'settled' | 'canceled' | 'superseded'): void;
@@ -203,8 +198,8 @@ interface _Controller {
   radius: boolean;
   readonly root: SmartRoot;
   flight: Map<string, _FlightNode>;
-  ghosts: Map<string, _GhostEntry>;
-  ghostEls: Set<SmartElement>;
+  /** Controller-local ghost identity index; payload stays owned by flight. */
+  ghostIndex: Map<SmartElement, string>;
   rootPositionAdded: boolean;
   /** Инлайн-position root'а ДО того, как ghost-протокол сделал его relative. */
   savedRootPosition: string;
@@ -434,7 +429,7 @@ function _structure(
   root: SmartRoot,
   keyAttr: string,
   shadow: boolean,
-  ghostEls: Set<SmartElement>,
+  ghostIndex: Map<SmartElement, string>,
 ): _StructEntry[] {
   const out: _StructEntry[] = [];
   const seen = new Set<string>();
@@ -443,7 +438,7 @@ function _structure(
     const kids = _childrenOf(node);
     const shadowKids = shadow ? _shadowChildrenOf(node) : [];
     for (const child of kids.concat(shadowKids)) {
-      if (ghostEls.has(child)) continue; // наш ghost — прозрачен для дифа
+      if (ghostIndex.has(child)) continue; // наш ghost — прозрачен для дифа
       const key = _getAttr(child, keyAttr);
       let nextAncestor = ancestorKey;
       if (key !== null && key !== '') {
@@ -629,8 +624,7 @@ function _getController(root: SmartRoot, opt: SmartOptions): _Controller {
     radius,
     root,
     flight: new Map(),
-    ghosts: new Map(),
-    ghostEls: new Set(),
+    ghostIndex: new Map(),
     rootPositionAdded: false,
     savedRootPosition: '',
     active: null,
@@ -678,8 +672,7 @@ function _cleanup(ctrl: _Controller): void {
     ctrl.savedRootPosition = '';
   }
   ctrl.flight = new Map();
-  ctrl.ghosts = new Map();
-  ctrl.ghostEls = new Set();
+  ctrl.ghostIndex = new Map();
 }
 
 /** Терминал по natural rest: уборка + резолв active-прогона как settled. */
@@ -740,16 +733,15 @@ function _appendAndPinGhost(ctrl: _Controller, el: SmartElement, box: _Rect): vo
 
 /** Немедленное физическое удаление ghost'а (реинкарнация ключа при живом ghost). */
 function _removeGhost(ctrl: _Controller, key: string): void {
-  const g = ctrl.ghosts.get(key);
-  if (g === undefined) return;
+  const g = ctrl.flight.get(key);
+  if (g === undefined || !g.isGhost) return;
   try {
     ctrl.root.removeChild(g.el);
   } catch {
     /* уже отсоединён */
   }
   _restoreGhostStyle(g.el); // восстановить исходные инлайн-стили, не слепо снять
-  ctrl.ghosts.delete(key);
-  ctrl.ghostEls.delete(g.el);
+  ctrl.ghostIndex.delete(g.el);
 }
 
 // ─── Handle реального прогона ─────────────────────────────────────────────────
@@ -818,7 +810,7 @@ function _animate(
   }
 
   // (б) batch-MEASURE: структура + page-боксы + радиусы NEW-снимка (один reflow).
-  const structure = _structure(ctrl.root, keyAttr, shadow, ctrl.ghostEls);
+  const structure = _structure(ctrl.root, keyAttr, shadow, ctrl.ghostIndex);
   const scroll = _scroll(ctrl.getScroll);
   const newLive = new Map<string, _SnapEntry>();
   const newOrder: string[] = [];
@@ -855,7 +847,7 @@ function _animate(
       skippedKeys.push(key);
       continue;
     }
-    if (ctrl.ghosts.has(key)) {
+    if (ctrl.flight.get(key)?.isGhost === true) {
       // Реинкарнация: ключ вернулся при живом ghost → matched от состояния ghost'а.
       reincarnated.add(key);
       matched.add(key);
@@ -905,10 +897,11 @@ function _animate(
   }
 
   // continue-exit: ghost всё ещё «в полёте», ключ по-прежнему отсутствует.
-  for (const [key, g] of ctrl.ghosts) {
+  for (const [el, key] of ctrl.ghostIndex) {
     if (newLive.has(key) || reincarnated.has(key) || desc.has(key)) continue;
+    const g = ctrl.flight.get(key)!;
     exitedKeys.push(key);
-    desc.set(key, { kind: 'exit', el: g.el, ghostBox: g.box, newExit: false, parentKey: null });
+    desc.set(key, { kind: 'exit', el, ghostBox: g.ghostBox!, newExit: false, parentKey: null });
   }
 
   // (г) участие matched: узел едет, если двигался сам ИЛИ движется его matched-предок.
@@ -966,8 +959,7 @@ function _animate(
 
   const nodes: ProjectionPlayNode[] = [];
   const newFlight = new Map<string, _FlightNode>();
-  const newGhosts = new Map<string, _GhostEntry>(ctrl.ghosts);
-  const newGhostEls = new Set<SmartElement>(ctrl.ghostEls);
+  const newGhostIndex = new Map<SmartElement, string>(ctrl.ghostIndex);
 
   const projParent = (key: string): string | null => {
     let anc = desc.get(key)?.parentKey ?? null;
@@ -1039,8 +1031,7 @@ function _animate(
     const box = d.ghostBox!;
     if (d.newExit) {
       _appendAndPinGhost(ctrl, el, box);
-      newGhosts.set(key, { el, box });
-      newGhostEls.add(el);
+      newGhostIndex.set(el, key);
       nodes.push({ id: key, parent: null, first: box, last: box, opacity: { from: 1, to: 0 } });
     } else {
       nodes.push({ id: key, parent: null, first: undefined, last: box, opacity: { from: 1, to: 0 } });
@@ -1058,8 +1049,7 @@ function _animate(
     });
   }
 
-  ctrl.ghosts = newGhosts;
-  ctrl.ghostEls = newGhostEls;
+  ctrl.ghostIndex = newGhostIndex;
 
   return _startRun(ctrl, nodes, newFlight, plan, tier);
 }
@@ -1115,7 +1105,7 @@ export function captureSmart(root: unknown, options?: SmartOptions): SmartCaptur
 
   // FIRST-снимок: структура (валидация дубля) + боксы/радиусы. Узлы активного
   // полёта НЕ меряются (аналитический V(p̂) через boxAt — ноль DOM под transform).
-  const structure = _structure(ctrl.root, keyAttr, shadow, ctrl.ghostEls);
+  const structure = _structure(ctrl.root, keyAttr, shadow, ctrl.ghostIndex);
   const scroll = _scroll(ctrl.getScroll);
   const snapshot = new Map<string, _SnapEntry>();
   for (const s of structure) {
