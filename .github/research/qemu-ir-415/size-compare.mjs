@@ -12,11 +12,48 @@ const candSize = await import(pathToFileURL(join(candidateRoot, 'scripts/size-ga
 const baseCompression = await import(pathToFileURL(join(baseRoot, 'scripts/compression-oracle.mjs')));
 const candCompression = await import(pathToFileURL(join(candidateRoot, 'scripts/compression-oracle.mjs')));
 
+const BASE_SHA = 'fe11daa407de396fad952be7679650f63dabd4dd';
+const CANDIDATE_SHA = 'df7aaced646116f34135083dbfbf62ee40265657';
+const failures = [];
+
+function triplet(raw, gzip, brotli) {
+  return { raw, gzip, brotli };
+}
+
+function compareTriplet(axis, id, base, candidate, sink = failures) {
+  const delta = {
+    raw: candidate.raw - base.raw,
+    gzip: candidate.gzip - base.gzip,
+    brotli: candidate.brotli - base.brotli,
+  };
+  for (const metric of ['raw', 'gzip', 'brotli']) {
+    if (candidate[metric] > base[metric]) {
+      sink.push({ axis, id, metric, base: base[metric], candidate: candidate[metric], delta: delta[metric] });
+    }
+  }
+  return delta;
+}
+
+// Evaluator calibration is part of the preregistered proof. A null pair must be
+// admitted, while an injected +1 B regression must be rejected independently
+// for raw, canonical gzip and observational Brotli.
+const calibrationBase = triplet(101, 79, 71);
+const nullFailures = [];
+compareTriplet('control-null', 'synthetic', calibrationBase, { ...calibrationBase }, nullFailures);
+if (nullFailures.length !== 0) throw new Error('null calibration rejected an identical pair');
+const sensitivity = {};
+for (const metric of ['raw', 'gzip', 'brotli']) {
+  const mutated = { ...calibrationBase, [metric]: calibrationBase[metric] + 1 };
+  const controlFailures = [];
+  compareTriplet('control-plus-one', metric, calibrationBase, mutated, controlFailures);
+  sensitivity[metric] = controlFailures.length === 1 && controlFailures[0].metric === metric;
+  if (!sensitivity[metric]) throw new Error(`+1 B sensitivity control did not fire for ${metric}`);
+}
+
 const basePkg = JSON.parse(readFileSync(join(baseRoot, 'package.json'), 'utf8'));
 const candPkg = JSON.parse(readFileSync(join(candidateRoot, 'package.json'), 'utf8'));
 const baseEntries = baseSize.deriveEntriesFromExports(basePkg);
 const candEntries = candSize.deriveEntriesFromExports(candPkg);
-
 const baseRows = baseSize.measureEntries(baseEntries, baseRoot).rows;
 const candRows = candSize.measureEntries(candEntries, candidateRoot).rows;
 
@@ -26,34 +63,26 @@ function indexRows(rows) {
 
 const baseByLabel = indexRows(baseRows);
 const candByLabel = indexRows(candRows);
-const failures = [];
 const shipped = [];
-
 const baseLabels = [...baseByLabel.keys()].sort();
 const candLabels = [...candByLabel.keys()].sort();
 if (JSON.stringify(baseLabels) !== JSON.stringify(candLabels)) {
   failures.push({ axis: 'shipped-entries', reason: 'entry-set-mismatch', baseLabels, candLabels });
 }
-
 for (const label of baseLabels) {
   const b = baseByLabel.get(label);
   const c = candByLabel.get(label);
   if (!b || !c || b.error || c.error) {
-    failures.push({ axis: 'shipped-entry', label, reason: 'missing-or-error', base: b ?? null, candidate: c ?? null });
+    failures.push({ axis: 'shipped-entry', id: label, reason: 'missing-or-error', base: b ?? null, candidate: c ?? null });
     continue;
   }
-  const metric = {
-    label,
-    base: { raw: b.rawBytes, gzip: b.gzBytes, brotli: b.brBytes },
-    candidate: { raw: c.rawBytes, gzip: c.gzBytes, brotli: c.brBytes },
-    delta: { raw: c.rawBytes - b.rawBytes, gzip: c.gzBytes - b.gzBytes, brotli: c.brBytes - b.brBytes },
-  };
-  shipped.push(metric);
-  for (const key of ['raw', 'gzip', 'brotli']) {
-    if (metric.candidate[key] > metric.base[key]) failures.push({ axis: 'shipped-entry', label, metric: key, ...metric });
-  }
+  const base = triplet(b.rawBytes, b.gzBytes, b.brBytes);
+  const candidate = triplet(c.rawBytes, c.gzBytes, c.brBytes);
+  shipped.push({ label, base, candidate, delta: compareTriplet('shipped-entry', label, base, candidate) });
 }
 
+// CJS is a first-class installed surface as well. Compare every built .cjs
+// artifact, not only the root entry, so a local win cannot hide a sibling loss.
 function walkCjs(root) {
   const out = [];
   const dist = join(root, 'dist');
@@ -74,84 +103,105 @@ const candCjs = walkCjs(candidateRoot);
 if (JSON.stringify(baseCjs) !== JSON.stringify(candCjs)) {
   failures.push({ axis: 'cjs-files', reason: 'file-set-mismatch', base: baseCjs, candidate: candCjs });
 }
-
 const cjs = [];
 for (const path of baseCjs) {
   if (!candCjs.includes(path)) continue;
   const bBytes = readFileSync(join(baseRoot, path));
   const cBytes = readFileSync(join(candidateRoot, path));
-  const b = {
-    raw: bBytes.length,
-    gzip: baseCompression.canonicalGzip(bBytes).length,
-    brotli: baseCompression.observationalBrotli(bBytes).length,
+  const base = triplet(
+    bBytes.length,
+    baseCompression.canonicalGzip(bBytes).length,
+    baseCompression.observationalBrotli(bBytes).length,
+  );
+  const candidate = triplet(
+    cBytes.length,
+    candCompression.canonicalGzip(cBytes).length,
+    candCompression.observationalBrotli(cBytes).length,
+  );
+  cjs.push({ path, base, candidate, delta: compareTriplet('cjs-file', path, base, candidate) });
+}
+
+// The official consumer matrix is the SSOT exported by size-gate itself. Run
+// it directly instead of parsing CLI text so raw/gzip/Brotli and split totals
+// are all compared under exactly the production measurement implementation.
+function scenarioDescriptor(scenario) {
+  return {
+    name: scenario.name,
+    code: scenario.code,
+    gate: scenario.gate,
+    totalGate: scenario.totalGate ?? scenario.gate,
   };
-  const c = {
-    raw: cBytes.length,
-    gzip: candCompression.canonicalGzip(cBytes).length,
-    brotli: candCompression.observationalBrotli(cBytes).length,
-  };
-  const row = { path, base: b, candidate: c, delta: { raw: c.raw - b.raw, gzip: c.gzip - b.gzip, brotli: c.brotli - b.brotli } };
-  cjs.push(row);
-  for (const key of ['raw', 'gzip', 'brotli']) {
-    if (c[key] > b[key]) failures.push({ axis: 'cjs-file', path, metric: key, ...row });
-  }
+}
+const baseScenarioDescriptors = baseSize.IMPORT_COST_SCENARIOS.map(scenarioDescriptor);
+const candScenarioDescriptors = candSize.IMPORT_COST_SCENARIOS.map(scenarioDescriptor);
+if (JSON.stringify(baseScenarioDescriptors) !== JSON.stringify(candScenarioDescriptors)) {
+  failures.push({
+    axis: 'import-scenarios',
+    reason: 'scenario-contract-mismatch',
+    base: baseScenarioDescriptors,
+    candidate: candScenarioDescriptors,
+  });
 }
 
-function parseScenarios(text) {
-  const rows = new Map();
-  for (const line of text.split(/\r?\n/)) {
-    const primary = line.match(/^(.+?)\s+(\d+) B gz\s+(\d+) B br(?:\s|$)/);
-    if (!primary) continue;
-    const name = primary[1].trim();
-    if (!name || name.startsWith('SUM ')) continue;
-    const lazy = line.match(/lazy (\d+) B gz\/(\d+) B br .*? total (\d+) B gz\/(\d+) B br/);
-    rows.set(name, {
-      gzip: Number(primary[2]),
-      brotli: Number(primary[3]),
-      totalGzip: lazy ? Number(lazy[3]) : Number(primary[2]),
-      totalBrotli: lazy ? Number(lazy[4]) : Number(primary[3]),
-    });
-  }
-  return rows;
-}
-
-const baseScenarioText = readFileSync(join(baseRoot, 'size-gate-output.txt'), 'utf8');
-const candScenarioText = readFileSync(join(candidateRoot, 'size-gate-output.txt'), 'utf8');
-const baseScenarios = parseScenarios(baseScenarioText);
-const candScenarios = parseScenarios(candScenarioText);
-const baseScenarioNames = [...baseScenarios.keys()].sort();
-const candScenarioNames = [...candScenarios.keys()].sort();
-if (baseScenarioNames.length === 0 || JSON.stringify(baseScenarioNames) !== JSON.stringify(candScenarioNames)) {
-  failures.push({ axis: 'import-scenarios', reason: 'scenario-set-mismatch-or-empty', base: baseScenarioNames, candidate: candScenarioNames });
-}
-
+const baseScenarioRows = await Promise.all(
+  baseSize.IMPORT_COST_SCENARIOS.map((scenario) =>
+    baseSize.measureScenario(scenario, join(baseRoot, 'dist/index.js'))),
+);
+const candScenarioRows = await Promise.all(
+  candSize.IMPORT_COST_SCENARIOS.map((scenario) =>
+    candSize.measureScenario(scenario, join(candidateRoot, 'dist/index.js'))),
+);
+const candScenarioByName = new Map(candScenarioRows.map((row) => [row.name, row]));
 const scenarios = [];
-for (const name of baseScenarioNames) {
-  const b = baseScenarios.get(name);
-  const c = candScenarios.get(name);
-  if (!b || !c) continue;
-  const row = {
-    name,
-    base: b,
-    candidate: c,
-    delta: {
-      gzip: c.gzip - b.gzip,
-      brotli: c.brotli - b.brotli,
-      totalGzip: c.totalGzip - b.totalGzip,
-      totalBrotli: c.totalBrotli - b.totalBrotli,
-    },
-  };
-  scenarios.push(row);
-  for (const key of ['gzip', 'brotli', 'totalGzip', 'totalBrotli']) {
-    if (c[key] > b[key]) failures.push({ axis: 'import-scenario', name, metric: key, ...row });
+for (const b of baseScenarioRows) {
+  const c = candScenarioByName.get(b.name);
+  if (!c || b.error || c.error) {
+    failures.push({ axis: 'import-scenario', id: b.name, reason: 'missing-or-error', base: b ?? null, candidate: c ?? null });
+    continue;
   }
+  const initialBase = triplet(b.rawBytes, b.gzBytes, b.brBytes);
+  const initialCandidate = triplet(c.rawBytes, c.gzBytes, c.brBytes);
+  const lazyBase = triplet(b.lazyRawBytes, b.lazyGzBytes, b.lazyBrBytes);
+  const lazyCandidate = triplet(c.lazyRawBytes, c.lazyGzBytes, c.lazyBrBytes);
+  const totalBase = triplet(b.totalRawBytes, b.totalGzBytes, b.totalBrBytes);
+  const totalCandidate = triplet(c.totalRawBytes, c.totalGzBytes, c.totalBrBytes);
+  scenarios.push({
+    name: b.name,
+    initial: {
+      base: initialBase,
+      candidate: initialCandidate,
+      delta: compareTriplet('import-scenario-initial', b.name, initialBase, initialCandidate),
+    },
+    lazy: {
+      base: lazyBase,
+      candidate: lazyCandidate,
+      delta: compareTriplet('import-scenario-lazy', b.name, lazyBase, lazyCandidate),
+    },
+    total: {
+      base: totalBase,
+      candidate: totalCandidate,
+      delta: compareTriplet('import-scenario-total', b.name, totalBase, totalCandidate),
+    },
+  });
+}
+if (baseScenarioRows.length === 0 || baseScenarioRows.length !== candScenarioRows.length) {
+  failures.push({
+    axis: 'import-scenarios',
+    reason: 'scenario-set-empty-or-length-mismatch',
+    baseCount: baseScenarioRows.length,
+    candidateCount: candScenarioRows.length,
+  });
 }
 
 const verdict = failures.length === 0 ? 'ADMITTED_SIZE_PARETO' : 'NO_GO_SIZE_PARETO';
 const result = {
   verdict,
-  base: 'fe11daa407de396fad952be7679650f63dabd4dd',
-  candidate: 'df7aaced646116f34135083dbfbf62ee40265657',
+  base: BASE_SHA,
+  candidate: CANDIDATE_SHA,
+  controls: {
+    nullPairAdmitted: true,
+    plusOneRejected: sensitivity,
+  },
   shipped,
   cjs,
   scenarios,
@@ -159,3 +209,4 @@ const result = {
 };
 writeFileSync(resultPath, `${JSON.stringify(result, null, 2)}\n`);
 console.log(JSON.stringify(result, null, 2));
+if (failures.length > 0) process.exitCode = 2;
