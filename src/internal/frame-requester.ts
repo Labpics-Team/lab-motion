@@ -10,8 +10,10 @@ export function createFrameRequester(
   tick: FrameCallback,
   uniqueReservations = true,
 ): () => void {
+  let fallback = false;
   let callingHost: boolean;
-  let pending = 0;
+  let pending: boolean;
+  let synchronousDelivery: boolean;
   let synchronousTimestamp: number | undefined;
   let queued = false;
   let queuedTimestamp: number | undefined;
@@ -32,14 +34,12 @@ export function createFrameRequester(
   }
 
   function accept(owner: number, timestamp?: number): void {
-    if (pending !== owner) return;
+    if (!pending || owner !== reservation) return;
+    pending = false;
     if (callingHost) {
-      pending = 0;
+      synchronousDelivery = true;
       synchronousTimestamp = timestamp;
-    } else {
-      pending = -1;
-      tick(timestamp);
-    }
+    } else tick(timestamp);
   }
 
   function deliverTrusted(timestamp?: number): void {
@@ -47,14 +47,15 @@ export function createFrameRequester(
   }
 
   return function requestFrame(): void {
-    if (reservation < 0) {
+    if (fallback) {
       defer(undefined);
       return;
     }
 
     const owner = ++reservation;
-    pending = owner;
+    pending = true;
     callingHost = true;
+    synchronousDelivery = false;
     synchronousTimestamp = undefined;
     let handle: number;
     try {
@@ -64,16 +65,16 @@ export function createFrameRequester(
           : deliverTrusted,
       );
     } catch (error) {
-      pending &&= -1;
+      pending = false;
       throw error;
     } finally {
       callingHost = false;
     }
     if (handle === 0) {
-      pending = 0;
-      reservation = -1;
+      pending = false;
+      fallback = true;
       defer(undefined);
-    } else if (!pending) {
+    } else if (synchronousDelivery) {
       defer(synchronousTimestamp);
     }
   };
