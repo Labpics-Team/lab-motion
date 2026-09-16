@@ -121,13 +121,7 @@ jobs:
         run: |
           set -euo pipefail
           if [ -f acquisition_failure.txt ]; then
-            python3 - <<'PY'
-          import json
-          reason = open('acquisition_failure.txt').read().strip()
-          result = {'verdict': 'BLOCKED_UNPROVEN', 'execution_failure': reason}
-          open('result.json', 'w').write(json.dumps(result, indent=2, sort_keys=True) + '\n')
-          print(json.dumps(result, indent=2, sort_keys=True))
-          PY
+            REASON="$(cat acquisition_failure.txt)" python3 -c 'import json,os; r={"verdict":"BLOCKED_UNPROVEN","execution_failure":os.environ["REASON"]}; open("result.json","w").write(json.dumps(r,indent=2,sort_keys=True)+"\n"); print(json.dumps(r,indent=2,sort_keys=True))'
           else
             python3 .github/research/qemu-ir-415/evaluate.py counts.tsv || true
           fi
