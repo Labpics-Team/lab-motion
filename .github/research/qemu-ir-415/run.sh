@@ -46,7 +46,7 @@ if [ ! -f "$QEMU_SOURCE/include/qemu/qemu-plugin.h" ]; then
     -o /tmp/qemu-include/qemu-plugin.h
   QEMU_INCLUDE=/tmp/qemu-include
 else
-  QEMU_INCLUDE="$QEMU_SOURCE/include"
+  QEMU_INCLUDE="$QEMU_SOURCE/include/qemu"
 fi
 
 gcc -O2 -shared -fPIC -fvisibility=hidden \
