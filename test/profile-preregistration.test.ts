@@ -4,11 +4,19 @@ import {
   eligibleDesktopCells,
   validateCalibrationReceipt,
   validateDesktopInventory,
+  validatePoweredDesignReceipt,
   validatePreregistration,
 } from '../bench/profile/validate.mjs';
 
 const copy = <T>(value: T): T => structuredClone(value);
 const hash = '0'.repeat(64);
+const engines = ['chromium', 'firefox', 'webkit'] as const;
+
+const clusters = (value: number) => Array.from({ length: 20 }, (_, run) => ({
+  run,
+  samples: [value, value, value],
+  semantic: true,
+}));
 
 const inventory = () => ({
   schemaVersion: 1,
@@ -16,7 +24,7 @@ const inventory = () => ({
   baselineRevision: PROFILE_PREREGISTRATION.baseline.revision,
   generatedAt: '2026-09-15T03:30:00.000Z',
   host: { platform: 'linux', release: 'fixture', arch: 'x64', node: 'v22.0.0' },
-  browsers: ['chromium', 'firefox', 'webkit'].map(engine => ({
+  browsers: engines.map(engine => ({
     engine,
     version: 'fixture',
     playwrightVersion: '1.61.1',
@@ -37,14 +45,58 @@ const calibration = () => ({
   calibrationId: 'fixture-calibration-1',
   attempt: 1,
   raw: {
-    aa: ['chromium', 'firefox', 'webkit'].map(engine => ({ engine })),
-    deliberate2x: ['chromium', 'firefox', 'webkit'].map(engine => ({ engine })),
+    aa: engines.map(engine => ({
+      engine,
+      interval: { ratio: 1, lower95: 1, upper95: 1 },
+      clusters: { a: clusters(10), b: clusters(10) },
+    })),
+    deliberate2x: engines.map(engine => ({
+      engine,
+      interval: { ratio: 2, lower95: 2, upper95: 2 },
+      clusters: { single: clusters(10), doubled: clusters(20) },
+    })),
   },
-  aa: { lower95: 0.99, upper95: 1.01 },
-  deliberate2x: { workMultiplier: 2, lower95: 1.8 },
+  aa: { lower95: 1, upper95: 1 },
+  deliberate2x: { workMultiplier: 2, lower95: 2 },
   candidateSamples: 0,
   status: 'PASS',
 });
+
+const poweredDesign = () => ({
+  schemaVersion: 1,
+  profileId: PROFILE_PREREGISTRATION.profileId,
+  baselineRevision: PROFILE_PREREGISTRATION.baseline.revision,
+  designId: 'fixture-powered-design-1',
+  generatedAt: '2026-09-15T03:31:00.000Z',
+  candidateSamples: 0,
+  pilotArtifactSha256: hash,
+  methodologyBlob: PROFILE_PREREGISTRATION.baseline.methodologyBlob,
+  cells: ['desktop-chromium', 'desktop-firefox', 'desktop-webkit'].map(id => ({
+    id,
+    chosenIndependentBlocks: 20,
+    practicalRelativeThreshold: 0.05,
+    estimatedPower: 0.9,
+    pilotKind: 'null-control',
+  })),
+});
+
+function setAaRatio(receipt: ReturnType<typeof calibration>, left: number, right: number): void {
+  const ratio = left / right;
+  for (const entry of receipt.raw.aa) {
+    entry.interval = { ratio, lower95: ratio, upper95: ratio };
+    entry.clusters = { a: clusters(left), b: clusters(right) };
+  }
+  receipt.aa = { lower95: ratio, upper95: ratio };
+}
+
+function setDeliberateRatio(receipt: ReturnType<typeof calibration>, doubled: number, single: number): void {
+  const ratio = doubled / single;
+  for (const entry of receipt.raw.deliberate2x) {
+    entry.interval = { ratio, lower95: ratio, upper95: ratio };
+    entry.clusters = { single: clusters(single), doubled: clusters(doubled) };
+  }
+  receipt.deliberate2x.lower95 = ratio;
+}
 
 describe('PROFILE-01 preregistration', () => {
   it('accepts the frozen registration and exact historical ceilings', () => {
@@ -64,6 +116,14 @@ describe('PROFILE-01 preregistration', () => {
       fullAnimateConsumer: 15600,
       animateCompositorMixed: 17500,
     });
+  });
+
+  it('rejects substitution of every frozen baseline blob', () => {
+    for (const key of ['compareManifestBlob', 'compareLockBlob', 'methodologyBlob', 'benchmarkRunnerBlob'] as const) {
+      const profile = copy(PROFILE_PREREGISTRATION) as any;
+      profile.baseline[key] = '0'.repeat(40);
+      expect(() => validatePreregistration(profile)).toThrow(new RegExp(`${key} drifted`));
+    }
   });
 
   it('keeps missing physical mobile cells explicit instead of accepting emulation', () => {
@@ -94,15 +154,31 @@ describe('PROFILE-01 preregistration', () => {
     expect(() => validateDesktopInventory(broken)).toThrow(/version missing/);
   });
 
-  it('fails closed when A/A escapes the preregistered band', () => {
+  it('rejects host-OS and Playwright provenance drift', () => {
+    const wrongHost = inventory() as any;
+    wrongHost.host.platform = 'darwin';
+    expect(() => validateDesktopInventory(wrongHost)).toThrow(/host\.platform drifted/);
+
+    const wrongPlaywright = inventory() as any;
+    wrongPlaywright.browsers[0].playwrightVersion = '1.62.0';
+    expect(() => validateDesktopInventory(wrongPlaywright)).toThrow(/Playwright provenance drifted/);
+  });
+
+  it('derives calibration intervals from raw clusters instead of trusting summaries', () => {
     const receipt = calibration() as any;
-    receipt.aa.upper95 = 1.051;
+    for (const cluster of receipt.raw.aa[0].clusters.a) cluster.samples = [20, 20, 20];
+    expect(() => validateCalibrationReceipt(receipt)).toThrow(/drifted from raw evidence/);
+  });
+
+  it('fails closed when raw-backed A/A escapes the preregistered band', () => {
+    const receipt = calibration();
+    setAaRatio(receipt, 17, 16);
     expect(() => validateCalibrationReceipt(receipt)).toThrow(/A\/A escaped/);
   });
 
-  it('fails closed when deliberate 2x work is not statistically visible', () => {
-    const receipt = calibration() as any;
-    receipt.deliberate2x.lower95 = 1.49;
+  it('fails closed when raw-backed deliberate work is not statistically visible', () => {
+    const receipt = calibration();
+    setDeliberateRatio(receipt, 23, 16);
     expect(() => validateCalibrationReceipt(receipt)).toThrow(/positive control unresolved/);
   });
 
@@ -116,9 +192,26 @@ describe('PROFILE-01 preregistration', () => {
     expect(() => validateCalibrationReceipt(contaminated)).toThrow(/candidate data appeared/);
   });
 
-  it('opens only the desktop cells after exact inventory and green calibration', () => {
-    expect(eligibleDesktopCells(inventory(), calibration())).toEqual([
-      'desktop-chromium', 'desktop-firefox', 'desktop-webkit',
+  it('requires a powered design bound to the frozen methodology', () => {
+    expect(validatePoweredDesignReceipt(poweredDesign()).cells).toHaveLength(3);
+    const wrongMethod = poweredDesign() as any;
+    wrongMethod.methodologyBlob = '0'.repeat(40);
+    expect(() => validatePoweredDesignReceipt(wrongMethod)).toThrow(/methodology drifted/);
+
+    const contaminated = poweredDesign() as any;
+    contaminated.candidateSamples = 1;
+    expect(() => validatePoweredDesignReceipt(contaminated)).toThrow(/observed candidate data/);
+  });
+
+  it('opens only cells with exact inventory, green calibration and power >= target', () => {
+    const design = poweredDesign();
+    design.cells[1]!.estimatedPower = 0.79;
+    expect(eligibleDesktopCells(inventory(), calibration(), design)).toEqual([
+      'desktop-chromium', 'desktop-webkit',
     ]);
+  });
+
+  it('does not open any candidate cell without a powered design receipt', () => {
+    expect(() => eligibleDesktopCells(inventory(), calibration(), undefined as any)).toThrow(/powered design/);
   });
 });
