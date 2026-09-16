@@ -71,6 +71,27 @@ describe('internal frame requester — hostile one-shot ownership', () => {
     expect(tick).toHaveBeenCalledWith(10);
   });
 
+  it('does not confuse a reentrant revoked reservation with synchronous delivery', () => {
+    vi.useFakeTimers();
+    const tick = vi.fn();
+    let hostCalls = 0;
+    let request!: () => void;
+    request = createFrameRequester(() => {
+      hostCalls += 1;
+      if (hostCalls === 1) {
+        expect(() => request()).toThrow('inner host failed');
+        return 1;
+      }
+      throw new Error('inner host failed');
+    }, tick);
+
+    request();
+    vi.runAllTimers();
+
+    expect(hostCalls).toBe(2);
+    expect(tick).not.toHaveBeenCalled();
+  });
+
   it('coalesces handle=0 fallback requests into one pending delivery', () => {
     vi.useFakeTimers();
     const schedule = vi.fn(() => 0);
