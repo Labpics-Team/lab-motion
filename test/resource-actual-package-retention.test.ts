@@ -15,13 +15,24 @@ import { expect, it } from 'vitest';
 
 const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '..');
 const PACKAGE = JSON.parse(readFileSync(join(ROOT, 'package.json'), 'utf8')) as { name: string };
+const PACKAGE_COMMAND_TIMEOUT_MS = 30_000;
+const PROBE_TIMEOUT_MS = 20_000;
+const WINDOWS_SHELL = process.platform === 'win32';
 
 function runInstalledPackageProbe(): string {
   const work = mkdtempSync(join(tmpdir(), 'resource-actual-package-'));
   try {
+    execFileSync('pnpm', ['build'], {
+      cwd: ROOT,
+      stdio: 'pipe',
+      shell: WINDOWS_SHELL,
+      timeout: PACKAGE_COMMAND_TIMEOUT_MS,
+    });
     execFileSync('pnpm', ['pack', '--pack-destination', work], {
       cwd: ROOT,
       stdio: 'pipe',
+      shell: WINDOWS_SHELL,
+      timeout: PACKAGE_COMMAND_TIMEOUT_MS,
     });
     const tarball = readdirSync(work).find((file) => file.endsWith('.tgz'));
     if (tarball === undefined) throw new Error('pnpm pack не создал tarball');
@@ -36,7 +47,12 @@ function runInstalledPackageProbe(): string {
     execFileSync(
       'npm',
       ['install', '--ignore-scripts', '--no-audit', '--no-fund', join(work, tarball)],
-      { cwd: app, stdio: 'pipe' },
+      {
+        cwd: app,
+        stdio: 'pipe',
+        shell: WINDOWS_SHELL,
+        timeout: PACKAGE_COMMAND_TIMEOUT_MS,
+      },
     );
 
     const installedRoot = join(app, 'node_modules', ...PACKAGE.name.split('/'));
@@ -142,7 +158,7 @@ console.log('resource-installed-package-retention: PASS');
     return execFileSync(process.execPath, ['--expose-gc', probePath], {
       cwd: app,
       encoding: 'utf8',
-      timeout: 90_000,
+      timeout: PROBE_TIMEOUT_MS,
     });
   } finally {
     rmSync(work, { recursive: true, force: true });
