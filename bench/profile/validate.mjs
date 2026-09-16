@@ -1,3 +1,4 @@
+import { pairedClusterBootstrap } from '../compare/methodology.mjs';
 import { PROFILE_PREREGISTRATION } from './preregistration.mjs';
 
 const SHA40 = /^[0-9a-f]{40}$/;
@@ -22,6 +23,12 @@ const REQUIRED_COMPETITORS = Object.freeze({
   playwright: '1.61.1',
   esbuild: '0.28.1',
   pngjs: '7.0.0',
+});
+const REQUIRED_BASELINE_BLOBS = Object.freeze({
+  compareManifestBlob: '51cc81e9d6e2499eff7bf628e99297f272ca0180',
+  compareLockBlob: 'e0db76350590da520f883998fe3aee9eb3b3c553',
+  methodologyBlob: '37b4072fb158426cab9fa4aed0466e96c2769cba',
+  benchmarkRunnerBlob: 'ce87c13b9934abaf6f05753b069742bd1a54db8c',
 });
 const REQUIRED_COSTS = Object.freeze({
   nano: 1024,
@@ -49,6 +56,32 @@ function uniqueStrings(values, label) {
   invariant(new Set(values).size === values.length, `${label} contains duplicates`);
 }
 
+function exactFinite(actual, expected, label) {
+  invariant(Number.isFinite(actual), `${label} missing`);
+  invariant(Object.is(actual, expected), `${label} drifted from raw evidence`);
+}
+
+function recomputeCalibrationInterval(entry, kind, profile) {
+  const left = kind === 'aa' ? entry?.clusters?.a : entry?.clusters?.doubled;
+  const right = kind === 'aa' ? entry?.clusters?.b : entry?.clusters?.single;
+  invariant(Array.isArray(left) && Array.isArray(right), `${entry?.engine ?? kind}: raw ${kind} clusters missing`);
+  const result = pairedClusterBootstrap(left, right, {
+    seed: kind === 'aa'
+      ? profile.statistics.bootstrapSeed
+      : profile.statistics.bootstrapSeed ^ 0x2a2a2a,
+    iterations: profile.statistics.bootstrapIterations,
+  });
+  const interval = {
+    ratio: result.p50.ratio,
+    lower95: result.p50.low,
+    upper95: result.p50.high,
+  };
+  for (const key of ['ratio', 'lower95', 'upper95']) {
+    exactFinite(entry?.interval?.[key], interval[key], `${entry?.engine ?? kind}.${kind}.${key}`);
+  }
+  return interval;
+}
+
 export function validatePreregistration(profile = PROFILE_PREREGISTRATION) {
   invariant(profile?.schemaVersion === 1, 'unsupported schemaVersion');
   invariant(profile.profileId === 'r11-profile-20260915-v1', 'unexpected profile identity');
@@ -64,8 +97,9 @@ export function validatePreregistration(profile = PROFILE_PREREGISTRATION) {
   invariant(baseline.packageVersion === '0.3.0', 'package version drifted');
   invariant(baseline.packageManager === 'pnpm@11.11.0', 'package manager drifted');
   invariant(baseline.nodeRange === '>=22', 'Node range drifted');
-  for (const key of ['compareManifestBlob', 'compareLockBlob', 'methodologyBlob', 'benchmarkRunnerBlob']) {
+  for (const [key, expected] of Object.entries(REQUIRED_BASELINE_BLOBS)) {
     invariant(SHA40.test(baseline[key]), `${key} must be exact blob SHA`);
+    invariant(baseline[key] === expected, `${key} drifted`);
   }
   exactObject(baseline.competitors, REQUIRED_COMPETITORS, 'competitors');
 
@@ -144,6 +178,7 @@ export function validateDesktopInventory(receipt, profile = PROFILE_PREREGISTRAT
   for (const key of ['platform', 'release', 'arch', 'node']) {
     invariant(typeof receipt.host?.[key] === 'string' && receipt.host[key].length > 0, `host.${key} missing`);
   }
+  invariant(receipt.host.platform === 'linux', 'host.platform drifted');
   invariant(Array.isArray(receipt.browsers) && JSON.stringify(receipt.browsers.map(({ engine }) => engine)) === JSON.stringify(['chromium', 'firefox', 'webkit']), 'desktop receipt must bind exactly Chromium/Firefox/WebKit');
   for (const browser of receipt.browsers) {
     invariant(typeof browser.version === 'string' && browser.version.length > 0, `${browser.engine}: version missing`);
@@ -170,20 +205,57 @@ export function validateCalibrationReceipt(receipt, profile = PROFILE_PREREGISTR
   invariant(Array.isArray(receipt.raw?.deliberate2x) && receipt.raw.deliberate2x.length === 3, 'positive-control raw engine matrix missing');
   invariant(JSON.stringify(receipt.raw.aa.map(({ engine }) => engine)) === JSON.stringify(['chromium', 'firefox', 'webkit']), 'A/A engine provenance drifted');
   invariant(JSON.stringify(receipt.raw.deliberate2x.map(({ engine }) => engine)) === JSON.stringify(['chromium', 'firefox', 'webkit']), 'positive-control engine provenance drifted');
+
+  const aaIntervals = receipt.raw.aa.map((entry) => recomputeCalibrationInterval(entry, 'aa', profile));
+  const deliberateIntervals = receipt.raw.deliberate2x.map((entry) => recomputeCalibrationInterval(entry, 'deliberate2x', profile));
+  const recomputedAaLower = Math.min(...aaIntervals.map(({ lower95 }) => lower95));
+  const recomputedAaUpper = Math.max(...aaIntervals.map(({ upper95 }) => upper95));
+  const recomputedDeliberateLower = Math.min(...deliberateIntervals.map(({ lower95 }) => lower95));
+  exactFinite(receipt.aa?.lower95, recomputedAaLower, 'A/A aggregate lower95');
+  exactFinite(receipt.aa?.upper95, recomputedAaUpper, 'A/A aggregate upper95');
+  exactFinite(receipt.deliberate2x?.lower95, recomputedDeliberateLower, 'positive-control aggregate lower95');
+
   const [aaLow, aaHigh] = profile.calibration.aaNonInferiorityBand;
-  invariant(Number.isFinite(receipt.aa?.lower95) && Number.isFinite(receipt.aa?.upper95), 'A/A interval missing');
   invariant(receipt.aa.lower95 >= aaLow && receipt.aa.upper95 <= aaHigh, 'A/A escaped non-inferiority band');
   invariant(receipt.deliberate2x?.workMultiplier === 2, 'positive control is not 2x work');
-  invariant(Number.isFinite(receipt.deliberate2x.lower95) && receipt.deliberate2x.lower95 >= profile.calibration.deliberateWorkDetectedLower95Min, 'positive control unresolved');
+  invariant(receipt.deliberate2x.lower95 >= profile.calibration.deliberateWorkDetectedLower95Min, 'positive control unresolved');
   invariant(receipt.candidateSamples === 0, 'candidate data appeared before calibration admission');
   invariant(receipt.status === 'PASS', 'calibration receipt is not admitted');
   return receipt;
 }
 
-export function eligibleDesktopCells(inventory, calibration, profile = PROFILE_PREREGISTRATION) {
+export function validatePoweredDesignReceipt(receipt, profile = PROFILE_PREREGISTRATION) {
+  validatePreregistration(profile);
+  invariant(receipt?.schemaVersion === 1, 'powered design schema mismatch');
+  invariant(receipt.profileId === profile.profileId && receipt.baselineRevision === profile.baseline.revision, 'powered design provenance mismatch');
+  invariant(typeof receipt.designId === 'string' && receipt.designId.length > 0, 'powered design identity missing');
+  invariant(typeof receipt.generatedAt === 'string' && !Number.isNaN(Date.parse(receipt.generatedAt)), 'powered design timestamp invalid');
+  invariant(receipt.candidateSamples === 0, 'powered design observed candidate data');
+  invariant(SHA256.test(receipt.pilotArtifactSha256), 'powered design pilot artifact digest missing');
+  invariant(receipt.methodologyBlob === profile.baseline.methodologyBlob, 'powered design methodology drifted');
+  invariant(Array.isArray(receipt.cells) && receipt.cells.length > 0, 'powered design cells missing');
+
+  const desktopIds = new Set(profile.roster.filter(({ class: kind }) => kind === 'desktop-browser').map(({ id }) => id));
+  const ids = receipt.cells.map(({ id }) => id);
+  uniqueStrings(ids, 'powered design cell ids');
+  for (const cell of receipt.cells) {
+    invariant(desktopIds.has(cell.id), `${cell.id}: powered design references non-desktop cell`);
+    invariant(Number.isSafeInteger(cell.chosenIndependentBlocks), `${cell.id}: chosen block count missing`);
+    invariant(cell.chosenIndependentBlocks >= profile.statistics.minimumIndependentBlocks && cell.chosenIndependentBlocks <= profile.statistics.maximumIndependentBlocks, `${cell.id}: chosen block count outside preregistered bounds`);
+    invariant(cell.practicalRelativeThreshold === profile.statistics.practicalRelativeThreshold, `${cell.id}: practical effect threshold drifted`);
+    invariant(Number.isFinite(cell.estimatedPower) && cell.estimatedPower >= 0 && cell.estimatedPower <= 1, `${cell.id}: estimated power invalid`);
+    invariant(cell.pilotKind === 'null-control', `${cell.id}: powered design must come from null/control pilot`);
+  }
+  return receipt;
+}
+
+export function eligibleDesktopCells(inventory, calibration, poweredDesign, profile = PROFILE_PREREGISTRATION) {
   validateDesktopInventory(inventory, profile);
   validateCalibrationReceipt(calibration, profile);
-  return profile.roster.filter(({ class: kind }) => kind === 'desktop-browser').map(({ id }) => id);
+  validatePoweredDesignReceipt(poweredDesign, profile);
+  return poweredDesign.cells
+    .filter(({ estimatedPower }) => estimatedPower >= profile.statistics.targetPower)
+    .map(({ id }) => id);
 }
 
 if (import.meta.url === `file://${process.argv[1]}`) {
