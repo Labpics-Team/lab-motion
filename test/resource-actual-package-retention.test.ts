@@ -1,7 +1,6 @@
 import { execFileSync } from 'node:child_process';
 import {
   copyFileSync,
-  existsSync,
   mkdirSync,
   mkdtempSync,
   readFileSync,
@@ -78,27 +77,18 @@ function runInstalledPackageProbe(): string {
       },
     );
 
-    const installedRoot = join(app, 'node_modules', ...PACKAGE.name.split('/'));
-    const paths = {
-      frameEsm: join(installedRoot, 'dist/frame/index.js'),
-      frameCjs: join(installedRoot, 'dist/frame/index.cjs'),
-      compositorEsm: join(installedRoot, 'dist/compositor/index.js'),
-      compositorCjs: join(installedRoot, 'dist/compositor/index.cjs'),
-    };
-    for (const [name, path] of Object.entries(paths)) {
-      if (!existsSync(path)) throw new Error(`установленный tarball не содержит ${name}: ${path}`);
-    }
-
+    const frameSpecifier = `${PACKAGE.name}/frame`;
+    const compositorSpecifier = `${PACKAGE.name}/compositor`;
     const probe = `
 import assert from 'node:assert/strict';
 import { createRequire } from 'node:module';
 import { setImmediate } from 'node:timers/promises';
-import { pathToFileURL } from 'node:url';
 
-const frameEsm = await import(pathToFileURL(${JSON.stringify(paths.frameEsm)}).href);
-const frameCjs = createRequire(import.meta.url)(${JSON.stringify(paths.frameCjs)});
-const compositorEsm = await import(pathToFileURL(${JSON.stringify(paths.compositorEsm)}).href);
-const compositorCjs = createRequire(import.meta.url)(${JSON.stringify(paths.compositorCjs)});
+const require = createRequire(import.meta.url);
+const frameEsm = await import(${JSON.stringify(frameSpecifier)});
+const frameCjs = require(${JSON.stringify(frameSpecifier)});
+const compositorEsm = await import(${JSON.stringify(compositorSpecifier)});
+const compositorCjs = require(${JSON.stringify(compositorSpecifier)});
 const gc = globalThis.gc;
 assert.equal(typeof gc, 'function', '--expose-gc missing');
 
