@@ -1,0 +1,268 @@
+name: research · MotionProgram binding ownership
+
+on:
+  push:
+    branches: ["research/mp-binding-index-run11"]
+
+permissions:
+  contents: write
+
+env:
+  COREPACK_ENABLE_DOWNLOAD_PROMPT: "0"
+  COREPACK_DEFAULT_TO_LATEST: "0"
+
+jobs:
+  research:
+    runs-on: ubuntu-latest
+    timeout-minutes: 35
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          fetch-depth: 0
+
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v6
+        with:
+          node-version: "24"
+
+      - name: Install
+        shell: bash
+        run: |
+          set -euo pipefail
+          corepack enable
+          corepack install --global pnpm@11.11.0
+          pnpm install --frozen-lockfile
+
+      - name: Install deterministic allocation oracle
+        shell: bash
+        run: |
+          cat > test/.research-motion-program-binding-allocation.test.ts <<'EOF'
+          import { expect, it } from 'vitest';
+          import { parseMotionProgramV1 } from '../src/internal/motion-program.js';
+          import { validProgramInput } from './motion-program-v1.fixtures.js';
+
+          it('research: counts parser-owned Map/Set allocations for one canonical program', () => {
+            const NativeMap = globalThis.Map;
+            const NativeSet = globalThis.Set;
+            let maps = 0;
+            let sets = 0;
+            class CountingMap<K, V> extends NativeMap<K, V> {
+              constructor(...args: any[]) {
+                maps++;
+                super(...args as []);
+              }
+            }
+            class CountingSet<T> extends NativeSet<T> {
+              constructor(...args: any[]) {
+                sets++;
+                super(...args as []);
+              }
+            }
+            globalThis.Map = CountingMap as unknown as MapConstructor;
+            globalThis.Set = CountingSet as unknown as SetConstructor;
+            try {
+              parseMotionProgramV1(validProgramInput());
+            } finally {
+              globalThis.Map = NativeMap;
+              globalThis.Set = NativeSet;
+            }
+            console.log(`RESEARCH_ALLOC maps=${maps} sets=${sets}`);
+            expect(maps).toBe(Number(process.env.EXPECTED_MAPS));
+            expect(sets).toBe(Number(process.env.EXPECTED_SETS));
+          });
+          EOF
+
+      - name: Baseline proof
+        shell: bash
+        env:
+          EXPECTED_MAPS: "2"
+          EXPECTED_SETS: "2"
+        run: |
+          set -euo pipefail
+          printf 'BASE_SHA=%s\n' "$(git rev-parse fe11daa407de396fad952be7679650f63dabd4dd)"
+          pnpm vitest run --reporter=verbose test/.research-motion-program-binding-allocation.test.ts \
+            test/motion-program-core-v1.test.ts test/motion-program-semantics-v1.test.ts \
+            test/motion-program-wire-v1.test.ts | tee /tmp/baseline-tests.log
+          pnpm build
+          cp -R dist /tmp/base-dist
+          pnpm size | tee /tmp/base-size.log
+
+      - name: Apply representation candidate
+        shell: bash
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+          path = Path('src/internal/motion-program.ts')
+          text = path.read_text()
+          old = '''  const writers = new Set<string>();
+            const surfaceOwners = new Map<string, number>();
+            const transformMasks = new Map<number, number>();
+            for (let i = 0; i < raw.length; i++) {
+              const tuple = snapshotExact(raw[i], 3);
+              const subjectSlot = unsignedInteger(tuple[0], UINT16_MAX);
+              const channel = parseChannel(tuple[1], stringsLength, features);
+              const writerKey = typeof channel === 'number'
+                ? `${subjectSlot}:s${channel}`
+                : `${subjectSlot}:h${channel[1]}`;
+              if (writers.has(writerKey)) fail('LMP_CANONICAL');
+              writers.add(writerKey);
+              const ownerGroup = unsignedInteger(tuple[2], UINT16_MAX);
+              const surface = typeof channel === 'number'
+                ? `s${MOTION_PROGRAM_CHANNEL_SURFACE_V1[channel]}`
+                : `h${channel[1]}`;
+              const surfaceKey = `${subjectSlot}:${surface}`;
+              const previousOwner = surfaceOwners.get(surfaceKey);
+              if (previousOwner !== undefined && previousOwner !== ownerGroup) fail('LMP_CANONICAL');
+              surfaceOwners.set(surfaceKey, ownerGroup);
+              if (
+                typeof channel === 'number' &&
+                channel >= MOTION_PROGRAM_STANDARD_CHANNEL_V1.translateX &&
+                channel <= MOTION_PROGRAM_STANDARD_CHANNEL_V1.skewY
+              ) {
+                const bit = 1 << (channel - MOTION_PROGRAM_STANDARD_CHANNEL_V1.translateX);
+                transformMasks.set(subjectSlot, (transformMasks.get(subjectSlot) ?? 0) | bit);
+              }
+              bindings[i] = Object.freeze([subjectSlot, channel, ownerGroup] as const);
+            }
+            for (const mask of transformMasks.values()) {
+              if (mask !== 0x7f) fail('LMP_CANONICAL');
+            }'''
+          new = '''  const writers = new Set<number>();
+            // Standard writer keys are negative; escaped host keys are non-negative.
+            // Both domains are exact integers throughout the complete uint16 input box.
+            const transformState = new Map<number, number>();
+            for (let i = 0; i < raw.length; i++) {
+              const tuple = snapshotExact(raw[i], 3);
+              const subjectSlot = unsignedInteger(tuple[0], UINT16_MAX);
+              const channel = parseChannel(tuple[1], stringsLength, features);
+              const writerKey = typeof channel === 'number'
+                ? -(subjectSlot * 12 + channel + 1)
+                : subjectSlot * 0x10000 + channel[1];
+              if (writers.has(writerKey)) fail('LMP_CANONICAL');
+              writers.add(writerKey);
+              const ownerGroup = unsignedInteger(tuple[2], UINT16_MAX);
+              if (
+                typeof channel === 'number' &&
+                channel >= MOTION_PROGRAM_STANDARD_CHANNEL_V1.translateX &&
+                channel <= MOTION_PROGRAM_STANDARD_CHANNEL_V1.skewY
+              ) {
+                const bit = 1 << (channel - MOTION_PROGRAM_STANDARD_CHANNEL_V1.translateX);
+                const state = transformState.get(subjectSlot);
+                if (state !== undefined && (state >>> 7) !== ownerGroup) fail('LMP_CANONICAL');
+                transformState.set(subjectSlot, (ownerGroup << 7) | (state ?? 0) | bit);
+              }
+              bindings[i] = Object.freeze([subjectSlot, channel, ownerGroup] as const);
+            }
+            for (const state of transformState.values()) {
+              if ((state & 0x7f) !== 0x7f) fail('LMP_CANONICAL');
+            }'''
+          if text.count(old) != 1:
+              raise SystemExit(f'expected exactly one parseBindings block, found {text.count(old)}')
+          path.write_text(text.replace(old, new))
+          PY
+          cp src/internal/motion-program.ts /tmp/candidate-motion-program.ts
+          git diff --check
+          git diff -- src/internal/motion-program.ts
+
+      - name: Candidate semantic and structural proof
+        shell: bash
+        env:
+          EXPECTED_MAPS: "1"
+          EXPECTED_SETS: "2"
+        run: |
+          set -euo pipefail
+          pnpm vitest run --reporter=verbose test/.research-motion-program-binding-allocation.test.ts \
+            test/motion-program-core-v1.test.ts test/motion-program-semantics-v1.test.ts \
+            test/motion-program-wire-v1.test.ts test/compiler-nano-lowering.test.ts | tee /tmp/candidate-tests.log
+          rm test/.research-motion-program-binding-allocation.test.ts
+          pnpm typecheck
+          pnpm build
+          pnpm size | tee /tmp/candidate-size.log
+
+      - name: Exact changed-byte comparison
+        shell: bash
+        run: |
+          set -euo pipefail
+          node --input-type=module <<'NODE'
+          import { readdirSync, readFileSync, statSync } from 'node:fs';
+          import { join, relative } from 'node:path';
+          import { canonicalGzip, observationalBrotli } from './scripts/compression-oracle.mjs';
+          const walk = (root, dir = root, out = []) => {
+            for (const name of readdirSync(dir)) {
+              const path = join(dir, name);
+              if (statSync(path).isDirectory()) walk(root, path, out);
+              else if (/\.(?:js|cjs)$/.test(name)) out.push(relative(root, path));
+            }
+            return out;
+          };
+          let changed = 0;
+          let regressed = 0;
+          for (const rel of walk('/tmp/base-dist')) {
+            const a = readFileSync(join('/tmp/base-dist', rel));
+            const b = readFileSync(join('dist', rel));
+            if (a.equals(b)) continue;
+            changed++;
+            const av = [a.length, canonicalGzip(a).length, observationalBrotli(a).length];
+            const bv = [b.length, canonicalGzip(b).length, observationalBrotli(b).length];
+            const d = bv.map((v, i) => v - av[i]);
+            console.log(`BYTE_DELTA ${rel} base=${av.join('/')} cand=${bv.join('/')} delta=${d.join('/')}`);
+            if (d.some((x) => x > 0)) regressed++;
+          }
+          console.log(`BYTE_SUMMARY changed=${changed} regressed=${regressed}`);
+          if (changed === 0 || regressed !== 0) process.exit(1);
+          NODE
+          echo '--- SIZE OUTPUT DIFF (baseline -> candidate) ---'
+          diff -u /tmp/base-size.log /tmp/candidate-size.log || true
+
+      - name: Positive control must turn RED
+        shell: bash
+        run: |
+          set -euo pipefail
+          python - <<'PY'
+          from pathlib import Path
+          path = Path('src/internal/motion-program.ts')
+          text = path.read_text()
+          old = "if (state !== undefined && (state >>> 7) !== ownerGroup) fail('LMP_CANONICAL');"
+          new = "if (false) fail('LMP_CANONICAL');"
+          if text.count(old) != 1:
+              raise SystemExit('positive-control mutation site missing')
+          path.write_text(text.replace(old, new))
+          PY
+          set +e
+          pnpm vitest run test/motion-program-core-v1.test.ts -t 'делает transform одним полным surface и не допускает двух owners' > /tmp/mutant.log 2>&1
+          status=$?
+          set -e
+          cat /tmp/mutant.log
+          if [[ $status -eq 0 ]]; then
+            echo '::error::positive-control mutant survived'
+            exit 1
+          fi
+          echo 'POSITIVE_CONTROL=RED'
+          cp /tmp/candidate-motion-program.ts src/internal/motion-program.ts
+          git diff --check
+
+      - name: Simplicity and full local authority
+        shell: bash
+        run: |
+          set -euo pipefail
+          # The retained form has exactly two parser indices: writer uniqueness and
+          # transform owner+coverage. Splitting either fact again would reintroduce
+          # the deleted ownership surface; no cache/pass/table is added.
+          pnpm check:static
+          pnpm test
+          pnpm pack:smoke
+          pnpm pack:compat
+
+      - name: Publish clean candidate commit
+        shell: bash
+        run: |
+          set -euo pipefail
+          test "$(git rev-parse --abbrev-ref HEAD)" = 'research/mp-binding-index-run11'
+          rm .github/workflows/research-mp-binding-index.yml
+          rm -f test/.research-motion-program-binding-allocation.test.ts
+          git add src/internal/motion-program.ts .github/workflows/research-mp-binding-index.yml
+          test "$(git diff --cached --name-only | sort)" = $'.github/workflows/research-mp-binding-index.yml\nsrc/internal/motion-program.ts'
+          git config user.name 'Labpics Autoresearch'
+          git config user.email 'lemone112@users.noreply.github.com'
+          git commit -m 'perf(motion-program): compact binding ownership index'
+          git push origin HEAD:research/mp-binding-index-run11
+          echo "CANDIDATE_SHA=$(git rev-parse HEAD)"
