@@ -1,0 +1,160 @@
+name: Research · MotionValue solver scratch
+
+on:
+  push:
+    branches: ["research/motion-value-solver-scratch-20260916"]
+
+permissions:
+  contents: read
+
+jobs:
+  evidence:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    env:
+      BASE_SHA: fe11daa407de396fad952be7679650f63dabd4dd
+    steps:
+      - name: Checkout candidate
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+
+      - name: Setup Node
+        uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v6
+        with:
+          node-version: "24"
+
+      - name: Activate pinned pnpm
+        run: |
+          corepack enable
+          corepack install --global pnpm@11.11.0
+
+      - name: Install
+        run: pnpm install --frozen-lockfile
+
+      - name: Candidate semantics and package gates
+        run: |
+          pnpm typecheck
+          pnpm build
+          pnpm vitest run test/motion-value*.test.ts
+          pnpm size
+          pnpm pack:smoke
+
+      - name: Structural allocation oracle with positive control
+        shell: bash
+        run: |
+          set -euo pipefail
+          base="$RUNNER_TEMP/base-motion-value.ts"
+          git show "$BASE_SHA:src/motion-value.ts" > "$base"
+          grep -Fq 'private readonly _solved = { value: 0, velocity: 0 };' "$base"
+          ! grep -Fq 'private readonly _solved = { value: 0, velocity: 0 };' src/motion-value.ts
+          grep -Fq 'const solvedSample = { value: 0, velocity: 0 };' src/motion-value.ts
+          mutated="$RUNNER_TEMP/mutated-motion-value.ts"
+          awk '/\/\/ ─── Animation run state/{print "  private readonly _solved = { value: 0, velocity: 0 };"} {print}' src/motion-value.ts > "$mutated"
+          grep -Fq 'private readonly _solved = { value: 0, velocity: 0 };' "$mutated"
+          printf 'baseline_instance_scratch=1\ncandidate_instance_scratch=0\npositive_control=RED-capable\n' > "$RUNNER_TEMP/structural.txt"
+
+      - name: Build exact base
+        shell: bash
+        run: |
+          set -euo pipefail
+          base="$RUNNER_TEMP/base"
+          git worktree add --detach "$base" "$BASE_SHA"
+          ln -s "$GITHUB_WORKSPACE/node_modules" "$base/node_modules"
+          (cd "$base" && pnpm build)
+
+      - name: Cross-instance reentrant differential
+        shell: bash
+        run: |
+          set -euo pipefail
+          cat > "$RUNNER_TEMP/reentry.mjs" <<'EOF'
+          import { pathToFileURL } from 'node:url';
+          const modulePath = process.argv[2];
+          const { MotionValue } = await import(pathToFileURL(modulePath).href);
+          const spring = { mass: 1, stiffness: 180, damping: 18 };
+          const makeClock = () => {
+            const queue = [];
+            return {
+              requestFrame(cb) { queue.push(cb); return 1; },
+              flush(ts) { const cb = queue.shift(); if (!cb) throw new Error('empty clock'); cb(ts); },
+              pending() { return queue.length; },
+            };
+          };
+          const ca = makeClock();
+          const cb = makeClock();
+          const a = new MotionValue({ initial: 0, spring, clamp: false, requestFrame: ca.requestFrame });
+          const b = new MotionValue({ initial: -1, spring, clamp: false, requestFrame: cb.requestFrame });
+          const trace = [];
+          let nested = false;
+          a.onChange((v) => {
+            trace.push(['a', v, a.velocity]);
+            if (!nested && v !== 0) {
+              nested = true;
+              b.setTarget(2);
+              cb.flush(16);
+              cb.flush(32);
+            }
+          });
+          b.onChange((v) => trace.push(['b', v, b.velocity]));
+          a.setTarget(1);
+          ca.flush(16);
+          ca.flush(32);
+          for (let i = 0; i < 8; i++) {
+            if (ca.pending()) ca.flush(48 + i * 16);
+            if (cb.pending()) cb.flush(48 + i * 16);
+          }
+          a.setTarget(-0.25);
+          if (ca.pending()) ca.flush(192);
+          a.snapTo(0.5);
+          b.stop();
+          a.destroy();
+          b.destroy();
+          console.log(JSON.stringify(trace));
+          EOF
+          node "$RUNNER_TEMP/reentry.mjs" "$RUNNER_TEMP/base/dist/index.js" > "$RUNNER_TEMP/base-trace.json"
+          node "$RUNNER_TEMP/reentry.mjs" "$GITHUB_WORKSPACE/dist/index.js" > "$RUNNER_TEMP/candidate-trace.json"
+          cmp "$RUNNER_TEMP/base-trace.json" "$RUNNER_TEMP/candidate-trace.json"
+
+      - name: Frozen raw gzip Brotli differential
+        shell: bash
+        run: |
+          set -euo pipefail
+          cat > "$RUNNER_TEMP/bytes.mjs" <<'EOF'
+          import { readFileSync, writeFileSync } from 'node:fs';
+          import { canonicalGzip, observationalBrotli } from './scripts/compression-oracle.mjs';
+          const baseDir = process.env.RUNNER_TEMP + '/base/dist';
+          const candidateDir = process.env.GITHUB_WORKSPACE + '/dist';
+          const rows = {};
+          for (const file of ['index.js', 'index.cjs']) {
+            const base = readFileSync(`${baseDir}/${file}`);
+            const candidate = readFileSync(`${candidateDir}/${file}`);
+            const metrics = (x) => ({ raw: x.length, gzip: canonicalGzip(x).length, brotli: observationalBrotli(x).length });
+            const b = metrics(base), c = metrics(candidate);
+            for (const key of ['raw', 'gzip', 'brotli']) if (c[key] > b[key]) throw new Error(`${file} ${key} regressed: ${b[key]} -> ${c[key]}`);
+            rows[file] = { base: b, candidate: c, delta: { raw: c.raw-b.raw, gzip: c.gzip-b.gzip, brotli: c.brotli-b.brotli } };
+          }
+          const result = {
+            base: process.env.BASE_SHA,
+            candidate: process.env.GITHUB_SHA,
+            node: process.version,
+            rows,
+            structural: { baselineInstanceScratch: 1, candidateInstanceScratch: 0 },
+            reentrantDifferential: 'exact-match',
+          };
+          writeFileSync(process.env.RUNNER_TEMP + '/result.json', JSON.stringify(result, null, 2));
+          console.log(JSON.stringify(result, null, 2));
+          EOF
+          node "$RUNNER_TEMP/bytes.mjs"
+
+      - name: Upload evidence
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
+        with:
+          name: motion-value-scratch-evidence-${{ github.sha }}
+          path: |
+            ${{ runner.temp }}/result.json
+            ${{ runner.temp }}/structural.txt
+            ${{ runner.temp }}/base-trace.json
+            ${{ runner.temp }}/candidate-trace.json
+          if-no-files-found: error
+          retention-days: 7
