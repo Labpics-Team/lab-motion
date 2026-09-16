@@ -549,3 +549,27 @@ describe('projection/dom: враждебный parent-цикл — никогд�
     }
   });
 });
+
+describe('projection/dom: failed LAST measurement ownership', () => {
+  it('drops a failed captured ancestor while a measured descendant keeps projecting as a root', () => {
+    const world = makeWorld();
+    const clock = makeClock();
+    const P = world.el('P-failed', P_FIRST);
+    const C = world.el('C-survives', C_FIRST, { parent: P });
+    const dom = createDomProjection(domOptions(world, clock));
+
+    dom.capture([P, C]);
+    P.getBoundingClientRect = () => {
+      throw new Error('detached before LAST measurement');
+    };
+    C.rect = { x: 30, y: 10, width: 20, height: 20 };
+
+    expect(() => dom.play()).not.toThrow();
+    expect(flightTransformWrites(world.writes(P))).toHaveLength(0);
+    const childWrites = flightTransformWrites(world.writes(C));
+    expect(childWrites.length).toBeGreaterThan(0);
+    const first = parseTranslateScale(childWrites[0].value!)!;
+    expect(first.tx).toBeCloseTo(-20, 9);
+    expect(first.ty).toBeCloseTo(0, 9);
+  });
+});
