@@ -1,0 +1,84 @@
+name: Research · MotionValue scratch bytes v3
+
+on:
+  push:
+    branches: ["research/motion-value-solver-scratch-20260916"]
+
+permissions:
+  contents: read
+
+jobs:
+  bytes:
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    env:
+      BASE_SHA: fe11daa407de396fad952be7679650f63dabd4dd
+      CANDIDATE_SHA: ca1ea386ced0c384098016142431f1f7fd70d9ac
+    steps:
+      - name: Checkout carrier
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+      - name: Setup Node
+        uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v6
+        with:
+          node-version: "24"
+      - name: Activate pinned pnpm
+        run: |
+          corepack enable
+          corepack install --global pnpm@11.11.0
+      - name: Install once
+        run: pnpm install --frozen-lockfile
+      - name: Build exact base and exact candidate
+        shell: bash
+        run: |
+          set -euo pipefail
+          git worktree add --detach "$RUNNER_TEMP/base" "$BASE_SHA"
+          git worktree add --detach "$RUNNER_TEMP/candidate" "$CANDIDATE_SHA"
+          ln -s "$GITHUB_WORKSPACE/node_modules" "$RUNNER_TEMP/base/node_modules"
+          ln -s "$GITHUB_WORKSPACE/node_modules" "$RUNNER_TEMP/candidate/node_modules"
+          (cd "$RUNNER_TEMP/base" && pnpm build)
+          (cd "$RUNNER_TEMP/candidate" && pnpm build)
+      - name: Frozen all-entry raw gzip Brotli differential
+        shell: bash
+        run: |
+          set -euo pipefail
+          cat > "$RUNNER_TEMP/candidate/.research-bytes.mjs" <<'EOF'
+          import { readFileSync, writeFileSync, readdirSync, statSync } from 'node:fs';
+          import { join, relative } from 'node:path';
+          import { canonicalGzip, observationalBrotli } from './scripts/compression-oracle.mjs';
+          const baseDir = process.env.RUNNER_TEMP + '/base/dist';
+          const candidateDir = process.env.RUNNER_TEMP + '/candidate/dist';
+          const walk = (root, dir = root, out = []) => {
+            for (const name of readdirSync(dir)) {
+              const path = join(dir, name);
+              if (statSync(path).isDirectory()) walk(root, path, out);
+              else if (name.endsWith('.js') || name.endsWith('.cjs')) out.push(relative(root, path));
+            }
+            return out.sort();
+          };
+          const baseFiles = walk(baseDir), candidateFiles = walk(candidateDir);
+          if (JSON.stringify(baseFiles) !== JSON.stringify(candidateFiles)) throw new Error('runtime entry set changed');
+          const metrics = (x) => ({ raw: x.length, gzip: canonicalGzip(x).length, brotli: observationalBrotli(x).length });
+          const rows = {};
+          for (const file of candidateFiles) {
+            const base = readFileSync(`${baseDir}/${file}`), candidate = readFileSync(`${candidateDir}/${file}`);
+            if (Buffer.compare(base, candidate) === 0) continue;
+            const b = metrics(base), c = metrics(candidate);
+            rows[file] = { base: b, candidate: c, delta: { raw: c.raw-b.raw, gzip: c.gzip-b.gzip, brotli: c.brotli-b.brotli } };
+            for (const key of ['raw', 'gzip', 'brotli']) if (c[key] > b[key]) throw new Error(`${file} ${key} regressed: ${b[key]} -> ${c[key]}`);
+          }
+          if (!Object.keys(rows).length) throw new Error('candidate changed no runtime entry');
+          const result = { base: process.env.BASE_SHA, candidate: process.env.CANDIDATE_SHA, node: process.version, changedRuntimeEntries: Object.keys(rows).length, rows };
+          writeFileSync(process.env.RUNNER_TEMP + '/result.json', JSON.stringify(result, null, 2));
+          console.log(JSON.stringify(result, null, 2));
+          EOF
+          node "$RUNNER_TEMP/candidate/.research-bytes.mjs"
+      - name: Upload immutable byte evidence
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
+        with:
+          name: motion-value-scratch-bytes-${{ github.sha }}
+          path: ${{ runner.temp }}/result.json
+          if-no-files-found: error
+          retention-days: 7
