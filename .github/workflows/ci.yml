@@ -2,7 +2,7 @@ name: CI
 
 on:
   push:
-    branches: ["main"]
+    branches: ["main", "autoresearch/qemu-ir-415-20260916"]
   pull_request:
   merge_group:
   workflow_dispatch:
@@ -198,6 +198,42 @@ jobs:
 
   browser-static:
     uses: ./.github/workflows/browser.yml
+
+  research-qemu-ir:
+    name: research · QEMU guest instructions · #415
+    if: ${{ github.ref == 'refs/heads/autoresearch/qemu-ir-415-20260916' && contains(github.event.head_commit.message, 'run QEMU via registered CI') }}
+    runs-on: ubuntu-24.04
+    timeout-minutes: 45
+    env:
+      RESULT_DIR: ${{ github.workspace }}/qemu-ir-415-result
+    steps:
+      - name: Checkout exact carrier
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          persist-credentials: false
+          fetch-depth: 0
+      - name: Setup frozen Node
+        uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v6
+        with:
+          node-version: "24.20.0"
+      - name: Activate pinned pnpm
+        run: |
+          corepack enable
+          corepack install --global pnpm@11.11.0
+      - name: Guard product candidate
+        run: |
+          test "$(git merge-base HEAD df7aaced646116f34135083dbfbf62ee40265657)" = "df7aaced646116f34135083dbfbf62ee40265657"
+          git diff --exit-code df7aaced646116f34135083dbfbf62ee40265657 -- src test package.json pnpm-lock.yaml
+      - name: Acquire preregistered QEMU evidence
+        run: bash .github/research/qemu-ir-415/run.sh
+      - name: Upload QEMU research receipt
+        if: always()
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
+        with:
+          name: qemu-ir-415-receipt
+          path: qemu-ir-415-result
+          if-no-files-found: warn
+          retention-days: 30
 
   CI:
     name: CI
