@@ -1,0 +1,162 @@
+name: Research · frame requester state
+
+on:
+  push:
+    branches: ["autoresearch/frame-requester-state-20260916"]
+
+permissions:
+  contents: read
+
+jobs:
+  evidence:
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    steps:
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          persist-credentials: false
+          fetch-depth: 0
+
+      - name: Setup Node
+        uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v6
+        with:
+          node-version: "24"
+
+      - name: Activate pinned pnpm
+        run: |
+          corepack enable
+          corepack install --global pnpm@11.11.0
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Structural state oracle with positive control
+        shell: bash
+        run: |
+          node --input-type=module <<'NODE'
+          import { readFileSync } from 'node:fs';
+          const source = readFileSync('src/internal/frame-requester.ts', 'utf8');
+          const prefix = source.slice(source.indexOf('): () => void {') + 16, source.indexOf('\n\n  function flush'));
+          const names = [...prefix.matchAll(/^\s*let\s+([A-Za-z_$][\w$]*)/gm)].map((m) => m[1]);
+          const expected = ['callingHost', 'pending', 'synchronousTimestamp', 'queued', 'queuedTimestamp', 'reservation'];
+          const same = names.length === expected.length && names.every((name, index) => name === expected[index]);
+          if (!same || source.includes('let fallback =') || source.includes('let synchronousDelivery')) {
+            throw new Error(`candidate state oracle failed: ${JSON.stringify(names)}`);
+          }
+          const mutant = prefix + '\n  let fallback = false;';
+          const mutantNames = [...mutant.matchAll(/^\s*let\s+([A-Za-z_$][\w$]*)/gm)].map((m) => m[1]);
+          if (mutantNames.length === expected.length) throw new Error('positive control was not detected');
+          console.log(JSON.stringify({ baselineRetainedScalars: 8, candidateRetainedScalars: names.length, names }));
+          NODE
+
+      - name: Targeted semantics
+        run: pnpm vitest run test/frame-requester.test.ts
+
+      - name: Behavioral oracle positive control
+        shell: bash
+        run: |
+          cp src/internal/frame-requester.ts "$RUNNER_TEMP/frame-requester.ts"
+          node --input-type=module <<'NODE'
+          import { readFileSync, writeFileSync } from 'node:fs';
+          const path = 'src/internal/frame-requester.ts';
+          const source = readFileSync(path, 'utf8');
+          const needle = '} else if (!pending) {';
+          if (!source.includes(needle)) throw new Error('mutation target missing');
+          writeFileSync(path, source.replace(needle, '} else if (false) {'));
+          NODE
+          set +e
+          pnpm vitest run test/frame-requester.test.ts -t "defers successful synchronous delivery from a trusted host to the trampoline"
+          status=$?
+          set -e
+          cp "$RUNNER_TEMP/frame-requester.ts" src/internal/frame-requester.ts
+          if [[ "$status" -eq 0 ]]; then
+            echo "::error::behavioral positive-control mutation survived"
+            exit 1
+          fi
+
+      - name: Paired exact-base and candidate builds
+        shell: bash
+        env:
+          BASE_SHA: fe11daa407de396fad952be7679650f63dabd4dd
+        run: |
+          cp src/internal/frame-requester.ts "$RUNNER_TEMP/candidate-frame-requester.ts"
+          git show "$BASE_SHA:src/internal/frame-requester.ts" > src/internal/frame-requester.ts
+          pnpm build
+          cp -R dist "$RUNNER_TEMP/base-dist"
+          cp "$RUNNER_TEMP/candidate-frame-requester.ts" src/internal/frame-requester.ts
+          pnpm build
+
+      - name: Paired shipped-byte Pareto
+        shell: bash
+        env:
+          BASE_SHA: fe11daa407de396fad952be7679650f63dabd4dd
+        run: |
+          BASE_DIST="$RUNNER_TEMP/base-dist" node --input-type=module <<'NODE'
+          import { readFileSync, writeFileSync, readdirSync, statSync } from 'node:fs';
+          import { join, relative } from 'node:path';
+          import { canonicalGzip, observationalBrotli } from './scripts/compression-oracle.mjs';
+
+          const baseRoot = process.env.BASE_DIST;
+          const candidateRoot = 'dist';
+          const walk = (root, dir = root, out = []) => {
+            for (const name of readdirSync(dir)) {
+              const path = join(dir, name);
+              if (statSync(path).isDirectory()) walk(root, path, out);
+              else if (path.endsWith('.js') || path.endsWith('.cjs')) out.push(relative(root, path));
+            }
+            return out;
+          };
+          const metrics = (bytes) => ({
+            raw: bytes.length,
+            gzip: canonicalGzip(bytes).length,
+            brotli: observationalBrotli(bytes).length,
+          });
+          const paths = [...new Set([...walk(baseRoot), ...walk(candidateRoot)])].sort();
+          const changed = [];
+          const regressions = [];
+          for (const path of paths) {
+            let base;
+            let candidate;
+            try { base = readFileSync(join(baseRoot, path)); } catch { continue; }
+            try { candidate = readFileSync(join(candidateRoot, path)); } catch { continue; }
+            if (base.equals(candidate)) continue;
+            const before = metrics(base);
+            const after = metrics(candidate);
+            const delta = Object.fromEntries(Object.keys(before).map((key) => [key, after[key] - before[key]]));
+            changed.push({ path, before, after, delta });
+            for (const key of ['raw', 'gzip', 'brotli']) {
+              if (delta[key] > 0) regressions.push({ path, metric: key, delta: delta[key] });
+            }
+          }
+          const result = {
+            base: process.env.BASE_SHA,
+            candidate: process.env.GITHUB_SHA,
+            node: process.version,
+            retainedScalars: { before: 8, after: 6 },
+            changed,
+            regressions,
+          };
+          writeFileSync('research-result.json', JSON.stringify(result, null, 2));
+          console.log(JSON.stringify(result, null, 2));
+          if (regressions.length) throw new Error(`protected byte regression: ${JSON.stringify(regressions)}`);
+          NODE
+
+      - name: Full semantic and package gates
+        run: |
+          pnpm check:static
+          pnpm typecheck:native
+          pnpm test
+          pnpm size
+          pnpm pack:smoke
+          pnpm pack:compat
+
+      - name: Upload immutable evidence
+        if: always()
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
+        with:
+          name: frame-requester-state-${{ github.sha }}
+          path: research-result.json
+          if-no-files-found: warn
+          retention-days: 7
+          compression-level: 0
