@@ -55,6 +55,22 @@ describe('internal frame requester — hostile one-shot ownership', () => {
     expect(tick).not.toHaveBeenCalled();
   });
 
+  it('defers successful synchronous delivery from a trusted host to the trampoline', () => {
+    vi.useFakeTimers();
+    const tick = vi.fn();
+    const request = createFrameRequester((callback) => {
+      callback(10);
+      return 1;
+    }, tick, false);
+
+    request();
+    expect(tick).not.toHaveBeenCalled();
+
+    vi.runAllTimers();
+    expect(tick).toHaveBeenCalledTimes(1);
+    expect(tick).toHaveBeenCalledWith(10);
+  });
+
   it('coalesces handle=0 fallback requests into one pending delivery', () => {
     vi.useFakeTimers();
     const schedule = vi.fn(() => 0);
