@@ -113,7 +113,6 @@ jobs:
           )
           p.write_text(s)
           PY
-          pnpm exec prettier --write src/animate/index.ts
           git diff --check
           git diff -- src/animate/index.ts
       - name: Candidate static, build, test, size
