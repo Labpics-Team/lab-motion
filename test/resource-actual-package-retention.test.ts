@@ -1,11 +1,13 @@
 import { execFileSync } from 'node:child_process';
 import {
+  copyFileSync,
   existsSync,
   mkdirSync,
   mkdtempSync,
   readFileSync,
   readdirSync,
   rmSync,
+  symlinkSync,
   writeFileSync,
 } from 'node:fs';
 import { tmpdir } from 'node:os';
@@ -19,17 +21,38 @@ const PACKAGE_COMMAND_TIMEOUT_MS = 30_000;
 const PROBE_TIMEOUT_MS = 20_000;
 const WINDOWS_SHELL = process.platform === 'win32';
 
+function copyTrackedSource(target: string): void {
+  const tracked = execFileSync('git', ['ls-files', '-z'], {
+    cwd: ROOT,
+    encoding: 'utf8',
+    timeout: PACKAGE_COMMAND_TIMEOUT_MS,
+  }).split('\0').filter(Boolean);
+  for (const relative of tracked) {
+    const destination = join(target, relative);
+    mkdirSync(dirname(destination), { recursive: true });
+    copyFileSync(join(ROOT, relative), destination);
+  }
+  symlinkSync(
+    join(ROOT, 'node_modules'),
+    join(target, 'node_modules'),
+    process.platform === 'win32' ? 'junction' : 'dir',
+  );
+}
+
 function runInstalledPackageProbe(): string {
   const work = mkdtempSync(join(tmpdir(), 'resource-actual-package-'));
   try {
+    const source = join(work, 'source');
+    mkdirSync(source);
+    copyTrackedSource(source);
     execFileSync('pnpm', ['build'], {
-      cwd: ROOT,
+      cwd: source,
       stdio: 'pipe',
       shell: WINDOWS_SHELL,
       timeout: PACKAGE_COMMAND_TIMEOUT_MS,
     });
     execFileSync('pnpm', ['pack', '--pack-destination', work], {
-      cwd: ROOT,
+      cwd: source,
       stdio: 'pipe',
       shell: WINDOWS_SHELL,
       timeout: PACKAGE_COMMAND_TIMEOUT_MS,
