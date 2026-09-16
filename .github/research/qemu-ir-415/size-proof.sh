@@ -2,7 +2,7 @@
 set -euo pipefail
 
 ROOT="$(pwd)"
-RESULT_DIR="$ROOT/qemu-ir-415-size-result"
+RESULT_DIR="$ROOT/qemu-ir-415-result"
 BASE=/tmp/lm-size-base
 CAND=/tmp/lm-size-candidate
 mkdir -p "$RESULT_DIR"
