@@ -1,0 +1,180 @@
+name: Autoresearch plan replay r11
+
+on:
+  push:
+    branches: ["autoresearch/plan-replay-r11-carrier"]
+
+permissions:
+  contents: write
+
+env:
+  COREPACK_ENABLE_DOWNLOAD_PROMPT: "0"
+  COREPACK_DEFAULT_TO_LATEST: "0"
+  BASE_SHA: fe11daa407de396fad952be7679650f63dabd4dd
+  CANDIDATE_BRANCH: autoresearch/plan-replay-r11
+
+jobs:
+  probe:
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020
+        with:
+          node-version: "24"
+      - name: Activate pinned pnpm
+        run: |
+          corepack enable
+          corepack install --global pnpm@11.11.0
+      - name: Install exact base
+        run: |
+          git checkout --detach "$BASE_SHA"
+          pnpm install --frozen-lockfile
+      - name: Build and measure base
+        shell: bash
+        run: |
+          pnpm build
+          node --input-type=module <<'NODE' | tee /tmp/base-size.json
+          import { readFileSync, readdirSync } from 'node:fs';
+          import { resolve, relative } from 'node:path';
+          import { canonicalGzip, observationalBrotli } from './scripts/compression-oracle.mjs';
+          const root = resolve('dist/animate');
+          const out = {};
+          for (const name of readdirSync(root)) {
+            if (!/\.(?:js|cjs)$/.test(name)) continue;
+            const raw = readFileSync(resolve(root, name));
+            out[relative(process.cwd(), resolve(root, name))] = {
+              raw: raw.length,
+              gzip: canonicalGzip(raw).length,
+              brotli: observationalBrotli(raw).length,
+            };
+          }
+          console.log(JSON.stringify(out));
+          NODE
+          pnpm size | tee /tmp/base-size-gate.txt
+      - name: Apply representation candidate
+        shell: bash
+        run: |
+          python3 <<'PY'
+          from pathlib import Path
+          p = Path('src/animate/index.ts')
+          s = p.read_text()
+          old = """type PlannedGroup = readonly [
+            el: AnimatableElement,
+            group: GroupKey,
+            record: ReturnType<typeof groupRecord>,
+            bound: BoundGroup,
+            delayMs: number,
+            /** Tier 3 — reduced, undefined — main, tuple — compositor. */
+            execution: SpringExecutionArtifactTuple | Extract<CompositorTierCode, 3> | undefined,
+          ];"""
+          new = """/** Tier 3 — reduced, undefined — main, tuple — compositor. */
+          type PlannedExecution =
+            | SpringExecutionArtifactTuple
+            | Extract<CompositorTierCode, 3>
+            | undefined;"""
+          assert s.count(old) == 1
+          s = s.replace(old, new)
+          old = """  const plan: PlannedGroup[] = [];
+          for (let i = 0; i < els.length; i++) {
+            const el = els[i]!;
+            const delayMs = targetDelays?.[i] ?? baseDelay;"""
+          new = """  const bounds: BoundGroup[] = [];
+          const executions: PlannedExecution[] = [];
+          for (let i = 0; i < els.length; i++) {
+            const el = els[i]!;"""
+          assert s.count(old) == 1
+          s = s.replace(old, new)
+          old = """      plan.push([el, group, rec, bound, delayMs, execution]);"""
+          new = """      bounds.push(bound);
+                executions.push(execution);"""
+          assert s.count(old) == 1
+          s = s.replace(old, new)
+          assert s.count('  const total = plan.length;') == 1
+          s = s.replace('  const total = plan.length;', '  const total = bounds.length;')
+          old = """    for (const [el, group, rec, bound, delayMs, execution] of plan) {"""
+          new = """    let planIndex = 0;
+              for (let i = 0; i < els.length; i++) {
+                const el = els[i]!;
+                const delayMs = targetDelays?.[i] ?? baseDelay;
+                for (const group of groups.keys()) {
+                  const rec = groupRecord(el, group);
+                  const bound = bounds[planIndex]!;
+                  const execution = executions[planIndex];
+                  planIndex++;"""
+          assert s.count(old) == 1
+          s = s.replace(old, new)
+          marker = """      // Sync timer остаётся pending, пока не опубликованы все
+                // owners: иначе duplicate target успевает записать target,
+                // а следующий заранее связанный effect возвращает from.
+              }
+              // Вторая commit-фаза:"""
+          replacement = """      // Sync timer остаётся pending, пока не опубликованы все
+                // owners: иначе duplicate target успевает записать target,
+                // а следующий заранее связанный effect возвращает from.
+                }
+              }
+              // Вторая commit-фаза:"""
+          assert s.count(marker) == 1
+          s = s.replace(marker, replacement)
+          p.write_text(s)
+          PY
+          pnpm exec prettier --write src/animate/index.ts
+          git diff --check
+          git diff -- src/animate/index.ts
+      - name: Candidate static, build, test, size
+        shell: bash
+        run: |
+          pnpm check:static
+          pnpm typecheck:native
+          pnpm build
+          pnpm vitest run
+          pnpm size | tee /tmp/candidate-size-gate.txt
+          node --input-type=module <<'NODE' | tee /tmp/candidate-size.json
+          import { readFileSync, readdirSync } from 'node:fs';
+          import { resolve, relative } from 'node:path';
+          import { canonicalGzip, observationalBrotli } from './scripts/compression-oracle.mjs';
+          const root = resolve('dist/animate');
+          const out = {};
+          for (const name of readdirSync(root)) {
+            if (!/\.(?:js|cjs)$/.test(name)) continue;
+            const raw = readFileSync(resolve(root, name));
+            out[relative(process.cwd(), resolve(root, name))] = {
+              raw: raw.length,
+              gzip: canonicalGzip(raw).length,
+              brotli: observationalBrotli(raw).length,
+            };
+          }
+          console.log(JSON.stringify(out));
+          NODE
+      - name: Compare protected bytes
+        shell: bash
+        run: |
+          node --input-type=module <<'NODE'
+          import { readFileSync } from 'node:fs';
+          const parse = (p) => JSON.parse(readFileSync(p, 'utf8').trim().split('\n').at(-1));
+          const a = parse('/tmp/base-size.json');
+          const b = parse('/tmp/candidate-size.json');
+          let bad = false;
+          for (const k of Object.keys(a)) {
+            const d = {};
+            for (const m of ['raw','gzip','brotli']) {
+              d[m] = b[k][m] - a[k][m];
+              if (d[m] > 0) bad = true;
+            }
+            console.log(k, JSON.stringify({base:a[k], candidate:b[k], delta:d}));
+          }
+          if (bad) process.exit(42);
+          NODE
+      - name: Publish clean exact candidate commit
+        shell: bash
+        run: |
+          git config user.name github-actions[bot]
+          git config user.email 41898282+github-actions[bot]@users.noreply.github.com
+          git add src/animate/index.ts
+          tree="$(git write-tree)"
+          commit="$(printf '%s\n' 'perf(animate): compact preflight plan representation' | git commit-tree "$tree" -p "$BASE_SHA")"
+          echo "candidate=$commit"
+          git push --force origin "$commit:refs/heads/$CANDIDATE_BRANCH"
