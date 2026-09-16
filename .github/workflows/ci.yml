@@ -200,7 +200,7 @@ jobs:
     uses: ./.github/workflows/browser.yml
 
   research-qemu-ir:
-    name: research · QEMU guest instructions · #415
+    name: research · complete size Pareto · #415
     runs-on: ubuntu-24.04
     timeout-minutes: 45
     env:
@@ -223,15 +223,15 @@ jobs:
         run: |
           test "$(git merge-base HEAD df7aaced646116f34135083dbfbf62ee40265657)" = "df7aaced646116f34135083dbfbf62ee40265657"
           git diff --exit-code df7aaced646116f34135083dbfbf62ee40265657 -- src test package.json pnpm-lock.yaml
-      - name: Acquire preregistered QEMU evidence
-        run: bash .github/research/qemu-ir-415/run.sh
-      - name: Upload QEMU research receipt
+      - name: Acquire preregistered complete-size evidence
+        run: bash .github/research/qemu-ir-415/size-proof.sh
+      - name: Upload complete-size research receipt
         if: always()
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
         with:
-          name: qemu-ir-415-receipt
+          name: size-pareto-415-receipt
           path: qemu-ir-415-result
-          if-no-files-found: warn
+          if-no-files-found: error
           retention-days: 30
 
   CI:
