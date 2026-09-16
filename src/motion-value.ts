@@ -82,13 +82,15 @@ import { CONVERGENCE_THRESHOLD, MAX_FRAMES, FIXED_DT_S } from './internal/consta
 /**
  * Порог численной стабильности: величины меньше него трактуются как ноль.
  * Две роли (обе — защита от вырождения, значение общее): (1) «покой» — скорость
- * ниже EPSILON считается нулевой (snap-if-at-rest в setTarget); (2) знаменатель —
+ * ниже EPSILON считается нулевой (snap-if-at-rest in setTarget); (2) знаменатель —
  * |range| ниже EPSILON вырожден, деление на него дало бы ±∞/NaN, поэтому диапазон
  * либо снапается, либо floor'ится к EPSILON. Локален модулю: деления на range в
  * drive/driver защищены early-exit `from === to` (absRange > 0 гарантирован
  * статически), им epsilon-пол не нужен — потому в общий internal/constants не вынесен.
  */
 const EPSILON = 1e-10;
+/** Синхронный output-buffer солвера: _tick копирует оба числа до callback-границы. */
+const solvedSample = { value: 0, velocity: 0 };
 
 /**
  * Единый fail-fast страж конечности публичных числовых входов MotionValue:
@@ -137,8 +139,6 @@ export class MotionValue {
 
   /** Registered onChange subscribers. */
   private readonly _listeners: Set<(value: number) => void> = new Set();
-  /** Caller-owned result солвера: один объект на значение вместо одного на кадр. */
-  private readonly _solved = { value: 0, velocity: 0 };
 
   // ── Animation run state (reset on each setTarget) ───────────────────────
 
@@ -417,7 +417,7 @@ export class MotionValue {
 
       // Общий солвер (internal/solver.ts) + стражи этого модуля инлайн
       // (value→1, velocity→0 — политика отличается от clampFinite spring.ts).
-      const raw = solveSpring(this._spring, this._elapsed, this._v0Normalized, this._solved);
+      const raw = solveSpring(this._spring, this._elapsed, this._v0Normalized, solvedSample);
       const normPos = Number.isFinite(raw.value) ? raw.value : 1;
       const normVel = Number.isFinite(raw.velocity) ? raw.velocity : 0;
 
