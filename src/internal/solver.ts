@@ -110,7 +110,8 @@ export function solveSpring(
   return out;
 }
 
-const basisSample = { value: 0, velocity: 0 };
+/** Синхронный output-buffer солвера; caller копирует оба числа до callback-границы. */
+export const springSample = { value: 0, velocity: 0 };
 
 /**
  * Строит линейный по v0 базис тем же физическим ядром. Внутренний output-seam
@@ -122,7 +123,7 @@ export function sampleSpringBasisUnchecked(
   t: number,
   out: MutableSpringBasis,
 ): MutableSpringBasis {
-  solveSpring(params, t, 0, basisSample, out);
+  solveSpring(params, t, 0, springSample, out);
   return out;
 }
 
