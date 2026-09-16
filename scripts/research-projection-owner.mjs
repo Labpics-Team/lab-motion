@@ -54,8 +54,29 @@ const oracle = (s) => !s.includes('measuredIds');
 if (!oracle(source) || oracle(positive)) throw new Error('structural oracle positive control failed');
 console.log('STRUCTURAL_ORACLE=' + JSON.stringify({ measurementMembershipSet: 0, ancestorCycleSet: cycleSetCount, failureDelete: true, positiveControl: 'RED' }));
 
+const testPath = 'test/projection-dom.test.ts';
+const semanticTest = `\n\ndescribe('projection/dom: failed LAST measurement ownership', () => {\n  it('drops a failed captured ancestor while a measured descendant keeps projecting as a root', () => {\n    const world = makeWorld();\n    const clock = makeClock();\n    const P = world.el('P-failed', P_FIRST);\n    const C = world.el('C-survives', C_FIRST, { parent: P });\n    const dom = createDomProjection(domOptions(world, clock));\n\n    dom.capture([P, C]);\n    P.getBoundingClientRect = () => {\n      throw new Error('detached before LAST measurement');\n    };\n    C.rect = { x: 30, y: 10, width: 20, height: 20 };\n\n    expect(() => dom.play()).not.toThrow();\n    expect(flightTransformWrites(world.writes(P))).toHaveLength(0);\n    const childWrites = flightTransformWrites(world.writes(C));\n    expect(childWrites.length).toBeGreaterThan(0);\n    const first = parseTranslateScale(childWrites[0].value!)!;\n    expect(first.tx).toBeCloseTo(-20, 9);\n    expect(first.ty).toBeCloseTo(0, 9);\n  });\n});\n`;
+const originalTest = readFileSync(testPath, 'utf8');
+if (originalTest.includes('failed LAST measurement ownership')) throw new Error('semantic test already exists');
+writeFileSync(testPath, originalTest + semanticTest);
+
 show('candidate typecheck', run('pnpm', ['typecheck']));
 show('candidate targeted tests', run('pnpm', ['exec', 'vitest', 'run', 'test/projection-dom.test.ts', 'test/projection-geometry.test.ts', 'test/projection-driver.test.ts']));
+
+// Positive control for the new semantic characterization: keep failed parent in the
+// single owner. That must turn the focused test RED, otherwise the test cannot
+// protect the ownership invariant this candidate relies on.
+writeFileSync(path, source.replace('          captured.delete(cap.el);\n', ''));
+let semanticMutationRed = false;
+try {
+  run('pnpm', ['exec', 'vitest', 'run', 'test/projection-dom.test.ts', '-t', 'drops a failed captured ancestor']);
+} catch {
+  semanticMutationRed = true;
+}
+if (!semanticMutationRed) throw new Error('semantic mutation positive control stayed green');
+writeFileSync(path, source);
+console.log('SEMANTIC_MUTATION=RED');
+
 show('candidate build', run('pnpm', ['build']));
 const candidateSize = run('pnpm', ['size']);
 show('CANDIDATE SIZE', candidateSize);
@@ -91,5 +112,6 @@ if (badDist.length) throw new Error('protected dist regression: ' + JSON.stringi
 
 writeFileSync('/tmp/base-size.txt', baseSize);
 writeFileSync('/tmp/candidate-size.txt', candidateSize);
-show('candidate diff', run('git', ['diff', '--', path]));
+show('candidate source diff', run('git', ['diff', '--', path]));
+show('candidate test diff', run('git', ['diff', '--', testPath]));
 console.log('EVIDENCE_RESULT=PASS');
