@@ -59,66 +59,58 @@ jobs:
         run: |
           python3 <<'PY'
           from pathlib import Path
+          import re
           p = Path('src/animate/index.ts')
           s = p.read_text()
-          old = """type PlannedGroup = readonly [
-            el: AnimatableElement,
-            group: GroupKey,
-            record: ReturnType<typeof groupRecord>,
-            bound: BoundGroup,
-            delayMs: number,
-            /** Tier 3 — reduced, undefined — main, tuple — compositor. */
-            execution: SpringExecutionArtifactTuple | Extract<CompositorTierCode, 3> | undefined,
-          ];"""
-          new = """/** Tier 3 — reduced, undefined — main, tuple — compositor. */
+          s, n = re.subn(
+              r"type PlannedGroup = readonly \[.*?\n\];",
+              """/** Tier 3 — reduced, undefined — main, tuple — compositor. */
           type PlannedExecution =
             | SpringExecutionArtifactTuple
             | Extract<CompositorTierCode, 3>
-            | undefined;"""
-          assert s.count(old) == 1
-          s = s.replace(old, new)
-          old = """  const plan: PlannedGroup[] = [];
-          for (let i = 0; i < els.length; i++) {
-            const el = els[i]!;
-            const delayMs = targetDelays?.[i] ?? baseDelay;"""
-          new = """  const bounds: BoundGroup[] = [];
+            | undefined;""",
+              s,
+              count=1,
+              flags=re.S,
+          )
+          assert n == 1, 'PlannedGroup block'
+          s, n = re.subn(
+              r"  const plan: PlannedGroup\[\] = \[\];\n  for \(let i = 0; i < els\.length; i\+\+\) \{\n    const el = els\[i\]!;\n    const delayMs = targetDelays\?\.\[i\] \?\? baseDelay;",
+              """  const bounds: BoundGroup[] = [];
           const executions: PlannedExecution[] = [];
           for (let i = 0; i < els.length; i++) {
-            const el = els[i]!;"""
-          assert s.count(old) == 1
-          s = s.replace(old, new)
-          old = """      plan.push([el, group, rec, bound, delayMs, execution]);"""
-          new = """      bounds.push(bound);
-                executions.push(execution);"""
-          assert s.count(old) == 1
-          s = s.replace(old, new)
+            const el = els[i]!;""",
+              s,
+              count=1,
+          )
+          assert n == 1, 'plan declaration'
+          assert s.count('      plan.push([el, group, rec, bound, delayMs, execution]);') == 1
+          s = s.replace(
+              '      plan.push([el, group, rec, bound, delayMs, execution]);',
+              '      bounds.push(bound);\n      executions.push(execution);',
+          )
           assert s.count('  const total = plan.length;') == 1
           s = s.replace('  const total = plan.length;', '  const total = bounds.length;')
-          old = """    for (const [el, group, rec, bound, delayMs, execution] of plan) {"""
-          new = """    let planIndex = 0;
-              for (let i = 0; i < els.length; i++) {
-                const el = els[i]!;
-                const delayMs = targetDelays?.[i] ?? baseDelay;
-                for (const group of groups.keys()) {
-                  const rec = groupRecord(el, group);
-                  const bound = bounds[planIndex]!;
-                  const execution = executions[planIndex];
-                  planIndex++;"""
-          assert s.count(old) == 1
-          s = s.replace(old, new)
-          marker = """      // Sync timer остаётся pending, пока не опубликованы все
-                // owners: иначе duplicate target успевает записать target,
-                // а следующий заранее связанный effect возвращает from.
-              }
-              // Вторая commit-фаза:"""
-          replacement = """      // Sync timer остаётся pending, пока не опубликованы все
-                // owners: иначе duplicate target успевает записать target,
-                // а следующий заранее связанный effect возвращает from.
-                }
-              }
-              // Вторая commit-фаза:"""
-          assert s.count(marker) == 1
-          s = s.replace(marker, replacement)
+          opening = '    for (const [el, group, rec, bound, delayMs, execution] of plan) {'
+          assert s.count(opening) == 1
+          s = s.replace(
+              opening,
+              """    let planIndex = 0;
+          for (let i = 0; i < els.length; i++) {
+            const el = els[i]!;
+            const delayMs = targetDelays?.[i] ?? baseDelay;
+            for (const group of groups.keys()) {
+              const rec = groupRecord(el, group);
+              const bound = bounds[planIndex]!;
+              const execution = executions[planIndex];
+              planIndex++;""",
+          )
+          tail = "    }\n    // Вторая commit-фаза: host completion видит уже целый owner graph."
+          assert s.count(tail) == 1, 'commit-loop tail'
+          s = s.replace(
+              tail,
+              "    }\n    }\n    // Вторая commit-фаза: host completion видит уже целый owner graph.",
+          )
           p.write_text(s)
           PY
           pnpm exec prettier --write src/animate/index.ts
