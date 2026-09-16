@@ -65,19 +65,21 @@ assert.equal(typeof gc, 'function', '--expose-gc missing');
 
 const retainedOwners = [];
 
-const frameCase = async (mod, label, terminal) => {
+const frameCase = (mod, label, terminal) => {
   let payload = { id: label };
   const ref = new WeakRef(payload);
-  const captured = payload;
+  const hold = (value) => () => { void value.id; };
+  let callback = hold(payload);
   const loop = mod.createFrameLoop({ requestFrame: () => 1 });
-  const off = loop.update(() => { void captured.id; });
+  const off = loop.update(callback);
   if (terminal) off();
-  retainedOwners.push(loop, off);
   payload = undefined;
+  callback = undefined;
+  retainedOwners.push(loop, off);
   return ref;
 };
 
-const compositorCase = async (mod, label, terminal) => {
+const compositorCase = (mod, label, terminal) => {
   let target = {
     marker: label,
     animate: () => ({ cancel() {} }),
@@ -104,16 +106,16 @@ const compositorCase = async (mod, label, terminal) => {
 };
 
 const dropped = [
-  await frameCase(frameEsm, 'frame-esm-dropped', true),
-  await frameCase(frameCjs, 'frame-cjs-dropped', true),
-  await compositorCase(compositorEsm, 'compositor-esm-dropped', true),
-  await compositorCase(compositorCjs, 'compositor-cjs-dropped', true),
+  frameCase(frameEsm, 'frame-esm-dropped', true),
+  frameCase(frameCjs, 'frame-cjs-dropped', true),
+  compositorCase(compositorEsm, 'compositor-esm-dropped', true),
+  compositorCase(compositorCjs, 'compositor-cjs-dropped', true),
 ];
 const live = [
-  await frameCase(frameEsm, 'frame-esm-live', false),
-  await frameCase(frameCjs, 'frame-cjs-live', false),
-  await compositorCase(compositorEsm, 'compositor-esm-live', false),
-  await compositorCase(compositorCjs, 'compositor-cjs-live', false),
+  frameCase(frameEsm, 'frame-esm-live', false),
+  frameCase(frameCjs, 'frame-cjs-live', false),
+  compositorCase(compositorEsm, 'compositor-esm-live', false),
+  compositorCase(compositorCjs, 'compositor-cjs-live', false),
 ];
 let deliberate = { id: 'deliberate-retention' };
 const deliberateRef = new WeakRef(deliberate);
