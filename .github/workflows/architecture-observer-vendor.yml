@@ -1,0 +1,47 @@
+name: architecture-observer-vendor
+
+# Публичная канарейка наблюдателя на vendored bundle.
+# Advisory: замечания не блокируют слияние без отдельной квалификации.
+on:
+  pull_request:
+  merge_group:
+  push:
+    branches: [main]
+
+permissions:
+  contents: read
+
+concurrency:
+  group: architecture-vendor-${{ github.event.pull_request.number || github.event.merge_group.head_sha || github.sha }}
+  cancel-in-progress: true
+
+jobs:
+  observe:
+    name: architecture evidence (vendored)
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    steps:
+      - name: Checkout full Git evidence
+        uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
+        with:
+          persist-credentials: false
+          fetch-depth: 0
+      - name: Select Node.js runtime
+        uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version: "22.14.0"
+      - name: Install canonical pinned native parser
+        run: bash .github/vendor/labpics-architecture-observer/install-tools.sh "$RUNNER_TEMP/architecture-parser" ast-grep
+      - name: Verify vendored observer before running it
+        run: node .github/vendor/labpics-architecture-observer/projection.mjs verify --root .github/vendor/labpics-architecture-observer
+      - name: Observe source and evolutionary architecture
+        env:
+          ARCHITECTURE_AST_GREP: ${{ runner.temp }}/architecture-parser/ast-grep
+        run: |
+          set -euo pipefail
+          node .github/vendor/labpics-architecture-observer/cli.mjs observe \
+            --repo "$GITHUB_WORKSPACE" \
+            --ref "${{ github.event.pull_request.head.sha || github.sha }}" \
+            --ast-grep "$ARCHITECTURE_AST_GREP" \
+            --out "$RUNNER_TEMP/architecture-evidence" \
+            --summary "$GITHUB_STEP_SUMMARY"
