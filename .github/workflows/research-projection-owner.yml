@@ -4,7 +4,8 @@ on:
     branches:
       - research/projection-measured-owner-20260916
 permissions:
-  contents: read
+  contents: write
+  actions: write
 jobs:
   evidence:
     runs-on: ubuntu-latest
@@ -12,11 +13,51 @@ jobs:
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
         with:
-          persist-credentials: false
           fetch-depth: 0
       - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020
         with:
           node-version: '24.20.0'
       - run: corepack enable && corepack install --global pnpm@11.11.0
       - run: pnpm install --frozen-lockfile
-      - run: node scripts/research-projection-owner.mjs
+      - name: Prove candidate
+        run: node scripts/research-projection-owner.mjs
+      - name: Materialize clean product branch
+        env:
+          BASE: fe11daa407de396fad952be7679650f63dabd4dd
+          PRODUCT: perf/projection-measured-owner-20260916
+        run: |
+          git diff --binary -- src/projection/dom.ts test/projection-dom.test.ts > /tmp/candidate.patch
+          test -s /tmp/candidate.patch
+          git reset --hard "$BASE"
+          git clean -fd
+          git checkout -b "$PRODUCT"
+          git apply /tmp/candidate.patch
+          python - <<'PY'
+          from pathlib import Path
+          p = Path('test/projection-dom.test.ts')
+          s = p.read_text()
+          s = s.replace("\n\n\ndescribe('projection/dom: failed LAST measurement ownership'", "\n\ndescribe('projection/dom: failed LAST measurement ownership'", 1)
+          p.write_text(s)
+          PY
+          git diff --check
+          pnpm typecheck
+          pnpm exec vitest run test/projection-dom.test.ts test/projection-geometry.test.ts test/projection-driver.test.ts
+          git config user.name "Lab Motion Autoresearch"
+          git config user.email "actions@users.noreply.github.com"
+          git add src/projection/dom.ts test/projection-dom.test.ts
+          git commit -m "perf(projection): reuse captured measurement owner"
+          git push origin "HEAD:refs/heads/$PRODUCT"
+          echo "PRODUCT_SHA=$(git rev-parse HEAD)"
+      - name: Dispatch authoritative exact-head CI
+        env:
+          GH_TOKEN: ${{ github.token }}
+          PRODUCT: perf/projection-measured-owner-20260916
+        run: |
+          curl --fail-with-body -L \
+            -X POST \
+            -H "Accept: application/vnd.github+json" \
+            -H "Authorization: Bearer $GH_TOKEN" \
+            -H "X-GitHub-Api-Version: 2022-11-28" \
+            https://api.github.com/repos/Labpics-Team/lab-motion/actions/workflows/ci.yml/dispatches \
+            -d "{\"ref\":\"$PRODUCT\"}"
+          echo "DISPATCHED_REF=$PRODUCT"
