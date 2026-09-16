@@ -116,28 +116,43 @@ jobs:
           node "$RUNNER_TEMP/reentry.mjs" "$GITHUB_WORKSPACE/dist/index.js" > "$RUNNER_TEMP/candidate-trace.json"
           cmp "$RUNNER_TEMP/base-trace.json" "$RUNNER_TEMP/candidate-trace.json"
 
-      - name: Frozen raw gzip Brotli differential
+      - name: Frozen all-entry raw gzip Brotli differential
         shell: bash
         run: |
           set -euo pipefail
           cat > "$RUNNER_TEMP/bytes.mjs" <<'EOF'
-          import { readFileSync, writeFileSync } from 'node:fs';
+          import { readFileSync, writeFileSync, readdirSync, statSync } from 'node:fs';
+          import { join, relative } from 'node:path';
           import { canonicalGzip, observationalBrotli } from './scripts/compression-oracle.mjs';
           const baseDir = process.env.RUNNER_TEMP + '/base/dist';
           const candidateDir = process.env.GITHUB_WORKSPACE + '/dist';
+          const walk = (root, dir = root, out = []) => {
+            for (const name of readdirSync(dir)) {
+              const path = join(dir, name);
+              if (statSync(path).isDirectory()) walk(root, path, out);
+              else if (name.endsWith('.js') || name.endsWith('.cjs')) out.push(relative(root, path));
+            }
+            return out.sort();
+          };
+          const baseFiles = walk(baseDir);
+          const candidateFiles = walk(candidateDir);
+          if (JSON.stringify(baseFiles) !== JSON.stringify(candidateFiles)) throw new Error('runtime entry set changed');
           const rows = {};
-          for (const file of ['index.js', 'index.cjs']) {
+          const metrics = (x) => ({ raw: x.length, gzip: canonicalGzip(x).length, brotli: observationalBrotli(x).length });
+          for (const file of candidateFiles) {
             const base = readFileSync(`${baseDir}/${file}`);
             const candidate = readFileSync(`${candidateDir}/${file}`);
-            const metrics = (x) => ({ raw: x.length, gzip: canonicalGzip(x).length, brotli: observationalBrotli(x).length });
+            if (Buffer.compare(base, candidate) === 0) continue;
             const b = metrics(base), c = metrics(candidate);
             for (const key of ['raw', 'gzip', 'brotli']) if (c[key] > b[key]) throw new Error(`${file} ${key} regressed: ${b[key]} -> ${c[key]}`);
             rows[file] = { base: b, candidate: c, delta: { raw: c.raw-b.raw, gzip: c.gzip-b.gzip, brotli: c.brotli-b.brotli } };
           }
+          if (Object.keys(rows).length === 0) throw new Error('candidate changed no shipped runtime entry');
           const result = {
             base: process.env.BASE_SHA,
             candidate: process.env.GITHUB_SHA,
             node: process.version,
+            changedRuntimeEntries: Object.keys(rows).length,
             rows,
             structural: { baselineInstanceScratch: 1, candidateInstanceScratch: 0 },
             reentrantDifferential: 'exact-match',
