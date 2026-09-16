@@ -550,8 +550,8 @@ describe('projection/dom: враждебный parent-цикл — никогд�
   });
 });
 
-describe('projection/dom: failed LAST measurement ownership', () => {
-  it('drops a failed captured ancestor while a measured descendant keeps projecting as a root', () => {
+describe('projection/dom: ошибка LAST-замера', () => {
+  it('исключает незамеренный предок, а измеренный потомок продолжает проекцию как корень', () => {
     const world = makeWorld();
     const clock = makeClock();
     const P = world.el('P-failed', P_FIRST);
