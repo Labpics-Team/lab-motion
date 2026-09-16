@@ -76,7 +76,7 @@ run_one() {
   local side="$1" case_name="$2" mode="$3" rep="$4" bundle="$5"
   echo "=== side=$side case=$case_name mode=$mode rep=$rep ===" | tee -a "$RESULT_DIR/raw.log"
   set +e
-  out=$(timeout 180s "$QEMU_BIN" -cpu max -plugin file=/tmp/lm-qemu-plugin.so \
+  out=$(timeout 180s "$QEMU_BIN" -cpu max -d plugin -plugin file=/tmp/lm-qemu-plugin.so \
     "$(command -v node)" \
     --allow-natives-syntax --single-threaded --predictable \
     --no-concurrent-recompilation --random-seed=20260916 \
