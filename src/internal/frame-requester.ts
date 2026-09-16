@@ -70,7 +70,7 @@ export function createFrameRequester(
       pending = false;
       reservation = -1;
       defer(undefined);
-    } else if (!pending) {
+    } else if (owner === reservation && !pending) {
       defer(synchronousTimestamp);
     }
   };
