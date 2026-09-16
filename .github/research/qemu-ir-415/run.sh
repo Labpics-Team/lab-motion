@@ -3,20 +3,54 @@ set -euo pipefail
 
 ROOT="$(pwd)"
 RESULT_DIR="$ROOT/qemu-ir-415-result"
+export RESULT_DIR
 mkdir -p "$RESULT_DIR"
 
 sudo apt-get update
-sudo apt-get install -y --no-install-recommends qemu-user gcc pkg-config libglib2.0-dev curl
-qemu-x86_64 --version | tee "$RESULT_DIR/qemu-version.txt"
-qemu-x86_64 -help 2>&1 | grep -q -- '-plugin'
+sudo apt-get install -y --no-install-recommends \
+  qemu-user gcc pkg-config libglib2.0-dev libpixman-1-dev zlib1g-dev \
+  ninja-build python3-venv curl xz-utils
 
-mkdir -p /tmp/qemu-include
-curl --fail --location --retry 3 \
-  https://raw.githubusercontent.com/qemu/qemu/v8.2.2/include/qemu/qemu-plugin.h \
-  -o /tmp/qemu-include/qemu-plugin.h
+QEMU_BIN="$(command -v qemu-x86_64)"
+"$QEMU_BIN" --version | tee "$RESULT_DIR/qemu-package-version.txt"
+
+if ! "$QEMU_BIN" -help 2>&1 | grep -q -- '-plugin'; then
+  echo 'Ubuntu qemu-user lacks plugin support; building exact upstream QEMU 8.2.2 linux-user with plugins.'
+  curl --proto '=https' --tlsv1.2 --fail --location --retry 3 \
+    https://download.qemu.org/qemu-8.2.2.tar.xz \
+    -o /tmp/qemu-8.2.2.tar.xz
+  sha256sum /tmp/qemu-8.2.2.tar.xz | tee "$RESULT_DIR/qemu-source-sha256.txt"
+  rm -rf /tmp/qemu-8.2.2
+  tar -C /tmp -xf /tmp/qemu-8.2.2.tar.xz
+  pushd /tmp/qemu-8.2.2 >/dev/null
+  ./configure \
+    --target-list=x86_64-linux-user \
+    --enable-plugins \
+    --disable-docs \
+    --disable-tools \
+    --disable-system \
+    --disable-werror
+  ninja -C build qemu-x86_64
+  QEMU_BIN=/tmp/qemu-8.2.2/build/qemu-x86_64
+  popd >/dev/null
+fi
+
+"$QEMU_BIN" --version | tee "$RESULT_DIR/qemu-version.txt"
+"$QEMU_BIN" -help 2>&1 | grep -q -- '-plugin'
+
+QEMU_SOURCE=/tmp/qemu-8.2.2
+if [ ! -f "$QEMU_SOURCE/include/qemu/qemu-plugin.h" ]; then
+  mkdir -p /tmp/qemu-include
+  curl --proto '=https' --tlsv1.2 --fail --location --retry 3 \
+    https://raw.githubusercontent.com/qemu/qemu/v8.2.2/include/qemu/qemu-plugin.h \
+    -o /tmp/qemu-include/qemu-plugin.h
+  QEMU_INCLUDE=/tmp/qemu-include
+else
+  QEMU_INCLUDE="$QEMU_SOURCE/include"
+fi
 
 gcc -O2 -shared -fPIC -fvisibility=hidden \
-  $(pkg-config --cflags glib-2.0) -I/tmp/qemu-include \
+  $(pkg-config --cflags glib-2.0) -I"$QEMU_INCLUDE" \
   .github/research/qemu-ir-415/plugin.c -o /tmp/lm-qemu-plugin.so
 NODE_ROOT="$(dirname "$(dirname "$(command -v node)")")"
 test -f "$NODE_ROOT/include/node/node_api.h"
@@ -42,7 +76,7 @@ run_one() {
   local side="$1" case_name="$2" mode="$3" rep="$4" bundle="$5"
   echo "=== side=$side case=$case_name mode=$mode rep=$rep ===" | tee -a "$RESULT_DIR/raw.log"
   set +e
-  out=$(timeout 180s qemu-x86_64 -cpu max -plugin file=/tmp/lm-qemu-plugin.so \
+  out=$(timeout 180s "$QEMU_BIN" -cpu max -plugin file=/tmp/lm-qemu-plugin.so \
     "$(command -v node)" \
     --allow-natives-syntax --single-threaded --predictable \
     --no-concurrent-recompilation --random-seed=20260916 \
@@ -97,7 +131,7 @@ fi
   echo "pnpm=$(pnpm --version)"
   echo "kernel=$(uname -srvmo)"
   echo "cpu=$(grep -m1 'model name' /proc/cpuinfo || true)"
-  qemu-x86_64 --version | head -1
+  "$QEMU_BIN" --version | head -1
 } | tee "$RESULT_DIR/environment.txt"
 
 (cd "$RESULT_DIR" && sha256sum result.json counts.tsv raw.log environment.txt hashes.txt qemu-version.txt | tee receipt-sha256.txt)
