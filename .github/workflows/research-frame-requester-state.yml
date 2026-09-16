@@ -53,7 +53,7 @@ jobs:
       - name: Targeted semantics
         run: pnpm vitest run test/frame-requester.test.ts
 
-      - name: Ownership positive control
+      - name: Encoded-state positive control
         shell: bash
         run: |
           cp src/internal/frame-requester.ts "$RUNNER_TEMP/frame-requester.ts"
@@ -61,17 +61,17 @@ jobs:
           import { readFileSync, writeFileSync } from 'node:fs';
           const path = 'src/internal/frame-requester.ts';
           const source = readFileSync(path, 'utf8');
-          const needle = 'owner === reservation && !pending';
+          const needle = 'pending = -1;\n      tick(timestamp);';
           if (!source.includes(needle)) throw new Error('mutation target missing');
-          writeFileSync(path, source.replace(needle, '!pending'));
+          writeFileSync(path, source.replace(needle, 'pending = 0;\n      tick(timestamp);'));
           NODE
           set +e
-          pnpm vitest run test/frame-requester.test.ts -t "does not confuse a reentrant revoked reservation with synchronous delivery"
+          pnpm vitest run test/frame-requester.test.ts -t "does not defer a nested callback delivered after the inner host unwinds"
           status=$?
           set -e
           cp "$RUNNER_TEMP/frame-requester.ts" src/internal/frame-requester.ts
           if [[ "$status" -eq 0 ]]; then
-            echo "::error::ownership positive-control mutation survived"
+            echo "::error::encoded-state positive-control mutation survived"
             exit 1
           fi
 
