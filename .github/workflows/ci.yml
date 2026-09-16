@@ -201,7 +201,6 @@ jobs:
 
   research-qemu-ir:
     name: research · QEMU guest instructions · #415
-    if: ${{ github.ref == 'refs/heads/autoresearch/qemu-ir-415-20260916' && contains(github.event.head_commit.message, 'run QEMU via registered CI') }}
     runs-on: ubuntu-24.04
     timeout-minutes: 45
     env:
