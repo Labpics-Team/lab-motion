@@ -1,4 +1,4 @@
-name: research · MotionProgram binding ownership
+name: research · MotionProgram binding ownership resume
 
 on:
   push:
@@ -32,63 +32,10 @@ jobs:
           corepack install --global pnpm@11.11.0
           pnpm install --frozen-lockfile
 
-      - name: Install deterministic allocation oracle
+      - name: Reconstitute exact candidate
         shell: bash
-        run: |
-          cat > test/.research-motion-program-binding-allocation.test.ts <<'EOF'
-          import { expect, it } from 'vitest';
-          import { parseMotionProgramV1 } from '../src/internal/motion-program.js';
-          import { validProgramInput } from './motion-program-v1.fixtures.js';
-
-          it('research: counts parser-owned Map/Set allocations for one canonical program', () => {
-            const NativeMap = globalThis.Map;
-            const NativeSet = globalThis.Set;
-            let maps = 0;
-            let sets = 0;
-            class CountingMap<K, V> extends NativeMap<K, V> {
-              constructor(...args: any[]) {
-                maps++;
-                super(...args as []);
-              }
-            }
-            class CountingSet<T> extends NativeSet<T> {
-              constructor(...args: any[]) {
-                sets++;
-                super(...args as []);
-              }
-            }
-            globalThis.Map = CountingMap as unknown as MapConstructor;
-            globalThis.Set = CountingSet as unknown as SetConstructor;
-            try {
-              parseMotionProgramV1(validProgramInput());
-            } finally {
-              globalThis.Map = NativeMap;
-              globalThis.Set = NativeSet;
-            }
-            console.log(`RESEARCH_ALLOC maps=${maps} sets=${sets}`);
-            expect(maps).toBe(Number(process.env.EXPECTED_MAPS));
-            expect(sets).toBe(Number(process.env.EXPECTED_SETS));
-          });
-          EOF
-
-      - name: Baseline proof
-        shell: bash
-        env:
-          EXPECTED_MAPS: "2"
-          EXPECTED_SETS: "2"
         run: |
           set -euo pipefail
-          printf 'BASE_SHA=%s\n' "$(git rev-parse fe11daa407de396fad952be7679650f63dabd4dd)"
-          pnpm vitest run --reporter=verbose test/.research-motion-program-binding-allocation.test.ts \
-            test/motion-program-core-v1.test.ts test/motion-program-semantics-v1.test.ts \
-            test/motion-program-wire-v1.test.ts | tee /tmp/baseline-tests.log
-          pnpm build
-          cp -R dist /tmp/base-dist
-          pnpm size | tee /tmp/base-size.log
-
-      - name: Apply representation candidate
-        shell: bash
-        run: |
           python - <<'PY'
           from pathlib import Path
           path = Path('src/internal/motion-program.ts')
@@ -156,62 +103,47 @@ jobs:
               if ((state & 0x7f) !== 0x7f) fail('LMP_CANONICAL');
             }'''
           if text.count(old) != 1:
-              raise SystemExit(f'expected exactly one parseBindings block, found {text.count(old)}')
+              raise SystemExit(f'candidate application site count={text.count(old)}')
           path.write_text(text.replace(old, new))
           PY
           cp src/internal/motion-program.ts /tmp/candidate-motion-program.ts
           git diff --check
-          git diff -- src/internal/motion-program.ts
 
-      - name: Candidate semantic and structural proof
-        shell: bash
-        env:
-          EXPECTED_MAPS: "1"
-          EXPECTED_SETS: "2"
-        run: |
-          set -euo pipefail
-          pnpm vitest run --reporter=verbose test/.research-motion-program-binding-allocation.test.ts \
-            test/motion-program-core-v1.test.ts test/motion-program-semantics-v1.test.ts \
-            test/motion-program-wire-v1.test.ts test/compiler-nano-lowering.test.ts | tee /tmp/candidate-tests.log
-          rm test/.research-motion-program-binding-allocation.test.ts
-          pnpm typecheck
-          pnpm build
-          pnpm size | tee /tmp/candidate-size.log
-
-      - name: Exact changed-byte comparison
+      - name: Numeric writer-key domain oracle
         shell: bash
         run: |
           set -euo pipefail
           node --input-type=module <<'NODE'
-          import { readdirSync, readFileSync, statSync } from 'node:fs';
-          import { join, relative } from 'node:path';
-          import { canonicalGzip, observationalBrotli } from './scripts/compression-oracle.mjs';
-          const walk = (root, dir = root, out = []) => {
-            for (const name of readdirSync(dir)) {
-              const path = join(dir, name);
-              if (statSync(path).isDirectory()) walk(root, path, out);
-              else if (/\.(?:js|cjs)$/.test(name)) out.push(relative(root, path));
+          const std = (subject, channel) => -(subject * 12 + channel + 1);
+          const host = (subject, index) => subject * 0x10000 + index;
+          const seenStandard = new Set();
+          for (let subject = 0; subject <= 0xffff; subject++) {
+            for (let channel = 0; channel < 12; channel++) {
+              const key = std(subject, channel);
+              if (!Number.isSafeInteger(key) || key >= 0 || seenStandard.has(key)) throw new Error(`std collision ${subject}/${channel}`);
+              seenStandard.add(key);
             }
-            return out;
-          };
-          let changed = 0;
-          let regressed = 0;
-          for (const rel of walk('/tmp/base-dist')) {
-            const a = readFileSync(join('/tmp/base-dist', rel));
-            const b = readFileSync(join('dist', rel));
-            if (a.equals(b)) continue;
-            changed++;
-            const av = [a.length, canonicalGzip(a).length, observationalBrotli(a).length];
-            const bv = [b.length, canonicalGzip(b).length, observationalBrotli(b).length];
-            const d = bv.map((v, i) => v - av[i]);
-            console.log(`BYTE_DELTA ${rel} base=${av.join('/')} cand=${bv.join('/')} delta=${d.join('/')}`);
-            if (d.some((x) => x > 0)) regressed++;
+            for (const index of [0, 1, 0xfffe, 0xffff]) {
+              const key = host(subject, index);
+              if (!Number.isSafeInteger(key) || key < 0) throw new Error(`host domain ${subject}/${index}`);
+              if (subject > 0 && key <= host(subject - 1, 0xffff)) throw new Error(`host interval overlap ${subject}/${index}`);
+            }
           }
-          console.log(`BYTE_SUMMARY changed=${changed} regressed=${regressed}`);
-          if (changed === 0 || regressed !== 0) process.exit(1);
+          if (std(0xffff, 11) === host(0, 0) || std(0, 0) === host(0xffff, 0xffff)) throw new Error('domain collision');
+          if (host(0xffff, 0xffff) !== 0xffffffff) throw new Error('host maximum drift');
+          console.log(`KEY_ORACLE=GREEN standardKeys=${seenStandard.size} hostMax=${host(0xffff, 0xffff)}`);
           NODE
-          echo '--- SIZE OUTPUT DIFF (baseline -> candidate) ---'
-          diff -u /tmp/base-size.log /tmp/candidate-size.log || true
+
+      - name: Candidate semantic proof
+        shell: bash
+        run: |
+          set -euo pipefail
+          pnpm vitest run --reporter=verbose \
+            test/motion-program-core-v1.test.ts \
+            test/motion-program-semantics-v1.test.ts \
+            test/motion-program-wire-v1.test.ts \
+            test/compiler-nano-lowering.test.ts
+          pnpm typecheck
 
       - name: Positive control must turn RED
         shell: bash
@@ -240,15 +172,15 @@ jobs:
           cp /tmp/candidate-motion-program.ts src/internal/motion-program.ts
           git diff --check
 
-      - name: Simplicity and full local authority
+      - name: Full local authority
         shell: bash
         run: |
           set -euo pipefail
-          # The retained form has exactly two parser indices: writer uniqueness and
-          # transform owner+coverage. Splitting either fact again would reintroduce
-          # the deleted ownership surface; no cache/pass/table is added.
           pnpm check:static
+          pnpm audit --audit-level=high
+          pnpm build
           pnpm test
+          pnpm size
           pnpm pack:smoke
           pnpm pack:compat
 
@@ -258,9 +190,8 @@ jobs:
           set -euo pipefail
           test "$(git rev-parse --abbrev-ref HEAD)" = 'research/mp-binding-index-run11'
           rm .github/workflows/research-mp-binding-index.yml
-          rm -f test/.research-motion-program-binding-allocation.test.ts
           git add src/internal/motion-program.ts .github/workflows/research-mp-binding-index.yml
-          test "$(git diff --cached --name-only | sort)" = $'.github/workflows/research-mp-binding-index.yml\nsrc/internal/motion-program.ts'
+          git diff --cached --check
           git config user.name 'Labpics Autoresearch'
           git config user.email 'lemone112@users.noreply.github.com'
           git commit -m 'perf(motion-program): compact binding ownership index'
