@@ -62,7 +62,7 @@ function walkCjs(root) {
       const abs = join(dir, name);
       const st = statSync(abs);
       if (st.isDirectory()) walk(abs);
-      else if (name.endsWith('.cjs')) out.push(relative(root, abs).replaceAll('\\\\', '/'));
+      else if (name.endsWith('.cjs')) out.push(relative(root, abs).replaceAll('\\', '/'));
     }
   };
   walk(dist);
@@ -108,8 +108,8 @@ function parseScenarios(text) {
     rows.set(name, {
       gzip: Number(primary[2]),
       brotli: Number(primary[3]),
-      totalGzip: lazy ? Number(lazy[5]) : Number(primary[2]),
-      totalBrotli: lazy ? Number(lazy[6]) : Number(primary[3]),
+      totalGzip: lazy ? Number(lazy[3]) : Number(primary[2]),
+      totalBrotli: lazy ? Number(lazy[4]) : Number(primary[3]),
     });
   }
   return rows;
