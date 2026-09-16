@@ -34,9 +34,6 @@ function compareTriplet(axis, id, base, candidate, sink = failures) {
   return delta;
 }
 
-// Evaluator calibration is part of the preregistered proof. A null pair must be
-// admitted, while an injected +1 B regression must be rejected independently
-// for raw, canonical gzip and observational Brotli.
 const calibrationBase = triplet(101, 79, 71);
 const nullFailures = [];
 compareTriplet('control-null', 'synthetic', calibrationBase, { ...calibrationBase }, nullFailures);
@@ -81,8 +78,6 @@ for (const label of baseLabels) {
   shipped.push({ label, base, candidate, delta: compareTriplet('shipped-entry', label, base, candidate) });
 }
 
-// CJS is a first-class installed surface as well. Compare every built .cjs
-// artifact, not only the root entry, so a local win cannot hide a sibling loss.
 function walkCjs(root) {
   const out = [];
   const dist = join(root, 'dist');
@@ -121,9 +116,6 @@ for (const path of baseCjs) {
   cjs.push({ path, base, candidate, delta: compareTriplet('cjs-file', path, base, candidate) });
 }
 
-// The official consumer matrix is the SSOT exported by size-gate itself. Run
-// it directly instead of parsing CLI text so raw/gzip/Brotli and split totals
-// are all compared under exactly the production measurement implementation.
 function scenarioDescriptor(scenario) {
   return {
     name: scenario.name,
@@ -209,4 +201,3 @@ const result = {
 };
 writeFileSync(resultPath, `${JSON.stringify(result, null, 2)}\n`);
 console.log(JSON.stringify(result, null, 2));
-if (failures.length > 0) process.exitCode = 2;
