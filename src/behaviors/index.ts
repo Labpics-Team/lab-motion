@@ -474,7 +474,7 @@ export function createBottomSheet(options: SheetOptions): SheetController {
       if (!base._following) return;
       base.tracker.push(p);
       lastPointer = _coord(p, axis);
-      const raw = _finite(grabValue + _sub(lastPointer, grabPointer));
+      const raw = grabValue + _sub(lastPointer, grabPointer);
       base.emit({ value: clampFollow(raw) });
     },
     pointerUp(p: BehaviorPoint): void {
