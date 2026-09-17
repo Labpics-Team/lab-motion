@@ -167,20 +167,16 @@ interface _SnapEntry {
   readonly parentKey: string | null;
 }
 
-type _NodeKind = 'matched' | 'enter' | 'exit';
-
 interface _FlightNode {
   el: SmartElement;
-  readonly kind: _NodeKind;
-  readonly savedTransform: string;
-  readonly savedOrigin: string;
-  readonly savedRadius: string;
-  readonly savedOpacity: string;
-  /** exit: этот узел — наш ghost (владение адаптера, removeChild на терминале). */
-  readonly isGhost: boolean;
-  /** matched-реинкарнация пишет ещё и opacity — восстановить на терминале. */
-  readonly hasOpacity: boolean;
-  /** exit: зафиксированный page-box ghost'а (last continue-exit). */
+  /** Только matched пишет transform/radii и получает transform-origin. */
+  readonly moves?: true;
+  readonly savedTransform?: string;
+  readonly savedOrigin?: string;
+  readonly savedRadius?: string;
+  /** Есть только если opacity принадлежит этому flight и требует restore. */
+  readonly savedOpacity?: string;
+  /** exit: зафиксированный page-box ghost'а; наличие поля — discriminator exit. */
   readonly ghostBox?: _Rect | undefined;
 }
 
@@ -212,13 +208,8 @@ interface _GhostLeaseOwner {
   box: _Rect;
 }
 
-/** Единственный element-scoped owner общей ghost-поверхности. */
-interface _GhostLease {
-  readonly savedStyle: Record<string, string>;
-  readonly savedInert: boolean;
-  readonly owners: _GhostLeaseOwner[];
-  host: _Controller;
-}
+/** [исходные стили, inert, владельцы, текущий физический host]. */
+type _GhostLease = [Record<string, string>, boolean, _GhostLeaseOwner[], _Controller];
 
 // ─── Локальные стражи (копия семантики projection/geometry finite) ───────────
 
@@ -605,7 +596,7 @@ function _getController(root: SmartRoot, opt: SmartOptions): _Controller {
       const node = flight.get(frame.id);
       if (node === undefined) continue;
       const style = node.el.style;
-      if (node.kind === 'matched') {
+      if (node.moves) {
         if (!frame.degenerate) {
           style.setProperty(
             'transform',
@@ -700,27 +691,22 @@ function _pinGhost(ctrl: _Controller, el: SmartElement, box: _Rect): void {
 function _appendAndPinGhost(ctrl: _Controller, el: SmartElement, box: _Rect): void {
   let lease = _savedGhostStyle.get(el);
   if (lease === undefined) {
-    lease = {
-      savedStyle: _snapshotGhostStyle(el),
-      savedInert: _readInert(el),
-      owners: [],
-      host: ctrl,
-    };
+    lease = [_snapshotGhostStyle(el), _readInert(el), [], ctrl];
     _savedGhostStyle.set(el, lease);
   }
 
-  const owner = lease.owners.find((candidate) => candidate.ctrl === ctrl);
-  if (owner === undefined) lease.owners.push({ ctrl, box });
+  const owner = lease[2].find((candidate) => candidate.ctrl === ctrl);
+  if (owner === undefined) lease[2].push({ ctrl, box });
   else owner.box = box;
 
-  if (lease.host !== ctrl) {
+  if (lease[3] !== ctrl) {
     try {
-      lease.host.root.removeChild(el);
+      lease[3].root.removeChild(el);
     } catch {
       /* append ниже всё равно попробует установить фактический host */
     }
   }
-  lease.host = ctrl;
+  lease[3] = ctrl;
   _pinGhost(ctrl, el, box);
 }
 
@@ -739,33 +725,36 @@ function _releaseGhost(ctrl: _Controller, el: SmartElement): void {
     return;
   }
 
-  const ownerIndex = lease.owners.findIndex((owner) => owner.ctrl === ctrl);
+  const ownerIndex = lease[2].findIndex((owner) => owner.ctrl === ctrl);
   if (ownerIndex < 0) return;
-  const releasingHost = lease.host === ctrl;
-  lease.owners.splice(ownerIndex, 1);
+  const releasingHost = lease[3] === ctrl;
+  lease[2].splice(ownerIndex, 1);
 
-  if (lease.owners.length === 0) {
+  if (lease[2].length === 0) {
     try {
-      lease.host.root.removeChild(el);
+      lease[3].root.removeChild(el);
     } catch {
       /* уже отсоединён */
     }
-    _restoreGhostStyle(el, lease.savedStyle);
-    _writeInert(el, lease.savedInert);
+    _restoreGhostStyle(el, lease[0]);
+    _writeInert(el, lease[1]);
     _savedGhostStyle.delete(el);
     return;
   }
 
   if (releasingHost) {
-    const next = lease.owners[lease.owners.length - 1]!;
-    try {
-      lease.host.root.removeChild(el);
-    } catch {
-      /* re-pin ниже восстановит физический host */
-    }
-    lease.host = next.ctrl;
-    _pinGhost(next.ctrl, el, next.box);
+    const next = lease[2][lease[2].length - 1]!;
+    _appendAndPinGhost(next.ctrl, el, next.box);
   }
+}
+
+/** Восстановить принадлежащие flight инлайн-свойства перед замером/терминалом. */
+function _restoreFlightNode(node: _FlightNode): void {
+  if (node.ghostBox !== undefined) return;
+  _restoreProp(node.el, 'transform', node.savedTransform!);
+  _restoreProp(node.el, 'transform-origin', node.savedOrigin!);
+  _restoreProp(node.el, 'border-radius', node.savedRadius!);
+  if (node.savedOpacity !== undefined) _restoreProp(node.el, 'opacity', node.savedOpacity);
 }
 
 // ─── Терминальная уборка (natural rest / cancel — одна форма) ─────────────────
@@ -773,16 +762,8 @@ function _releaseGhost(ctrl: _Controller, el: SmartElement): void {
 /** Терминальная уборка: снять transform/ghost-инлайны, восстановить стили, очистить полёт. */
 function _cleanup(ctrl: _Controller): void {
   for (const node of ctrl.flight.values()) {
-    if (node.kind === 'exit') {
-      _releaseGhost(ctrl, node.el);
-    } else {
-      _restoreProp(node.el, 'transform', node.savedTransform);
-      _restoreProp(node.el, 'transform-origin', node.savedOrigin);
-      _restoreProp(node.el, 'border-radius', node.savedRadius);
-      if (node.hasOpacity || node.kind === 'enter') {
-        _restoreProp(node.el, 'opacity', node.savedOpacity);
-      }
-    }
+    if (node.ghostBox !== undefined) _releaseGhost(ctrl, node.el);
+    else _restoreFlightNode(node);
   }
   if (ctrl.rootPositionAdded) {
     // Восстановить исходный инлайн-position root'а (не слепо снять — потребитель
@@ -821,7 +802,7 @@ function _cancelRun(ctrl: _Controller): void {
 /** Немедленно отпустить ghost этого controller (реинкарнация ключа). */
 function _removeGhost(ctrl: _Controller, key: string): void {
   const g = ctrl.flight.get(key);
-  if (g === undefined || !g.isGhost) return;
+  if (g?.ghostBox === undefined) return;
   _releaseGhost(ctrl, g.el);
   ctrl.ghostIndex.delete(g.el);
 }
@@ -881,15 +862,7 @@ function _animate(
 
   // (а) batch-CLEAR: снять наши инлайны узлов активного полёта (кроме ghost'ов —
   // они запинены absolute и продолжают жить), чтобы замер ниже видел чистый layout.
-  for (const node of ctrl.flight.values()) {
-    if (node.kind === 'exit') continue;
-    _restoreProp(node.el, 'transform', node.savedTransform);
-    _restoreProp(node.el, 'transform-origin', node.savedOrigin);
-    _restoreProp(node.el, 'border-radius', node.savedRadius);
-    if (node.hasOpacity || node.kind === 'enter') {
-      _restoreProp(node.el, 'opacity', node.savedOpacity);
-    }
-  }
+  for (const node of ctrl.flight.values()) _restoreFlightNode(node);
 
   // (б) batch-MEASURE: структура + page-боксы + радиусы NEW-снимка (один reflow).
   const structure = _structure(ctrl.root, keyAttr, shadow, ctrl.ghostIndex);
@@ -910,7 +883,6 @@ function _animate(
   const exitedKeys: string[] = [];
   const reincarnated = new Set<string>();
   interface _Desc {
-    kind: _NodeKind;
     el: SmartElement;
     oldBox?: _Rect;
     newBox?: _Rect;
@@ -929,12 +901,11 @@ function _animate(
       skippedKeys.push(key);
       continue;
     }
-    if (ctrl.flight.get(key)?.isGhost === true) {
+    if (ctrl.flight.get(key)?.ghostBox !== undefined) {
       // Реинкарнация: ключ вернулся при живом ghost → matched от состояния ghost'а.
       reincarnated.add(key);
       matched.add(key);
       desc.set(key, {
-        kind: 'matched',
         el: nl.el,
         newBox: nl.box,
         newRadii: nl.radii,
@@ -946,15 +917,14 @@ function _animate(
     const old = snapshot.get(key);
     if (old === undefined) {
       enteredKeys.push(key);
-      desc.set(key, { kind: 'enter', el: nl.el, newBox: nl.box });
+      desc.set(key, { el: nl.el, newBox: nl.box });
     } else if (_isDegenerate(old.box)) {
       // Вырожденный first (0×0 на capture): FLIP-«откуда» нет → fade-in на новом месте.
       enteredKeys.push(key);
-      desc.set(key, { kind: 'enter', el: nl.el, newBox: nl.box });
+      desc.set(key, { el: nl.el, newBox: nl.box });
     } else {
       matched.add(key);
       desc.set(key, {
-        kind: 'matched',
         el: nl.el,
         oldBox: old.box,
         newBox: nl.box,
@@ -974,7 +944,7 @@ function _animate(
       skippedKeys.push(key);
     } else {
       exitedKeys.push(key);
-      desc.set(key, { kind: 'exit', el: old.el, ghostBox: old.box, newExit: true, parentKey: null });
+      desc.set(key, { el: old.el, ghostBox: old.box, newExit: true, parentKey: null });
     }
   }
 
@@ -983,7 +953,7 @@ function _animate(
     if (newLive.has(key) || reincarnated.has(key) || desc.has(key)) continue;
     const g = ctrl.flight.get(key)!;
     exitedKeys.push(key);
-    desc.set(key, { kind: 'exit', el, ghostBox: g.ghostBox!, newExit: false, parentKey: null });
+    desc.set(key, { el, ghostBox: g.ghostBox!, newExit: false, parentKey: null });
   }
 
   // (г) участие matched: узел едет, если двигался сам ИЛИ движется его matched-предок.
@@ -1071,13 +1041,11 @@ function _animate(
       });
       newFlight.set(key, {
         el,
-        kind: 'matched',
+        moves: true,
         savedTransform: _inl(el, 'transform'),
         savedOrigin: _inl(el, 'transform-origin'),
         savedRadius: _inl(el, 'border-radius'),
-        savedOpacity: _inl(el, 'opacity'),
-        isGhost: false,
-        hasOpacity: d.reincarnation === true,
+        savedOpacity: d.reincarnation ? _inl(el, 'opacity') : undefined,
       });
     }
   }
@@ -1095,13 +1063,10 @@ function _animate(
     });
     newFlight.set(key, {
       el,
-      kind: 'enter',
       savedTransform: _inl(el, 'transform'),
       savedOrigin: _inl(el, 'transform-origin'),
       savedRadius: _inl(el, 'border-radius'),
       savedOpacity: _inl(el, 'opacity'),
-      isGhost: false,
-      hasOpacity: false,
     });
   }
 
@@ -1118,17 +1083,7 @@ function _animate(
     } else {
       nodes.push({ id: key, parent: null, first: undefined, last: box, opacity: { from: 1, to: 0 } });
     }
-    newFlight.set(key, {
-      el,
-      kind: 'exit',
-      savedTransform: '',
-      savedOrigin: '',
-      savedRadius: '',
-      savedOpacity: '',
-      isGhost: true,
-      hasOpacity: false,
-      ghostBox: box,
-    });
+    newFlight.set(key, { el, ghostBox: box });
   }
 
   ctrl.ghostIndex = newGhostIndex;
@@ -1160,7 +1115,7 @@ function _startRun(
   // Синхронный finish (пустые nodes / нет rAF) уже обнулил flight — origin не пишем.
   if (ctrl.flight === newFlight) {
     for (const [key, node] of newFlight) {
-      if (node.kind === 'matched' && ctrl.flight.has(key)) {
+      if (node.moves && ctrl.flight.has(key)) {
         node.el.style.setProperty('transform-origin', '0 0');
       }
     }
