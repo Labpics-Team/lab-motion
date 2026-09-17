@@ -713,6 +713,13 @@ function _appendAndPinGhost(ctrl: _Controller, el: SmartElement, box: _Rect): vo
   if (owner === undefined) lease.owners.push({ ctrl, box });
   else owner.box = box;
 
+  if (lease.host !== ctrl) {
+    try {
+      lease.host.root.removeChild(el);
+    } catch {
+      /* append ниже всё равно попробует установить фактический host */
+    }
+  }
   lease.host = ctrl;
   _pinGhost(ctrl, el, box);
 }
@@ -751,6 +758,11 @@ function _releaseGhost(ctrl: _Controller, el: SmartElement): void {
 
   if (releasingHost) {
     const next = lease.owners[lease.owners.length - 1]!;
+    try {
+      lease.host.root.removeChild(el);
+    } catch {
+      /* re-pin ниже восстановит физический host */
+    }
     lease.host = next.ctrl;
     _pinGhost(next.ctrl, el, next.box);
   }
