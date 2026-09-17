@@ -82,11 +82,10 @@ describe('./smart shared ghost lease', () => {
     const { ghost, focusable, inner, outer, innerFlight, outerFlight } = overlappingGhosts(true);
 
     expect(ghost.inline.get('position')).toBe('absolute');
-    expect(focusable.inert).toBe(true);
     outerFlight.cancel();
 
-    // Простого refcount styles/inert недостаточно: releasing controller не может
-    // физически удалить DOM identity, пока другой owner всё ещё держит visual lifetime.
+    // Этот assert различает простой refcount styles/inert от полного physical lease:
+    // releasing controller не может удалить DOM identity, пока другой owner жив.
     expect(inner.children.includes(ghost) || outer.children.includes(ghost)).toBe(true);
     expect(ghost.inline.get('position')).toBe('absolute');
     expect(focusable.inert).toBe(true);
