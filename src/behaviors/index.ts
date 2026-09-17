@@ -114,9 +114,9 @@ function _finite(x: number): number {
   return x > 0 ? Number.MAX_VALUE : -Number.MAX_VALUE;
 }
 
-/** Разность с защитой от overflow (|a|+|b|>MAX → ±∞ → clamp). */
+/** Разность уже нормализованных координат с защитой от overflow. */
 function _sub(a: number, b: number): number {
-  return _finite(_finite(a) - _finite(b));
+  return _finite(a - b);
 }
 
 /** Прочитать координату точки по оси (конечную). */
@@ -134,18 +134,9 @@ function _prefersReduced(matchMedia: MatchMediaLike | undefined): boolean {
   }
 }
 
-/**
- * Rubber-band сопротивление за границей (класс elastic у Motion): смещённая
- * координата = граница + overshoot·factor. factor ∈ [0,1] (0 = жёсткий clamp).
- * ЗНАК overshoot сохраняется — увод остаётся в ту же сторону, только короче.
- */
-function _rubberBand(overshoot: number, factor: number): number {
-  return _finite(overshoot) * factor;
-}
-
 /** Нормализовать factor сопротивления в [0,1] (дефолт при мусоре). */
 function _clampFactor(raw: number | undefined, dflt: number): number {
-  return typeof raw === 'number' && Number.isFinite(raw) ? Math.min(1, Math.max(0, raw)) : dflt;
+  return Number.isFinite(raw) ? Math.min(1, Math.max(0, raw!)) : dflt;
 }
 
 const DEFAULT_RUBBER_BAND = 0.5;
@@ -170,15 +161,9 @@ interface _SettleArgs {
 /** Хендл единого runner'а поведения. */
 interface _Runner {
   /** Запустить доводку value→target (ровно один активный цикл). */
-  settle(args: _SettleArgs): void;
+  _settle(args: _SettleArgs): void;
   /** Погасить активный цикл (перехват/cancel) — stale-кадры инвалидируются. */
-  invalidate(): void;
-  /** true, пока идёт пружинный цикл. */
-  readonly running: boolean;
-  /** Текущее значение цикла (для C¹-перехвата). */
-  readonly value: number;
-  /** Текущая скорость цикла (для C¹-перехвата). */
-  readonly velocity: number;
+  _invalidate(): number;
 }
 
 /**
@@ -192,32 +177,24 @@ function _createRunner(
   reduced: boolean,
 ): _Runner {
   let gen = 0;
-  let running = false;
-  let curVal = 0;
-  let curVel = 0;
+  let curVel: number | undefined;
 
   const schedule = (cb: (ts?: number) => void): void => {
-    if (!requestFrame) return; // недостижимо: снап-путь ловит отсутствие шва раньше
-    const handle = requestFrame(cb);
+    const handle = requestFrame!(cb);
     if (handle === 0) setTimeout(() => cb(undefined), 0); // non-draining шов (конвенция repo)
   };
 
   return {
-    settle(args: _SettleArgs): void {
+    _settle(args: _SettleArgs): void {
       gen++;
       const my = gen;
-      running = true;
-      curVal = _finite(args.from);
-      curVel = _finite(args.velocity);
+      curVel = args.velocity;
       const range = args.target - args.from;
 
       const finishNow = (): void => {
-        if (my !== gen) return;
-        running = false;
-        curVal = _finite(args.target);
-        curVel = 0;
-        args.onStep(curVal, 0);
-        args.onDone();
+        curVel = undefined;
+        args.onStep(args.target, 0);
+        if (my === gen) args.onDone();
       };
 
       // B4: reduced-motion / вырожденный диапазон / нет кадрового шва → снап.
@@ -229,16 +206,16 @@ function _createRunner(
       // C¹-стык: нормируем унаследованную скорость на диапазон (тот же приём,
       // что smooth-pickup MotionValue и snapBack gestures) — знак «к цели» и
       // непрерывность производной на границе follow|release получаются даром.
-      const v0n = args.velocity / range;
+      const v0n = curVel / range;
       let elapsed = 0;
       let lastTs: number | undefined;
       let frames = 0;
 
       const tick = (ts?: number): void => {
-        if (my !== gen || !running) return; // stale-кадр после перехвата/cancel
-        if (typeof ts === 'number' && Number.isFinite(ts)) {
-          elapsed = lastTs === undefined ? elapsed : elapsed + Math.max(0, (ts - lastTs) / 1000);
-          lastTs = ts;
+        if (my !== gen) return; // stale-кадр после перехвата/cancel
+        if (Number.isFinite(ts)) {
+          elapsed = lastTs === undefined ? elapsed : elapsed + Math.max(0, (ts! - lastTs) / 1000);
+          lastTs = ts!;
         } else {
           elapsed += FIXED_DT_S;
         }
@@ -247,8 +224,6 @@ function _createRunner(
         const s = solveSpring(args.spring, elapsed, v0n);
         const val = args.from + s.value * range;
         const vel = s.velocity * range;
-        curVal = _finite(val);
-        curVel = _finite(vel);
         const denom = Math.abs(range); // > 0 по построению (range !== 0)
 
         if (
@@ -261,24 +236,18 @@ function _createRunner(
           finishNow();
           return;
         }
-        args.onStep(curVal, curVel);
+        curVel = vel;
+        args.onStep(val, vel);
         schedule(tick);
       };
 
       schedule(tick);
     },
-    invalidate(): void {
+    _invalidate(): number {
       gen++;
-      running = false;
-    },
-    get running(): boolean {
-      return running;
-    },
-    get value(): number {
-      return curVal;
-    },
-    get velocity(): number {
-      return curVel;
+      const velocity = curVel ?? 0;
+      curVel = undefined;
+      return velocity;
     },
   };
 }
@@ -293,17 +262,11 @@ function _createBase<S extends BehaviorState<number>>(
   requestFrame: RequestFrameFn | undefined,
   matchMedia: MatchMediaLike | undefined,
 ) {
-  const reduced = _prefersReduced(matchMedia);
-  const runner = _createRunner(requestFrame, reduced);
+  const runner = _createRunner(requestFrame, _prefersReduced(matchMedia));
   const tracker = createVelocityTracker();
   const subs = new Set<(s: S) => void>();
   let state = initial;
   let destroyed = false;
-  // Хук прерывания активного жеста: cancel()/destroy() живут на базе и не видят
-  // контроллер-локального `dragging`, поэтому контроллер регистрирует сброс —
-  // иначе после destroy/cancel уцелевший `dragging` воскрешает движение
-  // следующим pointerMove (инертность destroy и phase-idle cancel ломались).
-  let onAbort: (() => void) | undefined;
 
   const emit = (next: Partial<S>): void => {
     state = { ...state, ...next };
@@ -317,7 +280,6 @@ function _createBase<S extends BehaviorState<number>>(
   };
 
   return {
-    reduced,
     runner,
     tracker,
     get state(): S {
@@ -327,9 +289,8 @@ function _createBase<S extends BehaviorState<number>>(
       return destroyed;
     },
     emit,
-    /** Контроллер регистрирует сброс своего `dragging`, вызываемый из cancel/destroy. */
-    setAbort(fn: () => void): void {
-      onAbort = fn;
+    get _following(): boolean {
+      return !destroyed && state.phase === 'follow';
     },
     subscribe(fn: (s: S) => void): () => void {
       if (destroyed) return () => {};
@@ -344,17 +305,14 @@ function _createBase<S extends BehaviorState<number>>(
      * no-op (не плодит эмитов). destroy() строится поверх неё.
      */
     cancel(): void {
-      if (destroyed) return;
-      onAbort?.(); // оборвать активный жест, иначе phase уедет в idle при живом dragging
-      if (!runner.running && state.phase === 'idle') return; // уже в покое
-      runner.invalidate();
+      if (destroyed || state.phase === 'idle') return; // уже в покое
+      runner._invalidate();
       tracker.reset();
       emit({ velocity: 0, phase: 'idle' } as Partial<S>);
     },
     destroy(): void {
       if (destroyed) return;
-      onAbort?.(); // сделать вход инертным: снять dragging до пометки destroyed
-      runner.invalidate();
+      runner._invalidate();
       tracker.reset();
       subs.clear();
       destroyed = true;
@@ -362,24 +320,24 @@ function _createBase<S extends BehaviorState<number>>(
   };
 }
 
-/**
- * Засеять трекер прайором скорости перехвата (C¹-pickup летящего значения):
- * синтетический сэмпл на полокна назад вдоль скорости — немедленный повторный
- * release наследует движение, а реальные сэмплы вытесняют прайор как обычно.
- * Тот же приём, что glide-pickup в createDrag.
- */
-function _seedPickup(
-  tracker: ReturnType<typeof createVelocityTracker>,
+/** Перехватить активную доводку тем же tracker/runner и сохранить C¹-prior. */
+function _beginPickup(
+  base: { runner: _Runner; tracker: ReturnType<typeof createVelocityTracker> },
   p: BehaviorPoint,
   axis: BehaviorAxis,
-  vAxis: number,
+  velocityScale = 1,
 ): void {
-  if (vAxis === 0) return;
-  const back = { x: _finite(p.x), y: _finite(p.y), t: _finite(p.t) - PICKUP_SEED_DT_S };
-  if (axis === 'x') back.x = _finite(p.x) - vAxis * PICKUP_SEED_DT_S;
-  else back.y = _finite(p.y) - vAxis * PICKUP_SEED_DT_S;
-  tracker.push(back);
+  const carry = base.runner._invalidate() * velocityScale;
+  base.tracker.reset();
+  if (carry !== 0) {
+    const back = { x: _finite(p.x), y: _finite(p.y), t: _finite(p.t) - PICKUP_SEED_DT_S };
+    if (axis === 'x') back.x -= carry * PICKUP_SEED_DT_S;
+    else back.y -= carry * PICKUP_SEED_DT_S;
+    base.tracker.push(back);
+  }
+  base.tracker.push(p);
 }
+
 
 // ═══════════════════════════════════════════════════════════════════════════
 // 1. BOTTOM SHEET
@@ -414,6 +372,8 @@ export interface SheetController {
   pointerMove(p: BehaviorPoint): void;
   pointerUp(p: BehaviorPoint): void;
   pointerCancel(): void;
+  /** Обновить snap-ограничения без смены owner/clock. */
+  update(snapPoints: readonly number[]): void;
   /** Программный переход к snap по индексу (единый clock, C¹ из текущей скорости). */
   snapTo(index: number): void;
   subscribe(fn: (s: SheetState) => void): () => void;
@@ -449,19 +409,18 @@ function _pickSnap(snaps: readonly number[], value: number, velocity: number): n
  * @throws {MotionParamError} при пустом snapPoints или невалидной пружине.
  */
 export function createBottomSheet(options: SheetOptions): SheetController {
-  const snaps = [...options.snapPoints].map(_finite).sort((a, b) => a - b);
-  if (snaps.length === 0) {
-    // Дешёвый детерминированный fail-fast (класс MotionParamError ядра).
-    throw new MotionParamError('LM003');
-  }
+  const readSnaps = (values: readonly number[]): number[] => {
+    const next = values.map(_finite).sort((a, b) => a - b);
+    if (next.length === 0) throw new MotionParamError('LM003');
+    return next;
+  };
+  let snaps = readSnaps(options.snapPoints);
   const axis = options.axis ?? 'y';
   const springParams = options.spring ?? (springTokens.default as SpringParams);
   validateSpringForFrameLoop(springParams);
   const rubber = _clampFactor(options.rubberBand, DEFAULT_RUBBER_BAND);
-  const minSnap = snaps[0]!;
-  const maxSnap = snaps[snaps.length - 1]!;
 
-  const start = _finite(options.initial ?? minSnap);
+  const start = _finite(options.initial ?? snaps[0]!);
   const startIndex = _pickSnap(snaps, start, 0);
   const base = _createBase<SheetState>(
     { value: start, velocity: 0, phase: 'idle', snapIndex: startIndex },
@@ -469,30 +428,35 @@ export function createBottomSheet(options: SheetOptions): SheetController {
     options.matchMedia,
   );
 
-  let dragging = false;
   let grabPointer = 0;
   let grabValue = 0;
-  base.setAbort(() => {
-    dragging = false;
-  });
+  let lastPointer = 0;
 
   /** Применить rubber-band за крайними snap к сырой позиции под пальцем. */
   const clampFollow = (raw: number): number => {
-    if (raw > maxSnap) return _finite(maxSnap + _rubberBand(raw - maxSnap, rubber));
-    if (raw < minSnap) return _finite(minSnap + _rubberBand(raw - minSnap, rubber));
+    const min = snaps[0]!;
+    const max = snaps[snaps.length - 1]!;
+    if (raw > max) {
+      if (!rubber && base._following && base.state.value > max) return Math.min(base.state.value, raw);
+      return _finite(max + _sub(raw, max) * rubber);
+    }
+    if (raw < min) {
+      if (!rubber && base._following && base.state.value < min) return Math.max(base.state.value, raw);
+      return _finite(min + _sub(raw, min) * rubber);
+    }
     return _finite(raw);
   };
 
   const settleTo = (index: number, velocity: number): void => {
     const target = snaps[index]!;
     base.emit({ phase: 'release', snapIndex: index });
-    base.runner.settle({
+    base.runner._settle({
       from: base.state.value,
       velocity,
       target,
       spring: springParams,
       onStep: (v, vel) => base.emit({ value: v, velocity: vel }),
-      onDone: () => base.emit({ value: target, velocity: 0, phase: 'settle', snapIndex: index }),
+      onDone: () => base.emit({ phase: 'settle' }),
     });
   };
 
@@ -500,44 +464,51 @@ export function createBottomSheet(options: SheetOptions): SheetController {
     pointerDown(p: BehaviorPoint): void {
       if (base.destroyed) return;
       // Прерывание: гасим активную доводку, наследуем её скорость прайором (C¹).
-      const carry = base.runner.running ? base.runner.velocity : 0;
-      base.runner.invalidate();
-      dragging = true;
+      _beginPickup(base, p, axis);
       grabPointer = _coord(p, axis);
+      lastPointer = grabPointer;
       grabValue = base.state.value;
-      base.tracker.reset();
-      _seedPickup(base.tracker, p, axis, carry);
-      base.tracker.push(p);
       base.emit({ phase: 'follow', velocity: 0 });
     },
     pointerMove(p: BehaviorPoint): void {
-      if (!dragging) return;
+      if (!base._following) return;
       base.tracker.push(p);
-      const raw = _finite(grabValue + _sub(_coord(p, axis), grabPointer));
-      base.emit({ value: clampFollow(raw), velocity: 0 });
+      lastPointer = _coord(p, axis);
+      const raw = _finite(grabValue + _sub(lastPointer, grabPointer));
+      base.emit({ value: clampFollow(raw) });
     },
     pointerUp(p: BehaviorPoint): void {
-      if (!dragging) return;
-      dragging = false;
+      if (!base._following) return;
       base.tracker.push(p);
       const v = axis === 'x' ? base.tracker.velocity().vx : base.tracker.velocity().vy;
       const index = _pickSnap(snaps, base.state.value, v);
       settleTo(index, _finite(v));
     },
     pointerCancel(): void {
-      if (!dragging) return;
-      dragging = false;
+      if (!base._following) return;
       // Детерминизм: осесть в ближайший snap без унаследованной скорости.
       const index = _pickSnap(snaps, base.state.value, 0);
       settleTo(index, 0);
     },
+    update(next: readonly number[]): void {
+      if (base.destroyed) return;
+      const parsed = readSnaps(next);
+      if (parsed.length === snaps.length && parsed.every((v, i) => v === snaps[i])) return;
+      snaps = parsed;
+      if (base._following) {
+        const value = base.state.value;
+        const min = snaps[0]!;
+        const max = snaps[snaps.length - 1]!;
+        grabPointer = lastPointer;
+        grabValue = !rubber ? value
+          : value > max ? max + (value - max) / rubber
+          : value < min ? min + (value - min) / rubber : value;
+      } else settleTo(Math.min(base.state.snapIndex, snaps.length - 1), base.runner._invalidate());
+    },
     snapTo(index: number): void {
       if (base.destroyed) return;
       const i = Math.max(0, Math.min(snaps.length - 1, Math.trunc(_finite(index))));
-      dragging = false;
-      const carry = base.runner.running ? base.runner.velocity : 0;
-      base.runner.invalidate();
-      settleTo(i, carry);
+      settleTo(i, base.runner._invalidate());
     },
     subscribe: base.subscribe,
     cancel: base.cancel,
@@ -623,35 +594,31 @@ export function createDragDismiss(options: DismissOptions): DismissController {
     options.matchMedia,
   );
 
-  let dragging = false;
   let grabPointer = 0;
   let grabValue = 0;
-  base.setAbort(() => {
-    dragging = false;
-  });
 
   const returnHome = (velocity: number): void => {
     base.emit({ phase: 'release' });
-    base.runner.settle({
+    base.runner._settle({
       from: base.state.value,
       velocity,
       target: 0,
       spring: springParams,
       onStep: (v, vel) => base.emit({ value: v, velocity: vel }),
-      onDone: () => base.emit({ value: 0, velocity: 0, phase: 'settle' }),
+      onDone: () => base.emit({ phase: 'settle' }),
     });
   };
 
   const dismiss = (velocity: number): void => {
     base.emit({ phase: 'release' });
-    base.runner.settle({
+    base.runner._settle({
       from: base.state.value,
       velocity,
       target: dismissTarget,
       spring: springParams,
       onStep: (v, vel) => base.emit({ value: v, velocity: vel }),
       onDone: () => {
-        base.emit({ value: dismissTarget, velocity: 0, phase: 'settle', dismissed: true });
+        base.emit({ phase: 'settle', dismissed: true });
         options.onDismiss?.();
       },
     });
@@ -660,25 +627,19 @@ export function createDragDismiss(options: DismissOptions): DismissController {
   const ctrl: DismissController = {
     pointerDown(p: BehaviorPoint): void {
       if (base.destroyed || base.state.dismissed) return;
-      const carry = base.runner.running ? base.runner.velocity : 0;
-      base.runner.invalidate();
-      dragging = true;
+      _beginPickup(base, p, axis);
       grabPointer = _coord(p, axis);
       grabValue = base.state.value;
-      base.tracker.reset();
-      _seedPickup(base.tracker, p, axis, carry);
-      base.tracker.push(p);
       base.emit({ phase: 'follow', velocity: 0 });
     },
     pointerMove(p: BehaviorPoint): void {
-      if (!dragging) return;
+      if (!base._following) return;
       base.tracker.push(p);
       const raw = _finite(grabValue + _sub(_coord(p, axis), grabPointer));
-      base.emit({ value: raw, velocity: 0 });
+      base.emit({ value: raw });
     },
     pointerUp(p: BehaviorPoint): void {
-      if (!dragging) return;
-      dragging = false;
+      if (!base._following) return;
       base.tracker.push(p);
       const v = axis === 'x' ? base.tracker.velocity().vx : base.tracker.velocity().vy;
       // Порог: смещение В НАПРАВЛЕНИИ dismiss ИЛИ скорость в ту же сторону.
@@ -688,8 +649,7 @@ export function createDragDismiss(options: DismissOptions): DismissController {
       else returnHome(_finite(v));
     },
     pointerCancel(): void {
-      if (!dragging) return;
-      dragging = false;
+      if (!base._following) return;
       // Детерминизм: перехват указателя ВСЕГДА возвращает домой, без скорости.
       returnHome(0);
     },
@@ -741,6 +701,8 @@ export interface CarouselController {
   pointerMove(p: BehaviorPoint): void;
   pointerUp(p: BehaviorPoint): void;
   pointerCancel(): void;
+  /** Обновить geometry/constraints без смены owner/clock. */
+  update(pageCount: number, pageSize: number): void;
   /** Программно перейти на страницу (единый clock). */
   goTo(index: number): void;
   next(): void;
@@ -760,8 +722,8 @@ const DEFAULT_CAROUSEL_VELOCITY = 400;
  * @throws {MotionParamError} при невалидном pageCount/pageSize или пружине.
  */
 export function createCarousel(options: CarouselOptions): CarouselController {
-  const pageCount = Math.trunc(_finite(options.pageCount));
-  const pageSize = _finite(options.pageSize);
+  let pageCount = Math.trunc(_finite(options.pageCount));
+  let pageSize = _finite(options.pageSize);
   if (!(pageCount >= 1)) {
     throw new MotionParamError('LM005');
   }
@@ -786,13 +748,9 @@ export function createCarousel(options: CarouselOptions): CarouselController {
     options.matchMedia,
   );
 
-  let dragging = false;
   let grabPointer = 0;
   let grabValue = 0;
   let swipeStartIndex = startIndex;
-  base.setAbort(() => {
-    dragging = false;
-  });
 
   // Знак перевода pointer-смещения в position-пространство:
   // горизонталь LTR → влево = следующая (position растёт) → −d; RTL → +d;
@@ -801,44 +759,37 @@ export function createCarousel(options: CarouselOptions): CarouselController {
 
   const settleTo = (index: number, velocity: number): void => {
     const i = clampIndex(index);
+    swipeStartIndex = i;
     const target = i * pageSize;
     base.emit({ phase: 'release' });
-    base.runner.settle({
+    base.runner._settle({
       from: base.state.value,
       velocity,
       target,
       spring: springParams,
       // Единый clock: index выводится из position КАЖДЫЙ кадр (не отдельный счётчик).
       onStep: (v, vel) => base.emit({ value: v, velocity: vel, index: clampIndex(Math.round(v / pageSize)) }),
-      onDone: () => base.emit({ value: target, velocity: 0, phase: 'settle', index: i }),
+      onDone: () => base.emit({ phase: 'settle' }),
     });
   };
 
   const ctrl: CarouselController = {
     pointerDown(p: BehaviorPoint): void {
       if (base.destroyed) return;
-      const carry = base.runner.running ? base.runner.velocity : 0;
-      base.runner.invalidate();
-      dragging = true;
+      _beginPickup(base, p, axis, posDirSign);
       grabPointer = _coord(p, axis);
       grabValue = base.state.value;
       swipeStartIndex = clampIndex(Math.round(base.state.value / pageSize));
-      base.tracker.reset();
-      // Прайор скорости перехвата в POSITION-пространстве (уже с posDirSign).
-      _seedPickup(base.tracker, p, axis, carry * posDirSign);
-      base.tracker.push(p);
       base.emit({ phase: 'follow', velocity: 0 });
     },
     pointerMove(p: BehaviorPoint): void {
-      if (!dragging) return;
+      if (!base._following) return;
       base.tracker.push(p);
-      const d = _sub(_coord(p, axis), grabPointer);
-      const value = _finite(grabValue + posDirSign * d);
-      base.emit({ value, velocity: 0, index: clampIndex(Math.round(value / pageSize)) });
+      const value = _finite(grabValue + posDirSign * _sub(_coord(p, axis), grabPointer));
+      base.emit({ value, index: clampIndex(Math.round(value / pageSize)) });
     },
     pointerUp(p: BehaviorPoint): void {
-      if (!dragging) return;
-      dragging = false;
+      if (!base._following) return;
       base.tracker.push(p);
       const vAxis = axis === 'x' ? base.tracker.velocity().vx : base.tracker.velocity().vy;
       // Скорость в position-пространстве.
@@ -852,17 +803,26 @@ export function createCarousel(options: CarouselOptions): CarouselController {
       settleTo(target, _finite(posVel));
     },
     pointerCancel(): void {
-      if (!dragging) return;
-      dragging = false;
+      if (!base._following) return;
       // Детерминизм: доводка к ближайшей странице без скорости.
       settleTo(Math.round(base.state.value / pageSize), 0);
     },
+    update(count: number, size: number): void {
+      if (base.destroyed) return;
+      const nextCount = Math.trunc(_finite(count));
+      const nextSize = _finite(size);
+      if (!(nextCount >= 1)) throw new MotionParamError('LM005');
+      if (!(nextSize > 0)) throw new MotionParamError('LM006');
+      if (nextCount === pageCount && nextSize === pageSize) return;
+      pageCount = nextCount;
+      pageSize = nextSize;
+      swipeStartIndex = clampIndex(swipeStartIndex);
+      if (base._following) base.emit({ index: clampIndex(Math.round(base.state.value / pageSize)) });
+      else settleTo(swipeStartIndex, base.runner._invalidate());
+    },
     goTo(index: number): void {
       if (base.destroyed) return;
-      dragging = false;
-      const carry = base.runner.running ? base.runner.velocity : 0;
-      base.runner.invalidate();
-      settleTo(Math.round(_finite(index)), carry);
+      settleTo(Math.round(_finite(index)), base.runner._invalidate());
     },
     next(): void {
       ctrl.goTo(base.state.index + 1);
@@ -953,11 +913,7 @@ export function createPullToRefresh(options: PullOptions): PullController {
     options.matchMedia,
   );
 
-  let dragging = false;
   let grabPointer = 0;
-  base.setAbort(() => {
-    dragging = false;
-  });
 
   const springTo = (
     target: number,
@@ -966,7 +922,7 @@ export function createPullToRefresh(options: PullOptions): PullController {
     phaseWhileMoving: BehaviorPhase = 'release',
   ): void => {
     base.emit({ phase: phaseWhileMoving });
-    base.runner.settle({
+    base.runner._settle({
       from: base.state.value,
       velocity,
       target,
@@ -978,7 +934,7 @@ export function createPullToRefresh(options: PullOptions): PullController {
 
   const returnHome = (velocity: number): void => {
     springTo(0, velocity, () =>
-      base.emit({ value: 0, velocity: 0, phase: 'idle', pulling: false, armed: false, pending: false }),
+      base.emit({ phase: 'idle', pulling: false, armed: false, pending: false }),
     );
   };
 
@@ -986,7 +942,7 @@ export function createPullToRefresh(options: PullOptions): PullController {
     // Доводка к pendingPosition ТЕМ ЖЕ runner'ом; на финише — pending-удержание.
     base.emit({ pulling: false });
     springTo(pendingPos, velocity, () => {
-      base.emit({ value: pendingPos, velocity: 0, phase: 'settle', pending: true, armed: false });
+      base.emit({ phase: 'settle', pending: true, armed: false });
       // Возврат пружиной ПОСЛЕ резолва async — без второго владельца позиции.
       Promise.resolve(options.onRefresh?.()).then(
         () => {
@@ -1004,24 +960,22 @@ export function createPullToRefresh(options: PullOptions): PullController {
   const ctrl: PullController = {
     pointerDown(p: BehaviorPoint): void {
       if (base.destroyed || base.state.pending) return; // pending владеет позицией
-      base.runner.invalidate();
-      dragging = true;
+      base.runner._invalidate();
       grabPointer = _coord(p, axis);
       base.tracker.reset();
       base.tracker.push(p);
       base.emit({ phase: 'follow', pulling: true, velocity: 0 });
     },
     pointerMove(p: BehaviorPoint): void {
-      if (!dragging) return;
+      if (!base._following) return;
       base.tracker.push(p);
       // Сырая протяжка в направлении dir; обратное — 0 (это не pull).
       const rawPull = dir * _sub(_coord(p, axis), grabPointer);
       const value = rawPull > 0 ? _finite(rawPull * resistance) : 0;
-      base.emit({ value, velocity: 0, armed: value >= threshold });
+      base.emit({ value, armed: value >= threshold });
     },
     pointerUp(p: BehaviorPoint): void {
-      if (!dragging) return;
-      dragging = false;
+      if (!base._following) return;
       base.tracker.push(p);
       const vAxis = axis === 'x' ? base.tracker.velocity().vx : base.tracker.velocity().vy;
       const pullVel = dir * vAxis * resistance;
@@ -1029,8 +983,7 @@ export function createPullToRefresh(options: PullOptions): PullController {
       else returnHome(_finite(pullVel));
     },
     pointerCancel(): void {
-      if (!dragging) return;
-      dragging = false;
+      if (!base._following) return;
       // Детерминизм: перехват возвращает домой без активации refresh.
       returnHome(0);
     },
