@@ -25,10 +25,14 @@ test('smart ghost остаётся focus-inert до последнего overlap
     outer.append(inner);
     document.body.append(outer);
 
+    // Headless projection синхронно settle'ится без scheduler-шва; здесь нужен
+    // именно живой browser-flight, поэтому используем нативный rAF платформы.
+    const options = { requestFrame: (cb: (ts?: number) => void) => requestAnimationFrame(cb) };
+
     ghost.focus();
     const focusableBefore = document.activeElement === ghost && ghost.inert === false;
 
-    const innerBefore = captureSmart(inner);
+    const innerBefore = captureSmart(inner, options);
     ghost.remove();
     const innerFlight = innerBefore.animate();
     ghost.focus();
@@ -36,7 +40,7 @@ test('smart ghost остаётся focus-inert до последнего overlap
       ghost.parentElement === inner && ghost.inert === true && document.activeElement !== ghost;
 
     // Второй controller получает тот же DOM identity, пока первый ещё владеет ghost.
-    const outerBefore = captureSmart(outer);
+    const outerBefore = captureSmart(outer, options);
     ghost.remove();
     const outerFlight = outerBefore.animate();
     ghost.focus();
