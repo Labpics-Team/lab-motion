@@ -58,7 +58,7 @@ describe('./behaviors JOURNEY resize seam — reuse the existing owner', () => {
     expect(clock.pending()).toBe(0);
   });
 
-  it('pager retarget has the same owner-preserving boundary and stale-frame suppression', () => {
+  it('pager retarget preserves C0/C1 while publishing the new index only at settle', () => {
     const clock = makeClock();
     const pager = createCarousel({
       pageCount: 3,
@@ -75,13 +75,20 @@ describe('./behaviors JOURNEY resize seam — reuse the existing owner', () => {
     expect(pager.state.value).not.toBe(0);
     expect(pager.state.velocity).not.toBe(0);
 
-    const before = { value: pager.state.value, velocity: pager.state.velocity };
+    const before = {
+      index: pager.state.index,
+      value: pager.state.value,
+      velocity: pager.state.velocity,
+    };
     expect(clock.pending()).toBe(1);
 
     pager.goTo(0);
 
     expect(pager.state.phase).toBe('release');
-    expect(pager.state.index).toBe(0);
+    // Carousel state.index is the settled/current page, not the active target.
+    // A future mutable-constraint path must therefore keep/recompute its target
+    // inside the existing owner instead of treating this public field as target state.
+    expect(pager.state.index).toBe(before.index);
     expect(pager.state.value).toBe(before.value);
     expect(pager.state.velocity).toBe(before.velocity);
 
