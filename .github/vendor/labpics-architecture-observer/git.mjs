@@ -7,7 +7,10 @@ const cleanToken = v => v?.replace(/^\n+/, '');
 export class GitReader {
     constructor(directory) {
         this.directory = path.resolve(directory);
-        this.environment = { PATH: process.env.PATH, SYSTEMROOT: process.env.SYSTEMROOT, HOME: process.platform === 'win32' ? process.env.USERPROFILE : '/nonexistent',
+        // Isolate Git configuration explicitly instead of poisoning HOME. HOME is
+        // part of executable discovery for legitimate wrapper installations and
+        // changing it can make a working Git binary disappear before analysis.
+        this.environment = { PATH: process.env.PATH, SYSTEMROOT: process.env.SYSTEMROOT, HOME: process.platform === 'win32' ? process.env.USERPROFILE : process.env.HOME,
             GIT_CONFIG_NOSYSTEM: '1', GIT_CONFIG_GLOBAL: process.platform === 'win32' ? 'NUL' : '/dev/null', GIT_OPTIONAL_LOCKS: '0', GIT_NO_LAZY_FETCH: '1', GIT_NO_REPLACE_OBJECTS: '1', GIT_TERMINAL_PROMPT: '0', LC_ALL: 'C' };
     }
     bytes(args, input) {

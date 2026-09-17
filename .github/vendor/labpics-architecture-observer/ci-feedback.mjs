@@ -32,6 +32,19 @@ export function createFeedback({ report, delta = null, ratchet = null, mode, exi
     const newCycles = new Set((comparable ? delta.newCycles : []).map(cycleKey));
     const blockingRules = new Set(mode === 'check' && exitCode === 1 ? (ratchet?.newViolations ?? report.violations).map(v => v.fingerprint) : []);
     const findings = [];
+    const ownership = report.facts?.semanticOwnership;
+    if (ownership && !ownership.complete) {
+        const property = ownership.declaredComponents ? 'semantic-ownership-model-partial' : 'semantic-ownership-model-missing';
+        findings.push({ fingerprint: digest({ property, declared: ownership.declaredPaths, total: ownership.totalPaths }), origin: 'coverage', property,
+            classification: 'coverage-gap', blocking: false, lifecycle: 'context',
+            statement: ownership.declaredComponents
+                ? `Semantic ownership covers ${ownership.declaredPaths}/${ownership.totalPaths} observed source paths; remaining directory groups are context only.`
+                : 'No semantic component ownership is declared; directory groups are retained only as historical context.',
+            consequence: 'Directory shape and co-change cannot safely stand in for bounded-context ownership, so hidden-coupling conclusions are withheld for uncovered units.',
+            lawfulCounterexample: 'A repository whose architecture is intentionally file-local can remain unmodeled; explicit rules may still prove their own narrower scopes.',
+            falsifier: 'Declare only the real component owners needed by product architecture, then rerun and verify that source paths map to those owners without overlap.',
+            witnesses: [], occurrences: 1 });
+    }
     for (const v of report.violations) {
         const blocking = blockingRules.has(v.fingerprint);
         findings.push({ fingerprint: fingerprint(v.fingerprint), origin: 'rule', property: label(v.ruleId),
@@ -86,8 +99,8 @@ export function createFeedback({ report, delta = null, ratchet = null, mode, exi
     for (const c of report.facts.hiddenCouplingCandidates) {
         findings.push({ fingerprint: digest({ property: 'unexplained-co-change', pair: pairKey(c.left, c.right) }),
             origin: 'history', property: 'unexplained-co-change', classification: 'investigation-candidate', blocking: false, lifecycle: 'context',
-            statement: label(c.left) + ' and ' + label(c.right) + ' co-change without an observed direct dependency.',
-            consequence: 'A hidden protocol or distributed policy is possible; an indirect dependency or incomplete graph can also explain the observation.',
+            statement: label(c.left) + ' and ' + label(c.right) + ' are declared components that repeatedly co-change without an observed direct, transitive or shared static relation.',
+            consequence: 'A shared decision or hidden protocol is possible; incomplete static evidence can still explain the observation, so this remains an investigation candidate.',
             lawfulCounterexample: 'Generated projections, coordinated maintenance, a lawful composition root or a transitive dependency.',
             falsifier: 'Inspect witness commits and a behavioral change; establish provenance or a lawful structural explanation instead of treating correlation as causation.',
             association: { shared: c.shared, leftChanges: c.leftChanges, rightChanges: c.rightChanges },

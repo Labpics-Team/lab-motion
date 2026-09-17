@@ -1,30 +1,30 @@
 {
   "repository": "Labpics-Team/agents-config",
-  "commit": "ef81dce1773d2695665990126baa452a8177565b",
+  "commit": "a7ce0832b42f85b69bcf232558cc1bfbfd3f4acf",
   "files": [
     {
       "path": "architecture/analyze.mjs",
       "local": "analyze.mjs",
-      "blob": "be8b2fdf883d68bff76d70ec642eede27eefb231",
-      "sha256": "dd80d366a325b80dde4501f29caa82f5d8a792d7ce1e70489c30cd5509dc495a"
+      "blob": "26c3e139d1b86c7cda12bba86ef50584588a42e4",
+      "sha256": "a8cbaa45b8bffb71d271b65336aac32dd388fa69e5d7980cc54a888f352d72d1"
     },
     {
       "path": "architecture/ci-feedback.mjs",
       "local": "ci-feedback.mjs",
-      "blob": "4bd0f832425691285b6a705b8ae0b8511a77c4a2",
-      "sha256": "5b8514fbedfbee65bc5fa18cf5108b31dbcfa449d3a1fe67f651b578a484804b"
+      "blob": "503fb8e7f9563099aae0dc6b1841f7bb7a0a5463",
+      "sha256": "352f8ee564d2693f73c48855424c41897884309a26b20155428d03f83e0c2ca7"
     },
     {
       "path": "architecture/cli.mjs",
       "local": "cli.mjs",
-      "blob": "00816616eb4221fd7c23ab671900bba385aaa91e",
-      "sha256": "242e3264ddd840eeb49571cf8b6460cd4c9bbf6947630ba4c12f2ff5bae63164"
+      "blob": "94b2bc8a8c12c2abe4d05149ff60843f53e919d7",
+      "sha256": "8d57fbc5e109a817fac46d4f59dc8bbe1308902582610f3f572d5eb5026d0fd1"
     },
     {
       "path": "architecture/git.mjs",
       "local": "git.mjs",
-      "blob": "15593e4d3fa1da21d9be91a10668b6046494b6fd",
-      "sha256": "19095a7dcca3ac34274abc0002acf3e8d5df01b96cf89c4bff74e41210588f0f"
+      "blob": "d36e639e4656fff216dfcacf607773388a9c4149",
+      "sha256": "cefa7239de3a00c0f61cb4142e8fc4502e0757bf39dd9b359eba348b23bce102"
     },
     {
       "path": "architecture/history.mjs",
@@ -41,8 +41,8 @@
     {
       "path": "architecture/model.mjs",
       "local": "model.mjs",
-      "blob": "98db9a0c3d34e796a0f2099344a9f8cac97ee09a",
-      "sha256": "a25a63eae8534cd84caa1957a98bb2e9a859f792e819e19943c0f9aa8f976ba2"
+      "blob": "6e021bc4496b3a1a162c3171fbbc8d9e0a299b42",
+      "sha256": "8fb44883b2eb462c743de95ce396b112c5e5b0481752c567b902de7d25e743e8"
     },
     {
       "path": "architecture/native-syntax.mjs",
@@ -53,14 +53,20 @@
     {
       "path": "architecture/provenance.mjs",
       "local": "provenance.mjs",
-      "blob": "14e676f988a6678ed8865f9a6431ac002d9fddba",
-      "sha256": "d448552c82e18643e81afaa64df53b8ed334e9a65b39446b80738c2268b60e0f"
+      "blob": "1271819330da95df2cb0cc4103e131a125426004",
+      "sha256": "9640e0ea42c2101a6b34859a5537864cc2d0f519e8118e7df61f8057d870c60d"
+    },
+    {
+      "path": "architecture/protocols.mjs",
+      "local": "protocols.mjs",
+      "blob": "91c9a6eb2e9db70872478f33b82e820af399482c",
+      "sha256": "f2f11c4365473452b818a812e6a507329844f65d63c2ec9c5b6aa6d3e8328ba1"
     },
     {
       "path": "architecture/report.mjs",
       "local": "report.mjs",
-      "blob": "973b502c4a474804a5690b24386f12a628c95728",
-      "sha256": "f1d122bfc188d5254533c6d992e4d9874302b159ce1fc9cdcb047135b5a8e360"
+      "blob": "d0ea8ca42df7f348db0e558b49f95e1654655096",
+      "sha256": "ef8d13bdb6721758beadb14950b90d15d3fdb0dcbdd000aacf6e243f660675fe"
     },
     {
       "path": "architecture/source-graph.mjs",

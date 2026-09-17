@@ -1,6 +1,6 @@
 import { createHash } from 'node:crypto';
 import path from 'node:path';
-export const TOOL_VERSION = '0.2.2';
+export const TOOL_VERSION = '0.3.0';
 export const REPORT_SCHEMA = 'labpics.architecture/report/v2';
 export const GRAPH_SCHEMA = 'labpics.architecture/graph/v2';
 export const BASELINE_SCHEMA = 'labpics.architecture/baseline/v1';

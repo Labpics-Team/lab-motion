@@ -1,6 +1,7 @@
 import { BASELINE_SCHEMA, REPORT_SCHEMA, TOOL_VERSION, baselineFrom, compareText, componentFor, digest, graphEligible, graphFrom, object, text, stableJson, within } from './model.mjs';
 import { buildSourceGraph } from './source-graph.mjs';
 import { analyzeHistory, queryCoupling } from './history.mjs';
+import { diagnoseProtocols, compareProtocolDiagnostics } from './protocols.mjs';
 export function stronglyConnected(graph) {
     const adj = new Map(graph.nodes.filter(n => !n.external).map(n => [n.id, new Set()])), reverse = new Map([...adj].map(([id]) => [id, new Set()]));
     for (const e of graph.edges)
@@ -54,15 +55,18 @@ function projection(graph, config) {
             nodes.set(n.id, n);
             continue;
         }
-        const components = new Set(n.paths.map(f => componentFor(f, config).id));
+        const owners = n.paths.map(f => componentFor(f, config));
+        const components = new Set(owners.map(o => o.id));
         // External sensors may choose package-level units crossing declared cuts.
         // Do not join their IDs to unrelated history IDs by spelling coincidence.
         if (components.size !== 1)
             continue;
-        const id = [...components][0];
+        const id = [...components][0], basis = owners.every(o => o.basis === 'declared') ? 'declared' : 'directory-fallback';
         pathOwner.set(n.id, id);
-        const existing = nodes.get(id) ?? { id, external: false, paths: [], basis: 'component-projection' };
+        const existing = nodes.get(id) ?? { id, external: false, paths: [], basis };
         existing.paths.push(...n.paths);
+        if (existing.basis !== basis)
+            existing.basis = 'mixed';
         nodes.set(id, existing);
     }
     const edges = [];
@@ -105,26 +109,60 @@ export function evaluateRules(graph, config) {
     return [...violations.values()].sort((a, b) => compareText(a.fingerprint, b.fingerprint));
 }
 function graphFacts(graph, history, config) {
-    const comp = projection(graph, config), internal = new Set(comp.nodes.filter(n => !n.external).map(n => n.id));
+    const comp = projection(graph, config), internalNodes = comp.nodes.filter(n => !n.external), internal = new Set(internalNodes.map(n => n.id));
+    const nodeById = new Map(internalNodes.map(n => [n.id, n]));
     const edges = comp.edges.filter(e => internal.has(e.from) && internal.has(e.to));
-    const undirected = new Set(edges.map(e => [e.from, e.to].sort(compareText).join('\0')));
-    const absent = pairs => pairs.map(pair => ({ ...pair, kind: internal.has(pair.left) && internal.has(pair.right) ? 'coupling-without-observed-direct-edge' : 'coupling-with-uncovered-static-unit', basis: 'association is not causation; direct edge absence is not proof of independence' }));
-    const hidden = absent(history.componentCoupling.filter(x => !undirected.has([x.left, x.right].sort(compareText).join('\0'))));
+    const outgoing = new Map([...internal].map(id => [id, new Set()])), incoming = new Map([...internal].map(id => [id, new Set()]));
+    for (const e of edges) { outgoing.get(e.from).add(e.to); incoming.get(e.to).add(e.from); }
+    const reaches = (from, target) => {
+        const seen = new Set([from]), queue = [...(outgoing.get(from) ?? [])];
+        while (queue.length) {
+            const next = queue.shift();
+            if (next === target) return true;
+            if (seen.has(next)) continue;
+            seen.add(next); queue.push(...(outgoing.get(next) ?? []));
+        }
+        return false;
+    };
+    const intersects = (a, b) => [...a].some(x => b.has(x));
+    const fallbackPath = id => id.startsWith('directory:') ? id.slice('directory:'.length) : null;
+    const nestedFallback = (left, right) => {
+        const a = fallbackPath(left), b = fallbackPath(right);
+        if (a === null || b === null) return false;
+        const withinDir = (child, parent) => child === parent || child.startsWith(parent === '(root)' ? '' : parent + '/');
+        return withinDir(a, b) || withinDir(b, a);
+    };
+    const explain = pair => {
+        const left = nodeById.get(pair.left), right = nodeById.get(pair.right);
+        if (!left || !right) return { kind: 'static-unit-uncovered', reason: 'one or both historical units are absent from the collected static graph' };
+        if (outgoing.get(pair.left).has(pair.right) || outgoing.get(pair.right).has(pair.left)) return { kind: 'direct-dependency', reason: 'an observed direct dependency already explains coordination' };
+        if (reaches(pair.left, pair.right) || reaches(pair.right, pair.left)) return { kind: 'transitive-dependency', reason: 'an observed dependency path already connects the units' };
+        if (intersects(outgoing.get(pair.left), outgoing.get(pair.right))) return { kind: 'shared-dependency', reason: 'both units depend on an observed common component' };
+        if (intersects(incoming.get(pair.left), incoming.get(pair.right))) return { kind: 'shared-consumer', reason: 'an observed common consumer depends on both units' };
+        if (nestedFallback(pair.left, pair.right)) return { kind: 'nested-directory', reason: 'directory fallback produced ancestor/descendant units; this is layout, not independent ownership' };
+        if (left.basis !== 'declared' || right.basis !== 'declared') return { kind: 'directory-correlation', reason: 'semantic ownership is not declared for both units; retain as historical context only' };
+        return { kind: 'unexplained-declared-component-coupling', reason: 'declared components repeatedly co-change without an observed direct, transitive or shared static relation' };
+    };
+    const couplingAssessments = history.componentCoupling.map(pair => ({ ...pair, ...explain(pair), associationBasis: 'Git co-change is correlation, not causation' }));
+    const hidden = couplingAssessments.filter(x => x.kind === 'unexplained-declared-component-coupling');
+    const directoryLeads = couplingAssessments.filter(x => x.kind === 'directory-correlation');
     const fanIn = new Map(), fanOut = new Map();
     for (const e of edges) {
-        if (!fanIn.has(e.to))
-            fanIn.set(e.to, new Set());
+        if (!fanIn.has(e.to)) fanIn.set(e.to, new Set());
         fanIn.get(e.to).add(e.from);
-        if (!fanOut.has(e.from))
-            fanOut.set(e.from, new Set());
+        if (!fanOut.has(e.from)) fanOut.set(e.from, new Set());
         fanOut.get(e.from).add(e.to);
     }
     const activity = new Map(history.componentHotspots.map(h => [h.component, h]));
-    const hotspots = [...internal].map(id => ({ component: id, fanIn: fanIn.get(id)?.size ?? 0, fanOut: fanOut.get(id)?.size ?? 0, changes: activity.get(id)?.changes ?? 0, evidence: activity.get(id)?.evidence ?? null }));
+    const hotspots = [...internal].map(id => ({ component: id, basis: nodeById.get(id)?.basis ?? 'unknown', fanIn: fanIn.get(id)?.size ?? 0, fanOut: fanOut.get(id)?.size ?? 0, changes: activity.get(id)?.changes ?? 0, evidence: activity.get(id)?.evidence ?? null }));
     hotspots.sort((a, b) => (b.fanIn * b.changes) - (a.fanIn * a.changes) || compareText(a.component, b.component));
-    return { cycles: stronglyConnected(graph), componentCycles: stronglyConnected(comp), hiddenCouplingCandidates: hidden, unstableBoundaryCandidates: hotspots.filter(h => h.fanIn && h.changes).slice(0, 30) };
+    const declaredPaths = graph.nodes.filter(n => !n.external).flatMap(n => n.paths).filter(p => componentFor(p, config).basis === 'declared');
+    const totalPaths = graph.nodes.filter(n => !n.external).flatMap(n => n.paths).length;
+    return { cycles: stronglyConnected(graph), componentCycles: stronglyConnected(comp), couplingAssessments, hiddenCouplingCandidates: hidden, directoryCouplingLeads: directoryLeads,
+        semanticOwnership: { declaredComponents: config.components.length, declaredPaths: declaredPaths.length, totalPaths, complete: totalPaths > 0 && declaredPaths.length === totalPaths },
+        unstableBoundaryCandidates: hotspots.filter(h => h.fanIn && h.changes && h.basis === 'declared').slice(0, 30) };
 }
-export function analyzeRepository({ git, commit, config, externalGraph = null, syntax = null, runtime }) {
+export function analyzeRepository({ git, commit, config, externalGraph = null, syntax = null, runtime, protocolEvidence = null }) {
     object(runtime, ['implementation', 'node'], 'analysis runtime');
     if (typeof runtime.implementation !== 'string' || !/^[a-f0-9]{64}$/.test(runtime.implementation))
         throw new TypeError('analysis runtime: invalid implementation identity');
@@ -139,8 +177,12 @@ export function analyzeRepository({ git, commit, config, externalGraph = null, s
     const raw = git.history(commit, config.history), history = analyzeHistory(raw, config, [...treePaths]), facts = graphFacts(graph, history, config), violations = evaluateRules(graph, config);
     const report = { schema: REPORT_SCHEMA, tool, subject: { commit, tree: snapshot.tree },
         configuration: { digest: digest(config), declaredComponents: config.components.length, declaredRules: config.rules.length },
-        graphEvidence: { producer: graph.producer, digest: digest(graph) }, coverage: { staticGraph: graph.coverage, history: history.coverage, limitations: graph.limitations, componentInference: config.components.length ? 'declared-with-directory-fallback' : 'directory-fallback-only; not semantic ownership' },
+        graphEvidence: { producer: graph.producer, digest: digest(graph) }, coverage: { staticGraph: graph.coverage, history: history.coverage, limitations: graph.limitations, componentInference: facts.semanticOwnership.complete ? 'declared-complete' : config.components.length ? 'declared-partial-with-directory-context' : 'directory-context-only; no semantic ownership model' },
         graph: { nodes: graph.nodes.length, edges: graph.edges.length, externalNodes: graph.nodes.filter(n => n.external).length }, structure: graph, history, facts, violations };
+    report.protocolDiagnostics = diagnoseProtocols(protocolEvidence, snapshot);
+    const protocolPaths = [...new Set(report.protocolDiagnostics.candidates.flatMap(c => c.witnesses.map(w => w.path)))];
+    if (protocolPaths.length)
+        report.protocolDiagnostics.context = reviewContext(report, protocolPaths, config);
     report.identity = digest(report);
     return report;
 }
@@ -152,6 +194,7 @@ export function compareReports(base, head) {
     const bv = keyed(base.violations, x => x.fingerprint), hv = keyed(head.violations, x => x.fingerprint), bc = new Set(base.facts.cycles.map(c => c.join('\0'))), hc = new Set(head.facts.cycles.map(c => c.join('\0')));
     const edgeKey = e => `${e.from}\0${e.to}\0${e.kind}\0${e.path}`, be = keyed(base.structure.edges, edgeKey), he = keyed(head.structure.edges, edgeKey);
     return { base: base.subject.commit, head: head.subject.commit, comparable,
+        protocolDiagnostics: compareProtocolDiagnostics(base.protocolDiagnostics, head.protocolDiagnostics),
         limitations: comparable ? [] : ['configuration, collector or runtime identity differs; delta is not attributable to code alone'],
         newViolations: [...hv].filter(([k]) => !bv.has(k)).map(([, v]) => v), resolvedViolations: [...bv].filter(([k]) => !hv.has(k)).map(([, v]) => v),
         newCycles: [...hc].filter(k => !bc.has(k)).map(k => k.split('\0')), resolvedCycles: [...bc].filter(k => !hc.has(k)).map(k => k.split('\0')),

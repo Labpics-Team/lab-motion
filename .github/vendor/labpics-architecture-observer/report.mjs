@@ -45,7 +45,11 @@ export function markdownReport(report, comparison = null, ratchet = null, contex
         if (!context.relatedUnchanged.length)
             out += '\nNo qualifying related unchanged files in the observed population. This does not prove independence.\n';
     }
-    out += section('Coupling without an observed direct dependency', report.facts.hiddenCouplingCandidates, x => `${pairLine(x, repository)} ${x.kind === 'coupling-with-uncovered-static-unit' ? 'Static unit is not covered; do not diagnose hidden dependency.' : ''}`);
+    out += section('Unexplained coupling between declared components', report.facts.hiddenCouplingCandidates, x => `${pairLine(x, repository)} ${safe(x.reason)}`);
+    out += section('Directory-only historical leads', report.facts.directoryCouplingLeads ?? [], x => `${pairLine(x, repository)} Directory grouping is not semantic ownership; this lead is intentionally withheld from CI findings.`);
+    const assessmentCounts = new Map();
+    for (const item of report.facts.couplingAssessments ?? []) assessmentCounts.set(item.kind, (assessmentCounts.get(item.kind) ?? 0) + 1);
+    if (assessmentCounts.size) out += `\nCoupling explanations: ${[...assessmentCounts].sort(([a], [b]) => compareText(a, b)).map(([kind, count]) => `${safe(kind)}=${count}`).join(', ')}.\n`;
     out += section('Dependency cycles', report.facts.cycles, c => `- ${c.map(code).join(' → ')}. Inspect the cycle witness edges in JSON; a cycle is a structural fact, not an automatic architecture defect.`);
     out += section('Frequently changed, depended-on components', report.facts.unstableBoundaryCandidates, x => `- ${code(x.component)}: ${x.changes} changes, fan-in ${x.fanIn}, fan-out ${x.fanOut}. ${commits(x.evidence, repository)}.`);
     const trend = report.history.changeBreadthTrend;

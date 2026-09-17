@@ -10,11 +10,12 @@ import { markdownReport } from './report.mjs';
 import { parseJsonData, readRegularFile } from './input.mjs';
 import { implementationDigest } from './provenance.mjs';
 import { createFeedback, annotationLines, feedbackMarkdown, failureAnnotation } from './ci-feedback.mjs';
+import { protocolMarkdown } from './protocols.mjs';
 function parseArgs(argv) {
     if (!argv.length)
         return null;
     const o = { command: argv[0], repo: '.', ref: 'HEAD', out: 'architecture-evidence', paths: [] }, seen = new Set();
-    const keys = ['--repo', '--ref', '--base', '--policy-ref', '--config', '--baseline', '--graph', '--base-graph', '--ast-grep', '--out', '--summary', '--repository', '--path', '--presentation'];
+    const keys = ['--repo', '--ref', '--base', '--policy-ref', '--config', '--baseline', '--graph', '--base-graph', '--ast-grep', '--out', '--summary', '--repository', '--path', '--presentation', '--protocols', '--base-protocols'];
     for (let i = 1; i < argv.length; i++) {
         const k = argv[i];
         if (!keys.includes(k) || i + 1 >= argv.length || argv[i + 1].startsWith('--'))
@@ -89,6 +90,8 @@ export function run(argv) {
     const presentation = o.presentation ?? 'detailed';
     if (!['detailed', 'github'].includes(presentation) || presentation === 'github' && o.command === 'baseline')
         throw new TypeError('Unsupported presentation for command');
+    if (['check', 'baseline'].includes(o.command) && (o.protocols || o['base-protocols']))
+        throw new Error('Protocol evidence is observational and cannot authorize check or baseline');
     const repo = path.resolve(o.repo), git = new GitReader(repo), commit = git.oid(o.ref), requestedBase = o.base ? git.oid(o.base) : null;
     const base = requestedBase ? git.mergeBase(requestedBase, commit) : null, policyCommit = o['policy-ref'] ? git.oid(o['policy-ref']) : requestedBase ?? commit;
     const configPath = o.config ?? '.architecture.json', trusted = committedConfig(git, policyCommit, configPath), candidate = committedConfig(git, commit, configPath), config = trusted.config;
@@ -96,12 +99,16 @@ export function run(argv) {
     const syntax = o['ast-grep'] ? createSyntaxCollector(o['ast-grep']) : null;
     if ((o.graph && !o['base-graph'] && base) || (o['base-graph'] && (!o.graph || !base)))
         throw new Error('External graph comparison requires both sides');
+    if ((o.protocols && base && !o['base-protocols']) || (o['base-protocols'] && (!o.protocols || !base)))
+        throw new Error('Protocol comparison requires evidence for both immutable subjects');
+    const protocolEvidence = o.protocols ? readJson(path.resolve(repo, o.protocols)) : null;
+    const baseProtocolEvidence = o['base-protocols'] ? readJson(path.resolve(repo, o['base-protocols'])) : null;
     const authoritativeGraph = o.command === 'check' || o.command === 'baseline';
     const subjectGraph = graphInput(repo, o.graph, authoritativeGraph);
     const runtime = { implementation: implementationDigest(), node: process.version };
-    const report = analyzeRepository({ git, commit, config, syntax, externalGraph: subjectGraph, runtime });
+    const report = analyzeRepository({ git, commit, config, syntax, externalGraph: subjectGraph, runtime, protocolEvidence });
     const baseGraph = base ? graphInput(repo, o['base-graph'], authoritativeGraph) : null;
-    const before = base ? analyzeRepository({ git, commit: base, config, syntax, externalGraph: baseGraph, runtime }) : null;
+    const before = base ? analyzeRepository({ git, commit: base, config, syntax, externalGraph: baseGraph, runtime, protocolEvidence: baseProtocolEvidence }) : null;
     const comparison = before ? { ...compareReports(before, report), requestedBase } : null;
     const selected = o.paths.length ? o.paths : base ? git.changedPaths(base, commit) : [];
     const context = selected.length ? reviewContext(before ?? report, selected, config) : null;
@@ -127,7 +134,7 @@ export function run(argv) {
         baselineExpansion = candidateBaseline.accepted.some(e => !allowed.has(e.fingerprint));
         ratchet = baselineVerdict(report, candidateBaseline);
     }
-    const markdown = markdownReport(report, comparison, ratchet, context, o.repository, policy);
+    const markdown = markdownReport(report, comparison, ratchet, context, o.repository, policy) + protocolMarkdown(report.protocolDiagnostics);
     // Publication projects the existing outcome; it never changes admission policy.
     const finish = status => {
         const feedback = presentation === 'github' ? createFeedback({ report, delta: comparison, ratchet, mode: o.command, exitCode: status, policy, repository: o.repository,
@@ -137,8 +144,6 @@ export function run(argv) {
         if (o.summary) appendFileSync(o.summary, visible + '\n');
         if (feedback) {
             for (const line of annotationLines(feedback)) console.log(line);
-            // Canonical JSON escapes embedded newlines; candidate prose cannot
-            // become a workflow command. Logs keep agent evidence without storage.
             console.log('::group::Architecture machine feedback (JSON)');
             console.log(stableJson(feedback));
             console.log('::endgroup::');
