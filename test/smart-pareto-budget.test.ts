@@ -26,9 +26,10 @@ describe('./smart strict Pareto budget', () => {
   ] as const)('%s не покупает JOURNEY-semantics ростом protected bytes', (kind, path) => {
     const actual = bytes(path);
     const ceiling = BASE[kind];
+    const violations = (Object.keys(ceiling) as Array<keyof typeof ceiling>)
+      .filter((metric) => actual[metric] > ceiling[metric])
+      .map((metric) => `${metric}: ${actual[metric]} > ${ceiling[metric]}`);
 
-    expect(actual.raw, `${kind} raw`).toBeLessThanOrEqual(ceiling.raw);
-    expect(actual.gzip, `${kind} canonical gzip`).toBeLessThanOrEqual(ceiling.gzip);
-    expect(actual.brotli, `${kind} Brotli`).toBeLessThanOrEqual(ceiling.brotli);
+    expect(violations, `${kind} protected bytes: ${JSON.stringify(actual)}`).toEqual([]);
   });
 });
