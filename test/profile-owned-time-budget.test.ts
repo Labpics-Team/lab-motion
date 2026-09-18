@@ -10,6 +10,7 @@ import {
   buildOwnedTimePilotReceipt,
   finalizeOwnedTimePilotReceipt,
 } from '../bench/profile/budget-pilot-core.mjs';
+import { BUDGET_HARNESS_KIND } from '../bench/profile/budget-pilot-desktop.mjs';
 
 const engines = ['chromium', 'firefox', 'webkit'] as const;
 
@@ -49,6 +50,7 @@ function rawScene(id: string) {
 describe('PROFILE-01 owned-time budget family', () => {
   it('freezes a timing representation with no discovery-to-holdout selector', () => {
     expect(() => validateOwnedTimeBudgetPreregistration()).not.toThrow();
+    expect(BUDGET_HARNESS_KIND).toBe('owned-time-budget-desktop-v1');
     expect(DESIGN.supersedesTimingFamily).toBe('whole-scene-enclosing-wall-v1');
     expect(DESIGN.measurement.targetOwnedMs).toBeGreaterThanOrEqual(5 * 40);
     expect(DESIGN.measurement.timingResolutionRule).toMatch(/no discovery-to-holdout/);
