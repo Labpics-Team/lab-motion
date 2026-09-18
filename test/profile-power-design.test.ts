@@ -159,13 +159,34 @@ describe('PROFILE-01 content-addressed powered design', () => {
     expect(() => derivePoweredDesign(finalized, inv, calibration, '2026-09-18T03:03:00.000Z')).toThrow(/degenerate A\/A noise/);
   });
 
-  it('rejects evidence substitution against the raw-backed pilot summaries', () => {
+  it('rejects aggregate-changing substitution against the raw-backed pilot summaries', () => {
     const inv = inventory();
     const pilot = pilotFor(inv);
     const changedPilot = structuredClone(pilot);
-    changedPilot.cells[0].scenes[0].raw.aa.a[0].samples[0] += 0.1;
+    for (const block of changedPilot.cells[0].scenes[0].raw.aa.a) block.samples[0] += 0.1;
     expect(() => validatePilotReceipt(changedPilot)).toThrow(/drifted from raw evidence/);
   });
+
+  it('content addressing rejects even a raw substitution that leaves aggregate summaries unchanged', () => {
+    const inv = inventory();
+    const pilot = pilotFor(inv);
+    const registration = {
+      schemaVersion: 1,
+      profileId: PROFILE_PREREGISTRATION.profileId,
+      baselineRevision: PROFILE_PREREGISTRATION.baseline.revision,
+      status: 'REGISTERED',
+      pilotId: pilot.pilotId,
+      pilotArtifactSha256: receiptSha256(pilot),
+      harnessRevision: pilot.harness.harnessRevision,
+      evidencePath: 'fixture://immutable-pilot',
+    };
+    expect(() => validatePilotRegistration(pilot, registration)).not.toThrow();
+
+    const changedPilot = structuredClone(pilot);
+    changedPilot.cells[0].scenes[0].raw.aa.a[0].samples[0] += 0.1;
+    expect(() => validatePilotReceipt(changedPilot)).not.toThrow();
+    expect(() => validatePilotRegistration(changedPilot, registration)).toThrow(/pilot digest does not match trusted registration/);
+  }, 15_000);
 
   it('rejects a pilot sample below the preregistered formal timing floor', () => {
     const inv = inventory();
