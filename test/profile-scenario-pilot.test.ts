@@ -1,6 +1,6 @@
 import { describe, expect, it, vi } from 'vitest';
 import { PROFILE_PREREGISTRATION } from '../bench/profile/preregistration.mjs';
-import { validatePilotReceipt } from '../bench/profile/power-design.mjs';
+import { finalizePilotReceipt, validatePilotReceipt } from '../bench/profile/power-design.mjs';
 import {
   acquireSceneControls,
   buildPilotReceipt,
@@ -78,7 +78,7 @@ describe('PROFILE-01 scenario null/control harness', () => {
 
   it('emits the canonical content-addressable pilot shape accepted by the independent validator', () => {
     const inv = inventory();
-    const receipt = buildPilotReceipt({
+    const rawReceipt = buildPilotReceipt({
       inventory: inv,
       harnessRevision: '1'.repeat(40),
       generatedAt: '2026-09-18T06:01:00.000Z',
@@ -89,8 +89,9 @@ describe('PROFILE-01 scenario null/control harness', () => {
         scenes: [rawScene('collection-reorder-100'), rawScene('direct-manipulation-sheet')],
       })),
     });
-    expect(receipt.candidateSamples).toBe(0);
-    expect(receipt.cells[0].scenes.map(({ id }) => id)).toEqual(PROFILE_PREREGISTRATION.statistics.m05.requiredSceneIds);
+    expect(rawReceipt.candidateSamples).toBe(0);
+    expect(rawReceipt.cells[0].scenes.map(({ id }) => id)).toEqual(PROFILE_PREREGISTRATION.statistics.m05.requiredSceneIds);
+    const receipt = finalizePilotReceipt(rawReceipt);
     expect(() => validatePilotReceipt(receipt)).not.toThrow();
   });
 });
