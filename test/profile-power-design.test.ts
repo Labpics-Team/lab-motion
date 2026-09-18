@@ -55,8 +55,9 @@ function calibrationCell(engine: typeof engines[number]) {
     browserVersion: 'fixture',
     aa: { ratio: 1, lower95: 1, upper95: 1 },
     deliberate2x: { ratio: 2, lower95: 2, upper95: 2 },
-    raw: {      aa: { a: calibrationClusters(10), b: calibrationClusters(10) },
-      deliberate2x: { single: calibrationClusters(10), doubled: calibrationClusters(20) },
+    raw: {
+      aa: { a: calibrationClusters(50), b: calibrationClusters(50) },
+      deliberate2x: { single: calibrationClusters(50), doubled: calibrationClusters(100) },
     },
   };
 }
@@ -85,7 +86,8 @@ function rawScene(id: string) {
 
 function pilotFor(inv: ReturnType<typeof inventory>) {
   return finalizePilotReceipt({
-    schemaVersion: 1,    profileId: PROFILE_PREREGISTRATION.profileId,
+    schemaVersion: 1,
+    profileId: PROFILE_PREREGISTRATION.profileId,
     baselineRevision: PROFILE_PREREGISTRATION.baseline.revision,
     pilotId: 'fixture-null-control-v1',
     generatedAt: '2026-09-18T03:02:00.000Z',
@@ -116,7 +118,8 @@ describe('PROFILE-01 content-addressed powered design', () => {
     const inv = inventory();
     const calibration = calibrationFor(inv);
     const pilot = pilotFor(inv);
-    const design = derivePoweredDesign(pilot, inv, calibration, '2026-09-18T03:03:00.000Z');    expect(design.cells.every((cell) => cell.chosenIndependentBlocks === 20)).toBe(true);
+    const design = derivePoweredDesign(pilot, inv, calibration, '2026-09-18T03:03:00.000Z');
+    expect(design.cells.every((cell) => cell.chosenIndependentBlocks === 20)).toBe(true);
     expect(design.cells.every((cell) => cell.estimatedPower === 1 && cell.status === 'powered')).toBe(true);
     expect(eligibleDesktopCells(inv, calibration, design, pilot)).toEqual([
       'desktop-chromium',
@@ -143,6 +146,7 @@ describe('PROFILE-01 content-addressed powered design', () => {
     changedPilot.cells[0].scenes[0].raw.aa.a[0].samples[0] = 10.1;
     expect(() => eligibleDesktopCells(inv, calibration, design, changedPilot)).toThrow(/pilot|raw evidence/);
   });
+
   it('fails closed when scenario control evidence is unresolved', () => {
     const inv = inventory();
     const pilot = pilotFor(inv);
