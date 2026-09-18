@@ -135,14 +135,6 @@ export interface SurfaceSeams extends SurfaceObserverClock {
 /** Допуск сертификации базы B: group-бокс равен committed ширине. */
 const MODEL_CERT_TOLERANCE_PX = 0.5;
 
-function deferred(): { promise: Promise<void>; resolve(): void } {
-  let resolve!: () => void;
-  const promise = new Promise<void>((r) => {
-    resolve = r;
-  });
-  return { promise, resolve };
-}
-
 const thenable = (value: unknown): value is PromiseLike<void> =>
   value !== null && typeof value === 'object' && typeof (value as { then?: unknown }).then === 'function';
 
@@ -186,9 +178,12 @@ export function startSurfaceTransition(
   let cssInjected = false;
   let vt: SurfaceViewTransitionLike | undefined;
 
-  const committed = deferred();
-  const ready = deferred();
-  const finished = deferred();
+  let commitDone!: () => void;
+  let readyDone!: () => void;
+  let finishDone!: () => void;
+  const committed = new Promise<void>((resolve) => { commitDone = resolve; });
+  const ready = new Promise<void>((resolve) => { readyDone = resolve; });
+  const finished = new Promise<void>((resolve) => { finishDone = resolve; });
   let observer: ReturnType<typeof createSurfaceObserver> | undefined;
   let inputCleanup: (() => void) | undefined;
   const generation = seams.generation;
@@ -229,14 +224,14 @@ export function startSurfaceTransition(
     }
     // Терминальный путь не оставляет висящих awaiter'ов: на happy path оба
     // уже зарезолвлены, на failed/canceled это no-op-страховка контракта.
-    ready.resolve();
-    committed.resolve();
-    finished.resolve();
+    readyDone();
+    commitDone();
+    finishDone();
   };
 
   const snap = (): void => {
-    ready.resolve();
-    committed.resolve();
+    readyDone();
+    commitDone();
     finalize('released');
   };
 
@@ -366,9 +361,9 @@ export function startSurfaceTransition(
       // observer, committed DOM раскрывается skipTransition.
       generation?.onSupersede(() => finalize('released'));
 
-      ready.resolve();
+      readyDone();
       state = 'running';
-      committed.resolve();
+      commitDone();
 
       // Input policy: первый значимый intent раскрывает committed DOM.
       // 'block' не подписывается; cleanup выполняется в finalize.
@@ -421,9 +416,9 @@ export function startSurfaceTransition(
   };
 
   return {
-    committed: committed.promise,
-    ready: ready.promise,
-    finished: finished.promise,
+    committed,
+    ready,
+    finished,
     cancel,
     get state(): SurfaceState {
       return state;
