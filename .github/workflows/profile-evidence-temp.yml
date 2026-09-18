@@ -44,7 +44,7 @@ jobs:
         shell: bash
         env:
           PROFILE_BASELINE_DIR: ${{ runner.temp }}/profile-baseline
-          PROFILE_HARNESS_REVISION: fe915c984555ca767a78dc4a9a765da36883d7f4
+          PROFILE_HARNESS_REVISION: fe915c9e7942c32e069b15dee8aa6cca2d330371
         run: |
           set -euo pipefail
           mkdir -p "$RUNNER_TEMP/profile-evidence"
