@@ -1,0 +1,72 @@
+name: PROFILE-01 evidence packet
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+env:
+  COREPACK_ENABLE_DOWNLOAD_PROMPT: "0"
+  COREPACK_DEFAULT_TO_LATEST: "0"
+
+jobs:
+  evidence:
+    runs-on: ubuntu-latest
+    timeout-minutes: 35
+    steps:
+      - name: Checkout research head
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          persist-credentials: false
+          fetch-depth: 0
+      - name: Setup Node
+        uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v6
+        with:
+          node-version: "24"
+      - name: Activate pinned pnpm
+        run: |
+          corepack enable
+          corepack install --global pnpm@11.11.0
+      - name: Install exact research dependencies
+        run: |
+          pnpm install --frozen-lockfile
+          pnpm --dir bench/compare install --frozen-lockfile
+          pnpm --dir bench/compare exec playwright install --with-deps chromium firefox webkit
+      - name: Build frozen baseline
+        shell: bash
+        run: |
+          set -euo pipefail
+          git worktree add --detach "$RUNNER_TEMP/profile-baseline" fe11daa407de396fad952be7679650f63dabd4dd
+          pnpm --dir "$RUNNER_TEMP/profile-baseline" install --frozen-lockfile
+          pnpm --dir "$RUNNER_TEMP/profile-baseline" build
+      - name: Generate content-addressed PROFILE evidence
+        shell: bash
+        env:
+          PROFILE_BASELINE_DIR: ${{ runner.temp }}/profile-baseline
+          PROFILE_HARNESS_REVISION: fe915c984555ca767a78dc4a9a765da36883d7f4
+        run: |
+          set -euo pipefail
+          mkdir -p "$RUNNER_TEMP/profile-evidence"
+          node bench/profile/capture-desktop.mjs > "$RUNNER_TEMP/profile-evidence/inventory.json"
+          PROFILE_INVENTORY_PATH="$RUNNER_TEMP/profile-evidence/inventory.json" \
+            PROFILE_CALIBRATION_ID="desktop-controls-20260918-v2" \
+            node bench/profile/calibrate-desktop.mjs > "$RUNNER_TEMP/profile-evidence/calibration.json"
+          PROFILE_INVENTORY_PATH="$RUNNER_TEMP/profile-evidence/inventory.json" \
+            PROFILE_PILOT_OUTPUT="$RUNNER_TEMP/profile-evidence/pilot.json" \
+            PROFILE_PILOT_ID="desktop-heavy-scenes-null-control-20260918-v1" \
+            node bench/profile/pilot-desktop.mjs
+          node bench/profile/power-design.mjs \
+            --inventory "$RUNNER_TEMP/profile-evidence/inventory.json" \
+            --calibration "$RUNNER_TEMP/profile-evidence/calibration.json" \
+            --pilot "$RUNNER_TEMP/profile-evidence/pilot.json" \
+            --out "$RUNNER_TEMP/profile-evidence/powered-design.json"
+          (cd "$RUNNER_TEMP/profile-evidence" && sha256sum *.json > SHA256SUMS)
+      - name: Upload immutable evidence packet
+        if: always()
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
+        with:
+          name: profile-01-evidence-${{ github.sha }}-${{ github.run_id }}
+          path: ${{ runner.temp }}/profile-evidence/
+          if-no-files-found: warn
+          retention-days: 14
