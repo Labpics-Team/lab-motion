@@ -91,6 +91,7 @@ describe('PROFILE-01 independent-arm normalized timing design', () => {
     expect(DESIGN.supersedesTimingFamily).toBe('paired-coarse-arm-difference-v1');
     expect(DESIGN.candidateSamplesObservedAtRegistration).toBe(false);
     expect(DESIGN.estimator.representation).toBe('difference-of-independently-resolved-arm-normalized-wall-times');
+    expect(DESIGN.estimator.factorTwoRatioBand).toEqual([1.9, 2.1]);
     expect(1 - DESIGN.holdoutCoverage ** DESIGN.holdoutProbeCount).toBeGreaterThanOrEqual(DESIGN.holdoutConfidence);
   });
 });

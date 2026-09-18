@@ -431,9 +431,17 @@ async function measureEngine(engine, browserType, bundle, inventory) {
       }
       const selectedRepeats = { motion: motionSelector.repeats, control: controlSelector.repeats };
       const measureDifferential = (selected, factor) => measureArmPair(page, sceneId, selected, factor, Boolean(nextArmOrder()));
-      const raw = await acquireAsymmetricControls(measureDifferential, selectedRepeats, {
-        orderSeed: PROFILE_PREREGISTRATION.statistics.orderSeed ^ Math.imul(sceneIndex + 1, 0x119de1f3),
-      });
+      let raw;
+      try {
+        raw = await acquireAsymmetricControls(measureDifferential, selectedRepeats, {
+          orderSeed: PROFILE_PREREGISTRATION.statistics.orderSeed ^ Math.imul(sceneIndex + 1, 0x119de1f3),
+        });
+      } catch (error) {
+        if (error instanceof AsymmetricPilotFailure) throw error;
+        throw new AsymmetricPilotFailure(error instanceof Error ? error.message.replace(/^PROFILE-01 asymmetric pilot: /u, '') : String(error), {
+          stage: 'run-block-acquisition', engine, sceneId, selectedRepeats,
+        });
+      }
       const aa = pairedMedianRatioInterval(raw.aa.a, raw.aa.b, PROFILE_PREREGISTRATION.statistics.bootstrapSeed ^ sceneIndex);
       const deliberate2x = pairedMedianRatioInterval(raw.deliberate2x.doubled, raw.deliberate2x.single, PROFILE_PREREGISTRATION.statistics.bootstrapSeed ^ sceneIndex ^ 0x2a2a2a);
       scenes.push({
@@ -454,9 +462,11 @@ async function measureEngine(engine, browserType, bundle, inventory) {
 
 function validateCalibration(cells) {
   const [aaLow, aaHigh] = PROFILE_PREREGISTRATION.calibration.aaNonInferiorityBand;
+  const [factorTwoLow, factorTwoHigh] = DESIGN.estimator.factorTwoRatioBand;
   for (const cell of cells) for (const scene of cell.scenes) {
     invariant(scene.aa.lower95 >= aaLow && scene.aa.upper95 <= aaHigh, `${cell.id}/${scene.id}: A/A differential escaped [${aaLow}, ${aaHigh}]`);
     invariant(scene.deliberate2x.lower95 >= PROFILE_PREREGISTRATION.calibration.deliberateWorkDetectedLower95Min, `${cell.id}/${scene.id}: deliberate-2x differential unresolved`);
+    invariant(scene.deliberate2x.lower95 >= factorTwoLow && scene.deliberate2x.upper95 <= factorTwoHigh, `${cell.id}/${scene.id}: factor-2 normalized scale escaped [${factorTwoLow}, ${factorTwoHigh}]`);
   }
 }
 
@@ -477,6 +487,7 @@ async function main() {
   const cells = [];
   try {
     for (const engine of DESIGN.engines) cells.push(await measureEngine(engine, playwright[engine], bundle, inventory));
+    validateCalibration(cells);
   } catch (error) {
     const failureReceipt = {
       schemaVersion: 1, node: DESIGN.node, designId: DESIGN.id, preregRevision, harnessRevision,
@@ -501,7 +512,6 @@ async function main() {
     cells,
   };
   await writeFile(outputPath, `${JSON.stringify(receipt, null, 2)}\n`, 'utf8');
-  validateCalibration(cells);
   process.stdout.write(`${JSON.stringify({ designId: DESIGN.id, candidateSamples: 0, sha256: sha256(receipt), cells: cells.map((cell) => ({ id: cell.id, scenes: cell.scenes.map((scene) => ({ id: scene.id, repeats: scene.selectedRepeats, aa: scene.aa, deliberate2x: scene.deliberate2x })) })) }, null, 2)}\n`);
 }
 
