@@ -1,5 +1,5 @@
 import { createRequire } from 'node:module';
-import { readFile } from 'node:fs/promises';
+import { readFile, writeFile } from 'node:fs/promises';
 import { pathToFileURL } from 'node:url';
 import { pairedClusterBootstrap } from '../compare/methodology.mjs';
 import { PROFILE_PREREGISTRATION } from './preregistration.mjs';
@@ -138,6 +138,16 @@ export function finalizeCalibrationReceipt(cells, generatedAt, options) {
   return receipt;
 }
 
+export async function persistCalibrationReceipt(cells, outputPath, generatedAt, options) {
+  const receipt = createCalibrationReceipt(cells, generatedAt, options);
+  // Failure evidence is evidence too: persist the exact raw receipt before the
+  // fail-closed admission check so an invalid calibration can be diagnosed
+  // without rerunning the same experiment until it happens to go green.
+  await writeFile(outputPath, `${JSON.stringify(receipt, null, 2)}\n`, 'utf8');
+  validateCalibrationReceipt(receipt);
+  return receipt;
+}
+
 async function main() {
   const inventoryPath = process.env.PROFILE_INVENTORY_PATH ?? new URL('./desktop-inventory-20260915.json', import.meta.url);
   const inventory = JSON.parse(await readFile(inventoryPath, 'utf8'));
@@ -153,10 +163,14 @@ async function main() {
     cells.push(cell);
   }
 
-  const receipt = finalizeCalibrationReceipt(cells, undefined, {
+  const options = {
     inventoryArtifactSha256: receiptSha256(inventory),
     calibrationId: process.env.PROFILE_CALIBRATION_ID ?? 'desktop-controls-20260918-v1',
-  });
+  };
+  const outputPath = process.env.PROFILE_CALIBRATION_OUTPUT;
+  const receipt = outputPath
+    ? await persistCalibrationReceipt(cells, outputPath, undefined, options)
+    : finalizeCalibrationReceipt(cells, undefined, options);
   process.stdout.write(`${JSON.stringify(receipt, null, 2)}\n`);
 }
 

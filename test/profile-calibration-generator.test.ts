@@ -1,7 +1,11 @@
+import { mkdtemp, readFile, rm } from 'node:fs/promises';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
 import { describe, expect, it } from 'vitest';
 import {
   createCalibrationReceipt,
   finalizeCalibrationReceipt,
+  persistCalibrationReceipt,
 } from '../bench/profile/calibrate-desktop.mjs';
 
 const engines = ['chromium', 'firefox', 'webkit'] as const;
@@ -59,6 +63,23 @@ describe('PROFILE-01 calibration generator boundary', () => {
 
     expect(createCalibrationReceipt(cells).status).toBe('FAIL');
     expect(() => finalizeCalibrationReceipt(cells)).toThrow(/A\/A escaped/);
+  });
+
+  it('сохраняет raw FAIL до fail-closed admission', async () => {
+    const cells = passingCells();
+    cells[0] = cell('chromium', { aaLeft: 106, aaRight: 100 });
+    const dir = await mkdtemp(join(tmpdir(), 'lab-motion-profile-calibration-'));
+    const output = join(dir, 'calibration.json');
+
+    try {
+      await expect(persistCalibrationReceipt(cells, output)).rejects.toThrow(/A\/A escaped/);
+      const receipt = JSON.parse(await readFile(output, 'utf8'));
+      expect(receipt.status).toBe('FAIL');
+      expect(receipt.candidateSamples).toBe(0);
+      expect(receipt.raw.aa[0].clusters.a).toHaveLength(20);
+    } finally {
+      await rm(dir, { recursive: true, force: true });
+    }
   });
 
   it('не выпускает неразрешимый positive control как успешный артефакт', () => {
