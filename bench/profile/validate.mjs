@@ -1,3 +1,4 @@
+import { pathToFileURL } from 'node:url';
 import { pairedClusterBootstrap } from '../compare/methodology.mjs';
 import { PROFILE_PREREGISTRATION } from './preregistration.mjs';
 
@@ -256,7 +257,7 @@ export function eligibleDesktopCells(inventory, calibration, poweredDesign, prof
   throw new Error('PROFILE-01: powered design admission requires a recomputable null/control pilot; self-declared power is non-admitting');
 }
 
-if (import.meta.url === `file://${process.argv[1]}`) {
+if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) {
   validatePreregistration();
   process.stdout.write(`${JSON.stringify({ profileId: PROFILE_PREREGISTRATION.profileId, status: 'VALID' })}\n`);
 }
