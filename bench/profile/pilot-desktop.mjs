@@ -9,9 +9,13 @@ import { validateDesktopInventory } from './validate.mjs';
 
 const ENGINES = ['chromium', 'firefox', 'webkit'];
 const RUN_BLOCKS = PROFILE_PREREGISTRATION.statistics.minimumIndependentBlocks;
-const BATCH_FLOOR_MS = 20;
-const MAX_BATCH_CALLS = 512;
-const DEFAULT_PILOT_ID = 'scenario-null-control-20260918-v2';
+const SELECTOR = PROFILE_PREREGISTRATION.scenarioSelector;
+const BATCH_FLOOR_MS = SELECTOR.formalFloorMs;
+const SELECTION_FLOOR_MS = SELECTOR.selectionFloorMs;
+const MAX_BATCH_CALLS = SELECTOR.maximumBatchCalls;
+const DISCOVERY_PROBE_COUNT = SELECTOR.discoveryProbeCount;
+const HOLDOUT_PROBE_COUNT = SELECTOR.holdoutProbeCount;
+const DEFAULT_PILOT_ID = 'scenario-null-control-20260918-v3';
 
 function invariant(condition, message) {
   if (!condition) throw new Error(`PROFILE-01 pilot: ${message}`);
@@ -33,18 +37,59 @@ function orderGenerator(seed) {
 }
 
 export async function chooseBatchCalls(measureScene, options = {}) {
-  const floorMs = options.floorMs ?? BATCH_FLOOR_MS;
+  const formalFloorMs = options.formalFloorMs ?? BATCH_FLOOR_MS;
+  const selectionFloorMs = options.selectionFloorMs ?? SELECTION_FLOOR_MS;
   const maxCalls = options.maxCalls ?? MAX_BATCH_CALLS;
-  invariant(Number.isFinite(floorMs) && floorMs > 0, 'timing floor must be positive');
+  const discoveryProbeCount = options.discoveryProbeCount ?? DISCOVERY_PROBE_COUNT;
+  const holdoutProbeCount = options.holdoutProbeCount ?? HOLDOUT_PROBE_COUNT;
+  invariant(Number.isFinite(formalFloorMs) && formalFloorMs > 0, 'formal timing floor must be positive');
+  invariant(Number.isFinite(selectionFloorMs) && selectionFloorMs >= formalFloorMs, 'selection timing floor must cover the formal floor');
   invariant(Number.isSafeInteger(maxCalls) && maxCalls > 0, 'max batch calls must be a positive integer');
+  invariant(Number.isSafeInteger(discoveryProbeCount) && discoveryProbeCount > 0, 'discovery probe count must be positive');
+  invariant(Number.isSafeInteger(holdoutProbeCount) && holdoutProbeCount > 0, 'holdout probe count must be positive');
 
   for (let calls = 1; calls <= maxCalls; calls *= 2) {
-    const elapsed = await measureScene(calls);
-    invariant(Number.isFinite(elapsed) && elapsed >= 0, `batch calibration returned invalid elapsed ${elapsed}`);
-    if (elapsed >= floorMs) return calls;
-    if (calls > Math.floor(maxCalls / 2)) break;
+    const discovery = [];
+    for (let probe = 0; probe < discoveryProbeCount; probe++) {
+      const elapsed = await measureScene(calls);
+      invariant(Number.isFinite(elapsed) && elapsed >= 0, `discovery probe returned invalid elapsed ${elapsed}`);
+      discovery.push(elapsed);
+    }
+    if (!discovery.every((elapsed) => elapsed >= selectionFloorMs)) {
+      if (calls > Math.floor(maxCalls / 2)) break;
+      continue;
+    }
+
+    // Holdout is deliberately separate from discovery. If it fails, this pilot
+    // aborts instead of escalating the batch from evidence it was meant to test.
+    const holdout = [];
+    for (let probe = 0; probe < holdoutProbeCount; probe++) {
+      const elapsed = await measureScene(calls);
+      invariant(Number.isFinite(elapsed) && elapsed >= 0, `holdout probe returned invalid elapsed ${elapsed}`);
+      holdout.push(elapsed);
+    }
+    invariant(
+      holdout.every((elapsed) => elapsed >= selectionFloorMs),
+      `selector holdout failed at ${calls} copies; same-pilot batch escalation is forbidden`,
+    );
+    return {
+      batchCalls: calls,
+      selector: {
+        kind: SELECTOR.kind,
+        batchCalls: calls,
+        formalFloorMs,
+        selectionFloorMs,
+        maximumBatchCalls: maxCalls,
+        discoveryProbeCount,
+        holdoutProbeCount,
+        holdoutCoverage: SELECTOR.holdoutCoverage,
+        holdoutConfidence: SELECTOR.holdoutConfidence,
+        discovery,
+        holdout,
+      },
+    };
   }
-  throw new Error(`PROFILE-01 pilot: scenario does not resolve above ${floorMs}ms by ${maxCalls} real scene copies`);
+  throw new Error(`PROFILE-01 pilot: scenario discovery does not resolve above ${selectionFloorMs}ms by ${maxCalls} real scene copies`);
 }
 
 export async function acquireSceneControls(measureScene, batchCalls, options = {}) {
@@ -98,7 +143,7 @@ export function buildPilotReceipt({ inventory, harnessRevision, cells, pilotId =
     inventoryArtifactSha256: receiptSha256(inventory),
     methodologyBlob: PROFILE_PREREGISTRATION.baseline.methodologyBlob,
     harness: {
-      kind: 'scenario-null-control-v1',
+      kind: 'scenario-null-control-v2',
       harnessRevision,
       baselineRevision: PROFILE_PREREGISTRATION.baseline.revision,
       independentUnit: PROFILE_PREREGISTRATION.statistics.independentUnit,
@@ -106,6 +151,7 @@ export function buildPilotReceipt({ inventory, harnessRevision, cells, pilotId =
       samplesPerCluster: 1,
       orderSeed: PROFILE_PREREGISTRATION.statistics.orderSeed,
       batchFloorMs: BATCH_FLOOR_MS,
+      selectorKind: SELECTOR.kind,
     },
     cells,
   };
@@ -358,11 +404,11 @@ async function measureEngine(engine, browserType, bundle, inventory) {
     for (let sceneIndex = 0; sceneIndex < PROFILE_PREREGISTRATION.scenes.length; sceneIndex++) {
       const scene = PROFILE_PREREGISTRATION.scenes[sceneIndex];
       const measure = (copies) => measureScene(page, scene.id, copies);
-      const batchCalls = await chooseBatchCalls(measure);
-      const raw = await acquireSceneControls(measure, batchCalls, {
+      const selected = await chooseBatchCalls(measure);
+      const raw = await acquireSceneControls(measure, selected.batchCalls, {
         orderSeed: PROFILE_PREREGISTRATION.statistics.orderSeed ^ Math.imul(sceneIndex + 1, 0x45d9f3b),
       });
-      scenes.push({ id: scene.id, batchCalls, raw });
+      scenes.push({ id: scene.id, batchCalls: selected.batchCalls, selector: selected.selector, raw });
     }
     await context.close();
     return { id: `desktop-${engine}`, engine, browserVersion: browser.version(), scenes };

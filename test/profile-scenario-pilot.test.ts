@@ -40,10 +40,29 @@ function clusters(value: number) {
   }));
 }
 
+
+function selector(batchCalls = 2) {
+  const contract = PROFILE_PREREGISTRATION.scenarioSelector;
+  return {
+    kind: contract.kind,
+    batchCalls,
+    formalFloorMs: contract.formalFloorMs,
+    selectionFloorMs: contract.selectionFloorMs,
+    maximumBatchCalls: contract.maximumBatchCalls,
+    discoveryProbeCount: contract.discoveryProbeCount,
+    holdoutProbeCount: contract.holdoutProbeCount,
+    holdoutCoverage: contract.holdoutCoverage,
+    holdoutConfidence: contract.holdoutConfidence,
+    discovery: Array(contract.discoveryProbeCount).fill(contract.selectionFloorMs),
+    holdout: Array(contract.holdoutProbeCount).fill(contract.selectionFloorMs),
+  };
+}
+
 function rawScene(id: string) {
   return {
     id,
     batchCalls: 2,
+    selector: selector(2),
     raw: {
       aa: { a: clusters(20), b: clusters(20) },
       deliberate2x: { single: clusters(20), doubled: clusters(40) },
@@ -52,15 +71,49 @@ function rawScene(id: string) {
 }
 
 describe('PROFILE-01 scenario null/control harness', () => {
-  it('calibrates the real repeated workload until the aggregate timing region clears the floor', async () => {
-    const measure = vi.fn(async (copies: number) => copies * 6);
-    await expect(chooseBatchCalls(measure, { floorMs: 20, maxCalls: 16 })).resolves.toBe(4);
-    expect(measure.mock.calls.map(([copies]) => copies)).toEqual([1, 2, 4]);
+  it('selects a real repeated workload with independent discovery and holdout evidence', async () => {
+    const measure = vi.fn(async (copies: number) => copies * 12);
+    const selected = await chooseBatchCalls(measure, {
+      formalFloorMs: 20,
+      selectionFloorMs: 40,
+      maxCalls: 16,
+      discoveryProbeCount: 2,
+      holdoutProbeCount: 3,
+    });
+    expect(selected.batchCalls).toBe(4);
+    expect(selected.selector.discovery).toEqual([48, 48]);
+    expect(selected.selector.holdout).toEqual([48, 48, 48]);
+    expect(measure.mock.calls.map(([copies]) => copies)).toEqual([1, 1, 2, 2, 4, 4, 4, 4, 4]);
   });
 
-  it('fails closed when real scene copies cannot resolve above the timing floor', async () => {
+  it('fails closed when discovery cannot resolve above the selection floor', async () => {
     const measure = vi.fn(async () => 0);
-    await expect(chooseBatchCalls(measure, { floorMs: 20, maxCalls: 8 })).rejects.toThrow(/does not resolve above 20ms/);
+    await expect(chooseBatchCalls(measure, {
+      formalFloorMs: 20,
+      selectionFloorMs: 40,
+      maxCalls: 8,
+      discoveryProbeCount: 2,
+      holdoutProbeCount: 3,
+    })).rejects.toThrow(/discovery does not resolve above 40ms/);
+  });
+
+  it('does not escalate the batch after a holdout falsifier', async () => {
+    const observedCopies: number[] = [];
+    let callsAtFour = 0;
+    const measure = vi.fn(async (copies: number) => {
+      observedCopies.push(copies);
+      if (copies < 4) return copies * 10;
+      callsAtFour++;
+      return callsAtFour === 5 ? 39 : 48;
+    });
+    await expect(chooseBatchCalls(measure, {
+      formalFloorMs: 20,
+      selectionFloorMs: 40,
+      maxCalls: 16,
+      discoveryProbeCount: 2,
+      holdoutProbeCount: 3,
+    })).rejects.toThrow(/same-pilot batch escalation is forbidden/);
+    expect(observedCopies).not.toContain(8);
   });
 
   it('executes actual doubled workload for the positive control instead of scaling a returned number', async () => {
@@ -74,6 +127,23 @@ describe('PROFILE-01 scenario null/control harness', () => {
     expect(raw.deliberate2x.doubled).toHaveLength(3);
     expect(calls.filter((copies) => copies === 4)).toHaveLength(3);
     expect(calls).not.toContain(1);
+  });
+
+  it('rejects a forged selector holdout even when formal samples are above their floor', () => {
+    const inv = inventory();
+    const rawReceipt = buildPilotReceipt({
+      inventory: inv,
+      harnessRevision: '1'.repeat(40),
+      generatedAt: '2026-09-18T06:01:00.000Z',
+      cells: engines.map((engine) => ({
+        id: `desktop-${engine}`,
+        engine,
+        browserVersion: 'fixture',
+        scenes: [rawScene('collection-reorder-100'), rawScene('direct-manipulation-sheet')],
+      })),
+    });
+    rawReceipt.cells[0].scenes[0].selector.holdout[0] = 39;
+    expect(() => finalizePilotReceipt(rawReceipt)).toThrow(/selector holdout escaped 40ms/);
   });
 
   it('emits the canonical content-addressable pilot shape accepted by the independent validator', () => {

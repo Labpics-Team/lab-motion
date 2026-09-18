@@ -73,13 +73,32 @@ function calibrationFor(inv: ReturnType<typeof inventory>) {
   );
 }
 
+
+function selector(batchCalls = 1) {
+  const contract = PROFILE_PREREGISTRATION.scenarioSelector;
+  return {
+    kind: contract.kind,
+    batchCalls,
+    formalFloorMs: contract.formalFloorMs,
+    selectionFloorMs: contract.selectionFloorMs,
+    maximumBatchCalls: contract.maximumBatchCalls,
+    discoveryProbeCount: contract.discoveryProbeCount,
+    holdoutProbeCount: contract.holdoutProbeCount,
+    holdoutCoverage: contract.holdoutCoverage,
+    holdoutConfidence: contract.holdoutConfidence,
+    discovery: Array(contract.discoveryProbeCount).fill(contract.selectionFloorMs),
+    holdout: Array(contract.holdoutProbeCount).fill(contract.selectionFloorMs),
+  };
+}
+
 function rawScene(id: string) {
   return {
     id,
     batchCalls: 1,
+    selector: selector(1),
     raw: {
-      aa: { a: clusters(10), b: clusters(10) },
-      deliberate2x: { single: clusters(10), doubled: clusters(20) },
+      aa: { a: clusters(40), b: clusters(40) },
+      deliberate2x: { single: clusters(40), doubled: clusters(80) },
     },
   };
 }
@@ -95,14 +114,15 @@ function pilotFor(inv: ReturnType<typeof inventory>) {
     inventoryArtifactSha256: receiptSha256(inv),
     methodologyBlob: PROFILE_PREREGISTRATION.baseline.methodologyBlob,
     harness: {
-      kind: 'scenario-null-control-v1',
+      kind: 'scenario-null-control-v2',
       harnessRevision: '1'.repeat(40),
       baselineRevision: PROFILE_PREREGISTRATION.baseline.revision,
       independentUnit: 'run-block',
       runBlocks: 20,
       samplesPerCluster: 1,
       orderSeed: PROFILE_PREREGISTRATION.statistics.orderSeed,
-      batchFloorMs: 20,
+      batchFloorMs: PROFILE_PREREGISTRATION.scenarioSelector.formalFloorMs,
+      selectorKind: PROFILE_PREREGISTRATION.scenarioSelector.kind,
     },
     cells: engines.map((engine) => ({
       id: `desktop-${engine}`,
@@ -143,15 +163,23 @@ describe('PROFILE-01 content-addressed powered design', () => {
     const pilot = pilotFor(inv);
     const design = derivePoweredDesign(pilot, inv, calibration, '2026-09-18T03:03:00.000Z');
     const changedPilot = structuredClone(pilot);
-    changedPilot.cells[0].scenes[0].raw.aa.a[0].samples[0] = 10.1;
+    changedPilot.cells[0].scenes[0].raw.aa.a[0].samples[0] = 40.1;
     expect(() => eligibleDesktopCells(inv, calibration, design, changedPilot)).toThrow(/pilot|raw evidence/);
+  });
+
+  it('rejects a pilot sample below the preregistered formal timing floor', () => {
+    const inv = inventory();
+    const pilot = pilotFor(inv);
+    const broken = structuredClone(pilot);
+    broken.cells[0].scenes[0].raw.aa.a[0].samples[0] = 19;
+    expect(() => validatePilotReceipt(broken)).toThrow(/below 20ms timing floor/);
   });
 
   it('fails closed when scenario control evidence is unresolved', () => {
     const inv = inventory();
     const pilot = pilotFor(inv);
     const broken = structuredClone(pilot);
-    broken.cells[1].scenes[1].raw.deliberate2x.doubled = clusters(14);
+    broken.cells[1].scenes[1].raw.deliberate2x.doubled = clusters(40);
     expect(() => validatePilotReceipt(broken)).toThrow(/raw evidence|positive control unresolved/);
   });
 });

@@ -10,7 +10,7 @@ const ENGINE_NAMES = ['chromium', 'firefox', 'webkit'];
 const ITERATIONS_PER_COPY = 5_000_000;
 const RUN_BLOCKS = 20;
 const SAMPLES_PER_BLOCK = 3;
-const CONTROL_TIMING_FLOOR_MS = 40;
+const CONTROL_TIMING_FLOOR_MS = PROFILE_PREREGISTRATION.calibration.timingFloorMs;
 const MAX_BATCH_COPIES = 64;
 const BATCH_PROBE_COUNT = 2;
 

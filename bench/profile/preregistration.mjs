@@ -185,10 +185,25 @@ export const PROFILE_PREREGISTRATION = Object.freeze({
 
   calibration: Object.freeze({
     requiredBeforeCandidate: true,
+    timingFloorMs: 40,
     aaNonInferiorityBand: Object.freeze([0.95, 1.05]),
     deliberateWorkMultiplier: 2,
     deliberateWorkDetectedLower95Min: 1.5,
     sameExperimentRetryPolicy: 'forbidden-after-invalid; change harness/root cause and register a new calibration identity',
+  }),
+
+  scenarioSelector: Object.freeze({
+    kind: 'two-stage-floor-transfer-v1',
+    formalFloorMs: 20,
+    selectionFloorMs: 40,
+    maximumBatchCalls: 512,
+    discoveryProbeCount: 5,
+    holdoutProbeCount: 59,
+    holdoutCoverage: 0.95,
+    holdoutConfidence: 0.95,
+    selectionRule: 'smallest power-of-two batch whose discovery probes all clear selectionFloorMs; then a fresh holdout at the same batch must also clear selectionFloorMs',
+    holdoutFailureRule: 'abort pilot; do not escalate batch size within the same pilot',
+    rationale: 'selectionFloorMs reuses the independently calibrated 40ms control floor and is 2x the formal 20ms floor; 59/59 holdout successes give at least 95% one-sided confidence that at least 95% of exchangeable pre-acquisition measurements clear the 40ms margin',
   }),
 
   observationPolicy: Object.freeze({

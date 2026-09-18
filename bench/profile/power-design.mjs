@@ -83,13 +83,55 @@ function controlInterval(left, right, seed, profile) {
   };
 }
 
-function validateClusters(clusters, runBlocks, label) {
+function validateClusters(clusters, runBlocks, floorMs, label) {
   invariant(Array.isArray(clusters) && clusters.length === runBlocks, `${label}: run-block count drifted`);
   for (let run = 0; run < clusters.length; run++) {
     const cluster = clusters[run];
     invariant(cluster?.run === run, `${label}: run identity drifted`);
-    invariant(cluster.semantic === true, `${label}: semantic oracle failed`);    invariant(Array.isArray(cluster.samples) && cluster.samples.length === 1, `${label}: pilot cluster must contain one sample`);
-    invariant(Number.isFinite(cluster.samples[0]) && cluster.samples[0] > 0, `${label}: pilot sample invalid`);
+    invariant(cluster.semantic === true, `${label}: semantic oracle failed`);
+    invariant(Array.isArray(cluster.samples) && cluster.samples.length === 1, `${label}: pilot cluster must contain one sample`);
+    invariant(
+      Number.isFinite(cluster.samples[0]) && cluster.samples[0] >= floorMs,
+      `${label}: pilot sample below ${floorMs}ms timing floor`,
+    );
+  }
+}
+
+function validateSelectorReceipt(selector, batchCalls, profile, label) {
+  const expected = profile.scenarioSelector;
+  invariant(selector?.kind === expected.kind, `${label}: selector kind drifted`);
+  invariant(selector.batchCalls === batchCalls, `${label}: selector batch binding drifted`);
+  invariant(Number.isSafeInteger(batchCalls) && batchCalls > 0, `${label}: batch calls invalid`);
+  invariant((batchCalls & (batchCalls - 1)) === 0, `${label}: batch calls must be a power of two`);
+  invariant(batchCalls <= expected.maximumBatchCalls, `${label}: batch calls exceed preregistered maximum`);
+  for (const key of [
+    'formalFloorMs',
+    'selectionFloorMs',
+    'maximumBatchCalls',
+    'discoveryProbeCount',
+    'holdoutProbeCount',
+    'holdoutCoverage',
+    'holdoutConfidence',
+  ]) {
+    invariant(Object.is(selector[key], expected[key]), `${label}: selector ${key} drifted`);
+  }
+  invariant(
+    1 - expected.holdoutCoverage ** expected.holdoutProbeCount >= expected.holdoutConfidence,
+    `${label}: selector holdout bound is weaker than preregistered confidence`,
+  );
+  invariant(
+    Array.isArray(selector.discovery) && selector.discovery.length === expected.discoveryProbeCount,
+    `${label}: selector discovery evidence missing`,
+  );
+  invariant(
+    Array.isArray(selector.holdout) && selector.holdout.length === expected.holdoutProbeCount,
+    `${label}: selector holdout evidence missing`,
+  );
+  for (const [kind, samples] of [['discovery', selector.discovery], ['holdout', selector.holdout]]) {
+    invariant(
+      samples.every((sample) => Number.isFinite(sample) && sample >= expected.selectionFloorMs),
+      `${label}: selector ${kind} escaped ${expected.selectionFloorMs}ms selection floor`,
+    );
   }
 }
 
@@ -110,13 +152,14 @@ export function validatePilotReceipt(receipt, profile = PROFILE_PREREGISTRATION)
   invariant(receipt.candidateSamples === 0, 'pilot observed candidate data');
   invariant(SHA256.test(receipt.inventoryArtifactSha256), 'pilot inventory digest missing');
   invariant(receipt.methodologyBlob === profile.baseline.methodologyBlob, 'pilot methodology drifted');
-  invariant(receipt.harness?.kind === 'scenario-null-control-v1', 'pilot harness kind drifted');
+  invariant(receipt.harness?.kind === 'scenario-null-control-v2', 'pilot harness kind drifted');
   invariant(SHA40.test(receipt.harness.harnessRevision), 'pilot harness revision missing');
   invariant(receipt.harness.baselineRevision === profile.baseline.revision, 'pilot did not execute frozen baseline');
   invariant(receipt.harness.independentUnit === profile.statistics.independentUnit, 'pilot sampling unit drifted');
   invariant(receipt.harness.runBlocks === profile.statistics.minimumIndependentBlocks, 'pilot must use preregistered minimum run-blocks');  invariant(receipt.harness.samplesPerCluster === 1, 'pilot cluster cardinality drifted');
   invariant(receipt.harness.orderSeed === profile.statistics.orderSeed, 'pilot order seed drifted');
-  invariant(receipt.harness.batchFloorMs === 20, 'pilot timer floor drifted');
+  invariant(receipt.harness.batchFloorMs === profile.scenarioSelector.formalFloorMs, 'pilot timer floor drifted');
+  invariant(receipt.harness.selectorKind === profile.scenarioSelector.kind, 'pilot selector kind drifted');
   invariant(Array.isArray(receipt.cells) && receipt.cells.length === DESKTOP.length, 'pilot desktop cell matrix missing');
   invariant(
     JSON.stringify(receipt.cells.map(({ id, engine }) => [id, engine])) === JSON.stringify(DESKTOP),
@@ -133,12 +176,15 @@ export function validatePilotReceipt(receipt, profile = PROFILE_PREREGISTRATION)
     );
     for (let sceneIndex = 0; sceneIndex < cell.scenes.length; sceneIndex++) {
       const scene = cell.scenes[sceneIndex];
-      invariant(Number.isSafeInteger(scene.batchCalls) && scene.batchCalls > 0, `${cell.id}/${scene.id}: batch calls invalid`);
+      const label = `${cell.id}/${scene.id}`;
+      validateSelectorReceipt(scene.selector, scene.batchCalls, profile, label);
       const blocks = receipt.harness.runBlocks;
-      validateClusters(scene.raw?.aa?.a, blocks, `${cell.id}/${scene.id}/aa-a`);
-      validateClusters(scene.raw?.aa?.b, blocks, `${cell.id}/${scene.id}/aa-b`);
-      validateClusters(scene.raw?.deliberate2x?.single, blocks, `${cell.id}/${scene.id}/single`);
-      validateClusters(scene.raw?.deliberate2x?.doubled, blocks, `${cell.id}/${scene.id}/doubled`);      const aa = controlInterval(
+      const floorMs = profile.scenarioSelector.formalFloorMs;
+      validateClusters(scene.raw?.aa?.a, blocks, floorMs, `${label}/aa-a`);
+      validateClusters(scene.raw?.aa?.b, blocks, floorMs, `${label}/aa-b`);
+      validateClusters(scene.raw?.deliberate2x?.single, blocks, floorMs, `${label}/single`);
+      validateClusters(scene.raw?.deliberate2x?.doubled, blocks, floorMs, `${label}/doubled`);
+      const aa = controlInterval(
         scene.raw.aa.a,
         scene.raw.aa.b,
         sceneSeed(profile, cellIndex, sceneIndex),
@@ -247,16 +293,16 @@ function sigmaUpper95(scene, seed) {
   return quantile(sigmas, 0.95);
 }
 
-export function estimateScenePower(scene, blocks, seed, profile = PROFILE_PREREGISTRATION) {
+function estimatePowerFromSigma(sigma, blocks, profile, label = 'scene') {
   invariant(
     Number.isSafeInteger(blocks) &&
       blocks >= profile.statistics.minimumIndependentBlocks &&
       blocks <= profile.statistics.maximumIndependentBlocks,
-    `${scene?.id ?? 'scene'}: power block count outside preregistered bounds`,
+    `${label}: power block count outside preregistered bounds`,
   );
+  invariant(Number.isFinite(sigma) && sigma >= 0, `${label}: power noise sigma is invalid`);
   const alphaPerScene = profile.statistics.familyAlpha / profile.statistics.m05.requiredSceneIds.length;
   invariant(alphaPerScene === 0.025, 'power Holm alpha drifted');
-  const sigma = sigmaUpper95(scene, seed);
   const effect = -Math.log(1 - profile.statistics.practicalRelativeThreshold);
   // Holm's first step is the worst case for a two-scene family: alpha/2 = 0.025.
   // The planned superiority test is two-sided at that per-scene alpha, so each tail
@@ -274,23 +320,30 @@ export function estimateScenePower(scene, blocks, seed, profile = PROFILE_PREREG
   };
 }
 
-export function derivePoweredCells(pilot, profile = PROFILE_PREREGISTRATION) {  validatePilotReceipt(pilot, profile);
+export function estimateScenePower(scene, blocks, seed, profile = PROFILE_PREREGISTRATION) {
+  return estimatePowerFromSigma(sigmaUpper95(scene, seed), blocks, profile, scene?.id ?? 'scene');
+}
+
+export function derivePoweredCells(pilot, profile = PROFILE_PREREGISTRATION) {
+  validatePilotReceipt(pilot, profile);
   return pilot.cells.map((cell, cellIndex) => {
+    // The null/control pilot fixes one noise estimate per scene. N changes only
+    // the analytic power term, so bootstrapping again for every candidate N adds
+    // work without adding evidence. Compute the deterministic sigma once.
+    const sceneNoise = cell.scenes.map((scene, sceneIndex) => ({
+      id: scene.id,
+      sigma: sigmaUpper95(scene, sceneSeed(profile, cellIndex, sceneIndex, 0x6d2b79f5)),
+    }));
     let last = null;
     for (
       let blocks = profile.statistics.minimumIndependentBlocks;
       blocks <= profile.statistics.maximumIndependentBlocks;
       blocks++
     ) {
-      const scenePowers = cell.scenes.map((scene, sceneIndex) => {
-        const power = estimateScenePower(
-          scene,
-          blocks,
-          sceneSeed(profile, cellIndex, sceneIndex, 0x6d2b79f5),
-          profile,
-        );
-        return { id: scene.id, ...power };
-      });
+      const scenePowers = sceneNoise.map(({ id, sigma }) => ({
+        id,
+        ...estimatePowerFromSigma(sigma, blocks, profile, id),
+      }));
       const estimatedPower = Math.min(...scenePowers.map(({ estimatedPower: power }) => power));
       last = { blocks, estimatedPower, scenePowers };
       if (estimatedPower >= profile.statistics.targetPower) break;

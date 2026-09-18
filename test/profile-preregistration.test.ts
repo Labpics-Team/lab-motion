@@ -135,6 +135,17 @@ describe('PROFILE-01 preregistration', () => {
     expect(() => validatePreregistration(profile)).toThrow(/cannot pre-authorize|explicitly unavailable/);
   });
 
+  it('freezes a two-stage selector whose holdout meets its declared coverage/confidence bound', () => {
+    const selector = PROFILE_PREREGISTRATION.scenarioSelector;
+    expect(selector.selectionFloorMs).toBe(2 * selector.formalFloorMs);
+    expect(1 - selector.holdoutCoverage ** selector.holdoutProbeCount).toBeGreaterThanOrEqual(selector.holdoutConfidence);
+    expect(() => validatePreregistration()).not.toThrow();
+
+    const weakened = copy(PROFILE_PREREGISTRATION) as any;
+    weakened.scenarioSelector.holdoutProbeCount = 20;
+    expect(() => validatePreregistration(weakened)).toThrow(/probe counts|confidence target/);
+  });
+
   it('rejects a profile that turns frames into independent participants', () => {
     const profile = copy(PROFILE_PREREGISTRATION) as any;
     profile.statistics.independentUnit = 'frame';

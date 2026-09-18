@@ -164,10 +164,25 @@ export function validatePreregistration(profile = PROFILE_PREREGISTRATION) {
   invariant(JSON.stringify(stats.m05.requiredSceneIds) === JSON.stringify(sceneIds), 'M-05 scenes drifted');
 
   invariant(profile.calibration?.requiredBeforeCandidate === true, 'calibration must precede candidate data');
+  invariant(profile.calibration.timingFloorMs === 40, 'calibration timing floor drifted');
   invariant(JSON.stringify(profile.calibration.aaNonInferiorityBand) === JSON.stringify([0.95, 1.05]), 'A/A band drifted');
   invariant(profile.calibration.deliberateWorkMultiplier === 2, 'positive-control multiplier drifted');
   invariant(profile.calibration.deliberateWorkDetectedLower95Min === 1.5, 'positive-control resolution drifted');
   invariant(/new calibration identity/.test(profile.calibration.sameExperimentRetryPolicy), 'repeat-to-green is not fenced');
+
+  const selector = profile.scenarioSelector;
+  invariant(selector?.kind === 'two-stage-floor-transfer-v1', 'scenario selector kind drifted');
+  invariant(selector.formalFloorMs === 20 && selector.selectionFloorMs === 40, 'scenario selector timing floors drifted');
+  invariant(selector.selectionFloorMs === 2 * selector.formalFloorMs, 'scenario selector lost 2x timing margin');
+  invariant(selector.maximumBatchCalls === 512, 'scenario selector maximum batch drifted');
+  invariant(selector.discoveryProbeCount === 5 && selector.holdoutProbeCount === 59, 'scenario selector probe counts drifted');
+  invariant(selector.holdoutCoverage === 0.95 && selector.holdoutConfidence === 0.95, 'scenario selector holdout target drifted');
+  invariant(
+    1 - selector.holdoutCoverage ** selector.holdoutProbeCount >= selector.holdoutConfidence,
+    'scenario selector holdout count does not meet confidence target',
+  );
+  invariant(/smallest power-of-two/.test(selector.selectionRule), 'scenario selector discovery rule drifted');
+  invariant(/do not escalate/.test(selector.holdoutFailureRule), 'scenario selector permits repeat-to-green escalation');
 
   const observation = profile.observationPolicy;
   invariant(observation?.keepEverySample && observation.keepFailures && observation.keepStalls && observation.keepMalformedReceipts, 'observation policy drops evidence');
@@ -216,6 +231,20 @@ export function validateCalibrationReceipt(receipt, profile = PROFILE_PREREGISTR
   invariant(Array.isArray(receipt.raw?.deliberate2x) && receipt.raw.deliberate2x.length === 3, 'positive-control raw engine matrix missing');
   invariant(JSON.stringify(receipt.raw.aa.map(({ engine }) => engine)) === JSON.stringify(['chromium', 'firefox', 'webkit']), 'A/A engine provenance drifted');
   invariant(JSON.stringify(receipt.raw.deliberate2x.map(({ engine }) => engine)) === JSON.stringify(['chromium', 'firefox', 'webkit']), 'positive-control engine provenance drifted');
+
+  if (receipt.schemaVersion === 2) {
+    const floorMs = profile.calibration.timingFloorMs;
+    invariant(receipt.workload?.timingFloorMs === floorMs, 'calibration workload timing floor drifted');
+    invariant(receipt.timing?.floorMs === floorMs && receipt.timing.resolved === true, 'calibration timing resolution missing');
+    const timingSamples = [
+      ...receipt.raw.aa.flatMap(({ clusters }) => [...clusters.a, ...clusters.b]),
+      ...receipt.raw.deliberate2x.flatMap(({ clusters }) => [...clusters.single, ...clusters.doubled]),
+    ].flatMap(({ samples }) => samples);
+    invariant(
+      timingSamples.length > 0 && timingSamples.every((sample) => Number.isFinite(sample) && sample >= floorMs),
+      `calibration sample below ${floorMs}ms timing floor`,
+    );
+  }
 
   const aaIntervals = receipt.raw.aa.map((entry) => recomputeCalibrationInterval(entry, 'aa', profile));
   const deliberateIntervals = receipt.raw.deliberate2x.map((entry) => recomputeCalibrationInterval(entry, 'deliberate2x', profile));
