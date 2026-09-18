@@ -566,7 +566,7 @@ function finishGroup(group: ExitGroup, outcome: 2 | 3 | 5): void {
   if (group.phase === 2) return;
   const token = deactivateGroup(group);
   const cleanups: ExitCleanup[] = [];
-  for (const transaction of Array.from(group.tickets)) {
+  for (const transaction of group.tickets) {
     const cleanup = detachExit(transaction, outcome, true);
     if (cleanup !== undefined) cleanups.push(cleanup);
   }
