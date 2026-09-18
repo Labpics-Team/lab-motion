@@ -105,7 +105,7 @@ describe('PROFILE-01 owned-time budget family', () => {
     await expect(acquireOwnedTimeObservation(measure, 1, {
       targetOwnedMs: 50,
       maximumLogicalUnits: 100,
-      maximumEnclosingWallMs: 50,
+      maximumEnclosingWallMs: 60,
     })).rejects.toThrow(/enclosing wall-time bound/);
   });
 
