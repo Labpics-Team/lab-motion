@@ -3,6 +3,7 @@ import { readFile } from 'node:fs/promises';
 import { pathToFileURL } from 'node:url';
 import { pairedClusterBootstrap } from '../compare/methodology.mjs';
 import { PROFILE_PREREGISTRATION } from './preregistration.mjs';
+import { receiptSha256 } from './power-design.mjs';
 import { validateCalibrationReceipt, validateDesktopInventory } from './validate.mjs';
 
 const ENGINE_NAMES = ['chromium', 'firefox', 'webkit'];
@@ -91,7 +92,7 @@ async function measureEngine(engine, type) {
   }
 }
 
-export function createCalibrationReceipt(cells, generatedAt = new Date().toISOString()) {
+export function createCalibrationReceipt(cells, generatedAt = new Date().toISOString(), options = {}) {
   const aaBand = PROFILE_PREREGISTRATION.calibration.aaNonInferiorityBand;
   const aaLower = Math.min(...cells.map((cell) => cell.aa.lower95));
   const aaUpper = Math.max(...cells.map((cell) => cell.aa.upper95));
@@ -101,10 +102,13 @@ export function createCalibrationReceipt(cells, generatedAt = new Date().toISOSt
     deliberateLower >= PROFILE_PREREGISTRATION.calibration.deliberateWorkDetectedLower95Min;
 
   return {
-    schemaVersion: 1,
+    schemaVersion: options.inventoryArtifactSha256 ? 2 : 1,
     profileId: PROFILE_PREREGISTRATION.profileId,
     baselineRevision: PROFILE_PREREGISTRATION.baseline.revision,
-    calibrationId: 'desktop-controls-20260915-v1',
+    calibrationId: options.calibrationId ?? 'desktop-controls-20260915-v1',
+    ...(options.inventoryArtifactSha256
+      ? { inventoryArtifactSha256: options.inventoryArtifactSha256 }
+      : {}),
     attempt: 1,
     generatedAt,
     workload: {
@@ -126,8 +130,8 @@ export function createCalibrationReceipt(cells, generatedAt = new Date().toISOSt
   };
 }
 
-export function finalizeCalibrationReceipt(cells, generatedAt) {
-  const receipt = createCalibrationReceipt(cells, generatedAt);
+export function finalizeCalibrationReceipt(cells, generatedAt, options) {
+  const receipt = createCalibrationReceipt(cells, generatedAt, options);
   // Генератор является admission boundary: FAIL не должен выглядеть для CI
   // успешным сохранённым артефактом.
   validateCalibrationReceipt(receipt);
@@ -135,7 +139,7 @@ export function finalizeCalibrationReceipt(cells, generatedAt) {
 }
 
 async function main() {
-  const inventoryPath = new URL('./desktop-inventory-20260915.json', import.meta.url);
+  const inventoryPath = process.env.PROFILE_INVENTORY_PATH ?? new URL('./desktop-inventory-20260915.json', import.meta.url);
   const inventory = JSON.parse(await readFile(inventoryPath, 'utf8'));
   validateDesktopInventory(inventory);
 
@@ -149,7 +153,10 @@ async function main() {
     cells.push(cell);
   }
 
-  const receipt = finalizeCalibrationReceipt(cells);
+  const receipt = finalizeCalibrationReceipt(cells, undefined, {
+    inventoryArtifactSha256: receiptSha256(inventory),
+    calibrationId: process.env.PROFILE_CALIBRATION_ID ?? 'desktop-controls-20260918-v1',
+  });
   process.stdout.write(`${JSON.stringify(receipt, null, 2)}\n`);
 }
 

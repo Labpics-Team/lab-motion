@@ -1,6 +1,13 @@
 import { pathToFileURL } from 'node:url';
 import { pairedClusterBootstrap } from '../compare/methodology.mjs';
 import { PROFILE_PREREGISTRATION } from './preregistration.mjs';
+import {
+  POWER_METHOD_ID,
+  POWER_TRIALS,
+  derivePoweredCells,
+  receiptSha256,
+  validatePilotReceipt,
+} from './power-design.mjs';
 
 const SHA40 = /^[0-9a-f]{40}$/;
 const SHA256 = /^[0-9a-f]{64}$/;
@@ -198,8 +205,11 @@ export function validateDesktopInventory(receipt, profile = PROFILE_PREREGISTRAT
 
 export function validateCalibrationReceipt(receipt, profile = PROFILE_PREREGISTRATION) {
   validatePreregistration(profile);
-  invariant(receipt?.schemaVersion === 1, 'calibration schema mismatch');
+  invariant(receipt?.schemaVersion === 1 || receipt?.schemaVersion === 2, 'calibration schema mismatch');
   invariant(receipt.profileId === profile.profileId && receipt.baselineRevision === profile.baseline.revision, 'calibration provenance mismatch');
+  if (receipt.schemaVersion === 2) {
+    invariant(SHA256.test(receipt.inventoryArtifactSha256), 'calibration inventory digest missing');
+  }
   invariant(typeof receipt.calibrationId === 'string' && receipt.calibrationId.length > 0, 'calibration identity missing');
   invariant(receipt.attempt === 1, 'same calibration identity may not repeat-to-green');
   invariant(Array.isArray(receipt.raw?.aa) && receipt.raw.aa.length === 3, 'A/A raw engine matrix missing');
@@ -227,13 +237,19 @@ export function validateCalibrationReceipt(receipt, profile = PROFILE_PREREGISTR
 
 export function validatePoweredDesignReceipt(receipt, profile = PROFILE_PREREGISTRATION) {
   validatePreregistration(profile);
-  invariant(receipt?.schemaVersion === 1, 'powered design schema mismatch');
+  invariant(receipt?.schemaVersion === 1 || receipt?.schemaVersion === 2, 'powered design schema mismatch');
   invariant(receipt.profileId === profile.profileId && receipt.baselineRevision === profile.baseline.revision, 'powered design provenance mismatch');
   invariant(typeof receipt.designId === 'string' && receipt.designId.length > 0, 'powered design identity missing');
   invariant(typeof receipt.generatedAt === 'string' && !Number.isNaN(Date.parse(receipt.generatedAt)), 'powered design timestamp invalid');
   invariant(receipt.candidateSamples === 0, 'powered design observed candidate data');
   invariant(SHA256.test(receipt.pilotArtifactSha256), 'powered design pilot artifact digest missing');
   invariant(receipt.methodologyBlob === profile.baseline.methodologyBlob, 'powered design methodology drifted');
+  if (receipt.schemaVersion === 2) {
+    invariant(receipt.powerMethod === POWER_METHOD_ID, 'powered design method drifted');
+    invariant(receipt.powerTrials === POWER_TRIALS, 'powered design trial count drifted');
+    invariant(SHA256.test(receipt.inventoryArtifactSha256), 'powered design inventory digest missing');
+    invariant(SHA256.test(receipt.calibrationArtifactSha256), 'powered design calibration digest missing');
+  }
   invariant(Array.isArray(receipt.cells) && receipt.cells.length > 0, 'powered design cells missing');
 
   const desktopIds = new Set(profile.roster.filter(({ class: kind }) => kind === 'desktop-browser').map(({ id }) => id));
@@ -246,15 +262,46 @@ export function validatePoweredDesignReceipt(receipt, profile = PROFILE_PREREGIS
     invariant(cell.practicalRelativeThreshold === profile.statistics.practicalRelativeThreshold, `${cell.id}: practical effect threshold drifted`);
     invariant(Number.isFinite(cell.estimatedPower) && cell.estimatedPower >= 0 && cell.estimatedPower <= 1, `${cell.id}: estimated power invalid`);
     invariant(cell.pilotKind === 'null-control', `${cell.id}: powered design must come from null/control pilot`);
+    if (receipt.schemaVersion === 2) {
+      invariant(cell.powerMethod === POWER_METHOD_ID && cell.powerTrials === POWER_TRIALS, `${cell.id}: power method drifted`);
+      invariant(Array.isArray(cell.scenePowers) && cell.scenePowers.length === profile.statistics.m05.requiredSceneIds.length, `${cell.id}: scene power matrix missing`);
+      invariant(['powered', 'unpowered-at-max-N'].includes(cell.status), `${cell.id}: power status invalid`);
+    }
   }
   return receipt;
 }
 
-export function eligibleDesktopCells(inventory, calibration, poweredDesign, profile = PROFILE_PREREGISTRATION) {
+export function eligibleDesktopCells(inventory, calibration, poweredDesign, pilot, profile = PROFILE_PREREGISTRATION) {
   validateDesktopInventory(inventory, profile);
   validateCalibrationReceipt(calibration, profile);
   validatePoweredDesignReceipt(poweredDesign, profile);
-  throw new Error('PROFILE-01: powered design admission requires a recomputable null/control pilot; self-declared power is non-admitting');
+  invariant(pilot !== undefined, 'powered design admission requires a recomputable null/control pilot');
+  validatePilotReceipt(pilot, profile);
+  invariant(calibration.schemaVersion === 2 && poweredDesign.schemaVersion === 2, 'legacy receipts are non-admitting');
+
+  const inventorySha256 = receiptSha256(inventory);
+  const calibrationSha256 = receiptSha256(calibration);
+  const pilotSha256 = receiptSha256(pilot);
+  invariant(pilot.inventoryArtifactSha256 === inventorySha256, 'pilot is not bound to inventory');
+  invariant(calibration.inventoryArtifactSha256 === inventorySha256, 'calibration is not bound to inventory');
+  invariant(poweredDesign.inventoryArtifactSha256 === inventorySha256, 'powered design is not bound to inventory');
+  invariant(poweredDesign.calibrationArtifactSha256 === calibrationSha256, 'powered design is not bound to calibration');
+  invariant(poweredDesign.pilotArtifactSha256 === pilotSha256, 'powered design is not bound to pilot');
+
+  for (const [index, cell] of pilot.cells.entries()) {
+    invariant(
+      cell.browserVersion === inventory.browsers[index]?.version,
+      `${cell.id}: pilot browser version is not bound to inventory`,
+    );
+  }
+  const derived = derivePoweredCells(pilot, profile);
+  invariant(
+    JSON.stringify(poweredDesign.cells) === JSON.stringify(derived),
+    'powered design is not deterministically derived from pilot',
+  );
+  return derived
+    .filter((cell) => cell.status === 'powered' && cell.estimatedPower >= profile.statistics.targetPower)
+    .map(({ id }) => id);
 }
 
 if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) {
