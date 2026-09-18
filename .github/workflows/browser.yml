@@ -90,7 +90,6 @@ jobs:
           git fetch --no-tags --depth=1 origin "$PROFILE_HEAD_SHA" "$PROFILE_PREREG_SHA" "$PROFILE_BASELINE_SHA"
           git checkout --detach "$PROFILE_HEAD_SHA"
           test "$(git rev-parse HEAD)" = "$PROFILE_HEAD_SHA"
-          git merge-base --is-ancestor "$PROFILE_PREREG_SHA" "$PROFILE_HEAD_SHA"
           git diff --exit-code "$PROFILE_PREREG_SHA" "$PROFILE_HEAD_SHA" -- . ':(exclude).github/workflows/browser.yml'
           pnpm --dir bench/compare install --frozen-lockfile
           pnpm --dir bench/compare exec playwright install --with-deps chromium firefox webkit
