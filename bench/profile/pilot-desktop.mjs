@@ -192,7 +192,6 @@ async function installBrowserHarness(page, bundle) {
         throw new Error(`direct terminal snap failed: y=${drag.y}`);
       }
       if (sheet.style.transform !== 'translateY(600px)') throw new Error('direct rendered value drifted');
-      drag.destroy();
       return meter.own;
     };
 
