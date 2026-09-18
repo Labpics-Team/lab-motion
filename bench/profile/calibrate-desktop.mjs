@@ -5,12 +5,16 @@ import { pairedClusterBootstrap } from '../compare/methodology.mjs';
 import { PROFILE_PREREGISTRATION } from './preregistration.mjs';
 import { validateCalibrationReceipt, validateDesktopInventory } from './validate.mjs';
 
-const compareRequire = createRequire(new URL('../compare/package.json', import.meta.url));
-const { chromium, firefox, webkit } = compareRequire('playwright');
-const ENGINES = [['chromium', chromium], ['firefox', firefox], ['webkit', webkit]];
+const ENGINE_NAMES = ['chromium', 'firefox', 'webkit'];
 const ITERATIONS = 5_000_000;
 const RUN_BLOCKS = 20;
 const SAMPLES_PER_BLOCK = 3;
+
+function engineTypes() {
+  const compareRequire = createRequire(new URL('../compare/package.json', import.meta.url));
+  const playwright = compareRequire('playwright');
+  return ENGINE_NAMES.map((engine) => [engine, playwright[engine]]);
+}
 
 function cluster(run, samples) {
   return { run, samples, semantic: true };
@@ -136,7 +140,7 @@ async function main() {
   validateDesktopInventory(inventory);
 
   const cells = [];
-  for (const [engine, type] of ENGINES) {
+  for (const [engine, type] of engineTypes()) {
     const cell = await measureEngine(engine, type);
     const bound = inventory.browsers.find((browser) => browser.engine === engine);
     if (cell.browserVersion !== bound?.version) {
