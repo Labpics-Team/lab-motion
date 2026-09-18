@@ -85,7 +85,8 @@ jobs:
           printf '%s\n' "$PROFILE_PREREG_SHA" > "$out/prereg-head.txt"
           printf '%s\n' "$PROFILE_BASELINE_SHA" > "$out/baseline-head.txt"
 
-          git fetch --no-tags origin "$PROFILE_PREREG_SHA" "$PROFILE_BASELINE_SHA"
+          git fetch --no-tags origin "$PROFILE_HEAD_SHA" "$PROFILE_PREREG_SHA" "$PROFILE_BASELINE_SHA"
+          git checkout --detach "$PROFILE_HEAD_SHA"
           test "$(git rev-parse HEAD)" = "$PROFILE_HEAD_SHA"
           git merge-base --is-ancestor "$PROFILE_PREREG_SHA" "$PROFILE_HEAD_SHA"
           git diff --exit-code "$PROFILE_PREREG_SHA" "$PROFILE_HEAD_SHA" -- bench/profile/differential-preregistration.mjs
