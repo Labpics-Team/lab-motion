@@ -67,6 +67,63 @@ jobs:
       - name: Run conformance (${{ matrix.browser }})
         run: pnpm exec playwright test --project=${{ matrix.browser }}
 
+      # Temporary PROFILE-01 evidence carrier inside the already-required browser
+      # graph. It is removed after the raw receipt is captured.
+      - name: PROFILE-01 coarse differential pilot
+        if: ${{ matrix.browser == 'chromium' && github.event_name == 'pull_request' && github.event.pull_request.number == 412 }}
+        shell: bash
+        env:
+          PROFILE_HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+          PROFILE_PREREG_SHA: a64353ca458ff7cb43f636f5217ca6b2a501f477
+          PROFILE_BASELINE_SHA: fe11daa407de396fad952be7679650f63dabd4dd
+        run: |
+          set -euo pipefail
+          out="$RUNNER_TEMP/profile-differential-evidence"
+          baseline="$RUNNER_TEMP/profile-baseline"
+          mkdir -p "$out"
+          printf '%s\n' "$PROFILE_HEAD_SHA" > "$out/research-head.txt"
+          printf '%s\n' "$PROFILE_PREREG_SHA" > "$out/prereg-head.txt"
+          printf '%s\n' "$PROFILE_BASELINE_SHA" > "$out/baseline-head.txt"
+
+          git fetch --no-tags origin "$PROFILE_PREREG_SHA" "$PROFILE_BASELINE_SHA"
+          test "$(git rev-parse HEAD)" = "$PROFILE_HEAD_SHA"
+          git merge-base --is-ancestor "$PROFILE_PREREG_SHA" "$PROFILE_HEAD_SHA"
+          git diff --exit-code "$PROFILE_PREREG_SHA" "$PROFILE_HEAD_SHA" -- bench/profile/differential-preregistration.mjs
+
+          pnpm --dir bench/compare install --frozen-lockfile
+          pnpm --dir bench/compare exec playwright install --with-deps chromium firefox webkit
+          node bench/profile/capture-desktop.mjs > "$out/inventory.json"
+
+          git worktree add --detach "$baseline" "$PROFILE_BASELINE_SHA"
+          (
+            cd "$baseline"
+            test "$(git rev-parse HEAD)" = "$PROFILE_BASELINE_SHA"
+            corepack enable
+            corepack install --global pnpm@11.11.0
+            pnpm install --frozen-lockfile
+            pnpm build
+          )
+
+          PROFILE_INVENTORY_PATH="$out/inventory.json" \
+          PROFILE_BASELINE_DIR="$baseline" \
+          PROFILE_DIFFERENTIAL_OUTPUT="$out/differential-pilot.json" \
+          PROFILE_HARNESS_REVISION="$PROFILE_HEAD_SHA" \
+          PROFILE_DIFFERENTIAL_PREREG_REVISION="$PROFILE_PREREG_SHA" \
+            node bench/profile/differential-pilot-desktop.mjs > "$out/differential-pilot.stdout.json"
+
+          sha256sum "$out/inventory.json" "$out/differential-pilot.json" > "$out/SHA256SUMS"
+
+      - name: Upload PROFILE-01 coarse differential raw evidence
+        if: ${{ always() && matrix.browser == 'chromium' && github.event_name == 'pull_request' && github.event.pull_request.number == 412 }}
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
+        with:
+          name: profile-01-coarse-differential-${{ github.run_id }}
+          path: ${{ runner.temp }}/profile-differential-evidence/
+          if-no-files-found: warn
+          retention-days: 14
+          compression-level: 0
+          overwrite: false
+
       # Trace/video/screenshot пишутся только on-failure (playwright.config) —
       # выгружаем их лишь когда шаг упал.
       - name: Upload failure artifacts
