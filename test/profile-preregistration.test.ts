@@ -203,12 +203,10 @@ describe('PROFILE-01 preregistration', () => {
     expect(() => validatePoweredDesignReceipt(contaminated)).toThrow(/observed candidate data/);
   });
 
-  it('opens only cells with exact inventory, green calibration and power >= target', () => {
+  it('fails closed when power is self-declared without a recomputable null/control pilot', () => {
     const design = poweredDesign();
-    design.cells[1]!.estimatedPower = 0.79;
-    expect(eligibleDesktopCells(inventory(), calibration(), design)).toEqual([
-      'desktop-chromium', 'desktop-webkit',
-    ]);
+    for (const cell of design.cells) cell.estimatedPower = 1;
+    expect(() => eligibleDesktopCells(inventory(), calibration(), design)).toThrow(/recomputable null\/control pilot/);
   });
 
   it('does not open any candidate cell without a powered design receipt', () => {
