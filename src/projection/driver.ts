@@ -571,8 +571,9 @@ export function createProjection(options?: ProjectionOptions): ProjectionControl
       phase = 'held'; // boxAt/pickup остаются аналитическими, автономных кадров нет
       pHat = pp;
       vHat = 0;
-      springBasis._valueV0 = springBasis._velocityV0 = 0;
-      emit(flight.projector, pp, 0);
+      // Скраб гасит скорость Q, но уже накопленный позиционный базис обязан остаться в кадре.
+      springBasis._velocityV0 = 0;
+      emit(flight.projector, pp, springBasis._valueV0);
     },
 
     release(velocity?: number): void {
@@ -588,7 +589,7 @@ export function createProjection(options?: ProjectionOptions): ProjectionControl
       }
 
       // Ребейз как перехват (единая механика rebaseNode, src = сам узел):
-      // first' = V(p_seek), radii/opacity — тем же lerp'ом (C⁰ всех каналов;
+      // first' = V(p_seek), radii/opacity — тем же лerp'ом (C⁰ всех каналов;
       // цели не менялись — теорема §2.3.2 даёт точный C¹ при v0 = v/(1−p_seek)).
       const rebased: ProjectionNodeInit[] = [];
       for (const n of flight.byId.values()) {
