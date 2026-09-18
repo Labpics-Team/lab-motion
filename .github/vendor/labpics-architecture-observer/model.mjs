@@ -123,7 +123,7 @@ export function classifyPath(candidate, config) {
         return 'lockfile';
     if (/\.(?:md|mdx|rst|txt|svg|png|jpe?g|gif|webp|pdf|woff2?|ttf)$/i.test(candidate))
         return 'documentation-or-asset';
-    if (/(?:^|\/)(?:tests?|__tests__)(?:\/|$)|(?:\.test|\.spec|_test)\.[^.]+$/i.test(candidate))
+    if (/(?:^|\/)(?:tests?|__tests__)(?:\/|$)|(?:\.test|\.spec|_test)\.[^.]+$|(?:^|\/)(?:test_[^/]*|conftest)\.py$/i.test(candidate))
         return 'test';
     if (/\.(?:[cm]?[jt]sx?|go|rs|py|java|kt|kts|cs|c|cc|cpp|cxx|h|hpp|rb|php|swift|scala|vue|svelte|ex|exs)$/i.test(candidate))
         return 'source';

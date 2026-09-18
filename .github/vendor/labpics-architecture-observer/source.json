@@ -1,6 +1,6 @@
 {
   "repository": "Labpics-Team/agents-config",
-  "commit": "a7ce0832b42f85b69bcf232558cc1bfbfd3f4acf",
+  "commit": "7e1952b12a9f848c800f3309ff37489d737a8025",
   "files": [
     {
       "path": "architecture/analyze.mjs",
@@ -41,8 +41,8 @@
     {
       "path": "architecture/model.mjs",
       "local": "model.mjs",
-      "blob": "6e021bc4496b3a1a162c3171fbbc8d9e0a299b42",
-      "sha256": "8fb44883b2eb462c743de95ce396b112c5e5b0481752c567b902de7d25e743e8"
+      "blob": "a37e5476336140abdbe0c2706701d20a5a5629e8",
+      "sha256": "f188e0fc8c83da9098013d6f59d07c0f0e6c9630f077295d6c50a7595dc4b2ca"
     },
     {
       "path": "architecture/native-syntax.mjs",
@@ -53,8 +53,8 @@
     {
       "path": "architecture/provenance.mjs",
       "local": "provenance.mjs",
-      "blob": "1271819330da95df2cb0cc4103e131a125426004",
-      "sha256": "9640e0ea42c2101a6b34859a5537864cc2d0f519e8118e7df61f8057d870c60d"
+      "blob": "5a942857cf1bbc3410047a2550340bd0c230447a",
+      "sha256": "5304eebccef02527bbeaedecad54f86d18090af6b7324d95129f7095b597ef8e"
     },
     {
       "path": "architecture/protocols.mjs",
@@ -67,6 +67,12 @@
       "local": "report.mjs",
       "blob": "d0ea8ca42df7f348db0e558b49f95e1654655096",
       "sha256": "ef8d13bdb6721758beadb14950b90d15d3fdb0dcbdd000aacf6e243f660675fe"
+    },
+    {
+      "path": "architecture/semantic-admission.mjs",
+      "local": "semantic-admission.mjs",
+      "blob": "b79d9a06884215b65b32965d58a09625951d656c",
+      "sha256": "f84c0940b26211d2fdba7545be64443d6ccfdab929f7b204aae6f8b8819683ab"
     },
     {
       "path": "architecture/source-graph.mjs",
