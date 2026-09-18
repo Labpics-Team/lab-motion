@@ -384,12 +384,12 @@ export function createDomProjection(options?: DomProjectionOptions): DomProjecti
         readonly radiiLast: BoxRadii | undefined;
       }
       const measured: Measured[] = [];
-      const measuredIds = new Set<string>();
       for (const cap of captured.values()) {
         let rect: { x: number; y: number; width: number; height: number };
         try {
           rect = cap.el.getBoundingClientRect();
         } catch {
+          captured.delete(cap.el);
           continue; // узел исчез между capture и play — тихая деградация
         }
         const last: FlipRect = {
@@ -401,7 +401,6 @@ export function createDomProjection(options?: DomProjectionOptions): DomProjecti
         const radiiLast =
           getCS !== undefined ? readRadii(cap.el, rect.width, rect.height, getCS) : undefined;
         measured.push({ cap, last, radiiLast });
-        measuredIds.add(cap.id);
       }
 
       // (в) дерево по composed-предкам + старт полёта.
@@ -429,7 +428,7 @@ export function createDomProjection(options?: DomProjectionOptions): DomProjecti
             // Мемо узла = ответ подъёма ИЗ него (ближайший замеренный СТРОГО
             // выше); пришедшему СНИЗУ замеренный узел-носитель мемо — сам ответ.
             const entry = byEl.get(cursor);
-            terminal = entry !== undefined && measuredIds.has(entry.id) ? entry.id : memo;
+            terminal = entry !== undefined ? entry.id : memo;
             break;
           }
           if (seen.has(cursor)) {
@@ -447,7 +446,7 @@ export function createDomProjection(options?: DomProjectionOptions): DomProjecti
           const node = path[i];
           ancestorMemo.set(node, cycle ? null : answer);
           const entry = byEl.get(node);
-          if (entry !== undefined && measuredIds.has(entry.id)) answer = entry.id;
+          if (entry !== undefined) answer = entry.id;
         }
         return ancestorMemo.get(el) ?? null;
       };
