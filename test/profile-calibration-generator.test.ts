@@ -3,6 +3,7 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { describe, expect, it } from 'vitest';
 import {
+  chooseCalibrationBatchCopies,
   createCalibrationReceipt,
   finalizeCalibrationReceipt,
   persistCalibrationReceipt,
@@ -45,6 +46,24 @@ function passingCells() {
 }
 
 describe('PROFILE-01 calibration generator boundary', () => {
+  it('выбирает реальный batch до coarse timing floor до A/A acquisition', async () => {
+    const probes: number[] = [];
+    const copies = await chooseCalibrationBatchCopies(async (count) => {
+      probes.push(count);
+      return count * 12.5;
+    }, { floorMs: 40, maxCopies: 16, probeCount: 2 });
+
+    expect(copies).toBe(4);
+    expect(probes).toEqual([1, 1, 2, 2, 4, 4]);
+  });
+
+  it('fail-closed если control workload не разрешается выше timing floor', async () => {
+    await expect(chooseCalibrationBatchCopies(
+      async (count) => count * 2,
+      { floorMs: 40, maxCopies: 8, probeCount: 2 },
+    )).rejects.toThrow(/does not resolve above 40ms by 8 real work copies/);
+  });
+
   it('возвращает только валидированный PASS receipt', () => {
     const receipt = finalizeCalibrationReceipt(
       passingCells(),
