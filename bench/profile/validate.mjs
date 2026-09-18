@@ -253,9 +253,7 @@ export function eligibleDesktopCells(inventory, calibration, poweredDesign, prof
   validateDesktopInventory(inventory, profile);
   validateCalibrationReceipt(calibration, profile);
   validatePoweredDesignReceipt(poweredDesign, profile);
-  return poweredDesign.cells
-    .filter(({ estimatedPower }) => estimatedPower >= profile.statistics.targetPower)
-    .map(({ id }) => id);
+  throw new Error('PROFILE-01: powered design admission requires a recomputable null/control pilot; self-declared power is non-admitting');
 }
 
 if (import.meta.url === `file://${process.argv[1]}`) {
