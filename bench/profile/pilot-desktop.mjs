@@ -10,18 +10,19 @@ import { validateDesktopInventory } from './validate.mjs';
 const ENGINES = ['chromium', 'firefox', 'webkit'];
 const RUN_BLOCKS = PROFILE_PREREGISTRATION.statistics.minimumIndependentBlocks;
 const SELECTOR = PROFILE_PREREGISTRATION.scenarioSelector;
-const BATCH_FLOOR_MS = SELECTOR.formalFloorMs;
+const AGGREGATE_FLOOR_MS = SELECTOR.formalFloorMs;
 const SELECTION_FLOOR_MS = SELECTOR.selectionFloorMs;
-const MAX_BATCH_CALLS = SELECTOR.maximumBatchCalls;
+const UNIT_BATCH_CALLS = SELECTOR.unitBatchCalls;
+const MAX_SERIAL_REPEATS = SELECTOR.maximumSerialRepeats;
 const DISCOVERY_PROBE_COUNT = SELECTOR.discoveryProbeCount;
 const HOLDOUT_PROBE_COUNT = SELECTOR.holdoutProbeCount;
-const DEFAULT_PILOT_ID = 'scenario-null-control-20260918-v3';
+const DEFAULT_PILOT_ID = 'scenario-null-control-20260918-v4';
 
 function invariant(condition, message) {
   if (!condition) throw new Error(`PROFILE-01 pilot: ${message}`);
 }
 
-function cluster(run, sample, floorMs = BATCH_FLOOR_MS) {
+function cluster(run, sample, floorMs = AGGREGATE_FLOOR_MS) {
   invariant(Number.isFinite(sample) && sample >= floorMs, `run ${run}: sample ${sample}ms is below ${floorMs}ms timing floor`);
   return { run, samples: [sample], semantic: true };
 }
@@ -37,67 +38,78 @@ function orderGenerator(seed) {
   };
 }
 
-export async function chooseBatchCalls(measureScene, options = {}) {
-  const formalFloorMs = options.formalFloorMs ?? BATCH_FLOOR_MS;
+function powerOfTwo(value) {
+  return Number.isSafeInteger(value) && value > 0 && (value & (value - 1)) === 0;
+}
+
+export async function chooseSerialRepeats(measureAggregate, options = {}) {
+  const formalFloorMs = options.formalFloorMs ?? AGGREGATE_FLOOR_MS;
   const selectionFloorMs = options.selectionFloorMs ?? SELECTION_FLOOR_MS;
-  const maxCalls = options.maxCalls ?? MAX_BATCH_CALLS;
+  const unitBatchCalls = options.unitBatchCalls ?? UNIT_BATCH_CALLS;
+  const maxSerialRepeats = options.maxSerialRepeats ?? MAX_SERIAL_REPEATS;
   const discoveryProbeCount = options.discoveryProbeCount ?? DISCOVERY_PROBE_COUNT;
   const holdoutProbeCount = options.holdoutProbeCount ?? HOLDOUT_PROBE_COUNT;
   invariant(Number.isFinite(formalFloorMs) && formalFloorMs > 0, 'formal timing floor must be positive');
   invariant(Number.isFinite(selectionFloorMs) && selectionFloorMs >= formalFloorMs, 'selection timing floor must cover the formal floor');
-  invariant(Number.isSafeInteger(maxCalls) && maxCalls > 0, 'max batch calls must be a positive integer');
+  invariant(powerOfTwo(unitBatchCalls), 'unitBatchCalls must be a positive power of two');
+  invariant(powerOfTwo(maxSerialRepeats), 'maxSerialRepeats must be a positive power of two');
   invariant(Number.isSafeInteger(discoveryProbeCount) && discoveryProbeCount > 0, 'discovery probe count must be positive');
   invariant(Number.isSafeInteger(holdoutProbeCount) && holdoutProbeCount > 0, 'holdout probe count must be positive');
 
-  for (let calls = 1; calls <= maxCalls; calls *= 2) {
+  for (let serialRepeats = 1; serialRepeats <= maxSerialRepeats; serialRepeats *= 2) {
     const discovery = [];
     for (let probe = 0; probe < discoveryProbeCount; probe++) {
-      const elapsed = await measureScene(calls);
+      const elapsed = await measureAggregate(serialRepeats);
       invariant(Number.isFinite(elapsed) && elapsed >= 0, `discovery probe returned invalid elapsed ${elapsed}`);
       discovery.push(elapsed);
     }
     if (!discovery.every((elapsed) => elapsed >= selectionFloorMs)) {
-      if (calls > Math.floor(maxCalls / 2)) break;
+      if (serialRepeats > Math.floor(maxSerialRepeats / 2)) break;
       continue;
     }
 
-    // Holdout is deliberately separate from discovery. If it fails, this pilot
-    // aborts instead of escalating the batch from evidence it was meant to test.
+    // Holdout не участвует в выборе. Его провал завершает pilot, а не обучает selector.
     const holdout = [];
     for (let probe = 0; probe < holdoutProbeCount; probe++) {
-      const elapsed = await measureScene(calls);
+      const elapsed = await measureAggregate(serialRepeats);
       invariant(Number.isFinite(elapsed) && elapsed >= 0, `holdout probe returned invalid elapsed ${elapsed}`);
       holdout.push(elapsed);
     }
     invariant(
       holdout.every((elapsed) => elapsed >= selectionFloorMs),
-      `selector holdout failed at ${calls} copies; same-pilot batch escalation is forbidden`,
+      `selector holdout failed at ${serialRepeats} serial repeats; same-pilot repeat escalation is forbidden`,
     );
     return {
-      batchCalls: calls,
+      unitBatchCalls,
+      serialRepeats,
       selector: {
         kind: SELECTOR.kind,
-        batchCalls: calls,
+        unitBatchCalls,
+        serialRepeats,
         formalFloorMs,
         selectionFloorMs,
-        maximumBatchCalls: maxCalls,
+        maximumSerialRepeats: maxSerialRepeats,
         discoveryProbeCount,
         holdoutProbeCount,
         holdoutCoverage: SELECTOR.holdoutCoverage,
         holdoutConfidence: SELECTOR.holdoutConfidence,
+        aggregationRule: SELECTOR.aggregationRule,
+        positiveControlRule: SELECTOR.positiveControlRule,
         discovery,
         holdout,
       },
     };
   }
-  throw new Error(`PROFILE-01 pilot: scenario discovery does not resolve above ${selectionFloorMs}ms by ${maxCalls} real scene copies`);
+  throw new Error(
+    `PROFILE-01 pilot: scenario aggregate does not resolve above ${selectionFloorMs}ms by ${maxSerialRepeats} serial repeats at ${unitBatchCalls} live scene copies`,
+  );
 }
 
-export async function acquireSceneControls(measureScene, batchCalls, options = {}) {
+export async function acquireSceneControls(measureAggregate, serialRepeats, options = {}) {
   const runBlocks = options.runBlocks ?? RUN_BLOCKS;
-  const floorMs = options.floorMs ?? BATCH_FLOOR_MS;
+  const floorMs = options.floorMs ?? AGGREGATE_FLOOR_MS;
   const seed = options.orderSeed ?? PROFILE_PREREGISTRATION.statistics.orderSeed;
-  invariant(Number.isSafeInteger(batchCalls) && batchCalls > 0, 'batchCalls must be positive');
+  invariant(powerOfTwo(serialRepeats), 'serialRepeats must be a positive power of two');
   invariant(Number.isSafeInteger(runBlocks) && runBlocks > 1, 'runBlocks must contain independent pairs');
   const nextOrder = orderGenerator(seed);
   const aa = { a: [], b: [] };
@@ -107,11 +119,11 @@ export async function acquireSceneControls(measureScene, batchCalls, options = {
     let a;
     let b;
     if (nextOrder()) {
-      b = await measureScene(batchCalls);
-      a = await measureScene(batchCalls);
+      b = await measureAggregate(serialRepeats);
+      a = await measureAggregate(serialRepeats);
     } else {
-      a = await measureScene(batchCalls);
-      b = await measureScene(batchCalls);
+      a = await measureAggregate(serialRepeats);
+      b = await measureAggregate(serialRepeats);
     }
     aa.a.push(cluster(run, a, floorMs));
     aa.b.push(cluster(run, b, floorMs));
@@ -119,11 +131,11 @@ export async function acquireSceneControls(measureScene, batchCalls, options = {
     let single;
     let doubled;
     if (nextOrder()) {
-      doubled = await measureScene(batchCalls * 2);
-      single = await measureScene(batchCalls);
+      doubled = await measureAggregate(serialRepeats * 2);
+      single = await measureAggregate(serialRepeats);
     } else {
-      single = await measureScene(batchCalls);
-      doubled = await measureScene(batchCalls * 2);
+      single = await measureAggregate(serialRepeats);
+      doubled = await measureAggregate(serialRepeats * 2);
     }
     deliberate2x.single.push(cluster(run, single, floorMs));
     deliberate2x.doubled.push(cluster(run, doubled, floorMs));
@@ -144,14 +156,14 @@ export function buildPilotReceipt({ inventory, harnessRevision, cells, pilotId =
     inventoryArtifactSha256: receiptSha256(inventory),
     methodologyBlob: PROFILE_PREREGISTRATION.baseline.methodologyBlob,
     harness: {
-      kind: 'scenario-null-control-v2',
+      kind: 'scenario-null-control-v3',
       harnessRevision,
       baselineRevision: PROFILE_PREREGISTRATION.baseline.revision,
       independentUnit: PROFILE_PREREGISTRATION.statistics.independentUnit,
       runBlocks: RUN_BLOCKS,
       samplesPerCluster: 1,
       orderSeed: PROFILE_PREREGISTRATION.statistics.orderSeed,
-      batchFloorMs: BATCH_FLOOR_MS,
+      aggregateFloorMs: AGGREGATE_FLOOR_MS,
       selectorKind: SELECTOR.kind,
     },
     cells,
@@ -388,8 +400,15 @@ async function installBrowserHarness(page, bundle) {
   });
 }
 
-async function measureScene(page, sceneId, copies) {
-  return page.evaluate(([id, count]) => globalThis.__labMotionProfileScene.measure(id, count), [sceneId, copies]);
+async function measureSceneAggregate(page, sceneId, copies, serialRepeats) {
+  invariant(Number.isSafeInteger(serialRepeats) && serialRepeats > 0, 'serial repeat count must be positive');
+  return page.evaluate(([id, count, repeats]) => {
+    let elapsed = 0;
+    for (let repeat = 0; repeat < repeats; repeat++) {
+      elapsed += globalThis.__labMotionProfileScene.measure(id, count);
+    }
+    return elapsed;
+  }, [sceneId, copies, serialRepeats]);
 }
 
 async function measureEngine(engine, browserType, bundle, inventory) {
@@ -404,12 +423,18 @@ async function measureEngine(engine, browserType, bundle, inventory) {
     const scenes = [];
     for (let sceneIndex = 0; sceneIndex < PROFILE_PREREGISTRATION.scenes.length; sceneIndex++) {
       const scene = PROFILE_PREREGISTRATION.scenes[sceneIndex];
-      const measure = (copies) => measureScene(page, scene.id, copies);
-      const selected = await chooseBatchCalls(measure);
-      const raw = await acquireSceneControls(measure, selected.batchCalls, {
+      const measure = (serialRepeats) => measureSceneAggregate(page, scene.id, UNIT_BATCH_CALLS, serialRepeats);
+      const selected = await chooseSerialRepeats(measure);
+      const raw = await acquireSceneControls(measure, selected.serialRepeats, {
         orderSeed: PROFILE_PREREGISTRATION.statistics.orderSeed ^ Math.imul(sceneIndex + 1, 0x45d9f3b),
       });
-      scenes.push({ id: scene.id, batchCalls: selected.batchCalls, selector: selected.selector, raw });
+      scenes.push({
+        id: scene.id,
+        unitBatchCalls: selected.unitBatchCalls,
+        serialRepeats: selected.serialRepeats,
+        selector: selected.selector,
+        raw,
+      });
     }
     await context.close();
     return { id: `desktop-${engine}`, engine, browserVersion: browser.version(), scenes };

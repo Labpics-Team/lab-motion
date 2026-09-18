@@ -220,17 +220,20 @@ export const PROFILE_PREREGISTRATION = Object.freeze({
   }),
 
   scenarioSelector: Object.freeze({
-    kind: 'two-stage-floor-transfer-v1',
+    kind: 'bounded-serial-aggregate-v1',
     formalFloorMs: 20,
     selectionFloorMs: 40,
-    maximumBatchCalls: 512,
+    unitBatchCalls: 128,
+    maximumSerialRepeats: 64,
     discoveryProbeCount: 5,
     holdoutProbeCount: 59,
     holdoutCoverage: 0.95,
     holdoutConfidence: 0.95,
-    selectionRule: 'smallest power-of-two batch whose discovery probes all clear selectionFloorMs; then a fresh holdout at the same batch must also clear selectionFloorMs',
-    holdoutFailureRule: 'abort pilot; do not escalate batch size within the same pilot',
-    rationale: 'selectionFloorMs reuses the independently calibrated 40ms control floor and is 2x the formal 20ms floor; 59/59 holdout successes give at least 95% one-sided confidence that at least 95% of exchangeable pre-acquisition measurements clear the 40ms margin',
+    selectionRule: 'smallest power-of-two serial repeat count whose discovery aggregates all clear selectionFloorMs; then a fresh holdout at the same repeat count must also clear selectionFloorMs',
+    holdoutFailureRule: 'abort pilot; do not escalate serial repeat count within the same pilot',
+    aggregationRule: 'sum owned-time from fresh complete scene executions while keeping live scene multiplicity fixed at unitBatchCalls',
+    positiveControlRule: 'double serial repeats at the same unitBatchCalls so deliberate-2x performs twice the complete scene work without raising peak live scene multiplicity',
+    rationale: 'selectionFloorMs stays at the independently calibrated 40ms control floor while timer mass grows by bounded serial semantic repetition instead of larger concurrent DOM batches; 59/59 holdout successes give at least 95% one-sided confidence that at least 95% of exchangeable pre-acquisition aggregates clear the 40ms margin',
   }),
 
   observationPolicy: Object.freeze({

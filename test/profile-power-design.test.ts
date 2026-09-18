@@ -74,18 +74,21 @@ function calibrationFor(inv: ReturnType<typeof inventory>) {
 }
 
 
-function selector(batchCalls = 1) {
+function selector(serialRepeats = 1) {
   const contract = PROFILE_PREREGISTRATION.scenarioSelector;
   return {
     kind: contract.kind,
-    batchCalls,
+    unitBatchCalls: contract.unitBatchCalls,
+    serialRepeats,
     formalFloorMs: contract.formalFloorMs,
     selectionFloorMs: contract.selectionFloorMs,
-    maximumBatchCalls: contract.maximumBatchCalls,
+    maximumSerialRepeats: contract.maximumSerialRepeats,
     discoveryProbeCount: contract.discoveryProbeCount,
     holdoutProbeCount: contract.holdoutProbeCount,
     holdoutCoverage: contract.holdoutCoverage,
     holdoutConfidence: contract.holdoutConfidence,
+    aggregationRule: contract.aggregationRule,
+    positiveControlRule: contract.positiveControlRule,
     discovery: Array(contract.discoveryProbeCount).fill(contract.selectionFloorMs),
     holdout: Array(contract.holdoutProbeCount).fill(contract.selectionFloorMs),
   };
@@ -94,7 +97,8 @@ function selector(batchCalls = 1) {
 function rawScene(id: string) {
   return {
     id,
-    batchCalls: 1,
+    unitBatchCalls: PROFILE_PREREGISTRATION.scenarioSelector.unitBatchCalls,
+    serialRepeats: 1,
     selector: selector(1),
     raw: {
       aa: { a: clusters(40, 0), b: clusters(40, 1) },
@@ -114,14 +118,14 @@ function pilotFor(inv: ReturnType<typeof inventory>) {
     inventoryArtifactSha256: receiptSha256(inv),
     methodologyBlob: PROFILE_PREREGISTRATION.baseline.methodologyBlob,
     harness: {
-      kind: 'scenario-null-control-v2',
+      kind: 'scenario-null-control-v3',
       harnessRevision: '1'.repeat(40),
       baselineRevision: PROFILE_PREREGISTRATION.baseline.revision,
       independentUnit: 'run-block',
       runBlocks: 20,
       samplesPerCluster: 1,
       orderSeed: PROFILE_PREREGISTRATION.statistics.orderSeed,
-      batchFloorMs: PROFILE_PREREGISTRATION.scenarioSelector.formalFloorMs,
+      aggregateFloorMs: PROFILE_PREREGISTRATION.scenarioSelector.formalFloorMs,
       selectorKind: PROFILE_PREREGISTRATION.scenarioSelector.kind,
     },
     cells: engines.map((engine) => ({

@@ -195,18 +195,23 @@ export function validatePreregistration(profile = PROFILE_PREREGISTRATION) {
   invariant(/new calibration identity/.test(profile.calibration.sameExperimentRetryPolicy), 'repeat-to-green is not fenced');
 
   const selector = profile.scenarioSelector;
-  invariant(selector?.kind === 'two-stage-floor-transfer-v1', 'scenario selector kind drifted');
+  invariant(selector?.kind === 'bounded-serial-aggregate-v1', 'scenario selector kind drifted');
   invariant(selector.formalFloorMs === 20 && selector.selectionFloorMs === 40, 'scenario selector timing floors drifted');
   invariant(selector.selectionFloorMs === 2 * selector.formalFloorMs, 'scenario selector lost 2x timing margin');
-  invariant(selector.maximumBatchCalls === 512, 'scenario selector maximum batch drifted');
+  invariant(selector.unitBatchCalls === 128, 'scenario selector live batch bound drifted');
+  invariant(selector.maximumSerialRepeats === 64, 'scenario selector serial work bound drifted');
+  invariant((selector.unitBatchCalls & (selector.unitBatchCalls - 1)) === 0, 'scenario selector live batch must be a power of two');
+  invariant((selector.maximumSerialRepeats & (selector.maximumSerialRepeats - 1)) === 0, 'scenario selector serial repeat bound must be a power of two');
   invariant(selector.discoveryProbeCount === 5 && selector.holdoutProbeCount === 59, 'scenario selector probe counts drifted');
   invariant(selector.holdoutCoverage === 0.95 && selector.holdoutConfidence === 0.95, 'scenario selector holdout target drifted');
   invariant(
     1 - selector.holdoutCoverage ** selector.holdoutProbeCount >= selector.holdoutConfidence,
     'scenario selector holdout count does not meet confidence target',
   );
-  invariant(/smallest power-of-two/.test(selector.selectionRule), 'scenario selector discovery rule drifted');
-  invariant(/do not escalate/.test(selector.holdoutFailureRule), 'scenario selector permits repeat-to-green escalation');
+  invariant(/smallest power-of-two serial repeat count/.test(selector.selectionRule), 'scenario selector discovery rule drifted');
+  invariant(/do not escalate serial repeat count/.test(selector.holdoutFailureRule), 'scenario selector permits repeat-to-green escalation');
+  invariant(/live scene multiplicity fixed/.test(selector.aggregationRule), 'scenario selector aggregation representation drifted');
+  invariant(/double serial repeats/.test(selector.positiveControlRule), 'scenario selector positive-control representation drifted');
 
   const observation = profile.observationPolicy;
   invariant(observation?.keepEverySample && observation.keepFailures && observation.keepStalls && observation.keepMalformedReceipts, 'observation policy drops evidence');

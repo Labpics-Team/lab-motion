@@ -135,15 +135,21 @@ describe('PROFILE-01 preregistration', () => {
     expect(() => validatePreregistration(profile)).toThrow(/cannot pre-authorize|explicitly unavailable/);
   });
 
-  it('freezes a two-stage selector whose holdout meets its declared coverage/confidence bound', () => {
+  it('freezes bounded serial aggregation whose holdout meets its declared coverage/confidence bound', () => {
     const selector = PROFILE_PREREGISTRATION.scenarioSelector;
     expect(selector.selectionFloorMs).toBe(2 * selector.formalFloorMs);
+    expect(selector.unitBatchCalls).toBe(128);
+    expect(selector.maximumSerialRepeats).toBe(64);
     expect(1 - selector.holdoutCoverage ** selector.holdoutProbeCount).toBeGreaterThanOrEqual(selector.holdoutConfidence);
     expect(() => validatePreregistration()).not.toThrow();
 
     const weakened = copy(PROFILE_PREREGISTRATION) as any;
     weakened.scenarioSelector.holdoutProbeCount = 20;
     expect(() => validatePreregistration(weakened)).toThrow(/probe counts|confidence target/);
+
+    const unbounded = copy(PROFILE_PREREGISTRATION) as any;
+    unbounded.scenarioSelector.maximumSerialRepeats = 128;
+    expect(() => validatePreregistration(unbounded)).toThrow(/serial work bound/);
   });
 
   it('freezes the complete M-05 power claim family and decision rule', () => {

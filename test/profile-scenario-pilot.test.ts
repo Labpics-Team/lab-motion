@@ -4,7 +4,7 @@ import { finalizePilotReceipt, validatePilotReceipt } from '../bench/profile/pow
 import {
   acquireSceneControls,
   buildPilotReceipt,
-  chooseBatchCalls,
+  chooseSerialRepeats,
 } from '../bench/profile/pilot-desktop.mjs';
 
 const engines = ['chromium', 'firefox', 'webkit'] as const;
@@ -40,19 +40,21 @@ function clusters(value: number) {
   }));
 }
 
-
-function selector(batchCalls = 2) {
+function selector(serialRepeats = 2) {
   const contract = PROFILE_PREREGISTRATION.scenarioSelector;
   return {
     kind: contract.kind,
-    batchCalls,
+    unitBatchCalls: contract.unitBatchCalls,
+    serialRepeats,
     formalFloorMs: contract.formalFloorMs,
     selectionFloorMs: contract.selectionFloorMs,
-    maximumBatchCalls: contract.maximumBatchCalls,
+    maximumSerialRepeats: contract.maximumSerialRepeats,
     discoveryProbeCount: contract.discoveryProbeCount,
     holdoutProbeCount: contract.holdoutProbeCount,
     holdoutCoverage: contract.holdoutCoverage,
     holdoutConfidence: contract.holdoutConfidence,
+    aggregationRule: contract.aggregationRule,
+    positiveControlRule: contract.positiveControlRule,
     discovery: Array(contract.discoveryProbeCount).fill(contract.selectionFloorMs),
     holdout: Array(contract.holdoutProbeCount).fill(contract.selectionFloorMs),
   };
@@ -61,7 +63,8 @@ function selector(batchCalls = 2) {
 function rawScene(id: string) {
   return {
     id,
-    batchCalls: 2,
+    unitBatchCalls: PROFILE_PREREGISTRATION.scenarioSelector.unitBatchCalls,
+    serialRepeats: 2,
     selector: selector(2),
     raw: {
       aa: { a: clusters(20), b: clusters(20) },
@@ -71,67 +74,79 @@ function rawScene(id: string) {
 }
 
 describe('PROFILE-01 scenario null/control harness', () => {
-  it('selects a real repeated workload with independent discovery and holdout evidence', async () => {
-    const measure = vi.fn(async (copies: number) => copies * 12);
-    const selected = await chooseBatchCalls(measure, {
+  it('selects bounded serial aggregation with independent discovery and holdout evidence', async () => {
+    const measure = vi.fn(async (serialRepeats: number) => serialRepeats * 12);
+    const selected = await chooseSerialRepeats(measure, {
       formalFloorMs: 20,
       selectionFloorMs: 40,
-      maxCalls: 16,
+      unitBatchCalls: 8,
+      maxSerialRepeats: 16,
       discoveryProbeCount: 2,
       holdoutProbeCount: 3,
     });
-    expect(selected.batchCalls).toBe(4);
+    expect(selected.unitBatchCalls).toBe(8);
+    expect(selected.serialRepeats).toBe(4);
     expect(selected.selector.discovery).toEqual([48, 48]);
     expect(selected.selector.holdout).toEqual([48, 48, 48]);
-    expect(measure.mock.calls.map(([copies]) => copies)).toEqual([1, 1, 2, 2, 4, 4, 4, 4, 4]);
+    expect(measure.mock.calls.map(([serialRepeats]) => serialRepeats)).toEqual([1, 1, 2, 2, 4, 4, 4, 4, 4]);
   });
 
-  it('fails closed when discovery cannot resolve above the selection floor', async () => {
+  it('fails closed when bounded serial aggregation cannot resolve above the selection floor', async () => {
     const measure = vi.fn(async () => 0);
-    await expect(chooseBatchCalls(measure, {
+    await expect(chooseSerialRepeats(measure, {
       formalFloorMs: 20,
       selectionFloorMs: 40,
-      maxCalls: 8,
+      unitBatchCalls: 8,
+      maxSerialRepeats: 8,
       discoveryProbeCount: 2,
       holdoutProbeCount: 3,
-    })).rejects.toThrow(/discovery does not resolve above 40ms/);
+    })).rejects.toThrow(/scenario aggregate does not resolve above 40ms/);
   });
 
-  it('does not escalate the batch after a holdout falsifier', async () => {
-    const observedCopies: number[] = [];
+  it('does not escalate serial repeats after a holdout falsifier', async () => {
+    const observedRepeats: number[] = [];
     let callsAtFour = 0;
-    const measure = vi.fn(async (copies: number) => {
-      observedCopies.push(copies);
-      if (copies < 4) return copies * 10;
+    const measure = vi.fn(async (serialRepeats: number) => {
+      observedRepeats.push(serialRepeats);
+      if (serialRepeats < 4) return serialRepeats * 10;
       callsAtFour++;
       return callsAtFour === 5 ? 39 : 48;
     });
-    await expect(chooseBatchCalls(measure, {
+    await expect(chooseSerialRepeats(measure, {
       formalFloorMs: 20,
       selectionFloorMs: 40,
-      maxCalls: 16,
+      unitBatchCalls: 8,
+      maxSerialRepeats: 16,
       discoveryProbeCount: 2,
       holdoutProbeCount: 3,
-    })).rejects.toThrow(/same-pilot batch escalation is forbidden/);
-    expect(observedCopies).not.toContain(8);
+    })).rejects.toThrow(/same-pilot repeat escalation is forbidden/);
+    expect(observedRepeats).not.toContain(8);
   });
 
   it('rejects the xorshift zero state instead of silently losing pair-order randomization', async () => {
-    const measure = vi.fn(async (copies: number) => copies * 20);
-    await expect(acquireSceneControls(measure, 1, { runBlocks: 3, floorMs: 20, orderSeed: 0 })).rejects.toThrow(/orderSeed must be a non-zero 32-bit value/);
+    const measure = vi.fn(async (serialRepeats: number) => serialRepeats * 20);
+    await expect(acquireSceneControls(measure, 1, { runBlocks: 3, floorMs: 20, orderSeed: 0 }))
+      .rejects.toThrow(/orderSeed must be a non-zero 32-bit value/);
   });
 
-  it('executes actual doubled workload for the positive control instead of scaling a returned number', async () => {
-    const calls: number[] = [];
-    const measure = vi.fn(async (copies: number) => {
-      calls.push(copies);
-      return copies * 10;
+  it('executes actual doubled serial workload without raising the live scene batch', async () => {
+    const repeats: number[] = [];
+    const measure = vi.fn(async (serialRepeats: number) => {
+      repeats.push(serialRepeats);
+      return serialRepeats * 10;
     });
     const raw = await acquireSceneControls(measure, 2, { runBlocks: 3, floorMs: 20, orderSeed: 7 });
     expect(raw.aa.a).toHaveLength(3);
     expect(raw.deliberate2x.doubled).toHaveLength(3);
-    expect(calls.filter((copies) => copies === 4)).toHaveLength(3);
-    expect(calls).not.toContain(1);
+    expect(repeats.filter((value) => value === 4)).toHaveLength(3);
+    expect(repeats.filter((value) => value === 2)).toHaveLength(9);
+    expect(new Set(repeats)).toEqual(new Set([2, 4]));
+  });
+
+  it('fails closed when an acquired aggregate falls below the timing floor', async () => {
+    const measure = vi.fn(async () => 19);
+    await expect(acquireSceneControls(measure, 2, { runBlocks: 3, floorMs: 20, orderSeed: 7 }))
+      .rejects.toThrow(/timing floor/);
   });
 
   it('rejects a forged selector holdout even when formal samples are above their floor', () => {

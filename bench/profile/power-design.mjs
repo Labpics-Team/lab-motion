@@ -97,21 +97,25 @@ function validateClusters(clusters, runBlocks, floorMs, label) {
   }
 }
 
-function validateSelectorReceipt(selector, batchCalls, profile, label) {
+function validateSelectorReceipt(selector, unitBatchCalls, serialRepeats, profile, label) {
   const expected = profile.scenarioSelector;
   invariant(selector?.kind === expected.kind, `${label}: selector kind drifted`);
-  invariant(selector.batchCalls === batchCalls, `${label}: selector batch binding drifted`);
-  invariant(Number.isSafeInteger(batchCalls) && batchCalls > 0, `${label}: batch calls invalid`);
-  invariant((batchCalls & (batchCalls - 1)) === 0, `${label}: batch calls must be a power of two`);
-  invariant(batchCalls <= expected.maximumBatchCalls, `${label}: batch calls exceed preregistered maximum`);
+  invariant(selector.unitBatchCalls === unitBatchCalls, `${label}: selector live-batch binding drifted`);
+  invariant(selector.serialRepeats === serialRepeats, `${label}: selector serial-repeat binding drifted`);
+  invariant(unitBatchCalls === expected.unitBatchCalls, `${label}: live-batch bound drifted`);
+  invariant(Number.isSafeInteger(serialRepeats) && serialRepeats > 0, `${label}: serial repeats invalid`);
+  invariant((serialRepeats & (serialRepeats - 1)) === 0, `${label}: serial repeats must be a power of two`);
+  invariant(serialRepeats <= expected.maximumSerialRepeats, `${label}: serial repeats exceed preregistered maximum`);
   for (const key of [
     'formalFloorMs',
     'selectionFloorMs',
-    'maximumBatchCalls',
+    'maximumSerialRepeats',
     'discoveryProbeCount',
     'holdoutProbeCount',
     'holdoutCoverage',
     'holdoutConfidence',
+    'aggregationRule',
+    'positiveControlRule',
   ]) {
     invariant(Object.is(selector[key], expected[key]), `${label}: selector ${key} drifted`);
   }
@@ -152,13 +156,13 @@ export function validatePilotReceipt(receipt, profile = PROFILE_PREREGISTRATION)
   invariant(receipt.candidateSamples === 0, 'pilot observed candidate data');
   invariant(SHA256.test(receipt.inventoryArtifactSha256), 'pilot inventory digest missing');
   invariant(receipt.methodologyBlob === profile.baseline.methodologyBlob, 'pilot methodology drifted');
-  invariant(receipt.harness?.kind === 'scenario-null-control-v2', 'pilot harness kind drifted');
+  invariant(receipt.harness?.kind === 'scenario-null-control-v3', 'pilot harness kind drifted');
   invariant(SHA40.test(receipt.harness.harnessRevision), 'pilot harness revision missing');
   invariant(receipt.harness.baselineRevision === profile.baseline.revision, 'pilot did not execute frozen baseline');
   invariant(receipt.harness.independentUnit === profile.statistics.independentUnit, 'pilot sampling unit drifted');
   invariant(receipt.harness.runBlocks === profile.statistics.minimumIndependentBlocks, 'pilot must use preregistered minimum run-blocks');  invariant(receipt.harness.samplesPerCluster === 1, 'pilot cluster cardinality drifted');
   invariant(receipt.harness.orderSeed === profile.statistics.orderSeed, 'pilot order seed drifted');
-  invariant(receipt.harness.batchFloorMs === profile.scenarioSelector.formalFloorMs, 'pilot timer floor drifted');
+  invariant(receipt.harness.aggregateFloorMs === profile.scenarioSelector.formalFloorMs, 'pilot aggregate timing floor drifted');
   invariant(receipt.harness.selectorKind === profile.scenarioSelector.kind, 'pilot selector kind drifted');
   invariant(Array.isArray(receipt.cells) && receipt.cells.length === DESKTOP.length, 'pilot desktop cell matrix missing');
   invariant(
@@ -177,7 +181,7 @@ export function validatePilotReceipt(receipt, profile = PROFILE_PREREGISTRATION)
     for (let sceneIndex = 0; sceneIndex < cell.scenes.length; sceneIndex++) {
       const scene = cell.scenes[sceneIndex];
       const label = `${cell.id}/${scene.id}`;
-      validateSelectorReceipt(scene.selector, scene.batchCalls, profile, label);
+      validateSelectorReceipt(scene.selector, scene.unitBatchCalls, scene.serialRepeats, profile, label);
       const blocks = receipt.harness.runBlocks;
       const floorMs = profile.scenarioSelector.formalFloorMs;
       validateClusters(scene.raw?.aa?.a, blocks, floorMs, `${label}/aa-a`);
