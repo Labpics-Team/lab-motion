@@ -184,11 +184,6 @@ interface _FlightNode {
   readonly ghostBox?: _Rect | undefined;
 }
 
-interface _GhostEntry {
-  readonly el: SmartElement;
-  readonly box: _Rect;
-}
-
 interface _ActiveRun {
   resolve(): void;
   setState(s: 'settled' | 'canceled' | 'superseded'): void;
@@ -203,13 +198,26 @@ interface _Controller {
   radius: boolean;
   readonly root: SmartRoot;
   flight: Map<string, _FlightNode>;
-  ghosts: Map<string, _GhostEntry>;
-  ghostEls: Set<SmartElement>;
+  /** Controller-local ghost identity index; payload stays owned by flight. */
+  ghostIndex: Map<SmartElement, string>;
   rootPositionAdded: boolean;
   /** Инлайн-position root'а ДО того, как ghost-протокол сделал его relative. */
   savedRootPosition: string;
   active: _ActiveRun | null;
   cancelActive(): void;
+}
+
+interface _GhostLeaseOwner {
+  readonly ctrl: _Controller;
+  box: _Rect;
+}
+
+/** Единственный element-scoped owner общей ghost-поверхности. */
+interface _GhostLease {
+  readonly savedStyle: Record<string, string>;
+  readonly savedInert: boolean;
+  readonly owners: _GhostLeaseOwner[];
+  host: _Controller;
 }
 
 // ─── Локальные стражи (копия семантики projection/geometry finite) ───────────
@@ -375,27 +383,35 @@ function _restoreProp(el: SmartElement, name: string, saved: string): void {
 /** Инлайн-стили ghost'а, которые закрепление (_appendAndPinGhost) перезаписывает. */
 const _GHOST_PINNED_PROPS = ['position', 'left', 'top', 'width', 'height', 'opacity'] as const;
 
-/**
- * Снимок инлайн-стилей ghost'а ДО закрепления — чтобы на терминале ВОССТАНОВИТЬ
- * их (а не слепо снять): удержанный потребителем и переприкреплённый узел не
- * теряет свои стили. Первый снимок выигрывает (continue-exit через прогоны
- * сохраняет исходные значения потребителя, не наши закреплённые).
- */
-const _savedGhostStyle = new WeakMap<SmartElement, Record<string, string>>();
+/** Общая lease-память ghost'а: стили, focus bit, владельцы и текущий физический host. */
+const _savedGhostStyle = new WeakMap<SmartElement, _GhostLease>();
 
-/** Записать снимок инлайн-стилей ghost'а, если ещё не записан (first-pin-wins). */
-function _snapshotGhostStyle(el: SmartElement): void {
-  if (_savedGhostStyle.has(el)) return;
+/** Снять исходный снимок инлайн-стилей ghost'а до первого pin. */
+function _snapshotGhostStyle(el: SmartElement): Record<string, string> {
   const saved: Record<string, string> = {};
   for (const p of _GHOST_PINNED_PROPS) saved[p] = _inl(el, p);
-  _savedGhostStyle.set(el, saved);
+  return saved;
 }
 
-/** Восстановить исходные инлайн-стили ghost'а (или снять, если их не было). */
-function _restoreGhostStyle(el: SmartElement): void {
-  const saved = _savedGhostStyle.get(el);
-  for (const p of _GHOST_PINNED_PROPS) _restoreProp(el, p, saved?.[p] ?? '');
-  _savedGhostStyle.delete(el);
+function _readInert(el: SmartElement): boolean {
+  try {
+    return (el as SmartElement & { inert?: unknown }).inert === true;
+  } catch {
+    return false;
+  }
+}
+
+function _writeInert(el: SmartElement, value: boolean): void {
+  try {
+    (el as SmartElement & { inert: boolean }).inert = value;
+  } catch {
+    /* враждебный host — тихая деградация */
+  }
+}
+
+/** Восстановить исходные инлайн-стили ghost'а. */
+function _restoreGhostStyle(el: SmartElement, saved: Record<string, string>): void {
+  for (const p of _GHOST_PINNED_PROPS) _restoreProp(el, p, saved[p] ?? '');
 }
 
 /** Санитайзнутый скролл page-пространства (нефинит/не-число → 0). */
@@ -434,7 +450,7 @@ function _structure(
   root: SmartRoot,
   keyAttr: string,
   shadow: boolean,
-  ghostEls: Set<SmartElement>,
+  ghostIndex: Map<SmartElement, string>,
 ): _StructEntry[] {
   const out: _StructEntry[] = [];
   const seen = new Set<string>();
@@ -443,7 +459,7 @@ function _structure(
     const kids = _childrenOf(node);
     const shadowKids = shadow ? _shadowChildrenOf(node) : [];
     for (const child of kids.concat(shadowKids)) {
-      if (ghostEls.has(child)) continue; // наш ghost — прозрачен для дифа
+      if (ghostIndex.has(child)) continue; // наш ghost — прозрачен для дифа
       const key = _getAttr(child, keyAttr);
       let nextAncestor = ancestorKey;
       if (key !== null && key !== '') {
@@ -629,8 +645,7 @@ function _getController(root: SmartRoot, opt: SmartOptions): _Controller {
     radius,
     root,
     flight: new Map(),
-    ghosts: new Map(),
-    ghostEls: new Set(),
+    ghostIndex: new Map(),
     rootPositionAdded: false,
     savedRootPosition: '',
     active: null,
@@ -647,20 +662,119 @@ function _inFlight(ctrl: _Controller, key: string): boolean {
   return ctrl.flight.has(key) && ctrl.controls.playing;
 }
 
+// ─── Ghost-протокол ───────────────────────────────────────────────────────────
+
+/** Закрепить физический ghost у конкретного владельца; ownership здесь не меняется. */
+function _pinGhost(ctrl: _Controller, el: SmartElement, box: _Rect): void {
+  try {
+    ctrl.root.appendChild(el);
+  } catch {
+    /* враждебный root — тихая деградация */
+  }
+  const rootBox = _pageBox(ctrl.root, _scroll(ctrl.getScroll));
+  const clientLeft = typeof ctrl.root.clientLeft === 'number' ? ctrl.root.clientLeft : 0;
+  const clientTop = typeof ctrl.root.clientTop === 'number' ? ctrl.root.clientTop : 0;
+  const st = el.style;
+  st.setProperty('position', 'absolute');
+  st.setProperty('left', _px(box.x - rootBox.x - clientLeft));
+  st.setProperty('top', _px(box.y - rootBox.y - clientTop));
+  st.setProperty('width', _px(box.width));
+  st.setProperty('height', _px(box.height));
+  _writeInert(el, true);
+
+  // Static root → position:relative (канон auto: absolute ghost якорится к root).
+  if (!ctrl.rootPositionAdded && ctrl.getCS !== undefined) {
+    try {
+      if (ctrl.getCS(ctrl.root).getPropertyValue('position') === 'static') {
+        ctrl.savedRootPosition = _inl(ctrl.root, 'position'); // до перезаписи
+        ctrl.root.style.setProperty('position', 'relative');
+        ctrl.rootPositionAdded = true;
+      }
+    } catch {
+      /* нет computed — не якорим */
+    }
+  }
+}
+
+/** Acquire общей ghost-поверхности: первый владелец снимает consumer snapshot. */
+function _appendAndPinGhost(ctrl: _Controller, el: SmartElement, box: _Rect): void {
+  let lease = _savedGhostStyle.get(el);
+  if (lease === undefined) {
+    lease = {
+      savedStyle: _snapshotGhostStyle(el),
+      savedInert: _readInert(el),
+      owners: [],
+      host: ctrl,
+    };
+    _savedGhostStyle.set(el, lease);
+  }
+
+  const owner = lease.owners.find((candidate) => candidate.ctrl === ctrl);
+  if (owner === undefined) lease.owners.push({ ctrl, box });
+  else owner.box = box;
+
+  if (lease.host !== ctrl) {
+    try {
+      lease.host.root.removeChild(el);
+    } catch {
+      /* append ниже всё равно попробует установить фактический host */
+    }
+  }
+  lease.host = ctrl;
+  _pinGhost(ctrl, el, box);
+}
+
+/**
+ * Release одного owner. Физическая поверхность живёт до последнего owner; если
+ * текущий host уходит раньше, ghost переезжает к оставшемуся owner вместе с anchor.
+ */
+function _releaseGhost(ctrl: _Controller, el: SmartElement): void {
+  const lease = _savedGhostStyle.get(el);
+  if (lease === undefined) {
+    try {
+      ctrl.root.removeChild(el);
+    } catch {
+      /* уже отсоединён */
+    }
+    return;
+  }
+
+  const ownerIndex = lease.owners.findIndex((owner) => owner.ctrl === ctrl);
+  if (ownerIndex < 0) return;
+  const releasingHost = lease.host === ctrl;
+  lease.owners.splice(ownerIndex, 1);
+
+  if (lease.owners.length === 0) {
+    try {
+      lease.host.root.removeChild(el);
+    } catch {
+      /* уже отсоединён */
+    }
+    _restoreGhostStyle(el, lease.savedStyle);
+    _writeInert(el, lease.savedInert);
+    _savedGhostStyle.delete(el);
+    return;
+  }
+
+  if (releasingHost) {
+    const next = lease.owners[lease.owners.length - 1]!;
+    try {
+      lease.host.root.removeChild(el);
+    } catch {
+      /* re-pin ниже восстановит физический host */
+    }
+    lease.host = next.ctrl;
+    _pinGhost(next.ctrl, el, next.box);
+  }
+}
+
 // ─── Терминальная уборка (natural rest / cancel — одна форма) ─────────────────
 
 /** Терминальная уборка: снять transform/ghost-инлайны, восстановить стили, очистить полёт. */
 function _cleanup(ctrl: _Controller): void {
   for (const node of ctrl.flight.values()) {
     if (node.kind === 'exit') {
-      // Ghost — владение адаптера: removeChild + снятие наших инлайнов.
-      try {
-        ctrl.root.removeChild(node.el);
-      } catch {
-        /* уже отсоединён */
-      }
-      // Восстановить исходные инлайн-стили (переприкреплённый узел не теряет их).
-      _restoreGhostStyle(node.el);
+      _releaseGhost(ctrl, node.el);
     } else {
       _restoreProp(node.el, 'transform', node.savedTransform);
       _restoreProp(node.el, 'transform-origin', node.savedOrigin);
@@ -678,8 +792,7 @@ function _cleanup(ctrl: _Controller): void {
     ctrl.savedRootPosition = '';
   }
   ctrl.flight = new Map();
-  ctrl.ghosts = new Map();
-  ctrl.ghostEls = new Set();
+  ctrl.ghostIndex = new Map();
 }
 
 /** Терминал по natural rest: уборка + резолв active-прогона как settled. */
@@ -705,51 +818,12 @@ function _cancelRun(ctrl: _Controller): void {
   }
 }
 
-// ─── Ghost-протокол ───────────────────────────────────────────────────────────
-
-/** Реинсерт ghost'а в root absolute на прежних page-координатах (padding-box). */
-function _appendAndPinGhost(ctrl: _Controller, el: SmartElement, box: _Rect): void {
-  try {
-    ctrl.root.appendChild(el);
-  } catch {
-    /* враждебный root — тихая деградация */
-  }
-  const rootBox = _pageBox(ctrl.root, _scroll(ctrl.getScroll));
-  const clientLeft = typeof ctrl.root.clientLeft === 'number' ? ctrl.root.clientLeft : 0;
-  const clientTop = typeof ctrl.root.clientTop === 'number' ? ctrl.root.clientTop : 0;
-  const st = el.style;
-  _snapshotGhostStyle(el); // до перезаписи — восстановим на терминале
-  st.setProperty('position', 'absolute');
-  st.setProperty('left', _px(box.x - rootBox.x - clientLeft));
-  st.setProperty('top', _px(box.y - rootBox.y - clientTop));
-  st.setProperty('width', _px(box.width));
-  st.setProperty('height', _px(box.height));
-  // Static root → position:relative (канон auto: absolute ghost якорится к root).
-  if (!ctrl.rootPositionAdded && ctrl.getCS !== undefined) {
-    try {
-      if (ctrl.getCS(ctrl.root).getPropertyValue('position') === 'static') {
-        ctrl.savedRootPosition = _inl(ctrl.root, 'position'); // до перезаписи
-        ctrl.root.style.setProperty('position', 'relative');
-        ctrl.rootPositionAdded = true;
-      }
-    } catch {
-      /* нет computed — не якорим */
-    }
-  }
-}
-
-/** Немедленное физическое удаление ghost'а (реинкарнация ключа при живом ghost). */
+/** Немедленно отпустить ghost этого controller (реинкарнация ключа). */
 function _removeGhost(ctrl: _Controller, key: string): void {
-  const g = ctrl.ghosts.get(key);
-  if (g === undefined) return;
-  try {
-    ctrl.root.removeChild(g.el);
-  } catch {
-    /* уже отсоединён */
-  }
-  _restoreGhostStyle(g.el); // восстановить исходные инлайн-стили, не слепо снять
-  ctrl.ghosts.delete(key);
-  ctrl.ghostEls.delete(g.el);
+  const g = ctrl.flight.get(key);
+  if (g === undefined || !g.isGhost) return;
+  _releaseGhost(ctrl, g.el);
+  ctrl.ghostIndex.delete(g.el);
 }
 
 // ─── Handle реального прогона ─────────────────────────────────────────────────
@@ -818,7 +892,7 @@ function _animate(
   }
 
   // (б) batch-MEASURE: структура + page-боксы + радиусы NEW-снимка (один reflow).
-  const structure = _structure(ctrl.root, keyAttr, shadow, ctrl.ghostEls);
+  const structure = _structure(ctrl.root, keyAttr, shadow, ctrl.ghostIndex);
   const scroll = _scroll(ctrl.getScroll);
   const newLive = new Map<string, _SnapEntry>();
   const newOrder: string[] = [];
@@ -855,7 +929,7 @@ function _animate(
       skippedKeys.push(key);
       continue;
     }
-    if (ctrl.ghosts.has(key)) {
+    if (ctrl.flight.get(key)?.isGhost === true) {
       // Реинкарнация: ключ вернулся при живом ghost → matched от состояния ghost'а.
       reincarnated.add(key);
       matched.add(key);
@@ -905,10 +979,11 @@ function _animate(
   }
 
   // continue-exit: ghost всё ещё «в полёте», ключ по-прежнему отсутствует.
-  for (const [key, g] of ctrl.ghosts) {
+  for (const [el, key] of ctrl.ghostIndex) {
     if (newLive.has(key) || reincarnated.has(key) || desc.has(key)) continue;
+    const g = ctrl.flight.get(key)!;
     exitedKeys.push(key);
-    desc.set(key, { kind: 'exit', el: g.el, ghostBox: g.box, newExit: false, parentKey: null });
+    desc.set(key, { kind: 'exit', el, ghostBox: g.ghostBox!, newExit: false, parentKey: null });
   }
 
   // (г) участие matched: узел едет, если двигался сам ИЛИ движется его matched-предок.
@@ -966,8 +1041,7 @@ function _animate(
 
   const nodes: ProjectionPlayNode[] = [];
   const newFlight = new Map<string, _FlightNode>();
-  const newGhosts = new Map<string, _GhostEntry>(ctrl.ghosts);
-  const newGhostEls = new Set<SmartElement>(ctrl.ghostEls);
+  const newGhostIndex = new Map<SmartElement, string>(ctrl.ghostIndex);
 
   const projParent = (key: string): string | null => {
     let anc = desc.get(key)?.parentKey ?? null;
@@ -1039,8 +1113,7 @@ function _animate(
     const box = d.ghostBox!;
     if (d.newExit) {
       _appendAndPinGhost(ctrl, el, box);
-      newGhosts.set(key, { el, box });
-      newGhostEls.add(el);
+      newGhostIndex.set(el, key);
       nodes.push({ id: key, parent: null, first: box, last: box, opacity: { from: 1, to: 0 } });
     } else {
       nodes.push({ id: key, parent: null, first: undefined, last: box, opacity: { from: 1, to: 0 } });
@@ -1058,8 +1131,7 @@ function _animate(
     });
   }
 
-  ctrl.ghosts = newGhosts;
-  ctrl.ghostEls = newGhostEls;
+  ctrl.ghostIndex = newGhostIndex;
 
   return _startRun(ctrl, nodes, newFlight, plan, tier);
 }
@@ -1115,7 +1187,7 @@ export function captureSmart(root: unknown, options?: SmartOptions): SmartCaptur
 
   // FIRST-снимок: структура (валидация дубля) + боксы/радиусы. Узлы активного
   // полёта НЕ меряются (аналитический V(p̂) через boxAt — ноль DOM под transform).
-  const structure = _structure(ctrl.root, keyAttr, shadow, ctrl.ghostEls);
+  const structure = _structure(ctrl.root, keyAttr, shadow, ctrl.ghostIndex);
   const scroll = _scroll(ctrl.getScroll);
   const snapshot = new Map<string, _SnapEntry>();
   for (const s of structure) {
