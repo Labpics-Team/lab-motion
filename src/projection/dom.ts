@@ -54,8 +54,8 @@ export interface DomProjectionElement {
   };
   readonly parentElement?: DomProjectionElement | null | undefined;
   readonly assignedSlot?: DomProjectionElement | null | undefined;
-  /** Для подъёма через границу shadow root: getRootNode().host. */
-  getRootNode?(): { readonly host?: DomProjectionElement | null | undefined } | null;
+  /** Нативный Node или структурный root; необязательный host читается адаптером. */
+  getRootNode?(): object | null;
 }
 
 export interface DomProjectionOptions {
@@ -202,7 +202,7 @@ function composedParent(el: DomProjectionElement): DomProjectionElement | null {
   if (parent !== null && parent !== undefined) return parent;
   if (typeof el.getRootNode === 'function') {
     try {
-      const host = el.getRootNode()?.host;
+      const host = (el.getRootNode() as { readonly host?: DomProjectionElement | null } | null)?.host;
       if (host !== null && host !== undefined && host !== el) return host;
     } catch {
       return null;

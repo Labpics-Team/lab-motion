@@ -314,3 +314,113 @@ export function animateWaapi(
     fill: fill ?? compiled.timing.fill,
   });
 }
+
+// ─── Native scroll progress timeline ────────────────────────────────────────
+
+/** Ось нативного ScrollTimeline; совпадает с CSS Scroll-driven Animations. */
+export type WaapiScrollAxis = 'block' | 'inline' | 'x' | 'y';
+
+/** Параметры нативной scroll-progress шкалы. JS fallback намеренно отсутствует. */
+export interface WaapiScrollTimelineOptions {
+  readonly source: unknown;
+  readonly axis?: WaapiScrollAxis;
+}
+
+/** View-progress subject + optional Web Animations attachment range. */
+export interface WaapiViewTimelineOptions {
+  readonly subject: unknown;
+  readonly axis?: WaapiScrollAxis;
+  readonly rangeStart?: string;
+  readonly rangeEnd?: string;
+}
+
+/**
+ * Scroll-linked эффект использует весь progress timeline; time/repeat-параметры
+ * обычной WAAPI-анимации здесь не принадлежат контракту.
+ */
+export type WaapiScrollCompileOptions = Omit<
+  WaapiCompileOptions,
+  'duration' | 'repeat' | 'repeatType' | 'repeatDelay'
+> & { readonly fill?: WaapiCompiled['timing']['fill'] };
+
+type ProgressTimelineName = 'ScrollTimeline' | 'ViewTimeline';
+type ProgressTimelineCtor = new (options: Record<string, unknown>) => unknown;
+
+function progressTimelineCtor(name: ProgressTimelineName): ProgressTimelineCtor | undefined {
+  const ctor = (globalThis as Record<string, unknown>)[name];
+  return typeof ctor === 'function' ? ctor as ProgressTimelineCtor : undefined;
+}
+
+/** Capability probe без UA-sniffing и без DOM-глобалов на import. */
+export function supportsScrollTimeline(): boolean {
+  return progressTimelineCtor('ScrollTimeline') !== undefined;
+}
+
+/** Capability probe view-progress timeline без UA-sniffing. */
+export function supportsViewTimeline(): boolean {
+  return progressTimelineCtor('ViewTimeline') !== undefined;
+}
+
+/** View и scroll используют один property compiler. */
+export type WaapiViewCompileOptions = WaapiScrollCompileOptions;
+
+/**
+ * Общий commit уже созданной progress timeline. Capability/fallback policy
+ * остаётся у публичных scroll/view адаптеров; здесь только property compiler.
+ */
+function animateProgressWaapi(
+  el: WaapiAnimatable,
+  options: WaapiScrollCompileOptions,
+  timeline: unknown,
+  rangeStart?: string,
+  rangeEnd?: string,
+): unknown {
+  const { fill, property, values, times, easing, format, easingPoints } = options;
+  const compiled = compileWaapi({
+    property,
+    values,
+    ...(times === undefined ? {} : { times }),
+    ...(easing === undefined ? {} : { easing }),
+    ...(format === undefined ? {} : { format }),
+    ...(easingPoints === undefined ? {} : { easingPoints }),
+    duration: 0.001,
+  });
+  return el.animate(compiled.keyframes, {
+    ...compiled.timing,
+    duration: 1,
+    iterations: 1,
+    direction: 'normal',
+    fill: fill ?? compiled.timing.fill,
+    timeline,
+    ...(rangeStart === undefined ? {} : { rangeStart }),
+    ...(rangeEnd === undefined ? {} : { rangeEnd }),
+  });
+}
+
+export function animateScrollWaapi(
+  el: WaapiAnimatable,
+  options: WaapiScrollCompileOptions,
+  scroll: WaapiScrollTimelineOptions,
+): unknown | undefined {
+  if (!supportsWaapi(el)) return undefined;
+  const Timeline = progressTimelineCtor('ScrollTimeline');
+  if (!Timeline) return undefined;
+  const timeline = new Timeline({ source: scroll.source, axis: scroll.axis ?? 'block' });
+  return animateProgressWaapi(el, options, timeline);
+}
+
+/**
+ * Отдать view progress → property браузеру целиком. Attachment range
+ * передаётся самому Web Animations effect, не пересчитывается в JS.
+ */
+export function animateViewWaapi(
+  el: WaapiAnimatable,
+  options: WaapiViewCompileOptions,
+  view: WaapiViewTimelineOptions,
+): unknown | undefined {
+  if (!supportsWaapi(el)) return undefined;
+  const Timeline = progressTimelineCtor('ViewTimeline');
+  if (!Timeline) return undefined;
+  const timeline = new Timeline({ subject: view.subject, axis: view.axis ?? 'block' });
+  return animateProgressWaapi(el, options, timeline, view.rangeStart, view.rangeEnd);
+}
