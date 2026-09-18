@@ -40,28 +40,23 @@ jobs:
           git worktree add --detach "$RUNNER_TEMP/profile-baseline" fe11daa407de396fad952be7679650f63dabd4dd
           pnpm --dir "$RUNNER_TEMP/profile-baseline" install --frozen-lockfile
           pnpm --dir "$RUNNER_TEMP/profile-baseline" build
-      - name: Generate content-addressed PROFILE evidence
+      - name: Preserve one non-admitting calibration diagnostic
         shell: bash
         env:
-          PROFILE_BASELINE_DIR: ${{ runner.temp }}/profile-baseline
-          PROFILE_HARNESS_REVISION: fe915c9e7942c32e069b15dee8aa6cca2d330371
+          PROFILE_HARNESS_REVISION: e472c0b277929a92e6bc62997cb2ebad9dee6c56
         run: |
           set -euo pipefail
           mkdir -p "$RUNNER_TEMP/profile-evidence"
           node bench/profile/capture-desktop.mjs > "$RUNNER_TEMP/profile-evidence/inventory.json"
+          set +e
           PROFILE_INVENTORY_PATH="$RUNNER_TEMP/profile-evidence/inventory.json" \
-            PROFILE_CALIBRATION_ID="desktop-controls-20260918-v2" \
-            node bench/profile/calibrate-desktop.mjs > "$RUNNER_TEMP/profile-evidence/calibration.json"
-          PROFILE_INVENTORY_PATH="$RUNNER_TEMP/profile-evidence/inventory.json" \
-            PROFILE_PILOT_OUTPUT="$RUNNER_TEMP/profile-evidence/pilot.json" \
-            PROFILE_PILOT_ID="desktop-heavy-scenes-null-control-20260918-v1" \
-            node bench/profile/pilot-desktop.mjs
-          node bench/profile/power-design.mjs \
-            --inventory "$RUNNER_TEMP/profile-evidence/inventory.json" \
-            --calibration "$RUNNER_TEMP/profile-evidence/calibration.json" \
-            --pilot "$RUNNER_TEMP/profile-evidence/pilot.json" \
-            --out "$RUNNER_TEMP/profile-evidence/powered-design.json"
+            PROFILE_CALIBRATION_OUTPUT="$RUNNER_TEMP/profile-evidence/diagnostic-calibration.json" \
+            PROFILE_CALIBRATION_ID="desktop-controls-diagnostic-20260918-v1" \
+            node bench/profile/calibrate-desktop.mjs
+          calibration_rc=$?
+          set -e
           (cd "$RUNNER_TEMP/profile-evidence" && sha256sum *.json > SHA256SUMS)
+          exit "$calibration_rc"
       - name: Upload immutable evidence packet
         if: always()
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
