@@ -55,7 +55,7 @@ jobs:
             node bench/profile/calibrate-desktop.mjs
           calibration_rc=$?
           set -e
-          (cd "$RUNNER_TEMP/profile-evidence" && sha256sum *.json > SHA256SUMS)
+          (cd "$RUNNER_TEMP/profile-evidence" && sha256sum ./*.json > SHA256SUMS)
           exit "$calibration_rc"
       - name: Upload immutable evidence packet
         if: always()
