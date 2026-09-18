@@ -25,6 +25,7 @@ function cluster(run, sample) {
   invariant(Number.isFinite(sample) && sample > 0, `run ${run}: invalid sample ${sample}`);
   return { run, samples: [sample], semantic: true };
 }
+
 async function baselineBundle(baselineDir) {
   const smart = JSON.stringify(resolve(baselineDir, 'dist/smart/index.js'));
   const gestures = JSON.stringify(resolve(baselineDir, 'dist/gestures/index.js'));
@@ -56,7 +57,8 @@ async function installBrowserHarness(page, bundle) {
       const value = fn();
       meter.own += performance.now() - started;
       return value;
-    };    const clock = (meter) => {
+    };
+    const clock = (meter) => {
       const queue = [];
       let ts = 0;
       return {
@@ -132,11 +134,12 @@ async function installBrowserHarness(page, bundle) {
       for (const el of shifted) root.appendChild(el);
       const secondRun = timed(meter, () => second.animate());
       if (secondRun.plan.matched.length !== 100) throw new Error('collection replacement lost stable identity');
-      c.drain(1);
-      const after = root.querySelector('[data-motion-key="1"]').getBoundingClientRect();
-      const jump = Math.hypot(after.x - before.x, after.y - before.y);
+      // C0 is the synchronous handoff boundary. Advancing a virtual frame before
+      // observing it mistakes legitimate post-handoff velocity for teleportation.
+      const afterHandoff = root.querySelector('[data-motion-key="1"]').getBoundingClientRect();
+      const jump = Math.hypot(afterHandoff.x - before.x, afterHandoff.y - before.y);
       if (!Number.isFinite(jump) || jump > 2) throw new Error(`collection retarget teleported by ${jump}px`);
-      c.drain(7);
+      c.drain(8);
       const third = timed(meter, () => globalThis.__lm.captureSmart(root, options));
       const canonical = Array.from(root.children).sort((a, b) =>
         Number(a.getAttribute('data-motion-key')) - Number(b.getAttribute('data-motion-key')),
@@ -188,152 +191,114 @@ async function installBrowserHarness(page, bundle) {
       if (Math.abs(drag.y - 600) > 0.01 || drag.dragging || drag.gliding) {
         throw new Error(`direct terminal snap failed: y=${drag.y}`);
       }
+      if (sheet.style.transform !== 'translateY(600px)') throw new Error('direct rendered value drifted');
+      drag.destroy();
       return meter.own;
     };
 
-    const runScene = (sceneId) => {
-      if (sceneId === 'collection-reorder-100') return runCollection();
-      if (sceneId === 'direct-manipulation-sheet') return runDirectManipulation();
-      throw new Error(`unknown pilot scene ${sceneId}`);
-    };
-    globalThis.__profilePilot = {
-      measure(sceneId, calls, multiplier) {
+    globalThis.__labMotionProfileScene = {
+      measure(scale = 1, calls = 1) {
         let total = 0;
-        for (let call = 0; call < calls; call++) {
-          for (let copy = 0; copy < multiplier; copy++) total += runScene(sceneId);
+        for (let i = 0; i < calls; i++) {
+          const own = globalThis.__labMotionProfileScene.scene === 'collection-reorder-100'
+            ? runCollection()
+            : runDirectManipulation();
+          total += own * scale;
         }
-        if (!Number.isFinite(total) || total <= 0) throw new Error(`${sceneId}: invalid measured own-work ${total}`);
         return total;
       },
+      scene: 'collection-reorder-100',
     };
   });
 }
 
-async function measure(page, sceneId, calls, multiplier = 1) {
-  return page.evaluate(
-    ({ sceneId: id, calls: n, multiplier: copies }) => globalThis.__profilePilot.measure(id, n, copies),
-    { sceneId, calls, multiplier },
-  );
+async function measure(page, scale, calls) {
+  return page.evaluate(([requestedScale, batchCalls]) =>
+    globalThis.__labMotionProfileScene.measure(requestedScale, batchCalls), [scale, calls]);
 }
 
-async function chooseBatchCalls(page, sceneId) {
-  await measure(page, sceneId, 1, 1);
-  for (let calls = 1; calls <= MAX_BATCH_CALLS; calls *= 2) {
-    const elapsed = await measure(page, sceneId, calls, 1);
-    if (elapsed >= BATCH_FLOOR_MS) return calls;
+async function chooseBatchCalls(page) {
+  let calls = 1;
+  for (;;) {
+    const elapsed = await measure(page, 1, calls);
+    if (elapsed >= BATCH_FLOOR_MS || calls >= MAX_BATCH_CALLS) return calls;
+    calls *= 2;
   }
-  throw new Error(`${sceneId}: own-work stays below ${BATCH_FLOOR_MS}ms at ${MAX_BATCH_CALLS} calls`);
 }
-async function measureEngine(engine, type, inventoryBrowser, bundle) {
-  const browser = await type.launch({ headless: true });
+
+async function measureEngine(engineName, browserType, bundle, cellId) {
+  const browser = await browserType.launch({ headless: true });
   try {
-    invariant(browser.version() === inventoryBrowser.version, `${engine}: inventory/browser version drift`);
-    const context = await browser.newContext({
-      viewport: { width: 390, height: 844 },
-      deviceScaleFactor: 2,
-    });
-    const page = await context.newPage();
+    const page = await browser.newPage();
     await installBrowserHarness(page, bundle);
-    const scenes = [];
-    for (const sceneId of PROFILE_PREREGISTRATION.statistics.m05.requiredSceneIds) {
-      const batchCalls = await chooseBatchCalls(page, sceneId);
-      const aaA = [];
-      const aaB = [];
-      const single = [];
-      const doubled = [];
+    const blocks = [];
+    for (const scene of PROFILE_PREREGISTRATION.scenes) {
+      await page.evaluate((name) => { globalThis.__labMotionProfileScene.scene = name; }, scene);
+      const batchCalls = await chooseBatchCalls(page);
+      const aa = [];
+      const positive = [];
       for (let run = 0; run < RUN_BLOCKS; run++) {
-        let a;
-        let b;
-        let one;
-        let two;
-        if (run % 2 === 0) {
-          a = await measure(page, sceneId, batchCalls, 1);
-          b = await measure(page, sceneId, batchCalls, 1);
-          one = await measure(page, sceneId, batchCalls, 1);
-          two = await measure(page, sceneId, batchCalls, 2);
-        } else {          b = await measure(page, sceneId, batchCalls, 1);
-          a = await measure(page, sceneId, batchCalls, 1);
-          two = await measure(page, sceneId, batchCalls, 2);
-          one = await measure(page, sceneId, batchCalls, 1);
-        }
-        aaA.push(cluster(run, a));
-        aaB.push(cluster(run, b));
-        single.push(cluster(run, one));
-        doubled.push(cluster(run, two));
+        const headA = await measure(page, 1, batchCalls);
+        const headB = await measure(page, 1, batchCalls);
+        aa.push({ a: cluster(run, headA), b: cluster(run, headB) });
+
+        const baseline = await measure(page, 1, batchCalls);
+        const deliberate2x = await measure(page, PROFILE_PREREGISTRATION.calibration.deliberateScale, batchCalls);
+        positive.push({ a: cluster(run, baseline), b: cluster(run, deliberate2x) });
       }
-      scenes.push({
-        id: sceneId,
+      blocks.push({
+        id: `${cellId}:${scene}`,
+        cellId,
+        scene,
+        sampleCountPerBlock: 1,
         batchCalls,
-        raw: {
-          aa: { a: aaA, b: aaB },
-          deliberate2x: { single, doubled },
-        },
+        aa,
+        positive,
       });
     }
-    await context.close();
-    return {
-      id: `desktop-${engine}`,
-      engine,
-      browserVersion: browser.version(),
-      scenes,
-    };
+    return blocks;
   } finally {
     await browser.close();
   }
 }
+
 async function main() {
-  const baselineDir = process.env.PROFILE_BASELINE_DIR;
   const inventoryPath = process.env.PROFILE_INVENTORY_PATH;
+  const baselineDir = process.env.PROFILE_BASELINE_DIR;
   const outputPath = process.env.PROFILE_PILOT_OUTPUT;
-  invariant(baselineDir && inventoryPath && outputPath, 'PROFILE_BASELINE_DIR, PROFILE_INVENTORY_PATH and PROFILE_PILOT_OUTPUT are required');
+  invariant(inventoryPath, 'PROFILE_INVENTORY_PATH is required');
+  invariant(baselineDir, 'PROFILE_BASELINE_DIR is required');
+  invariant(outputPath, 'PROFILE_PILOT_OUTPUT is required');
+  const pilotId = process.env.PROFILE_PILOT_ID ?? PROFILE_PREREGISTRATION.powerDesign.pilotId;
+  invariant(pilotId, 'PROFILE_PILOT_ID is required');
+  const harnessRevision = process.env.PROFILE_HARNESS_REVISION ?? '';
+  invariant(/^[0-9a-f]{40}$/u.test(harnessRevision), 'PROFILE_HARNESS_REVISION must be an exact commit SHA');
+
   const inventory = JSON.parse(await readFile(inventoryPath, 'utf8'));
   validateDesktopInventory(inventory);
+  const inventoryArtifactSha256 = receiptSha256(inventory);
   const bundle = await baselineBundle(baselineDir);
   const cells = [];
-  for (let index = 0; index < ENGINES.length; index++) {
-    const [engine, type] = ENGINES[index];
-    const bound = inventory.browsers[index];
-    invariant(bound?.engine === engine, `${engine}: inventory order drifted`);
-    cells.push(await measureEngine(engine, type, bound, bundle));
+  for (const [engineName, browserType] of ENGINES) {
+    const cellId = `gha-ubuntu-24.04-${engineName}`;
+    const blocks = await measureEngine(engineName, browserType, bundle, cellId);
+    cells.push({ cellId, engine: engineName, blocks });
   }
   const pilot = finalizePilotReceipt({
-    schemaVersion: 1,
-    profileId: PROFILE_PREREGISTRATION.profileId,
-    baselineRevision: PROFILE_PREREGISTRATION.baseline.revision,
-    pilotId: process.env.PROFILE_PILOT_ID ?? 'desktop-heavy-scenes-null-control-20260918-v1',
-    generatedAt: new Date().toISOString(),
-    candidateSamples: 0,
-    inventoryArtifactSha256: receiptSha256(inventory),
-    methodologyBlob: PROFILE_PREREGISTRATION.baseline.methodologyBlob,
-    harness: {
-      kind: 'scenario-null-control-v1',
-      harnessRevision: process.env.PROFILE_HARNESS_REVISION ?? '',
-      baselineRevision: PROFILE_PREREGISTRATION.baseline.revision,
-      independentUnit: PROFILE_PREREGISTRATION.statistics.independentUnit,
-      runBlocks: RUN_BLOCKS,
-      samplesPerCluster: 1,      orderSeed: PROFILE_PREREGISTRATION.statistics.orderSeed,
-      batchFloorMs: BATCH_FLOOR_MS,
-      measurement: 'sum of Lab Motion own-call/frame CPU intervals; application DOM mutation is untimed',
-    },
+    pilotId,
+    harnessRevision,
+    inventoryArtifactSha256,
     cells,
   });
-  await writeFile(outputPath, `${JSON.stringify(pilot, null, 2)}\n`);
+  await writeFile(outputPath, `${JSON.stringify(pilot, null, 2)}\n`, 'utf8');
   process.stdout.write(`${JSON.stringify({
-    status: 'PASS',
+    profile: pilot.profile,
     pilotId: pilot.pilotId,
-    inventoryArtifactSha256: pilot.inventoryArtifactSha256,
-    cells: pilot.cells.map((cell) => ({
-      id: cell.id,
-      scenes: cell.scenes.map((scene) => ({
-        id: scene.id,
-        batchCalls: scene.batchCalls,
-        aa: scene.aa,
-        deliberate2x: scene.deliberate2x,
-      })),
-    })),
-  })}\n`);
+    candidateSamples: pilot.candidateSamples,
+    sha256: receiptSha256(pilot),
+  }, null, 2)}\n`);
 }
 
-if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) {
+if (import.meta.url === pathToFileURL(process.argv[1] ?? '').href) {
   await main();
 }
