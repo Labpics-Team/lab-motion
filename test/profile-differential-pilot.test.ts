@@ -44,6 +44,19 @@ describe('PROFILE-01 coarse differential timing design', () => {
     expect(seen).not.toContain(4);
   });
 
+  it('preserves every discovery probe when the preregistered selector is exhausted', async () => {
+    const measure = vi.fn(async (repeats: number) => ({
+      motionWallMs: repeats * 50, controlWallMs: repeats * 0.5, estimateMs: repeats * 49.5,
+    }));
+    const error = await chooseCoarseArmRepeats(measure, {
+      candidates: [1, 2, 4], floorMs: 40, discoveryProbeCount: 2, holdoutProbeCount: 3,
+    }).catch((caught) => caught);
+    expect(error.name).toBe('DifferentialPilotFailure');
+    expect(error.evidence).toMatchObject({ stage: 'selector-exhausted', floorMs: 40, candidates: [1, 2, 4] });
+    expect(error.evidence.attempts.map((attempt: { repeats: number }) => attempt.repeats)).toEqual([1, 2, 4]);
+    expect(error.evidence.attempts.every((attempt: { discovery: unknown[] }) => attempt.discovery.length === 2)).toBe(true);
+  });
+
   it('doubles both arms for the positive control so application work stays differenced out', async () => {
     const factors: number[] = [];
     const measure = vi.fn(async (repeats: number, factor: number) => {

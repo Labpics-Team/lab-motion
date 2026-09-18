@@ -12,6 +12,14 @@ function invariant(condition, message) {
   if (!condition) throw new Error(`PROFILE-01 differential pilot: ${message}`);
 }
 
+class DifferentialPilotFailure extends Error {
+  constructor(message, evidence) {
+    super(`PROFILE-01 differential pilot: ${message}`);
+    this.name = 'DifferentialPilotFailure';
+    this.evidence = evidence;
+  }
+}
+
 function canonical(value) {
   if (value === null || typeof value === 'string' || typeof value === 'boolean' || typeof value === 'number') return JSON.stringify(value);
   if (Array.isArray(value)) return `[${value.map(canonical).join(',')}]`;
@@ -58,6 +66,7 @@ export async function chooseCoarseArmRepeats(measureProbe, options = {}) {
   invariant(Array.isArray(candidates) && candidates.length > 0, 'repeat candidates missing');
   invariant(candidates.every((value, index) => Number.isSafeInteger(value) && value > 0 && (index === 0 || value > candidates[index - 1])), 'repeat candidates must be positive and strictly increasing');
   invariant(Number.isFinite(floorMs) && floorMs > 0, 'timing floor must be positive');
+  const attempts = [];
 
   for (const repeats of candidates) {
     const discovery = [];
@@ -65,17 +74,21 @@ export async function chooseCoarseArmRepeats(measureProbe, options = {}) {
       const sample = await measureProbe(repeats);
       discovery.push(sample);
     }
+    attempts.push({ repeats, discovery });
     if (!discovery.every((sample) => sample.motionWallMs >= floorMs && sample.controlWallMs >= floorMs)) continue;
 
     const holdout = [];
     for (let probe = 0; probe < holdoutProbeCount; probe++) holdout.push(await measureProbe(repeats));
-    invariant(
-      holdout.every((sample) => sample.motionWallMs >= floorMs && sample.controlWallMs >= floorMs),
-      `holdout failed at ${repeats} repeats; same-pilot escalation is forbidden`,
-    );
+    if (!holdout.every((sample) => sample.motionWallMs >= floorMs && sample.controlWallMs >= floorMs)) {
+      throw new DifferentialPilotFailure(`holdout failed at ${repeats} repeats; same-pilot escalation is forbidden`, {
+        stage: 'selector-holdout', floorMs, candidates: [...candidates], attempts, repeats, holdout,
+      });
+    }
     return { repeats, discovery, holdout };
   }
-  throw new Error(`PROFILE-01 differential pilot: no preregistered repeat count resolves both coarse arms above ${floorMs}ms`);
+  throw new DifferentialPilotFailure(`no preregistered repeat count resolves both coarse arms above ${floorMs}ms`, {
+    stage: 'selector-exhausted', floorMs, candidates: [...candidates], attempts,
+  });
 }
 
 export async function acquireDifferentialControls(measureDifferential, repeats, options = {}) {
@@ -379,7 +392,17 @@ async function measureEngine(engine, browserType, bundle, inventory) {
       const sceneId = DESIGN.sceneIds[sceneIndex];
       const nextArmOrder = orderGenerator(PROFILE_PREREGISTRATION.statistics.orderSeed ^ Math.imul(sceneIndex + 1, 0x45d9f3b));
       const probe = (repeats) => measureArmPair(page, sceneId, repeats, 1, Boolean(nextArmOrder()));
-      const selected = await chooseCoarseArmRepeats(probe);
+      let selected;
+      try {
+        selected = await chooseCoarseArmRepeats(probe);
+      } catch (error) {
+        if (error instanceof DifferentialPilotFailure) {
+          throw new DifferentialPilotFailure(error.message.replace(/^PROFILE-01 differential pilot: /u, ''), {
+            engine, sceneId, ...error.evidence,
+          });
+        }
+        throw error;
+      }
       const measureDifferential = (repeats, factor) => measureArmPair(page, sceneId, repeats, factor, Boolean(nextArmOrder()));
       const raw = await acquireDifferentialControls(measureDifferential, selected.repeats, {
         orderSeed: PROFILE_PREREGISTRATION.statistics.orderSeed ^ Math.imul(sceneIndex + 1, 0x119de1f3),
@@ -418,7 +441,18 @@ async function main() {
   const compareRequire = createRequire(new URL('../compare/package.json', import.meta.url));
   const playwright = compareRequire('playwright');
   const cells = [];
-  for (const engine of DESIGN.engines) cells.push(await measureEngine(engine, playwright[engine], bundle, inventory));
+  try {
+    for (const engine of DESIGN.engines) cells.push(await measureEngine(engine, playwright[engine], bundle, inventory));
+  } catch (error) {
+    const failureReceipt = {
+      schemaVersion: 1, node: DESIGN.node, designId: DESIGN.id, preregRevision, harnessRevision,
+      baselineRevision: DESIGN.baselineRevision, generatedAt: new Date().toISOString(), candidateSamples: 0,
+      inventorySha256: sha256(inventory), design: DESIGN, status: 'failed', cells,
+      failure: { name: error?.name ?? 'Error', message: String(error?.message ?? error), evidence: error?.evidence ?? null },
+    };
+    await writeFile(outputPath, `${JSON.stringify(failureReceipt, null, 2)}\n`, 'utf8');
+    throw error;
+  }
   const receipt = {
     schemaVersion: 1,
     node: DESIGN.node,
