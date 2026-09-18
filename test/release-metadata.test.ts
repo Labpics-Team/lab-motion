@@ -52,6 +52,7 @@ function metadata() {
       'docs/motion-conformance.md',
       'docs/recipes.md',
       '!dist/**/*.map',
+      'docs/bindings.md',
     ],
     publishConfig: { access: 'public' },
     sideEffects: [
@@ -127,6 +128,10 @@ describe('release metadata SSOT', () => {
     ['missing referenced recipes', (pkg: any) => {
       pkg.files = pkg.files.filter((file: string) => file !== 'docs/recipes.md');
     }],
+    ['missing binding reference', (pkg: any) => {
+      pkg.files = pkg.files.filter((file: string) => file !== 'docs/bindings.md');
+    }],
+    ['unapproved published file', (pkg: any) => { pkg.files.push('private-notes.md'); }],
     ['wrong Node floor', (pkg: any) => { pkg.engines.node = '>=24'; }],
     ['missing peer', (pkg: any) => { delete pkg.peerDependencies.react; }],
     ['description drift', (pkg: any) => { pkg.description = 'faster'; }],

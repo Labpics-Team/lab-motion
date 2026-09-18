@@ -582,3 +582,77 @@ export function animate(
     stop: cancel,
   };
 }
+
+/** Локальный query-host: Element, Document, ShadowRoot или структурный адаптер. */
+export interface AnimateScopeRoot {
+  querySelectorAll(selector: string): ArrayLike<unknown>;
+}
+
+/** Область учёта вызовов, не второй владелец анимируемых свойств. */
+export interface AnimateScope {
+  /** Строка выбирает потомков root; явные цели передаются обычному animate. */
+  animate(target: AnimateTarget, props: AnimateProps, options?: AnimateOptions): AnimateControls;
+  /** Отзывает область и отменяет её незавершённые вызовы без возврата старых стилей. */
+  destroy(): void;
+}
+
+/**
+ * Связывает локальные селекторы и cleanup с жизненным циклом компонента.
+ * Query выполняется до вызова animate; ошибки селектора остаются ошибками host.
+ * После destroy поздние вызовы возвращают завершённый no-op, не читая входы.
+ * Уничтожение в синхронном setup отменяет новый run сразу после получения controls;
+ * уже совершённые синхронные эффекты не откатываются. Никакого покадрового слоя.
+ */
+export function createAnimateScope(root: AnimateScopeRoot): AnimateScope {
+  if (typeof root?.querySelectorAll !== 'function') {
+    throw new TypeError('createAnimateScope: root.querySelectorAll must be a function');
+  }
+  let liveRoot: AnimateScopeRoot | undefined = root;
+  const runs = new Set<AnimateControls>();
+  let idle: AnimateControls | undefined;
+  const inactive = (): AnimateControls => idle ??= animate([], {});
+  const cancelRuns = (): void => {
+    const errors: unknown[] = [];
+    for (const controls of runs) {
+      try { controls.cancel(); } catch (error) { errors.push(error); }
+    }
+    if (errors.length === 1) throw errors[0];
+    if (errors.length > 1) throw new AggregateError(errors, 'animate scope cleanup failed');
+  };
+  return {
+    animate(target, props, options): AnimateControls {
+      if (liveRoot === undefined) return inactive();
+      // Cast передаёт недоверенный query-выход существующей defensive границе
+      // full animate. Здесь не копируются проверка элементов и bounded snapshot.
+      const resolved = typeof target === 'string'
+        ? liveRoot.querySelectorAll(target) as AnimateTarget
+        : target;
+      if (liveRoot === undefined) return inactive();
+      const controls = animate(resolved, props, options);
+      // Query, options и host setup могут синхронно уничтожить компонент ещё
+      // до того, как обычный animate вернул доступный handle.
+      runs.add(controls);
+      const release = (): void => { runs.delete(controls); };
+      void controls.finished.then(release, release);
+      if (liveRoot === undefined) controls.cancel();
+      return controls;
+    },
+    destroy(): void {
+      if (liveRoot === undefined) return;
+      // Отзыв предшествует user/host cleanup: reentry не публикует новый run.
+      liveRoot = undefined;
+      // Вложенный cancel внутри host-транзакции может законно не сработать
+      // из-за reservation юнита. Один финальный drain после текущего стека
+      // снимает такую анимацию, включая handle, ещё не возвращённый setup-ом.
+      // Это одна job на destroy, не второй кадровый цикл или retry-loop.
+      void new INTRINSIC_PROMISE<void>((resolve) => resolve()).then(() => {
+        try { cancelRuns(); } catch (error) {
+          try {
+            (globalThis as { reportError?: (reason: unknown) => void }).reportError?.(error);
+          } catch { /* отчёт host-у не владеет освобождением ссылок */ }
+        } finally { runs.clear(); }
+      });
+      cancelRuns();
+    },
+  };
+}
