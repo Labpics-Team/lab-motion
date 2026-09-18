@@ -108,13 +108,12 @@ describe('PROFILE-01 owned-time budget family', () => {
   });
 
   it('counterbalances null and doubled-work controls without changing the fixed run-block count', async () => {
-    const measure = physical(50, 55);
+    const measure = physical(250, 255);
     const raw = await acquireOwnedTimeControls(measure, {
       runBlocks: 3,
       orderSeed: 7,
-      targetOwnedMs: 50,
       maximumLogicalUnits: 4,
-      maximumEnclosingWallMs: 200,
+      maximumEnclosingWallMs: 1000,
     });
     expect(raw.aa.a).toHaveLength(3);
     expect(raw.aa.b).toHaveLength(3);
