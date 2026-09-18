@@ -36,6 +36,8 @@ export const ASYMMETRIC_TIMING_PREREGISTRATION = Object.freeze({
     armOrder: 'counterbalanced from preregistered orderSeed',
     aaRule: 'two independent factor-1 normalized differences per run-block',
     positiveControlRule: 'factor-2 executes twice the real scene work in BOTH arms while normalization stays anchored to the selected factor-1 repeat counts',
+    factorTwoRatioBand: Object.freeze(PROFILE_PREREGISTRATION.calibration.aaNonInferiorityBand.map((bound) => bound * 2)),
+    factorTwoRatioRule: 'the paired-bootstrap 95% interval for factor-2 / factor-1 normalized differential must stay inside 2x the preregistered A/A non-inferiority band',
     positivityRule: 'every admitted normalized differential must be finite and > 0; otherwise the estimator is unresolved',
   }),
   selector: Object.freeze({
