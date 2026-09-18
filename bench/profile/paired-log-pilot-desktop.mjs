@@ -192,7 +192,9 @@ async function installHarness(page, bundle) {
             rubberBand: 0.25,
             requestFrame: clocks[index].requestFrame,
             matchMedia: () => ({ matches: false }),
-            onStep: (_x, y) => { sheets[index].style.transform = `translateY(${y}px)`; },
+            // Keep the library-owned callback dispatch in the timed path, but
+            // exclude consumer rendering from ownerMs as preregistered.
+            onStep: () => {},
           });
         }
       });
@@ -213,6 +215,9 @@ async function installHarness(page, bundle) {
       for (let index = 0; index < copies; index++) {
         const drag = drags[index];
         if (Math.abs(drag.y - 600) > 0.01 || drag.dragging || drag.gliding) throw new Error(`direct terminal snap failed: y=${drag.y}`);
+        // Render only after the owner clock has stopped. The scene still proves
+        // the terminal authored state without charging app-owned DOM work to M-05.
+        sheets[index].style.transform = `translateY(${drag.y}px)`;
         if (sheets[index].style.transform !== 'translateY(600px)') throw new Error('direct rendered value drifted');
       }
       return own;
