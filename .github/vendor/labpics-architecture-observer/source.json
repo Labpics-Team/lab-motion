@@ -1,0 +1,102 @@
+{
+  "repository": "Labpics-Team/agents-config",
+  "commit": "7e1952b12a9f848c800f3309ff37489d737a8025",
+  "files": [
+    {
+      "path": "architecture/analyze.mjs",
+      "local": "analyze.mjs",
+      "blob": "26c3e139d1b86c7cda12bba86ef50584588a42e4",
+      "sha256": "a8cbaa45b8bffb71d271b65336aac32dd388fa69e5d7980cc54a888f352d72d1"
+    },
+    {
+      "path": "architecture/ci-feedback.mjs",
+      "local": "ci-feedback.mjs",
+      "blob": "503fb8e7f9563099aae0dc6b1841f7bb7a0a5463",
+      "sha256": "352f8ee564d2693f73c48855424c41897884309a26b20155428d03f83e0c2ca7"
+    },
+    {
+      "path": "architecture/cli.mjs",
+      "local": "cli.mjs",
+      "blob": "94b2bc8a8c12c2abe4d05149ff60843f53e919d7",
+      "sha256": "8d57fbc5e109a817fac46d4f59dc8bbe1308902582610f3f572d5eb5026d0fd1"
+    },
+    {
+      "path": "architecture/git.mjs",
+      "local": "git.mjs",
+      "blob": "d36e639e4656fff216dfcacf607773388a9c4149",
+      "sha256": "cefa7239de3a00c0f61cb4142e8fc4502e0757bf39dd9b359eba348b23bce102"
+    },
+    {
+      "path": "architecture/history.mjs",
+      "local": "history.mjs",
+      "blob": "0d86440486910c5cb8dd8f6257c40c5dbf4aefaf",
+      "sha256": "1c407250eef64ccaf37c832afad6e52c168c89d4e705112243ac47f8e9f7b424"
+    },
+    {
+      "path": "architecture/input.mjs",
+      "local": "input.mjs",
+      "blob": "3b6dc7424e7e4b42685b0f4409fdd730ca13ccc1",
+      "sha256": "dcfa790781be78a4dff4079e3d8991a73142fc49dfecf5a0a9131730abae4945"
+    },
+    {
+      "path": "architecture/model.mjs",
+      "local": "model.mjs",
+      "blob": "a37e5476336140abdbe0c2706701d20a5a5629e8",
+      "sha256": "f188e0fc8c83da9098013d6f59d07c0f0e6c9630f077295d6c50a7595dc4b2ca"
+    },
+    {
+      "path": "architecture/native-syntax.mjs",
+      "local": "native-syntax.mjs",
+      "blob": "a5e4632cdcd815813bc70e8a8acd3dbd72e529c3",
+      "sha256": "3fcc2445d66b6ddc71f68e50c7acfe86fdfaff9b84e6db04dd55b608c4fd653b"
+    },
+    {
+      "path": "architecture/provenance.mjs",
+      "local": "provenance.mjs",
+      "blob": "5a942857cf1bbc3410047a2550340bd0c230447a",
+      "sha256": "5304eebccef02527bbeaedecad54f86d18090af6b7324d95129f7095b597ef8e"
+    },
+    {
+      "path": "architecture/protocols.mjs",
+      "local": "protocols.mjs",
+      "blob": "91c9a6eb2e9db70872478f33b82e820af399482c",
+      "sha256": "f2f11c4365473452b818a812e6a507329844f65d63c2ec9c5b6aa6d3e8328ba1"
+    },
+    {
+      "path": "architecture/report.mjs",
+      "local": "report.mjs",
+      "blob": "d0ea8ca42df7f348db0e558b49f95e1654655096",
+      "sha256": "ef8d13bdb6721758beadb14950b90d15d3fdb0dcbdd000aacf6e243f660675fe"
+    },
+    {
+      "path": "architecture/semantic-admission.mjs",
+      "local": "semantic-admission.mjs",
+      "blob": "b79d9a06884215b65b32965d58a09625951d656c",
+      "sha256": "f84c0940b26211d2fdba7545be64443d6ccfdab929f7b204aae6f8b8819683ab"
+    },
+    {
+      "path": "architecture/source-graph.mjs",
+      "local": "source-graph.mjs",
+      "blob": "4f31643e13fa33d562b22292d034abf1e3a2af11",
+      "sha256": "54d3e468324989561e7f78b68aa7ddf6c61c936ec40f6d7f1189318f8f359ed4"
+    },
+    {
+      "path": "architecture/syntax-values.mjs",
+      "local": "syntax-values.mjs",
+      "blob": "d3a62da081053234155adb238ea749755e632d25",
+      "sha256": "7d12f3314fade3b4b9c4ea447c6ad930219d81570e5193f7d5c357ba30f4656c"
+    },
+    {
+      "path": "architecture/projection.mjs",
+      "local": "projection.mjs",
+      "blob": "e03c7f27a17e839440dfb6219bd0b1afd2699a97",
+      "sha256": "89776f7068dfb50d0b8c4fd34a72ce82a1d9d3c4f1b6e434befb9c4f4f9f5b0b"
+    },
+    {
+      "path": "plans/tools/code-admission/install-tools.sh",
+      "local": "install-tools.sh",
+      "blob": "76b4a3c0fa95689a0c953cc5044b2651906b5671",
+      "sha256": "89738fc7c209bd38160686934950b20d5120b617ed90b1dcf9cf9a8297d0a36f"
+    }
+  ]
+}

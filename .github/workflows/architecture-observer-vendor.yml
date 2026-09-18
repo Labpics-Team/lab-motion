@@ -1,0 +1,67 @@
+name: architecture-observer-vendor
+
+# Public-repository path: generated observer bytes are vendored from agents-config.
+# Semantic ownership/laws are merge-blocking here; heuristic observations remain advisory.
+# Public PR code stays on GitHub-hosted runners and never reaches persistent self-hosted runners.
+on:
+  pull_request:
+  merge_group:
+  push:
+    branches: [main]
+
+permissions:
+  contents: read
+
+concurrency:
+  group: architecture-vendor-${{ github.event.pull_request.number || github.event.merge_group.head_sha || github.sha }}
+  cancel-in-progress: true
+
+jobs:
+  observe:
+    name: architecture evidence (vendored)
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    steps:
+      - name: Checkout full Git evidence
+        uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
+        with:
+          persist-credentials: false
+          fetch-depth: 0
+
+      - name: Select Node.js runtime
+        uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version: "22.14.0"
+
+      - name: Install canonical pinned native parser
+        run: bash .github/vendor/labpics-architecture-observer/install-tools.sh "$RUNNER_TEMP/architecture-parser" ast-grep
+
+      - name: Verify vendored observer before running it
+        run: node .github/vendor/labpics-architecture-observer/projection.mjs verify --root .github/vendor/labpics-architecture-observer
+
+      - name: Observe and enforce product architecture
+        env:
+          ARCHITECTURE_AST_GREP: ${{ runner.temp }}/architecture-parser/ast-grep
+          SUBJECT_SHA: ${{ github.event.pull_request.head.sha || github.sha }}
+          BASE_SHA: ${{ github.event.pull_request.base.sha || github.event.merge_group.base_sha }}
+        run: |
+          set -euo pipefail
+          evidence="$RUNNER_TEMP/architecture-evidence"
+          policy_sha="${BASE_SHA:-$SUBJECT_SHA}"
+          args=(observe
+            --repo "$GITHUB_WORKSPACE"
+            --ref "$SUBJECT_SHA"
+            --policy-ref "$policy_sha"
+            --config .architecture.json
+            --ast-grep "$ARCHITECTURE_AST_GREP"
+            --out "$evidence"
+            --summary "$GITHUB_STEP_SUMMARY"
+          )
+          if [[ -n "$BASE_SHA" ]]; then args+=(--base "$BASE_SHA"); fi
+          node .github/vendor/labpics-architecture-observer/cli.mjs "${args[@]}"
+          node .github/vendor/labpics-architecture-observer/semantic-admission.mjs \
+            --repo "$GITHUB_WORKSPACE" \
+            --report "$evidence/report.json" \
+            --policy "$evidence/policy.json" \
+            --config .architecture.json \
+            --out "$evidence/semantic-admission.json"
