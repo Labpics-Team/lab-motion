@@ -1,5 +1,6 @@
 import { pathToFileURL } from 'node:url';
 import { pairedClusterBootstrap } from '../compare/methodology.mjs';
+import { PROFILE_PILOT_REGISTRATION } from './pilot-registration.mjs';
 import { PROFILE_PREREGISTRATION } from './preregistration.mjs';
 import {
   POWER_METHOD_ID,
@@ -163,6 +164,29 @@ export function validatePreregistration(profile = PROFILE_PREREGISTRATION) {
   invariant(stats.m05.candidateToBestComparatorUpper95Max === 0.5, 'M-05 threshold drifted');
   invariant(JSON.stringify(stats.m05.requiredSceneIds) === JSON.stringify(sceneIds), 'M-05 scenes drifted');
 
+  const power = stats.powerContract;
+  invariant(power?.id === 'm05-paired-log-ratio-holm-v1' && power.claim === 'M-05', 'power contract identity drifted');
+  invariant(JSON.stringify(power.familySceneIds) === JSON.stringify(sceneIds), 'power claim family drifted');
+  invariant(JSON.stringify(Object.keys(power.metricByScene ?? {})) === JSON.stringify(sceneIds), 'power metric mapping drifted');
+  invariant(JSON.stringify(Object.keys(power.comparatorByScene ?? {})) === JSON.stringify(sceneIds), 'power comparator mapping drifted');
+  for (const sceneId of sceneIds) {
+    invariant(power.metricByScene[sceneId] === 'dominant-removable-main-thread-cost-ms', `${sceneId}: power metric drifted`);
+    invariant(power.comparatorByScene[sceneId] === 'best-ratio-eligible-preregistered-comparator', `${sceneId}: power comparator drifted`);
+  }
+  invariant(JSON.stringify(power.ratioEligibleComparators) === JSON.stringify(['motion', 'gsap', 'animejs', 'lab-motion-baseline']), 'ratio-eligible comparator roster drifted');
+  invariant(JSON.stringify(power.boundaryOnlyComparators) === JSON.stringify(['waapi-control']), 'boundary-only comparator roster drifted');
+  invariant(/before candidate samples/.test(power.comparatorSelectionRule), 'power comparator selection timing drifted');
+  invariant(power.noiseModel === 'paired run-block A/A log-ratio from the same scenario harness', 'power noise model drifted');
+  invariant(power.effectScale === 'log-ratio', 'power effect scale drifted');
+  invariant(power.testRule === 'two-sided conservative superiority planning at Holm first-step alpha', 'power test rule drifted');
+  invariant(power.familyAlpha === stats.familyAlpha && power.familyAlpha === 0.05, 'power family alpha drifted');
+  invariant(power.holmFirstStepAlpha === 0.025 && power.perTailAlpha === 0.0125, 'power Holm/tail alpha drifted');
+  invariant(power.criticalZ === 2.241402727604947, 'power critical value drifted');
+  invariant(power.aggregationRule === 'minimum-member-power', 'power aggregation rule drifted');
+  invariant(power.practicalRelativeThreshold === stats.practicalRelativeThreshold, 'power practical threshold drifted');
+  invariant(power.targetPower === stats.targetPower, 'power target drifted');
+  invariant(power.degenerateNoiseRule === 'reject', 'power degenerate-noise rule drifted');
+
   invariant(profile.calibration?.requiredBeforeCandidate === true, 'calibration must precede candidate data');
   invariant(profile.calibration.timingFloorMs === 40, 'calibration timing floor drifted');
   invariant(JSON.stringify(profile.calibration.aaNonInferiorityBand) === JSON.stringify([0.95, 1.05]), 'A/A band drifted');
@@ -300,12 +324,28 @@ export function validatePoweredDesignReceipt(receipt, profile = PROFILE_PREREGIS
   return receipt;
 }
 
+export function validatePilotRegistration(pilot, registration = PROFILE_PILOT_REGISTRATION, profile = PROFILE_PREREGISTRATION) {
+  validatePreregistration(profile);
+  validatePilotReceipt(pilot, profile);
+  invariant(registration?.schemaVersion === 1, 'pilot registration schema mismatch');
+  invariant(registration.profileId === profile.profileId && registration.baselineRevision === profile.baseline.revision, 'pilot registration provenance mismatch');
+  invariant(registration.status === 'REGISTERED', 'pilot has no trusted immutable registration');
+  invariant(SHA256.test(registration.pilotArtifactSha256), 'registered pilot digest missing');
+  invariant(SHA40.test(registration.harnessRevision), 'registered pilot harness revision missing');
+  invariant(typeof registration.pilotId === 'string' && registration.pilotId.length > 0, 'registered pilot identity missing');
+  invariant(typeof registration.evidencePath === 'string' && registration.evidencePath.length > 0, 'registered pilot evidence path missing');
+  invariant(registration.pilotId === pilot.pilotId, 'pilot identity does not match trusted registration');
+  invariant(registration.harnessRevision === pilot.harness.harnessRevision, 'pilot harness revision does not match trusted registration');
+  invariant(registration.pilotArtifactSha256 === receiptSha256(pilot), 'pilot digest does not match trusted registration');
+  return registration;
+}
+
 export function eligibleDesktopCells(inventory, calibration, poweredDesign, pilot, profile = PROFILE_PREREGISTRATION) {
   validateDesktopInventory(inventory, profile);
   validateCalibrationReceipt(calibration, profile);
   validatePoweredDesignReceipt(poweredDesign, profile);
   invariant(pilot !== undefined, 'powered design admission requires a recomputable null/control pilot');
-  validatePilotReceipt(pilot, profile);
+  validatePilotRegistration(pilot, PROFILE_PILOT_REGISTRATION, profile);
   invariant(calibration.schemaVersion === 2 && poweredDesign.schemaVersion === 2, 'legacy receipts are non-admitting');
 
   const inventorySha256 = receiptSha256(inventory);

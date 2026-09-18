@@ -7,15 +7,15 @@ import {
   receiptSha256,
   validatePilotReceipt,
 } from '../bench/profile/power-design.mjs';
-import { eligibleDesktopCells } from '../bench/profile/validate.mjs';
+import { eligibleDesktopCells, validatePilotRegistration } from '../bench/profile/validate.mjs';
 
 const engines = ['chromium', 'firefox', 'webkit'] as const;
 const hash = '0'.repeat(64);
 
-function clusters(value: number) {
+function clusters(value: number, phase = 0) {
   return Array.from({ length: 20 }, (_, run) => ({
     run,
-    samples: [value],
+    samples: [value * (1 + ((((run + phase) % 5) - 2) * 0.001))],
     semantic: true,
   }));
 }
@@ -97,8 +97,8 @@ function rawScene(id: string) {
     batchCalls: 1,
     selector: selector(1),
     raw: {
-      aa: { a: clusters(40), b: clusters(40) },
-      deliberate2x: { single: clusters(40), doubled: clusters(80) },
+      aa: { a: clusters(40, 0), b: clusters(40, 1) },
+      deliberate2x: { single: clusters(40, 0), doubled: clusters(80, 0) },
     },
   };
 }
@@ -134,37 +134,37 @@ function pilotFor(inv: ReturnType<typeof inventory>) {
 }
 
 describe('PROFILE-01 content-addressed powered design', () => {
-  it('admits only cells whose N is recomputed from the bound null/control pilot', () => {
+  it('derives N from non-degenerate null/control noise but keeps admission closed until the pilot is immutably registered', () => {
     const inv = inventory();
     const calibration = calibrationFor(inv);
     const pilot = pilotFor(inv);
     const design = derivePoweredDesign(pilot, inv, calibration, '2026-09-18T03:03:00.000Z');
-    expect(design.cells.every((cell) => cell.chosenIndependentBlocks === 20)).toBe(true);
-    expect(design.cells.every((cell) => cell.estimatedPower === 1 && cell.status === 'powered')).toBe(true);
-    expect(eligibleDesktopCells(inv, calibration, design, pilot)).toEqual([
-      'desktop-chromium',
-      'desktop-firefox',
-      'desktop-webkit',
-    ]);
+    expect(design.cells.every((cell) => cell.estimatedPower >= PROFILE_PREREGISTRATION.statistics.targetPower)).toBe(true);
+    expect(design.cells.every((cell) => cell.status === 'powered')).toBe(true);
+    expect(() => validatePilotRegistration(pilot)).toThrow(/no trusted immutable registration/);
+    expect(() => eligibleDesktopCells(inv, calibration, design, pilot)).toThrow(/no trusted immutable registration/);
   });
 
-  it('rejects a self-declared power change even when all hashes remain syntactically valid', () => {
+  it('rejects degenerate zero-noise A/A evidence instead of converting sigma=0 into power=1', () => {
     const inv = inventory();
     const calibration = calibrationFor(inv);
     const pilot = pilotFor(inv);
-    const design = derivePoweredDesign(pilot, inv, calibration, '2026-09-18T03:03:00.000Z');
-    design.cells[0].estimatedPower = 0.999;
-    expect(() => eligibleDesktopCells(inv, calibration, design, pilot)).toThrow(/deterministically derived/);
+    for (const cell of pilot.cells) {
+      for (const scene of cell.scenes) {
+        scene.raw.aa.a = clusters(40, 0);
+        scene.raw.aa.b = clusters(40, 0);
+      }
+    }
+    const finalized = finalizePilotReceipt(pilot);
+    expect(() => derivePoweredDesign(finalized, inv, calibration, '2026-09-18T03:03:00.000Z')).toThrow(/degenerate A\/A noise/);
   });
 
-  it('rejects evidence substitution across every content-addressed edge', () => {
+  it('rejects evidence substitution against the raw-backed pilot summaries', () => {
     const inv = inventory();
-    const calibration = calibrationFor(inv);
     const pilot = pilotFor(inv);
-    const design = derivePoweredDesign(pilot, inv, calibration, '2026-09-18T03:03:00.000Z');
     const changedPilot = structuredClone(pilot);
-    changedPilot.cells[0].scenes[0].raw.aa.a[0].samples[0] = 40.1;
-    expect(() => eligibleDesktopCells(inv, calibration, design, changedPilot)).toThrow(/pilot|raw evidence/);
+    changedPilot.cells[0].scenes[0].raw.aa.a[0].samples[0] += 0.1;
+    expect(() => validatePilotReceipt(changedPilot)).toThrow(/drifted from raw evidence/);
   });
 
   it('rejects a pilot sample below the preregistered formal timing floor', () => {
@@ -175,11 +175,11 @@ describe('PROFILE-01 content-addressed powered design', () => {
     expect(() => validatePilotReceipt(broken)).toThrow(/below 20ms timing floor/);
   });
 
-  it('fails closed when scenario control evidence is unresolved', () => {
+  it('fails closed when scenario positive-control evidence is unresolved', () => {
     const inv = inventory();
     const pilot = pilotFor(inv);
     const broken = structuredClone(pilot);
-    broken.cells[1].scenes[1].raw.deliberate2x.doubled = clusters(40);
+    broken.cells[1].scenes[1].raw.deliberate2x.doubled = clusters(40, 0);
     expect(() => validatePilotReceipt(broken)).toThrow(/raw evidence|positive control unresolved/);
   });
 });

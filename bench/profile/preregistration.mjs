@@ -181,6 +181,33 @@ export const PROFILE_PREREGISTRATION = Object.freeze({
       candidateToBestComparatorUpper95Max: 0.5,
       zeroCostControlRule: 'use boundary plus another meaningful metric; never divide by zero',
     }),
+    powerContract: Object.freeze({
+      id: 'm05-paired-log-ratio-holm-v1',
+      claim: 'M-05',
+      familySceneIds: Object.freeze(['collection-reorder-100', 'direct-manipulation-sheet']),
+      metricByScene: Object.freeze({
+        'collection-reorder-100': 'dominant-removable-main-thread-cost-ms',
+        'direct-manipulation-sheet': 'dominant-removable-main-thread-cost-ms',
+      }),
+      comparatorByScene: Object.freeze({
+        'collection-reorder-100': 'best-ratio-eligible-preregistered-comparator',
+        'direct-manipulation-sheet': 'best-ratio-eligible-preregistered-comparator',
+      }),
+      ratioEligibleComparators: Object.freeze(['motion', 'gsap', 'animejs', 'lab-motion-baseline']),
+      boundaryOnlyComparators: Object.freeze(['waapi-control']),
+      comparatorSelectionRule: 'select the lowest-cost semantically valid ratio-eligible comparator from comparator-only baseline data before candidate samples',
+      noiseModel: 'paired run-block A/A log-ratio from the same scenario harness',
+      effectScale: 'log-ratio',
+      testRule: 'two-sided conservative superiority planning at Holm first-step alpha',
+      familyAlpha: 0.05,
+      holmFirstStepAlpha: 0.025,
+      perTailAlpha: 0.0125,
+      criticalZ: 2.241402727604947,
+      aggregationRule: 'minimum-member-power',
+      practicalRelativeThreshold: 0.05,
+      targetPower: 0.8,
+      degenerateNoiseRule: 'reject',
+    }),
   }),
 
   calibration: Object.freeze({

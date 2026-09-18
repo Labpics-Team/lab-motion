@@ -116,6 +116,11 @@ describe('PROFILE-01 scenario null/control harness', () => {
     expect(observedCopies).not.toContain(8);
   });
 
+  it('rejects the xorshift zero state instead of silently losing pair-order randomization', async () => {
+    const measure = vi.fn(async (copies: number) => copies * 20);
+    await expect(acquireSceneControls(measure, 1, { runBlocks: 3, floorMs: 20, orderSeed: 0 })).rejects.toThrow(/orderSeed must be a non-zero 32-bit value/);
+  });
+
   it('executes actual doubled workload for the positive control instead of scaling a returned number', async () => {
     const calls: number[] = [];
     const measure = vi.fn(async (copies: number) => {

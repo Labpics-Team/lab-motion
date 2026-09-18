@@ -28,6 +28,7 @@ function cluster(run, sample, floorMs = BATCH_FLOOR_MS) {
 
 function orderGenerator(seed) {
   let state = seed >>> 0;
+  invariant(state !== 0, 'orderSeed must be a non-zero 32-bit value');
   return () => {
     state ^= state << 13;
     state ^= state >>> 17;

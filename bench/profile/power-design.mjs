@@ -3,7 +3,7 @@ import { readFile, writeFile } from 'node:fs/promises';
 import { pathToFileURL } from 'node:url';
 import { PROFILE_PREREGISTRATION } from './preregistration.mjs';
 
-export const POWER_METHOD_ID = 'paired-log-ratio-sigma95-holm-worstcase-v1';
+export const POWER_METHOD_ID = PROFILE_PREREGISTRATION.statistics.powerContract.id;
 export const POWER_TRIALS = 10_000;
 const SHA40 = /^[0-9a-f]{40}$/;
 const SHA256 = /^[0-9a-f]{64}$/;
@@ -300,19 +300,17 @@ function estimatePowerFromSigma(sigma, blocks, profile, label = 'scene') {
       blocks <= profile.statistics.maximumIndependentBlocks,
     `${label}: power block count outside preregistered bounds`,
   );
-  invariant(Number.isFinite(sigma) && sigma >= 0, `${label}: power noise sigma is invalid`);
-  const alphaPerScene = profile.statistics.familyAlpha / profile.statistics.m05.requiredSceneIds.length;
-  invariant(alphaPerScene === 0.025, 'power Holm alpha drifted');
-  const effect = -Math.log(1 - profile.statistics.practicalRelativeThreshold);
-  // Holm's first step is the worst case for a two-scene family: alpha/2 = 0.025.
-  // The planned superiority test is two-sided at that per-scene alpha, so each tail
-  // gets 0.0125 and z_(1-0.0125) = 2.2414027276. Planning at this stricter
-  // boundary is conservative for Holm's second step and avoids optimistic N.
-  const critical = 2.241402727604947;
-  const signal = sigma === 0 ? Infinity : effect * Math.sqrt(blocks) / sigma;
-  const estimatedPower = sigma === 0
-    ? 1
-    : normalCdf(signal - critical) + normalCdf(-signal - critical);
+  const contract = profile.statistics.powerContract;
+  invariant(contract?.id === POWER_METHOD_ID, `${label}: power method is not preregistered`);
+  invariant(contract.familySceneIds.includes(label), `${label}: scene is outside the preregistered power family`);
+  invariant(Number.isFinite(sigma) && sigma > 0, `${label}: degenerate A/A noise cannot support a power estimate`);
+  const alphaPerScene = contract.holmFirstStepAlpha;
+  invariant(alphaPerScene === contract.familyAlpha / contract.familySceneIds.length, 'power Holm alpha drifted');
+  invariant(contract.perTailAlpha === alphaPerScene / 2, 'power two-sided tail alpha drifted');
+  const effect = -Math.log(1 - contract.practicalRelativeThreshold);
+  const critical = contract.criticalZ;
+  const signal = effect * Math.sqrt(blocks) / sigma;
+  const estimatedPower = normalCdf(signal - critical) + normalCdf(-signal - critical);
   return {
     estimatedPower,
     noiseSigmaUpper95: sigma,
@@ -344,6 +342,7 @@ export function derivePoweredCells(pilot, profile = PROFILE_PREREGISTRATION) {
         id,
         ...estimatePowerFromSigma(sigma, blocks, profile, id),
       }));
+      invariant(profile.statistics.powerContract.aggregationRule === 'minimum-member-power', 'unsupported power aggregation rule');
       const estimatedPower = Math.min(...scenePowers.map(({ estimatedPower: power }) => power));
       last = { blocks, estimatedPower, scenePowers };
       if (estimatedPower >= profile.statistics.targetPower) break;

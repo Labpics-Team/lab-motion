@@ -146,6 +146,21 @@ describe('PROFILE-01 preregistration', () => {
     expect(() => validatePreregistration(weakened)).toThrow(/probe counts|confidence target/);
   });
 
+  it('freezes the complete M-05 power claim family and decision rule', () => {
+    const mutations = [
+      (profile: any) => { profile.statistics.powerContract.familySceneIds.reverse(); },
+      (profile: any) => { profile.statistics.powerContract.metricByScene['collection-reorder-100'] = 'wall-time'; },
+      (profile: any) => { profile.statistics.powerContract.comparatorByScene['direct-manipulation-sheet'] = 'motion-only'; },
+      (profile: any) => { profile.statistics.powerContract.criticalZ = 1.96; },
+      (profile: any) => { profile.statistics.powerContract.aggregationRule = 'mean-member-power'; },
+    ];
+    for (const mutate of mutations) {
+      const profile = copy(PROFILE_PREREGISTRATION) as any;
+      mutate(profile);
+      expect(() => validatePreregistration(profile)).toThrow(/power/);
+    }
+  });
+
   it('rejects a profile that turns frames into independent participants', () => {
     const profile = copy(PROFILE_PREREGISTRATION) as any;
     profile.statistics.independentUnit = 'frame';
