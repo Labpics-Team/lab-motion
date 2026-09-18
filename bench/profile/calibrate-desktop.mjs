@@ -2,7 +2,7 @@ import { createRequire } from 'node:module';
 import { readFile } from 'node:fs/promises';
 import { pairedClusterBootstrap } from '../compare/methodology.mjs';
 import { PROFILE_PREREGISTRATION } from './preregistration.mjs';
-import { validateDesktopInventory } from './validate.mjs';
+import { validateCalibrationReceipt, validateDesktopInventory } from './validate.mjs';
 
 const compareRequire = createRequire(new URL('../compare/package.json', import.meta.url));
 const { chromium, firefox, webkit } = compareRequire('playwright');
@@ -133,4 +133,7 @@ const receipt = {
   status: pass ? 'PASS' : 'FAIL',
 };
 
+// The generator is an admission boundary, not a report-only formatter: a FAIL
+// receipt must terminate the run non-zero instead of looking successful to CI.
+validateCalibrationReceipt(receipt);
 process.stdout.write(`${JSON.stringify(receipt, null, 2)}\n`);
