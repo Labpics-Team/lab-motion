@@ -182,6 +182,12 @@ S1–S4 используют не менее 20 позиционно-сбала�
 Релизный workflow сам этот стенд не запускает, поэтому без приложенного каталога текущего
 WebKit-доказательства нет.
 
+## Парный Surface compiler
+
+[Surface-стенд](surface-benchmark.md) измеряет полный публичный Vite transform
+на двух чистых checkout. Его baseline-only калибровка предшествует candidate
+замерам; cache-miss и полное чтение code/map не подменяют cold application startup.
+
 ## Потолок main-thread пути
 
 `pnpm bench:ceiling` сам пересобирает текущий fingerprinted checkout и измеряет engine-only
