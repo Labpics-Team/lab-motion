@@ -21,7 +21,7 @@ function clusters(value: number) {
 
 function cell(
   engine: typeof engines[number],
-  { aaLeft = 10, aaRight = 10, deliberate = 20, single = 10 } = {},
+  { aaLeft = 50, aaRight = 50, deliberate = 100, single = 50 } = {},
 ) {
   const aaRatio = aaLeft / aaRight;
   const deliberateRatio = deliberate / single;
@@ -72,13 +72,25 @@ describe('PROFILE-01 calibration generator boundary', () => {
 
     expect(receipt.status).toBe('PASS');
     expect(receipt.candidateSamples).toBe(0);
+    expect(receipt.timing).toEqual({ floorMs: 40, resolved: true });
+    expect(receipt.workload.timingFloorMs).toBe(40);
     expect(receipt.aa).toEqual({ lower95: 1, upper95: 1 });
     expect(receipt.deliberate2x.lower95).toBe(2);
   });
 
+  it('не допускает sub-floor raw timing даже при идеальных ratios', () => {
+    const cells = passingCells();
+    cells[2] = cell('webkit', { aaLeft: 39, aaRight: 39, deliberate: 78, single: 39 });
+
+    const receipt = createCalibrationReceipt(cells);
+    expect(receipt.timing).toEqual({ floorMs: 40, resolved: false });
+    expect(receipt.status).toBe('FAIL');
+    expect(() => finalizeCalibrationReceipt(cells)).toThrow(/calibration receipt is not admitted/);
+  });
+
   it('не выпускает A/A FAIL как успешный артефакт', () => {
     const cells = passingCells();
-    cells[0] = cell('chromium', { aaLeft: 106, aaRight: 100 });
+    cells[0] = cell('chromium', { aaLeft: 53, aaRight: 50 });
 
     expect(createCalibrationReceipt(cells).status).toBe('FAIL');
     expect(() => finalizeCalibrationReceipt(cells)).toThrow(/A\/A escaped/);
@@ -86,7 +98,7 @@ describe('PROFILE-01 calibration generator boundary', () => {
 
   it('сохраняет raw FAIL до fail-closed admission', async () => {
     const cells = passingCells();
-    cells[0] = cell('chromium', { aaLeft: 106, aaRight: 100 });
+    cells[0] = cell('chromium', { aaLeft: 53, aaRight: 50 });
     const dir = await mkdtemp(join(tmpdir(), 'lab-motion-profile-calibration-'));
     const output = join(dir, 'calibration.json');
 
@@ -103,7 +115,7 @@ describe('PROFILE-01 calibration generator boundary', () => {
 
   it('не выпускает неразрешимый positive control как успешный артефакт', () => {
     const cells = passingCells();
-    cells[2] = cell('webkit', { deliberate: 14, single: 10 });
+    cells[2] = cell('webkit', { deliberate: 70, single: 50 });
 
     expect(createCalibrationReceipt(cells).status).toBe('FAIL');
     expect(() => finalizeCalibrationReceipt(cells)).toThrow(/positive control unresolved/);
