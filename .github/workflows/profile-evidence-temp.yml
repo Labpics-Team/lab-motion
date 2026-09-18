@@ -1,4 +1,5 @@
 name: PROFILE-01 one-shot null/control pilot
+# Acquisition runs only when the exact PR head commit carries [profile-pilot].
 
 on:
   pull_request:
