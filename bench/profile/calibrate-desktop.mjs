@@ -1,5 +1,6 @@
 import { createRequire } from 'node:module';
 import { readFile } from 'node:fs/promises';
+import { pathToFileURL } from 'node:url';
 import { pairedClusterBootstrap } from '../compare/methodology.mjs';
 import { PROFILE_PREREGISTRATION } from './preregistration.mjs';
 import { validateCalibrationReceipt, validateDesktopInventory } from './validate.mjs';
@@ -86,54 +87,68 @@ async function measureEngine(engine, type) {
   }
 }
 
-const inventoryPath = new URL('./desktop-inventory-20260915.json', import.meta.url);
-const inventory = JSON.parse(await readFile(inventoryPath, 'utf8'));
-validateDesktopInventory(inventory);
+export function createCalibrationReceipt(cells, generatedAt = new Date().toISOString()) {
+  const aaBand = PROFILE_PREREGISTRATION.calibration.aaNonInferiorityBand;
+  const aaLower = Math.min(...cells.map((cell) => cell.aa.lower95));
+  const aaUpper = Math.max(...cells.map((cell) => cell.aa.upper95));
+  const deliberateLower = Math.min(...cells.map((cell) => cell.deliberate2x.lower95));
+  const pass = aaLower >= aaBand[0] &&
+    aaUpper <= aaBand[1] &&
+    deliberateLower >= PROFILE_PREREGISTRATION.calibration.deliberateWorkDetectedLower95Min;
 
-const cells = [];
-for (const [engine, type] of ENGINES) {
-  const cell = await measureEngine(engine, type);
-  const bound = inventory.browsers.find((browser) => browser.engine === engine);
-  if (cell.browserVersion !== bound?.version) {
-    throw new Error(`PROFILE-01 calibration: ${engine} inventory/version drift (${bound?.version} -> ${cell.browserVersion})`);
-  }
-  cells.push(cell);
+  return {
+    schemaVersion: 1,
+    profileId: PROFILE_PREREGISTRATION.profileId,
+    baselineRevision: PROFILE_PREREGISTRATION.baseline.revision,
+    calibrationId: 'desktop-controls-20260915-v1',
+    attempt: 1,
+    generatedAt,
+    workload: {
+      iterations: ITERATIONS,
+      deliberateMultiplier: 2,
+      runBlocks: RUN_BLOCKS,
+      samplesPerBlock: SAMPLES_PER_BLOCK,
+      samplingUnit: 'run-block',
+      order: 'alternating paired order per run block',
+    },
+    aa: { lower95: aaLower, upper95: aaUpper },
+    deliberate2x: { workMultiplier: 2, lower95: deliberateLower },
+    raw: {
+      aa: cells.map(({ engine, aa, raw }) => ({ engine, interval: aa, clusters: raw.aa })),
+      deliberate2x: cells.map(({ engine, deliberate2x, raw }) => ({ engine, interval: deliberate2x, clusters: raw.deliberate2x })),
+    },
+    candidateSamples: 0,
+    status: pass ? 'PASS' : 'FAIL',
+  };
 }
 
-const aaBand = PROFILE_PREREGISTRATION.calibration.aaNonInferiorityBand;
-const aaLower = Math.min(...cells.map((cell) => cell.aa.lower95));
-const aaUpper = Math.max(...cells.map((cell) => cell.aa.upper95));
-const deliberateLower = Math.min(...cells.map((cell) => cell.deliberate2x.lower95));
-const pass = aaLower >= aaBand[0] &&
-  aaUpper <= aaBand[1] &&
-  deliberateLower >= PROFILE_PREREGISTRATION.calibration.deliberateWorkDetectedLower95Min;
+export function finalizeCalibrationReceipt(cells, generatedAt) {
+  const receipt = createCalibrationReceipt(cells, generatedAt);
+  // Генератор является admission boundary: FAIL не должен выглядеть для CI
+  // успешным сохранённым артефактом.
+  validateCalibrationReceipt(receipt);
+  return receipt;
+}
 
-const receipt = {
-  schemaVersion: 1,
-  profileId: PROFILE_PREREGISTRATION.profileId,
-  baselineRevision: PROFILE_PREREGISTRATION.baseline.revision,
-  calibrationId: 'desktop-controls-20260915-v1',
-  attempt: 1,
-  generatedAt: new Date().toISOString(),
-  workload: {
-    iterations: ITERATIONS,
-    deliberateMultiplier: 2,
-    runBlocks: RUN_BLOCKS,
-    samplesPerBlock: SAMPLES_PER_BLOCK,
-    samplingUnit: 'run-block',
-    order: 'alternating paired order per run block',
-  },
-  aa: { lower95: aaLower, upper95: aaUpper },
-  deliberate2x: { workMultiplier: 2, lower95: deliberateLower },
-  raw: {
-    aa: cells.map(({ engine, aa, raw }) => ({ engine, interval: aa, clusters: raw.aa })),
-    deliberate2x: cells.map(({ engine, deliberate2x, raw }) => ({ engine, interval: deliberate2x, clusters: raw.deliberate2x })),
-  },
-  candidateSamples: 0,
-  status: pass ? 'PASS' : 'FAIL',
-};
+async function main() {
+  const inventoryPath = new URL('./desktop-inventory-20260915.json', import.meta.url);
+  const inventory = JSON.parse(await readFile(inventoryPath, 'utf8'));
+  validateDesktopInventory(inventory);
 
-// The generator is an admission boundary, not a report-only formatter: a FAIL
-// receipt must terminate the run non-zero instead of looking successful to CI.
-validateCalibrationReceipt(receipt);
-process.stdout.write(`${JSON.stringify(receipt, null, 2)}\n`);
+  const cells = [];
+  for (const [engine, type] of ENGINES) {
+    const cell = await measureEngine(engine, type);
+    const bound = inventory.browsers.find((browser) => browser.engine === engine);
+    if (cell.browserVersion !== bound?.version) {
+      throw new Error(`PROFILE-01 calibration: ${engine} inventory/version drift (${bound?.version} -> ${cell.browserVersion})`);
+    }
+    cells.push(cell);
+  }
+
+  const receipt = finalizeCalibrationReceipt(cells);
+  process.stdout.write(`${JSON.stringify(receipt, null, 2)}\n`);
+}
+
+if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) {
+  await main();
+}
