@@ -96,9 +96,11 @@ jobs:
           test "$(git rev-parse HEAD)" = "$PROFILE_HEAD_SHA"
           pnpm install --frozen-lockfile
 
-          # The matrix cell already has Chromium; install only the two engines
-          # needed to make the desktop tuple atomic on this same runner.
-          pnpm exec playwright install --with-deps firefox webkit
+          # PROFILE harness imports Playwright/esbuild through bench/compare so
+          # dependency and browser revisions must come from that frozen lockfile,
+          # not the root workspace's independently pinned Playwright.
+          pnpm --dir bench/compare install --frozen-lockfile
+          pnpm --dir bench/compare exec playwright install --with-deps chromium firefox webkit
 
           node bench/profile/capture-desktop.mjs > "$out/inventory.json"
 
