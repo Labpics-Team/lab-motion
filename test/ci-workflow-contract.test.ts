@@ -223,10 +223,32 @@ function assertCommands(job: Job, commands: string[]) {
   }
 }
 
+function assertArchitectureWorkflow(workflow: Workflow) {
+  expect(workflow).toBeDefined();
+  expect(workflow.on).toEqual({ pull_request: null, merge_group: null, push: { branches: ['main'] } });
+  expect(workflow.permissions).toEqual({ contents: 'read' });
+  expect(workflow.defaults).toBeUndefined();
+  expect(Object.keys(workflow.jobs)).toEqual(['observe']);
+  const observe = workflow.jobs.observe!;
+  expect(observe.name).toBe('architecture evidence (vendored)');
+  expect(observe['runs-on']).toBe('ubuntu-latest');
+  expect(observe['continue-on-error']).toBeUndefined();
+  expect((observe as Job & { 'timeout-minutes'?: number })['timeout-minutes']).toBe(25);
+  expect(observe.steps?.map((item) => item.name)).toEqual([
+    'Checkout full Git evidence',
+    'Select Node.js runtime',
+    'Install canonical pinned native parser',
+    'Verify vendored observer before running it',
+    'Observe and enforce product architecture',
+  ]);
+  expect(observe.steps?.at(-1)?.run).toContain('semantic-admission.mjs');
+}
+
 function assertNativeGraph(files: Map<string, string>) {
   const workflows = new Map([...files].map(([name, source]) => [name, parse(source) as Workflow]));
   expect([...workflows].filter(([, w]) => events(w.on).some((event) => candidateEvents.has(event)))
-    .map(([name]) => name).sort()).toEqual(['ci.yml']);
+    .map(([name]) => name).sort()).toEqual(['architecture-observer-vendor.yml', 'ci.yml']);
+  assertArchitectureWorkflow(workflows.get('architecture-observer-vendor.yml')!);
   expect(files.has('ci-gate.yml')).toBe(false);
   const ci = workflows.get('ci.yml')!;
   const browser = workflows.get('browser.yml')!;
@@ -329,6 +351,22 @@ describe('нативный граф CI', () => {
     const workflow = parse(files.get(file)!) as Workflow;
     mutate(workflow);
     files.set(file, stringify(workflow));
+    expect(() => assertNativeGraph(files)).toThrow();
+  });
+
+  it.each([
+    ['write permission', (w: Workflow) => { w.permissions = { contents: 'write' }; }],
+    ['runner drift', (w: Workflow) => { w.jobs.observe!['runs-on'] = 'windows-latest'; }],
+    ['semantic admission removed', (w: Workflow) => {
+      const last = w.jobs.observe!.steps!.at(-1)!;
+      last.run = last.run!.replace(/.*semantic-admission\.mjs.*\n?/g, '');
+    }],
+  ] as const)('отвергает изменение architecture auxiliary: %s', (_, mutate) => {
+    const files = sources();
+    assertNativeGraph(files);
+    const workflow = parse(files.get('architecture-observer-vendor.yml')!) as Workflow;
+    mutate(workflow);
+    files.set('architecture-observer-vendor.yml', stringify(workflow));
     expect(() => assertNativeGraph(files)).toThrow();
   });
 
