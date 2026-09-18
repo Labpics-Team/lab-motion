@@ -1,6 +1,6 @@
 name: PROFILE-01 one-shot null/control pilot
 # Acquisition runs only when the exact PR head commit carries [profile-pilot].
-# Trigger revision 2 follows the corrected synchronous C0 handoff oracle.
+# Trigger revision 3 follows removal of the nonexistent drag teardown.
 
 on:
   pull_request:
