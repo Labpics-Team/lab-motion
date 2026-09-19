@@ -72,10 +72,12 @@ function pilot() {
 describe('PROFILE-01 symmetric crossover timing family', () => {
   it('freezes a premise-changing symmetric estimator before candidate data', () => {
     expect(() => validateCrossoverPreregistration()).not.toThrow();
-    expect(DESIGN.id).toBe('symmetric-crossover-owner-v1');
+    expect(DESIGN.id).toBe('symmetric-crossover-bounded-work-v2');
     expect(DESIGN.candidateSamples).toBe(0);
     expect(DESIGN.crossover.aaPatterns).toEqual(['ABBA', 'BAAB']);
     expect(DESIGN.measurement.logicalUnitsByScene).toEqual({ 'collection-reorder-100': 1, 'direct-manipulation-sheet': 512 });
+    expect(DESIGN.measurement.liveBatchCallsByScene).toEqual({ 'collection-reorder-100': 32, 'direct-manipulation-sheet': 128 });
+    expect(DESIGN.measurement.maximumPilotWallMs).toBe(1_800_000);
   });
 
   it('executes one exact fixed packet and fails closed below the unchanged timing floor', async () => {
