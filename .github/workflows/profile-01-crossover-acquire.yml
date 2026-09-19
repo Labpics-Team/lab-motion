@@ -36,7 +36,7 @@ jobs:
           PROFILE_HEAD_SHA: ${{ github.sha }}
           PROFILE_REGISTERED_MAIN_SHA: 2c947007168d4964124db8ce8079bbfabc975687
           PROFILE_PREREG_SHA: 876d6db743bcac5ef5a93a0b6cc5bfdaf075093b
-          PROFILE_HARNESS_SHA: e7ab918b00c637ecef3618fdec283c32050864c0
+          PROFILE_HARNESS_SHA: 46340b900a989ed24969499a0ce4aba7a7ca5632
           PROFILE_BASELINE_SHA: fe11daa407de396fad952be7679650f63dabd4dd
         run: |
           set -euo pipefail
