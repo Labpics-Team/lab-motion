@@ -52,7 +52,7 @@ function packetForSample(sceneId: string, workMultiplier: 1 | 2, sample: number)
     ownerMs,
     enclosingWallMs: ownerMs + 201,
     referenceBeforeMs: 50,
-    referenceAfterMs: 50,
+    referenceLeadMs: 50,
     referenceAnchorMs: referenceBinding.anchorMs,
     referenceCopies: referenceBinding.batchCopies,
     referenceIterationsPerCopy: referenceBinding.iterationsPerCopy,
@@ -109,17 +109,17 @@ function pilot() {
   return { inventory, calibration: cal, receipt };
 }
 
-describe('PROFILE-01 calibration-bracket standardized-ms timing family', () => {
+describe('PROFILE-01 precalibration standardized-ms timing family', () => {
   it('freezes a premise-changing representation without candidate data', () => {
     expect(() => validateReferenceNormalizedPreregistration()).not.toThrow();
-    expect(DESIGN.id).toBe('calibration-bracket-standardized-owner-ms-v2');
+    expect(DESIGN.id).toBe('precalibration-standardized-owner-ms-v3');
     expect(DESIGN.candidateSamples).toBe(0);
     expect(DESIGN.measurement.liveBatchCallsByScene).toEqual({ 'collection-reorder-100': 32, 'direct-manipulation-sheet': 128 });
     expect(DESIGN.measurement.logicalUnitsByScene).toEqual({ 'collection-reorder-100': 1, 'direct-manipulation-sheet': 512 });
     expect(DESIGN.controls.aaBand).toEqual([0.95, 1.05]);
   });
 
-  it('normalizes multiplicative speed drift while preserving the 2x positive control', async () => {
+  it('standardizes multiplicative speed drift while preserving the 2x positive control', async () => {
     let call = 0;
     const measure = vi.fn(async ({ sceneId, logicalUnits, workMultiplier }: Request) => {
       const scale = 1 + ((call++ % 7) - 3) * 0.01;
@@ -129,7 +129,7 @@ describe('PROFILE-01 calibration-bracket standardized-ms timing family', () => {
         ownerMs,
         enclosingWallMs: ownerMs + 2 * referenceMs + 1,
         referenceBeforeMs: referenceMs,
-        referenceAfterMs: referenceMs,
+        referenceLeadMs: referenceMs,
         referenceAnchorMs: 100,
         referenceCopies: 1,
         referenceIterationsPerCopy: 5_000_000,
@@ -149,12 +149,12 @@ describe('PROFILE-01 calibration-bracket standardized-ms timing family', () => {
     }
   });
 
-  it('fails closed when either raw owner work or the bracketing reference is unresolved', async () => {
+  it('fails closed when either raw owner work or the pre-packet references are unresolved', async () => {
     const unresolvedReference = vi.fn(async ({ sceneId, logicalUnits, workMultiplier }: Request) => ({
       ownerMs: 50,
       enclosingWallMs: 90,
       referenceBeforeMs: 39,
-      referenceAfterMs: 41,
+      referenceLeadMs: 41,
       referenceAnchorMs: 50,
       referenceCopies: 1,
       referenceIterationsPerCopy: 5_000_000,
@@ -167,14 +167,14 @@ describe('PROFILE-01 calibration-bracket standardized-ms timing family', () => {
     await expect(acquireReferenceNormalizedObservation(unresolvedReference, 'collection-reorder-100', 1)).rejects.toBeInstanceOf(ReferenceNormalizedResolutionFailure);
   });
 
-  it('retains raw timings while exposing exactly one normalized sample per run-block', () => {
+  it('retains raw timings while exposing exactly one standardized-ms sample per run-block', () => {
     const { receipt } = pilot();
     const accepted = finalizeReferenceNormalizedPilotReceipt(receipt);
     const first = accepted.cells[0].scenes[0].raw.aa.a[0];
     expect(first.samples).toHaveLength(1);
     expect(first.ownerMs).toBeGreaterThanOrEqual(40);
     expect(first.referenceBeforeMs).toBe(50);
-    expect(first.referenceAfterMs).toBe(50);
+    expect(first.referenceLeadMs).toBe(50);
     expect(first.samples[0]).toBe(first.standardizedCostMs);
     expect(accepted.cells[0].scenes[0].aa.lower95).toBeGreaterThanOrEqual(0.95);
     expect(accepted.cells[0].scenes[0].aa.upper95).toBeLessThanOrEqual(1.05);
@@ -187,7 +187,7 @@ describe('PROFILE-01 calibration-bracket standardized-ms timing family', () => {
     expect(() => finalizeReferenceNormalizedPilotReceipt(receipt)).toThrow(/reference binding changed within pair|reference copies differ from cell binding/);
   });
 
-  it('derives the smallest deterministic powered N from the accepted normalized A/A noise', () => {
+  it('derives the smallest deterministic powered N from the accepted standardized A/A noise', () => {
     const { inventory, calibration: cal, receipt } = pilot();
     const design = deriveReferenceNormalizedPoweredDesign(receipt, inventory, cal, '2026-09-19T03:32:00.000Z');
     expect(design.candidateSamples).toBe(0);

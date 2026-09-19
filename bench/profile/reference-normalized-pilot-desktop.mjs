@@ -239,6 +239,7 @@ async function installHarness(page, bundle, referenceBinding) {
         if (!Number.isSafeInteger(logicalUnits) || logicalUnits <= 0) throw new Error('invalid fixed logical-unit count');
         if (workMultiplier !== 1 && workMultiplier !== 2) throw new Error('invalid work multiplier');
         const started = performance.now();
+        const referenceLeadMs = measureReference();
         const referenceBeforeMs = measureReference();
         let ownerMs = 0;
         let physicalExecutions = 0;
@@ -252,16 +253,15 @@ async function installHarness(page, bundle, referenceBinding) {
             physicalExecutions++;
           }
         }
-        const referenceAfterMs = measureReference();
         const enclosingWallMs = performance.now() - started;
         if (!Number.isFinite(ownerMs) || ownerMs < 0) throw new Error('invalid owner-time result');
-        if (![referenceBeforeMs, referenceAfterMs].every((value) => Number.isFinite(value) && value >= 0)) throw new Error('invalid reference result');
+        if (![referenceBeforeMs, referenceLeadMs].every((value) => Number.isFinite(value) && value >= 0)) throw new Error('invalid reference result');
         if (!Number.isFinite(enclosingWallMs) || enclosingWallMs < ownerMs) throw new Error('invalid enclosing wall-time result');
         return {
           ownerMs,
           enclosingWallMs,
           referenceBeforeMs,
-          referenceAfterMs,
+          referenceLeadMs,
           referenceAnchorMs: referenceBinding.anchorMs,
           referenceCopies: referenceBinding.batchCopies,
           referenceIterationsPerCopy: referenceBinding.iterationsPerCopy,

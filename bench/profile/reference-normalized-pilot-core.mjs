@@ -34,13 +34,13 @@ function expectedLogicalUnits(sceneId) {
   return units;
 }
 
-function standardizedCostMs(ownerMs, logicalUnits, referenceBeforeMs, referenceAfterMs, referenceAnchorMs) {
+function standardizedCostMs(ownerMs, logicalUnits, referenceBeforeMs, referenceLeadMs, referenceAnchorMs) {
   invariant(Number.isFinite(ownerMs) && ownerMs > 0, 'owner cost must be positive');
   invariant(Number.isSafeInteger(logicalUnits) && logicalUnits > 0, 'logical units must be positive');
   invariant(Number.isFinite(referenceBeforeMs) && referenceBeforeMs > 0, 'reference-before must be positive');
-  invariant(Number.isFinite(referenceAfterMs) && referenceAfterMs > 0, 'reference-after must be positive');
+  invariant(Number.isFinite(referenceLeadMs) && referenceLeadMs > 0, 'reference-lead must be positive');
   invariant(Number.isFinite(referenceAnchorMs) && referenceAnchorMs > 0, 'reference anchor must be positive');
-  return (ownerMs / logicalUnits) * referenceAnchorMs / Math.sqrt(referenceBeforeMs * referenceAfterMs);
+  return (ownerMs / logicalUnits) * referenceAnchorMs / Math.sqrt(referenceBeforeMs * referenceLeadMs);
 }
 
 export async function acquireReferenceNormalizedObservation(measurePacket, sceneId, workMultiplier = 1) {
@@ -54,7 +54,7 @@ export async function acquireReferenceNormalizedObservation(measurePacket, scene
   invariant(result?.semantic === true, `${sceneId}: semantic oracle failed`);
   invariant(Number.isFinite(result.ownerMs) && result.ownerMs >= 0, `${sceneId}: invalid owner-time`);
   invariant(Number.isFinite(result.referenceBeforeMs) && result.referenceBeforeMs >= 0, `${sceneId}: invalid reference-before`);
-  invariant(Number.isFinite(result.referenceAfterMs) && result.referenceAfterMs >= 0, `${sceneId}: invalid reference-after`);
+  invariant(Number.isFinite(result.referenceLeadMs) && result.referenceLeadMs >= 0, `${sceneId}: invalid reference-lead`);
   invariant(Number.isFinite(result.referenceAnchorMs) && result.referenceAnchorMs > 0, `${sceneId}: invalid reference anchor`);
   invariant(Number.isFinite(result.enclosingWallMs) && result.enclosingWallMs >= result.ownerMs, `${sceneId}: invalid enclosing wall-time`);
   invariant(result.logicalUnits === logicalUnits, `${sceneId}: fixed logical-unit count drifted`);
@@ -76,12 +76,12 @@ export async function acquireReferenceNormalizedObservation(measurePacket, scene
       minimumOwnerMsPerPacket: DESIGN.measurement.minimumOwnerMsPerPacket,
     });
   }
-  if (result.referenceBeforeMs < DESIGN.measurement.referenceFloorMs || result.referenceAfterMs < DESIGN.measurement.referenceFloorMs) {
-    throw new ReferenceNormalizedResolutionFailure('bracketing reference did not clear frozen timing floor', {
+  if (result.referenceBeforeMs < DESIGN.measurement.referenceFloorMs || result.referenceLeadMs < DESIGN.measurement.referenceFloorMs) {
+    throw new ReferenceNormalizedResolutionFailure('pre-packet reference did not clear frozen timing floor', {
       sceneId, logicalUnits, workMultiplier,
       referenceBeforeMs: result.referenceBeforeMs,
-      referenceAfterMs: result.referenceAfterMs,
-      referenceAnchorMs: result.referenceAnchorMs,
+      referenceLeadMs: result.referenceLeadMs,
+    referenceAnchorMs: result.referenceAnchorMs,
       referenceFloorMs: DESIGN.measurement.referenceFloorMs,
     });
   }
@@ -90,8 +90,8 @@ export async function acquireReferenceNormalizedObservation(measurePacket, scene
     ownerMs: result.ownerMs,
     enclosingWallMs: result.enclosingWallMs,
     referenceBeforeMs: result.referenceBeforeMs,
-    referenceAfterMs: result.referenceAfterMs,
-      referenceAnchorMs: result.referenceAnchorMs,
+    referenceLeadMs: result.referenceLeadMs,
+    referenceAnchorMs: result.referenceAnchorMs,
     referenceCopies: result.referenceCopies,
     referenceIterationsPerCopy: result.referenceIterationsPerCopy,
     logicalUnits,
@@ -99,7 +99,7 @@ export async function acquireReferenceNormalizedObservation(measurePacket, scene
     batchCalls: result.batchCalls,
     workMultiplier,
     rawCostPerLogicalUnitMs: result.ownerMs / logicalUnits,
-    standardizedCostMs: standardizedCostMs(result.ownerMs, logicalUnits, result.referenceBeforeMs, result.referenceAfterMs, result.referenceAnchorMs),
+    standardizedCostMs: standardizedCostMs(result.ownerMs, logicalUnits, result.referenceBeforeMs, result.referenceLeadMs, result.referenceAnchorMs),
     semantic: true,
   };
 }
@@ -162,13 +162,13 @@ function validateObservation(entry, sceneId, run, workMultiplier, label) {
   invariant(entry.physicalExecutions === logicalUnits * workMultiplier, `${label}: physical-work count drifted`);
   invariant(entry.batchCalls === DESIGN.measurement.liveBatchCallsByScene[sceneId], `${label}: live-batch count drifted`);
   invariant(entry.ownerMs >= DESIGN.measurement.minimumOwnerMsPerPacket, `${label}: raw owner floor escaped`);
-  invariant(entry.referenceBeforeMs >= DESIGN.measurement.referenceFloorMs && entry.referenceAfterMs >= DESIGN.measurement.referenceFloorMs, `${label}: reference floor escaped`);
+  invariant(entry.referenceBeforeMs >= DESIGN.measurement.referenceFloorMs && entry.referenceLeadMs >= DESIGN.measurement.referenceFloorMs, `${label}: reference floor escaped`);
   invariant(entry.enclosingWallMs >= entry.ownerMs && entry.enclosingWallMs <= DESIGN.measurement.maximumEnclosingWallMsPerPacket, `${label}: wall bound escaped`);
   invariant(Number.isSafeInteger(entry.referenceCopies) && entry.referenceCopies > 0, `${label}: reference copies invalid`);
   invariant(Number.isSafeInteger(entry.referenceIterationsPerCopy) && entry.referenceIterationsPerCopy > 0, `${label}: reference iterations invalid`);
   invariant(Object.is(entry.rawCostPerLogicalUnitMs, entry.ownerMs / logicalUnits), `${label}: raw cost drifted`);
   invariant(Number.isFinite(entry.referenceAnchorMs) && entry.referenceAnchorMs > 0, `${label}: reference anchor invalid`);
-  const expectedStandardized = standardizedCostMs(entry.ownerMs, logicalUnits, entry.referenceBeforeMs, entry.referenceAfterMs, entry.referenceAnchorMs);
+  const expectedStandardized = standardizedCostMs(entry.ownerMs, logicalUnits, entry.referenceBeforeMs, entry.referenceLeadMs, entry.referenceAnchorMs);
   invariant(Object.is(entry.standardizedCostMs, expectedStandardized) && Object.is(entry.samples[0], expectedStandardized), `${label}: standardized-ms sample drifted`);
 }
 
