@@ -430,7 +430,6 @@ export function createBottomSheet(options: SheetOptions): SheetController {
     options.matchMedia,
   );
 
-  let grabPointer = 0;
   let grabValue = 0;
   let lastPointer = 0;
 
@@ -467,16 +466,15 @@ export function createBottomSheet(options: SheetOptions): SheetController {
       if (base.destroyed) return;
       // Прерывание: гасим активную доводку, наследуем её скорость прайором (C¹).
       _beginPickup(base, p, axis);
-      grabPointer = _coord(p, axis);
-      lastPointer = grabPointer;
-      grabValue = base.state.value;
+      lastPointer = _coord(p, axis);
+      grabValue = _sub(base.state.value, lastPointer);
       base.emit({ phase: 'follow', velocity: 0 });
     },
     pointerMove(p: BehaviorPoint): void {
       if (!base._following) return;
       base.tracker.push(p);
       lastPointer = _coord(p, axis);
-      const raw = grabValue + _sub(lastPointer, grabPointer);
+      const raw = lastPointer + grabValue;
       base.emit({ value: clampFollow(raw) });
     },
     pointerUp(p: BehaviorPoint): void {
@@ -501,10 +499,10 @@ export function createBottomSheet(options: SheetOptions): SheetController {
         const value = base.state.value;
         const min = snaps[0]!;
         const max = snaps[snaps.length - 1]!;
-        grabPointer = lastPointer;
-        grabValue = !rubber ? value
+        grabValue = _sub(!rubber ? value
           : value > max ? max + (value - max) / rubber
-          : value < min ? min + (value - min) / rubber : value;
+          : value < min ? min + (value - min) / rubber : value, lastPointer);
+        base.emit({ snapIndex: Math.min(base.state.snapIndex, snaps.length - 1) });
       } else settleTo(Math.min(base.state.snapIndex, snaps.length - 1), base.runner._invalidate());
     },
     snapTo(index: number): void {
@@ -742,17 +740,16 @@ export function createCarousel(options: CarouselOptions): CarouselController {
   validateSpringForFrameLoop(springParams);
 
   const clampIndex = (i: number): number => Math.max(0, Math.min(pageCount - 1, i));
-  const startIndex = clampIndex(Math.round(_finite(options.index ?? 0)));
+  let targetIndex = clampIndex(Math.round(_finite(options.index ?? 0)));
 
   const base = _createBase<CarouselState>(
-    { value: startIndex * pageSize, velocity: 0, phase: 'idle', index: startIndex },
+    { value: targetIndex * pageSize, velocity: 0, phase: 'idle', index: targetIndex },
     options.requestFrame,
     options.matchMedia,
   );
 
   let grabPointer = 0;
   let grabValue = 0;
-  let swipeStartIndex = startIndex;
 
   // Знак перевода pointer-смещения в position-пространство:
   // горизонталь LTR → влево = следующая (position растёт) → −d; RTL → +d;
@@ -761,7 +758,7 @@ export function createCarousel(options: CarouselOptions): CarouselController {
 
   const settleTo = (index: number, velocity: number): void => {
     const i = clampIndex(index);
-    swipeStartIndex = i;
+    targetIndex = i;
     const target = i * pageSize;
     base.emit({ phase: 'release', index: clampIndex(base.state.index) });
     base.runner._settle({
@@ -781,7 +778,6 @@ export function createCarousel(options: CarouselOptions): CarouselController {
       _beginPickup(base, p, axis, posDirSign);
       grabPointer = _coord(p, axis);
       grabValue = base.state.value;
-      swipeStartIndex = clampIndex(Math.round(base.state.value / pageSize));
       base.emit({ phase: 'follow', velocity: 0 });
     },
     pointerMove(p: BehaviorPoint): void {
@@ -800,8 +796,9 @@ export function createCarousel(options: CarouselOptions): CarouselController {
       const landing = projectDefaultDecayRest(base.state.value, posVel);
       let target = Math.round(landing / pageSize);
       // Флик перелистывает минимум на страницу; доводка — максимум ±1 от старта свайпа.
-      if (Math.abs(posVel) >= velThresh) target = swipeStartIndex + (posVel > 0 ? 1 : -1);
-      target = Math.max(swipeStartIndex - 1, Math.min(swipeStartIndex + 1, target));
+      const start = clampIndex(Math.round(grabValue / pageSize));
+      if (Math.abs(posVel) >= velThresh) target = start + (posVel > 0 ? 1 : -1);
+      target = Math.max(start - 1, Math.min(start + 1, target));
       settleTo(target, posVel);
     },
     pointerCancel(): void {
@@ -815,9 +812,8 @@ export function createCarousel(options: CarouselOptions): CarouselController {
       if (count === pageCount && size === pageSize) return;
       pageCount = count;
       pageSize = size;
-      swipeStartIndex = clampIndex(swipeStartIndex);
       if (base._following) base.emit({ index: clampIndex(Math.round(base.state.value / pageSize)) });
-      else settleTo(swipeStartIndex, base.runner._invalidate());
+      else settleTo(targetIndex, base.runner._invalidate());
     },
     goTo(index: number): void {
       if (base.destroyed) return;
@@ -979,7 +975,7 @@ export function createPullToRefresh(options: PullOptions): PullController {
     },
     subscribe: base.subscribe,
     cancel(): void {
-      base.cancel({ pulling: false, armed: false, pending: false });
+      base.cancel({ value: 0, pulling: false, armed: false, pending: false });
     },
     destroy: base.destroy,
     get state(): PullState {

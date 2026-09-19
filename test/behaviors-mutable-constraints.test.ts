@@ -43,6 +43,19 @@ describe('./behaviors — mutable constraints: bottom sheet', () => {
   });
 
 
+  it('shrink во время follow сразу публикует legal snapIndex', () => {
+    const sheet = createBottomSheet({ snapPoints: [0, 100, 200], initial: 200 });
+    const seen: number[] = [];
+    sheet.subscribe((state) => seen.push(state.snapIndex));
+    sheet.pointerDown(pt(0, 200, 0));
+    seen.length = 0;
+
+    sheet.update([0, 100]);
+
+    expect(sheet.state).toMatchObject({ phase: 'follow', value: 200, snapIndex: 1 });
+    expect(seen).toEqual([1]);
+  });
+
   it('hard clamp при shrink не телепортирует активный follow и не разрешает новый outward overshoot', () => {
     const sheet = createBottomSheet({ snapPoints: [0, 600], rubberBand: 0 });
     sheet.pointerDown(pt(0, 0, 0));
@@ -171,6 +184,21 @@ describe('./behaviors — mutable constraints: pager', () => {
     pager.pointerMove(pt(-60, 0, 0.2));
     expect(pager.state.value).toBe(260);
     expect(pager.state.index).toBe(2);
+  });
+
+  it('resize во время follow переводит swipe anchor в новую index-геометрию', () => {
+    const pager = createCarousel({ pageCount: 4, pageSize: 200, index: 2, velocityThreshold: 1 });
+    pager.pointerDown(pt(0, 0, 0));
+    pager.update(8, 100);
+
+    // После resize текущая позиция 400 px соответствует странице 4. Быстрый флик
+    // вправо в position-space может уйти только на соседнюю страницу 5, не к старому anchor=2.
+    pager.pointerMove(pt(-20, 0, 0.1));
+    pager.pointerUp(pt(-40, 0, 0.2));
+
+    // Без нового anchor target ограничивался бы [1,3], и synchronous path сел бы на 3.
+    expect(pager.state.value).toBe(500);
+    expect(pager.state.index).toBe(5);
   });
 
   it('shrink во время follow сразу публикует legal index ровно через owner', () => {

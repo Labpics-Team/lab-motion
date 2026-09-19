@@ -190,6 +190,8 @@ describe('./behaviors pull-to-refresh — cancel/destroy и pointer-cancel', () 
     expect(canceled).toEqual([{ phase: 'idle', pending: false }]);
     expect(pull.state).toMatchObject({
       phase: 'idle',
+      value: 0,
+      velocity: 0,
       pulling: false,
       armed: false,
       pending: false,
