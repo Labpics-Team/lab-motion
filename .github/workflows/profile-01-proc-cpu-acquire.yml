@@ -1,0 +1,138 @@
+name: PROFILE-01 browser-tree CPU evidence acquisition
+
+on:
+  push:
+    branches:
+      - research/r11-profile-prereg-20260915
+
+permissions:
+  contents: read
+
+env:
+  COREPACK_ENABLE_DOWNLOAD_PROMPT: "0"
+  COREPACK_DEFAULT_TO_LATEST: "0"
+
+jobs:
+  acquire:
+    name: schedstat browser-tree null/control pilot
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    steps:
+      - name: Checkout exact pushed head
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          ref: ${{ github.sha }}
+          persist-credentials: false
+          fetch-depth: 0
+
+      - name: Setup Node
+        uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v6
+        with:
+          node-version: "24"
+
+      - name: Acquire preregistered browser-tree CPU evidence
+        shell: bash
+        env:
+          PROFILE_HEAD_SHA: ${{ github.sha }}
+          PROFILE_REGISTERED_MAIN_SHA: 2c947007168d4964124db8ce8079bbfabc975687
+          PROFILE_PREREG_SHA: c35b53845a035e910e303794202bdde20297bd31
+          PROFILE_HARNESS_SHA: 0be1b56bca6fe6c1b5e998a147fce7001ee2c93f
+          PROFILE_BASELINE_SHA: fe11daa407de396fad952be7679650f63dabd4dd
+        run: |
+          set -euo pipefail
+          out="$RUNNER_TEMP/profile-proc-cpu-evidence"
+          baseline="$RUNNER_TEMP/profile-baseline"
+          mkdir -p "$out"
+
+          corepack enable
+          corepack install --global pnpm@11.11.0
+          pnpm install --frozen-lockfile
+
+          git fetch --no-tags origin main "$PROFILE_REGISTERED_MAIN_SHA" "$PROFILE_PREREG_SHA" "$PROFILE_HARNESS_SHA" "$PROFILE_BASELINE_SHA"
+          test "$(git rev-parse HEAD)" = "$PROFILE_HEAD_SHA"
+          git merge-base --is-ancestor "$PROFILE_PREREG_SHA" "$PROFILE_HEAD_SHA"
+          git merge-base --is-ancestor "$PROFILE_HARNESS_SHA" "$PROFILE_HEAD_SHA"
+          git diff --exit-code "$PROFILE_PREREG_SHA" "$PROFILE_HEAD_SHA" -- bench/profile/proc-cpu-preregistration.mjs
+          git diff --exit-code "$PROFILE_HARNESS_SHA" "$PROFILE_HEAD_SHA" -- \
+            bench/profile/proc-cpu-preregistration.mjs \
+            bench/profile/proc-cpu-pilot-core.mjs \
+            bench/profile/proc-cpu-pilot-desktop.mjs \
+            test/profile-proc-cpu-control.test.ts
+
+          current_main_sha="$(git rev-parse origin/main)"
+          registered_main_tree="$(git rev-parse "$PROFILE_REGISTERED_MAIN_SHA^{tree}")"
+          current_main_tree="$(git rev-parse "origin/main^{tree}")"
+          test "$current_main_tree" = "$registered_main_tree"
+          printf '%s\n' "$PROFILE_HEAD_SHA" > "$out/research-head.txt"
+          printf '%s\n' "$current_main_sha" > "$out/current-main-head.txt"
+          printf '%s\n' "$current_main_tree" > "$out/current-main-tree.txt"
+          printf '%s\n' "$PROFILE_REGISTERED_MAIN_SHA" > "$out/registered-main-head.txt"
+          printf '%s\n' "$PROFILE_PREREG_SHA" > "$out/prereg-head.txt"
+          printf '%s\n' "$PROFILE_HARNESS_SHA" > "$out/harness-head.txt"
+          printf '%s\n' "$PROFILE_BASELINE_SHA" > "$out/baseline-head.txt"
+          {
+            printf 'runner.name=%s\nrunner.os=%s\nrunner.arch=%s\n' "$RUNNER_NAME" "$RUNNER_OS" "$RUNNER_ARCH"
+            printf 'image.os=%s\nimage.version=%s\n' "${ImageOS:-}" "${ImageVersion:-}"
+            printf 'kernel.sched_schedstats=%s\n' "$(cat /proc/sys/kernel/sched_schedstats 2>/dev/null || printf unavailable)"
+            uname -a
+            lscpu
+          } > "$out/runner.txt"
+
+          test -r /proc/self/schedstat
+          sched_before="$(cut -d' ' -f1 /proc/self/schedstat)"
+          node -e 'const end = Date.now() + 100; let x = 1; while (Date.now() < end) x = Math.sin(x) + 1; if (!Number.isFinite(x)) process.exit(2)'
+          sched_after="$(cut -d' ' -f1 /proc/self/schedstat)"
+          test "$sched_after" -gt "$sched_before"
+
+          pnpm exec vitest run test/profile-proc-cpu-control.test.ts
+          pnpm --dir bench/compare install --frozen-lockfile
+          pnpm --dir bench/compare exec playwright install --with-deps chromium firefox webkit
+          node bench/profile/capture-desktop.mjs > "$out/inventory.json"
+          PROFILE_INVENTORY_PATH="$out/inventory.json" \
+          PROFILE_CALIBRATION_OUTPUT="$out/calibration.json" \
+          PROFILE_CALIBRATION_ID="desktop-controls-proc-cpu-v1" \
+            node bench/profile/calibrate-desktop.mjs > "$out/calibration.stdout.json"
+
+          git worktree add --detach "$baseline" "$PROFILE_BASELINE_SHA"
+          (
+            cd "$baseline"
+            test "$(git rev-parse HEAD)" = "$PROFILE_BASELINE_SHA"
+            corepack enable
+            corepack install --global pnpm@11.11.0
+            pnpm install --frozen-lockfile
+            pnpm build
+          )
+
+          set +e
+          PROFILE_INVENTORY_PATH="$out/inventory.json" \
+          PROFILE_CALIBRATION_PATH="$out/calibration.json" \
+          PROFILE_BASELINE_DIR="$baseline" \
+          PROFILE_PROC_CPU_OUTPUT="$out/proc-cpu-pilot.json" \
+          PROFILE_HARNESS_REVISION="$PROFILE_HARNESS_SHA" \
+          PROFILE_PROC_CPU_PREREG_REVISION="$PROFILE_PREREG_SHA" \
+            node bench/profile/proc-cpu-pilot-desktop.mjs \
+            > "$out/proc-cpu-pilot.stdout.json" 2> "$out/proc-cpu-pilot.stderr.txt"
+          pilot_status=$?
+          set -e
+          printf '%s\n' "$pilot_status" > "$out/pilot-exit-code.txt"
+
+          find "$out" -maxdepth 1 -type f -print0 | sort -z | xargs -0 sha256sum > "$out/SHA256SUMS.tmp"
+          mv "$out/SHA256SUMS.tmp" "$out/SHA256SUMS"
+          echo '--- PROFILE-01 proc-cpu pilot stdout ---'
+          cat "$out/proc-cpu-pilot.stdout.json" || true
+          echo '--- PROFILE-01 proc-cpu pilot stderr ---'
+          cat "$out/proc-cpu-pilot.stderr.txt" || true
+          echo '--- PROFILE-01 evidence SHA256 ---'
+          cat "$out/SHA256SUMS"
+          exit "$pilot_status"
+
+      - name: Upload immutable raw evidence
+        if: ${{ always() }}
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
+        with:
+          name: profile-01-proc-cpu-${{ github.run_id }}
+          path: ${{ runner.temp }}/profile-proc-cpu-evidence/
+          if-no-files-found: error
+          retention-days: 14
+          compression-level: 0
+          overwrite: false
