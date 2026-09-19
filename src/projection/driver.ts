@@ -14,23 +14,21 @@
  * springUnchecked НЕ используется — у него v0 жёстко 0 (src/spring.ts:141-150),
  * это корень отсутствия velocity continuity в ./flip.
  *
- * Velocity continuity при перехвате (спека §2.3.2): скорость канала c ∈ {x,y,w,h}
- * узла аналитична каждый кадр: V̇_c = R_c · ṗ, R_c = L_c − F_c. Пер-боксовые px/s
- * НЕ хранятся — восстанавливаются замкнутой формой (принцип
- * readCompositorSpring: «состояние никогда не читается из DOM»).
- *   C⁰: first' = mixBox(first, last, p̂) — аналитический visual box, ноль DOM.
- *       Каналы radii/opacity ребейзятся той же формой: radii.first' =
- *       lerp(prev first, prev last, clamp01(p̂)) пер-угла/пер-оси, opacity.from' =
- *       lerp(prev from, prev to, clamp01(p̂)) — визуальный радиус/прозрачность
- *       СЕЙЧАС; переданные цели (.last/.to) не трогаются. Prev без radii/opacity →
- *       переданные берутся как есть.
- *   C¹: v0'·R'_c = v̂·R_c ⇒ доминантный канал c* = argmax |R'_c| по ВСЕМ
- *       продолжающимся узлам × каналам; v0' = v̂·R_{c*}/R'_{c*} (|R'| ≤ ε → 0),
- *       потолок V0_CAP (при p̂→1 знаменатель (1−p̂) мал — без капа нефизичный рывок).
- *   Теорема: при неизменных целях R'_c = (1−p̂)·R_c для ВСЕХ каналов сразу ⇒
- *   v0' = v̂/(1−p̂) точен для каждого канала каждого узла — точный C¹ всюду,
- *   отдельной ветки в коде нет. При изменённых целях — точный C¹ доминантного,
- *   C⁰ + пропорциональная скорость у остальных (честность WAAPI-групп).
+ * Velocity continuity при перехвате (спека §2.3.2) остаётся аналитической и
+ * без чтений DOM. Scalar channels (w/h/radii/opacity) сохраняют прежний общий
+ * progress P(t): доминантный диапазон задаёт bounded v0', а при неизменных целях
+ * теорема R'_c=(1−p̂)R_c даёт точный C¹ каждого такого канала.
+ *
+ * Page-space x/y используют тот же ОДИН solve, но ещё его линейный базис Q(t)
+ * по начальной скорости: V_c(t)=first'_c+R'_c·P(t)+u_c·Q(t), Q(0)=0, Q'(0)=1.
+ * u_c = v_boundary,c − R'_c·v0' восстанавливается из старых аналитических
+ * R·P'(t)+u·Q'(t). Поэтому при смене 2D-цели каждая ось сохраняет собственную
+ * физическую boundary velocity; неизменная цель даёт u=0 и остаётся на старом
+ * бит-пути. Тот же скорректированный page-space box поступает в parent-space
+ * projector, так что отдельного geometry owner/solver/clock не появляется.
+ *
+ * C⁰: first' — текущий аналитический visual box; radii/opacity ребейзятся тем
+ * же scalar P. V0_CAP по-прежнему ограничивает scalar v0' при малом диапазоне.
  *
  * release() после ребейза с НУЛЕВЫМ диапазоном всех каналов всех узлов
  * (|R'| ≤ RANGE_EPSILON, включая radii/opacity) — немедленный settle: один
@@ -55,10 +53,11 @@
 
 import { MotionParamError } from '../errors.js';
 import type { FlipRect } from '../flip/index.js';
-import { solveSpring } from '../internal/solver.js';
+import { solveSpring, type MutableSpringBasis } from '../internal/solver.js';
 import type { RequestFrameFn } from '../motion-value.js';
 import { type SpringParams, validateSpringForFrameLoop } from '../spring.js';
 import {
+  carryPositionAxis,
   clamp01,
   createProjector,
   finite,
@@ -66,6 +65,7 @@ import {
   mixBox,
   type BoxRadii,
   type CornerRadius,
+  type DriverProjectionNodeInit,
   type ProjectionFrame,
   type ProjectionNodeInit,
   type Projector,
@@ -96,8 +96,9 @@ export interface ProjectionPlayNode extends Omit<ProjectionNodeInit, 'first'> {
 }
 
 export interface ProjectionControls {
-  /** Старт/перехват. Mid-flight: C⁰ по построению (first' = V(p̂) аналитически, ноль DOM),
-   *  C¹ по формуле §2.3.2. Generation-инвалидация кадров старого полёта. */
+  /** Старт/перехват. Mid-flight: C⁰ по построению (first' = V(p̂) аналитически, ноль DOM).
+   *  C¹ — в поддерживаемом vector-domain (`clamp:false`); bounded-режим сохраняет legacy scalar semantics.
+   *  Generation-инвалидация кадров старого полёта. */
   play(nodes: readonly ProjectionPlayNode[]): void;
   /** Замораживает текущее аналитическое состояние без финального эмита и onRest.
    *  Повторный play может подхватить его с нулевой скоростью. Идемпотентен. */
@@ -146,23 +147,30 @@ function lerpRadii(a: BoxRadii, b: BoxRadii, t: number): BoxRadii {
   return out;
 }
 
+function boxWithPositionBasis(src: DriverProjectionNodeInit, pHat: number, q: number): FlipRect {
+  const box = mixBox(src.first, src.last, pHat) as { x: number; y: number; width: number; height: number };
+  box.x = carryPositionAxis(box.x, q, src._qx ?? 0);
+  box.y = carryPositionAxis(box.y, q, src._qy ?? 0);
+  return box;
+}
+
 /**
- * Ребейз узла на p̂ по данным src-узла: first' = V(p̂), radii.first'/opacity.from'
- * — тем же lerp'ом (C⁰ всех каналов); цели (.last/.to) — из target.
- * Единая механика pickup (src = prev-узел старого полёта) и release (src = сам
- * узел: скраб зафиксировал p_seek). Src без radii/opacity → канал target как есть.
+ * Ребейз узла на текущем аналитическом visual box. Scalar channels use p̂;
+ * page-space x/y additionally include the homogeneous Q(t) basis so repeated
+ * retargets never fall back to DOM reads or discard already-carried velocity.
  */
 function rebaseNode(
   id: string,
   target: Omit<ProjectionPlayNode, 'id'>,
-  src: ProjectionNodeInit,
+  src: DriverProjectionNodeInit,
   pHat: number,
-): ProjectionNodeInit {
+  positionBasisValue: number,
+): DriverProjectionNodeInit {
   const tc = clamp01(pHat);
   return {
     id,
     parent: target.parent,
-    first: mixBox(src.first, src.last, pHat),
+    first: boxWithPositionBasis(src, pHat, positionBasisValue),
     last: target.last,
     anchor: target.anchor,
     radii:
@@ -217,7 +225,7 @@ function prefersReducedMotion(
 
 interface Flight {
   /** Узлы полёта; Map сохраняет порядок вставки (= порядок resolved-входа). */
-  readonly byId: ReadonlyMap<string, ProjectionNodeInit>;
+  readonly byId: ReadonlyMap<string, DriverProjectionNodeInit>;
   readonly projector: Projector;
   /** Character-switch зафиксирован на play (§4.4: смена reduce в полёте не подхватывается). */
   readonly reduced: boolean;
@@ -242,12 +250,16 @@ export function createProjection(options?: ProjectionOptions): ProjectionControl
   let pHat = 1;
   /** Производная видимого p последнего кадра. Покой/cancel = 0. */
   let vHat = 0;
-  /** Публичный прогресс — всегда [0,1]. */
-  let progress = 1;
   /** Инвалидация кадров перехваченного полёта (класс stale-frame, flip :217-218). */
   let generation = 0;
   /** Переиспользуемый выход солвера (ноль аллокаций на кадр). */
   const solved = { value: 0, velocity: 0 };
+  const springBasis: MutableSpringBasis = {
+    _value: 0,
+    _valueV0: 0,
+    _velocity: 0,
+    _velocityV0: 0,
+  };
 
 
   // Один controller владеет максимум одной физической frame-reservation.
@@ -300,6 +312,7 @@ export function createProjection(options?: ProjectionOptions): ProjectionControl
       generation++;
       phase = 'canceled';
       vHat = 0;
+      springBasis._velocityV0 = 0;
       throw error;
     }
     synchronous = false;
@@ -318,11 +331,12 @@ export function createProjection(options?: ProjectionOptions): ProjectionControl
   /** Исключение пользовательского callback не должно оставлять «играющий» зомби-run. */
   const emit = (projector: Projector, p: number): void => {
     try {
-      onFrame?.(projector.at(p));
+      onFrame?.((projector.at as (p: number, q?: number) => readonly ProjectionFrame[])(p, springBasis._valueV0));
     } catch (error) {
       generation++;
       phase = 'canceled';
       vHat = 0;
+      springBasis._velocityV0 = 0;
       clearPendingTick();
       throw error;
     }
@@ -342,18 +356,19 @@ export function createProjection(options?: ProjectionOptions): ProjectionControl
     phase = 'rest';
     pHat = 1;
     vHat = 0;
-    progress = 1;
+    springBasis._valueV0 = springBasis._velocityV0 = 0;
     emit(projector, 1); // финал — РОВНО p = 1 (точный identity)
     if (gen === generation && phase === 'rest') onRest?.();
   };
 
-  const startRun = (projector: Projector, v0: number): void => {
+  const startRun = (projector: Projector, v0: number, vector = false): void => {
     generation++;
     const gen = generation;
     phase = 'active';
     pHat = 0;
     vHat = visibleVelocity(0, v0);
-    progress = 0;
+    springBasis._valueV0 = 0;
+    springBasis._velocityV0 = vector ? 1 : 0;
     let elapsed = 0;
     let lastTs: number | undefined;
     let frames = 0;
@@ -384,19 +399,30 @@ export function createProjection(options?: ProjectionOptions): ProjectionControl
 
       // Солвер отдаёт сырые числа — политика стражей на стороне вызывающего
       // (докблок solver.ts); зеркалим clampFinite-политику spring.ts.
-      solveSpring(params, elapsed, v0, solved);
+      solveSpring(params, elapsed, v0, solved, springBasis);
       const value = finite(solved.value);
       const velocity = finite(solved.velocity);
+      const q = vector ? finite(springBasis._valueV0) : 0;
+      const qVelocity = vector ? finite(springBasis._velocityV0) : 0;
+      const basisConverged =
+        !vector || (Math.abs(q) < REST && Math.abs(qVelocity) < REST);
       const converged =
-        (Math.abs(1 - value) < REST && Math.abs(velocity) < REST) || frames >= MAX_FRAMES;
+        (Math.abs(1 - value) < REST && Math.abs(velocity) < REST && basisConverged) ||
+        frames >= MAX_FRAMES;
       if (converged) {
         settle(projector);
         return;
       }
       const p = bounded ? clamp01(value) : value;
+      const basisVisible =
+        !bounded ||
+        (value > 0 && value < 1) ||
+        (value === 0 && velocity >= 0) ||
+        (value === 1 && velocity <= 0);
       pHat = p;
       vHat = visibleVelocity(value, velocity);
-      progress = clamp01(p);
+      springBasis._valueV0 = basisVisible ? q : 0;
+      springBasis._velocityV0 = basisVisible ? qVelocity : 0;
       emit(projector, p);
       // Callback мог синхронно перехватить run — не оставляем даже один stale request.
       if (gen === generation && phase === 'active') schedule(tick);
@@ -413,6 +439,8 @@ export function createProjection(options?: ProjectionOptions): ProjectionControl
       const prevById = phase !== 'rest' && flight !== null ? flight.byId : undefined;
       const pPrev = pHat;
       const vPrev = vHat;
+      const positionBasisPrev = springBasis._valueV0;
+      const positionBasisVelocityPrev = springBasis._velocityV0;
 
       // C⁰ всех каналов: visual pickup — first' = V(p̂) аналитически (ноль
       // DOM-чтений), radii.first'/opacity.from' — тем же lerp'ом на clamp01(p̂).
@@ -422,17 +450,18 @@ export function createProjection(options?: ProjectionOptions): ProjectionControl
           if (old === undefined) {
             throw new MotionParamError('LM078');
           }
-          return rebaseNode(n.id, n, old, pPrev);
+          return rebaseNode(n.id, n, old, pPrev, positionBasisPrev);
         }
         // first задан: узел структурно уже ProjectionNodeInit; геометрия читает
         // поля по ссылкам в обоих вариантах — копия объекта ничего не защищала.
         return n as ProjectionNodeInit;
       });
 
-      // C¹: v0' по доминантному каналу ВСЕХ продолжающихся узлов (новые не участвуют —
-      // их px/s не определены). Паттерн доминантной проекции + normalizeV0.
+      // Scalar continuation remains available for every mode. Independent x/y
+      // velocity is admitted only for the supported unclamped 2D domain.
       let v0 = 0;
-      if (prevById !== undefined && vPrev !== 0) {
+      let vector = false;
+      if (prevById !== undefined) {
         let bestAbs = 0;
         let bestR = 0;
         let bestRp = 0;
@@ -444,15 +473,18 @@ export function createProjection(options?: ProjectionOptions): ProjectionControl
             bestRp = rNew;
           }
         };
-        for (const node of resolved) {
+        for (let i = 0; i < resolved.length; i++) {
+          let node = resolved[i] as DriverProjectionNodeInit;
           const old = prevById.get(node.id);
           if (old === undefined) continue;
-          consider(old.last.x - old.first.x, node.last.x - node.first.x);
-          consider(old.last.y - old.first.y, node.last.y - node.first.y);
+          const oldRx = old.last.x - old.first.x;
+          const oldRy = old.last.y - old.first.y;
+          const rx = node.last.x - node.first.x;
+          const ry = node.last.y - node.first.y;
+          consider(oldRx, rx);
+          consider(oldRy, ry);
           consider(old.last.width - old.first.width, node.last.width - node.first.width);
           consider(old.last.height - old.first.height, node.last.height - node.first.height);
-          // Radii/opacity — полноправные каналы C¹ («всех каналов» — буквально):
-          // полёт только по радиусам/фейду не должен терять скорость на перехвате.
           if (old.radii !== undefined && node.radii !== undefined) {
             for (let c = 0; c < 4; c++) {
               consider(old.radii.last[c].x - old.radii.first[c].x, node.radii.last[c].x - node.radii.first[c].x);
@@ -462,9 +494,33 @@ export function createProjection(options?: ProjectionOptions): ProjectionControl
           if (old.opacity !== undefined && node.opacity !== undefined) {
             consider(old.opacity.to - old.opacity.from, node.opacity.to - node.opacity.from);
           }
+
+          if (!bounded) {
+            const oldX = old._qx ?? 0;
+            const oldY = old._qy ?? 0;
+            const oldVx = finite(oldRx * vPrev + oldX * positionBasisVelocityPrev);
+            const oldVy = finite(oldRy * vPrev + oldY * positionBasisVelocityPrev);
+            if (nodes[i].first !== undefined) node = resolved[i] = { ...node } as DriverProjectionNodeInit;
+            // Temporary physical velocities; finalized into residual coefficients after v0 is known.
+            node._qx = oldVx;
+            node._qy = oldVy;
+          }
         }
         if (bestAbs > RANGE_EPSILON) {
           v0 = clampMagnitude(finite((vPrev * bestR) / bestRp), V0_CAP);
+        }
+        if (!bounded) {
+          for (const raw of resolved) {
+            const node = raw as DriverProjectionNodeInit;
+            if (node._qx === undefined) continue;
+            const rx = node.last.x - node.first.x;
+            const ry = node.last.y - node.first.y;
+            const x = finite(node._qx - rx * v0) + 0;
+            const y = finite((node._qy ?? 0) - ry * v0) + 0;
+            node._qx = x;
+            node._qy = y;
+            if (x !== 0 || y !== 0) vector = true;
+          }
         }
       }
 
@@ -472,8 +528,8 @@ export function createProjection(options?: ProjectionOptions): ProjectionControl
       const projector = createProjector(resolved);
       const reduced = prefersReducedMotion(options?.matchMedia); // резолв ОДИН раз на play
 
-      const byId = new Map<string, ProjectionNodeInit>();
-      for (const node of resolved) byId.set(node.id, node);
+      const byId = new Map<string, DriverProjectionNodeInit>();
+      for (const node of resolved) byId.set(node.id, node as DriverProjectionNodeInit);
       flight = { byId, projector, reduced };
 
       if (reduced || resolved.length === 0) {
@@ -483,7 +539,7 @@ export function createProjection(options?: ProjectionOptions): ProjectionControl
         return;
       }
 
-      startRun(projector, v0);
+      startRun(projector, v0, vector);
     },
 
     cancel(): void {
@@ -492,6 +548,7 @@ export function createProjection(options?: ProjectionOptions): ProjectionControl
       clearPendingTick();
       phase = 'canceled';
       vHat = 0;
+      springBasis._velocityV0 = 0;
     },
 
     /**
@@ -509,7 +566,8 @@ export function createProjection(options?: ProjectionOptions): ProjectionControl
       phase = 'held'; // boxAt/pickup остаются аналитическими, автономных кадров нет
       pHat = pp;
       vHat = 0;
-      progress = clamp01(pp);
+      // Скраб гасит скорость Q, но уже накопленный позиционный базис обязан остаться в кадре.
+      springBasis._velocityV0 = 0;
       emit(flight.projector, pp);
     },
 
@@ -526,12 +584,14 @@ export function createProjection(options?: ProjectionOptions): ProjectionControl
       }
 
       // Ребейз как перехват (единая механика rebaseNode, src = сам узел):
-      // first' = V(p_seek), radii/opacity — тем же lerp'ом (C⁰ всех каналов;
+      // first' = V(p_seek), radii/opacity — тем же лerp'ом (C⁰ всех каналов;
       // цели не менялись — теорема §2.3.2 даёт точный C¹ при v0 = v/(1−p_seek)).
       const rebased: ProjectionNodeInit[] = [];
-      for (const n of flight.byId.values()) rebased.push(rebaseNode(n.id, n, n, p0));
+      for (const n of flight.byId.values()) {
+        rebased.push(rebaseNode(n.id, n, n, p0, springBasis._valueV0));
+      }
       const projector = createProjector(rebased);
-      const byId = new Map<string, ProjectionNodeInit>();
+      const byId = new Map<string, DriverProjectionNodeInit>();
       for (const node of rebased) byId.set(node.id, node);
       const reduced = flight.reduced;
       flight = { byId, projector, reduced };
@@ -557,14 +617,16 @@ export function createProjection(options?: ProjectionOptions): ProjectionControl
     boxAt(id: string): FlipRect | undefined {
       const node = flight?.byId.get(id);
       if (node === undefined) return undefined;
-      return phase === 'rest' ? node.last : mixBox(node.first, node.last, pHat);
+      return phase === 'rest'
+        ? node.last
+        : boxWithPositionBasis(node, pHat, springBasis._valueV0);
     },
 
     get playing(): boolean {
       return phase === 'active' || phase === 'held';
     },
     get progress(): number {
-      return progress;
+      return clamp01(pHat);
     },
     get velocity(): number {
       return vHat;
