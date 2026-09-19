@@ -118,7 +118,7 @@ export function validateProcCpuPreregistration(design = PROC_CPU_PREREGISTRATION
   invariant(design.measurement.minimumCpuMsPerArm === 40, 'CPU timing floor drifted');
   invariant(design.measurement.maximumEnclosingWallMsPerPair === 120_000, 'pair wall bound drifted');
   invariant(design.measurement.maximumPilotWallMs === 1_800_000, 'pilot wall bound drifted');
-  invariant(/task<\/tid>\/schedstat field 1/.test(design.measurement.platformRule), 'scheduler clock owner missing');
+  invariant(design.measurement.platformRule.includes('/proc/<pid>/task/<tid>/schedstat field 1'), 'scheduler clock owner missing');
   invariant(/exact process pid\+starttime and task tid\+starttime identity sets/.test(design.measurement.treeRule), 'process-tree stability rule missing');
   invariant(/no performance\.now owner timing/.test(design.measurement.attributionBoundary), 'exhausted owner clock leaked into sample');
   invariant(/whole-browser CPU envelope/.test(design.measurement.conservativeClaimRule), 'claim-boundary caveat missing');
