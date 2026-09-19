@@ -168,7 +168,7 @@ interface _Runner {
 
 /**
  * Создать единый runner поведения. Владеет generation-токеном: любой новый
- * `settle()` или `invalidate()` инкрементит его, и запланированные кадры чужого
+ * `_settle()` или `_invalidate()` инкрементит его, и запланированные кадры чужого
  * поколения гаснут (B1 — ноль параллельных loops). reduced-motion → мгновенный
  * снап в target без единого кадра (B4 character-switch).
  */
@@ -351,7 +351,7 @@ export interface SheetState extends BehaviorState<number> {
 
 /** Опции bottom sheet. */
 export interface SheetOptions {
-  /** Snap-точки (px) — будут отсортированы по возрастанию. Минимум одна. */
+  /** Непустой плотный список конечных snap-точек (px); сортируется по возрастанию. */
   readonly snapPoints: readonly number[];
   /** Стартовая позиция (px). По умолчанию — минимальная snap-точка. */
   readonly initial?: number | undefined;
@@ -675,9 +675,9 @@ export interface CarouselState extends BehaviorState<number> {
 
 /** Опции карусели/пейджера. */
 export interface CarouselOptions {
-  /** Число страниц (>= 1). */
+  /** Число страниц (конечное целое >= 1). */
   readonly pageCount: number;
-  /** Размер страницы (px, > 0). */
+  /** Размер страницы (конечное число px, > 0). */
   readonly pageSize: number;
   /** Стартовая страница. По умолчанию 0. */
   readonly index?: number | undefined;

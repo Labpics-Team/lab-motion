@@ -22,9 +22,14 @@ describe('./behaviors — mutable constraints: bottom sheet', () => {
     expect(sheet.state.phase).toBe('release');
     expect(sheet.state.snapIndex).toBe(1);
 
+    const replacementFrames: number[] = [];
+    const stop = sheet.subscribe((state) => replacementFrames.push(state.value));
     // Первый живой кадр обязан наследовать ровно ту velocity, которую отдал
-    // invalidated runner; мутант `_invalidate(): return 0` должен стать RED.
+    // invalidated runner; мутанты `_invalidate(): return 0` и снятый generation-guard
+    // обязаны стать RED: stale callback не имеет права публиковать второй кадр.
     clock.step(16);
+    stop();
+    expect(replacementFrames).toHaveLength(1);
     expect(sheet.state.velocity).toBeCloseTo(before.velocity, 9);
     clock.drain(16);
     expect(sheet.state.value).toBeCloseTo(200, 3);
@@ -116,6 +121,15 @@ describe('./behaviors — mutable constraints: bottom sheet', () => {
       expect(sheet.state).toBe(before);
       expect(clock.pending()).toBe(pending);
     }
+  });
+
+  it('ошибка update сохраняет прежнюю геометрию и после исключения', () => {
+    const sheet = createBottomSheet({ snapPoints: [0, 300, 600] });
+
+    expect(() => sheet.update([0, 100, Number.NaN])).toThrowError(MotionParamError);
+    sheet.snapTo(2);
+
+    expect(sheet.state).toMatchObject({ value: 600, snapIndex: 2, phase: 'settle' });
   });
 
   it('конструктор отвергает неконечные и разреженные snap-точки', () => {
@@ -314,6 +328,18 @@ describe('./behaviors — mutable constraints: pager', () => {
       expect(pager.state).toBe(before);
       expect(clock.pending()).toBe(pending);
     }
+  });
+
+  it('ошибка update не публикует частично разобранную геометрию', () => {
+    const invalidSize = createCarousel({ pageCount: 4, pageSize: 200, index: 3 });
+    expect(() => invalidSize.update(2, Number.NaN)).toThrowError(MotionParamError);
+    invalidSize.goTo(3);
+    expect(invalidSize.state).toMatchObject({ value: 600, index: 3 });
+
+    const invalidCount = createCarousel({ pageCount: 4, pageSize: 200, index: 3 });
+    expect(() => invalidCount.update(0, 120)).toThrowError(MotionParamError);
+    invalidCount.goTo(3);
+    expect(invalidCount.state).toMatchObject({ value: 600, index: 3 });
   });
 
   it('конструктор использует тот же строгий контракт геометрии', () => {
