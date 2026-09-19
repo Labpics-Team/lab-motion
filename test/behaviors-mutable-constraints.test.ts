@@ -154,6 +154,19 @@ describe('./behaviors — mutable constraints: pager', () => {
     expect(pager.state.index).toBe(2);
   });
 
+  it('shrink во время follow сразу публикует legal index ровно через owner', () => {
+    const pager = createCarousel({ pageCount: 4, pageSize: 100, index: 3 });
+    const seen: number[] = [];
+    pager.subscribe((state) => seen.push(state.index));
+    pager.pointerDown(pt(0, 0, 0));
+    seen.length = 0;
+
+    pager.update(2, 100);
+
+    expect(pager.state).toMatchObject({ phase: 'follow', value: 300, index: 1 });
+    expect(seen).toEqual([1]);
+  });
+
   it('shrink вне follow сразу клэмпит опубликованный index даже перед cancel', () => {
     const clock = makeClock();
     const pager = createCarousel({

@@ -142,6 +142,32 @@ describe('./behaviors pull-to-refresh — cancel/destroy и pointer-cancel', () 
     expect(pull.state.value).toBeCloseTo(0, 3);
   });
 
+  it('cancel во время armed follow сбрасывает флаги до следующего жеста', async () => {
+    let called = 0;
+    const pull = createPullToRefresh({
+      threshold: 60,
+      onRefresh: () => {
+        called++;
+      },
+    });
+    pull.pointerDown(pt(0, 0, 0));
+    pull.pointerMove(pt(0, 200, 0.1));
+    expect(pull.state.armed).toBe(true);
+
+    pull.cancel();
+    expect(pull.state).toMatchObject({
+      phase: 'idle',
+      pulling: false,
+      armed: false,
+      pending: false,
+    });
+
+    pull.pointerDown(pt(0, 0, 1));
+    pull.pointerUp(pt(0, 0, 1.1));
+    await flush();
+    expect(called).toBe(0);
+  });
+
   it('cancel во время pending отзывает старый refresh и сразу возвращает управление', async () => {
     const clock = makeClock();
     const d = deferred();
