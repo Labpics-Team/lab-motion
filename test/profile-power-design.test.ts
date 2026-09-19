@@ -73,7 +73,6 @@ function calibrationFor(inv: ReturnType<typeof inventory>) {
   );
 }
 
-
 function selector(serialRepeats = 1) {
   const contract = PROFILE_PREREGISTRATION.scenarioSelector;
   return {
@@ -137,11 +136,25 @@ function pilotFor(inv: ReturnType<typeof inventory>) {
   });
 }
 
+// These receipts are pure deterministic fixtures. Building them separately in
+// every test repeated the same 10k-iteration bootstrap many times and made CI
+// wall time, rather than the contract, decide whether the suite passed. Build
+// the canonical values once; each test gets an isolated clone before mutation.
+const fixtureInventory = inventory();
+const fixtureCalibration = calibrationFor(fixtureInventory);
+const fixturePilot = pilotFor(fixtureInventory);
+
+function fixture() {
+  return {
+    inv: structuredClone(fixtureInventory),
+    calibration: structuredClone(fixtureCalibration),
+    pilot: structuredClone(fixturePilot),
+  };
+}
+
 describe('PROFILE-01 content-addressed powered design', () => {
   it('derives N from non-degenerate null/control noise but keeps admission closed until the pilot is immutably registered', () => {
-    const inv = inventory();
-    const calibration = calibrationFor(inv);
-    const pilot = pilotFor(inv);
+    const { inv, calibration, pilot } = fixture();
     const design = derivePoweredDesign(pilot, inv, calibration, '2026-09-18T03:03:00.000Z');
     expect(design.cells.every((cell) => cell.estimatedPower >= PROFILE_PREREGISTRATION.statistics.targetPower)).toBe(true);
     expect(design.cells.every((cell) => cell.status === 'powered')).toBe(true);
@@ -150,9 +163,7 @@ describe('PROFILE-01 content-addressed powered design', () => {
   });
 
   it('rejects degenerate zero-noise A/A evidence instead of converting sigma=0 into power=1', () => {
-    const inv = inventory();
-    const calibration = calibrationFor(inv);
-    const pilot = pilotFor(inv);
+    const { inv, calibration, pilot } = fixture();
     for (const cell of pilot.cells) {
       for (const scene of cell.scenes) {
         scene.raw.aa.a = clusters(40, 0);
@@ -164,16 +175,14 @@ describe('PROFILE-01 content-addressed powered design', () => {
   });
 
   it('rejects aggregate-changing substitution against the raw-backed pilot summaries', () => {
-    const inv = inventory();
-    const pilot = pilotFor(inv);
+    const { pilot } = fixture();
     const changedPilot = structuredClone(pilot);
     for (const block of changedPilot.cells[0].scenes[0].raw.aa.a) block.samples[0] += 0.1;
     expect(() => validatePilotReceipt(changedPilot)).toThrow(/drifted from raw evidence/);
   });
 
   it('content addressing rejects even a raw substitution that leaves aggregate summaries unchanged', () => {
-    const inv = inventory();
-    const pilot = pilotFor(inv);
+    const { pilot } = fixture();
     const registration = {
       schemaVersion: 1,
       profileId: PROFILE_PREREGISTRATION.profileId,
@@ -193,16 +202,14 @@ describe('PROFILE-01 content-addressed powered design', () => {
   }, 15_000);
 
   it('rejects a pilot sample below the preregistered formal timing floor', () => {
-    const inv = inventory();
-    const pilot = pilotFor(inv);
+    const { pilot } = fixture();
     const broken = structuredClone(pilot);
     broken.cells[0].scenes[0].raw.aa.a[0].samples[0] = 19;
     expect(() => validatePilotReceipt(broken)).toThrow(/below 20ms timing floor/);
   });
 
   it('fails closed when scenario positive-control evidence is unresolved', () => {
-    const inv = inventory();
-    const pilot = pilotFor(inv);
+    const { pilot } = fixture();
     const broken = structuredClone(pilot);
     broken.cells[1].scenes[1].raw.deliberate2x.doubled = clusters(40, 0);
     expect(() => validatePilotReceipt(broken)).toThrow(/raw evidence|positive control unresolved/);
