@@ -62,8 +62,8 @@ export const PROC_CPU_PREREGISTRATION = frozen({
     maximumEnclosingWallMsPerPair: 120_000,
     maximumPilotWallMs: 1_800_000,
     platformRule: 'Linux cgroup v2 is mandatory; a fresh dedicated cgroup must expose cpu.stat usage_usec and be writable through non-interactive sudo on the ephemeral acquisition runner',
-    processRule: 'each pair gets one BrowserServer and one unique cgroup; the complete existing browser tree is moved into it before warmup, descendants inherit membership, both arms execute sequentially, and browser/server close before cgroup removal',
-    treeRule: 'before warmup, recursive descendants discovered through every task children file must all resolve inside the unique pair cgroup; formal CPU accounting comes only from monotonic cgroup cpu.stat usage_usec deltas, so task/process birth and exit during an arm remain accounted',
+    processRule: 'each pair gets one unique empty cgroup and one BrowserServer launched through a tiny wrapper that moves its own pid into that cgroup before exec of the real browser; all browser descendants therefore inherit membership from birth; both arms execute sequentially and browser/server close before cgroup removal',
+    treeRule: 'the BrowserServer root must resolve inside the unique pair cgroup immediately after launch while the Node runner remains outside; formal CPU accounting comes only from monotonic cgroup cpu.stat usage_usec deltas, so descendant task/process birth and exit during an arm remain accounted without endpoint membership inference',
     warmupRule: 'each arm receives identical fixed semantic warmup before the pre-arm cgroup cpu.stat snapshot; warmup and launch CPU are excluded from formal samples',
     workRule: 'each formal arm executes exactly logicalUnitsByScene × workMultiplier complete semantic units at the frozen live-batch size; no timer-driven stop, discovery, escalation or optional stopping',
     attributionBoundary: 'sample is the dedicated browser cgroup CPU-usage delta during the complete semantic arm; Node runner stays outside the cgroup and launch/setup-before-warmup, warmup and teardown are excluded by before/after cpu.stat snapshots; no performance.now owner timing contributes to the sample',
@@ -91,8 +91,8 @@ export const PROC_CPU_PREREGISTRATION = frozen({
   targetPower: PROFILE_PREREGISTRATION.statistics.targetPower,
   minimumIndependentBlocks: PROFILE_PREREGISTRATION.statistics.minimumIndependentBlocks,
   maximumIndependentBlocks: PROFILE_PREREGISTRATION.statistics.maximumIndependentBlocks,
-  attributionReview: 'before candidate admission, independent review must verify dedicated-cgroup ownership/inheritance, runner exclusion, complete pre-warmup tree migration, excluded launch/setup/warmup work, and whether the whole-browser CPU envelope validly represents the registered M-05 cost; unresolved attribution stays UNPROVEN even if controls pass',
-  failureRule: 'any semantic failure, unavailable/non-writable cgroup-v2 accounting, incomplete pre-warmup tree migration, non-monotonic cpu.stat, runner leakage into the browser cgroup, work/warmup drift, arm below the frozen 40ms CPU floor, pair/pilot wall bound, malformed pair, A/A escape, unresolved deliberate-2x, invalid calibration binding or unpowered design closes or blocks this family according to whether the failure falsifies the representation or only the carrier; no same-family retuning or repeat is admissible',
+  attributionReview: 'before candidate admission, independent review must verify dedicated-cgroup ownership/inheritance, pre-exec launcher membership, runner exclusion, excluded launch/setup/warmup work, and whether the whole-browser CPU envelope validly represents the registered M-05 cost; unresolved attribution stays UNPROVEN even if controls pass',
+  failureRule: 'any semantic failure, unavailable/non-writable cgroup-v2 accounting, launcher/root cgroup-membership mismatch, non-monotonic cpu.stat, runner leakage into the browser cgroup, work/warmup drift, arm below the frozen 40ms CPU floor, pair/pilot wall bound, malformed pair, A/A escape, unresolved deliberate-2x, invalid calibration binding or unpowered design closes or blocks this family according to whether the failure falsifies the representation or only the carrier; no same-family retuning or repeat is admissible',
 });
 
 export function validateProcCpuPreregistration(design = PROC_CPU_PREREGISTRATION) {
@@ -116,7 +116,7 @@ export function validateProcCpuPreregistration(design = PROC_CPU_PREREGISTRATION
   invariant(design.measurement.maximumEnclosingWallMsPerPair === 120_000, 'pair wall bound drifted');
   invariant(design.measurement.maximumPilotWallMs === 1_800_000, 'pilot wall bound drifted');
   invariant(/cgroup v2/.test(design.measurement.platformRule) && /cpu\.stat usage_usec/.test(design.measurement.platformRule), 'cgroup CPU owner missing');
-  invariant(/every task children file/.test(design.measurement.treeRule) && /birth and exit/.test(design.measurement.treeRule), 'dynamic-tree accounting rule missing');
+  invariant(/BrowserServer root/.test(design.measurement.treeRule) && /birth and exit/.test(design.measurement.treeRule), 'dynamic-tree accounting rule missing');
   invariant(/no performance\.now owner timing/.test(design.measurement.attributionBoundary), 'exhausted owner clock leaked into sample');
   invariant(/whole-browser CPU envelope/.test(design.measurement.conservativeClaimRule), 'claim-boundary caveat missing');
   invariant(design.controls.runBlocks === 20 && design.controls.bootstrapIterations === 10_000, 'control sample/bootstrap count drifted');
