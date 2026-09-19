@@ -34,12 +34,13 @@ function expectedLogicalUnits(sceneId) {
   return units;
 }
 
-function normalizedCost(ownerMs, logicalUnits, referenceBeforeMs, referenceAfterMs) {
+function standardizedCostMs(ownerMs, logicalUnits, referenceBeforeMs, referenceAfterMs, referenceAnchorMs) {
   invariant(Number.isFinite(ownerMs) && ownerMs > 0, 'owner cost must be positive');
   invariant(Number.isSafeInteger(logicalUnits) && logicalUnits > 0, 'logical units must be positive');
   invariant(Number.isFinite(referenceBeforeMs) && referenceBeforeMs > 0, 'reference-before must be positive');
   invariant(Number.isFinite(referenceAfterMs) && referenceAfterMs > 0, 'reference-after must be positive');
-  return (ownerMs / logicalUnits) / Math.sqrt(referenceBeforeMs * referenceAfterMs);
+  invariant(Number.isFinite(referenceAnchorMs) && referenceAnchorMs > 0, 'reference anchor must be positive');
+  return (ownerMs / logicalUnits) * referenceAnchorMs / Math.sqrt(referenceBeforeMs * referenceAfterMs);
 }
 
 export async function acquireReferenceNormalizedObservation(measurePacket, sceneId, workMultiplier = 1) {
@@ -54,6 +55,7 @@ export async function acquireReferenceNormalizedObservation(measurePacket, scene
   invariant(Number.isFinite(result.ownerMs) && result.ownerMs >= 0, `${sceneId}: invalid owner-time`);
   invariant(Number.isFinite(result.referenceBeforeMs) && result.referenceBeforeMs >= 0, `${sceneId}: invalid reference-before`);
   invariant(Number.isFinite(result.referenceAfterMs) && result.referenceAfterMs >= 0, `${sceneId}: invalid reference-after`);
+  invariant(Number.isFinite(result.referenceAnchorMs) && result.referenceAnchorMs > 0, `${sceneId}: invalid reference anchor`);
   invariant(Number.isFinite(result.enclosingWallMs) && result.enclosingWallMs >= result.ownerMs, `${sceneId}: invalid enclosing wall-time`);
   invariant(result.logicalUnits === logicalUnits, `${sceneId}: fixed logical-unit count drifted`);
   invariant(result.workMultiplier === workMultiplier, `${sceneId}: work multiplier drifted`);
@@ -79,6 +81,7 @@ export async function acquireReferenceNormalizedObservation(measurePacket, scene
       sceneId, logicalUnits, workMultiplier,
       referenceBeforeMs: result.referenceBeforeMs,
       referenceAfterMs: result.referenceAfterMs,
+      referenceAnchorMs: result.referenceAnchorMs,
       referenceFloorMs: DESIGN.measurement.referenceFloorMs,
     });
   }
@@ -88,6 +91,7 @@ export async function acquireReferenceNormalizedObservation(measurePacket, scene
     enclosingWallMs: result.enclosingWallMs,
     referenceBeforeMs: result.referenceBeforeMs,
     referenceAfterMs: result.referenceAfterMs,
+      referenceAnchorMs: result.referenceAnchorMs,
     referenceCopies: result.referenceCopies,
     referenceIterationsPerCopy: result.referenceIterationsPerCopy,
     logicalUnits,
@@ -95,7 +99,7 @@ export async function acquireReferenceNormalizedObservation(measurePacket, scene
     batchCalls: result.batchCalls,
     workMultiplier,
     rawCostPerLogicalUnitMs: result.ownerMs / logicalUnits,
-    normalizedCost: normalizedCost(result.ownerMs, logicalUnits, result.referenceBeforeMs, result.referenceAfterMs),
+    standardizedCostMs: standardizedCostMs(result.ownerMs, logicalUnits, result.referenceBeforeMs, result.referenceAfterMs, result.referenceAnchorMs),
     semantic: true,
   };
 }
@@ -103,7 +107,7 @@ export async function acquireReferenceNormalizedObservation(measurePacket, scene
 function cluster(run, observation) {
   return {
     run,
-    samples: [observation.normalizedCost],
+    samples: [observation.standardizedCostMs],
     ...observation,
   };
 }
@@ -163,8 +167,9 @@ function validateObservation(entry, sceneId, run, workMultiplier, label) {
   invariant(Number.isSafeInteger(entry.referenceCopies) && entry.referenceCopies > 0, `${label}: reference copies invalid`);
   invariant(Number.isSafeInteger(entry.referenceIterationsPerCopy) && entry.referenceIterationsPerCopy > 0, `${label}: reference iterations invalid`);
   invariant(Object.is(entry.rawCostPerLogicalUnitMs, entry.ownerMs / logicalUnits), `${label}: raw cost drifted`);
-  const expectedNormalized = normalizedCost(entry.ownerMs, logicalUnits, entry.referenceBeforeMs, entry.referenceAfterMs);
-  invariant(Object.is(entry.normalizedCost, expectedNormalized) && Object.is(entry.samples[0], expectedNormalized), `${label}: normalized sample drifted`);
+  invariant(Number.isFinite(entry.referenceAnchorMs) && entry.referenceAnchorMs > 0, `${label}: reference anchor invalid`);
+  const expectedStandardized = standardizedCostMs(entry.ownerMs, logicalUnits, entry.referenceBeforeMs, entry.referenceAfterMs, entry.referenceAnchorMs);
+  invariant(Object.is(entry.standardizedCostMs, expectedStandardized) && Object.is(entry.samples[0], expectedStandardized), `${label}: standardized-ms sample drifted`);
 }
 
 function validatePair(group, sceneId, leftName, rightName, leftMultiplier, rightMultiplier, allowedOrders, label) {
@@ -177,6 +182,7 @@ function validatePair(group, sceneId, leftName, rightName, leftMultiplier, right
     validateObservation(group[rightName][run], sceneId, run, rightMultiplier, `${label}/run-${run}/${rightName}`);
     invariant(group[leftName][run].referenceCopies === group[rightName][run].referenceCopies, `${label}/run-${run}: reference binding changed within pair`);
     invariant(group[leftName][run].referenceIterationsPerCopy === group[rightName][run].referenceIterationsPerCopy, `${label}/run-${run}: reference iteration binding changed within pair`);
+    invariant(Object.is(group[leftName][run].referenceAnchorMs, group[rightName][run].referenceAnchorMs), `${label}/run-${run}: reference anchor changed within pair`);
   }
 }
 
@@ -222,6 +228,7 @@ export function finalizeReferenceNormalizedPilotReceipt(receipt) {
     invariant(typeof cell.browserVersion === 'string' && cell.browserVersion.length > 0, `${engine}: browser version missing`);
     invariant(Number.isSafeInteger(cell.referenceBinding?.iterationsPerCopy) && cell.referenceBinding.iterationsPerCopy > 0, `${engine}: reference iteration binding missing`);
     invariant(Number.isSafeInteger(cell.referenceBinding?.batchCopies) && cell.referenceBinding.batchCopies > 0, `${engine}: reference batch binding missing`);
+    invariant(Number.isFinite(cell.referenceBinding?.anchorMs) && cell.referenceBinding.anchorMs > 0, `${engine}: reference anchor binding missing`);
     invariant(JSON.stringify(cell.scenes?.map(({ id }) => id)) === JSON.stringify(DESIGN.sceneIds), `${engine}: scene matrix drifted`);
     for (let sceneIndex = 0; sceneIndex < cell.scenes.length; sceneIndex++) {
       const scene = cell.scenes[sceneIndex];
@@ -232,6 +239,7 @@ export function finalizeReferenceNormalizedPilotReceipt(receipt) {
         for (const entry of group) {
           invariant(entry.referenceIterationsPerCopy === cell.referenceBinding.iterationsPerCopy, `${label}: reference iterations differ from cell binding`);
           invariant(entry.referenceCopies === cell.referenceBinding.batchCopies, `${label}: reference copies differ from cell binding`);
+          invariant(Object.is(entry.referenceAnchorMs, cell.referenceBinding.anchorMs), `${label}: reference anchor differs from cell binding`);
         }
       }
       const seed = DESIGN.controls.bootstrapSeed ^ Math.imul(cellIndex + 1, 0x45d9f3b) ^ Math.imul(sceneIndex + 1, 0x119de1f3);

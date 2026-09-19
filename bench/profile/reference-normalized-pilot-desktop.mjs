@@ -262,6 +262,7 @@ async function installHarness(page, bundle, referenceBinding) {
           enclosingWallMs,
           referenceBeforeMs,
           referenceAfterMs,
+          referenceAnchorMs: referenceBinding.anchorMs,
           referenceCopies: referenceBinding.batchCopies,
           referenceIterationsPerCopy: referenceBinding.iterationsPerCopy,
           logicalUnits,
@@ -298,12 +299,29 @@ async function measurePacket(page, request, pilotStartedAt) {
   return result;
 }
 
+function median(values) {
+  invariant(Array.isArray(values) && values.length > 0 && values.every((value) => Number.isFinite(value) && value > 0), `reference anchor samples invalid`);
+  const sorted = [...values].sort((a, b) => a - b);
+  const middle = Math.floor(sorted.length / 2);
+  return sorted.length % 2 ? sorted[middle] : (sorted[middle - 1] + sorted[middle]) / 2;
+}
+
 function referenceBindingForEngine(calibration, engine) {
   const iterationsPerCopy = calibration.workload?.iterationsPerCopy;
   const batchCopies = calibration.workload?.batchCopiesByEngine?.[engine];
+  const aa = calibration.raw?.aa?.find((entry) => entry.engine === engine);
+  const deliberate = calibration.raw?.deliberate2x?.find((entry) => entry.engine === engine);
+  const anchorSamples = [
+    ...(aa?.clusters?.a ?? []),
+    ...(aa?.clusters?.b ?? []),
+    ...(deliberate?.clusters?.single ?? []),
+  ].flatMap(({ samples }) => samples ?? []);
+  const anchorMs = median(anchorSamples);
   invariant(Number.isSafeInteger(iterationsPerCopy) && iterationsPerCopy > 0, `${engine}: calibration reference iterations missing`);
   invariant(Number.isSafeInteger(batchCopies) && batchCopies > 0, `${engine}: calibration reference copies missing`);
-  return { iterationsPerCopy, batchCopies };
+  invariant(anchorSamples.length === 20 * 3 * 3, `${engine}: calibration anchor sample cardinality drifted`);
+  invariant(anchorMs >= DESIGN.measurement.referenceFloorMs, `${engine}: calibration anchor below frozen floor`);
+  return { iterationsPerCopy, batchCopies, anchorMs };
 }
 
 async function measureEngine(engine, browserType, bundle, inventory, calibration, pilotStartedAt) {

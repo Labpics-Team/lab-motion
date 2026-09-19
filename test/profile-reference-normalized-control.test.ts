@@ -16,7 +16,7 @@ import { deriveReferenceNormalizedPoweredDesign } from '../bench/profile/referen
 
 const engines = ['chromium', 'firefox', 'webkit'] as const;
 type Request = { sceneId: string; logicalUnits: number; workMultiplier: 1 | 2 };
-const referenceBinding = { iterationsPerCopy: 5_000_000, batchCopies: 1 };
+const referenceBinding = { iterationsPerCopy: 5_000_000, batchCopies: 1, anchorMs: 50 };
 
 function calibrationCluster(run: number, value: number) {
   return { run, samples: [value, value, value], semantic: true };
@@ -47,12 +47,13 @@ function calibration(inventory: object) {
 
 function packetForSample(sceneId: string, workMultiplier: 1 | 2, sample: number) {
   const logicalUnits = DESIGN.measurement.logicalUnitsByScene[sceneId as keyof typeof DESIGN.measurement.logicalUnitsByScene];
-  const ownerMs = sample * 100 * logicalUnits;
+  const ownerMs = sample * logicalUnits;
   return {
     ownerMs,
     enclosingWallMs: ownerMs + 201,
-    referenceBeforeMs: 100,
-    referenceAfterMs: 100,
+    referenceBeforeMs: 50,
+    referenceAfterMs: 50,
+    referenceAnchorMs: referenceBinding.anchorMs,
     referenceCopies: referenceBinding.batchCopies,
     referenceIterationsPerCopy: referenceBinding.iterationsPerCopy,
     logicalUnits,
@@ -60,7 +61,7 @@ function packetForSample(sceneId: string, workMultiplier: 1 | 2, sample: number)
     batchCalls: DESIGN.measurement.liveBatchCallsByScene[sceneId as keyof typeof DESIGN.measurement.liveBatchCallsByScene],
     workMultiplier,
     rawCostPerLogicalUnitMs: ownerMs / logicalUnits,
-    normalizedCost: sample,
+    standardizedCostMs: sample,
     semantic: true,
     samples: [sample],
   };
@@ -75,13 +76,13 @@ function rawScene(id: string) {
     raw: {
       aa: {
         orders: aaOrders,
-        a: aaOrders.map((_, run) => ({ run, ...packetForSample(id, 1, 0.5 * Math.exp(signed(run))) })),
-        b: aaOrders.map((_, run) => ({ run, ...packetForSample(id, 1, 0.5 * Math.exp(-signed(run))) })),
+        a: aaOrders.map((_, run) => ({ run, ...packetForSample(id, 1, 50 * Math.exp(signed(run))) })),
+        b: aaOrders.map((_, run) => ({ run, ...packetForSample(id, 1, 50 * Math.exp(-signed(run))) })),
       },
       deliberate2x: {
         orders: deliberateOrders,
-        single: deliberateOrders.map((_, run) => ({ run, ...packetForSample(id, 1, 0.5 * Math.exp(signed(run) / 2)) })),
-        doubled: deliberateOrders.map((_, run) => ({ run, ...packetForSample(id, 2, 1.0 * Math.exp(-signed(run) / 2)) })),
+        single: deliberateOrders.map((_, run) => ({ run, ...packetForSample(id, 1, 50 * Math.exp(signed(run) / 2)) })),
+        doubled: deliberateOrders.map((_, run) => ({ run, ...packetForSample(id, 2, 100 * Math.exp(-signed(run) / 2)) })),
       },
     },
   };
@@ -108,10 +109,10 @@ function pilot() {
   return { inventory, calibration: cal, receipt };
 }
 
-describe('PROFILE-01 calibration-bracket normalized timing family', () => {
+describe('PROFILE-01 calibration-bracket standardized-ms timing family', () => {
   it('freezes a premise-changing representation without candidate data', () => {
     expect(() => validateReferenceNormalizedPreregistration()).not.toThrow();
-    expect(DESIGN.id).toBe('calibration-bracket-normalized-owner-v1');
+    expect(DESIGN.id).toBe('calibration-bracket-standardized-owner-ms-v2');
     expect(DESIGN.candidateSamples).toBe(0);
     expect(DESIGN.measurement.liveBatchCallsByScene).toEqual({ 'collection-reorder-100': 32, 'direct-manipulation-sheet': 128 });
     expect(DESIGN.measurement.logicalUnitsByScene).toEqual({ 'collection-reorder-100': 1, 'direct-manipulation-sheet': 512 });
@@ -129,6 +130,7 @@ describe('PROFILE-01 calibration-bracket normalized timing family', () => {
         enclosingWallMs: ownerMs + 2 * referenceMs + 1,
         referenceBeforeMs: referenceMs,
         referenceAfterMs: referenceMs,
+        referenceAnchorMs: 100,
         referenceCopies: 1,
         referenceIterationsPerCopy: 5_000_000,
         logicalUnits,
@@ -141,8 +143,8 @@ describe('PROFILE-01 calibration-bracket normalized timing family', () => {
     const raw = await acquireReferenceNormalizedControls(measure, 'direct-manipulation-sheet', { runBlocks: 3, orderSeed: 7 });
     expect(measure).toHaveBeenCalledTimes(12);
     for (let run = 0; run < 3; run++) {
-      expect(raw.aa.a[run].samples[0]).toBeCloseTo(0.5, 12);
-      expect(raw.aa.b[run].samples[0]).toBeCloseTo(0.5, 12);
+      expect(raw.aa.a[run].samples[0]).toBeCloseTo(50, 12);
+      expect(raw.aa.b[run].samples[0]).toBeCloseTo(50, 12);
       expect(raw.deliberate2x.doubled[run].samples[0] / raw.deliberate2x.single[run].samples[0]).toBeCloseTo(2, 12);
     }
   });
@@ -153,6 +155,7 @@ describe('PROFILE-01 calibration-bracket normalized timing family', () => {
       enclosingWallMs: 90,
       referenceBeforeMs: 39,
       referenceAfterMs: 41,
+      referenceAnchorMs: 50,
       referenceCopies: 1,
       referenceIterationsPerCopy: 5_000_000,
       logicalUnits,
@@ -170,9 +173,9 @@ describe('PROFILE-01 calibration-bracket normalized timing family', () => {
     const first = accepted.cells[0].scenes[0].raw.aa.a[0];
     expect(first.samples).toHaveLength(1);
     expect(first.ownerMs).toBeGreaterThanOrEqual(40);
-    expect(first.referenceBeforeMs).toBe(100);
-    expect(first.referenceAfterMs).toBe(100);
-    expect(first.samples[0]).toBe(first.normalizedCost);
+    expect(first.referenceBeforeMs).toBe(50);
+    expect(first.referenceAfterMs).toBe(50);
+    expect(first.samples[0]).toBe(first.standardizedCostMs);
     expect(accepted.cells[0].scenes[0].aa.lower95).toBeGreaterThanOrEqual(0.95);
     expect(accepted.cells[0].scenes[0].aa.upper95).toBeLessThanOrEqual(1.05);
     expect(accepted.cells[0].scenes[0].deliberate2x.lower95).toBeGreaterThanOrEqual(1.5);
