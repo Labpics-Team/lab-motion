@@ -46,12 +46,7 @@ function runInstalledPackageProbe(): string {
     const source = join(work, 'source');
     mkdirSync(source);
     copyTrackedSource(source);
-    // Retention is a runtime-owner claim. Build only its two public owner
-    // entries with the exact production tsup config: splitting:false makes each
-    // entry self-contained (except the intentional shared #frame edge), so this
-    // removes unrelated declaration/entry work without changing these emitted
-    // bytes. Full export/declaration/package completeness stays owned by the
-    // existing build + pack gates instead of being duplicated inside this proof.
+    // Собираем только два owner-entry и ниже сверяем их байты с полной production-сборкой.
     const packagePath = join(source, 'package.json');
     const manifest = JSON.parse(readFileSync(packagePath, 'utf8')) as {
       exports: Record<string, unknown>;
@@ -230,6 +225,6 @@ console.log('resource-installed-package-retention: PASS');
   }
 }
 
-it('установленный tarball освобождает terminal owners в ESM и CJS', () => {
+it('установленный tarball освобождает ресурсы завершённых владельцев в ESM и CJS', () => {
   expect(runInstalledPackageProbe()).toContain('resource-installed-package-retention: PASS');
 }, 120_000);
