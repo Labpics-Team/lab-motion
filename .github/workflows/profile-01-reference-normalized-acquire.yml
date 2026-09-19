@@ -1,4 +1,4 @@
-name: PROFILE-01 reference-normalized evidence acquisition
+name: PROFILE-01 precalibration standardized-ms evidence acquisition
 
 on:
   push:
@@ -14,7 +14,7 @@ env:
 
 jobs:
   acquire:
-    name: calibration-bracket normalized null/control pilot
+    name: precalibration standardized-ms null/control pilot
     runs-on: ubuntu-latest
     timeout-minutes: 45
     steps:
@@ -35,8 +35,8 @@ jobs:
         env:
           PROFILE_HEAD_SHA: ${{ github.sha }}
           PROFILE_REGISTERED_MAIN_SHA: 2c947007168d4964124db8ce8079bbfabc975687
-          PROFILE_PREREG_SHA: da7e4006c54db958d93c223b7c4e1fa9d41dc2d3
-          PROFILE_HARNESS_SHA: 133af631f4c385df7fb253c8ba443d729e19a181
+          PROFILE_PREREG_SHA: b68cf4e3354f5cdf0bbce40c3c18a828148ee058
+          PROFILE_HARNESS_SHA: 51428cbfa03e3f93c7f974224f4a0d6c6e5c4d3c
           PROFILE_BASELINE_SHA: fe11daa407de396fad952be7679650f63dabd4dd
         run: |
           set -euo pipefail
@@ -84,7 +84,7 @@ jobs:
           node bench/profile/capture-desktop.mjs > "$out/inventory.json"
           PROFILE_INVENTORY_PATH="$out/inventory.json" \
           PROFILE_CALIBRATION_OUTPUT="$out/calibration.json" \
-          PROFILE_CALIBRATION_ID="desktop-controls-reference-standardized-owner-ms-v2" \
+          PROFILE_CALIBRATION_ID="desktop-controls-precalibration-standardized-owner-ms-v3" \
             node bench/profile/calibrate-desktop.mjs > "$out/calibration.stdout.json"
 
           git worktree add --detach "$baseline" "$PROFILE_BASELINE_SHA"
@@ -123,9 +123,9 @@ jobs:
 
           find "$out" -maxdepth 1 -type f -print0 | sort -z | xargs -0 sha256sum > "$out/SHA256SUMS.tmp"
           mv "$out/SHA256SUMS.tmp" "$out/SHA256SUMS"
-          echo '--- PROFILE-01 reference-normalized pilot stdout ---'
+          echo '--- PROFILE-01 precalibration standardized-ms pilot stdout ---'
           cat "$out/reference-normalized-pilot.stdout.json" || true
-          echo '--- PROFILE-01 reference-normalized pilot stderr ---'
+          echo '--- PROFILE-01 precalibration standardized-ms pilot stderr ---'
           cat "$out/reference-normalized-pilot.stderr.txt" || true
           echo '--- PROFILE-01 powered design stdout ---'
           cat "$out/power.stdout.json" 2>/dev/null || true
