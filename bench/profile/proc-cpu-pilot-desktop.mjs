@@ -303,8 +303,6 @@ function readCgroupCpuUsageUs(cgroupPath) {
 
 function createBrowserCgroup() {
   invariant(process.platform === 'linux', 'cgroup CPU pilot requires Linux');
-  const controllers = readFileSync('/sys/fs/cgroup/cgroup.controllers', 'utf8').trim().split(/\s+/u);
-  invariant(controllers.includes('cpu'), 'cgroup-v2 cpu controller unavailable');
   execFileSync('sudo', ['-n', 'true'], { stdio: 'ignore' });
   const id = `lab-motion-profile-${process.pid}-${randomUUID()}`;
   const path = `/sys/fs/cgroup/${id}`;
