@@ -580,10 +580,9 @@ export function createDragDismiss(options: DismissOptions): DismissController {
   if (!(dist > 0)) {
     throw new MotionParamError('LM004');
   }
-  const velThresh =
-    typeof options.velocityThreshold === 'number' && Number.isFinite(options.velocityThreshold)
-      ? Math.abs(options.velocityThreshold)
-      : DEFAULT_DISMISS_VELOCITY;
+  const velThresh = Number.isFinite(options.velocityThreshold)
+    ? Math.abs(options.velocityThreshold as number)
+    : DEFAULT_DISMISS_VELOCITY;
   const springParams = options.spring ?? (springTokens.default as SpringParams);
   validateSpringForFrameLoop(springParams);
   const dismissTarget = _finite(options.dismissTarget ?? dir * dist * 8);
@@ -731,11 +730,9 @@ export function createCarousel(options: CarouselOptions): CarouselController {
   let pageCount = options.pageCount;
   let pageSize = options.pageSize;
   const axis = options.axis ?? 'x';
-  const rtl = options.rtl === true;
-  const velThresh =
-    typeof options.velocityThreshold === 'number' && Number.isFinite(options.velocityThreshold)
-      ? Math.abs(options.velocityThreshold)
-      : DEFAULT_CAROUSEL_VELOCITY;
+  const velThresh = Number.isFinite(options.velocityThreshold)
+    ? Math.abs(options.velocityThreshold as number)
+    : DEFAULT_CAROUSEL_VELOCITY;
   const springParams = options.spring ?? (springTokens.snappy as SpringParams);
   validateSpringForFrameLoop(springParams);
 
@@ -754,7 +751,7 @@ export function createCarousel(options: CarouselOptions): CarouselController {
   // Знак перевода pointer-смещения в position-пространство:
   // горизонталь LTR → влево = следующая (position растёт) → −d; RTL → +d;
   // вертикаль → вверх = следующая → −d.
-  const posDirSign = axis === 'x' && rtl ? 1 : -1;
+  const posDirSign = axis === 'x' && options.rtl === true ? 1 : -1;
 
   const settleTo = (index: number, velocity: number): void => {
     const i = clampIndex(index);
@@ -826,7 +823,10 @@ export function createCarousel(options: CarouselOptions): CarouselController {
       ctrl.goTo(base.state.index - 1);
     },
     subscribe: base.subscribe,
-    cancel: base.cancel,
+    cancel(): void {
+      targetIndex = base.state.index;
+      base.cancel();
+    },
     destroy: base.destroy,
     get state(): CarouselState {
       return base.state;
@@ -941,7 +941,11 @@ export function createPullToRefresh(options: PullOptions): PullController {
       const finish = (): void => {
         if (!base.destroyed && base.state === pendingState) returnHome(0);
       };
-      Promise.resolve(options.onRefresh?.()).then(finish, finish);
+      try {
+        Promise.resolve(options.onRefresh?.()).then(finish, finish);
+      } catch {
+        finish();
+      }
     });
   };
 

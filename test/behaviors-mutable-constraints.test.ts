@@ -229,6 +229,21 @@ describe('./behaviors — mutable constraints: pager', () => {
     expect(pager.state).toMatchObject({ index: 1, phase: 'idle' });
   });
 
+  it('resize после cancel не восстанавливает отменённый target', () => {
+    const clock = makeClock();
+    const pager = createCarousel({ pageCount: 4, pageSize: 100, requestFrame: clock.requestFrame });
+    pager.goTo(3);
+    expect(pager.state).toMatchObject({ phase: 'release', index: 0, value: 0 });
+
+    pager.cancel();
+    expect(pager.state).toMatchObject({ phase: 'idle', index: 0, value: 0 });
+
+    pager.update(4, 120);
+    clock.drain(16);
+    expect(pager.state.index).toBe(0);
+    expect(pager.state.value).toBeCloseTo(0, 3);
+  });
+
   it('settled resize сохраняет logical page и доводит position к новому pageSize', () => {
     const clock = makeClock();
     const pager = createCarousel({ pageCount: 4, pageSize: 200, index: 2, requestFrame: clock.requestFrame });

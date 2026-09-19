@@ -209,6 +209,30 @@ describe('./behaviors pull-to-refresh — cancel/destroy и pointer-cancel', () 
     expect(pull.state.pending).toBe(false);
   });
 
+  it('синхронный throw onRefresh обрабатывается как reject и возвращает домой', () => {
+    const failure = new Error('refresh failed');
+    const pull = createPullToRefresh({
+      threshold: 60,
+      resistance: 0.5,
+      matchMedia: reduceMedia(true) as unknown as (q: string) => MediaQueryList,
+      onRefresh: () => {
+        throw failure;
+      },
+    });
+    pull.pointerDown(pt(0, 0, 0));
+    pull.pointerMove(pt(0, 200, 0.1));
+
+    expect(() => pull.pointerUp(pt(0, 200, 0.15))).not.toThrow();
+    expect(pull.state).toMatchObject({
+      phase: 'idle',
+      value: 0,
+      velocity: 0,
+      pulling: false,
+      armed: false,
+      pending: false,
+    });
+  });
+
   it('cancel/destroy идемпотентны', () => {
     const pull = createPullToRefresh({ threshold: 60 });
     pull.cancel();
