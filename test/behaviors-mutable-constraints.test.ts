@@ -140,6 +140,22 @@ describe('./behaviors — mutable constraints: bottom sheet', () => {
     expect(() => createBottomSheet({ snapPoints: sparse })).toThrowError(MotionParamError);
   });
 
+  it('reentrant update из release-публикации оставляет последнюю sheet-геометрию владельцем', () => {
+    const sheet = createBottomSheet({ snapPoints: [0, 300, 600], initial: 300 });
+    let nested = false;
+    sheet.subscribe((state) => {
+      if (state.phase === 'release' && !nested) {
+        nested = true;
+        sheet.update([0, 100, 200]);
+      }
+    });
+
+    sheet.update([0, 200, 400]);
+
+    expect(nested).toBe(true);
+    expect(sheet.state).toMatchObject({ value: 100, snapIndex: 1, phase: 'settle' });
+  });
+
   it('reduced-motion использует обновлённые snap без кадров', () => {
     const clock = makeClock();
     const sheet = createBottomSheet({
@@ -286,6 +302,22 @@ describe('./behaviors — mutable constraints: pager', () => {
     pager.update(4, 200);
     expect(pager.state).toBe(before);
     expect(clock.pending()).toBe(pending);
+  });
+
+  it('reentrant update из release-публикации оставляет последнюю pager-геометрию владельцем', () => {
+    const pager = createCarousel({ pageCount: 4, pageSize: 200, index: 3 });
+    let nested = false;
+    pager.subscribe((state) => {
+      if (state.phase === 'release' && !nested) {
+        nested = true;
+        pager.update(2, 50);
+      }
+    });
+
+    pager.update(3, 120);
+
+    expect(nested).toBe(true);
+    expect(pager.state).toMatchObject({ value: 50, index: 1, phase: 'settle' });
   });
 
   it('RTL release и reduced-motion сохраняются после update', () => {

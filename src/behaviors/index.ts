@@ -268,8 +268,8 @@ function _createBase<S extends BehaviorState<number>>(
   let state = initial;
   let destroyed = false;
 
-  const emit = (next: Partial<S>): void => {
-    state = { ...state, ...next };
+  const emit = (next: Partial<S>): boolean => {
+    const emitted = state = { ...state, ...next };
     for (const fn of subs) {
       try {
         fn(state);
@@ -277,6 +277,8 @@ function _createBase<S extends BehaviorState<number>>(
         // Подписчик не имеет права срывать соседей.
       }
     }
+    // false: синхронный subscriber передал ownership более новой операции или destroy.
+    return !destroyed && state === emitted;
   };
 
   return {
@@ -449,12 +451,10 @@ export function createBottomSheet(options: SheetOptions): SheetController {
   };
 
   const settleTo = (index: number, velocity: number): void => {
-    const target = snaps[index]!;
-    base.emit({ phase: 'release', snapIndex: index });
-    base.runner._settle({
+    base.emit({ phase: 'release', snapIndex: index }) && base.runner._settle({
       from: base.state.value,
       velocity,
-      target,
+      target: snaps[index]!,
       spring: springParams,
       onStep: (v, vel) => base.emit({ value: v, velocity: vel }),
       onDone: () => base.emit({ phase: 'settle' }),
@@ -481,14 +481,12 @@ export function createBottomSheet(options: SheetOptions): SheetController {
       if (!base._following) return;
       base.tracker.push(p);
       const v = axis === 'x' ? base.tracker.velocity().vx : base.tracker.velocity().vy;
-      const index = _pickSnap(snaps, base.state.value, v);
-      settleTo(index, v);
+      settleTo(_pickSnap(snaps, base.state.value, v), v);
     },
     pointerCancel(): void {
       if (!base._following) return;
       // Детерминизм: осесть в ближайший snap без унаследованной скорости.
-      const index = _pickSnap(snaps, base.state.value, 0);
-      settleTo(index, 0);
+      settleTo(_pickSnap(snaps, base.state.value, 0), 0);
     },
     update(next: readonly number[]): void {
       if (base.destroyed) return;
@@ -756,12 +754,10 @@ export function createCarousel(options: CarouselOptions): CarouselController {
   const settleTo = (index: number, velocity: number): void => {
     const i = clampIndex(index);
     targetIndex = i;
-    const target = i * pageSize;
-    base.emit({ phase: 'release', index: clampIndex(base.state.index) });
-    base.runner._settle({
+    base.emit({ phase: 'release', index: clampIndex(base.state.index) }) && base.runner._settle({
       from: base.state.value,
       velocity,
-      target,
+      target: i * pageSize,
       spring: springParams,
       // Единый clock: index выводится из position КАЖДЫЙ кадр (не отдельный счётчик).
       onStep: (v, vel) => base.emit({ value: v, velocity: vel, index: clampIndex(Math.round(v / pageSize)) }),
