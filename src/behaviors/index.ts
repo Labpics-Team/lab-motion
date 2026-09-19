@@ -372,7 +372,7 @@ export interface SheetController {
   pointerMove(p: BehaviorPoint): void;
   pointerUp(p: BehaviorPoint): void;
   pointerCancel(): void;
-  /** Обновить snap-ограничения без смены owner/clock. */
+  /** Обновить snap-ограничения без смены владельца/часов. */
   update(snapPoints: readonly number[]): void;
   /** Программный переход к snap по индексу (единый clock, C¹ из текущей скорости). */
   snapTo(index: number): void;
@@ -406,13 +406,15 @@ function _pickSnap(snaps: readonly number[], value: number, velocity: number): n
  * follow→доводка (пружина/снап) без потери velocity, rubber-band за крайними
  * snap, программный snapTo, прерывание новым pointer-down. Один clock (B1).
  *
- * @throws {MotionParamError} при пустом snapPoints или невалидной пружине.
+ * @throws {MotionParamError} при пустых/неконечных snapPoints или невалидной пружине.
  */
 export function createBottomSheet(options: SheetOptions): SheetController {
   const readSnaps = (values: readonly number[]): number[] => {
-    const next = values.map(_finite).sort((a, b) => a - b);
-    if (next.length === 0) throw new MotionParamError('LM003');
-    return next;
+    const next = [...values];
+    if (!next.length || !next.every(Number.isFinite)) {
+      throw new MotionParamError('LM003');
+    }
+    return next.sort((a, b) => a - b);
   };
   let snaps = readSnaps(options.snapPoints);
   const axis = options.axis ?? 'y';
@@ -437,14 +439,14 @@ export function createBottomSheet(options: SheetOptions): SheetController {
     const min = snaps[0]!;
     const max = snaps[snaps.length - 1]!;
     if (raw > max) {
-      if (!rubber && base._following && base.state.value > max) return Math.min(base.state.value, raw);
+      if (!rubber && base.state.value > max) return Math.min(base.state.value, raw);
       return _finite(max + _sub(raw, max) * rubber);
     }
     if (raw < min) {
-      if (!rubber && base._following && base.state.value < min) return Math.max(base.state.value, raw);
+      if (!rubber && base.state.value < min) return Math.max(base.state.value, raw);
       return _finite(min + _sub(raw, min) * rubber);
     }
-    return _finite(raw);
+    return raw;
   };
 
   const settleTo = (index: number, velocity: number): void => {
@@ -482,7 +484,7 @@ export function createBottomSheet(options: SheetOptions): SheetController {
       base.tracker.push(p);
       const v = axis === 'x' ? base.tracker.velocity().vx : base.tracker.velocity().vy;
       const index = _pickSnap(snaps, base.state.value, v);
-      settleTo(index, _finite(v));
+      settleTo(index, v);
     },
     pointerCancel(): void {
       if (!base._following) return;
@@ -701,7 +703,7 @@ export interface CarouselController {
   pointerMove(p: BehaviorPoint): void;
   pointerUp(p: BehaviorPoint): void;
   pointerCancel(): void;
-  /** Обновить geometry/constraints без смены owner/clock. */
+  /** Обновить геометрию/ограничения без смены владельца/часов. */
   update(pageCount: number, pageSize: number): void;
   /** Программно перейти на страницу (единый clock). */
   goTo(index: number): void;
@@ -715,6 +717,11 @@ export interface CarouselController {
 
 const DEFAULT_CAROUSEL_VELOCITY = 400;
 
+function _readCarouselGeometry(count: number, size: number): void {
+  if (!Number.isFinite(count) || count < 1 || count % 1 !== 0) throw new MotionParamError('LM005');
+  if (!Number.isFinite(size) || size <= 0) throw new MotionParamError('LM006');
+}
+
 /**
  * Создать headless карусель/пейджер: ЕДИНЫЙ clock для позиции и индекса, inertia
  * с доводкой к странице, направление+velocity в выборе страницы, RTL и вертикаль.
@@ -722,14 +729,9 @@ const DEFAULT_CAROUSEL_VELOCITY = 400;
  * @throws {MotionParamError} при невалидном pageCount/pageSize или пружине.
  */
 export function createCarousel(options: CarouselOptions): CarouselController {
-  let pageCount = Math.trunc(_finite(options.pageCount));
-  let pageSize = _finite(options.pageSize);
-  if (!(pageCount >= 1)) {
-    throw new MotionParamError('LM005');
-  }
-  if (!(pageSize > 0)) {
-    throw new MotionParamError('LM006');
-  }
+  _readCarouselGeometry(options.pageCount, options.pageSize);
+  let pageCount = options.pageCount;
+  let pageSize = options.pageSize;
   const axis = options.axis ?? 'x';
   const rtl = options.rtl === true;
   const velThresh =
@@ -800,7 +802,7 @@ export function createCarousel(options: CarouselOptions): CarouselController {
       // Флик перелистывает минимум на страницу; доводка — максимум ±1 от старта свайпа.
       if (Math.abs(posVel) >= velThresh) target = swipeStartIndex + (posVel > 0 ? 1 : -1);
       target = Math.max(swipeStartIndex - 1, Math.min(swipeStartIndex + 1, target));
-      settleTo(target, _finite(posVel));
+      settleTo(target, posVel);
     },
     pointerCancel(): void {
       if (!base._following) return;
@@ -809,13 +811,10 @@ export function createCarousel(options: CarouselOptions): CarouselController {
     },
     update(count: number, size: number): void {
       if (base.destroyed) return;
-      const nextCount = Math.trunc(_finite(count));
-      const nextSize = _finite(size);
-      if (!(nextCount >= 1)) throw new MotionParamError('LM005');
-      if (!(nextSize > 0)) throw new MotionParamError('LM006');
-      if (nextCount === pageCount && nextSize === pageSize) return;
-      pageCount = nextCount;
-      pageSize = nextSize;
+      _readCarouselGeometry(count, size);
+      if (count === pageCount && size === pageSize) return;
+      pageCount = count;
+      pageSize = size;
       swipeStartIndex = clampIndex(swipeStartIndex);
       if (base._following) base.emit({ index: clampIndex(Math.round(base.state.value / pageSize)) });
       else settleTo(swipeStartIndex, base.runner._invalidate());

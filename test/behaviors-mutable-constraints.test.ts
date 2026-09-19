@@ -83,11 +83,30 @@ describe('./behaviors — mutable constraints: bottom sheet', () => {
     expect(clock.pending()).toBe(pending);
   });
 
-  it('невалидное обновление атомарно: старые snap остаются', () => {
-    const sheet = createBottomSheet({ snapPoints: [0, 300, 600] });
-    expect(() => sheet.update([])).toThrowError(MotionParamError);
+  it('невалидное обновление атомарно: не меняет ограничения, state или живой runner', () => {
+    const clock = makeClock();
+    const sheet = createBottomSheet({ snapPoints: [0, 300, 600], requestFrame: clock.requestFrame });
     sheet.snapTo(2);
-    expect(sheet.state.value).toBe(600);
+    clock.step(16);
+    const before = sheet.state;
+    const pending = clock.pending();
+    const sparse = Array<number>(3);
+    sparse[0] = 0;
+    sparse[2] = 600;
+
+    for (const invalid of [[], [0, Number.NaN, 600], [0, Number.POSITIVE_INFINITY, 600], sparse]) {
+      expect(() => sheet.update(invalid)).toThrowError(MotionParamError);
+      expect(sheet.state).toBe(before);
+      expect(clock.pending()).toBe(pending);
+    }
+  });
+
+  it('конструктор отвергает неконечные и разреженные snap-точки', () => {
+    const sparse = Array<number>(2);
+    sparse[0] = 0;
+    expect(() => createBottomSheet({ snapPoints: [0, Number.NaN] })).toThrowError(MotionParamError);
+    expect(() => createBottomSheet({ snapPoints: [0, Number.NEGATIVE_INFINITY] })).toThrowError(MotionParamError);
+    expect(() => createBottomSheet({ snapPoints: sparse })).toThrowError(MotionParamError);
   });
 
   it('reduced-motion использует обновлённые snap без кадров', () => {
@@ -229,11 +248,28 @@ describe('./behaviors — mutable constraints: pager', () => {
     expect(reducedClock.rafCalls()).toBe(0);
   });
 
-  it('невалидное обновление атомарно', () => {
-    const pager = createCarousel({ pageCount: 3, pageSize: 200 });
-    expect(() => pager.update(0, 120)).toThrowError(MotionParamError);
-    expect(() => pager.update(3, 0)).toThrowError(MotionParamError);
+  it('невалидное обновление атомарно и не прерывает живой runner', () => {
+    const clock = makeClock();
+    const pager = createCarousel({ pageCount: 3, pageSize: 200, requestFrame: clock.requestFrame });
     pager.goTo(2);
-    expect(pager.state.value).toBe(400);
+    clock.step(16);
+    const before = pager.state;
+    const pending = clock.pending();
+
+    for (const [count, size] of [
+      [0, 120], [2.5, 120], [Number.POSITIVE_INFINITY, 120],
+      [3, 0], [3, Number.NaN], [3, Number.POSITIVE_INFINITY],
+    ] as const) {
+      expect(() => pager.update(count, size)).toThrowError(MotionParamError);
+      expect(pager.state).toBe(before);
+      expect(clock.pending()).toBe(pending);
+    }
+  });
+
+  it('конструктор использует тот же строгий контракт геометрии', () => {
+    expect(() => createCarousel({ pageCount: 2.5, pageSize: 200 })).toThrowError(MotionParamError);
+    expect(() => createCarousel({ pageCount: Number.POSITIVE_INFINITY, pageSize: 200 })).toThrowError(MotionParamError);
+    expect(() => createCarousel({ pageCount: 3, pageSize: Number.NaN })).toThrowError(MotionParamError);
+    expect(() => createCarousel({ pageCount: 3, pageSize: Number.POSITIVE_INFINITY })).toThrowError(MotionParamError);
   });
 });
