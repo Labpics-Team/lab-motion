@@ -83,8 +83,7 @@ jobs:
           sudo -n true
           smoke_cg="/sys/fs/cgroup/lab-motion-profile-smoke-${GITHUB_RUN_ID}-${GITHUB_RUN_ATTEMPT}"
           sudo -n mkdir "$smoke_cg"
-          cleanup_cgroup() { sudo -n rmdir "$smoke_cg" 2>/dev/null || true; }
-          trap cleanup_cgroup EXIT
+          trap 'sudo -n rmdir "$smoke_cg" 2>/dev/null || true' EXIT
           smoke_before="$(awk '$1 == "usage_usec" { print $2 }' "$smoke_cg/cpu.stat")"
           PROFILE_SMOKE_CGROUP_PROCS="$smoke_cg/cgroup.procs" node -e 'const {execFileSync}=require("node:child_process"); const p=process.env.PROFILE_SMOKE_CGROUP_PROCS; execFileSync("sudo",["-n","tee",p],{input:String(process.pid)+"\n",stdio:["pipe","ignore","inherit"]}); const end=Date.now()+100; let x=1; while(Date.now()<end)x=Math.sin(x)+1; if(!Number.isFinite(x))process.exit(2)'
           smoke_after="$(awk '$1 == "usage_usec" { print $2 }' "$smoke_cg/cpu.stat")"
