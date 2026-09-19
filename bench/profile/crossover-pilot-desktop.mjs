@@ -237,20 +237,36 @@ async function installHarness(page, bundle) {
         const enclosingWallMs = performance.now() - started;
         if (!Number.isFinite(ownerMs) || ownerMs < 0) throw new Error('invalid owner-time result');
         if (!Number.isFinite(enclosingWallMs) || enclosingWallMs < ownerMs) throw new Error('invalid enclosing wall-time result');
-        return { ownerMs, enclosingWallMs, logicalUnits, physicalExecutions, workMultiplier, semantic: true };
+        return { ownerMs, enclosingWallMs, logicalUnits, physicalExecutions, batchCalls: copies, workMultiplier, semantic: true };
       },
     };
   });
 }
 
-async function measurePacket(page, request) {
-  return page.evaluate(
-    ([sceneId, copies, logicalUnits, workMultiplier]) => globalThis.__labMotionCrossover.measurePacket(sceneId, copies, logicalUnits, workMultiplier),
-    [request.sceneId, DESIGN.measurement.liveBatchCalls, request.logicalUnits, request.workMultiplier],
-  );
+function assertPilotWallBudget(pilotStartedAt) {
+  const elapsed = Date.now() - pilotStartedAt;
+  if (elapsed > DESIGN.measurement.maximumPilotWallMs) {
+    throw new CrossoverResolutionFailure('pilot exceeded whole-pilot wall bound', {
+      elapsedWallMs: elapsed,
+      maximumPilotWallMs: DESIGN.measurement.maximumPilotWallMs,
+    });
+  }
+  return elapsed;
 }
 
-async function measureEngine(engine, browserType, bundle, inventory) {
+async function measurePacket(page, request, pilotStartedAt) {
+  assertPilotWallBudget(pilotStartedAt);
+  const copies = DESIGN.measurement.liveBatchCallsByScene[request.sceneId];
+  invariant(Number.isSafeInteger(copies) && copies > 0, `${request.sceneId}: frozen live-batch count missing`);
+  const result = await page.evaluate(
+    ([sceneId, batchCalls, logicalUnits, workMultiplier]) => globalThis.__labMotionCrossover.measurePacket(sceneId, batchCalls, logicalUnits, workMultiplier),
+    [request.sceneId, copies, request.logicalUnits, request.workMultiplier],
+  );
+  assertPilotWallBudget(pilotStartedAt);
+  return result;
+}
+
+async function measureEngine(engine, browserType, bundle, inventory, pilotStartedAt) {
   const browser = await browserType.launch({ headless: true });
   try {
     const bound = inventory.browsers.find((entry) => entry.engine === engine);
@@ -263,7 +279,7 @@ async function measureEngine(engine, browserType, bundle, inventory) {
     for (let sceneIndex = 0; sceneIndex < DESIGN.sceneIds.length; sceneIndex++) {
       const sceneId = DESIGN.sceneIds[sceneIndex];
       const raw = await acquireSymmetricCrossoverControls(
-        (request) => measurePacket(page, request),
+        (request) => measurePacket(page, request, pilotStartedAt),
         sceneId,
         { orderSeed: PROFILE_PREREGISTRATION.statistics.orderSeed ^ Math.imul(sceneIndex + 1, 0x45d9f3b) },
       );
@@ -293,9 +309,10 @@ async function main() {
   const compareRequire = createRequire(new URL('../compare/package.json', import.meta.url));
   const playwright = compareRequire('playwright');
   const cells = [];
+  const pilotStartedAt = Date.now();
 
   try {
-    for (const engine of DESIGN.engines) cells.push(await measureEngine(engine, playwright[engine], bundle, inventory));
+    for (const engine of DESIGN.engines) cells.push(await measureEngine(engine, playwright[engine], bundle, inventory, pilotStartedAt));
   } catch (error) {
     const failureReceipt = {
       schemaVersion: 1,
@@ -306,6 +323,7 @@ async function main() {
       baselineRevision: DESIGN.baselineRevision,
       generatedAt: new Date().toISOString(),
       candidateSamples: 0,
+      pilotEnclosingWallMs: Date.now() - pilotStartedAt,
       inventorySha256: pairedLogReceiptSha256(inventory),
       design: DESIGN,
       status: 'failed',
@@ -320,7 +338,8 @@ async function main() {
     throw error;
   }
 
-  const raw = buildCrossoverPilotReceipt({ inventory, harnessRevision, preregRevision, cells });
+  const pilotEnclosingWallMs = assertPilotWallBudget(pilotStartedAt);
+  const raw = buildCrossoverPilotReceipt({ inventory, harnessRevision, preregRevision, cells, pilotEnclosingWallMs });
   await writeFile(outputPath, `${JSON.stringify(raw, null, 2)}\n`, 'utf8');
   const pilot = finalizeCrossoverPilotReceipt(raw);
   await writeFile(outputPath, `${JSON.stringify(pilot, null, 2)}\n`, 'utf8');

@@ -14,10 +14,10 @@ type Request = { sceneId: string; logicalUnits: number; workMultiplier: 1 | 2 };
 
 function driftingPacket() {
   let call = 0;
-  return vi.fn(async ({ logicalUnits, workMultiplier }: Request) => {
+  return vi.fn(async ({ sceneId, logicalUnits, workMultiplier }: Request) => {
     const unitCost = 0.1 * Math.exp(0.001 * call++);
     const ownerMs = unitCost * logicalUnits * workMultiplier;
-    return { ownerMs, enclosingWallMs: ownerMs + 1, logicalUnits, physicalExecutions: logicalUnits * workMultiplier, workMultiplier, semantic: true };
+    return { ownerMs, enclosingWallMs: ownerMs + 1, logicalUnits, physicalExecutions: logicalUnits * workMultiplier, batchCalls: DESIGN.measurement.liveBatchCallsByScene[sceneId as keyof typeof DESIGN.measurement.liveBatchCallsByScene], workMultiplier, semantic: true };
   });
 }
 
@@ -30,7 +30,7 @@ function cluster(sceneId: string, run: number, pattern: string, arm: string, wor
   const ps = positions(pattern, arm);
   const components = ps.map((position) => {
     const ownerMs = unitCost * logicalUnits * workMultiplier;
-    return { position, arm, ownerMs, enclosingWallMs: ownerMs + 1, logicalUnits, physicalExecutions: logicalUnits * workMultiplier, workMultiplier, costPerLogicalUnitMs: unitCost * workMultiplier, semantic: true };
+    return { position, arm, ownerMs, enclosingWallMs: ownerMs + 1, logicalUnits, physicalExecutions: logicalUnits * workMultiplier, batchCalls: DESIGN.measurement.liveBatchCallsByScene[sceneId as keyof typeof DESIGN.measurement.liveBatchCallsByScene], workMultiplier, costPerLogicalUnitMs: unitCost * workMultiplier, semantic: true };
   });
   const sample = Math.exp(components.reduce((sum, entry) => sum + Math.log(entry.costPerLogicalUnitMs), 0) / components.length);
   return { run, samples: [sample], positions: ps, components, ownerMs: components.reduce((sum, entry) => sum + entry.ownerMs, 0), enclosingWallMs: components.reduce((sum, entry) => sum + entry.enclosingWallMs, 0), workMultiplier, semantic: true };
@@ -64,6 +64,7 @@ function pilot() {
     preregRevision: '1'.repeat(40),
     harnessRevision: '2'.repeat(40),
     generatedAt: '2026-09-19T01:00:00.000Z',
+    pilotEnclosingWallMs: 1_000,
     cells: engines.map((engine) => ({ id: `desktop-${engine}`, engine, browserVersion: 'fixture', scenes: DESIGN.sceneIds.map(rawScene) })),
   });
   return { inventory, receipt };
@@ -84,8 +85,32 @@ describe('PROFILE-01 symmetric crossover timing family', () => {
     const measure = driftingPacket();
     const result = await acquireCrossoverObservation(measure, 'direct-manipulation-sheet', 1);
     expect(result.logicalUnits).toBe(512);
-    const unresolved = vi.fn(async ({ logicalUnits, workMultiplier }: Request) => ({ ownerMs: 39, enclosingWallMs: 40, logicalUnits, physicalExecutions: logicalUnits * workMultiplier, workMultiplier, semantic: true }));
+    const unresolved = vi.fn(async ({ sceneId, logicalUnits, workMultiplier }: Request) => ({ ownerMs: 39, enclosingWallMs: 40, logicalUnits, physicalExecutions: logicalUnits * workMultiplier, batchCalls: DESIGN.measurement.liveBatchCallsByScene[sceneId as keyof typeof DESIGN.measurement.liveBatchCallsByScene], workMultiplier, semantic: true }));
     await expect(acquireCrossoverObservation(unresolved, 'direct-manipulation-sheet', 1)).rejects.toBeInstanceOf(CrossoverResolutionFailure);
+  });
+
+  it('fails closed if the frozen scene batch or whole-pilot wall budget drifts', async () => {
+    const wrongBatch = vi.fn(async ({ sceneId, logicalUnits, workMultiplier }: Request) => {
+      const ownerMs = 50;
+      return {
+        ownerMs,
+        enclosingWallMs: ownerMs + 1,
+        logicalUnits,
+        physicalExecutions: logicalUnits * workMultiplier,
+        batchCalls: DESIGN.measurement.liveBatchCallsByScene[sceneId as keyof typeof DESIGN.measurement.liveBatchCallsByScene] - 1,
+        workMultiplier,
+        semantic: true,
+      };
+    });
+    await expect(acquireCrossoverObservation(wrongBatch, 'collection-reorder-100', 1)).rejects.toThrow(/live-batch count drifted/);
+
+    expect(() => buildCrossoverPilotReceipt({
+      inventory: { exact: 'fixture' },
+      preregRevision: '1'.repeat(40),
+      harnessRevision: '2'.repeat(40),
+      pilotEnclosingWallMs: DESIGN.measurement.maximumPilotWallMs + 1,
+      cells: [],
+    })).toThrow(/whole-pilot wall bound escaped/);
   });
 
   it('cancels first-order log-cost phase drift without inflating independent N', async () => {

@@ -54,6 +54,7 @@ export async function acquireCrossoverObservation(measurePacket, sceneId, workMu
   invariant(result.logicalUnits === logicalUnits, `${sceneId}: fixed logical-unit count drifted`);
   invariant(result.workMultiplier === workMultiplier, `${sceneId}: work multiplier drifted`);
   invariant(result.physicalExecutions === logicalUnits * workMultiplier, `${sceneId}: physical-work count drifted`);
+  invariant(result.batchCalls === DESIGN.measurement.liveBatchCallsByScene[sceneId], `${sceneId}: frozen live-batch count drifted`);
 
   if (result.enclosingWallMs > DESIGN.measurement.maximumEnclosingWallMsPerComponent) {
     throw new CrossoverResolutionFailure('component exceeded enclosing wall bound', {
@@ -73,6 +74,7 @@ export async function acquireCrossoverObservation(measurePacket, sceneId, workMu
     enclosingWallMs: result.enclosingWallMs,
     logicalUnits,
     physicalExecutions: result.physicalExecutions,
+    batchCalls: result.batchCalls,
     workMultiplier,
     costPerLogicalUnitMs: result.ownerMs / logicalUnits,
     semantic: true,
@@ -140,6 +142,7 @@ function validateComponent(component, sceneId, workMultiplier, position, label) 
   invariant(component.logicalUnits === logicalUnits, `${label}: component logical-unit count drifted`);
   invariant(component.workMultiplier === workMultiplier, `${label}: component multiplier drifted`);
   invariant(component.physicalExecutions === logicalUnits * workMultiplier, `${label}: component physical-work count drifted`);
+  invariant(component.batchCalls === DESIGN.measurement.liveBatchCallsByScene[sceneId], `${label}: component live-batch count drifted`);
   invariant(Number.isFinite(component.ownerMs) && component.ownerMs >= DESIGN.measurement.minimumOwnedMsPerComponent, `${label}: component owner-time floor escaped`);
   invariant(Number.isFinite(component.enclosingWallMs) && component.enclosingWallMs >= component.ownerMs && component.enclosingWallMs <= DESIGN.measurement.maximumEnclosingWallMsPerComponent, `${label}: component wall bound escaped`);
   invariant(Object.is(component.costPerLogicalUnitMs, component.ownerMs / logicalUnits), `${label}: component normalized cost drifted`);
@@ -180,10 +183,11 @@ function validateCrossoverPair(group, sceneId, leftName, rightName, leftArm, rig
   }
 }
 
-export function buildCrossoverPilotReceipt({ inventory, preregRevision, harnessRevision, cells, generatedAt = new Date().toISOString() }) {
+export function buildCrossoverPilotReceipt({ inventory, preregRevision, harnessRevision, cells, pilotEnclosingWallMs, generatedAt = new Date().toISOString() }) {
   validateCrossoverPreregistration();
   invariant(/^[0-9a-f]{40}$/u.test(preregRevision), 'preregRevision must be exact SHA');
   invariant(/^[0-9a-f]{40}$/u.test(harnessRevision), 'harnessRevision must be exact SHA');
+  invariant(Number.isFinite(pilotEnclosingWallMs) && pilotEnclosingWallMs >= 0 && pilotEnclosingWallMs <= DESIGN.measurement.maximumPilotWallMs, 'whole-pilot wall bound escaped');
   return {
     schemaVersion: 1,
     node: 'PROFILE-01',
@@ -193,6 +197,7 @@ export function buildCrossoverPilotReceipt({ inventory, preregRevision, harnessR
     baselineRevision: DESIGN.baselineRevision,
     generatedAt,
     candidateSamples: 0,
+    pilotEnclosingWallMs,
     inventorySha256: pairedLogReceiptSha256(inventory),
     design: DESIGN,
     cells,
@@ -205,6 +210,7 @@ export function finalizeCrossoverPilotReceipt(receipt) {
   invariant(receipt.designId === DESIGN.id, 'receipt design drifted');
   invariant(receipt.baselineRevision === DESIGN.baselineRevision, 'receipt baseline drifted');
   invariant(receipt.candidateSamples === 0, 'pilot observed candidate data');
+  invariant(Number.isFinite(receipt.pilotEnclosingWallMs) && receipt.pilotEnclosingWallMs >= 0 && receipt.pilotEnclosingWallMs <= DESIGN.measurement.maximumPilotWallMs, 'whole-pilot wall bound escaped');
   invariant(/^[0-9a-f]{40}$/u.test(receipt.preregRevision) && /^[0-9a-f]{40}$/u.test(receipt.harnessRevision), 'receipt exact revisions missing');
   invariant(/^[0-9a-f]{64}$/u.test(receipt.inventorySha256), 'inventory digest missing');
   invariant(Array.isArray(receipt.cells) && receipt.cells.length === DESIGN.engines.length, 'desktop cell matrix missing');
