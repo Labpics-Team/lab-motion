@@ -1,4 +1,4 @@
-name: PROFILE-01 symmetric crossover evidence acquisition
+name: PROFILE-01 bounded symmetric crossover evidence acquisition
 
 on:
   push:
@@ -14,7 +14,7 @@ env:
 
 jobs:
   acquire:
-    name: symmetric-crossover null/control pilot
+    name: bounded symmetric-crossover null/control pilot
     runs-on: ubuntu-latest
     timeout-minutes: 45
     steps:
@@ -35,8 +35,8 @@ jobs:
         env:
           PROFILE_HEAD_SHA: ${{ github.sha }}
           PROFILE_REGISTERED_MAIN_SHA: 2c947007168d4964124db8ce8079bbfabc975687
-          PROFILE_PREREG_SHA: 876d6db743bcac5ef5a93a0b6cc5bfdaf075093b
-          PROFILE_HARNESS_SHA: 46340b900a989ed24969499a0ce4aba7a7ca5632
+          PROFILE_PREREG_SHA: 4c259b4ff7776f4dcd30581c0e69c4752f6d1d33
+          PROFILE_HARNESS_SHA: 177327404a495f10bf82b9f1c1ce84d6f7415631
           PROFILE_BASELINE_SHA: fe11daa407de396fad952be7679650f63dabd4dd
         run: |
           set -euo pipefail
@@ -84,7 +84,7 @@ jobs:
           node bench/profile/capture-desktop.mjs > "$out/inventory.json"
           PROFILE_INVENTORY_PATH="$out/inventory.json" \
           PROFILE_CALIBRATION_OUTPUT="$out/calibration.json" \
-          PROFILE_CALIBRATION_ID="desktop-controls-symmetric-crossover-owner-v1" \
+          PROFILE_CALIBRATION_ID="desktop-controls-symmetric-crossover-bounded-work-v2" \
             node bench/profile/calibrate-desktop.mjs > "$out/calibration.stdout.json"
 
           git worktree add --detach "$baseline" "$PROFILE_BASELINE_SHA"
