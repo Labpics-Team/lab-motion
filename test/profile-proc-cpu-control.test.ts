@@ -22,14 +22,18 @@ function pairMeasure(browserVersion = 'fixture') {
       isolationToken,
       pairOrdinal,
       browserVersion,
+      cgroupId: `lab-motion-profile-fixture-${browserVersion}-${pairOrdinal}`,
       pairEnclosingWallMs: 200,
       semantic: true,
       observations: request.arms.map((arm: any, position: number) => ({
         key: arm.key,
-        browserTreeCpuMs: baseCpuMs * arm.workMultiplier,
-        browserTreeCpuNs: String(Math.round(baseCpuMs * arm.workMultiplier * 1e6)),
-        processIdentityCount: 1,
-        processDeltas: [{ pid: 1000 + pairOrdinal, starttime: '123', cpuNs: String(Math.round(baseCpuMs * arm.workMultiplier * 1e6)) }],
+        browserCgroupCpuMs: baseCpuMs * arm.workMultiplier,
+        browserCgroupCpuUs: String(Math.round(baseCpuMs * arm.workMultiplier * 1e3)),
+        cgroupId: `lab-motion-profile-fixture-${browserVersion}-${pairOrdinal}`,
+        rootPid: 1000 + pairOrdinal,
+        cgroupMembersAtLaunch: [1000 + pairOrdinal],
+        cgroupMembersBefore: [1000 + pairOrdinal],
+        cgroupMembersAfter: [1000 + pairOrdinal],
         enclosingWallMs: baseCpuMs * arm.workMultiplier + 5,
         warmupWallMs: 1,
         logicalUnits: request.logicalUnits,
@@ -65,11 +69,14 @@ async function fixtureCells() {
   return cells;
 }
 
-describe('PROFILE-01 Linux browser-tree CPU control family', () => {
+describe('PROFILE-01 Linux browser-cgroup CPU control family', () => {
   it('freezes the kernel CPU representation without weakening controls', () => {
     expect(() => validateProcCpuPreregistration()).not.toThrow();
-    expect(DESIGN.measurement.kind).toBe('linux-proc-browser-tree-schedstat-cpu-ms-v1');
+    expect(DESIGN.measurement.kind).toBe('linux-cgroup-v2-browser-cpu-usage-us-v3');
     expect(DESIGN.measurement.independentUnit).toBe('fresh-process-paired-run-block');
+    expect(DESIGN.measurement.processRule).toMatch(/before exec/);
+    expect(DESIGN.measurement.treeRule).toMatch(/birth and exit/);
+    expect(DESIGN.measurement.attributionBoundary).toMatch(/no performance\.now owner timing contributes/);
     expect(DESIGN.controls.aaBand).toEqual([0.95, 1.05]);
     expect(DESIGN.controls.deliberate2xLower95Min).toBe(1.5);
     expect(DESIGN.candidateSamples).toBe(0);
@@ -93,21 +100,25 @@ describe('PROFILE-01 Linux browser-tree CPU control family', () => {
     expect(pair.observations.doubled.samples[0]).toBeCloseTo(pair.observations.single.samples[0] * 2, 12);
   });
 
-  it('rejects a forged process-tree total that does not equal the per-process scheduler evidence', async () => {
+  it('rejects a forged cgroup ms/us total', async () => {
     const measure = pairMeasure();
     measure.mockImplementationOnce(async (request: any) => ({
       processLifecycle: 'launch-server-paired-arms-close',
       isolationToken: 'fixture-sum-mismatch',
       pairOrdinal: 1,
       browserVersion: 'fixture',
+      cgroupId: 'lab-motion-profile-fixture-mismatch',
       pairEnclosingWallMs: 100,
       semantic: true,
       observations: request.arms.map((arm: any, position: number) => ({
         key: arm.key,
-        browserTreeCpuMs: 50,
-        browserTreeCpuNs: '50000000',
-        processIdentityCount: 1,
-        processDeltas: [{ pid: 111, starttime: '123', cpuNs: '49000000' }],
+        browserCgroupCpuMs: 50,
+        browserCgroupCpuUs: '49000',
+        cgroupId: 'lab-motion-profile-fixture-mismatch',
+        rootPid: 111,
+        cgroupMembersAtLaunch: [111],
+        cgroupMembersBefore: [111],
+        cgroupMembersAfter: [111],
         enclosingWallMs: 55,
         warmupWallMs: 1,
         logicalUnits: request.logicalUnits,
@@ -124,24 +135,28 @@ describe('PROFILE-01 Linux browser-tree CPU control family', () => {
       })),
     }));
     await expect(acquireProcCpuBlock(measure, 'direct-manipulation-sheet', 0, 'aa', 'AB'))
-      .rejects.toThrow(/process CPU sum mismatch/);
+      .rejects.toThrow(/CPU ms\/us mismatch/);
   });
 
-  it('fails closed when an arm does not clear the frozen process-CPU floor', async () => {
+  it('fails closed when an arm does not clear the frozen cgroup-CPU floor', async () => {
     const measure = pairMeasure();
     measure.mockImplementationOnce(async (request: any) => ({
       processLifecycle: 'launch-server-paired-arms-close',
       isolationToken: 'fixture-floor-failure',
       pairOrdinal: 1,
       browserVersion: 'fixture',
+      cgroupId: 'lab-motion-profile-fixture-floor',
       pairEnclosingWallMs: 100,
       semantic: true,
       observations: request.arms.map((arm: any, position: number) => ({
         key: arm.key,
-        browserTreeCpuMs: 1,
-        browserTreeCpuNs: '1000000',
-        processIdentityCount: 1,
-        processDeltas: [{ pid: 111, starttime: '123', cpuNs: '1000000' }],
+        browserCgroupCpuMs: 1,
+        browserCgroupCpuUs: '1000',
+        cgroupId: 'lab-motion-profile-fixture-floor',
+        rootPid: 111,
+        cgroupMembersAtLaunch: [111],
+        cgroupMembersBefore: [111],
+        cgroupMembersAfter: [111],
         enclosingWallMs: 2,
         warmupWallMs: 1,
         logicalUnits: request.logicalUnits,

@@ -37,50 +37,43 @@ function observationFrom(raw, sceneId, run, workMultiplier, token, position) {
   const logicalUnits = frozenCount(DESIGN.measurement.logicalUnitsByScene, sceneId, 'logical-unit count');
   const batchCalls = frozenCount(DESIGN.measurement.liveBatchCallsByScene, sceneId, 'live-batch count');
   const warmupLogicalUnits = frozenCount(DESIGN.measurement.warmupLogicalUnitsByScene, sceneId, 'warmup count');
-  invariant(raw?.semantic === true, `${sceneId}/run-${run}/${position}: semantic oracle failed`);
-  invariant(raw.isolationToken === token, `${sceneId}/run-${run}/${position}: pair token drifted`);
-  invariant(raw.position === position, `${sceneId}/run-${run}/${position}: pair position drifted`);
-  invariant(Number.isFinite(raw.browserTreeCpuMs) && raw.browserTreeCpuMs >= 0, `${sceneId}/run-${run}/${position}: invalid browser-tree CPU time`);
-  invariant(typeof raw.browserTreeCpuNs === 'string' && /^[0-9]+$/u.test(raw.browserTreeCpuNs), `${sceneId}/run-${run}/${position}: CPU nanosecond receipt missing`);
-  invariant(Array.isArray(raw.processDeltas) && raw.processDeltas.length > 0, `${sceneId}/run-${run}/${position}: process CPU evidence missing`);
-  invariant(raw.processIdentityCount === raw.processDeltas.length, `${sceneId}/run-${run}/${position}: process identity count drifted`);
-  const identities = new Set();
-  let summedCpuNs = 0n;
-  for (const entry of raw.processDeltas) {
-    invariant(Number.isSafeInteger(entry?.pid) && entry.pid > 1, `${sceneId}/run-${run}/${position}: invalid process pid`);
-    invariant(typeof entry.starttime === 'string' && /^[0-9]+$/u.test(entry.starttime), `${sceneId}/run-${run}/${position}: invalid process starttime`);
-    invariant(typeof entry.cpuNs === 'string' && /^[0-9]+$/u.test(entry.cpuNs), `${sceneId}/run-${run}/${position}: invalid process CPU delta`);
-    const identity = `${entry.pid}:${entry.starttime}`;
-    invariant(!identities.has(identity), `${sceneId}/run-${run}/${position}: duplicate process identity`);
-    identities.add(identity);
-    summedCpuNs += BigInt(entry.cpuNs);
+  const label = `${sceneId}/run-${run}/${position}`;
+  invariant(raw?.semantic === true, `${label}: semantic oracle failed`);
+  invariant(raw.isolationToken === token, `${label}: pair token drifted`);
+  invariant(raw.position === position, `${label}: pair position drifted`);
+  invariant(Number.isFinite(raw.browserCgroupCpuMs) && raw.browserCgroupCpuMs >= 0, `${label}: invalid browser-cgroup CPU time`);
+  invariant(typeof raw.browserCgroupCpuUs === 'string' && /^[0-9]+$/u.test(raw.browserCgroupCpuUs), `${label}: CPU microsecond receipt missing`);
+  invariant(Object.is(Number(BigInt(raw.browserCgroupCpuUs)) / 1000, raw.browserCgroupCpuMs), `${label}: CPU ms/us mismatch`);
+  invariant(typeof raw.cgroupId === 'string' && raw.cgroupId.startsWith('lab-motion-profile-'), `${label}: cgroup identity missing`);
+  invariant(Number.isSafeInteger(raw.rootPid) && raw.rootPid > 1, `${label}: browser root pid missing`);
+  for (const memberSet of [raw.cgroupMembersAtLaunch, raw.cgroupMembersBefore, raw.cgroupMembersAfter]) {
+    invariant(Array.isArray(memberSet) && memberSet.length > 0 && memberSet.every((pid) => Number.isSafeInteger(pid) && pid > 1), `${label}: cgroup membership evidence missing`);
+    invariant(memberSet.includes(raw.rootPid), `${label}: browser root escaped cgroup membership`);
   }
-  invariant(summedCpuNs === BigInt(raw.browserTreeCpuNs), `${sceneId}/run-${run}/${position}: process CPU sum mismatch`);
-  invariant(Object.is(Number(summedCpuNs) / 1e6, raw.browserTreeCpuMs), `${sceneId}/run-${run}/${position}: CPU ms/ns mismatch`);
-  invariant(Number.isFinite(raw.enclosingWallMs) && raw.enclosingWallMs >= 0, `${sceneId}/run-${run}/${position}: invalid enclosing wall-time`);
-  invariant(Number.isFinite(raw.warmupWallMs) && raw.warmupWallMs >= 0, `${sceneId}/run-${run}/${position}: warmup wall diagnostic invalid`);
-  invariant(raw.logicalUnits === logicalUnits, `${sceneId}/run-${run}/${position}: logical-unit count drifted`);
-  invariant(raw.batchCalls === batchCalls, `${sceneId}/run-${run}/${position}: live-batch count drifted`);
-  invariant(raw.warmupLogicalUnits === warmupLogicalUnits, `${sceneId}/run-${run}/${position}: warmup count drifted`);
-  invariant(raw.workMultiplier === workMultiplier, `${sceneId}/run-${run}/${position}: work multiplier drifted`);
-  invariant(raw.physicalExecutions === logicalUnits * workMultiplier, `${sceneId}/run-${run}/${position}: formal work count drifted`);
-  if (raw.browserTreeCpuMs < DESIGN.measurement.minimumCpuMsPerArm) {
-    throw new ProcCpuFailure('formal arm did not clear frozen process-CPU floor', {
-      sceneId,
-      run,
-      position,
-      workMultiplier,
-      browserTreeCpuMs: raw.browserTreeCpuMs,
+  invariant(Number.isFinite(raw.enclosingWallMs) && raw.enclosingWallMs >= 0, `${label}: invalid enclosing wall-time`);
+  invariant(Number.isFinite(raw.warmupWallMs) && raw.warmupWallMs >= 0, `${label}: warmup wall diagnostic invalid`);
+  invariant(raw.logicalUnits === logicalUnits, `${label}: logical-unit count drifted`);
+  invariant(raw.batchCalls === batchCalls, `${label}: live-batch count drifted`);
+  invariant(raw.warmupLogicalUnits === warmupLogicalUnits, `${label}: warmup count drifted`);
+  invariant(raw.workMultiplier === workMultiplier, `${label}: work multiplier drifted`);
+  invariant(raw.physicalExecutions === logicalUnits * workMultiplier, `${label}: formal work count drifted`);
+  if (raw.browserCgroupCpuMs < DESIGN.measurement.minimumCpuMsPerArm) {
+    throw new ProcCpuFailure('formal arm did not clear frozen cgroup-CPU floor', {
+      sceneId, run, position, workMultiplier,
+      browserCgroupCpuMs: raw.browserCgroupCpuMs,
       minimumCpuMsPerArm: DESIGN.measurement.minimumCpuMsPerArm,
     });
   }
   return {
     run,
-    samples: [raw.browserTreeCpuMs / logicalUnits],
-    browserTreeCpuMs: raw.browserTreeCpuMs,
-    browserTreeCpuNs: raw.browserTreeCpuNs,
-    processDeltas: raw.processDeltas,
-    processIdentityCount: raw.processIdentityCount,
+    samples: [raw.browserCgroupCpuMs / logicalUnits],
+    browserCgroupCpuMs: raw.browserCgroupCpuMs,
+    browserCgroupCpuUs: raw.browserCgroupCpuUs,
+    cgroupId: raw.cgroupId,
+    cgroupMembersAtLaunch: raw.cgroupMembersAtLaunch,
+    cgroupMembersBefore: raw.cgroupMembersBefore,
+    cgroupMembersAfter: raw.cgroupMembersAfter,
+    rootPid: raw.rootPid,
     enclosingWallMs: raw.enclosingWallMs,
     warmupWallMs: raw.warmupWallMs,
     logicalUnits,
@@ -134,6 +127,7 @@ export async function acquireProcCpuBlock(measureFreshPair, sceneId, run, pairKi
   invariant(typeof result.isolationToken === 'string' && result.isolationToken.length >= 16, `${sceneId}/run-${run}/${pairKind}: pair isolation token missing`);
   invariant(Number.isSafeInteger(result.pairOrdinal) && result.pairOrdinal > 0, `${sceneId}/run-${run}/${pairKind}: pair ordinal missing`);
   invariant(typeof result.browserVersion === 'string' && result.browserVersion.length > 0, `${sceneId}/run-${run}/${pairKind}: browser version missing`);
+  invariant(typeof result.cgroupId === 'string' && result.cgroupId.startsWith('lab-motion-profile-'), `${sceneId}/run-${run}/${pairKind}: pair cgroup identity missing`);
   invariant(Number.isFinite(result.pairEnclosingWallMs) && result.pairEnclosingWallMs >= 0, `${sceneId}/run-${run}/${pairKind}: invalid pair wall-time`);
   if (result.pairEnclosingWallMs > DESIGN.measurement.maximumEnclosingWallMsPerPair) {
     throw new ProcCpuFailure('formal pair exceeded enclosing wall bound', {
@@ -154,6 +148,7 @@ export async function acquireProcCpuBlock(measureFreshPair, sceneId, run, pairKi
     invariant(raw.processLifecycle === result.processLifecycle, `${sceneId}/run-${run}/${pairKind}/${arm.key}: lifecycle drifted`);
     invariant(raw.pairOrdinal === result.pairOrdinal, `${sceneId}/run-${run}/${pairKind}/${arm.key}: pair ordinal drifted`);
     invariant(raw.browserVersion === result.browserVersion, `${sceneId}/run-${run}/${pairKind}/${arm.key}: browser version drifted`);
+    invariant(raw.cgroupId === result.cgroupId, `${sceneId}/run-${run}/${pairKind}/${arm.key}: cgroup identity drifted inside pair`);
     byKey[arm.key] = observationFrom(raw, sceneId, run, arm.workMultiplier, result.isolationToken, position);
   }
 
@@ -162,6 +157,7 @@ export async function acquireProcCpuBlock(measureFreshPair, sceneId, run, pairKi
     isolationToken: result.isolationToken,
     pairOrdinal: result.pairOrdinal,
     browserVersion: result.browserVersion,
+    cgroupId: result.cgroupId,
     pairEnclosingWallMs: result.pairEnclosingWallMs,
     observations: byKey,
   };
@@ -210,34 +206,31 @@ function validateObservation(entry, sceneId, run, workMultiplier, label, expecte
   invariant(entry.warmupLogicalUnits === warmupLogicalUnits, `${label}: warmup work drifted`);
   invariant(entry.workMultiplier === workMultiplier, `${label}: work multiplier drifted`);
   invariant(entry.physicalExecutions === logicalUnits * workMultiplier, `${label}: formal work count drifted`);
-  invariant(entry.browserTreeCpuMs >= DESIGN.measurement.minimumCpuMsPerArm, `${label}: process-CPU floor escaped`);
-  invariant(typeof entry.browserTreeCpuNs === 'string' && /^[0-9]+$/u.test(entry.browserTreeCpuNs), `${label}: CPU nanosecond receipt missing`);
-  invariant(Array.isArray(entry.processDeltas) && entry.processDeltas.length === entry.processIdentityCount && entry.processDeltas.length > 0, `${label}: process CPU evidence drifted`);
-  const identities = new Set();
-  let summedCpuNs = 0n;
-  for (const processDelta of entry.processDeltas) {
-    invariant(Number.isSafeInteger(processDelta?.pid) && processDelta.pid > 1, `${label}: invalid process pid`);
-    invariant(typeof processDelta.starttime === 'string' && /^[0-9]+$/u.test(processDelta.starttime), `${label}: invalid process starttime`);
-    invariant(typeof processDelta.cpuNs === 'string' && /^[0-9]+$/u.test(processDelta.cpuNs), `${label}: invalid process CPU delta`);
-    const identity = `${processDelta.pid}:${processDelta.starttime}`;
-    invariant(!identities.has(identity), `${label}: duplicate process identity`);
-    identities.add(identity);
-    summedCpuNs += BigInt(processDelta.cpuNs);
+  invariant(entry.browserCgroupCpuMs >= DESIGN.measurement.minimumCpuMsPerArm, `${label}: cgroup-CPU floor escaped`);
+  invariant(typeof entry.browserCgroupCpuUs === 'string' && /^[0-9]+$/u.test(entry.browserCgroupCpuUs), `${label}: CPU microsecond receipt missing`);
+  invariant(Object.is(Number(BigInt(entry.browserCgroupCpuUs)) / 1000, entry.browserCgroupCpuMs), `${label}: CPU ms/us mismatch`);
+  invariant(typeof entry.cgroupId === 'string' && entry.cgroupId.startsWith('lab-motion-profile-'), `${label}: cgroup identity drifted`);
+  invariant(Number.isSafeInteger(entry.rootPid) && entry.rootPid > 1, `${label}: browser root pid drifted`);
+  for (const memberSet of [entry.cgroupMembersAtLaunch, entry.cgroupMembersBefore, entry.cgroupMembersAfter]) {
+    invariant(Array.isArray(memberSet) && memberSet.length > 0 && memberSet.every((pid) => Number.isSafeInteger(pid) && pid > 1), `${label}: cgroup membership drifted`);
+    invariant(memberSet.includes(entry.rootPid), `${label}: browser root missing from cgroup membership`);
   }
-  invariant(summedCpuNs === BigInt(entry.browserTreeCpuNs), `${label}: process CPU sum mismatch`);
-  invariant(Object.is(Number(summedCpuNs) / 1e6, entry.browserTreeCpuMs), `${label}: CPU ms/ns mismatch`);
   invariant(Number.isFinite(entry.enclosingWallMs) && entry.enclosingWallMs >= 0, `${label}: arm wall-time invalid`);
   invariant(Number.isFinite(entry.warmupWallMs) && entry.warmupWallMs >= 0, `${label}: warmup wall diagnostic invalid`);
-  invariant(Object.is(entry.samples[0], entry.browserTreeCpuMs / logicalUnits), `${label}: sample/raw CPU mismatch`);
+  invariant(Object.is(entry.samples[0], entry.browserCgroupCpuMs / logicalUnits), `${label}: sample/raw CPU mismatch`);
 }
 
-function validatePair(group, sceneId, run, leftName, rightName, leftMultiplier, rightMultiplier, allowedOrders, label, tokens, browserVersion) {
+function validatePair(group, sceneId, run, leftName, rightName, leftMultiplier, rightMultiplier, allowedOrders, label, tokens, cgroupIds, browserVersion) {
   const order = group.orders[run];
   invariant(allowedOrders.includes(order), `${label}: unregistered order`);
   const token = group.pairTokens[run];
   invariant(typeof token === 'string' && token.length >= 16, `${label}: pair token missing`);
   invariant(!tokens.has(token), `${label}: pair isolation token reused across run-blocks`);
   tokens.add(token);
+  const cgroupId = group[leftName][run]?.cgroupId;
+  invariant(cgroupId === group[rightName][run]?.cgroupId, `${label}: pair arms escaped dedicated cgroup`);
+  invariant(!cgroupIds.has(cgroupId), `${label}: dedicated cgroup reused across run-blocks`);
+  cgroupIds.add(cgroupId);
   const firstKey = order[0] === 'A' ? 'a' : order[0] === 'B' ? 'b' : order[0] === 'S' ? 'single' : 'doubled';
   const secondKey = firstKey === leftName ? rightName : leftName;
   const positions = { [firstKey]: 0, [secondKey]: 1 };
@@ -280,6 +273,7 @@ export function finalizeProcCpuPilotReceipt(receipt) {
 
   const output = structuredClone(receipt);
   const tokens = new Set();
+  const cgroupIds = new Set();
   const [aaLow, aaHigh] = DESIGN.controls.aaBand;
   for (let cellIndex = 0; cellIndex < output.cells.length; cellIndex++) {
     const cell = output.cells[cellIndex];
@@ -300,7 +294,7 @@ export function finalizeProcCpuPilotReceipt(receipt) {
         invariant(Array.isArray(group[leftName]) && group[leftName].length === DESIGN.controls.runBlocks, `${label}/${groupName}: left block count drifted`);
         invariant(Array.isArray(group[rightName]) && group[rightName].length === DESIGN.controls.runBlocks, `${label}/${groupName}: right block count drifted`);
         for (let run = 0; run < DESIGN.controls.runBlocks; run++) {
-          validatePair(group, scene.id, run, leftName, rightName, leftMultiplier, rightMultiplier, orders, `${label}/${groupName}/run-${run}`, tokens, cell.browserVersion);
+          validatePair(group, scene.id, run, leftName, rightName, leftMultiplier, rightMultiplier, orders, `${label}/${groupName}/run-${run}`, tokens, cgroupIds, cell.browserVersion);
         }
       }
       const seed = DESIGN.controls.bootstrapSeed ^ Math.imul(cellIndex + 1, 0x45d9f3b) ^ Math.imul(sceneIndex + 1, 0x119de1f3);
@@ -310,10 +304,13 @@ export function finalizeProcCpuPilotReceipt(receipt) {
       invariant(scene.deliberate2x.lower95 >= DESIGN.controls.deliberate2xLower95Min, `${label}: deliberate-2x unresolved`);
     }
   }
-  invariant(tokens.size === DESIGN.engines.length * DESIGN.sceneIds.length * DESIGN.controls.runBlocks * 2, 'pair-process isolation-token cardinality drifted');
+  const expectedPairs = DESIGN.engines.length * DESIGN.sceneIds.length * DESIGN.controls.runBlocks * 2;
+  invariant(tokens.size === expectedPairs, 'pair-process isolation-token cardinality drifted');
+  invariant(cgroupIds.size === expectedPairs, 'dedicated-cgroup cardinality drifted');
   output.processIsolation = {
-    kind: 'fresh-browser-server-process-per-paired-run-block',
+    kind: 'fresh-browser-server-process-and-cgroup-per-paired-run-block',
     uniquePairTokens: tokens.size,
+    uniqueCgroupIds: cgroupIds.size,
     formalArmsPerPair: 2,
   };
   return output;

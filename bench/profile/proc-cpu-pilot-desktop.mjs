@@ -1,7 +1,7 @@
 import { randomUUID } from 'node:crypto';
 import { execFileSync } from 'node:child_process';
 import { createRequire } from 'node:module';
-import { readFileSync } from 'node:fs';
+import { readFileSync, unlinkSync, writeFileSync } from 'node:fs';
 import { readFile, writeFile } from 'node:fs/promises';
 import { resolve } from 'node:path';
 import { pathToFileURL } from 'node:url';
@@ -19,7 +19,7 @@ import {
 import { pairedLogReceiptSha256 } from './paired-log-pilot-core.mjs';
 import { validateCalibrationReceipt, validateDesktopInventory } from './validate.mjs';
 
-export const PROC_CPU_HARNESS_KIND = 'linux-proc-browser-tree-schedstat-cpu-ms-v1';
+export const PROC_CPU_HARNESS_KIND = 'linux-cgroup-v2-browser-cpu-usage-us-v3';
 
 function invariant(condition, message) {
   if (!condition) throw new Error(`PROFILE-01 proc-cpu desktop: ${message}`);
@@ -282,70 +282,72 @@ function assertPilotWallBudget(pilotStartedAt) {
   return elapsed;
 }
 
-function procChildren(pid) {
-  const text = readFileSync(`/proc/${pid}/task/${pid}/children`, 'utf8').trim();
-  return text === '' ? [] : text.split(/\s+/u).map((value) => Number(value));
+function cgroupKernelPath(pid) {
+  const line = readFileSync(`/proc/${pid}/cgroup`, 'utf8').split(/\n/u).find((entry) => entry.startsWith('0::'));
+  invariant(line, `pid ${pid}: cgroup-v2 membership missing`);
+  return line.slice(3) || '/';
 }
 
-function procIdentity(pid) {
-  const stat = readFileSync(`/proc/${pid}/stat`, 'utf8');
-  const commEnd = stat.lastIndexOf(')');
-  invariant(commEnd > 0, `pid ${pid}: malformed /proc stat`);
-  const fields = stat.slice(commEnd + 2).trim().split(/\s+/u);
-  const starttime = fields[19];
-  invariant(/^[0-9]+$/u.test(starttime ?? ''), `pid ${pid}: missing process starttime`);
-  const sched = readFileSync(`/proc/${pid}/schedstat`, 'utf8').trim().split(/\s+/u);
-  invariant(/^[0-9]+$/u.test(sched[0] ?? ''), `pid ${pid}: missing schedstat runtime`);
-  return { pid, starttime, cpuNs: BigInt(sched[0]) };
+function readCgroupPids(cgroupPath) {
+  const text = readFileSync(`${cgroupPath}/cgroup.procs`, 'utf8').trim();
+  if (text === '') return [];
+  return text.split(/\s+/u).map(Number).sort((a, b) => a - b);
 }
 
-function snapshotBrowserTree(rootPid) {
-  invariant(process.platform === 'linux', 'schedstat pilot requires Linux');
-  invariant(Number.isSafeInteger(rootPid) && rootPid > 1, 'browser-server root pid missing');
-  const stack = [rootPid];
-  const seen = new Set();
-  const entries = [];
-  while (stack.length > 0) {
-    const pid = stack.pop();
-    if (seen.has(pid)) continue;
-    seen.add(pid);
-    const identity = procIdentity(pid);
-    entries.push(identity);
-    for (const child of procChildren(pid)) stack.push(child);
-  }
-  entries.sort((a, b) => a.pid - b.pid);
-  invariant(entries.length > 0 && entries[0].cpuNs >= 0n, 'browser process tree is empty');
-  return entries;
+function readCgroupCpuUsageUs(cgroupPath) {
+  const fields = Object.fromEntries(readFileSync(`${cgroupPath}/cpu.stat`, 'utf8')
+    .trim().split(/\n/u).map((line) => line.trim().split(/\s+/u)));
+  invariant(/^[0-9]+$/u.test(fields.usage_usec ?? ''), `${cgroupPath}: cpu.stat usage_usec missing`);
+  return BigInt(fields.usage_usec);
 }
 
-function schedulerCpuDelta(before, after, label) {
-  const beforeKeys = before.map(({ pid, starttime }) => `${pid}:${starttime}`);
-  const afterKeys = after.map(({ pid, starttime }) => `${pid}:${starttime}`);
-  if (JSON.stringify(beforeKeys) !== JSON.stringify(afterKeys)) {
-    throw new ProcCpuFailure('browser process-tree identity drifted inside formal arm', {
-      label,
-      before: beforeKeys,
-      after: afterKeys,
-    });
-  }
-  let total = 0n;
-  const processDeltas = [];
-  for (let index = 0; index < before.length; index++) {
-    const delta = after[index].cpuNs - before[index].cpuNs;
-    invariant(delta >= 0n, `${label}: pid ${before[index].pid} schedstat moved backwards`);
-    total += delta;
-    processDeltas.push({
-      pid: before[index].pid,
-      starttime: before[index].starttime,
-      cpuNs: delta.toString(),
-    });
-  }
-  invariant(total > 0n, `${label}: browser process tree reported zero CPU runtime`);
+function createBrowserCgroup() {
+  invariant(process.platform === 'linux', 'cgroup CPU pilot requires Linux');
+  const controllers = readFileSync('/sys/fs/cgroup/cgroup.controllers', 'utf8').trim().split(/\s+/u);
+  invariant(controllers.includes('cpu'), 'cgroup-v2 cpu controller unavailable');
+  execFileSync('sudo', ['-n', 'true'], { stdio: 'ignore' });
+  const id = `lab-motion-profile-${process.pid}-${randomUUID()}`;
+  const path = `/sys/fs/cgroup/${id}`;
+  execFileSync('sudo', ['-n', 'mkdir', path], { stdio: 'ignore' });
+  invariant(readCgroupPids(path).length === 0, `${id}: fresh cgroup is not empty`);
+  readCgroupCpuUsageUs(path);
+  return { id, path, kernelPath: `/${id}` };
+}
+
+function removeBrowserCgroup(cgroup) {
+  const remaining = readCgroupPids(cgroup.path);
+  invariant(remaining.length === 0, `${cgroup.id}: browser cgroup still has members ${remaining.join(',')}`);
+  execFileSync('sudo', ['-n', 'rmdir', cgroup.path], { stdio: 'ignore' });
+}
+
+function createCgroupLauncher(cgroup, realExecutable) {
+  invariant(typeof realExecutable === 'string' && realExecutable.startsWith('/'), 'real browser executable missing');
+  const path = `/tmp/lab-motion-profile-launch-${process.pid}-${randomUUID()}.sh`;
+  const script = [
+    '#!/bin/sh',
+    'set -eu',
+    'printf "%s\\n" "$$" | sudo -n tee "$LAB_MOTION_CGROUP_PROCS" >/dev/null',
+    'exec "$LAB_MOTION_REAL_BROWSER" "$@"',
+    '',
+  ].join('\n');
+  writeFileSync(path, script, { mode: 0o700 });
+  return path;
+}
+
+function assertCgroupOwnership(cgroup, rootPid) {
+  invariant(cgroupKernelPath(process.pid) !== cgroup.kernelPath, `${cgroup.id}: Node runner leaked into browser cgroup`);
+  invariant(cgroupKernelPath(rootPid) === cgroup.kernelPath, `${cgroup.id}: BrowserServer root is outside dedicated cgroup`);
+  const members = readCgroupPids(cgroup.path);
+  invariant(members.includes(rootPid), `${cgroup.id}: BrowserServer root missing from cgroup.procs`);
+  return members;
+}
+function cgroupCpuDelta(beforeUs, afterUs, label) {
+  invariant(afterUs >= beforeUs, `${label}: cgroup cpu.stat moved backwards`);
+  const deltaUs = afterUs - beforeUs;
+  invariant(deltaUs > 0n, `${label}: browser cgroup reported zero CPU runtime`);
   return {
-    browserTreeCpuNs: total.toString(),
-    browserTreeCpuMs: Number(total) / 1e6,
-    processIdentityCount: processDeltas.length,
-    processDeltas,
+    browserCgroupCpuUs: deltaUs.toString(),
+    browserCgroupCpuMs: Number(deltaUs) / 1000,
   };
 }
 
@@ -353,19 +355,27 @@ async function measureProcCpuPair(browserType, engine, bundle, expectedVersion, 
   assertPilotWallBudget(pilotStartedAt);
   const isolationToken = `${engine}:${pairOrdinal}:${randomUUID()}`;
   const pairStartedAt = Date.now();
-  const server = await browserType.launchServer({ headless: true });
-  const rootPid = server.process()?.pid;
-  invariant(Number.isSafeInteger(rootPid) && rootPid > 1, `${engine}: BrowserServer pid missing`);
-  const browser = await browserType.connect(server.wsEndpoint());
+  const cgroup = createBrowserCgroup();
+  const launcherPath = createCgroupLauncher(cgroup, browserType.executablePath());
+  let server;
+  let browser;
   const observations = [];
   let browserVersion = '';
   try {
+    server = await browserType.launchServer({
+      headless: true,
+      executablePath: launcherPath,
+      env: { ...process.env, LAB_MOTION_CGROUP_PROCS: `${cgroup.path}/cgroup.procs`, LAB_MOTION_REAL_BROWSER: browserType.executablePath() },
+    });
+    const rootPid = server.process()?.pid;
+    invariant(Number.isSafeInteger(rootPid) && rootPid > 1, `${engine}: BrowserServer pid missing`);
+    const launchMembers = assertCgroupOwnership(cgroup, rootPid);
+    browser = await browserType.connect(server.wsEndpoint());
     browserVersion = browser.version();
     invariant(browserVersion === expectedVersion, `${engine}: inventory/version drift (${expectedVersion} -> ${browserVersion})`);
     const context = await browser.newContext({ viewport: { width: 390, height: 844 }, deviceScaleFactor: 2 });
     const page = await context.newPage();
     await installHarness(page, bundle);
-
     for (let position = 0; position < request.arms.length; position++) {
       const arm = request.arms[position];
       const warmupStartedAt = Date.now();
@@ -375,21 +385,28 @@ async function measureProcCpuPair(browserType, engine, bundle, expectedVersion, 
       );
       const warmupWallMs = Date.now() - warmupStartedAt;
       invariant(warmup?.semantic === true && warmup.warmupPhysicalExecutions === request.warmupLogicalUnits, `${request.sceneId}: warmup semantic/work drifted`);
-
-      const before = snapshotBrowserTree(rootPid);
+      assertCgroupOwnership(cgroup, rootPid);
+      const membersBefore = readCgroupPids(cgroup.path);
+      const beforeUs = readCgroupCpuUsageUs(cgroup.path);
       const armStartedAt = Date.now();
       const measured = await page.evaluate(
         ([sceneId, batchCalls, logicalUnits, workMultiplier]) => globalThis.__labMotionProcCpu.measure(sceneId, batchCalls, logicalUnits, workMultiplier),
         [request.sceneId, request.batchCalls, request.logicalUnits, arm.workMultiplier],
       );
       const enclosingWallMs = Date.now() - armStartedAt;
-      const after = snapshotBrowserTree(rootPid);
-      const cpu = schedulerCpuDelta(before, after, `${engine}/${request.sceneId}/pair-${pairOrdinal}/${arm.key}`);
+      const afterUs = readCgroupCpuUsageUs(cgroup.path);
+      const membersAfter = readCgroupPids(cgroup.path);
+      assertCgroupOwnership(cgroup, rootPid);
+      const cpu = cgroupCpuDelta(beforeUs, afterUs, `${engine}/${request.sceneId}/pair-${pairOrdinal}/${arm.key}`);
       invariant(measured?.semantic === true && measured.physicalExecutions === request.logicalUnits * arm.workMultiplier, `${request.sceneId}: formal semantic/work drifted`);
       observations.push({
         key: arm.key,
         ...measured,
         ...cpu,
+        cgroupId: cgroup.id,
+        cgroupMembersAtLaunch: launchMembers,
+        cgroupMembersBefore: membersBefore,
+        cgroupMembersAfter: membersAfter,
         enclosingWallMs,
         warmupWallMs,
         logicalUnits: request.logicalUnits,
@@ -407,8 +424,10 @@ async function measureProcCpuPair(browserType, engine, bundle, expectedVersion, 
     }
     await context.close();
   } finally {
-    await browser.close().catch(() => {});
-    await server.close().catch(() => {});
+    if (browser) await browser.close().catch(() => {});
+    if (server) await server.close().catch(() => {});
+    try { unlinkSync(launcherPath); } catch {}
+    removeBrowserCgroup(cgroup);
   }
   assertPilotWallBudget(pilotStartedAt);
   return {
@@ -416,6 +435,7 @@ async function measureProcCpuPair(browserType, engine, bundle, expectedVersion, 
     isolationToken,
     pairOrdinal,
     browserVersion,
+    cgroupId: cgroup.id,
     observations,
     pairEnclosingWallMs: Date.now() - pairStartedAt,
     semantic: true,
