@@ -19,6 +19,8 @@ const PACKAGE = JSON.parse(readFileSync(join(ROOT, 'package.json'), 'utf8')) as 
 const PACKAGE_COMMAND_TIMEOUT_MS = 30_000;
 const PROBE_TIMEOUT_MS = 20_000;
 const WINDOWS_SHELL = process.platform === 'win32';
+const TSUP_CLI = join(ROOT, 'node_modules', 'tsup', 'dist', 'cli-default.js');
+const RESOURCE_RUNTIME_EXPORTS = ['./frame', './compositor'] as const;
 
 function copyTrackedSource(target: string): void {
   const tracked = execFileSync('git', ['ls-files', '-z'], {
@@ -44,12 +46,37 @@ function runInstalledPackageProbe(): string {
     const source = join(work, 'source');
     mkdirSync(source);
     copyTrackedSource(source);
-    execFileSync('pnpm', ['build'], {
+    // Retention is a runtime-owner claim. Build only its two public owner
+    // entries with the exact production tsup config: splitting:false makes each
+    // entry self-contained (except the intentional shared #frame edge), so this
+    // removes unrelated declaration/entry work without changing these emitted
+    // bytes. Full export/declaration/package completeness stays owned by the
+    // existing build + pack gates instead of being duplicated inside this proof.
+    const packagePath = join(source, 'package.json');
+    const manifest = JSON.parse(readFileSync(packagePath, 'utf8')) as {
+      exports: Record<string, unknown>;
+    };
+    manifest.exports = Object.fromEntries(RESOURCE_RUNTIME_EXPORTS.map((key) => {
+      const value = manifest.exports[key];
+      if (value === undefined) throw new Error(`resource proof: missing public export ${key}`);
+      return [key, value];
+    }));
+    writeFileSync(packagePath, JSON.stringify(manifest, null, 2) + '\n');
+    execFileSync(process.execPath, [TSUP_CLI], {
       cwd: source,
       stdio: 'pipe',
-      shell: WINDOWS_SHELL,
       timeout: PACKAGE_COMMAND_TIMEOUT_MS,
     });
+    for (const relative of [
+      'frame/index.js',
+      'frame/index.cjs',
+      'compositor/index.js',
+      'compositor/index.cjs',
+    ]) {
+      expect(readFileSync(join(source, 'dist', relative))).toEqual(
+        readFileSync(join(ROOT, 'dist', relative)),
+      );
+    }
     execFileSync('pnpm', ['pack', '--pack-destination', work], {
       cwd: source,
       stdio: 'pipe',
@@ -94,6 +121,20 @@ assert.equal(typeof gc, 'function', '--expose-gc missing');
 
 const retainedOwners = [];
 
+const boundedCacheCase = (mod, label) => {
+  const cache = mod.createSpringLinearCache(2);
+  assert.equal(cache.capacity, 2, label + ': installed cache capacity drifted');
+  cache.compile({ mass: 1, stiffness: 170, damping: 26 });
+  cache.compile({ mass: 1, stiffness: 180, damping: 8 });
+  cache.compile({ mass: 1, stiffness: 120, damping: 30 });
+  assert.equal(cache.size, 2, label + ': installed cache exceeded frozen capacity');
+  cache.clear();
+  assert.equal(cache.size, 0, label + ': installed cache clear retained entries');
+};
+
+boundedCacheCase(compositorEsm, 'compositor-esm');
+boundedCacheCase(compositorCjs, 'compositor-cjs');
+
 const frameCase = (mod, label, terminal) => {
   let payload = { id: label };
   const ref = new WeakRef(payload);
@@ -109,9 +150,14 @@ const frameCase = (mod, label, terminal) => {
 };
 
 const compositorCase = (mod, label, terminal) => {
+  let animateCalls = 0;
+  let cancelCalls = 0;
   let target = {
     marker: label,
-    animate: () => ({ cancel() {} }),
+    animate: () => {
+      animateCalls++;
+      return { cancel() { cancelCalls++; } };
+    },
   };
   const ref = new WeakRef(target);
   const captured = target;
@@ -128,7 +174,13 @@ const compositorCase = (mod, label, terminal) => {
     setTimer: () => () => {},
   });
   controller.start();
-  if (terminal) controller.destroy();
+  assert.equal(animateCalls, 1, label + ': one controller start must own exactly one native effect');
+  if (terminal) {
+    controller.destroy();
+    assert.equal(cancelCalls, 1, label + ': terminal owner must release exactly one native effect');
+  } else {
+    assert.equal(cancelCalls, 0, label + ': live owner released native effect too early');
+  }
   retainedOwners.push(controller);
   target = undefined;
   return ref;
