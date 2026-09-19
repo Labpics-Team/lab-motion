@@ -148,10 +148,9 @@ function lerpRadii(a: BoxRadii, b: BoxRadii, t: number): BoxRadii {
 }
 
 function boxWithPositionBasis(src: DriverProjectionNodeInit, pHat: number, q: number): FlipRect {
-  const box = mixBox(src.first, src.last, pHat);
-  const out = box as { x: number; y: number };
-  out.x = carryPositionAxis(box.x, q, src._qx ?? 0);
-  out.y = carryPositionAxis(box.y, q, src._qy ?? 0);
+  const box = mixBox(src.first, src.last, pHat) as { x: number; y: number; width: number; height: number };
+  box.x = carryPositionAxis(box.x, q, src._qx ?? 0);
+  box.y = carryPositionAxis(box.y, q, src._qy ?? 0);
   return box;
 }
 
@@ -165,7 +164,7 @@ function rebaseNode(
   target: Omit<ProjectionPlayNode, 'id'>,
   src: DriverProjectionNodeInit,
   pHat: number,
-  positionBasisValue = 0,
+  positionBasisValue: number,
 ): DriverProjectionNodeInit {
   const tc = clamp01(pHat);
   return {
@@ -330,13 +329,9 @@ export function createProjection(options?: ProjectionOptions): ProjectionControl
   };
 
   /** Исключение пользовательского callback не должно оставлять «играющий» зомби-run. */
-  const emit = (
-    projector: Projector,
-    p: number,
-    positionBasisValue = 0,
-  ): void => {
+  const emit = (projector: Projector, p: number): void => {
     try {
-      onFrame?.((projector.at as (p: number, q?: number) => readonly ProjectionFrame[])(p, positionBasisValue));
+      onFrame?.((projector.at as (p: number, q?: number) => readonly ProjectionFrame[])(p, springBasis._valueV0));
     } catch (error) {
       generation++;
       phase = 'canceled';
@@ -362,7 +357,7 @@ export function createProjection(options?: ProjectionOptions): ProjectionControl
     pHat = 1;
     vHat = 0;
     springBasis._valueV0 = springBasis._velocityV0 = 0;
-    emit(projector, 1, 0); // финал — РОВНО p = 1 (точный identity)
+    emit(projector, 1); // финал — РОВНО p = 1 (точный identity)
     if (gen === generation && phase === 'rest') onRest?.();
   };
 
@@ -428,13 +423,13 @@ export function createProjection(options?: ProjectionOptions): ProjectionControl
       vHat = visibleVelocity(value, velocity);
       springBasis._valueV0 = basisVisible ? q : 0;
       springBasis._velocityV0 = basisVisible ? qVelocity : 0;
-      emit(projector, p, springBasis._valueV0);
+      emit(projector, p);
       // Callback мог синхронно перехватить run — не оставляем даже один stale request.
       if (gen === generation && phase === 'active') schedule(tick);
     };
 
     // Первый кадр — синхронно на p=0 (анти-мигание, flip :286-287).
-    emit(projector, 0, 0);
+    emit(projector, 0);
     if (gen === generation && phase === 'active') schedule(tick);
   };
 
@@ -573,7 +568,7 @@ export function createProjection(options?: ProjectionOptions): ProjectionControl
       vHat = 0;
       // Скраб гасит скорость Q, но уже накопленный позиционный базис обязан остаться в кадре.
       springBasis._velocityV0 = 0;
-      emit(flight.projector, pp, springBasis._valueV0);
+      emit(flight.projector, pp);
     },
 
     release(velocity?: number): void {
