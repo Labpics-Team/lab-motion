@@ -32,7 +32,8 @@ function cluster(sceneId: string, run: number, pattern: string, arm: string, wor
     const ownerMs = unitCost * logicalUnits * workMultiplier;
     return { position, arm, ownerMs, enclosingWallMs: ownerMs + 1, logicalUnits, physicalExecutions: logicalUnits * workMultiplier, workMultiplier, costPerLogicalUnitMs: unitCost * workMultiplier, semantic: true };
   });
-  return { run, samples: [unitCost * workMultiplier], positions: ps, components, ownerMs: components.reduce((sum, entry) => sum + entry.ownerMs, 0), enclosingWallMs: components.reduce((sum, entry) => sum + entry.enclosingWallMs, 0), workMultiplier, semantic: true };
+  const sample = Math.exp(components.reduce((sum, entry) => sum + Math.log(entry.costPerLogicalUnitMs), 0) / components.length);
+  return { run, samples: [sample], positions: ps, components, ownerMs: components.reduce((sum, entry) => sum + entry.ownerMs, 0), enclosingWallMs: components.reduce((sum, entry) => sum + entry.enclosingWallMs, 0), workMultiplier, semantic: true };
 }
 
 function rawScene(id: string) {
