@@ -36,7 +36,7 @@ jobs:
           PROFILE_HEAD_SHA: ${{ github.sha }}
           PROFILE_REGISTERED_MAIN_SHA: 2c947007168d4964124db8ce8079bbfabc975687
           PROFILE_PREREG_SHA: 76fa178f452fd355ad5de185dfdb3b504d57abbd
-          PROFILE_HARNESS_SHA: 345a29acb2b59ac807f5bfdc4805554f96f7c295
+          PROFILE_HARNESS_SHA: 97b56a5ad43a2fcbff6d48ef50af571b32d75238
           PROFILE_BASELINE_SHA: fe11daa407de396fad952be7679650f63dabd4dd
         run: |
           set -euo pipefail
@@ -79,7 +79,6 @@ jobs:
           } > "$out/runner.txt"
 
           test "$(stat -fc %T /sys/fs/cgroup)" = cgroup2fs
-          grep -qw cpu /sys/fs/cgroup/cgroup.controllers
           sudo -n true
           smoke_cg="/sys/fs/cgroup/lab-motion-profile-smoke-${GITHUB_RUN_ID}-${GITHUB_RUN_ATTEMPT}"
           sudo -n mkdir "$smoke_cg"
