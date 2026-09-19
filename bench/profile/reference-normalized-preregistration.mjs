@@ -19,12 +19,13 @@ const frozen = (value) => Object.freeze(value);
  */
 export const REFERENCE_NORMALIZED_PREREGISTRATION = frozen({
   schemaVersion: 1,
-  id: 'calibration-bracket-normalized-owner-v1',
+  id: 'calibration-bracket-standardized-owner-ms-v2',
   node: 'PROFILE-01',
   registeredAt: '2026-09-19',
   registeredMainRevision: '2c947007168d4964124db8ce8079bbfabc975687',
   baselineRevision: PROFILE_PREREGISTRATION.baseline.revision,
   candidateSamples: 0,
+  supersedes: frozen({ design: 'calibration-bracket-normalized-owner-v1', outcome: 'superseded-before-pilot', reason: 'static contract review preserved the frozen M-05 millisecond metric before admissible pilot data' }),
   predecessor: frozen({
     family: 'symmetric-crossover-bounded-work-v2',
     outcome: 'NO-GO',
@@ -63,9 +64,10 @@ export const REFERENCE_NORMALIZED_PREREGISTRATION = frozen({
     owner: 'canonical PROFILE-01 desktop calibration receipt',
     source: 'the same deterministic synthetic loop and per-engine batchCopies selected by the mandatory PASS calibration immediately before this pilot',
     bindingRule: 'pilot must validate the exact calibration receipt, then bind iterationsPerCopy and batchCopiesByEngine without changing them',
+    anchorRule: 'referenceAnchorMs is the deterministic median of all 1x samples in that engine calibration (A/A a+b plus deliberate single), frozen before formal pilot acquisition',
     bracketRule: 'measure one fixed reference packet immediately before and one immediately after each semantic packet; both must independently clear the unchanged 40 ms floor',
-    normalizationRule: 'normalizedCost = (ownerMs / logicalUnits) / sqrt(referenceBeforeMs * referenceAfterMs)',
-    reportingRule: 'retain raw ownerMs, enclosingWallMs, referenceBeforeMs, referenceAfterMs, logicalUnits, batchCalls and normalizedCost; reference time is never subtracted from ownerMs',
+    standardizationRule: 'standardizedCostMs = (ownerMs / logicalUnits) * referenceAnchorMs / sqrt(referenceBeforeMs * referenceAfterMs)',
+    reportingRule: 'retain raw ownerMs, enclosingWallMs, referenceBeforeMs, referenceAfterMs, logicalUnits, batchCalls and standardizedCostMs; reference time is never subtracted from ownerMs',
     independenceRule: 'reference workload contains no Lab Motion calls, DOM/layout reads, scene state or candidate code and is prewarmed before formal acquisition',
   }),
   controls: frozen({
@@ -78,18 +80,18 @@ export const REFERENCE_NORMALIZED_PREREGISTRATION = frozen({
     deliberateOrder: 'seeded SD/DS within each run-block',
     aaBand: PROFILE_PREREGISTRATION.calibration.aaNonInferiorityBand,
     deliberate2xLower95Min: PROFILE_PREREGISTRATION.calibration.deliberateWorkDetectedLower95Min,
-    pairIdentity: 'one normalized sample per arm per run-block; raw owner and reference timings remain attached to that arm',
+    pairIdentity: 'one standardized-ms sample per arm per run-block; raw owner and reference timings and the frozen calibration anchor remain attached to that arm',
   }),
   power: PROFILE_PREREGISTRATION.statistics.powerContract,
   targetPower: PROFILE_PREREGISTRATION.statistics.targetPower,
   minimumIndependentBlocks: PROFILE_PREREGISTRATION.statistics.minimumIndependentBlocks,
   maximumIndependentBlocks: PROFILE_PREREGISTRATION.statistics.maximumIndependentBlocks,
   failureRule: 'any semantic failure, work-count drift, raw owner packet below the frozen 40 ms floor, either bracket reference below 40 ms, packet/whole-pilot wall bound, malformed pair, A/A escape, unresolved deliberate-2x, invalid calibration binding, or unpowered design at max N closes this family; no same-family retuning or repeat is admissible',
-  attributionReview: 'independent review must verify both the exact owner boundary and that reference normalization is only a nuisance-scale covariate before candidate admission',
+  attributionReview: 'independent review must verify both the exact owner boundary and that reference standardization is only a nuisance-scale covariate before candidate admission',
 });
 
 export function validateReferenceNormalizedPreregistration(design = REFERENCE_NORMALIZED_PREREGISTRATION) {
-  invariant(design.schemaVersion === 1 && design.id === 'calibration-bracket-normalized-owner-v1', 'identity drifted');
+  invariant(design.schemaVersion === 1 && design.id === 'calibration-bracket-standardized-owner-ms-v2', 'identity drifted');
   invariant(design.node === 'PROFILE-01', 'node drifted');
   invariant(design.registeredMainRevision === '2c947007168d4964124db8ce8079bbfabc975687', 'registered main drifted');
   invariant(design.baselineRevision === PROFILE_PREREGISTRATION.baseline.revision, 'baseline drifted');
@@ -103,7 +105,8 @@ export function validateReferenceNormalizedPreregistration(design = REFERENCE_NO
   invariant(design.measurement.minimumOwnerMsPerPacket === 40 && design.measurement.referenceFloorMs === 40, 'timing floor drifted');
   invariant(design.measurement.maximumEnclosingWallMsPerPacket === 60_000, 'packet wall bound drifted');
   invariant(design.measurement.maximumPilotWallMs === 1_800_000, 'whole-pilot wall bound drifted');
-  invariant(/sqrt\(referenceBeforeMs \* referenceAfterMs\)/.test(design.reference.normalizationRule), 'reference normalization law drifted');
+  invariant(/sqrt\(referenceBeforeMs \* referenceAfterMs\)/.test(design.reference.standardizationRule), 'reference standardization law drifted');
+  invariant(/median of all 1x samples/.test(design.reference.anchorRule), 'reference anchor law drifted');
   invariant(/never subtracted/.test(design.reference.reportingRule), 'reference became a cost subtraction');
   invariant(/no Lab Motion calls/.test(design.reference.independenceRule), 'reference independence missing');
   invariant(design.controls.runBlocks === 20 && design.controls.bootstrapIterations === 10_000, 'control sample/bootstrap count drifted');
