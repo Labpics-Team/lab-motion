@@ -35,8 +35,8 @@ jobs:
         env:
           PROFILE_HEAD_SHA: ${{ github.sha }}
           PROFILE_REGISTERED_MAIN_SHA: 2c947007168d4964124db8ce8079bbfabc975687
-          PROFILE_PREREG_SHA: 619aeb0bced5d6c2837c3ea5bb4f0c575c864164
-          PROFILE_HARNESS_SHA: d98599f9b15e697c40acdfe9575248de7b81858c
+          PROFILE_PREREG_SHA: da7e4006c54db958d93c223b7c4e1fa9d41dc2d3
+          PROFILE_HARNESS_SHA: 133af631f4c385df7fb253c8ba443d729e19a181
           PROFILE_BASELINE_SHA: fe11daa407de396fad952be7679650f63dabd4dd
         run: |
           set -euo pipefail
@@ -84,7 +84,7 @@ jobs:
           node bench/profile/capture-desktop.mjs > "$out/inventory.json"
           PROFILE_INVENTORY_PATH="$out/inventory.json" \
           PROFILE_CALIBRATION_OUTPUT="$out/calibration.json" \
-          PROFILE_CALIBRATION_ID="desktop-controls-reference-normalized-owner-v1" \
+          PROFILE_CALIBRATION_ID="desktop-controls-reference-standardized-owner-ms-v2" \
             node bench/profile/calibrate-desktop.mjs > "$out/calibration.stdout.json"
 
           git worktree add --detach "$baseline" "$PROFILE_BASELINE_SHA"
