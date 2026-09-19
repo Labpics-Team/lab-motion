@@ -304,11 +304,11 @@ function _createBase<S extends BehaviorState<number>>(
      * velocity 0). Идемпотентна: повторный вызов на уже покоящейся машине —
      * no-op (не плодит эмитов). destroy() строится поверх неё.
      */
-    cancel(): void {
+    cancel(reset?: Partial<S>): void {
       if (destroyed || state.phase === 'idle') return; // уже в покое
       runner._invalidate();
       tracker.reset();
-      emit({ velocity: 0, phase: 'idle' } as Partial<S>);
+      emit({ ...reset, velocity: 0, phase: 'idle' } as Partial<S>);
     },
     destroy(): void {
       if (destroyed) return;
@@ -761,7 +761,7 @@ export function createCarousel(options: CarouselOptions): CarouselController {
     const i = clampIndex(index);
     swipeStartIndex = i;
     const target = i * pageSize;
-    base.emit({ phase: 'release' });
+    base.emit({ phase: 'release', index: clampIndex(base.state.index) });
     base.runner._settle({
       from: base.state.value,
       velocity,
@@ -919,9 +919,8 @@ export function createPullToRefresh(options: PullOptions): PullController {
     target: number,
     velocity: number,
     onDone: () => void,
-    phaseWhileMoving: BehaviorPhase = 'release',
   ): void => {
-    base.emit({ phase: phaseWhileMoving });
+    base.emit({ phase: 'release' });
     base.runner._settle({
       from: base.state.value,
       velocity,
@@ -943,27 +942,19 @@ export function createPullToRefresh(options: PullOptions): PullController {
     base.emit({ pulling: false });
     springTo(pendingPos, velocity, () => {
       base.emit({ phase: 'settle', pending: true, armed: false });
-      // Возврат пружиной ПОСЛЕ резолва async — без второго владельца позиции.
-      Promise.resolve(options.onRefresh?.()).then(
-        () => {
-          if (base.destroyed) return;
-          returnHome(0);
-        },
-        () => {
-          if (base.destroyed) return;
-          returnHome(0); // даже при reject позиция обязана вернуться (не залипнуть)
-        },
-      );
+      const pendingState = base.state;
+      const finish = (): void => {
+        if (!base.destroyed && base.state === pendingState) returnHome(0);
+      };
+      Promise.resolve(options.onRefresh?.()).then(finish, finish);
     });
   };
 
   const ctrl: PullController = {
     pointerDown(p: BehaviorPoint): void {
       if (base.destroyed || base.state.pending) return; // pending владеет позицией
-      base.runner._invalidate();
+      _beginPickup(base, p, axis, 0);
       grabPointer = _coord(p, axis);
-      base.tracker.reset();
-      base.tracker.push(p);
       base.emit({ phase: 'follow', pulling: true, velocity: 0 });
     },
     pointerMove(p: BehaviorPoint): void {
@@ -988,7 +979,9 @@ export function createPullToRefresh(options: PullOptions): PullController {
       returnHome(0);
     },
     subscribe: base.subscribe,
-    cancel: base.cancel,
+    cancel(): void {
+      base.cancel({ pulling: false, armed: false, pending: false });
+    },
     destroy: base.destroy,
     get state(): PullState {
       return base.state;

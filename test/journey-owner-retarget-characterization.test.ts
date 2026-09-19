@@ -32,6 +32,8 @@ describe('./behaviors JOURNEY resize seam — reuse the existing owner', () => {
 
     const before = { value: sheet.state.value, velocity: sheet.state.velocity };
     expect(clock.pending()).toBe(1);
+    let emissions = 0;
+    sheet.subscribe(() => emissions++);
 
     // Existing programmatic retarget is the seam a mutable-constraint update can
     // reuse: no consumer-owned velocity transfer and no second clock/state owner.
@@ -46,7 +48,9 @@ describe('./behaviors JOURNEY resize seam — reuse the existing owner', () => {
     // one callback belongs to the new generation. Generation ownership, not an
     // app-side cancel-handle collection, must make the former inert.
     expect(clock.pending()).toBe(2);
+    emissions = 0;
     clock.step(16);
+    expect(emissions).toBe(1); // stale generation не имеет права публиковать state
     expect(Number.isFinite(sheet.state.value)).toBe(true);
     expect(Number.isFinite(sheet.state.velocity)).toBe(true);
 

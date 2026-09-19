@@ -142,6 +142,45 @@ describe('./behaviors pull-to-refresh — cancel/destroy и pointer-cancel', () 
     expect(pull.state.value).toBeCloseTo(0, 3);
   });
 
+  it('cancel во время pending отзывает старый refresh и сразу возвращает управление', async () => {
+    const clock = makeClock();
+    const d = deferred();
+    const pull = createPullToRefresh({
+      threshold: 60,
+      resistance: 0.5,
+      requestFrame: clock.requestFrame,
+      onRefresh: () => d.promise,
+    });
+    pull.pointerDown(pt(0, 0, 0));
+    pull.pointerMove(pt(0, 200, 0.1));
+    pull.pointerUp(pt(0, 200, 0.15));
+    clock.drain(16);
+    await flush();
+    expect(pull.state.pending).toBe(true);
+
+    const canceled: Array<{ phase: string; pending: boolean }> = [];
+    pull.subscribe((state) => canceled.push({ phase: state.phase, pending: state.pending }));
+    pull.cancel();
+    expect(canceled).toEqual([{ phase: 'idle', pending: false }]);
+    expect(pull.state).toMatchObject({
+      phase: 'idle',
+      pulling: false,
+      armed: false,
+      pending: false,
+    });
+
+    pull.pointerDown(pt(0, 0, 1));
+    pull.pointerMove(pt(0, 40, 1.1));
+    const resumed = pull.state;
+    expect(resumed.phase).toBe('follow');
+
+    d.resolve();
+    await flush();
+    expect(pull.state.phase).toBe('follow');
+    expect(pull.state.value).toBe(resumed.value);
+    expect(pull.state.pending).toBe(false);
+  });
+
   it('cancel/destroy идемпотентны', () => {
     const pull = createPullToRefresh({ threshold: 60 });
     pull.cancel();

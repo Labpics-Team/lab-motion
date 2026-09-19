@@ -146,6 +146,7 @@ describe('./behaviors — mutable constraints: pager', () => {
     pager.update(4, 120);
     expect(pager.state.phase).toBe('follow');
     expect(pager.state.value).toBe(before);
+    expect(pager.state.index).toBe(2);
     pager.pointerMove(pt(-40, 0, 0.15));
     expect(pager.state.value).toBe(before);
     pager.pointerMove(pt(-60, 0, 0.2));
@@ -153,6 +154,20 @@ describe('./behaviors — mutable constraints: pager', () => {
     expect(pager.state.index).toBe(2);
   });
 
+  it('shrink вне follow сразу клэмпит опубликованный index даже перед cancel', () => {
+    const clock = makeClock();
+    const pager = createCarousel({
+      pageCount: 4,
+      pageSize: 100,
+      index: 3,
+      requestFrame: clock.requestFrame,
+    });
+
+    pager.update(2, 100);
+    expect(pager.state.index).toBe(1);
+    pager.cancel();
+    expect(pager.state).toMatchObject({ index: 1, phase: 'idle' });
+  });
 
   it('settled resize сохраняет logical page и доводит position к новому pageSize', () => {
     const clock = makeClock();
