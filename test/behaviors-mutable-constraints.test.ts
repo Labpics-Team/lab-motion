@@ -156,6 +156,25 @@ describe('./behaviors — mutable constraints: bottom sheet', () => {
     expect(sheet.state).toMatchObject({ value: 100, snapIndex: 1, phase: 'settle' });
   });
 
+  it('reentrant destroy из release-публикации не запускает осиротевший runner', () => {
+    const clock = makeClock();
+    const sheet = createBottomSheet({ snapPoints: [0, 300], requestFrame: clock.requestFrame });
+    let destroyed = false;
+    sheet.subscribe((state) => {
+      if (state.phase === 'release' && !destroyed) {
+        destroyed = true;
+        sheet.destroy();
+      }
+    });
+
+    sheet.snapTo(1);
+
+    expect(destroyed).toBe(true);
+    expect(clock.pending()).toBe(0);
+    sheet.snapTo(0);
+    expect(clock.pending()).toBe(0);
+  });
+
   it('reduced-motion использует обновлённые snap без кадров', () => {
     const clock = makeClock();
     const sheet = createBottomSheet({
