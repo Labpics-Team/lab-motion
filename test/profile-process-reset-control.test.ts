@@ -118,7 +118,7 @@ function pilot() {
       engine,
       browserVersion: 'fixture',
       launches: DESIGN.sceneIds.length * DESIGN.controls.runBlocks * 4,
-      scenes: DESIGN.sceneIds.map((id) => rawScene(id, engine, ordinal)),
+      scenes: DESIGN.sceneIds.map((id) => rawScene(id, `process-${engine}`, ordinal)),
     })),
   });
   return { inventory, calibration: cal, receipt };
