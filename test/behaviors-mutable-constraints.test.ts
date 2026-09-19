@@ -22,6 +22,10 @@ describe('./behaviors — mutable constraints: bottom sheet', () => {
     expect(sheet.state.phase).toBe('release');
     expect(sheet.state.snapIndex).toBe(1);
 
+    // Первый живой кадр обязан наследовать ровно ту velocity, которую отдал
+    // invalidated runner; мутант `_invalidate(): return 0` должен стать RED.
+    clock.step(16);
+    expect(sheet.state.velocity).toBeCloseTo(before.velocity, 9);
     clock.drain(16);
     expect(sheet.state.value).toBeCloseTo(200, 3);
     expect(sheet.state.snapIndex).toBe(1);
@@ -152,6 +156,9 @@ describe('./behaviors — mutable constraints: pager', () => {
     expect(pager.state.value).toBe(before.value);
     expect(pager.state.velocity).toBe(before.velocity);
     expect(pager.state.phase).toBe('release');
+    // То же mutation-proof для pager: первый replacement-frame сохраняет C¹.
+    clock.step(16);
+    expect(pager.state.velocity).toBeCloseTo(before.velocity, 9);
     clock.drain(16);
     expect(pager.state.value).toBeCloseTo(360, 3);
     expect(pager.state.index).toBe(3);
