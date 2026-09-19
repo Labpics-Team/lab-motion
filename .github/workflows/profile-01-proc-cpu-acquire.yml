@@ -35,7 +35,7 @@ jobs:
         env:
           PROFILE_HEAD_SHA: ${{ github.sha }}
           PROFILE_REGISTERED_MAIN_SHA: 2c947007168d4964124db8ce8079bbfabc975687
-          PROFILE_PREREG_SHA: c35b53845a035e910e303794202bdde20297bd31
+          PROFILE_PREREG_SHA: c35b5380392e7e9ae59aee5f2da57d885b56d8e4
           PROFILE_HARNESS_SHA: 0be1b56bca6fe6c1b5e998a147fce7001ee2c93f
           PROFILE_BASELINE_SHA: fe11daa407de396fad952be7679650f63dabd4dd
         run: |
