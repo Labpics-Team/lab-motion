@@ -124,11 +124,10 @@ function finiteOr(raw: number, fallback: number): number {
  * конечной границе double, сохраняя знак направления движения.
  * Все входы (power/velocity/timeConstant) уже провалидированы конечными —
  * ampRaw может быть только конечным числом или ±Infinity (никогда NaN),
- * поэтому единственный edge-case — знаковое переполнение произведения.
+ * поэтому sign сохраняет ровно тот же overflow-инвариант без второй ветки.
  */
 function clampAmplitude(ampRaw: number): number {
-  if (Number.isFinite(ampRaw)) return ampRaw;
-  return ampRaw > 0 ? Number.MAX_VALUE : -Number.MAX_VALUE;
+  return Number.isFinite(ampRaw) ? ampRaw : Math.sign(ampRaw) * Number.MAX_VALUE;
 }
 
 /**
