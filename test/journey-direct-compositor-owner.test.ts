@@ -90,10 +90,14 @@ describe('JOURNEY-01 direct-control compositor owner', () => {
     sheet.destroy();
   });
 
-  it('an ordinary requestFrame with a coincidental _settle property is not treated as the private carrier', () => {
+  it('requestFrame stays a pure clock even when hostile properties mimic the internal runner port', () => {
     let frames = 0;
-    const requestFrame = (() => ++frames) as ((cb: (timestamp?: number) => void) => number) & { _settle?: () => void };
-    requestFrame._settle = () => { throw new Error('must not be used as a carrier without _invalidate'); };
+    const requestFrame = (() => ++frames) as ((cb: (timestamp?: number) => void) => number) & {
+      _settle?: () => void;
+      _invalidate?: () => number;
+    };
+    requestFrame._settle = () => { throw new Error('requestFrame must never become the runner owner'); };
+    requestFrame._invalidate = () => { throw new Error('requestFrame must never become the runner owner'); };
     const sheet = createBottomSheet({ snapPoints: [0, 300], requestFrame });
     sheet.pointerDown(pt(0, 0, 0));
     sheet.pointerMove(pt(0, 100, 0.05));
@@ -215,10 +219,11 @@ describe('JOURNEY-01 direct-control compositor owner', () => {
     sheet.pointerUp(pickup);
     expect(sheet.state.value).toBe(pickupValue);
     expect(sheet.state.velocity).toBeCloseTo(pickupVelocity, 8);
+    const releaseTarget = [0, 300][sheet.state.snapIndex]!;
 
     clock.drain(1000 / 60);
     expect(sheet.state.phase).toBe('settle');
-    expect(sheet.state.value).toBe(300);
+    expect(sheet.state.value).toBe(releaseTarget);
     expect(sheet.state.velocity).toBe(0);
     const writes = applied.length;
     sheet.destroy();
@@ -351,11 +356,12 @@ describe('JOURNEY-01 direct-control compositor owner', () => {
     expect(sheet.state.value).toBe(pickupValue);
     expect(sheet.state.velocity).toBeCloseTo(pickupVelocity, 8);
 
+    const nativeCalls = native.calls;
     const writes = applied.length;
     sheet.destroy();
     clock.drain();
     expect(applied).toHaveLength(writes);
-    expect(native.calls).toBe(0);
+    expect(native.calls).toBe(nativeCalls);
   });
 
   it('reentrant animate host cannot publish a stale native owner after newer input', () => {

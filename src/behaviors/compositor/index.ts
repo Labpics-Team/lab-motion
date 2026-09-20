@@ -25,6 +25,12 @@ import {
 } from '../../compositor/sample.js';
 import { defaultRequestFrame } from '../../internal/request-frame.js';
 import type { RequestFrameFn } from '../../motion-value.js';
+import {
+  behaviorRunnerPort,
+  type BehaviorRunnerOptions,
+  type BehaviorRunnerPort,
+  type BehaviorSettleArgs,
+} from '../runner-port.js';
 import type { SpringParams } from '../../spring.js';
 import type { WaapiAnimatable } from '../../waapi/index.js';
 
@@ -56,24 +62,13 @@ export interface CompositorCarouselOptions extends CarouselOptions {
   readonly compositor: BehaviorCompositorSurface;
 }
 
-interface SettleArgs {
-  readonly from: number;
-  readonly velocity: number;
-  readonly target: number;
-  readonly spring: SpringParams;
-  readonly onStep: (value: number, velocity: number) => void;
-  readonly onDone: () => void;
-}
-
-interface RunnerCarrier extends RequestFrameFn {
-  _settle(args: SettleArgs): void;
-  _invalidate(): number;
+interface BehaviorCompositorOwner extends BehaviorRunnerPort {
   destroy(): void;
 }
 
 type NativeRun = {
   readonly kind: 0;
-  readonly args: SettleArgs;
+  readonly args: BehaviorSettleArgs;
   readonly animation: NativeAnimation;
   readonly artifact: SpringExecutionArtifactTuple;
   readonly startedAt: number;
@@ -81,7 +76,7 @@ type NativeRun = {
 
 type LiveRun = {
   readonly kind: 1;
-  readonly args: SettleArgs;
+  readonly args: BehaviorSettleArgs;
   readonly value: ReturnType<typeof handoffToLive>;
   unsubscribe?: (() => void) | undefined;
 };
@@ -96,7 +91,7 @@ function createOwner(
   surface: BehaviorCompositorSurface,
   requestFrame: RequestFrameFn | undefined,
   tier: CompositorTierCode,
-): RunnerCarrier {
+): BehaviorCompositorOwner {
   let target: BehaviorCompositorTarget | undefined = surface.target;
   let active: ActiveRun | undefined;
   let epoch = 0;
@@ -117,142 +112,142 @@ function createOwner(
     if (token === epoch) run.args.onDone();
   };
 
-  const carrier = ((callback: (timestamp?: number) => void) => schedule(callback)) as RunnerCarrier;
-
-  carrier._settle = (args): void => {
-    carrier._invalidate();
-    if (!target) return;
-    if (args.from === args.target || tier === 3) {
-      args.onStep(args.target, 0);
-      args.onDone();
-      return;
-    }
-    const token = ++epoch;
-    const v0 = args.velocity / (args.target - args.from);
-    const artifact = tier === 0 && Number.isFinite(v0)
-      ? tryCompileSpringExecutionArtifactTupleUnchecked(args.spring, v0, DEFAULT_TOLERANCE)
-      : undefined;
-
-    if (artifact && target) {
-      const plan = compileSpringRuntimeExecutionTupleUnchecked(
-        args.spring,
-        surface.property,
-        args.from,
-        args.target,
-        v0,
-        DEFAULT_TOLERANCE,
-        'both',
-        'replace',
-        format,
-        artifact,
-      );
-      if (token !== epoch || !target) return;
-      const startedAt = defaultNow();
-      if (token !== epoch || !target) return;
-      const animation = target.animate(plan[0], {
-        duration: plan[2],
-        easing: plan[1],
-        iterations: 1,
-        fill: plan[3],
-        composite: plan[4],
-      });
-      if (token !== epoch || !target) {
-        animation.cancel?.();
+  const owner: BehaviorCompositorOwner = {
+    _settle(args): void {
+      owner._invalidate();
+      if (!target) return;
+      if (args.from === args.target || tier === 3) {
+        args.onStep(args.target, 0);
+        args.onDone();
         return;
       }
-      const native: NativeRun = {
-        kind: 0,
-        args,
-        animation,
-        artifact,
-        startedAt,
-      };
-      active = native;
-      args.onStep(args.from, args.velocity);
-      if (active === native) animation.finished.then(() => finish(native), () => {});
-      return;
-    }
+      const token = ++epoch;
+      const v0 = args.velocity / (args.target - args.from);
+      const artifact = tier === 0 && Number.isFinite(v0)
+        ? tryCompileSpringExecutionArtifactTupleUnchecked(args.spring, v0, DEFAULT_TOLERANCE)
+        : undefined;
 
-    const value = handoffToLive({
-      spring: args.spring,
-      value: args.from,
-      velocity: args.velocity,
-      target: args.target,
-      requestFrame: schedule,
-    });
-    const live: LiveRun = { kind: 1, args, value };
-    active = live;
-    live.unsubscribe = value.onChange((next) => {
-      if (active !== live) return;
-      const velocity = value.velocity;
-      args.onStep(next, velocity);
-      if (active === live && next === args.target && velocity === 0) finish(live);
-    });
-  };
-
-  carrier._invalidate = (): number => {
-    const run = active;
-    epoch++;
-    if (!run) return 0;
-    active = undefined;
-    let value: number;
-    let velocity: number;
-
-    if (run.kind === 0) {
-      const currentTime = animationTimeOrFallback(
-        run.animation,
-        defaultNow() - run.startedAt,
-      );
-      const point = sampleSerializedSpringIntoUnchecked(
-        run.artifact[1],
-        run.artifact[2],
-        currentTime,
-        0,
-        sample,
-      );
-      const progress = point.value;
-      const raw = progress === 0
-        ? run.args.from
-        : progress === 1
-          ? run.args.target
-          : (1 - progress) * run.args.from + progress * run.args.target;
-      value = Number.isFinite(raw) ? raw : run.args.target;
-      velocity = currentTime < 0
-        ? run.args.velocity
-        : scaleSerializedVelocity(
-          point.velocity,
-          run.args.from,
-          run.args.target,
+      if (artifact && target) {
+        const plan = compileSpringRuntimeExecutionTupleUnchecked(
+          args.spring,
+          surface.property,
+          args.from,
+          args.target,
+          v0,
+          DEFAULT_TOLERANCE,
+          'both',
+          'replace',
+          format,
+          artifact,
         );
-    } else {
-      value = run.value.value;
-      velocity = run.value.velocity;
-    }
+        if (token !== epoch || !target) return;
+        const startedAt = defaultNow();
+        if (token !== epoch || !target) return;
+        const animation = target.animate(plan[0], {
+          duration: plan[2],
+          easing: plan[1],
+          iterations: 1,
+          fill: plan[3],
+          composite: plan[4],
+        });
+        if (token !== epoch || !target) {
+          animation.cancel?.();
+          return;
+        }
+        const native: NativeRun = {
+          kind: 0,
+          args,
+          animation,
+          artifact,
+          startedAt,
+        };
+        active = native;
+        args.onStep(args.from, args.velocity);
+        if (active === native) animation.finished.then(() => finish(native), () => {});
+        return;
+      }
 
-    // Successor-state публикуется до cleanup donor: underlying style получает
-    // sampled point, пока старый effect ещё маскирует его; cancel затем раскрывает
-    // то же значение. Reentrant input не может воскресить уже снятый run.
-    run.args.onStep(value, velocity);
-    if (run.kind === 0) run.animation.cancel?.();
-    else {
-      run.unsubscribe?.();
-      run.value.destroy();
-    }
-    return velocity;
-  };
+      const value = handoffToLive({
+        spring: args.spring,
+        value: args.from,
+        velocity: args.velocity,
+        target: args.target,
+        requestFrame: schedule,
+      });
+      const live: LiveRun = { kind: 1, args, value };
+      active = live;
+      live.unsubscribe = value.onChange((next) => {
+        if (active !== live) return;
+        const velocity = value.velocity;
+        args.onStep(next, velocity);
+        if (active === live && next === args.target && velocity === 0) finish(live);
+      });
+    },
 
-  carrier.destroy = (): void => {
-    const run = active;
-    active = undefined;
-    target = undefined;
-    epoch++;
-    if (run?.kind === 0) run.animation.cancel?.();
-    else if (run) {
-      run.unsubscribe?.();
-      run.value.destroy();
-    }
+    _invalidate(): number {
+      const run = active;
+      epoch++;
+      if (!run) return 0;
+      active = undefined;
+      let value: number;
+      let velocity: number;
+
+      if (run.kind === 0) {
+        const currentTime = animationTimeOrFallback(
+          run.animation,
+          defaultNow() - run.startedAt,
+        );
+        const point = sampleSerializedSpringIntoUnchecked(
+          run.artifact[1],
+          run.artifact[2],
+          currentTime,
+          0,
+          sample,
+        );
+        const progress = point.value;
+        const raw = progress === 0
+          ? run.args.from
+          : progress === 1
+            ? run.args.target
+            : (1 - progress) * run.args.from + progress * run.args.target;
+        value = Number.isFinite(raw) ? raw : run.args.target;
+        velocity = currentTime < 0
+          ? run.args.velocity
+          : scaleSerializedVelocity(
+            point.velocity,
+            run.args.from,
+            run.args.target,
+          );
+      } else {
+        value = run.value.value;
+        velocity = run.value.velocity;
+      }
+
+      // Successor-state публикуется до cleanup donor: underlying style получает
+      // sampled point, пока старый effect ещё маскирует его; cancel затем раскрывает
+      // то же значение. Reentrant input не может воскресить уже снятый run.
+      run.args.onStep(value, velocity);
+      if (run.kind === 0) run.animation.cancel?.();
+      else {
+        run.unsubscribe?.();
+        run.value.destroy();
+      }
+      return velocity;
+    },
+
+    destroy(): void {
+      const run = active;
+      active = undefined;
+      target = undefined;
+      epoch++;
+      if (run?.kind === 0) run.animation.cancel?.();
+      else if (run) {
+        run.unsubscribe?.();
+        run.value.destroy();
+      }
+    },
   };
-  return carrier;
+  return owner;
 }
 
 function connect<
@@ -264,7 +259,7 @@ function connect<
   },
 >(
   controller: C,
-  owner: RunnerCarrier | undefined,
+  owner: BehaviorCompositorOwner | undefined,
   surface: BehaviorCompositorSurface,
 ): C {
   const format = surface.format ?? Number;
@@ -284,7 +279,7 @@ function connect<
 function ownerFor(
   options: Pick<SheetOptions, 'matchMedia' | 'requestFrame'>,
   surface: BehaviorCompositorSurface,
-): RunnerCarrier {
+): BehaviorCompositorOwner {
   return createOwner(
     surface,
     options.requestFrame,
@@ -297,7 +292,11 @@ export function createCompositorBottomSheet(
   options: CompositorBottomSheetOptions,
 ): SheetController {
   const owner = ownerFor(options, options.compositor);
-  const controller = createHeadlessBottomSheet({ ...options, requestFrame: owner });
+  const headlessOptions: SheetOptions & BehaviorRunnerOptions = {
+    ...options,
+    [behaviorRunnerPort]: owner,
+  };
+  const controller = createHeadlessBottomSheet(headlessOptions);
   return connect(controller, owner, options.compositor);
 }
 
@@ -306,6 +305,10 @@ export function createCompositorCarousel(
   options: CompositorCarouselOptions,
 ): CarouselController {
   const owner = ownerFor(options, options.compositor);
-  const controller = createHeadlessCarousel({ ...options, requestFrame: owner });
+  const headlessOptions: CarouselOptions & BehaviorRunnerOptions = {
+    ...options,
+    [behaviorRunnerPort]: owner,
+  };
+  const controller = createHeadlessCarousel(headlessOptions);
   return connect(controller, owner, options.compositor);
 }
