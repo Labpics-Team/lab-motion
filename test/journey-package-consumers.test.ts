@@ -151,7 +151,88 @@ reduced.destroy();
 console.log('journey-pager-package: PASS');
 `;
 
-describe('JOURNEY-01: два независимых потребителя direct-control из реального пакета', () => {
+const listConsumer = String.raw`
+import assert from 'node:assert/strict';
+import { createReorder } from '@labpics/motion/behaviors/reorder';
+const rect = (x) => ({ x, y: 0, width: 20, height: 20 });
+const physicalX = { a: 0, b: 40, c: 80, x: 120 };
+const itemsFor = (keys) => keys.map((key) => ({ key, rect: rect(physicalX[key]) }));
+let items = itemsFor(['c', 'b', 'a']);
+const proposals = [];
+const controller = createReorder({
+  items,
+  axis: 'x',
+  direction: 'rtl',
+  onReorder(keys, proposal) { proposals.push({ keys: [...keys], proposal }); },
+});
+const pointer = controller.start('b');
+pointer.move({ x: 90, y: 10 });
+assert.deepEqual(proposals.at(-1).keys, ['b', 'c', 'a']);
+const pointerProposal = proposals.at(-1).proposal;
+assert.equal(controller.isCurrent(pointerProposal), true);
+pointer.cancel();
+const keyboard = controller.start('b');
+keyboard.step('right');
+assert.deepEqual(proposals.at(-1).keys, ['b', 'c', 'a']);
+const accepted = proposals.at(-1).proposal;
+// Commit принадлежит приложению: новый порядок, вставка и геометрия приходят через update().
+items = itemsFor(['b', 'c', 'a', 'x']);
+controller.update(items);
+assert.equal(controller.isCurrent(accepted), false);
+assert.equal(keyboard.active, true);
+// Фильтрация активной identity отзывает сессию; отложенное старое предложение уже невалидно.
+controller.update(itemsFor(['c', 'a', 'x']));
+assert.equal(keyboard.active, false);
+assert.equal(controller.activeKey, undefined);
+assert.equal(controller.isCurrent(accepted), false);
+controller.destroy();
+console.log('journey-list-package: PASS');
+`;
+
+const gridConsumer = String.raw`
+import assert from 'node:assert/strict';
+import { createReorder } from '@labpics/motion/behaviors/reorder';
+const rect = (x, y) => ({ x, y, width: 20, height: 20 });
+const layout = (keys, shift = 0) => keys.map((key, i) => ({
+  key,
+  rect: rect(shift + (i % 2) * 40, shift + Math.floor(i / 2) * 40),
+}));
+let items = layout(['a', 'b', 'c', 'd']);
+const proposals = [];
+const controller = createReorder({
+  items,
+  axis: 'both',
+  onReorder(keys, proposal) { proposals.push({ keys: [...keys], proposal }); },
+});
+const session = controller.start('a');
+session.step('down');
+assert.deepEqual(proposals.at(-1).keys, ['b', 'c', 'a', 'd']);
+const first = proposals.at(-1).proposal;
+assert.equal(controller.isCurrent(first), true);
+assert.deepEqual(items.map(({ key }) => key), ['a', 'b', 'c', 'd']);
+// Приложение подтверждает данные и присылает новую геометрию; resolver не держит второй store.
+items = layout(['b', 'c', 'a', 'd'], 200);
+controller.update(items);
+assert.equal(controller.isCurrent(first), false);
+assert.equal(session.active, true);
+session.move({ x: 250, y: 250 });
+assert.deepEqual(proposals.at(-1).keys, ['b', 'c', 'd', 'a']);
+const second = proposals.at(-1).proposal;
+assert.equal(controller.isCurrent(second), true);
+// Фильтр удаляет активный ключ, а новый ключ после update становится обычной stable identity.
+items = layout(['b', 'c', 'd', 'e'], -100);
+controller.update(items);
+assert.equal(session.active, false);
+assert.equal(controller.isCurrent(second), false);
+const inserted = controller.start('e');
+assert.equal(inserted.active, true);
+inserted.step('first');
+assert.deepEqual(proposals.at(-1).keys, ['e', 'b', 'c', 'd']);
+controller.destroy();
+console.log('journey-grid-package: PASS');
+`;
+
+describe('JOURNEY-01: независимые потребители реального пакета', () => {
   it('ошибка упаковки не оставляет временный каталог без владельца', () => {
     const marker = new Error('pack failed');
     let root = '';
@@ -182,6 +263,18 @@ describe('JOURNEY-01: два независимых потребителя direc
   it('pager: resize, RTL, intent-управление и reduced motion', () => {
     const output = installConsumer(packed.root, 'pager-app', packed.tarball, pagerConsumer);
     expect(output).toContain('journey-pager-package: PASS');
+    expect(packed.sha256).toMatch(/^[0-9a-f]{64}$/);
+  }, 30_000);
+
+  it('list: RTL pointer/keyboard, app-owned commit, insert/remove и stale revoke', () => {
+    const output = installConsumer(packed.root, 'list-app', packed.tarball, listConsumer);
+    expect(output).toContain('journey-list-package: PASS');
+    expect(packed.sha256).toMatch(/^[0-9a-f]{64}$/);
+  }, 30_000);
+
+  it('grid: новая geometry, app-owned commit, filter/insert и stale revoke', () => {
+    const output = installConsumer(packed.root, 'grid-app', packed.tarball, gridConsumer);
+    expect(output).toContain('journey-grid-package: PASS');
     expect(packed.sha256).toMatch(/^[0-9a-f]{64}$/);
   }, 30_000);
 });
