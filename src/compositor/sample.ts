@@ -24,11 +24,9 @@ export function animationTimeOrFallback(
   fallbackMs: number,
 ): number {
   try {
-    if (animation !== undefined && 'currentTime' in animation) {
-      const current = animation.currentTime;
-      if (current === null) return -1;
-      if (typeof current === 'number' && Number.isFinite(current)) return current;
-    }
+    const current = animation?.currentTime;
+    if (current === null) return -1;
+    if (typeof current === 'number' && Number.isFinite(current)) return current;
   } catch {
     // Отказ host-getter/in-trap не блокирует monotonic fallback clock.
   }

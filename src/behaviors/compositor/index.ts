@@ -128,8 +128,7 @@ function createOwner(
       return;
     }
     const token = ++epoch;
-    const range = args.target - args.from;
-    const v0 = args.velocity / range;
+    const v0 = args.velocity / (args.target - args.from);
     const artifact = tier === 0 && Number.isFinite(v0)
       ? tryCompileSpringExecutionArtifactTupleUnchecked(args.spring, v0, DEFAULT_TOLERANCE)
       : undefined;
@@ -170,9 +169,7 @@ function createOwner(
       };
       active = native;
       args.onStep(args.from, args.velocity);
-      if (active === native && token === epoch) {
-        animation.finished.then(() => finish(native), () => {});
-      }
+      if (active === native) animation.finished.then(() => finish(native), () => {});
       return;
     }
 
