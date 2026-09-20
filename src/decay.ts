@@ -132,16 +132,18 @@ function clampAmplitude(ampRaw: number): number {
 
 /**
  * Проекция default decay без создания sampling-модели. Это специализация
- * внутри того же домена: полный helper-граф createDecay не тянется в consumer.
- * Порядок IEEE-умножений сохраняется, не сворачивать 0.8*0.35.
+ * внутри того же домена: defaults и saturating-примитивы общие с createDecay.
+ * Полная модель не зависит от нового пути; неиспользуемая возможность удаляется
+ * из её consumer graph. Порядок IEEE-умножений сохраняется, не сворачивать 0.8*0.35.
  */
 export function projectDefaultDecayRest(from: number, velocity: number): number {
   if (!Number.isFinite(from)) throw new MotionParamError('LM021');
   if (!Number.isFinite(velocity)) throw new MotionParamError('LM022');
-  let amplitude = DEFAULT_POWER * velocity * DEFAULT_TIME_CONSTANT;
-  if (!Number.isFinite(amplitude)) amplitude = Math.sign(velocity) * Number.MAX_VALUE;
-  const rest = from + amplitude;
-  return Number.isFinite(rest) ? rest : Math.sign(amplitude) * Number.MAX_VALUE;
+  const amplitude = finiteOr(
+    DEFAULT_POWER * velocity * DEFAULT_TIME_CONSTANT,
+    Math.sign(velocity) * Number.MAX_VALUE,
+  );
+  return finiteOr(from + amplitude, amplitude > 0 ? Number.MAX_VALUE : -Number.MAX_VALUE);
 }
 
 // ─── createDecay ──────────────────────────────────────────────────────────────
