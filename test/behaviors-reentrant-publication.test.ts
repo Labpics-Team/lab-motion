@@ -63,6 +63,60 @@ describe('./behaviors — reentrant publication ownership', () => {
     });
   });
 
+  it('reentrant cancel while disarming an armed pull does not restart release or refresh', () => {
+    let frames = 0;
+    let refreshes = 0;
+    const pull = createPullToRefresh({
+      threshold: 10,
+      resistance: 1,
+      requestFrame: () => {
+        frames++;
+        return 1;
+      },
+      onRefresh: () => {
+        refreshes++;
+      },
+    });
+
+    pull.subscribe((state) => {
+      if (state.phase === 'follow' && state.armed && !state.pulling) pull.cancel();
+    });
+
+    pull.pointerDown({ x: 0, y: 0, t: 0 });
+    pull.pointerMove({ x: 0, y: 20, t: 0.05 });
+    pull.pointerUp({ x: 0, y: 20, t: 0.1 });
+
+    expect(frames).toBe(0);
+    expect(refreshes).toBe(0);
+    expect(pull.state).toMatchObject({
+      value: 0,
+      velocity: 0,
+      phase: 'idle',
+      pulling: false,
+      armed: false,
+      pending: false,
+    });
+  });
+
+  it('reentrant destroy while disarming an armed pull leaves destroyed state immutable', () => {
+    let afterDestroy: object | undefined;
+    const pull = createPullToRefresh({ threshold: 10, resistance: 1 });
+
+    pull.subscribe((state) => {
+      if (state.phase === 'follow' && state.armed && !state.pulling) {
+        pull.destroy();
+        afterDestroy = pull.state;
+      }
+    });
+
+    pull.pointerDown({ x: 0, y: 0, t: 0 });
+    pull.pointerMove({ x: 0, y: 20, t: 0.05 });
+    pull.pointerUp({ x: 0, y: 20, t: 0.1 });
+
+    expect(afterDestroy).toBeDefined();
+    expect(pull.state).toBe(afterDestroy);
+  });
+
   it('reentrant destroy at release publication does not start a pull runner', () => {
     let frames = 0;
     const pull = createPullToRefresh({
