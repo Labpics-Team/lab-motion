@@ -51,7 +51,6 @@ describe('./behaviors — mutable constraints: bottom sheet', () => {
     expect(sheet.state.value).toBeCloseTo(500, 6);
   });
 
-
   it('shrink во время follow сразу публикует legal snapIndex', () => {
     const sheet = createBottomSheet({ snapPoints: [0, 100, 200], initial: 200 });
     const seen: number[] = [];
@@ -132,12 +131,17 @@ describe('./behaviors — mutable constraints: bottom sheet', () => {
     expect(sheet.state).toMatchObject({ value: 600, snapIndex: 2, phase: 'settle' });
   });
 
-  it('конструктор отвергает неконечные и разреженные snap-точки', () => {
+  it('конструктор сохраняет legacy finite-normalization, а update остаётся строгим', () => {
+    const normalized = createBottomSheet({ snapPoints: [Number.NaN, Number.POSITIVE_INFINITY] });
+    expect(normalized.state.value).toBe(0);
+    normalized.snapTo(1);
+    expect(normalized.state.value).toBe(Number.MAX_VALUE);
+    expect(() => normalized.update([0, Number.POSITIVE_INFINITY])).toThrowError(MotionParamError);
+
     const sparse = Array<number>(2);
     sparse[0] = 0;
-    expect(() => createBottomSheet({ snapPoints: [0, Number.NaN] })).toThrowError(MotionParamError);
-    expect(() => createBottomSheet({ snapPoints: [0, Number.NEGATIVE_INFINITY] })).toThrowError(MotionParamError);
-    expect(() => createBottomSheet({ snapPoints: sparse })).toThrowError(MotionParamError);
+    const sparseSheet = createBottomSheet({ snapPoints: sparse });
+    expect(sparseSheet.state.value).toBe(-Number.MAX_VALUE);
   });
 
   it('reentrant update из release-публикации оставляет последнюю sheet-геометрию владельцем', () => {
@@ -393,10 +397,15 @@ describe('./behaviors — mutable constraints: pager', () => {
     expect(invalidCount.state).toMatchObject({ value: 600, index: 3 });
   });
 
-  it('конструктор использует тот же строгий контракт геометрии', () => {
-    expect(() => createCarousel({ pageCount: 2.5, pageSize: 200 })).toThrowError(MotionParamError);
-    expect(() => createCarousel({ pageCount: Number.POSITIVE_INFINITY, pageSize: 200 })).toThrowError(MotionParamError);
+  it('конструктор сохраняет legacy normalization, а update использует строгую геометрию', () => {
+    const normalized = createCarousel({ pageCount: 2.5, pageSize: Number.POSITIVE_INFINITY });
+    normalized.goTo(2);
+    expect(normalized.state.index).toBe(1);
+    expect(normalized.state.value).toBe(Number.MAX_VALUE);
+    expect(() => normalized.update(2.5, 100)).toThrowError(MotionParamError);
+    expect(() => normalized.update(2, Number.POSITIVE_INFINITY)).toThrowError(MotionParamError);
+
+    expect(() => createCarousel({ pageCount: Number.NaN, pageSize: 200 })).toThrowError(MotionParamError);
     expect(() => createCarousel({ pageCount: 3, pageSize: Number.NaN })).toThrowError(MotionParamError);
-    expect(() => createCarousel({ pageCount: 3, pageSize: Number.POSITIVE_INFINITY })).toThrowError(MotionParamError);
   });
 });
