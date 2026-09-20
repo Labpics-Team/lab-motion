@@ -292,7 +292,7 @@ function ownerFor(
   );
 }
 
-/** Follow stays live; release transfers into the existing compositor representation. */
+/** Follow остаётся живым, а release передаётся существующему compositor-представлению. */
 export function createCompositorBottomSheet(
   options: CompositorBottomSheetOptions,
 ): SheetController {
@@ -301,7 +301,7 @@ export function createCompositorBottomSheet(
   return connect(controller, owner, options.compositor);
 }
 
-/** Pager reuses the same owner law and the existing carousel target selection. */
+/** Pager переиспользует тот же закон владельца и существующий выбор цели carousel. */
 export function createCompositorCarousel(
   options: CompositorCarouselOptions,
 ): CarouselController {
