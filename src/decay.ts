@@ -120,14 +120,12 @@ function finiteOr(raw: number, fallback: number): number {
 }
 
 /**
- * Зажимает потенциально-переполненную (±Infinity) амплитуду к ближайшей
- * конечной границе double, сохраняя знак направления движения.
- * Все входы (power/velocity/timeConstant) уже провалидированы конечными —
- * ampRaw может быть только конечным числом или ±Infinity (никогда NaN),
- * поэтому sign сохраняет ровно тот же overflow-инвариант без второй ветки.
+ * Зажимает результат арифметики над конечными входами к ближайшей конечной
+ * границе double, сохраняя знак overflow. Такой raw бывает конечным или ±Infinity,
+ * но не NaN, поэтому sign точно сохраняет направление насыщения.
  */
-function clampAmplitude(ampRaw: number): number {
-  return finiteOr(ampRaw, Math.sign(ampRaw) * Number.MAX_VALUE);
+function clampOverflow(raw: number): number {
+  return finiteOr(raw, Math.sign(raw) * Number.MAX_VALUE);
 }
 
 /**
@@ -139,8 +137,8 @@ function clampAmplitude(ampRaw: number): number {
 export function projectDefaultDecayRest(from: number, velocity: number): number {
   if (!Number.isFinite(from)) throw new MotionParamError('LM021');
   if (!Number.isFinite(velocity)) throw new MotionParamError('LM022');
-  const amplitude = clampAmplitude(DEFAULT_POWER * velocity * DEFAULT_TIME_CONSTANT);
-  return finiteOr(from + amplitude, amplitude > 0 ? Number.MAX_VALUE : -Number.MAX_VALUE);
+  const amplitude = clampOverflow(DEFAULT_POWER * velocity * DEFAULT_TIME_CONSTANT);
+  return clampOverflow(from + amplitude);
 }
 
 // ─── createDecay ──────────────────────────────────────────────────────────────
@@ -186,8 +184,8 @@ export function createDecay(options: DecayOptions): DecayModel {
       : DEFAULT_REST_DELTA;
 
   // ── Амплитуда и точка покоя (overflow-safe) ────────────────────────────────
-  const amplitude = clampAmplitude(power * velocity * timeConstant);
-  const rest = finiteOr(from + amplitude, amplitude > 0 ? Number.MAX_VALUE : -Number.MAX_VALUE);
+  const amplitude = clampOverflow(power * velocity * timeConstant);
+  const rest = clampOverflow(from + amplitude);
 
   // ── Reduced-motion CHARACTER-switch ────────────────────────────────────────
   const reduced = prefersReducedMotion(options.matchMedia);
