@@ -353,7 +353,7 @@ export interface SheetState extends BehaviorState<number> {
 
 /** Опции bottom sheet. */
 export interface SheetOptions {
-  /** Непустой плотный список конечных snap-точек (px); сортируется по возрастанию. */
+  /** Snap-точки (px); конструктор сохраняет legacy finite-normalization, `update` строгий. */
   readonly snapPoints: readonly number[];
   /** Стартовая позиция (px). По умолчанию — минимальная snap-точка. */
   readonly initial?: number | undefined;
@@ -408,17 +408,17 @@ function _pickSnap(snaps: readonly number[], value: number, velocity: number): n
  * follow→доводка (пружина/снап) без потери velocity, rubber-band за крайними
  * snap, программный snapTo, прерывание новым pointer-down. Один clock (B1).
  *
- * @throws {MotionParamError} при пустых/неконечных snapPoints или невалидной пружине.
+ * @throws {MotionParamError} при пустом snapPoints или невалидной пружине.
  */
 export function createBottomSheet(options: SheetOptions): SheetController {
-  const readSnaps = (values: readonly number[]): number[] => {
+  const readSnaps = (values: readonly number[], strict: boolean): number[] => {
     const next = [...values];
-    if (!next.length || !next.every(Number.isFinite)) {
+    if (!next.length || (strict && !next.every(Number.isFinite))) {
       throw new MotionParamError('LM003');
     }
-    return next.sort((a, b) => a - b);
+    return (strict ? next : next.map(_finite)).sort((a, b) => a - b);
   };
-  let snaps = readSnaps(options.snapPoints);
+  let snaps = readSnaps(options.snapPoints, false);
   const axis = options.axis ?? 'y';
   const springParams = options.spring ?? (springTokens.default as SpringParams);
   validateSpringForFrameLoop(springParams);
@@ -490,7 +490,7 @@ export function createBottomSheet(options: SheetOptions): SheetController {
     },
     update(next: readonly number[]): void {
       if (base.destroyed) return;
-      const parsed = readSnaps(next);
+      const parsed = readSnaps(next, true);
       if (parsed.length === snaps.length && parsed.every((v, i) => v === snaps[i])) return;
       snaps = parsed;
       if (base._following) {
@@ -673,9 +673,9 @@ export interface CarouselState extends BehaviorState<number> {
 
 /** Опции карусели/пейджера. */
 export interface CarouselOptions {
-  /** Число страниц (конечное целое >= 1). */
+  /** Число страниц (>= 1); конструктор сохраняет legacy truncation, `update` строгий. */
   readonly pageCount: number;
-  /** Размер страницы (конечное число px, > 0). */
+  /** Размер страницы (px, > 0); конструктор сохраняет legacy finite-normalization. */
   readonly pageSize: number;
   /** Стартовая страница. По умолчанию 0. */
   readonly index?: number | undefined;
@@ -721,12 +721,12 @@ function _readCarouselGeometry(count: number, size: number): void {
  * Создать headless карусель/пейджер: ЕДИНЫЙ clock для позиции и индекса, inertia
  * с доводкой к странице, направление+velocity в выборе страницы, RTL и вертикаль.
  *
- * @throws {MotionParamError} при невалидном pageCount/pageSize или пружине.
+ * @throws {MotionParamError} если нормализованный pageCount/pageSize невалиден или пружина невалидна.
  */
 export function createCarousel(options: CarouselOptions): CarouselController {
-  _readCarouselGeometry(options.pageCount, options.pageSize);
-  let pageCount = options.pageCount;
-  let pageSize = options.pageSize;
+  let pageCount = Math.trunc(_finite(options.pageCount));
+  let pageSize = _finite(options.pageSize);
+  _readCarouselGeometry(pageCount, pageSize);
   const axis = options.axis ?? 'x';
   const velThresh = Number.isFinite(options.velocityThreshold)
     ? Math.abs(options.velocityThreshold as number)
