@@ -28,6 +28,63 @@ describe('./behaviors — reentrant publication ownership', () => {
     ]);
   });
 
+  it('reentrant cancel at release publication does not start pull settle or refresh', () => {
+    let frames = 0;
+    let refreshes = 0;
+    const pull = createPullToRefresh({
+      threshold: 10,
+      resistance: 1,
+      requestFrame: () => {
+        frames++;
+        return 1;
+      },
+      onRefresh: () => {
+        refreshes++;
+      },
+    });
+
+    pull.subscribe((state) => {
+      if (state.phase === 'release') pull.cancel();
+    });
+
+    pull.pointerDown({ x: 0, y: 0, t: 0 });
+    pull.pointerMove({ x: 0, y: 20, t: 0.05 });
+    pull.pointerUp({ x: 0, y: 20, t: 0.1 });
+
+    expect(frames).toBe(0);
+    expect(refreshes).toBe(0);
+    expect(pull.state).toMatchObject({
+      value: 0,
+      velocity: 0,
+      phase: 'idle',
+      pulling: false,
+      armed: false,
+      pending: false,
+    });
+  });
+
+  it('reentrant destroy at release publication does not start a pull runner', () => {
+    let frames = 0;
+    const pull = createPullToRefresh({
+      threshold: 10,
+      resistance: 1,
+      requestFrame: () => {
+        frames++;
+        return 1;
+      },
+    });
+
+    pull.subscribe((state) => {
+      if (state.phase === 'release') pull.destroy();
+    });
+
+    pull.pointerDown({ x: 0, y: 0, t: 0 });
+    pull.pointerMove({ x: 0, y: 20, t: 0.05 });
+    pull.pointerUp({ x: 0, y: 20, t: 0.1 });
+
+    expect(frames).toBe(0);
+  });
+
   it('reentrant cancel at pending publication does not start external refresh', () => {
     let refreshes = 0;
     const pull = createPullToRefresh({
