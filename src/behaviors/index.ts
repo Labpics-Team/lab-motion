@@ -276,9 +276,9 @@ function _createBase<S extends BehaviorState<number>>(
       } catch {
         // Подписчик не имеет права срывать соседей.
       }
-      if (destroyed || state !== emitted) return false;
+      if (state !== emitted) break;
     }
-    return true;
+    return !destroyed && state === emitted;
   };
 
   return {
