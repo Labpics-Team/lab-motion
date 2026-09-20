@@ -140,7 +140,7 @@ export function projectDefaultDecayRest(from: number, velocity: number): number 
   if (!Number.isFinite(from)) throw new MotionParamError('LM021');
   if (!Number.isFinite(velocity)) throw new MotionParamError('LM022');
   const amplitude = clampAmplitude(DEFAULT_POWER * velocity * DEFAULT_TIME_CONSTANT);
-  return finiteOr(from + amplitude, amplitude > 0 ? Number.MAX_VALUE : -Number.MAX_VALUE);
+  return finiteOr(from + amplitude, Math.sign(amplitude) * Number.MAX_VALUE);
 }
 
 // ─── createDecay ──────────────────────────────────────────────────────────────
@@ -187,7 +187,7 @@ export function createDecay(options: DecayOptions): DecayModel {
 
   // ── Амплитуда и точка покоя (overflow-safe) ────────────────────────────────
   const amplitude = clampAmplitude(power * velocity * timeConstant);
-  const rest = finiteOr(from + amplitude, amplitude > 0 ? Number.MAX_VALUE : -Number.MAX_VALUE);
+  const rest = finiteOr(from + amplitude, Math.sign(amplitude) * Number.MAX_VALUE);
 
   // ── Reduced-motion CHARACTER-switch ────────────────────────────────────────
   const reduced = prefersReducedMotion(options.matchMedia);
