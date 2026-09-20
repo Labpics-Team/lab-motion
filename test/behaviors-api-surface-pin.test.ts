@@ -46,6 +46,18 @@ describe('./behaviors public API surface pin (в обе стороны)', () => 
     expect(typeof behaviors.createBottomSheet({ snapPoints: [0, 100] }).update).toBe('function');
     expect(typeof behaviors.createCarousel({ pageCount: 2, pageSize: 100 }).update).toBe('function');
   });
+
+  it('новый strict update не меняет legacy normalization конструкторов', () => {
+    const sheet = behaviors.createBottomSheet({ snapPoints: [Number.NaN, Number.POSITIVE_INFINITY] });
+    sheet.snapTo(1);
+    expect(sheet.state.value).toBe(Number.MAX_VALUE);
+    expect(() => sheet.update([0, Number.POSITIVE_INFINITY])).toThrowError(MotionParamError);
+
+    const carousel = behaviors.createCarousel({ pageCount: 2.5, pageSize: Number.POSITIVE_INFINITY });
+    carousel.goTo(2);
+    expect(carousel.state.index).toBe(1);
+    expect(() => carousel.update(2.5, 100)).toThrowError(MotionParamError);
+  });
 });
 
 describe('./behaviors: единый контракт BehaviorState { value, velocity, phase }', () => {
@@ -70,7 +82,6 @@ describe('./behaviors: единый контракт BehaviorState { value, velo
 describe('./behaviors: cancel()/destroy() обрывают ЖИВОЙ жест во всех четырёх машинах (B3)', () => {
   // Follow-lifetime принадлежит общей state machine: после cancel/destroy
   // следующий pointerMove обязан быть инертным независимо от конкретной фабрики.
-  // Параметризуем по всем машинам, чтобы дыра ловилась независимо от реализации.
   type Point = ReturnType<typeof pt>;
   interface Draggable {
     pointerDown(p: Point): void;
