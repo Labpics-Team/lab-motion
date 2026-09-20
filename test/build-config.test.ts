@@ -14,7 +14,7 @@ describe('build config: изоляция Terser', () => {
     const firstCompress = terser.compress;
     const secondCompress = terser.compress;
     expect(firstCompress).not.toBe(secondCompress);
-    expect(firstCompress).toEqual({ passes: 3, pure_getters: true, toplevel: true });
+    expect(firstCompress).toEqual({ passes: 3, pure_getters: true });
     expect(secondCompress).toEqual(firstCompress);
     const firstMangle = terser.mangle!;
     const secondMangle = terser.mangle!;
