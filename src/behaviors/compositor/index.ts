@@ -29,7 +29,7 @@ import type { SpringParams } from '../../spring.js';
 import type { WaapiAnimatable } from '../../waapi/index.js';
 
 interface NativeAnimation {
-  currentTime?: number | null;
+  currentTime?: unknown;
   cancel?: () => void;
   finished: PromiseLike<unknown>;
 }
