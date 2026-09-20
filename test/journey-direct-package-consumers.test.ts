@@ -1,5 +1,5 @@
 import { execFileSync } from 'node:child_process';
-import { mkdtempSync, mkdirSync, rmSync, writeFileSync } from 'node:fs';
+import { existsSync, mkdtempSync, mkdirSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join, resolve } from 'node:path';
 import { createHash } from 'node:crypto';
@@ -8,18 +8,25 @@ import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 
 type Packed = { readonly root: string; readonly tarball: string; readonly sha256: string };
 
-function packOnce(): Packed {
-  const root = mkdtempSync(join(tmpdir(), 'journey-direct-package-'));
-  const packed = JSON.parse(execFileSync('npm', [
+function packOnce(
+  runPack: (root: string) => string = (root) => execFileSync('npm', [
     'pack', '--ignore-scripts', '--json', '--pack-destination', root,
-  ], { cwd: resolve('.'), encoding: 'utf8', timeout: 30_000 })) as Array<{ filename: string }>;
-  expect(packed).toHaveLength(1);
-  const tarball = join(root, packed[0]!.filename);
-  return {
-    root,
-    tarball,
-    sha256: createHash('sha256').update(readFileSync(tarball)).digest('hex'),
-  };
+  ], { cwd: resolve('.'), encoding: 'utf8', timeout: 30_000 }),
+): Packed {
+  const root = mkdtempSync(join(tmpdir(), 'journey-direct-package-'));
+  try {
+    const packed = JSON.parse(runPack(root)) as Array<{ filename: string }>;
+    expect(packed).toHaveLength(1);
+    const tarball = join(root, packed[0]!.filename);
+    return {
+      root,
+      tarball,
+      sha256: createHash('sha256').update(readFileSync(tarball)).digest('hex'),
+    };
+  } catch (error) {
+    rmSync(root, { recursive: true, force: true });
+    throw error;
+  }
 }
 
 function installConsumer(root: string, name: string, tarball: string, source: string): string {
@@ -77,14 +84,14 @@ assert.notEqual(boundary.velocity, 0);
 sheet.update([0, 200, 400]);
 assert.equal(sheet.state.value, boundary.value);
 assert.equal(sheet.state.velocity, boundary.velocity);
-// New pointer input owns the same controller and kills the queued old generation.
+// Новый ввод перехватывает того же владельца и гасит старое поколение.
 sheet.pointerDown({ x: 0, y: boundary.value, t: 1 });
 assert.equal(sheet.state.phase, 'follow');
 clock.drain();
 assert.equal(clock.pending(), 0);
 sheet.pointerCancel(); clock.drain();
-// Native keyboard controls only need this public intent operation; no app-side
-// velocity handoff, generation token, cancel collection or second state owner.
+// Клавиатурному адаптеру достаточно публичного intent-вызова: без ручной
+// передачи скорости, generation-token, коллекции cancel-handles или второго state-owner.
 sheet.snapTo(2); clock.drain();
 assert.equal(sheet.state.value, 400);
 assert.equal(sheet.state.snapIndex, 2);
@@ -118,12 +125,12 @@ assert.equal(pager.state.velocity, boundary.velocity);
 clock.drain();
 assert.equal(pager.state.index, 3);
 assert.equal(pager.state.value, 360);
-// Keyboard-equivalent intents use the same public owner and clock.
+// Эквивалентные клавиатурные intents используют того же владельца и clock.
 pager.prev(); clock.drain();
 assert.equal(pager.state.index, 2);
 pager.next(); clock.drain();
 assert.equal(pager.state.index, 3);
-// RTL pointer direction remains part of the same shipped controller semantics.
+// RTL-направление pointer остаётся семантикой того же поставляемого controller.
 pager.pointerDown({ x: 0, y: 0, t: 1 });
 pager.pointerMove({ x: -120, y: 0, t: 1.05 });
 pager.pointerUp({ x: -120, y: 0, t: 1.05 });
@@ -144,7 +151,18 @@ reduced.destroy();
 console.log('journey-pager-package: PASS');
 `;
 
-describe('JOURNEY-01 direct-control family — two independent real-package consumers', () => {
+describe('JOURNEY-01: два независимых потребителя direct-control из реального пакета', () => {
+  it('ошибка упаковки не оставляет временный каталог без владельца', () => {
+    const marker = new Error('pack failed');
+    let root = '';
+    expect(() => packOnce((createdRoot) => {
+      root = createdRoot;
+      throw marker;
+    })).toThrow(marker);
+    expect(root).not.toBe('');
+    expect(existsSync(root)).toBe(false);
+  });
+
   let packed: Packed;
 
   beforeAll(() => {
@@ -155,13 +173,13 @@ describe('JOURNEY-01 direct-control family — two independent real-package cons
     if (packed) rmSync(packed.root, { recursive: true, force: true });
   });
 
-  it('sheet consumer: interruption, live constraints, intent control and reduced motion', () => {
+  it('sheet: перехват, живые ограничения, intent-управление и reduced motion', () => {
     const output = installConsumer(packed.root, 'sheet-app', packed.tarball, sheetConsumer);
     expect(output).toContain('journey-sheet-package: PASS');
     expect(packed.sha256).toMatch(/^[0-9a-f]{64}$/);
   }, 30_000);
 
-  it('pager consumer: resize, RTL, intent control and reduced motion', () => {
+  it('pager: resize, RTL, intent-управление и reduced motion', () => {
     const output = installConsumer(packed.root, 'pager-app', packed.tarball, pagerConsumer);
     expect(output).toContain('journey-pager-package: PASS');
     expect(packed.sha256).toMatch(/^[0-9a-f]{64}$/);
