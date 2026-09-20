@@ -31,11 +31,18 @@ import type { WaapiAnimatable } from '../../waapi/index.js';
 interface NativeAnimation {
   currentTime?: number | null;
   cancel?: () => void;
-  finished?: PromiseLike<unknown>;
+  finished: PromiseLike<unknown>;
+}
+
+interface BehaviorCompositorTarget extends WaapiAnimatable {
+  animate(
+    keyframes: Record<string, string | number>[],
+    timing: object,
+  ): NativeAnimation;
 }
 
 export interface BehaviorCompositorSurface {
-  readonly target: WaapiAnimatable;
+  readonly target: BehaviorCompositorTarget;
   readonly property: string;
   readonly apply: (value: string | number) => void;
   readonly format?: ((value: number) => string | number) | undefined;
@@ -90,7 +97,7 @@ function createOwner(
   requestFrame: RequestFrameFn | undefined,
   tier: CompositorTierCode,
 ): RunnerCarrier {
-  let target: WaapiAnimatable | undefined = surface.target;
+  let target: BehaviorCompositorTarget | undefined = surface.target;
   let active: ActiveRun | undefined;
   let epoch = 0;
   const format = surface.format ?? Number;
@@ -149,7 +156,7 @@ function createOwner(
         iterations: 1,
         fill: plan[3],
         composite: plan[4],
-      }) as NativeAnimation;
+      });
       if (token !== epoch || !target) {
         animation.cancel?.();
         return;
@@ -164,7 +171,7 @@ function createOwner(
       active = native;
       args.onStep(args.from, args.velocity);
       if (active === native && token === epoch) {
-        animation.finished?.then(() => finish(native), () => {});
+        animation.finished.then(() => finish(native), () => {});
       }
       return;
     }
@@ -213,11 +220,13 @@ function createOwner(
           ? run.args.target
           : (1 - progress) * run.args.from + progress * run.args.target;
       value = Number.isFinite(raw) ? raw : run.args.target;
-      velocity = scaleSerializedVelocity(
-        point.velocity,
-        run.args.from,
-        run.args.target,
-      );
+      velocity = currentTime < 0
+        ? run.args.velocity
+        : scaleSerializedVelocity(
+          point.velocity,
+          run.args.from,
+          run.args.target,
+        );
     } else {
       value = run.value.value;
       velocity = run.value.velocity;
