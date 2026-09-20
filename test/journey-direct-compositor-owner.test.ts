@@ -8,7 +8,7 @@ import { pt } from './behaviors-helpers.js';
 
 function nativeTarget(onCancel?: () => void) {
   let animation: {
-    currentTime: number;
+    currentTime: number | null;
     cancel(): void;
     finished: Promise<void>;
     resolve(): void;
@@ -97,6 +97,40 @@ describe('JOURNEY-01 direct-control compositor owner', () => {
     await Promise.resolve();
     expect(sheet.state.phase).toBe('follow');
     expect(sheet.state.value).toBe(pickupValue);
+    sheet.destroy();
+  });
+
+  it('preserves release velocity when native local time is still pending at pickup', () => {
+    const native = nativeTarget();
+    const sheet = createCompositorBottomSheet({
+      snapPoints: [0, 300, 600],
+      compositor: {
+        target: native.target,
+        property: 'translate',
+        apply() {},
+      },
+      requestFrame: () => {
+        throw new Error('native settle must not request a main-thread frame');
+      },
+    });
+
+    sheet.pointerDown(pt(0, 0, 0));
+    sheet.pointerMove(pt(0, 180, 0.05));
+    sheet.pointerUp(pt(0, 180, 0.05));
+    const inheritedVelocity = sheet.state.velocity;
+    expect(inheritedVelocity).not.toBe(0);
+    expect(native.calls).toBe(1);
+
+    native.animation!.currentTime = null;
+    const pendingValue = sheet.state.value;
+    const pickup = pt(0, pendingValue, 0.1);
+    sheet.pointerDown(pickup);
+    sheet.pointerUp(pickup);
+
+    expect(native.calls).toBe(2);
+    expect(sheet.state.phase).toBe('release');
+    expect(sheet.state.value).toBe(pendingValue);
+    expect(sheet.state.velocity).toBeCloseTo(inheritedVelocity, 10);
     sheet.destroy();
   });
 
