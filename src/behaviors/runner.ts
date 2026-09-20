@@ -17,7 +17,7 @@ export interface BehaviorRunner {
 }
 
 /** Непубличный capability-key: обычный RequestFrameFn не может имитировать runner по форме. */
-export const behaviorRunner = Symbol();
+export const behaviorRunner: unique symbol = Symbol();
 
 /** Внутреннее расширение options; package exports этот модуль не публикует. */
 export interface BehaviorRunnerOptions {
