@@ -411,14 +411,13 @@ function _pickSnap(snaps: readonly number[], value: number, velocity: number): n
  * @throws {MotionParamError} при пустом snapPoints или невалидной пружине.
  */
 export function createBottomSheet(options: SheetOptions): SheetController {
-  const readSnaps = (values: readonly number[], strict: boolean): number[] => {
-    const next = [...values];
-    if (!next.length || (strict && !next.every(Number.isFinite))) {
+  const readSnaps = (next: number[]): number[] => {
+    if (!next.length || !next.every(Number.isFinite)) {
       throw new MotionParamError('LM003');
     }
-    return (strict ? next : next.map(_finite)).sort((a, b) => a - b);
+    return next.sort(_sub);
   };
-  let snaps = readSnaps(options.snapPoints, false);
+  let snaps = readSnaps([...options.snapPoints].map(_finite));
   const axis = options.axis ?? 'y';
   const springParams = options.spring ?? (springTokens.default as SpringParams);
   validateSpringForFrameLoop(springParams);
@@ -490,7 +489,7 @@ export function createBottomSheet(options: SheetOptions): SheetController {
     },
     update(next: readonly number[]): void {
       if (base.destroyed) return;
-      const parsed = readSnaps(next, true);
+      const parsed = readSnaps([...next]);
       if (parsed.length === snaps.length && parsed.every((v, i) => v === snaps[i])) return;
       snaps = parsed;
       if (base._following) {
