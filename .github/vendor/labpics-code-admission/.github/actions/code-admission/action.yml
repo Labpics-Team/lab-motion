@@ -1,0 +1,72 @@
+name: Qualified code admission
+description: Проверка immutable Git-снимков без исполнения кода продукта и без наследования его scanner policy.
+inputs:
+  repo:
+    description: Относительный путь единственного product checkout
+    required: true
+  base:
+    description: Точный commit базового состояния
+    required: true
+  candidate:
+    description: Точный commit интеграционного кандидата
+    required: true
+runs:
+  using: composite
+  steps:
+    - name: Select qualified Node runtime
+      uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020
+      with:
+        node-version: '22'
+    - name: Qualify and inspect immutable source snapshots
+      shell: bash
+      env:
+        SUBJECT: ${{ inputs.repo }}
+        BASE: ${{ inputs.base }}
+        CANDIDATE: ${{ inputs.candidate }}
+      run: |
+        set -euo pipefail
+        [[ "$SUBJECT" =~ ^\.code-subject\.[A-Za-z0-9]{8}$ ]] || exit 2
+        [[ "$BASE" =~ ^[a-f0-9]{40}$ && "$CANDIDATE" =~ ^[a-f0-9]{40}$ ]] || exit 2
+        root="$GITHUB_ACTION_PATH/../../.."
+        product="$GITHUB_WORKSPACE/$SUBJECT"
+        work="$(mktemp -d "$RUNNER_TEMP/code-admission.XXXXXXXX")"
+        cleanup() { rm -rf -- "$work"; }
+        trap cleanup EXIT
+        export TMPDIR="$work"
+        bash "$root/plans/tools/code-admission/install-tools.sh" "$work/tools"
+        ast_qualification="$work/ast-qualification.json"
+        node "$root/plans/tools/code-admission/qualify-ast-grep.mjs" --ast-grep "$work/tools/ast-grep" --rules "$root/plans/tools/code-admission/rules.json" > "$ast_qualification"
+        cat "$ast_qualification"
+        ast_digest="$(node -e 'const r = JSON.parse(require("node:fs").readFileSync(process.argv[1], "utf8")); if (r.schema !== "labpics.ast-grep/native-qualification/v1" || !/^[a-f0-9]{64}$/.test(r.binaryDigest)) process.exit(2); process.stdout.write(r.binaryDigest)' "$ast_qualification")"
+        ast_rules_digest="$(node -e 'const r = JSON.parse(require("node:fs").readFileSync(process.argv[1], "utf8")); if (r.schema !== "labpics.ast-grep/native-qualification/v1" || !/^[a-f0-9]{64}$/.test(r.rulesDigest)) process.exit(2); process.stdout.write(r.rulesDigest)' "$ast_qualification")"
+        qualification="$work/trivy-qualification.json"
+        node "$root/plans/tools/code-admission/qualify-trivy.mjs" "$work/tools/trivy" > "$qualification"
+        cat "$qualification"
+        qualified_digest="$(node -e 'const r = JSON.parse(require("node:fs").readFileSync(process.argv[1], "utf8")); if (r.schema !== "labpics.trivy/native-qualification/v1" || !/^[a-f0-9]{64}$/.test(r.binaryDigest)) process.exit(2); process.stdout.write(r.binaryDigest)' "$qualification")"
+        set +e
+        node "$root/plans/tools/code-admission.mjs" \
+          --base "$product" --base-ref "$BASE" \
+          --candidate "$product" --candidate-ref "$CANDIDATE" \
+          --trusted "$root" --ast-grep "$work/tools/ast-grep" --ast-grep-digest "$ast_digest" --ast-rules-digest "$ast_rules_digest" \
+          --trivy "$work/tools/trivy" --trivy-digest "$qualified_digest" --trivy-cache "$work/cache" --out "$work/evidence"
+        status=$?
+        set -e
+        if [[ "$status" == 0 && ( ! -s "$work/evidence/admission.json" || ! -s "$work/evidence/sbom.cdx.json" ) ]]; then
+          echo '::error::Scanner returned success without complete evidence'
+          exit 2
+        fi
+        if [[ -f "$work/evidence/admission.json" ]]; then
+          echo '::group::Qualified admission evidence'
+          cat "$work/evidence/admission.json"
+          echo '::endgroup::'
+          echo '::group::CycloneDX SBOM for the same source subject'
+          cat "$work/evidence/sbom.cdx.json"
+          echo '::endgroup::'
+          sha256sum "$work/evidence/admission.json" "$work/evidence/sbom.cdx.json"
+          {
+            echo '### Code admission'
+            printf 'Candidate: `%s`; baseline: `%s`; exit: `%s`.\n' "$CANDIDATE" "$BASE" "$status"
+            echo 'HIGH/CRITICAL и найденные секреты блокируют даже при наличии в baseline. Сбой или неполное evidence не означают PASS.'
+          } >> "$GITHUB_STEP_SUMMARY"
+        fi
+        exit "$status"
