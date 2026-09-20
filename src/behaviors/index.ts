@@ -910,8 +910,7 @@ export function createPullToRefresh(options: PullOptions): PullController {
     velocity: number,
     onDone: () => void,
   ): void => {
-    base.emit({ phase: 'release' });
-    base.runner._settle({
+    base.emit({ phase: 'release' }) && base.runner._settle({
       from: base.state.value,
       velocity,
       target,
