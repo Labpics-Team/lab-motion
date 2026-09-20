@@ -139,7 +139,10 @@ function clampAmplitude(ampRaw: number): number {
 export function projectDefaultDecayRest(from: number, velocity: number): number {
   if (!Number.isFinite(from)) throw new MotionParamError('LM021');
   if (!Number.isFinite(velocity)) throw new MotionParamError('LM022');
-  const amplitude = clampAmplitude(DEFAULT_POWER * velocity * DEFAULT_TIME_CONSTANT);
+  const amplitude = finiteOr(
+    DEFAULT_POWER * velocity * DEFAULT_TIME_CONSTANT,
+    Math.sign(velocity) * Number.MAX_VALUE,
+  );
   return finiteOr(from + amplitude, amplitude > 0 ? Number.MAX_VALUE : -Number.MAX_VALUE);
 }
 
