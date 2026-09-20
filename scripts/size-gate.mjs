@@ -170,7 +170,7 @@ export const BESPOKE_SUBPATH_GATES = {
   './behaviors/reorder': 1518,
   // JOURNEY-01 direct-control compositor owner: первый admitted shipped-факт,
   // exact ceiling без люфта; существующие ./behaviors и ./compositor не растут.
-  './behaviors/compositor': 7048,
+  './behaviors/compositor': 7041,
   './utils': 1400,
   // Build-tool entry (#208): Vite-адаптер lowering НАМЕРЕННО несёт канонический
   // MotionProgram V1 parser + nano spring SSOT — это цена доверенного артефакта
