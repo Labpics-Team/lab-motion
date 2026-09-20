@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { createBottomSheet } from '../src/behaviors/index.js';
+import { createBottomSheet, createPullToRefresh } from '../src/behaviors/index.js';
 
 describe('./behaviors — reentrant publication ownership', () => {
   it('nested publication cuts off stale outer fanout', () => {
@@ -26,5 +26,34 @@ describe('./behaviors — reentrant publication ownership', () => {
       { phase: 'release', value: 100, snapIndex: 1 },
       { phase: 'settle', value: 100, snapIndex: 1 },
     ]);
+  });
+
+  it('reentrant cancel at pending publication does not start external refresh', () => {
+    let refreshes = 0;
+    const pull = createPullToRefresh({
+      threshold: 10,
+      resistance: 1,
+      onRefresh: () => {
+        refreshes++;
+      },
+    });
+
+    pull.subscribe((state) => {
+      if (state.pending) pull.cancel();
+    });
+
+    pull.pointerDown({ x: 0, y: 0, t: 0 });
+    pull.pointerMove({ x: 0, y: 20, t: 0.05 });
+    pull.pointerUp({ x: 0, y: 20, t: 0.1 });
+
+    expect(refreshes).toBe(0);
+    expect(pull.state).toMatchObject({
+      value: 0,
+      velocity: 0,
+      phase: 'idle',
+      pulling: false,
+      armed: false,
+      pending: false,
+    });
   });
 });
