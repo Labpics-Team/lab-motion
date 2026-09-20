@@ -232,6 +232,190 @@ controller.destroy();
 console.log('journey-grid-package: PASS');
 `;
 
+const smartWorldSource = String.raw`
+function makeSmartClock() {
+  let now = 0;
+  let calls = 0;
+  const queue = [];
+  return {
+    requestFrame(cb) { calls++; queue.push(cb); return calls; },
+    step(ms = 16) {
+      now += ms;
+      const batch = queue.splice(0);
+      for (const cb of batch) cb(now);
+    },
+    drain(limit = 4000) {
+      let steps = 0;
+      while (queue.length) {
+        if (++steps > limit) throw new Error('smart clock did not settle');
+        this.step(16);
+      }
+    },
+    pending() { return queue.length; },
+    calls() { return calls; },
+  };
+}
+function parseTransform(raw) {
+  const m = /^translate\(([-+\d.eE]+)px, ([-+\d.eE]+)px\) scale\(([-+\d.eE]+), ([-+\d.eE]+)\)$/.exec(raw);
+  return m ? { tx: Number(m[1]), ty: Number(m[2]), sx: Number(m[3]), sy: Number(m[4]) } : null;
+}
+function makeSmartWorld() {
+  function element(name, key, rect, children = []) {
+    const inline = new Map();
+    const attrs = new Map();
+    const writes = [];
+    if (key !== null) attrs.set('data-motion-key', key);
+    const el = {
+      name, rect: { ...rect }, children, shadowRoot: null, isConnected: true,
+      focused: false, measures: 0, writes,
+      computed: { 'border-radius': '0px' },
+      style: {
+        setProperty(prop, value) { writes.push({ prop, value }); inline.set(prop, value); },
+        removeProperty(prop) { writes.push({ prop, value: null }); inline.delete(prop); },
+        getPropertyValue(prop) { return inline.get(prop) ?? ''; },
+      },
+      getAttribute(prop) { return attrs.get(prop) ?? null; },
+      getBoundingClientRect() {
+        el.measures++;
+        const t = parseTransform(inline.get('transform') ?? '');
+        return {
+          x: el.rect.x + (t?.tx ?? 0), y: el.rect.y + (t?.ty ?? 0),
+          width: el.rect.width * (t?.sx ?? 1), height: el.rect.height * (t?.sy ?? 1),
+        };
+      },
+    };
+    return el;
+  }
+  function root(rect, children) {
+    const r = element('root', null, rect, children);
+    r.clientLeft = 0; r.clientTop = 0;
+    r.appendChild = (node) => { if (!r.children.includes(node)) r.children.push(node); node.isConnected = true; return node; };
+    r.removeChild = (node) => { const i = r.children.indexOf(node); if (i >= 0) r.children.splice(i, 1); node.isConnected = false; return node; };
+    return r;
+  }
+  return { element, root };
+}
+function smartOptions(clock, extra = {}) {
+  return {
+    requestFrame: clock.requestFrame,
+    getScroll: () => ({ x: 0, y: 0 }),
+    getComputedStyle: (el) => ({ getPropertyValue: (name) => el.computed[name] ?? '' }),
+    ...extra,
+  };
+}
+function transforms(el) {
+  return el.writes.filter((w) => w.prop === 'transform' && typeof w.value === 'string').map((w) => w.value);
+}
+`;
+
+const cardDetailsConsumer = String.raw`
+import assert from 'node:assert/strict';
+import { captureSmart } from '@labpics/motion/smart';
+${smartWorldSource}
+const world = makeSmartWorld();
+const media = world.element('media', 'media', { x: 12, y: 12, width: 48, height: 48 });
+const card = world.element('card', 'card', { x: 0, y: 0, width: 120, height: 80 }, [media]);
+const root = world.root({ x: 0, y: 0, width: 640, height: 720 }, [card]);
+const clock = makeSmartClock();
+const options = smartOptions(clock);
+const first = captureSmart(root, options);
+card.rect = { x: 40, y: 30, width: 360, height: 300 };
+media.rect = { x: 80, y: 90, width: 200, height: 120 };
+const h1 = first.animate();
+assert.deepEqual(h1.plan.matched, ['card', 'media']);
+for (let i = 0; i < 4; i++) clock.step();
+const beforeTransform = parseTransform(transforms(card).at(-1));
+assert.ok(beforeTransform);
+const visualBefore = card.rect.x + beforeTransform.tx;
+const cardMeasures = card.measures;
+const mediaMeasures = media.measures;
+const second = captureSmart(root, options);
+assert.equal(card.measures, cardMeasures);
+assert.equal(media.measures, mediaMeasures);
+card.rect = { x: 20, y: 50, width: 420, height: 360 };
+media.rect = { x: 64, y: 130, width: 260, height: 160 };
+const h2 = second.animate();
+await h1.finished;
+assert.deepEqual(h2.plan.matched, ['card', 'media']);
+const afterTransform = parseTransform(transforms(card).at(-1));
+assert.ok(afterTransform);
+assert.ok(Math.abs((card.rect.x + afterTransform.tx) - visualBefore) < 1e-6);
+clock.drain();
+await h2.finished;
+assert.equal(card.style.getPropertyValue('transform'), '');
+assert.equal(media.style.getPropertyValue('transform'), '');
+
+// Нет изменения геометрии — нет анимационной работы и второго протокола.
+const noMotionCalls = clock.calls();
+const still = captureSmart(root, options).animate();
+await still.finished;
+assert.deepEqual(still.plan, { matched: [], entered: [], exited: [], skipped: [] });
+assert.equal(clock.calls(), noMotionCalls);
+
+// Reduced motion сохраняет тот же конечный layout без transform-кадров.
+const reducedWorld = makeSmartWorld();
+const reducedCard = reducedWorld.element('card', 'card', { x: 0, y: 0, width: 120, height: 80 });
+const reducedRoot = reducedWorld.root({ x: 0, y: 0, width: 640, height: 720 }, [reducedCard]);
+const reducedClock = makeSmartClock();
+const reducedCapture = captureSmart(reducedRoot, smartOptions(reducedClock, { matchMedia: () => ({ matches: true }) }));
+reducedCard.rect = { x: 90, y: 80, width: 320, height: 240 };
+const reduced = reducedCapture.animate();
+assert.equal(reduced.tier, 'reduced');
+await reduced.finished;
+assert.equal(transforms(reducedCard).length, 0);
+assert.equal(reducedClock.calls(), 0);
+console.log('journey-card-details-package: PASS');
+`;
+
+const panelSourceConsumer = String.raw`
+import assert from 'node:assert/strict';
+import { captureSmart } from '@labpics/motion/smart';
+${smartWorldSource}
+const world = makeSmartWorld();
+let surface = world.element('source', 'surface', { x: 300, y: 20, width: 80, height: 40 });
+const root = world.root({ x: 0, y: 0, width: 720, height: 640 }, [surface]);
+const clock = makeSmartClock();
+const options = smartOptions(clock);
+const openCapture = captureSmart(root, options);
+const source = surface;
+source.isConnected = false;
+surface = world.element('panel', 'surface', { x: 40, y: 60, width: 420, height: 300 });
+root.children = [surface];
+const opening = openCapture.animate();
+assert.deepEqual(opening.plan.matched, ['surface']);
+for (let i = 0; i < 4; i++) clock.step();
+const beforeTransform = parseTransform(transforms(surface).at(-1));
+assert.ok(beforeTransform);
+const visualBefore = surface.rect.x + beforeTransform.tx;
+const measuresBefore = surface.measures;
+const closeCapture = captureSmart(root, options);
+assert.equal(surface.measures, measuresBefore);
+const panel = surface;
+panel.isConnected = false;
+surface = world.element('source-again', 'surface', { x: 300, y: 20, width: 80, height: 40 });
+root.children = [surface];
+const closing = closeCapture.animate();
+await opening.finished;
+assert.deepEqual(closing.plan.matched, ['surface']);
+const firstClose = parseTransform(transforms(surface).at(-1));
+assert.ok(firstClose);
+assert.ok(Math.abs((surface.rect.x + firstClose.tx) - visualBefore) < 1e-6);
+clock.drain();
+await closing.finished;
+
+// Повторное открытие использует ту же stable identity, а не новый store/owner.
+const reopenCapture = captureSmart(root, options);
+surface.isConnected = false;
+surface = world.element('panel-again', 'surface', { x: 60, y: 70, width: 400, height: 280 });
+root.children = [surface];
+const reopened = reopenCapture.animate();
+assert.deepEqual(reopened.plan.matched, ['surface']);
+clock.drain();
+await reopened.finished;
+assert.equal(surface.style.getPropertyValue('transform'), '');
+console.log('journey-panel-source-package: PASS');
+`;
+
 describe('JOURNEY-01: независимые потребители реального пакета', () => {
   it('ошибка упаковки не оставляет временный каталог без владельца', () => {
     const marker = new Error('pack failed');
@@ -275,6 +459,18 @@ describe('JOURNEY-01: независимые потребители реальн
   it('grid: новая geometry, app-owned commit, filter/insert и stale revoke', () => {
     const output = installConsumer(packed.root, 'grid-app', packed.tarball, gridConsumer);
     expect(output).toContain('journey-grid-package: PASS');
+    expect(packed.sha256).toMatch(/^[0-9a-f]{64}$/);
+  }, 30_000);
+
+  it('card↔details: вложенная геометрия, перехват, resize, reduced и отсутствие движения', () => {
+    const output = installConsumer(packed.root, 'card-details-app', packed.tarball, cardDetailsConsumer);
+    expect(output).toContain('journey-card-details-package: PASS');
+    expect(packed.sha256).toMatch(/^[0-9a-f]{64}$/);
+  }, 30_000);
+
+  it('panel↔source: пересоздание, обратный ход и повторное открытие', () => {
+    const output = installConsumer(packed.root, 'panel-source-app', packed.tarball, panelSourceConsumer);
+    expect(output).toContain('journey-panel-source-package: PASS');
     expect(packed.sha256).toMatch(/^[0-9a-f]{64}$/);
   }, 30_000);
 });
