@@ -126,9 +126,8 @@ function _coord(p: BehaviorPoint, axis: BehaviorAxis): number {
 
 /** Прочитать предпочтение reduced-motion из инжектируемого matchMedia (B4). */
 function _prefersReduced(matchMedia: MatchMediaLike | undefined): boolean {
-  if (typeof matchMedia !== 'function') return false;
   try {
-    return matchMedia('(prefers-reduced-motion: reduce)').matches === true;
+    return !!matchMedia?.('(prefers-reduced-motion: reduce)').matches;
   } catch {
     return false;
   }
@@ -262,7 +261,13 @@ function _createBase<S extends BehaviorState<number>>(
   requestFrame: RequestFrameFn | undefined,
   matchMedia: MatchMediaLike | undefined,
 ) {
-  const runner = _createRunner(requestFrame, _prefersReduced(matchMedia));
+  // Приватный package-owned capability: optional compositor adapter передаёт
+  // callable requestFrame с тем же _Runner-owner. Публичный RequestFrameFn и
+  // обычные consumers не видят второго протокола/clock/state.
+  const runner = (requestFrame as (RequestFrameFn & Partial<_Runner>) | undefined)?._settle
+    && (requestFrame as RequestFrameFn & Partial<_Runner>)._invalidate
+    ? requestFrame as RequestFrameFn & _Runner
+    : _createRunner(requestFrame, _prefersReduced(matchMedia));
   const tracker = createVelocityTracker();
   const subs = new Set<(s: S) => void>();
   let state = initial;

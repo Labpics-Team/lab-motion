@@ -1,0 +1,305 @@
+import {
+  createBottomSheet as createHeadlessBottomSheet,
+  createCarousel as createHeadlessCarousel,
+  type BehaviorState,
+  type CarouselController,
+  type CarouselOptions,
+  type SheetController,
+  type SheetOptions,
+} from '../index.js';
+import { handoffToLive } from '../../compositor/handoff.js';
+import {
+  DEFAULT_TOLERANCE,
+  tryCompileSpringExecutionArtifactTupleUnchecked,
+  type SpringExecutionArtifactTuple,
+} from '../../compositor/curve.js';
+import {
+  resolveCompositorTierCodeFromInputs,
+  type CompositorTierCode,
+} from '../../compositor/detect.js';
+import { compileSpringRuntimeExecutionTupleUnchecked } from '../../compositor/execution.js';
+import {
+  animationTimeOrFallback,
+  sampleSerializedSpringIntoUnchecked,
+  scaleSerializedVelocity,
+} from '../../compositor/sample.js';
+import { defaultRequestFrame } from '../../internal/request-frame.js';
+import type { RequestFrameFn } from '../../motion-value.js';
+import type { SpringParams } from '../../spring.js';
+import type { WaapiAnimatable } from '../../waapi/index.js';
+
+interface NativeAnimation {
+  currentTime?: number | null;
+  cancel?: () => void;
+  finished?: PromiseLike<unknown>;
+}
+
+export interface BehaviorCompositorSurface {
+  readonly target: WaapiAnimatable;
+  readonly property: string;
+  readonly apply: (value: string | number) => void;
+  readonly format?: ((value: number) => string | number) | undefined;
+}
+
+export interface CompositorBottomSheetOptions extends SheetOptions {
+  readonly compositor: BehaviorCompositorSurface;
+}
+
+export interface CompositorCarouselOptions extends CarouselOptions {
+  readonly compositor: BehaviorCompositorSurface;
+}
+
+interface SettleArgs {
+  readonly from: number;
+  readonly velocity: number;
+  readonly target: number;
+  readonly spring: SpringParams;
+  readonly onStep: (value: number, velocity: number) => void;
+  readonly onDone: () => void;
+}
+
+interface RunnerCarrier extends RequestFrameFn {
+  _settle(args: SettleArgs): void;
+  _invalidate(): number;
+  destroy(): void;
+}
+
+type NativeRun = {
+  readonly kind: 0;
+  readonly args: SettleArgs;
+  readonly animation: NativeAnimation;
+  readonly artifact: SpringExecutionArtifactTuple;
+  readonly startedAt: number;
+};
+
+type LiveRun = {
+  readonly kind: 1;
+  readonly args: SettleArgs;
+  readonly value: ReturnType<typeof handoffToLive>;
+  unsubscribe?: (() => void) | undefined;
+};
+
+type ActiveRun = NativeRun | LiveRun;
+
+function defaultNow(): number {
+  return globalThis.performance?.now() ?? Date.now();
+}
+
+function createOwner(
+  surface: BehaviorCompositorSurface,
+  requestFrame: RequestFrameFn | undefined,
+  tier: CompositorTierCode,
+): RunnerCarrier {
+  let target: WaapiAnimatable | undefined = surface.target;
+  let active: ActiveRun | undefined;
+  let epoch = 0;
+  const format = surface.format ?? Number;
+  const schedule = requestFrame ?? defaultRequestFrame;
+  const sample = { value: 0, velocity: 0 };
+
+  const finish = (run: ActiveRun): void => {
+    if (active !== run) return;
+    active = undefined;
+    const token = epoch;
+    run.args.onStep(run.args.target, 0);
+    if (run.kind === 0) run.animation.cancel?.();
+    else {
+      run.unsubscribe?.();
+      run.value.destroy();
+    }
+    if (token === epoch) run.args.onDone();
+  };
+
+  const carrier = ((callback: (timestamp?: number) => void) => schedule(callback)) as RunnerCarrier;
+
+  carrier._settle = (args): void => {
+    carrier._invalidate();
+    if (!target) return;
+    if (args.from === args.target || tier === 3) {
+      args.onStep(args.target, 0);
+      args.onDone();
+      return;
+    }
+    const token = ++epoch;
+    const range = args.target - args.from;
+    const v0 = args.velocity / range;
+    const artifact = tier === 0 && Number.isFinite(v0)
+      ? tryCompileSpringExecutionArtifactTupleUnchecked(args.spring, v0, DEFAULT_TOLERANCE)
+      : undefined;
+
+    if (artifact && target) {
+      const plan = compileSpringRuntimeExecutionTupleUnchecked(
+        args.spring,
+        surface.property,
+        args.from,
+        args.target,
+        v0,
+        DEFAULT_TOLERANCE,
+        'both',
+        'replace',
+        format,
+        artifact,
+      );
+      if (token !== epoch || !target) return;
+      const startedAt = defaultNow();
+      if (token !== epoch || !target) return;
+      const animation = target.animate(plan[0], {
+        duration: plan[2],
+        easing: plan[1],
+        iterations: 1,
+        fill: plan[3],
+        composite: plan[4],
+      }) as NativeAnimation;
+      if (token !== epoch || !target) {
+        animation.cancel?.();
+        return;
+      }
+      const native: NativeRun = {
+        kind: 0,
+        args,
+        animation,
+        artifact,
+        startedAt,
+      };
+      active = native;
+      args.onStep(args.from, args.velocity);
+      if (active === native && token === epoch) {
+        animation.finished?.then(() => finish(native), () => {});
+      }
+      return;
+    }
+
+    const value = handoffToLive({
+      spring: args.spring,
+      value: args.from,
+      velocity: args.velocity,
+      target: args.target,
+      requestFrame: schedule,
+    });
+    const live: LiveRun = { kind: 1, args, value };
+    active = live;
+    live.unsubscribe = value.onChange((next) => {
+      if (active !== live) return;
+      const velocity = value.velocity;
+      args.onStep(next, velocity);
+      if (active === live && next === args.target && velocity === 0) finish(live);
+    });
+  };
+
+  carrier._invalidate = (): number => {
+    const run = active;
+    epoch++;
+    if (!run) return 0;
+    active = undefined;
+    let value: number;
+    let velocity: number;
+
+    if (run.kind === 0) {
+      const currentTime = animationTimeOrFallback(
+        run.animation,
+        defaultNow() - run.startedAt,
+      );
+      const point = sampleSerializedSpringIntoUnchecked(
+        run.artifact[1],
+        run.artifact[2],
+        currentTime,
+        0,
+        sample,
+      );
+      const progress = point.value;
+      const raw = progress === 0
+        ? run.args.from
+        : progress === 1
+          ? run.args.target
+          : (1 - progress) * run.args.from + progress * run.args.target;
+      value = Number.isFinite(raw) ? raw : run.args.target;
+      velocity = scaleSerializedVelocity(
+        point.velocity,
+        run.args.from,
+        run.args.target,
+      );
+    } else {
+      value = run.value.value;
+      velocity = run.value.velocity;
+    }
+
+    // Successor-state публикуется до cleanup donor: underlying style получает
+    // sampled point, пока старый effect ещё маскирует его; cancel затем раскрывает
+    // то же значение. Reentrant input не может воскресить уже снятый run.
+    run.args.onStep(value, velocity);
+    if (run.kind === 0) run.animation.cancel?.();
+    else {
+      run.unsubscribe?.();
+      run.value.destroy();
+    }
+    return velocity;
+  };
+
+  carrier.destroy = (): void => {
+    const run = active;
+    active = undefined;
+    target = undefined;
+    epoch++;
+    if (run?.kind === 0) run.animation.cancel?.();
+    else if (run) {
+      run.unsubscribe?.();
+      run.value.destroy();
+    }
+  };
+  return carrier;
+}
+
+function connect<
+  T extends BehaviorState<number>,
+  C extends {
+    readonly state: T;
+    subscribe(fn: (state: T) => void): () => void;
+    destroy(): void;
+  },
+>(
+  controller: C,
+  owner: RunnerCarrier | undefined,
+  surface: BehaviorCompositorSurface,
+): C {
+  const format = surface.format ?? Number;
+  surface.apply(format(controller.state.value));
+  const unsubscribe = controller.subscribe((state) => {
+    surface.apply(format(state.value));
+  });
+  const destroy = controller.destroy.bind(controller);
+  controller.destroy = (() => {
+    owner?.destroy();
+    destroy();
+    unsubscribe();
+  }) as C['destroy'];
+  return controller;
+}
+
+function ownerFor(
+  options: Pick<SheetOptions, 'matchMedia' | 'requestFrame'>,
+  surface: BehaviorCompositorSurface,
+): RunnerCarrier {
+  return createOwner(
+    surface,
+    options.requestFrame,
+    resolveCompositorTierCodeFromInputs(surface.target, options.matchMedia, options.requestFrame),
+  );
+}
+
+/** Follow stays live; release transfers into the existing compositor representation. */
+export function createCompositorBottomSheet(
+  options: CompositorBottomSheetOptions,
+): SheetController {
+  const owner = ownerFor(options, options.compositor);
+  const controller = createHeadlessBottomSheet({ ...options, requestFrame: owner });
+  return connect(controller, owner, options.compositor);
+}
+
+/** Pager reuses the same owner law and the existing carousel target selection. */
+export function createCompositorCarousel(
+  options: CompositorCarouselOptions,
+): CarouselController {
+  const owner = ownerFor(options, options.compositor);
+  const controller = createHeadlessCarousel({ ...options, requestFrame: owner });
+  return connect(controller, owner, options.compositor);
+}

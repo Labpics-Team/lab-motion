@@ -168,6 +168,9 @@ export const ANIMATE_COMPOSITOR_MIXED_GATE_BYTES = 17_500;
 export const BESPOKE_SUBPATH_GATES = {
   // Первый артефакт optional reorder; ни один прежний entry не финансирует его.
   './behaviors/reorder': 1518,
+  // JOURNEY-01 direct-control compositor owner: первый admitted shipped-факт,
+  // exact ceiling без люфта; существующие ./behaviors и ./compositor не растут.
+  './behaviors/compositor': 7048,
   './utils': 1400,
   // Build-tool entry (#208): Vite-адаптер lowering НАМЕРЕННО несёт канонический
   // MotionProgram V1 parser + nano spring SSOT — это цена доверенного артефакта
