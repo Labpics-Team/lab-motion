@@ -5,8 +5,8 @@ import { canonicalGzip, observationalBrotli } from '../scripts/compression-oracl
 
 /** First admitted JOURNEY-01 direct-control artifact; ceilings only ratchet down. */
 const MAX = {
-  esm: { raw: 18_302, gzip: 7_041, brotli: 6_442 },
-  cjs: { raw: 18_307, gzip: 7_032, brotli: 6_441 },
+  esm: { raw: 18_240, gzip: 7_039, brotli: 6_438 },
+  cjs: { raw: 18_245, gzip: 7_030, brotli: 6_434 },
 } as const;
 
 function vector(path: string) {
