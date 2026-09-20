@@ -81,17 +81,30 @@ clock.step(); clock.step();
 assert.equal(sheet.state.phase, 'release');
 const boundary = { value: sheet.state.value, velocity: sheet.state.velocity };
 assert.notEqual(boundary.velocity, 0);
+const pendingBeforeUpdate = clock.pending();
 sheet.update([0, 200, 400]);
+assert.equal(clock.pending(), pendingBeforeUpdate + 1);
 assert.equal(sheet.state.value, boundary.value);
 assert.equal(sheet.state.velocity, boundary.velocity);
+// Фальсификатор снятого токена поколения: физически остаются старый и новый
+// кадры, но после одного шага публиковать состояние вправе только новый.
+let publications = 0;
+const stop = sheet.subscribe(() => { publications++; });
+clock.step();
+stop();
+assert.equal(publications, 1);
+assert.notEqual(sheet.state.velocity, 0);
 // Новый ввод перехватывает того же владельца и гасит старое поколение.
-sheet.pointerDown({ x: 0, y: boundary.value, t: 1 });
+sheet.pointerDown({ x: 0, y: sheet.state.value, t: 1 });
 assert.equal(sheet.state.phase, 'follow');
+const takeoverValue = sheet.state.value;
 clock.drain();
+assert.equal(sheet.state.phase, 'follow');
+assert.equal(sheet.state.value, takeoverValue);
 assert.equal(clock.pending(), 0);
 sheet.pointerCancel(); clock.drain();
-// Клавиатурному адаптеру достаточно публичного intent-вызова: без ручной
-// передачи скорости, generation-token, коллекции cancel-handles или второго state-owner.
+// Клавиатурному адаптеру достаточно публичного вызова намерения: без ручной
+// передачи скорости, токена поколения, набора отмен или второго владельца состояния.
 sheet.snapTo(2); clock.drain();
 assert.equal(sheet.state.value, 400);
 assert.equal(sheet.state.snapIndex, 2);
@@ -105,6 +118,7 @@ const reduced = createBottomSheet({
 reduced.snapTo(2);
 assert.equal(reduced.state.value, 400);
 assert.equal(reducedClock.calls(), 0);
+assert.equal(reducedClock.pending(), 0);
 reduced.destroy();
 console.log('journey-sheet-package: PASS');
 `;
@@ -119,23 +133,43 @@ pager.goTo(3); clock.step(); clock.step();
 assert.equal(pager.state.phase, 'release');
 const boundary = { value: pager.state.value, velocity: pager.state.velocity };
 assert.notEqual(boundary.velocity, 0);
+const pendingBeforeUpdate = clock.pending();
 pager.update(4, 120);
+assert.equal(clock.pending(), pendingBeforeUpdate + 1);
 assert.equal(pager.state.value, boundary.value);
 assert.equal(pager.state.velocity, boundary.velocity);
+// Тот же исполняемый фальсификатор токена поколения: старый кадр остаётся в
+// очереди, но публикация на шаге должна принадлежать только новой доводке.
+let publications = 0;
+const stop = pager.subscribe(() => { publications++; });
+clock.step();
+stop();
+assert.equal(publications, 1);
+assert.notEqual(pager.state.velocity, 0);
 clock.drain();
 assert.equal(pager.state.index, 3);
 assert.equal(pager.state.value, 360);
-// Эквивалентные клавиатурные intents используют того же владельца и clock.
+// Эквивалентные клавиатурные намерения используют того же владельца и те же часы.
 pager.prev(); clock.drain();
 assert.equal(pager.state.index, 2);
 pager.next(); clock.drain();
 assert.equal(pager.state.index, 3);
-// RTL-направление pointer остаётся семантикой того же поставляемого controller.
+// Фальсификатор знака RTL: один и тот же левый жест от страницы 1 обязан
+// расходиться с LTR-контролем в противоположные стороны.
+pager.goTo(1); clock.drain();
 pager.pointerDown({ x: 0, y: 0, t: 1 });
 pager.pointerMove({ x: -120, y: 0, t: 1.05 });
 pager.pointerUp({ x: -120, y: 0, t: 1.05 });
 clock.drain();
-assert.equal(pager.state.index, 2);
+assert.equal(pager.state.index, 0);
+const ltrClock = makeClock();
+const ltr = createCarousel({ pageCount: 4, pageSize: 120, index: 1, requestFrame: ltrClock.requestFrame });
+ltr.pointerDown({ x: 0, y: 0, t: 1 });
+ltr.pointerMove({ x: -120, y: 0, t: 1.05 });
+ltr.pointerUp({ x: -120, y: 0, t: 1.05 });
+ltrClock.drain();
+assert.equal(ltr.state.index, 2);
+ltr.destroy();
 pager.destroy();
 
 const reducedClock = makeClock();
@@ -147,6 +181,7 @@ reduced.next();
 assert.equal(reduced.state.index, 1);
 assert.equal(reduced.state.value, 100);
 assert.equal(reducedClock.calls(), 0);
+assert.equal(reducedClock.pending(), 0);
 reduced.destroy();
 console.log('journey-pager-package: PASS');
 `;
@@ -175,12 +210,12 @@ const keyboard = controller.start('b');
 keyboard.step('right');
 assert.deepEqual(proposals.at(-1).keys, ['b', 'c', 'a']);
 const accepted = proposals.at(-1).proposal;
-// Commit принадлежит приложению: новый порядок, вставка и геометрия приходят через update().
+// Подтверждение принадлежит приложению: новый порядок, вставка и геометрия приходят через update().
 items = itemsFor(['b', 'c', 'a', 'x']);
 controller.update(items);
 assert.equal(controller.isCurrent(accepted), false);
 assert.equal(keyboard.active, true);
-// Фильтрация активной identity отзывает сессию; отложенное старое предложение уже невалидно.
+// Фильтрация активной идентичности отзывает сессию; отложенное старое предложение уже невалидно.
 controller.update(itemsFor(['c', 'a', 'x']));
 assert.equal(keyboard.active, false);
 assert.equal(controller.activeKey, undefined);
@@ -210,7 +245,7 @@ assert.deepEqual(proposals.at(-1).keys, ['b', 'c', 'a', 'd']);
 const first = proposals.at(-1).proposal;
 assert.equal(controller.isCurrent(first), true);
 assert.deepEqual(items.map(({ key }) => key), ['a', 'b', 'c', 'd']);
-// Приложение подтверждает данные и присылает новую геометрию; resolver не держит второй store.
+// Приложение подтверждает данные и присылает новую геометрию; решатель не держит второе хранилище.
 items = layout(['b', 'c', 'a', 'd'], 200);
 controller.update(items);
 assert.equal(controller.isCurrent(first), false);
@@ -219,7 +254,7 @@ session.move({ x: 250, y: 250 });
 assert.deepEqual(proposals.at(-1).keys, ['b', 'c', 'd', 'a']);
 const second = proposals.at(-1).proposal;
 assert.equal(controller.isCurrent(second), true);
-// Фильтр удаляет активный ключ, а новый ключ после update становится обычной stable identity.
+// Фильтр удаляет активный ключ, а новый ключ после update становится обычной стабильной идентичностью.
 items = layout(['b', 'c', 'd', 'e'], -100);
 controller.update(items);
 assert.equal(session.active, false);
@@ -352,7 +387,7 @@ await still.finished;
 assert.deepEqual(still.plan, { matched: [], entered: [], exited: [], skipped: [] });
 assert.equal(clock.calls(), noMotionCalls);
 
-// Reduced motion сохраняет тот же конечный layout без transform-кадров.
+// Сокращённое движение сохраняет ту же конечную раскладку без кадров преобразования.
 const reducedWorld = makeSmartWorld();
 const reducedCard = reducedWorld.element('card', 'card', { x: 0, y: 0, width: 120, height: 80 });
 const reducedRoot = reducedWorld.root({ x: 0, y: 0, width: 640, height: 720 }, [reducedCard]);
@@ -403,7 +438,7 @@ assert.ok(Math.abs((surface.rect.x + firstClose.tx) - visualBefore) < 1e-6);
 clock.drain();
 await closing.finished;
 
-// Повторное открытие использует ту же stable identity, а не новый store/owner.
+// Повторное открытие использует ту же стабильную идентичность, а не новое хранилище или владельца.
 const reopenCapture = captureSmart(root, options);
 surface.isConnected = false;
 surface = world.element('panel-again', 'surface', { x: 60, y: 70, width: 400, height: 280 });
@@ -438,31 +473,31 @@ describe('JOURNEY-01: независимые потребители реальн
     if (packed) rmSync(packed.root, { recursive: true, force: true });
   });
 
-  it('sheet: перехват, живые ограничения, intent-управление и reduced motion', () => {
+  it('sheet: перехват, живые ограничения, управление намерением и сокращённое движение', () => {
     const output = installConsumer(packed.root, 'sheet-app', packed.tarball, sheetConsumer);
     expect(output).toContain('journey-sheet-package: PASS');
     expect(packed.sha256).toMatch(/^[0-9a-f]{64}$/);
   }, 30_000);
 
-  it('pager: resize, RTL, intent-управление и reduced motion', () => {
+  it('pager: изменение размера, RTL, управление намерением и сокращённое движение', () => {
     const output = installConsumer(packed.root, 'pager-app', packed.tarball, pagerConsumer);
     expect(output).toContain('journey-pager-package: PASS');
     expect(packed.sha256).toMatch(/^[0-9a-f]{64}$/);
   }, 30_000);
 
-  it('list: RTL pointer/keyboard, app-owned commit, insert/remove и stale revoke', () => {
+  it('list: RTL указатель/клавиатура, подтверждение приложения, вставка/удаление и отзыв устаревшего', () => {
     const output = installConsumer(packed.root, 'list-app', packed.tarball, listConsumer);
     expect(output).toContain('journey-list-package: PASS');
     expect(packed.sha256).toMatch(/^[0-9a-f]{64}$/);
   }, 30_000);
 
-  it('grid: новая geometry, app-owned commit, filter/insert и stale revoke', () => {
+  it('grid: новая геометрия, подтверждение приложения, фильтр/вставка и отзыв устаревшего', () => {
     const output = installConsumer(packed.root, 'grid-app', packed.tarball, gridConsumer);
     expect(output).toContain('journey-grid-package: PASS');
     expect(packed.sha256).toMatch(/^[0-9a-f]{64}$/);
   }, 30_000);
 
-  it('card↔details: вложенная геометрия, перехват, resize, reduced и отсутствие движения', () => {
+  it('card↔details: вложенная геометрия, перехват, изменение размера, сокращённое и отсутствующее движение', () => {
     const output = installConsumer(packed.root, 'card-details-app', packed.tarball, cardDetailsConsumer);
     expect(output).toContain('journey-card-details-package: PASS');
     expect(packed.sha256).toMatch(/^[0-9a-f]{64}$/);

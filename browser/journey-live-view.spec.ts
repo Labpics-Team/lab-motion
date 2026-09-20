@@ -1,11 +1,11 @@
 /**
- * JOURNEY-01: два реальных live-view потребителя ./smart в браузере.
+ * JOURNEY-01: два реальных браузерных потребителя ./smart.
  * Пакетный импорт отдельно запинен test/journey-package-consumers.test.ts;
- * здесь собранный dist проходит реальный DOM/focus/click и визуальную C0-границу.
+ * здесь собранный dist проходит настоящий DOM, фокус, ввод и визуальную C0-границу.
  */
 import { expect, test } from './fixtures/harness';
 
-test('card↔details: вложенная геометрия, mid-flight retarget, focus и no/reduced-motion', async ({ page }) => {
+test('card↔details: вложенная геометрия, перенацеливание в полёте, фокус и режимы без движения', async ({ page }) => {
   const result = await page.evaluate(async () => {
     const { captureSmart } = await import('/dist/smart/index.js');
     document.body.innerHTML = `
@@ -39,7 +39,7 @@ test('card↔details: вложенная геометрия, mid-flight retarget
     const drain = (): void => {
       let guard = 0;
       while (queue.length > 0) {
-        if (++guard > 4000) throw new Error('live-view clock did not settle');
+        if (++guard > 4000) throw new Error('браузерные часы не остановились');
         step();
       }
     };
@@ -149,7 +149,7 @@ test('panel↔source: пересоздание узла, обратный ход
     const drain = (): void => {
       let guard = 0;
       while (queue.length > 0) {
-        if (++guard > 4000) throw new Error('panel clock did not settle');
+        if (++guard > 4000) throw new Error('часы панели не остановились');
         step();
       }
     };
@@ -227,4 +227,117 @@ test('panel↔source: пересоздание узла, обратный ход
   expect(result.focusAfter).toBe(true);
   expect(result.finalTransform).toBe('');
   expect(result.finalBox).toEqual({ x: 60, y: 70, width: 400, height: 280 });
+});
+
+
+test('движущийся элемент управления принимает настоящий указатель и клавиатуру, сохраняя фокус', async ({ page }) => {
+  await page.evaluate(async () => {
+    const { captureSmart } = await import('/dist/smart/index.js');
+    document.body.innerHTML = `
+      <div id="root" style="position:relative;width:720px;height:640px">
+        <article id="card" data-motion-key="card" style="position:absolute;left:20px;top:40px;width:180px;height:120px">
+          <button id="action" style="width:96px;height:40px">Действие</button>
+        </article>
+      </div>`;
+    const root = document.querySelector<HTMLElement>('#root')!;
+    const card = document.querySelector<HTMLElement>('#card')!;
+    const action = document.querySelector<HTMLButtonElement>('#action')!;
+    const queue: Array<(ts?: number) => void> = [];
+    let now = 0;
+    const state = {
+      activations: 0,
+      requestFrame(cb: (ts?: number) => void): number { queue.push(cb); return queue.length; },
+      step(): void { now += 16; for (const cb of queue.splice(0)) cb(now); },
+      drain(): void {
+        let guard = 0;
+        while (queue.length > 0) {
+          if (++guard > 4000) throw new Error('часы взаимодействия не остановились');
+          state.step();
+        }
+      },
+      first: Promise.resolve(),
+      second: Promise.resolve(),
+      pending: (): number => queue.length,
+    };
+    action.addEventListener('click', () => { state.activations++; });
+    const first = captureSmart(root, { requestFrame: state.requestFrame, radius: false });
+    card.style.cssText += ';left:80px;top:90px;width:360px;height:260px';
+    const handle = first.animate();
+    state.first = handle.finished;
+    for (let i = 0; i < 4; i++) state.step();
+    (window as unknown as { __journeyInteraction: typeof state }).__journeyInteraction = state;
+  });
+
+  const action = page.locator('#action');
+  const box = await action.boundingBox();
+  expect(box).not.toBeNull();
+  const point = { x: box!.x + box!.width / 2, y: box!.y + box!.height / 2 };
+  expect(await page.evaluate(
+    ({ x, y }) => document.elementFromPoint(x, y)?.id,
+    point,
+  )).toBe('action');
+
+  await page.mouse.click(point.x, point.y);
+  await expect.poll(() => page.evaluate(
+    () => (window as unknown as { __journeyInteraction: { activations: number } }).__journeyInteraction.activations,
+  )).toBe(1);
+
+  // Правдоподобный дефект: перекрытый указатель обязан сделать тот же ввод красным.
+  await action.evaluate((element) => { (element as HTMLElement).style.pointerEvents = 'none'; });
+  await page.mouse.click(point.x, point.y);
+  expect(await page.evaluate(
+    () => (window as unknown as { __journeyInteraction: { activations: number } }).__journeyInteraction.activations,
+  )).toBe(1);
+  await action.evaluate((element) => { (element as HTMLElement).style.pointerEvents = ''; });
+
+  await action.focus();
+  await page.keyboard.press('Enter');
+  await expect.poll(() => page.evaluate(
+    () => (window as unknown as { __journeyInteraction: { activations: number } }).__journeyInteraction.activations,
+  )).toBe(2);
+
+  const focusedAtRetarget = await page.evaluate(async () => {
+    const { captureSmart } = await import('/dist/smart/index.js');
+    const root = document.querySelector<HTMLElement>('#root')!;
+    const card = document.querySelector<HTMLElement>('#card')!;
+    const action = document.querySelector<HTMLButtonElement>('#action')!;
+    const state = (window as unknown as {
+      __journeyInteraction: {
+        requestFrame(cb: (ts?: number) => void): number;
+        second: Promise<void>;
+      };
+    }).__journeyInteraction;
+    const second = captureSmart(root, { requestFrame: state.requestFrame, radius: false });
+    card.style.cssText += ';left:40px;top:120px;width:420px;height:300px';
+    state.second = second.animate().finished;
+    return document.activeElement === action;
+  });
+  expect(focusedAtRetarget).toBe(true);
+
+  await page.keyboard.press('Enter');
+  await expect.poll(() => page.evaluate(
+    () => (window as unknown as { __journeyInteraction: { activations: number } }).__journeyInteraction.activations,
+  )).toBe(3);
+
+  const settled = await page.evaluate(async () => {
+    const action = document.querySelector<HTMLButtonElement>('#action')!;
+    const state = (window as unknown as {
+      __journeyInteraction: {
+        activations: number;
+        first: Promise<void>;
+        second: Promise<void>;
+        drain(): void;
+        pending(): number;
+      };
+    }).__journeyInteraction;
+    await state.first;
+    state.drain();
+    await state.second;
+    return {
+      activations: state.activations,
+      focused: document.activeElement === action,
+      pending: state.pending(),
+    };
+  });
+  expect(settled).toEqual({ activations: 3, focused: true, pending: 0 });
 });
