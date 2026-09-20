@@ -1,10 +1,49 @@
-import { describe, expect, it } from 'vitest';
+import { afterEach, describe, expect, it, vi } from 'vitest';
 import { createBottomSheet } from '../src/behaviors/index.js';
 import {
   createCompositorBottomSheet,
   createCompositorCarousel,
 } from '../src/behaviors/compositor/index.js';
+import {
+  DEFAULT_TOLERANCE,
+  tryCompileSpringExecutionArtifactTupleUnchecked,
+} from '../src/compositor/curve.js';
+import { __resetDetectionCache } from '../src/compositor/detect.js';
 import { pt } from './behaviors-helpers.js';
+
+const SPRING = { mass: 1, stiffness: 100, damping: 10 };
+
+type SurfaceTarget = Parameters<typeof createCompositorBottomSheet>[0]['compositor']['target'];
+
+function noWaapiTarget(): SurfaceTarget {
+  return {} as unknown as SurfaceTarget;
+}
+
+function frameClock() {
+  let nextHandle = 1;
+  let queue: Array<(timestamp?: number) => void> = [];
+  return {
+    requestFrame(callback: (timestamp?: number) => void): number {
+      queue.push(callback);
+      return nextHandle++;
+    },
+    step(timestamp: number): void {
+      const current = queue;
+      queue = [];
+      for (const callback of current) callback(timestamp);
+    },
+    drain(start = 0, limit = 240): void {
+      let timestamp = start;
+      for (let i = 0; i < limit && queue.length; i++) {
+        timestamp += 1000 / 60;
+        this.step(timestamp);
+      }
+    },
+    pending(): number {
+      return queue.length;
+    },
+  };
+}
 
 function nativeTarget(onCancel?: () => void) {
   let animation: {
@@ -30,6 +69,12 @@ function nativeTarget(onCancel?: () => void) {
     get cancelCalls() { return cancelCalls; },
   };
 }
+
+afterEach(() => {
+  vi.useRealTimers();
+  vi.unstubAllGlobals();
+  __resetDetectionCache();
+});
 
 describe('JOURNEY-01 direct-control compositor owner', () => {
   it('ordinary requestFrame stays ordinary when no package carrier is present', () => {
@@ -132,6 +177,185 @@ describe('JOURNEY-01 direct-control compositor owner', () => {
     expect(sheet.state.value).toBe(pendingValue);
     expect(sheet.state.velocity).toBeCloseTo(inheritedVelocity, 10);
     sheet.destroy();
+  });
+
+  it('tier 1 keeps one live owner through pickup, completion and cleanup', () => {
+    vi.stubGlobal('CSS', { supports: () => false });
+    vi.stubGlobal('navigator', { vendor: 'Google Inc.', userAgent: 'Chrome' });
+    __resetDetectionCache();
+    const clock = frameClock();
+    const native = nativeTarget();
+    const applied: number[] = [];
+    const sheet = createCompositorBottomSheet({
+      snapPoints: [0, 300],
+      spring: SPRING,
+      requestFrame: clock.requestFrame,
+      compositor: {
+        target: native.target,
+        property: 'translate',
+        format: Number,
+        apply: (value) => applied.push(Number(value)),
+      },
+    });
+
+    sheet.snapTo(1);
+    expect(native.calls).toBe(0);
+    expect(clock.pending()).toBe(1);
+    clock.step(0);
+    clock.step(1000 / 60);
+    const pickupValue = sheet.state.value;
+    const pickupVelocity = sheet.state.velocity;
+    expect(pickupValue).toBeGreaterThan(0);
+    expect(pickupValue).toBeLessThan(300);
+    expect(pickupVelocity).not.toBe(0);
+
+    const pickup = pt(0, pickupValue, 0.05);
+    sheet.pointerDown(pickup);
+    expect(sheet.state.value).toBe(pickupValue);
+    sheet.pointerUp(pickup);
+    expect(sheet.state.value).toBe(pickupValue);
+    expect(sheet.state.velocity).toBeCloseTo(pickupVelocity, 8);
+
+    clock.drain(1000 / 60);
+    expect(sheet.state.phase).toBe('settle');
+    expect(sheet.state.value).toBe(300);
+    expect(sheet.state.velocity).toBe(0);
+    const writes = applied.length;
+    sheet.destroy();
+    clock.drain();
+    expect(applied).toHaveLength(writes);
+    expect(native.calls).toBe(0);
+  });
+
+  it('tier 2 uses the same live handoff and revokes stale work on destroy', () => {
+    const clock = frameClock();
+    const applied: number[] = [];
+    const sheet = createCompositorBottomSheet({
+      snapPoints: [0, 300],
+      spring: SPRING,
+      requestFrame: clock.requestFrame,
+      compositor: {
+        target: noWaapiTarget(),
+        property: 'translate',
+        format: Number,
+        apply: (value) => applied.push(Number(value)),
+      },
+    });
+
+    sheet.snapTo(1);
+    clock.step(0);
+    clock.step(1000 / 60);
+    const pickupValue = sheet.state.value;
+    const pickupVelocity = sheet.state.velocity;
+    expect(pickupValue).toBeGreaterThan(0);
+    expect(pickupVelocity).not.toBe(0);
+
+    const pickup = pt(0, pickupValue, 0.05);
+    sheet.pointerDown(pickup);
+    sheet.pointerUp(pickup);
+    expect(sheet.state.value).toBe(pickupValue);
+    expect(sheet.state.velocity).toBeCloseTo(pickupVelocity, 8);
+
+    const writes = applied.length;
+    sheet.destroy();
+    clock.drain();
+    expect(applied).toHaveLength(writes);
+  });
+
+  it('tier 4 SSR path completes and cleans up without WAAPI or an injected frame clock', async () => {
+    vi.useFakeTimers();
+    vi.stubGlobal('window', undefined);
+    vi.stubGlobal('document', undefined);
+    vi.stubGlobal('requestAnimationFrame', undefined);
+    __resetDetectionCache();
+    const applied: number[] = [];
+    const sheet = createCompositorBottomSheet({
+      snapPoints: [0, 300],
+      spring: SPRING,
+      compositor: {
+        target: noWaapiTarget(),
+        property: 'translate',
+        format: Number,
+        apply: (value) => applied.push(Number(value)),
+      },
+    });
+
+    sheet.snapTo(1);
+    expect(sheet.state.phase).toBe('release');
+    await vi.advanceTimersByTimeAsync(34);
+    const pickupValue = sheet.state.value;
+    const pickupVelocity = sheet.state.velocity;
+    expect(pickupValue).toBeGreaterThan(0);
+    expect(pickupVelocity).not.toBe(0);
+
+    const pickup = pt(0, pickupValue, 0.05);
+    sheet.pointerDown(pickup);
+    sheet.pointerUp(pickup);
+    expect(sheet.state.value).toBe(pickupValue);
+    expect(sheet.state.velocity).toBeCloseTo(pickupVelocity, 8);
+
+    for (let i = 0; i < 240 && sheet.state.phase !== 'settle'; i++) {
+      await vi.advanceTimersByTimeAsync(17);
+    }
+    expect(sheet.state.phase).toBe('settle');
+    expect(sheet.state.value).toBe(300);
+    expect(sheet.state.velocity).toBe(0);
+    const writes = applied.length;
+    sheet.destroy();
+    await vi.runOnlyPendingTimersAsync();
+    expect(applied).toHaveLength(writes);
+  });
+
+  it('tier 0 over-cap compile falls back live before ownership changes', () => {
+    vi.stubGlobal('CSS', { supports: () => true });
+    vi.stubGlobal('navigator', { vendor: 'Google Inc.', userAgent: 'Chrome' });
+    __resetDetectionCache();
+    const clock = frameClock();
+    const native = nativeTarget();
+    const applied: number[] = [];
+    const sheet = createCompositorBottomSheet({
+      snapPoints: [0, 0.1],
+      spring: SPRING,
+      requestFrame: clock.requestFrame,
+      compositor: {
+        target: native.target,
+        property: 'translate',
+        format: Number,
+        apply: (value) => applied.push(Number(value)),
+      },
+    });
+
+    const velocity = 0.05 / 0.00005;
+    expect(tryCompileSpringExecutionArtifactTupleUnchecked(
+      SPRING,
+      velocity / 0.05,
+      DEFAULT_TOLERANCE,
+    )).toBeUndefined();
+
+    sheet.pointerDown(pt(0, 0, 0));
+    sheet.pointerMove(pt(0, 0.05, 0.00005));
+    sheet.pointerUp(pt(0, 0.05, 0.00005));
+    expect(sheet.state.velocity).toBeCloseTo(velocity, 8);
+    expect(native.calls).toBe(0);
+    expect(clock.pending()).toBe(1);
+
+    clock.step(0);
+    clock.step(1000 / 60);
+    const pickupValue = sheet.state.value;
+    const pickupVelocity = sheet.state.velocity;
+    expect(pickupValue).toBeGreaterThan(0.05);
+    expect(pickupVelocity).not.toBe(0);
+    const pickup = pt(0, pickupValue, 0.05);
+    sheet.pointerDown(pickup);
+    sheet.pointerUp(pickup);
+    expect(sheet.state.value).toBe(pickupValue);
+    expect(sheet.state.velocity).toBeCloseTo(pickupVelocity, 8);
+
+    const writes = applied.length;
+    sheet.destroy();
+    clock.drain();
+    expect(applied).toHaveLength(writes);
+    expect(native.calls).toBe(0);
   });
 
   it('reentrant animate host cannot publish a stale native owner after newer input', () => {
