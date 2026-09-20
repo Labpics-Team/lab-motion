@@ -40,6 +40,8 @@ const DEFAULT_POWER = 0.8;
 const DEFAULT_TIME_CONSTANT = 0.35;
 /** Дефолтный порог скорости (units/s), ниже которого движение считается завершённым. */
 const DEFAULT_REST_DELTA = 0.5;
+/** Общая конечная граница saturating arithmetic. */
+const MAX_VALUE = Number.MAX_VALUE;
 
 // ─── Типы ────────────────────────────────────────────────────────────────────
 
@@ -127,7 +129,7 @@ function finiteOr(raw: number, fallback: number): number {
  * поэтому sign сохраняет ровно тот же overflow-инвариант без второй ветки.
  */
 function clampAmplitude(ampRaw: number): number {
-  return Number.isFinite(ampRaw) ? ampRaw : Math.sign(ampRaw) * Number.MAX_VALUE;
+  return Number.isFinite(ampRaw) ? ampRaw : Math.sign(ampRaw) * MAX_VALUE;
 }
 
 /**
@@ -140,7 +142,7 @@ export function projectDefaultDecayRest(from: number, velocity: number): number 
   if (!Number.isFinite(from)) throw new MotionParamError('LM021');
   if (!Number.isFinite(velocity)) throw new MotionParamError('LM022');
   const amplitude = clampAmplitude(DEFAULT_POWER * velocity * DEFAULT_TIME_CONSTANT);
-  return finiteOr(from + amplitude, Math.sign(amplitude) * Number.MAX_VALUE);
+  return finiteOr(from + amplitude, amplitude > 0 ? MAX_VALUE : -MAX_VALUE);
 }
 
 // ─── createDecay ──────────────────────────────────────────────────────────────
@@ -187,7 +189,7 @@ export function createDecay(options: DecayOptions): DecayModel {
 
   // ── Амплитуда и точка покоя (overflow-safe) ────────────────────────────────
   const amplitude = clampAmplitude(power * velocity * timeConstant);
-  const rest = finiteOr(from + amplitude, Math.sign(amplitude) * Number.MAX_VALUE);
+  const rest = finiteOr(from + amplitude, amplitude > 0 ? MAX_VALUE : -MAX_VALUE);
 
   // ── Reduced-motion CHARACTER-switch ────────────────────────────────────────
   const reduced = prefersReducedMotion(options.matchMedia);
