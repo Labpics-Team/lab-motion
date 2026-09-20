@@ -932,7 +932,7 @@ export function createPullToRefresh(options: PullOptions): PullController {
     // Доводка к pendingPosition ТЕМ ЖЕ runner'ом; на финише — pending-удержание.
     base.emit({ pulling: false });
     springTo(pendingPos, velocity, () => {
-      base.emit({ phase: 'settle', pending: true, armed: false });
+      if (!base.emit({ phase: 'settle', pending: true, armed: false })) return;
       const pendingState = base.state;
       const finish = (): void => {
         if (!base.destroyed && base.state === pendingState) returnHome(0);
