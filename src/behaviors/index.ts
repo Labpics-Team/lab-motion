@@ -272,13 +272,13 @@ function _createBase<S extends BehaviorState<number>>(
     const emitted = state = { ...state, ...next };
     for (const fn of subs) {
       try {
-        fn(state);
+        fn(emitted);
       } catch {
         // Подписчик не имеет права срывать соседей.
       }
+      if (destroyed || state !== emitted) return false;
     }
-    // false: синхронный subscriber передал ownership более новой операции или destroy.
-    return !destroyed && state === emitted;
+    return true;
   };
 
   return {
