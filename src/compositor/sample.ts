@@ -11,7 +11,7 @@ export interface SerializedSpringSample {
 }
 
 export interface AnimationTimeSource {
-  readonly currentTime?: number | null;
+  readonly currentTime?: unknown;
 }
 
 /**
