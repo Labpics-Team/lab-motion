@@ -268,10 +268,9 @@ function connect<
   surface: BehaviorCompositorSurface,
 ): C {
   const format = surface.format ?? Number;
-  surface.apply(format(controller.state.value));
-  const unsubscribe = controller.subscribe((state) => {
-    surface.apply(format(state.value));
-  });
+  const apply = (state: T): void => surface.apply(format(state.value));
+  apply(controller.state);
+  const unsubscribe = controller.subscribe(apply);
   const destroy = controller.destroy.bind(controller);
   controller.destroy = (() => {
     owner.destroy();
