@@ -1,6 +1,5 @@
 import { expect, test } from '@playwright/test';
 
-type TraceCallFrame = { url?: string };
 type TraceEvent = {
   name?: string;
   ph?: string;
