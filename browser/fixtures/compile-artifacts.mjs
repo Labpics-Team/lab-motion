@@ -5,7 +5,7 @@
  * Собирает ДВА fixture реальным Vite, каждый дважды — с плагином
  * motionCompiler() (compiled) и без (uncompiled) — в самодостаточные
  * ESM-бандлы `browser/.artifacts/`:
- *   • nano: `animate(el, { opacity: 0.5 })` — compiled/uncompiled;
+ *   • nano: буквальный recipe из docs/compiler.md — compiled/uncompiled;
  *   • surface: `animate(el, { width: [240, 360] }, { layout: 'project' })`
  *     и list-вариант — surface-compiled/surface-uncompiled.
  * Спеки грузят бандлы по http и сверяют наблюдаемое в РЕАЛЬНОМ движке
@@ -19,6 +19,7 @@
 import { build } from 'vite';
 import { buildReorderRecipe } from './reorder-recipe.mjs';
 import { buildScopeRecipes } from './scope-recipes.mjs';
+import { readCompilerNanoRecipe } from '../../scripts/compiler-doc-recipe.mjs';
 import { existsSync, mkdirSync, rmSync, writeFileSync } from 'node:fs';
 import { dirname, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -34,8 +35,7 @@ const ALIAS = {
   '@labpics/motion/animate': resolve(DIST, 'animate/index.js'),
   '@labpics/motion/compiler/surface': resolve(DIST, 'compiler/surface/index.js'),
 };
-const NANO_FIXTURE = `import { animate } from '@labpics/motion/nano';
-export function play(el) { return animate(el, { opacity: 0.5 }); }`;
+const NANO_FIXTURE = readCompilerNanoRecipe(ROOT);
 // Позитивная форма после hotfix наблюдаемой эквивалентности (PR-1 Future
 // Layout): lowering сертифицируется ТОЛЬКО для голого expression statement —
 // результат не присваивается, не return'ится, не await'ится: неполные
