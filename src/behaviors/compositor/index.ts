@@ -36,8 +36,8 @@ import type { SpringParams } from '../../spring.js';
 import type { WaapiAnimatable } from '../../waapi/index.js';
 
 interface NativeAnimation {
-  currentTime?: unknown;
-  cancel?: () => void;
+  currentTime: unknown;
+  cancel(): void;
   finished: PromiseLike<unknown>;
 }
 
@@ -72,7 +72,6 @@ type NativeRun = {
   readonly args: BehaviorSettleArgs;
   readonly animation: NativeAnimation;
   readonly artifact: SpringExecutionArtifactTuple;
-  readonly startedAt: number;
 };
 
 type LiveRun = {
@@ -83,18 +82,10 @@ type LiveRun = {
 
 type ActiveRun = NativeRun | LiveRun;
 
-function defaultNow(): number {
-  return globalThis.performance?.now() ?? Date.now();
-}
-
 function validateSurface(surface: BehaviorCompositorSurface): void {
   const property = surface.property;
-  if (typeof property !== 'string' || property.length === 0) {
-    throw new MotionParamError('LM010');
-  }
-  if (property === 'offset' || property === 'easing' || property === 'composite') {
-    throw new MotionParamError('LM011');
-  }
+  if (typeof property !== 'string' || !property) throw new MotionParamError('LM010');
+  if (/^(offset|easing|composite)$/.test(property)) throw new MotionParamError('LM011');
 }
 
 function createOwner(
@@ -102,15 +93,20 @@ function createOwner(
   requestFrame: RequestFrameFn | undefined,
   tier: CompositorTierCode,
 ): BehaviorCompositorOwner {
-  let target: BehaviorCompositorTarget | undefined = surface.target;
-  let active: ActiveRun | undefined;
+  const target = surface.target;
+  let active: ActiveRun | null | undefined;
   let epoch = 0;
-  const format = surface.format ?? Number;
   const schedule = requestFrame ?? defaultRequestFrame;
   const sample = { value: 0, velocity: 0 };
 
+  const cancelHostAnimation = (animation: NativeAnimation): void => {
+    try {
+      animation.cancel();
+    } catch {}
+  };
+
   const dispose = (run: ActiveRun): void => {
-    if (run.kind === 0) run.animation.cancel?.();
+    if (run.kind === 0) cancelHostAnimation(run.animation);
     else run.value.destroy();
   };
 
@@ -118,15 +114,15 @@ function createOwner(
     if (active !== run) return;
     active = undefined;
     const token = epoch;
-    run.args.onStep(run.args.target, 0);
+    const owns = run.args.onStep(run.args.target, 0);
     dispose(run);
-    if (token === epoch) run.args.onDone();
+    if (owns && token === epoch) run.args.onDone();
   };
 
   const owner: BehaviorCompositorOwner = {
     _settle(args): void {
       owner._invalidate();
-      if (!target) return;
+      if (active === null) return;
       if (args.from === args.target || tier === 3) {
         if (args.onStep(args.target, 0)) args.onDone();
         return;
@@ -147,10 +143,9 @@ function createOwner(
           DEFAULT_TOLERANCE,
           'both',
           'replace',
-          format,
+          surface.format,
           artifact,
         );
-        const startedAt = defaultNow();
         if (token !== epoch) return;
         let animation: NativeAnimation;
         try {
@@ -166,18 +161,13 @@ function createOwner(
           throw error;
         }
         if (token !== epoch) {
-          animation.cancel?.();
+          cancelHostAnimation(animation);
           return;
         }
-        const run: NativeRun = active = {
-          kind: 0,
-          args,
-          animation,
-          artifact,
-          startedAt,
-        };
+        const run: NativeRun = active = { kind: 0, args, animation, artifact };
         args.onStep(args.from, args.velocity);
-        animation.finished.then(() => finish(run), () => finish(run));
+        const done = () => finish(run);
+        animation.finished.then(done, done);
         return;
       }
 
@@ -209,10 +199,7 @@ function createOwner(
       let velocity: number;
 
       if (run.kind === 0) {
-        const currentTime = animationTimeOrFallback(
-          run.animation,
-          defaultNow() - run.startedAt,
-        );
+        const currentTime = animationTimeOrFallback(run.animation, 0);
         const point = sampleSerializedSpringIntoUnchecked(
           run.artifact[1],
           run.artifact[2],
@@ -249,8 +236,7 @@ function createOwner(
 
     destroy(): void {
       const run = active;
-      active = undefined;
-      target = undefined;
+      active = null;
       epoch++;
       if (run) dispose(run);
     },
