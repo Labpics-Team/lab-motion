@@ -43,11 +43,11 @@ const ALIAS = {
 
 /** dist-модуль (не entry, не bare peer) в графе — нормализованный к dist-relative id. */
 function distModules(chunk) {
-  // Vite сообщает id с '/', а resolve() на Windows даёт '\': без нормализации
+  // Vite сообщает id с '/', а resolve() на Windows даёт '\\': без нормализации
   // startsWith никогда не совпадёт и граф dist-модулей будет ложно пустым.
-  const distSlash = DIST.replaceAll('\\', '/');
+  const distSlash = DIST.replaceAll('\\\\', '/');
   return Object.keys(chunk.modules)
-    .map((id) => id.replaceAll('\\', '/'))
+    .map((id) => id.replaceAll('\\\\', '/'))
     .filter((id) => id.startsWith(distSlash))
     .map((id) => id.slice(distSlash.length + 1));
 }
@@ -137,7 +137,30 @@ const SURFACE_COMPILED_MAX_GZ = 2470;
 
 const failures = [];
 const notes = [];
+const traceRecords = [];
+const TRACE = process.argv.includes('--trace');
 const check = (ok, message) => { if (!ok) failures.push(message); };
+
+function recordTrace(id, goal, result, refusal = null) {
+  if (!TRACE) return;
+  const owners = [
+    [RUNTIME_MODULE, '@labpics/motion/compiler/runtime', 'compiled'],
+    [SURFACE_MODULE, '@labpics/motion/compiler/surface', 'compiled'],
+    [NANO_MODULE, '@labpics/motion/nano', 'runtime'],
+    [ANIMATE_MODULE, '@labpics/motion/animate', 'runtime'],
+  ].filter(([module]) => result.modules.includes(module));
+  const [module, owner, execution] = owners.length === 1
+    ? owners[0]
+    : [null, 'unknown', 'unknown'];
+  traceRecords.push({
+    id,
+    goal,
+    owner,
+    path: module === null ? result.modules.join(' → ') : `dist/${module}`,
+    execution,
+    refusal: execution === 'runtime' ? refusal : null,
+  });
+}
 
 async function run() {
   if (!existsSync(DIST)) {
@@ -204,6 +227,8 @@ async function run() {
     );
     notes.push(`no-op контроль: динамическая opacity сохранила рантаймовый путь (${NANO_MODULE})`);
     notes.push(`граф compiled: ${compiled.modules.join(', ') || '(только entry)'}`);
+    recordTrace('nano-static', 'static opacity=0.5', compiled);
+    recordTrace('nano-dynamic', 'dynamic opacity', control, 'opacity is not build-known');
 
     // ── Surface lowering: layout:'project' реально стирает фасад ───────────────
     const surfaceBaseline = await buildFixture('surface-uncompiled', SURFACE, false, 'surface');
@@ -282,6 +307,9 @@ async function run() {
       `плагин ошибочно понизил surface-вызов с onFrame (граф: ${surfaceOnFrame.modules.join(', ')})`,
     );
     notes.push('surface no-op контроль: динамические концы и onFrame сохранили рантаймовый путь');
+    recordTrace('surface-static', "static width [240,360], layout='project'", surfaceCompiled);
+    recordTrace('surface-dynamic', "dynamic width endpoint, layout='project'", surfaceDynamic, 'endpoint is not build-known');
+    recordTrace('surface-on-frame', "static width, layout='project', onFrame", surfaceOnFrame, 'onFrame requires runtime observation');
 
     // ── TypeScript acceptance (бриф, этап C) ────────────────────────────────
     // Плагин обязан нижать TS/TSX-вход реального Vite-приложения. На
@@ -319,6 +347,9 @@ run().then(() => {
     console.error('compiler-acceptance: FAIL');
     for (const failure of failures) console.error(`  - ${failure}`);
     process.exit(1);
+  }
+  if (TRACE) {
+    for (const record of traceRecords) console.log(`tooling-trace ${JSON.stringify(record)}`);
   }
   console.log('compiler-acceptance: PASS — solver/parser/compiler элиминированы из бандла потребителя');
 }).catch((error) => {
