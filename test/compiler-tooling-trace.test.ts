@@ -75,8 +75,8 @@ const expectedTrace: TraceRecord[] = [
   },
 ];
 
-function run(scriptPath = script) {
-  return spawnSync(process.execPath, [scriptPath, '--trace'], {
+function run(scriptPath = script, trace = true) {
+  return spawnSync(process.execPath, trace ? [scriptPath, '--trace'] : [scriptPath], {
     cwd: root,
     encoding: 'utf8',
   });
@@ -158,6 +158,12 @@ describe('compiler tooling trace', () => {
     validateTrace(parseTrace(result.stdout));
   });
 
+  it('без --trace сохраняет обычный acceptance без диагностического вывода', () => {
+    const result = run(script, false);
+    expect(result.status, `${result.stdout}\n${result.stderr}`).toBe(0);
+    expect(parseTrace(result.stdout)).toEqual([]);
+  });
+
   it('не печатает trace, если compiler acceptance не стартовал', () => {
     const source = readFileSync(script, 'utf8');
     const changed = source.replace(
@@ -188,7 +194,39 @@ describe('compiler tooling trace', () => {
     expect(parseTrace(result.stdout)).toEqual([]);
   });
 
-  it('отвергает потерю записи и подмену owner/path/refusal', () => {
+  it('не печатает trace при отсутствии owner фактически собранного результата', () => {
+    const source = readFileSync(script, 'utf8');
+    const original = "recordTrace('nano-static', 'static opacity=0.5', compiled);";
+    const changed = source.replace(
+      original,
+      "recordTrace('nano-static', 'static opacity=0.5', { ...compiled, modules: ['unregistered/module.js'] });",
+    );
+    expect(changed).not.toBe(source);
+    writeFileSync(brokenScript, changed);
+
+    const result = run(brokenScript);
+    expect(result.status).not.toBe(0);
+    expect(result.stderr).toContain('ожидался один owner, получено 0');
+    expect(parseTrace(result.stdout)).toEqual([]);
+  });
+
+  it.each([
+    ['отсутствующей', "recordTrace('nano-dynamic', 'dynamic opacity', control);"],
+    ['пустой', "recordTrace('nano-dynamic', 'dynamic opacity', control, '');"],
+  ])('не публикует runtime trace с %s причиной отказа', (_case, replacement) => {
+    const source = readFileSync(script, 'utf8');
+    const original = "recordTrace('nano-dynamic', 'dynamic opacity', control, 'opacity is not build-known');";
+    const changed = source.replace(original, replacement);
+    expect(changed).not.toBe(source);
+    writeFileSync(brokenScript, changed);
+
+    const result = run(brokenScript);
+    expect(result.status).not.toBe(0);
+    expect(result.stderr).toContain('runtime refusal обязателен и не может быть пустым');
+    expect(parseTrace(result.stdout)).toEqual([]);
+  });
+
+  it('unit-контроль oracle отвергает потерю записи и подмену полей', () => {
     expect(() => validateTrace(cloneTrace().slice(1))).toThrow();
 
     const owner = cloneTrace();

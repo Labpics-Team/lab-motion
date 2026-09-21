@@ -144,7 +144,7 @@ const TRACE = process.argv.includes('--trace');
 const TRACE_SCHEMA_VERSION = 1;
 const check = (ok, message) => { if (!ok) failures.push(message); };
 
-function recordTrace(id, goal, result, refusal = null) {
+function recordTrace(id, goal, result, refusal) {
   if (!TRACE) return;
   const owners = [
     [RUNTIME_MODULE, '@labpics/motion/compiler/runtime', 'compiled'],
@@ -157,6 +157,14 @@ function recordTrace(id, goal, result, refusal = null) {
     return;
   }
   const [module, owner, execution] = owners[0];
+  if (execution === 'runtime' && (typeof refusal !== 'string' || refusal.trim().length === 0)) {
+    failures.push(`tooling trace ${id}: runtime refusal обязателен и не может быть пустым`);
+    return;
+  }
+  if (execution === 'compiled' && refusal != null) {
+    failures.push(`tooling trace ${id}: compiled refusal должен отсутствовать`);
+    return;
+  }
   traceRecords.push({
     schemaVersion: TRACE_SCHEMA_VERSION,
     id,
