@@ -78,7 +78,6 @@ type LiveRun = {
   readonly kind: 1;
   readonly args: BehaviorSettleArgs;
   readonly value: ReturnType<typeof handoffToLive>;
-  unsubscribe?: (() => void) | undefined;
 };
 
 type ActiveRun = NativeRun | LiveRun;
@@ -101,10 +100,7 @@ function createOwner(
 
   const dispose = (run: ActiveRun): void => {
     if (run.kind === 0) run.animation.cancel?.();
-    else {
-      run.unsubscribe?.();
-      run.value.destroy();
-    }
+    else run.value.destroy();
   };
 
   const finish = (run: ActiveRun): void => {
@@ -185,7 +181,7 @@ function createOwner(
         return;
       }
       const live: LiveRun = active = { kind: 1, args, value };
-      live.unsubscribe = value.onChange((next) => {
+      value.onChange((next) => {
         if (active !== live) return;
         const velocity = value.velocity;
         if (args.onStep(next, velocity) && next === args.target && velocity === 0) finish(live);
