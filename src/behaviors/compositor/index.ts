@@ -117,12 +117,12 @@ function createOwner(
       owner._invalidate();
       const host = target;
       if (!host) return;
+      const token = ++epoch;
       if (args.from === args.target || tier === 3) {
         args.onStep(args.target, 0);
-        args.onDone();
+        if (token === epoch) args.onDone();
         return;
       }
-      const token = ++epoch;
       const v0 = args.velocity / (args.target - args.from);
       const artifact = tier === 0 && Number.isFinite(v0)
         ? tryCompileSpringExecutionArtifactTupleUnchecked(args.spring, v0, DEFAULT_TOLERANCE)
@@ -178,6 +178,10 @@ function createOwner(
         target: args.target,
         requestFrame: schedule,
       });
+      if (token !== epoch) {
+        value.destroy();
+        return;
+      }
       const live: LiveRun = active = { kind: 1, args, value };
       live.unsubscribe = value.onChange((next) => {
         if (active !== live) return;
