@@ -24,6 +24,15 @@ direct named import `@labpics/motion/nano` без опций. Всё остал�
 обычный runtime-путь. Непредставимая программа или расхождение проекции —
 **ошибка сборки, не silent fallback**.
 
+Буквальный runnable-рецепт ниже является входом и для compiler-acceptance, и
+для browser-differential. Отдельных копий fixture у этих проверок нет.
+
+<!-- compiler-nano-recipe -->
+```typescript
+import { animate } from '@labpics/motion/nano';
+export function play(el) { return animate(el, { opacity: 0.5 }); }
+```
+
 ## Как строится доверенный артефакт
 
 Пайплайн: nano SSOT (`springLinear`) → кандидат MotionProgram V1 →
@@ -59,10 +68,10 @@ pnpm build && node scripts/compiler-acceptance.mjs --trace
 ## Гарантии
 
 - **Приёмочная проверка CI** (`pnpm acceptance:compiler`): реальный Vite-build
-  fixture с плагином и без — доказывает элиминацию солвера/парсера из бандла
-  потребителя и строго меньший вес артефакта.
-- **Browser-differential**: compiled-вызов сверяется с не-compiled в трёх
-  движках (Chromium/Firefox/WebKit, `browser/*.spec.ts`).
+  буквального рецепта выше с плагином и без доказывает элиминацию
+  солвера/парсера из бандла потребителя и строго меньший вес артефакта.
+- **Browser-differential**: тот же буквальный compiled-вызов сверяется с
+  не-compiled в трёх движках (Chromium/Firefox/WebKit, `browser/*.spec.ts`).
 - **Размерные потолки**: `./compiler/runtime` — exact-ратчет (рост только
   решением); `./compiler/vite` несёт parser+SSOT осознанно — это цена
   доверенного артефакта на стороне СБОРКИ, браузеру она не поставляется
