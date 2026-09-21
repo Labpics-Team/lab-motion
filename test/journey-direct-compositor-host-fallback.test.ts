@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest';
 import { createCompositorBottomSheet } from '../src/behaviors/compositor/index.js';
 
 describe('JOURNEY-01 compositor host rejection', () => {
-  it('falls back to the live owner when the host rejects the native plan', () => {
+  it('surfaces native host rejection after publishing one coherent terminal state', () => {
     const frames: Array<(timestamp?: number) => void> = [];
     const sheet = createCompositorBottomSheet({
       snapPoints: [0, 300],
@@ -21,9 +21,11 @@ describe('JOURNEY-01 compositor host rejection', () => {
       },
     });
 
-    expect(() => sheet.snapTo(1)).not.toThrow();
-    expect(sheet.state.phase).toBe('release');
-    expect(frames).toHaveLength(1);
+    expect(() => sheet.snapTo(1)).toThrow('host rejected native plan');
+    expect(sheet.state.phase).toBe('settle');
+    expect(sheet.state.value).toBe(300);
+    expect(sheet.state.velocity).toBe(0);
+    expect(frames).toHaveLength(0);
     sheet.destroy();
   });
 
@@ -45,11 +47,31 @@ describe('JOURNEY-01 compositor host rejection', () => {
       compositor: { target, property: 'translate', apply() {} },
     });
 
-    sheet.snapTo(1);
+    expect(() => sheet.snapTo(1)).toThrow('host rejected after reentry');
 
     expect(sheet.state.phase).toBe('follow');
     expect(frames).toHaveLength(0);
     sheet.destroy();
+  });
+
+  it.each([
+    ['', 'LM010'],
+    ['offset', 'LM011'],
+    ['easing', 'LM011'],
+    ['composite', 'LM011'],
+  ])('rejects invalid public compositor property %j before unchecked compilation', (property, code) => {
+    expect(() => createCompositorBottomSheet({
+      snapPoints: [0, 300],
+      compositor: {
+        target: {
+          animate() {
+            throw new Error('must not reach host');
+          },
+        },
+        property,
+        apply() {},
+      },
+    })).toThrow(expect.objectContaining({ code }));
   });
 
   it('keeps newer input authoritative when an instantaneous settle reenters through onStep', () => {
