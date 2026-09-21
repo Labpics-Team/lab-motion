@@ -29,14 +29,13 @@ export function installCompilerPlayground() {
 
   const reset = () => {
     stop();
-    target.style.opacity = '1';
+    target.style.removeProperty('opacity');
     setState('ready');
   };
 
   const run = () => {
     if (disposed || document.hidden) return;
-    stop();
-    target.style.opacity = '1';
+    reset();
 
     if (reduced()) {
       target.style.opacity = '0.5';
