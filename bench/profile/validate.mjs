@@ -354,8 +354,8 @@ export function eligibleDesktopCells(inventory, calibration, poweredDesign, pilo
   validateCalibrationReceipt(calibration, profile);
   validatePoweredDesignReceipt(poweredDesign, profile);
   invariant(pilot !== undefined, 'powered design admission requires a recomputable null/control pilot');
-  const derived = derivePoweredCells(pilot, profile);
   validatePilotRegistrationBinding(pilot, PROFILE_PILOT_REGISTRATION, profile);
+  const derived = derivePoweredCells(pilot, profile);
   invariant(calibration.schemaVersion === 2 && poweredDesign.schemaVersion === 2, 'legacy receipts are non-admitting');
 
   const inventorySha256 = receiptSha256(inventory);
