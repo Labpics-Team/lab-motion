@@ -21,6 +21,17 @@ function compilerPlaygroundRecipe() {
   };
 }
 
+function compilerPlaygroundLowering() {
+  const compiler = motionCompiler();
+  return {
+    ...compiler,
+    transform(code, id) {
+      if (id !== RESOLVED_PLAYGROUND_ID) return undefined;
+      return compiler.transform.call(this, code, id);
+    },
+  };
+}
+
 function assertCompilerPlaygroundLowered() {
   return {
     name: 'lab-motion:compiler-playground-proof',
@@ -37,7 +48,7 @@ function assertCompilerPlaygroundLowered() {
 
 export default defineConfig({
   base: './',
-  plugins: [compilerPlaygroundRecipe(), motionCompiler(), assertCompilerPlaygroundLowered()],
+  plugins: [compilerPlaygroundRecipe(), compilerPlaygroundLowering(), assertCompilerPlaygroundLowered()],
   build: {
     modulePreload: { polyfill: false },
   },
