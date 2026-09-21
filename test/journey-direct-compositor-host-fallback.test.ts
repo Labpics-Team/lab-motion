@@ -60,18 +60,24 @@ describe('JOURNEY-01 compositor host rejection', () => {
     ['easing', 'LM011'],
     ['composite', 'LM011'],
   ])('rejects invalid public compositor property %j before unchecked compilation', (property, code) => {
-    expect(() => createCompositorBottomSheet({
-      snapPoints: [0, 300],
-      compositor: {
-        target: {
-          animate() {
-            throw new Error('must not reach host');
+    let thrown: unknown;
+    try {
+      createCompositorBottomSheet({
+        snapPoints: [0, 300],
+        compositor: {
+          target: {
+            animate() {
+              throw new Error('must not reach host');
+            },
           },
+          property,
+          apply() {},
         },
-        property,
-        apply() {},
-      },
-    })).toThrow(expect.objectContaining({ code }));
+      });
+    } catch (error) {
+      thrown = error;
+    }
+    expect(thrown).toMatchObject({ code });
   });
 
   it('keeps newer input authoritative when an instantaneous settle reenters through onStep', () => {
