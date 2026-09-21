@@ -34,18 +34,20 @@ test('PROFILE-01: sampling profiler attribution is an explicit Chromium capabili
   await session.send('Profiler.disable');
   await session.detach();
 
-  expect(profile.samples?.length ?? 0).toBeGreaterThan(0);
-  expect(profile.timeDeltas?.length ?? 0).toBe(profile.samples?.length ?? 0);
+  const samples = profile.samples ?? [];
+  const deltas = profile.timeDeltas ?? [];
+  expect(samples.length).toBeGreaterThan(0);
+  expect(deltas.length).toBe(samples.length);
 
   const nodes = new Map(profile.nodes.map((node) => [node.id, node]));
-  const attributable = (profile.samples ?? []).filter((id) =>
-    nodes.get(id)?.callFrame.url.endsWith('lab-motion-profile-cdp-probe.js'),
-  );
-  expect(attributable.length).toBeGreaterThan(0);
+  let attributableSamples = 0;
+  let attributableUs = 0;
+  for (let index = 0; index < samples.length; index += 1) {
+    if (!nodes.get(samples[index])?.callFrame.url.endsWith('lab-motion-profile-cdp-probe.js')) continue;
+    attributableSamples += 1;
+    attributableUs += deltas[index] ?? 0;
+  }
 
-  const attributableUs = attributable.reduce((total, id, index) => {
-    const sampleIndex = profile.samples?.indexOf(id, index) ?? -1;
-    return total + (sampleIndex >= 0 ? (profile.timeDeltas?.[sampleIndex] ?? 0) : 0);
-  }, 0);
+  expect(attributableSamples).toBeGreaterThan(0);
   expect(attributableUs).toBeGreaterThan(0);
 });
