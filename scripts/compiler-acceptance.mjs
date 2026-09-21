@@ -149,14 +149,16 @@ function recordTrace(id, goal, result, refusal = null) {
     [NANO_MODULE, '@labpics/motion/nano', 'runtime'],
     [ANIMATE_MODULE, '@labpics/motion/animate', 'runtime'],
   ].filter(([module]) => result.modules.includes(module));
-  const [module, owner, execution] = owners.length === 1
-    ? owners[0]
-    : [null, 'unknown', 'unknown'];
+  if (owners.length !== 1) {
+    failures.push(`tooling trace ${id}: ожидался один owner, получено ${owners.length}`);
+    return;
+  }
+  const [module, owner, execution] = owners[0];
   traceRecords.push({
     id,
     goal,
     owner,
-    path: module === null ? result.modules.join(' → ') : `dist/${module}`,
+    path: `dist/${module}`,
     execution,
     refusal: execution === 'runtime' ? refusal : null,
   });
@@ -278,7 +280,7 @@ async function run() {
       `compiled surface (${surfaceCompiledGz} B gz) не меньше uncompiled (${surfaceBaselineGz} B gz)`,
     );
     // Абсолютные гейты: (1) код executor'а ≤1 KB gz независимо от данных;
-    // (2) total-решётка от факта (executor + сертифицированный артефакт вызова).
+    // (2) total-решётка от факта (executor + certified-артефакт вызова).
     const executorGz = gzipSync(readFileSync(resolve(DIST, SURFACE_MODULE))).length;
     check(
       executorGz <= SURFACE_EXECUTOR_MAX_GZ,
