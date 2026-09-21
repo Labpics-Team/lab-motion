@@ -128,7 +128,7 @@ function createOwner(
         ? tryCompileSpringExecutionArtifactTupleUnchecked(args.spring, v0, DEFAULT_TOLERANCE)
         : undefined;
 
-      if (artifact) {
+      native: if (artifact) {
         const plan = compileSpringRuntimeExecutionTupleUnchecked(
           args.spring,
           surface.property,
@@ -143,7 +143,7 @@ function createOwner(
         );
         const startedAt = defaultNow();
         if (token !== epoch) return;
-        let animation: NativeAnimation | undefined;
+        let animation: NativeAnimation;
         try {
           animation = host.animate(plan[0], {
             duration: plan[2],
@@ -152,24 +152,24 @@ function createOwner(
             fill: plan[3],
             composite: plan[4],
           });
-        } catch {}
+        } catch {
+          break native;
+        }
         if (token !== epoch) {
-          animation?.cancel?.();
+          animation.cancel?.();
           return;
         }
-        if (animation) {
-          const native: NativeRun = {
-            kind: 0,
-            args,
-            animation,
-            artifact,
-            startedAt,
-          };
-          active = native;
-          args.onStep(args.from, args.velocity);
-          if (active === native) animation.finished.then(() => finish(native), () => {});
-          return;
-        }
+        const run: NativeRun = {
+          kind: 0,
+          args,
+          animation,
+          artifact,
+          startedAt,
+        };
+        active = run;
+        args.onStep(args.from, args.velocity);
+        if (active === run) animation.finished.then(() => finish(run), () => {});
+        return;
       }
 
       const value = handoffToLive({
@@ -268,9 +268,10 @@ function connect<
   surface: BehaviorCompositorSurface,
 ): C {
   const format = surface.format ?? Number;
-  const apply = (state: T): void => surface.apply(format(state.value));
-  apply(controller.state);
-  const unsubscribe = controller.subscribe(apply);
+  surface.apply(format(controller.state.value));
+  const unsubscribe = controller.subscribe((state) => {
+    surface.apply(format(state.value));
+  });
   const destroy = controller.destroy.bind(controller);
   controller.destroy = (() => {
     owner.destroy();
