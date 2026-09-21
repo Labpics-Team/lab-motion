@@ -7,18 +7,7 @@ test('PROFILE-01: sampling profiler attribution is an explicit Chromium capabili
   }
 
   await page.goto('/site/dist/index.html');
-  await page.addScriptTag({
-    content: `
-      globalThis.__labMotionProfileProbe = (iterations) => {
-        let value = 0x12345678;
-        for (let i = 0; i < iterations; i += 1) {
-          value = Math.imul(value ^ i, 1664525) + 1013904223;
-        }
-        return value >>> 0;
-      };
-      //# sourceURL=lab-motion-profile-cdp-probe.js
-    `,
-  });
+  await page.addScriptTag({ url: '/browser/fixtures/profile-cdp-profiler-probe.js' });
 
   const session = await page.context().newCDPSession(page);
   await session.send('Profiler.enable');
@@ -43,7 +32,7 @@ test('PROFILE-01: sampling profiler attribution is an explicit Chromium capabili
   let attributableSamples = 0;
   let attributableUs = 0;
   for (let index = 0; index < samples.length; index += 1) {
-    if (!nodes.get(samples[index])?.callFrame.url.endsWith('lab-motion-profile-cdp-probe.js')) continue;
+    if (!nodes.get(samples[index])?.callFrame.url.endsWith('/browser/fixtures/profile-cdp-profiler-probe.js')) continue;
     attributableSamples += 1;
     attributableUs += deltas[index] ?? 0;
   }
