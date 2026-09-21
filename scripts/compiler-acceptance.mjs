@@ -141,6 +141,7 @@ const failures = [];
 const notes = [];
 const traceRecords = [];
 const TRACE = process.argv.includes('--trace');
+const TRACE_SCHEMA_VERSION = 1;
 const check = (ok, message) => { if (!ok) failures.push(message); };
 
 function recordTrace(id, goal, result, refusal = null) {
@@ -157,6 +158,7 @@ function recordTrace(id, goal, result, refusal = null) {
   }
   const [module, owner, execution] = owners[0];
   traceRecords.push({
+    schemaVersion: TRACE_SCHEMA_VERSION,
     id,
     goal,
     owner,

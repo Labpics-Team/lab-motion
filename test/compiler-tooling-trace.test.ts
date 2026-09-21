@@ -14,9 +14,11 @@ const builtCompiler = fileURLToPath(new URL('../dist/compiler/vite/index.js', im
 const brokenScript = fileURLToPath(new URL('../scripts/.compiler-acceptance-trace-test.mjs', import.meta.url));
 const pnpm = process.platform === 'win32' ? 'pnpm.cmd' : 'pnpm';
 const tracePrefix = 'tooling-trace ';
-const traceKeys = ['execution', 'goal', 'id', 'owner', 'path', 'refusal'] as const;
+const traceKeys = ['execution', 'goal', 'id', 'owner', 'path', 'refusal', 'schemaVersion'] as const;
+const traceSchemaVersion = 1 as const;
 
 type TraceRecord = {
+  schemaVersion: typeof traceSchemaVersion;
   id: string;
   goal: string;
   owner: string;
@@ -27,6 +29,7 @@ type TraceRecord = {
 
 const expectedTrace: TraceRecord[] = [
   {
+    schemaVersion: traceSchemaVersion,
     id: 'nano-static',
     goal: 'static opacity=0.5',
     owner: '@labpics/motion/compiler/runtime',
@@ -35,6 +38,7 @@ const expectedTrace: TraceRecord[] = [
     refusal: null,
   },
   {
+    schemaVersion: traceSchemaVersion,
     id: 'nano-dynamic',
     goal: 'dynamic opacity',
     owner: '@labpics/motion/nano',
@@ -43,6 +47,7 @@ const expectedTrace: TraceRecord[] = [
     refusal: 'opacity is not build-known',
   },
   {
+    schemaVersion: traceSchemaVersion,
     id: 'surface-static',
     goal: "static width [240,360], layout='project'",
     owner: '@labpics/motion/compiler/surface',
@@ -51,6 +56,7 @@ const expectedTrace: TraceRecord[] = [
     refusal: null,
   },
   {
+    schemaVersion: traceSchemaVersion,
     id: 'surface-dynamic',
     goal: "dynamic width endpoint, layout='project'",
     owner: '@labpics/motion/animate',
@@ -59,6 +65,7 @@ const expectedTrace: TraceRecord[] = [
     refusal: 'endpoint is not build-known',
   },
   {
+    schemaVersion: traceSchemaVersion,
     id: 'surface-on-frame',
     goal: "static width, layout='project', onFrame",
     owner: '@labpics/motion/animate',
@@ -195,5 +202,9 @@ describe('compiler tooling trace', () => {
     const refusal = cloneTrace();
     refusal[4]!.refusal = null;
     expect(() => validateTrace(refusal)).toThrow();
+
+    const schema = cloneTrace();
+    schema[0]!.schemaVersion = 2 as typeof traceSchemaVersion;
+    expect(() => validateTrace(schema)).toThrow();
   });
 });
