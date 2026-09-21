@@ -371,7 +371,6 @@ export function derivePoweredDesign(
   generatedAt = new Date().toISOString(),
   profile = PROFILE_PREREGISTRATION,
 ) {
-  validatePilotReceipt(pilot, profile);
   return {
     schemaVersion: 2,
     profileId: profile.profileId,

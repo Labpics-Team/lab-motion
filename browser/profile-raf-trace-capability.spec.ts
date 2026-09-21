@@ -47,26 +47,33 @@ async function collectTrace(page: Page, run: () => Promise<void>): Promise<Trace
     events.push(...(value as TraceEvent[]));
   });
 
-  await session.send('Tracing.start', {
-    traceConfig: {
-      recordMode: 'recordAsMuchAsPossible',
-      includedCategories: [
-        'devtools.timeline',
-        'disabled-by-default-devtools.timeline.stack',
-      ],
-    },
-  });
-
+  let tracingStarted = false;
   try {
+    await session.send('Tracing.start', {
+      traceConfig: {
+        recordMode: 'recordAsMuchAsPossible',
+        includedCategories: [
+          'devtools.timeline',
+          'disabled-by-default-devtools.timeline.stack',
+        ],
+      },
+    });
+    tracingStarted = true;
+
     await run();
     await page.evaluate(() => new Promise<void>((resolve) => requestAnimationFrame(() => resolve())));
   } finally {
-    const completed = new Promise<void>((resolve) => {
-      session.once('Tracing.tracingComplete', () => resolve());
-    });
-    await session.send('Tracing.end');
-    await completed;
-    await session.detach();
+    try {
+      if (tracingStarted) {
+        const completed = new Promise<void>((resolve) => {
+          session.once('Tracing.tracingComplete', () => resolve());
+        });
+        await session.send('Tracing.end');
+        await completed;
+      }
+    } finally {
+      await session.detach();
+    }
   }
 
   return events;

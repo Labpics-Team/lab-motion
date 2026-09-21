@@ -329,9 +329,7 @@ export function validatePoweredDesignReceipt(receipt, profile = PROFILE_PREREGIS
   return receipt;
 }
 
-export function validatePilotRegistration(pilot, registration = PROFILE_PILOT_REGISTRATION, profile = PROFILE_PREREGISTRATION) {
-  validatePreregistration(profile);
-  validatePilotReceipt(pilot, profile);
+function validatePilotRegistrationBinding(pilot, registration, profile) {
   invariant(registration?.schemaVersion === 1, 'pilot registration schema mismatch');
   invariant(registration.profileId === profile.profileId && registration.baselineRevision === profile.baseline.revision, 'pilot registration provenance mismatch');
   invariant(registration.status === 'REGISTERED', 'pilot has no trusted immutable registration');
@@ -345,12 +343,19 @@ export function validatePilotRegistration(pilot, registration = PROFILE_PILOT_RE
   return registration;
 }
 
+export function validatePilotRegistration(pilot, registration = PROFILE_PILOT_REGISTRATION, profile = PROFILE_PREREGISTRATION) {
+  validatePreregistration(profile);
+  validatePilotReceipt(pilot, profile);
+  return validatePilotRegistrationBinding(pilot, registration, profile);
+}
+
 export function eligibleDesktopCells(inventory, calibration, poweredDesign, pilot, profile = PROFILE_PREREGISTRATION) {
   validateDesktopInventory(inventory, profile);
   validateCalibrationReceipt(calibration, profile);
   validatePoweredDesignReceipt(poweredDesign, profile);
   invariant(pilot !== undefined, 'powered design admission requires a recomputable null/control pilot');
-  validatePilotRegistration(pilot, PROFILE_PILOT_REGISTRATION, profile);
+  const derived = derivePoweredCells(pilot, profile);
+  validatePilotRegistrationBinding(pilot, PROFILE_PILOT_REGISTRATION, profile);
   invariant(calibration.schemaVersion === 2 && poweredDesign.schemaVersion === 2, 'legacy receipts are non-admitting');
 
   const inventorySha256 = receiptSha256(inventory);
@@ -368,7 +373,6 @@ export function eligibleDesktopCells(inventory, calibration, poweredDesign, pilo
       `${cell.id}: pilot browser version is not bound to inventory`,
     );
   }
-  const derived = derivePoweredCells(pilot, profile);
   invariant(
     JSON.stringify(poweredDesign.cells) === JSON.stringify(derived),
     'powered design is not deterministically derived from pilot',
