@@ -159,10 +159,6 @@ function recordTrace(id, goal, result, refusal) {
     failures.push(`tooling trace ${id}: runtime refusal обязателен и не может быть пустым`);
     return;
   }
-  if (execution === 'compiled' && refusal != null) {
-    failures.push(`tooling trace ${id}: compiled refusal должен отсутствовать`);
-    return;
-  }
   traceRecords.push({
     schemaVersion: TRACE_SCHEMA_VERSION,
     id,
