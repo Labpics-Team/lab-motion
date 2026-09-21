@@ -99,30 +99,32 @@ function createOwner(
   const schedule = requestFrame ?? defaultRequestFrame;
   const sample = { value: 0, velocity: 0 };
 
-  const finish = (run: ActiveRun): void => {
-    if (active !== run) return;
-    active = undefined;
-    const token = epoch;
-    run.args.onStep(run.args.target, 0);
+  const dispose = (run: ActiveRun): void => {
     if (run.kind === 0) run.animation.cancel?.();
     else {
       run.unsubscribe?.();
       run.value.destroy();
     }
+  };
+
+  const finish = (run: ActiveRun): void => {
+    if (active !== run) return;
+    active = undefined;
+    const token = epoch;
+    run.args.onStep(run.args.target, 0);
+    dispose(run);
     if (token === epoch) run.args.onDone();
   };
 
   const owner: BehaviorCompositorOwner = {
     _settle(args): void {
       owner._invalidate();
-      const host = target;
-      if (!host) return;
-      const token = ++epoch;
+      if (!target) return;
       if (args.from === args.target || tier === 3) {
-        args.onStep(args.target, 0);
-        if (token === epoch) args.onDone();
+        if (args.onStep(args.target, 0)) args.onDone();
         return;
       }
+      const token = ++epoch;
       const v0 = args.velocity / (args.target - args.from);
       const artifact = tier === 0 && Number.isFinite(v0)
         ? tryCompileSpringExecutionArtifactTupleUnchecked(args.spring, v0, DEFAULT_TOLERANCE)
@@ -145,7 +147,7 @@ function createOwner(
         if (token !== epoch) return;
         let animation: NativeAnimation | undefined;
         try {
-          animation = host.animate(plan[0], {
+          animation = target.animate(plan[0], {
             duration: plan[2],
             easing: plan[1],
             iterations: 1,
@@ -186,8 +188,7 @@ function createOwner(
       live.unsubscribe = value.onChange((next) => {
         if (active !== live) return;
         const velocity = value.velocity;
-        args.onStep(next, velocity);
-        if (active === live && next === args.target && velocity === 0) finish(live);
+        if (args.onStep(next, velocity) && next === args.target && velocity === 0) finish(live);
       });
     },
 
@@ -234,11 +235,7 @@ function createOwner(
       // sampled point, пока старый effect ещё маскирует его; cancel затем раскрывает
       // то же значение. Reentrant input не может воскресить уже снятый run.
       run.args.onStep(value, velocity);
-      if (run.kind === 0) run.animation.cancel?.();
-      else {
-        run.unsubscribe?.();
-        run.value.destroy();
-      }
+      dispose(run);
       return velocity;
     },
 
@@ -247,11 +244,7 @@ function createOwner(
       active = undefined;
       target = undefined;
       epoch++;
-      if (run?.kind === 0) run.animation.cancel?.();
-      else if (run) {
-        run.unsubscribe?.();
-        run.value.destroy();
-      }
+      if (run) dispose(run);
     },
   };
   return owner;
