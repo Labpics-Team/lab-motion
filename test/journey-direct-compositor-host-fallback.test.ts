@@ -52,4 +52,40 @@ describe('JOURNEY-01 compositor host rejection', () => {
     sheet.destroy();
   });
 
+  it('finishes the active native owner when the host completion promise rejects', async () => {
+    let rejectFinished!: (reason?: unknown) => void;
+    let canceled = 0;
+    const finished = new Promise<never>((_resolve, reject) => {
+      rejectFinished = reject;
+    });
+    const sheet = createCompositorBottomSheet({
+      snapPoints: [0, 300],
+      compositor: {
+        target: {
+          animate() {
+            return {
+              finished,
+              cancel() {
+                canceled++;
+              },
+            };
+          },
+        },
+        property: 'translate',
+        apply() {},
+      },
+    });
+
+    sheet.snapTo(1);
+    expect(sheet.state.phase).toBe('release');
+
+    rejectFinished(new Error('host aborted native animation'));
+    await Promise.resolve();
+
+    expect(sheet.state.phase).toBe('settle');
+    expect(sheet.state.value).toBe(300);
+    expect(sheet.state.velocity).toBe(0);
+    expect(canceled).toBe(1);
+    sheet.destroy();
+  });
 });

@@ -166,7 +166,7 @@ function createOwner(
             startedAt,
           };
           args.onStep(args.from, args.velocity);
-          if (active === run) animation.finished.then(() => finish(run), () => {});
+          animation.finished.then(() => finish(run), () => finish(run));
           return;
         }
       }
