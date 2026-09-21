@@ -82,17 +82,14 @@ type LiveRun = {
 
 type ActiveRun = NativeRun | LiveRun;
 
-function validateSurface(surface: BehaviorCompositorSurface): void {
-  const property = surface.property;
-  if (typeof property !== 'string' || !property) throw new MotionParamError('LM010');
-  if (/^(offset|easing|composite)$/.test(property)) throw new MotionParamError('LM011');
-}
-
 function createOwner(
   surface: BehaviorCompositorSurface,
   requestFrame: RequestFrameFn | undefined,
   tier: CompositorTierCode,
 ): BehaviorCompositorOwner {
+  const property = surface.property;
+  if (typeof property !== 'string' || !property) throw new MotionParamError('LM010');
+  if (/^(offset|easing|composite)$/.test(property)) throw new MotionParamError('LM011');
   const target = surface.target;
   let active: ActiveRun | null | undefined;
   let epoch = 0;
@@ -136,7 +133,7 @@ function createOwner(
       if (artifact) {
         const plan = compileSpringRuntimeExecutionTupleUnchecked(
           args.spring,
-          surface.property,
+          property,
           args.from,
           args.target,
           v0,
@@ -274,7 +271,6 @@ function ownerFor(
   options: Pick<SheetOptions, 'matchMedia' | 'requestFrame'>,
   surface: BehaviorCompositorSurface,
 ): BehaviorCompositorOwner {
-  validateSurface(surface);
   return createOwner(
     surface,
     options.requestFrame,
