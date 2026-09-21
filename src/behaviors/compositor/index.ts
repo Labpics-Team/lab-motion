@@ -152,7 +152,7 @@ function createOwner(
             composite: plan[4],
           });
         } catch {}
-        if (token !== epoch || !target) {
+        if (token !== epoch) {
           animation?.cancel?.();
           return;
         }
@@ -263,7 +263,7 @@ function connect<
   },
 >(
   controller: C,
-  owner: BehaviorCompositorOwner | undefined,
+  owner: BehaviorCompositorOwner,
   surface: BehaviorCompositorSurface,
 ): C {
   const format = surface.format ?? Number;
@@ -273,7 +273,7 @@ function connect<
   });
   const destroy = controller.destroy.bind(controller);
   controller.destroy = (() => {
-    owner?.destroy();
+    owner.destroy();
     destroy();
     unsubscribe();
   }) as C['destroy'];
