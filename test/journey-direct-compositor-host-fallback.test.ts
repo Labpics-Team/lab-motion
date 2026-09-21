@@ -52,6 +52,73 @@ describe('JOURNEY-01 compositor host rejection', () => {
     sheet.destroy();
   });
 
+  it('keeps newer input authoritative when an instantaneous settle reenters through onStep', () => {
+    let sheet!: ReturnType<typeof createCompositorBottomSheet>;
+    let reentered = false;
+    sheet = createCompositorBottomSheet({
+      snapPoints: [0, 300],
+      matchMedia: () => ({ matches: true }),
+      compositor: {
+        target: {
+          animate() {
+            throw new Error('reduced motion must not animate');
+          },
+        },
+        property: 'translate',
+        apply(value) {
+          if (!reentered && sheet && value === 300 && sheet.state.phase === 'release') {
+            reentered = true;
+            sheet.pointerDown({ x: 0, y: 300, t: 0.01 });
+          }
+        },
+      },
+    });
+
+    sheet.snapTo(1);
+    expect(reentered).toBe(true);
+    expect(sheet.state.phase).toBe('follow');
+
+    sheet.pointerMove({ x: 0, y: 320, t: 0.02 });
+    expect(sheet.state.value).toBe(310);
+    sheet.destroy();
+  });
+
+  it('discards a live fallback if requestFrame reenters newer input during handoff', () => {
+    const frames: Array<(timestamp?: number) => void> = [];
+    let sheet!: ReturnType<typeof createCompositorBottomSheet>;
+    let reentered = false;
+    sheet = createCompositorBottomSheet({
+      snapPoints: [0, 300],
+      requestFrame(callback) {
+        frames.push(callback);
+        if (!reentered) {
+          reentered = true;
+          sheet.pointerDown({ x: 0, y: 40, t: 0.01 });
+        }
+        return frames.length;
+      },
+      compositor: {
+        target: { animate: undefined as never },
+        property: 'translate',
+        apply() {},
+      },
+    });
+
+    sheet.snapTo(1);
+    expect(reentered).toBe(true);
+    expect(sheet.state.phase).toBe('follow');
+
+    sheet.pointerMove({ x: 0, y: 80, t: 0.02 });
+    const afterMove = sheet.state.value;
+    expect(afterMove).toBe(40);
+
+    frames.shift()?.(16);
+    frames.shift()?.(32);
+    expect(sheet.state.phase).toBe('follow');
+    expect(sheet.state.value).toBe(afterMove);
+    sheet.destroy();
+  });
+
   it('finishes the active native owner when the host completion promise rejects', async () => {
     let rejectFinished!: (reason?: unknown) => void;
     let canceled = 0;
