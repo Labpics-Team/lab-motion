@@ -127,7 +127,7 @@ function createOwner(
         ? tryCompileSpringExecutionArtifactTupleUnchecked(args.spring, v0, DEFAULT_TOLERANCE)
         : undefined;
 
-      if (artifact && target) {
+      if (artifact) {
         const plan = compileSpringRuntimeExecutionTupleUnchecked(
           args.spring,
           surface.property,
@@ -140,31 +140,35 @@ function createOwner(
           format,
           artifact,
         );
-        if (token !== epoch || !target) return;
         const startedAt = defaultNow();
         if (token !== epoch || !target) return;
-        const animation = target.animate(plan[0], {
-          duration: plan[2],
-          easing: plan[1],
-          iterations: 1,
-          fill: plan[3],
-          composite: plan[4],
-        });
+        let animation: NativeAnimation | undefined;
+        try {
+          animation = target.animate(plan[0], {
+            duration: plan[2],
+            easing: plan[1],
+            iterations: 1,
+            fill: plan[3],
+            composite: plan[4],
+          });
+        } catch {}
         if (token !== epoch || !target) {
-          animation.cancel?.();
+          animation?.cancel?.();
           return;
         }
-        const native: NativeRun = {
-          kind: 0,
-          args,
-          animation,
-          artifact,
-          startedAt,
-        };
-        active = native;
-        args.onStep(args.from, args.velocity);
-        if (active === native) animation.finished.then(() => finish(native), () => {});
-        return;
+        if (animation) {
+          const native: NativeRun = {
+            kind: 0,
+            args,
+            animation,
+            artifact,
+            startedAt,
+          };
+          active = native;
+          args.onStep(args.from, args.velocity);
+          if (active === native) animation.finished.then(() => finish(native), () => {});
+          return;
+        }
       }
 
       const value = handoffToLive({
