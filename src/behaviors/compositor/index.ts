@@ -115,7 +115,8 @@ function createOwner(
   const owner: BehaviorCompositorOwner = {
     _settle(args): void {
       owner._invalidate();
-      if (!target) return;
+      const host = target;
+      if (!host) return;
       if (args.from === args.target || tier === 3) {
         args.onStep(args.target, 0);
         args.onDone();
@@ -141,10 +142,10 @@ function createOwner(
           artifact,
         );
         const startedAt = defaultNow();
-        if (token !== epoch || !target) return;
+        if (token !== epoch) return;
         let animation: NativeAnimation | undefined;
         try {
-          animation = target.animate(plan[0], {
+          animation = host.animate(plan[0], {
             duration: plan[2],
             easing: plan[1],
             iterations: 1,
