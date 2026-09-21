@@ -1,0 +1,34 @@
+[
+  {
+    "id": "lab-rust-unwrap",
+    "language": "rust",
+    "pattern": "$VALUE.unwrap()",
+    "message": "Моделируйте fallible-состояние явно вместо вызова unwrap().",
+    "positive": "fn f(result: Result<(), ()>) { result.unwrap(); }",
+    "negative": "fn f(result: Result<(), ()>) -> Result<(), ()> { result?; Ok(()) }"
+  },
+  {
+    "id": "lab-rust-todo",
+    "language": "rust",
+    "pattern": "todo!($$$ARGS)",
+    "message": "todo!() оставляет незавершённое исполняемое поведение.",
+    "positive": "fn f() { todo!(); }",
+    "negative": "fn f() {}"
+  },
+  {
+    "id": "lab-rust-unimplemented",
+    "language": "rust",
+    "pattern": "unimplemented!($$$ARGS)",
+    "message": "unimplemented!() оставляет незавершённое исполняемое поведение.",
+    "positive": "fn f() { unimplemented!(); }",
+    "negative": "fn f() {}"
+  },
+  {
+    "id": "lab-go-panic",
+    "language": "go",
+    "pattern": "panic($VALUE)",
+    "message": "Предпочитайте явную ошибку или доказанное невозможное состояние вместо panic().",
+    "positive": "package main\nfunc f() { panic(\"boom\") }\n",
+    "negative": "package main\nfunc f() error { return nil }\n"
+  }
+]

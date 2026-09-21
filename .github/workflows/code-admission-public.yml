@@ -1,0 +1,55 @@
+name: code-admission-public
+on:
+  pull_request:
+  merge_group:
+permissions:
+  contents: read
+concurrency:
+  group: labpics-public-admission-${{ github.repository }}-${{ github.event.pull_request.number || github.event.merge_group.head_sha || github.sha }}
+  cancel-in-progress: false
+jobs:
+  admission:
+    name: code-admission-public
+    runs-on: ubuntu-24.04
+    timeout-minutes: 25
+    steps:
+      - name: Checkout immutable carrier root
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          ref: ${{ github.workflow_sha }}
+          fetch-depth: 1
+          persist-credentials: false
+          submodules: false
+          lfs: false
+      - name: Select qualified Node runtime
+        uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020
+        with:
+          node-version: '22'
+      - name: Verify carrier provenance
+        shell: bash
+        run: |
+          set -euo pipefail
+          [[ "$(git rev-parse HEAD)" == "${{ github.workflow_sha }}" ]]
+          node .github/vendor/labpics-code-admission/verify.mjs --root .github/vendor/labpics-code-admission
+      - name: Checkout immutable integration candidate
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          path: .code-subject.public01
+          ref: ${{ github.sha }}
+          fetch-depth: 0
+          persist-credentials: false
+          submodules: false
+          lfs: false
+      - name: Run qualified source admission
+        uses: ./.github/vendor/labpics-code-admission/.github/actions/code-admission
+        with:
+          repo: .code-subject.public01
+          base: ${{ github.event.pull_request.base.sha || github.event.merge_group.base_sha }}
+          candidate: ${{ github.sha }}
+      - name: Remove candidate checkout
+        if: ${{ always() }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          [[ -d .code-subject.public01 && ! -L .code-subject.public01 ]]
+          rm -rf -- .code-subject.public01

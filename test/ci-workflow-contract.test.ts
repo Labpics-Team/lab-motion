@@ -226,12 +226,28 @@ function assertCommands(job: Job, commands: string[]) {
 function assertNativeGraph(files: Map<string, string>) {
   const workflows = new Map([...files].map(([name, source]) => [name, parse(source) as Workflow]));
   expect([...workflows].filter(([, w]) => events(w.on).some((event) => candidateEvents.has(event)))
-    .map(([name]) => name).sort()).toEqual(['ci.yml']);
+    .map(([name]) => name).sort()).toEqual(['ci.yml', 'code-admission-public.yml']);
   expect(files.has('ci-gate.yml')).toBe(false);
   const ci = workflows.get('ci.yml')!;
   const browser = workflows.get('browser.yml')!;
+  const admission = workflows.get('code-admission-public.yml')!;
   expect(ci.on).toEqual({ push: { branches: ['main'] }, pull_request: null, merge_group: null, workflow_dispatch: null });
   expect(browser.on).toEqual({ workflow_call: null });
+  expect(admission.on).toEqual({ pull_request: null, merge_group: null });
+  expect(admission.permissions).toEqual({ contents: 'read' });
+  expect(Object.keys(admission.jobs)).toEqual(['admission']);
+  const admissionJob = admission.jobs.admission!;
+  expect(admissionJob.name).toBe('code-admission-public');
+  expect(admissionJob['runs-on']).toBe('ubuntu-24.04');
+  expect(admissionJob.if).toBeUndefined();
+  expect(admissionJob['continue-on-error']).toBeUndefined();
+  expect((admissionJob.steps ?? []).filter((item) => item.uses).map((item) => item.uses)).toEqual([
+    'actions/checkout@11d5960a326750d5838078e36cf38b85af677262',
+    'actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020',
+    'actions/checkout@11d5960a326750d5838078e36cf38b85af677262',
+    './.github/vendor/labpics-code-admission/.github/actions/code-admission',
+  ]);
+  expect((admissionJob.steps ?? []).some((item) => item.name === 'Verify carrier provenance')).toBe(true);
   expect(Object.keys(ci.jobs).sort()).toEqual(['CI', 'browser-static', 'node-floor', 'verify']);
   expect(Object.keys(browser.jobs)).toEqual(['conformance']);
   for (const document of [ci, browser]) {

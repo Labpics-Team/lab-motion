@@ -1,0 +1,59 @@
+{
+  "schema": "labpics.code-admission/public-carrier/v1",
+  "sourceRepository": "Labpics-Team/agents-config",
+  "sourceCommit": "1099dd68ce3ad697274bc2ea707837607b60283c",
+  "files": [
+    {
+      "path": ".github/actions/code-admission/action.yml",
+      "blob": "71f83e3dacaf218e134da8d0427fea5c95fc2d77"
+    },
+    {
+      "path": "architecture/git.mjs",
+      "blob": "d36e639e4656fff216dfcacf607773388a9c4149"
+    },
+    {
+      "path": "architecture/model.mjs",
+      "blob": "ce4ca8e8dc93f3773f9171108e27ccf6a7719d11"
+    },
+    {
+      "path": "plans/tools/code-admission.mjs",
+      "blob": "1539978d325292a8614a806ffa957c60dd05f702"
+    },
+    {
+      "path": "plans/tools/code-admission/controls.mjs",
+      "blob": "dc4a37eb1920a7ff6af6427d81e6bc208a55dd67"
+    },
+    {
+      "path": "plans/tools/code-admission/identity.mjs",
+      "blob": "33dea8f91ab5d4e3ffc90f4226ad960a5f5f5018"
+    },
+    {
+      "path": "plans/tools/code-admission/install-tools.sh",
+      "blob": "76b4a3c0fa95689a0c953cc5044b2651906b5671"
+    },
+    {
+      "path": "plans/tools/code-admission/qualify-ast-grep.mjs",
+      "blob": "edd06d867cabad83880e2c9122d603f12ff33594"
+    },
+    {
+      "path": "plans/tools/code-admission/qualify-trivy.mjs",
+      "blob": "a177b9d5a2770b6b95c95ef5afc3fbe0acde9e0a"
+    },
+    {
+      "path": "plans/tools/code-admission/reject-symlinks.sh",
+      "blob": "8cb6759e987ef4ad259c6c0203cb1feb11915371"
+    },
+    {
+      "path": "plans/tools/code-admission/rules.json",
+      "blob": "2c9f6bc3ec07cb5f6bbe8daf8ece00666a4a0757"
+    },
+    {
+      "path": "plans/tools/code-admission/snapshot.mjs",
+      "blob": "097ab6678f7228176ee3778004e62f047e32af56"
+    },
+    {
+      "path": "plans/tools/code-admission/trivy.mjs",
+      "blob": "f83ac456ce9fe21cff1a0db2e176b93aac344214"
+    }
+  ]
+}
