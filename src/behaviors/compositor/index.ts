@@ -82,12 +82,6 @@ type LiveRun = {
 
 type ActiveRun = NativeRun | LiveRun;
 
-function validateSurface(surface: BehaviorCompositorSurface): void {
-  const property = surface.property;
-  if (typeof property !== 'string' || !property) throw new MotionParamError('LM010');
-  if (/^(offset|easing|composite)$/.test(property)) throw new MotionParamError('LM011');
-}
-
 function createOwner(
   surface: BehaviorCompositorSurface,
   requestFrame: RequestFrameFn | undefined,
@@ -273,7 +267,9 @@ function ownerFor(
   options: Pick<SheetOptions, 'matchMedia' | 'requestFrame'>,
   surface: BehaviorCompositorSurface,
 ): BehaviorCompositorOwner {
-  validateSurface(surface);
+  const property = surface.property;
+  if (typeof property !== 'string' || !property) throw new MotionParamError('LM010');
+  if (/^(offset|easing|composite)$/.test(property)) throw new MotionParamError('LM011');
   return createOwner(
     surface,
     options.requestFrame,
