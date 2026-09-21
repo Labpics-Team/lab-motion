@@ -18,6 +18,7 @@ type TraceEvent = {
 const FIXTURE_SUFFIX = '/browser/fixtures/profile-raf-trace-probe.js';
 const PROJECTION_SUFFIX = '/dist/projection/index.js';
 const BEHAVIORS_SUFFIX = '/dist/behaviors/index.js';
+const TRACE_COMPLETION_TIMEOUT_MS = 5_000;
 
 function stackUrls(value: unknown): string[] {
   if (Array.isArray(value)) return value.flatMap(stackUrls);
@@ -38,6 +39,34 @@ function sameIdentity(left: TraceEvent, right: TraceEvent): boolean {
     typeof a.frame === 'string' &&
     a.frame.length > 0 &&
     a.frame === b?.frame;
+}
+
+async function finishTrace(
+  end: () => Promise<unknown>,
+  subscribeComplete: (resolve: () => void) => () => void,
+  detach: () => Promise<void>,
+  timeoutMs = TRACE_COMPLETION_TIMEOUT_MS,
+): Promise<void> {
+  let unsubscribe = () => {};
+  let timer: ReturnType<typeof setTimeout> | undefined;
+  try {
+    const completed = new Promise<void>((resolve) => {
+      unsubscribe = subscribeComplete(resolve);
+    });
+    await end();
+    await Promise.race([
+      completed,
+      new Promise<never>((_, reject) => {
+        timer = setTimeout(() => {
+          reject(new Error(`PROFILE-01 trace completion timed out after ${timeoutMs}ms`));
+        }, timeoutMs);
+      }),
+    ]);
+  } finally {
+    if (timer !== undefined) clearTimeout(timer);
+    unsubscribe();
+    await detach();
+  }
 }
 
 async function collectTrace(page: Page, run: () => Promise<void>): Promise<TraceEvent[]> {
@@ -63,15 +92,16 @@ async function collectTrace(page: Page, run: () => Promise<void>): Promise<Trace
     await run();
     await page.evaluate(() => new Promise<void>((resolve) => requestAnimationFrame(() => resolve())));
   } finally {
-    try {
-      if (tracingStarted) {
-        const completed = new Promise<void>((resolve) => {
-          session.once('Tracing.tracingComplete', () => resolve());
-        });
-        await session.send('Tracing.end');
-        await completed;
-      }
-    } finally {
+    if (tracingStarted) {
+      await finishTrace(
+        () => session.send('Tracing.end'),
+        (resolve) => {
+          session.once('Tracing.tracingComplete', resolve);
+          return () => session.off('Tracing.tracingComplete', resolve);
+        },
+        () => session.detach(),
+      );
+    } else {
       await session.detach();
     }
   }
@@ -100,6 +130,24 @@ function expectOwnedFrame(events: TraceEvent[], sourceSuffix: string): void {
   expect(pair?.fire.tid).toBe(pair?.request.tid);
   expect(pair?.fire.dur).toBeGreaterThan(0);
 }
+
+test('PROFILE-01: таймаут tracingComplete завершает CDP-сессию перед отказом', async () => {
+  let ended = false;
+  let unsubscribed = false;
+  let detached = false;
+
+  const result = finishTrace(
+    async () => { ended = true; },
+    () => () => { unsubscribed = true; },
+    async () => { detached = true; },
+    1,
+  );
+
+  await expect(result).rejects.toThrow('PROFILE-01 trace completion timed out after 1ms');
+  expect(ended).toBe(true);
+  expect(unsubscribed).toBe(true);
+  expect(detached).toBe(true);
+});
 
 test('PROFILE-01: exact rAF trace duration is an explicit Chromium capability', async ({ page, browserName }) => {
   if (browserName !== 'chromium') {
