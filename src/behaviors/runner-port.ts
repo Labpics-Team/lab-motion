@@ -6,7 +6,8 @@ export interface BehaviorSettleArgs {
   readonly velocity: number;
   readonly target: number;
   readonly spring: SpringParams;
-  readonly onStep: (value: number, velocity: number) => void;
+  /** true, пока опубликованное состояние всё ещё владеет продолжением. */
+  readonly onStep: (value: number, velocity: number) => boolean;
   readonly onDone: () => void;
 }
 
