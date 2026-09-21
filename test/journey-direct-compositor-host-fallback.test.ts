@@ -159,6 +159,7 @@ describe('JOURNEY-01 compositor host rejection', () => {
         target: {
           animate() {
             return {
+              currentTime: null,
               finished,
               cancel() {
                 canceled++;
