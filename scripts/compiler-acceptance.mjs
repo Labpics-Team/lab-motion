@@ -43,11 +43,11 @@ const ALIAS = {
 
 /** dist-модуль (не entry, не bare peer) в графе — нормализованный к dist-relative id. */
 function distModules(chunk) {
-  // Vite сообщает id с '/', а resolve() на Windows даёт '\\': без нормализации
+  // Vite сообщает id с '/', а resolve() на Windows даёт '\': без нормализации
   // startsWith никогда не совпадёт и граф dist-модулей будет ложно пустым.
-  const distSlash = DIST.replaceAll('\\\\', '/');
+  const distSlash = DIST.replaceAll('\\', '/');
   return Object.keys(chunk.modules)
-    .map((id) => id.replaceAll('\\\\', '/'))
+    .map((id) => id.replaceAll('\\', '/'))
     .filter((id) => id.startsWith(distSlash))
     .map((id) => id.slice(distSlash.length + 1));
 }
@@ -278,7 +278,7 @@ async function run() {
       `compiled surface (${surfaceCompiledGz} B gz) не меньше uncompiled (${surfaceBaselineGz} B gz)`,
     );
     // Абсолютные гейты: (1) код executor'а ≤1 KB gz независимо от данных;
-    // (2) total-решётка от факта (executor + certified-артефакт вызова).
+    // (2) total-решётка от факта (executor + сертифицированный артефакт вызова).
     const executorGz = gzipSync(readFileSync(resolve(DIST, SURFACE_MODULE))).length;
     check(
       executorGz <= SURFACE_EXECUTOR_MAX_GZ,
