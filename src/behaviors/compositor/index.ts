@@ -23,6 +23,7 @@ import {
   sampleSerializedSpringIntoUnchecked,
   scaleSerializedVelocity,
 } from '../../compositor/sample.js';
+import { MotionParamError } from '../../errors.js';
 import { defaultRequestFrame } from '../../internal/request-frame.js';
 import type { RequestFrameFn } from '../../motion-value.js';
 import {
@@ -86,6 +87,16 @@ function defaultNow(): number {
   return globalThis.performance?.now() ?? Date.now();
 }
 
+function validateSurface(surface: BehaviorCompositorSurface): void {
+  const property = surface.property;
+  if (typeof property !== 'string' || property.length === 0) {
+    throw new MotionParamError('LM010');
+  }
+  if (property === 'offset' || property === 'easing' || property === 'composite') {
+    throw new MotionParamError('LM011');
+  }
+}
+
 function createOwner(
   surface: BehaviorCompositorSurface,
   requestFrame: RequestFrameFn | undefined,
@@ -141,7 +152,7 @@ function createOwner(
         );
         const startedAt = defaultNow();
         if (token !== epoch) return;
-        let animation: NativeAnimation | undefined;
+        let animation: NativeAnimation;
         try {
           animation = target.animate(plan[0], {
             duration: plan[2],
@@ -150,23 +161,24 @@ function createOwner(
             fill: plan[3],
             composite: plan[4],
           });
-        } catch {}
+        } catch (error) {
+          if (token === epoch && args.onStep(args.target, 0)) args.onDone();
+          throw error;
+        }
         if (token !== epoch) {
-          animation?.cancel?.();
+          animation.cancel?.();
           return;
         }
-        if (animation) {
-          const run: NativeRun = active = {
-            kind: 0,
-            args,
-            animation,
-            artifact,
-            startedAt,
-          };
-          args.onStep(args.from, args.velocity);
-          animation.finished.then(() => finish(run), () => finish(run));
-          return;
-        }
+        const run: NativeRun = active = {
+          kind: 0,
+          args,
+          animation,
+          artifact,
+          startedAt,
+        };
+        args.onStep(args.from, args.velocity);
+        animation.finished.then(() => finish(run), () => finish(run));
+        return;
       }
 
       const value = handoffToLive({
@@ -276,6 +288,7 @@ function ownerFor(
   options: Pick<SheetOptions, 'matchMedia' | 'requestFrame'>,
   surface: BehaviorCompositorSurface,
 ): BehaviorCompositorOwner {
+  validateSurface(surface);
   return createOwner(
     surface,
     options.requestFrame,
