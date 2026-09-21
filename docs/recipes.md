@@ -754,3 +754,16 @@ consumer передаёт `state.update` по собственной stable-key 
 или destroy отзывает старое предложение. Нельзя принять stale permutation
 после внешнего изменения коллекции. Listener/ResizeObserver и focus/ARIA
 принадлежат компоненту, не headless resolver.
+
+## Диагностика compiler lowering
+
+Сначала соберите точный `dist`, затем запустите тот же acceptance-путь с trace:
+
+```sh
+pnpm build && node scripts/compiler-acceptance.mjs --trace
+```
+
+Команда печатает `tooling-trace` только после успешной проверки lowering. Поля,
+версия схемы и правило fail-closed определены в [контракте компилятора](compiler.md#диагностический-trace-контракт).
+Если acceptance падает, trace не считается доказательством и не должен разбираться
+как частичный успешный результат.
