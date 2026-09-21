@@ -67,7 +67,7 @@ pnpm build && node scripts/compiler-acceptance.mjs --trace
 ```
 
 Команда сначала обязана пройти обычную compiler-acceptance проверку и только после
-этого печатает машинно-читаемые строки `tooling-trace` с `goal`, `owner`, `path`,
+этого печатает машинно-читаемые строки `tooling-trace` с `id`, `goal`, `owner`, `path`,
 `execution` и, для оставленного runtime-пути, `refusal`. Поэтому trace описывает
 фактически собранный граф, а не отдельную таблицу эвристик. Диагностика живёт только
 в repository tooling: она не экспортируется пакетом и без явного запуска не входит

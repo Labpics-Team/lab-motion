@@ -165,6 +165,22 @@ describe('compiler tooling trace', () => {
     expect(parseTrace(result.stdout)).toEqual([]);
   });
 
+  it('не печатает trace при неоднозначном owner фактически собранного результата', () => {
+    const source = readFileSync(script, 'utf8');
+    const original = "recordTrace('nano-static', 'static opacity=0.5', compiled);";
+    const changed = source.replace(
+      original,
+      "recordTrace('nano-static', 'static opacity=0.5', { ...compiled, modules: [...compiled.modules, NANO_MODULE] });",
+    );
+    expect(changed).not.toBe(source);
+    writeFileSync(brokenScript, changed);
+
+    const result = run(brokenScript);
+    expect(result.status).not.toBe(0);
+    expect(result.stderr).toContain('ожидался один owner, получено 2');
+    expect(parseTrace(result.stdout)).toEqual([]);
+  });
+
   it('отвергает потерю записи и подмену owner/path/refusal', () => {
     expect(() => validateTrace(cloneTrace().slice(1))).toThrow();
 
