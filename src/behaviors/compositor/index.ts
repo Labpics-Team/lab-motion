@@ -128,7 +128,7 @@ function createOwner(
         ? tryCompileSpringExecutionArtifactTupleUnchecked(args.spring, v0, DEFAULT_TOLERANCE)
         : undefined;
 
-      native: if (artifact) {
+      if (artifact) {
         const plan = compileSpringRuntimeExecutionTupleUnchecked(
           args.spring,
           surface.property,
@@ -143,7 +143,7 @@ function createOwner(
         );
         const startedAt = defaultNow();
         if (token !== epoch) return;
-        let animation: NativeAnimation;
+        let animation: NativeAnimation | undefined;
         try {
           animation = host.animate(plan[0], {
             duration: plan[2],
@@ -152,24 +152,23 @@ function createOwner(
             fill: plan[3],
             composite: plan[4],
           });
-        } catch {
-          break native;
-        }
+        } catch {}
         if (token !== epoch) {
-          animation.cancel?.();
+          animation?.cancel?.();
           return;
         }
-        const run: NativeRun = {
-          kind: 0,
-          args,
-          animation,
-          artifact,
-          startedAt,
-        };
-        active = run;
-        args.onStep(args.from, args.velocity);
-        if (active === run) animation.finished.then(() => finish(run), () => {});
-        return;
+        if (animation) {
+          const run: NativeRun = active = {
+            kind: 0,
+            args,
+            animation,
+            artifact,
+            startedAt,
+          };
+          args.onStep(args.from, args.velocity);
+          if (active === run) animation.finished.then(() => finish(run), () => {});
+          return;
+        }
       }
 
       const value = handoffToLive({
@@ -179,8 +178,7 @@ function createOwner(
         target: args.target,
         requestFrame: schedule,
       });
-      const live: LiveRun = { kind: 1, args, value };
-      active = live;
+      const live: LiveRun = active = { kind: 1, args, value };
       live.unsubscribe = value.onChange((next) => {
         if (active !== live) return;
         const velocity = value.velocity;
