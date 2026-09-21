@@ -50,12 +50,13 @@ describe('showcase build contract', () => {
 
   it('runs the literal compiler recipe from its existing documentation owner', () => {
     expect(compilerPlayground).toContain("from 'virtual:lab-motion-compiler-playground'");
-    expect(compilerPlayground).not.toContain("@labpics/motion/nano");
-    expect(compilerPlayground).not.toContain('opacity: 0.5');
+    expect(compilerPlayground).not.toContain("from '@labpics/motion/nano'");
+    expect(compilerPlayground).not.toContain('animate(');
     expect(viteConfig).toContain("from '../scripts/compiler-doc-recipe.mjs'");
     expect(viteConfig).toContain("from '../dist/compiler/vite/index.js'");
     expect(viteConfig).toContain('readCompilerNanoRecipe(ROOT)');
     expect(viteConfig).toContain('motionCompiler()');
+    expect(viteConfig).toContain('if (id !== RESOLVED_PLAYGROUND_ID) return undefined');
     expect(viteConfig).toContain("code.includes('@labpics/motion/compiler/runtime')");
     expect(siteHtml).toContain('data-action="run-compiler-recipe"');
     expect(siteHtml).toContain('aria-label="Compiled docs recipe playground"');
