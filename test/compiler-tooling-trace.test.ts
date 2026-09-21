@@ -1,10 +1,14 @@
 import { spawnSync } from 'node:child_process';
-import { existsSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
+import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { afterEach, beforeAll, describe, expect, it } from 'vitest';
+import { COMPILER_NANO_RECIPE_MARKER, readCompilerNanoRecipe } from '../scripts/compiler-doc-recipe.mjs';
 
 const root = fileURLToPath(new URL('..', import.meta.url));
 const script = fileURLToPath(new URL('../scripts/compiler-acceptance.mjs', import.meta.url));
+const browserCompilerSetup = fileURLToPath(new URL('../browser/fixtures/compile-artifacts.mjs', import.meta.url));
 const builtCompiler = fileURLToPath(new URL('../dist/compiler/vite/index.js', import.meta.url));
 const brokenScript = fileURLToPath(new URL('../scripts/.compiler-acceptance-trace-test.mjs', import.meta.url));
 const pnpm = process.platform === 'win32' ? 'pnpm.cmd' : 'pnpm';
@@ -103,6 +107,32 @@ afterEach(() => {
 });
 
 describe('compiler tooling trace', () => {
+  it('использует один буквальный docs-рецепт в acceptance и browser proof', () => {
+    const recipe = readCompilerNanoRecipe(root);
+    expect(recipe).toContain("from '@labpics/motion/nano'");
+    expect(recipe).toContain('opacity: 0.5');
+
+    for (const consumer of [script, browserCompilerSetup]) {
+      const source = readFileSync(consumer, 'utf8');
+      expect(source).toContain('readCompilerNanoRecipe');
+      expect(source).not.toContain("export function play(el) { return animate(el, { opacity: 0.5 }); }");
+    }
+  });
+
+  it('fail-closed отвергает неоднозначный docs-рецепт', () => {
+    const fixtureRoot = mkdtempSync(join(tmpdir(), 'lab-motion-compiler-recipe-'));
+    try {
+      mkdirSync(join(fixtureRoot, 'docs'));
+      writeFileSync(
+        join(fixtureRoot, 'docs/compiler.md'),
+        `${COMPILER_NANO_RECIPE_MARKER}\n\`\`\`typescript\nexport const first = 1;\n\`\`\`\n${COMPILER_NANO_RECIPE_MARKER}\n\`\`\`typescript\nexport const second = 2;\n\`\`\`\n`,
+      );
+      expect(() => readCompilerNanoRecipe(fixtureRoot)).toThrow('Ожидается ровно один');
+    } finally {
+      rmSync(fixtureRoot, { recursive: true, force: true });
+    }
+  });
+
   it('описывает ровно пять фактически собранных путей', () => {
     const result = run();
     expect(result.status, `${result.stdout}\n${result.stderr}`).toBe(0);
