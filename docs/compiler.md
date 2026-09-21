@@ -33,6 +33,14 @@ import { animate } from '@labpics/motion/nano';
 export function play(el) { return animate(el, { opacity: 0.5 }); }
 ```
 
+## Playground
+
+Browser-playground не пересобирает и не копирует рецепт: `browser/fixtures/compiler-playground.html`
+импортирует `browser/.artifacts/compiled.js`, а этот артефакт создаёт существующий
+`browser/fixtures/compile-artifacts.mjs` из буквального блока выше через
+`readCompilerNanoRecipe`. Поэтому playground, browser-differential и acceptance имеют один вход,
+а showcase и публикуемый пакет не получают второй compiler/tooling runtime.
+
 ## Как строится доверенный артефакт
 
 Пайплайн: nano SSOT (`springLinear`) → кандидат MotionProgram V1 →

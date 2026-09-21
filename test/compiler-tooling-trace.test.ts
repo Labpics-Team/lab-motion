@@ -9,6 +9,7 @@ import { COMPILER_NANO_RECIPE_MARKER, readCompilerNanoRecipe } from '../scripts/
 const root = fileURLToPath(new URL('..', import.meta.url));
 const script = fileURLToPath(new URL('../scripts/compiler-acceptance.mjs', import.meta.url));
 const browserCompilerSetup = fileURLToPath(new URL('../browser/fixtures/compile-artifacts.mjs', import.meta.url));
+const browserPlayground = fileURLToPath(new URL('../browser/fixtures/compiler-playground.html', import.meta.url));
 const builtCompiler = fileURLToPath(new URL('../dist/compiler/vite/index.js', import.meta.url));
 const brokenScript = fileURLToPath(new URL('../scripts/.compiler-acceptance-trace-test.mjs', import.meta.url));
 const pnpm = process.platform === 'win32' ? 'pnpm.cmd' : 'pnpm';
@@ -107,7 +108,7 @@ afterEach(() => {
 });
 
 describe('compiler tooling trace', () => {
-  it('использует один буквальный docs-рецепт в acceptance и browser proof', () => {
+  it('использует один буквальный docs-рецепт в acceptance, browser proof и playground', () => {
     const recipe = readCompilerNanoRecipe(root);
     expect(recipe).toContain("from '@labpics/motion/nano'");
     expect(recipe).toContain('opacity: 0.5');
@@ -117,6 +118,17 @@ describe('compiler tooling trace', () => {
       expect(source).toContain('readCompilerNanoRecipe');
       expect(source).not.toContain("export function play(el) { return animate(el, { opacity: 0.5 }); }");
     }
+
+    const playground = readFileSync(browserPlayground, 'utf8');
+    expect(playground).toContain("from '../.artifacts/compiled.js'");
+    expect(playground).not.toContain("from '@labpics/motion/nano'");
+    expect(playground).not.toContain('animate(');
+  });
+
+  it('не включает playground/trace в публикуемый production package', () => {
+    const pkg = JSON.parse(readFileSync(join(root, 'package.json'), 'utf8')) as { files: string[] };
+    expect(pkg.files.some((entry) => entry === 'browser' || entry.startsWith('browser/'))).toBe(false);
+    expect(pkg.files.some((entry) => entry === 'scripts' || entry.startsWith('scripts/'))).toBe(false);
   });
 
   it('fail-closed отвергает неоднозначный docs-рецепт', () => {

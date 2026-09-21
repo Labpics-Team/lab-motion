@@ -1,12 +1,5 @@
-import { installCompilerPlayground } from './compiler-playground.js';
 import { installShowcase } from './showcase.js';
 
-const disposeShowcase = installShowcase();
-const disposeCompilerPlayground = installCompilerPlayground();
-
-const dispose = () => {
-  disposeCompilerPlayground();
-  disposeShowcase();
-};
+const dispose = installShowcase();
 
 if (import.meta.hot) import.meta.hot.dispose(dispose);

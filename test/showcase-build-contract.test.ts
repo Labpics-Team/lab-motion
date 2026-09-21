@@ -5,10 +5,6 @@ const showcase = readFileSync(
   new URL('../site/src/scripts/showcase.js', import.meta.url),
   'utf8',
 );
-const compilerPlayground = readFileSync(
-  new URL('../site/src/scripts/compiler-playground.js', import.meta.url),
-  'utf8',
-);
 const viteConfig = readFileSync(
   new URL('../site/vite.config.mjs', import.meta.url),
   'utf8',
@@ -28,7 +24,6 @@ const playwrightConfig = readFileSync(
 const pkg = JSON.parse(
   readFileSync(new URL('../package.json', import.meta.url), 'utf8'),
 ) as {
-  files: string[];
   scripts: Record<string, string>;
   devDependencies: Record<string, string>;
 };
@@ -46,27 +41,6 @@ describe('showcase build contract', () => {
     expect(viteConfig).toContain("base: './'");
     expect(viteConfig).toContain('modulePreload: { polyfill: false }');
     expect(pkg.devDependencies.astro).toBeUndefined();
-  });
-
-  it('runs the literal compiler recipe from its existing documentation owner', () => {
-    expect(compilerPlayground).toContain("from 'virtual:lab-motion-compiler-playground'");
-    expect(compilerPlayground).not.toContain("from '@labpics/motion/nano'");
-    expect(compilerPlayground).not.toContain('animate(');
-    expect(viteConfig).toContain("from '../scripts/compiler-doc-recipe.mjs'");
-    expect(viteConfig).toContain("from '../dist/compiler/vite/index.js'");
-    expect(viteConfig).toContain('readCompilerNanoRecipe(ROOT)');
-    expect(viteConfig).toContain('motionCompiler()');
-    expect(viteConfig).toContain('if (id !== RESOLVED_PLAYGROUND_ID) return undefined');
-    expect(viteConfig).toContain("code.includes('@labpics/motion/compiler/runtime')");
-    expect(siteHtml).toContain('data-action="run-compiler-recipe"');
-    expect(siteHtml).toContain('aria-label="Compiled docs recipe playground"');
-  });
-
-  it('keeps playground/tooling outside the published production package', () => {
-    expect(pkg.files).not.toContain('site');
-    expect(pkg.files).not.toContain('scripts');
-    expect(pkg.files.some((entry) => entry.startsWith('site/'))).toBe(false);
-    expect(pkg.files.some((entry) => entry.startsWith('scripts/'))).toBe(false);
   });
 
   it('produces the showcase artifact before browser conformance runs', () => {
