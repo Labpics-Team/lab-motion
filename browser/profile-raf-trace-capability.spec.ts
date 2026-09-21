@@ -125,22 +125,24 @@ test('PROFILE-01: both frozen M-05 families retain exact production-owner attrib
   const projectionEvents = await collectTrace(page, async () => {
     await page.evaluate(async () => {
       const { createProjection } = await import('/dist/projection/index.js');
-      await new Promise<void>((resolve) => {
-        const controls = createProjection({
-          requestFrame: (callback) => requestAnimationFrame((timestamp) => callback(timestamp)),
-          onFrame: (frames) => {
-            const first = frames[0];
-            (globalThis as typeof globalThis & { __labMotionProfileOwnerSink?: number }).__labMotionProfileOwnerSink =
-              first === undefined ? 0 : first.tx + first.ty + first.sx + first.sy;
-          },
-          onRest: resolve,
-        });
-        controls.play([{
-          id: 'probe',
-          first: { x: 0, y: 0, width: 32, height: 32 },
-          last: { x: 96, y: 64, width: 48, height: 48 },
-        }]);
+      const controls = createProjection({
+        requestFrame: (callback) => requestAnimationFrame((timestamp) => callback(timestamp)),
+        // Пустой consumer сохраняет вычисление ProjectionFrame, но не добавляет
+        // прикладную мутацию внутрь измеряемого production-owned rAF.
+        onFrame: () => {},
       });
+      controls.play([{
+        id: 'probe',
+        first: { x: 0, y: 0, width: 32, height: 32 },
+        last: { x: 96, y: 64, width: 48, height: 48 },
+      }]);
+      while (controls.playing) {
+        await new Promise<void>((resolve) => setTimeout(resolve, 0));
+      }
+      const box = controls.boxAt('probe');
+      if (box?.x !== 96 || box.y !== 64 || box.width !== 48 || box.height !== 48) {
+        throw new Error('PROFILE-01 projection probe did not reach authored terminal geometry');
+      }
     });
   });
   expectOwnedFrame(projectionEvents, PROJECTION_SUFFIX);
@@ -148,22 +150,18 @@ test('PROFILE-01: both frozen M-05 families retain exact production-owner attrib
   const behaviorEvents = await collectTrace(page, async () => {
     await page.evaluate(async () => {
       const { createBottomSheet } = await import('/dist/behaviors/index.js');
-      await new Promise<void>((resolve) => {
-        const sheet = createBottomSheet({
-          snapPoints: [0, 300, 600],
-          requestFrame: (callback) => requestAnimationFrame((timestamp) => callback(timestamp)),
-        });
-        const unsubscribe = sheet.subscribe((state) => {
-          (globalThis as typeof globalThis & { __labMotionProfileOwnerSink?: number }).__labMotionProfileOwnerSink =
-            state.value + state.velocity;
-          if (state.phase === 'settle' && state.snapIndex === 1) {
-            unsubscribe();
-            sheet.destroy();
-            resolve();
-          }
-        });
-        sheet.snapTo(1);
+      const sheet = createBottomSheet({
+        snapPoints: [0, 300, 600],
+        requestFrame: (callback) => requestAnimationFrame((timestamp) => callback(timestamp)),
       });
+      sheet.snapTo(1);
+      while (sheet.state.phase !== 'settle') {
+        await new Promise<void>((resolve) => setTimeout(resolve, 0));
+      }
+      if (sheet.state.value !== 300 || sheet.state.snapIndex !== 1 || sheet.state.velocity !== 0) {
+        throw new Error('PROFILE-01 bottom-sheet probe did not reach authored terminal state');
+      }
+      sheet.destroy();
     });
   });
   expectOwnedFrame(behaviorEvents, BEHAVIORS_SUFFIX);
