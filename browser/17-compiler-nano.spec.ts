@@ -17,12 +17,14 @@ import { expect, test } from './fixtures/harness';
 
 const COMPILED = '/browser/.artifacts/compiled.js';
 const UNCOMPILED = '/browser/.artifacts/uncompiled.js';
+type Controls = Animation[] & { finished: Promise<Animation[]> };
+type Play = (el: Element) => Controls;
 
 test('compiled и uncompiled дают идентичную opacity-траекторию на движке', async ({ page }) => {
   const result = await page.evaluate(async ([compiledUrl, uncompiledUrl]) => {
     const [{ play: playCompiled }, { play: playUncompiled }] = await Promise.all([
-      import(compiledUrl) as Promise<{ play: (el: Element) => Animation[] }>,
-      import(uncompiledUrl) as Promise<{ play: (el: Element) => Animation[] }>,
+      import(compiledUrl) as Promise<{ play: Play }>,
+      import(uncompiledUrl) as Promise<{ play: Play }>,
     ]);
     const make = (): HTMLElement => {
       const el = document.createElement('div');
@@ -102,14 +104,46 @@ test('compiled и uncompiled дают идентичную opacity-траект�
   expect(Math.abs(result.finalUncompiled - 0.5)).toBeLessThanOrEqual(0.001);
 });
 
+test('compiled и uncompiled естественно завершаются одинаково', async ({ page }) => {
+  await page.emulateMedia({ reducedMotion: 'no-preference' });
+  const result = await page.evaluate(async ([compiledUrl, uncompiledUrl]) => {
+    const [{ play: playCompiled }, { play: playUncompiled }] = await Promise.all([
+      import(compiledUrl) as Promise<{ play: Play }>,
+      import(uncompiledUrl) as Promise<{ play: Play }>,
+    ]);
+    const run = (play: Play) => {
+      const el = document.createElement('div');
+      el.style.opacity = '1';
+      document.body.appendChild(el);
+      const controls = play(el);
+      return { el, controls, animation: controls[0]! };
+    };
+    const compiled = run(playCompiled);
+    const uncompiled = run(playUncompiled);
+    await Promise.all([compiled.controls.finished, uncompiled.controls.finished]);
+    const snapshot = ({ el, animation }: { el: HTMLElement; animation: Animation }) => ({
+      opacity: Number.parseFloat(getComputedStyle(el).opacity),
+      retained: el.getAnimations().length,
+      state: animation.playState,
+    });
+    const value = { compiled: snapshot(compiled), uncompiled: snapshot(uncompiled) };
+    compiled.el.remove();
+    uncompiled.el.remove();
+    return value;
+  }, [COMPILED, UNCOMPILED] as const);
+
+  expect(result.compiled).toEqual({ opacity: 0.5, retained: 0, state: 'idle' });
+  expect(result.uncompiled).toEqual(result.compiled);
+});
+
 test('compiled и uncompiled одинаково схлопывают анимацию под reduced motion', async ({ page }) => {
   await page.emulateMedia({ reducedMotion: 'reduce' });
   const result = await page.evaluate(async ([compiledUrl, uncompiledUrl]) => {
     const [{ play: playCompiled }, { play: playUncompiled }] = await Promise.all([
-      import(compiledUrl) as Promise<{ play: (el: Element) => Animation[] }>,
-      import(uncompiledUrl) as Promise<{ play: (el: Element) => Animation[] }>,
+      import(compiledUrl) as Promise<{ play: Play }>,
+      import(uncompiledUrl) as Promise<{ play: Play }>,
     ]);
-    const run = (play: (el: Element) => Animation[]) => {
+    const run = (play: Play) => {
       const el = document.createElement('div');
       document.body.appendChild(el);
       const anim = play(el)[0]!;

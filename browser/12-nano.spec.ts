@@ -119,3 +119,26 @@ test('nano чистит native effect после каждого replay и не �
     state: 'idle',
   });
 });
+
+test('nano сохраняет финал при естественном завершении spring в реальном движке', async ({ page }) => {
+  await page.emulateMedia({ reducedMotion: 'no-preference' });
+  const result = await page.evaluate(async () => {
+    const { animate } = await import('/dist/nano/index.js');
+    const element = document.createElement('div');
+    element.style.opacity = '1';
+    document.body.appendChild(element);
+
+    const controls = animate(element, { opacity: 0.5 });
+    const animation = controls[0]!;
+    await controls.finished;
+    const snapshot = {
+      opacity: getComputedStyle(element).opacity,
+      retained: element.getAnimations().length,
+      state: animation.playState,
+    };
+    element.remove();
+    return snapshot;
+  });
+
+  expect(result).toEqual({ opacity: '0.5', retained: 0, state: 'idle' });
+});
