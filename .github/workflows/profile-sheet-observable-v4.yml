@@ -1,0 +1,182 @@
+name: PROFILE-01 — sheet derived terminal oracle v4
+
+on:
+  push:
+    branches: ["research/r11-profile-sheet-derived-v4-20260922"]
+    paths:
+      - "bench/profile/sheet-observable-v4-preregistration.mjs"
+      - "bench/profile/probe-sheet-observable-v4.mjs"
+      - "bench/profile/validate-sheet-observable-v4.mjs"
+      - ".github/workflows/profile-sheet-observable-v4.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+env:
+  COREPACK_ENABLE_DOWNLOAD_PROMPT: "0"
+  COREPACK_DEFAULT_TO_LATEST: "0"
+
+jobs:
+  probe:
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    steps:
+      - name: Получить exact harness
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          persist-credentials: false
+          fetch-depth: 0
+
+      - name: Настроить Node
+        uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v6
+        with:
+          node-version: "24"
+
+      - name: Закрыть scope и доказать preregistration-before-samples
+        shell: bash
+        run: |
+          set -euo pipefail
+          test "$(git rev-parse HEAD)" = "$GITHUB_SHA"
+          base=2c947007168d4964124db8ce8079bbfabc975687
+          prereg=30eb8d119e6c99b516a7c356a2e1fb82fd2191b2
+          git merge-base --is-ancestor "$prereg" HEAD
+
+          # Научная preregistration — это экспортируемый неизменяемый контракт,
+          # а не CLI-транспорт модуля. CodeRabbit обнаружил дефект path→file URL
+          # уже после первого успешного sample. Исправление допустимо только если
+          # exact export побайтно совпадает с pre-sample ancestor и хэшем первого artifact.
+          original="$RUNNER_TEMP/sheet-observable-v4-preregistered.mjs"
+          git show "$prereg:bench/profile/sheet-observable-v4-preregistration.mjs" > "$original"
+          ORIGINAL_PREREG="$original" node --input-type=module <<'NODE'
+          import { createHash } from 'node:crypto';
+          import { resolve } from 'node:path';
+          import { pathToFileURL } from 'node:url';
+
+          const expected = 'c212c4fa2f374541081e557261841a8cd0b2df20a10df8fe4f3edcd91842a5f3';
+          const digest = (value) => createHash('sha256').update(JSON.stringify(value)).digest('hex');
+          const before = await import(`${pathToFileURL(process.env.ORIGINAL_PREREG).href}?frozen=1`);
+          const current = await import(`${pathToFileURL(resolve('bench/profile/sheet-observable-v4-preregistration.mjs')).href}?current=1`);
+          const beforeDigest = digest(before.SHEET_OBSERVABLE_V4);
+          const currentDigest = digest(current.SHEET_OBSERVABLE_V4);
+          if (beforeDigest !== expected || currentDigest !== expected || beforeDigest !== currentDigest) {
+            throw new Error(`preregistered contract drifted: ${JSON.stringify({ expected, beforeDigest, currentDigest })}`);
+          }
+          process.stdout.write(`${JSON.stringify({ preregisteredContractSha256: currentDigest })}\n`);
+          NODE
+
+          unexpected="$(git diff --name-only "$base"...HEAD | grep -Ev '^(bench/profile/(sheet-observable-v4-preregistration|probe-sheet-observable-v4|validate-sheet-observable-v4)\.mjs|\.github/workflows/profile-sheet-observable-v4\.yml)$' || true)"
+          if [[ -n "$unexpected" ]]; then
+            printf '::error::v4 scope escaped proof-plane only paths:\n%s\n' "$unexpected"
+            exit 1
+          fi
+
+      - name: Проверить immutable source pins
+        shell: bash
+        run: |
+          set -euo pipefail
+          baseline=fe11daa407de396fad952be7679650f63dabd4dd
+          check_blob() {
+            path="$1" expected="$2"
+            actual="$(git rev-parse "$baseline:$path")"
+            test "$actual" = "$expected" || {
+              printf '::error::source pin drift %s expected=%s actual=%s\n' "$path" "$expected" "$actual"
+              exit 1
+            }
+          }
+          check_blob src/behaviors/index.ts fa06548f592eddd7acd2c1121be26c1a86512718
+          check_blob src/gestures/index.ts a0b97661beece0ff1a7dce33203c8f921e4ac35d
+          check_blob src/internal/sliding-window.ts e1c3131a891ab9299b0746417d7e93ca98b190cc
+          check_blob src/decay.ts e6219f1d7d011375bbf93f699f659ebf80aeff7d
+          check_blob src/tokens/index.ts 854358d3d060c7f047736bacb142ab41cd62c27d
+          check_blob src/internal/motion-defaults.ts 56cf7a0c8e9875a240ba5b1eb43271026261beaf
+          check_blob src/internal/solver.ts 60beb917e3f56539de918b135a24d79a6472aef8
+          check_blob src/spring.ts 36d16e1b70abde88e0f044a0715739866d38cc01
+          check_blob src/internal/constants.ts 1d743b382ef21f3b0633da21602af517cb1f7ec2
+
+      - name: Связать proof formulas с pinned baseline source
+        shell: bash
+        run: |
+          set -euo pipefail
+          baseline=fe11daa407de396fad952be7679650f63dabd4dd
+          solver="$RUNNER_TEMP/profile-baseline-solver.ts"
+          spring="$RUNNER_TEMP/profile-baseline-spring.ts"
+          git show "$baseline:src/internal/solver.ts" > "$solver"
+          git show "$baseline:src/spring.ts" > "$spring"
+          SOLVER_SOURCE="$solver" SPRING_SOURCE="$spring" node --input-type=module <<'NODE'
+          import { readFile } from 'node:fs/promises';
+          import { verifyPinnedFormulaCorrespondence } from './bench/profile/sheet-observable-v4-preregistration.mjs';
+
+          const solverSource = await readFile(process.env.SOLVER_SOURCE, 'utf8');
+          const springSource = await readFile(process.env.SPRING_SOURCE, 'utf8');
+          const evidence = verifyPinnedFormulaCorrespondence(solverSource, springSource);
+          process.stdout.write(`${JSON.stringify(evidence)}\n`);
+          NODE
+
+      - name: Материализовать derived deadline до browser samples
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p profile-receipts
+          node --input-type=module <<'NODE'
+          import { writeFile } from 'node:fs/promises';
+          import { SHEET_OBSERVABLE_V4 } from './bench/profile/sheet-observable-v4-preregistration.mjs';
+          if (SHEET_OBSERVABLE_V4.derivation.terminalAtMs !== 1548) throw new Error('derived deadline drifted');
+          await writeFile(
+            'profile-receipts/sheet-observable-v4-preregistration.json',
+            `${JSON.stringify(SHEET_OBSERVABLE_V4, null, 2)}\n`,
+            'utf8',
+          );
+          process.stdout.write(`${JSON.stringify(SHEET_OBSERVABLE_V4.derivation)}\n`);
+          NODE
+
+      - name: Активировать закреплённый pnpm
+        run: |
+          corepack enable
+          corepack install --global pnpm@11.11.0
+
+      - name: Установить Playwright harness
+        run: |
+          cd bench/compare
+          pnpm install --frozen-lockfile
+          pnpm exec playwright install --with-deps chromium firefox webkit
+
+      - name: Собрать точный замороженный baseline
+        shell: bash
+        run: |
+          set -euo pipefail
+          baseline="$RUNNER_TEMP/profile-baseline"
+          git worktree add --detach "$baseline" fe11daa407de396fad952be7679650f63dabd4dd
+          cd "$baseline"
+          test "$(git rev-parse HEAD)" = fe11daa407de396fad952be7679650f63dabd4dd
+          pnpm install --frozen-lockfile
+          pnpm build
+          printf 'PROFILE_BASELINE_ROOT=%s\n' "$baseline" >> "$GITHUB_ENV"
+
+      - name: Проверить observable movement и derived terminal bound
+        shell: bash
+        run: |
+          set -euo pipefail
+          node bench/profile/probe-sheet-observable-v4.mjs \
+            --baseline-root "$PROFILE_BASELINE_ROOT" \
+            --harness-revision "$GITHUB_SHA" \
+            --out profile-receipts/sheet-observable-v4.json
+
+      - name: Проверить M-06 C1 velocity handoff и negative controls
+        shell: bash
+        run: |
+          set -euo pipefail
+          node bench/profile/validate-sheet-observable-v4.mjs \
+            profile-receipts/sheet-observable-v4.json \
+            profile-receipts/sheet-observable-v4-velocity-validation.json \
+            "$GITHUB_SHA"
+
+      - name: Сохранить immutable receipts
+        if: always()
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
+        with:
+          name: profile-01-sheet-observable-v4-${{ github.sha }}-${{ github.run_id }}
+          path: profile-receipts/
+          if-no-files-found: error
+          retention-days: 7
+          compression-level: 0
