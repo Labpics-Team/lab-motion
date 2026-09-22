@@ -35,7 +35,31 @@ jobs:
           base=2c947007168d4964124db8ce8079bbfabc975687
           prereg=30eb8d119e6c99b516a7c356a2e1fb82fd2191b2
           git merge-base --is-ancestor "$prereg" HEAD
-          git diff --quiet "$prereg" HEAD -- bench/profile/sheet-observable-v4-preregistration.mjs
+
+          # The scientific preregistration is the exported immutable contract,
+          # not the module's CLI transport. CodeRabbit found a path→file URL bug
+          # after the first successful sample. The repair is admissible only if
+          # the exact exported contract remains byte-identical to the pre-sample
+          # ancestor and to the contract hash captured by the first artifact.
+          original="$RUNNER_TEMP/sheet-observable-v4-preregistered.mjs"
+          git show "$prereg:bench/profile/sheet-observable-v4-preregistration.mjs" > "$original"
+          ORIGINAL_PREREG="$original" node --input-type=module <<'NODE'
+          import { createHash } from 'node:crypto';
+          import { resolve } from 'node:path';
+          import { pathToFileURL } from 'node:url';
+
+          const expected = 'c212c4fa2f374541081e557261841a8cd0b2df20a10df8fe4f3edcd91842a5f3';
+          const digest = (value) => createHash('sha256').update(JSON.stringify(value)).digest('hex');
+          const before = await import(`${pathToFileURL(process.env.ORIGINAL_PREREG).href}?frozen=1`);
+          const current = await import(`${pathToFileURL(resolve('bench/profile/sheet-observable-v4-preregistration.mjs')).href}?current=1`);
+          const beforeDigest = digest(before.SHEET_OBSERVABLE_V4);
+          const currentDigest = digest(current.SHEET_OBSERVABLE_V4);
+          if (beforeDigest !== expected || currentDigest !== expected || beforeDigest !== currentDigest) {
+            throw new Error(`preregistered contract drifted: ${JSON.stringify({ expected, beforeDigest, currentDigest })}`);
+          }
+          process.stdout.write(`${JSON.stringify({ preregisteredContractSha256: currentDigest })}\n`);
+          NODE
+
           unexpected="$(git diff --name-only "$base"...HEAD | grep -Ev '^(bench/profile/(sheet-observable-v4-preregistration|probe-sheet-observable-v4)\.mjs|\.github/workflows/profile-sheet-observable-v4\.yml)$' || true)"
           if [[ -n "$unexpected" ]]; then
             printf '::error::v4 scope escaped proof-plane only paths:\n%s\n' "$unexpected"
