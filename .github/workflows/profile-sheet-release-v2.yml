@@ -1,0 +1,77 @@
+name: PROFILE-01 — sheet release premise v2
+
+on:
+  push:
+    branches: ["research/r11-profile-sheet-release-v2-20260922"]
+    paths:
+      - "bench/profile/sheet-release-v2-preregistration.mjs"
+      - "bench/profile/probe-sheet-release-v2.mjs"
+      - "bench/compare/package.json"
+      - "bench/compare/pnpm-lock.yaml"
+      - ".github/workflows/profile-sheet-release-v2.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+env:
+  COREPACK_ENABLE_DOWNLOAD_PROMPT: "0"
+  COREPACK_DEFAULT_TO_LATEST: "0"
+
+jobs:
+  probe:
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    steps:
+      - name: Получить harness
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          persist-credentials: false
+          fetch-depth: 0
+
+      - name: Настроить Node
+        uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v6
+        with:
+          node-version: "24"
+
+      - name: Активировать закреплённый pnpm
+        run: |
+          corepack enable
+          corepack install --global pnpm@11.11.0
+
+      - name: Установить Playwright harness
+        run: |
+          cd bench/compare
+          pnpm install --frozen-lockfile
+          pnpm exec playwright install --with-deps chromium firefox webkit
+
+      - name: Собрать точный замороженный baseline
+        shell: bash
+        run: |
+          set -euo pipefail
+          baseline="$RUNNER_TEMP/profile-baseline"
+          git worktree add --detach "$baseline" fe11daa407de396fad952be7679650f63dabd4dd
+          cd "$baseline"
+          pnpm install --frozen-lockfile
+          pnpm build
+          printf 'PROFILE_BASELINE_ROOT=%s\n' "$baseline" >> "$GITHUB_ENV"
+
+      - name: Проверить premise-changing release law
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p profile-receipts
+          node bench/profile/probe-sheet-release-v2.mjs \
+            --baseline-root "$PROFILE_BASELINE_ROOT" \
+            --harness-revision "$GITHUB_SHA" \
+            --out profile-receipts/sheet-release-v2.json
+
+      - name: Сохранить неизменяемый receipt
+        if: always()
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
+        with:
+          name: profile-01-sheet-release-v2-${{ github.sha }}-${{ github.run_id }}
+          path: profile-receipts/
+          if-no-files-found: error
+          retention-days: 7
+          compression-level: 0
