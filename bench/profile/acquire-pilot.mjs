@@ -6,12 +6,13 @@ import { pathToFileURL } from 'node:url';
 import { PROFILE_PREREGISTRATION } from './preregistration.mjs';
 import {
   derivePoweredDesign,
-  finalizePilotReceipt,
+  materializePilotReceipt,
   receiptSha256,
 } from './power-design.mjs';
 import {
   validateCalibrationReceipt,
   validateDesktopInventory,
+  validatePilotReceipt,
   validatePoweredDesignReceipt,
 } from './validate.mjs';
 
@@ -128,15 +129,23 @@ async function startDistServer(baselineRoot) {
   };
 }
 
-async function installSceneHarness(page, origin) {
+async function installSceneHarness(page, origin, profile) {
   await page.goto(origin, { waitUntil: 'load' });
-  await page.evaluate(async ({ projectionUrl, behaviorsUrl }) => {
+  await page.evaluate(async ({ projectionUrl, behaviorsUrl, sceneContracts }) => {
     const projection = await import(projectionUrl);
     const behaviors = await import(behaviorsUrl);
     const global = globalThis;
     global.__profileModules = { projection, behaviors };
+    global.__profileSceneContracts = Object.fromEntries(sceneContracts.map((scene) => [scene.id, scene]));
     global.__runProfileSceneAggregate = async (sceneId, serialRepeats, unitBatchCalls) => {
+      const sceneContract = global.__profileSceneContracts[sceneId];
+      if (!sceneContract) throw new Error(`unknown PROFILE-01 scene ${sceneId}`);
       const now = () => performance.now();
+      const waitUntil = async (startedAt, targetMs) => {
+        while (now() - startedAt < targetMs) {
+          await new Promise((resolve) => requestAnimationFrame(() => resolve()));
+        }
+      };
       const phase = { setup: 0, input: 0, frame: 0, interruption: 0, teardown: 0 };
       const timed = (key, fn) => {
         const start = now();
@@ -192,27 +201,53 @@ async function installSceneHarness(page, origin) {
         const sched = scheduler();
         const controls = [];
         for (let instance = 0; instance < unitBatchCalls; instance++) {
-          const ctrl = timed('setup', () => projection.createProjection({
+          controls.push(timed('setup', () => projection.createProjection({
             requestFrame: sched.requestFrame,
             onFrame: () => {},
+          })));
+        }
+        const startedAt = now();
+        for (const ctrl of controls) {
+          const initial = Array.from({ length: 100 }, (_, index) => ({
+            id: `card-${index}`,
+            first: box(index),
+            last: box(index),
           }));
-          controls.push(ctrl);
-          const nodes = Array.from({ length: 100 }, (_, index) => ({
+          timed('input', () => ctrl.play(initial));
+        }
+
+        await waitUntil(startedAt, sceneContract.scheduleMs[1]);
+        for (const ctrl of controls) {
+          const reversed = Array.from({ length: 100 }, (_, index) => ({
             id: `card-${index}`,
             first: box(index),
             last: box(99 - index),
           }));
-          timed('input', () => ctrl.play(nodes));
+          timed('input', () => ctrl.play(reversed));
         }
-        await sched.drainRounds(6);
+
+        await waitUntil(startedAt, sceneContract.scheduleMs[2]);
         for (const ctrl of controls) {
-          const replacement = Array.from({ length: 100 }, (_, index) => ({
+          const replacements = Array.from({ length: 100 }, (_, index) => ({
             id: `card-${index}`,
             last: index % 5 === 0 ? box((index + 17) % 100) : box(99 - index),
           }));
-          timed('interruption', () => ctrl.play(replacement));
+          timed('interruption', () => ctrl.play(replacements));
         }
-        await sched.drainRounds(6);
+
+        await waitUntil(startedAt, sceneContract.scheduleMs[3]);
+        if (!controls.every((ctrl) => ctrl.playing)) {
+          throw new Error('collection mid-flight reorder reached a settled predecessor');
+        }
+        for (const ctrl of controls) {
+          const reordered = Array.from({ length: 100 }, (_, index) => ({
+            id: `card-${index}`,
+            last: box((index * 37) % 100),
+          }));
+          timed('interruption', () => ctrl.play(reordered));
+        }
+
+        await waitUntil(startedAt, sceneContract.scheduleMs[4]);
         for (const ctrl of controls) {
           const restored = Array.from({ length: 100 }, (_, index) => ({ id: `card-${index}`, last: box(index) }));
           timed('interruption', () => ctrl.play(restored));
@@ -220,10 +255,16 @@ async function installSceneHarness(page, origin) {
         await sched.drain();
         for (const ctrl of controls) {
           if (ctrl.playing) throw new Error('collection projection did not settle');
-          const first = ctrl.boxAt('card-0');
-          const last = ctrl.boxAt('card-99');
-          if (!first || !last || first.x !== box(0).x || first.y !== box(0).y || last.x !== box(99).x || last.y !== box(99).y) {
-            throw new Error('collection projection lost stable-id terminal geometry');
+          for (let index = 0; index < 100; index++) {
+            const actual = ctrl.boxAt(`card-${index}`);
+            const expected = box(index);
+            if (
+              !actual ||
+              actual.x !== expected.x || actual.y !== expected.y ||
+              actual.width !== expected.width || actual.height !== expected.height
+            ) {
+              throw new Error(`collection projection lost terminal geometry for card-${index}`);
+            }
           }
         }
       };
@@ -232,36 +273,40 @@ async function installSceneHarness(page, origin) {
         const sched = scheduler();
         const sheets = [];
         for (let instance = 0; instance < unitBatchCalls; instance++) {
-          const sheet = timed('setup', () => behaviors.createBottomSheet({
+          sheets.push(timed('setup', () => behaviors.createBottomSheet({
             snapPoints: [0, 300, 600],
             requestFrame: sched.requestFrame,
-          }));
-          sheets.push(sheet);
-          timed('input', () => sheet.pointerDown({ x: 0, y: 0, t: 0 }));
-          timed('input', () => sheet.pointerMove({ x: 0, y: 70, t: 0.05 }));
-          timed('input', () => sheet.pointerMove({ x: 0, y: 135, t: 0.10 }));
-          timed('input', () => sheet.pointerMove({ x: 0, y: 190, t: 0.15 }));
-          timed('input', () => sheet.pointerUp({ x: 0, y: 190, t: 0.16 }));
+          })));
         }
-        await sched.drainRounds(5);
+        const startedAt = now();
+        for (const sheet of sheets) timed('input', () => sheet.pointerDown({ x: 0, y: 0, t: 0 }));
+
+        const dragY = [80, 180, 300];
+        for (let index = 0; index < dragY.length; index++) {
+          const scheduledMs = sceneContract.scheduleMs[index + 1];
+          await waitUntil(startedAt, scheduledMs);
+          const point = { x: 0, y: dragY[index], t: scheduledMs / 1000 };
+          for (const sheet of sheets) timed('input', () => sheet.pointerMove(point));
+        }
         for (const sheet of sheets) {
-          const pickup = sheet.state.value;
-          timed('interruption', () => sheet.pointerDown({ x: 0, y: pickup, t: 0.32 }));
-          timed('interruption', () => sheet.pointerMove({ x: 0, y: pickup - 48, t: 0.38 }));
-          timed('interruption', () => sheet.pointerUp({ x: 0, y: pickup - 48, t: 0.40 }));
+          timed('input', () => sheet.pointerUp({ x: 0, y: dragY[2], t: sceneContract.scheduleMs[3] / 1000 }));
         }
+
+        await waitUntil(startedAt, sceneContract.scheduleMs[4]);
+        if (!sheets.every((sheet) => sheet.state.phase === 'release')) {
+          throw new Error('sheet interruption reached a settled predecessor');
+        }
+        for (const sheet of sheets) timed('interruption', () => sheet.snapTo(1));
+
+        await waitUntil(startedAt, sceneContract.scheduleMs[5]);
         await sched.drain();
         for (const sheet of sheets) {
           const state = sheet.state;
-          const snapPoints = [0, 300, 600];
           if (
-            state.phase !== 'settle' ||
-            !Number.isFinite(state.value) ||
-            !Number.isFinite(state.velocity) ||
-            state.velocity !== 0 ||
-            state.value !== snapPoints[state.snapIndex]
+            state.phase !== 'settle' || state.value !== 300 || state.snapIndex !== 1 ||
+            !Number.isFinite(state.velocity) || state.velocity !== 0
           ) {
-            throw new Error('sheet did not reach finite authored terminal snap state');
+            throw new Error('sheet did not reach authored terminal snap 300');
           }
           timed('teardown', () => sheet.destroy());
         }
@@ -282,6 +327,7 @@ async function installSceneHarness(page, origin) {
   }, {
     projectionUrl: `${origin}/dist/projection/index.js`,
     behaviorsUrl: `${origin}/dist/behaviors/index.js`,
+    sceneContracts: profile.scenes,
   });
 }
 
@@ -333,8 +379,11 @@ async function acquireScene(page, sceneId, profile) {
     doubled.push(cluster(run, two.ownedMs));
     phaseBreakdown.push({ run, aaA: a.phase, aaB: b.phase, single: one.phase, doubled: two.phase });
   }
+  const sceneContract = profile.scenes.find(({ id }) => id === sceneId);
+  invariant(sceneContract, `${sceneId}: preregistered scene contract missing`);
   return {
     id: sceneId,
+    sceneContractSha256: receiptSha256(sceneContract),
     unitBatchCalls: contract.unitBatchCalls,
     serialRepeats: selection.serialRepeats,
     selector: selectorReceipt(selection, contract),
@@ -355,7 +404,7 @@ async function acquireCell(engine, type, inventory, origin, profile) {
     });
     try {
       const page = await context.newPage();
-      await installSceneHarness(page, origin);
+      await installSceneHarness(page, origin, profile);
       const scenes = [];
       for (const sceneId of profile.statistics.m05.requiredSceneIds) {
         scenes.push(await acquireScene(page, sceneId, profile));
@@ -382,7 +431,7 @@ export async function acquirePilot({ baselineRoot, inventory, calibration, harne
     for (const engine of ['chromium', 'firefox', 'webkit']) {
       cells.push(await acquireCell(engine, ENGINE_TYPES[engine], inventory, server.origin, profile));
     }
-    return finalizePilotReceipt({
+    return materializePilotReceipt({
       schemaVersion: 1,
       profileId: profile.profileId,
       baselineRevision: profile.baseline.revision,
@@ -423,7 +472,10 @@ async function main() {
     readFile(calibrationPath, 'utf8').then(JSON.parse),
   ]);
   const pilot = await acquirePilot({ baselineRoot, inventory, calibration, harnessRevision, pilotId });
+  // Сначала сохраняем exact raw-backed receipt: красный admission не имеет права
+  // уничтожить единственный результат эксперимента и провоцировать repeat-to-green.
   await writeFile(outputPath, `${JSON.stringify(pilot, null, 2)}\n`, 'utf8');
+  validatePilotReceipt(pilot);
   const design = derivePoweredDesign(pilot, inventory, calibration);
   validatePoweredDesignReceipt(design);
   if (poweredOutputPath) await writeFile(poweredOutputPath, `${JSON.stringify(design, null, 2)}\n`, 'utf8');

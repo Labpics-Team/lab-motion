@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { chooseScenarioSerialRepeats } from '../bench/profile/acquire-pilot.mjs';
 import { PROFILE_PREREGISTRATION } from '../bench/profile/preregistration.mjs';
-import { finalizePilotReceipt, validatePilotReceipt } from '../bench/profile/power-design.mjs';
+import { finalizePilotReceipt, receiptSha256, validatePilotReceipt } from '../bench/profile/power-design.mjs';
 
 function tinyContract() {
   return {
@@ -72,6 +72,7 @@ describe('PROFILE-01: выбор масштаба pilot acquisition', () => {
     const clusters = (value: number) => Array.from({ length: 20 }, (_, run) => ({ run, samples: [value], semantic: true }));
     const scene = (id: string) => ({
       id,
+      sceneContractSha256: receiptSha256(profile.scenes.find((candidate) => candidate.id === id)!),
       unitBatchCalls: profile.scenarioSelector.unitBatchCalls,
       serialRepeats: 4,
       selector,

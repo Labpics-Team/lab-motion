@@ -205,6 +205,12 @@ export function validatePilotReceipt(receipt, profile = PROFILE_PREREGISTRATION)
     for (let sceneIndex = 0; sceneIndex < cell.scenes.length; sceneIndex++) {
       const scene = cell.scenes[sceneIndex];
       const label = `${cell.id}/${scene.id}`;
+      const sceneContract = profile.scenes.find(({ id }) => id === scene.id);
+      invariant(sceneContract !== undefined, `${label}: preregistered scene contract missing`);
+      invariant(
+        scene.sceneContractSha256 === receiptSha256(sceneContract),
+        `${label}: scene contract binding drifted`,
+      );
       validateSelectorReceipt(scene.selector, scene.unitBatchCalls, scene.serialRepeats, profile, label);
       const blocks = receipt.harness.runBlocks;
       const floorMs = profile.scenarioSelector.formalFloorMs;
@@ -240,7 +246,7 @@ export function validatePilotReceipt(receipt, profile = PROFILE_PREREGISTRATION)
     }
   }
   return receipt;
-}export function finalizePilotReceipt(receipt, profile = PROFILE_PREREGISTRATION) {
+}export function materializePilotReceipt(receipt, profile = PROFILE_PREREGISTRATION) {
   const output = structuredClone(receipt);
   for (let cellIndex = 0; cellIndex < output.cells.length; cellIndex++) {
     const cell = output.cells[cellIndex];
@@ -260,6 +266,11 @@ export function validatePilotReceipt(receipt, profile = PROFILE_PREREGISTRATION)
       );
     }
   }
+  return output;
+}
+
+export function finalizePilotReceipt(receipt, profile = PROFILE_PREREGISTRATION) {
+  const output = materializePilotReceipt(receipt, profile);
   validatePilotReceipt(output, profile);
   return output;
 }

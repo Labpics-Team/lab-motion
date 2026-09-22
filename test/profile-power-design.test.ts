@@ -100,6 +100,7 @@ function selector(serialRepeats = 1) {
 function rawScene(id: string) {
   return {
     id,
+    sceneContractSha256: receiptSha256(PROFILE_PREREGISTRATION.scenes.find((scene) => scene.id === id)!),
     unitBatchCalls: PROFILE_PREREGISTRATION.scenarioSelector.unitBatchCalls,
     serialRepeats: 1,
     selector: selector(1),
