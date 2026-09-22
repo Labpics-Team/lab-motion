@@ -1,3 +1,4 @@
+import { createHash } from 'node:crypto';
 import { pathToFileURL } from 'node:url';
 
 // PROFILE-01 proof-plane preregistration.
@@ -62,7 +63,7 @@ function settleTimeUpperBoundPinned(v0) {
   const delta = omega2 - alpha * alpha;
   const split = Math.sqrt(Math.abs(delta));
   const envelopeRate = delta >= 0 ? alpha : omega2 / (alpha + split);
-  invariant(envelopeRate > 0, 'frozen spring has no positive convergence rate');
+  if (!(envelopeRate > 0)) return Infinity;
   const stableExponent =
     (8 * Math.log(
       Math.max(
@@ -89,6 +90,51 @@ function settleTimeUpperBoundPinned(v0) {
     stableExponent,
     Math.log(modalAmplitude / convergenceThreshold),
   ) / envelopeRate;
+}
+
+const FORMULA_SOURCE_SHA256 = Object.freeze({
+  solvePinnedSpring: 'c1650306cc7dca667a3ccb27b6018e8dde20aa8584ea61ac453a94a2e4cdbf23',
+  settleTimeUpperBoundPinned: 'a005afa7778ed2dbaf9b2c655f7fae6dfda5b62cafb47796f233c1e2f4920406',
+});
+const BASELINE_SOLVER_WITNESSES = Object.freeze([
+  'const zeta = c / (2 * m * omega0);',
+  'const omegaD = omega0 * Math.sqrt(1 - zeta * zeta);',
+  'const B = (v0 - zeta * omega0) / omegaD;',
+  'const mode = B * sinD - cosD;',
+  'decay * (-zeta * omega0 * mode + omegaD * (sinD + B * cosD));',
+]);
+const BASELINE_SETTLE_WITNESSES = Object.freeze([
+  'const envelopeRate = delta >= 0 ? alpha : omega2 / (alpha + split);',
+  'if (!(envelopeRate > 0)) return Infinity;',
+  'if (delta === 0) return stableExponent / envelopeRate;',
+  'Math.log(modalAmplitude / CONVERGENCE_THRESHOLD),',
+  ') / envelopeRate;',
+]);
+
+function formulaSourceSha256(fn) {
+  return createHash('sha256').update(Function.prototype.toString.call(fn)).digest('hex');
+}
+
+export function verifyPinnedFormulaCorrespondence(solverSource, springSource) {
+  invariant(typeof solverSource === 'string' && solverSource.length > 0, 'baseline solver source is required');
+  invariant(typeof springSource === 'string' && springSource.length > 0, 'baseline spring source is required');
+  const solverHelperSha256 = formulaSourceSha256(solvePinnedSpring);
+  const settleHelperSha256 = formulaSourceSha256(settleTimeUpperBoundPinned);
+  invariant(
+    solverHelperSha256 === FORMULA_SOURCE_SHA256.solvePinnedSpring,
+    `local pinned solver formula drifted (${solverHelperSha256})`,
+  );
+  invariant(
+    settleHelperSha256 === FORMULA_SOURCE_SHA256.settleTimeUpperBoundPinned,
+    `local pinned settle formula drifted (${settleHelperSha256})`,
+  );
+  for (const witness of BASELINE_SOLVER_WITNESSES) {
+    invariant(solverSource.includes(witness), `baseline solver formula witness missing: ${witness}`);
+  }
+  for (const witness of BASELINE_SETTLE_WITNESSES) {
+    invariant(springSource.includes(witness), `baseline settle formula witness missing: ${witness}`);
+  }
+  return Object.freeze({ solverHelperSha256, settleHelperSha256 });
 }
 
 function deriveDeadline() {
