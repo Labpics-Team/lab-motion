@@ -6,6 +6,7 @@ on:
     paths:
       - "bench/profile/sheet-observable-v4-preregistration.mjs"
       - "bench/profile/probe-sheet-observable-v4.mjs"
+      - "bench/profile/validate-sheet-observable-v4.mjs"
       - ".github/workflows/profile-sheet-observable-v4.yml"
   workflow_dispatch:
 
@@ -36,11 +37,10 @@ jobs:
           prereg=30eb8d119e6c99b516a7c356a2e1fb82fd2191b2
           git merge-base --is-ancestor "$prereg" HEAD
 
-          # The scientific preregistration is the exported immutable contract,
-          # not the module's CLI transport. CodeRabbit found a path→file URL bug
-          # after the first successful sample. The repair is admissible only if
-          # the exact exported contract remains byte-identical to the pre-sample
-          # ancestor and to the contract hash captured by the first artifact.
+          # Научная preregistration — это экспортируемый неизменяемый контракт,
+          # а не CLI-транспорт модуля. CodeRabbit обнаружил дефект path→file URL
+          # уже после первого успешного sample. Исправление допустимо только если
+          # exact export побайтно совпадает с pre-sample ancestor и хэшем первого artifact.
           original="$RUNNER_TEMP/sheet-observable-v4-preregistered.mjs"
           git show "$prereg:bench/profile/sheet-observable-v4-preregistration.mjs" > "$original"
           ORIGINAL_PREREG="$original" node --input-type=module <<'NODE'
@@ -60,7 +60,7 @@ jobs:
           process.stdout.write(`${JSON.stringify({ preregisteredContractSha256: currentDigest })}\n`);
           NODE
 
-          unexpected="$(git diff --name-only "$base"...HEAD | grep -Ev '^(bench/profile/(sheet-observable-v4-preregistration|probe-sheet-observable-v4)\.mjs|\.github/workflows/profile-sheet-observable-v4\.yml)$' || true)"
+          unexpected="$(git diff --name-only "$base"...HEAD | grep -Ev '^(bench/profile/(sheet-observable-v4-preregistration|probe-sheet-observable-v4|validate-sheet-observable-v4)\.mjs|\.github/workflows/profile-sheet-observable-v4\.yml)$' || true)"
           if [[ -n "$unexpected" ]]; then
             printf '::error::v4 scope escaped proof-plane only paths:\n%s\n' "$unexpected"
             exit 1
@@ -142,6 +142,14 @@ jobs:
             --baseline-root "$PROFILE_BASELINE_ROOT" \
             --harness-revision "$GITHUB_SHA" \
             --out profile-receipts/sheet-observable-v4.json
+
+      - name: Проверить M-06 C1 velocity handoff и negative controls
+        shell: bash
+        run: |
+          set -euo pipefail
+          node bench/profile/validate-sheet-observable-v4.mjs \
+            profile-receipts/sheet-observable-v4.json \
+            profile-receipts/sheet-observable-v4-velocity-validation.json
 
       - name: Сохранить immutable receipts
         if: always()
