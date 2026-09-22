@@ -2,15 +2,19 @@ import { readFile } from 'node:fs/promises';
 import { pathToFileURL } from 'node:url';
 import { SHEET_OBSERVABLE_V4 } from './sheet-observable-v4-preregistration.mjs';
 
+const INVARIANT_PREFIX = 'PROFILE-01 sheet-observable-v4:';
+
 function invariant(condition, message) {
-  if (!condition) throw new Error(`PROFILE-01 sheet-observable-v4: ${message}`);
+  if (!condition) throw new Error(`${INVARIANT_PREFIX} ${message}`);
 }
 
-function expectReject(fn, label) {
+function expectReject(fn, label, expectedPrefix) {
   try {
     fn();
-  } catch {
-    return label;
+  } catch (error) {
+    const message = String(error instanceof Error ? error.message : error);
+    if (message.startsWith(expectedPrefix)) return label;
+    throw error;
   }
   throw new Error(`негативный контроль не сработал: ${label}`);
 }
@@ -178,25 +182,31 @@ function validateDerivation(contract) {
     settleDriftRejected: expectReject(
       () => assertDerivation({ ...contract.derivation, settleBoundSec: contract.derivation.settleBoundSec + 0.001 }, reference),
       'settle-bound-drift',
+      INVARIANT_PREFIX,
     ),
     velocityDriftRejected: expectReject(
       () => assertDerivation({ ...contract.derivation, interruptVelocityPxPerSec: 0 }, reference),
       'interrupt-velocity-drift',
+      INVARIANT_PREFIX,
     ),
     terminalDriftRejected: expectReject(
       () => assertDerivation({ ...contract.derivation, terminalAtMs: contract.derivation.terminalAtMs - contract.frameStepMs }, reference),
       'terminal-grid-drift',
+      INVARIANT_PREFIX,
     ),
     invalidThresholdRejected: expectReject(
       () => settleBoundReference(reference.interruptV0, contract.spring, 0),
       'invalid-convergence-threshold',
+      INVARIANT_PREFIX,
     ),
   });
 
   return { reference, controls };
 }
 
-export function validateSheetObservableV4Velocity(receipt, contract = SHEET_OBSERVABLE_V4) {
+export function validateSheetObservableV4Velocity(receipt, expectedHarnessRevision, contract = SHEET_OBSERVABLE_V4) {
+  invariant(/^[0-9a-f]{40}$/.test(expectedHarnessRevision), 'ожидаемая ревизия harness должна быть точным Git SHA');
+  invariant(receipt?.harnessRevision === expectedHarnessRevision, 'ревизия harness в квитанции не совпадает с проверяемой');
   invariant(receipt?.status === 'PASS', 'квитанция опыта не имеет статуса PASS');
   invariant(receipt?.baselineRevision === contract.baselineRevision, 'ревизия базовой линии изменилась');
   invariant(Array.isArray(receipt?.engines) && receipt.engines.length === EXPECTED_ENGINES.length, 'состав браузерных движков изменился');
@@ -212,14 +222,17 @@ export function validateSheetObservableV4Velocity(receipt, contract = SHEET_OBSE
     zeroVelocityRejected: expectReject(
       () => assertVelocityHandoff({ velocity: 0 }, { velocity: 0 }, contract.expected.movementDirection),
       'zero-velocity-handoff',
+      INVARIANT_PREFIX,
     ),
     reverseVelocityRejected: expectReject(
       () => assertVelocityHandoff({ velocity: -1 }, { velocity: -1 }, contract.expected.movementDirection),
       'reverse-velocity-handoff',
+      INVARIANT_PREFIX,
     ),
     discontinuousVelocityRejected: expectReject(
       () => assertVelocityHandoff({ velocity: 1 }, { velocity: 2 }, contract.expected.movementDirection),
       'discontinuous-velocity-handoff',
+      INVARIANT_PREFIX,
     ),
   });
 
@@ -266,9 +279,10 @@ export function validateSheetObservableV4Velocity(receipt, contract = SHEET_OBSE
 async function main() {
   const receiptPath = process.argv[2];
   const outputPath = process.argv[3];
-  invariant(receiptPath && outputPath, 'CLI требует <receipt.json> <validation.json>');
+  const expectedHarnessRevision = process.argv[4];
+  invariant(receiptPath && outputPath && expectedHarnessRevision, 'CLI требует <receipt.json> <validation.json> <harness-sha>');
   const receipt = JSON.parse(await readFile(receiptPath, 'utf8'));
-  const validation = validateSheetObservableV4Velocity(receipt);
+  const validation = validateSheetObservableV4Velocity(receipt, expectedHarnessRevision);
   const { writeFile } = await import('node:fs/promises');
   await writeFile(outputPath, `${JSON.stringify(validation, null, 2)}\n`, 'utf8');
   process.stdout.write(`${JSON.stringify({ status: validation.status, outputPath })}\n`);
