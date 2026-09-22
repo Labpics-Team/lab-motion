@@ -76,6 +76,12 @@ import type { MatchMediaLike } from '../internal/media-query.js';
 import { validateSpringForFrameLoop, type SpringParams } from '../spring.js';
 import { spring as springTokens } from '../tokens/index.js';
 import type { RequestFrameFn } from '../motion-value.js';
+import {
+  behaviorRunnerPort,
+  type BehaviorRunnerOptions,
+  type BehaviorRunnerPort,
+  type BehaviorSettleArgs,
+} from './runner-port.js';
 
 // ─── Общий контракт ──────────────────────────────────────────────────────────
 
@@ -126,9 +132,8 @@ function _coord(p: BehaviorPoint, axis: BehaviorAxis): number {
 
 /** Прочитать предпочтение reduced-motion из инжектируемого matchMedia (B4). */
 function _prefersReduced(matchMedia: MatchMediaLike | undefined): boolean {
-  if (typeof matchMedia !== 'function') return false;
   try {
-    return matchMedia('(prefers-reduced-motion: reduce)').matches === true;
+    return !!matchMedia?.('(prefers-reduced-motion: reduce)').matches;
   } catch {
     return false;
   }
@@ -146,27 +151,6 @@ const PICKUP_SEED_DT_S = 0.05;
 // ─── Единый runner (B1): один clock, доводка value→target пружиной ───────────
 
 /**
- * Аргументы одной доводки: from/velocity (унаследованная скорость момента
- * отпускания или перехвата), target, пружина, и колбэки на кадр/финиш.
- */
-interface _SettleArgs {
-  readonly from: number;
-  readonly velocity: number;
-  readonly target: number;
-  readonly spring: SpringParams;
-  readonly onStep: (value: number, velocity: number) => void;
-  readonly onDone: () => void;
-}
-
-/** Хендл единого runner'а поведения. */
-interface _Runner {
-  /** Запустить доводку value→target (ровно один активный цикл). */
-  _settle(args: _SettleArgs): void;
-  /** Погасить активный цикл (перехват/cancel) — stale-кадры инвалидируются. */
-  _invalidate(): number;
-}
-
-/**
  * Создать единый runner поведения. Владеет generation-токеном: любой новый
  * `_settle()` или `_invalidate()` инкрементит его, и запланированные кадры чужого
  * поколения гаснут (B1 — ноль параллельных loops). reduced-motion → мгновенный
@@ -175,7 +159,7 @@ interface _Runner {
 function _createRunner(
   requestFrame: RequestFrameFn | undefined,
   reduced: boolean,
-): _Runner {
+): BehaviorRunnerPort {
   let gen = 0;
   let curVel: number | undefined;
 
@@ -185,7 +169,7 @@ function _createRunner(
   };
 
   return {
-    _settle(args: _SettleArgs): void {
+    _settle(args: BehaviorSettleArgs): void {
       gen++;
       const my = gen;
       curVel = args.velocity;
@@ -257,12 +241,19 @@ function _createRunner(
  * скорости + reduced-флаг + идемпотентные cancel/destroy. Каждое из четырёх
  * поведений оборачивает её собственными обработчиками ввода/выбора цели.
  */
+interface _BaseOptions extends BehaviorRunnerOptions {
+  readonly requestFrame?: RequestFrameFn | undefined;
+  readonly matchMedia?: MatchMediaLike | undefined;
+}
+
 function _createBase<S extends BehaviorState<number>>(
   initial: S,
-  requestFrame: RequestFrameFn | undefined,
-  matchMedia: MatchMediaLike | undefined,
+  options: _BaseOptions,
 ) {
-  const runner = _createRunner(requestFrame, _prefersReduced(matchMedia));
+  // Compositor передаёт явный внутрипакетный порт отдельно от кадрового шва.
+  // Публичный RequestFrameFn остаётся обычной функцией без скрытого протокола.
+  const runner = options[behaviorRunnerPort]
+    ?? _createRunner(options.requestFrame, _prefersReduced(options.matchMedia));
   const tracker = createVelocityTracker();
   const subs = new Set<(s: S) => void>();
   let state = initial;
@@ -324,7 +315,7 @@ function _createBase<S extends BehaviorState<number>>(
 
 /** Перехватить активную доводку тем же tracker/runner и сохранить C¹-prior. */
 function _beginPickup(
-  base: { runner: _Runner; tracker: ReturnType<typeof createVelocityTracker> },
+  base: { runner: BehaviorRunnerPort; tracker: ReturnType<typeof createVelocityTracker> },
   p: BehaviorPoint,
   axis: BehaviorAxis,
   velocityScale = 1,
@@ -427,8 +418,7 @@ export function createBottomSheet(options: SheetOptions): SheetController {
   const startIndex = _pickSnap(snaps, start, 0);
   const base = _createBase<SheetState>(
     { value: start, velocity: 0, phase: 'idle', snapIndex: startIndex },
-    options.requestFrame,
-    options.matchMedia,
+    options,
   );
 
   let grabValue = 0;
@@ -586,8 +576,7 @@ export function createDragDismiss(options: DismissOptions): DismissController {
 
   const base = _createBase<DismissState>(
     { value: 0, velocity: 0, phase: 'idle', dismissed: false },
-    options.requestFrame,
-    options.matchMedia,
+    options,
   );
 
   let grabPointer = 0;
@@ -738,8 +727,7 @@ export function createCarousel(options: CarouselOptions): CarouselController {
 
   const base = _createBase<CarouselState>(
     { value: targetIndex * pageSize, velocity: 0, phase: 'idle', index: targetIndex },
-    options.requestFrame,
-    options.matchMedia,
+    options,
   );
 
   let grabPointer = 0;
@@ -899,8 +887,7 @@ export function createPullToRefresh(options: PullOptions): PullController {
 
   const base = _createBase<PullState>(
     { value: 0, velocity: 0, phase: 'idle', pulling: false, armed: false, pending: false },
-    options.requestFrame,
-    options.matchMedia,
+    options,
   );
 
   let grabPointer = 0;
