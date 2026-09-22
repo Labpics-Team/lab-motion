@@ -107,21 +107,32 @@ async function probeEngine(engine, browserType, origin, contract) {
             throw new Error(`terminal-at-derived-deadline law failed: ${JSON.stringify({ state, pending, expected })}`);
           }
         };
-        const expectReject = (fn, label) => {
+        const expectReject = (fn, label, expectedPrefix) => {
           try {
             fn();
-          } catch {
-            return label;
+          } catch (error) {
+            const message = String(error instanceof Error ? error.message : error);
+            if (message.startsWith(expectedPrefix)) return label;
+            throw error;
           }
           throw new Error(`oracle negative control survived: ${label}`);
         };
 
         const oracleControls = {
-          stationaryRejected: expectReject(() => assertMovement(260, 260, 16, 1), 'stationary'),
-          reverseRejected: expectReject(() => assertMovement(260, 250, 16, 1), 'reverse'),
+          stationaryRejected: expectReject(
+            () => assertMovement(260, 260, 16, 1),
+            'stationary',
+            'observable movement law failed:',
+          ),
+          reverseRejected: expectReject(
+            () => assertMovement(260, 250, 16, 1),
+            'reverse',
+            'observable movement law failed:',
+          ),
           pendingTerminalRejected: expectReject(
             () => assertTerminal({ phase: 'settle', value: 300, snapIndex: 1, velocity: 0 }, 1, frozen.expected.terminal),
             'pending-terminal',
+            'terminal-at-derived-deadline law failed:',
           ),
           positiveMovement: assertMovement(260, 276, 16, 1),
         };
