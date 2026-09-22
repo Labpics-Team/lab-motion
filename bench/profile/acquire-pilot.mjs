@@ -8,11 +8,11 @@ import {
   derivePoweredDesign,
   materializePilotReceipt,
   receiptSha256,
+  validatePilotReceipt,
 } from './power-design.mjs';
 import {
   validateCalibrationReceipt,
   validateDesktopInventory,
-  validatePilotReceipt,
   validatePoweredDesignReceipt,
 } from './validate.mjs';
 
@@ -474,18 +474,21 @@ async function main() {
   const pilot = await acquirePilot({ baselineRoot, inventory, calibration, harnessRevision, pilotId });
   // Сначала сохраняем exact raw-backed receipt: красный admission не имеет права
   // уничтожить единственный результат эксперимента и провоцировать repeat-to-green.
-  await writeFile(outputPath, `${JSON.stringify(pilot, null, 2)}\n`, 'utf8');
+  await writeFile(outputPath, `${JSON.stringify(pilot, null, 2)}\
+`, 'utf8');
   validatePilotReceipt(pilot);
   const design = derivePoweredDesign(pilot, inventory, calibration);
   validatePoweredDesignReceipt(design);
-  if (poweredOutputPath) await writeFile(poweredOutputPath, `${JSON.stringify(design, null, 2)}\n`, 'utf8');
+  if (poweredOutputPath) await writeFile(poweredOutputPath, `${JSON.stringify(design, null, 2)}\
+`, 'utf8');
   process.stdout.write(`${JSON.stringify({
     status: 'PASS',
     pilotId: pilot.pilotId,
     pilotArtifactSha256: receiptSha256(pilot),
     source: basename(outputPath),
     cells: design.cells.map(({ id, chosenIndependentBlocks, estimatedPower, status }) => ({ id, chosenIndependentBlocks, estimatedPower, status })),
-  })}\n`);
+  })}\
+`);
 }
 
 if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) {
