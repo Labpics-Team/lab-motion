@@ -141,6 +141,7 @@ const FLOAT_FIELDS = Object.freeze([
   'interruptV0',
   'settleBoundSec',
 ]);
+const EXPECTED_ENGINES = Object.freeze(['chromium', 'firefox', 'webkit']);
 
 function assertDerivation(actual, expected) {
   invariant(actual && expected, 'требуется расчёт границы');
@@ -198,7 +199,13 @@ function validateDerivation(contract) {
 export function validateSheetObservableV4Velocity(receipt, contract = SHEET_OBSERVABLE_V4) {
   invariant(receipt?.status === 'PASS', 'квитанция опыта не имеет статуса PASS');
   invariant(receipt?.baselineRevision === contract.baselineRevision, 'ревизия базовой линии изменилась');
-  invariant(Array.isArray(receipt?.engines) && receipt.engines.length === 3, 'состав браузерных движков изменился');
+  invariant(Array.isArray(receipt?.engines) && receipt.engines.length === EXPECTED_ENGINES.length, 'состав браузерных движков изменился');
+  const engineNames = receipt.engines.map(({ engine }) => engine);
+  invariant(
+    new Set(engineNames).size === EXPECTED_ENGINES.length
+      && EXPECTED_ENGINES.every((engine) => engineNames.includes(engine)),
+    'квитанция содержит неполный, повторяющийся или неверный набор браузерных движков',
+  );
 
   const derivation = validateDerivation(contract);
   const velocityControls = Object.freeze({
@@ -218,6 +225,11 @@ export function validateSheetObservableV4Velocity(receipt, contract = SHEET_OBSE
 
   for (const engine of receipt.engines) {
     invariant(engine.status === 'PASS', `${engine.engine}: опыт не прошёл`);
+    invariant(engine.terminalObservedAtMs === derivation.reference.terminalAtMs, `${engine.engine}: неверный момент терминального наблюдения`);
+    invariant(engine.pendingAtDeadline === 0, `${engine.engine}: на дедлайне осталась работа в планировщике`);
+    for (const [field, expected] of Object.entries(contract.expected.terminal)) {
+      invariant(engine.terminal?.[field] === expected, `${engine.engine}: поле терминального состояния ${field} изменилось`);
+    }
     invariant(Number.isFinite(engine.movementBefore?.velocity), `${engine.engine}: скорость первого кадра не конечна`);
     invariant(Math.sign(engine.movementBefore.velocity) === contract.expected.movementDirection, `${engine.engine}: скорость первого кадра имеет неверное направление`);
     invariant(Number.isFinite(engine.movementAfter?.velocity), `${engine.engine}: скорость движения не конечна`);
