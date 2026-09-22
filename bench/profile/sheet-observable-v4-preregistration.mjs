@@ -1,3 +1,5 @@
+import { pathToFileURL } from 'node:url';
+
 // PROFILE-01 proof-plane preregistration.
 // This file derives the next observation deadline only from the frozen scene,
 // frozen spring law, convergence law and virtual-clock contract. It does not
@@ -200,6 +202,6 @@ export const SHEET_OBSERVABLE_V4 = Object.freeze({
   }),
 });
 
-if (process.argv[1] && import.meta.url === new URL(`file://${process.argv[1]}`).href) {
+if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) {
   process.stdout.write(`${JSON.stringify(SHEET_OBSERVABLE_V4, null, 2)}\n`);
 }
