@@ -1,0 +1,96 @@
+name: PROFILE-01 — сбор pilot evidence
+
+on:
+  push:
+    branches: ["research/r11-profile-prereg-20260915"]
+    paths:
+      - "bench/profile/acquire-pilot.mjs"
+      - "bench/profile/power-design.mjs"
+      - "test/profile-pilot-acquisition.test.ts"
+      - ".github/workflows/profile-pilot-acquisition.yml"
+
+permissions:
+  contents: read
+
+env:
+  COREPACK_ENABLE_DOWNLOAD_PROMPT: "0"
+  COREPACK_DEFAULT_TO_LATEST: "0"
+
+jobs:
+  acquire:
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    steps:
+      - name: Получить harness
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          persist-credentials: false
+          fetch-depth: 0
+
+      - name: Настроить Node
+        uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v6
+        with:
+          node-version: "24"
+
+      - name: Активировать закреплённый pnpm
+        run: |
+          corepack enable
+          corepack install --global pnpm@11.11.0
+
+      - name: Установить зависимости harness
+        run: |
+          pnpm install --frozen-lockfile
+          cd bench/compare
+          pnpm install --frozen-lockfile
+          pnpm exec playwright install --with-deps chromium firefox webkit
+
+      - name: Собрать точный замороженный baseline
+        shell: bash
+        run: |
+          set -euo pipefail
+          baseline="$RUNNER_TEMP/profile-baseline"
+          git worktree add --detach "$baseline" fe11daa407de396fad952be7679650f63dabd4dd
+          cd "$baseline"
+          pnpm install --frozen-lockfile
+          pnpm build
+          printf 'PROFILE_BASELINE_ROOT=%s\n' "$baseline" >> "$GITHUB_ENV"
+
+      - name: Снять привязанный desktop inventory
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p profile-receipts
+          node bench/profile/capture-desktop.mjs > profile-receipts/inventory.json
+
+      - name: Однократно откалибровать controls
+        shell: bash
+        env:
+          PROFILE_INVENTORY_PATH: profile-receipts/inventory.json
+          PROFILE_CALIBRATION_OUTPUT: profile-receipts/calibration.json
+        run: |
+          set -euo pipefail
+          export PROFILE_CALIBRATION_ID="desktop-controls-${GITHUB_RUN_ID}-${GITHUB_SHA:0:12}"
+          node bench/profile/calibrate-desktop.mjs > profile-receipts/calibration-stdout.json
+
+      - name: Собрать preregistered null/control pilot
+        shell: bash
+        run: |
+          set -euo pipefail
+          node bench/profile/acquire-pilot.mjs \
+            --baseline-root "$PROFILE_BASELINE_ROOT" \
+            --inventory profile-receipts/inventory.json \
+            --calibration profile-receipts/calibration.json \
+            --out profile-receipts/pilot.json \
+            --powered-out profile-receipts/powered-design.json \
+            --harness-revision "$GITHUB_SHA" \
+            --pilot-id "r11-profile-pilot-${GITHUB_RUN_ID}"
+
+      - name: Сохранить неизменяемые receipts
+        if: always()
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
+        with:
+          name: profile-01-pilot-${{ github.sha }}-${{ github.run_id }}
+          path: profile-receipts/
+          if-no-files-found: error
+          retention-days: 7
+          compression-level: 0

@@ -88,6 +88,10 @@ function selector(serialRepeats = 1) {
     holdoutConfidence: contract.holdoutConfidence,
     aggregationRule: contract.aggregationRule,
     positiveControlRule: contract.positiveControlRule,
+    discoveryHistory: [{
+      serialRepeats,
+      samples: Array(contract.discoveryProbeCount).fill(contract.selectionFloorMs),
+    }],
     discovery: Array(contract.discoveryProbeCount).fill(contract.selectionFloorMs),
     holdout: Array(contract.holdoutProbeCount).fill(contract.selectionFloorMs),
   };

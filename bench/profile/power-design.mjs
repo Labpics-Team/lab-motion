@@ -124,6 +124,30 @@ function validateSelectorReceipt(selector, unitBatchCalls, serialRepeats, profil
     `${label}: selector holdout bound is weaker than preregistered confidence`,
   );
   invariant(
+    Array.isArray(selector.discoveryHistory) && selector.discoveryHistory.length > 0,
+    `${label}: selector discovery history missing`,
+  );
+  const expectedRepeats = selector.discoveryHistory.map(({ serialRepeats }) => serialRepeats);
+  invariant(
+    JSON.stringify(expectedRepeats) === JSON.stringify(
+      Array.from({ length: Math.log2(serialRepeats) + 1 }, (_, index) => 2 ** index),
+    ),
+    `${label}: selector did not prove minimal power-of-two search`,
+  );
+  for (const [index, entry] of selector.discoveryHistory.entries()) {
+    invariant(
+      Array.isArray(entry.samples) && entry.samples.length === expected.discoveryProbeCount,
+      `${label}: selector discovery history sample count drifted`,
+    );
+    const clears = entry.samples.every((sample) => Number.isFinite(sample) && sample >= expected.selectionFloorMs);
+    if (index < selector.discoveryHistory.length - 1) {
+      invariant(!clears, `${label}: selector skipped an earlier admissible serial repeat count`);
+    } else {
+      invariant(clears, `${label}: selected discovery evidence does not clear timing floor`);
+      invariant(JSON.stringify(entry.samples) === JSON.stringify(selector.discovery), `${label}: selected discovery bytes drifted from history`);
+    }
+  }
+  invariant(
     Array.isArray(selector.discovery) && selector.discovery.length === expected.discoveryProbeCount,
     `${label}: selector discovery evidence missing`,
   );
