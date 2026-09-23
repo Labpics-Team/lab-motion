@@ -22,9 +22,12 @@ function arg(name) {
   return i < 0 ? undefined : process.argv[i + 1];
 }
 
-async function serve(rootPath) {
-  const root = await realpath(resolve(rootPath));
-  const dist = await realpath(resolve(root, 'dist'));
+async function serve(baseRootPath, candidateRootPath) {
+  const roots = Object.create(null);
+  for (const [label, rootPath] of [['base', baseRootPath], ['candidate', candidateRootPath]]) {
+    const root = await realpath(resolve(rootPath));
+    roots[label] = { root, dist: await realpath(resolve(root, 'dist')) };
+  }
   const server = createServer(async (request, response) => {
     try {
       const pathname = new URL(request.url ?? '/', 'http://127.0.0.1').pathname;
@@ -33,8 +36,10 @@ async function serve(rootPath) {
         response.end('<!doctype html><meta charset="utf-8">');
         return;
       }
-      invariant(pathname.startsWith('/dist/'), 'path outside dist');
-      const file = await realpath(resolve(root, `.${pathname}`));
+      const match = pathname.match(/^\/(base|candidate)\/dist\/(.+)$/);
+      invariant(match, 'path outside frozen roots');
+      const { root, dist } = roots[match[1]];
+      const file = await realpath(resolve(root, `dist/${match[2]}`));
       invariant(file === dist || file.startsWith(`${dist}${sep}`), 'path escaped dist');
       response.writeHead(200, { 'content-type': MIME[extname(file)] ?? 'application/octet-stream', 'cache-control': 'no-store' });
       response.end(await readFile(file));
@@ -51,10 +56,14 @@ async function serve(rootPath) {
 
 async function install(page, origin) {
   await page.goto(origin, { waitUntil: 'load' });
-  await page.evaluate(async ({ url, sheets, frameMs, terminalMs }) => {
-    const { createBottomSheet } = await import(url);
+  await page.evaluate(async ({ urls, sheets, frameMs, terminalMs }) => {
+    const [{ createBottomSheet: createBase }, { createBottomSheet: createCandidate }] = await Promise.all([
+      import(urls.base),
+      import(urls.candidate),
+    ]);
     const g = globalThis;
-    g.__m05Run = (serial = 1) => {
+    g.__m05Run = (which, serial = 1) => {
+      const createBottomSheet = which === 'base' ? createBase : createCandidate;
       const started = performance.now();
       for (let repeat = 0; repeat < serial; repeat++) {
         let now = 0;
@@ -96,7 +105,7 @@ async function install(page, origin) {
       }
       return performance.now() - started;
     };
-  }, { url: `${origin}/dist/behaviors/index.js`, sheets: SHEETS, frameMs: FRAME_MS, terminalMs: TERMINAL_MS });
+  }, { urls: { base: `${origin}/base/dist/behaviors/index.js`, candidate: `${origin}/candidate/dist/behaviors/index.js` }, sheets: SHEETS, frameMs: FRAME_MS, terminalMs: TERMINAL_MS });
 }
 
 function median(values) {
@@ -110,49 +119,46 @@ function quantile(values, q) {
   return x[Math.min(x.length - 1, Math.max(0, Math.ceil(q * x.length) - 1))];
 }
 
-async function measure(page, serial) {
-  return page.evaluate((n) => globalThis.__m05Run(n), serial);
+async function measure(page, which, serial) {
+  return page.evaluate(({ target, repeats }) => globalThis.__m05Run(target, repeats), { target: which, repeats: serial });
 }
 
 async function main() {
   const baseRoot = arg('--base-root');
   const candidateRoot = arg('--candidate-root');
   invariant(baseRoot && candidateRoot, '--base-root and --candidate-root are required');
-  const baseServer = await serve(baseRoot);
-  const candidateServer = await serve(candidateRoot);
+  const server = await serve(baseRoot, candidateRoot);
   const browser = await chromium.launch({ headless: true });
   try {
     const context = await browser.newContext({ viewport: { width: 390, height: 844 }, deviceScaleFactor: 2 });
-    const base = await context.newPage();
-    const candidate = await context.newPage();
-    await install(base, baseServer.origin);
-    await install(candidate, candidateServer.origin);
+    const page = await context.newPage();
+    await install(page, server.origin);
     const discovery = [];
     let serial = 1;
     for (; serial <= 64; serial *= 2) {
       const probes = [];
-      for (let i = 0; i < 5; i++) probes.push(await measure(base, serial));
+      for (let i = 0; i < 5; i++) probes.push(await measure(page, 'base', serial));
       discovery.push({ serial, probes });
       if (probes.every((value) => value >= SELECTION_FLOOR_MS)) break;
     }
     invariant(serial <= 64, 'no serial repeat count cleared timing floor');
     for (let i = 0; i < WARMUPS; i++) {
-      await measure(base, serial);
-      await measure(candidate, serial);
+      await measure(page, 'base', serial);
+      await measure(page, 'candidate', serial);
     }
     const baseSamples = [];
     const candidateSamples = [];
     for (let i = 0; i < SAMPLES; i++) {
       if (i % 2 === 0) {
-        baseSamples.push(await measure(base, serial));
-        candidateSamples.push(await measure(candidate, serial));
+        baseSamples.push(await measure(page, 'base', serial));
+        candidateSamples.push(await measure(page, 'candidate', serial));
       } else {
-        candidateSamples.push(await measure(candidate, serial));
-        baseSamples.push(await measure(base, serial));
+        candidateSamples.push(await measure(page, 'candidate', serial));
+        baseSamples.push(await measure(page, 'base', serial));
       }
     }
-    const one = await measure(base, serial);
-    const two = await measure(base, serial * 2);
+    const one = await measure(page, 'base', serial);
+    const two = await measure(page, 'base', serial * 2);
     const result = {
       scene: 'direct-manipulation-sheet',
       sheets: SHEETS,
@@ -169,8 +175,7 @@ async function main() {
     process.stdout.write(`${JSON.stringify(result, null, 2)}\n`);
   } finally {
     await browser.close();
-    await baseServer.close();
-    await candidateServer.close();
+    await server.close();
   }
 }
 
