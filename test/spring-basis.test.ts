@@ -8,6 +8,8 @@ import {
 } from '../src/internal/read-spring.js';
 import {
   sampleSpringBasisUnchecked,
+  sampleSpringExactCached,
+  solveSpring,
   type MutableSpringBasis,
 } from '../src/internal/solver.js';
 import { readSpringUnchecked, sampleSpringUnchecked } from '../src/internal/read-spring.js';
@@ -118,6 +120,47 @@ describe('shared analytic spring basis', () => {
     expect(sin).toHaveBeenCalledTimes(1);
     expect(cos).toHaveBeenCalledTimes(1);
     controls.cancel();
+  });
+
+  it('exact cohort cache считает одинаковый physical key один раз', () => {
+    const spring = { mass: 1.125, stiffness: 173, damping: 11 };
+    const t = 0.123456789;
+    const exp = vi.spyOn(Math, 'exp');
+    const sin = vi.spyOn(Math, 'sin');
+    const cos = vi.spyOn(Math, 'cos');
+    try {
+      const first = { ...sampleSpringExactCached(spring, t, 7) };
+      for (let i = 0; i < 127; i++) {
+        const next = sampleSpringExactCached({ ...spring }, t, 7);
+        expect(Object.is(next.value, first.value)).toBe(true);
+        expect(Object.is(next.velocity, first.velocity)).toBe(true);
+      }
+      expect(exp).toHaveBeenCalledTimes(1);
+      expect(sin).toHaveBeenCalledTimes(1);
+      expect(cos).toHaveBeenCalledTimes(1);
+
+      sampleSpringExactCached(spring, t, -7);
+      expect(exp).toHaveBeenCalledTimes(2);
+      expect(sin).toHaveBeenCalledTimes(2);
+      expect(cos).toHaveBeenCalledTimes(2);
+    } finally {
+      exp.mockRestore();
+      sin.mockRestore();
+      cos.mockRestore();
+    }
+  });
+
+  it('exact cohort cache сохраняет binary64 канонического solver', () => {
+    for (const spring of SPRINGS) {
+      for (const t of [1 / 240, 0.017, 0.3, 2]) {
+        for (const v0 of [-100, -3, -0, 0, 2.5, 100]) {
+          const expected = solveSpring(spring, t, v0);
+          const actual = sampleSpringExactCached({ ...spring }, t, v0);
+          expect(Object.is(actual.value, expected.value), `value t=${t} v0=${v0}`).toBe(true);
+          expect(Object.is(actual.velocity, expected.velocity), `velocity t=${t} v0=${v0}`).toBe(true);
+        }
+      }
+    }
   });
 
 });
