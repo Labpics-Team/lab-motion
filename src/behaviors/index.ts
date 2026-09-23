@@ -306,50 +306,37 @@ function _createBase<S extends BehaviorState<number>>(
   // следующим pointerMove (инертность destroy и phase-idle cancel ломались).
   let onAbort: (() => void) | undefined;
 
-  const emit = (next: Partial<S>): void => {
-    if (subs.size === 0) {
-      if (exposed) {
-        state = { ...state, ...next };
-        exposed = false;
-      } else {
-        Object.assign(state, next);
-      }
-      return;
-    }
-
-    state = { ...state, ...next };
+  const notify = (): void => {
     exposed = true;
     for (const fn of subs) {
-      try {
-        fn(state);
-      } catch {
-        // Подписчик не имеет права срывать соседей.
-      }
+      try { fn(state); } catch { /* подписчик не блокирует соседей */ }
     }
+  };
+
+  const emit = (next: Partial<S>): void => {
+    if (subs.size === 0) {
+      if (exposed) state = { ...state, ...next };
+      else Object.assign(state, next);
+      exposed = false;
+      return;
+    }
+    state = { ...state, ...next };
+    notify();
   };
 
   const emitMotion = (value: number, velocity: number): void => {
     if (subs.size === 0) {
-      if (exposed) {
-        state = { ...state, value, velocity };
-        exposed = false;
-      } else {
+      if (exposed) state = { ...state, value, velocity };
+      else {
         const mutable = state as { value: number; velocity: number };
         mutable.value = value;
         mutable.velocity = velocity;
       }
+      exposed = false;
       return;
     }
-
     state = { ...state, value, velocity };
-    exposed = true;
-    for (const fn of subs) {
-      try {
-        fn(state);
-      } catch {
-        // Подписчик не имеет права срывать соседей.
-      }
-    }
+    notify();
   };
 
   return {
