@@ -1,6 +1,8 @@
 name: Research M05 hotpath
 
 on:
+  push:
+    branches: ["research/r11-m05-hotpath-20260923"]
   workflow_dispatch:
 
 permissions:
