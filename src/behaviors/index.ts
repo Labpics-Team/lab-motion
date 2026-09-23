@@ -195,7 +195,6 @@ function _createRunner(
   let running = false;
   let curVal = 0;
   let curVel = 0;
-  const springSample = { value: 0, velocity: 0 };
 
   const schedule = (cb: (ts?: number) => void): void => {
     if (!requestFrame) return; // недостижимо: снап-путь ловит отсутствие шва раньше
@@ -245,9 +244,9 @@ function _createRunner(
         }
         frames++;
 
-        solveSpring(args.spring, elapsed, v0n, springSample);
-        const val = args.from + springSample.value * range;
-        const vel = springSample.velocity * range;
+        const s = solveSpring(args.spring, elapsed, v0n);
+        const val = args.from + s.value * range;
+        const vel = s.velocity * range;
         curVal = _finite(val);
         curVel = _finite(vel);
         const denom = Math.abs(range); // > 0 по построению (range !== 0)
