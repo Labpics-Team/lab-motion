@@ -11,6 +11,7 @@ const FRAME_MS = 16;
 const TERMINAL_MS = 1548;
 const WARMUPS = 4;
 const SAMPLES = 24;
+const SERIAL_REPEATS = 32;
 const SELECTION_FLOOR_MS = 40;
 
 function invariant(condition, message) {
@@ -54,13 +55,18 @@ async function serve(baseRootPath, candidateRootPath) {
   return { origin: `http://127.0.0.1:${address.port}`, close: () => new Promise((ok, bad) => server.close(e => e ? bad(e) : ok())) };
 }
 
-async function install(page, origin) {
+async function install(page, origin, importFirst) {
   await page.goto(origin, { waitUntil: 'load' });
-  await page.evaluate(async ({ urls, sheets, frameMs, terminalMs }) => {
-    const [{ createBottomSheet: createBase }, { createBottomSheet: createCandidate }] = await Promise.all([
-      import(urls.base),
-      import(urls.candidate),
-    ]);
+  await page.evaluate(async ({ importFirst, urls, sheets, frameMs, terminalMs }) => {
+    let createBase;
+    let createCandidate;
+    if (importFirst === 'base') {
+      ({ createBottomSheet: createBase } = await import(urls.base));
+      ({ createBottomSheet: createCandidate } = await import(urls.candidate));
+    } else {
+      ({ createBottomSheet: createCandidate } = await import(urls.candidate));
+      ({ createBottomSheet: createBase } = await import(urls.base));
+    }
     const g = globalThis;
     g.__m05Run = (which, serial = 1) => {
       const createBottomSheet = which === 'base' ? createBase : createCandidate;
@@ -105,7 +111,7 @@ async function install(page, origin) {
       }
       return performance.now() - started;
     };
-  }, { urls: { base: `${origin}/base/dist/behaviors/index.js`, candidate: `${origin}/candidate/dist/behaviors/index.js` }, sheets: SHEETS, frameMs: FRAME_MS, terminalMs: TERMINAL_MS });
+  }, { importFirst, urls: { base: `${origin}/base/dist/behaviors/index.js`, candidate: `${origin}/candidate/dist/behaviors/index.js` }, sheets: SHEETS, frameMs: FRAME_MS, terminalMs: TERMINAL_MS });
 }
 
 function median(values) {
@@ -131,42 +137,62 @@ async function main() {
   const browser = await chromium.launch({ headless: true });
   try {
     const context = await browser.newContext({ viewport: { width: 390, height: 844 }, deviceScaleFactor: 2 });
-    const page = await context.newPage();
-    await install(page, server.origin);
-    const discovery = [];
-    let serial = 1;
-    for (; serial <= 64; serial *= 2) {
-      const probes = [];
-      for (let i = 0; i < 5; i++) probes.push(await measure(page, 'base', serial));
-      discovery.push({ serial, probes });
-      if (probes.every((value) => value >= SELECTION_FLOOR_MS)) break;
-    }
-    invariant(serial <= 64, 'no serial repeat count cleared timing floor');
-    for (let i = 0; i < WARMUPS; i++) {
-      await measure(page, 'base', serial);
-      await measure(page, 'candidate', serial);
-    }
     const baseSamples = [];
     const candidateSamples = [];
-    for (let i = 0; i < SAMPLES; i++) {
-      if (i % 2 === 0) {
-        baseSamples.push(await measure(page, 'base', serial));
-        candidateSamples.push(await measure(page, 'candidate', serial));
-      } else {
-        candidateSamples.push(await measure(page, 'candidate', serial));
-        baseSamples.push(await measure(page, 'base', serial));
+    const perOrder = [];
+    let one = NaN;
+    let two = NaN;
+
+    for (const importFirst of ['base', 'candidate']) {
+      const page = await context.newPage();
+      try {
+        await install(page, server.origin, importFirst);
+        for (let i = 0; i < WARMUPS; i++) {
+          if ((i + (importFirst === 'candidate' ? 1 : 0)) % 2 === 0) {
+            await measure(page, 'base', SERIAL_REPEATS);
+            await measure(page, 'candidate', SERIAL_REPEATS);
+          } else {
+            await measure(page, 'candidate', SERIAL_REPEATS);
+            await measure(page, 'base', SERIAL_REPEATS);
+          }
+        }
+
+        const orderBase = [];
+        const orderCandidate = [];
+        for (let i = 0; i < SAMPLES / 2; i++) {
+          if ((i + (importFirst === 'candidate' ? 1 : 0)) % 2 === 0) {
+            orderBase.push(await measure(page, 'base', SERIAL_REPEATS));
+            orderCandidate.push(await measure(page, 'candidate', SERIAL_REPEATS));
+          } else {
+            orderCandidate.push(await measure(page, 'candidate', SERIAL_REPEATS));
+            orderBase.push(await measure(page, 'base', SERIAL_REPEATS));
+          }
+        }
+        baseSamples.push(...orderBase);
+        candidateSamples.push(...orderCandidate);
+        perOrder.push({
+          importFirst,
+          baseP50: median(orderBase),
+          candidateP50: median(orderCandidate),
+          ratioP50: median(orderCandidate) / median(orderBase),
+        });
+        if (importFirst === 'base') {
+          one = await measure(page, 'base', SERIAL_REPEATS);
+          two = await measure(page, 'base', SERIAL_REPEATS * 2);
+        }
+      } finally {
+        await page.close();
       }
     }
-    const one = await measure(page, 'base', serial);
-    const two = await measure(page, 'base', serial * 2);
+
     const result = {
       scene: 'direct-manipulation-sheet',
       sheets: SHEETS,
-      warmups: WARMUPS,
+      warmupsPerImportOrder: WARMUPS,
       samples: SAMPLES,
       selectionFloorMs: SELECTION_FLOOR_MS,
-      serialRepeats: serial,
-      discovery,
+      serialRepeats: SERIAL_REPEATS,
+      importOrders: perOrder,
       base: { p50: median(baseSamples), p95: quantile(baseSamples, 0.95), raw: baseSamples },
       candidate: { p50: median(candidateSamples), p95: quantile(candidateSamples, 0.95), raw: candidateSamples },
       ratioP50: median(candidateSamples) / median(baseSamples),
