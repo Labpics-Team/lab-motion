@@ -1,0 +1,49 @@
+name: Research M05 hotpath
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+env:
+  COREPACK_ENABLE_DOWNLOAD_PROMPT: "0"
+  COREPACK_DEFAULT_TO_LATEST: "0"
+  BASE_SHA: 2c947007168d4964124db8ce8079bbfabc975687
+
+jobs:
+  measure:
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v6
+        with:
+          node-version: "24"
+      - name: Activate pnpm
+        run: |
+          corepack enable
+          corepack install --global pnpm@11.11.0
+      - name: Install
+        run: pnpm install --frozen-lockfile
+      - name: Install Chromium
+        run: pnpm exec playwright install --with-deps chromium
+      - name: Build candidate and exact base
+        shell: bash
+        run: |
+          set -euo pipefail
+          pnpm build
+          git worktree add --detach "$RUNNER_TEMP/base" "$BASE_SHA"
+          ln -s "$GITHUB_WORKSPACE/node_modules" "$RUNNER_TEMP/base/node_modules"
+          pnpm --dir "$RUNNER_TEMP/base" build
+      - name: Measure frozen sheet scene
+        run: node bench/research/behaviors-hotpath.mjs --base-root "$RUNNER_TEMP/base" --candidate-root "$GITHUB_WORKSPACE" | tee m05-hotpath.json
+      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
+        with:
+          name: m05-hotpath-${{ github.sha }}-${{ github.run_id }}
+          path: m05-hotpath.json
+          if-no-files-found: error
+          retention-days: 14
