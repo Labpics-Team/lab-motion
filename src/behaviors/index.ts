@@ -207,18 +207,20 @@ function _createRunner(
     settle(args: _SettleArgs): void {
       gen++;
       const my = gen;
+      const { from, velocity, target, spring, onStep, onDone } = args;
+      const range = target - from;
+      const denom = Math.abs(range);
       running = true;
-      curVal = _finite(args.from);
-      curVel = _finite(args.velocity);
-      const range = args.target - args.from;
+      curVal = _finite(from);
+      curVel = _finite(velocity);
 
       const finishNow = (): void => {
         if (my !== gen) return;
         running = false;
-        curVal = _finite(args.target);
+        curVal = _finite(target);
         curVel = 0;
-        args.onStep(curVal, 0);
-        args.onDone();
+        onStep(curVal, 0);
+        onDone();
       };
 
       // B4: reduced-motion / вырожденный диапазон / нет кадрового шва → снап.
@@ -230,7 +232,7 @@ function _createRunner(
       // C¹-стык: нормируем унаследованную скорость на диапазон (тот же приём,
       // что smooth-pickup MotionValue и snapBack gestures) — знак «к цели» и
       // непрерывность производной на границе follow|release получаются даром.
-      const v0n = args.velocity / range;
+      const v0n = velocity / range;
       let elapsed = 0;
       let lastTs: number | undefined;
       let frames = 0;
@@ -245,24 +247,22 @@ function _createRunner(
         }
         frames++;
 
-        solveSpring(args.spring, elapsed, v0n, _springSample);
-        const val = args.from + _springSample.value * range;
+        solveSpring(spring, elapsed, v0n, _springSample);
+        const val = from + _springSample.value * range;
         const vel = _springSample.velocity * range;
-        curVal = _finite(val);
-        curVel = _finite(vel);
-        const denom = Math.abs(range); // > 0 по построению (range !== 0)
-
         if (
           !Number.isFinite(val) ||
           !Number.isFinite(vel) ||
-          (Math.abs(val - args.target) / denom < CONVERGENCE_THRESHOLD &&
+          (Math.abs(val - target) / denom < CONVERGENCE_THRESHOLD &&
             Math.abs(vel) / denom < CONVERGENCE_THRESHOLD) ||
           frames >= MAX_FRAMES
         ) {
           finishNow();
           return;
         }
-        args.onStep(curVal, curVel);
+        curVal = val + 0;
+        curVel = vel + 0;
+        onStep(curVal, curVel);
         schedule(tick);
       };
 
@@ -307,19 +307,7 @@ function _createBase<S extends BehaviorState<number>>(
   // следующим pointerMove (инертность destroy и phase-idle cancel ломались).
   let onAbort: (() => void) | undefined;
 
-  const emit = (next: Partial<S>): void => {
-    if (subs.size === 0) {
-      if (exposed) {
-        state = { ...state, ...next };
-        exposed = false;
-      } else {
-        Object.assign(state, next);
-      }
-      return;
-    }
-
-    state = { ...state, ...next };
-    exposed = true;
+  const notify = (): void => {
     for (const fn of subs) {
       try {
         fn(state);
@@ -329,28 +317,28 @@ function _createBase<S extends BehaviorState<number>>(
     }
   };
 
-  const emitMotion = (value: number, velocity: number): void => {
-    if (subs.size === 0) {
-      if (exposed) {
-        state = { ...state, value, velocity };
-        exposed = false;
-      } else {
-        const mutable = state as { value: number; velocity: number };
-        mutable.value = value;
-        mutable.velocity = velocity;
-      }
-      return;
+  const emit = (next: Partial<S>): void => {
+    const observed = subs.size !== 0;
+    if (observed || exposed) {
+      state = { ...state, ...next };
+      exposed = observed;
+    } else {
+      Object.assign(state, next);
     }
+    if (observed) notify();
+  };
 
-    state = { ...state, value, velocity };
-    exposed = true;
-    for (const fn of subs) {
-      try {
-        fn(state);
-      } catch {
-        // Подписчик не имеет права срывать соседей.
-      }
+  const emitMotion = (value: number, velocity: number): void => {
+    const observed = subs.size !== 0;
+    if (observed || exposed) {
+      state = { ...state, value, velocity };
+      exposed = observed;
+    } else {
+      const mutable = state as { value: number; velocity: number };
+      mutable.value = value;
+      mutable.velocity = velocity;
     }
+    if (observed) notify();
   };
 
   return {
