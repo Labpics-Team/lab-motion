@@ -8,7 +8,7 @@
  */
 
 import { describe, expect, it, vi } from 'vitest';
-import { createBottomSheet } from '../src/behaviors/index.js';
+import { createBottomSheet, type SheetState } from '../src/behaviors/index.js';
 import { makeClock, reduceMedia, pt, flickY } from './behaviors-helpers.js';
 
 const SNAPS = [0, 300, 600];
@@ -83,6 +83,44 @@ describe('./behaviors bottom sheet — программный переход', (
     clock.drain(16);
     expect(sheet.state.value).toBeCloseTo(600, 3);
     expect(sheet.state.snapIndex).toBe(2);
+  });
+});
+
+describe('./behaviors bottom sheet — state остаётся настоящим snapshot', () => {
+  it('удержанный state не мутирует следующими автономными кадрами', () => {
+    const clock = makeClock();
+    const sheet = createBottomSheet({ snapPoints: SNAPS, requestFrame: clock.requestFrame });
+    sheet.snapTo(2);
+
+    const release = sheet.state;
+    const releaseCopy = { ...release };
+    clock.step(16);
+
+    expect(release).toEqual(releaseCopy);
+    const firstFrame = sheet.state;
+    const firstFrameCopy = { ...firstFrame };
+    expect(firstFrame).not.toBe(release);
+
+    clock.step(16);
+    expect(firstFrame).toEqual(firstFrameCopy);
+    expect(sheet.state).not.toBe(firstFrame);
+  });
+
+  it('subscriber получает отдельные удерживаемые snapshots на каждом emit', () => {
+    const clock = makeClock();
+    const sheet = createBottomSheet({ snapPoints: SNAPS, requestFrame: clock.requestFrame });
+    const seen: SheetState[] = [];
+    sheet.subscribe((state) => seen.push(state));
+
+    sheet.snapTo(2);
+    clock.step(16);
+    expect(seen.length).toBeGreaterThanOrEqual(2);
+    const first = seen[0]!;
+    const firstCopy = { ...first };
+
+    clock.step(16);
+    expect(first).toEqual(firstCopy);
+    expect(seen[1]).not.toBe(first);
   });
 });
 
