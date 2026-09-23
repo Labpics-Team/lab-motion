@@ -31,8 +31,10 @@ jobs:
           corepack install --global pnpm@11.11.0
       - name: Install
         run: pnpm install --frozen-lockfile
+      - name: Install research benchmark dependencies
+        run: pnpm --dir bench/compare install --frozen-lockfile
       - name: Install Chromium
-        run: pnpm exec playwright install --with-deps chromium
+        run: pnpm --dir bench/compare exec playwright install --with-deps chromium
       - name: Build candidate and exact base
         shell: bash
         run: |
