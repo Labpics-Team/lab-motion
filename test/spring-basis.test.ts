@@ -8,7 +8,6 @@ import {
 } from '../src/internal/read-spring.js';
 import {
   sampleSpringBasisUnchecked,
-  sampleSpringExactCached,
   solveSpring,
   type MutableSpringBasis,
 } from '../src/internal/solver.js';
@@ -131,10 +130,11 @@ describe('shared analytic spring basis', () => {
     const sin = vi.spyOn(Math, 'sin');
     const cos = vi.spyOn(Math, 'cos');
     try {
-      let actual = sampleSpringExactCached(spring, t, v0);
+      const actual = { value: 0, velocity: 0 };
+      solveSpring(spring, t, v0, actual);
       expect(actual.value).toBe(expected.value);
       expect(actual.velocity).toBe(expected.velocity);
-      for (let i = 1; i < 128; i++) actual = sampleSpringExactCached({ ...spring }, t, v0);
+      for (let i = 1; i < 128; i++) solveSpring({ ...spring }, t, v0, actual);
       expect(actual.value).toBe(expected.value);
       expect(actual.velocity).toBe(expected.velocity);
       expect(exp).toHaveBeenCalledTimes(1);
@@ -160,8 +160,10 @@ describe('shared analytic spring basis', () => {
     expect(reads).toEqual(['mass', 'stiffness', 'damping']);
     reads.length = 0;
 
-    const first = sampleSpringExactCached(spring, t, v0);
-    const second = sampleSpringExactCached(spring, t, v0);
+    const first = { value: 0, velocity: 0 };
+    const second = { value: 0, velocity: 0 };
+    solveSpring(spring, t, v0, first);
+    solveSpring(spring, t, v0, second);
     expect(first.value).toBe(expected.value);
     expect(first.velocity).toBe(expected.velocity);
     expect(second.value).toBe(expected.value);

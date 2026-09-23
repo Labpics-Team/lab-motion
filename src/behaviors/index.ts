@@ -70,7 +70,7 @@
 import { createVelocityTracker } from '../gestures/index.js';
 import { projectDefaultDecayRest } from '../decay.js';
 import { MotionParamError } from '../errors.js';
-import { sampleSpringExactCached } from '../internal/solver.js';
+import { solveSpring } from '../internal/solver.js';
 import { CONVERGENCE_THRESHOLD, FIXED_DT_S, MAX_FRAMES } from '../internal/constants.js';
 import type { MatchMediaLike } from '../internal/media-query.js';
 import { validateSpringForFrameLoop, type SpringParams } from '../spring.js';
@@ -151,6 +151,7 @@ function _clampFactor(raw: number | undefined, dflt: number): number {
 const DEFAULT_RUBBER_BAND = 0.5;
 /** Половина окна трекера — засев прайора скорости при перехвате (канон gestures). */
 const PICKUP_SEED_DT_S = 0.05;
+const _springSample = { value: 0, velocity: 0 };
 
 // ─── Единый runner (B1): один clock, доводка value→target пружиной ───────────
 
@@ -244,9 +245,9 @@ function _createRunner(
         }
         frames++;
 
-        const s = sampleSpringExactCached(args.spring, elapsed, v0n);
-        const val = args.from + s.value * range;
-        const vel = s.velocity * range;
+        solveSpring(args.spring, elapsed, v0n, _springSample);
+        const val = args.from + _springSample.value * range;
+        const vel = _springSample.velocity * range;
         curVal = _finite(val);
         curVel = _finite(vel);
         const denom = Math.abs(range); // > 0 по построению (range !== 0)

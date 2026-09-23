@@ -20,6 +20,14 @@ export interface MutableSpringBasis {
   _velocityV0: number;
 }
 
+let cachedMass = NaN;
+let cachedStiffness = NaN;
+let cachedDamping = NaN;
+let cachedTime = NaN;
+let cachedV0 = NaN;
+let cachedValue = 0;
+let cachedVelocity = 0;
+
 export function solveSpring(
   params: SpringParams,
   t: number,
@@ -28,6 +36,15 @@ export function solveSpring(
   basis?: MutableSpringBasis,
 ): { value: number; velocity: number } {
   const { mass: m, stiffness: k, damping: c } = params;
+  if (
+    basis === undefined && out !== undefined &&
+    Object.is(m, cachedMass) && Object.is(k, cachedStiffness) &&
+    Object.is(c, cachedDamping) && Object.is(t, cachedTime) && Object.is(v0, cachedV0)
+  ) {
+    out.value = cachedValue;
+    out.velocity = cachedVelocity;
+    return out;
+  }
   let value: number;
   let velocity: number;
   if (t <= 0) {
@@ -104,47 +121,19 @@ export function solveSpring(
     basis._velocity = t <= 0 ? -0 : velocity;
   }
 
+  if (basis === undefined && out !== undefined) {
+    cachedMass = m;
+    cachedStiffness = k;
+    cachedDamping = c;
+    cachedTime = t;
+    cachedV0 = v0;
+    cachedValue = value;
+    cachedVelocity = velocity;
+  }
   if (!out) return { value, velocity };
   out.value = value;
   out.velocity = velocity;
   return out;
-}
-
-const exactSample = { value: 0, velocity: 0 };
-const exactParams = { mass: NaN, stiffness: NaN, damping: NaN };
-let exactTime = NaN;
-let exactV0 = NaN;
-
-/**
- * Заимствованный exact-result синхронной когорты с одинаковыми физикой, t и v0.
- * Поля входной пружины читаются один раз и в прежнем порядке на КАЖДОМ вызове:
- * getter/изменяемый объект не превращается в скрытый immutable-key. На miss
- * канонический solver получает снятые скаляры через внутренний plain snapshot;
- * на hit повторные exp/sin/cos не выполняются.
- */
-export function sampleSpringExactCached(
-  params: SpringParams,
-  t: number,
-  v0: number,
-): Readonly<{ value: number; velocity: number }> {
-  const mass = params.mass;
-  const stiffness = params.stiffness;
-  const damping = params.damping;
-  if (
-    mass !== exactParams.mass ||
-    stiffness !== exactParams.stiffness ||
-    damping !== exactParams.damping ||
-    t !== exactTime ||
-    !Object.is(v0, exactV0)
-  ) {
-    exactParams.mass = mass;
-    exactParams.stiffness = stiffness;
-    exactParams.damping = damping;
-    exactTime = t;
-    exactV0 = v0;
-    solveSpring(exactParams, t, v0, exactSample);
-  }
-  return exactSample;
 }
 
 const basisSample = { value: 0, velocity: 0 };
