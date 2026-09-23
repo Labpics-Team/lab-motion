@@ -9,8 +9,9 @@ const MIME = Object.freeze({ '.js': 'text/javascript; charset=utf-8' });
 const SHEETS = 128;
 const FRAME_MS = 16;
 const TERMINAL_MS = 1548;
-const WARMUPS = 8;
+const WARMUPS = 4;
 const SAMPLES = 24;
+const SELECTION_FLOOR_MS = 40;
 
 function invariant(condition, message) {
   if (!condition) throw new Error(`M05 research: ${message}`);
@@ -126,28 +127,40 @@ async function main() {
     const candidate = await context.newPage();
     await install(base, baseServer.origin);
     await install(candidate, candidateServer.origin);
+    const discovery = [];
+    let serial = 1;
+    for (; serial <= 64; serial *= 2) {
+      const probes = [];
+      for (let i = 0; i < 5; i++) probes.push(await measure(base, serial));
+      discovery.push({ serial, probes });
+      if (probes.every((value) => value >= SELECTION_FLOOR_MS)) break;
+    }
+    invariant(serial <= 64, 'no serial repeat count cleared timing floor');
     for (let i = 0; i < WARMUPS; i++) {
-      await measure(base, 1);
-      await measure(candidate, 1);
+      await measure(base, serial);
+      await measure(candidate, serial);
     }
     const baseSamples = [];
     const candidateSamples = [];
     for (let i = 0; i < SAMPLES; i++) {
       if (i % 2 === 0) {
-        baseSamples.push(await measure(base, 1));
-        candidateSamples.push(await measure(candidate, 1));
+        baseSamples.push(await measure(base, serial));
+        candidateSamples.push(await measure(candidate, serial));
       } else {
-        candidateSamples.push(await measure(candidate, 1));
-        baseSamples.push(await measure(base, 1));
+        candidateSamples.push(await measure(candidate, serial));
+        baseSamples.push(await measure(base, serial));
       }
     }
-    const one = await measure(base, 1);
-    const two = await measure(base, 2);
+    const one = await measure(base, serial);
+    const two = await measure(base, serial * 2);
     const result = {
       scene: 'direct-manipulation-sheet',
       sheets: SHEETS,
       warmups: WARMUPS,
       samples: SAMPLES,
+      selectionFloorMs: SELECTION_FLOOR_MS,
+      serialRepeats: serial,
+      discovery,
       base: { p50: median(baseSamples), p95: quantile(baseSamples, 0.95), raw: baseSamples },
       candidate: { p50: median(candidateSamples), p95: quantile(candidateSamples, 0.95), raw: candidateSamples },
       ratioP50: median(candidateSamples) / median(baseSamples),
