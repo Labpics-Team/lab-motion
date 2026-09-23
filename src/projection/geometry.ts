@@ -422,6 +422,13 @@ export function createProjector(nodes: readonly ProjectionNodeInit[]): Projector
     const a = parentIdx[i];
     liveAncestor[i] = a === null ? null : degenerate[a] ? liveAncestor[a] : a;
   }
+  // DFS-state больше не нужен: переиспользуем тот же байт на узел как флаг,
+  // что его visual position реально понадобится живому потомку.
+  state.fill(0);
+  for (const i of orderIdx) {
+    const a = liveAncestor[i];
+    if (a !== null) state[a] = 1;
+  }
 
   // Переиспользуемые кадры (мутируются между вызовами at) + скретчи резолва.
   // Degenerate-кадр не зависит от p — заполняется ЦЕЛИКОМ один раз здесь
@@ -474,30 +481,35 @@ export function createProjector(nodes: readonly ProjectionNodeInit[]): Projector
       if (degenerate[i]) continue;
       const node = nodes[i];
       const frame = frames[oi];
-      mixInto(node.first, node.last, t, v);
-
       const a = liveAncestor[i];
-      if (a === null) {
-        if (anchorIsLast[i]) {
-          rootFlipInto(node.first, node.last, t, frame);
-          // k корня = V.size ⊘ B.size = эмитированный s (k_A = 1) — бит-консистентно
-          // с фактически применённым масштабом.
-          kx[i] = frame.sx;
-          ky[i] = frame.sy;
-        } else {
+
+      if (a === null && anchorIsLast[i]) {
+        rootFlipInto(node.first, node.last, t, frame);
+        // Обычный leaf-root не нуждается во втором mixInto: его visual position
+        // никто не читает. Для корня-предка сохраняем прежнюю bit-exact форму v.
+        kx[i] = frame.sx;
+        ky[i] = frame.sy;
+        if (state[i] !== 0) {
+          mixInto(node.first, node.last, t, v);
+          vx[i] = v.x;
+          vy[i] = v.y;
+        }
+      } else {
+        mixInto(node.first, node.last, t, v);
+        if (a === null) {
           rootAnchorInto(v, anchors[i], frame);
           kx[i] = frame.sx;
           ky[i] = frame.sy;
+        } else {
+          childInto(v, anchors[i], vx[a], vy[a], anchors[a], kx[a], ky[a], frame);
+          const kxi = finiteDiv(v.width, anchors[i].width, 1);
+          const kyi = finiteDiv(v.height, anchors[i].height, 1);
+          kx[i] = kxi < 0 ? 0 : kxi; // floor ≥ 0 — питает correctRadius и детей
+          ky[i] = kyi < 0 ? 0 : kyi;
         }
-      } else {
-        childInto(v, anchors[i], vx[a], vy[a], anchors[a], kx[a], ky[a], frame);
-        const kxi = finiteDiv(v.width, anchors[i].width, 1);
-        const kyi = finiteDiv(v.height, anchors[i].height, 1);
-        kx[i] = kxi < 0 ? 0 : kxi; // floor ≥ 0 — питает correctRadius и детей
-        ky[i] = kyi < 0 ? 0 : kyi;
+        vx[i] = v.x;
+        vy[i] = v.y;
       }
-      vx[i] = v.x;
-      vy[i] = v.y;
       frame.kx = kx[i];
       frame.ky = ky[i];
 

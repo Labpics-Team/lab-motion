@@ -55,7 +55,7 @@
 
 import { MotionParamError } from '../errors.js';
 import type { FlipRect } from '../flip/index.js';
-import { solveSpring } from '../internal/solver.js';
+import { sampleSpringExactCached } from '../internal/solver.js';
 import type { RequestFrameFn } from '../motion-value.js';
 import { type SpringParams, validateSpringForFrameLoop } from '../spring.js';
 import {
@@ -246,10 +246,6 @@ export function createProjection(options?: ProjectionOptions): ProjectionControl
   let progress = 1;
   /** Инвалидация кадров перехваченного полёта (класс stale-frame, flip :217-218). */
   let generation = 0;
-  /** Переиспользуемый выход солвера (ноль аллокаций на кадр). */
-  const solved = { value: 0, velocity: 0 };
-
-
   // Один controller владеет максимум одной физической frame-reservation.
   // Повторный play/cancel/seek меняет только логический callback внутри неё:
   // stale generation не оставляет второй rAF висеть рядом с новым полётом.
@@ -384,7 +380,7 @@ export function createProjection(options?: ProjectionOptions): ProjectionControl
 
       // Солвер отдаёт сырые числа — политика стражей на стороне вызывающего
       // (докблок solver.ts); зеркалим clampFinite-политику spring.ts.
-      solveSpring(params, elapsed, v0, solved);
+      const solved = sampleSpringExactCached(params, elapsed, v0);
       const value = finite(solved.value);
       const velocity = finite(solved.velocity);
       const converged =

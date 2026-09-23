@@ -86,6 +86,44 @@ describe('./behaviors bottom sheet — программный переход', (
   });
 });
 
+describe('./behaviors bottom sheet — state остаётся настоящим snapshot', () => {
+  it('удержанный state не мутирует следующими автономными кадрами', () => {
+    const clock = makeClock();
+    const sheet = createBottomSheet({ snapPoints: SNAPS, requestFrame: clock.requestFrame });
+    sheet.snapTo(2);
+
+    const release = sheet.state;
+    const releaseCopy = { ...release };
+    clock.step(16);
+
+    expect(release).toEqual(releaseCopy);
+    const firstFrame = sheet.state;
+    const firstFrameCopy = { ...firstFrame };
+    expect(firstFrame).not.toBe(release);
+
+    clock.step(16);
+    expect(firstFrame).toEqual(firstFrameCopy);
+    expect(sheet.state).not.toBe(firstFrame);
+  });
+
+  it('subscriber получает отдельные удерживаемые snapshots на каждом emit', () => {
+    const clock = makeClock();
+    const sheet = createBottomSheet({ snapPoints: SNAPS, requestFrame: clock.requestFrame });
+    const seen: Array<{ readonly value: number; readonly velocity: number; readonly phase: string }> = [];
+    sheet.subscribe((state) => seen.push(state));
+
+    sheet.snapTo(2);
+    clock.step(16);
+    expect(seen.length).toBeGreaterThanOrEqual(2);
+    const first = seen[0]!;
+    const firstCopy = { ...first };
+
+    clock.step(16);
+    expect(first).toEqual(firstCopy);
+    expect(seen[1]).not.toBe(first);
+  });
+});
+
 describe('./behaviors bottom sheet — прерывание pointer-down во время settle (мутант #3)', () => {
   it('pointer-down в фазе release гасит доводку, НЕ плодит второй clock', () => {
     const clock = makeClock();

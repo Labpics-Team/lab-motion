@@ -70,7 +70,7 @@
 import { createVelocityTracker } from '../gestures/index.js';
 import { projectDefaultDecayRest } from '../decay.js';
 import { MotionParamError } from '../errors.js';
-import { solveSpring } from '../internal/solver.js';
+import { sampleSpringExactCached } from '../internal/solver.js';
 import { CONVERGENCE_THRESHOLD, FIXED_DT_S, MAX_FRAMES } from '../internal/constants.js';
 import type { MatchMediaLike } from '../internal/media-query.js';
 import { validateSpringForFrameLoop, type SpringParams } from '../spring.js';
@@ -244,7 +244,7 @@ function _createRunner(
         }
         frames++;
 
-        const s = solveSpring(args.spring, elapsed, v0n);
+        const s = sampleSpringExactCached(args.spring, elapsed, v0n);
         const val = args.from + s.value * range;
         const vel = s.velocity * range;
         curVal = _finite(val);
@@ -298,6 +298,7 @@ function _createBase<S extends BehaviorState<number>>(
   const tracker = createVelocityTracker();
   const subs = new Set<(s: S) => void>();
   let state = initial;
+  let exposed = false;
   let destroyed = false;
   // Хук прерывания активного жеста: cancel()/destroy() живут на базе и не видят
   // контроллер-локального `dragging`, поэтому контроллер регистрирует сброс —
@@ -305,15 +306,37 @@ function _createBase<S extends BehaviorState<number>>(
   // следующим pointerMove (инертность destroy и phase-idle cancel ломались).
   let onAbort: (() => void) | undefined;
 
-  const emit = (next: Partial<S>): void => {
-    state = { ...state, ...next };
+  const notify = (): void => {
+    exposed = true;
     for (const fn of subs) {
-      try {
-        fn(state);
-      } catch {
-        // Подписчик не имеет права срывать соседей.
-      }
+      try { fn(state); } catch { /* подписчик не блокирует соседей */ }
     }
+  };
+
+  const emit = (next: Partial<S>): void => {
+    if (subs.size === 0) {
+      if (exposed) state = { ...state, ...next };
+      else Object.assign(state, next);
+      exposed = false;
+      return;
+    }
+    state = { ...state, ...next };
+    notify();
+  };
+
+  const emitMotion = (value: number, velocity: number): void => {
+    if (subs.size === 0) {
+      if (exposed) state = { ...state, value, velocity };
+      else {
+        const mutable = state as { value: number; velocity: number };
+        mutable.value = value;
+        mutable.velocity = velocity;
+      }
+      exposed = false;
+      return;
+    }
+    state = { ...state, value, velocity };
+    notify();
   };
 
   return {
@@ -321,12 +344,14 @@ function _createBase<S extends BehaviorState<number>>(
     runner,
     tracker,
     get state(): S {
+      exposed = true;
       return state;
     },
     get destroyed(): boolean {
       return destroyed;
     },
     emit,
+    emitMotion,
     /** Контроллер регистрирует сброс своего `dragging`, вызываемый из cancel/destroy. */
     setAbort(fn: () => void): void {
       onAbort = fn;
@@ -491,7 +516,7 @@ export function createBottomSheet(options: SheetOptions): SheetController {
       velocity,
       target,
       spring: springParams,
-      onStep: (v, vel) => base.emit({ value: v, velocity: vel }),
+      onStep: (v, vel) => base.emitMotion(v, vel),
       onDone: () => base.emit({ value: target, velocity: 0, phase: 'settle', snapIndex: index }),
     });
   };
@@ -637,7 +662,7 @@ export function createDragDismiss(options: DismissOptions): DismissController {
       velocity,
       target: 0,
       spring: springParams,
-      onStep: (v, vel) => base.emit({ value: v, velocity: vel }),
+      onStep: (v, vel) => base.emitMotion(v, vel),
       onDone: () => base.emit({ value: 0, velocity: 0, phase: 'settle' }),
     });
   };
@@ -649,7 +674,7 @@ export function createDragDismiss(options: DismissOptions): DismissController {
       velocity,
       target: dismissTarget,
       spring: springParams,
-      onStep: (v, vel) => base.emit({ value: v, velocity: vel }),
+      onStep: (v, vel) => base.emitMotion(v, vel),
       onDone: () => {
         base.emit({ value: dismissTarget, velocity: 0, phase: 'settle', dismissed: true });
         options.onDismiss?.();
@@ -971,7 +996,7 @@ export function createPullToRefresh(options: PullOptions): PullController {
       velocity,
       target,
       spring: springParams,
-      onStep: (v, vel) => base.emit({ value: v, velocity: vel }),
+      onStep: (v, vel) => base.emitMotion(v, vel),
       onDone,
     });
   };

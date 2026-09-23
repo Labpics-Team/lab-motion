@@ -247,6 +247,30 @@ describe('projection/geometry: статичный ребёнок ≡ counterScal
   });
 });
 
+// ─── Независимые root-листья: fast-path обязан быть тем же projectAt ─────────
+
+describe('projection/geometry: независимые root-листья сохраняют exact transform', () => {
+  const nodes = [
+    { id: 'a', first: { x: 0, y: 10, width: 100, height: 60 }, last: { x: 120, y: 30, width: 80, height: 90 } },
+    { id: 'b', first: { x: -40, y: 0, width: 50, height: 50 }, last: { x: 20, y: -20, width: 75, height: 25 } },
+  ] as const;
+
+  it('совпадает с independent projectAt на normal и overshoot p', () => {
+    const projector = createProjector(nodes);
+    for (const p of [-0.2, 0, 0.25, 0.75, 1, 1.15]) {
+      const frames = projector.at(p);
+      for (let i = 0; i < nodes.length; i++) {
+        const expected = projectAt(nodes[i], null, p);
+        const actual = frames[i];
+        expect(actual.tx, `tx ${nodes[i].id}@${p}`).toBe(expected.tx);
+        expect(actual.ty, `ty ${nodes[i].id}@${p}`).toBe(expected.ty);
+        expect(actual.sx, `sx ${nodes[i].id}@${p}`).toBe(expected.sx);
+        expect(actual.sy, `sy ${nodes[i].id}@${p}`).toBe(expected.sy);
+      }
+    }
+  });
+});
+
 // ─── Цепочка глубины 4: индукция схлопывается, рендер ≤ 1e-12 ────────────────
 
 describe('projection/geometry: цепочка глубины 4 (createProjector, рендер-проверка)', () => {

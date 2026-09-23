@@ -110,6 +110,42 @@ export function solveSpring(
   return out;
 }
 
+const exactSample = { value: 0, velocity: 0 };
+let exactMass = NaN;
+let exactStiffness = NaN;
+let exactDamping = NaN;
+let exactTime = NaN;
+let exactV0 = NaN;
+
+/**
+ * Заимствованный exact-result для синхронной когорты с одинаковыми
+ * `(mass, stiffness, damping, t, v0)`. Первый вызов выполняет канонический
+ * solveSpring, следующие возвращают те же два binary64 без повторных exp/sin/cos.
+ * Результат потребляется до любой host/user callback: следующий вызов его перезапишет.
+ */
+export function sampleSpringExactCached(
+  params: SpringParams,
+  t: number,
+  v0: number,
+): Readonly<{ value: number; velocity: number }> {
+  const { mass, stiffness, damping } = params;
+  if (
+    mass !== exactMass ||
+    stiffness !== exactStiffness ||
+    damping !== exactDamping ||
+    t !== exactTime ||
+    !Object.is(v0, exactV0)
+  ) {
+    solveSpring(params, t, v0, exactSample);
+    exactMass = mass;
+    exactStiffness = stiffness;
+    exactDamping = damping;
+    exactTime = t;
+    exactV0 = v0;
+  }
+  return exactSample;
+}
+
 const basisSample = { value: 0, velocity: 0 };
 
 /**
