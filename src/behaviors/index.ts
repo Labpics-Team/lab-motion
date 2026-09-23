@@ -152,6 +152,26 @@ const DEFAULT_RUBBER_BAND = 0.5;
 /** Половина окна трекера — засев прайора скорости при перехвате (канон gestures). */
 const PICKUP_SEED_DT_S = 0.05;
 const _springSample = { value: 0, velocity: 0 };
+const _springParams = { mass: NaN, stiffness: NaN, damping: NaN };
+let _springTime = NaN;
+let _springV0 = NaN;
+
+function _sampleSpring(params: SpringParams, t: number, v0: number): void {
+  const mass = params.mass;
+  const stiffness = params.stiffness;
+  const damping = params.damping;
+  if (
+    mass !== _springParams.mass || stiffness !== _springParams.stiffness ||
+    damping !== _springParams.damping || t !== _springTime || !Object.is(v0, _springV0)
+  ) {
+    _springParams.mass = mass;
+    _springParams.stiffness = stiffness;
+    _springParams.damping = damping;
+    _springTime = t;
+    _springV0 = v0;
+    solveSpring(_springParams, t, v0, _springSample);
+  }
+}
 
 // ─── Единый runner (B1): один clock, доводка value→target пружиной ───────────
 
@@ -247,7 +267,7 @@ function _createRunner(
         }
         frames++;
 
-        solveSpring(spring, elapsed, v0n, _springSample);
+        _sampleSpring(spring, elapsed, v0n);
         const val = from + _springSample.value * range;
         const vel = _springSample.velocity * range;
         if (
@@ -476,7 +496,9 @@ function _pickSnap(snaps: readonly number[], value: number, velocity: number): n
  * @throws {MotionParamError} при пустом snapPoints или невалидной пружине.
  */
 export function createBottomSheet(options: SheetOptions): SheetController {
-  const snaps = [...options.snapPoints].map(_finite).sort((a, b) => a - b);
+  const snaps = [...options.snapPoints];
+  for (let i = 0; i < snaps.length; i++) snaps[i] = _finite(snaps[i]!);
+  snaps.sort((a, b) => a - b);
   if (snaps.length === 0) {
     // Дешёвый детерминированный fail-fast (класс MotionParamError ядра).
     throw new MotionParamError('LM003');
@@ -489,7 +511,7 @@ export function createBottomSheet(options: SheetOptions): SheetController {
   const maxSnap = snaps[snaps.length - 1]!;
 
   const start = _finite(options.initial ?? minSnap);
-  const startIndex = _pickSnap(snaps, start, 0);
+  const startIndex = options.initial === undefined ? 0 : _pickSnap(snaps, start, 0);
   const base = _createBase<SheetState>(
     { value: start, velocity: 0, phase: 'idle', snapIndex: startIndex },
     options.requestFrame,

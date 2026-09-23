@@ -86,6 +86,34 @@ describe('./behaviors bottom sheet — программный переход', (
   });
 });
 
+describe('./behaviors bottom sheet — синхронная spring-когорта', () => {
+  it('два controller читают SpringParams каждый, но считают transcendental solve один раз', () => {
+    const clock = makeClock();
+    const reads = { mass: 0, stiffness: 0, damping: 0 };
+    const spring = {
+      get mass(): number { reads.mass++; return 1; },
+      get stiffness(): number { reads.stiffness++; return 170; },
+      get damping(): number { reads.damping++; return 10; },
+    };
+    const a = createBottomSheet({ snapPoints: SNAPS, spring, requestFrame: clock.requestFrame });
+    const b = createBottomSheet({ snapPoints: SNAPS, spring, requestFrame: clock.requestFrame });
+    a.snapTo(2);
+    b.snapTo(2);
+    clock.step(16); // t=0
+
+    reads.mass = reads.stiffness = reads.damping = 0;
+    const exp = vi.spyOn(Math, 'exp');
+    const sin = vi.spyOn(Math, 'sin');
+    const cos = vi.spyOn(Math, 'cos');
+    clock.step(32);
+
+    expect(reads).toEqual({ mass: 2, stiffness: 2, damping: 2 });
+    expect(exp).toHaveBeenCalledTimes(1);
+    expect(sin).toHaveBeenCalledTimes(1);
+    expect(cos).toHaveBeenCalledTimes(1);
+  });
+});
+
 describe('./behaviors bottom sheet — state остаётся настоящим snapshot', () => {
   it('удержанный state не мутирует следующими автономными кадрами', () => {
     const clock = makeClock();
