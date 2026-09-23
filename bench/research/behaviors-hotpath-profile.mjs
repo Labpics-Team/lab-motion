@@ -106,6 +106,7 @@ function cpuRows(profile) {
         function: frame.functionName || '(anonymous)',
         url: frame.url || '',
         line: (frame.lineNumber ?? -1) + 1,
+        column: (frame.columnNumber ?? -1) + 1,
         samples,
         share: samples / total,
       };
@@ -121,7 +122,7 @@ function allocationRows(profile) {
     const frame = node.callFrame ?? {};
     if ((node.selfSize ?? 0) > 0 && String(frame.url ?? '').includes('/dist/')) {
       const key = `${frame.functionName || '(anonymous)'}\u0000${frame.url}\u0000${(frame.lineNumber ?? -1) + 1}`;
-      const prior = rows.get(key) ?? { function: frame.functionName || '(anonymous)', url: frame.url || '', line: (frame.lineNumber ?? -1) + 1, sampledBytes: 0 };
+      const prior = rows.get(key) ?? { function: frame.functionName || '(anonymous)', url: frame.url || '', line: (frame.lineNumber ?? -1) + 1, column: (frame.columnNumber ?? -1) + 1, sampledBytes: 0 };
       prior.sampledBytes += node.selfSize;
       rows.set(key, prior);
     }

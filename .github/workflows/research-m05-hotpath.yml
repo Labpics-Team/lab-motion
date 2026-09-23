@@ -65,5 +65,6 @@ jobs:
             m05-hotpath.json
             m05-profile.json
             m05-profile-candidate.json
+            dist/behaviors/index.js
           if-no-files-found: error
           retention-days: 14
