@@ -206,18 +206,20 @@ function _createRunner(
     settle(args: _SettleArgs): void {
       gen++;
       const my = gen;
+      const { from, velocity, target, spring, onStep, onDone } = args;
+      const range = target - from;
+      const denom = Math.abs(range);
       running = true;
-      curVal = _finite(args.from);
-      curVel = _finite(args.velocity);
-      const range = args.target - args.from;
+      curVal = _finite(from);
+      curVel = _finite(velocity);
 
       const finishNow = (): void => {
         if (my !== gen) return;
         running = false;
-        curVal = _finite(args.target);
+        curVal = _finite(target);
         curVel = 0;
-        args.onStep(curVal, 0);
-        args.onDone();
+        onStep(curVal, 0);
+        onDone();
       };
 
       // B4: reduced-motion / вырожденный диапазон / нет кадрового шва → снап.
@@ -229,7 +231,7 @@ function _createRunner(
       // C¹-стык: нормируем унаследованную скорость на диапазон (тот же приём,
       // что smooth-pickup MotionValue и snapBack gestures) — знак «к цели» и
       // непрерывность производной на границе follow|release получаются даром.
-      const v0n = args.velocity / range;
+      const v0n = velocity / range;
       let elapsed = 0;
       let lastTs: number | undefined;
       let frames = 0;
@@ -244,24 +246,22 @@ function _createRunner(
         }
         frames++;
 
-        const s = solveSpring(args.spring, elapsed, v0n);
-        const val = args.from + s.value * range;
+        const s = solveSpring(spring, elapsed, v0n);
+        const val = from + s.value * range;
         const vel = s.velocity * range;
-        curVal = _finite(val);
-        curVel = _finite(vel);
-        const denom = Math.abs(range); // > 0 по построению (range !== 0)
-
         if (
           !Number.isFinite(val) ||
           !Number.isFinite(vel) ||
-          (Math.abs(val - args.target) / denom < CONVERGENCE_THRESHOLD &&
+          (Math.abs(val - target) / denom < CONVERGENCE_THRESHOLD &&
             Math.abs(vel) / denom < CONVERGENCE_THRESHOLD) ||
           frames >= MAX_FRAMES
         ) {
           finishNow();
           return;
         }
-        args.onStep(curVal, curVel);
+        curVal = val + 0;
+        curVel = vel + 0;
+        onStep(curVal, curVel);
         schedule(tick);
       };
 
@@ -298,6 +298,7 @@ function _createBase<S extends BehaviorState<number>>(
   const tracker = createVelocityTracker();
   const subs = new Set<(s: S) => void>();
   let state = initial;
+  let exposed = false;
   let destroyed = false;
   // Хук прерывания активного жеста: cancel()/destroy() живут на базе и не видят
   // контроллер-локального `dragging`, поэтому контроллер регистрирует сброс —
@@ -305,15 +306,32 @@ function _createBase<S extends BehaviorState<number>>(
   // следующим pointerMove (инертность destroy и phase-idle cancel ломались).
   let onAbort: (() => void) | undefined;
 
-  const emit = (next: Partial<S>): void => {
-    state = { ...state, ...next };
+  const notify = (): void => {
     for (const fn of subs) {
-      try {
-        fn(state);
-      } catch {
-        // Подписчик не имеет права срывать соседей.
-      }
+      try { fn(state); } catch { /* подписчик не блокирует соседей */ }
     }
+  };
+
+  const emit = (next: Partial<S>): void => {
+    const observed = subs.size !== 0;
+    if (observed || exposed) {
+      state = { ...state, ...next };
+      exposed = observed;
+    } else Object.assign(state, next);
+    if (observed) notify();
+  };
+
+  const emitMotion = (value: number, velocity: number): void => {
+    const observed = subs.size !== 0;
+    if (observed || exposed) {
+      state = { ...state, value, velocity };
+      exposed = observed;
+    } else {
+      const mutable = state as { value: number; velocity: number };
+      mutable.value = value;
+      mutable.velocity = velocity;
+    }
+    if (observed) notify();
   };
 
   return {
@@ -321,12 +339,14 @@ function _createBase<S extends BehaviorState<number>>(
     runner,
     tracker,
     get state(): S {
+      exposed = true;
       return state;
     },
     get destroyed(): boolean {
       return destroyed;
     },
     emit,
+    emitMotion,
     /** Контроллер регистрирует сброс своего `dragging`, вызываемый из cancel/destroy. */
     setAbort(fn: () => void): void {
       onAbort = fn;
@@ -491,7 +511,7 @@ export function createBottomSheet(options: SheetOptions): SheetController {
       velocity,
       target,
       spring: springParams,
-      onStep: (v, vel) => base.emit({ value: v, velocity: vel }),
+      onStep: (v, vel) => base.emitMotion(v, vel),
       onDone: () => base.emit({ value: target, velocity: 0, phase: 'settle', snapIndex: index }),
     });
   };
@@ -637,7 +657,7 @@ export function createDragDismiss(options: DismissOptions): DismissController {
       velocity,
       target: 0,
       spring: springParams,
-      onStep: (v, vel) => base.emit({ value: v, velocity: vel }),
+      onStep: (v, vel) => base.emitMotion(v, vel),
       onDone: () => base.emit({ value: 0, velocity: 0, phase: 'settle' }),
     });
   };
@@ -649,7 +669,7 @@ export function createDragDismiss(options: DismissOptions): DismissController {
       velocity,
       target: dismissTarget,
       spring: springParams,
-      onStep: (v, vel) => base.emit({ value: v, velocity: vel }),
+      onStep: (v, vel) => base.emitMotion(v, vel),
       onDone: () => {
         base.emit({ value: dismissTarget, velocity: 0, phase: 'settle', dismissed: true });
         options.onDismiss?.();
@@ -971,7 +991,7 @@ export function createPullToRefresh(options: PullOptions): PullController {
       velocity,
       target,
       spring: springParams,
-      onStep: (v, vel) => base.emit({ value: v, velocity: vel }),
+      onStep: (v, vel) => base.emitMotion(v, vel),
       onDone,
     });
   };
