@@ -53,11 +53,17 @@ jobs:
         run: |
           set -euo pipefail
           node bench/research/behaviors-hotpath-profile.mjs --root "$RUNNER_TEMP/base" | tee m05-profile.json
+      - name: Profile exact candidate hot path
+        shell: bash
+        run: |
+          set -euo pipefail
+          node bench/research/behaviors-hotpath-profile.mjs --root "$GITHUB_WORKSPACE" | tee m05-profile-candidate.json
       - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
         with:
           name: m05-hotpath-${{ github.sha }}-${{ github.run_id }}
           path: |
             m05-hotpath.json
             m05-profile.json
+            m05-profile-candidate.json
           if-no-files-found: error
           retention-days: 14
