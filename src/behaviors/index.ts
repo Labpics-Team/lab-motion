@@ -70,7 +70,7 @@
 import { createVelocityTracker } from '../gestures/index.js';
 import { projectDefaultDecayRest } from '../decay.js';
 import { MotionParamError } from '../errors.js';
-import { solveSpring } from '../internal/solver.js';
+import { sampleSpringExactCached } from '../internal/solver.js';
 import { CONVERGENCE_THRESHOLD, FIXED_DT_S, MAX_FRAMES } from '../internal/constants.js';
 import type { MatchMediaLike } from '../internal/media-query.js';
 import { validateSpringForFrameLoop, type SpringParams } from '../spring.js';
@@ -244,7 +244,7 @@ function _createRunner(
         }
         frames++;
 
-        const s = solveSpring(args.spring, elapsed, v0n);
+        const s = sampleSpringExactCached(args.spring, elapsed, v0n);
         const val = args.from + s.value * range;
         const vel = s.velocity * range;
         curVal = _finite(val);

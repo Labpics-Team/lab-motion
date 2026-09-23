@@ -110,6 +110,43 @@ export function solveSpring(
   return out;
 }
 
+const exactSample = { value: 0, velocity: 0 };
+const exactParams = { mass: NaN, stiffness: NaN, damping: NaN };
+let exactTime = NaN;
+let exactV0 = NaN;
+
+/**
+ * Заимствованный exact-result синхронной когорты с одинаковыми физикой, t и v0.
+ * Поля входной пружины читаются один раз и в прежнем порядке на КАЖДОМ вызове:
+ * getter/изменяемый объект не превращается в скрытый immutable-key. На miss
+ * канонический solver получает снятые скаляры через внутренний plain snapshot;
+ * на hit повторные exp/sin/cos не выполняются.
+ */
+export function sampleSpringExactCached(
+  params: SpringParams,
+  t: number,
+  v0: number,
+): Readonly<{ value: number; velocity: number }> {
+  const mass = params.mass;
+  const stiffness = params.stiffness;
+  const damping = params.damping;
+  if (
+    mass !== exactParams.mass ||
+    stiffness !== exactParams.stiffness ||
+    damping !== exactParams.damping ||
+    t !== exactTime ||
+    !Object.is(v0, exactV0)
+  ) {
+    exactParams.mass = mass;
+    exactParams.stiffness = stiffness;
+    exactParams.damping = damping;
+    exactTime = t;
+    exactV0 = v0;
+    solveSpring(exactParams, t, v0, exactSample);
+  }
+  return exactSample;
+}
+
 const basisSample = { value: 0, velocity: 0 };
 
 /**

@@ -8,6 +8,8 @@ import {
 } from '../src/internal/read-spring.js';
 import {
   sampleSpringBasisUnchecked,
+  sampleSpringExactCached,
+  solveSpring,
   type MutableSpringBasis,
 } from '../src/internal/solver.js';
 import { readSpringUnchecked, sampleSpringUnchecked } from '../src/internal/read-spring.js';
@@ -118,6 +120,56 @@ describe('shared analytic spring basis', () => {
     expect(sin).toHaveBeenCalledTimes(1);
     expect(cos).toHaveBeenCalledTimes(1);
     controls.cancel();
+  });
+
+  it('exact cohort считает одинаковую физику+t+v0 один раз', () => {
+    const spring = { mass: 1.125, stiffness: 173, damping: 11.5 };
+    const t = 0.137;
+    const v0 = 3.25;
+    const expected = solveSpring(spring, t, v0);
+    const exp = vi.spyOn(Math, 'exp');
+    const sin = vi.spyOn(Math, 'sin');
+    const cos = vi.spyOn(Math, 'cos');
+    try {
+      let actual = sampleSpringExactCached(spring, t, v0);
+      expect(actual.value).toBe(expected.value);
+      expect(actual.velocity).toBe(expected.velocity);
+      for (let i = 1; i < 128; i++) actual = sampleSpringExactCached({ ...spring }, t, v0);
+      expect(actual.value).toBe(expected.value);
+      expect(actual.velocity).toBe(expected.velocity);
+      expect(exp).toHaveBeenCalledTimes(1);
+      expect(sin).toHaveBeenCalledTimes(1);
+      expect(cos).toHaveBeenCalledTimes(1);
+    } finally {
+      exp.mockRestore();
+      sin.mockRestore();
+      cos.mockRestore();
+    }
+  });
+
+  it('exact cohort сохраняет прежний порядок и число чтений SpringParams getters', () => {
+    const reads: string[] = [];
+    const spring = {
+      get mass(): number { reads.push('mass'); return 1.25; },
+      get stiffness(): number { reads.push('stiffness'); return 179; },
+      get damping(): number { reads.push('damping'); return 13; },
+    };
+    const t = 0.193;
+    const v0 = -2.5;
+    const expected = solveSpring(spring, t, v0);
+    expect(reads).toEqual(['mass', 'stiffness', 'damping']);
+    reads.length = 0;
+
+    const first = sampleSpringExactCached(spring, t, v0);
+    const second = sampleSpringExactCached(spring, t, v0);
+    expect(first.value).toBe(expected.value);
+    expect(first.velocity).toBe(expected.velocity);
+    expect(second.value).toBe(expected.value);
+    expect(second.velocity).toBe(expected.velocity);
+    expect(reads).toEqual([
+      'mass', 'stiffness', 'damping',
+      'mass', 'stiffness', 'damping',
+    ]);
   });
 
 });
