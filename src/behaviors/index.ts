@@ -193,7 +193,7 @@ function _createRunner(
 
       const finishNow = (): void => {
         curVel = undefined;
-        args.onStep(args.target, 0);
+        args.onStep(_finite(args.target), 0);
         if (my === gen) args.onDone();
       };
 
@@ -238,7 +238,7 @@ function _createRunner(
         }
         curVel = vel;
         args.onStep(val, vel);
-        schedule(tick);
+        if (my === gen) schedule(tick);
       };
 
       schedule(tick);
@@ -594,8 +594,7 @@ export function createDragDismiss(options: DismissOptions): DismissController {
   let grabValue = 0;
 
   const returnHome = (velocity: number): void => {
-    base.emit({ phase: 'release' });
-    base.runner._settle({
+    base.emit({ phase: 'release' }) && base.runner._settle({
       from: base.state.value,
       velocity,
       target: 0,
@@ -606,16 +605,14 @@ export function createDragDismiss(options: DismissOptions): DismissController {
   };
 
   const dismiss = (velocity: number): void => {
-    base.emit({ phase: 'release' });
-    base.runner._settle({
+    base.emit({ phase: 'release' }) && base.runner._settle({
       from: base.state.value,
       velocity,
       target: dismissTarget,
       spring: springParams,
       onStep: (v, vel) => base.emit({ value: v, velocity: vel }),
       onDone: () => {
-        base.emit({ phase: 'settle', dismissed: true });
-        options.onDismiss?.();
+        if (base.emit({ phase: 'settle', dismissed: true })) options.onDismiss?.();
       },
     });
   };
@@ -735,9 +732,10 @@ export function createCarousel(options: CarouselOptions): CarouselController {
 
   const clampIndex = (i: number): number => Math.max(0, Math.min(pageCount - 1, i));
   let targetIndex = clampIndex(Math.round(_finite(options.index ?? 0)));
+  const initialValue = _finite(targetIndex * pageSize);
 
   const base = _createBase<CarouselState>(
-    { value: targetIndex * pageSize, velocity: 0, phase: 'idle', index: targetIndex },
+    { value: initialValue, velocity: 0, phase: 'idle', index: clampIndex(Math.round(initialValue / pageSize)) },
     options.requestFrame,
     options.matchMedia,
   );
