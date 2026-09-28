@@ -28,6 +28,7 @@ import { gzipSync } from 'node:zlib';
 import { existsSync, mkdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { dirname, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { readCompilerNanoRecipe } from './compiler-doc-recipe.mjs';
 
 const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '..');
 const DIST = resolve(ROOT, 'dist');
@@ -43,7 +44,7 @@ const ALIAS = {
 
 /** dist-модуль (не entry, не bare peer) в графе — нормализованный к dist-relative id. */
 function distModules(chunk) {
-  // Vite сообщает id с '/', а resolve() на Windows даёт '\': без нормализации
+  // Vite сообщает id с '/', а resolve() на Windows даёт '\\': без нормализации
   // startsWith никогда не совпадёт и граф dist-модулей будет ложно пустым.
   const distSlash = DIST.replaceAll('\\', '/');
   return Object.keys(chunk.modules)
@@ -96,8 +97,9 @@ export function Play(props: { el: Element }): unknown {
 }`;
 
 // Статическая opacity — единственная форма в скоупе lowering (#208 §core).
-const LOWERABLE = `import { animate } from '@labpics/motion/nano';
-export function play(el) { return animate(el, { opacity: 0.5 }); }`;
+// Это буквальный runnable-рецепт документации: acceptance и browser proof
+// не владеют отдельными копиями входа.
+const LOWERABLE = readCompilerNanoRecipe(ROOT);
 // Динамическая opacity — вне скоупа: плагин обязан отказать (positive control).
 const DYNAMIC = `import { animate } from '@labpics/motion/nano';
 export function play(el, v) { return animate(el, { opacity: v }); }`;
