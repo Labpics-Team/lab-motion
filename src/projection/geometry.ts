@@ -352,10 +352,6 @@ export interface DriverProjector extends Projector {
   at(p: number, positionBasisValue?: number): readonly ProjectionFrame[];
 }
 
-/** Внутреннее типизированное представление той же фабрики, без runtime-обёртки. @internal */
-export const createDriverProjector: (nodes: readonly Readonly<DriverProjectionNodeInit>[]) => DriverProjector = createProjector;
-
-export function createProjector(nodes: readonly ProjectionNodeInit[]): Projector;
 /** Реализация читает остаточный базис без изменения данных владельца. */
 export function createProjector(nodes: readonly Readonly<DriverProjectionNodeInit>[]): DriverProjector {
   const count = nodes.length;
@@ -502,8 +498,9 @@ export function createProjector(nodes: readonly Readonly<DriverProjectionNodeIni
       // Linear second-order spring solution: page position = scalar path + u·Q(t).
       // Q(0)=0 and Q'(0)=1, so this preserves C0 while carrying only the
       // independent x/y boundary velocity not representable by one scalar p.
-      const bx = q === 0 ? 0 : (node._qx ?? 0);
-      const by = q === 0 ? 0 : (node._qy ?? 0);
+      const vectorNode: Readonly<DriverProjectionNodeInit> = node;
+      const bx = q === 0 ? 0 : (vectorNode._qx ?? 0);
+      const by = q === 0 ? 0 : (vectorNode._qy ?? 0);
       v.x = carryPositionAxis(v.x, q, bx);
       v.y = carryPositionAxis(v.y, q, by);
 

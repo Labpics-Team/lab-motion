@@ -59,7 +59,7 @@ import { type SpringParams, validateSpringForFrameLoop } from '../spring.js';
 import {
   carryPositionAxis,
   clamp01,
-  createDriverProjector,
+  createProjector,
   finite,
   lerp1,
   mixBox,
@@ -510,7 +510,8 @@ export function createProjection(options?: ProjectionOptions): ProjectionControl
           v0 = clampMagnitude(finite((vPrev * bestR) / bestRp), V0_CAP);
         }
         if (!bounded) {
-          for (const node of resolved) {
+          for (const raw of resolved) {
+            const node: DriverProjectionNodeInit = raw;
             if (node._qx === undefined) continue;
             const rx = node.last.x - node.first.x;
             const ry = node.last.y - node.first.y;
@@ -524,7 +525,7 @@ export function createProjection(options?: ProjectionOptions): ProjectionControl
       }
 
       // Валидация дерева — рано, до любых эффектов, даже под reduce.
-      const projector = createDriverProjector(resolved);
+      const projector = createProjector(resolved);
       const reduced = prefersReducedMotion(options?.matchMedia); // резолв ОДИН раз на play
 
       const byId = new Map<string, DriverProjectionNodeInit>();
@@ -589,7 +590,7 @@ export function createProjection(options?: ProjectionOptions): ProjectionControl
       for (const n of flight.byId.values()) {
         rebased.push(rebaseNode(n.id, n, n, p0, springBasis._valueV0));
       }
-      const projector = createDriverProjector(rebased);
+      const projector = createProjector(rebased);
       const byId = new Map<string, DriverProjectionNodeInit>();
       for (const node of rebased) byId.set(node.id, node);
       const reduced = flight.reduced;

@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import * as projection from '../src/projection/index.js';
-import { createDriverProjector } from '../src/projection/geometry.js';
+import { createProjector as createDriverProjector } from '../src/projection/geometry.js';
 
 const first = Object.freeze({ x: 0, y: 10, width: 20, height: 20 });
 const last = Object.freeze({ x: 100, y: 30, width: 20, height: 20 });
