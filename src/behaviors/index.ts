@@ -238,7 +238,7 @@ function _createRunner(
         }
         curVel = vel;
         args.onStep(val, vel);
-        schedule(tick);
+        if (my === gen) schedule(tick);
       };
 
       schedule(tick);
@@ -594,8 +594,7 @@ export function createDragDismiss(options: DismissOptions): DismissController {
   let grabValue = 0;
 
   const returnHome = (velocity: number): void => {
-    base.emit({ phase: 'release' });
-    base.runner._settle({
+    base.emit({ phase: 'release' }) && base.runner._settle({
       from: base.state.value,
       velocity,
       target: 0,
@@ -606,16 +605,14 @@ export function createDragDismiss(options: DismissOptions): DismissController {
   };
 
   const dismiss = (velocity: number): void => {
-    base.emit({ phase: 'release' });
-    base.runner._settle({
+    base.emit({ phase: 'release' }) && base.runner._settle({
       from: base.state.value,
       velocity,
       target: dismissTarget,
       spring: springParams,
       onStep: (v, vel) => base.emit({ value: v, velocity: vel }),
       onDone: () => {
-        base.emit({ phase: 'settle', dismissed: true });
-        options.onDismiss?.();
+        if (base.emit({ phase: 'settle', dismissed: true })) options.onDismiss?.();
       },
     });
   };
