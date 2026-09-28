@@ -4,6 +4,29 @@ import { createBottomSheet, createCarousel } from '../src/behaviors/index.js';
 import { makeClock, pt, reduceMedia } from './behaviors-helpers.js';
 
 describe('./behaviors — mutable constraints: bottom sheet', () => {
+  it.each([1, -1])('follow сохраняет позу за новой границей при ненулевом pickup: %s', direction => {
+    const clock = makeClock();
+    const sheet = createBottomSheet({ snapPoints: [0, direction * 600], initial: 0,
+      rubberBand: 0.5, requestFrame: clock.requestFrame });
+    const pointer = 100 + direction * 600;
+    try {
+      sheet.pointerDown(pt(0, 100, 0));
+      sheet.pointerMove(pt(0, pointer, 0.1));
+      expect(sheet.state.value).toBe(direction * 600);
+      sheet.update([0, direction * 400]);
+      expect(sheet.state).toMatchObject({ phase: 'follow', value: direction * 600 });
+      sheet.pointerMove(pt(0, pointer, 0.15));
+      expect(sheet.state.value).toBe(direction * 600);
+      sheet.pointerMove(pt(0, pointer + direction * 20, 0.2));
+      // Сопротивление 0.5 переводит следующие 20 px указателя в 10 px поверхности.
+      expect(sheet.state.value).toBe(direction * 610);
+      expect(clock.rafCalls()).toBe(0);
+      expect(clock.pending()).toBe(0);
+    } finally {
+      sheet.destroy();
+    }
+  });
+
   it('release retarget сохраняет value/velocity и целевой индекс, старый кадр не оживает', () => {
     const clock = makeClock();
     const sheet = createBottomSheet({ snapPoints: [0, 300, 600], requestFrame: clock.requestFrame });
