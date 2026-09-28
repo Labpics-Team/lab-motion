@@ -80,7 +80,6 @@
 
 export {
   cornerRadiusAt,
-  createProjector,
   mixBox,
   projectAt,
   type BoxRadii,
@@ -105,3 +104,7 @@ export {
 } from './dom.js';
 /** Type re-export — стирается в рантайме (прецедент src/auto/index.ts:35). */
 export type { FlipRect } from '../flip/index.js';
+
+// Публичный вход скрывает внутренние коэффициенты и второй параметр кадрового базиса.
+import { createProjector as createInternalProjector, type ProjectionNodeInit, type Projector } from './geometry.js';
+export const createProjector: (nodes: readonly ProjectionNodeInit[]) => Projector = createInternalProjector;

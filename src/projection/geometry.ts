@@ -341,12 +341,19 @@ function isDegenerateBox(b: FlipRect): boolean {
  * ПЕРЕЯКОРИВАЮТСЯ к следующему невырожденному проецирующему предку (один раз);
  * finiteDiv остаётся вторым эшелоном (враждебный NaN в середине полёта).
  */
+/** Driver задаёт остаточную скорость; отсутствие коэффициента означает ноль, не ошибку. @internal */
 export interface DriverProjectionNodeInit extends ProjectionNodeInit {
   _qx?: number;
   _qy?: number;
 }
 
-export function createProjector(nodes: readonly ProjectionNodeInit[]): Projector {
+/** Внутренний потребитель базиса; коэффициенты принадлежат driver. @internal */
+export interface DriverProjector extends Projector {
+  at(p: number, positionBasisValue?: number): readonly ProjectionFrame[];
+}
+
+/** Реализация читает остаточный базис без изменения данных владельца. */
+export function createProjector(nodes: readonly Readonly<DriverProjectionNodeInit>[]): DriverProjector {
   const count = nodes.length;
 
   // Валидация id (рано, с именем виновника).
@@ -491,7 +498,7 @@ export function createProjector(nodes: readonly ProjectionNodeInit[]): Projector
       // Linear second-order spring solution: page position = scalar path + u·Q(t).
       // Q(0)=0 and Q'(0)=1, so this preserves C0 while carrying only the
       // independent x/y boundary velocity not representable by one scalar p.
-      const vectorNode = node as DriverProjectionNodeInit;
+      const vectorNode: Readonly<DriverProjectionNodeInit> = node;
       const bx = q === 0 ? 0 : (vectorNode._qx ?? 0);
       const by = q === 0 ? 0 : (vectorNode._qy ?? 0);
       v.x = carryPositionAxis(v.x, q, bx);
