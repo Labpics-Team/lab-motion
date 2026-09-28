@@ -89,14 +89,8 @@ export interface DomProjectionControls {
 // ─── Швы по умолчанию (DOM резолвится в момент вызова) ───────────────────────
 
 function defaultGetScroll(): { x: number; y: number } {
-  try {
-    const g = globalThis as { scrollX?: unknown; scrollY?: unknown };
-    const x = typeof g.scrollX === 'number' && Number.isFinite(g.scrollX) ? g.scrollX : 0;
-    const y = typeof g.scrollY === 'number' && Number.isFinite(g.scrollY) ? g.scrollY : 0;
-    return { x, y };
-  } catch {
-    return { x: 0, y: 0 };
-  }
+  const g = globalThis as { scrollX?: number; scrollY?: number };
+  return { x: g.scrollX as number, y: g.scrollY as number };
 }
 
 type ComputedStyleFn = (el: DomProjectionElement) => { getPropertyValue(n: string): string };
@@ -139,9 +133,9 @@ function readRadii(
       const raw = cs.getPropertyValue(prop).trim();
       if (raw === '') return undefined;
       const parts = raw.split(/\s+/);
-      if (parts.length < 1 || parts.length > 2) return undefined;
+      if (parts.length > 2) return undefined;
       const x = parseRadiusToken(parts[0], width);
-      const y = parseRadiusToken(parts.length === 2 ? parts[1] : parts[0], height);
+      const y = parseRadiusToken(parts[1] ?? parts[0], height);
       if (x === null || y === null) return undefined;
       corners.push({ x, y });
     }
@@ -153,21 +147,19 @@ function readRadii(
 
 // ─── Адаптер ─────────────────────────────────────────────────────────────────
 
+type SavedInline = readonly [string, string, string];
+
 interface CapturedEntry {
   readonly el: DomProjectionElement;
   readonly id: string;
   readonly first: FlipRect;
   readonly radiiFirst: BoxRadii | undefined;
-  readonly savedTransform: string;
-  readonly savedOrigin: string;
-  readonly savedRadius: string;
+  readonly saved: SavedInline;
 }
 
 interface FlightEntry {
   readonly el: DomProjectionElement;
-  readonly savedTransform: string;
-  readonly savedOrigin: string;
-  readonly savedRadius: string;
+  readonly saved: SavedInline;
   readonly radiiFirst: BoxRadii | undefined;
   readonly radiiLast: BoxRadii | undefined;
   /** Degenerate-узел: transform восстановлен ОДИН раз на полёт, не каждый кадр. */
@@ -262,7 +254,7 @@ export function createDomProjection(options?: DomProjectionOptions): DomProjecti
         // Вырожденный anchor: transform не применять — вернуть прежний инлайн.
         // Degenerate — константа полёта: restore один раз, не каждый кадр.
         if (!entry.degenerateRestored) {
-          restoreProp(style, 'transform', entry.savedTransform);
+          restoreProp(style, 'transform', entry.saved[0]);
           entry.degenerateRestored = true;
         }
       } else {
@@ -284,9 +276,10 @@ export function createDomProjection(options?: DomProjectionOptions): DomProjecti
 
   /** Один проход restore наших инлайнов узла (rest/cancel и batch-clear play). */
   const restoreEntry = (entry: FlightEntry): void => {
-    restoreProp(entry.el.style, 'transform', entry.savedTransform);
-    restoreProp(entry.el.style, 'transform-origin', entry.savedOrigin);
-    restoreProp(entry.el.style, 'border-radius', entry.savedRadius);
+    const saved = entry.saved;
+    restoreProp(entry.el.style, 'transform', saved[0]);
+    restoreProp(entry.el.style, 'transform-origin', saved[1]);
+    restoreProp(entry.el.style, 'border-radius', saved[2]);
   };
 
   /** Restore сохранённых инлайнов + очистка состояния полёта (rest и cancel). */
@@ -320,9 +313,7 @@ export function createDomProjection(options?: DomProjectionOptions): DomProjecti
 
         let first: FlipRect | undefined;
         let radiiFirst: BoxRadii | undefined;
-        let savedTransform: string;
-        let savedOrigin: string;
-        let savedRadius: string;
+        let saved: SavedInline;
 
         if (flightEntry !== undefined) {
           // §4.2: узел активного полёта — аналитический V(p̂), DOM под нашим
@@ -334,13 +325,13 @@ export function createDomProjection(options?: DomProjectionOptions): DomProjecti
             flightEntry.radiiFirst !== undefined && flightEntry.radiiLast !== undefined
               ? flightEntry.radiiFirst
               : undefined;
-          savedTransform = flightEntry.savedTransform;
-          savedOrigin = flightEntry.savedOrigin;
-          savedRadius = flightEntry.savedRadius;
+          saved = flightEntry.saved;
         } else {
-          savedTransform = safeInline(el, 'transform');
-          savedOrigin = safeInline(el, 'transform-origin');
-          savedRadius = safeInline(el, 'border-radius');
+          saved = [
+            safeInline(el, 'transform'),
+            safeInline(el, 'transform-origin'),
+            safeInline(el, 'border-radius'),
+          ];
         }
 
         if (first === undefined) {
@@ -359,7 +350,7 @@ export function createDomProjection(options?: DomProjectionOptions): DomProjecti
           if (getCS !== undefined) radiiFirst = readRadii(el, rect.width, rect.height, getCS);
         }
 
-        map.set(el, { el, id, first, radiiFirst, savedTransform, savedOrigin, savedRadius });
+        map.set(el, { el, id, first, radiiFirst, saved });
       }
       captured = map;
     },
@@ -378,11 +369,7 @@ export function createDomProjection(options?: DomProjectionOptions): DomProjecti
       // (б) batch-MEASURE: только чтения (один принудительный reflow).
       const scroll = getScrollSafe(getScroll);
       const getCS = radius ? resolveComputedStyle() : undefined;
-      interface Measured {
-        readonly cap: CapturedEntry;
-        readonly last: FlipRect;
-        readonly radiiLast: BoxRadii | undefined;
-      }
+      type Measured = readonly [CapturedEntry, FlipRect, BoxRadii | undefined];
       const measured: Measured[] = [];
       const measuredIds = new Set<string>();
       for (const cap of captured.values()) {
@@ -400,7 +387,7 @@ export function createDomProjection(options?: DomProjectionOptions): DomProjecti
         };
         const radiiLast =
           getCS !== undefined ? readRadii(cap.el, rect.width, rect.height, getCS) : undefined;
-        measured.push({ cap, last, radiiLast });
+        measured.push([cap, last, radiiLast]);
         measuredIds.add(cap.id);
       }
 
@@ -452,33 +439,28 @@ export function createDomProjection(options?: DomProjectionOptions): DomProjecti
         return ancestorMemo.get(el) ?? null;
       };
 
-      const nodes: ProjectionPlayNode[] = measured.map((m) => ({
-        id: m.cap.id,
-        parent: findAncestorId(m.cap.el),
+      const nodes: ProjectionPlayNode[] = measured.map(([cap, last, radiiLast]) => ({
+        id: cap.id,
+        parent: findAncestorId(cap.el),
         // Узел ВСЁ ЕЩЁ активного полёта → first: undefined: visual pickup
         // V(p̂)/radii/opacity считает драйвер на момент play — C⁰ и при
         // отложенном play (пружина уехала после capture). Новый узел — снимок.
-        first:
-          controls.playing && flightEls !== null && flightEls.has(m.cap.id)
-            ? undefined
-            : m.cap.first,
-        last: m.last,
+        first: controls.playing && flightEls !== null && flightEls.has(cap.id) ? undefined : cap.first,
+        last,
         radii:
-          m.cap.radiiFirst !== undefined && m.radiiLast !== undefined
-            ? { first: m.cap.radiiFirst, last: m.radiiLast }
+          cap.radiiFirst !== undefined && radiiLast !== undefined
+            ? { first: cap.radiiFirst, last: radiiLast }
             : undefined,
       }));
 
       // Новый writer-таргет ДО старта (первый кадр драйвера — синхронный).
       const newFlight = new Map<string, FlightEntry>();
-      for (const m of measured) {
-        newFlight.set(m.cap.id, {
-          el: m.cap.el,
-          savedTransform: m.cap.savedTransform,
-          savedOrigin: m.cap.savedOrigin,
-          savedRadius: m.cap.savedRadius,
-          radiiFirst: m.cap.radiiFirst,
-          radiiLast: m.radiiLast,
+      for (const [cap, , radiiLast] of measured) {
+        newFlight.set(cap.id, {
+          el: cap.el,
+          saved: cap.saved,
+          radiiFirst: cap.radiiFirst,
+          radiiLast,
           degenerateRestored: false,
         });
       }
@@ -492,9 +474,7 @@ export function createDomProjection(options?: DomProjectionOptions): DomProjecti
       // (синхронный JS). Синхронный finish (нет rAF / reduce) уже восстановил
       // инлайны и обнулил flightEls — origin тогда не пишем.
       if (flightEls !== null) {
-        for (const m of measured) {
-          m.cap.el.style.setProperty('transform-origin', '0 0');
-        }
+        for (const [cap] of measured) cap.el.style.setProperty('transform-origin', '0 0');
       }
 
       // Снимок потреблён ОДНОКРАТНО: повторный play без нового capture —
