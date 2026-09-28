@@ -352,9 +352,7 @@ export interface DriverProjector extends Projector {
   at(p: number, positionBasisValue?: number): readonly ProjectionFrame[];
 }
 
-export function createProjector(nodes: readonly ProjectionNodeInit[]): Projector {
-  return createDriverProjector(nodes);
-}
+export const createProjector: (nodes: readonly ProjectionNodeInit[]) => Projector = createDriverProjector;
 
 /** Читает остаточный базис без изменения данных владельца. @internal */
 export function createDriverProjector(nodes: readonly Readonly<DriverProjectionNodeInit>[]): DriverProjector {
