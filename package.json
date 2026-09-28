@@ -512,6 +512,7 @@
     "typecheck:browser": "tsc --noEmit -p tsconfig.browser.json",
     "typecheck:motion-program": "tsc -p tsconfig.motion-program.json",
     "test": "node scripts/check-docs-drift.mjs && vitest run",
+    "test:journey:behaviors-pareto": "pnpm build && vitest run test/journey-behaviors-pareto-budget.test.ts",
     "test:watch": "vitest",
     "naming:inventory": "node scripts/naming-inventory.mjs",
     "check:cycles": "node scripts/check-import-cycles.mjs",
