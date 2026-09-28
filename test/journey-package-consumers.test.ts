@@ -186,6 +186,92 @@ reduced.destroy();
 console.log('journey-pager-package: PASS');
 `;
 
+const compositorSheetConsumer = String.raw`
+import assert from 'node:assert/strict';
+import { createCompositorBottomSheet } from '@labpics/motion/behaviors/compositor';
+let frames = 0;
+let animation;
+let cancels = 0;
+const target = {
+  animate() {
+    let resolve;
+    const finished = new Promise((done) => { resolve = done; });
+    return animation = { currentTime: 0, finished, resolve, cancel() { cancels++; } };
+  },
+};
+const writes = [];
+const sheet = createCompositorBottomSheet({
+  snapPoints: [0, 300, 600],
+  requestFrame() { frames++; throw new Error('native release scheduled a main-thread frame'); },
+  compositor: { target, property: 'translate', format: Number, apply: (value) => writes.push(Number(value)) },
+});
+sheet.pointerDown({ x: 0, y: 0, t: 0 });
+sheet.pointerMove({ x: 0, y: 180, t: 0.05 });
+sheet.pointerUp({ x: 0, y: 180, t: 0.05 });
+assert.equal(frames, 0);
+assert.equal(sheet.state.phase, 'release');
+assert.notEqual(sheet.state.velocity, 0);
+animation.currentTime = 16;
+const releaseValue = sheet.state.value;
+const stale = animation;
+sheet.pointerDown({ x: 0, y: releaseValue, t: 0.1 });
+assert.equal(sheet.state.phase, 'follow');
+assert.notEqual(writes.at(-1), releaseValue);
+assert.equal(cancels, 1);
+const pickupValue = sheet.state.value;
+stale.resolve();
+await Promise.resolve();
+assert.equal(sheet.state.phase, 'follow');
+assert.equal(sheet.state.value, pickupValue);
+sheet.destroy();
+console.log('journey-compositor-sheet-package: PASS');
+`;
+
+const compositorPagerConsumer = String.raw`
+import assert from 'node:assert/strict';
+import { createCompositorCarousel } from '@labpics/motion/behaviors/compositor';
+let frames = 0;
+let animation;
+let cancels = 0;
+const target = {
+  animate() {
+    let resolve;
+    const finished = new Promise((done) => { resolve = done; });
+    return animation = { currentTime: 0, finished, resolve, cancel() { cancels++; } };
+  },
+};
+const pager = createCompositorCarousel({
+  pageCount: 3,
+  pageSize: 200,
+  requestFrame() { frames++; throw new Error('native pager scheduled a main-thread frame'); },
+  compositor: { target, property: 'translate', apply() {} },
+});
+pager.pointerDown({ x: 0, y: 0, t: 0 });
+pager.pointerMove({ x: -120, y: 0, t: 0.05 });
+pager.pointerUp({ x: -120, y: 0, t: 0.05 });
+assert.equal(frames, 0);
+assert.equal(pager.state.phase, 'release');
+assert.notEqual(pager.state.velocity, 0);
+animation.resolve();
+await Promise.resolve();
+assert.equal(pager.state.phase, 'settle');
+assert.equal(pager.state.value, 200);
+assert.equal(cancels, 1);
+pager.destroy();
+const reducedTarget = { calls: 0, animate() { this.calls++; throw new Error('reduced motion reached WAAPI'); } };
+const reduced = createCompositorCarousel({
+  pageCount: 3,
+  pageSize: 200,
+  matchMedia: () => ({ matches: true }),
+  compositor: { target: reducedTarget, property: 'translate', apply() {} },
+});
+reduced.next();
+assert.equal(reduced.state.value, 200);
+assert.equal(reducedTarget.calls, 0);
+reduced.destroy();
+console.log('journey-compositor-pager-package: PASS');
+`;
+
 const listConsumer = String.raw`
 import assert from 'node:assert/strict';
 import { createReorder } from '@labpics/motion/behaviors/reorder';
@@ -482,6 +568,18 @@ describe('JOURNEY-01: независимые потребители реальн
   it('pager: изменение размера, RTL, управление намерением и сокращённое движение', () => {
     const output = installConsumer(packed.root, 'pager-app', packed.tarball, pagerConsumer);
     expect(output).toContain('journey-pager-package: PASS');
+    expect(packed.sha256).toMatch(/^[0-9a-f]{64}$/);
+  }, 30_000);
+
+  it('direct sheet compositor: native commit без main-thread frame и непрерывный pickup из того же артефакта', () => {
+    const output = installConsumer(packed.root, 'compositor-sheet-app', packed.tarball, compositorSheetConsumer);
+    expect(output).toContain('journey-compositor-sheet-package: PASS');
+    expect(packed.sha256).toMatch(/^[0-9a-f]{64}$/);
+  }, 30_000);
+
+  it('direct pager compositor: native terminal ownership и reduced-motion без WAAPI', () => {
+    const output = installConsumer(packed.root, 'compositor-pager-app', packed.tarball, compositorPagerConsumer);
+    expect(output).toContain('journey-compositor-pager-package: PASS');
     expect(packed.sha256).toMatch(/^[0-9a-f]{64}$/);
   }, 30_000);
 

@@ -111,13 +111,13 @@ pnpm site:preview   # отдаёт site/dist на локальном серве�
 ## Карта пакета
 
 Импорт — `@labpics/motion` (ядро) или `@labpics/motion/<субпуть>`.
-Корневой экспорт + 43 субпути (входов `exports` в `package.json` — 44):
+Корневой экспорт + 44 субпути (входов `exports` в `package.json` — 45):
 
 | Группа | Субпути |
 | --- | --- |
 | Ядро анимации | `./nano` (WAAPI ≤ 1 КБ), `./animate` (one-liner фасад), `./frame`, `./driver`, `./compositor`, `./compositor/stagger`, `./waapi`, `./auto` |
 | Значения и физика | `./value`, `./spring`, `./decay`, `./easing`, `./keyframes`, `./stagger`, `./timeline`, `./presets`, `./tokens`, `./utils` |
-| Доменные эффекты | `./bindings`, `./flip`, `./projection`, `./smart`, `./gestures`, `./behaviors`, `./behaviors/reorder`, `./scroll`, `./in-view`, `./presence`, `./svg`, `./svg-morph`, `./a11y`, `./compiler/surface` (приватный executor compiled-поверхности) |
+| Доменные эффекты | `./bindings`, `./flip`, `./projection`, `./smart`, `./gestures`, `./behaviors`, `./behaviors/compositor`, `./behaviors/reorder`, `./scroll`, `./in-view`, `./presence`, `./svg`, `./svg-morph`, `./a11y`, `./compiler/surface` (приватный executor compiled-поверхности) |
 | Биндинги | `./react`, `./preact`, `./vue`, `./svelte`, `./solid`, `./angular`, `./qwik`, `./lit`, `./wc` |
 | Build-tool | `./compiler/vite` (плагин), `./compiler/runtime` (исполнитель, вставляется плагином) |
 
@@ -200,7 +200,7 @@ springFromDurationBounce(0.35, 0); // восприятие (duration, bounce) �
 | Раздел | Что внутри |
 | --- | --- |
 | [Рецепты](docs/recipes.md) | Runnable-интеграции: drag, FLIP, presence, скролл, bottom sheet |
-| [Справочник API](docs/api.md) | Все 43 субпути: что даёт каждый вход |
+| [Справочник API](docs/api.md) | Все 44 субпути: что даёт каждый вход |
 | [Архитектура](docs/architecture.md) | Слои движка, фазовая модель, инварианты, отвергнутые пути |
 | [Compositor](docs/compositor.md) | WAAPI-план, ретаргет, хендофф, fallback-матрица, поддержка браузеров |
 | [Projection](docs/projection.md) | Вложенный FLIP: дерево узлов, C¹-перехваты, не-цели v1 |
