@@ -193,7 +193,7 @@ function _createRunner(
 
       const finishNow = (): void => {
         curVel = undefined;
-        args.onStep(args.target, 0);
+        args.onStep(_finite(args.target), 0);
         if (my === gen) args.onDone();
       };
 
@@ -732,9 +732,10 @@ export function createCarousel(options: CarouselOptions): CarouselController {
 
   const clampIndex = (i: number): number => Math.max(0, Math.min(pageCount - 1, i));
   let targetIndex = clampIndex(Math.round(_finite(options.index ?? 0)));
+  const initialValue = _finite(targetIndex * pageSize);
 
   const base = _createBase<CarouselState>(
-    { value: targetIndex * pageSize, velocity: 0, phase: 'idle', index: targetIndex },
+    { value: initialValue, velocity: 0, phase: 'idle', index: clampIndex(Math.round(initialValue / pageSize)) },
     options.requestFrame,
     options.matchMedia,
   );
