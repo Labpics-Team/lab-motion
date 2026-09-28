@@ -59,7 +59,7 @@ import { type SpringParams, validateSpringForFrameLoop } from '../spring.js';
 import {
   carryPositionAxis,
   clamp01,
-  createProjector,
+  createDriverProjector,
   finite,
   lerp1,
   mixBox,
@@ -68,7 +68,7 @@ import {
   type DriverProjectionNodeInit,
   type ProjectionFrame,
   type ProjectionNodeInit,
-  type Projector,
+  type DriverProjector,
 } from './geometry.js';
 
 // ─── Публичные типы ──────────────────────────────────────────────────────────
@@ -226,7 +226,7 @@ function prefersReducedMotion(
 interface Flight {
   /** Узлы полёта; Map сохраняет порядок вставки (= порядок resolved-входа). */
   readonly byId: ReadonlyMap<string, DriverProjectionNodeInit>;
-  readonly projector: Projector;
+  readonly projector: DriverProjector;
   /** Character-switch зафиксирован на play (§4.4: смена reduce в полёте не подхватывается). */
   readonly reduced: boolean;
 }
@@ -329,9 +329,9 @@ export function createProjection(options?: ProjectionOptions): ProjectionControl
   };
 
   /** Исключение пользовательского callback не должно оставлять «играющий» зомби-run. */
-  const emit = (projector: Projector, p: number): void => {
+  const emit = (projector: DriverProjector, p: number): void => {
     try {
-      onFrame?.((projector.at as (p: number, q?: number) => readonly ProjectionFrame[])(p, springBasis._valueV0));
+      onFrame?.(projector.at(p, springBasis._valueV0));
     } catch (error) {
       generation++;
       phase = 'canceled';
@@ -349,7 +349,7 @@ export function createProjection(options?: ProjectionOptions): ProjectionControl
    * Финальный onFrame может синхронно запустить/отменить новый run —
    * тогда старый onRest stale (гард по gen/phase).
    */
-  const settle = (projector: Projector): void => {
+  const settle = (projector: DriverProjector): void => {
     generation++;
     clearPendingTick();
     const gen = generation;
@@ -361,7 +361,7 @@ export function createProjection(options?: ProjectionOptions): ProjectionControl
     if (gen === generation && phase === 'rest') onRest?.();
   };
 
-  const startRun = (projector: Projector, v0: number, vector = false): void => {
+  const startRun = (projector: DriverProjector, v0: number, vector = false): void => {
     generation++;
     const gen = generation;
     phase = 'active';
@@ -444,7 +444,7 @@ export function createProjection(options?: ProjectionOptions): ProjectionControl
 
       // C⁰ всех каналов: visual pickup — first' = V(p̂) аналитически (ноль
       // DOM-чтений), radii.first'/opacity.from' — тем же lerp'ом на clamp01(p̂).
-      const resolved: ProjectionNodeInit[] = nodes.map((n) => {
+      const resolved: DriverProjectionNodeInit[] = nodes.map((n) => {
         if (n.first === undefined) {
           const old = prevById?.get(n.id);
           if (old === undefined) {
@@ -474,7 +474,7 @@ export function createProjection(options?: ProjectionOptions): ProjectionControl
           }
         };
         for (let i = 0; i < resolved.length; i++) {
-          let node = resolved[i] as DriverProjectionNodeInit;
+          let node = resolved[i];
           const old = prevById.get(node.id);
           if (old === undefined) continue;
           const oldRx = old.last.x - old.first.x;
@@ -500,7 +500,7 @@ export function createProjection(options?: ProjectionOptions): ProjectionControl
             const oldY = old._qy ?? 0;
             const oldVx = finite(oldRx * vPrev + oldX * positionBasisVelocityPrev);
             const oldVy = finite(oldRy * vPrev + oldY * positionBasisVelocityPrev);
-            if (nodes[i].first !== undefined) node = resolved[i] = { ...node } as DriverProjectionNodeInit;
+            if (nodes[i].first !== undefined) node = resolved[i] = { ...node };
             // Temporary physical velocities; finalized into residual coefficients after v0 is known.
             node._qx = oldVx;
             node._qy = oldVy;
@@ -510,8 +510,7 @@ export function createProjection(options?: ProjectionOptions): ProjectionControl
           v0 = clampMagnitude(finite((vPrev * bestR) / bestRp), V0_CAP);
         }
         if (!bounded) {
-          for (const raw of resolved) {
-            const node = raw as DriverProjectionNodeInit;
+          for (const node of resolved) {
             if (node._qx === undefined) continue;
             const rx = node.last.x - node.first.x;
             const ry = node.last.y - node.first.y;
@@ -525,11 +524,11 @@ export function createProjection(options?: ProjectionOptions): ProjectionControl
       }
 
       // Валидация дерева — рано, до любых эффектов, даже под reduce.
-      const projector = createProjector(resolved);
+      const projector = createDriverProjector(resolved);
       const reduced = prefersReducedMotion(options?.matchMedia); // резолв ОДИН раз на play
 
       const byId = new Map<string, DriverProjectionNodeInit>();
-      for (const node of resolved) byId.set(node.id, node as DriverProjectionNodeInit);
+      for (const node of resolved) byId.set(node.id, node);
       flight = { byId, projector, reduced };
 
       if (reduced || resolved.length === 0) {
@@ -586,11 +585,11 @@ export function createProjection(options?: ProjectionOptions): ProjectionControl
       // Ребейз как перехват (единая механика rebaseNode, src = сам узел):
       // first' = V(p_seek), radii/opacity — тем же лerp'ом (C⁰ всех каналов;
       // цели не менялись — теорема §2.3.2 даёт точный C¹ при v0 = v/(1−p_seek)).
-      const rebased: ProjectionNodeInit[] = [];
+      const rebased: DriverProjectionNodeInit[] = [];
       for (const n of flight.byId.values()) {
         rebased.push(rebaseNode(n.id, n, n, p0, springBasis._valueV0));
       }
-      const projector = createProjector(rebased);
+      const projector = createDriverProjector(rebased);
       const byId = new Map<string, DriverProjectionNodeInit>();
       for (const node of rebased) byId.set(node.id, node);
       const reduced = flight.reduced;
