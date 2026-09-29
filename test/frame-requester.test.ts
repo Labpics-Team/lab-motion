@@ -55,6 +55,92 @@ describe('internal frame requester — hostile one-shot ownership', () => {
     expect(tick).not.toHaveBeenCalled();
   });
 
+  it('defers successful synchronous delivery from a trusted host to the trampoline', () => {
+    vi.useFakeTimers();
+    const tick = vi.fn();
+    const request = createFrameRequester((callback) => {
+      callback(10);
+      return 1;
+    }, tick, false);
+
+    request();
+    expect(tick).not.toHaveBeenCalled();
+
+    vi.runAllTimers();
+    expect(tick).toHaveBeenCalledTimes(1);
+    expect(tick).toHaveBeenCalledWith(10);
+  });
+
+  it('does not confuse a reentrant revoked reservation with synchronous delivery', () => {
+    vi.useFakeTimers();
+    const tick = vi.fn();
+    let hostCalls = 0;
+    let request!: () => void;
+    request = createFrameRequester(() => {
+      hostCalls += 1;
+      if (hostCalls === 1) {
+        expect(() => request()).toThrow('inner host failed');
+        return 1;
+      }
+      throw new Error('inner host failed');
+    }, tick);
+
+    request();
+    vi.runAllTimers();
+
+    expect(hostCalls).toBe(2);
+    expect(tick).not.toHaveBeenCalled();
+  });
+
+  it('preserves a reentrant synchronous delivery when the inner host then throws', () => {
+    vi.useFakeTimers();
+    const tick = vi.fn();
+    let hostCalls = 0;
+    let request!: () => void;
+    request = createFrameRequester((callback) => {
+      hostCalls += 1;
+      if (hostCalls === 1) {
+        expect(() => request()).toThrow('inner host failed after delivery');
+        return 1;
+      }
+      callback(20);
+      throw new Error('inner host failed after delivery');
+    }, tick);
+
+    request();
+    expect(tick).not.toHaveBeenCalled();
+
+    vi.runAllTimers();
+    expect(hostCalls).toBe(2);
+    expect(tick).toHaveBeenCalledTimes(1);
+    expect(tick).toHaveBeenCalledWith(20);
+  });
+
+  it('does not defer a nested callback delivered after the inner host unwinds', () => {
+    vi.useFakeTimers();
+    const ticks: Array<number | undefined> = [];
+    let hostCalls = 0;
+    let nestedDeliver: ((timestamp?: number) => void) | undefined;
+    let request!: () => void;
+    request = createFrameRequester((callback) => {
+      hostCalls += 1;
+      if (hostCalls === 1) {
+        request();
+        nestedDeliver!(30);
+        return 1;
+      }
+      nestedDeliver = callback;
+      return 1;
+    }, (timestamp) => ticks.push(timestamp));
+
+    request();
+    expect(ticks).toEqual([30]);
+
+    vi.runAllTimers();
+    expect(hostCalls).toBe(2);
+    expect(ticks).toEqual([30]);
+  });
+
   it('coalesces handle=0 fallback requests into one pending delivery', () => {
     vi.useFakeTimers();
     const schedule = vi.fn(() => 0);

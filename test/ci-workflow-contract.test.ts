@@ -18,6 +18,7 @@ type Step = {
   'working-directory'?: string;
   'continue-on-error'?: boolean;
 };
+type BrowserShard = { browser: string; shard: number; shards: number };
 type Job = {
   name?: string;
   'runs-on'?: string;
@@ -28,7 +29,11 @@ type Job = {
   defaults?: unknown;
   'continue-on-error'?: boolean;
   steps?: Step[];
-  strategy?: { 'fail-fast': boolean; matrix: Record<string, string[]> };
+  strategy?: {
+    'fail-fast': boolean;
+    'max-parallel'?: number;
+    matrix: { node?: string[]; include?: BrowserShard[] };
+  };
 };
 type Workflow = {
   on: Record<string, unknown>;
@@ -104,7 +109,7 @@ const browserCommands = [
   'pnpm exec playwright install --with-deps ${{ matrix.browser }}',
   'pnpm typecheck:browser',
   'pnpm site:build',
-  'pnpm exec playwright test --project=${{ matrix.browser }}',
+  'pnpm exec playwright test --project=${{ matrix.browser }} --shard=${{ matrix.shard }}/${{ matrix.shards }} --fail-on-flaky-tests',
 ];
 const floorCommand = 'shopt -s nullglob\narchives=(node-floor-artifact/*.tgz)\n'
   + '[[ ${#archives[@]} -eq 1 ]] \\\n'
@@ -196,7 +201,7 @@ const requiredActions = {
       "if": "failure()",
       "uses": "actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a",
       "with": {
-        "name": "browser-conformance-${{ matrix.browser }}-${{ github.run_id }}",
+        "name": "browser-conformance-${{ matrix.browser }}-${{ matrix.shard }}-${{ github.run_id }}",
         "path": "test-results/\nplaywright-report/\n",
         "if-no-files-found": "ignore",
         "retention-days": 7
@@ -304,7 +309,19 @@ function assertNativeGraph(files: Map<string, string>) {
   for (const job of [verify, tests, mutation]) expect(job.needs).toBeUndefined();
   expect(floor.needs).toEqual(['verify']);
   expect(floor.strategy).toEqual({ 'fail-fast': false, matrix: { node: ['22.0.0', '24'] } });
-  expect(conformance.strategy).toEqual({ 'fail-fast': false, matrix: { browser: ['chromium', 'firefox', 'webkit'] } });
+  expect(conformance.name).toBe('${{ matrix.browser }} · ${{ matrix.shard }}/${{ matrix.shards }}');
+  expect(conformance.needs).toBeUndefined();
+  // Полнота задаётся независимо от workflow: потеря/дубль доли не может стать GREEN.
+  expect(conformance.strategy).toEqual({
+    'fail-fast': false,
+    'max-parallel': 4,
+    matrix: { include: [
+      { browser: 'chromium', shard: 1, shards: 1 },
+      { browser: 'firefox', shard: 1, shards: 1 },
+      { browser: 'webkit', shard: 1, shards: 2 },
+      { browser: 'webkit', shard: 2, shards: 2 },
+    ] },
+  });
   const actionlint = step(verify, 'GitHub Actions contract');
   expect(actionlint.if).toBeUndefined();
   expect(actionlint['continue-on-error']).toBeUndefined();
@@ -379,8 +396,29 @@ describe('нативный граф CI', () => {
     ['добавлен trigger browser', 'browser.yml', (w: Workflow) => { w.on.pull_request = null; }],
     ['нет workflow_call', 'browser.yml', (w: Workflow) => { w.on = { workflow_dispatch: null }; }],
     ...['chromium', 'firefox', 'webkit'].map((engine) => [`нет ${engine}`, 'browser.yml', (w: Workflow) => {
-      w.jobs.conformance!.strategy!.matrix.browser = ['chromium', 'firefox', 'webkit'].filter((item) => item !== engine);
+      const matrix = w.jobs.conformance!.strategy!.matrix;
+      matrix.include = matrix.include!.filter((item) => item.browser !== engine);
     }] as const),
+    ['потеря второй доли WebKit', 'browser.yml', (w: Workflow) => {
+      w.jobs.conformance!.strategy!.matrix.include!.pop();
+    }],
+    ['дублирование первой доли WebKit', 'browser.yml', (w: Workflow) => {
+      w.jobs.conformance!.strategy!.matrix.include![3]!.shard = 1;
+    }],
+    ['невыполненная третья доля WebKit', 'browser.yml', (w: Workflow) => {
+      for (const part of w.jobs.conformance!.strategy!.matrix.include!) {
+        if (part.browser === 'webkit') part.shards = 3;
+      }
+    }],
+    ['неполный Firefox', 'browser.yml', (w: Workflow) => {
+      w.jobs.conformance!.strategy!.matrix.include![1]!.shards = 2;
+    }],
+    ['отмена соседних browser jobs после сбоя', 'browser.yml', (w: Workflow) => {
+      w.jobs.conformance!.strategy!['fail-fast'] = true;
+    }],
+    ['лишняя последовательная browser зависимость', 'browser.yml', (w: Workflow) => {
+      w.jobs.conformance!.needs = ['verify'];
+    }],
     ['игнорирование browser', 'browser.yml', (w: Workflow) => { w.jobs.conformance!['continue-on-error'] = true; }],
   ] as const)('отвергает изменение: %s', (_, file, mutate) => {
     const files = sources();
