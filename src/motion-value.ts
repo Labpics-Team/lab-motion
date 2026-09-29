@@ -90,6 +90,9 @@ import { CONVERGENCE_THRESHOLD, MAX_FRAMES, FIXED_DT_S } from './internal/consta
  */
 const EPSILON = 1e-10;
 
+/** Синхронный output-сcratch солвера: _tick копирует оба числа до callback-границы. */
+const solverSample = { value: 0, velocity: 0 };
+
 /**
  * Единый fail-fast страж конечности публичных числовых входов MotionValue:
  * NaN/±Infinity → MotionParamError синхронно (до Promise и до единого кадра).
@@ -137,8 +140,6 @@ export class MotionValue {
 
   /** Registered onChange subscribers. */
   private readonly _listeners: Set<(value: number) => void> = new Set();
-  /** Caller-owned result солвера: один объект на значение вместо одного на кадр. */
-  private readonly _solved = { value: 0, velocity: 0 };
 
   // ── Animation run state (reset on each setTarget) ───────────────────────
 
@@ -425,7 +426,7 @@ export class MotionValue {
 
       // Общий солвер (internal/solver.ts) + стражи этого модуля инлайн
       // (value→1, velocity→0 — политика отличается от clampFinite spring.ts).
-      const raw = solveSpring(this._spring, this._elapsed, this._v0Normalized, this._solved);
+      const raw = solveSpring(this._spring, this._elapsed, this._v0Normalized, solverSample);
       const normPos = Number.isFinite(raw.value) ? raw.value : 1;
       const normVel = Number.isFinite(raw.velocity) ? raw.velocity : 0;
 
