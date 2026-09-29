@@ -1,0 +1,97 @@
+name: PROFILE-01 — preregistered probe
+
+# Только ручной запуск на штатных self-hosted runners (de-04 первым по
+# CI-контракту). Платные GitHub-hosted runners запрещены. Тяжёлые тесты и
+# бенчи никогда не запускаются в песочнице.
+on:
+  workflow_dispatch:
+    inputs:
+      mode:
+        description: 'Режим пробы: old-vector (старый cost vector на PRODUCT_BASE)'
+        required: true
+        default: 'old-vector'
+        type: choice
+        options:
+          - old-vector
+      cells:
+        description: 'Клетки roster: desktop (без железа) или all (требует device lab)'
+        required: true
+        default: 'desktop'
+        type: choice
+        options:
+          - desktop
+          - all
+
+permissions:
+  contents: read
+
+env:
+  COREPACK_ENABLE_DOWNLOAD_PROMPT: '0'
+  COREPACK_DEFAULT_TO_LATEST: '0'
+
+jobs:
+  probe:
+    # Generic self-hosted label: парка de-04 обслуживает первым по контракту.
+    runs-on: self-hosted
+    timeout-minutes: 45
+    steps:
+      - name: Получить exact harness
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          persist-credentials: false
+          fetch-depth: 0
+
+      - name: Настроить Node
+        uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v6
+        with:
+          node-version: '24'
+
+      - name: Активировать pinned pnpm
+        run: |
+          corepack enable
+          corepack install --global pnpm@11.11.0
+
+      - name: Доказать preregistration-before-samples
+        shell: bash
+        run: |
+          set -euo pipefail
+          test "$(git rev-parse HEAD)" = "$GITHUB_SHA"
+          node --input-type=module <<'NODE'
+          import { PROFILE_01, preregistrationDigest, verifyPreregistration } from './bench/profile/profile-01-preregistration.mjs';
+          verifyPreregistration(PROFILE_01);
+          if (PROFILE_01.candidateSamplesObservedAtRegistration !== false) {
+            throw new Error('preregistration обязана предшествовать samples');
+          }
+          console.log(`preregistration digest: ${preregistrationDigest(PROFILE_01)}`);
+          NODE
+
+      - name: Установить зависимости
+        run: pnpm install --frozen-lockfile
+
+      - name: Собрать exact base
+        run: pnpm build
+
+      - name: Снять старый cost vector (fail-closed)
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p "$RUNNER_TEMP/profile-01-raw"
+          node bench/profile/probe-profile-01.mjs \
+            --mode '${{ inputs.mode }}' \
+            --cells '${{ inputs.cells }}' \
+            --out "$RUNNER_TEMP/profile-01-raw"
+
+      - name: Независимо перепроверить raw-артефакт
+        shell: bash
+        run: |
+          set -euo pipefail
+          for raw in "$RUNNER_TEMP"/profile-01-raw/*.json; do
+            node bench/profile/validate-profile-01.mjs --raw "$raw"
+          done
+
+      - name: Опубликовать raw-артефакт
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
+        with:
+          name: profile-01-raw-${{ github.sha }}
+          path: ${{ runner.temp }}/profile-01-raw/
+          retention-days: 90
