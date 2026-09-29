@@ -50,10 +50,11 @@ const events = (value: unknown): string[] => {
 };
 const bash = process.platform === 'win32'
   ? join(process.env.ProgramFiles ?? 'C:\\Program Files', 'Git/bin/bash.exe') : 'bash';
-const peers = ['verify', 'node-floor', 'browser-static'];
+const peers = ['verify', 'tests', 'mutation', 'node-floor', 'browser-static'];
 const activatePnpm = 'corepack enable\ncorepack install --global pnpm@11.11.0';
 const vitestCommand = 'set +e\npnpm vitest run 2>&1 | tee vitest.log\nstatus=${PIPESTATUS[0]}\nexit "$status"';
 const gateCommand = 'set -euo pipefail\n[[ "$VERIFY_RESULT" == success ]]\n'
+  + '[[ "$TESTS_RESULT" == success ]]\n[[ "$MUTATION_RESULT" == success ]]\n'
   + '[[ "$NODE_FLOOR_RESULT" == success ]]\n[[ "$BROWSER_RESULT" == success ]]';
 const actionlintCommand = [
   'archive="$RUNNER_TEMP/actionlint.tar.gz"',
@@ -78,14 +79,24 @@ const verifyCommands = [
   'node scripts/check-issue-forms.mjs',
   'version="$(node -p "require(\'./package.json\').version")"\n'
     + 'node scripts/check-release.mjs "v${version}" --validate-stored-date',
-  vitestCommand,
-  'pnpm vitest run --reporter=verbose test/*finiteness-fuzz.test.ts',
-  'pnpm exec stryker run stryker.driver.config.mjs',
   'pnpm size',
   'pnpm pack:smoke',
   'pnpm pack:compat',
   'pnpm acceptance:compiler',
   'mkdir node-floor-artifact\npnpm pack --pack-destination node-floor-artifact',
+];
+const testCommands = [
+  activatePnpm,
+  'pnpm install --frozen-lockfile',
+  'pnpm build',
+  vitestCommand,
+  'pnpm vitest run --reporter=verbose test/*finiteness-fuzz.test.ts',
+];
+const mutationCommands = [
+  activatePnpm,
+  'pnpm install --frozen-lockfile',
+  'pnpm build',
+  'pnpm exec stryker run stryker.driver.config.mjs',
 ];
 const browserCommands = [
   activatePnpm,
@@ -121,19 +132,7 @@ const requiredActions = {
       }
     },
     {
-      "index": 13,
-      "name": "Upload Vitest diagnostics",
-      "if": "failure() && steps.vitest.outcome == 'failure'",
-      "uses": "actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a",
-      "with": {
-        "name": "vitest-diagnostics-${{ github.run_id }}",
-        "path": "vitest.log",
-        "if-no-files-found": "error",
-        "retention-days": 7
-      }
-    },
-    {
-      "index": 21,
+      "index": 17,
       "name": "Upload Node-floor candidate",
       "uses": "actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a",
       "with": {
@@ -203,6 +202,55 @@ const requiredActions = {
         "retention-days": 7
       }
     }
+  ],
+  "tests": [
+    {
+      "index": 0,
+      "name": "Checkout",
+      "uses": "actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1",
+      "with": {
+        "persist-credentials": false,
+        "fetch-depth": 0
+      }
+    },
+    {
+      "index": 1,
+      "name": "Setup Node",
+      "uses": "actions/setup-node@820762786026740c76f36085b0efc47a31fe5020",
+      "with": {
+        "node-version": "24"
+      }
+    },
+    {
+      "index": 6,
+      "name": "Upload Vitest diagnostics",
+      "if": "failure() && steps.vitest.outcome == 'failure'",
+      "uses": "actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a",
+      "with": {
+        "name": "vitest-diagnostics-${{ github.run_id }}",
+        "path": "vitest.log",
+        "if-no-files-found": "error",
+        "retention-days": 7
+      }
+    }
+  ],
+  "mutation": [
+    {
+      "index": 0,
+      "name": "Checkout",
+      "uses": "actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1",
+      "with": {
+        "persist-credentials": false
+      }
+    },
+    {
+      "index": 1,
+      "name": "Setup Node",
+      "uses": "actions/setup-node@820762786026740c76f36085b0efc47a31fe5020",
+      "with": {
+        "node-version": "24"
+      }
+    }
   ]
 };
 
@@ -232,7 +280,7 @@ function assertNativeGraph(files: Map<string, string>) {
   const browser = workflows.get('browser.yml')!;
   expect(ci.on).toEqual({ push: { branches: ['main'] }, pull_request: null, merge_group: null, workflow_dispatch: null });
   expect(browser.on).toEqual({ workflow_call: null });
-  expect(Object.keys(ci.jobs).sort()).toEqual(['CI', 'browser-static', 'node-floor', 'verify']);
+  expect(Object.keys(ci.jobs).sort()).toEqual(['CI', 'browser-static', 'mutation', 'node-floor', 'tests', 'verify']);
   expect(Object.keys(browser.jobs)).toEqual(['conformance']);
   for (const document of [ci, browser]) {
     expect(document.permissions).toEqual({ contents: 'read' });
@@ -243,13 +291,17 @@ function assertNativeGraph(files: Map<string, string>) {
     }
   }
   const verify = ci.jobs.verify!;
+  const tests = ci.jobs.tests!;
+  const mutation = ci.jobs.mutation!;
   const floor = ci.jobs['node-floor']!;
   const conformance = browser.jobs.conformance!;
-  for (const job of [verify, floor, conformance]) {
+  for (const job of [verify, tests, mutation, floor, conformance]) {
     expect(job['runs-on']).toBe('ubuntu-latest');
     expect(job.if).toBeUndefined();
   }
   expect(ci.jobs['browser-static']).toEqual({ uses: './.github/workflows/browser.yml' });
+  // Нет ложных последовательных зависимостей: всё сходится только в CI.
+  for (const job of [verify, tests, mutation]) expect(job.needs).toBeUndefined();
   expect(floor.needs).toEqual(['verify']);
   expect(floor.strategy).toEqual({ 'fail-fast': false, matrix: { node: ['22.0.0', '24'] } });
   expect(conformance.strategy).toEqual({ 'fail-fast': false, matrix: { browser: ['chromium', 'firefox', 'webkit'] } });
@@ -261,15 +313,17 @@ function assertNativeGraph(files: Map<string, string>) {
     ACTIONLINT_VERSION: '1.7.12',
     ACTIONLINT_ARCHIVE_SHA256: '8aca8db96f1b94770f1b0d72b6dddcb1ebb8123cb3712530b08cc387b349a3d8',
   });
-  for (const [name, job] of Object.entries({ verify, floor, conformance })) {
+  for (const [name, job] of Object.entries({ verify, tests, mutation, floor, conformance })) {
     expect(job.steps!.map((item, index) => ({ index, ...item })).filter((item) => item.uses))
       .toEqual(requiredActions[name as keyof typeof requiredActions]);
   }
   assertCommands(verify, verifyCommands);
+  assertCommands(tests, testCommands);
+  assertCommands(mutation, mutationCommands);
   assertCommands(floor, [floorCommand]);
   assertCommands(conformance, browserCommands);
-  expect(step(verify, 'Vitest').id).toBe('vitest');
-  expect(step(verify, 'Upload Vitest diagnostics').if).toBe("failure() && steps.vitest.outcome == 'failure'");
+  expect(step(tests, 'Vitest').id).toBe('vitest');
+  expect(step(tests, 'Upload Vitest diagnostics').if).toBe("failure() && steps.vitest.outcome == 'failure'");
   const gate = ci.jobs.CI!;
   expect(gate.name).toBe('CI');
   expect(gate.if).toBe('${{ always() }}');
@@ -281,6 +335,8 @@ function assertNativeGraph(files: Map<string, string>) {
     shell: 'bash',
     env: {
       VERIFY_RESULT: '${{ needs.verify.result }}',
+      TESTS_RESULT: '${{ needs.tests.result }}',
+      MUTATION_RESULT: '${{ needs.mutation.result }}',
       NODE_FLOOR_RESULT: '${{ needs.node-floor.result }}',
       BROWSER_RESULT: '${{ needs.browser-static.result }}',
     },
@@ -298,6 +354,9 @@ describe('нативный граф CI', () => {
     ...peers.map((peer) => [`нет needs ${peer}`, 'ci.yml', (w: Workflow) => {
       w.jobs.CI!.needs = w.jobs.CI!.needs!.filter((item) => item !== peer);
     }] as const),
+    ['tests ждёт verify без необходимости', 'ci.yml', (w: Workflow) => { w.jobs.tests!.needs = ['verify']; }],
+    ['mutation ждёт tests без необходимости', 'ci.yml', (w: Workflow) => { w.jobs.mutation!.needs = ['tests']; }],
+    ['Node floor ждёт mutation без необходимости', 'ci.yml', (w: Workflow) => { w.jobs['node-floor']!.needs = ['verify', 'mutation']; }],
     ['новая job вне итога', 'ci.yml', (w: Workflow) => { w.jobs.extra = { 'runs-on': 'ubuntu-latest' }; }],
     ['игнорирование verify', 'ci.yml', (w: Workflow) => { w.jobs.verify!['continue-on-error'] = true; }],
     ['пропуск verify', 'ci.yml', (w: Workflow) => { w.jobs.verify!.if = false; }],
@@ -311,9 +370,9 @@ describe('нативный граф CI', () => {
       step(w.jobs.conformance!, 'Setup Node').if = false;
     }],
     ['скрытые diagnostics', 'ci.yml', (w: Workflow) => {
-      step(w.jobs.verify!, 'Upload Vitest diagnostics').if = "steps.vitest.outcome == 'failure'";
+      step(w.jobs.tests!, 'Upload Vitest diagnostics').if = "steps.vitest.outcome == 'failure'";
     }],
-    ['другой Vitest outcome', 'ci.yml', (w: Workflow) => { step(w.jobs.verify!, 'Vitest').id = 'other'; }],
+    ['другой Vitest outcome', 'ci.yml', (w: Workflow) => { step(w.jobs.tests!, 'Vitest').id = 'other'; }],
     ['фальшивый итог', 'ci.yml', (w: Workflow) => { w.jobs.CI!.steps![0]!.env!.BROWSER_RESULT = 'success'; }],
     ['пустой успех', 'ci.yml', (w: Workflow) => { w.jobs.CI!.steps![0]!.run = 'true\n'; }],
     ['игнорирование итога', 'ci.yml', (w: Workflow) => { w.jobs.CI!['continue-on-error'] = true; }],
@@ -343,6 +402,8 @@ describe('нативный граф CI', () => {
 
   it.each([
     ['ci.yml', 'verify', verifyCommands],
+    ['ci.yml', 'tests', testCommands],
+    ['ci.yml', 'mutation', mutationCommands],
     ['ci.yml', 'node-floor', [floorCommand]],
     ['browser.yml', 'conformance', browserCommands],
   ] as const)('%s/%s сохраняет каждую обязательную команду', (file, jobId, commands) => {
@@ -365,6 +426,8 @@ describe('нативный граф CI', () => {
 
   it.each([
     ['ci.yml', 'verify'],
+    ['ci.yml', 'tests'],
+    ['ci.yml', 'mutation'],
     ['ci.yml', 'node-floor'],
     ['browser.yml', 'conformance'],
   ] as const)('%s/%s сохраняет настройку каждого action', (file, jobId) => {
@@ -396,9 +459,12 @@ describe('нативный граф CI', () => {
   it('shell итога требует success каждого dependency', () => {
     const ci = parse(sources().get('ci.yml')!) as Workflow;
     const program = ci.jobs.CI!.steps![0]!.run!;
-    for (const key of ['VERIFY_RESULT', 'NODE_FLOOR_RESULT', 'BROWSER_RESULT']) {
+    for (const key of ['VERIFY_RESULT', 'TESTS_RESULT', 'MUTATION_RESULT', 'NODE_FLOOR_RESULT', 'BROWSER_RESULT']) {
       for (const result of ['success', 'failure', 'cancelled', 'skipped', 'neutral', 'pending', '', undefined]) {
-        const env: NodeJS.ProcessEnv = { ...process.env, VERIFY_RESULT: 'success', NODE_FLOOR_RESULT: 'success', BROWSER_RESULT: 'success' };
+        const env: NodeJS.ProcessEnv = {
+          ...process.env, VERIFY_RESULT: 'success', TESTS_RESULT: 'success',
+          MUTATION_RESULT: 'success', NODE_FLOOR_RESULT: 'success', BROWSER_RESULT: 'success',
+        };
         delete env[key];
         if (result !== undefined) env[key] = result;
         const actual = spawnSync(bash, ['--noprofile', '--norc', '-e', '-o', 'pipefail', '-c', program], {
@@ -412,7 +478,7 @@ describe('нативный граф CI', () => {
 
   it('shell Vitest сохраняет код отказа после tee для diagnostics', () => {
     const ci = parse(sources().get('ci.yml')!) as Workflow;
-    const program = step(ci.jobs.verify!, 'Vitest').run!;
+    const program = step(ci.jobs.tests!, 'Vitest').run!;
     const cwd = mkdtempSync(join(tmpdir(), 'motion-ci-vitest-'));
     try {
       for (const code of [0, 17]) {
