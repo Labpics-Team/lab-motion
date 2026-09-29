@@ -128,6 +128,33 @@ describe('showcase lifecycle ownership', () => {
     expect(animateMock).toHaveBeenCalledTimes(3);
   });
 
+  it('initial pageshow does not reset an already started user transition', async () => {
+    const { installShowcase } = await import('../site/src/scripts/showcase.js');
+    activeDispose = installShowcase();
+    document.querySelector<HTMLElement>('[data-action="retarget"]')!.click();
+    const active = controls.at(-1)!;
+    animateMock.mockClear();
+
+    window.dispatchEvent(new PageTransitionEvent('pageshow', { persisted: false }));
+
+    expect(active.cancel).not.toHaveBeenCalled();
+    expect(animateMock).not.toHaveBeenCalled();
+    expect(document.querySelector('[data-card="retarget"] [data-state]')?.textContent).toBe('running');
+  });
+
+  it('persisted pageshow resumes previews stopped for the page cache', async () => {
+    const { installShowcase } = await import('../site/src/scripts/showcase.js');
+    activeDispose = installShowcase();
+    const initial = [...controls];
+    window.dispatchEvent(new PageTransitionEvent('pagehide', { persisted: true }));
+    expect(initial.every((value) => value.cancel.mock.calls.length === 1)).toBe(true);
+    animateMock.mockClear();
+
+    window.dispatchEvent(new PageTransitionEvent('pageshow', { persisted: true }));
+
+    expect(animateMock).toHaveBeenCalledTimes(3);
+  });
+
   it('stops the hero when its stage leaves the viewport and disconnects the observer', async () => {
     const { installShowcase } = await import('../site/src/scripts/showcase.js');
     activeDispose = installShowcase();
