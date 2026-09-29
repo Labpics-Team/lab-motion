@@ -47,7 +47,7 @@ export interface PresenceTransitionControls {
 // Незавершённый Promise после отмены удерживает только обнуляемую ячейку,
 // не контроллер, DOM, callbacks приложения или остальные анимации группы.
 interface Sink { notify?: (failed: boolean, error?: unknown) => void }
-interface Effect { cancel: () => void; sink: Sink }
+interface Effect { cancel: PresenceAnimation['cancel']; sink: Sink }
 interface Phase {
   present: boolean;
   ended: boolean;
@@ -108,7 +108,7 @@ export function createPresenceTransition(options: PresenceTransitionOptions = {}
       effect.sink.notify = undefined;
       // Явная передача одного handle новой фазе сохраняет его нового владельца.
       if (current !== phase && current?.effects.has(animation)) continue;
-      try { effect.cancel(); } catch (error) { errors.push(error); }
+      try { effect.cancel.call(animation); } catch (error) { errors.push(error); }
     }
     return errors;
   }
@@ -170,7 +170,7 @@ export function createPresenceTransition(options: PresenceTransitionOptions = {}
           const stop = animation.cancel;
           if (typeof stop !== 'function') throw new MotionParamError('LM177');
           const sink: Sink = {};
-          phase.effects.set(animation, { cancel: () => stop.call(animation), sink });
+          phase.effects.set(animation, { cancel: stop, sink });
           const completion = animation.finished;
           if (!completion) throw new MotionParamError('LM178');
           const then = completion.then;
