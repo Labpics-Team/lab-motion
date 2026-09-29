@@ -195,20 +195,70 @@ export function preregistrationDigest(value = PROFILE_01) {
   return createHash('sha256').update(JSON.stringify(value)).digest('hex');
 }
 
-// Самопроверка замороженного контракта: структура, классы roster, число
-// потолков/сценариев, fail-closed флаги. Вызывается пробой до любых samples.
+// Самопроверка замороженного контракта: структура, ТОЧНЫЕ ЗНАЧЕНИЯ
+// потолков/сценариев/roster/scenes, fail-closed флаги. Вызывается пробой
+// до любых samples. Проверяются именно значения, а не только число ключей:
+// частичная проверка (только counts) пропускает тихую подмену значений.
+// Якорь заморозки — НЕ этот файл сам по себе, а связка: git ancestry
+// (probe доказывает HEAD из PRODUCT_BASE) + exact-head review + CI на
+// exact head. Отдельный .sha256-sidecar в том же PR отвергнут сознательно:
+// файл в том же trust-domain не добавляет независимости — подмена обновила
+// бы оба файла разом. Независимость даёт git-история и ревью, а не второй
+// файл рядом.
 export function verifyPreregistration(value = PROFILE_01) {
   invariant(value && typeof value === 'object', 'контракт обязан быть объектом');
+  invariant(value.node === 'PROFILE-01' && value.revision === 'r11', 'node/revision drifted');
   invariant(value.candidateSamplesObservedAtRegistration === false, 'preregistration обязана предшествовать samples');
+  invariant(value.productBase?.repo === 'Labpics-Team/lab-motion', 'product repo drifted');
   invariant(value.productBase?.mainSha === '0fb23264a93a18a8242fd15a2375e9f75845dbdf', 'product base drifted');
+  invariant(value.productBase?.mergedAtUtc === '2026-09-28T21:58:33Z', 'product base время drifted');
   const gates = value.oldCostVectorGzipBytes;
+  invariant(gates?.core === 2220 && gates?.subpath === 4608 && gates?.fullCoreConsumer === 2330, 'core/subpath/fullCore ceilings drifted');
   invariant(gates?.nano === 1024 && gates?.compiledRuntime === 341 && gates?.compilerSurface === 1024, 'старые 1024/341/1024 ceilings drifted');
+  invariant(gates?.inView === 1839 && gates?.inViewConsumer === 1908, 'in-view ceilings drifted');
+  invariant(gates?.compositorCapability === 6600, 'compositor capability ceiling drifted');
   invariant(gates?.fullAnimate === 15600 && gates?.animateCompositorMixed === 17500, 'full/mixed consumer ceilings drifted');
+  const bespokeExpected = {
+    './behaviors/reorder': 1518, './utils': 1400, './compiler/vite': 9163,
+    './compiler/runtime': 341, './compositor': 6450, './compositor/stagger': 6450,
+    './tokens': 1650, './projection': 5750, './smart': 7450, './presets': 5600,
+    './animate': 15600, './nano': 1024, './compiler/surface': 1024,
+    './in-view': 1839, './behaviors': 4600,
+  };
+  for (const [key, expected] of Object.entries(bespokeExpected)) {
+    invariant(gates?.bespoke?.[key] === expected, `bespoke gate ${key} drifted`);
+  }
   invariant(Object.keys(gates?.bespoke ?? {}).length === 15, 'bespoke subpath gates drifted');
+  const scenariosExpected = {
+    'reorder-controlled': 1522, 'nano spring-to': 1024, 'surface executor': 1024,
+    'in-view one-liner': 1908, 'only-spring': 920, 'projection-core-only': 720,
+    'projection-dom-one-liner': 5750, 'only-MotionValue': 1660, 'full-core': 2330,
+    'compositor-stagger capability': 6600, 'animate + compositor': 17500,
+    'only-clamp (utils tree-shake)': 340, 'animate-one-liner (фасад)': 15600,
+    'animate component scope': 15700, 'behaviors-sheet-one-liner': 3700,
+  };
+  for (const [key, expected] of Object.entries(scenariosExpected)) {
+    invariant(gates?.scenarios?.[key] === expected, `scenario gate ${key} drifted`);
+  }
   invariant(Object.keys(gates?.scenarios ?? {}).length === 15, 'consumer scenario gates drifted');
-  invariant((value.roster?.classes ?? []).length === 7, 'roster обязан покрывать 7 классов');
+  const rosterIds = (value.roster?.classes ?? []).map((entry) => entry?.id);
+  invariant(JSON.stringify(rosterIds) === JSON.stringify(['android-mid-60', 'android-mid-120', 'ios-60', 'ios-120', 'desktop-chromium', 'desktop-firefox', 'desktop-webkit']), 'roster классы drifted');
   invariant((value.affectedCellsMissingHw ?? []).length === 3, 'missing-HW affected cells drifted');
-  invariant(typeof value.scenes?.m05a?.id === 'string' && typeof value.scenes?.m05b?.id === 'string', 'M-05 сцены обязаны быть заморожены');
-  invariant(value.calibration?.failClosed !== undefined, 'fail-closed калибровка обязана быть явной');
+  invariant(value.scenes?.m04channels?.id === 'm04-100-scalar-channels' && value.scenes?.m04channels?.channels === 100, 'M-04 channels сцена drifted');
+  invariant(value.scenes?.m04full120?.id === 'm04-full-120hz', 'M-04 120Hz сцена drifted');
+  invariant(value.scenes?.m05a?.id === 'm05-sheet' && typeof value.scenes?.m05a?.family === 'string', 'M-05 sheet сцена drifted');
+  invariant(value.scenes?.m05b?.id === 'm05-list' && typeof value.scenes?.m05b?.family === 'string', 'M-05 list сцена drifted');
+  for (const key of ['noMotion', 'reducedMotion', 'waapi', 'oldLab', 'bestComparator', 'aa', 'positive']) {
+    invariant(typeof value.rawControls?.[key] === 'string', `raw control ${key} отсутствует`);
+  }
+  for (const key of ['independenceUnit', 'design', 'sampleSize', 'seed', 'stoppingRule', 'coverage', 'noRepeatToGreen']) {
+    invariant(typeof value.statsMde?.[key] === 'string', `stats/MDE ${key} отсутствует`);
+  }
+  for (const key of ['preserve', 'rawAndDigest', 'retention', 'forcedGc', 'denominators']) {
+    invariant(value.observationPolicy?.[key] !== undefined, `observation policy ${key} отсутствует`);
+  }
+  for (const key of ['aaBand', 'positiveDetection', 'failClosed', 'staleProfile']) {
+    invariant(typeof value.calibration?.[key] === 'string', `calibration ${key} отсутствует`);
+  }
   return true;
 }

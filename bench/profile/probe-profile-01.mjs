@@ -15,6 +15,7 @@ import {
   preregistrationDigest,
   verifyPreregistration,
 } from './profile-01-preregistration.mjs';
+import { PREREG_OWN_PATHS, makeGit } from './profile-git-proof.mjs';
 
 function fail(message) {
   throw new Error(`PROFILE-01 probe (fail-closed): ${message}`);
@@ -25,49 +26,7 @@ function arg(name) {
   return index === -1 ? undefined : process.argv[index + 1];
 }
 
-function gitHead(cwd) {
-  try {
-    return execFileSync('git', ['rev-parse', 'HEAD'], { cwd, encoding: 'utf8' }).trim();
-  } catch {
-    fail('git недоступен для доказательства provenance');
-  }
-}
-
-function gitBlob(cwd, rev, path) {
-  try {
-    return execFileSync('git', ['rev-parse', `${rev}:${path}`], { cwd, encoding: 'utf8' }).trim();
-  } catch {
-    fail(`git не смог доказать blob ${path}@${rev}`);
-  }
-}
-
-function gitDiffNames(cwd, base, head) {
-  try {
-    const output = execFileSync('git', ['diff', '--name-only', `${base}`, `${head}`], { cwd, encoding: 'utf8' });
-    return output.split('\n').map((line) => line.trim()).filter(Boolean);
-  } catch {
-    fail(`git не смог доказать эквивалентность дерева ${base}..${head}`);
-  }
-}
-
-function isAncestor(cwd, base) {
-  try {
-    execFileSync('git', ['merge-base', '--is-ancestor', base, 'HEAD'], { cwd, stdio: 'ignore' });
-    return true;
-  } catch {
-    return false;
-  }
-}
-
-// Измеряемое дерево обязано совпадать с PRODUCT_BASE везде, кроме самих
-// файлов preregistration-пакета. Это позволяет снимать old-vector на
-// PR-ветке, выросшей из PRODUCT_BASE, с доказанной эквивалентностью.
-const PREREG_OWN_PATHS = Object.freeze([
-  'bench/profile/profile-01-preregistration.mjs',
-  'bench/profile/probe-profile-01.mjs',
-  'bench/profile/validate-profile-01.mjs',
-  '.github/workflows/profile-01.yml',
-]);
+const git = makeGit(fail);
 
 function runSizeGate(repoRoot) {
   // scripts/size-gate.mjs не имеет --json: сырьём является точный stdout
@@ -85,6 +44,26 @@ function runSizeGate(repoRoot) {
   }
 }
 
+function writeArtifact(outDir, artifact, head, digest) {
+  const rawPath = join(outDir, `profile-01-${artifact.mode}-${head.slice(0, 12)}.json`);
+  writeFileSync(rawPath, `${JSON.stringify(artifact, null, 2)}\n`);
+  const rawDigest = createHash('sha256').update(JSON.stringify(artifact)).digest('hex');
+  // eslint-disable-next-line no-console
+  console.log(JSON.stringify({ rawPath, rawDigest, preregistrationDigest: digest, admission: artifact.admission }));
+}
+
+// Post-measurement отказ обязан сначала Persist артефакт с причиной
+// (OBSERVATION_POLICY: failures сохраняются с digest), затем fail.
+// Pre-measurement отказы (ancestry/blob/diff до runSizeGate) остаются
+// fail-fast без артефакта: измерения ещё не было.
+function persistAndFail(outDir, artifact, head, digest, reason) {
+  artifact.finishedAtUtc = new Date().toISOString();
+  artifact.admission = 'NOT-GRANTED';
+  artifact.rejection = reason;
+  writeArtifact(outDir, artifact, head, digest);
+  fail(reason);
+}
+
 function main() {
   const repoRoot = resolve(join(new URL('.', import.meta.url).pathname, '..', '..'));
   const mode = arg('--mode') ?? fail('требуется --mode old-vector|aa|ab');
@@ -98,7 +77,7 @@ function main() {
   const digest = preregistrationDigest(PROFILE_01);
 
   // 2. Точный base/provenance.
-  const head = gitHead(repoRoot);
+  const head = git.head(repoRoot);
   const artifact = {
     node: 'PROFILE-01',
     revision: 'r11',
@@ -117,27 +96,34 @@ function main() {
     calibration: {},
     costVector: null,
     admission: 'NOT-GRANTED',
+    rejection: null,
   };
 
   if (mode === 'old-vector') {
     const base = PROFILE_01.productBase.mainSha;
-    if (!isAncestor(repoRoot, base)) fail(`old-vector требует HEAD, выросший из PRODUCT_BASE ${base}`);
-    const sizeGateBlob = gitBlob(repoRoot, 'HEAD', 'scripts/size-gate.mjs');
+    if (!git.ancestor(repoRoot, base)) fail(`old-vector требует HEAD, выросший из PRODUCT_BASE ${base}`);
+    const sizeGateBlob = git.blob(repoRoot, 'HEAD', 'scripts/size-gate.mjs');
     if (sizeGateBlob !== '4b0f181212b65a881e750e84564778f5828448a3') {
       fail(`size-gate provenance drifted: ${sizeGateBlob}`);
     }
-    const diffPaths = head === base ? [] : gitDiffNames(repoRoot, base, head);
+    // [0] Рабочая копия обязана совпадать с коммитом: иначе runSizeGate
+    // исполнит непроверенный файл, а baseProof этого не покажет.
+    const workingSizeGateBlob = git.workingBlob(repoRoot, 'scripts/size-gate.mjs');
+    if (workingSizeGateBlob !== sizeGateBlob) {
+      fail(`рабочая копия size-gate.mjs отличается от коммита: working ${workingSizeGateBlob}, committed ${sizeGateBlob}`);
+    }
+    const diffPaths = head === base ? [] : git.diffNames(repoRoot, base, head);
     const foreign = diffPaths.filter((path) => !PREREG_OWN_PATHS.includes(path));
     if (foreign.length > 0) fail(`измеряемое дерево отличается от PRODUCT_BASE вне prereg-пакета: ${foreign.join(', ')}`);
     artifact.sizeGateBlob = sizeGateBlob;
     artifact.baseProof = { productBase: base, head, diffPaths };
     artifact.costVector = runSizeGate(repoRoot);
     if (artifact.costVector.exitCode !== 0) {
-      fail(`старый cost vector не зелёный на PRODUCT_BASE (exit ${artifact.costVector.exitCode})`);
+      persistAndFail(outDir, artifact, head, digest, `старый cost vector не зелёный на PRODUCT_BASE (exit ${artifact.costVector.exitCode})`);
     }
     for (const [name, gate] of Object.entries(PROFILE_01.oldCostVectorGzipBytes.scenarios)) {
       if (!artifact.costVector.transcript.includes(`${name} `) && !artifact.costVector.transcript.includes(name)) {
-        fail(`транскрипт size-gate не содержит сценарий ${name}`);
+        persistAndFail(outDir, artifact, head, digest, `транскрипт size-gate не содержит сценарий ${name}`);
       }
     }
     artifact.cellsMeasured.push('desktop-size-vector');
@@ -160,18 +146,19 @@ function main() {
   artifact.calibration = { aa: 'PENDING', positive2x: 'PENDING' };
 
   // 5. Fail-closed итог: без зелёной калибровки admission запрещён.
+  // Отклонённые aa/ab обязаны Persist failure-артефакт до fail ([2]):
+  // OBSERVATION_POLICY требует сохранять failures с digest.
+  if (mode !== 'old-vector') {
+    persistAndFail(outDir, artifact, head, digest, 'aa/ab режимы требуют зелёной browser-калибровки на self-hosted runner; локальный запуск запрещён');
+  }
   const ready = mode === 'old-vector' && artifact.costVector !== null;
   artifact.finishedAtUtc = new Date().toISOString();
   artifact.admission = ready ? 'OLD-VECTOR-ONLY' : 'NOT-GRANTED';
-  if (mode !== 'old-vector') {
-    fail('aa/ab режимы требуют зелёной browser-калибровки на self-hosted runner; локальный запуск запрещён');
+  if (!ready) {
+    persistAndFail(outDir, artifact, head, digest, 'old-vector не готов: costVector отсутствует');
   }
 
-  const rawPath = join(outDir, `profile-01-${mode}-${head.slice(0, 12)}.json`);
-  writeFileSync(rawPath, `${JSON.stringify(artifact, null, 2)}\n`);
-  const rawDigest = createHash('sha256').update(JSON.stringify(artifact)).digest('hex');
-  // eslint-disable-next-line no-console
-  console.log(JSON.stringify({ rawPath, rawDigest, preregistrationDigest: digest, admission: artifact.admission }));
+  writeArtifact(outDir, artifact, head, digest);
 }
 
 main();
