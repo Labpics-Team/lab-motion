@@ -242,8 +242,10 @@ export function installShowcase() {
     else replayPreviews();
   });
   listen(window, 'pagehide', stopPreviews);
-  listen(window, 'pageshow', () => {
-    if (!document.hidden) replayPreviews();
+  listen(window, 'pageshow', (event) => {
+    // Initial pageshow follows load: installation already started the previews.
+    // Only a bfcache restore needs to restart work stopped by pagehide.
+    if (event.persisted && !document.hidden) replayPreviews();
   });
 
   const hero = document.querySelector('[data-preview="hero-orb"]')?.closest('.hero-stage');

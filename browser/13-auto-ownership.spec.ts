@@ -3,9 +3,21 @@
  * terminal fill cleanup и отсутствие retention после disconnect.
  */
 
+import type { Page } from '@playwright/test';
 import { expect, test } from './fixtures/harness';
 
 const nextTask = (): Promise<void> => new Promise((resolve) => setTimeout(resolve, 0));
+
+async function expectCollected(page: Page, hasRetainedNodes: () => boolean): Promise<void> {
+  // requestGC is a request, not a guarantee. Await the same observable property
+  // within the existing assertion timeout instead of counting host GC attempts.
+  await expect.poll(async () => {
+    await page.evaluate(nextTask);
+    await page.requestGC();
+    return page.evaluate(hasRetainedNodes);
+  }).toBe(false);
+}
+
 
 test('transfer A→B до MutationObserver callback не отбирается старым owner', async ({ page }) => {
   const result = await page.evaluate(async () => {
@@ -203,20 +215,14 @@ test('retained controls после disconnect не удерживают parent',
     retained.__autoChild = weakChild;
   });
 
-  let alive = true;
-  for (let attempt = 0; attempt < 20 && alive; attempt++) {
-    await page.evaluate(nextTask);
-    await page.requestGC();
-    alive = await page.evaluate(() => {
-      const retained = window as unknown as {
-        __autoParent: WeakRef<HTMLDivElement>;
-        __autoChild: WeakRef<HTMLDivElement>;
-      };
-      return retained.__autoParent.deref() !== undefined ||
-        retained.__autoChild.deref() !== undefined;
-    });
-  }
-  expect(alive).toBe(false);
+  await expectCollected(page, () => {
+    const retained = window as unknown as {
+      __autoParent: WeakRef<HTMLDivElement>;
+      __autoChild: WeakRef<HTMLDivElement>;
+    };
+    return retained.__autoParent.deref() !== undefined ||
+      retained.__autoChild.deref() !== undefined;
+  });
 });
 
 test('reentrant disconnect в snapshot не публикует stale strong-cache', async ({ page }) => {
@@ -254,20 +260,14 @@ test('reentrant disconnect в snapshot не публикует stale strong-cach
     retained.__staleTrigger = weakTrigger;
   });
 
-  let alive = true;
-  for (let attempt = 0; attempt < 20 && alive; attempt++) {
-    await page.evaluate(nextTask);
-    await page.requestGC();
-    alive = await page.evaluate(() => {
-      const retained = window as unknown as {
-        __staleParent: WeakRef<HTMLDivElement>;
-        __staleChild: WeakRef<HTMLDivElement>;
-        __staleTrigger: WeakRef<HTMLDivElement>;
-      };
-      return retained.__staleParent.deref() !== undefined ||
-        retained.__staleChild.deref() !== undefined ||
-        retained.__staleTrigger.deref() !== undefined;
-    });
-  }
-  expect(alive).toBe(false);
+  await expectCollected(page, () => {
+    const retained = window as unknown as {
+      __staleParent: WeakRef<HTMLDivElement>;
+      __staleChild: WeakRef<HTMLDivElement>;
+      __staleTrigger: WeakRef<HTMLDivElement>;
+    };
+    return retained.__staleParent.deref() !== undefined ||
+      retained.__staleChild.deref() !== undefined ||
+      retained.__staleTrigger.deref() !== undefined;
+  });
 });

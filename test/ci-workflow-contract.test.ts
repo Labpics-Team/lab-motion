@@ -109,7 +109,7 @@ const browserCommands = [
   'pnpm exec playwright install --with-deps ${{ matrix.browser }}',
   'pnpm typecheck:browser',
   'pnpm site:build',
-  'pnpm exec playwright test --project=${{ matrix.browser }} --shard=${{ matrix.shard }}/${{ matrix.shards }}',
+  'pnpm exec playwright test --project=${{ matrix.browser }} --shard=${{ matrix.shard }}/${{ matrix.shards }} --fail-on-flaky-tests',
 ];
 const floorCommand = 'shopt -s nullglob\narchives=(node-floor-artifact/*.tgz)\n'
   + '[[ ${#archives[@]} -eq 1 ]] \\\n'
@@ -410,7 +410,7 @@ describe('нативный граф CI', () => {
         if (part.browser === 'webkit') part.shards = 3;
       }
     }],
-    ['потеря первой половины Firefox', 'browser.yml', (w: Workflow) => {
+    ['неполный Firefox', 'browser.yml', (w: Workflow) => {
       w.jobs.conformance!.strategy!.matrix.include![1]!.shards = 2;
     }],
     ['отмена соседних browser jobs после сбоя', 'browser.yml', (w: Workflow) => {
