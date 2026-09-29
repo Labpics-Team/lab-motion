@@ -18,7 +18,7 @@ it('a late subscriber immediately observes the latest emitted value', () => {
     received.push(value);
   });
 
-  // Mutation proof: replacing `run(mv.value)` with `run(initial)` makes this RED.
+  // Контроль мутации: замена `run(mv.value)` на `run(initial)` делает тест красным.
   expect(received).toEqual([100]);
 
   unsubscribe();

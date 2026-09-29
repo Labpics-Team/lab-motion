@@ -947,8 +947,8 @@ function parseBindings(
   const raw = snapshotCollection(input, 1, budget);
   const bindings = new Array<MotionProgramBindingV1>(raw.length);
   const writers = new Set<number>();
-  // Standard writer keys are negative; escaped host keys are non-negative.
-  // Both domains are exact integers throughout the complete uint16 input box.
+  // Обычные ключи writer отрицательны, экранированные host-ключи неотрицательны.
+  // Оба домена остаются точными целыми во всём входном диапазоне uint16.
   const transformState = new Map<number, number>();
   for (let i = 0; i < raw.length; i++) {
     const tuple = snapshotExact(raw[i], 3);

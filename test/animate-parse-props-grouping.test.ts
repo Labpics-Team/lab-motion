@@ -1,16 +1,28 @@
-import { readFileSync } from 'node:fs';
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 import { parseProps, type ChannelSpec } from '../src/animate/channels.js';
+import { animate } from '../src/animate/index.js';
+import { fakeEl } from './animate-facade-helpers.js';
 
 function channelKeys(specs: readonly ChannelSpec[] | undefined): string[] {
   return specs?.map((spec) => spec._key) ?? [];
 }
 
-function hasSingleGroupingOwner(source: string): boolean {
-  return (
-    source.includes('const groups = parseProps(requireAnimateProps(props));') &&
-    !/\bgroupSpecs\s*\(/.test(source)
-  );
+function countMaps(run: () => void): number {
+  const NativeMap = globalThis.Map;
+  let allocations = 0;
+  class CountingMap<K, V> extends NativeMap<K, V> {
+    constructor(entries?: readonly (readonly [K, V])[] | null) {
+      super(entries);
+      allocations++;
+    }
+  }
+  vi.stubGlobal('Map', CountingMap);
+  try {
+    run();
+  } finally {
+    vi.unstubAllGlobals();
+  }
+  return allocations;
 }
 
 describe('animate: владение группировкой parseProps', () => {
@@ -41,22 +53,27 @@ describe('animate: владение группировкой parseProps', () => 
     expect(channelKeys(groups.get('transform'))).toEqual(['scaleY', 'scaleX']);
   });
 
-  it('оставляет parseProps единственным владельцем группировки в animate', () => {
-    const source = readFileSync(
-      new URL('../src/animate/index.ts', import.meta.url),
-      'utf8',
-    );
+  it('не материализует второй Map группировки в публичном animate', () => {
+    const target = fakeEl().el;
+    const allocations = countMaps(() => {
+      void animate(
+        target,
+        { opacity: [0, 1] },
+        { matchMedia: () => ({ matches: true }) },
+      );
+    });
 
-    expect(hasSingleGroupingOwner(source)).toBe(true);
+    // parseProps + registry owner + numeric state + residuals.
+    // Любой второй группирующий Map увеличивает этот счётчик.
+    expect(allocations).toBe(4);
   });
 
-  it('структурный gate ловит возвращение второго группирующего прохода', () => {
-    const mutant = `
-const specs = parseProps(requireAnimateProps(props));
-function groupSpecs(specs) { return new Map(); }
-const groups = groupSpecs(specs);
-`;
+  it('allocation-oracle различает дополнительную материализацию группы', () => {
+    const allocations = countMaps(() => {
+      const groups = parseProps({ opacity: [0, 1] });
+      void new Map(groups);
+    });
 
-    expect(hasSingleGroupingOwner(mutant)).toBe(false);
+    expect(allocations).toBe(2);
   });
 });
