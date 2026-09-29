@@ -90,6 +90,10 @@ jobs:
           done
 
       - name: Опубликовать raw-артефакт
+        # if: always() — failure-артефакты (NOT-GRANTED с rejection) обязаны
+        # загружаться даже после failed probe ([1]): OBSERVATION_POLICY
+        # требует сохранять failures, иначе отрицательный результат теряется.
+        if: always()
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
         with:
           name: profile-01-raw-${{ github.sha }}
