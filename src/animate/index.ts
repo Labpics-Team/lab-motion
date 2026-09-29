@@ -65,7 +65,6 @@ import {
   sharedV0,
   type AnimatableElement,
   type BoundGroup,
-  type ChannelSpec,
   type GroupKey,
   type GroupOwner,
   type GroupRecord,
@@ -275,19 +274,6 @@ function resolveTargets(target: unknown): AnimatableElement[] {
   return snapshot as AnimatableElement[];
 }
 
-// ─── Группировка спецификаций ────────────────────────────────────────────────
-
-function groupSpecs(specs: readonly ChannelSpec[]): Map<GroupKey, ChannelSpec[]> {
-  const groups = new Map<GroupKey, ChannelSpec[]>();
-  for (const spec of specs) {
-    const list = groups.get(spec._group);
-    // Map создаётся здесь и хранит только непустые массивы.
-    if (list) list.push(spec);
-    else groups.set(spec._group, [spec]);
-  }
-  return groups;
-}
-
 // ─── Снап (единая reduced-политика пакета: мгновенный финал, без кадров) ─────
 
 function writeSnap(el: AnimatableElement, group: GroupKey, bound: BoundGroup): void {
@@ -362,7 +348,7 @@ export function animate(
   const baseDelay = resolveDelay(options.delay);
   const staggerInput = options.stagger;
   if (typeof staggerInput === 'number') resolveDelay(staggerInput);
-  const specs = parseProps(requireAnimateProps(props));
+  const groups = parseProps(requireAnimateProps(props));
   const els = resolveTargets(target);
   let targetDelays: number[] | undefined;
   if (staggerInput !== undefined) {
@@ -395,7 +381,6 @@ export function animate(
   //    bindGroup снимает живой state, но не прерывает владельца. Поэтому ни
   //    поздний DOM-read, ни ошибка привязки не оставят ранние цели уже
   //    запущенными; браузер также не увидит чередование read→write→read.
-  const groups = groupSpecs(specs);
   const plan: PlannedGroup[] = [];
   for (let i = 0; i < els.length; i++) {
     const el = els[i]!;

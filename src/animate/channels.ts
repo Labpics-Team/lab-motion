@@ -100,8 +100,14 @@ function parseCssValue(v: unknown): ValueAST {
  * ДО каких-либо записей в стиль (не-конечные числа, целиком 'transform',
  * нераспознанные CSS-значения). Пара [from, to] задаёт явный from.
  */
-export function parseProps(props: Record<string, unknown>): ChannelSpec[] {
-  const specs: ChannelSpec[] = [];
+function addSpec(groups: Map<GroupKey, ChannelSpec[]>, spec: ChannelSpec): void {
+  const list = groups.get(spec._group);
+  if (list) list.push(spec);
+  else groups.set(spec._group, [spec]);
+}
+
+export function parseProps(props: Record<string, unknown>): Map<GroupKey, ChannelSpec[]> {
+  const groups = new Map<GroupKey, ChannelSpec[]>();
   const keys = Object.keys(props);
   for (const key of keys) {
     const raw = props[key];
@@ -122,16 +128,16 @@ export function parseProps(props: Record<string, unknown>): ChannelSpec[] {
       // перехватываемого канала остаются явными.
       if (key === 'scale') {
         if (!keys.includes('scaleX')) {
-          specs.push({ _kind: 'num', _key: 'scaleX', _group: group, _explicitFrom: explicitFrom, _to: to });
+          addSpec(groups, { _kind: 'num', _key: 'scaleX', _group: group, _explicitFrom: explicitFrom, _to: to });
         }
         if (!keys.includes('scaleY')) {
-          specs.push({ _kind: 'num', _key: 'scaleY', _group: group, _explicitFrom: explicitFrom, _to: to });
+          addSpec(groups, { _kind: 'num', _key: 'scaleY', _group: group, _explicitFrom: explicitFrom, _to: to });
         }
       } else {
-        specs.push({ _kind: 'num', _key: key, _group: group, _explicitFrom: explicitFrom, _to: to });
+        addSpec(groups, { _kind: 'num', _key: key, _group: group, _explicitFrom: explicitFrom, _to: to });
       }
     } else {
-      specs.push({
+      addSpec(groups, {
         _kind: 'css',
         _key: key,
         _group: camelToKebab(key),
@@ -140,7 +146,7 @@ export function parseProps(props: Record<string, unknown>): ChannelSpec[] {
       });
     }
   }
-  return specs;
+  return groups;
 }
 
 // ─── Привязанные каналы (живое состояние прогона) ────────────────────────────
