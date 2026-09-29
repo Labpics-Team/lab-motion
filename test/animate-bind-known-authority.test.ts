@@ -64,7 +64,7 @@ describe('bindGroup transform key authority', () => {
 
   it('does not materialize a second key Set for settled state', () => {
     const { result: bound, allocations } = countSetAllocations(() =>
-      bindGroup(element, 'transform', parseProps({ x: [0, 100] }), record()),
+      bindGroup(element, 'transform', parseProps({ x: [0, 100] }).get('transform')!, record()),
     );
 
     expect(allocations).toBe(1);
@@ -90,7 +90,7 @@ describe('bindGroup transform key authority', () => {
     };
 
     const { result: bound, allocations } = countSetAllocations(() =>
-      bindGroup(element, 'transform', parseProps({ x: [0, 100] }), record(owner)),
+      bindGroup(element, 'transform', parseProps({ x: [0, 100] }).get('transform')!, record(owner)),
     );
 
     expect(allocations).toBe(1);
@@ -104,7 +104,7 @@ describe('bindGroup transform key authority', () => {
     const ownerBound = bindGroup(
       element,
       'transform',
-      parseProps({ x: [0, 100] }),
+      parseProps({ x: [0, 100] }).get('transform')!,
       rec,
     );
     const owner = new MainUnit({
@@ -122,7 +122,7 @@ describe('bindGroup transform key authority', () => {
 
     try {
       const { result: bound, allocations } = countSetAllocations(() =>
-        bindGroup(element, 'transform', parseProps({ y: [0, 50] }), rec),
+        bindGroup(element, 'transform', parseProps({ y: [0, 50] }).get('transform')!, rec),
       );
 
       expect(allocations).toBe(1);
