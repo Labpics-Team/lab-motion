@@ -1,10 +1,10 @@
-/** Memory witnesses use the same browser options in a dedicated worker process. */
+/** Проверки освобождения памяти: отдельный процесс с прежними параметрами браузера. */
 import type { Page } from '@playwright/test';
 import { expect, test } from './fixtures/harness';
 
-// launchOptions is worker-scoped: this pass-through gives memory witnesses their
-// own browser process without changing inherited options, devices or diagnostics.
-// Unrelated browser history must not become a root in the controls-retention proof.
+// launchOptions задаётся на процесс: переопределение отделяет проверки памяти,
+// сохраняя параметры движка, устройства и диагностику. История других сценариев
+// не должна влиять на проверку освобождения ресурсов сохранённого controls.
 test.use({
   launchOptions: async ({ launchOptions }, use) => { await use(launchOptions); },
 });
@@ -12,8 +12,8 @@ test.use({
 const nextTask = (): Promise<void> => new Promise((resolve) => setTimeout(resolve, 0));
 
 async function expectCollected(page: Page, hasRetainedNodes: () => boolean): Promise<void> {
-  // requestGC is a request, not a guarantee. Await the same observable property
-  // within the existing assertion timeout instead of counting host GC attempts.
+  // requestGC запрашивает сборку, но не гарантирует её завершение. Проверяем
+  // освобождение в прежнем таймауте, а не произвольное число попыток сборщика.
   await expect.poll(async () => {
     await page.evaluate(nextTask);
     await page.requestGC();
