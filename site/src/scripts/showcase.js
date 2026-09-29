@@ -242,8 +242,10 @@ export function installShowcase() {
     else replayPreviews();
   });
   listen(window, 'pagehide', stopPreviews);
-  listen(window, 'pageshow', () => {
-    if (!document.hidden) replayPreviews();
+  listen(window, 'pageshow', (event) => {
+    // При первом pageshow сцены уже запущены установкой обработчиков.
+    // Возобновление после pagehide нужно только при восстановлении из bfcache.
+    if (event.persisted && !document.hidden) replayPreviews();
   });
 
   const hero = document.querySelector('[data-preview="hero-orb"]')?.closest('.hero-stage');

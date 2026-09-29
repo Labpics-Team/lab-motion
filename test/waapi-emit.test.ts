@@ -537,9 +537,13 @@ describe('waapi: детерминизм', () => {
 describe('waapi-api-surface-pin', () => {
   it('ровно запиненный набор runtime-экспортов', () => {
     expect(Object.keys(waapi).sort()).toEqual([
+      'animateScrollWaapi',
+      'animateViewWaapi',
       'animateWaapi',
       'compileWaapi',
       'easingToLinear',
+      'supportsScrollTimeline',
+      'supportsViewTimeline',
       'supportsWaapi',
     ]);
   });

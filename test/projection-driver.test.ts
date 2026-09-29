@@ -743,3 +743,44 @@ describe('projection/driver: clamp — дефолт FALSE (осознанное 
     expect(Math.max(...txs)).toBeLessThanOrEqual(0);
   });
 });
+
+
+describe('projection/driver: единственная физическая frame-reservation', () => {
+  it('mid-flight play заменяет stale callback, не добавляя второй pending rAF', () => {
+    const clock = makeClock();
+    const controls = createProjection({ requestFrame: clock.requestFrame, onFrame: () => {} });
+    controls.play([{ id: 'a', first: F, last: L }]);
+    expect(clock.pending()).toBe(1);
+
+    controls.play([{ id: 'a', last: { x: 300, y: 0, width: 100, height: 100 } }]);
+    expect(clock.pending()).toBe(1);
+
+    clock.step(16);
+    expect(clock.pending()).toBe(1);
+    controls.cancel();
+    clock.step(16);
+    expect(clock.pending()).toBe(0);
+  });
+});
+
+describe('projection/driver: throwing requestFrame lifecycle', () => {
+  it('синхронный requestFrame error терминализирует run до повторного выброса', () => {
+    let captured: ((ts?: number) => void) | undefined;
+    const boom = new Error('frame boom');
+    const controls = createProjection({
+      requestFrame: (cb: (ts?: number) => void) => {
+        captured = cb;
+        throw boom;
+      },
+      onFrame: () => {},
+    });
+
+    expect(() => controls.play([{ id: 'a', first: F, last: L }])).toThrow(boom);
+    expect(controls.playing, 'RED requestFrame throw must cancel active run').toBe(false);
+    expect(controls.velocity).toBe(0);
+    const progress = controls.progress;
+    captured?.(16);
+    expect(controls.playing).toBe(false);
+    expect(controls.progress).toBe(progress);
+  });
+});

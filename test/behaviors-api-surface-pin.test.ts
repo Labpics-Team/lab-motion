@@ -1,7 +1,7 @@
 /**
  * test/behaviors-api-surface-pin.test.ts — пин публичной поверхности ./behaviors.
  * Класс: Б (contract pin). Пин в ОБЕ стороны (North-инвариант): пропавший И
- * лишний runtime-экспорт = красный. Ровно 4 фабрики; типы (BehaviorState,
+ * лишний runtime-экспорт = красный. Ровно 5 runtime-фабрик; типы (BehaviorState,
  * SheetController, …) стираются в рантайме и в Object.keys не попадают.
  *
  * RED PROOF (2026-07-10, заглушка src/behaviors `export {}`): «missing»-ассерт
@@ -19,10 +19,11 @@ const EXPECTED_EXPORTS = [
   'createCarousel',
   'createDragDismiss',
   'createPullToRefresh',
+  'createStateCascade',
 ] as const;
 
 describe('./behaviors public API surface pin (в обе стороны)', () => {
-  it('экспортирует ровно 4 контрактных runtime-фабрики — ни больше, ни меньше', () => {
+  it('экспортирует ровно 5 контрактных runtime-фабрик — ни больше, ни меньше', () => {
     const exported = new Set(Object.keys(behaviors));
     const expected = new Set<string>(EXPECTED_EXPORTS);
 
@@ -39,6 +40,23 @@ describe('./behaviors public API surface pin (в обе стороны)', () => 
     for (const name of EXPECTED_EXPORTS) {
       expect(typeof (behaviors as Record<string, unknown>)[name]).toBe('function');
     }
+  });
+
+  it('mutable geometry остаётся у существующих sheet/pager owners', () => {
+    expect(typeof behaviors.createBottomSheet({ snapPoints: [0, 100] }).update).toBe('function');
+    expect(typeof behaviors.createCarousel({ pageCount: 2, pageSize: 100 }).update).toBe('function');
+  });
+
+  it('новый strict update не меняет legacy normalization конструкторов', () => {
+    const sheet = behaviors.createBottomSheet({ snapPoints: [Number.NaN, Number.POSITIVE_INFINITY] });
+    sheet.snapTo(1);
+    expect(sheet.state.value).toBe(Number.MAX_VALUE);
+    expect(() => sheet.update([0, Number.POSITIVE_INFINITY])).toThrowError(MotionParamError);
+
+    const carousel = behaviors.createCarousel({ pageCount: 2.5, pageSize: Number.POSITIVE_INFINITY });
+    carousel.goTo(2);
+    expect(carousel.state.index).toBe(1);
+    expect(() => carousel.update(2.5, 100)).toThrowError(MotionParamError);
   });
 });
 
@@ -62,10 +80,8 @@ describe('./behaviors: единый контракт BehaviorState { value, velo
 });
 
 describe('./behaviors: cancel()/destroy() обрывают ЖИВОЙ жест во всех четырёх машинах (B3)', () => {
-  // cancel/destroy живут на общей базе и не видят контроллер-локальный `dragging`;
-  // каждая фабрика ОБЯЗАНА зарегистрировать сброс через base.setAbort. Забытая
-  // регистрация в любой из четырёх = воскрешение движения следующим pointerMove.
-  // Параметризуем по всем машинам, чтобы дыра ловилась независимо от фабрики.
+  // Follow-lifetime принадлежит общей state machine: после cancel/destroy
+  // следующий pointerMove обязан быть инертным независимо от конкретной фабрики.
   type Point = ReturnType<typeof pt>;
   interface Draggable {
     pointerDown(p: Point): void;

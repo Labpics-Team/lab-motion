@@ -121,7 +121,11 @@ function finiteDiv(num: number, den: number, fallback: number): number {
 
 /** Конечный lerp со схлопом −0 (P1). @internal — переиспользует driver (ребейз). */
 export function lerp1(a: number, b: number, t: number): number {
-  return finite(finite(a) + (finite(b) - finite(a)) * t) + 0;
+  const x = finite(a);
+  const y = finite(b);
+  if (t === 1) return y + 0;
+  const d = y - x;
+  return finite(Number.isFinite(d) ? x + d * t : x * (1 - t) + y * t) + 0;
 }
 
 /** @internal */
@@ -129,6 +133,12 @@ export function clamp01(x: number): number {
   const f = Number.isNaN(x) ? 0 : x;
   return f < 0 ? 0 : f > 1 ? 1 : f;
 }
+
+/** Driver-private page-position carry shared by analytic pickup and tree projection. @internal */
+export function carryPositionAxis(base: number, q: number, correction: number): number {
+  return correction === 0 ? base : finite(base + correction * q) + 0;
+}
+
 
 // ─── Внутренние мутируемые формы (переиспользование без аллокаций) ───────────
 
@@ -148,10 +158,10 @@ interface MutableTransform {
 
 /** Покомпонентный lerp в out; p уже санирован (NaN→0). Размеры флорятся ≥ 0. */
 function mixInto(first: FlipRect, last: FlipRect, t: number, out: MutableRect): MutableRect {
-  out.x = finite(finite(first.x) + (finite(last.x) - finite(first.x)) * t) + 0;
-  out.y = finite(finite(first.y) + (finite(last.y) - finite(first.y)) * t) + 0;
-  const w = finite(finite(first.width) + (finite(last.width) - finite(first.width)) * t) + 0;
-  const h = finite(finite(first.height) + (finite(last.height) - finite(first.height)) * t) + 0;
+  out.x = lerp1(first.x, last.x, t);
+  out.y = lerp1(first.y, last.y, t);
+  const w = lerp1(first.width, last.width, t);
+  const h = lerp1(first.height, last.height, t);
   // Floor размеров: overshoot позиции честный, зеркалирование отрицательным scale — нет.
   out.width = w < 0 ? 0 : w;
   out.height = h < 0 ? 0 : h;
@@ -277,8 +287,8 @@ export function cornerRadiusAt(
   p: number,
 ): CornerRadius {
   const t = clamp01(p); // прогресс радиуса клампится: overshoot на радиус не транслируем
-  let rx = finite(finite(first.x) + (finite(last.x) - finite(first.x)) * t);
-  let ry = finite(finite(first.y) + (finite(last.y) - finite(first.y)) * t);
+  let rx = lerp1(first.x, last.x, t);
+  let ry = lerp1(first.y, last.y, t);
   if (rx < 0) rx = 0;
   if (ry < 0) ry = 0;
   // Живые вызовы ./flip: x/y-полуоси корректируются независимо (эллиптический угол).
@@ -331,7 +341,19 @@ function isDegenerateBox(b: FlipRect): boolean {
  * ПЕРЕЯКОРИВАЮТСЯ к следующему невырожденному проецирующему предку (один раз);
  * finiteDiv остаётся вторым эшелоном (враждебный NaN в середине полёта).
  */
-export function createProjector(nodes: readonly ProjectionNodeInit[]): Projector {
+/** Driver задаёт остаточную скорость; отсутствие коэффициента означает ноль, не ошибку. @internal */
+export interface DriverProjectionNodeInit extends ProjectionNodeInit {
+  _qx?: number;
+  _qy?: number;
+}
+
+/** Внутренний потребитель базиса; коэффициенты принадлежат driver. @internal */
+export interface DriverProjector extends Projector {
+  at(p: number, positionBasisValue?: number): readonly ProjectionFrame[];
+}
+
+/** Реализация читает остаточный базис без изменения данных владельца. */
+export function createProjector(nodes: readonly Readonly<DriverProjectionNodeInit>[]): DriverProjector {
   const count = nodes.length;
 
   // Валидация id (рано, с именем виновника).
@@ -362,6 +384,7 @@ export function createProjector(nodes: readonly ProjectionNodeInit[]): Projector
       throw new MotionParamError('LM081');
     }
   }
+
 
   // Parent-ссылки (лес: у узла не больше одного родителя).
   const parentIdx: (number | null)[] = new Array(count);
@@ -460,8 +483,9 @@ export function createProjector(nodes: readonly ProjectionNodeInit[]): Projector
   const v: MutableRect = { x: 0, y: 0, width: 0, height: 0 };
   const order: readonly string[] = orderIdx.map((i) => nodes[i].id);
 
-  const at = (p: number): readonly ProjectionFrame[] => {
+  const at = (p: number, positionBasisValue = 0): readonly ProjectionFrame[] => {
     const t = Number.isNaN(p) ? 0 : p; // санация p — паритет flipAtRaw (NaN → 0)
+    const q = finite(positionBasisValue);
     const tc = clamp01(t);
     for (let oi = 0; oi < orderIdx.length; oi++) {
       const i = orderIdx[oi];
@@ -471,10 +495,18 @@ export function createProjector(nodes: readonly ProjectionNodeInit[]): Projector
       const node = nodes[i];
       const frame = frames[oi];
       mixInto(node.first, node.last, t, v);
+      // Linear second-order spring solution: page position = scalar path + u·Q(t).
+      // Q(0)=0 and Q'(0)=1, so this preserves C0 while carrying only the
+      // independent x/y boundary velocity not representable by one scalar p.
+      const vectorNode: Readonly<DriverProjectionNodeInit> = node;
+      const bx = q === 0 ? 0 : (vectorNode._qx ?? 0);
+      const by = q === 0 ? 0 : (vectorNode._qy ?? 0);
+      v.x = carryPositionAxis(v.x, q, bx);
+      v.y = carryPositionAxis(v.y, q, by);
 
       const a = liveAncestor[i];
       if (a === null) {
-        if (anchorIsLast[i]) {
+        if (anchorIsLast[i] && bx === 0 && by === 0) {
           rootFlipInto(node.first, node.last, t, frame);
           // k корня = V.size ⊘ B.size = эмитированный s (k_A = 1) — бит-консистентно
           // с фактически применённым масштабом.
@@ -512,8 +544,8 @@ export function createProjector(nodes: readonly ProjectionNodeInit[]): Projector
         for (let c = 0; c < 4; c++) {
           const rf = radii.first[c];
           const rl = radii.last[c];
-          let rx = finite(finite(rf.x) + (finite(rl.x) - finite(rf.x)) * tc);
-          let ry = finite(finite(rf.y) + (finite(rl.y) - finite(rf.y)) * tc);
+          let rx = lerp1(rf.x, rl.x, tc);
+          let ry = lerp1(rf.y, rl.y, tc);
           if (rx < 0) rx = 0;
           if (ry < 0) ry = 0;
           // Скалярный путь делает два деления на угол вместо четырёх: публичный

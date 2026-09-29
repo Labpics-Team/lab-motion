@@ -14,36 +14,15 @@
  *   - Возврат `valueAt: () => 0` вместо `() => rest` → 'valueAt(t) === rest для любого t' падает.
  *   - `isSettledAt: () => false` → 'isSettledAt всегда true' падает.
  *   - Отсутствие reduced-веток (полный hard-off: throw/undefined) → 'модель существует' падает.
+ *   - Неверный media query → shared query-sensitive seam вернёт false → reduced-тесты падают.
  */
 
 import { describe, expect, it } from 'vitest';
 import { createDecay } from '../src/decay.js';
+import { reducedMotionMedia } from './helpers/reduced-motion.js';
 
-function makeReduceMedia(): (query: string) => MediaQueryList {
-  return (): MediaQueryList => ({
-    matches: true,
-    media: '',
-    onchange: null,
-    addListener: () => {},
-    removeListener: () => {},
-    addEventListener: () => {},
-    removeEventListener: () => {},
-    dispatchEvent: () => false,
-  });
-}
-
-function makeNoPreferenceMedia(): (query: string) => MediaQueryList {
-  return (): MediaQueryList => ({
-    matches: false,
-    media: '',
-    onchange: null,
-    addListener: () => {},
-    removeListener: () => {},
-    addEventListener: () => {},
-    removeEventListener: () => {},
-    dispatchEvent: () => false,
-  });
-}
+const makeReduceMedia = () => reducedMotionMedia(true);
+const makeNoPreferenceMedia = () => reducedMotionMedia(false);
 
 describe('decay — reduced-motion: CHARACTER-switch', () => {
   it('reduced flag reflects matchMedia(prefers-reduced-motion)', () => {
@@ -82,8 +61,6 @@ describe('decay — reduced-motion: CHARACTER-switch', () => {
   });
 
   it('CHARACTER not hard-off: rest всё ещё несёт содержательное конечное значение, а не 0/NaN по умолчанию', () => {
-    // from=10, velocity=800 → амплитуда != 0 → rest !== from (реальная точка покоя посчитана,
-    // а не просто «анимация отключена»).
     const m = createDecay({ from: 10, velocity: 800, matchMedia: makeReduceMedia() });
     expect(Number.isFinite(m.rest)).toBe(true);
     expect(m.rest).not.toBe(10);

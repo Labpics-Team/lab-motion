@@ -8,8 +8,10 @@ describe('README: проверяемые факты публичной пове�
     const { subpaths } = collectInventory(ROOT);
     const nestedSubpaths = subpaths.filter((subpath) => subpath !== '.').length;
 
+    const form = new Intl.PluralRules('ru').select(nestedSubpaths);
+    const noun = form === 'one' ? 'субпуть' : form === 'few' ? 'субпути' : 'субпутей';
     expect(readme).toContain(
-      'Корневой экспорт + ' + nestedSubpaths + ' субпутей (входов `exports` в `package.json` — ' + subpaths.length + ')'
+      'Корневой экспорт + ' + nestedSubpaths + ' ' + noun + ' (входов `exports` в `package.json` — ' + subpaths.length + ')'
     );
   });
 

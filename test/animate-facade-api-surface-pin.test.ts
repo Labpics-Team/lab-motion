@@ -17,11 +17,11 @@ import { describe, expect, it } from 'vitest';
 import * as animateModule from '../src/animate/index.js';
 
 /**
- * Ровно один runtime-экспорт: сама функция фасада. Типы (AnimateControls,
+ * Runtime-экспорты: фасад и его область компонентного lifecycle. Типы (AnimateControls,
  * AnimateOptions, AnimateProps, AnimateTarget, AnimatableElement) — type-only,
  * стираются при рантайме и в этот пин не входят.
  */
-const EXPECTED_EXPORTS = new Set(['animate']);
+const EXPECTED_EXPORTS = new Set(['animate', 'createAnimateScope']);
 
 describe('./animate — пин публичной поверхности (инвариант 6)', () => {
   it('экспортирует ровно контрактные имена — не больше и не меньше', () => {

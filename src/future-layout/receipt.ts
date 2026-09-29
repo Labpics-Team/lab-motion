@@ -44,6 +44,8 @@ export interface SurfaceReceipt {
   readonly browserObservedMaximumPx?: number;
 }
 
+const EXPLICIT_LINEAR_NUMBER = /^[+-]?(?:\d+(?:\.\d+)?|\.\d+)(?:e[+-]?\d+)?$/i;
+
 /** Diagnostics-only parser канонического explicit `linear(value percent%, …)`.
  * Runtime хранит только реально исполняемую CSS-строку; proof receipt платит за
  * числовое представление только при явном построении диагностики. */
@@ -62,8 +64,13 @@ function parseExplicitLinearSamples(css: string): Float64Array {
     if (tokens.length !== 2 || !tokens[1]!.endsWith('%')) {
       throw new Error('surface receipt: stop без explicit percent');
     }
-    const value = Number(tokens[0]);
-    const percent = Number(tokens[1]!.slice(0, -1));
+    const valueToken = tokens[0]!;
+    const percentToken = tokens[1]!.slice(0, -1);
+    if (!EXPLICIT_LINEAR_NUMBER.test(valueToken) || !EXPLICIT_LINEAR_NUMBER.test(percentToken)) {
+      throw new Error('surface receipt: нечисловой linear()-stop');
+    }
+    const value = Number(valueToken);
+    const percent = Number(percentToken);
     if (!Number.isFinite(value) || !Number.isFinite(percent)) {
       throw new Error('surface receipt: нечисловой linear()-stop');
     }

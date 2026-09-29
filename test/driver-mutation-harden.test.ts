@@ -1,19 +1,21 @@
 /**
  * test/driver-mutation-harden.test.ts — S44: закалка mutation-покрытия driver.ts.
  *
- * Baseline Stryker: 44.26% (ниже break=76, 94 выживших + 71 no-cov). driver —
- * scrubbable playback-driver (timeScale/seek/play/pause/reverse/complete/cancel/
- * thenable/reduced/overflow). Инжектируемый клок (handle>0 → requestFrame-путь) →
- * детерминизм. Робастные оракулы: эндпоинты, settle-поведение, promise, монотонность.
+ * Исторический RED: первый Stryker-прогон дал 44.26% (94 survived + 71 no-cov),
+ * волны 1+2 подняли его до 61.49%, но phase-2b остался ниже admission floor.
+ * Эти числа сохраняют происхождение среза, но НЕ описывают текущую силу suite.
  *
- * СТАТУС: ЧАСТИЧНАЯ закалка (волны 1+2) 44.26%→61.49% — thenable покрыт с нуля,
- * no-cov 71→22 (почти устранён), +48 мутантов убито. driver — сложный ~5-волновой
- * stateful-модуль; ПОКА НЕ в Stryker-scope (ниже break=76). Остаток: часть killable
- * (convergence-порог 278/279 как в motion-value; setTimeout-fallback 382; reverse-
- * внутренности 344/351; progress-getter 429 — phase-2b), часть ЭКВИВАЛЕНТЫ (блок внизу).
+ * ТЕКУЩИЙ КОНТРАКТ исполняемый: `stryker.driver.config.mjs` мутирует весь
+ * `src/driver.ts`, использует capability-shaped driver suite и имеет break >=80;
+ * native `ci.yml` требует этот gate на каждом candidate. Точный mutation score
+ * принадлежит CI/report artifact конкретного SHA, а не устаревающему комментарию.
  *
- * Закрываемые КЛАССЫ (много no-cov путей — методы вообще без тестов):
- *   D1 thenable (476/481/482): await резолвится на settle (natural/complete/cancel/stop).
+ * Этот файл остаётся одной частью oracle. Точные state-machine, convergence,
+ * fallback, re-entrancy и terminal границы дополнительно закрываются соседними
+ * `driver-*-adversarial` / `driver-mutation-phase2b` тестами.
+ *
+ * Закрываемые КЛАССЫ:
+ *   D1 thenable: await резолвится на settle (natural/complete/cancel/stop).
  *   D2 complete/cancel/stop: complete→to, cancel/stop→текущее; идемпотентны.
  *   D3 seek: computeAt(t) эмит; t<0→0, NaN→игнор, +∞→complete.
  *   D4 reverse/timeScale: reverse→from; timeScale NaN→игнор; сеттер.
@@ -27,12 +29,11 @@
 import { describe, expect, it } from 'vitest';
 import { createDriver, type DriverOptions } from '../src/driver.js';
 import { MotionParamError } from '../src/index.js';
+import { reducedMotionMedia } from './helpers/reduced-motion.js';
 
 const STD_SPRING = { mass: 1, stiffness: 100, damping: 20 }; // ω0=10, ζ=1 критич.
 
-function media(reduce: boolean): (q: string) => MediaQueryList {
-  return (): MediaQueryList => ({ matches: reduce } as MediaQueryList);
-}
+const media = (reduce: boolean): ((q: string) => MediaQueryList) => reducedMotionMedia(reduce);
 
 /** Инжектируемый клок: handle>0 (requestFrame-путь), ручной drain с ts. */
 function makeClock() {

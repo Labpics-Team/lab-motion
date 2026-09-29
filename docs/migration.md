@@ -51,3 +51,36 @@ CSS-стилей. Низкоуровневые субпути не объеди�
 `time/speed/duration` getters, `reverse`, `complete` и `restart`. Публичного
 API регистрации произвольных кодеков или адаптеров целей пакет не
 предоставляет.
+
+
+## Компонентные области
+
+Для локальных селекторов и совместной остановки используйте `createAnimateScope`
+из `./animate`: создавайте scope в setup/mount и вызывайте `scope.destroy()` при
+cleanup. В React область принадлежит конкретному запуску эффекта, в Solid — owner.
+[Полные runnable-примеры](recipes.md#анимации-принадлежащие-компоненту).
+
+Это не полная замена Motion `useAnimate`, Anime Scope или GSAP Context. В частности,
+`destroy` сохраняет текущую позу согласно Lab Motion cancel и не восстанавливает
+старые inline styles, как revert. Область не владеет произвольными listeners и
+не добавляет отсутствующие keyframes/sequences/playback возможности.
+## Контролируемая перестановка вместо собственного sortable resolver
+
+Для list/grid используйте `createReorder` из `@labpics/motion/behaviors/reorder`.
+`onReorder` предлагает новый порядок, который обязан принять владелец данных,
+после чего передать новый snapshot через `update`. Это сохраняет привычную
+controlled-модель values/onReorder, но не копирует React `Reorder.Group`.
+
+Resolver headless: вместо wrapper-компонентов получает stable keys и измеренную
+geometry. Для pointer/keyboard + layout используйте [проверяемый рецепт](recipes.md#перестановка-списка-или-сетки).
+Нет неявного drag-follow, автопрокрутки, cross-list transfer или virtualizer.
+Неизмеренные ячейки не угадываются. Native TypeError/RangeError относятся к
+структуре snapshot; ошибки физики внешнего projection сохраняют свой контракт.
+## Обновление непрерывного слежения MotionValue
+
+При `setTarget` в полёте больше нет дополнительного кадра с остановленными часами.
+`value` и `velocity` на самой границе остаются прежними; следующий timestamp
+продолжает движение от времени этого snapshot. Повтор неизменной активной цели
+теперь сохраняет текущую траекторию. Код, намеренно перезапускавший движение через
+повтор `setTarget(sameTarget)`, должен явно выполнить `stop()` перед новым запуском.
+Не используйте повтор цели как способ задерживать движение на кадр.

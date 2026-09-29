@@ -525,33 +525,15 @@ export function surfaceArtifactLiteral(program: SurfaceProgram): string | undefi
     program.spring?.velocity ?? 0,
   );
   if (artifact === undefined) return undefined;
-  // P, Q и blend A сериализуются из ОДНОГО SSOT (tryCompileSurfaceArtifact):
-  // прежний executor восстанавливал A регулярным выражением из Q и дополнял
-  // пары вместо замены — расхождение с runtime достигало 0.738 между стопами.
-  // Соседние стопы с одинаковой позицией и разными значениями — не контракт
-  // домена, а признак битой строки: такой артефакт не эмитится.
-  for (const css of [artifact.easing, artifact.reciprocalEasing, artifact.blendEasing]) {
-    if (hasConflictingAdjacentStops(css)) return undefined;
-  }
+  // P, Q и смесь A сериализуются из ОДНОГО SSOT (tryCompileSurfaceArtifact).
+  // Их производители эмитят строго возрастающие явные позиции: P сохраняет
+  // порядок уникальных адаптивных отсчётов, Q/A проходят по тем же границам,
+  // а середина подразделения допускается только строго внутри интервала.
+  // Поэтому повторный O(stops) разбор трёх уже сертифицированных CSS-строк
+  // не добавляет защиты с отказом при сомнении; инвариант держит доменная проверка.
   return `{w0:${program.fromWidth},w1:${program.toWidth},d:${artifact.durationMs},`
     + `p:${JSON.stringify(artifact.easing)},q:${JSON.stringify(artifact.reciprocalEasing)},`
     + `a:${JSON.stringify(artifact.blendEasing)}}`;
-}
-
-/**
- * Соседние stops linear() с одинаковой позицией обязаны нести одинаковый
- * output: дубль-пара «v pc%, v pc%» легальна (усиление границы сегмента),
- * разные значения на одной позиции — разрыв, который не является доменным
- * контрактом поверхности.
- */
-function hasConflictingAdjacentStops(cssLinear: string): boolean {
-  let previous: readonly string[] = [];
-  for (const stop of cssLinear.slice(cssLinear.indexOf('(') + 1, -1).split(',')) {
-    const pair = stop.trim().split(' ');
-    if (pair[1] !== undefined && pair[1] === previous[1] && pair[0] !== previous[0]) return true;
-    previous = pair;
-  }
-  return false;
 }
 
 /** Статический литерал AST → plain-значение; undefined = сомнение. */

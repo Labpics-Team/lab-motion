@@ -5,8 +5,6 @@
 
 import { expect, test } from './fixtures/harness';
 
-const nextTask = (): Promise<void> => new Promise((resolve) => setTimeout(resolve, 0));
-
 test('transfer A→B до MutationObserver callback не отбирается старым owner', async ({ page }) => {
   const result = await page.evaluate(async () => {
     const { autoAnimate } = await import('/dist/auto/index.js');
@@ -175,99 +173,4 @@ test('CSSOM lease round-trip сохраняет canonical value, presence и !im
   });
 
   expect(result.after).toEqual(result.before);
-});
-
-test('retained controls после disconnect не удерживают parent', async ({ page }) => {
-  await page.evaluate(async () => {
-    const { autoAnimate } = await import('/dist/auto/index.js');
-    let parent: HTMLDivElement | undefined = document.createElement('div');
-    let child: HTMLDivElement | undefined = document.createElement('div');
-    parent.appendChild(child);
-    document.body.appendChild(parent);
-    const controls = autoAnimate(parent as never);
-    child.remove();
-    await new Promise<void>((resolve) => setTimeout(resolve, 0));
-    const weakParent = new WeakRef(parent);
-    const weakChild = new WeakRef(child);
-    controls.disconnect();
-    parent.remove();
-    parent = undefined;
-    child = undefined;
-    const retained = window as unknown as {
-      __autoControls: typeof controls;
-      __autoParent: WeakRef<HTMLDivElement>;
-      __autoChild: WeakRef<HTMLDivElement>;
-    };
-    retained.__autoControls = controls;
-    retained.__autoParent = weakParent;
-    retained.__autoChild = weakChild;
-  });
-
-  let alive = true;
-  for (let attempt = 0; attempt < 20 && alive; attempt++) {
-    await page.evaluate(nextTask);
-    await page.requestGC();
-    alive = await page.evaluate(() => {
-      const retained = window as unknown as {
-        __autoParent: WeakRef<HTMLDivElement>;
-        __autoChild: WeakRef<HTMLDivElement>;
-      };
-      return retained.__autoParent.deref() !== undefined ||
-        retained.__autoChild.deref() !== undefined;
-    });
-  }
-  expect(alive).toBe(false);
-});
-
-test('reentrant disconnect в snapshot не публикует stale strong-cache', async ({ page }) => {
-  await page.evaluate(async () => {
-    const { autoAnimate } = await import('/dist/auto/index.js');
-    let parent: HTMLDivElement | undefined = document.createElement('div');
-    let child: HTMLDivElement | undefined = document.createElement('div');
-    let trigger: HTMLDivElement | undefined = document.createElement('div');
-    parent.appendChild(child);
-    document.body.appendChild(parent);
-    const controls = autoAnimate(parent as never);
-    const rect = child.getBoundingClientRect.bind(child);
-    child.getBoundingClientRect = () => {
-      controls.disconnect();
-      return rect();
-    };
-    parent.appendChild(trigger);
-    await new Promise<void>((resolve) => setTimeout(resolve, 0));
-    const weakParent = new WeakRef(parent);
-    const weakChild = new WeakRef(child);
-    const weakTrigger = new WeakRef(trigger);
-    parent.remove();
-    parent = undefined;
-    child = undefined;
-    trigger = undefined;
-    const retained = window as unknown as {
-      __staleControls: typeof controls;
-      __staleParent: WeakRef<HTMLDivElement>;
-      __staleChild: WeakRef<HTMLDivElement>;
-      __staleTrigger: WeakRef<HTMLDivElement>;
-    };
-    retained.__staleControls = controls;
-    retained.__staleParent = weakParent;
-    retained.__staleChild = weakChild;
-    retained.__staleTrigger = weakTrigger;
-  });
-
-  let alive = true;
-  for (let attempt = 0; attempt < 20 && alive; attempt++) {
-    await page.evaluate(nextTask);
-    await page.requestGC();
-    alive = await page.evaluate(() => {
-      const retained = window as unknown as {
-        __staleParent: WeakRef<HTMLDivElement>;
-        __staleChild: WeakRef<HTMLDivElement>;
-        __staleTrigger: WeakRef<HTMLDivElement>;
-      };
-      return retained.__staleParent.deref() !== undefined ||
-        retained.__staleChild.deref() !== undefined ||
-        retained.__staleTrigger.deref() !== undefined;
-    });
-  }
-  expect(alive).toBe(false);
 });

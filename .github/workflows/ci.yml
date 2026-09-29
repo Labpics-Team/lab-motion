@@ -22,9 +22,9 @@ env:
 
 jobs:
   verify:
-    name: typecheck · build · test · fuzz · size · package
+    name: typecheck · build · size · package
     runs-on: ubuntu-latest
-    timeout-minutes: 25
+    timeout-minutes: 60
 
     steps:
       - name: Checkout
@@ -93,30 +93,6 @@ jobs:
           version="$(node -p "require('./package.json').version")"
           node scripts/check-release.mjs "v${version}" --validate-stored-date
 
-      - name: Vitest
-        id: vitest
-        shell: bash
-        run: |
-          set +e
-          pnpm vitest run 2>&1 | tee vitest.log
-          status=${PIPESTATUS[0]}
-          exit "$status"
-
-      - name: Upload Vitest diagnostics
-        if: failure() && steps.vitest.outcome == 'failure'
-        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
-        with:
-          name: vitest-diagnostics-${{ github.run_id }}
-          path: vitest.log
-          if-no-files-found: error
-          retention-days: 7
-
-      # Глоб вместо ручного списка: новый test/*-finiteness-fuzz.test.ts попадает в
-      # гейт автоматически (класс дрейфа «забытый файл в трёх копиях списка» закрыт;
-      # находка ревью #101 — потеря projection-fuzz при наивном разрешении конфликта).
-      - name: Fuzz · finiteness gate (virtual-time, seeded LCG, zero-dep)
-        run: pnpm vitest run --reporter=verbose test/*finiteness-fuzz.test.ts
-
       - name: Size gate
         run: pnpm size
 
@@ -148,6 +124,93 @@ jobs:
           retention-days: 1
           compression-level: 0
           overwrite: false
+
+  # Независимые проверки исполняются на разных машинах, а не конкурируют
+  # за CPU/RAM одного runner. Малый build дешевле дополнительного artifact join;
+  # каждый suite проверяет dist собственного exact checkout, без result cache.
+  tests:
+    name: test · fuzz
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    steps:
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          persist-credentials: false
+          # Release replay-тесты читают старые теги и их историю.
+          fetch-depth: 0
+
+      - name: Setup Node
+        uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v6
+        with:
+          node-version: "24"
+
+      - name: Activate pinned pnpm
+        run: |
+          corepack enable
+          corepack install --global pnpm@11.11.0
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Build
+        run: pnpm build
+
+      - name: Vitest
+        id: vitest
+        shell: bash
+        run: |
+          set +e
+          pnpm vitest run 2>&1 | tee vitest.log
+          status=${PIPESTATUS[0]}
+          exit "$status"
+
+      - name: Upload Vitest diagnostics
+        if: failure() && steps.vitest.outcome == 'failure'
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
+        with:
+          name: vitest-diagnostics-${{ github.run_id }}
+          path: vitest.log
+          if-no-files-found: error
+          retention-days: 7
+
+      # Глоб вместо ручного списка: новый test/*-finiteness-fuzz.test.ts попадает в
+      # гейт автоматически (класс дрейфа «забытый файл в трёх копиях списка» закрыт;
+      # находка ревью #101 — потеря projection-fuzz при наивном разрешении конфликта).
+      - name: Fuzz · finiteness gate (virtual-time, seeded LCG, zero-dep)
+        run: pnpm vitest run --reporter=verbose test/*finiteness-fuzz.test.ts
+
+  mutation:
+    name: driver mutation
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    steps:
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          persist-credentials: false
+
+      - name: Setup Node
+        uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v6
+        with:
+          node-version: "24"
+
+      - name: Activate pinned pnpm
+        run: |
+          corepack enable
+          corepack install --global pnpm@11.11.0
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Build
+        run: pnpm build
+
+      # Исторический phase-2b driver был оставлен ниже mutation-пола. Гейт мутирует
+      # весь src/driver.ts и использует capability-shaped suite; unknown killable
+      # survivor становится красным PR, а не новым комментарием в техдолге.
+      - name: Driver mutation gate
+        run: pnpm exec stryker run stryker.driver.config.mjs
 
   node-floor:
     name: consumer contract · Node ${{ matrix.node }}
@@ -196,7 +259,7 @@ jobs:
   CI:
     name: CI
     if: ${{ always() }}
-    needs: [verify, node-floor, browser-static]
+    needs: [verify, tests, mutation, node-floor, browser-static]
     runs-on: ubuntu-latest
     timeout-minutes: 5
     permissions: {}
@@ -205,10 +268,14 @@ jobs:
         shell: bash
         env:
           VERIFY_RESULT: ${{ needs.verify.result }}
+          TESTS_RESULT: ${{ needs.tests.result }}
+          MUTATION_RESULT: ${{ needs.mutation.result }}
           NODE_FLOOR_RESULT: ${{ needs.node-floor.result }}
           BROWSER_RESULT: ${{ needs.browser-static.result }}
         run: |
           set -euo pipefail
           [[ "$VERIFY_RESULT" == success ]]
+          [[ "$TESTS_RESULT" == success ]]
+          [[ "$MUTATION_RESULT" == success ]]
           [[ "$NODE_FLOOR_RESULT" == success ]]
           [[ "$BROWSER_RESULT" == success ]]

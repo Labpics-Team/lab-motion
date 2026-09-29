@@ -20,7 +20,10 @@ jobs:
   core:
     name: critical numerical core
     runs-on: ubuntu-latest
-    timeout-minutes: 60
+    # Exact-main 34825551291 дошёл до прежнего 60m потолка и был cancelled,
+    # поэтому тот ceiling не являлся доказательством test failure. Threshold и
+    # mutate-scope не ослабляем; даём широкой кампании физически завершиться.
+    timeout-minutes: 120
     permissions:
       contents: read
 
@@ -53,16 +56,60 @@ jobs:
         if: always()
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
-          name: mutation-report-${{ github.run_id }}
+          name: mutation-core-report-${{ github.run_id }}
           path: reports/mutation/
+          if-no-files-found: ignore
+          retention-days: 14
+
+  driver:
+    name: critical driver semantics
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    permissions:
+      contents: read
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - name: Setup Node
+        uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version: "24"
+
+      - name: Activate pinned pnpm
+        run: |
+          corepack enable
+          corepack install --global pnpm@11.11.0
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Build
+        run: pnpm build
+
+      - name: Driver mutation gate
+        run: pnpm exec stryker run stryker.driver.config.mjs
+
+      - name: Upload driver mutation report
+        if: always()
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: mutation-driver-report-${{ github.run_id }}
+          path: reports/mutation/driver/
           if-no-files-found: ignore
           retention-days: 14
 
   # Право записи issues существует только в job без кода репозитория и зависимостей.
   report-failure:
     name: Report scheduled mutation failure
-    needs: [core]
-    if: always() && github.event_name == 'schedule' && needs.core.result != 'success'
+    needs: [core, driver]
+    if: >-
+      always() &&
+      github.event_name == 'schedule' &&
+      (needs.core.result != 'success' || needs.driver.result != 'success')
     runs-on: ubuntu-latest
     timeout-minutes: 5
     permissions:
@@ -71,8 +118,10 @@ jobs:
       - name: Create failure issue
         env:
           GH_TOKEN: ${{ github.token }}
+          CORE_RESULT: ${{ needs.core.result }}
+          DRIVER_RESULT: ${{ needs.driver.result }}
         run: |
           title="mutation: ночной прогон красный ($(date -u +%F))"
           gh issue create --repo "$GITHUB_REPOSITORY" --title "$title" \
             --label "type:hardening,priority:P1" \
-            --body "Ночной mutation-прогон не завершился успешно: $GITHUB_SERVER_URL/$GITHUB_REPOSITORY/actions/runs/$GITHUB_RUN_ID — требуется разобрать причину до ослабления mutation-гейта."
+            --body "Ночной mutation-прогон не завершился успешно: core=$CORE_RESULT, driver=$DRIVER_RESULT. Run: $GITHUB_SERVER_URL/$GITHUB_REPOSITORY/actions/runs/$GITHUB_RUN_ID — требуется разобрать причину до ослабления mutation-гейта."
