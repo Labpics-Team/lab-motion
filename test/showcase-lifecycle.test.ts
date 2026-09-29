@@ -128,7 +128,7 @@ describe('showcase lifecycle ownership', () => {
     expect(animateMock).toHaveBeenCalledTimes(3);
   });
 
-  it('initial pageshow does not reset an already started user transition', async () => {
+  it('первый pageshow не сбрасывает начатый пользователем переход', async () => {
     const { installShowcase } = await import('../site/src/scripts/showcase.js');
     activeDispose = installShowcase();
     document.querySelector<HTMLElement>('[data-action="retarget"]')!.click();
@@ -142,7 +142,7 @@ describe('showcase lifecycle ownership', () => {
     expect(document.querySelector('[data-card="retarget"] [data-state]')?.textContent).toBe('running');
   });
 
-  it('persisted pageshow resumes previews stopped for the page cache', async () => {
+  it('pageshow из bfcache возобновляет остановленные сцены', async () => {
     const { installShowcase } = await import('../site/src/scripts/showcase.js');
     activeDispose = installShowcase();
     const initial = [...controls];

@@ -243,8 +243,8 @@ export function installShowcase() {
   });
   listen(window, 'pagehide', stopPreviews);
   listen(window, 'pageshow', (event) => {
-    // Initial pageshow follows load: installation already started the previews.
-    // Only a bfcache restore needs to restart work stopped by pagehide.
+    // При первом pageshow сцены уже запущены установкой обработчиков.
+    // Возобновление после pagehide нужно только при восстановлении из bfcache.
     if (event.persisted && !document.hidden) replayPreviews();
   });
 
