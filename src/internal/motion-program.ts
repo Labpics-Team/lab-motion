@@ -946,38 +946,34 @@ function parseBindings(
 ): readonly MotionProgramBindingV1[] {
   const raw = snapshotCollection(input, 1, budget);
   const bindings = new Array<MotionProgramBindingV1>(raw.length);
-  const writers = new Set<string>();
-  const surfaceOwners = new Map<string, number>();
-  const transformMasks = new Map<number, number>();
+  const writers = new Set<number>();
+  // Standard writer keys are negative; escaped host keys are non-negative.
+  // Both domains are exact integers throughout the complete uint16 input box.
+  const transformState = new Map<number, number>();
   for (let i = 0; i < raw.length; i++) {
     const tuple = snapshotExact(raw[i], 3);
     const subjectSlot = unsignedInteger(tuple[0], UINT16_MAX);
     const channel = parseChannel(tuple[1], stringsLength, features);
     const writerKey = typeof channel === 'number'
-      ? `${subjectSlot}:s${channel}`
-      : `${subjectSlot}:h${channel[1]}`;
+      ? -(subjectSlot * 12 + channel + 1)
+      : subjectSlot * 0x10000 + channel[1];
     if (writers.has(writerKey)) fail('LMP_CANONICAL');
     writers.add(writerKey);
     const ownerGroup = unsignedInteger(tuple[2], UINT16_MAX);
-    const surface = typeof channel === 'number'
-      ? `s${MOTION_PROGRAM_CHANNEL_SURFACE_V1[channel]}`
-      : `h${channel[1]}`;
-    const surfaceKey = `${subjectSlot}:${surface}`;
-    const previousOwner = surfaceOwners.get(surfaceKey);
-    if (previousOwner !== undefined && previousOwner !== ownerGroup) fail('LMP_CANONICAL');
-    surfaceOwners.set(surfaceKey, ownerGroup);
     if (
       typeof channel === 'number' &&
       channel >= MOTION_PROGRAM_STANDARD_CHANNEL_V1.translateX &&
       channel <= MOTION_PROGRAM_STANDARD_CHANNEL_V1.skewY
     ) {
       const bit = 1 << (channel - MOTION_PROGRAM_STANDARD_CHANNEL_V1.translateX);
-      transformMasks.set(subjectSlot, (transformMasks.get(subjectSlot) ?? 0) | bit);
+      const state = transformState.get(subjectSlot);
+      if (state !== undefined && (state >>> 7) !== ownerGroup) fail('LMP_CANONICAL');
+      transformState.set(subjectSlot, (ownerGroup << 7) | (state ?? 0) | bit);
     }
     bindings[i] = Object.freeze([subjectSlot, channel, ownerGroup] as const);
   }
-  for (const mask of transformMasks.values()) {
-    if (mask !== 0x7f) fail('LMP_CANONICAL');
+  for (const state of transformState.values()) {
+    if ((state & 0x7f) !== 0x7f) fail('LMP_CANONICAL');
   }
   return Object.freeze(bindings);
 }
