@@ -8,16 +8,33 @@ import { expect, test } from './fixtures/harness';
 
 const nextTask = (): Promise<void> => new Promise((resolve) => setTimeout(resolve, 0));
 
-async function expectCollected(page: Page, hasRetainedNodes: () => boolean): Promise<void> {
-  // requestGC is a request, not a guarantee. Await the same observable property
-  // within the existing assertion timeout instead of counting host GC attempts.
+async function expectCollected(page: Page, keys: string[]): Promise<void> {
+  // Reading WeakRef repeatedly can keep its target alive (ECMAScript AddToKeptObjects).
+  // Poll primitive finalization receipts instead; the final WeakRef check is unchanged.
+  await page.evaluate((names) => {
+    const pending = new Set<string>();
+    const registry = new FinalizationRegistry<string>((name) => pending.delete(name));
+    for (const name of names) {
+      const ref = Reflect.get(window, name) as WeakRef<object>;
+      const target = ref.deref();
+      if (target !== undefined) {
+        pending.add(name);
+        registry.register(target, name);
+      }
+    }
+    Object.assign(window, { __collectionProbe: { pending, registry } });
+  }, keys);
   await expect.poll(async () => {
     await page.evaluate(nextTask);
     await page.requestGC();
-    return page.evaluate(hasRetainedNodes);
-  }).toBe(false);
+    return page.evaluate(() => [...(window as unknown as {
+      __collectionProbe: { pending: Set<string> };
+    }).__collectionProbe.pending]);
+  }).toEqual([]);
+  expect(await page.evaluate((names) => names.map((name) =>
+    (Reflect.get(window, name) as WeakRef<object>).deref() === undefined), keys))
+    .toEqual(keys.map(() => true));
 }
-
 
 test('transfer A→B до MutationObserver callback не отбирается старым owner', async ({ page }) => {
   const result = await page.evaluate(async () => {
@@ -215,14 +232,7 @@ test('retained controls после disconnect не удерживают parent',
     retained.__autoChild = weakChild;
   });
 
-  await expectCollected(page, () => {
-    const retained = window as unknown as {
-      __autoParent: WeakRef<HTMLDivElement>;
-      __autoChild: WeakRef<HTMLDivElement>;
-    };
-    return retained.__autoParent.deref() !== undefined ||
-      retained.__autoChild.deref() !== undefined;
-  });
+  await expectCollected(page, ['__autoParent', '__autoChild']);
 });
 
 test('reentrant disconnect в snapshot не публикует stale strong-cache', async ({ page }) => {
@@ -260,14 +270,5 @@ test('reentrant disconnect в snapshot не публикует stale strong-cach
     retained.__staleTrigger = weakTrigger;
   });
 
-  await expectCollected(page, () => {
-    const retained = window as unknown as {
-      __staleParent: WeakRef<HTMLDivElement>;
-      __staleChild: WeakRef<HTMLDivElement>;
-      __staleTrigger: WeakRef<HTMLDivElement>;
-    };
-    return retained.__staleParent.deref() !== undefined ||
-      retained.__staleChild.deref() !== undefined ||
-      retained.__staleTrigger.deref() !== undefined;
-  });
+  await expectCollected(page, ['__staleParent', '__staleChild', '__staleTrigger']);
 });
