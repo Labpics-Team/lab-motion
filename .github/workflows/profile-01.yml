@@ -1,8 +1,13 @@
-name: PROFILE-01 — preregistered probe
+name: PROFILE-01 — проверка размерного протокола
 
-# Размерный вектор запускается вручную в той же среде, что обычный CI
+# Размерный вектор запускается в PR и вручную в той же среде, что обычный CI
 # публичного репозитория. Время/GPU/энергия этой машины не являются device proof.
 on:
+  pull_request:
+    paths:
+      - 'bench/profile/**'
+      - 'test/profile-measurement.test.ts'
+      - '.github/workflows/profile-01.yml'
   workflow_dispatch:
     inputs:
       mode:
@@ -27,15 +32,17 @@ permissions:
 env:
   COREPACK_ENABLE_DOWNLOAD_PROMPT: '0'
   COREPACK_DEFAULT_TO_LATEST: '0'
+  PROFILE_SOURCE_SHA: ${{ github.event.pull_request.head.sha || github.sha }}
 
 jobs:
   probe:
     runs-on: ubuntu-latest
     timeout-minutes: 45
     steps:
-      - name: Получить exact harness
+      - name: Получить точный источник измерителя
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
         with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
           persist-credentials: false
           fetch-depth: 0
 
@@ -44,16 +51,16 @@ jobs:
         with:
           node-version: '24'
 
-      - name: Активировать pinned pnpm
+      - name: Активировать закреплённый pnpm
         run: |
           corepack enable
           corepack install --global pnpm@11.11.0
 
-      - name: Проверить exact registration snapshot
+      - name: Проверить точную версию протокола
         shell: bash
         run: |
           set -euo pipefail
-          test "$(git rev-parse HEAD)" = "$GITHUB_SHA"
+          test "$(git rev-parse HEAD)" = "$PROFILE_SOURCE_SHA"
           node --input-type=module <<'NODE'
           import { PROFILE_01, preregistrationDigest, verifyPreregistration } from './bench/profile/profile-01-preregistration.mjs';
           verifyPreregistration(PROFILE_01);
@@ -66,15 +73,15 @@ jobs:
       - name: Установить зависимости
         run: pnpm install --frozen-lockfile
 
-      - name: Снять старый cost vector (fail-closed)
+      - name: Измерить прежний размерный вектор
         id: probe
         shell: bash
         run: |
           set -euo pipefail
           mkdir -p "$RUNNER_TEMP/profile-01-raw"
           node bench/profile/probe-profile-01.mjs \
-            --mode '${{ inputs.mode }}' \
-            --cells '${{ inputs.cells }}' \
+            --mode '${{ inputs.mode || 'old-vector' }}' \
+            --cells '${{ inputs.cells || 'desktop' }}' \
             --out "$RUNNER_TEMP/profile-01-raw"
 
       - name: Независимо перепроверить raw-артефакт
@@ -88,12 +95,10 @@ jobs:
           done
 
       - name: Опубликовать raw-артефакт
-        # if: always() — failure-артефакты (NOT-GRANTED с rejection) обязаны
-        # загружаться даже после failed probe ([1]): OBSERVATION_POLICY
-        # требует сохранять failures, иначе отрицательный результат теряется.
+        # Отрицательный результат сохраняется даже после отказа измерителя.
         if: always()
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
         with:
-          name: profile-01-raw-${{ github.sha }}
+          name: profile-01-raw-${{ env.PROFILE_SOURCE_SHA }}
           path: ${{ runner.temp }}/profile-01-raw/
           retention-days: 90

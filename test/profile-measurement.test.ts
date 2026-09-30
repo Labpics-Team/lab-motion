@@ -6,7 +6,54 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { validateReplayedVector } from '../bench/profile/profile-measurement.mjs';
-import { unmeasuredCells } from '../bench/profile/profile-01-preregistration.mjs';
+import { PROFILE_01, unmeasuredCells, verifyPreregistration } from '../bench/profile/profile-01-preregistration.mjs';
+
+describe('PROFILE: замороженный протокол проверяется целиком', () => {
+  it('принимает независимую JSON-копию полного протокола', () => {
+    expect(verifyPreregistration()).toBe(true);
+    expect(verifyPreregistration(JSON.parse(JSON.stringify(PROFILE_01)))).toBe(true);
+  });
+
+  it.each([
+    ['productBase', 'reason'], ['scenes', 'm05a', 'acceptance'],
+    ['rawControls', 'aa'], ['statsMde', 'sampleSize'], ['calibration', 'failClosed'],
+  ])('отвергает подмену условия %s.%s', (...path) => {
+    const changed = JSON.parse(JSON.stringify(PROFILE_01));
+    const parent = path.slice(0, -1).reduce((object, key) => object[key], changed);
+    parent[path.at(-1)!] = 'условие удалено';
+    expect(() => verifyPreregistration(changed)).toThrow();
+  });
+
+  it('отвергает потерю, подмену и лишние поля на каждой глубине', () => {
+    function visit(value: unknown, path: string[] = []) {
+      if (value === null || typeof value !== 'object') return;
+      for (const [key, child] of Object.entries(value)) {
+        const childPath = [...path, key];
+        for (const operation of ['delete', 'replace']) {
+          const changed = JSON.parse(JSON.stringify(PROFILE_01));
+          const parent = path.reduce((object, segment) => object[segment], changed);
+          if (operation === 'delete') delete parent[key];
+          else parent[key] = typeof child === 'string' ? `${child}!` : 'другой тип';
+          expect(() => verifyPreregistration(changed), `${operation} ${childPath.join('.')}`).toThrow();
+        }
+        visit(child, childPath);
+      }
+      const extra = JSON.parse(JSON.stringify(PROFILE_01));
+      const parent = path.reduce((object, key) => object[key], extra);
+      parent.unregistered = true;
+      expect(() => verifyPreregistration(extra), `extra ${path.join('.')}`).toThrow();
+    }
+    visit(PROFILE_01);
+    for (const invalid of [null, [], '', 1, true]) {
+      expect(() => verifyPreregistration(invalid)).toThrow();
+    }
+  });
+
+  it('не позволяет мутировать вложенные массивы исходного протокола', () => {
+    expect(() => PROFILE_01.roster.classes[0].browsers.push('подмена')).toThrow();
+    expect(PROFILE_01.roster.classes[0].browsers).toEqual(['chromium-webview-stable']);
+  });
+});
 
 function measured() {
   return {

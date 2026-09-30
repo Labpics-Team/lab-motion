@@ -1,7 +1,6 @@
 // PROFILE-01 git-proof: общие git-доказательства provenance для probe и validator.
 // Один источник PREREG_OWN_PATHS исключает дрейф allowlist между файлами.
-// Fail-closed: любая недоступность git превращается в отказ admission через
-// переданный fail-колбэк вызывающей стороны, а не в молчаливый пропуск.
+// Недоступность Git запрещает допуск через переданный обработчик отказа.
 
 import { execFileSync } from 'node:child_process';
 import { readCheckoutState } from '../compare/provenance.mjs';

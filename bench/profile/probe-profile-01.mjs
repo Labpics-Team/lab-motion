@@ -1,8 +1,7 @@
 // PROFILE-01 probe: исполняемый измерительный стенд.
 // Измерение размера использует обычную среду CI публичного репозитория.
 // Оно не доказывает задержку, частоту кадров или свойства физического устройства.
-// Fail-closed: невалидная калибровка или несоответствие frozen-контракта
-// останавливают admission, а не дают «зелёный» результат.
+// Недействительная калибровка или расхождение с протоколом запрещают допуск.
 // Использование: node bench/profile/probe-profile-01.mjs --mode old-vector|aa|ab --cells desktop|all --out <dir>
 
 import { createHash } from 'node:crypto';
@@ -39,10 +38,8 @@ function writeArtifact(outDir, artifact, head, digest) {
   console.log(JSON.stringify({ rawPath, rawDigest, preregistrationDigest: digest, admission: artifact.admission }));
 }
 
-// Post-measurement отказ обязан сначала Persist артефакт с причиной
-// (OBSERVATION_POLICY: failures сохраняются с digest), затем fail.
-// Pre-measurement отказы (ancestry/blob/diff до runSizeGate) остаются
-// fail-fast без артефакта: измерения ещё не было.
+// Отказ после измерения сохраняет артефакт с причиной и хешем.
+// Отказ до измерения ещё не создаёт данных для сохранения.
 function persistAndFail(outDir, artifact, head, digest, reason) {
   artifact.finishedAtUtc = new Date().toISOString();
   artifact.admission = 'NOT-GRANTED';
@@ -60,7 +57,7 @@ async function main() {
   const outDir = resolve(arg('--out') ?? join(tmpdir(), 'profile-01-raw'));
   mkdirSync(outDir, { recursive: true });
 
-  // 1. Frozen-контракт обязан проходить самопроверку до любых samples.
+  // Протокол проверяется до любых измерений.
   verifyPreregistration(PROFILE_01);
   const digest = preregistrationDigest(PROFILE_01);
 
@@ -126,9 +123,7 @@ async function main() {
   // без пройденной калибровки admission не выдаётся (см. ниже).
   artifact.calibration = { aa: 'PENDING', positive2x: 'PENDING' };
 
-  // 5. Fail-closed итог: без зелёной калибровки admission запрещён.
-  // Отклонённые aa/ab обязаны Persist failure-артефакт до fail ([2]):
-  // OBSERVATION_POLICY требует сохранять failures с digest.
+  // Без калибровки aa/ab сохраняют отказ до завершения процесса.
   if (mode !== 'old-vector') {
     persistAndFail(outDir, artifact, head, digest, 'aa/ab режимы требуют отдельной зелёной browser-калибровки');
   }
