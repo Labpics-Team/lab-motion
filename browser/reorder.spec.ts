@@ -16,6 +16,32 @@ async function mount(page: Page, grid = false, rtl = false): Promise<void> {
 }
 const order = (page: Page) => page.locator('#list > li').evaluateAll(nodes => nodes.map(n => (n as HTMLElement).dataset.key));
 
+for (const scope of ['ancestor', 'root'] as const) test(`data-move на ${scope} не управляет дочерней карточкой`, async ({ page }) => {
+  await mount(page);
+  await page.evaluate(scope => {
+    const root = document.getElementById('list')!;
+    const outer = scope === 'root' ? root : document.createElement('div');
+    if (outer !== root) { root.before(outer); outer.append(root); }
+    outer.dataset.move = 'next'; outer.tabIndex = -1;
+    const label = document.createElement('span'); label.id = 'plain-label'; label.textContent = 'Название';
+    root.querySelector('[data-key=b] .reorder-card')!.append(label);
+    const actionLabel = document.createElement('span'); actionLabel.id = 'action-label'; actionLabel.textContent = 'Переместить';
+    root.querySelector('[data-key=b] [data-move=next]')!.append(actionLabel);
+  }, scope);
+  const focused = page.locator('[data-key=c] [data-grip]');
+  await focused.focus();
+  // Только обработчик клика: нативный pointer focus не должен скрыть его эффект.
+  await page.locator('#plain-label').dispatchEvent('click');
+  expect(await order(page)).toEqual(['a', 'b', 'c', 'd']);
+  await expect(focused).toBeFocused();
+  await expect(page.locator('#status')).toHaveText('');
+
+  await page.locator('#action-label').click();
+  expect(await order(page)).toEqual(['a', 'c', 'b', 'd']);
+  await expect(page.locator('[data-key=b] [data-move=next]')).toBeFocused();
+  await expect(page.locator('#status')).toHaveText('b: 3 из 4');
+});
+
 test('реальный pointer reorder: scoped list, подтверждённый DOM, focus и cleanup', async ({ page }) => {
   await mount(page);
   const first = await page.locator('[data-key=a] [data-grip]').boundingBox();

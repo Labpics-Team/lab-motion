@@ -723,9 +723,10 @@ export function mountReorder(root: HTMLElement, status: HTMLElement): () => void
   });
   listen<MouseEvent>('click', e => {
     const node = slotFor(e), button = (e.target as Element).closest<HTMLElement>('[data-move]');
-    const action = button?.dataset.move;
-    if (!node || (action !== 'previous' && action !== 'next')) return;
-    button!.focus({ preventScroll: true });
+    if (!node || !button || !node.contains(button)) return;
+    const action = button.dataset.move;
+    if (action !== 'previous' && action !== 'next') return;
+    button.focus({ preventScroll: true });
     pan.pointerCancel(); finish(); state.update(measure()); dirty = false;
     session = state.start(node.dataset.key!); session?.step(action); finish();
   });
