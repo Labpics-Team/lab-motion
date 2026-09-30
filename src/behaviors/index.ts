@@ -45,8 +45,7 @@ function createFrameRunner(options: Parameters<BehaviorRunnerFactory>[0]): Behav
 
       const finishNow = (): void => {
         curVel = 0;
-        args.onStep(args.target, 0);
-        if (my === gen) args.onDone();
+        if (args.onStep(args.target, 0)) args.onDone();
       };
 
       // B4: reduced-motion / вырожденный диапазон / нет кадрового шва → снап.
@@ -88,8 +87,7 @@ function createFrameRunner(options: Parameters<BehaviorRunnerFactory>[0]): Behav
           return;
         }
         curVel = vel;
-        args.onStep(val, vel);
-        if (my === gen) schedule(tick);
+        if (args.onStep(val, vel)) schedule(tick);
       };
 
       schedule(tick);

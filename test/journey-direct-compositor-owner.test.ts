@@ -77,6 +77,104 @@ afterEach(() => {
 });
 
 describe('JOURNEY-01 direct-control compositor owner', () => {
+  it.each(['pointerDown', 'snapTo', 'update', 'cancel'] as const)('новое намерение из публикации pickup сохраняется после %s', (action) => {
+    const native = nativeTarget();
+    let sheet!: ReturnType<typeof createCompositorBottomSheet>;
+    let reenter = false;
+    sheet = createCompositorBottomSheet({
+      snapPoints: [0, 300],
+      onChange() {
+        if (reenter) {
+          reenter = false;
+          sheet.snapTo(0);
+        }
+      },
+      compositor: { target: native.target, property: 'translate', apply() {} },
+    });
+    sheet.snapTo(1);
+    native.animation!.currentTime = 16;
+    reenter = true;
+    if (action === 'pointerDown') sheet.pointerDown(pt(0, 100, 1));
+    else if (action === 'snapTo') sheet.snapTo(1);
+    else if (action === 'update') sheet.update([0, 400]);
+    else sheet.cancel();
+    expect(native.calls).toBe(2);
+    expect(sheet.state.phase).toBe('release');
+    expect(sheet.state.snapIndex).toBe(0);
+    sheet.destroy();
+  });
+
+  it.each(['snapTo', 'destroy'] as const)('чтение host currentTime не публикует старый sample после %s', (action) => {
+    const native = nativeTarget();
+    const sheet = createCompositorBottomSheet({
+      snapPoints: [0, 300],
+      compositor: { target: native.target, property: 'translate', apply() {} },
+    });
+    sheet.snapTo(1);
+    let terminal: typeof sheet.state;
+    Object.defineProperty(native.animation!, 'currentTime', {
+      get() {
+        if (action === 'destroy') sheet.destroy();
+        else sheet.snapTo(0);
+        terminal = sheet.state;
+        return 16;
+      },
+    });
+    sheet.pointerDown(pt(0, 100, 1));
+    expect(sheet.state).toBe(terminal!);
+    expect(sheet.state.value).toBe(0);
+    expect(native.cancelCalls).toBe(1);
+    sheet.destroy();
+  });
+
+  it('cancel сохраняет новый pointerDown из отмены host effect', () => {
+    let sheet!: ReturnType<typeof createCompositorBottomSheet>;
+    const native = nativeTarget(() => sheet.pointerDown(pt(0, 20, 1)));
+    sheet = createCompositorBottomSheet({
+      snapPoints: [0, 300],
+      compositor: { target: native.target, property: 'translate', apply() {} },
+    });
+    sheet.snapTo(1);
+    sheet.cancel();
+    expect(sheet.state.phase).toBe('follow');
+    expect(native.cancelCalls).toBe(1);
+    sheet.destroy();
+  });
+
+  it.each(['finished', 'then-getter', 'then-call'] as const)('отказ %s освобождает effect и сохраняет исходную ошибку', (mode) => {
+    const failure = new Error('completion subscription failed');
+    const cancel = vi.fn();
+    const finished = {
+      get then() {
+        if (mode === 'then-getter') throw failure;
+        return () => { throw failure; };
+      },
+    } as unknown as Promise<void>;
+    const sheet = createCompositorBottomSheet({
+      snapPoints: [0, 300],
+      compositor: {
+        property: 'translate',
+        apply() {},
+        target: { animate() {
+          return {
+            currentTime: 0,
+            cancel,
+            get finished() {
+              if (mode === 'finished') throw failure;
+              return finished;
+            },
+          };
+        } },
+      },
+    });
+    expect(() => sheet.snapTo(1)).toThrow(failure);
+    expect(cancel).toHaveBeenCalledTimes(1);
+    expect(sheet.state.value).toBe(300);
+    expect(sheet.state.phase).toBe('settle');
+    sheet.destroy();
+    expect(cancel).toHaveBeenCalledTimes(1);
+  });
+
   it.each(['native', 'live', 'reduced'] as const)('carousel: %s сохраняет конечный выход при переполнении цели', async (tier) => {
     const native = nativeTarget();
     const clock = frameClock();

@@ -185,8 +185,7 @@ function _createBase<S extends BehaviorState<number>>(
      * no-op (не плодит эмитов). destroy() строится поверх неё.
      */
     cancel(reset?: Partial<S>): void {
-      if (destroyed || state.phase === 'idle') return; // уже в покое
-      runner._invalidate();
+      if (destroyed || state.phase === 'idle' || runner._invalidate() === undefined) return;
       tracker.reset();
       emit({ ...reset, velocity: 0, phase: 'idle' } as Partial<S>);
     },
@@ -206,8 +205,10 @@ function _beginPickup(
   p: BehaviorPoint,
   axis: BehaviorAxis,
   velocityScale = 1,
-): void {
-  const carry = base.runner._invalidate() * velocityScale;
+): boolean {
+  const velocity = base.runner._invalidate();
+  if (velocity === undefined) return false;
+  const carry = velocity * velocityScale;
   base.tracker.reset();
   if (carry !== 0) {
     const back = { x: _finite(p.x), y: _finite(p.y), t: _finite(p.t) - PICKUP_SEED_DT_S };
@@ -216,6 +217,7 @@ function _beginPickup(
     base.tracker.push(back);
   }
   base.tracker.push(p);
+  return true;
 }
 
 
@@ -326,7 +328,8 @@ export function createBottomSheet(options: SheetOptions, createRunner: BehaviorR
     return raw;
   };
 
-  const settleTo = (index: number, velocity: number): void => {
+  const settleTo = (index: number, velocity: number | undefined): void => {
+    if (velocity === undefined) return;
     base.emit({ phase: 'release', snapIndex: index }) && base.runner._settle({
       from: base.state.value,
       velocity,
@@ -341,7 +344,7 @@ export function createBottomSheet(options: SheetOptions, createRunner: BehaviorR
     pointerDown(p: BehaviorPoint): void {
       if (base.destroyed) return;
       // Прерывание: гасим активную доводку, наследуем её скорость прайором (C¹).
-      _beginPickup(base, p, axis);
+      if (!_beginPickup(base, p, axis)) return;
       lastPointer = _coord(p, axis);
       grabValue = _sub(base.state.value, lastPointer);
       base.emit({ phase: 'follow', velocity: 0 });
@@ -496,7 +499,7 @@ export function createDragDismiss(options: DismissOptions, createRunner: Behavio
   const ctrl: DismissController = {
     pointerDown(p: BehaviorPoint): void {
       if (base.destroyed || base.state.dismissed) return;
-      _beginPickup(base, p, axis);
+      if (!_beginPickup(base, p, axis)) return;
       grabPointer = _coord(p, axis);
       grabValue = base.state.value;
       base.emit({ phase: 'follow', velocity: 0 });
@@ -623,7 +626,8 @@ export function createCarousel(options: CarouselOptions, createRunner: BehaviorR
   // вертикаль → вверх = следующая → −d.
   const posDirSign = axis === 'x' && options.rtl === true ? 1 : -1;
 
-  const settleTo = (index: number, velocity: number): void => {
+  const settleTo = (index: number, velocity: number | undefined): void => {
+    if (velocity === undefined) return;
     const i = clampIndex(index);
     targetIndex = i;
     base.emit({ phase: 'release', index: clampIndex(base.state.index) }) && base.runner._settle({
@@ -640,7 +644,7 @@ export function createCarousel(options: CarouselOptions, createRunner: BehaviorR
   const ctrl: CarouselController = {
     pointerDown(p: BehaviorPoint): void {
       if (base.destroyed) return;
-      _beginPickup(base, p, axis, posDirSign);
+      if (!_beginPickup(base, p, axis, posDirSign)) return;
       grabPointer = _coord(p, axis);
       grabValue = base.state.value;
       base.emit({ phase: 'follow', velocity: 0 });
@@ -818,7 +822,7 @@ export function createPullToRefresh(options: PullOptions, createRunner: Behavior
   const ctrl: PullController = {
     pointerDown(p: BehaviorPoint): void {
       if (base.destroyed || base.state.pending) return; // pending владеет позицией
-      _beginPickup(base, p, axis, 0);
+      if (!_beginPickup(base, p, axis, 0)) return;
       grabPointer = _coord(p, axis);
       base.emit({ phase: 'follow', pulling: true, velocity: 0 });
     },

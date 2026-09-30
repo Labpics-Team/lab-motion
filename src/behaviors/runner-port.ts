@@ -16,7 +16,8 @@ export interface BehaviorSettleArgs {
 /** Внутрипакетный шов: не является частью публичного RequestFrameFn. */
 export interface BehaviorRunnerPort {
   _settle(args: BehaviorSettleArgs): void;
-  _invalidate(): number;
+  /** undefined: публикация перехвата уступила более новому намерению. */
+  _invalidate(): number | undefined;
 }
 
 /** Исполнитель выбирается при сборке entry; фабрика вызывается после валидации поведения. */

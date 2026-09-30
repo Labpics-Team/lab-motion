@@ -112,7 +112,7 @@ function createOwner(
 
   const owner: BehaviorCompositorOwner = {
     _settle(args): void {
-      owner._invalidate();
+      if (owner._invalidate() === undefined) return;
       const currentSurface = surface;
       if (!currentSurface) return;
       if (args.from === args.target || tier === 3) {
@@ -159,7 +159,12 @@ function createOwner(
         const run: NativeRun = active = { kind: 0, args, animation, artifact };
         args.onStep(args.from, args.velocity);
         const done = () => finish(run);
-        animation.finished.then(done, done);
+        try {
+          animation.finished.then(done, done);
+        } catch (error) {
+          finish(run);
+          throw error;
+        }
         return;
       }
 
@@ -182,11 +187,12 @@ function createOwner(
       });
     },
 
-    _invalidate(): number {
+    _invalidate(): number | undefined {
       const run = active;
       epoch++;
       if (!run) return 0;
       active = undefined;
+      const token = epoch;
       let value: number;
       let velocity: number;
 
@@ -221,9 +227,9 @@ function createOwner(
       // Successor-state публикуется до cleanup donor: underlying style получает
       // sampled point, пока старый effect ещё маскирует его; cancel затем раскрывает
       // то же значение. Reentrant input не может воскресить уже снятый run.
-      run.args.onStep(value, velocity);
+      const owns = token === epoch && run.args.onStep(value, velocity);
       dispose(run);
-      return velocity;
+      return owns && token === epoch ? velocity : undefined;
     },
 
     destroy(): void {
