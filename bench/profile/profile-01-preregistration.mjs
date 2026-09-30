@@ -14,10 +14,10 @@ function invariant(condition, message) {
 // Точный продуктовый base, на котором зафиксирован старый cost vector.
 export const PRODUCT_BASE = Object.freeze({
   repo: 'Labpics-Team/lab-motion',
-  mainSha: '0fb23264a93a18a8242fd15a2375e9f75845dbdf',
-  mergeOf: 'PR #435 (squash), head c0bbba720d058042f08f0f37f7b14401db67da56',
-  mergeBase: 'f60acc91d63549758cbd75fa8c99ab06c79989bb',
-  mergedAtUtc: '2026-09-28T21:58:33Z',
+  mainSha: '0912acd875a67bed8f165e345626fd00082e258e',
+  mergeOf: 'PR #390; current main before PROFILE measurements',
+  registeredFrom: '0fb23264a93a18a8242fd15a2375e9f75845dbdf',
+  mergedAtUtc: '2026-09-29T17:24:51Z',
 });
 
 // Полный старый cost vector: потолки кода, а не новые оценки.
@@ -210,8 +210,8 @@ export function verifyPreregistration(value = PROFILE_01) {
   invariant(value.node === 'PROFILE-01' && value.revision === 'r11', 'node/revision drifted');
   invariant(value.candidateSamplesObservedAtRegistration === false, 'preregistration обязана предшествовать samples');
   invariant(value.productBase?.repo === 'Labpics-Team/lab-motion', 'product repo drifted');
-  invariant(value.productBase?.mainSha === '0fb23264a93a18a8242fd15a2375e9f75845dbdf', 'product base drifted');
-  invariant(value.productBase?.mergedAtUtc === '2026-09-28T21:58:33Z', 'product base время drifted');
+  invariant(value.productBase?.mainSha === '0912acd875a67bed8f165e345626fd00082e258e', 'product base drifted');
+  invariant(value.productBase?.mergedAtUtc === '2026-09-29T17:24:51Z', 'product base время drifted');
   const gates = value.oldCostVectorGzipBytes;
   invariant(gates?.core === 2220 && gates?.subpath === 4608 && gates?.fullCoreConsumer === 2330, 'core/subpath/fullCore ceilings drifted');
   invariant(gates?.nano === 1024 && gates?.compiledRuntime === 341 && gates?.compilerSurface === 1024, 'старые 1024/341/1024 ceilings drifted');

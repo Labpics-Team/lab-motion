@@ -10,6 +10,7 @@ import { execFileSync } from 'node:child_process';
 import { mkdirSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join, resolve } from 'node:path';
+import { fileURLToPath } from 'node:url';
 import {
   PROFILE_01,
   preregistrationDigest,
@@ -65,7 +66,7 @@ function persistAndFail(outDir, artifact, head, digest, reason) {
 }
 
 function main() {
-  const repoRoot = resolve(join(new URL('.', import.meta.url).pathname, '..', '..'));
+  const repoRoot = fileURLToPath(new URL('../../', import.meta.url));
   const mode = arg('--mode') ?? fail('требуется --mode old-vector|aa|ab');
   if (!['old-vector', 'aa', 'ab'].includes(mode)) fail(`неизвестный --mode ${mode}`);
   const cells = arg('--cells') ?? 'desktop';

@@ -5,6 +5,7 @@
 
 import { readFileSync } from 'node:fs';
 import { join, resolve } from 'node:path';
+import { fileURLToPath } from 'node:url';
 import {
   PROFILE_01,
   preregistrationDigest,
@@ -48,7 +49,7 @@ function main() {
     const proof = artifact.baseProof ?? {};
     if (proof.productBase !== base || proof.head !== artifact.head) fail('baseProof не покрывает artifact head');
     if (!Array.isArray(proof.diffPaths)) fail('baseProof.diffPaths отсутствует');
-    const repoRoot = resolve(join(new URL('.', import.meta.url).pathname, '..', '..'));
+    const repoRoot = fileURLToPath(new URL('../../', import.meta.url));
     const git = makeGit(fail);
     const currentHead = git.head(repoRoot);
     if (currentHead !== artifact.head) {
