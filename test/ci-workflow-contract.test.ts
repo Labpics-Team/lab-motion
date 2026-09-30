@@ -510,24 +510,22 @@ describe('нативный граф CI', () => {
     }
   });
 
-  it('shell итога требует success каждого dependency', () => {
+  it.each(['VERIFY_RESULT', 'TESTS_RESULT', 'MUTATION_RESULT', 'NODE_FLOOR_RESULT', 'BROWSER_RESULT']
+    .flatMap((key) => ['success', 'failure', 'cancelled', 'skipped', 'neutral', 'pending', '', undefined]
+      .map((result) => ({ key, result }))))('shell итога проверяет $key=$result', ({ key, result }) => {
     const ci = parse(sources().get('ci.yml')!) as Workflow;
     const program = ci.jobs.CI!.steps![0]!.run!;
-    for (const key of ['VERIFY_RESULT', 'TESTS_RESULT', 'MUTATION_RESULT', 'NODE_FLOOR_RESULT', 'BROWSER_RESULT']) {
-      for (const result of ['success', 'failure', 'cancelled', 'skipped', 'neutral', 'pending', '', undefined]) {
-        const env: NodeJS.ProcessEnv = {
-          ...process.env, VERIFY_RESULT: 'success', TESTS_RESULT: 'success',
-          MUTATION_RESULT: 'success', NODE_FLOOR_RESULT: 'success', BROWSER_RESULT: 'success',
-        };
-        delete env[key];
-        if (result !== undefined) env[key] = result;
-        const actual = spawnSync(bash, ['--noprofile', '--norc', '-e', '-o', 'pipefail', '-c', program], {
-          env, encoding: 'utf8', timeout: 5000,
-        });
-        expect(actual.error).toBeUndefined();
-        expect(actual.status === 0, `${key}=${result}: ${actual.stderr}`).toBe(result === 'success');
-      }
-    }
+    const env: NodeJS.ProcessEnv = {
+      ...process.env, VERIFY_RESULT: 'success', TESTS_RESULT: 'success',
+      MUTATION_RESULT: 'success', NODE_FLOOR_RESULT: 'success', BROWSER_RESULT: 'success',
+    };
+    delete env[key];
+    if (result !== undefined) env[key] = result;
+    const actual = spawnSync(bash, ['--noprofile', '--norc', '-e', '-o', 'pipefail', '-c', program], {
+      env, encoding: 'utf8', timeout: 5000,
+    });
+    expect(actual.error).toBeUndefined();
+    expect(actual.status === 0, `${key}=${result}: ${actual.stderr}`).toBe(result === 'success');
   });
 
   it('shell Vitest сохраняет код отказа после tee для diagnostics', () => {
