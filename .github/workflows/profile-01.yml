@@ -1,8 +1,7 @@
 name: PROFILE-01 — preregistered probe
 
-# Только ручной запуск на штатных self-hosted runners (de-04 первым по
-# CI-контракту). Платные GitHub-hosted runners запрещены. Тяжёлые тесты и
-# бенчи никогда не запускаются в песочнице.
+# Размерный вектор запускается вручную в той же среде, что обычный CI
+# публичного репозитория. Время/GPU/энергия этой машины не являются device proof.
 on:
   workflow_dispatch:
     inputs:
@@ -14,7 +13,7 @@ on:
         options:
           - old-vector
       cells:
-        description: 'Клетки roster: desktop (без железа) или all (требует device lab)'
+        description: 'Непроверенные timing/device-клетки: desktop или полный roster'
         required: true
         default: 'desktop'
         type: choice
@@ -31,8 +30,7 @@ env:
 
 jobs:
   probe:
-    # Generic self-hosted label: парка de-04 обслуживает первым по контракту.
-    runs-on: self-hosted
+    runs-on: ubuntu-latest
     timeout-minutes: 45
     steps:
       - name: Получить exact harness
@@ -51,7 +49,7 @@ jobs:
           corepack enable
           corepack install --global pnpm@11.11.0
 
-      - name: Доказать preregistration-before-samples
+      - name: Проверить exact registration snapshot
         shell: bash
         run: |
           set -euo pipefail
@@ -68,10 +66,8 @@ jobs:
       - name: Установить зависимости
         run: pnpm install --frozen-lockfile
 
-      - name: Собрать exact base
-        run: pnpm build
-
       - name: Снять старый cost vector (fail-closed)
+        id: probe
         shell: bash
         run: |
           set -euo pipefail
@@ -82,10 +78,12 @@ jobs:
             --out "$RUNNER_TEMP/profile-01-raw"
 
       - name: Независимо перепроверить raw-артефакт
+        if: ${{ !cancelled() && steps.probe.outcome != 'skipped' }}
         shell: bash
         run: |
           set -euo pipefail
           for raw in "$RUNNER_TEMP"/profile-01-raw/*.json; do
+            test -f "$raw"
             node bench/profile/validate-profile-01.mjs --raw "$raw"
           done
 

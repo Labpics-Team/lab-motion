@@ -1,17 +1,20 @@
 // PROFILE-01 validate: независимая перепроверка raw-артефакта пробы.
-// Ловит согласованные по виду, но неверные elapsed/divisor/missing sample,
-// подмену preregistration после samples и дрейф provenance.
+// Повторяет размерные измерения; не удостоверяет время исторического запуска
+// и не выдаёт допуска производительности или человеческой оценки.
 // Использование: node bench/profile/validate-profile-01.mjs --raw <path>
 
 import { readFileSync } from 'node:fs';
-import { join, resolve } from 'node:path';
+import { resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { isDeepStrictEqual } from 'node:util';
 import {
   PROFILE_01,
   preregistrationDigest,
   verifyPreregistration,
+  unmeasuredCells,
 } from './profile-01-preregistration.mjs';
 import { PREREG_OWN_PATHS, makeGit } from './profile-git-proof.mjs';
+import { measureOldVector, validateReplayedVector } from './profile-measurement.mjs';
 
 function fail(message) {
   throw new Error(`PROFILE-01 validate (fail-closed): ${message}`);
@@ -22,9 +25,16 @@ function arg(name) {
   return index === -1 ? undefined : process.argv[index + 1];
 }
 
-function main() {
+async function main() {
   const rawPath = resolve(arg('--raw') ?? fail('требуется --raw <path>'));
   const artifact = JSON.parse(readFileSync(rawPath, 'utf8'));
+  if (artifact.node !== 'PROFILE-01' || artifact.revision !== 'r11' ||
+      !['old-vector', 'aa', 'ab'].includes(artifact.mode)) fail('неверный вид артефакта');
+  if (!isDeepStrictEqual(artifact.cellsUnproven, unmeasuredCells(artifact.cells))) {
+    fail('неизмеренные клетки потеряны или подменены');
+  }
+  const expectedMeasured = artifact.admission === 'OLD-VECTOR-ONLY' ? ['desktop-size-vector'] : [];
+  if (!isDeepStrictEqual(artifact.cellsMeasured, expectedMeasured)) fail('неверный набор измеренных клеток');
 
   // 1. Замороженный контракт не менялся.
   verifyPreregistration(PROFILE_01);
@@ -39,10 +49,8 @@ function main() {
   // 2. Provenance exact base: независимое git-перевычисление ([4]).
   // Валидатор не доверяет полям raw JSON: HEAD, ancestry, diff и blob
   // пересчитываются из checkout, в котором запущен валидатор.
-  // Transcript size-gate — только диагностическое поле: проверяются
-  // exitCode, непустота и присутствие имён сценариев, побайтового
-  // сравнения с новым запуском нет (измерения зависят от build/runtime
-  // окружения; независимый re-run — отдельная dispatch-проба).
+  // Записанный exitCode не удостоверяет измерение. После проверки Git повторяем
+  // сборку и существующий size-gate; сравниваем данные, а не формат console.log.
   const SIZE_GATE_FROZEN = '4b0f181212b65a881e750e84564778f5828448a3';
   if (artifact.mode === 'old-vector') {
     const base = PROFILE_01.productBase.mainSha;
@@ -67,12 +75,8 @@ function main() {
     if (committed !== SIZE_GATE_FROZEN || committed !== artifact.sizeGateBlob) {
       fail(`size-gate provenance drifted: artifact ${artifact.sizeGateBlob}, git ${committed}`);
     }
-    if (!artifact.costVector || artifact.costVector.exitCode !== 0) fail('old-vector без зелёного costVector');
-    if (typeof artifact.costVector.transcript !== 'string' || artifact.costVector.transcript.length === 0) {
-      fail('costVector.transcript обязан быть непустой диагностикой');
-    }
-    for (const name of Object.keys(PROFILE_01.oldCostVectorGzipBytes.scenarios)) {
-      if (!artifact.costVector.transcript.includes(name)) fail(`транскрипт не содержит сценарий ${name}`);
+    if (artifact.admission === 'OLD-VECTOR-ONLY') {
+      validateReplayedVector(artifact.costVector, await measureOldVector(repoRoot));
     }
   }
 
@@ -100,10 +104,12 @@ function main() {
   // 5. Времена и seed фиксированы.
   if (!Number.isFinite(Date.parse(artifact.startedAtUtc ?? ''))) fail('startedAtUtc отсутствует');
   if (!Number.isFinite(Date.parse(artifact.finishedAtUtc ?? ''))) fail('finishedAtUtc отсутствует');
+  if (Date.parse(artifact.finishedAtUtc) < Date.parse(artifact.startedAtUtc)) fail('время окончания предшествует началу');
   if (artifact.seed !== 20260929) fail('seed drifted');
 
   // eslint-disable-next-line no-console
-  console.log(JSON.stringify({ valid: true, mode: artifact.mode, admission: artifact.admission }));
+  console.log(JSON.stringify({ valid: true, mode: artifact.mode, admission: artifact.admission,
+    verification: artifact.admission === 'OLD-VECTOR-ONLY' ? 'independent-size-remeasurement' : 'recorded-refusal-only' }));
 }
 
-main();
+await main();

@@ -195,6 +195,16 @@ export function preregistrationDigest(value = PROFILE_01) {
   return createHash('sha256').update(JSON.stringify(value)).digest('hex');
 }
 
+// Размер пакета не измеряет временные клетки roster. Имя runner и переменная
+// среды не превращают отсутствие измерения в доказательство.
+export function unmeasuredCells(cells) {
+  invariant(cells === 'desktop' || cells === 'all', 'неизвестный набор клеток');
+  return PROFILE_01.roster.classes
+    .filter((cell) => cells === 'all' || cell.id.startsWith('desktop-'))
+    .map((cell) => ({ cell: cell.id, reason: 'timing and device calibration not measured', blocks: 'A/B admission for this cell' }))
+    .concat([{ cell: 'whole-page energy/GPU', reason: 'device energy/GPU not measured', blocks: 'M-04/M-05 full-device cost claims' }]);
+}
+
 // Самопроверка замороженного контракта: структура, ТОЧНЫЕ ЗНАЧЕНИЯ
 // потолков/сценариев/roster/scenes, fail-closed флаги. Вызывается пробой
 // до любых samples. Проверяются именно значения, а не только число ключей:
