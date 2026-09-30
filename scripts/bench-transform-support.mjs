@@ -209,7 +209,10 @@ export async function runTransformLifecycleSample({ animate, count, lifecycle, c
         }
       }
       // После естественного завершения один drain очищает уже поставленные callbacks.
-      if (lifecycle === 'settled') clock.step(timestamp + 1);
+      if (lifecycle === 'settled') {
+        clock.step(timestamp + 1);
+        await flushReactions();
+      }
       if (lifecycle === 'live') requireLive('setup end');
       else requirePending(0, 'setup end');
       timestamp += profile.successorGapMs;

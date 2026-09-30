@@ -202,6 +202,39 @@ describe('paired public transform lifecycle screening', () => {
     expect(sample.semantic).toEqual(baseline.semantic);
   });
 
+  it('keeps the settled donor drain outside successor timing', async () => {
+    const baseline = await runTransformLifecycleSample({ animate, count: 1, lifecycle: 'settled', channels: 7, nowNs: () => 0n });
+    let calls = 0;
+    let queued = false;
+    let elapsed = 0n;
+    let donorReactions = 0;
+    const candidate: typeof animate = (targets, props, options) => {
+      const donor = ++calls === 1;
+      return animate(targets, props, {
+        ...options,
+        requestFrame(callback) {
+          return options!.requestFrame!((timestamp) => {
+            callback(timestamp);
+            if (donor && !queued && timestamp === TRANSFORM_PAIR_PROFILE.clockOriginMs + TRANSFORM_PAIR_PROFILE.durationMs) {
+              queued = true;
+              options!.requestFrame!(() => queueMicrotask(() => { donorReactions++; elapsed++; }));
+            }
+          });
+        },
+      });
+    };
+    const sample = await runTransformLifecycleSample({
+      animate: candidate, count: 1, lifecycle: 'settled', channels: 7, nowNs: () => elapsed,
+    });
+    expect(donorReactions).toBe(1);
+    expect(sample.operationNs).toBe(0);
+    expect(sample.frameNs).toEqual(baseline.frameNs);
+    expect(sample.cancelDrainNs).toBe(0);
+    expect(sample.semantic.targetTraceHashes).toEqual(baseline.semantic.targetTraceHashes);
+    expect(sample.semantic.finished).toBe(true);
+    expect(sample.semantic.pending).toBe(0);
+  });
+
   it.each([1, 100, 1000])('covers all seven transform channels on %i targets', async (count) => {
     const sample = await runTransformLifecycleSample({ animate, count, lifecycle: 'live', channels: 7 });
     expect(sample.semantic.targets).toBe(count);
