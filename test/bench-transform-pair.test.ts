@@ -184,6 +184,24 @@ describe('paired public transform lifecycle screening', () => {
     expect(sample.semantic.targetTraceHashes).toHaveLength(1);
   });
 
+  it.each(['fresh', 'settled', 'live'] as const)('%s accepts writes deferred within their frame', async (lifecycle) => {
+    const baseline = await runTransformLifecycleSample({ animate, count: 1, lifecycle, channels: 7 });
+    const wrappedStyles = new WeakSet<object>();
+    const deferred: typeof animate = (targets, props, options) => {
+      if (typeof targets === 'string' || !('length' in targets)) throw new Error('expected target array');
+      for (let target = 0; target < targets.length; target++) {
+        const style = targets[target]!.style;
+        if (wrappedStyles.has(style)) continue;
+        wrappedStyles.add(style);
+        const write = style.setProperty.bind(style);
+        style.setProperty = (property, value) => { queueMicrotask(() => write(property, value)); };
+      }
+      return animate(targets, props, options);
+    };
+    const sample = await runTransformLifecycleSample({ animate: deferred, count: 1, lifecycle, channels: 7 });
+    expect(sample.semantic).toEqual(baseline.semantic);
+  });
+
   it.each([1, 100, 1000])('covers all seven transform channels on %i targets', async (count) => {
     const sample = await runTransformLifecycleSample({ animate, count, lifecycle: 'live', channels: 7 });
     expect(sample.semantic.targets).toBe(count);

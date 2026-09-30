@@ -194,6 +194,7 @@ export async function runTransformLifecycleSample({ animate, count, lifecycle, c
       for (index = 0; index < setupOffsets.length; index++) {
         timestamp = profile.clockOriginMs + setupOffsets[index];
         clock.step(timestamp);
+        await flushReactions();
       }
       phase = 'outside';
       await flushReactions();
