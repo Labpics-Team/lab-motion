@@ -695,6 +695,7 @@ export function mountReorder(root: HTMLElement, status: HTMLElement): () => void
     finish(); state.update(measure()); dirty = false;
     session = state.start(node.dataset.key!);
     if (!session) return;
+    e.preventDefault();
     const r = node.getBoundingClientRect(); startX = r.x + r.width / 2; startY = r.y + r.height / 2;
     pointer = e.pointerId; root.setPointerCapture(pointer); pan.pointerDown(point(e));
     node.querySelector<HTMLElement>('[data-grip]')!.focus({ preventScroll: true });
@@ -721,8 +722,10 @@ export function mountReorder(root: HTMLElement, status: HTMLElement): () => void
     else if (session?.active && directions[e.key]) { e.preventDefault(); refresh(); session.step(directions[e.key]!); }
   });
   listen<MouseEvent>('click', e => {
-    const node = slotFor(e), action = (e.target as Element).closest<HTMLElement>('[data-move]')?.dataset.move;
+    const node = slotFor(e), button = (e.target as Element).closest<HTMLElement>('[data-move]');
+    const action = button?.dataset.move;
     if (!node || (action !== 'previous' && action !== 'next')) return;
+    button!.focus({ preventScroll: true });
     pan.pointerCancel(); finish(); state.update(measure()); dirty = false;
     session = state.start(node.dataset.key!); session?.step(action); finish();
   });
