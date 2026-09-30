@@ -87,7 +87,7 @@ test('browser built artifact: FIFO, observer errors и destroy во время �
 test('документированный адаптер: real reduced-motion, press ownership и возврат inline style', async ({ page }) => {
   const docs = readFileSync(new URL('../docs/recipes.md', import.meta.url), 'utf8');
   const section = docs.split('## Каскад состояний взаимодействия без гонок')[1]!;
-  const source = section.split('```ts\n')[1]!.split('```')[0]!;
+  const source = section.split(/```ts\r?\n/)[1]!.split('```')[0]!;
   const code = transformSync(source, { loader: 'ts', format: 'esm', target: 'es2022' }).code;
   await page.emulateMedia({ reducedMotion: 'reduce' });
   const result = await page.evaluate(async (compiled) => {

@@ -33,7 +33,7 @@ it('не предоставляет consumer право записи в бази
   // Чтения, импорты и весь dependency graph — positive control: иных ошибок нет.
   expect(errors.map((error) => ({
     code: error.code,
-    file: error.file?.fileName,
+    file: error.file === undefined ? undefined : resolve(error.file.fileName),
     line: error.file?.getLineAndCharacterOfPosition(error.start!).line,
   }))).toEqual([
     { code: 2540, file, line: 6 },

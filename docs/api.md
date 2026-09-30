@@ -7,7 +7,7 @@
 > [NAMING.md](NAMING.md).
 
 Импорт — `@labpics/motion` (ядро) или `@labpics/motion/<субпуть>`.
-Корневой экспорт + 43 субпути; неиспользуемые субпути вырезаются
+Корневой экспорт + 44 субпути; неиспользуемые субпути вырезаются
 tree-shaking'ом: `sideEffects` — точный allowlist из двух авто-регистрирующих
 входов (`./lit`, `./wc`).
 
@@ -127,6 +127,7 @@ await moves.finished;
 |---|---|
 | `…/gestures` | `createPress` (tap + клавиатурный путь Enter/Space), `createHover`, `createPan`, `createDrag` (границы + rubber-band + инерция + reduced-motion) |
 | `…/behaviors` | Headless state machines типовых мобильных взаимодействий: `createBottomSheet`, `createDragDismiss`, `createCarousel`, `createPullToRefresh`. Их общий контракт `BehaviorState { value, velocity, phase }`; отдельный `createStateCascade` разрешает цели конкурирующих визуальных намерений по свойствам. Подробно — [behaviors.md](behaviors.md) |
+| `…/behaviors/compositor` | Опциональный compositor-owner для `createCompositorBottomSheet`/`createCompositorCarousel`: follow остаётся headless/live, release передаёт `{ value, velocity, target }` существующему WAAPI/live owner, pickup возвращает `{ value, velocity }` без второго app-side tracker |
 | `…/scroll` | Headless-прогресс страницы/target-с-офсетами (семантика Motion), чистая in-view машина, скорость, scrub-клей к timeline |
 | `…/in-view` | Нативный `IntersectionObserver`-адаптер: selector/Element/список, custom root/margin/amount, one-shot либо парный enter/leave cleanup; возвращает idempotent `stop` |
 | `…/presence` | [Управляемый вход/выход](presence.md): `createPresenceTransition`, группа исполнителей и одна цель видимости; ручной `createPresence`, `swapPresence` (wait/sync) |

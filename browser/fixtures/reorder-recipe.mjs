@@ -6,7 +6,7 @@ import { build } from 'esbuild';
 export function reorderRecipe(root) {
   const text = readFileSync(resolve(root, 'docs/recipes.md'), 'utf8');
   const section = text.split('<!-- reorder-component-recipe:start -->')[1]?.split('<!-- reorder-component-recipe:end -->')[0];
-  const source = section?.match(/```typescript\n([\s\S]*?)\n```/)?.[1];
+  const source = section?.match(/```typescript\r?\n([\s\S]*?)\r?\n```/)?.[1];
   if (!source) throw new Error('reorder recipe is missing');
   return source;
 }

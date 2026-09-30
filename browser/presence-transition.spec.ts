@@ -3,7 +3,7 @@ import { transformSync } from 'esbuild';
 import { test, expect } from './fixtures/harness';
 
 const docs = readFileSync(new URL('../docs/recipes.md', import.meta.url), 'utf8');
-const recipe = docs.match(/```typescript\n([^`]*?export function bindAnimatedDialog[^]*?)\n```/)?.[1];
+const recipe = docs.match(/```typescript\r?\n([^`]*?export function bindAnimatedDialog[^]*?)\r?\n```/)?.[1];
 if (!recipe) throw new Error('Рабочий рецепт отсутствует');
 const code = transformSync(recipe, { loader: 'ts', format: 'esm', target: 'es2022' }).code;
 

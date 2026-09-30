@@ -466,6 +466,16 @@
         "default": "./dist/behaviors/index.cjs"
       }
     },
+    "./behaviors/compositor": {
+      "import": {
+        "types": "./dist/behaviors/compositor/index.d.ts",
+        "default": "./dist/behaviors/compositor/index.js"
+      },
+      "require": {
+        "types": "./dist/behaviors/compositor/index.d.cts",
+        "default": "./dist/behaviors/compositor/index.cjs"
+      }
+    },
     "./behaviors/reorder": {
       "import": {
         "types": "./dist/behaviors/reorder/index.d.ts",

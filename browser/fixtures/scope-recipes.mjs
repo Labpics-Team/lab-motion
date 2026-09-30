@@ -9,7 +9,7 @@ export function writeScopeRecipeSources(root, directory) {
     const marker = `<!-- recipe:animate-scope-${id} -->`;
     const parts = book.split(marker);
     if (parts.length !== 2) throw new Error(`Ожидается ровно один ${marker}`);
-    const match = parts[1].match(/^\s*```typescript\n([\s\S]*?)\n```/);
+    const match = parts[1].match(/^\s*```typescript\r?\n([\s\S]*?)\r?\n```/);
     if (!match) throw new Error(`Нет исполнимого TypeScript после ${marker}`);
     writeFileSync(join(directory, file), match[1]);
   }

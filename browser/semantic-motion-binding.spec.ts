@@ -4,7 +4,7 @@ import { fileURLToPath } from 'node:url';
 import { test, expect } from './fixtures/harness';
 
 const docs = readFileSync(new URL('../docs/recipes.md', import.meta.url), 'utf8');
-const recipe = docs.match(/```typescript\n([^`]*?export function bindUploadMotion[^]*?)\n```/)?.[1];
+const recipe = docs.match(/```typescript\r?\n([^`]*?export function bindUploadMotion[^]*?)\r?\n```/)?.[1];
 if (!recipe) throw new Error('Отсутствует исполняемый рецепт bindUploadMotion');
 const code = transformSync(recipe, { loader: 'ts', format: 'esm', target: 'es2022' }).code;
 
@@ -184,7 +184,7 @@ test('Solid: штатные signal/batch/cleanup без второго store и�
     destroyed:{writes:[2,2],cancels:4,state:'destroyed'},late:[2,2]});
 });
 
-const navigationRecipe = docs.match(/```typescript\n([^`]*?export function bindNavigationMotion[^]*?)\n```/)?.[1];
+const navigationRecipe = docs.match(/```typescript\r?\n([^`]*?export function bindNavigationMotion[^]*?)\r?\n```/)?.[1];
 if (!navigationRecipe) throw new Error('Отсутствует исполняемый рецепт bindNavigationMotion');
 const navigationCode = transformSync(navigationRecipe, { loader: 'ts', format: 'esm', target: 'es2022' }).code;
 
