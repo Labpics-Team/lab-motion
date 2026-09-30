@@ -120,6 +120,42 @@ describe('JOURNEY-01 direct-control compositor owner', () => {
     pager.destroy();
   });
 
+  it.each([0, 1])('carousel cancel публикует текущую цель до idle-обновления геометрии при progress=%s', async (progress) => {
+    const native = nativeTarget();
+    const pager = createCompositorCarousel({
+      pageCount: 4, pageSize: 100,
+      compositor: { target: native.target, property: 'translate', apply() {} },
+    });
+    let reenter = true;
+    pager.subscribe((state) => {
+      if (state.phase === 'idle' && reenter) { reenter = false; pager.update(4, 200); }
+    });
+    pager.goTo(3);
+    native.animation!.currentTime = native.duration * progress;
+    pager.cancel();
+    native.animation!.resolve();
+    await Promise.resolve();
+    expect(pager.state.index).toBe(3 * progress);
+    expect(pager.state.value).toBe(600 * progress);
+    pager.destroy();
+  });
+
+  it('carousel cancel в idle сохраняет исходную цель при насыщенной координате', () => {
+    const pager = createCompositorCarousel({
+      pageCount: 4, pageSize: Number.MAX_VALUE, index: 3,
+      matchMedia: () => ({ matches: true }),
+      compositor: { target: noWaapiTarget(), property: 'translate', apply() {} },
+    });
+    const initial = pager.state;
+    pager.cancel();
+    pager.cancel();
+    expect(pager.state).toBe(initial);
+    pager.update(4, 100);
+    expect(pager.state.index).toBe(3);
+    expect(pager.state.value).toBe(300);
+    pager.destroy();
+  });
+
   it('carousel cancel не перезаписывает новую цель из idle-подписчика', async () => {
     const native = nativeTarget();
     const pager = createCompositorCarousel({

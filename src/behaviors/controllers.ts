@@ -185,11 +185,12 @@ function _createBase<S extends BehaviorState<number>>(
      * Погасить активную доводку и осесть в покой на ТЕКУЩЕМ значении (phase idle,
      * velocity 0). Идемпотентна: повторный вызов на уже покоящейся машине —
      * no-op (не плодит эмитов). destroy() строится поверх неё.
+     * Сброс вычисляется после перехвата позиции, до публикации idle.
      */
-    cancel(reset?: Partial<S>): void {
+    cancel(reset?: () => Partial<S>): void {
       if (destroyed || state.phase === 'idle' || runner._invalidate() === undefined) return;
       tracker.reset();
-      emit({ ...reset, velocity: 0, phase: 'idle' } as Partial<S>);
+      emit({ ...reset?.(), velocity: 0, phase: 'idle' } as Partial<S>);
     },
     destroy(): void {
       if (destroyed) return;
@@ -701,8 +702,7 @@ export function createCarousel(options: CarouselOptions, createRunner: BehaviorR
     },
     subscribe: base.subscribe,
     cancel(): void {
-      base.cancel();
-      if (base.state.phase === 'idle') targetIndex = base.state.index;
+      base.cancel(() => ({ index: targetIndex = base.state.index }));
     },
     destroy: base.destroy,
     get state(): CarouselState {
@@ -854,7 +854,7 @@ export function createPullToRefresh(options: PullOptions, createRunner: Behavior
     },
     subscribe: base.subscribe,
     cancel(): void {
-      base.cancel({ value: 0, pulling: false, armed: false, pending: false });
+      base.cancel(() => ({ value: 0, pulling: false, armed: false, pending: false }));
     },
     destroy: base.destroy,
     get state(): PullState {
