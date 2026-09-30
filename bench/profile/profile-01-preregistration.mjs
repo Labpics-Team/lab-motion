@@ -16,12 +16,12 @@ function invariant(condition, message) {
   if (!condition) throw new Error(`PROFILE-01 preregistration: ${message}`);
 }
 
-// Точный baseline: прежний main с отдельным исправлением зависимостей тестов.
-// Runtime, размерный измеритель и потолки сохранены; branch SHA не назван main.
+// Точный main после исправления зависимостей тестов.
+// Runtime, размерный измеритель и потолки прежнего baseline сохранены.
 export const PRODUCT_BASE = Object.freeze({
   repo: 'Labpics-Team/lab-motion',
-  sourceSha: '667cfad1d0de2c4db1cf95074d1c43161308bb35',
-  upstreamMainSha: '0912acd875a67bed8f165e345626fd00082e258e',
+  sourceSha: '7d3ed42e5b054a06e4f6ca7f0c2efc02484e20fd',
+  upstreamMainSha: '7d3ed42e5b054a06e4f6ca7f0c2efc02484e20fd',
   sizeGateBlob: '4b0f181212b65a881e750e84564778f5828448a3',
   reason: 'исправление безопасности зависимостей; runtime и размерные потолки сохранены',
 });
