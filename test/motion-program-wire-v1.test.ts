@@ -206,6 +206,60 @@ describe('MotionProgram V1 canonical wire', () => {
     expect(decodeMotionProgramV1(wire)[2]).toEqual([value]);
   });
 
+  it.each([
+    ['одиночная строка', [MOTION_PROGRAM_LIMITS_V1.maxStringCodeUnits + 1]],
+    ['сумма строк', [MOTION_PROGRAM_LIMITS_V1.maxStringCodeUnits, 1]],
+  ] as const)('отклоняет превышение code-unit бюджета до re-encode и следующих таблиц: %s', (_name, lengths) => {
+    const input = minimalProgramInput();
+    const base = encodeMotionProgramV1(parseMotionProgramV1(input));
+    const table = new Uint8Array(lengths.reduce((sum, length) => sum + 4 + length, 0));
+    const tableView = new DataView(table.buffer);
+    let offset = 0;
+    for (let index = 0; index < lengths.length; index++) {
+      const length = lengths[index]!;
+      tableView.setUint32(offset, length, true);
+      table.fill(97 + index, offset + 4, offset + 4 + length);
+      offset += 4 + length;
+    }
+    const wire = replaceWireBytes(base, 18, 0, table);
+    new DataView(wire.buffer).setUint16(10, lengths.length, true);
+
+    const encode = TextEncoder.prototype.encode;
+    const getFloat64 = DataView.prototype.getFloat64;
+    let reencodes = 0;
+    let floatReads = 0;
+    let error: unknown;
+    TextEncoder.prototype.encode = function (value) {
+      reencodes++;
+      return encode.call(this, value);
+    };
+    DataView.prototype.getFloat64 = function (byteOffset, littleEndian) {
+      floatReads++;
+      return getFloat64.call(this, byteOffset, littleEndian);
+    };
+    try {
+      decodeMotionProgramV1(wire);
+    } catch (caught) {
+      error = caught;
+    } finally {
+      TextEncoder.prototype.encode = encode;
+      DataView.prototype.getFloat64 = getFloat64;
+    }
+    expectIssue(() => { throw error; }, 'LMP_LIMIT');
+    expect(reencodes).toBe(lengths.length - 1);
+    expect(floatReads).toBe(0);
+  });
+
+  it.each(['ascii', 'surrogate-pair'] as const)('сохраняет точную UTF-16 границу для %s', (kind) => {
+    const limit = MOTION_PROGRAM_LIMITS_V1.maxStringCodeUnits;
+    const value = kind === 'ascii' ? 'a'.repeat(limit) : '𠮷'.repeat(Math.floor(limit / 2)) + 'a';
+    expect(value.length).toBe(limit);
+    const input = minimalProgramInput();
+    input[2] = [value];
+    const wire = encodeMotionProgramV1(parseMotionProgramV1(input));
+    expect(decodeMotionProgramV1(wire)[2]).toEqual([value]);
+  });
+
   it('сохраняет пустую UTF-8 строку через raw(0)', () => {
     const input = validProgramInput();
     (input[2] as unknown[])[0] = '';
