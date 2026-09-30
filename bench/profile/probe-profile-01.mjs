@@ -87,7 +87,7 @@ async function main() {
   };
 
   if (mode === 'old-vector') {
-    const base = PROFILE_01.productBase.mainSha;
+    const base = PROFILE_01.productBase.sourceSha;
     if (!git.ancestor(repoRoot, base)) fail(`old-vector требует HEAD, выросший из PRODUCT_BASE ${base}`);
     const sizeGateBlob = git.blob(repoRoot, 'HEAD', 'scripts/size-gate.mjs');
     if (sizeGateBlob !== '4b0f181212b65a881e750e84564778f5828448a3') {

@@ -11,13 +11,13 @@ function invariant(condition, message) {
   if (!condition) throw new Error(`PROFILE-01 preregistration: ${message}`);
 }
 
-// Точный продуктовый base, на котором зафиксирован старый cost vector.
+// Точный baseline: прежний main с отдельным исправлением зависимостей тестов.
+// Runtime, размерный измеритель и потолки сохранены; branch SHA не назван main.
 export const PRODUCT_BASE = Object.freeze({
   repo: 'Labpics-Team/lab-motion',
-  mainSha: '0912acd875a67bed8f165e345626fd00082e258e',
-  mergeOf: 'PR #390; current main before PROFILE measurements',
-  registeredFrom: '0fb23264a93a18a8242fd15a2375e9f75845dbdf',
-  mergedAtUtc: '2026-09-29T17:24:51Z',
+  sourceSha: '667cfad1d0de2c4db1cf95074d1c43161308bb35',
+  upstreamMainSha: '0912acd875a67bed8f165e345626fd00082e258e',
+  reason: 'dependency security correction; runtime and cost ceilings unchanged',
 });
 
 // Полный старый cost vector: потолки кода, а не новые оценки.
@@ -220,8 +220,8 @@ export function verifyPreregistration(value = PROFILE_01) {
   invariant(value.node === 'PROFILE-01' && value.revision === 'r11', 'node/revision drifted');
   invariant(value.candidateSamplesObservedAtRegistration === false, 'preregistration обязана предшествовать samples');
   invariant(value.productBase?.repo === 'Labpics-Team/lab-motion', 'product repo drifted');
-  invariant(value.productBase?.mainSha === '0912acd875a67bed8f165e345626fd00082e258e', 'product base drifted');
-  invariant(value.productBase?.mergedAtUtc === '2026-09-29T17:24:51Z', 'product base время drifted');
+  invariant(value.productBase?.sourceSha === '667cfad1d0de2c4db1cf95074d1c43161308bb35', 'product base drifted');
+  invariant(value.productBase?.upstreamMainSha === '0912acd875a67bed8f165e345626fd00082e258e', 'upstream main drifted');
   const gates = value.oldCostVectorGzipBytes;
   invariant(gates?.core === 2220 && gates?.subpath === 4608 && gates?.fullCoreConsumer === 2330, 'core/subpath/fullCore ceilings drifted');
   invariant(gates?.nano === 1024 && gates?.compiledRuntime === 341 && gates?.compilerSurface === 1024, 'старые 1024/341/1024 ceilings drifted');

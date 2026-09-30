@@ -40,7 +40,7 @@ async function main() {
   verifyPreregistration(PROFILE_01);
   const frozen = preregistrationDigest(PROFILE_01);
   if (artifact.preregistrationDigest !== frozen) {
-    fail(`preregistration подменена после samples: artifact ${artifact.preregistrationDigest}, frozen ${frozen}`);
+    fail(`preregistration не совпадает: artifact ${artifact.preregistrationDigest}, frozen ${frozen}`);
   }
   if (artifact.candidateSamplesObservedAtRegistration !== false) {
     fail('preregistration обязана предшествовать samples');
@@ -53,7 +53,7 @@ async function main() {
   // сборку и существующий size-gate; сравниваем данные, а не формат console.log.
   const SIZE_GATE_FROZEN = '4b0f181212b65a881e750e84564778f5828448a3';
   if (artifact.mode === 'old-vector') {
-    const base = PROFILE_01.productBase.mainSha;
+    const base = PROFILE_01.productBase.sourceSha;
     const proof = artifact.baseProof ?? {};
     if (proof.productBase !== base || proof.head !== artifact.head) fail('baseProof не покрывает artifact head');
     if (!Array.isArray(proof.diffPaths)) fail('baseProof.diffPaths отсутствует');
