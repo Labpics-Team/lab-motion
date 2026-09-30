@@ -88,7 +88,7 @@ async function main() {
     const base = PROFILE_01.productBase.sourceSha;
     if (!git.ancestor(repoRoot, base)) fail(`old-vector требует HEAD, выросший из PRODUCT_BASE ${base}`);
     const sizeGateBlob = git.blob(repoRoot, 'HEAD', 'scripts/size-gate.mjs');
-    if (sizeGateBlob !== '4b0f181212b65a881e750e84564778f5828448a3') {
+    if (sizeGateBlob !== PROFILE_01.productBase.sizeGateBlob) {
       fail(`size-gate provenance drifted: ${sizeGateBlob}`);
     }
     // Рабочая копия обязана совпадать с коммитом: иначе измеритель

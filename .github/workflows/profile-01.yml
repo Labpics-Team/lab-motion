@@ -73,6 +73,44 @@ jobs:
             node bench/profile/validate-profile-01.mjs --raw "$raw"
           done
 
+      - name: Проверить отказ внешнего validator на подменах настоящего результата
+        if: ${{ !cancelled() && steps.probe.outcome == 'success' }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          node --input-type=module <<'NODE'
+          import assert from 'node:assert/strict';
+          import { spawnSync } from 'node:child_process';
+          import { mkdtempSync, readFileSync, readdirSync, rmSync, writeFileSync } from 'node:fs';
+          import { tmpdir } from 'node:os';
+          import { join } from 'node:path';
+          const rawDirectory = join(process.env.RUNNER_TEMP, 'profile-01-raw');
+          const files = readdirSync(rawDirectory).filter(name => name.endsWith('.json'));
+          assert.equal(files.length, 1);
+          const original = JSON.parse(readFileSync(join(rawDirectory, files[0]), 'utf8'));
+          const directory = mkdtempSync(join(tmpdir(), 'profile-replay-mutations-'));
+          try {
+            const cases = [
+              ['число', value => { value.costVector.scenarios[0].gzBytes += 1; }, 'scenarios не воспроизводится'],
+              ['identity', value => { value.head = '0'.repeat(40); }, 'baseProof не покрывает'],
+              ['клетки', value => { value.cellsUnproven = []; }, 'неизмеренные клетки потеряны'],
+            ];
+            for (const [name, mutate, rejection] of cases) {
+              const value = structuredClone(original);
+              mutate(value);
+              const path = join(directory, 'mutated.json');
+              writeFileSync(path, JSON.stringify(value));
+              const run = spawnSync(process.execPath, ['bench/profile/validate-profile-01.mjs', '--raw', path],
+                { encoding: 'utf8', timeout: 180_000, maxBuffer: 8 * 1024 * 1024 });
+              assert.equal(run.status, 1, `${name}: ${run.error ?? run.stderr}`);
+              assert.ok(run.stderr.includes(rejection), `${name}: неверная причина отказа: ${run.stderr}`);
+              console.log(`${name}: ожидаемый предметный отказ подтверждён`);
+            }
+          } finally {
+            rmSync(directory, { recursive: true, force: true });
+          }
+          NODE
+
       - name: Опубликовать raw-артефакт
         # Отрицательный результат сохраняется даже после отказа измерителя.
         if: always()

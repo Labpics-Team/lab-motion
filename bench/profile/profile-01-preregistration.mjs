@@ -22,12 +22,13 @@ export const PRODUCT_BASE = Object.freeze({
   repo: 'Labpics-Team/lab-motion',
   sourceSha: '667cfad1d0de2c4db1cf95074d1c43161308bb35',
   upstreamMainSha: '0912acd875a67bed8f165e345626fd00082e258e',
+  sizeGateBlob: '4b0f181212b65a881e750e84564778f5828448a3',
   reason: 'исправление безопасности зависимостей; runtime и размерные потолки сохранены',
 });
 
 // Полный старый cost vector: потолки кода, а не новые оценки.
-// Provenance: scripts/size-gate.mjs, blob 4b0f181212b65a881e750e84564778f5828448a3
-// на PRODUCT_BASE. Архивные фактические размеры новым измерением не являются:
+// Provenance: scripts/size-gate.mjs, PRODUCT_BASE.sizeGateBlob.
+// Архивные фактические размеры новым измерением не являются:
 // метод повторного снятия — node scripts/size-gate.mjs на exact base.
 export const OLD_COST_VECTOR_GZIP_BYTES = Object.freeze({
   core: 2220,

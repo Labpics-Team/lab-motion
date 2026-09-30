@@ -51,7 +51,6 @@ async function main() {
   // пересчитываются из checkout, в котором запущен валидатор.
   // Записанный exitCode не удостоверяет измерение. После проверки Git повторяем
   // сборку и существующий size-gate; сравниваем данные, а не формат console.log.
-  const SIZE_GATE_FROZEN = '4b0f181212b65a881e750e84564778f5828448a3';
   if (artifact.mode === 'old-vector') {
     const base = PROFILE_01.productBase.sourceSha;
     const proof = artifact.baseProof ?? {};
@@ -72,7 +71,7 @@ async function main() {
     const foreign = recomputed.filter((path) => !PREREG_OWN_PATHS.includes(path));
     if (foreign.length > 0) fail(`дерево отличается от PRODUCT_BASE вне prereg-пакета: ${foreign.join(', ')}`);
     const committed = git.blob(repoRoot, artifact.head, 'scripts/size-gate.mjs');
-    if (committed !== SIZE_GATE_FROZEN || committed !== artifact.sizeGateBlob) {
+    if (committed !== PROFILE_01.productBase.sizeGateBlob || committed !== artifact.sizeGateBlob) {
       fail(`size-gate provenance drifted: artifact ${artifact.sizeGateBlob}, git ${committed}`);
     }
     if (artifact.admission === 'OLD-VECTOR-ONLY') {
