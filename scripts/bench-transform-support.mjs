@@ -215,13 +215,11 @@ export async function runTransformLifecycleSample({ animate, count, lifecycle, c
     }
     const operationBefore = nowNs();
     controls = animate(targets, props, options);
-    let operationNs;
-    try { operationNs = Number(nowNs() - operationBefore); } finally {
-      // Observer не входит в operation timing, но нужен даже при отказе часов.
-      observeFinished(controls, (state) => { finished = state; });
-    }
-    requireLive('operation');
+    // Observer регистрируется до реакции и второго чтения часов: отказ часов не теряет finished.
+    observeFinished(controls, (state) => { finished = state; });
     await flushReactions();
+    const operationNs = Number(nowNs() - operationBefore);
+    requireLive('operation');
     requireNoRecordedFailures();
     if (finished.status === 'fulfilled' || onCompleteCalls !== 0 || (lifecycle !== 'fresh' && previousFinished.status !== 'fulfilled')) {
       throw new Error('transform: handoff finished/onComplete нарушен');
@@ -230,18 +228,18 @@ export async function runTransformLifecycleSample({ animate, count, lifecycle, c
     for (index = 0; index < frames; index++) {
       const before = nowNs();
       clock.step(timestamp + profile.frameOffsetsMs[index]);
+      await flushReactions();
       frameNs[index] = Number(nowNs() - before);
       requireLive(`frame ${index}`);
     }
     phase = 'outside';
-    await flushReactions();
     requireNoRecordedFailures();
     if (finished.status === 'fulfilled' || onCompleteCalls !== 0) throw new Error('transform: преждевременный finished/onComplete');
     const cancelBefore = nowNs();
     controls.cancel();
     clock.step(timestamp + profile.durationMs);
-    const cancelDrainNs = Number(nowNs() - cancelBefore);
     await flushReactions();
+    const cancelDrainNs = Number(nowNs() - cancelBefore);
     requireNoRecordedFailures();
     if (finished.status !== 'fulfilled' || onCompleteCalls !== 0 || previousCompleteCalls !== (lifecycle === 'settled' ? 1 : 0)) {
       throw new Error('transform: cancel finished/onComplete нарушен');

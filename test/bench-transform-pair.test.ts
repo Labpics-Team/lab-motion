@@ -95,6 +95,64 @@ describe('paired public transform lifecycle screening', () => {
     expect(slower.cancelDrainNs).toBe(baseline.cancelDrainNs);
   });
 
+
+  it.each(['operation', 'frame', 'cancel'] as const)(
+    'accounts for work deferred across a measured %s boundary', async (stage) => {
+      const baseline = await runTransformLifecycleSample({
+        animate, count: 1, lifecycle: 'fresh', channels: 7, nowNs: () => 0n,
+      });
+      let elapsed = 0n;
+      let work = 0;
+      const burn = () => { work++; elapsed++; };
+      let measuredFrameCallbacks = 0;
+      const candidate: typeof animate = (targets, props, options) => {
+        const controls = animate(targets, props, stage === 'frame' ? {
+          ...options,
+          requestFrame(callback) {
+            return options!.requestFrame!((timestamp) => {
+              callback(timestamp);
+              if (++measuredFrameCallbacks <= TRANSFORM_PAIR_PROFILE.frameOffsetsMs.length) queueMicrotask(burn);
+            });
+          },
+        } : options);
+        if (stage === 'operation') queueMicrotask(() => { for (let step = 0; step < 7; step++) burn(); });
+        if (stage !== 'cancel') return controls;
+        let firstCancel = true;
+        return {
+          ...controls,
+          cancel() {
+            controls.cancel();
+            if (firstCancel) {
+              firstCancel = false;
+              queueMicrotask(() => { for (let step = 0; step < 7; step++) burn(); });
+            }
+          },
+        };
+      };
+      const slower = await runTransformLifecycleSample({
+        animate: candidate, count: 1, lifecycle: 'fresh', channels: 7, nowNs: () => elapsed,
+      });
+      expect(slower.semantic).toEqual(baseline.semantic);
+      if (stage === 'operation') {
+        expect(work).toBe(7);
+        expect(slower.operationNs - baseline.operationNs).toBe(7);
+        expect(slower.frameNs).toEqual(baseline.frameNs);
+        expect(slower.cancelDrainNs).toBe(baseline.cancelDrainNs);
+      } else if (stage === 'frame') {
+        expect(work).toBe(TRANSFORM_PAIR_PROFILE.frameOffsetsMs.length);
+        expect(slower.operationNs).toBe(baseline.operationNs);
+        expect(slower.frameNs.map((value, index) => value - baseline.frameNs[index]!))
+          .toEqual(TRANSFORM_PAIR_PROFILE.frameOffsetsMs.map(() => 1));
+        expect(slower.cancelDrainNs).toBe(baseline.cancelDrainNs);
+      } else {
+        expect(work).toBe(7);
+        expect(slower.operationNs).toBe(baseline.operationNs);
+        expect(slower.frameNs).toEqual(baseline.frameNs);
+        expect(slower.cancelDrainNs - baseline.cancelDrainNs).toBe(7);
+      }
+    },
+  );
+
   it('rejects ambiguous CLI arguments and the same resolved checkout', () => {
     expect(() => parseTransformPairArgs([])).toThrow(/baseline.*candidate/);
     expect(() => parseTransformPairArgs(['--baseline', '.', '--candidate', './'])).toThrow(/same|один/);
