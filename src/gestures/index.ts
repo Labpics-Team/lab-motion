@@ -1,4 +1,4 @@
-/**
+﻿/**
  * gestures/index.ts — headless-распознаватели жестов (subpath ./gestures).
  *
  * Слой интеракции движка: press/tap (с клавиатурным путём), hover,
@@ -22,7 +22,8 @@
  */
 
 import { createDecay, type DecayModel } from '../decay.js';
-import { advanceSlidingWindow } from '../internal/sliding-window.js';
+import { createInputVelocityTracker, DEFAULT_VELOCITY_WINDOW_S, finite, finiteSub, type GesturePoint, type VelocityTracker } from '../internal/velocity-tracker.js';
+export type { GesturePoint, VelocityTracker } from '../internal/velocity-tracker.js';
 import { solveSpring } from '../internal/solver.js';
 import { CONVERGENCE_THRESHOLD } from '../internal/constants.js';
 import type { MatchMediaLike } from '../internal/media-query.js';
@@ -31,80 +32,16 @@ import type { RequestFrameFn } from '../motion-value.js';
 
 // ─── Общие типы и утилиты ────────────────────────────────────────────────────
 
-/** Точка жеста: координаты (px) + время (СЕКУНДЫ, напр. e.timeStamp/1000). */
-export interface GesturePoint {
-  readonly x: number;
-  readonly y: number;
-  readonly t: number;
-}
-
 /** Ось блокировки жеста. */
 export type GestureAxis = 'x' | 'y';
 
 /**
- * Страж конечности — зеркалит семантику clampFinite из spring.ts:
- * finite → как есть; NaN → 0; ±∞ → ±MAX_VALUE.
- */
-function finite(x: number): number {
-  if (Number.isFinite(x)) return x;
-  if (Number.isNaN(x)) return 0;
-  return x > 0 ? Number.MAX_VALUE : -Number.MAX_VALUE;
-}
-
-/** Разность с защитой от overflow (|a|+|b|>MAX_VALUE → ±∞ → clamp). */
-function finiteSub(a: number, b: number): number {
-  return finite(finite(a) - finite(b));
-}
-
-// ─── Velocity tracker ────────────────────────────────────────────────────────
-
-/** Оценщик мгновенной скорости указателя по скользящему окну сэмплов. */
-export interface VelocityTracker {
-  /** Добавить сэмпл (координаты px, время в секундах). */
-  push(p: GesturePoint): void;
-  /** Скорость (px/s) по окну: (последний − первый в окне) / Δt. Всегда конечна. */
-  velocity(): { vx: number; vy: number };
-  /** Сбросить все сэмплы. */
-  reset(): void;
-}
-
-const DEFAULT_VELOCITY_WINDOW_S = 0.1;
-
-/**
- * Создать трекер скорости.
- * Оценка = наклон между первым и последним сэмплом внутри окна `windowSec`
- * (по умолчанию 0.1s) — устойчиво к дрожанию отдельных событий и
- * детерминированно. Δt=0 (одинаковые timestamps) → скорость 0, не NaN.
+ * Оценка скорости по окну 0.1s по умолчанию. При редких событиях сохраняется
+ * последняя пара; одинаковые timestamps дают нулевую скорость при Δt=0.
  */
 export function createVelocityTracker(windowSec?: number): VelocityTracker {
-  const win =
-    typeof windowSec === 'number' && Number.isFinite(windowSec) && windowSec > 0
-      ? windowSec
-      : DEFAULT_VELOCITY_WINDOW_S;
-  let samples: GesturePoint[] = [];
-  let start = 0;
-
-  return {
-    push(p: GesturePoint): void {
-      const s = { x: finite(p.x), y: finite(p.y), t: finite(p.t) };
-      samples.push(s);
-      start = advanceSlidingWindow(samples, start, win);
-    },
-    velocity(): { vx: number; vy: number } {
-      if (samples.length - start < 2) return { vx: 0, vy: 0 };
-      const a = samples[start]!;
-      const b = samples[samples.length - 1];
-      const dt = b.t - a.t;
-      if (!(dt > 0)) return { vx: 0, vy: 0 }; // Δt<=0/NaN → нет наклона
-      return { vx: finite(finiteSub(b.x, a.x) / dt), vy: finite(finiteSub(b.y, a.y) / dt) };
-    },
-    reset(): void {
-      samples.length = 0;
-      start = 0;
-    },
-  };
+  return createInputVelocityTracker(windowSec);
 }
-
 // ─── Press (tap) ─────────────────────────────────────────────────────────────
 
 /** Опции распознавателя нажатия. */

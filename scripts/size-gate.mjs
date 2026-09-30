@@ -139,6 +139,10 @@ export const IN_VIEW_CONSUMER_GATE_BYTES = 1908;
 // общего consumer-графа, не смешивая его с file-level потолком.
 export const COMPOSITOR_CAPABILITY_GATE_BYTES = 6600;
 
+// Новый opt-in follow: не более 1 KiB сверх native-capability бюджета 6450 B.
+// Предел установлен до первой сборки этого entry; прежние клетки не меняются.
+export const COMPOSITOR_FOLLOW_GATE_BYTES = 6450 + 1024;
+
 // Совместный consumer-граф ./animate + базового spring-компилятора. Exact
 // clean-base 7968d161 (2026-07-16): 12 494 B gz; потолок равен факту без люфта,
 // чтобы локальная оптимизация одного entry не покупалась дублированием между
@@ -195,6 +199,7 @@ export const BESPOKE_SUBPATH_GATES = {
   // Групповой фасад самодостаточен и включает только нужные ему базовые план и
   // контроллер. Порог равен прежнему полному compositor-контракту, не новому факту.
   './compositor/stagger': 6450,
+  './compositor/follow': COMPOSITOR_FOLLOW_GATE_BYTES,
   // ./tokens — motion-токены (SSOT labui): duration/easing/spring/staggerGap +
   // distanceScale + springFromDurationBounce (каноническая пара ДС (duration,bounce)
   // → SpringParams; тянет validateSpringParams ядра, чтобы выход ГАРАНТИРОВАННО
@@ -368,6 +373,11 @@ export const IMPORT_COST_SCENARIOS = [
     name: 'compositor-stagger capability',
     code: `import { CompositorSpring, CompositorStaggerGroup, compileSpringPlan, compileStaggerPlan } from '%DIST%/../compositor/stagger/index.js'; console.log(CompositorSpring, CompositorStaggerGroup, compileSpringPlan, compileStaggerPlan);`,
     gate: COMPOSITOR_CAPABILITY_GATE_BYTES,
+  },
+  {
+    name: 'compositor-follow capability',
+    code: `import { createCompositorFollow, compileSpringPlan } from '%DIST%/../compositor/follow/index.js'; console.log(createCompositorFollow, compileSpringPlan);`,
+    gate: COMPOSITOR_FOLLOW_GATE_BYTES,
   },
   {
     // Cross-entry страж: фасад и прямой spring-компилятор часто сосуществуют;
