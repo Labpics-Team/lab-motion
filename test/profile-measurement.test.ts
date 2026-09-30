@@ -1,4 +1,10 @@
 import { describe, expect, it } from 'vitest';
+import { spawnSync } from 'node:child_process';
+import { createHash } from 'node:crypto';
+import { mkdtempSync, readFileSync, rmSync } from 'node:fs';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
+import { fileURLToPath } from 'node:url';
 import { validateReplayedVector } from '../bench/profile/profile-measurement.mjs';
 import { unmeasuredCells } from '../bench/profile/profile-01-preregistration.mjs';
 
@@ -68,4 +74,23 @@ describe('PROFILE: записанный успех не заменяет нез�
     ]);
     expect(() => unmeasuredCells('unknown')).toThrow();
   });
+
+  it('хеш реального failure-артефакта покрывает отступы, Unicode и конечный LF', () => {
+    const directory = mkdtempSync(join(tmpdir(), 'motion-profile-digest-'));
+    try {
+      const root = fileURLToPath(new URL('../', import.meta.url));
+      const run = spawnSync(process.execPath, [
+        'bench/profile/probe-profile-01.mjs', '--mode', 'aa', '--out', directory,
+      ], { cwd: root, encoding: 'utf8', timeout: 15_000 });
+      expect(run.status, run.stderr).toBe(1);
+      const receipt = JSON.parse(run.stdout.trim());
+      const raw = readFileSync(receipt.rawPath);
+      expect(JSON.parse(raw.toString('utf8')).rejection).toContain('browser-калибровки');
+      expect(raw.toString('utf8')).toContain('\n  "node"');
+      expect(raw.at(-1)).toBe(10);
+      expect(receipt.rawDigest).toBe(createHash('sha256').update(raw).digest('hex'));
+    } finally {
+      rmSync(directory, { recursive: true, force: true });
+    }
+  }, 20_000);
 });

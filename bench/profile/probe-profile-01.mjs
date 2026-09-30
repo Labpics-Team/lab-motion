@@ -32,8 +32,9 @@ const git = makeGit(fail);
 
 function writeArtifact(outDir, artifact, head, digest) {
   const rawPath = join(outDir, `profile-01-${artifact.mode}-${head.slice(0, 12)}.json`);
-  writeFileSync(rawPath, `${JSON.stringify(artifact, null, 2)}\n`);
-  const rawDigest = createHash('sha256').update(JSON.stringify(artifact)).digest('hex');
+  const rawBytes = `${JSON.stringify(artifact, null, 2)}\n`;
+  writeFileSync(rawPath, rawBytes);
+  const rawDigest = createHash('sha256').update(rawBytes).digest('hex');
   // eslint-disable-next-line no-console
   console.log(JSON.stringify({ rawPath, rawDigest, preregistrationDigest: digest, admission: artifact.admission }));
 }
