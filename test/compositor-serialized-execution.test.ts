@@ -424,7 +424,31 @@ describe('compositor: exact piecewise sampler', () => {
   it('present currentTime:null означает pending pre-start, absent использует now', () => {
     expect(animationTimeOrFallback({ currentTime: null }, 500)).toBe(-1);
     expect(animationTimeOrFallback({}, 500)).toBe(500);
+    expect(animationTimeOrFallback(undefined, 500)).toBe(500);
     expect(animationTimeOrFallback({ currentTime: 25 }, 500)).toBe(25);
+  });
+
+  it.each([NaN, Infinity, -Infinity, '25', { valueOf: () => 25 }])(
+    'невалидный host currentTime=%s сохраняет fallback без численного приведения',
+    (currentTime) => {
+      expect(animationTimeOrFallback({ currentTime }, 500)).toBe(500);
+    },
+  );
+
+  it.each([-25, 0, Number.MAX_VALUE])('конечный host currentTime=%s имеет приоритет над fallback', (currentTime) => {
+    expect(animationTimeOrFallback({ currentTime }, 500)).toBe(currentTime);
+  });
+
+  it('бросающий currentTime getter читается один раз и сохраняет fallback', () => {
+    let reads = 0;
+    const animation = {
+      get currentTime(): never {
+        reads++;
+        throw new Error('host time unavailable');
+      },
+    };
+    expect(animationTimeOrFallback(animation, 500)).toBe(500);
+    expect(reads).toBe(1);
   });
 
   it('adjacent MAX endpoints не теряют конечную скорость из-за cancellation', () => {
