@@ -71,6 +71,30 @@ describe('paired public transform lifecycle screening', () => {
     }
   });
 
+  it('measures extra candidate work inside the real public animate call', async () => {
+    const baseline = await runTransformLifecycleSample({
+      animate, count: 1, lifecycle: 'fresh', channels: 7, nowNs: () => 0n,
+    });
+    let elapsed = 0n;
+    let work = 0;
+    const candidate: typeof animate = (targets, props, options) => {
+      const controls = animate(targets, props, options);
+      for (let step = 0; step < 7; step++) {
+        work += step;
+        elapsed += 1n;
+      }
+      return controls;
+    };
+    const slower = await runTransformLifecycleSample({
+      animate: candidate, count: 1, lifecycle: 'fresh', channels: 7, nowNs: () => elapsed,
+    });
+    expect(work).toBe(21);
+    expect(slower.semantic).toEqual(baseline.semantic);
+    expect(slower.operationNs - baseline.operationNs).toBe(7);
+    expect(slower.frameNs).toEqual(baseline.frameNs);
+    expect(slower.cancelDrainNs).toBe(baseline.cancelDrainNs);
+  });
+
   it('rejects ambiguous CLI arguments and the same resolved checkout', () => {
     expect(() => parseTransformPairArgs([])).toThrow(/baseline.*candidate/);
     expect(() => parseTransformPairArgs(['--baseline', '.', '--candidate', './'])).toThrow(/same|один/);
