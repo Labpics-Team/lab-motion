@@ -15,7 +15,7 @@ beforeAll(() => {
 it('упакованный потребитель: ESM/CJS/SSR, literal recipe и TS5/6 типы', () => {
   const work = mkdtempSync(join(tmpdir(), 'semantic-binding-consumer-'));
   try {
-    const [pack] = JSON.parse(execFileSync('npm', ['pack', '--ignore-scripts', '--json', '--pack-destination', work], { encoding: 'utf8', timeout: 30_000 }));
+    const [pack] = JSON.parse(execFileSync('npm', ['pack', '--ignore-scripts', '--json', '--pack-destination', work], { encoding: 'utf8', timeout: 30_000, shell: process.platform === 'win32' }));
     const installed = join(work, 'node_modules/@labpics/motion'); mkdirSync(installed, { recursive: true });
     execFileSync('tar', ['-xzf', join(work, pack.filename), '-C', installed, '--strip-components=1']);
     writeFileSync(join(work, 'package.json'), '{"type":"module"}');
@@ -41,9 +41,9 @@ console.log('semantic-binding-consumer: PASS');
 `);
     expect(execFileSync(process.execPath, [join(work, 'consumer.mjs')], { encoding: 'utf8', timeout: 30_000 })).toContain('semantic-binding-consumer: PASS');
     const docs = readFileSync('docs/recipes.md', 'utf8');
-    const recipe = docs.match(/```typescript\n([^`]*?export function bindUploadMotion[^]*?)\n```/)?.[1];
+    const recipe = docs.match(/```typescript\r?\n([^`]*?export function bindUploadMotion[^]*?)\r?\n```/)?.[1];
     expect(recipe).toBeTruthy(); writeFileSync(join(work, 'recipe.ts'), recipe!);
-    const navigation = docs.match(/```typescript\n([^`]*?export function bindNavigationMotion[^]*?)\n```/)?.[1];
+    const navigation = docs.match(/```typescript\r?\n([^`]*?export function bindNavigationMotion[^]*?)\r?\n```/)?.[1];
     expect(navigation).toBeTruthy(); writeFileSync(join(work, 'navigation.ts'), navigation!);
     expect(readFileSync(join(installed, 'docs/bindings.md'), 'utf8')).toContain('createMotionBinding');
     expect(readFileSync(join(installed, 'dist/bindings/index.d.ts'), 'utf8')).not.toContain('NoInfer');
