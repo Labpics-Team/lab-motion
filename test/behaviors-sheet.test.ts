@@ -2,7 +2,7 @@
  * test/behaviors-sheet.test.ts — bottom sheet: пример, контракт переходов,
  * прерывание, cancel/destroy, reduced-motion. Класс А/Б.
  *
- * MUTATION-мишени (см. докблок src/behaviors/index.ts): #1 выбор snap по
+ * MUTATION-мишени (см. докблок src/behaviors/controllers.ts): #1 выбор snap по
  * скорости, #2 velocity на follow→release, #3 параллельный loop, #4 идемпотентность
  * cancel, #5 reduced-leak, #8 rubber-band знак.
  */

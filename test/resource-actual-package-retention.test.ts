@@ -20,7 +20,7 @@ const PACKAGE_COMMAND_TIMEOUT_MS = 30_000;
 const PROBE_TIMEOUT_MS = 20_000;
 const WINDOWS_SHELL = process.platform === 'win32';
 const TSUP_CLI = join(ROOT, 'node_modules', 'tsup', 'dist', 'cli-default.js');
-const RESOURCE_RUNTIME_EXPORTS = ['./frame', './compositor'] as const;
+const RESOURCE_RUNTIME_EXPORTS = ['./frame', './compositor', './behaviors/compositor'] as const;
 
 function copyTrackedSource(target: string): void {
   const tracked = execFileSync('git', ['ls-files', '-z'], {
@@ -46,7 +46,7 @@ function runInstalledPackageProbe(): string {
     const source = join(work, 'source');
     mkdirSync(source);
     copyTrackedSource(source);
-    // Собираем только два owner-entry и ниже сверяем их байты с полной production-сборкой.
+    // Собираем owner-entry и ниже сверяем их байты с полной production-сборкой.
     const packagePath = join(source, 'package.json');
     const manifest = JSON.parse(readFileSync(packagePath, 'utf8')) as {
       exports: Record<string, unknown>;
@@ -67,6 +67,8 @@ function runInstalledPackageProbe(): string {
       'frame/index.cjs',
       'compositor/index.js',
       'compositor/index.cjs',
+      'behaviors/compositor/index.js',
+      'behaviors/compositor/index.cjs',
     ]) {
       expect(readFileSync(join(source, 'dist', relative))).toEqual(
         readFileSync(join(ROOT, 'dist', relative)),
@@ -101,6 +103,7 @@ function runInstalledPackageProbe(): string {
 
     const frameSpecifier = `${PACKAGE.name}/frame`;
     const compositorSpecifier = `${PACKAGE.name}/compositor`;
+    const behaviorSpecifier = `${PACKAGE.name}/behaviors/compositor`;
     const probe = `
 import assert from 'node:assert/strict';
 import { createRequire } from 'node:module';
@@ -111,6 +114,8 @@ const frameEsm = await import(${JSON.stringify(frameSpecifier)});
 const frameCjs = require(${JSON.stringify(frameSpecifier)});
 const compositorEsm = await import(${JSON.stringify(compositorSpecifier)});
 const compositorCjs = require(${JSON.stringify(compositorSpecifier)});
+const behaviorEsm = await import(${JSON.stringify(behaviorSpecifier)});
+const behaviorCjs = require(${JSON.stringify(behaviorSpecifier)});
 const gc = globalThis.gc;
 assert.equal(typeof gc, 'function', '--expose-gc missing');
 
@@ -181,17 +186,47 @@ const compositorCase = (mod, label, terminal) => {
   return ref;
 };
 
+const behaviorCase = (mod, label, terminal) => {
+  const target = {
+    marker: label,
+    animate() {
+      let resolve;
+      const finished = new Promise((done) => { resolve = done; });
+      return { currentTime: 0, cancel() { resolve(); }, finished };
+    },
+  };
+  const ref = new WeakRef(target);
+  const sheet = mod.createCompositorBottomSheet({
+    snapPoints: [0, 300],
+    compositor: {
+      target,
+      property: 'translate',
+      format: (value) => { void target.marker; return value; },
+      apply: () => { void target.marker; },
+    },
+    requestFrame: () => { void target.marker; return 1; },
+  });
+  sheet.snapTo(1);
+  if (terminal) sheet.destroy();
+  retainedOwners.push(sheet);
+  return ref;
+};
+
 const dropped = [
   frameCase(frameEsm, 'frame-esm-dropped', true),
   frameCase(frameCjs, 'frame-cjs-dropped', true),
   compositorCase(compositorEsm, 'compositor-esm-dropped', true),
   compositorCase(compositorCjs, 'compositor-cjs-dropped', true),
+  behaviorCase(behaviorEsm, 'behavior-esm-dropped', true),
+  behaviorCase(behaviorCjs, 'behavior-cjs-dropped', true),
 ];
 const live = [
   frameCase(frameEsm, 'frame-esm-live', false),
   frameCase(frameCjs, 'frame-cjs-live', false),
   compositorCase(compositorEsm, 'compositor-esm-live', false),
   compositorCase(compositorCjs, 'compositor-cjs-live', false),
+  behaviorCase(behaviorEsm, 'behavior-esm-live', false),
+  behaviorCase(behaviorCjs, 'behavior-cjs-live', false),
 ];
 let deliberate = { id: 'deliberate-retention' };
 const deliberateRef = new WeakRef(deliberate);
