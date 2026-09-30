@@ -1,6 +1,7 @@
 import { isDeepStrictEqual } from 'node:util';
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
+import { CANONICAL_GZIP_PACKAGE } from '../../scripts/compression-policy.mjs';
 import {
   prepareBenchmarkCheckout,
   assertCheckoutUnchanged,
@@ -13,7 +14,7 @@ export async function measureOldVector(root) {
   const provenance = prepareBenchmarkCheckout({
     root,
     benchDirectory: root,
-    requiredRootPackages: ['esbuild', 'tsup', 'terser', 'typescript'],
+    requiredRootPackages: ['esbuild', CANONICAL_GZIP_PACKAGE],
   });
   const gate = await import('../../scripts/size-gate.mjs');
   const pkg = JSON.parse(readFileSync(join(root, 'package.json'), 'utf8'));
