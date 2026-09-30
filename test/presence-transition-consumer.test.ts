@@ -6,9 +6,10 @@ import { expect, it } from 'vitest';
 
 it('настоящий tarball: ESM/CJS/types/SSR и буквальный DOM-рецепт доступны потребителю', () => {
   expect(existsSync('dist/presence/index.js')).toBe(true);
-  const work = mkdtempSync(join(tmpdir(), 'presence-consumer-'));
+  // Пробел в пути проверяет передачу pack-destination через Windows shell.
+  const work = mkdtempSync(join(tmpdir(), 'presence consumer-'));
   try {
-    const pack = JSON.parse(execFileSync('npm', ['pack', '--ignore-scripts', '--json', '--pack-destination', work], { encoding: 'utf8', timeout: 30_000, shell: process.platform === 'win32' })) as Array<{ filename: string }>;
+    const pack = JSON.parse(execFileSync('npm', ['pack', '--ignore-scripts', '--json', '--pack-destination', process.platform === 'win32' ? `"${work}"` : work], { encoding: 'utf8', timeout: 30_000, shell: process.platform === 'win32' })) as Array<{ filename: string }>;
     const modulePath = join(work, 'node_modules/@labpics/motion'); mkdirSync(modulePath, { recursive: true });
     execFileSync('tar', ['-xzf', join(work, pack[0]!.filename), '-C', modulePath, '--strip-components=1']);
     writeFileSync(join(work, 'package.json'), '{"type":"module"}');

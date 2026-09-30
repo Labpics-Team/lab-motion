@@ -13,9 +13,10 @@ beforeAll(() => {
 });
 
 it('упакованный потребитель: ESM/CJS/SSR, literal recipe и TS5/6 типы', () => {
-  const work = mkdtempSync(join(tmpdir(), 'semantic-binding-consumer-'));
+  // Пробел в пути проверяет передачу pack-destination через Windows shell.
+  const work = mkdtempSync(join(tmpdir(), 'semantic binding consumer-'));
   try {
-    const [pack] = JSON.parse(execFileSync('npm', ['pack', '--ignore-scripts', '--json', '--pack-destination', work], { encoding: 'utf8', timeout: 30_000, shell: process.platform === 'win32' }));
+    const [pack] = JSON.parse(execFileSync('npm', ['pack', '--ignore-scripts', '--json', '--pack-destination', process.platform === 'win32' ? `"${work}"` : work], { encoding: 'utf8', timeout: 30_000, shell: process.platform === 'win32' }));
     const installed = join(work, 'node_modules/@labpics/motion'); mkdirSync(installed, { recursive: true });
     execFileSync('tar', ['-xzf', join(work, pack.filename), '-C', installed, '--strip-components=1']);
     writeFileSync(join(work, 'package.json'), '{"type":"module"}');
