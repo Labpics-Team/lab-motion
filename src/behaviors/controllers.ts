@@ -630,12 +630,11 @@ export function createCarousel(options: CarouselOptions, createRunner: BehaviorR
 
   const settleTo = (index: number, velocity: number | undefined): void => {
     if (velocity === undefined) return;
-    const i = clampIndex(index);
-    targetIndex = i;
+    targetIndex = clampIndex(index);
     base._emit({ phase: 'release', index: clampIndex(base.state.index) }) && base._runner._settle({
       from: base.state.value,
       velocity,
-      target: _finite(i * pageSize),
+      target: _finite(targetIndex * pageSize),
       spring: springParams,
       // Единый clock: index выводится из position КАЖДЫЙ кадр (не отдельный счётчик).
       onStep: (v, vel) => base._emit({ value: v, velocity: vel, index: clampIndex(Math.round(v / pageSize)) }),
@@ -691,15 +690,19 @@ export function createCarousel(options: CarouselOptions, createRunner: BehaviorR
       settleTo(Math.round(_finite(index)), base._runner._invalidate());
     },
     next(): void {
-      ctrl.goTo(base.state.index + 1);
+      if (base._destroyed) return;
+      const velocity = base._runner._invalidate();
+      settleTo(base.state.index + 1, velocity);
     },
     prev(): void {
-      ctrl.goTo(base.state.index - 1);
+      if (base._destroyed) return;
+      const velocity = base._runner._invalidate();
+      settleTo(base.state.index - 1, velocity);
     },
     subscribe: base.subscribe,
     cancel(): void {
-      targetIndex = base.state.index;
       base.cancel();
+      if (base.state.phase === 'idle') targetIndex = base.state.index;
     },
     destroy: base.destroy,
     get state(): CarouselState {

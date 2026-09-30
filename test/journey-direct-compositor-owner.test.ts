@@ -54,9 +54,11 @@ function nativeTarget(onCancel?: () => void) {
   } | undefined;
   let calls = 0;
   let cancelCalls = 0;
+  let duration = 0;
   const target = {
-    animate() {
+    animate(...args: unknown[]) {
       calls++;
+      duration = Number((args[1] as { duration?: number } | undefined)?.duration ?? 0);
       let resolve!: () => void;
       const finished = new Promise<void>((done) => { resolve = done; });
       return animation = { currentTime: 0, cancel() { cancelCalls++; onCancel?.(); }, finished, resolve };
@@ -67,6 +69,7 @@ function nativeTarget(onCancel?: () => void) {
     get animation() { return animation; },
     get calls() { return calls; },
     get cancelCalls() { return cancelCalls; },
+    get duration() { return duration; },
   };
 }
 
@@ -77,6 +80,91 @@ afterEach(() => {
 });
 
 describe('JOURNEY-01 direct-control compositor owner', () => {
+  it.each([
+    { action: 'next', initial: 0, expected: 2 },
+    { action: 'prev', initial: 3, expected: 1 },
+  ] as const)('carousel $action выбирает следующую цель после считывания native позиции', async ({ action, initial, expected }) => {
+    const native = nativeTarget();
+    const pager = createCompositorCarousel({
+      pageCount: 4, pageSize: 100, index: initial,
+      compositor: { target: native.target, property: 'translate', apply() {} },
+    });
+    pager[action]();
+    expect(native.duration).toBeGreaterThan(0);
+    // Host уже дошёл до границы, но microtask finished ещё не доставлен.
+    native.animation!.currentTime = native.duration;
+    pager[action]();
+    native.animation!.resolve();
+    await Promise.resolve();
+    expect(pager.state.index).toBe(expected);
+    expect(pager.state.value).toBe(expected * 100);
+    pager.destroy();
+  });
+
+  it('carousel cancel сохраняет считанную страницу для следующего обновления геометрии', async () => {
+    const native = nativeTarget();
+    const pager = createCompositorCarousel({
+      pageCount: 4, pageSize: 100,
+      compositor: { target: native.target, property: 'translate', apply() {} },
+    });
+    pager.goTo(2);
+    native.animation!.currentTime = native.duration;
+    pager.cancel();
+    expect(pager.state.phase).toBe('idle');
+    expect(pager.state.index).toBe(2);
+    pager.update(4, 200);
+    native.animation!.resolve();
+    await Promise.resolve();
+    expect(pager.state.index).toBe(2);
+    expect(pager.state.value).toBe(400);
+    pager.destroy();
+  });
+
+  it('carousel cancel не перезаписывает новую цель из idle-подписчика', async () => {
+    const native = nativeTarget();
+    const pager = createCompositorCarousel({
+      pageCount: 4, pageSize: 100,
+      compositor: { target: native.target, property: 'translate', apply() {} },
+    });
+    let reenter = true;
+    pager.subscribe((state) => {
+      if (state.phase === 'idle' && reenter) { reenter = false; pager.goTo(3); }
+    });
+    pager.goTo(1);
+    native.animation!.currentTime = native.duration;
+    pager.cancel();
+    pager.update(4, 200);
+    native.animation!.resolve();
+    await Promise.resolve();
+    expect(pager.state.index).toBe(3);
+    expect(pager.state.value).toBe(600);
+    pager.destroy();
+  });
+
+  it.each(['next', 'prev'] as const)('carousel %s уступает новому намерению из pickup и инертен после destroy', async (action) => {
+    const native = nativeTarget();
+    const pager = createCompositorCarousel({
+      pageCount: 4, pageSize: 100,
+      compositor: { target: native.target, property: 'translate', apply() {} },
+    });
+    pager.goTo(1);
+    let reenter = true;
+    pager.subscribe(() => {
+      if (reenter) { reenter = false; pager.goTo(3); }
+    });
+    native.animation!.currentTime = native.duration;
+    pager[action]();
+    native.animation!.resolve();
+    await Promise.resolve();
+    expect(pager.state.index).toBe(3);
+    pager.destroy();
+    const terminal = pager.state;
+    const calls = native.calls;
+    pager[action]();
+    expect(pager.state).toBe(terminal);
+    expect(native.calls).toBe(calls);
+  });
+
   it.each(['pointerDown', 'snapTo', 'update', 'cancel'] as const)('новое намерение из публикации pickup сохраняется после %s', (action) => {
     const native = nativeTarget();
     let sheet!: ReturnType<typeof createCompositorBottomSheet>;
