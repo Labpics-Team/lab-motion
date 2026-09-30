@@ -1,30 +1,9 @@
 name: PROFILE-01 — проверка размерного протокола
 
-# Размерный вектор запускается в PR и вручную в той же среде, что обычный CI
+# Размерный вектор вызывается вручную через ci.yml в той же среде, что обычный CI
 # публичного репозитория. Время/GPU/энергия этой машины не являются device proof.
 on:
-  pull_request:
-    paths:
-      - 'bench/profile/**'
-      - 'test/profile-measurement.test.ts'
-      - '.github/workflows/profile-01.yml'
-  workflow_dispatch:
-    inputs:
-      mode:
-        description: 'Режим пробы: old-vector (старый cost vector на PRODUCT_BASE)'
-        required: true
-        default: 'old-vector'
-        type: choice
-        options:
-          - old-vector
-      cells:
-        description: 'Непроверенные timing/device-клетки: desktop или полный roster'
-        required: true
-        default: 'desktop'
-        type: choice
-        options:
-          - desktop
-          - all
+  workflow_call:
 
 permissions:
   contents: read
@@ -80,8 +59,8 @@ jobs:
           set -euo pipefail
           mkdir -p "$RUNNER_TEMP/profile-01-raw"
           node bench/profile/probe-profile-01.mjs \
-            --mode '${{ inputs.mode || 'old-vector' }}' \
-            --cells '${{ inputs.cells || 'desktop' }}' \
+            --mode old-vector \
+            --cells all \
             --out "$RUNNER_TEMP/profile-01-raw"
 
       - name: Независимо перепроверить raw-артефакт

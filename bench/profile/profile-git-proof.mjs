@@ -16,6 +16,8 @@ export const PREREG_OWN_PATHS = Object.freeze([
   'bench/profile/profile-measurement.mjs',
   'test/profile-measurement.test.ts',
   '.github/workflows/profile-01.yml',
+  '.github/workflows/ci.yml',
+  'test/ci-workflow-contract.test.ts',
 ]);
 
 export function makeGit(fail) {

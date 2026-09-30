@@ -283,9 +283,20 @@ function assertNativeGraph(files: Map<string, string>) {
   expect(files.has('ci-gate.yml')).toBe(false);
   const ci = workflows.get('ci.yml')!;
   const browser = workflows.get('browser.yml')!;
-  expect(ci.on).toEqual({ push: { branches: ['main'] }, pull_request: null, merge_group: null, workflow_dispatch: null });
+  expect(ci.on).toEqual({
+    push: { branches: ['main'] }, pull_request: null, merge_group: null,
+    workflow_dispatch: { inputs: { profile_baseline: {
+      description: 'Снять зарегистрированный размерный baseline PROFILE-01',
+      type: 'boolean', default: false,
+    } } },
+  });
   expect(browser.on).toEqual({ workflow_call: null });
-  expect(Object.keys(ci.jobs).sort()).toEqual(['CI', 'browser-static', 'mutation', 'node-floor', 'tests', 'verify']);
+  expect(Object.keys(ci.jobs).sort()).toEqual(['CI', 'browser-static', 'mutation', 'node-floor', 'profile-baseline', 'tests', 'verify']);
+  expect(ci.jobs['profile-baseline']).toEqual({
+    if: "${{ github.event_name == 'workflow_dispatch' && inputs.profile_baseline }}",
+    uses: './.github/workflows/profile-01.yml',
+  });
+  expect(workflows.get('profile-01.yml')!.on).toEqual({ workflow_call: null });
   expect(Object.keys(browser.jobs)).toEqual(['conformance']);
   for (const document of [ci, browser]) {
     expect(document.permissions).toEqual({ contents: 'read' });
@@ -394,6 +405,11 @@ describe('нативный граф CI', () => {
     ['пустой успех', 'ci.yml', (w: Workflow) => { w.jobs.CI!.steps![0]!.run = 'true\n'; }],
     ['игнорирование итога', 'ci.yml', (w: Workflow) => { w.jobs.CI!['continue-on-error'] = true; }],
     ['добавлен trigger browser', 'browser.yml', (w: Workflow) => { w.on.pull_request = null; }],
+    ['добавлен PR trigger PROFILE', 'profile-01.yml', (w: Workflow) => { w.on.pull_request = null; }],
+    ['PROFILE запущен для обычного кандидата', 'ci.yml', (w: Workflow) => { delete w.jobs['profile-baseline']!.if; }],
+    ['PROFILE без явного запроса', 'ci.yml', (w: Workflow) => {
+      w.jobs['profile-baseline']!.if = "${{ github.event_name == 'workflow_dispatch' }}";
+    }],
     ['нет workflow_call', 'browser.yml', (w: Workflow) => { w.on = { workflow_dispatch: null }; }],
     ...['chromium', 'firefox', 'webkit'].map((engine) => [`нет ${engine}`, 'browser.yml', (w: Workflow) => {
       const matrix = w.jobs.conformance!.strategy!.matrix;
