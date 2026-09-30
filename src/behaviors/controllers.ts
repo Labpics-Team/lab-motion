@@ -40,31 +40,6 @@
  *       пружинных кадров), сохраняя состояние и РЕЗУЛЬТАТ (character-switch).
  *   B5. SSR-safe: ни window, ни document на пути импорта; единственный
  *       платформенный шов — инжектируемый requestFrame (детерминизм тестов).
- *
- * ─── MUTATION PROOF (ручная проба, 2026-07-10; каждый мутант откачен) ─────────
- * 10 мутантов в РАЗНЫЕ поведения/переходы, каждый кусается (RED на зафиксированной
- * спеке; прогон test/behaviors-*.test.ts):
- *   1. Слом выбора snap по скорости (проекция игнорит velocity: landing=value) →
- *      RED (property «flick вверх → верхний snap», sheet-example «доводка по флику»).
- *   2. Потеря velocity на follow→release (v0n=0 вместо velocity/range) → RED
- *      (dismiss «возврат наследует скорость», sheet C¹-контракт).
- *   3. Параллельный loop (pointerDown НЕ инкрементит generation) → RED
- *      (interruption «pointer-down во время settle не плодит второй clock»,
- *      clock.pending()/rafCalls двойные).
- *   4. Слом идемпотентности cancel (нет guard destroyed/idle) → RED
- *      (lifecycle «двойной cancel/destroy», эмитов больше 1).
- *   5. Reduced-leak (убран reduced-ветка в runner) → RED (reduced-контракт:
- *      промежуточные value ∈ (from,target), а обязан быть мгновенный снап).
- *   6. Слом порога dismiss (>= заменён на >) на граничном значении → RED
- *      (dismiss property «ровно на пороге → dismiss»).
- *   7. Слом единого clock carousel (index из отдельного счётчика, не из position)
- *      → RED (carousel «index и position согласованы каждый кадр»).
- *   8. Rubber-band знак (overshoot*factor → overshoot/factor или знак-flip) → RED
- *      (sheet «rubber-band за крайним snap уводит в ту же сторону, меньше»).
- *   9. Pull: второй владелец позиции (pending заводит свой таймер поверх runner)
- *      → RED (pull «pending удерживается тем же runner», нет двойных кадров).
- *  10. Carousel RTL-знак (rtl не флипает направление) → RED (property «RTL
- *      зеркалит выбор страницы»).
  */
 
 import { createVelocityTracker } from '../gestures/index.js';
