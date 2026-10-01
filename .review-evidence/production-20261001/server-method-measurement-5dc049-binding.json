@@ -1,0 +1,18 @@
+{
+  "schema": 1,
+  "createdAt": "2026-10-01T16:31:04.235726+00:00",
+  "report": {
+    "path": ".review-evidence/production-20261001/server-method-measurement-5dc049.md",
+    "sha256": "00bae364e9d0140dc72e3ed9411fa0a2f17ebde74d99d59a6307a4d9195d81fe",
+    "bytes": 20944
+  },
+  "sourceBasis": "8fb55ca0a116e5381a43351ab28834d17a4a9299",
+  "methodArchiveSha256": "5dc04987eace1aaf736da05192948897d50262be5a24ff9192b79744f47ab525",
+  "protocolDigest": "00e8d5880eb83dd27a52f90cc670d4ecc550229458af039d9924485805c25431",
+  "clockModelDigest": "7e45adab88a2c97af4e9074543318ae115e42b5c9669c4746b6e149d42bfbc4f",
+  "terminalManifestSha256": "1b07ee614b42d16de8e7d55aad6f0bbcbe2b3e9c84fc9cd8bf2e32bc1da62121",
+  "rootReadbackSha256": "60bef8e2d79f5671f9eb1997579a6e0c9534ab10ee1562dfb3cce75dd0a6fe11",
+  "verdict": "PASS in the exact historical method scope",
+  "actualRegisteredTimingSamples": 0,
+  "scopeLimit": "This report does not accept any later C epoch, actual performance, release, default-branch merge, or mobile claim. Literal report copy on isolated evidence branch; outside product/package source."
+}
