@@ -1,0 +1,11 @@
+{
+  "candidateSourceHead": "8fb55ca0a116e5381a43351ab28834d17a4a9299",
+  "runtimeReadsetSha256": "8f5b59054b7bf088f8f312e0d9e1645a2c6579ed8a78ef28f1120b552c4c24f6",
+  "originalReportPath": "/workspace/scratch/motion-runtime-second-order-final-20261001-default-cost-supplement/report-ru.md",
+  "sha256": "c69b128dd03d4597ec6fb585454dfbf2ed9b82c06794733cae9bebf87a608d64",
+  "bytes": 27505,
+  "result": "INCOMPLETE total-cost/coverage; no numeric cap FAIL claimed; bounded own prior PASS preserved",
+  "rawCostPrimaryManifestSha256": "95ce57889f9014fcfbcaa9c62040abba8568541a8611d88fc4741daafe7241ed",
+  "actualRegisteredServerSamples": 0,
+  "scope": "Literal independent second-order report. Cost/coverage INCOMPLETE; bounded priorruntime acceptances only."
+}
