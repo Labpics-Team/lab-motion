@@ -25,8 +25,8 @@ try {
       }
     };
     for (let warmup = 0; warmup < (scene.warmupBatches ?? 1); warmup++) await run();
-    // Promise checkpoint не завершает kept-alive job WeakRef в pinned Node.
-    // Новый host turn отделяет temporary keepalive от retained heap.
+    // Микрозадача Promise не освобождает временно удерживаемые цели WeakRef в зафиксированном Node.
+    // Новый оборот очереди отделяет это удержание от оставшейся памяти.
     await new Promise((resolve) => setImmediate(resolve));
     globalThis.gc(); globalThis.gc();
     const before = process.memoryUsage();
