@@ -18,12 +18,23 @@ export function compositorFollowRecipes(root) {
   return source;
 }
 
-export async function buildCompositorFollowRecipes(root, out, consumerRoot = root) {
+export async function buildCompositorFollowRecipes(root, out, consumerRoot = root, diagnosticObserver = false) {
   const packageRoot = realpathSync(root);
   const absWorkingDir = realpathSync(consumerRoot);
   const entryPoint = resolve(absWorkingDir, 'compositor-follow-recipes.ts');
   const outdir = resolve(out);
-  const source = compositorFollowRecipes(packageRoot);
+  const literalSource = compositorFollowRecipes(packageRoot);
+  const importHead = 'import { createCompositorFollow,';
+  if (diagnosticObserver && literalSource.split(importHead).length !== 2) {
+    throw new Error('diagnostic observer requires one explicit compositor follow import');
+  }
+  const source = diagnosticObserver
+    ? literalSource.replace(importHead, 'import { createCompositorFollow as createUnobservedCompositorFollow,') + `
+function createCompositorFollow(...args: Parameters<typeof createUnobservedCompositorFollow>) {
+  return globalThis.followProbe.observe(createUnobservedCompositorFollow(...args));
+}
+`
+    : literalSource;
   const result = await build({
     absWorkingDir,
     stdin: { contents: source, loader: 'ts', resolveDir: absWorkingDir, sourcefile: entryPoint },
@@ -45,6 +56,9 @@ export async function buildCompositorFollowRecipes(root, out, consumerRoot = roo
   return {
     documentSha256: sha256(readFileSync(resolve(packageRoot, 'docs/recipes.md'))),
     sourceSha256: sha256(source),
+    ...(diagnosticObserver ? { diagnostic: {
+      kind: 'public-boundary-observer', literalSourceSha256: sha256(literalSource),
+    } } : {}),
     packageInputs: inputs.filter((input) => input !== entryPoint)
       .map((input) => relative(packageRoot, input).split(sep).join('/')).sort(),
     outputs, measurement,
@@ -89,7 +103,8 @@ export async function buildPackagedCompositorFollowRecipes(root, out, suppliedTa
     if (shipped.name !== pkg.name || shipped.version !== pkg.version) {
       throw new Error('packed recipe identity differs from the candidate');
     }
-    const recipe = await buildCompositorFollowRecipes(installed, out, consumer);
+    // Временная диагностика WebKit; удалить после различения второго release.
+    const recipe = await buildCompositorFollowRecipes(installed, out, consumer, true);
     const receipt = {
       package: shipped.name + '@' + shipped.version,
       tarball: { file: basename(tarball), sha256: sha256(readFileSync(tarball)) },
