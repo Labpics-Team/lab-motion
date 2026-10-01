@@ -473,18 +473,24 @@ describe('benchmark methodology fail-closed contracts', () => {
   });
 
   it.each([
-    { name: '128мс и завершённый последний кадр', times: [32, 64, 140], width: 0.1, duration: 128, expected: true },
-    { name: '128мс и неразрешающие окна чтения', times: [32, 64, 80], width: 20, duration: 128, expected: false },
-    { name: '256мс и пересекающиеся широкие окна', times: [88, 136, 184], width: 32, duration: 256, expected: false },
-    { name: 'только завершённые позиции', times: [140, 156, 172], width: 0.1, duration: 128, expected: false },
-  ])('temporal oracle: $name', ({ times, width, duration, expected: accepted }) => {
-    const config = { ...START_SCENARIO_MANIFEST.s2, targetsPerCall: 3, durationMs: 128 };
-    const evidence = { topology: { calls: 1, targetsPerCall: 3, staggerGapMs: 0, durationMs: 128, toPx: 300 },
-      callStartedAtMs: [0], checkpoints: times.map((time) => ({ frameTimestampMs: time,
+    { name: '128мс и завершённый последний кадр', times: [32, 64, 140], positions: [75, 150, 300], width: 0.1, duration: 128, expected: true },
+    { name: '128мс и неразрешающие окна чтения', times: [32, 64, 80], positions: [75, 150, 187.5], width: 20, duration: 128, expected: false },
+    { name: '256мс и неразрешающие 32мс окна', times: [88, 136, 184], positions: [103.125, 159.375, 215.625], width: 32, duration: 256, expected: false },
+    { name: '256мс и разрешающие узкие окна', times: [88, 136, 184], positions: [103.125, 159.375, 215.625], width: 0.1, duration: 256, expected: true },
+    { name: 'только завершённые позиции', times: [140, 156, 172], positions: [300, 300, 300], width: 0.1, duration: 128, expected: false },
+  ])('temporal oracle: $name', ({ times, positions, width, duration, expected: accepted }) => {
+    const config = { ...START_SCENARIO_MANIFEST.s2, targetsPerCall: 3, durationMs: duration };
+    // Векторы заданы независимо; ширина окна меняется при том же законе движения.
+    const evidence = { topology: { calls: 1, targetsPerCall: 3, staggerGapMs: 0, durationMs: duration, toPx: 300 },
+      callStartedAtMs: [0], checkpoints: times.map((time, index) => ({ frameTimestampMs: time,
         groups: [{ readStartedMs: time, readEndedMs: time + width,
-          positions: [0, 1, 2].map(() => 300 * Math.min(1, time / duration)) }] })),
+          positions: Array(3).fill(positions[index]) }] })),
       terminal: [[300, 300, 300]] };
+    expect(config.durationMs).toBe(duration);
+    expect(evidence.topology.durationMs).toBe(duration);
+    expect(positions).toEqual(times.map((time) => 300 * Math.min(1, time / duration)));
     expect(evaluateStartSemanticEvidence(evidence, config, 1)).toBe(accepted);
+    expect(evaluateStartSemanticEvidence(evidence, { ...config, durationMs: duration === 128 ? 256 : 128 }, 1)).toBe(false);
   });
 
   it.each([0, 75])('fresh0→300 связывает фазу с API start, offset=%s', (offset) => {

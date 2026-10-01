@@ -22,7 +22,12 @@ function fail(message) {
 
 function arg(name) {
   const index = process.argv.indexOf(name);
-  return index === -1 ? undefined : process.argv[index + 1];
+  if (index === -1) return undefined;
+  for (let occurrence = index; occurrence !== -1; occurrence = process.argv.indexOf(name, occurrence + 1)) {
+    const value = process.argv[occurrence + 1];
+    if (value === undefined || value.length === 0 || value.startsWith('-')) fail(`флаг ${name} требует значение`);
+  }
+  return process.argv[index + 1];
 }
 
 async function main() {

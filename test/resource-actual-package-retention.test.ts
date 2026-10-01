@@ -7,6 +7,8 @@ import { fileURLToPath } from 'node:url';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 
 const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '..');
+// Архив пакета, сведения о сборке, точный скрипт и журналы сохраняют воспроизводимость,
+// включая неудачные прогоны. r11 G-PERF §4/§6 защищает ошибки и единственную копию доказательств.
 const EVIDENCE = join(ROOT, 'scratchpad', 'resource-evidence');
 const WINDOWS_SHELL = process.platform === 'win32';
 const NPM = WINDOWS_SHELL ? 'npm.cmd' : 'npm';
@@ -64,6 +66,7 @@ describe('RESOURCE-01: реальные байты установленного 
     copyFileSync(entry, join(evidenceRun, 'resource-package-probe.mjs'));
   }, 60_000);
 
+  // Удаляется только временный установленный пакет; evidenceRun сохраняет доказательства.
   afterAll(() => { if (work !== undefined) rmSync(work, { recursive: true, force: true }); });
 
   function probe(mode: string, forcedGc = false): Record<string, unknown> {

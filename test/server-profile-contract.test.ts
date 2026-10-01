@@ -1059,3 +1059,63 @@ describe('серверный PROFILE: независимые sabotage controls',
     expect(runner).toContain("['--expose-gc'");
   });
 });
+
+describe('PROFILE: ресурсный контракт проверяется до регистрации и samples', () => {
+  const keys = ['usage_usec', 'user_usec', 'system_usec', 'nr_periods', 'nr_throttled', 'throttled_usec'];
+  const healthy = { usage_usec: 100, user_usec: 70, system_usec: 30, nr_periods: 20, nr_throttled: 2, throttled_usec: 50 };
+  function machine(quota: string | null = '400000 100000', counters: Record<string, number> = healthy) {
+    const source = readFileSync(new URL('../bench/profile/server-profile-runner.mjs', import.meta.url), 'utf8');
+    const common = source.slice(source.indexOf('function readOptional('), source.indexOf('async function withBrowserTimeout('));
+    const capture = source.slice(source.indexOf('export function captureServerMachine('), source.indexOf('export function createServerJournal(')).replace(/^export /, '');
+    const files: Record<string, string> = {
+      '/proc/self/status': 'Cpus_allowed_list:\t0\nvoluntary_ctxt_switches:\t2\nnonvoluntary_ctxt_switches:\t3\n',
+      '/sys/fs/cgroup/cpu.stat': Object.entries(counters).map(([key, value]) => `${key} ${value}`).join('\n') + '\n',
+    };
+    if (quota !== null) files['/sys/fs/cgroup/cpu.max'] = quota;
+    const hashBinary = vi.fn(() => hash);
+    // Исполняем точные функции владельца. Независимый FS задаёт отсутствующие
+    // controller/counters; VM не запускает пакеты, браузер или измерение CPU.
+    const realm = createContext({
+      readFileSync(file: string) { if (!Object.hasOwn(files, file)) throw new Error('нет файла фикстуры ' + file); return files[file]; },
+      existsSync: (file: string) => Object.hasOwn(files, file), loadavg: () => [0, 0, 0],
+      platform: () => 'linux', release: () => '6.18.44', arch: () => 'x64', hostname: () => 'fixture',
+      cpus: () => [{ model: 'fixture' }], totalmem: () => 1024, sha256File: hashBinary, serverProfileDigest,
+      process: { version: 'v24.19.0', execPath: '/fixture/node', execArgv: [], memoryUsage: () => ({ heapUsed: 1 }) },
+    });
+    return { capture: runInContext(`${common}\n${capture}\ncaptureServerMachine;`, realm), hashBinary };
+  }
+
+  it('принимает шесть полных счётчиков, включая честное историческое throttling', () => {
+    const fixture = machine(), captured = fixture.capture();
+    expect(captured.identity.affinity).toBe('0');
+    expect(captured.identity.cgroupCpuMax).toBe('400000 100000');
+    expect(captured.sha256).toBe(serverProfileDigest(captured.identity));
+    expect(fixture.hashBinary).toHaveBeenCalledTimes(1);
+  });
+
+  it.each([null, '', ' \n'])('отвергает cpu.max=%j до hashing/setup', (quota) => {
+    const fixture = machine(quota);
+    let failure: any;
+    try { fixture.capture(); } catch (error) { failure = error; }
+    expect(failure?.message).toMatch(/cpu\.max.*до samples/);
+    expect(failure.raw.cgroupCpuMax).toBe(quota === null ? null : '');
+    expect(fixture.hashBinary).not.toHaveBeenCalled();
+  });
+
+  it.each(keys.flatMap((key) => ['missing', 'negative', 'fractional', 'overflow', 'nonfinite'].map((fault) => ({ key, fault }))))(
+    'отвергает cpu.stat $key/$fault до hashing/setup', ({ key, fault }) => {
+      const counters: Record<string, number> = { ...healthy };
+      if (fault === 'missing') delete counters[key];
+      else {
+        const invalid: Record<string, number> = { negative: -1, fractional: 0.5, overflow: Number.MAX_SAFE_INTEGER + 1, nonfinite: Infinity };
+        counters[key] = invalid[fault]!;
+      }
+      const fixture = machine('400000 100000', counters);
+      let failure: any;
+      try { fixture.capture(); } catch (error) { failure = error; }
+      expect(failure?.message).toMatch(/cpu\.stat.*до samples/);
+      expect(failure.raw.resource.cpuMax).toBe('400000 100000');
+      expect(Number.isSafeInteger(failure.raw.resource.cpuStat[key]) && failure.raw.resource.cpuStat[key] >= 0).toBe(false);
+      expect(fixture.hashBinary).not.toHaveBeenCalled();
+    });
+});

@@ -122,7 +122,10 @@ export const SERVER_PROFILE = freeze({
 });
 
 export function serverProfileDigest(value) {
-  return sha256Bytes(Buffer.from(JSON.stringify(value)));
+  const text = JSON.stringify(value);
+  // Native SHA читает UTF-8 string без отдельной Buffer копии. Undefined
+  // сохраняет прежний TypeError после того же однократного чтения JSON.
+  return sha256Bytes(text === undefined ? Buffer.from(text) : text);
 }
 
 export function verifyServerProfile(value) {

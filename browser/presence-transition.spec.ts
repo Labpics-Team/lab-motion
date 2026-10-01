@@ -96,8 +96,7 @@ test('вся группа native Animation завершена прежде onGon
 
 test('native pickup равен прямому animate, cancel-before-start является различителем', async ({ page }) => {
   const result = await page.evaluate(async () => {
-    const { createPresenceTransition } = await import('/browser/.artifacts/scope-recipes.js');
-    const { animate } = await import('/browser/.artifacts/scope-recipes.js');
+    const { createPresenceTransition, animate } = await import('/browser/.artifacts/scope-recipes.js');
     const els = [0, 1, 2].map(() => { const el = document.createElement('div'); document.body.append(el); return el; });
     const [managed, raw, wrong] = els as [HTMLDivElement, HTMLDivElement, HTMLDivElement];
     const options = { spring: { mass: 1, stiffness: 170, damping: 20 }, now: () => 0 };

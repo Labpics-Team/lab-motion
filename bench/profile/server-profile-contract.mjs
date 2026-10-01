@@ -7,7 +7,7 @@ import { assertBalancedRunBlocks, assertRealmTimerStep, binary64Ulp, deriveRealm
   exactBinomialOrderStatisticBounds, makeRoundRobinOrders, nextDown, nextUp, summarizeSamples } from '../compare/methodology.mjs';
 import { validateStockMotionValueBatch } from '../compare/methodology.mjs';
 import { sha256Bytes } from '../compare/provenance.mjs';
-import { TRANSFORM_PAIR_PROFILE, validateTransformLifecycleSample } from '../../scripts/bench-transform-support.mjs';
+import { TRANSFORM_PAIR_PROFILE, createTransformLifecycleValidator, validateTransformLifecycleSample } from '../../scripts/bench-transform-support.mjs';
 import { SERVER_PROFILE, planServerSampleSize, serverProfileDigest, serverTailPolicy, verifyServerProfile } from './server-profile-registration.mjs';
 
 const SHA256 = /^[a-f0-9]{64}$/;
@@ -180,7 +180,7 @@ export function serverCellPairs(stage, runs, expectedStage) {
   const seen = new Set();
   // Один sample имеет несколько проекций метрик. Проверка приобретённого raw
   // принадлежит sample/scene/work, а не повторяется для каждой проекции.
-  const validationCache = new WeakMap();
+  const validationCache = new WeakMap(), validateTransform = createTransformLifecycleValidator();
   for (const row of stage.rows) {
     const key = `${row.scene}:${row.run}`;
     invariant(!seen.has(key), 'повторный run'); seen.add(key);
@@ -193,13 +193,13 @@ export function serverCellPairs(stage, runs, expectedStage) {
     invariant(rows.length === runs, 'потеряна сцена');
     invariant(rows.every((row) => row.kind === cell.kind), 'подменён вид сцены');
     const read = Object.fromEntries(IDS.map((id) => [id, rows.map((row) => readServerSample(row.samples[id], cell,
-      expectedStage === 'positive' && id === 'right' ? 2 : 1, validationCache))]));
+      expectedStage === 'positive' && id === 'right' ? 2 : 1, validationCache, validateTransform))]));
     return { ...cell, left: read.left.map((row) => row.value), right: read.right.map((row) => row.value),
       leftBounds: read.left.map((row) => row.bounds), rightBounds: read.right.map((row) => row.bounds) };
   });
 }
 
-function readServerSample(sample, cell, workMultiplier, validationCache = new WeakMap()) {
+function readServerSample(sample, cell, workMultiplier, validationCache = new WeakMap(), validateTransform = validateTransformLifecycleSample) {
       const stockScene = cell.kind === 'engine' && SERVER_PROFILE.engineScenes.find((scene) => scene.id === cell.scene && scene.workload === 'stock-c');
       invariant(sample?.semantic === true && positive(sample[cell.metric]), `${cell.id}: неверный sample или semantics`);
       invariant(sample.workMultiplier === workMultiplier, 'подменён знаменатель положительного контроля');
@@ -223,7 +223,7 @@ function readServerSample(sample, cell, workMultiplier, validationCache = new We
           invariant(Array.isArray(raw.frameNs) && raw.frameNs.length === TRANSFORM_PAIR_PROFILE.frameOffsetsMs.length &&
             raw.frameNs.every((x) => Number.isSafeInteger(x) && x >= 0) && Number.isSafeInteger(raw.operationNs) && raw.operationNs >= 0 &&
             Number.isSafeInteger(raw.cancelDrainNs) && raw.cancelDrainNs >= 0, 'потеряны frame samples или safe CPU counter');
-          validateTransformLifecycleSample(raw, scene);
+          validateTransform(raw, scene);
           validateThreadCpuFields(raw.raw.cpuReads, raw.raw.clockReads);
           const semantic = raw.semantic;
           invariant(semantic?.valid === true && semantic.targets === scene.count && semantic.frames === raw.frameNs.length &&
@@ -293,9 +293,9 @@ export function validateServerBrowserSample(sample, scene, workMultiplier = 1) {
 }
 
 export function validateServerEngineSample(sample, scene, workMultiplier = 1) {
-  const validationCache = new WeakMap();
+  const validationCache = new WeakMap(), validateTransform = createTransformLifecycleValidator();
   for (const metric of scene.metrics ?? SERVER_PROFILE.metrics.engine) readServerSample(sample,
-    { id: `${scene.id}:${metric}`, kind: 'engine', scene: scene.id, metric }, workMultiplier, validationCache);
+    { id: `${scene.id}:${metric}`, kind: 'engine', scene: scene.id, metric }, workMultiplier, validationCache, validateTransform);
 }
 
 function coordinateReader(values, count, label) {
@@ -608,8 +608,9 @@ export function serverArtifactDigest(artifact) {
   flush(); return hash.digest('hex');
 }
 
-// Сериализация rows отдельными chunks сохраняет весь raw, даже когда итоговый
-// документ превышает максимальную строку V8. Один sample ограничен схемой сцены.
+// Массивы делятся между полными native JSON values. Верхние rows дают один run;
+// элемент comparators включает всю серию rows и должен помещаться в строку V8.
+// Общему документу это не требуется; зарегистрированный max N проверен отдельно.
 export function* serverArtifactChunks(artifact) {
   function* valueChunks(value) {
     if (Array.isArray(value)) {
@@ -833,11 +834,7 @@ export function validateServerJournal(artifact, records, rawDigest) {
   // отказ не повторяет сериализацию raw, не участвующего в успешном admission.
   for (const record of records) {
     const { digest, ...payload } = record;
-    const text = JSON.stringify(payload);
-    // Native hash принимает UTF-8 string прямо; временный Buffer копии не нужен.
-    // Для undefined сохраняется прежняя ошибка Buffer.from после того же чтения.
-    const bodyDigest = createHash('sha256').update(text === undefined ? Buffer.from(text) : text).digest('hex');
-    invariant(digest === bodyDigest, 'повреждена цепь журнала');
+    invariant(digest === serverProfileDigest(payload), 'повреждена цепь журнала');
   }
   return { journalFinalDigest: previous };
 }

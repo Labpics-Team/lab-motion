@@ -6,6 +6,7 @@ import { describe, expect, it } from 'vitest';
 import { animate, type AnimateOptions, type AnimateProps } from '../src/animate/index.js';
 import {
   TRANSFORM_PAIR_PROFILE,
+  createTransformLifecycleValidator,
   expectedTransformValues,
   runTransformLifecycleSample,
   validateTransformLifecycleSample,
@@ -699,6 +700,22 @@ describe('paired public transform lifecycle screening', () => {
     expect(() => validateTransformLifecycleSample(sample, { count: 1000, lifecycle: 'fresh', channels: 7 })).toThrow(/case/);
     sample.semantic.targetTraceHashes.count = 99;
     expect(() => validateTransformLifecycleSample(sample, { count: 100, lifecycle: 'fresh', channels: 7 })).toThrow(/hash RLE/);
+  });
+
+  it.each(['уже разобранный CSS другого кадра', 'новый неверный CSS'])('verification context повторно проверяет ожидаемые координаты: %s', async (fault) => {
+    const sample = await runTransformLifecycleSample({ animate: independentFreshLinear(), count: 100, lifecycle: 'fresh', channels: 7, nowNs: () => 0n });
+    const expectedCase = { count: 100, lifecycle: 'fresh', channels: 7 };
+    const validate = createTransformLifecycleValidator();
+    expect(validate(sample, expectedCase)).toEqual(validateTransformLifecycleSample(sample, expectedCase));
+    const mutant = JSON.parse(JSON.stringify(sample));
+    const trace = mutant.raw.targetTraces.runs[0].trace;
+    trace.values[2] = fault === 'уже разобранный CSS другого кадра' ? trace.values[3] : 'translateX(999px)';
+    trace.events[2].value = trace.values[2];
+    mutant.semantic.targetTraceHashes.fill(createHash('sha256').update(JSON.stringify(trace.values)).digest('hex'));
+    expect(() => validate(mutant, expectedCase)).toThrow(/transform/);
+    // Посторонний третий аргумент прежнего callable не может подменить parser.
+    expect(() => (validateTransformLifecycleSample as (...args: unknown[]) => unknown)(mutant, expectedCase, new Map())).toThrow(/transform/);
+    expect(validate(sample, expectedCase)).toEqual(validateTransformLifecycleSample(sample, expectedCase));
   });
 
   it.each(['oracle', 'cleanup'] as const)('сохраняет все восемь интервалов при позднем отказе %s', async (fault) => {

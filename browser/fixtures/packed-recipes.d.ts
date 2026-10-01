@@ -10,3 +10,31 @@ export declare function bindAnimatedDialog(dialog: HTMLDialogElement): {
     readonly state: string;
     destroy(): void;
   };
+
+interface CompositorRecipeOptions {
+  motion?: 'auto' | 'none';
+  onSelect?: (index: number) => void;
+  requestFrame?: NonNullable<ConstructorParameters<typeof CompositorSpring>[0]['requestFrame']>;
+}
+
+interface CompositorRecipeControls {
+  motion: InstanceType<typeof CompositorSpring>;
+  select(index: number): void;
+  readonly selected: number;
+  pause(): void;
+  resume(): void;
+  destroy(): void;
+}
+
+export declare function mountCardMotion(root: HTMLElement): () => void;
+export declare function mountCompositorSheet(root: HTMLElement, options: CompositorRecipeOptions & {
+  snapPoints: readonly number[];
+}): CompositorRecipeControls & { resize(next: readonly number[]): void };
+export declare function mountCompositorPager(root: HTMLElement, options?: CompositorRecipeOptions):
+  CompositorRecipeControls & { resize(): void };
+export declare function mountReorder(root: HTMLElement, status: HTMLElement): () => void;
+export declare function mountReact(container: Element | Document | DocumentFragment, hydrate?: boolean): {
+  destroy(): void;
+  commits(): number;
+};
+export declare function mountSolid(container: Parameters<typeof import('solid-js/web').render>[1]): () => void;

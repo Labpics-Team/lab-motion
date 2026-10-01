@@ -93,8 +93,16 @@ function readTransform(text) {
   return state;
 }
 
-function checkValues(text, expected, label) {
-  const actual = readTransform(text);
+function checkValues(text, expected, label, parsedTransforms) {
+  // CSS string неизменяема; повторный разбор в одном verification context
+  // не меняет чтение raw или сравнение каждого expected channel. Кеш ограничен
+  // 64 короткими строками и принадлежит вызову validator, не измеряемому пакету.
+  const cacheable = parsedTransforms && typeof text === 'string' && text.length <= 4096;
+  let actual = cacheable && parsedTransforms.get(text);
+  if (!actual) {
+    actual = readTransform(text);
+    if (cacheable && parsedTransforms.size < 64) parsedTransforms.set(text, Object.freeze(actual));
+  }
   for (const key of KEYS) {
     if (Math.abs(actual[key] - expected[key]) > TRANSFORM_PAIR_PROFILE.oracleAbsoluteTolerance) {
       throw new Error(`transform: ${label} ${key}=${actual[key]}, ожидалось ${expected[key]}`);
@@ -150,6 +158,17 @@ function captureTargetTraces(slots, lifecycle) {
 
 /** Пересчитывает успешный sample из первичных clock/CSS записей, без статистики или новых порогов. */
 export function validateTransformLifecycleSample(sample, expectedCase) {
+  return replayTransformLifecycleSample(sample, expectedCase);
+}
+
+// Повторные raw samples в одной серии используют один независимый CSS parser.
+// Его memo скрыт в closure; вызывающий не может подставить разобранные значения.
+export function createTransformLifecycleValidator() {
+  const parsedTransforms = new Map();
+  return (sample, expectedCase) => replayTransformLifecycleSample(sample, expectedCase, parsedTransforms);
+}
+
+function replayTransformLifecycleSample(sample, expectedCase, parsedTransforms) {
   const profile = TRANSFORM_PAIR_PROFILE;
   const { count, lifecycle, channels } = expectedCase ?? {};
   requireLineage(profile.counts.includes(count) && profile.lifecycles.includes(lifecycle) && profile.channels.includes(channels), 'неизвестный ожидаемый case');
@@ -215,10 +234,10 @@ export function validateTransformLifecycleSample(sample, expectedCase) {
       Array.isArray(trace.values) && trace.values.length === frameNs.length && Array.isArray(trace.writes) && trace.writes.length === frameNs.length &&
       Array.from(trace.writes).every((value) => value === 1) && trace.outsideWrites === 0 && trace.value === trace.values.at(-1), 'неполная запись target');
     for (let frame = 0; frame < trace.setup.length; frame++) {
-      checkValues(trace.setup[frame], interpolate(INITIAL, PREVIOUS, timeline.setupOffsetsMs[frame] / profile.durationMs), `raw setup target ${run.from} frame ${frame}`);
+      checkValues(trace.setup[frame], interpolate(INITIAL, PREVIOUS, timeline.setupOffsetsMs[frame] / profile.durationMs), `raw setup target ${run.from} frame ${frame}`, parsedTransforms);
     }
     for (let frame = 0; frame < trace.values.length; frame++) {
-      checkValues(trace.values[frame], expectedTransformValues(lifecycle, channels, timeline.frameOffsetsMs[frame]), `raw target ${run.from} frame ${frame}`);
+      checkValues(trace.values[frame], expectedTransformValues(lifecycle, channels, timeline.frameOffsetsMs[frame]), `raw target ${run.from} frame ${frame}`, parsedTransforms);
     }
     requireLineage(Array.isArray(trace.events) && trace.events.length === expectedEvents.length, 'потеряны target write events');
     for (let sequence = 0; sequence < trace.events.length; sequence++) {

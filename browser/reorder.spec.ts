@@ -9,9 +9,8 @@ async function mount(page: Page, grid = false, rtl = false): Promise<void> {
   </style><ul id="list" dir="${rtl ? 'rtl' : 'ltr'}" aria-label="Задачи">${['a', 'b', 'c', 'd'].map(key => `<li data-key="${key}"><div class="reorder-card"><button data-grip aria-pressed="false">${key}</button><button data-move="previous">Раньше ${key}</button><button data-move="next">Позже ${key}</button></div></li>`).join('')}</ul><p id="status" role="status" aria-live="polite"></p><ul id="other"><li data-key="a">Другой компонент</li></ul>`);
   await page.evaluate(async () => {
     // Артефакт globalSetup построен из буквального кода docs/recipes.md.
-    // @ts-expect-error generated browser-only fixture
     const { mountReorder } = await import('/browser/.artifacts/scope-recipes.js');
-    (window as unknown as { cleanup: () => void }).cleanup = mountReorder(document.getElementById('list'), document.getElementById('status'));
+    (window as unknown as { cleanup: () => void }).cleanup = mountReorder(document.getElementById('list')!, document.getElementById('status')!);
   });
 }
 const order = (page: Page) => page.locator('#list > li').evaluateAll(nodes => nodes.map(n => (n as HTMLElement).dataset.key));

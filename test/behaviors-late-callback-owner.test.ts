@@ -18,7 +18,7 @@ describe('./behaviors — getter позднего callback не восстана
         Object.defineProperty(callback, 'call', { get() { throw new Error('не читать callback.call'); } });
         const options = {
           distanceThreshold: 10, threshold: 10, resistance: 1,
-          requestFrame: clock.requestFrame, matchMedia: reduced ? reduceMedia : undefined,
+          requestFrame: clock.requestFrame, matchMedia: reduced ? reduceMedia() : undefined,
           get onDismiss() { reads++; action && control[action](); return callback; },
           get onRefresh() { reads++; action && control[action](); return callback; },
         };
@@ -26,6 +26,11 @@ describe('./behaviors — getter позднего callback не восстана
         control.pointerDown(pt(0, 0, 0));
         control.pointerMove(pt(0, 20, 0.2));
         control.pointerUp(pt(0, 20, 0.4));
+        // Проверка до drain различает синхронный reduced-путь и кадровую доводку.
+        expect(clock.rafCalls()).toBe(reduced ? 0 : 1);
+        expect(clock.pending()).toBe(reduced ? 0 : 1);
+        expect(reads).toBe(reduced ? 1 : 0);
+        expect(calls).toBe(reduced && !action ? 1 : 0);
         clock.drain(16);
         return { control, clock, options, receivers, reads, calls };
       }
@@ -36,6 +41,8 @@ describe('./behaviors — getter позднего callback не восстана
           const state = result.control.state;
           await Promise.resolve(); await Promise.resolve();
           result.clock.drain(16);
+          expect(result.clock.pending()).toBe(0);
+          if (reduced) expect(result.clock.rafCalls()).toBe(0);
           expect(result.reads).toBe(1);
           expect(result.calls).toBe(0);
           expect(result.receivers).toEqual([]);
@@ -47,6 +54,8 @@ describe('./behaviors — getter позднего callback не восстана
         const result = scenario();
         await Promise.resolve(); await Promise.resolve();
         result.clock.drain(16);
+        expect(result.clock.pending()).toBe(0);
+        if (reduced) expect(result.clock.rafCalls()).toBe(0);
         expect(result.reads).toBe(1);
         expect(result.calls).toBe(1);
         expect(result.receivers).toEqual([result.options]);

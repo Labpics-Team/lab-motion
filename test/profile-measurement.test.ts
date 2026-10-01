@@ -1,13 +1,43 @@
 import { describe, expect, it } from 'vitest';
 import { execFileSync, spawnSync } from 'node:child_process';
 import { createHash } from 'node:crypto';
-import { mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
+import { existsSync, mkdirSync, mkdtempSync, readFileSync, readdirSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { validateReplayedVector } from '../bench/profile/profile-measurement.mjs';
 import { PROFILE_01, unmeasuredCells, verifyPreregistration } from '../bench/profile/profile-01-preregistration.mjs';
 import { PREREG_OWN_PATHS, makeGit } from '../bench/profile/profile-git-proof.mjs';
+
+function cleanPreregistrationFixture(directory: string) {
+  const root = fileURLToPath(new URL('../', import.meta.url));
+  const frozenHead = execFileSync('git', ['--no-replace-objects', 'rev-parse', 'HEAD'], { cwd: root, encoding: 'utf8' }).trim();
+  // Контекст берётся из точного коммита; новые байты двух CLI принадлежат этой
+  // проверке. Фиксируем их до создания клона и не копируем грязное дерево.
+  const candidateCli = new Set(['bench/profile/probe-profile-01.mjs', 'bench/profile/validate-profile-01.mjs']);
+  const readset = PREREG_OWN_PATHS.map((path) => ({ path, bytes: candidateCli.has(path) ? readFileSync(join(root, path))
+    : execFileSync('git', ['--no-replace-objects', 'show', `${frozenHead}:${path}`], { cwd: root }) }));
+  const clone = join(directory, 'checkout');
+  execFileSync('git', ['clone', '--quiet', '--no-hardlinks', '--no-checkout', root, clone],
+    { encoding: 'utf8', timeout: 30_000 });
+  execFileSync('git', ['checkout', '--quiet', '--detach', PROFILE_01.productBase.sourceSha], { cwd: clone, timeout: 30_000 });
+  for (const { path, bytes } of readset) {
+    mkdirSync(dirname(join(clone, path)), { recursive: true });
+    writeFileSync(join(clone, path), bytes);
+    expect(createHash('sha256').update(readFileSync(join(clone, path))).digest('hex'))
+      .toBe(createHash('sha256').update(bytes).digest('hex'));
+  }
+  execFileSync('git', ['add', '--', ...PREREG_OWN_PATHS], { cwd: clone, timeout: 30_000 });
+  execFileSync('git', ['-c', 'core.hooksPath=' + join(directory, 'no-hooks'), '-c', 'commit.gpgsign=false',
+    '-c', 'user.name=PROFILE test', '-c', 'user.email=profile@example.invalid',
+    'commit', '--quiet', '-m', 'frozen prereg-only fixture'], { cwd: clone, timeout: 30_000 });
+  const head = execFileSync('git', ['rev-parse', 'HEAD'], { cwd: clone, encoding: 'utf8' }).trim();
+  const changed = execFileSync('git', ['diff', '--name-only', PROFILE_01.productBase.sourceSha, head],
+    { cwd: clone, encoding: 'utf8' }).trim().split('\n').filter(Boolean);
+  expect(changed.every((path) => PREREG_OWN_PATHS.includes(path))).toBe(true);
+  expect(execFileSync('git', ['status', '--porcelain'], { cwd: clone, encoding: 'utf8' })).toBe('');
+  return { clone, head };
+}
 
 describe('PROFILE: происхождение подтверждает настоящий Git', () => {
   it('различает clean, tracked/untracked drift, ancestry и недоступное доказательство', () => {
@@ -55,26 +85,10 @@ describe('PROFILE: происхождение подтверждает наст�
   it('old-vector сохраняет отказ измерения, когда в clean clone нет инструментов', () => {
     const directory = mkdtempSync(join(tmpdir(), 'motion-profile-missing-tools-'));
     try {
-      const root = fileURLToPath(new URL('../', import.meta.url));
-      const clone = join(directory, 'checkout');
-      execFileSync('git', ['clone', '--quiet', '--no-hardlinks', '--no-checkout', root, clone],
-        { encoding: 'utf8', timeout: 30_000 });
       // Отсутствие инструментов проверяется после происхождения. Текущая ветка
       // меняет runtime и правильно отвергается раньше: не расширяем список
       // исключений, а создаём разрешённую фикстуру регистрации над PRODUCT_BASE.
-      execFileSync('git', ['checkout', '--quiet', '--detach', PROFILE_01.productBase.sourceSha], { cwd: clone, timeout: 30_000 });
-      for (const path of PREREG_OWN_PATHS) {
-        mkdirSync(dirname(join(clone, path)), { recursive: true });
-        writeFileSync(join(clone, path), readFileSync(join(root, path)));
-      }
-      execFileSync('git', ['add', '--', ...PREREG_OWN_PATHS], { cwd: clone, timeout: 30_000 });
-      execFileSync('git', ['-c', 'core.hooksPath=' + join(directory, 'no-hooks'), '-c', 'commit.gpgsign=false',
-        '-c', 'user.name=PROFILE test', '-c', 'user.email=profile@example.invalid',
-        'commit', '--quiet', '-m', 'prereg-only missing-tools fixture'], { cwd: clone, timeout: 30_000 });
-      const sourceHead = execFileSync('git', ['rev-parse', 'HEAD'], { cwd: clone, encoding: 'utf8' }).trim();
-      const changed = execFileSync('git', ['diff', '--name-only', PROFILE_01.productBase.sourceSha, sourceHead],
-        { cwd: clone, encoding: 'utf8' }).trim().split('\n');
-      expect(changed.every((path) => PREREG_OWN_PATHS.includes(path))).toBe(true);
+      const { clone, head: sourceHead } = cleanPreregistrationFixture(directory);
       const run = spawnSync(process.execPath, [
         'bench/profile/probe-profile-01.mjs', '--mode', 'old-vector', '--cells', 'all',
         '--out', join(directory, 'raw'),
@@ -238,14 +252,17 @@ describe('PROFILE: записанный успех не заменяет нез�
   it('хеш реального failure-артефакта покрывает отступы, Unicode и конечный LF', () => {
     const directory = mkdtempSync(join(tmpdir(), 'motion-profile-digest-'));
     try {
-      const root = fileURLToPath(new URL('../', import.meta.url));
+      const { clone, head } = cleanPreregistrationFixture(directory);
       const run = spawnSync(process.execPath, [
-        'bench/profile/probe-profile-01.mjs', '--mode', 'aa', '--out', directory,
-      ], { cwd: root, encoding: 'utf8', timeout: 15_000 });
+        'bench/profile/probe-profile-01.mjs', '--mode', 'aa', '--out', join(directory, 'raw'),
+      ], { cwd: clone, encoding: 'utf8', timeout: 15_000 });
       expect(run.status, run.stderr).toBe(1);
       const receipt = JSON.parse(run.stdout.trim());
       const raw = readFileSync(receipt.rawPath);
-      expect(JSON.parse(raw.toString('utf8')).rejection).toContain('browser-калибровки');
+      const artifact = JSON.parse(raw.toString('utf8'));
+      expect(artifact.head).toBe(head);
+      expect(artifact.admission).toBe('NOT-GRANTED');
+      expect(artifact.rejection).toContain('browser-калибровки');
       expect(raw.toString('utf8')).toContain('\n  "node"');
       expect(raw.at(-1)).toBe(10);
       expect(receipt.rawDigest).toBe(createHash('sha256').update(raw).digest('hex'));
@@ -253,4 +270,33 @@ describe('PROFILE: записанный успех не заменяет нез�
       rmSync(directory, { recursive: true, force: true });
     }
   }, 20_000);
+});
+
+describe('PROFILE: ошибка операнда CLI не создаёт артефакт', () => {
+  it.each([
+    { script: 'probe-profile-01.mjs', args: ['--mode'] },
+    { script: 'probe-profile-01.mjs', args: ['--mode', '--out', 'raw'] },
+    { script: 'probe-profile-01.mjs', args: ['--mode', 'aa', '--cells'] },
+    { script: 'probe-profile-01.mjs', args: ['--mode', 'aa', '--cells', '--out', 'raw'] },
+    { script: 'probe-profile-01.mjs', args: ['--mode', 'aa', '--out'] },
+    { script: 'probe-profile-01.mjs', args: ['--out', '--mode', 'aa'] },
+    { script: 'probe-profile-01.mjs', args: ['--mode', 'aa', '--out', ''] },
+    { script: 'probe-profile-01.mjs', args: ['--mode', 'aa', '--out', 'raw', '--out'] },
+    { script: 'validate-profile-01.mjs', args: ['--raw'] },
+    { script: 'validate-profile-01.mjs', args: ['--raw', '--mode'] },
+    { script: 'validate-profile-01.mjs', args: ['--raw', ''] },
+    { script: 'validate-profile-01.mjs', args: ['--raw', 'raw.json', '--raw'] },
+  ])('$script $args', ({ script, args }) => {
+    const directory = mkdtempSync(join(tmpdir(), 'motion-profile-cli-'));
+    try {
+      const root = fileURLToPath(new URL('../', import.meta.url));
+      const run = spawnSync(process.execPath, [join(root, 'bench/profile', script), ...args],
+        { cwd: directory, encoding: 'utf8', timeout: 15_000, env: { ...process.env, TMPDIR: directory } });
+      expect(run.status, run.stderr).toBe(1);
+      expect(run.stdout).toBe('');
+      expect(run.stderr).toMatch(/флаг --(?:mode|cells|out|raw) требует значение/);
+      expect(readdirSync(directory)).toEqual([]);
+      expect(existsSync(join(directory, 'profile-01-raw'))).toBe(false);
+    } finally { rmSync(directory, { recursive: true, force: true }); }
+  });
 });

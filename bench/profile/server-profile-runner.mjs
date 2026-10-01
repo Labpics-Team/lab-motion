@@ -62,9 +62,20 @@ async function withBrowserTimeout(promise, label) {
 export function captureServerMachine() {
   const affinity = /^Cpus_allowed_list:\s*(.+)$/m.exec(readFileSync('/proc/self/status', 'utf8'))?.[1];
   if (!/^\d+$/.test(affinity ?? '')) throw new Error('server profile: нужен один CPU через taskset, общий scheduler не закреплён');
+  const cgroupCpuMax = readOptional('/sys/fs/cgroup/cpu.max');
+  if (typeof cgroupCpuMax !== 'string' || cgroupCpuMax.length === 0) {
+    throw Object.assign(new Error('server profile: нет cgroup v2 cpu.max; ресурсный контракт невыполним до samples'),
+      { raw: { affinity, cgroupCpuMax } });
+  }
+  const resource = captureServerLoad();
+  const resourceKeys = ['usage_usec', 'user_usec', 'system_usec', 'nr_periods', 'nr_throttled', 'throttled_usec'];
+  if (!resourceKeys.every((key) => Number.isSafeInteger(resource.cpuStat[key]) && resource.cpuStat[key] >= 0)) {
+    throw Object.assign(new Error('server profile: cpu.stat не содержит шесть безопасных неотрицательных счётчиков; ресурсный контракт невыполним до samples'),
+      { raw: { resource } });
+  }
   const identity = { platform: platform(), release: release(), arch: arch(), host: hostname(),
     cpu: cpus()[Number(affinity)]?.model, logicalCpus: cpus().length, totalMemoryBytes: totalmem(), affinity,
-    cgroupCpuMax: readOptional('/sys/fs/cgroup/cpu.max'), cgroupMemoryMax: readOptional('/sys/fs/cgroup/memory.max'),
+    cgroupCpuMax, cgroupMemoryMax: readOptional('/sys/fs/cgroup/memory.max'),
     governor: readOptional(`/sys/devices/system/cpu/cpu${affinity}/cpufreq/scaling_governor`),
     display: 'headless; физический экран отсутствует', power: 'среда сервера; не устройство', thermal: 'не измеряется',
     node: process.version, nodeExecutableSha256: sha256File(process.execPath), execArgv: process.execArgv };

@@ -1,7 +1,7 @@
 /** Исполняемые примеры берутся из docs/recipes.md, не копируются в стенд. */
 import { execFileSync } from 'node:child_process';
 import { createHash } from 'node:crypto';
-import { mkdirSync, readFileSync, writeFileSync } from 'node:fs';
+import { mkdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { join, relative, resolve, sep } from 'node:path';
 import { build, version as esbuildVersion } from 'esbuild';
 import { reorderRecipe } from './reorder-recipe.mjs';
@@ -23,6 +23,7 @@ export function packScopeRecipePackage(root, directory) {
   const integrity = `sha512-${createHash('sha512').update(bytes).digest('base64')}`;
   if (receipt.integrity !== integrity) throw new Error('scope-recipes: tarball integrity расходится с npm receipt');
   const packageRoot = join(directory, 'node_modules', '@labpics', 'motion');
+  rmSync(packageRoot, { recursive: true, force: true });
   mkdirSync(packageRoot, { recursive: true });
   execFileSync('tar', ['-xzf', tarball, '-C', packageRoot, '--strip-components=1'], { timeout: 120_000 });
   const manifest = readFileSync(join(packageRoot, 'package.json'));
