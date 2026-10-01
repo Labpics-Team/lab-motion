@@ -1,0 +1,31 @@
+{
+  "schema": 1,
+  "createdAt": "2026-10-01T15:20:10.330524+00:00",
+  "candidateSourceHead": "8fb55ca0a116e5381a43351ab28834d17a4a9299",
+  "runtimeReadset": "8f5b59054b7bf088f8f312e0d9e1645a2c6579ed8a78ef28f1120b552c4c24f6",
+  "originalPreparedManifestSha256": "f0aa9a7865644a32312a1de958859f08b6f9df75908b2f23c1b41601475c684b",
+  "actualRegisteredServerTimingSamples": 0,
+  "reportFiles": [
+    {
+      "path": ".review-evidence/production-20261001/runtime-correctness-8f5.md",
+      "sha256": "79dcccd3c65ffd31637ac4e3b0a36218f56e62c18fd54b8c205537995e9a8067",
+      "bytes": 16039
+    },
+    {
+      "path": ".review-evidence/production-20261001/runtime-second-order-8f5.md",
+      "sha256": "37a3d4b5a5c2f6a24d0f797badd02d2f809922fffa9051d0ebb4e47d02b3c3c5",
+      "bytes": 24891
+    },
+    {
+      "path": ".review-evidence/production-20261001/react18-floor-correctness.md",
+      "sha256": "88e45597d7604d96f754a2f9d666418c62a5d39f20efef04d5053e916803b575",
+      "bytes": 17671
+    },
+    {
+      "path": ".review-evidence/production-20261001/react18-floor-second-order.md",
+      "sha256": "7b0d8c73c556ebefdb13ee1ba94875a69145ad614843dac8df97e593c231063f",
+      "bytes": 16482
+    }
+  ],
+  "scope": "Literal original scoped runtime and React18.0 minimum reports; final method reviews and performance acceptance are pending. This isolated artifact branch is outside candidate source and package payload."
+}
