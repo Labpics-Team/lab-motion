@@ -1,0 +1,10 @@
+{
+  "sourceHead": "8fb55ca0a116e5381a43351ab28834d17a4a9299",
+  "methodArchiveSha256": "5dc04987eace1aaf736da05192948897d50262be5a24ff9192b79744f47ab525",
+  "protocolDigest": "00e8d5880eb83dd27a52f90cc670d4ecc550229458af039d9924485805c25431",
+  "clockModelDigest": "7e45adab88a2c97af4e9074543318ae115e42b5c9669c4746b6e149d42bfbc4f",
+  "reportOriginal": "/workspace/scratch/server-method-second-order-final-20261001/closure-144242Z/REPORT.md",
+  "reportSha256": "4f667948bdf5c249c2a12c0b918dc8a1757b8c909c5b1e50c32457b17f3bbdd0",
+  "scope": "IndependentSO scopedPASS only oldfrozen5dc/source8fb; mathematical/performance/adoption/newfutureCepoch not accepted.",
+  "actualRegisteredSamples": 0
+}
