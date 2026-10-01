@@ -594,8 +594,18 @@ export function validateServerArtifact(artifact) {
 // calibration → A/B. Raw rows должны совпасть с каждой сохранённой квитанцией.
 export function serverArtifactDigest(artifact) {
   const hash = createHash('sha256');
-  for (const chunk of serverArtifactChunks(artifact)) hash.update(chunk);
-  return hash.digest('hex');
+  let pending = [], length = 0;
+  const flush = () => { if (length) hash.update(pending.join('')); pending = []; length = 0; };
+  for (const chunk of serverArtifactChunks(artifact)) {
+    // Ограниченная склейка сокращает вызовы native hash для разделителей JSON.
+    // Внешний lazy iterator и чтения входа остаются прежними; кеша между вызовами нет.
+    if (typeof chunk !== 'string' || chunk.length >= 65_536) { flush(); hash.update(chunk); }
+    else {
+      if (length + chunk.length > 65_536) flush();
+      pending.push(chunk); length += chunk.length;
+    }
+  }
+  flush(); return hash.digest('hex');
 }
 
 // Сериализация rows отдельными chunks сохраняет весь raw, даже когда итоговый
@@ -823,7 +833,11 @@ export function validateServerJournal(artifact, records, rawDigest) {
   // отказ не повторяет сериализацию raw, не участвующего в успешном admission.
   for (const record of records) {
     const { digest, ...payload } = record;
-    invariant(digest === serverProfileDigest(payload), 'повреждена цепь журнала');
+    const text = JSON.stringify(payload);
+    // Native hash принимает UTF-8 string прямо; временный Buffer копии не нужен.
+    // Для undefined сохраняется прежняя ошибка Buffer.from после того же чтения.
+    const bodyDigest = createHash('sha256').update(text === undefined ? Buffer.from(text) : text).digest('hex');
+    invariant(digest === bodyDigest, 'повреждена цепь журнала');
   }
   return { journalFinalDigest: previous };
 }
