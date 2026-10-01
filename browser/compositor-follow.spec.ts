@@ -42,6 +42,15 @@ test.beforeEach(async ({ page }) => {
     const methods = new Set(['beginFollow', 'follow', 'settle', 'retarget', 'destroy']);
     let controlId = 0;
     probe.observe = (controls) => {
+      // setContent вызывает document.open и снимает прежние обработчики.
+      for (const type of ['pointerdown', 'pointermove', 'pointerup', 'pointercancel', 'gotpointercapture', 'lostpointercapture'] as const) {
+        document.addEventListener(type, (event) => record({
+          kind: 'pointer', type, id: event.pointerId, timeStamp: event.timeStamp,
+          x: event.clientX, y: event.clientY, buttons: event.buttons, button: event.button,
+          primary: event.isPrimary, trusted: event.isTrusted, pointerType: event.pointerType,
+          target: event.target instanceof Element ? elementName(event.target) : null,
+        }), true);
+      }
       const control = ++controlId;
       const wrappers = new Map<PropertyKey, (...args: unknown[]) => unknown>();
       return new Proxy(controls, { get(target, key) {
@@ -61,14 +70,6 @@ test.beforeEach(async ({ page }) => {
         return wrappers.get(key);
       } });
     };
-    for (const type of ['pointerdown', 'pointermove', 'pointerup', 'pointercancel', 'gotpointercapture', 'lostpointercapture'] as const) {
-      document.addEventListener(type, (event) => record({
-        kind: 'pointer', type, id: event.pointerId, timeStamp: event.timeStamp,
-        x: event.clientX, y: event.clientY, buttons: event.buttons, button: event.button,
-        primary: event.isPrimary, trusted: event.isTrusted, pointerType: event.pointerType,
-        target: event.target instanceof Element ? elementName(event.target) : null,
-      }), true);
-    }
     const ids = new WeakMap<Animation, number>();
     let animationId = 0;
     const id = (animation: Animation) => {
