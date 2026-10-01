@@ -1,0 +1,37 @@
+{
+  "schema": 1,
+  "createdAt": "2026-10-01T17:22:51.167372+00:00",
+  "artifactParent": "76722917f621bd4eefcc003f9bb937e0106e5930",
+  "sourceRepository": "Labpics-Team/agents-config",
+  "sourceHead": "85a837e83912ec6b3144b385d938b66a0c63adcf",
+  "r12Sha256": "b2e6d1462b0bce43773beaf307e3b3963c426bf07134f49c844d4991e1753622",
+  "witnessSha256": "d1802cf759a81f0afc064f2f6059fbd19ea277409ce8b077dc6642a46e28127a",
+  "reportFiles": [
+    {
+      "path": ".review-evidence/production-20261001/r12-correctness-85a.md",
+      "original": "/workspace/scratch/r12-blind-correctness-language-20261001/REPORT-RU.md",
+      "sha256": "d11c56d966297d021b497ce58192f484917c72a8649e7348cd5057b2f2ea764a",
+      "bytes": 15136
+    },
+    {
+      "path": ".review-evidence/production-20261001/r12-second-order-f6-6bcb.md",
+      "original": "/workspace/scratch/r12-docs-second-order-f6e2-6bcb-20261001T165850Z/REPORT.md",
+      "sha256": "8ea72ac95adc5cad69595169396561afa7ac25e628e0f9f843e7e24c22ff38b4",
+      "bytes": 8673
+    },
+    {
+      "path": ".review-evidence/production-20261001/r12-second-order-85a.md",
+      "original": "/workspace/scratch/r12-docs-second-order-85a837-20261001T170601Z/REPORT.md",
+      "sha256": "389f287fa811883026fdd072c246f99881e89bfac44a65fa3996ff4f39f95e42",
+      "bytes": 6216
+    },
+    {
+      "path": ".review-evidence/production-20261001/r12-historical-pr-body-aaaf.md",
+      "original": "/workspace/scratch/r12-current-base-aaafb902-20261001/pr-body-aaaf-final.md",
+      "sha256": "926ab0734c6dc975f73712d493fb47394b2dcba5a5f36237e27f5fe11f95c127",
+      "bytes": 49939
+    }
+  ],
+  "scope": "Полные буквальные отчёты документной приёмки r12 и историческое описание aaaf. Общая отдельная ветка доказательств задачи, вне продуктового исходника и npm пакета. Нет приёмки новой C, фактической производительности или выпуска.",
+  "actualRegisteredTimingSamples": 0
+}
