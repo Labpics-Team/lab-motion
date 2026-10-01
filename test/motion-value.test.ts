@@ -405,9 +405,10 @@ describe('MotionValue animation correctness', () => {
   it('works with handle=0 non-draining clock via setTimeout fallback', async () => {
     // requestFrame returns 0 without invoking cb. MotionValue installs setTimeout(0) fallback.
     const nonDraining = (_cb: (ts?: number) => void): number => 0;
-    vi.useFakeTimers({ toFake: ['setTimeout', 'clearTimeout'] });
-    const mv = new MotionValue({ initial: 0, spring: STD_SPRING, requestFrame: nonDraining });
+    let mv: MotionValue | undefined;
     try {
+      vi.useFakeTimers({ toFake: ['setTimeout', 'clearTimeout'] });
+      mv = new MotionValue({ initial: 0, spring: STD_SPRING, requestFrame: nonDraining });
       const values: number[] = [];
       mv.onChange((v) => values.push(v));
       mv.setTarget(50);
@@ -417,8 +418,11 @@ describe('MotionValue animation correctness', () => {
       expect(values[values.length - 1]).toBe(50);
       expect(vi.getTimerCount()).toBe(0);
     } finally {
-      mv.destroy();
-      vi.useRealTimers();
+      try {
+        mv?.destroy();
+      } finally {
+        vi.useRealTimers();
+      }
     }
   }, 10_000);
 });
