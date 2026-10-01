@@ -1,0 +1,744 @@
+{
+  "observedAt": "2026-10-01T20:18:34.708227+00:00",
+  "reportReadInFull": "/tmp/server-method-second-order-admission-cost-20261001T1940Z/REPORT.md",
+  "reportSha256": "89362193404b1e337f074c4a4608a95d3cc5e0e2f579afd03b0591d51fdae12d",
+  "terminalReceiptSha256": "ea3fcb3da4d2b61ecffc8e16bceb628b13bbd6c8211dd34ea0c5842006f1a33d",
+  "source": "7f9b85d82bdf531455a8eb0fae4406484205ef83",
+  "verdict": "PASS scoped affected closure",
+  "methodAcceptance": "Scoped hash/cost closure; current hosted CI and actual sampling remain open",
+  "outputs": 67,
+  "hashVerified": [
+    {
+      "path": "/tmp/server-method-second-order-admission-cost-20261001T1940Z/REPORT.md",
+      "sha256": "89362193404b1e337f074c4a4608a95d3cc5e0e2f579afd03b0591d51fdae12d",
+      "bytes": 18282
+    },
+    {
+      "path": "/tmp/server-method-second-order-admission-cost-20261001T1940Z/readset.json",
+      "sha256": "c8f7313d36a9e43983e20342a74b6f5cba3468de0824c05f5dcf94cca2e6205a",
+      "bytes": 42114
+    },
+    {
+      "path": "/tmp/server-method-second-order-admission-cost-20261001T1940Z/evidence-manifest.json",
+      "sha256": "1a0d0571792090305e32f0371dff2c2aa451a6131aca857b132cee1ed6f01828",
+      "bytes": 12303
+    },
+    {
+      "path": "/tmp/server-method-second-order-stock-c-20261001T172036Z/REPORT.md",
+      "sha256": "194d7a939293a6137a8f76c77c3ce00490efe012975b532eb8d58bfd8ff75505",
+      "bytes": 19256
+    },
+    {
+      "path": "/tmp/server-method-second-order-stock-c-20261001T172036Z/readset.json",
+      "sha256": "d5144774d0885b2249813422a74e03bd290a05e9acf4480494b4d099279931fe",
+      "bytes": 182713
+    },
+    {
+      "path": "/tmp/server-method-second-order-stock-c-20261001T172036Z/evidence-manifest.json",
+      "sha256": "16a29bbad06a0b53d72a339be750d6f4156e222658aeb9608498118877f9d179",
+      "bytes": 49069
+    },
+    {
+      "path": "/tmp/server-method-second-order-stock-c-20261001T172036Z/report-receipt.json",
+      "sha256": "c752ded6128f940277c420075e6e0209c71cb6369227749dcd3b4f322628d462",
+      "bytes": 1570
+    },
+    {
+      "path": "/tmp/server-method-second-order-dependency-20261001T1806Z/REPORT.md",
+      "sha256": "4c6847bbca954af159b45c5cedcfe4b87a3baa518ceb4e7832f7b9fa94390753",
+      "bytes": 14211
+    },
+    {
+      "path": "/tmp/server-method-second-order-dependency-20261001T1806Z/readset.json",
+      "sha256": "81da4e12c50e7b4ff99af1061574fb26798db4d87d57681c5d9e7829cec576d7",
+      "bytes": 28345
+    },
+    {
+      "path": "/tmp/server-method-second-order-dependency-20261001T1806Z/evidence-manifest.json",
+      "sha256": "5cbe922834050c8389f7a5069a11cdd43236db8da58550b7ab394ed31b024905",
+      "bytes": 10830
+    },
+    {
+      "path": "/tmp/server-method-second-order-dependency-20261001T1806Z/report-receipt.json",
+      "sha256": "0ef91fb6f0ecbb5bfeab3483a1202dd6f600fa4504b92c81b7c2f37d1b5e1647",
+      "bytes": 1679
+    },
+    {
+      "path": "/tmp/server-method-second-order-admission-cost-20261001T1940Z/diagnostic-profile-primary-selection.json",
+      "sha256": "1109f47434287b153c98703de0db5c578fd9f8923a941370efef2d7d015837a6",
+      "bytes": 6907
+    },
+    {
+      "path": "/tmp/server-method-second-order-admission-cost-20261001T1940Z/execution.json",
+      "sha256": "dbb3aab550d267f83742c81e717c8fcc9a64c0f44b37b295335a2c36699ea795",
+      "bytes": 5439
+    },
+    {
+      "path": "/tmp/server-method-second-order-admission-cost-20261001T1940Z/hash-lifecycle-controls.mjs",
+      "sha256": "555b67ff08b8f65af7edac170584ef2c048641a03c48222176094afc0fae98e9",
+      "bytes": 13378
+    },
+    {
+      "path": "/tmp/server-method-second-order-admission-cost-20261001T1940Z/immutable-verification.json",
+      "sha256": "114f517479b63ebd48b919d26fd8067eb96711556608e516be209b8fe9b6a1a9",
+      "bytes": 12572
+    },
+    {
+      "path": "/tmp/server-method-second-order-admission-cost-20261001T1940Z/new-contract.mjs",
+      "sha256": "9f2ae0da9c171221d86dd8f7ca4611818f94ce5d0fbe2d9dffc59e85e9a75161",
+      "bytes": 65234
+    },
+    {
+      "path": "/tmp/server-method-second-order-admission-cost-20261001T1940Z/new-healthy.stderr",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "bytes": 0
+    },
+    {
+      "path": "/tmp/server-method-second-order-admission-cost-20261001T1940Z/new-healthy.stdout",
+      "sha256": "c274df1088fa8f82a5bb4060c206343efd3b1d0320c85f94ab63bca8f802650e",
+      "bytes": 148
+    },
+    {
+      "path": "/tmp/server-method-second-order-admission-cost-20261001T1940Z/new-source/bench/compare/bench.mjs",
+      "sha256": "4939941e3fa40f6122619a63483aacd3d3c7375a2dee1b5e320fde653ba27a94",
+      "bytes": 55345
+    },
+    {
+      "path": "/tmp/server-method-second-order-admission-cost-20261001T1940Z/new-source/bench/compare/entries/waapi-control.entry.mjs",
+      "sha256": "2c6e355273b58d03d450a7d70ac2ac8869df357cad663ecdc7be31eef8a98b50",
+      "bytes": 1276
+    },
+    {
+      "path": "/tmp/server-method-second-order-admission-cost-20261001T1940Z/new-source/bench/compare/methodology.mjs",
+      "sha256": "a6440e56752573684809765ba992ce01b0993a889e130f16eb870cd1fcbcda87",
+      "bytes": 57045
+    },
+    {
+      "path": "/tmp/server-method-second-order-admission-cost-20261001T1940Z/new-source/bench/compare/motion-conformance.mjs",
+      "sha256": "d05f0cec91a48eb9e85ec6b12ba49f0ac3673d4489d6dd5af470aa878fbc7f28",
+      "bytes": 7239
+    },
+    {
+      "path": "/tmp/server-method-second-order-admission-cost-20261001T1940Z/new-source/bench/compare/package.json",
+      "sha256": "6c3b8f1957f2e9b166013d118102210b0a4e1be551c31b0ce3d1297a1ea1efce",
+      "bytes": 393
+    },
+    {
+      "path": "/tmp/server-method-second-order-admission-cost-20261001T1940Z/new-source/bench/compare/provenance.mjs",
+      "sha256": "51881a4a6ea2e1ad0330888e7e1b9c8b6e7c7aef3a3eb798a4185c7c3b846623",
+      "bytes": 24949
+    },
+    {
+      "path": "/tmp/server-method-second-order-admission-cost-20261001T1940Z/new-source/bench/compare/report-contract.mjs",
+      "sha256": "35dcbb5efd0534367d22b61cc767acbde206ff604bf05a41acaeb6d38a512b1d",
+      "bytes": 52579
+    },
+    {
+      "path": "/tmp/server-method-second-order-admission-cost-20261001T1940Z/new-source/bench/profile/server-profile-contract.mjs",
+      "sha256": "9f2ae0da9c171221d86dd8f7ca4611818f94ce5d0fbe2d9dffc59e85e9a75161",
+      "bytes": 65234
+    },
+    {
+      "path": "/tmp/server-method-second-order-admission-cost-20261001T1940Z/new-source/bench/profile/server-profile-registration.mjs",
+      "sha256": "98e162c114ef1329c99ac9b5bd8f24ab5a2df3d2e95da4b9d8caf5c69378079a",
+      "bytes": 16518
+    },
+    {
+      "path": "/tmp/server-method-second-order-admission-cost-20261001T1940Z/new-source/bench/profile/server-profile-retention.mjs",
+      "sha256": "df27d82963f775cca2b8efd06587a42840cc4fd0de72a11873b1a43b402587e1",
+      "bytes": 3040
+    },
+    {
+      "path": "/tmp/server-method-second-order-admission-cost-20261001T1940Z/new-source/bench/profile/server-profile-runner.mjs",
+      "sha256": "26f131a29b02f499e293e5b7224b493650d75d5225360f8fa0438d6d3e27266c",
+      "bytes": 48769
+    },
+    {
+      "path": "/tmp/server-method-second-order-admission-cost-20261001T1940Z/new-source/package.json",
+      "sha256": "de278702d9f6843be2b682c27d9cc0d16d552327f77f7a9f07bee0ff6793da52",
+      "bytes": 16122
+    },
+    {
+      "path": "/tmp/server-method-second-order-admission-cost-20261001T1940Z/new-source/scripts/bench-support.mjs",
+      "sha256": "2fb04fcfd34788870649982724f1166cb4c14a78ae1c44544028565db8208e05",
+      "bytes": 17507
+    },
+    {
+      "path": "/tmp/server-method-second-order-admission-cost-20261001T1940Z/new-source/scripts/bench-transform-support.mjs",
+      "sha256": "ddbcf5b758133624b3f285947457a8831872847c0e1913ee9afe163f751307c6",
+      "bytes": 30270
+    },
+    {
+      "path": "/tmp/server-method-second-order-admission-cost-20261001T1940Z/new-source/scripts/compression-oracle.mjs",
+      "sha256": "736f72336d54bca93dca1cfe426ff79476eb6b2fbd266296b00802eef565a6bb",
+      "bytes": 925
+    },
+    {
+      "path": "/tmp/server-method-second-order-admission-cost-20261001T1940Z/new-source/scripts/compression-policy.mjs",
+      "sha256": "78535921e66d3f1e9bb2936722cce03f0464ec835cd88ab4ac9a1cbd97cc38a4",
+      "bytes": 552
+    },
+    {
+      "path": "/tmp/server-method-second-order-admission-cost-20261001T1940Z/new-tamper.stderr",
+      "sha256": "b762f891aa3e2166956c7c0f831a3db0cfea112edcbf0d2229bbb9dd6f5e531a",
+      "bytes": 61
+    },
+    {
+      "path": "/tmp/server-method-second-order-admission-cost-20261001T1940Z/new-tamper.stdout",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "bytes": 0
+    },
+    {
+      "path": "/tmp/server-method-second-order-admission-cost-20261001T1940Z/node22-controls.stderr",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "bytes": 0
+    },
+    {
+      "path": "/tmp/server-method-second-order-admission-cost-20261001T1940Z/node22-controls.stdout",
+      "sha256": "5b0dcaa7382b0035c7f8a4046b8c16171200eb7bc67e87c1930d06f8872c366a",
+      "bytes": 203
+    },
+    {
+      "path": "/tmp/server-method-second-order-admission-cost-20261001T1940Z/node22-files/journal.ndjson",
+      "sha256": "cae79d853fd2c118288389a610845e808956324d7e8f44697854a25a18351a1f",
+      "bytes": 568
+    },
+    {
+      "path": "/tmp/server-method-second-order-admission-cost-20261001T1940Z/node22-files/partial.json",
+      "sha256": "3d0dd7c1c31784a6343b77c8a65f9b720a5b09a7007eb44faec6327da38ce1ff",
+      "bytes": 25
+    },
+    {
+      "path": "/tmp/server-method-second-order-admission-cost-20261001T1940Z/node22-files/preparation.json",
+      "sha256": "4985a97cd5029657b6eb20ae080ecc86b50e105b44f80bf4869bf5a93c66df41",
+      "bytes": 12535
+    },
+    {
+      "path": "/tmp/server-method-second-order-admission-cost-20261001T1940Z/node22-files/tampered.ndjson",
+      "sha256": "98ab8cac98f717dfaee7091bbe0914b4f065100ad572fd152a8f0fa1bb4014a5",
+      "bytes": 596
+    },
+    {
+      "path": "/tmp/server-method-second-order-admission-cost-20261001T1940Z/node22-result.json",
+      "sha256": "15af305283f3c27400ccac4127b2927fafa58078cb23455496113ef00c7cc836",
+      "bytes": 15101
+    },
+    {
+      "path": "/tmp/server-method-second-order-admission-cost-20261001T1940Z/node24-controls.stderr",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "bytes": 0
+    },
+    {
+      "path": "/tmp/server-method-second-order-admission-cost-20261001T1940Z/node24-controls.stdout",
+      "sha256": "1cde6868aa5c798846f950bec2f21102b5512c7a22efd11e3490c28ffd247e74",
+      "bytes": 204
+    },
+    {
+      "path": "/tmp/server-method-second-order-admission-cost-20261001T1940Z/node24-files/journal.ndjson",
+      "sha256": "cae79d853fd2c118288389a610845e808956324d7e8f44697854a25a18351a1f",
+      "bytes": 568
+    },
+    {
+      "path": "/tmp/server-method-second-order-admission-cost-20261001T1940Z/node24-files/partial.json",
+      "sha256": "3d0dd7c1c31784a6343b77c8a65f9b720a5b09a7007eb44faec6327da38ce1ff",
+      "bytes": 25
+    },
+    {
+      "path": "/tmp/server-method-second-order-admission-cost-20261001T1940Z/node24-files/preparation.json",
+      "sha256": "4985a97cd5029657b6eb20ae080ecc86b50e105b44f80bf4869bf5a93c66df41",
+      "bytes": 12535
+    },
+    {
+      "path": "/tmp/server-method-second-order-admission-cost-20261001T1940Z/node24-files/tampered.ndjson",
+      "sha256": "98ab8cac98f717dfaee7091bbe0914b4f065100ad572fd152a8f0fa1bb4014a5",
+      "bytes": 596
+    },
+    {
+      "path": "/tmp/server-method-second-order-admission-cost-20261001T1940Z/node24-result.json",
+      "sha256": "9e7028fd2088e9d42b9ef6351ff01fa6943c641f09b53cbb9d322146a115faac",
+      "bytes": 15095
+    },
+    {
+      "path": "/tmp/server-method-second-order-admission-cost-20261001T1940Z/old-contract.mjs",
+      "sha256": "6bdbe03b9837ba2dd1959963f02fd0434597e9839a82d95e31b7ba738b9f5d1b",
+      "bytes": 64246
+    },
+    {
+      "path": "/tmp/server-method-second-order-admission-cost-20261001T1940Z/old-reader-healthy.stderr",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "bytes": 0
+    },
+    {
+      "path": "/tmp/server-method-second-order-admission-cost-20261001T1940Z/old-reader-healthy.stdout",
+      "sha256": "c274df1088fa8f82a5bb4060c206343efd3b1d0320c85f94ab63bca8f802650e",
+      "bytes": 148
+    },
+    {
+      "path": "/tmp/server-method-second-order-admission-cost-20261001T1940Z/old-source/bench/compare/bench.mjs",
+      "sha256": "4939941e3fa40f6122619a63483aacd3d3c7375a2dee1b5e320fde653ba27a94",
+      "bytes": 55345
+    },
+    {
+      "path": "/tmp/server-method-second-order-admission-cost-20261001T1940Z/old-source/bench/compare/entries/waapi-control.entry.mjs",
+      "sha256": "2c6e355273b58d03d450a7d70ac2ac8869df357cad663ecdc7be31eef8a98b50",
+      "bytes": 1276
+    },
+    {
+      "path": "/tmp/server-method-second-order-admission-cost-20261001T1940Z/old-source/bench/compare/methodology.mjs",
+      "sha256": "a6440e56752573684809765ba992ce01b0993a889e130f16eb870cd1fcbcda87",
+      "bytes": 57045
+    },
+    {
+      "path": "/tmp/server-method-second-order-admission-cost-20261001T1940Z/old-source/bench/compare/motion-conformance.mjs",
+      "sha256": "d05f0cec91a48eb9e85ec6b12ba49f0ac3673d4489d6dd5af470aa878fbc7f28",
+      "bytes": 7239
+    },
+    {
+      "path": "/tmp/server-method-second-order-admission-cost-20261001T1940Z/old-source/bench/compare/package.json",
+      "sha256": "6c3b8f1957f2e9b166013d118102210b0a4e1be551c31b0ce3d1297a1ea1efce",
+      "bytes": 393
+    },
+    {
+      "path": "/tmp/server-method-second-order-admission-cost-20261001T1940Z/old-source/bench/compare/provenance.mjs",
+      "sha256": "51881a4a6ea2e1ad0330888e7e1b9c8b6e7c7aef3a3eb798a4185c7c3b846623",
+      "bytes": 24949
+    },
+    {
+      "path": "/tmp/server-method-second-order-admission-cost-20261001T1940Z/old-source/bench/compare/report-contract.mjs",
+      "sha256": "35dcbb5efd0534367d22b61cc767acbde206ff604bf05a41acaeb6d38a512b1d",
+      "bytes": 52579
+    },
+    {
+      "path": "/tmp/server-method-second-order-admission-cost-20261001T1940Z/old-source/bench/profile/server-profile-contract.mjs",
+      "sha256": "6bdbe03b9837ba2dd1959963f02fd0434597e9839a82d95e31b7ba738b9f5d1b",
+      "bytes": 64246
+    },
+    {
+      "path": "/tmp/server-method-second-order-admission-cost-20261001T1940Z/old-source/bench/profile/server-profile-registration.mjs",
+      "sha256": "98e162c114ef1329c99ac9b5bd8f24ab5a2df3d2e95da4b9d8caf5c69378079a",
+      "bytes": 16518
+    },
+    {
+      "path": "/tmp/server-method-second-order-admission-cost-20261001T1940Z/old-source/bench/profile/server-profile-retention.mjs",
+      "sha256": "df27d82963f775cca2b8efd06587a42840cc4fd0de72a11873b1a43b402587e1",
+      "bytes": 3040
+    },
+    {
+      "path": "/tmp/server-method-second-order-admission-cost-20261001T1940Z/old-source/bench/profile/server-profile-runner.mjs",
+      "sha256": "26f131a29b02f499e293e5b7224b493650d75d5225360f8fa0438d6d3e27266c",
+      "bytes": 48769
+    },
+    {
+      "path": "/tmp/server-method-second-order-admission-cost-20261001T1940Z/old-source/package.json",
+      "sha256": "de278702d9f6843be2b682c27d9cc0d16d552327f77f7a9f07bee0ff6793da52",
+      "bytes": 16122
+    },
+    {
+      "path": "/tmp/server-method-second-order-admission-cost-20261001T1940Z/old-source/scripts/bench-support.mjs",
+      "sha256": "2fb04fcfd34788870649982724f1166cb4c14a78ae1c44544028565db8208e05",
+      "bytes": 17507
+    },
+    {
+      "path": "/tmp/server-method-second-order-admission-cost-20261001T1940Z/old-source/scripts/bench-transform-support.mjs",
+      "sha256": "ddbcf5b758133624b3f285947457a8831872847c0e1913ee9afe163f751307c6",
+      "bytes": 30270
+    },
+    {
+      "path": "/tmp/server-method-second-order-admission-cost-20261001T1940Z/old-source/scripts/compression-oracle.mjs",
+      "sha256": "736f72336d54bca93dca1cfe426ff79476eb6b2fbd266296b00802eef565a6bb",
+      "bytes": 925
+    },
+    {
+      "path": "/tmp/server-method-second-order-admission-cost-20261001T1940Z/old-source/scripts/compression-policy.mjs",
+      "sha256": "78535921e66d3f1e9bb2936722cce03f0464ec835cd88ab4ac9a1cbd97cc38a4",
+      "bytes": 552
+    },
+    {
+      "path": "/tmp/server-method-second-order-admission-cost-20261001T1940Z/probe-inputs.json",
+      "sha256": "546e98811da8963afbfa59e4beca86c5ca1ee4f8aa9e38934c689ae85a81077d",
+      "bytes": 12368
+    },
+    {
+      "path": "/tmp/server-method-second-order-admission-cost-20261001T1940Z/protected-test-binding.json",
+      "sha256": "2dc9ea1f122ee56469f5ebcb9f6a095dea2a68735c37b87b5c66096202a5eba1",
+      "bytes": 623
+    },
+    {
+      "path": "/tmp/server-method-second-order-admission-cost-20261001T1940Z/provided-primary-summary.json",
+      "sha256": "f99f15b4342e5fb7cf830c1d6dd59519ed6500d45d036ef5b591862bf6274695",
+      "bytes": 29500
+    },
+    {
+      "path": "/tmp/server-method-second-order-admission-cost-20261001T1940Z/run-controls.py",
+      "sha256": "dcd3261d2f75decc69a89ca5558feba48053e8eb51c48dab705f6d945886479e",
+      "bytes": 2227
+    },
+    {
+      "path": "/tmp/server-method-second-order-admission-cost-20261001T1940Z/source-bindings.json",
+      "sha256": "89a0e5a272908998a5adbc98dc92b4f217cdd576d98531d910620c16eb99af85",
+      "bytes": 108384
+    },
+    {
+      "path": "/tmp/server-method-second-order-admission-cost-20261001T1940Z/source-delta.diff",
+      "sha256": "8ac0f970592cc56135f19fd3a7700f860e66ef8c9c026d917deac0dda451a3d4",
+      "bytes": 2425
+    },
+    {
+      "path": "/tmp/server-method-second-order-admission-cost-20261001T1940Z/supplemental-local-gate-primary.json",
+      "sha256": "7c392c2502b2f35284c23f3a875bc69f5f67ec33793530e796569ee360c16399",
+      "bytes": 1600
+    },
+    {
+      "path": "/tmp/server-method-second-order-admission-cost-20261001T1940Z/terminal-processes.json",
+      "sha256": "9124730158d42f09bb26eacd980f5ff717888014644970193f16cb2eee6de288",
+      "bytes": 410
+    },
+    {
+      "path": "/tmp/motion-server-method-admission-cost-delta-20261001T1940Z/PRIMARY-PACKET.json",
+      "sha256": "d6b1b9c0238c9b5b5fd3c79ce1425dcd21f5adef359ab5776964573f82754299",
+      "bytes": 11899
+    },
+    {
+      "path": "git:7f9b85d82bdf531455a8eb0fae4406484205ef83:bench/profile/server-profile-registration.mjs",
+      "sha256": "98e162c114ef1329c99ac9b5bd8f24ab5a2df3d2e95da4b9d8caf5c69378079a",
+      "bytes": 16518
+    },
+    {
+      "path": "git:7f9b85d82bdf531455a8eb0fae4406484205ef83:bench/profile/server-profile-contract.mjs",
+      "sha256": "9f2ae0da9c171221d86dd8f7ca4611818f94ce5d0fbe2d9dffc59e85e9a75161",
+      "bytes": 65234
+    },
+    {
+      "path": "git:7f9b85d82bdf531455a8eb0fae4406484205ef83:bench/profile/server-profile-runner.mjs",
+      "sha256": "26f131a29b02f499e293e5b7224b493650d75d5225360f8fa0438d6d3e27266c",
+      "bytes": 48769
+    },
+    {
+      "path": "git:7f9b85d82bdf531455a8eb0fae4406484205ef83:bench/profile/server-profile-retention.mjs",
+      "sha256": "df27d82963f775cca2b8efd06587a42840cc4fd0de72a11873b1a43b402587e1",
+      "bytes": 3040
+    },
+    {
+      "path": "git:7f9b85d82bdf531455a8eb0fae4406484205ef83:test/server-profile-contract.test.ts",
+      "sha256": "1a87570d011d9aeeaf601eaeba7ade567cf55ba8a2709e702c789be9d3fb0b5f",
+      "bytes": 81692
+    },
+    {
+      "path": "git:7f9b85d82bdf531455a8eb0fae4406484205ef83:docs/server-profile.md",
+      "sha256": "91258e617cae480dbc80db857076ac340c35b00e5cbe026916fa8f5cc4e82b99",
+      "bytes": 26339
+    },
+    {
+      "path": "git:7f9b85d82bdf531455a8eb0fae4406484205ef83:bench/compare/bench.mjs",
+      "sha256": "4939941e3fa40f6122619a63483aacd3d3c7375a2dee1b5e320fde653ba27a94",
+      "bytes": 55345
+    },
+    {
+      "path": "git:7f9b85d82bdf531455a8eb0fae4406484205ef83:bench/compare/methodology.mjs",
+      "sha256": "a6440e56752573684809765ba992ce01b0993a889e130f16eb870cd1fcbcda87",
+      "bytes": 57045
+    },
+    {
+      "path": "git:7f9b85d82bdf531455a8eb0fae4406484205ef83:scripts/bench-transform-support.mjs",
+      "sha256": "ddbcf5b758133624b3f285947457a8831872847c0e1913ee9afe163f751307c6",
+      "bytes": 30270
+    },
+    {
+      "path": "git:7f9b85d82bdf531455a8eb0fae4406484205ef83:test/bench-transform-pair.test.ts",
+      "sha256": "2f339c24d36c65c49624b9532129d132e81d7a17d745f890be50adef89204705",
+      "bytes": 48403
+    },
+    {
+      "path": "git:7f9b85d82bdf531455a8eb0fae4406484205ef83:test/benchmark-methodology.test.ts",
+      "sha256": "3faa3ba6131b6864bba17ec65c2a1b52dd6ab082dac8c602fbc86cb508c80f0b",
+      "bytes": 33675
+    },
+    {
+      "path": "git:7f9b85d82bdf531455a8eb0fae4406484205ef83:test/benchmark-report-contract.test.ts",
+      "sha256": "91759d8223e76cc8db450c392fa2983229945de40a7f61e19892002fefe36647",
+      "bytes": 51785
+    },
+    {
+      "path": "git:7f9b85d82bdf531455a8eb0fae4406484205ef83:scripts/bench-support.mjs",
+      "sha256": "2fb04fcfd34788870649982724f1166cb4c14a78ae1c44544028565db8208e05",
+      "bytes": 17507
+    },
+    {
+      "path": "git:7f9b85d82bdf531455a8eb0fae4406484205ef83:scripts/bench.mjs",
+      "sha256": "74b76202acc517036d43631466ec71e5fd2e6bf954522cf572b9a96d8d5f9f26",
+      "bytes": 19762
+    },
+    {
+      "path": "/tmp/motion-server-method-admission-cost-delta-20261001T1940Z/source-delta.diff",
+      "sha256": "8ac0f970592cc56135f19fd3a7700f860e66ef8c9c026d917deac0dda451a3d4",
+      "bytes": 2425
+    },
+    {
+      "path": "/tmp/motion-server-method-admission-cost-delta-20261001T1940Z/new-contract.mjs",
+      "sha256": "9f2ae0da9c171221d86dd8f7ca4611818f94ce5d0fbe2d9dffc59e85e9a75161",
+      "bytes": 65234
+    },
+    {
+      "path": "/tmp/motion-server-method-admission-cost-delta-20261001T1940Z/evidence/after-cost/fixtures.mjs",
+      "sha256": "5cff5e0655230dc7b4329f5635025f84de0be51df40d4deaf4e0cc44d2515ae8",
+      "bytes": 18704
+    },
+    {
+      "path": "/tmp/motion-server-method-admission-cost-delta-20261001T1940Z/SOURCE-FREEZE.json",
+      "sha256": "8a3fc71b4e71c68ce2a3804ea62b6f2bac84dac4631923294d0c5be37786da82",
+      "bytes": 5063
+    },
+    {
+      "path": "/tmp/motion-server-method-admission-cost-delta-20261001T1940Z/evidence/after-cost/acquired-steps.ndjson",
+      "sha256": "d170195f5711e863dd9acf083b0a1fef9e541f86128cb84319ee173f97ae8ca8",
+      "bytes": 1393
+    },
+    {
+      "path": "/tmp/motion-server-method-admission-cost-delta-20261001T1940Z/evidence/after-cost/after.cpuprofile",
+      "sha256": "119ce1b17ea74b185d676a4ec313e91bcb9d5626623d93cc75740bed3f555823",
+      "bytes": 339818
+    },
+    {
+      "path": "/tmp/motion-server-method-admission-cost-delta-20261001T1940Z/evidence/after-cost/exact-test-callback.ts",
+      "sha256": "7d1e66d88568f137f5831ed9cc52b38375587dc13673a6fd6faf29eaaa5977db",
+      "bytes": 1701
+    },
+    {
+      "path": "/tmp/motion-server-method-admission-cost-delta-20261001T1940Z/evidence/after-cost/execution.json",
+      "sha256": "50862f01cceeebb9c73976e8fd25f2cbc3a11d27d679cfb74d697f9fb021700c",
+      "bytes": 2370
+    },
+    {
+      "path": "/tmp/motion-server-method-admission-cost-delta-20261001T1940Z/evidence/after-cost/probe-result.json",
+      "sha256": "1b0f8d5266c2cdbbceb2e7807701e0710832d40373adc1aafddbea467e683c36",
+      "bytes": 2772
+    },
+    {
+      "path": "/tmp/motion-server-method-admission-cost-delta-20261001T1940Z/evidence/after-cost/probe.log",
+      "sha256": "5e8fe167674c50c87eec8a6521dfdb7c0947314ce43eccd0c9d20476a04a1b92",
+      "bytes": 1904
+    },
+    {
+      "path": "/tmp/motion-server-method-admission-cost-delta-20261001T1940Z/evidence/after-cost/probe.mjs",
+      "sha256": "ac0e56f496a843bc68c83a78ade835e44e37fc432190dfd2eae2de5fd037b030",
+      "bytes": 3591
+    },
+    {
+      "path": "/tmp/motion-server-method-admission-cost-delta-20261001T1940Z/evidence/before-cost/acquired-steps.ndjson",
+      "sha256": "57430045d12794c4f6adf9dc6bd7d82dd23af3945bcc75b451464b372b6edb62",
+      "bytes": 1405
+    },
+    {
+      "path": "/tmp/motion-server-method-admission-cost-delta-20261001T1940Z/evidence/before-cost/before.cpuprofile",
+      "sha256": "5bda8ea309ff5f6b914697b71a520ea117757880200bf3018b4f0fe43e068f20",
+      "bytes": 357402
+    },
+    {
+      "path": "/tmp/motion-server-method-admission-cost-delta-20261001T1940Z/evidence/before-cost/exact-test-callback.ts",
+      "sha256": "7d1e66d88568f137f5831ed9cc52b38375587dc13673a6fd6faf29eaaa5977db",
+      "bytes": 1701
+    },
+    {
+      "path": "/tmp/motion-server-method-admission-cost-delta-20261001T1940Z/evidence/before-cost/execution.json",
+      "sha256": "326190e7caa12f8a90b972018888c8b9ea0a3d5339a6ff76bf32463c2321d0c9",
+      "bytes": 2084
+    },
+    {
+      "path": "/tmp/motion-server-method-admission-cost-delta-20261001T1940Z/evidence/before-cost/fixtures.mjs",
+      "sha256": "5cff5e0655230dc7b4329f5635025f84de0be51df40d4deaf4e0cc44d2515ae8",
+      "bytes": 18704
+    },
+    {
+      "path": "/tmp/motion-server-method-admission-cost-delta-20261001T1940Z/evidence/before-cost/probe-result.json",
+      "sha256": "bb450cdfadcbcd2618de96d61fc9a585fa908cde8ec59c82e88a8cd90c1a136d",
+      "bytes": 2784
+    },
+    {
+      "path": "/tmp/motion-server-method-admission-cost-delta-20261001T1940Z/evidence/before-cost/probe.log",
+      "sha256": "24536b97e5fb6dd4d2ac86564c758d7cbd06b851ee99557c7b6f8eb5bd58b321",
+      "bytes": 1916
+    },
+    {
+      "path": "/tmp/motion-server-method-admission-cost-delta-20261001T1940Z/evidence/before-cost/probe.mjs",
+      "sha256": "6cfe0c4e943ce03b38e51661fb76d8907ea8d7a428ba672fea75c252ce848e44",
+      "bytes": 3575
+    },
+    {
+      "path": "/tmp/motion-server-method-admission-cost-delta-20261001T1940Z/evidence/differential/after-correction.json",
+      "sha256": "2cffd68ce68744d8c213c9f3375c5067daa2730c497ea9f3ef4cc47eb2118c3a",
+      "bytes": 35464
+    },
+    {
+      "path": "/tmp/motion-server-method-admission-cost-delta-20261001T1940Z/evidence/differential/array-walk-correction.json",
+      "sha256": "20eeda80093cfcf08815d6fd825a9be4111dd97974b42ed58b045836ee10fceb",
+      "bytes": 35464
+    },
+    {
+      "path": "/tmp/motion-server-method-admission-cost-delta-20261001T1940Z/evidence/differential/before-correction.json",
+      "sha256": "524cac8b2e3f94b7f34fb015b0bd7067c3d9ce156f89565132d2a56b39af6523",
+      "bytes": 35732
+    },
+    {
+      "path": "/tmp/motion-server-method-admission-cost-delta-20261001T1940Z/evidence/differential/bounded-stream-correction.json",
+      "sha256": "a2d58393ded2d2210d6351cceecbf3a1fec7fe32fccd7d968a85e180580fee50",
+      "bytes": 35464
+    },
+    {
+      "path": "/tmp/motion-server-method-admission-cost-delta-20261001T1940Z/evidence/differential/final-expanded-node22.json",
+      "sha256": "5849d77858fe7fc3e9d8811458bcdf19fc242b7592c398081f7758ad609bdf08",
+      "bytes": 41970
+    },
+    {
+      "path": "/tmp/motion-server-method-admission-cost-delta-20261001T1940Z/evidence/differential/final-expanded.json",
+      "sha256": "570e04f893352f850084ed0024e8ac375383658225c4a0ef8d1f9c149277554e",
+      "bytes": 41971
+    },
+    {
+      "path": "/tmp/motion-server-method-admission-cost-delta-20261001T1940Z/evidence/differential/probe.mjs",
+      "sha256": "0910f857b1801d40f97dc3f942929164fdee95cc2a60cafa99d3a708aeef7520",
+      "bytes": 9467
+    },
+    {
+      "path": "/tmp/motion-server-method-admission-cost-delta-20261001T1940Z/evidence/rejected-array-walk/acquired-steps.ndjson",
+      "sha256": "60273cc7b10c7f6500851ae4fff5583a087e344c5b0c23032417e7c80b0864d0",
+      "bytes": 1411
+    },
+    {
+      "path": "/tmp/motion-server-method-admission-cost-delta-20261001T1940Z/evidence/rejected-array-walk/after.cpuprofile",
+      "sha256": "a37d9716388d9ffaa7fe4a489e6fbf70642dbf48544245822d04643e29d0b013",
+      "bytes": 450598
+    },
+    {
+      "path": "/tmp/motion-server-method-admission-cost-delta-20261001T1940Z/evidence/rejected-array-walk/execution.json",
+      "sha256": "6aca24c60b0f4b4b3ce04d2424218757359afee036250f9d3ff8d5baaa30a4bb",
+      "bytes": 2362
+    },
+    {
+      "path": "/tmp/motion-server-method-admission-cost-delta-20261001T1940Z/evidence/rejected-array-walk/probe-result.json",
+      "sha256": "4c5cdcaa7c416844df09f82ac420ea37d1faf4e70b9643f2ee99c8afdbc50ad7",
+      "bytes": 2790
+    },
+    {
+      "path": "/tmp/motion-server-method-admission-cost-delta-20261001T1940Z/evidence/rejected-array-walk/probe.log",
+      "sha256": "ae5329226f9056050ba7252defc58e1f9b7eb78f4a6d37767d43dd54621f5ca4",
+      "bytes": 1922
+    },
+    {
+      "path": "/tmp/motion-server-method-admission-cost-delta-20261001T1940Z/evidence/rejected-array-walk/probe.mjs",
+      "sha256": "406e5eae467b160aba81f9dbab60886bcceb0cea89d209610219d9dd142232d5",
+      "bytes": 3587
+    },
+    {
+      "path": "/tmp/motion-server-method-admission-cost-delta-20261001T1940Z/evidence/rejected-array-walk/rejected-contract.mjs",
+      "sha256": "1b7dedc6f28d18032a28f1cbfde73bac0996a8a503047bedbfc06ec42fa25201",
+      "bytes": 70139
+    },
+    {
+      "path": "/tmp/motion-server-method-admission-cost-delta-20261001T1940Z/evidence/rejected-projection/acquired-steps.ndjson",
+      "sha256": "e9e9d844351e3590a1ba04d4d5d80db5d077eb4dd5d6441e726c28151bb590fe",
+      "bytes": 1398
+    },
+    {
+      "path": "/tmp/motion-server-method-admission-cost-delta-20261001T1940Z/evidence/rejected-projection/after.cpuprofile",
+      "sha256": "8fa3a975b3d592222f922ca7d72c8e10baa0bfe6eaecaea0b03f44d91f606075",
+      "bytes": 469473
+    },
+    {
+      "path": "/tmp/motion-server-method-admission-cost-delta-20261001T1940Z/evidence/rejected-projection/execution.json",
+      "sha256": "ed5ba4286ae13de42be6d27f316ac114543fe0b9b6303cd4d5c6cc38f46948dc",
+      "bytes": 2340
+    },
+    {
+      "path": "/tmp/motion-server-method-admission-cost-delta-20261001T1940Z/evidence/rejected-projection/probe-result.json",
+      "sha256": "aee81e7b57b4951fc7cc55bd50d05133efbad4ca1aba999ffe569d74efccdae6",
+      "bytes": 2777
+    },
+    {
+      "path": "/tmp/motion-server-method-admission-cost-delta-20261001T1940Z/evidence/rejected-projection/probe.log",
+      "sha256": "17c228c8ccb7085c666adbe84ec30e047348529de21efff4a306d92f5bd91cbb",
+      "bytes": 1909
+    },
+    {
+      "path": "/tmp/motion-server-method-admission-cost-delta-20261001T1940Z/evidence/rejected-projection/probe.mjs",
+      "sha256": "b91643d1fa1990210f57a3c02dfa82a3e7e96520b7790cd543f1aa32088528cc",
+      "bytes": 3576
+    },
+    {
+      "path": "/tmp/motion-server-method-admission-cost-delta-20261001T1940Z/evidence/rejected-projection/rejected-contract.mjs",
+      "sha256": "7f12106c1470ca8b7ad2649c46e18da44f183d3164cc1f05073a9e8aba48eff3",
+      "bytes": 69941
+    },
+    {
+      "path": "/tmp/motion-server-method-admission-cost-delta-20261001T1940Z/evidence/remote-red/job-110513093345.log",
+      "sha256": "e8c8854ca876107b520037109833f6b61fcd2e485462b6c670e6d881e97df330",
+      "bytes": 197420
+    },
+    {
+      "path": "/tmp/motion-server-method-admission-cost-delta-20261001T1940Z/evidence/remote-red/primary-receipt.json",
+      "sha256": "b08bd25ebdd15e9f1975afb920c5cb2bda9c7ea7e6bf33d6b3f8fb6dc6afde8a",
+      "bytes": 789
+    },
+    {
+      "path": "/tmp/motion-server-method-admission-cost-delta-20261001T1940Z/evidence/root-only-affected/dependency-environment.json",
+      "sha256": "fe4b5593fa89413ca2c502f9625964f46e172aa8375032e8f43d27755a1af9d4",
+      "bytes": 3603
+    },
+    {
+      "path": "/tmp/motion-server-method-admission-cost-delta-20261001T1940Z/evidence/root-only-affected/execution.json",
+      "sha256": "39170c06055f58dc5c58548336aebfcdb7fb164d015b172b3de51793adb05aa8",
+      "bytes": 1054
+    },
+    {
+      "path": "/tmp/motion-server-method-admission-cost-delta-20261001T1940Z/evidence/root-only-affected/summary.json",
+      "sha256": "ae14794ebc344f81b857140fcd5f3811676530b020dfe62b29c9dd1eb5ed2e70",
+      "bytes": 725
+    },
+    {
+      "path": "/tmp/motion-server-method-admission-cost-delta-20261001T1940Z/evidence/root-only-affected/vitest.json",
+      "sha256": "aae576812b810331df7f40477ba6be950bfcd750eb205a5ecf5a471c779ef89d",
+      "bytes": 96682
+    },
+    {
+      "path": "/tmp/motion-server-method-admission-cost-delta-20261001T1940Z/evidence/root-only-affected/vitest.log",
+      "sha256": "7fa442e21a9735a1c1ce2a59f9384bc4d53e12317f18ff14fa15f5d487220165",
+      "bytes": 84
+    },
+    {
+      "path": "/tmp/motion-server-method-admission-cost-delta-20261001T1940Z/motion-ci-root-only-cost-affected-checks.py",
+      "sha256": "8394c9dd6b527f93f210190d1a75b4d640e9b5718d39d6d216e127632054f8f9",
+      "bytes": 3800
+    },
+    {
+      "path": "/tmp/motion-server-method-admission-cost-delta-20261001T1940Z/motion-server-ci-cost-after-bounded-stream-20261001.py",
+      "sha256": "aee6bce5c63d4bdf332e6537546d65fe0526cad06378a77eb84aee22c659e369",
+      "bytes": 2467
+    },
+    {
+      "path": "/tmp/motion-server-method-admission-cost-delta-20261001T1940Z/old-contract.mjs",
+      "sha256": "6bdbe03b9837ba2dd1959963f02fd0434597e9839a82d95e31b7ba738b9f5d1b",
+      "bytes": 64246
+    },
+    {
+      "path": "/tmp/motion-server-method-admission-cost-delta-20261001T1940Z/source-and-checks.json",
+      "sha256": "9378f6786aa2e5c631018580048345f82fb74855e7b8138d759f45c489960333",
+      "bytes": 162194
+    },
+    {
+      "path": "/tmp/motion-server-method-admission-cost-delta-20261001T1940Z/source.tar.gz",
+      "sha256": "8cfd15a20fe299e785635fa5422ecbfe6d404c13138cc153bc922136f7bbbe48",
+      "bytes": 1749049
+    },
+    {
+      "path": "/tmp/server-method-second-order-stock-c-20261001T172036Z/norm-binding.json",
+      "sha256": "55dd5aeef48ebf2db07dffae3edbbce77be30eb6c88dffe601018dd4efcb82a8",
+      "bytes": 3975
+    },
+    {
+      "path": "/tmp/server-method-second-order-stock-c-20261001T172036Z/server-profile-contract-doc.md",
+      "sha256": "91258e617cae480dbc80db857076ac340c35b00e5cbe026916fa8f5cc4e82b99",
+      "bytes": 26339
+    }
+  ],
+  "scope": "Affected serialization/hash/cost closure only; current hosted CI remains required. No future source or actual performance admission.",
+  "actualRegisteredTimingSamples": 0
+}

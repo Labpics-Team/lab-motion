@@ -1,0 +1,80 @@
+{
+  "observedAt": "2026-10-01T20:13:18.324214+00:00",
+  "predataTuple": "/tmp/motion-server-predata-7f9b85d8-7016c19a-20261001/predata-tuple.json",
+  "tupleSha256": "931e2c7b1625f5b1aa98fb7057d4980aee852c622c07d8f28b394fbd7a49189d",
+  "hashVerified": [
+    {
+      "path": "/tmp/motion-server-predata-7f9b85d8-7016c19a-20261001/predata-tuple.json",
+      "sha256": "931e2c7b1625f5b1aa98fb7057d4980aee852c622c07d8f28b394fbd7a49189d",
+      "bytes": 38360
+    },
+    {
+      "path": "/tmp/motion-server-predata-7f9b85d8-7016c19a-20261001/predata-tuple.sha256",
+      "sha256": "e5ef39af4f0a79e6e576fb2b9bc488905b57e22732f5fe3acf69cce39f7164ac",
+      "bytes": 85
+    },
+    {
+      "path": "/tmp/motion-server-predata-7f9b85d8-7016c19a-20261001/preparation-affinity-failure-execution.json",
+      "sha256": "6f5f05fffb66350679e5d66138bfe7b2252775e709727601141bb20d98df49c4",
+      "bytes": 1091
+    },
+    {
+      "path": "/tmp/motion-server-predata-7f9b85d8-7016c19a-20261001/preparation-affinity-failure.stderr",
+      "sha256": "4f1dbbb93b1d8482aff1253b5d503148f7406842ce50ccb197e76279e141cfe5",
+      "bytes": 601
+    },
+    {
+      "path": "/tmp/motion-server-predata-7f9b85d8-7016c19a-20261001/preparation-affinity-failure.stdout",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "bytes": 0
+    },
+    {
+      "path": "/tmp/motion-server-predata-7f9b85d8-7016c19a-20261001/preparation-execution.json",
+      "sha256": "a7e5b2ad78d198c61c0d3587b7b33978a948f3469cdfed25d208d860e71f39cd",
+      "bytes": 1055
+    },
+    {
+      "path": "/tmp/motion-server-predata-7f9b85d8-7016c19a-20261001/preparation-pnpm-failure-tool-output.json",
+      "sha256": "7b97209bf7378f8e95111d90ecfb79fdb97db5cf78c7bfba61e019c4f009ca9b",
+      "bytes": 1058
+    },
+    {
+      "path": "/tmp/motion-server-predata-7f9b85d8-7016c19a-20261001/preparation.stderr",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "bytes": 0
+    },
+    {
+      "path": "/tmp/motion-server-predata-7f9b85d8-7016c19a-20261001/preparation.stdout",
+      "sha256": "ed9aeb03ba981793d5640a8e151f59be0e17da76a131154a096954f6ae906ddd",
+      "bytes": 365
+    },
+    {
+      "path": "/tmp/motion-server-predata-7f9b85d8-7016c19a-20261001/prepare.mjs",
+      "sha256": "e42140b7e813280a43170d918fc7c4685ece01427beef94008cc18a1484bfde8",
+      "bytes": 8097
+    }
+  ],
+  "source": "7f9b85d82bdf531455a8eb0fae4406484205ef83",
+  "protocol": "7016c19aa7a763fee68687327ef489abb119acd2a43d397b8485ca56e4cea15f",
+  "clock": "7e45adab88a2c97af4e9074543318ae115e42b5c9669c4746b6e149d42bfbc4f",
+  "plannedInvocation": [
+    "taskset",
+    "-c",
+    "0",
+    "/opt/codex/runtimes/codex-primary-runtime/dependencies/node/bin/node",
+    "bench/profile/server-profile-runner.mjs",
+    "--baseline",
+    "/tmp/motion-server-baseline-0b6f537e",
+    "--candidate",
+    "/workspace/lab-motion",
+    "--browser",
+    "chromium",
+    "--out",
+    "/tmp/motion-server-series-7f9b85d8-7016c19a-20261001-epoch4"
+  ],
+  "ownerHashesMatched": true,
+  "outputAbsent": true,
+  "hold": true,
+  "requiresFreshResourcesAndCurrentCIReviewAndQuietACK": true,
+  "actualRegisteredTimingSamples": 0
+}

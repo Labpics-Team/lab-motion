@@ -1,0 +1,182 @@
+{
+  "observedAt": "2026-10-01T19:57:34.532722+00:00",
+  "source": "7f9b85d82bdf531455a8eb0fae4406484205ef83",
+  "manifestSha256": "ecadb1c2dc16d47aa62da07ae10db4472dd2b8bd1e93b500c2207dbfa1f1db88",
+  "checks": [
+    {
+      "name": "static",
+      "head": "7f9b85d82bdf531455a8eb0fae4406484205ef83",
+      "command": [
+        "pnpm",
+        "check:static"
+      ],
+      "startedAt": "2026-10-01T19:51:49.067700+00:00",
+      "endedAt": "2026-10-01T19:52:00.509937+00:00",
+      "exitCode": 0
+    },
+    {
+      "name": "docs-facts",
+      "head": "7f9b85d82bdf531455a8eb0fae4406484205ef83",
+      "command": [
+        "node",
+        "scripts/check-docs-facts.mjs"
+      ],
+      "startedAt": "2026-10-01T19:52:00.510415+00:00",
+      "endedAt": "2026-10-01T19:52:00.553281+00:00",
+      "exitCode": 0
+    },
+    {
+      "name": "docs-drift",
+      "head": "7f9b85d82bdf531455a8eb0fae4406484205ef83",
+      "command": [
+        "node",
+        "scripts/check-docs-drift.mjs"
+      ],
+      "startedAt": "2026-10-01T19:52:00.553612+00:00",
+      "endedAt": "2026-10-01T19:52:00.604696+00:00",
+      "exitCode": 0
+    },
+    {
+      "name": "syntax",
+      "head": "7f9b85d82bdf531455a8eb0fae4406484205ef83",
+      "command": [
+        "node",
+        "--check",
+        "bench/profile/server-profile-contract.mjs"
+      ],
+      "startedAt": "2026-10-01T19:52:00.605159+00:00",
+      "endedAt": "2026-10-01T19:52:00.630105+00:00",
+      "exitCode": 0
+    },
+    {
+      "name": "ordinary",
+      "head": "7f9b85d82bdf531455a8eb0fae4406484205ef83",
+      "command": [
+        "pnpm",
+        "exec",
+        "vitest",
+        "run",
+        "--reporter=json",
+        "--outputFile=/tmp/motion-admission-cost-combined-7f9b85d8-gates-20261001/ordinary.json"
+      ],
+      "startedAt": "2026-10-01T19:52:00.630365+00:00",
+      "endedAt": "2026-10-01T19:53:43.511090+00:00",
+      "exitCode": 0
+    },
+    {
+      "name": "finiteness",
+      "head": "7f9b85d82bdf531455a8eb0fae4406484205ef83",
+      "command": [
+        "pnpm",
+        "vitest",
+        "run",
+        "--reporter=verbose",
+        "test/animate-facade-finiteness-fuzz.test.ts",
+        "test/animate-overflow-finiteness-fuzz.test.ts",
+        "test/behaviors-finiteness-fuzz.test.ts",
+        "test/decay-finiteness-fuzz.test.ts",
+        "test/easing-finiteness-fuzz.test.ts",
+        "test/projection-finiteness-fuzz.test.ts",
+        "test/smart-finiteness-fuzz.test.ts",
+        "test/solver-finiteness-fuzz.test.ts",
+        "test/timeline-finiteness-fuzz.test.ts",
+        "test/utils-finiteness-fuzz.test.ts"
+      ],
+      "startedAt": "2026-10-01T19:53:43.511495+00:00",
+      "endedAt": "2026-10-01T19:53:50.854936+00:00",
+      "exitCode": 0
+    }
+  ],
+  "ordinaryPassedTests": 4926,
+  "failed": 0,
+  "skipped": 0,
+  "hashVerified": [
+    {
+      "path": "/tmp/motion-admission-cost-combined-7f9b85d8-gates-20261001/docs-drift.exit",
+      "bytes": 2,
+      "sha256": "9a271f2a916b0b6ee6cecb2426f0b3206ef074578be55d9bc94f6f3fe3ab86aa"
+    },
+    {
+      "path": "/tmp/motion-admission-cost-combined-7f9b85d8-gates-20261001/docs-drift.log",
+      "bytes": 218,
+      "sha256": "4437b7385139583741ad88edbb67528fedc3fabce8beb61947a5bcc384bad4be"
+    },
+    {
+      "path": "/tmp/motion-admission-cost-combined-7f9b85d8-gates-20261001/docs-facts.exit",
+      "bytes": 2,
+      "sha256": "9a271f2a916b0b6ee6cecb2426f0b3206ef074578be55d9bc94f6f3fe3ab86aa"
+    },
+    {
+      "path": "/tmp/motion-admission-cost-combined-7f9b85d8-gates-20261001/docs-facts.log",
+      "bytes": 23,
+      "sha256": "d3b534c5348e15bf96aadf4f5a210761809cc2829415d4fd9015117c41a69d0f"
+    },
+    {
+      "path": "/tmp/motion-admission-cost-combined-7f9b85d8-gates-20261001/environment.json",
+      "bytes": 1250,
+      "sha256": "8164f64c24cdcdf302498c79877fe4a4b51e7664de173960df37ac01f2d9ef56"
+    },
+    {
+      "path": "/tmp/motion-admission-cost-combined-7f9b85d8-gates-20261001/execution.json",
+      "bytes": 2354,
+      "sha256": "0d4412190e0bd5998cca0c2ba172395e9bd88cb9fb1bd68445c2254ab6692ee5"
+    },
+    {
+      "path": "/tmp/motion-admission-cost-combined-7f9b85d8-gates-20261001/final-source.json",
+      "bytes": 603,
+      "sha256": "8d7af3b2158c14db9791bf334666480e1c4f632fbbb3aa822f69b52822c7e581"
+    },
+    {
+      "path": "/tmp/motion-admission-cost-combined-7f9b85d8-gates-20261001/finiteness.exit",
+      "bytes": 2,
+      "sha256": "9a271f2a916b0b6ee6cecb2426f0b3206ef074578be55d9bc94f6f3fe3ab86aa"
+    },
+    {
+      "path": "/tmp/motion-admission-cost-combined-7f9b85d8-gates-20261001/finiteness.log",
+      "bytes": 20365,
+      "sha256": "ec3bfd5dce13b8e1d1a6b51563bb6cd48fa5e4d052bfc424905b968645fd15db"
+    },
+    {
+      "path": "/tmp/motion-admission-cost-combined-7f9b85d8-gates-20261001/initial-source.json",
+      "bytes": 232,
+      "sha256": "51ce4bf0007411833dc8424caf20986eda75476ff6a6987feb35f93618d2469a"
+    },
+    {
+      "path": "/tmp/motion-admission-cost-combined-7f9b85d8-gates-20261001/ordinary.exit",
+      "bytes": 2,
+      "sha256": "9a271f2a916b0b6ee6cecb2426f0b3206ef074578be55d9bc94f6f3fe3ab86aa"
+    },
+    {
+      "path": "/tmp/motion-admission-cost-combined-7f9b85d8-gates-20261001/ordinary.json",
+      "bytes": 2099213,
+      "sha256": "0239b4fde396bd798e95f17a07a7e79d3ee542ca579802d9690240006a770d3f"
+    },
+    {
+      "path": "/tmp/motion-admission-cost-combined-7f9b85d8-gates-20261001/ordinary.log",
+      "bytes": 509,
+      "sha256": "2bc9cbeed4ef163ebd1a649de2ab9ad7bd1b8bd37072d0c77ce604092dd37bae"
+    },
+    {
+      "path": "/tmp/motion-admission-cost-combined-7f9b85d8-gates-20261001/static.exit",
+      "bytes": 2,
+      "sha256": "9a271f2a916b0b6ee6cecb2426f0b3206ef074578be55d9bc94f6f3fe3ab86aa"
+    },
+    {
+      "path": "/tmp/motion-admission-cost-combined-7f9b85d8-gates-20261001/static.log",
+      "bytes": 768,
+      "sha256": "964d492573bd5e47284778ef883e21cb6108eb1119585731819673521e104778"
+    },
+    {
+      "path": "/tmp/motion-admission-cost-combined-7f9b85d8-gates-20261001/syntax.exit",
+      "bytes": 2,
+      "sha256": "9a271f2a916b0b6ee6cecb2426f0b3206ef074578be55d9bc94f6f3fe3ab86aa"
+    },
+    {
+      "path": "/tmp/motion-admission-cost-combined-7f9b85d8-gates-20261001/syntax.log",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    }
+  ],
+  "currentHostedCIRequired": true,
+  "actualRegisteredTimingSamples": 0
+}

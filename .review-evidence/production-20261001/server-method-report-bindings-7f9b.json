@@ -1,0 +1,107 @@
+{
+  "schema": 1,
+  "createdAt": "2026-10-01T20:37:27.433748+00:00",
+  "artifactParent": "13a1f35d21c185bf3badba8c12c07dce0268af15",
+  "sourceRepository": "Labpics-Team/lab-motion",
+  "sourceHead": "7f9b85d82bdf531455a8eb0fae4406484205ef83",
+  "reportFiles": [
+    {
+      "path": ".review-evidence/production-20261001/server-method-measurement-11ab.md",
+      "original": "/tmp/server-method-measurement-stock-c-11ab-20261001/REPORT-RU.md",
+      "sha256": "b953f57e2fcf03acdec638138ba30c5ef54861bb5169f4b46737732db01f1d2c",
+      "bytes": 25863
+    },
+    {
+      "path": ".review-evidence/production-20261001/server-method-second-order-11ab.md",
+      "original": "/tmp/server-method-second-order-stock-c-20261001T172036Z/REPORT.md",
+      "sha256": "194d7a939293a6137a8f76c77c3ce00490efe012975b532eb8d58bfd8ff75505",
+      "bytes": 19256
+    },
+    {
+      "path": ".review-evidence/production-20261001/server-method-measurement-8f45.md",
+      "original": "/tmp/server-method-measurement-dependency-8f45-20261001/REPORT-RU.md",
+      "sha256": "3ff34ad329f0b5afb03cb8be202914135dcd5ceee7d0a31e8e8ca7d3175f5c2d",
+      "bytes": 15311
+    },
+    {
+      "path": ".review-evidence/production-20261001/server-method-second-order-8f45.md",
+      "original": "/tmp/server-method-second-order-dependency-20261001T1806Z/REPORT.md",
+      "sha256": "4c6847bbca954af159b45c5cedcfe4b87a3baa518ceb4e7832f7b9fa94390753",
+      "bytes": 14211
+    },
+    {
+      "path": ".review-evidence/production-20261001/server-method-measurement-7f9b.md",
+      "original": "/tmp/server-method-measurement-admission-7f9b-20261001/REPORT-RU.md",
+      "sha256": "7f0a6b3ee91a14a0fe679eeea3db02f0a17b6db058feabb89583b8257d548462",
+      "bytes": 22125
+    },
+    {
+      "path": ".review-evidence/production-20261001/server-method-second-order-7f9b.md",
+      "original": "/tmp/server-method-second-order-admission-cost-20261001T1940Z/REPORT.md",
+      "sha256": "89362193404b1e337f074c4a4608a95d3cc5e0e2f579afd03b0591d51fdae12d",
+      "bytes": 18282
+    },
+    {
+      "path": ".review-evidence/production-20261001/server-method-measurement-11ab-root-readback.json",
+      "original": "/workspace/scratch/motion-method-11ab-measurement-root-readback-20261001.json",
+      "sha256": "d75fd18291ce06ac229dcb7363b749c33fd31b2d9cb04b66be536c344fc01501",
+      "bytes": 204073
+    },
+    {
+      "path": ".review-evidence/production-20261001/server-method-second-order-11ab-root-readback.json",
+      "original": "/workspace/scratch/motion-method-11ab-so-root-readback-20261001.json",
+      "sha256": "04d7f335f6a5adc31b2d3789f9662b37cf2d80fdfb3aba4f76fdc8a15bc151e0",
+      "bytes": 229718
+    },
+    {
+      "path": ".review-evidence/production-20261001/server-method-measurement-8f45-root-readback.json",
+      "original": "/workspace/scratch/motion-method-8f45-measurement-root-readback-20261001.json",
+      "sha256": "e29470553bd276fc39b70e165b5c16383494b297282f788df90c2d950a49423f",
+      "bytes": 207922
+    },
+    {
+      "path": ".review-evidence/production-20261001/server-method-second-order-8f45-root-readback.json",
+      "original": "/workspace/scratch/motion-method-8f45-so-root-readback-20261001.json",
+      "sha256": "f56eb65b4521ef5aee72d36ee8a0a5155e97267ae3fd1d8e2007da2773071b1a",
+      "bytes": 25569
+    },
+    {
+      "path": ".review-evidence/production-20261001/server-method-measurement-7f9b-root-readback.json",
+      "original": "/workspace/scratch/motion-method-7f9b-measurement-root-readback-20261001.json",
+      "sha256": "d0b27d2ed3807d6e14b1f783792978fec271244c24029130abc292c830ae9a86",
+      "bytes": 221959
+    },
+    {
+      "path": ".review-evidence/production-20261001/server-method-second-order-7f9b-root-readback.json",
+      "original": "/workspace/scratch/motion-method-7f9b-so-root-readback-20261001.json",
+      "sha256": "60a4f4fa63d730c88fad5c7ae277a289c0f8aa3041e65ea575d17bf8d64436f1",
+      "bytes": 34141
+    },
+    {
+      "path": ".review-evidence/production-20261001/server-predata-epoch4.json",
+      "original": "/tmp/motion-server-predata-7f9b85d8-7016c19a-20261001/predata-tuple.json",
+      "sha256": "931e2c7b1625f5b1aa98fb7057d4980aee852c622c07d8f28b394fbd7a49189d",
+      "bytes": 38360
+    },
+    {
+      "path": ".review-evidence/production-20261001/server-predata-epoch4-root-readback.json",
+      "original": "/workspace/scratch/motion-predata-epoch4-root-metadata-readback-20261001.json",
+      "sha256": "e2a428d099f72f1f03725dcc6caae47c451f5d1e41400382975c46d998647a79",
+      "bytes": 3201
+    },
+    {
+      "path": ".review-evidence/production-20261001/source-gates-7f9b-manifest.json",
+      "original": "/tmp/motion-admission-cost-combined-7f9b85d8-gates-20261001/manifest.json",
+      "sha256": "ecadb1c2dc16d47aa62da07ae10db4472dd2b8bd1e93b500c2207dbfa1f1db88",
+      "bytes": 5180
+    },
+    {
+      "path": ".review-evidence/production-20261001/source-gates-7f9b-root-readback.json",
+      "original": "/workspace/scratch/motion-7f9b-current-local-gates-root-readback-20261001.json",
+      "sha256": "03ae546087cde3dbeff98aed6fd01089ed934cacbd73a7b5e79cb97700d94728",
+      "bytes": 6417
+    }
+  ],
+  "actualRegisteredTimingSamples": 0,
+  "scope": "Буквальные полные отчёты и квитанции разных закреплённых эпох; области допуска остаются исходными. Прежние отказы сохранены. Подготовленная среда и локальные проверки не удостоверяют фактическую производительность или выпуск."
+}
