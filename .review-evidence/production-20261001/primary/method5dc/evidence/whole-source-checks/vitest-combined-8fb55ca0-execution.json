@@ -1,0 +1,15 @@
+{
+  "head": "8fb55ca0a116e5381a43351ab28834d17a4a9299",
+  "command": [
+    "pnpm",
+    "vitest",
+    "run",
+    "--reporter=verbose",
+    "--reporter=json",
+    "--outputFile=/workspace/lab-motion/scratchpad/vitest-combined-8fb55ca0.json"
+  ],
+  "cwd": "/workspace/lab-motion",
+  "startedAt": "2026-10-01T13:59:10.442210+00:00",
+  "exitCode": 0,
+  "endedAt": "2026-10-01T14:01:07.855867+00:00"
+}

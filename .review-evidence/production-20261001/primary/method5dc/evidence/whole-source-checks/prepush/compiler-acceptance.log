@@ -1,0 +1,11 @@
+Already up to date
+Done in 482ms using pnpm v11.11.0
+$ node scripts/compiler-acceptance.mjs
+  размер: uncompiled 1175 B gz → compiled 815 B gz (−360 B, −30.6%)
+  no-op контроль: динамическая opacity сохранила рантаймовый путь (nano/index.js)
+  граф compiled: compiler/runtime/index.js
+  surface lowering: uncompiled 16654 B gz → compiled 2236 B gz (−14418 B, −86.6%; executor 961/1024 B gz, total-решётка 2470 B gz)
+  граф compiled surface: compiler/surface/index.js
+  surface no-op контроль: динамические концы и onFrame сохранили рантаймовый путь
+  TypeScript acceptance: TS и TSX нижатся дефолтной фазой Vite
+compiler-acceptance: PASS — solver/parser/compiler элиминированы из бандла потребителя

@@ -1,0 +1,8 @@
+{
+  "source": "/workspace/scratch/server-method-measurement-closure-5dc049-20261001/snapshot/evidence/frame-first-publication-closure/current-fixtures.mjs",
+  "sourceSha256": "048db61a51eba7972068083601190eb135720ad0932b7f19bd144fa6859dee96",
+  "target": "/workspace/scratch/server-method-measurement-closure-5dc049-20261001/fixture-local.mjs",
+  "targetSha256": "b0708cb5086820ce188d9942512dbd42d809b1f5f467352a547a29eb455a9161",
+  "transformation": "primary fixture prefix only; imports rebound to verified immutable source; appended exports; no author synthetic browser used",
+  "actualRegisteredTimingSamples": 0
+}

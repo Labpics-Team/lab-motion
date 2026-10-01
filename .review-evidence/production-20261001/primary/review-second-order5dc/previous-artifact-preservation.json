@@ -1,0 +1,48 @@
+{
+  "schema": 1,
+  "files": [
+    {
+      "path": "/workspace/scratch/server-method-second-order-final-20261001/REPORT.md",
+      "role": "own unchanged historical artifact",
+      "reviewScope": "own historical context/readset/probes only; no old acceptance transfer",
+      "sha256": "027451739fb5fcfe31fa4f52aae8d7a8c962955de886c5acb4e7ba8a6b7d8cbd",
+      "bytes": 19455
+    },
+    {
+      "path": "/workspace/scratch/server-method-second-order-final-20261001/readset.json",
+      "role": "own unchanged historical artifact",
+      "reviewScope": "own historical context/readset/probes only; no old acceptance transfer",
+      "sha256": "e1030cce721ffcb25c66e631493dca7315bf34a90525373ee11b87fddf0a0e37",
+      "bytes": 18211
+    },
+    {
+      "path": "/workspace/scratch/server-method-second-order-final-20261001/evidence-manifest.json",
+      "role": "own unchanged historical artifact",
+      "reviewScope": "own historical context/readset/probes only; no old acceptance transfer",
+      "sha256": "29911170012f7230c6c7bc3a6a7bec322bc2df4c31d4363b0316ba3ec37a2226",
+      "bytes": 2279
+    },
+    {
+      "path": "/workspace/scratch/server-method-second-order-final-20261001/closure-105048Z/REPORT.md",
+      "role": "own unchanged historical artifact",
+      "reviewScope": "own historical context/readset/probes only; no old acceptance transfer",
+      "sha256": "b84bc09bee6b50c2eb2dbb2388041a9ead5a4495c8619f963ac0449ff4375d17",
+      "bytes": 19629
+    },
+    {
+      "path": "/workspace/scratch/server-method-second-order-final-20261001/closure-105048Z/readset.json",
+      "role": "own unchanged historical artifact",
+      "reviewScope": "own historical context/readset/probes only; no old acceptance transfer",
+      "sha256": "9772597cd25135fa38d900ea32089e08bd0ec893fae89d112537f48906aa0a5e",
+      "bytes": 32199
+    },
+    {
+      "path": "/workspace/scratch/server-method-second-order-final-20261001/closure-105048Z/evidence-manifest.json",
+      "role": "own unchanged historical artifact",
+      "reviewScope": "own historical context/readset/probes only; no old acceptance transfer",
+      "sha256": "d05e486cd27ee571a54b441efd266886500e96741b0f340da64fab44c3a212b8",
+      "bytes": 3174
+    }
+  ],
+  "allUnchanged": true
+}

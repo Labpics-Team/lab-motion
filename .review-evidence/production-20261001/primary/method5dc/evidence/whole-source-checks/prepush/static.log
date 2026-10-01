@@ -1,0 +1,13 @@
+Already up to date
+Done in 455ms using pnpm v11.11.0
+$ pnpm audit --audit-level moderate && pnpm check:native-gate && pnpm check:cycles && pnpm check:error-catalog && pnpm typecheck && pnpm typecheck:browser && pnpm typecheck:motion-program
+No known vulnerabilities found
+$ node scripts/check-native-gate.mjs
+native-gate: OK (шаг ci.yml)
+$ node scripts/check-import-cycles.mjs
+Циклы относительных runtime-импортов не обнаружены: 108 файлов, 224 связей.
+$ node scripts/check-error-catalog.mjs
+error-catalog: OK
+$ tsc --noEmit
+$ tsc --noEmit -p tsconfig.browser.json
+$ tsc -p tsconfig.motion-program.json

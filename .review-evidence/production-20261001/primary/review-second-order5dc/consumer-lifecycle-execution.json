@@ -1,0 +1,10 @@
+{
+  "command": [
+    "node",
+    "/workspace/scratch/server-method-second-order-final-20261001/closure-144242Z/consumer-lifecycle-probe.mjs"
+  ],
+  "startUtc": "2026-10-01T15:16:56.629299+00:00",
+  "endUtc": "2026-10-01T15:16:56.743487+00:00",
+  "exitCode": 0,
+  "stderr": ""
+}

@@ -1,0 +1,11 @@
+{
+  "command": [
+    "df",
+    "-B1",
+    "/workspace",
+    "/tmp"
+  ],
+  "capturedUtc": "2026-10-01T15:25:51.655118+00:00",
+  "exitCode": 0,
+  "scope": "instantaneous host free space; no durable storage admission"
+}

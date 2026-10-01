@@ -1,0 +1,8 @@
+{
+  "syntheticOnly": true,
+  "actualTimingSamples": 0,
+  "input": "/workspace/scratch/server-method-measurement-closure-16f31-20261001/snapshot/evidence/method-closure/new-synthetic-fixtures.mjs",
+  "inputSha256": "490883ce74329911267f1323dff2fecc72f75155b7a6fc989cb7220b3e3d9b42",
+  "outputSha256": "80ad04e994cfe6bc4460d66e2e238ae99ba0b7b95c564f12fa061d9cdeed5c53",
+  "transformation": "prefix before syntheticBrowser, snapshot imports, export primitive fixtures; no product logic mutation"
+}

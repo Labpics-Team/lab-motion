@@ -1,0 +1,44 @@
+{
+  "schema": 1,
+  "sealedUtc": "2026-10-01T15:54:46.999359+00:00",
+  "axis": "single-axis second-order SERVER METHOD affected closure",
+  "verdict": "PASS",
+  "confirmedFindings": 0,
+  "report": {
+    "path": "/workspace/scratch/server-method-second-order-final-20261001/closure-144242Z/REPORT.md",
+    "characters": 15488,
+    "sha256": "4f667948bdf5c249c2a12c0b918dc8a1757b8c909c5b1e50c32457b17f3bbdd0",
+    "bytes": 18995
+  },
+  "readset": {
+    "path": "/workspace/scratch/server-method-second-order-final-20261001/closure-144242Z/readset.json",
+    "sha256": "14130861498463e305ce75110ce45eb2863f1cce5f09330b5411bda4452c5c7e",
+    "bytes": 92213
+  },
+  "evidenceManifest": {
+    "path": "/workspace/scratch/server-method-second-order-final-20261001/closure-144242Z/evidence-manifest.json",
+    "sha256": "7ba97019fdeab0e8c855bf9ad0e5a3c1bcf47fa4813d161983a80b8a19783510",
+    "bytes": 19533
+  },
+  "immutablePacketManifest": {
+    "path": "/workspace/scratch/motion-server-method-final-20261001T144242Z/manifest.json",
+    "sha256": "cb650e2d18f89a7e67d24ec9facdfbef458b9f9e39da50e3b36b1d15636a1b56",
+    "bytes": 836745
+  },
+  "sourceBasisHead": "8fb55ca0a116e5381a43351ab28834d17a4a9299",
+  "protocolDigest": "00e8d5880eb83dd27a52f90cc670d4ecc550229458af039d9924485805c25431",
+  "clockModelDigest": "7e45adab88a2c97af4e9074543318ae115e42b5c9669c4746b6e149d42bfbc4f",
+  "actualRegisteredPerformanceSamples": 0,
+  "limitations": [
+    "no numerical/measurement acceptance",
+    "no general runtime/product qualification",
+    "provided synthetic full-N replay not independently repeated",
+    "actual dense storage/RSS/crash/durable retention not proven",
+    "future source/clock/protocol/workload/package tuples invalidate affected proof"
+  ],
+  "processes": "END",
+  "heavy": 0,
+  "frozenOrLiveSourceEdits": false,
+  "deliveryEffects": false,
+  "previousOwnArtifactsUnchanged": true
+}

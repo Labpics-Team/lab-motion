@@ -1,0 +1,31 @@
+{
+  "command": [
+    "python3",
+    "seal-current.py"
+  ],
+  "cwd": "/workspace/scratch/server-method-measurement-closure-5dc049-20261001",
+  "startedUtc": "2026-10-01T16:07:31.652600+00:00",
+  "finishedUtc": "2026-10-01T16:07:31.969943+00:00",
+  "exit_code": 0,
+  "stdout": "all identities bound; sources/raw/commands/report retained; primary packet excludes reviewer rationale; processes closed; chmod0444/0555 applied",
+  "stderr": "",
+  "outputManifest": {
+    "path": "output-manifest.json",
+    "sha256": "dd1a29a84f250a9cc567a1d7e89d151ab4db1beb1ef3124dc342dbfbb46cf17a",
+    "bytes": 276686
+  },
+  "report": {
+    "path": "REPORT-RU.md",
+    "sha256": "00bae364e9d0140dc72e3ed9411fa0a2f17ebde74d99d59a6307a4d9195d81fe",
+    "bytes": 20944
+  },
+  "primaryManifest": {
+    "path": "PRIMARY/PRIMARY-MANIFEST.json",
+    "sha256": "2a1c3c19527df9f31b9109d3a70476e9fc7b1b94430b1d2e67b02b528e3bd26b",
+    "bytes": 17088
+  },
+  "probeProcessesClosed": true,
+  "fifosRemain": false,
+  "actualRegisteredTimingSamples": 0,
+  "heavyEndUtc": "2026-10-01T15:38:46.291564+00:00"
+}

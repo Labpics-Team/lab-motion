@@ -1,0 +1,152 @@
+--- old/bench/profile/server-profile-contract.mjs
++++ new/bench/profile/server-profile-contract.mjs
+@@ -48,6 +48,14 @@
+   return { ...errorBounds(measuredMs, errorMs), measuredMs, errorMs };
+ }
+ 
++// В perf интервале общий origin сокращается. Сопоставление document frame
++// с perf API включает три coarsened timestamps: frame, now и origin.
++// Та же закреплённая модель даёт три endpoint envelopes и девять ULP;
++// это semantic relation, не изменение uncertainty измеряемых API costs.
++export function serverBrowserSemanticClockErrorMs(monotonicHostUpperNs) {
++  return nextUp(1.5 * serverBrowserClockBounds({ beginMs: 0, endMs: 0 }, monotonicHostUpperNs).errorMs);
++}
++
+ function compactCoordinates(values) {
+   if (!Array.isArray(values)) return values;
+   const runs = [];
+@@ -59,7 +67,7 @@
+ }
+ 
+ function expandCoordinates(values, count) {
+-  if (Array.isArray(values)) { invariant(values.length === count && values.every(Number.isFinite), 'неполные normal-motion coordinates'); return values; }
++  if (Array.isArray(values)) { invariant(values.length === count && Array.from(values).every(Number.isFinite), 'неполные normal-motion coordinates'); return values; }
+   invariant(values?.encoding === 'rle' && values.count === count && Array.isArray(values.runs) &&
+     isDeepStrictEqual(Object.keys(values).sort(), ['count', 'encoding', 'runs']), 'неполные normal-motion RLE coordinates');
+   const expanded = [];
+@@ -72,10 +80,32 @@
+   return expanded;
+ }
+ 
++function compactSemanticGroups(groups) {
++  if (!Array.isArray(groups)) return groups;
++  return groups.map((group) => group && typeof group === 'object' && !Array.isArray(group) && Object.hasOwn(group, 'positions')
++    ? { ...group, positions: compactCoordinates(group.positions) } : group);
++}
++
+ export function compactServerSemanticEvidence(evidence) {
+-  return { ...evidence, checkpoints: evidence.checkpoints.map((checkpoint) => ({ ...checkpoint,
+-    groups: checkpoint.groups.map((group) => ({ ...group, positions: compactCoordinates(group.positions) })) })),
+-  terminal: evidence.terminal.map(compactCoordinates) };
++  if (!evidence || typeof evidence !== 'object' || Array.isArray(evidence)) return evidence;
++  // Отказ сохраняет приобретённый prefix и дополнительные поля, без создания отсутствующих наблюдений.
++  const compact = { ...evidence };
++  if (Array.isArray(evidence.checkpoints)) compact.checkpoints = evidence.checkpoints.map((checkpoint) =>
++    checkpoint && typeof checkpoint === 'object' && !Array.isArray(checkpoint) && Object.hasOwn(checkpoint, 'groups')
++      ? { ...checkpoint, groups: compactSemanticGroups(checkpoint.groups) } : checkpoint);
++  if (Array.isArray(evidence.terminal)) compact.terminal = evidence.terminal.map(compactCoordinates);
++  if (evidence.onset && typeof evidence.onset === 'object' && !Array.isArray(evidence.onset)) {
++    compact.onset = { ...evidence.onset };
++    for (const phase of ['before', 'after']) {
++      if (Object.hasOwn(evidence.onset, phase)) compact.onset[phase] = compactSemanticGroups(evidence.onset[phase]);
++    }
++    if (Object.hasOwn(evidence.onset, 'firstFrame')) {
++      const first = evidence.onset.firstFrame;
++      compact.onset.firstFrame = first && typeof first === 'object' && !Array.isArray(first) && Object.hasOwn(first, 'groups')
++        ? { ...first, groups: compactSemanticGroups(first.groups) } : first;
++    }
++  }
++  return compact;
+ }
+ 
+ function validateNormalMotion(evidence, scene, monotonicHostUpperNs) {
+@@ -83,12 +113,34 @@
+   invariant(!evidence.failures?.length, 'normal-motion control потерял failure');
+   const calls = SERVER_PROFILE.browserSemanticCalls;
+   invariant(evidence.terminal.length === calls && evidence.checkpoints.length === 3, 'потерян normal-motion checkpoint/call');
+-  const expanded = { ...evidence, checkpoints: evidence.checkpoints.map((checkpoint) => {
++  invariant(evidence.onset && typeof evidence.onset === 'object' && !Array.isArray(evidence.onset), 'нет normal-motion onset observations');
++  const onset = { ...evidence.onset };
++  for (const phase of ['before', 'after']) {
++    invariant(Array.isArray(onset[phase]) && onset[phase].length === calls, `потеряна normal-motion onset ${phase} группа`);
++    onset[phase] = Array.from(onset[phase], (group) => {
++      invariant(group && typeof group === 'object' && !Array.isArray(group), `невалидная normal-motion onset ${phase} группа`);
++      return { ...group, positions: expandCoordinates(group.positions, scene.targetsPerCall) };
++    });
++  }
++  invariant(Number.isFinite(onset.firstFrame?.frameTimestampMs) && Array.isArray(onset.firstFrame.groups) &&
++    onset.firstFrame.groups.length === calls, 'нет normal-motion first publication');
++  onset.firstFrame = { ...onset.firstFrame, groups: onset.firstFrame.groups.map((group) => ({ ...group,
++    positions: expandCoordinates(group?.positions, scene.targetsPerCall) })) };
++  // Clock/zero/phase law принадлежит общему oracle; decoder восстанавливает каждый target.
++  const expanded = { ...evidence, onset, checkpoints: evidence.checkpoints.map((checkpoint) => {
+     invariant(Number.isFinite(checkpoint.frameTimestampMs), 'нет observed normal-motion frame timestamp');
+     invariant(Array.isArray(checkpoint.groups) && checkpoint.groups.length === calls, 'потеряна normal-motion группа');
+     return { ...checkpoint, groups: checkpoint.groups.map((group) => ({ ...group, positions: expandCoordinates(group.positions, scene.targetsPerCall) })) };
+   }), terminal: evidence.terminal.map((values) => expandCoordinates(values, scene.targetsPerCall)) };
+-  const semanticClockErrorMs = serverBrowserClockBounds({ beginMs: 0, endMs: 0 }, monotonicHostUpperNs).errorMs;
++  const semanticClockErrorMs = serverBrowserSemanticClockErrorMs(monotonicHostUpperNs);
++  const observedTimes = [...expanded.callStartedAtMs, expanded.onset.firstFrame.frameTimestampMs,
++    ...expanded.onset.firstFrame.groups.flatMap((group) => [group.readStartedMs, group.readEndedMs, group.documentFrame?.beforeMs, group.documentFrame?.afterMs]),
++    ...['before', 'after'].flatMap((phase) => expanded.onset[phase]
++    .flatMap((group) => [group.readStartedMs, group.readEndedMs, group.documentFrame?.beforeMs, group.documentFrame?.afterMs])), ...expanded.checkpoints.flatMap((checkpoint) =>
++    [checkpoint.frameTimestampMs, ...checkpoint.groups.flatMap((group) => [group.readStartedMs, group.readEndedMs,
++      group.documentFrame?.beforeMs, group.documentFrame?.afterMs])])];
++  invariant(observedTimes.every(Number.isFinite), 'неполные normal-motion clock observations');
++  serverBrowserClockBounds({ beginMs: 0, endMs: Math.max(...observedTimes.map(Math.abs)) }, monotonicHostUpperNs);
+   invariant(evaluateStartSemanticEvidence(expanded, { ...scene, ...SERVER_PROFILE.browserSemantics, semanticClockErrorMs,
+     durationMs: SERVER_PROFILE.durationMs, toPx: SERVER_PROFILE.toPx }, calls), 'normal-motion oracle отверг intermediate/stagger/topology');
+ }
+@@ -229,7 +281,7 @@
+ 
+ function coordinateReader(values, count, label) {
+   if (Array.isArray(values)) {
+-    invariant(values.length === count && values.every(Number.isFinite), `неполные ${label} coordinates`);
++    invariant(values.length === count && Array.from(values).every(Number.isFinite), `неполные ${label} coordinates`);
+     return { at: (index) => values[index], runs: null };
+   }
+   if (values?.encoding === 'repeat') {
+@@ -263,8 +315,17 @@
+   const window = serverBrowserClockBounds({ beginMs: raw.startClock.beginMs, endMs: witness.readClock.endMs }, monotonicHostUpperNs);
+   invariant(window.high < SERVER_PROFILE.durationMs * (1 - SERVER_PROFILE.browserSemantics.finalTolerancePx / SERVER_PROFILE.toPx),
+     'start batch не разрешил окно до линейного endpoint');
+-  for (let call = 0; call < raw.calls; call++) invariant(leading.at(call) >= -SERVER_PROFILE.browserSemantics.finalTolerancePx &&
+-    leading.at(call) < SERVER_PROFILE.toPx - SERVER_PROFILE.browserSemantics.finalTolerancePx, 'timed owner мгновенно достиг endpoint до duration');
++  // Каждый свежий owner вызван после batch begin, а CSS прочитан до read end.
++  // Общая верхняя граница elapsed учитывает обе clock reads и float roundoff.
++  const maximumPosition = nextUp(nextUp(nextUp(SERVER_PROFILE.toPx / SERVER_PROFILE.durationMs) * window.high) +
++    SERVER_PROFILE.browserSemantics.movementThresholdPx);
++  for (let call = 0; call < raw.calls; call++) {
++    const position = leading.at(call);
++    invariant(position >= -SERVER_PROFILE.browserSemantics.finalTolerancePx &&
++      position < SERVER_PROFILE.toPx - SERVER_PROFILE.browserSemantics.finalTolerancePx, 'timed owner мгновенно достиг endpoint до duration');
++    invariant(position >= SERVER_PROFILE.browserSemantics.fromPx - SERVER_PROFILE.browserSemantics.movementThresholdPx &&
++      position <= maximumPosition, 'timed onset не соответствует свежему началу и actual clock окну');
++  }
+ }
+ 
+ function validateCancellationWitness(raw, targets) {
+@@ -650,8 +711,8 @@
+   const seen = new Map(), comparatorSamples = new Map(), retentionSamples = new Map(), failures = [], failedSamples = [];
+   for (let recordIndex = 0; recordIndex < records.length; recordIndex++) {
+     const record = records[recordIndex];
+-    const { digest, ...payload } = record;
+-    invariant(record.sequenceDigest === previous && digest === serverProfileDigest(payload), 'повреждена цепь журнала');
++    const { digest } = record;
++    invariant(record.sequenceDigest === previous && SHA256.test(digest), 'повреждена цепь журнала');
+     previous = digest;
+     if (record.type === 'registration-before-any-sample') {
+       invariant(!registration && !stopped && artifact.registration !== null && seen.size === 0 && isDeepStrictEqual(record.value.registration, artifact.registration) &&
+@@ -737,6 +798,12 @@
+   // Полный raw хешируется после проверки хронологии, failure union и полноты.
+   // Отказ на этих границах не сериализует заведомо негодную историю повторно.
+   invariant(finishedDigest === (rawDigest ?? serverArtifactDigest(artifact)), 'финальная квитанция не связана с raw/вердиктом');
++  // Каждая допущенная история заново проверяет все тела квитанций. Структурный
++  // отказ не повторяет сериализацию raw, не участвующего в успешном admission.
++  for (const record of records) {
++    const { digest, ...payload } = record;
++    invariant(digest === serverProfileDigest(payload), 'повреждена цепь журнала');
++  }
+   return { journalFinalDigest: previous };
+ }
+ 

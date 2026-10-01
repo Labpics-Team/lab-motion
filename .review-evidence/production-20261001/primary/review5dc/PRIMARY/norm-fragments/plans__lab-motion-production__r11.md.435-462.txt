@@ -1,0 +1,28 @@
+### G-PERF — разрешимость, полная стоимость и границы утверждений
+
+1. До изменения: exact base/head, build+lock+toolchain, scope/proposition/контракт, входы,
+   устройство/OS/browser и позитивный/негативный controls; профили old-Lab и best-comparator.
+2. Статистика: фиксированные единицы независимости и парный/блочный дизайн, warm/cold режимы,
+   число выборок из заранее выбранных MDE/power и null-pilot, seed и правило остановки.
+   Для нового admission family-wise 95% coverage либо заранее утверждённая multiplicity
+   correction; dependency между каналами/кадрами не создаёт фиктивное число участников.
+   Существующие более строгие valid gates и ранее зарегистрированные falsifiers сохраняются.
+3. Калибровка: A/A различает отсутствие изменения в исходной non-inferiority полосе, deliberate
+   2×work — положительный контроль. Для старого p95 admission upper ≤1,05 и остальные его
+   условия не меняются. Invalid calibration → candidate admission не запускается; baseline-only
+   RCA меняет метод лишь с конкретным дефектом/новой предпосылкой, независимо от A/B выгоды.
+4. Все samples, failures, stalls, GC/JIT/context switches и malformed receipts сохраняются.
+   Forced GC допустим в выделенном retention proof, не в timing. Initial, reachable total,
+   cold-compile, warm-compile, startup, interruption, frame, teardown, import/build и peak/retained
+   память имеют свои denominators. CPU/paint/compositor claims требуют trace, не API-name.
+5. Simplification pass сравнивает с отсутствием механизма и самым простым working control.
+   Кандидат может быть функционально полезным с явной новой optional ценой, но не ухудшает
+   старый protected envelope. Performance-only GO требует хотя бы одного существенного
+   улучшения и ни одного ухудшенного protected contract/metric, включая maintenance.
+6. Evidence содержит команды, raw, метод/контроль и внешний digest, позволяет независимый
+   replay и ловит согласованные по виду, но неверные elapsed/divisor/missing sample/source/order.
+   Истечение Actions artifact не удаляет единственную копию proof: компактный стабильный
+   witness/code хранится у research owner, raw — по approved durable artifact policy.
+   Квота storage не разрешает удалять чужие/единственные доказательства или платить без допуска.
+
+### G-COMPOSE — браузер и пользователь

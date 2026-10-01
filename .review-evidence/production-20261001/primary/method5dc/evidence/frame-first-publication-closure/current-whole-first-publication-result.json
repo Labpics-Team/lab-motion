@@ -1,0 +1,2454 @@
+{
+  "protocolDigest": "00e8d5880eb83dd27a52f90cc670d4ecc550229458af039d9924485805c25431",
+  "synthetic": true,
+  "actualTimingSamples": 0,
+  "source": [
+    {
+      "path": "bench/compare/bench.mjs",
+      "sha256": "f4aa1628b6320a08c5444277fe6a6a26c9e3f9f42db845db5821b5bf4334b467"
+    },
+    {
+      "path": "bench/compare/methodology.mjs",
+      "sha256": "e090f47784312a3fc936326157747f346718e2245c275eed62b41cf0de0b1702"
+    },
+    {
+      "path": "bench/profile/server-profile-contract.mjs",
+      "sha256": "0fb91bc3a109b46ac5bd3c63fc63f251ecc33ab89d81b90173f5c927f844afcd"
+    },
+    {
+      "path": "bench/profile/server-profile-runner.mjs",
+      "sha256": "749d9708f83a5922983effd077a69f1930d2429cf60c895760f4130177edc87b"
+    },
+    {
+      "path": "bench/profile/server-profile-registration.mjs",
+      "sha256": "211b4c0e107b56d06eb57e0b49f21bc3b1d06a06f34ffec1c06d4ecd15485396"
+    },
+    {
+      "path": "test/server-profile-contract.test.ts",
+      "sha256": "7147f065ea2e5ec6780e21997505ed0d28909afebde3e73dbeb2d0f7cbef94b0"
+    }
+  ],
+  "receipts": [
+    {
+      "name": "healthy",
+      "initialProgress": 0,
+      "initialProgressAt": 1,
+      "synthetic": true,
+      "actualTimingSamples": 0,
+      "sample": {
+        "raw": [
+          {
+            "startMs": 0.02499999999999858,
+            "cancelMs": 0.05000000000000071,
+            "batchStartMs": 0.7999999999999545,
+            "batchCancelMs": 1.6000000000000227,
+            "calls": 32,
+            "ownersStarted": 32,
+            "ownersCancelled": 32,
+            "startClock": {
+              "beginMs": 622.855,
+              "endMs": 623.655
+            },
+            "cancelClock": {
+              "beginMs": 623.66,
+              "endMs": 625.26
+            },
+            "startWitness": {
+              "connectedTargets": 3200,
+              "activeWaapi": 0,
+              "leadingPositions": {
+                "encoding": "repeat",
+                "count": 32,
+                "value": 0
+              },
+              "readClock": {
+                "beginMs": 623.66,
+                "endMs": 623.66
+              }
+            },
+            "cancelWitness": {
+              "connectedTargets": 3200,
+              "activeWaapiBefore": 0,
+              "transformsBefore": {
+                "encoding": "repeat",
+                "count": 3200,
+                "value": 0
+              },
+              "frames": [
+                {
+                  "connectedTargets": 3200,
+                  "activeWaapi": 0,
+                  "transforms": {
+                    "encoding": "repeat",
+                    "count": 3200,
+                    "value": 0
+                  }
+                },
+                {
+                  "connectedTargets": 3200,
+                  "activeWaapi": 0,
+                  "transforms": {
+                    "encoding": "repeat",
+                    "count": 3200,
+                    "value": 0
+                  }
+                }
+              ],
+              "cancelDrainMs": 33.60000000000002
+            }
+          },
+          {
+            "startMs": 0.02500000000000213,
+            "cancelMs": 0.050156249999997016,
+            "batchStartMs": 0.8000000000000682,
+            "batchCancelMs": 1.6049999999999045,
+            "calls": 32,
+            "ownersStarted": 32,
+            "ownersCancelled": 32,
+            "startClock": {
+              "beginMs": 657.265,
+              "endMs": 658.065
+            },
+            "cancelClock": {
+              "beginMs": 658.065,
+              "endMs": 659.67
+            },
+            "startWitness": {
+              "connectedTargets": 3200,
+              "activeWaapi": 0,
+              "leadingPositions": {
+                "encoding": "repeat",
+                "count": 32,
+                "value": 0
+              },
+              "readClock": {
+                "beginMs": 658.065,
+                "endMs": 658.065
+              }
+            },
+            "cancelWitness": {
+              "connectedTargets": 3200,
+              "activeWaapiBefore": 0,
+              "transformsBefore": {
+                "encoding": "repeat",
+                "count": 3200,
+                "value": 0
+              },
+              "frames": [
+                {
+                  "connectedTargets": 3200,
+                  "activeWaapi": 0,
+                  "transforms": {
+                    "encoding": "repeat",
+                    "count": 3200,
+                    "value": 0
+                  }
+                },
+                {
+                  "connectedTargets": 3200,
+                  "activeWaapi": 0,
+                  "transforms": {
+                    "encoding": "repeat",
+                    "count": 3200,
+                    "value": 0
+                  }
+                }
+              ],
+              "cancelDrainMs": 33.604999999999905
+            }
+          },
+          {
+            "startMs": 0.02500000000000213,
+            "cancelMs": 0.05000000000000071,
+            "batchStartMs": 0.8000000000000682,
+            "batchCancelMs": 1.6000000000000227,
+            "calls": 32,
+            "ownersStarted": 32,
+            "ownersCancelled": 32,
+            "startClock": {
+              "beginMs": 691.67,
+              "endMs": 692.47
+            },
+            "cancelClock": {
+              "beginMs": 692.475,
+              "endMs": 694.075
+            },
+            "startWitness": {
+              "connectedTargets": 3200,
+              "activeWaapi": 0,
+              "leadingPositions": {
+                "encoding": "repeat",
+                "count": 32,
+                "value": 0
+              },
+              "readClock": {
+                "beginMs": 692.47,
+                "endMs": 692.475
+              }
+            },
+            "cancelWitness": {
+              "connectedTargets": 3200,
+              "activeWaapiBefore": 0,
+              "transformsBefore": {
+                "encoding": "repeat",
+                "count": 3200,
+                "value": 0
+              },
+              "frames": [
+                {
+                  "connectedTargets": 3200,
+                  "activeWaapi": 0,
+                  "transforms": {
+                    "encoding": "repeat",
+                    "count": 3200,
+                    "value": 0
+                  }
+                },
+                {
+                  "connectedTargets": 3200,
+                  "activeWaapi": 0,
+                  "transforms": {
+                    "encoding": "repeat",
+                    "count": 3200,
+                    "value": 0
+                  }
+                }
+              ],
+              "cancelDrainMs": 33.60000000000002
+            }
+          },
+          {
+            "startMs": 0.025156249999998437,
+            "cancelMs": 0.05000000000000071,
+            "batchStartMs": 0.80499999999995,
+            "batchCancelMs": 1.6000000000000227,
+            "calls": 32,
+            "ownersStarted": 32,
+            "ownersCancelled": 32,
+            "startClock": {
+              "beginMs": 726.075,
+              "endMs": 726.88
+            },
+            "cancelClock": {
+              "beginMs": 726.88,
+              "endMs": 728.48
+            },
+            "startWitness": {
+              "connectedTargets": 3200,
+              "activeWaapi": 0,
+              "leadingPositions": {
+                "encoding": "repeat",
+                "count": 32,
+                "value": 0
+              },
+              "readClock": {
+                "beginMs": 726.88,
+                "endMs": 726.88
+              }
+            },
+            "cancelWitness": {
+              "connectedTargets": 3200,
+              "activeWaapiBefore": 0,
+              "transformsBefore": {
+                "encoding": "repeat",
+                "count": 3200,
+                "value": 0
+              },
+              "frames": [
+                {
+                  "connectedTargets": 3200,
+                  "activeWaapi": 0,
+                  "transforms": {
+                    "encoding": "repeat",
+                    "count": 3200,
+                    "value": 0
+                  }
+                },
+                {
+                  "connectedTargets": 3200,
+                  "activeWaapi": 0,
+                  "transforms": {
+                    "encoding": "repeat",
+                    "count": 3200,
+                    "value": 0
+                  }
+                }
+              ],
+              "cancelDrainMs": 33.60500000000002
+            }
+          },
+          {
+            "startMs": 0.02499999999999858,
+            "cancelMs": 0.05000000000000071,
+            "batchStartMs": 0.7999999999999545,
+            "batchCancelMs": 1.6000000000000227,
+            "calls": 32,
+            "ownersStarted": 32,
+            "ownersCancelled": 32,
+            "startClock": {
+              "beginMs": 760.485,
+              "endMs": 761.285
+            },
+            "cancelClock": {
+              "beginMs": 761.29,
+              "endMs": 762.89
+            },
+            "startWitness": {
+              "connectedTargets": 3200,
+              "activeWaapi": 0,
+              "leadingPositions": {
+                "encoding": "repeat",
+                "count": 32,
+                "value": 0
+              },
+              "readClock": {
+                "beginMs": 761.285,
+                "endMs": 761.285
+              }
+            },
+            "cancelWitness": {
+              "connectedTargets": 3200,
+              "activeWaapiBefore": 0,
+              "transformsBefore": {
+                "encoding": "repeat",
+                "count": 3200,
+                "value": 0
+              },
+              "frames": [
+                {
+                  "connectedTargets": 3200,
+                  "activeWaapi": 0,
+                  "transforms": {
+                    "encoding": "repeat",
+                    "count": 3200,
+                    "value": 0
+                  }
+                },
+                {
+                  "connectedTargets": 3200,
+                  "activeWaapi": 0,
+                  "transforms": {
+                    "encoding": "repeat",
+                    "count": 3200,
+                    "value": 0
+                  }
+                }
+              ],
+              "cancelDrainMs": 33.60000000000002
+            }
+          },
+          {
+            "startMs": 0.02500000000000213,
+            "cancelMs": 0.05000000000000071,
+            "batchStartMs": 0.8000000000000682,
+            "batchCancelMs": 1.6000000000000227,
+            "calls": 32,
+            "ownersStarted": 32,
+            "ownersCancelled": 32,
+            "startClock": {
+              "beginMs": 794.89,
+              "endMs": 795.69
+            },
+            "cancelClock": {
+              "beginMs": 795.695,
+              "endMs": 797.2950000000001
+            },
+            "startWitness": {
+              "connectedTargets": 3200,
+              "activeWaapi": 0,
+              "leadingPositions": {
+                "encoding": "repeat",
+                "count": 32,
+                "value": 0
+              },
+              "readClock": {
+                "beginMs": 795.695,
+                "endMs": 795.695
+              }
+            },
+            "cancelWitness": {
+              "connectedTargets": 3200,
+              "activeWaapiBefore": 0,
+              "transformsBefore": {
+                "encoding": "repeat",
+                "count": 3200,
+                "value": 0
+              },
+              "frames": [
+                {
+                  "connectedTargets": 3200,
+                  "activeWaapi": 0,
+                  "transforms": {
+                    "encoding": "repeat",
+                    "count": 3200,
+                    "value": 0
+                  }
+                },
+                {
+                  "connectedTargets": 3200,
+                  "activeWaapi": 0,
+                  "transforms": {
+                    "encoding": "repeat",
+                    "count": 3200,
+                    "value": 0
+                  }
+                }
+              ],
+              "cancelDrainMs": 33.60000000000002
+            }
+          },
+          {
+            "startMs": 0.02499999999999858,
+            "cancelMs": 0.05015625000000057,
+            "batchStartMs": 0.7999999999999545,
+            "batchCancelMs": 1.6050000000000182,
+            "calls": 32,
+            "ownersStarted": 32,
+            "ownersCancelled": 32,
+            "startClock": {
+              "beginMs": 829.3000000000001,
+              "endMs": 830.1
+            },
+            "cancelClock": {
+              "beginMs": 830.1,
+              "endMs": 831.705
+            },
+            "startWitness": {
+              "connectedTargets": 3200,
+              "activeWaapi": 0,
+              "leadingPositions": {
+                "encoding": "repeat",
+                "count": 32,
+                "value": 0
+              },
+              "readClock": {
+                "beginMs": 830.1,
+                "endMs": 830.1
+              }
+            },
+            "cancelWitness": {
+              "connectedTargets": 3200,
+              "activeWaapiBefore": 0,
+              "transformsBefore": {
+                "encoding": "repeat",
+                "count": 3200,
+                "value": 0
+              },
+              "frames": [
+                {
+                  "connectedTargets": 3200,
+                  "activeWaapi": 0,
+                  "transforms": {
+                    "encoding": "repeat",
+                    "count": 3200,
+                    "value": 0
+                  }
+                },
+                {
+                  "connectedTargets": 3200,
+                  "activeWaapi": 0,
+                  "transforms": {
+                    "encoding": "repeat",
+                    "count": 3200,
+                    "value": 0
+                  }
+                }
+              ],
+              "cancelDrainMs": 33.60500000000002
+            }
+          },
+          {
+            "startMs": 0.02499999999999858,
+            "cancelMs": 0.05000000000000071,
+            "batchStartMs": 0.7999999999999545,
+            "batchCancelMs": 1.6000000000000227,
+            "calls": 32,
+            "ownersStarted": 32,
+            "ownersCancelled": 32,
+            "startClock": {
+              "beginMs": 863.705,
+              "endMs": 864.505
+            },
+            "cancelClock": {
+              "beginMs": 864.51,
+              "endMs": 866.11
+            },
+            "startWitness": {
+              "connectedTargets": 3200,
+              "activeWaapi": 0,
+              "leadingPositions": {
+                "encoding": "repeat",
+                "count": 32,
+                "value": 0
+              },
+              "readClock": {
+                "beginMs": 864.505,
+                "endMs": 864.51
+              }
+            },
+            "cancelWitness": {
+              "connectedTargets": 3200,
+              "activeWaapiBefore": 0,
+              "transformsBefore": {
+                "encoding": "repeat",
+                "count": 3200,
+                "value": 0
+              },
+              "frames": [
+                {
+                  "connectedTargets": 3200,
+                  "activeWaapi": 0,
+                  "transforms": {
+                    "encoding": "repeat",
+                    "count": 3200,
+                    "value": 0
+                  }
+                },
+                {
+                  "connectedTargets": 3200,
+                  "activeWaapi": 0,
+                  "transforms": {
+                    "encoding": "repeat",
+                    "count": 3200,
+                    "value": 0
+                  }
+                }
+              ],
+              "cancelDrainMs": 33.60000000000002
+            }
+          }
+        ],
+        "warmup": [
+          {
+            "startMs": 0.02499999999999858,
+            "cancelMs": 0.05000000000000071,
+            "batchStartMs": 0.7999999999999545,
+            "batchCancelMs": 1.6000000000000227,
+            "calls": 32,
+            "ownersStarted": 32,
+            "ownersCancelled": 32,
+            "startClock": {
+              "beginMs": 588.45,
+              "endMs": 589.25
+            },
+            "cancelClock": {
+              "beginMs": 589.255,
+              "endMs": 590.855
+            },
+            "startWitness": {
+              "connectedTargets": 3200,
+              "activeWaapi": 0,
+              "leadingPositions": {
+                "encoding": "repeat",
+                "count": 32,
+                "value": 0
+              },
+              "readClock": {
+                "beginMs": 589.25,
+                "endMs": 589.25
+              }
+            },
+            "cancelWitness": {
+              "connectedTargets": 3200,
+              "activeWaapiBefore": 0,
+              "transformsBefore": {
+                "encoding": "repeat",
+                "count": 3200,
+                "value": 0
+              },
+              "frames": [
+                {
+                  "connectedTargets": 3200,
+                  "activeWaapi": 0,
+                  "transforms": {
+                    "encoding": "repeat",
+                    "count": 3200,
+                    "value": 0
+                  }
+                },
+                {
+                  "connectedTargets": 3200,
+                  "activeWaapi": 0,
+                  "transforms": {
+                    "encoding": "repeat",
+                    "count": 3200,
+                    "value": 0
+                  }
+                }
+              ],
+              "cancelDrainMs": 33.60000000000002
+            }
+          }
+        ],
+        "endpoints": [
+          300,
+          300,
+          300,
+          300,
+          300,
+          300,
+          300,
+          300,
+          300,
+          300,
+          300,
+          300,
+          300,
+          300,
+          300,
+          300,
+          300,
+          300,
+          300,
+          300,
+          300,
+          300,
+          300,
+          300,
+          300,
+          300,
+          300,
+          300,
+          300,
+          300,
+          300,
+          300,
+          300,
+          300,
+          300,
+          300,
+          300,
+          300,
+          300,
+          300,
+          300,
+          300,
+          300,
+          300,
+          300,
+          300,
+          300,
+          300,
+          300,
+          300,
+          300,
+          300,
+          300,
+          300,
+          300,
+          300,
+          300,
+          300,
+          300,
+          300,
+          300,
+          300,
+          300,
+          300,
+          300,
+          300,
+          300,
+          300,
+          300,
+          300,
+          300,
+          300,
+          300,
+          300,
+          300,
+          300,
+          300,
+          300,
+          300,
+          300,
+          300,
+          300,
+          300,
+          300,
+          300,
+          300,
+          300,
+          300,
+          300,
+          300,
+          300,
+          300,
+          300,
+          300,
+          300,
+          300,
+          300,
+          300,
+          300,
+          300
+        ],
+        "controlStartMs": 0.024999999999977263,
+        "controlCancelMs": 0.05000000000006821,
+        "controlCancelWitness": {
+          "connectedTargets": 100,
+          "activeWaapiBefore": 0,
+          "transformsBefore": {
+            "encoding": "repeat",
+            "count": 100,
+            "value": 300
+          },
+          "frames": [
+            {
+              "connectedTargets": 100,
+              "activeWaapi": 0,
+              "transforms": {
+                "encoding": "repeat",
+                "count": 100,
+                "value": 300
+              }
+            },
+            {
+              "connectedTargets": 100,
+              "activeWaapi": 0,
+              "transforms": {
+                "encoding": "repeat",
+                "count": 100,
+                "value": 300
+              }
+            }
+          ],
+          "cancelDrainMs": 32.055000000000064
+        },
+        "measurementTimeOriginMs": 1000,
+        "heapObservation": null,
+        "coldImportMs": 0,
+        "semanticEvidence": {
+          "topology": {
+            "calls": 1,
+            "targetsPerCall": 100,
+            "staggerGapMs": 0,
+            "durationMs": 128,
+            "toPx": 300
+          },
+          "callStartedAtMs": [
+            0.0049999999999954525
+          ],
+          "checkpoints": [
+            {
+              "frameTimestampMs": 48.00100000000006,
+              "groups": [
+                {
+                  "readStartedMs": 48,
+                  "positions": {
+                    "encoding": "rle",
+                    "count": 100,
+                    "runs": [
+                      [
+                        100,
+                        74.92734375000005
+                      ]
+                    ]
+                  },
+                  "documentFrame": {
+                    "beforeMs": 48.00100000000006,
+                    "afterMs": 48.00100000000006
+                  },
+                  "readEndedMs": 48
+                }
+              ]
+            },
+            {
+              "frameTimestampMs": 80.00400000000008,
+              "groups": [
+                {
+                  "readStartedMs": 80.005,
+                  "positions": {
+                    "encoding": "rle",
+                    "count": 100,
+                    "runs": [
+                      [
+                        100,
+                        149.93437500000007
+                      ]
+                    ]
+                  },
+                  "documentFrame": {
+                    "beforeMs": 80.00400000000008,
+                    "afterMs": 80.00400000000008
+                  },
+                  "readEndedMs": 80.005
+                }
+              ]
+            },
+            {
+              "frameTimestampMs": 96.00700000000009,
+              "groups": [
+                {
+                  "readStartedMs": 96.005,
+                  "positions": {
+                    "encoding": "rle",
+                    "count": 100,
+                    "runs": [
+                      [
+                        100,
+                        187.4414062500001
+                      ]
+                    ]
+                  },
+                  "documentFrame": {
+                    "beforeMs": 96.00700000000009,
+                    "afterMs": 96.00700000000009
+                  },
+                  "readEndedMs": 96.005
+                }
+              ]
+            }
+          ],
+          "terminal": [
+            {
+              "encoding": "rle",
+              "count": 100,
+              "runs": [
+                [
+                  100,
+                  300
+                ]
+              ]
+            }
+          ],
+          "onset": {
+            "before": [
+              {
+                "readStartedMs": 0,
+                "positions": {
+                  "encoding": "rle",
+                  "count": 100,
+                  "runs": [
+                    [
+                      100,
+                      0
+                    ]
+                  ]
+                },
+                "documentFrame": {
+                  "beforeMs": 0,
+                  "afterMs": 0
+                },
+                "readEndedMs": 0.0049999999999954525
+              }
+            ],
+            "after": [
+              {
+                "readStartedMs": 0.030000000000001137,
+                "positions": {
+                  "encoding": "rle",
+                  "count": 100,
+                  "runs": [
+                    [
+                      100,
+                      0
+                    ]
+                  ]
+                },
+                "documentFrame": {
+                  "beforeMs": 0,
+                  "afterMs": 0
+                },
+                "readEndedMs": 0.030000000000001137
+              }
+            ],
+            "firstFrame": {
+              "frameTimestampMs": 16.033000000000044,
+              "groups": [
+                {
+                  "readStartedMs": 16.03,
+                  "positions": {
+                    "encoding": "rle",
+                    "count": 100,
+                    "runs": [
+                      [
+                        100,
+                        0.002343750000011191
+                      ]
+                    ]
+                  },
+                  "documentFrame": {
+                    "beforeMs": 16.033000000000044,
+                    "afterMs": 16.033000000000044
+                  },
+                  "readEndedMs": 16.034999999999997
+                }
+              ]
+            }
+          },
+          "valid": true
+        },
+        "timerEvidence": {
+          "crossOriginIsolated": true,
+          "probes": [
+            {
+              "phase": "before",
+              "timeOriginMs": 1000,
+              "performanceNowDeltasMs": [
+                0.0049999999999954525,
+                0.0049999999999954525,
+                0.0049999999999954525,
+                0.0049999999999954525,
+                0.0049999999999954525,
+                0.0049999999999954525,
+                0.0049999999999954525,
+                0.005000000000052296,
+                0.0049999999999954525,
+                0.0049999999999954525,
+                0.0049999999999954525,
+                0.0049999999999954525,
+                0.0049999999999954525,
+                0.0049999999999954525,
+                0.0049999999999954525,
+                0.0049999999999954525,
+                0.0049999999999954525,
+                0.0049999999999954525,
+                0.0049999999999954525,
+                0.005000000000052296,
+                0.0049999999999954525,
+                0.0049999999999954525,
+                0.0049999999999954525,
+                0.0049999999999954525,
+                0.0049999999999954525,
+                0.0049999999999954525,
+                0.0049999999999954525,
+                0.0049999999999954525,
+                0.0049999999999954525,
+                0.0049999999999954525,
+                0.0049999999999954525,
+                0.0049999999999954525,
+                0.005000000000052296,
+                0.0049999999999954525,
+                0.0049999999999954525,
+                0.0049999999999954525,
+                0.0049999999999954525,
+                0.0049999999999954525,
+                0.0049999999999954525,
+                0.0049999999999954525,
+                0.0049999999999954525,
+                0.0049999999999954525,
+                0.0049999999999954525,
+                0.0049999999999954525,
+                0.005000000000052296,
+                0.0049999999999954525,
+                0.0049999999999954525,
+                0.0049999999999954525,
+                0.0049999999999954525,
+                0.0049999999999954525,
+                0.0049999999999954525,
+                0.0049999999999954525,
+                0.0049999999999954525,
+                0.0049999999999954525,
+                0.0049999999999954525,
+                0.0049999999999954525,
+                0.0049999999999954525,
+                0.005000000000052296,
+                0.0049999999999954525,
+                0.0049999999999954525,
+                0.0049999999999954525,
+                0.0049999999999954525,
+                0.0049999999999954525,
+                0.0049999999999954525
+              ]
+            },
+            {
+              "phase": "after",
+              "timeOriginMs": 1000,
+              "performanceNowDeltasMs": [
+                0.0049999999999954525,
+                0.0049999999999954525,
+                0.0049999999999954525,
+                0.0049999999999954525,
+                0.0049999999999954525,
+                0.0049999999999954525,
+                0.0049999999999954525,
+                0.0049999999999954525,
+                0.0049999999999954525,
+                0.0049999999999954525,
+                0.0049999999999954525,
+                0.005000000000109139,
+                0.0049999999999954525,
+                0.0049999999999954525,
+                0.0049999999999954525,
+                0.0049999999999954525,
+                0.0049999999999954525,
+                0.0049999999999954525,
+                0.0049999999999954525,
+                0.0049999999999954525,
+                0.0049999999999954525,
+                0.0049999999999954525,
+                0.0049999999999954525,
+                0.0049999999999954525,
+                0.0049999999999954525,
+                0.0049999999999954525,
+                0.0049999999999954525,
+                0.0049999999999954525,
+                0.0049999999999954525,
+                0.0049999999999954525,
+                0.0049999999999954525,
+                0.0049999999999954525,
+                0.0049999999999954525,
+                0.0049999999999954525,
+                0.0049999999999954525,
+                0.0049999999999954525,
+                0.005000000000109139,
+                0.0049999999999954525,
+                0.0049999999999954525,
+                0.0049999999999954525,
+                0.0049999999999954525,
+                0.0049999999999954525,
+                0.0049999999999954525,
+                0.0049999999999954525,
+                0.0049999999999954525,
+                0.0049999999999954525,
+                0.0049999999999954525,
+                0.0049999999999954525,
+                0.0049999999999954525,
+                0.0049999999999954525,
+                0.0049999999999954525,
+                0.0049999999999954525,
+                0.0049999999999954525,
+                0.0049999999999954525,
+                0.0049999999999954525,
+                0.0049999999999954525,
+                0.0049999999999954525,
+                0.0049999999999954525,
+                0.0049999999999954525,
+                0.0049999999999954525,
+                0.0049999999999954525,
+                0.005000000000109139,
+                0.0049999999999954525,
+                0.0049999999999954525
+              ]
+            }
+          ]
+        },
+        "timerStepMs": 0.005000000000109139,
+        "monotonicHostUpperNs": "43329584072074",
+        "clockModelDigest": "7e45adab88a2c97af4e9074543318ae115e42b5c9669c4746b6e149d42bfbc4f",
+        "startMs": 0.025019531249999893,
+        "cancelMs": 0.05003906250000023,
+        "repetitions": 8,
+        "workMultiplier": 1,
+        "denominator": "стоимость полезного вызова с зарегистрированными targets: browser batch/32; positive содержит 64 actual calls без деления на два; engine unchanged",
+        "semantic": true
+      },
+      "error": null,
+      "sut": {
+        "starts": 290,
+        "cancels": 290,
+        "connected": 0,
+        "closed": true
+      }
+    },
+    {
+      "name": "initial-progress-quarter",
+      "initialProgress": 0.25,
+      "initialProgressAt": 1,
+      "synthetic": true,
+      "actualTimingSamples": 0,
+      "sample": null,
+      "error": {
+        "name": "AggregateError",
+        "message": "server profile: browser sample не завершён",
+        "causes": [
+          "server profile: normal motion/topology не доказаны существующим oracle"
+        ],
+        "raw": {
+          "partial": [
+            {
+              "phase": "cold-import",
+              "coldImportMs": 0
+            },
+            {
+              "phase": "normal-motion",
+              "evidence": {
+                "topology": {
+                  "calls": 1,
+                  "targetsPerCall": 100,
+                  "staggerGapMs": 0,
+                  "durationMs": 128,
+                  "toPx": 300
+                },
+                "callStartedAtMs": [
+                  0.0049999999999954525
+                ],
+                "checkpoints": [
+                  {
+                    "frameTimestampMs": 48.00100000000006,
+                    "groups": [
+                      {
+                        "readStartedMs": 48,
+                        "positions": {
+                          "encoding": "rle",
+                          "count": 100,
+                          "runs": [
+                            [
+                              100,
+                              149.92734375000006
+                            ]
+                          ]
+                        },
+                        "documentFrame": {
+                          "beforeMs": 48.00100000000006,
+                          "afterMs": 48.00100000000006
+                        },
+                        "readEndedMs": 48
+                      }
+                    ]
+                  },
+                  {
+                    "frameTimestampMs": 80.00400000000008,
+                    "groups": [
+                      {
+                        "readStartedMs": 80.005,
+                        "positions": {
+                          "encoding": "rle",
+                          "count": 100,
+                          "runs": [
+                            [
+                              100,
+                              224.93437500000007
+                            ]
+                          ]
+                        },
+                        "documentFrame": {
+                          "beforeMs": 80.00400000000008,
+                          "afterMs": 80.00400000000008
+                        },
+                        "readEndedMs": 80.005
+                      }
+                    ]
+                  },
+                  {
+                    "frameTimestampMs": 96.00700000000009,
+                    "groups": [
+                      {
+                        "readStartedMs": 96.005,
+                        "positions": {
+                          "encoding": "rle",
+                          "count": 100,
+                          "runs": [
+                            [
+                              100,
+                              262.4414062500001
+                            ]
+                          ]
+                        },
+                        "documentFrame": {
+                          "beforeMs": 96.00700000000009,
+                          "afterMs": 96.00700000000009
+                        },
+                        "readEndedMs": 96.005
+                      }
+                    ]
+                  }
+                ],
+                "terminal": [
+                  {
+                    "encoding": "rle",
+                    "count": 100,
+                    "runs": [
+                      [
+                        100,
+                        300
+                      ]
+                    ]
+                  }
+                ],
+                "onset": {
+                  "before": [
+                    {
+                      "readStartedMs": 0,
+                      "positions": {
+                        "encoding": "rle",
+                        "count": 100,
+                        "runs": [
+                          [
+                            100,
+                            0
+                          ]
+                        ]
+                      },
+                      "documentFrame": {
+                        "beforeMs": 0,
+                        "afterMs": 0
+                      },
+                      "readEndedMs": 0.0049999999999954525
+                    }
+                  ],
+                  "after": [
+                    {
+                      "readStartedMs": 0.030000000000001137,
+                      "positions": {
+                        "encoding": "rle",
+                        "count": 100,
+                        "runs": [
+                          [
+                            100,
+                            75
+                          ]
+                        ]
+                      },
+                      "documentFrame": {
+                        "beforeMs": 0,
+                        "afterMs": 0
+                      },
+                      "readEndedMs": 0.030000000000001137
+                    }
+                  ],
+                  "firstFrame": {
+                    "frameTimestampMs": 16.033000000000044,
+                    "groups": [
+                      {
+                        "readStartedMs": 16.03,
+                        "positions": {
+                          "encoding": "rle",
+                          "count": 100,
+                          "runs": [
+                            [
+                              100,
+                              75.00234375000001
+                            ]
+                          ]
+                        },
+                        "documentFrame": {
+                          "beforeMs": 16.033000000000044,
+                          "afterMs": 16.033000000000044
+                        },
+                        "readEndedMs": 16.034999999999997
+                      }
+                    ]
+                  }
+                },
+                "valid": false
+              }
+            }
+          ],
+          "semanticEvidence": {
+            "topology": {
+              "calls": 1,
+              "targetsPerCall": 100,
+              "staggerGapMs": 0,
+              "durationMs": 128,
+              "toPx": 300
+            },
+            "callStartedAtMs": [
+              0.0049999999999954525
+            ],
+            "checkpoints": [
+              {
+                "frameTimestampMs": 48.00100000000006,
+                "groups": [
+                  {
+                    "readStartedMs": 48,
+                    "positions": {
+                      "encoding": "rle",
+                      "count": 100,
+                      "runs": [
+                        [
+                          100,
+                          149.92734375000006
+                        ]
+                      ]
+                    },
+                    "documentFrame": {
+                      "beforeMs": 48.00100000000006,
+                      "afterMs": 48.00100000000006
+                    },
+                    "readEndedMs": 48
+                  }
+                ]
+              },
+              {
+                "frameTimestampMs": 80.00400000000008,
+                "groups": [
+                  {
+                    "readStartedMs": 80.005,
+                    "positions": {
+                      "encoding": "rle",
+                      "count": 100,
+                      "runs": [
+                        [
+                          100,
+                          224.93437500000007
+                        ]
+                      ]
+                    },
+                    "documentFrame": {
+                      "beforeMs": 80.00400000000008,
+                      "afterMs": 80.00400000000008
+                    },
+                    "readEndedMs": 80.005
+                  }
+                ]
+              },
+              {
+                "frameTimestampMs": 96.00700000000009,
+                "groups": [
+                  {
+                    "readStartedMs": 96.005,
+                    "positions": {
+                      "encoding": "rle",
+                      "count": 100,
+                      "runs": [
+                        [
+                          100,
+                          262.4414062500001
+                        ]
+                      ]
+                    },
+                    "documentFrame": {
+                      "beforeMs": 96.00700000000009,
+                      "afterMs": 96.00700000000009
+                    },
+                    "readEndedMs": 96.005
+                  }
+                ]
+              }
+            ],
+            "terminal": [
+              {
+                "encoding": "rle",
+                "count": 100,
+                "runs": [
+                  [
+                    100,
+                    300
+                  ]
+                ]
+              }
+            ],
+            "onset": {
+              "before": [
+                {
+                  "readStartedMs": 0,
+                  "positions": {
+                    "encoding": "rle",
+                    "count": 100,
+                    "runs": [
+                      [
+                        100,
+                        0
+                      ]
+                    ]
+                  },
+                  "documentFrame": {
+                    "beforeMs": 0,
+                    "afterMs": 0
+                  },
+                  "readEndedMs": 0.0049999999999954525
+                }
+              ],
+              "after": [
+                {
+                  "readStartedMs": 0.030000000000001137,
+                  "positions": {
+                    "encoding": "rle",
+                    "count": 100,
+                    "runs": [
+                      [
+                        100,
+                        75
+                      ]
+                    ]
+                  },
+                  "documentFrame": {
+                    "beforeMs": 0,
+                    "afterMs": 0
+                  },
+                  "readEndedMs": 0.030000000000001137
+                }
+              ],
+              "firstFrame": {
+                "frameTimestampMs": 16.033000000000044,
+                "groups": [
+                  {
+                    "readStartedMs": 16.03,
+                    "positions": {
+                      "encoding": "rle",
+                      "count": 100,
+                      "runs": [
+                        [
+                          100,
+                          75.00234375000001
+                        ]
+                      ]
+                    },
+                    "documentFrame": {
+                      "beforeMs": 16.033000000000044,
+                      "afterMs": 16.033000000000044
+                    },
+                    "readEndedMs": 16.034999999999997
+                  }
+                ]
+              }
+            },
+            "valid": false
+          }
+        }
+      },
+      "sut": {
+        "starts": 1,
+        "cancels": 1,
+        "connected": 0,
+        "closed": true
+      }
+    },
+    {
+      "name": "timed-initial-progress-quarter",
+      "initialProgress": 0.25,
+      "initialProgressAt": 9,
+      "synthetic": true,
+      "actualTimingSamples": 0,
+      "sample": null,
+      "error": {
+        "name": "AggregateError",
+        "message": "server profile: browser sample не завершён",
+        "causes": [
+          "server profile: timed onset не соответствует свежему началу и actual clock окну"
+        ],
+        "raw": {
+          "raw": [
+            {
+              "startMs": 0.02499999999999858,
+              "cancelMs": 0.05000000000000071,
+              "batchStartMs": 0.7999999999999545,
+              "batchCancelMs": 1.6000000000000227,
+              "calls": 32,
+              "ownersStarted": 32,
+              "ownersCancelled": 32,
+              "startClock": {
+                "beginMs": 622.855,
+                "endMs": 623.655
+              },
+              "cancelClock": {
+                "beginMs": 623.66,
+                "endMs": 625.26
+              },
+              "startWitness": {
+                "connectedTargets": 3200,
+                "activeWaapi": 0,
+                "leadingPositions": {
+                  "encoding": "repeat",
+                  "count": 32,
+                  "value": 75
+                },
+                "readClock": {
+                  "beginMs": 623.66,
+                  "endMs": 623.66
+                }
+              },
+              "cancelWitness": {
+                "connectedTargets": 3200,
+                "activeWaapiBefore": 0,
+                "transformsBefore": {
+                  "encoding": "repeat",
+                  "count": 3200,
+                  "value": 75
+                },
+                "frames": [
+                  {
+                    "connectedTargets": 3200,
+                    "activeWaapi": 0,
+                    "transforms": {
+                      "encoding": "repeat",
+                      "count": 3200,
+                      "value": 75
+                    }
+                  },
+                  {
+                    "connectedTargets": 3200,
+                    "activeWaapi": 0,
+                    "transforms": {
+                      "encoding": "repeat",
+                      "count": 3200,
+                      "value": 75
+                    }
+                  }
+                ],
+                "cancelDrainMs": 33.60000000000002
+              }
+            },
+            {
+              "startMs": 0.02500000000000213,
+              "cancelMs": 0.050156249999997016,
+              "batchStartMs": 0.8000000000000682,
+              "batchCancelMs": 1.6049999999999045,
+              "calls": 32,
+              "ownersStarted": 32,
+              "ownersCancelled": 32,
+              "startClock": {
+                "beginMs": 657.265,
+                "endMs": 658.065
+              },
+              "cancelClock": {
+                "beginMs": 658.065,
+                "endMs": 659.67
+              },
+              "startWitness": {
+                "connectedTargets": 3200,
+                "activeWaapi": 0,
+                "leadingPositions": {
+                  "encoding": "repeat",
+                  "count": 32,
+                  "value": 75
+                },
+                "readClock": {
+                  "beginMs": 658.065,
+                  "endMs": 658.065
+                }
+              },
+              "cancelWitness": {
+                "connectedTargets": 3200,
+                "activeWaapiBefore": 0,
+                "transformsBefore": {
+                  "encoding": "repeat",
+                  "count": 3200,
+                  "value": 75
+                },
+                "frames": [
+                  {
+                    "connectedTargets": 3200,
+                    "activeWaapi": 0,
+                    "transforms": {
+                      "encoding": "repeat",
+                      "count": 3200,
+                      "value": 75
+                    }
+                  },
+                  {
+                    "connectedTargets": 3200,
+                    "activeWaapi": 0,
+                    "transforms": {
+                      "encoding": "repeat",
+                      "count": 3200,
+                      "value": 75
+                    }
+                  }
+                ],
+                "cancelDrainMs": 33.604999999999905
+              }
+            },
+            {
+              "startMs": 0.02500000000000213,
+              "cancelMs": 0.05000000000000071,
+              "batchStartMs": 0.8000000000000682,
+              "batchCancelMs": 1.6000000000000227,
+              "calls": 32,
+              "ownersStarted": 32,
+              "ownersCancelled": 32,
+              "startClock": {
+                "beginMs": 691.67,
+                "endMs": 692.47
+              },
+              "cancelClock": {
+                "beginMs": 692.475,
+                "endMs": 694.075
+              },
+              "startWitness": {
+                "connectedTargets": 3200,
+                "activeWaapi": 0,
+                "leadingPositions": {
+                  "encoding": "repeat",
+                  "count": 32,
+                  "value": 75
+                },
+                "readClock": {
+                  "beginMs": 692.47,
+                  "endMs": 692.475
+                }
+              },
+              "cancelWitness": {
+                "connectedTargets": 3200,
+                "activeWaapiBefore": 0,
+                "transformsBefore": {
+                  "encoding": "repeat",
+                  "count": 3200,
+                  "value": 75
+                },
+                "frames": [
+                  {
+                    "connectedTargets": 3200,
+                    "activeWaapi": 0,
+                    "transforms": {
+                      "encoding": "repeat",
+                      "count": 3200,
+                      "value": 75
+                    }
+                  },
+                  {
+                    "connectedTargets": 3200,
+                    "activeWaapi": 0,
+                    "transforms": {
+                      "encoding": "repeat",
+                      "count": 3200,
+                      "value": 75
+                    }
+                  }
+                ],
+                "cancelDrainMs": 33.60000000000002
+              }
+            },
+            {
+              "startMs": 0.025156249999998437,
+              "cancelMs": 0.05000000000000071,
+              "batchStartMs": 0.80499999999995,
+              "batchCancelMs": 1.6000000000000227,
+              "calls": 32,
+              "ownersStarted": 32,
+              "ownersCancelled": 32,
+              "startClock": {
+                "beginMs": 726.075,
+                "endMs": 726.88
+              },
+              "cancelClock": {
+                "beginMs": 726.88,
+                "endMs": 728.48
+              },
+              "startWitness": {
+                "connectedTargets": 3200,
+                "activeWaapi": 0,
+                "leadingPositions": {
+                  "encoding": "repeat",
+                  "count": 32,
+                  "value": 75
+                },
+                "readClock": {
+                  "beginMs": 726.88,
+                  "endMs": 726.88
+                }
+              },
+              "cancelWitness": {
+                "connectedTargets": 3200,
+                "activeWaapiBefore": 0,
+                "transformsBefore": {
+                  "encoding": "repeat",
+                  "count": 3200,
+                  "value": 75
+                },
+                "frames": [
+                  {
+                    "connectedTargets": 3200,
+                    "activeWaapi": 0,
+                    "transforms": {
+                      "encoding": "repeat",
+                      "count": 3200,
+                      "value": 75
+                    }
+                  },
+                  {
+                    "connectedTargets": 3200,
+                    "activeWaapi": 0,
+                    "transforms": {
+                      "encoding": "repeat",
+                      "count": 3200,
+                      "value": 75
+                    }
+                  }
+                ],
+                "cancelDrainMs": 33.60500000000002
+              }
+            },
+            {
+              "startMs": 0.02499999999999858,
+              "cancelMs": 0.05000000000000071,
+              "batchStartMs": 0.7999999999999545,
+              "batchCancelMs": 1.6000000000000227,
+              "calls": 32,
+              "ownersStarted": 32,
+              "ownersCancelled": 32,
+              "startClock": {
+                "beginMs": 760.485,
+                "endMs": 761.285
+              },
+              "cancelClock": {
+                "beginMs": 761.29,
+                "endMs": 762.89
+              },
+              "startWitness": {
+                "connectedTargets": 3200,
+                "activeWaapi": 0,
+                "leadingPositions": {
+                  "encoding": "repeat",
+                  "count": 32,
+                  "value": 75
+                },
+                "readClock": {
+                  "beginMs": 761.285,
+                  "endMs": 761.285
+                }
+              },
+              "cancelWitness": {
+                "connectedTargets": 3200,
+                "activeWaapiBefore": 0,
+                "transformsBefore": {
+                  "encoding": "repeat",
+                  "count": 3200,
+                  "value": 75
+                },
+                "frames": [
+                  {
+                    "connectedTargets": 3200,
+                    "activeWaapi": 0,
+                    "transforms": {
+                      "encoding": "repeat",
+                      "count": 3200,
+                      "value": 75
+                    }
+                  },
+                  {
+                    "connectedTargets": 3200,
+                    "activeWaapi": 0,
+                    "transforms": {
+                      "encoding": "repeat",
+                      "count": 3200,
+                      "value": 75
+                    }
+                  }
+                ],
+                "cancelDrainMs": 33.60000000000002
+              }
+            },
+            {
+              "startMs": 0.02500000000000213,
+              "cancelMs": 0.05000000000000071,
+              "batchStartMs": 0.8000000000000682,
+              "batchCancelMs": 1.6000000000000227,
+              "calls": 32,
+              "ownersStarted": 32,
+              "ownersCancelled": 32,
+              "startClock": {
+                "beginMs": 794.89,
+                "endMs": 795.69
+              },
+              "cancelClock": {
+                "beginMs": 795.695,
+                "endMs": 797.2950000000001
+              },
+              "startWitness": {
+                "connectedTargets": 3200,
+                "activeWaapi": 0,
+                "leadingPositions": {
+                  "encoding": "repeat",
+                  "count": 32,
+                  "value": 75
+                },
+                "readClock": {
+                  "beginMs": 795.695,
+                  "endMs": 795.695
+                }
+              },
+              "cancelWitness": {
+                "connectedTargets": 3200,
+                "activeWaapiBefore": 0,
+                "transformsBefore": {
+                  "encoding": "repeat",
+                  "count": 3200,
+                  "value": 75
+                },
+                "frames": [
+                  {
+                    "connectedTargets": 3200,
+                    "activeWaapi": 0,
+                    "transforms": {
+                      "encoding": "repeat",
+                      "count": 3200,
+                      "value": 75
+                    }
+                  },
+                  {
+                    "connectedTargets": 3200,
+                    "activeWaapi": 0,
+                    "transforms": {
+                      "encoding": "repeat",
+                      "count": 3200,
+                      "value": 75
+                    }
+                  }
+                ],
+                "cancelDrainMs": 33.60000000000002
+              }
+            },
+            {
+              "startMs": 0.02499999999999858,
+              "cancelMs": 0.05015625000000057,
+              "batchStartMs": 0.7999999999999545,
+              "batchCancelMs": 1.6050000000000182,
+              "calls": 32,
+              "ownersStarted": 32,
+              "ownersCancelled": 32,
+              "startClock": {
+                "beginMs": 829.3000000000001,
+                "endMs": 830.1
+              },
+              "cancelClock": {
+                "beginMs": 830.1,
+                "endMs": 831.705
+              },
+              "startWitness": {
+                "connectedTargets": 3200,
+                "activeWaapi": 0,
+                "leadingPositions": {
+                  "encoding": "repeat",
+                  "count": 32,
+                  "value": 75
+                },
+                "readClock": {
+                  "beginMs": 830.1,
+                  "endMs": 830.1
+                }
+              },
+              "cancelWitness": {
+                "connectedTargets": 3200,
+                "activeWaapiBefore": 0,
+                "transformsBefore": {
+                  "encoding": "repeat",
+                  "count": 3200,
+                  "value": 75
+                },
+                "frames": [
+                  {
+                    "connectedTargets": 3200,
+                    "activeWaapi": 0,
+                    "transforms": {
+                      "encoding": "repeat",
+                      "count": 3200,
+                      "value": 75
+                    }
+                  },
+                  {
+                    "connectedTargets": 3200,
+                    "activeWaapi": 0,
+                    "transforms": {
+                      "encoding": "repeat",
+                      "count": 3200,
+                      "value": 75
+                    }
+                  }
+                ],
+                "cancelDrainMs": 33.60500000000002
+              }
+            },
+            {
+              "startMs": 0.02499999999999858,
+              "cancelMs": 0.05000000000000071,
+              "batchStartMs": 0.7999999999999545,
+              "batchCancelMs": 1.6000000000000227,
+              "calls": 32,
+              "ownersStarted": 32,
+              "ownersCancelled": 32,
+              "startClock": {
+                "beginMs": 863.705,
+                "endMs": 864.505
+              },
+              "cancelClock": {
+                "beginMs": 864.51,
+                "endMs": 866.11
+              },
+              "startWitness": {
+                "connectedTargets": 3200,
+                "activeWaapi": 0,
+                "leadingPositions": {
+                  "encoding": "repeat",
+                  "count": 32,
+                  "value": 75
+                },
+                "readClock": {
+                  "beginMs": 864.505,
+                  "endMs": 864.51
+                }
+              },
+              "cancelWitness": {
+                "connectedTargets": 3200,
+                "activeWaapiBefore": 0,
+                "transformsBefore": {
+                  "encoding": "repeat",
+                  "count": 3200,
+                  "value": 75
+                },
+                "frames": [
+                  {
+                    "connectedTargets": 3200,
+                    "activeWaapi": 0,
+                    "transforms": {
+                      "encoding": "repeat",
+                      "count": 3200,
+                      "value": 75
+                    }
+                  },
+                  {
+                    "connectedTargets": 3200,
+                    "activeWaapi": 0,
+                    "transforms": {
+                      "encoding": "repeat",
+                      "count": 3200,
+                      "value": 75
+                    }
+                  }
+                ],
+                "cancelDrainMs": 33.60000000000002
+              }
+            }
+          ],
+          "warmup": [
+            {
+              "startMs": 0.02499999999999858,
+              "cancelMs": 0.05000000000000071,
+              "batchStartMs": 0.7999999999999545,
+              "batchCancelMs": 1.6000000000000227,
+              "calls": 32,
+              "ownersStarted": 32,
+              "ownersCancelled": 32,
+              "startClock": {
+                "beginMs": 588.45,
+                "endMs": 589.25
+              },
+              "cancelClock": {
+                "beginMs": 589.255,
+                "endMs": 590.855
+              },
+              "startWitness": {
+                "connectedTargets": 3200,
+                "activeWaapi": 0,
+                "leadingPositions": {
+                  "encoding": "rle",
+                  "count": 32,
+                  "runs": [
+                    [
+                      6,
+                      0
+                    ],
+                    [
+                      26,
+                      75
+                    ]
+                  ]
+                },
+                "readClock": {
+                  "beginMs": 589.25,
+                  "endMs": 589.25
+                }
+              },
+              "cancelWitness": {
+                "connectedTargets": 3200,
+                "activeWaapiBefore": 0,
+                "transformsBefore": {
+                  "encoding": "rle",
+                  "count": 3200,
+                  "runs": [
+                    [
+                      600,
+                      0
+                    ],
+                    [
+                      2600,
+                      75
+                    ]
+                  ]
+                },
+                "frames": [
+                  {
+                    "connectedTargets": 3200,
+                    "activeWaapi": 0,
+                    "transforms": {
+                      "encoding": "rle",
+                      "count": 3200,
+                      "runs": [
+                        [
+                          600,
+                          0
+                        ],
+                        [
+                          2600,
+                          75
+                        ]
+                      ]
+                    }
+                  },
+                  {
+                    "connectedTargets": 3200,
+                    "activeWaapi": 0,
+                    "transforms": {
+                      "encoding": "rle",
+                      "count": 3200,
+                      "runs": [
+                        [
+                          600,
+                          0
+                        ],
+                        [
+                          2600,
+                          75
+                        ]
+                      ]
+                    }
+                  }
+                ],
+                "cancelDrainMs": 33.60000000000002
+              }
+            }
+          ],
+          "endpoints": [
+            300,
+            300,
+            300,
+            300,
+            300,
+            300,
+            300,
+            300,
+            300,
+            300,
+            300,
+            300,
+            300,
+            300,
+            300,
+            300,
+            300,
+            300,
+            300,
+            300,
+            300,
+            300,
+            300,
+            300,
+            300,
+            300,
+            300,
+            300,
+            300,
+            300,
+            300,
+            300,
+            300,
+            300,
+            300,
+            300,
+            300,
+            300,
+            300,
+            300,
+            300,
+            300,
+            300,
+            300,
+            300,
+            300,
+            300,
+            300,
+            300,
+            300,
+            300,
+            300,
+            300,
+            300,
+            300,
+            300,
+            300,
+            300,
+            300,
+            300,
+            300,
+            300,
+            300,
+            300,
+            300,
+            300,
+            300,
+            300,
+            300,
+            300,
+            300,
+            300,
+            300,
+            300,
+            300,
+            300,
+            300,
+            300,
+            300,
+            300,
+            300,
+            300,
+            300,
+            300,
+            300,
+            300,
+            300,
+            300,
+            300,
+            300,
+            300,
+            300,
+            300,
+            300,
+            300,
+            300,
+            300,
+            300,
+            300,
+            300
+          ],
+          "controlStartMs": 0.024999999999977263,
+          "controlCancelMs": 0.05000000000006821,
+          "controlCancelWitness": {
+            "connectedTargets": 100,
+            "activeWaapiBefore": 0,
+            "transformsBefore": {
+              "encoding": "repeat",
+              "count": 100,
+              "value": 300
+            },
+            "frames": [
+              {
+                "connectedTargets": 100,
+                "activeWaapi": 0,
+                "transforms": {
+                  "encoding": "repeat",
+                  "count": 100,
+                  "value": 300
+                }
+              },
+              {
+                "connectedTargets": 100,
+                "activeWaapi": 0,
+                "transforms": {
+                  "encoding": "repeat",
+                  "count": 100,
+                  "value": 300
+                }
+              }
+            ],
+            "cancelDrainMs": 32.055000000000064
+          },
+          "measurementTimeOriginMs": 1000,
+          "heapObservation": null,
+          "coldImportMs": 0,
+          "semanticEvidence": {
+            "topology": {
+              "calls": 1,
+              "targetsPerCall": 100,
+              "staggerGapMs": 0,
+              "durationMs": 128,
+              "toPx": 300
+            },
+            "callStartedAtMs": [
+              0.0049999999999954525
+            ],
+            "checkpoints": [
+              {
+                "frameTimestampMs": 48.00100000000006,
+                "groups": [
+                  {
+                    "readStartedMs": 48,
+                    "positions": {
+                      "encoding": "rle",
+                      "count": 100,
+                      "runs": [
+                        [
+                          100,
+                          74.92734375000005
+                        ]
+                      ]
+                    },
+                    "documentFrame": {
+                      "beforeMs": 48.00100000000006,
+                      "afterMs": 48.00100000000006
+                    },
+                    "readEndedMs": 48
+                  }
+                ]
+              },
+              {
+                "frameTimestampMs": 80.00400000000008,
+                "groups": [
+                  {
+                    "readStartedMs": 80.005,
+                    "positions": {
+                      "encoding": "rle",
+                      "count": 100,
+                      "runs": [
+                        [
+                          100,
+                          149.93437500000007
+                        ]
+                      ]
+                    },
+                    "documentFrame": {
+                      "beforeMs": 80.00400000000008,
+                      "afterMs": 80.00400000000008
+                    },
+                    "readEndedMs": 80.005
+                  }
+                ]
+              },
+              {
+                "frameTimestampMs": 96.00700000000009,
+                "groups": [
+                  {
+                    "readStartedMs": 96.005,
+                    "positions": {
+                      "encoding": "rle",
+                      "count": 100,
+                      "runs": [
+                        [
+                          100,
+                          187.4414062500001
+                        ]
+                      ]
+                    },
+                    "documentFrame": {
+                      "beforeMs": 96.00700000000009,
+                      "afterMs": 96.00700000000009
+                    },
+                    "readEndedMs": 96.005
+                  }
+                ]
+              }
+            ],
+            "terminal": [
+              {
+                "encoding": "rle",
+                "count": 100,
+                "runs": [
+                  [
+                    100,
+                    300
+                  ]
+                ]
+              }
+            ],
+            "onset": {
+              "before": [
+                {
+                  "readStartedMs": 0,
+                  "positions": {
+                    "encoding": "rle",
+                    "count": 100,
+                    "runs": [
+                      [
+                        100,
+                        0
+                      ]
+                    ]
+                  },
+                  "documentFrame": {
+                    "beforeMs": 0,
+                    "afterMs": 0
+                  },
+                  "readEndedMs": 0.0049999999999954525
+                }
+              ],
+              "after": [
+                {
+                  "readStartedMs": 0.030000000000001137,
+                  "positions": {
+                    "encoding": "rle",
+                    "count": 100,
+                    "runs": [
+                      [
+                        100,
+                        0
+                      ]
+                    ]
+                  },
+                  "documentFrame": {
+                    "beforeMs": 0,
+                    "afterMs": 0
+                  },
+                  "readEndedMs": 0.030000000000001137
+                }
+              ],
+              "firstFrame": {
+                "frameTimestampMs": 16.033000000000044,
+                "groups": [
+                  {
+                    "readStartedMs": 16.03,
+                    "positions": {
+                      "encoding": "rle",
+                      "count": 100,
+                      "runs": [
+                        [
+                          100,
+                          0.002343750000011191
+                        ]
+                      ]
+                    },
+                    "documentFrame": {
+                      "beforeMs": 16.033000000000044,
+                      "afterMs": 16.033000000000044
+                    },
+                    "readEndedMs": 16.034999999999997
+                  }
+                ]
+              }
+            },
+            "valid": true
+          },
+          "timerEvidence": {
+            "crossOriginIsolated": true,
+            "probes": [
+              {
+                "phase": "before",
+                "timeOriginMs": 1000,
+                "performanceNowDeltasMs": [
+                  0.0049999999999954525,
+                  0.0049999999999954525,
+                  0.0049999999999954525,
+                  0.0049999999999954525,
+                  0.0049999999999954525,
+                  0.0049999999999954525,
+                  0.0049999999999954525,
+                  0.005000000000052296,
+                  0.0049999999999954525,
+                  0.0049999999999954525,
+                  0.0049999999999954525,
+                  0.0049999999999954525,
+                  0.0049999999999954525,
+                  0.0049999999999954525,
+                  0.0049999999999954525,
+                  0.0049999999999954525,
+                  0.0049999999999954525,
+                  0.0049999999999954525,
+                  0.0049999999999954525,
+                  0.005000000000052296,
+                  0.0049999999999954525,
+                  0.0049999999999954525,
+                  0.0049999999999954525,
+                  0.0049999999999954525,
+                  0.0049999999999954525,
+                  0.0049999999999954525,
+                  0.0049999999999954525,
+                  0.0049999999999954525,
+                  0.0049999999999954525,
+                  0.0049999999999954525,
+                  0.0049999999999954525,
+                  0.0049999999999954525,
+                  0.005000000000052296,
+                  0.0049999999999954525,
+                  0.0049999999999954525,
+                  0.0049999999999954525,
+                  0.0049999999999954525,
+                  0.0049999999999954525,
+                  0.0049999999999954525,
+                  0.0049999999999954525,
+                  0.0049999999999954525,
+                  0.0049999999999954525,
+                  0.0049999999999954525,
+                  0.0049999999999954525,
+                  0.005000000000052296,
+                  0.0049999999999954525,
+                  0.0049999999999954525,
+                  0.0049999999999954525,
+                  0.0049999999999954525,
+                  0.0049999999999954525,
+                  0.0049999999999954525,
+                  0.0049999999999954525,
+                  0.0049999999999954525,
+                  0.0049999999999954525,
+                  0.0049999999999954525,
+                  0.0049999999999954525,
+                  0.0049999999999954525,
+                  0.005000000000052296,
+                  0.0049999999999954525,
+                  0.0049999999999954525,
+                  0.0049999999999954525,
+                  0.0049999999999954525,
+                  0.0049999999999954525,
+                  0.0049999999999954525
+                ]
+              },
+              {
+                "phase": "after",
+                "timeOriginMs": 1000,
+                "performanceNowDeltasMs": [
+                  0.0049999999999954525,
+                  0.0049999999999954525,
+                  0.0049999999999954525,
+                  0.0049999999999954525,
+                  0.0049999999999954525,
+                  0.0049999999999954525,
+                  0.0049999999999954525,
+                  0.0049999999999954525,
+                  0.0049999999999954525,
+                  0.0049999999999954525,
+                  0.0049999999999954525,
+                  0.005000000000109139,
+                  0.0049999999999954525,
+                  0.0049999999999954525,
+                  0.0049999999999954525,
+                  0.0049999999999954525,
+                  0.0049999999999954525,
+                  0.0049999999999954525,
+                  0.0049999999999954525,
+                  0.0049999999999954525,
+                  0.0049999999999954525,
+                  0.0049999999999954525,
+                  0.0049999999999954525,
+                  0.0049999999999954525,
+                  0.0049999999999954525,
+                  0.0049999999999954525,
+                  0.0049999999999954525,
+                  0.0049999999999954525,
+                  0.0049999999999954525,
+                  0.0049999999999954525,
+                  0.0049999999999954525,
+                  0.0049999999999954525,
+                  0.0049999999999954525,
+                  0.0049999999999954525,
+                  0.0049999999999954525,
+                  0.0049999999999954525,
+                  0.005000000000109139,
+                  0.0049999999999954525,
+                  0.0049999999999954525,
+                  0.0049999999999954525,
+                  0.0049999999999954525,
+                  0.0049999999999954525,
+                  0.0049999999999954525,
+                  0.0049999999999954525,
+                  0.0049999999999954525,
+                  0.0049999999999954525,
+                  0.0049999999999954525,
+                  0.0049999999999954525,
+                  0.0049999999999954525,
+                  0.0049999999999954525,
+                  0.0049999999999954525,
+                  0.0049999999999954525,
+                  0.0049999999999954525,
+                  0.0049999999999954525,
+                  0.0049999999999954525,
+                  0.0049999999999954525,
+                  0.0049999999999954525,
+                  0.0049999999999954525,
+                  0.0049999999999954525,
+                  0.0049999999999954525,
+                  0.0049999999999954525,
+                  0.005000000000109139,
+                  0.0049999999999954525,
+                  0.0049999999999954525
+                ]
+              }
+            ]
+          },
+          "timerStepMs": 0.005000000000109139,
+          "monotonicHostUpperNs": "43329688676231",
+          "clockModelDigest": "7e45adab88a2c97af4e9074543318ae115e42b5c9669c4746b6e149d42bfbc4f",
+          "startMs": 0.025019531249999893,
+          "cancelMs": 0.05003906250000023,
+          "repetitions": 8,
+          "workMultiplier": 1,
+          "denominator": "стоимость полезного вызова с зарегистрированными targets: browser batch/32; positive содержит 64 actual calls без деления на два; engine unchanged",
+          "semantic": true
+        }
+      },
+      "sut": {
+        "starts": 290,
+        "cancels": 290,
+        "connected": 0,
+        "closed": true
+      }
+    }
+  ]
+}

@@ -1,0 +1,561 @@
+{
+  "schema": 1,
+  "axis": "second-order source/consumer/cost only",
+  "actualRegisteredPerformanceSamples": 0,
+  "originalEpochsRetained": true,
+  "publicCliCases": [
+    {
+      "name": "onset-healthy-fullN",
+      "command": [
+        "/opt/codex/runtimes/codex-primary-runtime/dependencies/node/bin/node",
+        "/workspace/lab-motion/bench/profile/server-profile-contract.mjs",
+        "--raw",
+        "/workspace/scratch/motion-server-frame-clock-closure-20261001T1310Z/onset-healthy-fullN.json",
+        "--digest",
+        "307edfb14a5fb890d3624c9df73122007754742e8caecff1c7eb605f98581f55",
+        "--journal",
+        "/workspace/scratch/motion-server-frame-clock-closure-20261001T1310Z/onset-healthy-fullN.ndjson"
+      ],
+      "protocolDigest": "00e8d5880eb83dd27a52f90cc670d4ecc550229458af039d9924485805c25431",
+      "startUtc": "2026-10-01T14:08:57.918Z",
+      "endUtc": "2026-10-01T14:09:09.919Z",
+      "status": 0,
+      "matched": true,
+      "stdout": "{\"verification\":\"server-cell-only\",\"verdict\":\"PASS\",\"unproven\":[\"mobile Android/iOS\",\"physical 60/120 Hz\",\"whole-page energy\",\"GPU\",\"M-04 physical-device envelope\",\"M-05 product scene families\"],\"journalFinalDigest\":\"c10bd16841a01e757152c2a6af40bac292f851b647e98097e6da7fc1c02deeae\"}\n",
+      "stderr": "",
+      "raw": {
+        "sha256": "307edfb14a5fb890d3624c9df73122007754742e8caecff1c7eb605f98581f55",
+        "bytes": 262372284
+      },
+      "journal": {
+        "sha256": "0751be6c38620fd376d8d0db8aec9b13ed296df84de97be5e5e2684f4c75bf2f",
+        "bytes": 264881637
+      }
+    },
+    {
+      "name": "onset-primary-quarter-s2",
+      "command": [
+        "/opt/codex/runtimes/codex-primary-runtime/dependencies/node/bin/node",
+        "/workspace/lab-motion/bench/profile/server-profile-contract.mjs",
+        "--raw",
+        "/workspace/scratch/motion-server-frame-clock-closure-20261001T1310Z/onset-primary-quarter-s2.json",
+        "--digest",
+        "e45442f49bf6b171379d991a68a128d957dff2a068a61d63b0ee2b5b432f7946",
+        "--journal",
+        "/workspace/scratch/motion-server-frame-clock-closure-20261001T1310Z/onset-primary-quarter-s2.ndjson"
+      ],
+      "protocolDigest": "00e8d5880eb83dd27a52f90cc670d4ecc550229458af039d9924485805c25431",
+      "startUtc": "2026-10-01T14:09:22.499Z",
+      "endUtc": "2026-10-01T14:09:34.600Z",
+      "status": 1,
+      "matched": true,
+      "stdout": "",
+      "stderr": "server profile: normal-motion oracle отверг intermediate/stagger/topology\n",
+      "raw": {
+        "sha256": "e45442f49bf6b171379d991a68a128d957dff2a068a61d63b0ee2b5b432f7946",
+        "bytes": 262372597
+      },
+      "journal": {
+        "sha256": "fdffe05861ca7f9ce8d5e0fcb0398638a26be993f59cde2861adfa9887c0989c",
+        "bytes": 264881950
+      }
+    },
+    {
+      "name": "onset-primary-quarter-s3",
+      "command": [
+        "/opt/codex/runtimes/codex-primary-runtime/dependencies/node/bin/node",
+        "/workspace/lab-motion/bench/profile/server-profile-contract.mjs",
+        "--raw",
+        "/workspace/scratch/motion-server-frame-clock-closure-20261001T1310Z/onset-primary-quarter-s3.json",
+        "--digest",
+        "acb678a6aadf00071990f048896efc519d2d0ddccfb8ad3553ba6779d67e2a28",
+        "--journal",
+        "/workspace/scratch/motion-server-frame-clock-closure-20261001T1310Z/onset-primary-quarter-s3.ndjson"
+      ],
+      "protocolDigest": "00e8d5880eb83dd27a52f90cc670d4ecc550229458af039d9924485805c25431",
+      "startUtc": "2026-10-01T14:09:46.194Z",
+      "endUtc": "2026-10-01T14:09:57.667Z",
+      "status": 1,
+      "matched": true,
+      "stdout": "",
+      "stderr": "server profile: normal-motion oracle отверг intermediate/stagger/topology\n",
+      "raw": {
+        "sha256": "acb678a6aadf00071990f048896efc519d2d0ddccfb8ad3553ba6779d67e2a28",
+        "bytes": 262373325
+      },
+      "journal": {
+        "sha256": "db1f726871a8c4889bf92549bafcd937c322ada47d3c0a6c3a0fad679faa2986",
+        "bytes": 264882678
+      }
+    },
+    {
+      "name": "frame-actual-duration256-all-new-fields",
+      "command": [
+        "/opt/codex/runtimes/codex-primary-runtime/dependencies/node/bin/node",
+        "/workspace/lab-motion/bench/profile/server-profile-contract.mjs",
+        "--raw",
+        "/workspace/scratch/motion-server-frame-clock-closure-20261001T1310Z/frame-actual-duration256-all-new-fields.json",
+        "--digest",
+        "e542cfd9b0f26b3d1af0ab8f91135ff1e67a3821532ee6eee6edc39827f58f63",
+        "--journal",
+        "/workspace/scratch/motion-server-frame-clock-closure-20261001T1310Z/frame-actual-duration256-all-new-fields.ndjson"
+      ],
+      "protocolDigest": "00e8d5880eb83dd27a52f90cc670d4ecc550229458af039d9924485805c25431",
+      "startUtc": "2026-10-01T14:10:09.352Z",
+      "endUtc": "2026-10-01T14:10:20.732Z",
+      "status": 1,
+      "matched": true,
+      "stdout": "",
+      "stderr": "server profile: normal-motion oracle отверг intermediate/stagger/topology\n",
+      "raw": {
+        "sha256": "e542cfd9b0f26b3d1af0ab8f91135ff1e67a3821532ee6eee6edc39827f58f63",
+        "bytes": 262372614
+      },
+      "journal": {
+        "sha256": "181dc21dded299a894187884c1b5643533eac4f696dc059edda5d6d1be48d061",
+        "bytes": 264881967
+      }
+    },
+    {
+      "name": "frame-actual-duration64-all-new-fields",
+      "command": [
+        "/opt/codex/runtimes/codex-primary-runtime/dependencies/node/bin/node",
+        "/workspace/lab-motion/bench/profile/server-profile-contract.mjs",
+        "--raw",
+        "/workspace/scratch/motion-server-frame-clock-closure-20261001T1310Z/frame-actual-duration64-all-new-fields.json",
+        "--digest",
+        "bb321a0bb2d3b3d99b1bf6a45803a1f37e48755a04ec23346cb0562a724e79f4",
+        "--journal",
+        "/workspace/scratch/motion-server-frame-clock-closure-20261001T1310Z/frame-actual-duration64-all-new-fields.ndjson"
+      ],
+      "protocolDigest": "00e8d5880eb83dd27a52f90cc670d4ecc550229458af039d9924485805c25431",
+      "startUtc": "2026-10-01T14:10:32.143Z",
+      "endUtc": "2026-10-01T14:10:43.297Z",
+      "status": 1,
+      "matched": true,
+      "stdout": "",
+      "stderr": "server profile: normal-motion oracle отверг intermediate/stagger/topology\n",
+      "raw": {
+        "sha256": "bb321a0bb2d3b3d99b1bf6a45803a1f37e48755a04ec23346cb0562a724e79f4",
+        "bytes": 262372584
+      },
+      "journal": {
+        "sha256": "a33a1474163429ef8e1416752c4dd5a25e2edbd8ac25c619e6357ffdd3ae5822",
+        "bytes": 264881937
+      }
+    },
+    {
+      "name": "first-publication-stale50-first-quarter-s2",
+      "command": [
+        "/opt/codex/runtimes/codex-primary-runtime/dependencies/node/bin/node",
+        "/workspace/lab-motion/bench/profile/server-profile-contract.mjs",
+        "--raw",
+        "/workspace/scratch/motion-server-frame-clock-closure-20261001T1310Z/first-publication-stale50-first-quarter-s2.json",
+        "--digest",
+        "a9e594e6ed2df99cc2452255b9b8777e0f996642ce0f9a3bbefbd8f8cd8bc1b0",
+        "--journal",
+        "/workspace/scratch/motion-server-frame-clock-closure-20261001T1310Z/first-publication-stale50-first-quarter-s2.ndjson"
+      ],
+      "protocolDigest": "00e8d5880eb83dd27a52f90cc670d4ecc550229458af039d9924485805c25431",
+      "startUtc": "2026-10-01T14:10:55.447Z",
+      "endUtc": "2026-10-01T14:11:07.052Z",
+      "status": 1,
+      "matched": true,
+      "stdout": "",
+      "stderr": "server profile: normal-motion oracle отверг intermediate/stagger/topology\n",
+      "raw": {
+        "sha256": "a9e594e6ed2df99cc2452255b9b8777e0f996642ce0f9a3bbefbd8f8cd8bc1b0",
+        "bytes": 262372604
+      },
+      "journal": {
+        "sha256": "d95fbf0e91f15163ce6d9f97ca70587e641ea52e395ca49814b5f251601d02f5",
+        "bytes": 264881957
+      }
+    },
+    {
+      "name": "first-publication-stale50-late-quarter-s2",
+      "command": [
+        "/opt/codex/runtimes/codex-primary-runtime/dependencies/node/bin/node",
+        "/workspace/lab-motion/bench/profile/server-profile-contract.mjs",
+        "--raw",
+        "/workspace/scratch/motion-server-frame-clock-closure-20261001T1310Z/first-publication-stale50-late-quarter-s2.json",
+        "--digest",
+        "59825cb9fa971352ac207ae9ec9ef84ab4ba6b6a494fc7513c1b6223b62b1114",
+        "--journal",
+        "/workspace/scratch/motion-server-frame-clock-closure-20261001T1310Z/first-publication-stale50-late-quarter-s2.ndjson"
+      ],
+      "protocolDigest": "00e8d5880eb83dd27a52f90cc670d4ecc550229458af039d9924485805c25431",
+      "startUtc": "2026-10-01T14:11:18.538Z",
+      "endUtc": "2026-10-01T14:11:29.799Z",
+      "status": 1,
+      "matched": true,
+      "stdout": "",
+      "stderr": "server profile: normal-motion oracle отверг intermediate/stagger/topology\n",
+      "raw": {
+        "sha256": "59825cb9fa971352ac207ae9ec9ef84ab4ba6b6a494fc7513c1b6223b62b1114",
+        "bytes": 262372607
+      },
+      "journal": {
+        "sha256": "c9b800ed67a95d1904373640060e47dca7f63596d48537b62b46cd1fc478f4c7",
+        "bytes": 264881960
+      }
+    },
+    {
+      "name": "first-publication-stale50-first-quarter-s3",
+      "command": [
+        "/opt/codex/runtimes/codex-primary-runtime/dependencies/node/bin/node",
+        "/workspace/lab-motion/bench/profile/server-profile-contract.mjs",
+        "--raw",
+        "/workspace/scratch/motion-server-frame-clock-closure-20261001T1310Z/first-publication-stale50-first-quarter-s3.json",
+        "--digest",
+        "9a5b1495591001b3da16bc26e3e5b60483ae14cd732071115d96c4df31d04f46",
+        "--journal",
+        "/workspace/scratch/motion-server-frame-clock-closure-20261001T1310Z/first-publication-stale50-first-quarter-s3.ndjson"
+      ],
+      "protocolDigest": "00e8d5880eb83dd27a52f90cc670d4ecc550229458af039d9924485805c25431",
+      "startUtc": "2026-10-01T14:11:41.419Z",
+      "endUtc": "2026-10-01T14:11:54.252Z",
+      "status": 1,
+      "matched": true,
+      "stdout": "",
+      "stderr": "server profile: normal-motion oracle отверг intermediate/stagger/topology\n",
+      "raw": {
+        "sha256": "9a5b1495591001b3da16bc26e3e5b60483ae14cd732071115d96c4df31d04f46",
+        "bytes": 262373332
+      },
+      "journal": {
+        "sha256": "f5479ccc40747c3b9282bb16c8fa812b14b2752db5bed4a43615300502f80add",
+        "bytes": 264882685
+      }
+    },
+    {
+      "name": "first-publication-stale50-late-quarter-s3",
+      "command": [
+        "/opt/codex/runtimes/codex-primary-runtime/dependencies/node/bin/node",
+        "/workspace/lab-motion/bench/profile/server-profile-contract.mjs",
+        "--raw",
+        "/workspace/scratch/motion-server-frame-clock-closure-20261001T1310Z/first-publication-stale50-late-quarter-s3.json",
+        "--digest",
+        "8a1bc0d6f88bab27e43e8fa9f5a445e6b44f4707c362a3b266d3445b3656f07b",
+        "--journal",
+        "/workspace/scratch/motion-server-frame-clock-closure-20261001T1310Z/first-publication-stale50-late-quarter-s3.ndjson"
+      ],
+      "protocolDigest": "00e8d5880eb83dd27a52f90cc670d4ecc550229458af039d9924485805c25431",
+      "startUtc": "2026-10-01T14:12:07.666Z",
+      "endUtc": "2026-10-01T14:12:18.989Z",
+      "status": 1,
+      "matched": true,
+      "stdout": "",
+      "stderr": "server profile: normal-motion oracle отверг intermediate/stagger/topology\n",
+      "raw": {
+        "sha256": "8a1bc0d6f88bab27e43e8fa9f5a445e6b44f4707c362a3b266d3445b3656f07b",
+        "bytes": 262373201
+      },
+      "journal": {
+        "sha256": "33f905c1b4f36e6bc7c297814ced122c0026c9566e2ec8256b3c153906ba1c07",
+        "bytes": 264882554
+      }
+    },
+    {
+      "name": "onset-actual-whole-healthy",
+      "command": [
+        "/opt/codex/runtimes/codex-primary-runtime/dependencies/node/bin/node",
+        "/workspace/lab-motion/bench/profile/server-profile-contract.mjs",
+        "--raw",
+        "/workspace/scratch/motion-server-frame-clock-closure-20261001T1310Z/onset-actual-whole-healthy.json",
+        "--digest",
+        "be63810639be4aeb31611b3512a7b0504a7203dc5f76fb2abbfa7d8feb138e83",
+        "--journal",
+        "/workspace/scratch/motion-server-frame-clock-closure-20261001T1310Z/onset-actual-whole-healthy.ndjson"
+      ],
+      "protocolDigest": "00e8d5880eb83dd27a52f90cc670d4ecc550229458af039d9924485805c25431",
+      "startUtc": "2026-10-01T14:12:31.138Z",
+      "endUtc": "2026-10-01T14:12:43.014Z",
+      "status": 0,
+      "matched": true,
+      "stdout": "{\"verification\":\"server-cell-only\",\"verdict\":\"PASS\",\"unproven\":[\"mobile Android/iOS\",\"physical 60/120 Hz\",\"whole-page energy\",\"GPU\",\"M-04 physical-device envelope\",\"M-05 product scene families\"],\"journalFinalDigest\":\"f5471695f3885024e15e2a535e450c97968d06eb1bac2ba810f8b8810b18f37a\"}\n",
+      "stderr": "",
+      "raw": {
+        "sha256": "be63810639be4aeb31611b3512a7b0504a7203dc5f76fb2abbfa7d8feb138e83",
+        "bytes": 262375726
+      },
+      "journal": {
+        "sha256": "9ed43c16e9e49968c6e38d3e7cba1fa893ac9d2558dd28093246380f4d76fbf9",
+        "bytes": 264885079
+      }
+    },
+    {
+      "name": "onset-actual-whole-timed-only-quarter",
+      "command": [
+        "/opt/codex/runtimes/codex-primary-runtime/dependencies/node/bin/node",
+        "/workspace/lab-motion/bench/profile/server-profile-contract.mjs",
+        "--raw",
+        "/workspace/scratch/motion-server-frame-clock-closure-20261001T1310Z/onset-actual-whole-timed-only-quarter.json",
+        "--digest",
+        "af13f6d3c2ebe40c7df78d2cc299e6dad3b6221a3d9a66f17b5cfabd98c47c91",
+        "--journal",
+        "/workspace/scratch/motion-server-frame-clock-closure-20261001T1310Z/onset-actual-whole-timed-only-quarter.ndjson"
+      ],
+      "protocolDigest": "00e8d5880eb83dd27a52f90cc670d4ecc550229458af039d9924485805c25431",
+      "startUtc": "2026-10-01T14:12:53.991Z",
+      "endUtc": "2026-10-01T14:13:04.910Z",
+      "status": 1,
+      "matched": true,
+      "stdout": "",
+      "stderr": "server profile: timed onset не соответствует свежему началу и actual clock окну\n",
+      "raw": {
+        "sha256": "af13f6d3c2ebe40c7df78d2cc299e6dad3b6221a3d9a66f17b5cfabd98c47c91",
+        "bytes": 262375810
+      },
+      "journal": {
+        "sha256": "592da03eb1d3c8f8c075f2b91cbc30a0f6a8ac9a14c5be497500b9aee46f3966",
+        "bytes": 264885163
+      }
+    },
+    {
+      "name": "onset-acquired-before-zero-corruption",
+      "command": [
+        "/opt/codex/runtimes/codex-primary-runtime/dependencies/node/bin/node",
+        "/workspace/lab-motion/bench/profile/server-profile-contract.mjs",
+        "--raw",
+        "/workspace/scratch/motion-server-frame-clock-closure-20261001T1310Z/onset-acquired-before-zero-corruption.json",
+        "--digest",
+        "7114b0dfe0d2892aee13762eb6578cbd56173acaf7a0619c60cbab47ac02e5de",
+        "--journal",
+        "/workspace/scratch/motion-server-frame-clock-closure-20261001T1310Z/onset-acquired-before-zero-corruption.ndjson"
+      ],
+      "protocolDigest": "00e8d5880eb83dd27a52f90cc670d4ecc550229458af039d9924485805c25431",
+      "startUtc": "2026-10-01T14:13:16.644Z",
+      "endUtc": "2026-10-01T14:13:28.139Z",
+      "status": 1,
+      "matched": true,
+      "stdout": "",
+      "stderr": "server profile: normal-motion oracle отверг intermediate/stagger/topology\n",
+      "raw": {
+        "sha256": "7114b0dfe0d2892aee13762eb6578cbd56173acaf7a0619c60cbab47ac02e5de",
+        "bytes": 262372290
+      },
+      "journal": {
+        "sha256": "1ec78cf033394e80ee712d6cda45dd66cc2bdcdedc6300648bafa7a68527b929",
+        "bytes": 264881643
+      }
+    },
+    {
+      "name": "onset-wide-read-window-unresolved",
+      "command": [
+        "/opt/codex/runtimes/codex-primary-runtime/dependencies/node/bin/node",
+        "/workspace/lab-motion/bench/profile/server-profile-contract.mjs",
+        "--raw",
+        "/workspace/scratch/motion-server-frame-clock-closure-20261001T1310Z/onset-wide-read-window-unresolved.json",
+        "--digest",
+        "aad40223fb0664ff5ed634938c9c175470e8c2d4839d535ea2ee13218c61cb68",
+        "--journal",
+        "/workspace/scratch/motion-server-frame-clock-closure-20261001T1310Z/onset-wide-read-window-unresolved.ndjson"
+      ],
+      "protocolDigest": "00e8d5880eb83dd27a52f90cc670d4ecc550229458af039d9924485805c25431",
+      "startUtc": "2026-10-01T14:13:39.850Z",
+      "endUtc": "2026-10-01T14:13:51.290Z",
+      "status": 1,
+      "matched": true,
+      "stdout": "",
+      "stderr": "server profile: normal-motion oracle отверг intermediate/stagger/topology\n",
+      "raw": {
+        "sha256": "aad40223fb0664ff5ed634938c9c175470e8c2d4839d535ea2ee13218c61cb68",
+        "bytes": 262372288
+      },
+      "journal": {
+        "sha256": "4cb7d5f89dab33a03f22c38a8334583ef979df6b3905591445077abeacc03cc1",
+        "bytes": 264881641
+      }
+    },
+    {
+      "name": "onset-healthy-later-saturated",
+      "command": [
+        "/opt/codex/runtimes/codex-primary-runtime/dependencies/node/bin/node",
+        "/workspace/lab-motion/bench/profile/server-profile-contract.mjs",
+        "--raw",
+        "/workspace/scratch/motion-server-frame-clock-closure-20261001T1310Z/onset-healthy-later-saturated.json",
+        "--digest",
+        "581cff880ab380b86538c006eebd198ebbe12c61b309d31c11ef390d93cf083e",
+        "--journal",
+        "/workspace/scratch/motion-server-frame-clock-closure-20261001T1310Z/onset-healthy-later-saturated.ndjson"
+      ],
+      "protocolDigest": "00e8d5880eb83dd27a52f90cc670d4ecc550229458af039d9924485805c25431",
+      "startUtc": "2026-10-01T14:14:03.440Z",
+      "endUtc": "2026-10-01T14:14:15.476Z",
+      "status": 0,
+      "matched": true,
+      "stdout": "{\"verification\":\"server-cell-only\",\"verdict\":\"PASS\",\"unproven\":[\"mobile Android/iOS\",\"physical 60/120 Hz\",\"whole-page energy\",\"GPU\",\"M-04 physical-device envelope\",\"M-05 product scene families\"],\"journalFinalDigest\":\"1196c0d4cfd2e4803e458dc98d0c4d59f460e7a077d3c801194f0f3769e82e45\"}\n",
+      "stderr": "",
+      "raw": {
+        "sha256": "581cff880ab380b86538c006eebd198ebbe12c61b309d31c11ef390d93cf083e",
+        "bytes": 262372287
+      },
+      "journal": {
+        "sha256": "1c3b78ef649941d5dfc4182719105edfe97fe87a48a0ef9c8f55d8baca25901a",
+        "bytes": 264881640
+      }
+    },
+    {
+      "name": "onset-partial-AB-complete-acquired-failure",
+      "command": [
+        "/opt/codex/runtimes/codex-primary-runtime/dependencies/node/bin/node",
+        "/workspace/lab-motion/bench/profile/server-profile-contract.mjs",
+        "--raw",
+        "/workspace/scratch/motion-server-frame-clock-closure-20261001T1310Z/onset-partial-AB-complete-acquired-failure.json",
+        "--digest",
+        "f546389d309bcdd393532182cad29df9bc226f077a5c2e4ec1550ef16210565c",
+        "--journal",
+        "/workspace/scratch/motion-server-frame-clock-closure-20261001T1310Z/onset-partial-AB-complete-acquired-failure.ndjson"
+      ],
+      "protocolDigest": "00e8d5880eb83dd27a52f90cc670d4ecc550229458af039d9924485805c25431",
+      "startUtc": "2026-10-01T14:14:26.298Z",
+      "endUtc": "2026-10-01T14:14:33.762Z",
+      "status": 0,
+      "matched": true,
+      "stdout": "{\"verification\":\"partial-samples-refused\",\"verdict\":\"UNPROVEN\",\"journalFinalDigest\":\"f81ecc05cbda42370874e15ff48b689bb3fb9e9f0809972afdba5b5963224e74\"}\n",
+      "stderr": "",
+      "raw": {
+        "sha256": "f546389d309bcdd393532182cad29df9bc226f077a5c2e4ec1550ef16210565c",
+        "bytes": 164952160
+      },
+      "journal": {
+        "sha256": "1effbc53cd92163a0abd7adefd99354dd3f4140142010b9403eef10d32a8202a",
+        "bytes": 166189788
+      }
+    }
+  ],
+  "suiteSummary": {
+    "numTotalTestSuites": 12,
+    "numPassedTestSuites": 12,
+    "numFailedTestSuites": 0,
+    "numPendingTestSuites": 0,
+    "numTotalTests": 307,
+    "numPassedTests": 307,
+    "numFailedTests": 0,
+    "numPendingTests": 0,
+    "numTodoTests": 0,
+    "startTime": 1790862639353,
+    "success": true
+  },
+  "maxN1024": {
+    "synthetic": true,
+    "actualTimingSamplesObserved": 0,
+    "command": [
+      "/opt/codex/runtimes/codex-primary-runtime/dependencies/node/bin/node",
+      "/workspace/lab-motion/bench/profile/server-profile-contract.mjs",
+      "--raw",
+      "/workspace/scratch/motion-server-frame-clock-closure-20261001T1310Z/maxN1024.json",
+      "--digest",
+      "9cca277c03431ae8eaf5cb62ac6d613f373a282571fc91744b2dc4ebeb4c45c0",
+      "--journal",
+      "/workspace/scratch/motion-server-frame-clock-closure-20261001T1310Z/maxN1024.ndjson"
+    ],
+    "protocolDigest": "00e8d5880eb83dd27a52f90cc670d4ecc550229458af039d9924485805c25431",
+    "runs": 1024,
+    "requiredRuns": 1024,
+    "feasible": true,
+    "stageRows": {
+      "aa": 4096,
+      "positive": 4096,
+      "ab": 4096
+    },
+    "raw": {
+      "sha256": "9cca277c03431ae8eaf5cb62ac6d613f373a282571fc91744b2dc4ebeb4c45c0",
+      "bytes": 925501117
+    },
+    "journal": {
+      "sha256": "15104fb3226920a8db37133ede193be3fa67f21c99bd7f579002aa6266a0b678",
+      "bytes": 934439111
+    },
+    "status": 0,
+    "signal": null,
+    "stdout": "{\"verification\":\"server-cell-only\",\"verdict\":\"PASS\",\"unproven\":[\"mobile Android/iOS\",\"physical 60/120 Hz\",\"whole-page energy\",\"GPU\",\"M-04 physical-device envelope\",\"M-05 product scene families\"],\"journalFinalDigest\":\"9e09ca78ccdaef47366d2bdbae5de24b4bdc7e15167ee197a6f02c50e2784d1e\"}\n",
+    "stderr": "",
+    "error": null,
+    "matched": true,
+    "rawCompressed": {
+      "sha256": "2373ec047351d4522ce487546108faf947c53d3102ff9ca4af01e6216d4a7e80",
+      "bytes": 41606541
+    },
+    "journalCompressed": {
+      "sha256": "298745c674a4f2f9eabbb24abe9ccf82e7d9e467e9f5492b4ee5ce9e59b260f7",
+      "bytes": 44790883
+    }
+  },
+  "maxReceiptEqualsStdout": true,
+  "providedPrimaryBindings": {
+    "receipt.json": null,
+    "SOURCE-FREEZE.json": {
+      "sha256": "4fb124eebf59ca473a46bd6f448bb5208c4d2037283bbe7715b9fbdf95ae8cec",
+      "bytes": 3551
+    },
+    "current-dependency-trees.json": {
+      "sha256": "5db378830ec82c1d326ff5dccbc59732419f7f8c8111b34b3dc73011929a2112",
+      "bytes": 2019
+    },
+    "checks-receipt.json": {
+      "sha256": "6a4d816721a10da58251e97345a73ee7e562a3296eb8b5060062149691823b41",
+      "bytes": 4475
+    },
+    "primary-clock-sources/sources-manifest.json": {
+      "sha256": "889d85624bdc7601f2dd535bc7f00aaef40b7892a89a9b3de5f72987d00b25c4",
+      "bytes": 3891
+    },
+    "evidence/frame-first-publication-closure/maxN1024-consumer-receipt.json": {
+      "sha256": "d564c2bee4b82e89bea58c5b06d1a453690391715657c59991aa25a3fcd4b186",
+      "bytes": 1669
+    },
+    "evidence/frame-first-publication-closure/max-format-consumer-probe.mjs": {
+      "sha256": "272068a3ecc3202472f75aa24840741153010af38dddb26c945d0e51cfd65904",
+      "bytes": 9037
+    },
+    "evidence/frame-first-publication-closure/max-format-consumer.log": {
+      "sha256": "b0d927a88f81853a6c8a3f032342d5d825f776e9545d26e0b2678fbe9b927091",
+      "bytes": 1472
+    },
+    "evidence/frame-first-publication-closure/max-format-fixtures.mjs": {
+      "sha256": "dacbe2186d2859199ed75b792ef24e373a6e1e2b1116da2dc63cdf6bb74206f5",
+      "bytes": 23012
+    },
+    "evidence/frame-first-publication-closure/public-cli-first-publication-results.json": {
+      "sha256": "9b74b2028250fab2c36da1e9536148c6e5b9630fd1a9465f177d472b758b3f37",
+      "bytes": 41602
+    },
+    "evidence/frame-first-publication-closure/public-cli-first-publication-probe.mjs": {
+      "sha256": "9cd121bc56306e2f57f114756e619a353922cc44425e19f94e0a9b18125f20ea",
+      "bytes": 10530
+    },
+    "evidence/frame-first-publication-closure/affected-first-publication-final.json": {
+      "sha256": "d0580744161e794a90b8dd860f17db362b6a98ef9199e191f36b6be2f9ee9388",
+      "bytes": 118366
+    },
+    "evidence/frame-first-publication-closure/affected-first-publication-final.log": {
+      "sha256": "9eeffbdc3d81f8d4be1f36fac10e34289e7eabb7e3ba6287f0a073597be9cacd",
+      "bytes": 182
+    },
+    "artifact-context/source-build-byte-proof.json": {
+      "sha256": "a930133462b96442f0a6aff46dfa2fa22e27bd395d57e47719a591f893d9fb34",
+      "bytes": 181701
+    },
+    "artifact-context/source-readset.json": {
+      "sha256": "8f5b59054b7bf088f8f312e0d9e1645a2c6579ed8a78ef28f1120b552c4c24f6",
+      "bytes": 192037
+    },
+    "artifact-context/baseline.tgz": {
+      "sha256": "3787bfcc0b9b4302d826984cefc29a0a5ff7142d60a52d721c8d2f1397125470",
+      "bytes": 560519
+    },
+    "artifact-context/candidate-npm.tgz": {
+      "sha256": "364f9ff8b505191965040eb17059a034e2cb39be5dd0b1468855ca7e9c61c524",
+      "bytes": 560840
+    },
+    "artifact-context/candidate-pnpm.tgz": {
+      "sha256": "46c9067832760159d35ccd2166b28e6486a57602b1e96d6d23e1c4c06804a402",
+      "bytes": 562846
+    }
+  },
+  "totalMaxCarrierBytes": 1859940228,
+  "maxCarrierDeltaFrom6fe08": 29241115,
+  "uncompressedMaxReplayNotPerformed": true
+}

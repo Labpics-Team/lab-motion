@@ -1,0 +1,85 @@
+[
+  {
+    "name": "healthy",
+    "synthetic": true,
+    "actualTimingSamples": 0,
+    "registeredRuns": 288,
+    "independentBlocks": 144,
+    "protocolDigest": "f3259d5a6bc59ffbc4e41ebab28e182b36e1c5904e8c7434d78877d1b334b5a0",
+    "mutation": null,
+    "command": [
+      "/opt/codex/runtimes/codex-primary-runtime/dependencies/node/bin/node",
+      "/workspace/scratch/server-method-measurement-closure-16f31-20261001/snapshot/source/bench/profile/server-profile-contract.mjs",
+      "--raw",
+      "/workspace/scratch/server-method-measurement-closure-16f31-20261001/fullN-window/healthy.json",
+      "--digest",
+      "aad25947e82354c6e03a792135104bc196310349429c6bcf2f8b800b03566284",
+      "--journal",
+      "/workspace/scratch/server-method-measurement-closure-16f31-20261001/fullN-window/healthy.ndjson"
+    ],
+    "startUtc": "2026-10-01T10:10:36.671Z",
+    "endUtc": "2026-10-01T10:10:47.835Z",
+    "raw": {
+      "path": "/workspace/scratch/server-method-measurement-closure-16f31-20261001/fullN-window/healthy.json",
+      "sha256": "aad25947e82354c6e03a792135104bc196310349429c6bcf2f8b800b03566284",
+      "bytes": 258235047
+    },
+    "journal": {
+      "path": "/workspace/scratch/server-method-measurement-closure-16f31-20261001/fullN-window/healthy.ndjson",
+      "sha256": "e934ecff18cadcb31bcfc2b03d433b15712907d8b8e28005722a2818a9cb12b9",
+      "bytes": 260747685,
+      "records": 10335
+    },
+    "status": 0,
+    "signal": null,
+    "error": null,
+    "stdout": "{\"verification\":\"server-cell-only\",\"verdict\":\"PASS\",\"unproven\":[\"mobile Android/iOS\",\"physical 60/120 Hz\",\"whole-page energy\",\"GPU\",\"M-04 physical-device envelope\",\"M-05 product scene families\"],\"journalFinalDigest\":\"744c2ecfe0913705222585048ebfd860f4d3f1dd3d77b87798fd1bc5ed67aae8\"}\n",
+    "stderr": ""
+  },
+  {
+    "name": "duration256-wide-window",
+    "synthetic": true,
+    "actualTimingSamples": 0,
+    "registeredRuns": 288,
+    "independentBlocks": 144,
+    "protocolDigest": "f3259d5a6bc59ffbc4e41ebab28e182b36e1c5904e8c7434d78877d1b334b5a0",
+    "mutation": {
+      "stage": "ab",
+      "scene": "s2",
+      "run": 0,
+      "participant": "right",
+      "field": "semanticEvidence",
+      "sourceResultSha256": "12d65de0ec855e95c892ecd15229ae235fcf9d7666b31acca15ace34523258f8",
+      "sourceRowDurationMs": 256,
+      "rawClocksUnchanged": true
+    },
+    "command": [
+      "/opt/codex/runtimes/codex-primary-runtime/dependencies/node/bin/node",
+      "/workspace/scratch/server-method-measurement-closure-16f31-20261001/snapshot/source/bench/profile/server-profile-contract.mjs",
+      "--raw",
+      "/workspace/scratch/server-method-measurement-closure-16f31-20261001/fullN-window/duration256-wide-window.json",
+      "--digest",
+      "0ecd9cd41231115482d0d5bffb1b8a0c4f49656181101875c0fe9046d10f40aa",
+      "--journal",
+      "/workspace/scratch/server-method-measurement-closure-16f31-20261001/fullN-window/duration256-wide-window.ndjson"
+    ],
+    "startUtc": "2026-10-01T10:10:56.121Z",
+    "endUtc": "2026-10-01T10:11:06.676Z",
+    "raw": {
+      "path": "/workspace/scratch/server-method-measurement-closure-16f31-20261001/fullN-window/duration256-wide-window.json",
+      "sha256": "0ecd9cd41231115482d0d5bffb1b8a0c4f49656181101875c0fe9046d10f40aa",
+      "bytes": 258241889
+    },
+    "journal": {
+      "path": "/workspace/scratch/server-method-measurement-closure-16f31-20261001/fullN-window/duration256-wide-window.ndjson",
+      "sha256": "5d1bd1d603aa6c7b1f76cfbf3dcfd112c579205a0971a794ca82d6b20fa9c8ef",
+      "bytes": 260754527,
+      "records": 10335
+    },
+    "status": 0,
+    "signal": null,
+    "error": null,
+    "stdout": "{\"verification\":\"server-cell-only\",\"verdict\":\"PASS\",\"unproven\":[\"mobile Android/iOS\",\"physical 60/120 Hz\",\"whole-page energy\",\"GPU\",\"M-04 physical-device envelope\",\"M-05 product scene families\"],\"journalFinalDigest\":\"514cec8d9ecaf0fd1ffbca58f0e494b9249fc3667fa0c64b4c536bb1ab224e43\"}\n",
+    "stderr": ""
+  }
+]

@@ -1,0 +1,10 @@
+{
+  "command": "corepack pnpm exec vitest run test/server-profile-contract.test.ts test/benchmark-methodology.test.ts test/bench-transform-pair.test.ts test/benchmark-report-contract.test.ts --maxWorkers=1",
+  "passed": 260,
+  "failed": 0,
+  "skipped": 0,
+  "publicCliCases": 8,
+  "maxRunsConsumer": 1024,
+  "actualTimingSamplesObserved": 0,
+  "evidenceScope": "Синтетические counters/provenance; это не product admission и не perf data."
+}

@@ -1,0 +1,135 @@
+{
+  "schema": 1,
+  "axis": "second-order clock-source ownership/identity only",
+  "status": "PASS",
+  "command": [
+    "/opt/codex/runtimes/codex-primary-runtime/dependencies/node/bin/node",
+    "/workspace/scratch/server-method-second-order-final-20261001/closure-144242Z/clock-source-binding-probe.mjs"
+  ],
+  "actualRegisteredPerformanceSamples": 0,
+  "clockModelDigest": "7e45adab88a2c97af4e9074543318ae115e42b5c9669c4746b6e149d42bfbc4f",
+  "numericAndBinaryPolicyFieldsUnchangedFrom6fe08": true,
+  "registeredSourcesMatchPrimaryManifest": true,
+  "sources": [
+    {
+      "key": "timeClamper",
+      "url": "https://chromium.googlesource.com/chromium/src/+/149.0.7827.55/third_party/blink/renderer/core/timing/time_clamper.cc",
+      "sha256": "2491cb64f50a54ccd10f778c058f0960ad4d9fa0861e39212bc27b8343bd103c",
+      "file": "time_clamper.cc",
+      "bytes": 3572
+    },
+    {
+      "key": "timeClamperHeader",
+      "url": "https://chromium.googlesource.com/chromium/src/+/149.0.7827.55/third_party/blink/renderer/core/timing/time_clamper.h",
+      "sha256": "f8065edb3ba8da66d58eb7042523fba44b6d515c04d482614670a5414a684944",
+      "file": "time_clamper.h",
+      "bytes": 1889
+    },
+    {
+      "key": "performance",
+      "url": "https://raw.githubusercontent.com/chromium/chromium/149.0.7827.55/third_party/blink/renderer/core/timing/performance.cc",
+      "sha256": "62de6788c9361958757f47a173369cc668f3691ec58f27e2d2edfab780efe200",
+      "file": "performance.cc",
+      "bytes": 56070
+    },
+    {
+      "key": "windowPerformance",
+      "url": "https://raw.githubusercontent.com/chromium/chromium/149.0.7827.55/third_party/blink/renderer/core/timing/window_performance.cc",
+      "sha256": "5916501d9960c6355f1b2b0cee7cbc10091bf63ac64b0bf6397d96e495f71983",
+      "file": "window_performance.cc",
+      "bytes": 69955
+    },
+    {
+      "key": "timeTicks",
+      "url": "https://raw.githubusercontent.com/chromium/chromium/149.0.7827.55/base/time/time_now_posix.cc",
+      "sha256": "6a7b898ec4a2eedbfcc2173ca3cac17b188829b9531ba3febcfe942925ed5796",
+      "file": "time_now_posix.cc",
+      "bytes": 4331
+    },
+    {
+      "key": "documentTimeline",
+      "url": "https://chromium.googlesource.com/chromium/src/+/149.0.7827.55/third_party/blink/renderer/core/animation/document_timeline.cc",
+      "sha256": "e8e405492b4f49f6be850e68c3431d1e2107ac032ea4ff11c433cc726642c702",
+      "file": "document_timeline.cc",
+      "bytes": 8643
+    },
+    {
+      "key": "animationClock",
+      "url": "https://chromium.googlesource.com/chromium/src/+/149.0.7827.55/third_party/blink/renderer/core/animation/animation_clock.cc",
+      "sha256": "f3290008c81dab4f17c7ae8439de25c1c95d0204be6dbb16dada0fd1a8e584eb",
+      "file": "animation_clock.cc",
+      "bytes": 4023
+    },
+    {
+      "key": "animationTimeline",
+      "url": "https://chromium.googlesource.com/chromium/src/+/149.0.7827.55/third_party/blink/renderer/core/animation/animation_timeline.cc",
+      "sha256": "6745f06a855d19691098929b29a5d28331d814c6ae21f1cdf12368eeb7ab5c90",
+      "file": "animation_timeline.cc",
+      "bytes": 8710
+    },
+    {
+      "key": "documentAnimations",
+      "url": "https://chromium.googlesource.com/chromium/src/+/149.0.7827.55/third_party/blink/renderer/core/animation/document_animations.cc",
+      "sha256": "6b20e0668cc740d1e2c9a9828b5316c81b7c43f2eb907af686729e51d10855d2",
+      "file": "document_animations.cc",
+      "bytes": 18539
+    },
+    {
+      "key": "pageAnimator",
+      "url": "https://chromium.googlesource.com/chromium/src/+/149.0.7827.55/third_party/blink/renderer/core/page/page_animator.cc",
+      "sha256": "ba6157ecdc92b5e3375e0239c3b79f39050f5ea3a84d27f65e60b03f1b676e03",
+      "file": "page_animator.cc",
+      "bytes": 17525
+    },
+    {
+      "key": "cssComputedStyle",
+      "url": "https://chromium.googlesource.com/chromium/src/+/149.0.7827.55/third_party/blink/renderer/core/css/css_computed_style_declaration.cc",
+      "sha256": "fc8f9580c1fd1bc2c28d753083925118c38134c37406dcd2f55d98a8ea2bbfb6",
+      "file": "css_computed_style_declaration.cc",
+      "bytes": 22078
+    },
+    {
+      "key": "documentStyle",
+      "url": "https://chromium.googlesource.com/chromium/src/+/149.0.7827.55/third_party/blink/renderer/core/dom/document.cc",
+      "sha256": "8a09dd50bdbbca54b11af849376c4f76df2fd62b14ae665c4c208553b4941dd6",
+      "file": "document.cc",
+      "bytes": 391722
+    },
+    {
+      "key": "nodeProcess",
+      "url": "https://raw.githubusercontent.com/nodejs/node/v24.19.0/src/node_process_methods.cc",
+      "sha256": "6f2d27513a933dd3d076c0ffe2f95a1846ba1d1060f7ccfbc6eb2df6692a34eb",
+      "file": "node_process_methods.cc",
+      "bytes": 28892
+    },
+    {
+      "key": "libuvCore",
+      "url": "https://raw.githubusercontent.com/nodejs/node/v24.19.0/deps/uv/src/unix/core.c",
+      "sha256": "18bfd5f2045417f8ace5d76e222bf7441b31ead5fc2cbaf6225965e0afea8767",
+      "file": "libuv-core.c",
+      "bytes": 50911
+    },
+    {
+      "key": "libuvLinux",
+      "url": "https://raw.githubusercontent.com/nodejs/node/v24.19.0/deps/uv/src/unix/linux.c",
+      "sha256": "215185d94697e05cd75ba9466bb9ea93076769a7767218d4183eaf0723ccf2d2",
+      "file": "libuv-linux.c",
+      "bytes": 73200
+    },
+    {
+      "key": "linuxRusage",
+      "url": "https://raw.githubusercontent.com/gregkh/linux/v6.18.44/kernel/sys.c",
+      "sha256": "0b656f8809d781b7e684a1a4c4144d925684c69e9f6050c41c6374c5206d2c8d",
+      "file": "linux-sys.c",
+      "bytes": 73523
+    },
+    {
+      "key": "linuxTimeval",
+      "url": "https://raw.githubusercontent.com/gregkh/linux/v6.18.44/kernel/time/time.c",
+      "sha256": "e757e825d72489c929a273f22aba8fa31487c29738960aea2683ac0274a58e6a",
+      "file": "linux-time.c",
+      "bytes": 27429
+    }
+  ],
+  "scope": "hash/source roster relation only; no upstream clock/numerical/measurement correctness verdict"
+}

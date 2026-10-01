@@ -1,0 +1,396 @@
+{
+  "schema": 1,
+  "axis": "second-order SERVER METHOD",
+  "packetManifest": {
+    "path": "/workspace/scratch/motion-server-method-final-20261001T144242Z/manifest.json",
+    "sha256": "cb650e2d18f89a7e67d24ec9facdfbef458b9f9e39da50e3b36b1d15636a1b56",
+    "bytes": 836745
+  },
+  "reportSeparateReceipt": "/workspace/scratch/server-method-second-order-final-20261001/closure-144242Z/report-receipt.json",
+  "closure": "own artifacts only; immutable inputs identified separately in readset",
+  "excludedForAcyclicSeal": [
+    "REPORT.md (bound by report-receipt)",
+    "evidence-manifest.json (self)",
+    "report-receipt.json (terminal seal)"
+  ],
+  "files": [
+    {
+      "path": "/workspace/scratch/server-method-second-order-final-20261001/closure-144242Z/affected-files.json",
+      "relativePath": "affected-files.json",
+      "sha256": "b2d753870ca12e20f820cdda03af45ba4a717f1b9a8d12c4c582ae5629645496",
+      "bytes": 2464
+    },
+    {
+      "path": "/workspace/scratch/server-method-second-order-final-20261001/closure-144242Z/artifact-lineage.json",
+      "relativePath": "artifact-lineage.json",
+      "sha256": "0aeb5437e024f917e6d588eb8bd78ad7bcc8ba044294a1a501e6826cd2d3141e",
+      "bytes": 176705
+    },
+    {
+      "path": "/workspace/scratch/server-method-second-order-final-20261001/closure-144242Z/artifact-readset-source-comparison.json",
+      "relativePath": "artifact-readset-source-comparison.json",
+      "sha256": "59e575b29555da53e4f25154a0a09d44579cc4dcf89337ee0afa990732181bb6",
+      "bytes": 1891
+    },
+    {
+      "path": "/workspace/scratch/server-method-second-order-final-20261001/closure-144242Z/bench__compare__bench.mjs.diff",
+      "relativePath": "bench__compare__bench.mjs.diff",
+      "sha256": "9d3a92381bb2945759a970913063443c953d8380bec8d6c5ae92a4e339386b94",
+      "bytes": 5154
+    },
+    {
+      "path": "/workspace/scratch/server-method-second-order-final-20261001/closure-144242Z/bench__compare__methodology.mjs.diff",
+      "relativePath": "bench__compare__methodology.mjs.diff",
+      "sha256": "e5f56a5c3f98660949b68d6687fb270837b1a8c59fb67093aa83055fcfab75f1",
+      "bytes": 9504
+    },
+    {
+      "path": "/workspace/scratch/server-method-second-order-final-20261001/closure-144242Z/bench__profile__server-profile-contract.mjs.diff",
+      "relativePath": "bench__profile__server-profile-contract.mjs.diff",
+      "sha256": "747c9761558b543df8aa0e88ea71663be4df15280cb985d849bfd9cd787d3e3e",
+      "bytes": 11303
+    },
+    {
+      "path": "/workspace/scratch/server-method-second-order-final-20261001/closure-144242Z/bench__profile__server-profile-registration.mjs.diff",
+      "relativePath": "bench__profile__server-profile-registration.mjs.diff",
+      "sha256": "8cf73d58a9537e08361a9d4088a6f1e53c98014da218330236caca29b04eb58d",
+      "bytes": 6710
+    },
+    {
+      "path": "/workspace/scratch/server-method-second-order-final-20261001/closure-144242Z/bench__profile__server-profile-runner.mjs.diff",
+      "relativePath": "bench__profile__server-profile-runner.mjs.diff",
+      "sha256": "6abb41af3e14f08a54cab34e50530d8efd697c29cc06ae359e1393510a45726b",
+      "bytes": 1648
+    },
+    {
+      "path": "/workspace/scratch/server-method-second-order-final-20261001/closure-144242Z/bounded-body-tamper.stderr.log",
+      "relativePath": "bounded-body-tamper.stderr.log",
+      "sha256": "b762f891aa3e2166956c7c0f831a3db0cfea112edcbf0d2229bbb9dd6f5e531a",
+      "bytes": 61
+    },
+    {
+      "path": "/workspace/scratch/server-method-second-order-final-20261001/closure-144242Z/bounded-body-tamper.stdout.log",
+      "relativePath": "bounded-body-tamper.stdout.log",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "bytes": 0
+    },
+    {
+      "path": "/workspace/scratch/server-method-second-order-final-20261001/closure-144242Z/bounded-current-refusal.stderr.log",
+      "relativePath": "bounded-current-refusal.stderr.log",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "bytes": 0
+    },
+    {
+      "path": "/workspace/scratch/server-method-second-order-final-20261001/closure-144242Z/bounded-current-refusal.stdout.log",
+      "relativePath": "bounded-current-refusal.stdout.log",
+      "sha256": "0d9bb83ba7ce691a6a19df6dd4819c8b957c1cfc42e5a25910ff0c02848c71f0",
+      "bytes": 148
+    },
+    {
+      "path": "/workspace/scratch/server-method-second-order-final-20261001/closure-144242Z/bounded-injected-storage-partial.stderr.log",
+      "relativePath": "bounded-injected-storage-partial.stderr.log",
+      "sha256": "9c175a4c5ac071bd68b02a02b4d94540e56c745eabc40fed433478eb238aa3f9",
+      "bytes": 83
+    },
+    {
+      "path": "/workspace/scratch/server-method-second-order-final-20261001/closure-144242Z/bounded-injected-storage-partial.stdout.log",
+      "relativePath": "bounded-injected-storage-partial.stdout.log",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "bytes": 0
+    },
+    {
+      "path": "/workspace/scratch/server-method-second-order-final-20261001/closure-144242Z/bounded-public-cli-results.json",
+      "relativePath": "bounded-public-cli-results.json",
+      "sha256": "0450f44afa84bf26d4ce7148a94194f6dd4f05f2b12681c4faa61decb2c149c1",
+      "bytes": 3037
+    },
+    {
+      "path": "/workspace/scratch/server-method-second-order-final-20261001/closure-144242Z/changed-body.ndjson",
+      "relativePath": "changed-body.ndjson",
+      "sha256": "53e4a2af7a9c299d711643875fe2ff5e765a1d4d1a54aab78fc5f3f92119a3aa",
+      "bytes": 604
+    },
+    {
+      "path": "/workspace/scratch/server-method-second-order-final-20261001/closure-144242Z/clock-source-binding-execution.json",
+      "relativePath": "clock-source-binding-execution.json",
+      "sha256": "111466428d2f372e365cd54c8971365c00081ead4a748375afdb0bdd5a7a8547",
+      "bytes": 235
+    },
+    {
+      "path": "/workspace/scratch/server-method-second-order-final-20261001/closure-144242Z/clock-source-binding-probe.mjs",
+      "relativePath": "clock-source-binding-probe.mjs",
+      "sha256": "4d332c5fed357aeeaf33d19bae36a5b830d599679177480d3c10e96ceb9c9cda",
+      "bytes": 2349
+    },
+    {
+      "path": "/workspace/scratch/server-method-second-order-final-20261001/closure-144242Z/clock-source-binding-probe.stderr.log",
+      "relativePath": "clock-source-binding-probe.stderr.log",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "bytes": 0
+    },
+    {
+      "path": "/workspace/scratch/server-method-second-order-final-20261001/closure-144242Z/clock-source-binding-probe.stdout.log",
+      "relativePath": "clock-source-binding-probe.stdout.log",
+      "sha256": "c90d31e6ff020228f1b4b2e7e4c16e0484de40b962470ddb913beceecca23f93",
+      "bytes": 5891
+    },
+    {
+      "path": "/workspace/scratch/server-method-second-order-final-20261001/closure-144242Z/clock-source-binding-result.json",
+      "relativePath": "clock-source-binding-result.json",
+      "sha256": "c90d31e6ff020228f1b4b2e7e4c16e0484de40b962470ddb913beceecca23f93",
+      "bytes": 5891
+    },
+    {
+      "path": "/workspace/scratch/server-method-second-order-final-20261001/closure-144242Z/consumer-lifecycle-execution.json",
+      "relativePath": "consumer-lifecycle-execution.json",
+      "sha256": "7315dd3a5afbe47384be40dbe8d2ff02e5ba1390910645327c488467060a5025",
+      "bytes": 278
+    },
+    {
+      "path": "/workspace/scratch/server-method-second-order-final-20261001/closure-144242Z/consumer-lifecycle-probe.attempt1.mjs",
+      "relativePath": "consumer-lifecycle-probe.attempt1.mjs",
+      "sha256": "e3a54084d08873b6257febad05301e5cc6aae413733b45beacada3245ea1228b",
+      "bytes": 11317
+    },
+    {
+      "path": "/workspace/scratch/server-method-second-order-final-20261001/closure-144242Z/consumer-lifecycle-probe.mjs",
+      "relativePath": "consumer-lifecycle-probe.mjs",
+      "sha256": "7af4e7fdc61a9d6a6dff1f9886177544d3dbab95c1fac24bcd3f1cb6067c997e",
+      "bytes": 11429
+    },
+    {
+      "path": "/workspace/scratch/server-method-second-order-final-20261001/closure-144242Z/consumer-lifecycle-probe.stderr.attempt1.log",
+      "relativePath": "consumer-lifecycle-probe.stderr.attempt1.log",
+      "sha256": "96bd90432efe8e9e9a99b35fc570707d32af87591c5b8cc8bd2e024b316a66a3",
+      "bytes": 1409
+    },
+    {
+      "path": "/workspace/scratch/server-method-second-order-final-20261001/closure-144242Z/consumer-lifecycle-probe.stderr.log",
+      "relativePath": "consumer-lifecycle-probe.stderr.log",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "bytes": 0
+    },
+    {
+      "path": "/workspace/scratch/server-method-second-order-final-20261001/closure-144242Z/consumer-lifecycle-probe.stdout.attempt1.log",
+      "relativePath": "consumer-lifecycle-probe.stdout.attempt1.log",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "bytes": 0
+    },
+    {
+      "path": "/workspace/scratch/server-method-second-order-final-20261001/closure-144242Z/consumer-lifecycle-probe.stdout.log",
+      "relativePath": "consumer-lifecycle-probe.stdout.log",
+      "sha256": "5e0378ba0fb76a5a6685c45469961d9ed9e4ca106fa75dc4c2595bf923a8f10b",
+      "bytes": 3992
+    },
+    {
+      "path": "/workspace/scratch/server-method-second-order-final-20261001/closure-144242Z/consumer-lifecycle-result.json",
+      "relativePath": "consumer-lifecycle-result.json",
+      "sha256": "5e0378ba0fb76a5a6685c45469961d9ed9e4ca106fa75dc4c2595bf923a8f10b",
+      "bytes": 3992
+    },
+    {
+      "path": "/workspace/scratch/server-method-second-order-final-20261001/closure-144242Z/current-refusal.json",
+      "relativePath": "current-refusal.json",
+      "sha256": "f9a15bdc49007f9f182d87fadfba8bc633520ee9e097507afe29279a7ed60021",
+      "bytes": 10847
+    },
+    {
+      "path": "/workspace/scratch/server-method-second-order-final-20261001/closure-144242Z/current-refusal.ndjson",
+      "relativePath": "current-refusal.ndjson",
+      "sha256": "6a951c6cb4a230c747c44354f1ff8ec359a85b6159b7b1bc69ea872b6d3bbd81",
+      "bytes": 569
+    },
+    {
+      "path": "/workspace/scratch/server-method-second-order-final-20261001/closure-144242Z/docs__server-profile.md.diff",
+      "relativePath": "docs__server-profile.md.diff",
+      "sha256": "1f515665bf6ecf3a1a4e2024a757dd5b5111887d3bb95ed50b9587257e0e9789",
+      "bytes": 8691
+    },
+    {
+      "path": "/workspace/scratch/server-method-second-order-final-20261001/closure-144242Z/fixture-adaptation.json",
+      "relativePath": "fixture-adaptation.json",
+      "sha256": "37f68111fbd5a9c6ca283c5e34e83fd353e724d2c92b54d8b0fdf800ca1e6d89",
+      "bytes": 571
+    },
+    {
+      "path": "/workspace/scratch/server-method-second-order-final-20261001/closure-144242Z/frozen-synthetic-fixtures.mjs",
+      "relativePath": "frozen-synthetic-fixtures.mjs",
+      "sha256": "cf1b0e938e6e3edcd26c5c2f0bc1d3c8a965467d65b5483c1e6b5ad4c598dbf1",
+      "bytes": 23204
+    },
+    {
+      "path": "/workspace/scratch/server-method-second-order-final-20261001/closure-144242Z/git-source-binding.json",
+      "relativePath": "git-source-binding.json",
+      "sha256": "46427143fa635f2263b66f2e5c19a66ab2c199d6ea5317922c647664fec0d0e3",
+      "bytes": 419
+    },
+    {
+      "path": "/workspace/scratch/server-method-second-order-final-20261001/closure-144242Z/immutable-verification.json",
+      "relativePath": "immutable-verification.json",
+      "sha256": "80d989913c8cfbb791b89988176c0b2e64a19640242428e035fb69a63731cbed",
+      "bytes": 741
+    },
+    {
+      "path": "/workspace/scratch/server-method-second-order-final-20261001/closure-144242Z/injected-storage-partial.json",
+      "relativePath": "injected-storage-partial.json",
+      "sha256": "312b3c074c3597cd390589a2a6dc5c2280482942bd3d7b9f94b4da0ae0fa238a",
+      "bytes": 31
+    },
+    {
+      "path": "/workspace/scratch/server-method-second-order-final-20261001/closure-144242Z/light-probe-execution.attempt1.json",
+      "relativePath": "light-probe-execution.attempt1.json",
+      "sha256": "286b2866cefdbfbd34fa764b3c5032f1282f2d8710df3da4de164e1240428217",
+      "bytes": 2062
+    },
+    {
+      "path": "/workspace/scratch/server-method-second-order-final-20261001/closure-144242Z/light-probe-execution.json",
+      "relativePath": "light-probe-execution.json",
+      "sha256": "286b2866cefdbfbd34fa764b3c5032f1282f2d8710df3da4de164e1240428217",
+      "bytes": 2062
+    },
+    {
+      "path": "/workspace/scratch/server-method-second-order-final-20261001/closure-144242Z/norm/AGENTS.md",
+      "relativePath": "norm/AGENTS.md",
+      "sha256": "0e1376312cedf91660b1c919ba4c1a9a6e067fe8719eb8daeb52113508b28f0a",
+      "bytes": 38398
+    },
+    {
+      "path": "/workspace/scratch/server-method-second-order-final-20261001/closure-144242Z/norm/plans/SPEC.md",
+      "relativePath": "norm/plans/SPEC.md",
+      "sha256": "7488d5885ee2405d678e488e34a84ce48254978c3a6ad3de2e4d31dfe7b3f651",
+      "bytes": 31491
+    },
+    {
+      "path": "/workspace/scratch/server-method-second-order-final-20261001/closure-144242Z/norm/plans/TEMPLATE.md",
+      "relativePath": "norm/plans/TEMPLATE.md",
+      "sha256": "7f4cb8dcc983f392a01f2abdddc7b74527412b0da725b114cee94677c651a97e",
+      "bytes": 10270
+    },
+    {
+      "path": "/workspace/scratch/server-method-second-order-final-20261001/closure-144242Z/norm/plans/lab-motion-production/ACTIVATION.md",
+      "relativePath": "norm/plans/lab-motion-production/ACTIVATION.md",
+      "sha256": "97e6b6ce4080b5c91d62e7ace5844a3c7aeeaa3bce04b21f832785bc807a4908",
+      "bytes": 194
+    },
+    {
+      "path": "/workspace/scratch/server-method-second-order-final-20261001/closure-144242Z/norm/plans/lab-motion-production/ACTIVE.md",
+      "relativePath": "norm/plans/lab-motion-production/ACTIVE.md",
+      "sha256": "42e36c2efa89912aa00395c938263c1bf35275325420df52ec736b0986606731",
+      "bytes": 235
+    },
+    {
+      "path": "/workspace/scratch/server-method-second-order-final-20261001/closure-144242Z/norm/plans/lab-motion-production/CLAIM.md",
+      "relativePath": "norm/plans/lab-motion-production/CLAIM.md",
+      "sha256": "56ac2167795a81b9d1a60d2ebc1cb8830a2653cbc45026bbcb2d0b0f8e837fa8",
+      "bytes": 139
+    },
+    {
+      "path": "/workspace/scratch/server-method-second-order-final-20261001/closure-144242Z/norm/plans/lab-motion-production/r11.md",
+      "relativePath": "norm/plans/lab-motion-production/r11.md",
+      "sha256": "cbeef108b288502165437c375bb259f3f4d6dc8ae4ae9e926db133adeba40d4b",
+      "bytes": 74166
+    },
+    {
+      "path": "/workspace/scratch/server-method-second-order-final-20261001/closure-144242Z/norm/plans/lab-motion-production/r12.md",
+      "relativePath": "norm/plans/lab-motion-production/r12.md",
+      "sha256": "89369af073e245a23d491bcc823b9a2a07655813da1b3dca604c84dcb72be718",
+      "bytes": 29760
+    },
+    {
+      "path": "/workspace/scratch/server-method-second-order-final-20261001/closure-144242Z/norm-binding.json",
+      "relativePath": "norm-binding.json",
+      "sha256": "5708e5340534a35230737655e18c6d73e163ce57035e5b9183fea09593d7bbba",
+      "bytes": 2495
+    },
+    {
+      "path": "/workspace/scratch/server-method-second-order-final-20261001/closure-144242Z/previous-artifact-preservation.json",
+      "relativePath": "previous-artifact-preservation.json",
+      "sha256": "74b2a8faea8f040f09d7bfb71abf0c31a8f08dc19beed4b14747daf6b1bec282",
+      "bytes": 2249
+    },
+    {
+      "path": "/workspace/scratch/server-method-second-order-final-20261001/closure-144242Z/primary-source-closure.json",
+      "relativePath": "primary-source-closure.json",
+      "sha256": "3088efe41c9e9c104badc5c2103ce218653b1deb7496d9019b6d8754b351e703",
+      "bytes": 4724
+    },
+    {
+      "path": "/workspace/scratch/server-method-second-order-final-20261001/closure-144242Z/provided-primary-summary.json",
+      "relativePath": "provided-primary-summary.json",
+      "sha256": "c631e6dcd277874dab89996d44f06f4fc5de020e7727316be3a3ba5ecd5c900a",
+      "bytes": 24897
+    },
+    {
+      "path": "/workspace/scratch/server-method-second-order-final-20261001/closure-144242Z/readset.json",
+      "relativePath": "readset.json",
+      "sha256": "14130861498463e305ce75110ce45eb2863f1cce5f09330b5411bda4452c5c7e",
+      "bytes": 92213
+    },
+    {
+      "path": "/workspace/scratch/server-method-second-order-final-20261001/closure-144242Z/review-command-receipt.json",
+      "relativePath": "review-command-receipt.json",
+      "sha256": "3e3560eb6332e07f3272371c2c9817a60a4fb13b9a6e78460098faa5fba4a062",
+      "bytes": 2351
+    },
+    {
+      "path": "/workspace/scratch/server-method-second-order-final-20261001/closure-144242Z/seal-review.py",
+      "relativePath": "seal-review.py",
+      "sha256": "cf0d6ac46a2f34cafb26e1d03c8b5230501f9d1ae01f145ea802a694415177a9",
+      "bytes": 18848
+    },
+    {
+      "path": "/workspace/scratch/server-method-second-order-final-20261001/closure-144242Z/storage-capacity-receipt.json",
+      "relativePath": "storage-capacity-receipt.json",
+      "sha256": "3ccc312a7ffb394c48a5b0f07c21508bce55ee2affa71598d7fa5ddf8184bf53",
+      "bytes": 217
+    },
+    {
+      "path": "/workspace/scratch/server-method-second-order-final-20261001/closure-144242Z/storage-capacity.stderr.log",
+      "relativePath": "storage-capacity.stderr.log",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "bytes": 0
+    },
+    {
+      "path": "/workspace/scratch/server-method-second-order-final-20261001/closure-144242Z/storage-capacity.stdout.log",
+      "relativePath": "storage-capacity.stdout.log",
+      "sha256": "af70bebfa701338d4b028c32b224a73bb27e6c2cb420d92dbb26614be929f6a6",
+      "bytes": 183
+    },
+    {
+      "path": "/workspace/scratch/server-method-second-order-final-20261001/closure-144242Z/storage-probe-result.json",
+      "relativePath": "storage-probe-result.json",
+      "sha256": "5d542f40a8ea8d24869ac2173b221680be59e7ab31df958d463d7ebbd44d4332",
+      "bytes": 919
+    },
+    {
+      "path": "/workspace/scratch/server-method-second-order-final-20261001/closure-144242Z/storage-probe.mjs",
+      "relativePath": "storage-probe.mjs",
+      "sha256": "ea9222051caff4d80fcf3549b26ab665bc860b94571ac5243e5b1f82fbfca2e2",
+      "bytes": 2308
+    },
+    {
+      "path": "/workspace/scratch/server-method-second-order-final-20261001/closure-144242Z/storage-probe.stderr.log",
+      "relativePath": "storage-probe.stderr.log",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "bytes": 0
+    },
+    {
+      "path": "/workspace/scratch/server-method-second-order-final-20261001/closure-144242Z/storage-probe.stdout.log",
+      "relativePath": "storage-probe.stdout.log",
+      "sha256": "5d542f40a8ea8d24869ac2173b221680be59e7ab31df958d463d7ebbd44d4332",
+      "bytes": 919
+    },
+    {
+      "path": "/workspace/scratch/server-method-second-order-final-20261001/closure-144242Z/test__benchmark-methodology.test.ts.diff",
+      "relativePath": "test__benchmark-methodology.test.ts.diff",
+      "sha256": "7b0d34905a315d7afc215b6776e5071e4f1cf6be3e2bb977314c62aaf584ac04",
+      "bytes": 1286
+    },
+    {
+      "path": "/workspace/scratch/server-method-second-order-final-20261001/closure-144242Z/test__server-profile-contract.test.ts.diff",
+      "relativePath": "test__server-profile-contract.test.ts.diff",
+      "sha256": "3522e3aba6d7d6c6b269a7f0da73dc06d253af7d8b0f305eaf5589891dcc9828",
+      "bytes": 24404
+    }
+  ]
+}

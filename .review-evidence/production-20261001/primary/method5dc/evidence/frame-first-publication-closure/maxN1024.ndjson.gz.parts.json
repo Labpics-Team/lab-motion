@@ -1,0 +1,49 @@
+{
+  "proposalOnly": false,
+  "consumable": true,
+  "schemaVersion": 1,
+  "recipe": "contiguous-gzip-byte-slices-20MiB-v1",
+  "storagePartMaxBytes": 20971520,
+  "sourceRepresentation": "exact-original-gzip-no-recompression",
+  "original": {
+    "bytes": 44790883,
+    "sha256": "298745c674a4f2f9eabbb24abe9ccf82e7d9e467e9f5492b4ee5ce9e59b260f7",
+    "reconstructedGitBlob": "5becf6dab5ef9aa4ae3d340818e3811c01b583bc",
+    "decodedIdentity": {
+      "sha256": "15104fb3226920a8db37133ede193be3fa67f21c99bd7f579002aa6266a0b678",
+      "bytes": 934439111,
+      "basis": "original CLI/max-N receipt plus streaming compression/gunzip generator"
+    }
+  },
+  "logicalAliases": [
+    ".review-evidence/production-20261001/primary/method5dc/evidence/frame-first-publication-closure/maxN1024.ndjson.gz"
+  ],
+  "logicalAliasExistsPhysicallyInNewTree": false,
+  "hydrationOutputPolicy": "Собственный каталог; отказ при существующем пути; атомарное имя после всех проверок",
+  "parts": [
+    {
+      "index": 0,
+      "offset": 0,
+      "bytes": 20971520,
+      "storagePath": ".review-evidence/production-20261001/primary/segments/298745c674a4f2f9eabbb24abe9ccf82e7d9e467e9f5492b4ee5ce9e59b260f7/part-000000.bin",
+      "gitBlob": "2b41d5dcd78f59fc1e14d06eba34ed07f00595d1",
+      "sha256": "f63b24c1780b2763441b2dbf3fbb743270b18079cf7799c3c1eec6b30508b6d6"
+    },
+    {
+      "index": 1,
+      "offset": 20971520,
+      "bytes": 20971520,
+      "storagePath": ".review-evidence/production-20261001/primary/segments/298745c674a4f2f9eabbb24abe9ccf82e7d9e467e9f5492b4ee5ce9e59b260f7/part-000001.bin",
+      "gitBlob": "2d118d6978f3ce3c3ba9fad9916e1f8d3f547120",
+      "sha256": "f8ff3a3bd6a8544eefcb8f34db4657303fbe35fa23f36b7df72c4f0375bfdc97"
+    },
+    {
+      "index": 2,
+      "offset": 41943040,
+      "bytes": 2847843,
+      "storagePath": ".review-evidence/production-20261001/primary/segments/298745c674a4f2f9eabbb24abe9ccf82e7d9e467e9f5492b4ee5ce9e59b260f7/part-000002.bin",
+      "gitBlob": "b949dae3310886064f821598f308c20e60e4e179",
+      "sha256": "3833615ec6ff35219c547d7ac330f772a24a77c44978115f3b36748974b39d03"
+    }
+  ]
+}

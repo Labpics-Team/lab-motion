@@ -1,0 +1,59 @@
+{
+  "inputSha256": "5358af8d9cf2c089b25443094f775eea4688fb4e072252fe00d6939d22ebc03c",
+  "actualTimingSamples": 0,
+  "scope": "independent acquisition arithmetic/primitive facts; central phase only, not clock-error certificate or new admission oracle",
+  "rows": [
+    {
+      "name": "healthy",
+      "actualTimingSamples": 0,
+      "starts": 290,
+      "allFreshBeforePx": 0,
+      "allImmediateAfterPx": 0,
+      "centralCompatiblePhaseMs": [
+        -0.21033333333330972,
+        0.21533333333329097
+      ],
+      "acquiredRawClockDigest": "99f8dab2c4385ae81cfd358f6024bd8d9e21ce5f8834a0c0c9dc9597b2a9993b",
+      "sampleStartMs": 0.025019531249999893,
+      "sampleCancelMs": 0.015039062500000089,
+      "timedCalls": [
+        32,
+        32,
+        32,
+        32,
+        32,
+        32,
+        32,
+        32
+      ],
+      "closed": true,
+      "connected": 0
+    },
+    {
+      "name": "initial-progress-quarter",
+      "actualTimingSamples": 0,
+      "starts": 290,
+      "allFreshBeforePx": 0,
+      "allImmediateAfterPx": 75.0,
+      "centralCompatiblePhaseMs": [
+        -32.21033333333331,
+        -31.78366666666669
+      ],
+      "acquiredRawClockDigest": "99f8dab2c4385ae81cfd358f6024bd8d9e21ce5f8834a0c0c9dc9597b2a9993b",
+      "sampleStartMs": 0.025019531249999893,
+      "sampleCancelMs": 0.015039062500000089,
+      "timedCalls": [
+        32,
+        32,
+        32,
+        32,
+        32,
+        32,
+        32,
+        32
+      ],
+      "closed": true,
+      "connected": 0
+    }
+  ]
+}

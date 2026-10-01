@@ -1,0 +1,327 @@
+Already up to date
+Done in 415ms using pnpm v11.11.0
+$ tsup && node scripts/emit-declarations.mjs
+CLI Building entry: {"index":"src/index.ts","easing/index":"src/easing/index.ts","react/index":"src/react/index.ts","svelte/index":"src/svelte/index.ts","vue/index":"src/vue/index.ts","value/index":"src/value/index.ts","driver/index":"src/driver/index.ts","stagger/index":"src/stagger/index.ts","timeline/index":"src/timeline/index.ts","keyframes/index":"src/keyframes/index.ts","decay/index":"src/decay/index.ts","lit/index":"src/lit/index.ts","gestures/index":"src/gestures/index.ts","scroll/index":"src/scroll/index.ts","in-view/index":"src/in-view/index.ts","presence/index":"src/presence/index.ts","flip/index":"src/flip/index.ts","projection/index":"src/projection/index.ts","smart/index":"src/smart/index.ts","svg/index":"src/svg/index.ts","a11y/index":"src/a11y/index.ts","spring/index":"src/spring/index.ts","waapi/index":"src/waapi/index.ts","auto/index":"src/auto/index.ts","svg-morph/index":"src/svg-morph/index.ts","solid/index":"src/solid/index.ts","preact/index":"src/preact/index.ts","angular/index":"src/angular/index.ts","wc/index":"src/wc/index.ts","qwik/index":"src/qwik/index.ts","frame/index":"src/frame/index.ts","presets/index":"src/presets/index.ts","utils/index":"src/utils/index.ts","compositor/index":"src/compositor/index.ts","compositor/stagger/index":"src/compositor/stagger/index.ts","tokens/index":"src/tokens/index.ts","animate/index":"src/animate/index.ts","nano/index":"src/nano/index.ts","compiler/vite/index":"src/compiler/vite/index.ts","compiler/runtime/index":"src/compiler/runtime/index.ts","compiler/surface/index":"src/compiler/surface/index.ts","behaviors/index":"src/behaviors/index.ts","behaviors/reorder/index":"src/behaviors/reorder/index.ts","bindings/index":"src/bindings/index.ts"}
+CLI Using tsconfig: tsconfig.json
+CLI tsup v8.5.1
+CLI Using tsup config: /workspace/lab-motion/tsup.config.ts
+CLI Target: es2022
+CLI Cleaning output folder
+CJS Build start
+ESM Build start
+TERSER Minifying with Terser
+TERSER Terser Minification success
+TERSER Minifying with Terser
+TERSER Terser Minification success
+TERSER Minifying with Terser
+TERSER Terser Minification success
+TERSER Minifying with Terser
+TERSER Terser Minification success
+TERSER Minifying with Terser
+TERSER Terser Minification success
+TERSER Minifying with Terser
+TERSER Terser Minification success
+TERSER Minifying with Terser
+TERSER Terser Minification success
+TERSER Minifying with Terser
+TERSER Terser Minification success
+TERSER Minifying with Terser
+TERSER Terser Minification success
+TERSER Minifying with Terser
+TERSER Terser Minification success
+TERSER Minifying with Terser
+TERSER Terser Minification success
+TERSER Minifying with Terser
+TERSER Terser Minification success
+TERSER Minifying with Terser
+TERSER Terser Minification success
+TERSER Minifying with Terser
+TERSER Terser Minification success
+TERSER Minifying with Terser
+TERSER Terser Minification success
+TERSER Minifying with Terser
+TERSER Terser Minification success
+TERSER Minifying with Terser
+TERSER Terser Minification success
+TERSER Minifying with Terser
+TERSER Terser Minification success
+TERSER Minifying with Terser
+TERSER Terser Minification success
+TERSER Minifying with Terser
+TERSER Terser Minification success
+TERSER Minifying with Terser
+TERSER Terser Minification success
+TERSER Minifying with Terser
+TERSER Terser Minification success
+TERSER Minifying with Terser
+TERSER Terser Minification success
+TERSER Minifying with Terser
+TERSER Terser Minification success
+TERSER Minifying with Terser
+TERSER Terser Minification success
+TERSER Minifying with Terser
+TERSER Terser Minification success
+TERSER Minifying with Terser
+TERSER Terser Minification success
+TERSER Minifying with Terser
+TERSER Terser Minification success
+TERSER Minifying with Terser
+TERSER Terser Minification success
+TERSER Minifying with Terser
+TERSER Terser Minification success
+TERSER Minifying with Terser
+TERSER Terser Minification success
+TERSER Minifying with Terser
+TERSER Terser Minification success
+TERSER Minifying with Terser
+TERSER Terser Minification success
+TERSER Minifying with Terser
+TERSER Terser Minification success
+TERSER Minifying with Terser
+TERSER Terser Minification success
+TERSER Minifying with Terser
+TERSER Terser Minification success
+TERSER Minifying with Terser
+TERSER Terser Minification success
+TERSER Minifying with Terser
+TERSER Terser Minification success
+TERSER Minifying with Terser
+TERSER Terser Minification success
+TERSER Minifying with Terser
+TERSER Terser Minification success
+TERSER Minifying with Terser
+TERSER Terser Minification success
+TERSER Minifying with Terser
+TERSER Terser Minification success
+TERSER Minifying with Terser
+TERSER Terser Minification success
+TERSER Minifying with Terser
+TERSER Terser Minification success
+TERSER Minifying with Terser
+TERSER Terser Minification success
+TERSER Minifying with Terser
+TERSER Terser Minification success
+TERSER Minifying with Terser
+TERSER Terser Minification success
+TERSER Minifying with Terser
+TERSER Terser Minification success
+TERSER Minifying with Terser
+TERSER Terser Minification success
+TERSER Minifying with Terser
+TERSER Terser Minification success
+TERSER Minifying with Terser
+TERSER Terser Minification success
+TERSER Minifying with Terser
+TERSER Terser Minification success
+TERSER Minifying with Terser
+TERSER Terser Minification success
+TERSER Minifying with Terser
+TERSER Terser Minification success
+TERSER Minifying with Terser
+TERSER Terser Minification success
+TERSER Minifying with Terser
+TERSER Terser Minification success
+TERSER Minifying with Terser
+TERSER Terser Minification success
+TERSER Minifying with Terser
+TERSER Terser Minification success
+TERSER Minifying with Terser
+TERSER Terser Minification success
+TERSER Minifying with Terser
+TERSER Terser Minification success
+TERSER Minifying with Terser
+TERSER Terser Minification success
+TERSER Minifying with Terser
+TERSER Terser Minification success
+TERSER Minifying with Terser
+TERSER Terser Minification success
+TERSER Minifying with Terser
+TERSER Terser Minification success
+TERSER Minifying with Terser
+TERSER Terser Minification success
+TERSER Minifying with Terser
+TERSER Terser Minification success
+TERSER Minifying with Terser
+TERSER Terser Minification success
+TERSER Minifying with Terser
+TERSER Terser Minification success
+TERSER Minifying with Terser
+TERSER Terser Minification success
+TERSER Minifying with Terser
+TERSER Terser Minification success
+TERSER Minifying with Terser
+TERSER Terser Minification success
+TERSER Minifying with Terser
+TERSER Terser Minification success
+TERSER Minifying with Terser
+TERSER Terser Minification success
+TERSER Minifying with Terser
+TERSER Terser Minification success
+TERSER Minifying with Terser
+TERSER Terser Minification success
+TERSER Minifying with Terser
+TERSER Terser Minification success
+TERSER Minifying with Terser
+TERSER Terser Minification success
+TERSER Minifying with Terser
+TERSER Terser Minification success
+TERSER Minifying with Terser
+TERSER Terser Minification success
+TERSER Minifying with Terser
+TERSER Terser Minification success
+TERSER Minifying with Terser
+TERSER Terser Minification success
+TERSER Minifying with Terser
+TERSER Terser Minification success
+TERSER Minifying with Terser
+TERSER Terser Minification success
+TERSER Minifying with Terser
+TERSER Terser Minification success
+TERSER Minifying with Terser
+TERSER Terser Minification success
+TERSER Minifying with Terser
+TERSER Terser Minification success
+TERSER Minifying with Terser
+TERSER Terser Minification success
+TERSER Minifying with Terser
+TERSER Terser Minification success
+ESM dist/easing/index.js             3.94 KB
+ESM dist/svelte/index.js             3.97 KB
+ESM dist/index.js                    5.16 KB
+ESM dist/stagger/index.js            1.23 KB
+ESM dist/driver/index.js             3.66 KB
+ESM dist/decay/index.js              1.17 KB
+ESM dist/react/index.js              6.86 KB
+ESM dist/value/index.js              6.06 KB
+ESM dist/vue/index.js                5.36 KB
+ESM dist/timeline/index.js           3.46 KB
+ESM dist/scroll/index.js             2.13 KB
+ESM dist/gestures/index.js           7.18 KB
+ESM dist/lit/index.js                5.17 KB
+ESM dist/in-view/index.js            4.70 KB
+ESM dist/presence/index.js           4.24 KB
+ESM dist/svg/index.js                4.74 KB
+ESM dist/a11y/index.js               1.25 KB
+ESM dist/flip/index.js               2.82 KB
+ESM dist/spring/index.js             4.45 KB
+ESM dist/projection/index.js         14.38 KB
+ESM dist/waapi/index.js              4.59 KB
+ESM dist/solid/index.js              4.10 KB
+ESM dist/keyframes/index.js          5.78 KB
+ESM dist/svg-morph/index.js          7.38 KB
+ESM dist/preact/index.js             4.11 KB
+ESM dist/frame/index.js              1.39 KB
+ESM dist/smart/index.js              20.19 KB
+ESM dist/wc/index.js                 5.04 KB
+ESM dist/qwik/index.js               4.14 KB
+ESM dist/utils/index.js              2.20 KB
+ESM dist/auto/index.js               12.92 KB
+ESM dist/tokens/index.js             2.42 KB
+ESM dist/presets/index.js            14.22 KB
+ESM dist/compiler/runtime/index.js   479.00 B
+ESM dist/compositor/index.js         15.44 KB
+ESM dist/angular/index.js            4.12 KB
+ESM dist/compiler/surface/index.js   2.12 KB
+ESM dist/behaviors/reorder/index.js  3.22 KB
+ESM dist/nano/index.js               1.68 KB
+ESM dist/bindings/index.js           2.71 KB
+ESM dist/compositor/stagger/index.js 16.28 KB
+ESM dist/behaviors/index.js          11.23 KB
+ESM dist/animate/index.js            37.99 KB
+ESM dist/compiler/vite/index.js      14.43 KB
+ESM ⚡️ Build success in 7372ms
+CJS dist/index.cjs                    5.18 KB
+CJS dist/easing/index.cjs             3.99 KB
+CJS dist/react/index.cjs              6.93 KB
+CJS dist/svelte/index.cjs             3.97 KB
+CJS dist/driver/index.cjs             3.66 KB
+CJS dist/keyframes/index.cjs          5.79 KB
+CJS dist/value/index.cjs              6.10 KB
+CJS dist/stagger/index.cjs            1.24 KB
+CJS dist/timeline/index.cjs           3.47 KB
+CJS dist/scroll/index.cjs             2.15 KB
+CJS dist/decay/index.cjs              1.18 KB
+CJS dist/in-view/index.cjs            4.72 KB
+CJS dist/svg/index.cjs                4.76 KB
+CJS dist/flip/index.cjs               2.84 KB
+CJS dist/gestures/index.cjs           7.20 KB
+CJS dist/presence/index.cjs           4.25 KB
+CJS dist/a11y/index.cjs               1.26 KB
+CJS dist/smart/index.cjs              20.21 KB
+CJS dist/waapi/index.cjs              4.62 KB
+CJS dist/spring/index.cjs             4.48 KB
+CJS dist/projection/index.cjs         14.40 KB
+CJS dist/svg-morph/index.cjs          7.39 KB
+CJS dist/solid/index.cjs              4.11 KB
+CJS dist/angular/index.cjs            4.15 KB
+CJS dist/vue/index.cjs                5.37 KB
+CJS dist/auto/index.cjs               12.94 KB
+CJS dist/lit/index.cjs                5.17 KB
+CJS dist/preact/index.cjs             4.12 KB
+CJS dist/utils/index.cjs              2.22 KB
+CJS dist/wc/index.cjs                 5.06 KB
+CJS dist/qwik/index.cjs               4.16 KB
+CJS dist/frame/index.cjs              1.41 KB
+CJS dist/tokens/index.cjs             2.45 KB
+CJS dist/nano/index.cjs               1.69 KB
+CJS dist/compiler/runtime/index.cjs   486.00 B
+CJS dist/compiler/surface/index.cjs   2.13 KB
+CJS dist/compiler/vite/index.cjs      14.44 KB
+CJS dist/compositor/index.cjs         15.47 KB
+CJS dist/presets/index.cjs            14.28 KB
+CJS dist/behaviors/reorder/index.cjs  3.23 KB
+CJS dist/compositor/stagger/index.cjs 16.29 KB
+CJS dist/bindings/index.cjs           2.72 KB
+CJS dist/behaviors/index.cjs          11.24 KB
+CJS dist/animate/index.cjs            37.98 KB
+CJS ⚡️ Build success in 7373ms
+emit-declarations: OK — 108 файлов × (d.ts + d.cts)
+
+lab-motion bench — горячие пути против dist (медиана по сэмплам)
+
+  checkout 8fb55ca0a116; worktree ba82eb5b512fbf6a55c84684159c67db1b7639375c026705a690c437d5268902; dist ee0ff8fe330a718cff82771a62d2d7744c17f7e6238c248e451e693216fc2511
+  AMD EPYC 9V74 80-Core Processor; v24.19.0; pnpm 11.11.0
+
+  путь                                                   ns/оп       ops/sec
+  ------------------------------------------------------------------------
+  пустой loop/sink baseline                                  2       474.86M
+  drive() полный прогон (47 кадров, clamp=default)        6.6k        151.1k
+  drive() clamp:false (47 кадров)                         5.9k        169.3k
+  MotionValue прогон (47 кадров)                          8.3k        121.0k
+  createDriver clamp:false (47 кадров)                   10.2k         97.8k
+  spring() публичный вызов (solver+validate)                72        13.91M
+  utils.interpolate 5-стоп запрос                           14        72.27M
+  compositor.compileSpringLinear COLD (сетка+RDP)        42.8k         23.4k
+  compositor.compileSpringLinear HIT (кэш)                  77        12.94M
+  compositor.readCompositorSpring O(1) read                109         9.19M
+
+изинг по умолчанию: отгруженные dist/tokens против dist/easing
+  реализация                        p50 ns      p95 ns
+  ----------------------------------------------------
+  tokens.standard                    38.22       42.40
+  easing.cubicBezier                105.55      110.44
+  ускорение specialized: 2.762× p50 / 2.605× p95
+  seed=0x51f15e, inputs=65536, repetitions=8, warmup=6, сбалансированных раундов=22
+  checksum tokens=8538784.6941990200; generic=8538784.6941990200
+  dist SHA-256=ee0ff8fe330a718cff82771a62d2d7744c17f7e6238c248e451e693216fc2511
+
+transform formatter+materialization: parts+join reconstruction против current dist/value
+  реализация                        p50 ns      p95 ns
+  ----------------------------------------------------
+  parts-reconstruction              903.32     1140.23
+  current-dist                      954.88     1183.48
+  отношение reconstruction/current: 0.946× p50 / 0.963× p95
+  seed=0x7a6f726d, inputs=16384, repetitions=16, warmup=6, сбалансированных раундов=22
+  checksum=d8b1b856; reconstruction=scripts/bench-support.mjs#reconstructedPartsBuildTransform; current=dist/value/index.js#buildTransform
+  тайминг включает formatter и полное посимвольное чтение результата.
+  свежий dist SHA-256=ee0ff8fe330a718cff82771a62d2d7744c17f7e6238c248e451e693216fc2511; speed hard gate: нет
+
+compositor: число стопов linear() (адаптив, tol=default 0.25px@100px)
+  ------------------------------------------------
+  critical (k170 c26)         32 стопов
+  bouncy   (k180 c8)          68 стопов
+  over     (k100 c40)         32 стопов
+  hit-rate типового stagger (50 элементов, 1 пружина): 98% (1 компиляция + 49 попаданий).
+
+  (sink-checksum ok)
+

@@ -1,0 +1,275 @@
+{
+  "synthetic": true,
+  "actualTimingSamples": 0,
+  "oracle": "Python rational endpoint interpolation and integer field sums; no lifecycle validator imported",
+  "rows": [
+    {
+      "case": "fresh-healthy",
+      "repetitions": 8,
+      "checks": [
+        {
+          "targetCoverage": 1000,
+          "frames": 6,
+          "cssRationalLinearLawMatched": true,
+          "hashMatchesRetainedCss": true,
+          "intervals": [
+            1250000,
+            1250000,
+            1250000,
+            1250000,
+            1250000,
+            1250000,
+            1250000,
+            1250000
+          ]
+        },
+        {
+          "targetCoverage": 1000,
+          "frames": 6,
+          "cssRationalLinearLawMatched": true,
+          "hashMatchesRetainedCss": true,
+          "intervals": [
+            1250000,
+            1250000,
+            1250000,
+            1250000,
+            1250000,
+            1250000,
+            1250000,
+            1250000
+          ]
+        },
+        {
+          "targetCoverage": 1000,
+          "frames": 6,
+          "cssRationalLinearLawMatched": true,
+          "hashMatchesRetainedCss": true,
+          "intervals": [
+            1250000,
+            1250000,
+            1250000,
+            1250000,
+            1250000,
+            1250000,
+            1250000,
+            1250000
+          ]
+        },
+        {
+          "targetCoverage": 1000,
+          "frames": 6,
+          "cssRationalLinearLawMatched": true,
+          "hashMatchesRetainedCss": true,
+          "intervals": [
+            1250000,
+            1250000,
+            1250000,
+            1250000,
+            1250000,
+            1250000,
+            1250000,
+            1250000
+          ]
+        },
+        {
+          "targetCoverage": 1000,
+          "frames": 6,
+          "cssRationalLinearLawMatched": true,
+          "hashMatchesRetainedCss": true,
+          "intervals": [
+            1250000,
+            1250000,
+            1250000,
+            1250000,
+            1250000,
+            1250000,
+            1250000,
+            1250000
+          ]
+        },
+        {
+          "targetCoverage": 1000,
+          "frames": 6,
+          "cssRationalLinearLawMatched": true,
+          "hashMatchesRetainedCss": true,
+          "intervals": [
+            1250000,
+            1250000,
+            1250000,
+            1250000,
+            1250000,
+            1250000,
+            1250000,
+            1250000
+          ]
+        },
+        {
+          "targetCoverage": 1000,
+          "frames": 6,
+          "cssRationalLinearLawMatched": true,
+          "hashMatchesRetainedCss": true,
+          "intervals": [
+            1250000,
+            1250000,
+            1250000,
+            1250000,
+            1250000,
+            1250000,
+            1250000,
+            1250000
+          ]
+        },
+        {
+          "targetCoverage": 1000,
+          "frames": 6,
+          "cssRationalLinearLawMatched": true,
+          "hashMatchesRetainedCss": true,
+          "intervals": [
+            1250000,
+            1250000,
+            1250000,
+            1250000,
+            1250000,
+            1250000,
+            1250000,
+            1250000
+          ]
+        }
+      ]
+    },
+    {
+      "case": "live-healthy",
+      "repetitions": 8,
+      "checks": [
+        {
+          "targetCoverage": 100,
+          "frames": 6,
+          "cssRationalLinearLawMatched": true,
+          "hashMatchesRetainedCss": true,
+          "intervals": [
+            1250000,
+            1250000,
+            1250000,
+            1250000,
+            1250000,
+            1250000,
+            1250000,
+            1250000
+          ]
+        },
+        {
+          "targetCoverage": 100,
+          "frames": 6,
+          "cssRationalLinearLawMatched": true,
+          "hashMatchesRetainedCss": true,
+          "intervals": [
+            1250000,
+            1250000,
+            1250000,
+            1250000,
+            1250000,
+            1250000,
+            1250000,
+            1250000
+          ]
+        },
+        {
+          "targetCoverage": 100,
+          "frames": 6,
+          "cssRationalLinearLawMatched": true,
+          "hashMatchesRetainedCss": true,
+          "intervals": [
+            1250000,
+            1250000,
+            1250000,
+            1250000,
+            1250000,
+            1250000,
+            1250000,
+            1250000
+          ]
+        },
+        {
+          "targetCoverage": 100,
+          "frames": 6,
+          "cssRationalLinearLawMatched": true,
+          "hashMatchesRetainedCss": true,
+          "intervals": [
+            1250000,
+            1250000,
+            1250000,
+            1250000,
+            1250000,
+            1250000,
+            1250000,
+            1250000
+          ]
+        },
+        {
+          "targetCoverage": 100,
+          "frames": 6,
+          "cssRationalLinearLawMatched": true,
+          "hashMatchesRetainedCss": true,
+          "intervals": [
+            1250000,
+            1250000,
+            1250000,
+            1250000,
+            1250000,
+            1250000,
+            1250000,
+            1250000
+          ]
+        },
+        {
+          "targetCoverage": 100,
+          "frames": 6,
+          "cssRationalLinearLawMatched": true,
+          "hashMatchesRetainedCss": true,
+          "intervals": [
+            1250000,
+            1250000,
+            1250000,
+            1250000,
+            1250000,
+            1250000,
+            1250000,
+            1250000
+          ]
+        },
+        {
+          "targetCoverage": 100,
+          "frames": 6,
+          "cssRationalLinearLawMatched": true,
+          "hashMatchesRetainedCss": true,
+          "intervals": [
+            1250000,
+            1250000,
+            1250000,
+            1250000,
+            1250000,
+            1250000,
+            1250000,
+            1250000
+          ]
+        },
+        {
+          "targetCoverage": 100,
+          "frames": 6,
+          "cssRationalLinearLawMatched": true,
+          "hashMatchesRetainedCss": true,
+          "intervals": [
+            1250000,
+            1250000,
+            1250000,
+            1250000,
+            1250000,
+            1250000,
+            1250000,
+            1250000
+          ]
+        }
+      ]
+    }
+  ]
+}

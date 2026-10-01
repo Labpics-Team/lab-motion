@@ -1,0 +1,53 @@
+{
+  "command": [
+    "node",
+    "/workspace/scratch/server-method-measurement-closure-5dc049-20261001/snapshot/source/bench/profile/server-profile-contract.mjs",
+    "--raw",
+    "/workspace/scratch/server-method-measurement-closure-5dc049-20261001/current-fullN-own-first-quarter.raw.fifo",
+    "--digest",
+    "0d4a25c5612e701db662ae852f522ccdf924e576036df145b9e469d05cb08b89",
+    "--journal",
+    "/workspace/scratch/server-method-measurement-closure-5dc049-20261001/current-fullN-own-first-quarter.journal.fifo"
+  ],
+  "startUtc": "2026-10-01T15:37:28.329768+00:00",
+  "endUtc": "2026-10-01T15:37:41.468646+00:00",
+  "exit": 1,
+  "stdout": "",
+  "stderr": "server profile: normal-motion oracle \u043e\u0442\u0432\u0435\u0440\u0433 intermediate/stagger/topology\n",
+  "streams": [
+    {
+      "fifo": "/workspace/scratch/server-method-measurement-closure-5dc049-20261001/current-fullN-own-first-quarter.raw.fifo",
+      "gzip": "/workspace/scratch/server-method-measurement-closure-5dc049-20261001/current-fullN-own-first-quarter.json.gz",
+      "uncompressedSha256": "0d4a25c5612e701db662ae852f522ccdf924e576036df145b9e469d05cb08b89",
+      "uncompressedBytes": 262372454,
+      "expected": {
+        "gzipPath": "/workspace/scratch/server-method-measurement-closure-5dc049-20261001/current-fullN-own-first-quarter.json.gz",
+        "sha256": "0d4a25c5612e701db662ae852f522ccdf924e576036df145b9e469d05cb08b89",
+        "bytes": 262372454,
+        "compressedSha256": "2177fb60470fe6fb032849202b4c07fbe466bf83171ec78263808c4d63565dbf",
+        "compressedBytes": 11813214,
+        "encoding": "lossless gzip level1; no plaintext file emitted"
+      },
+      "error": null,
+      "matched": true
+    },
+    {
+      "fifo": "/workspace/scratch/server-method-measurement-closure-5dc049-20261001/current-fullN-own-first-quarter.journal.fifo",
+      "gzip": "/workspace/scratch/server-method-measurement-closure-5dc049-20261001/current-fullN-own-first-quarter.ndjson.gz",
+      "uncompressedSha256": "a0b0287a6580c1a8bd0d1d326c3ae7260a0f675be9381465bec97f3e8a40eb8b",
+      "uncompressedBytes": 264881768,
+      "expected": {
+        "gzipPath": "/workspace/scratch/server-method-measurement-closure-5dc049-20261001/current-fullN-own-first-quarter.ndjson.gz",
+        "sha256": "a0b0287a6580c1a8bd0d1d326c3ae7260a0f675be9381465bec97f3e8a40eb8b",
+        "bytes": 264881768,
+        "compressedSha256": "3bfdd435baa57a81fbc85a4307d1a60c3ac4241fc15abb28d7963479c828ebae",
+        "compressedBytes": 12718973,
+        "encoding": "lossless gzip level1; no plaintext file emitted"
+      },
+      "error": null,
+      "matched": true
+    }
+  ],
+  "fifosRemoved": true,
+  "actualRegisteredTimingSamples": 0
+}

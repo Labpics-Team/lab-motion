@@ -1,0 +1,46 @@
+{
+  "root": {
+    "tsup": {
+      "version": "8.5.1",
+      "sha256": "0069fb7e1c74f8ad7960292641dfe1d71f2d86eac24f803ed5c9adcba9a1058e",
+      "files": 25
+    },
+    "typescript": {
+      "version": "6.0.3",
+      "sha256": "829607e617796d2a86fcf18ee47b9cfb259ae2f73e93351241ae8f7f8b68ba86",
+      "files": 140
+    },
+    "esbuild": {
+      "version": "0.28.2",
+      "sha256": "d6866b8bacdb30d35739bef878ad8634042d56c6d2a0b3451711a3f04f03d3bd",
+      "files": 7
+    }
+  },
+  "bench": {
+    "esbuild": {
+      "version": "0.28.1",
+      "sha256": "b8324734b879391cf940a4432c6ea70c04dfc68ee087d8a07e2a81695fb2f31c",
+      "files": 7
+    },
+    "playwright": {
+      "version": "1.61.1",
+      "sha256": "af51a04a6e6b8e7dcddb8ca870fea6357de5185e97e908b81558dba27e85de40",
+      "files": 63
+    },
+    "motion": {
+      "version": "12.42.2",
+      "sha256": "72c17e35c31a0ab237632bf042c3e60ccedea08115520fbff5b3682b8e8db1df",
+      "files": 30
+    },
+    "gsap": {
+      "version": "3.15.0",
+      "sha256": "2f7e7524219e647e73e092714262ef2473a59817bf22e04db3952f769710ba35",
+      "files": 179
+    },
+    "animejs": {
+      "version": "4.5.0",
+      "sha256": "186102a8378cd4531697ee409d284593980fd770e9f718db17fee440003af0ff",
+      "files": 215
+    }
+  }
+}

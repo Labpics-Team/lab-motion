@@ -1,0 +1,8 @@
+{
+  "original": "/workspace/scratch/motion-server-method-final-20261001T144242Z/evidence/frame-first-publication-closure/max-format-fixtures.mjs",
+  "originalSha256": "dacbe2186d2859199ed75b792ef24e373a6e1e2b1116da2dc63cdf6bb74206f5",
+  "adapted": "/tmp/server-method-second-order-144242Z/frozen-synthetic-fixtures.mjs",
+  "adaptedSha256": "cf1b0e938e6e3edcd26c5c2f0bc1d3c8a965467d65b5483c1e6b5ad4c598dbf1",
+  "change": "absolute import prefix only, frozen source owners instead of live owner path; no fixture values changed",
+  "actualRegisteredPerformanceSamples": 0
+}

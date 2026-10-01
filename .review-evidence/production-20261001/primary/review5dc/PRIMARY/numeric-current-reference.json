@@ -1,0 +1,1639 @@
+{
+  "exactRanks": [
+    {
+      "n": 4,
+      "p": 0.5,
+      "lowRank": 0,
+      "highRank": null
+    },
+    {
+      "n": 4,
+      "p": 0.95,
+      "lowRank": 2,
+      "highRank": null
+    },
+    {
+      "n": 143,
+      "p": 0.5,
+      "lowRank": 52,
+      "highRank": 92
+    },
+    {
+      "n": 143,
+      "p": 0.95,
+      "lowRank": 126,
+      "highRank": null
+    },
+    {
+      "n": 144,
+      "p": 0.5,
+      "lowRank": 53,
+      "highRank": 92
+    },
+    {
+      "n": 144,
+      "p": 0.95,
+      "lowRank": 127,
+      "highRank": 144
+    },
+    {
+      "n": 512,
+      "p": 0.5,
+      "lowRank": 220,
+      "highRank": 293
+    },
+    {
+      "n": 512,
+      "p": 0.95,
+      "lowRank": 469,
+      "highRank": 502
+    }
+  ],
+  "nextafter": [
+    {
+      "inputBits": "0000000000000000",
+      "upBits": "0000000000000001",
+      "downBits": "8000000000000001"
+    },
+    {
+      "inputBits": "8000000000000000",
+      "upBits": "0000000000000001",
+      "downBits": "8000000000000001"
+    },
+    {
+      "inputBits": "0000000000000001",
+      "upBits": "0000000000000002",
+      "downBits": "0000000000000000"
+    },
+    {
+      "inputBits": "8000000000000001",
+      "upBits": "8000000000000000",
+      "downBits": "8000000000000002"
+    },
+    {
+      "inputBits": "3ff0000000000000",
+      "upBits": "3ff0000000000001",
+      "downBits": "3fefffffffffffff"
+    },
+    {
+      "inputBits": "bff0000000000000",
+      "upBits": "bfefffffffffffff",
+      "downBits": "bff0000000000001"
+    },
+    {
+      "inputBits": "01a56e1fc2f8f359",
+      "upBits": "01a56e1fc2f8f35a",
+      "downBits": "01a56e1fc2f8f358"
+    },
+    {
+      "inputBits": "81a56e1fc2f8f359",
+      "upBits": "81a56e1fc2f8f358",
+      "downBits": "81a56e1fc2f8f35a"
+    },
+    {
+      "inputBits": "7e37e43c8800759c",
+      "upBits": "7e37e43c8800759d",
+      "downBits": "7e37e43c8800759b"
+    },
+    {
+      "inputBits": "fe37e43c8800759c",
+      "upBits": "fe37e43c8800759b",
+      "downBits": "fe37e43c8800759d"
+    },
+    {
+      "inputBits": "7ff0000000000000",
+      "upBits": "7ff0000000000000",
+      "downBits": "7fefffffffffffff"
+    },
+    {
+      "inputBits": "fff0000000000000",
+      "upBits": "ffefffffffffffff",
+      "downBits": "fff0000000000000"
+    }
+  ],
+  "costClockCases": [
+    {
+      "hostNs": "1000500000",
+      "beginMs": 999.965,
+      "endMs": 999.965,
+      "idealNumerator": "0",
+      "idealDenominator": "1000000"
+    },
+    {
+      "hostNs": "1000500000",
+      "beginMs": 999.965,
+      "endMs": 999.974999,
+      "idealNumerator": "0",
+      "idealDenominator": "1000000"
+    },
+    {
+      "hostNs": "1000500000",
+      "beginMs": 999.974999,
+      "endMs": 999.974999,
+      "idealNumerator": "0",
+      "idealDenominator": "1000000"
+    },
+    {
+      "hostNs": "1000500000",
+      "beginMs": 999.964999,
+      "endMs": 999.965,
+      "idealNumerator": "1",
+      "idealDenominator": "1000000"
+    },
+    {
+      "hostNs": "1000500000",
+      "beginMs": 999.964999,
+      "endMs": 999.974999,
+      "idealNumerator": "1",
+      "idealDenominator": "1000000"
+    },
+    {
+      "hostNs": "1000500000",
+      "beginMs": 999.974998,
+      "endMs": 999.974999,
+      "idealNumerator": "1",
+      "idealDenominator": "1000000"
+    },
+    {
+      "hostNs": "1000500000",
+      "beginMs": 999.960001,
+      "endMs": 999.965,
+      "idealNumerator": "4999",
+      "idealDenominator": "1000000"
+    },
+    {
+      "hostNs": "1000500000",
+      "beginMs": 999.960001,
+      "endMs": 999.974999,
+      "idealNumerator": "4999",
+      "idealDenominator": "1000000"
+    },
+    {
+      "hostNs": "1000500000",
+      "beginMs": 999.97,
+      "endMs": 999.974999,
+      "idealNumerator": "4999",
+      "idealDenominator": "1000000"
+    },
+    {
+      "hostNs": "1000500000",
+      "beginMs": 999.96,
+      "endMs": 999.965,
+      "idealNumerator": "5000",
+      "idealDenominator": "1000000"
+    },
+    {
+      "hostNs": "1000500000",
+      "beginMs": 999.96,
+      "endMs": 999.974999,
+      "idealNumerator": "5000",
+      "idealDenominator": "1000000"
+    },
+    {
+      "hostNs": "1000500000",
+      "beginMs": 999.969999,
+      "endMs": 999.974999,
+      "idealNumerator": "5000",
+      "idealDenominator": "1000000"
+    },
+    {
+      "hostNs": "1000500000",
+      "beginMs": 967.965,
+      "endMs": 999.965,
+      "idealNumerator": "32000000",
+      "idealDenominator": "1000000"
+    },
+    {
+      "hostNs": "1000500000",
+      "beginMs": 967.965,
+      "endMs": 999.974999,
+      "idealNumerator": "32000000",
+      "idealDenominator": "1000000"
+    },
+    {
+      "hostNs": "1000500000",
+      "beginMs": 967.974999,
+      "endMs": 999.965,
+      "idealNumerator": "32000000",
+      "idealDenominator": "1000000"
+    },
+    {
+      "hostNs": "1000500000",
+      "beginMs": 967.974999,
+      "endMs": 999.974999,
+      "idealNumerator": "32000000",
+      "idealDenominator": "1000000"
+    },
+    {
+      "hostNs": "1000000500000",
+      "beginMs": 999999.965,
+      "endMs": 999999.965,
+      "idealNumerator": "0",
+      "idealDenominator": "1000000"
+    },
+    {
+      "hostNs": "1000000500000",
+      "beginMs": 999999.965,
+      "endMs": 999999.974999,
+      "idealNumerator": "0",
+      "idealDenominator": "1000000"
+    },
+    {
+      "hostNs": "1000000500000",
+      "beginMs": 999999.974999,
+      "endMs": 999999.974999,
+      "idealNumerator": "0",
+      "idealDenominator": "1000000"
+    },
+    {
+      "hostNs": "1000000500000",
+      "beginMs": 999999.964999,
+      "endMs": 999999.965,
+      "idealNumerator": "1",
+      "idealDenominator": "1000000"
+    },
+    {
+      "hostNs": "1000000500000",
+      "beginMs": 999999.964999,
+      "endMs": 999999.974999,
+      "idealNumerator": "1",
+      "idealDenominator": "1000000"
+    },
+    {
+      "hostNs": "1000000500000",
+      "beginMs": 999999.974998,
+      "endMs": 999999.974999,
+      "idealNumerator": "1",
+      "idealDenominator": "1000000"
+    },
+    {
+      "hostNs": "1000000500000",
+      "beginMs": 999999.960001,
+      "endMs": 999999.965,
+      "idealNumerator": "4999",
+      "idealDenominator": "1000000"
+    },
+    {
+      "hostNs": "1000000500000",
+      "beginMs": 999999.960001,
+      "endMs": 999999.974999,
+      "idealNumerator": "4999",
+      "idealDenominator": "1000000"
+    },
+    {
+      "hostNs": "1000000500000",
+      "beginMs": 999999.97,
+      "endMs": 999999.974999,
+      "idealNumerator": "4999",
+      "idealDenominator": "1000000"
+    },
+    {
+      "hostNs": "1000000500000",
+      "beginMs": 999999.96,
+      "endMs": 999999.965,
+      "idealNumerator": "5000",
+      "idealDenominator": "1000000"
+    },
+    {
+      "hostNs": "1000000500000",
+      "beginMs": 999999.96,
+      "endMs": 999999.974999,
+      "idealNumerator": "5000",
+      "idealDenominator": "1000000"
+    },
+    {
+      "hostNs": "1000000500000",
+      "beginMs": 999999.969999,
+      "endMs": 999999.974999,
+      "idealNumerator": "5000",
+      "idealDenominator": "1000000"
+    },
+    {
+      "hostNs": "1000000500000",
+      "beginMs": 999967.965,
+      "endMs": 999999.965,
+      "idealNumerator": "32000000",
+      "idealDenominator": "1000000"
+    },
+    {
+      "hostNs": "1000000500000",
+      "beginMs": 999967.965,
+      "endMs": 999999.974999,
+      "idealNumerator": "32000000",
+      "idealDenominator": "1000000"
+    },
+    {
+      "hostNs": "1000000500000",
+      "beginMs": 999967.974999,
+      "endMs": 999999.965,
+      "idealNumerator": "32000000",
+      "idealDenominator": "1000000"
+    },
+    {
+      "hostNs": "1000000500000",
+      "beginMs": 999967.974999,
+      "endMs": 999999.974999,
+      "idealNumerator": "32000000",
+      "idealDenominator": "1000000"
+    },
+    {
+      "hostNs": "1000000000500000",
+      "beginMs": 999999999.965,
+      "endMs": 999999999.965,
+      "idealNumerator": "0",
+      "idealDenominator": "1000000"
+    },
+    {
+      "hostNs": "1000000000500000",
+      "beginMs": 999999999.965,
+      "endMs": 999999999.974999,
+      "idealNumerator": "0",
+      "idealDenominator": "1000000"
+    },
+    {
+      "hostNs": "1000000000500000",
+      "beginMs": 999999999.974999,
+      "endMs": 999999999.974999,
+      "idealNumerator": "0",
+      "idealDenominator": "1000000"
+    },
+    {
+      "hostNs": "1000000000500000",
+      "beginMs": 999999999.964999,
+      "endMs": 999999999.965,
+      "idealNumerator": "1",
+      "idealDenominator": "1000000"
+    },
+    {
+      "hostNs": "1000000000500000",
+      "beginMs": 999999999.964999,
+      "endMs": 999999999.974999,
+      "idealNumerator": "1",
+      "idealDenominator": "1000000"
+    },
+    {
+      "hostNs": "1000000000500000",
+      "beginMs": 999999999.974998,
+      "endMs": 999999999.974999,
+      "idealNumerator": "1",
+      "idealDenominator": "1000000"
+    },
+    {
+      "hostNs": "1000000000500000",
+      "beginMs": 999999999.960001,
+      "endMs": 999999999.965,
+      "idealNumerator": "4999",
+      "idealDenominator": "1000000"
+    },
+    {
+      "hostNs": "1000000000500000",
+      "beginMs": 999999999.960001,
+      "endMs": 999999999.974999,
+      "idealNumerator": "4999",
+      "idealDenominator": "1000000"
+    },
+    {
+      "hostNs": "1000000000500000",
+      "beginMs": 999999999.97,
+      "endMs": 999999999.974999,
+      "idealNumerator": "4999",
+      "idealDenominator": "1000000"
+    },
+    {
+      "hostNs": "1000000000500000",
+      "beginMs": 999999999.96,
+      "endMs": 999999999.965,
+      "idealNumerator": "5000",
+      "idealDenominator": "1000000"
+    },
+    {
+      "hostNs": "1000000000500000",
+      "beginMs": 999999999.96,
+      "endMs": 999999999.974999,
+      "idealNumerator": "5000",
+      "idealDenominator": "1000000"
+    },
+    {
+      "hostNs": "1000000000500000",
+      "beginMs": 999999999.969999,
+      "endMs": 999999999.974999,
+      "idealNumerator": "5000",
+      "idealDenominator": "1000000"
+    },
+    {
+      "hostNs": "1000000000500000",
+      "beginMs": 999999967.965,
+      "endMs": 999999999.965,
+      "idealNumerator": "32000000",
+      "idealDenominator": "1000000"
+    },
+    {
+      "hostNs": "1000000000500000",
+      "beginMs": 999999967.965,
+      "endMs": 999999999.974999,
+      "idealNumerator": "32000000",
+      "idealDenominator": "1000000"
+    },
+    {
+      "hostNs": "1000000000500000",
+      "beginMs": 999999967.974999,
+      "endMs": 999999999.965,
+      "idealNumerator": "32000000",
+      "idealDenominator": "1000000"
+    },
+    {
+      "hostNs": "1000000000500000",
+      "beginMs": 999999967.974999,
+      "endMs": 999999999.974999,
+      "idealNumerator": "32000000",
+      "idealDenominator": "1000000"
+    },
+    {
+      "hostNs": "4294967296500000",
+      "beginMs": 4294967295.965,
+      "endMs": 4294967295.965,
+      "idealNumerator": "0",
+      "idealDenominator": "1000000"
+    },
+    {
+      "hostNs": "4294967296500000",
+      "beginMs": 4294967295.965,
+      "endMs": 4294967295.974999,
+      "idealNumerator": "0",
+      "idealDenominator": "1000000"
+    },
+    {
+      "hostNs": "4294967296500000",
+      "beginMs": 4294967295.974999,
+      "endMs": 4294967295.974999,
+      "idealNumerator": "0",
+      "idealDenominator": "1000000"
+    },
+    {
+      "hostNs": "4294967296500000",
+      "beginMs": 4294967295.964999,
+      "endMs": 4294967295.965,
+      "idealNumerator": "1",
+      "idealDenominator": "1000000"
+    },
+    {
+      "hostNs": "4294967296500000",
+      "beginMs": 4294967295.964999,
+      "endMs": 4294967295.974999,
+      "idealNumerator": "1",
+      "idealDenominator": "1000000"
+    },
+    {
+      "hostNs": "4294967296500000",
+      "beginMs": 4294967295.974998,
+      "endMs": 4294967295.974999,
+      "idealNumerator": "1",
+      "idealDenominator": "1000000"
+    },
+    {
+      "hostNs": "4294967296500000",
+      "beginMs": 4294967295.960001,
+      "endMs": 4294967295.965,
+      "idealNumerator": "4999",
+      "idealDenominator": "1000000"
+    },
+    {
+      "hostNs": "4294967296500000",
+      "beginMs": 4294967295.960001,
+      "endMs": 4294967295.974999,
+      "idealNumerator": "4999",
+      "idealDenominator": "1000000"
+    },
+    {
+      "hostNs": "4294967296500000",
+      "beginMs": 4294967295.97,
+      "endMs": 4294967295.974999,
+      "idealNumerator": "4999",
+      "idealDenominator": "1000000"
+    },
+    {
+      "hostNs": "4294967296500000",
+      "beginMs": 4294967295.96,
+      "endMs": 4294967295.965,
+      "idealNumerator": "5000",
+      "idealDenominator": "1000000"
+    },
+    {
+      "hostNs": "4294967296500000",
+      "beginMs": 4294967295.96,
+      "endMs": 4294967295.974999,
+      "idealNumerator": "5000",
+      "idealDenominator": "1000000"
+    },
+    {
+      "hostNs": "4294967296500000",
+      "beginMs": 4294967295.969999,
+      "endMs": 4294967295.974999,
+      "idealNumerator": "5000",
+      "idealDenominator": "1000000"
+    },
+    {
+      "hostNs": "4294967296500000",
+      "beginMs": 4294967263.965,
+      "endMs": 4294967295.965,
+      "idealNumerator": "32000000",
+      "idealDenominator": "1000000"
+    },
+    {
+      "hostNs": "4294967296500000",
+      "beginMs": 4294967263.965,
+      "endMs": 4294967295.974999,
+      "idealNumerator": "32000000",
+      "idealDenominator": "1000000"
+    },
+    {
+      "hostNs": "4294967296500000",
+      "beginMs": 4294967263.974999,
+      "endMs": 4294967295.965,
+      "idealNumerator": "32000000",
+      "idealDenominator": "1000000"
+    },
+    {
+      "hostNs": "4294967296500000",
+      "beginMs": 4294967263.974999,
+      "endMs": 4294967295.974999,
+      "idealNumerator": "32000000",
+      "idealDenominator": "1000000"
+    },
+    {
+      "hostNs": "4398046511102500000",
+      "beginMs": 4398046511101.965,
+      "endMs": 4398046511101.965,
+      "idealNumerator": "0",
+      "idealDenominator": "1000000"
+    },
+    {
+      "hostNs": "4398046511102500000",
+      "beginMs": 4398046511101.965,
+      "endMs": 4398046511101.975,
+      "idealNumerator": "0",
+      "idealDenominator": "1000000"
+    },
+    {
+      "hostNs": "4398046511102500000",
+      "beginMs": 4398046511101.975,
+      "endMs": 4398046511101.975,
+      "idealNumerator": "0",
+      "idealDenominator": "1000000"
+    },
+    {
+      "hostNs": "4398046511102500000",
+      "beginMs": 4398046511101.965,
+      "endMs": 4398046511101.965,
+      "idealNumerator": "1",
+      "idealDenominator": "1000000"
+    },
+    {
+      "hostNs": "4398046511102500000",
+      "beginMs": 4398046511101.965,
+      "endMs": 4398046511101.975,
+      "idealNumerator": "1",
+      "idealDenominator": "1000000"
+    },
+    {
+      "hostNs": "4398046511102500000",
+      "beginMs": 4398046511101.975,
+      "endMs": 4398046511101.975,
+      "idealNumerator": "1",
+      "idealDenominator": "1000000"
+    },
+    {
+      "hostNs": "4398046511102500000",
+      "beginMs": 4398046511101.96,
+      "endMs": 4398046511101.965,
+      "idealNumerator": "4999",
+      "idealDenominator": "1000000"
+    },
+    {
+      "hostNs": "4398046511102500000",
+      "beginMs": 4398046511101.96,
+      "endMs": 4398046511101.975,
+      "idealNumerator": "4999",
+      "idealDenominator": "1000000"
+    },
+    {
+      "hostNs": "4398046511102500000",
+      "beginMs": 4398046511101.97,
+      "endMs": 4398046511101.975,
+      "idealNumerator": "4999",
+      "idealDenominator": "1000000"
+    },
+    {
+      "hostNs": "4398046511102500000",
+      "beginMs": 4398046511101.96,
+      "endMs": 4398046511101.965,
+      "idealNumerator": "5000",
+      "idealDenominator": "1000000"
+    },
+    {
+      "hostNs": "4398046511102500000",
+      "beginMs": 4398046511101.96,
+      "endMs": 4398046511101.975,
+      "idealNumerator": "5000",
+      "idealDenominator": "1000000"
+    },
+    {
+      "hostNs": "4398046511102500000",
+      "beginMs": 4398046511101.97,
+      "endMs": 4398046511101.975,
+      "idealNumerator": "5000",
+      "idealDenominator": "1000000"
+    },
+    {
+      "hostNs": "4398046511102500000",
+      "beginMs": 4398046511069.965,
+      "endMs": 4398046511101.965,
+      "idealNumerator": "32000000",
+      "idealDenominator": "1000000"
+    },
+    {
+      "hostNs": "4398046511102500000",
+      "beginMs": 4398046511069.965,
+      "endMs": 4398046511101.975,
+      "idealNumerator": "32000000",
+      "idealDenominator": "1000000"
+    },
+    {
+      "hostNs": "4398046511102500000",
+      "beginMs": 4398046511069.975,
+      "endMs": 4398046511101.965,
+      "idealNumerator": "32000000",
+      "idealDenominator": "1000000"
+    },
+    {
+      "hostNs": "4398046511102500000",
+      "beginMs": 4398046511069.975,
+      "endMs": 4398046511101.975,
+      "idealNumerator": "32000000",
+      "idealDenominator": "1000000"
+    }
+  ],
+  "semanticRelationCases": [
+    {
+      "hostNs": "1000500000",
+      "documentMs": 99.995,
+      "perfMs": 100.0,
+      "physicalLagMs": 0.0,
+      "errorNumerator": "43980465111",
+      "errorDenominator": "8796093022208"
+    },
+    {
+      "hostNs": "1000500000",
+      "documentMs": 99.995,
+      "perfMs": 99.990001,
+      "physicalLagMs": 0.0,
+      "errorNumerator": "21985834509",
+      "errorDenominator": "4398046511104"
+    },
+    {
+      "hostNs": "1000500000",
+      "documentMs": 99.995,
+      "perfMs": 100.009999,
+      "physicalLagMs": 0.0,
+      "errorNumerator": "16491574905",
+      "errorDenominator": "1099511627776"
+    },
+    {
+      "hostNs": "1000500000",
+      "documentMs": 99.995,
+      "perfMs": 100.0,
+      "physicalLagMs": 0.0,
+      "errorNumerator": "43980465111",
+      "errorDenominator": "8796093022208"
+    },
+    {
+      "hostNs": "1000500000",
+      "documentMs": 100.004999,
+      "perfMs": 100.0,
+      "physicalLagMs": 0.0,
+      "errorNumerator": "21985834509",
+      "errorDenominator": "4398046511104"
+    },
+    {
+      "hostNs": "1000500000",
+      "documentMs": 100.004999,
+      "perfMs": 99.990001,
+      "physicalLagMs": 0.0,
+      "errorNumerator": "131923803147",
+      "errorDenominator": "8796093022208"
+    },
+    {
+      "hostNs": "1000500000",
+      "documentMs": 100.004999,
+      "perfMs": 100.009999,
+      "physicalLagMs": 0.0,
+      "errorNumerator": "43980465111",
+      "errorDenominator": "8796093022208"
+    },
+    {
+      "hostNs": "1000500000",
+      "documentMs": 100.004999,
+      "perfMs": 100.0,
+      "physicalLagMs": 0.0,
+      "errorNumerator": "21985834509",
+      "errorDenominator": "4398046511104"
+    },
+    {
+      "hostNs": "1000500000",
+      "documentMs": 99.994,
+      "perfMs": 100.0,
+      "physicalLagMs": 0.001,
+      "errorNumerator": "21990232555521",
+      "errorDenominator": "4398046511104000"
+    },
+    {
+      "hostNs": "1000500000",
+      "documentMs": 99.994,
+      "perfMs": 99.990001,
+      "physicalLagMs": 0.001,
+      "errorNumerator": "21985834508979",
+      "errorDenominator": "4398046511104000"
+    },
+    {
+      "hostNs": "1000500000",
+      "documentMs": 99.994,
+      "perfMs": 100.009999,
+      "physicalLagMs": 0.001,
+      "errorNumerator": "65966299620021",
+      "errorDenominator": "4398046511104000"
+    },
+    {
+      "hostNs": "1000500000",
+      "documentMs": 99.994,
+      "perfMs": 100.0,
+      "physicalLagMs": 0.001,
+      "errorNumerator": "21990232555521",
+      "errorDenominator": "4398046511104000"
+    },
+    {
+      "hostNs": "1000500000",
+      "documentMs": 100.003999,
+      "perfMs": 100.0,
+      "physicalLagMs": 0.001,
+      "errorNumerator": "21985834508979",
+      "errorDenominator": "4398046511104000"
+    },
+    {
+      "hostNs": "1000500000",
+      "documentMs": 100.003999,
+      "perfMs": 99.990001,
+      "physicalLagMs": 0.001,
+      "errorNumerator": "65961901573479",
+      "errorDenominator": "4398046511104000"
+    },
+    {
+      "hostNs": "1000500000",
+      "documentMs": 100.003999,
+      "perfMs": 100.009999,
+      "physicalLagMs": 0.001,
+      "errorNumerator": "21990232555521",
+      "errorDenominator": "4398046511104000"
+    },
+    {
+      "hostNs": "1000500000",
+      "documentMs": 100.003999,
+      "perfMs": 100.0,
+      "physicalLagMs": 0.001,
+      "errorNumerator": "21985834508979",
+      "errorDenominator": "4398046511104000"
+    },
+    {
+      "hostNs": "1000500000",
+      "documentMs": 59.995,
+      "perfMs": 100.0,
+      "physicalLagMs": 40.0,
+      "errorNumerator": "703687441777",
+      "errorDenominator": "140737488355328"
+    },
+    {
+      "hostNs": "1000500000",
+      "documentMs": 59.995,
+      "perfMs": 99.990001,
+      "physicalLagMs": 40.0,
+      "errorNumerator": "703546704287",
+      "errorDenominator": "140737488355328"
+    },
+    {
+      "hostNs": "1000500000",
+      "documentMs": 59.995,
+      "perfMs": 100.009999,
+      "physicalLagMs": 40.0,
+      "errorNumerator": "2110921587841",
+      "errorDenominator": "140737488355328"
+    },
+    {
+      "hostNs": "1000500000",
+      "documentMs": 59.995,
+      "perfMs": 100.0,
+      "physicalLagMs": 40.0,
+      "errorNumerator": "703687441777",
+      "errorDenominator": "140737488355328"
+    },
+    {
+      "hostNs": "1000500000",
+      "documentMs": 60.004999,
+      "perfMs": 100.0,
+      "physicalLagMs": 40.0,
+      "errorNumerator": "21985834509",
+      "errorDenominator": "4398046511104"
+    },
+    {
+      "hostNs": "1000500000",
+      "documentMs": 60.004999,
+      "perfMs": 99.990001,
+      "physicalLagMs": 40.0,
+      "errorNumerator": "131923803147",
+      "errorDenominator": "8796093022208"
+    },
+    {
+      "hostNs": "1000500000",
+      "documentMs": 60.004999,
+      "perfMs": 100.009999,
+      "physicalLagMs": 40.0,
+      "errorNumerator": "43980465111",
+      "errorDenominator": "8796093022208"
+    },
+    {
+      "hostNs": "1000500000",
+      "documentMs": 60.004999,
+      "perfMs": 100.0,
+      "physicalLagMs": 40.0,
+      "errorNumerator": "21985834509",
+      "errorDenominator": "4398046511104"
+    },
+    {
+      "hostNs": "1000000500000",
+      "documentMs": 99.995,
+      "perfMs": 100.0,
+      "physicalLagMs": 0.0,
+      "errorNumerator": "43980465111",
+      "errorDenominator": "8796093022208"
+    },
+    {
+      "hostNs": "1000000500000",
+      "documentMs": 99.995,
+      "perfMs": 99.9900009999983,
+      "physicalLagMs": 0.0,
+      "errorNumerator": "43971669033",
+      "errorDenominator": "8796093022208"
+    },
+    {
+      "hostNs": "1000000500000",
+      "documentMs": 99.995,
+      "perfMs": 100.0099990000017,
+      "physicalLagMs": 0.0,
+      "errorNumerator": "131932599255",
+      "errorDenominator": "8796093022208"
+    },
+    {
+      "hostNs": "1000000500000",
+      "documentMs": 99.995,
+      "perfMs": 100.0,
+      "physicalLagMs": 0.0,
+      "errorNumerator": "43980465111",
+      "errorDenominator": "8796093022208"
+    },
+    {
+      "hostNs": "1000000500000",
+      "documentMs": 100.004999,
+      "perfMs": 100.0,
+      "physicalLagMs": 0.0,
+      "errorNumerator": "21985834509",
+      "errorDenominator": "4398046511104"
+    },
+    {
+      "hostNs": "1000000500000",
+      "documentMs": 100.004999,
+      "perfMs": 99.9900009999983,
+      "physicalLagMs": 0.0,
+      "errorNumerator": "65961901581",
+      "errorDenominator": "4398046511104"
+    },
+    {
+      "hostNs": "1000000500000",
+      "documentMs": 100.004999,
+      "perfMs": 100.0099990000017,
+      "physicalLagMs": 0.0,
+      "errorNumerator": "21990232563",
+      "errorDenominator": "4398046511104"
+    },
+    {
+      "hostNs": "1000000500000",
+      "documentMs": 100.004999,
+      "perfMs": 100.0,
+      "physicalLagMs": 0.0,
+      "errorNumerator": "21985834509",
+      "errorDenominator": "4398046511104"
+    },
+    {
+      "hostNs": "1000000500000",
+      "documentMs": 99.994,
+      "perfMs": 100.0,
+      "physicalLagMs": 0.001,
+      "errorNumerator": "21990232555521",
+      "errorDenominator": "4398046511104000"
+    },
+    {
+      "hostNs": "1000000500000",
+      "documentMs": 99.994,
+      "perfMs": 99.9900009999983,
+      "physicalLagMs": 0.001,
+      "errorNumerator": "21985834516479",
+      "errorDenominator": "4398046511104000"
+    },
+    {
+      "hostNs": "1000000500000",
+      "documentMs": 99.994,
+      "perfMs": 100.0099990000017,
+      "physicalLagMs": 0.001,
+      "errorNumerator": "65966299627521",
+      "errorDenominator": "4398046511104000"
+    },
+    {
+      "hostNs": "1000000500000",
+      "documentMs": 99.994,
+      "perfMs": 100.0,
+      "physicalLagMs": 0.001,
+      "errorNumerator": "21990232555521",
+      "errorDenominator": "4398046511104000"
+    },
+    {
+      "hostNs": "1000000500000",
+      "documentMs": 100.003999,
+      "perfMs": 100.0,
+      "physicalLagMs": 0.001,
+      "errorNumerator": "21985834508979",
+      "errorDenominator": "4398046511104000"
+    },
+    {
+      "hostNs": "1000000500000",
+      "documentMs": 100.003999,
+      "perfMs": 99.9900009999983,
+      "physicalLagMs": 0.001,
+      "errorNumerator": "65961901580979",
+      "errorDenominator": "4398046511104000"
+    },
+    {
+      "hostNs": "1000000500000",
+      "documentMs": 100.003999,
+      "perfMs": 100.0099990000017,
+      "physicalLagMs": 0.001,
+      "errorNumerator": "21990232563021",
+      "errorDenominator": "4398046511104000"
+    },
+    {
+      "hostNs": "1000000500000",
+      "documentMs": 100.003999,
+      "perfMs": 100.0,
+      "physicalLagMs": 0.001,
+      "errorNumerator": "21985834508979",
+      "errorDenominator": "4398046511104000"
+    },
+    {
+      "hostNs": "1000000500000",
+      "documentMs": 59.995,
+      "perfMs": 100.0,
+      "physicalLagMs": 40.0,
+      "errorNumerator": "703687441777",
+      "errorDenominator": "140737488355328"
+    },
+    {
+      "hostNs": "1000000500000",
+      "documentMs": 59.995,
+      "perfMs": 99.9900009999983,
+      "physicalLagMs": 40.0,
+      "errorNumerator": "703546704527",
+      "errorDenominator": "140737488355328"
+    },
+    {
+      "hostNs": "1000000500000",
+      "documentMs": 59.995,
+      "perfMs": 100.0099990000017,
+      "physicalLagMs": 40.0,
+      "errorNumerator": "2110921588081",
+      "errorDenominator": "140737488355328"
+    },
+    {
+      "hostNs": "1000000500000",
+      "documentMs": 59.995,
+      "perfMs": 100.0,
+      "physicalLagMs": 40.0,
+      "errorNumerator": "703687441777",
+      "errorDenominator": "140737488355328"
+    },
+    {
+      "hostNs": "1000000500000",
+      "documentMs": 60.004999,
+      "perfMs": 100.0,
+      "physicalLagMs": 40.0,
+      "errorNumerator": "21985834509",
+      "errorDenominator": "4398046511104"
+    },
+    {
+      "hostNs": "1000000500000",
+      "documentMs": 60.004999,
+      "perfMs": 99.9900009999983,
+      "physicalLagMs": 40.0,
+      "errorNumerator": "65961901581",
+      "errorDenominator": "4398046511104"
+    },
+    {
+      "hostNs": "1000000500000",
+      "documentMs": 60.004999,
+      "perfMs": 100.0099990000017,
+      "physicalLagMs": 40.0,
+      "errorNumerator": "21990232563",
+      "errorDenominator": "4398046511104"
+    },
+    {
+      "hostNs": "1000000500000",
+      "documentMs": 60.004999,
+      "perfMs": 100.0,
+      "physicalLagMs": 40.0,
+      "errorNumerator": "21985834509",
+      "errorDenominator": "4398046511104"
+    },
+    {
+      "hostNs": "1000000000500000",
+      "documentMs": 99.995,
+      "perfMs": 100.0,
+      "physicalLagMs": 0.0,
+      "errorNumerator": "43980465111",
+      "errorDenominator": "8796093022208"
+    },
+    {
+      "hostNs": "1000000000500000",
+      "documentMs": 99.995,
+      "perfMs": 99.99000096321106,
+      "physicalLagMs": 0.0,
+      "errorNumerator": "43971992617",
+      "errorDenominator": "8796093022208"
+    },
+    {
+      "hostNs": "1000000000500000",
+      "documentMs": 99.995,
+      "perfMs": 100.00999903678894,
+      "physicalLagMs": 0.0,
+      "errorNumerator": "131932922839",
+      "errorDenominator": "8796093022208"
+    },
+    {
+      "hostNs": "1000000000500000",
+      "documentMs": 99.995,
+      "perfMs": 100.0,
+      "physicalLagMs": 0.0,
+      "errorNumerator": "43980465111",
+      "errorDenominator": "8796093022208"
+    },
+    {
+      "hostNs": "1000000000500000",
+      "documentMs": 100.004999,
+      "perfMs": 100.0,
+      "physicalLagMs": 0.0,
+      "errorNumerator": "21985834509",
+      "errorDenominator": "4398046511104"
+    },
+    {
+      "hostNs": "1000000000500000",
+      "documentMs": 100.004999,
+      "perfMs": 99.99000096321106,
+      "physicalLagMs": 0.0,
+      "errorNumerator": "65962063373",
+      "errorDenominator": "4398046511104"
+    },
+    {
+      "hostNs": "1000000000500000",
+      "documentMs": 100.004999,
+      "perfMs": 100.00999903678894,
+      "physicalLagMs": 0.0,
+      "errorNumerator": "21990394355",
+      "errorDenominator": "4398046511104"
+    },
+    {
+      "hostNs": "1000000000500000",
+      "documentMs": 100.004999,
+      "perfMs": 100.0,
+      "physicalLagMs": 0.0,
+      "errorNumerator": "21985834509",
+      "errorDenominator": "4398046511104"
+    },
+    {
+      "hostNs": "1000000000500000",
+      "documentMs": 99.994,
+      "perfMs": 100.0,
+      "physicalLagMs": 0.001,
+      "errorNumerator": "21990232555521",
+      "errorDenominator": "4398046511104000"
+    },
+    {
+      "hostNs": "1000000000500000",
+      "documentMs": 99.994,
+      "perfMs": 99.99000096321106,
+      "physicalLagMs": 0.001,
+      "errorNumerator": "21985996308479",
+      "errorDenominator": "4398046511104000"
+    },
+    {
+      "hostNs": "1000000000500000",
+      "documentMs": 99.994,
+      "perfMs": 100.00999903678894,
+      "physicalLagMs": 0.001,
+      "errorNumerator": "65966461419521",
+      "errorDenominator": "4398046511104000"
+    },
+    {
+      "hostNs": "1000000000500000",
+      "documentMs": 99.994,
+      "perfMs": 100.0,
+      "physicalLagMs": 0.001,
+      "errorNumerator": "21990232555521",
+      "errorDenominator": "4398046511104000"
+    },
+    {
+      "hostNs": "1000000000500000",
+      "documentMs": 100.003999,
+      "perfMs": 100.0,
+      "physicalLagMs": 0.001,
+      "errorNumerator": "21985834508979",
+      "errorDenominator": "4398046511104000"
+    },
+    {
+      "hostNs": "1000000000500000",
+      "documentMs": 100.003999,
+      "perfMs": 99.99000096321106,
+      "physicalLagMs": 0.001,
+      "errorNumerator": "65962063372979",
+      "errorDenominator": "4398046511104000"
+    },
+    {
+      "hostNs": "1000000000500000",
+      "documentMs": 100.003999,
+      "perfMs": 100.00999903678894,
+      "physicalLagMs": 0.001,
+      "errorNumerator": "21990394355021",
+      "errorDenominator": "4398046511104000"
+    },
+    {
+      "hostNs": "1000000000500000",
+      "documentMs": 100.003999,
+      "perfMs": 100.0,
+      "physicalLagMs": 0.001,
+      "errorNumerator": "21985834508979",
+      "errorDenominator": "4398046511104000"
+    },
+    {
+      "hostNs": "1000000000500000",
+      "documentMs": 59.995,
+      "perfMs": 100.0,
+      "physicalLagMs": 40.0,
+      "errorNumerator": "703687441777",
+      "errorDenominator": "140737488355328"
+    },
+    {
+      "hostNs": "1000000000500000",
+      "documentMs": 59.995,
+      "perfMs": 99.99000096321106,
+      "physicalLagMs": 40.0,
+      "errorNumerator": "703551881871",
+      "errorDenominator": "140737488355328"
+    },
+    {
+      "hostNs": "1000000000500000",
+      "documentMs": 59.995,
+      "perfMs": 100.00999903678894,
+      "physicalLagMs": 40.0,
+      "errorNumerator": "2110926765425",
+      "errorDenominator": "140737488355328"
+    },
+    {
+      "hostNs": "1000000000500000",
+      "documentMs": 59.995,
+      "perfMs": 100.0,
+      "physicalLagMs": 40.0,
+      "errorNumerator": "703687441777",
+      "errorDenominator": "140737488355328"
+    },
+    {
+      "hostNs": "1000000000500000",
+      "documentMs": 60.004999,
+      "perfMs": 100.0,
+      "physicalLagMs": 40.0,
+      "errorNumerator": "21985834509",
+      "errorDenominator": "4398046511104"
+    },
+    {
+      "hostNs": "1000000000500000",
+      "documentMs": 60.004999,
+      "perfMs": 99.99000096321106,
+      "physicalLagMs": 40.0,
+      "errorNumerator": "65962063373",
+      "errorDenominator": "4398046511104"
+    },
+    {
+      "hostNs": "1000000000500000",
+      "documentMs": 60.004999,
+      "perfMs": 100.00999903678894,
+      "physicalLagMs": 40.0,
+      "errorNumerator": "21990394355",
+      "errorDenominator": "4398046511104"
+    },
+    {
+      "hostNs": "1000000000500000",
+      "documentMs": 60.004999,
+      "perfMs": 100.0,
+      "physicalLagMs": 40.0,
+      "errorNumerator": "21985834509",
+      "errorDenominator": "4398046511104"
+    },
+    {
+      "hostNs": "4294967296500000",
+      "documentMs": 99.995,
+      "perfMs": 100.0,
+      "physicalLagMs": 0.0,
+      "errorNumerator": "43980465111",
+      "errorDenominator": "8796093022208"
+    },
+    {
+      "hostNs": "4294967296500000",
+      "documentMs": 99.995,
+      "perfMs": 99.99000072479248,
+      "physicalLagMs": 0.0,
+      "errorNumerator": "43974089769",
+      "errorDenominator": "8796093022208"
+    },
+    {
+      "hostNs": "4294967296500000",
+      "documentMs": 99.995,
+      "perfMs": 100.00999927520752,
+      "physicalLagMs": 0.0,
+      "errorNumerator": "131935019991",
+      "errorDenominator": "8796093022208"
+    },
+    {
+      "hostNs": "4294967296500000",
+      "documentMs": 99.995,
+      "perfMs": 100.0,
+      "physicalLagMs": 0.0,
+      "errorNumerator": "43980465111",
+      "errorDenominator": "8796093022208"
+    },
+    {
+      "hostNs": "4294967296500000",
+      "documentMs": 100.004999,
+      "perfMs": 100.0,
+      "physicalLagMs": 0.0,
+      "errorNumerator": "21985834509",
+      "errorDenominator": "4398046511104"
+    },
+    {
+      "hostNs": "4294967296500000",
+      "documentMs": 100.004999,
+      "perfMs": 99.99000072479248,
+      "physicalLagMs": 0.0,
+      "errorNumerator": "65963111949",
+      "errorDenominator": "4398046511104"
+    },
+    {
+      "hostNs": "4294967296500000",
+      "documentMs": 100.004999,
+      "perfMs": 100.00999927520752,
+      "physicalLagMs": 0.0,
+      "errorNumerator": "21991442931",
+      "errorDenominator": "4398046511104"
+    },
+    {
+      "hostNs": "4294967296500000",
+      "documentMs": 100.004999,
+      "perfMs": 100.0,
+      "physicalLagMs": 0.0,
+      "errorNumerator": "21985834509",
+      "errorDenominator": "4398046511104"
+    },
+    {
+      "hostNs": "4294967296500000",
+      "documentMs": 99.994,
+      "perfMs": 100.0,
+      "physicalLagMs": 0.001,
+      "errorNumerator": "21990232555521",
+      "errorDenominator": "4398046511104000"
+    },
+    {
+      "hostNs": "4294967296500000",
+      "documentMs": 99.994,
+      "perfMs": 99.99000072479248,
+      "physicalLagMs": 0.001,
+      "errorNumerator": "21987044884479",
+      "errorDenominator": "4398046511104000"
+    },
+    {
+      "hostNs": "4294967296500000",
+      "documentMs": 99.994,
+      "perfMs": 100.00999927520752,
+      "physicalLagMs": 0.001,
+      "errorNumerator": "65967509995521",
+      "errorDenominator": "4398046511104000"
+    },
+    {
+      "hostNs": "4294967296500000",
+      "documentMs": 99.994,
+      "perfMs": 100.0,
+      "physicalLagMs": 0.001,
+      "errorNumerator": "21990232555521",
+      "errorDenominator": "4398046511104000"
+    },
+    {
+      "hostNs": "4294967296500000",
+      "documentMs": 100.003999,
+      "perfMs": 100.0,
+      "physicalLagMs": 0.001,
+      "errorNumerator": "21985834508979",
+      "errorDenominator": "4398046511104000"
+    },
+    {
+      "hostNs": "4294967296500000",
+      "documentMs": 100.003999,
+      "perfMs": 99.99000072479248,
+      "physicalLagMs": 0.001,
+      "errorNumerator": "65963111948979",
+      "errorDenominator": "4398046511104000"
+    },
+    {
+      "hostNs": "4294967296500000",
+      "documentMs": 100.003999,
+      "perfMs": 100.00999927520752,
+      "physicalLagMs": 0.001,
+      "errorNumerator": "21991442931021",
+      "errorDenominator": "4398046511104000"
+    },
+    {
+      "hostNs": "4294967296500000",
+      "documentMs": 100.003999,
+      "perfMs": 100.0,
+      "physicalLagMs": 0.001,
+      "errorNumerator": "21985834508979",
+      "errorDenominator": "4398046511104000"
+    },
+    {
+      "hostNs": "4294967296500000",
+      "documentMs": 59.995,
+      "perfMs": 100.0,
+      "physicalLagMs": 40.0,
+      "errorNumerator": "703687441777",
+      "errorDenominator": "140737488355328"
+    },
+    {
+      "hostNs": "4294967296500000",
+      "documentMs": 59.995,
+      "perfMs": 99.99000072479248,
+      "physicalLagMs": 40.0,
+      "errorNumerator": "703585436303",
+      "errorDenominator": "140737488355328"
+    },
+    {
+      "hostNs": "4294967296500000",
+      "documentMs": 59.995,
+      "perfMs": 100.00999927520752,
+      "physicalLagMs": 40.0,
+      "errorNumerator": "2110960319857",
+      "errorDenominator": "140737488355328"
+    },
+    {
+      "hostNs": "4294967296500000",
+      "documentMs": 59.995,
+      "perfMs": 100.0,
+      "physicalLagMs": 40.0,
+      "errorNumerator": "703687441777",
+      "errorDenominator": "140737488355328"
+    },
+    {
+      "hostNs": "4294967296500000",
+      "documentMs": 60.004999,
+      "perfMs": 100.0,
+      "physicalLagMs": 40.0,
+      "errorNumerator": "21985834509",
+      "errorDenominator": "4398046511104"
+    },
+    {
+      "hostNs": "4294967296500000",
+      "documentMs": 60.004999,
+      "perfMs": 99.99000072479248,
+      "physicalLagMs": 40.0,
+      "errorNumerator": "65963111949",
+      "errorDenominator": "4398046511104"
+    },
+    {
+      "hostNs": "4294967296500000",
+      "documentMs": 60.004999,
+      "perfMs": 100.00999927520752,
+      "physicalLagMs": 40.0,
+      "errorNumerator": "21991442931",
+      "errorDenominator": "4398046511104"
+    },
+    {
+      "hostNs": "4294967296500000",
+      "documentMs": 60.004999,
+      "perfMs": 100.0,
+      "physicalLagMs": 40.0,
+      "errorNumerator": "21985834509",
+      "errorDenominator": "4398046511104"
+    },
+    {
+      "hostNs": "4398046511102500000",
+      "documentMs": 99.995,
+      "perfMs": 100.0,
+      "physicalLagMs": 0.0,
+      "errorNumerator": "43980465111",
+      "errorDenominator": "8796093022208"
+    },
+    {
+      "hostNs": "4398046511102500000",
+      "documentMs": 99.995,
+      "perfMs": 99.990234375,
+      "physicalLagMs": 0.0,
+      "errorNumerator": "41918880809",
+      "errorDenominator": "8796093022208"
+    },
+    {
+      "hostNs": "4398046511102500000",
+      "documentMs": 99.995,
+      "perfMs": 100.009765625,
+      "physicalLagMs": 0.0,
+      "errorNumerator": "129879811031",
+      "errorDenominator": "8796093022208"
+    },
+    {
+      "hostNs": "4398046511102500000",
+      "documentMs": 99.995,
+      "perfMs": 100.0,
+      "physicalLagMs": 0.0,
+      "errorNumerator": "43980465111",
+      "errorDenominator": "8796093022208"
+    },
+    {
+      "hostNs": "4398046511102500000",
+      "documentMs": 100.004999,
+      "perfMs": 100.0,
+      "physicalLagMs": 0.0,
+      "errorNumerator": "21985834509",
+      "errorDenominator": "4398046511104"
+    },
+    {
+      "hostNs": "4398046511102500000",
+      "documentMs": 100.004999,
+      "perfMs": 99.990234375,
+      "physicalLagMs": 0.0,
+      "errorNumerator": "64935507469",
+      "errorDenominator": "4398046511104"
+    },
+    {
+      "hostNs": "4398046511102500000",
+      "documentMs": 100.004999,
+      "perfMs": 100.009765625,
+      "physicalLagMs": 0.0,
+      "errorNumerator": "20963838451",
+      "errorDenominator": "4398046511104"
+    },
+    {
+      "hostNs": "4398046511102500000",
+      "documentMs": 100.004999,
+      "perfMs": 100.0,
+      "physicalLagMs": 0.0,
+      "errorNumerator": "21985834509",
+      "errorDenominator": "4398046511104"
+    },
+    {
+      "hostNs": "4398046511102500000",
+      "documentMs": 99.994,
+      "perfMs": 100.0,
+      "physicalLagMs": 0.001,
+      "errorNumerator": "21990232555521",
+      "errorDenominator": "4398046511104000"
+    },
+    {
+      "hostNs": "4398046511102500000",
+      "documentMs": 99.994,
+      "perfMs": 99.990234375,
+      "physicalLagMs": 0.001,
+      "errorNumerator": "20959440404479",
+      "errorDenominator": "4398046511104000"
+    },
+    {
+      "hostNs": "4398046511102500000",
+      "documentMs": 99.994,
+      "perfMs": 100.009765625,
+      "physicalLagMs": 0.001,
+      "errorNumerator": "64939905515521",
+      "errorDenominator": "4398046511104000"
+    },
+    {
+      "hostNs": "4398046511102500000",
+      "documentMs": 99.994,
+      "perfMs": 100.0,
+      "physicalLagMs": 0.001,
+      "errorNumerator": "21990232555521",
+      "errorDenominator": "4398046511104000"
+    },
+    {
+      "hostNs": "4398046511102500000",
+      "documentMs": 100.003999,
+      "perfMs": 100.0,
+      "physicalLagMs": 0.001,
+      "errorNumerator": "21985834508979",
+      "errorDenominator": "4398046511104000"
+    },
+    {
+      "hostNs": "4398046511102500000",
+      "documentMs": 100.003999,
+      "perfMs": 99.990234375,
+      "physicalLagMs": 0.001,
+      "errorNumerator": "64935507468979",
+      "errorDenominator": "4398046511104000"
+    },
+    {
+      "hostNs": "4398046511102500000",
+      "documentMs": 100.003999,
+      "perfMs": 100.009765625,
+      "physicalLagMs": 0.001,
+      "errorNumerator": "20963838451021",
+      "errorDenominator": "4398046511104000"
+    },
+    {
+      "hostNs": "4398046511102500000",
+      "documentMs": 100.003999,
+      "perfMs": 100.0,
+      "physicalLagMs": 0.001,
+      "errorNumerator": "21985834508979",
+      "errorDenominator": "4398046511104000"
+    },
+    {
+      "hostNs": "4398046511102500000",
+      "documentMs": 59.995,
+      "perfMs": 100.0,
+      "physicalLagMs": 40.0,
+      "errorNumerator": "703687441777",
+      "errorDenominator": "140737488355328"
+    },
+    {
+      "hostNs": "4398046511102500000",
+      "documentMs": 59.995,
+      "perfMs": 99.990234375,
+      "physicalLagMs": 40.0,
+      "errorNumerator": "670702092943",
+      "errorDenominator": "140737488355328"
+    },
+    {
+      "hostNs": "4398046511102500000",
+      "documentMs": 59.995,
+      "perfMs": 100.009765625,
+      "physicalLagMs": 40.0,
+      "errorNumerator": "2078076976497",
+      "errorDenominator": "140737488355328"
+    },
+    {
+      "hostNs": "4398046511102500000",
+      "documentMs": 59.995,
+      "perfMs": 100.0,
+      "physicalLagMs": 40.0,
+      "errorNumerator": "703687441777",
+      "errorDenominator": "140737488355328"
+    },
+    {
+      "hostNs": "4398046511102500000",
+      "documentMs": 60.004999,
+      "perfMs": 100.0,
+      "physicalLagMs": 40.0,
+      "errorNumerator": "21985834509",
+      "errorDenominator": "4398046511104"
+    },
+    {
+      "hostNs": "4398046511102500000",
+      "documentMs": 60.004999,
+      "perfMs": 99.990234375,
+      "physicalLagMs": 40.0,
+      "errorNumerator": "64935507469",
+      "errorDenominator": "4398046511104"
+    },
+    {
+      "hostNs": "4398046511102500000",
+      "documentMs": 60.004999,
+      "perfMs": 100.009765625,
+      "physicalLagMs": 40.0,
+      "errorNumerator": "20963838451",
+      "errorDenominator": "4398046511104"
+    },
+    {
+      "hostNs": "4398046511102500000",
+      "documentMs": 60.004999,
+      "perfMs": 100.0,
+      "physicalLagMs": 40.0,
+      "errorNumerator": "21985834509",
+      "errorDenominator": "4398046511104"
+    }
+  ],
+  "actualRegisteredTimingSamples": 0
+}

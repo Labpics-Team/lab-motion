@@ -1,0 +1,54 @@
+{
+  "schema": 1,
+  "providedHead": "30e73995002422376ec763d2026cbdee19a34f42",
+  "providedEpoch": "2026-10-01T12:45:49.809843+00:00",
+  "currentHead": "8fb55ca0a116e5381a43351ab28834d17a4a9299",
+  "comparedTrackedRows": 631,
+  "changedTrackedRows": [
+    {
+      "path": "bench/compare/bench.mjs",
+      "scope": "method-context-only",
+      "sha256": "72ea787a1a5374578ab1267e750aaff0ba0da82d78e7f043221b9c5329f5aa8d",
+      "bytes": 52652
+    },
+    {
+      "path": "bench/compare/methodology.mjs",
+      "scope": "method-context-only",
+      "sha256": "651f4de53817b2a9ff863643f741a58eb6fa5fca2f35cb0b77b1c487b3d7d613",
+      "bytes": 50374
+    },
+    {
+      "path": "bench/profile/server-profile-contract.mjs",
+      "scope": "method-context-only",
+      "sha256": "e26e69337a05c69cb2c322e2851cd50dbd8e85e24cf11dbddcb36c7b854b0148",
+      "bytes": 60319
+    },
+    {
+      "path": "bench/profile/server-profile-registration.mjs",
+      "scope": "method-context-only",
+      "sha256": "d77ecb54dc348f7209f4fde200d27cabeefd0a33bf316ad2da94b469797310de",
+      "bytes": 11621
+    },
+    {
+      "path": "bench/profile/server-profile-runner.mjs",
+      "scope": "method-context-only",
+      "sha256": "d1745dd3a088e573f894533db9521fc22d3679107ab5a583c63d745047ae9b4a",
+      "bytes": 43677
+    },
+    {
+      "path": "docs/server-profile.md",
+      "scope": "method-context-only",
+      "sha256": "38b1ca155d40c1f3c6020b0bc3c76e2b2f61271943a65b4ecf6fe5218309efb6",
+      "bytes": 20109
+    },
+    {
+      "path": "test/server-profile-contract.test.ts",
+      "scope": "method-context-only",
+      "sha256": "6b653fccb91ab93808e95a4e95537e946d3e4809c94a191222a92098a3bdbd58",
+      "bytes": 62683
+    }
+  ],
+  "unchangedRuntimeAndVerificationRows": 621,
+  "uncomparedProductionDistRows": 304,
+  "scope": "source row byte identity only, no foreign runtime verdict/readset scope prose used"
+}

@@ -1,0 +1,63 @@
+{
+  "capturedUtc": "2026-10-01T14:21:08.453Z",
+  "scope": "Фактически установленные root React19 и bench packages; не source/package admission.",
+  "environment": {
+    "node": "v24.19.0",
+    "nodeExecutableSha256": "bc17c508ffeed0ec622934f9b7fa72f8e78da65350e63c3eceb56fa688aa5e12",
+    "pnpm": "11.11.0",
+    "packages": {
+      "esbuild": {
+        "version": "0.28.1",
+        "sha256": "b8324734b879391cf940a4432c6ea70c04dfc68ee087d8a07e2a81695fb2f31c",
+        "files": 7
+      },
+      "playwright": {
+        "version": "1.61.1",
+        "sha256": "af51a04a6e6b8e7dcddb8ca870fea6357de5185e97e908b81558dba27e85de40",
+        "files": 63
+      },
+      "motion": {
+        "version": "12.42.2",
+        "sha256": "72c17e35c31a0ab237632bf042c3e60ccedea08115520fbff5b3682b8e8db1df",
+        "files": 30
+      },
+      "gsap": {
+        "version": "3.15.0",
+        "sha256": "2f7e7524219e647e73e092714262ef2473a59817bf22e04db3952f769710ba35",
+        "files": 179
+      },
+      "animejs": {
+        "version": "4.5.0",
+        "sha256": "186102a8378cd4531697ee409d284593980fd770e9f718db17fee440003af0ff",
+        "files": 215
+      }
+    },
+    "rootPackages": {
+      "tsup": {
+        "version": "8.5.1",
+        "sha256": "c703a2b8ef42b2b39e78c58ea3361cab84d53cc8188bfacc412719693aa3328f",
+        "files": 25
+      },
+      "typescript": {
+        "version": "6.0.3",
+        "sha256": "829607e617796d2a86fcf18ee47b9cfb259ae2f73e93351241ae8f7f8b68ba86",
+        "files": 140
+      },
+      "esbuild": {
+        "version": "0.28.2",
+        "sha256": "172d2f7d53175288c7490242477bd573957d65aeb166b86572256b062d8cff27",
+        "files": 8
+      },
+      "react": {
+        "version": "19.3.0",
+        "sha256": "e7540009da5afca68ee899f098a6122d54e0b446c0fb8f331acb080a4db1b996",
+        "files": 27
+      },
+      "react-dom": {
+        "version": "19.3.0",
+        "sha256": "5e48b3a52fb70d684abea3a5aa9856aa9ac19b9b17b25c0f496c0f250565443c",
+        "files": 43
+      }
+    }
+  }
+}

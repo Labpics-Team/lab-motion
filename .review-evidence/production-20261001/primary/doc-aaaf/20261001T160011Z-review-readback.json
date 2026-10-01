@@ -1,0 +1,50 @@
+{
+  "at": "20261001T160011Z",
+  "head": "aaafb9029681e245eb1d4c5c8db25c3fe672d2a1",
+  "primaryFiles": [
+    {
+      "path": "/workspace/scratch/r12-current-base-aaafb902-20261001/20261001T160011Z-reviews.json",
+      "sha256": "4ac2c4f79706a3aff808c1ee031c2bed24d6430441d77f662f4d13bcada6fad2"
+    },
+    {
+      "path": "/workspace/scratch/r12-current-base-aaafb902-20261001/20261001T160011Z-comments.json",
+      "sha256": "2bc23c920206703be1521727ab5b6b9f8511c6ee543cda401deae336cd4c45cb"
+    },
+    {
+      "path": "/workspace/scratch/r12-current-base-aaafb902-20261001/20261001T160011Z-pr.json",
+      "sha256": "d9cc4151508e8c09bde324d0eff9c77462b675722aa60c55f2df8ea725060268"
+    }
+  ],
+  "summary": {
+    "reviews": [
+      {
+        "id": 5381887092,
+        "state": "CHANGES_REQUESTED",
+        "commit": "aaafb9029681e245eb1d4c5c8db25c3fe672d2a1",
+        "user": "coderabbitai[bot]",
+        "at": "2026-10-01T15:51:45Z"
+      }
+    ],
+    "comments": [
+      {
+        "id": 5923474152,
+        "updated": "2026-10-01T15:54:37Z",
+        "bytes": 13612,
+        "stateFlags": [],
+        "heads": [
+          "aaafb9029681e245eb1d4c5c8db25c3fe672d2a1",
+          "cf7ebf92269e4a1c4a6607a142b4cfe0d6de435f"
+        ],
+        "bodyTail": "-- {\"checkboxId\": \"f47ac10b-58cc-4372-a567-0e02b2c3d479\", \"radioGroupId\": \"utg-output-choice-group-unknown_comment_id\"} --> Create a new PR\n\n</details>\n\n</details>\n\n<!-- finishing_touch_checkbox_end -->\n\n<!-- autopilot:start -->\n- [ ] <!-- {\"checkboxId\":\"2708ad07-9f24-4260-9c11-7dc76a49f2e3\"} --> <strong title=\"Keep fixing CodeRabbit findings and required CI, and resolving merge conflicts\">Autopilot</strong> · Keep fixing CodeRabbit findings and required CI, and resolving merge conflicts\n\n> Autopilot is currently an internal CodeRabbit preview.\n<!-- autopilot:end -->\n<!-- tips_start -->\n\n---\n\n\n\n\n<sub>Comment `@coderabbitai help` to get the list of available commands.</sub>\n\n<!-- tips_end -->"
+      }
+    ],
+    "pr": {
+      "head": "aaafb9029681e245eb1d4c5c8db25c3fe672d2a1",
+      "base": "cf7ebf92269e4a1c4a6607a142b4cfe0d6de435f",
+      "mergeableState": "unknown",
+      "mergeable": null,
+      "state": "open",
+      "autoMerge": null
+    }
+  }
+}

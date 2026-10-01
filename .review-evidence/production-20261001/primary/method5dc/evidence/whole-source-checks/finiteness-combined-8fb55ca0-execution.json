@@ -1,0 +1,24 @@
+{
+  "head": "8fb55ca0a116e5381a43351ab28834d17a4a9299",
+  "command": [
+    "pnpm",
+    "vitest",
+    "run",
+    "--reporter=verbose",
+    "--reporter=json",
+    "--outputFile=/workspace/lab-motion/scratchpad/finiteness-combined-8fb55ca0.json",
+    "test/animate-facade-finiteness-fuzz.test.ts",
+    "test/animate-overflow-finiteness-fuzz.test.ts",
+    "test/behaviors-finiteness-fuzz.test.ts",
+    "test/decay-finiteness-fuzz.test.ts",
+    "test/easing-finiteness-fuzz.test.ts",
+    "test/projection-finiteness-fuzz.test.ts",
+    "test/smart-finiteness-fuzz.test.ts",
+    "test/solver-finiteness-fuzz.test.ts",
+    "test/timeline-finiteness-fuzz.test.ts",
+    "test/utils-finiteness-fuzz.test.ts"
+  ],
+  "startedAt": "2026-10-01T14:02:57.837553+00:00",
+  "exitCode": 0,
+  "endedAt": "2026-10-01T14:03:06.187905+00:00"
+}

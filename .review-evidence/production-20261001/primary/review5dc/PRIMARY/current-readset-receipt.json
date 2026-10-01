@@ -1,0 +1,158 @@
+{
+  "utc": "2026-10-01T15:50:46.313057+00:00",
+  "sourceImportClosure": [
+    {
+      "path": "/workspace/scratch/server-method-measurement-closure-5dc049-20261001/snapshot/source/scripts/bench-transform-support.mjs",
+      "sha256": "ddbcf5b758133624b3f285947457a8831872847c0e1913ee9afe163f751307c6",
+      "bytes": 30270,
+      "readKind": "executed ESM import closure / static inspected primary"
+    },
+    {
+      "path": "/workspace/scratch/server-method-measurement-closure-5dc049-20261001/snapshot/source/scripts/bench-support.mjs",
+      "sha256": "1764ccb1c2d2ca5ebe1b638f5e49526fe56a9f0c8ee05cd488142d840d1301fd",
+      "bytes": 16429,
+      "readKind": "executed ESM import closure / static inspected primary"
+    },
+    {
+      "path": "/workspace/scratch/server-method-measurement-closure-5dc049-20261001/snapshot/source/bench/profile/server-profile-registration.mjs",
+      "sha256": "211b4c0e107b56d06eb57e0b49f21bc3b1d06a06f34ffec1c06d4ecd15485396",
+      "bytes": 14622,
+      "readKind": "executed ESM import closure / static inspected primary"
+    },
+    {
+      "path": "/workspace/scratch/server-method-measurement-closure-5dc049-20261001/snapshot/source/bench/compare/provenance.mjs",
+      "sha256": "51881a4a6ea2e1ad0330888e7e1b9c8b6e7c7aef3a3eb798a4185c7c3b846623",
+      "bytes": 24949,
+      "readKind": "executed ESM import closure / static inspected primary"
+    },
+    {
+      "path": "/workspace/scratch/server-method-measurement-closure-5dc049-20261001/snapshot/source/bench/profile/server-profile-contract.mjs",
+      "sha256": "0fb91bc3a109b46ac5bd3c63fc63f251ecc33ab89d81b90173f5c927f844afcd",
+      "bytes": 62912,
+      "readKind": "executed ESM import closure / static inspected primary"
+    },
+    {
+      "path": "/workspace/scratch/server-method-measurement-closure-5dc049-20261001/snapshot/source/bench/compare/methodology.mjs",
+      "sha256": "e090f47784312a3fc936326157747f346718e2245c275eed62b41cf0de0b1702",
+      "bytes": 53464,
+      "readKind": "executed ESM import closure / static inspected primary"
+    }
+  ],
+  "clockPins": [
+    {
+      "path": "/workspace/scratch/server-method-measurement-closure-5dc049-20261001/snapshot/primary-clock-sources/animation_clock.cc",
+      "sha256": "f3290008c81dab4f17c7ae8439de25c1c95d0204be6dbb16dada0fd1a8e584eb",
+      "bytes": 4023
+    },
+    {
+      "path": "/workspace/scratch/server-method-measurement-closure-5dc049-20261001/snapshot/primary-clock-sources/animation_timeline.cc",
+      "sha256": "6745f06a855d19691098929b29a5d28331d814c6ae21f1cdf12368eeb7ab5c90",
+      "bytes": 8710
+    },
+    {
+      "path": "/workspace/scratch/server-method-measurement-closure-5dc049-20261001/snapshot/primary-clock-sources/css_computed_style_declaration.cc",
+      "sha256": "fc8f9580c1fd1bc2c28d753083925118c38134c37406dcd2f55d98a8ea2bbfb6",
+      "bytes": 22078
+    },
+    {
+      "path": "/workspace/scratch/server-method-measurement-closure-5dc049-20261001/snapshot/primary-clock-sources/document.cc",
+      "sha256": "8a09dd50bdbbca54b11af849376c4f76df2fd62b14ae665c4c208553b4941dd6",
+      "bytes": 391722
+    },
+    {
+      "path": "/workspace/scratch/server-method-measurement-closure-5dc049-20261001/snapshot/primary-clock-sources/document_animations.cc",
+      "sha256": "6b20e0668cc740d1e2c9a9828b5316c81b7c43f2eb907af686729e51d10855d2",
+      "bytes": 18539
+    },
+    {
+      "path": "/workspace/scratch/server-method-measurement-closure-5dc049-20261001/snapshot/primary-clock-sources/document_timeline.cc",
+      "sha256": "e8e405492b4f49f6be850e68c3431d1e2107ac032ea4ff11c433cc726642c702",
+      "bytes": 8643
+    },
+    {
+      "path": "/workspace/scratch/server-method-measurement-closure-5dc049-20261001/snapshot/primary-clock-sources/libuv-core.c",
+      "sha256": "18bfd5f2045417f8ace5d76e222bf7441b31ead5fc2cbaf6225965e0afea8767",
+      "bytes": 50911
+    },
+    {
+      "path": "/workspace/scratch/server-method-measurement-closure-5dc049-20261001/snapshot/primary-clock-sources/libuv-linux.c",
+      "sha256": "215185d94697e05cd75ba9466bb9ea93076769a7767218d4183eaf0723ccf2d2",
+      "bytes": 73200
+    },
+    {
+      "path": "/workspace/scratch/server-method-measurement-closure-5dc049-20261001/snapshot/primary-clock-sources/linux-sys.c",
+      "sha256": "0b656f8809d781b7e684a1a4c4144d925684c69e9f6050c41c6374c5206d2c8d",
+      "bytes": 73523
+    },
+    {
+      "path": "/workspace/scratch/server-method-measurement-closure-5dc049-20261001/snapshot/primary-clock-sources/linux-time.c",
+      "sha256": "e757e825d72489c929a273f22aba8fa31487c29738960aea2683ac0274a58e6a",
+      "bytes": 27429
+    },
+    {
+      "path": "/workspace/scratch/server-method-measurement-closure-5dc049-20261001/snapshot/primary-clock-sources/node_process_methods.cc",
+      "sha256": "6f2d27513a933dd3d076c0ffe2f95a1846ba1d1060f7ccfbc6eb2df6692a34eb",
+      "bytes": 28892
+    },
+    {
+      "path": "/workspace/scratch/server-method-measurement-closure-5dc049-20261001/snapshot/primary-clock-sources/page_animator.cc",
+      "sha256": "ba6157ecdc92b5e3375e0239c3b79f39050f5ea3a84d27f65e60b03f1b676e03",
+      "bytes": 17525
+    },
+    {
+      "path": "/workspace/scratch/server-method-measurement-closure-5dc049-20261001/snapshot/primary-clock-sources/performance.cc",
+      "sha256": "62de6788c9361958757f47a173369cc668f3691ec58f27e2d2edfab780efe200",
+      "bytes": 56070
+    },
+    {
+      "path": "/workspace/scratch/server-method-measurement-closure-5dc049-20261001/snapshot/primary-clock-sources/time_clamper.cc",
+      "sha256": "2491cb64f50a54ccd10f778c058f0960ad4d9fa0861e39212bc27b8343bd103c",
+      "bytes": 3572
+    },
+    {
+      "path": "/workspace/scratch/server-method-measurement-closure-5dc049-20261001/snapshot/primary-clock-sources/time_clamper.h",
+      "sha256": "f8065edb3ba8da66d58eb7042523fba44b6d515c04d482614670a5414a684944",
+      "bytes": 1889
+    },
+    {
+      "path": "/workspace/scratch/server-method-measurement-closure-5dc049-20261001/snapshot/primary-clock-sources/time_now_posix.cc",
+      "sha256": "6a7b898ec4a2eedbfcc2173ca3cac17b188829b9531ba3febcfe942925ed5796",
+      "bytes": 4331
+    },
+    {
+      "path": "/workspace/scratch/server-method-measurement-closure-5dc049-20261001/snapshot/primary-clock-sources/window_performance.cc",
+      "sha256": "5916501d9960c6355f1b2b0cee7cbc10091bf63ac64b0bf6397d96e495f71983",
+      "bytes": 69955
+    }
+  ],
+  "node": {
+    "path": "/opt/codex/runtimes/codex-primary-runtime/dependencies/node/bin/node",
+    "sha256": "bc17c508ffeed0ec622934f9b7fa72f8e78da65350e63c3eceb56fa688aa5e12",
+    "bytes": 125989464,
+    "version": "v24.19.0"
+  },
+  "artifactContextTarIdentities": [
+    {
+      "path": "artifact-context/baseline.tgz",
+      "sha256": "3787bfcc0b9b4302d826984cefc29a0a5ff7142d60a52d721c8d2f1397125470",
+      "bytes": 560519,
+      "retained": true
+    },
+    {
+      "path": "artifact-context/candidate-npm.tgz",
+      "sha256": "364f9ff8b505191965040eb17059a034e2cb39be5dd0b1468855ca7e9c61c524",
+      "bytes": 560840,
+      "retained": true
+    },
+    {
+      "path": "artifact-context/candidate-pnpm.tgz",
+      "sha256": "46c9067832760159d35ccd2166b28e6486a57602b1e96d6d23e1c4c06804a402",
+      "bytes": 562846,
+      "retained": true
+    }
+  ],
+  "snapshotRetainedFiles": 812,
+  "snapshotReadbackMismatches": [],
+  "normFragments": 10,
+  "actualRegisteredTimingSamples": 0
+}

@@ -1,0 +1,1561 @@
+diff --git a/bench/profile/server-profile-registration.mjs b/bench/profile/server-profile-registration.mjs
+index c6ac879c..f8462076 100644
+--- a/bench/profile/server-profile-registration.mjs
++++ b/bench/profile/server-profile-registration.mjs
+@@ -35,7 +35,8 @@ export const SERVER_PROFILE = freeze({
+   repetitions: 8,
+   browserBatchCalls: 32,
+   browserSemanticCalls: 1,
+-  browserSemantics: { movementThresholdPx: 0.5, finalTolerancePx: 2 },
++  browserSemantics: { movementThresholdPx: 0.5, finalTolerancePx: 2,
++    temporalOracle: 'одна фаза всех clipped/interior CSS координат; полный displacement interval разрешающей пары внутри прежнего CSS допуска; actual rAF/read окна, без расширения при uncertainty' },
+   warmupRuns: 4,
+   pilotRuns: 8,
+   minRuns: 288,
+@@ -57,6 +58,7 @@ export const SERVER_PROFILE = freeze({
+     browser: ['startMs', 'cancelMs'],
+   },
+   clock: { engine: 'process.threadCpuUsage (user + system), наносекунды', browser: 'realm-local performance.now, миллисекунды' },
++  engineRawLineage: 'все actual user/system CPU fields,16 clock endpoints и ordered scheduler/CSS traces сохраняются lossless; interval/coordinate/hash пересчитываются существующим lifecycle owner',
+   samplingUnit: 'средняя стоимость парного блока двух противоположных runs; повторы/кадры зависимы; p95 относится к распределению средних блоков',
+   denominator: 'стоимость полезного вызова с зарегистрированными targets: browser batch/32; positive содержит 64 actual calls без деления на два; engine unchanged',
+   stoppingRule: 'один baseline-only pilot → замороженный N → один A/A и 2×work → A/B только при годной калибровке; добор и повтор к green запрещены',
+diff --git a/bench/profile/server-profile-contract.mjs b/bench/profile/server-profile-contract.mjs
+index 65cf2c4d..e29e266d 100644
+--- a/bench/profile/server-profile-contract.mjs
++++ b/bench/profile/server-profile-contract.mjs
+@@ -6,7 +6,7 @@ import { pathToFileURL } from 'node:url';
+ import { assertBalancedRunBlocks, assertRealmTimerStep, binary64Ulp, deriveRealmTimerStep, evaluateStartSemanticEvidence,
+   exactBinomialOrderStatisticBounds, makeRoundRobinOrders, nextDown, nextUp, summarizeSamples } from '../compare/methodology.mjs';
+ import { sha256Bytes } from '../compare/provenance.mjs';
+-import { TRANSFORM_PAIR_PROFILE } from '../../scripts/bench-transform-support.mjs';
++import { TRANSFORM_PAIR_PROFILE, validateTransformLifecycleSample } from '../../scripts/bench-transform-support.mjs';
+ import { SERVER_PROFILE, planServerSampleSize, serverProfileDigest, serverTailPolicy, verifyServerProfile } from './server-profile-registration.mjs';
+ 
+ const SHA256 = /^[a-f0-9]{64}$/;
+@@ -78,16 +78,18 @@ export function compactServerSemanticEvidence(evidence) {
+   terminal: evidence.terminal.map(compactCoordinates) };
+ }
+ 
+-function validateNormalMotion(evidence, scene) {
++function validateNormalMotion(evidence, scene, monotonicHostUpperNs) {
+   invariant(evidence?.valid === true && Array.isArray(evidence.checkpoints) && Array.isArray(evidence.terminal), 'нет normal-motion oracle');
+   invariant(!evidence.failures?.length, 'normal-motion control потерял failure');
+   const calls = SERVER_PROFILE.browserSemanticCalls;
+-  invariant(evidence.terminal.length === calls && evidence.checkpoints.length === (scene.staggerGapMs > 0 ? 3 : 1), 'потерян normal-motion checkpoint/call');
++  invariant(evidence.terminal.length === calls && evidence.checkpoints.length === 3, 'потерян normal-motion checkpoint/call');
+   const expanded = { ...evidence, checkpoints: evidence.checkpoints.map((checkpoint) => {
++    invariant(Number.isFinite(checkpoint.frameTimestampMs), 'нет observed normal-motion frame timestamp');
+     invariant(Array.isArray(checkpoint.groups) && checkpoint.groups.length === calls, 'потеряна normal-motion группа');
+     return { ...checkpoint, groups: checkpoint.groups.map((group) => ({ ...group, positions: expandCoordinates(group.positions, scene.targetsPerCall) })) };
+   }), terminal: evidence.terminal.map((values) => expandCoordinates(values, scene.targetsPerCall)) };
+-  invariant(evaluateStartSemanticEvidence(expanded, { ...scene, ...SERVER_PROFILE.browserSemantics,
++  const semanticClockErrorMs = serverBrowserClockBounds({ beginMs: 0, endMs: 0 }, monotonicHostUpperNs).errorMs;
++  invariant(evaluateStartSemanticEvidence(expanded, { ...scene, ...SERVER_PROFILE.browserSemantics, semanticClockErrorMs,
+     durationMs: SERVER_PROFILE.durationMs, toPx: SERVER_PROFILE.toPx }, calls), 'normal-motion oracle отверг intermediate/stagger/topology');
+ }
+ 
+@@ -123,6 +125,9 @@ export function serverCellPairs(stage, runs, expectedStage) {
+   invariant(stage?.rows?.length === runs * (SERVER_PROFILE.engineScenes.length + SERVER_PROFILE.browserScenes.length), 'неполная серия измерений');
+   const expectedOrders = serverOrders(runs);
+   const seen = new Set();
++  // Один sample имеет несколько проекций метрик. Проверка приобретённого raw
++  // принадлежит sample/scene/work, а не повторяется для каждой проекции.
++  const validationCache = new WeakMap();
+   for (const row of stage.rows) {
+     const key = `${row.scene}:${row.run}`;
+     invariant(!seen.has(key), 'повторный run'); seen.add(key);
+@@ -135,23 +140,37 @@ export function serverCellPairs(stage, runs, expectedStage) {
+     invariant(rows.length === runs, 'потеряна сцена');
+     invariant(rows.every((row) => row.kind === cell.kind), 'подменён вид сцены');
+     const read = Object.fromEntries(IDS.map((id) => [id, rows.map((row) => readServerSample(row.samples[id], cell,
+-      expectedStage === 'positive' && id === 'right' ? 2 : 1))]));
++      expectedStage === 'positive' && id === 'right' ? 2 : 1, validationCache))]));
+     return { ...cell, left: read.left.map((row) => row.value), right: read.right.map((row) => row.value),
+       leftBounds: read.left.map((row) => row.bounds), rightBounds: read.right.map((row) => row.bounds) };
+   });
+ }
+ 
+-function readServerSample(sample, cell, workMultiplier) {
++function readServerSample(sample, cell, workMultiplier, validationCache = new WeakMap()) {
+       invariant(sample?.semantic === true && positive(sample[cell.metric]), `${cell.id}: неверный sample или semantics`);
+       invariant(sample.workMultiplier === workMultiplier, 'подменён знаменатель положительного контроля');
+       invariant(sample.denominator === SERVER_PROFILE.denominator && sample.repetitions === SERVER_PROFILE.repetitions, 'изменён знаменатель');
+       invariant(Array.isArray(sample.raw) && sample.raw.length === sample.repetitions * (cell.kind === 'engine' ? sample.workMultiplier : 1), 'потеряны raw повторы');
++      const validationKey = `${cell.kind}:${cell.scene}:${workMultiplier}`;
++      if (!validationCache.get(sample)?.has(validationKey)) {
+       if (cell.kind === 'engine') {
+         const scene = SERVER_PROFILE.engineScenes.find((scene) => scene.id === cell.scene);
+         for (const raw of sample.raw) {
+           invariant(Array.isArray(raw.frameNs) && raw.frameNs.length === TRANSFORM_PAIR_PROFILE.frameOffsetsMs.length &&
+             raw.frameNs.every((x) => Number.isSafeInteger(x) && x >= 0) && Number.isSafeInteger(raw.operationNs) && raw.operationNs >= 0 &&
+             Number.isSafeInteger(raw.cancelDrainNs) && raw.cancelDrainNs >= 0, 'потеряны frame samples или safe CPU counter');
++          validateTransformLifecycleSample(raw, scene);
++          const clockReads = raw.raw.clockReads, cpuReads = raw.raw.cpuReads;
++          invariant(Array.isArray(cpuReads) && cpuReads.length === clockReads.length, 'потеряны actual thread CPU fields');
++          for (let sequence = 0; sequence < cpuReads.length; sequence++) {
++            const read = cpuReads[sequence];
++            invariant(read?.sequence === sequence && Number.isSafeInteger(read.userUs) && read.userUs >= 0 &&
++              Number.isSafeInteger(read.systemUs) && read.systemUs >= 0, 'невалидные user/system CPU fields');
++            const valueNs = String((BigInt(read.userUs) + BigInt(read.systemUs)) * 1000n);
++            invariant(read.valueNs === valueNs && clockReads[sequence].valueNs === valueNs, 'CPU endpoint не пересчитывается из user/system');
++            if (sequence > 0) invariant(read.userUs >= cpuReads[sequence - 1].userUs && read.systemUs >= cpuReads[sequence - 1].systemUs,
++              'user/system CPU fields идут назад');
++          }
+           const semantic = raw.semantic;
+           invariant(semantic?.valid === true && semantic.targets === scene.count && semantic.frames === raw.frameNs.length &&
+             semantic.finished === true && semantic.pending === 0 && semantic.onCompleteCalls === 0 &&
+@@ -163,7 +182,7 @@ function readServerSample(sample, cell, workMultiplier) {
+         assertRealmTimerStep('server sample', sample.timerEvidence, sample.measurementTimeOriginMs);
+         invariant(sample.timerStepMs === step && sample.clockModelDigest === serverProfileDigest(SERVER_PROFILE.clockError), 'clock evidence/model не совпадают');
+         const scene = SERVER_PROFILE.browserScenes.find((scene) => scene.id === cell.scene);
+-        validateNormalMotion(sample.semanticEvidence, scene);
++        validateNormalMotion(sample.semanticEvidence, scene, sample.monotonicHostUpperNs);
+         invariant(Array.isArray(sample.endpoints) && sample.endpoints.length === scene.targetsPerCall &&
+           sample.endpoints.every((x) => Number.isFinite(x) && Math.abs(x - SERVER_PROFILE.toPx) <= 2), 'невалидный endpoint witness');
+         invariant(Array.isArray(sample.warmup) && sample.warmup.length === 1, 'потерян warmup batch');
+@@ -179,6 +198,8 @@ function readServerSample(sample, cell, workMultiplier) {
+         }
+         validateCancellationWitness({ cancelMs: sample.controlCancelMs, cancelWitness: sample.controlCancelWitness }, scene.targetsPerCall);
+       }
++      const checked = validationCache.get(sample) ?? new Set(); checked.add(validationKey); validationCache.set(sample, checked);
++      }
+       const rawValues = sample.raw.map((value) => cell.metric === 'meanFrameNs'
+         ? value.frameNs?.reduce((a, b) => a + b, 0) / value.frameNs?.length : value[cell.metric]);
+       invariant(rawValues.every(positive), 'некорректные raw timing');
+@@ -195,8 +216,15 @@ function readServerSample(sample, cell, workMultiplier) {
+ }
+ 
+ export function validateServerBrowserSample(sample, scene, workMultiplier = 1) {
++  const validationCache = new WeakMap();
+   for (const metric of SERVER_PROFILE.metrics.browser) readServerSample(sample,
+-    { id: `${scene.id}:${metric}`, kind: 'browser', scene: scene.id, metric }, workMultiplier);
++    { id: `${scene.id}:${metric}`, kind: 'browser', scene: scene.id, metric }, workMultiplier, validationCache);
++}
++
++export function validateServerEngineSample(sample, scene, workMultiplier = 1) {
++  const validationCache = new WeakMap();
++  for (const metric of SERVER_PROFILE.metrics.engine) readServerSample(sample,
++    { id: `${scene.id}:${metric}`, kind: 'engine', scene: scene.id, metric }, workMultiplier, validationCache);
+ }
+ 
+ function coordinateReader(values, count, label) {
+@@ -272,6 +300,7 @@ export function serverComparatorPlan(runs) {
+ }
+ 
+ function validateSupplementalSamples(artifact) {
++  const validationCache = new WeakMap();
+   invariant(Array.isArray(artifact.comparators) && artifact.comparators.length === SERVER_PROFILE.browserScenes.length * SERVER_PROFILE.comparators.length,
+     'потеряны обязательные comparator cells');
+   let index = 0;
+@@ -285,7 +314,7 @@ function validateSupplementalSamples(artifact) {
+     }
+     invariant(Array.isArray(comparator.rows) && comparator.rows.length === artifact.samplePlan.runs, 'потеряны raw comparator samples');
+     for (const sample of comparator.rows) for (const metric of SERVER_PROFILE.metrics.browser) readServerSample(sample,
+-      { id: `${id}:${scene.id}:${metric}`, kind: 'browser', scene: scene.id, metric }, 1);
++      { id: `${id}:${scene.id}:${metric}`, kind: 'browser', scene: scene.id, metric }, 1, validationCache);
+   }
+   invariant(isDeepStrictEqual(Object.keys(artifact.retention ?? {}).sort(), ['baseline', 'candidate']), 'потерян отдельный retention child');
+   for (const report of Object.values(artifact.retention)) {
+@@ -431,6 +460,11 @@ export function validateServerArtifact(artifact) {
+     invariant(artifact.verdict === 'UNPROVEN' && artifact.failures.length > 0 && !artifact.ab, 'незавершённое измерение объявлено успехом');
+     return { verification: 'recorded-refusal-only', verdict: 'UNPROVEN' };
+   }
++  // Identity стадий проверяется до дорогих raw проекций. Их подробная
++  // проверка по-прежнему принадлежит serverCellPairs каждой полной серии.
++  for (const name of ['pilot', 'aa', 'positive', ...(artifact.ab ? ['ab'] : [])]) {
++    invariant(artifact[name]?.name === name, 'имя стадии не соответствует владельцу artifact');
++  }
+   for (const id of artifact.ab ? ['baseline', 'candidate'] : ['baseline']) {
+     const control = artifact.rawControls?.[id];
+     invariant(control?.noMotion?.equal === true && SHA256.test(control.noMotion.beforeSha256) &&
+@@ -519,6 +553,75 @@ export function writeServerArtifact(file, artifact) {
+   return { sha256: hash.digest('hex'), bytes };
+ }
+ 
++// JSON carrier делится только между полными values. Строки, escape sequences
++// и числа разбирает native JSON.parse; весь artifact не становится строкой V8.
++export function parseServerJsonBytes(bytes, chunkBytes = 32 * 1024 * 1024) {
++  invariant(Buffer.isBuffer(bytes) && Number.isSafeInteger(chunkBytes) && chunkBytes > 0, 'невалидный JSON carrier');
++  const whitespace = (code) => code === 32 || code === 9 || code === 10 || code === 13;
++  const skip = (index, end) => { while (index < end && whitespace(bytes[index])) index++; return index; };
++  const stringEnd = (start, end) => {
++    let escaped = false;
++    for (let index = start + 1; index < end; index++) {
++      if (escaped) escaped = false;
++      else if (bytes[index] === 92) escaped = true;
++      else if (bytes[index] === 34) return index + 1;
++    }
++    throw new Error('server profile: оборван JSON string');
++  };
++  const valueEnd = (start, end) => {
++    let depth = 0;
++    for (let index = start; index < end; index++) {
++      const code = bytes[index];
++      if (code === 34) { index = stringEnd(index, end) - 1; continue; }
++      if (code === 123 || code === 91) depth++;
++      else if (code === 125 || code === 93) { if (!depth) return index; depth--; }
++      else if (code === 44 && !depth) return index;
++    }
++    return end;
++  };
++  const parse = (start, end) => {
++    start = skip(start, end); while (end > start && whitespace(bytes[end - 1])) end--;
++    const first = bytes[start];
++    if (end - start <= chunkBytes || (first !== 123 && first !== 91)) return JSON.parse(bytes.toString('utf8', start, end));
++    const object = first === 123, close = object ? 125 : 93, result = object ? {} : [];
++    invariant(bytes[end - 1] === close, 'оборван JSON container');
++    let cursor = skip(start + 1, end);
++    if (cursor === end - 1) return result;
++    for (;;) {
++      let key;
++      if (object) {
++        invariant(bytes[cursor] === 34, 'JSON object потерял key');
++        const keyEnd = stringEnd(cursor, end); key = JSON.parse(bytes.toString('utf8', cursor, keyEnd));
++        cursor = skip(keyEnd, end); invariant(bytes[cursor] === 58, 'JSON object потерял colon'); cursor = skip(cursor + 1, end);
++      }
++      const childEnd = valueEnd(cursor, end - 1), value = parse(cursor, childEnd);
++      // defineProperty сохраняет JSON.parse semantics для __proto__ и duplicate keys.
++      if (object) Object.defineProperty(result, key, { value, enumerable: true, configurable: true, writable: true });
++      else result.push(value);
++      cursor = skip(childEnd, end);
++      if (cursor === end - 1) return result;
++      invariant(bytes[cursor] === 44, 'JSON container потерял separator');
++      cursor = skip(cursor + 1, end); invariant(cursor < end - 1, 'JSON container содержит trailing comma');
++    }
++  };
++  return parse(0, bytes.length);
++}
++
++export function parseServerJournalBytes(bytes) {
++  invariant(Buffer.isBuffer(bytes), 'невалидный journal carrier');
++  const records = [];
++  let start = 0, end = bytes.length;
++  const whitespace = (code) => code === 32 || code === 9 || code === 10 || code === 13;
++  while (start < end && whitespace(bytes[start])) start++;
++  while (end > start && whitespace(bytes[end - 1])) end--;
++  invariant(start < end, 'нет журнала регистрации и samples');
++  for (let index = start; index < end; index++) if (bytes[index] === 10) {
++    records.push(parseServerJsonBytes(bytes.subarray(start, index))); start = index + 1;
++  }
++  records.push(parseServerJsonBytes(bytes.subarray(start, end)));
++  return records;
++}
++
+ export function serverStagePlan(stage, runs) {
+   const orders = serverOrders(runs), plan = [];
+   for (let run = 0; run < runs; run++) {
+@@ -530,7 +633,7 @@ export function serverStagePlan(stage, runs) {
+   return plan;
+ }
+ 
+-export function validateServerJournal(artifact, records, rawDigest = serverArtifactDigest(artifact)) {
++export function validateServerJournal(artifact, records, rawDigest) {
+   invariant(Array.isArray(records) && records.length > 0, 'нет журнала регистрации и samples');
+   if (artifact.samplePlan) invariant(Number.isSafeInteger(artifact.samplePlan.runs) && artifact.samplePlan.runs % 2 === 0 &&
+     artifact.samplePlan.runs >= SERVER_PROFILE.minRuns && artifact.samplePlan.runs <= SERVER_PROFILE.maxRuns, 'N журнала вне зарегистрированного ресурса');
+@@ -543,7 +646,7 @@ export function validateServerJournal(artifact, records, rawDigest = serverArtif
+   const resourceCounts = Object.fromEntries(phases.map((name) => [name, 0]));
+   const complete = (name) => counts[name] === plans[name].length && resourceCounts[name] === runsFor(name) / 2;
+   const comparatorPlan = artifact.samplePlan ? serverComparatorPlan(artifact.samplePlan.runs) : [];
+-  let comparatorCount = 0, retentionFinished = false;
++  let comparatorCount = 0, retentionFinished = false, finishedDigest;
+   const seen = new Map(), comparatorSamples = new Map(), retentionSamples = new Map(), failures = [], failedSamples = [];
+   for (let recordIndex = 0; recordIndex < records.length; recordIndex++) {
+     const record = records[recordIndex];
+@@ -588,7 +691,9 @@ export function validateServerJournal(artifact, records, rawDigest = serverArtif
+     } else if (record.type === 'failure') {
+       failures.push(record.value); stopped = true;
+     } else if (record.type === 'finished') {
+-      invariant(recordIndex === records.length - 1 && record.value.verdict === artifact.verdict && record.value.digest === rawDigest, 'финальная квитанция не связана с raw/вердиктом');
++      invariant(recordIndex === records.length - 1 && record.value.verdict === artifact.verdict && SHA256.test(record.value.digest),
++        'финальная квитанция не связана с raw/вердиктом');
++      finishedDigest = record.value.digest;
+     } else if (record.type === 'comparator-sample' || record.type === 'failed-comparator-sample') {
+       invariant(!stopped && calibration && complete('ab'), 'дополнительное измерение получено до годного A/B');
+       const value = record.value;
+@@ -629,6 +734,9 @@ export function validateServerJournal(artifact, records, rawDigest = serverArtif
+   invariant(isDeepStrictEqual(Object.fromEntries(retentionSamples), artifact.retention ?? {}), 'retention samples исключены из результата');
+   if (artifact.verdict !== 'UNPROVEN') invariant(comparatorCount === comparatorPlan.length && retentionFinished,
+     'обязательные comparator/retention measurements не завершены');
++  // Полный raw хешируется после проверки хронологии, failure union и полноты.
++  // Отказ на этих границах не сериализует заведомо негодную историю повторно.
++  invariant(finishedDigest === (rawDigest ?? serverArtifactDigest(artifact)), 'финальная квитанция не связана с raw/вердиктом');
+   return { journalFinalDigest: previous };
+ }
+ 
+@@ -643,8 +751,8 @@ if (process.argv[1] && pathToFileURL(path.resolve(process.argv[1])).href === imp
+     invariant(args.length === 6 && args[0] === '--raw' && args[2] === '--digest' && args[4] === '--journal',
+       'нужны --raw <json> --digest <внешний sha256> --journal <ndjson>');
+     const raw = readFileSync(args[1]); invariant(SHA256.test(args[3]) && sha256Bytes(raw) === args[3], 'не совпал внешний digest raw');
+-    const artifact = JSON.parse(raw);
+-    const records = readFileSync(args[5], 'utf8').trim().split('\n').map((line) => JSON.parse(line));
++    const artifact = parseServerJsonBytes(raw);
++    const records = parseServerJournalBytes(readFileSync(args[5]));
+     const chronology = validateServerJournal(artifact, records, args[3]);
+     process.stdout.write(`${JSON.stringify({ ...validateServerArtifact(artifact), ...chronology })}\n`);
+   } catch (error) { process.stderr.write(`${error.message}\n`); process.exitCode = 1; }
+diff --git a/bench/profile/server-profile-runner.mjs b/bench/profile/server-profile-runner.mjs
+index 5f0a1142..6c1ff17c 100644
+--- a/bench/profile/server-profile-runner.mjs
++++ b/bench/profile/server-profile-runner.mjs
+@@ -13,8 +13,8 @@ import { deriveRealmTimerStep, PRODUCTION_ADAPTER_PROFILE } from '../compare/met
+ import { assertCheckoutUnchanged, assertFileHashesUnchanged, assertInstalledPackageTreesUnchanged,
+   hashFileTree, prepareBenchmarkCheckout, sha256File } from '../compare/provenance.mjs';
+ import { SERVER_PROFILE, planServerSampleSize, serverProfileDigest } from './server-profile-registration.mjs';
+-import { compactServerSemanticEvidence, serverCalibrationVerdict, serverCellPairs,
+-  serverFamilyIntervals, serverOrders, serverResourceReasons, validateServerBrowserSample, verifyServerClockRegistration, writeServerArtifact } from './server-profile-contract.mjs';
++import { compactServerSemanticEvidence, serverBrowserClockBounds, serverCalibrationVerdict, serverCellPairs,
++  serverFamilyIntervals, serverOrders, serverResourceReasons, validateServerBrowserSample, validateServerEngineSample, verifyServerClockRegistration, writeServerArtifact } from './server-profile-contract.mjs';
+ 
+ const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../..');
+ const BENCH = path.join(ROOT, 'bench/compare');
+@@ -138,39 +138,49 @@ function buildAdapter(id, consumerRoot, esbuild, out) {
+   return { path: artifact, sha256: sha256File(artifact), ownerEntry: entry, ownerEntrySha256: sha256File(entry) };
+ }
+ 
+-function threadCpuNs() {
++function threadCpuNs(reads) {
+   const usage = process.threadCpuUsage();
++  const acquired = { sequence: reads.length, userUs: usage.user, systemUs: usage.system, valueNs: null };
++  reads.push(acquired);
+   if (![usage.user, usage.system].every((value) => Number.isSafeInteger(value) && value >= 0)) {
+     throw new Error('server profile: unsafe thread CPU counter вне clock model');
+   }
+-  return (BigInt(usage.user) + BigInt(usage.system)) * 1000n;
++  const valueNs = (BigInt(usage.user) + BigInt(usage.system)) * 1000n;
++  acquired.valueNs = String(valueNs);
++  return valueNs;
+ }
+ 
+ export async function measureServerEngine(animate, scene, workMultiplier = 1) {
+   const raw = [];
+   const before = process.memoryUsage();
+   const contextBefore = contextSwitches();
++  let cpuReads = [];
++  let sampleResult;
+   try {
+     for (let repetition = 0; repetition < SERVER_PROFILE.repetitions; repetition++) {
+       for (let extra = 0; extra < workMultiplier; extra++) {
++        cpuReads = [];
+         const measured = await runTransformLifecycleSample({ animate,
+-          count: scene.count, lifecycle: scene.lifecycle, channels: scene.channels, nowNs: threadCpuNs });
++          count: scene.count, lifecycle: scene.lifecycle, channels: scene.channels, nowNs: () => threadCpuNs(cpuReads) });
++        measured.raw.cpuReads = cpuReads;
+         const hashes = measured.semantic.targetTraceHashes;
+         if (hashes.every((hash) => hash === hashes[0])) measured.semantic.targetTraceHashes = { encoding: 'repeat', count: hashes.length, value: hashes[0] };
+         raw.push(measured);
+       }
+     }
++    const aggregate = (read) => raw.reduce((sum, sample) => sum + read(sample), 0) / SERVER_PROFILE.repetitions;
++    sampleResult = { operationNs: aggregate((sample) => sample.operationNs),
++      meanFrameNs: aggregate((sample) => sample.frameNs.reduce((a, b) => a + b, 0) / sample.frameNs.length),
++      cancelDrainNs: aggregate((sample) => sample.cancelDrainNs), semantic: raw.every((sample) => sample.semantic.valid),
++      repetitions: SERVER_PROFILE.repetitions, workMultiplier, denominator: SERVER_PROFILE.denominator,
++      contextSwitchObservation: { before: contextBefore, after: contextSwitches(), scope: 'Node process; timing использует только CPU текущего потока' },
++      allocationObservation: { before, after: process.memoryUsage(), scope: 'пакет + независимый oracle + harness; allocator/GC не разложены' }, raw };
++    validateServerEngineSample(sampleResult, scene, workMultiplier);
++    return sampleResult;
+   } catch (error) {
+-    throw Object.assign(new AggregateError([error], 'server profile: engine sample не завершён'), { raw: {
+-      completed: raw, failedRepetition: error?.raw ?? null, before, after: process.memoryUsage() } });
++    throw Object.assign(new AggregateError([error], 'server profile: engine sample не завершён'), { raw: sampleResult ?? {
++      completed: raw, failedRepetition: preserveRawNumbers(error?.raw ? { ...error.raw, cpuReads } : { cpuReads }), before, after: process.memoryUsage() } });
+   }
+-  const aggregate = (read) => raw.reduce((sum, sample) => sum + read(sample), 0) / SERVER_PROFILE.repetitions;
+-  return { operationNs: aggregate((sample) => sample.operationNs),
+-    meanFrameNs: aggregate((sample) => sample.frameNs.reduce((a, b) => a + b, 0) / sample.frameNs.length),
+-    cancelDrainNs: aggregate((sample) => sample.cancelDrainNs), semantic: raw.every((sample) => sample.semantic.valid),
+-    repetitions: SERVER_PROFILE.repetitions, workMultiplier, denominator: SERVER_PROFILE.denominator,
+-    contextSwitchObservation: { before: contextBefore, after: contextSwitches(), scope: 'Node process; timing использует только CPU текущего потока' },
+-    allocationObservation: { before, after: process.memoryUsage(), scope: 'пакет + независимый oracle + harness; allocator/GC не разложены' }, raw };
+ }
+ 
+ async function browserTimerProbe(page, phase) {
+@@ -199,7 +209,9 @@ export async function measureServerBrowser(browser, origin, adapter, scene, work
+       const begin = performance.now(); (0, eval)(source); return performance.now() - begin;
+     }, source), 'browser cold import');
+     partial.push({ phase: 'cold-import', coldImportMs });
+-    const semanticConfig = { ...scene, ...SERVER_PROFILE.browserSemantics, durationMs: SERVER_PROFILE.durationMs, toPx: SERVER_PROFILE.toPx };
++    const semanticClockErrorMs = serverBrowserClockBounds({ beginMs: 0, endMs: 0 }, process.hrtime.bigint().toString()).errorMs;
++    const semanticConfig = { ...scene, ...SERVER_PROFILE.browserSemantics, semanticClockErrorMs,
++      durationMs: SERVER_PROFILE.durationMs, toPx: SERVER_PROFILE.toPx };
+     const semanticEvidence = compactServerSemanticEvidence(await withBrowserTimeout(
+       runSemanticStartCheck(page, semanticConfig, SERVER_PROFILE.browserSemanticCalls), 'browser normal-motion semantic control'));
+     partial.push({ phase: 'normal-motion', evidence: semanticEvidence });
+diff --git a/test/server-profile-contract.test.ts b/test/server-profile-contract.test.ts
+index a7bfec8c..efddf632 100644
+--- a/test/server-profile-contract.test.ts
++++ b/test/server-profile-contract.test.ts
+@@ -1,14 +1,15 @@
+-import { describe, expect, it } from 'vitest';
++import { describe, expect, it, vi } from 'vitest';
+ import { mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
+ import os from 'node:os';
+ import path from 'node:path';
+ import { createContext, runInContext } from 'node:vm';
++import { createHash } from 'node:crypto';
+ import { SERVER_PROFILE, planServerSampleSize, serverProfileDigest, serverTailPolicy, verifyServerProfile } from '../bench/profile/server-profile-registration.mjs';
+ import { serverCalibrationVerdict, serverCellPairs, serverFamilyIntervals, serverMetricCells, serverOrders,
+   compactServerSemanticEvidence, serverArtifactChunks, serverArtifactDigest, serverBrowserClockBounds, serverOrderStatisticBounds, serverResourceReasons,
+-  validateServerArtifact, validateServerBrowserSample, validateServerJournal, writeServerArtifact } from '../bench/profile/server-profile-contract.mjs';
+-import { deriveRealmTimerStep } from '../bench/compare/methodology.mjs';
+-import { measureServerBrowser } from '../bench/profile/server-profile-runner.mjs';
++  parseServerJsonBytes, parseServerJournalBytes, validateServerArtifact, validateServerBrowserSample, validateServerEngineSample, validateServerJournal, writeServerArtifact } from '../bench/profile/server-profile-contract.mjs';
++import { deriveRealmTimerStep, evaluateStartSemanticEvidence } from '../bench/compare/methodology.mjs';
++import { measureServerBrowser, measureServerEngine } from '../bench/profile/server-profile-runner.mjs';
+ 
+ const hash = 'a'.repeat(64);
+ const clone = <T>(value: T): T => structuredClone(value);
+@@ -19,15 +20,50 @@ function pairs(runs = SERVER_PROFILE.minRuns, ratio = 1) {
+ }
+ 
+ function normalMotion(scene: any) {
+-  const times = scene.staggerGapMs > 0 ? [0.2, 0.5, 0.8].map((fraction) => SERVER_PROFILE.durationMs * fraction) : [SERVER_PROFILE.durationMs / 4];
++  const times = (scene.staggerGapMs > 0 ? [0.2, 0.5, 0.8] : [0.25, 0.5, 0.625]).map((fraction) => SERVER_PROFILE.durationMs * fraction);
+   const positions = (time: number) => Array.from({ length: scene.targetsPerCall }, (_, index) =>
+     SERVER_PROFILE.toPx * Math.max(0, Math.min(1, (time - scene.staggerGapMs * index) / SERVER_PROFILE.durationMs)));
+   return compactServerSemanticEvidence({ valid: true, topology: { calls: 1, targetsPerCall: scene.targetsPerCall, staggerGapMs: scene.staggerGapMs,
+     durationMs: SERVER_PROFILE.durationMs, toPx: SERVER_PROFILE.toPx }, callStartedAtMs: [0],
+-    checkpoints: times.map((time) => ({ groups: [{ readStartedMs: time, readEndedMs: time + 0.1, positions: positions(time) }] })),
++    checkpoints: times.map((time) => ({ frameTimestampMs: time, groups: [{ readStartedMs: time, readEndedMs: time + 0.1, positions: positions(time) }] })),
+     terminal: [Array(scene.targetsPerCall).fill(SERVER_PROFILE.toPx)] });
+ }
+ 
++// Независимые explicit linear vectors, не solver/formatter/expectedValues SUT.
++function engineRaw(scene: any) {
++  const render = ([x, y, scaleX, scaleY, rotate, skewX, skewY]: number[]) =>
++    `translate(${x}px, ${y}px) scaleX(${scaleX}) scaleY(${scaleY}) rotate(${rotate}deg) skew(${skewX}deg, ${skewY}deg)`;
++  const live = scene.lifecycle === 'live';
++  const offsets = [0, 16, 32, 48, 64, 80], setupOffsets = live ? [0, 32] : [];
++  const setup = live ? [[0, 0, 1, 1, 0, 0, 0], [16, 8, 1.25, 1.5, 8, 2, 4]].map(render) : [];
++  const values = live ? [16, 46, 76, 106, 136, 166].map((x) => render([x, 8, 1.25, 1.5, 8, 2, 4]))
++    : [[0, 0, 1, 1, 0, 0, 0], [32, 20, 1.375, 1.5, 12, 3, 5], [64, 40, 1.75, 2, 24, 6, 10],
++      [96, 60, 2.125, 2.5, 36, 9, 15], [128, 80, 2.5, 3, 48, 12, 20], [160, 100, 2.875, 3.5, 60, 15, 25]].map(render);
++  const base = 1_000_000 + (live ? 48 : 0);
++  const steps = [
++    ...setupOffsets.map((offset, index) => ({ stage: 'setup', index, phase: 'setup', timestampMs: 1_000_000 + offset })),
++    ...offsets.map((offset, index) => ({ stage: 'frame', index, phase: 'frames', timestampMs: base + offset })),
++    { stage: 'cancel-drain', index: null, phase: 'outside', timestampMs: base + 128 },
++    ...[256, 384].map((offset) => ({ stage: 'idle', index: null, phase: 'outside', timestampMs: base + offset })),
++  ].map((step, sequence) => ({ sequence, ...step }));
++  const events = steps.filter((step) => ['setup', 'frame'].includes(step.stage)).map((step, sequence) => ({ sequence,
++    phase: step.phase, index: step.index, step: step.sequence, timestampMs: step.timestampMs, property: 'transform',
++    value: step.stage === 'setup' ? setup[step.index!] : values[step.index!] }));
++  const clockReads = [{ metric: 'operationNs', frame: null }, ...offsets.map((_, frame) => ({ metric: 'frameNs', frame })),
++    { metric: 'cancelDrainNs', frame: null }].flatMap(({ metric, frame }, interval) => ['before', 'after'].map((edge, half) => ({
++      sequence: interval * 2 + half, metric, frame, edge,
++      valueNs: String(10_000_000 + interval * 2_000_000 + (half ? metric === 'cancelDrainNs' ? 500_000 : 1_000_000 : 0)) })));
++  return { operationNs: 1_000_000, frameNs: Array(6).fill(1_000_000), cancelDrainNs: 500_000,
++    raw: { schemaVersion: 1, case: { count: scene.count, lifecycle: scene.lifecycle, channels: scene.channels }, clockReads,
++      cpuReads: clockReads.map((read) => ({ sequence: read.sequence, userUs: Number(read.valueNs) / 1000, systemUs: 0, valueNs: read.valueNs })),
++      timeline: { clockOriginMs: 1_000_000, setupOffsetsMs: setupOffsets, frameOffsetsMs: offsets, successorBaseMs: base, steps },
++      targetTraces: { encoding: 'runs', count: scene.count, runs: [{ from: 0, count: scene.count,
++        trace: { value: values.at(-1), setup, setupWrites: setup.map(() => 1), values, writes: values.map(() => 1), outsideWrites: 0, events } }] } },
++    semantic: { valid: true, targets: scene.count, frames: 6, finished: true, pending: 0, onCompleteCalls: 0,
++      previousFinished: live ? true : null, previousCompleteCalls: 0, requests: live ? 9 : 7, executions: live ? 9 : 7,
++      targetTraceHashes: { encoding: 'repeat', count: scene.count, value: createHash('sha256').update(JSON.stringify(values)).digest('hex') } } };
++}
++
+ function stage(name = 'aa', runs = 2) {
+   const rows: any[] = [];
+   for (let run = 0; run < runs; run++) for (const [kind, scenes] of [['engine', SERVER_PROFILE.engineScenes], ['browser', SERVER_PROFILE.browserScenes]] as const) {
+@@ -38,11 +74,7 @@ function stage(name = 'aa', runs = 2) {
+         let raw: any[];
+         let extra: any = {};
+         if (kind === 'engine') {
+-          const count = (scene as any).count;
+-          const semantic = { valid: true, targets: count, frames: 6, finished: true, pending: 0, onCompleteCalls: 0,
+-            previousFinished: (scene as any).lifecycle === 'fresh' ? null : true, previousCompleteCalls: 0,
+-            targetTraceHashes: { encoding: 'repeat', count, value: hash } };
+-          raw = Array.from({ length: SERVER_PROFILE.repetitions * multiplier }, () => ({ operationNs: 1_000_000, frameNs: Array(6).fill(1_000_000), cancelDrainNs: 500_000, semantic }));
++          raw = Array.from({ length: SERVER_PROFILE.repetitions * multiplier }, () => engineRaw(scene));
+           extra = { operationNs: 1_000_000 * multiplier, meanFrameNs: 1_000_000 * multiplier, cancelDrainNs: 500_000 * multiplier };
+         } else {
+           const timerEvidence = { crossOriginIsolated: true, probes: ['before', 'after'].map((phase) => ({ phase,
+@@ -150,29 +182,48 @@ function admissionEvents(artifact: any) {
+   return events;
+ }
+ 
+-function chain(events: any[]) {
+-  let previous = '0'.repeat(64);
+-  return events.map((event) => {
++function chain(events: any[], shared?: { events: any[]; records: any[] }) {
++  // Только подготовка fixture переиспользует неизменённый префикс по identity.
++  // Валидатор заново проверяет каждый hash и весь N288 raw каждой истории.
++  let prefix = 0;
++  while (shared && prefix < events.length && events[prefix] === shared.events[prefix]) prefix++;
++  let previous = prefix ? shared!.records[prefix - 1].digest : '0'.repeat(64);
++  return [...(shared?.records.slice(0, prefix) ?? []), ...events.slice(prefix).map((event) => {
+     const payload = { sequenceDigest: previous, ...event }; previous = serverProfileDigest(payload);
+     return { ...payload, digest: previous };
+-  });
++  })];
++}
++
++// Два набора fault cases используют одну healthy N288 историю. Изменяются
++// только принадлежащие fault ветви; исходные events/raw остаются неизменными.
++let sharedAdmission: { artifact: any; events: any[]; records: any[] } | undefined;
++function admissionHistory() {
++  if (!sharedAdmission) {
++    const artifact = healthyAdmission(), events = admissionEvents(artifact);
++    sharedAdmission = { artifact, events, records: chain(events) };
++  }
++  return sharedAdmission;
+ }
+ 
+ // Исполняем настоящий browser owner в VM с независимым линейным DOM и
+ // намеренно грубыми часами. Это synthetic fault test, не performance sample.
+-function syntheticBrowser(options: { startCostMs?: number; snap?: boolean; snapAt?: number; cancelAt?: number; rejectTiming?: boolean } = {}) {
++function syntheticBrowser(options: { startCostMs?: number; snap?: boolean; snapAt?: number; cancelAt?: number; rejectTiming?: boolean;
++  durationMultiplier?: number; shape?: 'quadratic'; rafStepMs?: number; readCostMs?: number; timerLagMs?: number } = {}) {
+   const directory = mkdtempSync(path.join(os.tmpdir(), 'motion-server-synthetic-'));
+   const source = path.join(directory, 'adapter.js'); writeFileSync(source, '// Синтетический adapter задан VM.\n');
+   let timeMs = 100, starts = 0, cancels = 0;
+   const children: any[] = [];
+-  const position = (element: any) => element.motion ? SERVER_PROFILE.toPx * Math.max(0, Math.min(1,
+-    (timeMs - element.motion.startedMs - element.motion.delayMs) / element.motion.durationMs)) : element.x;
++  const position = (element: any) => {
++    if (!element.motion) return element.x;
++    const progress = Math.max(0, Math.min(1, (timeMs - element.motion.startedMs - element.motion.delayMs) / element.motion.durationMs));
++    return SERVER_PROFILE.toPx * (options.shape === 'quadratic' ? progress * progress : progress);
++  };
+   const start = (elements: any[], to: number, duration: number, gap = 0) => {
+     starts++;
+     const startedMs = timeMs;
+     for (const [index, element] of elements.entries()) {
+       if (options.snap || starts === options.snapAt) { element.x = to; element.motion = null; }
+-      else element.motion = { startedMs, durationMs: duration, delayMs: index * gap };
++      else element.motion = { startedMs, durationMs: duration * (options.durationMultiplier ?? 1), delayMs: index * gap };
+     }
+     timeMs += options.startCostMs ?? 0.025;
+     return { cancel() {
+@@ -186,9 +237,12 @@ function syntheticBrowser(options: { startCostMs?: number; snap?: boolean; snapA
+     timeMs += 0.001; return Math.floor(timeMs / 0.005) * 0.005;
+   } }, document: { createElement() { return { x: 0, motion: null, isConnected: false,
+     getAnimations: () => [], remove() { this.isConnected = false; } }; }, body: { appendChild(element: any) { element.isConnected = true; children.push(element); } } },
+-  getComputedStyle: (element: any) => ({ transform: String(position(element)) }), DOMMatrixReadOnly: class { e: number; constructor(value: string) { this.e = Number(value); } },
+-  setTimeout(callback: () => void, delay: number) { timeMs += delay; queueMicrotask(callback); },
+-  requestAnimationFrame(callback: (time: number) => void) { timeMs += 16; queueMicrotask(() => callback(timeMs)); },
++  getComputedStyle: (element: any) => {
++    const transform = String(position(element)); timeMs += options.readCostMs ?? 0;
++    return { transform };
++  }, DOMMatrixReadOnly: class { e: number; constructor(value: string) { this.e = Number(value); } },
++  setTimeout(callback: () => void, delay: number) { timeMs += delay + (options.timerLagMs ?? 0); queueMicrotask(callback); },
++  requestAnimationFrame(callback: (time: number) => void) { timeMs += options.rafStepMs ?? 16; queueMicrotask(() => callback(timeMs)); },
+   __adapterModule: { start, startStagger: start } };
+   sandbox.window = sandbox;
+   const realm = createContext(sandbox);
+@@ -198,11 +252,156 @@ function syntheticBrowser(options: { startCostMs?: number; snap?: boolean; snapA
+       return runInContext(`(${fn.toString()})`, realm)(argument);
+     } };
+   const context = { newPage: async () => page, close: async () => {} };
+-  return { browser: { newContext: async () => context }, adapter: { path: source },
++  return { browser: { newContext: async () => context }, page, adapter: { path: source },
+     dispose: () => rmSync(directory, { recursive: true, force: true }), read: () => ({ starts, cancels, connected: children.filter((element) => element.isConnected).length }) };
+ }
+ 
++// Исполняем замороженную границу page.evaluate общего владельца. VM задаёт
++// часы и движение самостоятельно; производственный oracle получает его raw.
++async function syntheticSemanticControl(fake: ReturnType<typeof syntheticBrowser>, scene: any) {
++  const bench = readFileSync(new URL('../bench/compare/bench.mjs', import.meta.url), 'utf8');
++  const source = bench.slice(bench.indexOf('export async function runSemanticStartCheck('), bench.indexOf('// ─── сценарий S5:')).trim().replace(/^export /, '');
++  const runCheck = Function('evaluateStartSemanticEvidence', `return (${source})`)(evaluateStartSemanticEvidence);
++  const semanticClockErrorMs = serverBrowserClockBounds({ beginMs: 0, endMs: 0 }, '1000000000000').errorMs;
++  return runCheck(fake.page, { ...scene, ...SERVER_PROFILE.browserSemantics, semanticClockErrorMs,
++    durationMs: SERVER_PROFILE.durationMs, toPx: SERVER_PROFILE.toPx }, SERVER_PROFILE.browserSemanticCalls);
++}
++
+ describe('серверный PROFILE: clock/progress falsifiers', () => {
++  it('chunked JSON сохраняет native values, порядок, escape/UTF8 и duplicate/prototype keys', () => {
++    const text = '{"rows":[{"text":"кириллица\\n\\\"[,]{}\\\\🙂","raw":[null,true,false,-0,1e200,9007199254740993]},[{},[]]],"__proto__":{"safe":1},"a":1,"a":2,"tail":"\\u0000"}';
++    const expected = JSON.parse(text);
++    for (const chunkBytes of [1, 7, 17, 64, 1024]) {
++      const actual = parseServerJsonBytes(Buffer.from(text), chunkBytes);
++      expect(actual).toEqual(expected); expect(Object.keys(actual)).toEqual(Object.keys(expected));
++      expect(Object.getPrototypeOf(actual)).toBe(Object.prototype);
++      expect(Object.hasOwn(actual, '__proto__')).toBe(true); expect(Object.is(actual.rows[0].raw[3], -0)).toBe(true);
++    }
++    for (const malformed of ['', '[1,]', '{"a":1,}', '{"a" 1}', '{"a":1}{}', '[1,,2]', '[{"a":1]]', '{"a":[1}}',
++      '{"a":"escape\\"}', '[NaN]', '[1 2]', '{"a":01}', '["unclosed]', '{bare:1}']) {
++      expect(() => JSON.parse(malformed)).toThrow();
++      expect(() => parseServerJsonBytes(Buffer.from(malformed), 1)).toThrow();
++    }
++  });
++  it('journal декодируется по полным records, сохраняя literal escapes и отказ на потерянной строке', () => {
++    const records = [{ type: 'sample', value: { text: 'строка\n[,]{}\\"', large: 'x'.repeat(1000) } },
++      { type: 'failure', value: { raw: [{ metric: -0 }, null] } }];
++    const bytes = Buffer.from(` \n${records.map((record) => JSON.stringify(record)).join('\n')}\r\n `);
++    expect(parseServerJournalBytes(bytes)).toEqual(records.map((record) => JSON.parse(JSON.stringify(record))));
++    expect(() => parseServerJournalBytes(Buffer.from(`${JSON.stringify(records[0])}\n\n${JSON.stringify(records[1])}`))).toThrow();
++    expect(() => parseServerJournalBytes(Buffer.from(' \r\n'))).toThrow();
++  });
++  it('настоящий engine owner сохраняет controlled CPU endpoints на успехе и позднем отказе', async () => {
++    const { animate } = await import('../src/animate/index.js');
++    let userUs = 0;
++    const cpu = vi.spyOn(process, 'threadCpuUsage').mockImplementation(() => ({ user: userUs += 1000, system: 0 }));
++    const scene = SERVER_PROFILE.engineScenes[1];
++    try {
++      const success = await measureServerEngine(animate, scene);
++      expect(success.raw).toHaveLength(8); expect(cpu).toHaveBeenCalledTimes(128);
++      for (const measured of success.raw) {
++        expect(measured.raw.clockReads).toHaveLength(16); expect(measured.raw.cpuReads).toHaveLength(16);
++        measured.raw.clockReads.forEach((read: any, sequence: number) => {
++          expect(measured.raw.cpuReads[sequence].valueNs).toBe(read.valueNs);
++          expect(String((BigInt(measured.raw.cpuReads[sequence].userUs) + BigInt(measured.raw.cpuReads[sequence].systemUs)) * 1000n)).toBe(read.valueNs);
++        });
++      }
++      validateServerEngineSample(success, scene);
++      cpu.mockClear();
++      const broken = ((...args: Parameters<typeof animate>) => {
++        const owner = animate(...args);
++        return { ...owner, cancel() { owner.cancel(); throw undefined; } };
++      }) as typeof animate;
++      const failure: any = await measureServerEngine(broken, scene).catch((error) => error);
++      // Опциональная долговечная квитанция только этого synthetic unit probe.
++      // CPU поля вымышлены mock clock; это не performance sample продукта.
++      if (process.env.MOTION_SERVER_PROFILE_UNIT_EVIDENCE) writeFileSync(process.env.MOTION_SERVER_PROFILE_UNIT_EVIDENCE,
++        `${JSON.stringify({ synthetic: true, actualTimingSamplesObserved: 0, scene, success,
++          failure: { name: failure?.name, message: failure?.message, raw: failure?.raw } }, null, 2)}\n`, { flag: 'wx' });
++      expect(failure).toBeInstanceOf(AggregateError); expect(failure.raw.completed).toEqual([]);
++      const failed = failure.raw.failedRepetition;
++      expect(failed.clockReads).toHaveLength(15); expect(failed.cpuReads).toHaveLength(15);
++      expect(failed.operationNs).toBe(1_000_000); expect(failed.frameNs).toEqual(Array(6).fill(1_000_000));
++      expect(failed.cancelDrainNs).toBe(null); expect(failed.unfinishedInterval.metric).toBe('cancelDrainNs');
++      expect(cpu).toHaveBeenCalledTimes(15);
++    } finally { cpu.mockRestore(); }
++  });
++  it.each(['missing-read', 'read-order', 'impossible-ns', 'coherent-impossible-ns', 'missing-cpu-field', 'backward-cpu-component',
++    'last-target-coordinate', 'missing-target-identity', 'hash-only-drift'])('engine raw lineage отвергает %s при semantic:true', (fault) => {
++    const scene = SERVER_PROFILE.engineScenes[1];
++    const sample: any = stage().rows.find((row) => row.scene === scene.id)!.samples.left;
++    validateServerEngineSample(sample, scene);
++    const measured = sample.raw[0], lineage = measured.raw;
++    if (fault === 'missing-read') lineage.clockReads.pop();
++    if (fault === 'read-order') [lineage.clockReads[0], lineage.clockReads[1]] = [lineage.clockReads[1], lineage.clockReads[0]];
++    if (fault === 'impossible-ns' || fault === 'coherent-impossible-ns') {
++      measured.operationNs++;
++      if (fault === 'coherent-impossible-ns') {
++        lineage.clockReads[1].valueNs = String(BigInt(lineage.clockReads[1].valueNs) + 1n);
++        lineage.cpuReads[1].valueNs = lineage.clockReads[1].valueNs;
++      }
++      sample.operationNs = sample.raw.reduce((sum: number, raw: any) => sum + raw.operationNs, 0) / sample.repetitions;
++    }
++    if (fault === 'missing-cpu-field') delete lineage.cpuReads[1].userUs;
++    if (fault === 'backward-cpu-component') {
++      lineage.cpuReads[1].userUs = lineage.cpuReads[0].userUs - 1;
++      lineage.cpuReads[1].systemUs = Number(lineage.cpuReads[1].valueNs) / 1000 - lineage.cpuReads[1].userUs;
++    }
++    if (fault === 'last-target-coordinate') {
++      const first = lineage.targetTraces.runs[0], last = clone(first.trace);
++      first.count--;
++      last.values[5] = last.values[5].replace('160px', '161px'); last.value = last.values[5]; last.events.at(-1).value = last.value;
++      lineage.targetTraces.runs.push({ from: scene.count - 1, count: 1, trace: last });
++      const firstHash = measured.semantic.targetTraceHashes.value;
++      measured.semantic.targetTraceHashes = Array(scene.count).fill(firstHash);
++      measured.semantic.targetTraceHashes[scene.count - 1] = createHash('sha256').update(JSON.stringify(last.values)).digest('hex');
++    }
++    if (fault === 'missing-target-identity') lineage.targetTraces.runs[0].count--;
++    if (fault === 'hash-only-drift') measured.semantic.targetTraceHashes.value = hash;
++    // Вызов новый: local projection cache не переносит trusted snapshot между проверками.
++    expect(() => validateServerEngineSample(sample, scene)).toThrow(/lineage|CPU|raw target/);
++  });
++  it.each(['duration64', 'duration256', 'quadratic-last-target', 'missing-frame-time'])('raw normal-motion oracle пересчитывает %s при valid:true', (fault) => {
++    const scene = SERVER_PROFILE.browserScenes[0];
++    const sample: any = stage().rows.find((row) => row.scene === scene.id)!.samples.left;
++    for (const checkpoint of sample.semanticEvidence.checkpoints) {
++      const group = checkpoint.groups[0], time = checkpoint.frameTimestampMs;
++      if (fault === 'missing-frame-time') { delete checkpoint.frameTimestampMs; continue; }
++      const positions = Array(scene.targetsPerCall).fill(SERVER_PROFILE.toPx * time / SERVER_PROFILE.durationMs);
++      if (fault === 'quadratic-last-target') positions[scene.targetsPerCall - 1] = SERVER_PROFILE.toPx * (time / SERVER_PROFILE.durationMs) ** 2;
++      else positions.fill(SERVER_PROFILE.toPx * Math.min(1, time / (fault === 'duration64' ? 64 : 256)));
++      group.positions = compactServerSemanticEvidence({ ...sample.semanticEvidence, checkpoints: [{ ...checkpoint, groups: [{ ...group, positions }] }] }).checkpoints[0].groups[0].positions;
++    }
++    sample.semanticEvidence.valid = true;
++    expect(() => validateServerBrowserSample(sample, scene)).toThrow(/normal-motion/);
++  });
++  it.each([{ durationMultiplier: 0.5 }, { durationMultiplier: 2 }, { shape: 'quadratic' as const }, { rafStepMs: 300 }])(
++    'отвергает чужую duration/shape и неразрешимое rAF окно %j', async (options) => {
++      const fake = syntheticBrowser(options);
++      try {
++        const error: any = await measureServerBrowser(fake.browser, { url: 'synthetic://profile' }, fake.adapter, SERVER_PROFILE.browserScenes[0]).catch((error) => error);
++        expect(error).toBeInstanceOf(AggregateError);
++        expect(error.raw.partial.find((row: any) => row.phase === 'normal-motion').evidence.valid).toBe(false);
++        expect(fake.read().starts).toBe(1);
++      } finally { fake.dispose(); }
++    });
++  it.each([
++    { name: '128мс: узкое окно при позднем таймере', options: { timerLagMs: 40 }, expected: true },
++    { name: '128мс: широкое неразрешающее окно', options: { timerLagMs: 40, readCostMs: 0.32 }, expected: false },
++    { name: '256мс: честное широкое окно', options: { durationMultiplier: 2, timerLagMs: 40, readCostMs: 0.32 }, expected: false },
++  ])('producer/consumer нормального движения: $name', async ({ options, expected }) => {
++    const scene = SERVER_PROFILE.browserScenes[0], fake = syntheticBrowser(options);
++    try {
++      const evidence = await syntheticSemanticControl(fake, scene);
++      expect(evidence.valid).toBe(expected);
++      const sample: any = stage().rows.find((row) => row.scene === scene.id)!.samples.left;
++      // Пересчитываем acquired окна и CSS даже при поддельном upstream valid.
++      sample.semanticEvidence = compactServerSemanticEvidence({ ...evidence, valid: true });
++      if (expected) expect(() => validateServerBrowserSample(sample, scene)).not.toThrow();
++      else expect(() => validateServerBrowserSample(sample, scene)).toThrow(/normal-motion/);
++      expect(fake.read()).toEqual({ starts: 1, cancels: 1, connected: 0 });
++    } finally { fake.dispose(); }
++  });
+   it.each(SERVER_PROFILE.browserScenes)('наблюдает intermediate $id и все32/64 useful owner outcomes', async (scene) => {
+     for (const multiplier of [1, 2]) {
+       const fake = syntheticBrowser();
+@@ -412,7 +611,7 @@ describe('серверный PROFILE: независимые sabotage controls',
+     const positive = stage('positive'); positive.name = 'aa';
+     expect(() => serverCellPairs(positive, 2, 'positive')).toThrow(/имя стадии/);
+     const wrongCount = stage(); wrongCount.rows[0].samples.left.raw[0].semantic.targetTraceHashes.count -= 1;
+-    expect(() => serverCellPairs(wrongCount, 2, 'aa')).toThrow(/lifecycle witness/);
++    expect(() => serverCellPairs(wrongCount, 2, 'aa')).toThrow(/hash RLE|lifecycle witness/);
+   });
+ 
+   it.each(['waapi', 'transform', 'disconnected', 'missing-frame', 'RLE-length', 'generic-RLE-length'])('cancel witness отвергает %s sabotage', (mutation) => {
+@@ -428,30 +627,31 @@ describe('серверный PROFILE: независимые sabotage controls',
+   });
+ 
+   it('завершённый public admission отвергает четыре независимых reviewer counterexamples', () => {
+-    const artifact = healthyAdmission();
++    const history = admissionHistory(), { artifact, events } = history;
+     expect(validateServerArtifact(artifact).verdict).toBe('PASS');
+-    const events = admissionEvents(artifact);
+-    expect(validateServerJournal(artifact, chain(events))).toHaveProperty('journalFinalDigest');
++    expect(validateServerJournal(artifact, history.records)).toHaveProperty('journalFinalDigest');
+     const earlyCalibration = events.filter((event) => event.type !== 'calibration');
+     earlyCalibration.splice(earlyCalibration.findIndex((event) => event.type === 'N-frozen-before-calibration-and-AB') + 1, 0,
+       { type: 'calibration', value: artifact.calibration });
+-    expect(() => validateServerJournal(artifact, chain(earlyCalibration))).toThrow(/до завершения/);
+-    const alwaysLeft = events.map((event) => event.type === 'sample' ? { ...event, value: { ...event.value } } : event);
++    expect(() => validateServerJournal(artifact, chain(earlyCalibration, history))).toThrow(/до завершения/);
++    const alwaysLeft = [...events];
+     const firstOpposite = alwaysLeft.findIndex((event) => event.type === 'sample' && event.value.participant === 'right');
+     [alwaysLeft[firstOpposite], alwaysLeft[firstOpposite + 1]] = [alwaysLeft[firstOpposite + 1], alwaysLeft[firstOpposite]];
+-    expect(() => validateServerJournal(artifact, chain(alwaysLeft))).toThrow(/порядок/);
++    expect(() => validateServerJournal(artifact, chain(alwaysLeft, history))).toThrow(/порядок/);
+     const ignoredFailure = [...events.slice(0, -1), { type: 'failure', value: { stage: 'ab', error: { message: 'retained reviewer failure' } } }, events.at(-1)];
+-    expect(() => validateServerJournal(artifact, chain(ignoredFailure))).toThrow(/failures/);
++    expect(() => validateServerJournal(artifact, chain(ignoredFailure, history))).toThrow(/failures/);
+     const wrongPositive = { ...artifact, positive: { ...artifact.positive, name: 'aa' } };
+     expect(() => validateServerArtifact(wrongPositive)).toThrow(/имя стадии/);
+     const wrongFinish = [...events.slice(0, -1), { type: 'finished', value: { verdict: 'PASS', digest: 'b'.repeat(64) } }];
+-    expect(() => validateServerJournal(artifact, chain(wrongFinish))).toThrow(/финальная/);
++    expect(() => validateServerJournal(artifact, chain(wrongFinish, history))).toThrow(/финальная/);
+   }, 30_000);
+ 
+   it('сохраняет partial A/B и поздний отказ, а пропавшие comparator/retention не допускает', () => {
+-    const complete = healthyAdmission();
+-    const partial: any = clone(complete); partial.verdict = 'UNPROVEN';
+-    const completeEvents = admissionEvents(complete);
++    const history = admissionHistory(), complete = history.artifact;
++    // Меняются только принадлежащие отказу ветви. Полная unchanged история
++    // N288 остаётся входом валидатора, без трёх лишних копий всего raw.
++    const partial: any = { ...complete, verdict: 'UNPROVEN', ab: { ...complete.ab } };
++    const completeEvents = history.events;
+     const firstAb = completeEvents.findIndex((event) => event.type === 'sample' && event.value.stage === 'ab');
+     const failed = completeEvents[firstAb + 1].value;
+     const error = { name: 'Error', message: 'timeout второго участника; первый raw сохранён', raw: { completed: [] } };
+@@ -461,11 +661,11 @@ describe('серверный PROFILE: независимые sabotage controls',
+     const partialEvents = [...completeEvents.slice(0, firstAb + 1), { type: 'failed-sample', value: { ...failed, value: undefined, error } },
+       { type: 'failure', value: partial.failures[0] }, { type: 'finished', value: { verdict: 'UNPROVEN', digest: serverArtifactDigest(partial) } }];
+     expect(validateServerArtifact(partial).verification).toBe('partial-samples-refused');
+-    expect(validateServerJournal(partial, chain(partialEvents))).toHaveProperty('journalFinalDigest');
++    expect(validateServerJournal(partial, chain(partialEvents, history))).toHaveProperty('journalFinalDigest');
+     const missingFailure = partialEvents.filter((event) => event.type !== 'failure');
+-    expect(() => validateServerJournal(partial, chain(missingFailure))).toThrow(/failures/);
++    expect(() => validateServerJournal(partial, chain(missingFailure, history))).toThrow(/failures/);
+ 
+-    const late: any = clone(complete); late.verdict = 'UNPROVEN';
++    const late: any = { ...complete, verdict: 'UNPROVEN' };
+     const firstComparator = completeEvents.findIndex((event) => event.type === 'comparator-sample');
+     const comparatorFailure = completeEvents[firstComparator + 1].value;
+     late.failures = [{ stage: 'ab', error }]; late.comparators = [{ ...late.comparators[0], rows: [late.comparators[0].rows[0]] }];
+@@ -473,12 +673,12 @@ describe('серверный PROFILE: независимые sabotage controls',
+     const lateEvents = [...completeEvents.slice(0, firstComparator + 1), { type: 'failed-comparator-sample', value: { ...comparatorFailure, stage: 'ab', error } },
+       { type: 'failure', value: late.failures[0] }, { type: 'finished', value: { verdict: 'UNPROVEN', digest: serverArtifactDigest(late) } }];
+     expect(validateServerArtifact(late).verification).toBe('completed-samples-refused');
+-    expect(validateServerJournal(late, chain(lateEvents))).toHaveProperty('journalFinalDigest');
++    expect(validateServerJournal(late, chain(lateEvents, history))).toHaveProperty('journalFinalDigest');
+ 
+-    const dropped: any = clone(complete); delete dropped.retention.candidate;
++    const dropped: any = { ...complete, retention: { ...complete.retention } }; delete dropped.retention.candidate;
+     expect(() => validateServerArtifact(dropped)).toThrow(/retention/);
+     const omitted = completeEvents.filter((event) => event.type !== 'comparator-sample');
+-    expect(() => validateServerJournal(complete, chain(omitted))).toThrow(/retention/);
++    expect(() => validateServerJournal(complete, chain(omitted, history))).toThrow(/retention/);
+   }, 30_000);
+ 
+   it('сохраняет историческое throttle отдельно от DELTA и закрывает нарушение условий', () => {
+diff --git a/docs/server-profile.md b/docs/server-profile.md
+index fe934348..74ed4703 100644
+--- a/docs/server-profile.md
++++ b/docs/server-profile.md
+@@ -39,10 +39,24 @@ Browser S2/S3 измеряют start/cancel общего transform API; они 
+ подменяют прежние canonical 1200 мс или их guards; стоимость генерации артефакта
+ может зависеть от duration. Все участники получают одинаковые параметры.
+ 
+-Перед timing существующий `runSemanticStartCheck` снимает промежуточные CSS
++Перед timing существующий `runSemanticStartCheck` снимает три промежуточных CSS
+ матрицы одного нормального вызова с теми же targets/duration/stagger/to и
+-проверяет всю топологию через прежний oracle. Endpoint300 без промежуточного
+-движения не принимается. Каждая timed серия содержит восемь batches:
++проверяет всю топологию через общий oracle. Каждый checkpoint сохраняет actual
++rAF timestamp и обе границы CSS read window. Все позиции связывает одна фаза
++линейного движения с зарегистрированной duration; нулевые и завершённые позиции
++дают односторонние ограничения той же фазы. Для каждого S2 target, а в S3 для
++leading target, нужна разрешающая пара промежуточных наблюдений: весь диапазон
++возможного перемещения по acquired окнам обязан лежать внутри наблюдаемой
++разности координат ± прежние 2 × 0,5 px. Пересечения широких диапазонов
++недостаточно. Общая постоянная фаза сокращается; прежняя stagger topology также
++проверяется. Controls различают duration 64/128/256 мс и нелинейную форму; три
++конечных checkpoints не доказывают все возможные функции между наблюдениями.
++S2 checkpoints назначаются на 0,25/0,5/0,625 duration, S3 — на 0,2/0,5/0,8
++меньшего из duration и delay span. Поздний завершённый checkpoint допускается
++после разрешающей пары. Единственная промежуточная позиция, насыщение всех
++checkpoints или широкие окна, не разрешившие скорость, дают UNPROVEN/отказ,
++включая случаи здорового движения. Допуск не расширяется из-за неопределённости.
++Endpoint300 без промежуточного движения не принимается. Каждая timed серия содержит восемь batches:
+ 32 настоящих вызова под одной парой clock reads для start и другой для cancel.
+ Positive выполняет 64 вызова; знаменатель остаётся 32. DOM allocation и наблюдения
+ находятся за границами этих интервалов; стоимость цикла и управления owners
+@@ -142,9 +156,15 @@ Forced GC применяется только после timing в отдель
+ `server-profile.sha256`. Журнал проверяет фактический порядок регистрации,
+ замораживания N, завершения controls, фактического порядка и допуска A/B. Имя
+ positive привязано к владельцу artifact, одиночная работа не заменяет 2×work.
+-Failure union и финальный digest связываются с журналом. Engine failure хранит
+-все уже приобретённые operation/frame интервалы, открытую границу cancel,
+-семантику до и после cleanup и original causes. Browser failure сохраняет
++Failure union и финальный digest связываются с журналом. Успешный engine raw
++хранит все 16 clock endpoints вместе с actual user/system полями, ordered
++scheduler times и lossless target CSS/write traces. Существующий lifecycle owner
++пересчитывает интервалы из BigInt endpoints, координаты из independent linear
++oracle и trace hashes из сохранённых строк. Микросекундные user/system fields
++связываются с каждым endpoint по sequence; невозможный ns interval не допускается.
++Engine failure хранит точный приобретённый prefix тех же данных, все
++operation/frame интервалы, открытую границу cancel, семантику до и после cleanup
++и original causes. Browser failure сохраняет
+ acquired batch clocks, начатых/отменённых owners и partial semantic checkpoints;
+ нечисловые приобретённые значения отмечаются явно. Cleanup failure не заменяет
+ первую ошибку. Итоговые метрики пересчитываются из raw; пропущенный
+@@ -156,6 +176,9 @@ acquired batch clocks, начатых/отменённых owners и partial sem
+ прежнего semantic oracle. Timing samples не сокращаются. Итоговый compact JSON
+ пишется по отдельным rows с потоковым digest: полный raw не обязан помещаться в
+ одну строку V8. Журнал и внешний digest связывают точные записанные bytes.
++Consumer также разбирает JSON по полным values и journal по records; общий
++artifact или journal не преобразуется в одну строку V8. Native JSON.parse
++сохраняет значения каждого chunk, Unicode/escapes и численное округление.
+ 
+ ```sh
+ node bench/profile/server-profile-contract.mjs \
+diff --git a/bench/compare/bench.mjs b/bench/compare/bench.mjs
+index 30e707f1..1e159954 100644
+--- a/bench/compare/bench.mjs
++++ b/bench/compare/bench.mjs
+@@ -447,7 +447,7 @@ export async function runSemanticStartCheck(page, scenario, calls) {
+     const delaySpan = config.staggerGapMs * (config.targetsPerCall - 1);
+     const checkpointTimes = config.staggerGapMs > 0
+       ? [0.2, 0.5, 0.8].map((fraction) => Math.min(config.durationMs, delaySpan) * fraction)
+-      : [config.durationMs * 0.25];
++      : [config.durationMs * 0.25, config.durationMs * 0.5, config.durationMs * 0.625];
+     try {
+       for (let call = 0; call < expectedCalls; call++) {
+         const elements = []; groups.push(elements);
+@@ -467,7 +467,10 @@ export async function runSemanticStartCheck(page, scenario, calls) {
+       for (const checkpointTime of checkpointTimes) {
+         const remaining = checkpointTime - (performance.now() - epoch);
+         if (remaining > 0) await new Promise((resolve) => setTimeout(resolve, remaining));
+-        const checkpoint = { groups: [] }; checkpoints.push(checkpoint);
++        // CSS после обновления кадра соотносится с его наблюдаемым timestamp,
++        // а не с предположением о частоте экрана или фазе первого callback.
++        const frameTimestampMs = await new Promise((resolve) => requestAnimationFrame((timestamp) => resolve(timestamp - epoch)));
++        const checkpoint = { frameTimestampMs, groups: [] }; checkpoints.push(checkpoint);
+         for (const elements of groups) {
+           const group = { readStartedMs: performance.now() - epoch, positions: [] }; checkpoint.groups.push(group);
+           for (const element of elements) group.positions.push(new DOMMatrixReadOnly(getComputedStyle(element).transform).e);
+diff --git a/bench/compare/methodology.mjs b/bench/compare/methodology.mjs
+index dec308b8..3c3b9b86 100644
+--- a/bench/compare/methodology.mjs
++++ b/bench/compare/methodology.mjs
+@@ -247,15 +247,17 @@ export function deriveTimerStep(values) {
+   return stepUpper;
+ }
+ 
++// Операция синхронна, не отдаёт view наружу и сохраняет только примитивный
++// результат. Один scratch word устраняет allocation на каждом округлении.
++const binary64Scratch = new DataView(new ArrayBuffer(8));
++
+ export function nextUp(value) {
+   if (Number.isNaN(value) || value === Infinity) return value;
+   if (value === 0) return Number.MIN_VALUE;
+-  const buffer = new ArrayBuffer(8);
+-  const view = new DataView(buffer);
+-  view.setFloat64(0, value);
+-  const bits = view.getBigUint64(0);
+-  view.setBigUint64(0, bits + (value > 0 ? 1n : -1n));
+-  return view.getFloat64(0);
++  binary64Scratch.setFloat64(0, value);
++  const bits = binary64Scratch.getBigUint64(0);
++  binary64Scratch.setBigUint64(0, bits + (value > 0 ? 1n : -1n));
++  return binary64Scratch.getFloat64(0);
+ }
+ 
+ export function nextDown(value) {
+@@ -599,7 +601,7 @@ export function evaluateStartSemanticEvidence(evidence, expected, calls) {
+     !Array.isArray(evidence.callStartedAtMs) ||
+     evidence.callStartedAtMs.length !== calls ||
+     evidence.callStartedAtMs.some((value) => !Number.isFinite(value) || value < 0) ||
+-    !Array.isArray(evidence.checkpoints) || evidence.checkpoints.length === 0 ||
++    !Array.isArray(evidence.checkpoints) || evidence.checkpoints.length < 2 ||
+     !Array.isArray(evidence.terminal) || evidence.terminal.length !== calls
+   ) return false;
+ 
+@@ -616,6 +618,15 @@ export function evaluateStartSemanticEvidence(evidence, expected, calls) {
+   if (!terminalValid) return false;
+ 
+   let provedPartialStagger = expected.staggerGapMs === 0;
++  const observations = Array.from({ length: calls }, () => []);
++  const phases = Array.from({ length: calls }, () => ({ low: -Infinity, high: Infinity }));
++  const resolved = Array.from({ length: calls }, () => Array(expected.targetsPerCall).fill(false));
++  const clockErrorMs = expected.semanticClockErrorMs ?? 0;
++  if (!Number.isFinite(clockErrorMs) || clockErrorMs < 0 ||
++      !Number.isFinite(expected.durationMs) || expected.durationMs <= 0) return false;
++  const slope = expected.toPx / expected.durationMs;
++  const coordinateError = 2 * expected.movementThresholdPx;
++  const interior = (value) => value >= expected.movementThresholdPx && value < expected.toPx - expected.finalTolerancePx;
+   for (const checkpoint of evidence.checkpoints) {
+     if (!Array.isArray(checkpoint?.groups) || checkpoint.groups.length !== calls) return false;
+     for (let call = 0; call < calls; call++) {
+@@ -627,13 +638,50 @@ export function evaluateStartSemanticEvidence(evidence, expected, calls) {
+         group.readEndedMs < group.readStartedMs ||
+         !shape(group.positions)
+       ) return false;
+-      if (expected.staggerGapMs === 0) {
+-        if (group.positions.some((value) => (
+-          value < expected.movementThresholdPx ||
+-          value >= expected.toPx - expected.finalTolerancePx
+-        ))) return false;
+-        continue;
++      const observationStartedMs = checkpoint.frameTimestampMs ?? group.readStartedMs;
++      if (!Number.isFinite(observationStartedMs) || observationStartedMs < evidence.callStartedAtMs[call] - clockErrorMs ||
++          observationStartedMs > group.readStartedMs + clockErrorMs) return false;
++      const history = observations[call];
++      if (history.length && observationStartedMs <= history.at(-1).startedMs) return false;
++      for (const prior of history) {
++        const elapsedLow = Math.max(0, nextDown(observationStartedMs - prior.endedMs - 2 * clockErrorMs));
++        const elapsedHigh = nextUp(group.readEndedMs - prior.startedMs + 2 * clockErrorMs);
++        const displacementLow = nextDown(slope * elapsedLow);
++        const displacementHigh = nextUp(slope * elapsedHigh);
++        let previousDelta = NaN, withinTolerance = false;
++        for (let target = 0; target < group.positions.length; target++) {
++          const before = prior.positions[target], after = group.positions[target];
++          // Пересечение широкого интервала не доказывает скорость. Полный
++          // диапазон перемещения должен укладываться в прежний CSS допуск.
++          if (interior(before) && interior(after) && elapsedLow > 0) {
++            const delta = after - before;
++            // Совпавший скаляр задаёт то же неравенство; raw identity и обе
++            // координаты каждого target всё равно проходят общий обход.
++            if (delta !== previousDelta) {
++              previousDelta = delta;
++              withinTolerance = displacementLow >= nextDown(delta - coordinateError) &&
++                displacementHigh <= nextUp(delta + coordinateError);
++            }
++            if (withinTolerance) resolved[call][target] = true;
++          }
++        }
++      }
++      history.push({ startedMs: observationStartedMs, endedMs: group.readEndedMs, positions: group.positions });
++      const phase = phases[call];
++      for (let target = 0; target < group.positions.length; target++) {
++        const value = group.positions[target], delay = target * expected.staggerGapMs;
++        if (value < -expected.movementThresholdPx || value > expected.toPx + expected.finalTolerancePx) return false;
++        if (expected.staggerGapMs === 0 && target > 0 && value === group.positions[target - 1]) continue;
++        // Одна фаза на весь вызов связывает все координаты и checkpoints.
++        // Clamp даёт одностороннее ограничение, а не новую неизвестную фазу.
++        if (value < expected.toPx - expected.finalTolerancePx) phase.low = Math.max(phase.low,
++          nextDown(nextDown(observationStartedMs - clockErrorMs - delay) - nextUp((value + expected.movementThresholdPx) / slope)));
++        if (value >= expected.movementThresholdPx) phase.high = Math.min(phase.high,
++          nextUp(nextUp(group.readEndedMs + clockErrorMs - delay) - nextDown((value -
++            (interior(value) ? expected.movementThresholdPx : expected.finalTolerancePx)) / slope)));
++        if (phase.low > phase.high) return false;
+       }
++      if (expected.staggerGapMs === 0) continue;
+ 
+       for (let target = 1; target < group.positions.length; target++) {
+         if (group.positions[target] > group.positions[target - 1] + expected.movementThresholdPx) {
+@@ -641,18 +689,16 @@ export function evaluateStartSemanticEvidence(evidence, expected, calls) {
+         }
+       }
+       const leadingPosition = group.positions[0];
+-      if (
+-        leadingPosition < expected.movementThresholdPx ||
+-        leadingPosition >= expected.toPx - expected.finalTolerancePx
+-      ) return false;
+       const staggerStepPx = (
+         expected.toPx * expected.staggerGapMs / expected.durationMs
+       );
+-      for (let target = 1; target < group.positions.length; target++) {
+-        const relativeExpected = Math.max(0, leadingPosition - staggerStepPx * target);
+-        if (
+-          Math.abs(group.positions[target] - relativeExpected) > expected.movementThresholdPx
+-        ) return false;
++      if (interior(leadingPosition)) {
++        for (let target = 1; target < group.positions.length; target++) {
++          const relativeExpected = Math.max(0, leadingPosition - staggerStepPx * target);
++          if (
++            Math.abs(group.positions[target] - relativeExpected) > expected.movementThresholdPx
++          ) return false;
++        }
+       }
+       let lastMoved = -1;
+       for (let target = 0; target < group.positions.length; target++) {
+@@ -661,7 +707,8 @@ export function evaluateStartSemanticEvidence(evidence, expected, calls) {
+       if (lastMoved >= 0 && lastMoved < expected.targetsPerCall - 1) provedPartialStagger = true;
+     }
+   }
+-  return provedPartialStagger;
++  return provedPartialStagger && resolved.every((targets) => expected.staggerGapMs === 0
++    ? targets.every(Boolean) : targets[0]);
+ }
+ 
+ /** Publish-run не имеет права сохранять sample с недоказанной топологией. */
+diff --git a/scripts/bench-transform-support.mjs b/scripts/bench-transform-support.mjs
+index cfd4e2f7..66862028 100644
+--- a/scripts/bench-transform-support.mjs
++++ b/scripts/bench-transform-support.mjs
+@@ -109,6 +109,142 @@ async function flushReactions() {
+ 
+ /** @typedef {{ status: 'pending' } | { status: 'fulfilled' } | { status: 'rejected', reason: unknown }} FinishedState */
+ 
++function requireLineage(condition, message) {
++  if (!condition) throw new Error(`transform lineage: ${message}`);
++}
++
++function sameArray(actual, expected) {
++  return Array.isArray(actual) && actual.length === expected.length && Array.from(actual).every((value, index) => value === expected[index]);
++}
++
++function caseTimeline({ lifecycle }) {
++  const profile = TRANSFORM_PAIR_PROFILE;
++  const setupOffsetsMs = lifecycle === 'fresh' ? [] : lifecycle === 'settled'
++    ? [...profile.previousSettledOffsetsMs] : [...profile.previousLiveOffsetsMs];
++  return {
++    clockOriginMs: profile.clockOriginMs, setupOffsetsMs, frameOffsetsMs: [...profile.frameOffsetsMs],
++    successorBaseMs: profile.clockOriginMs + (setupOffsetsMs.length ? setupOffsetsMs.at(-1) + profile.successorGapMs : 0),
++  };
++}
++
++/** Позиции целей задаёт from/count; одинаковые записи сохраняются целиком, без hash-only замены. */
++function captureTargetTraces(slots, lifecycle) {
++  const runs = [];
++  let previousText;
++  for (let target = 0; target < slots.length; target++) {
++    const slot = slots[target];
++    const trace = {
++      value: slot.value,
++      setup: lifecycle === 'fresh' ? [] : Array.from(slot.setup, (value) => value ?? null),
++      setupWrites: lifecycle === 'fresh' ? [] : Array.from(slot.setupWrites),
++      values: Array.from(slot.values, (value) => value ?? null), writes: Array.from(slot.writes),
++      outsideWrites: slot.outsideWrites, events: slot.events.map((event) => ({ ...event })),
++    };
++    const text = JSON.stringify(trace);
++    if (text === previousText) runs.at(-1).count++;
++    else runs.push({ from: target, count: 1, trace });
++    previousText = text;
++  }
++  return { encoding: 'runs', count: slots.length, runs };
++}
++
++/** Пересчитывает успешный sample из первичных clock/CSS записей, без статистики или новых порогов. */
++export function validateTransformLifecycleSample(sample, expectedCase) {
++  const profile = TRANSFORM_PAIR_PROFILE;
++  const { count, lifecycle, channels } = expectedCase ?? {};
++  requireLineage(profile.counts.includes(count) && profile.lifecycles.includes(lifecycle) && profile.channels.includes(channels), 'неизвестный ожидаемый case');
++  const raw = sample?.raw;
++  requireLineage(raw?.schemaVersion === 1 && raw.case?.count === count && raw.case?.lifecycle === lifecycle && raw.case?.channels === channels, 'case не соответствует владельцу');
++  requireLineage(sample.semantic?.valid === true, 'отказ не является успешным sample');
++  const expectedReads = [
++    { metric: 'operationNs', frame: null, edge: 'before' }, { metric: 'operationNs', frame: null, edge: 'after' },
++    ...profile.frameOffsetsMs.flatMap((_, frame) => [{ metric: 'frameNs', frame, edge: 'before' }, { metric: 'frameNs', frame, edge: 'after' }]),
++    { metric: 'cancelDrainNs', frame: null, edge: 'before' }, { metric: 'cancelDrainNs', frame: null, edge: 'after' },
++  ];
++  requireLineage(Array.isArray(raw.clockReads) && raw.clockReads.length === expectedReads.length, 'потеряны clock reads');
++  const readings = raw.clockReads.map((read, sequence) => {
++    const expected = expectedReads[sequence];
++    requireLineage(read?.sequence === sequence && read.metric === expected.metric && read.frame === expected.frame && read.edge === expected.edge, 'нарушен порядок clock reads');
++    requireLineage(typeof read.valueNs === 'string' && /^-?(?:0|[1-9]\d*)$/.test(read.valueNs), 'clock read не является целым ns');
++    const value = BigInt(read.valueNs);
++    requireLineage(value.toString() === read.valueNs, 'clock read не является каноническим StringBigInt');
++    return value;
++  });
++  for (let index = 1; index < readings.length; index++) requireLineage(readings[index] >= readings[index - 1], 'clock reads идут назад');
++  const intervals = [];
++  const frameNs = [];
++  let operationNs;
++  let cancelDrainNs;
++  for (let index = 0; index < readings.length; index += 2) {
++    const read = raw.clockReads[index];
++    const duration = readings[index + 1] - readings[index];
++    const value = Number(duration);
++    requireLineage(Number.isFinite(value) && value >= 0, 'некорректный пересчитанный интервал');
++    intervals.push({ metric: read.metric, frame: read.frame, beforeNs: read.valueNs, afterNs: raw.clockReads[index + 1].valueNs, durationNs: duration.toString() });
++    if (read.metric === 'operationNs') operationNs = value;
++    else if (read.metric === 'cancelDrainNs') cancelDrainNs = value;
++    else frameNs.push(value);
++  }
++  requireLineage(sample.operationNs === operationNs && sample.cancelDrainNs === cancelDrainNs &&
++    sameArray(sample.frameNs, frameNs), 'metric не пересчитывается из endpoints');
++  const timeline = caseTimeline(expectedCase);
++  requireLineage(raw.timeline?.clockOriginMs === timeline.clockOriginMs && raw.timeline?.successorBaseMs === timeline.successorBaseMs &&
++    sameArray(raw.timeline?.setupOffsetsMs, timeline.setupOffsetsMs) && sameArray(raw.timeline?.frameOffsetsMs, timeline.frameOffsetsMs), 'timeline не соответствует профилю');
++  const expectedSteps = [
++    ...timeline.setupOffsetsMs.map((offset, index) => ({ stage: 'setup', index, phase: 'setup', timestampMs: timeline.clockOriginMs + offset })),
++    ...(lifecycle === 'settled' ? [{ stage: 'settled-drain', index: null, phase: 'outside', timestampMs: timeline.clockOriginMs + timeline.setupOffsetsMs.at(-1) + 1 }] : []),
++    ...timeline.frameOffsetsMs.map((offset, index) => ({ stage: 'frame', index, phase: 'frames', timestampMs: timeline.successorBaseMs + offset })),
++    { stage: 'cancel-drain', index: null, phase: 'outside', timestampMs: timeline.successorBaseMs + profile.durationMs },
++    ...[2, 3].map((factor) => ({ stage: 'idle', index: null, phase: 'outside', timestampMs: timeline.successorBaseMs + profile.durationMs * factor })),
++  ];
++  requireLineage(Array.isArray(raw.timeline.steps) && raw.timeline.steps.length === expectedSteps.length, 'потеряны или добавлены scheduler steps');
++  for (let sequence = 0; sequence < raw.timeline.steps.length; sequence++) {
++    const step = raw.timeline.steps[sequence];
++    const expected = expectedSteps[sequence];
++    requireLineage(step?.sequence === sequence && Object.keys(expected).every((key) => step[key] === expected[key]), 'нарушен порядок scheduler steps');
++  }
++  const packed = raw.targetTraces;
++  requireLineage(packed?.encoding === 'runs' && packed.count === count && Array.isArray(packed.runs) && packed.runs.length > 0 && packed.runs.length <= count, 'некорректный target RLE');
++  const expectedEvents = expectedSteps.map((step, sequence) => ({ ...step, step: sequence })).filter((step) => step.stage === 'setup' || step.stage === 'frame');
++  let nextTarget = 0;
++  for (const run of packed.runs) {
++    requireLineage(run?.from === nextTarget && Number.isSafeInteger(run.count) && run.count > 0 && run.count <= count - nextTarget, 'RLE потерял или повторил target identity');
++    const trace = run.trace;
++    requireLineage(trace && Array.isArray(trace.setup) && trace.setup.length === timeline.setupOffsetsMs.length &&
++      Array.isArray(trace.setupWrites) && trace.setupWrites.length === trace.setup.length && Array.from(trace.setupWrites).every((value) => value === 1) &&
++      Array.isArray(trace.values) && trace.values.length === frameNs.length && Array.isArray(trace.writes) && trace.writes.length === frameNs.length &&
++      Array.from(trace.writes).every((value) => value === 1) && trace.outsideWrites === 0 && trace.value === trace.values.at(-1), 'неполная запись target');
++    for (let frame = 0; frame < trace.setup.length; frame++) {
++      checkValues(trace.setup[frame], interpolate(INITIAL, PREVIOUS, timeline.setupOffsetsMs[frame] / profile.durationMs), `raw setup target ${run.from} frame ${frame}`);
++    }
++    for (let frame = 0; frame < trace.values.length; frame++) {
++      checkValues(trace.values[frame], expectedTransformValues(lifecycle, channels, timeline.frameOffsetsMs[frame]), `raw target ${run.from} frame ${frame}`);
++    }
++    requireLineage(Array.isArray(trace.events) && trace.events.length === expectedEvents.length, 'потеряны target write events');
++    for (let sequence = 0; sequence < trace.events.length; sequence++) {
++      const event = trace.events[sequence];
++      const expected = expectedEvents[sequence];
++      const value = expected.stage === 'setup' ? trace.setup[expected.index] : trace.values[expected.index];
++      requireLineage(event?.sequence === sequence && event.phase === expected.phase && event.index === expected.index && event.step === expected.step &&
++        event.timestampMs === expected.timestampMs && event.property === 'transform' && event.value === value, 'write event не соответствует приобретённому кадру');
++    }
++    const hash = createHash('sha256').update(JSON.stringify(trace.values)).digest('hex');
++    const hashes = sample.semantic.targetTraceHashes;
++    if (Array.isArray(hashes)) {
++      requireLineage(hashes.length === count, 'потеряны target hashes');
++      for (let target = run.from; target < run.from + run.count; target++) requireLineage(hashes[target] === hash, 'hash не соответствует raw CSS');
++    } else {
++      requireLineage(hashes?.encoding === 'repeat' && hashes.count === count && hashes.value === hash, 'hash RLE не соответствует raw CSS');
++    }
++    nextTarget += run.count;
++  }
++  requireLineage(nextTarget === count && sample.semantic.targets === count && sample.semantic.frames === frameNs.length && sample.semantic.finished === true &&
++    sample.semantic.previousFinished === (lifecycle === 'fresh' ? null : true) && sample.semantic.onCompleteCalls === 0 &&
++    sample.semantic.previousCompleteCalls === (lifecycle === 'settled' ? 1 : 0) && Number.isSafeInteger(sample.semantic.requests) &&
++    sample.semantic.requests > 0 && sample.semantic.executions === sample.semantic.requests && sample.semantic.pending === 0, 'raw/semantic итог не соответствует case');
++  return { operationNs, frameNs, cancelDrainNs, intervals, traceRuns: packed.runs };
++}
++
+ export async function runTransformLifecycleSample({ animate, count, lifecycle, channels, nowNs = () => process.hrtime.bigint() }) {
+   const profile = TRANSFORM_PAIR_PROFILE;
+   if (typeof animate !== 'function' || !profile.counts.includes(count) ||
+@@ -116,17 +252,22 @@ export async function runTransformLifecycleSample({ animate, count, lifecycle, c
+     throw new Error('transform lifecycle: вход вне фиксированного профиля');
+   }
+   const clock = createBenchClock();
++  const clockReads = [];
++  const steps = [];
++  let currentStep = null;
+   const frames = profile.frameOffsetsMs.length;
+   const setupOffsets = lifecycle === 'settled' ? profile.previousSettledOffsetsMs : profile.previousLiveOffsetsMs;
+   const slots = Array.from({ length: count }, () => ({
+     value: '', setup: new Array(setupOffsets.length), setupWrites: new Uint32Array(setupOffsets.length),
+-    values: new Array(frames), writes: new Uint32Array(frames), outsideWrites: 0,
++    values: new Array(frames), writes: new Uint32Array(frames), outsideWrites: 0, events: [],
+   }));
+   let phase = 'outside';
+   let index = -1;
+   const targets = slots.map((slot) => ({ style: {
+     getPropertyValue: (name) => name === 'transform' ? slot.value : '',
+     setProperty(name, value) {
++      slot.events.push({ sequence: slot.events.length, phase, index: phase === 'outside' ? null : index,
++        step: currentStep?.sequence ?? null, timestampMs: currentStep?.timestampMs ?? null, property: name, value });
+       slot.value = name === 'transform' ? value : `invalid:${name}`;
+       if (phase === 'setup') { slot.setup[index] = slot.value; slot.setupWrites[index]++; }
+       else if (phase === 'frames') { slot.values[index] = slot.value; slot.writes[index]++; }
+@@ -148,6 +289,23 @@ export async function runTransformLifecycleSample({ animate, count, lifecycle, c
+     duration: profile.durationMs, ease: LINEAR, requestFrame: clock.requestFrame,
+     matchMedia: () => ({ matches: false }), onComplete: () => { onCompleteCalls++; },
+   };
++  const readNs = (metric, frame, edge) => {
++    const value = nowNs();
++    clockReads.push({ sequence: clockReads.length, metric, frame, edge, value });
++    return value;
++  };
++  // Время записи — общий последний предложенный scheduler timestamp, не чтение физических часов.
++  const step = (stage, frame, timestampMs) => {
++    currentStep = { sequence: steps.length, stage, index: frame, phase, timestampMs };
++    steps.push(currentStep);
++    clock.step(timestampMs);
++  };
++  const captureRaw = () => ({
++    schemaVersion: 1, case: { count, lifecycle, channels },
++    clockReads: clockReads.map(({ value, ...read }) => ({ ...read, valueNs: String(value) })),
++    timeline: { ...caseTimeline({ lifecycle }), steps: steps.map((entry) => ({ ...entry })) },
++    targetTraces: captureTargetTraces(slots, lifecycle),
++  });
+   const pending = () => clock.requests - clock.executions;
+   const requirePending = (expected, label) => {
+     if (pending() !== expected) throw new Error(`transform scheduler: ${label} pending=${pending()}, ожидалось ${expected}`);
+@@ -185,11 +343,12 @@ export async function runTransformLifecycleSample({ animate, count, lifecycle, c
+   const cleanup = async () => {
+     cleanupStarted = true;
+     phase = 'outside';
++    currentStep = null;
+     // Каждый владелец и drain получают попытку очистки; throw undefined тоже сохраняется.
+     try { controls?.cancel(); } catch (error) { cleanupErrors.push(error); }
+     try { previous?.cancel(); } catch (error) { cleanupErrors.push(error); }
+     for (let drain = 0; drain < 4 && pending() > 0; drain++) {
+-      try { clock.step(timestamp + profile.durationMs * (4 + drain)); } catch (error) { cleanupErrors.push(error); }
++      try { step('cleanup-drain', null, timestamp + profile.durationMs * (4 + drain)); } catch (error) { cleanupErrors.push(error); }
+     }
+     await flushReactions();
+     cleanupCompleted = true;
+@@ -211,10 +370,11 @@ export async function runTransformLifecycleSample({ animate, count, lifecycle, c
+       phase = 'setup';
+       for (index = 0; index < setupOffsets.length; index++) {
+         timestamp = profile.clockOriginMs + setupOffsets[index];
+-        clock.step(timestamp);
++        step('setup', index, timestamp);
+         await flushReactions();
+       }
+       phase = 'outside';
++      currentStep = null;
+       await flushReactions();
+       requireNoRecordedFailures();
+       if ((previousFinished.status === 'fulfilled') !== (lifecycle === 'settled') || previousCompleteCalls !== (lifecycle === 'settled' ? 1 : 0)) {
+@@ -228,8 +388,9 @@ export async function runTransformLifecycleSample({ animate, count, lifecycle, c
+       }
+       // После естественного завершения один drain очищает уже поставленные callbacks.
+       if (lifecycle === 'settled') {
+-        clock.step(timestamp + 1);
++        step('settled-drain', null, timestamp + 1);
+         await flushReactions();
++        currentStep = null;
+       }
+       if (lifecycle === 'live') requireLive('setup end');
+       else requirePending(0, 'setup end');
+@@ -237,12 +398,12 @@ export async function runTransformLifecycleSample({ animate, count, lifecycle, c
+     }
+     failurePhase = 'operation';
+     activeMetric = 'operationNs';
+-    intervalBefore = nowNs();
++    intervalBefore = readNs('operationNs', null, 'before');
+     controls = animate(targets, props, options);
+     // Observer регистрируется до реакции и второго чтения часов: отказ часов не теряет finished.
+     observeFinished(controls, (state) => { finished = state; });
+     await flushReactions();
+-    intervalAfter = nowNs();
++    intervalAfter = readNs('operationNs', null, 'after');
+     operationNs = Number(intervalAfter - intervalBefore);
+     activeMetric = null;
+     requireLive('operation');
+@@ -257,15 +418,16 @@ export async function runTransformLifecycleSample({ animate, count, lifecycle, c
+       activeFrame = index;
+       intervalBefore = null;
+       intervalAfter = null;
+-      intervalBefore = nowNs();
+-      clock.step(timestamp + profile.frameOffsetsMs[index]);
++      intervalBefore = readNs('frameNs', index, 'before');
++      step('frame', index, timestamp + profile.frameOffsetsMs[index]);
+       await flushReactions();
+-      intervalAfter = nowNs();
++      intervalAfter = readNs('frameNs', index, 'after');
+       frameNs[index] = Number(intervalAfter - intervalBefore);
+       activeMetric = null;
+       requireLive(`frame ${index}`);
+     }
+     phase = 'outside';
++    currentStep = null;
+     requireNoRecordedFailures();
+     if (finished.status === 'fulfilled' || onCompleteCalls !== 0) throw new Error('transform: преждевременный finished/onComplete');
+     failurePhase = 'cancel';
+@@ -273,11 +435,11 @@ export async function runTransformLifecycleSample({ animate, count, lifecycle, c
+     activeFrame = null;
+     intervalBefore = null;
+     intervalAfter = null;
+-    intervalBefore = nowNs();
++    intervalBefore = readNs('cancelDrainNs', null, 'before');
+     controls.cancel();
+-    clock.step(timestamp + profile.durationMs);
++    step('cancel-drain', null, timestamp + profile.durationMs);
+     await flushReactions();
+-    intervalAfter = nowNs();
++    intervalAfter = readNs('cancelDrainNs', null, 'after');
+     cancelDrainNs = Number(intervalAfter - intervalBefore);
+     activeMetric = null;
+     requireNoRecordedFailures();
+@@ -286,8 +448,8 @@ export async function runTransformLifecycleSample({ animate, count, lifecycle, c
+     }
+     requirePending(0, 'cancel drain');
+     const idleExecutions = clock.executions;
+-    clock.step(timestamp + profile.durationMs * 2);
+-    clock.step(timestamp + profile.durationMs * 3);
++    step('idle', null, timestamp + profile.durationMs * 2);
++    step('idle', null, timestamp + profile.durationMs * 3);
+     // PASS относится к состоянию после всех эффектов, включая повторную отмену обоих владельцев.
+     failurePhase = 'cleanup';
+     await cleanup();
+@@ -311,7 +473,7 @@ export async function runTransformLifecycleSample({ animate, count, lifecycle, c
+     if ([operationNs, ...frameNs, cancelDrainNs].some((value) => !Number.isFinite(value) || value < 0)) {
+       throw new Error('transform: некорректный timing');
+     }
+-    return { operationNs, frameNs, cancelDrainNs, semantic: {
++    return { operationNs, frameNs, cancelDrainNs, raw: captureRaw(), semantic: {
+       valid: true, targets: count, frames, targetTraceHashes, finished: finished.status === 'fulfilled', onCompleteCalls,
+       previousFinished: lifecycle === 'fresh' ? null : previousFinished.status === 'fulfilled', previousCompleteCalls,
+       requests: clock.requests, executions: clock.executions, pending: pending(),
+@@ -338,7 +500,7 @@ export async function runTransformLifecycleSample({ animate, count, lifecycle, c
+     const retainTiming = (value) => value === null || Number.isFinite(value)
+       ? value : { kind: 'nonfinite', value: String(value) };
+     throw Object.assign(new AggregateError(errors, message), { raw: {
+-      case: { count, lifecycle, channels }, operationNs: retainTiming(operationNs), frameNs: frameNs.map(retainTiming),
++      ...captureRaw(), operationNs: retainTiming(operationNs), frameNs: frameNs.map(retainTiming),
+       cancelDrainNs: retainTiming(cancelDrainNs), failurePhase, unfinishedInterval,
+       beforeCleanupSemantic, semantic: failureSemantic(), cleanupCompleted,
+     } });
+diff --git a/test/bench-transform-pair.test.ts b/test/bench-transform-pair.test.ts
+index a304c96d..14c85e27 100644
+--- a/test/bench-transform-pair.test.ts
++++ b/test/bench-transform-pair.test.ts
+@@ -1,12 +1,14 @@
+ import { mkdtempSync, mkdirSync, writeFileSync, rmSync } from 'node:fs';
+ import { tmpdir } from 'node:os';
+ import path from 'node:path';
++import { createHash } from 'node:crypto';
+ import { describe, expect, it } from 'vitest';
+ import { animate, type AnimateOptions, type AnimateProps } from '../src/animate/index.js';
+ import {
+   TRANSFORM_PAIR_PROFILE,
+   expectedTransformValues,
+   runTransformLifecycleSample,
++  validateTransformLifecycleSample,
+ } from '../scripts/bench-transform-support.mjs';
+ import { makeTransformPairPlan, parseTransformPairArgs, runTransformPair } from '../scripts/bench-transform-pair.mjs';
+ import { summarizeDistribution } from '../scripts/bench-support.mjs';
+@@ -553,6 +555,152 @@ describe('paired public transform lifecycle screening', () => {
+     expect(JSON.parse(JSON.stringify(retained.raw))).toEqual(retained.raw);
+   });
+ 
++  it('lineage сохраняет каждый внешний BigInt endpoint и фактический CSS всех целей', async () => {
++    const counterValues: string[] = [];
++    const writes: { target: number; timestampMs: number | undefined; value: string }[] = [];
++    let counter = 10n ** 26n;
++    let timestampMs: number | undefined;
++    const linear = independentFreshLinear();
++    const sample = await runTransformLifecycleSample({
++      count: 1000, lifecycle: 'fresh', channels: 7,
++      nowNs: () => { counter += 1000n; counterValues.push(counter.toString()); return counter; },
++      animate: (targets: Parameters<typeof animate>[0], props: AnimateProps, options: AnimateOptions) => {
++        if (typeof targets === 'string' || !('length' in targets)) throw new Error('Нужен список целей');
++        for (let target = 0; target < targets.length; target++) {
++          const style = targets[target]!.style;
++          const write = style.setProperty.bind(style);
++          style.setProperty = (property, value) => { writes.push({ target, timestampMs, value }); write(property, value); };
++        }
++        return linear(targets, props, { ...options, requestFrame: (callback) => options.requestFrame!((timestamp) => {
++          timestampMs = timestamp;
++          callback(timestamp);
++        }) });
++      },
++    });
++    expect(counterValues).toHaveLength(16);
++    expect(sample.raw.clockReads.map((read: { valueNs: string }) => read.valueNs)).toEqual(counterValues);
++    expect(writes).toHaveLength(6000);
++    expect(sample.raw.targetTraces.encoding).toBe('runs');
++    expect(sample.raw.targetTraces.count).toBe(1000);
++    expect(sample.raw.targetTraces.runs).toHaveLength(1);
++    const run = sample.raw.targetTraces.runs[0];
++    expect(run.from).toBe(0);
++    expect(run.count).toBe(1000);
++    for (const write of writes) {
++      const frame = TRANSFORM_PAIR_PROFILE.frameOffsetsMs.indexOf(write.timestampMs! - TRANSFORM_PAIR_PROFILE.clockOriginMs);
++      expect(run.trace.values[frame]).toBe(write.value);
++      expect(run.trace.events[frame]).toMatchObject({ timestampMs: write.timestampMs, property: 'transform', value: write.value });
++    }
++    const replay = validateTransformLifecycleSample(sample, { count: 1000, lifecycle: 'fresh', channels: 7 });
++    expect(replay).toMatchObject({ operationNs: 1000, frameNs: [1000, 1000, 1000, 1000, 1000, 1000], cancelDrainNs: 1000 });
++    expect(replay.intervals.map((interval: { durationNs: string }) => interval.durationNs)).toEqual(Array(8).fill('1000'));
++    expect(replay.traceRuns).toHaveLength(1);
++    expect(JSON.parse(JSON.stringify(sample.raw))).toEqual(sample.raw);
++  });
++
++  it.each(['fresh', 'live', 'settled'] as const)('lineage пересчитывает generic clock и setup/frame координаты: %s', async (lifecycle) => {
++    for (const channels of [1, 7]) {
++      let counter = 0n;
++      const sample = await runTransformLifecycleSample({ animate, count: 1, lifecycle, channels, nowNs: () => ++counter });
++      const replay = validateTransformLifecycleSample(sample, { count: 1, lifecycle, channels });
++      expect(replay.operationNs).toBe(1);
++      expect(replay.frameNs).toEqual([1, 1, 1, 1, 1, 1]);
++      expect(replay.cancelDrainNs).toBe(1);
++      const setupCount = lifecycle === 'fresh' ? 0 : lifecycle === 'live' ? 2 : 3;
++      expect(replay.traceRuns[0].trace.events).toHaveLength(setupCount + 6);
++      expect(replay.traceRuns[0].trace.setup).toHaveLength(setupCount);
++    }
++  });
++
++  it('lineage сохраняет весь приобретённый prefix при позднем cancel failure', async () => {
++    const values: string[] = [];
++    let counter = 0n;
++    const failure = await runTransformLifecycleSample({
++      animate: independentFreshLinear('cancel', new Error('Отказ отмены')), count: 1000, lifecycle: 'fresh', channels: 7,
++      nowNs: () => { counter += 1000n; values.push(counter.toString()); return counter; },
++    }).then(() => { throw new Error('Отказ не должен стать замером'); }, (error: any) => error);
++    expect(failure.raw.clockReads.map((read: { valueNs: string }) => read.valueNs)).toEqual(values);
++    expect(values).toHaveLength(15);
++    expect(failure.raw.clockReads[14]).toMatchObject({ metric: 'cancelDrainNs', frame: null, edge: 'before', valueNs: '15000' });
++    expect(failure.raw.targetTraces.runs[0]).toMatchObject({ from: 0, count: 1000 });
++    expect(failure.raw.targetTraces.runs[0].trace.events).toHaveLength(6);
++    expect(() => validateTransformLifecycleSample({ ...failure.raw, raw: failure.raw }, { count: 1000, lifecycle: 'fresh', channels: 7 })).toThrow(/отказ/);
++  });
++
++  it.each([7, 8])('lineage не придумывает endpoint при отказе часов на попытке %i', async (failedRead) => {
++    const acquired: string[] = [];
++    let attempted = 0;
++    const failure = await runTransformLifecycleSample({
++      animate: independentFreshLinear(), count: 1, lifecycle: 'fresh', channels: 7,
++      nowNs: () => { if (++attempted === failedRead) throw undefined; const value = BigInt(attempted); acquired.push(value.toString()); return value; },
++    }).then(() => { throw new Error('Отказ не должен стать замером'); }, (error: any) => error);
++    expect(failure.errors).toEqual([undefined]);
++    expect(failure.raw.clockReads.map((read: { valueNs: string }) => read.valueNs)).toEqual(acquired);
++    expect(failure.raw.clockReads).toHaveLength(failedRead - 1);
++    expect(failure.raw.targetTraces.runs[0].trace.events).toHaveLength(failedRead === 7 ? 2 : 3);
++  });
++
++  it('lineage сохраняет повторные и внешние записи CSS без потери overwritten значения', async () => {
++    const linear = independentFreshLinear();
++    let counter = 0n;
++    const failure = await runTransformLifecycleSample({
++      count: 1, lifecycle: 'fresh', channels: 7, nowNs: () => ++counter,
++      animate: (targets: Parameters<typeof animate>[0], props: AnimateProps, options: AnimateOptions) => {
++        if (typeof targets === 'string' || !('length' in targets)) throw new Error('Нужен список целей');
++        const style = targets[0]!.style;
++        const write = style.setProperty.bind(style);
++        let writes = 0;
++        style.setProperty = (property, value) => { if (++writes === 3) write(property, 'translateX(999px)'); write(property, value); };
++        const controls = linear(targets, props, options);
++        let cancels = 0;
++        return { ...controls, cancel() { controls.cancel(); if (++cancels === 2) write('transform', 'translateX(888px)'); } };
++      },
++    }).then(() => { throw new Error('Отказ не должен стать замером'); }, (error: any) => error);
++    const trace = failure.raw.targetTraces.runs[0].trace;
++    expect(trace.writes).toEqual([1, 1, 2, 1, 1, 1]);
++    expect(trace.outsideWrites).toBe(1);
++    expect(trace.events).toHaveLength(8);
++    expect(trace.events[2]).toMatchObject({ phase: 'frames', index: 2, value: 'translateX(999px)', timestampMs: 1000032 });
++    expect(trace.events[3]).toMatchObject({ phase: 'frames', index: 2, value: expect.stringContaining('translate(64px, 40px)') });
++    expect(trace.events[7]).toMatchObject({ phase: 'outside', index: null, step: null, timestampMs: null, value: 'translateX(888px)' });
++  });
++
++  it.each(['endpoint', 'clock-order', 'missing-clock', 'missing-target', 'RLE-count', 'RLE-from', 'RLE-hash-only', 'missing-event', 'event-order', 'event-time', 'coordinates-and-hash'] as const)(
++    'lineage отвергает согласованное по labels повреждение: %s', async (fault) => {
++      let counter = 0n;
++      const original = await runTransformLifecycleSample({ animate: independentFreshLinear(), count: 100, lifecycle: 'fresh', channels: 7, nowNs: () => counter += 1000n });
++      expect(() => validateTransformLifecycleSample(original, { count: 100, lifecycle: 'fresh', channels: 7 })).not.toThrow();
++      const mutant = JSON.parse(JSON.stringify(original));
++      const trace = mutant.raw.targetTraces.runs[0].trace;
++      if (fault === 'endpoint') mutant.raw.clockReads[1].valueNs = '2001';
++      if (fault === 'clock-order') [mutant.raw.clockReads[2], mutant.raw.clockReads[3]] = [mutant.raw.clockReads[3], mutant.raw.clockReads[2]];
++      if (fault === 'missing-clock') mutant.raw.clockReads.splice(4, 1);
++      if (fault === 'missing-target') mutant.raw.targetTraces.runs = [];
++      if (fault === 'RLE-count') mutant.raw.targetTraces.runs[0].count = 99;
++      if (fault === 'RLE-from') mutant.raw.targetTraces.runs[0].from = 1;
++      if (fault === 'RLE-hash-only') mutant.raw.targetTraces.runs[0].trace = { hash: original.semantic.targetTraceHashes[0] };
++      if (fault === 'missing-event') delete trace.events[2];
++      if (fault === 'event-order') [trace.events[2], trace.events[3]] = [trace.events[3], trace.events[2]];
++      if (fault === 'event-time') trace.events[2].timestampMs++;
++      if (fault === 'coordinates-and-hash') {
++        trace.values[2] = 'translateX(999px)';
++        trace.events[2].value = trace.values[2];
++        const hash = createHash('sha256').update(JSON.stringify(trace.values)).digest('hex');
++        mutant.semantic.targetTraceHashes.fill(hash);
++      }
++      expect(() => validateTransformLifecycleSample(mutant, { count: 100, lifecycle: 'fresh', channels: 7 })).toThrow(/transform/);
++    },
++  );
++
++  it('lineage связывает external case и повторённые hash identities с полным CSS', async () => {
++    const sample = await runTransformLifecycleSample({ animate: independentFreshLinear(), count: 100, lifecycle: 'fresh', channels: 7, nowNs: () => 0n });
++    sample.semantic.targetTraceHashes = { encoding: 'repeat', count: 100, value: sample.semantic.targetTraceHashes[0] };
++    expect(() => validateTransformLifecycleSample(sample, { count: 100, lifecycle: 'fresh', channels: 7 })).not.toThrow();
++    expect(() => validateTransformLifecycleSample(sample, { count: 1000, lifecycle: 'fresh', channels: 7 })).toThrow(/case/);
++    sample.semantic.targetTraceHashes.count = 99;
++    expect(() => validateTransformLifecycleSample(sample, { count: 100, lifecycle: 'fresh', channels: 7 })).toThrow(/hash RLE/);
++  });
++
+   it.each(['oracle', 'cleanup'] as const)('сохраняет все восемь интервалов при позднем отказе %s', async (fault) => {
+     const reason = Object.freeze(new Error('Ошибка поздней очистки'));
+     let reads = 0;
+diff --git a/test/benchmark-methodology.test.ts b/test/benchmark-methodology.test.ts
+index 0b9176d9..164dc064 100644
+--- a/test/benchmark-methodology.test.ts
++++ b/test/benchmark-methodology.test.ts
+@@ -377,7 +377,7 @@ describe('benchmark methodology fail-closed contracts', () => {
+       const callStartedAtMs = Array.from({ length: calls }, () => 0);
+       const checkpointTimes = config.staggerGapMs > 0
+         ? [0.2, 0.5, 0.8].map((fraction) => config.staggerGapMs * (config.targetsPerCall - 1) * fraction)
+-        : [config.durationMs * 0.25];
++        : [config.durationMs * 0.25, config.durationMs * 0.5, config.durationMs * 0.625];
+       const checkpoints = checkpointTimes.map((elapsedMs) => ({
+         groups: Array.from({ length: calls }, () => ({
+           readStartedMs: elapsedMs,
+@@ -472,6 +472,21 @@ describe('benchmark methodology fail-closed contracts', () => {
+     })).toThrow(/anime\.s3 run 1.*semantic/i);
+   });
+ 
++  it.each([
++    { name: '128мс и завершённый последний кадр', times: [32, 64, 140], width: 0.1, duration: 128, expected: true },
++    { name: '128мс и неразрешающие окна чтения', times: [32, 64, 80], width: 20, duration: 128, expected: false },
++    { name: '256мс и пересекающиеся широкие окна', times: [88, 136, 184], width: 32, duration: 256, expected: false },
++    { name: 'только завершённые позиции', times: [140, 156, 172], width: 0.1, duration: 128, expected: false },
++  ])('temporal oracle: $name', ({ times, width, duration, expected: accepted }) => {
++    const config = { ...START_SCENARIO_MANIFEST.s2, targetsPerCall: 3, durationMs: 128 };
++    const evidence = { topology: { calls: 1, targetsPerCall: 3, staggerGapMs: 0, durationMs: 128, toPx: 300 },
++      callStartedAtMs: [0], checkpoints: times.map((time) => ({ frameTimestampMs: time,
++        groups: [{ readStartedMs: time, readEndedMs: time + width,
++          positions: [0, 1, 2].map(() => 300 * Math.min(1, time / duration)) }] })),
++      terminal: [[300, 300, 300]] };
++    expect(evaluateStartSemanticEvidence(evidence, config, 1)).toBe(accepted);
++  });
++
+   it('bootstraps paired independent run clusters reproducibly without flattening rounds', () => {
+     const clusters = (base: number) => Array.from({ length: 12 }, (_, run) => ({
+       run,
+diff --git a/test/benchmark-report-contract.test.ts b/test/benchmark-report-contract.test.ts
+index a9af4c5e..60d53d96 100644
+--- a/test/benchmark-report-contract.test.ts
++++ b/test/benchmark-report-contract.test.ts
+@@ -73,7 +73,7 @@ function semanticEvidence(scenario: keyof typeof START_SCENARIO_MANIFEST, calls:
+   const config = START_SCENARIO_MANIFEST[scenario];
+   const checkpointTimes = config.staggerGapMs > 0
+     ? [0.2, 0.5, 0.8].map((fraction) => config.staggerGapMs * (config.targetsPerCall - 1) * fraction)
+-    : [config.durationMs * 0.25];
++    : [0.25, 0.5, 0.625].map((fraction) => config.durationMs * fraction);
+   const evidence: any = {
+     topology: {
+       calls,
+@@ -84,6 +84,7 @@ function semanticEvidence(scenario: keyof typeof START_SCENARIO_MANIFEST, calls:
+     },
+     callStartedAtMs: Array.from({ length: calls }, () => 0),
+     checkpoints: checkpointTimes.map((elapsedMs) => ({
++      frameTimestampMs: elapsedMs,
+       groups: Array.from({ length: calls }, () => ({
+         readStartedMs: elapsedMs,
+         readEndedMs: elapsedMs,

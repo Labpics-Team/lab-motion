@@ -1,0 +1,106 @@
+{
+  "contextHead": "30e73995002422376ec763d2026cbdee19a34f42",
+  "actualRegisteredPerformanceSamples": 0,
+  "sourceEditsFrozen": true,
+  "files": [
+    {
+      "path": "bench/profile/server-profile-registration.mjs",
+      "sha256": "211b4c0e107b56d06eb57e0b49f21bc3b1d06a06f34ffec1c06d4ecd15485396",
+      "bytes": 14622,
+      "role": "method-owner"
+    },
+    {
+      "path": "bench/profile/server-profile-contract.mjs",
+      "sha256": "0fb91bc3a109b46ac5bd3c63fc63f251ecc33ab89d81b90173f5c927f844afcd",
+      "bytes": 62912,
+      "role": "method-owner"
+    },
+    {
+      "path": "bench/profile/server-profile-runner.mjs",
+      "sha256": "749d9708f83a5922983effd077a69f1930d2429cf60c895760f4130177edc87b",
+      "bytes": 43661,
+      "role": "method-owner"
+    },
+    {
+      "path": "bench/profile/server-profile-retention.mjs",
+      "sha256": "23b65523bdb2cc481e8d958b4c5dd4ec3c0ce59c9964f7e3bf0020492bf3fdad",
+      "bytes": 1755,
+      "role": "method-owner"
+    },
+    {
+      "path": "test/server-profile-contract.test.ts",
+      "sha256": "7147f065ea2e5ec6780e21997505ed0d28909afebde3e73dbeb2d0f7cbef94b0",
+      "bytes": 73451,
+      "role": "method-owner"
+    },
+    {
+      "path": "docs/server-profile.md",
+      "sha256": "018918e1e68495b8fcce0a81fd296442bed2ac1c994e7594485e75b1fe8379fc",
+      "bytes": 23692,
+      "role": "method-owner"
+    },
+    {
+      "path": "bench/compare/bench.mjs",
+      "sha256": "f4aa1628b6320a08c5444277fe6a6a26c9e3f9f42db845db5821b5bf4334b467",
+      "bytes": 54929,
+      "role": "method-owner"
+    },
+    {
+      "path": "bench/compare/methodology.mjs",
+      "sha256": "e090f47784312a3fc936326157747f346718e2245c275eed62b41cf0de0b1702",
+      "bytes": 53464,
+      "role": "method-owner"
+    },
+    {
+      "path": "scripts/bench-transform-support.mjs",
+      "sha256": "ddbcf5b758133624b3f285947457a8831872847c0e1913ee9afe163f751307c6",
+      "bytes": 30270,
+      "role": "method-owner"
+    },
+    {
+      "path": "test/bench-transform-pair.test.ts",
+      "sha256": "2f339c24d36c65c49624b9532129d132e81d7a17d745f890be50adef89204705",
+      "bytes": 48403,
+      "role": "method-owner"
+    },
+    {
+      "path": "test/benchmark-methodology.test.ts",
+      "sha256": "3faa3ba6131b6864bba17ec65c2a1b52dd6ab082dac8c602fbc86cb508c80f0b",
+      "bytes": 33675,
+      "role": "consumer-test"
+    },
+    {
+      "path": "test/benchmark-report-contract.test.ts",
+      "sha256": "91759d8223e76cc8db450c392fa2983229945de40a7f61e19892002fefe36647",
+      "bytes": 51785,
+      "role": "consumer-test"
+    }
+  ],
+  "affected": {
+    "files": 4,
+    "passed": 307,
+    "failed": 0,
+    "skipped": 0,
+    "raw": "/workspace/scratch/motion-server-frame-clock-closure-20261001T1310Z/affected-first-publication-final.json",
+    "sha256": "d0580744161e794a90b8dd860f17db362b6a98ef9199e191f36b6be2f9ee9388"
+  },
+  "actualHealthy": {
+    "raw": "/workspace/scratch/motion-server-frame-clock-closure-20261001T1310Z/real-healthy-first-publication/semantic-only-result.json",
+    "sha256": "eff07df7c8a163edaa489ce84199f937dae65b37329ea7f59e546e6ec4c3b2d1",
+    "protocolDigest": "00e8d5880eb83dd27a52f90cc670d4ecc550229458af039d9924485805c25431",
+    "scenes": [
+      {
+        "id": "s2",
+        "accepted": true
+      },
+      {
+        "id": "s3",
+        "accepted": true
+      }
+    ]
+  },
+  "clockCertificate": {
+    "path": "/workspace/scratch/motion-server-frame-clock-closure-20261001T1310Z/CLOCK-CERTIFICATE.md",
+    "sha256": "686130793692b187046bd0eeaf37178150838d4dea0f40b305861f93a469763e"
+  }
+}

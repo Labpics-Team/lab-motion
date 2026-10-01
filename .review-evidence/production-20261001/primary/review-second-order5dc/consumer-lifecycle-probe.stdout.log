@@ -1,0 +1,107 @@
+{
+  "schema": 1,
+  "axis": "second-order SERVER METHOD",
+  "actualRegisteredPerformanceSamples": 0,
+  "syntheticOnly": true,
+  "command": [
+    "/opt/codex/runtimes/codex-primary-runtime/dependencies/node/bin/node",
+    "/workspace/scratch/server-method-second-order-final-20261001/closure-144242Z/consumer-lifecycle-probe.mjs"
+  ],
+  "cases": [
+    {
+      "name": "protocol and clock identity change, protected admission/resource fields remain exact",
+      "status": "PASS",
+      "protocol": "00e8d5880eb83dd27a52f90cc670d4ecc550229458af039d9924485805c25431",
+      "clockModel": "7e45adab88a2c97af4e9074543318ae115e42b5c9669c4746b6e149d42bfbc4f",
+      "preserved": "all non-clock fields except explicit fresh/document-frame semantics; N, thresholds, counts, timeouts, caps, denominators and scope exact",
+      "apiCostOutputCompatibilityCases": 3,
+      "scope": "identity/output compatibility, no independent numerical certificate"
+    },
+    {
+      "name": "canonical S1-S4 consumers retain their previous carrier without onset/document-frame requirements",
+      "status": "PASS",
+      "cases": [
+        {
+          "id": "s1",
+          "calls": 40,
+          "durationMs": 1200,
+          "current": true,
+          "prior6fe08": true,
+          "legacyTimestampCarrier": true
+        },
+        {
+          "id": "s2",
+          "calls": 5,
+          "durationMs": 1200,
+          "current": true,
+          "prior6fe08": true,
+          "legacyTimestampCarrier": true
+        },
+        {
+          "id": "s3",
+          "calls": 3,
+          "durationMs": 1200,
+          "current": true,
+          "prior6fe08": true,
+          "legacyTimestampCarrier": true
+        },
+        {
+          "id": "s4",
+          "calls": 1,
+          "durationMs": 1200,
+          "current": true,
+          "prior6fe08": true,
+          "legacyTimestampCarrier": true
+        }
+      ],
+      "scope": "only these synthetic consumer histories; no numerical or browser acceptance"
+    },
+    {
+      "name": "new server onset fields are mandatory, old direct sample reader explicitly refuses the current clock-model carrier",
+      "status": "PASS",
+      "cases": [
+        {
+          "id": "s2",
+          "completeCurrentCarrierAccepted": true,
+          "missingFirstPublicationRefusedCurrent": true,
+          "currentClockModelCarrierRefusedPriorDirectSampleReader": true
+        },
+        {
+          "id": "s3",
+          "completeCurrentCarrierAccepted": true,
+          "missingFirstPublicationRefusedCurrent": true,
+          "currentClockModelCarrierRefusedPriorDirectSampleReader": true
+        }
+      ],
+      "fullArtifactBoundary": "current protocol rejects old whole artifact; direct old sample reader is insufficient for current admission"
+    },
+    {
+      "name": "codec preserves complete first-publication fields and incomplete acquired prefixes without filling observations",
+      "status": "PASS",
+      "acquiredPrefixCount": 17,
+      "missingEndRemainsMissing": true,
+      "failureAndExtraFieldsPreserved": true,
+      "denseTargetsRetained": 100,
+      "denseFixtureNativeBytes": 490,
+      "denseFixtureRleBytes": 976,
+      "compressionGuarantee": false
+    },
+    {
+      "name": "accepted refusal hashes every journal body after chronology; corruption and unfinished output remain refusal",
+      "status": "PASS",
+      "raw": {
+        "sha256": "f9a15bdc49007f9f182d87fadfba8bc633520ee9e097507afe29279a7ed60021",
+        "bytes": 10847
+      },
+      "chronology": {
+        "journalFinalDigest": "055815a7632de539e42b622c0aaa5a52d7467f85842b2a5e609c2d2b764e5de9"
+      },
+      "bodyTamperRefused": true,
+      "unfinishedRefused": true,
+      "exclusiveOutputPreserved": true,
+      "rawFile": "/tmp/server-method-second-order-144242Z/current-refusal.json",
+      "journalFile": "/tmp/server-method-second-order-144242Z/current-refusal.ndjson",
+      "journalSha256": "6a951c6cb4a230c747c44354f1ff8ec359a85b6159b7b1bc69ea872b6d3bbd81"
+    }
+  ]
+}

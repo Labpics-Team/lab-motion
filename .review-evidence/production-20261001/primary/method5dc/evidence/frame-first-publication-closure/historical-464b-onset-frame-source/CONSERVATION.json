@@ -1,0 +1,26 @@
+{
+  "rawSha256": "464b2f5541031d590fe588f4dcfc90aa54ab12981f03452586c1bf6580f6ac0b",
+  "files": [
+    {
+      "name": "bench/compare/bench.mjs",
+      "sha256": "7002a789aab46299a6fa7c40e1070b471d5d8661f71e17adb7cdfa8551f01186"
+    },
+    {
+      "name": "bench/compare/methodology.mjs",
+      "sha256": "f5a991c92abc80a70e3a9baeddf3bb96749cd68e83ee154de27558b797f53ccb"
+    },
+    {
+      "name": "bench/profile/server-profile-contract.mjs",
+      "sha256": "6fe4e7a82dab61d88056486fc8653d3043676db22c1d757735f7c57865366bc5"
+    },
+    {
+      "name": "bench/profile/server-profile-runner.mjs",
+      "sha256": "749d9708f83a5922983effd077a69f1930d2429cf60c895760f4130177edc87b"
+    },
+    {
+      "name": "bench/profile/server-profile-registration.mjs",
+      "sha256": "2118dfc63e5c85c7ac7f5645b7e6d742c6c446380c943013c19b05370ce5bef8"
+    }
+  ],
+  "matched": true
+}

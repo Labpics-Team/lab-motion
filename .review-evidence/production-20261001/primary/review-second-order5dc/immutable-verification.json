@@ -1,0 +1,24 @@
+{
+  "schema": 1,
+  "axis": "second-order SERVER METHOD",
+  "packet": "/workspace/scratch/motion-server-method-final-20261001T144242Z",
+  "manifestFilesVerified": 3789,
+  "trackedSourceFiles": 631,
+  "sourceBasisHead": "8fb55ca0a116e5381a43351ab28834d17a4a9299",
+  "sourceBasisClean": true,
+  "rootBindings": {
+    "method.tar.gz": {
+      "sha256": "5dc04987eace1aaf736da05192948897d50262be5a24ff9192b79744f47ab525",
+      "bytes": 774446649
+    },
+    "manifest.json": {
+      "sha256": "cb650e2d18f89a7e67d24ec9facdfbef458b9f9e39da50e3b36b1d15636a1b56",
+      "bytes": 836745
+    },
+    "owner.patch": {
+      "sha256": "d2dc17a0679b9221ffcc4b8e87711774fdf2f0974fa497852d7ec1a868193c51",
+      "bytes": 68668
+    }
+  },
+  "failures": []
+}

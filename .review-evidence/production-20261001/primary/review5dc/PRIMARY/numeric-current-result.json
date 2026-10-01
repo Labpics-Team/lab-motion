@@ -1,0 +1,3141 @@
+{
+  "actualRegisteredTimingSamples": 0,
+  "protocolDigest": "00e8d5880eb83dd27a52f90cc670d4ecc550229458af039d9924485805c25431",
+  "clockModelDigest": "7e45adab88a2c97af4e9074543318ae115e42b5c9669c4746b6e149d42bfbc4f",
+  "inputs": [
+    {
+      "path": "bench/compare/methodology.mjs",
+      "sha256": "e090f47784312a3fc936326157747f346718e2245c275eed62b41cf0de0b1702"
+    },
+    {
+      "path": "bench/profile/server-profile-contract.mjs",
+      "sha256": "0fb91bc3a109b46ac5bd3c63fc63f251ecc33ab89d81b90173f5c927f844afcd"
+    },
+    {
+      "path": "bench/profile/server-profile-registration.mjs",
+      "sha256": "211b4c0e107b56d06eb57e0b49f21bc3b1d06a06f34ffec1c06d4ecd15485396"
+    }
+  ],
+  "referenceSha256": "0e7899a54592ed0597e8765dc1d618061a81061703dc4242f2bb4e234050ffa5",
+  "nextafter": [
+    {
+      "inputBits": "0000000000000000",
+      "upBits": "0000000000000001",
+      "downBits": "8000000000000001"
+    },
+    {
+      "inputBits": "8000000000000000",
+      "upBits": "0000000000000001",
+      "downBits": "8000000000000001"
+    },
+    {
+      "inputBits": "0000000000000001",
+      "upBits": "0000000000000002",
+      "downBits": "0000000000000000"
+    },
+    {
+      "inputBits": "8000000000000001",
+      "upBits": "8000000000000000",
+      "downBits": "8000000000000002"
+    },
+    {
+      "inputBits": "3ff0000000000000",
+      "upBits": "3ff0000000000001",
+      "downBits": "3fefffffffffffff"
+    },
+    {
+      "inputBits": "bff0000000000000",
+      "upBits": "bfefffffffffffff",
+      "downBits": "bff0000000000001"
+    },
+    {
+      "inputBits": "01a56e1fc2f8f359",
+      "upBits": "01a56e1fc2f8f35a",
+      "downBits": "01a56e1fc2f8f358"
+    },
+    {
+      "inputBits": "81a56e1fc2f8f359",
+      "upBits": "81a56e1fc2f8f358",
+      "downBits": "81a56e1fc2f8f35a"
+    },
+    {
+      "inputBits": "7e37e43c8800759c",
+      "upBits": "7e37e43c8800759d",
+      "downBits": "7e37e43c8800759b"
+    },
+    {
+      "inputBits": "fe37e43c8800759c",
+      "upBits": "fe37e43c8800759b",
+      "downBits": "fe37e43c8800759d"
+    },
+    {
+      "inputBits": "7ff0000000000000",
+      "upBits": "7ff0000000000000",
+      "downBits": "7fefffffffffffff"
+    },
+    {
+      "inputBits": "fff0000000000000",
+      "upBits": "ffefffffffffffff",
+      "downBits": "fff0000000000000"
+    }
+  ],
+  "ranks": [
+    {
+      "n": 4,
+      "p": 0.5,
+      "lowRank": 0,
+      "highRank": null,
+      "got": {
+        "estimate": 2,
+        "low": 0,
+        "high": null,
+        "lowRank": 0,
+        "highRank": null,
+        "observations": 4,
+        "probability": 0.5,
+        "alphaPerTail": 0.000625,
+        "minimumFiniteUpperBlocks": 11,
+        "noTailObservationProbability": 0.0625
+      }
+    },
+    {
+      "n": 4,
+      "p": 0.95,
+      "lowRank": 2,
+      "highRank": null,
+      "got": {
+        "estimate": 4,
+        "low": 2,
+        "high": null,
+        "lowRank": 2,
+        "highRank": null,
+        "observations": 4,
+        "probability": 0.95,
+        "alphaPerTail": 0.000625,
+        "minimumFiniteUpperBlocks": 144,
+        "noTailObservationProbability": 0.8145062499999999
+      }
+    },
+    {
+      "n": 143,
+      "p": 0.5,
+      "lowRank": 52,
+      "highRank": 92,
+      "got": {
+        "estimate": 72,
+        "low": 52,
+        "high": 92,
+        "lowRank": 52,
+        "highRank": 92,
+        "observations": 143,
+        "probability": 0.5,
+        "alphaPerTail": 0.000625,
+        "minimumFiniteUpperBlocks": 11,
+        "noTailObservationProbability": 8.96831017167883e-44
+      }
+    },
+    {
+      "n": 143,
+      "p": 0.95,
+      "lowRank": 126,
+      "highRank": null,
+      "got": {
+        "estimate": 136,
+        "low": 126,
+        "high": null,
+        "lowRank": 126,
+        "highRank": null,
+        "observations": 143,
+        "probability": 0.95,
+        "alphaPerTail": 0.000625,
+        "minimumFiniteUpperBlocks": 144,
+        "noTailObservationProbability": 0.0006523423237336307
+      }
+    },
+    {
+      "n": 144,
+      "p": 0.5,
+      "lowRank": 53,
+      "highRank": 92,
+      "got": {
+        "estimate": 72,
+        "low": 53,
+        "high": 92,
+        "lowRank": 53,
+        "highRank": 92,
+        "observations": 144,
+        "probability": 0.5,
+        "alphaPerTail": 0.000625,
+        "minimumFiniteUpperBlocks": 11,
+        "noTailObservationProbability": 4.484155085839415e-44
+      }
+    },
+    {
+      "n": 144,
+      "p": 0.95,
+      "lowRank": 127,
+      "highRank": 144,
+      "got": {
+        "estimate": 137,
+        "low": 127,
+        "high": 144,
+        "lowRank": 127,
+        "highRank": 144,
+        "observations": 144,
+        "probability": 0.95,
+        "alphaPerTail": 0.000625,
+        "minimumFiniteUpperBlocks": 144,
+        "noTailObservationProbability": 0.0006197252075469491
+      }
+    },
+    {
+      "n": 512,
+      "p": 0.5,
+      "lowRank": 220,
+      "highRank": 293,
+      "got": {
+        "estimate": 256,
+        "low": 220,
+        "high": 293,
+        "lowRank": 220,
+        "highRank": 293,
+        "observations": 512,
+        "probability": 0.5,
+        "alphaPerTail": 0.000625,
+        "minimumFiniteUpperBlocks": 11,
+        "noTailObservationProbability": 7.458340731200207e-155
+      }
+    },
+    {
+      "n": 512,
+      "p": 0.95,
+      "lowRank": 469,
+      "highRank": 502,
+      "got": {
+        "estimate": 487,
+        "low": 469,
+        "high": 502,
+        "lowRank": 469,
+        "highRank": 502,
+        "observations": 512,
+        "probability": 0.95,
+        "alphaPerTail": 0.000625,
+        "minimumFiniteUpperBlocks": 144,
+        "noTailObservationProbability": 3.930844897840318e-12
+      }
+    }
+  ],
+  "policy": {
+    "alphaPerTail": 0.000625,
+    "quantiles": [
+      0.5,
+      0.95
+    ],
+    "minimumBlocks": 144,
+    "correction": "Bonferroni: 10 cells × 2 quantiles × 2 participants × 2 tails; family-wise 95%"
+  },
+  "cost": [
+    {
+      "hostNs": "1000500000",
+      "beginMs": 999.965,
+      "endMs": 999.965,
+      "idealNumerator": "0",
+      "idealDenominator": "1000000",
+      "got": {
+        "low": 0,
+        "high": 0.012000000000682126,
+        "measuredMs": 0,
+        "errorMs": 0.012000000000682125
+      },
+      "enclosed": true
+    },
+    {
+      "hostNs": "1000500000",
+      "beginMs": 999.965,
+      "endMs": 999.974999,
+      "idealNumerator": "0",
+      "idealDenominator": "1000000",
+      "got": {
+        "low": 0,
+        "high": 0.021999000000675558,
+        "measuredMs": 0.00999899999999343,
+        "errorMs": 0.012000000000682126
+      },
+      "enclosed": true
+    },
+    {
+      "hostNs": "1000500000",
+      "beginMs": 999.974999,
+      "endMs": 999.974999,
+      "idealNumerator": "0",
+      "idealDenominator": "1000000",
+      "got": {
+        "low": 0,
+        "high": 0.012000000000682126,
+        "measuredMs": 0,
+        "errorMs": 0.012000000000682125
+      },
+      "enclosed": true
+    },
+    {
+      "hostNs": "1000500000",
+      "beginMs": 999.964999,
+      "endMs": 999.965,
+      "idealNumerator": "1",
+      "idealDenominator": "1000000",
+      "got": {
+        "low": 0,
+        "high": 0.012001000000679602,
+        "measuredMs": 9.999999974752427e-7,
+        "errorMs": 0.012000000000682125
+      },
+      "enclosed": true
+    },
+    {
+      "hostNs": "1000500000",
+      "beginMs": 999.964999,
+      "endMs": 999.974999,
+      "idealNumerator": "1",
+      "idealDenominator": "1000000",
+      "got": {
+        "low": 0,
+        "high": 0.022000000000673033,
+        "measuredMs": 0.009999999999990905,
+        "errorMs": 0.012000000000682126
+      },
+      "enclosed": true
+    },
+    {
+      "hostNs": "1000500000",
+      "beginMs": 999.974998,
+      "endMs": 999.974999,
+      "idealNumerator": "1",
+      "idealDenominator": "1000000",
+      "got": {
+        "low": 0,
+        "high": 0.012001000000679602,
+        "measuredMs": 9.999999974752427e-7,
+        "errorMs": 0.012000000000682125
+      },
+      "enclosed": true
+    },
+    {
+      "hostNs": "1000500000",
+      "beginMs": 999.960001,
+      "endMs": 999.965,
+      "idealNumerator": "4999",
+      "idealDenominator": "1000000",
+      "got": {
+        "low": 0,
+        "high": 0.016999000000680105,
+        "measuredMs": 0.004998999999997977,
+        "errorMs": 0.012000000000682126
+      },
+      "enclosed": true
+    },
+    {
+      "hostNs": "1000500000",
+      "beginMs": 999.960001,
+      "endMs": 999.974999,
+      "idealNumerator": "4999",
+      "idealDenominator": "1000000",
+      "got": {
+        "low": 0.00299799999930928,
+        "high": 0.026998000000673535,
+        "measuredMs": 0.014997999999991407,
+        "errorMs": 0.012000000000682126
+      },
+      "enclosed": true
+    },
+    {
+      "hostNs": "1000500000",
+      "beginMs": 999.97,
+      "endMs": 999.974999,
+      "idealNumerator": "4999",
+      "idealDenominator": "1000000",
+      "got": {
+        "low": 0,
+        "high": 0.016999000000680105,
+        "measuredMs": 0.004998999999997977,
+        "errorMs": 0.012000000000682126
+      },
+      "enclosed": true
+    },
+    {
+      "hostNs": "1000500000",
+      "beginMs": 999.96,
+      "endMs": 999.965,
+      "idealNumerator": "5000",
+      "idealDenominator": "1000000",
+      "got": {
+        "low": 0,
+        "high": 0.01700000000067758,
+        "measuredMs": 0.0049999999999954525,
+        "errorMs": 0.012000000000682126
+      },
+      "enclosed": true
+    },
+    {
+      "hostNs": "1000500000",
+      "beginMs": 999.96,
+      "endMs": 999.974999,
+      "idealNumerator": "5000",
+      "idealDenominator": "1000000",
+      "got": {
+        "low": 0.0029989999993067554,
+        "high": 0.02699900000067101,
+        "measuredMs": 0.014998999999988882,
+        "errorMs": 0.012000000000682126
+      },
+      "enclosed": true
+    },
+    {
+      "hostNs": "1000500000",
+      "beginMs": 999.969999,
+      "endMs": 999.974999,
+      "idealNumerator": "5000",
+      "idealDenominator": "1000000",
+      "got": {
+        "low": 0,
+        "high": 0.01700000000067758,
+        "measuredMs": 0.0049999999999954525,
+        "errorMs": 0.012000000000682126
+      },
+      "enclosed": true
+    },
+    {
+      "hostNs": "1000500000",
+      "beginMs": 967.965,
+      "endMs": 999.965,
+      "idealNumerator": "32000000",
+      "idealDenominator": "1000000",
+      "got": {
+        "low": 31.987999999999307,
+        "high": 32.0120000000007,
+        "measuredMs": 32,
+        "errorMs": 0.01200000000068923
+      },
+      "enclosed": true
+    },
+    {
+      "hostNs": "1000500000",
+      "beginMs": 967.965,
+      "endMs": 999.974999,
+      "idealNumerator": "32000000",
+      "idealDenominator": "1000000",
+      "got": {
+        "low": 31.9979989999993,
+        "high": 32.02199900000069,
+        "measuredMs": 32.00999899999999,
+        "errorMs": 0.01200000000068923
+      },
+      "enclosed": true
+    },
+    {
+      "hostNs": "1000500000",
+      "beginMs": 967.974999,
+      "endMs": 999.965,
+      "idealNumerator": "32000000",
+      "idealDenominator": "1000000",
+      "got": {
+        "low": 31.978000999999317,
+        "high": 32.002001000000696,
+        "measuredMs": 31.990001000000007,
+        "errorMs": 0.012000000000685677
+      },
+      "enclosed": true
+    },
+    {
+      "hostNs": "1000500000",
+      "beginMs": 967.974999,
+      "endMs": 999.974999,
+      "idealNumerator": "32000000",
+      "idealDenominator": "1000000",
+      "got": {
+        "low": 31.987999999999307,
+        "high": 32.0120000000007,
+        "measuredMs": 32,
+        "errorMs": 0.01200000000068923
+      },
+      "enclosed": true
+    },
+    {
+      "hostNs": "1000000500000",
+      "beginMs": 999999.965,
+      "endMs": 999999.965,
+      "idealNumerator": "0",
+      "idealDenominator": "1000000",
+      "got": {
+        "low": 0,
+        "high": 0.012000000698491936,
+        "measuredMs": 0,
+        "errorMs": 0.012000000698491935
+      },
+      "enclosed": true
+    },
+    {
+      "hostNs": "1000000500000",
+      "beginMs": 999999.965,
+      "endMs": 999999.974999,
+      "idealNumerator": "0",
+      "idealDenominator": "1000000",
+      "got": {
+        "low": 0,
+        "high": 0.02199900070019067,
+        "measuredMs": 0.009999000001698732,
+        "errorMs": 0.012000000698491936
+      },
+      "enclosed": true
+    },
+    {
+      "hostNs": "1000000500000",
+      "beginMs": 999999.974999,
+      "endMs": 999999.974999,
+      "idealNumerator": "0",
+      "idealDenominator": "1000000",
+      "got": {
+        "low": 0,
+        "high": 0.012000000698491936,
+        "measuredMs": 0,
+        "errorMs": 0.012000000698491935
+      },
+      "enclosed": true
+    },
+    {
+      "hostNs": "1000000500000",
+      "beginMs": 999999.964999,
+      "endMs": 999999.965,
+      "idealNumerator": "1",
+      "idealDenominator": "1000000",
+      "got": {
+        "low": 0,
+        "high": 0.01200100070610643,
+        "measuredMs": 0.00000100000761449337,
+        "errorMs": 0.012000000698491935
+      },
+      "enclosed": true
+    },
+    {
+      "hostNs": "1000000500000",
+      "beginMs": 999999.964999,
+      "endMs": 999999.974999,
+      "idealNumerator": "1",
+      "idealDenominator": "1000000",
+      "got": {
+        "low": 0,
+        "high": 0.022000000707805164,
+        "measuredMs": 0.010000000009313226,
+        "errorMs": 0.012000000698491936
+      },
+      "enclosed": true
+    },
+    {
+      "hostNs": "1000000500000",
+      "beginMs": 999999.974998,
+      "endMs": 999999.974999,
+      "idealNumerator": "1",
+      "idealDenominator": "1000000",
+      "got": {
+        "low": 0,
+        "high": 0.01200100070610643,
+        "measuredMs": 0.00000100000761449337,
+        "errorMs": 0.012000000698491935
+      },
+      "enclosed": true
+    },
+    {
+      "hostNs": "1000000500000",
+      "beginMs": 999999.960001,
+      "endMs": 999999.965,
+      "idealNumerator": "4999",
+      "idealDenominator": "1000000",
+      "got": {
+        "low": 0,
+        "high": 0.016999000695534058,
+        "measuredMs": 0.0049989999970421195,
+        "errorMs": 0.012000000698491936
+      },
+      "enclosed": true
+    },
+    {
+      "hostNs": "1000000500000",
+      "beginMs": 999999.960001,
+      "endMs": 999999.974999,
+      "idealNumerator": "4999",
+      "idealDenominator": "1000000",
+      "got": {
+        "low": 0.002997999300248915,
+        "high": 0.02699800069723279,
+        "measuredMs": 0.014997999998740852,
+        "errorMs": 0.012000000698491936
+      },
+      "enclosed": true
+    },
+    {
+      "hostNs": "1000000500000",
+      "beginMs": 999999.97,
+      "endMs": 999999.974999,
+      "idealNumerator": "4999",
+      "idealDenominator": "1000000",
+      "got": {
+        "low": 0,
+        "high": 0.016999000695534058,
+        "measuredMs": 0.0049989999970421195,
+        "errorMs": 0.012000000698491936
+      },
+      "enclosed": true
+    },
+    {
+      "hostNs": "1000000500000",
+      "beginMs": 999999.96,
+      "endMs": 999999.965,
+      "idealNumerator": "5000",
+      "idealDenominator": "1000000",
+      "got": {
+        "low": 0,
+        "high": 0.01700000070314855,
+        "measuredMs": 0.005000000004656613,
+        "errorMs": 0.012000000698491936
+      },
+      "enclosed": true
+    },
+    {
+      "hostNs": "1000000500000",
+      "beginMs": 999999.96,
+      "endMs": 999999.974999,
+      "idealNumerator": "5000",
+      "idealDenominator": "1000000",
+      "got": {
+        "low": 0.0029989993078634084,
+        "high": 0.026999000704847283,
+        "measuredMs": 0.014999000006355345,
+        "errorMs": 0.012000000698491936
+      },
+      "enclosed": true
+    },
+    {
+      "hostNs": "1000000500000",
+      "beginMs": 999999.969999,
+      "endMs": 999999.974999,
+      "idealNumerator": "5000",
+      "idealDenominator": "1000000",
+      "got": {
+        "low": 0,
+        "high": 0.01700000070314855,
+        "measuredMs": 0.005000000004656613,
+        "errorMs": 0.012000000698491936
+      },
+      "enclosed": true
+    },
+    {
+      "hostNs": "1000000500000",
+      "beginMs": 999967.965,
+      "endMs": 999999.965,
+      "idealNumerator": "32000000",
+      "idealDenominator": "1000000",
+      "got": {
+        "low": 31.987999999301497,
+        "high": 32.01200000069851,
+        "measuredMs": 32,
+        "errorMs": 0.01200000069849904
+      },
+      "enclosed": true
+    },
+    {
+      "hostNs": "1000000500000",
+      "beginMs": 999967.965,
+      "endMs": 999999.974999,
+      "idealNumerator": "32000000",
+      "idealDenominator": "1000000",
+      "got": {
+        "low": 31.997998999303196,
+        "high": 32.021999000700205,
+        "measuredMs": 32.0099990000017,
+        "errorMs": 0.01200000069849904
+      },
+      "enclosed": true
+    },
+    {
+      "hostNs": "1000000500000",
+      "beginMs": 999967.974999,
+      "endMs": 999999.965,
+      "idealNumerator": "32000000",
+      "idealDenominator": "1000000",
+      "got": {
+        "low": 31.978000999299802,
+        "high": 32.0020010006968,
+        "measuredMs": 31.9900009999983,
+        "errorMs": 0.012000000698495487
+      },
+      "enclosed": true
+    },
+    {
+      "hostNs": "1000000500000",
+      "beginMs": 999967.974999,
+      "endMs": 999999.974999,
+      "idealNumerator": "32000000",
+      "idealDenominator": "1000000",
+      "got": {
+        "low": 31.987999999301497,
+        "high": 32.01200000069851,
+        "measuredMs": 32,
+        "errorMs": 0.01200000069849904
+      },
+      "enclosed": true
+    },
+    {
+      "hostNs": "1000000000500000",
+      "beginMs": 999999999.965,
+      "endMs": 999999999.965,
+      "idealNumerator": "0",
+      "idealDenominator": "1000000",
+      "got": {
+        "low": 0,
+        "high": 0.01200071525573731,
+        "measuredMs": 0,
+        "errorMs": 0.012000715255737308
+      },
+      "enclosed": true
+    },
+    {
+      "hostNs": "1000000000500000",
+      "beginMs": 999999999.965,
+      "endMs": 999999999.974999,
+      "idealNumerator": "0",
+      "idealDenominator": "1000000",
+      "got": {
+        "low": 0,
+        "high": 0.02199963283538819,
+        "measuredMs": 0.009998917579650879,
+        "errorMs": 0.01200071525573731
+      },
+      "enclosed": true
+    },
+    {
+      "hostNs": "1000000000500000",
+      "beginMs": 999999999.974999,
+      "endMs": 999999999.974999,
+      "idealNumerator": "0",
+      "idealDenominator": "1000000",
+      "got": {
+        "low": 0,
+        "high": 0.01200071525573731,
+        "measuredMs": 0,
+        "errorMs": 0.012000715255737308
+      },
+      "enclosed": true
+    },
+    {
+      "hostNs": "1000000000500000",
+      "beginMs": 999999999.964999,
+      "endMs": 999999999.965,
+      "idealNumerator": "1",
+      "idealDenominator": "1000000",
+      "got": {
+        "low": 0,
+        "high": 0.012001788139343267,
+        "measuredMs": 0.0000010728836059570312,
+        "errorMs": 0.012000715255737308
+      },
+      "enclosed": true
+    },
+    {
+      "hostNs": "1000000000500000",
+      "beginMs": 999999999.964999,
+      "endMs": 999999999.974999,
+      "idealNumerator": "1",
+      "idealDenominator": "1000000",
+      "got": {
+        "low": 0,
+        "high": 0.022000705718994148,
+        "measuredMs": 0.009999990463256836,
+        "errorMs": 0.01200071525573731
+      },
+      "enclosed": true
+    },
+    {
+      "hostNs": "1000000000500000",
+      "beginMs": 999999999.974998,
+      "endMs": 999999999.974999,
+      "idealNumerator": "1",
+      "idealDenominator": "1000000",
+      "got": {
+        "low": 0,
+        "high": 0.012001668930053716,
+        "measuredMs": 9.5367431640625e-7,
+        "errorMs": 0.012000715255737308
+      },
+      "enclosed": true
+    },
+    {
+      "hostNs": "1000000000500000",
+      "beginMs": 999999999.960001,
+      "endMs": 999999999.965,
+      "idealNumerator": "4999",
+      "idealDenominator": "1000000",
+      "got": {
+        "low": 0,
+        "high": 0.016999756813049324,
+        "measuredMs": 0.004999041557312012,
+        "errorMs": 0.01200071525573731
+      },
+      "enclosed": true
+    },
+    {
+      "hostNs": "1000000000500000",
+      "beginMs": 999999999.960001,
+      "endMs": 999999999.974999,
+      "idealNumerator": "4999",
+      "idealDenominator": "1000000",
+      "got": {
+        "low": 0.00299724388122558,
+        "high": 0.026998674392700203,
+        "measuredMs": 0.01499795913696289,
+        "errorMs": 0.01200071525573731
+      },
+      "enclosed": true
+    },
+    {
+      "hostNs": "1000000000500000",
+      "beginMs": 999999999.97,
+      "endMs": 999999999.974999,
+      "idealNumerator": "4999",
+      "idealDenominator": "1000000",
+      "got": {
+        "low": 0,
+        "high": 0.016999637603759773,
+        "measuredMs": 0.004998922348022461,
+        "errorMs": 0.01200071525573731
+      },
+      "enclosed": true
+    },
+    {
+      "hostNs": "1000000000500000",
+      "beginMs": 999999999.96,
+      "endMs": 999999999.965,
+      "idealNumerator": "5000",
+      "idealDenominator": "1000000",
+      "got": {
+        "low": 0,
+        "high": 0.01700071048736573,
+        "measuredMs": 0.004999995231628418,
+        "errorMs": 0.01200071525573731
+      },
+      "enclosed": true
+    },
+    {
+      "hostNs": "1000000000500000",
+      "beginMs": 999999999.96,
+      "endMs": 999999999.974999,
+      "idealNumerator": "5000",
+      "idealDenominator": "1000000",
+      "got": {
+        "low": 0.0029981975555419863,
+        "high": 0.02699962806701661,
+        "measuredMs": 0.014998912811279297,
+        "errorMs": 0.01200071525573731
+      },
+      "enclosed": true
+    },
+    {
+      "hostNs": "1000000000500000",
+      "beginMs": 999999999.969999,
+      "endMs": 999999999.974999,
+      "idealNumerator": "5000",
+      "idealDenominator": "1000000",
+      "got": {
+        "low": 0,
+        "high": 0.01700071048736573,
+        "measuredMs": 0.004999995231628418,
+        "errorMs": 0.01200071525573731
+      },
+      "enclosed": true
+    },
+    {
+      "hostNs": "1000000000500000",
+      "beginMs": 999999967.965,
+      "endMs": 999999999.965,
+      "idealNumerator": "32000000",
+      "idealDenominator": "1000000",
+      "got": {
+        "low": 31.98799928474425,
+        "high": 32.01200071525575,
+        "measuredMs": 32,
+        "errorMs": 0.012000715255744414
+      },
+      "enclosed": true
+    },
+    {
+      "hostNs": "1000000000500000",
+      "beginMs": 999999967.965,
+      "endMs": 999999999.974999,
+      "idealNumerator": "32000000",
+      "idealDenominator": "1000000",
+      "got": {
+        "low": 31.997998202323902,
+        "high": 32.0219996328354,
+        "measuredMs": 32.00999891757965,
+        "errorMs": 0.012000715255744414
+      },
+      "enclosed": true
+    },
+    {
+      "hostNs": "1000000000500000",
+      "beginMs": 999999967.974999,
+      "endMs": 999999999.965,
+      "idealNumerator": "32000000",
+      "idealDenominator": "1000000",
+      "got": {
+        "low": 31.978000367164604,
+        "high": 32.002001797676094,
+        "measuredMs": 31.99000108242035,
+        "errorMs": 0.012000715255740861
+      },
+      "enclosed": true
+    },
+    {
+      "hostNs": "1000000000500000",
+      "beginMs": 999999967.974999,
+      "endMs": 999999999.974999,
+      "idealNumerator": "32000000",
+      "idealDenominator": "1000000",
+      "got": {
+        "low": 31.98799928474425,
+        "high": 32.01200071525575,
+        "measuredMs": 32,
+        "errorMs": 0.012000715255744414
+      },
+      "enclosed": true
+    },
+    {
+      "hostNs": "4294967296500000",
+      "beginMs": 4294967295.965,
+      "endMs": 4294967295.965,
+      "idealNumerator": "0",
+      "idealDenominator": "1000000",
+      "got": {
+        "low": 0,
+        "high": 0.012005722045898443,
+        "measuredMs": 0,
+        "errorMs": 0.012005722045898441
+      },
+      "enclosed": true
+    },
+    {
+      "hostNs": "4294967296500000",
+      "beginMs": 4294967295.965,
+      "endMs": 4294967295.974999,
+      "idealNumerator": "0",
+      "idealDenominator": "1000000",
+      "got": {
+        "low": 0,
+        "high": 0.022004520416259773,
+        "measuredMs": 0.009998798370361328,
+        "errorMs": 0.012005722045898443
+      },
+      "enclosed": true
+    },
+    {
+      "hostNs": "4294967296500000",
+      "beginMs": 4294967295.974999,
+      "endMs": 4294967295.974999,
+      "idealNumerator": "0",
+      "idealDenominator": "1000000",
+      "got": {
+        "low": 0,
+        "high": 0.012005722045898443,
+        "measuredMs": 0,
+        "errorMs": 0.012005722045898441
+      },
+      "enclosed": true
+    },
+    {
+      "hostNs": "4294967296500000",
+      "beginMs": 4294967295.964999,
+      "endMs": 4294967295.965,
+      "idealNumerator": "1",
+      "idealDenominator": "1000000",
+      "got": {
+        "low": 0,
+        "high": 0.01200667572021485,
+        "measuredMs": 9.5367431640625e-7,
+        "errorMs": 0.012005722045898441
+      },
+      "enclosed": true
+    },
+    {
+      "hostNs": "4294967296500000",
+      "beginMs": 4294967295.964999,
+      "endMs": 4294967295.974999,
+      "idealNumerator": "1",
+      "idealDenominator": "1000000",
+      "got": {
+        "low": 0,
+        "high": 0.02200547409057618,
+        "measuredMs": 0.009999752044677734,
+        "errorMs": 0.012005722045898443
+      },
+      "enclosed": true
+    },
+    {
+      "hostNs": "4294967296500000",
+      "beginMs": 4294967295.974998,
+      "endMs": 4294967295.974999,
+      "idealNumerator": "1",
+      "idealDenominator": "1000000",
+      "got": {
+        "low": 0,
+        "high": 0.01200667572021485,
+        "measuredMs": 9.5367431640625e-7,
+        "errorMs": 0.012005722045898441
+      },
+      "enclosed": true
+    },
+    {
+      "hostNs": "4294967296500000",
+      "beginMs": 4294967295.960001,
+      "endMs": 4294967295.965,
+      "idealNumerator": "4999",
+      "idealDenominator": "1000000",
+      "got": {
+        "low": 0,
+        "high": 0.017004882812500007,
+        "measuredMs": 0.0049991607666015625,
+        "errorMs": 0.012005722045898443
+      },
+      "enclosed": true
+    },
+    {
+      "hostNs": "4294967296500000",
+      "beginMs": 4294967295.960001,
+      "endMs": 4294967295.974999,
+      "idealNumerator": "4999",
+      "idealDenominator": "1000000",
+      "got": {
+        "low": 0.0029922370910644472,
+        "high": 0.027003681182861335,
+        "measuredMs": 0.01499795913696289,
+        "errorMs": 0.012005722045898443
+      },
+      "enclosed": true
+    },
+    {
+      "hostNs": "4294967296500000",
+      "beginMs": 4294967295.97,
+      "endMs": 4294967295.974999,
+      "idealNumerator": "4999",
+      "idealDenominator": "1000000",
+      "got": {
+        "low": 0,
+        "high": 0.017004882812500007,
+        "measuredMs": 0.0049991607666015625,
+        "errorMs": 0.012005722045898443
+      },
+      "enclosed": true
+    },
+    {
+      "hostNs": "4294967296500000",
+      "beginMs": 4294967295.96,
+      "endMs": 4294967295.965,
+      "idealNumerator": "5000",
+      "idealDenominator": "1000000",
+      "got": {
+        "low": 0,
+        "high": 0.017005836486816413,
+        "measuredMs": 0.005000114440917969,
+        "errorMs": 0.012005722045898443
+      },
+      "enclosed": true
+    },
+    {
+      "hostNs": "4294967296500000",
+      "beginMs": 4294967295.96,
+      "endMs": 4294967295.974999,
+      "idealNumerator": "5000",
+      "idealDenominator": "1000000",
+      "got": {
+        "low": 0.0029931907653808535,
+        "high": 0.02700463485717774,
+        "measuredMs": 0.014998912811279297,
+        "errorMs": 0.012005722045898443
+      },
+      "enclosed": true
+    },
+    {
+      "hostNs": "4294967296500000",
+      "beginMs": 4294967295.969999,
+      "endMs": 4294967295.974999,
+      "idealNumerator": "5000",
+      "idealDenominator": "1000000",
+      "got": {
+        "low": 0,
+        "high": 0.017005836486816413,
+        "measuredMs": 0.005000114440917969,
+        "errorMs": 0.012005722045898443
+      },
+      "enclosed": true
+    },
+    {
+      "hostNs": "4294967296500000",
+      "beginMs": 4294967263.965,
+      "endMs": 4294967295.965,
+      "idealNumerator": "32000000",
+      "idealDenominator": "1000000",
+      "got": {
+        "low": 31.98799427795409,
+        "high": 32.01200572204591,
+        "measuredMs": 32,
+        "errorMs": 0.012005722045905547
+      },
+      "enclosed": true
+    },
+    {
+      "hostNs": "4294967296500000",
+      "beginMs": 4294967263.965,
+      "endMs": 4294967295.974999,
+      "idealNumerator": "32000000",
+      "idealDenominator": "1000000",
+      "got": {
+        "low": 31.997993076324452,
+        "high": 32.022004520416274,
+        "measuredMs": 32.00999879837036,
+        "errorMs": 0.012005722045905547
+      },
+      "enclosed": true
+    },
+    {
+      "hostNs": "4294967296500000",
+      "beginMs": 4294967263.974999,
+      "endMs": 4294967295.965,
+      "idealNumerator": "32000000",
+      "idealDenominator": "1000000",
+      "got": {
+        "low": 31.977995479583733,
+        "high": 32.002006923675545,
+        "measuredMs": 31.99000120162964,
+        "errorMs": 0.012005722045901994
+      },
+      "enclosed": true
+    },
+    {
+      "hostNs": "4294967296500000",
+      "beginMs": 4294967263.974999,
+      "endMs": 4294967295.974999,
+      "idealNumerator": "32000000",
+      "idealDenominator": "1000000",
+      "got": {
+        "low": 31.98799427795409,
+        "high": 32.01200572204591,
+        "measuredMs": 32,
+        "errorMs": 0.012005722045905547
+      },
+      "enclosed": true
+    },
+    {
+      "hostNs": "4398046511102500000",
+      "beginMs": 4398046511101.965,
+      "endMs": 4398046511101.965,
+      "idealNumerator": "0",
+      "idealDenominator": "1000000",
+      "got": {
+        "low": 0,
+        "high": 0.014929687500000005,
+        "measuredMs": 0,
+        "errorMs": 0.014929687500000004
+      },
+      "enclosed": true
+    },
+    {
+      "hostNs": "4398046511102500000",
+      "beginMs": 4398046511101.965,
+      "endMs": 4398046511101.975,
+      "idealNumerator": "0",
+      "idealDenominator": "1000000",
+      "got": {
+        "low": 0,
+        "high": 0.025183593750000007,
+        "measuredMs": 0.01025390625,
+        "errorMs": 0.014929687500000005
+      },
+      "enclosed": true
+    },
+    {
+      "hostNs": "4398046511102500000",
+      "beginMs": 4398046511101.975,
+      "endMs": 4398046511101.975,
+      "idealNumerator": "0",
+      "idealDenominator": "1000000",
+      "got": {
+        "low": 0,
+        "high": 0.014929687500000005,
+        "measuredMs": 0,
+        "errorMs": 0.014929687500000004
+      },
+      "enclosed": true
+    },
+    {
+      "hostNs": "4398046511102500000",
+      "beginMs": 4398046511101.965,
+      "endMs": 4398046511101.965,
+      "idealNumerator": "1",
+      "idealDenominator": "1000000",
+      "got": {
+        "low": 0,
+        "high": 0.014929687500000005,
+        "measuredMs": 0,
+        "errorMs": 0.014929687500000004
+      },
+      "enclosed": true
+    },
+    {
+      "hostNs": "4398046511102500000",
+      "beginMs": 4398046511101.965,
+      "endMs": 4398046511101.975,
+      "idealNumerator": "1",
+      "idealDenominator": "1000000",
+      "got": {
+        "low": 0,
+        "high": 0.025183593750000007,
+        "measuredMs": 0.01025390625,
+        "errorMs": 0.014929687500000005
+      },
+      "enclosed": true
+    },
+    {
+      "hostNs": "4398046511102500000",
+      "beginMs": 4398046511101.975,
+      "endMs": 4398046511101.975,
+      "idealNumerator": "1",
+      "idealDenominator": "1000000",
+      "got": {
+        "low": 0,
+        "high": 0.014929687500000005,
+        "measuredMs": 0,
+        "errorMs": 0.014929687500000004
+      },
+      "enclosed": true
+    },
+    {
+      "hostNs": "4398046511102500000",
+      "beginMs": 4398046511101.96,
+      "endMs": 4398046511101.965,
+      "idealNumerator": "4999",
+      "idealDenominator": "1000000",
+      "got": {
+        "low": 0,
+        "high": 0.019812500000000007,
+        "measuredMs": 0.0048828125,
+        "errorMs": 0.014929687500000005
+      },
+      "enclosed": true
+    },
+    {
+      "hostNs": "4398046511102500000",
+      "beginMs": 4398046511101.96,
+      "endMs": 4398046511101.975,
+      "idealNumerator": "4999",
+      "idealDenominator": "1000000",
+      "got": {
+        "low": 0.00020703124999999452,
+        "high": 0.030066406250000007,
+        "measuredMs": 0.01513671875,
+        "errorMs": 0.014929687500000005
+      },
+      "enclosed": true
+    },
+    {
+      "hostNs": "4398046511102500000",
+      "beginMs": 4398046511101.97,
+      "endMs": 4398046511101.975,
+      "idealNumerator": "4999",
+      "idealDenominator": "1000000",
+      "got": {
+        "low": 0,
+        "high": 0.019812500000000007,
+        "measuredMs": 0.0048828125,
+        "errorMs": 0.014929687500000005
+      },
+      "enclosed": true
+    },
+    {
+      "hostNs": "4398046511102500000",
+      "beginMs": 4398046511101.96,
+      "endMs": 4398046511101.965,
+      "idealNumerator": "5000",
+      "idealDenominator": "1000000",
+      "got": {
+        "low": 0,
+        "high": 0.019812500000000007,
+        "measuredMs": 0.0048828125,
+        "errorMs": 0.014929687500000005
+      },
+      "enclosed": true
+    },
+    {
+      "hostNs": "4398046511102500000",
+      "beginMs": 4398046511101.96,
+      "endMs": 4398046511101.975,
+      "idealNumerator": "5000",
+      "idealDenominator": "1000000",
+      "got": {
+        "low": 0.00020703124999999452,
+        "high": 0.030066406250000007,
+        "measuredMs": 0.01513671875,
+        "errorMs": 0.014929687500000005
+      },
+      "enclosed": true
+    },
+    {
+      "hostNs": "4398046511102500000",
+      "beginMs": 4398046511101.97,
+      "endMs": 4398046511101.975,
+      "idealNumerator": "5000",
+      "idealDenominator": "1000000",
+      "got": {
+        "low": 0,
+        "high": 0.019812500000000007,
+        "measuredMs": 0.0048828125,
+        "errorMs": 0.014929687500000005
+      },
+      "enclosed": true
+    },
+    {
+      "hostNs": "4398046511102500000",
+      "beginMs": 4398046511069.965,
+      "endMs": 4398046511101.965,
+      "idealNumerator": "32000000",
+      "idealDenominator": "1000000",
+      "got": {
+        "low": 31.98507031249999,
+        "high": 32.014929687500015,
+        "measuredMs": 32,
+        "errorMs": 0.01492968750000711
+      },
+      "enclosed": true
+    },
+    {
+      "hostNs": "4398046511102500000",
+      "beginMs": 4398046511069.965,
+      "endMs": 4398046511101.975,
+      "idealNumerator": "32000000",
+      "idealDenominator": "1000000",
+      "got": {
+        "low": 31.99532421874999,
+        "high": 32.025183593750015,
+        "measuredMs": 32.01025390625,
+        "errorMs": 0.01492968750000711
+      },
+      "enclosed": true
+    },
+    {
+      "hostNs": "4398046511102500000",
+      "beginMs": 4398046511069.975,
+      "endMs": 4398046511101.965,
+      "idealNumerator": "32000000",
+      "idealDenominator": "1000000",
+      "got": {
+        "low": 31.974816406249992,
+        "high": 32.00467578125001,
+        "measuredMs": 31.98974609375,
+        "errorMs": 0.014929687500003556
+      },
+      "enclosed": true
+    },
+    {
+      "hostNs": "4398046511102500000",
+      "beginMs": 4398046511069.975,
+      "endMs": 4398046511101.975,
+      "idealNumerator": "32000000",
+      "idealDenominator": "1000000",
+      "got": {
+        "low": 31.98507031249999,
+        "high": 32.014929687500015,
+        "measuredMs": 32,
+        "errorMs": 0.01492968750000711
+      },
+      "enclosed": true
+    }
+  ],
+  "relations": [
+    {
+      "hostNs": "1000500000",
+      "documentMs": 99.995,
+      "perfMs": 100,
+      "physicalLagMs": 0,
+      "errorNumerator": "43980465111",
+      "errorDenominator": "8796093022208",
+      "bound": 0.01800000000102319,
+      "error": 0.0049999999999954525,
+      "enclosed": true
+    },
+    {
+      "hostNs": "1000500000",
+      "documentMs": 99.995,
+      "perfMs": 99.990001,
+      "physicalLagMs": 0,
+      "errorNumerator": "21985834509",
+      "errorDenominator": "4398046511104",
+      "bound": 0.01800000000102319,
+      "error": 0.004998999999997977,
+      "enclosed": true
+    },
+    {
+      "hostNs": "1000500000",
+      "documentMs": 99.995,
+      "perfMs": 100.009999,
+      "physicalLagMs": 0,
+      "errorNumerator": "16491574905",
+      "errorDenominator": "1099511627776",
+      "bound": 0.01800000000102319,
+      "error": 0.014998999999988882,
+      "enclosed": true
+    },
+    {
+      "hostNs": "1000500000",
+      "documentMs": 99.995,
+      "perfMs": 100,
+      "physicalLagMs": 0,
+      "errorNumerator": "43980465111",
+      "errorDenominator": "8796093022208",
+      "bound": 0.01800000000102319,
+      "error": 0.0049999999999954525,
+      "enclosed": true
+    },
+    {
+      "hostNs": "1000500000",
+      "documentMs": 100.004999,
+      "perfMs": 100,
+      "physicalLagMs": 0,
+      "errorNumerator": "21985834509",
+      "errorDenominator": "4398046511104",
+      "bound": 0.01800000000102319,
+      "error": 0.004998999999997977,
+      "enclosed": true
+    },
+    {
+      "hostNs": "1000500000",
+      "documentMs": 100.004999,
+      "perfMs": 99.990001,
+      "physicalLagMs": 0,
+      "errorNumerator": "131923803147",
+      "errorDenominator": "8796093022208",
+      "bound": 0.01800000000102319,
+      "error": 0.014997999999991407,
+      "enclosed": true
+    },
+    {
+      "hostNs": "1000500000",
+      "documentMs": 100.004999,
+      "perfMs": 100.009999,
+      "physicalLagMs": 0,
+      "errorNumerator": "43980465111",
+      "errorDenominator": "8796093022208",
+      "bound": 0.01800000000102319,
+      "error": 0.0049999999999954525,
+      "enclosed": true
+    },
+    {
+      "hostNs": "1000500000",
+      "documentMs": 100.004999,
+      "perfMs": 100,
+      "physicalLagMs": 0,
+      "errorNumerator": "21985834509",
+      "errorDenominator": "4398046511104",
+      "bound": 0.01800000000102319,
+      "error": 0.004998999999997977,
+      "enclosed": true
+    },
+    {
+      "hostNs": "1000500000",
+      "documentMs": 99.994,
+      "perfMs": 100,
+      "physicalLagMs": 0.001,
+      "errorNumerator": "21990232555521",
+      "errorDenominator": "4398046511104000",
+      "bound": 0.01800000000102319,
+      "error": 0.005000000000000227,
+      "enclosed": true
+    },
+    {
+      "hostNs": "1000500000",
+      "documentMs": 99.994,
+      "perfMs": 99.990001,
+      "physicalLagMs": 0.001,
+      "errorNumerator": "21985834508979",
+      "errorDenominator": "4398046511104000",
+      "bound": 0.01800000000102319,
+      "error": 0.0049989999999932025,
+      "enclosed": true
+    },
+    {
+      "hostNs": "1000500000",
+      "documentMs": 99.994,
+      "perfMs": 100.009999,
+      "physicalLagMs": 0.001,
+      "errorNumerator": "65966299620021",
+      "errorDenominator": "4398046511104000",
+      "bound": 0.01800000000102319,
+      "error": 0.014998999999993658,
+      "enclosed": true
+    },
+    {
+      "hostNs": "1000500000",
+      "documentMs": 99.994,
+      "perfMs": 100,
+      "physicalLagMs": 0.001,
+      "errorNumerator": "21990232555521",
+      "errorDenominator": "4398046511104000",
+      "bound": 0.01800000000102319,
+      "error": 0.005000000000000227,
+      "enclosed": true
+    },
+    {
+      "hostNs": "1000500000",
+      "documentMs": 100.003999,
+      "perfMs": 100,
+      "physicalLagMs": 0.001,
+      "errorNumerator": "21985834508979",
+      "errorDenominator": "4398046511104000",
+      "bound": 0.01800000000102319,
+      "error": 0.0049989999999932025,
+      "enclosed": true
+    },
+    {
+      "hostNs": "1000500000",
+      "documentMs": 100.003999,
+      "perfMs": 99.990001,
+      "physicalLagMs": 0.001,
+      "errorNumerator": "65961901573479",
+      "errorDenominator": "4398046511104000",
+      "bound": 0.01800000000102319,
+      "error": 0.014997999999986631,
+      "enclosed": true
+    },
+    {
+      "hostNs": "1000500000",
+      "documentMs": 100.003999,
+      "perfMs": 100.009999,
+      "physicalLagMs": 0.001,
+      "errorNumerator": "21990232555521",
+      "errorDenominator": "4398046511104000",
+      "bound": 0.01800000000102319,
+      "error": 0.005000000000000227,
+      "enclosed": true
+    },
+    {
+      "hostNs": "1000500000",
+      "documentMs": 100.003999,
+      "perfMs": 100,
+      "physicalLagMs": 0.001,
+      "errorNumerator": "21985834508979",
+      "errorDenominator": "4398046511104000",
+      "bound": 0.01800000000102319,
+      "error": 0.0049989999999932025,
+      "enclosed": true
+    },
+    {
+      "hostNs": "1000500000",
+      "documentMs": 59.995,
+      "perfMs": 100,
+      "physicalLagMs": 40,
+      "errorNumerator": "703687441777",
+      "errorDenominator": "140737488355328",
+      "bound": 0.01800000000102319,
+      "error": 0.005000000000002558,
+      "enclosed": true
+    },
+    {
+      "hostNs": "1000500000",
+      "documentMs": 59.995,
+      "perfMs": 99.990001,
+      "physicalLagMs": 40,
+      "errorNumerator": "703546704287",
+      "errorDenominator": "140737488355328",
+      "bound": 0.01800000000102319,
+      "error": 0.004998999999990872,
+      "enclosed": true
+    },
+    {
+      "hostNs": "1000500000",
+      "documentMs": 59.995,
+      "perfMs": 100.009999,
+      "physicalLagMs": 40,
+      "errorNumerator": "2110921587841",
+      "errorDenominator": "140737488355328",
+      "bound": 0.01800000000102319,
+      "error": 0.014998999999995988,
+      "enclosed": true
+    },
+    {
+      "hostNs": "1000500000",
+      "documentMs": 59.995,
+      "perfMs": 100,
+      "physicalLagMs": 40,
+      "errorNumerator": "703687441777",
+      "errorDenominator": "140737488355328",
+      "bound": 0.01800000000102319,
+      "error": 0.005000000000002558,
+      "enclosed": true
+    },
+    {
+      "hostNs": "1000500000",
+      "documentMs": 60.004999,
+      "perfMs": 100,
+      "physicalLagMs": 40,
+      "errorNumerator": "21985834509",
+      "errorDenominator": "4398046511104",
+      "bound": 0.01800000000102319,
+      "error": 0.004998999999997977,
+      "enclosed": true
+    },
+    {
+      "hostNs": "1000500000",
+      "documentMs": 60.004999,
+      "perfMs": 99.990001,
+      "physicalLagMs": 40,
+      "errorNumerator": "131923803147",
+      "errorDenominator": "8796093022208",
+      "bound": 0.01800000000102319,
+      "error": 0.014997999999991407,
+      "enclosed": true
+    },
+    {
+      "hostNs": "1000500000",
+      "documentMs": 60.004999,
+      "perfMs": 100.009999,
+      "physicalLagMs": 40,
+      "errorNumerator": "43980465111",
+      "errorDenominator": "8796093022208",
+      "bound": 0.01800000000102319,
+      "error": 0.0049999999999954525,
+      "enclosed": true
+    },
+    {
+      "hostNs": "1000500000",
+      "documentMs": 60.004999,
+      "perfMs": 100,
+      "physicalLagMs": 40,
+      "errorNumerator": "21985834509",
+      "errorDenominator": "4398046511104",
+      "bound": 0.01800000000102319,
+      "error": 0.004998999999997977,
+      "enclosed": true
+    },
+    {
+      "hostNs": "1000000500000",
+      "documentMs": 99.995,
+      "perfMs": 100,
+      "physicalLagMs": 0,
+      "errorNumerator": "43980465111",
+      "errorDenominator": "8796093022208",
+      "bound": 0.018000001047737905,
+      "error": 0.0049999999999954525,
+      "enclosed": true
+    },
+    {
+      "hostNs": "1000000500000",
+      "documentMs": 99.995,
+      "perfMs": 99.9900009999983,
+      "physicalLagMs": 0,
+      "errorNumerator": "43971669033",
+      "errorDenominator": "8796093022208",
+      "bound": 0.018000001047737905,
+      "error": 0.00499900000170328,
+      "enclosed": true
+    },
+    {
+      "hostNs": "1000000500000",
+      "documentMs": 99.995,
+      "perfMs": 100.0099990000017,
+      "physicalLagMs": 0,
+      "errorNumerator": "131932599255",
+      "errorDenominator": "8796093022208",
+      "bound": 0.018000001047737905,
+      "error": 0.014999000001694185,
+      "enclosed": true
+    },
+    {
+      "hostNs": "1000000500000",
+      "documentMs": 99.995,
+      "perfMs": 100,
+      "physicalLagMs": 0,
+      "errorNumerator": "43980465111",
+      "errorDenominator": "8796093022208",
+      "bound": 0.018000001047737905,
+      "error": 0.0049999999999954525,
+      "enclosed": true
+    },
+    {
+      "hostNs": "1000000500000",
+      "documentMs": 100.004999,
+      "perfMs": 100,
+      "physicalLagMs": 0,
+      "errorNumerator": "21985834509",
+      "errorDenominator": "4398046511104",
+      "bound": 0.018000001047737905,
+      "error": 0.004998999999997977,
+      "enclosed": true
+    },
+    {
+      "hostNs": "1000000500000",
+      "documentMs": 100.004999,
+      "perfMs": 99.9900009999983,
+      "physicalLagMs": 0,
+      "errorNumerator": "65961901581",
+      "errorDenominator": "4398046511104",
+      "bound": 0.018000001047737905,
+      "error": 0.01499800000169671,
+      "enclosed": true
+    },
+    {
+      "hostNs": "1000000500000",
+      "documentMs": 100.004999,
+      "perfMs": 100.0099990000017,
+      "physicalLagMs": 0,
+      "errorNumerator": "21990232563",
+      "errorDenominator": "4398046511104",
+      "bound": 0.018000001047737905,
+      "error": 0.005000000001700755,
+      "enclosed": true
+    },
+    {
+      "hostNs": "1000000500000",
+      "documentMs": 100.004999,
+      "perfMs": 100,
+      "physicalLagMs": 0,
+      "errorNumerator": "21985834509",
+      "errorDenominator": "4398046511104",
+      "bound": 0.018000001047737905,
+      "error": 0.004998999999997977,
+      "enclosed": true
+    },
+    {
+      "hostNs": "1000000500000",
+      "documentMs": 99.994,
+      "perfMs": 100,
+      "physicalLagMs": 0.001,
+      "errorNumerator": "21990232555521",
+      "errorDenominator": "4398046511104000",
+      "bound": 0.018000001047737905,
+      "error": 0.005000000000000227,
+      "enclosed": true
+    },
+    {
+      "hostNs": "1000000500000",
+      "documentMs": 99.994,
+      "perfMs": 99.9900009999983,
+      "physicalLagMs": 0.001,
+      "errorNumerator": "21985834516479",
+      "errorDenominator": "4398046511104000",
+      "bound": 0.018000001047737905,
+      "error": 0.004999000001698505,
+      "enclosed": true
+    },
+    {
+      "hostNs": "1000000500000",
+      "documentMs": 99.994,
+      "perfMs": 100.0099990000017,
+      "physicalLagMs": 0.001,
+      "errorNumerator": "65966299627521",
+      "errorDenominator": "4398046511104000",
+      "bound": 0.018000001047737905,
+      "error": 0.01499900000169896,
+      "enclosed": true
+    },
+    {
+      "hostNs": "1000000500000",
+      "documentMs": 99.994,
+      "perfMs": 100,
+      "physicalLagMs": 0.001,
+      "errorNumerator": "21990232555521",
+      "errorDenominator": "4398046511104000",
+      "bound": 0.018000001047737905,
+      "error": 0.005000000000000227,
+      "enclosed": true
+    },
+    {
+      "hostNs": "1000000500000",
+      "documentMs": 100.003999,
+      "perfMs": 100,
+      "physicalLagMs": 0.001,
+      "errorNumerator": "21985834508979",
+      "errorDenominator": "4398046511104000",
+      "bound": 0.018000001047737905,
+      "error": 0.0049989999999932025,
+      "enclosed": true
+    },
+    {
+      "hostNs": "1000000500000",
+      "documentMs": 100.003999,
+      "perfMs": 99.9900009999983,
+      "physicalLagMs": 0.001,
+      "errorNumerator": "65961901580979",
+      "errorDenominator": "4398046511104000",
+      "bound": 0.018000001047737905,
+      "error": 0.014998000001691934,
+      "enclosed": true
+    },
+    {
+      "hostNs": "1000000500000",
+      "documentMs": 100.003999,
+      "perfMs": 100.0099990000017,
+      "physicalLagMs": 0.001,
+      "errorNumerator": "21990232563021",
+      "errorDenominator": "4398046511104000",
+      "bound": 0.018000001047737905,
+      "error": 0.00500000000170553,
+      "enclosed": true
+    },
+    {
+      "hostNs": "1000000500000",
+      "documentMs": 100.003999,
+      "perfMs": 100,
+      "physicalLagMs": 0.001,
+      "errorNumerator": "21985834508979",
+      "errorDenominator": "4398046511104000",
+      "bound": 0.018000001047737905,
+      "error": 0.0049989999999932025,
+      "enclosed": true
+    },
+    {
+      "hostNs": "1000000500000",
+      "documentMs": 59.995,
+      "perfMs": 100,
+      "physicalLagMs": 40,
+      "errorNumerator": "703687441777",
+      "errorDenominator": "140737488355328",
+      "bound": 0.018000001047737905,
+      "error": 0.005000000000002558,
+      "enclosed": true
+    },
+    {
+      "hostNs": "1000000500000",
+      "documentMs": 59.995,
+      "perfMs": 99.9900009999983,
+      "physicalLagMs": 40,
+      "errorNumerator": "703546704527",
+      "errorDenominator": "140737488355328",
+      "bound": 0.018000001047737905,
+      "error": 0.004999000001696174,
+      "enclosed": true
+    },
+    {
+      "hostNs": "1000000500000",
+      "documentMs": 59.995,
+      "perfMs": 100.0099990000017,
+      "physicalLagMs": 40,
+      "errorNumerator": "2110921588081",
+      "errorDenominator": "140737488355328",
+      "bound": 0.018000001047737905,
+      "error": 0.01499900000170129,
+      "enclosed": true
+    },
+    {
+      "hostNs": "1000000500000",
+      "documentMs": 59.995,
+      "perfMs": 100,
+      "physicalLagMs": 40,
+      "errorNumerator": "703687441777",
+      "errorDenominator": "140737488355328",
+      "bound": 0.018000001047737905,
+      "error": 0.005000000000002558,
+      "enclosed": true
+    },
+    {
+      "hostNs": "1000000500000",
+      "documentMs": 60.004999,
+      "perfMs": 100,
+      "physicalLagMs": 40,
+      "errorNumerator": "21985834509",
+      "errorDenominator": "4398046511104",
+      "bound": 0.018000001047737905,
+      "error": 0.004998999999997977,
+      "enclosed": true
+    },
+    {
+      "hostNs": "1000000500000",
+      "documentMs": 60.004999,
+      "perfMs": 99.9900009999983,
+      "physicalLagMs": 40,
+      "errorNumerator": "65961901581",
+      "errorDenominator": "4398046511104",
+      "bound": 0.018000001047737905,
+      "error": 0.01499800000169671,
+      "enclosed": true
+    },
+    {
+      "hostNs": "1000000500000",
+      "documentMs": 60.004999,
+      "perfMs": 100.0099990000017,
+      "physicalLagMs": 40,
+      "errorNumerator": "21990232563",
+      "errorDenominator": "4398046511104",
+      "bound": 0.018000001047737905,
+      "error": 0.005000000001700755,
+      "enclosed": true
+    },
+    {
+      "hostNs": "1000000500000",
+      "documentMs": 60.004999,
+      "perfMs": 100,
+      "physicalLagMs": 40,
+      "errorNumerator": "21985834509",
+      "errorDenominator": "4398046511104",
+      "bound": 0.018000001047737905,
+      "error": 0.004998999999997977,
+      "enclosed": true
+    },
+    {
+      "hostNs": "1000000000500000",
+      "documentMs": 99.995,
+      "perfMs": 100,
+      "physicalLagMs": 0,
+      "errorNumerator": "43980465111",
+      "errorDenominator": "8796093022208",
+      "bound": 0.018001072883605966,
+      "error": 0.0049999999999954525,
+      "enclosed": true
+    },
+    {
+      "hostNs": "1000000000500000",
+      "documentMs": 99.995,
+      "perfMs": 99.99000096321106,
+      "physicalLagMs": 0,
+      "errorNumerator": "43971992617",
+      "errorDenominator": "8796093022208",
+      "bound": 0.018001072883605966,
+      "error": 0.004999036788944977,
+      "enclosed": true
+    },
+    {
+      "hostNs": "1000000000500000",
+      "documentMs": 99.995,
+      "perfMs": 100.00999903678894,
+      "physicalLagMs": 0,
+      "errorNumerator": "131932922839",
+      "errorDenominator": "8796093022208",
+      "bound": 0.018001072883605966,
+      "error": 0.014999036788935882,
+      "enclosed": true
+    },
+    {
+      "hostNs": "1000000000500000",
+      "documentMs": 99.995,
+      "perfMs": 100,
+      "physicalLagMs": 0,
+      "errorNumerator": "43980465111",
+      "errorDenominator": "8796093022208",
+      "bound": 0.018001072883605966,
+      "error": 0.0049999999999954525,
+      "enclosed": true
+    },
+    {
+      "hostNs": "1000000000500000",
+      "documentMs": 100.004999,
+      "perfMs": 100,
+      "physicalLagMs": 0,
+      "errorNumerator": "21985834509",
+      "errorDenominator": "4398046511104",
+      "bound": 0.018001072883605966,
+      "error": 0.004998999999997977,
+      "enclosed": true
+    },
+    {
+      "hostNs": "1000000000500000",
+      "documentMs": 100.004999,
+      "perfMs": 99.99000096321106,
+      "physicalLagMs": 0,
+      "errorNumerator": "65962063373",
+      "errorDenominator": "4398046511104",
+      "bound": 0.018001072883605966,
+      "error": 0.014998036788938407,
+      "enclosed": true
+    },
+    {
+      "hostNs": "1000000000500000",
+      "documentMs": 100.004999,
+      "perfMs": 100.00999903678894,
+      "physicalLagMs": 0,
+      "errorNumerator": "21990394355",
+      "errorDenominator": "4398046511104",
+      "bound": 0.018001072883605966,
+      "error": 0.005000036788942452,
+      "enclosed": true
+    },
+    {
+      "hostNs": "1000000000500000",
+      "documentMs": 100.004999,
+      "perfMs": 100,
+      "physicalLagMs": 0,
+      "errorNumerator": "21985834509",
+      "errorDenominator": "4398046511104",
+      "bound": 0.018001072883605966,
+      "error": 0.004998999999997977,
+      "enclosed": true
+    },
+    {
+      "hostNs": "1000000000500000",
+      "documentMs": 99.994,
+      "perfMs": 100,
+      "physicalLagMs": 0.001,
+      "errorNumerator": "21990232555521",
+      "errorDenominator": "4398046511104000",
+      "bound": 0.018001072883605966,
+      "error": 0.005000000000000227,
+      "enclosed": true
+    },
+    {
+      "hostNs": "1000000000500000",
+      "documentMs": 99.994,
+      "perfMs": 99.99000096321106,
+      "physicalLagMs": 0.001,
+      "errorNumerator": "21985996308479",
+      "errorDenominator": "4398046511104000",
+      "bound": 0.018001072883605966,
+      "error": 0.004999036788940202,
+      "enclosed": true
+    },
+    {
+      "hostNs": "1000000000500000",
+      "documentMs": 99.994,
+      "perfMs": 100.00999903678894,
+      "physicalLagMs": 0.001,
+      "errorNumerator": "65966461419521",
+      "errorDenominator": "4398046511104000",
+      "bound": 0.018001072883605966,
+      "error": 0.014999036788940658,
+      "enclosed": true
+    },
+    {
+      "hostNs": "1000000000500000",
+      "documentMs": 99.994,
+      "perfMs": 100,
+      "physicalLagMs": 0.001,
+      "errorNumerator": "21990232555521",
+      "errorDenominator": "4398046511104000",
+      "bound": 0.018001072883605966,
+      "error": 0.005000000000000227,
+      "enclosed": true
+    },
+    {
+      "hostNs": "1000000000500000",
+      "documentMs": 100.003999,
+      "perfMs": 100,
+      "physicalLagMs": 0.001,
+      "errorNumerator": "21985834508979",
+      "errorDenominator": "4398046511104000",
+      "bound": 0.018001072883605966,
+      "error": 0.0049989999999932025,
+      "enclosed": true
+    },
+    {
+      "hostNs": "1000000000500000",
+      "documentMs": 100.003999,
+      "perfMs": 99.99000096321106,
+      "physicalLagMs": 0.001,
+      "errorNumerator": "65962063372979",
+      "errorDenominator": "4398046511104000",
+      "bound": 0.018001072883605966,
+      "error": 0.014998036788933631,
+      "enclosed": true
+    },
+    {
+      "hostNs": "1000000000500000",
+      "documentMs": 100.003999,
+      "perfMs": 100.00999903678894,
+      "physicalLagMs": 0.001,
+      "errorNumerator": "21990394355021",
+      "errorDenominator": "4398046511104000",
+      "bound": 0.018001072883605966,
+      "error": 0.005000036788947227,
+      "enclosed": true
+    },
+    {
+      "hostNs": "1000000000500000",
+      "documentMs": 100.003999,
+      "perfMs": 100,
+      "physicalLagMs": 0.001,
+      "errorNumerator": "21985834508979",
+      "errorDenominator": "4398046511104000",
+      "bound": 0.018001072883605966,
+      "error": 0.0049989999999932025,
+      "enclosed": true
+    },
+    {
+      "hostNs": "1000000000500000",
+      "documentMs": 59.995,
+      "perfMs": 100,
+      "physicalLagMs": 40,
+      "errorNumerator": "703687441777",
+      "errorDenominator": "140737488355328",
+      "bound": 0.018001072883605966,
+      "error": 0.005000000000002558,
+      "enclosed": true
+    },
+    {
+      "hostNs": "1000000000500000",
+      "documentMs": 59.995,
+      "perfMs": 99.99000096321106,
+      "physicalLagMs": 40,
+      "errorNumerator": "703551881871",
+      "errorDenominator": "140737488355328",
+      "bound": 0.018001072883605966,
+      "error": 0.004999036788937872,
+      "enclosed": true
+    },
+    {
+      "hostNs": "1000000000500000",
+      "documentMs": 59.995,
+      "perfMs": 100.00999903678894,
+      "physicalLagMs": 40,
+      "errorNumerator": "2110926765425",
+      "errorDenominator": "140737488355328",
+      "bound": 0.018001072883605966,
+      "error": 0.014999036788942988,
+      "enclosed": true
+    },
+    {
+      "hostNs": "1000000000500000",
+      "documentMs": 59.995,
+      "perfMs": 100,
+      "physicalLagMs": 40,
+      "errorNumerator": "703687441777",
+      "errorDenominator": "140737488355328",
+      "bound": 0.018001072883605966,
+      "error": 0.005000000000002558,
+      "enclosed": true
+    },
+    {
+      "hostNs": "1000000000500000",
+      "documentMs": 60.004999,
+      "perfMs": 100,
+      "physicalLagMs": 40,
+      "errorNumerator": "21985834509",
+      "errorDenominator": "4398046511104",
+      "bound": 0.018001072883605966,
+      "error": 0.004998999999997977,
+      "enclosed": true
+    },
+    {
+      "hostNs": "1000000000500000",
+      "documentMs": 60.004999,
+      "perfMs": 99.99000096321106,
+      "physicalLagMs": 40,
+      "errorNumerator": "65962063373",
+      "errorDenominator": "4398046511104",
+      "bound": 0.018001072883605966,
+      "error": 0.014998036788938407,
+      "enclosed": true
+    },
+    {
+      "hostNs": "1000000000500000",
+      "documentMs": 60.004999,
+      "perfMs": 100.00999903678894,
+      "physicalLagMs": 40,
+      "errorNumerator": "21990394355",
+      "errorDenominator": "4398046511104",
+      "bound": 0.018001072883605966,
+      "error": 0.005000036788942452,
+      "enclosed": true
+    },
+    {
+      "hostNs": "1000000000500000",
+      "documentMs": 60.004999,
+      "perfMs": 100,
+      "physicalLagMs": 40,
+      "errorNumerator": "21985834509",
+      "errorDenominator": "4398046511104",
+      "bound": 0.018001072883605966,
+      "error": 0.004998999999997977,
+      "enclosed": true
+    },
+    {
+      "hostNs": "4294967296500000",
+      "documentMs": 99.995,
+      "perfMs": 100,
+      "physicalLagMs": 0,
+      "errorNumerator": "43980465111",
+      "errorDenominator": "8796093022208",
+      "bound": 0.018008583068847665,
+      "error": 0.0049999999999954525,
+      "enclosed": true
+    },
+    {
+      "hostNs": "4294967296500000",
+      "documentMs": 99.995,
+      "perfMs": 99.99000072479248,
+      "physicalLagMs": 0,
+      "errorNumerator": "43974089769",
+      "errorDenominator": "8796093022208",
+      "bound": 0.018008583068847665,
+      "error": 0.004999275207524079,
+      "enclosed": true
+    },
+    {
+      "hostNs": "4294967296500000",
+      "documentMs": 99.995,
+      "perfMs": 100.00999927520752,
+      "physicalLagMs": 0,
+      "errorNumerator": "131935019991",
+      "errorDenominator": "8796093022208",
+      "bound": 0.018008583068847665,
+      "error": 0.014999275207514984,
+      "enclosed": true
+    },
+    {
+      "hostNs": "4294967296500000",
+      "documentMs": 99.995,
+      "perfMs": 100,
+      "physicalLagMs": 0,
+      "errorNumerator": "43980465111",
+      "errorDenominator": "8796093022208",
+      "bound": 0.018008583068847665,
+      "error": 0.0049999999999954525,
+      "enclosed": true
+    },
+    {
+      "hostNs": "4294967296500000",
+      "documentMs": 100.004999,
+      "perfMs": 100,
+      "physicalLagMs": 0,
+      "errorNumerator": "21985834509",
+      "errorDenominator": "4398046511104",
+      "bound": 0.018008583068847665,
+      "error": 0.004998999999997977,
+      "enclosed": true
+    },
+    {
+      "hostNs": "4294967296500000",
+      "documentMs": 100.004999,
+      "perfMs": 99.99000072479248,
+      "physicalLagMs": 0,
+      "errorNumerator": "65963111949",
+      "errorDenominator": "4398046511104",
+      "bound": 0.018008583068847665,
+      "error": 0.014998275207517509,
+      "enclosed": true
+    },
+    {
+      "hostNs": "4294967296500000",
+      "documentMs": 100.004999,
+      "perfMs": 100.00999927520752,
+      "physicalLagMs": 0,
+      "errorNumerator": "21991442931",
+      "errorDenominator": "4398046511104",
+      "bound": 0.018008583068847665,
+      "error": 0.005000275207521554,
+      "enclosed": true
+    },
+    {
+      "hostNs": "4294967296500000",
+      "documentMs": 100.004999,
+      "perfMs": 100,
+      "physicalLagMs": 0,
+      "errorNumerator": "21985834509",
+      "errorDenominator": "4398046511104",
+      "bound": 0.018008583068847665,
+      "error": 0.004998999999997977,
+      "enclosed": true
+    },
+    {
+      "hostNs": "4294967296500000",
+      "documentMs": 99.994,
+      "perfMs": 100,
+      "physicalLagMs": 0.001,
+      "errorNumerator": "21990232555521",
+      "errorDenominator": "4398046511104000",
+      "bound": 0.018008583068847665,
+      "error": 0.005000000000000227,
+      "enclosed": true
+    },
+    {
+      "hostNs": "4294967296500000",
+      "documentMs": 99.994,
+      "perfMs": 99.99000072479248,
+      "physicalLagMs": 0.001,
+      "errorNumerator": "21987044884479",
+      "errorDenominator": "4398046511104000",
+      "bound": 0.018008583068847665,
+      "error": 0.004999275207519304,
+      "enclosed": true
+    },
+    {
+      "hostNs": "4294967296500000",
+      "documentMs": 99.994,
+      "perfMs": 100.00999927520752,
+      "physicalLagMs": 0.001,
+      "errorNumerator": "65967509995521",
+      "errorDenominator": "4398046511104000",
+      "bound": 0.018008583068847665,
+      "error": 0.01499927520751976,
+      "enclosed": true
+    },
+    {
+      "hostNs": "4294967296500000",
+      "documentMs": 99.994,
+      "perfMs": 100,
+      "physicalLagMs": 0.001,
+      "errorNumerator": "21990232555521",
+      "errorDenominator": "4398046511104000",
+      "bound": 0.018008583068847665,
+      "error": 0.005000000000000227,
+      "enclosed": true
+    },
+    {
+      "hostNs": "4294967296500000",
+      "documentMs": 100.003999,
+      "perfMs": 100,
+      "physicalLagMs": 0.001,
+      "errorNumerator": "21985834508979",
+      "errorDenominator": "4398046511104000",
+      "bound": 0.018008583068847665,
+      "error": 0.0049989999999932025,
+      "enclosed": true
+    },
+    {
+      "hostNs": "4294967296500000",
+      "documentMs": 100.003999,
+      "perfMs": 99.99000072479248,
+      "physicalLagMs": 0.001,
+      "errorNumerator": "65963111948979",
+      "errorDenominator": "4398046511104000",
+      "bound": 0.018008583068847665,
+      "error": 0.014998275207512733,
+      "enclosed": true
+    },
+    {
+      "hostNs": "4294967296500000",
+      "documentMs": 100.003999,
+      "perfMs": 100.00999927520752,
+      "physicalLagMs": 0.001,
+      "errorNumerator": "21991442931021",
+      "errorDenominator": "4398046511104000",
+      "bound": 0.018008583068847665,
+      "error": 0.005000275207526329,
+      "enclosed": true
+    },
+    {
+      "hostNs": "4294967296500000",
+      "documentMs": 100.003999,
+      "perfMs": 100,
+      "physicalLagMs": 0.001,
+      "errorNumerator": "21985834508979",
+      "errorDenominator": "4398046511104000",
+      "bound": 0.018008583068847665,
+      "error": 0.0049989999999932025,
+      "enclosed": true
+    },
+    {
+      "hostNs": "4294967296500000",
+      "documentMs": 59.995,
+      "perfMs": 100,
+      "physicalLagMs": 40,
+      "errorNumerator": "703687441777",
+      "errorDenominator": "140737488355328",
+      "bound": 0.018008583068847665,
+      "error": 0.005000000000002558,
+      "enclosed": true
+    },
+    {
+      "hostNs": "4294967296500000",
+      "documentMs": 59.995,
+      "perfMs": 99.99000072479248,
+      "physicalLagMs": 40,
+      "errorNumerator": "703585436303",
+      "errorDenominator": "140737488355328",
+      "bound": 0.018008583068847665,
+      "error": 0.004999275207516973,
+      "enclosed": true
+    },
+    {
+      "hostNs": "4294967296500000",
+      "documentMs": 59.995,
+      "perfMs": 100.00999927520752,
+      "physicalLagMs": 40,
+      "errorNumerator": "2110960319857",
+      "errorDenominator": "140737488355328",
+      "bound": 0.018008583068847665,
+      "error": 0.01499927520752209,
+      "enclosed": true
+    },
+    {
+      "hostNs": "4294967296500000",
+      "documentMs": 59.995,
+      "perfMs": 100,
+      "physicalLagMs": 40,
+      "errorNumerator": "703687441777",
+      "errorDenominator": "140737488355328",
+      "bound": 0.018008583068847665,
+      "error": 0.005000000000002558,
+      "enclosed": true
+    },
+    {
+      "hostNs": "4294967296500000",
+      "documentMs": 60.004999,
+      "perfMs": 100,
+      "physicalLagMs": 40,
+      "errorNumerator": "21985834509",
+      "errorDenominator": "4398046511104",
+      "bound": 0.018008583068847665,
+      "error": 0.004998999999997977,
+      "enclosed": true
+    },
+    {
+      "hostNs": "4294967296500000",
+      "documentMs": 60.004999,
+      "perfMs": 99.99000072479248,
+      "physicalLagMs": 40,
+      "errorNumerator": "65963111949",
+      "errorDenominator": "4398046511104",
+      "bound": 0.018008583068847665,
+      "error": 0.014998275207517509,
+      "enclosed": true
+    },
+    {
+      "hostNs": "4294967296500000",
+      "documentMs": 60.004999,
+      "perfMs": 100.00999927520752,
+      "physicalLagMs": 40,
+      "errorNumerator": "21991442931",
+      "errorDenominator": "4398046511104",
+      "bound": 0.018008583068847665,
+      "error": 0.005000275207521554,
+      "enclosed": true
+    },
+    {
+      "hostNs": "4294967296500000",
+      "documentMs": 60.004999,
+      "perfMs": 100,
+      "physicalLagMs": 40,
+      "errorNumerator": "21985834509",
+      "errorDenominator": "4398046511104",
+      "bound": 0.018008583068847665,
+      "error": 0.004998999999997977,
+      "enclosed": true
+    },
+    {
+      "hostNs": "4398046511102500000",
+      "documentMs": 99.995,
+      "perfMs": 100,
+      "physicalLagMs": 0,
+      "errorNumerator": "43980465111",
+      "errorDenominator": "8796093022208",
+      "bound": 0.02239453125000001,
+      "error": 0.0049999999999954525,
+      "enclosed": true
+    },
+    {
+      "hostNs": "4398046511102500000",
+      "documentMs": 99.995,
+      "perfMs": 99.990234375,
+      "physicalLagMs": 0,
+      "errorNumerator": "41918880809",
+      "errorDenominator": "8796093022208",
+      "bound": 0.02239453125000001,
+      "error": 0.0047656250000045475,
+      "enclosed": true
+    },
+    {
+      "hostNs": "4398046511102500000",
+      "documentMs": 99.995,
+      "perfMs": 100.009765625,
+      "physicalLagMs": 0,
+      "errorNumerator": "129879811031",
+      "errorDenominator": "8796093022208",
+      "bound": 0.02239453125000001,
+      "error": 0.014765624999995453,
+      "enclosed": true
+    },
+    {
+      "hostNs": "4398046511102500000",
+      "documentMs": 99.995,
+      "perfMs": 100,
+      "physicalLagMs": 0,
+      "errorNumerator": "43980465111",
+      "errorDenominator": "8796093022208",
+      "bound": 0.02239453125000001,
+      "error": 0.0049999999999954525,
+      "enclosed": true
+    },
+    {
+      "hostNs": "4398046511102500000",
+      "documentMs": 100.004999,
+      "perfMs": 100,
+      "physicalLagMs": 0,
+      "errorNumerator": "21985834509",
+      "errorDenominator": "4398046511104",
+      "bound": 0.02239453125000001,
+      "error": 0.004998999999997977,
+      "enclosed": true
+    },
+    {
+      "hostNs": "4398046511102500000",
+      "documentMs": 100.004999,
+      "perfMs": 99.990234375,
+      "physicalLagMs": 0,
+      "errorNumerator": "64935507469",
+      "errorDenominator": "4398046511104",
+      "bound": 0.02239453125000001,
+      "error": 0.014764624999997977,
+      "enclosed": true
+    },
+    {
+      "hostNs": "4398046511102500000",
+      "documentMs": 100.004999,
+      "perfMs": 100.009765625,
+      "physicalLagMs": 0,
+      "errorNumerator": "20963838451",
+      "errorDenominator": "4398046511104",
+      "bound": 0.02239453125000001,
+      "error": 0.004766625000002023,
+      "enclosed": true
+    },
+    {
+      "hostNs": "4398046511102500000",
+      "documentMs": 100.004999,
+      "perfMs": 100,
+      "physicalLagMs": 0,
+      "errorNumerator": "21985834509",
+      "errorDenominator": "4398046511104",
+      "bound": 0.02239453125000001,
+      "error": 0.004998999999997977,
+      "enclosed": true
+    },
+    {
+      "hostNs": "4398046511102500000",
+      "documentMs": 99.994,
+      "perfMs": 100,
+      "physicalLagMs": 0.001,
+      "errorNumerator": "21990232555521",
+      "errorDenominator": "4398046511104000",
+      "bound": 0.02239453125000001,
+      "error": 0.005000000000000227,
+      "enclosed": true
+    },
+    {
+      "hostNs": "4398046511102500000",
+      "documentMs": 99.994,
+      "perfMs": 99.990234375,
+      "physicalLagMs": 0.001,
+      "errorNumerator": "20959440404479",
+      "errorDenominator": "4398046511104000",
+      "bound": 0.02239453125000001,
+      "error": 0.004765624999999773,
+      "enclosed": true
+    },
+    {
+      "hostNs": "4398046511102500000",
+      "documentMs": 99.994,
+      "perfMs": 100.009765625,
+      "physicalLagMs": 0.001,
+      "errorNumerator": "64939905515521",
+      "errorDenominator": "4398046511104000",
+      "bound": 0.02239453125000001,
+      "error": 0.014765625000000228,
+      "enclosed": true
+    },
+    {
+      "hostNs": "4398046511102500000",
+      "documentMs": 99.994,
+      "perfMs": 100,
+      "physicalLagMs": 0.001,
+      "errorNumerator": "21990232555521",
+      "errorDenominator": "4398046511104000",
+      "bound": 0.02239453125000001,
+      "error": 0.005000000000000227,
+      "enclosed": true
+    },
+    {
+      "hostNs": "4398046511102500000",
+      "documentMs": 100.003999,
+      "perfMs": 100,
+      "physicalLagMs": 0.001,
+      "errorNumerator": "21985834508979",
+      "errorDenominator": "4398046511104000",
+      "bound": 0.02239453125000001,
+      "error": 0.0049989999999932025,
+      "enclosed": true
+    },
+    {
+      "hostNs": "4398046511102500000",
+      "documentMs": 100.003999,
+      "perfMs": 99.990234375,
+      "physicalLagMs": 0.001,
+      "errorNumerator": "64935507468979",
+      "errorDenominator": "4398046511104000",
+      "bound": 0.02239453125000001,
+      "error": 0.014764624999993202,
+      "enclosed": true
+    },
+    {
+      "hostNs": "4398046511102500000",
+      "documentMs": 100.003999,
+      "perfMs": 100.009765625,
+      "physicalLagMs": 0.001,
+      "errorNumerator": "20963838451021",
+      "errorDenominator": "4398046511104000",
+      "bound": 0.02239453125000001,
+      "error": 0.0047666250000067975,
+      "enclosed": true
+    },
+    {
+      "hostNs": "4398046511102500000",
+      "documentMs": 100.003999,
+      "perfMs": 100,
+      "physicalLagMs": 0.001,
+      "errorNumerator": "21985834508979",
+      "errorDenominator": "4398046511104000",
+      "bound": 0.02239453125000001,
+      "error": 0.0049989999999932025,
+      "enclosed": true
+    },
+    {
+      "hostNs": "4398046511102500000",
+      "documentMs": 59.995,
+      "perfMs": 100,
+      "physicalLagMs": 40,
+      "errorNumerator": "703687441777",
+      "errorDenominator": "140737488355328",
+      "bound": 0.02239453125000001,
+      "error": 0.005000000000002558,
+      "enclosed": true
+    },
+    {
+      "hostNs": "4398046511102500000",
+      "documentMs": 59.995,
+      "perfMs": 99.990234375,
+      "physicalLagMs": 40,
+      "errorNumerator": "670702092943",
+      "errorDenominator": "140737488355328",
+      "bound": 0.02239453125000001,
+      "error": 0.004765624999997442,
+      "enclosed": true
+    },
+    {
+      "hostNs": "4398046511102500000",
+      "documentMs": 59.995,
+      "perfMs": 100.009765625,
+      "physicalLagMs": 40,
+      "errorNumerator": "2078076976497",
+      "errorDenominator": "140737488355328",
+      "bound": 0.02239453125000001,
+      "error": 0.014765625000002558,
+      "enclosed": true
+    },
+    {
+      "hostNs": "4398046511102500000",
+      "documentMs": 59.995,
+      "perfMs": 100,
+      "physicalLagMs": 40,
+      "errorNumerator": "703687441777",
+      "errorDenominator": "140737488355328",
+      "bound": 0.02239453125000001,
+      "error": 0.005000000000002558,
+      "enclosed": true
+    },
+    {
+      "hostNs": "4398046511102500000",
+      "documentMs": 60.004999,
+      "perfMs": 100,
+      "physicalLagMs": 40,
+      "errorNumerator": "21985834509",
+      "errorDenominator": "4398046511104",
+      "bound": 0.02239453125000001,
+      "error": 0.004998999999997977,
+      "enclosed": true
+    },
+    {
+      "hostNs": "4398046511102500000",
+      "documentMs": 60.004999,
+      "perfMs": 99.990234375,
+      "physicalLagMs": 40,
+      "errorNumerator": "64935507469",
+      "errorDenominator": "4398046511104",
+      "bound": 0.02239453125000001,
+      "error": 0.014764624999997977,
+      "enclosed": true
+    },
+    {
+      "hostNs": "4398046511102500000",
+      "documentMs": 60.004999,
+      "perfMs": 100.009765625,
+      "physicalLagMs": 40,
+      "errorNumerator": "20963838451",
+      "errorDenominator": "4398046511104",
+      "bound": 0.02239453125000001,
+      "error": 0.004766625000002023,
+      "enclosed": true
+    },
+    {
+      "hostNs": "4398046511102500000",
+      "documentMs": 60.004999,
+      "perfMs": 100,
+      "physicalLagMs": 40,
+      "errorNumerator": "21985834509",
+      "errorDenominator": "4398046511104",
+      "bound": 0.02239453125000001,
+      "error": 0.004998999999997977,
+      "enclosed": true
+    }
+  ],
+  "uncertainty": [
+    {
+      "runs": 288,
+      "blocks": 144,
+      "unit": "средняя стоимость парного блока двух противоположных runs; повторы/кадры зависимы; p95 относится к распределению средних блоков",
+      "low": 0.9230769230769225,
+      "high": 1.0833333333333341,
+      "systematicBoundDidNotShrink": true
+    },
+    {
+      "runs": 1024,
+      "blocks": 512,
+      "unit": "средняя стоимость парного блока двух противоположных runs; повторы/кадры зависимы; p95 относится к распределению средних блоков",
+      "low": 0.9230769230769225,
+      "high": 1.0833333333333341,
+      "systematicBoundDidNotShrink": true
+    }
+  ],
+  "protectedExpected": {
+    "durationMs": 128,
+    "toPx": 300,
+    "repetitions": 8,
+    "browserBatchCalls": 32,
+    "browserSemanticCalls": 1,
+    "warmupRuns": 4,
+    "pilotRuns": 8,
+    "minRuns": 288,
+    "maxRuns": 1024,
+    "seed": 1397904978,
+    "familyAlpha": 0.05,
+    "familySize": 10,
+    "nonInferiorityUpper": 1.05,
+    "positiveLower": 1.5,
+    "positiveWorkMultiplier": 2,
+    "mdeRelative": 0.05,
+    "power": 0.8,
+    "browserOperationTimeoutMs": 30000
+  },
+  "plans": [
+    {
+      "logSd": 0,
+      "plan": {
+        "runs": 288,
+        "requiredRuns": 288,
+        "feasible": true,
+        "cells": [
+          {
+            "id": "0",
+            "logContrastSd": 0,
+            "requiredRuns": 0
+          },
+          {
+            "id": "1",
+            "logContrastSd": 0,
+            "requiredRuns": 0
+          },
+          {
+            "id": "2",
+            "logContrastSd": 0,
+            "requiredRuns": 0
+          },
+          {
+            "id": "3",
+            "logContrastSd": 0,
+            "requiredRuns": 0
+          },
+          {
+            "id": "4",
+            "logContrastSd": 0,
+            "requiredRuns": 0
+          },
+          {
+            "id": "5",
+            "logContrastSd": 0,
+            "requiredRuns": 0
+          },
+          {
+            "id": "6",
+            "logContrastSd": 0,
+            "requiredRuns": 0
+          },
+          {
+            "id": "7",
+            "logContrastSd": 0,
+            "requiredRuns": 0
+          },
+          {
+            "id": "8",
+            "logContrastSd": 0,
+            "requiredRuns": 0
+          },
+          {
+            "id": "9",
+            "logContrastSd": 0,
+            "requiredRuns": 0
+          }
+        ],
+        "tail": {
+          "alphaPerTail": 0.000625,
+          "quantiles": [
+            0.5,
+            0.95
+          ],
+          "minimumBlocks": 144,
+          "correction": "Bonferroni: 10 cells × 2 quantiles × 2 participants × 2 tails; family-wise 95%"
+        },
+        "method": "baseline-only paired block log-contrast normal approximation; power 0.8, MDE 5%, Bonferroni family 10×2; N в runs, блок содержит два run"
+      }
+    },
+    {
+      "logSd": 0.001,
+      "plan": {
+        "runs": 288,
+        "requiredRuns": 288,
+        "feasible": true,
+        "cells": [
+          {
+            "id": "0",
+            "logContrastSd": 0.0011547005383792587,
+            "requiredRuns": 2
+          },
+          {
+            "id": "1",
+            "logContrastSd": 0.0011547005383792587,
+            "requiredRuns": 2
+          },
+          {
+            "id": "2",
+            "logContrastSd": 0.0011547005383792587,
+            "requiredRuns": 2
+          },
+          {
+            "id": "3",
+            "logContrastSd": 0.0011547005383792587,
+            "requiredRuns": 2
+          },
+          {
+            "id": "4",
+            "logContrastSd": 0.0011547005383792587,
+            "requiredRuns": 2
+          },
+          {
+            "id": "5",
+            "logContrastSd": 0.0011547005383792587,
+            "requiredRuns": 2
+          },
+          {
+            "id": "6",
+            "logContrastSd": 0.0011547005383792587,
+            "requiredRuns": 2
+          },
+          {
+            "id": "7",
+            "logContrastSd": 0.0011547005383792587,
+            "requiredRuns": 2
+          },
+          {
+            "id": "8",
+            "logContrastSd": 0.0011547005383792587,
+            "requiredRuns": 2
+          },
+          {
+            "id": "9",
+            "logContrastSd": 0.0011547005383792587,
+            "requiredRuns": 2
+          }
+        ],
+        "tail": {
+          "alphaPerTail": 0.000625,
+          "quantiles": [
+            0.5,
+            0.95
+          ],
+          "minimumBlocks": 144,
+          "correction": "Bonferroni: 10 cells × 2 quantiles × 2 participants × 2 tails; family-wise 95%"
+        },
+        "method": "baseline-only paired block log-contrast normal approximation; power 0.8, MDE 5%, Bonferroni family 10×2; N в runs, блок содержит два run"
+      }
+    },
+    {
+      "logSd": 0.01,
+      "plan": {
+        "runs": 288,
+        "requiredRuns": 288,
+        "feasible": true,
+        "cells": [
+          {
+            "id": "0",
+            "logContrastSd": 0.011547005383792422,
+            "requiredRuns": 2
+          },
+          {
+            "id": "1",
+            "logContrastSd": 0.011547005383792422,
+            "requiredRuns": 2
+          },
+          {
+            "id": "2",
+            "logContrastSd": 0.011547005383792422,
+            "requiredRuns": 2
+          },
+          {
+            "id": "3",
+            "logContrastSd": 0.011547005383792422,
+            "requiredRuns": 2
+          },
+          {
+            "id": "4",
+            "logContrastSd": 0.011547005383792422,
+            "requiredRuns": 2
+          },
+          {
+            "id": "5",
+            "logContrastSd": 0.011547005383792422,
+            "requiredRuns": 2
+          },
+          {
+            "id": "6",
+            "logContrastSd": 0.011547005383792422,
+            "requiredRuns": 2
+          },
+          {
+            "id": "7",
+            "logContrastSd": 0.011547005383792422,
+            "requiredRuns": 2
+          },
+          {
+            "id": "8",
+            "logContrastSd": 0.011547005383792422,
+            "requiredRuns": 2
+          },
+          {
+            "id": "9",
+            "logContrastSd": 0.011547005383792422,
+            "requiredRuns": 2
+          }
+        ],
+        "tail": {
+          "alphaPerTail": 0.000625,
+          "quantiles": [
+            0.5,
+            0.95
+          ],
+          "minimumBlocks": 144,
+          "correction": "Bonferroni: 10 cells × 2 quantiles × 2 participants × 2 tails; family-wise 95%"
+        },
+        "method": "baseline-only paired block log-contrast normal approximation; power 0.8, MDE 5%, Bonferroni family 10×2; N в runs, блок содержит два run"
+      }
+    },
+    {
+      "logSd": 0.05,
+      "plan": {
+        "runs": 288,
+        "requiredRuns": 288,
+        "feasible": true,
+        "cells": [
+          {
+            "id": "0",
+            "logContrastSd": 0.05773502691896261,
+            "requiredRuns": 42
+          },
+          {
+            "id": "1",
+            "logContrastSd": 0.05773502691896261,
+            "requiredRuns": 42
+          },
+          {
+            "id": "2",
+            "logContrastSd": 0.05773502691896261,
+            "requiredRuns": 42
+          },
+          {
+            "id": "3",
+            "logContrastSd": 0.05773502691896261,
+            "requiredRuns": 42
+          },
+          {
+            "id": "4",
+            "logContrastSd": 0.05773502691896261,
+            "requiredRuns": 42
+          },
+          {
+            "id": "5",
+            "logContrastSd": 0.05773502691896261,
+            "requiredRuns": 42
+          },
+          {
+            "id": "6",
+            "logContrastSd": 0.05773502691896261,
+            "requiredRuns": 42
+          },
+          {
+            "id": "7",
+            "logContrastSd": 0.05773502691896261,
+            "requiredRuns": 42
+          },
+          {
+            "id": "8",
+            "logContrastSd": 0.05773502691896261,
+            "requiredRuns": 42
+          },
+          {
+            "id": "9",
+            "logContrastSd": 0.05773502691896261,
+            "requiredRuns": 42
+          }
+        ],
+        "tail": {
+          "alphaPerTail": 0.000625,
+          "quantiles": [
+            0.5,
+            0.95
+          ],
+          "minimumBlocks": 144,
+          "correction": "Bonferroni: 10 cells × 2 quantiles × 2 participants × 2 tails; family-wise 95%"
+        },
+        "method": "baseline-only paired block log-contrast normal approximation; power 0.8, MDE 5%, Bonferroni family 10×2; N в runs, блок содержит два run"
+      }
+    },
+    {
+      "logSd": 0.2,
+      "plan": {
+        "runs": 670,
+        "requiredRuns": 670,
+        "feasible": true,
+        "cells": [
+          {
+            "id": "0",
+            "logContrastSd": 0.23094010767585033,
+            "requiredRuns": 670
+          },
+          {
+            "id": "1",
+            "logContrastSd": 0.23094010767585033,
+            "requiredRuns": 670
+          },
+          {
+            "id": "2",
+            "logContrastSd": 0.23094010767585033,
+            "requiredRuns": 670
+          },
+          {
+            "id": "3",
+            "logContrastSd": 0.23094010767585033,
+            "requiredRuns": 670
+          },
+          {
+            "id": "4",
+            "logContrastSd": 0.23094010767585033,
+            "requiredRuns": 670
+          },
+          {
+            "id": "5",
+            "logContrastSd": 0.23094010767585033,
+            "requiredRuns": 670
+          },
+          {
+            "id": "6",
+            "logContrastSd": 0.23094010767585033,
+            "requiredRuns": 670
+          },
+          {
+            "id": "7",
+            "logContrastSd": 0.23094010767585033,
+            "requiredRuns": 670
+          },
+          {
+            "id": "8",
+            "logContrastSd": 0.23094010767585033,
+            "requiredRuns": 670
+          },
+          {
+            "id": "9",
+            "logContrastSd": 0.23094010767585033,
+            "requiredRuns": 670
+          }
+        ],
+        "tail": {
+          "alphaPerTail": 0.000625,
+          "quantiles": [
+            0.5,
+            0.95
+          ],
+          "minimumBlocks": 144,
+          "correction": "Bonferroni: 10 cells × 2 quantiles × 2 participants × 2 tails; family-wise 95%"
+        },
+        "method": "baseline-only paired block log-contrast normal approximation; power 0.8, MDE 5%, Bonferroni family 10×2; N в runs, блок содержит два run"
+      }
+    },
+    {
+      "logSd": 1,
+      "plan": {
+        "runs": 1024,
+        "requiredRuns": 16734,
+        "feasible": false,
+        "cells": [
+          {
+            "id": "0",
+            "logContrastSd": 1.1547005383792515,
+            "requiredRuns": 16734
+          },
+          {
+            "id": "1",
+            "logContrastSd": 1.1547005383792515,
+            "requiredRuns": 16734
+          },
+          {
+            "id": "2",
+            "logContrastSd": 1.1547005383792515,
+            "requiredRuns": 16734
+          },
+          {
+            "id": "3",
+            "logContrastSd": 1.1547005383792515,
+            "requiredRuns": 16734
+          },
+          {
+            "id": "4",
+            "logContrastSd": 1.1547005383792515,
+            "requiredRuns": 16734
+          },
+          {
+            "id": "5",
+            "logContrastSd": 1.1547005383792515,
+            "requiredRuns": 16734
+          },
+          {
+            "id": "6",
+            "logContrastSd": 1.1547005383792515,
+            "requiredRuns": 16734
+          },
+          {
+            "id": "7",
+            "logContrastSd": 1.1547005383792515,
+            "requiredRuns": 16734
+          },
+          {
+            "id": "8",
+            "logContrastSd": 1.1547005383792515,
+            "requiredRuns": 16734
+          },
+          {
+            "id": "9",
+            "logContrastSd": 1.1547005383792515,
+            "requiredRuns": 16734
+          }
+        ],
+        "tail": {
+          "alphaPerTail": 0.000625,
+          "quantiles": [
+            0.5,
+            0.95
+          ],
+          "minimumBlocks": 144,
+          "correction": "Bonferroni: 10 cells × 2 quantiles × 2 participants × 2 tails; family-wise 95%"
+        },
+        "method": "baseline-only paired block log-contrast normal approximation; power 0.8, MDE 5%, Bonferroni family 10×2; N в runs, блок содержит два run"
+      }
+    }
+  ]
+}

@@ -1,0 +1,27 @@
+{
+  "rawSha256": "b2146fbaf081998d0c9ff491f758e3735cae7532d7ee1d80556d17c001340385",
+  "files": [
+    {
+      "name": "bench/compare/bench.mjs",
+      "sha256": "cd03854721fffecf692b2b59be094d058bd6314a0dbe776831fd5463a4c21e13"
+    },
+    {
+      "name": "bench/compare/methodology.mjs",
+      "sha256": "c96328e3cea74863bcc9f9c9ab0bb9f986678c3fb54e288c2ea01c96f8f82e48"
+    },
+    {
+      "name": "bench/profile/server-profile-contract.mjs",
+      "sha256": "e3a75b8c53ff40ff18a06344dd805762d6a7e3b8d088b740897bf17600dfc9d9"
+    },
+    {
+      "name": "bench/profile/server-profile-runner.mjs",
+      "sha256": "d1745dd3a088e573f894533db9521fc22d3679107ab5a583c63d745047ae9b4a"
+    },
+    {
+      "name": "bench/profile/server-profile-registration.mjs",
+      "sha256": "3414269ac1a73192131efe456af2ba903ea5fd8bfb4b40e094eacc5f3492cb03"
+    }
+  ],
+  "matched": true,
+  "reconstruction": "Только отмена текущего узкого onset patch в отдельной копии; каждый byte digest сравнен с prior acquired raw."
+}

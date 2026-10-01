@@ -1,0 +1,65 @@
+{
+  "compression": "gzip level1 mtime0; no content changes",
+  "actualTimingSamples": 0,
+  "cliReceiptSha256": "f44a3a9ce49998bf440768f76dcaa2db40589bab6f154ff226f265748382ffbe",
+  "createdUtc": "2026-10-01T11:28:25.147206+00:00",
+  "records": [
+    {
+      "case": "healthy",
+      "kind": "raw",
+      "originalPath": "/workspace/scratch/server-method-measurement-closure-6fe08-20261001/fullN-onset/healthy.json",
+      "uncompressedSha256": "c83457e2b70873f4f2b5d651e12def2ab28c12c240f9361330cc9de49f93dd3b",
+      "uncompressedBytes": 258266278,
+      "gzipPath": "/workspace/scratch/server-method-measurement-closure-6fe08-20261001/fullN-onset/healthy.json.gz",
+      "gzipSha256": "1a9ef3421848f60ce2cc7f352487e24f807fe4c467a82b152b1271336e8bdc7e",
+      "gzipBytes": 12481601,
+      "fullDecompressedReadbackSha256": "c83457e2b70873f4f2b5d651e12def2ab28c12c240f9361330cc9de49f93dd3b",
+      "fullDecompressedReadbackBytes": 258266278,
+      "lossless": true,
+      "plaintextRemoved": true
+    },
+    {
+      "case": "healthy",
+      "kind": "journal",
+      "originalPath": "/workspace/scratch/server-method-measurement-closure-6fe08-20261001/fullN-onset/healthy.ndjson",
+      "uncompressedSha256": "d6aa980b3792ef7ca3769dc811719389537ce4d378cf42fd90467357ca04b699",
+      "uncompressedBytes": 260778818,
+      "gzipPath": "/workspace/scratch/server-method-measurement-closure-6fe08-20261001/fullN-onset/healthy.ndjson.gz",
+      "gzipSha256": "9d54a1ddecd83b02d35f3ad662cef6f5701517024475ef046ebf198ca4b7756f",
+      "gzipBytes": 13499895,
+      "fullDecompressedReadbackSha256": "d6aa980b3792ef7ca3769dc811719389537ce4d378cf42fd90467357ca04b699",
+      "fullDecompressedReadbackBytes": 260778818,
+      "lossless": true,
+      "plaintextRemoved": true
+    },
+    {
+      "case": "initial-progress-quarter",
+      "kind": "raw",
+      "originalPath": "/workspace/scratch/server-method-measurement-closure-6fe08-20261001/fullN-onset/initial-progress-quarter.json",
+      "uncompressedSha256": "435724396e76c41bba6c05ecd48217c01aff88ae68551d87e5f24fced6a99053",
+      "uncompressedBytes": 258265157,
+      "gzipPath": "/workspace/scratch/server-method-measurement-closure-6fe08-20261001/fullN-onset/initial-progress-quarter.json.gz",
+      "gzipSha256": "5d9b98de5ea2c28b45e6b47c72f55a4800c282fb3ba0b198f49f334ec3a50172",
+      "gzipBytes": 12478176,
+      "fullDecompressedReadbackSha256": "435724396e76c41bba6c05ecd48217c01aff88ae68551d87e5f24fced6a99053",
+      "fullDecompressedReadbackBytes": 258265157,
+      "lossless": true,
+      "plaintextRemoved": true
+    },
+    {
+      "case": "initial-progress-quarter",
+      "kind": "journal",
+      "originalPath": "/workspace/scratch/server-method-measurement-closure-6fe08-20261001/fullN-onset/initial-progress-quarter.ndjson",
+      "uncompressedSha256": "1373e2f04b9a1f6f294fab28670ea30efb2d49baa3bdfdb5c9d3c1990fa46478",
+      "uncompressedBytes": 260777697,
+      "gzipPath": "/workspace/scratch/server-method-measurement-closure-6fe08-20261001/fullN-onset/initial-progress-quarter.ndjson.gz",
+      "gzipSha256": "1c25613e1e317180bd2149f706352e76a840d0b1f1845fdff2589c8d2c76963f",
+      "gzipBytes": 13495270,
+      "fullDecompressedReadbackSha256": "1373e2f04b9a1f6f294fab28670ea30efb2d49baa3bdfdb5c9d3c1990fa46478",
+      "fullDecompressedReadbackBytes": 260777697,
+      "lossless": true,
+      "plaintextRemoved": true
+    }
+  ],
+  "plaintextRemovalUtc": "2026-10-01T11:28:25.199454+00:00"
+}

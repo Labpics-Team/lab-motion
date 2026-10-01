@@ -1,0 +1,18 @@
+{
+  "synthetic": true,
+  "actualTimingSamples": 0,
+  "fixtureSource": "/workspace/scratch/server-method-measurement-closure-6fe08-20261001/snapshot/evidence/window-closure/window-synthetic-fixtures.mjs",
+  "fixtureSha256": "842e5f365e42e80123ad0a42d92f6379145ed6dabe698a7c2140cf4b165fd918",
+  "fixtureLocalSha256": "e1547d050bc1859527643109197efc130899b8e1d9bebd48ef53ff5f28ccea6e",
+  "ownPriorProbeSources": [
+    {
+      "path": "/workspace/scratch/server-method-measurement-closure-16f31-20261001/semantic-replay.mjs",
+      "sha256": "1ef54baf82b64f209c76fe8c6b60ab808311103b3d64670783e387792790154b"
+    },
+    {
+      "path": "/workspace/scratch/server-method-measurement-closure-16f31-20261001/semantic-window-probe.mjs",
+      "sha256": "3113c583438b9326c8cc654eedb8f9054d4ab6578971d91db803d489e8855fbd"
+    }
+  ],
+  "mutation": "rebase imported fixture to verified current snapshot; unchanged own independent SUT and exact producer extraction; no source packet mutation"
+}

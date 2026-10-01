@@ -1,0 +1,19 @@
+{
+  "sealedUtc": "2026-10-01T18:19:51.943902+00:00",
+  "verdict": "PASS bounded map; delivery not performed",
+  "sourceWitnessHead": "85a837e83912ec6b3144b385d938b66a0c63adcf",
+  "manifest": {
+    "path": "/tmp/motion-primary-portability-map-20261001/evidence-manifest.json",
+    "bytes": 6002,
+    "sha256": "45578015e4529767a5a2a2bee3d8fb53d136eb5bfe7539797cbda473937ffe96"
+  },
+  "report": {
+    "path": "/tmp/motion-primary-portability-map-20261001/REPORT-RU.md",
+    "bytes": 6976,
+    "sha256": "84d38355fe007fc5fe36c5d8f3e4015972fcddca39ffe99a074b2c71f1bb24db"
+  },
+  "largeCarrierFreshHashPerformed": false,
+  "heavyProcessesStarted": 0,
+  "ownProcesses": "END",
+  "allSourcesReadOnly": true
+}

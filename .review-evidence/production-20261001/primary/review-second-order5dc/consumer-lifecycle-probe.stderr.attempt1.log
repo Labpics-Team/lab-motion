@@ -1,0 +1,17 @@
+file:///workspace/scratch/motion-server-method-final-20261001T105048Z/source/bench/profile/server-profile-contract.mjs:16
+  if (!value) throw new Error(`server profile: ${message}`);
+                    ^
+
+Error: server profile: clock evidence/model не совпадают
+    at invariant (file:///workspace/scratch/motion-server-method-final-20261001T105048Z/source/bench/profile/server-profile-contract.mjs:16:21)
+    at readServerSample (file:///workspace/scratch/motion-server-method-final-20261001T105048Z/source/bench/profile/server-profile-contract.mjs:183:9)
+    at validateServerBrowserSample (file:///workspace/scratch/motion-server-method-final-20261001T105048Z/source/bench/profile/server-profile-contract.mjs:220:56)
+    at file:///workspace/scratch/server-method-second-order-final-20261001/closure-144242Z/consumer-lifecycle-probe.mjs:64:5
+    at Array.map (<anonymous>)
+    at file:///workspace/scratch/server-method-second-order-final-20261001/closure-144242Z/consumer-lifecycle-probe.mjs:61:46
+    at run (file:///workspace/scratch/server-method-second-order-final-20261001/closure-144242Z/consumer-lifecycle-probe.mjs:18:74)
+    at file:///workspace/scratch/server-method-second-order-final-20261001/closure-144242Z/consumer-lifecycle-probe.mjs:59:1
+    at ModuleJob.run (node:internal/modules/esm/module_job:439:25)
+    at async node:internal/modules/esm/loader:643:26
+
+Node.js v24.19.0

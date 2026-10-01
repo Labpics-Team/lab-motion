@@ -1,0 +1,82 @@
+{
+  "createdAt": "2026-10-01T14:05:35.166022+00:00",
+  "head": "8fb55ca0a116e5381a43351ab28834d17a4a9299",
+  "base": "0b6f537e148b7dadadfb9e3ce7c446d014975958",
+  "upstreamMerged": "957ceaf26501525eff476cdc1d149d81fd5ebcd7",
+  "branch": "codex/motion-production-20261001",
+  "cleanWorktree": true,
+  "checks": [
+    {
+      "name": "vitest-combined-8fb55ca0",
+      "success": true,
+      "files": 344,
+      "tests": 4915,
+      "passed": 4915,
+      "failed": 0,
+      "skipped": 0,
+      "guards": [
+        {
+          "file": "/workspace/lab-motion/test/server-profile-contract.test.ts",
+          "name": "серверный PROFILE: независимые sabotage controls завершённый public admission отвергает четыре независимых reviewer counterexamples",
+          "status": "passed",
+          "durationMs": 27368.393226
+        }
+      ],
+      "receipts": [
+        {
+          "path": "/workspace/lab-motion/scratchpad/vitest-combined-8fb55ca0.json",
+          "sha256": "1b06443c393616189db495e3dfc618131fab12935bcd14dece117ee3b994a7ae",
+          "bytes": 2094207
+        },
+        {
+          "path": "/workspace/lab-motion/scratchpad/vitest-combined-8fb55ca0.log",
+          "sha256": "8fec992f92c6849859de997c210b30a3dcffc4d7f538c9ccd373f505fdcb7d58",
+          "bytes": 922993
+        },
+        {
+          "path": "/workspace/lab-motion/scratchpad/vitest-combined-8fb55ca0.exit",
+          "sha256": "9a271f2a916b0b6ee6cecb2426f0b3206ef074578be55d9bc94f6f3fe3ab86aa",
+          "bytes": 2
+        },
+        {
+          "path": "/workspace/lab-motion/scratchpad/vitest-combined-8fb55ca0-execution.json",
+          "sha256": "ed65c943f606741f5e451bbb414c7a752c232079c8c2dfd339101ff6a1da412d",
+          "bytes": 396
+        }
+      ]
+    },
+    {
+      "name": "finiteness-combined-8fb55ca0",
+      "success": true,
+      "files": 10,
+      "tests": 111,
+      "passed": 111,
+      "failed": 0,
+      "skipped": 0,
+      "guards": [],
+      "receipts": [
+        {
+          "path": "/workspace/lab-motion/scratchpad/finiteness-combined-8fb55ca0.json",
+          "sha256": "946887c6c75914ff04329939935490a390eca7ecda709700f043d11a390986c5",
+          "bytes": 46006
+        },
+        {
+          "path": "/workspace/lab-motion/scratchpad/finiteness-combined-8fb55ca0.log",
+          "sha256": "c8834efe77c7f9490c34747d5c827da119f4f684137e85dc1a839cfd10d8e34c",
+          "bytes": 20460
+        },
+        {
+          "path": "/workspace/lab-motion/scratchpad/finiteness-combined-8fb55ca0.exit",
+          "sha256": "9a271f2a916b0b6ee6cecb2426f0b3206ef074578be55d9bc94f6f3fe3ab86aa",
+          "bytes": 2
+        },
+        {
+          "path": "/workspace/lab-motion/scratchpad/finiteness-combined-8fb55ca0-execution.json",
+          "sha256": "92db21d29386f649dddae4b8951214ac9da24968cd2e0efa82194fd76493ad26",
+          "bytes": 820
+        }
+      ]
+    }
+  ],
+  "qualification": "Текущий общий clean исходник прошёл полный ordinary и отдельный canonical fuzz. Historical30e costFAIL сохранён, новый first-publication/clock+failfast subject отдельный. Методное independent acceptance и actual registered performance пока OPEN."
+}

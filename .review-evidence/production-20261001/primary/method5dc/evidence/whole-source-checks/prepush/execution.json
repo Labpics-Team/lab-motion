@@ -1,0 +1,46 @@
+[
+  {
+    "name": "static",
+    "head": "8fb55ca0a116e5381a43351ab28834d17a4a9299",
+    "command": [
+      "pnpm",
+      "check:static"
+    ],
+    "startedAt": "2026-10-01T14:33:13.283138+00:00",
+    "endedAt": "2026-10-01T14:33:25.901820+00:00",
+    "exitCode": 0
+  },
+  {
+    "name": "docs-facts",
+    "head": "8fb55ca0a116e5381a43351ab28834d17a4a9299",
+    "command": [
+      "node",
+      "scripts/check-docs-facts.mjs"
+    ],
+    "startedAt": "2026-10-01T14:33:25.902205+00:00",
+    "endedAt": "2026-10-01T14:33:25.957892+00:00",
+    "exitCode": 0
+  },
+  {
+    "name": "docs-drift",
+    "head": "8fb55ca0a116e5381a43351ab28834d17a4a9299",
+    "command": [
+      "node",
+      "scripts/check-docs-drift.mjs"
+    ],
+    "startedAt": "2026-10-01T14:33:25.958313+00:00",
+    "endedAt": "2026-10-01T14:33:26.016583+00:00",
+    "exitCode": 0
+  },
+  {
+    "name": "compiler-acceptance",
+    "head": "8fb55ca0a116e5381a43351ab28834d17a4a9299",
+    "command": [
+      "pnpm",
+      "acceptance:compiler"
+    ],
+    "startedAt": "2026-10-01T14:33:26.017028+00:00",
+    "endedAt": "2026-10-01T14:33:27.831269+00:00",
+    "exitCode": 0
+  }
+]

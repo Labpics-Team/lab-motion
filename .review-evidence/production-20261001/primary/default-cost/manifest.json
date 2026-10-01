@@ -1,0 +1,61 @@
+{
+  "createdAt": "2026-10-01T14:58:25.827258+00:00",
+  "results": {
+    "baseline": "  MotionValue прогон (47 кадров)                          7.2k        139.2k",
+    "final": "  MotionValue прогон (47 кадров)                          8.3k        121.0k"
+  },
+  "files": [
+    {
+      "path": "/tmp/motion-default-cost-final-20261001/REPORT.md",
+      "sha256": "d3b7673d134078e5a0c63953324c3ad4dea63ab3508191768b51fce28ce7d0bd",
+      "bytes": 2343
+    },
+    {
+      "path": "/tmp/motion-default-cost-final-20261001/baseline.execution.json",
+      "sha256": "c46cb9491aad292f394d30164fa2b48217a8b783c3eaa667e73c68f3d5b0b2ef",
+      "bytes": 67168
+    },
+    {
+      "path": "/tmp/motion-default-cost-final-20261001/baseline.exit",
+      "sha256": "9a271f2a916b0b6ee6cecb2426f0b3206ef074578be55d9bc94f6f3fe3ab86aa",
+      "bytes": 2
+    },
+    {
+      "path": "/tmp/motion-default-cost-final-20261001/baseline.stdout.log",
+      "sha256": "28b5cdb758254fba1c49b658541a2ecfe0e840e0ed53d108cfe03f82e8ca205b",
+      "bytes": 15118
+    },
+    {
+      "path": "/tmp/motion-default-cost-final-20261001/final.execution.json",
+      "sha256": "1b8f5c20c38811b08d52fb8868da74dd4bb4dd81872b568cda2c03c0fb93e6c0",
+      "bytes": 67678
+    },
+    {
+      "path": "/tmp/motion-default-cost-final-20261001/final.exit",
+      "sha256": "9a271f2a916b0b6ee6cecb2426f0b3206ef074578be55d9bc94f6f3fe3ab86aa",
+      "bytes": 2
+    },
+    {
+      "path": "/tmp/motion-default-cost-final-20261001/final.stdout.log",
+      "sha256": "1ccde5b80240f0abdf9806d0543a6782fe4b5799af80083b933775e578973b73",
+      "bytes": 15103
+    },
+    {
+      "path": "/tmp/motion-default-cost-final-20261001/preflight.json",
+      "sha256": "5d16fe234dce2cae4f42278028485eb55e858834617b80111286be48a6f3c9a1",
+      "bytes": 3016
+    },
+    {
+      "path": "/tmp/motion-default-cost-final-20261001/receipt.json",
+      "sha256": "6dd43ba9751ce0a06ac5ab08b9669293dec38027ed534697ef23a0da2f3e7c8d",
+      "bytes": 140762
+    },
+    {
+      "path": "/tmp/motion-default-cost-final-20261001/run.py",
+      "sha256": "ea078a5e0c69326ebdf07481893e733784bd4d7d7094c761cc5f859e4355e84d",
+      "bytes": 6464
+    }
+  ],
+  "registeredPerformanceSamples": 0,
+  "scope": "Descriptive whole unchanged stock owner; no NI/performance admission."
+}

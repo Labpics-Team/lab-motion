@@ -1,0 +1,33 @@
+{
+  "packetPath": "/workspace/scratch/motion-server-method-final-20261001T144242Z",
+  "tarPath": "/workspace/scratch/motion-server-method-final-20261001T144242Z/method.tar.gz",
+  "tarSha256": "5dc04987eace1aaf736da05192948897d50262be5a24ff9192b79744f47ab525",
+  "tarBytes": 774446649,
+  "manifestSha256": "cb650e2d18f89a7e67d24ec9facdfbef458b9f9e39da50e3b36b1d15636a1b56",
+  "patchSha256": "d2dc17a0679b9221ffcc4b8e87711774fdf2f0974fa497852d7ec1a868193c51",
+  "sourceBasisHead": "8fb55ca0a116e5381a43351ab28834d17a4a9299",
+  "sourceFreezeSha256": "4fb124eebf59ca473a46bd6f448bb5208c4d2037283bbe7715b9fbdf95ae8cec",
+  "protocolDigest": "00e8d5880eb83dd27a52f90cc670d4ecc550229458af039d9924485805c25431",
+  "clockModelDigest": "7e45adab88a2c97af4e9074543318ae115e42b5c9669c4746b6e149d42bfbc4f",
+  "clockCertificateSha256": "686130793692b187046bd0eeaf37178150838d4dea0f40b305861f93a469763e",
+  "ownerHashes": {
+    "bench/profile/server-profile-registration.mjs": "211b4c0e107b56d06eb57e0b49f21bc3b1d06a06f34ffec1c06d4ecd15485396",
+    "bench/profile/server-profile-contract.mjs": "0fb91bc3a109b46ac5bd3c63fc63f251ecc33ab89d81b90173f5c927f844afcd",
+    "bench/profile/server-profile-runner.mjs": "749d9708f83a5922983effd077a69f1930d2429cf60c895760f4130177edc87b",
+    "bench/profile/server-profile-retention.mjs": "23b65523bdb2cc481e8d958b4c5dd4ec3c0ce59c9964f7e3bf0020492bf3fdad",
+    "test/server-profile-contract.test.ts": "7147f065ea2e5ec6780e21997505ed0d28909afebde3e73dbeb2d0f7cbef94b0",
+    "docs/server-profile.md": "018918e1e68495b8fcce0a81fd296442bed2ac1c994e7594485e75b1fe8379fc",
+    "bench/compare/bench.mjs": "f4aa1628b6320a08c5444277fe6a6a26c9e3f9f42db845db5821b5bf4334b467",
+    "bench/compare/methodology.mjs": "e090f47784312a3fc936326157747f346718e2245c275eed62b41cf0de0b1702",
+    "scripts/bench-transform-support.mjs": "ddbcf5b758133624b3f285947457a8831872847c0e1913ee9afe163f751307c6",
+    "test/bench-transform-pair.test.ts": "2f339c24d36c65c49624b9532129d132e81d7a17d745f890be50adef89204705",
+    "test/benchmark-methodology.test.ts": "3faa3ba6131b6864bba17ec65c2a1b52dd6ab082dac8c602fbc86cb508c80f0b",
+    "test/benchmark-report-contract.test.ts": "91759d8223e76cc8db450c392fa2983229945de40a7f61e19892002fefe36647"
+  },
+  "readbackFiles": 3790,
+  "passedAffectedTests": 307,
+  "publicCliSyntheticCases": 15,
+  "maxRunsConsumer": 1024,
+  "actualRegisteredPerformanceSamples": 0,
+  "independentMethodReview": "Ожидается новая независимая проверка immutable packet."
+}

@@ -1,0 +1,71 @@
+{
+  "scope": "owned synthetic primary carrier conversion only",
+  "actualTimingSamples": 0,
+  "utc": "2026-10-01T10:14:38.098807+00:00",
+  "rows": [
+    {
+      "case": "healthy",
+      "kind": "raw",
+      "originalPath": "/workspace/scratch/server-method-measurement-closure-16f31-20261001/fullN-window/healthy.json",
+      "originalSha256": "aad25947e82354c6e03a792135104bc196310349429c6bcf2f8b800b03566284",
+      "originalBytes": 258235047,
+      "gzipPath": "/workspace/scratch/server-method-measurement-closure-16f31-20261001/fullN-window/healthy.json.gz",
+      "gzipSha256": "2389eba84c1f6c1adad9f5021ecb0490ddd94006b8f0039d86744b94aa6b6fd8",
+      "gzipBytes": 12476112,
+      "fullReadbackSha256": "aad25947e82354c6e03a792135104bc196310349429c6bcf2f8b800b03566284",
+      "fullReadbackBytes": 258235047,
+      "byteIdenticalReadback": true,
+      "plaintextDisposition": "replaced after durable compression receipt under explicit root instruction",
+      "level": 1,
+      "mtime": 0
+    },
+    {
+      "case": "healthy",
+      "kind": "journal",
+      "originalPath": "/workspace/scratch/server-method-measurement-closure-16f31-20261001/fullN-window/healthy.ndjson",
+      "originalSha256": "e934ecff18cadcb31bcfc2b03d433b15712907d8b8e28005722a2818a9cb12b9",
+      "originalBytes": 260747685,
+      "gzipPath": "/workspace/scratch/server-method-measurement-closure-16f31-20261001/fullN-window/healthy.ndjson.gz",
+      "gzipSha256": "89c668b776b7dd03f1582cdb1971f62de7f6580eb894a7bc57343700c5a226e3",
+      "gzipBytes": 13500107,
+      "fullReadbackSha256": "e934ecff18cadcb31bcfc2b03d433b15712907d8b8e28005722a2818a9cb12b9",
+      "fullReadbackBytes": 260747685,
+      "byteIdenticalReadback": true,
+      "plaintextDisposition": "replaced after durable compression receipt under explicit root instruction",
+      "level": 1,
+      "mtime": 0
+    },
+    {
+      "case": "duration256-wide-window",
+      "kind": "raw",
+      "originalPath": "/workspace/scratch/server-method-measurement-closure-16f31-20261001/fullN-window/duration256-wide-window.json",
+      "originalSha256": "0ecd9cd41231115482d0d5bffb1b8a0c4f49656181101875c0fe9046d10f40aa",
+      "originalBytes": 258241889,
+      "gzipPath": "/workspace/scratch/server-method-measurement-closure-16f31-20261001/fullN-window/duration256-wide-window.json.gz",
+      "gzipSha256": "2723409f54744f2f2bc8d3be1fb1934d50aa195ddadb88543392f8e4e8edeeec",
+      "gzipBytes": 12480353,
+      "fullReadbackSha256": "0ecd9cd41231115482d0d5bffb1b8a0c4f49656181101875c0fe9046d10f40aa",
+      "fullReadbackBytes": 258241889,
+      "byteIdenticalReadback": true,
+      "plaintextDisposition": "replaced after durable compression receipt under explicit root instruction",
+      "level": 1,
+      "mtime": 0
+    },
+    {
+      "case": "duration256-wide-window",
+      "kind": "journal",
+      "originalPath": "/workspace/scratch/server-method-measurement-closure-16f31-20261001/fullN-window/duration256-wide-window.ndjson",
+      "originalSha256": "5d1bd1d603aa6c7b1f76cfbf3dcfd112c579205a0971a794ca82d6b20fa9c8ef",
+      "originalBytes": 260754527,
+      "gzipPath": "/workspace/scratch/server-method-measurement-closure-16f31-20261001/fullN-window/duration256-wide-window.ndjson.gz",
+      "gzipSha256": "959199bc16301c805d905ebb5c90b7e20482ecf64515420623424b6ac7c670c7",
+      "gzipBytes": 13511260,
+      "fullReadbackSha256": "5d1bd1d603aa6c7b1f76cfbf3dcfd112c579205a0971a794ca82d6b20fa9c8ef",
+      "fullReadbackBytes": 260754527,
+      "byteIdenticalReadback": true,
+      "plaintextDisposition": "replaced after durable compression receipt under explicit root instruction",
+      "level": 1,
+      "mtime": 0
+    }
+  ]
+}

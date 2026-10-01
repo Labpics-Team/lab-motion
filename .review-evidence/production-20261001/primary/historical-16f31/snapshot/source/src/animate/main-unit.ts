@@ -1,0 +1,379 @@
+/** Main-thread executor одной CSS-поверхности внутри общего SurfaceBatch. */
+
+import { scaleSerializedVelocity } from '../compositor/sample.js';
+import { CONVERGENCE_THRESHOLD, FIXED_DT_S, MAX_FRAMES } from '../internal/constants.js';
+import { finiteOrZero } from '../internal/finite.js';
+import {
+  readSpringFromBasisUnchecked,
+  sampleSpringFromBasisUnchecked,
+} from '../internal/read-spring.js';
+import type { RequestFrameFn } from '../motion-value.js';
+import type { SpringParams } from '../spring.js';
+import { buildTransform } from '../value/transform.js';
+import {
+  RANGE_EPSILON,
+  channelAt,
+  cssAt,
+  type AnimatableElement,
+  type BoundGroup,
+  type ChannelSnapshot,
+  type CssChannel,
+  type GroupKey,
+  type GroupOwner,
+  type GroupRecord,
+} from './channels.js';
+import { SurfaceBatch, type SurfaceUnit } from './surface-batch.js';
+
+export type MotionMode =
+  | { readonly _type: 'spring'; readonly _spring: SpringParams }
+  | { readonly _type: 'tween'; readonly _durationMs: number; readonly _ease: (t: number) => number };
+
+export type { RequestFrameFn };
+
+export interface MainUnitOptions {
+  readonly _el: AnimatableElement;
+  readonly _group: GroupKey;
+  readonly _record: GroupRecord;
+  readonly _bound: BoundGroup;
+  readonly _mode: MotionMode;
+  readonly _delayMs: number;
+  readonly _batch: SurfaceBatch;
+  readonly _onDone: (natural: boolean) => void;
+  readonly _onRollback?: (() => void) | undefined;
+  readonly _startPaused?: boolean | undefined;
+}
+
+const FIXED_DT_MS = FIXED_DT_S * 1000;
+const EASE_DERIV_H = 1e-3;
+
+/** Unit хранит семантику группы; scheduler и spring-basis принадлежат aggregate. */
+export class MainUnit implements GroupOwner, SurfaceUnit {
+  _batchSlot = -1;
+  private _o: MainUnitOptions | undefined;
+  private _done = false;
+  private _paused: boolean;
+  private _active = false;
+  private _converged = false;
+  /** Локальная фаза, не требующая вычитания больших абсолютных timestamps. */
+  private _phaseMs: number;
+  private _lastTs: number | undefined;
+  private _frames = 0;
+  private _tweenK = 0;
+  private _renderedTweenK = 0;
+  private _tweenDpdt = NaN;
+  /**
+   * Host-write в полёте (#196): применяемые значения — уже опубликованное
+   * поколение поверхности для реентрантного capture/writeBack, хотя
+   * rendered-снапшот фиксируется только после успешного возврата setter-а.
+   */
+  private _writing = false;
+
+  constructor(options: MainUnitOptions) {
+    this._o = options;
+    this._paused = options._startPaused === true;
+    this._phaseMs = -options._delayMs;
+    try {
+      options._batch._add(this, this._paused);
+    } catch (error) {
+      this._done = true;
+      this._o = undefined;
+      throw error;
+    }
+  }
+
+  _captureNum(key: string): ChannelSnapshot | undefined {
+    if (this._done) return undefined;
+    const o = this._o!;
+    const channel = o._bound._numeric.find((item) => item._key === key);
+    if (channel !== undefined) {
+      // Во время host-write снимок обязан отдать применяемое поколение (#196):
+      // hostile setter уже сделал значение видимым до возврата.
+      const writing = this._writing;
+      let velocity = this._active ? (writing ? channel._velocity : channel._renderedVelocity) : 0;
+      if (this._active && o._mode._type === 'tween') {
+        const sampled = (channel._to - channel._from) *
+          this._tweenDerivative(this._liveTweenK());
+        velocity = finiteOrZero(sampled);
+      }
+      return { _value: writing ? channel._value : channel._renderedValue, _velocity: velocity };
+    }
+    const frozen = o._bound._residuals.get(key);
+    return frozen === undefined ? undefined : { _value: frozen, _velocity: 0 };
+  }
+
+  _captureCss(key: string): CssChannel | undefined {
+    if (this._done) return undefined;
+    const channel = this._o!._bound._css;
+    if (channel === undefined || channel._key !== key) return undefined;
+    const writing = this._writing;
+    const dpdt = !this._active
+      ? 0
+      : this._o!._mode._type === 'tween'
+        ? this._tweenDerivative(this._liveTweenK())
+        : writing ? channel._dpdt : channel._renderedDpdt;
+    return { ...channel, _dpdt: dpdt, _css: writing ? channel._css : channel._renderedCss };
+  }
+
+  /** k текущего поколения: во время host-write — применяемый, иначе rendered. */
+  private _liveTweenK(): number {
+    return this._writing ? this._tweenK : this._renderedTweenK;
+  }
+
+  _numericKeys(): readonly string[] {
+    if (this._done) return [];
+    const bound = this._o!._bound;
+    return [...bound._numeric.map((channel) => channel._key), ...bound._residuals.keys()];
+  }
+
+  _supersede(replacement?: () => void): void {
+    if (this._done) return;
+    replacement?.();
+    this._writeBack();
+    this._finish(false);
+  }
+
+  _rollback(): void {
+    this._finish(false);
+  }
+
+  play(): void {
+    if (this._done || !this._paused || this._o!._record._transition) return;
+    this._lastTs = undefined;
+    this._paused = false;
+    try {
+      this._o!._batch._activate(this);
+    } catch (error) {
+      this._paused = true;
+      throw error;
+    }
+  }
+
+  pause(): void {
+    if (this._done || this._paused || this._o!._record._transition) return;
+    this._paused = true;
+    this._o!._batch._deactivate(this);
+  }
+
+  seek(tMs: number): void {
+    if (this._done || this._o!._record._transition || !Number.isFinite(tMs)) return;
+    const localMs = Math.max(0, tMs);
+    this._active = true;
+    // Seek задаёт локальную фазу без восстановления абсолютного timestamp.
+    this._phaseMs = localMs;
+    this._lastTs = undefined;
+    if (this._compute()) this._settle();
+    else this._write();
+  }
+
+  cancel(): void {
+    if (this._done || this._o!._record._transition) return;
+    this._batchAbort();
+  }
+
+  _updateStep(ts: number | undefined): void {
+    if (this._done || this._paused || this._o!._record._transition) return;
+    let dt: number;
+    if (ts === undefined || !Number.isFinite(ts)) {
+      dt = FIXED_DT_MS;
+      this._lastTs = undefined;
+    } else {
+      dt = this._lastTs === undefined ? 0 : ts - this._lastTs;
+      this._lastTs = ts;
+      if (!Number.isFinite(dt)) {
+        dt = FIXED_DT_MS;
+        this._lastTs = undefined;
+      }
+    }
+    if (dt < 0) dt = 0;
+    // Фаза накапливает dt напрямую, без вычитания двух почти равных MAX-чисел
+    // после seek. Пересечение delay сохраняет весь frame-overshoot.
+    this._phaseMs += dt;
+    if (this._phaseMs >= 0) this._active = true;
+    if (this._active) {
+      this._frames++;
+      if (
+        this._compute() ||
+        (this._frames >= MAX_FRAMES && this._phaseMs <= 0)
+      ) this._converged = true;
+    }
+  }
+
+  _renderStep(): void {
+    if (this._done || this._paused || this._o!._record._transition) return;
+    if (this._converged) this._settle();
+    else if (this._active) this._write();
+  }
+
+  _batchAbort(): void {
+    if (this._done) return;
+    this._writeBack();
+    this._finish(false);
+  }
+
+  _batchRollback(): void {
+    if (this._done) return;
+    this._paused = true;
+    this._o!._onRollback?.();
+  }
+
+  private _compute(): boolean {
+    const o = this._o!;
+    const bound = o._bound;
+    if (o._mode._type === 'tween') {
+      if (this._phaseMs >= o._mode._durationMs) return true;
+      const k = this._phaseMs / o._mode._durationMs;
+      const eased = o._mode._ease(k);
+      const progress = Number.isFinite(eased) ? eased : k;
+      this._tweenK = k;
+      this._tweenDpdt = NaN;
+      for (const channel of bound._numeric) {
+        channel._value = channelAt(channel, progress);
+      }
+      if (bound._css !== undefined) bound._css._css = cssAt(bound._css, progress);
+      return false;
+    }
+
+    const basis = o._batch._springBasis(o._mode._spring, this._phaseMs / 1000);
+    let converged = true;
+    for (const channel of bound._numeric) {
+      const range = channel._solverTo - channel._from;
+      if (!Number.isFinite(range)) {
+        // Нормализованный базис остаётся конечным даже когда физический span
+        // переполняется; взвешенная позиция сохраняет представимый MAX ↔ -MAX.
+        const { value, velocity } = sampleSpringFromBasisUnchecked(basis, channel._v0);
+        channel._value = channelAt(channel, value);
+        channel._velocity = scaleSerializedVelocity(
+          velocity,
+          channel._from,
+          channel._solverTo,
+        );
+        converged = converged &&
+          Math.abs(value - 1) < CONVERGENCE_THRESHOLD &&
+          Math.abs(velocity) < CONVERGENCE_THRESHOLD;
+        continue;
+      }
+      const { value, velocity } = readSpringFromBasisUnchecked(
+        basis,
+        channel._from,
+        channel._solverTo,
+        channel._v0,
+      );
+      channel._value = value;
+      channel._velocity = velocity;
+      const scale = Math.max(Math.abs(range), RANGE_EPSILON);
+      converged = converged &&
+        Math.abs(value - channel._solverTo) / scale < CONVERGENCE_THRESHOLD &&
+        Math.abs(velocity) / scale < CONVERGENCE_THRESHOLD;
+    }
+    const css = bound._css;
+    if (css !== undefined) {
+      const { value, velocity } = sampleSpringFromBasisUnchecked(basis, css._v0);
+      css._dpdt = velocity;
+      css._css = cssAt(css, value);
+      converged = converged &&
+        Math.abs(value - 1) < CONVERGENCE_THRESHOLD &&
+        Math.abs(velocity) < CONVERGENCE_THRESHOLD;
+    }
+    return converged;
+  }
+
+  private _tweenDerivative(k = this._tweenK): number {
+    if (k === this._tweenK && !Number.isNaN(this._tweenDpdt)) return this._tweenDpdt;
+    const mode = this._o!._mode;
+    if (mode._type !== 'tween') return 0;
+    const k0 = k > EASE_DERIV_H ? k - EASE_DERIV_H : 0;
+    const k1 = k + EASE_DERIV_H < 1 ? k + EASE_DERIV_H : 1;
+    const raw = ((mode._ease(k1) - mode._ease(k0)) * 1000) /
+      ((k1 - k0) * mode._durationMs);
+    const value = finiteOrZero(raw);
+    if (k === this._tweenK) this._tweenDpdt = value;
+    return value;
+  }
+
+  private _write(): void {
+    const o = this._o!;
+    const bound = o._bound;
+    // Host-write и снапшот — одно поколение поверхности (#196): реентрантный
+    // successor внутри setter-а видит применяемые значения через _writing,
+    // а бросок хоста откатывает поколение (rendered остаётся последним
+    // успешным) без stale repair-записи после потери lease.
+    this._writing = true;
+    try {
+      if (o._group === 'transform') {
+        const state = bound._transform!;
+        for (const channel of bound._numeric) state[channel._key] = channel._value;
+        o._el.style.setProperty('transform', buildTransform(state));
+      } else if (bound._css !== undefined) {
+        o._el.style.setProperty(o._group, String(bound._css._css));
+      } else o._el.style.setProperty(o._group, String(bound._numeric[0]!._value));
+    } finally {
+      this._writing = false;
+    }
+    for (const channel of bound._numeric) {
+      channel._renderedValue = channel._value;
+      channel._renderedVelocity = channel._velocity;
+    }
+    if (bound._css !== undefined) {
+      bound._css._renderedCss = bound._css._css;
+      bound._css._renderedDpdt = bound._css._dpdt;
+    }
+    this._renderedTweenK = this._tweenK;
+  }
+
+  private _settle(): void {
+    if (this._done) return;
+    const bound = this._o!._bound;
+    for (const channel of bound._numeric) {
+      channel._value = channel._to;
+      channel._velocity = 0;
+    }
+    if (bound._css !== undefined) {
+      bound._css._css = cssAt(bound._css, 1);
+      // Поколение покоя целиком: финальный css без live-производной (#196) —
+      // симметрия с занулением _velocity числовых каналов выше.
+      bound._css._dpdt = 0;
+    }
+    // Терминальная ветвь _compute выходит до обновления _tweenK: реентрантный
+    // capture на settle-записи считал бы производную ПРОШЛОГО поколения при
+    // финальном значении. Ноль в кэше производной (ключ — текущий _tweenK,
+    // который capture и запросит) публикует скорость покоя без второй записи.
+    this._tweenDpdt = 0;
+    this._write();
+    // Реентрантный successor внутри settle-записи уже потребил финальное
+    // поколение и терминализировал unit: старый owner молча уступает (#196).
+    if (this._done) return;
+    this._writeBack();
+    this._finish(true);
+  }
+
+  private _writeBack(): void {
+    const o = this._o!;
+    const record = o._record;
+    const bound = o._bound;
+    // Supersede во время host-write фиксирует применяемое поколение (#196),
+    // а не rendered-снапшот прошлого кадра.
+    const writing = this._writing;
+    for (const channel of bound._numeric) {
+      record._numeric.set(channel._key, {
+        _value: writing ? channel._value : channel._renderedValue,
+        _velocity: 0,
+      });
+    }
+    // css без writing-ветки: у css-группы один канал, поэтому successor
+    // (live-capture либо его собственный writeBack) всегда перекрывает эту
+    // запись до любого чтения rec._cssValue — ветка была бы ненаблюдаемой
+    // (эквивалентный мутант) и не оправдывает байтов под size-гейтом.
+    if (bound._css !== undefined) record._cssValue = bound._css._renderedCss;
+  }
+
+  private _finish(natural: boolean): void {
+    if (this._done) return;
+    this._done = true;
+    const o = this._o!;
+    o._batch._remove(this, this._paused);
+    if (o._record._owner === this) o._record._owner = undefined;
+    const done = o._onDone;
+    this._o = undefined;
+    done(natural);
+  }
+}

@@ -1,0 +1,136 @@
+{
+  "actualRegisteredTimingSamples": 0,
+  "primarySha256": "eff07df7c8a163edaa489ce84199f937dae65b37329ea7f59e546e6ec4c3b2d1",
+  "sources": [
+    {
+      "name": "bench/compare/bench.mjs",
+      "sha256": "f4aa1628b6320a08c5444277fe6a6a26c9e3f9f42db845db5821b5bf4334b467",
+      "exactFrozenSourceMatched": true
+    },
+    {
+      "name": "bench/compare/methodology.mjs",
+      "sha256": "e090f47784312a3fc936326157747f346718e2245c275eed62b41cf0de0b1702",
+      "exactFrozenSourceMatched": true
+    },
+    {
+      "name": "bench/profile/server-profile-contract.mjs",
+      "sha256": "0fb91bc3a109b46ac5bd3c63fc63f251ecc33ab89d81b90173f5c927f844afcd",
+      "exactFrozenSourceMatched": true
+    },
+    {
+      "name": "bench/profile/server-profile-runner.mjs",
+      "sha256": "749d9708f83a5922983effd077a69f1930d2429cf60c895760f4130177edc87b",
+      "exactFrozenSourceMatched": true
+    },
+    {
+      "name": "bench/profile/server-profile-registration.mjs",
+      "sha256": "211b4c0e107b56d06eb57e0b49f21bc3b1d06a06f34ffec1c06d4ecd15485396",
+      "exactFrozenSourceMatched": true
+    }
+  ],
+  "bundleSha256": "b47d627de92ed410fdeaaffa6467b772a993002b60797763bae8defc63e48553",
+  "artifactTarSha256": "46c9067832760159d35ccd2166b28e6486a57602b1e96d6d23e1c4c06804a402",
+  "packageTree": {
+    "sha256": "409d59affc4f385be7a4d4b49b415b7f61c85f90115cd800c4271481b824a1c3",
+    "files": 312
+  },
+  "rows": [
+    {
+      "scene": {
+        "id": "s2",
+        "targetsPerCall": 100,
+        "staggerGapMs": 0
+      },
+      "actualRegisteredTimingSamples": 0,
+      "primaryDiagnostic": true,
+      "ownBrowserExecution": false,
+      "producerReplayed": true,
+      "consumerAccepted": true,
+      "phase": {
+        "low": 5.408826598419353,
+        "high": 5.871200065863135
+      },
+      "pairs": [
+        {
+          "a": 0,
+          "b": 1,
+          "deltaMs": 33.32500000000002,
+          "interiorTargets": 100,
+          "maxAbsoluteSlopeResidualPx": 0.00036875000003533387,
+          "clockDisplacementErrorPx": 0.08437531432136898
+        },
+        {
+          "a": 0,
+          "b": 2,
+          "deltaMs": 49.995000000000005,
+          "interiorTargets": 100,
+          "maxAbsoluteSlopeResidualPx": 0.0003187499999910415,
+          "clockDisplacementErrorPx": 0.08437531432136898
+        },
+        {
+          "a": 1,
+          "b": 2,
+          "deltaMs": 16.669999999999987,
+          "interiorTargets": 100,
+          "maxAbsoluteSlopeResidualPx": 0.0006875000000263753,
+          "clockDisplacementErrorPx": 0.08437531432136898
+        }
+      ],
+      "firstFrame": {
+        "timestamp": 5.639999998807909,
+        "zeros": true
+      },
+      "remainingElements": 0,
+      "activeNative": 0
+    },
+    {
+      "scene": {
+        "id": "s3",
+        "targetsPerCall": 200,
+        "staggerGapMs": 5
+      },
+      "actualRegisteredTimingSamples": 0,
+      "primaryDiagnostic": true,
+      "ownBrowserExecution": false,
+      "producerReplayed": true,
+      "consumerAccepted": true,
+      "phase": {
+        "low": 10.45387993801117,
+        "high": 10.916120072121622
+      },
+      "pairs": [
+        {
+          "a": 0,
+          "b": 1,
+          "deltaMs": 49.99499999999999,
+          "interiorTargets": 4,
+          "maxAbsoluteSlopeResidualPx": 0.00041875000002278284,
+          "clockDisplacementErrorPx": 0.08437531432136898
+        },
+        {
+          "a": 0,
+          "b": 2,
+          "deltaMs": 83.33,
+          "interiorTargets": 4,
+          "maxAbsoluteSlopeResidualPx": 0.0005124999999850388,
+          "clockDisplacementErrorPx": 0.08437531432136898
+        },
+        {
+          "a": 1,
+          "b": 2,
+          "deltaMs": 33.33500000000001,
+          "interiorTargets": 14,
+          "maxAbsoluteSlopeResidualPx": 0.0005062500000008185,
+          "clockDisplacementErrorPx": 0.08437531432136898
+        }
+      ],
+      "firstFrame": {
+        "timestamp": 10.6850000050664,
+        "zeros": true
+      },
+      "remainingElements": 0,
+      "activeNative": 0
+    }
+  ],
+  "limits": "Real supplied normal-motion observations replayed; timing/calibration/power/physical hardware claims absent. Synthetic API-cost fields used only as consumer shell."
+}

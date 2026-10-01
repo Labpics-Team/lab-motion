@@ -1,0 +1,21 @@
+{
+  "schema": 1,
+  "axis": "second-order SERVER METHOD storage/lifecycle boundary",
+  "command": [
+    "/opt/codex/runtimes/codex-primary-runtime/dependencies/node/bin/node",
+    "/workspace/scratch/server-method-second-order-final-20261001/closure-144242Z/storage-probe.mjs"
+  ],
+  "actualRegisteredPerformanceSamples": 0,
+  "syntheticOnly": true,
+  "status": "PASS",
+  "fault": "in-process injected ENOSPC on eighth write only",
+  "propagatedCode": "ENOSPC",
+  "descriptorCloseCalls": 1,
+  "file": "/tmp/server-method-second-order-144242Z/injected-storage-partial.json",
+  "partialBytes": 31,
+  "partialSha256": "312b3c074c3597cd390589a2a6dc5c2280482942bd3d7b9f94b4da0ae0fa238a",
+  "partialContent": "{\"acquiredPrefix\":[\"one\",\"two\"]",
+  "partialParserRefused": true,
+  "existingPartialOverwriteRefused": true,
+  "limits": "not an actual ENOSPC/SIGKILL/OOM/durable storage or whole-series recovery experiment"
+}

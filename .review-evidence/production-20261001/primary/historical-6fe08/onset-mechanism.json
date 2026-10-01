@@ -1,0 +1,86 @@
+{
+  "actualTimingSamples": 0,
+  "independentArithmetic": "Python nextafter common phase enclosure from raw CSS/clock values; no old/new validator imported",
+  "mechanisms": [
+    {
+      "case": "initial-jump75px-shortened-motion",
+      "initialTargets": 100,
+      "beforeLeadingPx": 0,
+      "afterLeadingPx": 75,
+      "startTimestampMs": 100.00200000000001,
+      "actualStartCallRelativeMs": 0,
+      "commonCompatiblePhaseMs": [
+        -32.22433333403184,
+        -31.774666665968166
+      ],
+      "speedPxPerMs": 2.34375,
+      "skippedProgress": 0.25,
+      "skippedDurationMs": 32,
+      "remainingLeadingMotionPx": 225,
+      "remainingLeadingDurationMs": 96,
+      "producerValid": true,
+      "consumerAccepted": true,
+      "previous16f31OracleAccepted": false,
+      "laterCheckpoints": [
+        {
+          "frameMs": 48.003000000000014,
+          "readStartedMs": 48,
+          "readEndedMs": 48.004999999999995,
+          "leadingPx": 187.50468750000002
+        },
+        {
+          "frameMs": 80.00100000000003,
+          "readStartedMs": 80,
+          "readEndedMs": 80,
+          "leadingPx": 262.50000000000006
+        },
+        {
+          "frameMs": 96.00400000000005,
+          "readStartedMs": 96.005,
+          "readEndedMs": 96.005,
+          "leadingPx": 300
+        }
+      ]
+    },
+    {
+      "case": "S3-initial-progress-quarter",
+      "initialTargets": 200,
+      "beforeLeadingPx": 0,
+      "afterLeadingPx": 75,
+      "startTimestampMs": 100.00200000000001,
+      "actualStartCallRelativeMs": 0,
+      "commonCompatiblePhaseMs": [
+        -32.22433333403183,
+        -31.774666665968198
+      ],
+      "speedPxPerMs": 2.34375,
+      "skippedProgress": 0.25,
+      "skippedDurationMs": 32,
+      "remainingLeadingMotionPx": 225,
+      "remainingLeadingDurationMs": 96,
+      "producerValid": true,
+      "consumerAccepted": true,
+      "previous16f31OracleAccepted": false,
+      "laterCheckpoints": [
+        {
+          "frameMs": 41.60300000000001,
+          "readStartedMs": 41.599999999999994,
+          "readEndedMs": 41.60499999999999,
+          "leadingPx": 172.50468750000002
+        },
+        {
+          "frameMs": 80.00100000000003,
+          "readStartedMs": 80,
+          "readEndedMs": 80,
+          "leadingPx": 262.50000000000006
+        },
+        {
+          "frameMs": 118.40400000000005,
+          "readStartedMs": 118.405,
+          "readEndedMs": 118.405,
+          "leadingPx": 300
+        }
+      ]
+    }
+  ]
+}

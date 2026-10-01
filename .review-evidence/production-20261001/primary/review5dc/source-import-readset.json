@@ -1,0 +1,38 @@
+[
+  {
+    "path": "/workspace/scratch/server-method-measurement-closure-5dc049-20261001/snapshot/source/scripts/bench-transform-support.mjs",
+    "sha256": "ddbcf5b758133624b3f285947457a8831872847c0e1913ee9afe163f751307c6",
+    "bytes": 30270,
+    "readKind": "executed ESM import closure / static inspected primary"
+  },
+  {
+    "path": "/workspace/scratch/server-method-measurement-closure-5dc049-20261001/snapshot/source/scripts/bench-support.mjs",
+    "sha256": "1764ccb1c2d2ca5ebe1b638f5e49526fe56a9f0c8ee05cd488142d840d1301fd",
+    "bytes": 16429,
+    "readKind": "executed ESM import closure / static inspected primary"
+  },
+  {
+    "path": "/workspace/scratch/server-method-measurement-closure-5dc049-20261001/snapshot/source/bench/profile/server-profile-registration.mjs",
+    "sha256": "211b4c0e107b56d06eb57e0b49f21bc3b1d06a06f34ffec1c06d4ecd15485396",
+    "bytes": 14622,
+    "readKind": "executed ESM import closure / static inspected primary"
+  },
+  {
+    "path": "/workspace/scratch/server-method-measurement-closure-5dc049-20261001/snapshot/source/bench/compare/provenance.mjs",
+    "sha256": "51881a4a6ea2e1ad0330888e7e1b9c8b6e7c7aef3a3eb798a4185c7c3b846623",
+    "bytes": 24949,
+    "readKind": "executed ESM import closure / static inspected primary"
+  },
+  {
+    "path": "/workspace/scratch/server-method-measurement-closure-5dc049-20261001/snapshot/source/bench/profile/server-profile-contract.mjs",
+    "sha256": "0fb91bc3a109b46ac5bd3c63fc63f251ecc33ab89d81b90173f5c927f844afcd",
+    "bytes": 62912,
+    "readKind": "executed ESM import closure / static inspected primary"
+  },
+  {
+    "path": "/workspace/scratch/server-method-measurement-closure-5dc049-20261001/snapshot/source/bench/compare/methodology.mjs",
+    "sha256": "e090f47784312a3fc936326157747f346718e2245c275eed62b41cf0de0b1702",
+    "bytes": 53464,
+    "readKind": "executed ESM import closure / static inspected primary"
+  }
+]

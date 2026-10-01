@@ -1,0 +1,37 @@
+[
+  {
+    "primaryPath": "/workspace/scratch/motion-server-method-final-20261001T144242Z/evidence/frame-first-publication-closure/real-healthy-first-publication/semantic-only.mjs",
+    "manifestPath": "evidence/frame-first-publication-closure/real-healthy-first-publication/semantic-only.mjs",
+    "sha256": "6aa81a008e78b27a13979e58f1bcd3bdb769b45d411c3d9096ca3d04a3966650",
+    "bytes": 7847,
+    "retainedPath": "/workspace/scratch/server-method-measurement-closure-5dc049-20261001/real-primary/semantic-only.mjs"
+  },
+  {
+    "primaryPath": "/workspace/scratch/motion-server-method-final-20261001T144242Z/evidence/frame-first-publication-closure/real-healthy-first-publication/semantic-only-result.json",
+    "manifestPath": "evidence/frame-first-publication-closure/real-healthy-first-publication/semantic-only-result.json",
+    "sha256": "eff07df7c8a163edaa489ce84199f937dae65b37329ea7f59e546e6ec4c3b2d1",
+    "bytes": 416962,
+    "retainedPath": "/workspace/scratch/server-method-measurement-closure-5dc049-20261001/real-primary/semantic-only-result.json"
+  },
+  {
+    "primaryPath": "/workspace/scratch/motion-server-method-final-20261001T144242Z/evidence/frame-first-publication-closure/real-healthy-first-publication/semantic-only.log",
+    "manifestPath": "evidence/frame-first-publication-closure/real-healthy-first-publication/semantic-only.log",
+    "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "bytes": 0,
+    "retainedPath": "/workspace/scratch/server-method-measurement-closure-5dc049-20261001/real-primary/semantic-only.log"
+  },
+  {
+    "primaryPath": "/workspace/scratch/motion-server-method-final-20261001T144242Z/evidence/frame-first-publication-closure/real-healthy-first-publication/candidate.iife.js",
+    "manifestPath": "evidence/frame-first-publication-closure/real-healthy-first-publication/candidate.iife.js",
+    "sha256": "b47d627de92ed410fdeaaffa6467b772a993002b60797763bae8defc63e48553",
+    "bytes": 39801,
+    "retainedPath": "/workspace/scratch/server-method-measurement-closure-5dc049-20261001/real-primary/candidate.iife.js"
+  },
+  {
+    "primaryPath": "/workspace/scratch/motion-server-method-final-20261001T144242Z/evidence/frame-first-publication-closure/real-healthy-first-publication/consumer/package/package.json",
+    "manifestPath": "evidence/frame-first-publication-closure/real-healthy-first-publication/consumer/package/package.json",
+    "sha256": "4ce460a412ed40152bb2bf1e796a284614571a6b6d6a313bce3037885011c709",
+    "bytes": 16085,
+    "retainedPath": "/workspace/scratch/server-method-measurement-closure-5dc049-20261001/real-primary/consumer/package/package.json"
+  }
+]

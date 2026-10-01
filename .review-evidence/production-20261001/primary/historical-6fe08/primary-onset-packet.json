@@ -1,0 +1,251 @@
+{
+  "axis": "measurement correctness",
+  "scope": "own current6fe08 PRIMARY-only fresh onset evidence; no REPORT or author/foreign review reasoning",
+  "immutableArtifact": {
+    "path": "/workspace/scratch/motion-server-method-final-20261001T105048Z/method.tar.gz",
+    "sha256": "6fe08fb7fcec77cbdbfe883dc9f014c8e743369500dd2f45ce40366e3b1fce1c",
+    "bytes": 286892869,
+    "manifestSha256": "b309c59bef24750abbc1d075d63fff15d5e05c92956f28db20c0abbced716f2f",
+    "ownerPatchSha256": "965e78ed8f845108421d80451f76fec0555fcc6a93d93de963f844274175889c"
+  },
+  "protocolDigest": "f2ad05507ef5436accf5541dcdcbb01afa6ce5f6fdbe5e724166f53a7466afaf",
+  "actualTimingSamples": 0,
+  "sourceBasisContext": "5e2ff31a54cd3802a6bd2829a3a962ad014088ac dirty frozen source; not final clean package",
+  "facts": [
+    {
+      "case": "initial-jump75px-shortened-motion",
+      "initialTargets": 100,
+      "beforeLeadingPx": 0,
+      "afterLeadingPx": 75,
+      "startTimestampMs": 100.00200000000001,
+      "actualStartCallRelativeMs": 0,
+      "commonCompatiblePhaseMs": [
+        -32.22433333403184,
+        -31.774666665968166
+      ],
+      "speedPxPerMs": 2.34375,
+      "skippedProgress": 0.25,
+      "skippedDurationMs": 32,
+      "remainingLeadingMotionPx": 225,
+      "remainingLeadingDurationMs": 96,
+      "producerValid": true,
+      "consumerAccepted": true,
+      "previous16f31OracleAccepted": false,
+      "laterCheckpoints": [
+        {
+          "frameMs": 48.003000000000014,
+          "readStartedMs": 48,
+          "readEndedMs": 48.004999999999995,
+          "leadingPx": 187.50468750000002
+        },
+        {
+          "frameMs": 80.00100000000003,
+          "readStartedMs": 80,
+          "readEndedMs": 80,
+          "leadingPx": 262.50000000000006
+        },
+        {
+          "frameMs": 96.00400000000005,
+          "readStartedMs": 96.005,
+          "readEndedMs": 96.005,
+          "leadingPx": 300
+        }
+      ]
+    },
+    {
+      "case": "S3-initial-progress-quarter",
+      "initialTargets": 200,
+      "beforeLeadingPx": 0,
+      "afterLeadingPx": 75,
+      "startTimestampMs": 100.00200000000001,
+      "actualStartCallRelativeMs": 0,
+      "commonCompatiblePhaseMs": [
+        -32.22433333403183,
+        -31.774666665968198
+      ],
+      "speedPxPerMs": 2.34375,
+      "skippedProgress": 0.25,
+      "skippedDurationMs": 32,
+      "remainingLeadingMotionPx": 225,
+      "remainingLeadingDurationMs": 96,
+      "producerValid": true,
+      "consumerAccepted": true,
+      "previous16f31OracleAccepted": false,
+      "laterCheckpoints": [
+        {
+          "frameMs": 41.60300000000001,
+          "readStartedMs": 41.599999999999994,
+          "readEndedMs": 41.60499999999999,
+          "leadingPx": 172.50468750000002
+        },
+        {
+          "frameMs": 80.00100000000003,
+          "readStartedMs": 80,
+          "readEndedMs": 80,
+          "leadingPx": 262.50000000000006
+        },
+        {
+          "frameMs": 118.40400000000005,
+          "readStartedMs": 118.405,
+          "readEndedMs": 118.405,
+          "leadingPx": 300
+        }
+      ]
+    }
+  ],
+  "reproduction": {
+    "cwd": "/workspace/scratch/server-method-measurement-closure-6fe08-20261001",
+    "prepare": "python3 prepare-local.py",
+    "probe": "node semantic-closure.mjs",
+    "immutableReuse": "copy primary inputs to a fresh owned writable directory; keep verified snapshot source unchanged"
+  },
+  "files": [
+    {
+      "relative": "semantic-closure.mjs",
+      "sha256": "e2330e6d6f90324f6c35f664398e4ef8e1ad15cac3bfb7d7d510487371eb956c",
+      "bytes": 5584
+    },
+    {
+      "relative": "semantic-closure-result.json",
+      "sha256": "ee8ccb2e2ec4502e643cd5aafdb99e7584b3cb5104993803208847eac8135717",
+      "bytes": 1674520
+    },
+    {
+      "relative": "semantic-closure-initial-result.json",
+      "sha256": "ee8ccb2e2ec4502e643cd5aafdb99e7584b3cb5104993803208847eac8135717",
+      "bytes": 1674520
+    },
+    {
+      "relative": "onset-mechanism.json",
+      "sha256": "636e1f958b21446c11751e27d94721c0530fbf3802e25c6f0825b97b5f4871f0",
+      "bytes": 2479
+    },
+    {
+      "relative": "semantic-replay.mjs",
+      "sha256": "1ef54baf82b64f209c76fe8c6b60ab808311103b3d64670783e387792790154b",
+      "bytes": 5101
+    },
+    {
+      "relative": "prepare-local.py",
+      "sha256": "3ed78974e21acb3197f67fc2104ab5f1e88a3b04847a831b1c234d94001cebd6",
+      "bytes": 1294
+    },
+    {
+      "relative": "prepare-local-receipt.json",
+      "sha256": "821011fc590f6db252af37bd24235f025a396f9f3bd36c68ce0c5e89e294f8ae",
+      "bytes": 982
+    },
+    {
+      "relative": "fixture-local.mjs",
+      "sha256": "e1547d050bc1859527643109197efc130899b8e1d9bebd48ef53ff5f28ccea6e",
+      "bytes": 17060
+    },
+    {
+      "relative": "snapshot/evidence/window-closure/window-synthetic-fixtures.mjs",
+      "sha256": "842e5f365e42e80123ad0a42d92f6379145ed6dabe698a7c2140cf4b165fd918",
+      "bytes": 20977
+    },
+    {
+      "relative": "snapshot/source/bench/compare/bench.mjs",
+      "sha256": "4581e2b8ad48d900cebb12b9a89602094571821ed62c60d829de3e7daf93a14b",
+      "bytes": 51764
+    },
+    {
+      "relative": "snapshot/source/bench/compare/methodology.mjs",
+      "sha256": "44b160de3b6d33986373d685018f6164d765965522e70d0c3b24a1e401553c25",
+      "bytes": 48934
+    },
+    {
+      "relative": "snapshot/source/bench/compare/provenance.mjs",
+      "sha256": "51881a4a6ea2e1ad0330888e7e1b9c8b6e7c7aef3a3eb798a4185c7c3b846623",
+      "bytes": 24949
+    },
+    {
+      "relative": "snapshot/source/bench/compare/entries/lab.entry.mjs",
+      "sha256": "f5570a7bbe8dc321ee3a3768a638abdc7e73ffe47ba2179ce9b4b85b3a336960",
+      "bytes": 826
+    },
+    {
+      "relative": "snapshot/source/bench/compare/entries/waapi-control.entry.mjs",
+      "sha256": "2c6e355273b58d03d450a7d70ac2ac8869df357cad663ecdc7be31eef8a98b50",
+      "bytes": 1276
+    },
+    {
+      "relative": "snapshot/source/bench/profile/server-profile-registration.mjs",
+      "sha256": "0d6872d178298b6330a87392f2db884fc15ef4c0b6d41d29309fd94f510e92dd",
+      "bytes": 11463
+    },
+    {
+      "relative": "snapshot/source/bench/profile/server-profile-contract.mjs",
+      "sha256": "5ad82b1674a854e0679dccd2af72f5d0e378c38c5b5cc8c02dcdc161beab81af",
+      "bytes": 57707
+    },
+    {
+      "relative": "snapshot/source/bench/profile/server-profile-runner.mjs",
+      "sha256": "d1745dd3a088e573f894533db9521fc22d3679107ab5a583c63d745047ae9b4a",
+      "bytes": 43677
+    },
+    {
+      "relative": "snapshot/source/scripts/bench-transform-support.mjs",
+      "sha256": "ddbcf5b758133624b3f285947457a8831872847c0e1913ee9afe163f751307c6",
+      "bytes": 30270
+    },
+    {
+      "relative": "snapshot/source/scripts/bench-support.mjs",
+      "sha256": "1764ccb1c2d2ca5ebe1b638f5e49526fe56a9f0c8ee05cd488142d840d1301fd",
+      "bytes": 16429
+    },
+    {
+      "relative": "snapshot/source/docs/server-profile.md",
+      "sha256": "d683a0383ac28ef8b7d0121dff356d939b4b085747cc9a0ed36d7651795fab28",
+      "bytes": 18776
+    }
+  ],
+  "executionReceipts": [
+    {
+      "label": "prepare-local",
+      "command": "python3 prepare-local.py",
+      "cwd": "/workspace/scratch/server-method-measurement-closure-6fe08-20261001",
+      "startedUtc": "2026-10-01T11:02:18.941489+00:00",
+      "finishedUtc": "2026-10-01T11:02:18.982511+00:00",
+      "exit_code": 0,
+      "stdout": "{\"synthetic\": true, \"actualTimingSamples\": 0, \"fixtureSource\": \"/workspace/scratch/server-method-measurement-closure-6fe08-20261001/snapshot/evidence/window-closure/window-synthetic-fixtures.mjs\", \"fixtureSha256\": \"842e5f365e42e80123ad0a42d92f6379145ed6dabe698a7c2140cf4b165fd918\", \"fixtureLocalSha256\": \"e1547d050bc1859527643109197efc130899b8e1d9bebd48ef53ff5f28ccea6e\", \"ownPriorProbeSources\": [{\"path\": \"/workspace/scratch/server-method-measurement-closure-16f31-20261001/semantic-replay.mjs\", \"sha256\": \"1ef54baf82b64f209c76fe8c6b60ab808311103b3d64670783e387792790154b\"}, {\"path\": \"/workspace/scratch/server-method-measurement-closure-16f31-20261001/semantic-window-probe.mjs\", \"sha256\": \"3113c583438b9326c8cc654eedb8f9054d4ab6578971d91db803d489e8855fbd\"}], \"mutation\": \"rebase imported fixture to verified current snapshot; unchanged own independent SUT and exact producer extraction; no source packet mutation\"}\n",
+      "stderr": ""
+    },
+    {
+      "label": "semantic-closure-bounded",
+      "command": "node semantic-closure.mjs",
+      "cwd": "/workspace/scratch/server-method-measurement-closure-6fe08-20261001",
+      "startedUtc": "2026-10-01T11:02:19.194488+00:00",
+      "finishedUtc": "2026-10-01T11:02:19.330880+00:00",
+      "exit_code": 0,
+      "stdout": "[{\"name\":\"healthy128-narrow\",\"producerValid\":true,\"accepted\":true,\"purportedAccepted\":true,\"error\":null,\"purportedError\":null,\"frames\":[{\"frameMs\":48.003000000000014,\"startMs\":48,\"endMs\":48.004999999999995,\"minPx\":112.50468750000002,\"maxPx\":112.50468750000002},{\"frameMs\":80.00100000000003,\"startMs\":80,\"endMs\":80,\"minPx\":187.50000000000006,\"maxPx\":187.50000000000006},{\"frameMs\":96.00400000000005,\"startMs\":96.005,\"endMs\":96.005,\"minPx\":225.0070312500001,\"maxPx\":225.0070312500001}]},{\"name\":\"duration64-narrow\",\"producerValid\":false,\"accepted\":false,\"purportedAccepted\":false,\"error\":\"server profile: нет normal-motion oracle\",\"purportedError\":\"server profile: normal-motion oracle отверг intermediate/stagger/topology\",\"frames\":[{\"frameMs\":48.003000000000014,\"startMs\":48,\"endMs\":48.004999999999995,\"minPx\":225.00937500000003,\"maxPx\":225.00937500000003},{\"frameMs\":80.00100000000003,\"startMs\":80,\"endMs\":80,\"minPx\":300,\"maxPx\":300},{\"frameMs\":96.00400000000005,\"startMs\":96.005,\"endMs\":96.005,\"minPx\":300,\"maxPx\":300}]},{\"name\":\"duration256-narrow\",\"producerValid\":false,\"accepted\":false,\"purportedAccepted\":false,\"error\":\"server profile: нет normal-motion oracle\",\"purportedError\":\"server profile: normal-motion oracle отверг intermediate/stagger/topology\",\"frames\":[{\"frameMs\":48.003000000000014,\"startMs\":48,\"endMs\":48.004999999999995,\"minPx\":56.25234375000001,\"maxPx\":56.25234375000001},{\"frameMs\":80.00100000000003,\"startMs\":80,\"endMs\":80,\"minPx\":93.75000000000003,\"maxPx\":93.75000000000003},{\"frameMs\":96.00400000000005,\"startMs\":96.005,\"endMs\":96.005,\"minPx\":112.50351562500005,\"maxPx\":112.50351562500005}]},{\"name\":\"last-target-quadratic\",\"producerValid\":false,\"accepted\":false,\"purportedAccepted\":false,\"error\":\"server profile: нет normal-motion oracle\",\"purportedError\":\"server profile: normal-motion oracle отверг intermediate/stagger/topology\",\"frames\":[{\"frameMs\":48.003000000000014,\"startMs\":48,\"endMs\":48.004999999999995,\"minPx\":42.191015698242204,\"maxPx\":112.50468750000002},{\"frameMs\":80.00100000000003,\"startMs\":80,\"endMs\":80,\"minPx\":117.18750000000009,\"maxPx\":187.50000000000006},{\"frameMs\":96.00400000000005,\"startMs\":96.005,\"endMs\":96.005,\"minPx\":168.76054703979506,\"maxPx\":225.0070312500001}]},{\"name\":\"MC03-healthy128-wide\",\"producerValid\":false,\"accepted\":false,\"purportedAccepted\":false,\"error\":\"server profile: нет normal-motion oracle\",\"purportedError\":\"server profile: normal-motion oracle отверг intermediate/stagger/topology\",\"frames\":[{\"frameMs\":88.00300000000001,\"startMs\":88,\"endMs\":120,\"minPx\":206.25468750000002,\"maxPx\":280.50468749999845},{\"frameMs\":136.00599999999935,\"startMs\":136.005,\"endMs\":168.005,\"minPx\":300,\"maxPx\":300},{\"frameMs\":184.00899999999865,\"startMs\":184.005,\"endMs\":216.01,\"minPx\":300,\"maxPx\":300}]},{\"name\":\"MC03-duration256-wide\",\"producerValid\":false,\"accepted\":false,\"purportedAccepted\":false,\"error\":\"server profile: нет normal-motion oracle\",\"purportedError\":\"server profile: normal-motion oracle отверг intermediate/stagger/topology\",\"frames\":[{\"frameMs\":88.00300000000001,\"startMs\":88,\"endMs\":120,\"minPx\":103.12734375000001,\"maxPx\":140.25234374999923},{\"frameMs\":136.00599999999935,\"startMs\":136.005,\"endMs\":168.005,\"minPx\":159.38085937499923,\"maxPx\":196.50585937499847},{\"frameMs\":184.00899999999865,\"startMs\":184.005,\"endMs\":216.01,\"minPx\":215.63437499999839,\"maxPx\":252.7593749999976}]},{\"name\":\"healthy128-later-resolving\",\"producerValid\":true,\"accepted\":true,\"purportedAccepted\":true,\"error\":null,\"purportedError\":null,\"frames\":[{\"frameMs\":88.00300000000001,\"startMs\":88,\"endMs\":88.10499999999999,\"minPx\":206.25468750000002,\"maxPx\":206.48671875000113},{\"frameMs\":104.1060000000005,\"startMs\":104.10500000000002,\"endMs\":104.20500000000001,\"minPx\":243.99609375000117,\"maxPx\":244.22812500000228},{\"frameMs\":120.209000000001,\"startMs\":120.21000000000001,\"endMs\":120.31,\"minPx\":281.73750000000234,\"maxPx\":281.96953125000346}]},{\"name\":\"initial-jump75px-shortened-motion\",\"producerValid\":true,\"accepted\":true,\"purportedAccepted\":true,\"error\":null,\"purportedError\":null,\"frames\":[{\"frameMs\":48.003000000000014,\"startMs\":48,\"endMs\":48.004999999999995,\"minPx\":187.50468750000002,\"maxPx\":187.50468750000002},{\"frameMs\":80.00100000000003,\"startMs\":80,\"endMs\":80,\"minPx\":262.50000000000006,\"maxPx\":262.50000000000006},{\"frameMs\":96.00400000000005,\"startMs\":96.005,\"endMs\":96.005,\"minPx\":300,\"maxPx\":300}]},{\"name\":\"S3-healthy128\",\"producerValid\":true,\"accepted\":true,\"purportedAccepted\":true,\"error\":null,\"purportedError\":null,\"frames\":[{\"frameMs\":41.60300000000001,\"startMs\":41.599999999999994,\"endMs\":41.60499999999999,\"minPx\":0,\"maxPx\":97.5046875},{\"frameMs\":80.00100000000003,\"startMs\":80,\"endMs\":80,\"minPx\":0,\"maxPx\":187.50000000000006},{\"frameMs\":118.40400000000005,\"startMs\":118.405,\"endMs\":118.405,\"minPx\":0,\"maxPx\":277.5070312500001}]},{\"name\":\"S3-duration64\",\"producerValid\":false,\"accepted\":false,\"purportedAccepted\":false,\"error\":\"server profile: нет normal-motion oracle\",\"purportedError\":\"server profile: normal-motion oracle отверг intermediate/stagger/topology\",\"frames\":[{\"frameMs\":41.60300000000001,\"startMs\":41.599999999999994,\"endMs\":41.60499999999999,\"minPx\":0,\"maxPx\":195.009375},{\"frameMs\":80.00100000000003,\"startMs\":80,\"endMs\":80,\"minPx\":0,\"maxPx\":300},{\"frameMs\":118.40400000000005,\"startMs\":118.405,\"endMs\":118.405,\"minPx\":0,\"maxPx\":300}]}]\n",
+      "stderr": ""
+    },
+    {
+      "label": "semantic-closure-complete-primary",
+      "command": "node semantic-closure.mjs",
+      "cwd": "/workspace/scratch/server-method-measurement-closure-6fe08-20261001",
+      "startedUtc": "2026-10-01T11:04:30.163684+00:00",
+      "finishedUtc": "2026-10-01T11:04:30.313945+00:00",
+      "exit_code": 0,
+      "stdout": "[{\"name\":\"healthy128-narrow\",\"producerValid\":true,\"accepted\":true,\"purportedAccepted\":true,\"error\":null,\"purportedError\":null,\"frames\":[{\"frameMs\":48.003000000000014,\"startMs\":48,\"endMs\":48.004999999999995,\"minPx\":112.50468750000002,\"maxPx\":112.50468750000002},{\"frameMs\":80.00100000000003,\"startMs\":80,\"endMs\":80,\"minPx\":187.50000000000006,\"maxPx\":187.50000000000006},{\"frameMs\":96.00400000000005,\"startMs\":96.005,\"endMs\":96.005,\"minPx\":225.0070312500001,\"maxPx\":225.0070312500001}]},{\"name\":\"duration64-narrow\",\"producerValid\":false,\"accepted\":false,\"purportedAccepted\":false,\"error\":\"server profile: нет normal-motion oracle\",\"purportedError\":\"server profile: normal-motion oracle отверг intermediate/stagger/topology\",\"frames\":[{\"frameMs\":48.003000000000014,\"startMs\":48,\"endMs\":48.004999999999995,\"minPx\":225.00937500000003,\"maxPx\":225.00937500000003},{\"frameMs\":80.00100000000003,\"startMs\":80,\"endMs\":80,\"minPx\":300,\"maxPx\":300},{\"frameMs\":96.00400000000005,\"startMs\":96.005,\"endMs\":96.005,\"minPx\":300,\"maxPx\":300}]},{\"name\":\"duration256-narrow\",\"producerValid\":false,\"accepted\":false,\"purportedAccepted\":false,\"error\":\"server profile: нет normal-motion oracle\",\"purportedError\":\"server profile: normal-motion oracle отверг intermediate/stagger/topology\",\"frames\":[{\"frameMs\":48.003000000000014,\"startMs\":48,\"endMs\":48.004999999999995,\"minPx\":56.25234375000001,\"maxPx\":56.25234375000001},{\"frameMs\":80.00100000000003,\"startMs\":80,\"endMs\":80,\"minPx\":93.75000000000003,\"maxPx\":93.75000000000003},{\"frameMs\":96.00400000000005,\"startMs\":96.005,\"endMs\":96.005,\"minPx\":112.50351562500005,\"maxPx\":112.50351562500005}]},{\"name\":\"last-target-quadratic\",\"producerValid\":false,\"accepted\":false,\"purportedAccepted\":false,\"error\":\"server profile: нет normal-motion oracle\",\"purportedError\":\"server profile: normal-motion oracle отверг intermediate/stagger/topology\",\"frames\":[{\"frameMs\":48.003000000000014,\"startMs\":48,\"endMs\":48.004999999999995,\"minPx\":42.191015698242204,\"maxPx\":112.50468750000002},{\"frameMs\":80.00100000000003,\"startMs\":80,\"endMs\":80,\"minPx\":117.18750000000009,\"maxPx\":187.50000000000006},{\"frameMs\":96.00400000000005,\"startMs\":96.005,\"endMs\":96.005,\"minPx\":168.76054703979506,\"maxPx\":225.0070312500001}]},{\"name\":\"MC03-healthy128-wide\",\"producerValid\":false,\"accepted\":false,\"purportedAccepted\":false,\"error\":\"server profile: нет normal-motion oracle\",\"purportedError\":\"server profile: normal-motion oracle отверг intermediate/stagger/topology\",\"frames\":[{\"frameMs\":88.00300000000001,\"startMs\":88,\"endMs\":120,\"minPx\":206.25468750000002,\"maxPx\":280.50468749999845},{\"frameMs\":136.00599999999935,\"startMs\":136.005,\"endMs\":168.005,\"minPx\":300,\"maxPx\":300},{\"frameMs\":184.00899999999865,\"startMs\":184.005,\"endMs\":216.01,\"minPx\":300,\"maxPx\":300}]},{\"name\":\"MC03-duration256-wide\",\"producerValid\":false,\"accepted\":false,\"purportedAccepted\":false,\"error\":\"server profile: нет normal-motion oracle\",\"purportedError\":\"server profile: normal-motion oracle отверг intermediate/stagger/topology\",\"frames\":[{\"frameMs\":88.00300000000001,\"startMs\":88,\"endMs\":120,\"minPx\":103.12734375000001,\"maxPx\":140.25234374999923},{\"frameMs\":136.00599999999935,\"startMs\":136.005,\"endMs\":168.005,\"minPx\":159.38085937499923,\"maxPx\":196.50585937499847},{\"frameMs\":184.00899999999865,\"startMs\":184.005,\"endMs\":216.01,\"minPx\":215.63437499999839,\"maxPx\":252.7593749999976}]},{\"name\":\"healthy128-later-resolving\",\"producerValid\":true,\"accepted\":true,\"purportedAccepted\":true,\"error\":null,\"purportedError\":null,\"frames\":[{\"frameMs\":88.00300000000001,\"startMs\":88,\"endMs\":88.10499999999999,\"minPx\":206.25468750000002,\"maxPx\":206.48671875000113},{\"frameMs\":104.1060000000005,\"startMs\":104.10500000000002,\"endMs\":104.20500000000001,\"minPx\":243.99609375000117,\"maxPx\":244.22812500000228},{\"frameMs\":120.209000000001,\"startMs\":120.21000000000001,\"endMs\":120.31,\"minPx\":281.73750000000234,\"maxPx\":281.96953125000346}]},{\"name\":\"initial-jump75px-shortened-motion\",\"producerValid\":true,\"accepted\":true,\"purportedAccepted\":true,\"error\":null,\"purportedError\":null,\"frames\":[{\"frameMs\":48.003000000000014,\"startMs\":48,\"endMs\":48.004999999999995,\"minPx\":187.50468750000002,\"maxPx\":187.50468750000002},{\"frameMs\":80.00100000000003,\"startMs\":80,\"endMs\":80,\"minPx\":262.50000000000006,\"maxPx\":262.50000000000006},{\"frameMs\":96.00400000000005,\"startMs\":96.005,\"endMs\":96.005,\"minPx\":300,\"maxPx\":300}]},{\"name\":\"S3-healthy128\",\"producerValid\":true,\"accepted\":true,\"purportedAccepted\":true,\"error\":null,\"purportedError\":null,\"frames\":[{\"frameMs\":41.60300000000001,\"startMs\":41.599999999999994,\"endMs\":41.60499999999999,\"minPx\":0,\"maxPx\":97.5046875},{\"frameMs\":80.00100000000003,\"startMs\":80,\"endMs\":80,\"minPx\":0,\"maxPx\":187.50000000000006},{\"frameMs\":118.40400000000005,\"startMs\":118.405,\"endMs\":118.405,\"minPx\":0,\"maxPx\":277.5070312500001}]},{\"name\":\"S3-duration64\",\"producerValid\":false,\"accepted\":false,\"purportedAccepted\":false,\"error\":\"server profile: нет normal-motion oracle\",\"purportedError\":\"server profile: normal-motion oracle отверг intermediate/stagger/topology\",\"frames\":[{\"frameMs\":41.60300000000001,\"startMs\":41.599999999999994,\"endMs\":41.60499999999999,\"minPx\":0,\"maxPx\":195.009375},{\"frameMs\":80.00100000000003,\"startMs\":80,\"endMs\":80,\"minPx\":0,\"maxPx\":300},{\"frameMs\":118.40400000000005,\"startMs\":118.405,\"endMs\":118.405,\"minPx\":0,\"maxPx\":300}]},{\"name\":\"S3-initial-progress-quarter\",\"producerValid\":true,\"accepted\":true,\"purportedAccepted\":true,\"error\":null,\"purportedError\":null,\"frames\":[{\"frameMs\":41.60300000000001,\"startMs\":41.599999999999994,\"endMs\":41.60499999999999,\"minPx\":0,\"maxPx\":172.50468750000002},{\"frameMs\":80.00100000000003,\"startMs\":80,\"endMs\":80,\"minPx\":0,\"maxPx\":262.50000000000006},{\"frameMs\":118.40400000000005,\"startMs\":118.405,\"endMs\":118.405,\"minPx\":0,\"maxPx\":300}]}]\n",
+      "stderr": ""
+    },
+    {
+      "label": "semantic-primary-digests",
+      "command": "sha256sum semantic-closure.mjs semantic-closure-result.json",
+      "cwd": "/workspace/scratch/server-method-measurement-closure-6fe08-20261001",
+      "startedUtc": "2026-10-01T11:04:30.497797+00:00",
+      "finishedUtc": "2026-10-01T11:04:30.503426+00:00",
+      "exit_code": 0,
+      "stdout": "e2330e6d6f90324f6c35f664398e4ef8e1ad15cac3bfb7d7d510487371eb956c  semantic-closure.mjs\nee8ccb2e2ec4502e643cd5aafdb99e7584b3cb5104993803208847eac8135717  semantic-closure-result.json\n",
+      "stderr": ""
+    }
+  ],
+  "fullN": {
+    "performed": false,
+    "held": "parent reserved runtime host until explicit END"
+  },
+  "readset": "readset.jsonl"
+}

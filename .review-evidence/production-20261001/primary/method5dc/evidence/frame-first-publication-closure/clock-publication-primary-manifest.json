@@ -1,0 +1,50 @@
+[
+  {
+    "name": "document_timeline.cc",
+    "url": "https://chromium.googlesource.com/chromium/src/+/149.0.7827.55/third_party/blink/renderer/core/animation/document_timeline.cc",
+    "sha256": "e8e405492b4f49f6be850e68c3431d1e2107ac032ea4ff11c433cc726642c702",
+    "bytes": 8643
+  },
+  {
+    "name": "animation_clock.cc",
+    "url": "https://chromium.googlesource.com/chromium/src/+/149.0.7827.55/third_party/blink/renderer/core/animation/animation_clock.cc",
+    "sha256": "f3290008c81dab4f17c7ae8439de25c1c95d0204be6dbb16dada0fd1a8e584eb",
+    "bytes": 4023
+  },
+  {
+    "name": "animation_timeline.cc",
+    "url": "https://chromium.googlesource.com/chromium/src/+/149.0.7827.55/third_party/blink/renderer/core/animation/animation_timeline.cc",
+    "sha256": "6745f06a855d19691098929b29a5d28331d814c6ae21f1cdf12368eeb7ab5c90",
+    "bytes": 8710
+  },
+  {
+    "name": "document_animations.cc",
+    "url": "https://chromium.googlesource.com/chromium/src/+/149.0.7827.55/third_party/blink/renderer/core/animation/document_animations.cc",
+    "sha256": "6b20e0668cc740d1e2c9a9828b5316c81b7c43f2eb907af686729e51d10855d2",
+    "bytes": 18539
+  },
+  {
+    "name": "page_animator.cc",
+    "url": "https://chromium.googlesource.com/chromium/src/+/149.0.7827.55/third_party/blink/renderer/core/page/page_animator.cc",
+    "sha256": "ba6157ecdc92b5e3375e0239c3b79f39050f5ea3a84d27f65e60b03f1b676e03",
+    "bytes": 17525
+  },
+  {
+    "name": "document.cc",
+    "url": "https://chromium.googlesource.com/chromium/src/+/149.0.7827.55/third_party/blink/renderer/core/dom/document.cc",
+    "sha256": "8a09dd50bdbbca54b11af849376c4f76df2fd62b14ae665c4c208553b4941dd6",
+    "bytes": 391722
+  },
+  {
+    "name": "css_computed_style_declaration.cc",
+    "url": "https://chromium.googlesource.com/chromium/src/+/149.0.7827.55/third_party/blink/renderer/core/css/css_computed_style_declaration.cc",
+    "sha256": "fc8f9580c1fd1bc2c28d753083925118c38134c37406dcd2f55d98a8ea2bbfb6",
+    "bytes": 22078
+  },
+  {
+    "name": "window_performance.cc",
+    "url": "https://raw.githubusercontent.com/chromium/chromium/149.0.7827.55/third_party/blink/renderer/core/timing/window_performance.cc",
+    "sha256": "5916501d9960c6355f1b2b0cee7cbc10091bf63ac64b0bf6397d96e495f71983",
+    "bytes": 69955
+  }
+]

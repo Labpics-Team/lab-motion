@@ -1,0 +1,92 @@
+{
+  "schema": 1,
+  "axis": "second-order producer/consumer primary source identity only",
+  "files": [
+    {
+      "path": "bench/profile/server-profile-registration.mjs",
+      "currentSha256": "211b4c0e107b56d06eb57e0b49f21bc3b1d06a06f34ffec1c06d4ecd15485396",
+      "primaryFrozenOwnerSha256": "211b4c0e107b56d06eb57e0b49f21bc3b1d06a06f34ffec1c06d4ecd15485396",
+      "receiptSha256": "211b4c0e107b56d06eb57e0b49f21bc3b1d06a06f34ffec1c06d4ecd15485396",
+      "allEqual": true
+    },
+    {
+      "path": "bench/profile/server-profile-contract.mjs",
+      "currentSha256": "0fb91bc3a109b46ac5bd3c63fc63f251ecc33ab89d81b90173f5c927f844afcd",
+      "primaryFrozenOwnerSha256": "0fb91bc3a109b46ac5bd3c63fc63f251ecc33ab89d81b90173f5c927f844afcd",
+      "receiptSha256": "0fb91bc3a109b46ac5bd3c63fc63f251ecc33ab89d81b90173f5c927f844afcd",
+      "allEqual": true
+    },
+    {
+      "path": "bench/profile/server-profile-runner.mjs",
+      "currentSha256": "749d9708f83a5922983effd077a69f1930d2429cf60c895760f4130177edc87b",
+      "primaryFrozenOwnerSha256": "749d9708f83a5922983effd077a69f1930d2429cf60c895760f4130177edc87b",
+      "receiptSha256": "749d9708f83a5922983effd077a69f1930d2429cf60c895760f4130177edc87b",
+      "allEqual": true
+    },
+    {
+      "path": "bench/profile/server-profile-retention.mjs",
+      "currentSha256": "23b65523bdb2cc481e8d958b4c5dd4ec3c0ce59c9964f7e3bf0020492bf3fdad",
+      "primaryFrozenOwnerSha256": "23b65523bdb2cc481e8d958b4c5dd4ec3c0ce59c9964f7e3bf0020492bf3fdad",
+      "receiptSha256": "23b65523bdb2cc481e8d958b4c5dd4ec3c0ce59c9964f7e3bf0020492bf3fdad",
+      "allEqual": true
+    },
+    {
+      "path": "test/server-profile-contract.test.ts",
+      "currentSha256": "7147f065ea2e5ec6780e21997505ed0d28909afebde3e73dbeb2d0f7cbef94b0",
+      "primaryFrozenOwnerSha256": "7147f065ea2e5ec6780e21997505ed0d28909afebde3e73dbeb2d0f7cbef94b0",
+      "receiptSha256": "7147f065ea2e5ec6780e21997505ed0d28909afebde3e73dbeb2d0f7cbef94b0",
+      "allEqual": true
+    },
+    {
+      "path": "docs/server-profile.md",
+      "currentSha256": "018918e1e68495b8fcce0a81fd296442bed2ac1c994e7594485e75b1fe8379fc",
+      "primaryFrozenOwnerSha256": "018918e1e68495b8fcce0a81fd296442bed2ac1c994e7594485e75b1fe8379fc",
+      "receiptSha256": "018918e1e68495b8fcce0a81fd296442bed2ac1c994e7594485e75b1fe8379fc",
+      "allEqual": true
+    },
+    {
+      "path": "bench/compare/bench.mjs",
+      "currentSha256": "f4aa1628b6320a08c5444277fe6a6a26c9e3f9f42db845db5821b5bf4334b467",
+      "primaryFrozenOwnerSha256": "f4aa1628b6320a08c5444277fe6a6a26c9e3f9f42db845db5821b5bf4334b467",
+      "receiptSha256": "f4aa1628b6320a08c5444277fe6a6a26c9e3f9f42db845db5821b5bf4334b467",
+      "allEqual": true
+    },
+    {
+      "path": "bench/compare/methodology.mjs",
+      "currentSha256": "e090f47784312a3fc936326157747f346718e2245c275eed62b41cf0de0b1702",
+      "primaryFrozenOwnerSha256": "e090f47784312a3fc936326157747f346718e2245c275eed62b41cf0de0b1702",
+      "receiptSha256": "e090f47784312a3fc936326157747f346718e2245c275eed62b41cf0de0b1702",
+      "allEqual": true
+    },
+    {
+      "path": "scripts/bench-transform-support.mjs",
+      "currentSha256": "ddbcf5b758133624b3f285947457a8831872847c0e1913ee9afe163f751307c6",
+      "primaryFrozenOwnerSha256": "ddbcf5b758133624b3f285947457a8831872847c0e1913ee9afe163f751307c6",
+      "receiptSha256": "ddbcf5b758133624b3f285947457a8831872847c0e1913ee9afe163f751307c6",
+      "allEqual": true
+    },
+    {
+      "path": "test/bench-transform-pair.test.ts",
+      "currentSha256": "2f339c24d36c65c49624b9532129d132e81d7a17d745f890be50adef89204705",
+      "primaryFrozenOwnerSha256": "2f339c24d36c65c49624b9532129d132e81d7a17d745f890be50adef89204705",
+      "receiptSha256": "2f339c24d36c65c49624b9532129d132e81d7a17d745f890be50adef89204705",
+      "allEqual": true
+    },
+    {
+      "path": "test/benchmark-methodology.test.ts",
+      "currentSha256": "3faa3ba6131b6864bba17ec65c2a1b52dd6ab082dac8c602fbc86cb508c80f0b",
+      "primaryFrozenOwnerSha256": "3faa3ba6131b6864bba17ec65c2a1b52dd6ab082dac8c602fbc86cb508c80f0b",
+      "receiptSha256": "3faa3ba6131b6864bba17ec65c2a1b52dd6ab082dac8c602fbc86cb508c80f0b",
+      "allEqual": true
+    },
+    {
+      "path": "test/benchmark-report-contract.test.ts",
+      "currentSha256": "91759d8223e76cc8db450c392fa2983229945de40a7f61e19892002fefe36647",
+      "primaryFrozenOwnerSha256": "91759d8223e76cc8db450c392fa2983229945de40a7f61e19892002fefe36647",
+      "receiptSha256": "91759d8223e76cc8db450c392fa2983229945de40a7f61e19892002fefe36647",
+      "allEqual": true
+    }
+  ],
+  "SOURCE_FREEZE_sha256": "4fb124eebf59ca473a46bd6f448bb5208c4d2037283bbe7715b9fbdf95ae8cec",
+  "noPrimaryOutcomeTransferBeyondOwnAxis": true
+}

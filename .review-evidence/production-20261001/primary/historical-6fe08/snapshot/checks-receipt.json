@@ -1,0 +1,14 @@
+{
+  "command": "corepack pnpm exec vitest run test/server-profile-contract.test.ts test/benchmark-methodology.test.ts test/bench-transform-pair.test.ts test/benchmark-report-contract.test.ts --maxWorkers=1",
+  "passed": 267,
+  "failed": 0,
+  "skipped": 0,
+  "publicCliCases": 8,
+  "maxRunsConsumer": 1024,
+  "actualTimingSamplesObserved": 0,
+  "fullNUnitDurationsMs": {
+    "завершённый public admission отвергает четыре независимых reviewer counterexamples": 23532.478751000002,
+    "сохраняет partial A/B и поздний отказ, а пропавшие comparator/retention не допускает": 16948.737523000003
+  },
+  "evidenceScope": "Синтетические counters/provenance; это не product admission и не perf data."
+}

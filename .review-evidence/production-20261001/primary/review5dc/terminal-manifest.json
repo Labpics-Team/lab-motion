@@ -1,0 +1,70 @@
+{
+  "schema": 1,
+  "axis": "measurement correctness",
+  "verdict": "PASS",
+  "confirmedCurrentScopedBlockers": [],
+  "sourceBasisHead": "8fb55ca0a116e5381a43351ab28834d17a4a9299",
+  "methodArchiveSha256": "5dc04987eace1aaf736da05192948897d50262be5a24ff9192b79744f47ab525",
+  "protocolDigest": "00e8d5880eb83dd27a52f90cc670d4ecc550229458af039d9924485805c25431",
+  "clockModelDigest": "7e45adab88a2c97af4e9074543318ae115e42b5c9669c4746b6e149d42bfbc4f",
+  "report": {
+    "path": "REPORT-RU.md",
+    "sha256": "00bae364e9d0140dc72e3ed9411fa0a2f17ebde74d99d59a6307a4d9195d81fe",
+    "bytes": 20944
+  },
+  "inputManifest": {
+    "path": "input-manifest.json",
+    "sha256": "2cafe5138f8d1dee35f7f6c9d1334d7ef2abca5456a4490c77982816c1f6ae19",
+    "bytes": 16496
+  },
+  "readset": {
+    "path": "readset.jsonl",
+    "sha256": "1c04b4e3f704b87170b41c5c38e795457e5953cad8cc17ce5aaaf317922526f1",
+    "bytes": 31085
+  },
+  "importReadset": {
+    "path": "source-import-readset.json",
+    "sha256": "14b615529a2ff8a149b1a93ba02e0a06786a36f6202d1a4aa1d736c46291ab56",
+    "bytes": 1916
+  },
+  "commands": {
+    "path": "commands.jsonl",
+    "sha256": "b3871d6709af4860b0ddf790c282a715e636ee2a4a181c3aa80fd2e2a53888b5",
+    "bytes": 1220572
+  },
+  "outputManifest": {
+    "path": "output-manifest.json",
+    "sha256": "dd1a29a84f250a9cc567a1d7e89d151ab4db1beb1ef3124dc342dbfbb46cf17a",
+    "bytes": 276686
+  },
+  "primaryOnlyManifest": {
+    "path": "PRIMARY/PRIMARY-MANIFEST.json",
+    "sha256": "2a1c3c19527df9f31b9109d3a70476e9fc7b1b94430b1d2e67b02b528e3bd26b",
+    "bytes": 17088
+  },
+  "compressionReceipt": {
+    "path": "compression-receipt.json",
+    "sha256": "f59bfde9125cb43f20585f25e1b3b3f45a8045ba21292bc0668ecdb686f26ded",
+    "bytes": 5801
+  },
+  "terminalSealReceipt": {
+    "path": "terminal-seal-receipt.json",
+    "sha256": "d085084b2892058cca94ccadf09355ae166c7664c081fa9e793d997049f57438",
+    "bytes": 1074
+  },
+  "heavyEnd": {
+    "path": "heavy-end-current.json",
+    "sha256": "162c38c739c6567180f551cb98a72daa76782a0bd2da66acde18f1f1d2574fd3",
+    "bytes": 664
+  },
+  "ownActualRegisteredTimingSamples": 0,
+  "probeProcessesClosed": true,
+  "slotFree": true,
+  "limitations": [
+    "finite observed CSS controls only; delayed full path and between-cut curves remain identifiable only within stated assumptions",
+    "timed bound is global batch-to-read window, not individual-owner trajectory",
+    "iid/stationarity and exact official upstream clock model are assumptions",
+    "no actual performance/mobile/adoption/global GO or future-epoch transfer",
+    "incidental foreign status strings appeared automatically; no rationale/reports used as evidence"
+  ]
+}

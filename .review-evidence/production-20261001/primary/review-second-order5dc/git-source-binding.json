@@ -1,0 +1,17 @@
+{
+  "schema": 1,
+  "axis": "second-order immutable source identity only",
+  "head": "8fb55ca0a116e5381a43351ab28834d17a4a9299",
+  "command": [
+    "git",
+    "-C",
+    "/workspace/lab-motion",
+    "cat-file",
+    "--batch"
+  ],
+  "inputFormat": "<exact HEAD>:<each manifest sourceFiles path>, one per line",
+  "sourceFilesVerified": 631,
+  "mismatches": [],
+  "stderr": "",
+  "noLiveCheckoutSemanticAcceptance": true
+}

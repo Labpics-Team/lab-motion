@@ -1,0 +1,53 @@
+{
+  "command": [
+    "node",
+    "/workspace/scratch/server-method-measurement-closure-5dc049-20261001/snapshot/source/bench/profile/server-profile-contract.mjs",
+    "--raw",
+    "/workspace/scratch/server-method-measurement-closure-5dc049-20261001/current-fullN-own-healthy.raw.fifo",
+    "--digest",
+    "faba6b49d81fc84331a7c7e6f9371f8902930c8472a5b4ce6e0e1c46537ff429",
+    "--journal",
+    "/workspace/scratch/server-method-measurement-closure-5dc049-20261001/current-fullN-own-healthy.journal.fifo"
+  ],
+  "startUtc": "2026-10-01T15:37:03.814537+00:00",
+  "endUtc": "2026-10-01T15:37:18.156439+00:00",
+  "exit": 0,
+  "stdout": "{\"verification\":\"server-cell-only\",\"verdict\":\"PASS\",\"unproven\":[\"mobile Android/iOS\",\"physical 60/120 Hz\",\"whole-page energy\",\"GPU\",\"M-04 physical-device envelope\",\"M-05 product scene families\"],\"journalFinalDigest\":\"a252978f04fe18caf78fb883c26fb62bb01b6e84b0eee966e7a82b77fa7faa13\"}\n",
+  "stderr": "",
+  "streams": [
+    {
+      "fifo": "/workspace/scratch/server-method-measurement-closure-5dc049-20261001/current-fullN-own-healthy.raw.fifo",
+      "gzip": "/workspace/scratch/server-method-measurement-closure-5dc049-20261001/current-fullN-own-healthy.json.gz",
+      "uncompressedSha256": "faba6b49d81fc84331a7c7e6f9371f8902930c8472a5b4ce6e0e1c46537ff429",
+      "uncompressedBytes": 262372458,
+      "expected": {
+        "gzipPath": "/workspace/scratch/server-method-measurement-closure-5dc049-20261001/current-fullN-own-healthy.json.gz",
+        "sha256": "faba6b49d81fc84331a7c7e6f9371f8902930c8472a5b4ce6e0e1c46537ff429",
+        "bytes": 262372458,
+        "compressedSha256": "ddb42256ab163a21f49e3f4d5dcd3e5b054ea6651148a2a211aecd4cde5e9d78",
+        "compressedBytes": 11813217,
+        "encoding": "lossless gzip level1; no plaintext file emitted"
+      },
+      "error": null,
+      "matched": true
+    },
+    {
+      "fifo": "/workspace/scratch/server-method-measurement-closure-5dc049-20261001/current-fullN-own-healthy.journal.fifo",
+      "gzip": "/workspace/scratch/server-method-measurement-closure-5dc049-20261001/current-fullN-own-healthy.ndjson.gz",
+      "uncompressedSha256": "e94752457a62a7b23cc70786b97ed107e3bdbbb98493308e7139a95263a47cf1",
+      "uncompressedBytes": 264881772,
+      "expected": {
+        "gzipPath": "/workspace/scratch/server-method-measurement-closure-5dc049-20261001/current-fullN-own-healthy.ndjson.gz",
+        "sha256": "e94752457a62a7b23cc70786b97ed107e3bdbbb98493308e7139a95263a47cf1",
+        "bytes": 264881772,
+        "compressedSha256": "7c4bca91579f7cad2a501d29fc9468fdc399ea333c01203da90476f649ca3d79",
+        "compressedBytes": 12716931,
+        "encoding": "lossless gzip level1; no plaintext file emitted"
+      },
+      "error": null,
+      "matched": true
+    }
+  ],
+  "fifosRemoved": true,
+  "actualRegisteredTimingSamples": 0
+}

@@ -1,0 +1,327 @@
+/**
+ * color.ts — Парсинг и интерполяция CSS-цветов.
+ *
+ * Поддерживаемые форматы: hex (#rgb, #rrggbb, #rgba, #rrggbbaa),
+ * rgb()/rgba(), hsl()/hsla().
+ *
+ * Инварианты:
+ *   VC1. FINITENESS GUARD: interpolateColor/mixColor НИКОГДА не возвращают
+ *        строки с NaN/Infinity.
+ *   VC2. SSR-safe.
+ *   VC3. Zero runtime deps.
+ *
+ * Контракт интерполяции:
+ *   RGB default 'linear' — имя режима γ=2, а не CSS srgb-linear:
+ *     ch(t) = √(a²·(1−t) + b²·t) в кодированных каналах [0,255].
+ *     Это аппроксимация; точная sRGB EOTF кусочная. Гарантии близости
+ *     к ней или визуальной неразличимости нет. Численный оракул и область
+ *     проверки: test/value-color-precision.test.ts.
+ *   'srgb' — линейный lerp кодированных каналов, не линейного света.
+ *   Alpha интерполируется отдельно; каналы не premultiplied.
+ *   HSL×HSL — линейные H,S,L и кратчайший путь hue независимо от space.
+ *   HSL↔RGB: W3C CSS Color 3 §4.2.4.
+ *
+ * Модуль исполняет переход заданных значений, не выбирает палитру и не
+ * удостоверяет контраст/читаемость промежуточных цветов. Граница с Lab Colors:
+ * docs/adr/0003-color-interpolation-contract.md.
+ */
+
+import { clampFinite } from './units.js';
+
+// ── Тип ParsedColor ───────────────────────────────────────────────────────────
+
+/** Внутреннее представление: r,g,b ∈ [0,255]; a ∈ [0,1]. */
+export interface ParsedColor {
+  readonly kind: 'color';
+  /** Red channel 0–255. */
+  readonly r: number;
+  /** Green channel 0–255. */
+  readonly g: number;
+  /** Blue channel 0–255. */
+  readonly b: number;
+  /** Alpha channel 0–1. */
+  readonly a: number;
+  /**
+   * Исходный формат — определяет формат вывода при интерполяции.
+   * 'hex' и 'rgb' → вывод rgb()/rgba().
+   * 'hsl' → вывод hsl()/hsla() (с сохранением H,S,L для интерполяции).
+   */
+  readonly format: 'hex' | 'rgb' | 'hsl';
+  /** Исходные HSL-значения (только для format='hsl'). */
+  readonly hsl?: { readonly h: number; readonly s: number; readonly l: number };
+}
+
+// ── Парсинг ───────────────────────────────────────────────────────────────────
+
+const HEX_RE = /^#([0-9a-f]{3,4}|[0-9a-f]{6}|[0-9a-f]{8})$/i;
+
+const NUM_PCT = '(\\d+(?:\\.\\d+)?%?)';
+// Hue по W3C CSS Color (legacy comma-синтаксис) — <number> СО знаком и БЕЗ
+// процента: «hsl(50%,…)» невалиден и отклоняется целиком, «hsl(-120,…)» ≡
+// hsl(240,…). Angle-единицы (deg/turn) живут только в modern space-синтаксисе,
+// который этот парсер сознательно не поддерживает (как и RGB_RE рядом).
+const HUE = '(-?\\d+(?:\\.\\d+)?)';
+const ALPHA = '(\\d+(?:\\.\\d+)?)';
+const SEP = '\\s*,\\s*';
+
+const RGB_RE = new RegExp(`^rgba?\\(\\s*(\\d+(?:\\.\\d+)?)${SEP}(\\d+(?:\\.\\d+)?)${SEP}(\\d+(?:\\.\\d+)?)(?:${SEP}${ALPHA})?\\s*\\)$`, 'i');
+const HSL_RE = new RegExp(`^hsla?\\(\\s*${HUE}${SEP}${NUM_PCT}${SEP}${NUM_PCT}(?:${SEP}${ALPHA})?\\s*\\)$`, 'i');
+
+/**
+ * Парсит строку CSS-цвета в типизированный AST.
+ * Возвращает `null` если формат не распознан.
+ *
+ * Поддержка:
+ *   hex: #rgb, #rrggbb, #rgba, #rrggbbaa
+ *   rgb: rgb(r, g, b), rgba(r, g, b, a) — r,g,b ∈ [0,255], a ∈ [0,1]
+ *   hsl: hsl(h, s%, l%), hsla(h, s%, l%, a) — h ∈ [0,360], s/l ∈ [0,100]
+ */
+export function parseColor(value: string): ParsedColor | null {
+  const s = value.trim();
+
+  const hex = HEX_RE.exec(s);
+  if (hex) {
+    const raw = hex[1]!;
+    const short = raw.length < 5;
+    const alpha = raw.length === 4
+      ? raw[3]! + raw[3]!
+      : raw.length === 8 ? raw.slice(6) : undefined;
+    return {
+      kind: 'color',
+      format: 'hex',
+      r: parseInt(short ? raw[0]! + raw[0]! : raw.slice(0, 2), 16),
+      g: parseInt(short ? raw[1]! + raw[1]! : raw.slice(2, 4), 16),
+      b: parseInt(short ? raw[2]! + raw[2]! : raw.slice(4, 6), 16),
+      a: alpha === undefined ? 1 : parseInt(alpha, 16) / 255,
+    };
+  }
+
+  // rgb() / rgba()
+  const rgb = RGB_RE.exec(s);
+  if (rgb) {
+    return { kind: 'color', format: 'rgb',
+      r: clamp255(parseFloat(rgb[1])),
+      g: clamp255(parseFloat(rgb[2])),
+      b: clamp255(parseFloat(rgb[3])),
+      a: rgb[4] !== undefined ? clamp01(parseFloat(rgb[4])) : 1 };
+  }
+
+  // hsl() / hsla()
+  const hsl = HSL_RE.exec(s);
+  if (hsl) {
+    const h = parseHue(hsl[1]);
+    const sv = parsePct(hsl[2]);
+    const lv = parsePct(hsl[3]);
+    const av = hsl[4] !== undefined ? clamp01(parseFloat(hsl[4])) : 1;
+    const { r, g, b } = hslToRgb(h, sv, lv);
+    return { kind: 'color', format: 'hsl',
+      r, g, b, a: av,
+      hsl: { h, s: sv, l: lv } };
+  }
+
+  return null;
+}
+
+// ── Интерполяция ─────────────────────────────────────────────────────────────
+
+/** Пространство RGB-смешения. Только для RGB-пути; HSL×HSL — своё. */
+export type ColorMixSpace = 'linear' | 'srgb';
+
+/** Опции интерполяции цвета. */
+export interface ColorMixOptions {
+  /**
+   * 'linear' (default) — γ=2: √(a²(1−t)+b²t), НЕ точный CSS srgb-linear.
+   * 'srgb' — lerp кодированных sRGB-каналов. Для HSL×HSL опция не применяется.
+   * Ни один режим не удостоверяет контраст или читаемость цветового пути.
+   */
+  readonly space?: ColorMixSpace | undefined;
+}
+
+/**
+ * Интерполирует между двумя ParsedColor.
+ *
+ * - Если оба format='hsl': интерполяция в пространстве HSL (с hue-wraparound).
+ * - Иначе: смешение R,G,B в приближённо-линейном свете (default) или
+ *   легаси-lerp кодированных каналов ({space:'srgb'}); alpha всегда линейно.
+ *
+ * Возвращает css-строку: rgb(...) или hsl(...) с alpha если a < 1.
+ *
+ * FINITENESS GUARD (VC1): все результаты зажимаются через clampFinite /
+ * clamp255 / clamp01 → вывод ВСЕГДА конечен.
+ */
+export function interpolateColor(
+  from: ParsedColor,
+  to: ParsedColor,
+  t: number,
+  options?: ColorMixOptions,
+): string {
+  const progress = Number.isFinite(t)
+    ? t <= 0 ? 0 : t >= 1 ? 1 : t
+    : Number.isNaN(t) ? 0
+    : t > 0 ? 1 : 0;
+
+  if (from.format === 'hsl' && to.format === 'hsl' && from.hsl && to.hsl) {
+    return interpolateHsl(from, to, progress);
+  }
+  return interpolateRgb(from, to, progress, options?.space !== 'srgb');
+}
+
+/**
+ * Удобная обёртка: смешать два CSS-цвета (строки) при прогрессе t.
+ * При нераспознанном формате возвращает from для t < 0.5, иначе to.
+ * Этот дискретный переход не означает поддержку интерполяции формата.
+ */
+export function mixColor(
+  fromStr: string,
+  toStr: string,
+  t: number,
+  options?: ColorMixOptions,
+): string {
+  const from = parseColor(fromStr);
+  const to = parseColor(toStr);
+  if (!from || !to) return t < 0.5 ? fromStr : toStr;
+  return interpolateColor(from, to, t, options);
+}
+
+// ── Внутренние утилиты ────────────────────────────────────────────────────────
+
+function interpolateRgb(from: ParsedColor, to: ParsedColor, t: number, linear: boolean): string {
+  // linear: √(a²(1−t)+b²t) — подкоренное ≥ 0 для конечных каналов и t∈[0,1];
+  // hostile-AST (Inf/NaN каналы) даёт NaN → clampFinite → 0 (VC1 держится).
+  const mix = linear
+    ? (a: number, b: number) => Math.sqrt(a * a * (1 - t) + b * b * t)
+    : (a: number, b: number) => a + (b - a) * t;
+  const r = clamp255(clampFinite(mix(from.r, to.r)));
+  const g = clamp255(clampFinite(mix(from.g, to.g)));
+  const b = clamp255(clampFinite(mix(from.b, to.b)));
+  // Alpha интерполируется отдельно от непредумноженных цветовых каналов.
+  const a = clamp01(clampFinite(from.a + (to.a - from.a) * t));
+  const ri = Math.round(r);
+  const gi = Math.round(g);
+  const bi = Math.round(b);
+  if (a >= 1) return `rgb(${ri}, ${gi}, ${bi})`;
+  return `rgba(${ri}, ${gi}, ${bi}, ${+a.toFixed(4)})`;
+}
+
+function interpolateHsl(from: ParsedColor, to: ParsedColor, t: number): string {
+  // Гарантировано наличие hsl (проверено в interpolateColor)
+  // eslint-disable-next-line @typescript-eslint/no-non-null-assertion
+  const fh = from.hsl!;
+  // eslint-disable-next-line @typescript-eslint/no-non-null-assertion
+  const th = to.hsl!;
+
+  // Hue wraparound: берём кратчайший путь по кругу
+  let dh = th.h - fh.h;
+  if (dh > 180) dh -= 360;
+  if (dh < -180) dh += 360;
+
+  const h = clampFinite(fh.h + dh * t);
+  const s = clamp01(clampFinite(fh.s + (th.s - fh.s) * t));
+  const l = clamp01(clampFinite(fh.l + (th.l - fh.l) * t));
+  const a = clamp01(clampFinite(from.a + (to.a - from.a) * t));
+
+  const hNorm = normalizeHue(h);
+  const sp = +(s * 100).toFixed(4);
+  const lp = +(l * 100).toFixed(4);
+
+  if (a >= 1) return `hsl(${+hNorm.toFixed(4)}, ${sp}%, ${lp}%)`;
+  return `hsla(${+hNorm.toFixed(4)}, ${sp}%, ${lp}%, ${+a.toFixed(4)})`;
+}
+
+// ── HSL ↔ RGB (канонические формулы W3C CSS Color 3 §4.2.4) ─────────────────
+
+/**
+ * Преобразует HSL в RGB.
+ * h ∈ [0,360], s ∈ [0,1], l ∈ [0,1]
+ * Возвращает r,g,b ∈ [0,255].
+ *
+ * Канонический источник: W3C CSS Color 3 §4.2.4
+ * https://www.w3.org/TR/css-color-3/#hsl-color
+ */
+export function hslToRgb(h: number, s: number, l: number): { r: number; g: number; b: number } {
+  if (s === 0) {
+    const c = clamp255(l * 255);
+    return { r: c, g: c, b: c };
+  }
+  const q = l < 0.5 ? l * (1 + s) : l + s - l * s;
+  const p = 2 * l - q;
+  const hk = normalizeHue(h) / 360;
+  return {
+    r: clamp255(hueToRgb(p, q, hk + 1 / 3) * 255),
+    g: clamp255(hueToRgb(p, q, hk) * 255),
+    b: clamp255(hueToRgb(p, q, hk - 1 / 3) * 255),
+  };
+}
+
+/** Вспомогательная функция H → канал по алгоритму W3C. */
+function hueToRgb(p: number, q: number, t: number): number {
+  let tc = t;
+  if (tc < 0) tc += 1;
+  if (tc > 1) tc -= 1;
+  if (tc < 1 / 6) return p + (q - p) * 6 * tc;
+  if (tc < 1 / 2) return q;
+  if (tc < 2 / 3) return p + (q - p) * (2 / 3 - tc) * 6;
+  return p;
+}
+
+/**
+ * Преобразует RGB в HSL.
+ * r,g,b ∈ [0,255]
+ * Возвращает h ∈ [0,360), s ∈ [0,1], l ∈ [0,1].
+ *
+ * Канонический источник: W3C CSS Color 3 §4.2.4
+ */
+export function rgbToHsl(r: number, g: number, b: number): { h: number; s: number; l: number } {
+  const rn = r / 255;
+  const gn = g / 255;
+  const bn = b / 255;
+  const max = Math.max(rn, gn, bn);
+  const min = Math.min(rn, gn, bn);
+  const l = (max + min) / 2;
+
+  if (max === min) {
+    return { h: 0, s: 0, l };
+  }
+
+  const d = max - min;
+  const s = l > 0.5 ? d / (2 - max - min) : d / (max + min);
+  let h: number;
+  if (max === rn) {
+    h = ((gn - bn) / d + (gn < bn ? 6 : 0)) / 6;
+  } else if (max === gn) {
+    h = ((bn - rn) / d + 2) / 6;
+  } else {
+    h = ((rn - gn) / d + 4) / 6;
+  }
+
+  return { h: h * 360, s, l };
+}
+
+// ── Вспомогательные зажимы ────────────────────────────────────────────────────
+
+function clamp255(x: number): number {
+  const f = clampFinite(x);
+  return f < 0 ? 0 : f > 255 ? 255 : f;
+}
+
+function clamp01(x: number): number {
+  const f = clampFinite(x);
+  return f < 0 ? 0 : f > 1 ? 1 : f;
+}
+
+/** Канон hue: [0, 360). Один хелпер на все места (parse/interpolate/hslToRgb). */
+function normalizeHue(h: number): number {
+  return ((h % 360) + 360) % 360;
+}
+
+function parseHue(s: string): number {
+  // Знак и >360 валидны по W3C — нормализуем в канон [0, 360), чтобы AST
+  // хранил один hue на цвет и интерполяция не делала лишний оборот.
+  return normalizeHue(clampFinite(parseFloat(s)));
+}
+
+function parsePct(s: string): number {
+  // S/L приходят как "50%" → 0.5; или как "50" → 0.5
+  const v = parseFloat(s);
+  return clamp01(clampFinite(s.includes('%') ? v / 100 : v));
+}

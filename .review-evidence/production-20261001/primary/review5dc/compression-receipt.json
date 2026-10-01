@@ -1,0 +1,110 @@
+{
+  "utc": "2026-10-01T15:58:50.731255+00:00",
+  "uncompressedTotalBytes": 1385612174,
+  "compressedTotalBytes": 65078782,
+  "streams": [
+    {
+      "case": "current-fullN-own-healthy",
+      "kind": "raw",
+      "gzipPath": "/workspace/scratch/server-method-measurement-closure-5dc049-20261001/current-fullN-own-healthy.json.gz",
+      "sha256": "faba6b49d81fc84331a7c7e6f9371f8902930c8472a5b4ce6e0e1c46537ff429",
+      "bytes": 262372458,
+      "compressedSha256": "ddb42256ab163a21f49e3f4d5dcd3e5b054ea6651148a2a211aecd4cde5e9d78",
+      "compressedBytes": 11813217,
+      "encoding": "lossless gzip level1; no plaintext file emitted",
+      "fullUncompressedReadback": {
+        "uncompressedSha256": "faba6b49d81fc84331a7c7e6f9371f8902930c8472a5b4ce6e0e1c46537ff429",
+        "uncompressedBytes": 262372458,
+        "error": null,
+        "matched": true
+      },
+      "representation": "Original serialization emitted directly into lossless gzip; exact full byte stream reconstructed by public CLI FIFO. No plaintext file existed or was deleted."
+    },
+    {
+      "case": "current-fullN-own-healthy",
+      "kind": "journal",
+      "gzipPath": "/workspace/scratch/server-method-measurement-closure-5dc049-20261001/current-fullN-own-healthy.ndjson.gz",
+      "sha256": "e94752457a62a7b23cc70786b97ed107e3bdbbb98493308e7139a95263a47cf1",
+      "bytes": 264881772,
+      "compressedSha256": "7c4bca91579f7cad2a501d29fc9468fdc399ea333c01203da90476f649ca3d79",
+      "compressedBytes": 12716931,
+      "encoding": "lossless gzip level1; no plaintext file emitted",
+      "fullUncompressedReadback": {
+        "uncompressedSha256": "e94752457a62a7b23cc70786b97ed107e3bdbbb98493308e7139a95263a47cf1",
+        "uncompressedBytes": 264881772,
+        "error": null,
+        "matched": true
+      },
+      "representation": "Original serialization emitted directly into lossless gzip; exact full byte stream reconstructed by public CLI FIFO. No plaintext file existed or was deleted."
+    },
+    {
+      "case": "current-fullN-own-first-quarter",
+      "kind": "raw",
+      "gzipPath": "/workspace/scratch/server-method-measurement-closure-5dc049-20261001/current-fullN-own-first-quarter.json.gz",
+      "sha256": "0d4a25c5612e701db662ae852f522ccdf924e576036df145b9e469d05cb08b89",
+      "bytes": 262372454,
+      "compressedSha256": "2177fb60470fe6fb032849202b4c07fbe466bf83171ec78263808c4d63565dbf",
+      "compressedBytes": 11813214,
+      "encoding": "lossless gzip level1; no plaintext file emitted",
+      "fullUncompressedReadback": {
+        "uncompressedSha256": "0d4a25c5612e701db662ae852f522ccdf924e576036df145b9e469d05cb08b89",
+        "uncompressedBytes": 262372454,
+        "error": null,
+        "matched": true
+      },
+      "representation": "Original serialization emitted directly into lossless gzip; exact full byte stream reconstructed by public CLI FIFO. No plaintext file existed or was deleted."
+    },
+    {
+      "case": "current-fullN-own-first-quarter",
+      "kind": "journal",
+      "gzipPath": "/workspace/scratch/server-method-measurement-closure-5dc049-20261001/current-fullN-own-first-quarter.ndjson.gz",
+      "sha256": "a0b0287a6580c1a8bd0d1d326c3ae7260a0f675be9381465bec97f3e8a40eb8b",
+      "bytes": 264881768,
+      "compressedSha256": "3bfdd435baa57a81fbc85a4307d1a60c3ac4241fc15abb28d7963479c828ebae",
+      "compressedBytes": 12718973,
+      "encoding": "lossless gzip level1; no plaintext file emitted",
+      "fullUncompressedReadback": {
+        "uncompressedSha256": "a0b0287a6580c1a8bd0d1d326c3ae7260a0f675be9381465bec97f3e8a40eb8b",
+        "uncompressedBytes": 264881768,
+        "error": null,
+        "matched": true
+      },
+      "representation": "Original serialization emitted directly into lossless gzip; exact full byte stream reconstructed by public CLI FIFO. No plaintext file existed or was deleted."
+    },
+    {
+      "case": "current-fullN-retained-own-failure",
+      "kind": "raw",
+      "gzipPath": "/workspace/scratch/server-method-measurement-closure-5dc049-20261001/current-fullN-retained-own-failure.json.gz",
+      "sha256": "30affbc81b2027dd3a1ca957cb968a912e384203eda8b292ff8ae702ccd386fb",
+      "bytes": 164939444,
+      "compressedSha256": "402c573dd4f80c59126201ba87344b46e99f07e394b73221c18845264e42aed2",
+      "compressedBytes": 7752437,
+      "encoding": "lossless gzip level1; no plaintext file emitted",
+      "fullUncompressedReadback": {
+        "uncompressedSha256": "30affbc81b2027dd3a1ca957cb968a912e384203eda8b292ff8ae702ccd386fb",
+        "uncompressedBytes": 164939444,
+        "error": null,
+        "matched": true
+      },
+      "representation": "Original serialization emitted directly into lossless gzip; exact full byte stream reconstructed by public CLI FIFO. No plaintext file existed or was deleted."
+    },
+    {
+      "case": "current-fullN-retained-own-failure",
+      "kind": "journal",
+      "gzipPath": "/workspace/scratch/server-method-measurement-closure-5dc049-20261001/current-fullN-retained-own-failure.ndjson.gz",
+      "sha256": "e4f25d30e002ef75232aad63fde152f4b15f242471be480d293d3e5384d94628",
+      "bytes": 166164278,
+      "compressedSha256": "9d661b657f47da60bad09e924d62385e5b9ac5abadd4558dd484263bbb9e2fc5",
+      "compressedBytes": 8264010,
+      "encoding": "lossless gzip level1; no plaintext file emitted",
+      "fullUncompressedReadback": {
+        "uncompressedSha256": "e4f25d30e002ef75232aad63fde152f4b15f242471be480d293d3e5384d94628",
+        "uncompressedBytes": 166164278,
+        "error": null,
+        "matched": true
+      },
+      "representation": "Original serialization emitted directly into lossless gzip; exact full byte stream reconstructed by public CLI FIFO. No plaintext file existed or was deleted."
+    }
+  ],
+  "actualRegisteredTimingSamples": 0
+}

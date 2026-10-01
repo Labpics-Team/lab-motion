@@ -1,0 +1,96 @@
+[
+  {
+    "name": "healthy",
+    "synthetic": true,
+    "actualTimingSamples": 0,
+    "registeredRuns": 288,
+    "independentBlocks": 144,
+    "protocolDigest": "f2ad05507ef5436accf5541dcdcbb01afa6ce5f6fdbe5e724166f53a7466afaf",
+    "clockModelDigest": "d63593c5430b41debb87c3f41370bee94090355b4ccc390f8eb507e34a64bb74",
+    "sourceAcquisitionSha256": "5358af8d9cf2c089b25443094f775eea4688fb4e072252fe00d6939d22ebc03c",
+    "replacement": {
+      "stage": "ab",
+      "scene": "s2",
+      "run": 0,
+      "participant": "right",
+      "source": "exact frozen producer acquired whole sample in independent deterministic DOM/SUT",
+      "initialProgress": 0,
+      "acquiredTimingClocksIdenticalToHealthy": true
+    },
+    "command": [
+      "/opt/codex/runtimes/codex-primary-runtime/dependencies/node/bin/node",
+      "/workspace/scratch/server-method-measurement-closure-6fe08-20261001/snapshot/source/bench/profile/server-profile-contract.mjs",
+      "--raw",
+      "/workspace/scratch/server-method-measurement-closure-6fe08-20261001/fullN-onset/healthy.json",
+      "--digest",
+      "c83457e2b70873f4f2b5d651e12def2ab28c12c240f9361330cc9de49f93dd3b",
+      "--journal",
+      "/workspace/scratch/server-method-measurement-closure-6fe08-20261001/fullN-onset/healthy.ndjson"
+    ],
+    "startedUtc": "2026-10-01T11:26:36.300Z",
+    "finishedUtc": "2026-10-01T11:26:47.741Z",
+    "raw": {
+      "path": "/workspace/scratch/server-method-measurement-closure-6fe08-20261001/fullN-onset/healthy.json",
+      "sha256": "c83457e2b70873f4f2b5d651e12def2ab28c12c240f9361330cc9de49f93dd3b",
+      "bytes": 258266278
+    },
+    "journal": {
+      "path": "/workspace/scratch/server-method-measurement-closure-6fe08-20261001/fullN-onset/healthy.ndjson",
+      "sha256": "d6aa980b3792ef7ca3769dc811719389537ce4d378cf42fd90467357ca04b699",
+      "bytes": 260778818,
+      "records": 10335
+    },
+    "status": 0,
+    "signal": null,
+    "error": null,
+    "stdout": "{\"verification\":\"server-cell-only\",\"verdict\":\"PASS\",\"unproven\":[\"mobile Android/iOS\",\"physical 60/120 Hz\",\"whole-page energy\",\"GPU\",\"M-04 physical-device envelope\",\"M-05 product scene families\"],\"journalFinalDigest\":\"2741c77fb6d7470c83dc472846a8c3b0364b954ced9f10cafa1a93849eb47410\"}\n",
+    "stderr": ""
+  },
+  {
+    "name": "initial-progress-quarter",
+    "synthetic": true,
+    "actualTimingSamples": 0,
+    "registeredRuns": 288,
+    "independentBlocks": 144,
+    "protocolDigest": "f2ad05507ef5436accf5541dcdcbb01afa6ce5f6fdbe5e724166f53a7466afaf",
+    "clockModelDigest": "d63593c5430b41debb87c3f41370bee94090355b4ccc390f8eb507e34a64bb74",
+    "sourceAcquisitionSha256": "5358af8d9cf2c089b25443094f775eea4688fb4e072252fe00d6939d22ebc03c",
+    "replacement": {
+      "stage": "ab",
+      "scene": "s2",
+      "run": 0,
+      "participant": "right",
+      "source": "exact frozen producer acquired whole sample in independent deterministic DOM/SUT",
+      "initialProgress": 0.25,
+      "acquiredTimingClocksIdenticalToHealthy": true
+    },
+    "command": [
+      "/opt/codex/runtimes/codex-primary-runtime/dependencies/node/bin/node",
+      "/workspace/scratch/server-method-measurement-closure-6fe08-20261001/snapshot/source/bench/profile/server-profile-contract.mjs",
+      "--raw",
+      "/workspace/scratch/server-method-measurement-closure-6fe08-20261001/fullN-onset/initial-progress-quarter.json",
+      "--digest",
+      "435724396e76c41bba6c05ecd48217c01aff88ae68551d87e5f24fced6a99053",
+      "--journal",
+      "/workspace/scratch/server-method-measurement-closure-6fe08-20261001/fullN-onset/initial-progress-quarter.ndjson"
+    ],
+    "startedUtc": "2026-10-01T11:26:56.784Z",
+    "finishedUtc": "2026-10-01T11:27:08.078Z",
+    "raw": {
+      "path": "/workspace/scratch/server-method-measurement-closure-6fe08-20261001/fullN-onset/initial-progress-quarter.json",
+      "sha256": "435724396e76c41bba6c05ecd48217c01aff88ae68551d87e5f24fced6a99053",
+      "bytes": 258265157
+    },
+    "journal": {
+      "path": "/workspace/scratch/server-method-measurement-closure-6fe08-20261001/fullN-onset/initial-progress-quarter.ndjson",
+      "sha256": "1373e2f04b9a1f6f294fab28670ea30efb2d49baa3bdfdb5c9d3c1990fa46478",
+      "bytes": 260777697,
+      "records": 10335
+    },
+    "status": 0,
+    "signal": null,
+    "error": null,
+    "stdout": "{\"verification\":\"server-cell-only\",\"verdict\":\"PASS\",\"unproven\":[\"mobile Android/iOS\",\"physical 60/120 Hz\",\"whole-page energy\",\"GPU\",\"M-04 physical-device envelope\",\"M-05 product scene families\"],\"journalFinalDigest\":\"c2bc4812f8ce523c6ba4e9ac1c3af9748eab9d751b76fd32fcd534f947177f60\"}\n",
+    "stderr": ""
+  }
+]

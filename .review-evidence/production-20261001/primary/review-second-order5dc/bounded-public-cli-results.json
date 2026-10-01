@@ -1,0 +1,80 @@
+{
+  "schema": 1,
+  "axis": "second-order SERVER METHOD public consumer/lifecycle",
+  "actualRegisteredPerformanceSamples": 0,
+  "syntheticOnly": true,
+  "cases": [
+    {
+      "name": "bounded-current-refusal",
+      "command": [
+        "node",
+        "/workspace/scratch/motion-server-method-final-20261001T144242Z/source/bench/profile/server-profile-contract.mjs",
+        "--raw",
+        "/tmp/server-method-second-order-144242Z/current-refusal.json",
+        "--digest",
+        "f9a15bdc49007f9f182d87fadfba8bc633520ee9e097507afe29279a7ed60021",
+        "--journal",
+        "/tmp/server-method-second-order-144242Z/current-refusal.ndjson"
+      ],
+      "startUtc": "2026-10-01T15:17:50.060996+00:00",
+      "endUtc": "2026-10-01T15:17:50.133027+00:00",
+      "exitCode": 0,
+      "expectedExitCode": 0,
+      "matched": true,
+      "stdout": "{\"verification\":\"preparation-refused\",\"verdict\":\"UNPROVEN\",\"journalFinalDigest\":\"055815a7632de539e42b622c0aaa5a52d7467f85842b2a5e609c2d2b764e5de9\"}\n",
+      "stderr": "",
+      "raw": {
+        "sha256": "f9a15bdc49007f9f182d87fadfba8bc633520ee9e097507afe29279a7ed60021",
+        "bytes": 10847
+      }
+    },
+    {
+      "name": "bounded-body-tamper",
+      "command": [
+        "node",
+        "/workspace/scratch/motion-server-method-final-20261001T144242Z/source/bench/profile/server-profile-contract.mjs",
+        "--raw",
+        "/tmp/server-method-second-order-144242Z/current-refusal.json",
+        "--digest",
+        "f9a15bdc49007f9f182d87fadfba8bc633520ee9e097507afe29279a7ed60021",
+        "--journal",
+        "/tmp/server-method-second-order-144242Z/changed-body.ndjson"
+      ],
+      "startUtc": "2026-10-01T15:17:50.133325+00:00",
+      "endUtc": "2026-10-01T15:17:50.194623+00:00",
+      "exitCode": 1,
+      "expectedExitCode": 1,
+      "matched": true,
+      "stdout": "",
+      "stderr": "server profile: повреждена цепь журнала\n",
+      "raw": {
+        "sha256": "f9a15bdc49007f9f182d87fadfba8bc633520ee9e097507afe29279a7ed60021",
+        "bytes": 10847
+      }
+    },
+    {
+      "name": "bounded-injected-storage-partial",
+      "command": [
+        "node",
+        "/workspace/scratch/motion-server-method-final-20261001T144242Z/source/bench/profile/server-profile-contract.mjs",
+        "--raw",
+        "/tmp/server-method-second-order-144242Z/injected-storage-partial.json",
+        "--digest",
+        "312b3c074c3597cd390589a2a6dc5c2280482942bd3d7b9f94b4da0ae0fa238a",
+        "--journal",
+        "/tmp/server-method-second-order-144242Z/current-refusal.ndjson"
+      ],
+      "startUtc": "2026-10-01T15:17:50.195040+00:00",
+      "endUtc": "2026-10-01T15:17:50.249494+00:00",
+      "exitCode": 1,
+      "expectedExitCode": 1,
+      "matched": true,
+      "stdout": "",
+      "stderr": "Expected ',' or '}' after property value in JSON at position 31 (line 1 column 32)\n",
+      "raw": {
+        "sha256": "312b3c074c3597cd390589a2a6dc5c2280482942bd3d7b9f94b4da0ae0fa238a",
+        "bytes": 31
+      }
+    }
+  ]
+}

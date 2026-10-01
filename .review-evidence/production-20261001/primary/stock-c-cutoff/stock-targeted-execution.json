@@ -1,0 +1,19 @@
+{
+  "command": [
+    "/tmp/motion-server-toolchain-20261001/bin/pnpm",
+    "exec",
+    "vitest",
+    "run",
+    "test/server-profile-contract.test.ts",
+    "-t",
+    "stock C",
+    "--reporter=json",
+    "--outputFile=/tmp/motion-server-stock-c-profile-20261001T1610Z/stock-targeted.json"
+  ],
+  "cwd": "/workspace/lab-motion",
+  "startUtc": "2026-10-01T16:11:46.408329+00:00",
+  "endUtc": "2026-10-01T16:11:50.851106+00:00",
+  "exitCode": 0,
+  "synthetic": true,
+  "actualRegisteredPerformanceSamples": 0
+}

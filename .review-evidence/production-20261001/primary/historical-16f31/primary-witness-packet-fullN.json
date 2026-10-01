@@ -1,0 +1,322 @@
+{
+  "axis": "measurement correctness",
+  "scope": "immutable16f31 primary-only semantic window witness; no REPORT or author/foreign rationale; synthetic predata",
+  "actualTimingSamples": 0,
+  "immutableArchive": {
+    "path": "/workspace/scratch/motion-server-method-final-20261001T092834Z/method.tar.gz",
+    "sha256": "16f31c652a82bf4b7c2cd077265bd85b926c020c752ecb98a1f00256f0a74a2d",
+    "bytes": 327020756,
+    "manifestSha256": "42c36c00383ca1e5a72864f03b385bf2e208d0bd788682f59e13c98de7aad3eb",
+    "ownerPatchSha256": "640ce6bfadcf26e1f9753225cb96cbf554cb8630fab7737773ba1f24a71a0003"
+  },
+  "protocolDigest": "f3259d5a6bc59ffbc4e41ebab28e182b36e1c5904e8c7434d78877d1b334b5a0",
+  "sourceContext": "5e2ff31a54cd3802a6bd2829a3a962ad014088ac dirty frozen bytes; not final clean package identity",
+  "commands": [
+    {
+      "label": "prepare-local",
+      "command": "python3 prepare-local.py",
+      "cwd": "/workspace/scratch/server-method-measurement-closure-16f31-20261001",
+      "started_utc": "2026-10-01T09:47:51.100710+00:00",
+      "finished_utc": "2026-10-01T09:47:51.124961+00:00",
+      "exit_code": 0,
+      "stdout": "{\"syntheticOnly\": true, \"actualTimingSamples\": 0, \"input\": \"/workspace/scratch/server-method-measurement-closure-16f31-20261001/snapshot/evidence/method-closure/new-synthetic-fixtures.mjs\", \"inputSha256\": \"490883ce74329911267f1323dff2fecc72f75155b7a6fc989cb7220b3e3d9b42\", \"outputSha256\": \"80ad04e994cfe6bc4460d66e2e238ae99ba0b7b95c564f12fa061d9cdeed5c53\", \"transformation\": \"prefix before syntheticBrowser, snapshot imports, export primitive fixtures; no product logic mutation\"}\n",
+      "stderr": ""
+    },
+    {
+      "label": "semantic-wide-window-hypothesis",
+      "command": "node semantic-window-probe.mjs",
+      "cwd": "/workspace/scratch/server-method-measurement-closure-16f31-20261001",
+      "started_utc": "2026-10-01T09:52:32.895497+00:00",
+      "finished_utc": "2026-10-01T09:52:32.963900+00:00",
+      "exit_code": 0,
+      "stdout": "[{\"actualSyntheticDurationMs\":128,\"accepted\":false,\"error\":\"server profile: нет normal-motion oracle\",\"producerValid\":false,\"checkpoints\":[{\"frame\":88.00300000000001,\"start\":88,\"end\":120,\"first\":206.25468750000002,\"last\":280.50468749999845},{\"frame\":136.00599999999935,\"start\":136.005,\"end\":168.005,\"first\":300,\"last\":300},{\"frame\":184.00899999999865,\"start\":184.005,\"end\":216.01,\"first\":300,\"last\":300}],\"terminal\":300,\"sut\":{\"starts\":1,\"cancels\":1,\"connected\":0}},{\"actualSyntheticDurationMs\":256,\"accepted\":true,\"error\":null,\"producerValid\":true,\"checkpoints\":[{\"frame\":88.00300000000001,\"start\":88,\"end\":120,\"first\":103.12734375000001,\"last\":140.25234374999923},{\"frame\":136.00599999999935,\"start\":136.005,\"end\":168.005,\"first\":159.38085937499923,\"last\":196.50585937499847},{\"frame\":184.00899999999865,\"start\":184.005,\"end\":216.01,\"first\":215.63437499999839,\"last\":252.7593749999976}],\"terminal\":300,\"sut\":{\"starts\":1,\"cancels\":1,\"connected\":0}}]\n",
+      "stderr": ""
+    },
+    {
+      "label": "semantic-window-complete-primary",
+      "command": "node semantic-window-probe.mjs",
+      "cwd": "/workspace/scratch/server-method-measurement-closure-16f31-20261001",
+      "started_utc": "2026-10-01T09:57:49.375764+00:00",
+      "finished_utc": "2026-10-01T09:57:49.521653+00:00",
+      "exit_code": 0,
+      "stdout": "[{\"actualSyntheticDurationMs\":128,\"accepted\":false,\"error\":\"server profile: нет normal-motion oracle\",\"producerValid\":false,\"checkpoints\":[{\"frame\":88.00300000000001,\"start\":88,\"end\":120,\"first\":206.25468750000002,\"last\":280.50468749999845},{\"frame\":136.00599999999935,\"start\":136.005,\"end\":168.005,\"first\":300,\"last\":300},{\"frame\":184.00899999999865,\"start\":184.005,\"end\":216.01,\"first\":300,\"last\":300}],\"terminal\":300,\"sut\":{\"starts\":1,\"cancels\":1,\"connected\":0,\"CSSreads\":400}},{\"actualSyntheticDurationMs\":256,\"accepted\":true,\"error\":null,\"producerValid\":true,\"checkpoints\":[{\"frame\":88.00300000000001,\"start\":88,\"end\":120,\"first\":103.12734375000001,\"last\":140.25234374999923},{\"frame\":136.00599999999935,\"start\":136.005,\"end\":168.005,\"first\":159.38085937499923,\"last\":196.50585937499847},{\"frame\":184.00899999999865,\"start\":184.005,\"end\":216.01,\"first\":215.63437499999839,\"last\":252.7593749999976}],\"terminal\":300,\"sut\":{\"starts\":1,\"cancels\":1,\"connected\":0,\"CSSreads\":400}}]\n",
+      "stderr": ""
+    }
+  ],
+  "exactReproduction": {
+    "cwd": "/workspace/scratch/server-method-measurement-closure-16f31-20261001/",
+    "command": "node semantic-window-probe.mjs",
+    "preparation": "python3 prepare-local.py",
+    "result": "semantic-window-probe-result.json"
+  },
+  "files": [
+    {
+      "relative": "semantic-window-probe.mjs",
+      "sha256": "3113c583438b9326c8cc654eedb8f9054d4ab6578971d91db803d489e8855fbd",
+      "bytes": 4630
+    },
+    {
+      "relative": "semantic-window-probe-result.json",
+      "sha256": "12d65de0ec855e95c892ecd15229ae235fcf9d7666b31acca15ace34523258f8",
+      "bytes": 281638
+    },
+    {
+      "relative": "semantic-window-probe-initial-result.json",
+      "sha256": "2a12b4f8fd9f005be99d85993978e7e51dadb813a3d2a3b4c9409a0836947760",
+      "bytes": 27931
+    },
+    {
+      "relative": "semantic-window-mechanism.json",
+      "sha256": "ec3613cefa6139dd038a497666a20b8894c363d1888fbf77ec04f52efc724215",
+      "bytes": 14376
+    },
+    {
+      "relative": "semantic-replay.mjs",
+      "sha256": "1ef54baf82b64f209c76fe8c6b60ab808311103b3d64670783e387792790154b",
+      "bytes": 5101
+    },
+    {
+      "relative": "fixture-local.mjs",
+      "sha256": "80ad04e994cfe6bc4460d66e2e238ae99ba0b7b95c564f12fa061d9cdeed5c53",
+      "bytes": 16971
+    },
+    {
+      "relative": "prepare-local.py",
+      "sha256": "3d65b84e552f10f8490889d531bac16ba689b791f2e972ba96ef63b2ce92a003",
+      "bytes": 843
+    },
+    {
+      "relative": "prepare-local-receipt.json",
+      "sha256": "544611701daae462eed695a8aeced3e278d3b4fb07b2fc24f46c922d2a3f804e",
+      "bytes": 495
+    },
+    {
+      "relative": "snapshot/source/bench/compare/bench.mjs",
+      "sha256": "4581e2b8ad48d900cebb12b9a89602094571821ed62c60d829de3e7daf93a14b",
+      "bytes": 51764
+    },
+    {
+      "relative": "snapshot/source/bench/compare/methodology.mjs",
+      "sha256": "323aba385bee62b993b9882245a4ae99d31494bc0200ffacf02b17daca27afa0",
+      "bytes": 47346
+    },
+    {
+      "relative": "snapshot/source/bench/profile/server-profile-contract.mjs",
+      "sha256": "5ad82b1674a854e0679dccd2af72f5d0e378c38c5b5cc8c02dcdc161beab81af",
+      "bytes": 57707
+    },
+    {
+      "relative": "snapshot/source/bench/profile/server-profile-registration.mjs",
+      "sha256": "9e2be42a205b15b424084f83089cefd6e1c870170ad620c9fa4cc9545ed0507e",
+      "bytes": 11365
+    },
+    {
+      "relative": "snapshot/source/bench/compare/provenance.mjs",
+      "sha256": "51881a4a6ea2e1ad0330888e7e1b9c8b6e7c7aef3a3eb798a4185c7c3b846623",
+      "bytes": 24949
+    },
+    {
+      "relative": "snapshot/source/scripts/bench-transform-support.mjs",
+      "sha256": "ddbcf5b758133624b3f285947457a8831872847c0e1913ee9afe163f751307c6",
+      "bytes": 30270
+    },
+    {
+      "relative": "snapshot/source/scripts/bench-support.mjs",
+      "sha256": "1764ccb1c2d2ca5ebe1b638f5e49526fe56a9f0c8ee05cd488142d840d1301fd",
+      "bytes": 16429
+    },
+    {
+      "relative": "fullN-window-cli.mjs",
+      "sha256": "3d40f22073d87897c000185308f185051d5bb4486541c0aa1744eaba3e3b15fa",
+      "bytes": 3804
+    },
+    {
+      "relative": "fixture-admission-local.mjs",
+      "sha256": "a8bb6a84fcfff995b038bfd188ea080ac79c63b484900fdec9708eafd7b7b802",
+      "bytes": 16981
+    },
+    {
+      "relative": "fullN-window-receipts.json",
+      "sha256": "a03ecf14ccbb0765e0d7f865b1892f72d9389c1f34087e06b6059a325c29cdad",
+      "bytes": 4016
+    },
+    {
+      "relative": "compress-primary.py",
+      "sha256": "cd82052971f9b8b4c79769982c4af2091392950ce46d73102230eb2a320bb4d2",
+      "bytes": 2060
+    },
+    {
+      "relative": "compression-receipt.json",
+      "sha256": "a136ae4c355d1441d57201d716364cd770d5e62e5c4d36f52a2eaf2cd5aa6655",
+      "bytes": 3678
+    },
+    {
+      "relative": "snapshot/evidence/method-closure/new-synthetic-fixtures.mjs",
+      "sha256": "490883ce74329911267f1323dff2fecc72f75155b7a6fc989cb7220b3e3d9b42",
+      "bytes": 19953
+    }
+  ],
+  "publicFullNReplay": {
+    "performed": true,
+    "actualTimingSamples": 0,
+    "receipts": [
+      {
+        "name": "healthy",
+        "synthetic": true,
+        "actualTimingSamples": 0,
+        "registeredRuns": 288,
+        "independentBlocks": 144,
+        "protocolDigest": "f3259d5a6bc59ffbc4e41ebab28e182b36e1c5904e8c7434d78877d1b334b5a0",
+        "mutation": null,
+        "command": [
+          "/opt/codex/runtimes/codex-primary-runtime/dependencies/node/bin/node",
+          "/workspace/scratch/server-method-measurement-closure-16f31-20261001/snapshot/source/bench/profile/server-profile-contract.mjs",
+          "--raw",
+          "/workspace/scratch/server-method-measurement-closure-16f31-20261001/fullN-window/healthy.json",
+          "--digest",
+          "aad25947e82354c6e03a792135104bc196310349429c6bcf2f8b800b03566284",
+          "--journal",
+          "/workspace/scratch/server-method-measurement-closure-16f31-20261001/fullN-window/healthy.ndjson"
+        ],
+        "startUtc": "2026-10-01T10:10:36.671Z",
+        "endUtc": "2026-10-01T10:10:47.835Z",
+        "raw": {
+          "path": "/workspace/scratch/server-method-measurement-closure-16f31-20261001/fullN-window/healthy.json",
+          "sha256": "aad25947e82354c6e03a792135104bc196310349429c6bcf2f8b800b03566284",
+          "bytes": 258235047
+        },
+        "journal": {
+          "path": "/workspace/scratch/server-method-measurement-closure-16f31-20261001/fullN-window/healthy.ndjson",
+          "sha256": "e934ecff18cadcb31bcfc2b03d433b15712907d8b8e28005722a2818a9cb12b9",
+          "bytes": 260747685,
+          "records": 10335
+        },
+        "status": 0,
+        "signal": null,
+        "error": null,
+        "stdout": "{\"verification\":\"server-cell-only\",\"verdict\":\"PASS\",\"unproven\":[\"mobile Android/iOS\",\"physical 60/120 Hz\",\"whole-page energy\",\"GPU\",\"M-04 physical-device envelope\",\"M-05 product scene families\"],\"journalFinalDigest\":\"744c2ecfe0913705222585048ebfd860f4d3f1dd3d77b87798fd1bc5ed67aae8\"}\n",
+        "stderr": ""
+      },
+      {
+        "name": "duration256-wide-window",
+        "synthetic": true,
+        "actualTimingSamples": 0,
+        "registeredRuns": 288,
+        "independentBlocks": 144,
+        "protocolDigest": "f3259d5a6bc59ffbc4e41ebab28e182b36e1c5904e8c7434d78877d1b334b5a0",
+        "mutation": {
+          "stage": "ab",
+          "scene": "s2",
+          "run": 0,
+          "participant": "right",
+          "field": "semanticEvidence",
+          "sourceResultSha256": "12d65de0ec855e95c892ecd15229ae235fcf9d7666b31acca15ace34523258f8",
+          "sourceRowDurationMs": 256,
+          "rawClocksUnchanged": true
+        },
+        "command": [
+          "/opt/codex/runtimes/codex-primary-runtime/dependencies/node/bin/node",
+          "/workspace/scratch/server-method-measurement-closure-16f31-20261001/snapshot/source/bench/profile/server-profile-contract.mjs",
+          "--raw",
+          "/workspace/scratch/server-method-measurement-closure-16f31-20261001/fullN-window/duration256-wide-window.json",
+          "--digest",
+          "0ecd9cd41231115482d0d5bffb1b8a0c4f49656181101875c0fe9046d10f40aa",
+          "--journal",
+          "/workspace/scratch/server-method-measurement-closure-16f31-20261001/fullN-window/duration256-wide-window.ndjson"
+        ],
+        "startUtc": "2026-10-01T10:10:56.121Z",
+        "endUtc": "2026-10-01T10:11:06.676Z",
+        "raw": {
+          "path": "/workspace/scratch/server-method-measurement-closure-16f31-20261001/fullN-window/duration256-wide-window.json",
+          "sha256": "0ecd9cd41231115482d0d5bffb1b8a0c4f49656181101875c0fe9046d10f40aa",
+          "bytes": 258241889
+        },
+        "journal": {
+          "path": "/workspace/scratch/server-method-measurement-closure-16f31-20261001/fullN-window/duration256-wide-window.ndjson",
+          "sha256": "5d1bd1d603aa6c7b1f76cfbf3dcfd112c579205a0971a794ca82d6b20fa9c8ef",
+          "bytes": 260754527,
+          "records": 10335
+        },
+        "status": 0,
+        "signal": null,
+        "error": null,
+        "stdout": "{\"verification\":\"server-cell-only\",\"verdict\":\"PASS\",\"unproven\":[\"mobile Android/iOS\",\"physical 60/120 Hz\",\"whole-page energy\",\"GPU\",\"M-04 physical-device envelope\",\"M-05 product scene families\"],\"journalFinalDigest\":\"514cec8d9ecaf0fd1ffbca58f0e494b9249fc3667fa0c64b4c536bb1ab224e43\"}\n",
+        "stderr": ""
+      }
+    ],
+    "compression": {
+      "scope": "owned synthetic primary carrier conversion only",
+      "actualTimingSamples": 0,
+      "utc": "2026-10-01T10:14:38.098807+00:00",
+      "rows": [
+        {
+          "case": "healthy",
+          "kind": "raw",
+          "originalPath": "/workspace/scratch/server-method-measurement-closure-16f31-20261001/fullN-window/healthy.json",
+          "originalSha256": "aad25947e82354c6e03a792135104bc196310349429c6bcf2f8b800b03566284",
+          "originalBytes": 258235047,
+          "gzipPath": "/workspace/scratch/server-method-measurement-closure-16f31-20261001/fullN-window/healthy.json.gz",
+          "gzipSha256": "2389eba84c1f6c1adad9f5021ecb0490ddd94006b8f0039d86744b94aa6b6fd8",
+          "gzipBytes": 12476112,
+          "fullReadbackSha256": "aad25947e82354c6e03a792135104bc196310349429c6bcf2f8b800b03566284",
+          "fullReadbackBytes": 258235047,
+          "byteIdenticalReadback": true,
+          "plaintextDisposition": "replaced after durable compression receipt under explicit root instruction",
+          "level": 1,
+          "mtime": 0
+        },
+        {
+          "case": "healthy",
+          "kind": "journal",
+          "originalPath": "/workspace/scratch/server-method-measurement-closure-16f31-20261001/fullN-window/healthy.ndjson",
+          "originalSha256": "e934ecff18cadcb31bcfc2b03d433b15712907d8b8e28005722a2818a9cb12b9",
+          "originalBytes": 260747685,
+          "gzipPath": "/workspace/scratch/server-method-measurement-closure-16f31-20261001/fullN-window/healthy.ndjson.gz",
+          "gzipSha256": "89c668b776b7dd03f1582cdb1971f62de7f6580eb894a7bc57343700c5a226e3",
+          "gzipBytes": 13500107,
+          "fullReadbackSha256": "e934ecff18cadcb31bcfc2b03d433b15712907d8b8e28005722a2818a9cb12b9",
+          "fullReadbackBytes": 260747685,
+          "byteIdenticalReadback": true,
+          "plaintextDisposition": "replaced after durable compression receipt under explicit root instruction",
+          "level": 1,
+          "mtime": 0
+        },
+        {
+          "case": "duration256-wide-window",
+          "kind": "raw",
+          "originalPath": "/workspace/scratch/server-method-measurement-closure-16f31-20261001/fullN-window/duration256-wide-window.json",
+          "originalSha256": "0ecd9cd41231115482d0d5bffb1b8a0c4f49656181101875c0fe9046d10f40aa",
+          "originalBytes": 258241889,
+          "gzipPath": "/workspace/scratch/server-method-measurement-closure-16f31-20261001/fullN-window/duration256-wide-window.json.gz",
+          "gzipSha256": "2723409f54744f2f2bc8d3be1fb1934d50aa195ddadb88543392f8e4e8edeeec",
+          "gzipBytes": 12480353,
+          "fullReadbackSha256": "0ecd9cd41231115482d0d5bffb1b8a0c4f49656181101875c0fe9046d10f40aa",
+          "fullReadbackBytes": 258241889,
+          "byteIdenticalReadback": true,
+          "plaintextDisposition": "replaced after durable compression receipt under explicit root instruction",
+          "level": 1,
+          "mtime": 0
+        },
+        {
+          "case": "duration256-wide-window",
+          "kind": "journal",
+          "originalPath": "/workspace/scratch/server-method-measurement-closure-16f31-20261001/fullN-window/duration256-wide-window.ndjson",
+          "originalSha256": "5d1bd1d603aa6c7b1f76cfbf3dcfd112c579205a0971a794ca82d6b20fa9c8ef",
+          "originalBytes": 260754527,
+          "gzipPath": "/workspace/scratch/server-method-measurement-closure-16f31-20261001/fullN-window/duration256-wide-window.ndjson.gz",
+          "gzipSha256": "959199bc16301c805d905ebb5c90b7e20482ecf64515420623424b6ac7c670c7",
+          "gzipBytes": 13511260,
+          "fullReadbackSha256": "5d1bd1d603aa6c7b1f76cfbf3dcfd112c579205a0971a794ca82d6b20fa9c8ef",
+          "fullReadbackBytes": 260754527,
+          "byteIdenticalReadback": true,
+          "plaintextDisposition": "replaced after durable compression receipt under explicit root instruction",
+          "level": 1,
+          "mtime": 0
+        }
+      ]
+    },
+    "scope": "independently constructed coherent synthetic full pipeline; actual producer/consumer primary trace, not actual performance qualification"
+  },
+  "processes": "all bounded commands exited; no live process owned by review",
+  "parentPrimaryPacketSha256": "9d3032251c11cf5c5a556479ee9da692cef8ff793cdbd6fd1eb6b691a4a37d4d"
+}

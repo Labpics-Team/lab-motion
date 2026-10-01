@@ -1,0 +1,149 @@
+{
+  "schema": 1,
+  "axis": "bounded primary evidence portability map; metadata/source identity only",
+  "sourceWitnessHead": "85a837e83912ec6b3144b385d938b66a0c63adcf",
+  "outputs": [
+    {
+      "path": "/tmp/motion-primary-portability-map-20261001/16f31-packet-metadata.json",
+      "name": "16f31-packet-metadata.json",
+      "bytes": 11117,
+      "sha256": "7412a27224c1461e7f69ebaa77ea85e04256ce91bc16d5159ffae86d5b99920b"
+    },
+    {
+      "path": "/tmp/motion-primary-portability-map-20261001/5dc-compression-receipt.json",
+      "name": "5dc-compression-receipt.json",
+      "bytes": 5801,
+      "sha256": "f59bfde9125cb43f20585f25e1b3b3f45a8045ba21292bc0668ecdb686f26ded"
+    },
+    {
+      "path": "/tmp/motion-primary-portability-map-20261001/5dc-current-readset-receipt.json",
+      "name": "5dc-current-readset-receipt.json",
+      "bytes": 7368,
+      "sha256": "f783a32fc18902266281ed5f431fd514477ffd012199503907fb3f465c5e6b5d"
+    },
+    {
+      "path": "/tmp/motion-primary-portability-map-20261001/5dc-manifest-gzip-metadata.json",
+      "name": "5dc-manifest-gzip-metadata.json",
+      "bytes": 24819,
+      "sha256": "d2ff31c156e93d061dde6230412d186a82659bfa3160c7a73f16405de572638c"
+    },
+    {
+      "path": "/tmp/motion-primary-portability-map-20261001/5dc-primary-only-file-metadata.json",
+      "name": "5dc-primary-only-file-metadata.json",
+      "bytes": 15911,
+      "sha256": "4196916a92b16554acaeafe525b332d9544648fa60ccf14bd8f27483adf20b80"
+    },
+    {
+      "path": "/tmp/motion-primary-portability-map-20261001/5dc-terminal-manifest.json",
+      "name": "5dc-terminal-manifest.json",
+      "bytes": 1483,
+      "sha256": "71e0b60eac0e833a7ffce6bc0fdcf8e2474211077c2ffc093faf32f44ac2a01e"
+    },
+    {
+      "path": "/tmp/motion-primary-portability-map-20261001/6fe08-packet-metadata.json",
+      "name": "6fe08-packet-metadata.json",
+      "bytes": 15288,
+      "sha256": "06c8d06d31768b4d805f0c4c6458d706efce54fead12304c418835a6edbc5aad"
+    },
+    {
+      "path": "/tmp/motion-primary-portability-map-20261001/REPORT-RU.md",
+      "name": "REPORT-RU.md",
+      "bytes": 6976,
+      "sha256": "84d38355fe007fc5fe36c5d8f3e4015972fcddca39ffe99a074b2c71f1bb24db"
+    },
+    {
+      "path": "/tmp/motion-primary-portability-map-20261001/budget-and-staging-bound.json",
+      "name": "budget-and-staging-bound.json",
+      "bytes": 489,
+      "sha256": "59975d84203ad6e6f32938a0e82df316f9b32f42102f0ca211b842b4a1041110"
+    },
+    {
+      "path": "/tmp/motion-primary-portability-map-20261001/collect-map.py",
+      "name": "collect-map.py",
+      "bytes": 22866,
+      "sha256": "340c515df6efa4fc8d6f92576ad58ce67fe3af3b59708b3a6284b9b3dd27c0d3"
+    },
+    {
+      "path": "/tmp/motion-primary-portability-map-20261001/commands.jsonl",
+      "name": "commands.jsonl",
+      "bytes": 336,
+      "sha256": "106e0db2d5dc2c94352fd22161416c3912c7a070c713df07c2f47b4f1e8ba7b7"
+    },
+    {
+      "path": "/tmp/motion-primary-portability-map-20261001/direct-ref-stat-sha256.json",
+      "name": "direct-ref-stat-sha256.json",
+      "bytes": 2303,
+      "sha256": "c65832fd906ec21cd8af43f507ff915ac290b921205b1f6389b5181e113cd2ee"
+    },
+    {
+      "path": "/tmp/motion-primary-portability-map-20261001/excluded.json",
+      "name": "excluded.json",
+      "bytes": 266,
+      "sha256": "2397cbc95ffaaa711f6fa69f78f0f7b540b3e91c13a82500551239c5f4621383"
+    },
+    {
+      "path": "/tmp/motion-primary-portability-map-20261001/git-object-ingest-map.json",
+      "name": "git-object-ingest-map.json",
+      "bytes": 280109,
+      "sha256": "7e20afcdb2591da358d0261ae7864fd6c153dd79529564ad21794b387aeececc"
+    },
+    {
+      "path": "/tmp/motion-primary-portability-map-20261001/portable-file-map.json",
+      "name": "portable-file-map.json",
+      "bytes": 732972,
+      "sha256": "3309df4f2333ff7f10b209c818dda92b119ee53a5636076221cde1eb1d81af9f"
+    },
+    {
+      "path": "/tmp/motion-primary-portability-map-20261001/probe-failure-1.json",
+      "name": "probe-failure-1.json",
+      "bytes": 291,
+      "sha256": "97e2d5671cc4847e78bdf115886dffdbb82933abed898ea627aaaff33bd03b2b"
+    },
+    {
+      "path": "/tmp/motion-primary-portability-map-20261001/readset.json",
+      "name": "readset.json",
+      "bytes": 235482,
+      "sha256": "50e0786bda31da6ba96edf01437a72095755d83ab16fab03186fb89bf3eb5395"
+    },
+    {
+      "path": "/tmp/motion-primary-portability-map-20261001/second-order-evidence-manifest.json",
+      "name": "second-order-evidence-manifest.json",
+      "bytes": 18114,
+      "sha256": "24578998ebe9c0064e604704b40afd22816e3d157f71d084c94ca6600cc6c68f"
+    },
+    {
+      "path": "/tmp/motion-primary-portability-map-20261001/second-order-report-receipt.json",
+      "name": "second-order-report-receipt.json",
+      "bytes": 704,
+      "sha256": "25b2653da26c8509dc74228b16923d43a724dfa0f963a030da92dec24f3cb6ab"
+    },
+    {
+      "path": "/tmp/motion-primary-portability-map-20261001/source-and-existing-url-map.json",
+      "name": "source-and-existing-url-map.json",
+      "bytes": 516442,
+      "sha256": "fbbbf503b3d5737ebdfc1f3f97261ebd2e7404988290df445b784f6701b8d2f1"
+    },
+    {
+      "path": "/tmp/motion-primary-portability-map-20261001/summary.json",
+      "name": "summary.json",
+      "bytes": 9101,
+      "sha256": "dac713f8726cd8432d41b69ebda4ee811a079af7ec05efbfcb7d99faf08ce0a3"
+    },
+    {
+      "path": "/tmp/motion-primary-portability-map-20261001/witness-primary-ref-readset.json",
+      "name": "witness-primary-ref-readset.json",
+      "bytes": 3956,
+      "sha256": "e29a218598e3e92269f52c268492085fd3937f3040c32d1950b7ec70bb3399f0"
+    },
+    {
+      "path": "/tmp/motion-primary-portability-map-20261001/witness-to-portable-map.json",
+      "name": "witness-to-portable-map.json",
+      "bytes": 46280,
+      "sha256": "bed3f56bad14aeff7dc631682a3e1c5f7a517551dfe8c77ffa03721234f78f23"
+    }
+  ],
+  "primarySourcesReadOnly": true,
+  "heavyProcessesStarted": 0,
+  "sourceGitOrPrMutations": false,
+  "processes": "END"
+}

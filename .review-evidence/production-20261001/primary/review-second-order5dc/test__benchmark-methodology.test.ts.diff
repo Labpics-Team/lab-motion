@@ -1,0 +1,20 @@
+--- old/test/benchmark-methodology.test.ts
++++ new/test/benchmark-methodology.test.ts
+@@ -487,6 +487,17 @@
+     expect(evaluateStartSemanticEvidence(evidence, config, 1)).toBe(accepted);
+   });
+ 
++  it.each([0, 75])('fresh0→300 связывает фазу с API start, offset=%s', (offset) => {
++    const config = { ...START_SCENARIO_MANIFEST.s2, targetsPerCall: 3, durationMs: 128, fromPx: 0, requireFreshStart: true };
++    const evidence = { topology: { calls: 1, targetsPerCall: 3, staggerGapMs: 0, durationMs: 128, toPx: 300 },
++      callStartedAtMs: [0], onset: { before: [{ readStartedMs: 0, readEndedMs: 0, positions: [0, 0, 0] }],
++        after: [{ readStartedMs: 0.025, readEndedMs: 0.05, positions: [offset, offset, offset] }] },
++      checkpoints: [32, 64, 80].map((time) => ({ frameTimestampMs: time,
++        groups: [{ readStartedMs: time, readEndedMs: time + 0.1, positions: Array(3).fill(Math.min(300, offset + 300 * time / 128)) }] })),
++      terminal: [[300, 300, 300]] };
++    expect(evaluateStartSemanticEvidence(evidence, config, 1)).toBe(offset === 0);
++  });
++
+   it('bootstraps paired independent run clusters reproducibly without flattening rounds', () => {
+     const clusters = (base: number) => Array.from({ length: 12 }, (_, run) => ({
+       run,

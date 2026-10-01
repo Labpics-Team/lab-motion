@@ -1,0 +1,90 @@
+[
+  {
+    "path": "bench/profile/server-profile-registration.mjs",
+    "old": {
+      "sha256": "0d6872d178298b6330a87392f2db884fc15ef4c0b6d41d29309fd94f510e92dd",
+      "bytes": 11463
+    },
+    "new": {
+      "sha256": "211b4c0e107b56d06eb57e0b49f21bc3b1d06a06f34ffec1c06d4ecd15485396",
+      "bytes": 14622
+    }
+  },
+  {
+    "path": "bench/profile/server-profile-contract.mjs",
+    "old": {
+      "sha256": "5ad82b1674a854e0679dccd2af72f5d0e378c38c5b5cc8c02dcdc161beab81af",
+      "bytes": 57707
+    },
+    "new": {
+      "sha256": "0fb91bc3a109b46ac5bd3c63fc63f251ecc33ab89d81b90173f5c927f844afcd",
+      "bytes": 62912
+    }
+  },
+  {
+    "path": "bench/profile/server-profile-runner.mjs",
+    "old": {
+      "sha256": "d1745dd3a088e573f894533db9521fc22d3679107ab5a583c63d745047ae9b4a",
+      "bytes": 43677
+    },
+    "new": {
+      "sha256": "749d9708f83a5922983effd077a69f1930d2429cf60c895760f4130177edc87b",
+      "bytes": 43661
+    }
+  },
+  {
+    "path": "test/server-profile-contract.test.ts",
+    "old": {
+      "sha256": "5c41d877dc247073c1b1a5dbf121e06f6baefa221957bf90b1476e4227926743",
+      "bytes": 56939
+    },
+    "new": {
+      "sha256": "7147f065ea2e5ec6780e21997505ed0d28909afebde3e73dbeb2d0f7cbef94b0",
+      "bytes": 73451
+    }
+  },
+  {
+    "path": "docs/server-profile.md",
+    "old": {
+      "sha256": "d683a0383ac28ef8b7d0121dff356d939b4b085747cc9a0ed36d7651795fab28",
+      "bytes": 18776
+    },
+    "new": {
+      "sha256": "018918e1e68495b8fcce0a81fd296442bed2ac1c994e7594485e75b1fe8379fc",
+      "bytes": 23692
+    }
+  },
+  {
+    "path": "bench/compare/bench.mjs",
+    "old": {
+      "sha256": "4581e2b8ad48d900cebb12b9a89602094571821ed62c60d829de3e7daf93a14b",
+      "bytes": 51764
+    },
+    "new": {
+      "sha256": "f4aa1628b6320a08c5444277fe6a6a26c9e3f9f42db845db5821b5bf4334b467",
+      "bytes": 54929
+    }
+  },
+  {
+    "path": "bench/compare/methodology.mjs",
+    "old": {
+      "sha256": "44b160de3b6d33986373d685018f6164d765965522e70d0c3b24a1e401553c25",
+      "bytes": 48934
+    },
+    "new": {
+      "sha256": "e090f47784312a3fc936326157747f346718e2245c275eed62b41cf0de0b1702",
+      "bytes": 53464
+    }
+  },
+  {
+    "path": "test/benchmark-methodology.test.ts",
+    "old": {
+      "sha256": "5ae67016d4669336732407dd31d6e1cd1e8e41267a6e0b56013d9ae8a7eedc6c",
+      "bytes": 32789
+    },
+    "new": {
+      "sha256": "3faa3ba6131b6864bba17ec65c2a1b52dd6ab082dac8c602fbc86cb508c80f0b",
+      "bytes": 33675
+    }
+  }
+]

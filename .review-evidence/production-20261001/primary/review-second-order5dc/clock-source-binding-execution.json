@@ -1,0 +1,9 @@
+{
+  "command": [
+    "node",
+    "/workspace/scratch/server-method-second-order-final-20261001/closure-144242Z/clock-source-binding-probe.mjs"
+  ],
+  "finishedUtc": "2026-10-01T15:20:11.856951+00:00",
+  "exitCode": 0,
+  "stderr": ""
+}

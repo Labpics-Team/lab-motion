@@ -1,0 +1,132 @@
+{
+  "affectedPassed": 307,
+  "affectedFailed": 0,
+  "affectedSkipped": 0,
+  "affectedCommand": [
+    "/tmp/motion-server-toolchain-20261001/bin/pnpm",
+    "exec",
+    "vitest",
+    "run",
+    "test/server-profile-contract.test.ts",
+    "test/benchmark-methodology.test.ts",
+    "test/bench-transform-pair.test.ts",
+    "test/benchmark-report-contract.test.ts",
+    "--reporter=json",
+    "--outputFile=/workspace/scratch/motion-server-frame-clock-closure-20261001T1310Z/affected-first-publication-final.json"
+  ],
+  "workersScope": "Существующий default Vitest config, без увеличения timeout или workers override.",
+  "publicCliCases": 15,
+  "maxRunsConsumer": 1024,
+  "actualRegisteredPerformanceSamples": 0,
+  "fullNUnitDurationsMs": {
+    "завершённый public admission отвергает четыре независимых reviewer counterexamples": 24367.924258,
+    "сохраняет partial A/B и поздний отказ, а пропавшие comparator/retention не допускает": 18738.976824999998
+  },
+  "wholeSourceChecks": [
+    {
+      "execution": {
+        "head": "8fb55ca0a116e5381a43351ab28834d17a4a9299",
+        "command": [
+          "pnpm",
+          "vitest",
+          "run",
+          "--reporter=verbose",
+          "--reporter=json",
+          "--outputFile=/workspace/lab-motion/scratchpad/vitest-combined-8fb55ca0.json"
+        ],
+        "cwd": "/workspace/lab-motion",
+        "startedAt": "2026-10-01T13:59:10.442210+00:00",
+        "exitCode": 0,
+        "endedAt": "2026-10-01T14:01:07.855867+00:00"
+      },
+      "passedTests": 4915,
+      "files": 344,
+      "skipped": 0
+    },
+    {
+      "execution": {
+        "head": "8fb55ca0a116e5381a43351ab28834d17a4a9299",
+        "command": [
+          "pnpm",
+          "vitest",
+          "run",
+          "--reporter=verbose",
+          "--reporter=json",
+          "--outputFile=/workspace/lab-motion/scratchpad/finiteness-combined-8fb55ca0.json",
+          "test/animate-facade-finiteness-fuzz.test.ts",
+          "test/animate-overflow-finiteness-fuzz.test.ts",
+          "test/behaviors-finiteness-fuzz.test.ts",
+          "test/decay-finiteness-fuzz.test.ts",
+          "test/easing-finiteness-fuzz.test.ts",
+          "test/projection-finiteness-fuzz.test.ts",
+          "test/smart-finiteness-fuzz.test.ts",
+          "test/solver-finiteness-fuzz.test.ts",
+          "test/timeline-finiteness-fuzz.test.ts",
+          "test/utils-finiteness-fuzz.test.ts"
+        ],
+        "startedAt": "2026-10-01T14:02:57.837553+00:00",
+        "exitCode": 0,
+        "endedAt": "2026-10-01T14:03:06.187905+00:00"
+      },
+      "passedTests": 111,
+      "files": 10,
+      "skipped": 0
+    }
+  ],
+  "prepush": [
+    {
+      "name": "static",
+      "head": "8fb55ca0a116e5381a43351ab28834d17a4a9299",
+      "command": [
+        "pnpm",
+        "check:static"
+      ],
+      "startedAt": "2026-10-01T14:33:13.283138+00:00",
+      "endedAt": "2026-10-01T14:33:25.901820+00:00",
+      "exitCode": 0
+    },
+    {
+      "name": "docs-facts",
+      "head": "8fb55ca0a116e5381a43351ab28834d17a4a9299",
+      "command": [
+        "node",
+        "scripts/check-docs-facts.mjs"
+      ],
+      "startedAt": "2026-10-01T14:33:25.902205+00:00",
+      "endedAt": "2026-10-01T14:33:25.957892+00:00",
+      "exitCode": 0
+    },
+    {
+      "name": "docs-drift",
+      "head": "8fb55ca0a116e5381a43351ab28834d17a4a9299",
+      "command": [
+        "node",
+        "scripts/check-docs-drift.mjs"
+      ],
+      "startedAt": "2026-10-01T14:33:25.958313+00:00",
+      "endedAt": "2026-10-01T14:33:26.016583+00:00",
+      "exitCode": 0
+    },
+    {
+      "name": "compiler-acceptance",
+      "head": "8fb55ca0a116e5381a43351ab28834d17a4a9299",
+      "command": [
+        "pnpm",
+        "acceptance:compiler"
+      ],
+      "startedAt": "2026-10-01T14:33:26.017028+00:00",
+      "endedAt": "2026-10-01T14:33:27.831269+00:00",
+      "exitCode": 0
+    }
+  ],
+  "semanticOnlyActualHealthy": {
+    "rawSha256": "eff07df7c8a163edaa489ce84199f937dae65b37329ea7f59e546e6ec4c3b2d1",
+    "protocolDigest": "00e8d5880eb83dd27a52f90cc670d4ecc550229458af039d9924485805c25431",
+    "acceptedScenes": [
+      "s2",
+      "s3"
+    ],
+    "sourceHashesMatched": true
+  },
+  "scope": "CLI/counters/provenance синтетические; actual healthy — только normal-motion semantic control. Независимая приёмка метода ещё не выдана."
+}

@@ -1,0 +1,26 @@
+{
+  "heavyEndUtc": "2026-10-01T15:38:46.291564+00:00",
+  "processesClosed": true,
+  "noFifosRemain": true,
+  "actualRegisteredTimingSamples": 0,
+  "cases": [
+    {
+      "name": "current-fullN-own-healthy",
+      "exit": 0,
+      "endUtc": "2026-10-01T15:37:18.156439+00:00",
+      "decodedReadbackMatched": true
+    },
+    {
+      "name": "current-fullN-own-first-quarter",
+      "exit": 1,
+      "endUtc": "2026-10-01T15:37:41.468646+00:00",
+      "decodedReadbackMatched": true
+    },
+    {
+      "name": "current-fullN-retained-own-failure",
+      "exit": 0,
+      "endUtc": "2026-10-01T15:37:55.197336+00:00",
+      "decodedReadbackMatched": true
+    }
+  ]
+}

@@ -1,0 +1,54 @@
+{
+  "schema": 1,
+  "exactOwnProbeArgvAndEpochs": [
+    {
+      "path": "/workspace/scratch/server-method-second-order-final-20261001/closure-144242Z/light-probe-execution.json",
+      "sha256": "286b2866cefdbfbd34fa764b3c5032f1282f2d8710df3da4de164e1240428217",
+      "bytes": 2062
+    },
+    {
+      "path": "/workspace/scratch/server-method-second-order-final-20261001/closure-144242Z/light-probe-execution.attempt1.json",
+      "sha256": "286b2866cefdbfbd34fa764b3c5032f1282f2d8710df3da4de164e1240428217",
+      "bytes": 2062
+    },
+    {
+      "path": "/workspace/scratch/server-method-second-order-final-20261001/closure-144242Z/consumer-lifecycle-execution.json",
+      "sha256": "7315dd3a5afbe47384be40dbe8d2ff02e5ba1390910645327c488467060a5025",
+      "bytes": 278
+    },
+    {
+      "path": "/workspace/scratch/server-method-second-order-final-20261001/closure-144242Z/clock-source-binding-execution.json",
+      "sha256": "111466428d2f372e365cd54c8971365c00081ead4a748375afdb0bdd5a7a8547",
+      "bytes": 235
+    },
+    {
+      "path": "/workspace/scratch/server-method-second-order-final-20261001/closure-144242Z/bounded-public-cli-results.json",
+      "sha256": "0450f44afa84bf26d4ce7148a94194f6dd4f05f2b12681c4faa61decb2c149c1",
+      "bytes": 3037
+    },
+    {
+      "path": "/workspace/scratch/server-method-second-order-final-20261001/closure-144242Z/storage-capacity-receipt.json",
+      "sha256": "3ccc312a7ffb394c48a5b0f07c21508bce55ee2affa71598d7fa5ddf8184bf53",
+      "bytes": 217
+    }
+  ],
+  "savedSourceReadProcedure": "bounded source blocks stated in readset plus eight complete saved old6fe08-to-current5dc049 diffs; own prior readset reuse bound to exact SHA256",
+  "immutableByteReadbackProcedure": "SHA256 and byte count of all 3789 packet manifest files and archive, no extraction of whole method archive; immutable-verification.json",
+  "savedProbeScripts": [
+    "consumer-lifecycle-probe.mjs",
+    "consumer-lifecycle-probe.attempt1.mjs",
+    "storage-probe.mjs",
+    "clock-source-binding-probe.mjs"
+  ],
+  "fixtureAdaptation": "absolute import prefix only, no values changed; fixture-adaptation.json",
+  "expectedRefusalExitCodes": [
+    0,
+    1,
+    1
+  ],
+  "firstWrongExpectationRetained": true,
+  "actualRegisteredPerformanceSamples": 0,
+  "heavyExecuted": false,
+  "sourceEdits": false,
+  "processes": "END"
+}

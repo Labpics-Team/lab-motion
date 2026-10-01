@@ -1,0 +1,831 @@
+--- a/bench/profile/server-profile-registration.mjs
++++ b/bench/profile/server-profile-registration.mjs
+@@ -35,8 +35,8 @@
+   repetitions: 8,
+   browserBatchCalls: 32,
+   browserSemanticCalls: 1,
+-  browserSemantics: { movementThresholdPx: 0.5, finalTolerancePx: 2,
+-    temporalOracle: 'одна фаза всех clipped/interior CSS координат; полный displacement interval разрешающей пары внутри прежнего CSS допуска; actual rAF/read окна, без расширения при uncertainty' },
++  browserSemantics: { movementThresholdPx: 0.5, finalTolerancePx: 2, requireFreshStart: true, fromPx: 0, requireDocumentFrame: true,
++    temporalOracle: 'наблюдаемый свежий onset 0→300 до/после API; фаза связана с началом вызова; полный displacement interval разрешающей пары внутри прежнего CSS допуска; timed onset ограничен actual batch/read часами; CSS в actual стабильном document frame, связанном с rAF; perf chronology сохранена, без расширения при uncertainty' },
+   warmupRuns: 4,
+   pilotRuns: 8,
+   minRuns: 288,
+@@ -85,13 +85,22 @@
+       timeClamper: { url: 'https://chromium.googlesource.com/chromium/src/+/149.0.7827.55/third_party/blink/renderer/core/timing/time_clamper.cc', sha256: '2491cb64f50a54ccd10f778c058f0960ad4d9fa0861e39212bc27b8343bd103c' },
+       timeClamperHeader: { url: 'https://chromium.googlesource.com/chromium/src/+/149.0.7827.55/third_party/blink/renderer/core/timing/time_clamper.h', sha256: 'f8065edb3ba8da66d58eb7042523fba44b6d515c04d482614670a5414a684944' },
+       performance: { url: 'https://raw.githubusercontent.com/chromium/chromium/149.0.7827.55/third_party/blink/renderer/core/timing/performance.cc', sha256: '62de6788c9361958757f47a173369cc668f3691ec58f27e2d2edfab780efe200' },
++      windowPerformance: { url: 'https://raw.githubusercontent.com/chromium/chromium/149.0.7827.55/third_party/blink/renderer/core/timing/window_performance.cc', sha256: '5916501d9960c6355f1b2b0cee7cbc10091bf63ac64b0bf6397d96e495f71983' },
+       timeTicks: { url: 'https://raw.githubusercontent.com/chromium/chromium/149.0.7827.55/base/time/time_now_posix.cc', sha256: '6a7b898ec4a2eedbfcc2173ca3cac17b188829b9531ba3febcfe942925ed5796' },
++      documentTimeline: { url: 'https://chromium.googlesource.com/chromium/src/+/149.0.7827.55/third_party/blink/renderer/core/animation/document_timeline.cc', sha256: 'e8e405492b4f49f6be850e68c3431d1e2107ac032ea4ff11c433cc726642c702' },
++      animationClock: { url: 'https://chromium.googlesource.com/chromium/src/+/149.0.7827.55/third_party/blink/renderer/core/animation/animation_clock.cc', sha256: 'f3290008c81dab4f17c7ae8439de25c1c95d0204be6dbb16dada0fd1a8e584eb' },
++      animationTimeline: { url: 'https://chromium.googlesource.com/chromium/src/+/149.0.7827.55/third_party/blink/renderer/core/animation/animation_timeline.cc', sha256: '6745f06a855d19691098929b29a5d28331d814c6ae21f1cdf12368eeb7ab5c90' },
++      documentAnimations: { url: 'https://chromium.googlesource.com/chromium/src/+/149.0.7827.55/third_party/blink/renderer/core/animation/document_animations.cc', sha256: '6b20e0668cc740d1e2c9a9828b5316c81b7c43f2eb907af686729e51d10855d2' },
++      pageAnimator: { url: 'https://chromium.googlesource.com/chromium/src/+/149.0.7827.55/third_party/blink/renderer/core/page/page_animator.cc', sha256: 'ba6157ecdc92b5e3375e0239c3b79f39050f5ea3a84d27f65e60b03f1b676e03' },
++      cssComputedStyle: { url: 'https://chromium.googlesource.com/chromium/src/+/149.0.7827.55/third_party/blink/renderer/core/css/css_computed_style_declaration.cc', sha256: 'fc8f9580c1fd1bc2c28d753083925118c38134c37406dcd2f55d98a8ea2bbfb6' },
++      documentStyle: { url: 'https://chromium.googlesource.com/chromium/src/+/149.0.7827.55/third_party/blink/renderer/core/dom/document.cc', sha256: '8a09dd50bdbbca54b11af849376c4f76df2fd62b14ae665c4c208553b4941dd6' },
+       nodeProcess: { url: 'https://raw.githubusercontent.com/nodejs/node/v24.19.0/src/node_process_methods.cc', sha256: '6f2d27513a933dd3d076c0ffe2f95a1846ba1d1060f7ccfbc6eb2df6692a34eb' },
+       libuvCore: { url: 'https://raw.githubusercontent.com/nodejs/node/v24.19.0/deps/uv/src/unix/core.c', sha256: '18bfd5f2045417f8ace5d76e222bf7441b31ead5fc2cbaf6225965e0afea8767' },
+       libuvLinux: { url: 'https://raw.githubusercontent.com/nodejs/node/v24.19.0/deps/uv/src/unix/linux.c', sha256: '215185d94697e05cd75ba9466bb9ea93076769a7767218d4183eaf0723ccf2d2' },
+       linuxRusage: { url: 'https://raw.githubusercontent.com/gregkh/linux/v6.18.44/kernel/sys.c', sha256: '0b656f8809d781b7e684a1a4c4144d925684c69e9f6050c41c6374c5206d2c8d' },
+       linuxTimeval: { url: 'https://raw.githubusercontent.com/gregkh/linux/v6.18.44/kernel/time/time.c', sha256: 'e757e825d72489c929a273f22aba8fa31487c29738960aea2683ac0274a58e6a' },
+     },
++    documentFrame: 'Chromium149 PageAnimator coarsens frame TimeTicks тем же isolated TimeClamper; DocumentTimeline origin совпадает с навигацией; AnimationClock стабилен в rendering/task; CSS recalc обновляет animation timing этим clock. До/после onset API observed publication clock одинаков и связывает origin свежего движения; checkpoint clock одинаков до/после CSS и связан с observed rAF. Frame timestamp может предшествовать execution wall, wall chronology отдельна. Сопоставление frame/perf включает три coarsened timestamps(frame/now/origin): upward(1.5×прежний2-endpoint envelope), без изменения API-cost bounds. Нет qualification или clocks противоречат — отказ. Это clock публикации CSS, а не атрибуция внутреннего таймера JS/native API.',
+     scope: 'Linux: два user/system counters с microsecond truncation; Chromium isolated TimeClamper может округлять в обе стороны на5us, TimeTicks truncates1us; обе clockreads и binary64 roundoff входят в pointwise bounds до CI, без shrink по repeats/N',
+     assumption: 'закреплённые official browser/Node binaries и Linux6.18.44 исполняют указанную upstream clock model; Node hrtime и browser TimeTicks используют общий Linux CLOCK_MONOTONIC без namespace/clock override; observed quantum является control, а не сертификатом error; другие binary/model/небезопасные counters дают отказ',
+   },
+--- a/bench/profile/server-profile-contract.mjs
++++ b/bench/profile/server-profile-contract.mjs
+@@ -48,6 +48,14 @@
+   return { ...errorBounds(measuredMs, errorMs), measuredMs, errorMs };
+ }
+ 
++// В perf интервале общий origin сокращается. Сопоставление document frame
++// с perf API включает три coarsened timestamps: frame, now и origin.
++// Та же закреплённая модель даёт три endpoint envelopes и девять ULP;
++// это semantic relation, не изменение uncertainty измеряемых API costs.
++export function serverBrowserSemanticClockErrorMs(monotonicHostUpperNs) {
++  return nextUp(1.5 * serverBrowserClockBounds({ beginMs: 0, endMs: 0 }, monotonicHostUpperNs).errorMs);
++}
++
+ function compactCoordinates(values) {
+   if (!Array.isArray(values)) return values;
+   const runs = [];
+@@ -59,7 +67,7 @@
+ }
+ 
+ function expandCoordinates(values, count) {
+-  if (Array.isArray(values)) { invariant(values.length === count && values.every(Number.isFinite), 'неполные normal-motion coordinates'); return values; }
++  if (Array.isArray(values)) { invariant(values.length === count && Array.from(values).every(Number.isFinite), 'неполные normal-motion coordinates'); return values; }
+   invariant(values?.encoding === 'rle' && values.count === count && Array.isArray(values.runs) &&
+     isDeepStrictEqual(Object.keys(values).sort(), ['count', 'encoding', 'runs']), 'неполные normal-motion RLE coordinates');
+   const expanded = [];
+@@ -72,10 +80,32 @@
+   return expanded;
+ }
+ 
++function compactSemanticGroups(groups) {
++  if (!Array.isArray(groups)) return groups;
++  return groups.map((group) => group && typeof group === 'object' && !Array.isArray(group) && Object.hasOwn(group, 'positions')
++    ? { ...group, positions: compactCoordinates(group.positions) } : group);
++}
++
+ export function compactServerSemanticEvidence(evidence) {
+-  return { ...evidence, checkpoints: evidence.checkpoints.map((checkpoint) => ({ ...checkpoint,
+-    groups: checkpoint.groups.map((group) => ({ ...group, positions: compactCoordinates(group.positions) })) })),
+-  terminal: evidence.terminal.map(compactCoordinates) };
++  if (!evidence || typeof evidence !== 'object' || Array.isArray(evidence)) return evidence;
++  // Отказ сохраняет приобретённый prefix и дополнительные поля, без создания отсутствующих наблюдений.
++  const compact = { ...evidence };
++  if (Array.isArray(evidence.checkpoints)) compact.checkpoints = evidence.checkpoints.map((checkpoint) =>
++    checkpoint && typeof checkpoint === 'object' && !Array.isArray(checkpoint) && Object.hasOwn(checkpoint, 'groups')
++      ? { ...checkpoint, groups: compactSemanticGroups(checkpoint.groups) } : checkpoint);
++  if (Array.isArray(evidence.terminal)) compact.terminal = evidence.terminal.map(compactCoordinates);
++  if (evidence.onset && typeof evidence.onset === 'object' && !Array.isArray(evidence.onset)) {
++    compact.onset = { ...evidence.onset };
++    for (const phase of ['before', 'after']) {
++      if (Object.hasOwn(evidence.onset, phase)) compact.onset[phase] = compactSemanticGroups(evidence.onset[phase]);
++    }
++    if (Object.hasOwn(evidence.onset, 'firstFrame')) {
++      const first = evidence.onset.firstFrame;
++      compact.onset.firstFrame = first && typeof first === 'object' && !Array.isArray(first) && Object.hasOwn(first, 'groups')
++        ? { ...first, groups: compactSemanticGroups(first.groups) } : first;
++    }
++  }
++  return compact;
+ }
+ 
+ function validateNormalMotion(evidence, scene, monotonicHostUpperNs) {
+@@ -83,12 +113,34 @@
+   invariant(!evidence.failures?.length, 'normal-motion control потерял failure');
+   const calls = SERVER_PROFILE.browserSemanticCalls;
+   invariant(evidence.terminal.length === calls && evidence.checkpoints.length === 3, 'потерян normal-motion checkpoint/call');
+-  const expanded = { ...evidence, checkpoints: evidence.checkpoints.map((checkpoint) => {
++  invariant(evidence.onset && typeof evidence.onset === 'object' && !Array.isArray(evidence.onset), 'нет normal-motion onset observations');
++  const onset = { ...evidence.onset };
++  for (const phase of ['before', 'after']) {
++    invariant(Array.isArray(onset[phase]) && onset[phase].length === calls, `потеряна normal-motion onset ${phase} группа`);
++    onset[phase] = Array.from(onset[phase], (group) => {
++      invariant(group && typeof group === 'object' && !Array.isArray(group), `невалидная normal-motion onset ${phase} группа`);
++      return { ...group, positions: expandCoordinates(group.positions, scene.targetsPerCall) };
++    });
++  }
++  invariant(Number.isFinite(onset.firstFrame?.frameTimestampMs) && Array.isArray(onset.firstFrame.groups) &&
++    onset.firstFrame.groups.length === calls, 'нет normal-motion first publication');
++  onset.firstFrame = { ...onset.firstFrame, groups: onset.firstFrame.groups.map((group) => ({ ...group,
++    positions: expandCoordinates(group?.positions, scene.targetsPerCall) })) };
++  // Clock/zero/phase law принадлежит общему oracle; decoder восстанавливает каждый target.
++  const expanded = { ...evidence, onset, checkpoints: evidence.checkpoints.map((checkpoint) => {
+     invariant(Number.isFinite(checkpoint.frameTimestampMs), 'нет observed normal-motion frame timestamp');
+     invariant(Array.isArray(checkpoint.groups) && checkpoint.groups.length === calls, 'потеряна normal-motion группа');
+     return { ...checkpoint, groups: checkpoint.groups.map((group) => ({ ...group, positions: expandCoordinates(group.positions, scene.targetsPerCall) })) };
+   }), terminal: evidence.terminal.map((values) => expandCoordinates(values, scene.targetsPerCall)) };
+-  const semanticClockErrorMs = serverBrowserClockBounds({ beginMs: 0, endMs: 0 }, monotonicHostUpperNs).errorMs;
++  const semanticClockErrorMs = serverBrowserSemanticClockErrorMs(monotonicHostUpperNs);
++  const observedTimes = [...expanded.callStartedAtMs, expanded.onset.firstFrame.frameTimestampMs,
++    ...expanded.onset.firstFrame.groups.flatMap((group) => [group.readStartedMs, group.readEndedMs, group.documentFrame?.beforeMs, group.documentFrame?.afterMs]),
++    ...['before', 'after'].flatMap((phase) => expanded.onset[phase]
++    .flatMap((group) => [group.readStartedMs, group.readEndedMs, group.documentFrame?.beforeMs, group.documentFrame?.afterMs])), ...expanded.checkpoints.flatMap((checkpoint) =>
++    [checkpoint.frameTimestampMs, ...checkpoint.groups.flatMap((group) => [group.readStartedMs, group.readEndedMs,
++      group.documentFrame?.beforeMs, group.documentFrame?.afterMs])])];
++  invariant(observedTimes.every(Number.isFinite), 'неполные normal-motion clock observations');
++  serverBrowserClockBounds({ beginMs: 0, endMs: Math.max(...observedTimes.map(Math.abs)) }, monotonicHostUpperNs);
+   invariant(evaluateStartSemanticEvidence(expanded, { ...scene, ...SERVER_PROFILE.browserSemantics, semanticClockErrorMs,
+     durationMs: SERVER_PROFILE.durationMs, toPx: SERVER_PROFILE.toPx }, calls), 'normal-motion oracle отверг intermediate/stagger/topology');
+ }
+@@ -229,7 +281,7 @@
+ 
+ function coordinateReader(values, count, label) {
+   if (Array.isArray(values)) {
+-    invariant(values.length === count && values.every(Number.isFinite), `неполные ${label} coordinates`);
++    invariant(values.length === count && Array.from(values).every(Number.isFinite), `неполные ${label} coordinates`);
+     return { at: (index) => values[index], runs: null };
+   }
+   if (values?.encoding === 'repeat') {
+@@ -263,8 +315,17 @@
+   const window = serverBrowserClockBounds({ beginMs: raw.startClock.beginMs, endMs: witness.readClock.endMs }, monotonicHostUpperNs);
+   invariant(window.high < SERVER_PROFILE.durationMs * (1 - SERVER_PROFILE.browserSemantics.finalTolerancePx / SERVER_PROFILE.toPx),
+     'start batch не разрешил окно до линейного endpoint');
+-  for (let call = 0; call < raw.calls; call++) invariant(leading.at(call) >= -SERVER_PROFILE.browserSemantics.finalTolerancePx &&
+-    leading.at(call) < SERVER_PROFILE.toPx - SERVER_PROFILE.browserSemantics.finalTolerancePx, 'timed owner мгновенно достиг endpoint до duration');
++  // Каждый свежий owner вызван после batch begin, а CSS прочитан до read end.
++  // Общая верхняя граница elapsed учитывает обе clock reads и float roundoff.
++  const maximumPosition = nextUp(nextUp(nextUp(SERVER_PROFILE.toPx / SERVER_PROFILE.durationMs) * window.high) +
++    SERVER_PROFILE.browserSemantics.movementThresholdPx);
++  for (let call = 0; call < raw.calls; call++) {
++    const position = leading.at(call);
++    invariant(position >= -SERVER_PROFILE.browserSemantics.finalTolerancePx &&
++      position < SERVER_PROFILE.toPx - SERVER_PROFILE.browserSemantics.finalTolerancePx, 'timed owner мгновенно достиг endpoint до duration');
++    invariant(position >= SERVER_PROFILE.browserSemantics.fromPx - SERVER_PROFILE.browserSemantics.movementThresholdPx &&
++      position <= maximumPosition, 'timed onset не соответствует свежему началу и actual clock окну');
++  }
+ }
+ 
+ function validateCancellationWitness(raw, targets) {
+@@ -650,8 +711,8 @@
+   const seen = new Map(), comparatorSamples = new Map(), retentionSamples = new Map(), failures = [], failedSamples = [];
+   for (let recordIndex = 0; recordIndex < records.length; recordIndex++) {
+     const record = records[recordIndex];
+-    const { digest, ...payload } = record;
+-    invariant(record.sequenceDigest === previous && digest === serverProfileDigest(payload), 'повреждена цепь журнала');
++    const { digest } = record;
++    invariant(record.sequenceDigest === previous && SHA256.test(digest), 'повреждена цепь журнала');
+     previous = digest;
+     if (record.type === 'registration-before-any-sample') {
+       invariant(!registration && !stopped && artifact.registration !== null && seen.size === 0 && isDeepStrictEqual(record.value.registration, artifact.registration) &&
+@@ -737,6 +798,12 @@
+   // Полный raw хешируется после проверки хронологии, failure union и полноты.
+   // Отказ на этих границах не сериализует заведомо негодную историю повторно.
+   invariant(finishedDigest === (rawDigest ?? serverArtifactDigest(artifact)), 'финальная квитанция не связана с raw/вердиктом');
++  // Каждая допущенная история заново проверяет все тела квитанций. Структурный
++  // отказ не повторяет сериализацию raw, не участвующего в успешном admission.
++  for (const record of records) {
++    const { digest, ...payload } = record;
++    invariant(digest === serverProfileDigest(payload), 'повреждена цепь журнала');
++  }
+   return { journalFinalDigest: previous };
+ }
+ 
+--- a/bench/profile/server-profile-runner.mjs
++++ b/bench/profile/server-profile-runner.mjs
+@@ -13,7 +13,7 @@
+ import { assertCheckoutUnchanged, assertFileHashesUnchanged, assertInstalledPackageTreesUnchanged,
+   hashFileTree, prepareBenchmarkCheckout, sha256File } from '../compare/provenance.mjs';
+ import { SERVER_PROFILE, planServerSampleSize, serverProfileDigest } from './server-profile-registration.mjs';
+-import { compactServerSemanticEvidence, serverBrowserClockBounds, serverCalibrationVerdict, serverCellPairs,
++import { compactServerSemanticEvidence, serverBrowserSemanticClockErrorMs, serverCalibrationVerdict, serverCellPairs,
+   serverFamilyIntervals, serverOrders, serverResourceReasons, validateServerBrowserSample, validateServerEngineSample, verifyServerClockRegistration, writeServerArtifact } from './server-profile-contract.mjs';
+ 
+ const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../..');
+@@ -209,7 +209,7 @@
+       const begin = performance.now(); (0, eval)(source); return performance.now() - begin;
+     }, source), 'browser cold import');
+     partial.push({ phase: 'cold-import', coldImportMs });
+-    const semanticClockErrorMs = serverBrowserClockBounds({ beginMs: 0, endMs: 0 }, process.hrtime.bigint().toString()).errorMs;
++    const semanticClockErrorMs = serverBrowserSemanticClockErrorMs(process.hrtime.bigint().toString());
+     const semanticConfig = { ...scene, ...SERVER_PROFILE.browserSemantics, semanticClockErrorMs,
+       durationMs: SERVER_PROFILE.durationMs, toPx: SERVER_PROFILE.toPx };
+     const semanticEvidence = compactServerSemanticEvidence(await withBrowserTimeout(
+--- a/test/server-profile-contract.test.ts
++++ b/test/server-profile-contract.test.ts
+@@ -6,7 +6,7 @@
+ import { createHash } from 'node:crypto';
+ import { SERVER_PROFILE, planServerSampleSize, serverProfileDigest, serverTailPolicy, verifyServerProfile } from '../bench/profile/server-profile-registration.mjs';
+ import { serverCalibrationVerdict, serverCellPairs, serverFamilyIntervals, serverMetricCells, serverOrders,
+-  compactServerSemanticEvidence, serverArtifactChunks, serverArtifactDigest, serverBrowserClockBounds, serverOrderStatisticBounds, serverResourceReasons,
++  compactServerSemanticEvidence, serverArtifactChunks, serverArtifactDigest, serverBrowserClockBounds, serverBrowserSemanticClockErrorMs, serverOrderStatisticBounds, serverResourceReasons,
+   parseServerJsonBytes, parseServerJournalBytes, validateServerArtifact, validateServerBrowserSample, validateServerEngineSample, validateServerJournal, writeServerArtifact } from '../bench/profile/server-profile-contract.mjs';
+ import { deriveRealmTimerStep, evaluateStartSemanticEvidence } from '../bench/compare/methodology.mjs';
+ import { measureServerBrowser, measureServerEngine } from '../bench/profile/server-profile-runner.mjs';
+@@ -25,7 +25,12 @@
+     SERVER_PROFILE.toPx * Math.max(0, Math.min(1, (time - scene.staggerGapMs * index) / SERVER_PROFILE.durationMs)));
+   return compactServerSemanticEvidence({ valid: true, topology: { calls: 1, targetsPerCall: scene.targetsPerCall, staggerGapMs: scene.staggerGapMs,
+     durationMs: SERVER_PROFILE.durationMs, toPx: SERVER_PROFILE.toPx }, callStartedAtMs: [0],
+-    checkpoints: times.map((time) => ({ frameTimestampMs: time, groups: [{ readStartedMs: time, readEndedMs: time + 0.1, positions: positions(time) }] })),
++    onset: { before: [{ readStartedMs: 0, readEndedMs: 0, documentFrame: { beforeMs: 0, afterMs: 0 }, positions: Array(scene.targetsPerCall).fill(0) }],
++      after: [{ readStartedMs: 0.025, readEndedMs: 0.05, documentFrame: { beforeMs: 0, afterMs: 0 }, positions: Array(scene.targetsPerCall).fill(0) }],
++      firstFrame: { frameTimestampMs: 0, groups: [{ readStartedMs: 0.06, readEndedMs: 0.07,
++        documentFrame: { beforeMs: 0, afterMs: 0 }, positions: Array(scene.targetsPerCall).fill(0) }] } },
++    checkpoints: times.map((time) => ({ frameTimestampMs: time, groups: [{ readStartedMs: time, readEndedMs: time + 0.1,
++      documentFrame: { beforeMs: time, afterMs: time }, positions: positions(time) }] })),
+     terminal: [Array(scene.targetsPerCall).fill(SERVER_PROFILE.toPx)] });
+ }
+ 
+@@ -208,14 +213,17 @@
+ // Исполняем настоящий browser owner в VM с независимым линейным DOM и
+ // намеренно грубыми часами. Это synthetic fault test, не performance sample.
+ function syntheticBrowser(options: { startCostMs?: number; snap?: boolean; snapAt?: number; cancelAt?: number; rejectTiming?: boolean;
+-  durationMultiplier?: number; shape?: 'quadratic'; rafStepMs?: number; readCostMs?: number; timerLagMs?: number } = {}) {
++  durationMultiplier?: number; shape?: 'quadratic'; rafStepMs?: number; readCostMs?: number; timerLagMs?: number;
++  initialProgress?: number; initialProgressAt?: number; onsetReadAt?: number; documentClock?: 'missing' | 'unstable' | 'unrelated';
++  documentOriginLagMs?: number; quarterAtFirstFrame?: boolean; quarterAtFrame?: number } = {}) {
+   const directory = mkdtempSync(path.join(os.tmpdir(), 'motion-server-synthetic-'));
+   const source = path.join(directory, 'adapter.js'); writeFileSync(source, '// Синтетический adapter задан VM.\n');
+-  let timeMs = 100, starts = 0, cancels = 0;
++  let timeMs = 100, frameTimeMs = timeMs - (options.documentOriginLagMs ?? 0), frameReads = 0, frames = 0, starts = 0, cancels = 0;
+   const children: any[] = [];
+   const position = (element: any) => {
+     if (!element.motion) return element.x;
+-    const progress = Math.max(0, Math.min(1, (timeMs - element.motion.startedMs - element.motion.delayMs) / element.motion.durationMs));
++    if (element.motion.pendingFrame) return SERVER_PROFILE.toPx * element.motion.initialProgress;
++    const progress = Math.max(0, Math.min(1, (timeMs - element.motion.startedMs - element.motion.delayMs) / element.motion.durationMs + element.motion.initialProgress));
+     return SERVER_PROFILE.toPx * (options.shape === 'quadratic' ? progress * progress : progress);
+   };
+   const start = (elements: any[], to: number, duration: number, gap = 0) => {
+@@ -223,7 +231,9 @@
+     const startedMs = timeMs;
+     for (const [index, element] of elements.entries()) {
+       if (options.snap || starts === options.snapAt) { element.x = to; element.motion = null; }
+-      else element.motion = { startedMs, durationMs: duration * (options.durationMultiplier ?? 1), delayMs: index * gap };
++      else element.motion = { startedMs, durationMs: duration * (options.durationMultiplier ?? 1), delayMs: index * gap,
++        pendingFrame: true,
++        initialProgress: starts >= (options.initialProgressAt ?? 1) ? options.initialProgress ?? 0 : 0 };
+     }
+     timeMs += options.startCostMs ?? 0.025;
+     return { cancel() {
+@@ -235,14 +245,32 @@
+   };
+   const sandbox: any = { crossOriginIsolated: true, performance: { timeOrigin: 1000, now() {
+     timeMs += 0.001; return Math.floor(timeMs / 0.005) * 0.005;
+-  } }, document: { createElement() { return { x: 0, motion: null, isConnected: false,
++  } }, document: { timeline: { get currentTime() {
++    if (options.documentClock === 'missing') return null;
++    return frameTimeMs + (options.documentClock === 'unstable' ? ++frameReads * 0.01 : options.documentClock === 'unrelated' ? 1 : 0);
++  } }, createElement() { return { x: 0, motion: null, isConnected: false,
+     getAnimations: () => [], remove() { this.isConnected = false; } }; }, body: { appendChild(element: any) { element.isConnected = true; children.push(element); } } },
+   getComputedStyle: (element: any) => {
++    if (starts === 0 && children.indexOf(element) === options.onsetReadAt) throw new Error('синтетический отказ acquired onset prefix');
+     const transform = String(position(element)); timeMs += options.readCostMs ?? 0;
+     return { transform };
+   }, DOMMatrixReadOnly: class { e: number; constructor(value: string) { this.e = Number(value); } },
+-  setTimeout(callback: () => void, delay: number) { timeMs += delay + (options.timerLagMs ?? 0); queueMicrotask(callback); },
+-  requestAnimationFrame(callback: (time: number) => void) { timeMs += options.rafStepMs ?? 16; queueMicrotask(() => callback(timeMs)); },
++  setTimeout(callback: () => void, delay: number) {
++    // VM автоматически публикует pending animation frame во время timer wait;
++    // explicit first-frame oracle получает тот же ноль своим rAF.
++    for (const element of children) if (element.motion?.pendingFrame) {
++      element.motion.startedMs += options.rafStepMs ?? 16; element.motion.pendingFrame = false;
++    }
++    timeMs += delay + (options.timerLagMs ?? 0); queueMicrotask(callback);
++  },
++  requestAnimationFrame(callback: (time: number) => void) {
++    timeMs += options.rafStepMs ?? 16; frameTimeMs = timeMs; frames++;
++    for (const element of children) if (element.motion) {
++      if (element.motion.pendingFrame) { element.motion.startedMs = frameTimeMs; element.motion.pendingFrame = false; }
++      if (frames === (options.quarterAtFirstFrame ? 1 : options.quarterAtFrame)) element.motion.initialProgress = 0.25;
++    }
++    queueMicrotask(() => callback(timeMs));
++  },
+   __adapterModule: { start, startStagger: start } };
+   sandbox.window = sandbox;
+   const realm = createContext(sandbox);
+@@ -262,7 +290,7 @@
+   const bench = readFileSync(new URL('../bench/compare/bench.mjs', import.meta.url), 'utf8');
+   const source = bench.slice(bench.indexOf('export async function runSemanticStartCheck('), bench.indexOf('// ─── сценарий S5:')).trim().replace(/^export /, '');
+   const runCheck = Function('evaluateStartSemanticEvidence', `return (${source})`)(evaluateStartSemanticEvidence);
+-  const semanticClockErrorMs = serverBrowserClockBounds({ beginMs: 0, endMs: 0 }, '1000000000000').errorMs;
++  const semanticClockErrorMs = serverBrowserSemanticClockErrorMs('1000000000000');
+   return runCheck(fake.page, { ...scene, ...SERVER_PROFILE.browserSemantics, semanticClockErrorMs,
+     durationMs: SERVER_PROFILE.durationMs, toPx: SERVER_PROFILE.toPx }, SERVER_PROFILE.browserSemanticCalls);
+ }
+@@ -402,6 +430,45 @@
+       expect(fake.read()).toEqual({ starts: 1, cancels: 1, connected: 0 });
+     } finally { fake.dispose(); }
+   });
++  it.each(SERVER_PROFILE.browserScenes)('отвергает начальный скачок0→75px в $id при valid:true', async (scene) => {
++    const fake = syntheticBrowser({ initialProgress: 0.25 });
++    try {
++      const evidence = await syntheticSemanticControl(fake, scene);
++      expect(evidence.onset.before[0].positions).toEqual(Array(scene.targetsPerCall).fill(0));
++      expect(evidence.onset.after[0].positions[0]).toBeGreaterThanOrEqual(75);
++      expect(evidence.valid).toBe(false);
++      const sample: any = stage().rows.find((row) => row.scene === scene.id)!.samples.left;
++      sample.semanticEvidence = compactServerSemanticEvidence({ ...evidence, valid: true });
++      expect(() => validateServerBrowserSample(sample, scene)).toThrow(/normal-motion/);
++      expect(fake.read()).toEqual({ starts: 1, cancels: 1, connected: 0 });
++    } finally { fake.dispose(); }
++  });
++  it.each(['missing-before', 'missing-after', 'missing-last-coordinate', 'wrong-before', 'post-before-start', 'wide-before', 'before-phase-drift'])(
++    'fresh onset decoder/oracle отвергает %s', (fault) => {
++      const scene = SERVER_PROFILE.browserScenes[0], sample: any = stage().rows.find((row) => row.scene === scene.id)!.samples.left;
++      if (fault === 'missing-before') delete sample.semanticEvidence.onset.before;
++      if (fault === 'missing-after') delete sample.semanticEvidence.onset.after;
++      if (fault === 'missing-last-coordinate') sample.semanticEvidence.onset.before[0].positions.count--;
++      if (fault === 'wrong-before') sample.semanticEvidence.onset.before[0].positions.runs = [[99, 0], [1, 75]];
++      if (fault === 'post-before-start') sample.semanticEvidence.callStartedAtMs[0] = 1;
++      if (fault === 'wide-before') sample.semanticEvidence.onset.before[0].readEndedMs = 20;
++      if (fault === 'before-phase-drift') sample.semanticEvidence.onset.before[0].readStartedMs = -1;
++      expect(() => validateServerBrowserSample(sample, scene)).toThrow(/normal-motion/);
++    });
++  it('сохраняет неполный acquired onset до отказа и все extra raw fields', async () => {
++    const scene = SERVER_PROFILE.browserScenes[0], fake = syntheticBrowser({ onsetReadAt: 17 });
++    try {
++      const evidence = await syntheticSemanticControl(fake, scene);
++      expect(evidence.valid).toBe(false); expect(evidence.onset.before[0].positions).toHaveLength(17);
++      expect(evidence.onset.before[0].readEndedMs).toBeUndefined(); expect(evidence.onset.after).toHaveLength(0);
++      const raw = { ...evidence, onset: { ...evidence.onset, acquiredNote: 'не синтезировать остальные координаты' } };
++      const compacted = compactServerSemanticEvidence(raw);
++      expect(compacted.onset.before[0].positions).toEqual({ encoding: 'rle', count: 17, runs: [[17, 0]] });
++      expect(compacted.onset.before[0].readEndedMs).toBeUndefined(); expect(compacted.onset.after).toEqual([]);
++      expect(compacted.onset.acquiredNote).toBe(raw.onset.acquiredNote);
++      expect(fake.read()).toEqual({ starts: 0, cancels: 0, connected: 0 });
++    } finally { fake.dispose(); }
++  });
+   it.each(SERVER_PROFILE.browserScenes)('наблюдает intermediate $id и все32/64 useful owner outcomes', async (scene) => {
+     for (const multiplier of [1, 2]) {
+       const fake = syntheticBrowser();
+@@ -415,12 +482,143 @@
+     }
+   });
+ 
++  it.each(['missing', 'unstable', 'unrelated'] as const)('producer отказывает при %s document frame и сохраняет приобретённый trace', async (documentClock) => {
++    const fake = syntheticBrowser({ documentClock });
++    try {
++      let failure: any;
++      try { await measureServerBrowser(fake.browser, { url: 'synthetic://profile' }, fake.adapter, SERVER_PROFILE.browserScenes[0]); }
++      catch (error) { failure = error; }
++      expect(failure).toMatchObject({ name: 'AggregateError' });
++      expect(failure.raw.semanticEvidence.valid).toBe(false);
++      expect(failure.raw.semanticEvidence.checkpoints).toHaveLength(3);
++      expect(failure.raw.semanticEvidence.checkpoints[0].groups[0]).toHaveProperty('documentFrame');
++      expect(fake.read()).toEqual({ starts: 1, cancels: 1, connected: 0 });
++    } finally { fake.dispose(); }
++  });
++
++  it.each(['missing-frame', 'missing-end', 'unstable', 'RAF-disagreement', 'future-clock'])('consumer отвергает %s при valid:true', (fault) => {
++    const scene = SERVER_PROFILE.browserScenes[0], sample = stage().rows.find((row: any) => row.scene === scene.id).samples.left;
++    const group = sample.semanticEvidence.checkpoints[0].groups[0];
++    if (fault === 'missing-frame') delete group.documentFrame;
++    if (fault === 'missing-end') delete group.documentFrame.afterMs;
++    if (fault === 'unstable') group.documentFrame.afterMs += 0.001;
++    if (fault === 'RAF-disagreement') { group.documentFrame.beforeMs++; group.documentFrame.afterMs++; }
++    if (fault === 'future-clock') for (const checkpoint of sample.semanticEvidence.checkpoints) {
++      checkpoint.frameTimestampMs += 1e9;
++      for (const current of checkpoint.groups) {
++        current.readStartedMs += 1e9; current.readEndedMs += 1e9;
++        current.documentFrame.beforeMs += 1e9; current.documentFrame.afterMs += 1e9;
++      }
++    }
++    expect(sample.semanticEvidence.valid).toBe(true);
++    expect(() => validateServerBrowserSample(sample, scene)).toThrow(/normal-motion|clock/);
++  });
++
++  it('fresh API и CSS публикация предыдущего кадра сохраняют здоровый128ms raw', () => {
++    const scene = SERVER_PROFILE.browserScenes[0], sample = stage().rows.find((row: any) => row.scene === scene.id).samples.left;
++    const evidence = sample.semanticEvidence;
++    // Приобретённые координаты/времена primary b214: прежний wall-after
++    // ошибочно требовал phase≥2.85ms, хотя CSS опубликован до API frame.
++    evidence.callStartedAtMs = [0.845];
++    evidence.onset.before[0] = { readStartedMs: 0.01, readEndedMs: 0.84,
++      documentFrame: { beforeMs: -15.735, afterMs: -15.735 }, positions: { encoding: 'rle', count: scene.targetsPerCall, runs: [[scene.targetsPerCall, 0]] } };
++    evidence.onset.after[0] = { readStartedMs: 3.065, readEndedMs: 3.73,
++      documentFrame: { beforeMs: -15.735, afterMs: -15.735 }, positions: { encoding: 'rle', count: scene.targetsPerCall, runs: [[scene.targetsPerCall, 0]] } };
++    evidence.onset.firstFrame = { frameTimestampMs: 0.935, groups: [{ readStartedMs: 4, readEndedMs: 4.1,
++      documentFrame: { beforeMs: 0.935, afterMs: 0.935 }, positions: { encoding: 'rle', count: scene.targetsPerCall, runs: [[scene.targetsPerCall, 0]] } }] };
++    evidence.checkpoints = [[34.265, 35.15, 35.94, 78.1172], [67.595, 68.55, 69.145, 156.234], [84.265, 85.22, 85.9, 195.305]]
++      .map(([frame, started, ended, value]) => ({ frameTimestampMs: frame, groups: [{ readStartedMs: started, readEndedMs: ended,
++        documentFrame: { beforeMs: frame, afterMs: frame }, positions: { encoding: 'rle', count: scene.targetsPerCall, runs: [[scene.targetsPerCall, value]] } }] }));
++    expect(() => validateServerBrowserSample(sample, scene)).not.toThrow();
++    evidence.onset.after[0].positions.runs[0][1] = 75;
++    expect(() => validateServerBrowserSample(sample, scene)).toThrow(/normal-motion/);
++  });
++
++  it.each(['before-missing', 'after-missing', 'after-unstable', 'after-future', 'after-backwards'])('consumer отвергает onset frame %s при valid:true', (fault) => {
++    const scene = SERVER_PROFILE.browserScenes[0], sample = stage().rows.find((row: any) => row.scene === scene.id).samples.left;
++    const onset = sample.semanticEvidence.onset;
++    if (fault === 'before-missing') delete onset.before[0].documentFrame;
++    if (fault === 'after-missing') delete onset.after[0].documentFrame;
++    if (fault === 'after-unstable') onset.after[0].documentFrame.afterMs += 0.001;
++    if (fault === 'after-future') onset.after[0].documentFrame = { beforeMs: 1, afterMs: 1 };
++    if (fault === 'after-backwards') onset.after[0].documentFrame = { beforeMs: -1, afterMs: -1 };
++    expect(sample.semanticEvidence.valid).toBe(true);
++    expect(() => validateServerBrowserSample(sample, scene)).toThrow(/normal-motion|clock/);
++  });
++
++  it('mixed document/perf envelope покрывает независимые ошибки frame/now/origin, сохраняя API-cost envelope', () => {
++    const host = '1000000000000', cost = serverBrowserClockBounds({ beginMs: 0, endMs: 0 }, host).errorMs;
++    const semantic = serverBrowserSemanticClockErrorMs(host);
++    // Независимые ошибки трёх приобретённых timestamps, с обоими направлениями
++    // clamp/truncation. Origin сокращается только между perf endpoints.
++    for (const frameError of [-0.006, 0, 0.006]) for (const nowError of [-0.006, 0, 0.006]) for (const originError of [-0.006, 0, 0.006]) {
++      const mixedObserved = 64 + frameError - nowError + originError;
++      expect(Math.abs(mixedObserved - 64)).toBeLessThanOrEqual(semantic);
++    }
++    expect(cost).toBeLessThan(0.0120001); expect(semantic).toBeGreaterThanOrEqual(0.018);
++  });
++
++  it.each(SERVER_PROFILE.browserScenes.flatMap((scene) => [1, 2].map((frame) => ({ scene, frame }))))('старый doc clock не подменяет полезную публикацию $scene.id frame$frame', async ({ scene, frame }) => {
++    const healthy = syntheticBrowser({ documentOriginLagMs: 50 });
++    const faulty = syntheticBrowser({ documentOriginLagMs: 50, quarterAtFrame: frame });
++    try {
++      const good: any = await syntheticSemanticControl(healthy, scene), bad: any = await syntheticSemanticControl(faulty, scene);
++      expect(good.valid).toBe(true); expect(bad.valid).toBe(false);
++      expect(bad.onset.before[0].positions.every((value: number) => value === 0)).toBe(true);
++      expect(bad.onset.after[0].positions.every((value: number) => value === 0)).toBe(true);
++      if (frame === 1) expect(bad.onset.firstFrame.groups[0].positions[0]).toBeGreaterThanOrEqual(75);
++      else expect(bad.onset.firstFrame.groups[0].positions.every((value: number) => Math.abs(value) <= 0.5)).toBe(true);
++      const sample = stage().rows.find((row: any) => row.scene === scene.id).samples.left;
++      sample.semanticEvidence = compactServerSemanticEvidence({ ...bad, valid: true });
++      expect(() => validateServerBrowserSample(sample, scene)).toThrow(/normal-motion/);
++      expect(healthy.read().connected).toBe(0); expect(faulty.read().connected).toBe(0);
++    } finally { healthy.dispose(); faulty.dispose(); }
++  });
++
++  it.each(['missing', 'nonzero', 'unstable', 'no-RAF', 'before-API-read'])('consumer отвергает first publication %s при valid:true', (fault) => {
++    const scene = SERVER_PROFILE.browserScenes[0], sample = stage().rows.find((row: any) => row.scene === scene.id).samples.left;
++    const first = sample.semanticEvidence.onset.firstFrame;
++    if (fault === 'missing') delete sample.semanticEvidence.onset.firstFrame;
++    if (fault === 'nonzero') first.groups[0].positions.runs[0][1] = 75;
++    if (fault === 'unstable') first.groups[0].documentFrame.afterMs += 0.001;
++    if (fault === 'no-RAF') delete first.frameTimestampMs;
++    if (fault === 'before-API-read') first.groups[0].readStartedMs = 0;
++    expect(() => validateServerBrowserSample(sample, scene)).toThrow(/normal-motion/);
++  });
++
+   it('endpoint snap и stateful nth-call snap отказывают до semantic:true', async () => {
+     for (const options of [{ snap: true }, { snapAt: 9 }]) {
+       const fake = syntheticBrowser(options);
+       try { await expect(measureServerBrowser(fake.browser, { url: 'synthetic://profile' }, fake.adapter, SERVER_PROFILE.browserScenes[0])).rejects.toMatchObject({ name: 'AggregateError' }); }
+       finally { fake.dispose(); }
+     }
++  });
++
++  it.each([3, 9])('сохраняет всю acquired работу при скачке0→75px только с timed вызова%s', async (initialProgressAt) => {
++    const fake = syntheticBrowser({ initialProgress: 0.25, initialProgressAt });
++    try {
++      let failure: any;
++      try { await measureServerBrowser(fake.browser, { url: 'synthetic://profile' }, fake.adapter, SERVER_PROFILE.browserScenes[0]); }
++      catch (error) { failure = error; }
++      expect(failure).toMatchObject({ name: 'AggregateError' });
++      expect(failure.raw.semanticEvidence.valid).toBe(true);
++      expect(failure.raw.raw).toHaveLength(SERVER_PROFILE.repetitions);
++      expect(failure.raw.warmup).toHaveLength(1);
++      expect(failure.raw.raw.every((row: any) => row.ownersStarted === SERVER_PROFILE.browserBatchCalls && row.ownersCancelled === row.ownersStarted)).toBe(true);
++      expect(fake.read().connected).toBe(0);
++      expect(() => validateServerBrowserSample(failure.raw, SERVER_PROFILE.browserScenes[0])).toThrow(/начала|onset/);
++    } finally { fake.dispose(); }
++  });
++
++  it('consumer повторно выводит timed onset из actual start/read clocks при valid:true', () => {
++    const scene = SERVER_PROFILE.browserScenes[0], sample = stage().rows.find((row: any) => row.scene === scene.id).samples.left;
++    const raw = sample.raw[0]; raw.startClock.endMs = raw.startClock.beginMs + 0.8;
++    raw.batchStartMs = raw.startClock.endMs - raw.startClock.beginMs; raw.startMs = raw.batchStartMs / SERVER_PROFILE.browserBatchCalls;
++    raw.startWitness.readClock = { beginMs: raw.startClock.endMs + 0.001, endMs: raw.startClock.endMs + 0.002 };
++    raw.startWitness.leadingPositions = { encoding: 'repeat', count: raw.calls, value: 75 };
++    sample.startMs = sample.raw.reduce((sum: number, row: any) => sum + row.startMs, 0) / sample.repetitions;
++    expect(sample.semanticEvidence.valid).toBe(true);
++    expect(() => validateServerBrowserSample(sample, scene)).toThrow(/начала|onset/);
+   });
+ 
+   it('один batch отличает25us от27us; квант5us не скрывает8% в CI', async () => {
+@@ -605,6 +803,17 @@
+     expect(() => validateServerJournal(artifact, journal([finished]))).toThrow(/failures/);
+     const broken = journal([failure, finished]); broken[0].digest = 'b'.repeat(64);
+     expect(() => validateServerJournal(artifact, broken)).toThrow(/цепь/);
++  });
++
++  it('допущенный UNPROVEN всё равно проверяет поздние body hashes после failure/chronology', () => {
++    const artifact: any = { registration: null, registrationDigest: null, verdict: 'UNPROVEN', failures: [{ stage: 'preparation', error: { message: 'сохранённый отказ' } }] };
++    const events = [{ type: 'failure', value: artifact.failures[0] }, { type: 'finished', value: { verdict: artifact.verdict, digest: serverArtifactDigest(artifact) } }];
++    const healthy = chain(events);
++    expect(validateServerJournal(artifact, healthy)).toHaveProperty('journalFinalDigest');
++    const malformed = clone(healthy); malformed[1].digest = 'b'.repeat(64);
++    expect(() => validateServerJournal(artifact, malformed)).toThrow(/цепь/);
++    const changedBody = clone(healthy); changedBody[1].unclaimed = 'body должен хешироваться целиком';
++    expect(() => validateServerJournal(artifact, changedBody)).toThrow(/цепь/);
+   });
+ 
+   it('имя positive не позволяет спрятать одиночную работу; RLE не доверяет чужой длине', () => {
+--- a/docs/server-profile.md
++++ b/docs/server-profile.md
+@@ -41,12 +41,47 @@
+ 
+ Перед timing существующий `runSemanticStartCheck` снимает три промежуточных CSS
+ матрицы одного нормального вызова с теми же targets/duration/stagger/to и
+-проверяет всю топологию через общий oracle. Каждый checkpoint сохраняет actual
+-rAF timestamp и обе границы CSS read window. Все позиции связывает одна фаза
++проверяет всю топологию через общий oracle. Серверная registration дополнительно
++требует fresh0→300: перед каждым API start наблюдаются CSS координаты всех
++fresh targets, сразу после возврата — те же targets; обе границы каждого окна
++и acquired prefixes сохраняются даже при отказе. До API все позиции должны
++соответствовать0 в прежнем CSS допуске. Общая фаза не может отрабатывать distance
++до document publication clock, наблюдаемого при API start, с учётом clock/CSS errors. Поэтому мгновенный
++скачок0→75px с последующим tween225px/96мс не подменяет полный300px/128мс.
++Сразу после onset вызывается один rAF существующего владельца: сохраняются
++его timestamp, полное CSS окно и document clock первой публикации всех targets.
++Она обязана сохранять fresh0 в прежнем0,5px допуске; acquired zero frame связывает
++нижнюю границу общей фазы. Старый document clock и поздний slope сами по себе
++не различают первый quarter jump. Если первая публикация уже ненулевая,
++неполна или не разрешает этот origin — отказ, без подбора phase margin.
++Та же фаза связывает первую публикацию с тремя прежними checkpoints;
++дополнительное наблюдение находится за границами timed API costs.
++Канонические1200мс сохраняют прежний относительный phase oracle; дополнительный
++контроль свежего начала относится к явно зарегистрированному серверному control.
++Каждая onset/checkpoint группа сохраняет обе границы CSS read window и
++document timeline до/после чтения; checkpoint также сохраняет actual rAF timestamp.
++В Chromium149 PageAnimator закрепляет document AnimationClock на кадре;
++AnimationClock сохраняет его в одном rendering/task; CSS recalc использует
++этот clock для animation timing. Каждая группа обязана наблюдать одно и то же
++значение document clock до/после CSS, согласованное с perf chronology, а в
++checkpoint — также с rAF. Сразу после API CSS может сохранять публикацию
++предшествующего кадра: wall chronology доказывает порядок API/чтений, а
++phase constraint этой позиции использует приобретённый clock публикации.
++Иначе ноль, который ещё не обновился в первом кадре, ошибочно требует новую
++фазу от времени исполнения getter. Document clock до/после синхронного API
++в одном task обязан совпадать; с ним связан origin свежего движения. Timestamp
++первого rAF может предшествовать wall времени API, когда callback исполняется
++позже начала кадра. Числа этих двух domains не подменяют друг друга.
++Perf interval сокращает общий origin; сопоставление document frame с API perf
++включает три coarsened timestamps: frame, now и origin. Его semantic envelope
++выводится как округлённые вверх 1,5 прежнего двухточечного clock envelope,
++включая консервативные девять ULP. API-cost bounds сохраняют прежнюю формулу.
++Нет clock qualification, значение изменилось или clocks противоречат друг другу — отказ.
++Все позиции связывает одна фаза
+ линейного движения с зарегистрированной duration; нулевые и завершённые позиции
+ дают односторонние ограничения той же фазы. Для каждого S2 target, а в S3 для
+ leading target, нужна разрешающая пара промежуточных наблюдений: весь диапазон
+-возможного перемещения по acquired окнам обязан лежать внутри наблюдаемой
++возможного перемещения между наблюдаемыми стабильными document frames обязан лежать внутри наблюдаемой
+ разности координат ± прежние 2 × 0,5 px. Пересечения широких диапазонов
+ недостаточно. Общая постоянная фаза сокращается; прежняя stagger topology также
+ проверяется. Controls различают duration 64/128/256 мс и нелинейную форму; три
+@@ -56,13 +91,19 @@
+ после разрешающей пары. Единственная промежуточная позиция, насыщение всех
+ checkpoints или широкие окна, не разрешившие скорость, дают UNPROVEN/отказ,
+ включая случаи здорового движения. Допуск не расширяется из-за неопределённости.
+-Endpoint300 без промежуточного движения не принимается. Каждая timed серия содержит восемь batches:
++Время исполнения CSS getter сохраняется как chronology и не выдаётся за
++продвижение опубликованного состояния кадра. Этот oracle проверяет видимое CSS;
++он не приписывает JS API внутренний native clock или GPU выполнение. Канонические
++1200мс сохраняют прежний oracle по perf/read окнам. Endpoint300 без промежуточного
++движения не принимается. Каждая timed серия содержит восемь batches:
+ 32 настоящих вызова под одной парой clock reads для start и другой для cancel.
+ Positive выполняет 64 вызова; знаменатель остаётся 32. DOM allocation и наблюдения
+ находятся за границами этих интервалов; стоимость цикла и управления owners
+ включена. После start сохраняются первые targets всех owners до отмены: окно
+ чтения обязано предшествовать линейному endpoint с учётом clock uncertainty.
+-Это обнаруживает также stateful snap в timed path. Полный normal-motion trace
++Позиции ограничены displacement от свежего нуля за верхнюю границу этого
++сохранённого clock интервала и прежним CSS допуском. Это обнаруживает также
++stateful snap и начальный скачок в timed path. Полный normal-motion trace
+ относится к отдельному контрольному вызову; конечный набор controls не доказывает
+ все возможные stateful поведения. После cancel наблюдаются все 32/64 группы.
+ 
+--- a/bench/compare/bench.mjs
++++ b/bench/compare/bench.mjs
+@@ -442,6 +442,7 @@
+   const evidence = await page.evaluate(async ({ config, calls: expectedCalls }) => {
+     const A = window.__adapterModule;
+     const groups = [], callStartedAtMs = [], controls = [], checkpoints = [], terminal = [], failures = [];
++    const onset = config.requireFreshStart ? { before: [], after: [] } : undefined;
+     let phase = 'setup', epoch;
+     const failed = (error, location) => failures.push({ phase: location, name: error?.name ?? typeof error, message: String(error?.message ?? error) });
+     const delaySpan = config.staggerGapMs * (config.targetsPerCall - 1);
+@@ -456,12 +457,57 @@
+           element.className = 'box'; document.body.appendChild(element);
+         }
+       }
+-      epoch = performance.now(); phase = 'start';
++      epoch = performance.now();
++      if (onset) {
++        phase = 'onset-before';
++        for (const elements of groups) {
++          const group = { readStartedMs: performance.now() - epoch, positions: [] }; onset.before.push(group);
++          if (config.requireDocumentFrame) {
++            const value = document.timeline?.currentTime;
++            group.documentFrame = { beforeMs: typeof value === 'number' ? value - epoch : value ?? null };
++          }
++          for (const element of elements) group.positions.push(new DOMMatrixReadOnly(getComputedStyle(element).transform).e);
++          if (config.requireDocumentFrame) {
++            const value = document.timeline?.currentTime;
++            group.documentFrame.afterMs = typeof value === 'number' ? value - epoch : value ?? null;
++          }
++          group.readEndedMs = performance.now() - epoch;
++        }
++      }
+       for (const elements of groups) {
++        phase = 'start';
+         callStartedAtMs.push(performance.now() - epoch);
+         controls.push(config.staggerGapMs > 0
+           ? A.startStagger(elements, config.toPx, config.durationMs, config.staggerGapMs)
+           : A.start(elements, config.toPx, config.durationMs));
++        if (onset) {
++          phase = 'onset-after';
++          const group = { readStartedMs: performance.now() - epoch, positions: [] }; onset.after.push(group);
++          if (config.requireDocumentFrame) {
++            const value = document.timeline?.currentTime;
++            group.documentFrame = { beforeMs: typeof value === 'number' ? value - epoch : value ?? null };
++          }
++          for (const element of elements) group.positions.push(new DOMMatrixReadOnly(getComputedStyle(element).transform).e);
++          if (config.requireDocumentFrame) {
++            const value = document.timeline?.currentTime;
++            group.documentFrame.afterMs = typeof value === 'number' ? value - epoch : value ?? null;
++          }
++          group.readEndedMs = performance.now() - epoch;
++        }
++      }
++      if (onset && config.requireDocumentFrame) {
++        phase = 'onset-first-frame';
++        const frameTimestampMs = await new Promise((resolve) => requestAnimationFrame((timestamp) => resolve(timestamp - epoch)));
++        onset.firstFrame = { frameTimestampMs, groups: [] };
++        for (const elements of groups) {
++          const group = { readStartedMs: performance.now() - epoch, positions: [] }; onset.firstFrame.groups.push(group);
++          const before = document.timeline?.currentTime;
++          group.documentFrame = { beforeMs: typeof before === 'number' ? before - epoch : before ?? null };
++          for (const element of elements) group.positions.push(new DOMMatrixReadOnly(getComputedStyle(element).transform).e);
++          const after = document.timeline?.currentTime;
++          group.documentFrame.afterMs = typeof after === 'number' ? after - epoch : after ?? null;
++          group.readEndedMs = performance.now() - epoch;
++        }
+       }
+       phase = 'checkpoint';
+       for (const checkpointTime of checkpointTimes) {
+@@ -473,7 +519,15 @@
+         const checkpoint = { frameTimestampMs, groups: [] }; checkpoints.push(checkpoint);
+         for (const elements of groups) {
+           const group = { readStartedMs: performance.now() - epoch, positions: [] }; checkpoint.groups.push(group);
++          if (config.requireDocumentFrame) {
++            const value = document.timeline?.currentTime;
++            group.documentFrame = { beforeMs: typeof value === 'number' ? value - epoch : value ?? null };
++          }
+           for (const element of elements) group.positions.push(new DOMMatrixReadOnly(getComputedStyle(element).transform).e);
++          if (config.requireDocumentFrame) {
++            const value = document.timeline?.currentTime;
++            group.documentFrame.afterMs = typeof value === 'number' ? value - epoch : value ?? null;
++          }
+           group.readEndedMs = performance.now() - epoch;
+         }
+       }
+@@ -499,6 +553,7 @@
+       callStartedAtMs,
+       checkpoints,
+       terminal,
++      ...(onset ? { onset } : {}),
+       ...(failures.length ? { failures, acquiredOwners: controls.length, createdTargets: groups.map((elements) => elements.length) } : {}),
+     };
+   }, { config: scenario, calls });
+--- a/bench/compare/methodology.mjs
++++ b/bench/compare/methodology.mjs
+@@ -608,7 +608,7 @@
+   const shape = (positions) => (
+     Array.isArray(positions) &&
+     positions.length === expected.targetsPerCall &&
+-    positions.every(Number.isFinite)
++    Array.from(positions).every(Number.isFinite)
+   );
+   const terminalValid = evidence.terminal.every((positions) => (
+     shape(positions) && positions.every((value) => (
+@@ -627,6 +627,62 @@
+   const slope = expected.toPx / expected.durationMs;
+   const coordinateError = 2 * expected.movementThresholdPx;
+   const interior = (value) => value >= expected.movementThresholdPx && value < expected.toPx - expected.finalTolerancePx;
++  const publicationFrameValid = (group) => Number.isFinite(group.documentFrame?.beforeMs) &&
++    group.documentFrame.beforeMs === group.documentFrame.afterMs &&
++    group.documentFrame.beforeMs <= group.readStartedMs + clockErrorMs &&
++    group.documentFrame.afterMs <= group.readEndedMs + clockErrorMs;
++  const includePositions = (phase, group, observationStartedMs, observationEndedMs = group.readEndedMs) => {
++    for (let target = 0; target < group.positions.length; target++) {
++      const value = group.positions[target], delay = target * expected.staggerGapMs;
++      if (value < -expected.movementThresholdPx || value > expected.toPx + expected.finalTolerancePx) return false;
++      if (expected.staggerGapMs === 0 && target > 0 && value === group.positions[target - 1]) continue;
++      // Clamp и interior связывает одна фаза на весь вызов и все observations.
++      if (value < expected.toPx - expected.finalTolerancePx) phase.low = Math.max(phase.low,
++        nextDown(nextDown(observationStartedMs - clockErrorMs - delay) - nextUp((value + expected.movementThresholdPx) / slope)));
++      if (value >= expected.movementThresholdPx) phase.high = Math.min(phase.high,
++        nextUp(nextUp(observationEndedMs + clockErrorMs - delay) - nextDown((value -
++          (interior(value) ? expected.movementThresholdPx : expected.finalTolerancePx)) / slope)));
++      if (phase.low > phase.high) return false;
++    }
++    return true;
++  };
++  if (expected.requireFreshStart) {
++    const onset = evidence.onset;
++    if (expected.fromPx !== 0 || !Array.isArray(onset?.before) || !Array.isArray(onset?.after) ||
++        onset.before.length !== calls || onset.after.length !== calls) return false;
++    for (let call = 0; call < calls; call++) {
++      const before = onset.before[call], after = onset.after[call], startedMs = evidence.callStartedAtMs[call];
++      if (![before, after].every((group) => Number.isFinite(group?.readStartedMs) && Number.isFinite(group?.readEndedMs) &&
++          group.readStartedMs >= 0 && group.readEndedMs >= group.readStartedMs && shape(group.positions)) ||
++          before.readEndedMs > startedMs + clockErrorMs || after.readStartedMs < startedMs - clockErrorMs ||
++          before.positions.some((value) => Math.abs(value - expected.fromPx) > expected.movementThresholdPx)) return false;
++      // API chronology и CSS publication используют разные clock domains.
++      // До API наблюдается ноль; phase не предшествует его publication origin.
++      // Прежний perf oracle сохраняет свой start clock без смены контракта.
++      if (expected.requireDocumentFrame) {
++        // В одном task document clock одинаков до/после синхронного API;
++        // timestamp следующего rAF может предшествовать его execution wall.
++        if (!publicationFrameValid(before) || !publicationFrameValid(after) ||
++            after.documentFrame.beforeMs !== before.documentFrame.beforeMs) return false;
++        phases[call].low = nextDown(before.documentFrame.beforeMs - clockErrorMs - nextUp(expected.movementThresholdPx / slope));
++        if (!includePositions(phases[call], after, after.documentFrame.beforeMs, after.documentFrame.afterMs)) return false;
++        const first = onset.firstFrame, group = first?.groups?.[call];
++        // Старый document clock и поздний slope не различают первый quarter
++        // jump. Первая acquired публикация обязана сохранить весь fresh ноль;
++        // с её frame clock начинается полезная полная траектория.
++        if (!Number.isFinite(first?.frameTimestampMs) || !Array.isArray(first.groups) || first.groups.length !== calls ||
++            !Number.isFinite(group?.readStartedMs) || !Number.isFinite(group.readEndedMs) ||
++            group.readStartedMs < after.readEndedMs - clockErrorMs || group.readEndedMs < group.readStartedMs ||
++            !shape(group.positions) || group.positions.some((value) => Math.abs(value - expected.fromPx) > expected.movementThresholdPx) ||
++            !publicationFrameValid(group) || Math.abs(group.documentFrame.beforeMs - first.frameTimestampMs) > clockErrorMs ||
++            group.documentFrame.beforeMs < after.documentFrame.beforeMs - clockErrorMs) return false;
++        if (!includePositions(phases[call], group, group.documentFrame.beforeMs, group.documentFrame.afterMs)) return false;
++      } else {
++        phases[call].low = nextDown(startedMs - clockErrorMs - nextUp(expected.movementThresholdPx / slope));
++        if (!includePositions(phases[call], after, after.readStartedMs)) return false;
++      }
++    }
++  }
+   for (const checkpoint of evidence.checkpoints) {
+     if (!Array.isArray(checkpoint?.groups) || checkpoint.groups.length !== calls) return false;
+     for (let call = 0; call < calls; call++) {
+@@ -638,14 +694,24 @@
+         group.readEndedMs < group.readStartedMs ||
+         !shape(group.positions)
+       ) return false;
+-      const observationStartedMs = checkpoint.frameTimestampMs ?? group.readStartedMs;
++      let observationStartedMs = checkpoint.frameTimestampMs ?? group.readStartedMs;
++      let observationEndedMs = group.readEndedMs;
+       if (!Number.isFinite(observationStartedMs) || observationStartedMs < evidence.callStartedAtMs[call] - clockErrorMs ||
+           observationStartedMs > group.readStartedMs + clockErrorMs) return false;
++      if (expected.requireFreshStart && group.readStartedMs < evidence.onset.after[call].readEndedMs - clockErrorMs) return false;
++      if (expected.requireDocumentFrame) {
++        const frame = group.documentFrame;
++        // DocumentTimeline фиксирован в одном rendering/task; CSS чтение не
++        // превращает время исполнения getter в elapsed движения. Связь с rAF
++        // проверяется по обоим clocks, без свободного смещения новой фазы.
++        if (!publicationFrameValid(group) || Math.abs(frame.beforeMs - checkpoint.frameTimestampMs) > clockErrorMs) return false;
++        observationStartedMs = frame.beforeMs; observationEndedMs = frame.afterMs;
++      }
+       const history = observations[call];
+       if (history.length && observationStartedMs <= history.at(-1).startedMs) return false;
+       for (const prior of history) {
+         const elapsedLow = Math.max(0, nextDown(observationStartedMs - prior.endedMs - 2 * clockErrorMs));
+-        const elapsedHigh = nextUp(group.readEndedMs - prior.startedMs + 2 * clockErrorMs);
++        const elapsedHigh = nextUp(observationEndedMs - prior.startedMs + 2 * clockErrorMs);
+         const displacementLow = nextDown(slope * elapsedLow);
+         const displacementHigh = nextUp(slope * elapsedHigh);
+         let previousDelta = NaN, withinTolerance = false;
+@@ -666,21 +732,8 @@
+           }
+         }
+       }
+-      history.push({ startedMs: observationStartedMs, endedMs: group.readEndedMs, positions: group.positions });
+-      const phase = phases[call];
+-      for (let target = 0; target < group.positions.length; target++) {
+-        const value = group.positions[target], delay = target * expected.staggerGapMs;
+-        if (value < -expected.movementThresholdPx || value > expected.toPx + expected.finalTolerancePx) return false;
+-        if (expected.staggerGapMs === 0 && target > 0 && value === group.positions[target - 1]) continue;
+-        // Одна фаза на весь вызов связывает все координаты и checkpoints.
+-        // Clamp даёт одностороннее ограничение, а не новую неизвестную фазу.
+-        if (value < expected.toPx - expected.finalTolerancePx) phase.low = Math.max(phase.low,
+-          nextDown(nextDown(observationStartedMs - clockErrorMs - delay) - nextUp((value + expected.movementThresholdPx) / slope)));
+-        if (value >= expected.movementThresholdPx) phase.high = Math.min(phase.high,
+-          nextUp(nextUp(group.readEndedMs + clockErrorMs - delay) - nextDown((value -
+-            (interior(value) ? expected.movementThresholdPx : expected.finalTolerancePx)) / slope)));
+-        if (phase.low > phase.high) return false;
+-      }
++      history.push({ startedMs: observationStartedMs, endedMs: observationEndedMs, positions: group.positions });
++      if (!includePositions(phases[call], group, observationStartedMs, observationEndedMs)) return false;
+       if (expected.staggerGapMs === 0) continue;
+ 
+       for (let target = 1; target < group.positions.length; target++) {
+--- a/test/benchmark-methodology.test.ts
++++ b/test/benchmark-methodology.test.ts
+@@ -487,6 +487,17 @@
+     expect(evaluateStartSemanticEvidence(evidence, config, 1)).toBe(accepted);
+   });
+ 
++  it.each([0, 75])('fresh0→300 связывает фазу с API start, offset=%s', (offset) => {
++    const config = { ...START_SCENARIO_MANIFEST.s2, targetsPerCall: 3, durationMs: 128, fromPx: 0, requireFreshStart: true };
++    const evidence = { topology: { calls: 1, targetsPerCall: 3, staggerGapMs: 0, durationMs: 128, toPx: 300 },
++      callStartedAtMs: [0], onset: { before: [{ readStartedMs: 0, readEndedMs: 0, positions: [0, 0, 0] }],
++        after: [{ readStartedMs: 0.025, readEndedMs: 0.05, positions: [offset, offset, offset] }] },
++      checkpoints: [32, 64, 80].map((time) => ({ frameTimestampMs: time,
++        groups: [{ readStartedMs: time, readEndedMs: time + 0.1, positions: Array(3).fill(Math.min(300, offset + 300 * time / 128)) }] })),
++      terminal: [[300, 300, 300]] };
++    expect(evaluateStartSemanticEvidence(evidence, config, 1)).toBe(offset === 0);
++  });
++
+   it('bootstraps paired independent run clusters reproducibly without flattening rounds', () => {
+     const clusters = (base: number) => Array.from({ length: 12 }, (_, run) => ({
+       run,

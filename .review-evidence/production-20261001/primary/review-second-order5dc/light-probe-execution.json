@@ -1,0 +1,24 @@
+[
+  {
+    "command": [
+      "node",
+      "/workspace/scratch/server-method-second-order-final-20261001/closure-144242Z/consumer-lifecycle-probe.mjs"
+    ],
+    "startUtc": "2026-10-01T15:15:32.939624+00:00",
+    "endUtc": "2026-10-01T15:15:33.034122+00:00",
+    "exitCode": 1,
+    "stdoutBytes": 0,
+    "stderr": "file:///workspace/scratch/motion-server-method-final-20261001T105048Z/source/bench/profile/server-profile-contract.mjs:16\n  if (!value) throw new Error(`server profile: ${message}`);\n                    ^\n\nError: server profile: clock evidence/model не совпадают\n    at invariant (file:///workspace/scratch/motion-server-method-final-20261001T105048Z/source/bench/profile/server-profile-contract.mjs:16:21)\n    at readServerSample (file:///workspace/scratch/motion-server-method-final-20261001T105048Z/source/bench/profile/server-profile-contract.mjs:183:9)\n    at validateServerBrowserSample (file:///workspace/scratch/motion-server-method-final-20261001T105048Z/source/bench/profile/server-profile-contract.mjs:220:56)\n    at file:///workspace/scratch/server-method-second-order-final-20261001/closure-144242Z/consumer-lifecycle-probe.mjs:64:5\n    at Array.map (<anonymous>)\n    at file:///workspace/scratch/server-method-second-order-final-20261001/closure-144242Z/consumer-lifecycle-probe.mjs:61:46\n    at run (file:///workspace/scratch/server-method-second-order-final-20261001/closure-144242Z/consumer-lifecycle-probe.mjs:18:74)\n    at file:///workspace/scratch/server-method-second-order-final-20261001/closure-144242Z/consumer-lifecycle-probe.mjs:59:1\n    at ModuleJob.run (node:internal/modules/esm/module_job:439:25)\n    at async node:internal/modules/esm/loader:643:26\n\nNode.js v24.19.0\n"
+  },
+  {
+    "command": [
+      "node",
+      "/workspace/scratch/server-method-second-order-final-20261001/closure-144242Z/storage-probe.mjs"
+    ],
+    "startUtc": "2026-10-01T15:15:33.034358+00:00",
+    "endUtc": "2026-10-01T15:15:33.093052+00:00",
+    "exitCode": 0,
+    "stdoutBytes": 919,
+    "stderr": ""
+  }
+]
