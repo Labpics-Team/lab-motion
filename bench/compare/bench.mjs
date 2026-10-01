@@ -29,11 +29,9 @@ import {
 } from 'node:fs';
 import os from 'node:os';
 import { createServer } from 'node:http';
+import { createRequire } from 'node:module';
 import path from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
-import esbuild from 'esbuild';
-import { chromium } from 'playwright';
-import { PNG } from 'pngjs';
 import {
   canonicalGzip,
   observationalBrotli,
@@ -83,6 +81,9 @@ import { S5_MOTION_CONTRACT } from './motion-conformance.mjs';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const ROOT = path.resolve(__dirname, '..', '..');
+// Чистые проверки семантики не требуют отдельной установки браузерного стенда.
+// Его зависимости остаются обязательными при фактической сборке и измерениях.
+const requireBenchmark = createRequire(import.meta.url);
 const RUNS = parseBenchCount('BENCH_RUNS', process.env.BENCH_RUNS, 20, { min: 20, max: 60 });
 const ORDER_SEED = 0x51f15e;
 const BOOTSTRAP_ITERATIONS = 10_000;
@@ -140,7 +141,7 @@ function libVersion(lib, rootPkg) {
 
 function buildAdapter(lib) {
   const outfile = path.join(__dirname, 'results', `.${lib.id}.iife.js`);
-  esbuild.buildSync({
+  requireBenchmark('esbuild').buildSync({
     ...PRODUCTION_ADAPTER_PROFILE,
     entryPoints: [path.join(__dirname, lib.entry)],
     format: 'iife',
@@ -153,7 +154,7 @@ function buildAdapter(lib) {
 
 /** import-cost: один ESM+minify артефакт, затем gzip-9 и Brotli-11. */
 function measureSize(lib) {
-  const res = esbuild.buildSync({
+  const res = requireBenchmark('esbuild').buildSync({
     ...PRODUCTION_ADAPTER_PROFILE,
     entryPoints: [path.join(__dirname, lib.entry)],
     format: 'esm',
@@ -568,7 +569,7 @@ export async function runSemanticStartCheck(page, scenario, calls) {
 function colorLeftEdge(pngBuf, channel) {
   // Полный скан: кадры скринкаста — целый вьюпорт (возможен и letterbox),
   // привязываться к конкретной строке нельзя. Ищем левейший пиксель канала.
-  const img = PNG.sync.read(pngBuf);
+  const img = requireBenchmark('pngjs').PNG.sync.read(pngBuf);
   let left = null;
   for (let y = 0; y < img.height; y++) {
     for (let x = 0; x < img.width; x++) {
@@ -916,6 +917,7 @@ async function main() {
   mkdirSync(path.join(__dirname, 'results'), { recursive: true });
 
   const rootPkg = JSON.parse(readFileSync(path.join(ROOT, 'package.json'), 'utf8'));
+  const { chromium } = requireBenchmark('playwright');
   const chromiumInstall = await resolveChromiumInstall();
   const chromiumTreeBefore = hashFileTree(chromiumInstall.directory);
   const benchmarkOrigin = await startBenchmarkOrigin();
