@@ -1,6 +1,6 @@
 ﻿import { expect, test } from './fixtures/harness';
 import { createHash } from 'node:crypto';
-import { readFileSync, writeFileSync } from 'node:fs';
+import { readFileSync } from 'node:fs';
 
 type PackageReceipt = {
   tarball: { sha256: string };
@@ -8,11 +8,7 @@ type PackageReceipt = {
 };
 
 type ProbeWindow = Window & {
-  followProbe: {
-    animations: Animation[]; frames: number; cleanup: () => void;
-    events: Record<string, unknown>[]; dropped: number;
-    observe: <T extends object>(controls: T) => T;
-  };
+  followProbe: { animations: Animation[]; frames: number; cleanup: () => void };
 };
 
 test.beforeEach(async ({ page }) => {
@@ -28,77 +24,11 @@ test.beforeEach(async ({ page }) => {
   test.info().annotations.push({ type: 'package-sha256', description: receipt.tarball.sha256 });
   await test.info().attach('shipped-recipe', { body: JSON.stringify(receipt), contentType: 'application/json' });
   await page.evaluate(() => {
-    const probe: ProbeWindow['followProbe'] = {
-      animations: [], frames: 0, cleanup: () => {}, events: [], dropped: 0, observe: (controls) => controls,
-    };
+    const probe = { animations: [] as Animation[], frames: 0, cleanup: () => {} };
     (window as unknown as ProbeWindow).followProbe = probe;
-    const record = (event: Record<string, unknown>) => {
-      if (probe.events.length < 512) probe.events.push({ sequence: probe.events.length, ...event });
-      else probe.dropped++;
-    };
-    const elementName = (element: Element) => ({
-      tag: element.tagName, id: element.id, data: element.getAttributeNames().filter((name) => name.startsWith('data-')),
-    });
-    const methods = new Set(['beginFollow', 'follow', 'settle', 'retarget', 'destroy']);
-    let controlId = 0;
-    probe.observe = (controls) => {
-      // setContent вызывает document.open и снимает прежние обработчики.
-      for (const type of ['pointerdown', 'pointermove', 'pointerup', 'pointercancel', 'gotpointercapture', 'lostpointercapture'] as const) {
-        document.addEventListener(type, (event) => record({
-          kind: 'pointer', type, id: event.pointerId, timeStamp: event.timeStamp,
-          x: event.clientX, y: event.clientY, buttons: event.buttons, button: event.button,
-          primary: event.isPrimary, trusted: event.isTrusted, pointerType: event.pointerType,
-          target: event.target instanceof Element ? elementName(event.target) : null,
-        }), true);
-      }
-      for (const type of ['dragstart', 'dragend'] as const) {
-        document.addEventListener(type, (event) => record({
-          kind: 'native-drag', type, timeStamp: event.timeStamp, trusted: event.isTrusted,
-          target: event.target instanceof Element ? elementName(event.target) : null,
-        }), true);
-      }
-      const control = ++controlId;
-      const wrappers = new Map<PropertyKey, (...args: unknown[]) => unknown>();
-      return new Proxy(controls, { get(target, key) {
-        const value: unknown = Reflect.get(target, key, target);
-        if (typeof key !== 'string' || !methods.has(key) || typeof value !== 'function') return value;
-        if (!wrappers.has(key)) wrappers.set(key, (...args: unknown[]) => {
-          record({ kind: 'public-call', control, method: key, args, frames: probe.frames });
-          try {
-            const result: unknown = Reflect.apply(value, target, args);
-            record({ kind: 'public-return', control, method: key, result: typeof result === 'number' ? result : typeof result, frames: probe.frames });
-            return result;
-          } catch (error) {
-            record({ kind: 'public-throw', control, method: key, error: error instanceof Error ? error.message : typeof error });
-            throw error;
-          }
-        });
-        return wrappers.get(key);
-      } });
-    };
-    const ids = new WeakMap<Animation, number>();
-    let animationId = 0;
-    const id = (animation: Animation) => {
-      if (!ids.has(animation)) ids.set(animation, ++animationId);
-      return ids.get(animation)!;
-    };
-    const cancel = Animation.prototype.cancel;
-    Animation.prototype.cancel = function () {
-      record({ kind: 'native-cancel', animation: id(this) });
-      return cancel.call(this);
-    };
-    const getAnimations = Element.prototype.getAnimations;
-    Element.prototype.getAnimations = function (...args) {
-      const animations = getAnimations.apply(this, args);
-      record({ kind: 'getAnimations', target: elementName(this), animations: animations.map(id), frames: probe.frames });
-      return animations;
-    };
     const animate = Element.prototype.animate;
     Element.prototype.animate = function (...args) {
-      const target = elementName(this);
-      record({ kind: 'native-animate-call', target });
       const animation = animate.apply(this, args);
-      record({ kind: 'native-created', animation: id(animation), target });
       animation.pause();
       animation.currentTime = 0;
       probe.animations.push(animation);
@@ -107,18 +37,6 @@ test.beforeEach(async ({ page }) => {
     const raf = window.requestAnimationFrame;
     window.requestAnimationFrame = (callback) => { probe.frames++; return raf.call(window, callback); };
   });
-});
-
-test.afterEach(async ({ page }, info) => {
-  const diagnostic = await page.evaluate(() => {
-    const probe = (window as unknown as ProbeWindow).followProbe;
-    return probe ? { events: probe.events, frames: probe.frames, created: probe.animations.length, dropped: probe.dropped } : null;
-  });
-  const report = { test: info.title, retry: info.retry, status: info.status, diagnostic };
-  const path = info.outputPath('follow-diagnostics.json');
-  writeFileSync(path, JSON.stringify(report, null, 2));
-  await info.attach('follow-diagnostics', { path, contentType: 'application/json' });
-  console.log('FOLLOW_DIAGNOSTICS ' + JSON.stringify(report));
 });
 
 test('рецепт панели: повторный pickup, native settle, focus и cleanup', async ({ page }) => {
