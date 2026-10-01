@@ -130,10 +130,10 @@ class InputSpring extends CompositorSpring implements CompositorFollow {
 
   private _writeInput(value: number): void {
     const input = this._following;
-    this._onLiveFrame(value);
+    const written = this._onLiveFrame(value);
     // Reentrant follow сохраняет input-owner; settle/handoff заменяют его.
-    // Успешная запись снимает donor до возможной ошибки внешнего callback.
-    if (this._following === input) this._releaseHost();
+    // Подавленный до apply кадр не выдаёт право снять native donor.
+    if (written && this._following === input) this._releaseHost();
   }
 
   private _validateValue(value: number): void {

@@ -241,6 +241,31 @@ describe('универсальный follow → native settle → pickup', () =>
     },
   );
 
+  it.each(['format', 'write'] as const)('пойманная inner-ошибка в %s снимает donor только после состоявшейся записи', (hook) => {
+    const f = fixture();
+    f.owner.start();
+    const failure = new Error('nested format failed');
+    let caught: unknown;
+    f.hooks[hook] = (value) => {
+      f.hooks[hook] = undefined;
+      f.hooks.format = () => { throw failure; };
+      try { f.owner.follow(20, 1.01); } catch (error) { caught = error; }
+      f.hooks.format = undefined;
+      return value;
+    };
+    f.owner.beginFollow(1);
+    expect(caught).toBe(failure);
+    const writes = hook === 'write' ? 1 : 0;
+    expect(f.writes).toHaveLength(writes);
+    expect(f.animations[0]!.cancel).toHaveBeenCalledTimes(writes);
+    f.owner.follow(30, 1.02);
+    expect(f.writes.at(-1)).toBe(30);
+    expect(f.animations).toHaveLength(1);
+    expect(f.animations[0]!.cancel).toHaveBeenCalledTimes(1);
+    expect(f.frames).toHaveLength(0);
+    f.owner.destroy();
+  });
+
   it('reentrant settle внутри pickup write оставляет новый native owner', () => {
     const f = fixture();
     f.owner.start();

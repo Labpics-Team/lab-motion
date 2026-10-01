@@ -480,11 +480,13 @@ export class CompositorSpring {
    * значения живёт в ОДНОМ месте (иначе тройной дубль тихо расходится). Читает
    * _apply/_format в момент ВЫЗОВА (после конструктора), поэтому bound-поле безопасно.
    */
-  protected readonly _onLiveFrame = (v: number): void => {
+  protected readonly _onLiveFrame = (v: number): boolean => {
     const epoch = this._epoch;
     this._from = v;
     const value = this._apply && this._format!(v);
-    if (this._epoch === epoch) this._apply?.(value!);
+    if (this._epoch !== epoch || !this._apply) return false;
+    this._apply(value!);
+    return true;
   };
 
   constructor(opts: CompositorSpringOptions) {
