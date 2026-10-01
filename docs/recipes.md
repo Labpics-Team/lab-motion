@@ -449,7 +449,7 @@ function pointerInput(
     active = { id: e.pointerId, coordinate: e[axis], origin: motion.beginFollow(e.timeStamp / 1000) };
     handle.setPointerCapture(e.pointerId);
   }, { signal: events.signal });
-  handle.addEventListener('pointermove', (e) => {
+  handle.ownerDocument.addEventListener('pointermove', (e) => {
     if (e.pointerId === active?.id) motion.follow(valueAt(e), e.timeStamp / 1000);
   }, { signal: events.signal });
   const finish = (e: PointerEvent) => {
@@ -459,8 +459,8 @@ function pointerInput(
     cancel();
     release(value, e.timeStamp / 1000, e.type !== 'pointerup');
   };
-  handle.addEventListener('pointerup', finish, { signal: events.signal });
-  handle.addEventListener('pointercancel', finish, { signal: events.signal });
+  handle.ownerDocument.addEventListener('pointerup', finish, { signal: events.signal });
+  handle.ownerDocument.addEventListener('pointercancel', finish, { signal: events.signal });
   handle.addEventListener('lostpointercapture', (e) => {
     if (e.pointerId !== active?.id) return;
     active = undefined;
