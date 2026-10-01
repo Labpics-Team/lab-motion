@@ -29,10 +29,28 @@ taskset -c 0 node bench/profile/server-profile-runner.mjs \
 отключёнными publish scripts. Адаптеры и engine импортируют извлечённые consumer
 архивы. В регистрацию до samples входят exact source SHA, package/lock inputs,
 runtime, harness/adapter hashes, весь browser tree, toolchain, CPU affinity,
-ядро ОС, лимиты cgroup, viewport/DPR и все знаменатели. Регистрируются две engine
-сцены: 100 scalar live retarget и 1000 targets × 7 transform channels fresh.
-Engine использует `animate`; изменение default bounded `MotionValue` hot loop
-требует отдельного evidence существующего bench C owner.
+ядро ОС, лимиты cgroup, viewport/DPR и все знаменатели. Регистрируются три engine
+сцены: 100 scalar live retarget, 1000 targets × 7 transform channels fresh и одна
+whole-stock-C `MotionValue` cell через существующий `scripts/bench-support.mjs`.
+Первые две используют `animate`, stock C импортирует `MotionValue` из actual packed
+main entry. Одна stock C операция содержит constructor0, default bounded spring
+{mass:1, stiffness:170, damping:26}, onChange, setTarget100, прежний synchronous
+drain47, destroy и return100. Factory и две исходные warmup batches по2000 операций
+находятся вне CPU. Затем восемь зарегистрированных reps содержат2000 actual calls
+каждая; positive содержит4000, но divisor остаётся2000. Сохраняются последние
+значения и frame counts каждой операции; mean47 или checksum100 не являются oracle.
+Preallocated stores и `getFrameCount` внутри CPU одинаковы обеим ролям; RLE и
+проверка outcomes идут после CPU. Это whole macro с минимальным recorder overhead,
+без per-frame p99 или100-channel заявления. Две legacy engine сцены не упрощаются.
+
+Новая stock C регистрация возникла после exploratory штатного wall benchmark:
+1 октября 14:53/14:54 UTC опубликованные baseline median7.2k ns и candidate8.3k ns уже известны.
+Это причина включить ранее непокрытый default bounded hot loop, не registered CPU
+приёмка. Оба исходных stdout/command/execution сохранены, а SHA stdout и helper
+semantic receipt закреплены в `exploratoryPrehistory`. `candidateSamplesObserved:false`
+относится только к моменту регистрации текущего CPU/API protocol epoch; оно не
+утверждает, что candidate раньше вообще не наблюдался. Новые N и CI выводятся до
+candidate CPU data из baseline-only pilot; порог1.05, MDE5% и power0.8 неизменны.
 Browser S2/S3 измеряют start/cancel общего transform API; они не доказывают
 семантику reorder/list или две продуктовые семьи M-05. Длительность этого нового
 узкого API-профиля — 128 мс, 100/200 targets, stagger 0/5 мс. Его числа не
@@ -112,8 +130,8 @@ stateful snap и начальный скачок в timed path. Полный nor
 Baseline-only pilot содержит восемь runs. Единственной независимой единицей
 является блок двух противоположных порядков; восемь внутренних повторов и кадры
 не увеличивают число независимых наблюдений. До калибровки сохраняется N из
-парного log-contrast, MDE 5% и мощности 0,8. Tail заранее задаёт минимум 288 runs
-(144 независимых блока). При N выше ресурсного предела 1024
+парного log-contrast, MDE 5% и мощности 0,8. Tail заранее задаёт минимум 292 runs
+(146 независимых блоков). При N выше ресурсного предела 1024
 диагностические controls сохраняются, а admission остаётся `UNPROVEN`.
 Эта приближённая формула планирует средний контраст и не обещает мощности tail.
 
@@ -122,8 +140,8 @@ Baseline-only pilot содержит восемь runs. Единственной
 Порядковые интервалы строятся из средних двух runs каждого блока. p50/p95 относятся
 к распределению этой средней стоимости блока, а не кадров или отдельных API-вызовов.
 Точная биномиальная масса считается в BigInt для q=1/2,19/20. Bonferroni по
-10 клеткам × 2 квантилям × 2 участникам × 2 tails даёт alpha каждого tail=1/1600.
-При 143 блоках upper p95 ещё не ограничен; 144 — первый допустимый размер.
+11 клеткам × 2 квантилям × 2 участникам × 2 tails даёт alpha каждого tail=1/1760.
+При145 блоках upper p95 ещё не ограничен;146 — первый допустимый размер.
 Семейное 95% покрытие условно на независимые одинаково распределённые блоки
 закреплённой клетки. Protected p95 upper остаётся ≤1,05.
 Негодная calibration сохраняет `UNPROVEN` и не запускает A/B.
@@ -186,6 +204,12 @@ vendored libuv; Linux6.18.44 `kernel/sys.c`, `kernel/time/time.c`.
 
 Heap/GC — наблюдения пакета, oracle и harness, без ложной точной атрибуции.
 Forced GC применяется только после timing в отдельном retention-процессе.
+Перед обоими heap snapshots процесс завершает текущий host turn через
+`setImmediate`, затем выполняет два GC: один Promise checkpoint в pinned Node
+сохраняет temporary WeakRef keepalive и не доказывает retained heap. Actual packed
+stock C control сохранил все 64 полезных исхода 47 frames/endpoint 100; у candidate
+64 targets были живы в том же job и 0 после host turn. Это уточнение границы
+наблюдения, а не точная атрибуция памяти или стоимость GC внутри CPU interval.
 Отрицательные retained heap delta сохраняются; отношения с нулевым/отрицательным
 знаменателем не вычисляются. Статические byte и численные guards принадлежат
 прежним владельцам и этим профилем не ослабляются.

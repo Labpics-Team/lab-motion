@@ -5,6 +5,7 @@ import path from 'node:path';
 import { pathToFileURL } from 'node:url';
 import { assertBalancedRunBlocks, assertRealmTimerStep, binary64Ulp, deriveRealmTimerStep, evaluateStartSemanticEvidence,
   exactBinomialOrderStatisticBounds, makeRoundRobinOrders, nextDown, nextUp, summarizeSamples } from '../compare/methodology.mjs';
+import { validateStockMotionValueBatch } from '../compare/methodology.mjs';
 import { sha256Bytes } from '../compare/provenance.mjs';
 import { TRANSFORM_PAIR_PROFILE, validateTransformLifecycleSample } from '../../scripts/bench-transform-support.mjs';
 import { SERVER_PROFILE, planServerSampleSize, serverProfileDigest, serverTailPolicy, verifyServerProfile } from './server-profile-registration.mjs';
@@ -165,7 +166,7 @@ export function serverOrders(runs, seed = SERVER_PROFILE.seed) {
 
 export function serverMetricCells() {
   return [
-    ...SERVER_PROFILE.engineScenes.flatMap((scene) => SERVER_PROFILE.metrics.engine.map((metric) => ({ id: `${scene.id}:${metric}`, scene: scene.id, kind: 'engine', metric }))),
+    ...SERVER_PROFILE.engineScenes.flatMap((scene) => (scene.metrics ?? SERVER_PROFILE.metrics.engine).map((metric) => ({ id: `${scene.id}:${metric}`, scene: scene.id, kind: 'engine', metric }))),
     ...SERVER_PROFILE.browserScenes.flatMap((scene) => SERVER_PROFILE.metrics.browser.map((metric) => ({ id: `${scene.id}:${metric}`, scene: scene.id, kind: 'browser', metric }))),
   ];
 }
@@ -199,30 +200,31 @@ export function serverCellPairs(stage, runs, expectedStage) {
 }
 
 function readServerSample(sample, cell, workMultiplier, validationCache = new WeakMap()) {
+      const stockScene = cell.kind === 'engine' && SERVER_PROFILE.engineScenes.find((scene) => scene.id === cell.scene && scene.workload === 'stock-c');
       invariant(sample?.semantic === true && positive(sample[cell.metric]), `${cell.id}: неверный sample или semantics`);
       invariant(sample.workMultiplier === workMultiplier, 'подменён знаменатель положительного контроля');
       invariant(sample.denominator === SERVER_PROFILE.denominator && sample.repetitions === SERVER_PROFILE.repetitions, 'изменён знаменатель');
-      invariant(Array.isArray(sample.raw) && sample.raw.length === sample.repetitions * (cell.kind === 'engine' ? sample.workMultiplier : 1), 'потеряны raw повторы');
+      invariant(Array.isArray(sample.raw) && sample.raw.length === sample.repetitions * (cell.kind === 'engine' && !stockScene ? sample.workMultiplier : 1), 'потеряны raw повторы');
       const validationKey = `${cell.kind}:${cell.scene}:${workMultiplier}`;
       if (!validationCache.get(sample)?.has(validationKey)) {
       if (cell.kind === 'engine') {
         const scene = SERVER_PROFILE.engineScenes.find((scene) => scene.id === cell.scene);
+        if (stockScene) {
+          invariant(sample.cpuScope === SERVER_PROFILE.stockCpuScope && Array.isArray(sample.warmup) && sample.warmup.length === scene.warmupBatches,
+            'stock C потерял canonical warmup или CPU scope');
+          for (const batch of sample.warmup) validateStockMotionValueBatch(batch, scene, 1, false);
+        }
         for (const raw of sample.raw) {
+          if (stockScene) {
+            validateStockMotionValueBatch(raw, scene, workMultiplier);
+            validateThreadCpuFields(raw.raw.cpuReads, raw.raw.clockReads);
+            continue;
+          }
           invariant(Array.isArray(raw.frameNs) && raw.frameNs.length === TRANSFORM_PAIR_PROFILE.frameOffsetsMs.length &&
             raw.frameNs.every((x) => Number.isSafeInteger(x) && x >= 0) && Number.isSafeInteger(raw.operationNs) && raw.operationNs >= 0 &&
             Number.isSafeInteger(raw.cancelDrainNs) && raw.cancelDrainNs >= 0, 'потеряны frame samples или safe CPU counter');
           validateTransformLifecycleSample(raw, scene);
-          const clockReads = raw.raw.clockReads, cpuReads = raw.raw.cpuReads;
-          invariant(Array.isArray(cpuReads) && cpuReads.length === clockReads.length, 'потеряны actual thread CPU fields');
-          for (let sequence = 0; sequence < cpuReads.length; sequence++) {
-            const read = cpuReads[sequence];
-            invariant(read?.sequence === sequence && Number.isSafeInteger(read.userUs) && read.userUs >= 0 &&
-              Number.isSafeInteger(read.systemUs) && read.systemUs >= 0, 'невалидные user/system CPU fields');
-            const valueNs = String((BigInt(read.userUs) + BigInt(read.systemUs)) * 1000n);
-            invariant(read.valueNs === valueNs && clockReads[sequence].valueNs === valueNs, 'CPU endpoint не пересчитывается из user/system');
-            if (sequence > 0) invariant(read.userUs >= cpuReads[sequence - 1].userUs && read.systemUs >= cpuReads[sequence - 1].systemUs,
-              'user/system CPU fields идут назад');
-          }
+          validateThreadCpuFields(raw.raw.cpuReads, raw.raw.clockReads);
           const semantic = raw.semantic;
           invariant(semantic?.valid === true && semantic.targets === scene.count && semantic.frames === raw.frameNs.length &&
             semantic.finished === true && semantic.pending === 0 && semantic.onCompleteCalls === 0 &&
@@ -258,6 +260,10 @@ function readServerSample(sample, cell, workMultiplier, validationCache = new We
       const recomputed = rawValues.reduce((a, b) => a + b, 0) / sample.repetitions;
       invariant(recomputed === sample[cell.metric], 'timing не пересчитывается из raw / знаменателя');
       const pointwise = sample.raw.map((raw) => {
+        if (stockScene) {
+          const durationNs = Number(BigInt(raw.raw.clockReads[1].valueNs) - BigInt(raw.raw.clockReads[0].valueNs));
+          return meanBounds([errorBounds(durationNs, SERVER_PROFILE.clockError.engineIntervalUncertaintyNs)], stockScene.callsPerRepetition);
+        }
         if (cell.kind === 'engine') return cell.metric === 'meanFrameNs'
           ? meanBounds(raw.frameNs.map((value) => errorBounds(value, SERVER_PROFILE.clockError.engineIntervalUncertaintyNs)), raw.frameNs.length)
           : errorBounds(raw[cell.metric], SERVER_PROFILE.clockError.engineIntervalUncertaintyNs);
@@ -265,6 +271,19 @@ function readServerSample(sample, cell, workMultiplier, validationCache = new We
         return meanBounds([interval], SERVER_PROFILE.browserBatchCalls);
       });
       return { value: sample[cell.metric], bounds: meanBounds(pointwise, sample.repetitions) };
+}
+
+function validateThreadCpuFields(cpuReads, clockReads) {
+  invariant(Array.isArray(cpuReads) && cpuReads.length === clockReads.length, 'потеряны actual thread CPU fields');
+  for (let sequence = 0; sequence < cpuReads.length; sequence++) {
+    const read = cpuReads[sequence];
+    invariant(read?.sequence === sequence && Number.isSafeInteger(read.userUs) && read.userUs >= 0 &&
+      Number.isSafeInteger(read.systemUs) && read.systemUs >= 0, 'невалидные user/system CPU fields');
+    const valueNs = String((BigInt(read.userUs) + BigInt(read.systemUs)) * 1000n);
+    invariant(read.valueNs === valueNs && clockReads[sequence].valueNs === valueNs, 'CPU endpoint не пересчитывается из user/system');
+    if (sequence > 0) invariant(read.userUs >= cpuReads[sequence - 1].userUs && read.systemUs >= cpuReads[sequence - 1].systemUs,
+      'user/system CPU fields идут назад');
+  }
 }
 
 export function validateServerBrowserSample(sample, scene, workMultiplier = 1) {
@@ -275,7 +294,7 @@ export function validateServerBrowserSample(sample, scene, workMultiplier = 1) {
 
 export function validateServerEngineSample(sample, scene, workMultiplier = 1) {
   const validationCache = new WeakMap();
-  for (const metric of SERVER_PROFILE.metrics.engine) readServerSample(sample,
+  for (const metric of scene.metrics ?? SERVER_PROFILE.metrics.engine) readServerSample(sample,
     { id: `${scene.id}:${metric}`, kind: 'engine', scene: scene.id, metric }, workMultiplier, validationCache);
 }
 
@@ -395,7 +414,7 @@ function validTraceHashes(hashes, expectedCount) {
     isDeepStrictEqual(Object.keys(hashes).sort(), ['count', 'encoding', 'value']);
 }
 
-// Для зарегистрированных q=1/2,19/20 и alpha=1/1600 ranks сравниваются
+// Для зарегистрированных q=1/2,19/20 и alpha=1/1760 ranks сравниваются
 // точно в BigInt. Float underflow и погрешность суммирования не дают admission.
 export function serverOrderStatisticBounds(values, probability, alphaPerTail) {
   invariant(Array.isArray(values) && values.length > 0 && values.every((x) => Number.isFinite(x) && x >= 0) &&
@@ -485,6 +504,8 @@ export function validateServerArtifact(artifact) {
   }
   invariant(SHA256.test(artifact.registrationDigest) && artifact.registrationDigest === serverProfileDigest(artifact.registration), 'подменён digest регистрации');
   invariant(artifact.registration?.candidateSamplesObserved === false, 'кандидат наблюдался до регистрации');
+  invariant(artifact.registration.candidateSamplesObservedScope === SERVER_PROFILE.candidateSamplesObservedScope,
+    'не указан scope регистрации с сохранённой exploratory prehistory');
   invariant(artifact.registration.protocolDigest === serverProfileDigest(SERVER_PROFILE), 'неверный digest протокола');
   invariant(SERVER_PROFILE.browsers.includes(artifact.registration.browser), 'неизвестный browser');
   for (const id of ['baseline', 'candidate']) {

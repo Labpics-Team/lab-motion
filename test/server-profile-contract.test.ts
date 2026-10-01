@@ -8,7 +8,7 @@ import { SERVER_PROFILE, planServerSampleSize, serverProfileDigest, serverTailPo
 import { serverCalibrationVerdict, serverCellPairs, serverFamilyIntervals, serverMetricCells, serverOrders,
   compactServerSemanticEvidence, serverArtifactChunks, serverArtifactDigest, serverBrowserClockBounds, serverBrowserSemanticClockErrorMs, serverOrderStatisticBounds, serverResourceReasons,
   parseServerJsonBytes, parseServerJournalBytes, validateServerArtifact, validateServerBrowserSample, validateServerEngineSample, validateServerJournal, writeServerArtifact } from '../bench/profile/server-profile-contract.mjs';
-import { deriveRealmTimerStep, evaluateStartSemanticEvidence } from '../bench/compare/methodology.mjs';
+import { compactStockMotionValueOutcomes, deriveRealmTimerStep, evaluateStartSemanticEvidence, validateStockMotionValueBatch } from '../bench/compare/methodology.mjs';
 import { measureServerBrowser, measureServerEngine } from '../bench/profile/server-profile-runner.mjs';
 
 const hash = 'a'.repeat(64);
@@ -69,6 +69,16 @@ function engineRaw(scene: any) {
       targetTraceHashes: { encoding: 'repeat', count: scene.count, value: createHash('sha256').update(JSON.stringify(values)).digest('hex') } } };
 }
 
+function stockRaw(scene: any, multiplier = 1, timed = true) {
+  const calls = scene.callsPerRepetition * multiplier;
+  const clockReads = timed ? ['before', 'after'].map((edge, sequence) => ({ sequence, metric: 'operationNs', frame: null, edge,
+    valueNs: String(10_000_000 + sequence * scene.callsPerRepetition * multiplier * 1_000_000) })) : [];
+  return { operationNs: timed ? 1_000_000 * multiplier : null, raw: { schemaVersion: 1, scene: scene.id,
+    phase: timed ? 'timed' : 'warmup', calls, completed: calls, denominator: scene.callsPerRepetition,
+    clockReads, cpuReads: clockReads.map((read) => ({ sequence: read.sequence, userUs: Number(read.valueNs) / 1000, systemUs: 0, valueNs: read.valueNs })),
+    outcomes: { encoding: 'runs', count: calls, runs: [{ from: 0, count: calls, value: 100, frames: 47 }] } } };
+}
+
 function stage(name = 'aa', runs = 2) {
   const rows: any[] = [];
   for (let run = 0; run < runs; run++) for (const [kind, scenes] of [['engine', SERVER_PROFILE.engineScenes], ['browser', SERVER_PROFILE.browserScenes]] as const) {
@@ -79,8 +89,14 @@ function stage(name = 'aa', runs = 2) {
         let raw: any[];
         let extra: any = {};
         if (kind === 'engine') {
-          raw = Array.from({ length: SERVER_PROFILE.repetitions * multiplier }, () => engineRaw(scene));
-          extra = { operationNs: 1_000_000 * multiplier, meanFrameNs: 1_000_000 * multiplier, cancelDrainNs: 500_000 * multiplier };
+          if ((scene as any).workload === 'stock-c') {
+            raw = Array.from({ length: SERVER_PROFILE.repetitions }, () => stockRaw(scene, multiplier));
+            extra = { operationNs: 1_000_000 * multiplier, cpuScope: SERVER_PROFILE.stockCpuScope,
+              warmup: Array.from({ length: (scene as any).warmupBatches }, () => stockRaw(scene, 1, false)) };
+          } else {
+            raw = Array.from({ length: SERVER_PROFILE.repetitions * multiplier }, () => engineRaw(scene));
+            extra = { operationNs: 1_000_000 * multiplier, meanFrameNs: 1_000_000 * multiplier, cancelDrainNs: 500_000 * multiplier };
+          }
         } else {
           const timerEvidence = { crossOriginIsolated: true, probes: ['before', 'after'].map((phase) => ({ phase,
             timeOriginMs: 1000, performanceNowDeltasMs: Array(64).fill(0.005) })) };
@@ -127,6 +143,7 @@ function registeredRefusal() {
     nodeExecutableSha256: SERVER_PROFILE.clockError.nodeExecutableSha256 };
   const consumer = { tarballSha256: hash, treeSha256: hash };
   const registration = { protocolDigest: serverProfileDigest(SERVER_PROFILE), candidateSamplesObserved: false,
+    candidateSamplesObservedScope: SERVER_PROFILE.candidateSamplesObservedScope,
     browser: 'chromium', browserVersion: SERVER_PROFILE.clockError.browserVersion, browserExecutableSha256: SERVER_PROFILE.clockError.browserExecutableSha256,
     clockModelDigest: serverProfileDigest(SERVER_PROFILE.clockError), browserTree: { sha256: hash, files: 1 },
     provenance: { baseline: provenance, candidate: { ...provenance, revision: 'b'.repeat(40) } },
@@ -175,7 +192,8 @@ function admissionEvents(artifact: any) {
     current.rows.forEach((row: any, index: number) => {
       for (const participant of row.order) events.push({ type: 'sample', value: { stage: name, kind: row.kind, scene: row.scene, run: row.run, participant,
         build: name === 'ab' && participant === 'right' ? 'candidate' : 'baseline', value: row.samples[participant] } });
-      if ((index + 1) % 8 === 0) events.push({ type: 'resources-block', value: { stage: name, ...current.blocks[Math.floor(index / 8)] } });
+      const blockRows = (SERVER_PROFILE.engineScenes.length + SERVER_PROFILE.browserScenes.length) * 2;
+      if ((index + 1) % blockRows === 0) events.push({ type: 'resources-block', value: { stage: name, ...current.blocks[Math.floor(index / blockRows)] } });
     });
   }
   for (const comparator of artifact.comparators) for (let run = 0; run < (comparator.rows ?? []).length; run++) {
@@ -189,7 +207,7 @@ function admissionEvents(artifact: any) {
 
 function chain(events: any[], shared?: { events: any[]; records: any[] }) {
   // Только подготовка fixture переиспользует неизменённый префикс по identity.
-  // Валидатор заново проверяет каждый hash и весь N288 raw каждой истории.
+  // Валидатор заново проверяет каждый hash и весь зарегистрированный raw каждой истории.
   let prefix = 0;
   while (shared && prefix < events.length && events[prefix] === shared.events[prefix]) prefix++;
   let previous = prefix ? shared!.records[prefix - 1].digest : '0'.repeat(64);
@@ -199,7 +217,7 @@ function chain(events: any[], shared?: { events: any[]; records: any[] }) {
   })];
 }
 
-// Два набора fault cases используют одну healthy N288 историю. Изменяются
+// Два набора fault cases используют одну healthy зарегистрированную историю. Изменяются
 // только принадлежащие fault ветви; исходные events/raw остаются неизменными.
 let sharedAdmission: { artifact: any; events: any[]; records: any[] } | undefined;
 function admissionHistory() {
@@ -296,6 +314,92 @@ async function syntheticSemanticControl(fake: ReturnType<typeof syntheticBrowser
 }
 
 describe('серверный PROFILE: clock/progress falsifiers', () => {
+  it('stock C добавляет ровно одну whole-macro family и сохраняет per-operation47/100', () => {
+    const scene = SERVER_PROFILE.engineScenes.find((scene) => scene.workload === 'stock-c')!;
+    expect(serverMetricCells()).toHaveLength(11);
+    expect(serverMetricCells().filter((cell) => cell.scene === scene.id).map((cell) => cell.metric)).toEqual(['operationNs']);
+    const plain = compactStockMotionValueOutcomes([100, 100, 0, 200], [47, 47, 0, 94]);
+    expect(plain).toEqual({ encoding: 'runs', count: 4, runs: [
+      { from: 0, count: 2, value: 100, frames: 47 }, { from: 2, count: 1, value: 0, frames: 0 }, { from: 3, count: 1, value: 200, frames: 94 }] });
+    const sample = stage().rows.find((row) => row.scene === scene.id)!.samples.left;
+    validateServerEngineSample(sample, scene);
+    const cell = serverCellPairs(stage(), 2, 'aa').find((cell) => cell.scene === scene.id)!;
+    expect(cell.leftBounds[0].low).toBeLessThanOrEqual(1_000_000 - 1);
+    expect(cell.leftBounds[0].high).toBeGreaterThanOrEqual(1_000_000 + 1);
+  });
+  it('stock C failure outcomes сохраняют приобретённые primitive identities после JSON/RLE', () => {
+    const acquired = [undefined, undefined, -0, 0, NaN, Infinity, -Infinity];
+    const saved = JSON.parse(JSON.stringify(compactStockMotionValueOutcomes(acquired, [47, 47, 47, 47, 47, 47, undefined])));
+    const expanded = saved.runs.flatMap((run: any) => Array.from({ length: run.count }, () => [run.value, run.frames]));
+    expect(expanded).toEqual([[{ type: 'undefined' }, 47], [{ type: 'undefined' }, 47], [{ number: '-0' }, 47], [0, 47],
+      [{ nonfinite: 'NaN' }, 47], [{ nonfinite: 'Infinity' }, 47], [{ nonfinite: '-Infinity' }, { type: 'undefined' }]]);
+    expect(saved.count).toBe(acquired.length);
+    expect(saved.runs.map((run: any) => run.from)).toEqual([0, 2, 3, 4, 5, 6]);
+  });
+  it.each(['mixed-frames', 'mixed-endpoints', 'missing-operation', 'wrong-divisor', 'missing-warmup', 'missing-cpu-read',
+    'coherent-off-grid-cpu', 'aggregate-only-drift'])('stock C raw отвергает %s с правильными aggregates', (fault) => {
+    const scene = SERVER_PROFILE.engineScenes.find((scene) => scene.workload === 'stock-c')!;
+    const sample = stage().rows.find((row) => row.scene === scene.id)!.samples.left;
+    validateServerEngineSample(sample, scene);
+    const raw = sample.raw[0];
+    if (fault === 'mixed-frames') raw.raw.outcomes.runs = [{ from: 0, count: 1000, value: 100, frames: 0 }, { from: 1000, count: 1000, value: 100, frames: 94 }];
+    if (fault === 'mixed-endpoints') raw.raw.outcomes.runs = [{ from: 0, count: 1000, value: 0, frames: 47 }, { from: 1000, count: 1000, value: 200, frames: 47 }];
+    if (fault === 'missing-operation') raw.raw.outcomes.runs[0].count--;
+    if (fault === 'wrong-divisor') raw.raw.denominator = 4000;
+    if (fault === 'missing-warmup') sample.warmup.pop();
+    if (fault === 'missing-cpu-read') raw.raw.cpuReads.pop();
+    if (fault === 'coherent-off-grid-cpu') {
+      raw.raw.clockReads[1].valueNs = String(BigInt(raw.raw.clockReads[1].valueNs) + 1n);
+      raw.raw.cpuReads[1].valueNs = raw.raw.clockReads[1].valueNs;
+      raw.operationNs += 1 / 2000;
+      sample.operationNs = sample.raw.reduce((sum: number, item: any) => sum + item.operationNs, 0) / sample.repetitions;
+    }
+    if (fault === 'aggregate-only-drift') sample.operationNs++;
+    expect(() => validateServerEngineSample(sample, scene)).toThrow(/stock C|CPU|timing/);
+  });
+  it('stock C producer делает2warmups, actual2×work и сохраняет поздний prefix без выдуманного CPU endpoint', async () => {
+    const scene = SERVER_PROFILE.engineScenes.find((scene) => scene.workload === 'stock-c')!;
+    let constructors = 0, destroys = 0, failAt = Infinity, userUs = 0;
+    const cpu = vi.spyOn(process, 'threadCpuUsage').mockImplementation(() => ({ user: userUs += 2_000_000, system: 0 }));
+    class ObservedMotionValue {
+      private readonly options: any;
+      private changed: (value: number) => unknown = () => {};
+      private index: number;
+      constructor(options: any) {
+        this.index = constructors++; this.options = options;
+        expect(options.initial).toBe(0); expect(options.spring).toEqual({ mass: 1, stiffness: 170, damping: 26 });
+        expect(Object.hasOwn(options, 'clamp')).toBe(false);
+      }
+      onChange(changed: (value: number) => unknown) { this.changed = changed; changed(0); }
+      setTarget(target: number) {
+        expect(target).toBe(100);
+        let count = 0;
+        const frame = () => { this.changed(++count === 47 ? 100 : count); if (count < 47) this.options.requestFrame(frame); };
+        this.options.requestFrame(frame);
+      }
+      destroy() { destroys++; if (this.index === failAt) throw undefined; }
+    }
+    try {
+      const success = await measureServerEngine(ObservedMotionValue, scene, 2);
+      expect(constructors).toBe(2 * 2000 + 8 * 4000); expect(destroys).toBe(constructors);
+      expect(cpu).toHaveBeenCalledTimes(16); expect(success.raw).toHaveLength(8); expect(success.warmup).toHaveLength(2);
+      success.warmup.forEach((batch: any) => validateStockMotionValueBatch(batch, scene, 1, false));
+      success.raw.forEach((batch: any) => {
+        expect(batch.raw.outcomes).toEqual({ encoding: 'runs', count: 4000, runs: [{ from: 0, count: 4000, value: 100, frames: 47 }] });
+        expect(batch.operationNs).toBe(1_000_000);
+      });
+      validateServerEngineSample(success, scene, 2);
+      constructors = destroys = 0; failAt = 4002; cpu.mockClear();
+      const failed: any = await measureServerEngine(ObservedMotionValue, scene).catch((error) => error);
+      expect(failed).toBeInstanceOf(AggregateError); expect(failed.raw.warmup).toHaveLength(2); expect(failed.raw.completed).toEqual([]);
+      expect(failed.raw.failedRepetition.raw).toMatchObject({ completed: 2, values: [100, 100], frames: [47, 47],
+        unfinishedOperation: { index: 2, valueAcquired: false, frameAcquired: false } });
+      expect(failed.raw.failedRepetition.raw.clockReads).toHaveLength(1); expect(failed.raw.failedRepetition.raw.cpuReads).toHaveLength(1);
+      expect(cpu).toHaveBeenCalledTimes(1);
+      if (process.env.MOTION_SERVER_STOCK_UNIT_EVIDENCE) writeFileSync(process.env.MOTION_SERVER_STOCK_UNIT_EVIDENCE,
+        JSON.stringify({ synthetic: true, actualRegisteredPerformanceSamples: 0, scene, success, failure: { name: failed.name, message: failed.message, raw: failed.raw } }) + '\n', { flag: 'wx' });
+    } finally { cpu.mockRestore(); }
+  });
   it('chunked JSON сохраняет native values, порядок, escape/UTF8 и duplicate/prototype keys', () => {
     const text = '{"rows":[{"text":"кириллица\\n\\\"[,]{}\\\\🙂","raw":[null,true,false,-0,1e200,9007199254740993]},[{},[]]],"__proto__":{"safe":1},"a":1,"a":2,"tail":"\\u0000"}';
     const expected = JSON.parse(text);
@@ -725,7 +829,7 @@ describe('серверный PROFILE: заранее зарегистриров�
   });
 
   it('выводит N из независимых baseline blocks и сохраняет невозможную мощность', () => {
-    expect(planServerSampleSize(pairs(SERVER_PROFILE.pilotRuns))).toMatchObject({ runs: 288, feasible: true });
+    expect(planServerSampleSize(pairs(SERVER_PROFILE.pilotRuns))).toMatchObject({ runs: 292, feasible: true });
     const noisy = pairs(SERVER_PROFILE.pilotRuns);
     noisy[0].right = [100, 100, 1000, 1000, 10, 10, 100, 100];
     expect(planServerSampleSize(noisy)).toMatchObject({ runs: SERVER_PROFILE.maxRuns, feasible: false });
@@ -754,11 +858,12 @@ describe('серверный PROFILE: заранее зарегистриров�
     expect(0.94 ** 10).toBeGreaterThan(SERVER_PROFILE.familyAlpha);
     expect(short.every((cell) => !cell.p95.bounded && cell.p95.high === null)).toBe(true);
     const policy = serverTailPolicy();
-    expect(policy.minimumBlocks).toBe(144);
-    expect(serverOrderStatisticBounds(Array(143).fill(1), 0.95, policy.alphaPerTail).high).toBeNull();
-    expect(serverOrderStatisticBounds(Array(144).fill(1), 0.95, policy.alphaPerTail).high).toBe(1);
-    expect(19n ** 144n * 1600n <= 20n ** 144n).toBe(true);
-    expect(19n ** 143n * 1600n <= 20n ** 143n).toBe(false);
+    expect(policy.alphaPerTail).toBe(1 / 1760);
+    expect(policy.minimumBlocks).toBe(146);
+    expect(serverOrderStatisticBounds(Array(145).fill(1), 0.95, policy.alphaPerTail).high).toBeNull();
+    expect(serverOrderStatisticBounds(Array(146).fill(1), 0.95, policy.alphaPerTail).high).toBe(1);
+    expect(19n ** 146n * 1760n <= 20n ** 146n).toBe(true);
+    expect(19n ** 145n * 1760n <= 20n ** 145n).toBe(false);
   });
 });
 
@@ -858,7 +963,7 @@ describe('серверный PROFILE: независимые sabotage controls',
   it('сохраняет partial A/B и поздний отказ, а пропавшие comparator/retention не допускает', () => {
     const history = admissionHistory(), complete = history.artifact;
     // Меняются только принадлежащие отказу ветви. Полная unchanged история
-    // N288 остаётся входом валидатора, без трёх лишних копий всего raw.
+    // Полный зарегистрированный N остаётся входом, без трёх лишних копий raw.
     const partial: any = { ...complete, verdict: 'UNPROVEN', ab: { ...complete.ab } };
     const completeEvents = history.events;
     const firstAb = completeEvents.findIndex((event) => event.type === 'sample' && event.value.stage === 'ab');

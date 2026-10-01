@@ -16,6 +16,15 @@ export const SERVER_PROFILE = freeze({
   rawEncoding: 'compact-json-stream-v1; every sample preserved; external digest and journal bind exact file bytes',
   id: 'PROFILE-01-server',
   baselineRevision: '0b6f537e148b7dadadfb9e3ce7c446d014975958',
+  candidateSamplesObservedScope: 'на момент регистрации ещё нет registered CPU/API cost samples текущего protocol epoch; historical exploratory stock wall и semantic/memory controls candidate уже известны',
+  exploratoryPrehistory: {
+    kind: 'existing stock C wall bench; exploratory scope-trigger до нового CPU protocol, не registered CPU samples',
+    baselineReportedMedian: '7.2k ns', candidateReportedMedian: '8.3k ns',
+    baselineStdoutSha256: '28b5cdb758254fba1c49b658541a2ecfe0e840e0ed53d108cfe03f82e8ca205b',
+    candidateStdoutSha256: '1ccde5b80240f0abdf9806d0543a6782fe4b5799af80083b933775e578973b73',
+    helperSemanticReceiptSha256: '010140351e9b3e2f17b1be6bd632a9ee21be67cf41220adcb86f1aec51010686',
+    selectionScope: 'N выводится только из нового baseline-only pilot по прежнему закону; 1.05/MDE/power/counts не подгоняются к exploratory effect',
+  },
   browsers: ['chromium', 'firefox', 'webkit'],
   viewport: { width: 800, height: 200 },
   deviceScaleFactor: 1,
@@ -24,6 +33,8 @@ export const SERVER_PROFILE = freeze({
   engineScenes: [
     { id: 'scalar-live-100', lifecycle: 'live', count: 100, channels: 1 },
     { id: 'transform-fresh-1000', lifecycle: 'fresh', count: 1000, channels: 7 },
+    { id: 'motion-value-default-stock-c', workload: 'stock-c', callsPerRepetition: 2000, warmupBatches: 2,
+      expectedFrames: 47, initial: 0, target: 100, spring: { mass: 1, stiffness: 170, damping: 26 }, metrics: ['operationNs'] },
   ],
   browserScenes: [
     { id: 's2', targetsPerCall: 100, staggerGapMs: 0 },
@@ -39,33 +50,34 @@ export const SERVER_PROFILE = freeze({
     temporalOracle: 'наблюдаемый свежий onset 0→300 до/после API; фаза связана с началом вызова; полный displacement interval разрешающей пары внутри прежнего CSS допуска; timed onset ограничен actual batch/read часами; CSS в actual стабильном document frame, связанном с rAF; perf chronology сохранена, без расширения при uncertainty' },
   warmupRuns: 4,
   pilotRuns: 8,
-  minRuns: 288,
+  minRuns: 292,
   maxRuns: 1024,
   seed: 0x53525652,
   statistics: 'точные биномиальные интервалы порядковых статистик по среднему стоимости двух противоположных runs',
   familyAlpha: 0.05,
-  familySize: 10,
+  familySize: 11,
   nonInferiorityUpper: 1.05,
   positiveLower: 1.5,
   positiveWorkMultiplier: 2,
   mdeRelative: 0.05,
   power: 0.8,
   zPower: 0.8416212335729143,
-  // Bonferroni: 10 клеток × p50/p95, двухсторонняя family-wise 95% полоса.
-  zFamily: 3.023341439739154,
+  // Bonferroni: 11 клеток × p50/p95, двухсторонняя family-wise 95% полоса.
+  zFamily: 3.052065201864885,
   metrics: {
     engine: ['operationNs', 'meanFrameNs', 'cancelDrainNs'],
     browser: ['startMs', 'cancelMs'],
   },
   clock: { engine: 'process.threadCpuUsage (user + system), наносекунды', browser: 'realm-local performance.now, миллисекунды' },
-  engineRawLineage: 'все actual user/system CPU fields,16 clock endpoints и ordered scheduler/CSS traces сохраняются lossless; interval/coordinate/hash пересчитываются существующим lifecycle owner',
+  engineRawLineage: 'все actual user/system CPU fields и ordered scheduler/CSS traces сохраняются lossless; legacy16 endpoints, stockC2 endpoints + каждый фактический47-frame/endpoint100 исход; интервалы и denominator пересчитываются существующим owner',
   samplingUnit: 'средняя стоимость парного блока двух противоположных runs; повторы/кадры зависимы; p95 относится к распределению средних блоков',
-  denominator: 'стоимость полезного вызова с зарегистрированными targets: browser batch/32; positive содержит 64 actual calls без деления на два; engine unchanged',
+  denominator: 'стоимость полезного вызова с зарегистрированными targets: browser batch/32; positive64actualcalls; legacyengine unchanged; stockC batch/2000, positive4000actualcalls/2000 без деления на два',
+  stockCpuScope: 'штатный whole stockC macro main-entry MotionValue: factory+2×2000warmups внеCPU; clock/drain/construct/onChange/setTarget/destroy вCPU, preallocated per-operation last+getFrameCount recording вCPU одинаков обеимролям; RLE/oracle внеCPU. Не per-framep99/100channels.',
   stoppingRule: 'один baseline-only pilot → замороженный N → один A/A и 2×work → A/B только при годной калибровке; добор и повтор к green запрещены',
   preservedGuards: 'size-gate, численные/семантические допуски и protected p95 upper ≤1.05 не меняются',
   scope: 'headless server: CPU потока engine и API browser при duration=128 ms; counts/stagger закреплены; endpoint/start/frame/retarget/cancel отдельно; canonical 1200 ms guards независимы',
   unproven: ['mobile Android/iOS', 'physical 60/120 Hz', 'whole-page energy', 'GPU', 'M-04 physical-device envelope', 'M-05 product scene families'],
-  forcedGc: 'только отдельный retention child process; в timing отсутствует',
+  forcedGc: 'только отдельный retention child process после host turn, затем два GC у каждого heap snapshot; в timing отсутствует',
   rawControls: 'baseline no-motion: два одинаковых PNG; reduced-motion: endpoint без rAF/WAAPI; candidate controls только после PASS calibration',
   resourcePolicy: 'весь cgroup: до/после каждого парного блока; affinity неизменна, nr_throttled/throttled_usec delta=0; все samples сохраняются, нарушение даёт UNPROVEN без post-hoc исключений',
   browserOperationTimeoutMs: 30_000,
@@ -118,9 +130,11 @@ export function verifyServerProfile(value) {
 }
 
 export function serverTailPolicy() {
-  const alphaPerTail = SERVER_PROFILE.familyAlpha / (SERVER_PROFILE.familySize * 2 * 2 * 2);
+  // Family alpha = 1/20; rational denominator предотвращает лишнюю float
+  // операцию, дающую соседний binary64 к точному1/1760.
+  const alphaPerTail = 1 / (SERVER_PROFILE.familySize * 2 * 2 * 2 * 20);
   return { alphaPerTail, quantiles: [0.5, 0.95], minimumBlocks: Math.ceil(Math.log(alphaPerTail) / Math.log(0.95)),
-    correction: 'Bonferroni: 10 cells × 2 quantiles × 2 participants × 2 tails; family-wise 95%' };
+    correction: 'Bonferroni: 11 cells × 2 quantiles × 2 participants × 2 tails; family-wise 95%' };
 }
 
 // Требуемый N выводится только из baseline A/A pilot, до любых candidate samples.
@@ -149,5 +163,5 @@ export function planServerSampleSize(pilotPairs) {
   const requiredRuns = Math.max(SERVER_PROFILE.minRuns, tail.minimumBlocks * 2, ...cells.map(({ requiredRuns: n }) => n));
   const runs = Math.min(SERVER_PROFILE.maxRuns, Math.ceil(requiredRuns / 2) * 2);
   return { runs, requiredRuns, feasible: requiredRuns <= SERVER_PROFILE.maxRuns, cells, tail,
-    method: 'baseline-only paired block log-contrast normal approximation; power 0.8, MDE 5%, Bonferroni family 10×2; N в runs, блок содержит два run' };
+    method: 'baseline-only paired block log-contrast normal approximation; power 0.8, MDE 5%, Bonferroni family 11×2; N в runs, блок содержит два run' };
 }

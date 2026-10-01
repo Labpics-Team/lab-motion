@@ -8,8 +8,9 @@ import path from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 import { PerformanceObserver } from 'node:perf_hooks';
 import { runTransformLifecycleSample } from '../../scripts/bench-transform-support.mjs';
+import { createMotionValueDefaultBenchmark } from '../../scripts/bench-support.mjs';
 import { runSemanticStartCheck, startBenchmarkOrigin } from '../compare/bench.mjs';
-import { deriveRealmTimerStep, PRODUCTION_ADAPTER_PROFILE } from '../compare/methodology.mjs';
+import { compactStockMotionValueOutcomes, deriveRealmTimerStep, PRODUCTION_ADAPTER_PROFILE, validateStockMotionValueBatch } from '../compare/methodology.mjs';
 import { assertCheckoutUnchanged, assertFileHashesUnchanged, assertInstalledPackageTreesUnchanged,
   hashFileTree, prepareBenchmarkCheckout, sha256File } from '../compare/provenance.mjs';
 import { SERVER_PROFILE, planServerSampleSize, serverProfileDigest } from './server-profile-registration.mjs';
@@ -21,7 +22,7 @@ const BENCH = path.join(ROOT, 'bench/compare');
 const requireBench = createRequire(path.join(BENCH, 'package.json'));
 const HARNESS_FILES = ['bench/profile/server-profile-registration.mjs', 'bench/profile/server-profile-contract.mjs',
   'bench/profile/server-profile-runner.mjs', 'bench/profile/server-profile-retention.mjs',
-  'scripts/bench-transform-support.mjs', 'scripts/bench-support.mjs', 'bench/compare/bench.mjs',
+  'scripts/bench-transform-support.mjs', 'scripts/bench-support.mjs', 'scripts/bench.mjs', 'bench/compare/bench.mjs',
   'bench/compare/methodology.mjs', 'bench/compare/provenance.mjs'];
 const ENTRIES = ['lab', ...SERVER_PROFILE.comparators];
 const PACKAGES = { motion: 'motion', gsap: 'gsap', anime: 'animejs', 'motion-mini': 'motion', 'anime-waapi': 'animejs' };
@@ -151,6 +152,7 @@ function threadCpuNs(reads) {
 }
 
 export async function measureServerEngine(animate, scene, workMultiplier = 1) {
+  if (scene.workload === 'stock-c') return measureServerStockC(animate, scene, workMultiplier);
   const raw = [];
   const before = process.memoryUsage();
   const contextBefore = contextSwitches();
@@ -180,6 +182,72 @@ export async function measureServerEngine(animate, scene, workMultiplier = 1) {
   } catch (error) {
     throw Object.assign(new AggregateError([error], 'server profile: engine sample не завершён'), { raw: sampleResult ?? {
       completed: raw, failedRepetition: preserveRawNumbers(error?.raw ? { ...error.raw, cpuReads } : { cpuReads }), before, after: process.memoryUsage() } });
+  }
+}
+
+/** Штатный stock C: per-call evidence stores внутри CPU, oracle/RLE снаружи. */
+export async function measureServerStockC(MotionValue, scene, workMultiplier = 1) {
+  const raw = [], warmup = [];
+  const before = process.memoryUsage(), contextBefore = contextSwitches();
+  let current = null;
+  let sampleResult;
+  try {
+    if (typeof MotionValue !== 'function' || ![1, 2].includes(workMultiplier)) throw new Error('stock C: неизвестный constructor/work multiplier');
+    const macro = createMotionValueDefaultBenchmark(MotionValue, scene.spring);
+    const batch = (timed, multiplier) => {
+      const calls = scene.callsPerRepetition * multiplier;
+      const values = new Array(calls), frames = new Array(calls);
+      const cpuReads = [], clockReads = [];
+      current = { raw: { schemaVersion: 1, scene: scene.id, phase: timed ? 'timed' : 'warmup', calls,
+        denominator: scene.callsPerRepetition, completed: 0, clockReads, cpuReads, values, frames, unfinishedOperation: null } };
+      const read = (edge) => {
+        const valueNs = threadCpuNs(cpuReads);
+        clockReads.push({ sequence: clockReads.length, metric: 'operationNs', frame: null, edge, valueNs: String(valueNs) });
+        return valueNs;
+      };
+      const start = timed ? read('before') : null;
+      for (let operation = 0; operation < calls; operation++) {
+        // Чтение frame count необходимо для каждого вызова: среднее47
+        // не отличает две неправильные операции0/94. Два массива выделены
+        // до CPU, а преобразование в RLE и oracle выполняются после него.
+        const value = macro.run();
+        values[operation] = value;
+        frames[operation] = macro.getFrameCount();
+        current.raw.completed++;
+      }
+      const end = timed ? read('after') : null;
+      const result = { operationNs: timed ? Number(end - start) / scene.callsPerRepetition : null,
+        raw: { schemaVersion: 1, scene: scene.id, phase: timed ? 'timed' : 'warmup', calls,
+          denominator: scene.callsPerRepetition, completed: calls, clockReads, cpuReads,
+          outcomes: compactStockMotionValueOutcomes(values, frames) } };
+      current = result;
+      validateStockMotionValueBatch(result, scene, multiplier, timed);
+      return result;
+    };
+    // Штатные две warmup batches до первой измеренной работы; candidate
+    // попадает сюда только после общей calibration и frozen N.
+    for (let index = 0; index < scene.warmupBatches; index++) warmup.push(batch(false, 1));
+    for (let repetition = 0; repetition < SERVER_PROFILE.repetitions; repetition++) raw.push(batch(true, workMultiplier));
+    sampleResult = { operationNs: raw.reduce((sum, result) => sum + result.operationNs, 0) / SERVER_PROFILE.repetitions,
+      semantic: true, repetitions: SERVER_PROFILE.repetitions, workMultiplier, denominator: SERVER_PROFILE.denominator,
+      cpuScope: SERVER_PROFILE.stockCpuScope, warmup, raw,
+      contextSwitchObservation: { before: contextBefore, after: contextSwitches(), scope: 'Node process; CPU только текущего потока' },
+      allocationObservation: { before, after: process.memoryUsage(), scope: 'whole macro + recorder + oracle + harness; retained отдельно' } };
+    validateServerEngineSample(sampleResult, scene, workMultiplier);
+    return sampleResult;
+  } catch (error) {
+    if (current?.raw?.values) {
+      const completed = current.raw.completed;
+      const valueAcquired = Object.hasOwn(current.raw.values, completed);
+      const frameAcquired = Object.hasOwn(current.raw.frames, completed);
+      current.raw.unfinishedOperation = { index: completed, valueAcquired, frameAcquired };
+      const acquired = (values, count) => values.slice(0, count).map((value) => value === undefined ? { type: 'undefined' }
+        : Object.is(value, -0) ? { number: '-0' } : value);
+      current.raw.values = acquired(current.raw.values, completed + Number(valueAcquired));
+      current.raw.frames = acquired(current.raw.frames, completed + Number(frameAcquired));
+    }
+    throw Object.assign(new AggregateError([error], 'server profile: stock C sample не завершён'), { raw: sampleResult ?? preserveRawNumbers({
+      warmup, completed: raw, failedRepetition: current, before, after: process.memoryUsage() }) });
   }
 }
 
@@ -432,7 +500,7 @@ export async function runServerProfile({ baseline, candidate, browser: browserNa
       .map((file) => [file, { path: path.join(ROOT, file), sha256: sha256File(path.join(ROOT, file)) }]));
     for (const id of ['baseline', 'candidate']) {
       prepared[id] = prepareBenchmarkCheckout({ root: roots[id], benchDirectory: BENCH, build: buildToStderr,
-        requiredDist: ['dist/animate/index.js'], requiredPackages: ['esbuild', 'playwright', 'motion', 'gsap', 'animejs'],
+        requiredDist: ['dist/animate/index.js', 'dist/index.js'], requiredPackages: ['esbuild', 'playwright', 'motion', 'gsap', 'animejs'],
         requiredRootPackages: ['tsup', 'typescript', 'esbuild'], requiredInputs: Object.entries(harness).map(([key, info]) => [key, info.path]) });
     }
     if (prepared.baseline.revision !== SERVER_PROFILE.baselineRevision) throw new Error('server profile: baseline отличается от регистрации');
@@ -448,6 +516,7 @@ export async function runServerProfile({ baseline, candidate, browser: browserNa
     Object.entries(adapters).forEach(([id, value]) => { harness[`adapter:${id}`] = value; });
     origin = await startBenchmarkOrigin(); browser = await browserType.launch({ headless: SERVER_PROFILE.headless, executablePath: executable });
     artifact.registration = { protocolDigest: serverProfileDigest(SERVER_PROFILE), candidateSamplesObserved: false,
+      candidateSamplesObservedScope: SERVER_PROFILE.candidateSamplesObservedScope,
       clockModelDigest: serverProfileDigest(SERVER_PROFILE.clockError),
       registeredAt: new Date().toISOString(), browser: browserName, browserVersion: browser.version(), browserExecutableSha256, browserTree,
       machine, provenance: prepared, packages, transitivePackages: Object.fromEntries(closure), harness,
@@ -463,6 +532,8 @@ export async function runServerProfile({ baseline, candidate, browser: browserNa
       const metadata = JSON.parse(readFileSync(path.join(packages[id].directory, 'package.json'), 'utf8'));
       const entry = metadata.exports['./animate'].import.default;
       implementations[id] = (await import(pathToFileURL(path.join(packages[id].directory, entry)).href)).animate;
+      const main = metadata.exports['.'].import.default;
+      implementations[`${id}:stock-c`] = (await import(pathToFileURL(path.join(packages[id].directory, main)).href)).MotionValue;
     };
     await loadImplementation('baseline');
     observer = new PerformanceObserver((list) => { for (const entry of list.getEntries()) artifact.gc.push({ startTime: entry.startTime, duration: entry.duration, detail: entry.detail }); });
@@ -483,7 +554,7 @@ export async function runServerProfile({ baseline, candidate, browser: browserNa
               const build = name === 'ab' && id === 'right' ? 'candidate' : 'baseline';
               const multiplier = name === 'positive' && id === 'right' ? SERVER_PROFILE.positiveWorkMultiplier : 1;
               try {
-                current.samples[id] = kind === 'engine' ? await engineMeasure(implementations[build], scene, multiplier)
+                current.samples[id] = kind === 'engine' ? await engineMeasure(implementations[scene.workload === 'stock-c' ? `${build}:stock-c` : build], scene, multiplier)
                   : await browserMeasure(browser, origin, adapters[build], scene, multiplier);
                 journal('sample', { stage: name, kind, scene: scene.id, run, participant: id, build, value: current.samples[id] });
               } catch (error) {

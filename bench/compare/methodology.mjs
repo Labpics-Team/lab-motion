@@ -16,6 +16,58 @@ export const BENCHMARK_TIMER_ISOLATION_POLICY = Object.freeze({
   originAgentCluster: '?1',
 });
 
+/** Упорядоченные исходы stock C без потерь; RLE строится после CPU интервала. */
+export function compactStockMotionValueOutcomes(values, frames) {
+  if (!Array.isArray(values) || !Array.isArray(frames) || values.length !== frames.length) {
+    throw new Error('stock C: потеряны приобретённые outcomes');
+  }
+  const runs = [];
+  const preserve = (value) => value === undefined ? { type: 'undefined' }
+    : Object.is(value, -0) ? { number: '-0' }
+      : typeof value === 'number' && !Number.isFinite(value) ? { nonfinite: String(value) } : value;
+  for (let index = 0; index < values.length; index++) {
+    const previous = runs.at(-1);
+    if (previous && Object.is(values[index - 1], values[index]) && Object.is(frames[index - 1], frames[index])) previous.count++;
+    else runs.push({ from: index, count: 1, value: preserve(values[index]), frames: preserve(frames[index]) });
+  }
+  return { encoding: 'runs', count: values.length, runs };
+}
+
+/** Каждый whole macro должен завершить47frames и endpoint100; среднее не является oracle. */
+export function validateStockMotionValueBatch(batch, scene, workMultiplier = 1, timed = true) {
+  const require = (condition, message) => { if (!condition) throw new Error(`stock C: ${message}`); };
+  const expectedCalls = scene.callsPerRepetition * workMultiplier;
+  require(batch?.raw?.schemaVersion === 1 && batch.raw.scene === scene.id && batch.raw.phase === (timed ? 'timed' : 'warmup') &&
+    batch.raw.calls === expectedCalls && batch.raw.completed === expectedCalls && batch.raw.denominator === scene.callsPerRepetition,
+  'неполный whole macro или изменённый знаменатель');
+  const outcomes = batch.raw.outcomes;
+  require(outcomes?.encoding === 'runs' && outcomes.count === expectedCalls && Array.isArray(outcomes.runs), 'потеряны per-operation outcomes');
+  let next = 0;
+  for (const run of outcomes.runs) {
+    require(run?.from === next && Number.isSafeInteger(run.count) && run.count > 0 && run.count <= expectedCalls - next,
+      'RLE потерял или повторил operation identity');
+    require(run.value === scene.target && run.frames === scene.expectedFrames, 'отдельная операция не завершила полезный47-frame/100 результат');
+    next += run.count;
+  }
+  require(next === expectedCalls, 'потерян acquired suffix');
+  if (!timed) {
+    require(batch.operationNs === null && batch.raw.clockReads.length === 0 && batch.raw.cpuReads.length === 0, 'warmup превратился в timing');
+    return { operationNs: null };
+  }
+  const reads = batch.raw.clockReads;
+  require(Array.isArray(reads) && reads.length === 2, 'потеряны CPU interval endpoints');
+  const endpoints = reads.map((read, sequence) => {
+    require(read?.sequence === sequence && read.metric === 'operationNs' && read.frame === null &&
+      read.edge === ['before', 'after'][sequence] && typeof read.valueNs === 'string' && /^(?:0|[1-9]\d*)$/.test(read.valueNs), 'нарушен CPU clock order/grid');
+    return BigInt(read.valueNs);
+  });
+  const duration = endpoints[1] - endpoints[0];
+  require(duration >= 0n && duration <= BigInt(Number.MAX_SAFE_INTEGER), 'CPU interval вне safe range');
+  const operationNs = Number(duration) / scene.callsPerRepetition;
+  require(batch.operationNs === operationNs, 'metric не пересчитывается из raw/2000');
+  return { operationNs, batchNs: Number(duration) };
+}
+
 /** Warm-floor использует шаг моды; superiority-порог — максимум всех дельт. */
 export const WARM_TIMER_CALIBRATION_POLICY = Object.freeze({
   practicalRelativeThreshold: 0.05,
