@@ -216,6 +216,7 @@ fl.play(first, el.getBoundingClientRect()); // элемент «доезжает
 при размонтировании нужен `binding.destroy()`. Повторное открытие во время ухода
 не сбрасывает позу и не позволяет старому завершению закрыть диалог.
 
+<!-- recipe:presence-dialog -->
 ```typescript
 import { animate } from '@labpics/motion/animate';
 import { createPresenceTransition } from '@labpics/motion/presence';
@@ -412,6 +413,277 @@ el.addEventListener('pointercancel', () => sheet.pointerCancel());
 // программно раскрыть до верхнего snap (единый clock, C¹ из текущей скорости):
 document.querySelector('.expand')?.addEventListener('click', () => sheet.snapTo(2));
 ```
+
+## Sheet: живая фаза и автономный snap
+
+Компонент содержит `[data-sheet-panel]`, нативную кнопку `[data-sheet-handle]`
+и необязательные кнопки `[data-sheet-snap="0"]`, `[data-sheet-snap="1"]` и т. д.
+У handle задайте `touch-action: none`; текст и поля ввода внутри panel остаются
+обычными интерактивными элементами. Snap points — конечные возрастающие физические
+смещения по Y. Приложение обновляет их после изменения высоты или содержимого.
+
+Один `CompositorSpring` владеет поверхностью. Pointerdown снимает native position
+и velocity; follow меняет цель выданного live-значения. На release чистый
+`createDecay().rest` помогает выбрать snap, а скорость в новый native effect
+переносит сам контроллер. Это не второй драйвер decay и не ручная копия velocity.
+
+<!-- recipe:compositor-sheet -->
+```typescript
+import { CompositorSpring } from '@labpics/motion/compositor';
+import { createDecay } from '@labpics/motion/decay';
+
+export function mountCompositorSheet(root: HTMLElement, options: {
+  snapPoints: readonly number[];
+  motion?: 'auto' | 'none';
+  onSelect?: (index: number) => void;
+  requestFrame?: (callback: (time?: number) => void) => number;
+}) {
+  const panel = root.querySelector<HTMLElement>('[data-sheet-panel]');
+  const handle = root.querySelector<HTMLButtonElement>('[data-sheet-handle]');
+  if (!panel || !handle) throw new Error('Нужны panel и button handle');
+  const check = (points: readonly number[]) => {
+    const copy = [...points];
+    if (!copy.length || copy.some((v, i) => !Number.isFinite(v) || (i > 0 && v <= copy[i - 1]!))) {
+      throw new RangeError('Snap points должны быть конечными и строго возрастающими');
+    }
+    return copy;
+  };
+  let points = check(options.snapPoints), selected = 0, paused = false;
+  let pointer: number | undefined, anchor = 0, coordinate = 0;
+  let live: ReturnType<CompositorSpring['handoffToLive']> | undefined;
+  const events = new AbortController();
+  const reduced = window.matchMedia('(prefers-reduced-motion: reduce)');
+  const quiet = () => options.motion === 'none' || reduced.matches;
+  const originalTransform = panel.style.transform;
+  const previousFocus = document.activeElement as HTMLElement | null;
+  const format = (value: number) => `translateY(${value}px)`;
+  panel.style.transform = format(points[0]!);
+  const motion = new CompositorSpring({
+    spring: { mass: 1, stiffness: 240, damping: 28 },
+    property: 'transform', from: points[0]!, to: points[0]!, target: panel,
+    format, apply: value => { panel.style.transform = String(value); },
+    matchMedia: () => ({ matches: quiet() }), requestFrame: options.requestFrame,
+  });
+  const bounded = (value: number) => Math.max(points[0]!, Math.min(points.at(-1)!, value));
+  const releaseCapture = () => {
+    const id = pointer; pointer = undefined;
+    if (id !== undefined && handle.hasPointerCapture(id)) handle.releasePointerCapture(id);
+  };
+  const select = (index: number) => {
+    if (events.signal.aborted) return;
+    if (!Number.isInteger(index) || index < 0 || index >= points.length) throw new RangeError('Нет такого snap');
+    releaseCapture(); live = undefined; selected = index;
+    if (!paused) {
+      if (quiet()) motion.handoffToLive(points[index]!).snapTo(points[index]!);
+      else motion.handoffToCompositor(points[index]!);
+    }
+    options.onSelect?.(index);
+  };
+  const follow = (event: PointerEvent) => {
+    if (pointer !== event.pointerId || !live) return;
+    coordinate = event.clientY;
+    const goal = bounded(anchor + coordinate);
+    if (quiet()) live.snapTo(goal); else live.setTarget(goal);
+  };
+  const finish = (event: PointerEvent, cancelled: boolean) => {
+    if (pointer !== event.pointerId || !live) return;
+    if (!cancelled) follow(event);
+    const rest = createDecay({ from: live.value, velocity: live.velocity }).rest;
+    const next = cancelled ? selected : points.reduce((best, value, index) =>
+      Math.abs(value - rest) < Math.abs(points[best]! - rest) ? index : best, 0);
+    select(next);
+  };
+  handle.addEventListener('pointerdown', event => {
+    if (paused || pointer !== undefined || !event.isPrimary || event.button !== 0) return;
+    event.preventDefault(); handle.focus({ preventScroll: true });
+    live = motion.handoffToLive();
+    coordinate = event.clientY; anchor = live.value - coordinate; pointer = event.pointerId;
+    handle.setPointerCapture(event.pointerId);
+  }, { signal: events.signal });
+  handle.addEventListener('pointermove', follow, { signal: events.signal });
+  handle.addEventListener('pointerup', event => finish(event, false), { signal: events.signal });
+  handle.addEventListener('pointercancel', event => finish(event, true), { signal: events.signal });
+  handle.addEventListener('lostpointercapture', event => finish(event, true), { signal: events.signal });
+  handle.addEventListener('keydown', event => {
+    if (event.isComposing || event.altKey || event.ctrlKey || event.metaKey) return;
+    const next = event.key === 'Home' ? 0 : event.key === 'End' ? points.length - 1
+      : event.key === 'ArrowUp' ? selected - 1 : event.key === 'ArrowDown' ? selected + 1 : undefined;
+    if (next !== undefined) { event.preventDefault(); select(Math.max(0, Math.min(points.length - 1, next))); }
+  }, { signal: events.signal });
+  root.addEventListener('click', event => {
+    const button = (event.target as Element).closest<HTMLButtonElement>('button[data-sheet-snap]');
+    if (button && root.contains(button)) select(Number(button.dataset.sheetSnap));
+  }, { signal: events.signal });
+  reduced.addEventListener('change', () => {
+    if (live && pointer !== undefined) live.snapTo(bounded(anchor + coordinate));
+    else select(selected);
+  }, { signal: events.signal });
+  return {
+    motion, select, get selected() { return selected; },
+    resize(next: readonly number[]) {
+      if (events.signal.aborted) return;
+      points = check(next); selected = Math.min(selected, points.length - 1);
+      if (pointer !== undefined && live) {
+        anchor = live.value - coordinate;
+        const goal = bounded(live.value);
+        if (quiet()) live.snapTo(goal); else live.setTarget(goal);
+      } else select(selected);
+    },
+    pause() { if (!events.signal.aborted) { releaseCapture(); paused = true; (live ?? motion.handoffToLive()).stop(); live = undefined; } },
+    resume() { if (!events.signal.aborted) { paused = false; select(selected); } },
+    destroy() {
+      if (events.signal.aborted) return;
+      events.abort(); releaseCapture(); live = undefined; motion.destroy(); panel.style.transform = originalTransform;
+      const active = (root.getRootNode() as Document | ShadowRoot).activeElement;
+      if (active && root.contains(active) && previousFocus?.isConnected) previousFocus.focus({ preventScroll: true });
+    },
+  };
+}
+```
+
+Для клавиатуры handle принимает Home/End и стрелки; кнопки snap используют обычный
+click. `onSelect` обновляет собственные `aria-expanded`, текст и выбранное состояние
+компонента. Он не заменяет модальный `<dialog>` или focus trap. `pause()` сохраняет
+текущую позу, `resume()` продолжает к выбранному snap. В режиме `motion: 'none'`
+и при reduced-motion цели применяются сразу; смена системного предпочтения также
+обрабатывается компонентом. `destroy()` снимает listeners/capture, движение и
+возвращает фокус, если он ещё внутри компонента.
+
+## Pager: страницы и RTL принадлежат компоненту
+
+Компонент содержит `[data-pager-viewport]`, его `[data-pager-track]` с прямыми
+детьми `[data-page]`, отдельную кнопку `[data-pager-handle]` и кнопки
+`[data-page-index="0"]` и т. д. Viewport имеет `overflow: hidden`, track —
+`display: flex`, страницы — `flex: 0 0 100%`; у handle `touch-action: none`.
+Направление задаётся обычным CSS `direction`. Драгать текст и поля ввода не нужно:
+они сохраняют выделение, IME и привычные focus/click-события.
+
+После resize, reparent, изменения числа страниц или direction вызовите `resize()`.
+Измерение ширины происходит на этой границе, а не на каждом pointermove. Индекс
+страницы остаётся в компоненте; общий контроллер знает только физическую ось X.
+
+<!-- recipe:compositor-pager -->
+```typescript
+import { CompositorSpring } from '@labpics/motion/compositor';
+import { createDecay } from '@labpics/motion/decay';
+
+export function mountCompositorPager(root: HTMLElement, options: {
+  motion?: 'auto' | 'none';
+  onSelect?: (index: number) => void;
+  requestFrame?: (callback: (time?: number) => void) => number;
+} = {}) {
+  const viewport = root.querySelector<HTMLElement>('[data-pager-viewport]');
+  const track = root.querySelector<HTMLElement>('[data-pager-track]');
+  const handle = root.querySelector<HTMLButtonElement>('[data-pager-handle]');
+  if (!viewport || !track || !handle) throw new Error('Нужны viewport, track и button handle');
+  const measure = () => {
+    const width = viewport.clientWidth;
+    const count = Array.from(track.children).filter(page => page.hasAttribute('data-page')).length;
+    if (!Number.isFinite(width) || width <= 0 || count < 1) throw new RangeError('Pager должен быть видимым и иметь страницы');
+    return { width, count, sign: getComputedStyle(viewport).direction === 'rtl' ? 1 : -1 };
+  };
+  let geometry = measure(), selected = 0, paused = false;
+  let pointer: number | undefined, anchor = 0, coordinate = 0;
+  let live: ReturnType<CompositorSpring['handoffToLive']> | undefined;
+  const events = new AbortController();
+  const reduced = window.matchMedia('(prefers-reduced-motion: reduce)');
+  const quiet = () => options.motion === 'none' || reduced.matches;
+  const originalTransform = track.style.transform;
+  const previousFocus = document.activeElement as HTMLElement | null;
+  const offset = (index: number) => geometry.sign * geometry.width * index;
+  const bounded = (value: number) => Math.max(Math.min(0, offset(geometry.count - 1)),
+    Math.min(Math.max(0, offset(geometry.count - 1)), value));
+  const format = (value: number) => `translateX(${value}px)`;
+  track.style.transform = format(0);
+  const motion = new CompositorSpring({
+    spring: { mass: 1, stiffness: 240, damping: 28 },
+    property: 'transform', from: 0, to: 0, target: track,
+    format, apply: value => { track.style.transform = String(value); },
+    matchMedia: () => ({ matches: quiet() }), requestFrame: options.requestFrame,
+  });
+  const releaseCapture = () => {
+    const id = pointer; pointer = undefined;
+    if (id !== undefined && handle.hasPointerCapture(id)) handle.releasePointerCapture(id);
+  };
+  const select = (index: number) => {
+    if (events.signal.aborted) return;
+    if (!Number.isInteger(index) || index < 0 || index >= geometry.count) throw new RangeError('Нет такой страницы');
+    releaseCapture(); live = undefined; selected = index;
+    if (!paused) {
+      if (quiet()) motion.handoffToLive(offset(index)).snapTo(offset(index));
+      else motion.handoffToCompositor(offset(index));
+    }
+    options.onSelect?.(index);
+  };
+  const follow = (event: PointerEvent) => {
+    if (pointer !== event.pointerId || !live) return;
+    coordinate = event.clientX;
+    const goal = bounded(anchor + coordinate);
+    if (quiet()) live.snapTo(goal); else live.setTarget(goal);
+  };
+  const finish = (event: PointerEvent, cancelled: boolean) => {
+    if (pointer !== event.pointerId || !live) return;
+    if (!cancelled) follow(event);
+    const rest = createDecay({ from: live.value, velocity: live.velocity }).rest;
+    select(cancelled ? selected : Math.max(0, Math.min(geometry.count - 1,
+      Math.round(rest / (geometry.sign * geometry.width)))));
+  };
+  handle.addEventListener('pointerdown', event => {
+    if (paused || pointer !== undefined || !event.isPrimary || event.button !== 0) return;
+    event.preventDefault(); handle.focus({ preventScroll: true });
+    live = motion.handoffToLive();
+    coordinate = event.clientX; anchor = live.value - coordinate; pointer = event.pointerId;
+    handle.setPointerCapture(event.pointerId);
+  }, { signal: events.signal });
+  handle.addEventListener('pointermove', follow, { signal: events.signal });
+  handle.addEventListener('pointerup', event => finish(event, false), { signal: events.signal });
+  handle.addEventListener('pointercancel', event => finish(event, true), { signal: events.signal });
+  handle.addEventListener('lostpointercapture', event => finish(event, true), { signal: events.signal });
+  handle.addEventListener('keydown', event => {
+    if (event.isComposing || event.altKey || event.ctrlKey || event.metaKey) return;
+    const step = event.key === 'ArrowRight' ? -geometry.sign : event.key === 'ArrowLeft' ? geometry.sign
+      : event.key === 'PageDown' ? 1 : event.key === 'PageUp' ? -1 : undefined;
+    const next = event.key === 'Home' ? 0 : event.key === 'End' ? geometry.count - 1
+      : step === undefined ? undefined : selected + step;
+    if (next !== undefined) { event.preventDefault(); select(Math.max(0, Math.min(geometry.count - 1, next))); }
+  }, { signal: events.signal });
+  root.addEventListener('click', event => {
+    const button = (event.target as Element).closest<HTMLButtonElement>('button[data-page-index]');
+    if (button && root.contains(button)) select(Number(button.dataset.pageIndex));
+  }, { signal: events.signal });
+  reduced.addEventListener('change', () => {
+    if (live && pointer !== undefined) live.snapTo(bounded(anchor + coordinate));
+    else select(selected);
+  }, { signal: events.signal });
+  return {
+    motion, select, get selected() { return selected; },
+    resize() {
+      if (events.signal.aborted) return;
+      geometry = measure(); selected = Math.min(selected, geometry.count - 1);
+      if (pointer !== undefined && live) {
+        anchor = live.value - coordinate;
+        const goal = bounded(live.value);
+        if (quiet()) live.snapTo(goal); else live.setTarget(goal);
+      } else select(selected);
+    },
+    pause() { if (!events.signal.aborted) { releaseCapture(); paused = true; (live ?? motion.handoffToLive()).stop(); live = undefined; } },
+    resume() { if (!events.signal.aborted) { paused = false; select(selected); } },
+    destroy() {
+      if (events.signal.aborted) return;
+      events.abort(); releaseCapture(); live = undefined; motion.destroy(); track.style.transform = originalTransform;
+      const active = (root.getRootNode() as Document | ShadowRoot).activeElement;
+      if (active && root.contains(active) && previousFocus?.isConnected) previousFocus.focus({ preventScroll: true });
+    },
+  };
+}
+```
+
+Свяжите `onSelect` с существующим состоянием страниц и `aria-current` кнопок;
+недоступные для чтения страницы скрывайте по семантике своего компонента. Home/End,
+PageUp/PageDown и стрелки на handle дают альтернативу перетаскиванию; горизонтальные
+стрелки учитывают RTL. Они не перехватывают клавиатуру полей ввода. Lifecycle,
+pause и `motion: 'none'` совпадают с sheet. Диагностика `motion.mode` показывает
+фактический native/live исход; fallback не объявляется compositor-исполнением.
 
 ## Анимации, принадлежащие компоненту
 
@@ -695,6 +967,7 @@ export function mountReorder(root: HTMLElement, status: HTMLElement): () => void
     finish(); state.update(measure()); dirty = false;
     session = state.start(node.dataset.key!);
     if (!session) return;
+    e.preventDefault();
     const r = node.getBoundingClientRect(); startX = r.x + r.width / 2; startY = r.y + r.height / 2;
     pointer = e.pointerId; root.setPointerCapture(pointer); pan.pointerDown(point(e));
     node.querySelector<HTMLElement>('[data-grip]')!.focus({ preventScroll: true });
@@ -721,8 +994,11 @@ export function mountReorder(root: HTMLElement, status: HTMLElement): () => void
     else if (session?.active && directions[e.key]) { e.preventDefault(); refresh(); session.step(directions[e.key]!); }
   });
   listen<MouseEvent>('click', e => {
-    const node = slotFor(e), action = (e.target as Element).closest<HTMLElement>('[data-move]')?.dataset.move;
-    if (!node || (action !== 'previous' && action !== 'next')) return;
+    const node = slotFor(e), button = (e.target as Element).closest<HTMLElement>('[data-move]');
+    if (!node || !button || !node.contains(button)) return;
+    const action = button.dataset.move;
+    if (action !== 'previous' && action !== 'next') return;
+    button.focus({ preventScroll: true });
     pan.pointerCancel(); finish(); state.update(measure()); dirty = false;
     session = state.start(node.dataset.key!); session?.step(action); finish();
   });

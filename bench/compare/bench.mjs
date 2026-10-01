@@ -438,51 +438,53 @@ async function runColdStartCost(page, scenario) {
 }
 
 /** Untimed oracle проверяет всю топологию, а не одного выжившего target. */
-async function runSemanticStartCheck(page, scenario, calls) {
+export async function runSemanticStartCheck(page, scenario, calls) {
   const evidence = await page.evaluate(async ({ config, calls: expectedCalls }) => {
     const A = window.__adapterModule;
-    const groups = Array.from({ length: expectedCalls }, () => (
-      Array.from({ length: config.targetsPerCall }, () => {
-        const element = document.createElement('div');
-        element.className = 'box';
-        document.body.appendChild(element);
-        return element;
-      })
-    ));
-    const epoch = performance.now();
-    const callStartedAtMs = [];
-    const controls = groups.map((elements) => {
-      callStartedAtMs.push(performance.now() - epoch);
-      return config.staggerGapMs > 0
-        ? A.startStagger(elements, config.toPx, config.durationMs, config.staggerGapMs)
-        : A.start(elements, config.toPx, config.durationMs);
-    });
+    const groups = [], callStartedAtMs = [], controls = [], checkpoints = [], terminal = [], failures = [];
+    let phase = 'setup', epoch;
+    const failed = (error, location) => failures.push({ phase: location, name: error?.name ?? typeof error, message: String(error?.message ?? error) });
     const delaySpan = config.staggerGapMs * (config.targetsPerCall - 1);
     const checkpointTimes = config.staggerGapMs > 0
-      ? [0.2, 0.5, 0.8].map((fraction) => delaySpan * fraction)
+      ? [0.2, 0.5, 0.8].map((fraction) => Math.min(config.durationMs, delaySpan) * fraction)
       : [config.durationMs * 0.25];
-    const checkpoints = [];
-    for (const checkpointTime of checkpointTimes) {
-      const remaining = checkpointTime - (performance.now() - epoch);
+    try {
+      for (let call = 0; call < expectedCalls; call++) {
+        const elements = []; groups.push(elements);
+        for (let target = 0; target < config.targetsPerCall; target++) {
+          const element = document.createElement('div'); elements.push(element);
+          element.className = 'box'; document.body.appendChild(element);
+        }
+      }
+      epoch = performance.now(); phase = 'start';
+      for (const elements of groups) {
+        callStartedAtMs.push(performance.now() - epoch);
+        controls.push(config.staggerGapMs > 0
+          ? A.startStagger(elements, config.toPx, config.durationMs, config.staggerGapMs)
+          : A.start(elements, config.toPx, config.durationMs));
+      }
+      phase = 'checkpoint';
+      for (const checkpointTime of checkpointTimes) {
+        const remaining = checkpointTime - (performance.now() - epoch);
+        if (remaining > 0) await new Promise((resolve) => setTimeout(resolve, remaining));
+        const checkpoint = { groups: [] }; checkpoints.push(checkpoint);
+        for (const elements of groups) {
+          const group = { readStartedMs: performance.now() - epoch, positions: [] }; checkpoint.groups.push(group);
+          for (const element of elements) group.positions.push(new DOMMatrixReadOnly(getComputedStyle(element).transform).e);
+          group.readEndedMs = performance.now() - epoch;
+        }
+      }
+      phase = 'terminal';
+      const remaining = config.durationMs + delaySpan + 100 - (performance.now() - epoch);
       if (remaining > 0) await new Promise((resolve) => setTimeout(resolve, remaining));
-      checkpoints.push({
-        groups: groups.map((elements) => {
-          const readStartedMs = performance.now() - epoch;
-          const positions = elements.map((element) => (
-            new DOMMatrixReadOnly(getComputedStyle(element).transform).e
-          ));
-          return { readStartedMs, readEndedMs: performance.now() - epoch, positions };
-        }),
-      });
+      for (const elements of groups) {
+        const positions = []; terminal.push(positions);
+        for (const element of elements) positions.push(new DOMMatrixReadOnly(getComputedStyle(element).transform).e);
+      }
+    } catch (error) { failed(error, phase); } finally {
+      for (const control of controls) { try { control.cancel(); } catch (error) { failed(error, 'cancel-cleanup'); } }
+      for (const elements of groups) for (const element of elements) { try { element.remove(); } catch (error) { failed(error, 'target-cleanup'); } }
     }
-    const terminalAt = config.durationMs + delaySpan + 100;
-    const remaining = terminalAt - (performance.now() - epoch);
-    if (remaining > 0) await new Promise((resolve) => setTimeout(resolve, remaining));
-    const terminal = groups.map((elements) => elements.map((element) => (
-      new DOMMatrixReadOnly(getComputedStyle(element).transform).e
-    )));
-    for (const control of controls) { try { control.cancel(); } catch { /* семантика уже снята */ } }
-    for (const elements of groups) for (const element of elements) element.remove();
     return {
       topology: {
         calls: expectedCalls,
@@ -494,11 +496,12 @@ async function runSemanticStartCheck(page, scenario, calls) {
       callStartedAtMs,
       checkpoints,
       terminal,
+      ...(failures.length ? { failures, acquiredOwners: controls.length, createdTargets: groups.map((elements) => elements.length) } : {}),
     };
   }, { config: scenario, calls });
   return {
     ...evidence,
-    valid: evaluateStartSemanticEvidence(evidence, scenario, calls),
+    valid: !evidence.failures?.length && evaluateStartSemanticEvidence(evidence, scenario, calls),
   };
 }
 

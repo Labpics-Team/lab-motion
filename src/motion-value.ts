@@ -135,8 +135,8 @@ export class MotionValue {
   /** Клэмп-режим: true = легаси CSS-safe; false — честная пружина (overshoot эмитится). */
   declare private readonly _clamp: boolean;
 
-  /** Injected frame scheduler. */
-  declare private readonly _requestFrame: RequestFrameFn;
+  /** Единственный scheduler-owner; отсутствие означает terminal destroy. */
+  declare private _requestFrame: RequestFrameFn | undefined;
 
   /** Registered onChange subscribers. */
   private readonly _listeners: Set<(value: number) => void> = new Set();
@@ -158,12 +158,10 @@ export class MotionValue {
 
   /** Whether a frame loop is currently active. */
   private _running: boolean = false;
-  /** Whether destroy() has been called. */
-  private _destroyed: boolean = false;
   /** Single-flight re-entrancy guard for the tick body. */
-  private _tickActive: boolean = false;
+  declare private _tickActive: boolean;
   /** Whether to use setTimeout fallback (handle=0 path). */
-  private _useTimeoutFallback: boolean = false;
+  declare private _useTimeoutFallback: boolean;
 
   /** Frame counter for the current run. */
   declare private _frameCount: number;
@@ -227,20 +225,23 @@ export class MotionValue {
    * Returns an unsubscribe function.
   */
   onChange(cb: (value: number) => void): () => void {
-    const added = !this._listeners.has(cb);
-    this._listeners.add(cb);
+    if (this._requestFrame === undefined) return () => {};
+    const listeners = this._listeners;
+    const added = !listeners.has(cb);
+    listeners.add(cb);
     // Подписка становится видимой только вместе с успешной первичной доставкой:
     // иначе бросивший callback навсегда отравляет каждый следующий кадр.
     try {
       cb(this._value);
     } catch (error) {
       // Повторный onChange того же callback не владеет старой Set-записью.
-      if (added) this._listeners.delete(cb);
+      if (added) listeners.delete(cb);
       throw error;
     }
-    return () => {
-      this._listeners.delete(cb);
-    };
+    // Живым callback владеет Set. Сохранённый off не удерживает компонент
+    // после terminal-очистки Set или удаления упавшего слушателя.
+    const reference = new WeakRef(cb);
+    return () => { listeners.delete(reference.deref()!); };
   }
 
   /**
@@ -258,7 +259,7 @@ export class MotionValue {
    * @param target - Finite target value.
    */
   setTarget(target: number): void {
-    if (this._destroyed) return;
+    if (this._requestFrame === undefined) return;
     assertFinite(target);
 
     // Повтор цели сохраняет подготовленную траекторию и её часы. Проверка
@@ -274,7 +275,7 @@ export class MotionValue {
     const currentVelocity = this._velocity; // units/s
     const targetRange = target - this._value;
     const range =
-      !(Math.abs(targetRange) > EPSILON) && currentVelocity !== 0
+      Math.abs(targetRange) <= EPSILON && currentVelocity !== 0
         ? Math.sign(currentVelocity) * Math.max(
             EPSILON,
             Math.abs(this._value) * Number.EPSILON,
@@ -315,22 +316,20 @@ export class MotionValue {
    * After destroy(), setTarget() and onChange() are no-ops.
    */
   destroy(): void {
-    this._destroyed = true;
+    this._requestFrame = undefined;
     this._running = false;
     this._listeners.clear();
   }
 
   /**
-   * Halt the running frame loop without destroying the instance: no further
-   * ticks fire, but `_destroyed` stays false and listeners are kept — unlike
-   * destroy(), a later setTarget() resumes animating normally. For consumers
-   * whose host can disconnect and reconnect (e.g. Lit hostDisconnected/
-   * hostConnected) without permanently killing the value.
+   * Останавливает кадровую петлю, сохраняя scheduler и подписки. Следующий
+   * setTarget() возобновляет движение; disconnect/reconnect хоста не требует
+   * уничтожать значение. destroy() остаётся терминальной границей lifetime.
    */
   stop(): void {
     this._running = false;
-    // Не сбрасываем неактивную траекторию: следующий setTarget — её единственный
-    // инициализатор. Поколение отсекает callback до любого чтения её полей.
+    // Пара value/velocity сохранена; следующий setTarget инициализирует траекторию.
+    // Поколение отсекает callback до любого чтения полей старой траектории.
     this._generation++; // invalidate any frame already scheduled by this run
   }
 
@@ -348,7 +347,7 @@ export class MotionValue {
    * форсированный re-render — штатный путь для этого host.requestUpdate().
    */
   snapTo(target: number): void {
-    if (this._destroyed) return;
+    if (this._requestFrame === undefined) return;
     assertFinite(target);
     // Идемпотентность: уже покоимся ровно в target → нечего менять и незачем
     // эмитить (лишний requestUpdate у Lit-хоста). Живой ран в тот же target —
@@ -374,25 +373,24 @@ export class MotionValue {
     let called = false;
     let timestamp: number | undefined;
     try {
-      if (this._useTimeoutFallback) {
-        setTimeout(() => this._tick(undefined, gen), 0);
-        return;
-      }
-      const handle = this._requestFrame((ts) => {
-        if (sync) {
-          called = true;
-          timestamp = ts;
-        } else if (!this._useTimeoutFallback) {
-          this._tick(ts, gen);
-        }
-      });
-      sync = false;
-      if (called || handle === 0) {
+      if (!this._useTimeoutFallback) {
+        const handle = this._requestFrame!((ts) => {
+          if (sync) {
+            called = true;
+            timestamp = ts;
+          } else if (!this._useTimeoutFallback) {
+            this._tick(ts, gen);
+          }
+        });
+        sync = false;
+        if (!called && handle !== 0) return;
         // Синхронный host и handle=0 сходятся в один trampoline; callback host-а
         // после возврата уже не может создать второй живой тик.
         this._useTimeoutFallback = true;
-        setTimeout(() => this._tick(timestamp, gen), 0);
       }
+      // Первый fallback и последующие кадры принадлежат одному timeout-пути.
+      // При уже включённом fallback timestamp остаётся undefined, как прежде.
+      setTimeout(() => this._tick(timestamp, gen), 0);
     } catch (error) {
       if (gen === this._generation) {
         // Host мог поставить callback перед throw: новое поколение делает его

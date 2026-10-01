@@ -247,7 +247,7 @@ export function deriveTimerStep(values) {
   return stepUpper;
 }
 
-function nextUp(value) {
+export function nextUp(value) {
   if (Number.isNaN(value) || value === Infinity) return value;
   if (value === 0) return Number.MIN_VALUE;
   const buffer = new ArrayBuffer(8);
@@ -258,9 +258,50 @@ function nextUp(value) {
   return view.getFloat64(0);
 }
 
-function binary64Ulp(value) {
+export function nextDown(value) {
+  return -nextUp(-value);
+}
+
+export function binary64Ulp(value) {
   const magnitude = Math.abs(value);
   return nextUp(magnitude) - magnitude;
+}
+
+// Точная биномиальная масса для рациональных q/alpha. Наблюдаемая единица,
+// семейство и admission принадлежат регистрации потребителя, не этому helper.
+export function exactBinomialOrderStatisticBounds(values, probabilityFraction, alphaFraction) {
+  if (!Array.isArray(values) || values.length === 0 || values.some((x) => !Number.isFinite(x) || x < 0)) {
+    throw new Error('exact order statistics: невалидные observations');
+  }
+  const [numerator, denominator] = probabilityFraction.map(BigInt);
+  const [alphaNumerator, alphaDenominator] = alphaFraction.map(BigInt);
+  if (numerator <= 0n || numerator >= denominator || alphaNumerator <= 0n || alphaNumerator * 2n >= alphaDenominator) {
+    throw new Error('exact order statistics: невалидные rational probabilities');
+  }
+  const sorted = [...values].sort((a, b) => a - b), n = sorted.length;
+  const populationDenominator = denominator ** BigInt(n), pmf = [];
+  let mass = (denominator - numerator) ** BigInt(n);
+  for (let count = 0; count <= n; count++) {
+    pmf.push(mass);
+    if (count < n) mass = mass * BigInt(n - count) * numerator / (BigInt(count + 1) * (denominator - numerator));
+  }
+  const cumulative = [], survival = [];
+  let total = 0n;
+  for (let i = 0; i <= n; i++) { total += pmf[i]; cumulative[i] = total; }
+  if (total !== populationDenominator) throw new Error('exact order statistics: биномиальная масса повреждена');
+  total = 0n;
+  for (let i = n; i >= 0; i--) { total += pmf[i]; survival[i] = total; }
+  let lowRank = 0, highRank = null;
+  for (let rank = 1; rank <= n; rank++) {
+    if (cumulative[rank - 1] * alphaDenominator <= populationDenominator * alphaNumerator) lowRank = rank;
+    if (highRank === null && survival[rank] * alphaDenominator <= populationDenominator * alphaNumerator) highRank = rank;
+  }
+  const probability = Number(numerator) / Number(denominator), alphaPerTail = Number(alphaNumerator) / Number(alphaDenominator);
+  const estimateRank = Number((BigInt(n) * numerator + denominator - 1n) / denominator);
+  return { estimate: sorted[Math.min(n - 1, estimateRank - 1)],
+    low: lowRank === 0 ? 0 : sorted[lowRank - 1], high: highRank === null ? null : sorted[highRank - 1],
+    lowRank, highRank, observations: n, probability, alphaPerTail,
+    minimumFiniteUpperBlocks: Math.ceil(Math.log(alphaPerTail) / Math.log(probability)), noTailObservationProbability: probability ** n };
 }
 
 function deriveRealmTimerBounds(name, evidence) {

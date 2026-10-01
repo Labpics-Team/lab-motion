@@ -6,6 +6,11 @@ on:
   pull_request:
   merge_group:
   workflow_dispatch:
+    inputs:
+      profile_baseline:
+        description: 'Снять зарегистрированный размерный baseline PROFILE-01'
+        type: boolean
+        default: false
 
 permissions:
   contents: read
@@ -21,6 +26,12 @@ env:
   COREPACK_DEFAULT_TO_LATEST: "0"
 
 jobs:
+  # Только явный baseline-запрос: обычный кандидат может менять runtime и
+  # не обязан совпадать с зарегистрированным старым источником PROFILE-01.
+  profile-baseline:
+    if: ${{ github.event_name == 'workflow_dispatch' && inputs.profile_baseline }}
+    uses: ./.github/workflows/profile-01.yml
+
   verify:
     name: typecheck · build · size · package
     runs-on: ubuntu-latest

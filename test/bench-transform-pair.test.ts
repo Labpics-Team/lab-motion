@@ -11,6 +11,62 @@ import {
 import { makeTransformPairPlan, parseTransformPairArgs, runTransformPair } from '../scripts/bench-transform-pair.mjs';
 import { summarizeDistribution } from '../scripts/bench-support.mjs';
 
+/** Независимый линейный контроль: конечные значения, время первого кадра и публичные запросы кадров. */
+function independentFreshLinear(fault: 'cancel' | 'cleanup' | 'oracle' | null = null, reason: unknown = undefined) {
+  return (targets: Parameters<typeof animate>[0], props: AnimateProps, options: AnimateOptions) => {
+    if (typeof targets === 'string' || !('length' in targets) || typeof options?.duration !== 'number') {
+      throw new Error('Линейный контроль: нужны список целей и числовая длительность');
+    }
+    const duration = options.duration;
+    const from = { x: 0, y: 0, scaleX: 1, scaleY: 1, rotate: 0, skewX: 0, skewY: 0 };
+    const destination = props as Record<string, number>;
+    let start: number | undefined;
+    let stopped = false;
+    let frame = 0;
+    let cancels = 0;
+    let resolveFinished!: () => void;
+    const finished = new Promise<void>((resolve) => { resolveFinished = resolve; });
+    const tick = (timestamp?: number) => {
+      if (stopped) return;
+      if (timestamp === undefined) throw new Error('Линейный контроль: время кадра отсутствует');
+      start ??= timestamp;
+      const progress = (timestamp - start) / duration;
+      const value = Object.fromEntries(Object.entries(from).map(([key, initial]) =>
+        [key, initial + ((destination[key] ?? initial) - initial) * progress]));
+      const text = `translate(${value.x}px, ${value.y}px) scaleX(${value.scaleX}) scaleY(${value.scaleY}) rotate(${value.rotate}deg) skew(${value.skewX}deg, ${value.skewY}deg)`;
+      for (let target = 0; target < targets.length; target++) {
+        targets[target]!.style.setProperty('transform', fault === 'oracle' && frame === 2 && target === targets.length - 1
+          ? 'translateX(999px)' : text);
+      }
+      frame++;
+      options.requestFrame!(tick);
+    };
+    options.requestFrame!(tick);
+    return {
+      finished,
+      cancel() {
+        stopped = true;
+        resolveFinished();
+        cancels++;
+        if ((fault === 'cancel' && cancels === 1) || (fault === 'cleanup' && cancels === 2)) throw reason;
+      },
+    };
+  };
+}
+
+type RetainedTiming = number | null | { kind: 'nonfinite'; value: string };
+type FailedTransformSample = AggregateError & {
+  raw: {
+    operationNs: RetainedTiming;
+    frameNs: RetainedTiming[];
+    cancelDrainNs: RetainedTiming;
+    failurePhase: string;
+    unfinishedInterval: { metric: string; frame: number | null; beforeNs: string | null; afterNs: string | null } | null;
+    semantic: { valid: false; targetTraces: { values: (string | null)[]; writes: number[] }[] };
+    beforeCleanupSemantic: { targetTraces: { values: (string | null)[]; writes: number[] }[] };
+  };
+};
+
 describe('paired public transform lifecycle screening', () => {
   it('fixes the workload and balances AB/BA within every paired block', () => {
     expect(TRANSFORM_PAIR_PROFILE.counts).toEqual([1, 100, 1000]);
@@ -386,8 +442,140 @@ describe('paired public transform lifecycle screening', () => {
     } catch (error) {
       expect(error).toBeInstanceOf(AggregateError);
       expect((error as AggregateError).errors).toEqual([measurementError, cleanupError]);
+      expect((error as FailedTransformSample).raw).toMatchObject({
+        operationNs: null, frameNs: [], cancelDrainNs: null,
+        unfinishedInterval: { metric: 'operationNs', beforeNs: '0', afterNs: null },
+        semantic: { valid: false, finished: 'fulfilled', pending: 0 },
+      });
     }
     expect(cancels).toBe(1);
+  });
+
+  it('сохраняет семь завершённых интервалов при независимом позднем отказе cancel', async () => {
+    let healthyReads = 0;
+    const healthy = await runTransformLifecycleSample({
+      animate: independentFreshLinear(), count: 1000, lifecycle: 'fresh', channels: 7,
+      nowNs: () => BigInt(++healthyReads) * 1000n,
+    });
+    expect(healthy.semantic.valid).toBe(true);
+    expect(healthyReads).toBe(16);
+    expect(healthy.operationNs).toBe(1000);
+    expect(healthy.frameNs).toEqual([1000, 1000, 1000, 1000, 1000, 1000]);
+    expect(healthy.cancelDrainNs).toBe(1000);
+
+    const reason = new Error('Независимый отказ поздней отмены');
+    let failedReads = 0;
+    const failure = await runTransformLifecycleSample({
+      animate: independentFreshLinear('cancel', reason), count: 1000, lifecycle: 'fresh', channels: 7,
+      nowNs: () => BigInt(++failedReads) * 1000n,
+    }).then(() => { throw new Error('Неуспешный замер не должен вернуться'); }, (error: unknown) => error);
+    expect(failure).toBeInstanceOf(AggregateError);
+    const retained = failure as FailedTransformSample;
+    expect(retained.errors).toEqual([reason]);
+    expect(failedReads).toBe(15);
+    expect(retained.raw).toMatchObject({
+      operationNs: healthy.operationNs, frameNs: healthy.frameNs, cancelDrainNs: null,
+      failurePhase: 'cancel', unfinishedInterval: { metric: 'cancelDrainNs', frame: null, beforeNs: '15000', afterNs: null },
+      beforeCleanupSemantic: { valid: false, targets: 1000, finished: 'pending', pending: 1 },
+      semantic: { valid: false, targets: 1000, finished: 'fulfilled', pending: 0 },
+    });
+    expect(retained.raw.semantic.targetTraces).toHaveLength(1000);
+    expect(retained.raw.semantic.targetTraces.every((trace) => trace.writes.join(',') === '1,1,1,1,1,1' &&
+      trace.values.length === 6 && trace.values.every((value) => typeof value === 'string'))).toBe(true);
+    expect(JSON.parse(JSON.stringify(retained.raw))).toEqual(retained.raw);
+  });
+
+  it.each([7, 8])('сохраняет завершённые интервалы и CSS при throw undefined на чтении часов %i', async (failedRead) => {
+    let reads = 0;
+    const failure = await runTransformLifecycleSample({
+      animate: independentFreshLinear(), count: 1, lifecycle: 'fresh', channels: 7,
+      nowNs: () => { if (++reads === failedRead) throw undefined; return BigInt(reads) * 1000n; },
+    }).then(() => { throw new Error('Отказ часов не должен стать замером'); }, (error: unknown) => error);
+    expect(failure).toBeInstanceOf(AggregateError);
+    const retained = failure as FailedTransformSample;
+    expect(retained.errors).toEqual([undefined]);
+    expect(reads).toBe(failedRead);
+    expect(retained.raw).toMatchObject({
+      operationNs: 1000, frameNs: [1000, 1000], cancelDrainNs: null,
+      failurePhase: 'frame', unfinishedInterval: { metric: 'frameNs', frame: 2, beforeNs: failedRead === 8 ? '7000' : null, afterNs: null },
+      beforeCleanupSemantic: { finished: 'pending', pending: 1 },
+      semantic: { valid: false, finished: 'fulfilled', pending: 0 },
+    });
+    expect(retained.raw.beforeCleanupSemantic.targetTraces[0].writes).toEqual([1, 1, failedRead === 8 ? 1 : 0, 0, 0, 0]);
+    if (failedRead === 8) expect(retained.raw.beforeCleanupSemantic.targetTraces[0].values[2]).toContain('translate(64px, 40px)');
+    else expect(retained.raw.beforeCleanupSemantic.targetTraces[0].values[2]).toBeNull();
+    expect(retained.raw.beforeCleanupSemantic.targetTraces[0].values.slice(3)).toEqual([null, null, null]);
+    expect(JSON.parse(JSON.stringify(retained.raw))).toEqual(retained.raw);
+  });
+
+  it('сохраняет состояние отказа до изменения CSS очисткой и обе исходные ошибки', async () => {
+    const cleanupError = Object.freeze(new Error('Очистка изменила CSS и отказала'));
+    const linear = independentFreshLinear();
+    let reads = 0;
+    const failure = await runTransformLifecycleSample({
+      animate: (targets: Parameters<typeof animate>[0], props: AnimateProps, options: AnimateOptions) => {
+        const controls = linear(targets, props, options);
+        return { ...controls, cancel() {
+          controls.cancel();
+          if (typeof targets !== 'string' && 'length' in targets) targets[0]!.style.setProperty('transform', 'translateX(999px)');
+          throw cleanupError;
+        } };
+      },
+      count: 1, lifecycle: 'fresh', channels: 7,
+      nowNs: () => { if (++reads === 8) throw undefined; return BigInt(reads) * 1000n; },
+    }).then(() => { throw new Error('Отказ не должен стать замером'); }, (error: unknown) => error);
+    expect(failure).toBeInstanceOf(AggregateError);
+    const retained = failure as FailedTransformSample;
+    expect(retained.errors).toEqual([undefined, cleanupError]);
+    expect(retained.raw.beforeCleanupSemantic.targetTraces[0]).toMatchObject({
+      value: expect.stringContaining('translate(64px, 40px)'), outsideWrites: 0,
+    });
+    expect(retained.raw.semantic.targetTraces[0]).toMatchObject({ value: 'translateX(999px)', outsideWrites: 1 });
+    expect(retained.raw).toMatchObject({ operationNs: 1000, frameNs: [1000, 1000], cancelDrainNs: null, semantic: { valid: false } });
+    expect(JSON.parse(JSON.stringify(retained.raw))).toEqual(retained.raw);
+  });
+
+  it('сохраняет неконечный интервал явно при JSON-переносе неуспешного замера', async () => {
+    let reads = 0;
+    const failure = await runTransformLifecycleSample({
+      animate: independentFreshLinear(), count: 1, lifecycle: 'fresh', channels: 7,
+      nowNs: () => { reads++; return reads === 1 ? 0n : reads === 2 ? 1n << 1024n : BigInt(reads); },
+    }).then(() => { throw new Error('Неконечные часы не должны дать замер'); }, (error: unknown) => error);
+    expect(failure).toBeInstanceOf(AggregateError);
+    const retained = failure as FailedTransformSample;
+    expect(retained.errors).toHaveLength(1);
+    expect(retained.errors[0].message).toMatch(/некорректный timing/);
+    expect(reads).toBe(16);
+    expect(retained.raw).toMatchObject({
+      operationNs: { kind: 'nonfinite', value: 'Infinity' }, frameNs: [1, 1, 1, 1, 1, 1], cancelDrainNs: 1,
+      failurePhase: 'timing', unfinishedInterval: null, semantic: { valid: false, finished: 'fulfilled', pending: 0 },
+    });
+    expect(JSON.parse(JSON.stringify(retained.raw))).toEqual(retained.raw);
+  });
+
+  it.each(['oracle', 'cleanup'] as const)('сохраняет все восемь интервалов при позднем отказе %s', async (fault) => {
+    const reason = Object.freeze(new Error('Ошибка поздней очистки'));
+    let reads = 0;
+    const failure = await runTransformLifecycleSample({
+      animate: independentFreshLinear(fault, reason), count: 100, lifecycle: 'fresh', channels: 7,
+      nowNs: () => BigInt(++reads) * 1000n,
+    }).then(() => { throw new Error('Отказ не должен стать замером'); }, (error: unknown) => error);
+    expect(failure).toBeInstanceOf(AggregateError);
+    const retained = failure as FailedTransformSample;
+    expect(reads).toBe(16);
+    expect(retained.raw).toMatchObject({
+      operationNs: 1000, frameNs: [1000, 1000, 1000, 1000, 1000, 1000], cancelDrainNs: 1000,
+      failurePhase: fault, unfinishedInterval: null,
+      semantic: { valid: false, targets: 100, finished: 'fulfilled', pending: 0 },
+    });
+    if (fault === 'oracle') {
+      expect(retained.errors).toHaveLength(1);
+      expect(retained.errors[0].message).toMatch(/target 99 frame 2/);
+      expect(retained.raw.semantic.targetTraces[99].values[2]).toBe('translateX(999px)');
+    } else {
+      expect(retained.errors).toEqual([reason]);
+    }
+    expect(JSON.parse(JSON.stringify(retained.raw))).toEqual(retained.raw);
   });
 
   it('retains the primary and both live cancellation failures while draining and resolving finished', async () => {
@@ -427,6 +615,10 @@ describe('paired public transform lifecycle screening', () => {
     } catch (error) {
       expect(error).toBeInstanceOf(AggregateError);
       expect((error as AggregateError).errors).toEqual([primary, successorError, donorError]);
+      expect((error as FailedTransformSample).raw).toMatchObject({
+        operationNs: null, frameNs: [], cancelDrainNs: null,
+        semantic: { valid: false, finished: 'fulfilled', previousFinished: 'fulfilled', pending: 0 },
+      });
     }
     expect(cancelled).toEqual(['successor', 'donor']);
     expect(cleanupDrains).toBeGreaterThan(0);
@@ -451,6 +643,10 @@ describe('paired public transform lifecycle screening', () => {
     } catch (error) {
       expect(error).toBeInstanceOf(AggregateError);
       expect((error as AggregateError).errors).toEqual([reason]);
+      expect((error as FailedTransformSample).raw).toMatchObject({
+        frameNs: [], cancelDrainNs: null,
+        semantic: role === 'donor' ? { valid: false, previousFinished: 'rejected' } : { valid: false, finished: 'rejected' },
+      });
     }
   });
 
@@ -482,6 +678,11 @@ describe('paired public transform lifecycle screening', () => {
     } catch (error) {
       expect(error).toBeInstanceOf(AggregateError);
       expect((error as AggregateError).errors).toEqual([undefined, successorError, donorError, undefined]);
+      expect((error as FailedTransformSample).raw).toMatchObject({
+        operationNs: null, frameNs: [], cancelDrainNs: null,
+        unfinishedInterval: { metric: 'operationNs', beforeNs: '0', afterNs: null },
+        semantic: { valid: false, finished: 'rejected', previousFinished: 'fulfilled', pending: 0 },
+      });
     }
     expect(cancelled).toEqual(['successor', 'donor']);
   });

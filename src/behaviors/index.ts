@@ -158,41 +158,63 @@ interface _SettleArgs {
   readonly onDone: () => void;
 }
 
-/** Хендл единого runner'а поведения. */
+/** Внутренний контракт доводки общего владельца поведения. */
 interface _Runner {
   /** Запустить доводку value→target (ровно один активный цикл). */
   _settle(args: _SettleArgs): void;
   /** Погасить активный цикл (перехват/cancel) — stale-кадры инвалидируются. */
-  _invalidate(): number;
+  _invalidate(reset?: boolean): number;
 }
 
 /**
- * Создать единый runner поведения. Владеет generation-токеном: любой новый
- * `_settle()` или `_invalidate()` инкрементит его, и запланированные кадры чужого
- * поколения гаснут (B1 — ноль параллельных loops). reduced-motion → мгновенный
- * снап в target без единого кадра (B4 character-switch).
+ * Общий владелец состояния, подписчиков, tracker и кадровой доводки. Четыре
+ * поведения задают переходы и цели, сохраняя один generation-токен: новый
+ * `_settle()` или `_invalidate()` гасит запланированные кадры старой доводки.
+ * reduced-motion мгновенно ставит target без кадров (B4).
  */
-function _createRunner(
-  requestFrame: RequestFrameFn | undefined,
-  reduced: boolean,
-): _Runner {
+function _createBase<S extends BehaviorState<number>, O extends object | true>(
+  initial: S,
+  options: {
+    readonly requestFrame?: RequestFrameFn | undefined;
+    readonly matchMedia?: MatchMediaLike | undefined;
+  },
+  owner: O,
+) {
+  let requestFrame = options.requestFrame;
+  const reduced = _prefersReduced(options.matchMedia);
   let gen = 0;
-  let curVel: number | undefined;
+  let curVel = 0;
 
   const schedule = (cb: (ts?: number) => void): void => {
     const handle = requestFrame!(cb);
     if (handle === 0) setTimeout(() => cb(undefined), 0); // non-draining шов (конвенция repo)
   };
 
-  return {
+  const tracker = createVelocityTracker();
+  const subs = new Set<(s: S) => void>();
+  let state = initial;
+
+  const emit = (next: Partial<S>): boolean => {
+    const emitted = state = { ...state, ...next };
+    for (const fn of subs) {
+      try {
+        fn(emitted);
+      } catch {
+        // Подписчик не имеет права срывать соседей.
+      }
+      if (state !== emitted) break;
+    }
+    return !!base.owner && state === emitted;
+  };
+
+  const base = {
     _settle(args: _SettleArgs): void {
-      gen++;
-      const my = gen;
+      const my = ++gen;
       curVel = args.velocity;
       const range = args.target - args.from;
 
       const finishNow = (): void => {
-        curVel = undefined;
+        curVel = 0;
         args.onStep(_finite(args.target), 0);
         if (my === gen) args.onDone();
       };
@@ -243,63 +265,32 @@ function _createRunner(
 
       schedule(tick);
     },
-    _invalidate(): number {
+    /** Программная смена цели сохраняет samples; перехват/cancel/destroy сбрасывают. */
+    _invalidate(reset?: boolean): number {
       gen++;
-      const velocity = curVel ?? 0;
-      curVel = undefined;
+      if (reset) tracker.reset();
+      const velocity = curVel;
+      curVel = 0;
       return velocity;
     },
-  };
-}
-
-/**
- * База поведения: подписчики + текущее состояние + единый runner + трекер
- * скорости + reduced-флаг + идемпотентные cancel/destroy. Каждое из четырёх
- * поведений оборачивает её собственными обработчиками ввода/выбора цели.
- */
-function _createBase<S extends BehaviorState<number>>(
-  initial: S,
-  requestFrame: RequestFrameFn | undefined,
-  matchMedia: MatchMediaLike | undefined,
-) {
-  const runner = _createRunner(requestFrame, _prefersReduced(matchMedia));
-  const tracker = createVelocityTracker();
-  const subs = new Set<(s: S) => void>();
-  let state = initial;
-  let destroyed = false;
-
-  const emit = (next: Partial<S>): boolean => {
-    const emitted = state = { ...state, ...next };
-    for (const fn of subs) {
-      try {
-        fn(emitted);
-      } catch {
-        // Подписчик не имеет права срывать соседей.
-      }
-      if (state !== emitted) break;
-    }
-    return !destroyed && state === emitted;
-  };
-
-  return {
-    runner,
     tracker,
+    // Только Dismiss/Pull нужны поздние getter и receiver исходных options.
+    // Sheet/Pager владеют lifecycle-token: после off не удерживают constructor
+    // onChange через ненужный options. Одна terminal-граница освобождает owner.
+    owner: owner as O | null,
     get state(): S {
       return state;
     },
-    get destroyed(): boolean {
-      return destroyed;
-    },
     emit,
     get _following(): boolean {
-      return !destroyed && state.phase === 'follow';
+      return !!base.owner && state.phase === 'follow';
     },
     subscribe(fn: (s: S) => void): () => void {
-      if (destroyed) return () => {};
+      if (!base.owner) return () => {};
       subs.add(fn);
-      return () => {
-        subs.delete(fn);
-      };
+      // Живой Set владеет fn; сохранённый off удерживает только слабую identity.
+      const reference = new WeakRef(fn);
+      return () => { subs.delete(reference.deref()!); };
     },
     /**
      * Погасить активную доводку и осесть в покой на ТЕКУЩЕМ значении (phase idle,
@@ -307,34 +298,32 @@ function _createBase<S extends BehaviorState<number>>(
      * no-op (не плодит эмитов). destroy() строится поверх неё.
      */
     cancel(reset?: Partial<S>): void {
-      if (destroyed || state.phase === 'idle') return; // уже в покое
-      runner._invalidate();
-      tracker.reset();
+      if (!base.owner || state.phase === 'idle') return; // уже в покое
+      base._invalidate(true);
       emit({ ...reset, velocity: 0, phase: 'idle' } as Partial<S>);
     },
     destroy(): void {
-      if (destroyed) return;
-      runner._invalidate();
-      tracker.reset();
+      if (!base.owner) return;
+      base.owner = null;
+      base._invalidate(true);
+      requestFrame = undefined;
       subs.clear();
-      destroyed = true;
     },
   };
+  return base;
 }
 
 /** Перехватить активную доводку тем же tracker/runner и сохранить C¹-prior. */
 function _beginPickup(
-  base: { runner: _Runner; tracker: ReturnType<typeof createVelocityTracker> },
+  base: _Runner & { tracker: ReturnType<typeof createVelocityTracker> },
   p: BehaviorPoint,
   axis: BehaviorAxis,
   velocityScale = 1,
 ): void {
-  const carry = base.runner._invalidate() * velocityScale;
-  base.tracker.reset();
+  const carry = base._invalidate(true) * velocityScale;
   if (carry !== 0) {
     const back = { x: _finite(p.x), y: _finite(p.y), t: _finite(p.t) - PICKUP_SEED_DT_S };
-    if (axis === 'x') back.x -= carry * PICKUP_SEED_DT_S;
-    else back.y -= carry * PICKUP_SEED_DT_S;
+    back[axis === 'x' ? 'x' : 'y'] -= carry * PICKUP_SEED_DT_S;
     base.tracker.push(back);
   }
   base.tracker.push(p);
@@ -425,10 +414,9 @@ export function createBottomSheet(options: SheetOptions): SheetController {
 
   const start = _finite(options.initial ?? snaps[0]!);
   const startIndex = _pickSnap(snaps, start, 0);
-  const base = _createBase<SheetState>(
+  const base = _createBase<SheetState, true>(
     { value: start, velocity: 0, phase: 'idle', snapIndex: startIndex },
-    options.requestFrame,
-    options.matchMedia,
+    options, true,
   );
 
   let grabValue = 0;
@@ -450,7 +438,7 @@ export function createBottomSheet(options: SheetOptions): SheetController {
   };
 
   const settleTo = (index: number, velocity: number): void => {
-    base.emit({ phase: 'release', snapIndex: index }) && base.runner._settle({
+    base.emit({ phase: 'release', snapIndex: index }) && base._settle({
       from: base.state.value,
       velocity,
       target: snaps[index]!,
@@ -462,7 +450,7 @@ export function createBottomSheet(options: SheetOptions): SheetController {
 
   const ctrl: SheetController = {
     pointerDown(p: BehaviorPoint): void {
-      if (base.destroyed) return;
+      if (!base.owner) return;
       // Прерывание: гасим активную доводку, наследуем её скорость прайором (C¹).
       _beginPickup(base, p, axis);
       lastPointer = _coord(p, axis);
@@ -488,7 +476,7 @@ export function createBottomSheet(options: SheetOptions): SheetController {
       settleTo(_pickSnap(snaps, base.state.value, 0), 0);
     },
     update(next: readonly number[]): void {
-      if (base.destroyed) return;
+      if (!base.owner) return;
       const parsed = readSnaps([...next]);
       if (parsed.length === snaps.length && parsed.every((v, i) => v === snaps[i])) return;
       snaps = parsed;
@@ -500,12 +488,12 @@ export function createBottomSheet(options: SheetOptions): SheetController {
           : value > max ? max + (value - max) / rubber
           : value < min ? min + (value - min) / rubber : value, lastPointer);
         base.emit({ snapIndex: Math.min(base.state.snapIndex, snaps.length - 1) });
-      } else settleTo(Math.min(base.state.snapIndex, snaps.length - 1), base.runner._invalidate());
+      } else settleTo(Math.min(base.state.snapIndex, snaps.length - 1), base._invalidate());
     },
     snapTo(index: number): void {
-      if (base.destroyed) return;
+      if (!base.owner) return;
       const i = Math.max(0, Math.min(snaps.length - 1, Math.trunc(_finite(index))));
-      settleTo(i, base.runner._invalidate());
+      settleTo(i, base._invalidate());
     },
     subscribe: base.subscribe,
     cancel: base.cancel,
@@ -583,18 +571,16 @@ export function createDragDismiss(options: DismissOptions): DismissController {
   const springParams = options.spring ?? (springTokens.default as SpringParams);
   validateSpringForFrameLoop(springParams);
   const dismissTarget = _finite(options.dismissTarget ?? dir * dist * 8);
-
-  const base = _createBase<DismissState>(
+  const base = _createBase<DismissState, DismissOptions>(
     { value: 0, velocity: 0, phase: 'idle', dismissed: false },
-    options.requestFrame,
-    options.matchMedia,
+    options, options,
   );
 
   let grabPointer = 0;
   let grabValue = 0;
 
   const returnHome = (velocity: number): void => {
-    base.emit({ phase: 'release' }) && base.runner._settle({
+    base.emit({ phase: 'release' }) && base._settle({
       from: base.state.value,
       velocity,
       target: 0,
@@ -605,21 +591,21 @@ export function createDragDismiss(options: DismissOptions): DismissController {
   };
 
   const dismiss = (velocity: number): void => {
-    base.emit({ phase: 'release' }) && base.runner._settle({
+    base.emit({ phase: 'release' }) && base._settle({
       from: base.state.value,
       velocity,
       target: dismissTarget,
       spring: springParams,
       onStep: (v, vel) => base.emit({ value: v, velocity: vel }),
       onDone: () => {
-        if (base.emit({ phase: 'settle', dismissed: true })) options.onDismiss?.();
+        if (base.emit({ phase: 'settle', dismissed: true })) base.owner?.onDismiss?.();
       },
     });
   };
 
   const ctrl: DismissController = {
     pointerDown(p: BehaviorPoint): void {
-      if (base.destroyed || base.state.dismissed) return;
+      if (!base.owner || base.state.dismissed) return;
       _beginPickup(base, p, axis);
       grabPointer = _coord(p, axis);
       grabValue = base.state.value;
@@ -734,10 +720,9 @@ export function createCarousel(options: CarouselOptions): CarouselController {
   let targetIndex = clampIndex(Math.round(_finite(options.index ?? 0)));
   const initialValue = _finite(targetIndex * pageSize);
 
-  const base = _createBase<CarouselState>(
+  const base = _createBase<CarouselState, true>(
     { value: initialValue, velocity: 0, phase: 'idle', index: clampIndex(Math.round(initialValue / pageSize)) },
-    options.requestFrame,
-    options.matchMedia,
+    options, true,
   );
 
   let grabPointer = 0;
@@ -751,7 +736,7 @@ export function createCarousel(options: CarouselOptions): CarouselController {
   const settleTo = (index: number, velocity: number): void => {
     const i = clampIndex(index);
     targetIndex = i;
-    base.emit({ phase: 'release', index: clampIndex(base.state.index) }) && base.runner._settle({
+    base.emit({ phase: 'release', index: clampIndex(base.state.index) }) && base._settle({
       from: base.state.value,
       velocity,
       target: i * pageSize,
@@ -764,7 +749,7 @@ export function createCarousel(options: CarouselOptions): CarouselController {
 
   const ctrl: CarouselController = {
     pointerDown(p: BehaviorPoint): void {
-      if (base.destroyed) return;
+      if (!base.owner) return;
       _beginPickup(base, p, axis, posDirSign);
       grabPointer = _coord(p, axis);
       grabValue = base.state.value;
@@ -797,17 +782,17 @@ export function createCarousel(options: CarouselOptions): CarouselController {
       settleTo(Math.round(base.state.value / pageSize), 0);
     },
     update(count: number, size: number): void {
-      if (base.destroyed) return;
+      if (!base.owner) return;
       _readCarouselGeometry(count, size);
       if (count === pageCount && size === pageSize) return;
       pageCount = count;
       pageSize = size;
       if (base._following) base.emit({ index: clampIndex(Math.round(base.state.value / pageSize)) });
-      else settleTo(targetIndex, base.runner._invalidate());
+      else settleTo(targetIndex, base._invalidate());
     },
     goTo(index: number): void {
-      if (base.destroyed) return;
-      settleTo(Math.round(_finite(index)), base.runner._invalidate());
+      if (!base.owner) return;
+      settleTo(Math.round(_finite(index)), base._invalidate());
     },
     next(): void {
       ctrl.goTo(base.state.index + 1);
@@ -894,11 +879,9 @@ export function createPullToRefresh(options: PullOptions): PullController {
   const springParams = options.spring ?? (springTokens.default as SpringParams);
   validateSpringForFrameLoop(springParams);
   const pendingPos = _finite(options.pendingPosition ?? threshold);
-
-  const base = _createBase<PullState>(
+  const base = _createBase<PullState, PullOptions>(
     { value: 0, velocity: 0, phase: 'idle', pulling: false, armed: false, pending: false },
-    options.requestFrame,
-    options.matchMedia,
+    options, options,
   );
 
   let grabPointer = 0;
@@ -908,7 +891,7 @@ export function createPullToRefresh(options: PullOptions): PullController {
     velocity: number,
     onDone: () => void,
   ): void => {
-    base.emit({ phase: 'release' }) && base.runner._settle({
+    base.emit({ phase: 'release' }) && base._settle({
       from: base.state.value,
       velocity,
       target,
@@ -931,10 +914,10 @@ export function createPullToRefresh(options: PullOptions): PullController {
       if (!base.emit({ phase: 'settle', pending: true, armed: false })) return;
       const pendingState = base.state;
       const finish = (): void => {
-        if (!base.destroyed && base.state === pendingState) returnHome(0);
+        if (base.owner && base.state === pendingState) returnHome(0);
       };
       try {
-        Promise.resolve(options.onRefresh?.()).then(finish, finish);
+        Promise.resolve(base.owner?.onRefresh?.()).then(finish, finish);
       } catch {
         finish();
       }
@@ -943,7 +926,7 @@ export function createPullToRefresh(options: PullOptions): PullController {
 
   const ctrl: PullController = {
     pointerDown(p: BehaviorPoint): void {
-      if (base.destroyed || base.state.pending) return; // pending владеет позицией
+      if (!base.owner || base.state.pending) return; // pending владеет позицией
       _beginPickup(base, p, axis, 0);
       grabPointer = _coord(p, axis);
       base.emit({ phase: 'follow', pulling: true, velocity: 0 });
