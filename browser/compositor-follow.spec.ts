@@ -51,6 +51,12 @@ test.beforeEach(async ({ page }) => {
           target: event.target instanceof Element ? elementName(event.target) : null,
         }), true);
       }
+      for (const type of ['dragstart', 'dragend'] as const) {
+        document.addEventListener(type, (event) => record({
+          kind: 'native-drag', type, timeStamp: event.timeStamp, trusted: event.isTrusted,
+          target: event.target instanceof Element ? elementName(event.target) : null,
+        }), true);
+      }
       const control = ++controlId;
       const wrappers = new Map<PropertyKey, (...args: unknown[]) => unknown>();
       return new Proxy(controls, { get(target, key) {
