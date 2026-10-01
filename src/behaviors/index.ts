@@ -27,8 +27,8 @@
  *     smooth-pickup MotionValue): доводка value→target с наследованием velocity
  *     (v0n = velocity/range даёт C¹ на стыке follow|release).
  *   ../spring validateSpringForFrameLoop — ранний fail-fast MotionParamError В ФАБРИКЕ.
- *   ../tokens spring — токены темпа (дефолтные пружины доводки); семантическую
- *     роль задаёт потребитель, labui НЕ импортируется.
+ *   ../internal/motion-defaults — общие пружины доводки и публичных токенов;
+ *     роль задаёт потребитель, labui и инициализация изингов не импортируются.
  *
  * Инварианты (нарушение = провал):
  *   B1. ОДНА state machine владеет фазой и переходами; pointer/programmatic
@@ -74,7 +74,7 @@ import { solveSpring } from '../internal/solver.js';
 import { CONVERGENCE_THRESHOLD, FIXED_DT_S, MAX_FRAMES } from '../internal/constants.js';
 import type { MatchMediaLike } from '../internal/media-query.js';
 import { validateSpringForFrameLoop, type SpringParams } from '../spring.js';
-import { spring as springTokens } from '../tokens/index.js';
+import { DEFAULT_SPRING, SNAPPY_SPRING } from '../internal/motion-defaults.js';
 import type { RequestFrameFn } from '../motion-value.js';
 
 // ─── Общий контракт ──────────────────────────────────────────────────────────
@@ -313,6 +313,19 @@ function _createBase<S extends BehaviorState<number>, O extends object | true>(
   return base;
 }
 
+/** Поздний getter может отозвать intent; повторная проверка предшествует эффекту. */
+function _invoke<O extends object>(
+  base: { owner: O | null; readonly state: unknown },
+  key: keyof O,
+): unknown {
+  const owner = base.owner;
+  const state = base.state;
+  const callback = owner?.[key] as (() => unknown) | undefined;
+  if (base.owner && base.state === state && callback != null) {
+    return Reflect.apply(callback, owner, []);
+  }
+}
+
 /** Перехватить активную доводку тем же tracker/runner и сохранить C¹-prior. */
 function _beginPickup(
   base: _Runner & { tracker: ReturnType<typeof createVelocityTracker> },
@@ -408,7 +421,7 @@ export function createBottomSheet(options: SheetOptions): SheetController {
   };
   let snaps = readSnaps([...options.snapPoints].map(_finite));
   const axis = options.axis ?? 'y';
-  const springParams = options.spring ?? (springTokens.default as SpringParams);
+  const springParams = options.spring ?? DEFAULT_SPRING;
   validateSpringForFrameLoop(springParams);
   const rubber = _clampFactor(options.rubberBand, DEFAULT_RUBBER_BAND);
 
@@ -568,7 +581,7 @@ export function createDragDismiss(options: DismissOptions): DismissController {
   const velThresh = Number.isFinite(options.velocityThreshold)
     ? Math.abs(options.velocityThreshold as number)
     : DEFAULT_DISMISS_VELOCITY;
-  const springParams = options.spring ?? (springTokens.default as SpringParams);
+  const springParams = options.spring ?? DEFAULT_SPRING;
   validateSpringForFrameLoop(springParams);
   const dismissTarget = _finite(options.dismissTarget ?? dir * dist * 8);
   const base = _createBase<DismissState, DismissOptions>(
@@ -598,7 +611,7 @@ export function createDragDismiss(options: DismissOptions): DismissController {
       spring: springParams,
       onStep: (v, vel) => base.emit({ value: v, velocity: vel }),
       onDone: () => {
-        if (base.emit({ phase: 'settle', dismissed: true })) base.owner?.onDismiss?.();
+        if (base.emit({ phase: 'settle', dismissed: true })) _invoke(base, 'onDismiss');
       },
     });
   };
@@ -713,7 +726,7 @@ export function createCarousel(options: CarouselOptions): CarouselController {
   const velThresh = Number.isFinite(options.velocityThreshold)
     ? Math.abs(options.velocityThreshold as number)
     : DEFAULT_CAROUSEL_VELOCITY;
-  const springParams = options.spring ?? (springTokens.snappy as SpringParams);
+  const springParams = options.spring ?? SNAPPY_SPRING;
   validateSpringForFrameLoop(springParams);
 
   const clampIndex = (i: number): number => Math.max(0, Math.min(pageCount - 1, i));
@@ -876,7 +889,7 @@ export function createPullToRefresh(options: PullOptions): PullController {
   const axis = options.axis ?? 'y';
   const dir: 1 | -1 = options.direction === -1 ? -1 : 1;
   const resistance = _clampFactor(options.resistance, DEFAULT_RUBBER_BAND);
-  const springParams = options.spring ?? (springTokens.default as SpringParams);
+  const springParams = options.spring ?? DEFAULT_SPRING;
   validateSpringForFrameLoop(springParams);
   const pendingPos = _finite(options.pendingPosition ?? threshold);
   const base = _createBase<PullState, PullOptions>(
@@ -917,7 +930,7 @@ export function createPullToRefresh(options: PullOptions): PullController {
         if (base.owner && base.state === pendingState) returnHome(0);
       };
       try {
-        Promise.resolve(base.owner?.onRefresh?.()).then(finish, finish);
+        Promise.resolve(_invoke(base, 'onRefresh')).then(finish, finish);
       } catch {
         finish();
       }

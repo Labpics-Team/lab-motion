@@ -39,16 +39,41 @@ Browser S2/S3 измеряют start/cancel общего transform API; они �
 подменяют прежние canonical 1200 мс или их guards; стоимость генерации артефакта
 может зависеть от duration. Все участники получают одинаковые параметры.
 
-Перед timing существующий `runSemanticStartCheck` снимает промежуточные CSS
+Перед timing существующий `runSemanticStartCheck` снимает три промежуточных CSS
 матрицы одного нормального вызова с теми же targets/duration/stagger/to и
-проверяет всю топологию через прежний oracle. Endpoint300 без промежуточного
-движения не принимается. Каждая timed серия содержит восемь batches:
+проверяет всю топологию через общий oracle. Серверная registration дополнительно
+требует fresh0→300: перед каждым API start наблюдаются CSS координаты всех
+fresh targets, сразу после возврата — те же targets; обе границы каждого окна
+и acquired prefixes сохраняются даже при отказе. До API все позиции должны
+соответствовать0 в прежнем CSS допуске. Общая фаза не может отрабатывать distance
+до наблюдаемого API start, с учётом прежних clock/CSS errors. Поэтому мгновенный
+скачок0→75px с последующим tween225px/96мс не подменяет полный300px/128мс.
+Канонические1200мс сохраняют прежний относительный phase oracle; дополнительный
+контроль свежего начала относится к явно зарегистрированному серверному control.
+Каждый checkpoint сохраняет actual
+rAF timestamp и обе границы CSS read window. Все позиции связывает одна фаза
+линейного движения с зарегистрированной duration; нулевые и завершённые позиции
+дают односторонние ограничения той же фазы. Для каждого S2 target, а в S3 для
+leading target, нужна разрешающая пара промежуточных наблюдений: весь диапазон
+возможного перемещения по acquired окнам обязан лежать внутри наблюдаемой
+разности координат ± прежние 2 × 0,5 px. Пересечения широких диапазонов
+недостаточно. Общая постоянная фаза сокращается; прежняя stagger topology также
+проверяется. Controls различают duration 64/128/256 мс и нелинейную форму; три
+конечных checkpoints не доказывают все возможные функции между наблюдениями.
+S2 checkpoints назначаются на 0,25/0,5/0,625 duration, S3 — на 0,2/0,5/0,8
+меньшего из duration и delay span. Поздний завершённый checkpoint допускается
+после разрешающей пары. Единственная промежуточная позиция, насыщение всех
+checkpoints или широкие окна, не разрешившие скорость, дают UNPROVEN/отказ,
+включая случаи здорового движения. Допуск не расширяется из-за неопределённости.
+Endpoint300 без промежуточного движения не принимается. Каждая timed серия содержит восемь batches:
 32 настоящих вызова под одной парой clock reads для start и другой для cancel.
 Positive выполняет 64 вызова; знаменатель остаётся 32. DOM allocation и наблюдения
 находятся за границами этих интервалов; стоимость цикла и управления owners
 включена. После start сохраняются первые targets всех owners до отмены: окно
 чтения обязано предшествовать линейному endpoint с учётом clock uncertainty.
-Это обнаруживает также stateful snap в timed path. Полный normal-motion trace
+Позиции ограничены displacement от свежего нуля за верхнюю границу этого
+сохранённого clock интервала и прежним CSS допуском. Это обнаруживает также
+stateful snap и начальный скачок в timed path. Полный normal-motion trace
 относится к отдельному контрольному вызову; конечный набор controls не доказывает
 все возможные stateful поведения. После cancel наблюдаются все 32/64 группы.
 
@@ -142,9 +167,15 @@ Forced GC применяется только после timing в отдель�
 `server-profile.sha256`. Журнал проверяет фактический порядок регистрации,
 замораживания N, завершения controls, фактического порядка и допуска A/B. Имя
 positive привязано к владельцу artifact, одиночная работа не заменяет 2×work.
-Failure union и финальный digest связываются с журналом. Engine failure хранит
-все уже приобретённые operation/frame интервалы, открытую границу cancel,
-семантику до и после cleanup и original causes. Browser failure сохраняет
+Failure union и финальный digest связываются с журналом. Успешный engine raw
+хранит все 16 clock endpoints вместе с actual user/system полями, ordered
+scheduler times и lossless target CSS/write traces. Существующий lifecycle owner
+пересчитывает интервалы из BigInt endpoints, координаты из independent linear
+oracle и trace hashes из сохранённых строк. Микросекундные user/system fields
+связываются с каждым endpoint по sequence; невозможный ns interval не допускается.
+Engine failure хранит точный приобретённый prefix тех же данных, все
+operation/frame интервалы, открытую границу cancel, семантику до и после cleanup
+и original causes. Browser failure сохраняет
 acquired batch clocks, начатых/отменённых owners и partial semantic checkpoints;
 нечисловые приобретённые значения отмечаются явно. Cleanup failure не заменяет
 первую ошибку. Итоговые метрики пересчитываются из raw; пропущенный
@@ -156,6 +187,9 @@ acquired batch clocks, начатых/отменённых owners и partial sem
 прежнего semantic oracle. Timing samples не сокращаются. Итоговый compact JSON
 пишется по отдельным rows с потоковым digest: полный raw не обязан помещаться в
 одну строку V8. Журнал и внешний digest связывают точные записанные bytes.
+Consumer также разбирает JSON по полным values и journal по records; общий
+artifact или journal не преобразуется в одну строку V8. Native JSON.parse
+сохраняет значения каждого chunk, Unicode/escapes и численное округление.
 
 ```sh
 node bench/profile/server-profile-contract.mjs \

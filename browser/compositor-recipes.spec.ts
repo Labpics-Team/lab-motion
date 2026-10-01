@@ -90,6 +90,93 @@ test('actual tarball: React SSR → hydration сохраняет DOM, StrictMode
 });
 
 for (const family of ['sheet', 'pager'] as const) {
+  for (const intent of ['healthy', 'destroy', 'select'] as const) {
+    test(`${family}: getter onSelect сохраняет ${intent} intent до внешнего эффекта`, async ({ page }) => {
+      const result = await page.evaluate(async ({ url, family, intent }) => {
+        const recipes = await import(url);
+        document.body.innerHTML = '<section></section>';
+        const root = document.querySelector<HTMLElement>('section')!;
+        root.innerHTML = family === 'sheet'
+          ? '<button data-sheet-handle>Положение</button><div data-sheet-panel></div>'
+          : '<button data-pager-handle>Страница</button><div data-pager-viewport style="width:240px"><div data-pager-track><div data-page>Первая</div><div data-page>Вторая</div></div></div>';
+        let consumer: any, nested = false, reads = 0;
+        const calls: number[] = [], receivers: unknown[] = [];
+        const callback = function (this: unknown, index: number) { calls.push(index); receivers.push(this); };
+        Object.defineProperty(callback, 'call', { get() { throw new Error('Не читать callback.call'); } });
+        const options = {
+          motion: 'none', snapPoints: [0, 120],
+          get onSelect() {
+            reads++;
+            if (intent === 'destroy') consumer.destroy();
+            if (intent === 'select' && !nested) { nested = true; consumer.select(1); }
+            return callback;
+          },
+        };
+        consumer = family === 'sheet' ? recipes.mountCompositorSheet(root, options) : recipes.mountCompositorPager(root, options);
+        consumer.select(0); consumer.destroy();
+        return { reads, calls, correctReceiver: receivers.every(receiver => receiver === options) };
+      }, { url: recipeUrl, family, intent });
+      expect(result).toEqual({ reads: intent === 'select' ? 2 : 1,
+        calls: intent === 'destroy' ? [] : intent === 'select' ? [1] : [0], correctReceiver: true });
+    });
+  }
+
+  for (const tree of ['light', 'shadow', 'nested', 'child-shadow',
+    'outside-shadow', 'outside-nested', 'parent-shadow', 'closed-shadow',
+    'parent-closed-shadow', 'ancestor-closed-shadow'] as const) {
+    test(`${family}: destroy восстанавливает прежний focus owner в ${tree}`, async ({ page }) => {
+      const result = await page.evaluate(async ({ url, family, tree }) => {
+        const recipes = await import(url);
+        document.body.replaceChildren();
+        let owner: HTMLElement | ShadowRoot = document.body;
+        if (tree !== 'light' && tree !== 'child-shadow') {
+          const host = document.createElement('div'); document.body.append(host);
+          owner = host.attachShadow({ mode: tree === 'closed-shadow'
+            || tree === 'parent-closed-shadow' || tree === 'ancestor-closed-shadow' ? 'closed' : 'open' });
+        }
+        let previousOwner = owner;
+        if (tree === 'outside-shadow' || tree === 'outside-nested') previousOwner = document.body;
+        if (tree === 'ancestor-closed-shadow') {
+          const host = document.createElement('div'); owner.append(host);
+          owner = host.attachShadow({ mode: 'closed' });
+        }
+        if (tree === 'outside-nested' || tree === 'parent-shadow'
+          || tree === 'parent-closed-shadow' || tree === 'ancestor-closed-shadow') {
+          const host = document.createElement('div'); owner.append(host);
+          owner = host.attachShadow({ mode: 'open' });
+        }
+        const previous = document.createElement('button'); previous.textContent = 'Назад';
+        if (tree === 'nested') {
+          const host = document.createElement('div'); owner.append(host);
+          host.attachShadow({ mode: 'open' }).append(previous);
+        } else previousOwner.append(previous);
+        const root = document.createElement('section'); owner.append(root);
+        root.innerHTML = family === 'sheet'
+          ? '<button data-sheet-handle>Положение</button><div data-sheet-panel></div>'
+          : '<button data-pager-handle>Страница</button><div data-pager-viewport style="width:240px"><div data-pager-track><div data-page>Первая</div></div></div>';
+        previous.focus();
+        // Oracle проверяет известный элемент через нативного владельца дерева,
+        // не повторяя поиск прежнего фокуса из публичного рецепта.
+        const hasFocus = (element: HTMLElement) =>
+          (element.getRootNode() as Document | ShadowRoot).activeElement === element;
+        const before = hasFocus(previous);
+        const consumer = family === 'sheet'
+          ? recipes.mountCompositorSheet(root, { snapPoints: [0, 120], motion: 'none' })
+          : recipes.mountCompositorPager(root, { motion: 'none' });
+        let handle = root.querySelector<HTMLButtonElement>('button')!;
+        if (tree === 'child-shadow') {
+          const widget = document.createElement('div'); root.append(widget);
+          handle = document.createElement('button'); handle.textContent = 'Вложенный ввод';
+          widget.attachShadow({ mode: 'open' }).append(handle);
+        }
+        handle.focus(); const activeControl = hasFocus(handle);
+        consumer.destroy(); consumer.destroy();
+        return { before, activeControl, restored: hasFocus(previous) };
+      }, { url: recipeUrl, family, tree });
+      expect(result).toEqual({ before: true, activeControl: true, restored: true });
+    });
+  }
+
   for (const quiet of ['none', 'reduced'] as const) {
     test(`${family}: ${quiet} pause сохраняет текущую quiet drag позу`, async ({ page }) => {
       await page.emulateMedia({ reducedMotion: quiet === 'reduced' ? 'reduce' : 'no-preference' });

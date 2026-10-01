@@ -442,12 +442,13 @@ export async function runSemanticStartCheck(page, scenario, calls) {
   const evidence = await page.evaluate(async ({ config, calls: expectedCalls }) => {
     const A = window.__adapterModule;
     const groups = [], callStartedAtMs = [], controls = [], checkpoints = [], terminal = [], failures = [];
+    const onset = config.requireFreshStart ? { before: [], after: [] } : undefined;
     let phase = 'setup', epoch;
     const failed = (error, location) => failures.push({ phase: location, name: error?.name ?? typeof error, message: String(error?.message ?? error) });
     const delaySpan = config.staggerGapMs * (config.targetsPerCall - 1);
     const checkpointTimes = config.staggerGapMs > 0
       ? [0.2, 0.5, 0.8].map((fraction) => Math.min(config.durationMs, delaySpan) * fraction)
-      : [config.durationMs * 0.25];
+      : [config.durationMs * 0.25, config.durationMs * 0.5, config.durationMs * 0.625];
     try {
       for (let call = 0; call < expectedCalls; call++) {
         const elements = []; groups.push(elements);
@@ -456,18 +457,36 @@ export async function runSemanticStartCheck(page, scenario, calls) {
           element.className = 'box'; document.body.appendChild(element);
         }
       }
-      epoch = performance.now(); phase = 'start';
+      epoch = performance.now();
+      if (onset) {
+        phase = 'onset-before';
+        for (const elements of groups) {
+          const group = { readStartedMs: performance.now() - epoch, positions: [] }; onset.before.push(group);
+          for (const element of elements) group.positions.push(new DOMMatrixReadOnly(getComputedStyle(element).transform).e);
+          group.readEndedMs = performance.now() - epoch;
+        }
+      }
       for (const elements of groups) {
+        phase = 'start';
         callStartedAtMs.push(performance.now() - epoch);
         controls.push(config.staggerGapMs > 0
           ? A.startStagger(elements, config.toPx, config.durationMs, config.staggerGapMs)
           : A.start(elements, config.toPx, config.durationMs));
+        if (onset) {
+          phase = 'onset-after';
+          const group = { readStartedMs: performance.now() - epoch, positions: [] }; onset.after.push(group);
+          for (const element of elements) group.positions.push(new DOMMatrixReadOnly(getComputedStyle(element).transform).e);
+          group.readEndedMs = performance.now() - epoch;
+        }
       }
       phase = 'checkpoint';
       for (const checkpointTime of checkpointTimes) {
         const remaining = checkpointTime - (performance.now() - epoch);
         if (remaining > 0) await new Promise((resolve) => setTimeout(resolve, remaining));
-        const checkpoint = { groups: [] }; checkpoints.push(checkpoint);
+        // CSS после обновления кадра соотносится с его наблюдаемым timestamp,
+        // а не с предположением о частоте экрана или фазе первого callback.
+        const frameTimestampMs = await new Promise((resolve) => requestAnimationFrame((timestamp) => resolve(timestamp - epoch)));
+        const checkpoint = { frameTimestampMs, groups: [] }; checkpoints.push(checkpoint);
         for (const elements of groups) {
           const group = { readStartedMs: performance.now() - epoch, positions: [] }; checkpoint.groups.push(group);
           for (const element of elements) group.positions.push(new DOMMatrixReadOnly(getComputedStyle(element).transform).e);
@@ -496,6 +515,7 @@ export async function runSemanticStartCheck(page, scenario, calls) {
       callStartedAtMs,
       checkpoints,
       terminal,
+      ...(onset ? { onset } : {}),
       ...(failures.length ? { failures, acquiredOwners: controls.length, createdTargets: groups.map((elements) => elements.length) } : {}),
     };
   }, { config: scenario, calls });

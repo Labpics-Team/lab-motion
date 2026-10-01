@@ -73,7 +73,7 @@ function semanticEvidence(scenario: keyof typeof START_SCENARIO_MANIFEST, calls:
   const config = START_SCENARIO_MANIFEST[scenario];
   const checkpointTimes = config.staggerGapMs > 0
     ? [0.2, 0.5, 0.8].map((fraction) => config.staggerGapMs * (config.targetsPerCall - 1) * fraction)
-    : [config.durationMs * 0.25];
+    : [0.25, 0.5, 0.625].map((fraction) => config.durationMs * fraction);
   const evidence: any = {
     topology: {
       calls,
@@ -84,6 +84,7 @@ function semanticEvidence(scenario: keyof typeof START_SCENARIO_MANIFEST, calls:
     },
     callStartedAtMs: Array.from({ length: calls }, () => 0),
     checkpoints: checkpointTimes.map((elapsedMs) => ({
+      frameTimestampMs: elapsedMs,
       groups: Array.from({ length: calls }, () => ({
         readStartedMs: elapsedMs,
         readEndedMs: elapsedMs,

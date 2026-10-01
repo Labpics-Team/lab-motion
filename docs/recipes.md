@@ -455,7 +455,19 @@ export function mountCompositorSheet(root: HTMLElement, options: {
   const reduced = window.matchMedia('(prefers-reduced-motion: reduce)');
   const quiet = () => options.motion === 'none' || reduced.matches;
   const originalTransform = panel.style.transform;
-  const previousFocus = document.activeElement as HTMLElement | null;
+  const focused = () => {
+    let tree = root.getRootNode() as Document | ShadowRoot;
+    let active = tree.activeElement;
+    // Доступный предок может быть closed: ищем его через host, не shadowRoot.
+    while (!active && 'host' in tree) {
+      tree = tree.host.getRootNode() as Document | ShadowRoot;
+      active = tree.activeElement;
+    }
+    active ??= root.ownerDocument.activeElement;
+    while (active?.shadowRoot?.activeElement) active = active.shadowRoot.activeElement;
+    return active as HTMLElement | null;
+  };
+  const previousFocus = focused();
   const format = (value: number) => `translateY(${value}px)`;
   panel.style.transform = format(points[0]!);
   const motion = new CompositorSpring({
@@ -477,7 +489,8 @@ export function mountCompositorSheet(root: HTMLElement, options: {
       if (quiet()) motion.handoffToLive(points[index]!).snapTo(points[index]!);
       else motion.handoffToCompositor(points[index]!);
     }
-    options.onSelect?.(index);
+    const onSelect = options.onSelect;
+    if (!events.signal.aborted && selected === index && onSelect != null) Reflect.apply(onSelect, options, [index]);
   };
   const follow = (event: PointerEvent) => {
     if (pointer !== event.pointerId || !live) return;
@@ -534,8 +547,9 @@ export function mountCompositorSheet(root: HTMLElement, options: {
     destroy() {
       if (events.signal.aborted) return;
       events.abort(); releaseCapture(); live = undefined; motion.destroy(); panel.style.transform = originalTransform;
-      const active = (root.getRootNode() as Document | ShadowRoot).activeElement;
-      if (active && root.contains(active) && previousFocus?.isConnected) previousFocus.focus({ preventScroll: true });
+      let active: Element | null = focused();
+      while (active && active !== root) active = active.parentElement ?? (active.getRootNode() as ShadowRoot).host ?? null;
+      if (active && previousFocus?.isConnected) previousFocus.focus({ preventScroll: true });
     },
   };
 }
@@ -589,7 +603,19 @@ export function mountCompositorPager(root: HTMLElement, options: {
   const reduced = window.matchMedia('(prefers-reduced-motion: reduce)');
   const quiet = () => options.motion === 'none' || reduced.matches;
   const originalTransform = track.style.transform;
-  const previousFocus = document.activeElement as HTMLElement | null;
+  const focused = () => {
+    let tree = root.getRootNode() as Document | ShadowRoot;
+    let active = tree.activeElement;
+    // Доступный предок может быть closed: ищем его через host, не shadowRoot.
+    while (!active && 'host' in tree) {
+      tree = tree.host.getRootNode() as Document | ShadowRoot;
+      active = tree.activeElement;
+    }
+    active ??= root.ownerDocument.activeElement;
+    while (active?.shadowRoot?.activeElement) active = active.shadowRoot.activeElement;
+    return active as HTMLElement | null;
+  };
+  const previousFocus = focused();
   const offset = (index: number) => geometry.sign * geometry.width * index;
   const bounded = (value: number) => Math.max(Math.min(0, offset(geometry.count - 1)),
     Math.min(Math.max(0, offset(geometry.count - 1)), value));
@@ -613,7 +639,8 @@ export function mountCompositorPager(root: HTMLElement, options: {
       if (quiet()) motion.handoffToLive(offset(index)).snapTo(offset(index));
       else motion.handoffToCompositor(offset(index));
     }
-    options.onSelect?.(index);
+    const onSelect = options.onSelect;
+    if (!events.signal.aborted && selected === index && onSelect != null) Reflect.apply(onSelect, options, [index]);
   };
   const follow = (event: PointerEvent) => {
     if (pointer !== event.pointerId || !live) return;
@@ -671,8 +698,9 @@ export function mountCompositorPager(root: HTMLElement, options: {
     destroy() {
       if (events.signal.aborted) return;
       events.abort(); releaseCapture(); live = undefined; motion.destroy(); track.style.transform = originalTransform;
-      const active = (root.getRootNode() as Document | ShadowRoot).activeElement;
-      if (active && root.contains(active) && previousFocus?.isConnected) previousFocus.focus({ preventScroll: true });
+      let active: Element | null = focused();
+      while (active && active !== root) active = active.parentElement ?? (active.getRootNode() as ShadowRoot).host ?? null;
+      if (active && previousFocus?.isConnected) previousFocus.focus({ preventScroll: true });
     },
   };
 }

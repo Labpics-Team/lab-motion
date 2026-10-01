@@ -77,7 +77,7 @@ test('RESOURCE-01: 10 000 native/live/serialized циклов фактическ
     assert(requests === 0 && queue.length === 0, 'автономные controls создали собственный frame');
 
     const retained = [];
-    let cycles = 0;
+    let cycles = 0, hostTurns = 0;
     let maximumCycleEffects = 0;
     const beforeEffects = createdEffects;
     for (let cycle = 0; cycle < 10_000; cycle++) {
@@ -112,6 +112,19 @@ test('RESOURCE-01: 10 000 native/live/serialized циклов фактическ
       element.remove();
       retained.push(controller, dynamic);
       cycles++;
+      if (cycles % 500 === 0) {
+        // Как в Node-стенде, серия заканчивается ходом хоста для отложенной
+        // очистки. Сразу после него проверяются прежние terminal-обязательства.
+        const beforeTurn = { writes, requests, createdEffects };
+        await new Promise<void>(resolve => requestAnimationFrame(() => resolve()));
+        hostTurns++;
+        assert(writes === beforeTurn.writes && requests === beforeTurn.requests,
+          'после хода хоста terminal owner восстановил writer/scheduler');
+        assert(createdEffects === beforeTurn.createdEffects,
+          'после хода хоста terminal owner создал native effect');
+        assert(queue.length === 0 && document.getAnimations().length === 2,
+          'после хода хоста потерян control либо остался native/job owner');
+      }
     }
     const observedCycleEffects = createdEffects - beforeEffects;
     assert(observedCycleEffects === cycles * 3, 'неполный знаменатель start/retarget/serialized commit');
@@ -122,7 +135,7 @@ test('RESOURCE-01: 10 000 native/live/serialized циклов фактическ
     assert(document.getAnimations().length === 0, 'контрольное native ownership не освобождено');
     (globalThis as typeof globalThis & { __resourceTerminalOwners?: unknown[] }).__resourceTerminalOwners = retained;
 
-    return { cycles, observedCycleEffects, maximumCycleEffects, retainedTerminalOwners: retained.length,
+    return { cycles, hostTurns, observedCycleEffects, maximumCycleEffects, retainedTerminalOwners: retained.length,
       terminalAnimations: document.getAnimations().length, terminalJobs: queue.length,
       controls: { live: 1, deliberate: 1, released: 0 },
       memory: { rasterGpu: 'не измерены: DOM Animation ownership не является GPU byte-измерением' } };
@@ -131,6 +144,7 @@ test('RESOURCE-01: 10 000 native/live/serialized циклов фактическ
     body: JSON.stringify({ browserName, ...report }, null, 2), contentType: 'application/json',
   });
   expect(report.cycles).toBe(10_000);
+  expect(report.hostTurns).toBe(20);
   expect(report.observedCycleEffects).toBe(30_000);
   expect(report.maximumCycleEffects).toBe(1);
   expect(report.retainedTerminalOwners).toBe(20_000);

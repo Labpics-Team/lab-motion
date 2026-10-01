@@ -247,15 +247,17 @@ export function deriveTimerStep(values) {
   return stepUpper;
 }
 
+// Операция синхронна, не отдаёт view наружу и сохраняет только примитивный
+// результат. Один scratch word устраняет allocation на каждом округлении.
+const binary64Scratch = new DataView(new ArrayBuffer(8));
+
 export function nextUp(value) {
   if (Number.isNaN(value) || value === Infinity) return value;
   if (value === 0) return Number.MIN_VALUE;
-  const buffer = new ArrayBuffer(8);
-  const view = new DataView(buffer);
-  view.setFloat64(0, value);
-  const bits = view.getBigUint64(0);
-  view.setBigUint64(0, bits + (value > 0 ? 1n : -1n));
-  return view.getFloat64(0);
+  binary64Scratch.setFloat64(0, value);
+  const bits = binary64Scratch.getBigUint64(0);
+  binary64Scratch.setBigUint64(0, bits + (value > 0 ? 1n : -1n));
+  return binary64Scratch.getFloat64(0);
 }
 
 export function nextDown(value) {
@@ -599,14 +601,14 @@ export function evaluateStartSemanticEvidence(evidence, expected, calls) {
     !Array.isArray(evidence.callStartedAtMs) ||
     evidence.callStartedAtMs.length !== calls ||
     evidence.callStartedAtMs.some((value) => !Number.isFinite(value) || value < 0) ||
-    !Array.isArray(evidence.checkpoints) || evidence.checkpoints.length === 0 ||
+    !Array.isArray(evidence.checkpoints) || evidence.checkpoints.length < 2 ||
     !Array.isArray(evidence.terminal) || evidence.terminal.length !== calls
   ) return false;
 
   const shape = (positions) => (
     Array.isArray(positions) &&
     positions.length === expected.targetsPerCall &&
-    positions.every(Number.isFinite)
+    Array.from(positions).every(Number.isFinite)
   );
   const terminalValid = evidence.terminal.every((positions) => (
     shape(positions) && positions.every((value) => (
@@ -616,6 +618,46 @@ export function evaluateStartSemanticEvidence(evidence, expected, calls) {
   if (!terminalValid) return false;
 
   let provedPartialStagger = expected.staggerGapMs === 0;
+  const observations = Array.from({ length: calls }, () => []);
+  const phases = Array.from({ length: calls }, () => ({ low: -Infinity, high: Infinity }));
+  const resolved = Array.from({ length: calls }, () => Array(expected.targetsPerCall).fill(false));
+  const clockErrorMs = expected.semanticClockErrorMs ?? 0;
+  if (!Number.isFinite(clockErrorMs) || clockErrorMs < 0 ||
+      !Number.isFinite(expected.durationMs) || expected.durationMs <= 0) return false;
+  const slope = expected.toPx / expected.durationMs;
+  const coordinateError = 2 * expected.movementThresholdPx;
+  const interior = (value) => value >= expected.movementThresholdPx && value < expected.toPx - expected.finalTolerancePx;
+  const includePositions = (phase, group, observationStartedMs) => {
+    for (let target = 0; target < group.positions.length; target++) {
+      const value = group.positions[target], delay = target * expected.staggerGapMs;
+      if (value < -expected.movementThresholdPx || value > expected.toPx + expected.finalTolerancePx) return false;
+      if (expected.staggerGapMs === 0 && target > 0 && value === group.positions[target - 1]) continue;
+      // Clamp и interior связывает одна фаза на весь вызов и все observations.
+      if (value < expected.toPx - expected.finalTolerancePx) phase.low = Math.max(phase.low,
+        nextDown(nextDown(observationStartedMs - clockErrorMs - delay) - nextUp((value + expected.movementThresholdPx) / slope)));
+      if (value >= expected.movementThresholdPx) phase.high = Math.min(phase.high,
+        nextUp(nextUp(group.readEndedMs + clockErrorMs - delay) - nextDown((value -
+          (interior(value) ? expected.movementThresholdPx : expected.finalTolerancePx)) / slope)));
+      if (phase.low > phase.high) return false;
+    }
+    return true;
+  };
+  if (expected.requireFreshStart) {
+    const onset = evidence.onset;
+    if (expected.fromPx !== 0 || !Array.isArray(onset?.before) || !Array.isArray(onset?.after) ||
+        onset.before.length !== calls || onset.after.length !== calls) return false;
+    for (let call = 0; call < calls; call++) {
+      const before = onset.before[call], after = onset.after[call], startedMs = evidence.callStartedAtMs[call];
+      if (![before, after].every((group) => Number.isFinite(group?.readStartedMs) && Number.isFinite(group?.readEndedMs) &&
+          group.readStartedMs >= 0 && group.readEndedMs >= group.readStartedMs && shape(group.positions)) ||
+          before.readEndedMs > startedMs + clockErrorMs || after.readStartedMs < startedMs - clockErrorMs ||
+          before.positions.some((value) => Math.abs(value - expected.fromPx) > expected.movementThresholdPx)) return false;
+      // Свежий tween не может отработать часть distance до своего API start.
+      // Допуск выводится из прежних CSS/clock errors, а не нового phase margin.
+      phases[call].low = nextDown(startedMs - clockErrorMs - nextUp(expected.movementThresholdPx / slope));
+      if (!includePositions(phases[call], after, after.readStartedMs)) return false;
+    }
+  }
   for (const checkpoint of evidence.checkpoints) {
     if (!Array.isArray(checkpoint?.groups) || checkpoint.groups.length !== calls) return false;
     for (let call = 0; call < calls; call++) {
@@ -627,13 +669,38 @@ export function evaluateStartSemanticEvidence(evidence, expected, calls) {
         group.readEndedMs < group.readStartedMs ||
         !shape(group.positions)
       ) return false;
-      if (expected.staggerGapMs === 0) {
-        if (group.positions.some((value) => (
-          value < expected.movementThresholdPx ||
-          value >= expected.toPx - expected.finalTolerancePx
-        ))) return false;
-        continue;
+      const observationStartedMs = checkpoint.frameTimestampMs ?? group.readStartedMs;
+      if (!Number.isFinite(observationStartedMs) || observationStartedMs < evidence.callStartedAtMs[call] - clockErrorMs ||
+          observationStartedMs > group.readStartedMs + clockErrorMs) return false;
+      if (expected.requireFreshStart && group.readStartedMs < evidence.onset.after[call].readEndedMs - clockErrorMs) return false;
+      const history = observations[call];
+      if (history.length && observationStartedMs <= history.at(-1).startedMs) return false;
+      for (const prior of history) {
+        const elapsedLow = Math.max(0, nextDown(observationStartedMs - prior.endedMs - 2 * clockErrorMs));
+        const elapsedHigh = nextUp(group.readEndedMs - prior.startedMs + 2 * clockErrorMs);
+        const displacementLow = nextDown(slope * elapsedLow);
+        const displacementHigh = nextUp(slope * elapsedHigh);
+        let previousDelta = NaN, withinTolerance = false;
+        for (let target = 0; target < group.positions.length; target++) {
+          const before = prior.positions[target], after = group.positions[target];
+          // Пересечение широкого интервала не доказывает скорость. Полный
+          // диапазон перемещения должен укладываться в прежний CSS допуск.
+          if (interior(before) && interior(after) && elapsedLow > 0) {
+            const delta = after - before;
+            // Совпавший скаляр задаёт то же неравенство; raw identity и обе
+            // координаты каждого target всё равно проходят общий обход.
+            if (delta !== previousDelta) {
+              previousDelta = delta;
+              withinTolerance = displacementLow >= nextDown(delta - coordinateError) &&
+                displacementHigh <= nextUp(delta + coordinateError);
+            }
+            if (withinTolerance) resolved[call][target] = true;
+          }
+        }
       }
+      history.push({ startedMs: observationStartedMs, endedMs: group.readEndedMs, positions: group.positions });
+      if (!includePositions(phases[call], group, observationStartedMs)) return false;
+      if (expected.staggerGapMs === 0) continue;
 
       for (let target = 1; target < group.positions.length; target++) {
         if (group.positions[target] > group.positions[target - 1] + expected.movementThresholdPx) {
@@ -641,18 +708,16 @@ export function evaluateStartSemanticEvidence(evidence, expected, calls) {
         }
       }
       const leadingPosition = group.positions[0];
-      if (
-        leadingPosition < expected.movementThresholdPx ||
-        leadingPosition >= expected.toPx - expected.finalTolerancePx
-      ) return false;
       const staggerStepPx = (
         expected.toPx * expected.staggerGapMs / expected.durationMs
       );
-      for (let target = 1; target < group.positions.length; target++) {
-        const relativeExpected = Math.max(0, leadingPosition - staggerStepPx * target);
-        if (
-          Math.abs(group.positions[target] - relativeExpected) > expected.movementThresholdPx
-        ) return false;
+      if (interior(leadingPosition)) {
+        for (let target = 1; target < group.positions.length; target++) {
+          const relativeExpected = Math.max(0, leadingPosition - staggerStepPx * target);
+          if (
+            Math.abs(group.positions[target] - relativeExpected) > expected.movementThresholdPx
+          ) return false;
+        }
       }
       let lastMoved = -1;
       for (let target = 0; target < group.positions.length; target++) {
@@ -661,7 +726,8 @@ export function evaluateStartSemanticEvidence(evidence, expected, calls) {
       if (lastMoved >= 0 && lastMoved < expected.targetsPerCall - 1) provedPartialStagger = true;
     }
   }
-  return provedPartialStagger;
+  return provedPartialStagger && resolved.every((targets) => expected.staggerGapMs === 0
+    ? targets.every(Boolean) : targets[0]);
 }
 
 /** Publish-run не имеет права сохранять sample с недоказанной топологией. */

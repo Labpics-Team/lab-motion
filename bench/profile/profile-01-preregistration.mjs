@@ -27,7 +27,7 @@ export const PRODUCT_BASE = Object.freeze({
 });
 
 // Полный старый cost vector: потолки кода, а не новые оценки.
-// Provenance: scripts/size-gate.mjs, PRODUCT_BASE.sizeGateBlob.
+// Происхождение: scripts/size-gate.mjs, PRODUCT_BASE.sizeGateBlob.
 // Архивные фактические размеры новым измерением не являются:
 // метод повторного снятия — node scripts/size-gate.mjs на exact base.
 export const OLD_COST_VECTOR_GZIP_BYTES = Object.freeze({

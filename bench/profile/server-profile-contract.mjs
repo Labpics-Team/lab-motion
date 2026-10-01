@@ -6,7 +6,7 @@ import { pathToFileURL } from 'node:url';
 import { assertBalancedRunBlocks, assertRealmTimerStep, binary64Ulp, deriveRealmTimerStep, evaluateStartSemanticEvidence,
   exactBinomialOrderStatisticBounds, makeRoundRobinOrders, nextDown, nextUp, summarizeSamples } from '../compare/methodology.mjs';
 import { sha256Bytes } from '../compare/provenance.mjs';
-import { TRANSFORM_PAIR_PROFILE } from '../../scripts/bench-transform-support.mjs';
+import { TRANSFORM_PAIR_PROFILE, validateTransformLifecycleSample } from '../../scripts/bench-transform-support.mjs';
 import { SERVER_PROFILE, planServerSampleSize, serverProfileDigest, serverTailPolicy, verifyServerProfile } from './server-profile-registration.mjs';
 
 const SHA256 = /^[a-f0-9]{64}$/;
@@ -59,7 +59,7 @@ function compactCoordinates(values) {
 }
 
 function expandCoordinates(values, count) {
-  if (Array.isArray(values)) { invariant(values.length === count && values.every(Number.isFinite), 'неполные normal-motion coordinates'); return values; }
+  if (Array.isArray(values)) { invariant(values.length === count && Array.from(values).every(Number.isFinite), 'неполные normal-motion coordinates'); return values; }
   invariant(values?.encoding === 'rle' && values.count === count && Array.isArray(values.runs) &&
     isDeepStrictEqual(Object.keys(values).sort(), ['count', 'encoding', 'runs']), 'неполные normal-motion RLE coordinates');
   const expanded = [];
@@ -72,22 +72,51 @@ function expandCoordinates(values, count) {
   return expanded;
 }
 
-export function compactServerSemanticEvidence(evidence) {
-  return { ...evidence, checkpoints: evidence.checkpoints.map((checkpoint) => ({ ...checkpoint,
-    groups: checkpoint.groups.map((group) => ({ ...group, positions: compactCoordinates(group.positions) })) })),
-  terminal: evidence.terminal.map(compactCoordinates) };
+function compactSemanticGroups(groups) {
+  if (!Array.isArray(groups)) return groups;
+  return groups.map((group) => group && typeof group === 'object' && !Array.isArray(group) && Object.hasOwn(group, 'positions')
+    ? { ...group, positions: compactCoordinates(group.positions) } : group);
 }
 
-function validateNormalMotion(evidence, scene) {
+export function compactServerSemanticEvidence(evidence) {
+  if (!evidence || typeof evidence !== 'object' || Array.isArray(evidence)) return evidence;
+  // Отказ сохраняет приобретённый prefix и дополнительные поля, без создания отсутствующих наблюдений.
+  const compact = { ...evidence };
+  if (Array.isArray(evidence.checkpoints)) compact.checkpoints = evidence.checkpoints.map((checkpoint) =>
+    checkpoint && typeof checkpoint === 'object' && !Array.isArray(checkpoint) && Object.hasOwn(checkpoint, 'groups')
+      ? { ...checkpoint, groups: compactSemanticGroups(checkpoint.groups) } : checkpoint);
+  if (Array.isArray(evidence.terminal)) compact.terminal = evidence.terminal.map(compactCoordinates);
+  if (evidence.onset && typeof evidence.onset === 'object' && !Array.isArray(evidence.onset)) {
+    compact.onset = { ...evidence.onset };
+    for (const phase of ['before', 'after']) {
+      if (Object.hasOwn(evidence.onset, phase)) compact.onset[phase] = compactSemanticGroups(evidence.onset[phase]);
+    }
+  }
+  return compact;
+}
+
+function validateNormalMotion(evidence, scene, monotonicHostUpperNs) {
   invariant(evidence?.valid === true && Array.isArray(evidence.checkpoints) && Array.isArray(evidence.terminal), 'нет normal-motion oracle');
   invariant(!evidence.failures?.length, 'normal-motion control потерял failure');
   const calls = SERVER_PROFILE.browserSemanticCalls;
-  invariant(evidence.terminal.length === calls && evidence.checkpoints.length === (scene.staggerGapMs > 0 ? 3 : 1), 'потерян normal-motion checkpoint/call');
-  const expanded = { ...evidence, checkpoints: evidence.checkpoints.map((checkpoint) => {
+  invariant(evidence.terminal.length === calls && evidence.checkpoints.length === 3, 'потерян normal-motion checkpoint/call');
+  invariant(evidence.onset && typeof evidence.onset === 'object' && !Array.isArray(evidence.onset), 'нет normal-motion onset observations');
+  const onset = { ...evidence.onset };
+  for (const phase of ['before', 'after']) {
+    invariant(Array.isArray(onset[phase]) && onset[phase].length === calls, `потеряна normal-motion onset ${phase} группа`);
+    onset[phase] = Array.from(onset[phase], (group) => {
+      invariant(group && typeof group === 'object' && !Array.isArray(group), `невалидная normal-motion onset ${phase} группа`);
+      return { ...group, positions: expandCoordinates(group.positions, scene.targetsPerCall) };
+    });
+  }
+  // Clock/zero/phase law принадлежит общему oracle; decoder восстанавливает каждый target.
+  const expanded = { ...evidence, onset, checkpoints: evidence.checkpoints.map((checkpoint) => {
+    invariant(Number.isFinite(checkpoint.frameTimestampMs), 'нет observed normal-motion frame timestamp');
     invariant(Array.isArray(checkpoint.groups) && checkpoint.groups.length === calls, 'потеряна normal-motion группа');
     return { ...checkpoint, groups: checkpoint.groups.map((group) => ({ ...group, positions: expandCoordinates(group.positions, scene.targetsPerCall) })) };
   }), terminal: evidence.terminal.map((values) => expandCoordinates(values, scene.targetsPerCall)) };
-  invariant(evaluateStartSemanticEvidence(expanded, { ...scene, ...SERVER_PROFILE.browserSemantics,
+  const semanticClockErrorMs = serverBrowserClockBounds({ beginMs: 0, endMs: 0 }, monotonicHostUpperNs).errorMs;
+  invariant(evaluateStartSemanticEvidence(expanded, { ...scene, ...SERVER_PROFILE.browserSemantics, semanticClockErrorMs,
     durationMs: SERVER_PROFILE.durationMs, toPx: SERVER_PROFILE.toPx }, calls), 'normal-motion oracle отверг intermediate/stagger/topology');
 }
 
@@ -123,6 +152,9 @@ export function serverCellPairs(stage, runs, expectedStage) {
   invariant(stage?.rows?.length === runs * (SERVER_PROFILE.engineScenes.length + SERVER_PROFILE.browserScenes.length), 'неполная серия измерений');
   const expectedOrders = serverOrders(runs);
   const seen = new Set();
+  // Один sample имеет несколько проекций метрик. Проверка приобретённого raw
+  // принадлежит sample/scene/work, а не повторяется для каждой проекции.
+  const validationCache = new WeakMap();
   for (const row of stage.rows) {
     const key = `${row.scene}:${row.run}`;
     invariant(!seen.has(key), 'повторный run'); seen.add(key);
@@ -135,23 +167,37 @@ export function serverCellPairs(stage, runs, expectedStage) {
     invariant(rows.length === runs, 'потеряна сцена');
     invariant(rows.every((row) => row.kind === cell.kind), 'подменён вид сцены');
     const read = Object.fromEntries(IDS.map((id) => [id, rows.map((row) => readServerSample(row.samples[id], cell,
-      expectedStage === 'positive' && id === 'right' ? 2 : 1))]));
+      expectedStage === 'positive' && id === 'right' ? 2 : 1, validationCache))]));
     return { ...cell, left: read.left.map((row) => row.value), right: read.right.map((row) => row.value),
       leftBounds: read.left.map((row) => row.bounds), rightBounds: read.right.map((row) => row.bounds) };
   });
 }
 
-function readServerSample(sample, cell, workMultiplier) {
+function readServerSample(sample, cell, workMultiplier, validationCache = new WeakMap()) {
       invariant(sample?.semantic === true && positive(sample[cell.metric]), `${cell.id}: неверный sample или semantics`);
       invariant(sample.workMultiplier === workMultiplier, 'подменён знаменатель положительного контроля');
       invariant(sample.denominator === SERVER_PROFILE.denominator && sample.repetitions === SERVER_PROFILE.repetitions, 'изменён знаменатель');
       invariant(Array.isArray(sample.raw) && sample.raw.length === sample.repetitions * (cell.kind === 'engine' ? sample.workMultiplier : 1), 'потеряны raw повторы');
+      const validationKey = `${cell.kind}:${cell.scene}:${workMultiplier}`;
+      if (!validationCache.get(sample)?.has(validationKey)) {
       if (cell.kind === 'engine') {
         const scene = SERVER_PROFILE.engineScenes.find((scene) => scene.id === cell.scene);
         for (const raw of sample.raw) {
           invariant(Array.isArray(raw.frameNs) && raw.frameNs.length === TRANSFORM_PAIR_PROFILE.frameOffsetsMs.length &&
             raw.frameNs.every((x) => Number.isSafeInteger(x) && x >= 0) && Number.isSafeInteger(raw.operationNs) && raw.operationNs >= 0 &&
             Number.isSafeInteger(raw.cancelDrainNs) && raw.cancelDrainNs >= 0, 'потеряны frame samples или safe CPU counter');
+          validateTransformLifecycleSample(raw, scene);
+          const clockReads = raw.raw.clockReads, cpuReads = raw.raw.cpuReads;
+          invariant(Array.isArray(cpuReads) && cpuReads.length === clockReads.length, 'потеряны actual thread CPU fields');
+          for (let sequence = 0; sequence < cpuReads.length; sequence++) {
+            const read = cpuReads[sequence];
+            invariant(read?.sequence === sequence && Number.isSafeInteger(read.userUs) && read.userUs >= 0 &&
+              Number.isSafeInteger(read.systemUs) && read.systemUs >= 0, 'невалидные user/system CPU fields');
+            const valueNs = String((BigInt(read.userUs) + BigInt(read.systemUs)) * 1000n);
+            invariant(read.valueNs === valueNs && clockReads[sequence].valueNs === valueNs, 'CPU endpoint не пересчитывается из user/system');
+            if (sequence > 0) invariant(read.userUs >= cpuReads[sequence - 1].userUs && read.systemUs >= cpuReads[sequence - 1].systemUs,
+              'user/system CPU fields идут назад');
+          }
           const semantic = raw.semantic;
           invariant(semantic?.valid === true && semantic.targets === scene.count && semantic.frames === raw.frameNs.length &&
             semantic.finished === true && semantic.pending === 0 && semantic.onCompleteCalls === 0 &&
@@ -163,7 +209,7 @@ function readServerSample(sample, cell, workMultiplier) {
         assertRealmTimerStep('server sample', sample.timerEvidence, sample.measurementTimeOriginMs);
         invariant(sample.timerStepMs === step && sample.clockModelDigest === serverProfileDigest(SERVER_PROFILE.clockError), 'clock evidence/model не совпадают');
         const scene = SERVER_PROFILE.browserScenes.find((scene) => scene.id === cell.scene);
-        validateNormalMotion(sample.semanticEvidence, scene);
+        validateNormalMotion(sample.semanticEvidence, scene, sample.monotonicHostUpperNs);
         invariant(Array.isArray(sample.endpoints) && sample.endpoints.length === scene.targetsPerCall &&
           sample.endpoints.every((x) => Number.isFinite(x) && Math.abs(x - SERVER_PROFILE.toPx) <= 2), 'невалидный endpoint witness');
         invariant(Array.isArray(sample.warmup) && sample.warmup.length === 1, 'потерян warmup batch');
@@ -178,6 +224,8 @@ function readServerSample(sample, cell, workMultiplier) {
           validateCancellationWitness(raw, calls * scene.targetsPerCall);
         }
         validateCancellationWitness({ cancelMs: sample.controlCancelMs, cancelWitness: sample.controlCancelWitness }, scene.targetsPerCall);
+      }
+      const checked = validationCache.get(sample) ?? new Set(); checked.add(validationKey); validationCache.set(sample, checked);
       }
       const rawValues = sample.raw.map((value) => cell.metric === 'meanFrameNs'
         ? value.frameNs?.reduce((a, b) => a + b, 0) / value.frameNs?.length : value[cell.metric]);
@@ -195,13 +243,20 @@ function readServerSample(sample, cell, workMultiplier) {
 }
 
 export function validateServerBrowserSample(sample, scene, workMultiplier = 1) {
+  const validationCache = new WeakMap();
   for (const metric of SERVER_PROFILE.metrics.browser) readServerSample(sample,
-    { id: `${scene.id}:${metric}`, kind: 'browser', scene: scene.id, metric }, workMultiplier);
+    { id: `${scene.id}:${metric}`, kind: 'browser', scene: scene.id, metric }, workMultiplier, validationCache);
+}
+
+export function validateServerEngineSample(sample, scene, workMultiplier = 1) {
+  const validationCache = new WeakMap();
+  for (const metric of SERVER_PROFILE.metrics.engine) readServerSample(sample,
+    { id: `${scene.id}:${metric}`, kind: 'engine', scene: scene.id, metric }, workMultiplier, validationCache);
 }
 
 function coordinateReader(values, count, label) {
   if (Array.isArray(values)) {
-    invariant(values.length === count && values.every(Number.isFinite), `неполные ${label} coordinates`);
+    invariant(values.length === count && Array.from(values).every(Number.isFinite), `неполные ${label} coordinates`);
     return { at: (index) => values[index], runs: null };
   }
   if (values?.encoding === 'repeat') {
@@ -235,8 +290,17 @@ function validateStartWitness(raw, scene, monotonicHostUpperNs) {
   const window = serverBrowserClockBounds({ beginMs: raw.startClock.beginMs, endMs: witness.readClock.endMs }, monotonicHostUpperNs);
   invariant(window.high < SERVER_PROFILE.durationMs * (1 - SERVER_PROFILE.browserSemantics.finalTolerancePx / SERVER_PROFILE.toPx),
     'start batch не разрешил окно до линейного endpoint');
-  for (let call = 0; call < raw.calls; call++) invariant(leading.at(call) >= -SERVER_PROFILE.browserSemantics.finalTolerancePx &&
-    leading.at(call) < SERVER_PROFILE.toPx - SERVER_PROFILE.browserSemantics.finalTolerancePx, 'timed owner мгновенно достиг endpoint до duration');
+  // Каждый свежий owner вызван после batch begin, а CSS прочитан до read end.
+  // Общая верхняя граница elapsed учитывает обе clock reads и float roundoff.
+  const maximumPosition = nextUp(nextUp(nextUp(SERVER_PROFILE.toPx / SERVER_PROFILE.durationMs) * window.high) +
+    SERVER_PROFILE.browserSemantics.movementThresholdPx);
+  for (let call = 0; call < raw.calls; call++) {
+    const position = leading.at(call);
+    invariant(position >= -SERVER_PROFILE.browserSemantics.finalTolerancePx &&
+      position < SERVER_PROFILE.toPx - SERVER_PROFILE.browserSemantics.finalTolerancePx, 'timed owner мгновенно достиг endpoint до duration');
+    invariant(position >= SERVER_PROFILE.browserSemantics.fromPx - SERVER_PROFILE.browserSemantics.movementThresholdPx &&
+      position <= maximumPosition, 'timed onset не соответствует свежему началу и actual clock окну');
+  }
 }
 
 function validateCancellationWitness(raw, targets) {
@@ -272,6 +336,7 @@ export function serverComparatorPlan(runs) {
 }
 
 function validateSupplementalSamples(artifact) {
+  const validationCache = new WeakMap();
   invariant(Array.isArray(artifact.comparators) && artifact.comparators.length === SERVER_PROFILE.browserScenes.length * SERVER_PROFILE.comparators.length,
     'потеряны обязательные comparator cells');
   let index = 0;
@@ -285,7 +350,7 @@ function validateSupplementalSamples(artifact) {
     }
     invariant(Array.isArray(comparator.rows) && comparator.rows.length === artifact.samplePlan.runs, 'потеряны raw comparator samples');
     for (const sample of comparator.rows) for (const metric of SERVER_PROFILE.metrics.browser) readServerSample(sample,
-      { id: `${id}:${scene.id}:${metric}`, kind: 'browser', scene: scene.id, metric }, 1);
+      { id: `${id}:${scene.id}:${metric}`, kind: 'browser', scene: scene.id, metric }, 1, validationCache);
   }
   invariant(isDeepStrictEqual(Object.keys(artifact.retention ?? {}).sort(), ['baseline', 'candidate']), 'потерян отдельный retention child');
   for (const report of Object.values(artifact.retention)) {
@@ -431,6 +496,11 @@ export function validateServerArtifact(artifact) {
     invariant(artifact.verdict === 'UNPROVEN' && artifact.failures.length > 0 && !artifact.ab, 'незавершённое измерение объявлено успехом');
     return { verification: 'recorded-refusal-only', verdict: 'UNPROVEN' };
   }
+  // Identity стадий проверяется до дорогих raw проекций. Их подробная
+  // проверка по-прежнему принадлежит serverCellPairs каждой полной серии.
+  for (const name of ['pilot', 'aa', 'positive', ...(artifact.ab ? ['ab'] : [])]) {
+    invariant(artifact[name]?.name === name, 'имя стадии не соответствует владельцу artifact');
+  }
   for (const id of artifact.ab ? ['baseline', 'candidate'] : ['baseline']) {
     const control = artifact.rawControls?.[id];
     invariant(control?.noMotion?.equal === true && SHA256.test(control.noMotion.beforeSha256) &&
@@ -519,6 +589,75 @@ export function writeServerArtifact(file, artifact) {
   return { sha256: hash.digest('hex'), bytes };
 }
 
+// JSON carrier делится только между полными values. Строки, escape sequences
+// и числа разбирает native JSON.parse; весь artifact не становится строкой V8.
+export function parseServerJsonBytes(bytes, chunkBytes = 32 * 1024 * 1024) {
+  invariant(Buffer.isBuffer(bytes) && Number.isSafeInteger(chunkBytes) && chunkBytes > 0, 'невалидный JSON carrier');
+  const whitespace = (code) => code === 32 || code === 9 || code === 10 || code === 13;
+  const skip = (index, end) => { while (index < end && whitespace(bytes[index])) index++; return index; };
+  const stringEnd = (start, end) => {
+    let escaped = false;
+    for (let index = start + 1; index < end; index++) {
+      if (escaped) escaped = false;
+      else if (bytes[index] === 92) escaped = true;
+      else if (bytes[index] === 34) return index + 1;
+    }
+    throw new Error('server profile: оборван JSON string');
+  };
+  const valueEnd = (start, end) => {
+    let depth = 0;
+    for (let index = start; index < end; index++) {
+      const code = bytes[index];
+      if (code === 34) { index = stringEnd(index, end) - 1; continue; }
+      if (code === 123 || code === 91) depth++;
+      else if (code === 125 || code === 93) { if (!depth) return index; depth--; }
+      else if (code === 44 && !depth) return index;
+    }
+    return end;
+  };
+  const parse = (start, end) => {
+    start = skip(start, end); while (end > start && whitespace(bytes[end - 1])) end--;
+    const first = bytes[start];
+    if (end - start <= chunkBytes || (first !== 123 && first !== 91)) return JSON.parse(bytes.toString('utf8', start, end));
+    const object = first === 123, close = object ? 125 : 93, result = object ? {} : [];
+    invariant(bytes[end - 1] === close, 'оборван JSON container');
+    let cursor = skip(start + 1, end);
+    if (cursor === end - 1) return result;
+    for (;;) {
+      let key;
+      if (object) {
+        invariant(bytes[cursor] === 34, 'JSON object потерял key');
+        const keyEnd = stringEnd(cursor, end); key = JSON.parse(bytes.toString('utf8', cursor, keyEnd));
+        cursor = skip(keyEnd, end); invariant(bytes[cursor] === 58, 'JSON object потерял colon'); cursor = skip(cursor + 1, end);
+      }
+      const childEnd = valueEnd(cursor, end - 1), value = parse(cursor, childEnd);
+      // defineProperty сохраняет JSON.parse semantics для __proto__ и duplicate keys.
+      if (object) Object.defineProperty(result, key, { value, enumerable: true, configurable: true, writable: true });
+      else result.push(value);
+      cursor = skip(childEnd, end);
+      if (cursor === end - 1) return result;
+      invariant(bytes[cursor] === 44, 'JSON container потерял separator');
+      cursor = skip(cursor + 1, end); invariant(cursor < end - 1, 'JSON container содержит trailing comma');
+    }
+  };
+  return parse(0, bytes.length);
+}
+
+export function parseServerJournalBytes(bytes) {
+  invariant(Buffer.isBuffer(bytes), 'невалидный journal carrier');
+  const records = [];
+  let start = 0, end = bytes.length;
+  const whitespace = (code) => code === 32 || code === 9 || code === 10 || code === 13;
+  while (start < end && whitespace(bytes[start])) start++;
+  while (end > start && whitespace(bytes[end - 1])) end--;
+  invariant(start < end, 'нет журнала регистрации и samples');
+  for (let index = start; index < end; index++) if (bytes[index] === 10) {
+    records.push(parseServerJsonBytes(bytes.subarray(start, index))); start = index + 1;
+  }
+  records.push(parseServerJsonBytes(bytes.subarray(start, end)));
+  return records;
+}
+
 export function serverStagePlan(stage, runs) {
   const orders = serverOrders(runs), plan = [];
   for (let run = 0; run < runs; run++) {
@@ -530,7 +669,7 @@ export function serverStagePlan(stage, runs) {
   return plan;
 }
 
-export function validateServerJournal(artifact, records, rawDigest = serverArtifactDigest(artifact)) {
+export function validateServerJournal(artifact, records, rawDigest) {
   invariant(Array.isArray(records) && records.length > 0, 'нет журнала регистрации и samples');
   if (artifact.samplePlan) invariant(Number.isSafeInteger(artifact.samplePlan.runs) && artifact.samplePlan.runs % 2 === 0 &&
     artifact.samplePlan.runs >= SERVER_PROFILE.minRuns && artifact.samplePlan.runs <= SERVER_PROFILE.maxRuns, 'N журнала вне зарегистрированного ресурса');
@@ -543,7 +682,7 @@ export function validateServerJournal(artifact, records, rawDigest = serverArtif
   const resourceCounts = Object.fromEntries(phases.map((name) => [name, 0]));
   const complete = (name) => counts[name] === plans[name].length && resourceCounts[name] === runsFor(name) / 2;
   const comparatorPlan = artifact.samplePlan ? serverComparatorPlan(artifact.samplePlan.runs) : [];
-  let comparatorCount = 0, retentionFinished = false;
+  let comparatorCount = 0, retentionFinished = false, finishedDigest;
   const seen = new Map(), comparatorSamples = new Map(), retentionSamples = new Map(), failures = [], failedSamples = [];
   for (let recordIndex = 0; recordIndex < records.length; recordIndex++) {
     const record = records[recordIndex];
@@ -588,7 +727,9 @@ export function validateServerJournal(artifact, records, rawDigest = serverArtif
     } else if (record.type === 'failure') {
       failures.push(record.value); stopped = true;
     } else if (record.type === 'finished') {
-      invariant(recordIndex === records.length - 1 && record.value.verdict === artifact.verdict && record.value.digest === rawDigest, 'финальная квитанция не связана с raw/вердиктом');
+      invariant(recordIndex === records.length - 1 && record.value.verdict === artifact.verdict && SHA256.test(record.value.digest),
+        'финальная квитанция не связана с raw/вердиктом');
+      finishedDigest = record.value.digest;
     } else if (record.type === 'comparator-sample' || record.type === 'failed-comparator-sample') {
       invariant(!stopped && calibration && complete('ab'), 'дополнительное измерение получено до годного A/B');
       const value = record.value;
@@ -629,6 +770,9 @@ export function validateServerJournal(artifact, records, rawDigest = serverArtif
   invariant(isDeepStrictEqual(Object.fromEntries(retentionSamples), artifact.retention ?? {}), 'retention samples исключены из результата');
   if (artifact.verdict !== 'UNPROVEN') invariant(comparatorCount === comparatorPlan.length && retentionFinished,
     'обязательные comparator/retention measurements не завершены');
+  // Полный raw хешируется после проверки хронологии, failure union и полноты.
+  // Отказ на этих границах не сериализует заведомо негодную историю повторно.
+  invariant(finishedDigest === (rawDigest ?? serverArtifactDigest(artifact)), 'финальная квитанция не связана с raw/вердиктом');
   return { journalFinalDigest: previous };
 }
 
@@ -643,8 +787,8 @@ if (process.argv[1] && pathToFileURL(path.resolve(process.argv[1])).href === imp
     invariant(args.length === 6 && args[0] === '--raw' && args[2] === '--digest' && args[4] === '--journal',
       'нужны --raw <json> --digest <внешний sha256> --journal <ndjson>');
     const raw = readFileSync(args[1]); invariant(SHA256.test(args[3]) && sha256Bytes(raw) === args[3], 'не совпал внешний digest raw');
-    const artifact = JSON.parse(raw);
-    const records = readFileSync(args[5], 'utf8').trim().split('\n').map((line) => JSON.parse(line));
+    const artifact = parseServerJsonBytes(raw);
+    const records = parseServerJournalBytes(readFileSync(args[5]));
     const chronology = validateServerJournal(artifact, records, args[3]);
     process.stdout.write(`${JSON.stringify({ ...validateServerArtifact(artifact), ...chronology })}\n`);
   } catch (error) { process.stderr.write(`${error.message}\n`); process.exitCode = 1; }

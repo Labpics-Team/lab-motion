@@ -1,12 +1,14 @@
 import { mkdtempSync, mkdirSync, writeFileSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
+import { createHash } from 'node:crypto';
 import { describe, expect, it } from 'vitest';
 import { animate, type AnimateOptions, type AnimateProps } from '../src/animate/index.js';
 import {
   TRANSFORM_PAIR_PROFILE,
   expectedTransformValues,
   runTransformLifecycleSample,
+  validateTransformLifecycleSample,
 } from '../scripts/bench-transform-support.mjs';
 import { makeTransformPairPlan, parseTransformPairArgs, runTransformPair } from '../scripts/bench-transform-pair.mjs';
 import { summarizeDistribution } from '../scripts/bench-support.mjs';
@@ -551,6 +553,152 @@ describe('paired public transform lifecycle screening', () => {
       failurePhase: 'timing', unfinishedInterval: null, semantic: { valid: false, finished: 'fulfilled', pending: 0 },
     });
     expect(JSON.parse(JSON.stringify(retained.raw))).toEqual(retained.raw);
+  });
+
+  it('lineage сохраняет каждый внешний BigInt endpoint и фактический CSS всех целей', async () => {
+    const counterValues: string[] = [];
+    const writes: { target: number; timestampMs: number | undefined; value: string }[] = [];
+    let counter = 10n ** 26n;
+    let timestampMs: number | undefined;
+    const linear = independentFreshLinear();
+    const sample = await runTransformLifecycleSample({
+      count: 1000, lifecycle: 'fresh', channels: 7,
+      nowNs: () => { counter += 1000n; counterValues.push(counter.toString()); return counter; },
+      animate: (targets: Parameters<typeof animate>[0], props: AnimateProps, options: AnimateOptions) => {
+        if (typeof targets === 'string' || !('length' in targets)) throw new Error('Нужен список целей');
+        for (let target = 0; target < targets.length; target++) {
+          const style = targets[target]!.style;
+          const write = style.setProperty.bind(style);
+          style.setProperty = (property, value) => { writes.push({ target, timestampMs, value }); write(property, value); };
+        }
+        return linear(targets, props, { ...options, requestFrame: (callback) => options.requestFrame!((timestamp) => {
+          timestampMs = timestamp;
+          callback(timestamp);
+        }) });
+      },
+    });
+    expect(counterValues).toHaveLength(16);
+    expect(sample.raw.clockReads.map((read: { valueNs: string }) => read.valueNs)).toEqual(counterValues);
+    expect(writes).toHaveLength(6000);
+    expect(sample.raw.targetTraces.encoding).toBe('runs');
+    expect(sample.raw.targetTraces.count).toBe(1000);
+    expect(sample.raw.targetTraces.runs).toHaveLength(1);
+    const run = sample.raw.targetTraces.runs[0];
+    expect(run.from).toBe(0);
+    expect(run.count).toBe(1000);
+    for (const write of writes) {
+      const frame = TRANSFORM_PAIR_PROFILE.frameOffsetsMs.indexOf(write.timestampMs! - TRANSFORM_PAIR_PROFILE.clockOriginMs);
+      expect(run.trace.values[frame]).toBe(write.value);
+      expect(run.trace.events[frame]).toMatchObject({ timestampMs: write.timestampMs, property: 'transform', value: write.value });
+    }
+    const replay = validateTransformLifecycleSample(sample, { count: 1000, lifecycle: 'fresh', channels: 7 });
+    expect(replay).toMatchObject({ operationNs: 1000, frameNs: [1000, 1000, 1000, 1000, 1000, 1000], cancelDrainNs: 1000 });
+    expect(replay.intervals.map((interval: { durationNs: string }) => interval.durationNs)).toEqual(Array(8).fill('1000'));
+    expect(replay.traceRuns).toHaveLength(1);
+    expect(JSON.parse(JSON.stringify(sample.raw))).toEqual(sample.raw);
+  });
+
+  it.each(['fresh', 'live', 'settled'] as const)('lineage пересчитывает generic clock и setup/frame координаты: %s', async (lifecycle) => {
+    for (const channels of [1, 7]) {
+      let counter = 0n;
+      const sample = await runTransformLifecycleSample({ animate, count: 1, lifecycle, channels, nowNs: () => ++counter });
+      const replay = validateTransformLifecycleSample(sample, { count: 1, lifecycle, channels });
+      expect(replay.operationNs).toBe(1);
+      expect(replay.frameNs).toEqual([1, 1, 1, 1, 1, 1]);
+      expect(replay.cancelDrainNs).toBe(1);
+      const setupCount = lifecycle === 'fresh' ? 0 : lifecycle === 'live' ? 2 : 3;
+      expect(replay.traceRuns[0].trace.events).toHaveLength(setupCount + 6);
+      expect(replay.traceRuns[0].trace.setup).toHaveLength(setupCount);
+    }
+  });
+
+  it('lineage сохраняет весь приобретённый prefix при позднем cancel failure', async () => {
+    const values: string[] = [];
+    let counter = 0n;
+    const failure = await runTransformLifecycleSample({
+      animate: independentFreshLinear('cancel', new Error('Отказ отмены')), count: 1000, lifecycle: 'fresh', channels: 7,
+      nowNs: () => { counter += 1000n; values.push(counter.toString()); return counter; },
+    }).then(() => { throw new Error('Отказ не должен стать замером'); }, (error: any) => error);
+    expect(failure.raw.clockReads.map((read: { valueNs: string }) => read.valueNs)).toEqual(values);
+    expect(values).toHaveLength(15);
+    expect(failure.raw.clockReads[14]).toMatchObject({ metric: 'cancelDrainNs', frame: null, edge: 'before', valueNs: '15000' });
+    expect(failure.raw.targetTraces.runs[0]).toMatchObject({ from: 0, count: 1000 });
+    expect(failure.raw.targetTraces.runs[0].trace.events).toHaveLength(6);
+    expect(() => validateTransformLifecycleSample({ ...failure.raw, raw: failure.raw }, { count: 1000, lifecycle: 'fresh', channels: 7 })).toThrow(/отказ/);
+  });
+
+  it.each([7, 8])('lineage не придумывает endpoint при отказе часов на попытке %i', async (failedRead) => {
+    const acquired: string[] = [];
+    let attempted = 0;
+    const failure = await runTransformLifecycleSample({
+      animate: independentFreshLinear(), count: 1, lifecycle: 'fresh', channels: 7,
+      nowNs: () => { if (++attempted === failedRead) throw undefined; const value = BigInt(attempted); acquired.push(value.toString()); return value; },
+    }).then(() => { throw new Error('Отказ не должен стать замером'); }, (error: any) => error);
+    expect(failure.errors).toEqual([undefined]);
+    expect(failure.raw.clockReads.map((read: { valueNs: string }) => read.valueNs)).toEqual(acquired);
+    expect(failure.raw.clockReads).toHaveLength(failedRead - 1);
+    expect(failure.raw.targetTraces.runs[0].trace.events).toHaveLength(failedRead === 7 ? 2 : 3);
+  });
+
+  it('lineage сохраняет повторные и внешние записи CSS без потери overwritten значения', async () => {
+    const linear = independentFreshLinear();
+    let counter = 0n;
+    const failure = await runTransformLifecycleSample({
+      count: 1, lifecycle: 'fresh', channels: 7, nowNs: () => ++counter,
+      animate: (targets: Parameters<typeof animate>[0], props: AnimateProps, options: AnimateOptions) => {
+        if (typeof targets === 'string' || !('length' in targets)) throw new Error('Нужен список целей');
+        const style = targets[0]!.style;
+        const write = style.setProperty.bind(style);
+        let writes = 0;
+        style.setProperty = (property, value) => { if (++writes === 3) write(property, 'translateX(999px)'); write(property, value); };
+        const controls = linear(targets, props, options);
+        let cancels = 0;
+        return { ...controls, cancel() { controls.cancel(); if (++cancels === 2) write('transform', 'translateX(888px)'); } };
+      },
+    }).then(() => { throw new Error('Отказ не должен стать замером'); }, (error: any) => error);
+    const trace = failure.raw.targetTraces.runs[0].trace;
+    expect(trace.writes).toEqual([1, 1, 2, 1, 1, 1]);
+    expect(trace.outsideWrites).toBe(1);
+    expect(trace.events).toHaveLength(8);
+    expect(trace.events[2]).toMatchObject({ phase: 'frames', index: 2, value: 'translateX(999px)', timestampMs: 1000032 });
+    expect(trace.events[3]).toMatchObject({ phase: 'frames', index: 2, value: expect.stringContaining('translate(64px, 40px)') });
+    expect(trace.events[7]).toMatchObject({ phase: 'outside', index: null, step: null, timestampMs: null, value: 'translateX(888px)' });
+  });
+
+  it.each(['endpoint', 'clock-order', 'missing-clock', 'missing-target', 'RLE-count', 'RLE-from', 'RLE-hash-only', 'missing-event', 'event-order', 'event-time', 'coordinates-and-hash'] as const)(
+    'lineage отвергает согласованное по labels повреждение: %s', async (fault) => {
+      let counter = 0n;
+      const original = await runTransformLifecycleSample({ animate: independentFreshLinear(), count: 100, lifecycle: 'fresh', channels: 7, nowNs: () => counter += 1000n });
+      expect(() => validateTransformLifecycleSample(original, { count: 100, lifecycle: 'fresh', channels: 7 })).not.toThrow();
+      const mutant = JSON.parse(JSON.stringify(original));
+      const trace = mutant.raw.targetTraces.runs[0].trace;
+      if (fault === 'endpoint') mutant.raw.clockReads[1].valueNs = '2001';
+      if (fault === 'clock-order') [mutant.raw.clockReads[2], mutant.raw.clockReads[3]] = [mutant.raw.clockReads[3], mutant.raw.clockReads[2]];
+      if (fault === 'missing-clock') mutant.raw.clockReads.splice(4, 1);
+      if (fault === 'missing-target') mutant.raw.targetTraces.runs = [];
+      if (fault === 'RLE-count') mutant.raw.targetTraces.runs[0].count = 99;
+      if (fault === 'RLE-from') mutant.raw.targetTraces.runs[0].from = 1;
+      if (fault === 'RLE-hash-only') mutant.raw.targetTraces.runs[0].trace = { hash: original.semantic.targetTraceHashes[0] };
+      if (fault === 'missing-event') delete trace.events[2];
+      if (fault === 'event-order') [trace.events[2], trace.events[3]] = [trace.events[3], trace.events[2]];
+      if (fault === 'event-time') trace.events[2].timestampMs++;
+      if (fault === 'coordinates-and-hash') {
+        trace.values[2] = 'translateX(999px)';
+        trace.events[2].value = trace.values[2];
+        const hash = createHash('sha256').update(JSON.stringify(trace.values)).digest('hex');
+        mutant.semantic.targetTraceHashes.fill(hash);
+      }
+      expect(() => validateTransformLifecycleSample(mutant, { count: 100, lifecycle: 'fresh', channels: 7 })).toThrow(/transform/);
+    },
+  );
+
+  it('lineage связывает external case и повторённые hash identities с полным CSS', async () => {
+    const sample = await runTransformLifecycleSample({ animate: independentFreshLinear(), count: 100, lifecycle: 'fresh', channels: 7, nowNs: () => 0n });
+    sample.semantic.targetTraceHashes = { encoding: 'repeat', count: 100, value: sample.semantic.targetTraceHashes[0] };
+    expect(() => validateTransformLifecycleSample(sample, { count: 100, lifecycle: 'fresh', channels: 7 })).not.toThrow();
+    expect(() => validateTransformLifecycleSample(sample, { count: 1000, lifecycle: 'fresh', channels: 7 })).toThrow(/case/);
+    sample.semantic.targetTraceHashes.count = 99;
+    expect(() => validateTransformLifecycleSample(sample, { count: 100, lifecycle: 'fresh', channels: 7 })).toThrow(/hash RLE/);
   });
 
   it.each(['oracle', 'cleanup'] as const)('сохраняет все восемь интервалов при позднем отказе %s', async (fault) => {

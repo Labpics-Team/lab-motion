@@ -13,8 +13,8 @@ import { deriveRealmTimerStep, PRODUCTION_ADAPTER_PROFILE } from '../compare/met
 import { assertCheckoutUnchanged, assertFileHashesUnchanged, assertInstalledPackageTreesUnchanged,
   hashFileTree, prepareBenchmarkCheckout, sha256File } from '../compare/provenance.mjs';
 import { SERVER_PROFILE, planServerSampleSize, serverProfileDigest } from './server-profile-registration.mjs';
-import { compactServerSemanticEvidence, serverCalibrationVerdict, serverCellPairs,
-  serverFamilyIntervals, serverOrders, serverResourceReasons, validateServerBrowserSample, verifyServerClockRegistration, writeServerArtifact } from './server-profile-contract.mjs';
+import { compactServerSemanticEvidence, serverBrowserClockBounds, serverCalibrationVerdict, serverCellPairs,
+  serverFamilyIntervals, serverOrders, serverResourceReasons, validateServerBrowserSample, validateServerEngineSample, verifyServerClockRegistration, writeServerArtifact } from './server-profile-contract.mjs';
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../..');
 const BENCH = path.join(ROOT, 'bench/compare');
@@ -138,39 +138,49 @@ function buildAdapter(id, consumerRoot, esbuild, out) {
   return { path: artifact, sha256: sha256File(artifact), ownerEntry: entry, ownerEntrySha256: sha256File(entry) };
 }
 
-function threadCpuNs() {
+function threadCpuNs(reads) {
   const usage = process.threadCpuUsage();
+  const acquired = { sequence: reads.length, userUs: usage.user, systemUs: usage.system, valueNs: null };
+  reads.push(acquired);
   if (![usage.user, usage.system].every((value) => Number.isSafeInteger(value) && value >= 0)) {
     throw new Error('server profile: unsafe thread CPU counter вне clock model');
   }
-  return (BigInt(usage.user) + BigInt(usage.system)) * 1000n;
+  const valueNs = (BigInt(usage.user) + BigInt(usage.system)) * 1000n;
+  acquired.valueNs = String(valueNs);
+  return valueNs;
 }
 
 export async function measureServerEngine(animate, scene, workMultiplier = 1) {
   const raw = [];
   const before = process.memoryUsage();
   const contextBefore = contextSwitches();
+  let cpuReads = [];
+  let sampleResult;
   try {
     for (let repetition = 0; repetition < SERVER_PROFILE.repetitions; repetition++) {
       for (let extra = 0; extra < workMultiplier; extra++) {
+        cpuReads = [];
         const measured = await runTransformLifecycleSample({ animate,
-          count: scene.count, lifecycle: scene.lifecycle, channels: scene.channels, nowNs: threadCpuNs });
+          count: scene.count, lifecycle: scene.lifecycle, channels: scene.channels, nowNs: () => threadCpuNs(cpuReads) });
+        measured.raw.cpuReads = cpuReads;
         const hashes = measured.semantic.targetTraceHashes;
         if (hashes.every((hash) => hash === hashes[0])) measured.semantic.targetTraceHashes = { encoding: 'repeat', count: hashes.length, value: hashes[0] };
         raw.push(measured);
       }
     }
+    const aggregate = (read) => raw.reduce((sum, sample) => sum + read(sample), 0) / SERVER_PROFILE.repetitions;
+    sampleResult = { operationNs: aggregate((sample) => sample.operationNs),
+      meanFrameNs: aggregate((sample) => sample.frameNs.reduce((a, b) => a + b, 0) / sample.frameNs.length),
+      cancelDrainNs: aggregate((sample) => sample.cancelDrainNs), semantic: raw.every((sample) => sample.semantic.valid),
+      repetitions: SERVER_PROFILE.repetitions, workMultiplier, denominator: SERVER_PROFILE.denominator,
+      contextSwitchObservation: { before: contextBefore, after: contextSwitches(), scope: 'Node process; timing использует только CPU текущего потока' },
+      allocationObservation: { before, after: process.memoryUsage(), scope: 'пакет + независимый oracle + harness; allocator/GC не разложены' }, raw };
+    validateServerEngineSample(sampleResult, scene, workMultiplier);
+    return sampleResult;
   } catch (error) {
-    throw Object.assign(new AggregateError([error], 'server profile: engine sample не завершён'), { raw: {
-      completed: raw, failedRepetition: error?.raw ?? null, before, after: process.memoryUsage() } });
+    throw Object.assign(new AggregateError([error], 'server profile: engine sample не завершён'), { raw: sampleResult ?? {
+      completed: raw, failedRepetition: preserveRawNumbers(error?.raw ? { ...error.raw, cpuReads } : { cpuReads }), before, after: process.memoryUsage() } });
   }
-  const aggregate = (read) => raw.reduce((sum, sample) => sum + read(sample), 0) / SERVER_PROFILE.repetitions;
-  return { operationNs: aggregate((sample) => sample.operationNs),
-    meanFrameNs: aggregate((sample) => sample.frameNs.reduce((a, b) => a + b, 0) / sample.frameNs.length),
-    cancelDrainNs: aggregate((sample) => sample.cancelDrainNs), semantic: raw.every((sample) => sample.semantic.valid),
-    repetitions: SERVER_PROFILE.repetitions, workMultiplier, denominator: SERVER_PROFILE.denominator,
-    contextSwitchObservation: { before: contextBefore, after: contextSwitches(), scope: 'Node process; timing использует только CPU текущего потока' },
-    allocationObservation: { before, after: process.memoryUsage(), scope: 'пакет + независимый oracle + harness; allocator/GC не разложены' }, raw };
 }
 
 async function browserTimerProbe(page, phase) {
@@ -199,7 +209,9 @@ export async function measureServerBrowser(browser, origin, adapter, scene, work
       const begin = performance.now(); (0, eval)(source); return performance.now() - begin;
     }, source), 'browser cold import');
     partial.push({ phase: 'cold-import', coldImportMs });
-    const semanticConfig = { ...scene, ...SERVER_PROFILE.browserSemantics, durationMs: SERVER_PROFILE.durationMs, toPx: SERVER_PROFILE.toPx };
+    const semanticClockErrorMs = serverBrowserClockBounds({ beginMs: 0, endMs: 0 }, process.hrtime.bigint().toString()).errorMs;
+    const semanticConfig = { ...scene, ...SERVER_PROFILE.browserSemantics, semanticClockErrorMs,
+      durationMs: SERVER_PROFILE.durationMs, toPx: SERVER_PROFILE.toPx };
     const semanticEvidence = compactServerSemanticEvidence(await withBrowserTimeout(
       runSemanticStartCheck(page, semanticConfig, SERVER_PROFILE.browserSemanticCalls), 'browser normal-motion semantic control'));
     partial.push({ phase: 'normal-motion', evidence: semanticEvidence });

@@ -1,14 +1,15 @@
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 import { mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import { createContext, runInContext } from 'node:vm';
+import { createHash } from 'node:crypto';
 import { SERVER_PROFILE, planServerSampleSize, serverProfileDigest, serverTailPolicy, verifyServerProfile } from '../bench/profile/server-profile-registration.mjs';
 import { serverCalibrationVerdict, serverCellPairs, serverFamilyIntervals, serverMetricCells, serverOrders,
   compactServerSemanticEvidence, serverArtifactChunks, serverArtifactDigest, serverBrowserClockBounds, serverOrderStatisticBounds, serverResourceReasons,
-  validateServerArtifact, validateServerBrowserSample, validateServerJournal, writeServerArtifact } from '../bench/profile/server-profile-contract.mjs';
-import { deriveRealmTimerStep } from '../bench/compare/methodology.mjs';
-import { measureServerBrowser } from '../bench/profile/server-profile-runner.mjs';
+  parseServerJsonBytes, parseServerJournalBytes, validateServerArtifact, validateServerBrowserSample, validateServerEngineSample, validateServerJournal, writeServerArtifact } from '../bench/profile/server-profile-contract.mjs';
+import { deriveRealmTimerStep, evaluateStartSemanticEvidence } from '../bench/compare/methodology.mjs';
+import { measureServerBrowser, measureServerEngine } from '../bench/profile/server-profile-runner.mjs';
 
 const hash = 'a'.repeat(64);
 const clone = <T>(value: T): T => structuredClone(value);
@@ -19,13 +20,50 @@ function pairs(runs = SERVER_PROFILE.minRuns, ratio = 1) {
 }
 
 function normalMotion(scene: any) {
-  const times = scene.staggerGapMs > 0 ? [0.2, 0.5, 0.8].map((fraction) => SERVER_PROFILE.durationMs * fraction) : [SERVER_PROFILE.durationMs / 4];
+  const times = (scene.staggerGapMs > 0 ? [0.2, 0.5, 0.8] : [0.25, 0.5, 0.625]).map((fraction) => SERVER_PROFILE.durationMs * fraction);
   const positions = (time: number) => Array.from({ length: scene.targetsPerCall }, (_, index) =>
     SERVER_PROFILE.toPx * Math.max(0, Math.min(1, (time - scene.staggerGapMs * index) / SERVER_PROFILE.durationMs)));
   return compactServerSemanticEvidence({ valid: true, topology: { calls: 1, targetsPerCall: scene.targetsPerCall, staggerGapMs: scene.staggerGapMs,
     durationMs: SERVER_PROFILE.durationMs, toPx: SERVER_PROFILE.toPx }, callStartedAtMs: [0],
-    checkpoints: times.map((time) => ({ groups: [{ readStartedMs: time, readEndedMs: time + 0.1, positions: positions(time) }] })),
+    onset: { before: [{ readStartedMs: 0, readEndedMs: 0, positions: Array(scene.targetsPerCall).fill(0) }],
+      after: [{ readStartedMs: 0.025, readEndedMs: 0.05, positions: Array(scene.targetsPerCall).fill(0) }] },
+    checkpoints: times.map((time) => ({ frameTimestampMs: time, groups: [{ readStartedMs: time, readEndedMs: time + 0.1, positions: positions(time) }] })),
     terminal: [Array(scene.targetsPerCall).fill(SERVER_PROFILE.toPx)] });
+}
+
+// Независимые explicit linear vectors, не solver/formatter/expectedValues SUT.
+function engineRaw(scene: any) {
+  const render = ([x, y, scaleX, scaleY, rotate, skewX, skewY]: number[]) =>
+    `translate(${x}px, ${y}px) scaleX(${scaleX}) scaleY(${scaleY}) rotate(${rotate}deg) skew(${skewX}deg, ${skewY}deg)`;
+  const live = scene.lifecycle === 'live';
+  const offsets = [0, 16, 32, 48, 64, 80], setupOffsets = live ? [0, 32] : [];
+  const setup = live ? [[0, 0, 1, 1, 0, 0, 0], [16, 8, 1.25, 1.5, 8, 2, 4]].map(render) : [];
+  const values = live ? [16, 46, 76, 106, 136, 166].map((x) => render([x, 8, 1.25, 1.5, 8, 2, 4]))
+    : [[0, 0, 1, 1, 0, 0, 0], [32, 20, 1.375, 1.5, 12, 3, 5], [64, 40, 1.75, 2, 24, 6, 10],
+      [96, 60, 2.125, 2.5, 36, 9, 15], [128, 80, 2.5, 3, 48, 12, 20], [160, 100, 2.875, 3.5, 60, 15, 25]].map(render);
+  const base = 1_000_000 + (live ? 48 : 0);
+  const steps = [
+    ...setupOffsets.map((offset, index) => ({ stage: 'setup', index, phase: 'setup', timestampMs: 1_000_000 + offset })),
+    ...offsets.map((offset, index) => ({ stage: 'frame', index, phase: 'frames', timestampMs: base + offset })),
+    { stage: 'cancel-drain', index: null, phase: 'outside', timestampMs: base + 128 },
+    ...[256, 384].map((offset) => ({ stage: 'idle', index: null, phase: 'outside', timestampMs: base + offset })),
+  ].map((step, sequence) => ({ sequence, ...step }));
+  const events = steps.filter((step) => ['setup', 'frame'].includes(step.stage)).map((step, sequence) => ({ sequence,
+    phase: step.phase, index: step.index, step: step.sequence, timestampMs: step.timestampMs, property: 'transform',
+    value: step.stage === 'setup' ? setup[step.index!] : values[step.index!] }));
+  const clockReads = [{ metric: 'operationNs', frame: null }, ...offsets.map((_, frame) => ({ metric: 'frameNs', frame })),
+    { metric: 'cancelDrainNs', frame: null }].flatMap(({ metric, frame }, interval) => ['before', 'after'].map((edge, half) => ({
+      sequence: interval * 2 + half, metric, frame, edge,
+      valueNs: String(10_000_000 + interval * 2_000_000 + (half ? metric === 'cancelDrainNs' ? 500_000 : 1_000_000 : 0)) })));
+  return { operationNs: 1_000_000, frameNs: Array(6).fill(1_000_000), cancelDrainNs: 500_000,
+    raw: { schemaVersion: 1, case: { count: scene.count, lifecycle: scene.lifecycle, channels: scene.channels }, clockReads,
+      cpuReads: clockReads.map((read) => ({ sequence: read.sequence, userUs: Number(read.valueNs) / 1000, systemUs: 0, valueNs: read.valueNs })),
+      timeline: { clockOriginMs: 1_000_000, setupOffsetsMs: setupOffsets, frameOffsetsMs: offsets, successorBaseMs: base, steps },
+      targetTraces: { encoding: 'runs', count: scene.count, runs: [{ from: 0, count: scene.count,
+        trace: { value: values.at(-1), setup, setupWrites: setup.map(() => 1), values, writes: values.map(() => 1), outsideWrites: 0, events } }] } },
+    semantic: { valid: true, targets: scene.count, frames: 6, finished: true, pending: 0, onCompleteCalls: 0,
+      previousFinished: live ? true : null, previousCompleteCalls: 0, requests: live ? 9 : 7, executions: live ? 9 : 7,
+      targetTraceHashes: { encoding: 'repeat', count: scene.count, value: createHash('sha256').update(JSON.stringify(values)).digest('hex') } } };
 }
 
 function stage(name = 'aa', runs = 2) {
@@ -38,11 +76,7 @@ function stage(name = 'aa', runs = 2) {
         let raw: any[];
         let extra: any = {};
         if (kind === 'engine') {
-          const count = (scene as any).count;
-          const semantic = { valid: true, targets: count, frames: 6, finished: true, pending: 0, onCompleteCalls: 0,
-            previousFinished: (scene as any).lifecycle === 'fresh' ? null : true, previousCompleteCalls: 0,
-            targetTraceHashes: { encoding: 'repeat', count, value: hash } };
-          raw = Array.from({ length: SERVER_PROFILE.repetitions * multiplier }, () => ({ operationNs: 1_000_000, frameNs: Array(6).fill(1_000_000), cancelDrainNs: 500_000, semantic }));
+          raw = Array.from({ length: SERVER_PROFILE.repetitions * multiplier }, () => engineRaw(scene));
           extra = { operationNs: 1_000_000 * multiplier, meanFrameNs: 1_000_000 * multiplier, cancelDrainNs: 500_000 * multiplier };
         } else {
           const timerEvidence = { crossOriginIsolated: true, probes: ['before', 'after'].map((phase) => ({ phase,
@@ -150,29 +184,50 @@ function admissionEvents(artifact: any) {
   return events;
 }
 
-function chain(events: any[]) {
-  let previous = '0'.repeat(64);
-  return events.map((event) => {
+function chain(events: any[], shared?: { events: any[]; records: any[] }) {
+  // Только подготовка fixture переиспользует неизменённый префикс по identity.
+  // Валидатор заново проверяет каждый hash и весь N288 raw каждой истории.
+  let prefix = 0;
+  while (shared && prefix < events.length && events[prefix] === shared.events[prefix]) prefix++;
+  let previous = prefix ? shared!.records[prefix - 1].digest : '0'.repeat(64);
+  return [...(shared?.records.slice(0, prefix) ?? []), ...events.slice(prefix).map((event) => {
     const payload = { sequenceDigest: previous, ...event }; previous = serverProfileDigest(payload);
     return { ...payload, digest: previous };
-  });
+  })];
+}
+
+// Два набора fault cases используют одну healthy N288 историю. Изменяются
+// только принадлежащие fault ветви; исходные events/raw остаются неизменными.
+let sharedAdmission: { artifact: any; events: any[]; records: any[] } | undefined;
+function admissionHistory() {
+  if (!sharedAdmission) {
+    const artifact = healthyAdmission(), events = admissionEvents(artifact);
+    sharedAdmission = { artifact, events, records: chain(events) };
+  }
+  return sharedAdmission;
 }
 
 // Исполняем настоящий browser owner в VM с независимым линейным DOM и
 // намеренно грубыми часами. Это synthetic fault test, не performance sample.
-function syntheticBrowser(options: { startCostMs?: number; snap?: boolean; snapAt?: number; cancelAt?: number; rejectTiming?: boolean } = {}) {
+function syntheticBrowser(options: { startCostMs?: number; snap?: boolean; snapAt?: number; cancelAt?: number; rejectTiming?: boolean;
+  durationMultiplier?: number; shape?: 'quadratic'; rafStepMs?: number; readCostMs?: number; timerLagMs?: number;
+  initialProgress?: number; initialProgressAt?: number; onsetReadAt?: number } = {}) {
   const directory = mkdtempSync(path.join(os.tmpdir(), 'motion-server-synthetic-'));
   const source = path.join(directory, 'adapter.js'); writeFileSync(source, '// Синтетический adapter задан VM.\n');
   let timeMs = 100, starts = 0, cancels = 0;
   const children: any[] = [];
-  const position = (element: any) => element.motion ? SERVER_PROFILE.toPx * Math.max(0, Math.min(1,
-    (timeMs - element.motion.startedMs - element.motion.delayMs) / element.motion.durationMs)) : element.x;
+  const position = (element: any) => {
+    if (!element.motion) return element.x;
+    const progress = Math.max(0, Math.min(1, (timeMs - element.motion.startedMs - element.motion.delayMs) / element.motion.durationMs + element.motion.initialProgress));
+    return SERVER_PROFILE.toPx * (options.shape === 'quadratic' ? progress * progress : progress);
+  };
   const start = (elements: any[], to: number, duration: number, gap = 0) => {
     starts++;
     const startedMs = timeMs;
     for (const [index, element] of elements.entries()) {
       if (options.snap || starts === options.snapAt) { element.x = to; element.motion = null; }
-      else element.motion = { startedMs, durationMs: duration, delayMs: index * gap };
+      else element.motion = { startedMs, durationMs: duration * (options.durationMultiplier ?? 1), delayMs: index * gap,
+        initialProgress: starts >= (options.initialProgressAt ?? 1) ? options.initialProgress ?? 0 : 0 };
     }
     timeMs += options.startCostMs ?? 0.025;
     return { cancel() {
@@ -186,9 +241,13 @@ function syntheticBrowser(options: { startCostMs?: number; snap?: boolean; snapA
     timeMs += 0.001; return Math.floor(timeMs / 0.005) * 0.005;
   } }, document: { createElement() { return { x: 0, motion: null, isConnected: false,
     getAnimations: () => [], remove() { this.isConnected = false; } }; }, body: { appendChild(element: any) { element.isConnected = true; children.push(element); } } },
-  getComputedStyle: (element: any) => ({ transform: String(position(element)) }), DOMMatrixReadOnly: class { e: number; constructor(value: string) { this.e = Number(value); } },
-  setTimeout(callback: () => void, delay: number) { timeMs += delay; queueMicrotask(callback); },
-  requestAnimationFrame(callback: (time: number) => void) { timeMs += 16; queueMicrotask(() => callback(timeMs)); },
+  getComputedStyle: (element: any) => {
+    if (starts === 0 && children.indexOf(element) === options.onsetReadAt) throw new Error('синтетический отказ acquired onset prefix');
+    const transform = String(position(element)); timeMs += options.readCostMs ?? 0;
+    return { transform };
+  }, DOMMatrixReadOnly: class { e: number; constructor(value: string) { this.e = Number(value); } },
+  setTimeout(callback: () => void, delay: number) { timeMs += delay + (options.timerLagMs ?? 0); queueMicrotask(callback); },
+  requestAnimationFrame(callback: (time: number) => void) { timeMs += options.rafStepMs ?? 16; queueMicrotask(() => callback(timeMs)); },
   __adapterModule: { start, startStagger: start } };
   sandbox.window = sandbox;
   const realm = createContext(sandbox);
@@ -198,11 +257,195 @@ function syntheticBrowser(options: { startCostMs?: number; snap?: boolean; snapA
       return runInContext(`(${fn.toString()})`, realm)(argument);
     } };
   const context = { newPage: async () => page, close: async () => {} };
-  return { browser: { newContext: async () => context }, adapter: { path: source },
+  return { browser: { newContext: async () => context }, page, adapter: { path: source },
     dispose: () => rmSync(directory, { recursive: true, force: true }), read: () => ({ starts, cancels, connected: children.filter((element) => element.isConnected).length }) };
 }
 
+// Исполняем замороженную границу page.evaluate общего владельца. VM задаёт
+// часы и движение самостоятельно; производственный oracle получает его raw.
+async function syntheticSemanticControl(fake: ReturnType<typeof syntheticBrowser>, scene: any) {
+  const bench = readFileSync(new URL('../bench/compare/bench.mjs', import.meta.url), 'utf8');
+  const source = bench.slice(bench.indexOf('export async function runSemanticStartCheck('), bench.indexOf('// ─── сценарий S5:')).trim().replace(/^export /, '');
+  const runCheck = Function('evaluateStartSemanticEvidence', `return (${source})`)(evaluateStartSemanticEvidence);
+  const semanticClockErrorMs = serverBrowserClockBounds({ beginMs: 0, endMs: 0 }, '1000000000000').errorMs;
+  return runCheck(fake.page, { ...scene, ...SERVER_PROFILE.browserSemantics, semanticClockErrorMs,
+    durationMs: SERVER_PROFILE.durationMs, toPx: SERVER_PROFILE.toPx }, SERVER_PROFILE.browserSemanticCalls);
+}
+
 describe('серверный PROFILE: clock/progress falsifiers', () => {
+  it('chunked JSON сохраняет native values, порядок, escape/UTF8 и duplicate/prototype keys', () => {
+    const text = '{"rows":[{"text":"кириллица\\n\\\"[,]{}\\\\🙂","raw":[null,true,false,-0,1e200,9007199254740993]},[{},[]]],"__proto__":{"safe":1},"a":1,"a":2,"tail":"\\u0000"}';
+    const expected = JSON.parse(text);
+    for (const chunkBytes of [1, 7, 17, 64, 1024]) {
+      const actual = parseServerJsonBytes(Buffer.from(text), chunkBytes);
+      expect(actual).toEqual(expected); expect(Object.keys(actual)).toEqual(Object.keys(expected));
+      expect(Object.getPrototypeOf(actual)).toBe(Object.prototype);
+      expect(Object.hasOwn(actual, '__proto__')).toBe(true); expect(Object.is(actual.rows[0].raw[3], -0)).toBe(true);
+    }
+    for (const malformed of ['', '[1,]', '{"a":1,}', '{"a" 1}', '{"a":1}{}', '[1,,2]', '[{"a":1]]', '{"a":[1}}',
+      '{"a":"escape\\"}', '[NaN]', '[1 2]', '{"a":01}', '["unclosed]', '{bare:1}']) {
+      expect(() => JSON.parse(malformed)).toThrow();
+      expect(() => parseServerJsonBytes(Buffer.from(malformed), 1)).toThrow();
+    }
+  });
+  it('journal декодируется по полным records, сохраняя literal escapes и отказ на потерянной строке', () => {
+    const records = [{ type: 'sample', value: { text: 'строка\n[,]{}\\"', large: 'x'.repeat(1000) } },
+      { type: 'failure', value: { raw: [{ metric: -0 }, null] } }];
+    const bytes = Buffer.from(` \n${records.map((record) => JSON.stringify(record)).join('\n')}\r\n `);
+    expect(parseServerJournalBytes(bytes)).toEqual(records.map((record) => JSON.parse(JSON.stringify(record))));
+    expect(() => parseServerJournalBytes(Buffer.from(`${JSON.stringify(records[0])}\n\n${JSON.stringify(records[1])}`))).toThrow();
+    expect(() => parseServerJournalBytes(Buffer.from(' \r\n'))).toThrow();
+  });
+  it('настоящий engine owner сохраняет controlled CPU endpoints на успехе и позднем отказе', async () => {
+    const { animate } = await import('../src/animate/index.js');
+    let userUs = 0;
+    const cpu = vi.spyOn(process, 'threadCpuUsage').mockImplementation(() => ({ user: userUs += 1000, system: 0 }));
+    const scene = SERVER_PROFILE.engineScenes[1];
+    try {
+      const success = await measureServerEngine(animate, scene);
+      expect(success.raw).toHaveLength(8); expect(cpu).toHaveBeenCalledTimes(128);
+      for (const measured of success.raw) {
+        expect(measured.raw.clockReads).toHaveLength(16); expect(measured.raw.cpuReads).toHaveLength(16);
+        measured.raw.clockReads.forEach((read: any, sequence: number) => {
+          expect(measured.raw.cpuReads[sequence].valueNs).toBe(read.valueNs);
+          expect(String((BigInt(measured.raw.cpuReads[sequence].userUs) + BigInt(measured.raw.cpuReads[sequence].systemUs)) * 1000n)).toBe(read.valueNs);
+        });
+      }
+      validateServerEngineSample(success, scene);
+      cpu.mockClear();
+      const broken = ((...args: Parameters<typeof animate>) => {
+        const owner = animate(...args);
+        return { ...owner, cancel() { owner.cancel(); throw undefined; } };
+      }) as typeof animate;
+      const failure: any = await measureServerEngine(broken, scene).catch((error) => error);
+      // Опциональная долговечная квитанция только этого synthetic unit probe.
+      // CPU поля вымышлены mock clock; это не performance sample продукта.
+      if (process.env.MOTION_SERVER_PROFILE_UNIT_EVIDENCE) writeFileSync(process.env.MOTION_SERVER_PROFILE_UNIT_EVIDENCE,
+        `${JSON.stringify({ synthetic: true, actualTimingSamplesObserved: 0, scene, success,
+          failure: { name: failure?.name, message: failure?.message, raw: failure?.raw } }, null, 2)}\n`, { flag: 'wx' });
+      expect(failure).toBeInstanceOf(AggregateError); expect(failure.raw.completed).toEqual([]);
+      const failed = failure.raw.failedRepetition;
+      expect(failed.clockReads).toHaveLength(15); expect(failed.cpuReads).toHaveLength(15);
+      expect(failed.operationNs).toBe(1_000_000); expect(failed.frameNs).toEqual(Array(6).fill(1_000_000));
+      expect(failed.cancelDrainNs).toBe(null); expect(failed.unfinishedInterval.metric).toBe('cancelDrainNs');
+      expect(cpu).toHaveBeenCalledTimes(15);
+    } finally { cpu.mockRestore(); }
+  });
+  it.each(['missing-read', 'read-order', 'impossible-ns', 'coherent-impossible-ns', 'missing-cpu-field', 'backward-cpu-component',
+    'last-target-coordinate', 'missing-target-identity', 'hash-only-drift'])('engine raw lineage отвергает %s при semantic:true', (fault) => {
+    const scene = SERVER_PROFILE.engineScenes[1];
+    const sample: any = stage().rows.find((row) => row.scene === scene.id)!.samples.left;
+    validateServerEngineSample(sample, scene);
+    const measured = sample.raw[0], lineage = measured.raw;
+    if (fault === 'missing-read') lineage.clockReads.pop();
+    if (fault === 'read-order') [lineage.clockReads[0], lineage.clockReads[1]] = [lineage.clockReads[1], lineage.clockReads[0]];
+    if (fault === 'impossible-ns' || fault === 'coherent-impossible-ns') {
+      measured.operationNs++;
+      if (fault === 'coherent-impossible-ns') {
+        lineage.clockReads[1].valueNs = String(BigInt(lineage.clockReads[1].valueNs) + 1n);
+        lineage.cpuReads[1].valueNs = lineage.clockReads[1].valueNs;
+      }
+      sample.operationNs = sample.raw.reduce((sum: number, raw: any) => sum + raw.operationNs, 0) / sample.repetitions;
+    }
+    if (fault === 'missing-cpu-field') delete lineage.cpuReads[1].userUs;
+    if (fault === 'backward-cpu-component') {
+      lineage.cpuReads[1].userUs = lineage.cpuReads[0].userUs - 1;
+      lineage.cpuReads[1].systemUs = Number(lineage.cpuReads[1].valueNs) / 1000 - lineage.cpuReads[1].userUs;
+    }
+    if (fault === 'last-target-coordinate') {
+      const first = lineage.targetTraces.runs[0], last = clone(first.trace);
+      first.count--;
+      last.values[5] = last.values[5].replace('160px', '161px'); last.value = last.values[5]; last.events.at(-1).value = last.value;
+      lineage.targetTraces.runs.push({ from: scene.count - 1, count: 1, trace: last });
+      const firstHash = measured.semantic.targetTraceHashes.value;
+      measured.semantic.targetTraceHashes = Array(scene.count).fill(firstHash);
+      measured.semantic.targetTraceHashes[scene.count - 1] = createHash('sha256').update(JSON.stringify(last.values)).digest('hex');
+    }
+    if (fault === 'missing-target-identity') lineage.targetTraces.runs[0].count--;
+    if (fault === 'hash-only-drift') measured.semantic.targetTraceHashes.value = hash;
+    // Вызов новый: local projection cache не переносит trusted snapshot между проверками.
+    expect(() => validateServerEngineSample(sample, scene)).toThrow(/lineage|CPU|raw target/);
+  });
+  it.each(['duration64', 'duration256', 'quadratic-last-target', 'missing-frame-time'])('raw normal-motion oracle пересчитывает %s при valid:true', (fault) => {
+    const scene = SERVER_PROFILE.browserScenes[0];
+    const sample: any = stage().rows.find((row) => row.scene === scene.id)!.samples.left;
+    for (const checkpoint of sample.semanticEvidence.checkpoints) {
+      const group = checkpoint.groups[0], time = checkpoint.frameTimestampMs;
+      if (fault === 'missing-frame-time') { delete checkpoint.frameTimestampMs; continue; }
+      const positions = Array(scene.targetsPerCall).fill(SERVER_PROFILE.toPx * time / SERVER_PROFILE.durationMs);
+      if (fault === 'quadratic-last-target') positions[scene.targetsPerCall - 1] = SERVER_PROFILE.toPx * (time / SERVER_PROFILE.durationMs) ** 2;
+      else positions.fill(SERVER_PROFILE.toPx * Math.min(1, time / (fault === 'duration64' ? 64 : 256)));
+      group.positions = compactServerSemanticEvidence({ ...sample.semanticEvidence, checkpoints: [{ ...checkpoint, groups: [{ ...group, positions }] }] }).checkpoints[0].groups[0].positions;
+    }
+    sample.semanticEvidence.valid = true;
+    expect(() => validateServerBrowserSample(sample, scene)).toThrow(/normal-motion/);
+  });
+  it.each([{ durationMultiplier: 0.5 }, { durationMultiplier: 2 }, { shape: 'quadratic' as const }, { rafStepMs: 300 }])(
+    'отвергает чужую duration/shape и неразрешимое rAF окно %j', async (options) => {
+      const fake = syntheticBrowser(options);
+      try {
+        const error: any = await measureServerBrowser(fake.browser, { url: 'synthetic://profile' }, fake.adapter, SERVER_PROFILE.browserScenes[0]).catch((error) => error);
+        expect(error).toBeInstanceOf(AggregateError);
+        expect(error.raw.partial.find((row: any) => row.phase === 'normal-motion').evidence.valid).toBe(false);
+        expect(fake.read().starts).toBe(1);
+      } finally { fake.dispose(); }
+    });
+  it.each([
+    { name: '128мс: узкое окно при позднем таймере', options: { timerLagMs: 40 }, expected: true },
+    { name: '128мс: широкое неразрешающее окно', options: { timerLagMs: 40, readCostMs: 0.32 }, expected: false },
+    { name: '256мс: честное широкое окно', options: { durationMultiplier: 2, timerLagMs: 40, readCostMs: 0.32 }, expected: false },
+  ])('producer/consumer нормального движения: $name', async ({ options, expected }) => {
+    const scene = SERVER_PROFILE.browserScenes[0], fake = syntheticBrowser(options);
+    try {
+      const evidence = await syntheticSemanticControl(fake, scene);
+      expect(evidence.valid).toBe(expected);
+      const sample: any = stage().rows.find((row) => row.scene === scene.id)!.samples.left;
+      // Пересчитываем acquired окна и CSS даже при поддельном upstream valid.
+      sample.semanticEvidence = compactServerSemanticEvidence({ ...evidence, valid: true });
+      if (expected) expect(() => validateServerBrowserSample(sample, scene)).not.toThrow();
+      else expect(() => validateServerBrowserSample(sample, scene)).toThrow(/normal-motion/);
+      expect(fake.read()).toEqual({ starts: 1, cancels: 1, connected: 0 });
+    } finally { fake.dispose(); }
+  });
+  it.each(SERVER_PROFILE.browserScenes)('отвергает начальный скачок0→75px в $id при valid:true', async (scene) => {
+    const fake = syntheticBrowser({ initialProgress: 0.25 });
+    try {
+      const evidence = await syntheticSemanticControl(fake, scene);
+      expect(evidence.onset.before[0].positions).toEqual(Array(scene.targetsPerCall).fill(0));
+      expect(evidence.onset.after[0].positions[0]).toBeGreaterThanOrEqual(75);
+      expect(evidence.valid).toBe(false);
+      const sample: any = stage().rows.find((row) => row.scene === scene.id)!.samples.left;
+      sample.semanticEvidence = compactServerSemanticEvidence({ ...evidence, valid: true });
+      expect(() => validateServerBrowserSample(sample, scene)).toThrow(/normal-motion/);
+      expect(fake.read()).toEqual({ starts: 1, cancels: 1, connected: 0 });
+    } finally { fake.dispose(); }
+  });
+  it.each(['missing-before', 'missing-after', 'missing-last-coordinate', 'wrong-before', 'post-before-start', 'wide-before', 'before-phase-drift'])(
+    'fresh onset decoder/oracle отвергает %s', (fault) => {
+      const scene = SERVER_PROFILE.browserScenes[0], sample: any = stage().rows.find((row) => row.scene === scene.id)!.samples.left;
+      if (fault === 'missing-before') delete sample.semanticEvidence.onset.before;
+      if (fault === 'missing-after') delete sample.semanticEvidence.onset.after;
+      if (fault === 'missing-last-coordinate') sample.semanticEvidence.onset.before[0].positions.count--;
+      if (fault === 'wrong-before') sample.semanticEvidence.onset.before[0].positions.runs = [[99, 0], [1, 75]];
+      if (fault === 'post-before-start') sample.semanticEvidence.callStartedAtMs[0] = 1;
+      if (fault === 'wide-before') sample.semanticEvidence.onset.before[0].readEndedMs = 20;
+      if (fault === 'before-phase-drift') sample.semanticEvidence.onset.before[0].readStartedMs = -1;
+      expect(() => validateServerBrowserSample(sample, scene)).toThrow(/normal-motion/);
+    });
+  it('сохраняет неполный acquired onset до отказа и все extra raw fields', async () => {
+    const scene = SERVER_PROFILE.browserScenes[0], fake = syntheticBrowser({ onsetReadAt: 17 });
+    try {
+      const evidence = await syntheticSemanticControl(fake, scene);
+      expect(evidence.valid).toBe(false); expect(evidence.onset.before[0].positions).toHaveLength(17);
+      expect(evidence.onset.before[0].readEndedMs).toBeUndefined(); expect(evidence.onset.after).toHaveLength(0);
+      const raw = { ...evidence, onset: { ...evidence.onset, acquiredNote: 'не синтезировать остальные координаты' } };
+      const compacted = compactServerSemanticEvidence(raw);
+      expect(compacted.onset.before[0].positions).toEqual({ encoding: 'rle', count: 17, runs: [[17, 0]] });
+      expect(compacted.onset.before[0].readEndedMs).toBeUndefined(); expect(compacted.onset.after).toEqual([]);
+      expect(compacted.onset.acquiredNote).toBe(raw.onset.acquiredNote);
+      expect(fake.read()).toEqual({ starts: 0, cancels: 0, connected: 0 });
+    } finally { fake.dispose(); }
+  });
   it.each(SERVER_PROFILE.browserScenes)('наблюдает intermediate $id и все32/64 useful owner outcomes', async (scene) => {
     for (const multiplier of [1, 2]) {
       const fake = syntheticBrowser();
@@ -222,6 +465,33 @@ describe('серверный PROFILE: clock/progress falsifiers', () => {
       try { await expect(measureServerBrowser(fake.browser, { url: 'synthetic://profile' }, fake.adapter, SERVER_PROFILE.browserScenes[0])).rejects.toMatchObject({ name: 'AggregateError' }); }
       finally { fake.dispose(); }
     }
+  });
+
+  it.each([3, 9])('сохраняет всю acquired работу при скачке0→75px только с timed вызова%s', async (initialProgressAt) => {
+    const fake = syntheticBrowser({ initialProgress: 0.25, initialProgressAt });
+    try {
+      let failure: any;
+      try { await measureServerBrowser(fake.browser, { url: 'synthetic://profile' }, fake.adapter, SERVER_PROFILE.browserScenes[0]); }
+      catch (error) { failure = error; }
+      expect(failure).toMatchObject({ name: 'AggregateError' });
+      expect(failure.raw.semanticEvidence.valid).toBe(true);
+      expect(failure.raw.raw).toHaveLength(SERVER_PROFILE.repetitions);
+      expect(failure.raw.warmup).toHaveLength(1);
+      expect(failure.raw.raw.every((row: any) => row.ownersStarted === SERVER_PROFILE.browserBatchCalls && row.ownersCancelled === row.ownersStarted)).toBe(true);
+      expect(fake.read().connected).toBe(0);
+      expect(() => validateServerBrowserSample(failure.raw, SERVER_PROFILE.browserScenes[0])).toThrow(/начала|onset/);
+    } finally { fake.dispose(); }
+  });
+
+  it('consumer повторно выводит timed onset из actual start/read clocks при valid:true', () => {
+    const scene = SERVER_PROFILE.browserScenes[0], sample = stage().rows.find((row: any) => row.scene === scene.id).samples.left;
+    const raw = sample.raw[0]; raw.startClock.endMs = raw.startClock.beginMs + 0.8;
+    raw.batchStartMs = raw.startClock.endMs - raw.startClock.beginMs; raw.startMs = raw.batchStartMs / SERVER_PROFILE.browserBatchCalls;
+    raw.startWitness.readClock = { beginMs: raw.startClock.endMs + 0.001, endMs: raw.startClock.endMs + 0.002 };
+    raw.startWitness.leadingPositions = { encoding: 'repeat', count: raw.calls, value: 75 };
+    sample.startMs = sample.raw.reduce((sum: number, row: any) => sum + row.startMs, 0) / sample.repetitions;
+    expect(sample.semanticEvidence.valid).toBe(true);
+    expect(() => validateServerBrowserSample(sample, scene)).toThrow(/начала|onset/);
   });
 
   it('один batch отличает25us от27us; квант5us не скрывает8% в CI', async () => {
@@ -412,7 +682,7 @@ describe('серверный PROFILE: независимые sabotage controls',
     const positive = stage('positive'); positive.name = 'aa';
     expect(() => serverCellPairs(positive, 2, 'positive')).toThrow(/имя стадии/);
     const wrongCount = stage(); wrongCount.rows[0].samples.left.raw[0].semantic.targetTraceHashes.count -= 1;
-    expect(() => serverCellPairs(wrongCount, 2, 'aa')).toThrow(/lifecycle witness/);
+    expect(() => serverCellPairs(wrongCount, 2, 'aa')).toThrow(/hash RLE|lifecycle witness/);
   });
 
   it.each(['waapi', 'transform', 'disconnected', 'missing-frame', 'RLE-length', 'generic-RLE-length'])('cancel witness отвергает %s sabotage', (mutation) => {
@@ -428,30 +698,31 @@ describe('серверный PROFILE: независимые sabotage controls',
   });
 
   it('завершённый public admission отвергает четыре независимых reviewer counterexamples', () => {
-    const artifact = healthyAdmission();
+    const history = admissionHistory(), { artifact, events } = history;
     expect(validateServerArtifact(artifact).verdict).toBe('PASS');
-    const events = admissionEvents(artifact);
-    expect(validateServerJournal(artifact, chain(events))).toHaveProperty('journalFinalDigest');
+    expect(validateServerJournal(artifact, history.records)).toHaveProperty('journalFinalDigest');
     const earlyCalibration = events.filter((event) => event.type !== 'calibration');
     earlyCalibration.splice(earlyCalibration.findIndex((event) => event.type === 'N-frozen-before-calibration-and-AB') + 1, 0,
       { type: 'calibration', value: artifact.calibration });
-    expect(() => validateServerJournal(artifact, chain(earlyCalibration))).toThrow(/до завершения/);
-    const alwaysLeft = events.map((event) => event.type === 'sample' ? { ...event, value: { ...event.value } } : event);
+    expect(() => validateServerJournal(artifact, chain(earlyCalibration, history))).toThrow(/до завершения/);
+    const alwaysLeft = [...events];
     const firstOpposite = alwaysLeft.findIndex((event) => event.type === 'sample' && event.value.participant === 'right');
     [alwaysLeft[firstOpposite], alwaysLeft[firstOpposite + 1]] = [alwaysLeft[firstOpposite + 1], alwaysLeft[firstOpposite]];
-    expect(() => validateServerJournal(artifact, chain(alwaysLeft))).toThrow(/порядок/);
+    expect(() => validateServerJournal(artifact, chain(alwaysLeft, history))).toThrow(/порядок/);
     const ignoredFailure = [...events.slice(0, -1), { type: 'failure', value: { stage: 'ab', error: { message: 'retained reviewer failure' } } }, events.at(-1)];
-    expect(() => validateServerJournal(artifact, chain(ignoredFailure))).toThrow(/failures/);
+    expect(() => validateServerJournal(artifact, chain(ignoredFailure, history))).toThrow(/failures/);
     const wrongPositive = { ...artifact, positive: { ...artifact.positive, name: 'aa' } };
     expect(() => validateServerArtifact(wrongPositive)).toThrow(/имя стадии/);
     const wrongFinish = [...events.slice(0, -1), { type: 'finished', value: { verdict: 'PASS', digest: 'b'.repeat(64) } }];
-    expect(() => validateServerJournal(artifact, chain(wrongFinish))).toThrow(/финальная/);
+    expect(() => validateServerJournal(artifact, chain(wrongFinish, history))).toThrow(/финальная/);
   }, 30_000);
 
   it('сохраняет partial A/B и поздний отказ, а пропавшие comparator/retention не допускает', () => {
-    const complete = healthyAdmission();
-    const partial: any = clone(complete); partial.verdict = 'UNPROVEN';
-    const completeEvents = admissionEvents(complete);
+    const history = admissionHistory(), complete = history.artifact;
+    // Меняются только принадлежащие отказу ветви. Полная unchanged история
+    // N288 остаётся входом валидатора, без трёх лишних копий всего raw.
+    const partial: any = { ...complete, verdict: 'UNPROVEN', ab: { ...complete.ab } };
+    const completeEvents = history.events;
     const firstAb = completeEvents.findIndex((event) => event.type === 'sample' && event.value.stage === 'ab');
     const failed = completeEvents[firstAb + 1].value;
     const error = { name: 'Error', message: 'timeout второго участника; первый raw сохранён', raw: { completed: [] } };
@@ -461,11 +732,11 @@ describe('серверный PROFILE: независимые sabotage controls',
     const partialEvents = [...completeEvents.slice(0, firstAb + 1), { type: 'failed-sample', value: { ...failed, value: undefined, error } },
       { type: 'failure', value: partial.failures[0] }, { type: 'finished', value: { verdict: 'UNPROVEN', digest: serverArtifactDigest(partial) } }];
     expect(validateServerArtifact(partial).verification).toBe('partial-samples-refused');
-    expect(validateServerJournal(partial, chain(partialEvents))).toHaveProperty('journalFinalDigest');
+    expect(validateServerJournal(partial, chain(partialEvents, history))).toHaveProperty('journalFinalDigest');
     const missingFailure = partialEvents.filter((event) => event.type !== 'failure');
-    expect(() => validateServerJournal(partial, chain(missingFailure))).toThrow(/failures/);
+    expect(() => validateServerJournal(partial, chain(missingFailure, history))).toThrow(/failures/);
 
-    const late: any = clone(complete); late.verdict = 'UNPROVEN';
+    const late: any = { ...complete, verdict: 'UNPROVEN' };
     const firstComparator = completeEvents.findIndex((event) => event.type === 'comparator-sample');
     const comparatorFailure = completeEvents[firstComparator + 1].value;
     late.failures = [{ stage: 'ab', error }]; late.comparators = [{ ...late.comparators[0], rows: [late.comparators[0].rows[0]] }];
@@ -473,12 +744,12 @@ describe('серверный PROFILE: независимые sabotage controls',
     const lateEvents = [...completeEvents.slice(0, firstComparator + 1), { type: 'failed-comparator-sample', value: { ...comparatorFailure, stage: 'ab', error } },
       { type: 'failure', value: late.failures[0] }, { type: 'finished', value: { verdict: 'UNPROVEN', digest: serverArtifactDigest(late) } }];
     expect(validateServerArtifact(late).verification).toBe('completed-samples-refused');
-    expect(validateServerJournal(late, chain(lateEvents))).toHaveProperty('journalFinalDigest');
+    expect(validateServerJournal(late, chain(lateEvents, history))).toHaveProperty('journalFinalDigest');
 
-    const dropped: any = clone(complete); delete dropped.retention.candidate;
+    const dropped: any = { ...complete, retention: { ...complete.retention } }; delete dropped.retention.candidate;
     expect(() => validateServerArtifact(dropped)).toThrow(/retention/);
     const omitted = completeEvents.filter((event) => event.type !== 'comparator-sample');
-    expect(() => validateServerJournal(complete, chain(omitted))).toThrow(/retention/);
+    expect(() => validateServerJournal(complete, chain(omitted, history))).toThrow(/retention/);
   }, 30_000);
 
   it('сохраняет историческое throttle отдельно от DELTA и закрывает нарушение условий', () => {

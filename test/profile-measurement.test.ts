@@ -1,13 +1,13 @@
 import { describe, expect, it } from 'vitest';
 import { execFileSync, spawnSync } from 'node:child_process';
 import { createHash } from 'node:crypto';
-import { mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
+import { mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
-import { join } from 'node:path';
+import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { validateReplayedVector } from '../bench/profile/profile-measurement.mjs';
 import { PROFILE_01, unmeasuredCells, verifyPreregistration } from '../bench/profile/profile-01-preregistration.mjs';
-import { makeGit } from '../bench/profile/profile-git-proof.mjs';
+import { PREREG_OWN_PATHS, makeGit } from '../bench/profile/profile-git-proof.mjs';
 
 describe('PROFILE: происхождение подтверждает настоящий Git', () => {
   it('различает clean, tracked/untracked drift, ancestry и недоступное доказательство', () => {
@@ -57,10 +57,24 @@ describe('PROFILE: происхождение подтверждает наст�
     try {
       const root = fileURLToPath(new URL('../', import.meta.url));
       const clone = join(directory, 'checkout');
-      const sourceHead = execFileSync('git', ['rev-parse', 'HEAD'], { cwd: root, encoding: 'utf8' }).trim();
       execFileSync('git', ['clone', '--quiet', '--no-hardlinks', '--no-checkout', root, clone],
         { encoding: 'utf8', timeout: 30_000 });
-      execFileSync('git', ['checkout', '--quiet', '--detach', sourceHead], { cwd: clone, timeout: 30_000 });
+      // Отсутствие инструментов проверяется после происхождения. Текущая ветка
+      // меняет runtime и правильно отвергается раньше: не расширяем список
+      // исключений, а создаём разрешённую фикстуру регистрации над PRODUCT_BASE.
+      execFileSync('git', ['checkout', '--quiet', '--detach', PROFILE_01.productBase.sourceSha], { cwd: clone, timeout: 30_000 });
+      for (const path of PREREG_OWN_PATHS) {
+        mkdirSync(dirname(join(clone, path)), { recursive: true });
+        writeFileSync(join(clone, path), readFileSync(join(root, path)));
+      }
+      execFileSync('git', ['add', '--', ...PREREG_OWN_PATHS], { cwd: clone, timeout: 30_000 });
+      execFileSync('git', ['-c', 'core.hooksPath=' + join(directory, 'no-hooks'), '-c', 'commit.gpgsign=false',
+        '-c', 'user.name=PROFILE test', '-c', 'user.email=profile@example.invalid',
+        'commit', '--quiet', '-m', 'prereg-only missing-tools fixture'], { cwd: clone, timeout: 30_000 });
+      const sourceHead = execFileSync('git', ['rev-parse', 'HEAD'], { cwd: clone, encoding: 'utf8' }).trim();
+      const changed = execFileSync('git', ['diff', '--name-only', PROFILE_01.productBase.sourceSha, sourceHead],
+        { cwd: clone, encoding: 'utf8' }).trim().split('\n');
+      expect(changed.every((path) => PREREG_OWN_PATHS.includes(path))).toBe(true);
       const run = spawnSync(process.execPath, [
         'bench/profile/probe-profile-01.mjs', '--mode', 'old-vector', '--cells', 'all',
         '--out', join(directory, 'raw'),
