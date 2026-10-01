@@ -48,6 +48,14 @@ export function serverBrowserClockBounds(clock, monotonicHostUpperNs) {
   return { ...errorBounds(measuredMs, errorMs), measuredMs, errorMs };
 }
 
+// В perf интервале общий origin сокращается. Сопоставление document frame
+// с perf API включает три coarsened timestamps: frame, now и origin.
+// Та же закреплённая модель даёт три endpoint envelopes и девять ULP;
+// это semantic relation, не изменение uncertainty измеряемых API costs.
+export function serverBrowserSemanticClockErrorMs(monotonicHostUpperNs) {
+  return nextUp(1.5 * serverBrowserClockBounds({ beginMs: 0, endMs: 0 }, monotonicHostUpperNs).errorMs);
+}
+
 function compactCoordinates(values) {
   if (!Array.isArray(values)) return values;
   const runs = [];
@@ -91,6 +99,11 @@ export function compactServerSemanticEvidence(evidence) {
     for (const phase of ['before', 'after']) {
       if (Object.hasOwn(evidence.onset, phase)) compact.onset[phase] = compactSemanticGroups(evidence.onset[phase]);
     }
+    if (Object.hasOwn(evidence.onset, 'firstFrame')) {
+      const first = evidence.onset.firstFrame;
+      compact.onset.firstFrame = first && typeof first === 'object' && !Array.isArray(first) && Object.hasOwn(first, 'groups')
+        ? { ...first, groups: compactSemanticGroups(first.groups) } : first;
+    }
   }
   return compact;
 }
@@ -109,13 +122,25 @@ function validateNormalMotion(evidence, scene, monotonicHostUpperNs) {
       return { ...group, positions: expandCoordinates(group.positions, scene.targetsPerCall) };
     });
   }
+  invariant(Number.isFinite(onset.firstFrame?.frameTimestampMs) && Array.isArray(onset.firstFrame.groups) &&
+    onset.firstFrame.groups.length === calls, 'нет normal-motion first publication');
+  onset.firstFrame = { ...onset.firstFrame, groups: onset.firstFrame.groups.map((group) => ({ ...group,
+    positions: expandCoordinates(group?.positions, scene.targetsPerCall) })) };
   // Clock/zero/phase law принадлежит общему oracle; decoder восстанавливает каждый target.
   const expanded = { ...evidence, onset, checkpoints: evidence.checkpoints.map((checkpoint) => {
     invariant(Number.isFinite(checkpoint.frameTimestampMs), 'нет observed normal-motion frame timestamp');
     invariant(Array.isArray(checkpoint.groups) && checkpoint.groups.length === calls, 'потеряна normal-motion группа');
     return { ...checkpoint, groups: checkpoint.groups.map((group) => ({ ...group, positions: expandCoordinates(group.positions, scene.targetsPerCall) })) };
   }), terminal: evidence.terminal.map((values) => expandCoordinates(values, scene.targetsPerCall)) };
-  const semanticClockErrorMs = serverBrowserClockBounds({ beginMs: 0, endMs: 0 }, monotonicHostUpperNs).errorMs;
+  const semanticClockErrorMs = serverBrowserSemanticClockErrorMs(monotonicHostUpperNs);
+  const observedTimes = [...expanded.callStartedAtMs, expanded.onset.firstFrame.frameTimestampMs,
+    ...expanded.onset.firstFrame.groups.flatMap((group) => [group.readStartedMs, group.readEndedMs, group.documentFrame?.beforeMs, group.documentFrame?.afterMs]),
+    ...['before', 'after'].flatMap((phase) => expanded.onset[phase]
+    .flatMap((group) => [group.readStartedMs, group.readEndedMs, group.documentFrame?.beforeMs, group.documentFrame?.afterMs])), ...expanded.checkpoints.flatMap((checkpoint) =>
+    [checkpoint.frameTimestampMs, ...checkpoint.groups.flatMap((group) => [group.readStartedMs, group.readEndedMs,
+      group.documentFrame?.beforeMs, group.documentFrame?.afterMs])])];
+  invariant(observedTimes.every(Number.isFinite), 'неполные normal-motion clock observations');
+  serverBrowserClockBounds({ beginMs: 0, endMs: Math.max(...observedTimes.map(Math.abs)) }, monotonicHostUpperNs);
   invariant(evaluateStartSemanticEvidence(expanded, { ...scene, ...SERVER_PROFILE.browserSemantics, semanticClockErrorMs,
     durationMs: SERVER_PROFILE.durationMs, toPx: SERVER_PROFILE.toPx }, calls), 'normal-motion oracle отверг intermediate/stagger/topology');
 }
@@ -686,8 +711,8 @@ export function validateServerJournal(artifact, records, rawDigest) {
   const seen = new Map(), comparatorSamples = new Map(), retentionSamples = new Map(), failures = [], failedSamples = [];
   for (let recordIndex = 0; recordIndex < records.length; recordIndex++) {
     const record = records[recordIndex];
-    const { digest, ...payload } = record;
-    invariant(record.sequenceDigest === previous && digest === serverProfileDigest(payload), 'повреждена цепь журнала');
+    const { digest } = record;
+    invariant(record.sequenceDigest === previous && SHA256.test(digest), 'повреждена цепь журнала');
     previous = digest;
     if (record.type === 'registration-before-any-sample') {
       invariant(!registration && !stopped && artifact.registration !== null && seen.size === 0 && isDeepStrictEqual(record.value.registration, artifact.registration) &&
@@ -773,6 +798,12 @@ export function validateServerJournal(artifact, records, rawDigest) {
   // Полный raw хешируется после проверки хронологии, failure union и полноты.
   // Отказ на этих границах не сериализует заведомо негодную историю повторно.
   invariant(finishedDigest === (rawDigest ?? serverArtifactDigest(artifact)), 'финальная квитанция не связана с raw/вердиктом');
+  // Каждая допущенная история заново проверяет все тела квитанций. Структурный
+  // отказ не повторяет сериализацию raw, не участвующего в успешном admission.
+  for (const record of records) {
+    const { digest, ...payload } = record;
+    invariant(digest === serverProfileDigest(payload), 'повреждена цепь журнала');
+  }
   return { journalFinalDigest: previous };
 }
 

@@ -6,7 +6,7 @@ import { createContext, runInContext } from 'node:vm';
 import { createHash } from 'node:crypto';
 import { SERVER_PROFILE, planServerSampleSize, serverProfileDigest, serverTailPolicy, verifyServerProfile } from '../bench/profile/server-profile-registration.mjs';
 import { serverCalibrationVerdict, serverCellPairs, serverFamilyIntervals, serverMetricCells, serverOrders,
-  compactServerSemanticEvidence, serverArtifactChunks, serverArtifactDigest, serverBrowserClockBounds, serverOrderStatisticBounds, serverResourceReasons,
+  compactServerSemanticEvidence, serverArtifactChunks, serverArtifactDigest, serverBrowserClockBounds, serverBrowserSemanticClockErrorMs, serverOrderStatisticBounds, serverResourceReasons,
   parseServerJsonBytes, parseServerJournalBytes, validateServerArtifact, validateServerBrowserSample, validateServerEngineSample, validateServerJournal, writeServerArtifact } from '../bench/profile/server-profile-contract.mjs';
 import { deriveRealmTimerStep, evaluateStartSemanticEvidence } from '../bench/compare/methodology.mjs';
 import { measureServerBrowser, measureServerEngine } from '../bench/profile/server-profile-runner.mjs';
@@ -25,9 +25,12 @@ function normalMotion(scene: any) {
     SERVER_PROFILE.toPx * Math.max(0, Math.min(1, (time - scene.staggerGapMs * index) / SERVER_PROFILE.durationMs)));
   return compactServerSemanticEvidence({ valid: true, topology: { calls: 1, targetsPerCall: scene.targetsPerCall, staggerGapMs: scene.staggerGapMs,
     durationMs: SERVER_PROFILE.durationMs, toPx: SERVER_PROFILE.toPx }, callStartedAtMs: [0],
-    onset: { before: [{ readStartedMs: 0, readEndedMs: 0, positions: Array(scene.targetsPerCall).fill(0) }],
-      after: [{ readStartedMs: 0.025, readEndedMs: 0.05, positions: Array(scene.targetsPerCall).fill(0) }] },
-    checkpoints: times.map((time) => ({ frameTimestampMs: time, groups: [{ readStartedMs: time, readEndedMs: time + 0.1, positions: positions(time) }] })),
+    onset: { before: [{ readStartedMs: 0, readEndedMs: 0, documentFrame: { beforeMs: 0, afterMs: 0 }, positions: Array(scene.targetsPerCall).fill(0) }],
+      after: [{ readStartedMs: 0.025, readEndedMs: 0.05, documentFrame: { beforeMs: 0, afterMs: 0 }, positions: Array(scene.targetsPerCall).fill(0) }],
+      firstFrame: { frameTimestampMs: 0, groups: [{ readStartedMs: 0.06, readEndedMs: 0.07,
+        documentFrame: { beforeMs: 0, afterMs: 0 }, positions: Array(scene.targetsPerCall).fill(0) }] } },
+    checkpoints: times.map((time) => ({ frameTimestampMs: time, groups: [{ readStartedMs: time, readEndedMs: time + 0.1,
+      documentFrame: { beforeMs: time, afterMs: time }, positions: positions(time) }] })),
     terminal: [Array(scene.targetsPerCall).fill(SERVER_PROFILE.toPx)] });
 }
 
@@ -211,13 +214,15 @@ function admissionHistory() {
 // намеренно грубыми часами. Это synthetic fault test, не performance sample.
 function syntheticBrowser(options: { startCostMs?: number; snap?: boolean; snapAt?: number; cancelAt?: number; rejectTiming?: boolean;
   durationMultiplier?: number; shape?: 'quadratic'; rafStepMs?: number; readCostMs?: number; timerLagMs?: number;
-  initialProgress?: number; initialProgressAt?: number; onsetReadAt?: number } = {}) {
+  initialProgress?: number; initialProgressAt?: number; onsetReadAt?: number; documentClock?: 'missing' | 'unstable' | 'unrelated';
+  documentOriginLagMs?: number; quarterAtFirstFrame?: boolean; quarterAtFrame?: number } = {}) {
   const directory = mkdtempSync(path.join(os.tmpdir(), 'motion-server-synthetic-'));
   const source = path.join(directory, 'adapter.js'); writeFileSync(source, '// Синтетический adapter задан VM.\n');
-  let timeMs = 100, starts = 0, cancels = 0;
+  let timeMs = 100, frameTimeMs = timeMs - (options.documentOriginLagMs ?? 0), frameReads = 0, frames = 0, starts = 0, cancels = 0;
   const children: any[] = [];
   const position = (element: any) => {
     if (!element.motion) return element.x;
+    if (element.motion.pendingFrame) return SERVER_PROFILE.toPx * element.motion.initialProgress;
     const progress = Math.max(0, Math.min(1, (timeMs - element.motion.startedMs - element.motion.delayMs) / element.motion.durationMs + element.motion.initialProgress));
     return SERVER_PROFILE.toPx * (options.shape === 'quadratic' ? progress * progress : progress);
   };
@@ -227,6 +232,7 @@ function syntheticBrowser(options: { startCostMs?: number; snap?: boolean; snapA
     for (const [index, element] of elements.entries()) {
       if (options.snap || starts === options.snapAt) { element.x = to; element.motion = null; }
       else element.motion = { startedMs, durationMs: duration * (options.durationMultiplier ?? 1), delayMs: index * gap,
+        pendingFrame: true,
         initialProgress: starts >= (options.initialProgressAt ?? 1) ? options.initialProgress ?? 0 : 0 };
     }
     timeMs += options.startCostMs ?? 0.025;
@@ -239,15 +245,32 @@ function syntheticBrowser(options: { startCostMs?: number; snap?: boolean; snapA
   };
   const sandbox: any = { crossOriginIsolated: true, performance: { timeOrigin: 1000, now() {
     timeMs += 0.001; return Math.floor(timeMs / 0.005) * 0.005;
-  } }, document: { createElement() { return { x: 0, motion: null, isConnected: false,
+  } }, document: { timeline: { get currentTime() {
+    if (options.documentClock === 'missing') return null;
+    return frameTimeMs + (options.documentClock === 'unstable' ? ++frameReads * 0.01 : options.documentClock === 'unrelated' ? 1 : 0);
+  } }, createElement() { return { x: 0, motion: null, isConnected: false,
     getAnimations: () => [], remove() { this.isConnected = false; } }; }, body: { appendChild(element: any) { element.isConnected = true; children.push(element); } } },
   getComputedStyle: (element: any) => {
     if (starts === 0 && children.indexOf(element) === options.onsetReadAt) throw new Error('синтетический отказ acquired onset prefix');
     const transform = String(position(element)); timeMs += options.readCostMs ?? 0;
     return { transform };
   }, DOMMatrixReadOnly: class { e: number; constructor(value: string) { this.e = Number(value); } },
-  setTimeout(callback: () => void, delay: number) { timeMs += delay + (options.timerLagMs ?? 0); queueMicrotask(callback); },
-  requestAnimationFrame(callback: (time: number) => void) { timeMs += options.rafStepMs ?? 16; queueMicrotask(() => callback(timeMs)); },
+  setTimeout(callback: () => void, delay: number) {
+    // VM автоматически публикует pending animation frame во время timer wait;
+    // explicit first-frame oracle получает тот же ноль своим rAF.
+    for (const element of children) if (element.motion?.pendingFrame) {
+      element.motion.startedMs += options.rafStepMs ?? 16; element.motion.pendingFrame = false;
+    }
+    timeMs += delay + (options.timerLagMs ?? 0); queueMicrotask(callback);
+  },
+  requestAnimationFrame(callback: (time: number) => void) {
+    timeMs += options.rafStepMs ?? 16; frameTimeMs = timeMs; frames++;
+    for (const element of children) if (element.motion) {
+      if (element.motion.pendingFrame) { element.motion.startedMs = frameTimeMs; element.motion.pendingFrame = false; }
+      if (frames === (options.quarterAtFirstFrame ? 1 : options.quarterAtFrame)) element.motion.initialProgress = 0.25;
+    }
+    queueMicrotask(() => callback(timeMs));
+  },
   __adapterModule: { start, startStagger: start } };
   sandbox.window = sandbox;
   const realm = createContext(sandbox);
@@ -267,7 +290,7 @@ async function syntheticSemanticControl(fake: ReturnType<typeof syntheticBrowser
   const bench = readFileSync(new URL('../bench/compare/bench.mjs', import.meta.url), 'utf8');
   const source = bench.slice(bench.indexOf('export async function runSemanticStartCheck('), bench.indexOf('// ─── сценарий S5:')).trim().replace(/^export /, '');
   const runCheck = Function('evaluateStartSemanticEvidence', `return (${source})`)(evaluateStartSemanticEvidence);
-  const semanticClockErrorMs = serverBrowserClockBounds({ beginMs: 0, endMs: 0 }, '1000000000000').errorMs;
+  const semanticClockErrorMs = serverBrowserSemanticClockErrorMs('1000000000000');
   return runCheck(fake.page, { ...scene, ...SERVER_PROFILE.browserSemantics, semanticClockErrorMs,
     durationMs: SERVER_PROFILE.durationMs, toPx: SERVER_PROFILE.toPx }, SERVER_PROFILE.browserSemanticCalls);
 }
@@ -457,6 +480,110 @@ describe('серверный PROFILE: clock/progress falsifiers', () => {
         expect(fake.read().connected).toBe(0);
       } finally { fake.dispose(); }
     }
+  });
+
+  it.each(['missing', 'unstable', 'unrelated'] as const)('producer отказывает при %s document frame и сохраняет приобретённый trace', async (documentClock) => {
+    const fake = syntheticBrowser({ documentClock });
+    try {
+      let failure: any;
+      try { await measureServerBrowser(fake.browser, { url: 'synthetic://profile' }, fake.adapter, SERVER_PROFILE.browserScenes[0]); }
+      catch (error) { failure = error; }
+      expect(failure).toMatchObject({ name: 'AggregateError' });
+      expect(failure.raw.semanticEvidence.valid).toBe(false);
+      expect(failure.raw.semanticEvidence.checkpoints).toHaveLength(3);
+      expect(failure.raw.semanticEvidence.checkpoints[0].groups[0]).toHaveProperty('documentFrame');
+      expect(fake.read()).toEqual({ starts: 1, cancels: 1, connected: 0 });
+    } finally { fake.dispose(); }
+  });
+
+  it.each(['missing-frame', 'missing-end', 'unstable', 'RAF-disagreement', 'future-clock'])('consumer отвергает %s при valid:true', (fault) => {
+    const scene = SERVER_PROFILE.browserScenes[0], sample = stage().rows.find((row: any) => row.scene === scene.id).samples.left;
+    const group = sample.semanticEvidence.checkpoints[0].groups[0];
+    if (fault === 'missing-frame') delete group.documentFrame;
+    if (fault === 'missing-end') delete group.documentFrame.afterMs;
+    if (fault === 'unstable') group.documentFrame.afterMs += 0.001;
+    if (fault === 'RAF-disagreement') { group.documentFrame.beforeMs++; group.documentFrame.afterMs++; }
+    if (fault === 'future-clock') for (const checkpoint of sample.semanticEvidence.checkpoints) {
+      checkpoint.frameTimestampMs += 1e9;
+      for (const current of checkpoint.groups) {
+        current.readStartedMs += 1e9; current.readEndedMs += 1e9;
+        current.documentFrame.beforeMs += 1e9; current.documentFrame.afterMs += 1e9;
+      }
+    }
+    expect(sample.semanticEvidence.valid).toBe(true);
+    expect(() => validateServerBrowserSample(sample, scene)).toThrow(/normal-motion|clock/);
+  });
+
+  it('fresh API и CSS публикация предыдущего кадра сохраняют здоровый128ms raw', () => {
+    const scene = SERVER_PROFILE.browserScenes[0], sample = stage().rows.find((row: any) => row.scene === scene.id).samples.left;
+    const evidence = sample.semanticEvidence;
+    // Приобретённые координаты/времена primary b214: прежний wall-after
+    // ошибочно требовал phase≥2.85ms, хотя CSS опубликован до API frame.
+    evidence.callStartedAtMs = [0.845];
+    evidence.onset.before[0] = { readStartedMs: 0.01, readEndedMs: 0.84,
+      documentFrame: { beforeMs: -15.735, afterMs: -15.735 }, positions: { encoding: 'rle', count: scene.targetsPerCall, runs: [[scene.targetsPerCall, 0]] } };
+    evidence.onset.after[0] = { readStartedMs: 3.065, readEndedMs: 3.73,
+      documentFrame: { beforeMs: -15.735, afterMs: -15.735 }, positions: { encoding: 'rle', count: scene.targetsPerCall, runs: [[scene.targetsPerCall, 0]] } };
+    evidence.onset.firstFrame = { frameTimestampMs: 0.935, groups: [{ readStartedMs: 4, readEndedMs: 4.1,
+      documentFrame: { beforeMs: 0.935, afterMs: 0.935 }, positions: { encoding: 'rle', count: scene.targetsPerCall, runs: [[scene.targetsPerCall, 0]] } }] };
+    evidence.checkpoints = [[34.265, 35.15, 35.94, 78.1172], [67.595, 68.55, 69.145, 156.234], [84.265, 85.22, 85.9, 195.305]]
+      .map(([frame, started, ended, value]) => ({ frameTimestampMs: frame, groups: [{ readStartedMs: started, readEndedMs: ended,
+        documentFrame: { beforeMs: frame, afterMs: frame }, positions: { encoding: 'rle', count: scene.targetsPerCall, runs: [[scene.targetsPerCall, value]] } }] }));
+    expect(() => validateServerBrowserSample(sample, scene)).not.toThrow();
+    evidence.onset.after[0].positions.runs[0][1] = 75;
+    expect(() => validateServerBrowserSample(sample, scene)).toThrow(/normal-motion/);
+  });
+
+  it.each(['before-missing', 'after-missing', 'after-unstable', 'after-future', 'after-backwards'])('consumer отвергает onset frame %s при valid:true', (fault) => {
+    const scene = SERVER_PROFILE.browserScenes[0], sample = stage().rows.find((row: any) => row.scene === scene.id).samples.left;
+    const onset = sample.semanticEvidence.onset;
+    if (fault === 'before-missing') delete onset.before[0].documentFrame;
+    if (fault === 'after-missing') delete onset.after[0].documentFrame;
+    if (fault === 'after-unstable') onset.after[0].documentFrame.afterMs += 0.001;
+    if (fault === 'after-future') onset.after[0].documentFrame = { beforeMs: 1, afterMs: 1 };
+    if (fault === 'after-backwards') onset.after[0].documentFrame = { beforeMs: -1, afterMs: -1 };
+    expect(sample.semanticEvidence.valid).toBe(true);
+    expect(() => validateServerBrowserSample(sample, scene)).toThrow(/normal-motion|clock/);
+  });
+
+  it('mixed document/perf envelope покрывает независимые ошибки frame/now/origin, сохраняя API-cost envelope', () => {
+    const host = '1000000000000', cost = serverBrowserClockBounds({ beginMs: 0, endMs: 0 }, host).errorMs;
+    const semantic = serverBrowserSemanticClockErrorMs(host);
+    // Независимые ошибки трёх приобретённых timestamps, с обоими направлениями
+    // clamp/truncation. Origin сокращается только между perf endpoints.
+    for (const frameError of [-0.006, 0, 0.006]) for (const nowError of [-0.006, 0, 0.006]) for (const originError of [-0.006, 0, 0.006]) {
+      const mixedObserved = 64 + frameError - nowError + originError;
+      expect(Math.abs(mixedObserved - 64)).toBeLessThanOrEqual(semantic);
+    }
+    expect(cost).toBeLessThan(0.0120001); expect(semantic).toBeGreaterThanOrEqual(0.018);
+  });
+
+  it.each(SERVER_PROFILE.browserScenes.flatMap((scene) => [1, 2].map((frame) => ({ scene, frame }))))('старый doc clock не подменяет полезную публикацию $scene.id frame$frame', async ({ scene, frame }) => {
+    const healthy = syntheticBrowser({ documentOriginLagMs: 50 });
+    const faulty = syntheticBrowser({ documentOriginLagMs: 50, quarterAtFrame: frame });
+    try {
+      const good: any = await syntheticSemanticControl(healthy, scene), bad: any = await syntheticSemanticControl(faulty, scene);
+      expect(good.valid).toBe(true); expect(bad.valid).toBe(false);
+      expect(bad.onset.before[0].positions.every((value: number) => value === 0)).toBe(true);
+      expect(bad.onset.after[0].positions.every((value: number) => value === 0)).toBe(true);
+      if (frame === 1) expect(bad.onset.firstFrame.groups[0].positions[0]).toBeGreaterThanOrEqual(75);
+      else expect(bad.onset.firstFrame.groups[0].positions.every((value: number) => Math.abs(value) <= 0.5)).toBe(true);
+      const sample = stage().rows.find((row: any) => row.scene === scene.id).samples.left;
+      sample.semanticEvidence = compactServerSemanticEvidence({ ...bad, valid: true });
+      expect(() => validateServerBrowserSample(sample, scene)).toThrow(/normal-motion/);
+      expect(healthy.read().connected).toBe(0); expect(faulty.read().connected).toBe(0);
+    } finally { healthy.dispose(); faulty.dispose(); }
+  });
+
+  it.each(['missing', 'nonzero', 'unstable', 'no-RAF', 'before-API-read'])('consumer отвергает first publication %s при valid:true', (fault) => {
+    const scene = SERVER_PROFILE.browserScenes[0], sample = stage().rows.find((row: any) => row.scene === scene.id).samples.left;
+    const first = sample.semanticEvidence.onset.firstFrame;
+    if (fault === 'missing') delete sample.semanticEvidence.onset.firstFrame;
+    if (fault === 'nonzero') first.groups[0].positions.runs[0][1] = 75;
+    if (fault === 'unstable') first.groups[0].documentFrame.afterMs += 0.001;
+    if (fault === 'no-RAF') delete first.frameTimestampMs;
+    if (fault === 'before-API-read') first.groups[0].readStartedMs = 0;
+    expect(() => validateServerBrowserSample(sample, scene)).toThrow(/normal-motion/);
   });
 
   it('endpoint snap и stateful nth-call snap отказывают до semantic:true', async () => {
@@ -676,6 +803,17 @@ describe('серверный PROFILE: независимые sabotage controls',
     expect(() => validateServerJournal(artifact, journal([finished]))).toThrow(/failures/);
     const broken = journal([failure, finished]); broken[0].digest = 'b'.repeat(64);
     expect(() => validateServerJournal(artifact, broken)).toThrow(/цепь/);
+  });
+
+  it('допущенный UNPROVEN всё равно проверяет поздние body hashes после failure/chronology', () => {
+    const artifact: any = { registration: null, registrationDigest: null, verdict: 'UNPROVEN', failures: [{ stage: 'preparation', error: { message: 'сохранённый отказ' } }] };
+    const events = [{ type: 'failure', value: artifact.failures[0] }, { type: 'finished', value: { verdict: artifact.verdict, digest: serverArtifactDigest(artifact) } }];
+    const healthy = chain(events);
+    expect(validateServerJournal(artifact, healthy)).toHaveProperty('journalFinalDigest');
+    const malformed = clone(healthy); malformed[1].digest = 'b'.repeat(64);
+    expect(() => validateServerJournal(artifact, malformed)).toThrow(/цепь/);
+    const changedBody = clone(healthy); changedBody[1].unclaimed = 'body должен хешироваться целиком';
+    expect(() => validateServerJournal(artifact, changedBody)).toThrow(/цепь/);
   });
 
   it('имя positive не позволяет спрятать одиночную работу; RLE не доверяет чужой длине', () => {

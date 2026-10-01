@@ -13,7 +13,7 @@ import { deriveRealmTimerStep, PRODUCTION_ADAPTER_PROFILE } from '../compare/met
 import { assertCheckoutUnchanged, assertFileHashesUnchanged, assertInstalledPackageTreesUnchanged,
   hashFileTree, prepareBenchmarkCheckout, sha256File } from '../compare/provenance.mjs';
 import { SERVER_PROFILE, planServerSampleSize, serverProfileDigest } from './server-profile-registration.mjs';
-import { compactServerSemanticEvidence, serverBrowserClockBounds, serverCalibrationVerdict, serverCellPairs,
+import { compactServerSemanticEvidence, serverBrowserSemanticClockErrorMs, serverCalibrationVerdict, serverCellPairs,
   serverFamilyIntervals, serverOrders, serverResourceReasons, validateServerBrowserSample, validateServerEngineSample, verifyServerClockRegistration, writeServerArtifact } from './server-profile-contract.mjs';
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../..');
@@ -209,7 +209,7 @@ export async function measureServerBrowser(browser, origin, adapter, scene, work
       const begin = performance.now(); (0, eval)(source); return performance.now() - begin;
     }, source), 'browser cold import');
     partial.push({ phase: 'cold-import', coldImportMs });
-    const semanticClockErrorMs = serverBrowserClockBounds({ beginMs: 0, endMs: 0 }, process.hrtime.bigint().toString()).errorMs;
+    const semanticClockErrorMs = serverBrowserSemanticClockErrorMs(process.hrtime.bigint().toString());
     const semanticConfig = { ...scene, ...SERVER_PROFILE.browserSemantics, semanticClockErrorMs,
       durationMs: SERVER_PROFILE.durationMs, toPx: SERVER_PROFILE.toPx };
     const semanticEvidence = compactServerSemanticEvidence(await withBrowserTimeout(

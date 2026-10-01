@@ -462,7 +462,15 @@ export async function runSemanticStartCheck(page, scenario, calls) {
         phase = 'onset-before';
         for (const elements of groups) {
           const group = { readStartedMs: performance.now() - epoch, positions: [] }; onset.before.push(group);
+          if (config.requireDocumentFrame) {
+            const value = document.timeline?.currentTime;
+            group.documentFrame = { beforeMs: typeof value === 'number' ? value - epoch : value ?? null };
+          }
           for (const element of elements) group.positions.push(new DOMMatrixReadOnly(getComputedStyle(element).transform).e);
+          if (config.requireDocumentFrame) {
+            const value = document.timeline?.currentTime;
+            group.documentFrame.afterMs = typeof value === 'number' ? value - epoch : value ?? null;
+          }
           group.readEndedMs = performance.now() - epoch;
         }
       }
@@ -475,7 +483,29 @@ export async function runSemanticStartCheck(page, scenario, calls) {
         if (onset) {
           phase = 'onset-after';
           const group = { readStartedMs: performance.now() - epoch, positions: [] }; onset.after.push(group);
+          if (config.requireDocumentFrame) {
+            const value = document.timeline?.currentTime;
+            group.documentFrame = { beforeMs: typeof value === 'number' ? value - epoch : value ?? null };
+          }
           for (const element of elements) group.positions.push(new DOMMatrixReadOnly(getComputedStyle(element).transform).e);
+          if (config.requireDocumentFrame) {
+            const value = document.timeline?.currentTime;
+            group.documentFrame.afterMs = typeof value === 'number' ? value - epoch : value ?? null;
+          }
+          group.readEndedMs = performance.now() - epoch;
+        }
+      }
+      if (onset && config.requireDocumentFrame) {
+        phase = 'onset-first-frame';
+        const frameTimestampMs = await new Promise((resolve) => requestAnimationFrame((timestamp) => resolve(timestamp - epoch)));
+        onset.firstFrame = { frameTimestampMs, groups: [] };
+        for (const elements of groups) {
+          const group = { readStartedMs: performance.now() - epoch, positions: [] }; onset.firstFrame.groups.push(group);
+          const before = document.timeline?.currentTime;
+          group.documentFrame = { beforeMs: typeof before === 'number' ? before - epoch : before ?? null };
+          for (const element of elements) group.positions.push(new DOMMatrixReadOnly(getComputedStyle(element).transform).e);
+          const after = document.timeline?.currentTime;
+          group.documentFrame.afterMs = typeof after === 'number' ? after - epoch : after ?? null;
           group.readEndedMs = performance.now() - epoch;
         }
       }
@@ -489,7 +519,15 @@ export async function runSemanticStartCheck(page, scenario, calls) {
         const checkpoint = { frameTimestampMs, groups: [] }; checkpoints.push(checkpoint);
         for (const elements of groups) {
           const group = { readStartedMs: performance.now() - epoch, positions: [] }; checkpoint.groups.push(group);
+          if (config.requireDocumentFrame) {
+            const value = document.timeline?.currentTime;
+            group.documentFrame = { beforeMs: typeof value === 'number' ? value - epoch : value ?? null };
+          }
           for (const element of elements) group.positions.push(new DOMMatrixReadOnly(getComputedStyle(element).transform).e);
+          if (config.requireDocumentFrame) {
+            const value = document.timeline?.currentTime;
+            group.documentFrame.afterMs = typeof value === 'number' ? value - epoch : value ?? null;
+          }
           group.readEndedMs = performance.now() - epoch;
         }
       }
