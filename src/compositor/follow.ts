@@ -57,7 +57,7 @@ class InputSpring extends CompositorSpring implements CompositorFollow {
     this._mv = undefined;
     try {
       // Reentry видит новый ввод; native donor снимается после underlying-записи.
-      this._onLiveFrame(value);
+      this._writeInput(value);
     } catch (error) {
       if (this._epoch === generation) {
         this._from = previous;
@@ -67,7 +67,6 @@ class InputSpring extends CompositorSpring implements CompositorFollow {
       throw error;
     }
     mv?.destroy();
-    if (this._epoch === generation) this._releaseHost();
     return this._from;
   }
 
@@ -76,7 +75,7 @@ class InputSpring extends CompositorSpring implements CompositorFollow {
     this._validateValue(value);
     this._trackInput(value, tSeconds);
     this._epoch++;
-    this._onLiveFrame(value);
+    this._writeInput(value);
   }
 
   settle(target: number, tSeconds: number): void {
@@ -128,6 +127,14 @@ class InputSpring extends CompositorSpring implements CompositorFollow {
   }
 
   protected override _commitOwner(): void { this._following = undefined; }
+
+  private _writeInput(value: number): void {
+    const input = this._following;
+    this._onLiveFrame(value);
+    // Reentrant follow сохраняет input-owner; settle/handoff заменяют его.
+    // Успешная запись снимает donor до возможной ошибки внешнего callback.
+    if (this._following === input) this._releaseHost();
+  }
 
   private _validateValue(value: number): void {
     if (!Number.isFinite(value)) throw new MotionParamError('LM009');

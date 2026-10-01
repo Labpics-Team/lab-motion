@@ -202,19 +202,44 @@ describe('универсальный follow → native settle → pickup', () =>
     expect(f.writes).toHaveLength(writes);
   });
 
-  it('ошибка форматирования pickup сохраняет native donor и первичную ошибку', () => {
+  it.each(['format', 'write'] as const)('ошибка pickup в %s сохраняет native donor и первичную ошибку', (hook) => {
     const f = fixture();
     f.owner.start();
-    const failure = new Error('format failed');
-    f.hooks.format = () => { throw failure; };
+    const failure = new Error('pickup failed');
+    f.hooks[hook] = () => { throw failure; };
     expect(() => f.owner.beginFollow(1)).toThrow(failure);
     expect(f.animations[0]!.cancel).not.toHaveBeenCalled();
-    f.hooks.format = undefined;
+    f.hooks[hook] = undefined;
     f.owner.retarget(200);
     expect(f.animations).toHaveLength(2);
     expect(f.animations[0]!.cancel).toHaveBeenCalledTimes(1);
     f.owner.destroy();
   });
+
+  it.each([['format', false], ['format', true], ['write', false], ['write', true]] as const)(
+    'reentrant follow из %s снимает donor; ошибка outer callback: %s', (hook, throws) => {
+      const f = fixture();
+      f.owner.start();
+      const failure = new Error('outer callback failed');
+      f.hooks[hook] = (value) => {
+        f.hooks[hook] = undefined;
+        f.owner.follow(20, 1.01);
+        if (throws) throw failure;
+        return value;
+      };
+      if (throws) expect(() => f.owner.beginFollow(1)).toThrow(failure);
+      else expect(f.owner.beginFollow(1)).toBe(20);
+      expect(f.owner.value).toBe(20);
+      expect(f.writes.at(-1)).toBe(20);
+      expect(f.animations).toHaveLength(1);
+      expect(f.animations[0]!.cancel).toHaveBeenCalledTimes(1);
+      expect(f.frames).toHaveLength(0);
+      f.owner.follow(30, 1.02);
+      expect(f.writes.at(-1)).toBe(30);
+      expect(f.animations[0]!.cancel).toHaveBeenCalledTimes(1);
+      f.owner.destroy();
+    },
+  );
 
   it('reentrant settle внутри pickup write оставляет новый native owner', () => {
     const f = fixture();
@@ -229,6 +254,32 @@ describe('универсальный follow → native settle → pickup', () =>
     expect(f.animations[1]!.cancel).not.toHaveBeenCalled();
     expect(f.frames).toHaveLength(0);
     f.owner.destroy();
+  });
+
+  it.each(['settle', 'retarget', 'handoff', 'stop', 'destroy'] as const)('nested follow сохраняет successor %s', (action) => {
+    const f = fixture();
+    f.owner.start();
+    f.hooks.write = () => {
+      f.hooks.write = () => {
+        f.hooks.write = undefined;
+        if (action === 'settle') f.owner.settle(200, 1.01);
+        else if (action === 'retarget') f.owner.retarget(200);
+        else if (action === 'handoff') f.owner.handoffToLive(200);
+        else f.owner[action]();
+      };
+      f.owner.follow(20, 1.01);
+    };
+    f.owner.beginFollow(1);
+    expect(f.animations[0]!.cancel).toHaveBeenCalledTimes(1);
+    const native = action === 'settle' || action === 'retarget';
+    expect(f.animations).toHaveLength(native ? 2 : 1);
+    if (native) expect(f.animations[1]!.cancel).not.toHaveBeenCalled();
+    expect(f.frames).toHaveLength(action === 'handoff' ? 1 : 0);
+    if (action === 'stop') expect(() => f.owner.follow(30, 1.02)).toThrow(MotionParamError);
+    f.owner.destroy();
+    const writes = f.writes.length;
+    f.owner.follow(30, 1.02);
+    expect(f.writes).toHaveLength(writes);
   });
 
   it('destroy во время write не даёт callback восстановить direct или native owner', () => {

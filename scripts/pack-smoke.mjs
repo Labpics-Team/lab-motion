@@ -180,6 +180,32 @@ try {
     log(execSync(`node ${file}`, { cwd: app, encoding: 'utf8' }).trim());
   }
 
+  // Публичное наследование должно работать с теми же именами, что обещают типы.
+  for (const kind of ['esm', 'cjs']) {
+    const probe = `
+      for (const sub of ['compositor', 'compositor/stagger']) {
+        const { CompositorSpring } = ${kind === 'esm' ? `await import('${pkg.name}/' + sub)` : `require('${pkg.name}/' + sub)`};
+        class PublicSpring extends CompositorSpring {
+          readValue() { return this.value; }
+          stop() { super.stop(); }
+        }
+        const owner = new PublicSpring({
+          spring: { mass: 1, stiffness: 170, damping: 26 }, property: 'opacity',
+          from: 7, to: 9, apply() {}, matchMedia: () => ({ matches: true }),
+        });
+        if (owner.readValue() !== 7) throw new Error('subclass value');
+        owner.start();
+        owner.retarget(11);
+        if (owner.readValue() !== 11) throw new Error('subclass retarget');
+        owner.stop(); owner.destroy();
+      }
+      console.log('public subclass ${kind} OK');
+    `;
+    const file = kind === 'esm' ? 'subclass.mjs' : 'subclass.cjs';
+    writeFileSync(join(app, file), probe);
+    log(execSync(`node ${file}`, { cwd: app, encoding: 'utf8' }).trim());
+  }
+
   // 3. Публичный frame, фасад ./animate и zero-dependency binding обязаны разделять один
   // scheduler ИМЕННО после pack/install. Source-тест не ловит дублирование,
   // которое создаёт сборщик при `splitting: false`: три entry могли пройти все

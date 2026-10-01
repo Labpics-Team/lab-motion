@@ -443,32 +443,37 @@ export class CompositorSpring {
   private readonly _composite: 'replace' | 'add' | 'accumulate';
   private _format: ((v: number) => string | number) | undefined;
   private _target: WaapiAnimatable | undefined;
+  /** @internal */
   protected _apply: ((value: string | number) => void) | undefined;
-  /** Часы — lifetime-capability: destroy снимает её до любого host cleanup. */
+  /** @internal Часы — lifetime-capability: destroy снимает её до любого host cleanup. */
   protected _now: (() => number) | undefined;
   private _requestFrame: RequestFrameFn | undefined;
   private readonly _delay: number;
   private _setTimer: SetTimerFn | undefined;
+  /** @internal */
   protected readonly _tier: CompositorTierCode;
 
+  /** @internal */
   protected _from: number;
+  /** @internal */
   protected _to: number;
   private _v0Norm = 0;
   private _startTime!: number;
   /** Задержка ТЕКУЩЕГО прогона (мс): _delay на первичном start, 0 на retarget/handoff. */
   private _startDelay!: number;
-  /** Единственный host-owner; null резервирует незавершённый setTimer. */
+  /** @internal Единственный host-owner; null резервирует незавершённый setTimer. */
   protected _host: HostOwner;
   /** Один artifact — SSOT samples и duration текущего compositor-owner. */
   private _artifact: SpringExecutionArtifactTuple | undefined;
   private readonly _sample = { value: 0, velocity: 0 };
+  /** @internal */
   protected _mv: MotionValue | undefined;
-  /** Монотонный identity-token текущего owner/continuation. */
+  /** @internal Монотонный identity-token текущего owner/continuation. */
   protected _epoch = 0;
-  /** Host cleanup блокирует мутации, пока current-owner continuation не выдаст capability. */
+  /** @internal Host cleanup блокирует мутации, пока current-owner continuation не выдаст capability. */
   protected _cleaning?: true;
 
-  /**
+  /** @internal
    * Единый мост «кадр живой пружины → внутреннее значение + apply». Один экземпляр
    * на контроллер, переиспользуется всеми живыми путями (_ensureFallback,
    * compositor→live хендофф, reduced-хендофф) — DRY: правило распространения
@@ -794,7 +799,7 @@ export class CompositorSpring {
     }
   }
 
-  /** Слот снимается до первого недоверенного host-вызова. */
+  /** @internal Слот снимается до первого недоверенного host-вызова. */
   protected _releaseHost(): void {
     const host = this._host;
     this._host = undefined;
@@ -834,7 +839,7 @@ export class CompositorSpring {
     }
   }
 
-  /** Фактический piecewise-снимок без style/layout-read. */
+  /** @internal Фактический piecewise-снимок без style/layout-read. */
   protected _snapshot(generation: number): { value: number; velocity: number } | undefined {
     const now = this._now!();
     if (this._epoch !== generation) return undefined;
@@ -913,7 +918,7 @@ export class CompositorSpring {
     if (donor !== host) this._cancelHost(donor);
   }
 
-  /** Строит live-кандидата; ошибка не меняет metadata действующего donor. */
+  /** @internal Строит live-кандидата; ошибка не меняет metadata действующего donor. */
   protected _liveCandidate(
     value: number,
     velocity: number,
@@ -942,7 +947,7 @@ export class CompositorSpring {
     }
   }
 
-  /** CAS-публикация live-owner; stale-кандидат оплачивается здесь же. */
+  /** @internal CAS-публикация live-owner; stale-кандидат оплачивается здесь же. */
   protected _adoptLive(
     mv: MotionValue,
     target: number,
