@@ -449,6 +449,10 @@ function pointerInput(
     active = { id: e.pointerId, coordinate: e[axis], origin: motion.beginFollow(e.timeStamp / 1000) };
     handle.setPointerCapture(e.pointerId);
   }, { signal: events.signal });
+  // Нативный drag не должен забирать поток у принятого pointer-жеста.
+  handle.addEventListener('dragstart', (e) => {
+    if (active) e.preventDefault();
+  }, { signal: events.signal });
   handle.ownerDocument.addEventListener('pointermove', (e) => {
     if (e.pointerId === active?.id) motion.follow(valueAt(e), e.timeStamp / 1000);
   }, { signal: events.signal });

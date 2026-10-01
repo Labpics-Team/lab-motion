@@ -219,3 +219,25 @@ test('рецепт карусели: локальная страница, пов
   await page.locator('[data-previous]').click();
   expect(await page.evaluate(() => (window as unknown as ProbeWindow).followProbe.animations.length)).toBe(result.count);
 });
+
+
+test('рецепт панели: принятый pointer сохраняет mouse focus и клавиатуру', async ({ page }) => {
+  await page.setContent(`<section id="panel-root"><button data-open>Открыть</button>
+    <section data-panel aria-label="Параметры"><div data-handle tabindex="0">Потяните панель</div>
+      <button data-close>Закрыть</button></section></section>`);
+  await page.evaluate(async () => {
+    // @ts-expect-error Модуль собирается из буквального кода docs/recipes.md.
+    const { mountSnapPanel } = await import('/browser/.artifacts/compositor-follow-recipes.js');
+    (window as unknown as ProbeWindow).followProbe.cleanup = mountSnapPanel(document.getElementById('panel-root'));
+  });
+  await page.locator('[data-open]').click();
+  await page.evaluate(() => {
+    const animation = (window as unknown as ProbeWindow).followProbe.animations.at(-1)!;
+    animation.currentTime = Number(animation.effect!.getComputedTiming().duration);
+  });
+  await page.locator('[data-handle]').click();
+  await expect(page.locator('[data-handle]')).toBeFocused();
+  await page.keyboard.press('Tab');
+  await expect(page.locator('[data-close]')).toBeFocused();
+  await page.evaluate(() => (window as unknown as ProbeWindow).followProbe.cleanup());
+});
