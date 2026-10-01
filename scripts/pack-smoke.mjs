@@ -146,6 +146,40 @@ try {
   writeFileSync(join(app, 'cjs.cjs'), cjsProbe);
   log(execSync('node cjs.cjs', { cwd: app, encoding: 'utf8' }).trim());
 
+  // Самодостаточный follow-entry проверяется после pack/install в обоих форматах.
+  const followProbe = (kind) => `
+    globalThis.CSS = { supports: () => true };
+    Object.defineProperty(globalThis, 'navigator', { configurable: true, value: { vendor: '', userAgent: 'Chromium' } });
+    const { createCompositorFollow } = ${kind === 'esm'
+      ? `await import('${pkg.name}/compositor/follow')`
+      : `require('${pkg.name}/compositor/follow')`};
+    const animations = [];
+    let frames = 0;
+    let written;
+    const owner = createCompositorFollow({
+      spring: { mass: 1, stiffness: 170, damping: 26 }, property: 'opacity', from: 0, to: 100,
+      target: { animate() { const a = { currentTime: 16, cancelled: false, cancel() { this.cancelled = true; } }; animations.push(a); return a; } },
+      apply(value) { written = value; }, now: () => 0, requestFrame: () => ++frames,
+      matchMedia: () => ({ matches: false }),
+    });
+    owner.start();
+    for (let turn = 1; turn <= 2; turn++) {
+      const value = owner.beginFollow(turn);
+      if (!Number.isFinite(value) || written !== value || !animations.at(-1).cancelled) throw new Error('follow pickup failed');
+      owner.follow(value + 20, turn + 0.02);
+      owner.settle(100 * (turn + 1), turn + 0.02);
+    }
+    if (animations.length !== 3 || frames !== 0) throw new Error('native repeat became live');
+    owner.destroy();
+    if (animations.some((a) => !a.cancelled)) throw new Error('follow owner leaked');
+    console.log('follow ${kind}: native repeat + terminal cleanup OK');
+  `;
+  for (const kind of ['esm', 'cjs']) {
+    const file = kind === 'esm' ? 'follow.mjs' : 'follow.cjs';
+    writeFileSync(join(app, file), followProbe(kind));
+    log(execSync(`node ${file}`, { cwd: app, encoding: 'utf8' }).trim());
+  }
+
   // 3. Публичный frame, фасад ./animate и zero-dependency binding обязаны разделять один
   // scheduler ИМЕННО после pack/install. Source-тест не ловит дублирование,
   // которое создаёт сборщик при `splitting: false`: три entry могли пройти все

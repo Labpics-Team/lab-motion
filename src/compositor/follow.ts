@@ -1,6 +1,6 @@
 import { MotionParamError } from '../errors.js';
 import type { MotionValue } from '../motion-value.js';
-import { createInputVelocityTracker, DEFAULT_VELOCITY_WINDOW_S, type VelocityTracker } from '../internal/velocity-tracker.js';
+import { createInputVelocityTracker, DEFAULT_VELOCITY_WINDOW_S, type InputVelocityTracker } from '../internal/velocity-tracker.js';
 import { CompositorSpring, type CompositorSpringOptions } from './core.js';
 
 /** Один spring-owner для прямого ввода и автономного продолжения. */
@@ -21,7 +21,7 @@ export function createCompositorFollow(options: CompositorSpringOptions): Compos
 
 class InputSpring extends CompositorSpring implements CompositorFollow {
   private _following: {
-    tracker: VelocityTracker;
+    tracker: InputVelocityTracker;
     t: number;
     at: number;
     origin: number;
@@ -44,12 +44,12 @@ class InputSpring extends CompositorSpring implements CompositorFollow {
       value = read.value;
       velocity = read.velocity;
     }
-    const tracker = createInputVelocityTracker(undefined, true);
+    const tracker = createInputVelocityTracker();
     if (velocity !== 0) {
       const dt = DEFAULT_VELOCITY_WINDOW_S / 2;
-      tracker.push({ x: -velocity * dt, y: 0, t: -dt });
+      tracker.push(-velocity * dt, -dt);
     }
-    tracker.push({ x: 0, y: 0, t: 0 });
+    tracker.push(0, 0);
     // Live callback теряет право записи до вызова пользовательского writer.
     // При ошибке writer сохранённый MotionValue остаётся остановленным и повторяемым.
     mv?.stop();
@@ -144,13 +144,13 @@ class InputSpring extends CompositorSpring implements CompositorFollow {
     if (!this._following) throw new MotionParamError('LM184');
     const input = this._following;
     input.t = t;
-    input.tracker.push({ x: value - input.origin, y: 0, t: t - input.at });
+    input.tracker.push(value - input.origin, t - input.at);
   }
 
   private _inputVelocity(): number {
     const input = this._following!;
     // При немедленном re-release prior не проходит через вычитание больших координат/часов.
     return input.t === input.at && this._from === input.origin
-      ? input.velocity : input.tracker.velocity().vx;
+      ? input.velocity : input.tracker.velocity();
   }
 }
