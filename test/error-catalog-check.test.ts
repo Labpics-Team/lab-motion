@@ -276,6 +276,31 @@ ${row('LM001', 'unknown')}
     expect(errors.join('\n')).toMatch(/runtime-escape конструктора/);
   });
 
+  it.each(["'./nested/barrel.js'", '`./nested/barrel.js`'])(
+    'проверяет origin динамического импорта транзитивного barrel: %s', (specifier) => {
+      const errors = validateErrorCatalog({
+        catalogText: catalog([]),
+        sources: [
+          ['src/public.ts', "export { MotionParamError } from './errors.js';"],
+          ['src/nested/barrel.ts', "export * from '../public.js';"],
+          ['src/use.ts', `const errors = await import(${specifier}); new errors[key](runtimeCode);`],
+        ],
+      });
+      expect(errors.some(error => error.startsWith('src/use.ts:') &&
+        error.includes('runtime-escape конструктора'))).toBe(true);
+    },
+  );
+
+  it('разрешает динамический импорт barrel без runtime-конструктора', () => {
+    expect(validateErrorCatalog({
+      catalogText: catalog([]),
+      sources: [
+        ['src/public.ts', "export type { MotionParamError } from './errors.js'; export const value = 1;"],
+        ['src/use.ts', "const api = await import('./public.js'); void api.value;"],
+      ],
+    })).toEqual([]);
+  });
+
   it.each([
     "export { MotionParamError } from './errors.js';",
     "export * from './errors.js';",

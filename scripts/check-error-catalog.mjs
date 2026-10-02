@@ -283,14 +283,14 @@ function isConstructorProperty(node) {
     argument.text === 'MotionParamError';
 }
 
-function isDynamicErrorsImport(node) {
+function isDynamicErrorsImport(node, file, exportsConstructor) {
   if (!ts.isCallExpression(node) || node.expression.kind !== ts.SyntaxKind.ImportKeyword) {
     return false;
   }
   const specifier = node.arguments[0];
   return specifier !== undefined &&
     (ts.isStringLiteral(specifier) || ts.isNoSubstitutionTemplateLiteral(specifier)) &&
-    isErrorsModule(specifier.text);
+    exportsConstructor(file, specifier.text);
 }
 
 function inspectMotionParamErrorSource(source, file = 'source.ts', exportsConstructor = (_file, moduleName) => isErrorsModule(moduleName)) {
@@ -341,7 +341,7 @@ function inspectMotionParamErrorSource(source, file = 'source.ts', exportsConstr
   for (const node of constructorScope.escapes) escape(node);
   const visit = (node) => {
     if (innerConstructions.has(node)) return;
-    if (isDynamicErrorsImport(node)) {
+    if (isDynamicErrorsImport(node, sourceFile.fileName, exportsConstructor)) {
       escape(node);
       return;
     }
