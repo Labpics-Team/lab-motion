@@ -6,7 +6,7 @@ import { createContext, runInContext } from 'node:vm';
 import { createHash } from 'node:crypto';
 import { SERVER_PROFILE, planServerSampleSize, serverProfileDigest, serverTailPolicy, verifyServerProfile } from '../bench/profile/server-profile-registration.mjs';
 import { serverCalibrationVerdict, serverCellPairs, serverFamilyIntervals, serverMetricCells, serverOrders,
-  compactServerCpuEvidence, compactServerSemanticEvidence, serverArtifactChunks, serverArtifactDigest, serverBrowserClockBounds, serverBrowserSemanticClockErrorMs, serverOrderStatisticBounds, serverResourceReasons,
+  compactServerCpuEvidence, expandServerCpuEvidence, compactServerSemanticEvidence, serverArtifactChunks, serverArtifactDigest, serverBrowserClockBounds, serverBrowserSemanticClockErrorMs, serverOrderStatisticBounds, serverResourceReasons,
   parseServerJsonBytes, parseServerJournalBytes, validateServerArtifact, validateServerBrowserSample, validateServerEngineSample, validateServerJournal,
   verifyServerClockRegistration, writeServerArtifact } from '../bench/profile/server-profile-contract.mjs';
 import { compactStockMotionValueOutcomes, deriveRealmTimerStep, evaluateStartSemanticEvidence, validateStockMotionValueBatch } from '../bench/compare/methodology.mjs';
@@ -252,6 +252,36 @@ function admissionHistory() {
   }
   return sharedAdmission;
 }
+
+describe('серверный PROFILE: потеря полей при CPU RLE запрещена', () => {
+  const original = [
+    { sequence: 0, clock: 'CLOCK_THREAD_CPUTIME_ID', pid: 12345, tid: 12345, seconds: '9007199254740993', nanoseconds: 17, valueNs: '9007199254740993000000017' },
+    { sequence: 1, clock: 'CLOCK_THREAD_CPUTIME_ID', pid: 12345, tid: 12345, seconds: '9007199254740993', nanoseconds: 18, valueNs: '9007199254740993000000018' },
+    { sequence: 2, clock: 'CLOCK_THREAD_CPUTIME_ID', pid: 23456, tid: 23456, seconds: '9007199254740993', nanoseconds: 19, valueNs: '9007199254740993000000019' },
+  ];
+  const encoded = { encoding: 'native-cpu-rle-v1', count: 3, runs: [
+    { from: 0, count: 2, clock: 'CLOCK_THREAD_CPUTIME_ID', pid: 12345, tid: 12345, values: [['9007199254740993', 17], ['9007199254740993', 18]] },
+    { from: 2, count: 1, clock: 'CLOCK_THREAD_CPUTIME_ID', pid: 23456, tid: 23456, values: [['9007199254740993', 19]] },
+  ] };
+  it('восстанавливает каждый exact timespec/ordinal/PID и исходный порядок JSON', () => {
+    expect(compactServerCpuEvidence(original)).toEqual(encoded);
+    const restored = expandServerCpuEvidence(JSON.parse(JSON.stringify(encoded)), 3);
+    expect(restored).toEqual(original);
+    expect(JSON.stringify(restored)).toBe(JSON.stringify(original));
+    expect(expandServerCpuEvidence(original, 3)).toBe(original);
+  });
+  it.each(['valueNs', 'sequence'])('encoder не исправляет forged %s', (field) => {
+    const changed = clone(original); changed[1][field] = field === 'valueNs' ? '9007199254740993000000019' : 0;
+    const before = JSON.stringify(changed);
+    expect(() => compactServerCpuEvidence(changed)).toThrow(/native CPU/);
+    expect(JSON.stringify(changed)).toBe(before);
+  });
+  it.each(['count', 'gap'])('decoder не скрывает %s в приобретённом suffix', (field) => {
+    const changed = clone(encoded);
+    if (field === 'count') changed.count++; else changed.runs[1].from++;
+    expect(() => expandServerCpuEvidence(changed, 3)).toThrow(/native CPU/);
+  });
+});
 
 // Исполняем настоящий browser owner в VM с независимым линейным DOM и
 // намеренно грубыми часами. Это synthetic fault test, не performance sample.
