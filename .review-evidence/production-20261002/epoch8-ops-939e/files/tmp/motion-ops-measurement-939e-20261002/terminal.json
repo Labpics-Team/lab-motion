@@ -1,0 +1,33 @@
+{
+  "schema": "independent-ops939e-measurement-terminal-v1",
+  "sourceHead": "939e7f4a7ebef2dd494f9dec8690932fecebfd73",
+  "sourceTree": "deba4db1952029bdb7d2244b207f570007700b19",
+  "base": "fe092331360837fd7f63d71a4b7f867ba849ebd4",
+  "taskActualStartUtc": "2026-10-02T05:20:44.272106+00:00",
+  "actualStartUtc": "2026-10-02T05:42:59.690888+00:00",
+  "actualEndUtc": "2026-10-02T05:42:59.718718+00:00",
+  "argv": [
+    "taskset",
+    "-c",
+    "2",
+    "/opt/codex/runtimes/codex-primary-runtime/dependencies/python/bin/python3",
+    "/tmp/motion-ops-measurement-939e-20261002/prepare-readset.py"
+  ],
+  "childPid": 737832,
+  "exitCode": 0,
+  "cpu": 2,
+  "action": "metadata readset/report/manifest finalization only; no new source confirmations or product execution",
+  "allEND": true,
+  "allChildrenJoined": true,
+  "heavy": 0,
+  "queued": 0,
+  "SUTExecutions": 0,
+  "seriesLaunches": 0,
+  "nativeExecutions": 0,
+  "newConsumerExecutions": 0,
+  "stopOwnExecAfterSeal": true,
+  "primaryNativeControlActualEndUtc": "2026-10-02T05:02:47.474210+00:00",
+  "primaryNativeControlActualExit": 0,
+  "currentGatesActualEndUtc": "2026-10-02T05:11:58.543358+00:00",
+  "currentGatesActualExit": 0
+}

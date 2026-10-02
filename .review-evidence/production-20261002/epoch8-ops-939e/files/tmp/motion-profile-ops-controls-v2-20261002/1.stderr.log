@@ -1,0 +1,28 @@
+node:internal/modules/run_main:107
+    triggerUncaughtException(
+    ^
+
+AssertionError [ERR_ASSERTION]: Warning: Detected unsettled top-level await at file:///workspace/lab-motion/test/fixtures/server-thread-cpu-clock-check.mjs:191
+  try { process.stdout.write(JSON.stringify(await child(process.argv[3], process.argv[4])) + '\n'); }
+                                            ^
+
+
+
+
+
+13 !== 0
+
+    at ChildProcess.<anonymous> (file:///workspace/lab-motion/test/fixtures/server-thread-cpu-clock-check.mjs:140:64)
+    at Object.onceWrapper (node:events:631:26)
+    at ChildProcess.emit (node:events:509:28)
+    at maybeClose (node:internal/child_process:1141:16)
+    at ChildProcess._handle.onexit (node:internal/child_process:306:5) {
+  generatedMessage: false,
+  code: 'ERR_ASSERTION',
+  actual: 13,
+  expected: 0,
+  operator: 'strictEqual',
+  diff: 'simple'
+}
+
+Node.js v24.19.0

@@ -1,0 +1,22 @@
+{
+  "topKeys": [
+    "schema",
+    "protocol",
+    "registration",
+    "registrationDigest",
+    "verdict",
+    "failures",
+    "warmup",
+    "gc",
+    "stages",
+    "jitObservation",
+    "engineClockPreparation",
+    "rawControls",
+    "pilot",
+    "samplePlan",
+    "frozenPlanDigest",
+    "aa",
+    "finishedAt"
+  ],
+  "journalLines": 925
+}

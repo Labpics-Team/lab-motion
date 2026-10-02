@@ -1,0 +1,7 @@
+{
+  "startUtc": "2026-10-02T04:43:58.674786+00:00",
+  "cpu": 2,
+  "scope": "single immutable epoch8 actual prefix; no SUT rerun; no mutable/future CLI read",
+  "heavy": 0,
+  "queued": 0
+}

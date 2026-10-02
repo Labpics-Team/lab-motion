@@ -1,0 +1,207 @@
+{
+  "createdAtUtc": "2026-10-02T05:08:15.204115+00:00",
+  "base": "fe092331360837fd7f63d71a4b7f867ba849ebd4",
+  "head": "939e7f4a7ebef2dd494f9dec8690932fecebfd73",
+  "tree": "deba4db1952029bdb7d2244b207f570007700b19",
+  "branch": "codex/motion-production-20261001",
+  "sourceClean": true,
+  "changedPaths": [
+    "bench/profile/server-profile-registration.mjs",
+    "bench/profile/server-profile-runner.mjs",
+    "docs/server-profile.md",
+    "test/fixtures/server-thread-cpu-clock-check.mjs",
+    "test/server-profile-contract.test.ts"
+  ],
+  "scope": "PRIMARY only: immutable source, diff, exact preserved owners, current control output including initial failed fixtures, and original registered raw reference. No author/reviewer REPORTs.",
+  "files": {
+    "SOURCE-CONSERVATION.json": {
+      "path": "/tmp/motion-profile-ops-939e7f4a-20261002/SOURCE-CONSERVATION.json",
+      "bytes": 2206,
+      "sha256": "43910c9395b9909c90e337d48e963e5571b75ca406a9b62cd82842248a77ee01"
+    },
+    "source.tar.gz": {
+      "path": "/tmp/motion-profile-ops-939e7f4a-20261002/source.tar.gz",
+      "bytes": 1773271,
+      "sha256": "8661dbd05016c95e309307c062d55e52b9e01045afbdde93f19b0f813339fa70"
+    },
+    "changed-paths.txt": {
+      "path": "/tmp/motion-profile-ops-939e7f4a-20261002/changed-paths.txt",
+      "bytes": 194,
+      "sha256": "a162569b45cfb91a9623cf08fc822e14bcfb0b4d3a7d753e4bff2059df73e7c3"
+    },
+    "source.diff": {
+      "path": "/tmp/motion-profile-ops-939e7f4a-20261002/source.diff",
+      "bytes": 30495,
+      "sha256": "4ba846fa1c8d3d8b41e4fd250d7cf45607dfe4128f49b35661622483c4b2045d"
+    },
+    "tree.txt": {
+      "path": "/tmp/motion-profile-ops-939e7f4a-20261002/tree.txt",
+      "bytes": 54508,
+      "sha256": "c0a576e104ea4fe0847e8a352dd0e7918c35f3f03227d7cd2d232fd43dda96f6"
+    },
+    "commit.txt": {
+      "path": "/tmp/motion-profile-ops-939e7f4a-20261002/commit.txt",
+      "bytes": 350,
+      "sha256": "26e4a8d87d4260f0858181e37f55b5e0c268063c69646402f1d83ceca08031b9"
+    },
+    "source:bench/profile/server-profile-registration.mjs": {
+      "path": "/workspace/lab-motion/bench/profile/server-profile-registration.mjs",
+      "bytes": 19123,
+      "sha256": "7c9c6bf65341fb023d4db2e45a01ef9bacf5246a7af3c62385f15f8523be396f"
+    },
+    "source:bench/profile/server-profile-runner.mjs": {
+      "path": "/workspace/lab-motion/bench/profile/server-profile-runner.mjs",
+      "bytes": 53215,
+      "sha256": "a3f39c0aa74d2458060bff6bf7540f251d527cecbae29f52f6f5848cd254ae91"
+    },
+    "source:docs/server-profile.md": {
+      "path": "/workspace/lab-motion/docs/server-profile.md",
+      "bytes": 6356,
+      "sha256": "60ee167808782eea22d154f93bfaf52aa68ab16b487077047c928ed8e2ebe2bf"
+    },
+    "source:test/fixtures/server-thread-cpu-clock-check.mjs": {
+      "path": "/workspace/lab-motion/test/fixtures/server-thread-cpu-clock-check.mjs",
+      "bytes": 12296,
+      "sha256": "1e7ba0af37efb8f774ba0217965addff60a56cc9b2de7ef2c8964262b96e5390"
+    },
+    "source:test/server-profile-contract.test.ts": {
+      "path": "/workspace/lab-motion/test/server-profile-contract.test.ts",
+      "bytes": 105078,
+      "sha256": "c599cfebb8c77841adf74214083aecd89b6f12df22012cecdc4ee5c56ca3d1fa"
+    },
+    "/tmp/motion-profile-ops-controls-20261002/execution.json": {
+      "path": "/tmp/motion-profile-ops-controls-20261002/execution.json",
+      "bytes": 1361,
+      "sha256": "9ce38d04f5fda1ead4a8e574532d563ce7b4e681850137968ea17acaedea8848"
+    },
+    "/tmp/motion-profile-ops-controls-20261002/vitest-result.json": {
+      "path": "/tmp/motion-profile-ops-controls-20261002/vitest-result.json",
+      "bytes": 85213,
+      "sha256": "0cf6a5740cde96041aa827896080914e00d028bb0ffe91da57db5a6245094823"
+    },
+    "/tmp/motion-profile-ops-controls-20261002/0.stdout.log": {
+      "path": "/tmp/motion-profile-ops-controls-20261002/0.stdout.log",
+      "bytes": 137,
+      "sha256": "24e2b25103b4a1ec6ad1d9f75ec78776ba095c9b8dc9f39363423ead2a450ab8"
+    },
+    "/tmp/motion-profile-ops-controls-20261002/0.stderr.log": {
+      "path": "/tmp/motion-profile-ops-controls-20261002/0.stderr.log",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    "/tmp/motion-profile-ops-controls-v2-20261002/execution.json": {
+      "path": "/tmp/motion-profile-ops-controls-v2-20261002/execution.json",
+      "bytes": 2386,
+      "sha256": "600f54a3bfe6f75c206eb0df0e59768325a84934f5c43d0724d08b798b73aa90"
+    },
+    "/tmp/motion-profile-ops-controls-v2-20261002/vitest-result.json": {
+      "path": "/tmp/motion-profile-ops-controls-v2-20261002/vitest-result.json",
+      "bytes": 83950,
+      "sha256": "2c8f97e4fccbdc185f6a0c61ee04ecaf5ee2ec1e5c711ef50cdb234c0ed8fa32"
+    },
+    "/tmp/motion-profile-ops-controls-v2-20261002/0.stdout.log": {
+      "path": "/tmp/motion-profile-ops-controls-v2-20261002/0.stdout.log",
+      "bytes": 140,
+      "sha256": "8dddd9bcc4494202485fe003cfe633f0fe77fdadec7fc95b7de91c754690f90b"
+    },
+    "/tmp/motion-profile-ops-controls-v2-20261002/0.stderr.log": {
+      "path": "/tmp/motion-profile-ops-controls-v2-20261002/0.stderr.log",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    "/tmp/motion-profile-ops-controls-v2-20261002/1.stdout.log": {
+      "path": "/tmp/motion-profile-ops-controls-v2-20261002/1.stdout.log",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    "/tmp/motion-profile-ops-controls-v2-20261002/1.stderr.log": {
+      "path": "/tmp/motion-profile-ops-controls-v2-20261002/1.stderr.log",
+      "bytes": 880,
+      "sha256": "b2c865c498fe25e80e0df555e66005c382003021416a151d2ed771f33f04e6ef"
+    },
+    "/tmp/motion-profile-ops-native-v3-20261002/execution.json": {
+      "path": "/tmp/motion-profile-ops-native-v3-20261002/execution.json",
+      "bytes": 1018,
+      "sha256": "203924d5c8bfdf809e33e64eaf6058169f229ec82dd756f1d769b5b57d6c92a9"
+    },
+    "/tmp/motion-profile-ops-native-v3-20261002/stdout.log": {
+      "path": "/tmp/motion-profile-ops-native-v3-20261002/stdout.log",
+      "bytes": 43396,
+      "sha256": "5d2ed60a3744a12c669cf81acbd61fa5cafccacfe5e9372bc7e5e09a8237f876"
+    },
+    "/tmp/motion-profile-ops-native-v3-20261002/stderr.log": {
+      "path": "/tmp/motion-profile-ops-native-v3-20261002/stderr.log",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    "/tmp/motion-qualified-fe092331-20261002/PRIMARY-PACKET.json": {
+      "path": "/tmp/motion-qualified-fe092331-20261002/PRIMARY-PACKET.json",
+      "bytes": 7130,
+      "sha256": "4184a52ea58d4f3b27e7cd4c571425c51efda578f1a283b2aab396dd0659e29e"
+    },
+    "/tmp/motion-server-predata-fe092331-ce535cf6-20261002-epoch8/FINAL-RAW-PRIMARY/PRIMARY-PACKET.json": {
+      "path": "/tmp/motion-server-predata-fe092331-ce535cf6-20261002-epoch8/FINAL-RAW-PRIMARY/PRIMARY-PACKET.json",
+      "bytes": 7689,
+      "sha256": "faa1eca3ff8b228ef2b57f6492e3c2ff3fad208ec8419e408dcf5ffee3313860"
+    }
+  },
+  "norms": {
+    "/workspace/agents-config/AGENTS.md": {
+      "path": "/workspace/agents-config/AGENTS.md",
+      "bytes": 38398,
+      "sha256": "0e1376312cedf91660b1c919ba4c1a9a6e067fe8719eb8daeb52113508b28f0a"
+    },
+    "/workspace/agents-config/plans/SPEC.md": {
+      "path": "/workspace/agents-config/plans/SPEC.md",
+      "bytes": 31491,
+      "sha256": "7488d5885ee2405d678e488e34a84ce48254978c3a6ad3de2e4d31dfe7b3f651"
+    }
+  },
+  "sourceFunctionConservation": {
+    "measureServerEngine": {
+      "beforeSha256": "d1d9d9964e020a59db34dd61f5bb458ea78a5fb1db3f1ed724e1d629e6db784b",
+      "afterSha256": "d1d9d9964e020a59db34dd61f5bb458ea78a5fb1db3f1ed724e1d629e6db784b",
+      "byteIdentical": true
+    },
+    "measureServerBrowser": {
+      "beforeSha256": "4b5722fe1cc357062a912f8786f4f59af41b47eb0f824fa503c0712de0d6771b",
+      "afterSha256": "4b5722fe1cc357062a912f8786f4f59af41b47eb0f824fa503c0712de0d6771b",
+      "byteIdentical": true
+    },
+    "bench/profile/server-thread-cpu-clock.mjs": {
+      "beforeSha256": "bb31090e4beaa6d4bc4dcc7789d0993672630e091fca65957174988c58ddba71",
+      "afterSha256": "bb31090e4beaa6d4bc4dcc7789d0993672630e091fca65957174988c58ddba71",
+      "byteIdentical": true
+    },
+    "bench/profile/server-thread-cpu-clock.c": {
+      "beforeSha256": "4f32f23c2409c3e83943121a587c8d9f5e19af7f308ac987323ff4189ddd14c0",
+      "afterSha256": "4f32f23c2409c3e83943121a587c8d9f5e19af7f308ac987323ff4189ddd14c0",
+      "byteIdentical": true
+    },
+    "bench/profile/server-profile-contract.mjs": {
+      "beforeSha256": "ba6d365e3faf623cc8da5dae78ff2bfa3288529b9640052a0474d55d8e33d72e",
+      "afterSha256": "ba6d365e3faf623cc8da5dae78ff2bfa3288529b9640052a0474d55d8e33d72e",
+      "byteIdentical": true
+    },
+    "scripts/bench-transform-support.mjs": {
+      "beforeSha256": "fcb531d342cb6e72ea06acb16bc5fc25f52440aa9c6aff8c7e09f2215476850c",
+      "afterSha256": "fcb531d342cb6e72ea06acb16bc5fc25f52440aa9c6aff8c7e09f2215476850c",
+      "byteIdentical": true
+    },
+    "scripts/bench-support.mjs": {
+      "beforeSha256": "2fb04fcfd34788870649982724f1166cb4c14a78ae1c44544028565db8208e05",
+      "afterSha256": "2fb04fcfd34788870649982724f1166cb4c14a78ae1c44544028565db8208e05",
+      "byteIdentical": true
+    },
+    "bench/compare/methodology.mjs": {
+      "beforeSha256": "a6440e56752573684809765ba992ce01b0993a889e130f16eb870cd1fcbcda87",
+      "afterSha256": "a6440e56752573684809765ba992ce01b0993a889e130f16eb870cd1fcbcda87",
+      "byteIdentical": true
+    },
+    "bench/compare/provenance.mjs": {
+      "beforeSha256": "51881a4a6ea2e1ad0330888e7e1b9c8b6e7c7aef3a3eb798a4185c7c3b846623",
+      "afterSha256": "51881a4a6ea2e1ad0330888e7e1b9c8b6e7c7aef3a3eb798a4185c7c3b846623",
+      "byteIdentical": true
+    }
+  }
+}

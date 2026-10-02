@@ -1,0 +1,225 @@
+{
+  "at": "2026-10-02T04:46:24.126615+00:00",
+  "sourceHead": "fe092331360837fd7f63d71a4b7f867ba849ebd4",
+  "protocolDigest": "ce535cf6d6f0b0f140d44403627b63d936ef2461883a52680e7bbcad3ee49e5a",
+  "clockModelDigest": "04d863513d53b248b1be3e0905240f3bd6f4d06124582ce3093c2cbfe5320852",
+  "primary": {
+    "path": "/tmp/motion-server-predata-fe092331-ce535cf6-20261002-epoch8/FINAL-RAW-PRIMARY/PRIMARY-PACKET.json",
+    "bytes": 7689,
+    "sha256": "faa1eca3ff8b228ef2b57f6492e3c2ff3fad208ec8419e408dcf5ffee3313860"
+  },
+  "all28BindingsMatch": true,
+  "bindings": [
+    {
+      "name": "server-profile.json",
+      "path": "/tmp/motion-server-series-fe092331-ce535cf6-20261002-epoch8/server-profile.json",
+      "bytes": 21741898,
+      "sha256": "d098aad5475f93813cf47c096d9a1c0335e73949730903dd2cfd4190fa038975",
+      "match": true
+    },
+    {
+      "name": "server-profile.json.gz",
+      "path": "/tmp/motion-server-predata-fe092331-ce535cf6-20261002-epoch8/FINAL-RAW-PRIMARY/server-profile.json.gz",
+      "bytes": 1781895,
+      "sha256": "4618e5c3b870972a4f61b4710d499f640b6a1fc10b0b3e0b0af35baf420b7e7e",
+      "match": true
+    },
+    {
+      "name": "journal.ndjson",
+      "path": "/tmp/motion-server-series-fe092331-ce535cf6-20261002-epoch8/journal.ndjson",
+      "bytes": 21768420,
+      "sha256": "8552cce134e3778fa0516912f4f628d21de834e9b284006147c4ab128aa387cb",
+      "match": true
+    },
+    {
+      "name": "journal.ndjson.gz",
+      "path": "/tmp/motion-server-predata-fe092331-ce535cf6-20261002-epoch8/FINAL-RAW-PRIMARY/journal.ndjson.gz",
+      "bytes": 1815397,
+      "sha256": "220b096840cc09681ee1b1a43a13461c04aca3d9608e0fff98b0946697e190ee",
+      "match": true
+    },
+    {
+      "name": "server-profile.sha256",
+      "path": "/tmp/motion-server-series-fe092331-ce535cf6-20261002-epoch8/server-profile.sha256",
+      "bytes": 86,
+      "sha256": "b97c00cdcc86df9044dd9e34cc432e8b3498fa50e6fd84cf04593f77c64b32b1",
+      "match": true
+    },
+    {
+      "name": "baseline-no-motion-after.png",
+      "path": "/tmp/motion-server-series-fe092331-ce535cf6-20261002-epoch8/baseline-no-motion-after.png",
+      "bytes": 1013,
+      "sha256": "dababf13392d9d7ed0a62d1fa3653e4ee5d73783e36207781fc66109b7e68f6f",
+      "match": true
+    },
+    {
+      "name": "baseline-no-motion-before.png",
+      "path": "/tmp/motion-server-series-fe092331-ce535cf6-20261002-epoch8/baseline-no-motion-before.png",
+      "bytes": 1013,
+      "sha256": "dababf13392d9d7ed0a62d1fa3653e4ee5d73783e36207781fc66109b7e68f6f",
+      "match": true
+    },
+    {
+      "name": "baseline.iife.js",
+      "path": "/tmp/motion-server-series-fe092331-ce535cf6-20261002-epoch8/baseline.iife.js",
+      "bytes": 39800,
+      "sha256": "28ff5f138dd63b0e350787d949149950a9ba2639e0f9869b86d811de0e6b6c23",
+      "match": true
+    },
+    {
+      "name": "candidate.iife.js",
+      "path": "/tmp/motion-server-series-fe092331-ce535cf6-20261002-epoch8/candidate.iife.js",
+      "bytes": 39801,
+      "sha256": "b47d627de92ed410fdeaaffa6467b772a993002b60797763bae8defc63e48553",
+      "match": true
+    },
+    {
+      "name": "motion.iife.js",
+      "path": "/tmp/motion-server-series-fe092331-ce535cf6-20261002-epoch8/motion.iife.js",
+      "bytes": 64148,
+      "sha256": "719e4ecca55eda3705e97b26f6f180482d42cc9582dc89ce684ae5484be88867",
+      "match": true
+    },
+    {
+      "name": "gsap.iife.js",
+      "path": "/tmp/motion-server-series-fe092331-ce535cf6-20261002-epoch8/gsap.iife.js",
+      "bytes": 70908,
+      "sha256": "805a3679343782b171062b14cca34d76f64d6f1c0ec2b5cb46439dab882bba89",
+      "match": true
+    },
+    {
+      "name": "anime.iife.js",
+      "path": "/tmp/motion-server-series-fe092331-ce535cf6-20261002-epoch8/anime.iife.js",
+      "bytes": 34774,
+      "sha256": "d09f840f71a92abc049dec089b71960909435ba52ebb911ea40fcf08876bf0fd",
+      "match": true
+    },
+    {
+      "name": "waapi-ctl.iife.js",
+      "path": "/tmp/motion-server-series-fe092331-ce535cf6-20261002-epoch8/waapi-ctl.iife.js",
+      "bytes": 1035,
+      "sha256": "2ab1c372e3cb739cd42496ef655f5300d2a9bffc41e9367470afad21718be2b8",
+      "match": true
+    },
+    {
+      "name": "motion-mini.iife.js",
+      "path": "/tmp/motion-server-series-fe092331-ce535cf6-20261002-epoch8/motion-mini.iife.js",
+      "bytes": 8534,
+      "sha256": "c3ac5aff06c25db7e48dcbbb6d2310aeac17721d210ea5cd097bd7e1361849c4",
+      "match": true
+    },
+    {
+      "name": "anime-waapi.iife.js",
+      "path": "/tmp/motion-server-series-fe092331-ce535cf6-20261002-epoch8/anime-waapi.iife.js",
+      "bytes": 10643,
+      "sha256": "397432a5365ef786c63484ebed417494067211c4683307a3568658f5ca583051",
+      "match": true
+    },
+    {
+      "name": "actual-launch.json",
+      "path": "/tmp/motion-server-predata-fe092331-ce535cf6-20261002-epoch8/actual-launch.json",
+      "bytes": 1531,
+      "sha256": "40ab4bd6f21f3ddb6300d8eab8750b006c92e5054aad76ad28db847c7d48f0cb",
+      "match": true
+    },
+    {
+      "name": "actual-execution.json",
+      "path": "/tmp/motion-server-predata-fe092331-ce535cf6-20261002-epoch8/actual-execution.json",
+      "bytes": 1357,
+      "sha256": "aa6092fd9ae8908717d9e428fa2b860e3a84bdca82a3fa6f2f846bae3aa24db3",
+      "match": true
+    },
+    {
+      "name": "actual.stdout.log",
+      "path": "/tmp/motion-server-predata-fe092331-ce535cf6-20261002-epoch8/actual.stdout.log",
+      "bytes": 12167,
+      "sha256": "c58fcea7dae8459827289a43b1780d5b8b1a4b08b69859599a7a1b048d6c74dd",
+      "match": true
+    },
+    {
+      "name": "actual.stderr.log",
+      "path": "/tmp/motion-server-predata-fe092331-ce535cf6-20261002-epoch8/actual.stderr.log",
+      "bytes": 2422,
+      "sha256": "2298ae67ff318554d651985a635b130bd671d3303d661df8e180d33eb0760c87",
+      "match": true
+    },
+    {
+      "name": "OPERATOR-STOP-BEFORE-SIGNAL.json",
+      "path": "/tmp/motion-server-predata-fe092331-ce535cf6-20261002-epoch8/OPERATOR-STOP-BEFORE-SIGNAL.json",
+      "bytes": 1705,
+      "sha256": "b045fffd16b7bc52063bad921f5a5b54158d2e57743b426b03bef935a3c152cb",
+      "match": true
+    },
+    {
+      "name": "OPERATOR-SIGNAL.json",
+      "path": "/tmp/motion-server-predata-fe092331-ce535cf6-20261002-epoch8/OPERATOR-SIGNAL.json",
+      "bytes": 253,
+      "sha256": "a5248ea8f4665a18fde79ce8c057a85156de90bfbb734aa25d3338c30d874f2d",
+      "match": true
+    },
+    {
+      "name": "PROCESS-RETIREMENT.json",
+      "path": "/tmp/motion-server-predata-fe092331-ce535cf6-20261002-epoch8/PROCESS-RETIREMENT.json",
+      "bytes": 870,
+      "sha256": "2ed7225b9d127a326d82b10369428bd0041c5a2a0b346ae24774661e70767c4c",
+      "match": true
+    },
+    {
+      "name": "FINAL-SMALL-CHECK.json",
+      "path": "/tmp/motion-server-predata-fe092331-ce535cf6-20261002-epoch8/FINAL-SMALL-CHECK.json",
+      "bytes": 512,
+      "sha256": "51f0b7b3cc32c07b3cba1e99d32ddc15bc1f3b354c704c1d7966c4206d649c68",
+      "match": true
+    },
+    {
+      "name": "ROOT-QUIET-GRANT.json",
+      "path": "/tmp/motion-server-predata-fe092331-ce535cf6-20261002-epoch8/ROOT-QUIET-GRANT.json",
+      "bytes": 3636,
+      "sha256": "aa7c1cde93eac70f5b37164fe31f6bb5fa2842d7480a20f678cf9658fc3d6e54",
+      "match": true
+    },
+    {
+      "name": "predata-tuple.json",
+      "path": "/tmp/motion-server-predata-fe092331-ce535cf6-20261002-epoch8/predata-tuple.json",
+      "bytes": 41722,
+      "sha256": "5bcaa87d3349231591f4c8718e44e41c851f50d17bd3d52ae1c32d4eaca77ec5",
+      "match": true
+    },
+    {
+      "name": "PRIMARY-PREDATA-PACKET.json",
+      "path": "/tmp/motion-server-predata-fe092331-ce535cf6-20261002-epoch8/PRIMARY-PREDATA-PACKET.json",
+      "bytes": 3641,
+      "sha256": "1b6a07037f7511876370df46f6c0ae9ea70b51fa473093083d1ce2dbd271cd26",
+      "match": true
+    },
+    {
+      "name": "RAW-SUMMARY.json",
+      "path": "/tmp/motion-server-predata-fe092331-ce535cf6-20261002-epoch8/FINAL-RAW-PRIMARY/RAW-SUMMARY.json",
+      "bytes": 7323,
+      "sha256": "13ecfc8e7ec317b5053d8180960a52331c761599e082117ab75a7a6fd65500a4",
+      "match": true
+    },
+    {
+      "name": "PROCESS-RETIREMENT-QUALIFIED.json",
+      "path": "/tmp/motion-server-predata-fe092331-ce535cf6-20261002-epoch8/FINAL-RAW-PRIMARY/PROCESS-RETIREMENT-QUALIFIED.json",
+      "bytes": 424,
+      "sha256": "a5ff846425359a697553243f61d7a00b9f3c74efa5314c43cabd9b7449749b41",
+      "match": true
+    }
+  ],
+  "losslessGzipReadback": [
+    {
+      "name": "server-profile.json",
+      "bytes": 21741898,
+      "sha256": "d098aad5475f93813cf47c096d9a1c0335e73949730903dd2cfd4190fa038975",
+      "exact": true
+    },
+    {
+      "name": "journal.ndjson",
+      "bytes": 21768420,
+      "sha256": "8552cce134e3778fa0516912f4f628d21de834e9b284006147c4ab128aa387cb",
+      "exact": true
+    }
+  ],
+  "scope": "Только custody/bytes/сжатие и rawprimary полное чтение. Семантика данных/производительность/NI/количество samples не удостоверяются этим readback; независимая actualprefix ось работает отдельно."
+}

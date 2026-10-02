@@ -1,0 +1,417 @@
+{
+  "schema": "independent-ops939e-readset-v1",
+  "sourceHead": "939e7f4a7ebef2dd494f9dec8690932fecebfd73",
+  "sourceTree": "deba4db1952029bdb7d2244b207f570007700b19",
+  "axis": "five-path ops correctness/measurement boundary",
+  "records": [
+    {
+      "utc": "2026-10-02T05:23:06.138129+00:00",
+      "path": "/tmp/motion-ops-measurement-939e-20261002/source/test/fixtures/server-thread-cpu-clock-check.mjs",
+      "category": "source",
+      "bytes": 12296,
+      "sha256": "1e7ba0af37efb8f774ba0217965addff60a56cc9b2de7ef2c8964262b96e5390",
+      "reviewedLines": [
+        1,
+        195
+      ],
+      "totalLines": 195
+    },
+    {
+      "utc": "2026-10-02T05:23:06.154937+00:00",
+      "path": "/tmp/motion-ops-measurement-939e-20261002/source/bench/profile/server-profile-runner.mjs",
+      "category": "source",
+      "bytes": 53215,
+      "sha256": "a3f39c0aa74d2458060bff6bf7540f251d527cecbae29f52f6f5848cd254ae91",
+      "reviewedLines": [
+        524,
+        744
+      ],
+      "totalLines": 744
+    },
+    {
+      "utc": "2026-10-02T05:23:06.159442+00:00",
+      "path": "/tmp/motion-ops-measurement-939e-20261002/source/bench/profile/server-profile-contract.mjs",
+      "category": "source",
+      "bytes": 73913,
+      "sha256": "ba6d365e3faf623cc8da5dae78ff2bfa3288529b9640052a0474d55d8e33d72e",
+      "reviewedLines": [
+        592,
+        700
+      ],
+      "totalLines": 963
+    },
+    {
+      "utc": "2026-10-02T05:26:01.442790+00:00",
+      "category": "raw-control-results",
+      "path": "/tmp/motion-ops-measurement-939e-20261002/PRIMARY/primary/tmp/motion-profile-ops-controls-20261002/execution.json",
+      "bytes": 1361,
+      "sha256": "9ce38d04f5fda1ead4a8e574532d563ce7b4e681850137968ea17acaedea8848",
+      "reviewedScope": "Full receipt/JSON parsing and independent literal assertion counts; target assertions/errors; author parsed verdict files unused"
+    },
+    {
+      "utc": "2026-10-02T05:26:01.442895+00:00",
+      "category": "raw-control-results",
+      "path": "/tmp/motion-ops-measurement-939e-20261002/PRIMARY/primary/tmp/motion-profile-ops-controls-20261002/vitest-result.json",
+      "bytes": 85213,
+      "sha256": "0cf6a5740cde96041aa827896080914e00d028bb0ffe91da57db5a6245094823",
+      "reviewedScope": "Full receipt/JSON parsing and independent literal assertion counts; target assertions/errors; author parsed verdict files unused"
+    },
+    {
+      "utc": "2026-10-02T05:26:01.444092+00:00",
+      "category": "raw-control-results",
+      "path": "/tmp/motion-ops-measurement-939e-20261002/PRIMARY/primary/tmp/motion-profile-ops-controls-v2-20261002/execution.json",
+      "bytes": 2386,
+      "sha256": "600f54a3bfe6f75c206eb0df0e59768325a84934f5c43d0724d08b798b73aa90",
+      "reviewedScope": "Full receipt/JSON parsing and independent literal assertion counts; target assertions/errors; author parsed verdict files unused"
+    },
+    {
+      "utc": "2026-10-02T05:26:01.444158+00:00",
+      "category": "raw-control-results",
+      "path": "/tmp/motion-ops-measurement-939e-20261002/PRIMARY/primary/tmp/motion-profile-ops-controls-v2-20261002/vitest-result.json",
+      "bytes": 83950,
+      "sha256": "2c8f97e4fccbdc185f6a0c61ee04ecaf5ee2ec1e5c711ef50cdb234c0ed8fa32",
+      "reviewedScope": "Full receipt/JSON parsing and independent literal assertion counts; target assertions/errors; author parsed verdict files unused"
+    },
+    {
+      "utc": "2026-10-02T05:26:01.444418+00:00",
+      "category": "raw-control-results",
+      "path": "/tmp/motion-ops-measurement-939e-20261002/PRIMARY/primary/tmp/motion-profile-ops-controls-v2-20261002/1.stderr.log",
+      "bytes": 880,
+      "sha256": "b2c865c498fe25e80e0df555e66005c382003021416a151d2ed771f33f04e6ef",
+      "reviewedScope": "Full receipt/JSON parsing and independent literal assertion counts; target assertions/errors; author parsed verdict files unused"
+    },
+    {
+      "utc": "2026-10-02T05:26:01.444769+00:00",
+      "category": "raw-control-results",
+      "path": "/tmp/motion-ops-measurement-939e-20261002/PRIMARY/primary/tmp/motion-profile-ops-native-v3-20261002/execution.json",
+      "bytes": 1018,
+      "sha256": "203924d5c8bfdf809e33e64eaf6058169f229ec82dd756f1d769b5b57d6c92a9",
+      "reviewedScope": "Full receipt/JSON parsing and independent literal assertion counts; target assertions/errors; author parsed verdict files unused"
+    },
+    {
+      "utc": "2026-10-02T05:26:01.444841+00:00",
+      "category": "raw-control-results",
+      "path": "/tmp/motion-ops-measurement-939e-20261002/PRIMARY/primary/tmp/motion-profile-ops-native-v3-20261002/stderr.log",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "reviewedScope": "Full receipt/JSON parsing and independent literal assertion counts; target assertions/errors; author parsed verdict files unused"
+    },
+    {
+      "utc": "2026-10-02T05:26:01.464755+00:00",
+      "category": "raw-control-results",
+      "path": "/tmp/motion-ops-measurement-939e-20261002/PRIMARY/supplement/tmp/motion-profile-ops-current-gates-939e7f4a-20261002/receipt.json",
+      "bytes": 7279,
+      "sha256": "2e9262d758c2571143723dbdb1daaa5dd952d86de45f3f48cc446468e0cb3c9f",
+      "reviewedScope": "Full receipt/JSON parsing and independent literal assertion counts; target assertions/errors; author parsed verdict files unused"
+    },
+    {
+      "utc": "2026-10-02T05:26:01.465990+00:00",
+      "category": "raw-control-results",
+      "path": "/tmp/motion-ops-measurement-939e-20261002/PRIMARY/supplement/tmp/motion-profile-ops-current-gates-939e7f4a-20261002/whole.json",
+      "bytes": 2143666,
+      "sha256": "1c5eee6be5a31c19f4f4218c4c029039180f214f9187f20cb8352b159c053650",
+      "reviewedScope": "Full receipt/JSON parsing and independent literal assertion counts; target assertions/errors; author parsed verdict files unused"
+    },
+    {
+      "utc": "2026-10-02T05:28:15.878043+00:00",
+      "path": "/tmp/motion-ops-measurement-939e-20261002/source/bench/profile/server-profile-runner.mjs",
+      "category": "source",
+      "bytes": 53215,
+      "sha256": "a3f39c0aa74d2458060bff6bf7540f251d527cecbae29f52f6f5848cd254ae91",
+      "reviewedLines": [
+        89,
+        137
+      ],
+      "totalLines": 744
+    },
+    {
+      "utc": "2026-10-02T05:28:16.076276+00:00",
+      "path": "/tmp/motion-ops-measurement-939e-20261002/source/test/server-profile-contract.test.ts",
+      "category": "source",
+      "bytes": 105078,
+      "sha256": "c599cfebb8c77841adf74214083aecd89b6f12df22012cecdc4ee5c56ca3d1fa",
+      "reviewedLines": [
+        870,
+        960
+      ],
+      "totalLines": 1389
+    },
+    {
+      "utc": "2026-10-02T05:30:28.624291+00:00",
+      "path": "/tmp/motion-ops-measurement-939e-20261002/source/docs/server-profile.md",
+      "category": "source-claims",
+      "bytes": 6356,
+      "sha256": "60ee167808782eea22d154f93bfaf52aa68ab16b487077047c928ed8e2ebe2bf",
+      "reviewedLines": [
+        1,
+        76
+      ],
+      "totalLines": 76
+    },
+    {
+      "utc": "2026-10-02T05:30:28.842440+00:00",
+      "path": "/tmp/motion-ops-measurement-939e-20261002/source/bench/profile/server-profile-registration.mjs",
+      "category": "source",
+      "bytes": 19123,
+      "sha256": "7c9c6bf65341fb023d4db2e45a01ef9bacf5246a7af3c62385f15f8523be396f",
+      "reviewedLines": [
+        49,
+        83
+      ],
+      "totalLines": 183
+    },
+    {
+      "utc": "2026-10-02T05:32:09.828739+00:00",
+      "path": "/tmp/motion-ops-measurement-939e-20261002/source/test/server-profile-contract.test.ts",
+      "category": "source",
+      "bytes": 105078,
+      "sha256": "c599cfebb8c77841adf74214083aecd89b6f12df22012cecdc4ee5c56ca3d1fa",
+      "reviewedLines": [
+        14,
+        178
+      ],
+      "totalLines": 1389
+    },
+    {
+      "utc": "2026-10-02T05:32:10.039007+00:00",
+      "path": "/tmp/motion-ops-measurement-939e-20261002/source/bench/profile/server-profile-contract.mjs",
+      "category": "source",
+      "bytes": 73913,
+      "sha256": "ba6d365e3faf623cc8da5dae78ff2bfa3288529b9640052a0474d55d8e33d72e",
+      "reviewedLines": [
+        614,
+        640
+      ],
+      "totalLines": 963
+    },
+    {
+      "utc": "2026-10-02T05:32:10.230827+00:00",
+      "path": "/tmp/motion-ops-measurement-939e-20261002/source/bench/profile/server-profile-runner.mjs",
+      "category": "source",
+      "bytes": 53215,
+      "sha256": "a3f39c0aa74d2458060bff6bf7540f251d527cecbae29f52f6f5848cd254ae91",
+      "reviewedLines": [
+        30,
+        65
+      ],
+      "totalLines": 744
+    },
+    {
+      "utc": "2026-10-02T05:35:21.242701+00:00",
+      "category": "norm-binding",
+      "reviewedScope": "Exact current norm bytes transferred from own sealed fe proof",
+      "path": "/tmp/motion-ops-measurement-939e-20261002/norm/AGENTS.md",
+      "bytes": 38398,
+      "sha256": "0e1376312cedf91660b1c919ba4c1a9a6e067fe8719eb8daeb52113508b28f0a"
+    },
+    {
+      "utc": "2026-10-02T05:35:21.242900+00:00",
+      "category": "norm-binding",
+      "reviewedScope": "Exact current norm bytes transferred from own sealed fe proof",
+      "path": "/tmp/motion-ops-measurement-939e-20261002/norm/plans/SPEC.md",
+      "bytes": 31491,
+      "sha256": "7488d5885ee2405d678e488e34a84ce48254978c3a6ad3de2e4d31dfe7b3f651"
+    },
+    {
+      "utc": "2026-10-02T05:35:21.243036+00:00",
+      "category": "norm-binding",
+      "reviewedScope": "Exact current norm bytes transferred from own sealed fe proof",
+      "path": "/tmp/motion-ops-measurement-939e-20261002/norm/plans/TEMPLATE.md",
+      "bytes": 10270,
+      "sha256": "7f4cb8dcc983f392a01f2abdddc7b74527412b0da725b114cee94677c651a97e"
+    },
+    {
+      "utc": "2026-10-02T05:35:21.243177+00:00",
+      "category": "norm-binding",
+      "reviewedScope": "Exact current norm bytes transferred from own sealed fe proof",
+      "path": "/tmp/motion-ops-measurement-939e-20261002/norm/plans/lab-motion-production/ACTIVE.md",
+      "bytes": 235,
+      "sha256": "42e36c2efa89912aa00395c938263c1bf35275325420df52ec736b0986606731"
+    },
+    {
+      "utc": "2026-10-02T05:35:21.243251+00:00",
+      "category": "norm-binding",
+      "reviewedScope": "Exact current norm bytes transferred from own sealed fe proof",
+      "path": "/tmp/motion-ops-measurement-939e-20261002/norm/plans/lab-motion-production/CLAIM.md",
+      "bytes": 139,
+      "sha256": "56ac2167795a81b9d1a60d2ebc1cb8830a2653cbc45026bbcb2d0b0f8e837fa8"
+    },
+    {
+      "utc": "2026-10-02T05:35:21.243318+00:00",
+      "category": "norm-binding",
+      "reviewedScope": "Exact current norm bytes transferred from own sealed fe proof",
+      "path": "/tmp/motion-ops-measurement-939e-20261002/norm/plans/lab-motion-production/ACTIVATION.md",
+      "bytes": 194,
+      "sha256": "97e6b6ce4080b5c91d62e7ace5844a3c7aeeaa3bce04b21f832785bc807a4908"
+    },
+    {
+      "utc": "2026-10-02T05:35:21.243486+00:00",
+      "category": "norm-binding",
+      "reviewedScope": "Exact current norm bytes transferred from own sealed fe proof",
+      "path": "/tmp/motion-ops-measurement-939e-20261002/norm/plans/lab-motion-production/r11.md",
+      "bytes": 74166,
+      "sha256": "cbeef108b288502165437c375bb259f3f4d6dc8ae4ae9e926db133adeba40d4b"
+    },
+    {
+      "utc": "2026-10-02T05:35:21.243711+00:00",
+      "category": "norm-binding",
+      "reviewedScope": "Exact current norm bytes transferred from own sealed fe proof",
+      "path": "/tmp/motion-ops-measurement-939e-20261002/norm/plans/lab-motion-production/r12.md",
+      "bytes": 40024,
+      "sha256": "b2e6d1462b0bce43773beaf307e3b3963c426bf07134f49c844d4991e1753622"
+    },
+    {
+      "utc": "2026-10-02T05:35:21.252021+00:00",
+      "category": "source-primary-readback",
+      "reviewedScope": "Every exact immutable diff hunk, applied against own fe source in memory",
+      "path": "/tmp/motion-ops-measurement-939e-20261002/PRIMARY/primary/tmp/motion-profile-ops-939e7f4a-20261002/source.diff",
+      "bytes": 30495,
+      "sha256": "4ba846fa1c8d3d8b41e4fd250d7cf45607dfe4128f49b35661622483c4b2045d"
+    },
+    {
+      "utc": "2026-10-02T05:35:21.252100+00:00",
+      "category": "source-primary-readback",
+      "reviewedScope": "All 641 mode/blob bindings and full tree reconstruction",
+      "path": "/tmp/motion-ops-measurement-939e-20261002/PRIMARY/primary/tmp/motion-profile-ops-939e7f4a-20261002/tree.txt",
+      "bytes": 54508,
+      "sha256": "c0a576e104ea4fe0847e8a352dd0e7918c35f3f03227d7cd2d232fd43dda96f6"
+    },
+    {
+      "utc": "2026-10-02T05:35:21.252173+00:00",
+      "category": "source-primary-readback",
+      "reviewedScope": "Literal commit OID/tree/parent binding only; commit message hashed, not semantic oracle",
+      "path": "/tmp/motion-ops-measurement-939e-20261002/PRIMARY/primary/tmp/motion-profile-ops-939e7f4a-20261002/commit.txt",
+      "bytes": 350,
+      "sha256": "26e4a8d87d4260f0858181e37f55b5e0c268063c69646402f1d83ceca08031b9"
+    },
+    {
+      "utc": "2026-10-02T05:35:21.252201+00:00",
+      "category": "source-primary-readback",
+      "reviewedScope": "Full literal native records; exact C/host/mutants and both embedded signal artifact/journal SHA reconstructions",
+      "path": "/tmp/motion-ops-measurement-939e-20261002/PRIMARY/primary/tmp/motion-profile-ops-native-v3-20261002/stdout.log",
+      "bytes": 43396,
+      "sha256": "5d2ed60a3744a12c669cf81acbd61fa5cafccacfe5e9372bc7e5e09a8237f876"
+    },
+    {
+      "utc": "2026-10-02T05:35:21.252260+00:00",
+      "category": "source-primary-readback",
+      "reviewedScope": "Full current-head required command identity/start/end/exit/stdout stderr SHA bindings",
+      "path": "/tmp/motion-ops-measurement-939e-20261002/PRIMARY/supplement/tmp/motion-profile-ops-current-gates-939e7f4a-20261002/receipt.json",
+      "bytes": 7279,
+      "sha256": "2e9262d758c2571143723dbdb1daaa5dd952d86de45f3f48cc446468e0cb3c9f"
+    }
+  ],
+  "uniqueDirectReadPaths": 27,
+  "sourceConservationScope": {
+    "sourceFilesBound": 641,
+    "changedFiles": 5,
+    "unchangedFiles": 636,
+    "measuredAndSupportFunctions": {
+      "errorRecord": {
+        "bytes": 504,
+        "sha256": "4521e38326ee657ba4757130068e251d67d47cd3e9171f8ef414b8c4f160f096",
+        "byteIdentical": true,
+        "rangeRule": "top-level declaration through next top-level declaration"
+      },
+      "withBrowserTimeout": {
+        "bytes": 382,
+        "sha256": "c3a307cbdde1417f2d786db0065d7e11d00018f2e297a24fc700170c85f01d67",
+        "byteIdentical": true,
+        "rangeRule": "top-level declaration through next top-level declaration"
+      },
+      "createServerJournal": {
+        "bytes": 443,
+        "sha256": "84275cedaa1f8fb4db82a35f16f54235c83bde80b3641f7df9741773c80ae727",
+        "byteIdentical": true,
+        "rangeRule": "top-level declaration through next top-level declaration"
+      },
+      "measureServerEngine": {
+        "bytes": 2430,
+        "sha256": "d1d9d9964e020a59db34dd61f5bb458ea78a5fb1db3f1ed724e1d629e6db784b",
+        "byteIdentical": true,
+        "rangeRule": "top-level declaration through next top-level declaration"
+      },
+      "measureServerStockC": {
+        "bytes": 4439,
+        "sha256": "e61fe2e1b8f26ced5bdd823c28cd1e53857cbc616f6428f72e93c8a13794cf03",
+        "byteIdentical": true,
+        "rangeRule": "top-level declaration through next top-level declaration"
+      },
+      "browserTimerProbe": {
+        "bytes": 529,
+        "sha256": "b092841eb7c0eed2db28e6ac8e9249e5359024a910af1f2f0a8a5468302b66dc",
+        "byteIdentical": true,
+        "rangeRule": "top-level declaration through next top-level declaration"
+      },
+      "measureServerBrowser": {
+        "bytes": 11601,
+        "sha256": "4b5722fe1cc357062a912f8786f4f59af41b47eb0f824fa503c0712de0d6771b",
+        "byteIdentical": true,
+        "rangeRule": "top-level declaration through next top-level declaration"
+      },
+      "measureBrowserRawControls": {
+        "bytes": 3209,
+        "sha256": "586b480eacf82202e37279cebb6a5bb184f2dec8ccf9f5fb80499bc6cc4e3ef4",
+        "byteIdentical": true,
+        "rangeRule": "top-level declaration through next top-level declaration"
+      },
+      "makeRetention": {
+        "bytes": 700,
+        "sha256": "ffbc1f68fc642a8f34cd0b5f9f2c0c2ece100ebbf17f6500db74806433be66e8",
+        "byteIdentical": true,
+        "rangeRule": "top-level declaration through next top-level declaration"
+      }
+    },
+    "unchangedMathProofTransferred": true
+  },
+  "ownFeProofFiles": [
+    {
+      "path": "/tmp/motion-qualified-measurement-fe092-20261002/MANIFEST.json",
+      "bytes": 129076,
+      "sha256": "ae22831f4a79399d6fcff1607522cc5e9faf3635b90f20be544cbf7a65b6742d"
+    },
+    {
+      "path": "/tmp/motion-qualified-measurement-fe092-20261002/all-bindings.json",
+      "bytes": 298089,
+      "sha256": "3f557f476d586211dffab0582659930b6f99a39447cd803bafbb847c6f8ad8a8"
+    },
+    {
+      "path": "/tmp/motion-qualified-measurement-fe092-20261002/readset.json",
+      "bytes": 13269,
+      "sha256": "ee9942fd835a93e197c9d4db26527d96f53b59cf8eb19bdf6bf7401c948d10dd"
+    },
+    {
+      "path": "/tmp/motion-qualified-measurement-fe092-20261002/terminal.json",
+      "bytes": 1067,
+      "sha256": "67806faa1c789738a4d2732b5c31bfde49f6ba19da57b61ee856ceb706d4d587"
+    }
+  ],
+  "separateFeEpoch8ProofFiles": [
+    {
+      "path": "/tmp/motion-epoch8-actual-prefix-acceptance-20261002/MANIFEST.json",
+      "bytes": 14984,
+      "sha256": "17e84709214446baeb2d51730963dfe87cdc3fcb93a7d909fcad15da995a947a"
+    },
+    {
+      "path": "/tmp/motion-epoch8-actual-prefix-acceptance-20261002/REPORT.md",
+      "bytes": 21216,
+      "sha256": "9e465106777d6976ec2cc14d8253f38d744c3523331c9c8c8bf5d6edab640b67"
+    },
+    {
+      "path": "/tmp/motion-epoch8-actual-prefix-acceptance-20261002/terminal.json",
+      "bytes": 1232,
+      "sha256": "c27ef94ac68cee2ecc954877e074f0aaf1ce3aadac6583f9c2ae8cffd3fb8986"
+    }
+  ],
+  "runtimeBoundary": {
+    "SUTExecutions": 0,
+    "runnerExecutions": 0,
+    "nativeExecutions": 0,
+    "newConsumerExecutions": 0,
+    "seriesLaunches": 0,
+    "browserBuildProbes": 0,
+    "rawMetadataAnalysesOnly": true,
+    "heavy": 0,
+    "queued": 0
+  }
+}

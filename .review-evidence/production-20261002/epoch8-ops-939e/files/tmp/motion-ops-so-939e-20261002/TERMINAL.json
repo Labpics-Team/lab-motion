@@ -1,0 +1,24 @@
+{
+  "reviewer": "native_clock_second_order_acceptance",
+  "head": "939e7f4a7ebef2dd494f9dec8690932fecebfd73",
+  "axis": "second-order source architecture/operational lifecycle",
+  "actualStartUtc": "2026-10-02T05:08:59.711432+00:00",
+  "actualEndUtc": "2026-10-02T05:30:06.365614+00:00",
+  "exit": 0,
+  "artifactWriter": {
+    "startedAtUtc": "2026-10-02T05:30:06.308698+00:00",
+    "actualEndUtc": "2026-10-02T05:30:06.365614+00:00",
+    "exit": 0,
+    "allChildrenJoined": true
+  },
+  "allReadAndArtifactChildrenJoined": true,
+  "allEND": true,
+  "reviewerSutRuntimeProbesBuildBrowserSeriesPilot": 0,
+  "sourceNormTestsThresholdEvidenceMutations": 0,
+  "foreignVerdictOracle": false,
+  "cpuAffinity": "2",
+  "heavy": 0,
+  "queued": 0,
+  "state": "STOP after metadata seal; no source publication awaited",
+  "terminalScope": "actual artifact-writer completion observed by supervisor after wait; only review seal metadata writes follow"
+}

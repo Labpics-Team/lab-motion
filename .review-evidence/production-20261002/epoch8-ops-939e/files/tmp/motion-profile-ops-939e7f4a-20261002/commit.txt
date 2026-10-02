@@ -1,0 +1,6 @@
+tree deba4db1952029bdb7d2244b207f570007700b19
+parent fe092331360837fd7f63d71a4b7f867ba849ebd4
+author Даниил Ерошов <daniilerosov12@gmail.com> 1790917509 +0000
+committer Даниил Ерошов <daniilerosov12@gmail.com> 1790917509 +0000
+
+fix(profile): сохранять отказ мощности и штатную остановку

@@ -1,0 +1,252 @@
+{
+  "sourceHead": "fe092331360837fd7f63d71a4b7f867ba849ebd4",
+  "actualStartUtc": "2026-10-02T04:20:13.960249+00:00",
+  "actualEndUtc": "2026-10-02T04:37:07.905350+00:00",
+  "exitCode": 1,
+  "artifactVerdict": "UNPROVEN",
+  "classification": "OPERATOR_INTERRUPTION_AFTER_DECLARED_POWER_FAILURE",
+  "powerStatus": "UNPROVEN_POWER",
+  "stages": {
+    "warmup": {
+      "rows": 20,
+      "completedSamples": 40,
+      "blocks": 2,
+      "completeRunPrefix": 4,
+      "sampleParticipants": {
+        "left": 20,
+        "right": 20
+      }
+    },
+    "pilot": {
+      "rows": 40,
+      "completedSamples": 80,
+      "blocks": 4,
+      "completeRunPrefix": 8,
+      "sampleParticipants": {
+        "left": 40,
+        "right": 40
+      }
+    },
+    "aa": {
+      "rows": 379,
+      "completedSamples": 756,
+      "blocks": 37,
+      "completeRunPrefix": 75,
+      "sampleParticipants": {
+        "left": 378,
+        "right": 378
+      }
+    },
+    "positive": {
+      "absent": true
+    },
+    "ab": {
+      "absent": true
+    }
+  },
+  "samplePlan": {
+    "runs": 1024,
+    "requiredRuns": 1240,
+    "feasible": false,
+    "cells": [
+      {
+        "id": "scalar-live-100:operationNs",
+        "logContrastSd": 0.21832165010077154,
+        "requiredRuns": 608
+      },
+      {
+        "id": "scalar-live-100:meanFrameNs",
+        "logContrastSd": 0.17712472608783167,
+        "requiredRuns": 400
+      },
+      {
+        "id": "scalar-live-100:cancelDrainNs",
+        "logContrastSd": 0.23728284158047863,
+        "requiredRuns": 718
+      },
+      {
+        "id": "transform-fresh-1000:operationNs",
+        "logContrastSd": 0.12107720778616901,
+        "requiredRuns": 188
+      },
+      {
+        "id": "transform-fresh-1000:meanFrameNs",
+        "logContrastSd": 0.04298991748054509,
+        "requiredRuns": 24
+      },
+      {
+        "id": "transform-fresh-1000:cancelDrainNs",
+        "logContrastSd": 0.15074001446253718,
+        "requiredRuns": 290
+      },
+      {
+        "id": "motion-value-default-stock-c:operationNs",
+        "logContrastSd": 0.03241848016341594,
+        "requiredRuns": 14
+      },
+      {
+        "id": "s2:startMs",
+        "logContrastSd": 0.08406619936357286,
+        "requiredRuns": 92
+      },
+      {
+        "id": "s2:cancelMs",
+        "logContrastSd": 0.3118325833828246,
+        "requiredRuns": 1240
+      },
+      {
+        "id": "s3:startMs",
+        "logContrastSd": 0.16330919650773462,
+        "requiredRuns": 340
+      },
+      {
+        "id": "s3:cancelMs",
+        "logContrastSd": 0.18174912800567172,
+        "requiredRuns": 422
+      }
+    ],
+    "tail": {
+      "alphaPerTail": 0.0005681818181818182,
+      "quantiles": [
+        0.5,
+        0.95
+      ],
+      "minimumBlocks": 146,
+      "correction": "Bonferroni: 11 cells × 2 quantiles × 2 participants × 2 tails; family-wise 95%"
+    },
+    "method": "baseline-only paired block log-contrast normal approximation; power 0.8, MDE 5%, Bonferroni family 11×2; N в runs, блок содержит два run"
+  },
+  "NfrozenEvent": {
+    "sequenceDigest": "371a5ce45b34f862bbb785ce0133fc10aa228f2255987a41df43f8a15dd8479f",
+    "type": "N-frozen-before-calibration-and-AB",
+    "value": {
+      "samplePlan": {
+        "runs": 1024,
+        "requiredRuns": 1240,
+        "feasible": false,
+        "cells": [
+          {
+            "id": "scalar-live-100:operationNs",
+            "logContrastSd": 0.21832165010077154,
+            "requiredRuns": 608
+          },
+          {
+            "id": "scalar-live-100:meanFrameNs",
+            "logContrastSd": 0.17712472608783167,
+            "requiredRuns": 400
+          },
+          {
+            "id": "scalar-live-100:cancelDrainNs",
+            "logContrastSd": 0.23728284158047863,
+            "requiredRuns": 718
+          },
+          {
+            "id": "transform-fresh-1000:operationNs",
+            "logContrastSd": 0.12107720778616901,
+            "requiredRuns": 188
+          },
+          {
+            "id": "transform-fresh-1000:meanFrameNs",
+            "logContrastSd": 0.04298991748054509,
+            "requiredRuns": 24
+          },
+          {
+            "id": "transform-fresh-1000:cancelDrainNs",
+            "logContrastSd": 0.15074001446253718,
+            "requiredRuns": 290
+          },
+          {
+            "id": "motion-value-default-stock-c:operationNs",
+            "logContrastSd": 0.03241848016341594,
+            "requiredRuns": 14
+          },
+          {
+            "id": "s2:startMs",
+            "logContrastSd": 0.08406619936357286,
+            "requiredRuns": 92
+          },
+          {
+            "id": "s2:cancelMs",
+            "logContrastSd": 0.3118325833828246,
+            "requiredRuns": 1240
+          },
+          {
+            "id": "s3:startMs",
+            "logContrastSd": 0.16330919650773462,
+            "requiredRuns": 340
+          },
+          {
+            "id": "s3:cancelMs",
+            "logContrastSd": 0.18174912800567172,
+            "requiredRuns": 422
+          }
+        ],
+        "tail": {
+          "alphaPerTail": 0.0005681818181818182,
+          "quantiles": [
+            0.5,
+            0.95
+          ],
+          "minimumBlocks": 146,
+          "correction": "Bonferroni: 11 cells × 2 quantiles × 2 participants × 2 tails; family-wise 95%"
+        },
+        "method": "baseline-only paired block log-contrast normal approximation; power 0.8, MDE 5%, Bonferroni family 11×2; N в runs, блок содержит два run"
+      },
+      "digest": "d789c895134eae7830c680624bd1b8ff61a2a1f4f4a2b2ced139fdeac531cd6d"
+    },
+    "digest": "c9057321a55c912e984ae89a16f0ae864ab00412d0138045bcb1f30ea22678b3"
+  },
+  "journalEventCounts": {
+    "registration-before-any-sample": 1,
+    "raw-controls-baseline": 1,
+    "sample": 876,
+    "resources-block": 43,
+    "N-frozen-before-calibration-and-AB": 1,
+    "failed-sample": 1,
+    "failure": 1,
+    "finished": 1
+  },
+  "journalSampleCounts": {
+    "warmup": 40,
+    "pilot": 80,
+    "aa": 756
+  },
+  "journalFinished": {
+    "sequenceDigest": "1c7a089afc2db26055ad24e28b91f9825a4f533e5ba03f44c6a98460ce132c1d",
+    "type": "finished",
+    "value": {
+      "verdict": "UNPROVEN",
+      "digest": "d098aad5475f93813cf47c096d9a1c0335e73949730903dd2cfd4190fa038975"
+    },
+    "digest": "9b2eabc74dc3dfcaf35c03ef87dc78b28787e37b29c48a2029ee2ef36a0e6b8b"
+  },
+  "failedSampleCoordinates": [
+    {
+      "stage": "aa",
+      "kind": "browser",
+      "scene": "s2",
+      "run": 75,
+      "participant": "right",
+      "partialRawPresent": true
+    }
+  ],
+  "candidateRawControlsAbsent": true,
+  "candidateAndABSamples": 0,
+  "positiveSamples": 0,
+  "failureStages": [
+    "aa"
+  ],
+  "losslessReadbacks": {
+    "server-profile.json": {
+      "decompressedBytes": 21741898,
+      "decompressedSha256": "d098aad5475f93813cf47c096d9a1c0335e73949730903dd2cfd4190fa038975",
+      "exact": true
+    },
+    "journal.ndjson": {
+      "decompressedBytes": 21768420,
+      "decompressedSha256": "8552cce134e3778fa0516912f4f628d21de834e9b284006147c4ab128aa387cb",
+      "exact": true
+    }
+  },
+  "observationBoundary": "Every completed sample and every Node-observed partial in original journal/artifact retained. Renderer-local unreturned observations are not asserted recoverable. A/A incomplete; no 2x/calibration/admission PASS claimed."
+}

@@ -1,0 +1,51 @@
+{
+  "sourceHead": "939e7f4a7ebef2dd494f9dec8690932fecebfd73",
+  "tree": "deba4db1952029bdb7d2244b207f570007700b19",
+  "actualCiCheckout": "f218293f3d65e2f6a42068401754deabb2cd38d2",
+  "actualCiParents": [
+    "957ceaf26501525eff476cdc1d149d81fd5ebcd7",
+    "939e7f4a7ebef2dd494f9dec8690932fecebfd73"
+  ],
+  "runId": 36970296356,
+  "attempt": 1,
+  "jobId": 110722669880,
+  "requiredSuccessfulChecks": 10,
+  "existingConditionalProfileSkip": "profile-baseline",
+  "wholeFiles": 344,
+  "wholeTests": 5027,
+  "finitenessFiles": 10,
+  "finitenessTests": 111,
+  "native": {
+    "node": "v24.19.0",
+    "kernel": "6.17.0-1022-azure",
+    "records": 13,
+    "actualCompiledMutantsKilled": 6,
+    "actualSignals": [
+      {
+        "signal": "SIGINT",
+        "aborts": 1,
+        "scope": "настоящий сигнал Node через общий CLI wrapper и реальный отказ/finally до подготовки; без SUT серии"
+      },
+      {
+        "signal": "SIGTERM",
+        "aborts": 1,
+        "scope": "настоящий сигнал Node через общий CLI wrapper и реальный отказ/finally до подготовки; без SUT серии"
+      }
+    ],
+    "sourceSha256": "4f32f23c2409c3e83943121a587c8d9f5e19af7f308ac987323ff4189ddd14c0",
+    "hostSha256": "15ee4c885cb88c317051a1951030c441b9c78bf105ceb6f21d5ebce6eac3586e",
+    "certificateScope": "functional raw/ABI/signal controls, no performance or physical clock accuracy"
+  },
+  "codeRabbit": {
+    "commentId": 5936940453,
+    "updatedAt": "2026-10-02T05:44:35Z",
+    "automaticReviewsPaused": true,
+    "currentSubstantiveReviewObserved": false,
+    "latestCoveredHead": "fe092331360837fd7f63d71a4b7f867ba849ebd4",
+    "requiredCurrentGate": "OPEN",
+    "resumeReviewMessagesPaidOrOverrides": 0
+  },
+  "empirical": "old fe epoch8 UNPROVEN_POWER/operator interruption; no current 939e experiment",
+  "endedAtUtc": "2026-10-02T05:54:00.842131+00:00",
+  "allChildrenJoined": true
+}

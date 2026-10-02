@@ -1,0 +1,35 @@
+{
+  "recordedBeforeSignalUtc": "2026-10-02T04:37:05.552368+00:00",
+  "classification": "OPERATOR_INTERRUPTION_AFTER_DECLARED_POWER_FAILURE",
+  "verdict": "UNPROVEN_POWER",
+  "grant8": {
+    "path": "/tmp/motion-server-predata-fe092331-ce535cf6-20261002-epoch8/ROOT-QUIET-GRANT.json",
+    "sha256": "aa7c1cde93eac70f5b37164fe31f6bb5fa2842d7480a20f678cf9658fc3d6e54"
+  },
+  "sourceHead": "fe092331360837fd7f63d71a4b7f867ba849ebd4",
+  "protocolDigest": "ce535cf6d6f0b0f140d44403627b63d936ef2461883a52680e7bbcad3ee49e5a",
+  "clockModelDigest": "04d863513d53b248b1be3e0905240f3bd6f4d06124582ce3093c2cbfe5320852",
+  "Nfrozen": {
+    "runs": 1024,
+    "requiredRuns": 1240,
+    "feasible": false,
+    "minimumIndependentBlocks": 146,
+    "digest": "d789c895134eae7830c680624bd1b8ff61a2a1f4f4a2b2ced139fdeac531cd6d"
+  },
+  "candidateSamples": 0,
+  "reason": "Declared required1240 exceeds unchanged cap1024; stop unproductive complete1024 AA/positive diagnostic, no admission possible",
+  "target": {
+    "pid": 719896,
+    "ppid": 719575,
+    "expectedPinnedExecutable": "/home/agent/.cache/ms-playwright/chromium-1228/chrome-linux64/chrome",
+    "actualExecutable": "/home/agent/.cache/ms-playwright/chromium-1228/chrome-linux64/chrome",
+    "executableBytes": 278568152,
+    "executableSha256": "2d18db9d8608b052b6a552ee00ec1e830f93692e928b65ecc67d693bd33fe801",
+    "device": 27,
+    "inode": 1580954,
+    "startTicks": "9454218"
+  },
+  "plannedSignal": "SIGTERM",
+  "signalCount": 1,
+  "recoveryScope": "Complete samples already journaled; all Node-observed partials recovered by existing catch/finally. Renderer-local unreturned observations may be unrecoverable; no full AA/2x/calibration PASS claimed."
+}

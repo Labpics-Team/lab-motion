@@ -1,0 +1,157 @@
+{
+  "atUtc": "2026-10-02T05:32:29.915912+00:00",
+  "head": "939e7f4a7ebef2dd494f9dec8690932fecebfd73",
+  "reportFullReadByRoot": true,
+  "reportSha256": "360a22330663c0e00356b798b9a94a803dbabc602873ed7936326c53ec8ee034",
+  "allOutputBindingsMatch": true,
+  "outputs": [
+    {
+      "path": "/tmp/motion-ops-so-939e-20261002/CURRENT-GATES-BINDINGS.json",
+      "bytes": 12978,
+      "sha256": "a101f55dfb2c01abf802bf873ad68f2de3db2047e47ac3ac5033c307710bdd0b",
+      "match": true
+    },
+    {
+      "path": "/tmp/motion-ops-so-939e-20261002/IDENTITY-TRANSFER.json",
+      "bytes": 125016,
+      "sha256": "c657440f02554c3e3e7213ae7d7dfe3e627259979fd5032bbf1c107ecb082343",
+      "match": true
+    },
+    {
+      "path": "/tmp/motion-ops-so-939e-20261002/PRIMARY-BINDINGS.json",
+      "bytes": 8133,
+      "sha256": "47c59a7bd228fc6252ba45df2f931392e07454812b0cfc61fac3829ec25a7e50",
+      "match": true
+    },
+    {
+      "path": "/tmp/motion-ops-so-939e-20261002/READSET.json",
+      "bytes": 36744,
+      "sha256": "8a343399c2fc3bebe809e4a234d578b63a3e238b68892a27d743018996c68c89",
+      "match": true
+    },
+    {
+      "path": "/tmp/motion-ops-so-939e-20261002/REPORT.md",
+      "bytes": 25187,
+      "sha256": "360a22330663c0e00356b798b9a94a803dbabc602873ed7936326c53ec8ee034",
+      "match": true
+    },
+    {
+      "path": "/tmp/motion-ops-so-939e-20261002/SOURCE-BOUNDARIES.json",
+      "bytes": 12901,
+      "sha256": "74b9ec0fdc36b9f0c86466106a3fae4510815aa10267d4c143272de2fda62500",
+      "match": true
+    },
+    {
+      "path": "/tmp/motion-ops-so-939e-20261002/SOURCE-IDENTITY.json",
+      "bytes": 1710,
+      "sha256": "57662fc2552d1c2e68f8f9580e5229eba64ab1335136c0b486475f7a51e67b3b",
+      "match": true
+    },
+    {
+      "path": "/tmp/motion-ops-so-939e-20261002/START.json",
+      "bytes": 322,
+      "sha256": "d8aca4d497ba7716731dd6d47b13f2c955ade963003c2fb56b319cad85bdcf5d",
+      "match": true
+    },
+    {
+      "path": "/tmp/motion-ops-so-939e-20261002/TERMINAL.json",
+      "bytes": 939,
+      "sha256": "a083d805304ad723f3ff190d59f327048cbb0b04299e2694b8755e0239f378d9",
+      "match": true
+    },
+    {
+      "path": "/tmp/motion-ops-so-939e-20261002/artifact-writer.stderr.log",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "match": true
+    },
+    {
+      "path": "/tmp/motion-ops-so-939e-20261002/artifact-writer.stdout.log",
+      "bytes": 365,
+      "sha256": "1584bf73cd89b12b6815f8b86ce61778228ec3ab281bc7ead86c4adb3a6c85ad",
+      "match": true
+    },
+    {
+      "path": "/tmp/motion-ops-so-939e-20261002/commit.raw",
+      "bytes": 350,
+      "sha256": "26e4a8d87d4260f0858181e37f55b5e0c268063c69646402f1d83ceca08031b9",
+      "match": true
+    },
+    {
+      "path": "/tmp/motion-ops-so-939e-20261002/create-report.py",
+      "bytes": 32444,
+      "sha256": "42aa58da08585fdb3c54b99037de91dc09a46b0639b26a3e0906569fc44f5c6c",
+      "match": true
+    },
+    {
+      "path": "/tmp/motion-ops-so-939e-20261002/source/bench/profile/server-profile-registration.mjs",
+      "bytes": 19123,
+      "sha256": "7c9c6bf65341fb023d4db2e45a01ef9bacf5246a7af3c62385f15f8523be396f",
+      "match": true
+    },
+    {
+      "path": "/tmp/motion-ops-so-939e-20261002/source/bench/profile/server-profile-runner.mjs",
+      "bytes": 53215,
+      "sha256": "a3f39c0aa74d2458060bff6bf7540f251d527cecbae29f52f6f5848cd254ae91",
+      "match": true
+    },
+    {
+      "path": "/tmp/motion-ops-so-939e-20261002/source/docs/server-profile.md",
+      "bytes": 6356,
+      "sha256": "60ee167808782eea22d154f93bfaf52aa68ab16b487077047c928ed8e2ebe2bf",
+      "match": true
+    },
+    {
+      "path": "/tmp/motion-ops-so-939e-20261002/source/test/fixtures/server-thread-cpu-clock-check.mjs",
+      "bytes": 12296,
+      "sha256": "1e7ba0af37efb8f774ba0217965addff60a56cc9b2de7ef2c8964262b96e5390",
+      "match": true
+    },
+    {
+      "path": "/tmp/motion-ops-so-939e-20261002/source/test/server-profile-contract.test.ts",
+      "bytes": 105078,
+      "sha256": "c599cfebb8c77841adf74214083aecd89b6f12df22012cecdc4ee5c56ca3d1fa",
+      "match": true
+    },
+    {
+      "path": "/tmp/motion-ops-so-939e-20261002/source.diff",
+      "bytes": 30495,
+      "sha256": "4ba846fa1c8d3d8b41e4fd250d7cf45607dfe4128f49b35661622483c4b2045d",
+      "match": true
+    },
+    {
+      "path": "/tmp/motion-ops-so-939e-20261002/source.tar",
+      "bytes": 7454720,
+      "sha256": "ff8ca442617a4becb751cff3c57ceb2aaca61c9ed0ab0416a843212e8378c193",
+      "match": true
+    },
+    {
+      "path": "/tmp/motion-ops-so-939e-20261002/tree.raw",
+      "bytes": 1192,
+      "sha256": "c5dbe7181ec1c6f9838d4dae4ca979b13e3284bac9164bc2d135395ae221cc92",
+      "match": true
+    },
+    {
+      "path": "/tmp/motion-ops-so-939e-20261002/MANIFEST.json",
+      "bytes": 4462,
+      "sha256": "c6a9fa8f2df6a25b1c2d2ea951f197f49ce2a3ea1d2b26ca66f6bd30c4a41885",
+      "match": true
+    },
+    {
+      "path": "/tmp/motion-ops-so-939e-20261002/SEAL.json",
+      "bytes": 1081,
+      "sha256": "9e8ce273b369c6cb7a03762a64a1e29fc61b8ac9fd7bd45c8192271bbafc7555",
+      "match": true
+    }
+  ],
+  "verdict": "PASS scoped source second-order acceptance",
+  "blockers": 0,
+  "limits": [
+    "cooperative cancellation, no physical-signal hard deadline",
+    "native controls before preparation; in-sample VM fault control",
+    "no all-failure child-join certificate for test-helper timeout; successful controls close/join",
+    "precommit native receipts lack contemporaneous runner/fixture hash; current source/whole required checks bound",
+    "no full calibration/NI/performance/mobile/product GO"
+  ],
+  "disposition": "Publish within explicit source/operational scope; no all-failure control cleanup or empirical claims added. Actual fe epoch8 remains separate."
+}

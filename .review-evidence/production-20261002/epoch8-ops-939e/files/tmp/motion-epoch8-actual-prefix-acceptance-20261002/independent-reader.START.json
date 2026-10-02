@@ -1,0 +1,16 @@
+{
+  "operation": "independent literal-byte JSON/journal/clock/N analysis; no SUT",
+  "actualStartUtc": "2026-10-02T05:07:29.429781+00:00",
+  "argv": [
+    "taskset",
+    "-c",
+    "2",
+    "/opt/codex/runtimes/codex-primary-runtime/dependencies/python/bin/python3",
+    "/tmp/motion-epoch8-actual-prefix-acceptance-20261002/independent-readback.py"
+  ],
+  "scriptSha256": "8eaad0e4b5c85608e720e8638f5da6012f07b266adb7542c26f9370b098c5534",
+  "timeoutSeconds": 30,
+  "timedOut": false,
+  "heavy": 0,
+  "queued": 0
+}

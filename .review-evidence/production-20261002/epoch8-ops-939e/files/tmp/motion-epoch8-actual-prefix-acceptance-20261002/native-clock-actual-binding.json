@@ -1,0 +1,9 @@
+{
+  "path": "/tmp/motion-server-series-fe092331-ce535cf6-20261002-epoch8/native-clock/thread-cpu-clock.node",
+  "bytes": 16192,
+  "sha256": "21bb3221b35523770ee025546c5e4fadb8bd7a64627a65147bd23ca48ac6c76a",
+  "ownedCopy": "/tmp/motion-epoch8-actual-prefix-acceptance-20261002/PRIMARY/actual-thread-cpu-clock.node",
+  "bytesMatched": true,
+  "shaMatched": true,
+  "notExecutedByReviewer": true
+}

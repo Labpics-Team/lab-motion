@@ -1,0 +1,68 @@
+{
+  "actualStartUtc": "2026-10-02T05:07:29.454016+00:00",
+  "actualEndUtc": "2026-10-02T05:07:30.968854+00:00",
+  "journalRecords": 925,
+  "registeredCompletedSamples": 876,
+  "nativeCpuEndpoints": 47872,
+  "independentPlan": {
+    "runs": 1024,
+    "requiredRuns": 1240,
+    "feasible": false,
+    "minimumBlocks": 146,
+    "alphaPerTail": 0.0005681818181818182
+  },
+  "stages": {
+    "warmup": {
+      "rows": 20,
+      "samples": 40,
+      "fullRuns": 4,
+      "lastRun": 3,
+      "lastRunSamples": 10,
+      "pairedBlockReceipts": 2,
+      "incompleteRows": []
+    },
+    "pilot": {
+      "rows": 40,
+      "samples": 80,
+      "fullRuns": 8,
+      "lastRun": 7,
+      "lastRunSamples": 10,
+      "pairedBlockReceipts": 4,
+      "incompleteRows": []
+    },
+    "aa": {
+      "rows": 379,
+      "samples": 756,
+      "fullRuns": 75,
+      "lastRun": 75,
+      "lastRunSamples": 6,
+      "pairedBlockReceipts": 37,
+      "incompleteRows": [
+        {
+          "kind": "browser",
+          "scene": "s2",
+          "run": 75,
+          "order": [
+            "right",
+            "left"
+          ],
+          "samples": {}
+        }
+      ]
+    }
+  },
+  "resourceThrottledBlocks": 0,
+  "chronology": {
+    "predataCreated": "2026-10-02T03:40:32.995Z",
+    "grant": "2026-10-02T04:18:42.959163+00:00",
+    "actualStart": "2026-10-02T04:20:13.960249+00:00",
+    "registration": "2026-10-02T04:20:50.631Z",
+    "stopBeforeSignal": "2026-10-02T04:37:05.552368+00:00",
+    "signal": "2026-10-02T04:37:05.552880+00:00",
+    "failure": "2026-10-02T04:37:05.640Z",
+    "finished": "2026-10-02T04:37:07.436Z",
+    "actualEnd": "2026-10-02T04:37:07.905350+00:00"
+  },
+  "sampleMetricMaxAbsError": 0.0,
+  "pilotSdMaxAbsDifferencePythonVsRecordedJs": 3.608224830031759e-16
+}

@@ -1,0 +1,122 @@
+Already up to date
+Done in 352ms using pnpm v11.11.0
+
+ RUN  v4.1.11 /workspace/lab-motion
+
+ ✓ test/behaviors-finiteness-fuzz.test.ts > ./behaviors finiteness fuzz — злой ввод → конечное состояние > bottom sheet: 3000 злых жестов держат value/velocity конечными 136ms
+ ✓ test/decay-finiteness-fuzz.test.ts > decay: finiteness fuzz — random inputs (10k+) > valueAt/velocityAt/rest are always finite over 10k random (from, velocity, power, timeConstant, t) 245ms
+ ✓ test/decay-finiteness-fuzz.test.ts > decay: finiteness fuzz — overflow edges (cartesian of extreme magnitudes) > rest/valueAt/velocityAt finite for every combination of extreme from/velocity 13ms
+ ✓ test/decay-finiteness-fuzz.test.ts > decay: finiteness fuzz — overflow edges (cartesian of extreme magnitudes) > extreme power/timeConstant combined with extreme velocity stay finite 0ms
+ ✓ test/decay-finiteness-fuzz.test.ts > decay: NaN/Infinity in t (virtual time) never leaks > valueAt(NaN) does not throw and returns a finite value (treated as t=0) 1ms
+ ✓ test/decay-finiteness-fuzz.test.ts > decay: NaN/Infinity in t (virtual time) never leaks > valueAt(-Infinity) clamps to t=0 (not yet started) 0ms
+ ✓ test/decay-finiteness-fuzz.test.ts > decay: NaN/Infinity in t (virtual time) never leaks > valueAt(Infinity) === rest (fully settled) 0ms
+ ✓ test/decay-finiteness-fuzz.test.ts > decay: NaN/Infinity in t (virtual time) never leaks > velocityAt(Infinity) === 0 0ms
+ ✓ test/decay-finiteness-fuzz.test.ts > decay: required-input validation (throws, does not silently NaN) > from=NaN throws MotionParamError 1ms
+ ✓ test/decay-finiteness-fuzz.test.ts > decay: required-input validation (throws, does not silently NaN) > from=Infinity throws MotionParamError 0ms
+ ✓ test/decay-finiteness-fuzz.test.ts > decay: required-input validation (throws, does not silently NaN) > velocity=NaN throws MotionParamError 0ms
+ ✓ test/decay-finiteness-fuzz.test.ts > decay: required-input validation (throws, does not silently NaN) > velocity=-Infinity throws MotionParamError 0ms
+ ✓ test/behaviors-finiteness-fuzz.test.ts > ./behaviors finiteness fuzz — злой ввод → конечное состояние > drag-to-dismiss: злой ввод конечен 111ms
+ ✓ test/behaviors-finiteness-fuzz.test.ts > ./behaviors finiteness fuzz — злой ввод → конечное состояние > carousel: злой ввод конечен 112ms
+ ✓ test/timeline-finiteness-fuzz.test.ts > timeline-finiteness-fuzz: overflow-range (|from|+|to|>MAX_VALUE) > 10k+ overflow-range сегментов никогда не дают NaN/Infinity 112ms
+ ✓ test/behaviors-finiteness-fuzz.test.ts > ./behaviors finiteness fuzz — злой ввод → конечное состояние > pull-to-refresh: злой ввод конечен 117ms
+ ✓ test/timeline-finiteness-fuzz.test.ts > timeline-finiteness-fuzz: экстремальные seek значения > seek(Infinity), seek(-Infinity), seek(NaN), seek(MAX_VALUE) никогда не дают NaN 0ms
+ ✓ test/timeline-finiteness-fuzz.test.ts > timeline-finiteness-fuzz: easing возвращающий NaN/Infinity > easing=() => NaN никогда не пропускает NaN в emit 0ms
+ ✓ test/timeline-finiteness-fuzz.test.ts > timeline-finiteness-fuzz: easing возвращающий NaN/Infinity > easing=() => Infinity никогда не пропускает Infinity в emit 0ms
+ ✓ test/timeline-finiteness-fuzz.test.ts > timeline-finiteness-fuzz: easing возвращающий NaN/Infinity > easing=() => -Infinity никогда не пропускает -Infinity в emit 0ms
+ ✓ test/timeline-finiteness-fuzz.test.ts > timeline-finiteness-fuzz: 10k+ случайных сегментов (полный fuzz) > никогда не эмитирует NaN/Infinity при случайных from/to/duration/seek 107ms
+ ✓ test/timeline-finiteness-fuzz.test.ts > timeline-finiteness-fuzz: множество сегментов > 5-сегментный таймлайн с overflow-range: всё конечно 1ms
+ ✓ test/timeline-finiteness-fuzz.test.ts > timeline-finiteness-fuzz: guard критичен (структурная проверка) > seek(0.5) на нормальном сегменте возвращает значение в [from, to] 0ms
+ ✓ test/timeline-finiteness-fuzz.test.ts > timeline-finiteness-fuzz: guard критичен (структурная проверка) > seek(0.5) на overflow-range сегменте возвращает `to` 0ms
+ ✓ test/projection-finiteness-fuzz.test.ts > projection: finiteness fuzz — 10k злых деревьев (P1) > каждое число каждого кадра конечно и не −0; радиусы ≥ 0; opacity ∈ [0,1] 98ms
+ ✓ test/projection-finiteness-fuzz.test.ts > projection: finiteness fuzz — чистые функции (mixBox/projectAt/cornerRadiusAt) > mixBox: конечно, без −0, размеры ≥ 0 (floor) на 3000 злых пар 5ms
+ ✓ test/projection-finiteness-fuzz.test.ts > projection: finiteness fuzz — чистые функции (mixBox/projectAt/cornerRadiusAt) > projectAt: конечно и без −0 на 3000 злых узлов (с предком и без) 7ms
+ ✓ test/projection-finiteness-fuzz.test.ts > projection: finiteness fuzz — чистые функции (mixBox/projectAt/cornerRadiusAt) > cornerRadiusAt: конечно, без −0, ≥ 0 на 3000 злых углов (включая k→0/NaN) 3ms
+ ✓ test/projection-finiteness-fuzz.test.ts > projection: валидация createProjector — коды MotionParamError > мальформный radii-кортеж (as-any): ранний MotionParamError, не TypeError из at() 1ms
+ ✓ test/projection-finiteness-fuzz.test.ts > projection: валидация createProjector — коды MotionParamError > пустой id 0ms
+ ✓ test/projection-finiteness-fuzz.test.ts > projection: валидация createProjector — коды MotionParamError > дубль id 0ms
+ ✓ test/projection-finiteness-fuzz.test.ts > projection: валидация createProjector — коды MotionParamError > неизвестный parent 0ms
+ ✓ test/projection-finiteness-fuzz.test.ts > projection: валидация createProjector — коды MotionParamError > цикл: самоссылка 0ms
+ ✓ test/projection-finiteness-fuzz.test.ts > projection: валидация createProjector — коды MotionParamError > цикл из двух узлов: бросок с кодом цикла LM083 0ms
+ ✓ test/projection-finiteness-fuzz.test.ts > projection: валидация createProjector — коды MotionParamError > валидные структуры НЕ бросают даже со злыми числами (враждебное состояние ≠ параметры) 0ms
+ ✓ test/animate-overflow-finiteness-fuzz.test.ts > animate-overflow-finiteness: prerequisites > tween is callable — anti-theater guard (RED if engine absent) 1ms
+ ✓ test/animate-overflow-finiteness-fuzz.test.ts > animate-overflow-finiteness: prerequisites > drive is callable — anti-theater guard (RED if engine absent) 0ms
+ ✓ test/animate-overflow-finiteness-fuzz.test.ts > tween() — overflow-edge finiteness fuzz (invariant 3) > direct overflow pairs — all t ∈ {0, 0.001, 0.1, 0.5, 0.9, 0.999, 1} produce finite output 1ms
+ ✓ test/animate-overflow-finiteness-fuzz.test.ts > tween() — overflow-edge finiteness fuzz (invariant 3) > tween(from, to, 0) === from and tween(from, to, 1) === to for overflow pairs 0ms
+ ✓ test/animate-overflow-finiteness-fuzz.test.ts > tween() — overflow-edge finiteness fuzz (invariant 3) > seeded LCG fuzz ≥10 000 samples — all outputs finite (invariant 3) 2ms
+ ✓ test/animate-overflow-finiteness-fuzz.test.ts > tween() — overflow-edge finiteness fuzz (invariant 3) > tween(MAX_VALUE, -MAX_VALUE, 0.5) === 0 — two-point form gives exact midpoint 0ms
+ ✓ test/animate-overflow-finiteness-fuzz.test.ts > tween() — overflow-edge finiteness fuzz (invariant 3) > tween(-MAX_VALUE, MAX_VALUE, 0.5) === 0 — symmetric case 0ms
+ ✓ test/animate-overflow-finiteness-fuzz.test.ts > drive() — overflow-edge finiteness fuzz (invariant 3, virtual-time) > drive() overflow pairs — handle=0 (setTimeout fallback): all emitted values finite and promise resolves 1ms
+ ✓ test/animate-overflow-finiteness-fuzz.test.ts > drive() — overflow-edge finiteness fuzz (invariant 3, virtual-time) > drive() overflow — timestamp clock (ts=0 first frame, the t=0 NaN edge): all emitted finite 0ms
+ ✓ test/animate-overflow-finiteness-fuzz.test.ts > drive() — overflow-edge finiteness fuzz (invariant 3, virtual-time) > drive() overflow reverse direction (ts=0 first frame): all emitted finite 0ms
+ ✓ test/animate-overflow-finiteness-fuzz.test.ts > drive() — overflow-edge finiteness fuzz (invariant 3, virtual-time) > seeded fuzz — 200 overflow pairs via handle=0 clock: all emitted finite, all promises resolve 1ms
+ ✓ test/animate-overflow-finiteness-fuzz.test.ts > drive() — overflow-edge finiteness fuzz (invariant 3, virtual-time) > drive() finite range (non-overflow) is NOT short-circuited — animates normally 66ms
+ ✓ test/animate-facade-finiteness-fuzz.test.ts > ./animate — финитность и детерминизм (Класс В, property/fuzz) > P1: seeded fuzz 400 сценариев — ни одной NaN/Infinity-записи на всём props-спейсе 107ms
+ ✓ test/animate-facade-finiteness-fuzz.test.ts > ./animate — финитность и детерминизм (Класс В, property/fuzz) > P2: не-конечные входы → ранний MotionParamError и ноль записей 6ms
+ ✓ test/animate-facade-finiteness-fuzz.test.ts > ./animate — финитность и детерминизм (Класс В, property/fuzz) > P3: детерминизм — один seed → бит-идентичный журнал записей 10ms
+ ✓ test/animate-facade-finiteness-fuzz.test.ts > ./animate — финитность и детерминизм (Класс В, property/fuzz) > P1-направленный: экстремальные пары from/to не пробивают финитный страж 0ms
+ ✓ test/easing-finiteness-fuzz.test.ts > easing finiteness fuzz — NE1 (CSS-safe invariant) > normalizeEasing is callable — prerequisite guard (RED if absent) 1ms
+ ✓ test/easing-finiteness-fuzz.test.ts > easing finiteness fuzz — NE1 (CSS-safe invariant) > linear is callable — prerequisite guard (RED if absent) 0ms
+ ✓ test/easing-finiteness-fuzz.test.ts > easing finiteness fuzz — NE1 (CSS-safe invariant) > normalizeEasing(linear) produces ONLY finite output over >=10k samples + IEEE-754 edges (NE1) 4ms
+ ✓ test/easing-finiteness-fuzz.test.ts > easing finiteness fuzz — NE1 (CSS-safe invariant) > normalizeEasing of hostile fn (t=>t/0) produces ONLY finite output — NaN/Infinity hardened (NE1) 1ms
+ ✓ test/easing-finiteness-fuzz.test.ts > easing finiteness fuzz — NE1 (CSS-safe invariant) > normalizeEasing of hostile fn (t=>NaN) clamps EXACTLY to 0 — mutation-pins NaN→0 contract (NE1) 1ms
+ ✓ test/easing-finiteness-fuzz.test.ts > easing finiteness fuzz — NE1 (CSS-safe invariant) > normalizeEasing of hostile fn (t=>+Infinity) clamps EXACTLY to Number.MAX_VALUE — mutation-pins +Inf contract (NE1) 1ms
+ ✓ test/easing-finiteness-fuzz.test.ts > easing finiteness fuzz — NE1 (CSS-safe invariant) > normalizeEasing of hostile fn (t=>-Infinity) clamps EXACTLY to -Number.MAX_VALUE — mutation-pins -Inf contract (NE1) 1ms
+ ✓ test/easing-finiteness-fuzz.test.ts > easing finiteness fuzz — NE1 (CSS-safe invariant) > normalizeEasing of hostile fn (t=>Number.MAX_VALUE*2) clamps EXACTLY to Number.MAX_VALUE — mutation-pins overflow contract (NE1) 1ms
+ ✓ test/easing-finiteness-fuzz.test.ts > easing finiteness fuzz — NE1 (CSS-safe invariant) > linear alone (without normalizer) produces ONLY finite output over >=10k samples + IEEE-754 edges (NE1) 1ms
+ ✓ test/easing-finiteness-fuzz.test.ts > easing finiteness fuzz — NE1 (CSS-safe invariant) > easeIn — NE1 finite over all IEEE-754 inputs 1ms
+ ✓ test/easing-finiteness-fuzz.test.ts > easing finiteness fuzz — NE1 (CSS-safe invariant) > easeOut — NE1 finite over all IEEE-754 inputs 1ms
+ ✓ test/easing-finiteness-fuzz.test.ts > easing finiteness fuzz — NE1 (CSS-safe invariant) > easeInOut — NE1 finite over all IEEE-754 inputs 1ms
+ ✓ test/easing-finiteness-fuzz.test.ts > easing finiteness fuzz — NE1 (CSS-safe invariant) > sineIn — NE1 finite over all IEEE-754 inputs 1ms
+ ✓ test/easing-finiteness-fuzz.test.ts > easing finiteness fuzz — NE1 (CSS-safe invariant) > sineOut — NE1 finite over all IEEE-754 inputs 1ms
+ ✓ test/easing-finiteness-fuzz.test.ts > easing finiteness fuzz — NE1 (CSS-safe invariant) > sineInOut — NE1 finite over all IEEE-754 inputs 1ms
+ ✓ test/easing-finiteness-fuzz.test.ts > easing finiteness fuzz — NE1 (CSS-safe invariant) > expoIn — NE1 finite over all IEEE-754 inputs 1ms
+ ✓ test/easing-finiteness-fuzz.test.ts > easing finiteness fuzz — NE1 (CSS-safe invariant) > expoOut — NE1 finite over all IEEE-754 inputs 2ms
+ ✓ test/easing-finiteness-fuzz.test.ts > easing finiteness fuzz — NE1 (CSS-safe invariant) > expoInOut — NE1 finite over all IEEE-754 inputs 1ms
+ ✓ test/easing-finiteness-fuzz.test.ts > easing finiteness fuzz — NE1 (CSS-safe invariant) > circIn — NE1 finite over all IEEE-754 inputs 1ms
+ ✓ test/easing-finiteness-fuzz.test.ts > easing finiteness fuzz — NE1 (CSS-safe invariant) > circOut — NE1 finite over all IEEE-754 inputs 1ms
+ ✓ test/easing-finiteness-fuzz.test.ts > easing finiteness fuzz — NE1 (CSS-safe invariant) > circInOut — NE1 finite over all IEEE-754 inputs 1ms
+ ✓ test/easing-finiteness-fuzz.test.ts > easing finiteness fuzz — NE1 (CSS-safe invariant) > backIn — NE1 finite over all IEEE-754 inputs 1ms
+ ✓ test/easing-finiteness-fuzz.test.ts > easing finiteness fuzz — NE1 (CSS-safe invariant) > backOut — NE1 finite over all IEEE-754 inputs 1ms
+ ✓ test/easing-finiteness-fuzz.test.ts > easing finiteness fuzz — NE1 (CSS-safe invariant) > backInOut — NE1 finite over all IEEE-754 inputs 1ms
+ ✓ test/easing-finiteness-fuzz.test.ts > easing finiteness fuzz — NE1 (CSS-safe invariant) > anticipate — NE1 finite over all IEEE-754 inputs 1ms
+ ✓ test/easing-finiteness-fuzz.test.ts > easing finiteness fuzz — NE1 (CSS-safe invariant) > elastic — NE1 finite over all IEEE-754 inputs 1ms
+ ✓ test/easing-finiteness-fuzz.test.ts > easing finiteness fuzz — NE1 (CSS-safe invariant) > bounce — NE1 finite over all IEEE-754 inputs 1ms
+ ✓ test/easing-finiteness-fuzz.test.ts > easing finiteness fuzz — NE1 (CSS-safe invariant) > power(2) (quad) — NE1 finite over all IEEE-754 inputs 1ms
+ ✓ test/easing-finiteness-fuzz.test.ts > easing finiteness fuzz — NE1 (CSS-safe invariant) > power(3) (cubic) — NE1 finite over all IEEE-754 inputs 1ms
+ ✓ test/easing-finiteness-fuzz.test.ts > easing finiteness fuzz — NE1 (CSS-safe invariant) > power(4) (quart) — NE1 finite over all IEEE-754 inputs 1ms
+ ✓ test/easing-finiteness-fuzz.test.ts > easing finiteness fuzz — NE1 (CSS-safe invariant) > power(5) (quint) — NE1 finite over all IEEE-754 inputs 1ms
+ ✓ test/easing-finiteness-fuzz.test.ts > easing finiteness fuzz — NE1 (CSS-safe invariant) > power(0.5) (sqrt) — NE1 finite over all IEEE-754 inputs 0ms
+ ✓ test/easing-finiteness-fuzz.test.ts > easing finiteness fuzz — NE1 (CSS-safe invariant) > power(10) (extreme) — NE1 finite over all IEEE-754 inputs 0ms
+ ✓ test/easing-finiteness-fuzz.test.ts > easing finiteness fuzz — NE1 (CSS-safe invariant) > cubicBezier(0.25,0.1,0.25,1) (CSS ease) — NE1 finite over all IEEE-754 inputs 2ms
+ ✓ test/easing-finiteness-fuzz.test.ts > easing finiteness fuzz — NE1 (CSS-safe invariant) > cubicBezier(0.42,0,1,1) (CSS ease-in) — NE1 finite over all IEEE-754 inputs 1ms
+ ✓ test/easing-finiteness-fuzz.test.ts > easing finiteness fuzz — NE1 (CSS-safe invariant) > cubicBezier(0,0,0.58,1) (CSS ease-out) — NE1 finite over all IEEE-754 inputs 1ms
+ ✓ test/easing-finiteness-fuzz.test.ts > easing finiteness fuzz — NE1 (CSS-safe invariant) > cubicBezier(0,1.5,1,-0.5) (overshooting) — NE1 finite over all IEEE-754 inputs 1ms
+ ✓ test/easing-finiteness-fuzz.test.ts > easing finiteness fuzz — NE1 (CSS-safe invariant) > steps(1,"end") — NE1 finite over all IEEE-754 inputs 1ms
+ ✓ test/easing-finiteness-fuzz.test.ts > easing finiteness fuzz — NE1 (CSS-safe invariant) > steps(4,"end") — NE1 finite over all IEEE-754 inputs 1ms
+ ✓ test/easing-finiteness-fuzz.test.ts > easing finiteness fuzz — NE1 (CSS-safe invariant) > steps(4,"start") — NE1 finite over all IEEE-754 inputs 1ms
+ ✓ test/easing-finiteness-fuzz.test.ts > easing finiteness fuzz — NE1 (CSS-safe invariant) > steps(10,"end") — NE1 finite over all IEEE-754 inputs 0ms
+ ✓ test/utils-finiteness-fuzz.test.ts > utils finiteness fuzz — CSS-safe invariant > clamp is callable — prerequisite guard 1ms
+ ✓ test/utils-finiteness-fuzz.test.ts > utils finiteness fuzz — CSS-safe invariant > interpolate is callable — prerequisite guard 0ms
+ ✓ test/utils-finiteness-fuzz.test.ts > utils finiteness fuzz — CSS-safe invariant > clamp(0,1)(·) finite over all IEEE-754 inputs 2ms
+ ✓ test/utils-finiteness-fuzz.test.ts > utils finiteness fuzz — CSS-safe invariant > clamp(0,Infinity)(·) one-sided finite over all inputs 2ms
+ ✓ test/utils-finiteness-fuzz.test.ts > utils finiteness fuzz — CSS-safe invariant > clamp(-Infinity,Infinity)(·) finite over all inputs 1ms
+ ✓ test/utils-finiteness-fuzz.test.ts > utils finiteness fuzz — CSS-safe invariant > wrap(0,360)(·) finite over all IEEE-754 inputs 3ms
+ ✓ test/utils-finiteness-fuzz.test.ts > utils finiteness fuzz — CSS-safe invariant > wrap(-50,50)(·) finite over all inputs 2ms
+ ✓ test/utils-finiteness-fuzz.test.ts > utils finiteness fuzz — CSS-safe invariant > wrap(5,5)(·) degenerate range finite over all inputs 1ms
+ ✓ test/utils-finiteness-fuzz.test.ts > utils finiteness fuzz — CSS-safe invariant > snap(0.25)(·) finite over all inputs 1ms
+ ✓ test/utils-finiteness-fuzz.test.ts > utils finiteness fuzz — CSS-safe invariant > snap(-7)(·) negative increment finite over all inputs 2ms
+ ✓ test/utils-finiteness-fuzz.test.ts > utils finiteness fuzz — CSS-safe invariant > snap([0,90,180,270])(·) targets finite over all inputs 1ms
+ ✓ test/utils-finiteness-fuzz.test.ts > utils finiteness fuzz — CSS-safe invariant > mapRange(-10,10,0,100)(·) finite over all inputs 1ms
+ ✓ test/utils-finiteness-fuzz.test.ts > utils finiteness fuzz — CSS-safe invariant > mapRange(5,5,0,1)(·) degenerate input range finite over all inputs 1ms
+ ✓ test/utils-finiteness-fuzz.test.ts > utils finiteness fuzz — CSS-safe invariant > interpolate multi-stop {clamp:false, ease:t*t}(·) finite over all inputs 2ms
+ ✓ test/utils-finiteness-fuzz.test.ts > utils finiteness fuzz — CSS-safe invariant > interpolate default clamp {ease:t=>1/t hostile}(·) finite over all inputs 1ms
+ ✓ test/utils-finiteness-fuzz.test.ts > utils finiteness fuzz — CSS-safe invariant > mix(fuzz, fuzz, fuzz) finite over 10k triples + edges 3ms
+ ✓ test/solver-finiteness-fuzz.test.ts > solver finiteness property fuzz > produces finite value and velocity over 10 000 seeded samples 7ms
+ ✓ test/smart-finiteness-fuzz.test.ts > ./smart: финитность ≥10k злых дифов (seeded LCG) > capture→мутация→animate→кадры→перехват: ни броска, ни NaN/Inf/-0 в записях 5117ms
+ ✓ test/smart-finiteness-fuzz.test.ts > ./smart: финитность ≥10k злых дифов (seeded LCG) > негативный контроль: дубликат ключа ОБЯЗАН бросать (fuzz не глотает валидацию) 1ms
+
+ Test Files  10 passed (10)
+      Tests  111 passed (111)
+   Start at  05:11:40
+   Duration  5.46s (transform 728ms, setup 0ms, import 976ms, tests 6.48s, environment 1ms)
+

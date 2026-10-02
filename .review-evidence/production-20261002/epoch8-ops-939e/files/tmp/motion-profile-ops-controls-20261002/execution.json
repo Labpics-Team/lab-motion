@@ -1,0 +1,29 @@
+{
+  "records": [
+    {
+      "argv": [
+        "pnpm",
+        "exec",
+        "vitest",
+        "run",
+        "test/server-profile-contract.test.ts",
+        "-t",
+        "сохраняет невозможную мощность|отмена перед запуском|отмена внутри получения",
+        "--reporter=json",
+        "--outputFile=/tmp/motion-profile-ops-controls-20261002/vitest-result.json"
+      ],
+      "cwd": "/workspace/lab-motion",
+      "startUtc": "2026-10-02T05:00:07.267967+00:00",
+      "endUtc": "2026-10-02T05:00:09.615487+00:00",
+      "exitCode": 1,
+      "environment": {
+        "PATH": "/opt/codex/runtimes/codex-primary-runtime/dependencies/node/bin:/tmp/motion-server-toolchain-20261001/bin:/home/agent/.local/bin:/opt/codex/runtimes/codex-primary-runtime/dependencies/bin/override:/opt/codex/runtimes/codex-primary-runtime/dependencies/python/bin:/opt/codex/runtimes/codex-primary-runtime/dependencies/node/bin:/opt/codex/runtimes/codex-primary-runtime/dependencies/bin:/opt/codex/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin:/home/agent/.local/bin:/opt/codex/runtimes/codex-primary-runtime/dependencies/bin/fallback",
+        "CI": "true",
+        "NODE_PATH": null,
+        "NODE_OPTIONS": null
+      }
+    }
+  ],
+  "registeredTimingSamples": 0,
+  "allChildrenJoined": true
+}

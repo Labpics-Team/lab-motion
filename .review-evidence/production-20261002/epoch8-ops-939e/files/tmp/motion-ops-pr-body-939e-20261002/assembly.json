@@ -1,0 +1,21 @@
+{
+  "head": "939e7f4a7ebef2dd494f9dec8690932fecebfd73",
+  "bodyChars": 37662,
+  "bodyBytes": 52718,
+  "bodySha256": "f1c4959f33fad923994065ec437e55040854c52fc01c44f501635d7723c476bb",
+  "suffixSha256": "833d2f50ad056e172c21b0244bea1b8be739d38cc8b1fb0c2286f42f4168da3d",
+  "literalReports": [
+    {
+      "path": "/tmp/motion-ops-measurement-939e-20261002/REPORT.md",
+      "bytes": 17966,
+      "sha256": "0178142581aaaf9ff45f25b18b8dbb8ca1b02e298146e16d24b48e6b980525a8"
+    },
+    {
+      "path": "/tmp/motion-ops-so-939e-20261002/REPORT.md",
+      "bytes": 25187,
+      "sha256": "360a22330663c0e00356b798b9a94a803dbabc602873ed7936326c53ec8ee034"
+    }
+  ],
+  "sourceCapture": "/tmp/motion-ops-pr-body-before-939e-20261002",
+  "published": false
+}

@@ -1,0 +1,213 @@
+{
+  "head": "939e7f4a7ebef2dd494f9dec8690932fecebfd73",
+  "startedAt": "2026-10-02T05:09:54.637225+00:00",
+  "environment": {
+    "PATH": "/tmp/motion-server-toolchain-20261001/bin:/opt/codex/runtimes/codex-primary-runtime/dependencies/node/bin:/home/agent/.local/bin:/opt/codex/runtimes/codex-primary-runtime/dependencies/bin/override:/opt/codex/runtimes/codex-primary-runtime/dependencies/python/bin:/opt/codex/runtimes/codex-primary-runtime/dependencies/node/bin:/opt/codex/runtimes/codex-primary-runtime/dependencies/bin:/opt/codex/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin:/home/agent/.local/bin:/opt/codex/runtimes/codex-primary-runtime/dependencies/bin/fallback",
+    "NODE_PATH": null,
+    "NODE_OPTIONS": null,
+    "CI": "true"
+  },
+  "commands": [
+    {
+      "name": "whole",
+      "argv": [
+        "/tmp/motion-server-toolchain-20261001/bin/pnpm",
+        "exec",
+        "vitest",
+        "run",
+        "--reporter=json",
+        "--outputFile=/tmp/motion-profile-ops-current-gates-939e7f4a-20261002/whole.json"
+      ],
+      "cwd": "/workspace/lab-motion",
+      "startedAt": "2026-10-02T05:09:54.638259+00:00",
+      "finishedAt": "2026-10-02T05:11:39.162925+00:00",
+      "wallSeconds": 104.52468414600298,
+      "exit": 0,
+      "files": {
+        "whole.stdout": {
+          "bytes": 143,
+          "sha256": "58dcf3aa307e3eabdacb286da55c0455c5ba21930b42111e38d45b83a347f8ee"
+        },
+        "whole.stderr": {
+          "bytes": 359,
+          "sha256": "71e9b1989414511cfc3173ea9ebd35a7256b7b47f487171603fcc9095eaecbc4"
+        }
+      }
+    },
+    {
+      "name": "finiteness",
+      "argv": [
+        "/tmp/motion-server-toolchain-20261001/bin/pnpm",
+        "exec",
+        "vitest",
+        "run",
+        "--reporter=verbose",
+        "test/animate-facade-finiteness-fuzz.test.ts",
+        "test/animate-overflow-finiteness-fuzz.test.ts",
+        "test/behaviors-finiteness-fuzz.test.ts",
+        "test/decay-finiteness-fuzz.test.ts",
+        "test/easing-finiteness-fuzz.test.ts",
+        "test/projection-finiteness-fuzz.test.ts",
+        "test/smart-finiteness-fuzz.test.ts",
+        "test/solver-finiteness-fuzz.test.ts",
+        "test/timeline-finiteness-fuzz.test.ts",
+        "test/utils-finiteness-fuzz.test.ts"
+      ],
+      "cwd": "/workspace/lab-motion",
+      "startedAt": "2026-10-02T05:11:39.163321+00:00",
+      "finishedAt": "2026-10-02T05:11:45.832051+00:00",
+      "wallSeconds": 6.668750672994065,
+      "exit": 0,
+      "files": {
+        "finiteness.stdout": {
+          "bytes": 20314,
+          "sha256": "7530ca14e5f36b49a68b5acffbc984316332c4b00ec4fe6c2a8da18a4123bfb0"
+        },
+        "finiteness.stderr": {
+          "bytes": 0,
+          "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+        }
+      }
+    },
+    {
+      "name": "actionlint",
+      "argv": [
+        "/workspace/lab-motion/scratchpad/actionlint-ci-pinned/actionlint"
+      ],
+      "cwd": "/workspace/lab-motion",
+      "startedAt": "2026-10-02T05:11:45.832434+00:00",
+      "finishedAt": "2026-10-02T05:11:45.840485+00:00",
+      "wallSeconds": 0.008060583000769839,
+      "exit": 0,
+      "files": {
+        "actionlint.stdout": {
+          "bytes": 0,
+          "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+        },
+        "actionlint.stderr": {
+          "bytes": 0,
+          "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+        }
+      }
+    },
+    {
+      "name": "static",
+      "argv": [
+        "/tmp/motion-server-toolchain-20261001/bin/pnpm",
+        "check:static"
+      ],
+      "cwd": "/workspace/lab-motion",
+      "startedAt": "2026-10-02T05:11:45.840796+00:00",
+      "finishedAt": "2026-10-02T05:11:56.888038+00:00",
+      "wallSeconds": 11.047261248007999,
+      "exit": 0,
+      "files": {
+        "static.stdout": {
+          "bytes": 260,
+          "sha256": "6d614bc8dc520d53f50dbac1249232c668c54513cf443329f436a0aa5a6f551c"
+        },
+        "static.stderr": {
+          "bytes": 396,
+          "sha256": "fb87992a36e0405ba8b299d10727870ce8bf9a5fc364397f334f6effcf58b720"
+        }
+      }
+    },
+    {
+      "name": "docs-facts",
+      "argv": [
+        "/opt/codex/runtimes/codex-primary-runtime/dependencies/node/bin/node",
+        "scripts/check-docs-facts.mjs"
+      ],
+      "cwd": "/workspace/lab-motion",
+      "startedAt": "2026-10-02T05:11:56.888639+00:00",
+      "finishedAt": "2026-10-02T05:11:56.928271+00:00",
+      "wallSeconds": 0.039646998993703164,
+      "exit": 0,
+      "files": {
+        "docs-facts.stdout": {
+          "bytes": 23,
+          "sha256": "d3b534c5348e15bf96aadf4f5a210761809cc2829415d4fd9015117c41a69d0f"
+        },
+        "docs-facts.stderr": {
+          "bytes": 0,
+          "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+        }
+      }
+    },
+    {
+      "name": "docs-drift",
+      "argv": [
+        "/opt/codex/runtimes/codex-primary-runtime/dependencies/node/bin/node",
+        "scripts/check-docs-drift.mjs"
+      ],
+      "cwd": "/workspace/lab-motion",
+      "startedAt": "2026-10-02T05:11:56.928887+00:00",
+      "finishedAt": "2026-10-02T05:11:56.976601+00:00",
+      "wallSeconds": 0.04773039399879053,
+      "exit": 0,
+      "files": {
+        "docs-drift.stdout": {
+          "bytes": 218,
+          "sha256": "4437b7385139583741ad88edbb67528fedc3fabce8beb61947a5bcc384bad4be"
+        },
+        "docs-drift.stderr": {
+          "bytes": 0,
+          "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+        }
+      }
+    },
+    {
+      "name": "pnpm-pack",
+      "argv": [
+        "/tmp/motion-server-toolchain-20261001/bin/pnpm",
+        "--config.ignore-scripts=true",
+        "pack",
+        "--out",
+        "/tmp/motion-profile-ops-current-gates-939e7f4a-20261002/candidate-pnpm.tgz"
+      ],
+      "cwd": "/workspace/lab-motion",
+      "startedAt": "2026-10-02T05:11:56.977270+00:00",
+      "finishedAt": "2026-10-02T05:11:57.590323+00:00",
+      "wallSeconds": 0.6130709879944334,
+      "exit": 0,
+      "files": {
+        "pnpm-pack.stdout": {
+          "bytes": 8071,
+          "sha256": "28ea2ddee0af4edf3b2efd543da919bb2ab171330817225d2ca4c74476f270a4"
+        },
+        "pnpm-pack.stderr": {
+          "bytes": 0,
+          "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+        }
+      }
+    },
+    {
+      "name": "npm-pack",
+      "argv": [
+        "npm",
+        "pack",
+        "--ignore-scripts",
+        "--pack-destination",
+        "/tmp/motion-profile-ops-current-gates-939e7f4a-20261002"
+      ],
+      "cwd": "/workspace/lab-motion",
+      "startedAt": "2026-10-02T05:11:57.591092+00:00",
+      "finishedAt": "2026-10-02T05:11:58.542712+00:00",
+      "wallSeconds": 0.9516396370017901,
+      "exit": 0,
+      "files": {
+        "npm-pack.stdout": {
+          "bytes": 25,
+          "sha256": "abd90dcb1d334fc0369e0d014da05d72546794877f45ec7e3ffcf4609c70ed1a"
+        },
+        "npm-pack.stderr": {
+          "bytes": 13684,
+          "sha256": "647bdd0dd86a07af57b39b52396e151394d730774d1a72c8b110ce5caa4824e3"
+        }
+      }
+    }
+  ],
+  "endedAt": "2026-10-02T05:11:58.543358+00:00",
+  "allChildrenJoined": true,
+  "exit": 0
+}

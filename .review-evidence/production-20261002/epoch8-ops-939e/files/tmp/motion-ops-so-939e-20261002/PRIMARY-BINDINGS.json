@@ -1,0 +1,207 @@
+{
+  "primary": {
+    "path": "/tmp/motion-profile-ops-939e7f4a-20261002/PRIMARY-PACKET.json",
+    "bytes": 9872,
+    "sha256": "97492707b736d36bec8cbaa09c911d44a09e02aac61e38c472fccfd1d4ae6c73"
+  },
+  "exactRefs": 28,
+  "refs": [
+    {
+      "key": "SOURCE-CONSERVATION.json",
+      "path": "/tmp/motion-profile-ops-939e7f4a-20261002/SOURCE-CONSERVATION.json",
+      "bytes": 2206,
+      "sha256": "43910c9395b9909c90e337d48e963e5571b75ca406a9b62cd82842248a77ee01",
+      "section": "files"
+    },
+    {
+      "key": "source.tar.gz",
+      "path": "/tmp/motion-profile-ops-939e7f4a-20261002/source.tar.gz",
+      "bytes": 1773271,
+      "sha256": "8661dbd05016c95e309307c062d55e52b9e01045afbdde93f19b0f813339fa70",
+      "section": "files"
+    },
+    {
+      "key": "changed-paths.txt",
+      "path": "/tmp/motion-profile-ops-939e7f4a-20261002/changed-paths.txt",
+      "bytes": 194,
+      "sha256": "a162569b45cfb91a9623cf08fc822e14bcfb0b4d3a7d753e4bff2059df73e7c3",
+      "section": "files"
+    },
+    {
+      "key": "source.diff",
+      "path": "/tmp/motion-profile-ops-939e7f4a-20261002/source.diff",
+      "bytes": 30495,
+      "sha256": "4ba846fa1c8d3d8b41e4fd250d7cf45607dfe4128f49b35661622483c4b2045d",
+      "section": "files"
+    },
+    {
+      "key": "tree.txt",
+      "path": "/tmp/motion-profile-ops-939e7f4a-20261002/tree.txt",
+      "bytes": 54508,
+      "sha256": "c0a576e104ea4fe0847e8a352dd0e7918c35f3f03227d7cd2d232fd43dda96f6",
+      "section": "files"
+    },
+    {
+      "key": "commit.txt",
+      "path": "/tmp/motion-profile-ops-939e7f4a-20261002/commit.txt",
+      "bytes": 350,
+      "sha256": "26e4a8d87d4260f0858181e37f55b5e0c268063c69646402f1d83ceca08031b9",
+      "section": "files"
+    },
+    {
+      "key": "source:bench/profile/server-profile-registration.mjs",
+      "path": "/workspace/lab-motion/bench/profile/server-profile-registration.mjs",
+      "bytes": 19123,
+      "sha256": "7c9c6bf65341fb023d4db2e45a01ef9bacf5246a7af3c62385f15f8523be396f",
+      "section": "files"
+    },
+    {
+      "key": "source:bench/profile/server-profile-runner.mjs",
+      "path": "/workspace/lab-motion/bench/profile/server-profile-runner.mjs",
+      "bytes": 53215,
+      "sha256": "a3f39c0aa74d2458060bff6bf7540f251d527cecbae29f52f6f5848cd254ae91",
+      "section": "files"
+    },
+    {
+      "key": "source:docs/server-profile.md",
+      "path": "/workspace/lab-motion/docs/server-profile.md",
+      "bytes": 6356,
+      "sha256": "60ee167808782eea22d154f93bfaf52aa68ab16b487077047c928ed8e2ebe2bf",
+      "section": "files"
+    },
+    {
+      "key": "source:test/fixtures/server-thread-cpu-clock-check.mjs",
+      "path": "/workspace/lab-motion/test/fixtures/server-thread-cpu-clock-check.mjs",
+      "bytes": 12296,
+      "sha256": "1e7ba0af37efb8f774ba0217965addff60a56cc9b2de7ef2c8964262b96e5390",
+      "section": "files"
+    },
+    {
+      "key": "source:test/server-profile-contract.test.ts",
+      "path": "/workspace/lab-motion/test/server-profile-contract.test.ts",
+      "bytes": 105078,
+      "sha256": "c599cfebb8c77841adf74214083aecd89b6f12df22012cecdc4ee5c56ca3d1fa",
+      "section": "files"
+    },
+    {
+      "key": "/tmp/motion-profile-ops-controls-20261002/execution.json",
+      "path": "/tmp/motion-profile-ops-controls-20261002/execution.json",
+      "bytes": 1361,
+      "sha256": "9ce38d04f5fda1ead4a8e574532d563ce7b4e681850137968ea17acaedea8848",
+      "section": "files"
+    },
+    {
+      "key": "/tmp/motion-profile-ops-controls-20261002/vitest-result.json",
+      "path": "/tmp/motion-profile-ops-controls-20261002/vitest-result.json",
+      "bytes": 85213,
+      "sha256": "0cf6a5740cde96041aa827896080914e00d028bb0ffe91da57db5a6245094823",
+      "section": "files"
+    },
+    {
+      "key": "/tmp/motion-profile-ops-controls-20261002/0.stdout.log",
+      "path": "/tmp/motion-profile-ops-controls-20261002/0.stdout.log",
+      "bytes": 137,
+      "sha256": "24e2b25103b4a1ec6ad1d9f75ec78776ba095c9b8dc9f39363423ead2a450ab8",
+      "section": "files"
+    },
+    {
+      "key": "/tmp/motion-profile-ops-controls-20261002/0.stderr.log",
+      "path": "/tmp/motion-profile-ops-controls-20261002/0.stderr.log",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "section": "files"
+    },
+    {
+      "key": "/tmp/motion-profile-ops-controls-v2-20261002/execution.json",
+      "path": "/tmp/motion-profile-ops-controls-v2-20261002/execution.json",
+      "bytes": 2386,
+      "sha256": "600f54a3bfe6f75c206eb0df0e59768325a84934f5c43d0724d08b798b73aa90",
+      "section": "files"
+    },
+    {
+      "key": "/tmp/motion-profile-ops-controls-v2-20261002/vitest-result.json",
+      "path": "/tmp/motion-profile-ops-controls-v2-20261002/vitest-result.json",
+      "bytes": 83950,
+      "sha256": "2c8f97e4fccbdc185f6a0c61ee04ecaf5ee2ec1e5c711ef50cdb234c0ed8fa32",
+      "section": "files"
+    },
+    {
+      "key": "/tmp/motion-profile-ops-controls-v2-20261002/0.stdout.log",
+      "path": "/tmp/motion-profile-ops-controls-v2-20261002/0.stdout.log",
+      "bytes": 140,
+      "sha256": "8dddd9bcc4494202485fe003cfe633f0fe77fdadec7fc95b7de91c754690f90b",
+      "section": "files"
+    },
+    {
+      "key": "/tmp/motion-profile-ops-controls-v2-20261002/0.stderr.log",
+      "path": "/tmp/motion-profile-ops-controls-v2-20261002/0.stderr.log",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "section": "files"
+    },
+    {
+      "key": "/tmp/motion-profile-ops-controls-v2-20261002/1.stdout.log",
+      "path": "/tmp/motion-profile-ops-controls-v2-20261002/1.stdout.log",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "section": "files"
+    },
+    {
+      "key": "/tmp/motion-profile-ops-controls-v2-20261002/1.stderr.log",
+      "path": "/tmp/motion-profile-ops-controls-v2-20261002/1.stderr.log",
+      "bytes": 880,
+      "sha256": "b2c865c498fe25e80e0df555e66005c382003021416a151d2ed771f33f04e6ef",
+      "section": "files"
+    },
+    {
+      "key": "/tmp/motion-profile-ops-native-v3-20261002/execution.json",
+      "path": "/tmp/motion-profile-ops-native-v3-20261002/execution.json",
+      "bytes": 1018,
+      "sha256": "203924d5c8bfdf809e33e64eaf6058169f229ec82dd756f1d769b5b57d6c92a9",
+      "section": "files"
+    },
+    {
+      "key": "/tmp/motion-profile-ops-native-v3-20261002/stdout.log",
+      "path": "/tmp/motion-profile-ops-native-v3-20261002/stdout.log",
+      "bytes": 43396,
+      "sha256": "5d2ed60a3744a12c669cf81acbd61fa5cafccacfe5e9372bc7e5e09a8237f876",
+      "section": "files"
+    },
+    {
+      "key": "/tmp/motion-profile-ops-native-v3-20261002/stderr.log",
+      "path": "/tmp/motion-profile-ops-native-v3-20261002/stderr.log",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "section": "files"
+    },
+    {
+      "key": "/tmp/motion-qualified-fe092331-20261002/PRIMARY-PACKET.json",
+      "path": "/tmp/motion-qualified-fe092331-20261002/PRIMARY-PACKET.json",
+      "bytes": 7130,
+      "sha256": "4184a52ea58d4f3b27e7cd4c571425c51efda578f1a283b2aab396dd0659e29e",
+      "section": "files"
+    },
+    {
+      "key": "/tmp/motion-server-predata-fe092331-ce535cf6-20261002-epoch8/FINAL-RAW-PRIMARY/PRIMARY-PACKET.json",
+      "path": "/tmp/motion-server-predata-fe092331-ce535cf6-20261002-epoch8/FINAL-RAW-PRIMARY/PRIMARY-PACKET.json",
+      "bytes": 7689,
+      "sha256": "faa1eca3ff8b228ef2b57f6492e3c2ff3fad208ec8419e408dcf5ffee3313860",
+      "section": "files"
+    },
+    {
+      "key": "/workspace/agents-config/AGENTS.md",
+      "path": "/workspace/agents-config/AGENTS.md",
+      "bytes": 38398,
+      "sha256": "0e1376312cedf91660b1c919ba4c1a9a6e067fe8719eb8daeb52113508b28f0a",
+      "section": "norms"
+    },
+    {
+      "key": "/workspace/agents-config/plans/SPEC.md",
+      "path": "/workspace/agents-config/plans/SPEC.md",
+      "bytes": 31491,
+      "sha256": "7488d5885ee2405d678e488e34a84ce48254978c3a6ad3de2e4d31dfe7b3f651",
+      "section": "norms"
+    }
+  ],
+  "authorArchiveMatchesOwn641Files": true
+}

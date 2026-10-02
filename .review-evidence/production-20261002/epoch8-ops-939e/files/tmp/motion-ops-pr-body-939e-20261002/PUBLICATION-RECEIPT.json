@@ -1,0 +1,63 @@
+{
+  "head": "939e7f4a7ebef2dd494f9dec8690932fecebfd73",
+  "actualCiMerge": "f218293f3d65e2f6a42068401754deabb2cd38d2",
+  "bodyChars": 37662,
+  "bodyBytes": 52718,
+  "bodySha256": "f1c4959f33fad923994065ec437e55040854c52fc01c44f501635d7723c476bb",
+  "literalReports": [
+    {
+      "path": "/tmp/motion-ops-measurement-939e-20261002/REPORT.md",
+      "bytes": 17966,
+      "sha256": "0178142581aaaf9ff45f25b18b8dbb8ca1b02e298146e16d24b48e6b980525a8"
+    },
+    {
+      "path": "/tmp/motion-ops-so-939e-20261002/REPORT.md",
+      "bytes": 25187,
+      "sha256": "360a22330663c0e00356b798b9a94a803dbabc602873ed7936326c53ec8ee034"
+    }
+  ],
+  "preservedAutoSuffixSha256": "833d2f50ad056e172c21b0244bea1b8be739d38cc8b1fb0c2286f42f4168da3d",
+  "remoteReadbackExact": true,
+  "readbackEndedAtUtc": "2026-10-02T05:57:18.168399+00:00",
+  "allChildrenJoined": true,
+  "commentsReviewsRequestsPaidOrOverrides": 0,
+  "sourceMainMergeReleaseDeploy": 0,
+  "refs": [
+    {
+      "path": "/tmp/motion-ops-pr-body-939e-20261002/assembly.json",
+      "bytes": 751,
+      "sha256": "67df71ac482224d0f814316d44ef1727803c04233b5953732869e9f395a16e30"
+    },
+    {
+      "path": "/tmp/motion-ops-pr-body-939e-20261002/body.md",
+      "bytes": 52718,
+      "sha256": "f1c4959f33fad923994065ec437e55040854c52fc01c44f501635d7723c476bb"
+    },
+    {
+      "path": "/tmp/motion-ops-pr-body-939e-20261002/patch-response-mcp.json",
+      "bytes": 54434,
+      "sha256": "d63879e8dfb5bffac7f69335799ddbd13649fd634b5fc8e5769205ea7bdb7803"
+    },
+    {
+      "path": "/tmp/motion-ops-pr-body-939e-20261002/publication-times.json",
+      "bytes": 77,
+      "sha256": "f5bf67136360783078312ad975993ca87a87968dc5dbf9f9d38e060e5b684f2d"
+    },
+    {
+      "path": "/tmp/motion-ops-pr-body-939e-20261002/readback.json",
+      "bytes": 69657,
+      "sha256": "4323e57b036a43ad037d670a6ab524abeb7d831193c8d7c312e35331b5c6b8d7"
+    },
+    {
+      "path": "/tmp/motion-ops-pr-body-939e-20261002/readback.stderr",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "path": "/tmp/motion-ops-pr-body-939e-20261002/request.json",
+      "bytes": 52903,
+      "sha256": "812444cc1429103a07cc708dcb224d91c0c147a8d782c6de5429d5c6ce25e53a"
+    }
+  ],
+  "futureWrites": "none; future observations in separate supplement"
+}

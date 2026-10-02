@@ -1,0 +1,797 @@
+{
+  "reviewer": "native_clock_second_order_acceptance",
+  "head": "939e7f4a7ebef2dd494f9dec8690932fecebfd73",
+  "tree": "deba4db1952029bdb7d2244b207f570007700b19",
+  "base": "fe092331360837fd7f63d71a4b7f867ba849ebd4",
+  "axis": "second-order operational lifecycle/signals, evidence boundaries, compatibility, cost and simpler alternative",
+  "createdAtUtc": "2026-10-02T05:30:06.359328+00:00",
+  "verdict": "PASS-scoped-source-architecture",
+  "confirmedBlockers": [],
+  "notCertified": [
+    "real-series interruption",
+    "hard signal/cleanup deadline",
+    "all-failure test child join",
+    "actual-series time/disk upper",
+    "statistical admission",
+    "physical mobile",
+    "full product GO"
+  ],
+  "readerRuntimeExecutions": 0,
+  "sourceOrNormMutations": 0,
+  "foreignVerdictOracle": false,
+  "entries": [
+    {
+      "path": "/tmp/motion-ops-so-939e-20261002/source.tar",
+      "bytes": 7454720,
+      "sha256": "ff8ca442617a4becb751cff3c57ceb2aaca61c9ed0ab0416a843212e8378c193",
+      "role": "immutable SOURCE",
+      "readScope": "641 entries: bytes/mode/symlink Git reconstruction; five changed paths semantic inspection; unchanged boundaries scoped transfer",
+      "readMode": "all bytes; scoped semantic read"
+    },
+    {
+      "path": "/tmp/motion-ops-so-939e-20261002/source.diff",
+      "bytes": 30495,
+      "sha256": "4ba846fa1c8d3d8b41e4fd250d7cf45607dfe4128f49b35661622483c4b2045d",
+      "role": "immutable delta",
+      "readScope": "full exact five-file diff",
+      "readMode": "semantic read"
+    },
+    {
+      "path": "/tmp/motion-ops-so-939e-20261002/commit.raw",
+      "bytes": 350,
+      "sha256": "26e4a8d87d4260f0858181e37f55b5e0c268063c69646402f1d83ceca08031b9",
+      "role": "immutable identity",
+      "readScope": "full object bytes; independent Git object digest",
+      "readMode": "semantic read"
+    },
+    {
+      "path": "/tmp/motion-ops-so-939e-20261002/tree.raw",
+      "bytes": 1192,
+      "sha256": "c5dbe7181ec1c6f9838d4dae4ca979b13e3284bac9164bc2d135395ae221cc92",
+      "role": "immutable identity",
+      "readScope": "full object bytes; independent Git object digest",
+      "readMode": "semantic read"
+    },
+    {
+      "path": "/tmp/motion-ops-so-939e-20261002/source/bench/profile/server-profile-registration.mjs",
+      "bytes": 19123,
+      "sha256": "7c9c6bf65341fb023d4db2e45a01ef9bacf5246a7af3c62385f15f8523be396f",
+      "role": "changed SOURCE",
+      "readScope": "diff full; 1–90 and 137–183; all bytes compare except stoppingRule; previous scoped clock/model transfer",
+      "readMode": "semantic read"
+    },
+    {
+      "path": "/tmp/motion-ops-so-939e-20261002/source/bench/profile/server-profile-runner.mjs",
+      "bytes": 53215,
+      "sha256": "a3f39c0aa74d2458060bff6bf7540f251d527cecbae29f52f6f5848cd254ae91",
+      "role": "changed SOURCE",
+      "readScope": "diff full; 1–135, 530–744; all five acquisition/raw-control/retention function byte comparisons",
+      "readMode": "semantic read"
+    },
+    {
+      "path": "/tmp/motion-ops-so-939e-20261002/source/docs/server-profile.md",
+      "bytes": 6356,
+      "sha256": "60ee167808782eea22d154f93bfaf52aa68ab16b487077047c928ed8e2ebe2bf",
+      "role": "changed SOURCE",
+      "readScope": "full reference role and scope",
+      "readMode": "semantic read"
+    },
+    {
+      "path": "/tmp/motion-ops-so-939e-20261002/source/test/fixtures/server-thread-cpu-clock-check.mjs",
+      "bytes": 12296,
+      "sha256": "1e7ba0af37efb8f774ba0217965addff60a56cc9b2de7ef2c8964262b96e5390",
+      "role": "changed SOURCE",
+      "readScope": "full 1–195",
+      "readMode": "semantic read"
+    },
+    {
+      "path": "/tmp/motion-ops-so-939e-20261002/source/test/server-profile-contract.test.ts",
+      "bytes": 105078,
+      "sha256": "c599cfebb8c77841adf74214083aecd89b6f12df22012cecdc4ee5c56ca3d1fa",
+      "role": "changed SOURCE",
+      "readScope": "diff full; 865–1016 especially 880–950; unchanged rest bounded previous proof",
+      "readMode": "semantic read"
+    },
+    {
+      "path": "/workspace/agents-config/AGENTS.md",
+      "bytes": 38398,
+      "sha256": "0e1376312cedf91660b1c919ba4c1a9a6e067fe8719eb8daeb52113508b28f0a",
+      "role": "normative contract / bounded unchanged transfer",
+      "readScope": "103–150, 187–207; targeted architecture/failure/ownership search; unchanged previous scoped norm",
+      "readMode": "semantic read"
+    },
+    {
+      "path": "/workspace/agents-config/plans/SPEC.md",
+      "bytes": 31491,
+      "sha256": "7488d5885ee2405d678e488e34a84ce48254978c3a6ad3de2e4d31dfe7b3f651",
+      "role": "normative contract / bounded unchanged transfer",
+      "readScope": "55–80, 312–324; authority/lifecycle; unchanged previous full normative reading",
+      "readMode": "semantic read"
+    },
+    {
+      "path": "/workspace/agents-config/plans/TEMPLATE.md",
+      "bytes": 10270,
+      "sha256": "7f4cb8dcc983f392a01f2abdddc7b74527412b0da725b114cee94677c651a97e",
+      "role": "normative contract / bounded unchanged transfer",
+      "readScope": "unchanged previous full normative reading; current byte identity",
+      "readMode": "semantic read"
+    },
+    {
+      "path": "/workspace/agents-config/plans/lab-motion-production/ACTIVE.md",
+      "bytes": 235,
+      "sha256": "42e36c2efa89912aa00395c938263c1bf35275325420df52ec736b0986606731",
+      "role": "normative contract / bounded unchanged transfer",
+      "readScope": "full current authority",
+      "readMode": "semantic read"
+    },
+    {
+      "path": "/workspace/agents-config/plans/lab-motion-production/CLAIM.md",
+      "bytes": 139,
+      "sha256": "56ac2167795a81b9d1a60d2ebc1cb8830a2653cbc45026bbcb2d0b0f8e837fa8",
+      "role": "normative contract / bounded unchanged transfer",
+      "readScope": "full current owner/node",
+      "readMode": "semantic read"
+    },
+    {
+      "path": "/workspace/agents-config/plans/lab-motion-production/ACTIVATION.md",
+      "bytes": 194,
+      "sha256": "97e6b6ce4080b5c91d62e7ace5844a3c7aeeaa3bce04b21f832785bc807a4908",
+      "role": "normative contract / bounded unchanged transfer",
+      "readScope": "full current activation pointer; does not assert current entire r11 SHA equals initial grant SHA",
+      "readMode": "semantic read"
+    },
+    {
+      "path": "/workspace/agents-config/plans/lab-motion-production/r11.md",
+      "bytes": 74166,
+      "sha256": "cbeef108b288502165437c375bb259f3f4d6dc8ae4ae9e926db133adeba40d4b",
+      "role": "normative contract / bounded unchanged transfer",
+      "readScope": "174–206, 339–351, 435–457 and targeted context; unchanged previous invariant/gate scope",
+      "readMode": "semantic read"
+    },
+    {
+      "path": "/workspace/agents-config/plans/lab-motion-production/r12.md",
+      "bytes": 40024,
+      "sha256": "b2e6d1462b0bce43773beaf307e3b3963c426bf07134f49c844d4991e1753622",
+      "role": "normative contract / bounded unchanged transfer",
+      "readScope": "1–40 current prepared state; targeted server clauses, previous unchanged scope only",
+      "readMode": "semantic read"
+    },
+    {
+      "path": "/workspace/agents-config/skills/architecture/references/composition.md",
+      "bytes": 18836,
+      "sha256": "9297e36749db27c85b57aa65048faa72f656d23a68c49f3f4459c0269ce55d03",
+      "role": "canonical boundary procedure",
+      "readScope": "full 1–182 across repaired read windows",
+      "readMode": "semantic read"
+    },
+    {
+      "path": "/tmp/motion-qualified-so-fe092-20261002/REPORT.md",
+      "bytes": 22096,
+      "sha256": "ec16f2c7cfb96a7ea52d4e719f89e4e089a7536b425da4a153c202ba9ca430b7",
+      "role": "own prior proof",
+      "readScope": "own sealed fe092 proof only; transfer by exact 636 unchanged source bytes/norm identity; no new-runtime claim",
+      "readMode": "SHA binding and own prior reading"
+    },
+    {
+      "path": "/tmp/motion-qualified-so-fe092-20261002/READSET.json",
+      "bytes": 42064,
+      "sha256": "09bfa6fdecaf66f52afc6ae051d70f8edb0ae63e41cb6240eb739878869dc513",
+      "role": "own prior proof",
+      "readScope": "own sealed fe092 proof only; transfer by exact 636 unchanged source bytes/norm identity; no new-runtime claim",
+      "readMode": "SHA binding and own prior reading"
+    },
+    {
+      "path": "/tmp/motion-qualified-so-fe092-20261002/MANIFEST.json",
+      "bytes": 3538,
+      "sha256": "86b1f95dbac7d758fd16f33758ef38aa8e5a541fc319b62c292b5c25dcc960ce",
+      "role": "own prior proof",
+      "readScope": "own sealed fe092 proof only; transfer by exact 636 unchanged source bytes/norm identity; no new-runtime claim",
+      "readMode": "SHA binding and own prior reading"
+    },
+    {
+      "path": "/tmp/motion-qualified-so-fe092-20261002/TERMINAL.json",
+      "bytes": 920,
+      "sha256": "e04891c613658b83ccecd8925bb1769bdbda40c21ec422da057e432f56bb2362",
+      "role": "own prior proof",
+      "readScope": "own sealed fe092 proof only; transfer by exact 636 unchanged source bytes/norm identity; no new-runtime claim",
+      "readMode": "SHA binding and own prior reading"
+    },
+    {
+      "path": "/tmp/motion-qualified-fe092331-20261002/source.tar",
+      "bytes": 7444480,
+      "sha256": "a91db3d664b91a7e169a49de4794fa7150064f35fe281a6a2b6fec2fd6023709",
+      "role": "own previous immutable SOURCE",
+      "readScope": "all 641 entries compared with current archive",
+      "readMode": "all-byte transfer check"
+    },
+    {
+      "path": "/tmp/motion-profile-ops-939e7f4a-20261002/PRIMARY-PACKET.json",
+      "bytes": 9872,
+      "sha256": "97492707b736d36bec8cbaa09c911d44a09e02aac61e38c472fccfd1d4ae6c73",
+      "role": "PRIMARY packet",
+      "readScope": "full literal index; claim scope only",
+      "readMode": "semantic read"
+    },
+    {
+      "path": "/tmp/motion-profile-ops-939e7f4a-20261002/SOURCE-CONSERVATION.json",
+      "bytes": 2206,
+      "sha256": "43910c9395b9909c90e337d48e963e5571b75ca406a9b62cd82842248a77ee01",
+      "role": "PRIMARY source/raw ref",
+      "readScope": "exact bytes/hash binding to PRIMARY; metadata is not author authority; SOURCE/function conservation independently checked",
+      "readMode": "SHA binding only unless duplicated semantic scope above"
+    },
+    {
+      "path": "/tmp/motion-profile-ops-939e7f4a-20261002/source.tar.gz",
+      "bytes": 1773271,
+      "sha256": "8661dbd05016c95e309307c062d55e52b9e01045afbdde93f19b0f813339fa70",
+      "role": "PRIMARY source/raw ref",
+      "readScope": "exact bytes/hash binding to PRIMARY; metadata is not author authority; SOURCE/function conservation independently checked",
+      "readMode": "SHA binding only unless duplicated semantic scope above"
+    },
+    {
+      "path": "/tmp/motion-profile-ops-939e7f4a-20261002/changed-paths.txt",
+      "bytes": 194,
+      "sha256": "a162569b45cfb91a9623cf08fc822e14bcfb0b4d3a7d753e4bff2059df73e7c3",
+      "role": "PRIMARY source/raw ref",
+      "readScope": "exact bytes/hash binding to PRIMARY; metadata is not author authority; SOURCE/function conservation independently checked",
+      "readMode": "SHA binding only unless duplicated semantic scope above"
+    },
+    {
+      "path": "/tmp/motion-profile-ops-939e7f4a-20261002/source.diff",
+      "bytes": 30495,
+      "sha256": "4ba846fa1c8d3d8b41e4fd250d7cf45607dfe4128f49b35661622483c4b2045d",
+      "role": "PRIMARY source/raw ref",
+      "readScope": "exact bytes/hash binding to PRIMARY; metadata is not author authority; SOURCE/function conservation independently checked",
+      "readMode": "SHA binding only unless duplicated semantic scope above"
+    },
+    {
+      "path": "/tmp/motion-profile-ops-939e7f4a-20261002/tree.txt",
+      "bytes": 54508,
+      "sha256": "c0a576e104ea4fe0847e8a352dd0e7918c35f3f03227d7cd2d232fd43dda96f6",
+      "role": "PRIMARY source/raw ref",
+      "readScope": "exact bytes/hash binding to PRIMARY; metadata is not author authority; SOURCE/function conservation independently checked",
+      "readMode": "SHA binding only unless duplicated semantic scope above"
+    },
+    {
+      "path": "/tmp/motion-profile-ops-939e7f4a-20261002/commit.txt",
+      "bytes": 350,
+      "sha256": "26e4a8d87d4260f0858181e37f55b5e0c268063c69646402f1d83ceca08031b9",
+      "role": "PRIMARY source/raw ref",
+      "readScope": "exact bytes/hash binding to PRIMARY; metadata is not author authority; SOURCE/function conservation independently checked",
+      "readMode": "SHA binding only unless duplicated semantic scope above"
+    },
+    {
+      "path": "/workspace/lab-motion/bench/profile/server-profile-registration.mjs",
+      "bytes": 19123,
+      "sha256": "7c9c6bf65341fb023d4db2e45a01ef9bacf5246a7af3c62385f15f8523be396f",
+      "role": "PRIMARY source/raw ref",
+      "readScope": "exact bytes/hash binding to PRIMARY; metadata is not author authority; SOURCE/function conservation independently checked",
+      "readMode": "SHA binding only unless duplicated semantic scope above"
+    },
+    {
+      "path": "/workspace/lab-motion/bench/profile/server-profile-runner.mjs",
+      "bytes": 53215,
+      "sha256": "a3f39c0aa74d2458060bff6bf7540f251d527cecbae29f52f6f5848cd254ae91",
+      "role": "PRIMARY source/raw ref",
+      "readScope": "exact bytes/hash binding to PRIMARY; metadata is not author authority; SOURCE/function conservation independently checked",
+      "readMode": "SHA binding only unless duplicated semantic scope above"
+    },
+    {
+      "path": "/workspace/lab-motion/docs/server-profile.md",
+      "bytes": 6356,
+      "sha256": "60ee167808782eea22d154f93bfaf52aa68ab16b487077047c928ed8e2ebe2bf",
+      "role": "PRIMARY source/raw ref",
+      "readScope": "exact bytes/hash binding to PRIMARY; metadata is not author authority; SOURCE/function conservation independently checked",
+      "readMode": "SHA binding only unless duplicated semantic scope above"
+    },
+    {
+      "path": "/workspace/lab-motion/test/fixtures/server-thread-cpu-clock-check.mjs",
+      "bytes": 12296,
+      "sha256": "1e7ba0af37efb8f774ba0217965addff60a56cc9b2de7ef2c8964262b96e5390",
+      "role": "PRIMARY source/raw ref",
+      "readScope": "exact bytes/hash binding to PRIMARY; metadata is not author authority; SOURCE/function conservation independently checked",
+      "readMode": "SHA binding only unless duplicated semantic scope above"
+    },
+    {
+      "path": "/workspace/lab-motion/test/server-profile-contract.test.ts",
+      "bytes": 105078,
+      "sha256": "c599cfebb8c77841adf74214083aecd89b6f12df22012cecdc4ee5c56ca3d1fa",
+      "role": "PRIMARY source/raw ref",
+      "readScope": "exact bytes/hash binding to PRIMARY; metadata is not author authority; SOURCE/function conservation independently checked",
+      "readMode": "SHA binding only unless duplicated semantic scope above"
+    },
+    {
+      "path": "/tmp/motion-profile-ops-controls-20261002/execution.json",
+      "bytes": 1361,
+      "sha256": "9ce38d04f5fda1ead4a8e574532d563ce7b4e681850137968ea17acaedea8848",
+      "role": "PRIMARY source/raw ref",
+      "readScope": "full raw execution/failed fixture logs",
+      "readMode": "semantic read"
+    },
+    {
+      "path": "/tmp/motion-profile-ops-controls-20261002/vitest-result.json",
+      "bytes": 85213,
+      "sha256": "0cf6a5740cde96041aa827896080914e00d028bb0ffe91da57db5a6245094823",
+      "role": "PRIMARY source/raw ref",
+      "readScope": "raw framework objects parsed; targeted 3 new controls + N test states/durations/failures; no broader correctness oracle",
+      "readMode": "all bytes; selected semantic read"
+    },
+    {
+      "path": "/tmp/motion-profile-ops-controls-20261002/0.stdout.log",
+      "bytes": 137,
+      "sha256": "24e2b25103b4a1ec6ad1d9f75ec78776ba095c9b8dc9f39363423ead2a450ab8",
+      "role": "PRIMARY source/raw ref",
+      "readScope": "exact bytes/hash binding to PRIMARY; metadata is not author authority; SOURCE/function conservation independently checked",
+      "readMode": "SHA binding only unless duplicated semantic scope above"
+    },
+    {
+      "path": "/tmp/motion-profile-ops-controls-20261002/0.stderr.log",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "role": "PRIMARY source/raw ref",
+      "readScope": "full raw execution/failed fixture logs",
+      "readMode": "semantic read"
+    },
+    {
+      "path": "/tmp/motion-profile-ops-controls-v2-20261002/execution.json",
+      "bytes": 2386,
+      "sha256": "600f54a3bfe6f75c206eb0df0e59768325a84934f5c43d0724d08b798b73aa90",
+      "role": "PRIMARY source/raw ref",
+      "readScope": "full raw execution/failed fixture logs",
+      "readMode": "semantic read"
+    },
+    {
+      "path": "/tmp/motion-profile-ops-controls-v2-20261002/vitest-result.json",
+      "bytes": 83950,
+      "sha256": "2c8f97e4fccbdc185f6a0c61ee04ecaf5ee2ec1e5c711ef50cdb234c0ed8fa32",
+      "role": "PRIMARY source/raw ref",
+      "readScope": "raw framework objects parsed; targeted 3 new controls + N test states/durations/failures; no broader correctness oracle",
+      "readMode": "all bytes; selected semantic read"
+    },
+    {
+      "path": "/tmp/motion-profile-ops-controls-v2-20261002/0.stdout.log",
+      "bytes": 140,
+      "sha256": "8dddd9bcc4494202485fe003cfe633f0fe77fdadec7fc95b7de91c754690f90b",
+      "role": "PRIMARY source/raw ref",
+      "readScope": "exact bytes/hash binding to PRIMARY; metadata is not author authority; SOURCE/function conservation independently checked",
+      "readMode": "SHA binding only unless duplicated semantic scope above"
+    },
+    {
+      "path": "/tmp/motion-profile-ops-controls-v2-20261002/0.stderr.log",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "role": "PRIMARY source/raw ref",
+      "readScope": "full raw execution/failed fixture logs",
+      "readMode": "semantic read"
+    },
+    {
+      "path": "/tmp/motion-profile-ops-controls-v2-20261002/1.stdout.log",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "role": "PRIMARY source/raw ref",
+      "readScope": "exact bytes/hash binding to PRIMARY; metadata is not author authority; SOURCE/function conservation independently checked",
+      "readMode": "SHA binding only unless duplicated semantic scope above"
+    },
+    {
+      "path": "/tmp/motion-profile-ops-controls-v2-20261002/1.stderr.log",
+      "bytes": 880,
+      "sha256": "b2c865c498fe25e80e0df555e66005c382003021416a151d2ed771f33f04e6ef",
+      "role": "PRIMARY source/raw ref",
+      "readScope": "full raw execution/failed fixture logs",
+      "readMode": "semantic read"
+    },
+    {
+      "path": "/tmp/motion-profile-ops-native-v3-20261002/execution.json",
+      "bytes": 1018,
+      "sha256": "203924d5c8bfdf809e33e64eaf6058169f229ec82dd756f1d769b5b57d6c92a9",
+      "role": "PRIMARY source/raw ref",
+      "readScope": "full raw execution/failed fixture logs",
+      "readMode": "semantic read"
+    },
+    {
+      "path": "/tmp/motion-profile-ops-native-v3-20261002/stdout.log",
+      "bytes": 43396,
+      "sha256": "5d2ed60a3744a12c669cf81acbd61fa5cafccacfe5e9372bc7e5e09a8237f876",
+      "role": "PRIMARY source/raw ref",
+      "readScope": "full raw JSON parsed; 13 record roster, C/host identity and 2 operator-signal artifact/journal cases",
+      "readMode": "all bytes; scoped semantic read"
+    },
+    {
+      "path": "/tmp/motion-profile-ops-native-v3-20261002/stderr.log",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "role": "PRIMARY source/raw ref",
+      "readScope": "full raw execution/failed fixture logs",
+      "readMode": "semantic read"
+    },
+    {
+      "path": "/tmp/motion-qualified-fe092331-20261002/PRIMARY-PACKET.json",
+      "bytes": 7130,
+      "sha256": "4184a52ea58d4f3b27e7cd4c571425c51efda578f1a283b2aab396dd0659e29e",
+      "role": "PRIMARY source/raw ref",
+      "readScope": "exact bytes/hash binding to PRIMARY; metadata is not author authority; SOURCE/function conservation independently checked",
+      "readMode": "SHA binding only unless duplicated semantic scope above"
+    },
+    {
+      "path": "/tmp/motion-server-predata-fe092331-ce535cf6-20261002-epoch8/FINAL-RAW-PRIMARY/PRIMARY-PACKET.json",
+      "bytes": 7689,
+      "sha256": "faa1eca3ff8b228ef2b57f6492e3c2ff3fad208ec8419e408dcf5ffee3313860",
+      "role": "PRIMARY source/raw ref",
+      "readScope": "exact bytes/hash binding to PRIMARY; metadata is not author authority; SOURCE/function conservation independently checked",
+      "readMode": "SHA binding only unless duplicated semantic scope above"
+    },
+    {
+      "path": "/tmp/motion-profile-ops-current-gates-939e7f4a-20261002/PRIMARY-GATES-SUPPLEMENT.json",
+      "bytes": 5891,
+      "sha256": "6631d9fa61f250e03debc6a669ed5e711d30ad5bb5c8307a07e220b337abd8e7",
+      "role": "current PRIMARY supplement",
+      "readScope": "full literal index; no parsed verdict oracle",
+      "readMode": "semantic read"
+    },
+    {
+      "path": "/tmp/motion-profile-ops-current-gates-939e7f4a-20261002/heavy-profile-cases.json",
+      "bytes": 1611,
+      "sha256": "e9e8d5e636404922d49d3d3683ae7d6ec801ed47ff0dbae9d39069d4b4248715",
+      "role": "fresh current gate raw/ref",
+      "readScope": "SHA/bytes only; interpretations not used",
+      "readMode": "SHA binding only"
+    },
+    {
+      "path": "/tmp/motion-profile-ops-current-gates-939e7f4a-20261002/parsed-results-and-packages.json",
+      "bytes": 3029,
+      "sha256": "c3d2d316b73e75bfdfdaaa62cda9698cd259c8c2f20c2899681dd33f955e6c36",
+      "role": "fresh current gate raw/ref",
+      "readScope": "SHA/bytes only; interpretations not used",
+      "readMode": "SHA binding only"
+    },
+    {
+      "path": "/tmp/motion-profile-ops-current-gates-939e7f4a-20261002/labpics-motion-0.3.0.tgz",
+      "bytes": 560040,
+      "sha256": "54482b3da5ae3e530e9f25f29b91471b1ff95cf2d8212735a0eeb71002d6fba7",
+      "role": "fresh current gate raw/ref",
+      "readScope": "full archive file roster/private isolation, package fields, exact old/current archive comparison",
+      "readMode": "all-byte and package semantic read"
+    },
+    {
+      "path": "/tmp/motion-profile-ops-current-gates-939e7f4a-20261002/npm-pack.stderr",
+      "bytes": 13684,
+      "sha256": "647bdd0dd86a07af57b39b52396e151394d730774d1a72c8b110ce5caa4824e3",
+      "role": "fresh current gate raw/ref",
+      "readScope": "hash binding all; raw log/error text read for current command results; no parsed author verdict",
+      "readMode": "raw read/binding"
+    },
+    {
+      "path": "/tmp/motion-profile-ops-current-gates-939e7f4a-20261002/npm-pack.stdout",
+      "bytes": 25,
+      "sha256": "abd90dcb1d334fc0369e0d014da05d72546794877f45ec7e3ffcf4609c70ed1a",
+      "role": "fresh current gate raw/ref",
+      "readScope": "hash binding all; raw log/error text read for current command results; no parsed author verdict",
+      "readMode": "raw read/binding"
+    },
+    {
+      "path": "/tmp/motion-profile-ops-current-gates-939e7f4a-20261002/candidate-pnpm.tgz",
+      "bytes": 562051,
+      "sha256": "b41708c31e122da9ae46a558f0c5f447195f36ca19c9b0fe6c19954887d790e4",
+      "role": "fresh current gate raw/ref",
+      "readScope": "full archive file roster/private isolation, package fields, exact old/current archive comparison",
+      "readMode": "all-byte and package semantic read"
+    },
+    {
+      "path": "/tmp/motion-profile-ops-current-gates-939e7f4a-20261002/pnpm-pack.stderr",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "role": "fresh current gate raw/ref",
+      "readScope": "hash binding all; raw log/error text read for current command results; no parsed author verdict",
+      "readMode": "raw read/binding"
+    },
+    {
+      "path": "/tmp/motion-profile-ops-current-gates-939e7f4a-20261002/pnpm-pack.stdout",
+      "bytes": 8071,
+      "sha256": "28ea2ddee0af4edf3b2efd543da919bb2ab171330817225d2ca4c74476f270a4",
+      "role": "fresh current gate raw/ref",
+      "readScope": "hash binding all; raw log/error text read for current command results; no parsed author verdict",
+      "readMode": "raw read/binding"
+    },
+    {
+      "path": "/tmp/motion-profile-ops-current-gates-939e7f4a-20261002/docs-drift.stderr",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "role": "fresh current gate raw/ref",
+      "readScope": "hash binding all; raw log/error text read for current command results; no parsed author verdict",
+      "readMode": "raw read/binding"
+    },
+    {
+      "path": "/tmp/motion-profile-ops-current-gates-939e7f4a-20261002/docs-drift.stdout",
+      "bytes": 218,
+      "sha256": "4437b7385139583741ad88edbb67528fedc3fabce8beb61947a5bcc384bad4be",
+      "role": "fresh current gate raw/ref",
+      "readScope": "hash binding all; raw log/error text read for current command results; no parsed author verdict",
+      "readMode": "raw read/binding"
+    },
+    {
+      "path": "/tmp/motion-profile-ops-current-gates-939e7f4a-20261002/docs-facts.stderr",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "role": "fresh current gate raw/ref",
+      "readScope": "hash binding all; raw log/error text read for current command results; no parsed author verdict",
+      "readMode": "raw read/binding"
+    },
+    {
+      "path": "/tmp/motion-profile-ops-current-gates-939e7f4a-20261002/docs-facts.stdout",
+      "bytes": 23,
+      "sha256": "d3b534c5348e15bf96aadf4f5a210761809cc2829415d4fd9015117c41a69d0f",
+      "role": "fresh current gate raw/ref",
+      "readScope": "hash binding all; raw log/error text read for current command results; no parsed author verdict",
+      "readMode": "raw read/binding"
+    },
+    {
+      "path": "/tmp/motion-profile-ops-current-gates-939e7f4a-20261002/static.stderr",
+      "bytes": 396,
+      "sha256": "fb87992a36e0405ba8b299d10727870ce8bf9a5fc364397f334f6effcf58b720",
+      "role": "fresh current gate raw/ref",
+      "readScope": "hash binding all; raw log/error text read for current command results; no parsed author verdict",
+      "readMode": "raw read/binding"
+    },
+    {
+      "path": "/tmp/motion-profile-ops-current-gates-939e7f4a-20261002/static.stdout",
+      "bytes": 260,
+      "sha256": "6d614bc8dc520d53f50dbac1249232c668c54513cf443329f436a0aa5a6f551c",
+      "role": "fresh current gate raw/ref",
+      "readScope": "hash binding all; raw log/error text read for current command results; no parsed author verdict",
+      "readMode": "raw read/binding"
+    },
+    {
+      "path": "/tmp/motion-profile-ops-current-gates-939e7f4a-20261002/actionlint.stderr",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "role": "fresh current gate raw/ref",
+      "readScope": "hash binding all; raw log/error text read for current command results; no parsed author verdict",
+      "readMode": "raw read/binding"
+    },
+    {
+      "path": "/tmp/motion-profile-ops-current-gates-939e7f4a-20261002/actionlint.stdout",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "role": "fresh current gate raw/ref",
+      "readScope": "hash binding all; raw log/error text read for current command results; no parsed author verdict",
+      "readMode": "raw read/binding"
+    },
+    {
+      "path": "/tmp/motion-profile-ops-current-gates-939e7f4a-20261002/finiteness.stderr",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "role": "fresh current gate raw/ref",
+      "readScope": "hash binding all; raw log/error text read for current command results; no parsed author verdict",
+      "readMode": "raw read/binding"
+    },
+    {
+      "path": "/tmp/motion-profile-ops-current-gates-939e7f4a-20261002/finiteness.stdout",
+      "bytes": 20314,
+      "sha256": "7530ca14e5f36b49a68b5acffbc984316332c4b00ec4fe6c2a8da18a4123bfb0",
+      "role": "fresh current gate raw/ref",
+      "readScope": "hash binding all; raw log/error text read for current command results; no parsed author verdict",
+      "readMode": "raw read/binding"
+    },
+    {
+      "path": "/tmp/motion-profile-ops-current-gates-939e7f4a-20261002/receipt.json",
+      "bytes": 7279,
+      "sha256": "2e9262d758c2571143723dbdb1daaa5dd952d86de45f3f48cc446468e0cb3c9f",
+      "role": "fresh current gate raw/ref",
+      "readScope": "full execution argv/env/actual boundaries",
+      "readMode": "semantic read"
+    },
+    {
+      "path": "/tmp/motion-profile-ops-current-gates-939e7f4a-20261002/whole.json",
+      "bytes": 2143666,
+      "sha256": "1c5eee6be5a31c19f4f4218c4c029039180f214f9187f20cb8352b159c053650",
+      "role": "fresh current gate raw/ref",
+      "readScope": "raw full framework JSON parsed; counts + three changed controls independently selected",
+      "readMode": "all bytes; scoped semantic read"
+    },
+    {
+      "path": "/tmp/motion-profile-ops-current-gates-939e7f4a-20261002/whole.stderr",
+      "bytes": 359,
+      "sha256": "71e9b1989414511cfc3173ea9ebd35a7256b7b47f487171603fcc9095eaecbc4",
+      "role": "fresh current gate raw/ref",
+      "readScope": "hash binding all; raw log/error text read for current command results; no parsed author verdict",
+      "readMode": "raw read/binding"
+    },
+    {
+      "path": "/tmp/motion-profile-ops-current-gates-939e7f4a-20261002/whole.stdout",
+      "bytes": 143,
+      "sha256": "58dcf3aa307e3eabdacb286da55c0455c5ba21930b42111e38d45b83a347f8ee",
+      "role": "fresh current gate raw/ref",
+      "readScope": "hash binding all; raw log/error text read for current command results; no parsed author verdict",
+      "readMode": "raw read/binding"
+    },
+    {
+      "path": "/tmp/motion-profile-ops-current-gates-939e7f4a-20261002/launch.json",
+      "bytes": 784,
+      "sha256": "6275dc2f993b62a90237d9400a6380455aaa716d34a97a2a33b415b1c9665df1",
+      "role": "fresh current gate raw/ref",
+      "readScope": "full execution argv/env/actual boundaries",
+      "readMode": "semantic read"
+    },
+    {
+      "path": "/tmp/motion-profile-ops-current-gates-939e7f4a-20261002/run.py",
+      "bytes": 2987,
+      "sha256": "a7e3405e4c48bb82c1d15df4c58de9c638387b0e7ba9b03f4ce7d5479dadbf46",
+      "role": "fresh current gate raw/ref",
+      "readScope": "full execution owner, exact-source precondition and actual waits",
+      "readMode": "semantic read"
+    }
+  ],
+  "archiveInternalSemanticScopes": [
+    {
+      "file": "bench/profile/server-profile-contract.mjs",
+      "scope": "1–95, 592–697, 834–963 current direct read; unchanged remainder own fe/f647 proof"
+    },
+    {
+      "files": [
+        ".github/ISSUE_TEMPLATE/bug.yml",
+        ".github/ISSUE_TEMPLATE/config.yml",
+        ".github/ISSUE_TEMPLATE/docs.yml",
+        ".github/ISSUE_TEMPLATE/feature.yml",
+        ".github/ISSUE_TEMPLATE/hardening.yml",
+        ".github/dependabot.yml",
+        ".github/pull_request_template.md",
+        ".github/workflows/browser.yml",
+        ".github/workflows/ci.yml",
+        ".github/workflows/mutation.yml",
+        ".github/workflows/profile-01.yml",
+        ".github/workflows/release.yml",
+        "bench/profile/server-profile-contract.mjs",
+        "bench/profile/server-thread-cpu-clock.c",
+        "bench/profile/server-thread-cpu-clock.mjs",
+        "package.json",
+        "pnpm-lock.yaml",
+        "src/a11y/index.ts",
+        "src/angular/index.ts",
+        "src/animate/channels.ts",
+        "src/animate/index.ts",
+        "src/animate/main-unit.ts",
+        "src/animate/surface-batch.ts",
+        "src/animate/targets.ts",
+        "src/animate/waapi-unit.ts",
+        "src/auto/index.ts",
+        "src/behaviors/index.ts",
+        "src/behaviors/reorder/index.ts",
+        "src/behaviors/state-cascade.ts",
+        "src/bindings/index.ts",
+        "src/compiler/core.ts",
+        "src/compiler/nano-default-artifact.ts",
+        "src/compiler/runtime/index.ts",
+        "src/compiler/surface/index.ts",
+        "src/compiler/vite/index.ts",
+        "src/compositor/cache.ts",
+        "src/compositor/core.ts",
+        "src/compositor/curve.ts",
+        "src/compositor/detect.ts",
+        "src/compositor/error-bound.ts",
+        "src/compositor/execution.ts",
+        "src/compositor/format.ts",
+        "src/compositor/handoff.ts",
+        "src/compositor/index.ts",
+        "src/compositor/sample.ts",
+        "src/compositor/segmenter.ts",
+        "src/compositor/stagger.ts",
+        "src/compositor/stagger/index.ts",
+        "src/decay.ts",
+        "src/decay/index.ts",
+        "src/drive.ts",
+        "src/driver.ts",
+        "src/driver/index.ts",
+        "src/easing/index.ts",
+        "src/errors.ts",
+        "src/flip/index.ts",
+        "src/frame/index.ts",
+        "src/future-layout/artifact.ts",
+        "src/future-layout/coordinator.ts",
+        "src/future-layout/index.ts",
+        "src/future-layout/observer.ts",
+        "src/future-layout/proof.ts",
+        "src/future-layout/receipt.ts",
+        "src/future-layout/route.ts",
+        "src/future-layout/transaction.ts",
+        "src/gestures/index.ts",
+        "src/in-view/index.ts",
+        "src/index.ts",
+        "src/internal/binding-value.ts",
+        "src/internal/constants.ts",
+        "src/internal/cubic-bezier.ts",
+        "src/internal/finite.ts",
+        "src/internal/frame-requester.ts",
+        "src/internal/media-query.ts",
+        "src/internal/motion-defaults.ts",
+        "src/internal/motion-program.ts",
+        "src/internal/read-spring.ts",
+        "src/internal/repeat-cursor.ts",
+        "src/internal/request-frame.ts",
+        "src/internal/sample-keyframes.ts",
+        "src/internal/schedule-v1.ts",
+        "src/internal/sliding-window.ts",
+        "src/internal/solver.ts",
+        "src/internal/template.ts",
+        "src/internal/types.ts",
+        "src/keyframes/index.ts",
+        "src/lit/controller.ts",
+        "src/lit/element.ts",
+        "src/lit/index.ts",
+        "src/motion-value.ts",
+        "src/nano/index.ts",
+        "src/nano/spring-linear.ts",
+        "src/preact/index.ts",
+        "src/presence/index.ts",
+        "src/presence/machine.ts",
+        "src/presence/transition.ts",
+        "src/presets/index.ts",
+        "src/projection/dom.ts",
+        "src/projection/driver.ts",
+        "src/projection/geometry.ts",
+        "src/projection/index.ts",
+        "src/qwik/index.ts",
+        "src/react/index.ts",
+        "src/scroll/index.ts",
+        "src/smart/index.ts",
+        "src/solid/index.ts",
+        "src/spring.ts",
+        "src/spring/index.ts",
+        "src/stagger/index.ts",
+        "src/stagger/scheduler.ts",
+        "src/svelte/index.ts",
+        "src/svg-morph/index.ts",
+        "src/svg/index.ts",
+        "src/timeline/index.ts",
+        "src/tokens/index.ts",
+        "src/tween.ts",
+        "src/utils/index.ts",
+        "src/value/color.ts",
+        "src/value/index.ts",
+        "src/value/parse.ts",
+        "src/value/transform.ts",
+        "src/value/units.ts",
+        "src/vue/index.ts",
+        "src/waapi/index.ts",
+        "src/wc/index.ts",
+        "test/ci-workflow-contract.test.ts"
+      ],
+      "scope": "126 exact unchanged public/CI/recipe/clock entries compared; semantic transfer limited to own sealed fe proof"
+    },
+    {
+      "functions": [
+        {
+          "function": "measureServerEngine",
+          "sha256": "d1d9d9964e020a59db34dd61f5bb458ea78a5fb1db3f1ed724e1d629e6db784b",
+          "bytes": 2430,
+          "byteIdentical": true
+        },
+        {
+          "function": "measureServerStockC",
+          "sha256": "e61fe2e1b8f26ced5bdd823c28cd1e53857cbc616f6428f72e93c8a13794cf03",
+          "bytes": 4439,
+          "byteIdentical": true
+        },
+        {
+          "function": "measureServerBrowser",
+          "sha256": "4b5722fe1cc357062a912f8786f4f59af41b47eb0f824fa503c0712de0d6771b",
+          "bytes": 11601,
+          "byteIdentical": true
+        },
+        {
+          "function": "measureBrowserRawControls",
+          "sha256": "586b480eacf82202e37279cebb6a5bb184f2dec8ccf9f5fb80499bc6cc4e3ef4",
+          "bytes": 3209,
+          "byteIdentical": true
+        },
+        {
+          "function": "makeRetention",
+          "sha256": "ffbc1f68fc642a8f34cd0b5f9f2c0c2ece100ebbf17f6500db74806433be66e8",
+          "bytes": 700,
+          "byteIdentical": true
+        }
+      ],
+      "scope": "whole-function byte equality, no new runtime execution"
+    }
+  ],
+  "truncationHandling": "Large combined reads were visibly truncated; the critical runner/contract/fixture/test/composition windows were re-read in smaller calls. No full-source semantic coverage inferred from archive hashing."
+}

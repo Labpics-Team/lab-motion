@@ -1,0 +1,520 @@
+{
+  "checkedUtc": "2026-10-02T05:21:26.691141+00:00",
+  "refs": [
+    {
+      "path": "/tmp/motion-profile-ops-939e7f4a-20261002/SOURCE-CONSERVATION.json",
+      "bytes": 2206,
+      "sha256": "43910c9395b9909c90e337d48e963e5571b75ca406a9b62cd82842248a77ee01",
+      "key": "SOURCE-CONSERVATION.json",
+      "category": "primary",
+      "ownedCopy": "/tmp/motion-ops-measurement-939e-20261002/PRIMARY/primary/tmp/motion-profile-ops-939e7f4a-20261002/SOURCE-CONSERVATION.json",
+      "bytesMatched": true,
+      "shaMatched": true
+    },
+    {
+      "path": "/tmp/motion-profile-ops-939e7f4a-20261002/source.tar.gz",
+      "bytes": 1773271,
+      "sha256": "8661dbd05016c95e309307c062d55e52b9e01045afbdde93f19b0f813339fa70",
+      "key": "source.tar.gz",
+      "category": "primary",
+      "ownedCopy": "/tmp/motion-ops-measurement-939e-20261002/PRIMARY/primary/tmp/motion-profile-ops-939e7f4a-20261002/source.tar.gz",
+      "bytesMatched": true,
+      "shaMatched": true
+    },
+    {
+      "path": "/tmp/motion-profile-ops-939e7f4a-20261002/changed-paths.txt",
+      "bytes": 194,
+      "sha256": "a162569b45cfb91a9623cf08fc822e14bcfb0b4d3a7d753e4bff2059df73e7c3",
+      "key": "changed-paths.txt",
+      "category": "primary",
+      "ownedCopy": "/tmp/motion-ops-measurement-939e-20261002/PRIMARY/primary/tmp/motion-profile-ops-939e7f4a-20261002/changed-paths.txt",
+      "bytesMatched": true,
+      "shaMatched": true
+    },
+    {
+      "path": "/tmp/motion-profile-ops-939e7f4a-20261002/source.diff",
+      "bytes": 30495,
+      "sha256": "4ba846fa1c8d3d8b41e4fd250d7cf45607dfe4128f49b35661622483c4b2045d",
+      "key": "source.diff",
+      "category": "primary",
+      "ownedCopy": "/tmp/motion-ops-measurement-939e-20261002/PRIMARY/primary/tmp/motion-profile-ops-939e7f4a-20261002/source.diff",
+      "bytesMatched": true,
+      "shaMatched": true
+    },
+    {
+      "path": "/tmp/motion-profile-ops-939e7f4a-20261002/tree.txt",
+      "bytes": 54508,
+      "sha256": "c0a576e104ea4fe0847e8a352dd0e7918c35f3f03227d7cd2d232fd43dda96f6",
+      "key": "tree.txt",
+      "category": "primary",
+      "ownedCopy": "/tmp/motion-ops-measurement-939e-20261002/PRIMARY/primary/tmp/motion-profile-ops-939e7f4a-20261002/tree.txt",
+      "bytesMatched": true,
+      "shaMatched": true
+    },
+    {
+      "path": "/tmp/motion-profile-ops-939e7f4a-20261002/commit.txt",
+      "bytes": 350,
+      "sha256": "26e4a8d87d4260f0858181e37f55b5e0c268063c69646402f1d83ceca08031b9",
+      "key": "commit.txt",
+      "category": "primary",
+      "ownedCopy": "/tmp/motion-ops-measurement-939e-20261002/PRIMARY/primary/tmp/motion-profile-ops-939e7f4a-20261002/commit.txt",
+      "bytesMatched": true,
+      "shaMatched": true
+    },
+    {
+      "path": "/tmp/motion-profile-ops-controls-20261002/execution.json",
+      "bytes": 1361,
+      "sha256": "9ce38d04f5fda1ead4a8e574532d563ce7b4e681850137968ea17acaedea8848",
+      "key": "/tmp/motion-profile-ops-controls-20261002/execution.json",
+      "category": "primary",
+      "ownedCopy": "/tmp/motion-ops-measurement-939e-20261002/PRIMARY/primary/tmp/motion-profile-ops-controls-20261002/execution.json",
+      "bytesMatched": true,
+      "shaMatched": true
+    },
+    {
+      "path": "/tmp/motion-profile-ops-controls-20261002/vitest-result.json",
+      "bytes": 85213,
+      "sha256": "0cf6a5740cde96041aa827896080914e00d028bb0ffe91da57db5a6245094823",
+      "key": "/tmp/motion-profile-ops-controls-20261002/vitest-result.json",
+      "category": "primary",
+      "ownedCopy": "/tmp/motion-ops-measurement-939e-20261002/PRIMARY/primary/tmp/motion-profile-ops-controls-20261002/vitest-result.json",
+      "bytesMatched": true,
+      "shaMatched": true
+    },
+    {
+      "path": "/tmp/motion-profile-ops-controls-20261002/0.stdout.log",
+      "bytes": 137,
+      "sha256": "24e2b25103b4a1ec6ad1d9f75ec78776ba095c9b8dc9f39363423ead2a450ab8",
+      "key": "/tmp/motion-profile-ops-controls-20261002/0.stdout.log",
+      "category": "primary",
+      "ownedCopy": "/tmp/motion-ops-measurement-939e-20261002/PRIMARY/primary/tmp/motion-profile-ops-controls-20261002/0.stdout.log",
+      "bytesMatched": true,
+      "shaMatched": true
+    },
+    {
+      "path": "/tmp/motion-profile-ops-controls-20261002/0.stderr.log",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "key": "/tmp/motion-profile-ops-controls-20261002/0.stderr.log",
+      "category": "primary",
+      "ownedCopy": "/tmp/motion-ops-measurement-939e-20261002/PRIMARY/primary/tmp/motion-profile-ops-controls-20261002/0.stderr.log",
+      "bytesMatched": true,
+      "shaMatched": true
+    },
+    {
+      "path": "/tmp/motion-profile-ops-controls-v2-20261002/execution.json",
+      "bytes": 2386,
+      "sha256": "600f54a3bfe6f75c206eb0df0e59768325a84934f5c43d0724d08b798b73aa90",
+      "key": "/tmp/motion-profile-ops-controls-v2-20261002/execution.json",
+      "category": "primary",
+      "ownedCopy": "/tmp/motion-ops-measurement-939e-20261002/PRIMARY/primary/tmp/motion-profile-ops-controls-v2-20261002/execution.json",
+      "bytesMatched": true,
+      "shaMatched": true
+    },
+    {
+      "path": "/tmp/motion-profile-ops-controls-v2-20261002/vitest-result.json",
+      "bytes": 83950,
+      "sha256": "2c8f97e4fccbdc185f6a0c61ee04ecaf5ee2ec1e5c711ef50cdb234c0ed8fa32",
+      "key": "/tmp/motion-profile-ops-controls-v2-20261002/vitest-result.json",
+      "category": "primary",
+      "ownedCopy": "/tmp/motion-ops-measurement-939e-20261002/PRIMARY/primary/tmp/motion-profile-ops-controls-v2-20261002/vitest-result.json",
+      "bytesMatched": true,
+      "shaMatched": true
+    },
+    {
+      "path": "/tmp/motion-profile-ops-controls-v2-20261002/0.stdout.log",
+      "bytes": 140,
+      "sha256": "8dddd9bcc4494202485fe003cfe633f0fe77fdadec7fc95b7de91c754690f90b",
+      "key": "/tmp/motion-profile-ops-controls-v2-20261002/0.stdout.log",
+      "category": "primary",
+      "ownedCopy": "/tmp/motion-ops-measurement-939e-20261002/PRIMARY/primary/tmp/motion-profile-ops-controls-v2-20261002/0.stdout.log",
+      "bytesMatched": true,
+      "shaMatched": true
+    },
+    {
+      "path": "/tmp/motion-profile-ops-controls-v2-20261002/0.stderr.log",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "key": "/tmp/motion-profile-ops-controls-v2-20261002/0.stderr.log",
+      "category": "primary",
+      "ownedCopy": "/tmp/motion-ops-measurement-939e-20261002/PRIMARY/primary/tmp/motion-profile-ops-controls-v2-20261002/0.stderr.log",
+      "bytesMatched": true,
+      "shaMatched": true
+    },
+    {
+      "path": "/tmp/motion-profile-ops-controls-v2-20261002/1.stdout.log",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "key": "/tmp/motion-profile-ops-controls-v2-20261002/1.stdout.log",
+      "category": "primary",
+      "ownedCopy": "/tmp/motion-ops-measurement-939e-20261002/PRIMARY/primary/tmp/motion-profile-ops-controls-v2-20261002/1.stdout.log",
+      "bytesMatched": true,
+      "shaMatched": true
+    },
+    {
+      "path": "/tmp/motion-profile-ops-controls-v2-20261002/1.stderr.log",
+      "bytes": 880,
+      "sha256": "b2c865c498fe25e80e0df555e66005c382003021416a151d2ed771f33f04e6ef",
+      "key": "/tmp/motion-profile-ops-controls-v2-20261002/1.stderr.log",
+      "category": "primary",
+      "ownedCopy": "/tmp/motion-ops-measurement-939e-20261002/PRIMARY/primary/tmp/motion-profile-ops-controls-v2-20261002/1.stderr.log",
+      "bytesMatched": true,
+      "shaMatched": true
+    },
+    {
+      "path": "/tmp/motion-profile-ops-native-v3-20261002/execution.json",
+      "bytes": 1018,
+      "sha256": "203924d5c8bfdf809e33e64eaf6058169f229ec82dd756f1d769b5b57d6c92a9",
+      "key": "/tmp/motion-profile-ops-native-v3-20261002/execution.json",
+      "category": "primary",
+      "ownedCopy": "/tmp/motion-ops-measurement-939e-20261002/PRIMARY/primary/tmp/motion-profile-ops-native-v3-20261002/execution.json",
+      "bytesMatched": true,
+      "shaMatched": true
+    },
+    {
+      "path": "/tmp/motion-profile-ops-native-v3-20261002/stdout.log",
+      "bytes": 43396,
+      "sha256": "5d2ed60a3744a12c669cf81acbd61fa5cafccacfe5e9372bc7e5e09a8237f876",
+      "key": "/tmp/motion-profile-ops-native-v3-20261002/stdout.log",
+      "category": "primary",
+      "ownedCopy": "/tmp/motion-ops-measurement-939e-20261002/PRIMARY/primary/tmp/motion-profile-ops-native-v3-20261002/stdout.log",
+      "bytesMatched": true,
+      "shaMatched": true
+    },
+    {
+      "path": "/tmp/motion-profile-ops-native-v3-20261002/stderr.log",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "key": "/tmp/motion-profile-ops-native-v3-20261002/stderr.log",
+      "category": "primary",
+      "ownedCopy": "/tmp/motion-ops-measurement-939e-20261002/PRIMARY/primary/tmp/motion-profile-ops-native-v3-20261002/stderr.log",
+      "bytesMatched": true,
+      "shaMatched": true
+    },
+    {
+      "path": "/tmp/motion-qualified-fe092331-20261002/PRIMARY-PACKET.json",
+      "bytes": 7130,
+      "sha256": "4184a52ea58d4f3b27e7cd4c571425c51efda578f1a283b2aab396dd0659e29e",
+      "key": "/tmp/motion-qualified-fe092331-20261002/PRIMARY-PACKET.json",
+      "category": "primary",
+      "ownedCopy": "/tmp/motion-ops-measurement-939e-20261002/PRIMARY/primary/tmp/motion-qualified-fe092331-20261002/PRIMARY-PACKET.json",
+      "bytesMatched": true,
+      "shaMatched": true
+    },
+    {
+      "path": "/tmp/motion-server-predata-fe092331-ce535cf6-20261002-epoch8/FINAL-RAW-PRIMARY/PRIMARY-PACKET.json",
+      "bytes": 7689,
+      "sha256": "faa1eca3ff8b228ef2b57f6492e3c2ff3fad208ec8419e408dcf5ffee3313860",
+      "key": "/tmp/motion-server-predata-fe092331-ce535cf6-20261002-epoch8/FINAL-RAW-PRIMARY/PRIMARY-PACKET.json",
+      "category": "primary",
+      "ownedCopy": "/tmp/motion-ops-measurement-939e-20261002/PRIMARY/primary/tmp/motion-server-predata-fe092331-ce535cf6-20261002-epoch8/FINAL-RAW-PRIMARY/PRIMARY-PACKET.json",
+      "bytesMatched": true,
+      "shaMatched": true
+    },
+    {
+      "path": "/tmp/motion-profile-ops-current-gates-939e7f4a-20261002/heavy-profile-cases.json",
+      "bytes": 1611,
+      "sha256": "e9e8d5e636404922d49d3d3683ae7d6ec801ed47ff0dbae9d39069d4b4248715",
+      "key": "heavy-profile-cases.json",
+      "category": "supplement",
+      "ownedCopy": "/tmp/motion-ops-measurement-939e-20261002/PRIMARY/supplement/tmp/motion-profile-ops-current-gates-939e7f4a-20261002/heavy-profile-cases.json",
+      "bytesMatched": true,
+      "shaMatched": true
+    },
+    {
+      "path": "/tmp/motion-profile-ops-current-gates-939e7f4a-20261002/parsed-results-and-packages.json",
+      "bytes": 3029,
+      "sha256": "c3d2d316b73e75bfdfdaaa62cda9698cd259c8c2f20c2899681dd33f955e6c36",
+      "key": "parsed-results-and-packages.json",
+      "category": "supplement",
+      "ownedCopy": "/tmp/motion-ops-measurement-939e-20261002/PRIMARY/supplement/tmp/motion-profile-ops-current-gates-939e7f4a-20261002/parsed-results-and-packages.json",
+      "bytesMatched": true,
+      "shaMatched": true
+    },
+    {
+      "path": "/tmp/motion-profile-ops-current-gates-939e7f4a-20261002/labpics-motion-0.3.0.tgz",
+      "bytes": 560040,
+      "sha256": "54482b3da5ae3e530e9f25f29b91471b1ff95cf2d8212735a0eeb71002d6fba7",
+      "key": "labpics-motion-0.3.0.tgz",
+      "category": "supplement",
+      "ownedCopy": "/tmp/motion-ops-measurement-939e-20261002/PRIMARY/supplement/tmp/motion-profile-ops-current-gates-939e7f4a-20261002/labpics-motion-0.3.0.tgz",
+      "bytesMatched": true,
+      "shaMatched": true
+    },
+    {
+      "path": "/tmp/motion-profile-ops-current-gates-939e7f4a-20261002/npm-pack.stderr",
+      "bytes": 13684,
+      "sha256": "647bdd0dd86a07af57b39b52396e151394d730774d1a72c8b110ce5caa4824e3",
+      "key": "npm-pack.stderr",
+      "category": "supplement",
+      "ownedCopy": "/tmp/motion-ops-measurement-939e-20261002/PRIMARY/supplement/tmp/motion-profile-ops-current-gates-939e7f4a-20261002/npm-pack.stderr",
+      "bytesMatched": true,
+      "shaMatched": true
+    },
+    {
+      "path": "/tmp/motion-profile-ops-current-gates-939e7f4a-20261002/npm-pack.stdout",
+      "bytes": 25,
+      "sha256": "abd90dcb1d334fc0369e0d014da05d72546794877f45ec7e3ffcf4609c70ed1a",
+      "key": "npm-pack.stdout",
+      "category": "supplement",
+      "ownedCopy": "/tmp/motion-ops-measurement-939e-20261002/PRIMARY/supplement/tmp/motion-profile-ops-current-gates-939e7f4a-20261002/npm-pack.stdout",
+      "bytesMatched": true,
+      "shaMatched": true
+    },
+    {
+      "path": "/tmp/motion-profile-ops-current-gates-939e7f4a-20261002/candidate-pnpm.tgz",
+      "bytes": 562051,
+      "sha256": "b41708c31e122da9ae46a558f0c5f447195f36ca19c9b0fe6c19954887d790e4",
+      "key": "candidate-pnpm.tgz",
+      "category": "supplement",
+      "ownedCopy": "/tmp/motion-ops-measurement-939e-20261002/PRIMARY/supplement/tmp/motion-profile-ops-current-gates-939e7f4a-20261002/candidate-pnpm.tgz",
+      "bytesMatched": true,
+      "shaMatched": true
+    },
+    {
+      "path": "/tmp/motion-profile-ops-current-gates-939e7f4a-20261002/pnpm-pack.stderr",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "key": "pnpm-pack.stderr",
+      "category": "supplement",
+      "ownedCopy": "/tmp/motion-ops-measurement-939e-20261002/PRIMARY/supplement/tmp/motion-profile-ops-current-gates-939e7f4a-20261002/pnpm-pack.stderr",
+      "bytesMatched": true,
+      "shaMatched": true
+    },
+    {
+      "path": "/tmp/motion-profile-ops-current-gates-939e7f4a-20261002/pnpm-pack.stdout",
+      "bytes": 8071,
+      "sha256": "28ea2ddee0af4edf3b2efd543da919bb2ab171330817225d2ca4c74476f270a4",
+      "key": "pnpm-pack.stdout",
+      "category": "supplement",
+      "ownedCopy": "/tmp/motion-ops-measurement-939e-20261002/PRIMARY/supplement/tmp/motion-profile-ops-current-gates-939e7f4a-20261002/pnpm-pack.stdout",
+      "bytesMatched": true,
+      "shaMatched": true
+    },
+    {
+      "path": "/tmp/motion-profile-ops-current-gates-939e7f4a-20261002/docs-drift.stderr",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "key": "docs-drift.stderr",
+      "category": "supplement",
+      "ownedCopy": "/tmp/motion-ops-measurement-939e-20261002/PRIMARY/supplement/tmp/motion-profile-ops-current-gates-939e7f4a-20261002/docs-drift.stderr",
+      "bytesMatched": true,
+      "shaMatched": true
+    },
+    {
+      "path": "/tmp/motion-profile-ops-current-gates-939e7f4a-20261002/docs-drift.stdout",
+      "bytes": 218,
+      "sha256": "4437b7385139583741ad88edbb67528fedc3fabce8beb61947a5bcc384bad4be",
+      "key": "docs-drift.stdout",
+      "category": "supplement",
+      "ownedCopy": "/tmp/motion-ops-measurement-939e-20261002/PRIMARY/supplement/tmp/motion-profile-ops-current-gates-939e7f4a-20261002/docs-drift.stdout",
+      "bytesMatched": true,
+      "shaMatched": true
+    },
+    {
+      "path": "/tmp/motion-profile-ops-current-gates-939e7f4a-20261002/docs-facts.stderr",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "key": "docs-facts.stderr",
+      "category": "supplement",
+      "ownedCopy": "/tmp/motion-ops-measurement-939e-20261002/PRIMARY/supplement/tmp/motion-profile-ops-current-gates-939e7f4a-20261002/docs-facts.stderr",
+      "bytesMatched": true,
+      "shaMatched": true
+    },
+    {
+      "path": "/tmp/motion-profile-ops-current-gates-939e7f4a-20261002/docs-facts.stdout",
+      "bytes": 23,
+      "sha256": "d3b534c5348e15bf96aadf4f5a210761809cc2829415d4fd9015117c41a69d0f",
+      "key": "docs-facts.stdout",
+      "category": "supplement",
+      "ownedCopy": "/tmp/motion-ops-measurement-939e-20261002/PRIMARY/supplement/tmp/motion-profile-ops-current-gates-939e7f4a-20261002/docs-facts.stdout",
+      "bytesMatched": true,
+      "shaMatched": true
+    },
+    {
+      "path": "/tmp/motion-profile-ops-current-gates-939e7f4a-20261002/static.stderr",
+      "bytes": 396,
+      "sha256": "fb87992a36e0405ba8b299d10727870ce8bf9a5fc364397f334f6effcf58b720",
+      "key": "static.stderr",
+      "category": "supplement",
+      "ownedCopy": "/tmp/motion-ops-measurement-939e-20261002/PRIMARY/supplement/tmp/motion-profile-ops-current-gates-939e7f4a-20261002/static.stderr",
+      "bytesMatched": true,
+      "shaMatched": true
+    },
+    {
+      "path": "/tmp/motion-profile-ops-current-gates-939e7f4a-20261002/static.stdout",
+      "bytes": 260,
+      "sha256": "6d614bc8dc520d53f50dbac1249232c668c54513cf443329f436a0aa5a6f551c",
+      "key": "static.stdout",
+      "category": "supplement",
+      "ownedCopy": "/tmp/motion-ops-measurement-939e-20261002/PRIMARY/supplement/tmp/motion-profile-ops-current-gates-939e7f4a-20261002/static.stdout",
+      "bytesMatched": true,
+      "shaMatched": true
+    },
+    {
+      "path": "/tmp/motion-profile-ops-current-gates-939e7f4a-20261002/actionlint.stderr",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "key": "actionlint.stderr",
+      "category": "supplement",
+      "ownedCopy": "/tmp/motion-ops-measurement-939e-20261002/PRIMARY/supplement/tmp/motion-profile-ops-current-gates-939e7f4a-20261002/actionlint.stderr",
+      "bytesMatched": true,
+      "shaMatched": true
+    },
+    {
+      "path": "/tmp/motion-profile-ops-current-gates-939e7f4a-20261002/actionlint.stdout",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "key": "actionlint.stdout",
+      "category": "supplement",
+      "ownedCopy": "/tmp/motion-ops-measurement-939e-20261002/PRIMARY/supplement/tmp/motion-profile-ops-current-gates-939e7f4a-20261002/actionlint.stdout",
+      "bytesMatched": true,
+      "shaMatched": true
+    },
+    {
+      "path": "/tmp/motion-profile-ops-current-gates-939e7f4a-20261002/finiteness.stderr",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "key": "finiteness.stderr",
+      "category": "supplement",
+      "ownedCopy": "/tmp/motion-ops-measurement-939e-20261002/PRIMARY/supplement/tmp/motion-profile-ops-current-gates-939e7f4a-20261002/finiteness.stderr",
+      "bytesMatched": true,
+      "shaMatched": true
+    },
+    {
+      "path": "/tmp/motion-profile-ops-current-gates-939e7f4a-20261002/finiteness.stdout",
+      "bytes": 20314,
+      "sha256": "7530ca14e5f36b49a68b5acffbc984316332c4b00ec4fe6c2a8da18a4123bfb0",
+      "key": "finiteness.stdout",
+      "category": "supplement",
+      "ownedCopy": "/tmp/motion-ops-measurement-939e-20261002/PRIMARY/supplement/tmp/motion-profile-ops-current-gates-939e7f4a-20261002/finiteness.stdout",
+      "bytesMatched": true,
+      "shaMatched": true
+    },
+    {
+      "path": "/tmp/motion-profile-ops-current-gates-939e7f4a-20261002/receipt.json",
+      "bytes": 7279,
+      "sha256": "2e9262d758c2571143723dbdb1daaa5dd952d86de45f3f48cc446468e0cb3c9f",
+      "key": "receipt.json",
+      "category": "supplement",
+      "ownedCopy": "/tmp/motion-ops-measurement-939e-20261002/PRIMARY/supplement/tmp/motion-profile-ops-current-gates-939e7f4a-20261002/receipt.json",
+      "bytesMatched": true,
+      "shaMatched": true
+    },
+    {
+      "path": "/tmp/motion-profile-ops-current-gates-939e7f4a-20261002/whole.json",
+      "bytes": 2143666,
+      "sha256": "1c5eee6be5a31c19f4f4218c4c029039180f214f9187f20cb8352b159c053650",
+      "key": "whole.json",
+      "category": "supplement",
+      "ownedCopy": "/tmp/motion-ops-measurement-939e-20261002/PRIMARY/supplement/tmp/motion-profile-ops-current-gates-939e7f4a-20261002/whole.json",
+      "bytesMatched": true,
+      "shaMatched": true
+    },
+    {
+      "path": "/tmp/motion-profile-ops-current-gates-939e7f4a-20261002/whole.stderr",
+      "bytes": 359,
+      "sha256": "71e9b1989414511cfc3173ea9ebd35a7256b7b47f487171603fcc9095eaecbc4",
+      "key": "whole.stderr",
+      "category": "supplement",
+      "ownedCopy": "/tmp/motion-ops-measurement-939e-20261002/PRIMARY/supplement/tmp/motion-profile-ops-current-gates-939e7f4a-20261002/whole.stderr",
+      "bytesMatched": true,
+      "shaMatched": true
+    },
+    {
+      "path": "/tmp/motion-profile-ops-current-gates-939e7f4a-20261002/whole.stdout",
+      "bytes": 143,
+      "sha256": "58dcf3aa307e3eabdacb286da55c0455c5ba21930b42111e38d45b83a347f8ee",
+      "key": "whole.stdout",
+      "category": "supplement",
+      "ownedCopy": "/tmp/motion-ops-measurement-939e-20261002/PRIMARY/supplement/tmp/motion-profile-ops-current-gates-939e7f4a-20261002/whole.stdout",
+      "bytesMatched": true,
+      "shaMatched": true
+    },
+    {
+      "path": "/tmp/motion-profile-ops-current-gates-939e7f4a-20261002/launch.json",
+      "bytes": 784,
+      "sha256": "6275dc2f993b62a90237d9400a6380455aaa716d34a97a2a33b415b1c9665df1",
+      "key": "launch.json",
+      "category": "supplement",
+      "ownedCopy": "/tmp/motion-ops-measurement-939e-20261002/PRIMARY/supplement/tmp/motion-profile-ops-current-gates-939e7f4a-20261002/launch.json",
+      "bytesMatched": true,
+      "shaMatched": true
+    },
+    {
+      "path": "/tmp/motion-profile-ops-current-gates-939e7f4a-20261002/run.py",
+      "bytes": 2987,
+      "sha256": "a7e3405e4c48bb82c1d15df4c58de9c638387b0e7ba9b03f4ce7d5479dadbf46",
+      "key": "run.py",
+      "category": "supplement",
+      "ownedCopy": "/tmp/motion-ops-measurement-939e-20261002/PRIMARY/supplement/tmp/motion-profile-ops-current-gates-939e7f4a-20261002/run.py",
+      "bytesMatched": true,
+      "shaMatched": true
+    },
+    {
+      "path": "/tmp/motion-profile-ops-939e7f4a-20261002/PRIMARY-PACKET.json",
+      "bytes": 9872,
+      "sha256": "97492707b736d36bec8cbaa09c911d44a09e02aac61e38c472fccfd1d4ae6c73",
+      "key": "source-primary",
+      "category": "supplement",
+      "ownedCopy": "/tmp/motion-ops-measurement-939e-20261002/PRIMARY/supplement/tmp/motion-profile-ops-939e7f4a-20261002/PRIMARY-PACKET.json",
+      "bytesMatched": true,
+      "shaMatched": true
+    },
+    {
+      "path": "/workspace/lab-motion/bench/profile/server-profile-registration.mjs",
+      "bytes": 19123,
+      "sha256": "7c9c6bf65341fb023d4db2e45a01ef9bacf5246a7af3c62385f15f8523be396f",
+      "key": "source:bench/profile/server-profile-registration.mjs",
+      "category": "source-archive-owner",
+      "ownedCopy": "/tmp/motion-ops-measurement-939e-20261002/source/bench/profile/server-profile-registration.mjs",
+      "bytesMatched": true,
+      "shaMatched": true,
+      "liveMutablePathNotRead": true
+    },
+    {
+      "path": "/workspace/lab-motion/bench/profile/server-profile-runner.mjs",
+      "bytes": 53215,
+      "sha256": "a3f39c0aa74d2458060bff6bf7540f251d527cecbae29f52f6f5848cd254ae91",
+      "key": "source:bench/profile/server-profile-runner.mjs",
+      "category": "source-archive-owner",
+      "ownedCopy": "/tmp/motion-ops-measurement-939e-20261002/source/bench/profile/server-profile-runner.mjs",
+      "bytesMatched": true,
+      "shaMatched": true,
+      "liveMutablePathNotRead": true
+    },
+    {
+      "path": "/workspace/lab-motion/docs/server-profile.md",
+      "bytes": 6356,
+      "sha256": "60ee167808782eea22d154f93bfaf52aa68ab16b487077047c928ed8e2ebe2bf",
+      "key": "source:docs/server-profile.md",
+      "category": "source-archive-owner",
+      "ownedCopy": "/tmp/motion-ops-measurement-939e-20261002/source/docs/server-profile.md",
+      "bytesMatched": true,
+      "shaMatched": true,
+      "liveMutablePathNotRead": true
+    },
+    {
+      "path": "/workspace/lab-motion/test/fixtures/server-thread-cpu-clock-check.mjs",
+      "bytes": 12296,
+      "sha256": "1e7ba0af37efb8f774ba0217965addff60a56cc9b2de7ef2c8964262b96e5390",
+      "key": "source:test/fixtures/server-thread-cpu-clock-check.mjs",
+      "category": "source-archive-owner",
+      "ownedCopy": "/tmp/motion-ops-measurement-939e-20261002/source/test/fixtures/server-thread-cpu-clock-check.mjs",
+      "bytesMatched": true,
+      "shaMatched": true,
+      "liveMutablePathNotRead": true
+    },
+    {
+      "path": "/workspace/lab-motion/test/server-profile-contract.test.ts",
+      "bytes": 105078,
+      "sha256": "c599cfebb8c77841adf74214083aecd89b6f12df22012cecdc4ee5c56ca3d1fa",
+      "key": "source:test/server-profile-contract.test.ts",
+      "category": "source-archive-owner",
+      "ownedCopy": "/tmp/motion-ops-measurement-939e-20261002/source/test/server-profile-contract.test.ts",
+      "bytesMatched": true,
+      "shaMatched": true,
+      "liveMutablePathNotRead": true
+    }
+  ]
+}

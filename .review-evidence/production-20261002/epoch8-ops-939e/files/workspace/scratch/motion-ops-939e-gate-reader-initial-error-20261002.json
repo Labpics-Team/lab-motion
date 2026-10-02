@@ -1,0 +1,7 @@
+{
+  "property": "Expected docs/server-profile.md in public pack",
+  "observed": "PNPM pack has no changed members and no server-profile path",
+  "error": "AssertionError: []",
+  "owner": "root reader, not SUT",
+  "rawDriverRerun": false
+}

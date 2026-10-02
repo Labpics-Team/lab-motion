@@ -1,0 +1,39 @@
+{
+  "operation": "one canonical consumer/readback of existing epoch8 bytes, no SUT",
+  "actualStartUtc": "2026-10-02T05:00:17.799197+00:00",
+  "argv": [
+    "taskset",
+    "-c",
+    "2",
+    "/opt/codex/runtimes/codex-primary-runtime/dependencies/node/bin/node",
+    "/tmp/motion-epoch8-actual-prefix-acceptance-20261002/canonical-readback.mjs"
+  ],
+  "inputs": [
+    {
+      "path": "/tmp/motion-epoch8-actual-prefix-acceptance-20261002/PRIMARY/server-profile.json",
+      "bytes": 21741898,
+      "sha256": "d098aad5475f93813cf47c096d9a1c0335e73949730903dd2cfd4190fa038975"
+    },
+    {
+      "path": "/tmp/motion-epoch8-actual-prefix-acceptance-20261002/PRIMARY/journal.ndjson",
+      "bytes": 21768420,
+      "sha256": "8552cce134e3778fa0516912f4f628d21de834e9b284006147c4ab128aa387cb"
+    },
+    {
+      "path": "/tmp/motion-epoch8-actual-prefix-acceptance-20261002/canonical-readback.mjs",
+      "bytes": 2625,
+      "sha256": "718cb2ba2c80548badc8eeb2d2e3285c61ef6ec2f8a41ad901ad90f98153331b"
+    }
+  ],
+  "timeoutSeconds": 30,
+  "timedOut": false,
+  "sourceHead": "fe092331360837fd7f63d71a4b7f867ba849ebd4",
+  "heavy": 0,
+  "queued": 0,
+  "childPid": 730360,
+  "exit": 1,
+  "actualEndUtc": "2026-10-02T05:00:19.074345+00:00",
+  "wallSeconds": 1.2751528109947685,
+  "allChildrenJoined": true,
+  "allEND": true
+}

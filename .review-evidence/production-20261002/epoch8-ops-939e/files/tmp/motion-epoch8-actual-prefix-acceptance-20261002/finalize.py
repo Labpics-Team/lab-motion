@@ -1,0 +1,18 @@
+import datetime,hashlib,json,subprocess,time,sys
+from pathlib import Path
+p=Path(__file__).parent
+utc=lambda:datetime.datetime.now(datetime.timezone.utc).isoformat()
+ref=lambda path:{'path':str(path.relative_to(p)),'bytes':path.stat().st_size,'sha256':hashlib.sha256(path.read_bytes()).hexdigest()}
+start=utc();childargv=['taskset','-c','2',sys.executable,str(p/'seal-input-verification.py')]
+with (p/'finalization.stdout.log').open('wb') as out,(p/'finalization.stderr.log').open('wb') as err:
+ child=subprocess.Popen(childargv,stdout=out,stderr=err);exitcode=child.wait()
+end=utc();assert exitcode==0,(exitcode,(p/'finalization.stderr.log').read_text())
+terminal={'schema':'independent-epoch8-measurement-terminal-v1','sourceHead':'fe092331360837fd7f63d71a4b7f867ba849ebd4','sourceTree':'285e30e36db32f2fdc9ae442327f6b3396dcf254','actualStartUtc':start,'actualEndUtc':end,'exitCode':exitcode,'argv':childargv,'childPid':child.pid,'cpu':2,'action':'source/data-only final input verification/readset/seal; no SUT or new series','allEND':True,'allChildrenJoined':child.poll() is not None,'heavy':0,'queued':0,'registeredReviewerSutSamples':0,'registeredReviewerSeriesLaunches':0,'reviewerNativeExecutions':0,'canonicalConsumerInvocations':1,'canonicalConsumerExit':1,'canonicalConsumerEndUtc':'2026-10-02T05:00:19.074345+00:00','canonicalConsumerRerun':False,'independentReadbackEndUtc':'2026-10-02T05:07:31.702866+00:00','independentReadbackExit':0,'recordedSeriesActualEndUtc':'2026-10-02T04:37:07.905350+00:00','recordedSeriesExit':1,'stopOwnExecAfterSeal':True}
+(p/'terminal.json').write_text(json.dumps(terminal,ensure_ascii=False,indent=2)+'\n')
+with (p/'REPORT.md').open('a') as f:f.write('\nФактический END последней source/data-only проверки: **'+end+' UTC**, exit0, все её children joined/allEND; heavy0/queued0. Terminal/manifest содержат полный argv и отдельные реальные receipts canonical/independent readers и исходной серии. После seal own exec прекращён до отдельной новой задачи.\n')
+files=[ref(x) for x in sorted(p.rglob('*')) if x.is_file() and x.name not in ['MANIFEST.json','FINAL-SEAL.json']]
+manifest={'schema':'independent-epoch8-actual-prefix-manifest-v1','axis':'single existing epoch8 raw prefix identity/measurement/interpretation','verdict':'PASS within stated prefix/interpretation boundary','empiricalDisposition':'UNPROVEN: infeasible frozen N and operator-interrupted incomplete AA','sourceHead':terminal['sourceHead'],'sourceTree':terminal['sourceTree'],'actualEndUtc':end,'exitCode':0,'allEND':True,'heavy':0,'queued':0,'registeredReviewerSutSamples':0,'canonicalConsumerInvocations':1,'canonicalConsumerExit':1,'independentAnalysisExit':0,'files':files,'externalInputBindingsSha256':ref(p/'all-bindings.json')['sha256'],'reportSha256':ref(p/'REPORT.md')['sha256'],'readsetSha256':ref(p/'readset.json')['sha256'],'terminalSha256':ref(p/'terminal.json')['sha256']}
+(p/'MANIFEST.json').write_text(json.dumps(manifest,ensure_ascii=False,indent=2)+'\n')
+seal={'schema':'independent-epoch8-final-seal-v1','actualVerifiedChildEndUtc':end,'sealedAtUtc':utc(),'exitCode':0,'allEND':True,'allChildrenJoined':True,'heavy':0,'queued':0,'sourceHead':terminal['sourceHead'],'sourceTree':terminal['sourceTree'],'files':[ref(p/x) for x in ['REPORT.md','MANIFEST.json','all-bindings.json','readset.json','terminal.json','reader-errors.json','independent-readback.json']],'canonicalReaderExit':1,'independentReaderExit':0,'stopOwnExecAfterSeal':True}
+(p/'FINAL-SEAL.json').write_text(json.dumps(seal,ensure_ascii=False,indent=2)+'\n')
+print(json.dumps(seal,ensure_ascii=False,indent=2))

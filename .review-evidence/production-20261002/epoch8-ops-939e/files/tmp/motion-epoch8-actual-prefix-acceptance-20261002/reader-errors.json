@@ -1,0 +1,78 @@
+{
+  "schema": "reviewer-errors-preserved-v1",
+  "originalEvidenceModified": false,
+  "canonicalConsumerInvocations": 1,
+  "canonicalConsumerReruns": 0,
+  "errors": [
+    {
+      "artifact": "reader-setup-attempt1.error.json",
+      "owner": "reviewer",
+      "kind": "missing own PRIMARY directory during initial copy",
+      "exit": 1,
+      "sutFinding": false
+    },
+    {
+      "artifact": "reader-projection-attempt1.error.json",
+      "owner": "reviewer",
+      "kind": "pilot stage object incorrectly treated as array",
+      "exit": 1,
+      "sutFinding": false
+    },
+    {
+      "artifact": "canonical-reader.stderr.log",
+      "receipt": "canonical-reader.END.json",
+      "script": "canonical-readback.mjs",
+      "owner": "reviewer",
+      "kind": "extra wrapper expected hash(samplePlan), source uses hash({registrationDigest,samplePlan})",
+      "exit": 1,
+      "sutFinding": false,
+      "replayed": false
+    },
+    {
+      "artifact": "independent-reader.stderr.log.attempt1",
+      "receipt": "independent-reader.END.json.attempt1",
+      "script": "independent-readback.py.attempt1",
+      "owner": "reviewer",
+      "kind": "compared full registered clock provenance with intentionally three-field per-sample clock identity",
+      "exit": 1,
+      "sutFinding": false,
+      "correctedSourceOnlyAnalysis": "independent-reader.END.json"
+    }
+  ],
+  "successfulIndependentLiteralAnalysis": {
+    "operation": "independent literal-byte JSON/journal/clock/N analysis; no SUT",
+    "actualStartUtc": "2026-10-02T05:07:29.429781+00:00",
+    "argv": [
+      "taskset",
+      "-c",
+      "2",
+      "/opt/codex/runtimes/codex-primary-runtime/dependencies/python/bin/python3",
+      "/tmp/motion-epoch8-actual-prefix-acceptance-20261002/independent-readback.py"
+    ],
+    "scriptSha256": "8eaad0e4b5c85608e720e8638f5da6012f07b266adb7542c26f9370b098c5534",
+    "timeoutSeconds": 30,
+    "timedOut": false,
+    "heavy": 0,
+    "queued": 0,
+    "childPid": 730934,
+    "exit": 0,
+    "actualEndUtc": "2026-10-02T05:07:31.702866+00:00",
+    "wallSeconds": 2.273097642988432,
+    "allChildrenJoined": true,
+    "allEND": true
+  },
+  "canonicalProgressInferredFromThrowLocation": {
+    "throwAtLine": 28,
+    "notOverallReaderSuccess": true,
+    "completedBeforeThrow": [
+      "literal SHA/parse",
+      "validateServerJournal",
+      "validateServerArtifact recorded-refusal-only branch",
+      "all 876 sample raw validators",
+      "complete warmup/pilot cells",
+      "isDeepStrictEqual canonical pilot plan"
+    ],
+    "frozenDigestCheckedIndependently": "d789c895134eae7830c680624bd1b8ff61a2a1f4f4a2b2ced139fdeac531cd6d",
+    "wrapperWrongPlanOnlyDigest": "59a0c6f9eb2c2347e14f4f5c3e56c08b8fd35762225a097b032ece91108d9ba3"
+  }
+}

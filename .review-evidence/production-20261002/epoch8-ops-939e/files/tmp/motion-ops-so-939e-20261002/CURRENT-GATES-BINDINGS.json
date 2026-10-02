@@ -1,0 +1,358 @@
+{
+  "checkedAtUtc": "2026-10-02T05:18:51.858009+00:00",
+  "sourceCommit": "939e7f4a7ebef2dd494f9dec8690932fecebfd73",
+  "receipt": {
+    "path": "/tmp/motion-profile-ops-current-gates-939e7f4a-20261002/receipt.json",
+    "bytes": 7279,
+    "sha256": "2e9262d758c2571143723dbdb1daaa5dd952d86de45f3f48cc446468e0cb3c9f"
+  },
+  "endedAtUtc": "2026-10-02T05:11:58.543358+00:00",
+  "allChildrenJoined": true,
+  "commands": [
+    {
+      "name": "whole",
+      "startedAt": "2026-10-02T05:09:54.638259+00:00",
+      "finishedAt": "2026-10-02T05:11:39.162925+00:00",
+      "wallSeconds": 104.52468414600298,
+      "exit": 0,
+      "argv": [
+        "/tmp/motion-server-toolchain-20261001/bin/pnpm",
+        "exec",
+        "vitest",
+        "run",
+        "--reporter=json",
+        "--outputFile=/tmp/motion-profile-ops-current-gates-939e7f4a-20261002/whole.json"
+      ]
+    },
+    {
+      "name": "finiteness",
+      "startedAt": "2026-10-02T05:11:39.163321+00:00",
+      "finishedAt": "2026-10-02T05:11:45.832051+00:00",
+      "wallSeconds": 6.668750672994065,
+      "exit": 0,
+      "argv": [
+        "/tmp/motion-server-toolchain-20261001/bin/pnpm",
+        "exec",
+        "vitest",
+        "run",
+        "--reporter=verbose",
+        "test/animate-facade-finiteness-fuzz.test.ts",
+        "test/animate-overflow-finiteness-fuzz.test.ts",
+        "test/behaviors-finiteness-fuzz.test.ts",
+        "test/decay-finiteness-fuzz.test.ts",
+        "test/easing-finiteness-fuzz.test.ts",
+        "test/projection-finiteness-fuzz.test.ts",
+        "test/smart-finiteness-fuzz.test.ts",
+        "test/solver-finiteness-fuzz.test.ts",
+        "test/timeline-finiteness-fuzz.test.ts",
+        "test/utils-finiteness-fuzz.test.ts"
+      ]
+    },
+    {
+      "name": "actionlint",
+      "startedAt": "2026-10-02T05:11:45.832434+00:00",
+      "finishedAt": "2026-10-02T05:11:45.840485+00:00",
+      "wallSeconds": 0.008060583000769839,
+      "exit": 0,
+      "argv": [
+        "/workspace/lab-motion/scratchpad/actionlint-ci-pinned/actionlint"
+      ]
+    },
+    {
+      "name": "static",
+      "startedAt": "2026-10-02T05:11:45.840796+00:00",
+      "finishedAt": "2026-10-02T05:11:56.888038+00:00",
+      "wallSeconds": 11.047261248007999,
+      "exit": 0,
+      "argv": [
+        "/tmp/motion-server-toolchain-20261001/bin/pnpm",
+        "check:static"
+      ]
+    },
+    {
+      "name": "docs-facts",
+      "startedAt": "2026-10-02T05:11:56.888639+00:00",
+      "finishedAt": "2026-10-02T05:11:56.928271+00:00",
+      "wallSeconds": 0.039646998993703164,
+      "exit": 0,
+      "argv": [
+        "/opt/codex/runtimes/codex-primary-runtime/dependencies/node/bin/node",
+        "scripts/check-docs-facts.mjs"
+      ]
+    },
+    {
+      "name": "docs-drift",
+      "startedAt": "2026-10-02T05:11:56.928887+00:00",
+      "finishedAt": "2026-10-02T05:11:56.976601+00:00",
+      "wallSeconds": 0.04773039399879053,
+      "exit": 0,
+      "argv": [
+        "/opt/codex/runtimes/codex-primary-runtime/dependencies/node/bin/node",
+        "scripts/check-docs-drift.mjs"
+      ]
+    },
+    {
+      "name": "pnpm-pack",
+      "startedAt": "2026-10-02T05:11:56.977270+00:00",
+      "finishedAt": "2026-10-02T05:11:57.590323+00:00",
+      "wallSeconds": 0.6130709879944334,
+      "exit": 0,
+      "argv": [
+        "/tmp/motion-server-toolchain-20261001/bin/pnpm",
+        "--config.ignore-scripts=true",
+        "pack",
+        "--out",
+        "/tmp/motion-profile-ops-current-gates-939e7f4a-20261002/candidate-pnpm.tgz"
+      ]
+    },
+    {
+      "name": "npm-pack",
+      "startedAt": "2026-10-02T05:11:57.591092+00:00",
+      "finishedAt": "2026-10-02T05:11:58.542712+00:00",
+      "wallSeconds": 0.9516396370017901,
+      "exit": 0,
+      "argv": [
+        "npm",
+        "pack",
+        "--ignore-scripts",
+        "--pack-destination",
+        "/tmp/motion-profile-ops-current-gates-939e7f4a-20261002"
+      ]
+    }
+  ],
+  "whole": {
+    "numTotalTests": 5027,
+    "numPassedTests": 5027,
+    "numFailedTests": 0,
+    "numPendingTests": 0,
+    "success": true
+  },
+  "currentSelectedAssertions": [
+    {
+      "name": "серверный PROFILE: заранее зарегистрированные границы сохраняет невозможную мощность до отказа и не запускает A/A, 2×work или кандидат",
+      "status": "passed",
+      "durationMs": 38.52585100000033,
+      "failureMessages": []
+    },
+    {
+      "name": "серверный PROFILE: заранее зарегистрированные границы отмена перед запуском сохраняет отказ, digest и завершённый журнал",
+      "status": "passed",
+      "durationMs": 4.7604419999997845,
+      "failureMessages": []
+    },
+    {
+      "name": "серверный PROFILE: заранее зарегистрированные границы отмена внутри получения sample сохраняет его до остановки следующего владельца",
+      "status": "passed",
+      "durationMs": 4.405947000000197,
+      "failureMessages": []
+    }
+  ],
+  "refs": [
+    {
+      "key": "heavy-profile-cases.json",
+      "path": "/tmp/motion-profile-ops-current-gates-939e7f4a-20261002/heavy-profile-cases.json",
+      "bytes": 1611,
+      "sha256": "e9e8d5e636404922d49d3d3683ae7d6ec801ed47ff0dbae9d39069d4b4248715",
+      "semanticUse": false
+    },
+    {
+      "key": "parsed-results-and-packages.json",
+      "path": "/tmp/motion-profile-ops-current-gates-939e7f4a-20261002/parsed-results-and-packages.json",
+      "bytes": 3029,
+      "sha256": "c3d2d316b73e75bfdfdaaa62cda9698cd259c8c2f20c2899681dd33f955e6c36",
+      "semanticUse": false
+    },
+    {
+      "key": "labpics-motion-0.3.0.tgz",
+      "path": "/tmp/motion-profile-ops-current-gates-939e7f4a-20261002/labpics-motion-0.3.0.tgz",
+      "bytes": 560040,
+      "sha256": "54482b3da5ae3e530e9f25f29b91471b1ff95cf2d8212735a0eeb71002d6fba7",
+      "semanticUse": true
+    },
+    {
+      "key": "npm-pack.stderr",
+      "path": "/tmp/motion-profile-ops-current-gates-939e7f4a-20261002/npm-pack.stderr",
+      "bytes": 13684,
+      "sha256": "647bdd0dd86a07af57b39b52396e151394d730774d1a72c8b110ce5caa4824e3",
+      "semanticUse": true
+    },
+    {
+      "key": "npm-pack.stdout",
+      "path": "/tmp/motion-profile-ops-current-gates-939e7f4a-20261002/npm-pack.stdout",
+      "bytes": 25,
+      "sha256": "abd90dcb1d334fc0369e0d014da05d72546794877f45ec7e3ffcf4609c70ed1a",
+      "semanticUse": true
+    },
+    {
+      "key": "candidate-pnpm.tgz",
+      "path": "/tmp/motion-profile-ops-current-gates-939e7f4a-20261002/candidate-pnpm.tgz",
+      "bytes": 562051,
+      "sha256": "b41708c31e122da9ae46a558f0c5f447195f36ca19c9b0fe6c19954887d790e4",
+      "semanticUse": true
+    },
+    {
+      "key": "pnpm-pack.stderr",
+      "path": "/tmp/motion-profile-ops-current-gates-939e7f4a-20261002/pnpm-pack.stderr",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "semanticUse": true
+    },
+    {
+      "key": "pnpm-pack.stdout",
+      "path": "/tmp/motion-profile-ops-current-gates-939e7f4a-20261002/pnpm-pack.stdout",
+      "bytes": 8071,
+      "sha256": "28ea2ddee0af4edf3b2efd543da919bb2ab171330817225d2ca4c74476f270a4",
+      "semanticUse": true
+    },
+    {
+      "key": "docs-drift.stderr",
+      "path": "/tmp/motion-profile-ops-current-gates-939e7f4a-20261002/docs-drift.stderr",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "semanticUse": true
+    },
+    {
+      "key": "docs-drift.stdout",
+      "path": "/tmp/motion-profile-ops-current-gates-939e7f4a-20261002/docs-drift.stdout",
+      "bytes": 218,
+      "sha256": "4437b7385139583741ad88edbb67528fedc3fabce8beb61947a5bcc384bad4be",
+      "semanticUse": true
+    },
+    {
+      "key": "docs-facts.stderr",
+      "path": "/tmp/motion-profile-ops-current-gates-939e7f4a-20261002/docs-facts.stderr",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "semanticUse": true
+    },
+    {
+      "key": "docs-facts.stdout",
+      "path": "/tmp/motion-profile-ops-current-gates-939e7f4a-20261002/docs-facts.stdout",
+      "bytes": 23,
+      "sha256": "d3b534c5348e15bf96aadf4f5a210761809cc2829415d4fd9015117c41a69d0f",
+      "semanticUse": true
+    },
+    {
+      "key": "static.stderr",
+      "path": "/tmp/motion-profile-ops-current-gates-939e7f4a-20261002/static.stderr",
+      "bytes": 396,
+      "sha256": "fb87992a36e0405ba8b299d10727870ce8bf9a5fc364397f334f6effcf58b720",
+      "semanticUse": true
+    },
+    {
+      "key": "static.stdout",
+      "path": "/tmp/motion-profile-ops-current-gates-939e7f4a-20261002/static.stdout",
+      "bytes": 260,
+      "sha256": "6d614bc8dc520d53f50dbac1249232c668c54513cf443329f436a0aa5a6f551c",
+      "semanticUse": true
+    },
+    {
+      "key": "actionlint.stderr",
+      "path": "/tmp/motion-profile-ops-current-gates-939e7f4a-20261002/actionlint.stderr",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "semanticUse": true
+    },
+    {
+      "key": "actionlint.stdout",
+      "path": "/tmp/motion-profile-ops-current-gates-939e7f4a-20261002/actionlint.stdout",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "semanticUse": true
+    },
+    {
+      "key": "finiteness.stderr",
+      "path": "/tmp/motion-profile-ops-current-gates-939e7f4a-20261002/finiteness.stderr",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "semanticUse": true
+    },
+    {
+      "key": "finiteness.stdout",
+      "path": "/tmp/motion-profile-ops-current-gates-939e7f4a-20261002/finiteness.stdout",
+      "bytes": 20314,
+      "sha256": "7530ca14e5f36b49a68b5acffbc984316332c4b00ec4fe6c2a8da18a4123bfb0",
+      "semanticUse": true
+    },
+    {
+      "key": "receipt.json",
+      "path": "/tmp/motion-profile-ops-current-gates-939e7f4a-20261002/receipt.json",
+      "bytes": 7279,
+      "sha256": "2e9262d758c2571143723dbdb1daaa5dd952d86de45f3f48cc446468e0cb3c9f",
+      "semanticUse": true
+    },
+    {
+      "key": "whole.json",
+      "path": "/tmp/motion-profile-ops-current-gates-939e7f4a-20261002/whole.json",
+      "bytes": 2143666,
+      "sha256": "1c5eee6be5a31c19f4f4218c4c029039180f214f9187f20cb8352b159c053650",
+      "semanticUse": true
+    },
+    {
+      "key": "whole.stderr",
+      "path": "/tmp/motion-profile-ops-current-gates-939e7f4a-20261002/whole.stderr",
+      "bytes": 359,
+      "sha256": "71e9b1989414511cfc3173ea9ebd35a7256b7b47f487171603fcc9095eaecbc4",
+      "semanticUse": true
+    },
+    {
+      "key": "whole.stdout",
+      "path": "/tmp/motion-profile-ops-current-gates-939e7f4a-20261002/whole.stdout",
+      "bytes": 143,
+      "sha256": "58dcf3aa307e3eabdacb286da55c0455c5ba21930b42111e38d45b83a347f8ee",
+      "semanticUse": true
+    },
+    {
+      "key": "launch.json",
+      "path": "/tmp/motion-profile-ops-current-gates-939e7f4a-20261002/launch.json",
+      "bytes": 784,
+      "sha256": "6275dc2f993b62a90237d9400a6380455aaa716d34a97a2a33b415b1c9665df1",
+      "semanticUse": true
+    },
+    {
+      "key": "run.py",
+      "path": "/tmp/motion-profile-ops-current-gates-939e7f4a-20261002/run.py",
+      "bytes": 2987,
+      "sha256": "a7e3405e4c48bb82c1d15df4c58de9c638387b0e7ba9b03f4ce7d5479dadbf46",
+      "semanticUse": true
+    },
+    {
+      "key": "source-primary",
+      "path": "/tmp/motion-profile-ops-939e7f4a-20261002/PRIMARY-PACKET.json",
+      "bytes": 9872,
+      "sha256": "97492707b736d36bec8cbaa09c911d44a09e02aac61e38c472fccfd1d4ae6c73",
+      "semanticUse": true
+    }
+  ],
+  "packages": [
+    {
+      "path": "/tmp/motion-profile-ops-current-gates-939e7f4a-20261002/candidate-pnpm.tgz",
+      "bytes": 562051,
+      "sha256": "b41708c31e122da9ae46a558f0c5f447195f36ca19c9b0fe6c19954887d790e4",
+      "files": 312,
+      "privatePaths": [],
+      "packageJsonDifferences": {
+        "packageManager": [
+          "pnpm@11.11.0",
+          null
+        ]
+      },
+      "byteIdenticalToOwnReviewedFeArchive": true
+    },
+    {
+      "path": "/tmp/motion-profile-ops-current-gates-939e7f4a-20261002/labpics-motion-0.3.0.tgz",
+      "bytes": 560040,
+      "sha256": "54482b3da5ae3e530e9f25f29b91471b1ff95cf2d8212735a0eeb71002d6fba7",
+      "files": 312,
+      "privatePaths": [],
+      "packageJsonDifferences": {},
+      "byteIdenticalToOwnReviewedFeArchive": true
+    }
+  ],
+  "scope": "read-only raw framework/log/package binding; all supplemental 25 refs; author parsed interpretations not oracle; no reviewer runtime",
+  "supplement": {
+    "path": "/tmp/motion-profile-ops-current-gates-939e7f4a-20261002/PRIMARY-GATES-SUPPLEMENT.json",
+    "bytes": 5891,
+    "sha256": "6631d9fa61f250e03debc6a669ed5e711d30ad5bb5c8307a07e220b337abd8e7"
+  }
+}

@@ -1,0 +1,13 @@
+{
+  "atUtc": "2026-10-02T04:40:46.718800+00:00",
+  "knownOwnedPids": {
+    "719888": {
+      "state": "Z (zombie)",
+      "comm": "esbuild",
+      "active": false
+    }
+  },
+  "activeOwnedKnownCount": 0,
+  "matchingBrowserProcesses": [],
+  "qualification": "Initial general profile search matched the inspection shell itself. This browser-only search excludes the observing shell; esbuild zombie at PPID1 is not running."
+}

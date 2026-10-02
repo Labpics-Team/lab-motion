@@ -1,0 +1,47 @@
+{
+  "schema": "independent-ops939e-final-seal-v1",
+  "sourceHead": "939e7f4a7ebef2dd494f9dec8690932fecebfd73",
+  "sourceTree": "deba4db1952029bdb7d2244b207f570007700b19",
+  "actualEndUtc": "2026-10-02T05:42:59.718718+00:00",
+  "sealedAtUtc": "2026-10-02T05:42:59.766070+00:00",
+  "exitCode": 0,
+  "allEND": true,
+  "allChildrenJoined": true,
+  "heavy": 0,
+  "queued": 0,
+  "SUTExecutions": 0,
+  "newConsumerExecutions": 0,
+  "stopOwnExecAfterSeal": true,
+  "files": [
+    {
+      "path": "REPORT.md",
+      "bytes": 17966,
+      "sha256": "0178142581aaaf9ff45f25b18b8dbb8ca1b02e298146e16d24b48e6b980525a8"
+    },
+    {
+      "path": "MANIFEST.json",
+      "bytes": 125855,
+      "sha256": "38300f78851f0e0fe1bcffecd759f52cf9663a8c68186027be538b1dfd295f91"
+    },
+    {
+      "path": "all-bindings.json",
+      "bytes": 278308,
+      "sha256": "7df441d4a882a950517dd05679ce5e1b64524c1ae3ac422107170393646d3d78"
+    },
+    {
+      "path": "readset.json",
+      "bytes": 18153,
+      "sha256": "2448540a4cc7049cba28988bcda8fa6c7bc3aadcd42c529ddb82efe182a20b55"
+    },
+    {
+      "path": "terminal.json",
+      "bytes": 1190,
+      "sha256": "b1f7ddfb5b7567d32fb926cc7b1285cfdc2340e384c5abcf64cbb9a84f0dc5e4"
+    },
+    {
+      "path": "controls-existing-readback.json",
+      "bytes": 24591,
+      "sha256": "a4332d4b68622649260a90c592a1e68ce8e63d0f51d9d153dec66abd24596df6"
+    }
+  ]
+}

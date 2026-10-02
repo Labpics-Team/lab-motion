@@ -1,0 +1,43 @@
+{
+  "head": "939e7f4a7ebef2dd494f9dec8690932fecebfd73",
+  "whole": {
+    "numTotalTests": 5027,
+    "numPassedTests": 5027,
+    "numFailedTests": 0,
+    "numPendingTests": 0,
+    "numTodoTests": 0,
+    "success": true,
+    "files": 344
+  },
+  "criticalTests": [
+    {
+      "title": "серверный PROFILE: независимые sabotage controls полный healthy admission создаёт и проверяет весь зарегистрированный N",
+      "status": "passed",
+      "durationMs": 14386.372447000002
+    }
+  ],
+  "finitenessFooter": "apRange(5,5,0,1)(·) degenerate input range finite over all inputs 1ms\n ✓ test/utils-finiteness-fuzz.test.ts > utils finiteness fuzz — CSS-safe invariant > interpolate multi-stop {clamp:false, ease:t*t}(·) finite over all inputs 2ms\n ✓ test/utils-finiteness-fuzz.test.ts > utils finiteness fuzz — CSS-safe invariant > interpolate default clamp {ease:t=>1/t hostile}(·) finite over all inputs 1ms\n ✓ test/utils-finiteness-fuzz.test.ts > utils finiteness fuzz — CSS-safe invariant > mix(fuzz, fuzz, fuzz) finite over 10k triples + edges 3ms\n ✓ test/solver-finiteness-fuzz.test.ts > solver finiteness property fuzz > produces finite value and velocity over 10 000 seeded samples 7ms\n ✓ test/smart-finiteness-fuzz.test.ts > ./smart: финитность ≥10k злых дифов (seeded LCG) > capture→мутация→animate→кадры→перехват: ни броска, ни NaN/Inf/-0 в записях 5117ms\n ✓ test/smart-finiteness-fuzz.test.ts > ./smart: финитность ≥10k злых дифов (seeded LCG) > негативный контроль: дубликат ключа ОБЯЗАН бросать (fuzz не глотает валидацию) 1ms\n\n Test Files  10 passed (10)\n      Tests  111 passed (111)\n   Start at  05:11:40\n   Duration  5.46s (transform 728ms, setup 0ms, import 976ms, tests 6.48s, environment 1ms)\n\n",
+  "packages": {
+    "pnpm": {
+      "path": "/tmp/motion-profile-ops-current-gates-939e7f4a-20261002/candidate-pnpm.tgz",
+      "bytes": 562051,
+      "sha256": "b41708c31e122da9ae46a558f0c5f447195f36ca19c9b0fe6c19954887d790e4",
+      "members": 312,
+      "allMemberBytesEqualToFe": true,
+      "priorPath": "/tmp/motion-profile-current-gates-fe092331-20261002/candidate-pnpm.tgz",
+      "priorTarballSha256": "b41708c31e122da9ae46a558f0c5f447195f36ca19c9b0fe6c19954887d790e4",
+      "tarballBytesIdentical": true
+    },
+    "npm": {
+      "path": "/tmp/motion-profile-ops-current-gates-939e7f4a-20261002/labpics-motion-0.3.0.tgz",
+      "bytes": 560040,
+      "sha256": "54482b3da5ae3e530e9f25f29b91471b1ff95cf2d8212735a0eeb71002d6fba7",
+      "members": 312,
+      "allMemberBytesEqualToFe": true,
+      "priorPath": "/tmp/motion-profile-current-gates-fe092331-20261002/labpics-motion-0.3.0.tgz",
+      "priorTarballSha256": "54482b3da5ae3e530e9f25f29b91471b1ff95cf2d8212735a0eeb71002d6fba7",
+      "tarballBytesIdentical": true
+    }
+  },
+  "allCommandsExit0": true
+}

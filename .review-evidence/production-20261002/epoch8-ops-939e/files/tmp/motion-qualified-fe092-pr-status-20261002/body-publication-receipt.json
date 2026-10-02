@@ -1,0 +1,13 @@
+{
+  "startUtc": "2026-10-02T04:04:52.755454+00:00",
+  "endUtc": "2026-10-02T04:04:54.551576+00:00",
+  "head": "fe092331360837fd7f63d71a4b7f867ba849ebd4",
+  "bodyChars": 33497,
+  "bodyBytes": 45828,
+  "bodySha256": "d32bb263af881f3668601ce88b05e3b122028a8c4a9c4c4d29a5875cf2a83dae",
+  "preservedCurrentAutoSuffixSha256": "833d2f50ad056e172c21b0244bea1b8be739d38cc8b1fb0c2286f42f4168da3d",
+  "remoteReadbackExact": true,
+  "reportsLiteral": true,
+  "commentsReviewsRequestsSent": 0,
+  "mergeReleaseDeploy": 0
+}

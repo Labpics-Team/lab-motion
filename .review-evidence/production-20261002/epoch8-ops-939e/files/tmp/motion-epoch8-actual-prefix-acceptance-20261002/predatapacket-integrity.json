@@ -1,0 +1,65 @@
+[
+  {
+    "path": "/tmp/motion-server-predata-fe092331-ce535cf6-20261002-epoch8/predata-tuple.json",
+    "bytes": 41722,
+    "sha256": "5bcaa87d3349231591f4c8718e44e41c851f50d17bd3d52ae1c32d4eaca77ec5",
+    "ownedCopy": "/tmp/motion-epoch8-actual-prefix-acceptance-20261002/PREDATA/predata-tuple.json",
+    "match": true
+  },
+  {
+    "path": "/tmp/motion-server-predata-fe092331-ce535cf6-20261002-epoch8/predata-tuple.sha256",
+    "bytes": 85,
+    "sha256": "301ba13dec2e315395b8c706afc0081062c72819da3944730368418a8722bf20",
+    "ownedCopy": "/tmp/motion-epoch8-actual-prefix-acceptance-20261002/PREDATA/predata-tuple.sha256",
+    "match": true
+  },
+  {
+    "path": "/tmp/motion-server-predata-fe092331-ce535cf6-20261002-epoch8/prepare.mjs",
+    "bytes": 7865,
+    "sha256": "ef193f392ee35fb22132998e458afc95d49573053257f50b28902d1e1ede083a",
+    "ownedCopy": "/tmp/motion-epoch8-actual-prefix-acceptance-20261002/PREDATA/prepare.mjs",
+    "match": true
+  },
+  {
+    "path": "/tmp/motion-server-predata-fe092331-ce535cf6-20261002-epoch8/preparation-start.json",
+    "bytes": 975,
+    "sha256": "9e44dcf14f280f98569f963d1c6571a3b8f85a1c9af4f1adc6f86602e9f4fcb3",
+    "ownedCopy": "/tmp/motion-epoch8-actual-prefix-acceptance-20261002/PREDATA/preparation-start.json",
+    "match": true
+  },
+  {
+    "path": "/tmp/motion-server-predata-fe092331-ce535cf6-20261002-epoch8/preparation-execution.json",
+    "bytes": 1065,
+    "sha256": "6d551452b78abef20687483f97c5c0e95ca4e22448a83f3f017ab45672ab68af",
+    "ownedCopy": "/tmp/motion-epoch8-actual-prefix-acceptance-20261002/PREDATA/preparation-execution.json",
+    "match": true
+  },
+  {
+    "path": "/tmp/motion-server-predata-fe092331-ce535cf6-20261002-epoch8/prepare.stdout",
+    "bytes": 646,
+    "sha256": "9e9abac6e32072a7bb86c9b84598031a9e495e910f3257277ad0ec79cb14c7fa",
+    "ownedCopy": "/tmp/motion-epoch8-actual-prefix-acceptance-20261002/PREDATA/prepare.stdout",
+    "match": true
+  },
+  {
+    "path": "/tmp/motion-server-predata-fe092331-ce535cf6-20261002-epoch8/prepare.stderr",
+    "bytes": 0,
+    "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "ownedCopy": "/tmp/motion-epoch8-actual-prefix-acceptance-20261002/PREDATA/prepare.stderr",
+    "match": true
+  },
+  {
+    "path": "/tmp/motion-server-predata-fe092331-ce535cf6-20261002-epoch8/launch-single-series.py",
+    "bytes": 2996,
+    "sha256": "98623d56bf4cda4c7b54bf8734f7bb39a61604deaedfa55678c04b35abe425db",
+    "ownedCopy": "/tmp/motion-epoch8-actual-prefix-acceptance-20261002/PREDATA/launch-single-series.py",
+    "match": true
+  },
+  {
+    "path": "/tmp/motion-server-predata-fe092331-ce535cf6-20261002-epoch8/native-clock/thread-cpu-clock.node",
+    "bytes": 16192,
+    "sha256": "21bb3221b35523770ee025546c5e4fadb8bd7a64627a65147bd23ca48ac6c76a",
+    "ownedCopy": "/tmp/motion-epoch8-actual-prefix-acceptance-20261002/PREDATA/thread-cpu-clock.node",
+    "match": true
+  }
+]

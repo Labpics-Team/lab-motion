@@ -1,0 +1,47 @@
+{
+  "measureServerEngine": {
+    "beforeSha256": "d1d9d9964e020a59db34dd61f5bb458ea78a5fb1db3f1ed724e1d629e6db784b",
+    "afterSha256": "d1d9d9964e020a59db34dd61f5bb458ea78a5fb1db3f1ed724e1d629e6db784b",
+    "byteIdentical": true
+  },
+  "measureServerBrowser": {
+    "beforeSha256": "4b5722fe1cc357062a912f8786f4f59af41b47eb0f824fa503c0712de0d6771b",
+    "afterSha256": "4b5722fe1cc357062a912f8786f4f59af41b47eb0f824fa503c0712de0d6771b",
+    "byteIdentical": true
+  },
+  "bench/profile/server-thread-cpu-clock.mjs": {
+    "beforeSha256": "bb31090e4beaa6d4bc4dcc7789d0993672630e091fca65957174988c58ddba71",
+    "afterSha256": "bb31090e4beaa6d4bc4dcc7789d0993672630e091fca65957174988c58ddba71",
+    "byteIdentical": true
+  },
+  "bench/profile/server-thread-cpu-clock.c": {
+    "beforeSha256": "4f32f23c2409c3e83943121a587c8d9f5e19af7f308ac987323ff4189ddd14c0",
+    "afterSha256": "4f32f23c2409c3e83943121a587c8d9f5e19af7f308ac987323ff4189ddd14c0",
+    "byteIdentical": true
+  },
+  "bench/profile/server-profile-contract.mjs": {
+    "beforeSha256": "ba6d365e3faf623cc8da5dae78ff2bfa3288529b9640052a0474d55d8e33d72e",
+    "afterSha256": "ba6d365e3faf623cc8da5dae78ff2bfa3288529b9640052a0474d55d8e33d72e",
+    "byteIdentical": true
+  },
+  "scripts/bench-transform-support.mjs": {
+    "beforeSha256": "fcb531d342cb6e72ea06acb16bc5fc25f52440aa9c6aff8c7e09f2215476850c",
+    "afterSha256": "fcb531d342cb6e72ea06acb16bc5fc25f52440aa9c6aff8c7e09f2215476850c",
+    "byteIdentical": true
+  },
+  "scripts/bench-support.mjs": {
+    "beforeSha256": "2fb04fcfd34788870649982724f1166cb4c14a78ae1c44544028565db8208e05",
+    "afterSha256": "2fb04fcfd34788870649982724f1166cb4c14a78ae1c44544028565db8208e05",
+    "byteIdentical": true
+  },
+  "bench/compare/methodology.mjs": {
+    "beforeSha256": "a6440e56752573684809765ba992ce01b0993a889e130f16eb870cd1fcbcda87",
+    "afterSha256": "a6440e56752573684809765ba992ce01b0993a889e130f16eb870cd1fcbcda87",
+    "byteIdentical": true
+  },
+  "bench/compare/provenance.mjs": {
+    "beforeSha256": "51881a4a6ea2e1ad0330888e7e1b9c8b6e7c7aef3a3eb798a4185c7c3b846623",
+    "afterSha256": "51881a4a6ea2e1ad0330888e7e1b9c8b6e7c7aef3a3eb798a4185c7c3b846623",
+    "byteIdentical": true
+  }
+}

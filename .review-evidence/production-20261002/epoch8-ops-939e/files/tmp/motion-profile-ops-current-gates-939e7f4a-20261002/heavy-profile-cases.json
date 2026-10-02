@@ -1,0 +1,32 @@
+[
+  {
+    "title": "серверный PROFILE: clock/progress falsifiers stock C producer делает2warmups, actual2×work и сохраняет поздний prefix без выдуманного CPU endpoint",
+    "status": "passed",
+    "durationMs": 1290.8767630000002
+  },
+  {
+    "title": "серверный PROFILE: независимые sabotage controls полный healthy admission создаёт и проверяет весь зарегистрированный N",
+    "status": "passed",
+    "durationMs": 14386.372447000002
+  },
+  {
+    "title": "серверный PROFILE: независимые sabotage controls полная история отвергает calibration до завершения A/A и 2×work",
+    "status": "passed",
+    "durationMs": 1800.1040030000004
+  },
+  {
+    "title": "серверный PROFILE: независимые sabotage controls полная история отвергает замену противоположного порядка пар",
+    "status": "passed",
+    "durationMs": 1641.7011979999988
+  },
+  {
+    "title": "серверный PROFILE: независимые sabotage controls полная история отвергает подмену финального raw digest",
+    "status": "passed",
+    "durationMs": 1848.0594829999973
+  },
+  {
+    "title": "серверный PROFILE: независимые sabotage controls сохраняет partial A/B и поздний отказ, а пропавшие comparator/retention не допускает",
+    "status": "passed",
+    "durationMs": 13182.378325000001
+  }
+]

@@ -1,0 +1,39 @@
+{
+  "startUtc": "2026-10-02T05:47:05.475461+00:00",
+  "endUtc": "2026-10-02T05:47:06.092069+00:00",
+  "source": "939e7f4a7ebef2dd494f9dec8690932fecebfd73",
+  "readOnly": true,
+  "allChildrenJoined": true,
+  "refs": [
+    {
+      "path": "/tmp/motion-ops-current-ci-939e-20261002-observation-02/actual-merge.json",
+      "bytes": 2708,
+      "sha256": "5dbd857bffcc5868bbcee296dce92c04bd208c74ee207326c56f0b02f17c086a"
+    },
+    {
+      "path": "/tmp/motion-ops-current-ci-939e-20261002-observation-02/actual-merge.stderr",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "path": "/tmp/motion-ops-current-ci-939e-20261002-observation-02/jobs.json",
+      "bytes": 26700,
+      "sha256": "f5cdfad6f0b826fc8d9f4b6982f275c2e4dab5c3b4edad46bca563f97d120f7e"
+    },
+    {
+      "path": "/tmp/motion-ops-current-ci-939e-20261002-observation-02/jobs.stderr",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "path": "/tmp/motion-ops-current-ci-939e-20261002-observation-02/run.json",
+      "bytes": 13626,
+      "sha256": "cccd3ef433bd07ec6f3d2a1748cc9c425b35eebd8cab6697cd33ce56c2ed9e04"
+    },
+    {
+      "path": "/tmp/motion-ops-current-ci-939e-20261002-observation-02/run.stderr",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    }
+  ]
+}

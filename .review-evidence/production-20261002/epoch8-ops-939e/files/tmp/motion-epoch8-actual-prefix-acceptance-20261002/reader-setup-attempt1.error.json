@@ -1,0 +1,8 @@
+{
+  "recordedAtUtc": "2026-10-02T04:48:03.676793+00:00",
+  "phase": "owned snapshot setup before raw JSON parsing",
+  "exitCode": 1,
+  "error": "FileNotFoundError: [Errno 2] No such file or directory: '/tmp/motion-epoch8-actual-prefix-acceptance-20261002/PRIMARY/server-profile.json'",
+  "rawEvidenceChanged": false,
+  "correctiveAction": "create owned PRIMARY directory; repeat only the copy/hash metadata step"
+}

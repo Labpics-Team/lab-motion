@@ -1,0 +1,185 @@
+{
+  "checkedAt": "2026-10-02T04:15:49.984029+00:00",
+  "sourceHead": "fe092331360837fd7f63d71a4b7f867ba849ebd4",
+  "ciRun": 36962663350,
+  "runAttempt": 1,
+  "actualCiCheckoutCommit": "07eb42bb2e1ecc8d8ee4805fc407934fc3cdd482",
+  "actualCiCheckoutTree": "285e30e36db32f2fdc9ae442327f6b3396dcf254",
+  "sourceTreeEqualsActualCiCheckout": true,
+  "actualTestSteps": [
+    {
+      "name": "Set up job",
+      "conclusion": "success",
+      "status": "completed",
+      "number": 1
+    },
+    {
+      "name": "Checkout",
+      "conclusion": "success",
+      "status": "completed",
+      "number": 2
+    },
+    {
+      "name": "Setup Node",
+      "conclusion": "success",
+      "status": "completed",
+      "number": 3
+    },
+    {
+      "name": "Activate pinned pnpm",
+      "conclusion": "success",
+      "status": "completed",
+      "number": 4
+    },
+    {
+      "name": "Install dependencies",
+      "conclusion": "success",
+      "status": "completed",
+      "number": 5
+    },
+    {
+      "name": "Build",
+      "conclusion": "success",
+      "status": "completed",
+      "number": 6
+    },
+    {
+      "name": "Vitest",
+      "conclusion": "success",
+      "status": "completed",
+      "number": 7
+    },
+    {
+      "name": "Upload Vitest diagnostics",
+      "conclusion": "skipped",
+      "status": "completed",
+      "number": 8
+    },
+    {
+      "name": "Fuzz · finiteness gate (virtual-time, seeded LCG, zero-dep)",
+      "conclusion": "success",
+      "status": "completed",
+      "number": 9
+    },
+    {
+      "name": "Setup registered native-clock Node",
+      "conclusion": "success",
+      "status": "completed",
+      "number": 10
+    },
+    {
+      "name": "Native CPU clock · actual source and refusal controls",
+      "conclusion": "success",
+      "status": "completed",
+      "number": 11
+    },
+    {
+      "name": "Post Setup registered native-clock Node",
+      "conclusion": "success",
+      "status": "completed",
+      "number": 20
+    },
+    {
+      "name": "Post Setup Node",
+      "conclusion": "success",
+      "status": "completed",
+      "number": 21
+    },
+    {
+      "name": "Post Checkout",
+      "conclusion": "success",
+      "status": "completed",
+      "number": 22
+    },
+    {
+      "name": "Complete job",
+      "conclusion": "success",
+      "status": "completed",
+      "number": 23
+    }
+  ],
+  "requiredTestStepsPassed": [
+    "Vitest",
+    "Fuzz · finiteness gate (virtual-time, seeded LCG, zero-dep)",
+    "Setup registered native-clock Node",
+    "Native CPU clock · actual source and refusal controls"
+  ],
+  "whole5024Pass": true,
+  "explicitFiniteness111Pass": true,
+  "nativeActualRecords": 11,
+  "compiledNativeMutantsKilled": 6,
+  "conditionalDiagnosticsSkip": "Existing upload-if-failure; Vitest success so not applicable. Not a skipped assertion/new allowlist.",
+  "jobLogsQualification": "Official connector decoded UTF8 full job body. Prior gh redirect rejected before payload; original empty log preserved. No workflow/job rerun.",
+  "metadataHarnessFailures": [
+    "First extractor expected mutants instead of records.",
+    "Second assertion required all step success, but existing failure-only diagnostic upload is legitimately skipped.",
+    "Field-name inspection assumed homogeneous name rows; actual API rows use mode. All occurred before primary creation on same acquired bytes, no source/runtime rerun."
+  ],
+  "coderabbit": {
+    "commentId": 5936940453,
+    "updatedAt": "2026-10-02T04:05:44Z",
+    "currentRecentReviewedRange": "f6476ae990254f606faf97f80afe41965bec2fb2→fe092331360837fd7f63d71a4b7f867ba849ebd4",
+    "currentCoveredCommit": "fe092331360837fd7f63d71a4b7f867ba849ebd4",
+    "formalReviewOnCurrentHead": false,
+    "substantiveCurrentReviewed": true,
+    "fullDeliveryPass": false,
+    "premerge": "8PASS/1architectureWARN"
+  },
+  "refs": [
+    {
+      "path": "/tmp/motion-qualified-fe092-pr-status-20261002/current-checks.json",
+      "bytes": 3459,
+      "sha256": "46cbb8f27b46f759dcd598cc7d6ca1ce1b489b0192aeefcf7dd5033256abbb8d"
+    },
+    {
+      "path": "/tmp/motion-qualified-fe092-pr-status-20261002/current-checkruns.json",
+      "bytes": 39304,
+      "sha256": "815f31569ecf0a68e190cd8d7ac9a78103bb80626add0b4a4a35acf2bd807d66"
+    },
+    {
+      "path": "/tmp/motion-qualified-fe092-pr-status-20261002/current-run.json",
+      "bytes": 13616,
+      "sha256": "9b2bf68d6d1efab3b050d374b0be49ed08bc72217707bb98762d65c595ce7d82"
+    },
+    {
+      "path": "/tmp/motion-qualified-fe092-pr-status-20261002/current-run-jobs.json",
+      "bytes": 29048,
+      "sha256": "ebfac94174313b663d8cc6986d707cf100d08463f83a483dee46835a53e6685d"
+    },
+    {
+      "path": "/tmp/motion-qualified-fe092-pr-status-20261002/current-tests-job-mcp.json",
+      "bytes": 260601,
+      "sha256": "2e9b0342acf2db741ca913f0a3c20072e1e9f498213dcea17647c2875adda500"
+    },
+    {
+      "path": "/tmp/motion-qualified-fe092-pr-status-20261002/current-tests-job-mcp.log",
+      "bytes": 219801,
+      "sha256": "ef717f198ea692fc596feb9fa62d0c37f9e0046d95e4ca9afb2e504e2de98fa7"
+    },
+    {
+      "path": "/tmp/motion-qualified-fe092-pr-status-20261002/actual-ci-merge-commit.json",
+      "bytes": 2708,
+      "sha256": "7f23b6880db868e9c78ff09b06158e1f7fddf4f93912019dd654a773ac513ad8"
+    },
+    {
+      "path": "/tmp/motion-qualified-fe092-pr-status-20261002/current-reviews.json",
+      "bytes": 16348,
+      "sha256": "7b9af1b6f9082b8138340f478d6829bae193f05881f45a487c9e1a3dbc9e7084"
+    },
+    {
+      "path": "/tmp/motion-qualified-fe092-pr-status-20261002/current-issue-comments.json",
+      "bytes": 25434,
+      "sha256": "ecb2963280077e74249c83fdf5105fcc3d38c92cbb9c1da134dd99f3eb9895f2"
+    },
+    {
+      "path": "/tmp/motion-qualified-fe092-pr-status-20261002/current-full-bot-body.md",
+      "bytes": 20799,
+      "sha256": "9c4efc201a1cfdad879eaaddfbcd3895c8282405688db7f2c50d2fd351525bc2"
+    },
+    {
+      "path": "/tmp/motion-qualified-fe092-pr-status-20261002/body-publication-receipt.json",
+      "bytes": 509,
+      "sha256": "befaac31f89242fe2ba98f25bdae23ce1c42024f59bb76cfe2ba0db26684addc"
+    }
+  ]
+}

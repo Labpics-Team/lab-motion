@@ -1,0 +1,11 @@
+file:///tmp/motion-epoch8-actual-prefix-acceptance-20261002/canonical-readback.mjs:28
+if (serverProfileDigest(recomputedPlan) !== artifact.frozenPlanDigest) throw new Error('canonical frozen plan digest mismatch');
+                                                                             ^
+
+Error: canonical frozen plan digest mismatch
+    at file:///tmp/motion-epoch8-actual-prefix-acceptance-20261002/canonical-readback.mjs:28:78
+    at ModuleJob.run (node:internal/modules/esm/module_job:439:25)
+    at async node:internal/modules/esm/loader:643:26
+    at async asyncRunEntryPointWithESMLoader (node:internal/modules/run_main:101:5)
+
+Node.js v24.19.0

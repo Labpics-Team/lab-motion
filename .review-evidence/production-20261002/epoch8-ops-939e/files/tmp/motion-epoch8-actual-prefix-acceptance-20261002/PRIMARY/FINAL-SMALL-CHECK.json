@@ -1,0 +1,17 @@
+{
+  "checkedAt": "2026-10-02T04:20:13.904976+00:00",
+  "sourceHead": "fe092331360837fd7f63d71a4b7f867ba849ebd4",
+  "node": "v24.19.0",
+  "pnpm": "11.11.0",
+  "machine": {
+    "affinity": "0",
+    "cpuMax": "400000 100000",
+    "kernel": "6.18.44"
+  },
+  "tmpAvailableBytes": 4680781824,
+  "operationalShapeAndTwoReservesRequiredBytes": 4102375169,
+  "actualOutputAbsent": true,
+  "singleLaunchBefore": false,
+  "grantSha256": "aa7c1cde93eac70f5b37164fe31f6bb5fa2842d7480a20f678cf9658fc3d6e54",
+  "exitCode": 0
+}

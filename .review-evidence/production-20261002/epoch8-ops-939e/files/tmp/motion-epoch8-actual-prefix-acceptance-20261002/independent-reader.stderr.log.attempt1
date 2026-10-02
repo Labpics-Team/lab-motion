@@ -1,0 +1,5 @@
+Traceback (most recent call last):
+  File "/tmp/motion-epoch8-actual-prefix-acceptance-20261002/independent-readback.py", line 169, in <module>
+    assert sample['cpuClock'] == clock
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^
+AssertionError

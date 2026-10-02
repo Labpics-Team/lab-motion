@@ -1,0 +1,37 @@
+{
+  "atUtc": "2026-10-02T04:37:56.780344+00:00",
+  "knownOwnedPidsStillPresent": {
+    "719888": {
+      "comm": "esbuild",
+      "status": [
+        "Name:\tesbuild",
+        "State:\tZ (zombie)",
+        "Tgid:\t719888",
+        "Ngid:\t0",
+        "Pid:\t719888",
+        "PPid:\t1"
+      ]
+    }
+  },
+  "ownedBrowserProfileProcessesStillPresent": [
+    {
+      "pid": 730066,
+      "comm": "bash"
+    }
+  ],
+  "artifactFiles": {
+    "server-profile.sha256": 86,
+    "server-profile.json": 21741898,
+    "baseline-no-motion-after.png": 1013,
+    "baseline-no-motion-before.png": 1013,
+    "journal.ndjson": 21768420,
+    "anime-waapi.iife.js": 10643,
+    "motion-mini.iife.js": 8534,
+    "waapi-ctl.iife.js": 1035,
+    "anime.iife.js": 34774,
+    "gsap.iife.js": 70908,
+    "motion.iife.js": 64148,
+    "candidate.iife.js": 39801,
+    "baseline.iife.js": 39800
+  }
+}

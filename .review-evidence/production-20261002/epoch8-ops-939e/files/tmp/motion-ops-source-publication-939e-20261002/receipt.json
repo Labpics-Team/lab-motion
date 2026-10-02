@@ -1,0 +1,74 @@
+{
+  "started": "2026-10-02T05:44:13.612983+00:00",
+  "path": "/workspace/lab-motion",
+  "repo": "Labpics-Team/lab-motion",
+  "base": "fe092331360837fd7f63d71a4b7f867ba849ebd4",
+  "head": "939e7f4a7ebef2dd494f9dec8690932fecebfd73",
+  "branch": "codex/motion-production-20261001",
+  "pr": 460,
+  "objects": {
+    "argv": [
+      "python3",
+      "/workspace/scratch/publish-git-objects-only-20261001.py",
+      "--path",
+      "/workspace/lab-motion",
+      "--repo",
+      "Labpics-Team/lab-motion",
+      "--base",
+      "fe092331360837fd7f63d71a4b7f867ba849ebd4",
+      "--head",
+      "939e7f4a7ebef2dd494f9dec8690932fecebfd73",
+      "--branch",
+      "codex/motion-production-20261001"
+    ],
+    "ended": "2026-10-02T05:44:22.244153+00:00",
+    "exit": 0
+  },
+  "casEnded": "2026-10-02T05:44:23.950748+00:00",
+  "tree": "deba4db1952029bdb7d2244b207f570007700b19",
+  "bodies": [
+    {
+      "path": "bench/profile/server-profile-registration.mjs",
+      "gitOid": "a707eebdaf94ace6926097765e9876b42dad7960",
+      "bytes": 19123,
+      "sha256": "7c9c6bf65341fb023d4db2e45a01ef9bacf5246a7af3c62385f15f8523be396f",
+      "match": true
+    },
+    {
+      "path": "bench/profile/server-profile-runner.mjs",
+      "gitOid": "141701dbbc15a74a894a903b35c6bc44083ccb18",
+      "bytes": 53215,
+      "sha256": "a3f39c0aa74d2458060bff6bf7540f251d527cecbae29f52f6f5848cd254ae91",
+      "match": true
+    },
+    {
+      "path": "docs/server-profile.md",
+      "gitOid": "2eeb3155fd675c1f1b86052fb5c4a86464297070",
+      "bytes": 6356,
+      "sha256": "60ee167808782eea22d154f93bfaf52aa68ab16b487077047c928ed8e2ebe2bf",
+      "match": true
+    },
+    {
+      "path": "test/fixtures/server-thread-cpu-clock-check.mjs",
+      "gitOid": "60626c7a97e239d29d45c20164369761e31310a7",
+      "bytes": 12296,
+      "sha256": "1e7ba0af37efb8f774ba0217965addff60a56cc9b2de7ef2c8964262b96e5390",
+      "match": true
+    },
+    {
+      "path": "test/server-profile-contract.test.ts",
+      "gitOid": "a3d79c94cb196d2e711eff3fbbc9f34dde393735",
+      "bytes": 105078,
+      "sha256": "c599cfebb8c77841adf74214083aecd89b6f12df22012cecdc4ee5c56ca3d1fa",
+      "match": true
+    }
+  ],
+  "allChangedBodiesMatch": true,
+  "mainBefore": "957ceaf26501525eff476cdc1d149d81fd5ebcd7",
+  "mainAfter": "957ceaf26501525eff476cdc1d149d81fd5ebcd7",
+  "prAfterObserved": "939e7f4a7ebef2dd494f9dec8690932fecebfd73",
+  "exit": 0,
+  "result": "PASS — точные объекты, отдельная ссылка CAS, все изменённые тела прочитаны",
+  "ended": "2026-10-02T05:44:27.018328+00:00",
+  "allChildrenEnded": true
+}

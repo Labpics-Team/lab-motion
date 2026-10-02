@@ -1,0 +1,31 @@
+{
+  "startUtc": "2026-10-02T04:20:13.960249+00:00",
+  "argv": [
+    "taskset",
+    "-c",
+    "0",
+    "/opt/codex/runtimes/codex-primary-runtime/dependencies/node/bin/node",
+    "bench/profile/server-profile-runner.mjs",
+    "--baseline",
+    "/tmp/motion-server-baseline-0b6f537e",
+    "--candidate",
+    "/workspace/lab-motion",
+    "--browser",
+    "chromium",
+    "--out",
+    "/tmp/motion-server-series-fe092331-ce535cf6-20261002-epoch8"
+  ],
+  "cwd": "/workspace/lab-motion",
+  "sourceHead": "fe092331360837fd7f63d71a4b7f867ba849ebd4",
+  "protocolDigest": "ce535cf6d6f0b0f140d44403627b63d936ef2461883a52680e7bbcad3ee49e5a",
+  "clockModelDigest": "04d863513d53b248b1be3e0905240f3bd6f4d06124582ce3093c2cbfe5320852",
+  "predataTupleSha256": "5bcaa87d3349231591f4c8718e44e41c851f50d17bd3d52ae1c32d4eaca77ec5",
+  "environment": {
+    "PATH": "/tmp/motion-server-toolchain-20261001/bin:/opt/codex/runtimes/codex-primary-runtime/dependencies/node/bin:/home/agent/.local/bin:/opt/codex/runtimes/codex-primary-runtime/dependencies/bin/override:/opt/codex/runtimes/codex-primary-runtime/dependencies/python/bin:/opt/codex/runtimes/codex-primary-runtime/dependencies/node/bin:/opt/codex/runtimes/codex-primary-runtime/dependencies/bin:/opt/codex/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin:/home/agent/.local/bin:/opt/codex/runtimes/codex-primary-runtime/dependencies/bin/fallback",
+    "CI": "true",
+    "NODE_PATH": null,
+    "NODE_OPTIONS": null
+  },
+  "singleLaunch": true,
+  "outputAbsentBeforeLaunch": true
+}

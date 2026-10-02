@@ -1,0 +1,11 @@
+{
+  "reader": "initial structured projection of pilot",
+  "input": "/tmp/motion-epoch8-actual-prefix-acceptance-20261002/PRIMARY/server-profile.json",
+  "observedError": "KeyError: 0",
+  "cause": "Pilot is a stage object with rows, not an array",
+  "actualExit": 1,
+  "toolSession": 4608,
+  "recordedAtUtc": "2026-10-02T04:58:56.677817+00:00",
+  "originalEvidenceModified": false,
+  "canonicalConsumerExecuted": false
+}

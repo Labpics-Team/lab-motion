@@ -1,0 +1,10 @@
+{
+  "actualStartUtc": "2026-10-02T05:08:59.711432+00:00",
+  "head": "939e7f4a7ebef2dd494f9dec8690932fecebfd73",
+  "base": "fe092331360837fd7f63d71a4b7f867ba849ebd4",
+  "axis": "second-order operations/signals/measurement-source boundary/compatibility/cost",
+  "cpu": 2,
+  "runtimeProbes": 0,
+  "heavy": 0,
+  "queued": 0
+}

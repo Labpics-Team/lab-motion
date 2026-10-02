@@ -1,0 +1,636 @@
+{
+  "atUtc": "2026-10-02T05:20:41.965870+00:00",
+  "sourceHead": "fe092331360837fd7f63d71a4b7f867ba849ebd4",
+  "reportFullReadByRoot": true,
+  "reportSha256": "9e465106777d6976ec2cc14d8253f38d744c3523331c9c8c8bf5d6edab640b67",
+  "allBindingsMatch": true,
+  "bindings": [
+    {
+      "path": "PREDATA/launch-single-series.py",
+      "bytes": 2996,
+      "sha256": "98623d56bf4cda4c7b54bf8734f7bb39a61604deaedfa55678c04b35abe425db",
+      "actualPath": "/tmp/motion-epoch8-actual-prefix-acceptance-20261002/PREDATA/launch-single-series.py",
+      "match": true
+    },
+    {
+      "path": "PREDATA/predata-tuple.json",
+      "bytes": 41722,
+      "sha256": "5bcaa87d3349231591f4c8718e44e41c851f50d17bd3d52ae1c32d4eaca77ec5",
+      "actualPath": "/tmp/motion-epoch8-actual-prefix-acceptance-20261002/PREDATA/predata-tuple.json",
+      "match": true
+    },
+    {
+      "path": "PREDATA/predata-tuple.sha256",
+      "bytes": 85,
+      "sha256": "301ba13dec2e315395b8c706afc0081062c72819da3944730368418a8722bf20",
+      "actualPath": "/tmp/motion-epoch8-actual-prefix-acceptance-20261002/PREDATA/predata-tuple.sha256",
+      "match": true
+    },
+    {
+      "path": "PREDATA/preparation-execution.json",
+      "bytes": 1065,
+      "sha256": "6d551452b78abef20687483f97c5c0e95ca4e22448a83f3f017ab45672ab68af",
+      "actualPath": "/tmp/motion-epoch8-actual-prefix-acceptance-20261002/PREDATA/preparation-execution.json",
+      "match": true
+    },
+    {
+      "path": "PREDATA/preparation-start.json",
+      "bytes": 975,
+      "sha256": "9e44dcf14f280f98569f963d1c6571a3b8f85a1c9af4f1adc6f86602e9f4fcb3",
+      "actualPath": "/tmp/motion-epoch8-actual-prefix-acceptance-20261002/PREDATA/preparation-start.json",
+      "match": true
+    },
+    {
+      "path": "PREDATA/prepare.mjs",
+      "bytes": 7865,
+      "sha256": "ef193f392ee35fb22132998e458afc95d49573053257f50b28902d1e1ede083a",
+      "actualPath": "/tmp/motion-epoch8-actual-prefix-acceptance-20261002/PREDATA/prepare.mjs",
+      "match": true
+    },
+    {
+      "path": "PREDATA/prepare.stderr",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "actualPath": "/tmp/motion-epoch8-actual-prefix-acceptance-20261002/PREDATA/prepare.stderr",
+      "match": true
+    },
+    {
+      "path": "PREDATA/prepare.stdout",
+      "bytes": 646,
+      "sha256": "9e9abac6e32072a7bb86c9b84598031a9e495e910f3257277ad0ec79cb14c7fa",
+      "actualPath": "/tmp/motion-epoch8-actual-prefix-acceptance-20261002/PREDATA/prepare.stdout",
+      "match": true
+    },
+    {
+      "path": "PREDATA/thread-cpu-clock.node",
+      "bytes": 16192,
+      "sha256": "21bb3221b35523770ee025546c5e4fadb8bd7a64627a65147bd23ca48ac6c76a",
+      "actualPath": "/tmp/motion-epoch8-actual-prefix-acceptance-20261002/PREDATA/thread-cpu-clock.node",
+      "match": true
+    },
+    {
+      "path": "PRIMARY/FINAL-SMALL-CHECK.json",
+      "bytes": 512,
+      "sha256": "51f0b7b3cc32c07b3cba1e99d32ddc15bc1f3b354c704c1d7966c4206d649c68",
+      "actualPath": "/tmp/motion-epoch8-actual-prefix-acceptance-20261002/PRIMARY/FINAL-SMALL-CHECK.json",
+      "match": true
+    },
+    {
+      "path": "PRIMARY/OPERATOR-SIGNAL.json",
+      "bytes": 253,
+      "sha256": "a5248ea8f4665a18fde79ce8c057a85156de90bfbb734aa25d3338c30d874f2d",
+      "actualPath": "/tmp/motion-epoch8-actual-prefix-acceptance-20261002/PRIMARY/OPERATOR-SIGNAL.json",
+      "match": true
+    },
+    {
+      "path": "PRIMARY/OPERATOR-STOP-BEFORE-SIGNAL.json",
+      "bytes": 1705,
+      "sha256": "b045fffd16b7bc52063bad921f5a5b54158d2e57743b426b03bef935a3c152cb",
+      "actualPath": "/tmp/motion-epoch8-actual-prefix-acceptance-20261002/PRIMARY/OPERATOR-STOP-BEFORE-SIGNAL.json",
+      "match": true
+    },
+    {
+      "path": "PRIMARY/PRIMARY-PREDATA-PACKET.json",
+      "bytes": 3641,
+      "sha256": "1b6a07037f7511876370df46f6c0ae9ea70b51fa473093083d1ce2dbd271cd26",
+      "actualPath": "/tmp/motion-epoch8-actual-prefix-acceptance-20261002/PRIMARY/PRIMARY-PREDATA-PACKET.json",
+      "match": true
+    },
+    {
+      "path": "PRIMARY/PROCESS-RETIREMENT-QUALIFIED.json",
+      "bytes": 424,
+      "sha256": "a5ff846425359a697553243f61d7a00b9f3c74efa5314c43cabd9b7449749b41",
+      "actualPath": "/tmp/motion-epoch8-actual-prefix-acceptance-20261002/PRIMARY/PROCESS-RETIREMENT-QUALIFIED.json",
+      "match": true
+    },
+    {
+      "path": "PRIMARY/PROCESS-RETIREMENT.json",
+      "bytes": 870,
+      "sha256": "2ed7225b9d127a326d82b10369428bd0041c5a2a0b346ae24774661e70767c4c",
+      "actualPath": "/tmp/motion-epoch8-actual-prefix-acceptance-20261002/PRIMARY/PROCESS-RETIREMENT.json",
+      "match": true
+    },
+    {
+      "path": "PRIMARY/RAW-SUMMARY.json",
+      "bytes": 7323,
+      "sha256": "13ecfc8e7ec317b5053d8180960a52331c761599e082117ab75a7a6fd65500a4",
+      "actualPath": "/tmp/motion-epoch8-actual-prefix-acceptance-20261002/PRIMARY/RAW-SUMMARY.json",
+      "match": true
+    },
+    {
+      "path": "PRIMARY/ROOT-QUIET-GRANT.json",
+      "bytes": 3636,
+      "sha256": "aa7c1cde93eac70f5b37164fe31f6bb5fa2842d7480a20f678cf9658fc3d6e54",
+      "actualPath": "/tmp/motion-epoch8-actual-prefix-acceptance-20261002/PRIMARY/ROOT-QUIET-GRANT.json",
+      "match": true
+    },
+    {
+      "path": "PRIMARY/actual-execution.json",
+      "bytes": 1357,
+      "sha256": "aa6092fd9ae8908717d9e428fa2b860e3a84bdca82a3fa6f2f846bae3aa24db3",
+      "actualPath": "/tmp/motion-epoch8-actual-prefix-acceptance-20261002/PRIMARY/actual-execution.json",
+      "match": true
+    },
+    {
+      "path": "PRIMARY/actual-launch.json",
+      "bytes": 1531,
+      "sha256": "40ab4bd6f21f3ddb6300d8eab8750b006c92e5054aad76ad28db847c7d48f0cb",
+      "actualPath": "/tmp/motion-epoch8-actual-prefix-acceptance-20261002/PRIMARY/actual-launch.json",
+      "match": true
+    },
+    {
+      "path": "PRIMARY/actual-thread-cpu-clock.node",
+      "bytes": 16192,
+      "sha256": "21bb3221b35523770ee025546c5e4fadb8bd7a64627a65147bd23ca48ac6c76a",
+      "actualPath": "/tmp/motion-epoch8-actual-prefix-acceptance-20261002/PRIMARY/actual-thread-cpu-clock.node",
+      "match": true
+    },
+    {
+      "path": "PRIMARY/actual.stderr.log",
+      "bytes": 2422,
+      "sha256": "2298ae67ff318554d651985a635b130bd671d3303d661df8e180d33eb0760c87",
+      "actualPath": "/tmp/motion-epoch8-actual-prefix-acceptance-20261002/PRIMARY/actual.stderr.log",
+      "match": true
+    },
+    {
+      "path": "PRIMARY/actual.stdout.log",
+      "bytes": 12167,
+      "sha256": "c58fcea7dae8459827289a43b1780d5b8b1a4b08b69859599a7a1b048d6c74dd",
+      "actualPath": "/tmp/motion-epoch8-actual-prefix-acceptance-20261002/PRIMARY/actual.stdout.log",
+      "match": true
+    },
+    {
+      "path": "PRIMARY/anime-waapi.iife.js",
+      "bytes": 10643,
+      "sha256": "397432a5365ef786c63484ebed417494067211c4683307a3568658f5ca583051",
+      "actualPath": "/tmp/motion-epoch8-actual-prefix-acceptance-20261002/PRIMARY/anime-waapi.iife.js",
+      "match": true
+    },
+    {
+      "path": "PRIMARY/anime.iife.js",
+      "bytes": 34774,
+      "sha256": "d09f840f71a92abc049dec089b71960909435ba52ebb911ea40fcf08876bf0fd",
+      "actualPath": "/tmp/motion-epoch8-actual-prefix-acceptance-20261002/PRIMARY/anime.iife.js",
+      "match": true
+    },
+    {
+      "path": "PRIMARY/baseline-actual-consumer.tgz",
+      "bytes": 560519,
+      "sha256": "3787bfcc0b9b4302d826984cefc29a0a5ff7142d60a52d721c8d2f1397125470",
+      "actualPath": "/tmp/motion-epoch8-actual-prefix-acceptance-20261002/PRIMARY/baseline-actual-consumer.tgz",
+      "match": true
+    },
+    {
+      "path": "PRIMARY/baseline-no-motion-after.png",
+      "bytes": 1013,
+      "sha256": "dababf13392d9d7ed0a62d1fa3653e4ee5d73783e36207781fc66109b7e68f6f",
+      "actualPath": "/tmp/motion-epoch8-actual-prefix-acceptance-20261002/PRIMARY/baseline-no-motion-after.png",
+      "match": true
+    },
+    {
+      "path": "PRIMARY/baseline-no-motion-before.png",
+      "bytes": 1013,
+      "sha256": "dababf13392d9d7ed0a62d1fa3653e4ee5d73783e36207781fc66109b7e68f6f",
+      "actualPath": "/tmp/motion-epoch8-actual-prefix-acceptance-20261002/PRIMARY/baseline-no-motion-before.png",
+      "match": true
+    },
+    {
+      "path": "PRIMARY/baseline.iife.js",
+      "bytes": 39800,
+      "sha256": "28ff5f138dd63b0e350787d949149950a9ba2639e0f9869b86d811de0e6b6c23",
+      "actualPath": "/tmp/motion-epoch8-actual-prefix-acceptance-20261002/PRIMARY/baseline.iife.js",
+      "match": true
+    },
+    {
+      "path": "PRIMARY/candidate-actual-consumer.tgz",
+      "bytes": 562051,
+      "sha256": "b41708c31e122da9ae46a558f0c5f447195f36ca19c9b0fe6c19954887d790e4",
+      "actualPath": "/tmp/motion-epoch8-actual-prefix-acceptance-20261002/PRIMARY/candidate-actual-consumer.tgz",
+      "match": true
+    },
+    {
+      "path": "PRIMARY/candidate.iife.js",
+      "bytes": 39801,
+      "sha256": "b47d627de92ed410fdeaaffa6467b772a993002b60797763bae8defc63e48553",
+      "actualPath": "/tmp/motion-epoch8-actual-prefix-acceptance-20261002/PRIMARY/candidate.iife.js",
+      "match": true
+    },
+    {
+      "path": "PRIMARY/gsap.iife.js",
+      "bytes": 70908,
+      "sha256": "805a3679343782b171062b14cca34d76f64d6f1c0ec2b5cb46439dab882bba89",
+      "actualPath": "/tmp/motion-epoch8-actual-prefix-acceptance-20261002/PRIMARY/gsap.iife.js",
+      "match": true
+    },
+    {
+      "path": "PRIMARY/journal.ndjson",
+      "bytes": 21768420,
+      "sha256": "8552cce134e3778fa0516912f4f628d21de834e9b284006147c4ab128aa387cb",
+      "actualPath": "/tmp/motion-epoch8-actual-prefix-acceptance-20261002/PRIMARY/journal.ndjson",
+      "match": true
+    },
+    {
+      "path": "PRIMARY/journal.ndjson.gz",
+      "bytes": 1815397,
+      "sha256": "220b096840cc09681ee1b1a43a13461c04aca3d9608e0fff98b0946697e190ee",
+      "actualPath": "/tmp/motion-epoch8-actual-prefix-acceptance-20261002/PRIMARY/journal.ndjson.gz",
+      "match": true
+    },
+    {
+      "path": "PRIMARY/motion-mini.iife.js",
+      "bytes": 8534,
+      "sha256": "c3ac5aff06c25db7e48dcbbb6d2310aeac17721d210ea5cd097bd7e1361849c4",
+      "actualPath": "/tmp/motion-epoch8-actual-prefix-acceptance-20261002/PRIMARY/motion-mini.iife.js",
+      "match": true
+    },
+    {
+      "path": "PRIMARY/motion.iife.js",
+      "bytes": 64148,
+      "sha256": "719e4ecca55eda3705e97b26f6f180482d42cc9582dc89ce684ae5484be88867",
+      "actualPath": "/tmp/motion-epoch8-actual-prefix-acceptance-20261002/PRIMARY/motion.iife.js",
+      "match": true
+    },
+    {
+      "path": "PRIMARY/predata-tuple.json",
+      "bytes": 41722,
+      "sha256": "5bcaa87d3349231591f4c8718e44e41c851f50d17bd3d52ae1c32d4eaca77ec5",
+      "actualPath": "/tmp/motion-epoch8-actual-prefix-acceptance-20261002/PRIMARY/predata-tuple.json",
+      "match": true
+    },
+    {
+      "path": "PRIMARY/server-profile.json",
+      "bytes": 21741898,
+      "sha256": "d098aad5475f93813cf47c096d9a1c0335e73949730903dd2cfd4190fa038975",
+      "actualPath": "/tmp/motion-epoch8-actual-prefix-acceptance-20261002/PRIMARY/server-profile.json",
+      "match": true
+    },
+    {
+      "path": "PRIMARY/server-profile.json.gz",
+      "bytes": 1781895,
+      "sha256": "4618e5c3b870972a4f61b4710d499f640b6a1fc10b0b3e0b0af35baf420b7e7e",
+      "actualPath": "/tmp/motion-epoch8-actual-prefix-acceptance-20261002/PRIMARY/server-profile.json.gz",
+      "match": true
+    },
+    {
+      "path": "PRIMARY/server-profile.sha256",
+      "bytes": 86,
+      "sha256": "b97c00cdcc86df9044dd9e34cc432e8b3498fa50e6fd84cf04593f77c64b32b1",
+      "actualPath": "/tmp/motion-epoch8-actual-prefix-acceptance-20261002/PRIMARY/server-profile.sha256",
+      "match": true
+    },
+    {
+      "path": "PRIMARY/waapi-ctl.iife.js",
+      "bytes": 1035,
+      "sha256": "2ab1c372e3cb739cd42496ef655f5300d2a9bffc41e9367470afad21718be2b8",
+      "actualPath": "/tmp/motion-epoch8-actual-prefix-acceptance-20261002/PRIMARY/waapi-ctl.iife.js",
+      "match": true
+    },
+    {
+      "path": "PRIMARY-PACKET.json",
+      "bytes": 7689,
+      "sha256": "faa1eca3ff8b228ef2b57f6492e3c2ff3fad208ec8419e408dcf5ffee3313860",
+      "actualPath": "/tmp/motion-epoch8-actual-prefix-acceptance-20261002/PRIMARY-PACKET.json",
+      "match": true
+    },
+    {
+      "path": "REPORT.md",
+      "bytes": 21216,
+      "sha256": "9e465106777d6976ec2cc14d8253f38d744c3523331c9c8c8bf5d6edab640b67",
+      "actualPath": "/tmp/motion-epoch8-actual-prefix-acceptance-20261002/REPORT.md",
+      "match": true
+    },
+    {
+      "path": "all-bindings.json",
+      "bytes": 286823,
+      "sha256": "3afe47ac56cdeb45d8ec43a0f080d093d1ee0a5bbb028ede188d30e29c784e9f",
+      "actualPath": "/tmp/motion-epoch8-actual-prefix-acceptance-20261002/all-bindings.json",
+      "match": true
+    },
+    {
+      "path": "bind-inputs.py",
+      "bytes": 7619,
+      "sha256": "1dafe590a29a103462a900dd9c9097b025f4df72867a5304547882e2ad57611e",
+      "actualPath": "/tmp/motion-epoch8-actual-prefix-acceptance-20261002/bind-inputs.py",
+      "match": true
+    },
+    {
+      "path": "canonical-readback.mjs",
+      "bytes": 2625,
+      "sha256": "718cb2ba2c80548badc8eeb2d2e3285c61ef6ec2f8a41ad901ad90f98153331b",
+      "actualPath": "/tmp/motion-epoch8-actual-prefix-acceptance-20261002/canonical-readback.mjs",
+      "match": true
+    },
+    {
+      "path": "canonical-reader.END.json",
+      "bytes": 1319,
+      "sha256": "a4a53c518fc6e250309153d42aff6ada81d39841dcf0aacf0c48d83ffcec8a2e",
+      "actualPath": "/tmp/motion-epoch8-actual-prefix-acceptance-20261002/canonical-reader.END.json",
+      "match": true
+    },
+    {
+      "path": "canonical-reader.START.json",
+      "bytes": 1146,
+      "sha256": "8510a35041825e43876686bfeaba1cd7798509b000496eb8b06b40c0dd0ebf15",
+      "actualPath": "/tmp/motion-epoch8-actual-prefix-acceptance-20261002/canonical-reader.START.json",
+      "match": true
+    },
+    {
+      "path": "canonical-reader.stderr.log",
+      "bytes": 658,
+      "sha256": "6b2cfc1fc730454502663246545012f7711335dfe1247103c6baad8ac5a3a4de",
+      "actualPath": "/tmp/motion-epoch8-actual-prefix-acceptance-20261002/canonical-reader.stderr.log",
+      "match": true
+    },
+    {
+      "path": "canonical-reader.stdout.json",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "actualPath": "/tmp/motion-epoch8-actual-prefix-acceptance-20261002/canonical-reader.stdout.json",
+      "match": true
+    },
+    {
+      "path": "finalization.stderr.log",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "actualPath": "/tmp/motion-epoch8-actual-prefix-acceptance-20261002/finalization.stderr.log",
+      "match": true
+    },
+    {
+      "path": "finalization.stdout.log",
+      "bytes": 179,
+      "sha256": "df78b72844e1828772c7320e39590150fd2b90cb1214b606ec9434238c9da300",
+      "actualPath": "/tmp/motion-epoch8-actual-prefix-acceptance-20261002/finalization.stdout.log",
+      "match": true
+    },
+    {
+      "path": "finalize.py",
+      "bytes": 3719,
+      "sha256": "163eb9abdfd905a254ac6a96c99f5f75e0a5b4c78fd84f25f28403a6ad865e3b",
+      "actualPath": "/tmp/motion-epoch8-actual-prefix-acceptance-20261002/finalize.py",
+      "match": true
+    },
+    {
+      "path": "independent-readback.json",
+      "bytes": 31702,
+      "sha256": "9d78624206cb45e017932c8934cda989875b20ff20e72f5672c83d5b8fa8813c",
+      "actualPath": "/tmp/motion-epoch8-actual-prefix-acceptance-20261002/independent-readback.json",
+      "match": true
+    },
+    {
+      "path": "independent-readback.py",
+      "bytes": 19810,
+      "sha256": "8eaad0e4b5c85608e720e8638f5da6012f07b266adb7542c26f9370b098c5534",
+      "actualPath": "/tmp/motion-epoch8-actual-prefix-acceptance-20261002/independent-readback.py",
+      "match": true
+    },
+    {
+      "path": "independent-readback.py.attempt1",
+      "bytes": 19728,
+      "sha256": "aa44a04c88152c4985a26816db6833f17c2bdc9bb3041a51775e574c9d6c08fb",
+      "actualPath": "/tmp/motion-epoch8-actual-prefix-acceptance-20261002/independent-readback.py.attempt1",
+      "match": true
+    },
+    {
+      "path": "independent-reader.END.json",
+      "bytes": 687,
+      "sha256": "6f152563b305715f0760133a9a78579ddf0f9deb42333965f883f12f18857dd6",
+      "actualPath": "/tmp/motion-epoch8-actual-prefix-acceptance-20261002/independent-reader.END.json",
+      "match": true
+    },
+    {
+      "path": "independent-reader.END.json.attempt1",
+      "bytes": 688,
+      "sha256": "75a091684dcfbc2a4e74d981209b2604bcbe827cd041ca314b3da34514b60849",
+      "actualPath": "/tmp/motion-epoch8-actual-prefix-acceptance-20261002/independent-reader.END.json.attempt1",
+      "match": true
+    },
+    {
+      "path": "independent-reader.START.json",
+      "bytes": 515,
+      "sha256": "8742a1882e7cd34e55448369ad16a69359ed4a8a85131b01a423a9adc05e9b17",
+      "actualPath": "/tmp/motion-epoch8-actual-prefix-acceptance-20261002/independent-reader.START.json",
+      "match": true
+    },
+    {
+      "path": "independent-reader.START.json.attempt1",
+      "bytes": 515,
+      "sha256": "e6bfe210b662a7a9b39409678f5d2a149a3761340f518b0e93a7d59c3671260d",
+      "actualPath": "/tmp/motion-epoch8-actual-prefix-acceptance-20261002/independent-reader.START.json.attempt1",
+      "match": true
+    },
+    {
+      "path": "independent-reader.stderr.log",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "actualPath": "/tmp/motion-epoch8-actual-prefix-acceptance-20261002/independent-reader.stderr.log",
+      "match": true
+    },
+    {
+      "path": "independent-reader.stderr.log.attempt1",
+      "bytes": 237,
+      "sha256": "bcbbe9eed531805256d870718b9d67f6a858025576794a0eae49ae1184e2c30f",
+      "actualPath": "/tmp/motion-epoch8-actual-prefix-acceptance-20261002/independent-reader.stderr.log.attempt1",
+      "match": true
+    },
+    {
+      "path": "independent-reader.stdout.json",
+      "bytes": 1766,
+      "sha256": "28bc3ac4d66b093ddca75ba198d45bab204f8a35a9a5b8414f974f81b3e64fce",
+      "actualPath": "/tmp/motion-epoch8-actual-prefix-acceptance-20261002/independent-reader.stdout.json",
+      "match": true
+    },
+    {
+      "path": "independent-reader.stdout.json.attempt1",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "actualPath": "/tmp/motion-epoch8-actual-prefix-acceptance-20261002/independent-reader.stdout.json.attempt1",
+      "match": true
+    },
+    {
+      "path": "native-clock-actual-binding.json",
+      "bytes": 396,
+      "sha256": "c4034b2b5e66b8fee66631a815d33c52078f33c2c13c8d04abde47d104517213",
+      "actualPath": "/tmp/motion-epoch8-actual-prefix-acceptance-20261002/native-clock-actual-binding.json",
+      "match": true
+    },
+    {
+      "path": "norm/AGENTS.md",
+      "bytes": 38398,
+      "sha256": "0e1376312cedf91660b1c919ba4c1a9a6e067fe8719eb8daeb52113508b28f0a",
+      "actualPath": "/tmp/motion-epoch8-actual-prefix-acceptance-20261002/norm/AGENTS.md",
+      "match": true
+    },
+    {
+      "path": "norm/plans/SPEC.md",
+      "bytes": 31491,
+      "sha256": "7488d5885ee2405d678e488e34a84ce48254978c3a6ad3de2e4d31dfe7b3f651",
+      "actualPath": "/tmp/motion-epoch8-actual-prefix-acceptance-20261002/norm/plans/SPEC.md",
+      "match": true
+    },
+    {
+      "path": "norm/plans/TEMPLATE.md",
+      "bytes": 10270,
+      "sha256": "7f4cb8dcc983f392a01f2abdddc7b74527412b0da725b114cee94677c651a97e",
+      "actualPath": "/tmp/motion-epoch8-actual-prefix-acceptance-20261002/norm/plans/TEMPLATE.md",
+      "match": true
+    },
+    {
+      "path": "norm/plans/lab-motion-production/ACTIVATION.md",
+      "bytes": 194,
+      "sha256": "97e6b6ce4080b5c91d62e7ace5844a3c7aeeaa3bce04b21f832785bc807a4908",
+      "actualPath": "/tmp/motion-epoch8-actual-prefix-acceptance-20261002/norm/plans/lab-motion-production/ACTIVATION.md",
+      "match": true
+    },
+    {
+      "path": "norm/plans/lab-motion-production/ACTIVE.md",
+      "bytes": 235,
+      "sha256": "42e36c2efa89912aa00395c938263c1bf35275325420df52ec736b0986606731",
+      "actualPath": "/tmp/motion-epoch8-actual-prefix-acceptance-20261002/norm/plans/lab-motion-production/ACTIVE.md",
+      "match": true
+    },
+    {
+      "path": "norm/plans/lab-motion-production/CLAIM.md",
+      "bytes": 139,
+      "sha256": "56ac2167795a81b9d1a60d2ebc1cb8830a2653cbc45026bbcb2d0b0f8e837fa8",
+      "actualPath": "/tmp/motion-epoch8-actual-prefix-acceptance-20261002/norm/plans/lab-motion-production/CLAIM.md",
+      "match": true
+    },
+    {
+      "path": "norm/plans/lab-motion-production/r11.md",
+      "bytes": 74166,
+      "sha256": "cbeef108b288502165437c375bb259f3f4d6dc8ae4ae9e926db133adeba40d4b",
+      "actualPath": "/tmp/motion-epoch8-actual-prefix-acceptance-20261002/norm/plans/lab-motion-production/r11.md",
+      "match": true
+    },
+    {
+      "path": "norm/plans/lab-motion-production/r12.md",
+      "bytes": 40024,
+      "sha256": "b2e6d1462b0bce43773beaf307e3b3963c426bf07134f49c844d4991e1753622",
+      "actualPath": "/tmp/motion-epoch8-actual-prefix-acceptance-20261002/norm/plans/lab-motion-production/r12.md",
+      "match": true
+    },
+    {
+      "path": "predatapacket-integrity.json",
+      "bytes": 2932,
+      "sha256": "73d36c759de7fcd7b41a2171328bb5da9fb71684777d7798c5b0a217784ef7c0",
+      "actualPath": "/tmp/motion-epoch8-actual-prefix-acceptance-20261002/predatapacket-integrity.json",
+      "match": true
+    },
+    {
+      "path": "primary-integrity.json",
+      "bytes": 11335,
+      "sha256": "e4208c4be5284e0194640aa1855b4cc2ac500b58c4bf2b033f6654b92a2e69af",
+      "actualPath": "/tmp/motion-epoch8-actual-prefix-acceptance-20261002/primary-integrity.json",
+      "match": true
+    },
+    {
+      "path": "raw-key-inventory.json",
+      "bytes": 344,
+      "sha256": "b427dd530377cb82cf5edf9c72740d72bb5b4da5c2452af04cfb5f2e828e9e85",
+      "actualPath": "/tmp/motion-epoch8-actual-prefix-acceptance-20261002/raw-key-inventory.json",
+      "match": true
+    },
+    {
+      "path": "read.py",
+      "bytes": 1002,
+      "sha256": "4f8e50798b0fa2d1e647a6f6363d73a19b4650af8741bc0abe0a5789e5de131c",
+      "actualPath": "/tmp/motion-epoch8-actual-prefix-acceptance-20261002/read.py",
+      "match": true
+    },
+    {
+      "path": "reader-errors.json",
+      "bytes": 2746,
+      "sha256": "af8dea7a4a0893830733d254ee096e99eb42f01514d98dfc5e620271177ad88d",
+      "actualPath": "/tmp/motion-epoch8-actual-prefix-acceptance-20261002/reader-errors.json",
+      "match": true
+    },
+    {
+      "path": "reader-projection-attempt1.error.json",
+      "bytes": 420,
+      "sha256": "3f17dd2c6f0e18aa7e37dec209e9a9c7ca142750389c6d93240bd159ebb819b1",
+      "actualPath": "/tmp/motion-epoch8-actual-prefix-acceptance-20261002/reader-projection-attempt1.error.json",
+      "match": true
+    },
+    {
+      "path": "reader-setup-attempt1.error.json",
+      "bytes": 415,
+      "sha256": "a0a2a03bad3f50d41e9728d468f258cbb335174e6993737cdd3fd95040c0e815",
+      "actualPath": "/tmp/motion-epoch8-actual-prefix-acceptance-20261002/reader-setup-attempt1.error.json",
+      "match": true
+    },
+    {
+      "path": "readset.json",
+      "bytes": 26468,
+      "sha256": "51194fd188407fa52e768be10f29a4f98b939ed796ce5bca6a946fd3453fa5da",
+      "actualPath": "/tmp/motion-epoch8-actual-prefix-acceptance-20261002/readset.json",
+      "match": true
+    },
+    {
+      "path": "readset.ndjson",
+      "bytes": 20153,
+      "sha256": "6107cb6c03432e0f870eb4cf2d3134e52a8173b0cd830e373659fd726982f1ff",
+      "actualPath": "/tmp/motion-epoch8-actual-prefix-acceptance-20261002/readset.ndjson",
+      "match": true
+    },
+    {
+      "path": "run-canonical-reader.py",
+      "bytes": 1627,
+      "sha256": "6442aa660a0ba624ba6e3b9f6fb3241ae7b3fadd2246f71d4741069273ff7773",
+      "actualPath": "/tmp/motion-epoch8-actual-prefix-acceptance-20261002/run-canonical-reader.py",
+      "match": true
+    },
+    {
+      "path": "run-independent-audit.py",
+      "bytes": 1358,
+      "sha256": "5f2ab06f8a3c7a0e8b0801901142eee40f5afb6fc670c30b444a930052d8395c",
+      "actualPath": "/tmp/motion-epoch8-actual-prefix-acceptance-20261002/run-independent-audit.py",
+      "match": true
+    },
+    {
+      "path": "seal-input-verification.py",
+      "bytes": 1946,
+      "sha256": "97813aa9bbca3d8e4fd7842e3c6db543730ef60baff7513fa1fd62f566ed8e2b",
+      "actualPath": "/tmp/motion-epoch8-actual-prefix-acceptance-20261002/seal-input-verification.py",
+      "match": true
+    },
+    {
+      "path": "start.json",
+      "bytes": 188,
+      "sha256": "64a806075717096f5d78f0dc1333276121f44c3967c91d82d79c1cb6d5e97733",
+      "actualPath": "/tmp/motion-epoch8-actual-prefix-acceptance-20261002/start.json",
+      "match": true
+    },
+    {
+      "path": "terminal.json",
+      "bytes": 1232,
+      "sha256": "c27ef94ac68cee2ecc954877e074f0aaf1ce3aadac6583f9c2ae8cffd3fb8986",
+      "actualPath": "/tmp/motion-epoch8-actual-prefix-acceptance-20261002/terminal.json",
+      "match": true
+    },
+    {
+      "path": "/tmp/motion-epoch8-actual-prefix-acceptance-20261002/MANIFEST.json",
+      "bytes": 14984,
+      "sha256": "17e84709214446baeb2d51730963dfe87cdc3fcb93a7d909fcad15da995a947a",
+      "match": true
+    }
+  ],
+  "sampleCounts": {
+    "warmup": 40,
+    "pilot": 80,
+    "aa": 756,
+    "total": 876,
+    "fullAA": 75,
+    "pairedAABlocks": 37,
+    "candidate": 0
+  },
+  "journalRecords": 925,
+  "nativeEndpoints": 47872,
+  "requiredRuns": 1240,
+  "cap": 1024,
+  "feasible": false,
+  "verdict": "PASS scoped prefix custody and interpretation; empirical UNPROVEN",
+  "canonicalConsumerExit": 1,
+  "canonicalReaderErrorPreserved": true,
+  "independentReadbackExit": 0,
+  "scope": "Full REPORT accepted within stated fe actual-prefix boundary; no complete calibration/NI/physical/mobile/productGO or future939e transfer."
+}

@@ -1,0 +1,42 @@
+{
+  "actualStartUtc": "2026-10-02T05:08:59.711432+00:00",
+  "capturedAtUtc": "2026-10-02T05:08:59.779109+00:00",
+  "head": "939e7f4a7ebef2dd494f9dec8690932fecebfd73",
+  "tree": "deba4db1952029bdb7d2244b207f570007700b19",
+  "base": "fe092331360837fd7f63d71a4b7f867ba849ebd4",
+  "changed": [
+    "bench/profile/server-profile-registration.mjs",
+    "bench/profile/server-profile-runner.mjs",
+    "docs/server-profile.md",
+    "test/fixtures/server-thread-cpu-clock-check.mjs",
+    "test/server-profile-contract.test.ts"
+  ],
+  "sourceFiles": 641,
+  "inputs": [
+    {
+      "path": "/tmp/motion-ops-so-939e-20261002/source.tar",
+      "bytes": 7454720,
+      "sha256": "ff8ca442617a4becb751cff3c57ceb2aaca61c9ed0ab0416a843212e8378c193"
+    },
+    {
+      "path": "/tmp/motion-ops-so-939e-20261002/source.diff",
+      "bytes": 30495,
+      "sha256": "4ba846fa1c8d3d8b41e4fd250d7cf45607dfe4128f49b35661622483c4b2045d"
+    },
+    {
+      "path": "/tmp/motion-ops-so-939e-20261002/commit.raw",
+      "bytes": 350,
+      "sha256": "26e4a8d87d4260f0858181e37f55b5e0c268063c69646402f1d83ceca08031b9"
+    },
+    {
+      "path": "/tmp/motion-ops-so-939e-20261002/tree.raw",
+      "bytes": 1192,
+      "sha256": "c5dbe7181ec1c6f9838d4dae4ca979b13e3284bac9164bc2d135395ae221cc92"
+    }
+  ],
+  "commitHeaders": "tree deba4db1952029bdb7d2244b207f570007700b19\nparent fe092331360837fd7f63d71a4b7f867ba849ebd4\nauthor Даниил Ерошов <daniilerosov12@gmail.com> 1790917509 +0000\ncommitter Даниил Ерошов <daniilerosov12@gmail.com> 1790917509 +0000",
+  "sourceAcquisition": "read-only git immutable archive/cat-file/diff; no SUT/runtime/build",
+  "heavy": 0,
+  "queued": 0,
+  "allReadChildrenJoined": true
+}

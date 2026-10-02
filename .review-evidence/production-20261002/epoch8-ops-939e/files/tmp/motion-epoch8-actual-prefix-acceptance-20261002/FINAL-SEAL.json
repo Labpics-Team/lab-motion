@@ -1,0 +1,52 @@
+{
+  "schema": "independent-epoch8-final-seal-v1",
+  "actualVerifiedChildEndUtc": "2026-10-02T05:19:17.715031+00:00",
+  "sealedAtUtc": "2026-10-02T05:19:17.771211+00:00",
+  "exitCode": 0,
+  "allEND": true,
+  "allChildrenJoined": true,
+  "heavy": 0,
+  "queued": 0,
+  "sourceHead": "fe092331360837fd7f63d71a4b7f867ba849ebd4",
+  "sourceTree": "285e30e36db32f2fdc9ae442327f6b3396dcf254",
+  "files": [
+    {
+      "path": "REPORT.md",
+      "bytes": 21216,
+      "sha256": "9e465106777d6976ec2cc14d8253f38d744c3523331c9c8c8bf5d6edab640b67"
+    },
+    {
+      "path": "MANIFEST.json",
+      "bytes": 14984,
+      "sha256": "17e84709214446baeb2d51730963dfe87cdc3fcb93a7d909fcad15da995a947a"
+    },
+    {
+      "path": "all-bindings.json",
+      "bytes": 286823,
+      "sha256": "3afe47ac56cdeb45d8ec43a0f080d093d1ee0a5bbb028ede188d30e29c784e9f"
+    },
+    {
+      "path": "readset.json",
+      "bytes": 26468,
+      "sha256": "51194fd188407fa52e768be10f29a4f98b939ed796ce5bca6a946fd3453fa5da"
+    },
+    {
+      "path": "terminal.json",
+      "bytes": 1232,
+      "sha256": "c27ef94ac68cee2ecc954877e074f0aaf1ce3aadac6583f9c2ae8cffd3fb8986"
+    },
+    {
+      "path": "reader-errors.json",
+      "bytes": 2746,
+      "sha256": "af8dea7a4a0893830733d254ee096e99eb42f01514d98dfc5e620271177ad88d"
+    },
+    {
+      "path": "independent-readback.json",
+      "bytes": 31702,
+      "sha256": "9d78624206cb45e017932c8934cda989875b20ff20e72f5672c83d5b8fa8813c"
+    }
+  ],
+  "canonicalReaderExit": 1,
+  "independentReaderExit": 0,
+  "stopOwnExecAfterSeal": true
+}

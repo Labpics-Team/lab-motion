@@ -1,0 +1,58 @@
+{
+  "at": "2026-10-02T04:18:42.959163+00:00",
+  "epoch": 8,
+  "sourceHead": "fe092331360837fd7f63d71a4b7f867ba849ebd4",
+  "protocolDigest": "ce535cf6d6f0b0f140d44403627b63d936ef2461883a52680e7bbcad3ee49e5a",
+  "clockModelDigest": "04d863513d53b248b1be3e0905240f3bd6f4d06124582ce3093c2cbfe5320852",
+  "tupleSha256": "5bcaa87d3349231591f4c8718e44e41c851f50d17bd3d52ae1c32d4eaca77ec5",
+  "out": "/tmp/motion-server-series-fe092331-ce535cf6-20261002-epoch8",
+  "argv": [
+    "taskset",
+    "-c",
+    "0",
+    "/opt/codex/runtimes/codex-primary-runtime/dependencies/node/bin/node",
+    "bench/profile/server-profile-runner.mjs",
+    "--baseline",
+    "/tmp/motion-server-baseline-0b6f537e",
+    "--candidate",
+    "/workspace/lab-motion",
+    "--browser",
+    "chromium",
+    "--out",
+    "/tmp/motion-server-series-fe092331-ce535cf6-20261002-epoch8"
+  ],
+  "authorizedSingleLaunch": true,
+  "currentOutputAbsent": true,
+  "actualLaunchAbsent": true,
+  "currentRegisteredObservations": 0,
+  "currentCiRun": 36962663350,
+  "currentCiPrimary": {
+    "path": "/tmp/motion-qualified-fe092-pr-status-20261002/CURRENT-CI-CR-PRIMARY.json",
+    "bytes": 6107,
+    "sha256": "443f20a0f38ac1b211e67e3f51244df6fce4cdb84abebf8eaf266a1a9e51ad33"
+  },
+  "currentRequiredJobsPassed": true,
+  "currentTwoAxesSealed": true,
+  "currentTwoReportsDurablyDelivered": "067a7b0ffc16c066aece7e52c705e6ffdeb82c0a",
+  "deliveryReceiptSha256": "650d2184a4df38f76834f3af1506a3e8aad5524334991bfde8fc1a23f3e10323",
+  "freshResources": {
+    "tmpFreeBytes": 4680785920,
+    "cpuMax": "400000 100000",
+    "memoryMax": "17179869184",
+    "remainingBytesAfterSyntheticShapeAndTwo1GiBAllocations": 578410751
+  },
+  "operationalBudgetQualification": "Достаточный запас для одного existingCLI и first-failure prefix; безусловная граница произвольной trace ширины не утверждается.",
+  "quietOwnerState": {
+    "rootHeavy": 0,
+    "rootQueuedHeavy": 0,
+    "otherOwnedTestsBuildsBenchmarks": 0,
+    "measurementReviewerEnded": true,
+    "secondOrderReviewerEnded": true,
+    "depotReviewerEnded": true,
+    "motionAuthorAttestedReady": true
+  },
+  "quietRule": "До фактического END никакие новые local tests/builds/probes/profiles/compilation/gzip или тяжёлые проверки; допускаются короткие чтения уже записанного статуса и коммуникация. Source/protocol/clock/N/thresholds не менять.",
+  "scope": "Авторизован только однократный зарегистрированный сбор данных существующимCLI. Statistical result не означает finalproductionGO/mobileproof/merge/release/deploy.",
+  "chosenHoldDisposition": "Внешний preparatory hold сохранён в tuple как историческое выбранное условие. Его снимает этот grant для data acquisition: r11 PROFILE допускает preGO inventory/nullcontrols/A/A; G-DELIVERY требует delivery checks ДоGO, не до сбора. CodeRabbit current substantive exactfe review наблюдалось8PASS1architectureWARN; warning и formaldeliverygate требуют отдельного disposition, не заменяются этим grant.",
+  "stopping": "Один baseline-only pilot, замороженный N, один A/A+реальная2xработа, A/B только после годной калибровки; first-failure prefix сохранить, автоматический повтор запрещён."
+}

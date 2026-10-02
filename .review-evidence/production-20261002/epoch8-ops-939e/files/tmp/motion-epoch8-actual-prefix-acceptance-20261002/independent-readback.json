@@ -1,0 +1,830 @@
+{
+  "schema": "independent-epoch8-literal-readback-v1",
+  "actualStartUtc": "2026-10-02T05:07:29.454016+00:00",
+  "actualEndUtc": "2026-10-02T05:07:30.968854+00:00",
+  "sourceHead": "fe092331360837fd7f63d71a4b7f867ba849ebd4",
+  "sourceTree": "285e30e36db32f2fdc9ae442327f6b3396dcf254",
+  "rawBytes": 21741898,
+  "rawSha256": "d098aad5475f93813cf47c096d9a1c0335e73949730903dd2cfd4190fa038975",
+  "journalBytes": 21768420,
+  "journalSha256": "8552cce134e3778fa0516912f4f628d21de834e9b284006147c4ab128aa387cb",
+  "journalRecords": 925,
+  "journalTypes": {
+    "registration-before-any-sample": 1,
+    "raw-controls-baseline": 1,
+    "sample": 876,
+    "resources-block": 43,
+    "N-frozen-before-calibration-and-AB": 1,
+    "failed-sample": 1,
+    "failure": 1,
+    "finished": 1
+  },
+  "journalFinalDigest": "9b2eabc74dc3dfcaf35c03ef87dc78b28787e37b29c48a2029ee2ef36a0e6b8b",
+  "registrationDigest": "220a838fe8f264adc121f80364cd2b447a4d95423d671ed9c44fe2881cdd5745",
+  "frozenPlanDigest": "d789c895134eae7830c680624bd1b8ff61a2a1f4f4a2b2ced139fdeac531cd6d",
+  "wrongWrapperPlanOnlyDigest": "59a0c6f9eb2c2347e14f4f5c3e56c08b8fd35762225a097b032ece91108d9ba3",
+  "NFreezeRecordZeroBasedIndex": 128,
+  "stages": {
+    "warmup": {
+      "rows": 20,
+      "samples": 40,
+      "fullRuns": 4,
+      "lastRun": 3,
+      "lastRunSamples": 10,
+      "pairedBlockReceipts": 2,
+      "incompleteRows": []
+    },
+    "pilot": {
+      "rows": 40,
+      "samples": 80,
+      "fullRuns": 8,
+      "lastRun": 7,
+      "lastRunSamples": 10,
+      "pairedBlockReceipts": 4,
+      "incompleteRows": []
+    },
+    "aa": {
+      "rows": 379,
+      "samples": 756,
+      "fullRuns": 75,
+      "lastRun": 75,
+      "lastRunSamples": 6,
+      "pairedBlockReceipts": 37,
+      "incompleteRows": [
+        {
+          "kind": "browser",
+          "scene": "s2",
+          "run": 75,
+          "order": [
+            "right",
+            "left"
+          ],
+          "samples": {}
+        }
+      ]
+    }
+  },
+  "candidateCompletedSamples": 0,
+  "candidateFailedSamples": 0,
+  "registeredCompletedSamples": 876,
+  "nativeCpuSamples": 528,
+  "nativeCpuEndpoints": 47872,
+  "browserSamples": 348,
+  "nativeClockPidTid": 719575,
+  "nativeCpuLastCounterNs": "107865979967",
+  "sampleMetricMaxAbsError": 0.0,
+  "stockTimedUsefulCalls": 2816000,
+  "stockUntimedWarmupUsefulCalls": 704000,
+  "pilotRecomputedCells": [
+    {
+      "id": "scalar-live-100:operationNs",
+      "left": [
+        219216.125,
+        204932.625,
+        240963.5,
+        246611.75,
+        184716.0,
+        173530.75,
+        196644.875,
+        168562.0
+      ],
+      "right": [
+        203620.25,
+        207596.125,
+        230510.625,
+        204381.625,
+        169776.5,
+        405512.25,
+        174349.625,
+        206736.5
+      ],
+      "blockLogContrasts": [
+        0.030444078518216067,
+        0.11608739674961654,
+        -0.38222981068628936,
+        -0.04190229307471416
+      ],
+      "logContrastSd": 0.21832165010077154,
+      "requiredRuns": 608
+    },
+    {
+      "id": "scalar-live-100:meanFrameNs",
+      "left": [
+        74044.0625,
+        55402.770833333336,
+        60827.3125,
+        80012.35416666666,
+        62240.87499999999,
+        62348.458333333336,
+        56257.27083333334,
+        79634.64583333334
+      ],
+      "right": [
+        85333.47916666667,
+        69828.85416666667,
+        57394.5625,
+        59058.35416666666,
+        82593.25,
+        57348.979166666664,
+        57711.625,
+        59913.5
+      ],
+      "blockLogContrasts": [
+        -0.1866621049427284,
+        0.18087218951412432,
+        -0.09966605867618838,
+        0.12951202879887447
+      ],
+      "logContrastSd": 0.17712472608783167,
+      "requiredRuns": 400
+    },
+    {
+      "id": "scalar-live-100:cancelDrainNs",
+      "left": [
+        23232.0,
+        32659.875,
+        21682.125,
+        18229.625,
+        15427.875,
+        11751.25,
+        10840.0,
+        14004.5
+      ],
+      "right": [
+        27834.0,
+        24591.75,
+        12329.75,
+        18023.0,
+        16622.375,
+        14598.25,
+        11009.875,
+        22771.5
+      ],
+      "blockLogContrasts": [
+        0.05150429151553482,
+        0.28793622256646234,
+        -0.14575789089149271,
+        -0.2508403244313113
+      ],
+      "logContrastSd": 0.23728284158047827,
+      "requiredRuns": 718
+    },
+    {
+      "id": "transform-fresh-1000:operationNs",
+      "left": [
+        1010181.375,
+        1085354.625,
+        1289678.625,
+        1067818.5,
+        1415795.375,
+        1162043.625,
+        1199386.75,
+        1071511.25
+      ],
+      "right": [
+        1031388.125,
+        1094890.375,
+        1048922.25,
+        1909475.875,
+        1062187.75,
+        1271736.875,
+        1044317.5,
+        1481069.875
+      ],
+      "blockLogContrasts": [
+        -0.014761581172821003,
+        -0.18729058008042898,
+        0.09857869794402685,
+        -0.09262392872686309
+      ],
+      "logContrastSd": 0.12107720778616901,
+      "requiredRuns": 188
+    },
+    {
+      "id": "transform-fresh-1000:meanFrameNs",
+      "left": [
+        584088.0625,
+        602270.7291666667,
+        697280.4375,
+        606693.6041666667,
+        582822.3125,
+        623181.875,
+        579059.7083333333,
+        601258.3333333333
+      ],
+      "right": [
+        569698.5625,
+        632999.1041666666,
+        611296.5,
+        606646.4375,
+        573275.0,
+        678456.8541666666,
+        580112.375,
+        595976.4166666666
+      ],
+      "blockLogContrasts": [
+        -0.012408783148572411,
+        0.0658416572508882,
+        -0.0342328250195143,
+        0.003503672545138059
+      ],
+      "logContrastSd": 0.04298991748054509,
+      "requiredRuns": 24
+    },
+    {
+      "id": "transform-fresh-1000:cancelDrainNs",
+      "left": [
+        286327.5,
+        290209.375,
+        329809.5,
+        387880.75,
+        292370.25,
+        272744.5,
+        282285.125,
+        291314.625
+      ],
+      "right": [
+        271458.875,
+        296832.625,
+        259506.125,
+        287093.5,
+        281259.75,
+        324426.625,
+        260931.75,
+        326835.875
+      ],
+      "blockLogContrasts": [
+        0.015379911727109175,
+        0.27031245499173284,
+        -0.06739078751005234,
+        -0.018197751039404686
+      ],
+      "logContrastSd": 0.15074001446253718,
+      "requiredRuns": 290
+    },
+    {
+      "id": "motion-value-default-stock-c:operationNs",
+      "left": [
+        6327.8235,
+        6510.2665,
+        6913.767437500001,
+        6242.8824374999995,
+        6098.2415,
+        6338.0616875000005,
+        6094.386875,
+        6237.020187499999
+      ],
+      "right": [
+        6092.024375,
+        6986.6921875,
+        6369.9531875,
+        6129.520750000001,
+        6070.468,
+        6298.9127499999995,
+        6104.5866875,
+        6490.2686875
+      ],
+      "blockLogContrasts": [
+        -0.01632546458655426,
+        0.05012401140591205,
+        0.005380351689657559,
+        -0.020736818655616496
+      ],
+      "logContrastSd": 0.03241848016341594,
+      "requiredRuns": 14
+    },
+    {
+      "id": "s2:startMs",
+      "left": [
+        0.2181835938245058,
+        0.2990039062569849,
+        0.2420312500325963,
+        0.25613281258847564,
+        0.27363281248835847,
+        0.27349609369412065,
+        0.2190820312825963,
+        0.22962890611961484
+      ],
+      "right": [
+        0.2229101561824791,
+        0.27509765629656613,
+        0.2654882813221775,
+        0.21669921872671694,
+        0.3223437499254942,
+        0.26216796872904524,
+        0.2719140624976717,
+        0.24466796882916242
+      ],
+      "blockLogContrasts": [
+        0.03094928396866714,
+        0.03734097726700558,
+        -0.06076473824384343,
+        -0.13973867289692465
+      ],
+      "logContrastSd": 0.08406619936357286,
+      "requiredRuns": 92
+    },
+    {
+      "id": "s2:cancelMs",
+      "left": [
+        0.050019531219732016,
+        0.02132812497438863,
+        0.049355468654539436,
+        0.0336523437872529,
+        0.017675781156867743,
+        0.06742187502095476,
+        0.07292968744877726,
+        0.019296875107102096
+      ],
+      "right": [
+        0.023984374944120646,
+        0.06773437501396984,
+        0.05552734370576218,
+        0.025117187527939677,
+        0.01822265627561137,
+        0.021933593787252903,
+        0.02033203112659976,
+        0.04814453120343387
+      ],
+      "blockLogContrasts": [
+        -0.21027810189275775,
+        0.08735166316236054,
+        0.5462399161277156,
+        0.1815169393210585
+      ],
+      "logContrastSd": 0.3118325833828246,
+      "requiredRuns": 1240
+    },
+    {
+      "id": "s3:startMs",
+      "left": [
+        0.2940039062523283,
+        0.43249999987892807,
+        0.3006640624371357,
+        0.29300781240453944,
+        0.37222656258381903,
+        0.24322265631053597,
+        0.3462890625814907,
+        0.2527929688221775
+      ],
+      "right": [
+        0.38824218756053597,
+        0.4254101562546566,
+        0.42210937512572855,
+        0.3543359375325963,
+        0.2758203124976717,
+        0.2627734376001172,
+        0.3629882813547738,
+        0.23888671869644895
+      ],
+      "blockLogContrasts": [
+        -0.13075386840208203,
+        -0.2646585302198661,
+        0.11121909703447619,
+        0.00474235287417446
+      ],
+      "logContrastSd": 0.16330919650773465,
+      "requiredRuns": 340
+    },
+    {
+      "id": "s3:cancelMs",
+      "left": [
+        0.08269531244877726,
+        0.07527343748370185,
+        0.12320312514202669,
+        0.0874609375023283,
+        0.08787109371041879,
+        0.08341796864988282,
+        0.08671875001164153,
+        0.08357421885011718
+      ],
+      "right": [
+        0.0684179687523283,
+        0.07855468755587935,
+        0.0750585938221775,
+        0.06376953126164153,
+        0.0897656250745058,
+        0.07712890615221113,
+        0.08156249992316589,
+        0.08339843747671694
+      ],
+      "blockLogContrasts": [
+        0.07342985277886482,
+        0.405741056500744,
+        0.028527199107284407,
+        0.031703019305668434
+      ],
+      "logContrastSd": 0.18174912800567172,
+      "requiredRuns": 422
+    }
+  ],
+  "pilotSdMaxAbsDifferencePythonVsRecordedJs": 3.608224830031759e-16,
+  "independentPlan": {
+    "runs": 1024,
+    "requiredRuns": 1240,
+    "feasible": false,
+    "minimumBlocks": 146,
+    "alphaPerTail": 0.0005681818181818182
+  },
+  "resources": [
+    {
+      "stage": "warmup",
+      "block": 0,
+      "nrThrottled": 0,
+      "throttledUsec": 0,
+      "before": "2026-10-02T04:20:52.602Z",
+      "after": "2026-10-02T04:21:15.347Z"
+    },
+    {
+      "stage": "warmup",
+      "block": 1,
+      "nrThrottled": 0,
+      "throttledUsec": 0,
+      "before": "2026-10-02T04:21:15.347Z",
+      "after": "2026-10-02T04:21:37.590Z"
+    },
+    {
+      "stage": "pilot",
+      "block": 0,
+      "nrThrottled": 0,
+      "throttledUsec": 0,
+      "before": "2026-10-02T04:21:38.872Z",
+      "after": "2026-10-02T04:22:01.141Z"
+    },
+    {
+      "stage": "pilot",
+      "block": 1,
+      "nrThrottled": 0,
+      "throttledUsec": 0,
+      "before": "2026-10-02T04:22:01.141Z",
+      "after": "2026-10-02T04:22:23.526Z"
+    },
+    {
+      "stage": "pilot",
+      "block": 2,
+      "nrThrottled": 0,
+      "throttledUsec": 0,
+      "before": "2026-10-02T04:22:23.526Z",
+      "after": "2026-10-02T04:22:45.825Z"
+    },
+    {
+      "stage": "pilot",
+      "block": 3,
+      "nrThrottled": 0,
+      "throttledUsec": 0,
+      "before": "2026-10-02T04:22:45.825Z",
+      "after": "2026-10-02T04:23:08.037Z"
+    },
+    {
+      "stage": "aa",
+      "block": 0,
+      "nrThrottled": 0,
+      "throttledUsec": 0,
+      "before": "2026-10-02T04:23:09.415Z",
+      "after": "2026-10-02T04:23:31.706Z"
+    },
+    {
+      "stage": "aa",
+      "block": 1,
+      "nrThrottled": 0,
+      "throttledUsec": 0,
+      "before": "2026-10-02T04:23:31.706Z",
+      "after": "2026-10-02T04:23:54.003Z"
+    },
+    {
+      "stage": "aa",
+      "block": 2,
+      "nrThrottled": 0,
+      "throttledUsec": 0,
+      "before": "2026-10-02T04:23:54.003Z",
+      "after": "2026-10-02T04:24:16.452Z"
+    },
+    {
+      "stage": "aa",
+      "block": 3,
+      "nrThrottled": 0,
+      "throttledUsec": 0,
+      "before": "2026-10-02T04:24:16.452Z",
+      "after": "2026-10-02T04:24:38.854Z"
+    },
+    {
+      "stage": "aa",
+      "block": 4,
+      "nrThrottled": 0,
+      "throttledUsec": 0,
+      "before": "2026-10-02T04:24:38.854Z",
+      "after": "2026-10-02T04:25:01.145Z"
+    },
+    {
+      "stage": "aa",
+      "block": 5,
+      "nrThrottled": 0,
+      "throttledUsec": 0,
+      "before": "2026-10-02T04:25:01.145Z",
+      "after": "2026-10-02T04:25:23.397Z"
+    },
+    {
+      "stage": "aa",
+      "block": 6,
+      "nrThrottled": 0,
+      "throttledUsec": 0,
+      "before": "2026-10-02T04:25:23.397Z",
+      "after": "2026-10-02T04:25:45.416Z"
+    },
+    {
+      "stage": "aa",
+      "block": 7,
+      "nrThrottled": 0,
+      "throttledUsec": 0,
+      "before": "2026-10-02T04:25:45.416Z",
+      "after": "2026-10-02T04:26:07.649Z"
+    },
+    {
+      "stage": "aa",
+      "block": 8,
+      "nrThrottled": 0,
+      "throttledUsec": 0,
+      "before": "2026-10-02T04:26:07.649Z",
+      "after": "2026-10-02T04:26:29.900Z"
+    },
+    {
+      "stage": "aa",
+      "block": 9,
+      "nrThrottled": 0,
+      "throttledUsec": 0,
+      "before": "2026-10-02T04:26:29.900Z",
+      "after": "2026-10-02T04:26:52.037Z"
+    },
+    {
+      "stage": "aa",
+      "block": 10,
+      "nrThrottled": 0,
+      "throttledUsec": 0,
+      "before": "2026-10-02T04:26:52.037Z",
+      "after": "2026-10-02T04:27:14.059Z"
+    },
+    {
+      "stage": "aa",
+      "block": 11,
+      "nrThrottled": 0,
+      "throttledUsec": 0,
+      "before": "2026-10-02T04:27:14.059Z",
+      "after": "2026-10-02T04:27:36.296Z"
+    },
+    {
+      "stage": "aa",
+      "block": 12,
+      "nrThrottled": 0,
+      "throttledUsec": 0,
+      "before": "2026-10-02T04:27:36.296Z",
+      "after": "2026-10-02T04:27:58.579Z"
+    },
+    {
+      "stage": "aa",
+      "block": 13,
+      "nrThrottled": 0,
+      "throttledUsec": 0,
+      "before": "2026-10-02T04:27:58.579Z",
+      "after": "2026-10-02T04:28:20.876Z"
+    },
+    {
+      "stage": "aa",
+      "block": 14,
+      "nrThrottled": 0,
+      "throttledUsec": 0,
+      "before": "2026-10-02T04:28:20.876Z",
+      "after": "2026-10-02T04:28:43.023Z"
+    },
+    {
+      "stage": "aa",
+      "block": 15,
+      "nrThrottled": 0,
+      "throttledUsec": 0,
+      "before": "2026-10-02T04:28:43.023Z",
+      "after": "2026-10-02T04:29:05.592Z"
+    },
+    {
+      "stage": "aa",
+      "block": 16,
+      "nrThrottled": 0,
+      "throttledUsec": 0,
+      "before": "2026-10-02T04:29:05.592Z",
+      "after": "2026-10-02T04:29:27.872Z"
+    },
+    {
+      "stage": "aa",
+      "block": 17,
+      "nrThrottled": 0,
+      "throttledUsec": 0,
+      "before": "2026-10-02T04:29:27.872Z",
+      "after": "2026-10-02T04:29:49.888Z"
+    },
+    {
+      "stage": "aa",
+      "block": 18,
+      "nrThrottled": 0,
+      "throttledUsec": 0,
+      "before": "2026-10-02T04:29:49.888Z",
+      "after": "2026-10-02T04:30:12.024Z"
+    },
+    {
+      "stage": "aa",
+      "block": 19,
+      "nrThrottled": 0,
+      "throttledUsec": 0,
+      "before": "2026-10-02T04:30:12.024Z",
+      "after": "2026-10-02T04:30:34.620Z"
+    },
+    {
+      "stage": "aa",
+      "block": 20,
+      "nrThrottled": 0,
+      "throttledUsec": 0,
+      "before": "2026-10-02T04:30:34.620Z",
+      "after": "2026-10-02T04:30:56.801Z"
+    },
+    {
+      "stage": "aa",
+      "block": 21,
+      "nrThrottled": 0,
+      "throttledUsec": 0,
+      "before": "2026-10-02T04:30:56.801Z",
+      "after": "2026-10-02T04:31:19.115Z"
+    },
+    {
+      "stage": "aa",
+      "block": 22,
+      "nrThrottled": 0,
+      "throttledUsec": 0,
+      "before": "2026-10-02T04:31:19.115Z",
+      "after": "2026-10-02T04:31:41.673Z"
+    },
+    {
+      "stage": "aa",
+      "block": 23,
+      "nrThrottled": 0,
+      "throttledUsec": 0,
+      "before": "2026-10-02T04:31:41.674Z",
+      "after": "2026-10-02T04:32:03.936Z"
+    },
+    {
+      "stage": "aa",
+      "block": 24,
+      "nrThrottled": 0,
+      "throttledUsec": 0,
+      "before": "2026-10-02T04:32:03.936Z",
+      "after": "2026-10-02T04:32:26.090Z"
+    },
+    {
+      "stage": "aa",
+      "block": 25,
+      "nrThrottled": 0,
+      "throttledUsec": 0,
+      "before": "2026-10-02T04:32:26.091Z",
+      "after": "2026-10-02T04:32:48.290Z"
+    },
+    {
+      "stage": "aa",
+      "block": 26,
+      "nrThrottled": 0,
+      "throttledUsec": 0,
+      "before": "2026-10-02T04:32:48.290Z",
+      "after": "2026-10-02T04:33:10.734Z"
+    },
+    {
+      "stage": "aa",
+      "block": 27,
+      "nrThrottled": 0,
+      "throttledUsec": 0,
+      "before": "2026-10-02T04:33:10.734Z",
+      "after": "2026-10-02T04:33:33.069Z"
+    },
+    {
+      "stage": "aa",
+      "block": 28,
+      "nrThrottled": 0,
+      "throttledUsec": 0,
+      "before": "2026-10-02T04:33:33.069Z",
+      "after": "2026-10-02T04:33:55.280Z"
+    },
+    {
+      "stage": "aa",
+      "block": 29,
+      "nrThrottled": 0,
+      "throttledUsec": 0,
+      "before": "2026-10-02T04:33:55.280Z",
+      "after": "2026-10-02T04:34:17.312Z"
+    },
+    {
+      "stage": "aa",
+      "block": 30,
+      "nrThrottled": 0,
+      "throttledUsec": 0,
+      "before": "2026-10-02T04:34:17.313Z",
+      "after": "2026-10-02T04:34:39.537Z"
+    },
+    {
+      "stage": "aa",
+      "block": 31,
+      "nrThrottled": 0,
+      "throttledUsec": 0,
+      "before": "2026-10-02T04:34:39.537Z",
+      "after": "2026-10-02T04:35:02.201Z"
+    },
+    {
+      "stage": "aa",
+      "block": 32,
+      "nrThrottled": 0,
+      "throttledUsec": 0,
+      "before": "2026-10-02T04:35:02.202Z",
+      "after": "2026-10-02T04:35:24.556Z"
+    },
+    {
+      "stage": "aa",
+      "block": 33,
+      "nrThrottled": 0,
+      "throttledUsec": 0,
+      "before": "2026-10-02T04:35:24.556Z",
+      "after": "2026-10-02T04:35:47.008Z"
+    },
+    {
+      "stage": "aa",
+      "block": 34,
+      "nrThrottled": 0,
+      "throttledUsec": 0,
+      "before": "2026-10-02T04:35:47.008Z",
+      "after": "2026-10-02T04:36:09.155Z"
+    },
+    {
+      "stage": "aa",
+      "block": 35,
+      "nrThrottled": 0,
+      "throttledUsec": 0,
+      "before": "2026-10-02T04:36:09.156Z",
+      "after": "2026-10-02T04:36:31.181Z"
+    },
+    {
+      "stage": "aa",
+      "block": 36,
+      "nrThrottled": 0,
+      "throttledUsec": 0,
+      "before": "2026-10-02T04:36:31.181Z",
+      "after": "2026-10-02T04:36:53.522Z"
+    }
+  ],
+  "resourceThrottledBlocks": 0,
+  "failedSample": {
+    "index": 922,
+    "stage": "aa",
+    "kind": "browser",
+    "scene": "s2",
+    "run": 75,
+    "participant": "right",
+    "build": "baseline",
+    "partial": {
+      "partial": [],
+      "scene": {
+        "id": "s2",
+        "targetsPerCall": 100,
+        "staggerGapMs": 0
+      },
+      "workMultiplier": 1
+    },
+    "timerEvidence": null,
+    "error": {
+      "name": "AggregateError",
+      "message": "server profile: browser sample не завершён",
+      "errors": [
+        {
+          "name": "Error",
+          "message": "browserContext.newPage: Target page, context or browser has been closed\nBrowser logs:\n\n<launching> /home/agent/.cache/ms-playwright/chromium-1228/chrome-linux64/chrome --disable-field-trial-config --disable-background-networking --disable-background-timer-throttling --disable-backgrounding-occluded-windows --disable-back-forward-cache --disable-breakpad --disable-client-side-phishing-detection --disable-component-extensions-with-background-pages --disable-component-update --no-default-browser-check --disable-default-apps --disable-dev-shm-usage --disable-edgeupdater --disable-extensions --disable-features=AvoidUnnecessaryBeforeUnloadCheckSync,BoundaryEventDispatchTracksNodeRemoval,DestroyProfileOnBrowserClose,DialMediaRouteProvider,GlobalMediaControls,HttpsUpgrades,LensOverlay,MediaRouter,PaintHolding,ThirdPartyStoragePartitioning,Translate,AutoDeElevate,RenderDocument,OptimizationHints,msForceBrowserSignIn,msEdgeUpdateLaunchServicesPreferredVersion --enable-features=CDPScreenshotNewSurface --allow-pre-commit-input --disable-hang-monitor --disable-ipc-flooding-protection --disable-popup-blocking --disable-prompt-on-repost --disable-renderer-backgrounding --force-color-profile=srgb --metrics-recording-only --no-first-run --password-store=basic --use-mock-keychain --no-service-autorun --export-tagged-pdf --disable-search-engine-choice-screen --unsafely-disable-devtools-self-xss-warnings --edge-skip-compat-layer-relaunch --disable-infobars --disable-search-engine-choice-screen --disable-sync --enable-unsafe-swiftshader --headless --hide-scrollbars --mute-audio --blink-settings=primaryHoverType=2,availableHoverTypes=2,primaryPointerType=4,availablePointerTypes=4 --no-sandbox --user-data-dir=/tmp/playwright_chromiumdev_profile-1Ty4CB --remote-debugging-pipe --no-startup-window\n<launched> pid=719896\n[pid=719896][err] [719896:719910:1002/042050.490821:ERROR:dbus/bus.cc:405] Failed to connect to the bus: Failed to connect to socket /run/dbus/system_bus_socket: No such file or directory\n[pid=719896][err] [719896:719910:1002/042050.490866:ERROR:dbus/bus.cc:405] Failed to connect to the bus: Could not parse server address: Unknown address type (examples of valid types are \"tcp\" and on UNIX \"unix\")\n[pid=719896][err] [719896:719910:1002/042050.492085:ERROR:dbus/bus.cc:405] Failed to connect to the bus: Failed to connect to socket /run/dbus/system_bus_socket: No such file or directory\n[pid=719896][err] [719896:719910:1002/042050.492195:ERROR:dbus/bus.cc:405] Failed to connect to the bus: Failed to connect to socket /run/dbus/system_bus_socket: No such file or directory\n[pid=719896][err] [719896:719910:1002/042050.492204:ERROR:dbus/bus.cc:405] Failed to connect to the bus: Could not parse server address: Unknown address type (examples of valid types are \"tcp\" and on UNIX \"unix\")\n[pid=719896][err] [719896:719910:1002/042050.583373:ERROR:dbus/bus.cc:405] Failed to connect to the bus: Could not parse server address: Unknown address type (examples of valid types are \"tcp\" and on UNIX \"unix\")\n[pid=719896][err] [719896:719896:1002/042050.585199:ERROR:dbus/object_proxy.cc:572] Failed to call method: org.freedesktop.DBus.NameHasOwner: object_path= /org/freedesktop/DBus: unknown error type: \n[pid=719896][err] [719896:719896:1002/042050.585261:ERROR:dbus/object_proxy.cc:572] Failed to call method: org.freedesktop.DBus.NameHasOwner: object_path= /org/freedesktop/DBus: unknown error type: \n[pid=719896][err] [719896:719910:1002/042050.587204:ERROR:dbus/bus.cc:405] Failed to connect to the bus: Could not parse server address: Unknown address type (examples of valid types are \"tcp\" and on UNIX \"unix\")\n[pid=719896][err] [719896:719910:1002/042050.587216:ERROR:dbus/bus.cc:405] Failed to connect to the bus: Could not parse server address: Unknown address type (examples of valid types are \"tcp\" and on UNIX \"unix\")\n[pid=719896][err] [719896:719896:1002/042050.606899:ERROR:dbus/object_proxy.cc:572] Failed to call method: org.freedesktop.DBus.NameHasOwner: object_path= /org/freedesktop/DBus: unknown error type: \n[pid=719896][err] [719896:719910:1002/042050.608782:ERROR:dbus/bus.cc:405] Failed to connect to the bus: Failed to connect to socket /run/dbus/system_bus_socket: No such file or directory\n[pid=719896][err] [719896:719910:1002/042050.609231:ERROR:dbus/bus.cc:405] Failed to connect to the bus: Failed to connect to socket /run/dbus/system_bus_socket: No such file or directory\n[pid=719896][err] [719896:719896:1002/042050.609649:ERROR:dbus/object_proxy.cc:572] Failed to call method: org.freedesktop.DBus.NameHasOwner: object_path= /org/freedesktop/DBus: unknown error type: \n[pid=719896][err] [719896:719896:1002/042050.610181:ERROR:dbus/object_proxy.cc:572] Failed to call method: org.freedesktop.DBus.NameHasOwner: object_path= /org/freedesktop/DBus: unknown error type: \n[pid=719896][err] [719896:719910:1002/042050.610505:ERROR:dbus/bus.cc:405] Failed to connect to the bus: Could not parse server address: Unknown address type (examples of valid types are \"tcp\" and on UNIX \"unix\")\n[pid=719896][err] [719896:719896:1002/042050.620600:ERROR:dbus/object_proxy.cc:572] Failed to call method: org.freedesktop.DBus.Properties.GetAll: object_path= /org/freedesktop/UPower/devices/DisplayDevice: unknown error type: \n[pid=719896][err] [719896:719896:1002/042050.620636:ERROR:dbus/object_proxy.cc:572] Failed to call method: org.freedesktop.DBus.NameHasOwner: object_path= /org/freedesktop/DBus: unknown error type: \n[pid=719896][err] [719896:719910:1002/042050.620887:ERROR:dbus/bus.cc:405] Failed to connect to the bus: Could not parse server address: Unknown address type (examples of valid types are \"tcp\" and on UNIX \"unix\")\n[pid=719896][err] [719896:719896:1002/042050.624465:ERROR:dbus/object_proxy.cc:572] Failed to call method: org.freedesktop.DBus.NameHasOwner: object_path= /org/freedesktop/DBus: unknown error type: \n[pid=719896][err] [719896:719910:1002/042050.625026:ERROR:dbus/bus.cc:405] Failed to connect to the bus: Could not parse server address: Unknown address type (examples of valid types are \"tcp\" and on UNIX \"unix\")\n[pid=719896][err] [719896:719896:1002/042050.627728:ERROR:dbus/object_proxy.cc:572] Failed to call method: org.freedesktop.DBus.NameHasOwner: object_path= /org/freedesktop/DBus: unknown error type: \n[pid=719896][err] [719896:719911:1002/042059.097886:ERROR:google_apis/gcm/engine/connection_handler_impl.cc:404] Received message of invalid type 84\n[pid=719896][err] [719896:719911:1002/042059.097904:ERROR:google_apis/gcm/engine/connection_factory_impl.cc:484] ConnectionHandler failed with net error: -4\n[pid=719896][err] [719896:719911:1002/042059.145676:ERROR:google_apis/gcm/engine/registration_request.cc:291] Registration response error message: PHONE_REGISTRATION_ERROR\n[pid=719896][err] [719896:719911:1002/042059.180954:ERROR:google_apis/gcm/engine/registration_request.cc:291] Registration response error message: PHONE_REGISTRATION_ERROR\n[pid=719896][err] [719896:719911:1002/042059.196410:ERROR:google_apis/gcm/engine/registration_request.cc:291] Registration response error message: PHONE_REGISTRATION_ERROR\n[pid=719896][err] [719896:719911:1002/042120.895222:ERROR:google_apis/gcm/engine/registration_request.cc:291] Registration response error message: DEPRECATED_ENDPOINT\n[pid=719896][err] [719896:719911:1002/042122.505456:ERROR:google_apis/gcm/engine/connection_handler_impl.cc:404] Received message of invalid type 84\n[pid=719896][err] [719896:719911:1002/042122.505621:ERROR:google_apis/gcm/engine/connection_factory_impl.cc:484] ConnectionHandler failed with net error: -4\n[pid=719896][err] [719896:719911:1002/042212.283703:ERROR:google_apis/gcm/engine/registration_request.cc:291] Registration response error message: DEPRECATED_ENDPOINT\n[pid=719896][err] [719896:719911:1002/042219.852183:ERROR:google_apis/gcm/engine/connection_handler_impl.cc:404] Received message of invalid type 84\n[pid=719896][err] [719896:719911:1002/042219.852199:ERROR:google_apis/gcm/engine/connection_factory_impl.cc:484] ConnectionHandler failed with net error: -4\n[pid=719896][err] [719896:719896:1002/042253.382203:ERROR:chrome/browser/ui/views/user_education/impl/browser_user_education_interface_impl.cc:186] Attempting to show IPH IPH_ExtensionsZeroStatePromo before browser initialization complete; IPH will not be shown.\n[pid=719896][err] [719896:719911:1002/042340.996829:ERROR:google_apis/gcm/engine/connection_handler_impl.cc:404] Received message of invalid type 84\n[pid=719896][err] [719896:719911:1002/042340.997074:ERROR:google_apis/gcm/engine/connection_factory_impl.cc:484] ConnectionHandler failed with net error: -4\n[pid=719896][err] [719896:719911:1002/042343.252702:ERROR:google_apis/gcm/engine/registration_request.cc:291] Registration response error message: DEPRECATED_ENDPOINT\n[pid=719896][err] [719896:719896:1002/042453.811245:ERROR:chrome/browser/ui/views/user_education/impl/browser_user_education_interface_impl.cc:186] Attempting to show IPH IPH_ExtensionsZeroStatePromo before browser initialization complete; IPH will not be shown.\n[pid=719896][err] [719896:719911:1002/042625.242818:ERROR:google_apis/gcm/engine/connection_handler_impl.cc:404] Received message of invalid type 84\n[pid=719896][err] [719896:719911:1002/042625.242844:ERROR:google_apis/gcm/engine/connection_factory_impl.cc:484] ConnectionHandler failed with net error: -4\n[pid=719896][err] [719896:719911:1002/042652.336159:ERROR:google_apis/gcm/engine/registration_request.cc:291] Registration response error message: DEPRECATED_ENDPOINT\n[pid=719896][err] [719896:719896:1002/042654.466460:ERROR:chrome/browser/ui/views/user_education/impl/browser_user_education_interface_impl.cc:186] Attempting to show IPH IPH_ExtensionsZeroStatePromo before browser initialization complete; IPH will not be shown.\n[pid=719896][err] [719896:719896:1002/042855.540920:ERROR:chrome/browser/ui/views/user_education/impl/browser_user_education_interface_impl.cc:186] Attempting to show IPH IPH_ExtensionsZeroStatePromo before browser initialization complete; IPH will not be shown.\n[pid=719896][err] [719896:719896:1002/043057.851492:ERROR:chrome/browser/ui/views/user_education/impl/browser_user_education_interface_impl.cc:186] Attempting to show IPH IPH_ExtensionsZeroStatePromo before browser initialization complete; IPH will not be shown.\n[pid=719896][err] [719896:719911:1002/043208.456308:ERROR:google_apis/gcm/engine/connection_handler_impl.cc:404] Received message of invalid type 84\n[pid=719896][err] [719896:719911:1002/043208.456521:ERROR:google_apis/gcm/engine/connection_factory_impl.cc:484] ConnectionHandler failed with net error: -4\n[pid=719896][err] [719896:719911:1002/043259.660106:ERROR:google_apis/gcm/engine/registration_request.cc:291] Registration response error message: DEPRECATED_ENDPOINT\n[pid=719896][err] [719896:719896:1002/043300.669765:ERROR:chrome/browser/ui/views/user_education/impl/browser_user_education_interface_impl.cc:186] Attempting to show IPH IPH_ExtensionsZeroStatePromo before browser initialization complete; IPH will not be shown.\n[pid=719896][err] [719896:719896:1002/043503.318153:ERROR:chrome/browser/ui/views/user_education/impl/browser_user_education_interface_impl.cc:186] Attempting to show IPH IPH_ExtensionsZeroStatePromo before browser initialization complete; IPH will not be shown.\n[pid=719896][err] [719896:719896:1002/043705.594597:ERROR:chrome/browser/ui/views/user_education/impl/browser_user_education_interface_impl.cc:186] Attempting to show IPH IPH_ExtensionsZeroStatePromo before browser initialization complete; IPH will not be shown."
+        }
+      ],
+      "raw": {
+        "partial": [],
+        "scene": {
+          "id": "s2",
+          "targetsPerCall": 100,
+          "staggerGapMs": 0
+        },
+        "workMultiplier": 1
+      }
+    }
+  },
+  "chronology": {
+    "predataCreated": "2026-10-02T03:40:32.995Z",
+    "grant": "2026-10-02T04:18:42.959163+00:00",
+    "actualStart": "2026-10-02T04:20:13.960249+00:00",
+    "registration": "2026-10-02T04:20:50.631Z",
+    "stopBeforeSignal": "2026-10-02T04:37:05.552368+00:00",
+    "signal": "2026-10-02T04:37:05.552880+00:00",
+    "failure": "2026-10-02T04:37:05.640Z",
+    "finished": "2026-10-02T04:37:07.436Z",
+    "actualEnd": "2026-10-02T04:37:07.905350+00:00"
+  },
+  "disposition": "UNPROVEN: infeasible registered N and operator-interrupted incomplete baseline-only AA",
+  "canonicalRerun": false,
+  "SutExecutions": 0,
+  "heavy": 0,
+  "queued": 0
+}
