@@ -1,0 +1,57 @@
+{
+  "schema": 1,
+  "axis": "documentation factual/authority correctness of +27 durable-anchor lines only",
+  "sourceHead": "84a0f547156656a70cf73f29b9a2930b5a1997fa",
+  "sourceParent": "85a837e83912ec6b3144b385d938b66a0c63adcf",
+  "providerCommit": "eaf0f9509c9d48aaec367ca108c79622b247250e",
+  "providerTree": "97ff31635b960a8561e370e02d59f73d6307f255",
+  "outputs": [
+    {
+      "path": "/tmp/r12-durable-links-doc-correctness-84a0-20261001/REPORT-RU.md",
+      "name": "REPORT-RU.md",
+      "bytes": 4111,
+      "sha256": "917c0539cef596a77179344bca8cee0231da60be89786fa396e3f4238f0b9ce0"
+    },
+    {
+      "path": "/tmp/r12-durable-links-doc-correctness-84a0-20261001/anchor-checks.json",
+      "name": "anchor-checks.json",
+      "bytes": 3780,
+      "sha256": "5c6d44eb77c7106bcf2af792a2bc86a81c89203938b4e35442726b32330780e9"
+    },
+    {
+      "path": "/tmp/r12-durable-links-doc-correctness-84a0-20261001/check-durable-links.py",
+      "name": "check-durable-links.py",
+      "bytes": 12449,
+      "sha256": "12ddd3721412189d1253f775c6f58464d9c699d571e25d1bdba28766472d0114"
+    },
+    {
+      "path": "/tmp/r12-durable-links-doc-correctness-84a0-20261001/commands.jsonl",
+      "name": "commands.jsonl",
+      "bytes": 5365,
+      "sha256": "c125ad26617ec552b77dae5ccd1e2eaca4d0bfffad2194a7f5dde2d93b6a06ca"
+    },
+    {
+      "path": "/tmp/r12-durable-links-doc-correctness-84a0-20261001/readset.json",
+      "name": "readset.json",
+      "bytes": 6437,
+      "sha256": "6520aad35bd89da97fb72930e351060740a466667181e116fd82b0c051718f29"
+    },
+    {
+      "path": "/tmp/r12-durable-links-doc-correctness-84a0-20261001/start-metadata.json",
+      "name": "start-metadata.json",
+      "bytes": 469,
+      "sha256": "3d6ba6c2109a30aeeeb92189af8e2d389dbbb273d1f4146fa308019691a1b84b"
+    },
+    {
+      "path": "/tmp/r12-durable-links-doc-correctness-84a0-20261001/summary.json",
+      "name": "summary.json",
+      "bytes": 2982,
+      "sha256": "70c5aa5a02fb0a912444d2fb5408bb812f089e4eb4f67042eddf577ee9454b56"
+    }
+  ],
+  "actualRegisteredSamples": 0,
+  "heavywork": 0,
+  "newPayloadFetchOrDecode": false,
+  "sourceOrRemoteMutations": false,
+  "processes": "END"
+}

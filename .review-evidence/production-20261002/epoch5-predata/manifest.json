@@ -1,0 +1,52 @@
+{
+  "sealedAt": "2026-10-01T22:21:34.540865+00:00",
+  "head": "185f02c2a85972a531627e14b7e0207e27855f95",
+  "protocolDigest": "7016c19aa7a763fee68687327ef489abb119acd2a43d397b8485ca56e4cea15f",
+  "clockModelDigest": "7e45adab88a2c97af4e9074543318ae115e42b5c9669c4746b6e149d42bfbc4f",
+  "metadataCaptureEndUtc": "2026-10-01T22:19:18.826482+00:00",
+  "files": {
+    "checks-at-preparation.json": {
+      "path": "/tmp/motion-server-predata-185f02c2-7016c19a-20261001/checks-at-preparation.json",
+      "bytes": 45374,
+      "sha256": "6fad799dc7fe209d3afbf5f0716f1e7f4c095b080ea78be080da08b053939f64"
+    },
+    "execution.json": {
+      "path": "/tmp/motion-server-predata-185f02c2-7016c19a-20261001/execution.json",
+      "bytes": 1793,
+      "sha256": "7c045b723363ada19a551ea3a97972bc5cb56a8c39147577af1927be54cec5e5"
+    },
+    "predata-tuple.sha256": {
+      "path": "/tmp/motion-server-predata-185f02c2-7016c19a-20261001/predata-tuple.sha256",
+      "bytes": 85,
+      "sha256": "e18570a648bf17c5bbead23de206b2775505fb5d2db24e47334462e9ef99da4c"
+    },
+    "predata-tuple.json": {
+      "path": "/tmp/motion-server-predata-185f02c2-7016c19a-20261001/predata-tuple.json",
+      "bytes": 38509,
+      "sha256": "e7472dfbdb3bdca3aa5065543d431f9bb70f6410d0d76e63c5f22ff3050a3691"
+    },
+    "stderr.log": {
+      "path": "/tmp/motion-server-predata-185f02c2-7016c19a-20261001/stderr.log",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    "stdout.log": {
+      "path": "/tmp/motion-server-predata-185f02c2-7016c19a-20261001/stdout.log",
+      "bytes": 365,
+      "sha256": "c6d60c3877ed430f0648afcda03e6bc3059aa660826c936b831f3de89942be5b"
+    },
+    "prepare.mjs": {
+      "path": "/tmp/motion-server-predata-185f02c2-7016c19a-20261001/prepare.mjs",
+      "bytes": 8065,
+      "sha256": "bb9aa8e67d3e840ee2815fdb77b46c1b497e28e2c5a5ea0c58bf2bdd01082f82"
+    }
+  },
+  "immutableChecksCopy": {
+    "path": "/tmp/motion-server-predata-185f02c2-7016c19a-20261001/checks-at-preparation.json",
+    "sha256": "6fad799dc7fe209d3afbf5f0716f1e7f4c095b080ea78be080da08b053939f64"
+  },
+  "plannedOutput": "/tmp/motion-server-series-185f02c2-7016c19a-20261001-epoch5",
+  "outputMustBeAbsent": true,
+  "actualRegisteredSamples": 0,
+  "qualification": "Immutable metadata tuple before anysamples. Existing mutable authorchecks pointer is complemented by exact captured copy for later provenance. Space captured before root duplicatecleanup; fresh resourcebudget/allquiet grant still required."
+}

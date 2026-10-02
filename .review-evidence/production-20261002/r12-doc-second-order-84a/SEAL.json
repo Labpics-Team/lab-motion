@@ -1,0 +1,21 @@
+{
+  "verdict": "PASS_DOC_SECOND_ORDER_SCOPED",
+  "head": "84a0f547156656a70cf73f29b9a2930b5a1997fa",
+  "children": "END",
+  "heavyWork": 0,
+  "REPORT.md": {
+    "path": "/tmp/r12-durable-links-doc-so-84a0f547-20261001/REPORT.md",
+    "bytes": 11466,
+    "sha256": "18066d6f4db7de6f6c97fe9cd81c75bb3010818cc1b9e09d330f7a76f9cb181a"
+  },
+  "MANIFEST.json": {
+    "path": "/tmp/r12-durable-links-doc-so-84a0f547-20261001/MANIFEST.json",
+    "bytes": 8587,
+    "sha256": "03593f93277cf98ded6b43ee36b0cc3f6564d9a9af2de590c23ed5d7bde9f9b5"
+  },
+  "DOC-PRIMARY-READBACK.json": {
+    "path": "/tmp/r12-durable-links-doc-so-84a0f547-20261001/DOC-PRIMARY-READBACK.json",
+    "bytes": 20769,
+    "sha256": "4683783817203d43fe000a8c0f87b1555a86752af3bc9a8cf0c9d03fcf0c53d0"
+  }
+}

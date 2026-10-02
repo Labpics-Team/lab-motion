@@ -1,0 +1,1104 @@
+{
+  "at": "2026-10-01T23:43:47.992517+00:00",
+  "sourceHead": "185f02c2a85972a531627e14b7e0207e27855f95",
+  "registrationDigest": "24c31634618a1d0d55e4e774ac1ac6940c6f826016f5ce95119c1e76efaa7674",
+  "packetSha256": "9d8b010f9ddd38e6bac25004fa156daae0200f71c3a8f18f1412619b8dea8983",
+  "bindings": [
+    {
+      "path": "/tmp/motion-server-series-185f02c2-7016c19a-20261001-epoch6/server-profile.json",
+      "bytes": 86606,
+      "sha256": "672b6740f847404966ae86564f8a809deb45d4fbd74bb65d35bebbcd844416e4"
+    },
+    {
+      "path": "/tmp/motion-server-series-185f02c2-7016c19a-20261001-epoch6/journal.ndjson",
+      "bytes": 177601,
+      "sha256": "78f6f2919ea07a71c470a5e83f9e4105194366af01cd0932cbdf785a3153d29f"
+    },
+    {
+      "path": "/tmp/motion-server-series-185f02c2-7016c19a-20261001-epoch6/server-profile.sha256",
+      "bytes": 86,
+      "sha256": "32b9e09605deb43be9c74553562ef410b589275b0585b7db0dce0d52f81c5af4"
+    },
+    {
+      "path": "/tmp/motion-server-predata-185f02c2-7016c19a-20261001-epoch6/actual-launch.json",
+      "bytes": 1531,
+      "sha256": "d25f4a3772ad86b93ffacd160e44ab544dfaf47b3a33d8f2221b2fd9ad0d6df0"
+    },
+    {
+      "path": "/tmp/motion-server-predata-185f02c2-7016c19a-20261001-epoch6/actual-execution.json",
+      "bytes": 1355,
+      "sha256": "c884dae1d2bada0717426df404d5afff5cc109f653c4782165257eaacaa95868"
+    },
+    {
+      "path": "/tmp/motion-server-predata-185f02c2-7016c19a-20261001-epoch6/actual.stdout.log",
+      "bytes": 51681,
+      "sha256": "312852d3451a939efc2622aab15bb7dfc7e0f3fc462619e5478faa74db07a682"
+    },
+    {
+      "path": "/tmp/motion-server-predata-185f02c2-7016c19a-20261001-epoch6/actual.stderr.log",
+      "bytes": 90,
+      "sha256": "305ccfaef64f47f74b8c6fa6ce2dfe7c01b26160f4bd6f7d24712352b273c08b"
+    },
+    {
+      "path": "/tmp/motion-server-predata-185f02c2-7016c19a-20261001-epoch6/predata-tuple.json",
+      "bytes": 39450,
+      "sha256": "e9687480c8ce7d2028a55275e84a77f9ce195cdbae783170573bf63035c52f31"
+    },
+    {
+      "path": "/tmp/motion-server-predata-185f02c2-7016c19a-20261001-epoch6/first-warmup-cpu-refusal-primary/acquired-clock-readback.json",
+      "bytes": 47604,
+      "sha256": "9459dfddf9a903ab099b4e2492bb515789cd1d5d855a136942ec4665105e93e7"
+    },
+    {
+      "path": "/workspace/lab-motion/bench/profile/server-profile-registration.mjs",
+      "bytes": 16782,
+      "sha256": "1596ca1be9d490bae7c82d13a97c7c6ecb9ba65be959f1a1290b18b92c84337e"
+    },
+    {
+      "path": "/workspace/lab-motion/bench/profile/server-profile-contract.mjs",
+      "bytes": 65202,
+      "sha256": "7eff7e001c8f075ee02990c99b49609c8446dea4b59564cf03bd03e134510c83"
+    },
+    {
+      "path": "/workspace/lab-motion/bench/profile/server-profile-runner.mjs",
+      "bytes": 49601,
+      "sha256": "5d0f11e31fceedfc524c09fe3cd0948395f218ce45f117c659a0a3551d4a3168"
+    },
+    {
+      "path": "/workspace/lab-motion/scripts/bench-transform-support.mjs",
+      "bytes": 31565,
+      "sha256": "fcb531d342cb6e72ea06acb16bc5fc25f52440aa9c6aff8c7e09f2215476850c"
+    }
+  ],
+  "allMatch": true,
+  "verdict": "UNPROVEN",
+  "stages": [
+    "warmup"
+  ],
+  "warmupActualSchema": {
+    "name": "warmup",
+    "rows": 1,
+    "completeSamples": 0,
+    "blocks": 0
+  },
+  "oneObservedIncompleteBaselineWarmup": true,
+  "completeEngineSamples": 0,
+  "pilotRuns": 0,
+  "AAorABRuns": 0,
+  "candidateTimingObserved": false,
+  "rawRepetitions": [
+    {
+      "repetition": 0,
+      "operationNs": 2432000,
+      "cancelDrainNs": 140000,
+      "frameNs": [
+        383000,
+        0,
+        0,
+        742000,
+        158000,
+        240000
+      ],
+      "semantic": {
+        "valid": true,
+        "targets": 100,
+        "frames": 6,
+        "targetTraceHashes": {
+          "encoding": "repeat",
+          "count": 100,
+          "value": "1f06ccedb753a0e0f74559684425a45d7715f4c3485e65c646068da9854e8ff5"
+        },
+        "finished": true,
+        "onCompleteCalls": 0,
+        "previousFinished": true,
+        "previousCompleteCalls": 0,
+        "requests": 10,
+        "executions": 10,
+        "pending": 0
+      },
+      "equalEndpointPairs": [
+        {
+          "metric": "frameNs",
+          "frame": 1,
+          "before": {
+            "sequence": 4,
+            "userUs": 1628492,
+            "systemUs": 1324134,
+            "valueNs": "2952626000"
+          },
+          "after": {
+            "sequence": 5,
+            "userUs": 1628492,
+            "systemUs": 1324134,
+            "valueNs": "2952626000"
+          }
+        },
+        {
+          "metric": "frameNs",
+          "frame": 2,
+          "before": {
+            "sequence": 6,
+            "userUs": 1628492,
+            "systemUs": 1324134,
+            "valueNs": "2952626000"
+          },
+          "after": {
+            "sequence": 7,
+            "userUs": 1628492,
+            "systemUs": 1324134,
+            "valueNs": "2952626000"
+          }
+        }
+      ]
+    },
+    {
+      "repetition": 1,
+      "operationNs": 483000,
+      "cancelDrainNs": 0,
+      "frameNs": [
+        0,
+        805000,
+        0,
+        0,
+        0,
+        0
+      ],
+      "semantic": {
+        "valid": true,
+        "targets": 100,
+        "frames": 6,
+        "targetTraceHashes": {
+          "encoding": "repeat",
+          "count": 100,
+          "value": "1f06ccedb753a0e0f74559684425a45d7715f4c3485e65c646068da9854e8ff5"
+        },
+        "finished": true,
+        "onCompleteCalls": 0,
+        "previousFinished": true,
+        "previousCompleteCalls": 0,
+        "requests": 10,
+        "executions": 10,
+        "pending": 0
+      },
+      "equalEndpointPairs": [
+        {
+          "metric": "frameNs",
+          "frame": 0,
+          "before": {
+            "sequence": 2,
+            "userUs": 1637871,
+            "systemUs": 1324343,
+            "valueNs": "2962214000"
+          },
+          "after": {
+            "sequence": 3,
+            "userUs": 1637871,
+            "systemUs": 1324343,
+            "valueNs": "2962214000"
+          }
+        },
+        {
+          "metric": "frameNs",
+          "frame": 2,
+          "before": {
+            "sequence": 6,
+            "userUs": 1638676,
+            "systemUs": 1324343,
+            "valueNs": "2963019000"
+          },
+          "after": {
+            "sequence": 7,
+            "userUs": 1638676,
+            "systemUs": 1324343,
+            "valueNs": "2963019000"
+          }
+        },
+        {
+          "metric": "frameNs",
+          "frame": 3,
+          "before": {
+            "sequence": 8,
+            "userUs": 1638676,
+            "systemUs": 1324343,
+            "valueNs": "2963019000"
+          },
+          "after": {
+            "sequence": 9,
+            "userUs": 1638676,
+            "systemUs": 1324343,
+            "valueNs": "2963019000"
+          }
+        },
+        {
+          "metric": "frameNs",
+          "frame": 4,
+          "before": {
+            "sequence": 10,
+            "userUs": 1638676,
+            "systemUs": 1324343,
+            "valueNs": "2963019000"
+          },
+          "after": {
+            "sequence": 11,
+            "userUs": 1638676,
+            "systemUs": 1324343,
+            "valueNs": "2963019000"
+          }
+        },
+        {
+          "metric": "frameNs",
+          "frame": 5,
+          "before": {
+            "sequence": 12,
+            "userUs": 1638676,
+            "systemUs": 1324343,
+            "valueNs": "2963019000"
+          },
+          "after": {
+            "sequence": 13,
+            "userUs": 1638676,
+            "systemUs": 1324343,
+            "valueNs": "2963019000"
+          }
+        },
+        {
+          "metric": "cancelDrainNs",
+          "frame": null,
+          "before": {
+            "sequence": 14,
+            "userUs": 1638676,
+            "systemUs": 1324343,
+            "valueNs": "2963019000"
+          },
+          "after": {
+            "sequence": 15,
+            "userUs": 1638676,
+            "systemUs": 1324343,
+            "valueNs": "2963019000"
+          }
+        }
+      ]
+    },
+    {
+      "repetition": 2,
+      "operationNs": 1172000,
+      "cancelDrainNs": 370000,
+      "frameNs": [
+        0,
+        270000,
+        0,
+        0,
+        0,
+        0
+      ],
+      "semantic": {
+        "valid": true,
+        "targets": 100,
+        "frames": 6,
+        "targetTraceHashes": {
+          "encoding": "repeat",
+          "count": 100,
+          "value": "1f06ccedb753a0e0f74559684425a45d7715f4c3485e65c646068da9854e8ff5"
+        },
+        "finished": true,
+        "onCompleteCalls": 0,
+        "previousFinished": true,
+        "previousCompleteCalls": 0,
+        "requests": 10,
+        "executions": 10,
+        "pending": 0
+      },
+      "equalEndpointPairs": [
+        {
+          "metric": "frameNs",
+          "frame": 0,
+          "before": {
+            "sequence": 2,
+            "userUs": 1644476,
+            "systemUs": 1327257,
+            "valueNs": "2971733000"
+          },
+          "after": {
+            "sequence": 3,
+            "userUs": 1644476,
+            "systemUs": 1327257,
+            "valueNs": "2971733000"
+          }
+        },
+        {
+          "metric": "frameNs",
+          "frame": 2,
+          "before": {
+            "sequence": 6,
+            "userUs": 1644625,
+            "systemUs": 1327378,
+            "valueNs": "2972003000"
+          },
+          "after": {
+            "sequence": 7,
+            "userUs": 1644625,
+            "systemUs": 1327378,
+            "valueNs": "2972003000"
+          }
+        },
+        {
+          "metric": "frameNs",
+          "frame": 3,
+          "before": {
+            "sequence": 8,
+            "userUs": 1644625,
+            "systemUs": 1327378,
+            "valueNs": "2972003000"
+          },
+          "after": {
+            "sequence": 9,
+            "userUs": 1644625,
+            "systemUs": 1327378,
+            "valueNs": "2972003000"
+          }
+        },
+        {
+          "metric": "frameNs",
+          "frame": 4,
+          "before": {
+            "sequence": 10,
+            "userUs": 1644625,
+            "systemUs": 1327378,
+            "valueNs": "2972003000"
+          },
+          "after": {
+            "sequence": 11,
+            "userUs": 1644625,
+            "systemUs": 1327378,
+            "valueNs": "2972003000"
+          }
+        },
+        {
+          "metric": "frameNs",
+          "frame": 5,
+          "before": {
+            "sequence": 12,
+            "userUs": 1644625,
+            "systemUs": 1327378,
+            "valueNs": "2972003000"
+          },
+          "after": {
+            "sequence": 13,
+            "userUs": 1644625,
+            "systemUs": 1327378,
+            "valueNs": "2972003000"
+          }
+        }
+      ]
+    },
+    {
+      "repetition": 3,
+      "operationNs": 1090000,
+      "cancelDrainNs": 0,
+      "frameNs": [
+        0,
+        0,
+        0,
+        0,
+        0,
+        0
+      ],
+      "semantic": {
+        "valid": true,
+        "targets": 100,
+        "frames": 6,
+        "targetTraceHashes": {
+          "encoding": "repeat",
+          "count": 100,
+          "value": "1f06ccedb753a0e0f74559684425a45d7715f4c3485e65c646068da9854e8ff5"
+        },
+        "finished": true,
+        "onCompleteCalls": 0,
+        "previousFinished": true,
+        "previousCompleteCalls": 0,
+        "requests": 10,
+        "executions": 10,
+        "pending": 0
+      },
+      "equalEndpointPairs": [
+        {
+          "metric": "frameNs",
+          "frame": 0,
+          "before": {
+            "sequence": 2,
+            "userUs": 1650918,
+            "systemUs": 1329536,
+            "valueNs": "2980454000"
+          },
+          "after": {
+            "sequence": 3,
+            "userUs": 1650918,
+            "systemUs": 1329536,
+            "valueNs": "2980454000"
+          }
+        },
+        {
+          "metric": "frameNs",
+          "frame": 1,
+          "before": {
+            "sequence": 4,
+            "userUs": 1650918,
+            "systemUs": 1329536,
+            "valueNs": "2980454000"
+          },
+          "after": {
+            "sequence": 5,
+            "userUs": 1650918,
+            "systemUs": 1329536,
+            "valueNs": "2980454000"
+          }
+        },
+        {
+          "metric": "frameNs",
+          "frame": 2,
+          "before": {
+            "sequence": 6,
+            "userUs": 1650918,
+            "systemUs": 1329536,
+            "valueNs": "2980454000"
+          },
+          "after": {
+            "sequence": 7,
+            "userUs": 1650918,
+            "systemUs": 1329536,
+            "valueNs": "2980454000"
+          }
+        },
+        {
+          "metric": "frameNs",
+          "frame": 3,
+          "before": {
+            "sequence": 8,
+            "userUs": 1650918,
+            "systemUs": 1329536,
+            "valueNs": "2980454000"
+          },
+          "after": {
+            "sequence": 9,
+            "userUs": 1650918,
+            "systemUs": 1329536,
+            "valueNs": "2980454000"
+          }
+        },
+        {
+          "metric": "frameNs",
+          "frame": 4,
+          "before": {
+            "sequence": 10,
+            "userUs": 1650918,
+            "systemUs": 1329536,
+            "valueNs": "2980454000"
+          },
+          "after": {
+            "sequence": 11,
+            "userUs": 1650918,
+            "systemUs": 1329536,
+            "valueNs": "2980454000"
+          }
+        },
+        {
+          "metric": "frameNs",
+          "frame": 5,
+          "before": {
+            "sequence": 12,
+            "userUs": 1650918,
+            "systemUs": 1329536,
+            "valueNs": "2980454000"
+          },
+          "after": {
+            "sequence": 13,
+            "userUs": 1650918,
+            "systemUs": 1329536,
+            "valueNs": "2980454000"
+          }
+        },
+        {
+          "metric": "cancelDrainNs",
+          "frame": null,
+          "before": {
+            "sequence": 14,
+            "userUs": 1650918,
+            "systemUs": 1329536,
+            "valueNs": "2980454000"
+          },
+          "after": {
+            "sequence": 15,
+            "userUs": 1650918,
+            "systemUs": 1329536,
+            "valueNs": "2980454000"
+          }
+        }
+      ]
+    },
+    {
+      "repetition": 4,
+      "operationNs": 0,
+      "cancelDrainNs": 0,
+      "frameNs": [
+        0,
+        0,
+        0,
+        0,
+        0,
+        0
+      ],
+      "semantic": {
+        "valid": true,
+        "targets": 100,
+        "frames": 6,
+        "targetTraceHashes": {
+          "encoding": "repeat",
+          "count": 100,
+          "value": "1f06ccedb753a0e0f74559684425a45d7715f4c3485e65c646068da9854e8ff5"
+        },
+        "finished": true,
+        "onCompleteCalls": 0,
+        "previousFinished": true,
+        "previousCompleteCalls": 0,
+        "requests": 10,
+        "executions": 10,
+        "pending": 0
+      },
+      "equalEndpointPairs": [
+        {
+          "metric": "operationNs",
+          "frame": null,
+          "before": {
+            "sequence": 0,
+            "userUs": 1656505,
+            "systemUs": 1329536,
+            "valueNs": "2986041000"
+          },
+          "after": {
+            "sequence": 1,
+            "userUs": 1656505,
+            "systemUs": 1329536,
+            "valueNs": "2986041000"
+          }
+        },
+        {
+          "metric": "frameNs",
+          "frame": 0,
+          "before": {
+            "sequence": 2,
+            "userUs": 1656505,
+            "systemUs": 1329536,
+            "valueNs": "2986041000"
+          },
+          "after": {
+            "sequence": 3,
+            "userUs": 1656505,
+            "systemUs": 1329536,
+            "valueNs": "2986041000"
+          }
+        },
+        {
+          "metric": "frameNs",
+          "frame": 1,
+          "before": {
+            "sequence": 4,
+            "userUs": 1656505,
+            "systemUs": 1329536,
+            "valueNs": "2986041000"
+          },
+          "after": {
+            "sequence": 5,
+            "userUs": 1656505,
+            "systemUs": 1329536,
+            "valueNs": "2986041000"
+          }
+        },
+        {
+          "metric": "frameNs",
+          "frame": 2,
+          "before": {
+            "sequence": 6,
+            "userUs": 1656505,
+            "systemUs": 1329536,
+            "valueNs": "2986041000"
+          },
+          "after": {
+            "sequence": 7,
+            "userUs": 1656505,
+            "systemUs": 1329536,
+            "valueNs": "2986041000"
+          }
+        },
+        {
+          "metric": "frameNs",
+          "frame": 3,
+          "before": {
+            "sequence": 8,
+            "userUs": 1656505,
+            "systemUs": 1329536,
+            "valueNs": "2986041000"
+          },
+          "after": {
+            "sequence": 9,
+            "userUs": 1656505,
+            "systemUs": 1329536,
+            "valueNs": "2986041000"
+          }
+        },
+        {
+          "metric": "frameNs",
+          "frame": 4,
+          "before": {
+            "sequence": 10,
+            "userUs": 1656505,
+            "systemUs": 1329536,
+            "valueNs": "2986041000"
+          },
+          "after": {
+            "sequence": 11,
+            "userUs": 1656505,
+            "systemUs": 1329536,
+            "valueNs": "2986041000"
+          }
+        },
+        {
+          "metric": "frameNs",
+          "frame": 5,
+          "before": {
+            "sequence": 12,
+            "userUs": 1656505,
+            "systemUs": 1329536,
+            "valueNs": "2986041000"
+          },
+          "after": {
+            "sequence": 13,
+            "userUs": 1656505,
+            "systemUs": 1329536,
+            "valueNs": "2986041000"
+          }
+        },
+        {
+          "metric": "cancelDrainNs",
+          "frame": null,
+          "before": {
+            "sequence": 14,
+            "userUs": 1656505,
+            "systemUs": 1329536,
+            "valueNs": "2986041000"
+          },
+          "after": {
+            "sequence": 15,
+            "userUs": 1656505,
+            "systemUs": 1329536,
+            "valueNs": "2986041000"
+          }
+        }
+      ]
+    },
+    {
+      "repetition": 5,
+      "operationNs": 1093000,
+      "cancelDrainNs": 1072000,
+      "frameNs": [
+        0,
+        0,
+        0,
+        0,
+        0,
+        0
+      ],
+      "semantic": {
+        "valid": true,
+        "targets": 100,
+        "frames": 6,
+        "targetTraceHashes": {
+          "encoding": "repeat",
+          "count": 100,
+          "value": "1f06ccedb753a0e0f74559684425a45d7715f4c3485e65c646068da9854e8ff5"
+        },
+        "finished": true,
+        "onCompleteCalls": 0,
+        "previousFinished": true,
+        "previousCompleteCalls": 0,
+        "requests": 10,
+        "executions": 10,
+        "pending": 0
+      },
+      "equalEndpointPairs": [
+        {
+          "metric": "frameNs",
+          "frame": 0,
+          "before": {
+            "sequence": 2,
+            "userUs": 1664951,
+            "systemUs": 1329536,
+            "valueNs": "2994487000"
+          },
+          "after": {
+            "sequence": 3,
+            "userUs": 1664951,
+            "systemUs": 1329536,
+            "valueNs": "2994487000"
+          }
+        },
+        {
+          "metric": "frameNs",
+          "frame": 1,
+          "before": {
+            "sequence": 4,
+            "userUs": 1664951,
+            "systemUs": 1329536,
+            "valueNs": "2994487000"
+          },
+          "after": {
+            "sequence": 5,
+            "userUs": 1664951,
+            "systemUs": 1329536,
+            "valueNs": "2994487000"
+          }
+        },
+        {
+          "metric": "frameNs",
+          "frame": 2,
+          "before": {
+            "sequence": 6,
+            "userUs": 1664951,
+            "systemUs": 1329536,
+            "valueNs": "2994487000"
+          },
+          "after": {
+            "sequence": 7,
+            "userUs": 1664951,
+            "systemUs": 1329536,
+            "valueNs": "2994487000"
+          }
+        },
+        {
+          "metric": "frameNs",
+          "frame": 3,
+          "before": {
+            "sequence": 8,
+            "userUs": 1664951,
+            "systemUs": 1329536,
+            "valueNs": "2994487000"
+          },
+          "after": {
+            "sequence": 9,
+            "userUs": 1664951,
+            "systemUs": 1329536,
+            "valueNs": "2994487000"
+          }
+        },
+        {
+          "metric": "frameNs",
+          "frame": 4,
+          "before": {
+            "sequence": 10,
+            "userUs": 1664951,
+            "systemUs": 1329536,
+            "valueNs": "2994487000"
+          },
+          "after": {
+            "sequence": 11,
+            "userUs": 1664951,
+            "systemUs": 1329536,
+            "valueNs": "2994487000"
+          }
+        },
+        {
+          "metric": "frameNs",
+          "frame": 5,
+          "before": {
+            "sequence": 12,
+            "userUs": 1664951,
+            "systemUs": 1329536,
+            "valueNs": "2994487000"
+          },
+          "after": {
+            "sequence": 13,
+            "userUs": 1664951,
+            "systemUs": 1329536,
+            "valueNs": "2994487000"
+          }
+        }
+      ]
+    },
+    {
+      "repetition": 6,
+      "operationNs": 1196000,
+      "cancelDrainNs": 0,
+      "frameNs": [
+        0,
+        0,
+        0,
+        0,
+        0,
+        0
+      ],
+      "semantic": {
+        "valid": true,
+        "targets": 100,
+        "frames": 6,
+        "targetTraceHashes": {
+          "encoding": "repeat",
+          "count": 100,
+          "value": "1f06ccedb753a0e0f74559684425a45d7715f4c3485e65c646068da9854e8ff5"
+        },
+        "finished": true,
+        "onCompleteCalls": 0,
+        "previousFinished": true,
+        "previousCompleteCalls": 0,
+        "requests": 10,
+        "executions": 10,
+        "pending": 0
+      },
+      "equalEndpointPairs": [
+        {
+          "metric": "frameNs",
+          "frame": 0,
+          "before": {
+            "sequence": 2,
+            "userUs": 1672110,
+            "systemUs": 1329857,
+            "valueNs": "3001967000"
+          },
+          "after": {
+            "sequence": 3,
+            "userUs": 1672110,
+            "systemUs": 1329857,
+            "valueNs": "3001967000"
+          }
+        },
+        {
+          "metric": "frameNs",
+          "frame": 1,
+          "before": {
+            "sequence": 4,
+            "userUs": 1672110,
+            "systemUs": 1329857,
+            "valueNs": "3001967000"
+          },
+          "after": {
+            "sequence": 5,
+            "userUs": 1672110,
+            "systemUs": 1329857,
+            "valueNs": "3001967000"
+          }
+        },
+        {
+          "metric": "frameNs",
+          "frame": 2,
+          "before": {
+            "sequence": 6,
+            "userUs": 1672110,
+            "systemUs": 1329857,
+            "valueNs": "3001967000"
+          },
+          "after": {
+            "sequence": 7,
+            "userUs": 1672110,
+            "systemUs": 1329857,
+            "valueNs": "3001967000"
+          }
+        },
+        {
+          "metric": "frameNs",
+          "frame": 3,
+          "before": {
+            "sequence": 8,
+            "userUs": 1672110,
+            "systemUs": 1329857,
+            "valueNs": "3001967000"
+          },
+          "after": {
+            "sequence": 9,
+            "userUs": 1672110,
+            "systemUs": 1329857,
+            "valueNs": "3001967000"
+          }
+        },
+        {
+          "metric": "frameNs",
+          "frame": 4,
+          "before": {
+            "sequence": 10,
+            "userUs": 1672110,
+            "systemUs": 1329857,
+            "valueNs": "3001967000"
+          },
+          "after": {
+            "sequence": 11,
+            "userUs": 1672110,
+            "systemUs": 1329857,
+            "valueNs": "3001967000"
+          }
+        },
+        {
+          "metric": "frameNs",
+          "frame": 5,
+          "before": {
+            "sequence": 12,
+            "userUs": 1672110,
+            "systemUs": 1329857,
+            "valueNs": "3001967000"
+          },
+          "after": {
+            "sequence": 13,
+            "userUs": 1672110,
+            "systemUs": 1329857,
+            "valueNs": "3001967000"
+          }
+        },
+        {
+          "metric": "cancelDrainNs",
+          "frame": null,
+          "before": {
+            "sequence": 14,
+            "userUs": 1672110,
+            "systemUs": 1329857,
+            "valueNs": "3001967000"
+          },
+          "after": {
+            "sequence": 15,
+            "userUs": 1672110,
+            "systemUs": 1329857,
+            "valueNs": "3001967000"
+          }
+        }
+      ]
+    },
+    {
+      "repetition": 7,
+      "operationNs": 0,
+      "cancelDrainNs": 0,
+      "frameNs": [
+        0,
+        0,
+        1507000,
+        0,
+        0,
+        236000
+      ],
+      "semantic": {
+        "valid": true,
+        "targets": 100,
+        "frames": 6,
+        "targetTraceHashes": {
+          "encoding": "repeat",
+          "count": 100,
+          "value": "1f06ccedb753a0e0f74559684425a45d7715f4c3485e65c646068da9854e8ff5"
+        },
+        "finished": true,
+        "onCompleteCalls": 0,
+        "previousFinished": true,
+        "previousCompleteCalls": 0,
+        "requests": 10,
+        "executions": 10,
+        "pending": 0
+      },
+      "equalEndpointPairs": [
+        {
+          "metric": "operationNs",
+          "frame": null,
+          "before": {
+            "sequence": 0,
+            "userUs": 1677416,
+            "systemUs": 1329857,
+            "valueNs": "3007273000"
+          },
+          "after": {
+            "sequence": 1,
+            "userUs": 1677416,
+            "systemUs": 1329857,
+            "valueNs": "3007273000"
+          }
+        },
+        {
+          "metric": "frameNs",
+          "frame": 0,
+          "before": {
+            "sequence": 2,
+            "userUs": 1677416,
+            "systemUs": 1329857,
+            "valueNs": "3007273000"
+          },
+          "after": {
+            "sequence": 3,
+            "userUs": 1677416,
+            "systemUs": 1329857,
+            "valueNs": "3007273000"
+          }
+        },
+        {
+          "metric": "frameNs",
+          "frame": 1,
+          "before": {
+            "sequence": 4,
+            "userUs": 1677416,
+            "systemUs": 1329857,
+            "valueNs": "3007273000"
+          },
+          "after": {
+            "sequence": 5,
+            "userUs": 1677416,
+            "systemUs": 1329857,
+            "valueNs": "3007273000"
+          }
+        },
+        {
+          "metric": "frameNs",
+          "frame": 3,
+          "before": {
+            "sequence": 8,
+            "userUs": 1678764,
+            "systemUs": 1330016,
+            "valueNs": "3008780000"
+          },
+          "after": {
+            "sequence": 9,
+            "userUs": 1678764,
+            "systemUs": 1330016,
+            "valueNs": "3008780000"
+          }
+        },
+        {
+          "metric": "frameNs",
+          "frame": 4,
+          "before": {
+            "sequence": 10,
+            "userUs": 1678764,
+            "systemUs": 1330016,
+            "valueNs": "3008780000"
+          },
+          "after": {
+            "sequence": 11,
+            "userUs": 1678764,
+            "systemUs": 1330016,
+            "valueNs": "3008780000"
+          }
+        },
+        {
+          "metric": "cancelDrainNs",
+          "frame": null,
+          "before": {
+            "sequence": 14,
+            "userUs": 1679000,
+            "systemUs": 1330016,
+            "valueNs": "3009016000"
+          },
+          "after": {
+            "sequence": 15,
+            "userUs": 1679000,
+            "systemUs": 1330016,
+            "valueNs": "3009016000"
+          }
+        }
+      ]
+    }
+  ],
+  "qualification": "Observedraw equal CPU endpoints retained with semantictrace for100targets; validatorrefused. Counterprecision/kernelmodel diagnosisrequired; noacceptzero/relaxerrors/retrysamples. Histories5/6retained.",
+  "initialRootMetadataDisplayRefusals": [
+    "Earlier display treated stagesstrings asobjects; correctedactualstrings.",
+    "Firstwarmup assertion treated warmup asarray instead ofactual runStage object; optionaliterator display alsofailed ondictkeys. Corrected onlyschema: rows1/incomplete samples{} and blocks0. No source/artifact/check tolerance changes."
+  ]
+}

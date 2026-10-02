@@ -1,0 +1,42 @@
+{
+  "at": "2026-10-01T22:19:30.341444+00:00",
+  "source": "185f02c2a85972a531627e14b7e0207e27855f95",
+  "reportReadFull": true,
+  "reportSha256": "4181a83c8c5c46353f7f51dc0559d4c91209b7fc156c966028dc8a39063838ec",
+  "fullOutputFileBindings": 845,
+  "primaryFileBindings": 100,
+  "checkedUniqueFiles": 845,
+  "allMatchedReadOnly": true,
+  "terminalBindings": [
+    {
+      "path": "/tmp/server-method-measurement-delta-185f-20261001/terminal-manifest.json",
+      "bytes": 3711,
+      "sha256": "b011ba18fe1bda7d4833ba3dc3bf534261a613633194d8ed055628cebc4bcabf"
+    },
+    {
+      "path": "/tmp/server-method-measurement-delta-185f-20261001/output-manifest.json",
+      "bytes": 156696,
+      "sha256": "82f6a501b787eb9465ee735d7748fc7a1b35c99db49010016b6b4570ceaea7bd"
+    },
+    {
+      "path": "/tmp/server-method-measurement-delta-185f-20261001/REPORT-RU.md",
+      "bytes": 28858,
+      "sha256": "4181a83c8c5c46353f7f51dc0559d4c91209b7fc156c966028dc8a39063838ec"
+    },
+    {
+      "path": "/tmp/server-method-measurement-delta-185f-20261001/PRIMARY/PRIMARY-MANIFEST.json",
+      "bytes": 20640,
+      "sha256": "a12b605e7a8196f97712d69fdff7b37269a3d70e936b337f120370be9463fdd6"
+    },
+    {
+      "path": "/tmp/server-method-measurement-delta-185f-20261001/exact-readset.json",
+      "bytes": 172761,
+      "sha256": "a6314e72417af332563bbeacd9cace17a8ab25102de4e1e713a1091d1059a9cd"
+    }
+  ],
+  "sealSha256": "e4370d911c81c7657bbfeb9ba9cdfb9a76ad3283d673884e1263d9c6b6320cac",
+  "measurementScope": "PASS exact185affectedmethoddelta; actualdataUNPROVEN0",
+  "historicalLocalRESOURCERefusalPreserved": true,
+  "laterCurrentCIAndQuietResourceSeparateEvidence": "/workspace/scratch/motion-185-current-ci-cr-root-readback-20261001.json",
+  "actualRegisteredSamples": 0
+}

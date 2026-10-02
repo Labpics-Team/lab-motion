@@ -1,0 +1,30 @@
+[
+  {
+    "name": "identity",
+    "argv": [
+      "python3",
+      "identity.py"
+    ],
+    "cwd": "/tmp/motion-runtime-own-delta-185f02c2-20261001",
+    "startUtc": "2026-10-01T22:30:33.878027+00:00",
+    "endUtc": "2026-10-01T22:30:34.089765+00:00",
+    "exit": 0,
+    "boundSeconds": 5,
+    "NODE_PATH": null,
+    "NODE_OPTIONS": null
+  },
+  {
+    "name": "reduced",
+    "argv": [
+      "/opt/codex/runtimes/codex-primary-runtime/dependencies/node/bin/node",
+      "reduced-probe.mjs"
+    ],
+    "cwd": "/tmp/motion-runtime-own-delta-185f02c2-20261001",
+    "startUtc": "2026-10-01T22:30:34.089907+00:00",
+    "endUtc": "2026-10-01T22:30:34.156450+00:00",
+    "exit": 0,
+    "boundSeconds": 5,
+    "NODE_PATH": null,
+    "NODE_OPTIONS": null
+  }
+]

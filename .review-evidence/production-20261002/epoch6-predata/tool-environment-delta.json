@@ -1,0 +1,17 @@
+{
+  "baseline": {
+    "tsup": {
+      "before": {
+        "version": "8.5.1",
+        "sha256": "0069fb7e1c74f8ad7960292641dfe1d71f2d86eac24f803ed5c9adcba9a1058e",
+        "files": 25
+      },
+      "after": {
+        "version": "8.5.1",
+        "sha256": "897380bc5824e41999cad580dee5670f791646847cbdb01a741bbccd94ae8847",
+        "files": 25
+      }
+    }
+  },
+  "candidate": {}
+}

@@ -1,0 +1,25 @@
+{
+  "sealedUtc": "2026-10-01T22:55:42.386806+00:00",
+  "verdict": "PASS scoped doc factual/authority delta",
+  "sourceHead": "84a0f547156656a70cf73f29b9a2930b5a1997fa",
+  "sourceParent": "85a837e83912ec6b3144b385d938b66a0c63adcf",
+  "report": {
+    "path": "/tmp/r12-durable-links-doc-correctness-84a0-20261001/REPORT-RU.md",
+    "bytes": 4111,
+    "sha256": "917c0539cef596a77179344bca8cee0231da60be89786fa396e3f4238f0b9ce0"
+  },
+  "evidenceManifest": {
+    "path": "/tmp/r12-durable-links-doc-correctness-84a0-20261001/evidence-manifest.json",
+    "bytes": 2179,
+    "sha256": "5913efb7b9096d2b743d98fb27b42240422568b78429cd31a48f62ec6c40d9cc"
+  },
+  "summary": {
+    "path": "/tmp/r12-durable-links-doc-correctness-84a0-20261001/summary.json",
+    "bytes": 2982,
+    "sha256": "70c5aa5a02fb0a912444d2fb5408bb812f089e4eb4f67042eddf577ee9454b56"
+  },
+  "primaryPacketSha256": "d13d519f15adf0d5ccba4829f97e08a80d2469461c24067d7c65870b8b22749f",
+  "supplementSha256": "88d55d51de259d8523d593ff69244b2f1e9e84a5b8abec376d0278e8f098ebb1",
+  "heavywork": 0,
+  "processes": "END"
+}

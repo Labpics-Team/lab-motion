@@ -1,0 +1,638 @@
+{
+  "schema": 1,
+  "createdUtc": "2026-10-01T22:24:49.039118+00:00",
+  "axis": "bounded affected second-order closure185f; no numerical/measurement/general-runtime axis",
+  "sourceHead": "185f02c2a85972a531627e14b7e0207e27855f95",
+  "tree": "d2b7d736ba9a37b930a0bd4cfa3cae92f12a92bc",
+  "comparisonHead": "7f9b85d82bdf531455a8eb0fae4406484205ef83",
+  "primaryIndex": {
+    "path": "/tmp/motion-cr-method-delta-185f02c2-20261001/PRIMARY-PACKET.json",
+    "sha256": "9c5bbb20ca1c9e8442cbe692710f9d62bf91d3d1865b58d6eba4a2365831bc9a"
+  },
+  "primaryFiles": [
+    {
+      "path": "/tmp/motion-cr-method-delta-185f02c2-20261001/source-and-checks.json",
+      "sha256": "8485c2ed0523b03366dbbfb7adb01d0b0990dcb2784804553681e015a97efe7a",
+      "bytes": 171199,
+      "scope": "whole metadata structure/source bindings/17delta; prior-runtime assertions NOT acceptance proof"
+    },
+    {
+      "path": "/tmp/motion-cr-method-delta-185f02c2-20261001/SOURCE-FREEZE.json",
+      "sha256": "618c9a919f05c8fe9705f3986057d82700e86d9316098b4bdbbec9090279b4fc",
+      "bytes": 4875,
+      "scope": "whole identity/owner/protocol/N metadata"
+    },
+    {
+      "path": "/tmp/motion-cr-method-delta-185f02c2-20261001/source-delta.diff",
+      "sha256": "cb6b0ebc6855be9ace2aef710a60100c1a6d43d40e7397eb3452ce9956c99149",
+      "bytes": 46761,
+      "scope": "all17hunks read in partitioned tool output; source contexts separately listed"
+    },
+    {
+      "path": "/tmp/motion-cr-method-delta-185f02c2-20261001/source.tar.gz",
+      "sha256": "8c7d68e4a045f71a5059fce689e31747165d2ce7b332b26a1ade9eef9cf89019",
+      "bytes": 1742110,
+      "scope": "631opaque bytes hash/Git bind; no whole631semantic acceptance"
+    },
+    {
+      "path": "/tmp/motion-cr-method-delta-185f02c2-20261001/evidence/current-remote-red/job-110572573065-tool-recovered.log",
+      "sha256": "67f39b234f85a762f141e036e44be3cd69d6198b8654e581f702e5dd26678551",
+      "bytes": 195881,
+      "scope": "selected raw lines476,1246,1511–1533: actual merge/head/timeout/totals; no foreign comments"
+    },
+    {
+      "path": "/tmp/motion-cr-method-delta-185f02c2-20261001/evidence/current-remote-red/primary-receipt.json",
+      "sha256": "8cbd7727a7ab183e99727091b969f13f6a83f8aeab6e20e9fa5364fd67f4bdd1",
+      "bytes": 1121,
+      "scope": "whole command/failure/merge chronology metadata; commentary fields not proof"
+    },
+    {
+      "path": "/tmp/motion-cr-method-delta-185f02c2-20261001/evidence/current-remote-red/merge-commit.json",
+      "sha256": "e9c469c71d52b3ab0df370bffc6f66efe0eec84dedc49823833df3926be17dc6",
+      "bytes": 645065,
+      "scope": "opaque SHA/size verification only; no semantic acceptance"
+    },
+    {
+      "path": "/tmp/motion-cr-method-delta-185f02c2-20261001/evidence/current-ordinary-calibration-refusal/docs-drift.stdout.log",
+      "sha256": "0557c1be337d682265bc93e1fbb2b5de562d09ff8b6f100a8e087fd1e6abab24",
+      "bytes": 383,
+      "scope": "opaque SHA/size verification only; no semantic acceptance"
+    },
+    {
+      "path": "/tmp/motion-cr-method-delta-185f02c2-20261001/evidence/current-ordinary-calibration-refusal/docs-drift.stderr.log",
+      "sha256": "ce343c921f625b5ebf30003cbf4a9166447c5a2f3f79921cbc4a844289ad92d4",
+      "bytes": 36,
+      "scope": "opaque SHA/size verification only; no semantic acceptance"
+    },
+    {
+      "path": "/tmp/motion-cr-method-delta-185f02c2-20261001/evidence/current-ordinary-calibration-refusal/receipt.json",
+      "sha256": "5d18100a2bc9c7c06ce262f7d59ad0c8889343d333c896a1fbd86d616d6817c8",
+      "bytes": 4329,
+      "scope": "whole source/argv/environment/start/end/status bindings"
+    },
+    {
+      "path": "/tmp/motion-cr-method-delta-185f02c2-20261001/evidence/current-ordinary-calibration-refusal/ordinary.stdout.log",
+      "sha256": "283cc455e23e1736afc767e67577dda30cd10d1f4552dd086fdfdb397d1c34e9",
+      "bytes": 138,
+      "scope": "whole raw stdout"
+    },
+    {
+      "path": "/tmp/motion-cr-method-delta-185f02c2-20261001/evidence/current-ordinary-calibration-refusal/ordinary.stderr.log",
+      "sha256": "21fe42a535437ac6d774c121ab823b678a112b5360e3c08e29c6841279baf0a4",
+      "bytes": 802,
+      "scope": "whole raw stderr; deliberate Git negative errors retained"
+    },
+    {
+      "path": "/tmp/motion-cr-method-delta-185f02c2-20261001/evidence/current-ordinary-calibration-refusal/ordinary.json",
+      "sha256": "8be06573663da8f3c9b5220cc105f86a12ca3ac0663f915ddd37cfed6196428b",
+      "bytes": 2123648,
+      "scope": "parsed totals/solefailure + protected full-four/2fixture selected assertions; no unrelated runtime/numeric verdict"
+    },
+    {
+      "path": "/tmp/motion-cr-method-delta-185f02c2-20261001/evidence/common-string-controls/registration-node24.json",
+      "sha256": "0d2148868ec7b17d95d2c7d351ac28c5cd199322ba2e5f5e5d2b403f1a069207",
+      "bytes": 13867,
+      "scope": "keys/count/Node/epoch/sample0 metadata only; rows not semantic proof"
+    },
+    {
+      "path": "/tmp/motion-cr-method-delta-185f02c2-20261001/evidence/common-string-controls/registration-24.stdout",
+      "sha256": "12b6dfd60c2831c0efa8b00477981c3a6f98128b5eddb4a01106bb170eba05a9",
+      "bytes": 127,
+      "scope": "opaque SHA/size verification only; no semantic acceptance"
+    },
+    {
+      "path": "/tmp/motion-cr-method-delta-185f02c2-20261001/evidence/common-string-controls/registration-24.stderr",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "bytes": 0,
+      "scope": "opaque SHA/size verification only; no semantic acceptance"
+    },
+    {
+      "path": "/tmp/motion-cr-method-delta-185f02c2-20261001/evidence/common-string-controls/contract-24.stdout",
+      "sha256": "9db5e6eff5599b2700584383471d9881fa4768daed8c28861f883d5de4f2b091",
+      "bytes": 39,
+      "scope": "opaque SHA/size verification only; no semantic acceptance"
+    },
+    {
+      "path": "/tmp/motion-cr-method-delta-185f02c2-20261001/evidence/common-string-controls/contract-24.stderr",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "bytes": 0,
+      "scope": "opaque SHA/size verification only; no semantic acceptance"
+    },
+    {
+      "path": "/tmp/motion-cr-method-delta-185f02c2-20261001/evidence/common-string-controls/registration-node22.json",
+      "sha256": "16424eab7c80ec23f8cd9d9ba45f38b7df35d4f3c574f04d05de25c61f134003",
+      "bytes": 13866,
+      "scope": "keys/count/Node/epoch/sample0 metadata only; rows not semantic proof"
+    },
+    {
+      "path": "/tmp/motion-cr-method-delta-185f02c2-20261001/evidence/common-string-controls/registration-22.stdout",
+      "sha256": "b590b2b7638b3201a858ceb5fac7079755c724f93f472e2bdd10a0fc39e857dc",
+      "bytes": 126,
+      "scope": "opaque SHA/size verification only; no semantic acceptance"
+    },
+    {
+      "path": "/tmp/motion-cr-method-delta-185f02c2-20261001/evidence/common-string-controls/registration-22.stderr",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "bytes": 0,
+      "scope": "opaque SHA/size verification only; no semantic acceptance"
+    },
+    {
+      "path": "/tmp/motion-cr-method-delta-185f02c2-20261001/evidence/common-string-controls/contract-22.stdout",
+      "sha256": "9db5e6eff5599b2700584383471d9881fa4768daed8c28861f883d5de4f2b091",
+      "bytes": 39,
+      "scope": "opaque SHA/size verification only; no semantic acceptance"
+    },
+    {
+      "path": "/tmp/motion-cr-method-delta-185f02c2-20261001/evidence/common-string-controls/contract-22.stderr",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "bytes": 0,
+      "scope": "opaque SHA/size verification only; no semantic acceptance"
+    },
+    {
+      "path": "/tmp/motion-cr-method-delta-185f02c2-20261001/evidence/common-string-controls/execution.json",
+      "sha256": "a9d487e378ace4a32eb9715fc8ede5832c1187e3efdf8cf6f80c34d6e6c265d7",
+      "bytes": 1694,
+      "scope": "whole commands/environment/terminal/source epoch"
+    },
+    {
+      "path": "/tmp/motion-cr-method-delta-185f02c2-20261001/evidence/native-serialization-controls/probe.mjs",
+      "sha256": "f02ba598462f098b734bdabc39a84536c4ebbb0c490d1daa356a9fc82f1bbe53",
+      "bytes": 3951,
+      "scope": "whole proposed recursive serializer/differential cases/footprint executable code; outside comment identifier excluded as proof"
+    },
+    {
+      "path": "/tmp/motion-cr-method-delta-185f02c2-20261001/evidence/native-serialization-controls/stdout.log",
+      "sha256": "770ea98a5d94e1422e6e8d2ba546a8128d6a84415e109db77006e7a6e182c0ed",
+      "bytes": 1372,
+      "scope": "opaque SHA/size verification only; no semantic acceptance"
+    },
+    {
+      "path": "/tmp/motion-cr-method-delta-185f02c2-20261001/evidence/native-serialization-controls/stderr.log",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "bytes": 0,
+      "scope": "opaque SHA/size verification only; no semantic acceptance"
+    },
+    {
+      "path": "/tmp/motion-cr-method-delta-185f02c2-20261001/evidence/native-serialization-controls/result.json",
+      "sha256": "eef1756d6090003fc68638bbd1f6cc05782c9d0d2468b2240ab0b293266a693f",
+      "bytes": 1697,
+      "scope": "keys/source epoch/sample0 only; no acceptance of proposal or outside comment ID"
+    },
+    {
+      "path": "/tmp/motion-cr-method-delta-185f02c2-20261001/evidence/native-serialization-controls/execution.json",
+      "sha256": "ed95eee5cf57381b92ae9471c25b3d19b047cf290fdc91bc25aa90eb86bcdf0b",
+      "bytes": 947,
+      "scope": "command/source epoch/terminal metadata"
+    },
+    {
+      "path": "/tmp/motion-cr-method-delta-185f02c2-20261001/evidence/cost-after/probe.mjs",
+      "sha256": "1301226c0813e2e2683033ea89d89ee0e16063b649f78c6c3846d74dce740481",
+      "bytes": 3599,
+      "scope": "whole executable command/fixture extraction/profiler/timeout/assert substitute method; comments not justification"
+    },
+    {
+      "path": "/tmp/motion-cr-method-delta-185f02c2-20261001/evidence/cost-after/probe.log",
+      "sha256": "5cbb39a192c10740d7478259eb65fa7595753c4745c5d8267ad0f384cbf0ae47",
+      "bytes": 1920,
+      "scope": "opaque SHA/size verification only; no semantic acceptance"
+    },
+    {
+      "path": "/tmp/motion-cr-method-delta-185f02c2-20261001/evidence/cost-after/exact-test-callback.ts",
+      "sha256": "7d1e66d88568f137f5831ed9cc52b38375587dc13673a6fd6faf29eaaa5977db",
+      "bytes": 1701,
+      "scope": "whole1701B exact source subsection"
+    },
+    {
+      "path": "/tmp/motion-cr-method-delta-185f02c2-20261001/evidence/cost-after/fixtures.mjs",
+      "sha256": "5cff5e0655230dc7b4329f5635025f84de0be51df40d4deaf4e0cc44d2515ae8",
+      "bytes": 18704,
+      "scope": "opaque SHA/size verification only; no semantic acceptance"
+    },
+    {
+      "path": "/tmp/motion-cr-method-delta-185f02c2-20261001/evidence/cost-after/acquired-steps.ndjson",
+      "sha256": "98eccc0d86c1e470813797ded3f9b1a2884724616a4467221ba8c4b50c0cd95e",
+      "bytes": 1409,
+      "scope": "opaque SHA/size verification only; no semantic acceptance"
+    },
+    {
+      "path": "/tmp/motion-cr-method-delta-185f02c2-20261001/evidence/cost-after/probe-result.json",
+      "sha256": "7acd064c8e0dc38a19edeaa26a61e1d412050bec441dd78fdaa26c7d461c58f4",
+      "bytes": 2788,
+      "scope": "selected scalar result/source/callback/Node/elapsed/failure; diagnostic epoch only; qualification narrative not proof"
+    },
+    {
+      "path": "/tmp/motion-cr-method-delta-185f02c2-20261001/evidence/cost-after/after.cpuprofile",
+      "sha256": "e209e38baf638c6f89731e0a4a2433b2ca7dc81d21454d823c9821b380560974",
+      "bytes": 303490,
+      "scope": "opaque SHA/size verification only; no semantic acceptance"
+    },
+    {
+      "path": "/tmp/motion-cr-method-delta-185f02c2-20261001/evidence/cost-after/execution.json",
+      "sha256": "9313b6ae5b54efdf6f3a9dee389cbf00b924866181214e88aa94f4cecb618e83",
+      "bytes": 2639,
+      "scope": "argv/cwd/start/end/status/60s/source hashes/file bindings; narrative excluded as proof"
+    },
+    {
+      "path": "/tmp/motion-cr-method-delta-185f02c2-20261001/evidence/cache-law/stdout.log",
+      "sha256": "4d45bfd1bc32924ecc44c4f2b5ced549227350f917a2f8ebe25bb155f0ad39c7",
+      "bytes": 234,
+      "scope": "opaque SHA/size verification only; no semantic acceptance"
+    },
+    {
+      "path": "/tmp/motion-cr-method-delta-185f02c2-20261001/evidence/cache-law/stderr.log",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "bytes": 0,
+      "scope": "opaque SHA/size verification only; no semantic acceptance"
+    },
+    {
+      "path": "/tmp/motion-cr-method-delta-185f02c2-20261001/evidence/cache-law/result.json",
+      "sha256": "f98b380b96d048d729892be4fe34aa3b9fec216d1107e91c273a5da2171ad8cf",
+      "bytes": 28072,
+      "scope": "JSON top-level schema only; no reuse of assertion verdict as proof"
+    },
+    {
+      "path": "/tmp/motion-cr-method-delta-185f02c2-20261001/evidence/cache-law/execution.json",
+      "sha256": "944d0e87de8b4e961a6bbcd1db656b22cf511f287e30a342f0aa9a4e553792e2",
+      "bytes": 1842,
+      "scope": "opaque SHA/size verification only; no semantic acceptance"
+    },
+    {
+      "path": "/tmp/motion-cr-method-delta-185f02c2-20261001/evidence/native-serialization-controls/initial-import-failure/execution.json",
+      "sha256": "24b1864e1875924a9dbac557272b327367514f47bac9946a32ae793af2a46e01",
+      "bytes": 705,
+      "scope": "opaque SHA/size verification only; no semantic acceptance"
+    },
+    {
+      "path": "/tmp/motion-cr-method-delta-185f02c2-20261001/evidence/native-serialization-controls/initial-import-failure/stderr.log",
+      "sha256": "b5311aa0fc9eab7e2e1d7090113c4b7850e805d060b4b367088d6c0602807252",
+      "bytes": 583,
+      "scope": "whole preserved primary failure"
+    },
+    {
+      "path": "/tmp/motion-cr-method-delta-185f02c2-20261001/evidence/native-serialization-controls/initial-import-failure/stdout.log",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "bytes": 0,
+      "scope": "opaque SHA/size verification only; no semantic acceptance"
+    },
+    {
+      "path": "/tmp/motion-cr-method-delta-185f02c2-20261001/evidence/native-serialization-controls/initial-import-failure/probe.mjs",
+      "sha256": "584162396cd9800413fd21a659e31171494ed467da4bd2e1a2f0d63f3f9f9aa5",
+      "bytes": 3907,
+      "scope": "opaque SHA/size verification only; no semantic acceptance"
+    }
+  ],
+  "opaqueAll631SourceBindingReceipt": "/tmp/server-method-second-order-185f02c2-20261001T2144Z/source-bindings.json",
+  "sourceSemanticReadset": [
+    {
+      "path": "bench/compare/provenance.mjs",
+      "mode": "100644",
+      "gitBlob": "e1452d9972e222049fafad6439d6094720c4fa70",
+      "sha256": "51881a4a6ea2e1ad0330888e7e1b9c8b6e7c7aef3a3eb798a4185c7c3b846623",
+      "bytes": 24949,
+      "gitAndArchiveEqual": true,
+      "previousEqual": true,
+      "semanticReadScope": "current94–100 sha256Bytes/native SHA; import closure plus own prior exact-source scopes"
+    },
+    {
+      "path": "bench/profile/probe-profile-01.mjs",
+      "mode": "100644",
+      "gitBlob": "47e3ea3e9b66d7d66756540fe091a906188c13d1",
+      "sha256": "42952452cb39ff80fe7af89215f1e7839199c6e1d0c637471186e1a1b3317e5d",
+      "bytes": 7088,
+      "gitAndArchiveEqual": true,
+      "previousEqual": false,
+      "semanticReadScope": "current1–95/all changed hunks; actual malformed public CLI subprocesses"
+    },
+    {
+      "path": "bench/profile/server-profile-contract.mjs",
+      "mode": "100644",
+      "gitBlob": "4ee04f2ffd75503c3e289dbc097b404ec139c5ba",
+      "sha256": "7eff7e001c8f075ee02990c99b49609c8446dea4b59564cf03bd03e134510c83",
+      "bytes": 65202,
+      "gitAndArchiveEqual": true,
+      "previousEqual": false,
+      "semanticReadScope": "all changed hunks/imports; current168–248,292–303; serializer/writer exact slice bytes; journal834–838 + own earlier byte-equal context; full module actual import/current refusal replay"
+    },
+    {
+      "path": "bench/profile/server-profile-registration.mjs",
+      "mode": "100644",
+      "gitBlob": "2de2c489b2e74aea05be5ff9708bcb1ae8c385fd",
+      "sha256": "1596ca1be9d490bae7c82d13a97c7c6ecb9ba65be959f1a1290b18b92c84337e",
+      "bytes": 16782,
+      "gitAndArchiveEqual": true,
+      "previousEqual": false,
+      "semanticReadScope": "complete changed hunk124–129; previous profile-law scope qualified unchanged; current protocol raw value independently hashed"
+    },
+    {
+      "path": "bench/profile/server-profile-runner.mjs",
+      "mode": "100644",
+      "gitBlob": "6a1ceaeac6c53cfed3f313bf586f7e9f7a0625c4",
+      "sha256": "5d0f11e31fceedfc524c09fe3cd0948395f218ce45f117c659a0a3551d4a3168",
+      "bytes": 49601,
+      "gitAndArchiveEqual": true,
+      "previousEqual": false,
+      "semanticReadScope": "current1–145,474–548,615–685; exact machine/helper source slices VM executed; actual preparation-failure/finally path executed"
+    },
+    {
+      "path": "bench/profile/validate-profile-01.mjs",
+      "mode": "100644",
+      "gitBlob": "998f61097cd727f5ed00399686c6fd7b23038fea",
+      "sha256": "1ec1b58869ebd36da0754b831bb1340aa5052fb0b8fa0a4d0fc715d0d54d1e04",
+      "bytes": 7186,
+      "gitAndArchiveEqual": true,
+      "previousEqual": false,
+      "semanticReadScope": "current1–110/all changed hunks; actual malformed public CLI subprocesses"
+    },
+    {
+      "path": "browser/fixtures/packed-recipes.d.ts",
+      "mode": "100644",
+      "gitBlob": "c65147f012d61e5977e8e90e41ba063b811f182c",
+      "sha256": "bbc33fcc80530684a66c68ea90d4b8596784b729717880c984a36a6a06ac96ac",
+      "bytes": 2017,
+      "gitAndArchiveEqual": true,
+      "previousEqual": false,
+      "semanticReadScope": "whole current43lines/new declarations and old declared type boundary"
+    },
+    {
+      "path": "browser/fixtures/scope-recipes.mjs",
+      "mode": "100644",
+      "gitBlob": "962e6eece406b07205529519363b9243c46d00d8",
+      "sha256": "661a591b92e2995e7f4c4a0b1a843e548a094970955a0063f6cdac89f0a58247",
+      "bytes": 7987,
+      "gitAndArchiveEqual": true,
+      "previousEqual": false,
+      "semanticReadScope": "current1–95/all changed hunk; exact packScopeRecipePackage source slice VM nativeFS with independent npm/tar facades"
+    },
+    {
+      "path": "browser/presence-transition.spec.ts",
+      "mode": "100644",
+      "gitBlob": "92ceb996ed3d2a3eaf6e27ec976ed799ea3ff32d",
+      "sha256": "cb4dc7b7787be4cdf68f10f8381c8e0804ba575cd9468b08cecf8dd3ab51581e",
+      "bytes": 7493,
+      "gitAndArchiveEqual": true,
+      "previousEqual": false,
+      "semanticReadScope": "complete changed hunk only; verification consumer import names, no new browser/runtime verdict"
+    },
+    {
+      "path": "browser/reorder.spec.ts",
+      "mode": "100644",
+      "gitBlob": "f4acc8f5bc7bd5e60e42657d12676611551725f9",
+      "sha256": "5932c471f230b11833c76a87291c16aaee39da0dba8883e78ab1f9c1cae6fe24",
+      "bytes": 8996,
+      "gitAndArchiveEqual": true,
+      "previousEqual": false,
+      "semanticReadScope": "complete changed hunk only; verification consumer non-null calls, no new browser/runtime verdict"
+    },
+    {
+      "path": "docs/server-profile.md",
+      "mode": "100644",
+      "gitBlob": "b114d51d275afa8d828c28732b68f5a710a0d45a",
+      "sha256": "56ae95327e3590196371d3b06e4a4f955482b16d98255d49cd44624e8b4fd0f2",
+      "bytes": 26839,
+      "gitAndArchiveEqual": true,
+      "previousEqual": false,
+      "semanticReadScope": "complete changed239–253hunk; current operational streaming/V8/max-N promises checked against serializer/native primary; prior doc scope own-chain only"
+    },
+    {
+      "path": "scripts/bench-transform-support.mjs",
+      "mode": "100644",
+      "gitBlob": "48c3814014a7ead37db7f2fe6fd1ae199e4e700a",
+      "sha256": "fcb531d342cb6e72ea06acb16bc5fc25f52440aa9c6aff8c7e09f2215476850c",
+      "bytes": 31565,
+      "gitAndArchiveEqual": true,
+      "previousEqual": false,
+      "semanticReadScope": "current1–293 parser/check/public factory/replay; exact private VM slice and actual imported public replay; unchanged producer guards via diff/own chain, no fresh real timing"
+    },
+    {
+      "path": "test/behaviors-late-callback-owner.test.ts",
+      "mode": "100644",
+      "gitBlob": "0bac1471f9f1b7af2faba7a5f2caac7cc0161567",
+      "sha256": "5b62dae47e9dd35c1c026f91a3a782300e0655439c1f906122c3ee083503527b",
+      "bytes": 3349,
+      "gitAndArchiveEqual": true,
+      "previousEqual": false,
+      "semanticReadScope": "complete changed hunks18–60; reduceMedia() and added pre-drain/end guards; not runtime axis"
+    },
+    {
+      "path": "test/bench-transform-pair.test.ts",
+      "mode": "100644",
+      "gitBlob": "9320afca5194eba6bae403faa93e4f0d12293a7a",
+      "sha256": "52cddc9fdbf34c220d140c26db644e913d698f4a6d6df98f951e9f14e45e9a4f",
+      "bytes": 49935,
+      "gitAndArchiveEqual": true,
+      "previousEqual": false,
+      "semanticReadScope": "current1–95 and changed702–727 factory tests; assertions not oracle; independent own carrier supplied"
+    },
+    {
+      "path": "test/benchmark-methodology.test.ts",
+      "mode": "100644",
+      "gitBlob": "7361d681d3db1c1cb5d097150cd4a8561a9c3a4f",
+      "sha256": "1728e170a5f8c35a2b2ace615aedc9682ed77e8b6b280cab8f0c7c3c9fdaec98",
+      "bytes": 34432,
+      "gitAndArchiveEqual": true,
+      "previousEqual": false,
+      "semanticReadScope": "complete473–504changed temporal test hunk; no numeric verdict"
+    },
+    {
+      "path": "test/profile-measurement.test.ts",
+      "mode": "100644",
+      "gitBlob": "fce559cc8890534e5d7327740ceb7762b7114f3f",
+      "sha256": "29f99acbbc56a3671442ca9382b8cd400085f06b1dce4c65bcc8d6b682adbbbc",
+      "bytes": 17773,
+      "gitAndArchiveEqual": true,
+      "previousEqual": false,
+      "semanticReadScope": "all changed hunks imports/helper/three affected test areas/malformed cases; no new clone/build execution"
+    },
+    {
+      "path": "test/resource-actual-package-retention.test.ts",
+      "mode": "100644",
+      "gitBlob": "9f6a103e9a1f288786efdac625b9d6134ed95023",
+      "sha256": "f59866843a86c85adef6781cc9abf7b624a11ae4d3f0988ecb799b739176a12f",
+      "bytes": 6658,
+      "gitAndArchiveEqual": true,
+      "previousEqual": false,
+      "semanticReadScope": "all changed comment hunks7–10,66–69; substantive owner unchanged, primary refusal only"
+    },
+    {
+      "path": "test/server-profile-contract.test.ts",
+      "mode": "100644",
+      "gitBlob": "33abf5954389e5aac5e2cbe10076414ce1c52bb1",
+      "sha256": "4e02a006e4647ed7705cad3d933992d76fa665184facdee287f54f3efc13dc63",
+      "bytes": 85833,
+      "gitAndArchiveEqual": true,
+      "previousEqual": false,
+      "semanticReadScope": "all changed resource-test hunk1062–1122; unchanged1701B protected callback/source30_000 extracted and bound; no fresh full-N execution"
+    }
+  ],
+  "all17ChangedHunksRead": true,
+  "all631ByteHashCheckIsNotSemanticAcceptance": true,
+  "privateCopiedInputReceipt": "/tmp/server-method-second-order-185f02c2-20261001T2144Z/probe-inputs.json",
+  "copiesCount": 64,
+  "normHead": "85a837e83912ec6b3144b385d938b66a0c63adcf",
+  "normBindings": [
+    {
+      "path": "AGENTS.md",
+      "head": "85a837e83912ec6b3144b385d938b66a0c63adcf",
+      "sha256": "0e1376312cedf91660b1c919ba4c1a9a6e067fe8719eb8daeb52113508b28f0a",
+      "bytes": 38398
+    },
+    {
+      "path": "plans/SPEC.md",
+      "head": "85a837e83912ec6b3144b385d938b66a0c63adcf",
+      "sha256": "7488d5885ee2405d678e488e34a84ce48254978c3a6ad3de2e4d31dfe7b3f651",
+      "bytes": 31491
+    },
+    {
+      "path": "plans/TEMPLATE.md",
+      "head": "85a837e83912ec6b3144b385d938b66a0c63adcf",
+      "sha256": "7f4cb8dcc983f392a01f2abdddc7b74527412b0da725b114cee94677c651a97e",
+      "bytes": 10270
+    },
+    {
+      "path": "plans/PARALLEL.md",
+      "head": "85a837e83912ec6b3144b385d938b66a0c63adcf",
+      "sha256": "904989597f28b87a33bb69716f0acc7b45dcef563741c30f802de77110112280",
+      "bytes": 8812
+    },
+    {
+      "path": "plans/lab-motion-production/r11.md",
+      "head": "85a837e83912ec6b3144b385d938b66a0c63adcf",
+      "sha256": "cbeef108b288502165437c375bb259f3f4d6dc8ae4ae9e926db133adeba40d4b",
+      "bytes": 74166
+    },
+    {
+      "path": "plans/lab-motion-production/r12.md",
+      "head": "85a837e83912ec6b3144b385d938b66a0c63adcf",
+      "sha256": "b2e6d1462b0bce43773beaf307e3b3963c426bf07134f49c844d4991e1753622",
+      "bytes": 40024
+    },
+    {
+      "path": "plans/lab-motion-production/ACTIVE.md",
+      "head": "85a837e83912ec6b3144b385d938b66a0c63adcf",
+      "sha256": "42e36c2efa89912aa00395c938263c1bf35275325420df52ec736b0986606731",
+      "bytes": 235
+    },
+    {
+      "path": "plans/lab-motion-production/CLAIM.md",
+      "head": "85a837e83912ec6b3144b385d938b66a0c63adcf",
+      "sha256": "56ac2167795a81b9d1a60d2ebc1cb8830a2653cbc45026bbcb2d0b0f8e837fa8",
+      "bytes": 139
+    },
+    {
+      "path": "plans/lab-motion-production/ACTIVATION.md",
+      "head": "85a837e83912ec6b3144b385d938b66a0c63adcf",
+      "sha256": "97e6b6ce4080b5c91d62e7ace5844a3c7aeeaa3bce04b21f832785bc807a4908",
+      "bytes": 194
+    }
+  ],
+  "normSemanticScope": "AGENTS fresh184–204,227–255; SPEC/TEMPLATE/PARALLEL byte-identical own-chain authority context reused; r11 fresh325–355,430–470; ACTIVE/CLAIM/ACTIVATION whole; r12 first28prepared-status only",
+  "skillScope": "Own architecture skill/procedure and its original bounded references previously read in this same chain; no new skill/delegation",
+  "oldOwnSeals": [
+    {
+      "path": "/tmp/server-method-second-order-admission-cost-20261001T1940Z/REPORT.md",
+      "sha256": "89362193404b1e337f074c4a4608a95d3cc5e0e2f579afd03b0591d51fdae12d",
+      "bytes": 18282,
+      "scope": "own immutable prior chain; only exact named conserved portions reused"
+    },
+    {
+      "path": "/tmp/server-method-second-order-admission-cost-20261001T1940Z/readset.json",
+      "sha256": "c8f7313d36a9e43983e20342a74b6f5cba3468de0824c05f5dcf94cca2e6205a",
+      "bytes": 42114,
+      "scope": "own immutable prior chain; only exact named conserved portions reused"
+    },
+    {
+      "path": "/tmp/server-method-second-order-admission-cost-20261001T1940Z/evidence-manifest.json",
+      "sha256": "1a0d0571792090305e32f0371dff2c2aa451a6131aca857b132cee1ed6f01828",
+      "bytes": 12303,
+      "scope": "own immutable prior chain; only exact named conserved portions reused"
+    },
+    {
+      "path": "/tmp/server-method-second-order-admission-cost-20261001T1940Z/report-receipt.json",
+      "sha256": "ea3fcb3da4d2b61ecffc8e16bceb628b13bbd6c8211dd34ea0c5842006f1a33d",
+      "bytes": 4403,
+      "scope": "own immutable prior chain; only exact named conserved portions reused"
+    },
+    {
+      "path": "/tmp/server-method-second-order-dependency-20261001T1806Z/REPORT.md",
+      "sha256": "4c6847bbca954af159b45c5cedcfe4b87a3baa518ceb4e7832f7b9fa94390753",
+      "bytes": 14211,
+      "scope": "own immutable prior chain; only exact named conserved portions reused"
+    },
+    {
+      "path": "/tmp/server-method-second-order-dependency-20261001T1806Z/readset.json",
+      "sha256": "81da4e12c50e7b4ff99af1061574fb26798db4d87d57681c5d9e7829cec576d7",
+      "bytes": 28345,
+      "scope": "own immutable prior chain; only exact named conserved portions reused"
+    },
+    {
+      "path": "/tmp/server-method-second-order-dependency-20261001T1806Z/evidence-manifest.json",
+      "sha256": "5cbe922834050c8389f7a5069a11cdd43236db8da58550b7ab394ed31b024905",
+      "bytes": 10830,
+      "scope": "own immutable prior chain; only exact named conserved portions reused"
+    },
+    {
+      "path": "/tmp/server-method-second-order-dependency-20261001T1806Z/report-receipt.json",
+      "sha256": "0ef91fb6f0ecbb5bfeab3483a1202dd6f600fa4504b92c81b7c2f37d1b5e1647",
+      "bytes": 1679,
+      "scope": "own immutable prior chain; only exact named conserved portions reused"
+    },
+    {
+      "path": "/tmp/server-method-second-order-stock-c-20261001T172036Z/REPORT.md",
+      "sha256": "194d7a939293a6137a8f76c77c3ce00490efe012975b532eb8d58bfd8ff75505",
+      "bytes": 19256,
+      "scope": "own immutable prior chain; only exact named conserved portions reused"
+    },
+    {
+      "path": "/tmp/server-method-second-order-stock-c-20261001T172036Z/readset.json",
+      "sha256": "d5144774d0885b2249813422a74e03bd290a05e9acf4480494b4d099279931fe",
+      "bytes": 182713,
+      "scope": "own immutable prior chain; only exact named conserved portions reused"
+    },
+    {
+      "path": "/tmp/server-method-second-order-stock-c-20261001T172036Z/evidence-manifest.json",
+      "sha256": "16a29bbad06a0b53d72a339be750d6f4156e222658aeb9608498118877f9d179",
+      "bytes": 49069,
+      "scope": "own immutable prior chain; only exact named conserved portions reused"
+    },
+    {
+      "path": "/tmp/server-method-second-order-stock-c-20261001T172036Z/report-receipt.json",
+      "sha256": "c752ded6128f940277c420075e6e0209c71cb6369227749dcd3b4f322628d462",
+      "bytes": 1570,
+      "scope": "own immutable prior chain; only exact named conserved portions reused"
+    }
+  ],
+  "qualifiedTransferOperators": [
+    "/tmp/server-method-second-order-185f02c2-20261001T2144Z/conserved-unit-bindings.json",
+    "/tmp/server-method-second-order-185f02c2-20261001T2144Z/current-protocol-binding.json",
+    "/tmp/server-method-second-order-185f02c2-20261001T2144Z/protected-callback-binding.json",
+    "614 source/108src+tsup exact equality",
+    "6unchanged current owner bindings; not913-runtime proof transfer"
+  ],
+  "excludedSemanticInputs": [
+    "author HANDOFF",
+    "author CLOCK-CERTIFICATE",
+    "author QUALIFIED-TRANSFER",
+    "author RUN-PLAN/rationale/review reports",
+    "foreign REPORT/verdict",
+    "PR bodies/comments/bot conclusions",
+    "unlisted live owner bytes"
+  ],
+  "providedPrimarySelection": "/tmp/server-method-second-order-185f02c2-20261001T2144Z/provided-primary-selection.json",
+  "dependencyLinks": "/tmp/server-method-second-order-185f02c2-20261001T2144Z/dependency-links.json",
+  "ownCommandReceipt": "/tmp/server-method-second-order-185f02c2-20261001T2144Z/execution.json",
+  "ownControls": {
+    "path": "/tmp/server-method-second-order-185f02c2-20261001T2144Z/controls.mjs",
+    "sha256": "7cc5523dde3f4b54201d7dd03715e7ff6993bfa8259b4bbd43b9a25a3e9d1a5a"
+  },
+  "limits": [
+    "no new real registered samples0",
+    "no browser/build/full-N/current hostedCI or package/runtime blanket acceptance",
+    "no arbitraryJS/CSS intrinsic equivalence or numerical/admission verdict",
+    "no wholeRSS/GC/crash/ENOSPC/quota-race qualification",
+    "no causal attribution of current RESOURCE refusal; preserved primaryfailure",
+    "intermediate e0ad diagnostic not current185/default workers/30sgate/performance proof"
+  ],
+  "allOwnChildrenAndJoins": "END",
+  "heavy": 0,
+  "sourceWorkflowRemoteMutation": 0
+}

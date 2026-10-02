@@ -1,0 +1,91 @@
+{
+  "at": "2026-10-01T22:15:15.151174+00:00",
+  "sourceHead": "185f02c2a85972a531627e14b7e0207e27855f95",
+  "actualMerge": "19b0eeb0c52da96275e5493054e33f4a74672480",
+  "actualMergeTree": "d2b7d736ba9a37b930a0bd4cfa3cae92f12a92bc",
+  "candidateTreeMatches": true,
+  "sourceArchive631PreviouslyBound": true,
+  "ciRequiredJobsSuccessful": [
+    110605778097,
+    110605778207,
+    110605778312,
+    110605778372,
+    110605778484,
+    110605778765,
+    110605778789,
+    110606211770,
+    110606211866,
+    110606869786
+  ],
+  "onlyConditionalBaselineSkipped": true,
+  "actualWhole344Files4975Tests111FinitenessPassed": true,
+  "wholeLogReadMatchesReportedProtected22739msAnd16510ms": true,
+  "codeRabbit": {
+    "issueCommentId": 5936940453,
+    "updatedAt": "2026-10-01T22:09:28Z",
+    "url": "https://github.com/Labpics-Team/lab-motion/pull/460#issuecomment-5936940453",
+    "author": "coderabbitai[bot]",
+    "range": [
+      "7f9b85d82bdf531455a8eb0fae4406484205ef83",
+      "185f02c2a85972a531627e14b7e0207e27855f95"
+    ],
+    "selectedFiles": [
+      "bench/profile/probe-profile-01.mjs",
+      "bench/profile/server-profile-contract.mjs",
+      "bench/profile/server-profile-registration.mjs",
+      "bench/profile/server-profile-runner.mjs",
+      "bench/profile/validate-profile-01.mjs",
+      "browser/fixtures/packed-recipes.d.ts",
+      "browser/fixtures/scope-recipes.mjs",
+      "browser/presence-transition.spec.ts",
+      "browser/reorder.spec.ts",
+      "docs/server-profile.md",
+      "scripts/bench-transform-support.mjs",
+      "test/behaviors-late-callback-owner.test.ts",
+      "test/bench-transform-pair.test.ts",
+      "test/benchmark-methodology.test.ts",
+      "test/profile-measurement.test.ts",
+      "test/resource-actual-package-retention.test.ts",
+      "test/server-profile-contract.test.ts"
+    ],
+    "selected17ExactlyMatchGitDelta": true,
+    "noActionableCommentsReported": true,
+    "githubReviewApproved": false,
+    "oldCHANGES_REQUESTEDNotErased": true
+  },
+  "bindings": [
+    {
+      "path": "/tmp/motion-source-publication-185f02c2-20261001/current-ci-primary-receipt.json",
+      "bytes": 1212,
+      "sha256": "e86a100516ddf5a292a197bd3d30668775ad0c6aa59811acf1f03cd65c9cb5c1"
+    },
+    {
+      "path": "/tmp/motion-source-publication-185f02c2-20261001/test-fuzz-110605778207.log",
+      "bytes": 200382,
+      "sha256": "133a83c78678d07d33cfe74032f4cec8dec4fc6554172cc56f008bbd313457cf"
+    },
+    {
+      "path": "/tmp/motion-source-publication-185f02c2-20261001/actual-ci-merge.json",
+      "bytes": 2708,
+      "sha256": "5e05b3bf040518c9b3c20ea7c1bdbbba4e5feec5e0f5275006b72abe3460e1ab"
+    },
+    {
+      "path": "/tmp/motion-source-publication-185f02c2-20261001/jobs-36932741507.json",
+      "bytes": 28495,
+      "sha256": "4aa9cb64899c3662ff133c3b73e4619fd9ac3bff1943c88c51fa08ebe8742544"
+    },
+    {
+      "path": "/tmp/motion-source-publication-185f02c2-20261001/check-runs.json",
+      "bytes": 39304,
+      "sha256": "44d155d3e209f658dd4ba54deb18a934012873e6be5e927b7e631ff04a5e2eec"
+    },
+    {
+      "path": "/tmp/motion-source-publication-185f02c2-20261001/issue-comments.json",
+      "bytes": 31601,
+      "sha256": "b940b88ffc246f5f509aa5e291ea844c77ca87df0930e4deb85952caca737f67"
+    }
+  ],
+  "local185WholeRESOURCEAANegativePreserved": true,
+  "isolatedQuietRESOURCEControlSeparate": true,
+  "actualRegisteredSamples": 0
+}

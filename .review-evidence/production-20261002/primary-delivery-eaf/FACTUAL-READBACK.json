@@ -1,0 +1,170 @@
+{
+  "at": "2026-10-01T22:22:35.863285+00:00",
+  "verdict": "PASS_DELIVERY_FACTUAL_ADDENDUM",
+  "axis": "custom-ref carrier source→provider objects→exact compressed consumer bytes only",
+  "candidate": "eaf0f9509c9d48aaec367ca108c79622b247250e",
+  "tree": "97ff31635b960a8561e370e02d59f73d6307f255",
+  "parent": "13a1f35d21c185bf3badba8c12c07dce0268af15",
+  "customRef": "refs/evidence/production-primary-20261001",
+  "remoteUniquePhysicalObjects": 477,
+  "remoteAliases": 699,
+  "remotePhysicalBytes": 702081502,
+  "allRemoteTreeRowsEqualOwnPrepublicationGitMetadata": true,
+  "allProviderRecursiveTreeOIDsIndependentlyReencoded": true,
+  "providerDirectoriesReencoded": 233,
+  "base647LeavesConserved": true,
+  "createdTrees68OwnSequenceMatched": true,
+  "all477JournalRowsIndependentlyBoundToPinnedPhysicalMap": true,
+  "streamStderr477Empty": true,
+  "actualProviderHydrationCompressedBytes": 44790883,
+  "actualProviderHydrationSha256": "298745c674a4f2f9eabbb24abe9ccf82e7d9e467e9f5492b4ee5ce9e59b260f7",
+  "actualProviderHydrationGitBlob": "5becf6dab5ef9aa4ae3d340818e3811c01b583bc",
+  "providerLiteralOriginalComparison": true,
+  "independentProviderReadbackRole": "Reviewer checks completed primary producer logs and exact producer code; ROOT executed provider streams and provider hydration. Prior independent local byte restoration is separately scoped.",
+  "fullGzipDecodePerformed": false,
+  "decodedPrefixBytes": 8192,
+  "registeredTimingSamples": 0,
+  "readerAdditionalPayloadBytesRead": 0,
+  "readerAdditionalNetworkCalls": 0,
+  "bareGitReadsOrChildrenStillNeeded": false,
+  "readerChildren": "END",
+  "authorFullReportOrForeignReviewsUsed": false,
+  "inputs": [
+    {
+      "path": "/tmp/motion-primary-segmented-staging-20261001/physical-object-bindings.json",
+      "bytes": 235687,
+      "sha256": "f2e98cea8c23ea1f155344ada5d11818679665d1ad1c94b8a98ce5f4e7803e0b",
+      "snapshot": "/tmp/motion-primary-delivery-factual-addendum-eaf0f950-20261001/primary/physical-object-bindings.json"
+    },
+    {
+      "path": "/tmp/motion-primary-segmented-staging-20261001/remote-readback/before.json",
+      "bytes": 561831,
+      "sha256": "66207235c3a10ea8d62e232b10cf64ac8b4b7853edf9c33f19cc267e374aed2a",
+      "snapshot": "/tmp/motion-primary-delivery-factual-addendum-eaf0f950-20261001/primary/remote-before.json"
+    },
+    {
+      "path": "/tmp/motion-primary-incremental-tree-so-50ee1f52-20261001/true-Git-metadata-cache.json",
+      "bytes": 884863,
+      "sha256": "57c6d8c2433cd3bb2d55668b1a11684cb681bc453c1d75d04346677c6ce1f573"
+    },
+    {
+      "path": "/tmp/motion-primary-segmented-staging-20261001/remote-readback/full-remote-blob-sha256.jsonl",
+      "bytes": 212378,
+      "sha256": "23b1f6e4fcf334f8bed38342060f9dc917ea53e21dbb1501b27e47460fb10eac",
+      "snapshot": "/tmp/motion-primary-delivery-factual-addendum-eaf0f950-20261001/primary/full-remote-blob-sha256.jsonl"
+    },
+    {
+      "path": "/tmp/motion-primary-segmented-staging-20261001/remote-readback/terminal-receipt.json",
+      "bytes": 1710,
+      "sha256": "cc947460d4819d812804a047c618042e12d3f3a98956882b15acc1c7a65cef03",
+      "snapshot": "/tmp/motion-primary-delivery-factual-addendum-eaf0f950-20261001/primary/remote-terminal.json"
+    },
+    {
+      "path": "/tmp/motion-primary-segmented-staging-20261001/publication-incremental-trees/publication-receipt.json",
+      "bytes": 2840,
+      "sha256": "95d8f066a314ea8e823588286bf08f0c64c8a0f51f77dd97ad4f96405b161c5d",
+      "snapshot": "/tmp/motion-primary-delivery-factual-addendum-eaf0f950-20261001/publication-receipt.json"
+    },
+    {
+      "path": "/tmp/motion-primary-segmented-staging-20261001/publication-incremental-trees/created-trees.jsonl",
+      "bytes": 17808,
+      "sha256": "76aa334262c35c0c54b0dad0d4fa92431a9aba65e62ddbe7dc728353473f5fdb",
+      "snapshot": "/tmp/motion-primary-delivery-factual-addendum-eaf0f950-20261001/created-trees.jsonl"
+    },
+    {
+      "path": "/tmp/motion-primary-incremental-tree-so-50ee1f52-20261001/incremental-primary-readback.json",
+      "bytes": 21465,
+      "sha256": "99089c680df8a4c803147e33b54ceaad0c83cebfe83ccfe8f48f45448cf5a9c4"
+    },
+    {
+      "path": "/tmp/motion-primary-segmented-staging-20261001/publication-incremental-trees/atomic-ref-update.json",
+      "bytes": 768,
+      "sha256": "abecd2adc829acfdcb2928f40fb58eef8eaf113acfb059a2dc815479c272c0de",
+      "snapshot": "/tmp/motion-primary-delivery-factual-addendum-eaf0f950-20261001/atomic-ref-update.json"
+    },
+    {
+      "path": "/tmp/motion-primary-segmented-staging-20261001/publication-incremental-trees/exact-created-objects.json",
+      "bytes": 10580,
+      "sha256": "5ef43a5b867366f8151018be70d19ea6a567eea4a364df5ba9f40e974c1932b3",
+      "snapshot": "/tmp/motion-primary-delivery-factual-addendum-eaf0f950-20261001/exact-created-objects.json"
+    },
+    {
+      "path": "/tmp/motion-primary-segmented-staging-20261001/publication-incremental-trees/before.json",
+      "bytes": 1388,
+      "sha256": "aec19935d4d273268513e80789bf83c82c415c32e94bb151f2395340d161fcb2",
+      "snapshot": "/tmp/motion-primary-delivery-factual-addendum-eaf0f950-20261001/before.json"
+    },
+    {
+      "path": "/tmp/motion-primary-segmented-staging-20261001/provider-hydration/maxN1024.ndjson.gz.parts.json",
+      "bytes": 2199,
+      "sha256": "c32eb1fe6d805d598db43fbe767a6d4af2aa5b8029309671676e55e1a7d93139",
+      "snapshot": "/tmp/motion-primary-delivery-factual-addendum-eaf0f950-20261001/primary/provider-recipe.json"
+    },
+    {
+      "path": "/tmp/motion-primary-segmented-staging-20261001/provider-hydration/hydrate-segments.py",
+      "bytes": 8391,
+      "sha256": "e298de0b2a13d0f9fec0f865a0e83a957c384202038a68ad1668aa2d9436f68d",
+      "snapshot": "/tmp/motion-primary-delivery-factual-addendum-eaf0f950-20261001/primary/provider-loader.py"
+    },
+    {
+      "path": "/tmp/motion-primary-segmented-staging-20261001/provider-hydration/loader.stdout",
+      "bytes": 946,
+      "sha256": "e394e453267f8caff969e00118b35d7deb232a5c0d845e470e01ff89d8a6ec09",
+      "snapshot": "/tmp/motion-primary-delivery-factual-addendum-eaf0f950-20261001/primary/provider-loader.stdout"
+    },
+    {
+      "path": "/tmp/motion-primary-segmented-staging-20261001/provider-hydration/execution.json",
+      "bytes": 757,
+      "sha256": "992a30143dc2f054d67d65f5d441c2f3e0d2ac696845e1ccbbd43376f0f7c981",
+      "snapshot": "/tmp/motion-primary-delivery-factual-addendum-eaf0f950-20261001/primary/provider-execution.json"
+    },
+    {
+      "path": "/tmp/motion-primary-segmented-staging-20261001/provider-hydration/loader.stderr",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "snapshot": "/tmp/motion-primary-delivery-factual-addendum-eaf0f950-20261001/primary/loader.stderr"
+    },
+    {
+      "path": "/tmp/motion-primary-segmented-staging-20261001/provider-hydration/hydrate-segments.py.stderr",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "snapshot": "/tmp/motion-primary-delivery-factual-addendum-eaf0f950-20261001/primary/hydrate-segments.py.stderr"
+    },
+    {
+      "path": "/tmp/motion-primary-segmented-staging-20261001/provider-hydration/maxN1024.ndjson.gz.parts.json.stderr",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "snapshot": "/tmp/motion-primary-delivery-factual-addendum-eaf0f950-20261001/primary/maxN1024.ndjson.gz.parts.json.stderr"
+    },
+    {
+      "path": "/tmp/motion-primary-segmented-staging-20261001/provider-hydration/terminal-receipt.json",
+      "bytes": 1826,
+      "sha256": "125da3c597e77f3cfae355d0224903182938582e1dc56496b607488569454c5d",
+      "snapshot": "/tmp/motion-primary-delivery-factual-addendum-eaf0f950-20261001/primary/provider-terminal.json"
+    },
+    {
+      "path": "/tmp/motion-primary-segmented-staging-20261001/provider-hydration/before.json",
+      "bytes": 547,
+      "sha256": "cacfc3d51477b349b377cc9e22e2efcf8ef2a06173544e68c8ed5ddc09ca6c31",
+      "snapshot": "/tmp/motion-primary-delivery-factual-addendum-eaf0f950-20261001/primary/provider-before.json"
+    },
+    {
+      "path": "/workspace/scratch/verify-motion-primary-segmented-remote-eaf0f950-20261001.py",
+      "bytes": 4694,
+      "sha256": "852369235e2fcf2f49a90ce6ff4a67ea1a3407c4491ca1d4b720164924fd75a6",
+      "snapshot": "/tmp/motion-primary-delivery-factual-addendum-eaf0f950-20261001/primary/stream-producer.py"
+    },
+    {
+      "path": "/workspace/scratch/verify-motion-primary-provider-hydration-eaf0f950-20261001.py",
+      "bytes": 4504,
+      "sha256": "57cc31c7489647bee16ba34a8c34e1fcbe665ec6bc0661b35aa381a8cc1bb30e",
+      "snapshot": "/tmp/motion-primary-delivery-factual-addendum-eaf0f950-20261001/primary/hydration-producer.py"
+    },
+    {
+      "path": "/workspace/scratch/publish-motion-primary-segmented-eaf0f950-incremental-trees-20261001.py",
+      "bytes": 12717,
+      "sha256": "50ee1f5294d4abe67a33a3a8c76b0f7205a6e6b8dc385b6f41d303c788658814",
+      "snapshot": "/tmp/motion-primary-delivery-factual-addendum-eaf0f950-20261001/primary/publisher.py"
+    }
+  ]
+}

@@ -1,0 +1,83 @@
+{
+  "at": "2026-10-01T23:19:16.564810+00:00",
+  "head": "185f02c2a85972a531627e14b7e0207e27855f95",
+  "packetSha256": "85d86f01d2fdc729a702dcbb3c60f8d5732c9b23a1e683736c9ec0d76ea02a6e",
+  "tupleSha256": "e9687480c8ce7d2028a55275e84a77f9ce195cdbae783170573bf63035c52f31",
+  "bindings": [
+    {
+      "path": "/tmp/motion-server-predata-185f02c2-7016c19a-20261001-epoch6/checks-at-preparation.json",
+      "bytes": 45374,
+      "sha256": "6fad799dc7fe209d3afbf5f0716f1e7f4c095b080ea78be080da08b053939f64"
+    },
+    {
+      "path": "/tmp/motion-server-predata-185f02c2-7016c19a-20261001-epoch6/launch-single-series.py",
+      "bytes": 2996,
+      "sha256": "9910bc3d0fa5341a79392bc5f7d586e0ac3d4564026f06e14ca2239566b8d0ea"
+    },
+    {
+      "path": "/tmp/motion-server-predata-185f02c2-7016c19a-20261001-epoch6/plan-context-conservation.json",
+      "bytes": 2258,
+      "sha256": "b037c572c7720f945b7281df12c2c20d85631301b56a26f7533acd4fa655505c"
+    },
+    {
+      "path": "/tmp/motion-server-predata-185f02c2-7016c19a-20261001-epoch6/predata-tuple.json",
+      "bytes": 39450,
+      "sha256": "e9687480c8ce7d2028a55275e84a77f9ce195cdbae783170573bf63035c52f31"
+    },
+    {
+      "path": "/tmp/motion-server-predata-185f02c2-7016c19a-20261001-epoch6/predata-tuple.sha256",
+      "bytes": 85,
+      "sha256": "742d88fdba7cc3e963130dd2fbece0f16c9c993bd52efb5dec3b2ccca7bfc770"
+    },
+    {
+      "path": "/tmp/motion-server-predata-185f02c2-7016c19a-20261001-epoch6/prepare-delta.mjs",
+      "bytes": 4691,
+      "sha256": "7332383c9aa582076764406f6bc1250b57ffb485fa872ab7d75a436f29342fd4"
+    },
+    {
+      "path": "/tmp/motion-server-predata-185f02c2-7016c19a-20261001-epoch6/tool-environment-delta.json",
+      "bytes": 383,
+      "sha256": "71f9850ec70abaaac9585a53e6e23741fdcee2ad57fea040df8b2f81d8bf3e17"
+    }
+  ],
+  "allMatch": true,
+  "conservedSemanticFields": [
+    "expectedHead",
+    "baselineRevision",
+    "protocol",
+    "protocolDigest",
+    "clockModelDigest",
+    "sourceFreeze",
+    "ownerHashes",
+    "source",
+    "existingActualPackages",
+    "publicationClockSourceFreeze",
+    "sourcePins"
+  ],
+  "machineIdentityConserved": true,
+  "clockRegistrationDeltaLimitedTo": "Freshmachineobservationtime/load/memory plus exactbaseline tsupdigest0069→8973; allotherclockregistrationfields literalconserved.",
+  "environmentDelta": {
+    "baseline": {
+      "tsup": {
+        "before": {
+          "version": "8.5.1",
+          "sha256": "0069fb7e1c74f8ad7960292641dfe1d71f2d86eac24f803ed5c9adcba9a1058e",
+          "files": 25
+        },
+        "after": {
+          "version": "8.5.1",
+          "sha256": "897380bc5824e41999cad580dee5670f791646847cbdb01a741bbccd94ae8847",
+          "files": 25
+        }
+      }
+    },
+    "candidate": {}
+  },
+  "source17StillMatches": true,
+  "sameOriginalInvocationExceptFreshOutput": true,
+  "sampleBoundsChainStoppingConserved": true,
+  "samples": 0,
+  "outputAbsent": true,
+  "qualification": "Metadataonlycurrenttooltree delta beforefirstpilot; source/profile/clock/Nlaw/tars/toolversions/candidate/otherbaseline tools unchanged. Historicalbrowser-tree certificate transfer qualified and actualCLI revalidates identity beforedata. Finalquiet/resourcegrant pendingboundedpredataaxis.",
+  "initialRootReaderRefusal": "First root assumed entireclockRegistration equality; diagnosticleafdiff proved onlyfreshmachineobservations and exactknownbaseline toolhashdelta. Corrected expectation to these allowedmetadatachanges; clock model/machineidentity andall otherregistrationfields retained exactchecks."
+}

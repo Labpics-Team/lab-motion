@@ -1,0 +1,29 @@
+{
+  "observedAt": "2026-10-01T22:12:36.480852+00:00",
+  "sourceHead": "185f02c2a85972a531627e14b7e0207e27855f95",
+  "actualMergeCheckout": "19b0eeb0c52da96275e5493054e33f4a74672480",
+  "actualMergeParents": [
+    "957ceaf26501525eff476cdc1d149d81fd5ebcd7",
+    "185f02c2a85972a531627e14b7e0207e27855f95"
+  ],
+  "mergeTree": "d2b7d736ba9a37b930a0bd4cfa3cae92f12a92bc",
+  "candidateTree": "d2b7d736ba9a37b930a0bd4cfa3cae92f12a92bc",
+  "mergeTreeMatchesCandidate": true,
+  "requiredCiRun": 36932741507,
+  "testFuzzJob": 110605778207,
+  "testFiles": 344,
+  "passed": 4975,
+  "failed": 0,
+  "finitenessTests": 111,
+  "protectedFullFourMsReported": 22739,
+  "protectedPartialMsReported": 16510,
+  "protectedTimeoutMs": 30000,
+  "node": "24.21.0",
+  "rawDecodedLog": {
+    "path": "/tmp/motion-source-publication-185f02c2-20261001/test-fuzz-110605778207.log",
+    "bytes": 200382,
+    "sha256": "133a83c78678d07d33cfe74032f4cec8dec4fc6554172cc56f008bbd313457cf"
+  },
+  "rerun": false,
+  "qualification": "Local185 canonical AA calibration refusal remains historical fact; fresh exact-tree hosted fullsuite PASS is separate evidence, not cause attribution or deletion. CurrentCR pending; no actualregistered samples."
+}

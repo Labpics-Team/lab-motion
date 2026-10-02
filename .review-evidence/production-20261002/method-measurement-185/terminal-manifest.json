@@ -1,0 +1,89 @@
+{
+  "sourceGit": "185f02c2a85972a531627e14b7e0207e27855f95",
+  "sourceTree": "d2b7d736ba9a37b930a0bd4cfa3cae92f12a92bc",
+  "inputPrimarySha256": "9c5bbb20ca1c9e8442cbe692710f9d62bf91d3d1865b58d6eba4a2365831bc9a",
+  "sourceArchiveSha256": "8c7d68e4a045f71a5059fce689e31747165d2ce7b332b26a1ade9eef9cf89019",
+  "protocolDigest": "7016c19aa7a763fee68687327ef489abb119acd2a43d397b8485ca56e4cea15f",
+  "clockModelDigest": "7e45adab88a2c97af4e9074543318ae115e42b5c9669c4746b6e149d42bfbc4f",
+  "deltaVerdict": "PASS-scoped",
+  "measurementMethodVerdict": "PASS-scoped affected delta with exact qualified own-chain operator transfer",
+  "confirmedMeasurementBlockers": [],
+  "actualPerformanceQualification": "UNPROVEN",
+  "actualRegisteredTimingSamples": 0,
+  "ordinaryProductionGate": "INCOMPLETE: retained RESOURCE heap A/A refusal before candidate admission",
+  "ownHarnessFailuresRetained": true,
+  "invalidation": "Any later source/operator/serializer/parser/cache ownership/runtime/clock/protocol/environment/artifact change requires affected closure; future source or package bytes are not accepted by this report.",
+  "utc": "2026-10-01T22:16:22.268278+00:00",
+  "axis": "measurement validity; own-chain frozen185 affected common UTF8/CSS context/resource/CLI delta",
+  "bindings": {
+    "REPORT-RU.md": {
+      "path": "REPORT-RU.md",
+      "sha256": "4181a83c8c5c46353f7f51dc0559d4c91209b7fc156c966028dc8a39063838ec",
+      "bytes": 28858
+    },
+    "measurement-verdict.json": {
+      "path": "measurement-verdict.json",
+      "sha256": "faf07768e17423f50020cace5b9b8e19badf68d21e19a61d19ca7b934a529a1c",
+      "bytes": 1356
+    },
+    "exact-readset.json": {
+      "path": "exact-readset.json",
+      "sha256": "a6314e72417af332563bbeacd9cace17a8ab25102de4e1e713a1091d1059a9cd",
+      "bytes": 172761
+    },
+    "commands.jsonl": {
+      "path": "commands.jsonl",
+      "sha256": "df9d3093c7981c7edb7d3a594ed7d44266871e9cc0efc7697f8bc12d32fca08b",
+      "bytes": 363472
+    },
+    "input-rehash.json": {
+      "path": "input-rehash.json",
+      "sha256": "a7fe5d3a2341695a6fb16c4916a4c6c10e3dcf00ed2c5c8ae94db37b3e576753",
+      "bytes": 124859
+    },
+    "PRIMARY/PRIMARY-MANIFEST.json": {
+      "path": "PRIMARY/PRIMARY-MANIFEST.json",
+      "sha256": "a12b605e7a8196f97712d69fdff7b37269a3d70e936b337f120370be9463fdd6",
+      "bytes": 20640
+    },
+    "output-manifest.json": {
+      "path": "output-manifest.json",
+      "sha256": "82f6a501b787eb9465ee735d7748fc7a1b35c99db49010016b6b4570ceaea7bd",
+      "bytes": 156696
+    },
+    "heavy-END.json": {
+      "path": "heavy-END.json",
+      "sha256": "d87d039fa93c05a01f922d090407919f43c669eed3f1bea9144d079669c802fc",
+      "bytes": 507
+    },
+    "bounded-execution.json": {
+      "path": "bounded-execution.json",
+      "sha256": "4c9f46d0eb35e46c8d3c2c61e860213f4092d518db546e334798c666d9df81ab",
+      "bytes": 1594
+    },
+    "boundary-result.json": {
+      "path": "boundary-result.json",
+      "sha256": "3eea1c60cec9318d6f2c6427ff0de2c07a7c198fb183cf057acea4962ff4ce9f",
+      "bytes": 4636353
+    },
+    "journal-result.json": {
+      "path": "journal-result.json",
+      "sha256": "f73c39fadc91738a37f66e802d451395b45b1a3f2c3438f656b581aa6abd016c",
+      "bytes": 5072654
+    },
+    "transfer-proof.json": {
+      "path": "transfer-proof.json",
+      "sha256": "7e7650bbb1088a284c91bcd2af39d868055772eefe9fca62443180bd2f27a655",
+      "bytes": 188601
+    },
+    "own-harness-errors.json": {
+      "path": "own-harness-errors.json",
+      "sha256": "370145e4ba96c70520f1c3cf15b610c5d1ec1260aa15a9a9e6a2757f6bb6b05f",
+      "bytes": 2858
+    }
+  },
+  "processesClosed": true,
+  "fifoRemaining": [],
+  "ownHeavyProcesses": 0,
+  "slotFree": true
+}

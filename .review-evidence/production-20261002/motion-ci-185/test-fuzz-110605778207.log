@@ -1,0 +1,1524 @@
+﻿2026-10-01T22:04:03.5863196Z Current runner version: '2.337.0'
+2026-10-01T22:04:03.5883955Z ##[group]Runner Image Provisioner
+2026-10-01T22:04:03.5884705Z Hosted Compute Agent
+2026-10-01T22:04:03.5885289Z Version: 20260901.588
+2026-10-01T22:04:03.5885883Z Commit: f88ec8081b781fac6c440065ac7ff9e710ce3d0b
+2026-10-01T22:04:03.5886525Z Build Date: 2026-09-01T19:56:44Z
+2026-10-01T22:04:03.5887091Z Worker ID: {bed8c71d-e01f-4f34-a43f-1239fdc8a59c}
+2026-10-01T22:04:03.5887770Z Azure Region: eastus
+2026-10-01T22:04:03.5888280Z ##[endgroup]
+2026-10-01T22:04:03.5889669Z ##[group]Operating System
+2026-10-01T22:04:03.5890219Z Ubuntu
+2026-10-01T22:04:03.5890660Z 24.04.5
+2026-10-01T22:04:03.5891134Z LTS
+2026-10-01T22:04:03.5891602Z ##[endgroup]
+2026-10-01T22:04:03.5892129Z ##[group]Runner Image
+2026-10-01T22:04:03.5892915Z Image: ubuntu-24.04
+2026-10-01T22:04:03.5893400Z Version: 20260927.320.1
+2026-10-01T22:04:03.5894500Z Included Software: https://github.com/actions/runner-images/blob/ubuntu24/20260927.320/images/ubuntu/Ubuntu2404-Readme.md
+2026-10-01T22:04:03.5895862Z Image Release: https://github.com/actions/runner-images/releases/tag/ubuntu24%2F20260927.320
+2026-10-01T22:04:03.5896687Z ##[endgroup]
+2026-10-01T22:04:03.5897603Z ##[group]GITHUB_TOKEN Permissions
+2026-10-01T22:04:03.5899415Z Contents: read
+2026-10-01T22:04:03.5899989Z Metadata: read
+2026-10-01T22:04:03.5900602Z ##[endgroup]
+2026-10-01T22:04:03.5902327Z Secret source: Actions
+2026-10-01T22:04:03.5903442Z Cache mode: write
+2026-10-01T22:04:03.5904055Z Prepare workflow directory
+2026-10-01T22:04:03.6209871Z Prepare all required actions
+2026-10-01T22:04:03.6248999Z Getting action download info
+2026-10-01T22:04:03.9161100Z Download action repository 'actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1' (SHA:3d3c42e5aac5ba805825da76410c181273ba90b1)
+2026-10-01T22:04:04.1350358Z Download action repository 'actions/setup-node@820762786026740c76f36085b0efc47a31fe5020' (SHA:820762786026740c76f36085b0efc47a31fe5020)
+2026-10-01T22:04:04.7283137Z Download action repository 'actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a' (SHA:043fb46d1a93c77aae656e7c1c64a875d1fc6a0a)
+2026-10-01T22:04:05.0449499Z Complete job name: test · fuzz
+2026-10-01T22:04:05.1089903Z ##[group]Run actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+2026-10-01T22:04:05.1090756Z with:
+2026-10-01T22:04:05.1091118Z   persist-credentials: false
+2026-10-01T22:04:05.1091526Z   fetch-depth: 0
+2026-10-01T22:04:05.1091901Z   repository: Labpics-Team/lab-motion
+2026-10-01T22:04:05.1095316Z   token: ***
+2026-10-01T22:04:05.1095680Z   ssh-strict: true
+2026-10-01T22:04:05.1096037Z   ssh-user: git
+2026-10-01T22:04:05.1096385Z   clean: true
+2026-10-01T22:04:05.1096745Z   sparse-checkout-cone-mode: true
+2026-10-01T22:04:05.1097163Z   fetch-tags: false
+2026-10-01T22:04:05.1097526Z   show-progress: true
+2026-10-01T22:04:05.1097899Z   lfs: false
+2026-10-01T22:04:05.1098252Z   submodules: false
+2026-10-01T22:04:05.1098624Z   set-safe-directory: true
+2026-10-01T22:04:05.1099038Z   allow-unsafe-pr-checkout: false
+2026-10-01T22:04:05.1099689Z env:
+2026-10-01T22:04:05.1100039Z   COREPACK_ENABLE_DOWNLOAD_PROMPT: 0
+2026-10-01T22:04:05.1100491Z   COREPACK_DEFAULT_TO_LATEST: 0
+2026-10-01T22:04:05.1100933Z ##[endgroup]
+2026-10-01T22:04:05.1919400Z Syncing repository: Labpics-Team/lab-motion
+2026-10-01T22:04:05.1921580Z ##[group]Getting Git version info
+2026-10-01T22:04:05.1922660Z Working directory is '/home/runner/work/lab-motion/lab-motion'
+2026-10-01T22:04:05.1923994Z [command]/usr/bin/git version
+2026-10-01T22:04:05.1972920Z git version 2.55.0
+2026-10-01T22:04:05.1989138Z ##[endgroup]
+2026-10-01T22:04:05.1997390Z Temporarily overriding HOME='/home/runner/work/_temp/1ac5bf17-106d-40c2-8c59-16e9c6e95444' before making global git config changes
+2026-10-01T22:04:05.1999344Z Adding repository directory to the temporary git global config as a safe directory
+2026-10-01T22:04:05.2003155Z [command]/usr/bin/git config --global --add safe.directory /home/runner/work/lab-motion/lab-motion
+2026-10-01T22:04:05.2079974Z Deleting the contents of '/home/runner/work/lab-motion/lab-motion'
+2026-10-01T22:04:05.2083036Z ##[group]Determining repository object format
+2026-10-01T22:04:05.2084467Z ##[endgroup]
+2026-10-01T22:04:05.2085357Z ##[group]Initializing the repository
+2026-10-01T22:04:05.2090183Z [command]/usr/bin/git init /home/runner/work/lab-motion/lab-motion
+2026-10-01T22:04:05.2413956Z hint: Using 'master' as the name for the initial branch. This default branch name
+2026-10-01T22:04:05.2415553Z hint: will change to "main" in Git 3.0. To configure the initial branch name
+2026-10-01T22:04:05.2417073Z hint: to use in all of your new repositories, which will suppress this warning,
+2026-10-01T22:04:05.2418240Z hint: call:
+2026-10-01T22:04:05.2418953Z hint:
+2026-10-01T22:04:05.2419795Z hint: 	git config --global init.defaultBranch <name>
+2026-10-01T22:04:05.2420747Z hint:
+2026-10-01T22:04:05.2421673Z hint: Names commonly chosen instead of 'master' are 'main', 'trunk' and
+2026-10-01T22:04:05.2423314Z hint: 'development'. The just-created branch can be renamed via this command:
+2026-10-01T22:04:05.2424686Z hint:
+2026-10-01T22:04:05.2425525Z hint: 	git branch -m <name>
+2026-10-01T22:04:05.2426329Z hint:
+2026-10-01T22:04:05.2427304Z hint: Disable this message with "git config set advice.defaultBranchName false"
+2026-10-01T22:04:05.2428956Z Initialized empty Git repository in /home/runner/work/lab-motion/lab-motion/.git/
+2026-10-01T22:04:05.2431738Z [command]/usr/bin/git remote add origin https://github.com/Labpics-Team/lab-motion
+2026-10-01T22:04:05.2700440Z ##[endgroup]
+2026-10-01T22:04:05.2701149Z ##[group]Disabling automatic garbage collection
+2026-10-01T22:04:05.2703872Z [command]/usr/bin/git config --local gc.auto 0
+2026-10-01T22:04:05.3041794Z ##[endgroup]
+2026-10-01T22:04:05.3043157Z ##[group]Setting up auth
+2026-10-01T22:04:05.3043893Z Removing SSH command configuration
+2026-10-01T22:04:05.3048297Z [command]/usr/bin/git config --local --name-only --get-regexp core\.sshCommand
+2026-10-01T22:04:05.3082024Z [command]/usr/bin/git submodule foreach --recursive sh -c "git config --local --name-only --get-regexp 'core\.sshCommand' && git config --local --unset-all 'core.sshCommand' || :"
+2026-10-01T22:04:05.3463313Z Removing HTTP extra header
+2026-10-01T22:04:05.3467986Z [command]/usr/bin/git config --local --name-only --get-regexp http\.https\:\/\/github\.com\/\.extraheader
+2026-10-01T22:04:05.3498024Z [command]/usr/bin/git submodule foreach --recursive sh -c "git config --local --name-only --get-regexp 'http\.https\:\/\/github\.com\/\.extraheader' && git config --local --unset-all 'http.https://github.com/.extraheader' || :"
+2026-10-01T22:04:05.3692323Z Removing includeIf entries pointing to credentials config files
+2026-10-01T22:04:05.3696517Z [command]/usr/bin/git config --local --name-only --get-regexp ^includeIf\.gitdir:
+2026-10-01T22:04:05.3725443Z [command]/usr/bin/git submodule foreach --recursive git config --local --show-origin --name-only --get-regexp remote.origin.url
+2026-10-01T22:04:05.3926094Z [command]/usr/bin/git config --file /home/runner/work/_temp/git-credentials-dcffbebc-c46e-49c1-98d4-da5c8666d2f2.config http.https://github.com/.extraheader AUTHORIZATION: basic ***
+2026-10-01T22:04:05.4040389Z [command]/usr/bin/git config --local includeIf.gitdir:/home/runner/work/lab-motion/lab-motion/.git.path /home/runner/work/_temp/git-credentials-dcffbebc-c46e-49c1-98d4-da5c8666d2f2.config
+2026-10-01T22:04:05.4182355Z [command]/usr/bin/git config --local includeIf.gitdir:/home/runner/work/lab-motion/lab-motion/.git/worktrees/*.path /home/runner/work/_temp/git-credentials-dcffbebc-c46e-49c1-98d4-da5c8666d2f2.config
+2026-10-01T22:04:05.4321317Z [command]/usr/bin/git config --local includeIf.gitdir:/github/workspace/.git.path /github/runner_temp/git-credentials-dcffbebc-c46e-49c1-98d4-da5c8666d2f2.config
+2026-10-01T22:04:05.4400385Z [command]/usr/bin/git config --local includeIf.gitdir:/github/workspace/.git/worktrees/*.path /github/runner_temp/git-credentials-dcffbebc-c46e-49c1-98d4-da5c8666d2f2.config
+2026-10-01T22:04:05.4445190Z ##[endgroup]
+2026-10-01T22:04:05.4446194Z ##[group]Fetching the repository
+2026-10-01T22:04:05.4447518Z [command]/usr/bin/git -c protocol.version=2 fetch --no-tags --prune --no-recurse-submodules origin +refs/heads/*:refs/remotes/origin/* +refs/tags/*:refs/tags/* +19b0eeb0c52da96275e5493054e33f4a74672480:refs/remotes/pull/460/merge
+2026-10-01T22:04:08.7576200Z From https://github.com/Labpics-Team/lab-motion
+2026-10-01T22:04:08.7578031Z  * [new branch]        agent/benchmark-report-882280e           -> origin/agent/benchmark-report-882280e
+2026-10-01T22:04:08.7578952Z  * [new branch]        agent/production-readiness               -> origin/agent/production-readiness
+2026-10-01T22:04:08.7579826Z  * [new branch]        agent/release-tag-before-publish         -> origin/agent/release-tag-before-publish
+2026-10-01T22:04:08.7580807Z  * [new branch]        autoresearch/bounded-transform-key-scan  -> origin/autoresearch/bounded-transform-key-scan
+2026-10-01T22:04:08.7581813Z  * [new branch]        autoresearch/callgrind-bind-415-r1       -> origin/autoresearch/callgrind-bind-415-r1
+2026-10-01T22:04:08.7583173Z  * [new branch]        autoresearch/deliver-smart-ghost-owner-r1 -> origin/autoresearch/deliver-smart-ghost-owner-r1
+2026-10-01T22:04:08.7584119Z  * [new branch]        autoresearch/fixed-code-ptrace-415-r1    -> origin/autoresearch/fixed-code-ptrace-415-r1
+2026-10-01T22:04:08.7584765Z  * [new branch]        autoresearch/frame-requester-state-20260916 -> origin/autoresearch/frame-requester-state-20260916
+2026-10-01T22:04:08.7585465Z  * [new branch]        autoresearch/hybrid-known-set-elision-r1 -> origin/autoresearch/hybrid-known-set-elision-r1
+2026-10-01T22:04:08.7586118Z  * [new branch]        autoresearch/plan-replay-r11-carrier     -> origin/autoresearch/plan-replay-r11-carrier
+2026-10-01T22:04:08.7586705Z  * [new branch]        autoresearch/qemu-ir-415-20260916        -> origin/autoresearch/qemu-ir-415-20260916
+2026-10-01T22:04:08.7587300Z  * [new branch]        autoresearch/selfhosted-pmu-415-r1       -> origin/autoresearch/selfhosted-pmu-415-r1
+2026-10-01T22:04:08.7588233Z  * [new branch]        autoresearch/smart-ghost-owner-adversarial-r3 -> origin/autoresearch/smart-ghost-owner-adversarial-r3
+2026-10-01T22:04:08.7588980Z  * [new branch]        autoresearch/smart-ghost-owner-cpu-r2    -> origin/autoresearch/smart-ghost-owner-cpu-r2
+2026-10-01T22:04:08.7589673Z  * [new branch]        autoresearch/smart-ghost-owner-r1        -> origin/autoresearch/smart-ghost-owner-r1
+2026-10-01T22:04:08.7653284Z  * [new branch]        autoresearch/timer-wrapper-elision-20260916 -> origin/autoresearch/timer-wrapper-elision-20260916
+2026-10-01T22:04:08.7654468Z  * [new branch]        autoresearch/timer-wrapper-topology-20260916 -> origin/autoresearch/timer-wrapper-topology-20260916
+2026-10-01T22:04:08.7655665Z  * [new branch]        autoresearch/transform-bind-rdtsc-20260915 -> origin/autoresearch/transform-bind-rdtsc-20260915
+2026-10-01T22:04:08.7656729Z  * [new branch]        autoresearch/transform-bind-start-proof-20260915 -> origin/autoresearch/transform-bind-start-proof-20260915
+2026-10-01T22:04:08.7657765Z  * [new branch]        canary/architecture-observer-vendor      -> origin/canary/architecture-observer-vendor
+2026-10-01T22:04:08.7658672Z  * [new branch]        carrier/inview-owner-fusion-r11          -> origin/carrier/inview-owner-fusion-r11
+2026-10-01T22:04:08.7659762Z  * [new branch]        carrier/projection-affine-overflow-fix-20260914 -> origin/carrier/projection-affine-overflow-fix-20260914
+2026-10-01T22:04:08.7660881Z  * [new branch]        carrier/r11-affine-overflow-green-20260914 -> origin/carrier/r11-affine-overflow-green-20260914
+2026-10-01T22:04:08.7661976Z  * [new branch]        carrier/r11-affine-overflow-red-20260914 -> origin/carrier/r11-affine-overflow-red-20260914
+2026-10-01T22:04:08.7663148Z  * [new branch]        carrier/r11-dom-tuples-20260915          -> origin/carrier/r11-dom-tuples-20260915
+2026-10-01T22:04:08.7664099Z  * [new branch]        carrier/r11-dominant-fusion-20260915     -> origin/carrier/r11-dominant-fusion-20260915
+2026-10-01T22:04:08.7665379Z  * [new branch]        carrier/r11-geometry-basis-ssot-20260914 -> origin/carrier/r11-geometry-basis-ssot-20260914
+2026-10-01T22:04:08.7666458Z  * [new branch]        carrier/r11-geometry-channel-v0-20260914 -> origin/carrier/r11-geometry-channel-v0-20260914
+2026-10-01T22:04:08.7667818Z  * [new branch]        carrier/r11-geometry-contract-owner-cleanup-20260914 -> origin/carrier/r11-geometry-contract-owner-cleanup-20260914
+2026-10-01T22:04:08.7669474Z  * [new branch]        carrier/r11-geometry-cost-ablation-20260914 -> origin/carrier/r11-geometry-cost-ablation-20260914
+2026-10-01T22:04:08.7670551Z  * [new branch]        carrier/r11-geometry-dom-compact-20260914 -> origin/carrier/r11-geometry-dom-compact-20260914
+2026-10-01T22:04:08.7671646Z  * [new branch]        carrier/r11-geometry-domain-boundary-20260914 -> origin/carrier/r11-geometry-domain-boundary-20260914
+2026-10-01T22:04:08.7672908Z  * [new branch]        carrier/r11-geometry-domain-dom-compact-20260914 -> origin/carrier/r11-geometry-domain-dom-compact-20260914
+2026-10-01T22:04:08.7673662Z  * [new branch]        carrier/r11-geometry-final-3b-20260914   -> origin/carrier/r11-geometry-final-3b-20260914
+2026-10-01T22:04:08.7674399Z  * [new branch]        carrier/r11-geometry-final-branch-elision-20260914 -> origin/carrier/r11-geometry-final-branch-elision-20260914
+2026-10-01T22:04:08.7675639Z  * [new branch]        carrier/r11-geometry-fused-retarget-20260914 -> origin/carrier/r11-geometry-fused-retarget-20260914
+2026-10-01T22:04:08.7676861Z  * [new branch]        carrier/r11-geometry-inline-clamp-20260914 -> origin/carrier/r11-geometry-inline-clamp-20260914
+2026-10-01T22:04:08.7678035Z  * [new branch]        carrier/r11-geometry-inline-state-20260914 -> origin/carrier/r11-geometry-inline-state-20260914
+2026-10-01T22:04:08.7679142Z  * [new branch]        carrier/r11-geometry-normalized-clamp-20260914 -> origin/carrier/r11-geometry-normalized-clamp-20260914
+2026-10-01T22:04:08.7680262Z  * [new branch]        carrier/r11-geometry-same-surface-combo-20260914 -> origin/carrier/r11-geometry-same-surface-combo-20260914
+2026-10-01T22:04:08.7681209Z  * [new branch]        carrier/r11-geometry-shared-position-20260914 -> origin/carrier/r11-geometry-shared-position-20260914
+2026-10-01T22:04:08.7681930Z  * [new branch]        carrier/r11-geometry-tuple-bounded-20260914 -> origin/carrier/r11-geometry-tuple-bounded-20260914
+2026-10-01T22:04:08.7682928Z  * [new branch]        carrier/r11-geometry-vector-fix-20260914 -> origin/carrier/r11-geometry-vector-fix-20260914
+2026-10-01T22:04:08.7683637Z  * [new branch]        carrier/r11-integrate-materialize-20260914 -> origin/carrier/r11-integrate-materialize-20260914
+2026-10-01T22:04:08.7684361Z  * [new branch]        carrier/r11-motion-contract-review-fix-20260914 -> origin/carrier/r11-motion-contract-review-fix-20260914
+2026-10-01T22:04:08.7685158Z  * [new branch]        carrier/r11-normalized-clamp-endpoint-lerp-20260914 -> origin/carrier/r11-normalized-clamp-endpoint-lerp-20260914
+2026-10-01T22:04:08.7686137Z  * [new branch]        carrier/r11-normalized-clamp-flight-bound-20260914 -> origin/carrier/r11-normalized-clamp-flight-bound-20260914
+2026-10-01T22:04:08.7686895Z  * [new branch]        carrier/r11-normalized-clamp-ieee-20260914 -> origin/carrier/r11-normalized-clamp-ieee-20260914
+2026-10-01T22:04:08.7687577Z  * [new branch]        carrier/r11-profile-calibration-20260915 -> origin/carrier/r11-profile-calibration-20260915
+2026-10-01T22:04:08.7688295Z  * [new branch]        carrier/r11-profile-desktop-inventory-20260915 -> origin/carrier/r11-profile-desktop-inventory-20260915
+2026-10-01T22:04:08.7689086Z  * [new branch]        carrier/r11-profile-registration-hardening-20260915 -> origin/carrier/r11-profile-registration-hardening-20260915
+2026-10-01T22:04:08.7689867Z  * [new branch]        carrier/r11-projection-cleanup-matrix-20260914 -> origin/carrier/r11-projection-cleanup-matrix-20260914
+2026-10-01T22:04:08.7690578Z  * [new branch]        carrier/r11-projection-dom-state-20260914 -> origin/carrier/r11-projection-dom-state-20260914
+2026-10-01T22:04:08.7691421Z  * [new branch]        carrier/r11-projection-metafile-20260914 -> origin/carrier/r11-projection-metafile-20260914
+2026-10-01T22:04:08.7692087Z  * [new branch]        carrier/r11-reorder-budget-fix-20260914  -> origin/carrier/r11-reorder-budget-fix-20260914
+2026-10-01T22:04:08.7692959Z  * [new branch]        carrier/r11-residual-algebra-matrix-20260914 -> origin/carrier/r11-residual-algebra-matrix-20260914
+2026-10-01T22:04:08.7693625Z  * [new branch]        carrier/r11-review-fixes-20260914        -> origin/carrier/r11-review-fixes-20260914
+2026-10-01T22:04:08.7694288Z  * [new branch]        carrier/r11-safe-structural-matrix-20260915 -> origin/carrier/r11-safe-structural-matrix-20260915
+2026-10-01T22:04:08.7695185Z  * [new branch]        chore/code-admission-public-carrier-20260920 -> origin/chore/code-admission-public-carrier-20260920
+2026-10-01T22:04:08.7696099Z  * [new branch]        chore/production-baseline                -> origin/chore/production-baseline
+2026-10-01T22:04:08.7696985Z  * [new branch]        chore/repository-governance-hardening    -> origin/chore/repository-governance-hardening
+2026-10-01T22:04:08.7697932Z  * [new branch]        chore/repository-hardening               -> origin/chore/repository-hardening
+2026-10-01T22:04:08.7698595Z  * [new branch]        claude/animation-library-production-4zhzvx -> origin/claude/animation-library-production-4zhzvx
+2026-10-01T22:04:08.7699312Z  * [new branch]        claude/product-production-readiness-ed7ok5 -> origin/claude/product-production-readiness-ed7ok5
+2026-10-01T22:04:08.7699994Z  * [new branch]        codex/motion-foundation-20260930         -> origin/codex/motion-foundation-20260930
+2026-10-01T22:04:08.7700674Z  * [new branch]        codex/motion-generic-follow-20261001     -> origin/codex/motion-generic-follow-20261001
+2026-10-01T22:04:08.7701294Z  * [new branch]        codex/motion-production-20261001         -> origin/codex/motion-production-20261001
+2026-10-01T22:04:08.7701941Z  * [new branch]        codex/motion-review-evidence-20261001    -> origin/codex/motion-review-evidence-20261001
+2026-10-01T22:04:08.7702934Z  * [new branch]        delivery/component-scope-376-20260913    -> origin/delivery/component-scope-376-20260913
+2026-10-01T22:04:08.7703568Z  * [new branch]        delivery/n-keyframes-205-20260913        -> origin/delivery/n-keyframes-205-20260913
+2026-10-01T22:04:08.7704166Z  * [new branch]        delivery/reorder-317-20260913            -> origin/delivery/reorder-317-20260913
+2026-10-01T22:04:08.7704780Z  * [new branch]        dependabot/npm_and_yarn/vitest-5.0.0     -> origin/dependabot/npm_and_yarn/vitest-5.0.0
+2026-10-01T22:04:08.7705368Z  * [new branch]        docs/motion-preview                      -> origin/docs/motion-preview
+2026-10-01T22:04:08.7705911Z  * [new branch]        docs/size-perf-table-step5               -> origin/docs/size-perf-table-step5
+2026-10-01T22:04:08.7706500Z  * [new branch]        feat/animate-component-scope-376         -> origin/feat/animate-component-scope-376
+2026-10-01T22:04:08.7707118Z  * [new branch]        feat/animate-keyframe-tracks-205         -> origin/feat/animate-keyframe-tracks-205
+2026-10-01T22:04:08.7707698Z  * [new branch]        feat/animate-linear-compile              -> origin/feat/animate-linear-compile
+2026-10-01T22:04:08.7708267Z  * [new branch]        feat/animate-n-keyframes-205             -> origin/feat/animate-n-keyframes-205
+2026-10-01T22:04:08.7708778Z  * [new branch]        feat/bench-wow                           -> origin/feat/bench-wow
+2026-10-01T22:04:08.7709310Z  * [new branch]        feat/compiler-nano-program-v1            -> origin/feat/compiler-nano-program-v1
+2026-10-01T22:04:08.7709885Z  * [new branch]        feat/compiler-nano-residual-v1           -> origin/feat/compiler-nano-residual-v1
+2026-10-01T22:04:08.7710449Z  * [new branch]        feat/compiler-static-nano-v1             -> origin/feat/compiler-static-nano-v1
+2026-10-01T22:04:08.7711000Z  * [new branch]        feat/controlled-reorder-317              -> origin/feat/controlled-reorder-317
+2026-10-01T22:04:08.7711733Z  * [new branch]        feat/interaction-state-cascade-20260912  -> origin/feat/interaction-state-cascade-20260912
+2026-10-01T22:04:08.7712366Z  * [new branch]        feat/nano-static-lowering-221            -> origin/feat/nano-static-lowering-221
+2026-10-01T22:04:08.7713092Z  * [new branch]        feat/native-scroll-waapi-20260912        -> origin/feat/native-scroll-waapi-20260912
+2026-10-01T22:04:08.7713660Z  * [new branch]        feat/perf-further-opts                   -> origin/feat/perf-further-opts
+2026-10-01T22:04:08.7714198Z  * [new branch]        feat/perf-hotpath-allocs                 -> origin/feat/perf-hotpath-allocs
+2026-10-01T22:04:08.7714745Z  * [new branch]        feat/perf-snap-read-hotpath              -> origin/feat/perf-snap-read-hotpath
+2026-10-01T22:04:08.7715262Z  * [new branch]        feat/perf-timeline                       -> origin/feat/perf-timeline
+2026-10-01T22:04:08.7715750Z  * [new branch]        feat/presets-start                       -> origin/feat/presets-start
+2026-10-01T22:04:08.7716278Z  * [new branch]        feat/presets-text-number                 -> origin/feat/presets-text-number
+2026-10-01T22:04:08.7716852Z  * [new branch]        feat/semantic-motion-bindings-383        -> origin/feat/semantic-motion-bindings-383
+2026-10-01T22:04:08.7717399Z  * [new branch]        feat/timeline-labels                     -> origin/feat/timeline-labels
+2026-10-01T22:04:08.7717976Z  * [new branch]        fix/benchmark-handoff-samples-20260905   -> origin/fix/benchmark-handoff-samples-20260905
+2026-10-01T22:04:08.7718632Z  * [new branch]        fix/benchmark-input-attestation-20260905 -> origin/fix/benchmark-input-attestation-20260905
+2026-10-01T22:04:08.7719253Z  * [new branch]        fix/benchmark-stagger-evidence           -> origin/fix/benchmark-stagger-evidence
+2026-10-01T22:04:08.7719813Z  * [new branch]        fix/dispatchable-release                 -> origin/fix/dispatchable-release
+2026-10-01T22:04:08.7720445Z  * [new branch]        fix/independent-motion-conformance-20260905 -> origin/fix/independent-motion-conformance-20260905
+2026-10-01T22:04:08.7721269Z  * [new branch]        fix/motion-value-continuous-follow-20260912 -> origin/fix/motion-value-continuous-follow-20260912
+2026-10-01T22:04:08.7721972Z  * [new branch]        fix/motion-value-stream-retarget-20260912 -> origin/fix/motion-value-stream-retarget-20260912
+2026-10-01T22:04:08.7722748Z  * [new branch]        fix/pole-space-unified-226               -> origin/fix/pole-space-unified-226
+2026-10-01T22:04:08.7723311Z  * [new branch]        fix/release-request-branch               -> origin/fix/release-request-branch
+2026-10-01T22:04:08.7723881Z  * [new branch]        fix/restore-local-energy-grid            -> origin/fix/restore-local-energy-grid
+2026-10-01T22:04:08.7724425Z  * [new branch]        fix/tag-exist-check                      -> origin/fix/tag-exist-check
+2026-10-01T22:04:08.7725035Z  * [new branch]        fix/wire-budget-before-traversal-20261001 -> origin/fix/wire-budget-before-traversal-20261001
+2026-10-01T22:04:08.7725730Z  * [new branch]        geometry/r11-vector-retarget-20260914    -> origin/geometry/r11-vector-retarget-20260914
+2026-10-01T22:04:08.7726344Z  * [new branch]        integrate/r11-combined-carrier           -> origin/integrate/r11-combined-carrier
+2026-10-01T22:04:08.7726947Z  * [new branch]        integrate/r11-reorder-budget-carrier     -> origin/integrate/r11-reorder-budget-carrier
+2026-10-01T22:04:08.7727567Z  * [new branch]        integrate/r11-review-fixes-carrier       -> origin/integrate/r11-review-fixes-carrier
+2026-10-01T22:04:08.7728127Z  * [new branch]        integrate/r11-wave-a-368                 -> origin/integrate/r11-wave-a-368
+2026-10-01T22:04:08.7728648Z  * [new branch]        integrate/r11-wave-a-374                 -> origin/integrate/r11-wave-a-374
+2026-10-01T22:04:08.7729158Z  * [new branch]        integrate/r11-wave-a-377                 -> origin/integrate/r11-wave-a-377
+2026-10-01T22:04:08.7729791Z  * [new branch]        integrate/r11-wave-a-380                 -> origin/integrate/r11-wave-a-380
+2026-10-01T22:04:08.7730363Z  * [new branch]        integrate/r11-wave-a-current-main        -> origin/integrate/r11-wave-a-current-main
+2026-10-01T22:04:08.7730912Z  * [new branch]        integrate/r11-wave-b-371                 -> origin/integrate/r11-wave-b-371
+2026-10-01T22:04:08.7731425Z  * [new branch]        integrate/r11-wave-b-373                 -> origin/integrate/r11-wave-b-373
+2026-10-01T22:04:08.7731939Z  * [new branch]        integrate/r11-wave-b-378                 -> origin/integrate/r11-wave-b-378
+2026-10-01T22:04:08.7732597Z  * [new branch]        integrate/r11-wave-c-384                 -> origin/integrate/r11-wave-c-384
+2026-10-01T22:04:08.7733303Z  * [new branch]        journey/direct-control-compositor-handoff-20260920 -> origin/journey/direct-control-compositor-handoff-20260920
+2026-10-01T22:04:08.7734035Z  * [new branch]        journey/integration-preview-20260929     -> origin/journey/integration-preview-20260929
+2026-10-01T22:04:08.7734562Z  * [new branch]        main                                     -> origin/main
+2026-10-01T22:04:08.7735067Z  * [new branch]        perf/animate-known-set-elision           -> origin/perf/animate-known-set-elision
+2026-10-01T22:04:08.7735689Z  * [new branch]        perf/animate-terminal-release-20260912   -> origin/perf/animate-terminal-release-20260912
+2026-10-01T22:04:08.7736337Z  * [new branch]        perf/auto-retired-ticket-iteration       -> origin/perf/auto-retired-ticket-iteration
+2026-10-01T22:04:08.7737013Z  * [new branch]        perf/batch-owned-spring-workspace-20260906 -> origin/perf/batch-owned-spring-workspace-20260906
+2026-10-01T22:04:08.7737674Z  * [new branch]        perf/behaviors-decay-rest-20260912       -> origin/perf/behaviors-decay-rest-20260912
+2026-10-01T22:04:08.7738342Z  * [new branch]        perf/compiler-default-partial-eval-20260912 -> origin/perf/compiler-default-partial-eval-20260912
+2026-10-01T22:04:08.7739006Z  * [new branch]        perf/compiler-event-map-20260911         -> origin/perf/compiler-event-map-20260911
+2026-10-01T22:04:08.7739801Z  * [new branch]        perf/compiler-runtime-call-snapshots-20260907 -> origin/perf/compiler-runtime-call-snapshots-20260907
+2026-10-01T22:04:08.7740526Z  * [new branch]        perf/compositor-tight-linear-separators  -> origin/perf/compositor-tight-linear-separators
+2026-10-01T22:04:08.7741193Z  * [new branch]        perf/decay-rest-projection-20260912      -> origin/perf/decay-rest-projection-20260912
+2026-10-01T22:04:08.7741850Z  * [new branch]        perf/fuse-animate-prop-grouping-20260915 -> origin/perf/fuse-animate-prop-grouping-20260915
+2026-10-01T22:04:08.7742673Z  * [new branch]        perf/future-layout-flat-lifecycle-r11    -> origin/perf/future-layout-flat-lifecycle-r11
+2026-10-01T22:04:08.7743301Z  * [new branch]        perf/implicit-grid-rdp-20260912          -> origin/perf/implicit-grid-rdp-20260912
+2026-10-01T22:04:08.7743941Z  * [new branch]        perf/implicit-identity-keyframes-20260913 -> origin/perf/implicit-identity-keyframes-20260913
+2026-10-01T22:04:08.7744605Z  * [new branch]        perf/in-view-owner-fusion-20260916       -> origin/perf/in-view-owner-fusion-20260916
+2026-10-01T22:04:08.7745214Z  * [new branch]        perf/isolate-future-layout-seam          -> origin/perf/isolate-future-layout-seam
+2026-10-01T22:04:08.7745802Z  * [new branch]        perf/measured-hotpaths-20260905          -> origin/perf/measured-hotpaths-20260905
+2026-10-01T22:04:08.7746437Z  * [new branch]        perf/motion-value-solver-scratch-20260916 -> origin/perf/motion-value-solver-scratch-20260916
+2026-10-01T22:04:08.7747111Z  * [new branch]        perf/nano-dead-velocity-branch-20260907  -> origin/perf/nano-dead-velocity-branch-20260907
+2026-10-01T22:04:08.7747804Z  * [new branch]        perf/nano-exact-settle-fast-forward-20260911 -> origin/perf/nano-exact-settle-fast-forward-20260911
+2026-10-01T22:04:08.7748436Z  * [new branch]        perf/nano-shared-settle-exp              -> origin/perf/nano-shared-settle-exp
+2026-10-01T22:04:08.7749213Z  * [new branch]        perf/presence-cancel-wrapper-elision     -> origin/perf/presence-cancel-wrapper-elision
+2026-10-01T22:04:08.7749879Z  * [new branch]        perf/projection-measured-owner-20260916  -> origin/perf/projection-measured-owner-20260916
+2026-10-01T22:04:08.7750519Z  * [new branch]        perf/r11-m05-behavior-state-20260923     -> origin/perf/r11-m05-behavior-state-20260923
+2026-10-01T22:04:08.7751111Z  * [new branch]        perf/r12-unit-options-plan               -> origin/perf/r12-unit-options-plan
+2026-10-01T22:04:08.7751715Z  * [new branch]        perf/root-matched-recurrence-20260907    -> origin/perf/root-matched-recurrence-20260907
+2026-10-01T22:04:08.7752367Z  * [new branch]        perf/smart-ghost-owner-fusion-20260916   -> origin/perf/smart-ghost-owner-fusion-20260916
+2026-10-01T22:04:08.7753087Z  * [new branch]        perf/surface-no-reparse-20260912         -> origin/perf/surface-no-reparse-20260912
+2026-10-01T22:04:08.7753718Z  * [new branch]        perf/surface-width-emission-20260912     -> origin/perf/surface-width-emission-20260912
+2026-10-01T22:04:08.7754331Z  * [new branch]        perf/terminal-aggregate-20260912         -> origin/perf/terminal-aggregate-20260912
+2026-10-01T22:04:08.7754969Z  * [new branch]        perf/timeline-label-owner-fusion-20260915 -> origin/perf/timeline-label-owner-fusion-20260915
+2026-10-01T22:04:08.7755541Z  * [new branch]        please-ignore                            -> origin/please-ignore
+2026-10-01T22:04:08.7756054Z  * [new branch]        profile/profile-01-prereg                -> origin/profile/profile-01-prereg
+2026-10-01T22:04:08.7756545Z  * [new branch]        release/0.2.0                            -> origin/release/0.2.0
+2026-10-01T22:04:08.7757114Z  * [new branch]        research/animate-single-buffer-20260912-r3 -> origin/research/animate-single-buffer-20260912-r3
+2026-10-01T22:04:08.7757774Z  * [new branch]        research/auto-terminal-set-20260916      -> origin/research/auto-terminal-set-20260916
+2026-10-01T22:04:08.7758491Z  * [new branch]        research/autoresearch-20260913-t3        -> origin/research/autoresearch-20260913-t3
+2026-10-01T22:04:08.7759089Z  * [new branch]        research/autoresearch-20260916-r11       -> origin/research/autoresearch-20260916-r11
+2026-10-01T22:04:08.7759782Z  * [new branch]        research/autoresearch-adaptive-curvature-20260916 -> origin/research/autoresearch-adaptive-curvature-20260916
+2026-10-01T22:04:08.7760490Z  * [new branch]        research/batch-clock-owner-20260907      -> origin/research/batch-clock-owner-20260907
+2026-10-01T22:04:08.7761136Z  * [new branch]        research/bindgroup-qemu-icount-20260915-r1 -> origin/research/bindgroup-qemu-icount-20260915-r1
+2026-10-01T22:04:08.7761805Z  * [new branch]        research/bindgroup-turbo-bb-20260915-r1  -> origin/research/bindgroup-turbo-bb-20260915-r1
+2026-10-01T22:04:08.7762568Z  * [new branch]        research/binding-acceptance-20260913     -> origin/research/binding-acceptance-20260913
+2026-10-01T22:04:08.7763240Z  * [new branch]        research/bindings-noinfer-final-20260913 -> origin/research/bindings-noinfer-final-20260913
+2026-10-01T22:04:08.7763908Z  * [new branch]        research/bounded-transform-browser-start -> origin/research/bounded-transform-browser-start
+2026-10-01T22:04:08.7764564Z  * [new branch]        research/cache-drop-stored-hash-20260914 -> origin/research/cache-drop-stored-hash-20260914
+2026-10-01T22:04:08.7765201Z  * [new branch]        research/cache-state-elision-20260914    -> origin/research/cache-state-elision-20260914
+2026-10-01T22:04:08.7765847Z  * [new branch]        research/cascade-batch-candidate-20260913 -> origin/research/cascade-batch-candidate-20260913
+2026-10-01T22:04:08.7766508Z  * [new branch]        research/cascade-docs-candidate-20260913 -> origin/research/cascade-docs-candidate-20260913
+2026-10-01T22:04:08.7767119Z  * [new branch]        research/cascade-source-20260913         -> origin/research/cascade-source-20260913
+2026-10-01T22:04:08.7767850Z  * [new branch]        research/cohort-proof-source-20260906    -> origin/research/cohort-proof-source-20260906
+2026-10-01T22:04:08.7768550Z  * [new branch]        research/compiler-default-curve-cache-20260907 -> origin/research/compiler-default-curve-cache-20260907
+2026-10-01T22:04:08.7769299Z  * [new branch]        research/compiler-default-partial-eval-20260912 -> origin/research/compiler-default-partial-eval-20260912
+2026-10-01T22:04:08.7770080Z  * [new branch]        research/compiler-event-map-byte-buffer-20260912-r5 -> origin/research/compiler-event-map-byte-buffer-20260912-r5
+2026-10-01T22:04:08.7770869Z  * [new branch]        research/compiler-event-map-token-buffer-20260911 -> origin/research/compiler-event-map-token-buffer-20260911
+2026-10-01T22:04:08.7771653Z  * [new branch]        research/compiler-frozen-number-canonical-20260911 -> origin/research/compiler-frozen-number-canonical-20260911
+2026-10-01T22:04:08.7772393Z  * [new branch]        research/compiler-fused-edit-map-20260912-r6 -> origin/research/compiler-fused-edit-map-20260912-r6
+2026-10-01T22:04:08.7773214Z  * [new branch]        research/compiler-positional-wire-20260911 -> origin/research/compiler-positional-wire-20260911
+2026-10-01T22:04:08.7773944Z  * [new branch]        research/compiler-positional-wire-proof-20260911 -> origin/research/compiler-positional-wire-proof-20260911
+2026-10-01T22:04:08.7774701Z  * [new branch]        research/compiler-recurrence-ownership-20260913 -> origin/research/compiler-recurrence-ownership-20260913
+2026-10-01T22:04:08.7775450Z  * [new branch]        research/compiler-route-dead-planner-20260911 -> origin/research/compiler-route-dead-planner-20260911
+2026-10-01T22:04:08.7776213Z  * [new branch]        research/compiler-route-dead-planner-proof-20260911 -> origin/research/compiler-route-dead-planner-proof-20260911
+2026-10-01T22:04:08.7776999Z  * [new branch]        research/compiler-runtime-artifact-hoist-20260911 -> origin/research/compiler-runtime-artifact-hoist-20260911
+2026-10-01T22:04:08.7777922Z  * [new branch]        research/compiler-runtime-artifact-hoist-proof-20260911 -> origin/research/compiler-runtime-artifact-hoist-proof-20260911
+2026-10-01T22:04:08.7778728Z  * [new branch]        research/compiler-runtime-default-delay-20260911 -> origin/research/compiler-runtime-default-delay-20260911
+2026-10-01T22:04:08.7779522Z  * [new branch]        research/compiler-runtime-single-coordinator-20260912 -> origin/research/compiler-runtime-single-coordinator-20260912
+2026-10-01T22:04:08.7780400Z  * [new branch]        research/compiler-runtime-single-coordinator-proof-20260912 -> origin/research/compiler-runtime-single-coordinator-proof-20260912
+2026-10-01T22:04:08.7781174Z  * [new branch]        research/compiler-scalar-wire-20260911   -> origin/research/compiler-scalar-wire-20260911
+2026-10-01T22:04:08.7781826Z  * [new branch]        research/compiler-single-pass-20260911   -> origin/research/compiler-single-pass-20260911
+2026-10-01T22:04:08.7782675Z  * [new branch]        research/compiler-single-plan-import-ownership-20260911 -> origin/research/compiler-single-plan-import-ownership-20260911
+2026-10-01T22:04:08.7783502Z  * [new branch]        research/compiler-sourcemap-stream-20260911 -> origin/research/compiler-sourcemap-stream-20260911
+2026-10-01T22:04:08.7784191Z  * [new branch]        research/compositor-compact-rdp-emitter  -> origin/research/compositor-compact-rdp-emitter
+2026-10-01T22:04:08.7784884Z  * [new branch]        research/compositor-regex-free-round-20260911 -> origin/research/compositor-regex-free-round-20260911
+2026-10-01T22:04:08.7785591Z  * [new branch]        research/compositor-sample-scratch-20260916 -> origin/research/compositor-sample-scratch-20260916
+2026-10-01T22:04:08.7786294Z  * [new branch]        research/continuous-follow-delivery-20260912 -> origin/research/continuous-follow-delivery-20260912
+2026-10-01T22:04:08.7786997Z  * [new branch]        research/css-linear-position-elision-20260906 -> origin/research/css-linear-position-elision-20260906
+2026-10-01T22:04:08.7787800Z  * [new branch]        research/cubic-hermite-20260912          -> origin/research/cubic-hermite-20260912
+2026-10-01T22:04:08.7788466Z  * [new branch]        research/decay-rest-projection-carrier-20260912 -> origin/research/decay-rest-projection-carrier-20260912
+2026-10-01T22:04:08.7789211Z  * [new branch]        research/decay-rest-specialization-20260912-r9 -> origin/research/decay-rest-specialization-20260912-r9
+2026-10-01T22:04:08.7789922Z  * [new branch]        research/deliver-surface-no-reparse-20260912 -> origin/research/deliver-surface-no-reparse-20260912
+2026-10-01T22:04:08.7790618Z  * [new branch]        research/emitter-metrics-fusion-20260914 -> origin/research/emitter-metrics-fusion-20260914
+2026-10-01T22:04:08.7791289Z  * [new branch]        research/event-map-cold-replication-20260911 -> origin/research/event-map-cold-replication-20260911
+2026-10-01T22:04:08.7791924Z  * [new branch]        research/extrema-fusion-20260914         -> origin/research/extrema-fusion-20260914
+2026-10-01T22:04:08.7792618Z  * [new branch]        research/frozen-collinear-20260912       -> origin/research/frozen-collinear-20260912
+2026-10-01T22:04:08.7793267Z  * [new branch]        research/fused-parser-forced-ir-20260915 -> origin/research/fused-parser-forced-ir-20260915
+2026-10-01T22:04:08.7793968Z  * [new branch]        research/fused-parser-fresh-callgrind-20260915 -> origin/research/fused-parser-fresh-callgrind-20260915
+2026-10-01T22:04:08.7794641Z  * [new branch]        research/fused-parser-net-ir-20260915    -> origin/research/fused-parser-net-ir-20260915
+2026-10-01T22:04:08.7795312Z  * [new branch]        research/fused-parser-single-call-ir-20260915 -> origin/research/fused-parser-single-call-ir-20260915
+2026-10-01T22:04:08.7795955Z  * [new branch]        research/fused-vite-map-20260914         -> origin/research/fused-vite-map-20260914
+2026-10-01T22:04:08.7796545Z  * [new branch]        research/implicit-grid-rdp-20260912      -> origin/research/implicit-grid-rdp-20260912
+2026-10-01T22:04:08.7797234Z  * [new branch]        research/implicit-identity-browser-v15-20260913 -> origin/research/implicit-identity-browser-v15-20260913
+2026-10-01T22:04:08.7798100Z  * [new branch]        research/implicit-identity-callgrind-v14-20260913 -> origin/research/implicit-identity-callgrind-v14-20260913
+2026-10-01T22:04:08.7798905Z  * [new branch]        research/implicit-identity-candidate-null-v6b-20260913 -> origin/research/implicit-identity-candidate-null-v6b-20260913
+2026-10-01T22:04:08.7799712Z  * [new branch]        research/implicit-identity-composite-v6-20260913 -> origin/research/implicit-identity-composite-v6-20260913
+2026-10-01T22:04:08.7800481Z  * [new branch]        research/implicit-identity-concurrent-v11-20260913 -> origin/research/implicit-identity-concurrent-v11-20260913
+2026-10-01T22:04:08.7801226Z  * [new branch]        research/implicit-identity-exacthead-20260914 -> origin/research/implicit-identity-exacthead-20260914
+2026-10-01T22:04:08.7801974Z  * [new branch]        research/implicit-identity-forced-opt-v19-20260913 -> origin/research/implicit-identity-forced-opt-v19-20260913
+2026-10-01T22:04:08.7802897Z  * [new branch]        research/implicit-identity-hwpmu-v21-20260915 -> origin/research/implicit-identity-hwpmu-v21-20260915
+2026-10-01T22:04:08.7803659Z  * [new branch]        research/implicit-identity-long-window-v4-20260913 -> origin/research/implicit-identity-long-window-v4-20260913
+2026-10-01T22:04:08.7804423Z  * [new branch]        research/implicit-identity-matched-v9-20260913 -> origin/research/implicit-identity-matched-v9-20260913
+2026-10-01T22:04:08.7805186Z  * [new branch]        research/implicit-identity-microblocks-v10-20260913 -> origin/research/implicit-identity-microblocks-v10-20260913
+2026-10-01T22:04:08.7805983Z  * [new branch]        research/implicit-identity-paired-block-v5-20260913 -> origin/research/implicit-identity-paired-block-v5-20260913
+2026-10-01T22:04:08.7806721Z  * [new branch]        research/implicit-identity-pmu-v13-20260913 -> origin/research/implicit-identity-pmu-v13-20260913
+2026-10-01T22:04:08.7807617Z  * [new branch]        research/implicit-identity-pmu-v13-selfhosted-20260913 -> origin/research/implicit-identity-pmu-v13-selfhosted-20260913
+2026-10-01T22:04:08.7808426Z  * [new branch]        research/implicit-identity-precision-v8-20260913 -> origin/research/implicit-identity-precision-v8-20260913
+2026-10-01T22:04:08.7809152Z  * [new branch]        research/implicit-identity-proof-20260913 -> origin/research/implicit-identity-proof-20260913
+2026-10-01T22:04:08.7809918Z  * [new branch]        research/implicit-identity-reference-clock-v7-20260913 -> origin/research/implicit-identity-reference-clock-v7-20260913
+2026-10-01T22:04:08.7810732Z  * [new branch]        research/implicit-identity-single-seek-v18-20260913 -> origin/research/implicit-identity-single-seek-v18-20260913
+2026-10-01T22:04:08.7811522Z  * [new branch]        research/implicit-identity-structural-v12-20260913 -> origin/research/implicit-identity-structural-v12-20260913
+2026-10-01T22:04:08.7812307Z  * [new branch]        research/implicit-identity-taken-path-v16-20260913 -> origin/research/implicit-identity-taken-path-v16-20260913
+2026-10-01T22:04:08.7813179Z  * [new branch]        research/implicit-identity-taskclock-v20-20260913 -> origin/research/implicit-identity-taskclock-v20-20260913
+2026-10-01T22:04:08.7813973Z  * [new branch]        research/implicit-identity-taskclock-v20b-20260913 -> origin/research/implicit-identity-taskclock-v20b-20260913
+2026-10-01T22:04:08.7814753Z  * [new branch]        research/implicit-identity-taskclock-v20c-20260913 -> origin/research/implicit-identity-taskclock-v20c-20260913
+2026-10-01T22:04:08.7815457Z  * [new branch]        research/implicit-identity-v3-20260913   -> origin/research/implicit-identity-v3-20260913
+2026-10-01T22:04:08.7816194Z  * [new branch]        research/implicit-identity-whole-window-v17-20260913 -> origin/research/implicit-identity-whole-window-v17-20260913
+2026-10-01T22:04:08.7816898Z  * [new branch]        research/inview-owner-fusion-r11         -> origin/research/inview-owner-fusion-r11
+2026-10-01T22:04:08.7817610Z  * [new branch]        research/inview-owner-mutation-r11       -> origin/research/inview-owner-mutation-r11
+2026-10-01T22:04:08.7818251Z  * [new branch]        research/keyframes-callgrind-20260915    -> origin/research/keyframes-callgrind-20260915
+2026-10-01T22:04:08.7818932Z  * [new branch]        research/keyframes-callgrind-thread1-20260915 -> origin/research/keyframes-callgrind-thread1-20260915
+2026-10-01T22:04:08.7819647Z  * [new branch]        research/lazy-serialized-samples-20260913-v1 -> origin/research/lazy-serialized-samples-20260913-v1
+2026-10-01T22:04:08.7820348Z  * [new branch]        research/managed-presence-delivery-20260913 -> origin/research/managed-presence-delivery-20260913
+2026-10-01T22:04:08.7820975Z  * [new branch]        research/mechanism-20260912-r4           -> origin/research/mechanism-20260912-r4
+2026-10-01T22:04:08.7821579Z  * [new branch]        research/monotone-settle-combo-20260906  -> origin/research/monotone-settle-combo-20260906
+2026-10-01T22:04:08.7822295Z  * [new branch]        research/motion-value-solver-scratch-20260916 -> origin/research/motion-value-solver-scratch-20260916
+2026-10-01T22:04:08.7823081Z  * [new branch]        research/motionvalue-scratch-owner       -> origin/research/motionvalue-scratch-owner
+2026-10-01T22:04:08.7823686Z  * [new branch]        research/mp-binding-index-run11          -> origin/research/mp-binding-index-run11
+2026-10-01T22:04:08.7824315Z  * [new branch]        research/mv-listener-sentinel-20260916   -> origin/research/mv-listener-sentinel-20260916
+2026-10-01T22:04:08.7824967Z  * [new branch]        research/nano-cache-rounded-w2-20260911  -> origin/research/nano-cache-rounded-w2-20260911
+2026-10-01T22:04:08.7825664Z  * [new branch]        research/nano-exact-settle-proof-20260911 -> origin/research/nano-exact-settle-proof-20260911
+2026-10-01T22:04:08.7826388Z  * [new branch]        research/nano-grid-root-specialization-20260911 -> origin/research/nano-grid-root-specialization-20260911
+2026-10-01T22:04:08.7827258Z  * [new branch]        research/nano-monotone-block-probe-20260907 -> origin/research/nano-monotone-block-probe-20260907
+2026-10-01T22:04:08.7827954Z  * [new branch]        research/nano-reduced-shortcircuit-20260913 -> origin/research/nano-reduced-shortcircuit-20260913
+2026-10-01T22:04:08.7828620Z  * [new branch]        research/nano-settle-exp-reuse-20260906  -> origin/research/nano-settle-exp-reuse-20260906
+2026-10-01T22:04:08.7829248Z  * [new branch]        research/nano-single-log-size-20260911   -> origin/research/nano-single-log-size-20260911
+2026-10-01T22:04:08.7829884Z  * [new branch]        research/nano-static-transport-20260913  -> origin/research/nano-static-transport-20260913
+2026-10-01T22:04:08.7830548Z  * [new branch]        research/nano-stream-serialization-20260907 -> origin/research/nano-stream-serialization-20260907
+2026-10-01T22:04:08.7831229Z  * [new branch]        research/native-prepare-execute-20260906 -> origin/research/native-prepare-execute-20260906
+2026-10-01T22:04:08.7831869Z  * [new branch]        research/native-view-waapi-20260912      -> origin/research/native-view-waapi-20260912
+2026-10-01T22:04:08.7832615Z  * [new branch]        research/native-view-waapi-final-20260912 -> origin/research/native-view-waapi-final-20260912
+2026-10-01T22:04:08.7833346Z  * [new branch]        research/numeric-stagger-terminal-bound-20260915 -> origin/research/numeric-stagger-terminal-bound-20260915
+2026-10-01T22:04:08.7834124Z  * [new branch]        research/omit-linear-endpoint-positions-20260907 -> origin/research/omit-linear-endpoint-positions-20260907
+2026-10-01T22:04:08.7834819Z  * [new branch]        research/overcap-two-segment-20260916    -> origin/research/overcap-two-segment-20260916
+2026-10-01T22:04:08.7835467Z  * [new branch]        research/packed-spring-samples-20260913  -> origin/research/packed-spring-samples-20260913
+2026-10-01T22:04:08.7836123Z  * [new branch]        research/pr416-compression-proof-20260915 -> origin/research/pr416-compression-proof-20260915
+2026-10-01T22:04:08.7836931Z  * [new branch]        research/presence-cancel-wrapper-20260916 -> origin/research/presence-cancel-wrapper-20260916
+2026-10-01T22:04:08.7837622Z  * [new branch]        research/presence-commit-boundary-20260913 -> origin/research/presence-commit-boundary-20260913
+2026-10-01T22:04:08.7838254Z  * [new branch]        research/presence-delivery-381           -> origin/research/presence-delivery-381
+2026-10-01T22:04:08.7838850Z  * [new branch]        research/presence-followup-20260913      -> origin/research/presence-followup-20260913
+2026-10-01T22:04:08.7839507Z  * [new branch]        research/projection-measured-owner-20260916 -> origin/research/projection-measured-owner-20260916
+2026-10-01T22:04:08.7840204Z  * [new branch]        research/r11-affine-overflow-green-20260914 -> origin/research/r11-affine-overflow-green-20260914
+2026-10-01T22:04:08.7840867Z  * [new branch]        research/r11-geometry-clamp-fix-20260914 -> origin/research/r11-geometry-clamp-fix-20260914
+2026-10-01T22:04:08.7841650Z  * [new branch]        research/r11-geometry-contract-owner-materialized-20260914 -> origin/research/r11-geometry-contract-owner-materialized-20260914
+2026-10-01T22:04:08.7842694Z  * [new branch]        research/r11-geometry-domain-dom-materialized-20260914 -> origin/research/r11-geometry-domain-dom-materialized-20260914
+2026-10-01T22:04:08.7843500Z  * [new branch]        research/r11-geometry-final-materialized-20260914 -> origin/research/r11-geometry-final-materialized-20260914
+2026-10-01T22:04:08.7844227Z  * [new branch]        research/r11-geometry-inline-clamp-20260914 -> origin/research/r11-geometry-inline-clamp-20260914
+2026-10-01T22:04:08.7844946Z  * [new branch]        research/r11-geometry-normalized-clamp-20260914 -> origin/research/r11-geometry-normalized-clamp-20260914
+2026-10-01T22:04:08.7845606Z  * [new branch]        research/r11-m05-hotpath-20260923        -> origin/research/r11-m05-hotpath-20260923
+2026-10-01T22:04:08.7846401Z  * [new branch]        research/r11-m05-state-candidate-profile-20260923 -> origin/research/r11-m05-state-candidate-profile-20260923
+2026-10-01T22:04:08.7847101Z  * [new branch]        research/r11-m05-tick-cache-20260923     -> origin/research/r11-m05-tick-cache-20260923
+2026-10-01T22:04:08.7847827Z  * [new branch]        research/r11-normalized-clamp-endpoint-lerp-20260914 -> origin/research/r11-normalized-clamp-endpoint-lerp-20260914
+2026-10-01T22:04:08.7848639Z  * [new branch]        research/r11-normalized-clamp-flight-bound-20260914 -> origin/research/r11-normalized-clamp-flight-bound-20260914
+2026-10-01T22:04:08.7849365Z  * [new branch]        research/r11-profile-prereg-20260915     -> origin/research/r11-profile-prereg-20260915
+2026-10-01T22:04:08.7850061Z  * [new branch]        research/r11-profile-sheet-derived-v4-20260922 -> origin/research/r11-profile-sheet-derived-v4-20260922
+2026-10-01T22:04:08.7850831Z  * [new branch]        research/r11-profile-sheet-observable-v3-20260922 -> origin/research/r11-profile-sheet-observable-v3-20260922
+2026-10-01T22:04:08.7851600Z  * [new branch]        research/r11-profile-sheet-release-v2-20260922 -> origin/research/r11-profile-sheet-release-v2-20260922
+2026-10-01T22:04:08.7852320Z  * [new branch]        research/r11-reorder-axis-noop-red-20260914 -> origin/research/r11-reorder-axis-noop-red-20260914
+2026-10-01T22:04:08.7853125Z  * [new branch]        research/r11-reorder-frame-owner-20260914 -> origin/research/r11-reorder-frame-owner-20260914
+2026-10-01T22:04:08.7853852Z  * [new branch]        research/r11-reorder-owner-mutation-20260914 -> origin/research/r11-reorder-owner-mutation-20260914
+2026-10-01T22:04:08.7854554Z  * [new branch]        research/r11-reorder-size-neutral-20260914 -> origin/research/r11-reorder-size-neutral-20260914
+2026-10-01T22:04:08.7855267Z  * [new branch]        research/r11-smart-focus-lifetime-red-20260914 -> origin/research/r11-smart-focus-lifetime-red-20260914
+2026-10-01T22:04:08.7855975Z  * [new branch]        research/rdp-ordered-frontier-proof-20260911 -> origin/research/rdp-ordered-frontier-proof-20260911
+2026-10-01T22:04:08.7856787Z  * [new branch]        research/recurrence-seed-erasure-20260911 -> origin/research/recurrence-seed-erasure-20260911
+2026-10-01T22:04:08.7857467Z  * [new branch]        research/runtime-lifetime-proof-20260911 -> origin/research/runtime-lifetime-proof-20260911
+2026-10-01T22:04:08.7858159Z  * [new branch]        research/semantic-binding-delivery-20260913 -> origin/research/semantic-binding-delivery-20260913
+2026-10-01T22:04:08.7858815Z  * [new branch]        research/set-free-transform-20260907     -> origin/research/set-free-transform-20260907
+2026-10-01T22:04:08.7859467Z  * [new branch]        research/smart-ghost-index-control-20260916 -> origin/research/smart-ghost-index-control-20260916
+2026-10-01T22:04:08.7860149Z  * [new branch]        research/smart-ghost-index-fusion-20260916 -> origin/research/smart-ghost-index-fusion-20260916
+2026-10-01T22:04:08.7860832Z  * [new branch]        research/spring-cohort-semigroup-20260906 -> origin/research/spring-cohort-semigroup-20260906
+2026-10-01T22:04:08.7861557Z  * [new branch]        research/state-cascade-artifact-pareto-20260912 -> origin/research/state-cascade-artifact-pareto-20260912
+2026-10-01T22:04:08.7862257Z  * [new branch]        research/state-cascade-proof-20260912    -> origin/research/state-cascade-proof-20260912
+2026-10-01T22:04:08.7863013Z  * [new branch]        research/style-surface-no-reparse-20260912 -> origin/research/style-surface-no-reparse-20260912
+2026-10-01T22:04:08.7863678Z  * [new branch]        research/surface-cap-preflight-20260912  -> origin/research/surface-cap-preflight-20260912
+2026-10-01T22:04:08.7864328Z  * [new branch]        research/surface-continuation-20260912   -> origin/research/surface-continuation-20260912
+2026-10-01T22:04:08.7865036Z  * [new branch]        research/surface-delivery-receipt-20260912-audit -> origin/research/surface-delivery-receipt-20260912-audit
+2026-10-01T22:04:08.7865807Z  * [new branch]        research/surface-execution-only-artifact-20260912 -> origin/research/surface-execution-only-artifact-20260912
+2026-10-01T22:04:08.7866732Z  * [new branch]        research/surface-materialization-evidence-20260912 -> origin/research/surface-materialization-evidence-20260912
+2026-10-01T22:04:08.7867495Z  * [new branch]        research/surface-no-reparse-batch-rca-20260912 -> origin/research/surface-no-reparse-batch-rca-20260912
+2026-10-01T22:04:08.7868249Z  * [new branch]        research/surface-no-reparse-bridge-20260912-9f6c -> origin/research/surface-no-reparse-bridge-20260912-9f6c
+2026-10-01T22:04:08.7869014Z  * [new branch]        research/surface-no-reparse-candidate-20260912-9f6c -> origin/research/surface-no-reparse-candidate-20260912-9f6c
+2026-10-01T22:04:08.7869774Z  * [new branch]        research/surface-no-reparse-phase-20260912-9f6c -> origin/research/surface-no-reparse-phase-20260912-9f6c
+2026-10-01T22:04:08.7870554Z  * [new branch]        research/surface-no-reparse-process-isolate-20260912 -> origin/research/surface-no-reparse-process-isolate-20260912
+2026-10-01T22:04:08.7871339Z  * [new branch]        research/surface-no-reparse-proof-20260912 -> origin/research/surface-no-reparse-proof-20260912
+2026-10-01T22:04:08.7872016Z  * [new branch]        research/surface-ownership-proof-20260911 -> origin/research/surface-ownership-proof-20260911
+2026-10-01T22:04:08.7872783Z  * [new branch]        research/surface-provisioning-proof-yDNEKZ -> origin/research/surface-provisioning-proof-yDNEKZ
+2026-10-01T22:04:08.7873449Z  * [new branch]        research/surface-public-proof-20260912   -> origin/research/surface-public-proof-20260912
+2026-10-01T22:04:08.7874141Z  * [new branch]        research/surface362-independent-proof-20260912 -> origin/research/surface362-independent-proof-20260912
+2026-10-01T22:04:08.7874823Z  * [new branch]        research/surface366-transport-20260912   -> origin/research/surface366-transport-20260912
+2026-10-01T22:04:08.7875451Z  * [new branch]        research/svelte-authoritative-value      -> origin/research/svelte-authoritative-value
+2026-10-01T22:04:08.7876172Z  * [new branch]        research/svelte-value-evidence           -> origin/research/svelte-value-evidence
+2026-10-01T22:04:08.7876778Z  * [new branch]        research/timeline-label-owner-20260915   -> origin/research/timeline-label-owner-20260915
+2026-10-01T22:04:08.7877421Z  * [new branch]        research/timeline-label-owner-fusion-r11 -> origin/research/timeline-label-owner-fusion-r11
+2026-10-01T22:04:08.7878058Z  * [new branch]        research/unify-timed-mode-205-20260913   -> origin/research/unify-timed-mode-205-20260913
+2026-10-01T22:04:08.7878698Z  * [new branch]        research/unit-terminal-erasure-20260912  -> origin/research/unit-terminal-erasure-20260912
+2026-10-01T22:04:08.7879366Z  * [new branch]        research/waapi-artifact-retention-20260913 -> origin/research/waapi-artifact-retention-20260913
+2026-10-01T22:04:08.7880019Z  * [new branch]        research/waapi-owner-flat-20260915       -> origin/research/waapi-owner-flat-20260915
+2026-10-01T22:04:08.7880652Z  * [new branch]        research/waapi-self-release-20260912-r9  -> origin/research/waapi-self-release-20260912-r9
+2026-10-01T22:04:08.7881286Z  * [new branch]        research/workspace-admission-20260906    -> origin/research/workspace-admission-20260906
+2026-10-01T22:04:08.7881894Z  * [new branch]        salvage/pull-cancel-red-20260921         -> origin/salvage/pull-cancel-red-20260921
+2026-10-01T22:04:08.7882650Z  * [new branch]        salvage/resource-414-refresh-20260921    -> origin/salvage/resource-414-refresh-20260921
+2026-10-01T22:04:08.7883217Z  * [new branch]        temp-never-used                          -> origin/temp-never-used
+2026-10-01T22:04:08.7883814Z  * [new branch]        test/combined-motion-evidence-20260905   -> origin/test/combined-motion-evidence-20260905
+2026-10-01T22:04:08.7884448Z  * [new branch]        test/git-provenance-contract-20260905    -> origin/test/git-provenance-contract-20260905
+2026-10-01T22:04:08.7885123Z  * [new branch]        test/independent-compositor-oracle-20260905 -> origin/test/independent-compositor-oracle-20260905
+2026-10-01T22:04:08.7885981Z  * [new branch]        test/integration-fixture-reliability-20260905 -> origin/test/integration-fixture-reliability-20260905
+2026-10-01T22:04:08.7886685Z  * [new branch]        test/paired-transform-lifecycle-20260905 -> origin/test/paired-transform-lifecycle-20260905
+2026-10-01T22:04:08.7887324Z  * [new branch]        wip/seek-reentry-blocked-20260905        -> origin/wip/seek-reentry-blocked-20260905
+2026-10-01T22:04:08.7887949Z  * [new branch]        work/motion-profile-foundation-20260930  -> origin/work/motion-profile-foundation-20260930
+2026-10-01T22:04:08.7888484Z  * [new branch]        x                                        -> origin/x
+2026-10-01T22:04:08.7888862Z  * [new branch]        xx                                       -> origin/xx
+2026-10-01T22:04:08.7889238Z  * [new branch]        xxx                                      -> origin/xxx
+2026-10-01T22:04:08.7889626Z  * [new branch]        xxxx                                     -> origin/xxxx
+2026-10-01T22:04:08.7890005Z  * [new tag]           v0.2.0                                   -> v0.2.0
+2026-10-01T22:04:08.7890363Z  * [new tag]           v0.3.0                                   -> v0.3.0
+2026-10-01T22:04:08.7890766Z  * [new ref]           19b0eeb0c52da96275e5493054e33f4a74672480 -> pull/460/merge
+2026-10-01T22:04:08.7892198Z ##[endgroup]
+2026-10-01T22:04:08.7892698Z ##[group]Determining the checkout info
+2026-10-01T22:04:08.7893110Z ##[endgroup]
+2026-10-01T22:04:08.7893371Z [command]/usr/bin/git sparse-checkout disable
+2026-10-01T22:04:08.7894044Z [command]/usr/bin/git config --local --unset-all extensions.worktreeConfig
+2026-10-01T22:04:08.7894916Z ##[group]Checking out the ref
+2026-10-01T22:04:08.7895282Z [command]/usr/bin/git checkout --progress --force refs/remotes/pull/460/merge
+2026-10-01T22:04:08.8179812Z Note: switching to 'refs/remotes/pull/460/merge'.
+2026-10-01T22:04:08.8180076Z 
+2026-10-01T22:04:08.8180306Z You are in 'detached HEAD' state. You can look around, make experimental
+2026-10-01T22:04:08.8180952Z changes and commit them, and you can discard any commits you make in this
+2026-10-01T22:04:08.8181392Z state without impacting any branches by switching back to a branch.
+2026-10-01T22:04:08.8181635Z 
+2026-10-01T22:04:08.8181821Z If you want to create a new branch to retain commits you create, you may
+2026-10-01T22:04:08.8182242Z do so (now or later) by using -c with the switch command. Example:
+2026-10-01T22:04:08.8182581Z 
+2026-10-01T22:04:08.8182801Z   git switch -c <new-branch-name>
+2026-10-01T22:04:08.8182981Z 
+2026-10-01T22:04:08.8183095Z Or undo this operation with:
+2026-10-01T22:04:08.8183257Z 
+2026-10-01T22:04:08.8183350Z   git switch -
+2026-10-01T22:04:08.8183478Z 
+2026-10-01T22:04:08.8183678Z Turn off this advice by setting config variable advice.detachedHead to false
+2026-10-01T22:04:08.8183950Z 
+2026-10-01T22:04:08.8184276Z HEAD is now at 19b0eeb0 Merge 185f02c2a85972a531627e14b7e0207e27855f95 into 957ceaf26501525eff476cdc1d149d81fd5ebcd7
+2026-10-01T22:04:08.8193423Z ##[endgroup]
+2026-10-01T22:04:08.8235956Z [command]/usr/bin/git log -1 --format=%H
+2026-10-01T22:04:08.8262631Z 19b0eeb0c52da96275e5493054e33f4a74672480
+2026-10-01T22:04:08.8269676Z ##[group]Removing auth
+2026-10-01T22:04:08.8270100Z Removing SSH command configuration
+2026-10-01T22:04:08.8272714Z [command]/usr/bin/git config --local --name-only --get-regexp core\.sshCommand
+2026-10-01T22:04:08.8302910Z [command]/usr/bin/git submodule foreach --recursive sh -c "git config --local --name-only --get-regexp 'core\.sshCommand' && git config --local --unset-all 'core.sshCommand' || :"
+2026-10-01T22:04:08.8495507Z Removing HTTP extra header
+2026-10-01T22:04:08.8498697Z [command]/usr/bin/git config --local --name-only --get-regexp http\.https\:\/\/github\.com\/\.extraheader
+2026-10-01T22:04:08.8532354Z [command]/usr/bin/git submodule foreach --recursive sh -c "git config --local --name-only --get-regexp 'http\.https\:\/\/github\.com\/\.extraheader' && git config --local --unset-all 'http.https://github.com/.extraheader' || :"
+2026-10-01T22:04:08.8718677Z Removing includeIf entries pointing to credentials config files
+2026-10-01T22:04:08.8721245Z [command]/usr/bin/git config --local --name-only --get-regexp ^includeIf\.gitdir:
+2026-10-01T22:04:08.8748025Z includeif.gitdir:/home/runner/work/lab-motion/lab-motion/.git.path
+2026-10-01T22:04:08.8748684Z includeif.gitdir:/home/runner/work/lab-motion/lab-motion/.git/worktrees/*.path
+2026-10-01T22:04:08.8749123Z includeif.gitdir:/github/workspace/.git.path
+2026-10-01T22:04:08.8749495Z includeif.gitdir:/github/workspace/.git/worktrees/*.path
+2026-10-01T22:04:08.8754821Z [command]/usr/bin/git config --local --get-all includeif.gitdir:/home/runner/work/lab-motion/lab-motion/.git.path
+2026-10-01T22:04:08.8777293Z /home/runner/work/_temp/git-credentials-dcffbebc-c46e-49c1-98d4-da5c8666d2f2.config
+2026-10-01T22:04:08.8785202Z [command]/usr/bin/git config --local --unset includeif.gitdir:/home/runner/work/lab-motion/lab-motion/.git.path \/home\/runner\/work\/_temp\/git\-credentials\-dcffbebc\-c46e\-49c1\-98d4\-da5c8666d2f2\.config
+2026-10-01T22:04:08.8850227Z [command]/usr/bin/git config --local --get-all includeif.gitdir:/home/runner/work/lab-motion/lab-motion/.git/worktrees/*.path
+2026-10-01T22:04:08.8871580Z /home/runner/work/_temp/git-credentials-dcffbebc-c46e-49c1-98d4-da5c8666d2f2.config
+2026-10-01T22:04:08.8878162Z [command]/usr/bin/git config --local --unset includeif.gitdir:/home/runner/work/lab-motion/lab-motion/.git/worktrees/*.path \/home\/runner\/work\/_temp\/git\-credentials\-dcffbebc\-c46e\-49c1\-98d4\-da5c8666d2f2\.config
+2026-10-01T22:04:08.8917472Z [command]/usr/bin/git config --local --get-all includeif.gitdir:/github/workspace/.git.path
+2026-10-01T22:04:08.8941710Z /github/runner_temp/git-credentials-dcffbebc-c46e-49c1-98d4-da5c8666d2f2.config
+2026-10-01T22:04:08.8947412Z [command]/usr/bin/git config --local --unset includeif.gitdir:/github/workspace/.git.path \/github\/runner_temp\/git\-credentials\-dcffbebc\-c46e\-49c1\-98d4\-da5c8666d2f2\.config
+2026-10-01T22:04:08.8979865Z [command]/usr/bin/git config --local --get-all includeif.gitdir:/github/workspace/.git/worktrees/*.path
+2026-10-01T22:04:08.9018442Z /github/runner_temp/git-credentials-dcffbebc-c46e-49c1-98d4-da5c8666d2f2.config
+2026-10-01T22:04:08.9022024Z [command]/usr/bin/git config --local --unset includeif.gitdir:/github/workspace/.git/worktrees/*.path \/github\/runner_temp\/git\-credentials\-dcffbebc\-c46e\-49c1\-98d4\-da5c8666d2f2\.config
+2026-10-01T22:04:08.9058907Z [command]/usr/bin/git submodule foreach --recursive git config --local --show-origin --name-only --get-regexp remote.origin.url
+2026-10-01T22:04:08.9258103Z Removing credentials config '/home/runner/work/_temp/git-credentials-dcffbebc-c46e-49c1-98d4-da5c8666d2f2.config'
+2026-10-01T22:04:08.9259507Z ##[endgroup]
+2026-10-01T22:04:08.9481163Z ##[group]Run actions/setup-node@820762786026740c76f36085b0efc47a31fe5020
+2026-10-01T22:04:08.9481544Z with:
+2026-10-01T22:04:08.9481781Z   node-version: 24
+2026-10-01T22:04:08.9482015Z   check-latest: false
+2026-10-01T22:04:08.9484318Z   token: ***
+2026-10-01T22:04:08.9484567Z   package-manager-cache: true
+2026-10-01T22:04:08.9484838Z env:
+2026-10-01T22:04:08.9485066Z   COREPACK_ENABLE_DOWNLOAD_PROMPT: 0
+2026-10-01T22:04:08.9485354Z   COREPACK_DEFAULT_TO_LATEST: 0
+2026-10-01T22:04:08.9485605Z ##[endgroup]
+2026-10-01T22:04:09.0517724Z Found in cache @ /opt/hostedtoolcache/node/24.21.0/x64
+2026-10-01T22:04:09.0519934Z ##[group]Environment details
+2026-10-01T22:04:09.3658754Z node: v24.21.0
+2026-10-01T22:04:09.3659020Z npm: 11.19.0
+2026-10-01T22:04:09.3659223Z yarn: 1.22.22
+2026-10-01T22:04:09.3659992Z ##[endgroup]
+2026-10-01T22:04:09.3787941Z ##[group]Run corepack enable
+2026-10-01T22:04:09.3788236Z [36;1mcorepack enable[0m
+2026-10-01T22:04:09.3788480Z [36;1mcorepack install --global pnpm@11.11.0[0m
+2026-10-01T22:04:09.3995924Z shell: /usr/bin/bash -e {0}
+2026-10-01T22:04:09.3996153Z env:
+2026-10-01T22:04:09.3996347Z   COREPACK_ENABLE_DOWNLOAD_PROMPT: 0
+2026-10-01T22:04:09.3996787Z   COREPACK_DEFAULT_TO_LATEST: 0
+2026-10-01T22:04:09.3996993Z ##[endgroup]
+2026-10-01T22:04:09.6028975Z Installing pnpm@11.11.0...
+2026-10-01T22:04:10.0920787Z ##[group]Run pnpm install --frozen-lockfile
+2026-10-01T22:04:10.0921097Z [36;1mpnpm install --frozen-lockfile[0m
+2026-10-01T22:04:10.0981783Z shell: /usr/bin/bash -e {0}
+2026-10-01T22:04:10.0981996Z env:
+2026-10-01T22:04:10.0982181Z   COREPACK_ENABLE_DOWNLOAD_PROMPT: 0
+2026-10-01T22:04:10.0982616Z   COREPACK_DEFAULT_TO_LATEST: 0
+2026-10-01T22:04:10.0982848Z ##[endgroup]
+2026-10-01T22:04:10.6550360Z ? Verifying lockfile against supply-chain policies (440 entries)...
+2026-10-01T22:04:10.6638066Z Lockfile is up to date, resolution step is skipped
+2026-10-01T22:04:10.7443880Z Progress: resolved 1, reused 0, downloaded 0, added 0
+2026-10-01T22:04:10.7815292Z Packages: +336
+2026-10-01T22:04:10.7816123Z ++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+2026-10-01T22:04:11.7533770Z Progress: resolved 336, reused 0, downloaded 67, added 4
+2026-10-01T22:04:12.7705267Z Progress: resolved 336, reused 0, downloaded 263, added 20
+2026-10-01T22:04:13.5870925Z Progress: resolved 336, reused 0, downloaded 336, added 336, done
+2026-10-01T22:04:14.1634587Z ✓ Lockfile passes supply-chain policies (440 entries in 3.5s)
+2026-10-01T22:04:14.1770598Z .../esbuild@0.28.2/node_modules/esbuild postinstall$ node install.js
+2026-10-01T22:04:14.2377286Z .../esbuild@0.28.2/node_modules/esbuild postinstall: Done
+2026-10-01T22:04:14.4001390Z 
+2026-10-01T22:04:14.4002092Z devDependencies:
+2026-10-01T22:04:14.4002960Z + @angular/core 22.2.0
+2026-10-01T22:04:14.4003335Z + @builder.io/qwik 1.20.1
+2026-10-01T22:04:14.4003680Z + @playwright/test 1.63.0
+2026-10-01T22:04:14.4004004Z + @stryker-mutator/core 9.6.1
+2026-10-01T22:04:14.4004429Z + @stryker-mutator/vitest-runner 9.6.1
+2026-10-01T22:04:14.4004805Z + @types/node 26.6.3
+2026-10-01T22:04:14.4005161Z + @types/react 19.3.0
+2026-10-01T22:04:14.4005626Z + @typescript/native-preview 7.0.0-dev.20260707.2
+2026-10-01T22:04:14.4006055Z + esbuild 0.28.2
+2026-10-01T22:04:14.4006330Z + jsdom 29.1.1
+2026-10-01T22:04:14.4006566Z + lit 3.3.3
+2026-10-01T22:04:14.4006807Z + pako 3.0.2
+2026-10-01T22:04:14.4007079Z + preact 10.29.8
+2026-10-01T22:04:14.4007416Z + react 19.3.0
+2026-10-01T22:04:14.4007688Z + react-dom 19.3.0
+2026-10-01T22:04:14.4007966Z + solid-js 1.9.15
+2026-10-01T22:04:14.4008186Z + svelte 5.57.1
+2026-10-01T22:04:14.4008500Z + terser 5.51.2
+2026-10-01T22:04:14.4008754Z + tsup 8.5.1
+2026-10-01T22:04:14.4009028Z + typescript 6.0.3
+2026-10-01T22:04:14.4009414Z + typescript5 <- typescript 5.9.3
+2026-10-01T22:04:14.4009749Z + vite 8.3.1
+2026-10-01T22:04:14.4009992Z + vitest 4.1.11
+2026-10-01T22:04:14.4010231Z + vue 3.5.43
+2026-10-01T22:04:14.4010485Z + yaml 2.9.1
+2026-10-01T22:04:14.4010638Z 
+2026-10-01T22:04:14.4906164Z Done in 4.3s using pnpm v11.11.0
+2026-10-01T22:04:14.6282266Z ##[group]Run pnpm build
+2026-10-01T22:04:14.6283383Z [36;1mpnpm build[0m
+2026-10-01T22:04:14.6341485Z shell: /usr/bin/bash -e {0}
+2026-10-01T22:04:14.6341706Z env:
+2026-10-01T22:04:14.6341888Z   COREPACK_ENABLE_DOWNLOAD_PROMPT: 0
+2026-10-01T22:04:14.6342116Z   COREPACK_DEFAULT_TO_LATEST: 0
+2026-10-01T22:04:14.6342319Z ##[endgroup]
+2026-10-01T22:04:15.3816856Z Already up to date
+2026-10-01T22:04:15.3821745Z Done in 366ms using pnpm v11.11.0
+2026-10-01T22:04:15.3950981Z $ tsup && node scripts/emit-declarations.mjs
+2026-10-01T22:04:15.6283723Z [34mCLI[39m Building entry: {"index":"src/index.ts","easing/index":"src/easing/index.ts","react/index":"src/react/index.ts","svelte/index":"src/svelte/index.ts","vue/index":"src/vue/index.ts","value/index":"src/value/index.ts","driver/index":"src/driver/index.ts","stagger/index":"src/stagger/index.ts","timeline/index":"src/timeline/index.ts","keyframes/index":"src/keyframes/index.ts","decay/index":"src/decay/index.ts","lit/index":"src/lit/index.ts","gestures/index":"src/gestures/index.ts","scroll/index":"src/scroll/index.ts","in-view/index":"src/in-view/index.ts","presence/index":"src/presence/index.ts","flip/index":"src/flip/index.ts","projection/index":"src/projection/index.ts","smart/index":"src/smart/index.ts","svg/index":"src/svg/index.ts","a11y/index":"src/a11y/index.ts","spring/index":"src/spring/index.ts","waapi/index":"src/waapi/index.ts","auto/index":"src/auto/index.ts","svg-morph/index":"src/svg-morph/index.ts","solid/index":"src/solid/index.ts","preact/index":"src/preact/index.ts","angular/index":"src/angular/index.ts","wc/index":"src/wc/index.ts","qwik/index":"src/qwik/index.ts","frame/index":"src/frame/index.ts","presets/index":"src/presets/index.ts","utils/index":"src/utils/index.ts","compositor/index":"src/compositor/index.ts","compositor/stagger/index":"src/compositor/stagger/index.ts","tokens/index":"src/tokens/index.ts","animate/index":"src/animate/index.ts","nano/index":"src/nano/index.ts","compiler/vite/index":"src/compiler/vite/index.ts","compiler/runtime/index":"src/compiler/runtime/index.ts","compiler/surface/index":"src/compiler/surface/index.ts","behaviors/index":"src/behaviors/index.ts","behaviors/reorder/index":"src/behaviors/reorder/index.ts","bindings/index":"src/bindings/index.ts"}
+2026-10-01T22:04:15.6292085Z [34mCLI[39m Using tsconfig: tsconfig.json
+2026-10-01T22:04:15.6292700Z [34mCLI[39m tsup v8.5.1
+2026-10-01T22:04:15.6293433Z [34mCLI[39m Using tsup config: /home/runner/work/lab-motion/lab-motion/tsup.config.ts
+2026-10-01T22:04:15.6301127Z [34mCLI[39m Target: es2022
+2026-10-01T22:04:15.6323003Z [34mCLI[39m Cleaning output folder
+2026-10-01T22:04:15.6331496Z [34mCJS[39m Build start
+2026-10-01T22:04:15.6332360Z [34mESM[39m Build start
+2026-10-01T22:04:15.9734397Z [34mTERSER[39m Minifying with Terser
+2026-10-01T22:04:15.9734868Z [32mTERSER[39m Terser Minification success
+2026-10-01T22:04:16.0524569Z [34mTERSER[39m Minifying with Terser
+2026-10-01T22:04:16.0525209Z [32mTERSER[39m Terser Minification success
+2026-10-01T22:04:16.1657681Z [34mTERSER[39m Minifying with Terser
+2026-10-01T22:04:16.1658432Z [32mTERSER[39m Terser Minification success
+2026-10-01T22:04:16.2322257Z [34mTERSER[39m Minifying with Terser
+2026-10-01T22:04:16.2322904Z [32mTERSER[39m Terser Minification success
+2026-10-01T22:04:16.3041281Z [34mTERSER[39m Minifying with Terser
+2026-10-01T22:04:16.3041703Z [32mTERSER[39m Terser Minification success
+2026-10-01T22:04:16.3248837Z [34mTERSER[39m Minifying with Terser
+2026-10-01T22:04:16.3249448Z [32mTERSER[39m Terser Minification success
+2026-10-01T22:04:16.3966482Z [34mTERSER[39m Minifying with Terser
+2026-10-01T22:04:16.3967138Z [32mTERSER[39m Terser Minification success
+2026-10-01T22:04:16.4455697Z [34mTERSER[39m Minifying with Terser
+2026-10-01T22:04:16.4456506Z [32mTERSER[39m Terser Minification success
+2026-10-01T22:04:16.4603967Z [34mTERSER[39m Minifying with Terser
+2026-10-01T22:04:16.4604730Z [32mTERSER[39m Terser Minification success
+2026-10-01T22:04:16.5468639Z [34mTERSER[39m Minifying with Terser
+2026-10-01T22:04:16.5469224Z [32mTERSER[39m Terser Minification success
+2026-10-01T22:04:16.6054609Z [34mTERSER[39m Minifying with Terser
+2026-10-01T22:04:16.6055122Z [32mTERSER[39m Terser Minification success
+2026-10-01T22:04:16.6353371Z [34mTERSER[39m Minifying with Terser
+2026-10-01T22:04:16.6354000Z [32mTERSER[39m Terser Minification success
+2026-10-01T22:04:16.7327643Z [34mTERSER[39m Minifying with Terser
+2026-10-01T22:04:16.7329029Z [32mTERSER[39m Terser Minification success
+2026-10-01T22:04:16.7934074Z [34mTERSER[39m Minifying with Terser
+2026-10-01T22:04:16.7971438Z [32mTERSER[39m Terser Minification success
+2026-10-01T22:04:16.8417886Z [34mTERSER[39m Minifying with Terser
+2026-10-01T22:04:16.8418586Z [32mTERSER[39m Terser Minification success
+2026-10-01T22:04:16.8771391Z [34mTERSER[39m Minifying with Terser
+2026-10-01T22:04:16.8772077Z [32mTERSER[39m Terser Minification success
+2026-10-01T22:04:16.9499638Z [34mTERSER[39m Minifying with Terser
+2026-10-01T22:04:16.9500070Z [32mTERSER[39m Terser Minification success
+2026-10-01T22:04:17.1071048Z [34mTERSER[39m Minifying with Terser
+2026-10-01T22:04:17.1071470Z [32mTERSER[39m Terser Minification success
+2026-10-01T22:04:17.1180265Z [34mTERSER[39m Minifying with Terser
+2026-10-01T22:04:17.1181193Z [32mTERSER[39m Terser Minification success
+2026-10-01T22:04:17.1517092Z [34mTERSER[39m Minifying with Terser
+2026-10-01T22:04:17.1517502Z [32mTERSER[39m Terser Minification success
+2026-10-01T22:04:17.2029834Z [34mTERSER[39m Minifying with Terser
+2026-10-01T22:04:17.2030279Z [32mTERSER[39m Terser Minification success
+2026-10-01T22:04:17.2966301Z [34mTERSER[39m Minifying with Terser
+2026-10-01T22:04:17.2966795Z [32mTERSER[39m Terser Minification success
+2026-10-01T22:04:17.3492906Z [34mTERSER[39m Minifying with Terser
+2026-10-01T22:04:17.3493411Z [32mTERSER[39m Terser Minification success
+2026-10-01T22:04:17.4583796Z [34mTERSER[39m Minifying with Terser
+2026-10-01T22:04:17.4584450Z [32mTERSER[39m Terser Minification success
+2026-10-01T22:04:17.5087391Z [34mTERSER[39m Minifying with Terser
+2026-10-01T22:04:17.5113149Z [32mTERSER[39m Terser Minification success
+2026-10-01T22:04:17.5737452Z [34mTERSER[39m Minifying with Terser
+2026-10-01T22:04:17.5738260Z [32mTERSER[39m Terser Minification success
+2026-10-01T22:04:17.6263519Z [34mTERSER[39m Minifying with Terser
+2026-10-01T22:04:17.6264155Z [32mTERSER[39m Terser Minification success
+2026-10-01T22:04:17.6472983Z [34mTERSER[39m Minifying with Terser
+2026-10-01T22:04:17.6473806Z [32mTERSER[39m Terser Minification success
+2026-10-01T22:04:17.6985364Z [34mTERSER[39m Minifying with Terser
+2026-10-01T22:04:17.6985988Z [32mTERSER[39m Terser Minification success
+2026-10-01T22:04:17.7299054Z [34mTERSER[39m Minifying with Terser
+2026-10-01T22:04:17.7299729Z [32mTERSER[39m Terser Minification success
+2026-10-01T22:04:17.8784555Z [34mTERSER[39m Minifying with Terser
+2026-10-01T22:04:17.8785022Z [32mTERSER[39m Terser Minification success
+2026-10-01T22:04:17.9374229Z [34mTERSER[39m Minifying with Terser
+2026-10-01T22:04:17.9374861Z [32mTERSER[39m Terser Minification success
+2026-10-01T22:04:18.0900768Z [34mTERSER[39m Minifying with Terser
+2026-10-01T22:04:18.0901372Z [32mTERSER[39m Terser Minification success
+2026-10-01T22:04:18.1129370Z [34mTERSER[39m Minifying with Terser
+2026-10-01T22:04:18.1130024Z [32mTERSER[39m Terser Minification success
+2026-10-01T22:04:18.1363959Z [34mTERSER[39m Minifying with Terser
+2026-10-01T22:04:18.1364761Z [32mTERSER[39m Terser Minification success
+2026-10-01T22:04:18.2960742Z [34mTERSER[39m Minifying with Terser
+2026-10-01T22:04:18.2961432Z [32mTERSER[39m Terser Minification success
+2026-10-01T22:04:18.3019577Z [34mTERSER[39m Minifying with Terser
+2026-10-01T22:04:18.3020154Z [32mTERSER[39m Terser Minification success
+2026-10-01T22:04:18.3134195Z [34mTERSER[39m Minifying with Terser
+2026-10-01T22:04:18.3135271Z [32mTERSER[39m Terser Minification success
+2026-10-01T22:04:18.4426492Z [34mTERSER[39m Minifying with Terser
+2026-10-01T22:04:18.4427177Z [32mTERSER[39m Terser Minification success
+2026-10-01T22:04:18.4703538Z [34mTERSER[39m Minifying with Terser
+2026-10-01T22:04:18.4704116Z [32mTERSER[39m Terser Minification success
+2026-10-01T22:04:18.4988719Z [34mTERSER[39m Minifying with Terser
+2026-10-01T22:04:18.4989670Z [32mTERSER[39m Terser Minification success
+2026-10-01T22:04:18.6978714Z [34mTERSER[39m Minifying with Terser
+2026-10-01T22:04:18.6979156Z [32mTERSER[39m Terser Minification success
+2026-10-01T22:04:18.8064340Z [34mTERSER[39m Minifying with Terser
+2026-10-01T22:04:18.8064931Z [32mTERSER[39m Terser Minification success
+2026-10-01T22:04:19.1391903Z [34mTERSER[39m Minifying with Terser
+2026-10-01T22:04:19.1392355Z [32mTERSER[39m Terser Minification success
+2026-10-01T22:04:19.1826044Z [34mTERSER[39m Minifying with Terser
+2026-10-01T22:04:19.1826633Z [32mTERSER[39m Terser Minification success
+2026-10-01T22:04:19.2384455Z [34mTERSER[39m Minifying with Terser
+2026-10-01T22:04:19.2385184Z [32mTERSER[39m Terser Minification success
+2026-10-01T22:04:19.3035727Z [34mTERSER[39m Minifying with Terser
+2026-10-01T22:04:19.3036152Z [32mTERSER[39m Terser Minification success
+2026-10-01T22:04:19.3414478Z [34mTERSER[39m Minifying with Terser
+2026-10-01T22:04:19.3415075Z [32mTERSER[39m Terser Minification success
+2026-10-01T22:04:19.3886750Z [34mTERSER[39m Minifying with Terser
+2026-10-01T22:04:19.3887353Z [32mTERSER[39m Terser Minification success
+2026-10-01T22:04:19.4016220Z [34mTERSER[39m Minifying with Terser
+2026-10-01T22:04:19.4017002Z [32mTERSER[39m Terser Minification success
+2026-10-01T22:04:19.4344646Z [34mTERSER[39m Minifying with Terser
+2026-10-01T22:04:19.4345329Z [32mTERSER[39m Terser Minification success
+2026-10-01T22:04:19.4871170Z [34mTERSER[39m Minifying with Terser
+2026-10-01T22:04:19.4871584Z [32mTERSER[39m Terser Minification success
+2026-10-01T22:04:19.4985595Z [34mTERSER[39m Minifying with Terser
+2026-10-01T22:04:19.4986161Z [32mTERSER[39m Terser Minification success
+2026-10-01T22:04:19.5274028Z [34mTERSER[39m Minifying with Terser
+2026-10-01T22:04:19.5293623Z [32mTERSER[39m Terser Minification success
+2026-10-01T22:04:19.5952724Z [34mTERSER[39m Minifying with Terser
+2026-10-01T22:04:19.5953313Z [32mTERSER[39m Terser Minification success
+2026-10-01T22:04:19.6360777Z [34mTERSER[39m Minifying with Terser
+2026-10-01T22:04:19.6361368Z [32mTERSER[39m Terser Minification success
+2026-10-01T22:04:19.6532292Z [34mTERSER[39m Minifying with Terser
+2026-10-01T22:04:19.6533050Z [32mTERSER[39m Terser Minification success
+2026-10-01T22:04:19.6941326Z [34mTERSER[39m Minifying with Terser
+2026-10-01T22:04:19.6941891Z [32mTERSER[39m Terser Minification success
+2026-10-01T22:04:19.7621732Z [34mTERSER[39m Minifying with Terser
+2026-10-01T22:04:19.7622129Z [32mTERSER[39m Terser Minification success
+2026-10-01T22:04:19.7910430Z [34mTERSER[39m Minifying with Terser
+2026-10-01T22:04:19.7910888Z [32mTERSER[39m Terser Minification success
+2026-10-01T22:04:19.8339606Z [34mTERSER[39m Minifying with Terser
+2026-10-01T22:04:19.8340056Z [32mTERSER[39m Terser Minification success
+2026-10-01T22:04:19.8432810Z [34mTERSER[39m Minifying with Terser
+2026-10-01T22:04:19.8433300Z [32mTERSER[39m Terser Minification success
+2026-10-01T22:04:19.8804168Z [34mTERSER[39m Minifying with Terser
+2026-10-01T22:04:19.8804640Z [32mTERSER[39m Terser Minification success
+2026-10-01T22:04:20.0061846Z [34mTERSER[39m Minifying with Terser
+2026-10-01T22:04:20.0062254Z [32mTERSER[39m Terser Minification success
+2026-10-01T22:04:20.0460742Z [34mTERSER[39m Minifying with Terser
+2026-10-01T22:04:20.0461437Z [32mTERSER[39m Terser Minification success
+2026-10-01T22:04:20.1174830Z [34mTERSER[39m Minifying with Terser
+2026-10-01T22:04:20.1175445Z [32mTERSER[39m Terser Minification success
+2026-10-01T22:04:20.2106809Z [34mTERSER[39m Minifying with Terser
+2026-10-01T22:04:20.2107650Z [32mTERSER[39m Terser Minification success
+2026-10-01T22:04:20.2508425Z [34mTERSER[39m Minifying with Terser
+2026-10-01T22:04:20.2508842Z [32mTERSER[39m Terser Minification success
+2026-10-01T22:04:20.2839413Z [34mTERSER[39m Minifying with Terser
+2026-10-01T22:04:20.2839983Z [32mTERSER[39m Terser Minification success
+2026-10-01T22:04:20.3208655Z [34mTERSER[39m Minifying with Terser
+2026-10-01T22:04:20.3209255Z [32mTERSER[39m Terser Minification success
+2026-10-01T22:04:20.3600062Z [34mTERSER[39m Minifying with Terser
+2026-10-01T22:04:20.3601142Z [32mTERSER[39m Terser Minification success
+2026-10-01T22:04:20.3744019Z [34mTERSER[39m Minifying with Terser
+2026-10-01T22:04:20.3744869Z [32mTERSER[39m Terser Minification success
+2026-10-01T22:04:20.4070857Z [34mTERSER[39m Minifying with Terser
+2026-10-01T22:04:20.4071293Z [32mTERSER[39m Terser Minification success
+2026-10-01T22:04:20.4266663Z [34mTERSER[39m Minifying with Terser
+2026-10-01T22:04:20.4267330Z [32mTERSER[39m Terser Minification success
+2026-10-01T22:04:20.5316652Z [34mTERSER[39m Minifying with Terser
+2026-10-01T22:04:20.5317224Z [32mTERSER[39m Terser Minification success
+2026-10-01T22:04:20.7086642Z [34mTERSER[39m Minifying with Terser
+2026-10-01T22:04:20.7087307Z [32mTERSER[39m Terser Minification success
+2026-10-01T22:04:20.8295138Z [34mTERSER[39m Minifying with Terser
+2026-10-01T22:04:20.8295718Z [32mTERSER[39m Terser Minification success
+2026-10-01T22:04:20.8494508Z [34mTERSER[39m Minifying with Terser
+2026-10-01T22:04:20.8494898Z [32mTERSER[39m Terser Minification success
+2026-10-01T22:04:20.8642247Z [34mTERSER[39m Minifying with Terser
+2026-10-01T22:04:20.8642979Z [32mTERSER[39m Terser Minification success
+2026-10-01T22:04:20.9967038Z [34mTERSER[39m Minifying with Terser
+2026-10-01T22:04:20.9967453Z [32mTERSER[39m Terser Minification success
+2026-10-01T22:04:21.0020175Z [34mTERSER[39m Minifying with Terser
+2026-10-01T22:04:21.0020719Z [32mTERSER[39m Terser Minification success
+2026-10-01T22:04:21.0131600Z [34mTERSER[39m Minifying with Terser
+2026-10-01T22:04:21.0132215Z [32mTERSER[39m Terser Minification success
+2026-10-01T22:04:21.0461891Z [34mTERSER[39m Minifying with Terser
+2026-10-01T22:04:21.0462619Z [32mTERSER[39m Terser Minification success
+2026-10-01T22:04:21.0680270Z [34mTERSER[39m Minifying with Terser
+2026-10-01T22:04:21.0681263Z [32mTERSER[39m Terser Minification success
+2026-10-01T22:04:21.0888735Z [34mTERSER[39m Minifying with Terser
+2026-10-01T22:04:21.0889124Z [32mTERSER[39m Terser Minification success
+2026-10-01T22:04:21.1836030Z [34mTERSER[39m Minifying with Terser
+2026-10-01T22:04:21.1836732Z [32mTERSER[39m Terser Minification success
+2026-10-01T22:04:21.2960742Z [34mTERSER[39m Minifying with Terser
+2026-10-01T22:04:21.2961328Z [32mTERSER[39m Terser Minification success
+2026-10-01T22:04:21.6240851Z [34mTERSER[39m Minifying with Terser
+2026-10-01T22:04:21.6241273Z [32mTERSER[39m Terser Minification success
+2026-10-01T22:04:21.6397006Z [32mCJS[39m [1mdist/index.cjs                    [22m[32m5.18 KB[39m
+2026-10-01T22:04:21.6397794Z [32mCJS[39m [1mdist/easing/index.cjs             [22m[32m3.99 KB[39m
+2026-10-01T22:04:21.6398464Z [32mCJS[39m [1mdist/react/index.cjs              [22m[32m6.93 KB[39m
+2026-10-01T22:04:21.6399077Z [32mCJS[39m [1mdist/svelte/index.cjs             [22m[32m3.97 KB[39m
+2026-10-01T22:04:21.6399688Z [32mCJS[39m [1mdist/vue/index.cjs                [22m[32m5.37 KB[39m
+2026-10-01T22:04:21.6400292Z [32mCJS[39m [1mdist/value/index.cjs              [22m[32m6.10 KB[39m
+2026-10-01T22:04:21.6400934Z [32mCJS[39m [1mdist/stagger/index.cjs            [22m[32m1.24 KB[39m
+2026-10-01T22:04:21.6401525Z [32mCJS[39m [1mdist/decay/index.cjs              [22m[32m1.18 KB[39m
+2026-10-01T22:04:21.6401977Z [32mCJS[39m [1mdist/lit/index.cjs                [22m[32m5.17 KB[39m
+2026-10-01T22:04:21.6402575Z [32mCJS[39m [1mdist/keyframes/index.cjs          [22m[32m5.79 KB[39m
+2026-10-01T22:04:21.6403337Z [32mCJS[39m [1mdist/gestures/index.cjs           [22m[32m7.20 KB[39m
+2026-10-01T22:04:21.6404142Z [32mCJS[39m [1mdist/scroll/index.cjs             [22m[32m2.15 KB[39m
+2026-10-01T22:04:21.6404985Z [32mCJS[39m [1mdist/in-view/index.cjs            [22m[32m4.72 KB[39m
+2026-10-01T22:04:21.6405838Z [32mCJS[39m [1mdist/flip/index.cjs               [22m[32m2.84 KB[39m
+2026-10-01T22:04:21.6406668Z [32mCJS[39m [1mdist/presence/index.cjs           [22m[32m4.25 KB[39m
+2026-10-01T22:04:21.6407490Z [32mCJS[39m [1mdist/a11y/index.cjs               [22m[32m1.26 KB[39m
+2026-10-01T22:04:21.6407962Z [32mCJS[39m [1mdist/projection/index.cjs         [22m[32m14.40 KB[39m
+2026-10-01T22:04:21.6408426Z [32mCJS[39m [1mdist/svg/index.cjs                [22m[32m4.76 KB[39m
+2026-10-01T22:04:21.6408868Z [32mCJS[39m [1mdist/waapi/index.cjs              [22m[32m4.62 KB[39m
+2026-10-01T22:04:21.6409338Z [32mCJS[39m [1mdist/svg-morph/index.cjs          [22m[32m7.39 KB[39m
+2026-10-01T22:04:21.6409815Z [32mCJS[39m [1mdist/spring/index.cjs             [22m[32m4.48 KB[39m
+2026-10-01T22:04:21.6410262Z [32mCJS[39m [1mdist/solid/index.cjs              [22m[32m4.11 KB[39m
+2026-10-01T22:04:21.6410859Z [32mCJS[39m [1mdist/timeline/index.cjs           [22m[32m3.47 KB[39m
+2026-10-01T22:04:21.6411302Z [32mCJS[39m [1mdist/preact/index.cjs             [22m[32m4.12 KB[39m
+2026-10-01T22:04:21.6411746Z [32mCJS[39m [1mdist/frame/index.cjs              [22m[32m1.41 KB[39m
+2026-10-01T22:04:21.6412177Z [32mCJS[39m [1mdist/angular/index.cjs            [22m[32m4.15 KB[39m
+2026-10-01T22:04:21.6412714Z [32mCJS[39m [1mdist/qwik/index.cjs               [22m[32m4.16 KB[39m
+2026-10-01T22:04:21.6413144Z [32mCJS[39m [1mdist/driver/index.cjs             [22m[32m3.66 KB[39m
+2026-10-01T22:04:21.6413574Z [32mCJS[39m [1mdist/utils/index.cjs              [22m[32m2.22 KB[39m
+2026-10-01T22:04:21.6414019Z [32mCJS[39m [1mdist/presets/index.cjs            [22m[32m14.28 KB[39m
+2026-10-01T22:04:21.6414475Z [32mCJS[39m [1mdist/wc/index.cjs                 [22m[32m5.06 KB[39m
+2026-10-01T22:04:21.6414918Z [32mCJS[39m [1mdist/nano/index.cjs               [22m[32m1.69 KB[39m
+2026-10-01T22:04:21.6415347Z [32mCJS[39m [1mdist/tokens/index.cjs             [22m[32m2.45 KB[39m
+2026-10-01T22:04:21.6415788Z [32mCJS[39m [1mdist/compositor/index.cjs         [22m[32m15.47 KB[39m
+2026-10-01T22:04:21.6416238Z [32mCJS[39m [1mdist/compositor/stagger/index.cjs [22m[32m16.29 KB[39m
+2026-10-01T22:04:21.6416867Z [32mCJS[39m [1mdist/bindings/index.cjs           [22m[32m2.72 KB[39m
+2026-10-01T22:04:21.6417319Z [32mCJS[39m [1mdist/smart/index.cjs              [22m[32m20.21 KB[39m
+2026-10-01T22:04:21.6417763Z [32mCJS[39m [1mdist/behaviors/index.cjs          [22m[32m11.24 KB[39m
+2026-10-01T22:04:21.6418207Z [32mCJS[39m [1mdist/animate/index.cjs            [22m[32m37.98 KB[39m
+2026-10-01T22:04:21.6418646Z [32mCJS[39m [1mdist/auto/index.cjs               [22m[32m12.94 KB[39m
+2026-10-01T22:04:21.6419096Z [32mCJS[39m [1mdist/compiler/runtime/index.cjs   [22m[32m486.00 B[39m
+2026-10-01T22:04:21.6419570Z [32mCJS[39m [1mdist/compiler/surface/index.cjs   [22m[32m2.13 KB[39m
+2026-10-01T22:04:21.6420027Z [32mCJS[39m [1mdist/compiler/vite/index.cjs      [22m[32m14.44 KB[39m
+2026-10-01T22:04:21.6420475Z [32mCJS[39m [1mdist/behaviors/reorder/index.cjs  [22m[32m3.23 KB[39m
+2026-10-01T22:04:21.6420859Z [32mCJS[39m ⚡️ Build success in 6006ms
+2026-10-01T22:04:21.6421267Z [32mESM[39m [1mdist/behaviors/reorder/index.js  [22m[32m3.22 KB[39m
+2026-10-01T22:04:21.6421713Z [32mESM[39m [1mdist/easing/index.js             [22m[32m3.94 KB[39m
+2026-10-01T22:04:21.6422141Z [32mESM[39m [1mdist/index.js                    [22m[32m5.16 KB[39m
+2026-10-01T22:04:21.6422737Z [32mESM[39m [1mdist/react/index.js              [22m[32m6.86 KB[39m
+2026-10-01T22:04:21.6423171Z [32mESM[39m [1mdist/svelte/index.js             [22m[32m3.97 KB[39m
+2026-10-01T22:04:21.6423734Z [32mESM[39m [1mdist/stagger/index.js            [22m[32m1.23 KB[39m
+2026-10-01T22:04:21.6424179Z [32mESM[39m [1mdist/vue/index.js                [22m[32m5.36 KB[39m
+2026-10-01T22:04:21.6424615Z [32mESM[39m [1mdist/driver/index.js             [22m[32m3.66 KB[39m
+2026-10-01T22:04:21.6425038Z [32mESM[39m [1mdist/value/index.js              [22m[32m6.06 KB[39m
+2026-10-01T22:04:21.6425462Z [32mESM[39m [1mdist/decay/index.js              [22m[32m1.17 KB[39m
+2026-10-01T22:04:21.6425913Z [32mESM[39m [1mdist/timeline/index.js           [22m[32m3.46 KB[39m
+2026-10-01T22:04:21.6426370Z [32mESM[39m [1mdist/keyframes/index.js          [22m[32m5.78 KB[39m
+2026-10-01T22:04:21.6426999Z [32mESM[39m [1mdist/lit/index.js                [22m[32m5.17 KB[39m
+2026-10-01T22:04:21.6427722Z [32mESM[39m [1mdist/scroll/index.js             [22m[32m2.13 KB[39m
+2026-10-01T22:04:21.6428468Z [32mESM[39m [1mdist/in-view/index.js            [22m[32m4.70 KB[39m
+2026-10-01T22:04:21.6429192Z [32mESM[39m [1mdist/gestures/index.js           [22m[32m7.18 KB[39m
+2026-10-01T22:04:21.6429798Z [32mESM[39m [1mdist/presence/index.js           [22m[32m4.24 KB[39m
+2026-10-01T22:04:21.6430244Z [32mESM[39m [1mdist/svg/index.js                [22m[32m4.74 KB[39m
+2026-10-01T22:04:21.6430676Z [32mESM[39m [1mdist/a11y/index.js               [22m[32m1.25 KB[39m
+2026-10-01T22:04:21.6431118Z [32mESM[39m [1mdist/spring/index.js             [22m[32m4.45 KB[39m
+2026-10-01T22:04:21.6431551Z [32mESM[39m [1mdist/waapi/index.js              [22m[32m4.59 KB[39m
+2026-10-01T22:04:21.6432003Z [32mESM[39m [1mdist/projection/index.js         [22m[32m14.38 KB[39m
+2026-10-01T22:04:21.6432568Z [32mESM[39m [1mdist/svg-morph/index.js          [22m[32m7.38 KB[39m
+2026-10-01T22:04:21.6433135Z [32mESM[39m [1mdist/auto/index.js               [22m[32m12.92 KB[39m
+2026-10-01T22:04:21.6433581Z [32mESM[39m [1mdist/solid/index.js              [22m[32m4.10 KB[39m
+2026-10-01T22:04:21.6434294Z [32mESM[39m [1mdist/preact/index.js             [22m[32m4.11 KB[39m
+2026-10-01T22:04:21.6434774Z [32mESM[39m [1mdist/angular/index.js            [22m[32m4.12 KB[39m
+2026-10-01T22:04:21.6435200Z [32mESM[39m [1mdist/wc/index.js                 [22m[32m5.04 KB[39m
+2026-10-01T22:04:21.6435637Z [32mESM[39m [1mdist/frame/index.js              [22m[32m1.39 KB[39m
+2026-10-01T22:04:21.6436076Z [32mESM[39m [1mdist/utils/index.js              [22m[32m2.20 KB[39m
+2026-10-01T22:04:21.6436501Z [32mESM[39m [1mdist/flip/index.js               [22m[32m2.82 KB[39m
+2026-10-01T22:04:21.6436936Z [32mESM[39m [1mdist/presets/index.js            [22m[32m14.22 KB[39m
+2026-10-01T22:04:21.6437386Z [32mESM[39m [1mdist/smart/index.js              [22m[32m20.19 KB[39m
+2026-10-01T22:04:21.6437839Z [32mESM[39m [1mdist/compositor/index.js         [22m[32m15.44 KB[39m
+2026-10-01T22:04:21.6438280Z [32mESM[39m [1mdist/tokens/index.js             [22m[32m2.42 KB[39m
+2026-10-01T22:04:21.6438713Z [32mESM[39m [1mdist/nano/index.js               [22m[32m1.68 KB[39m
+2026-10-01T22:04:21.6439153Z [32mESM[39m [1mdist/compositor/stagger/index.js [22m[32m16.28 KB[39m
+2026-10-01T22:04:21.6439586Z [32mESM[39m [1mdist/qwik/index.js               [22m[32m4.14 KB[39m
+2026-10-01T22:04:21.6440040Z [32mESM[39m [1mdist/bindings/index.js           [22m[32m2.71 KB[39m
+2026-10-01T22:04:21.6440551Z [32mESM[39m [1mdist/behaviors/index.js          [22m[32m11.23 KB[39m
+2026-10-01T22:04:21.6441026Z [32mESM[39m [1mdist/animate/index.js            [22m[32m37.99 KB[39m
+2026-10-01T22:04:21.6441486Z [32mESM[39m [1mdist/compiler/surface/index.js   [22m[32m2.12 KB[39m
+2026-10-01T22:04:21.6441936Z [32mESM[39m [1mdist/compiler/runtime/index.js   [22m[32m479.00 B[39m
+2026-10-01T22:04:21.6442380Z [32mESM[39m [1mdist/compiler/vite/index.js      [22m[32m14.43 KB[39m
+2026-10-01T22:04:21.6443138Z [32mESM[39m ⚡️ Build success in 6007ms
+2026-10-01T22:04:22.4286276Z emit-declarations: OK — 108 файлов × (d.ts + d.cts)
+2026-10-01T22:04:22.4742189Z ##[group]Run set +e
+2026-10-01T22:04:22.4742693Z [36;1mset +e[0m
+2026-10-01T22:04:22.4742907Z [36;1mpnpm vitest run 2>&1 | tee vitest.log[0m
+2026-10-01T22:04:22.4743172Z [36;1mstatus=${PIPESTATUS[0]}[0m
+2026-10-01T22:04:22.4743403Z [36;1mexit "$status"[0m
+2026-10-01T22:04:22.4804063Z shell: /usr/bin/bash --noprofile --norc -e -o pipefail {0}
+2026-10-01T22:04:22.4804346Z env:
+2026-10-01T22:04:22.4804519Z   COREPACK_ENABLE_DOWNLOAD_PROMPT: 0
+2026-10-01T22:04:22.4804748Z   COREPACK_DEFAULT_TO_LATEST: 0
+2026-10-01T22:04:22.4804951Z ##[endgroup]
+2026-10-01T22:04:23.1857702Z Already up to date
+2026-10-01T22:04:23.1863368Z Done in 318ms using pnpm v11.11.0
+2026-10-01T22:04:23.5365250Z Already up to date
+2026-10-01T22:04:23.5370439Z Done in 310ms using pnpm v11.11.0
+2026-10-01T22:04:23.8022156Z 
+2026-10-01T22:04:23.8025399Z [1m[30m[46m RUN [49m[39m[22m [36mv4.1.11 [39m[90m/home/runner/work/lab-motion/lab-motion[39m
+2026-10-01T22:04:23.8026196Z 
+2026-10-01T22:04:24.4413268Z  [32m✓[39m test/auto-animate.test.ts [2m([22m[2m78 tests[22m[2m)[22m[32m 55[2mms[22m[39m
+2026-10-01T22:04:25.0644890Z  [32m✓[39m test/continuity-differential-matrix.test.ts [2m([22m[2m110 tests[22m[2m)[22m[32m 296[2mms[22m[39m
+2026-10-01T22:04:26.2031023Z  [32m✓[39m test/bench-transform-pair.test.ts [2m([22m[2m70 tests[22m[2m)[22m[33m 851[2mms[22m[39m
+2026-10-01T22:04:26.7334448Z  [32m✓[39m test/motion-program-wire-v1.test.ts [2m([22m[2m20 tests[22m[2m)[22m[32m 293[2mms[22m[39m
+2026-10-01T22:04:27.5014633Z  [32m✓[39m test/motion-program-semantics-v1.test.ts [2m([22m[2m28 tests[22m[2m)[22m[33m 566[2mms[22m[39m
+2026-10-01T22:04:27.5016656Z      [33m[2m✓[22m[39m остаётся total на seeded raw-binary64 transform corpus [33m 362[2mms[22m[39m
+2026-10-01T22:04:28.4284561Z  [32m✓[39m test/motion-value.test.ts [2m([22m[2m46 tests[22m[2m)[22m[33m 721[2mms[22m[39m
+2026-10-01T22:04:28.4286044Z      [33m[2m✓[22m[39m NEVER emits NaN or Infinity for any valid finite initial/target combination [33m 690[2mms[22m[39m
+2026-10-01T22:04:28.7257721Z  [32m✓[39m test/projection-driver.test.ts [2m([22m[2m31 tests[22m[2m)[22m[32m 31[2mms[22m[39m
+2026-10-01T22:04:29.0074518Z  [32m✓[39m test/benchmark-methodology.test.ts [2m([22m[2m32 tests[22m[2m)[22m[32m 99[2mms[22m[39m
+2026-10-01T22:04:29.1966239Z  [32m✓[39m test/motion-value-mutation-harden.test.ts [2m([22m[2m28 tests[22m[2m)[22m[32m 19[2mms[22m[39m
+2026-10-01T22:04:29.4821534Z  [32m✓[39m test/frame-loop.test.ts [2m([22m[2m45 tests[22m[2m)[22m[32m 114[2mms[22m[39m
+2026-10-01T22:04:29.7953323Z  [32m✓[39m test/animate-waapi-lifecycle.test.ts [2m([22m[2m28 tests[22m[2m)[22m[32m 94[2mms[22m[39m
+2026-10-01T22:04:31.9407431Z  [32m✓[39m test/benchmark-provenance.test.ts [2m([22m[2m34 tests[22m[2m)[22m[33m 1937[2mms[22m[39m
+2026-10-01T22:04:33.7485057Z  [32m✓[39m test/size-gate-autoderive.test.ts [2m([22m[2m36 tests[22m[2m)[22m[33m 1595[2mms[22m[39m
+2026-10-01T22:04:33.7488601Z      [33m[2m✓[22m[39m measureScenario: все текущие статические сценарии byte-identical старому single-output oracle [33m 660[2mms[22m[39m
+2026-10-01T22:04:33.7490322Z      [33m[2m✓[22m[39m integration: current repo package.json exports every subpath the real dist/ build emits [33m 678[2mms[22m[39m
+2026-10-01T22:04:33.9753756Z  [32m✓[39m test/animate-lifecycle-atomicity.test.ts [2m([22m[2m37 tests[22m[2m)[22m[32m 35[2mms[22m[39m
+2026-10-01T22:04:34.2214585Z  [32m✓[39m test/smart-lifecycle.test.ts [2m([22m[2m23 tests[22m[2m)[22m[32m 46[2mms[22m[39m
+2026-10-01T22:04:38.2939974Z  [32m✓[39m test/release-workflow-contract.test.ts [2m([22m[2m30 tests[22m[2m)[22m[33m 3857[2mms[22m[39m
+2026-10-01T22:04:38.2942001Z      [33m[2m✓[22m[39m fixture объявляет только собственный main, независимо от веток запускающего checkout [33m 435[2mms[22m[39m
+2026-10-01T22:04:38.2943779Z      [33m[2m✓[22m[39m исполняет replay на настоящем v0.3.0 checkout и его сохранённой дате [33m 762[2mms[22m[39m
+2026-10-01T22:04:38.2945078Z      [33m[2m✓[22m[39m до setup/install отклоняет настоящий v0.2.0 checkout с неподдерживаемым протоколом [33m 327[2mms[22m[39m
+2026-10-01T22:04:38.2946399Z      [33m[2m✓[22m[39m реальная граница fixture различает доступность обязательных release-команд [33m 617[2mms[22m[39m
+2026-10-01T22:04:38.2947588Z      [33m[2m✓[22m[39m v0.3.0 stored-date path fail-closed отклоняет некалендарную дату CHANGELOG [33m 338[2mms[22m[39m
+2026-10-01T22:04:38.2948897Z      [33m[2m✓[22m[39m workflow, shell blocks и embedded Node programs синтаксически валидны [33m 1293[2mms[22m[39m
+2026-10-01T22:04:39.2836113Z  [32m✓[39m test/react-runtime.test.ts [2m([22m[2m19 tests[22m[2m)[22m[32m 74[2mms[22m[39m
+2026-10-01T22:04:39.4421684Z  [32m✓[39m test/projection-dom.test.ts [2m([22m[2m18 tests[22m[2m)[22m[32m 17[2mms[22m[39m
+2026-10-01T22:04:39.6173247Z  [32m✓[39m test/vue.test.ts [2m([22m[2m28 tests[22m[2m)[22m[32m 14[2mms[22m[39m
+2026-10-01T22:04:39.7953506Z  [32m✓[39m test/projection-geometry.test.ts [2m([22m[2m30 tests[22m[2m)[22m[32m 27[2mms[22m[39m
+2026-10-01T22:04:40.5234796Z  [32m✓[39m test/compositor-host-owner.test.ts [2m([22m[2m33 tests[22m[2m)[22m[33m 524[2mms[22m[39m
+2026-10-01T22:04:40.5237567Z      [33m[2m✓[22m[39m state-machine: все трассы start/retarget/stop/destroy сохраняют одного owner [33m 497[2mms[22m[39m
+2026-10-01T22:04:40.7004662Z  [32m✓[39m test/driver-mutation-harden.test.ts [2m([22m[2m38 tests[22m[2m)[22m[32m 20[2mms[22m[39m
+2026-10-01T22:04:41.1507469Z  [32m✓[39m test/animate-surface-batch.test.ts [2m([22m[2m24 tests[22m[2m)[22m[32m 59[2mms[22m[39m
+2026-10-01T22:04:41.4522868Z  [32m✓[39m test/repeat-runtime-adversarial.test.ts [2m([22m[2m24 tests[22m[2m)[22m[32m 100[2mms[22m[39m
+2026-10-01T22:04:41.7060930Z  [32m✓[39m test/waapi-emit.test.ts [2m([22m[2m41 tests[22m[2m)[22m[32m 62[2mms[22m[39m
+2026-10-01T22:04:45.4863499Z  [32m✓[39m test/ci-workflow-contract.test.ts [2m([22m[2m94 tests[22m[2m)[22m[33m 3576[2mms[22m[39m
+2026-10-01T22:04:45.4944057Z      [33m[2m✓[22m[39m ci.yml/verify сохраняет каждую обязательную команду [33m 685[2mms[22m[39m
+2026-10-01T22:04:45.6496758Z  [32m✓[39m test/keyframes-mutation-harden.test.ts [2m([22m[2m52 tests[22m[2m)[22m[32m 18[2mms[22m[39m
+2026-10-01T22:04:49.2446366Z  [32m✓[39m test/journey-package-consumers.test.ts [2m([22m[2m7 tests[22m[2m)[22m[33m 3470[2mms[22m[39m
+2026-10-01T22:04:49.4680669Z  [32m✓[39m test/presets-text-number.test.ts [2m([22m[2m47 tests[22m[2m)[22m[32m 29[2mms[22m[39m
+2026-10-01T22:04:49.6824513Z  [32m✓[39m test/presence-impulse-continuity.test.ts [2m([22m[2m13 tests[22m[2m)[22m[32m 14[2mms[22m[39m
+2026-10-01T22:04:50.0694840Z  [32m✓[39m test/compositor-serialized-execution.test.ts [2m([22m[2m20 tests[22m[2m)[22m[32m 140[2mms[22m[39m
+2026-10-01T22:04:50.2969863Z  [32m✓[39m test/compositor-stagger.test.ts [2m([22m[2m24 tests[22m[2m)[22m[32m 26[2mms[22m[39m
+2026-10-01T22:04:50.5461404Z  [32m✓[39m test/animate-scale-residual.test.ts [2m([22m[2m25 tests[22m[2m)[22m[32m 38[2mms[22m[39m
+2026-10-01T22:04:50.7783634Z  [32m✓[39m test/repeat-v1-conformance.test.ts [2m([22m[2m16 tests[22m[2m)[22m[32m 70[2mms[22m[39m
+2026-10-01T22:04:51.0083123Z  [32m✓[39m test/keyframes-loop-clock-mutation-harden.test.ts [2m([22m[2m23 tests[22m[2m)[22m[32m 97[2mms[22m[39m
+2026-10-01T22:04:51.2215035Z  [32m✓[39m test/animate-waapi-long-delay.test.ts [2m([22m[2m21 tests[22m[2m)[22m[32m 26[2mms[22m[39m
+2026-10-01T22:04:51.4843133Z  [32m✓[39m test/animate-surface-reentry-generation.test.ts [2m([22m[2m11 tests[22m[2m)[22m[32m 31[2mms[22m[39m
+2026-10-01T22:04:51.8018525Z  [32m✓[39m test/gestures-snapback-spring.test.ts [2m([22m[2m17 tests[22m[2m)[22m[32m 128[2mms[22m[39m
+2026-10-01T22:04:52.0221366Z  [32m✓[39m test/compositor-compile.test.ts [2m([22m[2m29 tests[22m[2m)[22m[32m 45[2mms[22m[39m
+2026-10-01T22:04:52.6971811Z  [32m✓[39m test/value-finiteness-overflow-fuzz.test.ts [2m([22m[2m24 tests[22m[2m)[22m[33m 536[2mms[22m[39m
+2026-10-01T22:04:52.8688256Z  [32m✓[39m test/color-mutation-harden.test.ts [2m([22m[2m36 tests[22m[2m)[22m[32m 13[2mms[22m[39m
+2026-10-01T22:04:53.0695386Z  [32m✓[39m test/compositor-fallback-matrix.test.ts [2m([22m[2m21 tests[22m[2m)[22m[32m 18[2mms[22m[39m
+2026-10-01T22:04:53.3200365Z  [32m✓[39m test/animate-facade.test.ts [2m([22m[2m28 tests[22m[2m)[22m[32m 34[2mms[22m[39m
+2026-10-01T22:04:53.4954644Z  [32m✓[39m test/future-layout-runtime-policy.test.ts [2m([22m[2m20 tests[22m[2m)[22m[32m 15[2mms[22m[39m
+2026-10-01T22:04:53.7707735Z  [32m✓[39m test/presence-transition.test.ts [2m([22m[2m30 tests[22m[2m)[22m[32m 141[2mms[22m[39m
+2026-10-01T22:04:54.1045587Z  [32m✓[39m test/compositor-cold-compile-differential.test.ts [2m([22m[2m8 tests[22m[2m)[22m[32m 199[2mms[22m[39m
+2026-10-01T22:04:54.2903832Z  [32m✓[39m test/motion-program-core-v1.test.ts [2m([22m[2m17 tests[22m[2m)[22m[32m 24[2mms[22m[39m
+2026-10-01T22:04:54.5015180Z  [32m✓[39m test/animate-overflow-finiteness-fuzz.test.ts [2m([22m[2m12 tests[22m[2m)[22m[32m 80[2mms[22m[39m
+2026-10-01T22:04:54.7515197Z  [32m✓[39m test/animate-css-velocity-pickup.test.ts [2m([22m[2m11 tests[22m[2m)[22m[32m 42[2mms[22m[39m
+2026-10-01T22:04:55.0512224Z  [32m✓[39m test/spring-ergonomics.test.ts [2m([22m[2m29 tests[22m[2m)[22m[32m 122[2mms[22m[39m
+2026-10-01T22:04:55.2762603Z  [32m✓[39m test/behaviors-mutable-constraints.test.ts [2m([22m[2m28 tests[22m[2m)[22m[32m 18[2mms[22m[39m
+2026-10-01T22:04:55.6998940Z  [32m✓[39m test/compiler-nano-lowering.test.ts [2m([22m[2m41 tests[22m[2m)[22m[32m 45[2mms[22m[39m
+2026-10-01T22:04:56.0465020Z  [32m✓[39m test/semantic-motion-binding.test.ts [2m([22m[2m49 tests[22m[2m)[22m[32m 178[2mms[22m[39m
+2026-10-01T22:04:56.3654847Z fatal: path 'missing.txt' does not exist in 'c4c05619efcdcdf075e59e6e9d7601536a8503be'
+2026-10-01T22:04:56.3685215Z fatal: could not open 'missing.txt' for reading: No such file or directory
+2026-10-01T22:04:56.3715478Z fatal: ambiguous argument 'missing-revision': unknown revision or path not in the working tree.
+2026-10-01T22:04:56.3738641Z Use '--' to separate paths from revisions, like this:
+2026-10-01T22:04:56.3739659Z 'git <command> [<revision>...] -- [<file>...]'
+2026-10-01T22:04:59.0746367Z  [32m✓[39m test/profile-measurement.test.ts [2m([22m[2m36 tests[22m[2m)[22m[33m 2836[2mms[22m[39m
+2026-10-01T22:04:59.0749162Z      [33m[2m✓[22m[39m old-vector сохраняет отказ измерения, когда в clean clone нет инструментов [33m 1455[2mms[22m[39m
+2026-10-01T22:04:59.0750610Z      [33m[2m✓[22m[39m хеш реального failure-артефакта покрывает отступы, Unicode и конечный LF [33m 544[2mms[22m[39m
+2026-10-01T22:04:59.2979070Z  [32m✓[39m test/compositor-retarget.test.ts [2m([22m[2m21 tests[22m[2m)[22m[32m 29[2mms[22m[39m
+2026-10-01T22:04:59.6131100Z  [32m✓[39m test/stagger-property-fuzz.test.ts [2m([22m[2m25 tests[22m[2m)[22m[32m 102[2mms[22m[39m
+2026-10-01T22:04:59.8902084Z  [32m✓[39m test/drive-initial-velocity.test.ts [2m([22m[2m14 tests[22m[2m)[22m[32m 114[2mms[22m[39m
+2026-10-01T22:05:00.1754381Z  [32m✓[39m test/compiler-surface-lowering.test.ts [2m([22m[2m23 tests[22m[2m)[22m[32m 20[2mms[22m[39m
+2026-10-01T22:05:00.3275861Z  [32m✓[39m test/in-view.test.ts [2m([22m[2m20 tests[22m[2m)[22m[32m 13[2mms[22m[39m
+2026-10-01T22:05:00.4913042Z  [32m✓[39m test/decay-mutation-harden.test.ts [2m([22m[2m24 tests[22m[2m)[22m[32m 7[2mms[22m[39m
+2026-10-01T22:05:00.9187527Z  [32m✓[39m test/gestures-glide-pickup.test.ts [2m([22m[2m9 tests[22m[2m)[22m[32m 284[2mms[22m[39m
+2026-10-01T22:05:01.1111100Z  [32m✓[39m test/spring-low-omega0-wall-clock.test.ts [2m([22m[2m18 tests[22m[2m)[22m[32m 12[2mms[22m[39m
+2026-10-01T22:05:01.3518260Z  [32m✓[39m test/animate-tween-velocity-pickup.test.ts [2m([22m[2m12 tests[22m[2m)[22m[32m 52[2mms[22m[39m
+2026-10-01T22:05:01.5705327Z  [32m✓[39m test/driver-scrub-fuzz.test.ts [2m([22m[2m23 tests[22m[2m)[22m[32m 36[2mms[22m[39m
+2026-10-01T22:05:02.1358156Z  [32m✓[39m test/transform-allocation-ceiling.test.ts [2m([22m[2m11 tests[22m[2m)[22m[32m 92[2mms[22m[39m
+2026-10-01T22:05:02.5704679Z  [32m✓[39m test/gestures-compositor-pickup.test.ts [2m([22m[2m8 tests[22m[2m)[22m[32m 232[2mms[22m[39m
+2026-10-01T22:05:03.0614092Z  [32m✓[39m test/reorder.test.ts [2m([22m[2m19 tests[22m[2m)[22m[33m 321[2mms[22m[39m
+2026-10-01T22:05:03.2771318Z  [32m✓[39m test/compositor-handoff.test.ts [2m([22m[2m12 tests[22m[2m)[22m[32m 20[2mms[22m[39m
+2026-10-01T22:05:04.4273345Z  [32m✓[39m test/gestures-drag.test.ts [2m([22m[2m21 tests[22m[2m)[22m[33m 958[2mms[22m[39m
+2026-10-01T22:05:04.4275561Z      [33m[2m✓[22m[39m 1000 злых сценариев → x/y всегда конечны [33m 765[2mms[22m[39m
+2026-10-01T22:05:04.6495559Z  [32m✓[39m test/keyframes.test.ts [2m([22m[2m33 tests[22m[2m)[22m[32m 57[2mms[22m[39m
+2026-10-01T22:05:04.9084391Z  [32m✓[39m test/animate-scope.test.ts [2m([22m[2m23 tests[22m[2m)[22m[32m 53[2mms[22m[39m
+2026-10-01T22:05:05.1390091Z  [32m✓[39m test/animate-frame-batching.test.ts [2m([22m[2m18 tests[22m[2m)[22m[32m 55[2mms[22m[39m
+2026-10-01T22:05:05.3474739Z  [32m✓[39m test/motion-value-velocity-read.test.ts [2m([22m[2m12 tests[22m[2m)[22m[32m 78[2mms[22m[39m
+2026-10-01T22:05:05.5496858Z  [32m✓[39m test/animate-main-lane.test.ts [2m([22m[2m25 tests[22m[2m)[22m[32m 19[2mms[22m[39m
+2026-10-01T22:05:05.7321645Z  [32m✓[39m test/easing-endpoints.test.ts [2m([22m[2m91 tests[22m[2m)[22m[32m 38[2mms[22m[39m
+2026-10-01T22:05:06.5694971Z  [32m✓[39m test/repeat-cursor.test.ts [2m([22m[2m20 tests[22m[2m)[22m[33m 666[2mms[22m[39m
+2026-10-01T22:05:06.5704333Z      [33m[2m✓[22m[39m matches an independent iteration-index oracle on 20k deterministic cases [33m 438[2mms[22m[39m
+2026-10-01T22:05:06.7966396Z  [32m✓[39m test/svg-morph.test.ts [2m([22m[2m23 tests[22m[2m)[22m[32m 27[2mms[22m[39m
+2026-10-01T22:05:06.9935414Z  [32m✓[39m test/frame-adapter.test.ts [2m([22m[2m11 tests[22m[2m)[22m[32m 35[2mms[22m[39m
+2026-10-01T22:05:07.4010855Z  [32m✓[39m test/motion-conformance.test.ts [2m([22m[2m57 tests[22m[2m)[22m[32m 212[2mms[22m[39m
+2026-10-01T22:05:07.6960111Z  [32m✓[39m test/presets-sample-pure.test.ts [2m([22m[2m16 tests[22m[2m)[22m[32m 140[2mms[22m[39m
+2026-10-01T22:05:07.8884866Z  [32m✓[39m test/animate-group-clock-coherence.test.ts [2m([22m[2m7 tests[22m[2m)[22m[32m 14[2mms[22m[39m
+2026-10-01T22:05:08.0713504Z  [32m✓[39m test/compositor-webkit-execution.test.ts [2m([22m[2m12 tests[22m[2m)[22m[32m 27[2mms[22m[39m
+2026-10-01T22:05:08.9250647Z  [32m✓[39m test/benchmark-report-contract.test.ts [2m([22m[2m101 tests[22m[2m)[22m[33m 44279[2mms[22m[39m
+2026-10-01T22:05:08.9304054Z      [33m[2m✓[22m[39m публикация требует качества и не позволяет ослабить требования вызывающему [33m 2181[2mms[22m[39m
+2026-10-01T22:05:08.9331437Z      [33m[2m✓[22m[39m принимает полный отчёт с 8 × 8 траекториями и независимой пружиной [33m 894[2mms[22m[39m
+2026-10-01T22:05:08.9357754Z      [33m[2m✓[22m[39m сохраняет наблюдаемое JS-зависание как валидную диагностику, отклоняя blocked quality claim [33m 1184[2mms[22m[39m
+2026-10-01T22:05:08.9359999Z      [33m[2m✓[22m[39m отклоняет одинаковое неверное движение baseline и blocked при score 100 и valid=true [33m 759[2mms[22m[39m
+2026-10-01T22:05:08.9361251Z      [33m[2m✓[22m[39m один плохой native-прогон не исчезает за медианой score 100 [33m 804[2mms[22m[39m
+2026-10-01T22:05:08.9363081Z      [33m[2m✓[22m[39m не принимает подделанный cached PASS даже с каноническими Markdown и SHA [33m 391[2mms[22m[39m
+2026-10-01T22:05:08.9364441Z      [33m[2m✓[22m[39m отклоняет подмену motion manifest: positionTolerancePx [33m 342[2mms[22m[39m
+2026-10-01T22:05:08.9365590Z      [33m[2m✓[22m[39m отклоняет подмену motion manifest: timeToleranceMs [33m 327[2mms[22m[39m
+2026-10-01T22:05:08.9366710Z      [33m[2m✓[22m[39m отклоняет подмену motion manifest: maxObservationGapMs [33m 363[2mms[22m[39m
+2026-10-01T22:05:08.9367773Z      [33m[2m✓[22m[39m отклоняет подмену motion manifest: distancePx [33m 331[2mms[22m[39m
+2026-10-01T22:05:08.9368780Z      [33m[2m✓[22m[39m отклоняет подмену motion manifest: durationMs [33m 334[2mms[22m[39m
+2026-10-01T22:05:08.9369780Z      [33m[2m✓[22m[39m отклоняет подмену motion manifest: id [33m 387[2mms[22m[39m
+2026-10-01T22:05:08.9370757Z      [33m[2m✓[22m[39m отклоняет подмену вложенных параметров пружины [33m 350[2mms[22m[39m
+2026-10-01T22:05:08.9371949Z      [33m[2m✓[22m[39m требует provenance независимого oracle, даже если вердикты пересчитываются [33m 386[2mms[22m[39m
+2026-10-01T22:05:08.9373547Z      [33m[2m✓[22m[39m отклоняет неоднозначные требования empty [33m 665[2mms[22m[39m
+2026-10-01T22:05:08.9374569Z      [33m[2m✓[22m[39m отклоняет неоднозначные требования unknown participant [33m 554[2mms[22m[39m
+2026-10-01T22:05:08.9375652Z      [33m[2m✓[22m[39m отклоняет неоднозначные требования inherited participant [33m 625[2mms[22m[39m
+2026-10-01T22:05:08.9376777Z      [33m[2m✓[22m[39m отклоняет неоднозначные требования duplicate participant [33m 586[2mms[22m[39m
+2026-10-01T22:05:08.9377829Z      [33m[2m✓[22m[39m отклоняет неоднозначные требования missing mode [33m 640[2mms[22m[39m
+2026-10-01T22:05:08.9378878Z      [33m[2m✓[22m[39m отклоняет неоднозначные требования extra mode [33m 476[2mms[22m[39m
+2026-10-01T22:05:08.9379945Z      [33m[2m✓[22m[39m отклоняет неоднозначные требования scalar list [33m 390[2mms[22m[39m
+2026-10-01T22:05:08.9380953Z      [33m[2m✓[22m[39m отклоняет неоднозначные требования null [33m 395[2mms[22m[39m
+2026-10-01T22:05:08.9382004Z      [33m[2m✓[22m[39m без baseline witness движение остаётся inconclusive [33m 870[2mms[22m[39m
+2026-10-01T22:05:08.9383296Z      [33m[2m✓[22m[39m без blocked witness движение остаётся inconclusive [33m 951[2mms[22m[39m
+2026-10-01T22:05:08.9384436Z      [33m[2m✓[22m[39m не квалифицирует неподвижный witness, хотя целевая траектория правильная [33m 813[2mms[22m[39m
+2026-10-01T22:05:08.9385586Z      [33m[2m✓[22m[39m не нормализует общий поздний native-старт по Animation.startTime [33m 679[2mms[22m[39m
+2026-10-01T22:05:08.9386758Z      [33m[2m✓[22m[39m не достраивает пропущенные кадры из верных редких положений цели и witness [33m 842[2mms[22m[39m
+2026-10-01T22:05:08.9388342Z      [33m[2m✓[22m[39m не подставляет witness из других кадров при правильных отдельных траекториях [33m 993[2mms[22m[39m
+2026-10-01T22:05:08.9389791Z      [33m[2m✓[22m[39m не удаляет одинаковые кадры из обеих сеток при сохранённом счётчике захвата [33m 692[2mms[22m[39m
+2026-10-01T22:05:08.9390785Z      [33m[2m✓[22m[39m требует отдельную привязку часов baseline [33m 974[2mms[22m[39m
+2026-10-01T22:05:08.9391609Z      [33m[2m✓[22m[39m требует отдельную привязку часов blocked [33m 958[2mms[22m[39m
+2026-10-01T22:05:08.9392852Z      [33m[2m✓[22m[39m 28 мс между CDP marker и API не проходят как допустимый сдвиг движения [33m 609[2mms[22m[39m
+2026-10-01T22:05:08.9394030Z      [33m[2m✓[22m[39m не принимает CDP marker другого realm даже при малом численном интервале [33m 393[2mms[22m[39m
+2026-10-01T22:05:08.9395182Z      [33m[2m✓[22m[39m измеренная неопределённость расходует временной бюджет движения [33m 765[2mms[22m[39m
+2026-10-01T22:05:08.9396218Z      [33m[2m✓[22m[39m потеря красной цели через кадр: retained null [33m 494[2mms[22m[39m
+2026-10-01T22:05:08.9397254Z      [33m[2m✓[22m[39m потеря красной цели через кадр: dropped frames [33m 664[2mms[22m[39m
+2026-10-01T22:05:08.9398666Z      [33m[2m✓[22m[39m не выдаёт достоверность старого отчёта за соответствие контракту движения [33m 695[2mms[22m[39m
+2026-10-01T22:05:08.9399979Z      [33m[2m✓[22m[39m accepts a clean paired report whose summaries and freeze evidence recompute [33m 1669[2mms[22m[39m
+2026-10-01T22:05:08.9401411Z      [33m[2m✓[22m[39m rejects a fully self-consistent report when any start topology is unproved [33m 469[2mms[22m[39m
+2026-10-01T22:05:08.9402976Z      [33m[2m✓[22m[39m publishes scoped ratio intervals and verdicts without an overall score [33m 317[2mms[22m[39m
+2026-10-01T22:05:08.9404424Z      [33m[2m✓[22m[39m uses the shared calibrated calls in samples, thresholds and canonical markdown [33m 662[2mms[22m[39m
+2026-10-01T22:05:08.9405773Z      [33m[2m✓[22m[39m diagnoses the exact claim, competitor, cluster and invalid sample [33m 378[2mms[22m[39m
+2026-10-01T22:05:08.9407094Z      [33m[2m✓[22m[39m rejects a publish warm batch below the calibrated timer floor before claims [33m 316[2mms[22m[39m
+2026-10-01T22:05:08.9408498Z      [33m[2m✓[22m[39m uses separate participant maxima even when worst realms are in different runs [33m 592[2mms[22m[39m
+2026-10-01T22:05:08.9410065Z      [33m[2m✓[22m[39m keeps harmonic probe mass in the superiority uncertainty, not the warm floor [33m 600[2mms[22m[39m
+2026-10-01T22:05:08.9411220Z      [33m[2m✓[22m[39m rejects dirty claim [33m 302[2mms[22m[39m
+2026-10-01T22:05:08.9412047Z      [33m[2m✓[22m[39m rejects future date [33m 317[2mms[22m[39m
+2026-10-01T22:05:08.9413054Z      [33m[2m✓[22m[39m rejects orphan markdown [33m 357[2mms[22m[39m
+2026-10-01T22:05:08.9413964Z      [33m[2m✓[22m[39m rejects markdown mutation [33m 350[2mms[22m[39m
+2026-10-01T22:05:08.9414927Z      [33m[2m✓[22m[39m rejects missing Chromium tree hash [33m 303[2mms[22m[39m
+2026-10-01T22:05:08.9416132Z      [33m[2m✓[22m[39m rejects forged timer step [33m 305[2mms[22m[39m
+2026-10-01T22:05:08.9417112Z      [33m[2m✓[22m[39m rejects forged clock uncertainty [33m 351[2mms[22m[39m
+2026-10-01T22:05:08.9418082Z      [33m[2m✓[22m[39m rejects missing timer isolation [33m 410[2mms[22m[39m
+2026-10-01T22:05:08.9419072Z      [33m[2m✓[22m[39m rejects missing publish realm evidence [33m 368[2mms[22m[39m
+2026-10-01T22:05:08.9420110Z      [33m[2m✓[22m[39m rejects publish measurement realm drift [33m 367[2mms[22m[39m
+2026-10-01T22:05:08.9421195Z      [33m[2m✓[22m[39m rejects cross-realm publish evidence [33m 361[2mms[22m[39m
+2026-10-01T22:05:08.9422227Z      [33m[2m✓[22m[39m rejects forged calibration policy [33m 358[2mms[22m[39m
+2026-10-01T22:05:08.9423432Z      [33m[2m✓[22m[39m rejects forged effective calls [33m 355[2mms[22m[39m
+2026-10-01T22:05:08.9424442Z      [33m[2m✓[22m[39m rejects missing pilot participant [33m 362[2mms[22m[39m
+2026-10-01T22:05:08.9425446Z      [33m[2m✓[22m[39m rejects missing cold sample [33m 346[2mms[22m[39m
+2026-10-01T22:05:08.9426604Z      [33m[2m✓[22m[39m rejects null cold sample [33m 380[2mms[22m[39m
+2026-10-01T22:05:08.9427517Z      [33m[2m✓[22m[39m rejects presented sample forgery [33m 389[2mms[22m[39m
+2026-10-01T22:05:08.9428520Z      [33m[2m✓[22m[39m rejects presented frame forgery [33m 384[2mms[22m[39m
+2026-10-01T22:05:08.9429581Z      [33m[2m✓[22m[39m rejects presented start token forgery [33m 393[2mms[22m[39m
+2026-10-01T22:05:08.9430597Z      [33m[2m✓[22m[39m rejects presented start realm drift [33m 365[2mms[22m[39m
+2026-10-01T22:05:08.9431766Z      [33m[2m✓[22m[39m rejects survivor-filtered warm cluster [33m 306[2mms[22m[39m
+2026-10-01T22:05:08.9433204Z      [33m[2m✓[22m[39m rejects semantic failure hidden from verdict [33m 374[2mms[22m[39m
+2026-10-01T22:05:08.9434243Z      [33m[2m✓[22m[39m rejects claim interval forgery [33m 355[2mms[22m[39m
+2026-10-01T22:05:09.1602036Z  [32m✓[39m test/release-artifact.test.ts [2m([22m[2m12 tests[22m[2m)[22m[33m 923[2mms[22m[39m
+2026-10-01T22:05:09.3224512Z  [32m✓[39m test/spring-overdamped-slow-pole.test.ts [2m([22m[2m14 tests[22m[2m)[22m[32m 12[2mms[22m[39m
+2026-10-01T22:05:09.3723096Z  [32m✓[39m test/server-profile-contract.test.ts [2m([22m[2m152 tests[22m[2m)[22m[33m 44867[2mms[22m[39m
+2026-10-01T22:05:09.3725064Z      [33m[2m✓[22m[39m stock C producer делает2warmups, actual2×work и сохраняет поздний prefix без выдуманного CPU endpoint [33m 1803[2mms[22m[39m
+2026-10-01T22:05:09.3726586Z      [33m[2m✓[22m[39m настоящий engine owner сохраняет controlled CPU endpoints на успехе и позднем отказе [33m 833[2mms[22m[39m
+2026-10-01T22:05:09.3727872Z      [33m[2m✓[22m[39m наблюдает intermediate 's2' и все32/64 useful owner outcomes [33m 365[2mms[22m[39m
+2026-10-01T22:05:09.3729074Z      [33m[2m✓[22m[39m наблюдает intermediate 's3' и все32/64 useful owner outcomes [33m 512[2mms[22m[39m
+2026-10-01T22:05:09.3730300Z      [33m[2m✓[22m[39m итоговая сериализация сохраняет JSON identity и не требует общей строки V8 [33m 1041[2mms[22m[39m
+2026-10-01T22:05:09.3731591Z      [33m[2m✓[22m[39m завершённый public admission отвергает четыре независимых reviewer counterexamples [33m 22739[2mms[22m[39m
+2026-10-01T22:05:09.3733082Z      [33m[2m✓[22m[39m сохраняет partial A/B и поздний отказ, а пропавшие comparator/retention не допускает [33m 16510[2mms[22m[39m
+2026-10-01T22:05:09.5549766Z  [32m✓[39m test/value-color-differential.test.ts [2m([22m[2m46 tests[22m[2m)[22m[32m 10[2mms[22m[39m
+2026-10-01T22:05:09.6803583Z  [32m✓[39m test/projection-finiteness-fuzz.test.ts [2m([22m[2m11 tests[22m[2m)[22m[32m 190[2mms[22m[39m
+2026-10-01T22:05:09.7606982Z  [32m✓[39m test/react.test.ts [2m([22m[2m13 tests[22m[2m)[22m[32m 12[2mms[22m[39m
+2026-10-01T22:05:09.8448965Z  [32m✓[39m test/value-interpolate-property.test.ts [2m([22m[2m49 tests[22m[2m)[22m[32m 12[2mms[22m[39m
+2026-10-01T22:05:09.9737782Z  [32m✓[39m test/smart-diff.test.ts [2m([22m[2m12 tests[22m[2m)[22m[32m 17[2mms[22m[39m
+2026-10-01T22:05:10.1267597Z  [32m✓[39m test/behaviors-state-cascade-lifecycle.test.ts [2m([22m[2m24 tests[22m[2m)[22m[32m 120[2mms[22m[39m
+2026-10-01T22:05:10.2587963Z  [32m✓[39m test/timeline-virtual-time.test.ts [2m([22m[2m10 tests[22m[2m)[22m[32m 86[2mms[22m[39m
+2026-10-01T22:05:10.3515110Z  [32m✓[39m test/presence.test.ts [2m([22m[2m19 tests[22m[2m)[22m[32m 86[2mms[22m[39m
+2026-10-01T22:05:10.4289048Z  [32m✓[39m test/compositor-cache.test.ts [2m([22m[2m18 tests[22m[2m)[22m[33m 1312[2mms[22m[39m
+2026-10-01T22:05:10.4291468Z      [33m[2m✓[22m[39m policy точно совпадает с эталонным LRU на exhaustive и длинной трассе [33m 1294[2mms[22m[39m
+2026-10-01T22:05:10.5457495Z  [32m✓[39m test/driver-velocity-read.test.ts [2m([22m[2m14 tests[22m[2m)[22m[32m 134[2mms[22m[39m
+2026-10-01T22:05:10.6393005Z  [32m✓[39m test/qwik.test.ts [2m([22m[2m15 tests[22m[2m)[22m[32m 31[2mms[22m[39m
+2026-10-01T22:05:10.7208352Z  [32m✓[39m test/drive-underdamped-resolution-latency.test.ts [2m([22m[2m4 tests[22m[2m)[22m[32m 9[2mms[22m[39m
+2026-10-01T22:05:10.8404352Z  [32m✓[39m test/tokens.test.ts [2m([22m[2m25 tests[22m[2m)[22m[32m 42[2mms[22m[39m
+2026-10-01T22:05:10.9046464Z  [32m✓[39m test/svelte.test.ts [2m([22m[2m14 tests[22m[2m)[22m[32m 13[2mms[22m[39m
+2026-10-01T22:05:11.0597552Z  [32m✓[39m test/easing-finiteness-fuzz.test.ts [2m([22m[2m41 tests[22m[2m)[22m[32m 52[2mms[22m[39m
+2026-10-01T22:05:11.2494941Z  [32m✓[39m test/value-parse.test.ts [2m([22m[2m59 tests[22m[2m)[22m[32m 14[2mms[22m[39m
+2026-10-01T22:05:11.2564192Z  [32m✓[39m test/behaviors-state-cascade-batch.test.ts [2m([22m[2m16 tests[22m[2m)[22m[33m 726[2mms[22m[39m
+2026-10-01T22:05:11.2566980Z    [33m[2m✓[22m[39m 1024 группы × 8 изменений: полная независимая модель и downstream mirror совпадают [33m 702[2mms[22m[39m
+2026-10-01T22:05:11.3164982Z  [32m✓[39m test/nano.test.ts [2m([22m[2m19 tests[22m[2m)[22m[32m 246[2mms[22m[39m
+2026-10-01T22:05:11.5361123Z  [32m✓[39m test/svg.test.ts [2m([22m[2m38 tests[22m[2m)[22m[32m 122[2mms[22m[39m
+2026-10-01T22:05:11.6594541Z  [32m✓[39m test/timeline-finiteness-fuzz.test.ts [2m([22m[2m9 tests[22m[2m)[22m[32m 230[2mms[22m[39m
+2026-10-01T22:05:11.7190558Z  [32m✓[39m test/flip.test.ts [2m([22m[2m20 tests[22m[2m)[22m[32m 197[2mms[22m[39m
+2026-10-01T22:05:11.7766084Z  [32m✓[39m test/driver-state-machine-adversarial.test.ts [2m([22m[2m15 tests[22m[2m)[22m[32m 25[2mms[22m[39m
+2026-10-01T22:05:11.8755168Z  [32m✓[39m test/compositor-return-to-native.test.ts [2m([22m[2m17 tests[22m[2m)[22m[32m 30[2mms[22m[39m
+2026-10-01T22:05:11.9026346Z  [32m✓[39m test/easing-factory-validation.test.ts [2m([22m[2m51 tests[22m[2m)[22m[32m 14[2mms[22m[39m
+2026-10-01T22:05:11.9554524Z  [32m✓[39m test/timeline-api-surface-pin.test.ts [2m([22m[2m28 tests[22m[2m)[22m[32m 14[2mms[22m[39m
+2026-10-01T22:05:12.1014747Z  [32m✓[39m test/animate-runtime-boundaries.test.ts [2m([22m[2m25 tests[22m[2m)[22m[32m 29[2mms[22m[39m
+2026-10-01T22:05:12.2253206Z  [32m✓[39m test/compositor-velocity-budget.test.ts [2m([22m[2m10 tests[22m[2m)[22m[32m 128[2mms[22m[39m
+2026-10-01T22:05:12.2256069Z  [32m✓[39m test/motion-value-follow.test.ts [2m([22m[2m12 tests[22m[2m)[22m[32m 109[2mms[22m[39m
+2026-10-01T22:05:12.3199844Z  [32m✓[39m test/spring-observable-constructors.test.ts [2m([22m[2m24 tests[22m[2m)[22m[32m 19[2mms[22m[39m
+2026-10-01T22:05:12.4088967Z  [32m✓[39m test/spring-settle-budget-differential.test.ts [2m([22m[2m16 tests[22m[2m)[22m[32m 13[2mms[22m[39m
+2026-10-01T22:05:12.5428865Z  [32m✓[39m test/easing-canonical-differential.test.ts [2m([22m[2m17 tests[22m[2m)[22m[32m 77[2mms[22m[39m
+2026-10-01T22:05:12.6289345Z  [32m✓[39m test/presets-factories.test.ts [2m([22m[2m16 tests[22m[2m)[22m[32m 35[2mms[22m[39m
+2026-10-01T22:05:12.6397010Z  [32m✓[39m test/error-catalog-check.test.ts [2m([22m[2m19 tests[22m[2m)[22m[32m 34[2mms[22m[39m
+2026-10-01T22:05:12.8126515Z  [32m✓[39m test/stagger-finiteness.test.ts [2m([22m[2m34 tests[22m[2m)[22m[32m 11[2mms[22m[39m
+2026-10-01T22:05:12.8384378Z  [32m✓[39m test/motion-value-listener-isolation.test.ts [2m([22m[2m11 tests[22m[2m)[22m[32m 16[2mms[22m[39m
+2026-10-01T22:05:13.0834332Z  [32m✓[39m test/compositor-stagger-count-boundary.test.ts [2m([22m[2m8 tests[22m[2m)[22m[32m 52[2mms[22m[39m
+2026-10-01T22:05:13.2915150Z  [32m✓[39m test/timeline-settle-contract.test.ts [2m([22m[2m5 tests[22m[2m)[22m[32m 8[2mms[22m[39m
+2026-10-01T22:05:13.3709727Z  [32m✓[39m test/animate-spring-workspace.test.ts [2m([22m[2m7 tests[22m[2m)[22m[33m 633[2mms[22m[39m
+2026-10-01T22:05:13.3711663Z      [33m[2m✓[22m[39m сохраняет бюджет прямых object-ссылок живых и завершённых MainUnit [33m 578[2mms[22m[39m
+2026-10-01T22:05:13.5190741Z  [32m✓[39m test/future-layout-api.test.ts [2m([22m[2m9 tests[22m[2m)[22m[32m 16[2mms[22m[39m
+2026-10-01T22:05:13.7167774Z  [32m✓[39m test/projection-vector-retarget.test.ts [2m([22m[2m4 tests[22m[2m)[22m[32m 13[2mms[22m[39m
+2026-10-01T22:05:13.7328940Z  [32m✓[39m test/driver-virtual-time.test.ts [2m([22m[2m6 tests[22m[2m)[22m[32m 161[2mms[22m[39m
+2026-10-01T22:05:13.8925490Z  [32m✓[39m test/utils-differential.test.ts [2m([22m[2m47 tests[22m[2m)[22m[32m 17[2mms[22m[39m
+2026-10-01T22:05:13.9014650Z  [32m✓[39m test/sliding-window-mutation-harden.test.ts [2m([22m[2m12 tests[22m[2m)[22m[32m 7[2mms[22m[39m
+2026-10-01T22:05:14.1060539Z  [32m✓[39m test/wc.test.ts [2m([22m[2m16 tests[22m[2m)[22m[32m 12[2mms[22m[39m
+2026-10-01T22:05:14.1454911Z  [32m✓[39m test/easing-monotonic-shape.test.ts [2m([22m[2m38 tests[22m[2m)[22m[32m 76[2mms[22m[39m
+2026-10-01T22:05:14.3227972Z  [32m✓[39m test/a11y.test.ts [2m([22m[2m18 tests[22m[2m)[22m[32m 29[2mms[22m[39m
+2026-10-01T22:05:14.5512323Z  [32m✓[39m test/animate-facade-compositor.test.ts [2m([22m[2m12 tests[22m[2m)[22m[32m 23[2mms[22m[39m
+2026-10-01T22:05:14.7314921Z  [32m✓[39m test/bench-support.test.ts [2m([22m[2m9 tests[22m[2m)[22m[33m 347[2mms[22m[39m
+2026-10-01T22:05:14.8214541Z  [32m✓[39m test/scroll-observer.test.ts [2m([22m[2m14 tests[22m[2m)[22m[32m 57[2mms[22m[39m
+2026-10-01T22:05:14.9323047Z  [32m✓[39m test/future-layout-compiler-lowering.test.ts [2m([22m[2m16 tests[22m[2m)[22m[32m 10[2mms[22m[39m
+2026-10-01T22:05:15.1314562Z  [32m✓[39m test/easing-subpath-smoke.test.ts [2m([22m[2m7 tests[22m[2m)[22m[32m 24[2mms[22m[39m
+2026-10-01T22:05:15.3469950Z  [32m✓[39m test/drive-spring-param-boundary.test.ts [2m([22m[2m13 tests[22m[2m)[22m[32m 26[2mms[22m[39m
+2026-10-01T22:05:15.6918804Z  [32m✓[39m test/surface-observational-equivalence.test.ts [2m([22m[2m17 tests[22m[2m)[22m[32m 30[2mms[22m[39m
+2026-10-01T22:05:15.9123011Z  [32m✓[39m test/angular.test.ts [2m([22m[2m11 tests[22m[2m)[22m[32m 29[2mms[22m[39m
+2026-10-01T22:05:15.9183565Z  [32m✓[39m test/compiler-tooling-trace.test.ts [2m([22m[2m11 tests[22m[2m)[22m[33m 2951[2mms[22m[39m
+2026-10-01T22:05:15.9185048Z      [33m[2m✓[22m[39m описывает ровно пять фактически собранных путей [33m 459[2mms[22m[39m
+2026-10-01T22:05:15.9186548Z      [33m[2m✓[22m[39m без --trace сохраняет обычный acceptance без диагностического вывода [33m 438[2mms[22m[39m
+2026-10-01T22:05:15.9187955Z      [33m[2m✓[22m[39m не печатает trace при неоднозначном owner фактически собранного результата [33m 462[2mms[22m[39m
+2026-10-01T22:05:15.9189149Z      [33m[2m✓[22m[39m не печатает trace при отсутствии owner фактически собранного результата [33m 450[2mms[22m[39m
+2026-10-01T22:05:15.9190556Z      [33m[2m✓[22m[39m не публикует runtime trace с отсутствующей причиной отказа [33m 471[2mms[22m[39m
+2026-10-01T22:05:15.9191573Z      [33m[2m✓[22m[39m не публикует runtime trace с пустой причиной отказа [33m 478[2mms[22m[39m
+2026-10-01T22:05:16.1040887Z  [32m✓[39m test/spring-easing-c1.test.ts [2m([22m[2m19 tests[22m[2m)[22m[32m 48[2mms[22m[39m
+2026-10-01T22:05:16.1271186Z  [32m✓[39m test/unclamped-overshoot-surfaces.test.ts [2m([22m[2m6 tests[22m[2m)[22m[32m 35[2mms[22m[39m
+2026-10-01T22:05:16.3044402Z  [32m✓[39m test/preact.test.ts [2m([22m[2m8 tests[22m[2m)[22m[32m 24[2mms[22m[39m
+2026-10-01T22:05:16.3115999Z  [32m✓[39m test/behaviors-sheet.test.ts [2m([22m[2m12 tests[22m[2m)[22m[32m 12[2mms[22m[39m
+2026-10-01T22:05:16.5025057Z  [32m✓[39m test/behaviors-pull.test.ts [2m([22m[2m10 tests[22m[2m)[22m[32m 12[2mms[22m[39m
+2026-10-01T22:05:16.5758385Z  [32m✓[39m test/schedule-v1.test.ts [2m([22m[2m7 tests[22m[2m)[22m[32m 130[2mms[22m[39m
+2026-10-01T22:05:16.6681411Z  [32m✓[39m test/drive-double-tick-guard.test.ts [2m([22m[2m3 tests[22m[2m)[22m[32m 33[2mms[22m[39m
+2026-10-01T22:05:16.7855811Z  [32m✓[39m test/svg-morph-compound.test.ts [2m([22m[2m20 tests[22m[2m)[22m[32m 43[2mms[22m[39m
+2026-10-01T22:05:16.8377185Z  [32m✓[39m test/behaviors-resize-owner-lower-bound.test.ts [2m([22m[2m7 tests[22m[2m)[22m[32m 12[2mms[22m[39m
+2026-10-01T22:05:16.9941413Z  [32m✓[39m test/gestures-velocity-press.test.ts [2m([22m[2m19 tests[22m[2m)[22m[32m 53[2mms[22m[39m
+2026-10-01T22:05:17.0354520Z  [32m✓[39m test/solid.test.ts [2m([22m[2m13 tests[22m[2m)[22m[32m 9[2mms[22m[39m
+2026-10-01T22:05:17.1925846Z  [32m✓[39m test/release-metadata.test.ts [2m([22m[2m45 tests[22m[2m)[22m[32m 19[2mms[22m[39m
+2026-10-01T22:05:17.3787425Z  [32m✓[39m test/animate-error-codes.test.ts [2m([22m[2m23 tests[22m[2m)[22m[32m 17[2mms[22m[39m
+2026-10-01T22:05:17.4093462Z  [32m✓[39m test/scroll-math.test.ts [2m([22m[2m12 tests[22m[2m)[22m[32m 213[2mms[22m[39m
+2026-10-01T22:05:17.6199045Z  [32m✓[39m test/motion-value-initial-velocity-validation.test.ts [2m([22m[2m10 tests[22m[2m)[22m[32m 32[2mms[22m[39m
+2026-10-01T22:05:17.8828226Z  [32m✓[39m test/surface-materialization.test.ts [2m([22m[2m5 tests[22m[2m)[22m[32m 93[2mms[22m[39m
+2026-10-01T22:05:18.0784367Z  [32m✓[39m test/smart-api-surface-pin.test.ts [2m([22m[2m12 tests[22m[2m)[22m[32m 11[2mms[22m[39m
+2026-10-01T22:05:18.2461795Z  [32m✓[39m test/future-layout-receipt.test.ts [2m([22m[2m8 tests[22m[2m)[22m[32m 16[2mms[22m[39m
+2026-10-01T22:05:18.4283293Z  [32m✓[39m test/animate-hostile-microtask.test.ts [2m([22m[2m7 tests[22m[2m)[22m[32m 11[2mms[22m[39m
+2026-10-01T22:05:18.6057268Z  [32m✓[39m test/behaviors-reentrant-publication.test.ts [2m([22m[2m15 tests[22m[2m)[22m[32m 13[2mms[22m[39m
+2026-10-01T22:05:18.7775144Z  [32m✓[39m test/drive-overdamped-convergence.test.ts [2m([22m[2m9 tests[22m[2m)[22m[32m 28[2mms[22m[39m
+2026-10-01T22:05:19.0803859Z  [32m✓[39m test/driver-reduced-motion.test.ts [2m([22m[2m13 tests[22m[2m)[22m[32m 146[2mms[22m[39m
+2026-10-01T22:05:19.2663626Z  [32m✓[39m test/utils-factory-validation.test.ts [2m([22m[2m30 tests[22m[2m)[22m[32m 12[2mms[22m[39m
+2026-10-01T22:05:19.4222114Z  [32m✓[39m test/value-var-redos.test.ts [2m([22m[2m10 tests[22m[2m)[22m[32m 7[2mms[22m[39m
+2026-10-01T22:05:19.6370227Z  [32m✓[39m test/perf-hot-path.test.ts [2m([22m[2m6 tests[22m[2m)[22m[32m 57[2mms[22m[39m
+2026-10-01T22:05:20.6714577Z  [32m✓[39m test/showcase-lifecycle.test.ts [2m([22m[2m6 tests[22m[2m)[22m[32m 129[2mms[22m[39m
+2026-10-01T22:05:20.8695351Z  [32m✓[39m test/presets-waapi.test.ts [2m([22m[2m11 tests[22m[2m)[22m[32m 12[2mms[22m[39m
+2026-10-01T22:05:21.0421693Z  [32m✓[39m test/behaviors-api-surface-pin.test.ts [2m([22m[2m18 tests[22m[2m)[22m[32m 10[2mms[22m[39m
+2026-10-01T22:05:21.1853747Z  [32m✓[39m test/lit-reduced-motion.test.ts [2m([22m[2m7 tests[22m[2m)[22m[32m 6[2mms[22m[39m
+2026-10-01T22:05:22.9951263Z  [32m✓[39m test/future-layout-domain-fuzz.test.ts [2m([22m[2m2 tests[22m[2m)[22m[33m 8002[2mms[22m[39m
+2026-10-01T22:05:22.9963783Z      [33m[2m✓[22m[39m fail-closed позитивность, coupling budget, монотонность A, содержательный домен [33m 7998[2mms[22m[39m
+2026-10-01T22:05:24.0394775Z  [32m✓[39m test/smart-finiteness-fuzz.test.ts [2m([22m[2m2 tests[22m[2m)[22m[33m 6492[2mms[22m[39m
+2026-10-01T22:05:24.0395966Z      [33m[2m✓[22m[39m capture→мутация→animate→кадры→перехват: ни броска, ни NaN/Inf/-0 в записях [33m 6490[2mms[22m[39m
+2026-10-01T22:05:25.6103223Z  [32m✓[39m test/release-tag-state-machine.test.ts [2m([22m[2m20 tests[22m[2m)[22m[33m 4300[2mms[22m[39m
+2026-10-01T22:05:25.6105686Z      [33m[2m✓[22m[39m tag-job fail-closed для reread-failure [33m 2711[2mms[22m[39m
+2026-10-01T22:05:25.6106752Z      [33m[2m✓[22m[39m tag-job fail-closed для deep-chain [33m 308[2mms[22m[39m
+2026-10-01T22:05:25.6108061Z      [33m[2m✓[22m[39m publish-job fail-closed для deep-chain [33m 309[2mms[22m[39m
+2026-10-01T22:05:25.7604762Z  [32m✓[39m test/projection-api-surface-pin.test.ts [2m([22m[2m8 tests[22m[2m)[22m[32m 8[2mms[22m[39m
+2026-10-01T22:05:26.0761679Z  [32m✓[39m test/gestures-hover-pan.test.ts [2m([22m[2m11 tests[22m[2m)[22m[32m 146[2mms[22m[39m
+2026-10-01T22:05:26.3284108Z  [32m✓[39m test/animate-delay-overflow.test.ts [2m([22m[2m11 tests[22m[2m)[22m[32m 18[2mms[22m[39m
+2026-10-01T22:05:26.5212826Z  [32m✓[39m test/timeline-reduced-motion.test.ts [2m([22m[2m10 tests[22m[2m)[22m[32m 9[2mms[22m[39m
+2026-10-01T22:05:26.8758502Z  [32m✓[39m test/compositor-max-value-error.test.ts [2m([22m[2m10 tests[22m[2m)[22m[32m 152[2mms[22m[39m
+2026-10-01T22:05:27.1992030Z  [32m✓[39m test/animate-facade-finiteness-fuzz.test.ts [2m([22m[2m4 tests[22m[2m)[22m[32m 155[2mms[22m[39m
+2026-10-01T22:05:27.3588271Z  [32m✓[39m test/easing-api-surface-pin.test.ts [2m([22m[2m25 tests[22m[2m)[22m[32m 9[2mms[22m[39m
+2026-10-01T22:05:27.4335052Z  [32m✓[39m test/semantic-motion-binding-consumer.test.ts [2m([22m[2m3 tests[22m[2m)[22m[33m 4284[2mms[22m[39m
+2026-10-01T22:05:27.4336270Z    [33m[2m✓[22m[39m упакованный потребитель: ESM/CJS/SSR, literal recipe и TS5/6 типы [33m 3836[2mms[22m[39m
+2026-10-01T22:05:27.5298624Z  [32m✓[39m test/runner-scheduler-rearm.test.ts [2m([22m[2m6 tests[22m[2m)[22m[32m 11[2mms[22m[39m
+2026-10-01T22:05:27.7285085Z  [32m✓[39m test/presets-run-virtual-time.test.ts [2m([22m[2m8 tests[22m[2m)[22m[32m 14[2mms[22m[39m
+2026-10-01T22:05:27.8277160Z  [32m✓[39m test/compiler-single-plan.test.ts [2m([22m[2m3 tests[22m[2m)[22m[32m 93[2mms[22m[39m
+2026-10-01T22:05:27.8786047Z  [32m✓[39m test/utils-cove-harden.test.ts [2m([22m[2m19 tests[22m[2m)[22m[32m 9[2mms[22m[39m
+2026-10-01T22:05:27.9814058Z  [32m✓[39m test/dist-freshness.test.ts [2m([22m[2m7 tests[22m[2m)[22m[32m 19[2mms[22m[39m
+2026-10-01T22:05:28.0302053Z  [32m✓[39m test/behaviors-dismiss.test.ts [2m([22m[2m8 tests[22m[2m)[22m[32m 6[2mms[22m[39m
+2026-10-01T22:05:28.1385411Z  [32m✓[39m test/behaviors-carousel.test.ts [2m([22m[2m9 tests[22m[2m)[22m[32m 11[2mms[22m[39m
+2026-10-01T22:05:28.1816836Z  [32m✓[39m test/convergence-relative-threshold.test.ts [2m([22m[2m5 tests[22m[2m)[22m[32m 5[2mms[22m[39m
+2026-10-01T22:05:28.3199337Z  [32m✓[39m test/spring-clamp-finite-nan.test.ts [2m([22m[2m9 tests[22m[2m)[22m[32m 5[2mms[22m[39m
+2026-10-01T22:05:28.3536979Z  [32m✓[39m test/drive-step-clock-deadlock.test.ts [2m([22m[2m4 tests[22m[2m)[22m[32m 77[2mms[22m[39m
+2026-10-01T22:05:28.4693571Z  [32m✓[39m test/behaviors-state-cascade.test.ts [2m([22m[2m10 tests[22m[2m)[22m[32m 11[2mms[22m[39m
+2026-10-01T22:05:28.5076919Z  [32m✓[39m test/utils-mutation-harden.test.ts [2m([22m[2m29 tests[22m[2m)[22m[32m 9[2mms[22m[39m
+2026-10-01T22:05:28.6850802Z  [32m✓[39m test/future-layout-domain-property.test.ts [2m([22m[2m9 tests[22m[2m)[22m[32m 33[2mms[22m[39m
+2026-10-01T22:05:28.7256992Z  [32m✓[39m test/motion-program-infinite-schedule.test.ts [2m([22m[2m5 tests[22m[2m)[22m[32m 43[2mms[22m[39m
+2026-10-01T22:05:28.8720299Z  [32m✓[39m test/decay-differential.test.ts [2m([22m[2m10 tests[22m[2m)[22m[32m 33[2mms[22m[39m
+2026-10-01T22:05:28.8821036Z  [32m✓[39m test/easing-determinism.test.ts [2m([22m[2m30 tests[22m[2m)[22m[32m 23[2mms[22m[39m
+2026-10-01T22:05:29.0228645Z  [32m✓[39m test/frame-requester.test.ts [2m([22m[2m11 tests[22m[2m)[22m[32m 12[2mms[22m[39m
+2026-10-01T22:05:29.0325980Z  [32m✓[39m test/core-solver-buffer.test.ts [2m([22m[2m4 tests[22m[2m)[22m[32m 8[2mms[22m[39m
+2026-10-01T22:05:29.2084446Z  [32m✓[39m test/utils-finiteness-fuzz.test.ts [2m([22m[2m16 tests[22m[2m)[22m[32m 38[2mms[22m[39m
+2026-10-01T22:05:29.4633885Z  [32m✓[39m test/decay-finiteness-fuzz.test.ts [2m([22m[2m11 tests[22m[2m)[22m[32m 290[2mms[22m[39m
+2026-10-01T22:05:29.6302769Z  [32m✓[39m test/tween-mutation-harden.test.ts [2m([22m[2m8 tests[22m[2m)[22m[32m 5[2mms[22m[39m
+2026-10-01T22:05:29.8004404Z [90mstderr[2m | test/lit-api-surface-pin.test.ts
+2026-10-01T22:05:29.8033871Z [22m[39mLit is in dev mode. Not recommended for production! See https://lit.dev/msg/dev-mode for more information.
+2026-10-01T22:05:29.8043584Z 
+2026-10-01T22:05:29.8166333Z  [32m✓[39m test/lit-api-surface-pin.test.ts [2m([22m[2m12 tests[22m[2m)[22m[32m 7[2mms[22m[39m
+2026-10-01T22:05:29.9923906Z  [32m✓[39m test/future-layout-observer.test.ts [2m([22m[2m5 tests[22m[2m)[22m[32m 9[2mms[22m[39m
+2026-10-01T22:05:30.0494705Z  [32m✓[39m test/vue-runtime.test.ts [2m([22m[2m4 tests[22m[2m)[22m[32m 28[2mms[22m[39m
+2026-10-01T22:05:30.1625283Z  [32m✓[39m test/driver-mutation-phase2b.test.ts [2m([22m[2m5 tests[22m[2m)[22m[32m 12[2mms[22m[39m
+2026-10-01T22:05:30.3085556Z  [32m✓[39m test/compositor-error-bound.test.ts [2m([22m[2m8 tests[22m[2m)[22m[32m 89[2mms[22m[39m
+2026-10-01T22:05:30.3208303Z  [32m✓[39m test/overdamped-trajectory.test.ts [2m([22m[2m9 tests[22m[2m)[22m[32m 7[2mms[22m[39m
+2026-10-01T22:05:30.5888388Z  [32m✓[39m test/angular-runtime.test.ts [2m([22m[2m5 tests[22m[2m)[22m[32m 10[2mms[22m[39m
+2026-10-01T22:05:30.5983366Z  [32m✓[39m test/compositor-rdp-frontier-differential.test.ts [2m([22m[2m4 tests[22m[2m)[22m[32m 142[2mms[22m[39m
+2026-10-01T22:05:30.7663051Z  [32m✓[39m test/driver-api-surface-pin.test.ts [2m([22m[2m26 tests[22m[2m)[22m[32m 11[2mms[22m[39m
+2026-10-01T22:05:30.7864446Z  [32m✓[39m test/value-api-surface-pin.test.ts [2m([22m[2m20 tests[22m[2m)[22m[32m 10[2mms[22m[39m
+2026-10-01T22:05:30.9499557Z  [32m✓[39m test/presets-validation.test.ts [2m([22m[2m12 tests[22m[2m)[22m[32m 9[2mms[22m[39m
+2026-10-01T22:05:30.9841870Z  [32m✓[39m test/read-spring-unchecked.test.ts [2m([22m[2m5 tests[22m[2m)[22m[32m 42[2mms[22m[39m
+2026-10-01T22:05:31.2001849Z  [32m✓[39m test/keyframes-property-fuzz.test.ts [2m([22m[2m3 tests[22m[2m)[22m[32m 88[2mms[22m[39m
+2026-10-01T22:05:31.2086066Z  [32m✓[39m test/compositor-compile-work.test.ts [2m([22m[2m3 tests[22m[2m)[22m[32m 15[2mms[22m[39m
+2026-10-01T22:05:31.3640148Z  [32m✓[39m test/solid-runtime.test.ts [2m([22m[2m5 tests[22m[2m)[22m[32m 7[2mms[22m[39m
+2026-10-01T22:05:31.3954500Z  [32m✓[39m test/drive-unclamped-overshoot.test.ts [2m([22m[2m3 tests[22m[2m)[22m[32m 7[2mms[22m[39m
+2026-10-01T22:05:31.6784611Z  [32m✓[39m test/value-color-precision.test.ts [2m([22m[2m5 tests[22m[2m)[22m[32m 149[2mms[22m[39m
+2026-10-01T22:05:32.0001221Z  [32m✓[39m test/compositor-rdp-frontier.test.ts [2m([22m[2m5 tests[22m[2m)[22m[32m 156[2mms[22m[39m
+2026-10-01T22:05:32.2544250Z  [32m✓[39m test/animate-subframe-phase.test.ts [2m([22m[2m7 tests[22m[2m)[22m[32m 42[2mms[22m[39m
+2026-10-01T22:05:32.3047417Z  [32m✓[39m test/preact-runtime.test.ts [2m([22m[2m4 tests[22m[2m)[22m[32m 26[2mms[22m[39m
+2026-10-01T22:05:32.5218843Z  [32m✓[39m test/presets-reduced-motion.test.ts [2m([22m[2m5 tests[22m[2m)[22m[32m 7[2mms[22m[39m
+2026-10-01T22:05:32.5514321Z  [32m✓[39m test/spring-basis.test.ts [2m([22m[2m4 tests[22m[2m)[22m[32m 87[2mms[22m[39m
+2026-10-01T22:05:32.7462310Z  [32m✓[39m test/lit-reconnect.test.ts [2m([22m[2m3 tests[22m[2m)[22m[32m 6[2mms[22m[39m
+2026-10-01T22:05:32.8054534Z  [32m✓[39m test/future-layout-effects.test.ts [2m([22m[2m5 tests[22m[2m)[22m[32m 11[2mms[22m[39m
+2026-10-01T22:05:32.9404550Z  [32m✓[39m test/utils-subpath-smoke.test.ts [2m([22m[2m5 tests[22m[2m)[22m[32m 16[2mms[22m[39m
+2026-10-01T22:05:33.0308043Z  [32m✓[39m test/motion-controller-integration.test.ts [2m([22m[2m5 tests[22m[2m)[22m[32m 5[2mms[22m[39m
+2026-10-01T22:05:33.1217530Z  [32m✓[39m test/compiler-doc-recipe.test.ts [2m([22m[2m4 tests[22m[2m)[22m[32m 8[2mms[22m[39m
+2026-10-01T22:05:33.2553305Z  [32m✓[39m test/future-layout-domain.test.ts [2m([22m[2m5 tests[22m[2m)[22m[32m 23[2mms[22m[39m
+2026-10-01T22:05:33.3145351Z  [32m✓[39m test/convergence-threshold-behavior-pin.test.ts [2m([22m[2m2 tests[22m[2m)[22m[32m 9[2mms[22m[39m
+2026-10-01T22:05:33.6004519Z  [32m✓[39m test/drive-nonfinite-input.test.ts [2m([22m[2m8 tests[22m[2m)[22m[32m 31[2mms[22m[39m
+2026-10-01T22:05:33.8704549Z  [32m✓[39m test/animate-finished-allocation.test.ts [2m([22m[2m6 tests[22m[2m)[22m[32m 65[2mms[22m[39m
+2026-10-01T22:05:34.0423811Z  [32m✓[39m test/keyframes-reduced-motion.test.ts [2m([22m[2m6 tests[22m[2m)[22m[32m 7[2mms[22m[39m
+2026-10-01T22:05:34.2662547Z  [32m✓[39m test/wc-runtime.test.ts [2m([22m[2m4 tests[22m[2m)[22m[32m 33[2mms[22m[39m
+2026-10-01T22:05:34.3424724Z  [32m✓[39m test/nano-spring-linear-binary64.test.ts [2m([22m[2m7 tests[22m[2m)[22m[32m 107[2mms[22m[39m
+2026-10-01T22:05:34.5013975Z  [32m✓[39m test/animate-seek-contract.test.ts [2m([22m[2m4 tests[22m[2m)[22m[32m 12[2mms[22m[39m
+2026-10-01T22:05:34.6814539Z  [32m✓[39m test/invalid-param-error.test.ts [2m([22m[2m9 tests[22m[2m)[22m[32m 8[2mms[22m[39m
+2026-10-01T22:05:34.8713445Z  [32m✓[39m test/stagger-count-cap.test.ts [2m([22m[2m8 tests[22m[2m)[22m[32m 37[2mms[22m[39m
+2026-10-01T22:05:34.9404400Z  [32m✓[39m test/standard-easing-specialized.test.ts [2m([22m[2m7 tests[22m[2m)[22m[33m 390[2mms[22m[39m
+2026-10-01T22:05:35.0692841Z  [32m✓[39m test/bindings-shared-frame.test.ts [2m([22m[2m3 tests[22m[2m)[22m[32m 6[2mms[22m[39m
+2026-10-01T22:05:35.1725126Z  [32m✓[39m test/value-internal-parser.test.ts [2m([22m[2m7 tests[22m[2m)[22m[32m 52[2mms[22m[39m
+2026-10-01T22:05:35.2634938Z  [32m✓[39m test/compositor-retarget-cache.test.ts [2m([22m[2m5 tests[22m[2m)[22m[32m 10[2mms[22m[39m
+2026-10-01T22:05:35.3355243Z  [32m✓[39m test/keyframes-api-surface-pin.test.ts [2m([22m[2m15 tests[22m[2m)[22m[32m 7[2mms[22m[39m
+2026-10-01T22:05:35.4543009Z  [32m✓[39m test/journey-owner-retarget-characterization.test.ts [2m([22m[2m2 tests[22m[2m)[22m[32m 9[2mms[22m[39m
+2026-10-01T22:05:35.5141387Z  [32m✓[39m test/animate-route-sum.test.ts [2m([22m[2m4 tests[22m[2m)[22m[32m 15[2mms[22m[39m
+2026-10-01T22:05:35.6828289Z  [32m✓[39m test/behaviors-property.test.ts [2m([22m[2m3 tests[22m[2m)[22m[32m 57[2mms[22m[39m
+2026-10-01T22:05:35.7043062Z  [32m✓[39m test/animate-bind-known-authority.test.ts [2m([22m[2m4 tests[22m[2m)[22m[32m 6[2mms[22m[39m
+2026-10-01T22:05:35.8548822Z  [32m✓[39m test/solver-finiteness-fuzz.test.ts [2m([22m[2m1 test[22m[2m)[22m[32m 14[2mms[22m[39m
+2026-10-01T22:05:35.8818338Z  [32m✓[39m test/projection-vector-clamp.test.ts [2m([22m[2m2 tests[22m[2m)[22m[32m 23[2mms[22m[39m
+2026-10-01T22:05:36.0828843Z  [32m✓[39m test/semantic-motion-binding-runtime.test.ts [2m([22m[2m2 tests[22m[2m)[22m[32m 15[2mms[22m[39m
+2026-10-01T22:05:36.1077553Z  [32m✓[39m test/future-layout-coordinator.test.ts [2m([22m[2m5 tests[22m[2m)[22m[32m 7[2mms[22m[39m
+2026-10-01T22:05:38.1511954Z  [32m✓[39m test/behaviors-state-cascade-model.test.ts [2m([22m[2m2 tests[22m[2m)[22m[33m 1878[2mms[22m[39m
+2026-10-01T22:05:38.1554262Z      [33m[2m✓[22m[39m 8192 перехода совпадают с полным merge активных слоёв и patch-mirror [33m 1866[2mms[22m[39m
+2026-10-01T22:05:38.3054441Z  [32m✓[39m test/animate-scope-package.test.ts [2m([22m[2m2 tests[22m[2m)[22m[33m 1754[2mms[22m[39m
+2026-10-01T22:05:38.3063633Z    [33m[2m✓[22m[39m новая public capability и её типы доступны через установленную export-границу [33m 1691[2mms[22m[39m
+2026-10-01T22:05:38.6194365Z  [32m✓[39m test/animate-facade-defaults.test.ts [2m([22m[2m4 tests[22m[2m)[22m[32m 9[2mms[22m[39m
+2026-10-01T22:05:41.1854514Z  [32m✓[39m test/reorder-package.test.ts [2m([22m[2m2 tests[22m[2m)[22m[33m 2016[2mms[22m[39m
+2026-10-01T22:05:41.1888797Z    [33m[2m✓[22m[39m публичный nested entry: ESM/CJS/types и буквальный DOM-рецепт [33m 1986[2mms[22m[39m
+2026-10-01T22:05:41.5347181Z  [32m✓[39m test/webkit-freeze-contract.test.ts [2m([22m[2m13 tests[22m[2m)[22m[32m 18[2mms[22m[39m
+2026-10-01T22:05:41.7673950Z  [32m✓[39m test/animate-facade-ssr.test.ts [2m([22m[2m5 tests[22m[2m)[22m[32m 10[2mms[22m[39m
+2026-10-01T22:05:42.1474506Z  [32m✓[39m test/keyframes-implicit-identity.test.ts [2m([22m[2m5 tests[22m[2m)[22m[32m 143[2mms[22m[39m
+2026-10-01T22:05:43.2754066Z [90mstderr[2m | test/lit-runtime.test.ts
+2026-10-01T22:05:43.2783677Z [22m[39mLit is in dev mode. Not recommended for production! See https://lit.dev/msg/dev-mode for more information.
+2026-10-01T22:05:43.2842658Z 
+2026-10-01T22:05:43.3414835Z  [32m✓[39m test/lit-runtime.test.ts [2m([22m[2m3 tests[22m[2m)[22m[32m 59[2mms[22m[39m
+2026-10-01T22:05:43.7004532Z  [32m✓[39m test/utils-api-surface-pin.test.ts [2m([22m[2m16 tests[22m[2m)[22m[32m 15[2mms[22m[39m
+2026-10-01T22:05:44.7494376Z  [32m✓[39m test/animate-scope-recipes.test.ts [2m([22m[2m1 test[22m[2m)[22m[33m 6389[2mms[22m[39m
+2026-10-01T22:05:44.7560583Z    [33m[2m✓[22m[39m runnable DOM setup снимает listener при броске; React recipe рендерится без DOM на сервере [33m 6387[2mms[22m[39m
+2026-10-01T22:05:44.9604189Z  [32m✓[39m test/decay-reduced-motion.test.ts [2m([22m[2m8 tests[22m[2m)[22m[32m 7[2mms[22m[39m
+2026-10-01T22:05:45.1074232Z  [32m✓[39m test/behaviors-finiteness-fuzz.test.ts [2m([22m[2m4 tests[22m[2m)[22m[33m 1066[2mms[22m[39m
+2026-10-01T22:05:45.1133511Z      [33m[2m✓[22m[39m drag-to-dismiss: злой ввод конечен [33m 318[2mms[22m[39m
+2026-10-01T22:05:45.1794746Z  [32m✓[39m test/segmenter-recurrence-oracle.test.ts [2m([22m[2m7 tests[22m[2m)[22m[32m 25[2mms[22m[39m
+2026-10-01T22:05:45.4045147Z [90mstdout[2m | test/zero-dep-smoke.test.ts[2m > [22m[2mzero-dep + bundle-size smoke (invariant 1)[2m > [22m[2mкорневой ESM использует канонический gzip и единый CORE-порог
+2026-10-01T22:05:45.4046993Z [22m[39m[@labpics/motion] dist/index.js canonical gzip size: 2205 bytes
+2026-10-01T22:05:45.4047742Z 
+2026-10-01T22:05:45.4083783Z  [32m✓[39m test/zero-dep-smoke.test.ts [2m([22m[2m4 tests[22m[2m)[22m[32m 35[2mms[22m[39m
+2026-10-01T22:05:45.4144475Z  [32m✓[39m test/pack-release-boundary.test.ts [2m([22m[2m5 tests[22m[2m)[22m[32m 10[2mms[22m[39m
+2026-10-01T22:05:45.5654611Z  [32m✓[39m test/frame-api-surface-pin.test.ts [2m([22m[2m6 tests[22m[2m)[22m[32m 7[2mms[22m[39m
+2026-10-01T22:05:45.6370759Z  [32m✓[39m test/animate-residual-registry-invariant.test.ts [2m([22m[2m4 tests[22m[2m)[22m[32m 12[2mms[22m[39m
+2026-10-01T22:05:45.8694581Z  [32m✓[39m test/decay-api-surface-pin.test.ts [2m([22m[2m9 tests[22m[2m)[22m[32m 18[2mms[22m[39m
+2026-10-01T22:05:46.2374282Z  [32m✓[39m test/behaviors-late-callback-owner.test.ts [2m([22m[2m12 tests[22m[2m)[22m[32m 23[2mms[22m[39m
+2026-10-01T22:05:46.6455171Z  [32m✓[39m test/keyframes-lerp-value-pin.test.ts [2m([22m[2m2 tests[22m[2m)[22m[32m 53[2mms[22m[39m
+2026-10-01T22:05:46.9247683Z  [32m✓[39m test/api-surface-pin.test.ts [2m([22m[2m8 tests[22m[2m)[22m[32m 15[2mms[22m[39m
+2026-10-01T22:05:47.1446294Z  [32m✓[39m test/in-view-owner-allocation.test.ts [2m([22m[2m2 tests[22m[2m)[22m[32m 7[2mms[22m[39m
+2026-10-01T22:05:47.5204293Z  [32m✓[39m test/spring-ode-oracle.test.ts [2m([22m[2m5 tests[22m[2m)[22m[32m 99[2mms[22m[39m
+2026-10-01T22:05:47.9594320Z  [32m✓[39m test/bindings-api-surface-pin.test.ts [2m([22m[2m7 tests[22m[2m)[22m[32m 10[2mms[22m[39m
+2026-10-01T22:05:48.2662827Z [90mstderr[2m | test/lit-ssr-safe.test.ts[2m > [22m[2m./lit SSR-safety (окружение: node, нет window/document/HTMLElement)[2m > [22m[2mимпорт ./lit не бросает (доказательство отсутствия top-level window/document доступа)
+2026-10-01T22:05:48.2694213Z [22m[39mLit is in dev mode. Not recommended for production! See https://lit.dev/msg/dev-mode for more information.
+2026-10-01T22:05:48.2718442Z 
+2026-10-01T22:05:48.2756057Z  [32m✓[39m test/lit-ssr-safe.test.ts [2m([22m[2m3 tests[22m[2m)[22m[32m 59[2mms[22m[39m
+2026-10-01T22:05:48.5136796Z  [32m✓[39m test/future-layout-receipt-parser.test.ts [2m([22m[2m9 tests[22m[2m)[22m[32m 15[2mms[22m[39m
+2026-10-01T22:05:48.7574363Z  [32m✓[39m test/gestures-api-surface-pin.test.ts [2m([22m[2m8 tests[22m[2m)[22m[32m 11[2mms[22m[39m
+2026-10-01T22:05:49.0814128Z  [32m✓[39m test/fixed-dt-fallback-pin.test.ts [2m([22m[2m1 test[22m[2m)[22m[32m 13[2mms[22m[39m
+2026-10-01T22:05:49.3254392Z  [32m✓[39m test/animate-progression.test.ts [2m([22m[2m1 test[22m[2m)[22m[32m 10[2mms[22m[39m
+2026-10-01T22:05:49.8318844Z  [32m✓[39m test/compositor-api-surface-pin.test.ts [2m([22m[2m3 tests[22m[2m)[22m[32m 13[2mms[22m[39m
+2026-10-01T22:05:50.2484333Z  [32m✓[39m test/animate-spring-cache.test.ts [2m([22m[2m2 tests[22m[2m)[22m[32m 108[2mms[22m[39m
+2026-10-01T22:05:50.6324248Z  [32m✓[39m test/presence-transition-consumer.test.ts [2m([22m[2m1 test[22m[2m)[22m[33m 4861[2mms[22m[39m
+2026-10-01T22:05:50.6383579Z    [33m[2m✓[22m[39m настоящий tarball: ESM/CJS/types/SSR и буквальный DOM-рецепт доступны потребителю [33m 4859[2mms[22m[39m
+2026-10-01T22:05:50.8585314Z  [32m✓[39m test/compiler-import-ownership.test.ts [2m([22m[2m6 tests[22m[2m)[22m[32m 37[2mms[22m[39m
+2026-10-01T22:05:50.9377252Z  [32m✓[39m test/default-request-frame.test.ts [2m([22m[2m2 tests[22m[2m)[22m[32m 4[2mms[22m[39m
+2026-10-01T22:05:51.2164306Z  [32m✓[39m test/reduced-motion-policy.test.ts [2m([22m[2m3 tests[22m[2m)[22m[32m 31[2mms[22m[39m
+2026-10-01T22:05:51.2314507Z  [32m✓[39m test/waapi-scroll-timeline.test.ts [2m([22m[2m3 tests[22m[2m)[22m[32m 9[2mms[22m[39m
+2026-10-01T22:05:51.4064230Z  [32m✓[39m test/motion-contract-v1.test.ts [2m([22m[2m3 tests[22m[2m)[22m[32m 7[2mms[22m[39m
+2026-10-01T22:05:51.6074583Z  [32m✓[39m test/driver-terminal-boundary-adversarial.test.ts [2m([22m[2m3 tests[22m[2m)[22m[32m 12[2mms[22m[39m
+2026-10-01T22:05:51.6372644Z  [32m✓[39m test/waapi-view-timeline.test.ts [2m([22m[2m3 tests[22m[2m)[22m[32m 7[2mms[22m[39m
+2026-10-01T22:05:51.7951425Z  [32m✓[39m test/motion-value-terminal-sentinel.test.ts [2m([22m[2m7 tests[22m[2m)[22m[32m 10[2mms[22m[39m
+2026-10-01T22:05:51.8444427Z  [32m✓[39m test/future-layout-compiler.test.ts [2m([22m[2m1 test[22m[2m)[22m[32m 7[2mms[22m[39m
+2026-10-01T22:05:52.0824321Z  [32m✓[39m test/animate-parse-props-grouping.test.ts [2m([22m[2m4 tests[22m[2m)[22m[32m 8[2mms[22m[39m
+2026-10-01T22:05:52.2304687Z  [32m✓[39m test/animate-facade-api-surface-pin.test.ts [2m([22m[2m2 tests[22m[2m)[22m[32m 7[2mms[22m[39m
+2026-10-01T22:05:52.3877528Z  [32m✓[39m test/stagger-api-surface-pin.test.ts [2m([22m[2m4 tests[22m[2m)[22m[32m 11[2mms[22m[39m
+2026-10-01T22:05:52.7194255Z  [32m✓[39m test/in-view-dist-contract.test.ts [2m([22m[2m2 tests[22m[2m)[22m[32m 165[2mms[22m[39m
+2026-10-01T22:05:53.1361590Z  [32m✓[39m test/git-path-list.test.ts [2m([22m[2m3 tests[22m[2m)[22m[32m 110[2mms[22m[39m
+2026-10-01T22:05:53.2079887Z  [32m✓[39m test/keyframes-shipped-allocation.test.ts [2m([22m[2m2 tests[22m[2m)[22m[32m 58[2mms[22m[39m
+2026-10-01T22:05:53.3663439Z  [32m✓[39m test/showcase-build-contract.test.ts [2m([22m[2m5 tests[22m[2m)[22m[32m 5[2mms[22m[39m
+2026-10-01T22:05:53.4374425Z  [32m✓[39m test/behaviors-carousel-overflow.test.ts [2m([22m[2m8 tests[22m[2m)[22m[32m 19[2mms[22m[39m
+2026-10-01T22:05:53.5424872Z  [32m✓[39m test/timeline-label-owner-allocation.test.ts [2m([22m[2m4 tests[22m[2m)[22m[32m 5[2mms[22m[39m
+2026-10-01T22:05:53.9564140Z  [32m✓[39m test/decay-rest-projection.test.ts [2m([22m[2m3 tests[22m[2m)[22m[32m 239[2mms[22m[39m
+2026-10-01T22:05:55.2343266Z  [32m✓[39m test/presence-transition-retention.test.ts [2m([22m[2m2 tests[22m[2m)[22m[33m 1085[2mms[22m[39m
+2026-10-01T22:05:55.2373892Z    [33m[2m✓[22m[39m destroy освобождает callbacks даже при вечном finished (js) [33m 440[2mms[22m[39m
+2026-10-01T22:05:55.2375313Z    [33m[2m✓[22m[39m destroy освобождает callbacks даже при вечном finished (cjs) [33m 644[2mms[22m[39m
+2026-10-01T22:05:55.4684733Z  [32m✓[39m test/lit-element-template.test.ts [2m([22m[2m4 tests[22m[2m)[22m[32m 6[2mms[22m[39m
+2026-10-01T22:05:55.8014274Z  [32m✓[39m test/utils-determinism.test.ts [2m([22m[2m5 tests[22m[2m)[22m[32m 17[2mms[22m[39m
+2026-10-01T22:05:56.0891457Z  [32m✓[39m test/projection-vector-seek-continuity.test.ts [2m([22m[2m1 test[22m[2m)[22m[32m 9[2mms[22m[39m
+2026-10-01T22:05:56.2194771Z  [32m✓[39m test/animate-spring-borrow-types.test.ts [2m([22m[2m1 test[22m[2m)[22m[33m 1982[2mms[22m[39m
+2026-10-01T22:05:56.2213711Z    [33m[2m✓[22m[39m не предоставляет consumer право записи в базис и результат проекции [33m 1980[2mms[22m[39m
+2026-10-01T22:05:56.3624576Z  [32m✓[39m test/segment-search-large.test.ts [2m([22m[2m2 tests[22m[2m)[22m[32m 7[2mms[22m[39m
+2026-10-01T22:05:56.4914285Z  [32m✓[39m test/projection-affine-overflow.test.ts [2m([22m[2m4 tests[22m[2m)[22m[32m 20[2mms[22m[39m
+2026-10-01T22:05:57.0214347Z  [32m✓[39m test/journey-behaviors-pareto-budget.test.ts [2m([22m[2m2 tests[22m[2m)[22m[32m 176[2mms[22m[39m
+2026-10-01T22:05:57.2054710Z  [32m✓[39m test/compositor-stagger-package.test.ts [2m([22m[2m3 tests[22m[2m)[22m[32m 11[2mms[22m[39m
+2026-10-01T22:05:57.3447408Z  [32m✓[39m test/driver-single-solve.test.ts [2m([22m[2m1 test[22m[2m)[22m[32m 8[2mms[22m[39m
+2026-10-01T22:05:57.4084384Z  [32m✓[39m test/repeat-frame-cursor-count.test.ts [2m([22m[2m1 test[22m[2m)[22m[32m 7[2mms[22m[39m
+2026-10-01T22:05:57.5356676Z  [32m✓[39m test/spring-determinism.test.ts [2m([22m[2m4 tests[22m[2m)[22m[32m 5[2mms[22m[39m
+2026-10-01T22:05:57.8300225Z  [32m✓[39m test/motion-param-error-code.test.ts [2m([22m[2m4 tests[22m[2m)[22m[32m 10[2mms[22m[39m
+2026-10-01T22:05:58.0714343Z  [32m✓[39m test/motion-value-shared-scratch.test.ts [2m([22m[2m1 test[22m[2m)[22m[32m 4[2mms[22m[39m
+2026-10-01T22:05:58.3757239Z  [32m✓[39m test/projection-driver-basis-contract.test.ts [2m([22m[2m2 tests[22m[2m)[22m[32m 6[2mms[22m[39m
+2026-10-01T22:05:58.7364412Z  [32m✓[39m test/compositor-stagger-api-surface-pin.test.ts [2m([22m[2m2 tests[22m[2m)[22m[32m 7[2mms[22m[39m
+2026-10-01T22:05:58.9264250Z  [32m✓[39m test/animate-scope-gc.test.ts [2m([22m[2m3 tests[22m[2m)[22m[33m 1224[2mms[22m[39m
+2026-10-01T22:05:58.9293391Z    [33m[2m✓[22m[39m scope не удерживает завершённые цели и уничтоженный root: source [33m 524[2mms[22m[39m
+2026-10-01T22:05:58.9294938Z    [33m[2m✓[22m[39m scope не удерживает завершённые цели и уничтоженный root: cjs [33m 416[2mms[22m[39m
+2026-10-01T22:05:59.1020986Z  [32m✓[39m test/compiler-parse-diagnostics.test.ts [2m([22m[2m2 tests[22m[2m)[22m[32m 7[2mms[22m[39m
+2026-10-01T22:05:59.2395417Z  [32m✓[39m test/behaviors-reset-domain.test.ts [2m([22m[2m2 tests[22m[2m)[22m[32m 4[2mms[22m[39m
+2026-10-01T22:05:59.3361263Z  [32m✓[39m test/surface-execution-ownership.test.ts [2m([22m[2m2 tests[22m[2m)[22m[32m 9[2mms[22m[39m
+2026-10-01T22:05:59.5131169Z  [32m✓[39m test/stagger-allocation.test.ts [2m([22m[2m2 tests[22m[2m)[22m[32m 5[2mms[22m[39m
+2026-10-01T22:05:59.7026671Z  [32m✓[39m test/driver-mutation-contract.test.ts [2m([22m[2m2 tests[22m[2m)[22m[32m 15[2mms[22m[39m
+2026-10-01T22:05:59.7197415Z  [32m✓[39m test/nano-package.test.ts [2m([22m[2m2 tests[22m[2m)[22m[32m 5[2mms[22m[39m
+2026-10-01T22:05:59.8911312Z  [32m✓[39m test/reduce-short-circuits.test.ts [2m([22m[2m1 test[22m[2m)[22m[32m 7[2mms[22m[39m
+2026-10-01T22:06:00.2931986Z  [32m✓[39m test/readme-facts.test.ts [2m([22m[2m2 tests[22m[2m)[22m[32m 70[2mms[22m[39m
+2026-10-01T22:06:00.4917207Z  [32m✓[39m test/presets-api-surface-pin.test.ts [2m([22m[2m2 tests[22m[2m)[22m[32m 5[2mms[22m[39m
+2026-10-01T22:06:00.8674307Z  [32m✓[39m test/spring-easing-binary64-horizon.test.ts [2m([22m[2m1 test[22m[2m)[22m[32m 6[2mms[22m[39m
+2026-10-01T22:06:01.0824472Z  [32m✓[39m test/reorder-gc.test.ts [2m([22m[2m3 tests[22m[2m)[22m[33m 1005[2mms[22m[39m
+2026-10-01T22:06:01.0825822Z    [33m[2m✓[22m[39m source: retained terminal owner/session не удерживают callback; живой positive control [33m 333[2mms[22m[39m
+2026-10-01T22:06:01.0913905Z    [33m[2m✓[22m[39m cjs: retained terminal owner/session не удерживают callback; живой positive control [33m 388[2mms[22m[39m
+2026-10-01T22:06:01.1914192Z  [32m✓[39m test/tween-boundary.test.ts [2m([22m[2m4 tests[22m[2m)[22m[32m 7[2mms[22m[39m
+2026-10-01T22:06:01.4356755Z  [32m✓[39m test/motion-value-bounded-zero.test.ts [2m([22m[2m2 tests[22m[2m)[22m[32m 6[2mms[22m[39m
+2026-10-01T22:06:01.7350160Z  [32m✓[39m test/compositor-retention-gc.test.ts [2m([22m[2m1 test[22m[2m)[22m[33m 362[2mms[22m[39m
+2026-10-01T22:06:01.7428281Z      [33m[2m✓[22m[39m destroy разрывает target, artifact и effect/timer owners [33m 361[2mms[22m[39m
+2026-10-01T22:06:02.0777746Z  [32m✓[39m test/build-config.test.ts [2m([22m[2m1 test[22m[2m)[22m[32m 5[2mms[22m[39m
+2026-10-01T22:06:02.3357800Z  [32m✓[39m test/compiler-nano-release-artifact.test.ts [2m([22m[2m2 tests[22m[2m)[22m[32m 18[2mms[22m[39m
+2026-10-01T22:06:02.6894610Z  [32m✓[39m test/root-request-frame-ssot.test.ts [2m([22m[2m2 tests[22m[2m)[22m[32m 9[2mms[22m[39m
+2026-10-01T22:06:02.7254666Z  [32m✓[39m test/frame-retention-gc.test.ts [2m([22m[2m1 test[22m[2m)[22m[33m 655[2mms[22m[39m
+2026-10-01T22:06:02.7307145Z    [33m[2m✓[22m[39m frame rollback освобождает dead reentrant callbacks [33m 650[2mms[22m[39m
+2026-10-01T22:06:02.9180646Z  [32m✓[39m test/reduced-motion-test-oracle.test.ts [2m([22m[2m3 tests[22m[2m)[22m[32m 9[2mms[22m[39m
+2026-10-01T22:06:03.2394357Z  [32m✓[39m test/reorder-keyboard-axis-noop.test.ts [2m([22m[2m1 test[22m[2m)[22m[32m 7[2mms[22m[39m
+2026-10-01T22:06:03.5759415Z  [32m✓[39m test/svelte-current-value.test.ts [2m([22m[2m1 test[22m[2m)[22m[32m 9[2mms[22m[39m
+2026-10-01T22:06:03.9879626Z  [32m✓[39m test/behaviors-snap-ordering.test.ts [2m([22m[2m1 test[22m[2m)[22m[32m 9[2mms[22m[39m
+2026-10-01T22:06:16.6499921Z [90mstdout[2m | test/semantic-motion-binding-mutation.test.ts[2m > [22m[2mпубличные witnesses различают восемь неверных binding-реализаций и здоровый контроль
+2026-10-01T22:06:16.6563220Z [22m[39mbinding mutation receipt {"sourceSHA256":"7a1914a113ae61548d001983b8049f7a5f87d6a05031611f4ac631d1be80d344","testSHA256":"de837d6e67d84613ed354d256757c7fb28fb93cbe834c59d9a0471c6be8c863b","node":"v24.21.0","baselineTests":49,"restoredTests":49,"records":[{"name":"restart-unchanged","witness":"семантическая привязка движения обновляет только изменившиеся визуальные роли, не копирует app model","failedTests":3,"killed":true},{"name":"mutable-goal","witness":"семантическая привязка движения снимает неизменяемые цели до первой записи и не сохраняет чужой mutable объект","failedTests":1,"killed":true},{"name":"aliased-goal","witness":"семантическая привязка движения снимает неизменяемые цели до первой записи и не сохраняет чужой mutable объект","failedTests":2,"killed":true},{"name":"partial-cleanup","witness":"семантическая привязка движения destroy отменяет всё несмотря на исключение, не возобновляется от позднего update","failedTests":10,"killed":true},{"name":"cancel-successor","witness":"семантическая привязка движения переданный в следующий результат тот же handle не отменяется","failedTests":2,"killed":true},{"name":"overwrite-destroy","witness":"ошибка после destroy не перезаписывает терминальное уничтожение","failedTests":1,"killed":true},{"name":"recursive-project","witness":"семантическая привязка движения проекция не может рекурсивно записывать новую модель","failedTests":1,"killed":true},{"name":"read-after-revoke","witness":"отзыв во время проверки принадлежности поля прекращает чтение его значения","failedTests":1,"killed":true}]}
+2026-10-01T22:06:16.6592799Z 
+2026-10-01T22:06:16.6653807Z  [32m✓[39m test/semantic-motion-binding-mutation.test.ts [2m([22m[2m1 test[22m[2m)[22m[33m 13614[2mms[22m[39m
+2026-10-01T22:06:16.6713586Z    [33m[2m✓[22m[39m публичные witnesses различают восемь неверных binding-реализаций и здоровый контроль [33m 13612[2mms[22m[39m
+2026-10-01T22:06:21.4991074Z  [32m✓[39m test/resource-actual-package-retention.test.ts [2m([22m[2m4 tests[22m[2m)[22m[33m 57318[2mms[22m[39m
+2026-10-01T22:06:21.4993060Z      [33m[2m✓[22m[39m 10 000 mount/update/interrupt/dispose циклов на каждый ESM/CJS owner не оставляют effects/listeners/jobs [33m 4531[2mms[22m[39m
+2026-10-01T22:06:21.4994497Z      [33m[2m✓[22m[39m отдельный forced-GC proof различает terminal/live/dropped/deliberate owners после 10 000 циклов [33m 41103[2mms[22m[39m
+2026-10-01T22:06:21.4995754Z      [33m[2m✓[22m[39m dropped owners возвращают heap в заранее разрешённую A/A baseline-полосу без роста по циклам [33m 4559[2mms[22m[39m
+2026-10-01T22:06:21.5098425Z 
+2026-10-01T22:06:21.5111346Z [2m Test Files [22m [1m[32m344 passed[39m[22m[90m (344)[39m
+2026-10-01T22:06:21.5128558Z [2m      Tests [22m [1m[32m4975 passed[39m[22m[90m (4975)[39m
+2026-10-01T22:06:21.5128992Z [2m   Start at [22m 22:04:23
+2026-10-01T22:06:21.5132396Z [2m   Duration [22m 117.68s[2m (transform 5.52s, setup 0ms, import 20.34s, tests 250.83s, environment 4.34s)[22m
+2026-10-01T22:06:21.5133737Z 
+2026-10-01T22:06:21.6265275Z ##[group]Run pnpm vitest run --reporter=verbose test/*finiteness-fuzz.test.ts
+2026-10-01T22:06:21.6265888Z [36;1mpnpm vitest run --reporter=verbose test/*finiteness-fuzz.test.ts[0m
+2026-10-01T22:06:21.6323615Z shell: /usr/bin/bash -e {0}
+2026-10-01T22:06:21.6323815Z env:
+2026-10-01T22:06:21.6323991Z   COREPACK_ENABLE_DOWNLOAD_PROMPT: 0
+2026-10-01T22:06:21.6324223Z   COREPACK_DEFAULT_TO_LATEST: 0
+2026-10-01T22:06:21.6324420Z ##[endgroup]
+2026-10-01T22:06:22.3355450Z Already up to date
+2026-10-01T22:06:22.3360977Z Done in 323ms using pnpm v11.11.0
+2026-10-01T22:06:22.6897700Z Already up to date
+2026-10-01T22:06:22.6902847Z Done in 313ms using pnpm v11.11.0
+2026-10-01T22:06:22.9443210Z 
+2026-10-01T22:06:22.9457025Z [1m[30m[46m RUN [49m[39m[22m [36mv4.1.11 [39m[90m/home/runner/work/lab-motion/lab-motion[39m
+2026-10-01T22:06:22.9457358Z 
+2026-10-01T22:06:23.4745271Z  [32m✓[39m test/behaviors-finiteness-fuzz.test.ts[2m > [22m./behaviors finiteness fuzz — злой ввод → конечное состояние[2m > [22mbottom sheet: 3000 злых жестов держат value/velocity конечными[32m 214[2mms[22m[39m
+2026-10-01T22:06:23.5655214Z  [32m✓[39m test/decay-finiteness-fuzz.test.ts[2m > [22mdecay: finiteness fuzz — random inputs (10k+)[2m > [22mvalueAt/velocityAt/rest are always finite over 10k random (from, velocity, power, timeConstant, t)[33m 359[2mms[22m[39m
+2026-10-01T22:06:23.5955127Z  [32m✓[39m test/decay-finiteness-fuzz.test.ts[2m > [22mdecay: finiteness fuzz — overflow edges (cartesian of extreme magnitudes)[2m > [22mrest/valueAt/velocityAt finite for every combination of extreme from/velocity[32m 21[2mms[22m[39m
+2026-10-01T22:06:23.5972839Z  [32m✓[39m test/decay-finiteness-fuzz.test.ts[2m > [22mdecay: finiteness fuzz — overflow edges (cartesian of extreme magnitudes)[2m > [22mextreme power/timeConstant combined with extreme velocity stay finite[32m 1[2mms[22m[39m
+2026-10-01T22:06:23.6024243Z  [32m✓[39m test/decay-finiteness-fuzz.test.ts[2m > [22mdecay: NaN/Infinity in t (virtual time) never leaks[2m > [22mvalueAt(NaN) does not throw and returns a finite value (treated as t=0)[32m 1[2mms[22m[39m
+2026-10-01T22:06:23.6033981Z  [32m✓[39m test/decay-finiteness-fuzz.test.ts[2m > [22mdecay: NaN/Infinity in t (virtual time) never leaks[2m > [22mvalueAt(-Infinity) clamps to t=0 (not yet started)[32m 0[2mms[22m[39m
+2026-10-01T22:06:23.6054182Z  [32m✓[39m test/decay-finiteness-fuzz.test.ts[2m > [22mdecay: NaN/Infinity in t (virtual time) never leaks[2m > [22mvalueAt(Infinity) === rest (fully settled)[32m 0[2mms[22m[39m
+2026-10-01T22:06:23.6056276Z  [32m✓[39m test/decay-finiteness-fuzz.test.ts[2m > [22mdecay: NaN/Infinity in t (virtual time) never leaks[2m > [22mvelocityAt(Infinity) === 0[32m 0[2mms[22m[39m
+2026-10-01T22:06:23.6058319Z  [32m✓[39m test/decay-finiteness-fuzz.test.ts[2m > [22mdecay: required-input validation (throws, does not silently NaN)[2m > [22mfrom=NaN throws MotionParamError[32m 0[2mms[22m[39m
+2026-10-01T22:06:23.6060491Z  [32m✓[39m test/decay-finiteness-fuzz.test.ts[2m > [22mdecay: required-input validation (throws, does not silently NaN)[2m > [22mfrom=Infinity throws MotionParamError[32m 1[2mms[22m[39m
+2026-10-01T22:06:23.6062830Z  [32m✓[39m test/decay-finiteness-fuzz.test.ts[2m > [22mdecay: required-input validation (throws, does not silently NaN)[2m > [22mvelocity=NaN throws MotionParamError[32m 0[2mms[22m[39m
+2026-10-01T22:06:23.6065034Z  [32m✓[39m test/decay-finiteness-fuzz.test.ts[2m > [22mdecay: required-input validation (throws, does not silently NaN)[2m > [22mvelocity=-Infinity throws MotionParamError[32m 0[2mms[22m[39m
+2026-10-01T22:06:23.6767208Z  [32m✓[39m test/behaviors-finiteness-fuzz.test.ts[2m > [22m./behaviors finiteness fuzz — злой ввод → конечное состояние[2m > [22mdrag-to-dismiss: злой ввод конечен[32m 204[2mms[22m[39m
+2026-10-01T22:06:23.8793992Z  [32m✓[39m test/behaviors-finiteness-fuzz.test.ts[2m > [22m./behaviors finiteness fuzz — злой ввод → конечное состояние[2m > [22mcarousel: злой ввод конечен[32m 202[2mms[22m[39m
+2026-10-01T22:06:23.8993869Z  [32m✓[39m test/timeline-finiteness-fuzz.test.ts[2m > [22mtimeline-finiteness-fuzz: overflow-range (|from|+|to|>MAX_VALUE)[2m > [22m10k+ overflow-range сегментов никогда не дают NaN/Infinity[32m 107[2mms[22m[39m
+2026-10-01T22:06:24.0015272Z  [32m✓[39m test/timeline-finiteness-fuzz.test.ts[2m > [22mtimeline-finiteness-fuzz: экстремальные seek значения[2m > [22mseek(Infinity), seek(-Infinity), seek(NaN), seek(MAX_VALUE) никогда не дают NaN[32m 0[2mms[22m[39m
+2026-10-01T22:06:24.0047783Z  [32m✓[39m test/timeline-finiteness-fuzz.test.ts[2m > [22mtimeline-finiteness-fuzz: easing возвращающий NaN/Infinity[2m > [22measing=() => NaN никогда не пропускает NaN в emit[32m 0[2mms[22m[39m
+2026-10-01T22:06:24.0074047Z  [32m✓[39m test/timeline-finiteness-fuzz.test.ts[2m > [22mtimeline-finiteness-fuzz: easing возвращающий NaN/Infinity[2m > [22measing=() => Infinity никогда не пропускает Infinity в emit[32m 0[2mms[22m[39m
+2026-10-01T22:06:24.0076275Z  [32m✓[39m test/timeline-finiteness-fuzz.test.ts[2m > [22mtimeline-finiteness-fuzz: easing возвращающий NaN/Infinity[2m > [22measing=() => -Infinity никогда не пропускает -Infinity в emit[32m 0[2mms[22m[39m
+2026-10-01T22:06:24.0119878Z  [32m✓[39m test/timeline-finiteness-fuzz.test.ts[2m > [22mtimeline-finiteness-fuzz: 10k+ случайных сегментов (полный fuzz)[2m > [22mникогда не эмитирует NaN/Infinity при случайных from/to/duration/seek[32m 106[2mms[22m[39m
+2026-10-01T22:06:24.0171565Z  [32m✓[39m test/timeline-finiteness-fuzz.test.ts[2m > [22mtimeline-finiteness-fuzz: множество сегментов[2m > [22m5-сегментный таймлайн с overflow-range: всё конечно[32m 1[2mms[22m[39m
+2026-10-01T22:06:24.0185347Z  [32m✓[39m test/timeline-finiteness-fuzz.test.ts[2m > [22mtimeline-finiteness-fuzz: guard критичен (структурная проверка)[2m > [22mseek(0.5) на нормальном сегменте возвращает значение в [from, to][32m 0[2mms[22m[39m
+2026-10-01T22:06:24.0187502Z  [32m✓[39m test/timeline-finiteness-fuzz.test.ts[2m > [22mtimeline-finiteness-fuzz: guard критичен (структурная проверка)[2m > [22mseek(0.5) на overflow-range сегменте возвращает `to`[32m 1[2mms[22m[39m
+2026-10-01T22:06:24.1109744Z  [32m✓[39m test/behaviors-finiteness-fuzz.test.ts[2m > [22m./behaviors finiteness fuzz — злой ввод → конечное состояние[2m > [22mpull-to-refresh: злой ввод конечен[32m 231[2mms[22m[39m
+2026-10-01T22:06:24.3397551Z  [32m✓[39m test/projection-finiteness-fuzz.test.ts[2m > [22mprojection: finiteness fuzz — 10k злых деревьев (P1)[2m > [22mкаждое число каждого кадра конечно и не −0; радиусы ≥ 0; opacity ∈ [0,1][32m 128[2mms[22m[39m
+2026-10-01T22:06:24.3806844Z  [32m✓[39m test/projection-finiteness-fuzz.test.ts[2m > [22mprojection: finiteness fuzz — чистые функции (mixBox/projectAt/cornerRadiusAt)[2m > [22mmixBox: конечно, без −0, размеры ≥ 0 (floor) на 3000 злых пар[32m 8[2mms[22m[39m
+2026-10-01T22:06:24.3809428Z  [32m✓[39m test/projection-finiteness-fuzz.test.ts[2m > [22mprojection: finiteness fuzz — чистые функции (mixBox/projectAt/cornerRadiusAt)[2m > [22mprojectAt: конечно и без −0 на 3000 злых узлов (с предком и без)[32m 10[2mms[22m[39m
+2026-10-01T22:06:24.3812112Z  [32m✓[39m test/projection-finiteness-fuzz.test.ts[2m > [22mprojection: finiteness fuzz — чистые функции (mixBox/projectAt/cornerRadiusAt)[2m > [22mcornerRadiusAt: конечно, без −0, ≥ 0 на 3000 злых углов (включая k→0/NaN)[32m 6[2mms[22m[39m
+2026-10-01T22:06:24.3814719Z  [32m✓[39m test/projection-finiteness-fuzz.test.ts[2m > [22mprojection: валидация createProjector — коды MotionParamError[2m > [22mмальформный radii-кортеж (as-any): ранний MotionParamError, не TypeError из at()[32m 2[2mms[22m[39m
+2026-10-01T22:06:24.3817146Z  [32m✓[39m test/projection-finiteness-fuzz.test.ts[2m > [22mprojection: валидация createProjector — коды MotionParamError[2m > [22mпустой id[32m 0[2mms[22m[39m
+2026-10-01T22:06:24.3819290Z  [32m✓[39m test/projection-finiteness-fuzz.test.ts[2m > [22mprojection: валидация createProjector — коды MotionParamError[2m > [22mдубль id[32m 0[2mms[22m[39m
+2026-10-01T22:06:24.3821165Z  [32m✓[39m test/projection-finiteness-fuzz.test.ts[2m > [22mprojection: валидация createProjector — коды MotionParamError[2m > [22mнеизвестный parent[32m 0[2mms[22m[39m
+2026-10-01T22:06:24.3823734Z  [32m✓[39m test/projection-finiteness-fuzz.test.ts[2m > [22mprojection: валидация createProjector — коды MotionParamError[2m > [22mцикл: самоссылка[32m 0[2mms[22m[39m
+2026-10-01T22:06:24.3826448Z  [32m✓[39m test/projection-finiteness-fuzz.test.ts[2m > [22mprojection: валидация createProjector — коды MotionParamError[2m > [22mцикл из двух узлов: бросок с кодом цикла LM083[32m 0[2mms[22m[39m
+2026-10-01T22:06:24.3828752Z  [32m✓[39m test/projection-finiteness-fuzz.test.ts[2m > [22mprojection: валидация createProjector — коды MotionParamError[2m > [22mвалидные структуры НЕ бросают даже со злыми числами (враждебное состояние ≠ параметры)[32m 0[2mms[22m[39m
+2026-10-01T22:06:24.6213927Z  [32m✓[39m test/animate-facade-finiteness-fuzz.test.ts[2m > [22m./animate — финитность и детерминизм (Класс В, property/fuzz)[2m > [22mP1: seeded fuzz 400 сценариев — ни одной NaN/Infinity-записи на всём props-спейсе[32m 120[2mms[22m[39m
+2026-10-01T22:06:24.6483600Z  [32m✓[39m test/animate-facade-finiteness-fuzz.test.ts[2m > [22m./animate — финитность и детерминизм (Класс В, property/fuzz)[2m > [22mP2: не-конечные входы → ранний MotionParamError и ноль записей[32m 3[2mms[22m[39m
+2026-10-01T22:06:24.6486087Z  [32m✓[39m test/animate-facade-finiteness-fuzz.test.ts[2m > [22m./animate — финитность и детерминизм (Класс В, property/fuzz)[2m > [22mP3: детерминизм — один seed → бит-идентичный журнал записей[32m 23[2mms[22m[39m
+2026-10-01T22:06:24.6489991Z  [32m✓[39m test/animate-facade-finiteness-fuzz.test.ts[2m > [22m./animate — финитность и детерминизм (Класс В, property/fuzz)[2m > [22mP1-направленный: экстремальные пары from/to не пробивают финитный страж[32m 1[2mms[22m[39m
+2026-10-01T22:06:24.6796393Z  [32m✓[39m test/animate-overflow-finiteness-fuzz.test.ts[2m > [22manimate-overflow-finiteness: prerequisites[2m > [22mtween is callable — anti-theater guard (RED if engine absent)[32m 3[2mms[22m[39m
+2026-10-01T22:06:24.6799335Z  [32m✓[39m test/animate-overflow-finiteness-fuzz.test.ts[2m > [22manimate-overflow-finiteness: prerequisites[2m > [22mdrive is callable — anti-theater guard (RED if engine absent)[32m 0[2mms[22m[39m
+2026-10-01T22:06:24.6822256Z  [32m✓[39m test/animate-overflow-finiteness-fuzz.test.ts[2m > [22mtween() — overflow-edge finiteness fuzz (invariant 3)[2m > [22mdirect overflow pairs — all t ∈ {0, 0.001, 0.1, 0.5, 0.9, 0.999, 1} produce finite output[32m 1[2mms[22m[39m
+2026-10-01T22:06:24.6826054Z  [32m✓[39m test/animate-overflow-finiteness-fuzz.test.ts[2m > [22mtween() — overflow-edge finiteness fuzz (invariant 3)[2m > [22mtween(from, to, 0) === from and tween(from, to, 1) === to for overflow pairs[32m 1[2mms[22m[39m
+2026-10-01T22:06:24.6828643Z  [32m✓[39m test/animate-overflow-finiteness-fuzz.test.ts[2m > [22mtween() — overflow-edge finiteness fuzz (invariant 3)[2m > [22mseeded LCG fuzz ≥10 000 samples — all outputs finite (invariant 3)[32m 3[2mms[22m[39m
+2026-10-01T22:06:24.6838371Z  [32m✓[39m test/animate-overflow-finiteness-fuzz.test.ts[2m > [22mtween() — overflow-edge finiteness fuzz (invariant 3)[2m > [22mtween(MAX_VALUE, -MAX_VALUE, 0.5) === 0 — two-point form gives exact midpoint[32m 0[2mms[22m[39m
+2026-10-01T22:06:24.6840942Z  [32m✓[39m test/animate-overflow-finiteness-fuzz.test.ts[2m > [22mtween() — overflow-edge finiteness fuzz (invariant 3)[2m > [22mtween(-MAX_VALUE, MAX_VALUE, 0.5) === 0 — symmetric case[32m 0[2mms[22m[39m
+2026-10-01T22:06:24.6843904Z  [32m✓[39m test/animate-overflow-finiteness-fuzz.test.ts[2m > [22mdrive() — overflow-edge finiteness fuzz (invariant 3, virtual-time)[2m > [22mdrive() overflow pairs — handle=0 (setTimeout fallback): all emitted values finite and promise resolves[32m 3[2mms[22m[39m
+2026-10-01T22:06:24.6846831Z  [32m✓[39m test/animate-overflow-finiteness-fuzz.test.ts[2m > [22mdrive() — overflow-edge finiteness fuzz (invariant 3, virtual-time)[2m > [22mdrive() overflow — timestamp clock (ts=0 first frame, the t=0 NaN edge): all emitted finite[32m 3[2mms[22m[39m
+2026-10-01T22:06:24.6849689Z  [32m✓[39m test/animate-overflow-finiteness-fuzz.test.ts[2m > [22mdrive() — overflow-edge finiteness fuzz (invariant 3, virtual-time)[2m > [22mdrive() overflow reverse direction (ts=0 first frame): all emitted finite[32m 0[2mms[22m[39m
+2026-10-01T22:06:24.6852769Z  [32m✓[39m test/animate-overflow-finiteness-fuzz.test.ts[2m > [22mdrive() — overflow-edge finiteness fuzz (invariant 3, virtual-time)[2m > [22mseeded fuzz — 200 overflow pairs via handle=0 clock: all emitted finite, all promises resolve[32m 1[2mms[22m[39m
+2026-10-01T22:06:24.6855701Z  [32m✓[39m test/animate-overflow-finiteness-fuzz.test.ts[2m > [22mdrive() — overflow-edge finiteness fuzz (invariant 3, virtual-time)[2m > [22mdrive() finite range (non-overflow) is NOT short-circuited — animates normally[32m 76[2mms[22m[39m
+2026-10-01T22:06:24.8658736Z  [32m✓[39m test/easing-finiteness-fuzz.test.ts[2m > [22measing finiteness fuzz — NE1 (CSS-safe invariant)[2m > [22mnormalizeEasing is callable — prerequisite guard (RED if absent)[32m 1[2mms[22m[39m
+2026-10-01T22:06:24.8661839Z  [32m✓[39m test/easing-finiteness-fuzz.test.ts[2m > [22measing finiteness fuzz — NE1 (CSS-safe invariant)[2m > [22mlinear is callable — prerequisite guard (RED if absent)[32m 0[2mms[22m[39m
+2026-10-01T22:06:24.8664547Z  [32m✓[39m test/easing-finiteness-fuzz.test.ts[2m > [22measing finiteness fuzz — NE1 (CSS-safe invariant)[2m > [22mnormalizeEasing(linear) produces ONLY finite output over >=10k samples + IEEE-754 edges (NE1)[32m 3[2mms[22m[39m
+2026-10-01T22:06:24.8667277Z  [32m✓[39m test/easing-finiteness-fuzz.test.ts[2m > [22measing finiteness fuzz — NE1 (CSS-safe invariant)[2m > [22mnormalizeEasing of hostile fn (t=>t/0) produces ONLY finite output — NaN/Infinity hardened (NE1)[32m 2[2mms[22m[39m
+2026-10-01T22:06:24.8684796Z  [32m✓[39m test/easing-finiteness-fuzz.test.ts[2m > [22measing finiteness fuzz — NE1 (CSS-safe invariant)[2m > [22mnormalizeEasing of hostile fn (t=>NaN) clamps EXACTLY to 0 — mutation-pins NaN→0 contract (NE1)[32m 3[2mms[22m[39m
+2026-10-01T22:06:24.8687692Z  [32m✓[39m test/easing-finiteness-fuzz.test.ts[2m > [22measing finiteness fuzz — NE1 (CSS-safe invariant)[2m > [22mnormalizeEasing of hostile fn (t=>+Infinity) clamps EXACTLY to Number.MAX_VALUE — mutation-pins +Inf contract (NE1)[32m 1[2mms[22m[39m
+2026-10-01T22:06:24.8690870Z  [32m✓[39m test/easing-finiteness-fuzz.test.ts[2m > [22measing finiteness fuzz — NE1 (CSS-safe invariant)[2m > [22mnormalizeEasing of hostile fn (t=>-Infinity) clamps EXACTLY to -Number.MAX_VALUE — mutation-pins -Inf contract (NE1)[32m 1[2mms[22m[39m
+2026-10-01T22:06:24.8698790Z  [32m✓[39m test/easing-finiteness-fuzz.test.ts[2m > [22measing finiteness fuzz — NE1 (CSS-safe invariant)[2m > [22mnormalizeEasing of hostile fn (t=>Number.MAX_VALUE*2) clamps EXACTLY to Number.MAX_VALUE — mutation-pins overflow contract (NE1)[32m 1[2mms[22m[39m
+2026-10-01T22:06:24.8701668Z  [32m✓[39m test/easing-finiteness-fuzz.test.ts[2m > [22measing finiteness fuzz — NE1 (CSS-safe invariant)[2m > [22mlinear alone (without normalizer) produces ONLY finite output over >=10k samples + IEEE-754 edges (NE1)[32m 2[2mms[22m[39m
+2026-10-01T22:06:24.8704136Z  [32m✓[39m test/easing-finiteness-fuzz.test.ts[2m > [22measing finiteness fuzz — NE1 (CSS-safe invariant)[2m > [22measeIn — NE1 finite over all IEEE-754 inputs[32m 3[2mms[22m[39m
+2026-10-01T22:06:24.8706182Z  [32m✓[39m test/easing-finiteness-fuzz.test.ts[2m > [22measing finiteness fuzz — NE1 (CSS-safe invariant)[2m > [22measeOut — NE1 finite over all IEEE-754 inputs[32m 1[2mms[22m[39m
+2026-10-01T22:06:24.8708248Z  [32m✓[39m test/easing-finiteness-fuzz.test.ts[2m > [22measing finiteness fuzz — NE1 (CSS-safe invariant)[2m > [22measeInOut — NE1 finite over all IEEE-754 inputs[32m 2[2mms[22m[39m
+2026-10-01T22:06:24.8710305Z  [32m✓[39m test/easing-finiteness-fuzz.test.ts[2m > [22measing finiteness fuzz — NE1 (CSS-safe invariant)[2m > [22msineIn — NE1 finite over all IEEE-754 inputs[32m 5[2mms[22m[39m
+2026-10-01T22:06:24.8712319Z  [32m✓[39m test/easing-finiteness-fuzz.test.ts[2m > [22measing finiteness fuzz — NE1 (CSS-safe invariant)[2m > [22msineOut — NE1 finite over all IEEE-754 inputs[32m 2[2mms[22m[39m
+2026-10-01T22:06:24.8714498Z  [32m✓[39m test/easing-finiteness-fuzz.test.ts[2m > [22measing finiteness fuzz — NE1 (CSS-safe invariant)[2m > [22msineInOut — NE1 finite over all IEEE-754 inputs[32m 1[2mms[22m[39m
+2026-10-01T22:06:24.8716563Z  [32m✓[39m test/easing-finiteness-fuzz.test.ts[2m > [22measing finiteness fuzz — NE1 (CSS-safe invariant)[2m > [22mexpoIn — NE1 finite over all IEEE-754 inputs[32m 3[2mms[22m[39m
+2026-10-01T22:06:24.8718601Z  [32m✓[39m test/easing-finiteness-fuzz.test.ts[2m > [22measing finiteness fuzz — NE1 (CSS-safe invariant)[2m > [22mexpoOut — NE1 finite over all IEEE-754 inputs[32m 1[2mms[22m[39m
+2026-10-01T22:06:24.8720656Z  [32m✓[39m test/easing-finiteness-fuzz.test.ts[2m > [22measing finiteness fuzz — NE1 (CSS-safe invariant)[2m > [22mexpoInOut — NE1 finite over all IEEE-754 inputs[32m 1[2mms[22m[39m
+2026-10-01T22:06:24.8722834Z  [32m✓[39m test/easing-finiteness-fuzz.test.ts[2m > [22measing finiteness fuzz — NE1 (CSS-safe invariant)[2m > [22mcircIn — NE1 finite over all IEEE-754 inputs[32m 1[2mms[22m[39m
+2026-10-01T22:06:24.8725969Z  [32m✓[39m test/easing-finiteness-fuzz.test.ts[2m > [22measing finiteness fuzz — NE1 (CSS-safe invariant)[2m > [22mcircOut — NE1 finite over all IEEE-754 inputs[32m 1[2mms[22m[39m
+2026-10-01T22:06:24.8728140Z  [32m✓[39m test/easing-finiteness-fuzz.test.ts[2m > [22measing finiteness fuzz — NE1 (CSS-safe invariant)[2m > [22mcircInOut — NE1 finite over all IEEE-754 inputs[32m 1[2mms[22m[39m
+2026-10-01T22:06:24.8744002Z  [32m✓[39m test/easing-finiteness-fuzz.test.ts[2m > [22measing finiteness fuzz — NE1 (CSS-safe invariant)[2m > [22mbackIn — NE1 finite over all IEEE-754 inputs[32m 1[2mms[22m[39m
+2026-10-01T22:06:24.8773976Z  [32m✓[39m test/easing-finiteness-fuzz.test.ts[2m > [22measing finiteness fuzz — NE1 (CSS-safe invariant)[2m > [22mbackOut — NE1 finite over all IEEE-754 inputs[32m 1[2mms[22m[39m
+2026-10-01T22:06:24.8804067Z  [32m✓[39m test/easing-finiteness-fuzz.test.ts[2m > [22measing finiteness fuzz — NE1 (CSS-safe invariant)[2m > [22mbackInOut — NE1 finite over all IEEE-754 inputs[32m 1[2mms[22m[39m
+2026-10-01T22:06:24.8826525Z  [32m✓[39m test/easing-finiteness-fuzz.test.ts[2m > [22measing finiteness fuzz — NE1 (CSS-safe invariant)[2m > [22manticipate — NE1 finite over all IEEE-754 inputs[32m 1[2mms[22m[39m
+2026-10-01T22:06:24.8828725Z  [32m✓[39m test/easing-finiteness-fuzz.test.ts[2m > [22measing finiteness fuzz — NE1 (CSS-safe invariant)[2m > [22melastic — NE1 finite over all IEEE-754 inputs[32m 1[2mms[22m[39m
+2026-10-01T22:06:24.8830813Z  [32m✓[39m test/easing-finiteness-fuzz.test.ts[2m > [22measing finiteness fuzz — NE1 (CSS-safe invariant)[2m > [22mbounce — NE1 finite over all IEEE-754 inputs[32m 1[2mms[22m[39m
+2026-10-01T22:06:24.8833162Z  [32m✓[39m test/easing-finiteness-fuzz.test.ts[2m > [22measing finiteness fuzz — NE1 (CSS-safe invariant)[2m > [22mpower(2) (quad) — NE1 finite over all IEEE-754 inputs[32m 1[2mms[22m[39m
+2026-10-01T22:06:24.8837031Z  [32m✓[39m test/easing-finiteness-fuzz.test.ts[2m > [22measing finiteness fuzz — NE1 (CSS-safe invariant)[2m > [22mpower(3) (cubic) — NE1 finite over all IEEE-754 inputs[32m 1[2mms[22m[39m
+2026-10-01T22:06:24.8839233Z  [32m✓[39m test/easing-finiteness-fuzz.test.ts[2m > [22measing finiteness fuzz — NE1 (CSS-safe invariant)[2m > [22mpower(4) (quart) — NE1 finite over all IEEE-754 inputs[32m 1[2mms[22m[39m
+2026-10-01T22:06:24.8841426Z  [32m✓[39m test/easing-finiteness-fuzz.test.ts[2m > [22measing finiteness fuzz — NE1 (CSS-safe invariant)[2m > [22mpower(5) (quint) — NE1 finite over all IEEE-754 inputs[32m 1[2mms[22m[39m
+2026-10-01T22:06:24.8843834Z  [32m✓[39m test/easing-finiteness-fuzz.test.ts[2m > [22measing finiteness fuzz — NE1 (CSS-safe invariant)[2m > [22mpower(0.5) (sqrt) — NE1 finite over all IEEE-754 inputs[32m 1[2mms[22m[39m
+2026-10-01T22:06:24.8846016Z  [32m✓[39m test/easing-finiteness-fuzz.test.ts[2m > [22measing finiteness fuzz — NE1 (CSS-safe invariant)[2m > [22mpower(10) (extreme) — NE1 finite over all IEEE-754 inputs[32m 1[2mms[22m[39m
+2026-10-01T22:06:24.8848335Z  [32m✓[39m test/easing-finiteness-fuzz.test.ts[2m > [22measing finiteness fuzz — NE1 (CSS-safe invariant)[2m > [22mcubicBezier(0.25,0.1,0.25,1) (CSS ease) — NE1 finite over all IEEE-754 inputs[32m 3[2mms[22m[39m
+2026-10-01T22:06:24.8850632Z  [32m✓[39m test/easing-finiteness-fuzz.test.ts[2m > [22measing finiteness fuzz — NE1 (CSS-safe invariant)[2m > [22mcubicBezier(0.42,0,1,1) (CSS ease-in) — NE1 finite over all IEEE-754 inputs[32m 3[2mms[22m[39m
+2026-10-01T22:06:24.8853064Z  [32m✓[39m test/easing-finiteness-fuzz.test.ts[2m > [22measing finiteness fuzz — NE1 (CSS-safe invariant)[2m > [22mcubicBezier(0,0,0.58,1) (CSS ease-out) — NE1 finite over all IEEE-754 inputs[32m 2[2mms[22m[39m
+2026-10-01T22:06:24.8855396Z  [32m✓[39m test/easing-finiteness-fuzz.test.ts[2m > [22measing finiteness fuzz — NE1 (CSS-safe invariant)[2m > [22mcubicBezier(0,1.5,1,-0.5) (overshooting) — NE1 finite over all IEEE-754 inputs[32m 3[2mms[22m[39m
+2026-10-01T22:06:24.8857564Z  [32m✓[39m test/easing-finiteness-fuzz.test.ts[2m > [22measing finiteness fuzz — NE1 (CSS-safe invariant)[2m > [22msteps(1,"end") — NE1 finite over all IEEE-754 inputs[32m 1[2mms[22m[39m
+2026-10-01T22:06:24.8859609Z  [32m✓[39m test/easing-finiteness-fuzz.test.ts[2m > [22measing finiteness fuzz — NE1 (CSS-safe invariant)[2m > [22msteps(4,"end") — NE1 finite over all IEEE-754 inputs[32m 2[2mms[22m[39m
+2026-10-01T22:06:24.8861999Z  [32m✓[39m test/easing-finiteness-fuzz.test.ts[2m > [22measing finiteness fuzz — NE1 (CSS-safe invariant)[2m > [22msteps(4,"start") — NE1 finite over all IEEE-754 inputs[32m 1[2mms[22m[39m
+2026-10-01T22:06:24.8885101Z  [32m✓[39m test/easing-finiteness-fuzz.test.ts[2m > [22measing finiteness fuzz — NE1 (CSS-safe invariant)[2m > [22msteps(10,"end") — NE1 finite over all IEEE-754 inputs[32m 1[2mms[22m[39m
+2026-10-01T22:06:24.9096597Z  [32m✓[39m test/utils-finiteness-fuzz.test.ts[2m > [22mutils finiteness fuzz — CSS-safe invariant[2m > [22mclamp is callable — prerequisite guard[32m 2[2mms[22m[39m
+2026-10-01T22:06:24.9115041Z  [32m✓[39m test/utils-finiteness-fuzz.test.ts[2m > [22mutils finiteness fuzz — CSS-safe invariant[2m > [22minterpolate is callable — prerequisite guard[32m 0[2mms[22m[39m
+2026-10-01T22:06:24.9121206Z  [32m✓[39m test/utils-finiteness-fuzz.test.ts[2m > [22mutils finiteness fuzz — CSS-safe invariant[2m > [22mclamp(0,1)(·) finite over all IEEE-754 inputs[32m 6[2mms[22m[39m
+2026-10-01T22:06:24.9125240Z  [32m✓[39m test/utils-finiteness-fuzz.test.ts[2m > [22mutils finiteness fuzz — CSS-safe invariant[2m > [22mclamp(0,Infinity)(·) one-sided finite over all inputs[32m 6[2mms[22m[39m
+2026-10-01T22:06:24.9126479Z  [32m✓[39m test/utils-finiteness-fuzz.test.ts[2m > [22mutils finiteness fuzz — CSS-safe invariant[2m > [22mclamp(-Infinity,Infinity)(·) finite over all inputs[32m 1[2mms[22m[39m
+2026-10-01T22:06:24.9127554Z  [32m✓[39m test/utils-finiteness-fuzz.test.ts[2m > [22mutils finiteness fuzz — CSS-safe invariant[2m > [22mwrap(0,360)(·) finite over all IEEE-754 inputs[32m 8[2mms[22m[39m
+2026-10-01T22:06:24.9128558Z  [32m✓[39m test/utils-finiteness-fuzz.test.ts[2m > [22mutils finiteness fuzz — CSS-safe invariant[2m > [22mwrap(-50,50)(·) finite over all inputs[32m 3[2mms[22m[39m
+2026-10-01T22:06:24.9129992Z  [32m✓[39m test/utils-finiteness-fuzz.test.ts[2m > [22mutils finiteness fuzz — CSS-safe invariant[2m > [22mwrap(5,5)(·) degenerate range finite over all inputs[32m 1[2mms[22m[39m
+2026-10-01T22:06:24.9131577Z  [32m✓[39m test/utils-finiteness-fuzz.test.ts[2m > [22mutils finiteness fuzz — CSS-safe invariant[2m > [22msnap(0.25)(·) finite over all inputs[32m 2[2mms[22m[39m
+2026-10-01T22:06:24.9132823Z  [32m✓[39m test/utils-finiteness-fuzz.test.ts[2m > [22mutils finiteness fuzz — CSS-safe invariant[2m > [22msnap(-7)(·) negative increment finite over all inputs[32m 2[2mms[22m[39m
+2026-10-01T22:06:24.9134177Z  [32m✓[39m test/utils-finiteness-fuzz.test.ts[2m > [22mutils finiteness fuzz — CSS-safe invariant[2m > [22msnap([0,90,180,270])(·) targets finite over all inputs[32m 1[2mms[22m[39m
+2026-10-01T22:06:24.9135205Z  [32m✓[39m test/utils-finiteness-fuzz.test.ts[2m > [22mutils finiteness fuzz — CSS-safe invariant[2m > [22mmapRange(-10,10,0,100)(·) finite over all inputs[32m 1[2mms[22m[39m
+2026-10-01T22:06:24.9136270Z  [32m✓[39m test/utils-finiteness-fuzz.test.ts[2m > [22mutils finiteness fuzz — CSS-safe invariant[2m > [22mmapRange(5,5,0,1)(·) degenerate input range finite over all inputs[32m 1[2mms[22m[39m
+2026-10-01T22:06:24.9137448Z  [32m✓[39m test/utils-finiteness-fuzz.test.ts[2m > [22mutils finiteness fuzz — CSS-safe invariant[2m > [22minterpolate multi-stop {clamp:false, ease:t*t}(·) finite over all inputs[32m 2[2mms[22m[39m
+2026-10-01T22:06:24.9138605Z  [32m✓[39m test/utils-finiteness-fuzz.test.ts[2m > [22mutils finiteness fuzz — CSS-safe invariant[2m > [22minterpolate default clamp {ease:t=>1/t hostile}(·) finite over all inputs[32m 1[2mms[22m[39m
+2026-10-01T22:06:24.9139718Z  [32m✓[39m test/utils-finiteness-fuzz.test.ts[2m > [22mutils finiteness fuzz — CSS-safe invariant[2m > [22mmix(fuzz, fuzz, fuzz) finite over 10k triples + edges[32m 6[2mms[22m[39m
+2026-10-01T22:06:25.0249642Z  [32m✓[39m test/solver-finiteness-fuzz.test.ts[2m > [22msolver finiteness property fuzz[2m > [22mproduces finite value and velocity over 10 000 seeded samples[32m 10[2mms[22m[39m
+2026-10-01T22:06:28.6675185Z  [32m✓[39m test/smart-finiteness-fuzz.test.ts[2m > [22m./smart: финитность ≥10k злых дифов (seeded LCG)[2m > [22mcapture→мутация→animate→кадры→перехват: ни броска, ни NaN/Inf/-0 в записях[33m 5365[2mms[22m[39m
+2026-10-01T22:06:28.6734441Z  [32m✓[39m test/smart-finiteness-fuzz.test.ts[2m > [22m./smart: финитность ≥10k злых дифов (seeded LCG)[2m > [22mнегативный контроль: дубликат ключа ОБЯЗАН бросать (fuzz не глотает валидацию)[32m 1[2mms[22m[39m
+2026-10-01T22:06:28.6782863Z 
+2026-10-01T22:06:28.6783652Z [2m Test Files [22m [1m[32m10 passed[39m[22m[90m (10)[39m
+2026-10-01T22:06:28.6784335Z [2m      Tests [22m [1m[32m111 passed[39m[22m[90m (111)[39m
+2026-10-01T22:06:28.6785211Z [2m   Start at [22m 22:06:22
+2026-10-01T22:06:28.6786119Z [2m   Duration [22m 5.70s[2m (transform 650ms, setup 0ms, import 919ms, tests 7.35s, environment 1ms)[22m
+2026-10-01T22:06:28.6786663Z 
+2026-10-01T22:06:28.7365590Z Post job cleanup.
+2026-10-01T22:06:28.8430009Z Post job cleanup.
+2026-10-01T22:06:28.9134148Z [command]/usr/bin/git version
+2026-10-01T22:06:28.9169639Z git version 2.55.0
+2026-10-01T22:06:28.9196535Z Temporarily overriding HOME='/home/runner/work/_temp/4366d5bc-03e2-4423-a8d6-df25d9cdbd9d' before making global git config changes
+2026-10-01T22:06:28.9197758Z Adding repository directory to the temporary git global config as a safe directory
+2026-10-01T22:06:28.9200767Z [command]/usr/bin/git config --global --add safe.directory /home/runner/work/lab-motion/lab-motion
+2026-10-01T22:06:28.9227784Z Removing SSH command configuration
+2026-10-01T22:06:28.9233098Z [command]/usr/bin/git config --local --name-only --get-regexp core\.sshCommand
+2026-10-01T22:06:28.9263159Z [command]/usr/bin/git submodule foreach --recursive sh -c "git config --local --name-only --get-regexp 'core\.sshCommand' && git config --local --unset-all 'core.sshCommand' || :"
+2026-10-01T22:06:28.9466705Z Removing HTTP extra header
+2026-10-01T22:06:28.9472660Z [command]/usr/bin/git config --local --name-only --get-regexp http\.https\:\/\/github\.com\/\.extraheader
+2026-10-01T22:06:28.9501142Z [command]/usr/bin/git submodule foreach --recursive sh -c "git config --local --name-only --get-regexp 'http\.https\:\/\/github\.com\/\.extraheader' && git config --local --unset-all 'http.https://github.com/.extraheader' || :"
+2026-10-01T22:06:28.9713228Z Removing includeIf entries pointing to credentials config files
+2026-10-01T22:06:28.9720258Z [command]/usr/bin/git config --local --name-only --get-regexp ^includeIf\.gitdir:
+2026-10-01T22:06:28.9752940Z [command]/usr/bin/git submodule foreach --recursive git config --local --show-origin --name-only --get-regexp remote.origin.url
+2026-10-01T22:06:29.0101207Z Cleaning up orphan processes

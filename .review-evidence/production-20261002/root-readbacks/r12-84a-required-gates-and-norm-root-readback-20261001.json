@@ -1,0 +1,131 @@
+{
+  "at": "2026-10-01T22:50:34.409099+00:00",
+  "head": "84a0f547156656a70cf73f29b9a2930b5a1997fa",
+  "allSevenPassed": true,
+  "gateReceiptSha256": "a139654e7e89dc8df5f638b5e1836b409fddf9a9cad18c6c534f89969dc50160",
+  "gates": [
+    {
+      "name": "native",
+      "log": {
+        "path": "/tmp/r12-durable-links-current-gates-84a-20261001/native.log",
+        "sha256": "5a5beef2ba3c22f285142e56104778a3a6c646b3af5aff88a49bc594b04e41a5",
+        "bytes": 640
+      },
+      "exit": 0,
+      "tail": [
+        "✔ подавление scan не убирает исходную panic находку (288.309606ms)",
+        "✔ native qualification использует те же разрешения и отвергает исходный дефект (6407.814421ms)",
+        "ℹ tests 4",
+        "ℹ suites 0",
+        "ℹ pass 4",
+        "ℹ fail 0",
+        "ℹ cancelled 0",
+        "ℹ skipped 0",
+        "ℹ todo 0",
+        "ℹ duration_ms 12170.529133"
+      ]
+    },
+    {
+      "name": "plans",
+      "log": {
+        "path": "/tmp/r12-durable-links-current-gates-84a-20261001/plans.log",
+        "sha256": "9f48e18d4559b7cdd88c8bdd17b8e3d1317ac642cece974e63c6595119e16ce5",
+        "bytes": 68310
+      },
+      "exit": 0,
+      "tail": [
+        "✔ renderMd: каждый репозиторий и сервис присутствуют в карте (RED при потере) (0.282836ms)",
+        "✔ TRUST-OWNER-01 допускается только как read-only bootstrap work (0.953978ms)",
+        "ℹ tests 712",
+        "ℹ suites 0",
+        "ℹ pass 711",
+        "ℹ fail 0",
+        "ℹ cancelled 0",
+        "ℹ skipped 1",
+        "ℹ todo 0",
+        "ℹ duration_ms 24801.688807"
+      ]
+    },
+    {
+      "name": "authoring",
+      "log": {
+        "path": "/tmp/r12-durable-links-current-gates-84a-20261001/authoring.log",
+        "sha256": "39ad99df2c4b91dd2f194cce5d652b952fee639053d4a9dfc47c9040294f1a03",
+        "bytes": 35061
+      },
+      "exit": 0,
+      "tail": [
+        "✔ fairness assumption changes liveness result and must be explicit (0.27898ms)",
+        "✔ permanent dependency failure does not refute liveness promised only after recovery (1.021029ms)",
+        "ℹ tests 320",
+        "ℹ suites 0",
+        "ℹ pass 320",
+        "ℹ fail 0",
+        "ℹ cancelled 0",
+        "ℹ skipped 0",
+        "ℹ todo 0",
+        "ℹ duration_ms 19707.946712"
+      ]
+    },
+    {
+      "name": "architecture",
+      "log": {
+        "path": "/tmp/r12-durable-links-current-gates-84a-20261001/architecture.log",
+        "sha256": "f57888389d0ab3da6c0de413c9de111aad26ce484186811510dba22f9111cd37",
+        "bytes": 28269
+      },
+      "exit": 0,
+      "tail": [
+        "✔ blocking check rejects candidate-committed external graph self-attestation (58.324622ms)",
+        "✔ blocking check accepts separately generated complete graph evidence (46.583248ms)",
+        "ℹ tests 256",
+        "ℹ suites 0",
+        "ℹ pass 256",
+        "ℹ fail 0",
+        "ℹ cancelled 0",
+        "ℹ skipped 0",
+        "ℹ todo 0",
+        "ℹ duration_ms 6465.742368"
+      ]
+    },
+    {
+      "name": "plan-lint",
+      "log": {
+        "path": "/tmp/r12-durable-links-current-gates-84a-20261001/plan-lint.log",
+        "sha256": "d2982a7ecbff976794cc60937f2eb7bd3fc2b910bc93a0b58ad6e5b55ade628a",
+        "bytes": 43
+      },
+      "exit": 0,
+      "tail": [
+        "plan-lint: OK (37 треков, 15 active)"
+      ]
+    },
+    {
+      "name": "systemmap",
+      "log": {
+        "path": "/tmp/r12-durable-links-current-gates-84a-20261001/systemmap.log",
+        "sha256": "45f1b7209b899b0fbed9d8bab66ad90bd05adf522420d9716fb56fed1c2dcced",
+        "bytes": 46
+      },
+      "exit": 0,
+      "tail": [
+        "systemmap: OK (карта актуальна)"
+      ]
+    },
+    {
+      "name": "diff",
+      "log": {
+        "path": "/tmp/r12-durable-links-current-gates-84a-20261001/diff.log",
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "bytes": 0
+      },
+      "exit": 0,
+      "tail": []
+    }
+  ],
+  "normativeSupplementSha256": "b037c572c7720f945b7281df12c2c20d85631301b56a26f7533acd4fa655505c",
+  "criticalNormConservedCount": 7,
+  "candidateClean": true,
+  "actualTimingSamples": 0,
+  "qualification": "RequiredlocalCIequivalents and literal norm conserved; hostedCI/currentCR afterpublication. Noactualquietgrant yet."
+}

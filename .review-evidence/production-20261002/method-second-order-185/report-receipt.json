@@ -1,0 +1,42 @@
+{
+  "schema": 1,
+  "sealedUtc": "2026-10-01T22:26:36.436733+00:00",
+  "axis": "bounded affected second-order185f",
+  "verdict": "PASS scoped affected closure; wholeproduction INCOMPLETE",
+  "confirmedFindings": 0,
+  "sourceHead": "185f02c2a85972a531627e14b7e0207e27855f95",
+  "tree": "d2b7d736ba9a37b930a0bd4cfa3cae92f12a92bc",
+  "comparisonHead": "7f9b85d82bdf531455a8eb0fae4406484205ef83",
+  "primaryPacketSha256": "9c5bbb20ca1c9e8442cbe692710f9d62bf91d3d1865b58d6eba4a2365831bc9a",
+  "report": {
+    "path": "/tmp/server-method-second-order-185f02c2-20261001T2144Z/REPORT.md",
+    "sha256": "8ee76728c75d6a4ef0f811a7130820fce59f1be7544818dce4630565b52ee2f8",
+    "bytes": 19708,
+    "characters": 15498
+  },
+  "readset": {
+    "path": "/tmp/server-method-second-order-185f02c2-20261001T2144Z/readset.json",
+    "sha256": "fa5919de43457489054470ed55c4c01f192186c929e0d6f934da16b32c5dcf03",
+    "bytes": 30991
+  },
+  "evidenceManifest": {
+    "path": "/tmp/server-method-second-order-185f02c2-20261001T2144Z/evidence-manifest.json",
+    "sha256": "cd27225bb0910ea22102995056f482b4a3b546c221c7c4d9c31378a7304fd352",
+    "bytes": 23676,
+    "files": 137
+  },
+  "allOwnOutputHashesReadbackEqual": true,
+  "oldOwnSealsUnchanged": true,
+  "allOwnChildrenAndJoins": "END",
+  "heavy": 0,
+  "builtinObserversRestored": true,
+  "browserLaunches": 0,
+  "actualRegisteredSamples": 0,
+  "wholeNExecutions": 0,
+  "sourceWorkflowRemoteMutation": 0,
+  "currentOrdinaryFailureRetained": true,
+  "currentResourceRCAEstablished": false,
+  "freshHostedCIGateNotClosedByThisReport": true,
+  "samplingAdmission": false,
+  "futureBytesAccepted": false
+}

@@ -1,0 +1,36 @@
+{
+  "command": "python3 seal.py",
+  "startedUtc": "2026-10-01T23:24:18.594028+00:00",
+  "finishedUtc": "2026-10-01T23:24:18.601489+00:00",
+  "exitCode": 0,
+  "fullOutputReadbackFiles": 58,
+  "mismatches": 0,
+  "report": {
+    "path": "REPORT-RU.md",
+    "sha256": "4b071c5e55c1bece7e2395ea0ae5b3b76a2eea3cbfc58ae2856f5702b21bad7f",
+    "bytes": 11273
+  },
+  "terminal": {
+    "path": "terminal-manifest.json",
+    "sha256": "d87534df194075f2778db1b47f773ebd84066c815f6a19261fa88a3daa444a4b",
+    "bytes": 3650
+  },
+  "readset": {
+    "path": "exact-readset.json",
+    "sha256": "0bc08060351c1296643289f76a7d1d3dfa6be01eba555ac93c0b5f5dbb327b62",
+    "bytes": 17360
+  },
+  "outputManifest": {
+    "path": "output-manifest.json",
+    "sha256": "6e3bf5f7eb2d486b001686aa7445c96d3bd9192d9e49b8199a9b989a1b4cc2f6",
+    "bytes": 9453
+  },
+  "filesReadOnly": true,
+  "ownHeavyProcesses": 0,
+  "queuedCpuIoProbesHashGraphWork": 0,
+  "allReviewerCommandsClosed": true,
+  "slotFree": true,
+  "newBuildExecutorsTimingRuns": 0,
+  "newPackageTreeHashRuns": 0,
+  "actualRegisteredPerformanceSamples": 0
+}

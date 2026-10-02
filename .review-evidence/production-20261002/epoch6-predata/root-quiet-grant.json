@@ -1,0 +1,65 @@
+{
+  "grantedAtUtc": "2026-10-01T23:28:50.090465+00:00",
+  "candidateHead": "185f02c2a85972a531627e14b7e0207e27855f95",
+  "candidateTree": "d2b7d736ba9a37b930a0bd4cfa3cae92f12a92bc",
+  "planContextHead": "84a0f547156656a70cf73f29b9a2930b5a1997fa",
+  "protocolDigest": "7016c19aa7a763fee68687327ef489abb119acd2a43d397b8485ca56e4cea15f",
+  "clockModelDigest": "7e45adab88a2c97af4e9074543318ae115e42b5c9669c4746b6e149d42bfbc4f",
+  "predataTupleSha256": "e9687480c8ce7d2028a55275e84a77f9ce195cdbae783170573bf63035c52f31",
+  "rootPredataReadbackSha256": "e16d88f4c90b48c588a905cae835cbeaba16602f1dc12a0bfdb7f9c87a5ab51e",
+  "normConservationSha256": "b037c572c7720f945b7281df12c2c20d85631301b56a26f7533acd4fa655505c",
+  "rootMethodMeasurementReadbackSha256": "953539ad67977620e759b0886b195631794cdd6e2daf6f46e1ac6ae89ead8487",
+  "rootMethodSOReadbackSha256": "59f3c5fb5de53d45e2280e22cf37ba76b0fe6d26991cbdf99af1fa9f0fa16bb9",
+  "rootRuntimeDeltaReadbackSha256": "7e3c20cbf58159ce56af7ca08446ee3e7933c98510fe9f8cd6a610e5927a41ec",
+  "rootCurrentCICRReadbackSha256": "4fde07394ffc15563e58abac79029245debfde2f21596d10eb921f4776b07965",
+  "rootDocCorrectnessReadbackSha256": "63cfc0d36ce27706e124c028f1b409d4c1682904a548f15c2c1cc78d766bae11",
+  "rootDocSOReadbackSha256": "54b5f0bcc4c8a72660d005cb461669094b3c088a874a036304792214270c7786",
+  "docPublicationReceiptSha256": "60e4ea23be13cab075d8d9e4c081acc895523c994cd241ac51c4d366105a0d5f",
+  "rootHeavyWork": 0,
+  "rootQueuedLocalWork": false,
+  "peerStates": {
+    "motionAuthor": "READY and all own executors END; launch only single prescribed CLI",
+    "runtimeCorrectness": "END22:30:34.156450 and sealed; heavy0",
+    "measurement": "NewboundedenvreportsealedEND23:24:18.601489 heavy0/running0/queued0",
+    "methodSecondOrder": "sealed END; heavy0",
+    "docSecondOrderColors": "sealed END22:50:27; heavy0/network0",
+    "docCorrectness": "sealed END22:53:03; heavy0"
+  },
+  "qualification": "Root quiet ACK based actual END and existing sealed reports; concurrent remote-only docCI/CR does not run on this server. Old localRESOURCEAAFAIL remains historical; current exact-tree hostedCI all successful and current17fileCR noactionablecomments separately qualified. No performance/productionGO implied. Freshcurrentenvironment admissibility report fullread/root62MATCH; historical failure not erased; grant5exhausted atitsEND. All other existingactors remainEND.",
+  "conditionBeforeLaunch": "Author capture fresh resource/affinity/quota/source/outputABSENT preflight; if exact constraints fail STOP preserve refusal without timing. Root will perform no local heavy tests/hash/graph/package/provider payload work until singleactualseriesEND.",
+  "authorizedActualAction": "Freshfirstpilotregistration ofcurrentstabletooltree; exactlyone originalCLI epoch6. Baselinepilot8→freezeN292..1024→oneAA/actual2x→ABconditional→retention. No repeatobservedseries/dobor/Ncut/tolerance/timeouts/sourcechanges.",
+  "actualSamplesBeforeGrant": 0,
+  "output": "/tmp/motion-server-series-185f02c2-7016c19a-20261001-epoch6",
+  "epoch": 6,
+  "predataPrimarySha256": "85d86f01d2fdc729a702dcbb3c60f8d5732c9b23a1e683736c9ec0d76ea02a6e",
+  "rootEnvAdmissibilityReadbackSha256": "c066ac452f5e6808a41ffa536aefe88b42c19f10148b8d385fb83da4f195575b",
+  "envAdmissibilityReportSha256": "4b071c5e55c1bece7e2395ea0ae5b3b76a2eea3cbfc58ae2856f5702b21bad7f",
+  "envAdmissibilityTerminalSha256": "d87534df194075f2778db1b47f773ebd84066c815f6a19261fa88a3daa444a4b",
+  "failedPredecessorEpoch": {
+    "epoch": 5,
+    "sourceUnchanged": true,
+    "startUtc": "2026-10-01T23:07:07.631980Z",
+    "endUtc": "2026-10-01T23:07:45.710793Z",
+    "verdict": "UNPROVEN",
+    "samples": 0,
+    "guardUnchanged": true
+  },
+  "baselineToolDelta": {
+    "tsupVersion": "8.5.1",
+    "files": 25,
+    "beforeSha256": "0069fb7e1c74f8ad7960292641dfe1d71f2d86eac24f803ed5c9adcba9a1058e",
+    "currentSha256": "897380bc5824e41999cad580dee5670f791646847cbdb01a741bbccd94ae8847",
+    "qualification": "Currenttree stablebefore/after oneexactcanonicalbuild; exacthistorical7-filecauseunproven. No packageexclusions ordriftguardweakening."
+  },
+  "freshRootResourceObservation": {
+    "at": "2026-10-01T23:28:50.090502+00:00",
+    "tmpFreeBytes": 3369398272,
+    "minimumRequiredBytes": 3012181141,
+    "loadAverage": [
+      0.0,
+      0.0,
+      0.0
+    ],
+    "outputAbsent": true
+  }
+}

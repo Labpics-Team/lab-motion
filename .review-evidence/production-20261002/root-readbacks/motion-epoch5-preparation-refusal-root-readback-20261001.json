@@ -1,0 +1,49 @@
+{
+  "at": "2026-10-01T23:12:36.791888+00:00",
+  "source": "185f02c2a85972a531627e14b7e0207e27855f95",
+  "actualRunnerInvoked": true,
+  "actualRegisteredTimingSamples": 0,
+  "artifactVerdict": "UNPROVEN",
+  "journalTypes": [
+    "registration-before-any-sample",
+    "failure",
+    "failure",
+    "finished"
+  ],
+  "failures": [
+    {
+      "stage": "preparation",
+      "at": "2026-10-01T23:07:45.515Z",
+      "error": {
+        "name": "Error",
+        "message": "provenance: tsup изменился во время benchmark-прогона"
+      }
+    },
+    {
+      "stage": "final-provenance",
+      "error": {
+        "name": "Error",
+        "message": "provenance: tsup изменился во время benchmark-прогона"
+      }
+    }
+  ],
+  "bindings": [
+    {
+      "path": "/tmp/motion-server-series-185f02c2-7016c19a-20261001-epoch5/server-profile.json",
+      "bytes": 34815,
+      "sha256": "f47e7301d8f02c9cfef415ab9523cd3f7474253df9888aa02fa4a8a12858314d"
+    },
+    {
+      "path": "/tmp/motion-server-series-185f02c2-7016c19a-20261001-epoch5/journal.ndjson",
+      "bytes": 22994,
+      "sha256": "3e86013c0b7dcea8debd3f107df711b9fe1f31dace2bc14e43f3823056aebe57"
+    },
+    {
+      "path": "/tmp/motion-server-series-185f02c2-7016c19a-20261001-epoch5/server-profile.sha256",
+      "bytes": 86,
+      "sha256": "72d0d0728cf5067548d454ec57663b04de86252b18fd8503f7d4dbbc04b1bb35"
+    }
+  ],
+  "qualification": "Actualseriesattempt endedbeforewarmup/pilot for toolprovenance change; never convertedtogreen/performancemeasurement. Toolstabilitycontrol isdistinctpreparation withoutsamples.",
+  "initialRootReaderRefusal": "First root assertion used registration instead of literal registration-before-any-sample; actualstdout retained. Corrected known event label only; exactzero warmup/stages and UNPROVEN checked unchanged."
+}

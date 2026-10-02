@@ -1,0 +1,39 @@
+{
+  "utc": "2026-10-01T22:16:22.362077+00:00",
+  "command": "python3 seal.py",
+  "startedUtc": "2026-10-01T22:16:22.122232+00:00",
+  "exit_code": 0,
+  "fullOutputReadbackFiles": 845,
+  "mismatches": 0,
+  "terminalBinding": {
+    "path": "terminal-manifest.json",
+    "sha256": "b011ba18fe1bda7d4833ba3dc3bf534261a613633194d8ed055628cebc4bcabf",
+    "bytes": 3711
+  },
+  "outputManifestBinding": {
+    "path": "output-manifest.json",
+    "sha256": "82f6a501b787eb9465ee735d7748fc7a1b35c99db49010016b6b4570ceaea7bd",
+    "bytes": 156696
+  },
+  "reportBinding": {
+    "path": "REPORT-RU.md",
+    "sha256": "4181a83c8c5c46353f7f51dc0559d4c91209b7fc156c966028dc8a39063838ec",
+    "bytes": 28858
+  },
+  "primaryManifestBinding": {
+    "path": "PRIMARY/PRIMARY-MANIFEST.json",
+    "sha256": "a12b605e7a8196f97712d69fdff7b37269a3d70e936b337f120370be9463fdd6",
+    "bytes": 20640
+  },
+  "exactReadsetBinding": {
+    "path": "exact-readset.json",
+    "sha256": "a6314e72417af332563bbeacd9cace17a8ab25102de4e1e713a1091d1059a9cd",
+    "bytes": 172761
+  },
+  "primaryReadbackFiles": 100,
+  "readOnlyFiles": true,
+  "processesClosed": true,
+  "ownHeavyProcesses": 0,
+  "slotFree": true,
+  "actualRegisteredTimingSamples": 0
+}

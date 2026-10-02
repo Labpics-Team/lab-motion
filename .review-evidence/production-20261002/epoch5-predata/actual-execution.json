@@ -1,0 +1,40 @@
+{
+  "startUtc": "2026-10-01T23:07:07.631980+00:00",
+  "endUtc": "2026-10-01T23:07:45.710793+00:00",
+  "exitCode": 1,
+  "childPid": 640363,
+  "argv": [
+    "taskset",
+    "-c",
+    "0",
+    "/opt/codex/runtimes/codex-primary-runtime/dependencies/node/bin/node",
+    "bench/profile/server-profile-runner.mjs",
+    "--baseline",
+    "/tmp/motion-server-baseline-0b6f537e",
+    "--candidate",
+    "/workspace/lab-motion",
+    "--browser",
+    "chromium",
+    "--out",
+    "/tmp/motion-server-series-185f02c2-7016c19a-20261001-epoch5"
+  ],
+  "output": "/tmp/motion-server-series-185f02c2-7016c19a-20261001-epoch5",
+  "singleLaunch": true,
+  "files": {
+    "actual-launch.json": {
+      "path": "/tmp/motion-server-predata-185f02c2-7016c19a-20261001/actual-launch.json",
+      "bytes": 1531,
+      "sha256": "937ff50939360e5483a8124ad82f45de11dd62b71eed4db8857335d701e1d61c"
+    },
+    "actual.stdout.log": {
+      "path": "/tmp/motion-server-predata-185f02c2-7016c19a-20261001/actual.stdout.log",
+      "bytes": 530,
+      "sha256": "2c675f0d4299f938131acb3483e893de3e5087146ed8aeb7b72da35208e71594"
+    },
+    "actual.stderr.log": {
+      "path": "/tmp/motion-server-predata-185f02c2-7016c19a-20261001/actual.stderr.log",
+      "bytes": 90,
+      "sha256": "305ccfaef64f47f74b8c6fa6ce2dfe7c01b26160f4bd6f7d24712352b273c08b"
+    }
+  }
+}

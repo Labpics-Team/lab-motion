@@ -1,0 +1,247 @@
+{
+  "at": "2026-10-01T21:55:33.708640+00:00",
+  "source": "185f02c2a85972a531627e14b7e0207e27855f95",
+  "primaryPacketSha256": "9c5bbb20ca1c9e8442cbe692710f9d62bf91d3d1865b58d6eba4a2365831bc9a",
+  "checkedPrimary": [
+    {
+      "path": "/tmp/motion-cr-method-delta-185f02c2-20261001/source-and-checks.json",
+      "bytes": 171199,
+      "sha256": "8485c2ed0523b03366dbbfb7adb01d0b0990dcb2784804553681e015a97efe7a"
+    },
+    {
+      "path": "/tmp/motion-cr-method-delta-185f02c2-20261001/SOURCE-FREEZE.json",
+      "bytes": 4875,
+      "sha256": "618c9a919f05c8fe9705f3986057d82700e86d9316098b4bdbbec9090279b4fc"
+    },
+    {
+      "path": "/tmp/motion-cr-method-delta-185f02c2-20261001/source-delta.diff",
+      "bytes": 46761,
+      "sha256": "cb6b0ebc6855be9ace2aef710a60100c1a6d43d40e7397eb3452ce9956c99149"
+    },
+    {
+      "path": "/tmp/motion-cr-method-delta-185f02c2-20261001/source.tar.gz",
+      "bytes": 1742110,
+      "sha256": "8c7d68e4a045f71a5059fce689e31747165d2ce7b332b26a1ade9eef9cf89019"
+    },
+    {
+      "path": "/tmp/motion-cr-method-delta-185f02c2-20261001/evidence/current-remote-red/job-110572573065-tool-recovered.log",
+      "bytes": 195881,
+      "sha256": "67f39b234f85a762f141e036e44be3cd69d6198b8654e581f702e5dd26678551"
+    },
+    {
+      "path": "/tmp/motion-cr-method-delta-185f02c2-20261001/evidence/current-remote-red/primary-receipt.json",
+      "bytes": 1121,
+      "sha256": "8cbd7727a7ab183e99727091b969f13f6a83f8aeab6e20e9fa5364fd67f4bdd1"
+    },
+    {
+      "path": "/tmp/motion-cr-method-delta-185f02c2-20261001/evidence/current-remote-red/merge-commit.json",
+      "bytes": 645065,
+      "sha256": "e9c469c71d52b3ab0df370bffc6f66efe0eec84dedc49823833df3926be17dc6"
+    },
+    {
+      "path": "/tmp/motion-cr-method-delta-185f02c2-20261001/evidence/current-ordinary-calibration-refusal/docs-drift.stdout.log",
+      "bytes": 383,
+      "sha256": "0557c1be337d682265bc93e1fbb2b5de562d09ff8b6f100a8e087fd1e6abab24"
+    },
+    {
+      "path": "/tmp/motion-cr-method-delta-185f02c2-20261001/evidence/current-ordinary-calibration-refusal/docs-drift.stderr.log",
+      "bytes": 36,
+      "sha256": "ce343c921f625b5ebf30003cbf4a9166447c5a2f3f79921cbc4a844289ad92d4"
+    },
+    {
+      "path": "/tmp/motion-cr-method-delta-185f02c2-20261001/evidence/current-ordinary-calibration-refusal/receipt.json",
+      "bytes": 4329,
+      "sha256": "5d18100a2bc9c7c06ce262f7d59ad0c8889343d333c896a1fbd86d616d6817c8"
+    },
+    {
+      "path": "/tmp/motion-cr-method-delta-185f02c2-20261001/evidence/current-ordinary-calibration-refusal/ordinary.stdout.log",
+      "bytes": 138,
+      "sha256": "283cc455e23e1736afc767e67577dda30cd10d1f4552dd086fdfdb397d1c34e9"
+    },
+    {
+      "path": "/tmp/motion-cr-method-delta-185f02c2-20261001/evidence/current-ordinary-calibration-refusal/ordinary.stderr.log",
+      "bytes": 802,
+      "sha256": "21fe42a535437ac6d774c121ab823b678a112b5360e3c08e29c6841279baf0a4"
+    },
+    {
+      "path": "/tmp/motion-cr-method-delta-185f02c2-20261001/evidence/current-ordinary-calibration-refusal/ordinary.json",
+      "bytes": 2123648,
+      "sha256": "8be06573663da8f3c9b5220cc105f86a12ca3ac0663f915ddd37cfed6196428b"
+    },
+    {
+      "path": "/tmp/motion-cr-method-delta-185f02c2-20261001/evidence/common-string-controls/registration-node24.json",
+      "bytes": 13867,
+      "sha256": "0d2148868ec7b17d95d2c7d351ac28c5cd199322ba2e5f5e5d2b403f1a069207"
+    },
+    {
+      "path": "/tmp/motion-cr-method-delta-185f02c2-20261001/evidence/common-string-controls/registration-24.stdout",
+      "bytes": 127,
+      "sha256": "12b6dfd60c2831c0efa8b00477981c3a6f98128b5eddb4a01106bb170eba05a9"
+    },
+    {
+      "path": "/tmp/motion-cr-method-delta-185f02c2-20261001/evidence/common-string-controls/registration-24.stderr",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "path": "/tmp/motion-cr-method-delta-185f02c2-20261001/evidence/common-string-controls/contract-24.stdout",
+      "bytes": 39,
+      "sha256": "9db5e6eff5599b2700584383471d9881fa4768daed8c28861f883d5de4f2b091"
+    },
+    {
+      "path": "/tmp/motion-cr-method-delta-185f02c2-20261001/evidence/common-string-controls/contract-24.stderr",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "path": "/tmp/motion-cr-method-delta-185f02c2-20261001/evidence/common-string-controls/registration-node22.json",
+      "bytes": 13866,
+      "sha256": "16424eab7c80ec23f8cd9d9ba45f38b7df35d4f3c574f04d05de25c61f134003"
+    },
+    {
+      "path": "/tmp/motion-cr-method-delta-185f02c2-20261001/evidence/common-string-controls/registration-22.stdout",
+      "bytes": 126,
+      "sha256": "b590b2b7638b3201a858ceb5fac7079755c724f93f472e2bdd10a0fc39e857dc"
+    },
+    {
+      "path": "/tmp/motion-cr-method-delta-185f02c2-20261001/evidence/common-string-controls/registration-22.stderr",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "path": "/tmp/motion-cr-method-delta-185f02c2-20261001/evidence/common-string-controls/contract-22.stdout",
+      "bytes": 39,
+      "sha256": "9db5e6eff5599b2700584383471d9881fa4768daed8c28861f883d5de4f2b091"
+    },
+    {
+      "path": "/tmp/motion-cr-method-delta-185f02c2-20261001/evidence/common-string-controls/contract-22.stderr",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "path": "/tmp/motion-cr-method-delta-185f02c2-20261001/evidence/common-string-controls/execution.json",
+      "bytes": 1694,
+      "sha256": "a9d487e378ace4a32eb9715fc8ede5832c1187e3efdf8cf6f80c34d6e6c265d7"
+    },
+    {
+      "path": "/tmp/motion-cr-method-delta-185f02c2-20261001/evidence/native-serialization-controls/probe.mjs",
+      "bytes": 3951,
+      "sha256": "f02ba598462f098b734bdabc39a84536c4ebbb0c490d1daa356a9fc82f1bbe53"
+    },
+    {
+      "path": "/tmp/motion-cr-method-delta-185f02c2-20261001/evidence/native-serialization-controls/stdout.log",
+      "bytes": 1372,
+      "sha256": "770ea98a5d94e1422e6e8d2ba546a8128d6a84415e109db77006e7a6e182c0ed"
+    },
+    {
+      "path": "/tmp/motion-cr-method-delta-185f02c2-20261001/evidence/native-serialization-controls/stderr.log",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "path": "/tmp/motion-cr-method-delta-185f02c2-20261001/evidence/native-serialization-controls/result.json",
+      "bytes": 1697,
+      "sha256": "eef1756d6090003fc68638bbd1f6cc05782c9d0d2468b2240ab0b293266a693f"
+    },
+    {
+      "path": "/tmp/motion-cr-method-delta-185f02c2-20261001/evidence/native-serialization-controls/execution.json",
+      "bytes": 947,
+      "sha256": "ed95eee5cf57381b92ae9471c25b3d19b047cf290fdc91bc25aa90eb86bcdf0b"
+    },
+    {
+      "path": "/tmp/motion-cr-method-delta-185f02c2-20261001/evidence/cost-after/probe.mjs",
+      "bytes": 3599,
+      "sha256": "1301226c0813e2e2683033ea89d89ee0e16063b649f78c6c3846d74dce740481"
+    },
+    {
+      "path": "/tmp/motion-cr-method-delta-185f02c2-20261001/evidence/cost-after/probe.log",
+      "bytes": 1920,
+      "sha256": "5cbb39a192c10740d7478259eb65fa7595753c4745c5d8267ad0f384cbf0ae47"
+    },
+    {
+      "path": "/tmp/motion-cr-method-delta-185f02c2-20261001/evidence/cost-after/exact-test-callback.ts",
+      "bytes": 1701,
+      "sha256": "7d1e66d88568f137f5831ed9cc52b38375587dc13673a6fd6faf29eaaa5977db"
+    },
+    {
+      "path": "/tmp/motion-cr-method-delta-185f02c2-20261001/evidence/cost-after/fixtures.mjs",
+      "bytes": 18704,
+      "sha256": "5cff5e0655230dc7b4329f5635025f84de0be51df40d4deaf4e0cc44d2515ae8"
+    },
+    {
+      "path": "/tmp/motion-cr-method-delta-185f02c2-20261001/evidence/cost-after/acquired-steps.ndjson",
+      "bytes": 1409,
+      "sha256": "98eccc0d86c1e470813797ded3f9b1a2884724616a4467221ba8c4b50c0cd95e"
+    },
+    {
+      "path": "/tmp/motion-cr-method-delta-185f02c2-20261001/evidence/cost-after/probe-result.json",
+      "bytes": 2788,
+      "sha256": "7acd064c8e0dc38a19edeaa26a61e1d412050bec441dd78fdaa26c7d461c58f4"
+    },
+    {
+      "path": "/tmp/motion-cr-method-delta-185f02c2-20261001/evidence/cost-after/after.cpuprofile",
+      "bytes": 303490,
+      "sha256": "e209e38baf638c6f89731e0a4a2433b2ca7dc81d21454d823c9821b380560974"
+    },
+    {
+      "path": "/tmp/motion-cr-method-delta-185f02c2-20261001/evidence/cost-after/execution.json",
+      "bytes": 2639,
+      "sha256": "9313b6ae5b54efdf6f3a9dee389cbf00b924866181214e88aa94f4cecb618e83"
+    },
+    {
+      "path": "/tmp/motion-cr-method-delta-185f02c2-20261001/evidence/cache-law/stdout.log",
+      "bytes": 234,
+      "sha256": "4d45bfd1bc32924ecc44c4f2b5ced549227350f917a2f8ebe25bb155f0ad39c7"
+    },
+    {
+      "path": "/tmp/motion-cr-method-delta-185f02c2-20261001/evidence/cache-law/stderr.log",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "path": "/tmp/motion-cr-method-delta-185f02c2-20261001/evidence/cache-law/result.json",
+      "bytes": 28072,
+      "sha256": "f98b380b96d048d729892be4fe34aa3b9fec216d1107e91c273a5da2171ad8cf"
+    },
+    {
+      "path": "/tmp/motion-cr-method-delta-185f02c2-20261001/evidence/cache-law/execution.json",
+      "bytes": 1842,
+      "sha256": "944d0e87de8b4e961a6bbcd1db656b22cf511f287e30a342f0aa9a4e553792e2"
+    },
+    {
+      "path": "/tmp/motion-cr-method-delta-185f02c2-20261001/evidence/native-serialization-controls/initial-import-failure/execution.json",
+      "bytes": 705,
+      "sha256": "24b1864e1875924a9dbac557272b327367514f47bac9946a32ae793af2a46e01"
+    },
+    {
+      "path": "/tmp/motion-cr-method-delta-185f02c2-20261001/evidence/native-serialization-controls/initial-import-failure/stderr.log",
+      "bytes": 583,
+      "sha256": "b5311aa0fc9eab7e2e1d7090113c4b7850e805d060b4b367088d6c0602807252"
+    },
+    {
+      "path": "/tmp/motion-cr-method-delta-185f02c2-20261001/evidence/native-serialization-controls/initial-import-failure/stdout.log",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "path": "/tmp/motion-cr-method-delta-185f02c2-20261001/evidence/native-serialization-controls/initial-import-failure/probe.mjs",
+      "bytes": 3907,
+      "sha256": "584162396cd9800413fd21a659e31171494ed467da4bd2e1a2f0d63f3f9f9aa5"
+    }
+  ],
+  "additionalBindings": [
+    {
+      "path": "/tmp/motion-cr-profile-closure-20261001/sealed-primary/PRIMARY-PACKET.json",
+      "sha256": "f65f2e5c2f7b0b5122266a1ab1e2f555c4e739f1143cff4ca0b56dbdbce0d348",
+      "bytes": 1064
+    }
+  ],
+  "sourceArchiveMembers": 631,
+  "archiveDirectories": 68,
+  "gitTreePaths": 631,
+  "sourceOwners": 17,
+  "allMatched": true,
+  "actualRegisteredSamples": 0,
+  "semanticPeerReviewPending": true,
+  "fullordinaryRESOURCEAAfailurePreserved": true
+}

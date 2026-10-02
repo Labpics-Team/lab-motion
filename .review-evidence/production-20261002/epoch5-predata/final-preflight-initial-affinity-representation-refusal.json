@@ -1,0 +1,19 @@
+{
+  "atUtc": "2026-10-01T23:07:02.145932+00:00",
+  "exitCode": 1,
+  "reason": "final quota/affinity drift",
+  "actualRegisteredPerformanceSamples": 0,
+  "outputExists": false,
+  "harnessCompared": {
+    "registeredAffinity": "0",
+    "registeredType": "str",
+    "actualAffinity": [
+      0
+    ],
+    "actualType": "list",
+    "registeredQuota": "400000 100000",
+    "actualQuota": "400000 100000"
+  },
+  "causalCorrection": "same /proc/self/status Cpus_allowed_list string representation as existing captureServerMachine owner",
+  "correctedActualAffinity": "0"
+}

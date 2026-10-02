@@ -1,0 +1,2 @@
+$ tsup && node scripts/emit-declarations.mjs
+$ tsup && node scripts/emit-declarations.mjs

@@ -1,0 +1,220 @@
+{
+  "at": "2026-10-01T23:17:16.637727+00:00",
+  "packetSha256": "b7271ff08f9506882093190c7380a6dc0e2a7cecf7b8e05962392139a3c09ad5",
+  "bindings": [
+    {
+      "path": "/tmp/motion-server-predata-185f02c2-7016c19a-20261001/tsup-dependency-refusal-primary/baseline-published-artifact-comparison.json",
+      "bytes": 68286,
+      "sha256": "fd2d8334ef610cfb96d4a1664bea3a7c3bc6718165761c2ddfb37f0fbc97352d"
+    },
+    {
+      "path": "/tmp/motion-server-predata-185f02c2-7016c19a-20261001/tsup-dependency-refusal-primary/diagnostic-helper.mjs",
+      "bytes": 3195,
+      "sha256": "33117d794c269c1b95a668552f746b4184ae8dc6ba5fea137e5f0decb90a4360"
+    },
+    {
+      "path": "/tmp/motion-server-predata-185f02c2-7016c19a-20261001/tsup-dependency-refusal-primary/diagnostic-stderr-qualification.json",
+      "bytes": 303,
+      "sha256": "4a6fab5c0a77a0e48a3537d6915f52cf0a0101d91f83076c7f94e17cfb4d291d"
+    },
+    {
+      "path": "/tmp/motion-server-predata-185f02c2-7016c19a-20261001/tsup-dependency-refusal-primary/actual-baseline-vs-candidate-shims.diff",
+      "bytes": 12440,
+      "sha256": "24698aec17f54e3ee689f9c326cbdd6c888eb4d4fec73a0f1715dba6930d8a10"
+    },
+    {
+      "path": "/tmp/motion-server-predata-185f02c2-7016c19a-20261001/tsup-dependency-refusal-primary/distinguishing-build-execution.json",
+      "bytes": 1116,
+      "sha256": "44cfda3dc90c7d2010ce9ca825178e99bfccf5e56de4463a711351871c79b35b"
+    },
+    {
+      "path": "/tmp/motion-server-predata-185f02c2-7016c19a-20261001/tsup-dependency-refusal-primary/distinguishing-build-after.json",
+      "bytes": 39482,
+      "sha256": "8f0d2745680a68641df7589a7d21d494fa32a532f29f64b14cafc80dc9b8591f"
+    },
+    {
+      "path": "/tmp/motion-server-predata-185f02c2-7016c19a-20261001/tsup-dependency-refusal-primary/diagnostic-build.stderr.log",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "path": "/tmp/motion-server-predata-185f02c2-7016c19a-20261001/tsup-dependency-refusal-primary/diagnostic-build.stdout.log",
+      "bytes": 11778,
+      "sha256": "cafe5ffb1550d5c4dd4de6e22a612e2c6e4bb05e9fd54eae2b81ccaa6980a4eb"
+    },
+    {
+      "path": "/tmp/motion-server-predata-185f02c2-7016c19a-20261001/tsup-dependency-refusal-primary/distinguishing-build-before.json",
+      "bytes": 39482,
+      "sha256": "8f0d2745680a68641df7589a7d21d494fa32a532f29f64b14cafc80dc9b8591f"
+    },
+    {
+      "path": "/tmp/motion-server-predata-185f02c2-7016c19a-20261001/tsup-dependency-refusal-primary/before-diagnostic.json",
+      "bytes": 13521,
+      "sha256": "28494c3327f84220ef863eddf3dbd3aa867d58dedfb6631c0392cab69d154705"
+    },
+    {
+      "path": "/tmp/motion-server-predata-185f02c2-7016c19a-20261001/tsup-dependency-refusal-primary/candidate/node_modules/.bin/tsserver",
+      "bytes": 1771,
+      "sha256": "ace9e36adee8770675c0670b6998bc5aac7fab970bf5de803dba2d3508c0118e"
+    },
+    {
+      "path": "/tmp/motion-server-predata-185f02c2-7016c19a-20261001/tsup-dependency-refusal-primary/candidate/node_modules/.bin/tsc",
+      "bytes": 1741,
+      "sha256": "3f72bad36129af0241b72baf43064ef8903776644a44b79a5a0a9f82cb751533"
+    },
+    {
+      "path": "/tmp/motion-server-predata-185f02c2-7016c19a-20261001/tsup-dependency-refusal-primary/candidate/node_modules/.bin/tree-kill",
+      "bytes": 1723,
+      "sha256": "ebbafa12914cc78ba9cccaa0b96014bee5c8c3801bc4d57477fd25c694b57119"
+    },
+    {
+      "path": "/tmp/motion-server-predata-185f02c2-7016c19a-20261001/tsup-dependency-refusal-primary/candidate/node_modules/.bin/sucrase-node",
+      "bytes": 1763,
+      "sha256": "096593ea1678095f24471eff58e4dafbfad86e578bdc5681b7bca12e6cdeb4fd"
+    },
+    {
+      "path": "/tmp/motion-server-predata-185f02c2-7016c19a-20261001/tsup-dependency-refusal-primary/candidate/node_modules/.bin/sucrase",
+      "bytes": 1733,
+      "sha256": "065b9cefce0de11e770a4539908f0a79a0b03ae533f825c5a2b8a804423039f3"
+    },
+    {
+      "path": "/tmp/motion-server-predata-185f02c2-7016c19a-20261001/tsup-dependency-refusal-primary/candidate/node_modules/.bin/rollup",
+      "bytes": 1745,
+      "sha256": "c76e6a1714ee2383b3e3bbb77a0741020a45acd404e68986a7def9f6cee6c3ef"
+    },
+    {
+      "path": "/tmp/motion-server-predata-185f02c2-7016c19a-20261001/tsup-dependency-refusal-primary/candidate/node_modules/.bin/esbuild",
+      "bytes": 1263,
+      "sha256": "f906ab88a88320f7d2eb4d246eb02a56085f15f685aa956cb060cb296bf03a2e"
+    },
+    {
+      "path": "/tmp/motion-server-predata-185f02c2-7016c19a-20261001/tsup-dependency-refusal-primary/baseline/node_modules/.bin/tsserver",
+      "bytes": 1876,
+      "sha256": "d5ab99cf2ee5a7bf04f5f7aa65b070f69e59d2cf85052dba26a19bd60df9eda9"
+    },
+    {
+      "path": "/tmp/motion-server-predata-185f02c2-7016c19a-20261001/tsup-dependency-refusal-primary/baseline/node_modules/.bin/tsc",
+      "bytes": 1846,
+      "sha256": "898ffc79f0f4c0a62e96d4ce2bd91dee924d7c2fa008a582cdb047c6b649142b"
+    },
+    {
+      "path": "/tmp/motion-server-predata-185f02c2-7016c19a-20261001/tsup-dependency-refusal-primary/baseline/node_modules/.bin/tree-kill",
+      "bytes": 1828,
+      "sha256": "f740b18cd9c252a399e347efdf0633e2b274c3c5797e251ee726a5d94e3b565b"
+    },
+    {
+      "path": "/tmp/motion-server-predata-185f02c2-7016c19a-20261001/tsup-dependency-refusal-primary/baseline/node_modules/.bin/sucrase-node",
+      "bytes": 1868,
+      "sha256": "85c62fa9f1a773cc4bfe84567df8aaa97ffb35484f644aa75569fe6a3e77597c"
+    },
+    {
+      "path": "/tmp/motion-server-predata-185f02c2-7016c19a-20261001/tsup-dependency-refusal-primary/baseline/node_modules/.bin/sucrase",
+      "bytes": 1838,
+      "sha256": "cd587bfafd6196be2508f83552d91f3c5664389c930d4823befdd23cf7e750c5"
+    },
+    {
+      "path": "/tmp/motion-server-predata-185f02c2-7016c19a-20261001/tsup-dependency-refusal-primary/baseline/node_modules/.bin/rollup",
+      "bytes": 1850,
+      "sha256": "9553cd9f36c34c9747ba00554700617b01737cae4ebfd2ff24c90e632d204a47"
+    },
+    {
+      "path": "/tmp/motion-server-predata-185f02c2-7016c19a-20261001/tsup-dependency-refusal-primary/baseline/node_modules/.bin/esbuild",
+      "bytes": 1838,
+      "sha256": "3a7fbf08812bd7b56b02169d72789cd9c905cc22455dc65ac457df81c0ae6b89"
+    },
+    {
+      "path": "/tmp/motion-server-predata-185f02c2-7016c19a-20261001/actual-launch.json",
+      "bytes": 1531,
+      "sha256": "937ff50939360e5483a8124ad82f45de11dd62b71eed4db8857335d701e1d61c"
+    },
+    {
+      "path": "/tmp/motion-server-predata-185f02c2-7016c19a-20261001/actual-execution.json",
+      "bytes": 1332,
+      "sha256": "12f3529bf5a2feca25d66a77aa822c3e4de18985155f80b4676b841e1cf047f4"
+    },
+    {
+      "path": "/tmp/motion-server-predata-185f02c2-7016c19a-20261001/actual.stderr.log",
+      "bytes": 90,
+      "sha256": "305ccfaef64f47f74b8c6fa6ce2dfe7c01b26160f4bd6f7d24712352b273c08b"
+    },
+    {
+      "path": "/tmp/motion-server-predata-185f02c2-7016c19a-20261001/actual.stdout.log",
+      "bytes": 530,
+      "sha256": "2c675f0d4299f938131acb3483e893de3e5087146ed8aeb7b72da35208e71594"
+    },
+    {
+      "path": "/tmp/motion-server-series-185f02c2-7016c19a-20261001-epoch5/server-profile.json",
+      "bytes": 34815,
+      "sha256": "f47e7301d8f02c9cfef415ab9523cd3f7474253df9888aa02fa4a8a12858314d"
+    },
+    {
+      "path": "/tmp/motion-server-series-185f02c2-7016c19a-20261001-epoch5/server-profile.sha256",
+      "bytes": 86,
+      "sha256": "72d0d0728cf5067548d454ec57663b04de86252b18fd8503f7d4dbbc04b1bb35"
+    },
+    {
+      "path": "/tmp/motion-server-series-185f02c2-7016c19a-20261001-epoch5/journal.ndjson",
+      "bytes": 22994,
+      "sha256": "3e86013c0b7dcea8debd3f107df711b9fe1f31dace2bc14e43f3823056aebe57"
+    },
+    {
+      "path": "/tmp/motion-server-predata-185f02c2-7016c19a-20261001/predata-tuple.json",
+      "bytes": 38509,
+      "sha256": "e7472dfbdb3bdca3aa5065543d431f9bb70f6410d0d76e63c5f22ff3050a3691"
+    },
+    {
+      "path": "/workspace/lab-motion/bench/compare/provenance.mjs",
+      "bytes": 24949,
+      "sha256": "51881a4a6ea2e1ad0330888e7e1b9c8b6e7c7aef3a3eb798a4185c7c3b846623"
+    },
+    {
+      "path": "/workspace/lab-motion/bench/profile/server-profile-runner.mjs",
+      "bytes": 49601,
+      "sha256": "5d0f11e31fceedfc524c09fe3cd0948395f218ce45f117c659a0a3551d4a3168"
+    }
+  ],
+  "allMatch": true,
+  "threePackageManifestsLiteralBeforeAfterEqual": true,
+  "baselineRuntimeDistFingerprintConserved": true,
+  "actualBuildExecution": {
+    "startUtc": "2026-10-01T23:10:38.381Z",
+    "endUtc": "2026-10-01T23:10:51.320Z",
+    "argv": [
+      "pnpm",
+      "run",
+      "build"
+    ],
+    "cwd": "/tmp/motion-server-baseline-0b6f537e",
+    "environment": {
+      "PATH": "/tmp/motion-server-toolchain-20261001/bin:/opt/codex/runtimes/codex-primary-runtime/dependencies/node/bin:/home/agent/.local/bin:/opt/codex/runtimes/codex-primary-runtime/dependencies/bin/override:/opt/codex/runtimes/codex-primary-runtime/dependencies/python/bin:/opt/codex/runtimes/codex-primary-runtime/dependencies/node/bin:/opt/codex/runtimes/codex-primary-runtime/dependencies/bin:/opt/codex/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin:/home/agent/.local/bin:/opt/codex/runtimes/codex-primary-runtime/dependencies/bin/fallback",
+      "CI": "true",
+      "NODE_PATH": null,
+      "NODE_OPTIONS": null
+    },
+    "node": "v24.19.0",
+    "exitCode": 0,
+    "actualPerformanceSamples": 0,
+    "packagesStable": {
+      "tsup": true,
+      "typescript": true,
+      "esbuild": true
+    },
+    "distRuntimeStable": true,
+    "sourceHead": "0b6f537e148b7dadadfb9e3ce7c446d014975958",
+    "sourceStatus": ""
+  },
+  "baselineArtifactComparisonTopLevelKeys": [
+    "oldTarball",
+    "actualEpoch5Tarball",
+    "oldMembers",
+    "newMembers",
+    "sameMemberPaths",
+    "changedMembers",
+    "oldOnly",
+    "newOnly",
+    "oldManifest",
+    "actualManifest"
+  ],
+  "samples": 0,
+  "qualification": "Source185/profile7016/clock7e unchanged. Currenttooltrees stable in solecanonicalbuild; no preinitialbuild perfile manifest, so exacthistorical7shimcause not established from direct beforeafter. Successstderr unavailable explicitlyqualified. Failureepoch5 remainsUNPROVEN. Newpredata admissibility boundedreviewpending."
+}

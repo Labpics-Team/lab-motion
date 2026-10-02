@@ -1,0 +1,33 @@
+{
+  "grantedAtUtc": "2026-10-01T22:58:51.582647+00:00",
+  "candidateHead": "185f02c2a85972a531627e14b7e0207e27855f95",
+  "candidateTree": "d2b7d736ba9a37b930a0bd4cfa3cae92f12a92bc",
+  "planContextHead": "84a0f547156656a70cf73f29b9a2930b5a1997fa",
+  "protocolDigest": "7016c19aa7a763fee68687327ef489abb119acd2a43d397b8485ca56e4cea15f",
+  "clockModelDigest": "7e45adab88a2c97af4e9074543318ae115e42b5c9669c4746b6e149d42bfbc4f",
+  "predataTupleSha256": "e7472dfbdb3bdca3aa5065543d431f9bb70f6410d0d76e63c5f22ff3050a3691",
+  "rootPredataReadbackSha256": "d90b7b5a5d55b0e4c1b5e7860a1cd3ed4deb9684c2074c0cb96762a6389d990a",
+  "normConservationSha256": "b037c572c7720f945b7281df12c2c20d85631301b56a26f7533acd4fa655505c",
+  "rootMethodMeasurementReadbackSha256": "953539ad67977620e759b0886b195631794cdd6e2daf6f46e1ac6ae89ead8487",
+  "rootMethodSOReadbackSha256": "59f3c5fb5de53d45e2280e22cf37ba76b0fe6d26991cbdf99af1fa9f0fa16bb9",
+  "rootRuntimeDeltaReadbackSha256": "7e3c20cbf58159ce56af7ca08446ee3e7933c98510fe9f8cd6a610e5927a41ec",
+  "rootCurrentCICRReadbackSha256": "4fde07394ffc15563e58abac79029245debfde2f21596d10eb921f4776b07965",
+  "rootDocCorrectnessReadbackSha256": "63cfc0d36ce27706e124c028f1b409d4c1682904a548f15c2c1cc78d766bae11",
+  "rootDocSOReadbackSha256": "54b5f0bcc4c8a72660d005cb461669094b3c088a874a036304792214270c7786",
+  "docPublicationReceiptSha256": "60e4ea23be13cab075d8d9e4c081acc895523c994cd241ac51c4d366105a0d5f",
+  "rootHeavyWork": 0,
+  "rootQueuedLocalWork": false,
+  "peerStates": {
+    "motionAuthor": "READY and all own executors END; launch only single prescribed CLI",
+    "runtimeCorrectness": "END22:30:34.156450 and sealed; heavy0",
+    "measurement": "sealed END; heavy0",
+    "methodSecondOrder": "sealed END; heavy0",
+    "docSecondOrderColors": "sealed END22:50:27; heavy0/network0",
+    "docCorrectness": "sealed END22:53:03; heavy0"
+  },
+  "qualification": "Root quiet ACK based actual END and existing sealed reports; concurrent remote-only docCI/CR does not run on this server. Old localRESOURCEAAFAIL remains historical; current exact-tree hostedCI all successful and current17fileCR noactionablecomments separately qualified. No performance/productionGO implied.",
+  "conditionBeforeLaunch": "Author capture fresh resource/affinity/quota/source/outputABSENT preflight; if exact constraints fail STOP preserve refusal without timing. Root will perform no local heavy tests/hash/graph/package/provider payload work until singleactualseriesEND.",
+  "authorizedActualAction": "Exactly one original preregistered CLI epoch5: baselinepilot8 → frozenN292..1024 → one AA±5% and 2xwork lower>1.5 → AB only if calibration passes → separate retention. No rerun/dobor/Ncut/timeout/threshold/worker/source changes.",
+  "actualSamplesBeforeGrant": 0,
+  "output": "/tmp/motion-server-series-185f02c2-7016c19a-20261001-epoch5"
+}

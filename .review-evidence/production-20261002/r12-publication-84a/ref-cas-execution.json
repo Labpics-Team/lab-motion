@@ -1,0 +1,27 @@
+{
+  "at": "2026-10-01T22:56:24.345378+00:00",
+  "request": {
+    "query": "mutation($input:UpdateRefsInput!){updateRefs(input:$input){clientMutationId}}",
+    "variables": {
+      "input": {
+        "repositoryId": "R_kgDOT7INzQ",
+        "clientMutationId": "r12-durable-primary-links-84a-20261001",
+        "refUpdates": [
+          {
+            "name": "refs/heads/codex/colors-motion-production-20261001",
+            "beforeOid": "85a837e83912ec6b3144b385d938b66a0c63adcf",
+            "afterOid": "84a0f547156656a70cf73f29b9a2930b5a1997fa",
+            "force": false
+          }
+        ]
+      }
+    }
+  },
+  "response": {
+    "data": {
+      "updateRefs": {
+        "clientMutationId": "r12-durable-primary-links-84a-20261001"
+      }
+    }
+  }
+}

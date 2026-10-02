@@ -1,0 +1,20 @@
+{
+  "REPORT.md": {
+    "path": "/tmp/motion-primary-delivery-factual-addendum-eaf0f950-20261001/REPORT.md",
+    "bytes": 14258,
+    "sha256": "1531a48524d808c793802c99d5ac698d2fb3a03d7421eda238a55175b5381e66"
+  },
+  "MANIFEST.json": {
+    "path": "/tmp/motion-primary-delivery-factual-addendum-eaf0f950-20261001/MANIFEST.json",
+    "bytes": 9290,
+    "sha256": "c6b4fa3be324bd08e5d8f7a20eb9e9b9e6ab397d60c5ef0bb074620a95c97fd3"
+  },
+  "FACTUAL-READBACK.json": {
+    "path": "/tmp/motion-primary-delivery-factual-addendum-eaf0f950-20261001/FACTUAL-READBACK.json",
+    "bytes": 9187,
+    "sha256": "b11a399e04cba35f6fc1c15ee92d54aa020b6584fcf916486ffd7407a4a939d9"
+  },
+  "verdict": "PASS_DELIVERY_FACTUAL_ADDENDUM",
+  "children": "END",
+  "moreBareGitReadsNeeded": false
+}

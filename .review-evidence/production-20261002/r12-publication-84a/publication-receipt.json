@@ -1,0 +1,18 @@
+{
+  "finishedUtc": "2026-10-01T22:57:49.793229+00:00",
+  "head": "84a0f547156656a70cf73f29b9a2930b5a1997fa",
+  "tree": "79d00f27934e68228be420b4cf37808acc4e9f25",
+  "branch": "codex/colors-motion-production-20261001",
+  "atomicCASAt": "2026-10-01T22:56:24.345378+00:00",
+  "force": false,
+  "before": "85a837e83912ec6b3144b385d938b66a0c63adcf",
+  "remoteSourceReadback": "84a0f547156656a70cf73f29b9a2930b5a1997fa",
+  "PR": 1195,
+  "bodySha256": "64e3c04689ff482be82454305362fc21f7b723fa5ca0c16c4725c8298eaf9d05",
+  "botSuffixLiteralPreserved": true,
+  "botSuffixSha256": "4c26245eeedc76aaa1ed89a56689138fa95deca413814117f98394aa2afcc32d",
+  "mainBefore": "0303b8a9fa4a51529ce9c781c0563929bb3f5839",
+  "mainAfter": "0303b8a9fa4a51529ce9c781c0563929bb3f5839",
+  "scope": "Sameisolateddocbranch; two scoped docreports ROOTfullread matched; mandatory7localPASS. RemoteCI/currentCR pending; no product/mainrelease/deploy.",
+  "initialReadbackRefusal": "After successful22:56:24 CAS exactbranch84 readback, immediatelyfollowingPRmetadata head was stale; assertion stopped bodypublication. LaterfreshPR84 confirmed; onlybodycontinued, no refretry."
+}
