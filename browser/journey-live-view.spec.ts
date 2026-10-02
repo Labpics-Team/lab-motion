@@ -1,13 +1,13 @@
 /**
  * JOURNEY-01: два реальных браузерных потребителя ./smart.
  * Пакетный импорт отдельно запинен test/journey-package-consumers.test.ts;
- * здесь собранный dist проходит настоящий DOM, фокус, ввод и визуальную C0-границу.
+ * здесь установленный production tarball проходит настоящий DOM, фокус, ввод и визуальную C0-границу.
  */
 import { expect, test } from './fixtures/harness';
 
 test('card↔details: вложенная геометрия, перенацеливание в полёте, фокус и режимы без движения', async ({ page }) => {
   const result = await page.evaluate(async () => {
-    const { captureSmart } = await import('/dist/smart/index.js');
+    const { captureSmart } = await import('/browser/.artifacts/scope-recipes.js');
     document.body.innerHTML = `
       <button id="focus">Фокус</button>
       <div id="root" style="position:relative;width:720px;height:640px">
@@ -124,7 +124,7 @@ test('card↔details: вложенная геометрия, перенацел�
 
 test('panel↔source: пересоздание узла, обратный ход, повторное открытие и интерактивность', async ({ page }) => {
   const result = await page.evaluate(async () => {
-    const { captureSmart } = await import('/dist/smart/index.js');
+    const { captureSmart } = await import('/browser/.artifacts/scope-recipes.js');
     document.body.innerHTML = `
       <button id="focus">Фокус</button>
       <div id="root" style="position:relative;width:720px;height:640px">
@@ -232,7 +232,7 @@ test('panel↔source: пересоздание узла, обратный ход
 
 test('движущийся элемент управления принимает настоящий указатель и клавиатуру, сохраняя фокус', async ({ page }) => {
   await page.evaluate(async () => {
-    const { captureSmart } = await import('/dist/smart/index.js');
+    const { captureSmart } = await import('/browser/.artifacts/scope-recipes.js');
     document.body.innerHTML = `
       <div id="root" style="position:relative;width:720px;height:640px">
         <article id="card" data-motion-key="card" style="position:absolute;left:20px;top:40px;width:180px;height:120px">
@@ -297,7 +297,7 @@ test('движущийся элемент управления принимае�
   )).toBe(2);
 
   const focusedAtRetarget = await page.evaluate(async () => {
-    const { captureSmart } = await import('/dist/smart/index.js');
+    const { captureSmart } = await import('/browser/.artifacts/scope-recipes.js');
     const root = document.querySelector<HTMLElement>('#root')!;
     const card = document.querySelector<HTMLElement>('#card')!;
     const action = document.querySelector<HTMLButtonElement>('#action')!;

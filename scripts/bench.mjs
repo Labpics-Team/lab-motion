@@ -31,8 +31,10 @@ import {
 } from '../bench/compare/methodology.mjs';
 import {
   checksumTransformOutputs,
+  createMotionValueDefaultBenchmark,
   createSeededTransformStates,
   createSeededUnitInputs,
+  makeSynchronousDrainClock as makeClock,
   materializeTransformOutputs,
   reconstructedPartsBuildTransform,
   summarizeDistribution,
@@ -65,27 +67,6 @@ const compositor = await import(distUrl('dist/compositor/index.js'));
 const tokenModule = await import(distUrl('dist/tokens/index.js'));
 const easingModule = await import(distUrl('dist/easing/index.js'));
 const valueModule = await import(distUrl('dist/value/index.js'));
-
-/** Синхронные дренируемые часы: requestFrame копит cb, drain гоняет их без ts
- *  (→ solver двигается фикс-шагом FIXED_DT_S). Handle ненулевой — drive/MV не
- *  ставят setTimeout-фоллбек, прогон остаётся синхронным. */
-function makeClock() {
-  let queue = [];
-  const requestFrame = (cb) => {
-    queue.push(cb);
-    return queue.length; // ненулевой handle
-  };
-  const drain = (cap = 100000) => {
-    let n = 0;
-    while (queue.length && n < cap) {
-      const cb = queue.shift();
-      cb();
-      n++;
-    }
-    return n;
-  };
-  return { requestFrame, drain };
-}
 
 /**
  * Замер: median ns/op по `samples` сэмплам, в каждом — `iters` итераций.
@@ -297,21 +278,12 @@ row('пустой loop/sink baseline', 'итерация', measure((i) => i & 1,
 
 // ── C. MotionValue прогон (макро: второй горячий цикл, v0-путь) ──
 {
-  let frames = 0;
+  const macro = createMotionValueDefaultBenchmark(MotionValue, SPRING);
   const r = measure(
-    () => {
-      const clock = makeClock();
-      let last = 0;
-      const mv = new MotionValue({ initial: 0, spring: SPRING, requestFrame: clock.requestFrame });
-      mv.onChange((v) => (last = v));
-      mv.setTarget(100);
-      frames = clock.drain();
-      mv.destroy();
-      return last;
-    },
+    macro.run,
     { iters: 2000, samples: 7 },
   );
-  row(`MotionValue прогон (${frames} кадров)`, 'прогон', r);
+  row(`MotionValue прогон (${macro.getFrameCount()} кадров)`, 'прогон', r);
 }
 
 // ── D. createDriver clamp:false (горячий путь: солвер+сходимость+эмит) ──

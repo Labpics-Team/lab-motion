@@ -29,11 +29,9 @@ import {
 } from 'node:fs';
 import os from 'node:os';
 import { createServer } from 'node:http';
+import { createRequire } from 'node:module';
 import path from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
-import esbuild from 'esbuild';
-import { chromium } from 'playwright';
-import { PNG } from 'pngjs';
 import {
   canonicalGzip,
   observationalBrotli,
@@ -83,6 +81,9 @@ import { S5_MOTION_CONTRACT } from './motion-conformance.mjs';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const ROOT = path.resolve(__dirname, '..', '..');
+// Чистые проверки семантики не требуют отдельной установки браузерного стенда.
+// Его зависимости остаются обязательными при фактической сборке и измерениях.
+const requireBenchmark = createRequire(import.meta.url);
 const RUNS = parseBenchCount('BENCH_RUNS', process.env.BENCH_RUNS, 20, { min: 20, max: 60 });
 const ORDER_SEED = 0x51f15e;
 const BOOTSTRAP_ITERATIONS = 10_000;
@@ -140,7 +141,7 @@ function libVersion(lib, rootPkg) {
 
 function buildAdapter(lib) {
   const outfile = path.join(__dirname, 'results', `.${lib.id}.iife.js`);
-  esbuild.buildSync({
+  requireBenchmark('esbuild').buildSync({
     ...PRODUCTION_ADAPTER_PROFILE,
     entryPoints: [path.join(__dirname, lib.entry)],
     format: 'iife',
@@ -153,7 +154,7 @@ function buildAdapter(lib) {
 
 /** import-cost: один ESM+minify артефакт, затем gzip-9 и Brotli-11. */
 function measureSize(lib) {
-  const res = esbuild.buildSync({
+  const res = requireBenchmark('esbuild').buildSync({
     ...PRODUCTION_ADAPTER_PROFILE,
     entryPoints: [path.join(__dirname, lib.entry)],
     format: 'esm',
@@ -438,51 +439,110 @@ async function runColdStartCost(page, scenario) {
 }
 
 /** Untimed oracle проверяет всю топологию, а не одного выжившего target. */
-async function runSemanticStartCheck(page, scenario, calls) {
+export async function runSemanticStartCheck(page, scenario, calls) {
   const evidence = await page.evaluate(async ({ config, calls: expectedCalls }) => {
     const A = window.__adapterModule;
-    const groups = Array.from({ length: expectedCalls }, () => (
-      Array.from({ length: config.targetsPerCall }, () => {
-        const element = document.createElement('div');
-        element.className = 'box';
-        document.body.appendChild(element);
-        return element;
-      })
-    ));
-    const epoch = performance.now();
-    const callStartedAtMs = [];
-    const controls = groups.map((elements) => {
-      callStartedAtMs.push(performance.now() - epoch);
-      return config.staggerGapMs > 0
-        ? A.startStagger(elements, config.toPx, config.durationMs, config.staggerGapMs)
-        : A.start(elements, config.toPx, config.durationMs);
-    });
+    const groups = [], callStartedAtMs = [], controls = [], checkpoints = [], terminal = [], failures = [];
+    const onset = config.requireFreshStart ? { before: [], after: [] } : undefined;
+    let phase = 'setup', epoch;
+    const failed = (error, location) => failures.push({ phase: location, name: error?.name ?? typeof error, message: String(error?.message ?? error) });
     const delaySpan = config.staggerGapMs * (config.targetsPerCall - 1);
     const checkpointTimes = config.staggerGapMs > 0
-      ? [0.2, 0.5, 0.8].map((fraction) => delaySpan * fraction)
-      : [config.durationMs * 0.25];
-    const checkpoints = [];
-    for (const checkpointTime of checkpointTimes) {
-      const remaining = checkpointTime - (performance.now() - epoch);
+      ? [0.2, 0.5, 0.8].map((fraction) => Math.min(config.durationMs, delaySpan) * fraction)
+      : [config.durationMs * 0.25, config.durationMs * 0.5, config.durationMs * 0.625];
+    try {
+      for (let call = 0; call < expectedCalls; call++) {
+        const elements = []; groups.push(elements);
+        for (let target = 0; target < config.targetsPerCall; target++) {
+          const element = document.createElement('div'); elements.push(element);
+          element.className = 'box'; document.body.appendChild(element);
+        }
+      }
+      epoch = performance.now();
+      if (onset) {
+        phase = 'onset-before';
+        for (const elements of groups) {
+          const group = { readStartedMs: performance.now() - epoch, positions: [] }; onset.before.push(group);
+          if (config.requireDocumentFrame) {
+            const value = document.timeline?.currentTime;
+            group.documentFrame = { beforeMs: typeof value === 'number' ? value - epoch : value ?? null };
+          }
+          for (const element of elements) group.positions.push(new DOMMatrixReadOnly(getComputedStyle(element).transform).e);
+          if (config.requireDocumentFrame) {
+            const value = document.timeline?.currentTime;
+            group.documentFrame.afterMs = typeof value === 'number' ? value - epoch : value ?? null;
+          }
+          group.readEndedMs = performance.now() - epoch;
+        }
+      }
+      for (const elements of groups) {
+        phase = 'start';
+        callStartedAtMs.push(performance.now() - epoch);
+        controls.push(config.staggerGapMs > 0
+          ? A.startStagger(elements, config.toPx, config.durationMs, config.staggerGapMs)
+          : A.start(elements, config.toPx, config.durationMs));
+        if (onset) {
+          phase = 'onset-after';
+          const group = { readStartedMs: performance.now() - epoch, positions: [] }; onset.after.push(group);
+          if (config.requireDocumentFrame) {
+            const value = document.timeline?.currentTime;
+            group.documentFrame = { beforeMs: typeof value === 'number' ? value - epoch : value ?? null };
+          }
+          for (const element of elements) group.positions.push(new DOMMatrixReadOnly(getComputedStyle(element).transform).e);
+          if (config.requireDocumentFrame) {
+            const value = document.timeline?.currentTime;
+            group.documentFrame.afterMs = typeof value === 'number' ? value - epoch : value ?? null;
+          }
+          group.readEndedMs = performance.now() - epoch;
+        }
+      }
+      if (onset && config.requireDocumentFrame) {
+        phase = 'onset-first-frame';
+        const frameTimestampMs = await new Promise((resolve) => requestAnimationFrame((timestamp) => resolve(timestamp - epoch)));
+        onset.firstFrame = { frameTimestampMs, groups: [] };
+        for (const elements of groups) {
+          const group = { readStartedMs: performance.now() - epoch, positions: [] }; onset.firstFrame.groups.push(group);
+          const before = document.timeline?.currentTime;
+          group.documentFrame = { beforeMs: typeof before === 'number' ? before - epoch : before ?? null };
+          for (const element of elements) group.positions.push(new DOMMatrixReadOnly(getComputedStyle(element).transform).e);
+          const after = document.timeline?.currentTime;
+          group.documentFrame.afterMs = typeof after === 'number' ? after - epoch : after ?? null;
+          group.readEndedMs = performance.now() - epoch;
+        }
+      }
+      phase = 'checkpoint';
+      for (const checkpointTime of checkpointTimes) {
+        const remaining = checkpointTime - (performance.now() - epoch);
+        if (remaining > 0) await new Promise((resolve) => setTimeout(resolve, remaining));
+        // CSS после обновления кадра соотносится с его наблюдаемым timestamp,
+        // а не с предположением о частоте экрана или фазе первого callback.
+        const frameTimestampMs = await new Promise((resolve) => requestAnimationFrame((timestamp) => resolve(timestamp - epoch)));
+        const checkpoint = { frameTimestampMs, groups: [] }; checkpoints.push(checkpoint);
+        for (const elements of groups) {
+          const group = { readStartedMs: performance.now() - epoch, positions: [] }; checkpoint.groups.push(group);
+          if (config.requireDocumentFrame) {
+            const value = document.timeline?.currentTime;
+            group.documentFrame = { beforeMs: typeof value === 'number' ? value - epoch : value ?? null };
+          }
+          for (const element of elements) group.positions.push(new DOMMatrixReadOnly(getComputedStyle(element).transform).e);
+          if (config.requireDocumentFrame) {
+            const value = document.timeline?.currentTime;
+            group.documentFrame.afterMs = typeof value === 'number' ? value - epoch : value ?? null;
+          }
+          group.readEndedMs = performance.now() - epoch;
+        }
+      }
+      phase = 'terminal';
+      const remaining = config.durationMs + delaySpan + 100 - (performance.now() - epoch);
       if (remaining > 0) await new Promise((resolve) => setTimeout(resolve, remaining));
-      checkpoints.push({
-        groups: groups.map((elements) => {
-          const readStartedMs = performance.now() - epoch;
-          const positions = elements.map((element) => (
-            new DOMMatrixReadOnly(getComputedStyle(element).transform).e
-          ));
-          return { readStartedMs, readEndedMs: performance.now() - epoch, positions };
-        }),
-      });
+      for (const elements of groups) {
+        const positions = []; terminal.push(positions);
+        for (const element of elements) positions.push(new DOMMatrixReadOnly(getComputedStyle(element).transform).e);
+      }
+    } catch (error) { failed(error, phase); } finally {
+      for (const control of controls) { try { control.cancel(); } catch (error) { failed(error, 'cancel-cleanup'); } }
+      for (const elements of groups) for (const element of elements) { try { element.remove(); } catch (error) { failed(error, 'target-cleanup'); } }
     }
-    const terminalAt = config.durationMs + delaySpan + 100;
-    const remaining = terminalAt - (performance.now() - epoch);
-    if (remaining > 0) await new Promise((resolve) => setTimeout(resolve, remaining));
-    const terminal = groups.map((elements) => elements.map((element) => (
-      new DOMMatrixReadOnly(getComputedStyle(element).transform).e
-    )));
-    for (const control of controls) { try { control.cancel(); } catch { /* семантика уже снята */ } }
-    for (const elements of groups) for (const element of elements) element.remove();
     return {
       topology: {
         calls: expectedCalls,
@@ -494,11 +554,13 @@ async function runSemanticStartCheck(page, scenario, calls) {
       callStartedAtMs,
       checkpoints,
       terminal,
+      ...(onset ? { onset } : {}),
+      ...(failures.length ? { failures, acquiredOwners: controls.length, createdTargets: groups.map((elements) => elements.length) } : {}),
     };
   }, { config: scenario, calls });
   return {
     ...evidence,
-    valid: evaluateStartSemanticEvidence(evidence, scenario, calls),
+    valid: !evidence.failures?.length && evaluateStartSemanticEvidence(evidence, scenario, calls),
   };
 }
 
@@ -507,7 +569,7 @@ async function runSemanticStartCheck(page, scenario, calls) {
 function colorLeftEdge(pngBuf, channel) {
   // Полный скан: кадры скринкаста — целый вьюпорт (возможен и letterbox),
   // привязываться к конкретной строке нельзя. Ищем левейший пиксель канала.
-  const img = PNG.sync.read(pngBuf);
+  const img = requireBenchmark('pngjs').PNG.sync.read(pngBuf);
   let left = null;
   for (let y = 0; y < img.height; y++) {
     for (let x = 0; x < img.width; x++) {
@@ -855,6 +917,7 @@ async function main() {
   mkdirSync(path.join(__dirname, 'results'), { recursive: true });
 
   const rootPkg = JSON.parse(readFileSync(path.join(ROOT, 'package.json'), 'utf8'));
+  const { chromium } = requireBenchmark('playwright');
   const chromiumInstall = await resolveChromiumInstall();
   const chromiumTreeBefore = hashFileTree(chromiumInstall.directory);
   const benchmarkOrigin = await startBenchmarkOrigin();
