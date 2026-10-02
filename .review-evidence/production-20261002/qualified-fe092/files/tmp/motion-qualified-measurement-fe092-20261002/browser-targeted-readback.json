@@ -1,0 +1,829 @@
+{
+  "rawResultSha256": "8a09834bbe48caffd4bd5b05cd93e5a55a032d7d0cd48ec1e1e22bffa1832188",
+  "targetedSpecs": [
+    {
+      "title": "sheet: destroy восстанавливает исходный inline transform (important)",
+      "ok": true,
+      "tags": [],
+      "tests": [
+        {
+          "timeout": 30000,
+          "annotations": [],
+          "expectedStatus": "passed",
+          "projectId": "chromium",
+          "projectName": "chromium",
+          "results": [
+            {
+              "workerIndex": 0,
+              "parallelIndex": 0,
+              "status": "passed",
+              "duration": 248,
+              "errors": [],
+              "stdout": [],
+              "stderr": [],
+              "retry": 0,
+              "startTime": "2026-10-02T03:36:50.632Z",
+              "annotations": [],
+              "attachments": []
+            }
+          ],
+          "status": "expected"
+        }
+      ],
+      "id": "b9227b25fa0930e6bacb-b3054523c916af3e1854",
+      "file": "compositor-recipes.spec.ts",
+      "line": 94,
+      "column": 5
+    },
+    {
+      "title": "sheet: destroy восстанавливает исходный inline transform (plain)",
+      "ok": true,
+      "tags": [],
+      "tests": [
+        {
+          "timeout": 30000,
+          "annotations": [],
+          "expectedStatus": "passed",
+          "projectId": "chromium",
+          "projectName": "chromium",
+          "results": [
+            {
+              "workerIndex": 0,
+              "parallelIndex": 0,
+              "status": "passed",
+              "duration": 242,
+              "errors": [],
+              "stdout": [],
+              "stderr": [],
+              "retry": 0,
+              "startTime": "2026-10-02T03:36:50.890Z",
+              "annotations": [],
+              "attachments": []
+            }
+          ],
+          "status": "expected"
+        }
+      ],
+      "id": "b9227b25fa0930e6bacb-c99a2a568e584b750304",
+      "file": "compositor-recipes.spec.ts",
+      "line": 94,
+      "column": 5
+    },
+    {
+      "title": "sheet: destroy восстанавливает исходный inline transform (none)",
+      "ok": true,
+      "tags": [],
+      "tests": [
+        {
+          "timeout": 30000,
+          "annotations": [],
+          "expectedStatus": "passed",
+          "projectId": "chromium",
+          "projectName": "chromium",
+          "results": [
+            {
+              "workerIndex": 0,
+              "parallelIndex": 0,
+              "status": "passed",
+              "duration": 260,
+              "errors": [],
+              "stdout": [],
+              "stderr": [],
+              "retry": 0,
+              "startTime": "2026-10-02T03:36:51.148Z",
+              "annotations": [],
+              "attachments": []
+            }
+          ],
+          "status": "expected"
+        }
+      ],
+      "id": "b9227b25fa0930e6bacb-f8f1b6123cc76c79173d",
+      "file": "compositor-recipes.spec.ts",
+      "line": 94,
+      "column": 5
+    },
+    {
+      "title": "sheet: destroy восстанавливает исходный inline transform (absent)",
+      "ok": true,
+      "tags": [],
+      "tests": [
+        {
+          "timeout": 30000,
+          "annotations": [],
+          "expectedStatus": "passed",
+          "projectId": "chromium",
+          "projectName": "chromium",
+          "results": [
+            {
+              "workerIndex": 0,
+              "parallelIndex": 0,
+              "status": "passed",
+              "duration": 221,
+              "errors": [],
+              "stdout": [],
+              "stderr": [],
+              "retry": 0,
+              "startTime": "2026-10-02T03:36:51.420Z",
+              "annotations": [],
+              "attachments": []
+            }
+          ],
+          "status": "expected"
+        }
+      ],
+      "id": "b9227b25fa0930e6bacb-862439f0b160cfc7e5d4",
+      "file": "compositor-recipes.spec.ts",
+      "line": 94,
+      "column": 5
+    },
+    {
+      "title": "pager: destroy восстанавливает исходный inline transform (important)",
+      "ok": true,
+      "tags": [],
+      "tests": [
+        {
+          "timeout": 30000,
+          "annotations": [],
+          "expectedStatus": "passed",
+          "projectId": "chromium",
+          "projectName": "chromium",
+          "results": [
+            {
+              "workerIndex": 0,
+              "parallelIndex": 0,
+              "status": "passed",
+              "duration": 204,
+              "errors": [],
+              "stdout": [],
+              "stderr": [],
+              "retry": 0,
+              "startTime": "2026-10-02T03:36:56.318Z",
+              "annotations": [],
+              "attachments": []
+            }
+          ],
+          "status": "expected"
+        }
+      ],
+      "id": "b9227b25fa0930e6bacb-bbb0040208df579c3ccf",
+      "file": "compositor-recipes.spec.ts",
+      "line": 94,
+      "column": 5
+    },
+    {
+      "title": "pager: destroy восстанавливает исходный inline transform (plain)",
+      "ok": true,
+      "tags": [],
+      "tests": [
+        {
+          "timeout": 30000,
+          "annotations": [],
+          "expectedStatus": "passed",
+          "projectId": "chromium",
+          "projectName": "chromium",
+          "results": [
+            {
+              "workerIndex": 0,
+              "parallelIndex": 0,
+              "status": "passed",
+              "duration": 210,
+              "errors": [],
+              "stdout": [],
+              "stderr": [],
+              "retry": 0,
+              "startTime": "2026-10-02T03:36:56.529Z",
+              "annotations": [],
+              "attachments": []
+            }
+          ],
+          "status": "expected"
+        }
+      ],
+      "id": "b9227b25fa0930e6bacb-dfad3701b6c9cd537a3e",
+      "file": "compositor-recipes.spec.ts",
+      "line": 94,
+      "column": 5
+    },
+    {
+      "title": "pager: destroy восстанавливает исходный inline transform (none)",
+      "ok": true,
+      "tags": [],
+      "tests": [
+        {
+          "timeout": 30000,
+          "annotations": [],
+          "expectedStatus": "passed",
+          "projectId": "chromium",
+          "projectName": "chromium",
+          "results": [
+            {
+              "workerIndex": 0,
+              "parallelIndex": 0,
+              "status": "passed",
+              "duration": 212,
+              "errors": [],
+              "stdout": [],
+              "stderr": [],
+              "retry": 0,
+              "startTime": "2026-10-02T03:36:56.747Z",
+              "annotations": [],
+              "attachments": []
+            }
+          ],
+          "status": "expected"
+        }
+      ],
+      "id": "b9227b25fa0930e6bacb-d89d6a54d98868120267",
+      "file": "compositor-recipes.spec.ts",
+      "line": 94,
+      "column": 5
+    },
+    {
+      "title": "pager: destroy восстанавливает исходный inline transform (absent)",
+      "ok": true,
+      "tags": [],
+      "tests": [
+        {
+          "timeout": 30000,
+          "annotations": [],
+          "expectedStatus": "passed",
+          "projectId": "chromium",
+          "projectName": "chromium",
+          "results": [
+            {
+              "workerIndex": 0,
+              "parallelIndex": 0,
+              "status": "passed",
+              "duration": 210,
+              "errors": [],
+              "stdout": [],
+              "stderr": [],
+              "retry": 0,
+              "startTime": "2026-10-02T03:36:56.967Z",
+              "annotations": [],
+              "attachments": []
+            }
+          ],
+          "status": "expected"
+        }
+      ],
+      "id": "b9227b25fa0930e6bacb-2c2b288c8d18e5157ed5",
+      "file": "compositor-recipes.spec.ts",
+      "line": 94,
+      "column": 5
+    },
+    {
+      "title": "sheet: destroy восстанавливает исходный inline transform (important)",
+      "ok": true,
+      "tags": [],
+      "tests": [
+        {
+          "timeout": 30000,
+          "annotations": [],
+          "expectedStatus": "passed",
+          "projectId": "firefox",
+          "projectName": "firefox",
+          "results": [
+            {
+              "workerIndex": 1,
+              "parallelIndex": 0,
+              "status": "passed",
+              "duration": 395,
+              "errors": [],
+              "stdout": [],
+              "stderr": [],
+              "retry": 0,
+              "startTime": "2026-10-02T03:37:04.287Z",
+              "annotations": [],
+              "attachments": []
+            }
+          ],
+          "status": "expected"
+        }
+      ],
+      "id": "b9227b25fa0930e6bacb-eebdab82d707edcc729b",
+      "file": "compositor-recipes.spec.ts",
+      "line": 94,
+      "column": 5
+    },
+    {
+      "title": "sheet: destroy восстанавливает исходный inline transform (plain)",
+      "ok": true,
+      "tags": [],
+      "tests": [
+        {
+          "timeout": 30000,
+          "annotations": [],
+          "expectedStatus": "passed",
+          "projectId": "firefox",
+          "projectName": "firefox",
+          "results": [
+            {
+              "workerIndex": 1,
+              "parallelIndex": 0,
+              "status": "passed",
+              "duration": 408,
+              "errors": [],
+              "stdout": [],
+              "stderr": [],
+              "retry": 0,
+              "startTime": "2026-10-02T03:37:04.693Z",
+              "annotations": [],
+              "attachments": []
+            }
+          ],
+          "status": "expected"
+        }
+      ],
+      "id": "b9227b25fa0930e6bacb-a2cb76bfac90ad025c1f",
+      "file": "compositor-recipes.spec.ts",
+      "line": 94,
+      "column": 5
+    },
+    {
+      "title": "sheet: destroy восстанавливает исходный inline transform (none)",
+      "ok": true,
+      "tags": [],
+      "tests": [
+        {
+          "timeout": 30000,
+          "annotations": [],
+          "expectedStatus": "passed",
+          "projectId": "firefox",
+          "projectName": "firefox",
+          "results": [
+            {
+              "workerIndex": 1,
+              "parallelIndex": 0,
+              "status": "passed",
+              "duration": 370,
+              "errors": [],
+              "stdout": [],
+              "stderr": [],
+              "retry": 0,
+              "startTime": "2026-10-02T03:37:05.116Z",
+              "annotations": [],
+              "attachments": []
+            }
+          ],
+          "status": "expected"
+        }
+      ],
+      "id": "b9227b25fa0930e6bacb-916036cdfd89d04fc259",
+      "file": "compositor-recipes.spec.ts",
+      "line": 94,
+      "column": 5
+    },
+    {
+      "title": "sheet: destroy восстанавливает исходный inline transform (absent)",
+      "ok": true,
+      "tags": [],
+      "tests": [
+        {
+          "timeout": 30000,
+          "annotations": [],
+          "expectedStatus": "passed",
+          "projectId": "firefox",
+          "projectName": "firefox",
+          "results": [
+            {
+              "workerIndex": 1,
+              "parallelIndex": 0,
+              "status": "passed",
+              "duration": 379,
+              "errors": [],
+              "stdout": [],
+              "stderr": [],
+              "retry": 0,
+              "startTime": "2026-10-02T03:37:05.496Z",
+              "annotations": [],
+              "attachments": []
+            }
+          ],
+          "status": "expected"
+        }
+      ],
+      "id": "b9227b25fa0930e6bacb-8119d382c7d03bb55949",
+      "file": "compositor-recipes.spec.ts",
+      "line": 94,
+      "column": 5
+    },
+    {
+      "title": "pager: destroy восстанавливает исходный inline transform (important)",
+      "ok": true,
+      "tags": [],
+      "tests": [
+        {
+          "timeout": 30000,
+          "annotations": [],
+          "expectedStatus": "passed",
+          "projectId": "firefox",
+          "projectName": "firefox",
+          "results": [
+            {
+              "workerIndex": 1,
+              "parallelIndex": 0,
+              "status": "passed",
+              "duration": 361,
+              "errors": [],
+              "stdout": [],
+              "stderr": [],
+              "retry": 0,
+              "startTime": "2026-10-02T03:37:16.504Z",
+              "annotations": [],
+              "attachments": []
+            }
+          ],
+          "status": "expected"
+        }
+      ],
+      "id": "b9227b25fa0930e6bacb-3223a4c9a4235eaa0b38",
+      "file": "compositor-recipes.spec.ts",
+      "line": 94,
+      "column": 5
+    },
+    {
+      "title": "pager: destroy восстанавливает исходный inline transform (plain)",
+      "ok": true,
+      "tags": [],
+      "tests": [
+        {
+          "timeout": 30000,
+          "annotations": [],
+          "expectedStatus": "passed",
+          "projectId": "firefox",
+          "projectName": "firefox",
+          "results": [
+            {
+              "workerIndex": 1,
+              "parallelIndex": 0,
+              "status": "passed",
+              "duration": 399,
+              "errors": [],
+              "stdout": [],
+              "stderr": [],
+              "retry": 0,
+              "startTime": "2026-10-02T03:37:16.880Z",
+              "annotations": [],
+              "attachments": []
+            }
+          ],
+          "status": "expected"
+        }
+      ],
+      "id": "b9227b25fa0930e6bacb-ca53412c60dac5efdad5",
+      "file": "compositor-recipes.spec.ts",
+      "line": 94,
+      "column": 5
+    },
+    {
+      "title": "pager: destroy восстанавливает исходный inline transform (none)",
+      "ok": true,
+      "tags": [],
+      "tests": [
+        {
+          "timeout": 30000,
+          "annotations": [],
+          "expectedStatus": "passed",
+          "projectId": "firefox",
+          "projectName": "firefox",
+          "results": [
+            {
+              "workerIndex": 1,
+              "parallelIndex": 0,
+              "status": "passed",
+              "duration": 435,
+              "errors": [],
+              "stdout": [],
+              "stderr": [],
+              "retry": 0,
+              "startTime": "2026-10-02T03:37:17.287Z",
+              "annotations": [],
+              "attachments": []
+            }
+          ],
+          "status": "expected"
+        }
+      ],
+      "id": "b9227b25fa0930e6bacb-01acde058e58d608b45c",
+      "file": "compositor-recipes.spec.ts",
+      "line": 94,
+      "column": 5
+    },
+    {
+      "title": "pager: destroy восстанавливает исходный inline transform (absent)",
+      "ok": true,
+      "tags": [],
+      "tests": [
+        {
+          "timeout": 30000,
+          "annotations": [],
+          "expectedStatus": "passed",
+          "projectId": "firefox",
+          "projectName": "firefox",
+          "results": [
+            {
+              "workerIndex": 1,
+              "parallelIndex": 0,
+              "status": "passed",
+              "duration": 437,
+              "errors": [],
+              "stdout": [],
+              "stderr": [],
+              "retry": 0,
+              "startTime": "2026-10-02T03:37:17.732Z",
+              "annotations": [],
+              "attachments": []
+            }
+          ],
+          "status": "expected"
+        }
+      ],
+      "id": "b9227b25fa0930e6bacb-b74e64cce52032b3066a",
+      "file": "compositor-recipes.spec.ts",
+      "line": 94,
+      "column": 5
+    },
+    {
+      "title": "sheet: destroy восстанавливает исходный inline transform (important)",
+      "ok": true,
+      "tags": [],
+      "tests": [
+        {
+          "timeout": 30000,
+          "annotations": [],
+          "expectedStatus": "passed",
+          "projectId": "webkit",
+          "projectName": "webkit",
+          "results": [
+            {
+              "workerIndex": 2,
+              "parallelIndex": 0,
+              "status": "passed",
+              "duration": 489,
+              "errors": [],
+              "stdout": [],
+              "stderr": [],
+              "retry": 0,
+              "startTime": "2026-10-02T03:37:30.908Z",
+              "annotations": [],
+              "attachments": []
+            }
+          ],
+          "status": "expected"
+        }
+      ],
+      "id": "b9227b25fa0930e6bacb-a7365a638cb1e5fb56f0",
+      "file": "compositor-recipes.spec.ts",
+      "line": 94,
+      "column": 5
+    },
+    {
+      "title": "sheet: destroy восстанавливает исходный inline transform (plain)",
+      "ok": true,
+      "tags": [],
+      "tests": [
+        {
+          "timeout": 30000,
+          "annotations": [],
+          "expectedStatus": "passed",
+          "projectId": "webkit",
+          "projectName": "webkit",
+          "results": [
+            {
+              "workerIndex": 2,
+              "parallelIndex": 0,
+              "status": "passed",
+              "duration": 488,
+              "errors": [],
+              "stdout": [],
+              "stderr": [],
+              "retry": 0,
+              "startTime": "2026-10-02T03:37:31.417Z",
+              "annotations": [],
+              "attachments": []
+            }
+          ],
+          "status": "expected"
+        }
+      ],
+      "id": "b9227b25fa0930e6bacb-da797967a8ce1847769c",
+      "file": "compositor-recipes.spec.ts",
+      "line": 94,
+      "column": 5
+    },
+    {
+      "title": "sheet: destroy восстанавливает исходный inline transform (none)",
+      "ok": true,
+      "tags": [],
+      "tests": [
+        {
+          "timeout": 30000,
+          "annotations": [],
+          "expectedStatus": "passed",
+          "projectId": "webkit",
+          "projectName": "webkit",
+          "results": [
+            {
+              "workerIndex": 2,
+              "parallelIndex": 0,
+              "status": "passed",
+              "duration": 497,
+              "errors": [],
+              "stdout": [],
+              "stderr": [],
+              "retry": 0,
+              "startTime": "2026-10-02T03:37:31.916Z",
+              "annotations": [],
+              "attachments": []
+            }
+          ],
+          "status": "expected"
+        }
+      ],
+      "id": "b9227b25fa0930e6bacb-2bba6c5ceff398bbf416",
+      "file": "compositor-recipes.spec.ts",
+      "line": 94,
+      "column": 5
+    },
+    {
+      "title": "sheet: destroy восстанавливает исходный inline transform (absent)",
+      "ok": true,
+      "tags": [],
+      "tests": [
+        {
+          "timeout": 30000,
+          "annotations": [],
+          "expectedStatus": "passed",
+          "projectId": "webkit",
+          "projectName": "webkit",
+          "results": [
+            {
+              "workerIndex": 2,
+              "parallelIndex": 0,
+              "status": "passed",
+              "duration": 482,
+              "errors": [],
+              "stdout": [],
+              "stderr": [],
+              "retry": 0,
+              "startTime": "2026-10-02T03:37:32.423Z",
+              "annotations": [],
+              "attachments": []
+            }
+          ],
+          "status": "expected"
+        }
+      ],
+      "id": "b9227b25fa0930e6bacb-f7d7f87e7a41f917fc53",
+      "file": "compositor-recipes.spec.ts",
+      "line": 94,
+      "column": 5
+    },
+    {
+      "title": "pager: destroy восстанавливает исходный inline transform (important)",
+      "ok": true,
+      "tags": [],
+      "tests": [
+        {
+          "timeout": 30000,
+          "annotations": [],
+          "expectedStatus": "passed",
+          "projectId": "webkit",
+          "projectName": "webkit",
+          "results": [
+            {
+              "workerIndex": 2,
+              "parallelIndex": 0,
+              "status": "passed",
+              "duration": 453,
+              "errors": [],
+              "stdout": [],
+              "stderr": [],
+              "retry": 0,
+              "startTime": "2026-10-02T03:37:42.979Z",
+              "annotations": [],
+              "attachments": []
+            }
+          ],
+          "status": "expected"
+        }
+      ],
+      "id": "b9227b25fa0930e6bacb-0cd796215fb8238c68a4",
+      "file": "compositor-recipes.spec.ts",
+      "line": 94,
+      "column": 5
+    },
+    {
+      "title": "pager: destroy восстанавливает исходный inline transform (plain)",
+      "ok": true,
+      "tags": [],
+      "tests": [
+        {
+          "timeout": 30000,
+          "annotations": [],
+          "expectedStatus": "passed",
+          "projectId": "webkit",
+          "projectName": "webkit",
+          "results": [
+            {
+              "workerIndex": 2,
+              "parallelIndex": 0,
+              "status": "passed",
+              "duration": 435,
+              "errors": [],
+              "stdout": [],
+              "stderr": [],
+              "retry": 0,
+              "startTime": "2026-10-02T03:37:43.443Z",
+              "annotations": [],
+              "attachments": []
+            }
+          ],
+          "status": "expected"
+        }
+      ],
+      "id": "b9227b25fa0930e6bacb-9cb375c75f0a211834f4",
+      "file": "compositor-recipes.spec.ts",
+      "line": 94,
+      "column": 5
+    },
+    {
+      "title": "pager: destroy восстанавливает исходный inline transform (none)",
+      "ok": true,
+      "tags": [],
+      "tests": [
+        {
+          "timeout": 30000,
+          "annotations": [],
+          "expectedStatus": "passed",
+          "projectId": "webkit",
+          "projectName": "webkit",
+          "results": [
+            {
+              "workerIndex": 2,
+              "parallelIndex": 0,
+              "status": "passed",
+              "duration": 470,
+              "errors": [],
+              "stdout": [],
+              "stderr": [],
+              "retry": 0,
+              "startTime": "2026-10-02T03:37:43.887Z",
+              "annotations": [],
+              "attachments": []
+            }
+          ],
+          "status": "expected"
+        }
+      ],
+      "id": "b9227b25fa0930e6bacb-9710236e8e5f0b0d7dec",
+      "file": "compositor-recipes.spec.ts",
+      "line": 94,
+      "column": 5
+    },
+    {
+      "title": "pager: destroy восстанавливает исходный inline transform (absent)",
+      "ok": true,
+      "tags": [],
+      "tests": [
+        {
+          "timeout": 30000,
+          "annotations": [],
+          "expectedStatus": "passed",
+          "projectId": "webkit",
+          "projectName": "webkit",
+          "results": [
+            {
+              "workerIndex": 2,
+              "parallelIndex": 0,
+              "status": "passed",
+              "duration": 449,
+              "errors": [],
+              "stdout": [],
+              "stderr": [],
+              "retry": 0,
+              "startTime": "2026-10-02T03:37:44.365Z",
+              "annotations": [],
+              "attachments": []
+            }
+          ],
+          "status": "expected"
+        }
+      ],
+      "id": "b9227b25fa0930e6bacb-e559578f72d04678d4e9",
+      "file": "compositor-recipes.spec.ts",
+      "line": 94,
+      "column": 5
+    }
+  ],
+  "stats": {
+    "startTime": "2026-10-02T03:36:47.991Z",
+    "duration": 67182.69799999999,
+    "expected": 144,
+    "skipped": 0,
+    "unexpected": 0,
+    "flaky": 0
+  }
+}

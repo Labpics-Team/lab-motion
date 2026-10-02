@@ -1,0 +1,16 @@
+{
+  "startUtc": "2026-10-02T03:21:15.912033+00:00",
+  "argv": [
+    "taskset",
+    "-c",
+    "0",
+    "/opt/codex/runtimes/codex-primary-runtime/dependencies/node/bin/node",
+    "test/fixtures/server-thread-cpu-clock-check.mjs"
+  ],
+  "cwd": "/workspace/lab-motion",
+  "env": {
+    "NODE_PATH": null,
+    "NODE_OPTIONS": null
+  },
+  "registeredTimingSamples": 0
+}

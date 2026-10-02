@@ -1,0 +1,21 @@
+diff --git a/.github/workflows/ci.yml b/.github/workflows/ci.yml
+index f4c8c0b8..fa747bfc 100644
+--- a/.github/workflows/ci.yml
++++ b/.github/workflows/ci.yml
+@@ -191,6 +191,16 @@ jobs:
+       - name: Fuzz · finiteness gate (virtual-time, seeded LCG, zero-dep)
+         run: pnpm vitest run --reporter=verbose test/*finiteness-fuzz.test.ts
+ 
++      # Проверяем настоящий C/header/API на зарегистрированном Node, сохраняя
++      # обычный suite выше на текущем Node24. Это не performance calibration.
++      - name: Setup registered native-clock Node
++        uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v6
++        with:
++          node-version: "24.19.0"
++
++      - name: Native CPU clock · actual source and refusal controls
++        run: node test/fixtures/server-thread-cpu-clock-check.mjs
++
+   mutation:
+     name: driver mutation
+     runs-on: ubuntu-latest

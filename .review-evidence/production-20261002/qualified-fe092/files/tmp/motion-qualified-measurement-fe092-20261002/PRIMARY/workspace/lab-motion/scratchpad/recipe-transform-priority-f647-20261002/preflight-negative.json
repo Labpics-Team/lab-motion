@@ -1,0 +1,8 @@
+{
+  "status": "DOC_RECEIPT_MISMATCH",
+  "browserStarted": false,
+  "currentDocsSha256": "0808d2bde83cdd6d3af74c0e3bd4dd4996d469ff29c56c4937dae05ecccef8f3",
+  "actualFixtureRecipesSha256": "53e241c1aa75f842c173051fd0d8e90da39dc19813867802d33f5c6b513b3fa5",
+  "bundleMatchesReceipt": true,
+  "interpretation": "old actual fixture subject only; no claim current docs equal packed recipe"
+}

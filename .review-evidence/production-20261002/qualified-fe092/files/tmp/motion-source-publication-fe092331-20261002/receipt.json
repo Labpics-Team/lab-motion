@@ -1,0 +1,88 @@
+{
+  "started": "2026-10-02T04:00:25.826950+00:00",
+  "path": "/workspace/lab-motion",
+  "repo": "Labpics-Team/lab-motion",
+  "base": "f6476ae990254f606faf97f80afe41965bec2fb2",
+  "head": "fe092331360837fd7f63d71a4b7f867ba849ebd4",
+  "branch": "codex/motion-production-20261001",
+  "pr": 460,
+  "objects": {
+    "argv": [
+      "python3",
+      "/workspace/scratch/publish-git-objects-only-20261001.py",
+      "--path",
+      "/workspace/lab-motion",
+      "--repo",
+      "Labpics-Team/lab-motion",
+      "--base",
+      "f6476ae990254f606faf97f80afe41965bec2fb2",
+      "--head",
+      "fe092331360837fd7f63d71a4b7f867ba849ebd4",
+      "--branch",
+      "codex/motion-production-20261001"
+    ],
+    "ended": "2026-10-02T04:00:38.841745+00:00",
+    "exit": 0
+  },
+  "casEnded": "2026-10-02T04:00:40.334799+00:00",
+  "tree": "285e30e36db32f2fdc9ae442327f6b3396dcf254",
+  "bodies": [
+    {
+      "path": ".github/workflows/ci.yml",
+      "gitOid": "fa747bfc21f5ab22826cf9e30715918578c45576",
+      "bytes": 11569,
+      "sha256": "9a8f5c8f37b8a939e534c5afa08bae5213db73ec2484fb5c397b22de3ee599d8",
+      "match": true
+    },
+    {
+      "path": "browser/compositor-recipes.spec.ts",
+      "gitOid": "e93c08e084998bc6206eef3965d4e5ac16d964dc",
+      "bytes": 26057,
+      "sha256": "e0baa661fbeb83770e8035708ecde292e7e7ad38502b6d745d3ebb3726edaecc",
+      "match": true
+    },
+    {
+      "path": "docs/recipes.md",
+      "gitOid": "8292e9f1c836a200d21bc4160c9bd6c14add78ef",
+      "bytes": 58035,
+      "sha256": "ba7300424fa8923e822ef55d4ff6f36550e06c476aca80869b02f87259b61645",
+      "match": true
+    },
+    {
+      "path": "test/ci-workflow-contract.test.ts",
+      "gitOid": "f2dfd2cb1a5f595c49e674cdd0533be50218086a",
+      "bytes": 24040,
+      "sha256": "0a0ee8faf5e0c1c647f4944e7e131b34c7e0fc0d850a7f890d498f73a8f31ed9",
+      "match": true
+    },
+    {
+      "path": "test/fixtures/server-thread-cpu-clock-check.mjs",
+      "gitOid": "99bd6595885c7d26f9db5257e4536e9ede7dd447",
+      "bytes": 8851,
+      "sha256": "d032a5cb9668578b9fbcce986e1cbefa2865fdc17c986742a1274b0e34cb951c",
+      "match": true
+    },
+    {
+      "path": "test/fixtures/server-thread-cpu-clock-host.c",
+      "gitOid": "08629b8b6358644331fcfc7e572ee2073282863a",
+      "bytes": 1503,
+      "sha256": "15ee4c885cb88c317051a1951030c441b9c78bf105ceb6f21d5ebce6eac3586e",
+      "match": true
+    },
+    {
+      "path": "test/server-profile-contract.test.ts",
+      "gitOid": "99b85b3fc2bba7bef8c1daa626e1bed95b9c9da6",
+      "bytes": 99503,
+      "sha256": "14aa08faad2bf30b1ad355e49b3da86bd5b61d653057ff28bbfa318cce177eb8",
+      "match": true
+    }
+  ],
+  "allChangedBodiesMatch": true,
+  "mainBefore": "957ceaf26501525eff476cdc1d149d81fd5ebcd7",
+  "mainAfter": "957ceaf26501525eff476cdc1d149d81fd5ebcd7",
+  "prAfterObserved": "fe092331360837fd7f63d71a4b7f867ba849ebd4",
+  "exit": 0,
+  "result": "PASS — точные объекты, отдельная ссылка CAS, все изменённые тела прочитаны",
+  "ended": "2026-10-02T04:00:44.106748+00:00",
+  "allChildrenEnded": true
+}

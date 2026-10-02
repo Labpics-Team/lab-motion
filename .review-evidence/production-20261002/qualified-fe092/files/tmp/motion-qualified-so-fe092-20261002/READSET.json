@@ -1,0 +1,844 @@
+{
+  "capturedAtUtc": "2026-10-02T03:55:35.347923+00:00",
+  "head": "fe092331360837fd7f63d71a4b7f867ba849ebd4",
+  "tree": "285e30e36db32f2fdc9ae442327f6b3396dcf254",
+  "base": "f6476ae990254f606faf97f80afe41965bec2fb2",
+  "axis": "Second-order architecture/compatibility/CI enforcement/recipe stylesheet lifecycle and addedcost/simpler remedies",
+  "entries": [
+    {
+      "path": "/workspace/agents-config/AGENTS.md",
+      "kind": "normative-own-read-transfer",
+      "sha256": "0e1376312cedf91660b1c919ba4c1a9a6e067fe8719eb8daeb52113508b28f0a",
+      "bytes": 38398,
+      "scope": "Рабочие нормы; фокус 103–145 и 199, область и полномочия; current direct reread103–150 and187–207",
+      "byteIdenticalOwnF647": true
+    },
+    {
+      "path": "/workspace/agents-config/plans/SPEC.md",
+      "kind": "normative-own-read-transfer",
+      "sha256": "7488d5885ee2405d678e488e34a84ce48254978c3a6ad3de2e4d31dfe7b3f651",
+      "bytes": 31491,
+      "scope": "Вся спецификация 1–368; authoritative/lifecycle/draft/grants/evidence",
+      "byteIdenticalOwnF647": true
+    },
+    {
+      "path": "/workspace/agents-config/plans/TEMPLATE.md",
+      "kind": "normative-own-read-transfer",
+      "sha256": "7f4cb8dcc983f392a01f2abdddc7b74527412b0da725b114cee94677c651a97e",
+      "bytes": 10270,
+      "scope": "Весь template; выбранный подход/alternatives/cost/evidence",
+      "byteIdenticalOwnF647": true
+    },
+    {
+      "path": "/workspace/agents-config/plans/lab-motion-production/ACTIVE.md",
+      "kind": "normative-own-read-transfer",
+      "sha256": "42e36c2efa89912aa00395c938263c1bf35275325420df52ec736b0986606731",
+      "bytes": 235,
+      "scope": "Полный файл: r11 active",
+      "byteIdenticalOwnF647": true
+    },
+    {
+      "path": "/workspace/agents-config/plans/lab-motion-production/CLAIM.md",
+      "kind": "normative-own-read-transfer",
+      "sha256": "56ac2167795a81b9d1a60d2ebc1cb8830a2653cbc45026bbcb2d0b0f8e837fa8",
+      "bytes": 139,
+      "scope": "Полный файл: r11 PROFILE-01",
+      "byteIdenticalOwnF647": true
+    },
+    {
+      "path": "/workspace/agents-config/plans/lab-motion-production/ACTIVATION.md",
+      "kind": "normative-own-read-transfer",
+      "sha256": "97e6b6ce4080b5c91d62e7ace5844a3c7aeeaa3bce04b21f832785bc807a4908",
+      "bytes": 194,
+      "scope": "Полный файл: r11 grant",
+      "byteIdenticalOwnF647": true
+    },
+    {
+      "path": "/workspace/agents-config/plans/lab-motion-production/r11.md",
+      "kind": "normative-own-read-transfer",
+      "sha256": "cbeef108b288502165437c375bb259f3f4d6dc8ae4ae9e926db133adeba40d4b",
+      "bytes": 74166,
+      "scope": "Scoped: original objective; M-04/M-05; ASM/INV; PROFILE 339–351; G-PERF 435–456; статусы/Unknowns. Не весь файл semantic-audited.",
+      "byteIdenticalOwnF647": true
+    },
+    {
+      "path": "/workspace/agents-config/plans/lab-motion-production/r12.md",
+      "kind": "normative-own-read-transfer",
+      "sha256": "b2e6d1462b0bce43773beaf307e3b3963c426bf07134f49c844d4991e1753622",
+      "bytes": 40024,
+      "scope": "Подготовленный successor; сохранение области, objective, ASM/INV, PROFILE, gates/Unknowns. Не treated as active.",
+      "byteIdenticalOwnF647": true
+    },
+    {
+      "path": "/workspace/agents-config/skills/architecture/references/composition.md",
+      "kind": "normative-own-read-transfer",
+      "sha256": "9297e36749db27c85b57aa65048faa72f656d23a68c49f3f4459c0269ce55d03",
+      "bytes": 18836,
+      "scope": "Нормативная процедура при изменении эксплуатационной границы; scope/consumer/budget/alternatives. Tool output частично truncates middle; не заявляется полный semantic audit.",
+      "byteIdenticalOwnF647": true
+    },
+    {
+      "path": "/tmp/motion-qualified-so-fe092-20261002/source/.github/workflows/ci.yml",
+      "kind": "immutable-source-scoped",
+      "sha256": "9a8f5c8f37b8a939e534c5afa08bae5213db73ec2484fb5c397b22de3ee599d8",
+      "bytes": 11569,
+      "scope": "Full diff; source135–216 tests job/step placement; unchanged gate graph and rules read through workflow contract"
+    },
+    {
+      "path": "/tmp/motion-qualified-so-fe092-20261002/source/test/ci-workflow-contract.test.ts",
+      "kind": "immutable-source-scoped",
+      "sha256": "0a0ee8faf5e0c1c647f4944e7e131b34c7e0fc0d850a7f890d498f73a8f31ed9",
+      "bytes": 24040,
+      "scope": "Full diff; source1–133 plus targeted276–516 owner/action/command/CI join/mutation loops; output partly truncated, no new suite execution"
+    },
+    {
+      "path": "/tmp/motion-qualified-so-fe092-20261002/source/test/fixtures/server-thread-cpu-clock-check.mjs",
+      "kind": "immutable-source-scoped",
+      "sha256": "d032a5cb9668578b9fbcce986e1cbefa2865fdc17c986742a1274b0e34cb951c",
+      "bytes": 8851,
+      "scope": "Whole144 lines via exact diff; child/API/native ABI/error controls, 8 compiles, source mutants, cleanup and bounded child calls"
+    },
+    {
+      "path": "/tmp/motion-qualified-so-fe092-20261002/source/test/fixtures/server-thread-cpu-clock-host.c",
+      "kind": "immutable-source-scoped",
+      "sha256": "15ee4c885cb88c317051a1951030c441b9c78bf105ceb6f21d5ebce6eac3586e",
+      "bytes": 1503,
+      "scope": "Whole43 lines via exact diff; linker-wrapped clocks/resolution/PID/TID, no production change"
+    },
+    {
+      "path": "/tmp/motion-qualified-so-fe092-20261002/source/test/server-profile-contract.test.ts",
+      "kind": "immutable-source-scoped",
+      "sha256": "14aa08faad2bf30b1ad355e49b3da86bd5b61d653057ff28bbfa318cce177eb8",
+      "bytes": 99503,
+      "scope": "Full delta; source239–253,1002–1053 and all admissionHistory/sharedAdmission/guard call sites scanned; own literal setup/chain and15 statements preservation; not whole-file correctness audit"
+    },
+    {
+      "path": "/tmp/motion-qualified-so-fe092-20261002/source/docs/recipes.md",
+      "kind": "immutable-source-scoped",
+      "sha256": "ba7300424fa8923e822ef55d4ff6f36550e06c476aca80869b02f87259b61645",
+      "bytes": 58035,
+      "scope": "Full delta plus source424–721 complete sheet/pager bodies and documentation; CSSOM value/priority/absence and existing lifecycle ownership"
+    },
+    {
+      "path": "/tmp/motion-qualified-so-fe092-20261002/source/browser/compositor-recipes.spec.ts",
+      "kind": "immutable-source-scoped",
+      "sha256": "e0baa661fbeb83770e8035708ecde292e7e7ad38502b6d745d3ebb3726edaecc",
+      "bytes": 26057,
+      "scope": "Full delta and1–91 actual package/SSR harness; source94+ new four-state sheet/pager assertions; not whole browser suite audit"
+    },
+    {
+      "path": "/tmp/motion-qualified-fe092331-20261002/source.diff",
+      "kind": "immutable-primary-content",
+      "sha256": "6700f7b29e449eaaace6e386be0a05e18cbfe6891f7b8192b762704fb0872deb",
+      "bytes": 25089,
+      "scope": "Whole exact diff read;7paths"
+    },
+    {
+      "path": "/tmp/motion-qualified-fe092331-20261002/PRIMARY-PACKET.json",
+      "kind": "immutable-primary-content",
+      "sha256": "4184a52ea58d4f3b27e7cd4c571425c51efda578f1a283b2aab396dd0659e29e",
+      "bytes": 7130,
+      "scope": "Whole source identity and refs; author scope notlaw"
+    },
+    {
+      "path": "/tmp/motion-qualified-fe092331-20261002/commit.raw",
+      "kind": "immutable-primary-content",
+      "sha256": "06e8f583ddc2803ef75e4996a4dd4a4b239d05d72bc25480f048eaacb82c9fd7",
+      "bytes": 337,
+      "scope": "Git object bytes independently hashed; tree header binding"
+    },
+    {
+      "path": "/tmp/motion-qualified-fe092331-20261002/tree.raw",
+      "kind": "immutable-primary-content",
+      "sha256": "35e40734e08087c8588cb36f688950059062d93e1ca1faef68ae8856cb488e86",
+      "bytes": 1192,
+      "scope": "Raw Git object bytes independently hashed, compare root rebuilt all641blobs"
+    },
+    {
+      "path": "/tmp/motion-native-clock-permanent-controls-20261002/frozen-inputs.json",
+      "kind": "primary-content-scoped",
+      "sha256": "466622a3b354b395895820f48e8a470ad4041c86c24278de2bceca54b4ba1ee5",
+      "bytes": 1296,
+      "scope": "Whole; exact six source hashes transferred to finalfe092 despite precommit f647 HEAD label"
+    },
+    {
+      "path": "/tmp/motion-native-clock-permanent-controls-20261002/execution-start.json",
+      "kind": "primary-content-scoped",
+      "sha256": "fa6317233cc9b20e32734a31865c57c0de15968cf1d9c370b7b9d6fe2d18e82f",
+      "bytes": 364,
+      "scope": "Whole argv/time/environment; zero registered timing declaration checked against source"
+    },
+    {
+      "path": "/tmp/motion-native-clock-permanent-controls-20261002/execution.json",
+      "kind": "primary-content-scoped",
+      "sha256": "09f85ad246a08b4a3ae75687a10f4a0b20ff4965f05d920296c58fc039c1ba08",
+      "bytes": 974,
+      "scope": "Whole actual process metadata/timing/exit/files; not own runtime"
+    },
+    {
+      "path": "/tmp/motion-native-clock-permanent-controls-20261002/run.py",
+      "kind": "primary-content-scoped",
+      "sha256": "ad4b4a3d8f1af34e091c6a134abd9e6acd93f5f06ae2ae60dcd3ed55f95cc495",
+      "bytes": 1970,
+      "scope": "Whole raw acquisition/processgroup deadline and log custody; not executed by reviewer"
+    },
+    {
+      "path": "/tmp/motion-native-clock-permanent-controls-20261002/stdout.log",
+      "kind": "primary-content-scoped",
+      "sha256": "446c88b9ee8bee84984940f1f84734c4a276cf17b7b0d15664cc356c9a66a5e6",
+      "bytes": 10973,
+      "scope": "Parsed actual-api metadata/endpoints and all11 case/compiled-source records; not complete mutant stderr semantic acceptance; source hashes and counter arithmetic checked"
+    },
+    {
+      "path": "/tmp/motion-admission-granularity-20261002/before.test.ts",
+      "kind": "primary-content-scoped",
+      "sha256": "372a0938d7f7adaddb307a96904be9350f4269df9b22223af63051926e4067b7",
+      "bytes": 97980,
+      "scope": "Old original callback and exact setup/chain regions independently compared; whole file bytes bound to ownf647source"
+    },
+    {
+      "path": "/tmp/motion-admission-granularity-20261002/conservation.mjs",
+      "kind": "primary-content-scoped",
+      "sha256": "d2599a23d52c5dd12ff0194fc48c403b2210b5302140235114234240f2e1e476",
+      "bytes": 3357,
+      "scope": "Whole raw primary computation source; not executed; success flags notoracle"
+    },
+    {
+      "path": "/tmp/motion-admission-granularity-20261002/conservation-result.json",
+      "kind": "primary-content-scoped",
+      "sha256": "42c34b74c6d004621667d206e87757de80eabfc5af78f76c9e566e779d864170",
+      "bytes": 7138,
+      "scope": "Whole proposition/raw old/new callbacks; own literal conservation verified separately rather than accepting author flags"
+    },
+    {
+      "path": "/tmp/motion-ci-f6476ae9-failure-20261002/job-110685127941.log",
+      "kind": "primary-content-scoped",
+      "sha256": "812738cebb87d49e9e519bedf542e7f6f1a199d6cd612f06d636c9d13bb39860",
+      "bytes": 244446,
+      "scope": "Targeted old nativeCI aggregate callback timeout lines1226,1603–1624; broadsearch output incidental unrelated entries notused asoracle"
+    },
+    {
+      "path": "/workspace/lab-motion/scratchpad/recipe-transform-priority-f647-20261002/red2.observations.json",
+      "kind": "primary-content-scoped",
+      "sha256": "4023d247c553a680473126f40c76eda2be049a1b56b530ecbe3877d221e04af5",
+      "bytes": 8071,
+      "scope": "Whole stale-old-actual-tar raw before/move/after vectors for8states; own deficit identification via priority/pixel; authorRED/check flags notoracle and no freshdoc equivalence"
+    },
+    {
+      "path": "/workspace/lab-motion/scratchpad/recipe-transform-priority-f647-20261002/red2.command.json",
+      "kind": "primary-content-scoped",
+      "sha256": "eeabbb8f43a7ec840a19a8532e79f6492a15c615cc30a86d59de44736c18e2cc",
+      "bytes": 337,
+      "scope": "Whole old control argv/time/exit"
+    },
+    {
+      "path": "/workspace/lab-motion/scratchpad/recipe-transform-priority-f647-20261002/preflight-negative.json",
+      "kind": "primary-content-scoped",
+      "sha256": "c06a5edbfff10054e8cd3c6281bb542f7f06c473b4d16b1c664b1d4590a52569",
+      "bytes": 387,
+      "scope": "Whole identity mismatch raw fields; retained negative notrelabelled currentdoc proof"
+    },
+    {
+      "path": "/tmp/motion-profile-current-gates-fe092331-20261002/PRIMARY-GATES-SUPPLEMENT.json",
+      "kind": "primary-content-scoped",
+      "sha256": "ed166f092eb854a1c8317d835dbe2035f96ae527837a7e7bb1eb9204419895c1",
+      "bytes": 6196,
+      "scope": "Whole refs/source/package bindings; independently checked30refs"
+    },
+    {
+      "path": "/tmp/motion-profile-current-gates-fe092331-20261002/receipt.json",
+      "kind": "primary-content-scoped",
+      "sha256": "26138e2b9c80ab254ab047f28c231db6db763a6b6cdd4f61a138dbf9ee8a834e",
+      "bytes": 7262,
+      "scope": "Whole raw commands/environment/end/exit; semantic globalGO notinferred"
+    },
+    {
+      "path": "/tmp/motion-profile-current-gates-fe092331-20261002/run.py",
+      "kind": "primary-content-scoped",
+      "sha256": "297f5bb795effeb6ba7d90202d2e57b9b525dfd96c8ab34196b231e5afb7a055",
+      "bytes": 2983,
+      "scope": "Whole cleanHEAD input/command-acquisition script; not executed by reviewer"
+    },
+    {
+      "path": "/tmp/motion-profile-current-gates-fe092331-20261002/whole.json",
+      "kind": "primary-content-scoped",
+      "sha256": "ae5e6b196a1a077b9672171d56782bb9772d25391872c3d44fe652b581519b0f",
+      "bytes": 2141909,
+      "scope": "JSON parsed;6 source-matched admission framework cases and their duration/status/failureMessages selected, broader suite summary notoracle"
+    },
+    {
+      "path": "/tmp/motion-recipes-current-browser-fe092331-20261002/execution.json",
+      "kind": "primary-content-scoped",
+      "sha256": "ab4d7527d1e2468dff621d1f792435f7684197721f00f1d7d09e6f2b03ca3a00",
+      "bytes": 3171,
+      "scope": "Whole raw argv/env/time/exit/source; qualification prose notoracle, host-validation bypass limits evaluated from literalenv"
+    },
+    {
+      "path": "/tmp/motion-recipes-current-browser-fe092331-20261002/run.py",
+      "kind": "primary-content-scoped",
+      "sha256": "b9517f9664984f731830d849e2d444b377020e54846989347956a60b65d8b6ac",
+      "bytes": 2746,
+      "scope": "Whole acquisition/cleanHEAD/code script; not executed"
+    },
+    {
+      "path": "/tmp/motion-recipes-current-browser-fe092331-20261002/result.json",
+      "kind": "primary-content-scoped",
+      "sha256": "8a09834bbe48caffd4bd5b05cd93e5a55a032d7d0cd48ec1e1e22bffa1832188",
+      "bytes": 166286,
+      "scope": "JSON parsed;24 new stylesheet cases across3projects selected for retry/status/errors/duration; no retained DOM observation dump in freshcases"
+    },
+    {
+      "path": "/tmp/motion-recipes-current-browser-fe092331-20261002/scope-recipes.package.json",
+      "kind": "primary-content-scoped",
+      "sha256": "df1fd41df0c4b268b24f3c00e7566570d0a360d2643bae955201f4ac417c219d",
+      "bytes": 1210,
+      "scope": "Whole freshdoc/bundle/npm archive/package manifest bindings"
+    },
+    {
+      "path": "/tmp/motion-recipes-current-browser-fe092331-20261002/scope-recipes.js",
+      "kind": "primary-content-scoped",
+      "sha256": "5320f49b7889f455a0792252e44f6069b75638d2d27051e5a25d6504d2f71c5a",
+      "bytes": 1382990,
+      "scope": "Wholebytes hash; targeted codepresence only priority getter/newrestore/removal operations, not whole bundled third-party audit"
+    },
+    {
+      "path": "/tmp/motion-profile-current-gates-fe092331-20261002/candidate-pnpm.tgz",
+      "kind": "actual-package-readback",
+      "sha256": "b41708c31e122da9ae46a558f0c5f447195f36ca19c9b0fe6c19954887d790e4",
+      "bytes": 562051,
+      "scope": "All312 file names private/native boundary and actual package.json semantic equality; no package consumer execution",
+      "metadataNormalization": [
+        "packageManager"
+      ]
+    },
+    {
+      "path": "/tmp/motion-profile-current-gates-fe092331-20261002/labpics-motion-0.3.0.tgz",
+      "kind": "actual-package-readback",
+      "sha256": "54482b3da5ae3e530e9f25f29b91471b1ff95cf2d8212735a0eeb71002d6fba7",
+      "bytes": 560040,
+      "scope": "All312 file names private/native boundary and actual package.json semantic equality; no package consumer execution",
+      "metadataNormalization": []
+    },
+    {
+      "path": "/tmp/motion-native-cpu-rle-so-5a4c-20261002/REPORT.md",
+      "kind": "own-previous-sealed-proof",
+      "sha256": "2c2ca68c1e497196363a1450cd7caef2bf2b30479bc399d4ee23a380b4358829",
+      "bytes": 26849,
+      "scope": "Own f647 proof/custody only; transfer restricted634unchanged source and9unchanged norms, no old whole test acceptance carried"
+    },
+    {
+      "path": "/tmp/motion-native-cpu-rle-so-5a4c-20261002/READSET.json",
+      "kind": "own-previous-sealed-proof",
+      "sha256": "29446511ed5dd03508581c9858d5fb7b9dfb4e1203dfe21bc3cc9f23a9937528",
+      "bytes": 37557,
+      "scope": "Own f647 proof/custody only; transfer restricted634unchanged source and9unchanged norms, no old whole test acceptance carried"
+    },
+    {
+      "path": "/tmp/motion-native-cpu-rle-so-5a4c-20261002/MANIFEST.json",
+      "kind": "own-previous-sealed-proof",
+      "sha256": "5571944715a28d01739f89fc9a82c6b9d6a67dd6ae1f05dc212f70141f3ede09",
+      "bytes": 2893,
+      "scope": "Own f647 proof/custody only; transfer restricted634unchanged source and9unchanged norms, no old whole test acceptance carried"
+    },
+    {
+      "path": "/tmp/motion-native-cpu-rle-so-5a4c-20261002/TERMINAL.json",
+      "kind": "own-previous-sealed-proof",
+      "sha256": "88a00ff9f35fd96fef5f5f06a7a434b7119ef41c2d1dc2402e5284b07668bb03",
+      "bytes": 1075,
+      "scope": "Own f647 proof/custody only; transfer restricted634unchanged source and9unchanged norms, no old whole test acceptance carried"
+    }
+  ],
+  "identityOnlySets": [
+    {
+      "path": "/tmp/motion-qualified-fe092331-20261002/PRIMARY-PACKET.json",
+      "sha256": "4184a52ea58d4f3b27e7cd4c571425c51efda578f1a283b2aab396dd0659e29e",
+      "refs": [
+        {
+          "path": "/tmp/motion-qualified-fe092331-20261002/source.tar",
+          "bytes": 7444480,
+          "sha256": "a91db3d664b91a7e169a49de4794fa7150064f35fe281a6a2b6fec2fd6023709",
+          "expectedSha256": "a91db3d664b91a7e169a49de4794fa7150064f35fe281a6a2b6fec2fd6023709",
+          "matches": true,
+          "role": "identity only until scoped content read"
+        },
+        {
+          "path": "/tmp/motion-qualified-fe092331-20261002/source.diff",
+          "bytes": 25089,
+          "sha256": "6700f7b29e449eaaace6e386be0a05e18cbfe6891f7b8192b762704fb0872deb",
+          "expectedSha256": "6700f7b29e449eaaace6e386be0a05e18cbfe6891f7b8192b762704fb0872deb",
+          "matches": true,
+          "role": "identity only until scoped content read"
+        },
+        {
+          "path": "/tmp/motion-qualified-fe092331-20261002/commit.raw",
+          "bytes": 337,
+          "sha256": "06e8f583ddc2803ef75e4996a4dd4a4b239d05d72bc25480f048eaacb82c9fd7",
+          "expectedSha256": "06e8f583ddc2803ef75e4996a4dd4a4b239d05d72bc25480f048eaacb82c9fd7",
+          "matches": true,
+          "role": "identity only until scoped content read"
+        },
+        {
+          "path": "/tmp/motion-qualified-fe092331-20261002/tree.raw",
+          "bytes": 1192,
+          "sha256": "35e40734e08087c8588cb36f688950059062d93e1ca1faef68ae8856cb488e86",
+          "expectedSha256": "35e40734e08087c8588cb36f688950059062d93e1ca1faef68ae8856cb488e86",
+          "matches": true,
+          "role": "identity only until scoped content read"
+        },
+        {
+          "path": "/tmp/motion-admission-granularity-20261002/before.test.ts",
+          "bytes": 97980,
+          "sha256": "372a0938d7f7adaddb307a96904be9350f4269df9b22223af63051926e4067b7",
+          "expectedSha256": "372a0938d7f7adaddb307a96904be9350f4269df9b22223af63051926e4067b7",
+          "matches": true,
+          "role": "identity only until scoped content read"
+        },
+        {
+          "path": "/tmp/motion-admission-granularity-20261002/conservation.mjs",
+          "bytes": 3357,
+          "sha256": "d2599a23d52c5dd12ff0194fc48c403b2210b5302140235114234240f2e1e476",
+          "expectedSha256": "d2599a23d52c5dd12ff0194fc48c403b2210b5302140235114234240f2e1e476",
+          "matches": true,
+          "role": "identity only until scoped content read"
+        },
+        {
+          "path": "/tmp/motion-admission-granularity-20261002/conservation-result.json",
+          "bytes": 7138,
+          "sha256": "42c34b74c6d004621667d206e87757de80eabfc5af78f76c9e566e779d864170",
+          "expectedSha256": "42c34b74c6d004621667d206e87757de80eabfc5af78f76c9e566e779d864170",
+          "matches": true,
+          "role": "identity only until scoped content read"
+        },
+        {
+          "path": "/tmp/motion-admission-granularity-20261002/conservation.stdout.log",
+          "bytes": 56,
+          "sha256": "1398dca418323dc4f382b8bf27c511fbdb3fdea22c8552a31f18629773a591e0",
+          "expectedSha256": "1398dca418323dc4f382b8bf27c511fbdb3fdea22c8552a31f18629773a591e0",
+          "matches": true,
+          "role": "identity only until scoped content read"
+        },
+        {
+          "path": "/tmp/motion-admission-granularity-20261002/conservation.stderr.log",
+          "bytes": 0,
+          "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+          "expectedSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+          "matches": true,
+          "role": "identity only until scoped content read"
+        },
+        {
+          "path": "/tmp/motion-native-clock-permanent-controls-20261002/frozen-inputs.json",
+          "bytes": 1296,
+          "sha256": "466622a3b354b395895820f48e8a470ad4041c86c24278de2bceca54b4ba1ee5",
+          "expectedSha256": "466622a3b354b395895820f48e8a470ad4041c86c24278de2bceca54b4ba1ee5",
+          "matches": true,
+          "role": "identity only until scoped content read"
+        },
+        {
+          "path": "/tmp/motion-native-clock-permanent-controls-20261002/execution-start.json",
+          "bytes": 364,
+          "sha256": "fa6317233cc9b20e32734a31865c57c0de15968cf1d9c370b7b9d6fe2d18e82f",
+          "expectedSha256": "fa6317233cc9b20e32734a31865c57c0de15968cf1d9c370b7b9d6fe2d18e82f",
+          "matches": true,
+          "role": "identity only until scoped content read"
+        },
+        {
+          "path": "/tmp/motion-native-clock-permanent-controls-20261002/execution.json",
+          "bytes": 974,
+          "sha256": "09f85ad246a08b4a3ae75687a10f4a0b20ff4965f05d920296c58fc039c1ba08",
+          "expectedSha256": "09f85ad246a08b4a3ae75687a10f4a0b20ff4965f05d920296c58fc039c1ba08",
+          "matches": true,
+          "role": "identity only until scoped content read"
+        },
+        {
+          "path": "/tmp/motion-native-clock-permanent-controls-20261002/stdout.log",
+          "bytes": 10973,
+          "sha256": "446c88b9ee8bee84984940f1f84734c4a276cf17b7b0d15664cc356c9a66a5e6",
+          "expectedSha256": "446c88b9ee8bee84984940f1f84734c4a276cf17b7b0d15664cc356c9a66a5e6",
+          "matches": true,
+          "role": "identity only until scoped content read"
+        },
+        {
+          "path": "/tmp/motion-native-clock-permanent-controls-20261002/stderr.log",
+          "bytes": 0,
+          "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+          "expectedSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+          "matches": true,
+          "role": "identity only until scoped content read"
+        },
+        {
+          "path": "/tmp/motion-native-clock-permanent-controls-20261002/run.py",
+          "bytes": 1970,
+          "sha256": "ad4b4a3d8f1af34e091c6a134abd9e6acd93f5f06ae2ae60dcd3ed55f95cc495",
+          "expectedSha256": "ad4b4a3d8f1af34e091c6a134abd9e6acd93f5f06ae2ae60dcd3ed55f95cc495",
+          "matches": true,
+          "role": "identity only until scoped content read"
+        },
+        {
+          "path": "/tmp/motion-ci-f6476ae9-failure-20261002/job-110685127941.log",
+          "bytes": 244446,
+          "sha256": "812738cebb87d49e9e519bedf542e7f6f1a199d6cd612f06d636c9d13bb39860",
+          "expectedSha256": "812738cebb87d49e9e519bedf542e7f6f1a199d6cd612f06d636c9d13bb39860",
+          "matches": true,
+          "role": "identity only until scoped content read"
+        },
+        {
+          "path": "/tmp/motion-ci-f6476ae9-failure-20261002/run.json",
+          "bytes": 13151,
+          "sha256": "4e32d07e1f22ee7745295f332be2009c80f3c9a7bb79d987c6d43442fe3ab754",
+          "expectedSha256": "4e32d07e1f22ee7745295f332be2009c80f3c9a7bb79d987c6d43442fe3ab754",
+          "matches": true,
+          "role": "identity only until scoped content read"
+        },
+        {
+          "path": "/tmp/motion-ci-f6476ae9-failure-20261002/primary-receipt.json",
+          "bytes": 1233,
+          "sha256": "6819f715975d180dcbaa92540cc09e1bc0077e037bb135e9adc1e0ced27845a7",
+          "expectedSha256": "6819f715975d180dcbaa92540cc09e1bc0077e037bb135e9adc1e0ced27845a7",
+          "matches": true,
+          "role": "identity only until scoped content read"
+        },
+        {
+          "path": "/tmp/motion-ci-f6476ae9-failure-20261002/causal-excerpt.txt",
+          "bytes": 3559,
+          "sha256": "10a71af13018a0025b9a46e03536407e0b134f87c1dd603ad7a0692692922489",
+          "expectedSha256": "10a71af13018a0025b9a46e03536407e0b134f87c1dd603ad7a0692692922489",
+          "matches": true,
+          "role": "identity only until scoped content read"
+        },
+        {
+          "path": "/workspace/lab-motion/scratchpad/recipe-transform-priority-f647-20261002/red2.observations.json",
+          "bytes": 8071,
+          "sha256": "4023d247c553a680473126f40c76eda2be049a1b56b530ecbe3877d221e04af5",
+          "expectedSha256": "4023d247c553a680473126f40c76eda2be049a1b56b530ecbe3877d221e04af5",
+          "matches": true,
+          "role": "identity only until scoped content read"
+        },
+        {
+          "path": "/workspace/lab-motion/scratchpad/recipe-transform-priority-f647-20261002/red2.command.json",
+          "bytes": 337,
+          "sha256": "eeabbb8f43a7ec840a19a8532e79f6492a15c615cc30a86d59de44736c18e2cc",
+          "expectedSha256": "eeabbb8f43a7ec840a19a8532e79f6492a15c615cc30a86d59de44736c18e2cc",
+          "matches": true,
+          "role": "identity only until scoped content read"
+        },
+        {
+          "path": "/workspace/lab-motion/scratchpad/recipe-transform-priority-f647-20261002/red2.stdout.log",
+          "bytes": 8146,
+          "sha256": "16b3be86e5cfef997ad9f3f9d8cd323ea94c6c98318212700cc1c656654b92a2",
+          "expectedSha256": "16b3be86e5cfef997ad9f3f9d8cd323ea94c6c98318212700cc1c656654b92a2",
+          "matches": true,
+          "role": "identity only until scoped content read"
+        },
+        {
+          "path": "/workspace/lab-motion/scratchpad/recipe-transform-priority-f647-20261002/red2.stderr.log",
+          "bytes": 0,
+          "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+          "expectedSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+          "matches": true,
+          "role": "identity only until scoped content read"
+        },
+        {
+          "path": "/workspace/lab-motion/scratchpad/recipe-transform-priority-f647-20261002/preflight-negative.json",
+          "bytes": 387,
+          "sha256": "c06a5edbfff10054e8cd3c6281bb542f7f06c473b4d16b1c664b1d4590a52569",
+          "expectedSha256": "c06a5edbfff10054e8cd3c6281bb542f7f06c473b4d16b1c664b1d4590a52569",
+          "matches": true,
+          "role": "identity only until scoped content read"
+        },
+        {
+          "path": "/workspace/lab-motion/scratchpad/recipe-transform-priority-f647-20261002/red.error.json",
+          "bytes": 2355,
+          "sha256": "76da3ef11a23f1159580fa075c818308f2995da34010809ea78e2798964ad8c9",
+          "expectedSha256": "76da3ef11a23f1159580fa075c818308f2995da34010809ea78e2798964ad8c9",
+          "matches": true,
+          "role": "identity only until scoped content read"
+        },
+        {
+          "path": "/workspace/lab-motion/scratchpad/recipe-transform-priority-f647-20261002/owned.patch",
+          "bytes": 8005,
+          "sha256": "9831ecee2000715dc89b3fbe991c8d09c07e80db152170d6d2d557a4890ed194",
+          "expectedSha256": "9831ecee2000715dc89b3fbe991c8d09c07e80db152170d6d2d557a4890ed194",
+          "matches": true,
+          "role": "identity only until scoped content read"
+        },
+        {
+          "path": "/tmp/motion-profile-f647-final-20261002/PRIMARY-PACKET.json",
+          "bytes": 3823,
+          "sha256": "e0d911564aae5890a75788c33347e01299993c2b7b1c643edfb69e94863e2961",
+          "expectedSha256": "e0d911564aae5890a75788c33347e01299993c2b7b1c643edfb69e94863e2961",
+          "matches": true,
+          "role": "identity only until scoped content read"
+        }
+      ],
+      "meaning": "26primaryrefs+previousPRIMARY exact; content scope separately recorded"
+    },
+    {
+      "path": "/tmp/motion-profile-current-gates-fe092331-20261002/PRIMARY-GATES-SUPPLEMENT.json",
+      "sha256": "ed166f092eb854a1c8317d835dbe2035f96ae527837a7e7bb1eb9204419895c1",
+      "refs": [
+        {
+          "path": "/tmp/motion-profile-current-gates-fe092331-20261002/receipt.json",
+          "bytes": 7262,
+          "sha256": "26138e2b9c80ab254ab047f28c231db6db763a6b6cdd4f61a138dbf9ee8a834e",
+          "matches": true,
+          "role": "identity only unless content scope recorded; parsed-results-and-packages.json opaque"
+        },
+        {
+          "path": "/tmp/motion-profile-current-gates-fe092331-20261002/run.py",
+          "bytes": 2983,
+          "sha256": "297f5bb795effeb6ba7d90202d2e57b9b525dfd96c8ab34196b231e5afb7a055",
+          "matches": true,
+          "role": "identity only unless content scope recorded; parsed-results-and-packages.json opaque"
+        },
+        {
+          "path": "/tmp/motion-profile-current-gates-fe092331-20261002/whole.json",
+          "bytes": 2141909,
+          "sha256": "ae5e6b196a1a077b9672171d56782bb9772d25391872c3d44fe652b581519b0f",
+          "matches": true,
+          "role": "identity only unless content scope recorded; parsed-results-and-packages.json opaque"
+        },
+        {
+          "path": "/tmp/motion-profile-current-gates-fe092331-20261002/parsed-results-and-packages.json",
+          "bytes": 111835,
+          "sha256": "c4a729874bc83cb6a44e8e2d6358e2fc35074159593e80515f8693fafd65aac3",
+          "matches": true,
+          "role": "identity only unless content scope recorded; parsed-results-and-packages.json opaque"
+        },
+        {
+          "path": "/tmp/motion-profile-current-gates-fe092331-20261002/actionlint.stdout",
+          "bytes": 0,
+          "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+          "matches": true,
+          "role": "identity only unless content scope recorded; parsed-results-and-packages.json opaque"
+        },
+        {
+          "path": "/tmp/motion-profile-current-gates-fe092331-20261002/docs-drift.stdout",
+          "bytes": 218,
+          "sha256": "4437b7385139583741ad88edbb67528fedc3fabce8beb61947a5bcc384bad4be",
+          "matches": true,
+          "role": "identity only unless content scope recorded; parsed-results-and-packages.json opaque"
+        },
+        {
+          "path": "/tmp/motion-profile-current-gates-fe092331-20261002/docs-facts.stdout",
+          "bytes": 23,
+          "sha256": "d3b534c5348e15bf96aadf4f5a210761809cc2829415d4fd9015117c41a69d0f",
+          "matches": true,
+          "role": "identity only unless content scope recorded; parsed-results-and-packages.json opaque"
+        },
+        {
+          "path": "/tmp/motion-profile-current-gates-fe092331-20261002/finiteness.stdout",
+          "bytes": 20314,
+          "sha256": "22186f2cca1db0a296867d16604c9e0fa4439e9919bda70f97ff6afa2be16b98",
+          "matches": true,
+          "role": "identity only unless content scope recorded; parsed-results-and-packages.json opaque"
+        },
+        {
+          "path": "/tmp/motion-profile-current-gates-fe092331-20261002/npm-pack.stdout",
+          "bytes": 25,
+          "sha256": "abd90dcb1d334fc0369e0d014da05d72546794877f45ec7e3ffcf4609c70ed1a",
+          "matches": true,
+          "role": "identity only unless content scope recorded; parsed-results-and-packages.json opaque"
+        },
+        {
+          "path": "/tmp/motion-profile-current-gates-fe092331-20261002/pnpm-pack.stdout",
+          "bytes": 8067,
+          "sha256": "8ba6c8a1d1bfc39f55927fde65fea0bcb4a3897f29d2dd85c3f24e690447aa7a",
+          "matches": true,
+          "role": "identity only unless content scope recorded; parsed-results-and-packages.json opaque"
+        },
+        {
+          "path": "/tmp/motion-profile-current-gates-fe092331-20261002/static.stdout",
+          "bytes": 260,
+          "sha256": "573909cff1d43f41082b6f4b1691f00cea86d28c60a3de986037f8119296512c",
+          "matches": true,
+          "role": "identity only unless content scope recorded; parsed-results-and-packages.json opaque"
+        },
+        {
+          "path": "/tmp/motion-profile-current-gates-fe092331-20261002/whole.stdout",
+          "bytes": 139,
+          "sha256": "c2335dbb8d49cac33fa26e27baaa87273a48149bfb73406b1fe953d47f0a3be3",
+          "matches": true,
+          "role": "identity only unless content scope recorded; parsed-results-and-packages.json opaque"
+        },
+        {
+          "path": "/tmp/motion-profile-current-gates-fe092331-20261002/actionlint.stderr",
+          "bytes": 0,
+          "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+          "matches": true,
+          "role": "identity only unless content scope recorded; parsed-results-and-packages.json opaque"
+        },
+        {
+          "path": "/tmp/motion-profile-current-gates-fe092331-20261002/docs-drift.stderr",
+          "bytes": 0,
+          "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+          "matches": true,
+          "role": "identity only unless content scope recorded; parsed-results-and-packages.json opaque"
+        },
+        {
+          "path": "/tmp/motion-profile-current-gates-fe092331-20261002/docs-facts.stderr",
+          "bytes": 0,
+          "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+          "matches": true,
+          "role": "identity only unless content scope recorded; parsed-results-and-packages.json opaque"
+        },
+        {
+          "path": "/tmp/motion-profile-current-gates-fe092331-20261002/finiteness.stderr",
+          "bytes": 0,
+          "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+          "matches": true,
+          "role": "identity only unless content scope recorded; parsed-results-and-packages.json opaque"
+        },
+        {
+          "path": "/tmp/motion-profile-current-gates-fe092331-20261002/npm-pack.stderr",
+          "bytes": 13684,
+          "sha256": "647bdd0dd86a07af57b39b52396e151394d730774d1a72c8b110ce5caa4824e3",
+          "matches": true,
+          "role": "identity only unless content scope recorded; parsed-results-and-packages.json opaque"
+        },
+        {
+          "path": "/tmp/motion-profile-current-gates-fe092331-20261002/pnpm-pack.stderr",
+          "bytes": 0,
+          "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+          "matches": true,
+          "role": "identity only unless content scope recorded; parsed-results-and-packages.json opaque"
+        },
+        {
+          "path": "/tmp/motion-profile-current-gates-fe092331-20261002/static.stderr",
+          "bytes": 396,
+          "sha256": "fb87992a36e0405ba8b299d10727870ce8bf9a5fc364397f334f6effcf58b720",
+          "matches": true,
+          "role": "identity only unless content scope recorded; parsed-results-and-packages.json opaque"
+        },
+        {
+          "path": "/tmp/motion-profile-current-gates-fe092331-20261002/whole.stderr",
+          "bytes": 359,
+          "sha256": "8fc2bab2a8ef882281b49e70bd0f237ee30fde252ac0427a7aa94b61e850eff3",
+          "matches": true,
+          "role": "identity only unless content scope recorded; parsed-results-and-packages.json opaque"
+        },
+        {
+          "path": "/tmp/motion-recipes-current-browser-fe092331-20261002/execution.json",
+          "bytes": 3171,
+          "sha256": "ab4d7527d1e2468dff621d1f792435f7684197721f00f1d7d09e6f2b03ca3a00",
+          "matches": true,
+          "role": "identity only unless content scope recorded; parsed-results-and-packages.json opaque"
+        },
+        {
+          "path": "/tmp/motion-recipes-current-browser-fe092331-20261002/run.py",
+          "bytes": 2746,
+          "sha256": "b9517f9664984f731830d849e2d444b377020e54846989347956a60b65d8b6ac",
+          "matches": true,
+          "role": "identity only unless content scope recorded; parsed-results-and-packages.json opaque"
+        },
+        {
+          "path": "/tmp/motion-recipes-current-browser-fe092331-20261002/result.json",
+          "bytes": 166286,
+          "sha256": "8a09834bbe48caffd4bd5b05cd93e5a55a032d7d0cd48ec1e1e22bffa1832188",
+          "matches": true,
+          "role": "identity only unless content scope recorded; parsed-results-and-packages.json opaque"
+        },
+        {
+          "path": "/tmp/motion-recipes-current-browser-fe092331-20261002/scope-recipes.js",
+          "bytes": 1382990,
+          "sha256": "5320f49b7889f455a0792252e44f6069b75638d2d27051e5a25d6504d2f71c5a",
+          "matches": true,
+          "role": "identity only unless content scope recorded; parsed-results-and-packages.json opaque"
+        },
+        {
+          "path": "/tmp/motion-recipes-current-browser-fe092331-20261002/scope-recipes.package.json",
+          "bytes": 1210,
+          "sha256": "df1fd41df0c4b268b24f3c00e7566570d0a360d2643bae955201f4ac417c219d",
+          "matches": true,
+          "role": "identity only unless content scope recorded; parsed-results-and-packages.json opaque"
+        },
+        {
+          "path": "/tmp/motion-recipes-current-browser-fe092331-20261002/stdout.log",
+          "bytes": 397,
+          "sha256": "3134bfa1bd92d7d5d0babaed1307f38bfa4405dc22b060f613d6bd8a40cba297",
+          "matches": true,
+          "role": "identity only unless content scope recorded; parsed-results-and-packages.json opaque"
+        },
+        {
+          "path": "/tmp/motion-recipes-current-browser-fe092331-20261002/stderr.log",
+          "bytes": 1038,
+          "sha256": "d4478546d47ef0d8333f4329ae20756380308917338f02b45016008a41cf48a1",
+          "matches": true,
+          "role": "identity only unless content scope recorded; parsed-results-and-packages.json opaque"
+        },
+        {
+          "path": "/tmp/motion-profile-current-gates-fe092331-20261002/candidate-pnpm.tgz",
+          "bytes": 562051,
+          "sha256": "b41708c31e122da9ae46a558f0c5f447195f36ca19c9b0fe6c19954887d790e4",
+          "matches": true,
+          "role": "identity only unless content scope recorded; parsed-results-and-packages.json opaque"
+        },
+        {
+          "path": "/tmp/motion-profile-current-gates-fe092331-20261002/labpics-motion-0.3.0.tgz",
+          "bytes": 560040,
+          "sha256": "54482b3da5ae3e530e9f25f29b91471b1ff95cf2d8212735a0eeb71002d6fba7",
+          "matches": true,
+          "role": "identity only unless content scope recorded; parsed-results-and-packages.json opaque"
+        },
+        {
+          "path": "/tmp/motion-qualified-fe092331-20261002/PRIMARY-PACKET.json",
+          "bytes": 7130,
+          "sha256": "4184a52ea58d4f3b27e7cd4c571425c51efda578f1a283b2aab396dd0659e29e",
+          "matches": true,
+          "role": "identity only unless content scope recorded; parsed-results-and-packages.json opaque"
+        }
+      ],
+      "meaning": "30refs exact; parsed-results-and-packages.json opaque, notread asoracle"
+    }
+  ],
+  "sourceIdentity": {
+    "archive": "/tmp/motion-qualified-fe092331-20261002/source.tar",
+    "sha256": "a91db3d664b91a7e169a49de4794fa7150064f35fe281a6a2b6fec2fd6023709",
+    "files": 641,
+    "byteCompared": 641,
+    "unchangedAgainstOwnF647": 634,
+    "changed": [
+      ".github/workflows/ci.yml",
+      "browser/compositor-recipes.spec.ts",
+      "docs/recipes.md",
+      "test/ci-workflow-contract.test.ts",
+      "test/fixtures/server-thread-cpu-clock-check.mjs",
+      "test/fixtures/server-thread-cpu-clock-host.c",
+      "test/server-profile-contract.test.ts"
+    ],
+    "missing": 0,
+    "semanticWholeSourceAudit": false,
+    "independentlyComputedCommit": "fe092331360837fd7f63d71a4b7f867ba849ebd4",
+    "independentlyComputedTree": "285e30e36db32f2fdc9ae442327f6b3396dcf254"
+  },
+  "skill": {
+    "resource": "skill://user/6ab1aaddc46481918fb78c5248bfdd91/verify/SKILL.md",
+    "via": "skills.read earlier in continuedtask context",
+    "purpose": "Exact scope and own-proof byte transfer; norms unchanged"
+  },
+  "excludedOracles": [
+    "foreign REPORT/HANDOFF",
+    "root/bot verdict",
+    "author rationale/success interpretation",
+    "parsed-results-and-packages.json summary"
+  ],
+  "executionScope": {
+    "cpu": 2,
+    "productionImports": 0,
+    "runtimeProbes": 0,
+    "compile": 0,
+    "build": 0,
+    "profile": 0,
+    "registeredTiming": 0,
+    "pilot": 0,
+    "fullN": 0,
+    "wholeSuites": 0,
+    "productSourceNormThresholdTestEvidenceMutations": 0
+  },
+  "knownHarnessCorrection": [
+    {
+      "exitCode": 1,
+      "issue": "Initial overly broad exact package.json byte equality rejected legitimate PNPM removal of packageManager; scope corrected to unchanged consumer contracts. No product mutation/finding."
+    }
+  ],
+  "outputWrites": "only own reviewdirectory"
+}

@@ -1,0 +1,195 @@
+{
+  "checkedUtc": "2026-10-02T03:49:50.885923+00:00",
+  "supplementSha256": "ed166f092eb854a1c8317d835dbe2035f96ae527837a7e7bb1eb9204419895c1",
+  "refs": [
+    {
+      "path": "/tmp/motion-profile-current-gates-fe092331-20261002/receipt.json",
+      "bytes": 7262,
+      "sha256": "26138e2b9c80ab254ab047f28c231db6db763a6b6cdd4f61a138dbf9ee8a834e",
+      "snapshotPath": "/tmp/motion-qualified-measurement-fe092-20261002/SUPPLEMENT/tmp/motion-profile-current-gates-fe092331-20261002/receipt.json",
+      "matches": true
+    },
+    {
+      "path": "/tmp/motion-profile-current-gates-fe092331-20261002/run.py",
+      "bytes": 2983,
+      "sha256": "297f5bb795effeb6ba7d90202d2e57b9b525dfd96c8ab34196b231e5afb7a055",
+      "snapshotPath": "/tmp/motion-qualified-measurement-fe092-20261002/SUPPLEMENT/tmp/motion-profile-current-gates-fe092331-20261002/run.py",
+      "matches": true
+    },
+    {
+      "path": "/tmp/motion-profile-current-gates-fe092331-20261002/whole.json",
+      "bytes": 2141909,
+      "sha256": "ae5e6b196a1a077b9672171d56782bb9772d25391872c3d44fe652b581519b0f",
+      "snapshotPath": "/tmp/motion-qualified-measurement-fe092-20261002/SUPPLEMENT/tmp/motion-profile-current-gates-fe092331-20261002/whole.json",
+      "matches": true
+    },
+    {
+      "path": "/tmp/motion-profile-current-gates-fe092331-20261002/parsed-results-and-packages.json",
+      "bytes": 111835,
+      "sha256": "c4a729874bc83cb6a44e8e2d6358e2fc35074159593e80515f8693fafd65aac3",
+      "snapshotPath": "/tmp/motion-qualified-measurement-fe092-20261002/SUPPLEMENT/tmp/motion-profile-current-gates-fe092331-20261002/parsed-results-and-packages.json",
+      "matches": true
+    },
+    {
+      "path": "/tmp/motion-profile-current-gates-fe092331-20261002/actionlint.stdout",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "snapshotPath": "/tmp/motion-qualified-measurement-fe092-20261002/SUPPLEMENT/tmp/motion-profile-current-gates-fe092331-20261002/actionlint.stdout",
+      "matches": true
+    },
+    {
+      "path": "/tmp/motion-profile-current-gates-fe092331-20261002/docs-drift.stdout",
+      "bytes": 218,
+      "sha256": "4437b7385139583741ad88edbb67528fedc3fabce8beb61947a5bcc384bad4be",
+      "snapshotPath": "/tmp/motion-qualified-measurement-fe092-20261002/SUPPLEMENT/tmp/motion-profile-current-gates-fe092331-20261002/docs-drift.stdout",
+      "matches": true
+    },
+    {
+      "path": "/tmp/motion-profile-current-gates-fe092331-20261002/docs-facts.stdout",
+      "bytes": 23,
+      "sha256": "d3b534c5348e15bf96aadf4f5a210761809cc2829415d4fd9015117c41a69d0f",
+      "snapshotPath": "/tmp/motion-qualified-measurement-fe092-20261002/SUPPLEMENT/tmp/motion-profile-current-gates-fe092331-20261002/docs-facts.stdout",
+      "matches": true
+    },
+    {
+      "path": "/tmp/motion-profile-current-gates-fe092331-20261002/finiteness.stdout",
+      "bytes": 20314,
+      "sha256": "22186f2cca1db0a296867d16604c9e0fa4439e9919bda70f97ff6afa2be16b98",
+      "snapshotPath": "/tmp/motion-qualified-measurement-fe092-20261002/SUPPLEMENT/tmp/motion-profile-current-gates-fe092331-20261002/finiteness.stdout",
+      "matches": true
+    },
+    {
+      "path": "/tmp/motion-profile-current-gates-fe092331-20261002/npm-pack.stdout",
+      "bytes": 25,
+      "sha256": "abd90dcb1d334fc0369e0d014da05d72546794877f45ec7e3ffcf4609c70ed1a",
+      "snapshotPath": "/tmp/motion-qualified-measurement-fe092-20261002/SUPPLEMENT/tmp/motion-profile-current-gates-fe092331-20261002/npm-pack.stdout",
+      "matches": true
+    },
+    {
+      "path": "/tmp/motion-profile-current-gates-fe092331-20261002/pnpm-pack.stdout",
+      "bytes": 8067,
+      "sha256": "8ba6c8a1d1bfc39f55927fde65fea0bcb4a3897f29d2dd85c3f24e690447aa7a",
+      "snapshotPath": "/tmp/motion-qualified-measurement-fe092-20261002/SUPPLEMENT/tmp/motion-profile-current-gates-fe092331-20261002/pnpm-pack.stdout",
+      "matches": true
+    },
+    {
+      "path": "/tmp/motion-profile-current-gates-fe092331-20261002/static.stdout",
+      "bytes": 260,
+      "sha256": "573909cff1d43f41082b6f4b1691f00cea86d28c60a3de986037f8119296512c",
+      "snapshotPath": "/tmp/motion-qualified-measurement-fe092-20261002/SUPPLEMENT/tmp/motion-profile-current-gates-fe092331-20261002/static.stdout",
+      "matches": true
+    },
+    {
+      "path": "/tmp/motion-profile-current-gates-fe092331-20261002/whole.stdout",
+      "bytes": 139,
+      "sha256": "c2335dbb8d49cac33fa26e27baaa87273a48149bfb73406b1fe953d47f0a3be3",
+      "snapshotPath": "/tmp/motion-qualified-measurement-fe092-20261002/SUPPLEMENT/tmp/motion-profile-current-gates-fe092331-20261002/whole.stdout",
+      "matches": true
+    },
+    {
+      "path": "/tmp/motion-profile-current-gates-fe092331-20261002/actionlint.stderr",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "snapshotPath": "/tmp/motion-qualified-measurement-fe092-20261002/SUPPLEMENT/tmp/motion-profile-current-gates-fe092331-20261002/actionlint.stderr",
+      "matches": true
+    },
+    {
+      "path": "/tmp/motion-profile-current-gates-fe092331-20261002/docs-drift.stderr",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "snapshotPath": "/tmp/motion-qualified-measurement-fe092-20261002/SUPPLEMENT/tmp/motion-profile-current-gates-fe092331-20261002/docs-drift.stderr",
+      "matches": true
+    },
+    {
+      "path": "/tmp/motion-profile-current-gates-fe092331-20261002/docs-facts.stderr",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "snapshotPath": "/tmp/motion-qualified-measurement-fe092-20261002/SUPPLEMENT/tmp/motion-profile-current-gates-fe092331-20261002/docs-facts.stderr",
+      "matches": true
+    },
+    {
+      "path": "/tmp/motion-profile-current-gates-fe092331-20261002/finiteness.stderr",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "snapshotPath": "/tmp/motion-qualified-measurement-fe092-20261002/SUPPLEMENT/tmp/motion-profile-current-gates-fe092331-20261002/finiteness.stderr",
+      "matches": true
+    },
+    {
+      "path": "/tmp/motion-profile-current-gates-fe092331-20261002/npm-pack.stderr",
+      "bytes": 13684,
+      "sha256": "647bdd0dd86a07af57b39b52396e151394d730774d1a72c8b110ce5caa4824e3",
+      "snapshotPath": "/tmp/motion-qualified-measurement-fe092-20261002/SUPPLEMENT/tmp/motion-profile-current-gates-fe092331-20261002/npm-pack.stderr",
+      "matches": true
+    },
+    {
+      "path": "/tmp/motion-profile-current-gates-fe092331-20261002/pnpm-pack.stderr",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "snapshotPath": "/tmp/motion-qualified-measurement-fe092-20261002/SUPPLEMENT/tmp/motion-profile-current-gates-fe092331-20261002/pnpm-pack.stderr",
+      "matches": true
+    },
+    {
+      "path": "/tmp/motion-profile-current-gates-fe092331-20261002/static.stderr",
+      "bytes": 396,
+      "sha256": "fb87992a36e0405ba8b299d10727870ce8bf9a5fc364397f334f6effcf58b720",
+      "snapshotPath": "/tmp/motion-qualified-measurement-fe092-20261002/SUPPLEMENT/tmp/motion-profile-current-gates-fe092331-20261002/static.stderr",
+      "matches": true
+    },
+    {
+      "path": "/tmp/motion-profile-current-gates-fe092331-20261002/whole.stderr",
+      "bytes": 359,
+      "sha256": "8fc2bab2a8ef882281b49e70bd0f237ee30fde252ac0427a7aa94b61e850eff3",
+      "snapshotPath": "/tmp/motion-qualified-measurement-fe092-20261002/SUPPLEMENT/tmp/motion-profile-current-gates-fe092331-20261002/whole.stderr",
+      "matches": true
+    },
+    {
+      "path": "/tmp/motion-recipes-current-browser-fe092331-20261002/execution.json",
+      "bytes": 3171,
+      "sha256": "ab4d7527d1e2468dff621d1f792435f7684197721f00f1d7d09e6f2b03ca3a00",
+      "snapshotPath": "/tmp/motion-qualified-measurement-fe092-20261002/SUPPLEMENT/tmp/motion-recipes-current-browser-fe092331-20261002/execution.json",
+      "matches": true
+    },
+    {
+      "path": "/tmp/motion-recipes-current-browser-fe092331-20261002/run.py",
+      "bytes": 2746,
+      "sha256": "b9517f9664984f731830d849e2d444b377020e54846989347956a60b65d8b6ac",
+      "snapshotPath": "/tmp/motion-qualified-measurement-fe092-20261002/SUPPLEMENT/tmp/motion-recipes-current-browser-fe092331-20261002/run.py",
+      "matches": true
+    },
+    {
+      "path": "/tmp/motion-recipes-current-browser-fe092331-20261002/result.json",
+      "bytes": 166286,
+      "sha256": "8a09834bbe48caffd4bd5b05cd93e5a55a032d7d0cd48ec1e1e22bffa1832188",
+      "snapshotPath": "/tmp/motion-qualified-measurement-fe092-20261002/SUPPLEMENT/tmp/motion-recipes-current-browser-fe092331-20261002/result.json",
+      "matches": true
+    },
+    {
+      "path": "/tmp/motion-recipes-current-browser-fe092331-20261002/scope-recipes.js",
+      "bytes": 1382990,
+      "sha256": "5320f49b7889f455a0792252e44f6069b75638d2d27051e5a25d6504d2f71c5a",
+      "snapshotPath": "/tmp/motion-qualified-measurement-fe092-20261002/SUPPLEMENT/tmp/motion-recipes-current-browser-fe092331-20261002/scope-recipes.js",
+      "matches": true
+    },
+    {
+      "path": "/tmp/motion-recipes-current-browser-fe092331-20261002/scope-recipes.package.json",
+      "bytes": 1210,
+      "sha256": "df1fd41df0c4b268b24f3c00e7566570d0a360d2643bae955201f4ac417c219d",
+      "snapshotPath": "/tmp/motion-qualified-measurement-fe092-20261002/SUPPLEMENT/tmp/motion-recipes-current-browser-fe092331-20261002/scope-recipes.package.json",
+      "matches": true
+    },
+    {
+      "path": "/tmp/motion-recipes-current-browser-fe092331-20261002/stdout.log",
+      "bytes": 397,
+      "sha256": "3134bfa1bd92d7d5d0babaed1307f38bfa4405dc22b060f613d6bd8a40cba297",
+      "snapshotPath": "/tmp/motion-qualified-measurement-fe092-20261002/SUPPLEMENT/tmp/motion-recipes-current-browser-fe092331-20261002/stdout.log",
+      "matches": true
+    },
+    {
+      "path": "/tmp/motion-recipes-current-browser-fe092331-20261002/stderr.log",
+      "bytes": 1038,
+      "sha256": "d4478546d47ef0d8333f4329ae20756380308917338f02b45016008a41cf48a1",
+      "snapshotPath": "/tmp/motion-qualified-measurement-fe092-20261002/SUPPLEMENT/tmp/motion-recipes-current-browser-fe092331-20261002/stderr.log",
+      "matches": true
+    }
+  ]
+}

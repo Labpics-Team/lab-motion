@@ -1,0 +1,57 @@
+{
+  "sourceBeforeSha256": "372a0938d7f7adaddb307a96904be9350f4269df9b22223af63051926e4067b7",
+  "sourceAfterSha256": "14aa08faad2bf30b1ad355e49b3da86bd5b61d653057ff28bbfa318cce177eb8",
+  "originalCallback": "{\n    const history = admissionHistory(), { artifact, events } = history;\n    expect(validateServerArtifact(artifact).verdict).toBe('PASS');\n    expect(validateServerJournal(artifact, history.records)).toHaveProperty('journalFinalDigest');\n    const earlyCalibration = events.filter((event) => event.type !== 'calibration');\n    earlyCalibration.splice(earlyCalibration.findIndex((event) => event.type === 'N-frozen-before-calibration-and-AB') + 1, 0,\n      { type: 'calibration', value: artifact.calibration });\n    expect(() => validateServerJournal(artifact, chain(earlyCalibration, history))).toThrow(/до завершения/);\n    const alwaysLeft = [...events];\n    const firstOpposite = alwaysLeft.findIndex((event) => event.type === 'sample' && event.value.participant === 'right');\n    [alwaysLeft[firstOpposite], alwaysLeft[firstOpposite + 1]] = [alwaysLeft[firstOpposite + 1], alwaysLeft[firstOpposite]];\n    expect(() => validateServerJournal(artifact, chain(alwaysLeft, history))).toThrow(/порядок/);\n    const ignoredFailure = [...events.slice(0, -1), { type: 'failure', value: { stage: 'ab', error: { message: 'retained reviewer failure' } } }, events.at(-1)];\n    expect(() => validateServerJournal(artifact, chain(ignoredFailure, history))).toThrow(/failures/);\n    const wrongPositive = { ...artifact, positive: { ...artifact.positive, name: 'aa' } };\n    expect(() => validateServerArtifact(wrongPositive)).toThrow(/имя стадии/);\n    const wrongFinish = [...events.slice(0, -1), { type: 'finished', value: { verdict: 'PASS', digest: 'b'.repeat(64) } }];\n    expect(() => validateServerJournal(artifact, chain(wrongFinish, history))).toThrow(/финальная/);\n  }",
+  "newCases": [
+    {
+      "name": "полный healthy admission создаёт и проверяет весь зарегистрированный N",
+      "timeout": "30_000",
+      "body": "{\n    healthyAdmissionTask = task;\n    const history = admissionHistory(), { artifact } = history;\n    expect(validateServerArtifact(artifact).verdict).toBe('PASS');\n    expect(validateServerJournal(artifact, history.records)).toHaveProperty('journalFinalDigest');\n  }"
+    },
+    {
+      "name": "полная история отвергает calibration до завершения A/A и 2×work",
+      "timeout": "30_000",
+      "body": "{\n    const history = acceptedAdmission(), { artifact, events } = history;\n    const earlyCalibration = events.filter((event) => event.type !== 'calibration');\n    earlyCalibration.splice(earlyCalibration.findIndex((event) => event.type === 'N-frozen-before-calibration-and-AB') + 1, 0,\n      { type: 'calibration', value: artifact.calibration });\n    expect(() => validateServerJournal(artifact, chain(earlyCalibration, history))).toThrow(/до завершения/);\n  }"
+    },
+    {
+      "name": "полная история отвергает замену противоположного порядка пар",
+      "timeout": "30_000",
+      "body": "{\n    const history = acceptedAdmission(), { artifact, events } = history;\n    const alwaysLeft = [...events];\n    const firstOpposite = alwaysLeft.findIndex((event) => event.type === 'sample' && event.value.participant === 'right');\n    [alwaysLeft[firstOpposite], alwaysLeft[firstOpposite + 1]] = [alwaysLeft[firstOpposite + 1], alwaysLeft[firstOpposite]];\n    expect(() => validateServerJournal(artifact, chain(alwaysLeft, history))).toThrow(/порядок/);\n  }"
+    },
+    {
+      "name": "полная история отвергает потерянный failure union",
+      "timeout": "30_000",
+      "body": "{\n    const history = acceptedAdmission(), { artifact, events } = history;\n    const ignoredFailure = [...events.slice(0, -1), { type: 'failure', value: { stage: 'ab', error: { message: 'retained reviewer failure' } } }, events.at(-1)];\n    expect(() => validateServerJournal(artifact, chain(ignoredFailure, history))).toThrow(/failures/);\n  }"
+    },
+    {
+      "name": "полная история отвергает подмену имени positive",
+      "timeout": "30_000",
+      "body": "{\n    const { artifact } = acceptedAdmission();\n    const wrongPositive = { ...artifact, positive: { ...artifact.positive, name: 'aa' } };\n    expect(() => validateServerArtifact(wrongPositive)).toThrow(/имя стадии/);\n  }"
+    },
+    {
+      "name": "полная история отвергает подмену финального raw digest",
+      "timeout": "30_000",
+      "body": "{\n    const history = acceptedAdmission(), { artifact, events } = history;\n    const wrongFinish = [...events.slice(0, -1), { type: 'finished', value: { verdict: 'PASS', digest: 'b'.repeat(64) } }];\n    expect(() => validateServerJournal(artifact, chain(wrongFinish, history))).toThrow(/финальная/);\n  }"
+    }
+  ],
+  "conservedOriginalStatements": [
+    "expect(validateServerArtifact(artifact).verdict).toBe('PASS');",
+    "expect(validateServerJournal(artifact, history.records)).toHaveProperty('journalFinalDigest');",
+    "const earlyCalibration = events.filter((event) => event.type !== 'calibration');",
+    "earlyCalibration.splice(earlyCalibration.findIndex((event) => event.type === 'N-frozen-before-calibration-and-AB') + 1, 0,\n      { type: 'calibration', value: artifact.calibration });",
+    "expect(() => validateServerJournal(artifact, chain(earlyCalibration, history))).toThrow(/до завершения/);",
+    "const alwaysLeft = [...events];",
+    "const firstOpposite = alwaysLeft.findIndex((event) => event.type === 'sample' && event.value.participant === 'right');",
+    "[alwaysLeft[firstOpposite], alwaysLeft[firstOpposite + 1]] = [alwaysLeft[firstOpposite + 1], alwaysLeft[firstOpposite]];",
+    "expect(() => validateServerJournal(artifact, chain(alwaysLeft, history))).toThrow(/порядок/);",
+    "const ignoredFailure = [...events.slice(0, -1), { type: 'failure', value: { stage: 'ab', error: { message: 'retained reviewer failure' } } }, events.at(-1)];",
+    "expect(() => validateServerJournal(artifact, chain(ignoredFailure, history))).toThrow(/failures/);",
+    "const wrongPositive = { ...artifact, positive: { ...artifact.positive, name: 'aa' } };",
+    "expect(() => validateServerArtifact(wrongPositive)).toThrow(/имя стадии/);",
+    "const wrongFinish = [...events.slice(0, -1), { type: 'finished', value: { verdict: 'PASS', digest: 'b'.repeat(64) } }];",
+    "expect(() => validateServerJournal(artifact, chain(wrongFinish, history))).toThrow(/финальная/);"
+  ],
+  "fullHealthySetupAndChainLiteralUnchanged": true,
+  "beforeAllAdded": false,
+  "semanticScope": "Six individually bounded laws, with healthy full-N construction+hash+Artifact+Journal inside first timed case; all five existing faults keep original operations/assertions. Not a speed claim or aggregate-30s PASS."
+}

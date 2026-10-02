@@ -1,0 +1,40 @@
+{
+  "diffSha256": "6700f7b29e449eaaace6e386be0a05e18cbfe6891f7b8192b762704fb0872deb",
+  "applied": [
+    {
+      "path": ".github/workflows/ci.yml",
+      "resultSha256": "9a8f5c8f37b8a939e534c5afa08bae5213db73ec2484fb5c397b22de3ee599d8",
+      "hunksExactlyApplyToOwnf647": true
+    },
+    {
+      "path": "browser/compositor-recipes.spec.ts",
+      "resultSha256": "e0baa661fbeb83770e8035708ecde292e7e7ad38502b6d745d3ebb3726edaecc",
+      "hunksExactlyApplyToOwnf647": true
+    },
+    {
+      "path": "docs/recipes.md",
+      "resultSha256": "ba7300424fa8923e822ef55d4ff6f36550e06c476aca80869b02f87259b61645",
+      "hunksExactlyApplyToOwnf647": true
+    },
+    {
+      "path": "test/ci-workflow-contract.test.ts",
+      "resultSha256": "0a0ee8faf5e0c1c647f4944e7e131b34c7e0fc0d850a7f890d498f73a8f31ed9",
+      "hunksExactlyApplyToOwnf647": true
+    },
+    {
+      "path": "test/fixtures/server-thread-cpu-clock-check.mjs",
+      "resultSha256": "d032a5cb9668578b9fbcce986e1cbefa2865fdc17c986742a1274b0e34cb951c",
+      "hunksExactlyApplyToOwnf647": true
+    },
+    {
+      "path": "test/fixtures/server-thread-cpu-clock-host.c",
+      "resultSha256": "15ee4c885cb88c317051a1951030c441b9c78bf105ceb6f21d5ebce6eac3586e",
+      "hunksExactlyApplyToOwnf647": true
+    },
+    {
+      "path": "test/server-profile-contract.test.ts",
+      "resultSha256": "14aa08faad2bf30b1ad355e49b3da86bd5b61d653057ff28bbfa318cce177eb8",
+      "hunksExactlyApplyToOwnf647": true
+    }
+  ]
+}

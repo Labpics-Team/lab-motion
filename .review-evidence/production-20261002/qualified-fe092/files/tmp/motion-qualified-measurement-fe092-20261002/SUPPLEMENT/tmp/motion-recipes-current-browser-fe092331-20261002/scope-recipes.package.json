@@ -1,0 +1,38 @@
+{
+  "schema": "scope-recipes-package-v1",
+  "package": {
+    "name": "@labpics/motion",
+    "version": "0.3.0"
+  },
+  "tarball": {
+    "filename": "labpics-motion-0.3.0.tgz",
+    "sha256": "54482b3da5ae3e530e9f25f29b91471b1ff95cf2d8212735a0eeb71002d6fba7",
+    "integrity": "sha512-MLTTxLhm6ZOzEiVK6n4aEgK1IZM0EjFPJXMmuk84bQaKStQeJQ9wHBqTSTbVbteprYVPXOmzwzZtk1NqBFXeZw=="
+  },
+  "manifest": {
+    "sha256": "de278702d9f6843be2b682c27d9cc0d16d552327f77f7a9f07bee0ff6793da52",
+    "fileCount": 312
+  },
+  "recipesSha256": "ba7300424fa8923e822ef55d4ff6f36550e06c476aca80869b02f87259b61645",
+  "runtime": {
+    "node": "v24.19.0",
+    "esbuild": "0.28.2"
+  },
+  "motionInputs": [
+    "dist/animate/index.js",
+    "dist/behaviors/reorder/index.js",
+    "dist/compositor/index.js",
+    "dist/decay/index.js",
+    "dist/frame/index.js",
+    "dist/gestures/index.js",
+    "dist/presence/index.js",
+    "dist/projection/index.js",
+    "dist/smart/index.js"
+  ],
+  "bundleSha256": "5320f49b7889f455a0792252e44f6069b75638d2d27051e5a25d6504d2f71c5a",
+  "ssrHtmlSha256": "68e14d501fd6a56fe445a8cc3377eed78c0298669be9a723a06d7c2ab558142f",
+  "ssrMotionInputs": [
+    "dist/animate/index.js",
+    "dist/frame/index.js"
+  ]
+}

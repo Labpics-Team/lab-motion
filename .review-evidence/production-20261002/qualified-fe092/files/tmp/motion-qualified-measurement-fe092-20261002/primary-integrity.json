@@ -1,0 +1,220 @@
+{
+  "checkedUtc": "2026-10-02T03:33:20.926092+00:00",
+  "refs": [
+    {
+      "path": "/tmp/motion-qualified-fe092331-20261002/source.tar",
+      "bytes": 7444480,
+      "sha256": "a91db3d664b91a7e169a49de4794fa7150064f35fe281a6a2b6fec2fd6023709",
+      "actualBytes": 7444480,
+      "snapshotPath": "/tmp/motion-qualified-measurement-fe092-20261002/PRIMARY/tmp/motion-qualified-fe092331-20261002/source.tar",
+      "matches": true
+    },
+    {
+      "path": "/tmp/motion-qualified-fe092331-20261002/source.diff",
+      "bytes": 25089,
+      "sha256": "6700f7b29e449eaaace6e386be0a05e18cbfe6891f7b8192b762704fb0872deb",
+      "actualBytes": 25089,
+      "snapshotPath": "/tmp/motion-qualified-measurement-fe092-20261002/PRIMARY/tmp/motion-qualified-fe092331-20261002/source.diff",
+      "matches": true
+    },
+    {
+      "path": "/tmp/motion-qualified-fe092331-20261002/commit.raw",
+      "bytes": 337,
+      "sha256": "06e8f583ddc2803ef75e4996a4dd4a4b239d05d72bc25480f048eaacb82c9fd7",
+      "actualBytes": 337,
+      "snapshotPath": "/tmp/motion-qualified-measurement-fe092-20261002/PRIMARY/tmp/motion-qualified-fe092331-20261002/commit.raw",
+      "matches": true
+    },
+    {
+      "path": "/tmp/motion-qualified-fe092331-20261002/tree.raw",
+      "bytes": 1192,
+      "sha256": "35e40734e08087c8588cb36f688950059062d93e1ca1faef68ae8856cb488e86",
+      "actualBytes": 1192,
+      "snapshotPath": "/tmp/motion-qualified-measurement-fe092-20261002/PRIMARY/tmp/motion-qualified-fe092331-20261002/tree.raw",
+      "matches": true
+    },
+    {
+      "path": "/tmp/motion-admission-granularity-20261002/before.test.ts",
+      "bytes": 97980,
+      "sha256": "372a0938d7f7adaddb307a96904be9350f4269df9b22223af63051926e4067b7",
+      "actualBytes": 97980,
+      "snapshotPath": "/tmp/motion-qualified-measurement-fe092-20261002/PRIMARY/tmp/motion-admission-granularity-20261002/before.test.ts",
+      "matches": true
+    },
+    {
+      "path": "/tmp/motion-admission-granularity-20261002/conservation.mjs",
+      "bytes": 3357,
+      "sha256": "d2599a23d52c5dd12ff0194fc48c403b2210b5302140235114234240f2e1e476",
+      "actualBytes": 3357,
+      "snapshotPath": "/tmp/motion-qualified-measurement-fe092-20261002/PRIMARY/tmp/motion-admission-granularity-20261002/conservation.mjs",
+      "matches": true
+    },
+    {
+      "path": "/tmp/motion-admission-granularity-20261002/conservation-result.json",
+      "bytes": 7138,
+      "sha256": "42c34b74c6d004621667d206e87757de80eabfc5af78f76c9e566e779d864170",
+      "actualBytes": 7138,
+      "snapshotPath": "/tmp/motion-qualified-measurement-fe092-20261002/PRIMARY/tmp/motion-admission-granularity-20261002/conservation-result.json",
+      "matches": true
+    },
+    {
+      "path": "/tmp/motion-admission-granularity-20261002/conservation.stdout.log",
+      "bytes": 56,
+      "sha256": "1398dca418323dc4f382b8bf27c511fbdb3fdea22c8552a31f18629773a591e0",
+      "actualBytes": 56,
+      "snapshotPath": "/tmp/motion-qualified-measurement-fe092-20261002/PRIMARY/tmp/motion-admission-granularity-20261002/conservation.stdout.log",
+      "matches": true
+    },
+    {
+      "path": "/tmp/motion-admission-granularity-20261002/conservation.stderr.log",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "actualBytes": 0,
+      "snapshotPath": "/tmp/motion-qualified-measurement-fe092-20261002/PRIMARY/tmp/motion-admission-granularity-20261002/conservation.stderr.log",
+      "matches": true
+    },
+    {
+      "path": "/tmp/motion-native-clock-permanent-controls-20261002/frozen-inputs.json",
+      "bytes": 1296,
+      "sha256": "466622a3b354b395895820f48e8a470ad4041c86c24278de2bceca54b4ba1ee5",
+      "actualBytes": 1296,
+      "snapshotPath": "/tmp/motion-qualified-measurement-fe092-20261002/PRIMARY/tmp/motion-native-clock-permanent-controls-20261002/frozen-inputs.json",
+      "matches": true
+    },
+    {
+      "path": "/tmp/motion-native-clock-permanent-controls-20261002/execution-start.json",
+      "bytes": 364,
+      "sha256": "fa6317233cc9b20e32734a31865c57c0de15968cf1d9c370b7b9d6fe2d18e82f",
+      "actualBytes": 364,
+      "snapshotPath": "/tmp/motion-qualified-measurement-fe092-20261002/PRIMARY/tmp/motion-native-clock-permanent-controls-20261002/execution-start.json",
+      "matches": true
+    },
+    {
+      "path": "/tmp/motion-native-clock-permanent-controls-20261002/execution.json",
+      "bytes": 974,
+      "sha256": "09f85ad246a08b4a3ae75687a10f4a0b20ff4965f05d920296c58fc039c1ba08",
+      "actualBytes": 974,
+      "snapshotPath": "/tmp/motion-qualified-measurement-fe092-20261002/PRIMARY/tmp/motion-native-clock-permanent-controls-20261002/execution.json",
+      "matches": true
+    },
+    {
+      "path": "/tmp/motion-native-clock-permanent-controls-20261002/stdout.log",
+      "bytes": 10973,
+      "sha256": "446c88b9ee8bee84984940f1f84734c4a276cf17b7b0d15664cc356c9a66a5e6",
+      "actualBytes": 10973,
+      "snapshotPath": "/tmp/motion-qualified-measurement-fe092-20261002/PRIMARY/tmp/motion-native-clock-permanent-controls-20261002/stdout.log",
+      "matches": true
+    },
+    {
+      "path": "/tmp/motion-native-clock-permanent-controls-20261002/stderr.log",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "actualBytes": 0,
+      "snapshotPath": "/tmp/motion-qualified-measurement-fe092-20261002/PRIMARY/tmp/motion-native-clock-permanent-controls-20261002/stderr.log",
+      "matches": true
+    },
+    {
+      "path": "/tmp/motion-native-clock-permanent-controls-20261002/run.py",
+      "bytes": 1970,
+      "sha256": "ad4b4a3d8f1af34e091c6a134abd9e6acd93f5f06ae2ae60dcd3ed55f95cc495",
+      "actualBytes": 1970,
+      "snapshotPath": "/tmp/motion-qualified-measurement-fe092-20261002/PRIMARY/tmp/motion-native-clock-permanent-controls-20261002/run.py",
+      "matches": true
+    },
+    {
+      "path": "/tmp/motion-ci-f6476ae9-failure-20261002/job-110685127941.log",
+      "bytes": 244446,
+      "sha256": "812738cebb87d49e9e519bedf542e7f6f1a199d6cd612f06d636c9d13bb39860",
+      "actualBytes": 244446,
+      "snapshotPath": "/tmp/motion-qualified-measurement-fe092-20261002/PRIMARY/tmp/motion-ci-f6476ae9-failure-20261002/job-110685127941.log",
+      "matches": true
+    },
+    {
+      "path": "/tmp/motion-ci-f6476ae9-failure-20261002/run.json",
+      "bytes": 13151,
+      "sha256": "4e32d07e1f22ee7745295f332be2009c80f3c9a7bb79d987c6d43442fe3ab754",
+      "actualBytes": 13151,
+      "snapshotPath": "/tmp/motion-qualified-measurement-fe092-20261002/PRIMARY/tmp/motion-ci-f6476ae9-failure-20261002/run.json",
+      "matches": true
+    },
+    {
+      "path": "/tmp/motion-ci-f6476ae9-failure-20261002/primary-receipt.json",
+      "bytes": 1233,
+      "sha256": "6819f715975d180dcbaa92540cc09e1bc0077e037bb135e9adc1e0ced27845a7",
+      "actualBytes": 1233,
+      "snapshotPath": "/tmp/motion-qualified-measurement-fe092-20261002/PRIMARY/tmp/motion-ci-f6476ae9-failure-20261002/primary-receipt.json",
+      "matches": true
+    },
+    {
+      "path": "/tmp/motion-ci-f6476ae9-failure-20261002/causal-excerpt.txt",
+      "bytes": 3559,
+      "sha256": "10a71af13018a0025b9a46e03536407e0b134f87c1dd603ad7a0692692922489",
+      "actualBytes": 3559,
+      "snapshotPath": "/tmp/motion-qualified-measurement-fe092-20261002/PRIMARY/tmp/motion-ci-f6476ae9-failure-20261002/causal-excerpt.txt",
+      "matches": true
+    },
+    {
+      "path": "/workspace/lab-motion/scratchpad/recipe-transform-priority-f647-20261002/red2.observations.json",
+      "bytes": 8071,
+      "sha256": "4023d247c553a680473126f40c76eda2be049a1b56b530ecbe3877d221e04af5",
+      "actualBytes": 8071,
+      "snapshotPath": "/tmp/motion-qualified-measurement-fe092-20261002/PRIMARY/workspace/lab-motion/scratchpad/recipe-transform-priority-f647-20261002/red2.observations.json",
+      "matches": true
+    },
+    {
+      "path": "/workspace/lab-motion/scratchpad/recipe-transform-priority-f647-20261002/red2.command.json",
+      "bytes": 337,
+      "sha256": "eeabbb8f43a7ec840a19a8532e79f6492a15c615cc30a86d59de44736c18e2cc",
+      "actualBytes": 337,
+      "snapshotPath": "/tmp/motion-qualified-measurement-fe092-20261002/PRIMARY/workspace/lab-motion/scratchpad/recipe-transform-priority-f647-20261002/red2.command.json",
+      "matches": true
+    },
+    {
+      "path": "/workspace/lab-motion/scratchpad/recipe-transform-priority-f647-20261002/red2.stdout.log",
+      "bytes": 8146,
+      "sha256": "16b3be86e5cfef997ad9f3f9d8cd323ea94c6c98318212700cc1c656654b92a2",
+      "actualBytes": 8146,
+      "snapshotPath": "/tmp/motion-qualified-measurement-fe092-20261002/PRIMARY/workspace/lab-motion/scratchpad/recipe-transform-priority-f647-20261002/red2.stdout.log",
+      "matches": true
+    },
+    {
+      "path": "/workspace/lab-motion/scratchpad/recipe-transform-priority-f647-20261002/red2.stderr.log",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "actualBytes": 0,
+      "snapshotPath": "/tmp/motion-qualified-measurement-fe092-20261002/PRIMARY/workspace/lab-motion/scratchpad/recipe-transform-priority-f647-20261002/red2.stderr.log",
+      "matches": true
+    },
+    {
+      "path": "/workspace/lab-motion/scratchpad/recipe-transform-priority-f647-20261002/preflight-negative.json",
+      "bytes": 387,
+      "sha256": "c06a5edbfff10054e8cd3c6281bb542f7f06c473b4d16b1c664b1d4590a52569",
+      "actualBytes": 387,
+      "snapshotPath": "/tmp/motion-qualified-measurement-fe092-20261002/PRIMARY/workspace/lab-motion/scratchpad/recipe-transform-priority-f647-20261002/preflight-negative.json",
+      "matches": true
+    },
+    {
+      "path": "/workspace/lab-motion/scratchpad/recipe-transform-priority-f647-20261002/red.error.json",
+      "bytes": 2355,
+      "sha256": "76da3ef11a23f1159580fa075c818308f2995da34010809ea78e2798964ad8c9",
+      "actualBytes": 2355,
+      "snapshotPath": "/tmp/motion-qualified-measurement-fe092-20261002/PRIMARY/workspace/lab-motion/scratchpad/recipe-transform-priority-f647-20261002/red.error.json",
+      "matches": true
+    },
+    {
+      "path": "/workspace/lab-motion/scratchpad/recipe-transform-priority-f647-20261002/owned.patch",
+      "bytes": 8005,
+      "sha256": "9831ecee2000715dc89b3fbe991c8d09c07e80db152170d6d2d557a4890ed194",
+      "actualBytes": 8005,
+      "snapshotPath": "/tmp/motion-qualified-measurement-fe092-20261002/PRIMARY/workspace/lab-motion/scratchpad/recipe-transform-priority-f647-20261002/owned.patch",
+      "matches": true
+    },
+    {
+      "path": "/tmp/motion-profile-f647-final-20261002/PRIMARY-PACKET.json",
+      "sha256": "e0d911564aae5890a75788c33347e01299993c2b7b1c643edfb69e94863e2961",
+      "actualBytes": 3823,
+      "snapshotPath": "/tmp/motion-qualified-measurement-fe092-20261002/PRIMARY/tmp/motion-profile-f647-final-20261002/PRIMARY-PACKET.json",
+      "matches": true
+    }
+  ]
+}

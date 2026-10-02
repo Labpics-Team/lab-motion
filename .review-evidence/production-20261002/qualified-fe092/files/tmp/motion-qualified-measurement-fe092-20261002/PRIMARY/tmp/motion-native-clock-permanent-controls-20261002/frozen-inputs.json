@@ -1,0 +1,42 @@
+{
+  "head": "f6476ae990254f606faf97f80afe41965bec2fb2",
+  "inputs": [
+    {
+      "path": "test/fixtures/server-thread-cpu-clock-check.mjs",
+      "bytes": 8851,
+      "sha256": "d032a5cb9668578b9fbcce986e1cbefa2865fdc17c986742a1274b0e34cb951c"
+    },
+    {
+      "path": "test/fixtures/server-thread-cpu-clock-host.c",
+      "bytes": 1503,
+      "sha256": "15ee4c885cb88c317051a1951030c441b9c78bf105ceb6f21d5ebce6eac3586e"
+    },
+    {
+      "path": "bench/profile/server-thread-cpu-clock.mjs",
+      "bytes": 7279,
+      "sha256": "bb31090e4beaa6d4bc4dcc7789d0993672630e091fca65957174988c58ddba71"
+    },
+    {
+      "path": "bench/profile/server-thread-cpu-clock.c",
+      "bytes": 4159,
+      "sha256": "4f32f23c2409c3e83943121a587c8d9f5e19af7f308ac987323ff4189ddd14c0"
+    },
+    {
+      "path": ".github/workflows/ci.yml",
+      "bytes": 11569,
+      "sha256": "9a8f5c8f37b8a939e534c5afa08bae5213db73ec2484fb5c397b22de3ee599d8"
+    },
+    {
+      "path": "test/ci-workflow-contract.test.ts",
+      "bytes": 24040,
+      "sha256": "0a0ee8faf5e0c1c647f4944e7e131b34c7e0fc0d850a7f890d498f73a8f31ed9"
+    }
+  ],
+  "argv": [
+    "taskset",
+    "-c",
+    "0",
+    "/opt/codex/runtimes/codex-primary-runtime/dependencies/node/bin/node",
+    "test/fixtures/server-thread-cpu-clock-check.mjs"
+  ]
+}

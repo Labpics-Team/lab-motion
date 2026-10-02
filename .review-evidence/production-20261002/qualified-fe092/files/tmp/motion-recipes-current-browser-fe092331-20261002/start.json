@@ -1,0 +1,25 @@
+{
+  "sourceHead": "fe092331360837fd7f63d71a4b7f867ba849ebd4",
+  "argv": [
+    "/tmp/motion-server-toolchain-20261001/bin/pnpm",
+    "exec",
+    "playwright",
+    "test",
+    "browser/compositor-recipes.spec.ts",
+    "--fail-on-flaky-tests",
+    "--reporter=json",
+    "--output=/tmp/motion-recipes-current-browser-fe092331-20261002/artifacts"
+  ],
+  "cwd": "/workspace/lab-motion",
+  "startUtc": "2026-10-02T03:36:46.707193+00:00",
+  "environment": {
+    "PATH": "/tmp/motion-server-toolchain-20261001/bin:/opt/codex/runtimes/codex-primary-runtime/dependencies/node/bin:/home/agent/.local/bin:/opt/codex/runtimes/codex-primary-runtime/dependencies/bin/override:/opt/codex/runtimes/codex-primary-runtime/dependencies/python/bin:/opt/codex/runtimes/codex-primary-runtime/dependencies/node/bin:/opt/codex/runtimes/codex-primary-runtime/dependencies/bin:/opt/codex/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin:/home/agent/.local/bin:/opt/codex/runtimes/codex-primary-runtime/dependencies/bin/fallback",
+    "NODE_PATH": null,
+    "NODE_OPTIONS": null,
+    "CI": "true",
+    "LD_LIBRARY_PATH": "/workspace/lab-motion/scratchpad/browser-deps/root/usr/lib/x86_64-linux-gnu",
+    "PLAYWRIGHT_SKIP_VALIDATE_HOST_REQUIREMENTS": "1",
+    "PLAYWRIGHT_JSON_OUTPUT_FILE": "/tmp/motion-recipes-current-browser-fe092331-20261002/result.json"
+  },
+  "qualification": "Existing stale-ldconfig validation bypass with actual required libraries and all three real engines, original dependency failures retained in immutable prior packets. No executable override/test skip/timeout change. Conformance Playwright1.63, not registered timing Chromium149. Config-owned CI worker1/retries2; flaky tests fail."
+}

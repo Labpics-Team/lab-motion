@@ -1,0 +1,157 @@
+{
+  "head": "fe092331360837fd7f63d71a4b7f867ba849ebd4",
+  "tree": "285e30e36db32f2fdc9ae442327f6b3396dcf254",
+  "sourcePacket": {
+    "path": "/tmp/motion-qualified-fe092331-20261002/PRIMARY-PACKET.json",
+    "sha256": "4184a52ea58d4f3b27e7cd4c571425c51efda578f1a283b2aab396dd0659e29e"
+  },
+  "refs": [
+    {
+      "path": "/tmp/motion-profile-current-gates-fe092331-20261002/receipt.json",
+      "bytes": 7262,
+      "sha256": "26138e2b9c80ab254ab047f28c231db6db763a6b6cdd4f61a138dbf9ee8a834e"
+    },
+    {
+      "path": "/tmp/motion-profile-current-gates-fe092331-20261002/run.py",
+      "bytes": 2983,
+      "sha256": "297f5bb795effeb6ba7d90202d2e57b9b525dfd96c8ab34196b231e5afb7a055"
+    },
+    {
+      "path": "/tmp/motion-profile-current-gates-fe092331-20261002/whole.json",
+      "bytes": 2141909,
+      "sha256": "ae5e6b196a1a077b9672171d56782bb9772d25391872c3d44fe652b581519b0f"
+    },
+    {
+      "path": "/tmp/motion-profile-current-gates-fe092331-20261002/parsed-results-and-packages.json",
+      "bytes": 111835,
+      "sha256": "c4a729874bc83cb6a44e8e2d6358e2fc35074159593e80515f8693fafd65aac3"
+    },
+    {
+      "path": "/tmp/motion-profile-current-gates-fe092331-20261002/actionlint.stdout",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "path": "/tmp/motion-profile-current-gates-fe092331-20261002/docs-drift.stdout",
+      "bytes": 218,
+      "sha256": "4437b7385139583741ad88edbb67528fedc3fabce8beb61947a5bcc384bad4be"
+    },
+    {
+      "path": "/tmp/motion-profile-current-gates-fe092331-20261002/docs-facts.stdout",
+      "bytes": 23,
+      "sha256": "d3b534c5348e15bf96aadf4f5a210761809cc2829415d4fd9015117c41a69d0f"
+    },
+    {
+      "path": "/tmp/motion-profile-current-gates-fe092331-20261002/finiteness.stdout",
+      "bytes": 20314,
+      "sha256": "22186f2cca1db0a296867d16604c9e0fa4439e9919bda70f97ff6afa2be16b98"
+    },
+    {
+      "path": "/tmp/motion-profile-current-gates-fe092331-20261002/npm-pack.stdout",
+      "bytes": 25,
+      "sha256": "abd90dcb1d334fc0369e0d014da05d72546794877f45ec7e3ffcf4609c70ed1a"
+    },
+    {
+      "path": "/tmp/motion-profile-current-gates-fe092331-20261002/pnpm-pack.stdout",
+      "bytes": 8067,
+      "sha256": "8ba6c8a1d1bfc39f55927fde65fea0bcb4a3897f29d2dd85c3f24e690447aa7a"
+    },
+    {
+      "path": "/tmp/motion-profile-current-gates-fe092331-20261002/static.stdout",
+      "bytes": 260,
+      "sha256": "573909cff1d43f41082b6f4b1691f00cea86d28c60a3de986037f8119296512c"
+    },
+    {
+      "path": "/tmp/motion-profile-current-gates-fe092331-20261002/whole.stdout",
+      "bytes": 139,
+      "sha256": "c2335dbb8d49cac33fa26e27baaa87273a48149bfb73406b1fe953d47f0a3be3"
+    },
+    {
+      "path": "/tmp/motion-profile-current-gates-fe092331-20261002/actionlint.stderr",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "path": "/tmp/motion-profile-current-gates-fe092331-20261002/docs-drift.stderr",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "path": "/tmp/motion-profile-current-gates-fe092331-20261002/docs-facts.stderr",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "path": "/tmp/motion-profile-current-gates-fe092331-20261002/finiteness.stderr",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "path": "/tmp/motion-profile-current-gates-fe092331-20261002/npm-pack.stderr",
+      "bytes": 13684,
+      "sha256": "647bdd0dd86a07af57b39b52396e151394d730774d1a72c8b110ce5caa4824e3"
+    },
+    {
+      "path": "/tmp/motion-profile-current-gates-fe092331-20261002/pnpm-pack.stderr",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "path": "/tmp/motion-profile-current-gates-fe092331-20261002/static.stderr",
+      "bytes": 396,
+      "sha256": "fb87992a36e0405ba8b299d10727870ce8bf9a5fc364397f334f6effcf58b720"
+    },
+    {
+      "path": "/tmp/motion-profile-current-gates-fe092331-20261002/whole.stderr",
+      "bytes": 359,
+      "sha256": "8fc2bab2a8ef882281b49e70bd0f237ee30fde252ac0427a7aa94b61e850eff3"
+    },
+    {
+      "path": "/tmp/motion-recipes-current-browser-fe092331-20261002/execution.json",
+      "bytes": 3171,
+      "sha256": "ab4d7527d1e2468dff621d1f792435f7684197721f00f1d7d09e6f2b03ca3a00"
+    },
+    {
+      "path": "/tmp/motion-recipes-current-browser-fe092331-20261002/run.py",
+      "bytes": 2746,
+      "sha256": "b9517f9664984f731830d849e2d444b377020e54846989347956a60b65d8b6ac"
+    },
+    {
+      "path": "/tmp/motion-recipes-current-browser-fe092331-20261002/result.json",
+      "bytes": 166286,
+      "sha256": "8a09834bbe48caffd4bd5b05cd93e5a55a032d7d0cd48ec1e1e22bffa1832188"
+    },
+    {
+      "path": "/tmp/motion-recipes-current-browser-fe092331-20261002/scope-recipes.js",
+      "bytes": 1382990,
+      "sha256": "5320f49b7889f455a0792252e44f6069b75638d2d27051e5a25d6504d2f71c5a"
+    },
+    {
+      "path": "/tmp/motion-recipes-current-browser-fe092331-20261002/scope-recipes.package.json",
+      "bytes": 1210,
+      "sha256": "df1fd41df0c4b268b24f3c00e7566570d0a360d2643bae955201f4ac417c219d"
+    },
+    {
+      "path": "/tmp/motion-recipes-current-browser-fe092331-20261002/stdout.log",
+      "bytes": 397,
+      "sha256": "3134bfa1bd92d7d5d0babaed1307f38bfa4405dc22b060f613d6bd8a40cba297"
+    },
+    {
+      "path": "/tmp/motion-recipes-current-browser-fe092331-20261002/stderr.log",
+      "bytes": 1038,
+      "sha256": "d4478546d47ef0d8333f4329ae20756380308917338f02b45016008a41cf48a1"
+    }
+  ],
+  "packages": [
+    {
+      "path": "/tmp/motion-profile-current-gates-fe092331-20261002/candidate-pnpm.tgz",
+      "bytes": 562051,
+      "sha256": "b41708c31e122da9ae46a558f0c5f447195f36ca19c9b0fe6c19954887d790e4"
+    },
+    {
+      "path": "/tmp/motion-profile-current-gates-fe092331-20261002/labpics-motion-0.3.0.tgz",
+      "bytes": 560040,
+      "sha256": "54482b3da5ae3e530e9f25f29b91471b1ff95cf2d8212735a0eeb71002d6fba7"
+    }
+  ]
+}

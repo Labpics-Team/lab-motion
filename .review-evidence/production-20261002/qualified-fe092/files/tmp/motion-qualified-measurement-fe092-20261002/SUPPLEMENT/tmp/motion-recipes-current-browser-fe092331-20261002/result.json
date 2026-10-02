@@ -1,0 +1,5045 @@
+{
+  "config": {
+    "argv": [
+      "/opt/codex/runtimes/codex-primary-runtime/dependencies/node/bin/node",
+      "/workspace/lab-motion/node_modules/@playwright/test/cli.js",
+      "test",
+      "browser/compositor-recipes.spec.ts",
+      "--fail-on-flaky-tests",
+      "--reporter=json",
+      "--output=/tmp/motion-recipes-current-browser-fe092331-20261002/artifacts"
+    ],
+    "configFile": "/workspace/lab-motion/playwright.config.ts",
+    "rootDir": "/workspace/lab-motion/browser",
+    "failOnFlakyTests": true,
+    "forbidOnly": true,
+    "fullyParallel": true,
+    "globalSetup": "/workspace/lab-motion/browser/fixtures/compile-artifacts.mjs",
+    "globalTeardown": null,
+    "globalTimeout": 0,
+    "grep": {},
+    "grepInvert": null,
+    "maxFailures": 0,
+    "metadata": {
+      "actualWorkers": 1
+    },
+    "preserveOutput": "always",
+    "projects": [
+      {
+        "outputDir": "/tmp/motion-recipes-current-browser-fe092331-20261002/artifacts",
+        "repeatEach": 1,
+        "retries": 2,
+        "metadata": {
+          "actualWorkers": 1
+        },
+        "id": "chromium",
+        "name": "chromium",
+        "testDir": "/workspace/lab-motion/browser",
+        "testIgnore": [],
+        "testMatch": [
+          "/.*\\.spec\\.ts$/"
+        ],
+        "timeout": 30000
+      },
+      {
+        "outputDir": "/tmp/motion-recipes-current-browser-fe092331-20261002/artifacts",
+        "repeatEach": 1,
+        "retries": 2,
+        "metadata": {
+          "actualWorkers": 1
+        },
+        "id": "firefox",
+        "name": "firefox",
+        "testDir": "/workspace/lab-motion/browser",
+        "testIgnore": [],
+        "testMatch": [
+          "/.*\\.spec\\.ts$/"
+        ],
+        "timeout": 30000
+      },
+      {
+        "outputDir": "/tmp/motion-recipes-current-browser-fe092331-20261002/artifacts",
+        "repeatEach": 1,
+        "retries": 2,
+        "metadata": {
+          "actualWorkers": 1
+        },
+        "id": "webkit",
+        "name": "webkit",
+        "testDir": "/workspace/lab-motion/browser",
+        "testIgnore": [],
+        "testMatch": [
+          "/.*\\.spec\\.ts$/"
+        ],
+        "timeout": 30000
+      }
+    ],
+    "quiet": false,
+    "reporter": [
+      [
+        "json"
+      ]
+    ],
+    "reportSlowTests": {
+      "max": 5,
+      "threshold": 300000
+    },
+    "shard": null,
+    "tags": [],
+    "updateSnapshots": "missing",
+    "updateSourceMethod": "patch",
+    "version": "1.63.0",
+    "workers": 1,
+    "webServer": {
+      "command": "node browser/fixtures/server.mjs 6180",
+      "url": "http://127.0.0.1:6180/site/dist/index.html",
+      "reuseExistingServer": false,
+      "timeout": 20000
+    }
+  },
+  "suites": [
+    {
+      "title": "compositor-recipes.spec.ts",
+      "file": "compositor-recipes.spec.ts",
+      "column": 0,
+      "line": 0,
+      "specs": [
+        {
+          "title": "literal recipes используют manifest и байты фактического npm tarball",
+          "ok": true,
+          "tags": [],
+          "tests": [
+            {
+              "timeout": 30000,
+              "annotations": [],
+              "expectedStatus": "passed",
+              "projectId": "chromium",
+              "projectName": "chromium",
+              "results": [
+                {
+                  "workerIndex": 0,
+                  "parallelIndex": 0,
+                  "status": "passed",
+                  "duration": 203,
+                  "errors": [],
+                  "stdout": [],
+                  "stderr": [
+                    {
+                      "text": "Skipping host requirements validation logic because `PLAYWRIGHT_SKIP_VALIDATE_HOST_REQUIREMENTS` env variable is set.\n"
+                    }
+                  ],
+                  "retry": 0,
+                  "startTime": "2026-10-02T03:36:49.999Z",
+                  "annotations": [],
+                  "attachments": [
+                    {
+                      "name": "actual-package-receipt",
+                      "contentType": "application/json",
+                      "body": "eyJzY2hlbWEiOiJzY29wZS1yZWNpcGVzLXBhY2thZ2UtdjEiLCJwYWNrYWdlIjp7Im5hbWUiOiJAbGFicGljcy9tb3Rpb24iLCJ2ZXJzaW9uIjoiMC4zLjAifSwidGFyYmFsbCI6eyJmaWxlbmFtZSI6ImxhYnBpY3MtbW90aW9uLTAuMy4wLnRneiIsInNoYTI1NiI6IjU0NDgyYjNkYTVhZTNlNTMwZTlmMjVmMjliOTE0NzFiMWZmOTVjZjJkODIxMjczNWEwZWViNzEwMDJkNmZiYTciLCJpbnRlZ3JpdHkiOiJzaGE1MTItTUxUVHhMaG02Wk96RWlWSzZuNGFFZ0sxSVpNMEVqRlBKWE1tdWs4NGJRYUtTdFFlSlE5d0hCcVRTVGJWYnRlcHJZVlBYT216d3padGsxTnFCRlhlWnc9PSJ9LCJtYW5pZmVzdCI6eyJzaGEyNTYiOiJkZTI3ODcwMmQ5ZjY4NDNiZTJiNjgyYzI3ZDljYzBkMTZkNTUyMzI3Zjc3ZjdhOWYwN2JlZTBmZjY3OTNkYTUyIiwiZmlsZUNvdW50IjozMTJ9LCJyZWNpcGVzU2hhMjU2IjoiYmE3MzAwNDI0ZmE4OTIzZTgyMmVmNTVkNGZmNmYzNjU1MGUwNmM0NzZhY2E4MDg2OWIwMmY4NzI1OWI2MTY0NSIsInJ1bnRpbWUiOnsibm9kZSI6InYyNC4xOS4wIiwiZXNidWlsZCI6IjAuMjguMiJ9LCJtb3Rpb25JbnB1dHMiOlsiZGlzdC9hbmltYXRlL2luZGV4LmpzIiwiZGlzdC9iZWhhdmlvcnMvcmVvcmRlci9pbmRleC5qcyIsImRpc3QvY29tcG9zaXRvci9pbmRleC5qcyIsImRpc3QvZGVjYXkvaW5kZXguanMiLCJkaXN0L2ZyYW1lL2luZGV4LmpzIiwiZGlzdC9nZXN0dXJlcy9pbmRleC5qcyIsImRpc3QvcHJlc2VuY2UvaW5kZXguanMiLCJkaXN0L3Byb2plY3Rpb24vaW5kZXguanMiLCJkaXN0L3NtYXJ0L2luZGV4LmpzIl0sImJ1bmRsZVNoYTI1NiI6IjUzMjBmNDliNzg4OWY0NTVhMDc5MjI1MmU0NGY2MDY5Yjc1NjM4ZDJkMjcwNTFlNWEyNWQ2NTA0ZDJmNzFjNWEiLCJzc3JIdG1sU2hhMjU2IjoiNjhlMTRkNTAxZmQ2YTU2ZmU0NDVhOGNjMzM3N2VlZDc4YzAyOTg2NjliZTlhNzIzYTA2ZDdjMmFiNTU4MTQyZiIsInNzck1vdGlvbklucHV0cyI6WyJkaXN0L2FuaW1hdGUvaW5kZXguanMiLCJkaXN0L2ZyYW1lL2luZGV4LmpzIl19"
+                    }
+                  ]
+                }
+              ],
+              "status": "expected"
+            }
+          ],
+          "id": "b9227b25fa0930e6bacb-02e639059adb0c4196b4",
+          "file": "compositor-recipes.spec.ts",
+          "line": 44,
+          "column": 1
+        },
+        {
+          "title": "actual tarball: React SSR → hydration сохраняет DOM, StrictMode cleanup и поздний click",
+          "ok": true,
+          "tags": [],
+          "tests": [
+            {
+              "timeout": 30000,
+              "annotations": [],
+              "expectedStatus": "passed",
+              "projectId": "chromium",
+              "projectName": "chromium",
+              "results": [
+                {
+                  "workerIndex": 0,
+                  "parallelIndex": 0,
+                  "status": "passed",
+                  "duration": 325,
+                  "errors": [],
+                  "stdout": [],
+                  "stderr": [],
+                  "retry": 0,
+                  "startTime": "2026-10-02T03:36:50.294Z",
+                  "annotations": [],
+                  "attachments": []
+                }
+              ],
+              "status": "expected"
+            }
+          ],
+          "id": "b9227b25fa0930e6bacb-c0c575d63dd7c0ebaa4b",
+          "file": "compositor-recipes.spec.ts",
+          "line": 61,
+          "column": 1
+        },
+        {
+          "title": "sheet: destroy восстанавливает исходный inline transform (important)",
+          "ok": true,
+          "tags": [],
+          "tests": [
+            {
+              "timeout": 30000,
+              "annotations": [],
+              "expectedStatus": "passed",
+              "projectId": "chromium",
+              "projectName": "chromium",
+              "results": [
+                {
+                  "workerIndex": 0,
+                  "parallelIndex": 0,
+                  "status": "passed",
+                  "duration": 248,
+                  "errors": [],
+                  "stdout": [],
+                  "stderr": [],
+                  "retry": 0,
+                  "startTime": "2026-10-02T03:36:50.632Z",
+                  "annotations": [],
+                  "attachments": []
+                }
+              ],
+              "status": "expected"
+            }
+          ],
+          "id": "b9227b25fa0930e6bacb-b3054523c916af3e1854",
+          "file": "compositor-recipes.spec.ts",
+          "line": 94,
+          "column": 5
+        },
+        {
+          "title": "sheet: destroy восстанавливает исходный inline transform (plain)",
+          "ok": true,
+          "tags": [],
+          "tests": [
+            {
+              "timeout": 30000,
+              "annotations": [],
+              "expectedStatus": "passed",
+              "projectId": "chromium",
+              "projectName": "chromium",
+              "results": [
+                {
+                  "workerIndex": 0,
+                  "parallelIndex": 0,
+                  "status": "passed",
+                  "duration": 242,
+                  "errors": [],
+                  "stdout": [],
+                  "stderr": [],
+                  "retry": 0,
+                  "startTime": "2026-10-02T03:36:50.890Z",
+                  "annotations": [],
+                  "attachments": []
+                }
+              ],
+              "status": "expected"
+            }
+          ],
+          "id": "b9227b25fa0930e6bacb-c99a2a568e584b750304",
+          "file": "compositor-recipes.spec.ts",
+          "line": 94,
+          "column": 5
+        },
+        {
+          "title": "sheet: destroy восстанавливает исходный inline transform (none)",
+          "ok": true,
+          "tags": [],
+          "tests": [
+            {
+              "timeout": 30000,
+              "annotations": [],
+              "expectedStatus": "passed",
+              "projectId": "chromium",
+              "projectName": "chromium",
+              "results": [
+                {
+                  "workerIndex": 0,
+                  "parallelIndex": 0,
+                  "status": "passed",
+                  "duration": 260,
+                  "errors": [],
+                  "stdout": [],
+                  "stderr": [],
+                  "retry": 0,
+                  "startTime": "2026-10-02T03:36:51.148Z",
+                  "annotations": [],
+                  "attachments": []
+                }
+              ],
+              "status": "expected"
+            }
+          ],
+          "id": "b9227b25fa0930e6bacb-f8f1b6123cc76c79173d",
+          "file": "compositor-recipes.spec.ts",
+          "line": 94,
+          "column": 5
+        },
+        {
+          "title": "sheet: destroy восстанавливает исходный inline transform (absent)",
+          "ok": true,
+          "tags": [],
+          "tests": [
+            {
+              "timeout": 30000,
+              "annotations": [],
+              "expectedStatus": "passed",
+              "projectId": "chromium",
+              "projectName": "chromium",
+              "results": [
+                {
+                  "workerIndex": 0,
+                  "parallelIndex": 0,
+                  "status": "passed",
+                  "duration": 221,
+                  "errors": [],
+                  "stdout": [],
+                  "stderr": [],
+                  "retry": 0,
+                  "startTime": "2026-10-02T03:36:51.420Z",
+                  "annotations": [],
+                  "attachments": []
+                }
+              ],
+              "status": "expected"
+            }
+          ],
+          "id": "b9227b25fa0930e6bacb-862439f0b160cfc7e5d4",
+          "file": "compositor-recipes.spec.ts",
+          "line": 94,
+          "column": 5
+        },
+        {
+          "title": "sheet: getter onSelect сохраняет healthy intent до внешнего эффекта",
+          "ok": true,
+          "tags": [],
+          "tests": [
+            {
+              "timeout": 30000,
+              "annotations": [],
+              "expectedStatus": "passed",
+              "projectId": "chromium",
+              "projectName": "chromium",
+              "results": [
+                {
+                  "workerIndex": 0,
+                  "parallelIndex": 0,
+                  "status": "passed",
+                  "duration": 219,
+                  "errors": [],
+                  "stdout": [],
+                  "stderr": [],
+                  "retry": 0,
+                  "startTime": "2026-10-02T03:36:51.651Z",
+                  "annotations": [],
+                  "attachments": []
+                }
+              ],
+              "status": "expected"
+            }
+          ],
+          "id": "b9227b25fa0930e6bacb-36d62d3a22937b4916fa",
+          "file": "compositor-recipes.spec.ts",
+          "line": 141,
+          "column": 5
+        },
+        {
+          "title": "sheet: getter onSelect сохраняет destroy intent до внешнего эффекта",
+          "ok": true,
+          "tags": [],
+          "tests": [
+            {
+              "timeout": 30000,
+              "annotations": [],
+              "expectedStatus": "passed",
+              "projectId": "chromium",
+              "projectName": "chromium",
+              "results": [
+                {
+                  "workerIndex": 0,
+                  "parallelIndex": 0,
+                  "status": "passed",
+                  "duration": 208,
+                  "errors": [],
+                  "stdout": [],
+                  "stderr": [],
+                  "retry": 0,
+                  "startTime": "2026-10-02T03:36:51.879Z",
+                  "annotations": [],
+                  "attachments": []
+                }
+              ],
+              "status": "expected"
+            }
+          ],
+          "id": "b9227b25fa0930e6bacb-a8a353ffb22bfa9d173a",
+          "file": "compositor-recipes.spec.ts",
+          "line": 141,
+          "column": 5
+        },
+        {
+          "title": "sheet: getter onSelect сохраняет select intent до внешнего эффекта",
+          "ok": true,
+          "tags": [],
+          "tests": [
+            {
+              "timeout": 30000,
+              "annotations": [],
+              "expectedStatus": "passed",
+              "projectId": "chromium",
+              "projectName": "chromium",
+              "results": [
+                {
+                  "workerIndex": 0,
+                  "parallelIndex": 0,
+                  "status": "passed",
+                  "duration": 236,
+                  "errors": [],
+                  "stdout": [],
+                  "stderr": [],
+                  "retry": 0,
+                  "startTime": "2026-10-02T03:36:52.098Z",
+                  "annotations": [],
+                  "attachments": []
+                }
+              ],
+              "status": "expected"
+            }
+          ],
+          "id": "b9227b25fa0930e6bacb-7fc8e74b128304296725",
+          "file": "compositor-recipes.spec.ts",
+          "line": 141,
+          "column": 5
+        },
+        {
+          "title": "sheet: destroy восстанавливает прежний focus owner в light",
+          "ok": true,
+          "tags": [],
+          "tests": [
+            {
+              "timeout": 30000,
+              "annotations": [],
+              "expectedStatus": "passed",
+              "projectId": "chromium",
+              "projectName": "chromium",
+              "results": [
+                {
+                  "workerIndex": 0,
+                  "parallelIndex": 0,
+                  "status": "passed",
+                  "duration": 206,
+                  "errors": [],
+                  "stdout": [],
+                  "stderr": [],
+                  "retry": 0,
+                  "startTime": "2026-10-02T03:36:52.345Z",
+                  "annotations": [],
+                  "attachments": []
+                }
+              ],
+              "status": "expected"
+            }
+          ],
+          "id": "b9227b25fa0930e6bacb-d7b6eea2e85570e9790c",
+          "file": "compositor-recipes.spec.ts",
+          "line": 174,
+          "column": 5
+        },
+        {
+          "title": "sheet: destroy восстанавливает прежний focus owner в shadow",
+          "ok": true,
+          "tags": [],
+          "tests": [
+            {
+              "timeout": 30000,
+              "annotations": [],
+              "expectedStatus": "passed",
+              "projectId": "chromium",
+              "projectName": "chromium",
+              "results": [
+                {
+                  "workerIndex": 0,
+                  "parallelIndex": 0,
+                  "status": "passed",
+                  "duration": 236,
+                  "errors": [],
+                  "stdout": [],
+                  "stderr": [],
+                  "retry": 0,
+                  "startTime": "2026-10-02T03:36:52.567Z",
+                  "annotations": [],
+                  "attachments": []
+                }
+              ],
+              "status": "expected"
+            }
+          ],
+          "id": "b9227b25fa0930e6bacb-3b06a379d3ce321b7c41",
+          "file": "compositor-recipes.spec.ts",
+          "line": 174,
+          "column": 5
+        },
+        {
+          "title": "sheet: destroy восстанавливает прежний focus owner в nested",
+          "ok": true,
+          "tags": [],
+          "tests": [
+            {
+              "timeout": 30000,
+              "annotations": [],
+              "expectedStatus": "passed",
+              "projectId": "chromium",
+              "projectName": "chromium",
+              "results": [
+                {
+                  "workerIndex": 0,
+                  "parallelIndex": 0,
+                  "status": "passed",
+                  "duration": 213,
+                  "errors": [],
+                  "stdout": [],
+                  "stderr": [],
+                  "retry": 0,
+                  "startTime": "2026-10-02T03:36:52.813Z",
+                  "annotations": [],
+                  "attachments": []
+                }
+              ],
+              "status": "expected"
+            }
+          ],
+          "id": "b9227b25fa0930e6bacb-5b2cfdb444d2b79b15c5",
+          "file": "compositor-recipes.spec.ts",
+          "line": 174,
+          "column": 5
+        },
+        {
+          "title": "sheet: destroy восстанавливает прежний focus owner в child-shadow",
+          "ok": true,
+          "tags": [],
+          "tests": [
+            {
+              "timeout": 30000,
+              "annotations": [],
+              "expectedStatus": "passed",
+              "projectId": "chromium",
+              "projectName": "chromium",
+              "results": [
+                {
+                  "workerIndex": 0,
+                  "parallelIndex": 0,
+                  "status": "passed",
+                  "duration": 227,
+                  "errors": [],
+                  "stdout": [],
+                  "stderr": [],
+                  "retry": 0,
+                  "startTime": "2026-10-02T03:36:53.034Z",
+                  "annotations": [],
+                  "attachments": []
+                }
+              ],
+              "status": "expected"
+            }
+          ],
+          "id": "b9227b25fa0930e6bacb-bbd689b1794953978b0d",
+          "file": "compositor-recipes.spec.ts",
+          "line": 174,
+          "column": 5
+        },
+        {
+          "title": "sheet: destroy восстанавливает прежний focus owner в outside-shadow",
+          "ok": true,
+          "tags": [],
+          "tests": [
+            {
+              "timeout": 30000,
+              "annotations": [],
+              "expectedStatus": "passed",
+              "projectId": "chromium",
+              "projectName": "chromium",
+              "results": [
+                {
+                  "workerIndex": 0,
+                  "parallelIndex": 0,
+                  "status": "passed",
+                  "duration": 237,
+                  "errors": [],
+                  "stdout": [],
+                  "stderr": [],
+                  "retry": 0,
+                  "startTime": "2026-10-02T03:36:53.269Z",
+                  "annotations": [],
+                  "attachments": []
+                }
+              ],
+              "status": "expected"
+            }
+          ],
+          "id": "b9227b25fa0930e6bacb-7952c47045164286b23d",
+          "file": "compositor-recipes.spec.ts",
+          "line": 174,
+          "column": 5
+        },
+        {
+          "title": "sheet: destroy восстанавливает прежний focus owner в outside-nested",
+          "ok": true,
+          "tags": [],
+          "tests": [
+            {
+              "timeout": 30000,
+              "annotations": [],
+              "expectedStatus": "passed",
+              "projectId": "chromium",
+              "projectName": "chromium",
+              "results": [
+                {
+                  "workerIndex": 0,
+                  "parallelIndex": 0,
+                  "status": "passed",
+                  "duration": 244,
+                  "errors": [],
+                  "stdout": [],
+                  "stderr": [],
+                  "retry": 0,
+                  "startTime": "2026-10-02T03:36:53.516Z",
+                  "annotations": [],
+                  "attachments": []
+                }
+              ],
+              "status": "expected"
+            }
+          ],
+          "id": "b9227b25fa0930e6bacb-e2b4cd01f3e41c06bd13",
+          "file": "compositor-recipes.spec.ts",
+          "line": 174,
+          "column": 5
+        },
+        {
+          "title": "sheet: destroy восстанавливает прежний focus owner в parent-shadow",
+          "ok": true,
+          "tags": [],
+          "tests": [
+            {
+              "timeout": 30000,
+              "annotations": [],
+              "expectedStatus": "passed",
+              "projectId": "chromium",
+              "projectName": "chromium",
+              "results": [
+                {
+                  "workerIndex": 0,
+                  "parallelIndex": 0,
+                  "status": "passed",
+                  "duration": 213,
+                  "errors": [],
+                  "stdout": [],
+                  "stderr": [],
+                  "retry": 0,
+                  "startTime": "2026-10-02T03:36:53.768Z",
+                  "annotations": [],
+                  "attachments": []
+                }
+              ],
+              "status": "expected"
+            }
+          ],
+          "id": "b9227b25fa0930e6bacb-ff35b957d595985005b0",
+          "file": "compositor-recipes.spec.ts",
+          "line": 174,
+          "column": 5
+        },
+        {
+          "title": "sheet: destroy восстанавливает прежний focus owner в closed-shadow",
+          "ok": true,
+          "tags": [],
+          "tests": [
+            {
+              "timeout": 30000,
+              "annotations": [],
+              "expectedStatus": "passed",
+              "projectId": "chromium",
+              "projectName": "chromium",
+              "results": [
+                {
+                  "workerIndex": 0,
+                  "parallelIndex": 0,
+                  "status": "passed",
+                  "duration": 195,
+                  "errors": [],
+                  "stdout": [],
+                  "stderr": [],
+                  "retry": 0,
+                  "startTime": "2026-10-02T03:36:53.990Z",
+                  "annotations": [],
+                  "attachments": []
+                }
+              ],
+              "status": "expected"
+            }
+          ],
+          "id": "b9227b25fa0930e6bacb-80b3e3c7b3ded6376ca1",
+          "file": "compositor-recipes.spec.ts",
+          "line": 174,
+          "column": 5
+        },
+        {
+          "title": "sheet: destroy восстанавливает прежний focus owner в parent-closed-shadow",
+          "ok": true,
+          "tags": [],
+          "tests": [
+            {
+              "timeout": 30000,
+              "annotations": [],
+              "expectedStatus": "passed",
+              "projectId": "chromium",
+              "projectName": "chromium",
+              "results": [
+                {
+                  "workerIndex": 0,
+                  "parallelIndex": 0,
+                  "status": "passed",
+                  "duration": 219,
+                  "errors": [],
+                  "stdout": [],
+                  "stderr": [],
+                  "retry": 0,
+                  "startTime": "2026-10-02T03:36:54.192Z",
+                  "annotations": [],
+                  "attachments": []
+                }
+              ],
+              "status": "expected"
+            }
+          ],
+          "id": "b9227b25fa0930e6bacb-00d4ce50cfc2c73f88fa",
+          "file": "compositor-recipes.spec.ts",
+          "line": 174,
+          "column": 5
+        },
+        {
+          "title": "sheet: destroy восстанавливает прежний focus owner в ancestor-closed-shadow",
+          "ok": true,
+          "tags": [],
+          "tests": [
+            {
+              "timeout": 30000,
+              "annotations": [],
+              "expectedStatus": "passed",
+              "projectId": "chromium",
+              "projectName": "chromium",
+              "results": [
+                {
+                  "workerIndex": 0,
+                  "parallelIndex": 0,
+                  "status": "passed",
+                  "duration": 192,
+                  "errors": [],
+                  "stdout": [],
+                  "stderr": [],
+                  "retry": 0,
+                  "startTime": "2026-10-02T03:36:54.420Z",
+                  "annotations": [],
+                  "attachments": []
+                }
+              ],
+              "status": "expected"
+            }
+          ],
+          "id": "b9227b25fa0930e6bacb-ed86e7567e5041439c22",
+          "file": "compositor-recipes.spec.ts",
+          "line": 174,
+          "column": 5
+        },
+        {
+          "title": "sheet: none pause сохраняет текущую quiet drag позу",
+          "ok": true,
+          "tags": [],
+          "tests": [
+            {
+              "timeout": 30000,
+              "annotations": [],
+              "expectedStatus": "passed",
+              "projectId": "chromium",
+              "projectName": "chromium",
+              "results": [
+                {
+                  "workerIndex": 0,
+                  "parallelIndex": 0,
+                  "status": "passed",
+                  "duration": 288,
+                  "errors": [],
+                  "stdout": [],
+                  "stderr": [],
+                  "retry": 0,
+                  "startTime": "2026-10-02T03:36:54.619Z",
+                  "annotations": [],
+                  "attachments": []
+                }
+              ],
+              "status": "expected"
+            }
+          ],
+          "id": "b9227b25fa0930e6bacb-12e18f3e2974aa64bab1",
+          "file": "compositor-recipes.spec.ts",
+          "line": 228,
+          "column": 5
+        },
+        {
+          "title": "sheet: reduced pause сохраняет текущую quiet drag позу",
+          "ok": true,
+          "tags": [],
+          "tests": [
+            {
+              "timeout": 30000,
+              "annotations": [],
+              "expectedStatus": "passed",
+              "projectId": "chromium",
+              "projectName": "chromium",
+              "results": [
+                {
+                  "workerIndex": 0,
+                  "parallelIndex": 0,
+                  "status": "passed",
+                  "duration": 276,
+                  "errors": [],
+                  "stdout": [],
+                  "stderr": [],
+                  "retry": 0,
+                  "startTime": "2026-10-02T03:36:54.914Z",
+                  "annotations": [],
+                  "attachments": []
+                }
+              ],
+              "status": "expected"
+            }
+          ],
+          "id": "b9227b25fa0930e6bacb-4e20fecccbd16b17842e",
+          "file": "compositor-recipes.spec.ts",
+          "line": 228,
+          "column": 5
+        },
+        {
+          "title": "sheet: native interruption → live follow → native release; один inert callback",
+          "ok": true,
+          "tags": [],
+          "tests": [
+            {
+              "timeout": 30000,
+              "annotations": [],
+              "expectedStatus": "passed",
+              "projectId": "chromium",
+              "projectName": "chromium",
+              "results": [
+                {
+                  "workerIndex": 0,
+                  "parallelIndex": 0,
+                  "status": "passed",
+                  "duration": 293,
+                  "errors": [],
+                  "stdout": [],
+                  "stderr": [],
+                  "retry": 0,
+                  "startTime": "2026-10-02T03:36:55.198Z",
+                  "annotations": [],
+                  "attachments": []
+                }
+              ],
+              "status": "expected"
+            }
+          ],
+          "id": "b9227b25fa0930e6bacb-474a92013bd2c900b890",
+          "file": "compositor-recipes.spec.ts",
+          "line": 258,
+          "column": 3
+        },
+        {
+          "title": "sheet: pointercancel не меняет выбранную цель, pause сохраняет позу",
+          "ok": true,
+          "tags": [],
+          "tests": [
+            {
+              "timeout": 30000,
+              "annotations": [],
+              "expectedStatus": "passed",
+              "projectId": "chromium",
+              "projectName": "chromium",
+              "results": [
+                {
+                  "workerIndex": 0,
+                  "parallelIndex": 0,
+                  "status": "passed",
+                  "duration": 287,
+                  "errors": [],
+                  "stdout": [],
+                  "stderr": [],
+                  "retry": 0,
+                  "startTime": "2026-10-02T03:36:55.502Z",
+                  "annotations": [],
+                  "attachments": []
+                }
+              ],
+              "status": "expected"
+            }
+          ],
+          "id": "b9227b25fa0930e6bacb-c065bc95dff3a337ab3c",
+          "file": "compositor-recipes.spec.ts",
+          "line": 316,
+          "column": 3
+        },
+        {
+          "title": "sheet: no-motion, keyboard, IME и явный resize/reparent",
+          "ok": true,
+          "tags": [],
+          "tests": [
+            {
+              "timeout": 30000,
+              "annotations": [],
+              "expectedStatus": "passed",
+              "projectId": "chromium",
+              "projectName": "chromium",
+              "results": [
+                {
+                  "workerIndex": 0,
+                  "parallelIndex": 0,
+                  "status": "passed",
+                  "duration": 239,
+                  "errors": [],
+                  "stdout": [],
+                  "stderr": [],
+                  "retry": 0,
+                  "startTime": "2026-10-02T03:36:55.796Z",
+                  "annotations": [],
+                  "attachments": []
+                }
+              ],
+              "status": "expected"
+            }
+          ],
+          "id": "b9227b25fa0930e6bacb-4088fea38887ad81217f",
+          "file": "compositor-recipes.spec.ts",
+          "line": 346,
+          "column": 3
+        },
+        {
+          "title": "sheet: reduced-motion при mount и при смене предпочтения",
+          "ok": true,
+          "tags": [],
+          "tests": [
+            {
+              "timeout": 30000,
+              "annotations": [],
+              "expectedStatus": "passed",
+              "projectId": "chromium",
+              "projectName": "chromium",
+              "results": [
+                {
+                  "workerIndex": 0,
+                  "parallelIndex": 0,
+                  "status": "passed",
+                  "duration": 268,
+                  "errors": [],
+                  "stdout": [],
+                  "stderr": [],
+                  "retry": 0,
+                  "startTime": "2026-10-02T03:36:56.042Z",
+                  "annotations": [],
+                  "attachments": []
+                }
+              ],
+              "status": "expected"
+            }
+          ],
+          "id": "b9227b25fa0930e6bacb-1b4d11d5fb943c4f393b",
+          "file": "compositor-recipes.spec.ts",
+          "line": 383,
+          "column": 3
+        },
+        {
+          "title": "pager: destroy восстанавливает исходный inline transform (important)",
+          "ok": true,
+          "tags": [],
+          "tests": [
+            {
+              "timeout": 30000,
+              "annotations": [],
+              "expectedStatus": "passed",
+              "projectId": "chromium",
+              "projectName": "chromium",
+              "results": [
+                {
+                  "workerIndex": 0,
+                  "parallelIndex": 0,
+                  "status": "passed",
+                  "duration": 204,
+                  "errors": [],
+                  "stdout": [],
+                  "stderr": [],
+                  "retry": 0,
+                  "startTime": "2026-10-02T03:36:56.318Z",
+                  "annotations": [],
+                  "attachments": []
+                }
+              ],
+              "status": "expected"
+            }
+          ],
+          "id": "b9227b25fa0930e6bacb-bbb0040208df579c3ccf",
+          "file": "compositor-recipes.spec.ts",
+          "line": 94,
+          "column": 5
+        },
+        {
+          "title": "pager: destroy восстанавливает исходный inline transform (plain)",
+          "ok": true,
+          "tags": [],
+          "tests": [
+            {
+              "timeout": 30000,
+              "annotations": [],
+              "expectedStatus": "passed",
+              "projectId": "chromium",
+              "projectName": "chromium",
+              "results": [
+                {
+                  "workerIndex": 0,
+                  "parallelIndex": 0,
+                  "status": "passed",
+                  "duration": 210,
+                  "errors": [],
+                  "stdout": [],
+                  "stderr": [],
+                  "retry": 0,
+                  "startTime": "2026-10-02T03:36:56.529Z",
+                  "annotations": [],
+                  "attachments": []
+                }
+              ],
+              "status": "expected"
+            }
+          ],
+          "id": "b9227b25fa0930e6bacb-dfad3701b6c9cd537a3e",
+          "file": "compositor-recipes.spec.ts",
+          "line": 94,
+          "column": 5
+        },
+        {
+          "title": "pager: destroy восстанавливает исходный inline transform (none)",
+          "ok": true,
+          "tags": [],
+          "tests": [
+            {
+              "timeout": 30000,
+              "annotations": [],
+              "expectedStatus": "passed",
+              "projectId": "chromium",
+              "projectName": "chromium",
+              "results": [
+                {
+                  "workerIndex": 0,
+                  "parallelIndex": 0,
+                  "status": "passed",
+                  "duration": 212,
+                  "errors": [],
+                  "stdout": [],
+                  "stderr": [],
+                  "retry": 0,
+                  "startTime": "2026-10-02T03:36:56.747Z",
+                  "annotations": [],
+                  "attachments": []
+                }
+              ],
+              "status": "expected"
+            }
+          ],
+          "id": "b9227b25fa0930e6bacb-d89d6a54d98868120267",
+          "file": "compositor-recipes.spec.ts",
+          "line": 94,
+          "column": 5
+        },
+        {
+          "title": "pager: destroy восстанавливает исходный inline transform (absent)",
+          "ok": true,
+          "tags": [],
+          "tests": [
+            {
+              "timeout": 30000,
+              "annotations": [],
+              "expectedStatus": "passed",
+              "projectId": "chromium",
+              "projectName": "chromium",
+              "results": [
+                {
+                  "workerIndex": 0,
+                  "parallelIndex": 0,
+                  "status": "passed",
+                  "duration": 210,
+                  "errors": [],
+                  "stdout": [],
+                  "stderr": [],
+                  "retry": 0,
+                  "startTime": "2026-10-02T03:36:56.967Z",
+                  "annotations": [],
+                  "attachments": []
+                }
+              ],
+              "status": "expected"
+            }
+          ],
+          "id": "b9227b25fa0930e6bacb-2c2b288c8d18e5157ed5",
+          "file": "compositor-recipes.spec.ts",
+          "line": 94,
+          "column": 5
+        },
+        {
+          "title": "pager: getter onSelect сохраняет healthy intent до внешнего эффекта",
+          "ok": true,
+          "tags": [],
+          "tests": [
+            {
+              "timeout": 30000,
+              "annotations": [],
+              "expectedStatus": "passed",
+              "projectId": "chromium",
+              "projectName": "chromium",
+              "results": [
+                {
+                  "workerIndex": 0,
+                  "parallelIndex": 0,
+                  "status": "passed",
+                  "duration": 208,
+                  "errors": [],
+                  "stdout": [],
+                  "stderr": [],
+                  "retry": 0,
+                  "startTime": "2026-10-02T03:36:57.184Z",
+                  "annotations": [],
+                  "attachments": []
+                }
+              ],
+              "status": "expected"
+            }
+          ],
+          "id": "b9227b25fa0930e6bacb-9fdb6c92eb68b0dc5a36",
+          "file": "compositor-recipes.spec.ts",
+          "line": 141,
+          "column": 5
+        },
+        {
+          "title": "pager: getter onSelect сохраняет destroy intent до внешнего эффекта",
+          "ok": true,
+          "tags": [],
+          "tests": [
+            {
+              "timeout": 30000,
+              "annotations": [],
+              "expectedStatus": "passed",
+              "projectId": "chromium",
+              "projectName": "chromium",
+              "results": [
+                {
+                  "workerIndex": 0,
+                  "parallelIndex": 0,
+                  "status": "passed",
+                  "duration": 215,
+                  "errors": [],
+                  "stdout": [],
+                  "stderr": [],
+                  "retry": 0,
+                  "startTime": "2026-10-02T03:36:57.399Z",
+                  "annotations": [],
+                  "attachments": []
+                }
+              ],
+              "status": "expected"
+            }
+          ],
+          "id": "b9227b25fa0930e6bacb-7a2a048649ee93d25b16",
+          "file": "compositor-recipes.spec.ts",
+          "line": 141,
+          "column": 5
+        },
+        {
+          "title": "pager: getter onSelect сохраняет select intent до внешнего эффекта",
+          "ok": true,
+          "tags": [],
+          "tests": [
+            {
+              "timeout": 30000,
+              "annotations": [],
+              "expectedStatus": "passed",
+              "projectId": "chromium",
+              "projectName": "chromium",
+              "results": [
+                {
+                  "workerIndex": 0,
+                  "parallelIndex": 0,
+                  "status": "passed",
+                  "duration": 196,
+                  "errors": [],
+                  "stdout": [],
+                  "stderr": [],
+                  "retry": 0,
+                  "startTime": "2026-10-02T03:36:57.622Z",
+                  "annotations": [],
+                  "attachments": []
+                }
+              ],
+              "status": "expected"
+            }
+          ],
+          "id": "b9227b25fa0930e6bacb-facfaccfeea12ce54902",
+          "file": "compositor-recipes.spec.ts",
+          "line": 141,
+          "column": 5
+        },
+        {
+          "title": "pager: destroy восстанавливает прежний focus owner в light",
+          "ok": true,
+          "tags": [],
+          "tests": [
+            {
+              "timeout": 30000,
+              "annotations": [],
+              "expectedStatus": "passed",
+              "projectId": "chromium",
+              "projectName": "chromium",
+              "results": [
+                {
+                  "workerIndex": 0,
+                  "parallelIndex": 0,
+                  "status": "passed",
+                  "duration": 192,
+                  "errors": [],
+                  "stdout": [],
+                  "stderr": [],
+                  "retry": 0,
+                  "startTime": "2026-10-02T03:36:57.825Z",
+                  "annotations": [],
+                  "attachments": []
+                }
+              ],
+              "status": "expected"
+            }
+          ],
+          "id": "b9227b25fa0930e6bacb-8140d380105e885b5f68",
+          "file": "compositor-recipes.spec.ts",
+          "line": 174,
+          "column": 5
+        },
+        {
+          "title": "pager: destroy восстанавливает прежний focus owner в shadow",
+          "ok": true,
+          "tags": [],
+          "tests": [
+            {
+              "timeout": 30000,
+              "annotations": [],
+              "expectedStatus": "passed",
+              "projectId": "chromium",
+              "projectName": "chromium",
+              "results": [
+                {
+                  "workerIndex": 0,
+                  "parallelIndex": 0,
+                  "status": "passed",
+                  "duration": 218,
+                  "errors": [],
+                  "stdout": [],
+                  "stderr": [],
+                  "retry": 0,
+                  "startTime": "2026-10-02T03:36:58.024Z",
+                  "annotations": [],
+                  "attachments": []
+                }
+              ],
+              "status": "expected"
+            }
+          ],
+          "id": "b9227b25fa0930e6bacb-3b4ae1d7fac8b9852dfd",
+          "file": "compositor-recipes.spec.ts",
+          "line": 174,
+          "column": 5
+        },
+        {
+          "title": "pager: destroy восстанавливает прежний focus owner в nested",
+          "ok": true,
+          "tags": [],
+          "tests": [
+            {
+              "timeout": 30000,
+              "annotations": [],
+              "expectedStatus": "passed",
+              "projectId": "chromium",
+              "projectName": "chromium",
+              "results": [
+                {
+                  "workerIndex": 0,
+                  "parallelIndex": 0,
+                  "status": "passed",
+                  "duration": 232,
+                  "errors": [],
+                  "stdout": [],
+                  "stderr": [],
+                  "retry": 0,
+                  "startTime": "2026-10-02T03:36:58.250Z",
+                  "annotations": [],
+                  "attachments": []
+                }
+              ],
+              "status": "expected"
+            }
+          ],
+          "id": "b9227b25fa0930e6bacb-754b13dc44bfccee054d",
+          "file": "compositor-recipes.spec.ts",
+          "line": 174,
+          "column": 5
+        },
+        {
+          "title": "pager: destroy восстанавливает прежний focus owner в child-shadow",
+          "ok": true,
+          "tags": [],
+          "tests": [
+            {
+              "timeout": 30000,
+              "annotations": [],
+              "expectedStatus": "passed",
+              "projectId": "chromium",
+              "projectName": "chromium",
+              "results": [
+                {
+                  "workerIndex": 0,
+                  "parallelIndex": 0,
+                  "status": "passed",
+                  "duration": 195,
+                  "errors": [],
+                  "stdout": [],
+                  "stderr": [],
+                  "retry": 0,
+                  "startTime": "2026-10-02T03:36:58.489Z",
+                  "annotations": [],
+                  "attachments": []
+                }
+              ],
+              "status": "expected"
+            }
+          ],
+          "id": "b9227b25fa0930e6bacb-d51ec7ae35b7a91b60ee",
+          "file": "compositor-recipes.spec.ts",
+          "line": 174,
+          "column": 5
+        },
+        {
+          "title": "pager: destroy восстанавливает прежний focus owner в outside-shadow",
+          "ok": true,
+          "tags": [],
+          "tests": [
+            {
+              "timeout": 30000,
+              "annotations": [],
+              "expectedStatus": "passed",
+              "projectId": "chromium",
+              "projectName": "chromium",
+              "results": [
+                {
+                  "workerIndex": 0,
+                  "parallelIndex": 0,
+                  "status": "passed",
+                  "duration": 207,
+                  "errors": [],
+                  "stdout": [],
+                  "stderr": [],
+                  "retry": 0,
+                  "startTime": "2026-10-02T03:36:58.691Z",
+                  "annotations": [],
+                  "attachments": []
+                }
+              ],
+              "status": "expected"
+            }
+          ],
+          "id": "b9227b25fa0930e6bacb-0a2c011315384a263f28",
+          "file": "compositor-recipes.spec.ts",
+          "line": 174,
+          "column": 5
+        },
+        {
+          "title": "pager: destroy восстанавливает прежний focus owner в outside-nested",
+          "ok": true,
+          "tags": [],
+          "tests": [
+            {
+              "timeout": 30000,
+              "annotations": [],
+              "expectedStatus": "passed",
+              "projectId": "chromium",
+              "projectName": "chromium",
+              "results": [
+                {
+                  "workerIndex": 0,
+                  "parallelIndex": 0,
+                  "status": "passed",
+                  "duration": 230,
+                  "errors": [],
+                  "stdout": [],
+                  "stderr": [],
+                  "retry": 0,
+                  "startTime": "2026-10-02T03:36:58.905Z",
+                  "annotations": [],
+                  "attachments": []
+                }
+              ],
+              "status": "expected"
+            }
+          ],
+          "id": "b9227b25fa0930e6bacb-7e18b0d5adec7d3b994b",
+          "file": "compositor-recipes.spec.ts",
+          "line": 174,
+          "column": 5
+        },
+        {
+          "title": "pager: destroy восстанавливает прежний focus owner в parent-shadow",
+          "ok": true,
+          "tags": [],
+          "tests": [
+            {
+              "timeout": 30000,
+              "annotations": [],
+              "expectedStatus": "passed",
+              "projectId": "chromium",
+              "projectName": "chromium",
+              "results": [
+                {
+                  "workerIndex": 0,
+                  "parallelIndex": 0,
+                  "status": "passed",
+                  "duration": 209,
+                  "errors": [],
+                  "stdout": [],
+                  "stderr": [],
+                  "retry": 0,
+                  "startTime": "2026-10-02T03:36:59.143Z",
+                  "annotations": [],
+                  "attachments": []
+                }
+              ],
+              "status": "expected"
+            }
+          ],
+          "id": "b9227b25fa0930e6bacb-5b8565382c142d31810c",
+          "file": "compositor-recipes.spec.ts",
+          "line": 174,
+          "column": 5
+        },
+        {
+          "title": "pager: destroy восстанавливает прежний focus owner в closed-shadow",
+          "ok": true,
+          "tags": [],
+          "tests": [
+            {
+              "timeout": 30000,
+              "annotations": [],
+              "expectedStatus": "passed",
+              "projectId": "chromium",
+              "projectName": "chromium",
+              "results": [
+                {
+                  "workerIndex": 0,
+                  "parallelIndex": 0,
+                  "status": "passed",
+                  "duration": 196,
+                  "errors": [],
+                  "stdout": [],
+                  "stderr": [],
+                  "retry": 0,
+                  "startTime": "2026-10-02T03:36:59.359Z",
+                  "annotations": [],
+                  "attachments": []
+                }
+              ],
+              "status": "expected"
+            }
+          ],
+          "id": "b9227b25fa0930e6bacb-895574013e1a0b71d28a",
+          "file": "compositor-recipes.spec.ts",
+          "line": 174,
+          "column": 5
+        },
+        {
+          "title": "pager: destroy восстанавливает прежний focus owner в parent-closed-shadow",
+          "ok": true,
+          "tags": [],
+          "tests": [
+            {
+              "timeout": 30000,
+              "annotations": [],
+              "expectedStatus": "passed",
+              "projectId": "chromium",
+              "projectName": "chromium",
+              "results": [
+                {
+                  "workerIndex": 0,
+                  "parallelIndex": 0,
+                  "status": "passed",
+                  "duration": 220,
+                  "errors": [],
+                  "stdout": [],
+                  "stderr": [],
+                  "retry": 0,
+                  "startTime": "2026-10-02T03:36:59.562Z",
+                  "annotations": [],
+                  "attachments": []
+                }
+              ],
+              "status": "expected"
+            }
+          ],
+          "id": "b9227b25fa0930e6bacb-c44ba4a3e44fdd3beeac",
+          "file": "compositor-recipes.spec.ts",
+          "line": 174,
+          "column": 5
+        },
+        {
+          "title": "pager: destroy восстанавливает прежний focus owner в ancestor-closed-shadow",
+          "ok": true,
+          "tags": [],
+          "tests": [
+            {
+              "timeout": 30000,
+              "annotations": [],
+              "expectedStatus": "passed",
+              "projectId": "chromium",
+              "projectName": "chromium",
+              "results": [
+                {
+                  "workerIndex": 0,
+                  "parallelIndex": 0,
+                  "status": "passed",
+                  "duration": 235,
+                  "errors": [],
+                  "stdout": [],
+                  "stderr": [],
+                  "retry": 0,
+                  "startTime": "2026-10-02T03:36:59.791Z",
+                  "annotations": [],
+                  "attachments": []
+                }
+              ],
+              "status": "expected"
+            }
+          ],
+          "id": "b9227b25fa0930e6bacb-bf249281a16847645129",
+          "file": "compositor-recipes.spec.ts",
+          "line": 174,
+          "column": 5
+        },
+        {
+          "title": "pager: none pause сохраняет текущую quiet drag позу",
+          "ok": true,
+          "tags": [],
+          "tests": [
+            {
+              "timeout": 30000,
+              "annotations": [],
+              "expectedStatus": "passed",
+              "projectId": "chromium",
+              "projectName": "chromium",
+              "results": [
+                {
+                  "workerIndex": 0,
+                  "parallelIndex": 0,
+                  "status": "passed",
+                  "duration": 253,
+                  "errors": [],
+                  "stdout": [],
+                  "stderr": [],
+                  "retry": 0,
+                  "startTime": "2026-10-02T03:37:00.033Z",
+                  "annotations": [],
+                  "attachments": []
+                }
+              ],
+              "status": "expected"
+            }
+          ],
+          "id": "b9227b25fa0930e6bacb-0134e91720dbed2edcc3",
+          "file": "compositor-recipes.spec.ts",
+          "line": 228,
+          "column": 5
+        },
+        {
+          "title": "pager: reduced pause сохраняет текущую quiet drag позу",
+          "ok": true,
+          "tags": [],
+          "tests": [
+            {
+              "timeout": 30000,
+              "annotations": [],
+              "expectedStatus": "passed",
+              "projectId": "chromium",
+              "projectName": "chromium",
+              "results": [
+                {
+                  "workerIndex": 0,
+                  "parallelIndex": 0,
+                  "status": "passed",
+                  "duration": 262,
+                  "errors": [],
+                  "stdout": [],
+                  "stderr": [],
+                  "retry": 0,
+                  "startTime": "2026-10-02T03:37:00.294Z",
+                  "annotations": [],
+                  "attachments": []
+                }
+              ],
+              "status": "expected"
+            }
+          ],
+          "id": "b9227b25fa0930e6bacb-5a94877d8f272f9edb3b",
+          "file": "compositor-recipes.spec.ts",
+          "line": 228,
+          "column": 5
+        },
+        {
+          "title": "pager: native interruption → live follow → native release; один inert callback",
+          "ok": true,
+          "tags": [],
+          "tests": [
+            {
+              "timeout": 30000,
+              "annotations": [],
+              "expectedStatus": "passed",
+              "projectId": "chromium",
+              "projectName": "chromium",
+              "results": [
+                {
+                  "workerIndex": 0,
+                  "parallelIndex": 0,
+                  "status": "passed",
+                  "duration": 293,
+                  "errors": [],
+                  "stdout": [],
+                  "stderr": [],
+                  "retry": 0,
+                  "startTime": "2026-10-02T03:37:00.562Z",
+                  "annotations": [],
+                  "attachments": []
+                }
+              ],
+              "status": "expected"
+            }
+          ],
+          "id": "b9227b25fa0930e6bacb-e21826d6ea1b1680404a",
+          "file": "compositor-recipes.spec.ts",
+          "line": 258,
+          "column": 3
+        },
+        {
+          "title": "pager: pointercancel не меняет выбранную цель, pause сохраняет позу",
+          "ok": true,
+          "tags": [],
+          "tests": [
+            {
+              "timeout": 30000,
+              "annotations": [],
+              "expectedStatus": "passed",
+              "projectId": "chromium",
+              "projectName": "chromium",
+              "results": [
+                {
+                  "workerIndex": 0,
+                  "parallelIndex": 0,
+                  "status": "passed",
+                  "duration": 280,
+                  "errors": [],
+                  "stdout": [],
+                  "stderr": [],
+                  "retry": 0,
+                  "startTime": "2026-10-02T03:37:00.862Z",
+                  "annotations": [],
+                  "attachments": []
+                }
+              ],
+              "status": "expected"
+            }
+          ],
+          "id": "b9227b25fa0930e6bacb-32a7dfed76ac6b148f75",
+          "file": "compositor-recipes.spec.ts",
+          "line": 316,
+          "column": 3
+        },
+        {
+          "title": "pager: no-motion, keyboard, IME и явный resize/reparent",
+          "ok": true,
+          "tags": [],
+          "tests": [
+            {
+              "timeout": 30000,
+              "annotations": [],
+              "expectedStatus": "passed",
+              "projectId": "chromium",
+              "projectName": "chromium",
+              "results": [
+                {
+                  "workerIndex": 0,
+                  "parallelIndex": 0,
+                  "status": "passed",
+                  "duration": 226,
+                  "errors": [],
+                  "stdout": [],
+                  "stderr": [],
+                  "retry": 0,
+                  "startTime": "2026-10-02T03:37:01.150Z",
+                  "annotations": [],
+                  "attachments": []
+                }
+              ],
+              "status": "expected"
+            }
+          ],
+          "id": "b9227b25fa0930e6bacb-6c089d936d56441b8765",
+          "file": "compositor-recipes.spec.ts",
+          "line": 346,
+          "column": 3
+        },
+        {
+          "title": "pager: reduced-motion при mount и при смене предпочтения",
+          "ok": true,
+          "tags": [],
+          "tests": [
+            {
+              "timeout": 30000,
+              "annotations": [],
+              "expectedStatus": "passed",
+              "projectId": "chromium",
+              "projectName": "chromium",
+              "results": [
+                {
+                  "workerIndex": 0,
+                  "parallelIndex": 0,
+                  "status": "passed",
+                  "duration": 395,
+                  "errors": [],
+                  "stdout": [],
+                  "stderr": [],
+                  "retry": 0,
+                  "startTime": "2026-10-02T03:37:01.383Z",
+                  "annotations": [],
+                  "attachments": []
+                }
+              ],
+              "status": "expected"
+            }
+          ],
+          "id": "b9227b25fa0930e6bacb-da72de09c82972ba42f3",
+          "file": "compositor-recipes.spec.ts",
+          "line": 383,
+          "column": 3
+        },
+        {
+          "title": "literal recipes используют manifest и байты фактического npm tarball",
+          "ok": true,
+          "tags": [],
+          "tests": [
+            {
+              "timeout": 30000,
+              "annotations": [],
+              "expectedStatus": "passed",
+              "projectId": "firefox",
+              "projectName": "firefox",
+              "results": [
+                {
+                  "workerIndex": 1,
+                  "parallelIndex": 0,
+                  "status": "passed",
+                  "duration": 1124,
+                  "errors": [],
+                  "stdout": [],
+                  "stderr": [
+                    {
+                      "text": "Skipping host requirements validation logic because `PLAYWRIGHT_SKIP_VALIDATE_HOST_REQUIREMENTS` env variable is set.\n"
+                    }
+                  ],
+                  "retry": 0,
+                  "startTime": "2026-10-02T03:37:02.189Z",
+                  "annotations": [],
+                  "attachments": [
+                    {
+                      "name": "actual-package-receipt",
+                      "contentType": "application/json",
+                      "body": "eyJzY2hlbWEiOiJzY29wZS1yZWNpcGVzLXBhY2thZ2UtdjEiLCJwYWNrYWdlIjp7Im5hbWUiOiJAbGFicGljcy9tb3Rpb24iLCJ2ZXJzaW9uIjoiMC4zLjAifSwidGFyYmFsbCI6eyJmaWxlbmFtZSI6ImxhYnBpY3MtbW90aW9uLTAuMy4wLnRneiIsInNoYTI1NiI6IjU0NDgyYjNkYTVhZTNlNTMwZTlmMjVmMjliOTE0NzFiMWZmOTVjZjJkODIxMjczNWEwZWViNzEwMDJkNmZiYTciLCJpbnRlZ3JpdHkiOiJzaGE1MTItTUxUVHhMaG02Wk96RWlWSzZuNGFFZ0sxSVpNMEVqRlBKWE1tdWs4NGJRYUtTdFFlSlE5d0hCcVRTVGJWYnRlcHJZVlBYT216d3padGsxTnFCRlhlWnc9PSJ9LCJtYW5pZmVzdCI6eyJzaGEyNTYiOiJkZTI3ODcwMmQ5ZjY4NDNiZTJiNjgyYzI3ZDljYzBkMTZkNTUyMzI3Zjc3ZjdhOWYwN2JlZTBmZjY3OTNkYTUyIiwiZmlsZUNvdW50IjozMTJ9LCJyZWNpcGVzU2hhMjU2IjoiYmE3MzAwNDI0ZmE4OTIzZTgyMmVmNTVkNGZmNmYzNjU1MGUwNmM0NzZhY2E4MDg2OWIwMmY4NzI1OWI2MTY0NSIsInJ1bnRpbWUiOnsibm9kZSI6InYyNC4xOS4wIiwiZXNidWlsZCI6IjAuMjguMiJ9LCJtb3Rpb25JbnB1dHMiOlsiZGlzdC9hbmltYXRlL2luZGV4LmpzIiwiZGlzdC9iZWhhdmlvcnMvcmVvcmRlci9pbmRleC5qcyIsImRpc3QvY29tcG9zaXRvci9pbmRleC5qcyIsImRpc3QvZGVjYXkvaW5kZXguanMiLCJkaXN0L2ZyYW1lL2luZGV4LmpzIiwiZGlzdC9nZXN0dXJlcy9pbmRleC5qcyIsImRpc3QvcHJlc2VuY2UvaW5kZXguanMiLCJkaXN0L3Byb2plY3Rpb24vaW5kZXguanMiLCJkaXN0L3NtYXJ0L2luZGV4LmpzIl0sImJ1bmRsZVNoYTI1NiI6IjUzMjBmNDliNzg4OWY0NTVhMDc5MjI1MmU0NGY2MDY5Yjc1NjM4ZDJkMjcwNTFlNWEyNWQ2NTA0ZDJmNzFjNWEiLCJzc3JIdG1sU2hhMjU2IjoiNjhlMTRkNTAxZmQ2YTU2ZmU0NDVhOGNjMzM3N2VlZDc4YzAyOTg2NjliZTlhNzIzYTA2ZDdjMmFiNTU4MTQyZiIsInNzck1vdGlvbklucHV0cyI6WyJkaXN0L2FuaW1hdGUvaW5kZXguanMiLCJkaXN0L2ZyYW1lL2luZGV4LmpzIl19"
+                    }
+                  ]
+                }
+              ],
+              "status": "expected"
+            }
+          ],
+          "id": "b9227b25fa0930e6bacb-a342ebaff99df437e22f",
+          "file": "compositor-recipes.spec.ts",
+          "line": 44,
+          "column": 1
+        },
+        {
+          "title": "actual tarball: React SSR → hydration сохраняет DOM, StrictMode cleanup и поздний click",
+          "ok": true,
+          "tags": [],
+          "tests": [
+            {
+              "timeout": 30000,
+              "annotations": [],
+              "expectedStatus": "passed",
+              "projectId": "firefox",
+              "projectName": "firefox",
+              "results": [
+                {
+                  "workerIndex": 1,
+                  "parallelIndex": 0,
+                  "status": "passed",
+                  "duration": 578,
+                  "errors": [],
+                  "stdout": [],
+                  "stderr": [],
+                  "retry": 0,
+                  "startTime": "2026-10-02T03:37:03.698Z",
+                  "annotations": [],
+                  "attachments": []
+                }
+              ],
+              "status": "expected"
+            }
+          ],
+          "id": "b9227b25fa0930e6bacb-9d571436e166e68ea6c4",
+          "file": "compositor-recipes.spec.ts",
+          "line": 61,
+          "column": 1
+        },
+        {
+          "title": "sheet: destroy восстанавливает исходный inline transform (important)",
+          "ok": true,
+          "tags": [],
+          "tests": [
+            {
+              "timeout": 30000,
+              "annotations": [],
+              "expectedStatus": "passed",
+              "projectId": "firefox",
+              "projectName": "firefox",
+              "results": [
+                {
+                  "workerIndex": 1,
+                  "parallelIndex": 0,
+                  "status": "passed",
+                  "duration": 395,
+                  "errors": [],
+                  "stdout": [],
+                  "stderr": [],
+                  "retry": 0,
+                  "startTime": "2026-10-02T03:37:04.287Z",
+                  "annotations": [],
+                  "attachments": []
+                }
+              ],
+              "status": "expected"
+            }
+          ],
+          "id": "b9227b25fa0930e6bacb-eebdab82d707edcc729b",
+          "file": "compositor-recipes.spec.ts",
+          "line": 94,
+          "column": 5
+        },
+        {
+          "title": "sheet: destroy восстанавливает исходный inline transform (plain)",
+          "ok": true,
+          "tags": [],
+          "tests": [
+            {
+              "timeout": 30000,
+              "annotations": [],
+              "expectedStatus": "passed",
+              "projectId": "firefox",
+              "projectName": "firefox",
+              "results": [
+                {
+                  "workerIndex": 1,
+                  "parallelIndex": 0,
+                  "status": "passed",
+                  "duration": 408,
+                  "errors": [],
+                  "stdout": [],
+                  "stderr": [],
+                  "retry": 0,
+                  "startTime": "2026-10-02T03:37:04.693Z",
+                  "annotations": [],
+                  "attachments": []
+                }
+              ],
+              "status": "expected"
+            }
+          ],
+          "id": "b9227b25fa0930e6bacb-a2cb76bfac90ad025c1f",
+          "file": "compositor-recipes.spec.ts",
+          "line": 94,
+          "column": 5
+        },
+        {
+          "title": "sheet: destroy восстанавливает исходный inline transform (none)",
+          "ok": true,
+          "tags": [],
+          "tests": [
+            {
+              "timeout": 30000,
+              "annotations": [],
+              "expectedStatus": "passed",
+              "projectId": "firefox",
+              "projectName": "firefox",
+              "results": [
+                {
+                  "workerIndex": 1,
+                  "parallelIndex": 0,
+                  "status": "passed",
+                  "duration": 370,
+                  "errors": [],
+                  "stdout": [],
+                  "stderr": [],
+                  "retry": 0,
+                  "startTime": "2026-10-02T03:37:05.116Z",
+                  "annotations": [],
+                  "attachments": []
+                }
+              ],
+              "status": "expected"
+            }
+          ],
+          "id": "b9227b25fa0930e6bacb-916036cdfd89d04fc259",
+          "file": "compositor-recipes.spec.ts",
+          "line": 94,
+          "column": 5
+        },
+        {
+          "title": "sheet: destroy восстанавливает исходный inline transform (absent)",
+          "ok": true,
+          "tags": [],
+          "tests": [
+            {
+              "timeout": 30000,
+              "annotations": [],
+              "expectedStatus": "passed",
+              "projectId": "firefox",
+              "projectName": "firefox",
+              "results": [
+                {
+                  "workerIndex": 1,
+                  "parallelIndex": 0,
+                  "status": "passed",
+                  "duration": 379,
+                  "errors": [],
+                  "stdout": [],
+                  "stderr": [],
+                  "retry": 0,
+                  "startTime": "2026-10-02T03:37:05.496Z",
+                  "annotations": [],
+                  "attachments": []
+                }
+              ],
+              "status": "expected"
+            }
+          ],
+          "id": "b9227b25fa0930e6bacb-8119d382c7d03bb55949",
+          "file": "compositor-recipes.spec.ts",
+          "line": 94,
+          "column": 5
+        },
+        {
+          "title": "sheet: getter onSelect сохраняет healthy intent до внешнего эффекта",
+          "ok": true,
+          "tags": [],
+          "tests": [
+            {
+              "timeout": 30000,
+              "annotations": [],
+              "expectedStatus": "passed",
+              "projectId": "firefox",
+              "projectName": "firefox",
+              "results": [
+                {
+                  "workerIndex": 1,
+                  "parallelIndex": 0,
+                  "status": "passed",
+                  "duration": 420,
+                  "errors": [],
+                  "stdout": [],
+                  "stderr": [],
+                  "retry": 0,
+                  "startTime": "2026-10-02T03:37:05.884Z",
+                  "annotations": [],
+                  "attachments": []
+                }
+              ],
+              "status": "expected"
+            }
+          ],
+          "id": "b9227b25fa0930e6bacb-5b3b7a7e4e73d7f3ac22",
+          "file": "compositor-recipes.spec.ts",
+          "line": 141,
+          "column": 5
+        },
+        {
+          "title": "sheet: getter onSelect сохраняет destroy intent до внешнего эффекта",
+          "ok": true,
+          "tags": [],
+          "tests": [
+            {
+              "timeout": 30000,
+              "annotations": [],
+              "expectedStatus": "passed",
+              "projectId": "firefox",
+              "projectName": "firefox",
+              "results": [
+                {
+                  "workerIndex": 1,
+                  "parallelIndex": 0,
+                  "status": "passed",
+                  "duration": 415,
+                  "errors": [],
+                  "stdout": [],
+                  "stderr": [],
+                  "retry": 0,
+                  "startTime": "2026-10-02T03:37:06.313Z",
+                  "annotations": [],
+                  "attachments": []
+                }
+              ],
+              "status": "expected"
+            }
+          ],
+          "id": "b9227b25fa0930e6bacb-335625676be12110dbce",
+          "file": "compositor-recipes.spec.ts",
+          "line": 141,
+          "column": 5
+        },
+        {
+          "title": "sheet: getter onSelect сохраняет select intent до внешнего эффекта",
+          "ok": true,
+          "tags": [],
+          "tests": [
+            {
+              "timeout": 30000,
+              "annotations": [],
+              "expectedStatus": "passed",
+              "projectId": "firefox",
+              "projectName": "firefox",
+              "results": [
+                {
+                  "workerIndex": 1,
+                  "parallelIndex": 0,
+                  "status": "passed",
+                  "duration": 519,
+                  "errors": [],
+                  "stdout": [],
+                  "stderr": [],
+                  "retry": 0,
+                  "startTime": "2026-10-02T03:37:06.741Z",
+                  "annotations": [],
+                  "attachments": []
+                }
+              ],
+              "status": "expected"
+            }
+          ],
+          "id": "b9227b25fa0930e6bacb-a37e3ff6b4b0157e9dd1",
+          "file": "compositor-recipes.spec.ts",
+          "line": 141,
+          "column": 5
+        },
+        {
+          "title": "sheet: destroy восстанавливает прежний focus owner в light",
+          "ok": true,
+          "tags": [],
+          "tests": [
+            {
+              "timeout": 30000,
+              "annotations": [],
+              "expectedStatus": "passed",
+              "projectId": "firefox",
+              "projectName": "firefox",
+              "results": [
+                {
+                  "workerIndex": 1,
+                  "parallelIndex": 0,
+                  "status": "passed",
+                  "duration": 1331,
+                  "errors": [],
+                  "stdout": [],
+                  "stderr": [],
+                  "retry": 0,
+                  "startTime": "2026-10-02T03:37:07.278Z",
+                  "annotations": [],
+                  "attachments": []
+                }
+              ],
+              "status": "expected"
+            }
+          ],
+          "id": "b9227b25fa0930e6bacb-a12e37aaea8810483620",
+          "file": "compositor-recipes.spec.ts",
+          "line": 174,
+          "column": 5
+        },
+        {
+          "title": "sheet: destroy восстанавливает прежний focus owner в shadow",
+          "ok": true,
+          "tags": [],
+          "tests": [
+            {
+              "timeout": 30000,
+              "annotations": [],
+              "expectedStatus": "passed",
+              "projectId": "firefox",
+              "projectName": "firefox",
+              "results": [
+                {
+                  "workerIndex": 1,
+                  "parallelIndex": 0,
+                  "status": "passed",
+                  "duration": 447,
+                  "errors": [],
+                  "stdout": [],
+                  "stderr": [],
+                  "retry": 0,
+                  "startTime": "2026-10-02T03:37:08.619Z",
+                  "annotations": [],
+                  "attachments": []
+                }
+              ],
+              "status": "expected"
+            }
+          ],
+          "id": "b9227b25fa0930e6bacb-7dc228fe72579b1fecfa",
+          "file": "compositor-recipes.spec.ts",
+          "line": 174,
+          "column": 5
+        },
+        {
+          "title": "sheet: destroy восстанавливает прежний focus owner в nested",
+          "ok": true,
+          "tags": [],
+          "tests": [
+            {
+              "timeout": 30000,
+              "annotations": [],
+              "expectedStatus": "passed",
+              "projectId": "firefox",
+              "projectName": "firefox",
+              "results": [
+                {
+                  "workerIndex": 1,
+                  "parallelIndex": 0,
+                  "status": "passed",
+                  "duration": 396,
+                  "errors": [],
+                  "stdout": [],
+                  "stderr": [],
+                  "retry": 0,
+                  "startTime": "2026-10-02T03:37:09.075Z",
+                  "annotations": [],
+                  "attachments": []
+                }
+              ],
+              "status": "expected"
+            }
+          ],
+          "id": "b9227b25fa0930e6bacb-d47841d550a3038e0556",
+          "file": "compositor-recipes.spec.ts",
+          "line": 174,
+          "column": 5
+        },
+        {
+          "title": "sheet: destroy восстанавливает прежний focus owner в child-shadow",
+          "ok": true,
+          "tags": [],
+          "tests": [
+            {
+              "timeout": 30000,
+              "annotations": [],
+              "expectedStatus": "passed",
+              "projectId": "firefox",
+              "projectName": "firefox",
+              "results": [
+                {
+                  "workerIndex": 1,
+                  "parallelIndex": 0,
+                  "status": "passed",
+                  "duration": 402,
+                  "errors": [],
+                  "stdout": [],
+                  "stderr": [],
+                  "retry": 0,
+                  "startTime": "2026-10-02T03:37:09.481Z",
+                  "annotations": [],
+                  "attachments": []
+                }
+              ],
+              "status": "expected"
+            }
+          ],
+          "id": "b9227b25fa0930e6bacb-333ad68ed90c7c679a1a",
+          "file": "compositor-recipes.spec.ts",
+          "line": 174,
+          "column": 5
+        },
+        {
+          "title": "sheet: destroy восстанавливает прежний focus owner в outside-shadow",
+          "ok": true,
+          "tags": [],
+          "tests": [
+            {
+              "timeout": 30000,
+              "annotations": [],
+              "expectedStatus": "passed",
+              "projectId": "firefox",
+              "projectName": "firefox",
+              "results": [
+                {
+                  "workerIndex": 1,
+                  "parallelIndex": 0,
+                  "status": "passed",
+                  "duration": 390,
+                  "errors": [],
+                  "stdout": [],
+                  "stderr": [],
+                  "retry": 0,
+                  "startTime": "2026-10-02T03:37:09.892Z",
+                  "annotations": [],
+                  "attachments": []
+                }
+              ],
+              "status": "expected"
+            }
+          ],
+          "id": "b9227b25fa0930e6bacb-af824aacca696d96eb22",
+          "file": "compositor-recipes.spec.ts",
+          "line": 174,
+          "column": 5
+        },
+        {
+          "title": "sheet: destroy восстанавливает прежний focus owner в outside-nested",
+          "ok": true,
+          "tags": [],
+          "tests": [
+            {
+              "timeout": 30000,
+              "annotations": [],
+              "expectedStatus": "passed",
+              "projectId": "firefox",
+              "projectName": "firefox",
+              "results": [
+                {
+                  "workerIndex": 1,
+                  "parallelIndex": 0,
+                  "status": "passed",
+                  "duration": 394,
+                  "errors": [],
+                  "stdout": [],
+                  "stderr": [],
+                  "retry": 0,
+                  "startTime": "2026-10-02T03:37:10.294Z",
+                  "annotations": [],
+                  "attachments": []
+                }
+              ],
+              "status": "expected"
+            }
+          ],
+          "id": "b9227b25fa0930e6bacb-b22b0987f084ead87a5e",
+          "file": "compositor-recipes.spec.ts",
+          "line": 174,
+          "column": 5
+        },
+        {
+          "title": "sheet: destroy восстанавливает прежний focus owner в parent-shadow",
+          "ok": true,
+          "tags": [],
+          "tests": [
+            {
+              "timeout": 30000,
+              "annotations": [],
+              "expectedStatus": "passed",
+              "projectId": "firefox",
+              "projectName": "firefox",
+              "results": [
+                {
+                  "workerIndex": 1,
+                  "parallelIndex": 0,
+                  "status": "passed",
+                  "duration": 409,
+                  "errors": [],
+                  "stdout": [],
+                  "stderr": [],
+                  "retry": 0,
+                  "startTime": "2026-10-02T03:37:10.700Z",
+                  "annotations": [],
+                  "attachments": []
+                }
+              ],
+              "status": "expected"
+            }
+          ],
+          "id": "b9227b25fa0930e6bacb-88a717087854a7143667",
+          "file": "compositor-recipes.spec.ts",
+          "line": 174,
+          "column": 5
+        },
+        {
+          "title": "sheet: destroy восстанавливает прежний focus owner в closed-shadow",
+          "ok": true,
+          "tags": [],
+          "tests": [
+            {
+              "timeout": 30000,
+              "annotations": [],
+              "expectedStatus": "passed",
+              "projectId": "firefox",
+              "projectName": "firefox",
+              "results": [
+                {
+                  "workerIndex": 1,
+                  "parallelIndex": 0,
+                  "status": "passed",
+                  "duration": 469,
+                  "errors": [],
+                  "stdout": [],
+                  "stderr": [],
+                  "retry": 0,
+                  "startTime": "2026-10-02T03:37:11.117Z",
+                  "annotations": [],
+                  "attachments": []
+                }
+              ],
+              "status": "expected"
+            }
+          ],
+          "id": "b9227b25fa0930e6bacb-ad8506683889e001d701",
+          "file": "compositor-recipes.spec.ts",
+          "line": 174,
+          "column": 5
+        },
+        {
+          "title": "sheet: destroy восстанавливает прежний focus owner в parent-closed-shadow",
+          "ok": true,
+          "tags": [],
+          "tests": [
+            {
+              "timeout": 30000,
+              "annotations": [],
+              "expectedStatus": "passed",
+              "projectId": "firefox",
+              "projectName": "firefox",
+              "results": [
+                {
+                  "workerIndex": 1,
+                  "parallelIndex": 0,
+                  "status": "passed",
+                  "duration": 492,
+                  "errors": [],
+                  "stdout": [],
+                  "stderr": [],
+                  "retry": 0,
+                  "startTime": "2026-10-02T03:37:11.597Z",
+                  "annotations": [],
+                  "attachments": []
+                }
+              ],
+              "status": "expected"
+            }
+          ],
+          "id": "b9227b25fa0930e6bacb-8e756e2ae6b5d8a735d6",
+          "file": "compositor-recipes.spec.ts",
+          "line": 174,
+          "column": 5
+        },
+        {
+          "title": "sheet: destroy восстанавливает прежний focus owner в ancestor-closed-shadow",
+          "ok": true,
+          "tags": [],
+          "tests": [
+            {
+              "timeout": 30000,
+              "annotations": [],
+              "expectedStatus": "passed",
+              "projectId": "firefox",
+              "projectName": "firefox",
+              "results": [
+                {
+                  "workerIndex": 1,
+                  "parallelIndex": 0,
+                  "status": "passed",
+                  "duration": 440,
+                  "errors": [],
+                  "stdout": [],
+                  "stderr": [],
+                  "retry": 0,
+                  "startTime": "2026-10-02T03:37:12.100Z",
+                  "annotations": [],
+                  "attachments": []
+                }
+              ],
+              "status": "expected"
+            }
+          ],
+          "id": "b9227b25fa0930e6bacb-b6fe32869a84763b9e35",
+          "file": "compositor-recipes.spec.ts",
+          "line": 174,
+          "column": 5
+        },
+        {
+          "title": "sheet: none pause сохраняет текущую quiet drag позу",
+          "ok": true,
+          "tags": [],
+          "tests": [
+            {
+              "timeout": 30000,
+              "annotations": [],
+              "expectedStatus": "passed",
+              "projectId": "firefox",
+              "projectName": "firefox",
+              "results": [
+                {
+                  "workerIndex": 1,
+                  "parallelIndex": 0,
+                  "status": "passed",
+                  "duration": 1415,
+                  "errors": [],
+                  "stdout": [],
+                  "stderr": [],
+                  "retry": 0,
+                  "startTime": "2026-10-02T03:37:12.549Z",
+                  "annotations": [],
+                  "attachments": []
+                }
+              ],
+              "status": "expected"
+            }
+          ],
+          "id": "b9227b25fa0930e6bacb-737681559703bb77e142",
+          "file": "compositor-recipes.spec.ts",
+          "line": 228,
+          "column": 5
+        },
+        {
+          "title": "sheet: reduced pause сохраняет текущую quiet drag позу",
+          "ok": true,
+          "tags": [],
+          "tests": [
+            {
+              "timeout": 30000,
+              "annotations": [],
+              "expectedStatus": "passed",
+              "projectId": "firefox",
+              "projectName": "firefox",
+              "results": [
+                {
+                  "workerIndex": 1,
+                  "parallelIndex": 0,
+                  "status": "passed",
+                  "duration": 490,
+                  "errors": [],
+                  "stdout": [],
+                  "stderr": [],
+                  "retry": 0,
+                  "startTime": "2026-10-02T03:37:13.972Z",
+                  "annotations": [],
+                  "attachments": []
+                }
+              ],
+              "status": "expected"
+            }
+          ],
+          "id": "b9227b25fa0930e6bacb-e9895c2c7570afc3b4ea",
+          "file": "compositor-recipes.spec.ts",
+          "line": 228,
+          "column": 5
+        },
+        {
+          "title": "sheet: native interruption → live follow → native release; один inert callback",
+          "ok": true,
+          "tags": [],
+          "tests": [
+            {
+              "timeout": 30000,
+              "annotations": [],
+              "expectedStatus": "passed",
+              "projectId": "firefox",
+              "projectName": "firefox",
+              "results": [
+                {
+                  "workerIndex": 1,
+                  "parallelIndex": 0,
+                  "status": "passed",
+                  "duration": 472,
+                  "errors": [],
+                  "stdout": [],
+                  "stderr": [],
+                  "retry": 0,
+                  "startTime": "2026-10-02T03:37:14.474Z",
+                  "annotations": [],
+                  "attachments": []
+                }
+              ],
+              "status": "expected"
+            }
+          ],
+          "id": "b9227b25fa0930e6bacb-a5f91f4906bc8a14a877",
+          "file": "compositor-recipes.spec.ts",
+          "line": 258,
+          "column": 3
+        },
+        {
+          "title": "sheet: pointercancel не меняет выбранную цель, pause сохраняет позу",
+          "ok": true,
+          "tags": [],
+          "tests": [
+            {
+              "timeout": 30000,
+              "annotations": [],
+              "expectedStatus": "passed",
+              "projectId": "firefox",
+              "projectName": "firefox",
+              "results": [
+                {
+                  "workerIndex": 1,
+                  "parallelIndex": 0,
+                  "status": "passed",
+                  "duration": 490,
+                  "errors": [],
+                  "stdout": [],
+                  "stderr": [],
+                  "retry": 0,
+                  "startTime": "2026-10-02T03:37:14.955Z",
+                  "annotations": [],
+                  "attachments": []
+                }
+              ],
+              "status": "expected"
+            }
+          ],
+          "id": "b9227b25fa0930e6bacb-b4e5be4eb8712c7b6533",
+          "file": "compositor-recipes.spec.ts",
+          "line": 316,
+          "column": 3
+        },
+        {
+          "title": "sheet: no-motion, keyboard, IME и явный resize/reparent",
+          "ok": true,
+          "tags": [],
+          "tests": [
+            {
+              "timeout": 30000,
+              "annotations": [],
+              "expectedStatus": "passed",
+              "projectId": "firefox",
+              "projectName": "firefox",
+              "results": [
+                {
+                  "workerIndex": 1,
+                  "parallelIndex": 0,
+                  "status": "passed",
+                  "duration": 489,
+                  "errors": [],
+                  "stdout": [],
+                  "stderr": [],
+                  "retry": 0,
+                  "startTime": "2026-10-02T03:37:15.459Z",
+                  "annotations": [],
+                  "attachments": []
+                }
+              ],
+              "status": "expected"
+            }
+          ],
+          "id": "b9227b25fa0930e6bacb-6a3ae6e28dc766fae16b",
+          "file": "compositor-recipes.spec.ts",
+          "line": 346,
+          "column": 3
+        },
+        {
+          "title": "sheet: reduced-motion при mount и при смене предпочтения",
+          "ok": true,
+          "tags": [],
+          "tests": [
+            {
+              "timeout": 30000,
+              "annotations": [],
+              "expectedStatus": "passed",
+              "projectId": "firefox",
+              "projectName": "firefox",
+              "results": [
+                {
+                  "workerIndex": 1,
+                  "parallelIndex": 0,
+                  "status": "passed",
+                  "duration": 538,
+                  "errors": [],
+                  "stdout": [],
+                  "stderr": [],
+                  "retry": 0,
+                  "startTime": "2026-10-02T03:37:15.957Z",
+                  "annotations": [],
+                  "attachments": []
+                }
+              ],
+              "status": "expected"
+            }
+          ],
+          "id": "b9227b25fa0930e6bacb-d71c46abdeeeba8ad2cd",
+          "file": "compositor-recipes.spec.ts",
+          "line": 383,
+          "column": 3
+        },
+        {
+          "title": "pager: destroy восстанавливает исходный inline transform (important)",
+          "ok": true,
+          "tags": [],
+          "tests": [
+            {
+              "timeout": 30000,
+              "annotations": [],
+              "expectedStatus": "passed",
+              "projectId": "firefox",
+              "projectName": "firefox",
+              "results": [
+                {
+                  "workerIndex": 1,
+                  "parallelIndex": 0,
+                  "status": "passed",
+                  "duration": 361,
+                  "errors": [],
+                  "stdout": [],
+                  "stderr": [],
+                  "retry": 0,
+                  "startTime": "2026-10-02T03:37:16.504Z",
+                  "annotations": [],
+                  "attachments": []
+                }
+              ],
+              "status": "expected"
+            }
+          ],
+          "id": "b9227b25fa0930e6bacb-3223a4c9a4235eaa0b38",
+          "file": "compositor-recipes.spec.ts",
+          "line": 94,
+          "column": 5
+        },
+        {
+          "title": "pager: destroy восстанавливает исходный inline transform (plain)",
+          "ok": true,
+          "tags": [],
+          "tests": [
+            {
+              "timeout": 30000,
+              "annotations": [],
+              "expectedStatus": "passed",
+              "projectId": "firefox",
+              "projectName": "firefox",
+              "results": [
+                {
+                  "workerIndex": 1,
+                  "parallelIndex": 0,
+                  "status": "passed",
+                  "duration": 399,
+                  "errors": [],
+                  "stdout": [],
+                  "stderr": [],
+                  "retry": 0,
+                  "startTime": "2026-10-02T03:37:16.880Z",
+                  "annotations": [],
+                  "attachments": []
+                }
+              ],
+              "status": "expected"
+            }
+          ],
+          "id": "b9227b25fa0930e6bacb-ca53412c60dac5efdad5",
+          "file": "compositor-recipes.spec.ts",
+          "line": 94,
+          "column": 5
+        },
+        {
+          "title": "pager: destroy восстанавливает исходный inline transform (none)",
+          "ok": true,
+          "tags": [],
+          "tests": [
+            {
+              "timeout": 30000,
+              "annotations": [],
+              "expectedStatus": "passed",
+              "projectId": "firefox",
+              "projectName": "firefox",
+              "results": [
+                {
+                  "workerIndex": 1,
+                  "parallelIndex": 0,
+                  "status": "passed",
+                  "duration": 435,
+                  "errors": [],
+                  "stdout": [],
+                  "stderr": [],
+                  "retry": 0,
+                  "startTime": "2026-10-02T03:37:17.287Z",
+                  "annotations": [],
+                  "attachments": []
+                }
+              ],
+              "status": "expected"
+            }
+          ],
+          "id": "b9227b25fa0930e6bacb-01acde058e58d608b45c",
+          "file": "compositor-recipes.spec.ts",
+          "line": 94,
+          "column": 5
+        },
+        {
+          "title": "pager: destroy восстанавливает исходный inline transform (absent)",
+          "ok": true,
+          "tags": [],
+          "tests": [
+            {
+              "timeout": 30000,
+              "annotations": [],
+              "expectedStatus": "passed",
+              "projectId": "firefox",
+              "projectName": "firefox",
+              "results": [
+                {
+                  "workerIndex": 1,
+                  "parallelIndex": 0,
+                  "status": "passed",
+                  "duration": 437,
+                  "errors": [],
+                  "stdout": [],
+                  "stderr": [],
+                  "retry": 0,
+                  "startTime": "2026-10-02T03:37:17.732Z",
+                  "annotations": [],
+                  "attachments": []
+                }
+              ],
+              "status": "expected"
+            }
+          ],
+          "id": "b9227b25fa0930e6bacb-b74e64cce52032b3066a",
+          "file": "compositor-recipes.spec.ts",
+          "line": 94,
+          "column": 5
+        },
+        {
+          "title": "pager: getter onSelect сохраняет healthy intent до внешнего эффекта",
+          "ok": true,
+          "tags": [],
+          "tests": [
+            {
+              "timeout": 30000,
+              "annotations": [],
+              "expectedStatus": "passed",
+              "projectId": "firefox",
+              "projectName": "firefox",
+              "results": [
+                {
+                  "workerIndex": 1,
+                  "parallelIndex": 0,
+                  "status": "passed",
+                  "duration": 1365,
+                  "errors": [],
+                  "stdout": [],
+                  "stderr": [],
+                  "retry": 0,
+                  "startTime": "2026-10-02T03:37:18.176Z",
+                  "annotations": [],
+                  "attachments": []
+                }
+              ],
+              "status": "expected"
+            }
+          ],
+          "id": "b9227b25fa0930e6bacb-620c5d3b7d38a7a42645",
+          "file": "compositor-recipes.spec.ts",
+          "line": 141,
+          "column": 5
+        },
+        {
+          "title": "pager: getter onSelect сохраняет destroy intent до внешнего эффекта",
+          "ok": true,
+          "tags": [],
+          "tests": [
+            {
+              "timeout": 30000,
+              "annotations": [],
+              "expectedStatus": "passed",
+              "projectId": "firefox",
+              "projectName": "firefox",
+              "results": [
+                {
+                  "workerIndex": 1,
+                  "parallelIndex": 0,
+                  "status": "passed",
+                  "duration": 431,
+                  "errors": [],
+                  "stdout": [],
+                  "stderr": [],
+                  "retry": 0,
+                  "startTime": "2026-10-02T03:37:19.550Z",
+                  "annotations": [],
+                  "attachments": []
+                }
+              ],
+              "status": "expected"
+            }
+          ],
+          "id": "b9227b25fa0930e6bacb-d8ab69ea65b1e56e0bf0",
+          "file": "compositor-recipes.spec.ts",
+          "line": 141,
+          "column": 5
+        },
+        {
+          "title": "pager: getter onSelect сохраняет select intent до внешнего эффекта",
+          "ok": true,
+          "tags": [],
+          "tests": [
+            {
+              "timeout": 30000,
+              "annotations": [],
+              "expectedStatus": "passed",
+              "projectId": "firefox",
+              "projectName": "firefox",
+              "results": [
+                {
+                  "workerIndex": 1,
+                  "parallelIndex": 0,
+                  "status": "passed",
+                  "duration": 453,
+                  "errors": [],
+                  "stdout": [],
+                  "stderr": [],
+                  "retry": 0,
+                  "startTime": "2026-10-02T03:37:19.989Z",
+                  "annotations": [],
+                  "attachments": []
+                }
+              ],
+              "status": "expected"
+            }
+          ],
+          "id": "b9227b25fa0930e6bacb-a6b9529599501ed8bbad",
+          "file": "compositor-recipes.spec.ts",
+          "line": 141,
+          "column": 5
+        },
+        {
+          "title": "pager: destroy восстанавливает прежний focus owner в light",
+          "ok": true,
+          "tags": [],
+          "tests": [
+            {
+              "timeout": 30000,
+              "annotations": [],
+              "expectedStatus": "passed",
+              "projectId": "firefox",
+              "projectName": "firefox",
+              "results": [
+                {
+                  "workerIndex": 1,
+                  "parallelIndex": 0,
+                  "status": "passed",
+                  "duration": 409,
+                  "errors": [],
+                  "stdout": [],
+                  "stderr": [],
+                  "retry": 0,
+                  "startTime": "2026-10-02T03:37:20.450Z",
+                  "annotations": [],
+                  "attachments": []
+                }
+              ],
+              "status": "expected"
+            }
+          ],
+          "id": "b9227b25fa0930e6bacb-f448f5531fd63860dda2",
+          "file": "compositor-recipes.spec.ts",
+          "line": 174,
+          "column": 5
+        },
+        {
+          "title": "pager: destroy восстанавливает прежний focus owner в shadow",
+          "ok": true,
+          "tags": [],
+          "tests": [
+            {
+              "timeout": 30000,
+              "annotations": [],
+              "expectedStatus": "passed",
+              "projectId": "firefox",
+              "projectName": "firefox",
+              "results": [
+                {
+                  "workerIndex": 1,
+                  "parallelIndex": 0,
+                  "status": "passed",
+                  "duration": 478,
+                  "errors": [],
+                  "stdout": [],
+                  "stderr": [],
+                  "retry": 0,
+                  "startTime": "2026-10-02T03:37:20.868Z",
+                  "annotations": [],
+                  "attachments": []
+                }
+              ],
+              "status": "expected"
+            }
+          ],
+          "id": "b9227b25fa0930e6bacb-5487d2c0a573c134787d",
+          "file": "compositor-recipes.spec.ts",
+          "line": 174,
+          "column": 5
+        },
+        {
+          "title": "pager: destroy восстанавливает прежний focus owner в nested",
+          "ok": true,
+          "tags": [],
+          "tests": [
+            {
+              "timeout": 30000,
+              "annotations": [],
+              "expectedStatus": "passed",
+              "projectId": "firefox",
+              "projectName": "firefox",
+              "results": [
+                {
+                  "workerIndex": 1,
+                  "parallelIndex": 0,
+                  "status": "passed",
+                  "duration": 419,
+                  "errors": [],
+                  "stdout": [],
+                  "stderr": [],
+                  "retry": 0,
+                  "startTime": "2026-10-02T03:37:21.356Z",
+                  "annotations": [],
+                  "attachments": []
+                }
+              ],
+              "status": "expected"
+            }
+          ],
+          "id": "b9227b25fa0930e6bacb-07c9147dc3354c41e125",
+          "file": "compositor-recipes.spec.ts",
+          "line": 174,
+          "column": 5
+        },
+        {
+          "title": "pager: destroy восстанавливает прежний focus owner в child-shadow",
+          "ok": true,
+          "tags": [],
+          "tests": [
+            {
+              "timeout": 30000,
+              "annotations": [],
+              "expectedStatus": "passed",
+              "projectId": "firefox",
+              "projectName": "firefox",
+              "results": [
+                {
+                  "workerIndex": 1,
+                  "parallelIndex": 0,
+                  "status": "passed",
+                  "duration": 476,
+                  "errors": [],
+                  "stdout": [],
+                  "stderr": [],
+                  "retry": 0,
+                  "startTime": "2026-10-02T03:37:21.784Z",
+                  "annotations": [],
+                  "attachments": []
+                }
+              ],
+              "status": "expected"
+            }
+          ],
+          "id": "b9227b25fa0930e6bacb-ea1caa8be06f41dc08f5",
+          "file": "compositor-recipes.spec.ts",
+          "line": 174,
+          "column": 5
+        },
+        {
+          "title": "pager: destroy восстанавливает прежний focus owner в outside-shadow",
+          "ok": true,
+          "tags": [],
+          "tests": [
+            {
+              "timeout": 30000,
+              "annotations": [],
+              "expectedStatus": "passed",
+              "projectId": "firefox",
+              "projectName": "firefox",
+              "results": [
+                {
+                  "workerIndex": 1,
+                  "parallelIndex": 0,
+                  "status": "passed",
+                  "duration": 428,
+                  "errors": [],
+                  "stdout": [],
+                  "stderr": [],
+                  "retry": 0,
+                  "startTime": "2026-10-02T03:37:22.267Z",
+                  "annotations": [],
+                  "attachments": []
+                }
+              ],
+              "status": "expected"
+            }
+          ],
+          "id": "b9227b25fa0930e6bacb-879622d5abb698a65d61",
+          "file": "compositor-recipes.spec.ts",
+          "line": 174,
+          "column": 5
+        },
+        {
+          "title": "pager: destroy восстанавливает прежний focus owner в outside-nested",
+          "ok": true,
+          "tags": [],
+          "tests": [
+            {
+              "timeout": 30000,
+              "annotations": [],
+              "expectedStatus": "passed",
+              "projectId": "firefox",
+              "projectName": "firefox",
+              "results": [
+                {
+                  "workerIndex": 1,
+                  "parallelIndex": 0,
+                  "status": "passed",
+                  "duration": 436,
+                  "errors": [],
+                  "stdout": [],
+                  "stderr": [],
+                  "retry": 0,
+                  "startTime": "2026-10-02T03:37:22.704Z",
+                  "annotations": [],
+                  "attachments": []
+                }
+              ],
+              "status": "expected"
+            }
+          ],
+          "id": "b9227b25fa0930e6bacb-a2120765b7aad740d2f1",
+          "file": "compositor-recipes.spec.ts",
+          "line": 174,
+          "column": 5
+        },
+        {
+          "title": "pager: destroy восстанавливает прежний focus owner в parent-shadow",
+          "ok": true,
+          "tags": [],
+          "tests": [
+            {
+              "timeout": 30000,
+              "annotations": [],
+              "expectedStatus": "passed",
+              "projectId": "firefox",
+              "projectName": "firefox",
+              "results": [
+                {
+                  "workerIndex": 1,
+                  "parallelIndex": 0,
+                  "status": "passed",
+                  "duration": 451,
+                  "errors": [],
+                  "stdout": [],
+                  "stderr": [],
+                  "retry": 0,
+                  "startTime": "2026-10-02T03:37:23.148Z",
+                  "annotations": [],
+                  "attachments": []
+                }
+              ],
+              "status": "expected"
+            }
+          ],
+          "id": "b9227b25fa0930e6bacb-d63220eb7842316d3150",
+          "file": "compositor-recipes.spec.ts",
+          "line": 174,
+          "column": 5
+        },
+        {
+          "title": "pager: destroy восстанавливает прежний focus owner в closed-shadow",
+          "ok": true,
+          "tags": [],
+          "tests": [
+            {
+              "timeout": 30000,
+              "annotations": [],
+              "expectedStatus": "passed",
+              "projectId": "firefox",
+              "projectName": "firefox",
+              "results": [
+                {
+                  "workerIndex": 1,
+                  "parallelIndex": 0,
+                  "status": "passed",
+                  "duration": 1380,
+                  "errors": [],
+                  "stdout": [],
+                  "stderr": [],
+                  "retry": 0,
+                  "startTime": "2026-10-02T03:37:23.608Z",
+                  "annotations": [],
+                  "attachments": []
+                }
+              ],
+              "status": "expected"
+            }
+          ],
+          "id": "b9227b25fa0930e6bacb-17e21391013c25024473",
+          "file": "compositor-recipes.spec.ts",
+          "line": 174,
+          "column": 5
+        },
+        {
+          "title": "pager: destroy восстанавливает прежний focus owner в parent-closed-shadow",
+          "ok": true,
+          "tags": [],
+          "tests": [
+            {
+              "timeout": 30000,
+              "annotations": [],
+              "expectedStatus": "passed",
+              "projectId": "firefox",
+              "projectName": "firefox",
+              "results": [
+                {
+                  "workerIndex": 1,
+                  "parallelIndex": 0,
+                  "status": "passed",
+                  "duration": 427,
+                  "errors": [],
+                  "stdout": [],
+                  "stderr": [],
+                  "retry": 0,
+                  "startTime": "2026-10-02T03:37:24.996Z",
+                  "annotations": [],
+                  "attachments": []
+                }
+              ],
+              "status": "expected"
+            }
+          ],
+          "id": "b9227b25fa0930e6bacb-148a441d1037966f0cf7",
+          "file": "compositor-recipes.spec.ts",
+          "line": 174,
+          "column": 5
+        },
+        {
+          "title": "pager: destroy восстанавливает прежний focus owner в ancestor-closed-shadow",
+          "ok": true,
+          "tags": [],
+          "tests": [
+            {
+              "timeout": 30000,
+              "annotations": [],
+              "expectedStatus": "passed",
+              "projectId": "firefox",
+              "projectName": "firefox",
+              "results": [
+                {
+                  "workerIndex": 1,
+                  "parallelIndex": 0,
+                  "status": "passed",
+                  "duration": 460,
+                  "errors": [],
+                  "stdout": [],
+                  "stderr": [],
+                  "retry": 0,
+                  "startTime": "2026-10-02T03:37:25.431Z",
+                  "annotations": [],
+                  "attachments": []
+                }
+              ],
+              "status": "expected"
+            }
+          ],
+          "id": "b9227b25fa0930e6bacb-ef955d7105e2ecfe9808",
+          "file": "compositor-recipes.spec.ts",
+          "line": 174,
+          "column": 5
+        },
+        {
+          "title": "pager: none pause сохраняет текущую quiet drag позу",
+          "ok": true,
+          "tags": [],
+          "tests": [
+            {
+              "timeout": 30000,
+              "annotations": [],
+              "expectedStatus": "passed",
+              "projectId": "firefox",
+              "projectName": "firefox",
+              "results": [
+                {
+                  "workerIndex": 1,
+                  "parallelIndex": 0,
+                  "status": "passed",
+                  "duration": 486,
+                  "errors": [],
+                  "stdout": [],
+                  "stderr": [],
+                  "retry": 0,
+                  "startTime": "2026-10-02T03:37:25.900Z",
+                  "annotations": [],
+                  "attachments": []
+                }
+              ],
+              "status": "expected"
+            }
+          ],
+          "id": "b9227b25fa0930e6bacb-c8da02b6ff07d2846123",
+          "file": "compositor-recipes.spec.ts",
+          "line": 228,
+          "column": 5
+        },
+        {
+          "title": "pager: reduced pause сохраняет текущую quiet drag позу",
+          "ok": true,
+          "tags": [],
+          "tests": [
+            {
+              "timeout": 30000,
+              "annotations": [],
+              "expectedStatus": "passed",
+              "projectId": "firefox",
+              "projectName": "firefox",
+              "results": [
+                {
+                  "workerIndex": 1,
+                  "parallelIndex": 0,
+                  "status": "passed",
+                  "duration": 484,
+                  "errors": [],
+                  "stdout": [],
+                  "stderr": [],
+                  "retry": 0,
+                  "startTime": "2026-10-02T03:37:26.396Z",
+                  "annotations": [],
+                  "attachments": []
+                }
+              ],
+              "status": "expected"
+            }
+          ],
+          "id": "b9227b25fa0930e6bacb-e21a9f5eb4a984ec9a97",
+          "file": "compositor-recipes.spec.ts",
+          "line": 228,
+          "column": 5
+        },
+        {
+          "title": "pager: native interruption → live follow → native release; один inert callback",
+          "ok": true,
+          "tags": [],
+          "tests": [
+            {
+              "timeout": 30000,
+              "annotations": [],
+              "expectedStatus": "passed",
+              "projectId": "firefox",
+              "projectName": "firefox",
+              "results": [
+                {
+                  "workerIndex": 1,
+                  "parallelIndex": 0,
+                  "status": "passed",
+                  "duration": 494,
+                  "errors": [],
+                  "stdout": [],
+                  "stderr": [],
+                  "retry": 0,
+                  "startTime": "2026-10-02T03:37:26.888Z",
+                  "annotations": [],
+                  "attachments": []
+                }
+              ],
+              "status": "expected"
+            }
+          ],
+          "id": "b9227b25fa0930e6bacb-ad914fda67d8e6a0ed07",
+          "file": "compositor-recipes.spec.ts",
+          "line": 258,
+          "column": 3
+        },
+        {
+          "title": "pager: pointercancel не меняет выбранную цель, pause сохраняет позу",
+          "ok": true,
+          "tags": [],
+          "tests": [
+            {
+              "timeout": 30000,
+              "annotations": [],
+              "expectedStatus": "passed",
+              "projectId": "firefox",
+              "projectName": "firefox",
+              "results": [
+                {
+                  "workerIndex": 1,
+                  "parallelIndex": 0,
+                  "status": "passed",
+                  "duration": 471,
+                  "errors": [],
+                  "stdout": [],
+                  "stderr": [],
+                  "retry": 0,
+                  "startTime": "2026-10-02T03:37:27.391Z",
+                  "annotations": [],
+                  "attachments": []
+                }
+              ],
+              "status": "expected"
+            }
+          ],
+          "id": "b9227b25fa0930e6bacb-771755e3ba5d1832d22c",
+          "file": "compositor-recipes.spec.ts",
+          "line": 316,
+          "column": 3
+        },
+        {
+          "title": "pager: no-motion, keyboard, IME и явный resize/reparent",
+          "ok": true,
+          "tags": [],
+          "tests": [
+            {
+              "timeout": 30000,
+              "annotations": [],
+              "expectedStatus": "passed",
+              "projectId": "firefox",
+              "projectName": "firefox",
+              "results": [
+                {
+                  "workerIndex": 1,
+                  "parallelIndex": 0,
+                  "status": "passed",
+                  "duration": 414,
+                  "errors": [],
+                  "stdout": [],
+                  "stderr": [],
+                  "retry": 0,
+                  "startTime": "2026-10-02T03:37:27.870Z",
+                  "annotations": [],
+                  "attachments": []
+                }
+              ],
+              "status": "expected"
+            }
+          ],
+          "id": "b9227b25fa0930e6bacb-6aae9f57978ee825c8de",
+          "file": "compositor-recipes.spec.ts",
+          "line": 346,
+          "column": 3
+        },
+        {
+          "title": "pager: reduced-motion при mount и при смене предпочтения",
+          "ok": true,
+          "tags": [],
+          "tests": [
+            {
+              "timeout": 30000,
+              "annotations": [],
+              "expectedStatus": "passed",
+              "projectId": "firefox",
+              "projectName": "firefox",
+              "results": [
+                {
+                  "workerIndex": 1,
+                  "parallelIndex": 0,
+                  "status": "passed",
+                  "duration": 621,
+                  "errors": [],
+                  "stdout": [],
+                  "stderr": [],
+                  "retry": 0,
+                  "startTime": "2026-10-02T03:37:28.291Z",
+                  "annotations": [],
+                  "attachments": []
+                }
+              ],
+              "status": "expected"
+            }
+          ],
+          "id": "b9227b25fa0930e6bacb-5eb9a57dd8fb002d3b64",
+          "file": "compositor-recipes.spec.ts",
+          "line": 383,
+          "column": 3
+        },
+        {
+          "title": "literal recipes используют manifest и байты фактического npm tarball",
+          "ok": true,
+          "tags": [],
+          "tests": [
+            {
+              "timeout": 30000,
+              "annotations": [],
+              "expectedStatus": "passed",
+              "projectId": "webkit",
+              "projectName": "webkit",
+              "results": [
+                {
+                  "workerIndex": 2,
+                  "parallelIndex": 0,
+                  "status": "passed",
+                  "duration": 520,
+                  "errors": [],
+                  "stdout": [],
+                  "stderr": [
+                    {
+                      "text": "Skipping host requirements validation logic because `PLAYWRIGHT_SKIP_VALIDATE_HOST_REQUIREMENTS` env variable is set.\n"
+                    }
+                  ],
+                  "retry": 0,
+                  "startTime": "2026-10-02T03:37:29.579Z",
+                  "annotations": [],
+                  "attachments": [
+                    {
+                      "name": "actual-package-receipt",
+                      "contentType": "application/json",
+                      "body": "eyJzY2hlbWEiOiJzY29wZS1yZWNpcGVzLXBhY2thZ2UtdjEiLCJwYWNrYWdlIjp7Im5hbWUiOiJAbGFicGljcy9tb3Rpb24iLCJ2ZXJzaW9uIjoiMC4zLjAifSwidGFyYmFsbCI6eyJmaWxlbmFtZSI6ImxhYnBpY3MtbW90aW9uLTAuMy4wLnRneiIsInNoYTI1NiI6IjU0NDgyYjNkYTVhZTNlNTMwZTlmMjVmMjliOTE0NzFiMWZmOTVjZjJkODIxMjczNWEwZWViNzEwMDJkNmZiYTciLCJpbnRlZ3JpdHkiOiJzaGE1MTItTUxUVHhMaG02Wk96RWlWSzZuNGFFZ0sxSVpNMEVqRlBKWE1tdWs4NGJRYUtTdFFlSlE5d0hCcVRTVGJWYnRlcHJZVlBYT216d3padGsxTnFCRlhlWnc9PSJ9LCJtYW5pZmVzdCI6eyJzaGEyNTYiOiJkZTI3ODcwMmQ5ZjY4NDNiZTJiNjgyYzI3ZDljYzBkMTZkNTUyMzI3Zjc3ZjdhOWYwN2JlZTBmZjY3OTNkYTUyIiwiZmlsZUNvdW50IjozMTJ9LCJyZWNpcGVzU2hhMjU2IjoiYmE3MzAwNDI0ZmE4OTIzZTgyMmVmNTVkNGZmNmYzNjU1MGUwNmM0NzZhY2E4MDg2OWIwMmY4NzI1OWI2MTY0NSIsInJ1bnRpbWUiOnsibm9kZSI6InYyNC4xOS4wIiwiZXNidWlsZCI6IjAuMjguMiJ9LCJtb3Rpb25JbnB1dHMiOlsiZGlzdC9hbmltYXRlL2luZGV4LmpzIiwiZGlzdC9iZWhhdmlvcnMvcmVvcmRlci9pbmRleC5qcyIsImRpc3QvY29tcG9zaXRvci9pbmRleC5qcyIsImRpc3QvZGVjYXkvaW5kZXguanMiLCJkaXN0L2ZyYW1lL2luZGV4LmpzIiwiZGlzdC9nZXN0dXJlcy9pbmRleC5qcyIsImRpc3QvcHJlc2VuY2UvaW5kZXguanMiLCJkaXN0L3Byb2plY3Rpb24vaW5kZXguanMiLCJkaXN0L3NtYXJ0L2luZGV4LmpzIl0sImJ1bmRsZVNoYTI1NiI6IjUzMjBmNDliNzg4OWY0NTVhMDc5MjI1MmU0NGY2MDY5Yjc1NjM4ZDJkMjcwNTFlNWEyNWQ2NTA0ZDJmNzFjNWEiLCJzc3JIdG1sU2hhMjU2IjoiNjhlMTRkNTAxZmQ2YTU2ZmU0NDVhOGNjMzM3N2VlZDc4YzAyOTg2NjliZTlhNzIzYTA2ZDdjMmFiNTU4MTQyZiIsInNzck1vdGlvbklucHV0cyI6WyJkaXN0L2FuaW1hdGUvaW5kZXguanMiLCJkaXN0L2ZyYW1lL2luZGV4LmpzIl19"
+                    }
+                  ]
+                }
+              ],
+              "status": "expected"
+            }
+          ],
+          "id": "b9227b25fa0930e6bacb-d6136ed89c4dc54a0cea",
+          "file": "compositor-recipes.spec.ts",
+          "line": 44,
+          "column": 1
+        },
+        {
+          "title": "actual tarball: React SSR → hydration сохраняет DOM, StrictMode cleanup и поздний click",
+          "ok": true,
+          "tags": [],
+          "tests": [
+            {
+              "timeout": 30000,
+              "annotations": [],
+              "expectedStatus": "passed",
+              "projectId": "webkit",
+              "projectName": "webkit",
+              "results": [
+                {
+                  "workerIndex": 2,
+                  "parallelIndex": 0,
+                  "status": "passed",
+                  "duration": 672,
+                  "errors": [],
+                  "stdout": [],
+                  "stderr": [],
+                  "retry": 0,
+                  "startTime": "2026-10-02T03:37:30.224Z",
+                  "annotations": [],
+                  "attachments": []
+                }
+              ],
+              "status": "expected"
+            }
+          ],
+          "id": "b9227b25fa0930e6bacb-116740f63b07a8a35180",
+          "file": "compositor-recipes.spec.ts",
+          "line": 61,
+          "column": 1
+        },
+        {
+          "title": "sheet: destroy восстанавливает исходный inline transform (important)",
+          "ok": true,
+          "tags": [],
+          "tests": [
+            {
+              "timeout": 30000,
+              "annotations": [],
+              "expectedStatus": "passed",
+              "projectId": "webkit",
+              "projectName": "webkit",
+              "results": [
+                {
+                  "workerIndex": 2,
+                  "parallelIndex": 0,
+                  "status": "passed",
+                  "duration": 489,
+                  "errors": [],
+                  "stdout": [],
+                  "stderr": [],
+                  "retry": 0,
+                  "startTime": "2026-10-02T03:37:30.908Z",
+                  "annotations": [],
+                  "attachments": []
+                }
+              ],
+              "status": "expected"
+            }
+          ],
+          "id": "b9227b25fa0930e6bacb-a7365a638cb1e5fb56f0",
+          "file": "compositor-recipes.spec.ts",
+          "line": 94,
+          "column": 5
+        },
+        {
+          "title": "sheet: destroy восстанавливает исходный inline transform (plain)",
+          "ok": true,
+          "tags": [],
+          "tests": [
+            {
+              "timeout": 30000,
+              "annotations": [],
+              "expectedStatus": "passed",
+              "projectId": "webkit",
+              "projectName": "webkit",
+              "results": [
+                {
+                  "workerIndex": 2,
+                  "parallelIndex": 0,
+                  "status": "passed",
+                  "duration": 488,
+                  "errors": [],
+                  "stdout": [],
+                  "stderr": [],
+                  "retry": 0,
+                  "startTime": "2026-10-02T03:37:31.417Z",
+                  "annotations": [],
+                  "attachments": []
+                }
+              ],
+              "status": "expected"
+            }
+          ],
+          "id": "b9227b25fa0930e6bacb-da797967a8ce1847769c",
+          "file": "compositor-recipes.spec.ts",
+          "line": 94,
+          "column": 5
+        },
+        {
+          "title": "sheet: destroy восстанавливает исходный inline transform (none)",
+          "ok": true,
+          "tags": [],
+          "tests": [
+            {
+              "timeout": 30000,
+              "annotations": [],
+              "expectedStatus": "passed",
+              "projectId": "webkit",
+              "projectName": "webkit",
+              "results": [
+                {
+                  "workerIndex": 2,
+                  "parallelIndex": 0,
+                  "status": "passed",
+                  "duration": 497,
+                  "errors": [],
+                  "stdout": [],
+                  "stderr": [],
+                  "retry": 0,
+                  "startTime": "2026-10-02T03:37:31.916Z",
+                  "annotations": [],
+                  "attachments": []
+                }
+              ],
+              "status": "expected"
+            }
+          ],
+          "id": "b9227b25fa0930e6bacb-2bba6c5ceff398bbf416",
+          "file": "compositor-recipes.spec.ts",
+          "line": 94,
+          "column": 5
+        },
+        {
+          "title": "sheet: destroy восстанавливает исходный inline transform (absent)",
+          "ok": true,
+          "tags": [],
+          "tests": [
+            {
+              "timeout": 30000,
+              "annotations": [],
+              "expectedStatus": "passed",
+              "projectId": "webkit",
+              "projectName": "webkit",
+              "results": [
+                {
+                  "workerIndex": 2,
+                  "parallelIndex": 0,
+                  "status": "passed",
+                  "duration": 482,
+                  "errors": [],
+                  "stdout": [],
+                  "stderr": [],
+                  "retry": 0,
+                  "startTime": "2026-10-02T03:37:32.423Z",
+                  "annotations": [],
+                  "attachments": []
+                }
+              ],
+              "status": "expected"
+            }
+          ],
+          "id": "b9227b25fa0930e6bacb-f7d7f87e7a41f917fc53",
+          "file": "compositor-recipes.spec.ts",
+          "line": 94,
+          "column": 5
+        },
+        {
+          "title": "sheet: getter onSelect сохраняет healthy intent до внешнего эффекта",
+          "ok": true,
+          "tags": [],
+          "tests": [
+            {
+              "timeout": 30000,
+              "annotations": [],
+              "expectedStatus": "passed",
+              "projectId": "webkit",
+              "projectName": "webkit",
+              "results": [
+                {
+                  "workerIndex": 2,
+                  "parallelIndex": 0,
+                  "status": "passed",
+                  "duration": 472,
+                  "errors": [],
+                  "stdout": [],
+                  "stderr": [],
+                  "retry": 0,
+                  "startTime": "2026-10-02T03:37:32.914Z",
+                  "annotations": [],
+                  "attachments": []
+                }
+              ],
+              "status": "expected"
+            }
+          ],
+          "id": "b9227b25fa0930e6bacb-4f6565ae300e3c2e263f",
+          "file": "compositor-recipes.spec.ts",
+          "line": 141,
+          "column": 5
+        },
+        {
+          "title": "sheet: getter onSelect сохраняет destroy intent до внешнего эффекта",
+          "ok": true,
+          "tags": [],
+          "tests": [
+            {
+              "timeout": 30000,
+              "annotations": [],
+              "expectedStatus": "passed",
+              "projectId": "webkit",
+              "projectName": "webkit",
+              "results": [
+                {
+                  "workerIndex": 2,
+                  "parallelIndex": 0,
+                  "status": "passed",
+                  "duration": 469,
+                  "errors": [],
+                  "stdout": [],
+                  "stderr": [],
+                  "retry": 0,
+                  "startTime": "2026-10-02T03:37:33.398Z",
+                  "annotations": [],
+                  "attachments": []
+                }
+              ],
+              "status": "expected"
+            }
+          ],
+          "id": "b9227b25fa0930e6bacb-2a5ec22d68d98a7de1aa",
+          "file": "compositor-recipes.spec.ts",
+          "line": 141,
+          "column": 5
+        },
+        {
+          "title": "sheet: getter onSelect сохраняет select intent до внешнего эффекта",
+          "ok": true,
+          "tags": [],
+          "tests": [
+            {
+              "timeout": 30000,
+              "annotations": [],
+              "expectedStatus": "passed",
+              "projectId": "webkit",
+              "projectName": "webkit",
+              "results": [
+                {
+                  "workerIndex": 2,
+                  "parallelIndex": 0,
+                  "status": "passed",
+                  "duration": 454,
+                  "errors": [],
+                  "stdout": [],
+                  "stderr": [],
+                  "retry": 0,
+                  "startTime": "2026-10-02T03:37:33.877Z",
+                  "annotations": [],
+                  "attachments": []
+                }
+              ],
+              "status": "expected"
+            }
+          ],
+          "id": "b9227b25fa0930e6bacb-b9432653438fa584573a",
+          "file": "compositor-recipes.spec.ts",
+          "line": 141,
+          "column": 5
+        },
+        {
+          "title": "sheet: destroy восстанавливает прежний focus owner в light",
+          "ok": true,
+          "tags": [],
+          "tests": [
+            {
+              "timeout": 30000,
+              "annotations": [],
+              "expectedStatus": "passed",
+              "projectId": "webkit",
+              "projectName": "webkit",
+              "results": [
+                {
+                  "workerIndex": 2,
+                  "parallelIndex": 0,
+                  "status": "passed",
+                  "duration": 517,
+                  "errors": [],
+                  "stdout": [],
+                  "stderr": [],
+                  "retry": 0,
+                  "startTime": "2026-10-02T03:37:34.341Z",
+                  "annotations": [],
+                  "attachments": []
+                }
+              ],
+              "status": "expected"
+            }
+          ],
+          "id": "b9227b25fa0930e6bacb-6f20570f3923bdfc5f89",
+          "file": "compositor-recipes.spec.ts",
+          "line": 174,
+          "column": 5
+        },
+        {
+          "title": "sheet: destroy восстанавливает прежний focus owner в shadow",
+          "ok": true,
+          "tags": [],
+          "tests": [
+            {
+              "timeout": 30000,
+              "annotations": [],
+              "expectedStatus": "passed",
+              "projectId": "webkit",
+              "projectName": "webkit",
+              "results": [
+                {
+                  "workerIndex": 2,
+                  "parallelIndex": 0,
+                  "status": "passed",
+                  "duration": 514,
+                  "errors": [],
+                  "stdout": [],
+                  "stderr": [],
+                  "retry": 0,
+                  "startTime": "2026-10-02T03:37:34.872Z",
+                  "annotations": [],
+                  "attachments": []
+                }
+              ],
+              "status": "expected"
+            }
+          ],
+          "id": "b9227b25fa0930e6bacb-ccc58397d9160bc2b410",
+          "file": "compositor-recipes.spec.ts",
+          "line": 174,
+          "column": 5
+        },
+        {
+          "title": "sheet: destroy восстанавливает прежний focus owner в nested",
+          "ok": true,
+          "tags": [],
+          "tests": [
+            {
+              "timeout": 30000,
+              "annotations": [],
+              "expectedStatus": "passed",
+              "projectId": "webkit",
+              "projectName": "webkit",
+              "results": [
+                {
+                  "workerIndex": 2,
+                  "parallelIndex": 0,
+                  "status": "passed",
+                  "duration": 515,
+                  "errors": [],
+                  "stdout": [],
+                  "stderr": [],
+                  "retry": 0,
+                  "startTime": "2026-10-02T03:37:35.398Z",
+                  "annotations": [],
+                  "attachments": []
+                }
+              ],
+              "status": "expected"
+            }
+          ],
+          "id": "b9227b25fa0930e6bacb-e71a776088807c91ed63",
+          "file": "compositor-recipes.spec.ts",
+          "line": 174,
+          "column": 5
+        },
+        {
+          "title": "sheet: destroy восстанавливает прежний focus owner в child-shadow",
+          "ok": true,
+          "tags": [],
+          "tests": [
+            {
+              "timeout": 30000,
+              "annotations": [],
+              "expectedStatus": "passed",
+              "projectId": "webkit",
+              "projectName": "webkit",
+              "results": [
+                {
+                  "workerIndex": 2,
+                  "parallelIndex": 0,
+                  "status": "passed",
+                  "duration": 486,
+                  "errors": [],
+                  "stdout": [],
+                  "stderr": [],
+                  "retry": 0,
+                  "startTime": "2026-10-02T03:37:35.923Z",
+                  "annotations": [],
+                  "attachments": []
+                }
+              ],
+              "status": "expected"
+            }
+          ],
+          "id": "b9227b25fa0930e6bacb-f9187792fbabba4b5aa8",
+          "file": "compositor-recipes.spec.ts",
+          "line": 174,
+          "column": 5
+        },
+        {
+          "title": "sheet: destroy восстанавливает прежний focus owner в outside-shadow",
+          "ok": true,
+          "tags": [],
+          "tests": [
+            {
+              "timeout": 30000,
+              "annotations": [],
+              "expectedStatus": "passed",
+              "projectId": "webkit",
+              "projectName": "webkit",
+              "results": [
+                {
+                  "workerIndex": 2,
+                  "parallelIndex": 0,
+                  "status": "passed",
+                  "duration": 477,
+                  "errors": [],
+                  "stdout": [],
+                  "stderr": [],
+                  "retry": 0,
+                  "startTime": "2026-10-02T03:37:36.419Z",
+                  "annotations": [],
+                  "attachments": []
+                }
+              ],
+              "status": "expected"
+            }
+          ],
+          "id": "b9227b25fa0930e6bacb-b6d8ba556fce57e0bcea",
+          "file": "compositor-recipes.spec.ts",
+          "line": 174,
+          "column": 5
+        },
+        {
+          "title": "sheet: destroy восстанавливает прежний focus owner в outside-nested",
+          "ok": true,
+          "tags": [],
+          "tests": [
+            {
+              "timeout": 30000,
+              "annotations": [],
+              "expectedStatus": "passed",
+              "projectId": "webkit",
+              "projectName": "webkit",
+              "results": [
+                {
+                  "workerIndex": 2,
+                  "parallelIndex": 0,
+                  "status": "passed",
+                  "duration": 523,
+                  "errors": [],
+                  "stdout": [],
+                  "stderr": [],
+                  "retry": 0,
+                  "startTime": "2026-10-02T03:37:36.903Z",
+                  "annotations": [],
+                  "attachments": []
+                }
+              ],
+              "status": "expected"
+            }
+          ],
+          "id": "b9227b25fa0930e6bacb-752f30d804b6abd7fc02",
+          "file": "compositor-recipes.spec.ts",
+          "line": 174,
+          "column": 5
+        },
+        {
+          "title": "sheet: destroy восстанавливает прежний focus owner в parent-shadow",
+          "ok": true,
+          "tags": [],
+          "tests": [
+            {
+              "timeout": 30000,
+              "annotations": [],
+              "expectedStatus": "passed",
+              "projectId": "webkit",
+              "projectName": "webkit",
+              "results": [
+                {
+                  "workerIndex": 2,
+                  "parallelIndex": 0,
+                  "status": "passed",
+                  "duration": 521,
+                  "errors": [],
+                  "stdout": [],
+                  "stderr": [],
+                  "retry": 0,
+                  "startTime": "2026-10-02T03:37:37.435Z",
+                  "annotations": [],
+                  "attachments": []
+                }
+              ],
+              "status": "expected"
+            }
+          ],
+          "id": "b9227b25fa0930e6bacb-9d30aee61512ed5f5a61",
+          "file": "compositor-recipes.spec.ts",
+          "line": 174,
+          "column": 5
+        },
+        {
+          "title": "sheet: destroy восстанавливает прежний focus owner в closed-shadow",
+          "ok": true,
+          "tags": [],
+          "tests": [
+            {
+              "timeout": 30000,
+              "annotations": [],
+              "expectedStatus": "passed",
+              "projectId": "webkit",
+              "projectName": "webkit",
+              "results": [
+                {
+                  "workerIndex": 2,
+                  "parallelIndex": 0,
+                  "status": "passed",
+                  "duration": 524,
+                  "errors": [],
+                  "stdout": [],
+                  "stderr": [],
+                  "retry": 0,
+                  "startTime": "2026-10-02T03:37:37.964Z",
+                  "annotations": [],
+                  "attachments": []
+                }
+              ],
+              "status": "expected"
+            }
+          ],
+          "id": "b9227b25fa0930e6bacb-cf43b28e76570cd88b3a",
+          "file": "compositor-recipes.spec.ts",
+          "line": 174,
+          "column": 5
+        },
+        {
+          "title": "sheet: destroy восстанавливает прежний focus owner в parent-closed-shadow",
+          "ok": true,
+          "tags": [],
+          "tests": [
+            {
+              "timeout": 30000,
+              "annotations": [],
+              "expectedStatus": "passed",
+              "projectId": "webkit",
+              "projectName": "webkit",
+              "results": [
+                {
+                  "workerIndex": 2,
+                  "parallelIndex": 0,
+                  "status": "passed",
+                  "duration": 511,
+                  "errors": [],
+                  "stdout": [],
+                  "stderr": [],
+                  "retry": 0,
+                  "startTime": "2026-10-02T03:37:38.496Z",
+                  "annotations": [],
+                  "attachments": []
+                }
+              ],
+              "status": "expected"
+            }
+          ],
+          "id": "b9227b25fa0930e6bacb-5fa7276ab69ca9e62889",
+          "file": "compositor-recipes.spec.ts",
+          "line": 174,
+          "column": 5
+        },
+        {
+          "title": "sheet: destroy восстанавливает прежний focus owner в ancestor-closed-shadow",
+          "ok": true,
+          "tags": [],
+          "tests": [
+            {
+              "timeout": 30000,
+              "annotations": [],
+              "expectedStatus": "passed",
+              "projectId": "webkit",
+              "projectName": "webkit",
+              "results": [
+                {
+                  "workerIndex": 2,
+                  "parallelIndex": 0,
+                  "status": "passed",
+                  "duration": 509,
+                  "errors": [],
+                  "stdout": [],
+                  "stderr": [],
+                  "retry": 0,
+                  "startTime": "2026-10-02T03:37:39.015Z",
+                  "annotations": [],
+                  "attachments": []
+                }
+              ],
+              "status": "expected"
+            }
+          ],
+          "id": "b9227b25fa0930e6bacb-e2dcfcb8c6338b4a2520",
+          "file": "compositor-recipes.spec.ts",
+          "line": 174,
+          "column": 5
+        },
+        {
+          "title": "sheet: none pause сохраняет текущую quiet drag позу",
+          "ok": true,
+          "tags": [],
+          "tests": [
+            {
+              "timeout": 30000,
+              "annotations": [],
+              "expectedStatus": "passed",
+              "projectId": "webkit",
+              "projectName": "webkit",
+              "results": [
+                {
+                  "workerIndex": 2,
+                  "parallelIndex": 0,
+                  "status": "passed",
+                  "duration": 540,
+                  "errors": [],
+                  "stdout": [],
+                  "stderr": [],
+                  "retry": 0,
+                  "startTime": "2026-10-02T03:37:39.531Z",
+                  "annotations": [],
+                  "attachments": []
+                }
+              ],
+              "status": "expected"
+            }
+          ],
+          "id": "b9227b25fa0930e6bacb-b35bccb35f94946b66f7",
+          "file": "compositor-recipes.spec.ts",
+          "line": 228,
+          "column": 5
+        },
+        {
+          "title": "sheet: reduced pause сохраняет текущую quiet drag позу",
+          "ok": true,
+          "tags": [],
+          "tests": [
+            {
+              "timeout": 30000,
+              "annotations": [],
+              "expectedStatus": "passed",
+              "projectId": "webkit",
+              "projectName": "webkit",
+              "results": [
+                {
+                  "workerIndex": 2,
+                  "parallelIndex": 0,
+                  "status": "passed",
+                  "duration": 542,
+                  "errors": [],
+                  "stdout": [],
+                  "stderr": [],
+                  "retry": 0,
+                  "startTime": "2026-10-02T03:37:40.080Z",
+                  "annotations": [],
+                  "attachments": []
+                }
+              ],
+              "status": "expected"
+            }
+          ],
+          "id": "b9227b25fa0930e6bacb-547c511a5d8de621b1de",
+          "file": "compositor-recipes.spec.ts",
+          "line": 228,
+          "column": 5
+        },
+        {
+          "title": "sheet: native interruption → live follow → native release; один inert callback",
+          "ok": true,
+          "tags": [],
+          "tests": [
+            {
+              "timeout": 30000,
+              "annotations": [],
+              "expectedStatus": "passed",
+              "projectId": "webkit",
+              "projectName": "webkit",
+              "results": [
+                {
+                  "workerIndex": 2,
+                  "parallelIndex": 0,
+                  "status": "passed",
+                  "duration": 621,
+                  "errors": [],
+                  "stdout": [],
+                  "stderr": [],
+                  "retry": 0,
+                  "startTime": "2026-10-02T03:37:40.635Z",
+                  "annotations": [],
+                  "attachments": []
+                }
+              ],
+              "status": "expected"
+            }
+          ],
+          "id": "b9227b25fa0930e6bacb-b65ce25e03d37392d142",
+          "file": "compositor-recipes.spec.ts",
+          "line": 258,
+          "column": 3
+        },
+        {
+          "title": "sheet: pointercancel не меняет выбранную цель, pause сохраняет позу",
+          "ok": true,
+          "tags": [],
+          "tests": [
+            {
+              "timeout": 30000,
+              "annotations": [],
+              "expectedStatus": "passed",
+              "projectId": "webkit",
+              "projectName": "webkit",
+              "results": [
+                {
+                  "workerIndex": 2,
+                  "parallelIndex": 0,
+                  "status": "passed",
+                  "duration": 562,
+                  "errors": [],
+                  "stdout": [],
+                  "stderr": [],
+                  "retry": 0,
+                  "startTime": "2026-10-02T03:37:41.267Z",
+                  "annotations": [],
+                  "attachments": []
+                }
+              ],
+              "status": "expected"
+            }
+          ],
+          "id": "b9227b25fa0930e6bacb-a680a883dcb95bf83c1b",
+          "file": "compositor-recipes.spec.ts",
+          "line": 316,
+          "column": 3
+        },
+        {
+          "title": "sheet: no-motion, keyboard, IME и явный resize/reparent",
+          "ok": true,
+          "tags": [],
+          "tests": [
+            {
+              "timeout": 30000,
+              "annotations": [],
+              "expectedStatus": "passed",
+              "projectId": "webkit",
+              "projectName": "webkit",
+              "results": [
+                {
+                  "workerIndex": 2,
+                  "parallelIndex": 0,
+                  "status": "passed",
+                  "duration": 513,
+                  "errors": [],
+                  "stdout": [],
+                  "stderr": [],
+                  "retry": 0,
+                  "startTime": "2026-10-02T03:37:41.840Z",
+                  "annotations": [],
+                  "attachments": []
+                }
+              ],
+              "status": "expected"
+            }
+          ],
+          "id": "b9227b25fa0930e6bacb-fb4585379106873227e6",
+          "file": "compositor-recipes.spec.ts",
+          "line": 346,
+          "column": 3
+        },
+        {
+          "title": "sheet: reduced-motion при mount и при смене предпочтения",
+          "ok": true,
+          "tags": [],
+          "tests": [
+            {
+              "timeout": 30000,
+              "annotations": [],
+              "expectedStatus": "passed",
+              "projectId": "webkit",
+              "projectName": "webkit",
+              "results": [
+                {
+                  "workerIndex": 2,
+                  "parallelIndex": 0,
+                  "status": "passed",
+                  "duration": 611,
+                  "errors": [],
+                  "stdout": [],
+                  "stderr": [],
+                  "retry": 0,
+                  "startTime": "2026-10-02T03:37:42.361Z",
+                  "annotations": [],
+                  "attachments": []
+                }
+              ],
+              "status": "expected"
+            }
+          ],
+          "id": "b9227b25fa0930e6bacb-e9a164c1c92918c79225",
+          "file": "compositor-recipes.spec.ts",
+          "line": 383,
+          "column": 3
+        },
+        {
+          "title": "pager: destroy восстанавливает исходный inline transform (important)",
+          "ok": true,
+          "tags": [],
+          "tests": [
+            {
+              "timeout": 30000,
+              "annotations": [],
+              "expectedStatus": "passed",
+              "projectId": "webkit",
+              "projectName": "webkit",
+              "results": [
+                {
+                  "workerIndex": 2,
+                  "parallelIndex": 0,
+                  "status": "passed",
+                  "duration": 453,
+                  "errors": [],
+                  "stdout": [],
+                  "stderr": [],
+                  "retry": 0,
+                  "startTime": "2026-10-02T03:37:42.979Z",
+                  "annotations": [],
+                  "attachments": []
+                }
+              ],
+              "status": "expected"
+            }
+          ],
+          "id": "b9227b25fa0930e6bacb-0cd796215fb8238c68a4",
+          "file": "compositor-recipes.spec.ts",
+          "line": 94,
+          "column": 5
+        },
+        {
+          "title": "pager: destroy восстанавливает исходный inline transform (plain)",
+          "ok": true,
+          "tags": [],
+          "tests": [
+            {
+              "timeout": 30000,
+              "annotations": [],
+              "expectedStatus": "passed",
+              "projectId": "webkit",
+              "projectName": "webkit",
+              "results": [
+                {
+                  "workerIndex": 2,
+                  "parallelIndex": 0,
+                  "status": "passed",
+                  "duration": 435,
+                  "errors": [],
+                  "stdout": [],
+                  "stderr": [],
+                  "retry": 0,
+                  "startTime": "2026-10-02T03:37:43.443Z",
+                  "annotations": [],
+                  "attachments": []
+                }
+              ],
+              "status": "expected"
+            }
+          ],
+          "id": "b9227b25fa0930e6bacb-9cb375c75f0a211834f4",
+          "file": "compositor-recipes.spec.ts",
+          "line": 94,
+          "column": 5
+        },
+        {
+          "title": "pager: destroy восстанавливает исходный inline transform (none)",
+          "ok": true,
+          "tags": [],
+          "tests": [
+            {
+              "timeout": 30000,
+              "annotations": [],
+              "expectedStatus": "passed",
+              "projectId": "webkit",
+              "projectName": "webkit",
+              "results": [
+                {
+                  "workerIndex": 2,
+                  "parallelIndex": 0,
+                  "status": "passed",
+                  "duration": 470,
+                  "errors": [],
+                  "stdout": [],
+                  "stderr": [],
+                  "retry": 0,
+                  "startTime": "2026-10-02T03:37:43.887Z",
+                  "annotations": [],
+                  "attachments": []
+                }
+              ],
+              "status": "expected"
+            }
+          ],
+          "id": "b9227b25fa0930e6bacb-9710236e8e5f0b0d7dec",
+          "file": "compositor-recipes.spec.ts",
+          "line": 94,
+          "column": 5
+        },
+        {
+          "title": "pager: destroy восстанавливает исходный inline transform (absent)",
+          "ok": true,
+          "tags": [],
+          "tests": [
+            {
+              "timeout": 30000,
+              "annotations": [],
+              "expectedStatus": "passed",
+              "projectId": "webkit",
+              "projectName": "webkit",
+              "results": [
+                {
+                  "workerIndex": 2,
+                  "parallelIndex": 0,
+                  "status": "passed",
+                  "duration": 449,
+                  "errors": [],
+                  "stdout": [],
+                  "stderr": [],
+                  "retry": 0,
+                  "startTime": "2026-10-02T03:37:44.365Z",
+                  "annotations": [],
+                  "attachments": []
+                }
+              ],
+              "status": "expected"
+            }
+          ],
+          "id": "b9227b25fa0930e6bacb-e559578f72d04678d4e9",
+          "file": "compositor-recipes.spec.ts",
+          "line": 94,
+          "column": 5
+        },
+        {
+          "title": "pager: getter onSelect сохраняет healthy intent до внешнего эффекта",
+          "ok": true,
+          "tags": [],
+          "tests": [
+            {
+              "timeout": 30000,
+              "annotations": [],
+              "expectedStatus": "passed",
+              "projectId": "webkit",
+              "projectName": "webkit",
+              "results": [
+                {
+                  "workerIndex": 2,
+                  "parallelIndex": 0,
+                  "status": "passed",
+                  "duration": 445,
+                  "errors": [],
+                  "stdout": [],
+                  "stderr": [],
+                  "retry": 0,
+                  "startTime": "2026-10-02T03:37:44.823Z",
+                  "annotations": [],
+                  "attachments": []
+                }
+              ],
+              "status": "expected"
+            }
+          ],
+          "id": "b9227b25fa0930e6bacb-3f507e4bc95b8a47355c",
+          "file": "compositor-recipes.spec.ts",
+          "line": 141,
+          "column": 5
+        },
+        {
+          "title": "pager: getter onSelect сохраняет destroy intent до внешнего эффекта",
+          "ok": true,
+          "tags": [],
+          "tests": [
+            {
+              "timeout": 30000,
+              "annotations": [],
+              "expectedStatus": "passed",
+              "projectId": "webkit",
+              "projectName": "webkit",
+              "results": [
+                {
+                  "workerIndex": 2,
+                  "parallelIndex": 0,
+                  "status": "passed",
+                  "duration": 474,
+                  "errors": [],
+                  "stdout": [],
+                  "stderr": [],
+                  "retry": 0,
+                  "startTime": "2026-10-02T03:37:45.279Z",
+                  "annotations": [],
+                  "attachments": []
+                }
+              ],
+              "status": "expected"
+            }
+          ],
+          "id": "b9227b25fa0930e6bacb-b648d94f0b6c207b7c19",
+          "file": "compositor-recipes.spec.ts",
+          "line": 141,
+          "column": 5
+        },
+        {
+          "title": "pager: getter onSelect сохраняет select intent до внешнего эффекта",
+          "ok": true,
+          "tags": [],
+          "tests": [
+            {
+              "timeout": 30000,
+              "annotations": [],
+              "expectedStatus": "passed",
+              "projectId": "webkit",
+              "projectName": "webkit",
+              "results": [
+                {
+                  "workerIndex": 2,
+                  "parallelIndex": 0,
+                  "status": "passed",
+                  "duration": 459,
+                  "errors": [],
+                  "stdout": [],
+                  "stderr": [],
+                  "retry": 0,
+                  "startTime": "2026-10-02T03:37:45.765Z",
+                  "annotations": [],
+                  "attachments": []
+                }
+              ],
+              "status": "expected"
+            }
+          ],
+          "id": "b9227b25fa0930e6bacb-34a5e795de527f2df712",
+          "file": "compositor-recipes.spec.ts",
+          "line": 141,
+          "column": 5
+        },
+        {
+          "title": "pager: destroy восстанавливает прежний focus owner в light",
+          "ok": true,
+          "tags": [],
+          "tests": [
+            {
+              "timeout": 30000,
+              "annotations": [],
+              "expectedStatus": "passed",
+              "projectId": "webkit",
+              "projectName": "webkit",
+              "results": [
+                {
+                  "workerIndex": 2,
+                  "parallelIndex": 0,
+                  "status": "passed",
+                  "duration": 525,
+                  "errors": [],
+                  "stdout": [],
+                  "stderr": [],
+                  "retry": 0,
+                  "startTime": "2026-10-02T03:37:46.232Z",
+                  "annotations": [],
+                  "attachments": []
+                }
+              ],
+              "status": "expected"
+            }
+          ],
+          "id": "b9227b25fa0930e6bacb-9736fb3e0863bcc33dee",
+          "file": "compositor-recipes.spec.ts",
+          "line": 174,
+          "column": 5
+        },
+        {
+          "title": "pager: destroy восстанавливает прежний focus owner в shadow",
+          "ok": true,
+          "tags": [],
+          "tests": [
+            {
+              "timeout": 30000,
+              "annotations": [],
+              "expectedStatus": "passed",
+              "projectId": "webkit",
+              "projectName": "webkit",
+              "results": [
+                {
+                  "workerIndex": 2,
+                  "parallelIndex": 0,
+                  "status": "passed",
+                  "duration": 509,
+                  "errors": [],
+                  "stdout": [],
+                  "stderr": [],
+                  "retry": 0,
+                  "startTime": "2026-10-02T03:37:46.765Z",
+                  "annotations": [],
+                  "attachments": []
+                }
+              ],
+              "status": "expected"
+            }
+          ],
+          "id": "b9227b25fa0930e6bacb-827f258175f737877f62",
+          "file": "compositor-recipes.spec.ts",
+          "line": 174,
+          "column": 5
+        },
+        {
+          "title": "pager: destroy восстанавливает прежний focus owner в nested",
+          "ok": true,
+          "tags": [],
+          "tests": [
+            {
+              "timeout": 30000,
+              "annotations": [],
+              "expectedStatus": "passed",
+              "projectId": "webkit",
+              "projectName": "webkit",
+              "results": [
+                {
+                  "workerIndex": 2,
+                  "parallelIndex": 0,
+                  "status": "passed",
+                  "duration": 524,
+                  "errors": [],
+                  "stdout": [],
+                  "stderr": [],
+                  "retry": 0,
+                  "startTime": "2026-10-02T03:37:47.282Z",
+                  "annotations": [],
+                  "attachments": []
+                }
+              ],
+              "status": "expected"
+            }
+          ],
+          "id": "b9227b25fa0930e6bacb-c8b970287edb80b06d45",
+          "file": "compositor-recipes.spec.ts",
+          "line": 174,
+          "column": 5
+        },
+        {
+          "title": "pager: destroy восстанавливает прежний focus owner в child-shadow",
+          "ok": true,
+          "tags": [],
+          "tests": [
+            {
+              "timeout": 30000,
+              "annotations": [],
+              "expectedStatus": "passed",
+              "projectId": "webkit",
+              "projectName": "webkit",
+              "results": [
+                {
+                  "workerIndex": 2,
+                  "parallelIndex": 0,
+                  "status": "passed",
+                  "duration": 544,
+                  "errors": [],
+                  "stdout": [],
+                  "stderr": [],
+                  "retry": 0,
+                  "startTime": "2026-10-02T03:37:47.813Z",
+                  "annotations": [],
+                  "attachments": []
+                }
+              ],
+              "status": "expected"
+            }
+          ],
+          "id": "b9227b25fa0930e6bacb-30bafaadb65a79c4ff1e",
+          "file": "compositor-recipes.spec.ts",
+          "line": 174,
+          "column": 5
+        },
+        {
+          "title": "pager: destroy восстанавливает прежний focus owner в outside-shadow",
+          "ok": true,
+          "tags": [],
+          "tests": [
+            {
+              "timeout": 30000,
+              "annotations": [],
+              "expectedStatus": "passed",
+              "projectId": "webkit",
+              "projectName": "webkit",
+              "results": [
+                {
+                  "workerIndex": 2,
+                  "parallelIndex": 0,
+                  "status": "passed",
+                  "duration": 530,
+                  "errors": [],
+                  "stdout": [],
+                  "stderr": [],
+                  "retry": 0,
+                  "startTime": "2026-10-02T03:37:48.366Z",
+                  "annotations": [],
+                  "attachments": []
+                }
+              ],
+              "status": "expected"
+            }
+          ],
+          "id": "b9227b25fa0930e6bacb-4b9e3766a8d489b513e0",
+          "file": "compositor-recipes.spec.ts",
+          "line": 174,
+          "column": 5
+        },
+        {
+          "title": "pager: destroy восстанавливает прежний focus owner в outside-nested",
+          "ok": true,
+          "tags": [],
+          "tests": [
+            {
+              "timeout": 30000,
+              "annotations": [],
+              "expectedStatus": "passed",
+              "projectId": "webkit",
+              "projectName": "webkit",
+              "results": [
+                {
+                  "workerIndex": 2,
+                  "parallelIndex": 0,
+                  "status": "passed",
+                  "duration": 509,
+                  "errors": [],
+                  "stdout": [],
+                  "stderr": [],
+                  "retry": 0,
+                  "startTime": "2026-10-02T03:37:48.905Z",
+                  "annotations": [],
+                  "attachments": []
+                }
+              ],
+              "status": "expected"
+            }
+          ],
+          "id": "b9227b25fa0930e6bacb-4a8957dce96cfb564bc5",
+          "file": "compositor-recipes.spec.ts",
+          "line": 174,
+          "column": 5
+        },
+        {
+          "title": "pager: destroy восстанавливает прежний focus owner в parent-shadow",
+          "ok": true,
+          "tags": [],
+          "tests": [
+            {
+              "timeout": 30000,
+              "annotations": [],
+              "expectedStatus": "passed",
+              "projectId": "webkit",
+              "projectName": "webkit",
+              "results": [
+                {
+                  "workerIndex": 2,
+                  "parallelIndex": 0,
+                  "status": "passed",
+                  "duration": 488,
+                  "errors": [],
+                  "stdout": [],
+                  "stderr": [],
+                  "retry": 0,
+                  "startTime": "2026-10-02T03:37:49.421Z",
+                  "annotations": [],
+                  "attachments": []
+                }
+              ],
+              "status": "expected"
+            }
+          ],
+          "id": "b9227b25fa0930e6bacb-3e478a42736eea81eaa2",
+          "file": "compositor-recipes.spec.ts",
+          "line": 174,
+          "column": 5
+        },
+        {
+          "title": "pager: destroy восстанавливает прежний focus owner в closed-shadow",
+          "ok": true,
+          "tags": [],
+          "tests": [
+            {
+              "timeout": 30000,
+              "annotations": [],
+              "expectedStatus": "passed",
+              "projectId": "webkit",
+              "projectName": "webkit",
+              "results": [
+                {
+                  "workerIndex": 2,
+                  "parallelIndex": 0,
+                  "status": "passed",
+                  "duration": 498,
+                  "errors": [],
+                  "stdout": [],
+                  "stderr": [],
+                  "retry": 0,
+                  "startTime": "2026-10-02T03:37:49.919Z",
+                  "annotations": [],
+                  "attachments": []
+                }
+              ],
+              "status": "expected"
+            }
+          ],
+          "id": "b9227b25fa0930e6bacb-7300a8c12f7f4f5f62d8",
+          "file": "compositor-recipes.spec.ts",
+          "line": 174,
+          "column": 5
+        },
+        {
+          "title": "pager: destroy восстанавливает прежний focus owner в parent-closed-shadow",
+          "ok": true,
+          "tags": [],
+          "tests": [
+            {
+              "timeout": 30000,
+              "annotations": [],
+              "expectedStatus": "passed",
+              "projectId": "webkit",
+              "projectName": "webkit",
+              "results": [
+                {
+                  "workerIndex": 2,
+                  "parallelIndex": 0,
+                  "status": "passed",
+                  "duration": 531,
+                  "errors": [],
+                  "stdout": [],
+                  "stderr": [],
+                  "retry": 0,
+                  "startTime": "2026-10-02T03:37:50.425Z",
+                  "annotations": [],
+                  "attachments": []
+                }
+              ],
+              "status": "expected"
+            }
+          ],
+          "id": "b9227b25fa0930e6bacb-637807cf199b3325214d",
+          "file": "compositor-recipes.spec.ts",
+          "line": 174,
+          "column": 5
+        },
+        {
+          "title": "pager: destroy восстанавливает прежний focus owner в ancestor-closed-shadow",
+          "ok": true,
+          "tags": [],
+          "tests": [
+            {
+              "timeout": 30000,
+              "annotations": [],
+              "expectedStatus": "passed",
+              "projectId": "webkit",
+              "projectName": "webkit",
+              "results": [
+                {
+                  "workerIndex": 2,
+                  "parallelIndex": 0,
+                  "status": "passed",
+                  "duration": 506,
+                  "errors": [],
+                  "stdout": [],
+                  "stderr": [],
+                  "retry": 0,
+                  "startTime": "2026-10-02T03:37:50.964Z",
+                  "annotations": [],
+                  "attachments": []
+                }
+              ],
+              "status": "expected"
+            }
+          ],
+          "id": "b9227b25fa0930e6bacb-2e04d23b0ca5b3732683",
+          "file": "compositor-recipes.spec.ts",
+          "line": 174,
+          "column": 5
+        },
+        {
+          "title": "pager: none pause сохраняет текущую quiet drag позу",
+          "ok": true,
+          "tags": [],
+          "tests": [
+            {
+              "timeout": 30000,
+              "annotations": [],
+              "expectedStatus": "passed",
+              "projectId": "webkit",
+              "projectName": "webkit",
+              "results": [
+                {
+                  "workerIndex": 2,
+                  "parallelIndex": 0,
+                  "status": "passed",
+                  "duration": 626,
+                  "errors": [],
+                  "stdout": [],
+                  "stderr": [],
+                  "retry": 0,
+                  "startTime": "2026-10-02T03:37:51.479Z",
+                  "annotations": [],
+                  "attachments": []
+                }
+              ],
+              "status": "expected"
+            }
+          ],
+          "id": "b9227b25fa0930e6bacb-61d6f50c4c59b1d14c7f",
+          "file": "compositor-recipes.spec.ts",
+          "line": 228,
+          "column": 5
+        },
+        {
+          "title": "pager: reduced pause сохраняет текущую quiet drag позу",
+          "ok": true,
+          "tags": [],
+          "tests": [
+            {
+              "timeout": 30000,
+              "annotations": [],
+              "expectedStatus": "passed",
+              "projectId": "webkit",
+              "projectName": "webkit",
+              "results": [
+                {
+                  "workerIndex": 2,
+                  "parallelIndex": 0,
+                  "status": "passed",
+                  "duration": 553,
+                  "errors": [],
+                  "stdout": [],
+                  "stderr": [],
+                  "retry": 0,
+                  "startTime": "2026-10-02T03:37:52.114Z",
+                  "annotations": [],
+                  "attachments": []
+                }
+              ],
+              "status": "expected"
+            }
+          ],
+          "id": "b9227b25fa0930e6bacb-ef915a68b956b518e3a2",
+          "file": "compositor-recipes.spec.ts",
+          "line": 228,
+          "column": 5
+        },
+        {
+          "title": "pager: native interruption → live follow → native release; один inert callback",
+          "ok": true,
+          "tags": [],
+          "tests": [
+            {
+              "timeout": 30000,
+              "annotations": [],
+              "expectedStatus": "passed",
+              "projectId": "webkit",
+              "projectName": "webkit",
+              "results": [
+                {
+                  "workerIndex": 2,
+                  "parallelIndex": 0,
+                  "status": "passed",
+                  "duration": 633,
+                  "errors": [],
+                  "stdout": [],
+                  "stderr": [],
+                  "retry": 0,
+                  "startTime": "2026-10-02T03:37:52.675Z",
+                  "annotations": [],
+                  "attachments": []
+                }
+              ],
+              "status": "expected"
+            }
+          ],
+          "id": "b9227b25fa0930e6bacb-c5e7718feda3ba40a3e9",
+          "file": "compositor-recipes.spec.ts",
+          "line": 258,
+          "column": 3
+        },
+        {
+          "title": "pager: pointercancel не меняет выбранную цель, pause сохраняет позу",
+          "ok": true,
+          "tags": [],
+          "tests": [
+            {
+              "timeout": 30000,
+              "annotations": [],
+              "expectedStatus": "passed",
+              "projectId": "webkit",
+              "projectName": "webkit",
+              "results": [
+                {
+                  "workerIndex": 2,
+                  "parallelIndex": 0,
+                  "status": "passed",
+                  "duration": 566,
+                  "errors": [],
+                  "stdout": [],
+                  "stderr": [],
+                  "retry": 0,
+                  "startTime": "2026-10-02T03:37:53.317Z",
+                  "annotations": [],
+                  "attachments": []
+                }
+              ],
+              "status": "expected"
+            }
+          ],
+          "id": "b9227b25fa0930e6bacb-b48a4280f8e4bf033184",
+          "file": "compositor-recipes.spec.ts",
+          "line": 316,
+          "column": 3
+        },
+        {
+          "title": "pager: no-motion, keyboard, IME и явный resize/reparent",
+          "ok": true,
+          "tags": [],
+          "tests": [
+            {
+              "timeout": 30000,
+              "annotations": [],
+              "expectedStatus": "passed",
+              "projectId": "webkit",
+              "projectName": "webkit",
+              "results": [
+                {
+                  "workerIndex": 2,
+                  "parallelIndex": 0,
+                  "status": "passed",
+                  "duration": 525,
+                  "errors": [],
+                  "stdout": [],
+                  "stderr": [],
+                  "retry": 0,
+                  "startTime": "2026-10-02T03:37:53.892Z",
+                  "annotations": [],
+                  "attachments": []
+                }
+              ],
+              "status": "expected"
+            }
+          ],
+          "id": "b9227b25fa0930e6bacb-650fb81dc7e145244057",
+          "file": "compositor-recipes.spec.ts",
+          "line": 346,
+          "column": 3
+        },
+        {
+          "title": "pager: reduced-motion при mount и при смене предпочтения",
+          "ok": true,
+          "tags": [],
+          "tests": [
+            {
+              "timeout": 30000,
+              "annotations": [],
+              "expectedStatus": "passed",
+              "projectId": "webkit",
+              "projectName": "webkit",
+              "results": [
+                {
+                  "workerIndex": 2,
+                  "parallelIndex": 0,
+                  "status": "passed",
+                  "duration": 657,
+                  "errors": [],
+                  "stdout": [],
+                  "stderr": [],
+                  "retry": 0,
+                  "startTime": "2026-10-02T03:37:54.425Z",
+                  "annotations": [],
+                  "attachments": []
+                }
+              ],
+              "status": "expected"
+            }
+          ],
+          "id": "b9227b25fa0930e6bacb-7c6dc492760852ea582d",
+          "file": "compositor-recipes.spec.ts",
+          "line": 383,
+          "column": 3
+        }
+      ]
+    }
+  ],
+  "errors": [],
+  "stats": {
+    "startTime": "2026-10-02T03:36:47.991Z",
+    "duration": 67182.69799999999,
+    "expected": 144,
+    "skipped": 0,
+    "unexpected": 0,
+    "flaky": 0
+  }
+}

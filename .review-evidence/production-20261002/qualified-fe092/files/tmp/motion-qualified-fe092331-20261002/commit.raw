@@ -1,0 +1,6 @@
+tree 285e30e36db32f2fdc9ae442327f6b3396dcf254
+parent 95a42651244c5279b0f688eaf236e39ec31724b0
+author Даниил Ерошов <daniilerosov12@gmail.com> 1790911653 +0000
+committer Даниил Ерошов <daniilerosov12@gmail.com> 1790911653 +0000
+
+fix(recipes): восстановить исходный приоритет transform

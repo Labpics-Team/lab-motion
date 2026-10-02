@@ -1,0 +1,59 @@
+{
+  "sourceHead": "fe092331360837fd7f63d71a4b7f867ba849ebd4",
+  "protocolDigest": "ce535cf6d6f0b0f140d44403627b63d936ef2461883a52680e7bbcad3ee49e5a",
+  "clockModelDigest": "04d863513d53b248b1be3e0905240f3bd6f4d06124582ce3093c2cbfe5320852",
+  "predataTuple": {
+    "path": "/tmp/motion-server-predata-fe092331-ce535cf6-20261002-epoch8/predata-tuple.json",
+    "bytes": 41722,
+    "sha256": "5bcaa87d3349231591f4c8718e44e41c851f50d17bd3d52ae1c32d4eaca77ec5"
+  },
+  "plannedOutput": "/tmp/motion-server-series-fe092331-ce535cf6-20261002-epoch8",
+  "outputAbsent": true,
+  "budgetBytes": {
+    "freshPreparationAvailable": 4700635136,
+    "maximumSyntheticShapeCarrier": 1954891521,
+    "additionalActualWidthsAndFirstFailurePrefixContingency": 1073741824,
+    "unchangedExtraReserve": 1073741824,
+    "remainingAfterBothAllocations": 598259967
+  },
+  "owners": [
+    {
+      "path": "/workspace/lab-motion/bench/profile/server-profile-runner.mjs",
+      "bytes": 51648,
+      "sha256": "a5ed5d601ff4f31a72c739462e0f18622a39a0c1cd76742a1743090833a7c636"
+    },
+    {
+      "path": "/workspace/lab-motion/bench/profile/server-profile-contract.mjs",
+      "bytes": 73913,
+      "sha256": "ba6d365e3faf623cc8da5dae78ff2bfa3288529b9640052a0474d55d8e33d72e"
+    },
+    {
+      "path": "/workspace/lab-motion/bench/profile/server-profile-registration.mjs",
+      "bytes": 18998,
+      "sha256": "90bf39f1aa0118251353001ff015df8e2a67651bee924d147a87841dbae2d470"
+    },
+    {
+      "path": "/workspace/lab-motion/scripts/bench-transform-support.mjs",
+      "bytes": 31565,
+      "sha256": "fcb531d342cb6e72ea06acb16bc5fc25f52440aa9c6aff8c7e09f2215476850c"
+    },
+    {
+      "path": "/workspace/lab-motion/scripts/bench-support.mjs",
+      "bytes": 17507,
+      "sha256": "2fb04fcfd34788870649982724f1166cb4c14a78ae1c44544028565db8208e05"
+    }
+  ],
+  "scope": "Операционный бюджет одного неизменённого existing CLI, не универсальная верхняя граница всех возможных runtime traces. Новый синтетический consumer не выполнялся.",
+  "sourceFacts": [
+    "N не превышает1024; две роли каждого зарегистрированного scene; warmup4/pilot8 и единственные AA/2x/AB сохраняются целиком. N определяется прежним baseline-only законом до candidate timings.",
+    "Legacy engine:8 repetitions, positive выполняет2 независимых actual work; не более1000 targets/work;6 фиксированных timed scheduler offsets и закреплённые setup/idle/cleanup lists. StockC:8 repetitions,2000 calls/work или4000 positive,47 frames на успешно завершённую операцию;2 fixed warmup batches.",
+    "Browser:не более64 calls/batch ×200targets/call,8 timed batches +2 консервативно выделенных warmup batches, fixed semantic/cancellation controls. Coordinates и CPU endpoint metadata восстанавливаются lossless; NaN/undefined/negative-zero failure raw сохраняются существующим owner.",
+    "runStage добавляет sample+hash journal после каждого завершённого sample; при первом throw пишет failed-sample и выходит, не запускает ещё один full-N хвост. Finally сохраняет приобретённый prefix и завершение/отказы cleanup.",
+    "Дополнительный1GiB выделен на отклонение от synthetic shape: фактические числовые/временные widths, один неполный engine/browser prefix и его сохранённые error/journal copies, source-bound packages/adapters/PNG/metadata. Это contingency, не доказанный универсальный trace certificate."
+  ],
+  "unchangedPolicy": [
+    "Нет pruning/filtering/downsampling или изменения raw/counts/workers/timeout/seed/stopping/N/1.05. Нет нового writer/serializer/store/monitor-selected acceptance.",
+    "Старые actual5/6 и их failures не удалены; первые исходные warmup observations epoch6 остаются историей. Epoch8 ещё не запускалась.",
+    "Финальные space/affinity/quota/tool/source checks выполняются непосредственно перед единственным launch; новый quiet grant обязателен. При отказе сохраняется исходный результат, автоматического retry нет."
+  ]
+}

@@ -1,0 +1,353 @@
+{
+  "schema": "motion-independent-qualified-method-readset-v1",
+  "sourceHead": "fe092331360837fd7f63d71a4b7f867ba849ebd4",
+  "sourceTree": "285e30e36db32f2fdc9ae442327f6b3396dcf254",
+  "entries": [
+    {
+      "utc": "2026-10-02T03:33:33.827894+00:00",
+      "path": "/tmp/motion-qualified-measurement-fe092-20261002/diff-.github__workflows__ci.yml.txt",
+      "category": "ci-diff",
+      "bytes": 961,
+      "sha256": "9d903911604c9ce00e2e6088a21beb5bda62813617b9056f0f0a2b67e1d9223e",
+      "reviewedLines": [
+        1,
+        21
+      ],
+      "totalLines": 21
+    },
+    {
+      "utc": "2026-10-02T03:33:33.857197+00:00",
+      "path": "/tmp/motion-qualified-measurement-fe092-20261002/diff-test__server-profile-contract.test.ts.txt",
+      "category": "measurement-test-diff",
+      "bytes": 4276,
+      "sha256": "dfda47603ea03daccb52caef312225fcc805b0d1dd4b4b994647bb9dbc688e59",
+      "reviewedLines": [
+        1,
+        65
+      ],
+      "totalLines": 65
+    },
+    {
+      "utc": "2026-10-02T03:33:33.869498+00:00",
+      "path": "/tmp/motion-qualified-measurement-fe092-20261002/source/test/fixtures/server-thread-cpu-clock-host.c",
+      "category": "native-abi-fault-host",
+      "bytes": 1503,
+      "sha256": "15ee4c885cb88c317051a1951030c441b9c78bf105ceb6f21d5ebce6eac3586e",
+      "reviewedLines": [
+        1,
+        43
+      ],
+      "totalLines": 43
+    },
+    {
+      "utc": "2026-10-02T03:33:33.871303+00:00",
+      "path": "/tmp/motion-qualified-measurement-fe092-20261002/source/test/fixtures/server-thread-cpu-clock-check.mjs",
+      "category": "native-abi-test-owner",
+      "bytes": 8851,
+      "sha256": "d032a5cb9668578b9fbcce986e1cbefa2865fdc17c986742a1274b0e34cb951c",
+      "reviewedLines": [
+        1,
+        144
+      ],
+      "totalLines": 144
+    },
+    {
+      "utc": "2026-10-02T03:34:10.792602+00:00",
+      "path": "/tmp/motion-qualified-measurement-fe092-20261002/source/.github/workflows/ci.yml",
+      "category": "ci-native-prerequisites",
+      "bytes": 11569,
+      "sha256": "9a8f5c8f37b8a939e534c5afa08bae5213db73ec2484fb5c397b22de3ee599d8",
+      "reviewedLines": [
+        113,
+        213
+      ],
+      "totalLines": 302
+    },
+    {
+      "utc": "2026-10-02T03:34:10.821852+00:00",
+      "path": "/tmp/motion-qualified-measurement-fe092-20261002/diff-browser__compositor-recipes.spec.ts.txt",
+      "category": "browser-guard-and-timing-diff",
+      "bytes": 4157,
+      "sha256": "f675f3b75ff72113e13d61dffe4939dbfe0324a9d0c07143039095b97332e1db",
+      "reviewedLines": [
+        1,
+        58
+      ],
+      "totalLines": 58
+    },
+    {
+      "utc": "2026-10-02T03:34:10.828185+00:00",
+      "path": "/tmp/motion-qualified-measurement-fe092-20261002/diff-test__ci-workflow-contract.test.ts.txt",
+      "category": "ci-contract-diff",
+      "bytes": 830,
+      "sha256": "fd69e75951908d15220ad8e284df4c278f2dabe0b4abfb2bc430b85c21bee0f9",
+      "reviewedLines": [
+        1,
+        27
+      ],
+      "totalLines": 27
+    },
+    {
+      "utc": "2026-10-02T03:35:16.527545+00:00",
+      "path": "/tmp/motion-qualified-measurement-fe092-20261002/source/bench/profile/server-thread-cpu-clock.c",
+      "category": "native-getter-law",
+      "bytes": 4159,
+      "sha256": "4f32f23c2409c3e83943121a587c8d9f5e19af7f308ac987323ff4189ddd14c0",
+      "reviewedLines": [
+        1,
+        78
+      ],
+      "totalLines": 78
+    },
+    {
+      "utc": "2026-10-02T03:35:16.576958+00:00",
+      "path": "/tmp/motion-qualified-measurement-fe092-20261002/source/bench/profile/server-thread-cpu-clock.mjs",
+      "category": "native-api-prerequisites",
+      "bytes": 7279,
+      "sha256": "bb31090e4beaa6d4bc4dcc7789d0993672630e091fca65957174988c58ddba71",
+      "reviewedLines": [
+        1,
+        121
+      ],
+      "totalLines": 121
+    },
+    {
+      "utc": "2026-10-02T03:35:16.584256+00:00",
+      "path": "/tmp/motion-qualified-measurement-fe092-20261002/source/vitest.config.ts",
+      "category": "test-sequencing",
+      "bytes": 157,
+      "sha256": "26f615c59fe968f0591008a7919374916be4e4249eae23353defb4e88badc67e",
+      "reviewedLines": [
+        1,
+        8
+      ],
+      "totalLines": 8
+    },
+    {
+      "utc": "2026-10-02T03:35:16.590560+00:00",
+      "path": "/workspace/agents-config/plans/lab-motion-production/r11.md",
+      "category": "active-norm",
+      "bytes": 74166,
+      "sha256": "cbeef108b288502165437c375bb259f3f4d6dc8ae4ae9e926db133adeba40d4b",
+      "reviewedLines": [
+        195,
+        227
+      ],
+      "totalLines": 567
+    },
+    {
+      "utc": "2026-10-02T03:36:48.430632+00:00",
+      "path": "/tmp/motion-native-cpu-rle-measurement-5a4c-20261002/source/test/server-profile-contract.test.ts",
+      "category": "own-base-callback-exact-statements",
+      "bytes": 97980,
+      "sha256": "372a0938d7f7adaddb307a96904be9350f4269df9b22223af63051926e4067b7",
+      "reviewedLines": [
+        1002,
+        1020
+      ],
+      "totalLines": 1287
+    },
+    {
+      "utc": "2026-10-02T03:36:48.457186+00:00",
+      "path": "/tmp/motion-qualified-measurement-fe092-20261002/PRIMARY/tmp/motion-native-clock-permanent-controls-20261002/frozen-inputs.json",
+      "category": "native-primary-source-bindings",
+      "bytes": 1296,
+      "sha256": "466622a3b354b395895820f48e8a470ad4041c86c24278de2bceca54b4ba1ee5",
+      "reviewedLines": [
+        1,
+        42
+      ],
+      "totalLines": 42
+    },
+    {
+      "utc": "2026-10-02T03:36:48.461265+00:00",
+      "path": "/tmp/motion-qualified-measurement-fe092-20261002/source/test/server-profile-contract.test.ts",
+      "category": "new-admission-case-partition",
+      "bytes": 99503,
+      "sha256": "14aa08faad2bf30b1ad355e49b3da86bd5b61d653057ff28bbfa318cce177eb8",
+      "reviewedLines": [
+        1002,
+        1054
+      ],
+      "totalLines": 1317
+    },
+    {
+      "utc": "2026-10-02T03:36:48.466033+00:00",
+      "path": "/tmp/motion-qualified-measurement-fe092-20261002/PRIMARY/tmp/motion-native-clock-permanent-controls-20261002/execution.json",
+      "category": "native-primary-actual-execution",
+      "bytes": 974,
+      "sha256": "09f85ad246a08b4a3ae75687a10f4a0b20ff4965f05d920296c58fc039c1ba08",
+      "reviewedLines": [
+        1,
+        34
+      ],
+      "totalLines": 34
+    },
+    {
+      "utc": "2026-10-02T03:39:23.116074+00:00",
+      "path": "/tmp/motion-qualified-measurement-fe092-20261002/diff-docs__recipes.md.txt",
+      "category": "recipe-delta-and-browser-witness-target",
+      "bytes": 3848,
+      "sha256": "e232405829c2f3e75d4bbb0c786778f099530f31223e7eb4db6259b583e16fb1",
+      "reviewedLines": [
+        1,
+        55
+      ],
+      "totalLines": 55
+    },
+    {
+      "utc": "2026-10-02T03:39:23.123063+00:00",
+      "path": "/tmp/motion-qualified-measurement-fe092-20261002/PRIMARY/tmp/motion-native-clock-permanent-controls-20261002/stdout.log",
+      "category": "native-primary-raw-structured-read",
+      "bytes": 10973,
+      "sha256": "446c88b9ee8bee84984940f1f84734c4a276cf17b7b0d15664cc356c9a66a5e6",
+      "reviewedScope": "source/host hashes; Node/kernel; all acquired endpoints and all 11 records mode/name/exit/stdout/stderr/argv/metadata; independently interpreted, not killed flag"
+    },
+    {
+      "utc": "2026-10-02T03:40:59.761068+00:00",
+      "path": "/tmp/motion-profile-current-gates-fe092331-20261002/PRIMARY-GATES-SUPPLEMENT.json",
+      "category": "primary-gates-reference-metadata",
+      "bytes": 6196,
+      "sha256": "ed166f092eb854a1c8317d835dbe2035f96ae527837a7e7bb1eb9204419895c1",
+      "reviewedScope": "identity/head/tree and reference/receipt metadata; author verdict fields unused"
+    },
+    {
+      "utc": "2026-10-02T03:42:11.332699+00:00",
+      "path": "/tmp/motion-profile-current-gates-fe092331-20261002/run.py",
+      "category": "current-gates-execution-owner",
+      "bytes": 2983,
+      "sha256": "297f5bb795effeb6ba7d90202d2e57b9b525dfd96c8ab34196b231e5afb7a055",
+      "reviewedLines": [
+        1,
+        15
+      ],
+      "totalLines": 15
+    },
+    {
+      "utc": "2026-10-02T03:42:11.363790+00:00",
+      "path": "/tmp/motion-qualified-measurement-fe092-20261002/PRIMARY/tmp/motion-native-clock-permanent-controls-20261002/run.py",
+      "category": "native-primary-capture-owner",
+      "bytes": 1970,
+      "sha256": "ad4b4a3d8f1af34e091c6a134abd9e6acd93f5f06ae2ae60dcd3ed55f95cc495",
+      "reviewedLines": [
+        1,
+        21
+      ],
+      "totalLines": 21
+    },
+    {
+      "utc": "2026-10-02T03:42:11.368737+00:00",
+      "path": "/tmp/motion-qualified-measurement-fe092-20261002/source/test/ci-workflow-contract.test.ts",
+      "category": "ci-failclosed-validator",
+      "bytes": 24040,
+      "sha256": "0a0ee8faf5e0c1c647f4944e7e131b34c7e0fc0d850a7f890d498f73a8f31ed9",
+      "reviewedLines": [
+        365,
+        418
+      ],
+      "totalLines": 558
+    },
+    {
+      "utc": "2026-10-02T03:42:40.097710+00:00",
+      "path": "/tmp/motion-qualified-measurement-fe092-20261002/source/test/ci-workflow-contract.test.ts",
+      "category": "ci-command-and-action-admission",
+      "bytes": 24040,
+      "sha256": "0a0ee8faf5e0c1c647f4944e7e131b34c7e0fc0d850a7f890d498f73a8f31ed9",
+      "reviewedLines": [
+        294,
+        365
+      ],
+      "totalLines": 558
+    },
+    {
+      "utc": "2026-10-02T03:42:40.111716+00:00",
+      "path": "/tmp/motion-profile-current-gates-fe092331-20261002/receipt.json",
+      "category": "fresh-whole-source-and-execution-binding",
+      "bytes": 7262,
+      "sha256": "26138e2b9c80ab254ab047f28c231db6db763a6b6cdd4f61a138dbf9ee8a834e",
+      "reviewedLines": [
+        1,
+        76
+      ],
+      "totalLines": 213
+    },
+    {
+      "utc": "2026-10-02T03:42:40.132478+00:00",
+      "path": "/tmp/motion-profile-current-gates-fe092331-20261002/whole.json",
+      "category": "fresh-whole-primary-targeted-raw",
+      "bytes": 2141909,
+      "sha256": "ae5e6b196a1a077b9672171d56782bb9772d25391872c3d44fe652b581519b0f",
+      "reviewedScope": "target server-profile and ci-workflow file status/individual assertions incl six admission cases with durations/failure messages; top factual counts; no author parsed-results"
+    },
+    {
+      "utc": "2026-10-02T03:49:50.908848+00:00",
+      "path": "/tmp/motion-profile-current-gates-fe092331-20261002/receipt.json",
+      "category": "fresh-primary-targeted-structured-read",
+      "bytes": 7262,
+      "sha256": "26138e2b9c80ab254ab047f28c231db6db763a6b6cdd4f61a138dbf9ee8a834e",
+      "reviewedScope": "head; commands argv/exit/timestamps/hash; actual endedAt/allChildrenJoined"
+    },
+    {
+      "utc": "2026-10-02T03:49:50.908949+00:00",
+      "path": "/tmp/motion-recipes-current-browser-fe092331-20261002/result.json",
+      "category": "fresh-primary-targeted-structured-read",
+      "bytes": 166286,
+      "sha256": "8a09834bbe48caffd4bd5b05cd93e5a55a032d7d0cd48ec1e1e22bffa1832188",
+      "reviewedScope": "new inline-transform restore spec names; project status and actual test result/duration; raw stats"
+    },
+    {
+      "utc": "2026-10-02T03:57:06.048896+00:00",
+      "path": "/tmp/motion-qualified-measurement-fe092-20261002/source/test/ci-workflow-contract.test.ts",
+      "category": "ci-native-command-failclosed",
+      "bytes": 24040,
+      "sha256": "0a0ee8faf5e0c1c647f4944e7e131b34c7e0fc0d850a7f890d498f73a8f31ed9",
+      "reviewedLines": [
+        44,
+        101
+      ],
+      "totalLines": 558
+    },
+    {
+      "path": "/tmp/motion-qualified-measurement-fe092-20261002/source/test/ci-workflow-contract.test.ts",
+      "bytes": 24040,
+      "sha256": "0a0ee8faf5e0c1c647f4944e7e131b34c7e0fc0d850a7f890d498f73a8f31ed9",
+      "category": "ci-command-validator-source",
+      "reviewedLines": [
+        277,
+        286
+      ],
+      "reviewedScope": "assertCommands: exact commands/no-if/no-continue-on-error/no working-directory and bash shell",
+      "utc": "2026-10-02T03:59:01.888008+00:00"
+    }
+  ],
+  "sourceIntegritySeparate": "641 files in source-bindings.json; identity is not semantic coverage",
+  "conservationSeparate": [
+    "admission-conservation.json",
+    "diff-bindings.json",
+    "native-primary-independent-readback.json"
+  ],
+  "ownf647Transfer": {
+    "manifestBinding": {
+      "path": "/tmp/motion-native-cpu-rle-measurement-f647-20261002/MANIFEST.json",
+      "bytes": 6105,
+      "sha256": "35ea57c49dca88fc010c1b692a36d633ccdacbff36ea0ced2427f1a2d7f13ae9"
+    },
+    "readsetBinding": {
+      "path": "/tmp/motion-native-cpu-rle-measurement-f647-20261002/readset.json",
+      "bytes": 56739,
+      "sha256": "e485491f9d5c4fc3b3e923dbc50482ea34e1729c2dc567abf41283abd2835e30"
+    },
+    "sourceBinding": {
+      "path": "/tmp/motion-native-cpu-rle-measurement-f647-20261002/source-bindings.json",
+      "bytes": 301370,
+      "sha256": "f7cbe918fc1bc323e93749d9a30d3063b6a721b29a2760b58233adfac254d3f6"
+    },
+    "scope": "634 whole source files unchanged; modified test only conserved statements/functions; norms byte-identical; no fresh reviewer runtime/native execution",
+    "priorReadsetPath": "/tmp/motion-native-cpu-rle-measurement-f647-20261002/readset.json"
+  },
+  "notReadAsOracle": [
+    "foreign REPORT/HANDOFF/bot conclusions/author rationale",
+    "author conservation-result/parsed-results conclusions"
+  ],
+  "freshReviewerRuntime": false
+}

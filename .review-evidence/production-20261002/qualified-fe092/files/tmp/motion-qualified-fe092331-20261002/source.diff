@@ -1,0 +1,425 @@
+diff --git a/.github/workflows/ci.yml b/.github/workflows/ci.yml
+index f4c8c0b8..fa747bfc 100644
+--- a/.github/workflows/ci.yml
++++ b/.github/workflows/ci.yml
+@@ -191,6 +191,16 @@ jobs:
+       - name: Fuzz · finiteness gate (virtual-time, seeded LCG, zero-dep)
+         run: pnpm vitest run --reporter=verbose test/*finiteness-fuzz.test.ts
+ 
++      # Проверяем настоящий C/header/API на зарегистрированном Node, сохраняя
++      # обычный suite выше на текущем Node24. Это не performance calibration.
++      - name: Setup registered native-clock Node
++        uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v6
++        with:
++          node-version: "24.19.0"
++
++      - name: Native CPU clock · actual source and refusal controls
++        run: node test/fixtures/server-thread-cpu-clock-check.mjs
++
+   mutation:
+     name: driver mutation
+     runs-on: ubuntu-latest
+diff --git a/browser/compositor-recipes.spec.ts b/browser/compositor-recipes.spec.ts
+index e162843a..e93c08e0 100644
+--- a/browser/compositor-recipes.spec.ts
++++ b/browser/compositor-recipes.spec.ts
+@@ -90,6 +90,53 @@ test('actual tarball: React SSR → hydration сохраняет DOM, StrictMode
+ });
+ 
+ for (const family of ['sheet', 'pager'] as const) {
++  for (const initial of ['important', 'plain', 'none', 'absent'] as const) {
++    test(`${family}: destroy восстанавливает исходный inline transform (${initial})`, async ({ page }) => {
++      const result = await page.evaluate(async ({ url, family, initial }) => {
++        const recipes = await import(url);
++        document.body.innerHTML = '<section></section>';
++        const root = document.querySelector<HTMLElement>('section')!;
++        root.innerHTML = family === 'sheet'
++          ? '<button data-sheet-handle>Положение</button><div data-sheet-panel></div>'
++          : '<button data-pager-handle>Страница</button><div data-pager-viewport style="width:240px;overflow:hidden"><div data-pager-track style="display:flex"><div data-page style="flex:0 0 100%">Первая</div><div data-page style="flex:0 0 100%">Вторая</div></div></div>';
++        const target = root.querySelector<HTMLElement>(family === 'sheet' ? '[data-sheet-panel]' : '[data-pager-track]')!;
++        target.id = 'transform-owner';
++        const translate = (value: number) => `translate${family === 'sheet' ? 'Y' : 'X'}(${value}px)`;
++        if (initial !== 'absent') target.style.setProperty('transform',
++          initial === 'none' ? 'none' : translate(17), initial === 'important' ? 'important' : '');
++        const read = () => {
++          const transform = getComputedStyle(target).transform;
++          const matrix = transform === 'none' ? new DOMMatrixReadOnly() : new DOMMatrixReadOnly(transform);
++          return { value: target.style.getPropertyValue('transform'), priority: target.style.getPropertyPriority('transform'),
++            present: Array.from(target.style).includes('transform'), pixel: family === 'sheet' ? matrix.m42 : matrix.m41 };
++        };
++        const before = read();
++        const consumer = family === 'sheet'
++          ? recipes.mountCompositorSheet(root, { snapPoints: [0, 120], motion: 'none' })
++          : recipes.mountCompositorPager(root, { motion: 'none' });
++        consumer.select(1);
++        const moved = { ...read(), selected: consumer.selected };
++        // Конкурирующее правило появляется после здорового движения: потеря
++        // исходного !important меняет видимую позу именно при cleanup.
++        const stylesheet = document.createElement('style');
++        stylesheet.textContent = `#transform-owner { transform: ${translate(99)}${initial === 'important' ? ' !important' : ''}; }`;
++        document.head.append(stylesheet);
++        consumer.destroy(); consumer.destroy();
++        const after = read();
++        const effects = target.getAnimations().length;
++        stylesheet.remove(); root.remove();
++        return { before, moved, after, effects };
++      }, { url: recipeUrl, family, initial });
++      expect(result.before).toEqual({ value: initial === 'absent' ? '' : initial === 'none' ? 'none'
++        : `translate${family === 'sheet' ? 'Y' : 'X'}(17px)`, priority: initial === 'important' ? 'important' : '',
++        present: initial !== 'absent', pixel: initial === 'none' || initial === 'absent' ? 0 : 17 });
++      expect(result.moved.selected).toBe(1);
++      expect(result.moved.pixel).toBe(family === 'sheet' ? 120 : -240);
++      expect(result.after).toEqual({ ...result.before, pixel: initial === 'absent' ? 99 : result.before.pixel });
++      expect(result.effects).toBe(0);
++    });
++  }
++
+   for (const intent of ['healthy', 'destroy', 'select'] as const) {
+     test(`${family}: getter onSelect сохраняет ${intent} intent до внешнего эффекта`, async ({ page }) => {
+       const result = await page.evaluate(async ({ url, family, intent }) => {
+diff --git a/docs/recipes.md b/docs/recipes.md
+index b7d40ef9..8292e9f1 100644
+--- a/docs/recipes.md
++++ b/docs/recipes.md
+@@ -451,7 +451,8 @@ export function mountCompositorSheet(root: HTMLElement, options: {
+   const events = new AbortController();
+   const reduced = window.matchMedia('(prefers-reduced-motion: reduce)');
+   const quiet = () => options.motion === 'none' || reduced.matches;
+-  const originalTransform = panel.style.transform;
++  const originalTransform = panel.style.getPropertyValue('transform');
++  const originalTransformPriority = panel.style.getPropertyPriority('transform');
+   const focused = () => {
+     let tree = root.getRootNode() as Document | ShadowRoot;
+     let active = tree.activeElement;
+@@ -543,7 +544,9 @@ export function mountCompositorSheet(root: HTMLElement, options: {
+     resume() { if (!events.signal.aborted) { paused = false; select(selected); } },
+     destroy() {
+       if (events.signal.aborted) return;
+-      events.abort(); releaseCapture(); live = undefined; motion.destroy(); panel.style.transform = originalTransform;
++      events.abort(); releaseCapture(); live = undefined; motion.destroy();
++      if (originalTransform) panel.style.setProperty('transform', originalTransform, originalTransformPriority);
++      else panel.style.removeProperty('transform');
+       let active: Element | null = focused();
+       while (active && active !== root) active = active.parentElement ?? (active.getRootNode() as ShadowRoot).host ?? null;
+       if (active && previousFocus?.isConnected) previousFocus.focus({ preventScroll: true });
+@@ -557,6 +560,8 @@ export function mountCompositorSheet(root: HTMLElement, options: {
+ и удержание фокуса остаются у компонента. `pause()` сохраняет позу, `resume()`
+ продолжает движение. `motion: 'none'` и системное уменьшенное движение применяют
+ цель сразу. При размонтировании вызовите `destroy()` для очистки и возврата фокуса.
++Очистка возвращает исходное inline-значение `transform` вместе с приоритетом;
++если свойство отсутствовало, оно удаляется.
+ 
+ ## Pager: страницы и RTL принадлежат компоненту
+ 
+@@ -593,7 +598,8 @@ export function mountCompositorPager(root: HTMLElement, options: {
+   const events = new AbortController();
+   const reduced = window.matchMedia('(prefers-reduced-motion: reduce)');
+   const quiet = () => options.motion === 'none' || reduced.matches;
+-  const originalTransform = track.style.transform;
++  const originalTransform = track.style.getPropertyValue('transform');
++  const originalTransformPriority = track.style.getPropertyPriority('transform');
+   const focused = () => {
+     let tree = root.getRootNode() as Document | ShadowRoot;
+     let active = tree.activeElement;
+@@ -688,7 +694,9 @@ export function mountCompositorPager(root: HTMLElement, options: {
+     resume() { if (!events.signal.aborted) { paused = false; select(selected); } },
+     destroy() {
+       if (events.signal.aborted) return;
+-      events.abort(); releaseCapture(); live = undefined; motion.destroy(); track.style.transform = originalTransform;
++      events.abort(); releaseCapture(); live = undefined; motion.destroy();
++      if (originalTransform) track.style.setProperty('transform', originalTransform, originalTransformPriority);
++      else track.style.removeProperty('transform');
+       let active: Element | null = focused();
+       while (active && active !== root) active = active.parentElement ?? (active.getRootNode() as ShadowRoot).host ?? null;
+       if (active && previousFocus?.isConnected) previousFocus.focus({ preventScroll: true });
+diff --git a/test/ci-workflow-contract.test.ts b/test/ci-workflow-contract.test.ts
+index 58058b6f..f2dfd2cb 100644
+--- a/test/ci-workflow-contract.test.ts
++++ b/test/ci-workflow-contract.test.ts
+@@ -96,6 +96,7 @@ const testCommands = [
+   'pnpm build',
+   vitestCommand,
+   'pnpm vitest run --reporter=verbose test/*finiteness-fuzz.test.ts',
++  'node test/fixtures/server-thread-cpu-clock-check.mjs',
+ ];
+ const mutationCommands = [
+   activatePnpm,
+@@ -237,6 +238,14 @@ const requiredActions = {
+         "if-no-files-found": "error",
+         "retention-days": 7
+       }
++    },
++    {
++      "index": 8,
++      "name": "Setup registered native-clock Node",
++      "uses": "actions/setup-node@820762786026740c76f36085b0efc47a31fe5020",
++      "with": {
++        "node-version": "24.19.0"
++      }
+     }
+   ],
+   "mutation": [
+diff --git a/test/fixtures/server-thread-cpu-clock-check.mjs b/test/fixtures/server-thread-cpu-clock-check.mjs
+new file mode 100644
+index 00000000..99bd6595
+--- /dev/null
++++ b/test/fixtures/server-thread-cpu-clock-check.mjs
+@@ -0,0 +1,144 @@
++// Обязательная Linux/Node24.19 проверка private getter; не performance sample.
++import assert from 'node:assert/strict';
++import { execFileSync, spawnSync } from 'node:child_process';
++import { createHash } from 'node:crypto';
++import { mkdtempSync, mkdirSync, readFileSync, rmSync, writeFileSync, appendFileSync } from 'node:fs';
++import { createRequire } from 'node:module';
++import os from 'node:os';
++import path from 'node:path';
++import { fileURLToPath } from 'node:url';
++import { Worker } from 'node:worker_threads';
++
++const root = fileURLToPath(new URL('../..', import.meta.url));
++const self = fileURLToPath(import.meta.url);
++const owner = new URL('../../bench/profile/server-thread-cpu-clock.mjs', import.meta.url);
++const source = path.join(root, 'bench/profile/server-thread-cpu-clock.c');
++const host = path.join(root, 'test/fixtures/server-thread-cpu-clock-host.c');
++const include = path.join(root, 'bench/profile/native-clock/include');
++const hash = bytes => createHash('sha256').update(bytes).digest('hex');
++const flags = ['-std=c11', '-O2', '-Wall', '-Wextra', '-Werror', '-shared', '-fPIC', '-fvisibility=hidden', '-DNAPI_VERSION=8'];
++const codes = [['read-errno', 'read', 'CLOCK_READ'], ['negative-seconds', 'read', 'CLOCK_VALUE'],
++  ['negative-nanoseconds', 'read', 'CLOCK_VALUE'], ['overflow-nanoseconds', 'read', 'CLOCK_VALUE'],
++  ['negative-pid', 'read', 'CLOCK_IDENTITY'], ['negative-tid', 'read', 'CLOCK_IDENTITY'],
++  ['resolution-errno', 'info', 'CLOCK_RESOLUTION'], ['zero-resolution', 'info', 'CLOCK_RESOLUTION']];
++
++async function child(mode, directory) {
++  if (mode === 'native-abi') {
++    const native = createRequire(import.meta.url)(directory);
++    process.env.MOTION_CLOCK_CHECK_MODE = 'large-exact';
++    let acquired, info;
++    assert.doesNotThrow(() => { acquired = native.read(); });
++    assert.doesNotThrow(() => { info = native.info(); });
++    assert.deepEqual(acquired, { seconds: '9007199254740993', nanoseconds: 17, pid: process.pid, tid: process.pid });
++    assert.deepEqual(info, { pid: process.pid, tid: process.pid, nominalResolutionNs: '1' });
++    for (const [fault, method, code] of codes) {
++      process.env.MOTION_CLOCK_CHECK_MODE = fault;
++      assert.throws(() => native[method](), error => error.code === code, fault);
++    }
++    return { mode, controls: codes.length + 2, exactLargeSeconds: true };
++  }
++  const api = await import(owner);
++  assert.throws(() => api.readServerThreadCpuEndpoint(), /не подготовлен/);
++  if (mode === 'worker') {
++    const worker = new Worker(`(async () => {
++      const { parentPort } = require('node:worker_threads');
++      const { prepareServerThreadCpuClock } = await import(${JSON.stringify(owner.href)});
++      try { prepareServerThreadCpuClock({directory:${JSON.stringify(directory)}}); parentPort.postMessage({accepted:true}); }
++      catch(error) { parentPort.postMessage({message:error.message,raw:error.raw}); }
++    })();`, { eval: true });
++    const result = await new Promise((resolve, reject) => {
++      worker.once('message', resolve); worker.once('error', reject);
++      worker.once('exit', code => { if (code) reject(new Error('worker exit ' + code)); });
++    });
++    await worker.terminate();
++    assert.equal(result.raw?.isMainThread, false); assert.match(result.message, /main-thread/);
++    return { mode, refusal: result };
++  }
++  if (mode === 'stale') {
++    mkdirSync(path.join(directory, 'native-clock'), { recursive: true });
++    const binary = path.join(directory, 'native-clock/thread-cpu-clock.node');
++    writeFileSync(binary, 'retained-stale-binary');
++    assert.throws(() => api.prepareServerThreadCpuClock({ directory }), /stale\/replay/);
++    assert.equal(readFileSync(binary, 'utf8'), 'retained-stale-binary');
++    return { mode, retainedOriginal: true };
++  }
++  if (mode === 'missing-compiler') {
++    process.env.PATH = directory;
++    assert.throws(() => api.prepareServerThreadCpuClock({ directory }), /нет C compiler/);
++    return { mode, refusal: true };
++  }
++  assert.equal(mode, 'actual-api');
++  const prepared = api.prepareServerThreadCpuClock({ directory });
++  const { metadata } = prepared;
++  assert.equal(metadata.node.version, 'v24.19.0');
++  assert.equal(metadata.pid, process.pid); assert.equal(metadata.tid, process.pid);
++  assert.equal(metadata.clock, 'CLOCK_THREAD_CPUTIME_ID');
++  assert.equal(metadata.nominalResolutionIsNotErrorCertificate, true);
++  for (const [file, digest] of Object.entries(metadata.nativeSources)) assert.equal(hash(readFileSync(path.join(root, file))), digest);
++  assert.equal(hash(readFileSync(metadata.nativeBinary.path)), metadata.nativeBinary.sha256);
++  const first = api.readServerThreadCpuEndpoint();
++  let sum = 0; for (let i = 0; i < 8192; i++) sum = (sum + i) | 0;
++  assert.equal(sum, 33550336);
++  const second = api.readServerThreadCpuEndpoint();
++  for (const read of [first, second]) {
++    assert.equal(read.pid, process.pid); assert.equal(read.tid, process.pid);
++    assert.equal(read.valueNs, String(BigInt(read.seconds) * 1000000000n + BigInt(read.nanoseconds)));
++  }
++  assert(BigInt(second.valueNs) > BigInt(first.valueNs));
++  prepared.assertUnchanged();
++  assert.throws(() => api.prepareServerThreadCpuClock({ directory }), /уже подготовлен/);
++  appendFileSync(metadata.nativeBinary.path, Buffer.from([0]));
++  assert.throws(() => prepared.assertUnchanged(), /identity изменились/);
++  return { mode, metadata, acquired: [first, second], scope: 'actual API/ABI, не физическая точность clock model' };
++}
++
++function run(mode, directory) {
++  return spawnSync(process.execPath, [self, '--case', mode, directory], { encoding: 'utf8', timeout: 30000 });
++}
++
++async function main() {
++  assert.equal(process.platform, 'linux'); assert.equal(process.arch, 'x64'); assert.equal(process.version, 'v24.19.0');
++  const directory = mkdtempSync(path.join(os.tmpdir(), 'motion-native-clock-check-'));
++  const records = [];
++  try {
++    for (const mode of ['actual-api', 'worker', 'stale', 'missing-compiler']) {
++      const result = run(mode, path.join(directory, mode));
++      assert.equal(result.status, 0, `${mode}: ${result.stderr || result.stdout}`);
++      records.push(JSON.parse(result.stdout));
++    }
++    const original = readFileSync(source, 'utf8');
++    const replacements = [
++      ['wrong-clock', 'CLOCK_THREAD_CPUTIME_ID', 'CLOCK_PROCESS_CPUTIME_ID', true],
++      ['read-errno', 'if (clock_gettime(CLOCK_THREAD_CPUTIME_ID, &value) != 0) return fail(env, "CLOCK_READ", strerror(errno));',
++        '(void)clock_gettime(CLOCK_THREAD_CPUTIME_ID, &value);'],
++      ['invalid-timespec', 'if (value.tv_sec < 0 || value.tv_nsec < 0 || value.tv_nsec >= 1000000000L)', 'if (0)'],
++      ['invalid-identity', 'if (pid <= 0 || tid <= 0)', 'if (0)'],
++      ['seconds-number-loss', '!string_field(env, result, "seconds", seconds)', '!integer_field(env, result, "seconds", (int64_t)value.tv_sec)'],
++      ['resolution-errno', 'if (clock_getres(CLOCK_THREAD_CPUTIME_ID, &resolution) != 0) return fail(env, "CLOCK_RESOLUTION", strerror(errno));',
++        '(void)clock_getres(CLOCK_THREAD_CPUTIME_ID, &resolution);'],
++    ];
++    for (const [name, before, after, all] of [['healthy-native', '', '', false], ...replacements]) {
++      if (before) assert(original.includes(before), name);
++      const body = before ? all ? original.replaceAll(before, after) : original.replace(before, after) : original;
++      const file = path.join(directory, name + '.c'), binary = path.join(directory, name + '.node');
++      writeFileSync(file, body);
++      const argv = [...flags, '-I', include, '-o', binary, file, host,
++        '-Wl,--wrap=clock_gettime', '-Wl,--wrap=clock_getres', '-Wl,--wrap=getpid', '-Wl,--wrap=syscall'];
++      execFileSync('cc', argv, { encoding: 'utf8', timeout: 30000 });
++      const result = run('native-abi', binary);
++      if (before) {
++        assert.equal(result.status, 1, `${name}: mutant must reach the independent ABI oracle`);
++        assert.match(result.stderr, /AssertionError/);
++      } else assert.equal(result.status, 0, result.stderr);
++      records.push({ name, sourceSha256: hash(Buffer.from(body)), binarySha256: hash(readFileSync(binary)),
++        argv, exitCode: result.status, killed: Boolean(before), stdout: result.stdout, stderr: result.stderr });
++    }
++    process.stdout.write(JSON.stringify({ node: process.version, kernel: os.release(), sourceSha256: hash(readFileSync(source)),
++      hostSha256: hash(readFileSync(host)), records, registeredTimingSamples: 0 }) + '\n');
++  } finally { rmSync(directory, { recursive: true, force: true }); }
++}
++
++if (process.argv[2] === '--case') {
++  try { process.stdout.write(JSON.stringify(await child(process.argv[3], process.argv[4])) + '\n'); }
++  catch (error) { process.stderr.write(String(error.stack ?? error) + '\n'); process.exitCode = 1; }
++} else await main();
+diff --git a/test/fixtures/server-thread-cpu-clock-host.c b/test/fixtures/server-thread-cpu-clock-host.c
+new file mode 100644
+index 00000000..08629b8b
+--- /dev/null
++++ b/test/fixtures/server-thread-cpu-clock-host.c
+@@ -0,0 +1,43 @@
++/* Управляемый native host для проверок настоящего C getter, без JS mock ABI. */
++#define _GNU_SOURCE
++#include <errno.h>
++#include <stdarg.h>
++#include <stdlib.h>
++#include <string.h>
++#include <sys/syscall.h>
++#include <time.h>
++#include <unistd.h>
++
++extern pid_t __real_getpid(void);
++extern long __real_syscall(long number, ...);
++
++static int mode(const char *name) {
++  const char *value = getenv("MOTION_CLOCK_CHECK_MODE");
++  return value != NULL && strcmp(value, name) == 0;
++}
++
++int __wrap_clock_gettime(clockid_t clock, struct timespec *value) {
++  value->tv_sec = 9007199254740993LL;
++  value->tv_nsec = 17;
++  if (clock != CLOCK_THREAD_CPUTIME_ID) { errno = EINVAL; return -1; }
++  if (mode("read-errno")) { errno = EIO; return -1; }
++  if (mode("negative-seconds")) value->tv_sec = -1;
++  if (mode("negative-nanoseconds")) value->tv_nsec = -1;
++  if (mode("overflow-nanoseconds")) value->tv_nsec = 1000000000L;
++  return 0;
++}
++
++int __wrap_clock_getres(clockid_t clock, struct timespec *value) {
++  value->tv_sec = 0;
++  value->tv_nsec = 1;
++  if (clock != CLOCK_THREAD_CPUTIME_ID) { errno = EINVAL; return -1; }
++  if (mode("resolution-errno")) { errno = EIO; return -1; }
++  if (mode("zero-resolution")) value->tv_nsec = 0;
++  return 0;
++}
++
++pid_t __wrap_getpid(void) { return mode("negative-pid") ? -1 : __real_getpid(); }
++long __wrap_syscall(long number, ...) {
++  if (number != SYS_gettid) { errno = EINVAL; return -1; }
++  return mode("negative-tid") ? -1 : __real_syscall(number);
++}
+diff --git a/test/server-profile-contract.test.ts b/test/server-profile-contract.test.ts
+index acf6d651..99b85b3f 100644
+--- a/test/server-profile-contract.test.ts
++++ b/test/server-profile-contract.test.ts
+@@ -1,4 +1,4 @@
+-import { describe, expect, it, vi } from 'vitest';
++import { describe, expect, it, vi, type TestContext } from 'vitest';
+ import { mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
+ import os from 'node:os';
+ import path from 'node:path';
+@@ -999,22 +999,52 @@ describe('серверный PROFILE: независимые sabotage controls',
+     expect(() => serverCellPairs(value, 2, 'aa')).toThrow(/cancel/);
+   });
+ 
+-  it('завершённый public admission отвергает четыре независимых reviewer counterexamples', () => {
+-    const history = admissionHistory(), { artifact, events } = history;
++  let healthyAdmissionTask: TestContext['task'] | undefined;
++  const acceptedAdmission = () => {
++    // Полный setup и успешный admission принадлежат предыдущему timed test.
++    // Result учитывает также framework timeout; отдельный fault без healthy
++    // prerequisite даёт отказ, не skip и не самостоятельный setup.
++    expect(healthyAdmissionTask?.result?.state).toBe('pass');
++    return admissionHistory();
++  };
++
++  it('полный healthy admission создаёт и проверяет весь зарегистрированный N', ({ task }) => {
++    healthyAdmissionTask = task;
++    const history = admissionHistory(), { artifact } = history;
+     expect(validateServerArtifact(artifact).verdict).toBe('PASS');
+     expect(validateServerJournal(artifact, history.records)).toHaveProperty('journalFinalDigest');
++  }, 30_000);
++
++  it('полная история отвергает calibration до завершения A/A и 2×work', () => {
++    const history = acceptedAdmission(), { artifact, events } = history;
+     const earlyCalibration = events.filter((event) => event.type !== 'calibration');
+     earlyCalibration.splice(earlyCalibration.findIndex((event) => event.type === 'N-frozen-before-calibration-and-AB') + 1, 0,
+       { type: 'calibration', value: artifact.calibration });
+     expect(() => validateServerJournal(artifact, chain(earlyCalibration, history))).toThrow(/до завершения/);
++  }, 30_000);
++
++  it('полная история отвергает замену противоположного порядка пар', () => {
++    const history = acceptedAdmission(), { artifact, events } = history;
+     const alwaysLeft = [...events];
+     const firstOpposite = alwaysLeft.findIndex((event) => event.type === 'sample' && event.value.participant === 'right');
+     [alwaysLeft[firstOpposite], alwaysLeft[firstOpposite + 1]] = [alwaysLeft[firstOpposite + 1], alwaysLeft[firstOpposite]];
+     expect(() => validateServerJournal(artifact, chain(alwaysLeft, history))).toThrow(/порядок/);
++  }, 30_000);
++
++  it('полная история отвергает потерянный failure union', () => {
++    const history = acceptedAdmission(), { artifact, events } = history;
+     const ignoredFailure = [...events.slice(0, -1), { type: 'failure', value: { stage: 'ab', error: { message: 'retained reviewer failure' } } }, events.at(-1)];
+     expect(() => validateServerJournal(artifact, chain(ignoredFailure, history))).toThrow(/failures/);
++  }, 30_000);
++
++  it('полная история отвергает подмену имени positive', () => {
++    const { artifact } = acceptedAdmission();
+     const wrongPositive = { ...artifact, positive: { ...artifact.positive, name: 'aa' } };
+     expect(() => validateServerArtifact(wrongPositive)).toThrow(/имя стадии/);
++  }, 30_000);
++
++  it('полная история отвергает подмену финального raw digest', () => {
++    const history = acceptedAdmission(), { artifact, events } = history;
+     const wrongFinish = [...events.slice(0, -1), { type: 'finished', value: { verdict: 'PASS', digest: 'b'.repeat(64) } }];
+     expect(() => validateServerJournal(artifact, chain(wrongFinish, history))).toThrow(/финальная/);
+   }, 30_000);

@@ -1,0 +1,90 @@
+{
+  "frozenInputHeadLabel": "f6476ae990254f606faf97f80afe41965bec2fb2",
+  "freshReviewerNativeExecution": false,
+  "allSixFrozenInputFilesMatchFinalSource": true,
+  "allFiveNativeSourceHeadersMatch": true,
+  "actualReportedRuntimeDeltaNs": 195011,
+  "exactEndpointArithmeticMatches": true,
+  "physicalErrorCertificate": false,
+  "registeredTimingSamples": 0,
+  "healthyWrappedAbiExit": 0,
+  "faultModes": 8,
+  "mutants": [
+    {
+      "name": "wrong-clock",
+      "sourceSha256": "6665cb95197c02c77177ed6fcc1d57c98c09b781de827781cbbe60252751aae2",
+      "actualExitCode": 1,
+      "actualAssertionFirstLine": "AssertionError [ERR_ASSERTION]: Got unwanted exception.",
+      "compiledInputExactlyReconstructed": true
+    },
+    {
+      "name": "read-errno",
+      "sourceSha256": "a9d2d522bcec4b0ba0f9b20310ba206b8fe1c4b821311d87acb92169a475cbe5",
+      "actualExitCode": 1,
+      "actualAssertionFirstLine": "AssertionError [ERR_ASSERTION]: Missing expected exception: read-errno",
+      "compiledInputExactlyReconstructed": true
+    },
+    {
+      "name": "invalid-timespec",
+      "sourceSha256": "8d2e92e4f7dcab73e7809dfb24b58488b577b0c508ef561af066ba175a4dd819",
+      "actualExitCode": 1,
+      "actualAssertionFirstLine": "AssertionError [ERR_ASSERTION]: Missing expected exception: negative-seconds",
+      "compiledInputExactlyReconstructed": true
+    },
+    {
+      "name": "invalid-identity",
+      "sourceSha256": "812526d543cc63fbd339277a498d1d27d83eed6b2dbda730acaf5f43de602d65",
+      "actualExitCode": 1,
+      "actualAssertionFirstLine": "AssertionError [ERR_ASSERTION]: Missing expected exception: negative-pid",
+      "compiledInputExactlyReconstructed": true
+    },
+    {
+      "name": "seconds-number-loss",
+      "sourceSha256": "ff1137ebbfb40617f1eaf7a7b63c13872ae165beab51796e888f9b84c7457eea",
+      "actualExitCode": 1,
+      "actualAssertionFirstLine": "AssertionError [ERR_ASSERTION]: Expected values to be strictly deep-equal:",
+      "compiledInputExactlyReconstructed": true
+    },
+    {
+      "name": "resolution-errno",
+      "sourceSha256": "655f595a6e37863f5bca9db6dbd45d80b998157d9892c662b54d3624bb5d81c4",
+      "actualExitCode": 1,
+      "actualAssertionFirstLine": "AssertionError [ERR_ASSERTION]: Missing expected exception: resolution-errno",
+      "compiledInputExactlyReconstructed": true
+    }
+  ],
+  "rawExecution": {
+    "startUtc": "2026-10-02T03:21:15.912033+00:00",
+    "endUtc": "2026-10-02T03:21:17.430487+00:00",
+    "wallSeconds": 1.5184685720014386,
+    "exitCode": 0,
+    "timedOut": false,
+    "allChildrenJoined": true,
+    "argv": [
+      "taskset",
+      "-c",
+      "0",
+      "/opt/codex/runtimes/codex-primary-runtime/dependencies/node/bin/node",
+      "test/fixtures/server-thread-cpu-clock-check.mjs"
+    ],
+    "registeredTimingSamples": 0,
+    "files": {
+      "execution-start.json": {
+        "bytes": 364,
+        "sha256": "fa6317233cc9b20e32734a31865c57c0de15968cf1d9c370b7b9d6fe2d18e82f"
+      },
+      "stdout.log": {
+        "bytes": 10973,
+        "sha256": "446c88b9ee8bee84984940f1f84734c4a276cf17b7b0d15664cc356c9a66a5e6"
+      },
+      "stderr.log": {
+        "bytes": 0,
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      },
+      "frozen-inputs.json": {
+        "bytes": 1296,
+        "sha256": "466622a3b354b395895820f48e8a470ad4041c86c24278de2bceca54b4ba1ee5"
+      }
+    }
+  }
+}

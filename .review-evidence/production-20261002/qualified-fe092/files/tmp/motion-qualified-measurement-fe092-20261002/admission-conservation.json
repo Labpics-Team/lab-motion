@@ -1,0 +1,82 @@
+{
+  "oldSourceSha256": "372a0938d7f7adaddb307a96904be9350f4269df9b22223af63051926e4067b7",
+  "newSourceSha256": "14aa08faad2bf30b1ad355e49b3da86bd5b61d653057ff28bbfa318cce177eb8",
+  "literalBeforeMatchesOwnf647": true,
+  "oldNegativeLaws": 5,
+  "newNegativeLaws": 5,
+  "oldHealthyAssertions": 2,
+  "newHealthyAssertions": 2,
+  "newTimedTests": 6,
+  "eachCaseTimeoutMs": 30000,
+  "oldCombinedTimeoutMs": 30000,
+  "oldAggregateBudgetConserved": false,
+  "newAggregateMaximumMs": 180000,
+  "fullNSetupInsideHealthyTimedCase": true,
+  "requiresFrameworkPassIncludingTimeout": true,
+  "noSkipOrHiddenSetup": true,
+  "guardStatements": [
+    {
+      "guard": "const earlyCalibration",
+      "bytes": 394,
+      "sha256": "30d51070ccb4baae4d4e901d054dd3d3ca336f788d72ef9fcf9c2de606bddde4",
+      "exactStatementsConserved": true
+    },
+    {
+      "guard": "const alwaysLeft",
+      "bytes": 388,
+      "sha256": "2193c8118d5be79b3b8415cc37e051167a3140cc287085cf88de7e5375bcf4d5",
+      "exactStatementsConserved": true
+    },
+    {
+      "guard": "const ignoredFailure",
+      "bytes": 264,
+      "sha256": "54ced0174745b7def449d3f12550c704fd9dc5f8d24be3fe7d30ba0e896f1dcc",
+      "exactStatementsConserved": true
+    },
+    {
+      "guard": "const wrongPositive",
+      "bytes": 178,
+      "sha256": "ac73b250acc6a9ae8d579b79f71041325ed1b6b803c2e17bc1da056715b0c90a",
+      "exactStatementsConserved": true
+    },
+    {
+      "guard": "const wrongFinish",
+      "bytes": 233,
+      "sha256": "5883657976f73a5927ff1ecc151e4806959897aeda7df7c76396b0b52379e7ea",
+      "exactStatementsConserved": true
+    }
+  ],
+  "conservedFunctions": [
+    {
+      "name": "stage",
+      "sha256": "0ffd4cdcdaf4384d3003964124e5983ad660aad47ba0983507ca7a90660969f4",
+      "bytes": 4329,
+      "byteIdentical": true
+    },
+    {
+      "name": "healthyAdmission",
+      "sha256": "88fcb3b5c90f449187dcb2c8af4746bccbf2cfe657dd842fffcdd15b9b44f36d",
+      "bytes": 2102,
+      "byteIdentical": true
+    },
+    {
+      "name": "admissionEvents",
+      "sha256": "a7a7e73f39d6663d31c6d8c1d6eef10b1bd149bef9d7b91b437bdc5ad811cd20",
+      "bytes": 1939,
+      "byteIdentical": true
+    },
+    {
+      "name": "chain",
+      "sha256": "28725dd714906832a68c8fb38aa9eca5b29d9cc953626bcdfd8fddb90a9ab223",
+      "bytes": 807,
+      "byteIdentical": true
+    },
+    {
+      "name": "admissionHistory",
+      "sha256": "ad9af96672362d9391cd3e7c173d7d65a71925b443252f90daef73fd2f3fdb01",
+      "bytes": 871,
+      "byteIdentical": true
+    }
+  ],
+  "testFileOutsidePartitionByteIdenticalExceptTypeImport": true
+}

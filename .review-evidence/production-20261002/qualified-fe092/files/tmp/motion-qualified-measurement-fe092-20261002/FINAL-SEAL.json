@@ -1,0 +1,19 @@
+{
+  "verdict": "PASS",
+  "sourceHead": "fe092331360837fd7f63d71a4b7f867ba849ebd4",
+  "sourceTree": "285e30e36db32f2fdc9ae442327f6b3396dcf254",
+  "reportSha256": "64c7e689cc0d58b786902a992200af3170515048714eaa60bfac683e83d25a99",
+  "manifestSha256": "ae22831f4a79399d6fcff1607522cc5e9faf3635b90f20be544cbf7a65b6742d",
+  "readsetSha256": "ee9942fd835a93e197c9d4db26527d96f53b59cf8eb19bdf6bf7401c948d10dd",
+  "allBindingsSha256": "3f557f476d586211dffab0582659930b6f99a39447cd803bafbb847c6f8ad8a8",
+  "terminalSha256": "67806faa1c789738a4d2732b5c31bfde49f6ba19da57b61ee856ceb706d4d587",
+  "sourceOnlyActualEndUtc": "2026-10-02T03:59:01.896622+00:00",
+  "sourceOnlyExitCode": 0,
+  "sealWrittenUtc": "2026-10-02T03:59:01.948627+00:00",
+  "allEND": true,
+  "allChildrenJoined": true,
+  "heavy": 0,
+  "queued": 0,
+  "freshReviewerRuntime": false,
+  "stopOwnExecAfterSeal": true
+}

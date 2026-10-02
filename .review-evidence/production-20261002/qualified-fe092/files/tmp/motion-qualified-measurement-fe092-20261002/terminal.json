@@ -1,0 +1,25 @@
+{
+  "schema": "motion-independent-qualified-measurement-terminal-v1",
+  "sourceHead": "fe092331360837fd7f63d71a4b7f867ba849ebd4",
+  "sourceTree": "285e30e36db32f2fdc9ae442327f6b3396dcf254",
+  "startUtc": "2026-10-02T03:59:01.789254+00:00",
+  "actualEndUtc": "2026-10-02T03:59:01.896622+00:00",
+  "exitCode": 0,
+  "argv": [
+    "/opt/codex/runtimes/codex-primary-runtime/dependencies/python/bin/python3",
+    "/tmp/motion-qualified-measurement-fe092-20261002/finalize.py"
+  ],
+  "cpu": 2,
+  "action": "source-only hash/readset/manifest finalization; no SUT/native/runtime probe/build/profile",
+  "allEND": true,
+  "allChildrenJoined": true,
+  "heavy": 0,
+  "queued": 0,
+  "freshReviewerRuntime": false,
+  "freshReviewerNativeExecution": false,
+  "registeredReviewerTimingSamples": 0,
+  "stopOwnExecAfterSeal": true,
+  "nativePrimaryActualEndUtc": "2026-10-02T03:21:17.430487+00:00",
+  "nativePrimaryScope": "f647 frozen head label, exact final native/fixture input bytes; not fresh reviewer execution",
+  "freshWholeActualEndUtc": "2026-10-02T03:35:41.110457+00:00"
+}

@@ -1,0 +1,49 @@
+{
+  "role": "author helper, not independent QA",
+  "reviewId": 5387928749,
+  "inlineId": 4162512580,
+  "sourceSha": "f6476ae990254f606faf97f80afe41965bec2fb2",
+  "ownedPaths": [
+    "docs/recipes.md",
+    "browser/compositor-recipes.spec.ts"
+  ],
+  "productDelta": "capture original inline transform value and priority; restore with setProperty or remove originally absent property",
+  "beforeEvidence": {
+    "subject": "frozen OLD actual-tarball fixture, not current docs literal",
+    "actualTarballSha256": "364f9ff8b505191965040eb17059a034e2cb39be5dd0b1468855ca7e9c61c524",
+    "actualBundleSha256": "0cf981af25f70cad91450d763a40723f2fcd7c7d00b6df6838d8afe107415e8d",
+    "actualFixtureRecipesSha256": "53e241c1aa75f842c173051fd0d8e90da39dc19813867802d33f5c6b513b3fa5",
+    "currentBeforeDocsSha256": "0808d2bde83cdd6d3af74c0e3bd4dd4996d469ff29c56c4937dae05ecccef8f3",
+    "browser": "153.0.8010.12",
+    "exit": 1,
+    "actualStartUTC": "2026-10-02T03:22:29.369273+00:00",
+    "actualEndUTC": "2026-10-02T03:22:29.910972+00:00",
+    "cases": 8,
+    "healthyProgressCases": 8,
+    "productRedCases": [
+      "sheet/important",
+      "pager/important"
+    ],
+    "healthyControls": 6
+  },
+  "preservedNegatives": [
+    "preflight-negative.json: current docs differ from old actual fixture recipe hash",
+    "red.error.json: attempt1 Invalid URL (exit2), corrected in separate attempt2"
+  ],
+  "afterStatus": "AUTHOR_PATCH_READY; browser/typecheck/new actual pack NOT RUN by this author after patch; lead coordinates fresh canonical affected checks",
+  "durableRegressionCasesPerEngine": 8,
+  "checks": {
+    "gitDiffCheck": "PASS",
+    "coreTouched": false,
+    "oldAssertionsModified": false,
+    "newAPI": false
+  },
+  "terminal": {
+    "readbackUTC": "2026-10-02T03:24:18.981454+00:00",
+    "activeChromeProcesses": [],
+    "authorHeavyRunning": 0,
+    "authorHeavyQueued": 0,
+    "browserClosed": true,
+    "serverClosed": true
+  }
+}

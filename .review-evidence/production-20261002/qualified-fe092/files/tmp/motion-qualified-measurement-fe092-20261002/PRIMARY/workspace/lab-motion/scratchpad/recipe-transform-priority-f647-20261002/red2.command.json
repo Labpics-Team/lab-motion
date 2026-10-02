@@ -1,0 +1,14 @@
+{
+  "argv": [
+    "timeout",
+    "--signal=TERM",
+    "--kill-after=2s",
+    "10s",
+    "node",
+    "scratchpad/recipe-transform-priority-f647-20261002/witness.attempt2.mjs"
+  ],
+  "cwd": "/workspace/lab-motion",
+  "actualStartUTC": "2026-10-02T03:22:29.369273+00:00",
+  "actualEndUTC": "2026-10-02T03:22:29.910972+00:00",
+  "exit": 1
+}

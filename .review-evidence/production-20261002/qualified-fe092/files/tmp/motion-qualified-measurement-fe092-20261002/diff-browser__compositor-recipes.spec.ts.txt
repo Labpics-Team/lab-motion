@@ -1,0 +1,58 @@
+diff --git a/browser/compositor-recipes.spec.ts b/browser/compositor-recipes.spec.ts
+index e162843a..e93c08e0 100644
+--- a/browser/compositor-recipes.spec.ts
++++ b/browser/compositor-recipes.spec.ts
+@@ -90,6 +90,53 @@ test('actual tarball: React SSR → hydration сохраняет DOM, StrictMode
+ });
+ 
+ for (const family of ['sheet', 'pager'] as const) {
++  for (const initial of ['important', 'plain', 'none', 'absent'] as const) {
++    test(`${family}: destroy восстанавливает исходный inline transform (${initial})`, async ({ page }) => {
++      const result = await page.evaluate(async ({ url, family, initial }) => {
++        const recipes = await import(url);
++        document.body.innerHTML = '<section></section>';
++        const root = document.querySelector<HTMLElement>('section')!;
++        root.innerHTML = family === 'sheet'
++          ? '<button data-sheet-handle>Положение</button><div data-sheet-panel></div>'
++          : '<button data-pager-handle>Страница</button><div data-pager-viewport style="width:240px;overflow:hidden"><div data-pager-track style="display:flex"><div data-page style="flex:0 0 100%">Первая</div><div data-page style="flex:0 0 100%">Вторая</div></div></div>';
++        const target = root.querySelector<HTMLElement>(family === 'sheet' ? '[data-sheet-panel]' : '[data-pager-track]')!;
++        target.id = 'transform-owner';
++        const translate = (value: number) => `translate${family === 'sheet' ? 'Y' : 'X'}(${value}px)`;
++        if (initial !== 'absent') target.style.setProperty('transform',
++          initial === 'none' ? 'none' : translate(17), initial === 'important' ? 'important' : '');
++        const read = () => {
++          const transform = getComputedStyle(target).transform;
++          const matrix = transform === 'none' ? new DOMMatrixReadOnly() : new DOMMatrixReadOnly(transform);
++          return { value: target.style.getPropertyValue('transform'), priority: target.style.getPropertyPriority('transform'),
++            present: Array.from(target.style).includes('transform'), pixel: family === 'sheet' ? matrix.m42 : matrix.m41 };
++        };
++        const before = read();
++        const consumer = family === 'sheet'
++          ? recipes.mountCompositorSheet(root, { snapPoints: [0, 120], motion: 'none' })
++          : recipes.mountCompositorPager(root, { motion: 'none' });
++        consumer.select(1);
++        const moved = { ...read(), selected: consumer.selected };
++        // Конкурирующее правило появляется после здорового движения: потеря
++        // исходного !important меняет видимую позу именно при cleanup.
++        const stylesheet = document.createElement('style');
++        stylesheet.textContent = `#transform-owner { transform: ${translate(99)}${initial === 'important' ? ' !important' : ''}; }`;
++        document.head.append(stylesheet);
++        consumer.destroy(); consumer.destroy();
++        const after = read();
++        const effects = target.getAnimations().length;
++        stylesheet.remove(); root.remove();
++        return { before, moved, after, effects };
++      }, { url: recipeUrl, family, initial });
++      expect(result.before).toEqual({ value: initial === 'absent' ? '' : initial === 'none' ? 'none'
++        : `translate${family === 'sheet' ? 'Y' : 'X'}(17px)`, priority: initial === 'important' ? 'important' : '',
++        present: initial !== 'absent', pixel: initial === 'none' || initial === 'absent' ? 0 : 17 });
++      expect(result.moved.selected).toBe(1);
++      expect(result.moved.pixel).toBe(family === 'sheet' ? 120 : -240);
++      expect(result.after).toEqual({ ...result.before, pixel: initial === 'absent' ? 99 : result.before.pixel });
++      expect(result.effects).toBe(0);
++    });
++  }
++
+   for (const intent of ['healthy', 'destroy', 'select'] as const) {
+     test(`${family}: getter onSelect сохраняет ${intent} intent до внешнего эффекта`, async ({ page }) => {
+       const result = await page.evaluate(async ({ url, family, intent }) => {

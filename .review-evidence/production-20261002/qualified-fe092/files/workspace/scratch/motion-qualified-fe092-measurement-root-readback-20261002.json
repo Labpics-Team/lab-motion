@@ -1,0 +1,4434 @@
+{
+  "at": "2026-10-02T04:00:25.628109+00:00",
+  "sourceHead": "fe092331360837fd7f63d71a4b7f867ba849ebd4",
+  "tree": "285e30e36db32f2fdc9ae442327f6b3396dcf254",
+  "axis": "tests-native-api-abi-ci-measurement-law-and-prerequisites",
+  "manifest": {
+    "path": "/tmp/motion-qualified-measurement-fe092-20261002/MANIFEST.json",
+    "bytes": 129076,
+    "sha256": "ae22831f4a79399d6fcff1607522cc5e9faf3635b90f20be544cbf7a65b6742d"
+  },
+  "reportFullReadByRoot": true,
+  "reportSha256": "64c7e689cc0d58b786902a992200af3170515048714eaa60bfac683e83d25a99",
+  "allOutputBindingsMatch": true,
+  "outputs": [
+    {
+      "path": "/tmp/motion-qualified-measurement-fe092-20261002/PRIMARY/tmp/motion-admission-granularity-20261002/before.test.ts",
+      "bytes": 97980,
+      "sha256": "372a0938d7f7adaddb307a96904be9350f4269df9b22223af63051926e4067b7",
+      "match": true
+    },
+    {
+      "path": "/tmp/motion-qualified-measurement-fe092-20261002/PRIMARY/tmp/motion-admission-granularity-20261002/conservation-result.json",
+      "bytes": 7138,
+      "sha256": "42c34b74c6d004621667d206e87757de80eabfc5af78f76c9e566e779d864170",
+      "match": true
+    },
+    {
+      "path": "/tmp/motion-qualified-measurement-fe092-20261002/PRIMARY/tmp/motion-admission-granularity-20261002/conservation.mjs",
+      "bytes": 3357,
+      "sha256": "d2599a23d52c5dd12ff0194fc48c403b2210b5302140235114234240f2e1e476",
+      "match": true
+    },
+    {
+      "path": "/tmp/motion-qualified-measurement-fe092-20261002/PRIMARY/tmp/motion-admission-granularity-20261002/conservation.stderr.log",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "match": true
+    },
+    {
+      "path": "/tmp/motion-qualified-measurement-fe092-20261002/PRIMARY/tmp/motion-admission-granularity-20261002/conservation.stdout.log",
+      "bytes": 56,
+      "sha256": "1398dca418323dc4f382b8bf27c511fbdb3fdea22c8552a31f18629773a591e0",
+      "match": true
+    },
+    {
+      "path": "/tmp/motion-qualified-measurement-fe092-20261002/PRIMARY/tmp/motion-ci-f6476ae9-failure-20261002/causal-excerpt.txt",
+      "bytes": 3559,
+      "sha256": "10a71af13018a0025b9a46e03536407e0b134f87c1dd603ad7a0692692922489",
+      "match": true
+    },
+    {
+      "path": "/tmp/motion-qualified-measurement-fe092-20261002/PRIMARY/tmp/motion-ci-f6476ae9-failure-20261002/job-110685127941.log",
+      "bytes": 244446,
+      "sha256": "812738cebb87d49e9e519bedf542e7f6f1a199d6cd612f06d636c9d13bb39860",
+      "match": true
+    },
+    {
+      "path": "/tmp/motion-qualified-measurement-fe092-20261002/PRIMARY/tmp/motion-ci-f6476ae9-failure-20261002/primary-receipt.json",
+      "bytes": 1233,
+      "sha256": "6819f715975d180dcbaa92540cc09e1bc0077e037bb135e9adc1e0ced27845a7",
+      "match": true
+    },
+    {
+      "path": "/tmp/motion-qualified-measurement-fe092-20261002/PRIMARY/tmp/motion-ci-f6476ae9-failure-20261002/run.json",
+      "bytes": 13151,
+      "sha256": "4e32d07e1f22ee7745295f332be2009c80f3c9a7bb79d987c6d43442fe3ab754",
+      "match": true
+    },
+    {
+      "path": "/tmp/motion-qualified-measurement-fe092-20261002/PRIMARY/tmp/motion-native-clock-permanent-controls-20261002/execution-start.json",
+      "bytes": 364,
+      "sha256": "fa6317233cc9b20e32734a31865c57c0de15968cf1d9c370b7b9d6fe2d18e82f",
+      "match": true
+    },
+    {
+      "path": "/tmp/motion-qualified-measurement-fe092-20261002/PRIMARY/tmp/motion-native-clock-permanent-controls-20261002/execution.json",
+      "bytes": 974,
+      "sha256": "09f85ad246a08b4a3ae75687a10f4a0b20ff4965f05d920296c58fc039c1ba08",
+      "match": true
+    },
+    {
+      "path": "/tmp/motion-qualified-measurement-fe092-20261002/PRIMARY/tmp/motion-native-clock-permanent-controls-20261002/frozen-inputs.json",
+      "bytes": 1296,
+      "sha256": "466622a3b354b395895820f48e8a470ad4041c86c24278de2bceca54b4ba1ee5",
+      "match": true
+    },
+    {
+      "path": "/tmp/motion-qualified-measurement-fe092-20261002/PRIMARY/tmp/motion-native-clock-permanent-controls-20261002/run.py",
+      "bytes": 1970,
+      "sha256": "ad4b4a3d8f1af34e091c6a134abd9e6acd93f5f06ae2ae60dcd3ed55f95cc495",
+      "match": true
+    },
+    {
+      "path": "/tmp/motion-qualified-measurement-fe092-20261002/PRIMARY/tmp/motion-native-clock-permanent-controls-20261002/stderr.log",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "match": true
+    },
+    {
+      "path": "/tmp/motion-qualified-measurement-fe092-20261002/PRIMARY/tmp/motion-native-clock-permanent-controls-20261002/stdout.log",
+      "bytes": 10973,
+      "sha256": "446c88b9ee8bee84984940f1f84734c4a276cf17b7b0d15664cc356c9a66a5e6",
+      "match": true
+    },
+    {
+      "path": "/tmp/motion-qualified-measurement-fe092-20261002/PRIMARY/tmp/motion-profile-f647-final-20261002/PRIMARY-PACKET.json",
+      "bytes": 3823,
+      "sha256": "e0d911564aae5890a75788c33347e01299993c2b7b1c643edfb69e94863e2961",
+      "match": true
+    },
+    {
+      "path": "/tmp/motion-qualified-measurement-fe092-20261002/PRIMARY/tmp/motion-qualified-fe092331-20261002/commit.raw",
+      "bytes": 337,
+      "sha256": "06e8f583ddc2803ef75e4996a4dd4a4b239d05d72bc25480f048eaacb82c9fd7",
+      "match": true
+    },
+    {
+      "path": "/tmp/motion-qualified-measurement-fe092-20261002/PRIMARY/tmp/motion-qualified-fe092331-20261002/source.diff",
+      "bytes": 25089,
+      "sha256": "6700f7b29e449eaaace6e386be0a05e18cbfe6891f7b8192b762704fb0872deb",
+      "match": true
+    },
+    {
+      "path": "/tmp/motion-qualified-measurement-fe092-20261002/PRIMARY/tmp/motion-qualified-fe092331-20261002/source.tar",
+      "bytes": 7444480,
+      "sha256": "a91db3d664b91a7e169a49de4794fa7150064f35fe281a6a2b6fec2fd6023709",
+      "match": true
+    },
+    {
+      "path": "/tmp/motion-qualified-measurement-fe092-20261002/PRIMARY/tmp/motion-qualified-fe092331-20261002/tree.raw",
+      "bytes": 1192,
+      "sha256": "35e40734e08087c8588cb36f688950059062d93e1ca1faef68ae8856cb488e86",
+      "match": true
+    },
+    {
+      "path": "/tmp/motion-qualified-measurement-fe092-20261002/PRIMARY/workspace/lab-motion/scratchpad/recipe-transform-priority-f647-20261002/owned.patch",
+      "bytes": 8005,
+      "sha256": "9831ecee2000715dc89b3fbe991c8d09c07e80db152170d6d2d557a4890ed194",
+      "match": true
+    },
+    {
+      "path": "/tmp/motion-qualified-measurement-fe092-20261002/PRIMARY/workspace/lab-motion/scratchpad/recipe-transform-priority-f647-20261002/preflight-negative.json",
+      "bytes": 387,
+      "sha256": "c06a5edbfff10054e8cd3c6281bb542f7f06c473b4d16b1c664b1d4590a52569",
+      "match": true
+    },
+    {
+      "path": "/tmp/motion-qualified-measurement-fe092-20261002/PRIMARY/workspace/lab-motion/scratchpad/recipe-transform-priority-f647-20261002/red.error.json",
+      "bytes": 2355,
+      "sha256": "76da3ef11a23f1159580fa075c818308f2995da34010809ea78e2798964ad8c9",
+      "match": true
+    },
+    {
+      "path": "/tmp/motion-qualified-measurement-fe092-20261002/PRIMARY/workspace/lab-motion/scratchpad/recipe-transform-priority-f647-20261002/red2.command.json",
+      "bytes": 337,
+      "sha256": "eeabbb8f43a7ec840a19a8532e79f6492a15c615cc30a86d59de44736c18e2cc",
+      "match": true
+    },
+    {
+      "path": "/tmp/motion-qualified-measurement-fe092-20261002/PRIMARY/workspace/lab-motion/scratchpad/recipe-transform-priority-f647-20261002/red2.observations.json",
+      "bytes": 8071,
+      "sha256": "4023d247c553a680473126f40c76eda2be049a1b56b530ecbe3877d221e04af5",
+      "match": true
+    },
+    {
+      "path": "/tmp/motion-qualified-measurement-fe092-20261002/PRIMARY/workspace/lab-motion/scratchpad/recipe-transform-priority-f647-20261002/red2.stderr.log",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "match": true
+    },
+    {
+      "path": "/tmp/motion-qualified-measurement-fe092-20261002/PRIMARY/workspace/lab-motion/scratchpad/recipe-transform-priority-f647-20261002/red2.stdout.log",
+      "bytes": 8146,
+      "sha256": "16b3be86e5cfef997ad9f3f9d8cd323ea94c6c98318212700cc1c656654b92a2",
+      "match": true
+    },
+    {
+      "path": "/tmp/motion-qualified-measurement-fe092-20261002/PRIMARY-GATES-SUPPLEMENT.json",
+      "bytes": 6196,
+      "sha256": "ed166f092eb854a1c8317d835dbe2035f96ae527837a7e7bb1eb9204419895c1",
+      "match": true
+    },
+    {
+      "path": "/tmp/motion-qualified-measurement-fe092-20261002/PRIMARY-PACKET.json",
+      "bytes": 7130,
+      "sha256": "4184a52ea58d4f3b27e7cd4c571425c51efda578f1a283b2aab396dd0659e29e",
+      "match": true
+    },
+    {
+      "path": "/tmp/motion-qualified-measurement-fe092-20261002/REPORT.md",
+      "bytes": 16769,
+      "sha256": "64c7e689cc0d58b786902a992200af3170515048714eaa60bfac683e83d25a99",
+      "match": true
+    },
+    {
+      "path": "/tmp/motion-qualified-measurement-fe092-20261002/SUPPLEMENT/tmp/motion-profile-current-gates-fe092331-20261002/actionlint.stderr",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "match": true
+    },
+    {
+      "path": "/tmp/motion-qualified-measurement-fe092-20261002/SUPPLEMENT/tmp/motion-profile-current-gates-fe092331-20261002/actionlint.stdout",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "match": true
+    },
+    {
+      "path": "/tmp/motion-qualified-measurement-fe092-20261002/SUPPLEMENT/tmp/motion-profile-current-gates-fe092331-20261002/docs-drift.stderr",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "match": true
+    },
+    {
+      "path": "/tmp/motion-qualified-measurement-fe092-20261002/SUPPLEMENT/tmp/motion-profile-current-gates-fe092331-20261002/docs-drift.stdout",
+      "bytes": 218,
+      "sha256": "4437b7385139583741ad88edbb67528fedc3fabce8beb61947a5bcc384bad4be",
+      "match": true
+    },
+    {
+      "path": "/tmp/motion-qualified-measurement-fe092-20261002/SUPPLEMENT/tmp/motion-profile-current-gates-fe092331-20261002/docs-facts.stderr",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "match": true
+    },
+    {
+      "path": "/tmp/motion-qualified-measurement-fe092-20261002/SUPPLEMENT/tmp/motion-profile-current-gates-fe092331-20261002/docs-facts.stdout",
+      "bytes": 23,
+      "sha256": "d3b534c5348e15bf96aadf4f5a210761809cc2829415d4fd9015117c41a69d0f",
+      "match": true
+    },
+    {
+      "path": "/tmp/motion-qualified-measurement-fe092-20261002/SUPPLEMENT/tmp/motion-profile-current-gates-fe092331-20261002/finiteness.stderr",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "match": true
+    },
+    {
+      "path": "/tmp/motion-qualified-measurement-fe092-20261002/SUPPLEMENT/tmp/motion-profile-current-gates-fe092331-20261002/finiteness.stdout",
+      "bytes": 20314,
+      "sha256": "22186f2cca1db0a296867d16604c9e0fa4439e9919bda70f97ff6afa2be16b98",
+      "match": true
+    },
+    {
+      "path": "/tmp/motion-qualified-measurement-fe092-20261002/SUPPLEMENT/tmp/motion-profile-current-gates-fe092331-20261002/npm-pack.stderr",
+      "bytes": 13684,
+      "sha256": "647bdd0dd86a07af57b39b52396e151394d730774d1a72c8b110ce5caa4824e3",
+      "match": true
+    },
+    {
+      "path": "/tmp/motion-qualified-measurement-fe092-20261002/SUPPLEMENT/tmp/motion-profile-current-gates-fe092331-20261002/npm-pack.stdout",
+      "bytes": 25,
+      "sha256": "abd90dcb1d334fc0369e0d014da05d72546794877f45ec7e3ffcf4609c70ed1a",
+      "match": true
+    },
+    {
+      "path": "/tmp/motion-qualified-measurement-fe092-20261002/SUPPLEMENT/tmp/motion-profile-current-gates-fe092331-20261002/parsed-results-and-packages.json",
+      "bytes": 111835,
+      "sha256": "c4a729874bc83cb6a44e8e2d6358e2fc35074159593e80515f8693fafd65aac3",
+      "match": true
+    },
+    {
+      "path": "/tmp/motion-qualified-measurement-fe092-20261002/SUPPLEMENT/tmp/motion-profile-current-gates-fe092331-20261002/pnpm-pack.stderr",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "match": true
+    },
+    {
+      "path": "/tmp/motion-qualified-measurement-fe092-20261002/SUPPLEMENT/tmp/motion-profile-current-gates-fe092331-20261002/pnpm-pack.stdout",
+      "bytes": 8067,
+      "sha256": "8ba6c8a1d1bfc39f55927fde65fea0bcb4a3897f29d2dd85c3f24e690447aa7a",
+      "match": true
+    },
+    {
+      "path": "/tmp/motion-qualified-measurement-fe092-20261002/SUPPLEMENT/tmp/motion-profile-current-gates-fe092331-20261002/receipt.json",
+      "bytes": 7262,
+      "sha256": "26138e2b9c80ab254ab047f28c231db6db763a6b6cdd4f61a138dbf9ee8a834e",
+      "match": true
+    },
+    {
+      "path": "/tmp/motion-qualified-measurement-fe092-20261002/SUPPLEMENT/tmp/motion-profile-current-gates-fe092331-20261002/run.py",
+      "bytes": 2983,
+      "sha256": "297f5bb795effeb6ba7d90202d2e57b9b525dfd96c8ab34196b231e5afb7a055",
+      "match": true
+    },
+    {
+      "path": "/tmp/motion-qualified-measurement-fe092-20261002/SUPPLEMENT/tmp/motion-profile-current-gates-fe092331-20261002/static.stderr",
+      "bytes": 396,
+      "sha256": "fb87992a36e0405ba8b299d10727870ce8bf9a5fc364397f334f6effcf58b720",
+      "match": true
+    },
+    {
+      "path": "/tmp/motion-qualified-measurement-fe092-20261002/SUPPLEMENT/tmp/motion-profile-current-gates-fe092331-20261002/static.stdout",
+      "bytes": 260,
+      "sha256": "573909cff1d43f41082b6f4b1691f00cea86d28c60a3de986037f8119296512c",
+      "match": true
+    },
+    {
+      "path": "/tmp/motion-qualified-measurement-fe092-20261002/SUPPLEMENT/tmp/motion-profile-current-gates-fe092331-20261002/whole.json",
+      "bytes": 2141909,
+      "sha256": "ae5e6b196a1a077b9672171d56782bb9772d25391872c3d44fe652b581519b0f",
+      "match": true
+    },
+    {
+      "path": "/tmp/motion-qualified-measurement-fe092-20261002/SUPPLEMENT/tmp/motion-profile-current-gates-fe092331-20261002/whole.stderr",
+      "bytes": 359,
+      "sha256": "8fc2bab2a8ef882281b49e70bd0f237ee30fde252ac0427a7aa94b61e850eff3",
+      "match": true
+    },
+    {
+      "path": "/tmp/motion-qualified-measurement-fe092-20261002/SUPPLEMENT/tmp/motion-profile-current-gates-fe092331-20261002/whole.stdout",
+      "bytes": 139,
+      "sha256": "c2335dbb8d49cac33fa26e27baaa87273a48149bfb73406b1fe953d47f0a3be3",
+      "match": true
+    },
+    {
+      "path": "/tmp/motion-qualified-measurement-fe092-20261002/SUPPLEMENT/tmp/motion-recipes-current-browser-fe092331-20261002/execution.json",
+      "bytes": 3171,
+      "sha256": "ab4d7527d1e2468dff621d1f792435f7684197721f00f1d7d09e6f2b03ca3a00",
+      "match": true
+    },
+    {
+      "path": "/tmp/motion-qualified-measurement-fe092-20261002/SUPPLEMENT/tmp/motion-recipes-current-browser-fe092331-20261002/result.json",
+      "bytes": 166286,
+      "sha256": "8a09834bbe48caffd4bd5b05cd93e5a55a032d7d0cd48ec1e1e22bffa1832188",
+      "match": true
+    },
+    {
+      "path": "/tmp/motion-qualified-measurement-fe092-20261002/SUPPLEMENT/tmp/motion-recipes-current-browser-fe092331-20261002/run.py",
+      "bytes": 2746,
+      "sha256": "b9517f9664984f731830d849e2d444b377020e54846989347956a60b65d8b6ac",
+      "match": true
+    },
+    {
+      "path": "/tmp/motion-qualified-measurement-fe092-20261002/SUPPLEMENT/tmp/motion-recipes-current-browser-fe092331-20261002/scope-recipes.js",
+      "bytes": 1382990,
+      "sha256": "5320f49b7889f455a0792252e44f6069b75638d2d27051e5a25d6504d2f71c5a",
+      "match": true
+    },
+    {
+      "path": "/tmp/motion-qualified-measurement-fe092-20261002/SUPPLEMENT/tmp/motion-recipes-current-browser-fe092331-20261002/scope-recipes.package.json",
+      "bytes": 1210,
+      "sha256": "df1fd41df0c4b268b24f3c00e7566570d0a360d2643bae955201f4ac417c219d",
+      "match": true
+    },
+    {
+      "path": "/tmp/motion-qualified-measurement-fe092-20261002/SUPPLEMENT/tmp/motion-recipes-current-browser-fe092331-20261002/stderr.log",
+      "bytes": 1038,
+      "sha256": "d4478546d47ef0d8333f4329ae20756380308917338f02b45016008a41cf48a1",
+      "match": true
+    },
+    {
+      "path": "/tmp/motion-qualified-measurement-fe092-20261002/SUPPLEMENT/tmp/motion-recipes-current-browser-fe092331-20261002/stdout.log",
+      "bytes": 397,
+      "sha256": "3134bfa1bd92d7d5d0babaed1307f38bfa4405dc22b060f613d6bd8a40cba297",
+      "match": true
+    },
+    {
+      "path": "/tmp/motion-qualified-measurement-fe092-20261002/admission-conservation.json",
+      "bytes": 2576,
+      "sha256": "f5403a0594421d1bb075cca29f6b4eba4e9afe6fe33105f5e9862f1fece28791",
+      "match": true
+    },
+    {
+      "path": "/tmp/motion-qualified-measurement-fe092-20261002/all-bindings.json",
+      "bytes": 298089,
+      "sha256": "3f557f476d586211dffab0582659930b6f99a39447cd803bafbb847c6f8ad8a8",
+      "match": true
+    },
+    {
+      "path": "/tmp/motion-qualified-measurement-fe092-20261002/bind-and-conserve.py",
+      "bytes": 13497,
+      "sha256": "0f2cca228bd399b63f1fbe9c4883d2229577f074e9099feb99b86c6c8b3b2026",
+      "match": true
+    },
+    {
+      "path": "/tmp/motion-qualified-measurement-fe092-20261002/browser-targeted-readback.json",
+      "bytes": 23330,
+      "sha256": "13d733c6609c1ad938dad61bf672a0b58679db7bfa3c0a9a2c44de2e040fc0b8",
+      "match": true
+    },
+    {
+      "path": "/tmp/motion-qualified-measurement-fe092-20261002/diff-.github__workflows__ci.yml.txt",
+      "bytes": 961,
+      "sha256": "9d903911604c9ce00e2e6088a21beb5bda62813617b9056f0f0a2b67e1d9223e",
+      "match": true
+    },
+    {
+      "path": "/tmp/motion-qualified-measurement-fe092-20261002/diff-bindings.json",
+      "bytes": 1473,
+      "sha256": "1fb62c317fb68c113e8fd3af5d561da3fd1e5fa1c38be9e6c0c17284211ea61c",
+      "match": true
+    },
+    {
+      "path": "/tmp/motion-qualified-measurement-fe092-20261002/diff-browser__compositor-recipes.spec.ts.txt",
+      "bytes": 4157,
+      "sha256": "f675f3b75ff72113e13d61dffe4939dbfe0324a9d0c07143039095b97332e1db",
+      "match": true
+    },
+    {
+      "path": "/tmp/motion-qualified-measurement-fe092-20261002/diff-docs__recipes.md.txt",
+      "bytes": 3848,
+      "sha256": "e232405829c2f3e75d4bbb0c786778f099530f31223e7eb4db6259b583e16fb1",
+      "match": true
+    },
+    {
+      "path": "/tmp/motion-qualified-measurement-fe092-20261002/diff-test__ci-workflow-contract.test.ts.txt",
+      "bytes": 830,
+      "sha256": "fd69e75951908d15220ad8e284df4c278f2dabe0b4abfb2bc430b85c21bee0f9",
+      "match": true
+    },
+    {
+      "path": "/tmp/motion-qualified-measurement-fe092-20261002/diff-test__fixtures__server-thread-cpu-clock-check.mjs.txt",
+      "bytes": 9238,
+      "sha256": "c3fd3e84a3a7b13709d6c010b88fde1ab54fc92a3a0c36b3087fcca455cfed2f",
+      "match": true
+    },
+    {
+      "path": "/tmp/motion-qualified-measurement-fe092-20261002/diff-test__fixtures__server-thread-cpu-clock-host.c.txt",
+      "bytes": 1779,
+      "sha256": "0b9de4924d6115a2c125dc17b7923c62b19074af9cd4d3bb543edbd5144f9ca5",
+      "match": true
+    },
+    {
+      "path": "/tmp/motion-qualified-measurement-fe092-20261002/diff-test__server-profile-contract.test.ts.txt",
+      "bytes": 4276,
+      "sha256": "dfda47603ea03daccb52caef312225fcc805b0d1dd4b4b994647bb9dbc688e59",
+      "match": true
+    },
+    {
+      "path": "/tmp/motion-qualified-measurement-fe092-20261002/finalization.stderr.log",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "match": true
+    },
+    {
+      "path": "/tmp/motion-qualified-measurement-fe092-20261002/finalization.stdout.log",
+      "bytes": 304,
+      "sha256": "cc1e7aa83e5a683625e494b664cf5da3d4fbbad9f060683f2cec0bd6c8393300",
+      "match": true
+    },
+    {
+      "path": "/tmp/motion-qualified-measurement-fe092-20261002/finalize.py",
+      "bytes": 3869,
+      "sha256": "50fe2cc9e51dca88325be516ee3328cc83b8b79e92a958faca82392e9e79052b",
+      "match": true
+    },
+    {
+      "path": "/tmp/motion-qualified-measurement-fe092-20261002/fresh-whole-targeted-readback.json",
+      "bytes": 12436,
+      "sha256": "2d6d95474a189375e62b5628a7ac7184aea30c1079b9b1d4e95177cd447fa51b",
+      "match": true
+    },
+    {
+      "path": "/tmp/motion-qualified-measurement-fe092-20261002/native-primary-independent-readback.json",
+      "bytes": 3402,
+      "sha256": "7e48b0ef2f4c5b144b1d787e03f78cb9e86608999d5d1e4b8e565e442fbc2fd3",
+      "match": true
+    },
+    {
+      "path": "/tmp/motion-qualified-measurement-fe092-20261002/norm/AGENTS.md",
+      "bytes": 38398,
+      "sha256": "0e1376312cedf91660b1c919ba4c1a9a6e067fe8719eb8daeb52113508b28f0a",
+      "match": true
+    },
+    {
+      "path": "/tmp/motion-qualified-measurement-fe092-20261002/norm/plans/SPEC.md",
+      "bytes": 31491,
+      "sha256": "7488d5885ee2405d678e488e34a84ce48254978c3a6ad3de2e4d31dfe7b3f651",
+      "match": true
+    },
+    {
+      "path": "/tmp/motion-qualified-measurement-fe092-20261002/norm/plans/TEMPLATE.md",
+      "bytes": 10270,
+      "sha256": "7f4cb8dcc983f392a01f2abdddc7b74527412b0da725b114cee94677c651a97e",
+      "match": true
+    },
+    {
+      "path": "/tmp/motion-qualified-measurement-fe092-20261002/norm/plans/lab-motion-production/ACTIVATION.md",
+      "bytes": 194,
+      "sha256": "97e6b6ce4080b5c91d62e7ace5844a3c7aeeaa3bce04b21f832785bc807a4908",
+      "match": true
+    },
+    {
+      "path": "/tmp/motion-qualified-measurement-fe092-20261002/norm/plans/lab-motion-production/ACTIVE.md",
+      "bytes": 235,
+      "sha256": "42e36c2efa89912aa00395c938263c1bf35275325420df52ec736b0986606731",
+      "match": true
+    },
+    {
+      "path": "/tmp/motion-qualified-measurement-fe092-20261002/norm/plans/lab-motion-production/CLAIM.md",
+      "bytes": 139,
+      "sha256": "56ac2167795a81b9d1a60d2ebc1cb8830a2653cbc45026bbcb2d0b0f8e837fa8",
+      "match": true
+    },
+    {
+      "path": "/tmp/motion-qualified-measurement-fe092-20261002/norm/plans/lab-motion-production/r11.md",
+      "bytes": 74166,
+      "sha256": "cbeef108b288502165437c375bb259f3f4d6dc8ae4ae9e926db133adeba40d4b",
+      "match": true
+    },
+    {
+      "path": "/tmp/motion-qualified-measurement-fe092-20261002/norm/plans/lab-motion-production/r12.md",
+      "bytes": 40024,
+      "sha256": "b2e6d1462b0bce43773beaf307e3b3963c426bf07134f49c844d4991e1753622",
+      "match": true
+    },
+    {
+      "path": "/tmp/motion-qualified-measurement-fe092-20261002/norm-bindings.json",
+      "bytes": 4199,
+      "sha256": "cb85d87cd6de1b4ef70d9d39d536502792e25ce1a4d8a8e996d627fbbbc03bec",
+      "match": true
+    },
+    {
+      "path": "/tmp/motion-qualified-measurement-fe092-20261002/primary-integrity.json",
+      "bytes": 10899,
+      "sha256": "28bda9e0ed5b63b0fb536261e1fa25cd22d6f2eaa8574775d70fce1287768795",
+      "match": true
+    },
+    {
+      "path": "/tmp/motion-qualified-measurement-fe092-20261002/read.py",
+      "bytes": 1002,
+      "sha256": "4f8e50798b0fa2d1e647a6f6363d73a19b4650af8741bc0abe0a5789e5de131c",
+      "match": true
+    },
+    {
+      "path": "/tmp/motion-qualified-measurement-fe092-20261002/readset.json",
+      "bytes": 13269,
+      "sha256": "ee9942fd835a93e197c9d4db26527d96f53b59cf8eb19bdf6bf7401c948d10dd",
+      "match": true
+    },
+    {
+      "path": "/tmp/motion-qualified-measurement-fe092-20261002/readset.ndjson",
+      "bytes": 9256,
+      "sha256": "80e46e0dbe4661a3035d6f5f50975ccf1bdb02868aefa1f731ea79a782fa91c9",
+      "match": true
+    },
+    {
+      "path": "/tmp/motion-qualified-measurement-fe092-20261002/source/.architecture.json",
+      "bytes": 725,
+      "sha256": "33f51bf3d7d0e2dc62b17e99ebee488e5673682aa9e176027de5745f4aaef4b8",
+      "match": true
+    },
+    {
+      "path": "/tmp/motion-qualified-measurement-fe092-20261002/source/.github/ISSUE_TEMPLATE/bug.yml",
+      "bytes": 2465,
+      "sha256": "9e5d7bab9db037cee2f05dd016d75cacb62333c7e974b61deefe1de30cb70ea8",
+      "match": true
+    },
+    {
+      "path": "/tmp/motion-qualified-measurement-fe092-20261002/source/.github/ISSUE_TEMPLATE/config.yml",
+      "bytes": 279,
+      "sha256": "ddf7102689910b843c2bcf37ef6041a39f2ea92e1d643cd21e4eab1d5a166a01",
+      "match": true
+    },
+    {
+      "path": "/tmp/motion-qualified-measurement-fe092-20261002/source/.github/ISSUE_TEMPLATE/docs.yml",
+      "bytes": 1066,
+      "sha256": "a9b0558485d0f8251f1308ecf7e4fa42b94522a8247f869b8e3a65282bb4fdbb",
+      "match": true
+    },
+    {
+      "path": "/tmp/motion-qualified-measurement-fe092-20261002/source/.github/ISSUE_TEMPLATE/feature.yml",
+      "bytes": 2056,
+      "sha256": "7c92c45c745cbf3946400c641a3d0d13a3dc4663da88f4763728652ea6a03e73",
+      "match": true
+    },
+    {
+      "path": "/tmp/motion-qualified-measurement-fe092-20261002/source/.github/ISSUE_TEMPLATE/hardening.yml",
+      "bytes": 1620,
+      "sha256": "50dc4205adc521f9476d4449c567080af6ba541ea12bd6dccdf2733821fb092d",
+      "match": true
+    },
+    {
+      "path": "/tmp/motion-qualified-measurement-fe092-20261002/source/.github/dependabot.yml",
+      "bytes": 613,
+      "sha256": "06ebc358b414f78c6e82c45da9492b699d4fde6d5b394c1c77f2aa9437c61eac",
+      "match": true
+    },
+    {
+      "path": "/tmp/motion-qualified-measurement-fe092-20261002/source/.github/pull_request_template.md",
+      "bytes": 2597,
+      "sha256": "7389e71116d8ff5404808d327af7fe3177b189d0833f083a3ad786e59c592ace",
+      "match": true
+    },
+    {
+      "path": "/tmp/motion-qualified-measurement-fe092-20261002/source/.github/workflows/browser.yml",
+      "bytes": 3830,
+      "sha256": "c652c325636ef9acee8ee7eb75c6a73d938665d19e6342ffc6fc84ed61bb31c1",
+      "match": true
+    },
+    {
+      "path": "/tmp/motion-qualified-measurement-fe092-20261002/source/.github/workflows/ci.yml",
+      "bytes": 11569,
+      "sha256": "9a8f5c8f37b8a939e534c5afa08bae5213db73ec2484fb5c397b22de3ee599d8",
+      "match": true
+    },
+    {
+      "path": "/tmp/motion-qualified-measurement-fe092-20261002/source/.github/workflows/mutation.yml",
+      "bytes": 4115,
+      "sha256": "b83812be65e5213522e3ca0863a3e84e4b5c78c865419f2aedd9083d175528dd",
+      "match": true
+    },
+    {
+      "path": "/tmp/motion-qualified-measurement-fe092-20261002/source/.github/workflows/profile-01.yml",
+      "bytes": 5639,
+      "sha256": "67076c39901a63cfab587c6dd483b953d5865fc2c391694d18e4694d330efc8a",
+      "match": true
+    },
+    {
+      "path": "/tmp/motion-qualified-measurement-fe092-20261002/source/.github/workflows/release.yml",
+      "bytes": 40495,
+      "sha256": "80b6bc23c474c0c02e13b6bc2e26065fed6fc86fd6fa4f10778c514d2ef4c4ae",
+      "match": true
+    },
+    {
+      "path": "/tmp/motion-qualified-measurement-fe092-20261002/source/.gitignore",
+      "bytes": 283,
+      "sha256": "12af83d8703805c82c3b78bdc10cd9c14f496e9b4beca64ece6ada4cd5135363",
+      "match": true
+    },
+    {
+      "path": "/tmp/motion-qualified-measurement-fe092-20261002/source/CHANGELOG.md",
+      "bytes": 44966,
+      "sha256": "d7ac35e265e189d46ff02f1ea7a02be91f8e4ad1e520beef7b60a9641afcc411",
+      "match": true
+    },
+    {
+      "path": "/tmp/motion-qualified-measurement-fe092-20261002/source/CONTRIBUTING.md",
+      "bytes": 9922,
+      "sha256": "d371787fbf4924f1c5715125e2e5ad601410bfbbd604e87ab0d7ea1fd8c360c1",
+      "match": true
+    },
+    {
+      "path": "/tmp/motion-qualified-measurement-fe092-20261002/source/LICENSE",
+      "bytes": 1064,
+      "sha256": "37ffb21a9e03804a978f4203134bf7a2088864b3dd3c0c5ee3809a3a99391c4b",
+      "match": true
+    },
+    {
+      "path": "/tmp/motion-qualified-measurement-fe092-20261002/source/README.md",
+      "bytes": 13068,
+      "sha256": "1408d05ee4194e68f11a5239336a4395a7ba0ed61b14cf81282357156cf897cc",
+      "match": true
+    },
+    {
+      "path": "/tmp/motion-qualified-measurement-fe092-20261002/source/SECURITY.md",
+      "bytes": 2278,
+      "sha256": "a8f654f61f1cc3230fdfa56d500c1b3aa4384eb335fe0e122b8ba1017a99ec86",
+      "match": true
+    },
+    {
+      "path": "/tmp/motion-qualified-measurement-fe092-20261002/source/bench/color-interpolation.mjs",
+      "bytes": 4265,
+      "sha256": "5cca2bff9ea74e6fdfbe9a9e7450d08b463f8c1c4b3f5d0ace0b0c0d75a2706b",
+      "match": true
+    },
+    {
+      "path": "/tmp/motion-qualified-measurement-fe092-20261002/source/bench/compare/bench.mjs",
+      "bytes": 55345,
+      "sha256": "4939941e3fa40f6122619a63483aacd3d3c7375a2dee1b5e320fde653ba27a94",
+      "match": true
+    },
+    {
+      "path": "/tmp/motion-qualified-measurement-fe092-20261002/source/bench/compare/conformance-smoke.mjs",
+      "bytes": 7441,
+      "sha256": "b012a2865e53991e20b03c0799f187c4617f50f91e385822fa47ed7b93bf1180",
+      "match": true
+    },
+    {
+      "path": "/tmp/motion-qualified-measurement-fe092-20261002/source/bench/compare/entries/anime-waapi.entry.mjs",
+      "bytes": 473,
+      "sha256": "cee62343f6aa836288b8ebd3c20bda0471e064dcd40f86941645e0318ecd17ed",
+      "match": true
+    },
+    {
+      "path": "/tmp/motion-qualified-measurement-fe092-20261002/source/bench/compare/entries/anime.entry.mjs",
+      "bytes": 508,
+      "sha256": "716a636eca3ac3bf09723e91928eb4b4d586c83433f61aa9e55d19dee3e712b2",
+      "match": true
+    },
+    {
+      "path": "/tmp/motion-qualified-measurement-fe092-20261002/source/bench/compare/entries/gsap.entry.mjs",
+      "bytes": 490,
+      "sha256": "6cbbd9b044a0255307756080bb84c7b8e3848154d9c3095fdab43bdafbaec1ff",
+      "match": true
+    },
+    {
+      "path": "/tmp/motion-qualified-measurement-fe092-20261002/source/bench/compare/entries/lab-spring.entry.mjs",
+      "bytes": 1600,
+      "sha256": "5b02039fdcbb876bb690cb1c38f14ae40712c2f8a521ec1b662e288a079be269",
+      "match": true
+    },
+    {
+      "path": "/tmp/motion-qualified-measurement-fe092-20261002/source/bench/compare/entries/lab.entry.mjs",
+      "bytes": 826,
+      "sha256": "f5570a7bbe8dc321ee3a3768a638abdc7e73ffe47ba2179ce9b4b85b3a336960",
+      "match": true
+    },
+    {
+      "path": "/tmp/motion-qualified-measurement-fe092-20261002/source/bench/compare/entries/motion-mini.entry.mjs",
+      "bytes": 519,
+      "sha256": "f981b58b211a5ccc6963d0e35778ea9e14db1a97332996a3a9ce9b1a08b66cc4",
+      "match": true
+    },
+    {
+      "path": "/tmp/motion-qualified-measurement-fe092-20261002/source/bench/compare/entries/motion.entry.mjs",
+      "bytes": 564,
+      "sha256": "328a687ae343448a981e923d47a115e92aea1829e292189a354606cd549c88d4",
+      "match": true
+    },
+    {
+      "path": "/tmp/motion-qualified-measurement-fe092-20261002/source/bench/compare/entries/waapi-control.entry.mjs",
+      "bytes": 1276,
+      "sha256": "2c6e355273b58d03d450a7d70ac2ac8869df357cad663ecdc7be31eef8a98b50",
+      "match": true
+    },
+    {
+      "path": "/tmp/motion-qualified-measurement-fe092-20261002/source/bench/compare/methodology.mjs",
+      "bytes": 57045,
+      "sha256": "a6440e56752573684809765ba992ce01b0993a889e130f16eb870cd1fcbcda87",
+      "match": true
+    },
+    {
+      "path": "/tmp/motion-qualified-measurement-fe092-20261002/source/bench/compare/motion-conformance.mjs",
+      "bytes": 7239,
+      "sha256": "d05f0cec91a48eb9e85ec6b12ba49f0ac3673d4489d6dd5af470aa878fbc7f28",
+      "match": true
+    },
+    {
+      "path": "/tmp/motion-qualified-measurement-fe092-20261002/source/bench/compare/package.json",
+      "bytes": 393,
+      "sha256": "6c3b8f1957f2e9b166013d118102210b0a4e1be551c31b0ce3d1297a1ea1efce",
+      "match": true
+    },
+    {
+      "path": "/tmp/motion-qualified-measurement-fe092-20261002/source/bench/compare/pnpm-lock.yaml",
+      "bytes": 11973,
+      "sha256": "a170c0b4fc30933e667a77a962d81631d9d9625ae2c457e4557b4f8988f6253f",
+      "match": true
+    },
+    {
+      "path": "/tmp/motion-qualified-measurement-fe092-20261002/source/bench/compare/pnpm-workspace.yaml",
+      "bytes": 29,
+      "sha256": "ac02d96368617c760f093cfe61fdec64b6244007ab3553e0d6621f706f54a353",
+      "match": true
+    },
+    {
+      "path": "/tmp/motion-qualified-measurement-fe092-20261002/source/bench/compare/provenance.mjs",
+      "bytes": 24949,
+      "sha256": "51881a4a6ea2e1ad0330888e7e1b9c8b6e7c7aef3a3eb798a4185c7c3b846623",
+      "match": true
+    },
+    {
+      "path": "/tmp/motion-qualified-measurement-fe092-20261002/source/bench/compare/report-contract.mjs",
+      "bytes": 52579,
+      "sha256": "35dcbb5efd0534367d22b61cc767acbde206ff604bf05a41acaeb6d38a512b1d",
+      "match": true
+    },
+    {
+      "path": "/tmp/motion-qualified-measurement-fe092-20261002/source/bench/compare/webkit-contract.mjs",
+      "bytes": 4670,
+      "sha256": "9a62041a785f945a304311ce56e5c98bd3bce5b2f30456ab53a1b534f4f50a58",
+      "match": true
+    },
+    {
+      "path": "/tmp/motion-qualified-measurement-fe092-20261002/source/bench/compare/webkit-freeze.mjs",
+      "bytes": 10809,
+      "sha256": "b8e9da7e56458c9c310b8df637e398d5e2dbfca6905237de9f1aa0e19126011b",
+      "match": true
+    },
+    {
+      "path": "/tmp/motion-qualified-measurement-fe092-20261002/source/bench/compiler-cold-start.mjs",
+      "bytes": 3559,
+      "sha256": "4fa4aeb244f696e9caa9bb61f6b794d88839bf4d4c446dcd8f98e9a9f8a80c72",
+      "match": true
+    },
+    {
+      "path": "/tmp/motion-qualified-measurement-fe092-20261002/source/bench/compositor-compile.mjs",
+      "bytes": 2945,
+      "sha256": "1346e2203df91ad8b8ab88a07aef57396297b63b817e0611b62e0903e73a7e88",
+      "match": true
+    },
+    {
+      "path": "/tmp/motion-qualified-measurement-fe092-20261002/source/bench/profile/native-clock/LICENSE",
+      "bytes": 2337,
+      "sha256": "ec62dc96da0099b87f4511736c87309335527fb7031639493e06c95728dc8c54",
+      "match": true
+    },
+    {
+      "path": "/tmp/motion-qualified-measurement-fe092-20261002/source/bench/profile/native-clock/README.md",
+      "bytes": 1385,
+      "sha256": "209fe23d861255eb9c83ac37f00b68168aeb6c4f30bb485f57eb5bbed92ebcf1",
+      "match": true
+    },
+    {
+      "path": "/tmp/motion-qualified-measurement-fe092-20261002/source/bench/profile/native-clock/include/js_native_api.h",
+      "bytes": 33158,
+      "sha256": "8808ef8899a1691411928ef5dd7dae0537aedc93d3a34e223b2d89692e79c788",
+      "match": true
+    },
+    {
+      "path": "/tmp/motion-qualified-measurement-fe092-20261002/source/bench/profile/native-clock/include/js_native_api_types.h",
+      "bytes": 7871,
+      "sha256": "4f19cb90d240765cc0961d92a1ee20f65fdc50db7de1ab0a5cb6bc227224e1a0",
+      "match": true
+    },
+    {
+      "path": "/tmp/motion-qualified-measurement-fe092-20261002/source/bench/profile/native-clock/include/node_api.h",
+      "bytes": 10370,
+      "sha256": "2d4560831e525b47b060ec8a0864ab73993df9e20215ce9f0fe7b24cd31af32a",
+      "match": true
+    },
+    {
+      "path": "/tmp/motion-qualified-measurement-fe092-20261002/source/bench/profile/native-clock/include/node_api_types.h",
+      "bytes": 1930,
+      "sha256": "a25356630d3058f0a0c8937d9f297e9471e037fda58c2696d8a505c2bd99cb00",
+      "match": true
+    },
+    {
+      "path": "/tmp/motion-qualified-measurement-fe092-20261002/source/bench/profile/probe-profile-01.mjs",
+      "bytes": 7088,
+      "sha256": "42952452cb39ff80fe7af89215f1e7839199c6e1d0c637471186e1a1b3317e5d",
+      "match": true
+    },
+    {
+      "path": "/tmp/motion-qualified-measurement-fe092-20261002/source/bench/profile/profile-01-preregistration.mjs",
+      "bytes": 14873,
+      "sha256": "2c2fe1c1c024dc83b32e281b25b0e443acf0683c04ef780d3fdc0a0e31400be1",
+      "match": true
+    },
+    {
+      "path": "/tmp/motion-qualified-measurement-fe092-20261002/source/bench/profile/profile-git-proof.mjs",
+      "bytes": 2779,
+      "sha256": "77bc2eb844ff4452cf0c29f04a6882a232c8154716a7412561ed45ae8a991b13",
+      "match": true
+    },
+    {
+      "path": "/tmp/motion-qualified-measurement-fe092-20261002/source/bench/profile/profile-measurement.mjs",
+      "bytes": 2759,
+      "sha256": "c06b0372db6d7b023f5262c9dd0c49fab832ee9aa71244195acd162389f8841a",
+      "match": true
+    },
+    {
+      "path": "/tmp/motion-qualified-measurement-fe092-20261002/source/bench/profile/server-profile-contract.mjs",
+      "bytes": 73913,
+      "sha256": "ba6d365e3faf623cc8da5dae78ff2bfa3288529b9640052a0474d55d8e33d72e",
+      "match": true
+    },
+    {
+      "path": "/tmp/motion-qualified-measurement-fe092-20261002/source/bench/profile/server-profile-registration.mjs",
+      "bytes": 18998,
+      "sha256": "90bf39f1aa0118251353001ff015df8e2a67651bee924d147a87841dbae2d470",
+      "match": true
+    },
+    {
+      "path": "/tmp/motion-qualified-measurement-fe092-20261002/source/bench/profile/server-profile-retention.mjs",
+      "bytes": 3040,
+      "sha256": "df27d82963f775cca2b8efd06587a42840cc4fd0de72a11873b1a43b402587e1",
+      "match": true
+    },
+    {
+      "path": "/tmp/motion-qualified-measurement-fe092-20261002/source/bench/profile/server-profile-runner.mjs",
+      "bytes": 51648,
+      "sha256": "a5ed5d601ff4f31a72c739462e0f18622a39a0c1cd76742a1743090833a7c636",
+      "match": true
+    },
+    {
+      "path": "/tmp/motion-qualified-measurement-fe092-20261002/source/bench/profile/server-thread-cpu-clock.c",
+      "bytes": 4159,
+      "sha256": "4f32f23c2409c3e83943121a587c8d9f5e19af7f308ac987323ff4189ddd14c0",
+      "match": true
+    },
+    {
+      "path": "/tmp/motion-qualified-measurement-fe092-20261002/source/bench/profile/server-thread-cpu-clock.mjs",
+      "bytes": 7279,
+      "sha256": "bb31090e4beaa6d4bc4dcc7789d0993672630e091fca65957174988c58ddba71",
+      "match": true
+    },
+    {
+      "path": "/tmp/motion-qualified-measurement-fe092-20261002/source/bench/profile/validate-profile-01.mjs",
+      "bytes": 7186,
+      "sha256": "1ec1b58869ebd36da0754b831bb1340aa5052fb0b8fa0a4d0fc715d0d54d1e04",
+      "match": true
+    },
+    {
+      "path": "/tmp/motion-qualified-measurement-fe092-20261002/source/browser/01-imports.spec.ts",
+      "bytes": 3493,
+      "sha256": "3e9829f4f9c5c9547a5f060d8972db52979b25f0ae819dfbda0ae4da6d92e079",
+      "match": true
+    },
+    {
+      "path": "/tmp/motion-qualified-measurement-fe092-20261002/source/browser/02-tiers-linear.spec.ts",
+      "bytes": 3928,
+      "sha256": "86b9050df124eefb424af94200c43602dba943e344b2dd0a0df1fff36dc513df",
+      "match": true
+    },
+    {
+      "path": "/tmp/motion-qualified-measurement-fe092-20261002/source/browser/03-compositor-spring.spec.ts",
+      "bytes": 8073,
+      "sha256": "b0bc3e78a8239d9bae4826e9db45611b3e1929b4f1671ab92d4f80ea36fc42c1",
+      "match": true
+    },
+    {
+      "path": "/tmp/motion-qualified-measurement-fe092-20261002/source/browser/04-lifecycle.spec.ts",
+      "bytes": 10449,
+      "sha256": "284965668e5df051d1f4d65ac6e34012b3cf025c64a46c14502d897726e68cd1",
+      "match": true
+    },
+    {
+      "path": "/tmp/motion-qualified-measurement-fe092-20261002/source/browser/05-reduced-motion.spec.ts",
+      "bytes": 5121,
+      "sha256": "cf53e695e22e2bc72fe5e7e46c80f363b67f45fc31d2636eefdaa030f74486fd",
+      "match": true
+    },
+    {
+      "path": "/tmp/motion-qualified-measurement-fe092-20261002/source/browser/06-gestures-pointer.spec.ts",
+      "bytes": 5852,
+      "sha256": "c867900eb9752b89a011d36ea4951b092f826fe2dcf402ce9f9b1f2325625263",
+      "match": true
+    },
+    {
+      "path": "/tmp/motion-qualified-measurement-fe092-20261002/source/browser/07-flip-measure.spec.ts",
+      "bytes": 5259,
+      "sha256": "a5261e0e701d38a53892762b38bf75e60b84b6be9a1e4ca98c3d27184dd4e4f6",
+      "match": true
+    },
+    {
+      "path": "/tmp/motion-qualified-measurement-fe092-20261002/source/browser/08-shadow-dom.spec.ts",
+      "bytes": 3887,
+      "sha256": "ab0072c5afdedc9605426d1e63794dfc33d9ed7b6587818b8395b04340dcaf16",
+      "match": true
+    },
+    {
+      "path": "/tmp/motion-qualified-measurement-fe092-20261002/source/browser/09-ssr-hydration.spec.ts",
+      "bytes": 2846,
+      "sha256": "12adf45dda711292cc448402ace13d3ffa0662444d6f48b0e0b3b3f3d9cffa7c",
+      "match": true
+    },
+    {
+      "path": "/tmp/motion-qualified-measurement-fe092-20261002/source/browser/10-cleanup.spec.ts",
+      "bytes": 3588,
+      "sha256": "72ef1e3ac364f0ad8183fcb2259064b499a2f08e47bf34991f131c94d03bcf9d",
+      "match": true
+    },
+    {
+      "path": "/tmp/motion-qualified-measurement-fe092-20261002/source/browser/11-behaviors-pointer.spec.ts",
+      "bytes": 6964,
+      "sha256": "f02d64a8a1cb31e72c7105233734c6163c60b040b62cb8f8bb864b98b3fc1f1d",
+      "match": true
+    },
+    {
+      "path": "/tmp/motion-qualified-measurement-fe092-20261002/source/browser/12-nano.spec.ts",
+      "bytes": 5716,
+      "sha256": "91bde2793e829be045f601cf69c91152f786dfa93b9d8e7b28eb913d4a8f34f0",
+      "match": true
+    },
+    {
+      "path": "/tmp/motion-qualified-measurement-fe092-20261002/source/browser/13-auto-ownership.spec.ts",
+      "bytes": 6580,
+      "sha256": "82e3166f9fde1dbfcd2647c9795a00b8a07276adc7e84d5cbd8dd058abc14e02",
+      "match": true
+    },
+    {
+      "path": "/tmp/motion-qualified-measurement-fe092-20261002/source/browser/13-auto-retention.spec.ts",
+      "bytes": 4570,
+      "sha256": "d832664ae44eecb5784ea7b4e049d626686c5961bc165c4fb16985b97b0b1ce2",
+      "match": true
+    },
+    {
+      "path": "/tmp/motion-qualified-measurement-fe092-20261002/source/browser/14-presets-graphemes.spec.ts",
+      "bytes": 660,
+      "sha256": "28ced0d22c8f6615223eae36d3c20d6d8ef4afc0cd236c18bd580ad3706763ae",
+      "match": true
+    },
+    {
+      "path": "/tmp/motion-qualified-measurement-fe092-20261002/source/browser/15-waapi-repeat-terminal.spec.ts",
+      "bytes": 1938,
+      "sha256": "4b5be041940369c7f341ad5f4c941b45d8f1b4358b4b0892bd80eba931211806",
+      "match": true
+    },
+    {
+      "path": "/tmp/motion-qualified-measurement-fe092-20261002/source/browser/16-in-view.spec.ts",
+      "bytes": 9958,
+      "sha256": "85e1c5a75e154b244c32a890add0e3bf1956ae73bd803d7899aa9b86eea5ee72",
+      "match": true
+    },
+    {
+      "path": "/tmp/motion-qualified-measurement-fe092-20261002/source/browser/17-compiler-nano.spec.ts",
+      "bytes": 8261,
+      "sha256": "d5ae434548e65306b85adcd0583a3adb939a9a64dca5f8ae7167b3d2a7b7dd8a",
+      "match": true
+    },
+    {
+      "path": "/tmp/motion-qualified-measurement-fe092-20261002/source/browser/18-surface-freeze.spec.ts",
+      "bytes": 11851,
+      "sha256": "39fdbbdbd2f0b0e8740b5e8f87f1d46db9eedf3bc76c42079aa14cf0078e8587",
+      "match": true
+    },
+    {
+      "path": "/tmp/motion-qualified-measurement-fe092-20261002/source/browser/19-surface-compiler.spec.ts",
+      "bytes": 10753,
+      "sha256": "09adaff1591504fca91a9579b6f48e36e5fdada7789df4b63e1b8926b50df794",
+      "match": true
+    },
+    {
+      "path": "/tmp/motion-qualified-measurement-fe092-20261002/source/browser/20-showcase.spec.ts",
+      "bytes": 14139,
+      "sha256": "b889067e13b42f7485fa5a44f9220908c2dacbeb1e4fd28e960348608f3fb3ae",
+      "match": true
+    },
+    {
+      "path": "/tmp/motion-qualified-measurement-fe092-20261002/source/browser/21-showcase-reduced-motion.spec.ts",
+      "bytes": 599,
+      "sha256": "9f0e864d596f0b3eb33f41464d2575fbc257ba15256aa48c1c28bb86923fb84c",
+      "match": true
+    },
+    {
+      "path": "/tmp/motion-qualified-measurement-fe092-20261002/source/browser/22-compiler-playground.spec.ts",
+      "bytes": 2473,
+      "sha256": "0728d005840a768690476b4441c75a95018ba24eb7a813ed35ce917a5de338ee",
+      "match": true
+    },
+    {
+      "path": "/tmp/motion-qualified-measurement-fe092-20261002/source/browser/22-motion-state-contract.spec.ts",
+      "bytes": 8671,
+      "sha256": "4b788155cbb8028d094f807411b1080867b9ec56e29466a50dd6ef1f722825bd",
+      "match": true
+    },
+    {
+      "path": "/tmp/motion-qualified-measurement-fe092-20261002/source/browser/23-motion-value-follow.spec.ts",
+      "bytes": 4040,
+      "sha256": "ac8c393787e1e46bd1b0d92ffbbcd999852a94e465d29255699dfbb7cec09513",
+      "match": true
+    },
+    {
+      "path": "/tmp/motion-qualified-measurement-fe092-20261002/source/browser/24-native-scroll-timeline.spec.ts",
+      "bytes": 2835,
+      "sha256": "66b7fa7e7c235ee91ed23f6807c9b1b2567b730c5140df8492de0ab302a229fa",
+      "match": true
+    },
+    {
+      "path": "/tmp/motion-qualified-measurement-fe092-20261002/source/browser/25-native-view-timeline.spec.ts",
+      "bytes": 2815,
+      "sha256": "6ea4f80dc3f0439e721a3649a65a4a704cde2d58b37ae19cd671fb41d78d24e0",
+      "match": true
+    },
+    {
+      "path": "/tmp/motion-qualified-measurement-fe092-20261002/source/browser/animate-scope.spec.ts",
+      "bytes": 8245,
+      "sha256": "110b543bfb32f7f71d98148196734c5f96f5039a53eb3e406aefb1bfc6b76d02",
+      "match": true
+    },
+    {
+      "path": "/tmp/motion-qualified-measurement-fe092-20261002/source/browser/compositor-recipes.spec.ts",
+      "bytes": 26057,
+      "sha256": "e0baa661fbeb83770e8035708ecde292e7e7ad38502b6d745d3ebb3726edaecc",
+      "match": true
+    },
+    {
+      "path": "/tmp/motion-qualified-measurement-fe092-20261002/source/browser/fixtures/compile-artifacts.mjs",
+      "bytes": 8037,
+      "sha256": "862d05336cf37488026446b434e931d173c4bfbdecc66df1ddc3736f47536de2",
+      "match": true
+    },
+    {
+      "path": "/tmp/motion-qualified-measurement-fe092-20261002/source/browser/fixtures/compiler-playground.html",
+      "bytes": 1540,
+      "sha256": "7c25d76ebb7637be44d691cccbe09911ea2d365383ce91a61f76668016878aff",
+      "match": true
+    },
+    {
+      "path": "/tmp/motion-qualified-measurement-fe092-20261002/source/browser/fixtures/harness.html",
+      "bytes": 880,
+      "sha256": "27c560a8e84ca5d74313c7b340037c58ac58dc051c1bfd9da871a24a2f56ada9",
+      "match": true
+    },
+    {
+      "path": "/tmp/motion-qualified-measurement-fe092-20261002/source/browser/fixtures/harness.ts",
+      "bytes": 3132,
+      "sha256": "35c3512245bec8feb537cd0227d34132ae81222637a6855c9b73417b13f19f95",
+      "match": true
+    },
+    {
+      "path": "/tmp/motion-qualified-measurement-fe092-20261002/source/browser/fixtures/packed-recipes.d.ts",
+      "bytes": 2017,
+      "sha256": "bbc33fcc80530684a66c68ea90d4b8596784b729717880c984a36a6a06ac96ac",
+      "match": true
+    },
+    {
+      "path": "/tmp/motion-qualified-measurement-fe092-20261002/source/browser/fixtures/reorder-recipe.mjs",
+      "bytes": 619,
+      "sha256": "22826fb3d927c02ff8910d6b44742e569ce29ab884905c2f24482840bbe08e9a",
+      "match": true
+    },
+    {
+      "path": "/tmp/motion-qualified-measurement-fe092-20261002/source/browser/fixtures/scope-recipes.mjs",
+      "bytes": 7987,
+      "sha256": "661a591b92e2995e7f4c4a0b1a843e548a094970955a0063f6cdac89f0a58247",
+      "match": true
+    },
+    {
+      "path": "/tmp/motion-qualified-measurement-fe092-20261002/source/browser/fixtures/server.mjs",
+      "bytes": 2915,
+      "sha256": "b06cc97250f929fb1545103e719330b867212ea2855dd2097e28866245dfd171",
+      "match": true
+    },
+    {
+      "path": "/tmp/motion-qualified-measurement-fe092-20261002/source/browser/fixtures/spring-ode.ts",
+      "bytes": 2461,
+      "sha256": "e858ee11f8df41b7e3c5a0923be2f435d4ca853893622ed9a7e1a07542793e1d",
+      "match": true
+    },
+    {
+      "path": "/tmp/motion-qualified-measurement-fe092-20261002/source/browser/journey-live-view.spec.ts",
+      "bytes": 14919,
+      "sha256": "7392c16ca62593620309149394cfdef40955a423e0b96cd61d38686b91929e7f",
+      "match": true
+    },
+    {
+      "path": "/tmp/motion-qualified-measurement-fe092-20261002/source/browser/presence-transition.spec.ts",
+      "bytes": 7493,
+      "sha256": "cb4dc7b7787be4cdf68f10f8381c8e0804ba575cd9468b08cecf8dd3ab51581e",
+      "match": true
+    },
+    {
+      "path": "/tmp/motion-qualified-measurement-fe092-20261002/source/browser/reorder.spec.ts",
+      "bytes": 8996,
+      "sha256": "5932c471f230b11833c76a87291c16aaee39da0dba8883e78ab1f9c1cae6fe24",
+      "match": true
+    },
+    {
+      "path": "/tmp/motion-qualified-measurement-fe092-20261002/source/browser/resource-actual-package.spec.ts",
+      "bytes": 9148,
+      "sha256": "2f25f54dd0b128d446b298413d672d920c75420832ec27fec1a3682f3c0254a3",
+      "match": true
+    },
+    {
+      "path": "/tmp/motion-qualified-measurement-fe092-20261002/source/browser/semantic-motion-binding.spec.ts",
+      "bytes": 16586,
+      "sha256": "126fb6bd44ee211afb7fde879610da5429f76368f0761a464676c8570db69fb4",
+      "match": true
+    },
+    {
+      "path": "/tmp/motion-qualified-measurement-fe092-20261002/source/browser/state-cascade.spec.ts",
+      "bytes": 6710,
+      "sha256": "b00257a88953d88161a2ec1aea623bf9901c8a8aa6d11cdd74230ada8207d393",
+      "match": true
+    },
+    {
+      "path": "/tmp/motion-qualified-measurement-fe092-20261002/source/browser/surface-materialization.spec.ts",
+      "bytes": 3456,
+      "sha256": "6129da36d0dc4ab3cbc80cec7d520de3907717954ce458b4e1904c96ef043a7d",
+      "match": true
+    },
+    {
+      "path": "/tmp/motion-qualified-measurement-fe092-20261002/source/conformance/motion-program-v1.json",
+      "bytes": 81110,
+      "sha256": "3b8bb461e817db12d4543022a045a86c7b7384c37aae91eb065528f8f66b333d",
+      "match": true
+    },
+    {
+      "path": "/tmp/motion-qualified-measurement-fe092-20261002/source/docs/NAMING.md",
+      "bytes": 5941,
+      "sha256": "d9e4080384e292b2a8f2fd31b0e4f35fb6c70acc5e119ef56ba604f82cb0ffcd",
+      "match": true
+    },
+    {
+      "path": "/tmp/motion-qualified-measurement-fe092-20261002/source/docs/RELEASES.md",
+      "bytes": 9194,
+      "sha256": "d7997321547dfad4d110693e562dffdffbfbdb7126a1bc1e1ea61edeb057d2df",
+      "match": true
+    },
+    {
+      "path": "/tmp/motion-qualified-measurement-fe092-20261002/source/docs/adr/0002-spring-physics-vs-budget.md",
+      "bytes": 7739,
+      "sha256": "a93ff6a68b1055bb43f67b84768d1d7192458d6dfd814319a2b794a5fd8ce193",
+      "match": true
+    },
+    {
+      "path": "/tmp/motion-qualified-measurement-fe092-20261002/source/docs/adr/0003-color-interpolation-contract.md",
+      "bytes": 5072,
+      "sha256": "c6017de5b87b6e14cdb6a1674d2627e87f45e177bc19b8098c7507d825c1b860",
+      "match": true
+    },
+    {
+      "path": "/tmp/motion-qualified-measurement-fe092-20261002/source/docs/api.md",
+      "bytes": 24730,
+      "sha256": "2f570ca964fb3135d172670805a6bc2912e18d5557cdd5b8a0df9e102b5a0c05",
+      "match": true
+    },
+    {
+      "path": "/tmp/motion-qualified-measurement-fe092-20261002/source/docs/architecture.md",
+      "bytes": 5965,
+      "sha256": "149de5a6cdb141e14c99842706137e15829f3c7ddfe06494bf19862315ad9bbd",
+      "match": true
+    },
+    {
+      "path": "/tmp/motion-qualified-measurement-fe092-20261002/source/docs/behaviors.md",
+      "bytes": 15002,
+      "sha256": "855d1fbb99273f1d921e864e520be240505b33d8a049d5831718fe138d3acd0a",
+      "match": true
+    },
+    {
+      "path": "/tmp/motion-qualified-measurement-fe092-20261002/source/docs/benchmark.md",
+      "bytes": 18097,
+      "sha256": "3250f5bda688da4736fdfb5cdeb10aba4f26881975ce36566a6a9e6a4c66a536",
+      "match": true
+    },
+    {
+      "path": "/tmp/motion-qualified-measurement-fe092-20261002/source/docs/bindings.md",
+      "bytes": 8288,
+      "sha256": "637d5eb122db474291fad6e05d058327d27bfd9f1e76b12f2a6722ec0c5b1532",
+      "match": true
+    },
+    {
+      "path": "/tmp/motion-qualified-measurement-fe092-20261002/source/docs/compiler.md",
+      "bytes": 6857,
+      "sha256": "1746518f2d9e28dae317b16bf56a600242c9d0796640cadd63f81c1b3070af71",
+      "match": true
+    },
+    {
+      "path": "/tmp/motion-qualified-measurement-fe092-20261002/source/docs/compositor.md",
+      "bytes": 18896,
+      "sha256": "ab7bb3a86a16a01e0b974ac8e81f9023573df9eb59441c633b6d83e616ee51a7",
+      "match": true
+    },
+    {
+      "path": "/tmp/motion-qualified-measurement-fe092-20261002/source/docs/errors.md",
+      "bytes": 30632,
+      "sha256": "0a73a44b4315f6cdeb192fb224d5de75933042d759600ba2dc302b9727946ef7",
+      "match": true
+    },
+    {
+      "path": "/tmp/motion-qualified-measurement-fe092-20261002/source/docs/future-layout.md",
+      "bytes": 15343,
+      "sha256": "fcf0ffaa12f1cccc5a6c2d8f69f63124143fd74b229eaeb5d7b48c16d163dc79",
+      "match": true
+    },
+    {
+      "path": "/tmp/motion-qualified-measurement-fe092-20261002/source/docs/migration.md",
+      "bytes": 7815,
+      "sha256": "34f050ac5aaa20f03ce5c645001d097c1d92b1cea0121db2ad24ae2c72f3bce3",
+      "match": true
+    },
+    {
+      "path": "/tmp/motion-qualified-measurement-fe092-20261002/source/docs/motion-conformance.md",
+      "bytes": 7711,
+      "sha256": "28f9fe29608edce6cbc43ad6e7d501663b56020a0a20efc9ed2145de25e54e4e",
+      "match": true
+    },
+    {
+      "path": "/tmp/motion-qualified-measurement-fe092-20261002/source/docs/motion-contract.md",
+      "bytes": 22317,
+      "sha256": "0622cce3621d7afd0c93942ab46955a419c1f8391d4a6a9eb6f48fe13b4ff6ad",
+      "match": true
+    },
+    {
+      "path": "/tmp/motion-qualified-measurement-fe092-20261002/source/docs/presence.md",
+      "bytes": 7919,
+      "sha256": "92720cbdb4143d66e511a84d1dbc083a1f6f44339645c2abeee86f6a2ff05548",
+      "match": true
+    },
+    {
+      "path": "/tmp/motion-qualified-measurement-fe092-20261002/source/docs/projection.md",
+      "bytes": 5873,
+      "sha256": "146e288b2dba28bacc8519849970dcf5852cad7cee6feb979e2a56cfc25ecfca",
+      "match": true
+    },
+    {
+      "path": "/tmp/motion-qualified-measurement-fe092-20261002/source/docs/recipes.md",
+      "bytes": 58035,
+      "sha256": "ba7300424fa8923e822ef55d4ff6f36550e06c476aca80869b02f87259b61645",
+      "match": true
+    },
+    {
+      "path": "/tmp/motion-qualified-measurement-fe092-20261002/source/docs/server-profile.md",
+      "bytes": 5987,
+      "sha256": "fbef20828a855c6f289de8a1c7d6049738fefec6c4d73f0ce57a68640c4557f7",
+      "match": true
+    },
+    {
+      "path": "/tmp/motion-qualified-measurement-fe092-20261002/source/docs/smart.md",
+      "bytes": 3957,
+      "sha256": "f8a2b611b0fd81f17f9bd035484c0861ba49e9bf91ca0a9d13b9a7c0b8e7c58c",
+      "match": true
+    },
+    {
+      "path": "/tmp/motion-qualified-measurement-fe092-20261002/source/docs/tokens.md",
+      "bytes": 2831,
+      "sha256": "a4234278c2ae07b8c775bdc33ec5269438045e64f0265a03f94b91802c630d44",
+      "match": true
+    },
+    {
+      "path": "/tmp/motion-qualified-measurement-fe092-20261002/source/docs/transform-benchmark.md",
+      "bytes": 8795,
+      "sha256": "0e952c85ef1ae5aaac95f8c327b1551acb8eb43a1ca8f753945e7ecdd2b83806",
+      "match": true
+    },
+    {
+      "path": "/tmp/motion-qualified-measurement-fe092-20261002/source/package.json",
+      "bytes": 16122,
+      "sha256": "de278702d9f6843be2b682c27d9cc0d16d552327f77f7a9f07bee0ff6793da52",
+      "match": true
+    },
+    {
+      "path": "/tmp/motion-qualified-measurement-fe092-20261002/source/playwright.config.ts",
+      "bytes": 5794,
+      "sha256": "bcf1fef3e347cf0399903566eacfbae140b887371a34ff963a4fceb5695fc35c",
+      "match": true
+    },
+    {
+      "path": "/tmp/motion-qualified-measurement-fe092-20261002/source/pnpm-lock.yaml",
+      "bytes": 137906,
+      "sha256": "0389cfa8ad9586f8cafccfb831acc29c89a3bc7ea00c409cce8634b5727f1740",
+      "match": true
+    },
+    {
+      "path": "/tmp/motion-qualified-measurement-fe092-20261002/source/pnpm-workspace.yaml",
+      "bytes": 319,
+      "sha256": "5843369ed19c18950ce11c1ca9e321c76a824a38e5677c468f569f0d7a7f1032",
+      "match": true
+    },
+    {
+      "path": "/tmp/motion-qualified-measurement-fe092-20261002/source/scripts/bench-ceiling.mjs",
+      "bytes": 9644,
+      "sha256": "915a952a2913b683b30971ed4441811c3cf67d26524dbc37ebec4219b148d660",
+      "match": true
+    },
+    {
+      "path": "/tmp/motion-qualified-measurement-fe092-20261002/source/scripts/bench-latency.mjs",
+      "bytes": 11170,
+      "sha256": "2252b180a32562f9f6f3c04481c819119b960f064c8f618d84099e542d4f474e",
+      "match": true
+    },
+    {
+      "path": "/tmp/motion-qualified-measurement-fe092-20261002/source/scripts/bench-support.mjs",
+      "bytes": 17507,
+      "sha256": "2fb04fcfd34788870649982724f1166cb4c14a78ae1c44544028565db8208e05",
+      "match": true
+    },
+    {
+      "path": "/tmp/motion-qualified-measurement-fe092-20261002/source/scripts/bench-transform-pair.mjs",
+      "bytes": 9588,
+      "sha256": "9012150c30ebb4994fe16e497eb4e95c2df0e26df20a011d6ba814278d06d252",
+      "match": true
+    },
+    {
+      "path": "/tmp/motion-qualified-measurement-fe092-20261002/source/scripts/bench-transform-support.mjs",
+      "bytes": 31565,
+      "sha256": "fcb531d342cb6e72ea06acb16bc5fc25f52440aa9c6aff8c7e09f2215476850c",
+      "match": true
+    },
+    {
+      "path": "/tmp/motion-qualified-measurement-fe092-20261002/source/scripts/bench.mjs",
+      "bytes": 19762,
+      "sha256": "74b76202acc517036d43631466ec71e5fd2e6bf954522cf572b9a96d8d5f9f26",
+      "match": true
+    },
+    {
+      "path": "/tmp/motion-qualified-measurement-fe092-20261002/source/scripts/check-binding-mutations.mjs",
+      "bytes": 5592,
+      "sha256": "5e35396343a03f98333173db762274c03d580b698352dcd9581b57fbae161615",
+      "match": true
+    },
+    {
+      "path": "/tmp/motion-qualified-measurement-fe092-20261002/source/scripts/check-docs-drift.mjs",
+      "bytes": 9834,
+      "sha256": "1a110e01642a06956a655ceb3cc6a75ddf75000340c6a1f7b36f3417f72ae599",
+      "match": true
+    },
+    {
+      "path": "/tmp/motion-qualified-measurement-fe092-20261002/source/scripts/check-docs-facts.mjs",
+      "bytes": 7422,
+      "sha256": "424ea745291a283ad0abae6ad3148dca2a739fe4fd6758a5b9dd9d99287c787f",
+      "match": true
+    },
+    {
+      "path": "/tmp/motion-qualified-measurement-fe092-20261002/source/scripts/check-error-catalog.mjs",
+      "bytes": 15574,
+      "sha256": "622ea9650330c37549dc79e975ef62644567a52617e0271b4d826d442606f22d",
+      "match": true
+    },
+    {
+      "path": "/tmp/motion-qualified-measurement-fe092-20261002/source/scripts/check-import-cycles.mjs",
+      "bytes": 7322,
+      "sha256": "31e3baff02e797d8ccb0014781eb7973aaa519c234856f9293f534e59331df9b",
+      "match": true
+    },
+    {
+      "path": "/tmp/motion-qualified-measurement-fe092-20261002/source/scripts/check-issue-forms.mjs",
+      "bytes": 2867,
+      "sha256": "c032cf5970a342c6ff5270f5878d123fd55f279e0626b9e6228c07627e266644",
+      "match": true
+    },
+    {
+      "path": "/tmp/motion-qualified-measurement-fe092-20261002/source/scripts/check-native-gate.mjs",
+      "bytes": 2002,
+      "sha256": "54c7cdd1e5feca208ba647e17ab14a3d12e971c9dd6b38ee14b5413ddaebe32c",
+      "match": true
+    },
+    {
+      "path": "/tmp/motion-qualified-measurement-fe092-20261002/source/scripts/check-release-artifact.mjs",
+      "bytes": 7596,
+      "sha256": "27d6a821ae5096449f23f4c6e1bbc965fcafa2f63b956c371d86827b4f7ff135",
+      "match": true
+    },
+    {
+      "path": "/tmp/motion-qualified-measurement-fe092-20261002/source/scripts/check-release.mjs",
+      "bytes": 1443,
+      "sha256": "89b47ec3dd8e0b7446e06da199583e49ed8814ab2feaf10eb6af4e2ce2506bdd",
+      "match": true
+    },
+    {
+      "path": "/tmp/motion-qualified-measurement-fe092-20261002/source/scripts/compiler-acceptance.mjs",
+      "bytes": 21856,
+      "sha256": "57719f24dfff78afc5d4a718eed716bf5eef8db48e5dd4ef56f08b22f763f497",
+      "match": true
+    },
+    {
+      "path": "/tmp/motion-qualified-measurement-fe092-20261002/source/scripts/compiler-doc-recipe.mjs",
+      "bytes": 1682,
+      "sha256": "f4f3f013004e8ae40fdaa3dd2869fdae30d35d30711818bf20bad20c861f01b1",
+      "match": true
+    },
+    {
+      "path": "/tmp/motion-qualified-measurement-fe092-20261002/source/scripts/compression-oracle.mjs",
+      "bytes": 925,
+      "sha256": "736f72336d54bca93dca1cfe426ff79476eb6b2fbd266296b00802eef565a6bb",
+      "match": true
+    },
+    {
+      "path": "/tmp/motion-qualified-measurement-fe092-20261002/source/scripts/compression-policy.mjs",
+      "bytes": 552,
+      "sha256": "78535921e66d3f1e9bb2936722cce03f0464ec835cd88ab4ac9a1cbd97cc38a4",
+      "match": true
+    },
+    {
+      "path": "/tmp/motion-qualified-measurement-fe092-20261002/source/scripts/emit-declarations.mjs",
+      "bytes": 3001,
+      "sha256": "b640c865b30802d678ad8047a18e27b511c2dec69bada3fbf6d2ca25faf0e74c",
+      "match": true
+    },
+    {
+      "path": "/tmp/motion-qualified-measurement-fe092-20261002/source/scripts/git-path-list.mjs",
+      "bytes": 1040,
+      "sha256": "d2b50c9d2d380d3a3db88ae7912355e3d5535a12eaf2c0e917e5124c49b249ff",
+      "match": true
+    },
+    {
+      "path": "/tmp/motion-qualified-measurement-fe092-20261002/source/scripts/motion-program-semantics.ts",
+      "bytes": 23232,
+      "sha256": "531ed7acee1b3d3c50dd30ff5be86c88ed1ecbb0555a99cd973717d54bd3794b",
+      "match": true
+    },
+    {
+      "path": "/tmp/motion-qualified-measurement-fe092-20261002/source/scripts/motion-program-wire.ts",
+      "bytes": 14786,
+      "sha256": "9f56f063bf9d5b82c635b315a87a83ecd2bc7cd1962d62847094ecc315751137",
+      "match": true
+    },
+    {
+      "path": "/tmp/motion-qualified-measurement-fe092-20261002/source/scripts/naming-inventory.mjs",
+      "bytes": 5787,
+      "sha256": "73cf7d4cf66f63821c34b3a70f28fb379a1eb20b7bd6c40b6d5d68a361d4f907",
+      "match": true
+    },
+    {
+      "path": "/tmp/motion-qualified-measurement-fe092-20261002/source/scripts/pack-compat.mjs",
+      "bytes": 26438,
+      "sha256": "e5ad31cde5bfcb38c235261dced8189d561611cee253a80b5c392fe77a633afd",
+      "match": true
+    },
+    {
+      "path": "/tmp/motion-qualified-measurement-fe092-20261002/source/scripts/pack-smoke.mjs",
+      "bytes": 15172,
+      "sha256": "3234e554b238ca24a43ee623fb68436f1d9a7db1aa7491c22a3a6221e4c75dd0",
+      "match": true
+    },
+    {
+      "path": "/tmp/motion-qualified-measurement-fe092-20261002/source/scripts/release-metadata.mjs",
+      "bytes": 10000,
+      "sha256": "3946248a41b673ae71ec95297cf8ffa3580584ba6f96da55b08a55862c09b881",
+      "match": true
+    },
+    {
+      "path": "/tmp/motion-qualified-measurement-fe092-20261002/source/scripts/size-gate.mjs",
+      "bytes": 59795,
+      "sha256": "502e8c5253418a51c59331a4492db516d08f55b114eeb146b6c1e03957e91af9",
+      "match": true
+    },
+    {
+      "path": "/tmp/motion-qualified-measurement-fe092-20261002/source/site/index.html",
+      "bytes": 10957,
+      "sha256": "a82e4a778b8ce58d369af0cbee674bd1779d03210e1a34da36fd66af9ed559f2",
+      "match": true
+    },
+    {
+      "path": "/tmp/motion-qualified-measurement-fe092-20261002/source/site/src/scripts/main.js",
+      "bytes": 141,
+      "sha256": "6bc5d5ef014d803b843429e4b041f2500bbed18614883652f328d76c8864dc6c",
+      "match": true
+    },
+    {
+      "path": "/tmp/motion-qualified-measurement-fe092-20261002/source/site/src/scripts/showcase.js",
+      "bytes": 9849,
+      "sha256": "3bc48257f2bf8ca93407808fd3d36f0b7a56c432eebbb14dd7931491b66445b5",
+      "match": true
+    },
+    {
+      "path": "/tmp/motion-qualified-measurement-fe092-20261002/source/site/src/styles/site.css",
+      "bytes": 12854,
+      "sha256": "29d4d616e67fbeeb05cb96d0bccc34a0bfd0e53eba08c2544627b7d1051dbf84",
+      "match": true
+    },
+    {
+      "path": "/tmp/motion-qualified-measurement-fe092-20261002/source/site/vite.config.mjs",
+      "bytes": 142,
+      "sha256": "eea5f91edfb8d6bfc11860b0e6b79b07744869b788a024e7fa1931ad3b285fdb",
+      "match": true
+    },
+    {
+      "path": "/tmp/motion-qualified-measurement-fe092-20261002/source/src/a11y/index.ts",
+      "bytes": 8107,
+      "sha256": "60e6540954de9ba36df74cfa3fa1529e49dd38c942be0d8dc128d3070ef5d181",
+      "match": true
+    },
+    {
+      "path": "/tmp/motion-qualified-measurement-fe092-20261002/source/src/angular/index.ts",
+      "bytes": 3601,
+      "sha256": "5480430bc238fa46f47495b6eb1566b2ecabf0a6a416e88a287cb00c57c0ba05",
+      "match": true
+    },
+    {
+      "path": "/tmp/motion-qualified-measurement-fe092-20261002/source/src/animate/channels.ts",
+      "bytes": 28244,
+      "sha256": "274ee381a2dfeee6deaa1ec4fe02e75cc2c006dd4d96ba5eb1f94ed5763cdb91",
+      "match": true
+    },
+    {
+      "path": "/tmp/motion-qualified-measurement-fe092-20261002/source/src/animate/index.ts",
+      "bytes": 31006,
+      "sha256": "3e0be973c04c8d587fd314024f66400741b0951611ab92f3a6e48fc88105e2df",
+      "match": true
+    },
+    {
+      "path": "/tmp/motion-qualified-measurement-fe092-20261002/source/src/animate/main-unit.ts",
+      "bytes": 14599,
+      "sha256": "6802506b1321520f51091662f1a1683a9314eafc3332abe01acd13da7af20013",
+      "match": true
+    },
+    {
+      "path": "/tmp/motion-qualified-measurement-fe092-20261002/source/src/animate/surface-batch.ts",
+      "bytes": 7573,
+      "sha256": "d98bcd308733a14b4c936f19944d49b517d8db5846de81dd77ded43b4f4bb53f",
+      "match": true
+    },
+    {
+      "path": "/tmp/motion-qualified-measurement-fe092-20261002/source/src/animate/targets.ts",
+      "bytes": 1900,
+      "sha256": "14fca63736b0fd1727053c37981e35ae1f4e53c9eb4f6f736a23e8078aa1f79f",
+      "match": true
+    },
+    {
+      "path": "/tmp/motion-qualified-measurement-fe092-20261002/source/src/animate/waapi-unit.ts",
+      "bytes": 23836,
+      "sha256": "ef9a70da662bc72328934f7bbc1f39dc88845b98847f71ae9bf786a703bd881b",
+      "match": true
+    },
+    {
+      "path": "/tmp/motion-qualified-measurement-fe092-20261002/source/src/auto/index.ts",
+      "bytes": 47023,
+      "sha256": "fd0ebffc99dabc0126fae2391ead13ef83b555e1f2ca2a099c090b034a983197",
+      "match": true
+    },
+    {
+      "path": "/tmp/motion-qualified-measurement-fe092-20261002/source/src/behaviors/index.ts",
+      "bytes": 46475,
+      "sha256": "5f9cf1338496dc339bc941c58d53bf609a172aab38faf806b6ade7b75d372385",
+      "match": true
+    },
+    {
+      "path": "/tmp/motion-qualified-measurement-fe092-20261002/source/src/behaviors/reorder/index.ts",
+      "bytes": 11249,
+      "sha256": "024dd6b57443d0d707f38c82d30733530251aa357ac12e9605dcf97e2f1edc48",
+      "match": true
+    },
+    {
+      "path": "/tmp/motion-qualified-measurement-fe092-20261002/source/src/behaviors/state-cascade.ts",
+      "bytes": 10600,
+      "sha256": "385785a2c9836972805d6a27210c8575f625f57003645b990bbaf205d526ea16",
+      "match": true
+    },
+    {
+      "path": "/tmp/motion-qualified-measurement-fe092-20261002/source/src/bindings/index.ts",
+      "bytes": 9385,
+      "sha256": "7a1914a113ae61548d001983b8049f7a5f87d6a05031611f4ac631d1be80d344",
+      "match": true
+    },
+    {
+      "path": "/tmp/motion-qualified-measurement-fe092-20261002/source/src/compiler/core.ts",
+      "bytes": 30614,
+      "sha256": "4240a6dc58c38f3f7e669f965287de64d5f1597f7157a296ecc676f8e1cf59d6",
+      "match": true
+    },
+    {
+      "path": "/tmp/motion-qualified-measurement-fe092-20261002/source/src/compiler/nano-default-artifact.ts",
+      "bytes": 1295,
+      "sha256": "1942eeb0451ce91e8773355f6b1d31cc3c3505f13205428b2d38e4e705fb8530",
+      "match": true
+    },
+    {
+      "path": "/tmp/motion-qualified-measurement-fe092-20261002/source/src/compiler/runtime/index.ts",
+      "bytes": 2491,
+      "sha256": "4d0539afeb39d047d8bab44cbb39d4e47323261c66bcee5af613a45f50a13efa",
+      "match": true
+    },
+    {
+      "path": "/tmp/motion-qualified-measurement-fe092-20261002/source/src/compiler/surface/index.ts",
+      "bytes": 10468,
+      "sha256": "fc1251e9a19db8af79be55c6143ee251806bbdd4d90d556ec3d04fd4d68122e2",
+      "match": true
+    },
+    {
+      "path": "/tmp/motion-qualified-measurement-fe092-20261002/source/src/compiler/vite/index.ts",
+      "bytes": 7839,
+      "sha256": "6d5915adcf571c70a3119c0407c70bba624148d142cd3326866d17d8c9b64419",
+      "match": true
+    },
+    {
+      "path": "/tmp/motion-qualified-measurement-fe092-20261002/source/src/compositor/cache.ts",
+      "bytes": 7686,
+      "sha256": "0df49b5643114f6c42f339ca876a33669ff9531ed6b1be76c2c5e41f78d662cc",
+      "match": true
+    },
+    {
+      "path": "/tmp/motion-qualified-measurement-fe092-20261002/source/src/compositor/core.ts",
+      "bytes": 50391,
+      "sha256": "1a8d96a552778eb29f3be2d620b2a0fcbf6717d53389279197bb22cb8ba83cd4",
+      "match": true
+    },
+    {
+      "path": "/tmp/motion-qualified-measurement-fe092-20261002/source/src/compositor/curve.ts",
+      "bytes": 10432,
+      "sha256": "79de16378b23d2f2a4d41d1ca6d0b0d3a39fae44445913bdd805a86dd0909e0e",
+      "match": true
+    },
+    {
+      "path": "/tmp/motion-qualified-measurement-fe092-20261002/source/src/compositor/detect.ts",
+      "bytes": 12020,
+      "sha256": "a8c574e94cebb5564af1f83cb282e122e22f690f3f4d92607359771ef25d8fcf",
+      "match": true
+    },
+    {
+      "path": "/tmp/motion-qualified-measurement-fe092-20261002/source/src/compositor/error-bound.ts",
+      "bytes": 7567,
+      "sha256": "b1aa2bf82161f9c21d91fe7e93f245090c73609ceebfbae6823db1eebd7900e1",
+      "match": true
+    },
+    {
+      "path": "/tmp/motion-qualified-measurement-fe092-20261002/source/src/compositor/execution.ts",
+      "bytes": 6083,
+      "sha256": "124feb9288c7165049056f7eb51586c41c7524d906dd6fc4dce4572ec2f7cc9b",
+      "match": true
+    },
+    {
+      "path": "/tmp/motion-qualified-measurement-fe092-20261002/source/src/compositor/format.ts",
+      "bytes": 2302,
+      "sha256": "25daf40fa80ed08616f5a72ff5c210cfebe84372ebce0972efa7eb8b5a357f84",
+      "match": true
+    },
+    {
+      "path": "/tmp/motion-qualified-measurement-fe092-20261002/source/src/compositor/handoff.ts",
+      "bytes": 4780,
+      "sha256": "10d24be8424245bea24617a14218eef73743b747ec0fd03421348739adb1c65f",
+      "match": true
+    },
+    {
+      "path": "/tmp/motion-qualified-measurement-fe092-20261002/source/src/compositor/index.ts",
+      "bytes": 305,
+      "sha256": "a78e83c97c3225e7433d9f2d07b710a2c358d5e814d4517990ef32b48b6bbc88",
+      "match": true
+    },
+    {
+      "path": "/tmp/motion-qualified-measurement-fe092-20261002/source/src/compositor/sample.ts",
+      "bytes": 4800,
+      "sha256": "1dadce80a985a32aa35564bff8bc9d04f9735b9e1398f3017e38ade30ac58075",
+      "match": true
+    },
+    {
+      "path": "/tmp/motion-qualified-measurement-fe092-20261002/source/src/compositor/segmenter.ts",
+      "bytes": 17932,
+      "sha256": "516866f549baa3e098fb24ab5ffdc18e82bfe7faeae5ac36c60211a720895f21",
+      "match": true
+    },
+    {
+      "path": "/tmp/motion-qualified-measurement-fe092-20261002/source/src/compositor/stagger/index.ts",
+      "bytes": 697,
+      "sha256": "54f9c8c6594c49627ebe3c9cb4742296046852d7888ad46d5fc691f5fe4209b7",
+      "match": true
+    },
+    {
+      "path": "/tmp/motion-qualified-measurement-fe092-20261002/source/src/compositor/stagger.ts",
+      "bytes": 18576,
+      "sha256": "bccd1c5968547ccbcc7116cbfcc235d81a3597227737a04d19b31ac4339840f0",
+      "match": true
+    },
+    {
+      "path": "/tmp/motion-qualified-measurement-fe092-20261002/source/src/decay/index.ts",
+      "bytes": 524,
+      "sha256": "fe88d20e714b516efb152c3e8739cde8e24cccc1d4dc6c90c50f60e5f289282d",
+      "match": true
+    },
+    {
+      "path": "/tmp/motion-qualified-measurement-fe092-20261002/source/src/decay.ts",
+      "bytes": 12130,
+      "sha256": "f1994f5a9a4e3b8e744568fc0d174ac83270833f23c2ca739c291d403f330444",
+      "match": true
+    },
+    {
+      "path": "/tmp/motion-qualified-measurement-fe092-20261002/source/src/drive.ts",
+      "bytes": 17092,
+      "sha256": "1b5c9e5ad463458181d78a8d1144bcd31c802e70e2b680cb0fb2a863dddb884c",
+      "match": true
+    },
+    {
+      "path": "/tmp/motion-qualified-measurement-fe092-20261002/source/src/driver/index.ts",
+      "bytes": 534,
+      "sha256": "9af0dd9236a94ae78f3b490f62dcdda885ff33f174827807ba0da14958a39904",
+      "match": true
+    },
+    {
+      "path": "/tmp/motion-qualified-measurement-fe092-20261002/source/src/driver.ts",
+      "bytes": 25931,
+      "sha256": "ff78da8023e3b1d50ab4668ad0a7175c8749c11287f37d0ef04f0e70b903d27c",
+      "match": true
+    },
+    {
+      "path": "/tmp/motion-qualified-measurement-fe092-20261002/source/src/easing/index.ts",
+      "bytes": 24964,
+      "sha256": "9dfb08fd704baec3dc9242495b693d69fb8331d04a74abaa51ed9a8085377722",
+      "match": true
+    },
+    {
+      "path": "/tmp/motion-qualified-measurement-fe092-20261002/source/src/errors.ts",
+      "bytes": 1503,
+      "sha256": "cd058c4e5edabf7928d8a69e779bc53aac006a01a267f429adfc1db0a9697fe8",
+      "match": true
+    },
+    {
+      "path": "/tmp/motion-qualified-measurement-fe092-20261002/source/src/flip/index.ts",
+      "bytes": 12946,
+      "sha256": "f74bec898ae732acccc4c1ca36dc731ec9ae4e6d38f36a1bc730221f2ddc04db",
+      "match": true
+    },
+    {
+      "path": "/tmp/motion-qualified-measurement-fe092-20261002/source/src/frame/index.ts",
+      "bytes": 14316,
+      "sha256": "971570bd17c4dad624292efae4126741ae1303bdd09553d1cc0c14ce5a423c6f",
+      "match": true
+    },
+    {
+      "path": "/tmp/motion-qualified-measurement-fe092-20261002/source/src/future-layout/artifact.ts",
+      "bytes": 8606,
+      "sha256": "e942f9e8e9ef82a8dd7f00513ef3737a27b81ac913054e93e3a3df32835bed06",
+      "match": true
+    },
+    {
+      "path": "/tmp/motion-qualified-measurement-fe092-20261002/source/src/future-layout/coordinator.ts",
+      "bytes": 6021,
+      "sha256": "44cb627651550a1de339bbcb95551005452cd04eab5393fa5985294ff6aa16bd",
+      "match": true
+    },
+    {
+      "path": "/tmp/motion-qualified-measurement-fe092-20261002/source/src/future-layout/index.ts",
+      "bytes": 1629,
+      "sha256": "644f60ff77b074d2e129f9ffd45b850fb08073d174c39d2674fec6be0e595861",
+      "match": true
+    },
+    {
+      "path": "/tmp/motion-qualified-measurement-fe092-20261002/source/src/future-layout/observer.ts",
+      "bytes": 3814,
+      "sha256": "6ccb4419a18717ae133195c69a56caf2b9ba852dacca86771c162b179866db15",
+      "match": true
+    },
+    {
+      "path": "/tmp/motion-qualified-measurement-fe092-20261002/source/src/future-layout/proof.ts",
+      "bytes": 3108,
+      "sha256": "4052490462e55ab7d29fbdf5b0828595c3e30e45ddbe6b2c37978ab2cd032263",
+      "match": true
+    },
+    {
+      "path": "/tmp/motion-qualified-measurement-fe092-20261002/source/src/future-layout/receipt.ts",
+      "bytes": 14673,
+      "sha256": "489c7da2f630f40e143927857d463d8cd91349d3743e33bae0e3660eaed21059",
+      "match": true
+    },
+    {
+      "path": "/tmp/motion-qualified-measurement-fe092-20261002/source/src/future-layout/route.ts",
+      "bytes": 13883,
+      "sha256": "fffb2508d1a73e4474cc2d333cf786c8a2c6017e83862951f81e40d96fc5e8e5",
+      "match": true
+    },
+    {
+      "path": "/tmp/motion-qualified-measurement-fe092-20261002/source/src/future-layout/transaction.ts",
+      "bytes": 21425,
+      "sha256": "c712ba4367453427c5d28eecd6f8c893b2ee8974fec9f3a58e0bf397a51645fd",
+      "match": true
+    },
+    {
+      "path": "/tmp/motion-qualified-measurement-fe092-20261002/source/src/gestures/index.ts",
+      "bytes": 33342,
+      "sha256": "8eb89815e00f15db5af41e09544cabf0f89fb12ac30854a6dd58d694c4fc2505",
+      "match": true
+    },
+    {
+      "path": "/tmp/motion-qualified-measurement-fe092-20261002/source/src/in-view/index.ts",
+      "bytes": 16293,
+      "sha256": "45e001368047dff29a983c03e1dff2aceeff22caa3d9e3b13f93971f56b7b13b",
+      "match": true
+    },
+    {
+      "path": "/tmp/motion-qualified-measurement-fe092-20261002/source/src/index.ts",
+      "bytes": 957,
+      "sha256": "c093bf00a07d3b1164ad6ce72c5582c009b7eb0315fb2093fac4c831f21d5dd7",
+      "match": true
+    },
+    {
+      "path": "/tmp/motion-qualified-measurement-fe092-20261002/source/src/internal/binding-value.ts",
+      "bytes": 1663,
+      "sha256": "4950c9ab89d671fb22c9261dc03b2466adf1e40c42ed410c17fe508ac4d56c60",
+      "match": true
+    },
+    {
+      "path": "/tmp/motion-qualified-measurement-fe092-20261002/source/src/internal/constants.ts",
+      "bytes": 1213,
+      "sha256": "bca16da28b7ad524a51c9745a832fd01be73577eed0341c4e50d568db81f6fb2",
+      "match": true
+    },
+    {
+      "path": "/tmp/motion-qualified-measurement-fe092-20261002/source/src/internal/cubic-bezier.ts",
+      "bytes": 2523,
+      "sha256": "0d7c71dcfc0e49d5c4f61b8f6108e9be34baf9b82bbe1e27dbfcf25694cda7ab",
+      "match": true
+    },
+    {
+      "path": "/tmp/motion-qualified-measurement-fe092-20261002/source/src/internal/finite.ts",
+      "bytes": 452,
+      "sha256": "28ed861d29b90536cc96a4e67222eb5b435f8237f058ebd30706d84ce9336635",
+      "match": true
+    },
+    {
+      "path": "/tmp/motion-qualified-measurement-fe092-20261002/source/src/internal/frame-requester.ts",
+      "bytes": 2099,
+      "sha256": "03503e62827b53b5b90a1ad0c852a70838c40ca3b3fa5531be95d2ea822b6689",
+      "match": true
+    },
+    {
+      "path": "/tmp/motion-qualified-measurement-fe092-20261002/source/src/internal/media-query.ts",
+      "bytes": 352,
+      "sha256": "0edf4f4671d98c92011b12671fdd260ccd351d2056556f8ced8fd6eb0e715748",
+      "match": true
+    },
+    {
+      "path": "/tmp/motion-qualified-measurement-fe092-20261002/source/src/internal/motion-defaults.ts",
+      "bytes": 1121,
+      "sha256": "f33be9fef7abf51e003566a5ca2d016f121c097feeef2a883c9e0162ab27f6c1",
+      "match": true
+    },
+    {
+      "path": "/tmp/motion-qualified-measurement-fe092-20261002/source/src/internal/motion-program.ts",
+      "bytes": 45986,
+      "sha256": "a38fe1fd489f1f093fa48e1b6e7f63d5a74ac706576ff93d42870c9d7ebc2a46",
+      "match": true
+    },
+    {
+      "path": "/tmp/motion-qualified-measurement-fe092-20261002/source/src/internal/read-spring.ts",
+      "bytes": 3843,
+      "sha256": "9f430f293a9dbd3d6597754eaa946569f5278aae7ac4b03cf63fe31a048fd5c9",
+      "match": true
+    },
+    {
+      "path": "/tmp/motion-qualified-measurement-fe092-20261002/source/src/internal/repeat-cursor.ts",
+      "bytes": 3885,
+      "sha256": "3b719210da406d773b84f68278cef9effcd05a35967ad8b85bea1518a851ab95",
+      "match": true
+    },
+    {
+      "path": "/tmp/motion-qualified-measurement-fe092-20261002/source/src/internal/request-frame.ts",
+      "bytes": 401,
+      "sha256": "d1e5b8eb3eabd1d5dcbe89a21290b9b556132a44409e9588979b50614de7697e",
+      "match": true
+    },
+    {
+      "path": "/tmp/motion-qualified-measurement-fe092-20261002/source/src/internal/sample-keyframes.ts",
+      "bytes": 1878,
+      "sha256": "7f44ccede8319927033be710aaf16e4a59c20eb9c05fbe78ceff8933e3ef4db9",
+      "match": true
+    },
+    {
+      "path": "/tmp/motion-qualified-measurement-fe092-20261002/source/src/internal/schedule-v1.ts",
+      "bytes": 4835,
+      "sha256": "767b38af25a52f2eed4dffdcf04b4ec4bbc751b57c5310f33eedd906d337b3d0",
+      "match": true
+    },
+    {
+      "path": "/tmp/motion-qualified-measurement-fe092-20261002/source/src/internal/sliding-window.ts",
+      "bytes": 2124,
+      "sha256": "40fe303b8e8d89a21a8a91b23585d5876da63231ca50f587cd7e6e24721a2711",
+      "match": true
+    },
+    {
+      "path": "/tmp/motion-qualified-measurement-fe092-20261002/source/src/internal/solver.ts",
+      "bytes": 8287,
+      "sha256": "4cbc4761ace8c48d9b02cf247978c019f7837d0661400e8d243308db6ab7e742",
+      "match": true
+    },
+    {
+      "path": "/tmp/motion-qualified-measurement-fe092-20261002/source/src/internal/template.ts",
+      "bytes": 754,
+      "sha256": "76d68a01b5636c1cc1a562768948c79508c2a0f7fee4595465fe34cbb081d711",
+      "match": true
+    },
+    {
+      "path": "/tmp/motion-qualified-measurement-fe092-20261002/source/src/internal/types.ts",
+      "bytes": 713,
+      "sha256": "996dd871c70f7b5327e68e6393e61b2229c05365dc128b471a09252af12aabe3",
+      "match": true
+    },
+    {
+      "path": "/tmp/motion-qualified-measurement-fe092-20261002/source/src/keyframes/index.ts",
+      "bytes": 23855,
+      "sha256": "bcd4eeee747f3373d328665f6f0e70e54e6a3371e63b3ad772884232fcda6d3d",
+      "match": true
+    },
+    {
+      "path": "/tmp/motion-qualified-measurement-fe092-20261002/source/src/lit/controller.ts",
+      "bytes": 7509,
+      "sha256": "e084ce1b57c95e61a59decf3b12ca3a8c965719e7dfcc865ae96d4a57bffea49",
+      "match": true
+    },
+    {
+      "path": "/tmp/motion-qualified-measurement-fe092-20261002/source/src/lit/element.ts",
+      "bytes": 6431,
+      "sha256": "2be4795e074c9e75f100ecd00d9be6aea29ff5e4cc9eaf553e774de01faf4579",
+      "match": true
+    },
+    {
+      "path": "/tmp/motion-qualified-measurement-fe092-20261002/source/src/lit/index.ts",
+      "bytes": 1136,
+      "sha256": "2089610c36c0598a0f0d499c3414851c7602568183a7e72ad54e99640547191b",
+      "match": true
+    },
+    {
+      "path": "/tmp/motion-qualified-measurement-fe092-20261002/source/src/motion-value.ts",
+      "bytes": 27418,
+      "sha256": "5b475b534528395d83cb717f7e74bd1fae39834817ce811223608b207727756e",
+      "match": true
+    },
+    {
+      "path": "/tmp/motion-qualified-measurement-fe092-20261002/source/src/nano/index.ts",
+      "bytes": 3689,
+      "sha256": "84b0edc7753b4755f9944e09a06356fa62d86110bd472eeb66b280f94ea88a3c",
+      "match": true
+    },
+    {
+      "path": "/tmp/motion-qualified-measurement-fe092-20261002/source/src/nano/spring-linear.ts",
+      "bytes": 4097,
+      "sha256": "d735f5b389eb45216921d4b425d1a349bf34ada9505bda9e2015787b19a505ab",
+      "match": true
+    },
+    {
+      "path": "/tmp/motion-qualified-measurement-fe092-20261002/source/src/preact/index.ts",
+      "bytes": 3159,
+      "sha256": "43f3d7877de56dbf97a55bdeb02bfeb75a19c520e2254ade64f667843c82c03e",
+      "match": true
+    },
+    {
+      "path": "/tmp/motion-qualified-measurement-fe092-20261002/source/src/presence/index.ts",
+      "bytes": 559,
+      "sha256": "2b48d9c37d0e68623262ef158d875774243ac59b45ca79ec664890ee3c4f3d64",
+      "match": true
+    },
+    {
+      "path": "/tmp/motion-qualified-measurement-fe092-20261002/source/src/presence/machine.ts",
+      "bytes": 19948,
+      "sha256": "34a8b0b55bfb306076fa4716b6d772fe1d6392b1383eca207e6b7f732aab0798",
+      "match": true
+    },
+    {
+      "path": "/tmp/motion-qualified-measurement-fe092-20261002/source/src/presence/transition.ts",
+      "bytes": 11783,
+      "sha256": "c661736249a257646390aeabc240a631135513a2de7595f18f5e728bd742c88a",
+      "match": true
+    },
+    {
+      "path": "/tmp/motion-qualified-measurement-fe092-20261002/source/src/presets/index.ts",
+      "bytes": 58957,
+      "sha256": "5a94844f45036df175421924ac5d7fea028c22e0c79690d1b323290a54d1b727",
+      "match": true
+    },
+    {
+      "path": "/tmp/motion-qualified-measurement-fe092-20261002/source/src/projection/dom.ts",
+      "bytes": 24472,
+      "sha256": "48d1e3c23d6280aba52397462238a2cda56d9d54f96320e2f90f76531ca7ece3",
+      "match": true
+    },
+    {
+      "path": "/tmp/motion-qualified-measurement-fe092-20261002/source/src/projection/driver.ts",
+      "bytes": 30823,
+      "sha256": "baa7e35ab648b518da0fece893592fbe39780251725122bb415369b228334aa5",
+      "match": true
+    },
+    {
+      "path": "/tmp/motion-qualified-measurement-fe092-20261002/source/src/projection/geometry.ts",
+      "bytes": 26103,
+      "sha256": "dabaec207bb026a7cce917ee219c4658257199d67fc9dcea425d7607cf688969",
+      "match": true
+    },
+    {
+      "path": "/tmp/motion-qualified-measurement-fe092-20261002/source/src/projection/index.ts",
+      "bytes": 8317,
+      "sha256": "1b57777389d538c5e8335a27004b3d286adae9e0066ce9b45bec529d37dc61a6",
+      "match": true
+    },
+    {
+      "path": "/tmp/motion-qualified-measurement-fe092-20261002/source/src/qwik/index.ts",
+      "bytes": 5695,
+      "sha256": "9d61d4138cd93809ae3181de6dacd2227c33364214487e6ceec9ff85a2995e4c",
+      "match": true
+    },
+    {
+      "path": "/tmp/motion-qualified-measurement-fe092-20261002/source/src/react/index.ts",
+      "bytes": 17117,
+      "sha256": "a95f1129500af44c72f88d160ca6dc959fbac6bbbb9af0e398abc9e83ceb118a",
+      "match": true
+    },
+    {
+      "path": "/tmp/motion-qualified-measurement-fe092-20261002/source/src/scroll/index.ts",
+      "bytes": 15157,
+      "sha256": "dde90267faf3fc1c6c77416bfd315eecced48ba4604aa8e3cb18ecbb782ba2a4",
+      "match": true
+    },
+    {
+      "path": "/tmp/motion-qualified-measurement-fe092-20261002/source/src/smart/index.ts",
+      "bytes": 49559,
+      "sha256": "72c1d466894a5bcdec84397a5afaf9e86b7041449824496cdfe3cb902f44f7e7",
+      "match": true
+    },
+    {
+      "path": "/tmp/motion-qualified-measurement-fe092-20261002/source/src/solid/index.ts",
+      "bytes": 4312,
+      "sha256": "223764ea7e1c83ec8fdf325dbd9c0480b9ac0e2b85691ea14774d785d16220c1",
+      "match": true
+    },
+    {
+      "path": "/tmp/motion-qualified-measurement-fe092-20261002/source/src/spring/index.ts",
+      "bytes": 23354,
+      "sha256": "b359a9be0cbd86260f2aa76a0228c5df92e4d81ca6880ca73e4e165ce7b0c914",
+      "match": true
+    },
+    {
+      "path": "/tmp/motion-qualified-measurement-fe092-20261002/source/src/spring.ts",
+      "bytes": 15523,
+      "sha256": "91eb34fff7906d43661063795e282ac5ca47e5a1f2980d0410381ca3302dda36",
+      "match": true
+    },
+    {
+      "path": "/tmp/motion-qualified-measurement-fe092-20261002/source/src/stagger/index.ts",
+      "bytes": 5872,
+      "sha256": "e9c72b7fe0ec30fe6005e0b4a3051fc0ddbae2526280c36bd800cc8debb7168a",
+      "match": true
+    },
+    {
+      "path": "/tmp/motion-qualified-measurement-fe092-20261002/source/src/stagger/scheduler.ts",
+      "bytes": 4420,
+      "sha256": "8749a07d4c1aa7b248ba2e1de5b2a9e1574d69e2d8858777bc60f207b4ebc938",
+      "match": true
+    },
+    {
+      "path": "/tmp/motion-qualified-measurement-fe092-20261002/source/src/svelte/index.ts",
+      "bytes": 5259,
+      "sha256": "fa802235b5c8b29843abd24bce3c99fd11be7786c5e4ff13c9ae9da73fd5ad53",
+      "match": true
+    },
+    {
+      "path": "/tmp/motion-qualified-measurement-fe092-20261002/source/src/svg/index.ts",
+      "bytes": 18883,
+      "sha256": "534e9e987d0a85b18b335272155273796cecd86f9edcaf8a97b0c6792cf73b19",
+      "match": true
+    },
+    {
+      "path": "/tmp/motion-qualified-measurement-fe092-20261002/source/src/svg-morph/index.ts",
+      "bytes": 15557,
+      "sha256": "ec0d1e9cb229424ec1618fdaa667cabdd54839a2897be023b8d49af4e654935d",
+      "match": true
+    },
+    {
+      "path": "/tmp/motion-qualified-measurement-fe092-20261002/source/src/timeline/index.ts",
+      "bytes": 28511,
+      "sha256": "2f0f18d812dce9c6abd0bc23355e36eae68bb556abe4fa5b3848440f7533f5f6",
+      "match": true
+    },
+    {
+      "path": "/tmp/motion-qualified-measurement-fe092-20261002/source/src/tokens/index.ts",
+      "bytes": 18859,
+      "sha256": "524830e05aeb30a80a4aa0de980ecb1460f6a6a34cb501c98a5973e201ea03c7",
+      "match": true
+    },
+    {
+      "path": "/tmp/motion-qualified-measurement-fe092-20261002/source/src/tween.ts",
+      "bytes": 1382,
+      "sha256": "60d9505b6e8174c423cc44cb9123388fec8e1c385b288ca22e48944aac792c16",
+      "match": true
+    },
+    {
+      "path": "/tmp/motion-qualified-measurement-fe092-20261002/source/src/utils/index.ts",
+      "bytes": 20269,
+      "sha256": "6458d62c55eb5d175107a16f5695ce57fa4fe02b720b56c415c12a853393b706",
+      "match": true
+    },
+    {
+      "path": "/tmp/motion-qualified-measurement-fe092-20261002/source/src/value/color.ts",
+      "bytes": 13682,
+      "sha256": "bfe5088b47bca4e03049ae2b0e1bb32393b245fb3b5ef693ba8ff4d1cbe168a6",
+      "match": true
+    },
+    {
+      "path": "/tmp/motion-qualified-measurement-fe092-20261002/source/src/value/index.ts",
+      "bytes": 5148,
+      "sha256": "633fbda0a0e172f67fc3059ec60664e8139bb07cfd03d11172101cdc690abf2a",
+      "match": true
+    },
+    {
+      "path": "/tmp/motion-qualified-measurement-fe092-20261002/source/src/value/parse.ts",
+      "bytes": 1436,
+      "sha256": "f544ed14777834b618893909976e5e72a9dce5fff085c754666b8836975b407e",
+      "match": true
+    },
+    {
+      "path": "/tmp/motion-qualified-measurement-fe092-20261002/source/src/value/transform.ts",
+      "bytes": 7728,
+      "sha256": "9b002747772242f845f5de002a4a60cff226a7746211dad82610381f5d00d8c9",
+      "match": true
+    },
+    {
+      "path": "/tmp/motion-qualified-measurement-fe092-20261002/source/src/value/units.ts",
+      "bytes": 10415,
+      "sha256": "d36bd34047108a2436faafb085b780976dad71cc73a864600a1e89a28c34d6c7",
+      "match": true
+    },
+    {
+      "path": "/tmp/motion-qualified-measurement-fe092-20261002/source/src/vue/index.ts",
+      "bytes": 14235,
+      "sha256": "878ecbf5a42228e4aa33b3ba65a067840e74d0284b45b649260eebb8238ddcb2",
+      "match": true
+    },
+    {
+      "path": "/tmp/motion-qualified-measurement-fe092-20261002/source/src/waapi/index.ts",
+      "bytes": 18514,
+      "sha256": "3bab35b44ff026410dd638cb344342dd715cfe505af96a5beba08a03863c9b79",
+      "match": true
+    },
+    {
+      "path": "/tmp/motion-qualified-measurement-fe092-20261002/source/src/wc/index.ts",
+      "bytes": 8720,
+      "sha256": "0bb5396cff6e701e0f1191a9d5d7bef6ff67118b2b968c3d7310962ea7380cc2",
+      "match": true
+    },
+    {
+      "path": "/tmp/motion-qualified-measurement-fe092-20261002/source/stryker.config.mjs",
+      "bytes": 3169,
+      "sha256": "15644eba279fd5d81fce9ee15fc97226318de035e7b47fa468046255494742c6",
+      "match": true
+    },
+    {
+      "path": "/tmp/motion-qualified-measurement-fe092-20261002/source/stryker.driver.config.mjs",
+      "bytes": 610,
+      "sha256": "b9bb12eea292b5dfbf5cc739524139baf3452d0cb401bf71c0975f95f975120a",
+      "match": true
+    },
+    {
+      "path": "/tmp/motion-qualified-measurement-fe092-20261002/source/test/a11y.test.ts",
+      "bytes": 9503,
+      "sha256": "0733399517c74c35f95f510f8b9d8489c851c0dd26749e65b150d51a0583a80c",
+      "match": true
+    },
+    {
+      "path": "/tmp/motion-qualified-measurement-fe092-20261002/source/test/angular-runtime.test.ts",
+      "bytes": 5345,
+      "sha256": "725695ff61dfc60a93ebbcba247e4600ef283eef228085ae8cc75c7614bfc370",
+      "match": true
+    },
+    {
+      "path": "/tmp/motion-qualified-measurement-fe092-20261002/source/test/angular.test.ts",
+      "bytes": 8972,
+      "sha256": "4ca4672d3bb4aedf02375c83daa1da85f8f5abf3374679dacebbaaec604210e3",
+      "match": true
+    },
+    {
+      "path": "/tmp/motion-qualified-measurement-fe092-20261002/source/test/animate-bind-known-authority.test.ts",
+      "bytes": 4182,
+      "sha256": "6f507983af56d117cab2d281c1c8a1af2b7bacc032fe099f33c5793bb5d1c249",
+      "match": true
+    },
+    {
+      "path": "/tmp/motion-qualified-measurement-fe092-20261002/source/test/animate-css-velocity-pickup.test.ts",
+      "bytes": 18700,
+      "sha256": "91c3deed342d0456a8eb27617a517646e73ea50ef35c309ed45063957bd9b002",
+      "match": true
+    },
+    {
+      "path": "/tmp/motion-qualified-measurement-fe092-20261002/source/test/animate-delay-overflow.test.ts",
+      "bytes": 6493,
+      "sha256": "6b4b89952b9f68d0389103705513873c78d1092100a75fa6f351c65f5f10d2d2",
+      "match": true
+    },
+    {
+      "path": "/tmp/motion-qualified-measurement-fe092-20261002/source/test/animate-error-codes.test.ts",
+      "bytes": 8156,
+      "sha256": "1cced3cf3a968c7c768c643cc9f39f2ca30c8d02041430043cf00a7f6bfcd730",
+      "match": true
+    },
+    {
+      "path": "/tmp/motion-qualified-measurement-fe092-20261002/source/test/animate-facade-api-surface-pin.test.ts",
+      "bytes": 2540,
+      "sha256": "16c179c45dd9de4f59e11c7c4cca9236c4f8b56d130ddf519278015e14609cc4",
+      "match": true
+    },
+    {
+      "path": "/tmp/motion-qualified-measurement-fe092-20261002/source/test/animate-facade-compositor.test.ts",
+      "bytes": 9408,
+      "sha256": "f36098888c2b0f4796fa487b056d3a4f753539f1155c09e422de615c2370818d",
+      "match": true
+    },
+    {
+      "path": "/tmp/motion-qualified-measurement-fe092-20261002/source/test/animate-facade-defaults.test.ts",
+      "bytes": 3944,
+      "sha256": "21d6c272e04789263b39dd7cc821cfe24228746da12ce645bbab06afeabd40fb",
+      "match": true
+    },
+    {
+      "path": "/tmp/motion-qualified-measurement-fe092-20261002/source/test/animate-facade-finiteness-fuzz.test.ts",
+      "bytes": 6400,
+      "sha256": "6e233c1f6db387a0d77cfceba3de08fe949d802d601ec1c6d4c9996d1d7b0cf3",
+      "match": true
+    },
+    {
+      "path": "/tmp/motion-qualified-measurement-fe092-20261002/source/test/animate-facade-helpers.ts",
+      "bytes": 9190,
+      "sha256": "df8aec5aaf03f307dd7dba1076b779590d4fb4f97282dceead381c87cd4983d7",
+      "match": true
+    },
+    {
+      "path": "/tmp/motion-qualified-measurement-fe092-20261002/source/test/animate-facade-ssr.test.ts",
+      "bytes": 3882,
+      "sha256": "4bd849f25d6d5891ce9b433edb19454f42e30d619e8b973ffb2d8c32f2a4594f",
+      "match": true
+    },
+    {
+      "path": "/tmp/motion-qualified-measurement-fe092-20261002/source/test/animate-facade.test.ts",
+      "bytes": 19706,
+      "sha256": "7e55e042219c9d3bede8a1e2c9c9a5129330c429375128633470a09db729deaa",
+      "match": true
+    },
+    {
+      "path": "/tmp/motion-qualified-measurement-fe092-20261002/source/test/animate-finished-allocation.test.ts",
+      "bytes": 4436,
+      "sha256": "3fb29d6e6ef0861c96be9574b52dfe70fc23c9e6967470f75422c5c3cce25a4f",
+      "match": true
+    },
+    {
+      "path": "/tmp/motion-qualified-measurement-fe092-20261002/source/test/animate-frame-batching.test.ts",
+      "bytes": 14292,
+      "sha256": "6a6d2aa9b4dfa5049f885adedc8b3922bdb1e037b05e63d886958400d0a840d3",
+      "match": true
+    },
+    {
+      "path": "/tmp/motion-qualified-measurement-fe092-20261002/source/test/animate-group-clock-coherence.test.ts",
+      "bytes": 13566,
+      "sha256": "a28ff8f8262fd90d5711c8d7710deafe5dff1cf6684b4ebb6fbcff6b016fa219",
+      "match": true
+    },
+    {
+      "path": "/tmp/motion-qualified-measurement-fe092-20261002/source/test/animate-hostile-microtask.test.ts",
+      "bytes": 7542,
+      "sha256": "9b3dea791089f9ae0fdf6e36087fafb7b536d668464296b934b4b44b3b5e4f3b",
+      "match": true
+    },
+    {
+      "path": "/tmp/motion-qualified-measurement-fe092-20261002/source/test/animate-lifecycle-atomicity.test.ts",
+      "bytes": 30144,
+      "sha256": "da7d579a85a7a8a1e139b1d2e34b645e0d4f08dcfa95f097208699fb9c4b8a55",
+      "match": true
+    },
+    {
+      "path": "/tmp/motion-qualified-measurement-fe092-20261002/source/test/animate-main-lane.test.ts",
+      "bytes": 14137,
+      "sha256": "f8e77cd4e7d21d396a871c4650401c983eb49d358003b72a543976a6542dbc41",
+      "match": true
+    },
+    {
+      "path": "/tmp/motion-qualified-measurement-fe092-20261002/source/test/animate-overflow-finiteness-fuzz.test.ts",
+      "bytes": 18745,
+      "sha256": "31464a38133eebc0e8179517b573a2d124309067e12cb67b40df33fd45b837c3",
+      "match": true
+    },
+    {
+      "path": "/tmp/motion-qualified-measurement-fe092-20261002/source/test/animate-parse-props-grouping.test.ts",
+      "bytes": 2610,
+      "sha256": "a18028cbc7c1855908730efff27935da99b235c52bc42d191b67b2899db6be47",
+      "match": true
+    },
+    {
+      "path": "/tmp/motion-qualified-measurement-fe092-20261002/source/test/animate-progression.test.ts",
+      "bytes": 2843,
+      "sha256": "a6df859122dd74d90ee4fab9c51973f7acb1c5c26bfac193ccdecd9bbb26cca9",
+      "match": true
+    },
+    {
+      "path": "/tmp/motion-qualified-measurement-fe092-20261002/source/test/animate-residual-registry-invariant.test.ts",
+      "bytes": 3427,
+      "sha256": "e2df6bcdcfc836f01b2db4829e49d052c6cfc8c3245b50a8c64a7118556b4744",
+      "match": true
+    },
+    {
+      "path": "/tmp/motion-qualified-measurement-fe092-20261002/source/test/animate-route-sum.test.ts",
+      "bytes": 4204,
+      "sha256": "bd4030727db1f7fea879d8235b2b339b6f83a5649f6139d7556798dcb5e3e452",
+      "match": true
+    },
+    {
+      "path": "/tmp/motion-qualified-measurement-fe092-20261002/source/test/animate-runtime-boundaries.test.ts",
+      "bytes": 11138,
+      "sha256": "ee4a46bd33f3d1218ed2576c6e993fdd6034d6868d70be4bff16e07b75f49444",
+      "match": true
+    },
+    {
+      "path": "/tmp/motion-qualified-measurement-fe092-20261002/source/test/animate-scale-residual.test.ts",
+      "bytes": 21185,
+      "sha256": "c66b71e1b83d0f3a1fe20faf320662d4cd6b2f5e260477ec86d68678c922cd31",
+      "match": true
+    },
+    {
+      "path": "/tmp/motion-qualified-measurement-fe092-20261002/source/test/animate-scope-gc.test.ts",
+      "bytes": 1807,
+      "sha256": "732a2f91b631d15a4cfa1e3b6eacaf5ecdb1d27b9e6631f5e81a8b55020eb8fb",
+      "match": true
+    },
+    {
+      "path": "/tmp/motion-qualified-measurement-fe092-20261002/source/test/animate-scope-package.test.ts",
+      "bytes": 3953,
+      "sha256": "c9857430fac44a3803fc75d277eed8afdefb38994fbf6de6ce6b7ecce5b9b2e5",
+      "match": true
+    },
+    {
+      "path": "/tmp/motion-qualified-measurement-fe092-20261002/source/test/animate-scope-recipes.test.ts",
+      "bytes": 3945,
+      "sha256": "7b1a1338d55fa86ccc877f408d81484bc61d74438f529d3e99e4cf4ee7977586",
+      "match": true
+    },
+    {
+      "path": "/tmp/motion-qualified-measurement-fe092-20261002/source/test/animate-scope.test.ts",
+      "bytes": 14313,
+      "sha256": "22632669ff5b88b34cbbd43a93ca3e192031838da5496d32290d85ef3f498d50",
+      "match": true
+    },
+    {
+      "path": "/tmp/motion-qualified-measurement-fe092-20261002/source/test/animate-seek-contract.test.ts",
+      "bytes": 4424,
+      "sha256": "1e4cc317521c738289646561978956fc6b2ebf698139de69614246b3f36c392f",
+      "match": true
+    },
+    {
+      "path": "/tmp/motion-qualified-measurement-fe092-20261002/source/test/animate-spring-borrow-types.test.ts",
+      "bytes": 2290,
+      "sha256": "a4b054c2d764f3e463e74e3230ff3c010af5a425412b0e4d4f015d02cd30e56b",
+      "match": true
+    },
+    {
+      "path": "/tmp/motion-qualified-measurement-fe092-20261002/source/test/animate-spring-cache.test.ts",
+      "bytes": 2828,
+      "sha256": "f39dc37891c30f6e51c03d70e5d1663277b396c5423237d3c2d4dc4d8885e79c",
+      "match": true
+    },
+    {
+      "path": "/tmp/motion-qualified-measurement-fe092-20261002/source/test/animate-spring-workspace.test.ts",
+      "bytes": 10571,
+      "sha256": "fc9c747ac29565f0fe3de9ad2bd0343fbfc9e54a466c2a2430c9c746fa64bb0f",
+      "match": true
+    },
+    {
+      "path": "/tmp/motion-qualified-measurement-fe092-20261002/source/test/animate-subframe-phase.test.ts",
+      "bytes": 4891,
+      "sha256": "9d2083269a8cb63470b2be3d17b09e27706cef88abfb28fa87ebd733c1032d92",
+      "match": true
+    },
+    {
+      "path": "/tmp/motion-qualified-measurement-fe092-20261002/source/test/animate-surface-batch.test.ts",
+      "bytes": 25190,
+      "sha256": "a0a4e8b2fa21109ca7d44200890cce4813ce745da8b949a624a3769aafe1f926",
+      "match": true
+    },
+    {
+      "path": "/tmp/motion-qualified-measurement-fe092-20261002/source/test/animate-surface-reentry-generation.test.ts",
+      "bytes": 20796,
+      "sha256": "e05846f21e8bd808b65d38c0611ad52f0e16cbd2c103f80327cabc8fc9d60cb8",
+      "match": true
+    },
+    {
+      "path": "/tmp/motion-qualified-measurement-fe092-20261002/source/test/animate-tween-velocity-pickup.test.ts",
+      "bytes": 15535,
+      "sha256": "e12eb03fc27df93352a86deaf710d1c85162158e05007e11e77fe5df0a2ce830",
+      "match": true
+    },
+    {
+      "path": "/tmp/motion-qualified-measurement-fe092-20261002/source/test/animate-waapi-lifecycle.test.ts",
+      "bytes": 32540,
+      "sha256": "63b3f3cc53fb7f05af260ae99012d200d591ed51782caa438bf94de74ece2e1f",
+      "match": true
+    },
+    {
+      "path": "/tmp/motion-qualified-measurement-fe092-20261002/source/test/animate-waapi-long-delay.test.ts",
+      "bytes": 20907,
+      "sha256": "c57d5bcec54f4579aa8603e93dd7bce3fe65d315a0dcafd2b9e600ce952e03dc",
+      "match": true
+    },
+    {
+      "path": "/tmp/motion-qualified-measurement-fe092-20261002/source/test/api-surface-pin.test.ts",
+      "bytes": 3185,
+      "sha256": "54d478acc1ccdc3985c4fd49edb0239516f2aba0228b93f78e0c20c9ae7cdcfc",
+      "match": true
+    },
+    {
+      "path": "/tmp/motion-qualified-measurement-fe092-20261002/source/test/auto-animate.test.ts",
+      "bytes": 74625,
+      "sha256": "64cdb3acb9aa71dab7ee0228b3da42e49d28fe713577d8b967751b0c2a3b4ba4",
+      "match": true
+    },
+    {
+      "path": "/tmp/motion-qualified-measurement-fe092-20261002/source/test/behaviors-api-surface-pin.test.ts",
+      "bytes": 7065,
+      "sha256": "dc7f860e27f972643a5880e155306fa959882295d08f61e68664498628333b50",
+      "match": true
+    },
+    {
+      "path": "/tmp/motion-qualified-measurement-fe092-20261002/source/test/behaviors-carousel-overflow.test.ts",
+      "bytes": 2417,
+      "sha256": "e01d92029a38a6c589b6dd43ad58f03b92ae8b5674214f37303d64ac5be35b99",
+      "match": true
+    },
+    {
+      "path": "/tmp/motion-qualified-measurement-fe092-20261002/source/test/behaviors-carousel.test.ts",
+      "bytes": 5994,
+      "sha256": "f51a1cd543673beab53f8b34047f14edc95baa0d8c354be3cf675caad8bb0f30",
+      "match": true
+    },
+    {
+      "path": "/tmp/motion-qualified-measurement-fe092-20261002/source/test/behaviors-dismiss.test.ts",
+      "bytes": 6054,
+      "sha256": "3a3e08f7c56b2217cb4718adbad6090b4baa796909ac7b0a4b9508d44e2ff1a6",
+      "match": true
+    },
+    {
+      "path": "/tmp/motion-qualified-measurement-fe092-20261002/source/test/behaviors-finiteness-fuzz.test.ts",
+      "bytes": 3615,
+      "sha256": "080ad7a69e579f76b6e30e1ceb80979afee0ffa458963c8c58035ad533c29803",
+      "match": true
+    },
+    {
+      "path": "/tmp/motion-qualified-measurement-fe092-20261002/source/test/behaviors-helpers.ts",
+      "bytes": 2896,
+      "sha256": "569ce21af8d5953d9205d395d96955d33619c523b790ee8fe60d75e5aec73a49",
+      "match": true
+    },
+    {
+      "path": "/tmp/motion-qualified-measurement-fe092-20261002/source/test/behaviors-late-callback-owner.test.ts",
+      "bytes": 3349,
+      "sha256": "5b62dae47e9dd35c1c026f91a3a782300e0655439c1f906122c3ee083503527b",
+      "match": true
+    },
+    {
+      "path": "/tmp/motion-qualified-measurement-fe092-20261002/source/test/behaviors-mutable-constraints.test.ts",
+      "bytes": 18364,
+      "sha256": "90b9257c3d1e929c0c0c119ace75911a8575a654e667637cbdee16fed77147b4",
+      "match": true
+    },
+    {
+      "path": "/tmp/motion-qualified-measurement-fe092-20261002/source/test/behaviors-property.test.ts",
+      "bytes": 4201,
+      "sha256": "4ca8d1515e30cb47acb3ba78b1f0ba84b0f8062cefc098320ece32dcc4ed5851",
+      "match": true
+    },
+    {
+      "path": "/tmp/motion-qualified-measurement-fe092-20261002/source/test/behaviors-pull.test.ts",
+      "bytes": 8670,
+      "sha256": "bf7c4f9c43ae31aa8b6e1270e479179f2cacb1bf6c2fbd96336bfdcf2b9d2e89",
+      "match": true
+    },
+    {
+      "path": "/tmp/motion-qualified-measurement-fe092-20261002/source/test/behaviors-reentrant-publication.test.ts",
+      "bytes": 7523,
+      "sha256": "de603842205113adb401af014e211a42b2e4cce1f8807dab6d590b9f180b08ba",
+      "match": true
+    },
+    {
+      "path": "/tmp/motion-qualified-measurement-fe092-20261002/source/test/behaviors-reset-domain.test.ts",
+      "bytes": 1583,
+      "sha256": "f3d1b4960a12699875c570fdafa11ac556d15be4e8f545d4511e467b8704492b",
+      "match": true
+    },
+    {
+      "path": "/tmp/motion-qualified-measurement-fe092-20261002/source/test/behaviors-resize-owner-lower-bound.test.ts",
+      "bytes": 8519,
+      "sha256": "4db28760c1a43427adcc3ae4eee1e6c858f4fa7811d230b587a4ddea6e3ba8bf",
+      "match": true
+    },
+    {
+      "path": "/tmp/motion-qualified-measurement-fe092-20261002/source/test/behaviors-sheet.test.ts",
+      "bytes": 8844,
+      "sha256": "903f06e35f6ed70a2e4fd55273939cfcd4dd84f86bf4183dd231e570f1514505",
+      "match": true
+    },
+    {
+      "path": "/tmp/motion-qualified-measurement-fe092-20261002/source/test/behaviors-snap-ordering.test.ts",
+      "bytes": 589,
+      "sha256": "8ca72a19290bf4198621f603390193c41326fdcba729222f11fe6e0f27fb5eab",
+      "match": true
+    },
+    {
+      "path": "/tmp/motion-qualified-measurement-fe092-20261002/source/test/behaviors-state-cascade-batch.test.ts",
+      "bytes": 12535,
+      "sha256": "d74ad49c185d5174594770fccc10e0e9c40aa5f5aea3eaca6cb15d8e81a4246c",
+      "match": true
+    },
+    {
+      "path": "/tmp/motion-qualified-measurement-fe092-20261002/source/test/behaviors-state-cascade-lifecycle.test.ts",
+      "bytes": 12845,
+      "sha256": "edb508f675b819bbb396d18b22f7b1ee501b239f453ba05f971b1b2f2b065b79",
+      "match": true
+    },
+    {
+      "path": "/tmp/motion-qualified-measurement-fe092-20261002/source/test/behaviors-state-cascade-model.test.ts",
+      "bytes": 3956,
+      "sha256": "c8c1e27ca5deaf711dac4f945140ef9c6bd215cd79d77effc8c5fa5cd9400422",
+      "match": true
+    },
+    {
+      "path": "/tmp/motion-qualified-measurement-fe092-20261002/source/test/behaviors-state-cascade.test.ts",
+      "bytes": 5944,
+      "sha256": "da1ebb7a9cf40f48e18fd6388606be05dcb4090a108fc9cc8668c2ed331e367b",
+      "match": true
+    },
+    {
+      "path": "/tmp/motion-qualified-measurement-fe092-20261002/source/test/bench-support.test.ts",
+      "bytes": 9457,
+      "sha256": "83a09499b2efc21467e091e793cd412fdbf67960b85e98e819caf73c676f51c2",
+      "match": true
+    },
+    {
+      "path": "/tmp/motion-qualified-measurement-fe092-20261002/source/test/bench-transform-pair.test.ts",
+      "bytes": 49935,
+      "sha256": "52cddc9fdbf34c220d140c26db644e913d698f4a6d6df98f951e9f14e45e9a4f",
+      "match": true
+    },
+    {
+      "path": "/tmp/motion-qualified-measurement-fe092-20261002/source/test/benchmark-clock-fixture.ts",
+      "bytes": 644,
+      "sha256": "7da4a9e2f8b70a722a7209fed6ae3f1f2fd8aa5b1421b27ccceb4787d0ed8b8d",
+      "match": true
+    },
+    {
+      "path": "/tmp/motion-qualified-measurement-fe092-20261002/source/test/benchmark-methodology.test.ts",
+      "bytes": 34432,
+      "sha256": "1728e170a5f8c35a2b2ace615aedc9682ed77e8b6b280cab8f0c7c3c9fdaec98",
+      "match": true
+    },
+    {
+      "path": "/tmp/motion-qualified-measurement-fe092-20261002/source/test/benchmark-provenance.test.ts",
+      "bytes": 32493,
+      "sha256": "2e8885ce332d3c630f7f921b9217e9f8d9f5f2accaa2b4b1389268f371264fd5",
+      "match": true
+    },
+    {
+      "path": "/tmp/motion-qualified-measurement-fe092-20261002/source/test/benchmark-report-contract.test.ts",
+      "bytes": 51785,
+      "sha256": "91759d8223e76cc8db450c392fa2983229945de40a7f61e19892002fefe36647",
+      "match": true
+    },
+    {
+      "path": "/tmp/motion-qualified-measurement-fe092-20261002/source/test/bindings-api-surface-pin.test.ts",
+      "bytes": 3023,
+      "sha256": "3379972fe334ae08b87be16438868f479bf773faeaba2c089626889c20b068c1",
+      "match": true
+    },
+    {
+      "path": "/tmp/motion-qualified-measurement-fe092-20261002/source/test/bindings-shared-frame.test.ts",
+      "bytes": 4332,
+      "sha256": "0b858aa83373a7c7e484d96ac099de32fec2fbfbf1ad4fdd4908a40d3b830bf7",
+      "match": true
+    },
+    {
+      "path": "/tmp/motion-qualified-measurement-fe092-20261002/source/test/build-config.test.ts",
+      "bytes": 1070,
+      "sha256": "e38f87efccc9ed57d838b83d2e1ad0f1e787bb0181350b93f05a585db77e1bdb",
+      "match": true
+    },
+    {
+      "path": "/tmp/motion-qualified-measurement-fe092-20261002/source/test/ci-workflow-contract.test.ts",
+      "bytes": 24040,
+      "sha256": "0a0ee8faf5e0c1c647f4944e7e131b34c7e0fc0d850a7f890d498f73a8f31ed9",
+      "match": true
+    },
+    {
+      "path": "/tmp/motion-qualified-measurement-fe092-20261002/source/test/color-mutation-harden.test.ts",
+      "bytes": 19973,
+      "sha256": "f320381401b9f95070ce09d0f5c1908414ef9e3803d2d0ea5ddbb616fb0199e5",
+      "match": true
+    },
+    {
+      "path": "/tmp/motion-qualified-measurement-fe092-20261002/source/test/compiler-doc-recipe.test.ts",
+      "bytes": 4651,
+      "sha256": "98d8174240dea1b3a189aeec98ad9460a256dc9b381771616df89dde4265423d",
+      "match": true
+    },
+    {
+      "path": "/tmp/motion-qualified-measurement-fe092-20261002/source/test/compiler-import-ownership.test.ts",
+      "bytes": 2820,
+      "sha256": "dc1c35b0a33a9c4addc3d566e5d40551db6e0f90ecae4848f01c019d61af3a6d",
+      "match": true
+    },
+    {
+      "path": "/tmp/motion-qualified-measurement-fe092-20261002/source/test/compiler-nano-lowering.test.ts",
+      "bytes": 18113,
+      "sha256": "2e580ef24117c5a2d92d34bd2adf0e9091a65cf0b6de6fe6e0f391335537e2a3",
+      "match": true
+    },
+    {
+      "path": "/tmp/motion-qualified-measurement-fe092-20261002/source/test/compiler-nano-release-artifact.test.ts",
+      "bytes": 1049,
+      "sha256": "2df7213bfd6e47fdb1a6c02221ba3e13090b60ad8e0432e9998b007de5066dc1",
+      "match": true
+    },
+    {
+      "path": "/tmp/motion-qualified-measurement-fe092-20261002/source/test/compiler-parse-diagnostics.test.ts",
+      "bytes": 1671,
+      "sha256": "d05c96de124eb93235ce10bfcd468670fbe4c00946c5f2b1c4c79324289912a1",
+      "match": true
+    },
+    {
+      "path": "/tmp/motion-qualified-measurement-fe092-20261002/source/test/compiler-single-plan.test.ts",
+      "bytes": 6229,
+      "sha256": "df2e2c1438f13d56e2bc02d433a45e7c8a1ccce77d42c9ab6c07ce8d74d86e16",
+      "match": true
+    },
+    {
+      "path": "/tmp/motion-qualified-measurement-fe092-20261002/source/test/compiler-surface-lowering.test.ts",
+      "bytes": 16837,
+      "sha256": "4185b21594f2ffcf5df6cf2125585a96575a1c95476bff7970697ef69c565f78",
+      "match": true
+    },
+    {
+      "path": "/tmp/motion-qualified-measurement-fe092-20261002/source/test/compiler-tooling-trace.test.ts",
+      "bytes": 10162,
+      "sha256": "e26e67679aba0dcbc52a687dce4139402ca415c7e0c7b85171da4f74c30e721b",
+      "match": true
+    },
+    {
+      "path": "/tmp/motion-qualified-measurement-fe092-20261002/source/test/compositor-api-surface-pin.test.ts",
+      "bytes": 2836,
+      "sha256": "3476c21f5aff9e3052d0676933d3ee9e9deb920234551c027a5bd2db30be7c49",
+      "match": true
+    },
+    {
+      "path": "/tmp/motion-qualified-measurement-fe092-20261002/source/test/compositor-cache.test.ts",
+      "bytes": 13499,
+      "sha256": "1ea87b9a88e6743886f7309bcf45967552d04eef40f8c5f9f44a058ca0f37852",
+      "match": true
+    },
+    {
+      "path": "/tmp/motion-qualified-measurement-fe092-20261002/source/test/compositor-cold-compile-differential.test.ts",
+      "bytes": 19016,
+      "sha256": "94555ba99f442d2811925c5dadb1211317661b3e64cc61ff0992230f5a80c03f",
+      "match": true
+    },
+    {
+      "path": "/tmp/motion-qualified-measurement-fe092-20261002/source/test/compositor-compile-work.test.ts",
+      "bytes": 5121,
+      "sha256": "8f90182ff85569dade959f1e609b859e59d124854c2f59f04dc2a5353d637bc9",
+      "match": true
+    },
+    {
+      "path": "/tmp/motion-qualified-measurement-fe092-20261002/source/test/compositor-compile.test.ts",
+      "bytes": 20559,
+      "sha256": "3aa2395b4e83a749eb10f5c47c2f777726e4f817b74d6384fc02dcf90d039438",
+      "match": true
+    },
+    {
+      "path": "/tmp/motion-qualified-measurement-fe092-20261002/source/test/compositor-error-bound.test.ts",
+      "bytes": 5476,
+      "sha256": "2b80e801015a4028354c8eb64977ad6c50ccb5498c1146c92f326b2b5b8eced2",
+      "match": true
+    },
+    {
+      "path": "/tmp/motion-qualified-measurement-fe092-20261002/source/test/compositor-fallback-matrix.test.ts",
+      "bytes": 19862,
+      "sha256": "d57e6973bf839063ff9da13d5317f58519bee756852aa54f17f2fd1ae4dcec6d",
+      "match": true
+    },
+    {
+      "path": "/tmp/motion-qualified-measurement-fe092-20261002/source/test/compositor-handoff.test.ts",
+      "bytes": 14540,
+      "sha256": "65106212fa29b06a1fb64c19cc622f33b21fb808ebd42498d5eb578475a0d134",
+      "match": true
+    },
+    {
+      "path": "/tmp/motion-qualified-measurement-fe092-20261002/source/test/compositor-host-owner.test.ts",
+      "bytes": 25968,
+      "sha256": "e69783a76de0a0a57ee7146ce6a7800db32fb5f4a62c17e206e2f56b3683f9e8",
+      "match": true
+    },
+    {
+      "path": "/tmp/motion-qualified-measurement-fe092-20261002/source/test/compositor-max-value-error.test.ts",
+      "bytes": 6411,
+      "sha256": "0844764ab7cabc36e25beae3cc1d3236e97238345df408ebf51249895864906e",
+      "match": true
+    },
+    {
+      "path": "/tmp/motion-qualified-measurement-fe092-20261002/source/test/compositor-rdp-frontier-differential.test.ts",
+      "bytes": 5340,
+      "sha256": "71bbf3dd59e3069a9490c899590edc8fc6fba7c349ce1d23c5b47d249a47826a",
+      "match": true
+    },
+    {
+      "path": "/tmp/motion-qualified-measurement-fe092-20261002/source/test/compositor-rdp-frontier.test.ts",
+      "bytes": 4921,
+      "sha256": "5991400d8ada617ed0b4609c407800d85f56bf772a875633cb05a327dae6814d",
+      "match": true
+    },
+    {
+      "path": "/tmp/motion-qualified-measurement-fe092-20261002/source/test/compositor-retarget-cache.test.ts",
+      "bytes": 4246,
+      "sha256": "b1c9e03da52b516520f59c223865ff8e2ac88cc72cf9d92d54e65610a49137c5",
+      "match": true
+    },
+    {
+      "path": "/tmp/motion-qualified-measurement-fe092-20261002/source/test/compositor-retarget.test.ts",
+      "bytes": 17739,
+      "sha256": "65f974fc2ae6bd460fbbfab490e5ff05056f2580729e5026fd82c92ec85f39fa",
+      "match": true
+    },
+    {
+      "path": "/tmp/motion-qualified-measurement-fe092-20261002/source/test/compositor-retention-gc.test.ts",
+      "bytes": 1300,
+      "sha256": "cf9ed440188196437d4945c7c60b60f2e9558c7d47bad4dfd63ff3f07ce06cb9",
+      "match": true
+    },
+    {
+      "path": "/tmp/motion-qualified-measurement-fe092-20261002/source/test/compositor-return-to-native.test.ts",
+      "bytes": 11385,
+      "sha256": "2cf9a69b5ef5cb09b88e8b3306b99854b729844a180e5afa224baebc7cbdb330",
+      "match": true
+    },
+    {
+      "path": "/tmp/motion-qualified-measurement-fe092-20261002/source/test/compositor-serialized-execution.test.ts",
+      "bytes": 21756,
+      "sha256": "fbb32a24019044bbcab26a0710edb5caf719aa11c5d4b5f6dbff65693f24dbff",
+      "match": true
+    },
+    {
+      "path": "/tmp/motion-qualified-measurement-fe092-20261002/source/test/compositor-stagger-api-surface-pin.test.ts",
+      "bytes": 1676,
+      "sha256": "abceb41fe7504e368516463ff75158f7f9130f7664d1919277f48e62bcee8eff",
+      "match": true
+    },
+    {
+      "path": "/tmp/motion-qualified-measurement-fe092-20261002/source/test/compositor-stagger-count-boundary.test.ts",
+      "bytes": 10082,
+      "sha256": "e6c3dbb589edf559e501edb5719875c0c93a33f11a0fcc9b8ec02d1eca8d47f8",
+      "match": true
+    },
+    {
+      "path": "/tmp/motion-qualified-measurement-fe092-20261002/source/test/compositor-stagger-package.test.ts",
+      "bytes": 1891,
+      "sha256": "e7a8491249ae18a3de452bf5c8178efeb7eaf1627fcde0b9ccec6996e7e95685",
+      "match": true
+    },
+    {
+      "path": "/tmp/motion-qualified-measurement-fe092-20261002/source/test/compositor-stagger.test.ts",
+      "bytes": 21591,
+      "sha256": "c0e5e77c19c02fde5fcde36d7bca341e3d0615f77f16322da692fe51344fe5cf",
+      "match": true
+    },
+    {
+      "path": "/tmp/motion-qualified-measurement-fe092-20261002/source/test/compositor-velocity-budget.test.ts",
+      "bytes": 11133,
+      "sha256": "0666ca6f4d368147a815213bb511958318c892f9d69eb78d99d671b29a8aba2e",
+      "match": true
+    },
+    {
+      "path": "/tmp/motion-qualified-measurement-fe092-20261002/source/test/compositor-webkit-execution.test.ts",
+      "bytes": 13547,
+      "sha256": "febb2467de5aa71173081fd91dd4fb8a9a07963708e40d550a8aa320d10e1ba3",
+      "match": true
+    },
+    {
+      "path": "/tmp/motion-qualified-measurement-fe092-20261002/source/test/continuity-differential-matrix.test.ts",
+      "bytes": 91266,
+      "sha256": "2033e7af2c64119e094394811b65509524dcaf5b96f106dde440a5b9b34c205b",
+      "match": true
+    },
+    {
+      "path": "/tmp/motion-qualified-measurement-fe092-20261002/source/test/continuity-helpers.ts",
+      "bytes": 6465,
+      "sha256": "acda4db63d0cc555c7fb795f1946aa4fe76671fd12c8516192d892dad91ebe8e",
+      "match": true
+    },
+    {
+      "path": "/tmp/motion-qualified-measurement-fe092-20261002/source/test/convergence-relative-threshold.test.ts",
+      "bytes": 5994,
+      "sha256": "706cfd9fbd6c46e74c198e78beec154c7fb37127e5493e2016b3977d68f82609",
+      "match": true
+    },
+    {
+      "path": "/tmp/motion-qualified-measurement-fe092-20261002/source/test/convergence-threshold-behavior-pin.test.ts",
+      "bytes": 4552,
+      "sha256": "27edf4f07e7c1b77c5c0d4d2ba4a3be24f1322d7fc1d44239803a178bae6cb54",
+      "match": true
+    },
+    {
+      "path": "/tmp/motion-qualified-measurement-fe092-20261002/source/test/core-solver-buffer.test.ts",
+      "bytes": 5680,
+      "sha256": "17d615dea052e5931308537234ac7a2b888fa7aa2e136639070d15b82e4374db",
+      "match": true
+    },
+    {
+      "path": "/tmp/motion-qualified-measurement-fe092-20261002/source/test/decay-api-surface-pin.test.ts",
+      "bytes": 3350,
+      "sha256": "769be31cdd9b6153fb6dbb022a908dc3ab64a07b6703af919c7d5e99cde6b19d",
+      "match": true
+    },
+    {
+      "path": "/tmp/motion-qualified-measurement-fe092-20261002/source/test/decay-differential.test.ts",
+      "bytes": 5723,
+      "sha256": "5987f7cb1d82dee43bd0e73743493d46f1013f5b712c6869e2a5594e3ce84aba",
+      "match": true
+    },
+    {
+      "path": "/tmp/motion-qualified-measurement-fe092-20261002/source/test/decay-finiteness-fuzz.test.ts",
+      "bytes": 5623,
+      "sha256": "b122c46919191792954015e3efac43750ba0179c2ac59114b0d9b06f1fe23714",
+      "match": true
+    },
+    {
+      "path": "/tmp/motion-qualified-measurement-fe092-20261002/source/test/decay-mutation-harden.test.ts",
+      "bytes": 16486,
+      "sha256": "89c1baca42d2ea176538b623f400a9e3b9924da6c2828740ea401c9f00047e08",
+      "match": true
+    },
+    {
+      "path": "/tmp/motion-qualified-measurement-fe092-20261002/source/test/decay-reduced-motion.test.ts",
+      "bytes": 3595,
+      "sha256": "c97475272aac6f30ffeb3c5725e41de7e7081280e39ce3aae4976e1f38bd4c4f",
+      "match": true
+    },
+    {
+      "path": "/tmp/motion-qualified-measurement-fe092-20261002/source/test/decay-rest-projection.test.ts",
+      "bytes": 2206,
+      "sha256": "861f5318b9811f08f952b176c254a77b66bfbf5270191072e1feffdd694b9471",
+      "match": true
+    },
+    {
+      "path": "/tmp/motion-qualified-measurement-fe092-20261002/source/test/default-request-frame.test.ts",
+      "bytes": 2774,
+      "sha256": "67d2ccd3d3e9dc053358f6b237139aa57c7a0e8a6dc6a259cb4050c037a51e42",
+      "match": true
+    },
+    {
+      "path": "/tmp/motion-qualified-measurement-fe092-20261002/source/test/dist-freshness.test.ts",
+      "bytes": 6060,
+      "sha256": "b0f20ede3d1a3ccd45f6a905eaccfa1d737ca1c6f06a1bdcbb0402c22c84c732",
+      "match": true
+    },
+    {
+      "path": "/tmp/motion-qualified-measurement-fe092-20261002/source/test/drive-double-tick-guard.test.ts",
+      "bytes": 8630,
+      "sha256": "372d55095fcafcf0a11b724d90d0a9e9f027760fa54b4ab7c2b35bdd30e9b2bf",
+      "match": true
+    },
+    {
+      "path": "/tmp/motion-qualified-measurement-fe092-20261002/source/test/drive-initial-velocity.test.ts",
+      "bytes": 17031,
+      "sha256": "acf0b038a96f493e64776ea40c3962c275c328a78ec0bfec91b76ddbfedef89f",
+      "match": true
+    },
+    {
+      "path": "/tmp/motion-qualified-measurement-fe092-20261002/source/test/drive-nonfinite-input.test.ts",
+      "bytes": 4500,
+      "sha256": "937dca3418a9043d8b6d0fac0652798174943471f7f52f1688f7e1e137745fe5",
+      "match": true
+    },
+    {
+      "path": "/tmp/motion-qualified-measurement-fe092-20261002/source/test/drive-overdamped-convergence.test.ts",
+      "bytes": 7463,
+      "sha256": "9bba4f6999efca7c91885f355172216434bb196408ef2ce4f8c4a2110affe140",
+      "match": true
+    },
+    {
+      "path": "/tmp/motion-qualified-measurement-fe092-20261002/source/test/drive-spring-param-boundary.test.ts",
+      "bytes": 9076,
+      "sha256": "634bb8474f6e24b2e089dedafc53e061976cb99220b48b04905711e652ff8304",
+      "match": true
+    },
+    {
+      "path": "/tmp/motion-qualified-measurement-fe092-20261002/source/test/drive-step-clock-deadlock.test.ts",
+      "bytes": 5983,
+      "sha256": "e39980d4d37f6bcaf3e3f9c3c9c1880fdde9df89a8f3afe4bc4533e50cc86c20",
+      "match": true
+    },
+    {
+      "path": "/tmp/motion-qualified-measurement-fe092-20261002/source/test/drive-unclamped-overshoot.test.ts",
+      "bytes": 5031,
+      "sha256": "91499f9a0e897347317c89aa1b04803e8f21a4988355a7c46102e79f41d64f3d",
+      "match": true
+    },
+    {
+      "path": "/tmp/motion-qualified-measurement-fe092-20261002/source/test/drive-underdamped-resolution-latency.test.ts",
+      "bytes": 12332,
+      "sha256": "97c401c0e0dba90acd03aba873f1e8b2a53b7030c40d2691170531988961f51b",
+      "match": true
+    },
+    {
+      "path": "/tmp/motion-qualified-measurement-fe092-20261002/source/test/driver-api-surface-pin.test.ts",
+      "bytes": 5238,
+      "sha256": "81ec7a1b1eaecd921bc14bc6dc3a3725f4f14c574ee68d3e28cf5c63c6e5873f",
+      "match": true
+    },
+    {
+      "path": "/tmp/motion-qualified-measurement-fe092-20261002/source/test/driver-mutation-contract.test.ts",
+      "bytes": 1484,
+      "sha256": "b3d7c07825f02e4b53e70e172d1f1568dea1370fcd49e848a0b0ef1891b3f2ab",
+      "match": true
+    },
+    {
+      "path": "/tmp/motion-qualified-measurement-fe092-20261002/source/test/driver-mutation-harden.test.ts",
+      "bytes": 25610,
+      "sha256": "66e8e5509655a55c7c67fab5d4d7faf2f9aa57b7ae25629d42e7f31c1c6e075d",
+      "match": true
+    },
+    {
+      "path": "/tmp/motion-qualified-measurement-fe092-20261002/source/test/driver-mutation-phase2b.test.ts",
+      "bytes": 5498,
+      "sha256": "7fad450559d972ebfe7a0ca3ab475d35feb048cb091ca4370a3c362db3e759cd",
+      "match": true
+    },
+    {
+      "path": "/tmp/motion-qualified-measurement-fe092-20261002/source/test/driver-reduced-motion.test.ts",
+      "bytes": 7442,
+      "sha256": "9e164cdee42dff6ad2b36f5728c690a8fd4d007519aa4c53a301a345f9097beb",
+      "match": true
+    },
+    {
+      "path": "/tmp/motion-qualified-measurement-fe092-20261002/source/test/driver-scrub-fuzz.test.ts",
+      "bytes": 15430,
+      "sha256": "40bf94abcb67160dbfd252f2948f8bf0ed500dd9e3fc25b069ece2d1947eacdb",
+      "match": true
+    },
+    {
+      "path": "/tmp/motion-qualified-measurement-fe092-20261002/source/test/driver-single-solve.test.ts",
+      "bytes": 1855,
+      "sha256": "9d84526edcaca839eea50c8f513a1f16e03519b6b1c7c6b6f60e27d1bad5f35b",
+      "match": true
+    },
+    {
+      "path": "/tmp/motion-qualified-measurement-fe092-20261002/source/test/driver-state-machine-adversarial.test.ts",
+      "bytes": 11681,
+      "sha256": "27a2e53310c181dd4237ace98a782f39f5b803121ae69e9c8baab362ccd4b6b1",
+      "match": true
+    },
+    {
+      "path": "/tmp/motion-qualified-measurement-fe092-20261002/source/test/driver-terminal-boundary-adversarial.test.ts",
+      "bytes": 2660,
+      "sha256": "ce8ff1cad284582b899900c393da07a2788b3e00015e9187fb45f0aa8c00e629",
+      "match": true
+    },
+    {
+      "path": "/tmp/motion-qualified-measurement-fe092-20261002/source/test/driver-velocity-read.test.ts",
+      "bytes": 12594,
+      "sha256": "4b9207a05980bc421babc369f25f3adc61fd4c43543ad1756bfa39570a763c0d",
+      "match": true
+    },
+    {
+      "path": "/tmp/motion-qualified-measurement-fe092-20261002/source/test/driver-virtual-time.test.ts",
+      "bytes": 9768,
+      "sha256": "619b13ddf5b4184242fadc150af51f4038be2a94533457d7de1d00ab04647724",
+      "match": true
+    },
+    {
+      "path": "/tmp/motion-qualified-measurement-fe092-20261002/source/test/easing-api-surface-pin.test.ts",
+      "bytes": 6372,
+      "sha256": "501e6ed36c83ced1d4779ba261803da777fc547db4013ce70cca0ddbc0ed7bc1",
+      "match": true
+    },
+    {
+      "path": "/tmp/motion-qualified-measurement-fe092-20261002/source/test/easing-canonical-differential.test.ts",
+      "bytes": 10784,
+      "sha256": "6a670c7e17baefefeb3df1dd739e06720554960b403097411f1f70fcb0164709",
+      "match": true
+    },
+    {
+      "path": "/tmp/motion-qualified-measurement-fe092-20261002/source/test/easing-determinism.test.ts",
+      "bytes": 5719,
+      "sha256": "a5a3f6338ecde1f20845c724959983742a2958367d743e51d985cf359afb9ffc",
+      "match": true
+    },
+    {
+      "path": "/tmp/motion-qualified-measurement-fe092-20261002/source/test/easing-endpoints.test.ts",
+      "bytes": 14107,
+      "sha256": "aaef6c390392bc23063782da46bc21e643ac5a7699aecf5c3f2cc05e6c7f6d41",
+      "match": true
+    },
+    {
+      "path": "/tmp/motion-qualified-measurement-fe092-20261002/source/test/easing-factory-validation.test.ts",
+      "bytes": 11312,
+      "sha256": "ec56d3cc3576bcdfdbf71769710bcc5dd674bbbfc311c7b23f7259c74b483352",
+      "match": true
+    },
+    {
+      "path": "/tmp/motion-qualified-measurement-fe092-20261002/source/test/easing-finiteness-fuzz.test.ts",
+      "bytes": 12103,
+      "sha256": "866a37e9bf9a4abc987e8be54c9d9c298d14d7cb6dfd472825166991b5be73be",
+      "match": true
+    },
+    {
+      "path": "/tmp/motion-qualified-measurement-fe092-20261002/source/test/easing-monotonic-shape.test.ts",
+      "bytes": 9551,
+      "sha256": "5730b0bd53f797812f5f1829b28b18b4ad2b2265d732a44dc133c837d0c0c5e9",
+      "match": true
+    },
+    {
+      "path": "/tmp/motion-qualified-measurement-fe092-20261002/source/test/easing-subpath-smoke.test.ts",
+      "bytes": 9188,
+      "sha256": "0b2ea206d62e427c2ff204f5a92556c6cc593ce6672e1cc6ab6653d190e6486f",
+      "match": true
+    },
+    {
+      "path": "/tmp/motion-qualified-measurement-fe092-20261002/source/test/error-catalog-check.test.ts",
+      "bytes": 10952,
+      "sha256": "3972fd3dd26db9fd04870a98af0bdfd767df1e9d7e32a3785c147a4dc6877bbc",
+      "match": true
+    },
+    {
+      "path": "/tmp/motion-qualified-measurement-fe092-20261002/source/test/fixed-dt-fallback-pin.test.ts",
+      "bytes": 2889,
+      "sha256": "92f12da2a467265dea3098ff636bbf759079fee78ff2cb9b00660b92021ecbc0",
+      "match": true
+    },
+    {
+      "path": "/tmp/motion-qualified-measurement-fe092-20261002/source/test/fixtures/animate-scope-gc.probe.ts",
+      "bytes": 2277,
+      "sha256": "02a9f0e05c318fed47a7f09b93bd6bff1e906d66a33310709432b982b57e95ca",
+      "match": true
+    },
+    {
+      "path": "/tmp/motion-qualified-measurement-fe092-20261002/source/test/fixtures/compositor-retention-gc.probe.ts",
+      "bytes": 2424,
+      "sha256": "be1b110a52b678690b6f5f1e915dbc095572d77b04767d2cae3ba44e4b25d7bb",
+      "match": true
+    },
+    {
+      "path": "/tmp/motion-qualified-measurement-fe092-20261002/source/test/fixtures/frame-retention-gc.probe.ts",
+      "bytes": 3479,
+      "sha256": "e6ebc72e8f6fe446e210cc9e53bdbb3eb1323264dbfdbd3508b070c987e35426",
+      "match": true
+    },
+    {
+      "path": "/tmp/motion-qualified-measurement-fe092-20261002/source/test/fixtures/reorder-gc.probe.ts",
+      "bytes": 1400,
+      "sha256": "16f4fd41a499d5969ed40a28826c8bc401a0f87ea1360f9591553d0da0c195a5",
+      "match": true
+    },
+    {
+      "path": "/tmp/motion-qualified-measurement-fe092-20261002/source/test/fixtures/resource-package-probe.mjs",
+      "bytes": 33416,
+      "sha256": "0b7049cdc4b3707384db4d20829d3355fb4cbd99c1cd138fdf7929fef7b06501",
+      "match": true
+    },
+    {
+      "path": "/tmp/motion-qualified-measurement-fe092-20261002/source/test/fixtures/server-thread-cpu-clock-check.mjs",
+      "bytes": 8851,
+      "sha256": "d032a5cb9668578b9fbcce986e1cbefa2865fdc17c986742a1274b0e34cb951c",
+      "match": true
+    },
+    {
+      "path": "/tmp/motion-qualified-measurement-fe092-20261002/source/test/fixtures/server-thread-cpu-clock-host.c",
+      "bytes": 1503,
+      "sha256": "15ee4c885cb88c317051a1951030c441b9c78bf105ceb6f21d5ebce6eac3586e",
+      "match": true
+    },
+    {
+      "path": "/tmp/motion-qualified-measurement-fe092-20261002/source/test/flip.test.ts",
+      "bytes": 11773,
+      "sha256": "0a2372e60e76cf952bb27e817a8b8186afe63d5b4af96df21173495d948c1aa3",
+      "match": true
+    },
+    {
+      "path": "/tmp/motion-qualified-measurement-fe092-20261002/source/test/frame-adapter.test.ts",
+      "bytes": 13692,
+      "sha256": "6ed44094c608809939d96b7e7820c1be559bf25a7da217a5ffe4d8a92f39a11e",
+      "match": true
+    },
+    {
+      "path": "/tmp/motion-qualified-measurement-fe092-20261002/source/test/frame-api-surface-pin.test.ts",
+      "bytes": 3445,
+      "sha256": "4e8860bf6a4fc8a805f51a5581881564524f805f6f7a2eedee61498841370ee3",
+      "match": true
+    },
+    {
+      "path": "/tmp/motion-qualified-measurement-fe092-20261002/source/test/frame-loop.test.ts",
+      "bytes": 33874,
+      "sha256": "1cb064f7cb7eee354ff1a7fa12a9913fdfca24d6eefcbaf5dce3be64b9947e1e",
+      "match": true
+    },
+    {
+      "path": "/tmp/motion-qualified-measurement-fe092-20261002/source/test/frame-requester.test.ts",
+      "bytes": 5681,
+      "sha256": "2a23b8dfadf6a944095ef1f6a7e03e2c4c11563121d4bdce39b7488e59253683",
+      "match": true
+    },
+    {
+      "path": "/tmp/motion-qualified-measurement-fe092-20261002/source/test/frame-retention-gc.test.ts",
+      "bytes": 1057,
+      "sha256": "0dff8da7bbbeee1f91e449f6765d6c60ca9fd1d866c3f3f622a92c86eeb1fd77",
+      "match": true
+    },
+    {
+      "path": "/tmp/motion-qualified-measurement-fe092-20261002/source/test/future-layout-api.test.ts",
+      "bytes": 9953,
+      "sha256": "a6796e64ced0933490e73e4d365ef3bf998cdcbb28a1f9c225976acea5f0173d",
+      "match": true
+    },
+    {
+      "path": "/tmp/motion-qualified-measurement-fe092-20261002/source/test/future-layout-compiler-lowering.test.ts",
+      "bytes": 9350,
+      "sha256": "2c5a829a3e710a6590a483b96ce691e50bfe0f81924f0d98f5ff24b88f224eb0",
+      "match": true
+    },
+    {
+      "path": "/tmp/motion-qualified-measurement-fe092-20261002/source/test/future-layout-compiler.test.ts",
+      "bytes": 2611,
+      "sha256": "2ed4c6014b0c0fc3bad15f932ec1a3e74ecddb455f5ee0594855c84d930ae08b",
+      "match": true
+    },
+    {
+      "path": "/tmp/motion-qualified-measurement-fe092-20261002/source/test/future-layout-coordinator.test.ts",
+      "bytes": 3977,
+      "sha256": "66eeddcd147dd28b4ba8cdb6b484dfb36c99aac87237af01c1967166c94984e4",
+      "match": true
+    },
+    {
+      "path": "/tmp/motion-qualified-measurement-fe092-20261002/source/test/future-layout-domain-fuzz.test.ts",
+      "bytes": 9312,
+      "sha256": "b3faa75d52e5b568b5d01543a4cd7e8944f8591fcd0a9db4b76acb34936d8c96",
+      "match": true
+    },
+    {
+      "path": "/tmp/motion-qualified-measurement-fe092-20261002/source/test/future-layout-domain-property.test.ts",
+      "bytes": 5806,
+      "sha256": "efa9d21412b0cd1d94c3e2036d8ab6d606a67f148d75a50d24c12d0d67385026",
+      "match": true
+    },
+    {
+      "path": "/tmp/motion-qualified-measurement-fe092-20261002/source/test/future-layout-domain.test.ts",
+      "bytes": 4617,
+      "sha256": "689738b38ed9d14d4d8540c409cf7fbe6918f0742706a71e365aee879e98c005",
+      "match": true
+    },
+    {
+      "path": "/tmp/motion-qualified-measurement-fe092-20261002/source/test/future-layout-effects.test.ts",
+      "bytes": 4790,
+      "sha256": "5bad8dff6155083b7330921eb6d05f39a3cd8835263db37382ffd6bcb28c9ede",
+      "match": true
+    },
+    {
+      "path": "/tmp/motion-qualified-measurement-fe092-20261002/source/test/future-layout-helpers.ts",
+      "bytes": 11010,
+      "sha256": "73bb9a56d7bae8d4b307fa118d530239f73a8020e07a3e68084f641bcbaa785a",
+      "match": true
+    },
+    {
+      "path": "/tmp/motion-qualified-measurement-fe092-20261002/source/test/future-layout-observer.test.ts",
+      "bytes": 5512,
+      "sha256": "92c036a6c44cb6af7469abe8b86d4ee1b64917c48e72bde181577dcb17078098",
+      "match": true
+    },
+    {
+      "path": "/tmp/motion-qualified-measurement-fe092-20261002/source/test/future-layout-receipt-parser.test.ts",
+      "bytes": 2974,
+      "sha256": "46b3f2dc91fe7fd590607da9efa55182206e2254a03abe80260b06f154613a65",
+      "match": true
+    },
+    {
+      "path": "/tmp/motion-qualified-measurement-fe092-20261002/source/test/future-layout-receipt.test.ts",
+      "bytes": 7590,
+      "sha256": "bfaff642ae5d90c0b75570c5fc998bc275c40a9b597210d8731103891ea46c8a",
+      "match": true
+    },
+    {
+      "path": "/tmp/motion-qualified-measurement-fe092-20261002/source/test/future-layout-runtime-policy.test.ts",
+      "bytes": 19345,
+      "sha256": "8e4938eb47146274cf5791d48a6ecee6d2675ea41b62b17b57c2fc0c63b6c508",
+      "match": true
+    },
+    {
+      "path": "/tmp/motion-qualified-measurement-fe092-20261002/source/test/gestures-api-surface-pin.test.ts",
+      "bytes": 2899,
+      "sha256": "00eef61bae4ac160a4c08401a412fc4a31acd3f52931bc0fcfbe0069483be2be",
+      "match": true
+    },
+    {
+      "path": "/tmp/motion-qualified-measurement-fe092-20261002/source/test/gestures-compositor-pickup.test.ts",
+      "bytes": 14940,
+      "sha256": "0d2feb125f318c30385ebb6bb75caf354e221e3c839de943ef482f3b8bcc1850",
+      "match": true
+    },
+    {
+      "path": "/tmp/motion-qualified-measurement-fe092-20261002/source/test/gestures-drag.test.ts",
+      "bytes": 14464,
+      "sha256": "ad704fca94965e7554b8cf114e740724697491349c7ae39de339154357c04bf3",
+      "match": true
+    },
+    {
+      "path": "/tmp/motion-qualified-measurement-fe092-20261002/source/test/gestures-glide-pickup.test.ts",
+      "bytes": 16017,
+      "sha256": "37e070af009efc35ded3bd9c8c4dc9788eeb8421319025057d4837a719efc096",
+      "match": true
+    },
+    {
+      "path": "/tmp/motion-qualified-measurement-fe092-20261002/source/test/gestures-hover-pan.test.ts",
+      "bytes": 6521,
+      "sha256": "ad9bda9a98261e08a438285b9dc5acd3eb7b2bdb39485f16c627534c0062c272",
+      "match": true
+    },
+    {
+      "path": "/tmp/motion-qualified-measurement-fe092-20261002/source/test/gestures-snapback-spring.test.ts",
+      "bytes": 20637,
+      "sha256": "b93e17aa010239933f991f136653faf61805d707d9dfeedf780e86d8d925625a",
+      "match": true
+    },
+    {
+      "path": "/tmp/motion-qualified-measurement-fe092-20261002/source/test/gestures-velocity-press.test.ts",
+      "bytes": 8474,
+      "sha256": "c1d882c047f51c3a1f2c782288128d0d043fc7aec8290611e6d31a821fca2483",
+      "match": true
+    },
+    {
+      "path": "/tmp/motion-qualified-measurement-fe092-20261002/source/test/git-path-list.test.ts",
+      "bytes": 2434,
+      "sha256": "5d5a8094d72c0ba79e9f7aeec8a8da171ec92e015765e31ea08a90570c97dbf6",
+      "match": true
+    },
+    {
+      "path": "/tmp/motion-qualified-measurement-fe092-20261002/source/test/helpers/reduced-motion.ts",
+      "bytes": 874,
+      "sha256": "a0eb1a0d7046029b7e4d02514c7cfd2a33f3ef14f97b188b1da8f222f3cd0199",
+      "match": true
+    },
+    {
+      "path": "/tmp/motion-qualified-measurement-fe092-20261002/source/test/in-view-dist-contract.test.ts",
+      "bytes": 2525,
+      "sha256": "6653d42d9350798895fc9e347bc72d84dd3164733b1cbff6e1924cb431fbc393",
+      "match": true
+    },
+    {
+      "path": "/tmp/motion-qualified-measurement-fe092-20261002/source/test/in-view-owner-allocation.test.ts",
+      "bytes": 3127,
+      "sha256": "01c1f308821172f656d3174af7e2dd6c0a4056c72c0b6b9d906409e5be2ddbf2",
+      "match": true
+    },
+    {
+      "path": "/tmp/motion-qualified-measurement-fe092-20261002/source/test/in-view.test.ts",
+      "bytes": 16719,
+      "sha256": "08635591b70bf0ac0649d47c1014a1b7277304019c704de583557878e39bf7d2",
+      "match": true
+    },
+    {
+      "path": "/tmp/motion-qualified-measurement-fe092-20261002/source/test/invalid-param-error.test.ts",
+      "bytes": 4380,
+      "sha256": "5c8858392a1f8d71c87b0b14e950f0941246d6f2101d8b1eac692e5572b01160",
+      "match": true
+    },
+    {
+      "path": "/tmp/motion-qualified-measurement-fe092-20261002/source/test/journey-behaviors-pareto-budget.test.ts",
+      "bytes": 1860,
+      "sha256": "a5def595a4a489836954a3aeef7878fea8440b7277fc0d047c70d60a30f6fab5",
+      "match": true
+    },
+    {
+      "path": "/tmp/motion-qualified-measurement-fe092-20261002/source/test/journey-owner-retarget-characterization.test.ts",
+      "bytes": 4224,
+      "sha256": "6b05e0a67d4599765a60bdd14c994e305ef592aa14865539c2502db1fc340c97",
+      "match": true
+    },
+    {
+      "path": "/tmp/motion-qualified-measurement-fe092-20261002/source/test/journey-package-consumers.test.ts",
+      "bytes": 22355,
+      "sha256": "802d29b21a9c63d7638b70e709cba690002db3566e8ab4a7d90a59f2e78fde7f",
+      "match": true
+    },
+    {
+      "path": "/tmp/motion-qualified-measurement-fe092-20261002/source/test/keyframes-api-surface-pin.test.ts",
+      "bytes": 4231,
+      "sha256": "ba8b9859384a40d0234bd94120f2f9e7b9cd2d70e6550e609e550070c6b4410a",
+      "match": true
+    },
+    {
+      "path": "/tmp/motion-qualified-measurement-fe092-20261002/source/test/keyframes-implicit-identity.test.ts",
+      "bytes": 3805,
+      "sha256": "832190e706239643ddfd3aac05c08b52ce05c6b5844e1403b5e05615b618316c",
+      "match": true
+    },
+    {
+      "path": "/tmp/motion-qualified-measurement-fe092-20261002/source/test/keyframes-lerp-value-pin.test.ts",
+      "bytes": 3337,
+      "sha256": "27915861b28fa16d385c558798d8832724a5576bfd2564e366378eba26bcd5bb",
+      "match": true
+    },
+    {
+      "path": "/tmp/motion-qualified-measurement-fe092-20261002/source/test/keyframes-loop-clock-mutation-harden.test.ts",
+      "bytes": 20982,
+      "sha256": "be00994134bdb9542bf5882324de6dec9e26f9f1dab3e5db3a2b04fa3ca37c22",
+      "match": true
+    },
+    {
+      "path": "/tmp/motion-qualified-measurement-fe092-20261002/source/test/keyframes-mutation-harden.test.ts",
+      "bytes": 23176,
+      "sha256": "7bb6fb9b6b2efd55b75c4be3e9896dd35d1aae0baab4ff135fab34f2e2a33bf6",
+      "match": true
+    },
+    {
+      "path": "/tmp/motion-qualified-measurement-fe092-20261002/source/test/keyframes-property-fuzz.test.ts",
+      "bytes": 5122,
+      "sha256": "e664d56bb8c39e54f8140a15dcc2c25e87aa8bd8e15bda46d7ce8d2a571eb056",
+      "match": true
+    },
+    {
+      "path": "/tmp/motion-qualified-measurement-fe092-20261002/source/test/keyframes-reduced-motion.test.ts",
+      "bytes": 4427,
+      "sha256": "781679e8e4bd312f27cc2e390c65c1572a5ba6cf805f6ac679bc0131629ed38d",
+      "match": true
+    },
+    {
+      "path": "/tmp/motion-qualified-measurement-fe092-20261002/source/test/keyframes-shipped-allocation.test.ts",
+      "bytes": 2445,
+      "sha256": "ab4545a67f2a6c06838d2f89e17d8624df0d48097dc3a96a23d4ab1d66b45f62",
+      "match": true
+    },
+    {
+      "path": "/tmp/motion-qualified-measurement-fe092-20261002/source/test/keyframes.test.ts",
+      "bytes": 14440,
+      "sha256": "ce400691aabc18e6bf9fddd5476f7b09e837681a9ba55ab11ba9e56c2e5fa174",
+      "match": true
+    },
+    {
+      "path": "/tmp/motion-qualified-measurement-fe092-20261002/source/test/lit-api-surface-pin.test.ts",
+      "bytes": 5538,
+      "sha256": "418cbcc197095ce592db30649d43d739fe11e77c84c5e2443759cb4b26d43619",
+      "match": true
+    },
+    {
+      "path": "/tmp/motion-qualified-measurement-fe092-20261002/source/test/lit-element-template.test.ts",
+      "bytes": 2132,
+      "sha256": "ec0b8b9025b89133c54bcbe4143a93243b06c18b98f96850c6c81c615f4f82eb",
+      "match": true
+    },
+    {
+      "path": "/tmp/motion-qualified-measurement-fe092-20261002/source/test/lit-reconnect.test.ts",
+      "bytes": 4858,
+      "sha256": "45ca6440b5b009bd28a122fcb576ea426f4cb40a49c7246cd652ed2b71fde037",
+      "match": true
+    },
+    {
+      "path": "/tmp/motion-qualified-measurement-fe092-20261002/source/test/lit-reduced-motion.test.ts",
+      "bytes": 6889,
+      "sha256": "6c37cd2122ed6a1f80f7681b9181ea8bc1cdb83e807f1069c946ca3da80ed23d",
+      "match": true
+    },
+    {
+      "path": "/tmp/motion-qualified-measurement-fe092-20261002/source/test/lit-runtime.test.ts",
+      "bytes": 3769,
+      "sha256": "34a30629ed04ded034ca99d94f5fc7442aa2402f5cdcd018f8edbfdbf85592b5",
+      "match": true
+    },
+    {
+      "path": "/tmp/motion-qualified-measurement-fe092-20261002/source/test/lit-ssr-safe.test.ts",
+      "bytes": 3022,
+      "sha256": "d197d756474c0965aaa09381712cf05a99e895ca492f9f7b8ebb1b138ac7f171",
+      "match": true
+    },
+    {
+      "path": "/tmp/motion-qualified-measurement-fe092-20261002/source/test/motion-conformance.test.ts",
+      "bytes": 13668,
+      "sha256": "9fc9eb85381255e27e0661f61d28118bbbbcae4b7ff961bbc71c2e99e8c9f74c",
+      "match": true
+    },
+    {
+      "path": "/tmp/motion-qualified-measurement-fe092-20261002/source/test/motion-contract-v1.test.ts",
+      "bytes": 2667,
+      "sha256": "1b6af6e59bd86bde4f29891d9b4430846a74d83e539f95f79a750a0b93c8c464",
+      "match": true
+    },
+    {
+      "path": "/tmp/motion-qualified-measurement-fe092-20261002/source/test/motion-controller-integration.test.ts",
+      "bytes": 4658,
+      "sha256": "23f33f02a4beb75f38a97a99d27b56e9bb0e6810d80b03fa6e186827752756a1",
+      "match": true
+    },
+    {
+      "path": "/tmp/motion-qualified-measurement-fe092-20261002/source/test/motion-param-error-code.test.ts",
+      "bytes": 1803,
+      "sha256": "751e8564603310bd433b659617cd347e941ece380d9a947c337f5af32e46ce4e",
+      "match": true
+    },
+    {
+      "path": "/tmp/motion-qualified-measurement-fe092-20261002/source/test/motion-program-core-v1.test.ts",
+      "bytes": 18853,
+      "sha256": "05efb228f3a51fa94a04cc2c079a8d4956c3e407f9306ea0b51e0c34a88eea11",
+      "match": true
+    },
+    {
+      "path": "/tmp/motion-qualified-measurement-fe092-20261002/source/test/motion-program-infinite-schedule.test.ts",
+      "bytes": 5798,
+      "sha256": "bb8dfd5ea3f6c2dbbad18290372f837e4874f8cab1d1425e49b339144d0b52f8",
+      "match": true
+    },
+    {
+      "path": "/tmp/motion-qualified-measurement-fe092-20261002/source/test/motion-program-semantics-v1.test.ts",
+      "bytes": 38042,
+      "sha256": "6ff6a73a8590e6d033d4047b26f1afc261181d2f5cfa52ff35e2747505627de4",
+      "match": true
+    },
+    {
+      "path": "/tmp/motion-qualified-measurement-fe092-20261002/source/test/motion-program-v1.fixtures.ts",
+      "bytes": 3835,
+      "sha256": "3c48eaf5d8c0a7c32acd30bb119f44326acb73b450a21198adfc06046beb94de",
+      "match": true
+    },
+    {
+      "path": "/tmp/motion-qualified-measurement-fe092-20261002/source/test/motion-program-wire-v1.test.ts",
+      "bytes": 49154,
+      "sha256": "6ba7776d0f83532aa5cca76fe6dba7483451fcca4178ff182ec6c5ab83c6333f",
+      "match": true
+    },
+    {
+      "path": "/tmp/motion-qualified-measurement-fe092-20261002/source/test/motion-value-bounded-zero.test.ts",
+      "bytes": 1164,
+      "sha256": "1ecfedc1719ba7398c89d21cdcdba4b929063b6662fa40ec416c92ef68cdda33",
+      "match": true
+    },
+    {
+      "path": "/tmp/motion-qualified-measurement-fe092-20261002/source/test/motion-value-follow.test.ts",
+      "bytes": 11021,
+      "sha256": "e50937149fa4781677bd2c2521a6763ddd4303371c16c77d12b487a7d9b0389c",
+      "match": true
+    },
+    {
+      "path": "/tmp/motion-qualified-measurement-fe092-20261002/source/test/motion-value-initial-velocity-validation.test.ts",
+      "bytes": 8014,
+      "sha256": "7a192967dfca1f9c2e17531a59f39e792452e9ca4c6de1cad1ccb9a382b41fc1",
+      "match": true
+    },
+    {
+      "path": "/tmp/motion-qualified-measurement-fe092-20261002/source/test/motion-value-listener-isolation.test.ts",
+      "bytes": 10300,
+      "sha256": "06e9f70b92c2fa7bb2e33be7276241fec9c634263c587ac93f7f4e6222662f57",
+      "match": true
+    },
+    {
+      "path": "/tmp/motion-qualified-measurement-fe092-20261002/source/test/motion-value-mutation-harden.test.ts",
+      "bytes": 34177,
+      "sha256": "86a3b3cb19a1b77760727b3beff09c8cd43bc8ec6b4ece338432462c9e4c3538",
+      "match": true
+    },
+    {
+      "path": "/tmp/motion-qualified-measurement-fe092-20261002/source/test/motion-value-shared-scratch.test.ts",
+      "bytes": 1739,
+      "sha256": "17c647cb20e08498c0007eced3f17d8eea50427e6f6196a9c7ad1ed5a331fbf1",
+      "match": true
+    },
+    {
+      "path": "/tmp/motion-qualified-measurement-fe092-20261002/source/test/motion-value-terminal-sentinel.test.ts",
+      "bytes": 2616,
+      "sha256": "29989bdab33547f7aa801a56d65ecec2421a090171f9eaa09dfaff8cb3285f67",
+      "match": true
+    },
+    {
+      "path": "/tmp/motion-qualified-measurement-fe092-20261002/source/test/motion-value-velocity-read.test.ts",
+      "bytes": 14272,
+      "sha256": "c06908d483e18cfb453eb1cb74bc8bc4f3977ca2e7f223c5e1ed8450c47691e8",
+      "match": true
+    },
+    {
+      "path": "/tmp/motion-qualified-measurement-fe092-20261002/source/test/motion-value.test.ts",
+      "bytes": 36847,
+      "sha256": "22eb4edf27b83b48302ad885cd68e1afc58b2b9f645378b6d62557e323316ef5",
+      "match": true
+    },
+    {
+      "path": "/tmp/motion-qualified-measurement-fe092-20261002/source/test/nano-package.test.ts",
+      "bytes": 1510,
+      "sha256": "55ad61f165732b9cb582898b54ba92f8f310410999b80d01433d14256c1cf411",
+      "match": true
+    },
+    {
+      "path": "/tmp/motion-qualified-measurement-fe092-20261002/source/test/nano-spring-linear-binary64.test.ts",
+      "bytes": 4427,
+      "sha256": "205729226ccb41e058463e88b36f2127e15bf65c6b2288ac722ded814101abb7",
+      "match": true
+    },
+    {
+      "path": "/tmp/motion-qualified-measurement-fe092-20261002/source/test/nano.test.ts",
+      "bytes": 12004,
+      "sha256": "4fa90e3b7adc55a87f9737824e22b0b70096f57773f8322c52b5c48043c3545c",
+      "match": true
+    },
+    {
+      "path": "/tmp/motion-qualified-measurement-fe092-20261002/source/test/overdamped-trajectory.test.ts",
+      "bytes": 5450,
+      "sha256": "55e3f2f732fd34a3aed07ff04c6fb0cb734043d182e693dc16aae91f8cdd4ef8",
+      "match": true
+    },
+    {
+      "path": "/tmp/motion-qualified-measurement-fe092-20261002/source/test/pack-release-boundary.test.ts",
+      "bytes": 3535,
+      "sha256": "aa827109935825f21e5f6491ca181d41e15d0e74b61268b9d93cfe3aed021710",
+      "match": true
+    },
+    {
+      "path": "/tmp/motion-qualified-measurement-fe092-20261002/source/test/perf-hot-path.test.ts",
+      "bytes": 7360,
+      "sha256": "5eaf761db33d4d889c2de0c23aa3afaa8b5ba3d143be615566e01c6df7ca60d0",
+      "match": true
+    },
+    {
+      "path": "/tmp/motion-qualified-measurement-fe092-20261002/source/test/preact-runtime.test.ts",
+      "bytes": 4960,
+      "sha256": "594ea2835f98595c26ca97b1035a83c81a37082c7b0b38842c12b80136b2c64e",
+      "match": true
+    },
+    {
+      "path": "/tmp/motion-qualified-measurement-fe092-20261002/source/test/preact.test.ts",
+      "bytes": 8854,
+      "sha256": "36854ad072772dbb8770a05ca5ef7345892e614b16c64c75f737ea110892efe2",
+      "match": true
+    },
+    {
+      "path": "/tmp/motion-qualified-measurement-fe092-20261002/source/test/presence-impulse-continuity.test.ts",
+      "bytes": 21816,
+      "sha256": "cdb99c74dd0bb3f8ed2d43fd5988156f4f862752ab343da61a7babfc36934769",
+      "match": true
+    },
+    {
+      "path": "/tmp/motion-qualified-measurement-fe092-20261002/source/test/presence-transition-consumer.test.ts",
+      "bytes": 3406,
+      "sha256": "f2becd4399b2c7abf5acd9e2280eb41c4732dc0a6d62993a35a95bb7361daf19",
+      "match": true
+    },
+    {
+      "path": "/tmp/motion-qualified-measurement-fe092-20261002/source/test/presence-transition-retention.test.ts",
+      "bytes": 2140,
+      "sha256": "2b168f6a1a0a172822a2ac9d72aa178019bd34a057a12568ff34b417f8498393",
+      "match": true
+    },
+    {
+      "path": "/tmp/motion-qualified-measurement-fe092-20261002/source/test/presence-transition.test.ts",
+      "bytes": 19104,
+      "sha256": "a57d0fc837b49602276eb827b0f710cafa766a4b0ec1329f0afda217efe2612e",
+      "match": true
+    },
+    {
+      "path": "/tmp/motion-qualified-measurement-fe092-20261002/source/test/presence.test.ts",
+      "bytes": 12742,
+      "sha256": "ec9fe6a4a01cf02a23df825c2153e9bf6cc3093c592f44608b77d0811e90e03c",
+      "match": true
+    },
+    {
+      "path": "/tmp/motion-qualified-measurement-fe092-20261002/source/test/presets-api-surface-pin.test.ts",
+      "bytes": 1375,
+      "sha256": "b8695bedc07d03afea2e47048782e9c6402d04e0cf5dc9a31bcbb4e905e876e1",
+      "match": true
+    },
+    {
+      "path": "/tmp/motion-qualified-measurement-fe092-20261002/source/test/presets-factories.test.ts",
+      "bytes": 10663,
+      "sha256": "c53bb1c5d6bc7bc42b870e8e95c98f84252550b9ac83c4ae144c3be1765a79e2",
+      "match": true
+    },
+    {
+      "path": "/tmp/motion-qualified-measurement-fe092-20261002/source/test/presets-reduced-motion.test.ts",
+      "bytes": 4878,
+      "sha256": "6f860182028ae9c0b48ffefe916f06a454994ff5290ef0debd175921c02a6236",
+      "match": true
+    },
+    {
+      "path": "/tmp/motion-qualified-measurement-fe092-20261002/source/test/presets-run-virtual-time.test.ts",
+      "bytes": 6217,
+      "sha256": "5364e8b74516b2ab4c126b66fbbe91e983125ed4822328fc71b72bec212773a2",
+      "match": true
+    },
+    {
+      "path": "/tmp/motion-qualified-measurement-fe092-20261002/source/test/presets-sample-pure.test.ts",
+      "bytes": 13632,
+      "sha256": "0102510305fe0f4bafc535361d64b209a56f3acaeeaa093fa1f3d565104d4e6a",
+      "match": true
+    },
+    {
+      "path": "/tmp/motion-qualified-measurement-fe092-20261002/source/test/presets-text-number.test.ts",
+      "bytes": 21974,
+      "sha256": "368686c38a27930fe300a79d5958c1ce0f0da806e79f020752076f83b5c264ed",
+      "match": true
+    },
+    {
+      "path": "/tmp/motion-qualified-measurement-fe092-20261002/source/test/presets-validation.test.ts",
+      "bytes": 5215,
+      "sha256": "54bdbf2f429f4f441d1f405456109542a49a02e849f343b04b9170df85bd540b",
+      "match": true
+    },
+    {
+      "path": "/tmp/motion-qualified-measurement-fe092-20261002/source/test/presets-waapi.test.ts",
+      "bytes": 7172,
+      "sha256": "6b141ea416d25efe6a316d6df4ab359e6b75d132334f351fe43522549159eb00",
+      "match": true
+    },
+    {
+      "path": "/tmp/motion-qualified-measurement-fe092-20261002/source/test/profile-measurement.test.ts",
+      "bytes": 17773,
+      "sha256": "29f99acbbc56a3671442ca9382b8cd400085f06b1dce4c65bcc8d6b682adbbbc",
+      "match": true
+    },
+    {
+      "path": "/tmp/motion-qualified-measurement-fe092-20261002/source/test/projection-affine-overflow.test.ts",
+      "bytes": 1941,
+      "sha256": "a9c5b929aaf7e973b57c05d1819d3f947cee61305f5697020a6d25f899883e8b",
+      "match": true
+    },
+    {
+      "path": "/tmp/motion-qualified-measurement-fe092-20261002/source/test/projection-api-surface-pin.test.ts",
+      "bytes": 6650,
+      "sha256": "da297348cc6897a026e0d0bfee589d5f981b8d5ba7f65f7c82f41d341b5082c2",
+      "match": true
+    },
+    {
+      "path": "/tmp/motion-qualified-measurement-fe092-20261002/source/test/projection-dom.test.ts",
+      "bytes": 26689,
+      "sha256": "bde31a6ccdbe9cd11f522fd1d52840f77bf3bb392f05e2e06590535af58a6caa",
+      "match": true
+    },
+    {
+      "path": "/tmp/motion-qualified-measurement-fe092-20261002/source/test/projection-driver-basis-contract.test.ts",
+      "bytes": 1717,
+      "sha256": "3de7f5259d90c4751260405d5eed81b216bb0f57b5b5c759a6f81ab538148a1b",
+      "match": true
+    },
+    {
+      "path": "/tmp/motion-qualified-measurement-fe092-20261002/source/test/projection-driver.test.ts",
+      "bytes": 34557,
+      "sha256": "280152c720564b3383261c731abc43a94f21734dc47f574a395bbbbccc253f34",
+      "match": true
+    },
+    {
+      "path": "/tmp/motion-qualified-measurement-fe092-20261002/source/test/projection-finiteness-fuzz.test.ts",
+      "bytes": 13408,
+      "sha256": "79a847c381e00522c2a92f7d6471b333b75352368151beda12d2dbed0c33a6a6",
+      "match": true
+    },
+    {
+      "path": "/tmp/motion-qualified-measurement-fe092-20261002/source/test/projection-geometry.test.ts",
+      "bytes": 26165,
+      "sha256": "7abdbcbe64bedfe32e8c2e53b37f41477c4aa32148d4ac6e14615407912327e5",
+      "match": true
+    },
+    {
+      "path": "/tmp/motion-qualified-measurement-fe092-20261002/source/test/projection-helpers.ts",
+      "bytes": 12537,
+      "sha256": "7d22dab8477667ff282dba3c413f18c298ba019efeb0b156ea20b83ec1193216",
+      "match": true
+    },
+    {
+      "path": "/tmp/motion-qualified-measurement-fe092-20261002/source/test/projection-vector-clamp.test.ts",
+      "bytes": 4094,
+      "sha256": "4a188160a10b0f577c10fe33216e00a592799b64e63ac3e4c115afd36c438b5d",
+      "match": true
+    },
+    {
+      "path": "/tmp/motion-qualified-measurement-fe092-20261002/source/test/projection-vector-retarget.test.ts",
+      "bytes": 9743,
+      "sha256": "082de9855ba3bfe6983df1c1e6d9828b007f9f23c1b389d956aedb537887f156",
+      "match": true
+    },
+    {
+      "path": "/tmp/motion-qualified-measurement-fe092-20261002/source/test/projection-vector-seek-continuity.test.ts",
+      "bytes": 2115,
+      "sha256": "4981c275dcdcbe510d95dd5abed90993827bf30da13011885c2bcc26117af260",
+      "match": true
+    },
+    {
+      "path": "/tmp/motion-qualified-measurement-fe092-20261002/source/test/qwik.test.ts",
+      "bytes": 12517,
+      "sha256": "fa7f371dc8192287897521add6a2ffb441de1952769c2ca73122a67d68b0ceb7",
+      "match": true
+    },
+    {
+      "path": "/tmp/motion-qualified-measurement-fe092-20261002/source/test/react-runtime.test.ts",
+      "bytes": 28036,
+      "sha256": "f3a79eeaddb2ba690fa2df22be6c645601542150cfc2cd9ac50a718f429ecdf5",
+      "match": true
+    },
+    {
+      "path": "/tmp/motion-qualified-measurement-fe092-20261002/source/test/react.test.ts",
+      "bytes": 13255,
+      "sha256": "8317aa9c8ef1b6ad6c5ddedc027d050bccf443e1e794238842c70419ec5a4ab2",
+      "match": true
+    },
+    {
+      "path": "/tmp/motion-qualified-measurement-fe092-20261002/source/test/read-spring-unchecked.test.ts",
+      "bytes": 5177,
+      "sha256": "c16081d570a058167d23d70679cded020ac47acad0af2e5cdae5d0c8ea446c77",
+      "match": true
+    },
+    {
+      "path": "/tmp/motion-qualified-measurement-fe092-20261002/source/test/readme-facts.test.ts",
+      "bytes": 1392,
+      "sha256": "5e316488f2b069ba403cf43e36f5b8cf0c09b870a347a0ec48a3a11945f915fc",
+      "match": true
+    },
+    {
+      "path": "/tmp/motion-qualified-measurement-fe092-20261002/source/test/reduce-short-circuits.test.ts",
+      "bytes": 1453,
+      "sha256": "86b743a54c8d43efc28d442c934bbbfe94560df038f674cc94fe64476e2dc719",
+      "match": true
+    },
+    {
+      "path": "/tmp/motion-qualified-measurement-fe092-20261002/source/test/reduced-motion-policy.test.ts",
+      "bytes": 2701,
+      "sha256": "523063f00d9cfa94f8332b4cd14c16b1ff32ad1c4de78e98a75bc64e53dc4f54",
+      "match": true
+    },
+    {
+      "path": "/tmp/motion-qualified-measurement-fe092-20261002/source/test/reduced-motion-test-oracle.test.ts",
+      "bytes": 1017,
+      "sha256": "d2d007ac3cac8701665d26f82099d51450c366c7d815946c869c55836fa2afa4",
+      "match": true
+    },
+    {
+      "path": "/tmp/motion-qualified-measurement-fe092-20261002/source/test/release-artifact.test.ts",
+      "bytes": 13520,
+      "sha256": "18cebaf37512dd8bfe0a40d3d79bcbad6df153b6f6699467a00ee37122e6bf99",
+      "match": true
+    },
+    {
+      "path": "/tmp/motion-qualified-measurement-fe092-20261002/source/test/release-metadata.test.ts",
+      "bytes": 8201,
+      "sha256": "5d7322ee20898f7f1ed283ebec71bbb3a581a4544fb719c0d725dd75f53a30c5",
+      "match": true
+    },
+    {
+      "path": "/tmp/motion-qualified-measurement-fe092-20261002/source/test/release-tag-state-machine.test.ts",
+      "bytes": 6887,
+      "sha256": "9556a00f45ee0348a042393de407762c211d9fcbea67a87c3e8f5254cff77d95",
+      "match": true
+    },
+    {
+      "path": "/tmp/motion-qualified-measurement-fe092-20261002/source/test/release-workflow-contract.test.ts",
+      "bytes": 28703,
+      "sha256": "313a954baf436b7142b30cafec067c68c958a4787ba0fa15bd7888c578f636b5",
+      "match": true
+    },
+    {
+      "path": "/tmp/motion-qualified-measurement-fe092-20261002/source/test/reorder-gc.test.ts",
+      "bytes": 1451,
+      "sha256": "83ce92fbb15ba143a02fcd2d81851efb58916435d5189f5e2405207c059e6e79",
+      "match": true
+    },
+    {
+      "path": "/tmp/motion-qualified-measurement-fe092-20261002/source/test/reorder-keyboard-axis-noop.test.ts",
+      "bytes": 728,
+      "sha256": "5a018f3e5489218c95831f10a51a9ab2b809b8261bb8ae6fcb0e68e1037954e8",
+      "match": true
+    },
+    {
+      "path": "/tmp/motion-qualified-measurement-fe092-20261002/source/test/reorder-package.test.ts",
+      "bytes": 3926,
+      "sha256": "59af7c0aa2772c1be27069c9a390771433d738b72d262d2d33016e908b238c8f",
+      "match": true
+    },
+    {
+      "path": "/tmp/motion-qualified-measurement-fe092-20261002/source/test/reorder.test.ts",
+      "bytes": 14741,
+      "sha256": "05004dccb15bdeb78f093f8378c26d236def4f553a218e250884628ab4cdf4db",
+      "match": true
+    },
+    {
+      "path": "/tmp/motion-qualified-measurement-fe092-20261002/source/test/repeat-cursor.test.ts",
+      "bytes": 13953,
+      "sha256": "0ba95d4a3a1374e647677b63cd43d52cea384865338591505d2f6596431cdc91",
+      "match": true
+    },
+    {
+      "path": "/tmp/motion-qualified-measurement-fe092-20261002/source/test/repeat-frame-cursor-count.test.ts",
+      "bytes": 1830,
+      "sha256": "ec206a5ca2ff122167a528bf664025b3eb9e348d311ab531c5eb460876dbc33b",
+      "match": true
+    },
+    {
+      "path": "/tmp/motion-qualified-measurement-fe092-20261002/source/test/repeat-runtime-adversarial.test.ts",
+      "bytes": 24371,
+      "sha256": "e1afa47d185784ddfb2e17fa6109481e953ed15073d64c85cc38719027e1d4cc",
+      "match": true
+    },
+    {
+      "path": "/tmp/motion-qualified-measurement-fe092-20261002/source/test/repeat-v1-conformance.test.ts",
+      "bytes": 20993,
+      "sha256": "41431c757e165ae10bad7731dc9524f4cc213547179691c4dd4f87ae5f0e98c9",
+      "match": true
+    },
+    {
+      "path": "/tmp/motion-qualified-measurement-fe092-20261002/source/test/resource-actual-package-retention.test.ts",
+      "bytes": 6658,
+      "sha256": "f59866843a86c85adef6781cc9abf7b624a11ae4d3f0988ecb799b739176a12f",
+      "match": true
+    },
+    {
+      "path": "/tmp/motion-qualified-measurement-fe092-20261002/source/test/root-request-frame-ssot.test.ts",
+      "bytes": 1018,
+      "sha256": "19ccd1fa66624c5bfa85a521c88b19a0ef274b7dc901e6c26d2da62071ab3b78",
+      "match": true
+    },
+    {
+      "path": "/tmp/motion-qualified-measurement-fe092-20261002/source/test/runner-scheduler-rearm.test.ts",
+      "bytes": 6274,
+      "sha256": "76ec24776c1d925239ed3b7d111a14844adcf1610d35eb9d105169663b1f3122",
+      "match": true
+    },
+    {
+      "path": "/tmp/motion-qualified-measurement-fe092-20261002/source/test/schedule-v1.test.ts",
+      "bytes": 8720,
+      "sha256": "66af200988f8487f61d4cf78d00c0956a760139e554adc4dcca8061aee32c7e1",
+      "match": true
+    },
+    {
+      "path": "/tmp/motion-qualified-measurement-fe092-20261002/source/test/scroll-math.test.ts",
+      "bytes": 8160,
+      "sha256": "c8e95b078cf345723f15458d07ed0ca4edfc15a4e21a77130f24d440b4b6a9ae",
+      "match": true
+    },
+    {
+      "path": "/tmp/motion-qualified-measurement-fe092-20261002/source/test/scroll-observer.test.ts",
+      "bytes": 9391,
+      "sha256": "4ea75d0766d1f3b3bb0d1f0ea22245f007c091b566482daa2f42439193c9bb8f",
+      "match": true
+    },
+    {
+      "path": "/tmp/motion-qualified-measurement-fe092-20261002/source/test/segment-search-large.test.ts",
+      "bytes": 2094,
+      "sha256": "bfeef1e4dcbb64a6937bb21cf1a9a9de0a3d93a2e489595ed52f95fdf764058b",
+      "match": true
+    },
+    {
+      "path": "/tmp/motion-qualified-measurement-fe092-20261002/source/test/segmenter-recurrence-oracle.test.ts",
+      "bytes": 3576,
+      "sha256": "1e90890deaa18904e6e1c7b512501d054f7a16bf18e9f104f1ed23c72c5f27cf",
+      "match": true
+    },
+    {
+      "path": "/tmp/motion-qualified-measurement-fe092-20261002/source/test/semantic-motion-binding-consumer.test.ts",
+      "bytes": 6746,
+      "sha256": "de446f23bb8ff9fdd89aa2f3bbdf080c40b8bced584cc49ac65d12c2c5134c62",
+      "match": true
+    },
+    {
+      "path": "/tmp/motion-qualified-measurement-fe092-20261002/source/test/semantic-motion-binding-mutation.test.ts",
+      "bytes": 981,
+      "sha256": "5740225d5c0b7760b173761daf091d21e827a413583760dca5647e35ccd0b398",
+      "match": true
+    },
+    {
+      "path": "/tmp/motion-qualified-measurement-fe092-20261002/source/test/semantic-motion-binding-runtime.test.ts",
+      "bytes": 4013,
+      "sha256": "57d2f046fc2895abd3c7fb7dbbc66b62dde2677b81ea50ecd320888ff7086fdf",
+      "match": true
+    },
+    {
+      "path": "/tmp/motion-qualified-measurement-fe092-20261002/source/test/semantic-motion-binding.test.ts",
+      "bytes": 18060,
+      "sha256": "de837d6e67d84613ed354d256757c7fb28fb93cbe834c59d9a0471c6be8c863b",
+      "match": true
+    },
+    {
+      "path": "/tmp/motion-qualified-measurement-fe092-20261002/source/test/server-profile-contract.test.ts",
+      "bytes": 99503,
+      "sha256": "14aa08faad2bf30b1ad355e49b3da86bd5b61d653057ff28bbfa318cce177eb8",
+      "match": true
+    },
+    {
+      "path": "/tmp/motion-qualified-measurement-fe092-20261002/source/test/showcase-build-contract.test.ts",
+      "bytes": 2391,
+      "sha256": "81de059c1965dd0869f8ae4f45500ac0aff90d23daf9f528f5c08583f06f4529",
+      "match": true
+    },
+    {
+      "path": "/tmp/motion-qualified-measurement-fe092-20261002/source/test/showcase-lifecycle.test.ts",
+      "bytes": 7264,
+      "sha256": "53839cec2910cf05f66028cd2bfb9d4ec440ae0325bac5ab1879b39b963e2ce6",
+      "match": true
+    },
+    {
+      "path": "/tmp/motion-qualified-measurement-fe092-20261002/source/test/size-gate-autoderive.test.ts",
+      "bytes": 30857,
+      "sha256": "6b4e60fa7d46c1f6699224c050d51a2c460a5b640db7cf4c3c1320481886de12",
+      "match": true
+    },
+    {
+      "path": "/tmp/motion-qualified-measurement-fe092-20261002/source/test/sliding-window-mutation-harden.test.ts",
+      "bytes": 9727,
+      "sha256": "26399ca1e6974d554ea3f7e803676f70d4aaae04ea937effb66c870d28a8cd09",
+      "match": true
+    },
+    {
+      "path": "/tmp/motion-qualified-measurement-fe092-20261002/source/test/smart-api-surface-pin.test.ts",
+      "bytes": 7776,
+      "sha256": "79b0345c8de23faa276e58a62717896a8f6c1113e30f7b83edd4d1de5afd543b",
+      "match": true
+    },
+    {
+      "path": "/tmp/motion-qualified-measurement-fe092-20261002/source/test/smart-diff.test.ts",
+      "bytes": 13084,
+      "sha256": "9e46e403f59d5d91c964da5043100c5b6b4a4c8f2476ccd1c73bdf870901439e",
+      "match": true
+    },
+    {
+      "path": "/tmp/motion-qualified-measurement-fe092-20261002/source/test/smart-finiteness-fuzz.test.ts",
+      "bytes": 8015,
+      "sha256": "3eef80850422692aa01b3ab193e37f771dca9b5a400c24a267d56aa421390aeb",
+      "match": true
+    },
+    {
+      "path": "/tmp/motion-qualified-measurement-fe092-20261002/source/test/smart-helpers.ts",
+      "bytes": 10632,
+      "sha256": "53690f4e06b9ef43a00c39adb7146689e3a2bd9b8459e72ad105e4fa50fb60b7",
+      "match": true
+    },
+    {
+      "path": "/tmp/motion-qualified-measurement-fe092-20261002/source/test/smart-lifecycle.test.ts",
+      "bytes": 30080,
+      "sha256": "b562ae342bb3037c8e4167b51abfc4aa5eeb2b377a4d9da6152d2fde2673ec3d",
+      "match": true
+    },
+    {
+      "path": "/tmp/motion-qualified-measurement-fe092-20261002/source/test/solid-runtime.test.ts",
+      "bytes": 5045,
+      "sha256": "663710a4d1afb97527e6889e4b97853a93720564a50b4dc05dc0d7284d8e2430",
+      "match": true
+    },
+    {
+      "path": "/tmp/motion-qualified-measurement-fe092-20261002/source/test/solid.test.ts",
+      "bytes": 8305,
+      "sha256": "20c1fc4167a33a8141bf422158ad8bb99329b9d3ada94330d145d5249cc586b5",
+      "match": true
+    },
+    {
+      "path": "/tmp/motion-qualified-measurement-fe092-20261002/source/test/solver-finiteness-fuzz.test.ts",
+      "bytes": 4048,
+      "sha256": "a1e05baabcb5bb6a4a1103330f37add5ce3012733a8f922a5173df0e573a801d",
+      "match": true
+    },
+    {
+      "path": "/tmp/motion-qualified-measurement-fe092-20261002/source/test/spring-basis.test.ts",
+      "bytes": 4882,
+      "sha256": "e477ed9307eac7f0dec5dcb11dbbe57184df0d9b9fe2114ea146bad1c2b36e85",
+      "match": true
+    },
+    {
+      "path": "/tmp/motion-qualified-measurement-fe092-20261002/source/test/spring-clamp-finite-nan.test.ts",
+      "bytes": 5982,
+      "sha256": "9f5c8d02424ccac0343553e0fcde36df9d44be305acc532f0eefd8ccc58aa0fd",
+      "match": true
+    },
+    {
+      "path": "/tmp/motion-qualified-measurement-fe092-20261002/source/test/spring-determinism.test.ts",
+      "bytes": 1828,
+      "sha256": "3a03747ca899917555bb6a80fed3f10b59a73f8aa7b944bcf449affcc9634e68",
+      "match": true
+    },
+    {
+      "path": "/tmp/motion-qualified-measurement-fe092-20261002/source/test/spring-easing-binary64-horizon.test.ts",
+      "bytes": 1309,
+      "sha256": "1061c03ea4cb58cc81bdeb93442b06cfe32be0013117e5f816f06d91f55a53a4",
+      "match": true
+    },
+    {
+      "path": "/tmp/motion-qualified-measurement-fe092-20261002/source/test/spring-easing-c1.test.ts",
+      "bytes": 8913,
+      "sha256": "e192977665a6d18d32a4221a08d53ba0ed7e881a5015ce469b252f0d4883051c",
+      "match": true
+    },
+    {
+      "path": "/tmp/motion-qualified-measurement-fe092-20261002/source/test/spring-ergonomics.test.ts",
+      "bytes": 18395,
+      "sha256": "635c8b23985b956cc41b0df6c5ee755586dc8d1dabe3d15708278e73421b987b",
+      "match": true
+    },
+    {
+      "path": "/tmp/motion-qualified-measurement-fe092-20261002/source/test/spring-low-omega0-wall-clock.test.ts",
+      "bytes": 15993,
+      "sha256": "1af9b92da8afbab0d323b9ce60ce54ac5aaab8b7f5d2d0565a9044e912611e13",
+      "match": true
+    },
+    {
+      "path": "/tmp/motion-qualified-measurement-fe092-20261002/source/test/spring-observable-constructors.test.ts",
+      "bytes": 11006,
+      "sha256": "4cbfead276345d6de0d75410c668877a4b40f0cf85e4651d43dee121ace8bcec",
+      "match": true
+    },
+    {
+      "path": "/tmp/motion-qualified-measurement-fe092-20261002/source/test/spring-ode-oracle.test.ts",
+      "bytes": 3071,
+      "sha256": "804e81619e30e189a72a038d77f282bcb522c5fa0804ddda11caf7e5d8b6f5c2",
+      "match": true
+    },
+    {
+      "path": "/tmp/motion-qualified-measurement-fe092-20261002/source/test/spring-overdamped-slow-pole.test.ts",
+      "bytes": 13475,
+      "sha256": "871267446be2b5d7e1ea338e40372f26806bbb3e8aa9064a3a530e0c16f5615f",
+      "match": true
+    },
+    {
+      "path": "/tmp/motion-qualified-measurement-fe092-20261002/source/test/spring-settle-budget-differential.test.ts",
+      "bytes": 10951,
+      "sha256": "ec745862000aab0ccfc53af8179714e72e34e6017acae8bc621e66ab4e152fbe",
+      "match": true
+    },
+    {
+      "path": "/tmp/motion-qualified-measurement-fe092-20261002/source/test/stagger-allocation.test.ts",
+      "bytes": 1493,
+      "sha256": "ac7d57b89c8fadde5b5ed813a86fee799911276c40ce8fd4ae76cf7c107b2559",
+      "match": true
+    },
+    {
+      "path": "/tmp/motion-qualified-measurement-fe092-20261002/source/test/stagger-api-surface-pin.test.ts",
+      "bytes": 2533,
+      "sha256": "0e552d12fb7044fa43b5bf213b4e498cdd3a2cfd5363440f132b961212d14e3d",
+      "match": true
+    },
+    {
+      "path": "/tmp/motion-qualified-measurement-fe092-20261002/source/test/stagger-count-cap.test.ts",
+      "bytes": 4357,
+      "sha256": "bb2180fdc2e336e3c40f4a218642db6b74e6e6c85f1099709982c738f8e0e6af",
+      "match": true
+    },
+    {
+      "path": "/tmp/motion-qualified-measurement-fe092-20261002/source/test/stagger-finiteness.test.ts",
+      "bytes": 10438,
+      "sha256": "8e8a7f21525c086e80ce5ec8ce05045709e068d92a13e50c880d3238afd36d80",
+      "match": true
+    },
+    {
+      "path": "/tmp/motion-qualified-measurement-fe092-20261002/source/test/stagger-property-fuzz.test.ts",
+      "bytes": 17448,
+      "sha256": "c701fd73a789063105e4fb56d441d59225f208f6172f1be06ecb37ba87a18a86",
+      "match": true
+    },
+    {
+      "path": "/tmp/motion-qualified-measurement-fe092-20261002/source/test/standard-easing-specialized.test.ts",
+      "bytes": 4416,
+      "sha256": "49fb8ecd1cfe124f4848d838745ce0d9d0ad96f2f820f125619c159a6892ce01",
+      "match": true
+    },
+    {
+      "path": "/tmp/motion-qualified-measurement-fe092-20261002/source/test/surface-execution-ownership.test.ts",
+      "bytes": 1582,
+      "sha256": "80b72c4f2bf8d50766a2589f0d5b6b9eb1c8d4f8801762a6a6def4139b165c2a",
+      "match": true
+    },
+    {
+      "path": "/tmp/motion-qualified-measurement-fe092-20261002/source/test/surface-materialization.test.ts",
+      "bytes": 7996,
+      "sha256": "2b590e1fbdadc1cd5408325f9c3c85e8ae433ba05094637153ea009447cb3a5b",
+      "match": true
+    },
+    {
+      "path": "/tmp/motion-qualified-measurement-fe092-20261002/source/test/surface-observational-equivalence.test.ts",
+      "bytes": 9073,
+      "sha256": "826dea01420cb4ced3ac0d7f6931db0c3ed47fb99d994318d551a1492f154922",
+      "match": true
+    },
+    {
+      "path": "/tmp/motion-qualified-measurement-fe092-20261002/source/test/svelte-current-value.test.ts",
+      "bytes": 680,
+      "sha256": "c4fd136af1c8dd9075024d0bb5e6ef8777f9be7a10610bb0d77d5879ccd3f9b1",
+      "match": true
+    },
+    {
+      "path": "/tmp/motion-qualified-measurement-fe092-20261002/source/test/svelte.test.ts",
+      "bytes": 12213,
+      "sha256": "edb044da2bb359b122b6e6d6f3d6db50d0673ffff80cc1602cc129703abf1b7c",
+      "match": true
+    },
+    {
+      "path": "/tmp/motion-qualified-measurement-fe092-20261002/source/test/svg-morph-compound.test.ts",
+      "bytes": 8577,
+      "sha256": "be378fadfb938f5df978b10fcbbc8b90d2a9e1c9a1a36a09b55e75e66d5a6e2a",
+      "match": true
+    },
+    {
+      "path": "/tmp/motion-qualified-measurement-fe092-20261002/source/test/svg-morph.test.ts",
+      "bytes": 13902,
+      "sha256": "591642a14d838bd1348c4f640326065f483c24ce401bd2e92a35ffcc9284c43d",
+      "match": true
+    },
+    {
+      "path": "/tmp/motion-qualified-measurement-fe092-20261002/source/test/svg.test.ts",
+      "bytes": 11856,
+      "sha256": "adb6d827bba69fcecd1d3582217ab7bcd6cfc704494b454ca313b337bd608d67",
+      "match": true
+    },
+    {
+      "path": "/tmp/motion-qualified-measurement-fe092-20261002/source/test/timeline-api-surface-pin.test.ts",
+      "bytes": 11181,
+      "sha256": "2118654d5d687f4e46de51004ab96775f24d19820294c9808dfe4d33e73c774c",
+      "match": true
+    },
+    {
+      "path": "/tmp/motion-qualified-measurement-fe092-20261002/source/test/timeline-finiteness-fuzz.test.ts",
+      "bytes": 11848,
+      "sha256": "7bbf0f1c0be3464c63e93c26864726e09000a41877a2c2f28af9c828e1da419e",
+      "match": true
+    },
+    {
+      "path": "/tmp/motion-qualified-measurement-fe092-20261002/source/test/timeline-label-owner-allocation.test.ts",
+      "bytes": 2359,
+      "sha256": "f7a5b9bba729e220f9ded22088517ab698db59fbb19319aa3c4237da0b3a3313",
+      "match": true
+    },
+    {
+      "path": "/tmp/motion-qualified-measurement-fe092-20261002/source/test/timeline-reduced-motion.test.ts",
+      "bytes": 6437,
+      "sha256": "b81da5e96f6fbed4324d1eab81bbdce61d493d027c478a706486c88f2008003c",
+      "match": true
+    },
+    {
+      "path": "/tmp/motion-qualified-measurement-fe092-20261002/source/test/timeline-settle-contract.test.ts",
+      "bytes": 9998,
+      "sha256": "e44a237ab74d72474a3da28fc6e4502c6ecc5b4889c9ed9ee1442a0cb1c1f8a6",
+      "match": true
+    },
+    {
+      "path": "/tmp/motion-qualified-measurement-fe092-20261002/source/test/timeline-virtual-time.test.ts",
+      "bytes": 12777,
+      "sha256": "c334da85b30a59c286c3b1c13117f82692333371d3515421860c646a8be76000",
+      "match": true
+    },
+    {
+      "path": "/tmp/motion-qualified-measurement-fe092-20261002/source/test/tokens.test.ts",
+      "bytes": 12317,
+      "sha256": "fc774ee5d1e456b24971b18981e0972411140fe9e81b62ac585e19a755a2bbd8",
+      "match": true
+    },
+    {
+      "path": "/tmp/motion-qualified-measurement-fe092-20261002/source/test/transform-allocation-ceiling.test.ts",
+      "bytes": 15123,
+      "sha256": "b01ca00f1a8d001bc2829641488f71b0394803aea20a748c8b2aeb8cfe48c0ec",
+      "match": true
+    },
+    {
+      "path": "/tmp/motion-qualified-measurement-fe092-20261002/source/test/tween-boundary.test.ts",
+      "bytes": 1308,
+      "sha256": "07ea394c58060728efed02841fca9ab8edbbcfd87b7b946d4f86f5267fdf311c",
+      "match": true
+    },
+    {
+      "path": "/tmp/motion-qualified-measurement-fe092-20261002/source/test/tween-mutation-harden.test.ts",
+      "bytes": 5584,
+      "sha256": "acc00829c0226eac3b5b703daeb86579d17c5c21e3bda8ea8ad3397c900e13ce",
+      "match": true
+    },
+    {
+      "path": "/tmp/motion-qualified-measurement-fe092-20261002/source/test/unclamped-overshoot-surfaces.test.ts",
+      "bytes": 8929,
+      "sha256": "464c2fd4839d1abf4bf91be3344420deb13b464467bba1581e864f259706b82c",
+      "match": true
+    },
+    {
+      "path": "/tmp/motion-qualified-measurement-fe092-20261002/source/test/utils-api-surface-pin.test.ts",
+      "bytes": 3750,
+      "sha256": "91653fb332ec41b5f00f346c73174da646f9207d0fb1bb83179503e478539001",
+      "match": true
+    },
+    {
+      "path": "/tmp/motion-qualified-measurement-fe092-20261002/source/test/utils-cove-harden.test.ts",
+      "bytes": 6143,
+      "sha256": "320dbfd58283c99fa598f08d37d39f1498054f318618dd2beed0290c0ec0347b",
+      "match": true
+    },
+    {
+      "path": "/tmp/motion-qualified-measurement-fe092-20261002/source/test/utils-determinism.test.ts",
+      "bytes": 2118,
+      "sha256": "001ec8daf0f3fdc7e9fd550f7bc87d3694b6a5c0f79c33bff9f4de7be789b2ab",
+      "match": true
+    },
+    {
+      "path": "/tmp/motion-qualified-measurement-fe092-20261002/source/test/utils-differential.test.ts",
+      "bytes": 9728,
+      "sha256": "5775707618697b6885f8856b00c6f665408f01e5067e12f7e1242de48d07f8e6",
+      "match": true
+    },
+    {
+      "path": "/tmp/motion-qualified-measurement-fe092-20261002/source/test/utils-factory-validation.test.ts",
+      "bytes": 7391,
+      "sha256": "027ce5548474b890f4baf4e091db93ec7fb2ecf7f97b9d3c6277cbb87ea3e9d2",
+      "match": true
+    },
+    {
+      "path": "/tmp/motion-qualified-measurement-fe092-20261002/source/test/utils-finiteness-fuzz.test.ts",
+      "bytes": 5673,
+      "sha256": "99d8a87d159d22f4ddbf362f1db2938af88e7020bb9d0e7da2faf84eb0722697",
+      "match": true
+    },
+    {
+      "path": "/tmp/motion-qualified-measurement-fe092-20261002/source/test/utils-mutation-harden.test.ts",
+      "bytes": 5809,
+      "sha256": "ad2d0a050d3e2b031bc6983ddfa94f3dd26b9bd5ec6bb4a86344ac5eb5279c4e",
+      "match": true
+    },
+    {
+      "path": "/tmp/motion-qualified-measurement-fe092-20261002/source/test/utils-subpath-smoke.test.ts",
+      "bytes": 4754,
+      "sha256": "bb5aae5afe7ee3b1fb6a183f719b3fd72c62589bbe2c608466cce45144683293",
+      "match": true
+    },
+    {
+      "path": "/tmp/motion-qualified-measurement-fe092-20261002/source/test/value-api-surface-pin.test.ts",
+      "bytes": 5257,
+      "sha256": "e4e06253ed6df70ecae751c30d0efb610f67aa0a61d633a2b153d4164fcd3920",
+      "match": true
+    },
+    {
+      "path": "/tmp/motion-qualified-measurement-fe092-20261002/source/test/value-color-differential.test.ts",
+      "bytes": 13367,
+      "sha256": "24cc0dcf67824559910df7650a619a5ec57f31a4f1e1c0d18672ca13e43bfc49",
+      "match": true
+    },
+    {
+      "path": "/tmp/motion-qualified-measurement-fe092-20261002/source/test/value-color-precision.test.ts",
+      "bytes": 4980,
+      "sha256": "7bf402331651cd5c4fd3360531c3897062e5d556395c3b2a8a303667973126e1",
+      "match": true
+    },
+    {
+      "path": "/tmp/motion-qualified-measurement-fe092-20261002/source/test/value-finiteness-overflow-fuzz.test.ts",
+      "bytes": 20029,
+      "sha256": "4e5556cd93679569f89990df20722c7f2d9c2da9689f894e2959dcc22a730483",
+      "match": true
+    },
+    {
+      "path": "/tmp/motion-qualified-measurement-fe092-20261002/source/test/value-internal-parser.test.ts",
+      "bytes": 4249,
+      "sha256": "f3d34ee7b41c5c81430a99023aa7fa50dab1b4572b837b8f26410a8cefab14e0",
+      "match": true
+    },
+    {
+      "path": "/tmp/motion-qualified-measurement-fe092-20261002/source/test/value-interpolate-property.test.ts",
+      "bytes": 13085,
+      "sha256": "2da2128a681c5568fd1781de8c4770fced16744260eb72c9c3afee77387cdd3a",
+      "match": true
+    },
+    {
+      "path": "/tmp/motion-qualified-measurement-fe092-20261002/source/test/value-parse.test.ts",
+      "bytes": 11936,
+      "sha256": "07b5d142f5016026ebe8f73f7e9e4154fc29bbc6ee35c9dd2e21275a60d9501d",
+      "match": true
+    },
+    {
+      "path": "/tmp/motion-qualified-measurement-fe092-20261002/source/test/value-var-redos.test.ts",
+      "bytes": 7389,
+      "sha256": "e2071d0af29d2e56ab41e395808fa7037ca09d33cfbe2f789893eb8f7e36b33a",
+      "match": true
+    },
+    {
+      "path": "/tmp/motion-qualified-measurement-fe092-20261002/source/test/vue-runtime.test.ts",
+      "bytes": 5617,
+      "sha256": "9e28340946ee57cfa37b6c4ce865570367c04844a29d604d82005acb056874f1",
+      "match": true
+    },
+    {
+      "path": "/tmp/motion-qualified-measurement-fe092-20261002/source/test/vue.test.ts",
+      "bytes": 26524,
+      "sha256": "3ce92c5a80f29ded93931a8092475a069343bcd4acbf40b7be2c92053bcf602a",
+      "match": true
+    },
+    {
+      "path": "/tmp/motion-qualified-measurement-fe092-20261002/source/test/waapi-emit.test.ts",
+      "bytes": 24035,
+      "sha256": "aabef7c5930b831338b39a9cbbb04e736ec7bc8fdb23aef76395cbe4333a0ad0",
+      "match": true
+    },
+    {
+      "path": "/tmp/motion-qualified-measurement-fe092-20261002/source/test/waapi-scroll-timeline.test.ts",
+      "bytes": 2684,
+      "sha256": "14b0d86cfec578f312a207b1237badefdb2eb830dab182237803aaf72878e036",
+      "match": true
+    },
+    {
+      "path": "/tmp/motion-qualified-measurement-fe092-20261002/source/test/waapi-view-timeline.test.ts",
+      "bytes": 2633,
+      "sha256": "e2f0e517a5a46b600862c1730edae0c43147283a11b9e89ec021ffbfa81261e8",
+      "match": true
+    },
+    {
+      "path": "/tmp/motion-qualified-measurement-fe092-20261002/source/test/wc-runtime.test.ts",
+      "bytes": 4508,
+      "sha256": "b0d1f3aff397aa005ff9e5e7723d26a7e801796984d07d97296b164ceda2b25b",
+      "match": true
+    },
+    {
+      "path": "/tmp/motion-qualified-measurement-fe092-20261002/source/test/wc.test.ts",
+      "bytes": 9674,
+      "sha256": "d8784c038fa6628fcec72ae14de76872c185549e7c13c9399ce8a91cc774d018",
+      "match": true
+    },
+    {
+      "path": "/tmp/motion-qualified-measurement-fe092-20261002/source/test/webkit-freeze-contract.test.ts",
+      "bytes": 3926,
+      "sha256": "bac017af1923105f5081533ffd352c2f0faec3bb4ce13c75688b5d51d90f8f97",
+      "match": true
+    },
+    {
+      "path": "/tmp/motion-qualified-measurement-fe092-20261002/source/test/zero-dep-smoke.test.ts",
+      "bytes": 3501,
+      "sha256": "6b9365f8bac59d966a1417fadfec3a0be03effcb51f812f828f519ed89b68792",
+      "match": true
+    },
+    {
+      "path": "/tmp/motion-qualified-measurement-fe092-20261002/source/tsconfig.browser.json",
+      "bytes": 851,
+      "sha256": "24b710d19a0677ab1adefae4d0a956c098213d5eb14aa330c0b73b06ba88c830",
+      "match": true
+    },
+    {
+      "path": "/tmp/motion-qualified-measurement-fe092-20261002/source/tsconfig.json",
+      "bytes": 658,
+      "sha256": "2afb9819766cf6e2d7862a2f4b709f1c730effd0e83d8f64b8575213ca55b24c",
+      "match": true
+    },
+    {
+      "path": "/tmp/motion-qualified-measurement-fe092-20261002/source/tsconfig.motion-program.json",
+      "bytes": 329,
+      "sha256": "23b8f3e89e9dc8655a35655dc81d594dffc748667c7ebcceea9c203863afd09e",
+      "match": true
+    },
+    {
+      "path": "/tmp/motion-qualified-measurement-fe092-20261002/source/tsup.config.ts",
+      "bytes": 6233,
+      "sha256": "bc9079fb5b8fff97bff753acde91ba2fe6c85e8d78a256edc2fe0601a76e8d14",
+      "match": true
+    },
+    {
+      "path": "/tmp/motion-qualified-measurement-fe092-20261002/source/vitest.config.ts",
+      "bytes": 157,
+      "sha256": "26f615c59fe968f0591008a7919374916be4e4249eae23353defb4e88badc67e",
+      "match": true
+    },
+    {
+      "path": "/tmp/motion-qualified-measurement-fe092-20261002/source/vitest.stryker.config.ts",
+      "bytes": 471,
+      "sha256": "a6357772e9ed3ea7134705becbc84fcb847cdbc6a81e6b6435f064b500c19c77",
+      "match": true
+    },
+    {
+      "path": "/tmp/motion-qualified-measurement-fe092-20261002/source/vitest.stryker.driver.config.ts",
+      "bytes": 716,
+      "sha256": "24f69c5e951ca1545d83ea8235dbc0738e41b64203f7cebf0c6910c636e2b799",
+      "match": true
+    },
+    {
+      "path": "/tmp/motion-qualified-measurement-fe092-20261002/source-bindings.json",
+      "bytes": 264545,
+      "sha256": "1ea8bc99a57b96dad5391321d66c225f3456c23a5548a669162ce19e401f78e0",
+      "match": true
+    },
+    {
+      "path": "/tmp/motion-qualified-measurement-fe092-20261002/start.json",
+      "bytes": 380,
+      "sha256": "9c9239803886c3e725a476ad4a95abb22397bf31664e37ad068ce0beaba63f85",
+      "match": true
+    },
+    {
+      "path": "/tmp/motion-qualified-measurement-fe092-20261002/supplement-integrity.json",
+      "bytes": 10344,
+      "sha256": "75f69acf3f08456a7a22a0802764853585510d208a9efb33f8104a8409f957d8",
+      "match": true
+    },
+    {
+      "path": "/tmp/motion-qualified-measurement-fe092-20261002/terminal.json",
+      "bytes": 1067,
+      "sha256": "67806faa1c789738a4d2732b5c31bfde49f6ba19da57b61ee856ceb706d4d587",
+      "match": true
+    }
+  ],
+  "terminal": {
+    "schema": "motion-independent-qualified-measurement-terminal-v1",
+    "sourceHead": "fe092331360837fd7f63d71a4b7f867ba849ebd4",
+    "sourceTree": "285e30e36db32f2fdc9ae442327f6b3396dcf254",
+    "startUtc": "2026-10-02T03:59:01.789254+00:00",
+    "actualEndUtc": "2026-10-02T03:59:01.896622+00:00",
+    "exitCode": 0,
+    "argv": [
+      "/opt/codex/runtimes/codex-primary-runtime/dependencies/python/bin/python3",
+      "/tmp/motion-qualified-measurement-fe092-20261002/finalize.py"
+    ],
+    "cpu": 2,
+    "action": "source-only hash/readset/manifest finalization; no SUT/native/runtime probe/build/profile",
+    "allEND": true,
+    "allChildrenJoined": true,
+    "heavy": 0,
+    "queued": 0,
+    "freshReviewerRuntime": false,
+    "freshReviewerNativeExecution": false,
+    "registeredReviewerTimingSamples": 0,
+    "stopOwnExecAfterSeal": true,
+    "nativePrimaryActualEndUtc": "2026-10-02T03:21:17.430487+00:00",
+    "nativePrimaryScope": "f647 frozen head label, exact final native/fixture input bytes; not fresh reviewer execution",
+    "freshWholeActualEndUtc": "2026-10-02T03:35:41.110457+00:00"
+  },
+  "disposition": "PASS scoped tests/nativeAPIABI/CI/measurementlaw. Five old falsifiers conserved; six30s budgets explicit. No physicalaccuracy/fresh reviewer runtime/productGO/actualseries claims."
+}

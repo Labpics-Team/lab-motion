@@ -1,0 +1,84 @@
+{
+  "schema": "server-predata-primary-v1",
+  "sourceHead": "fe092331360837fd7f63d71a4b7f867ba849ebd4",
+  "protocolDigest": "ce535cf6d6f0b0f140d44403627b63d936ef2461883a52680e7bbcad3ee49e5a",
+  "clockModelDigest": "04d863513d53b248b1be3e0905240f3bd6f4d06124582ce3093c2cbfe5320852",
+  "refs": [
+    {
+      "path": "/tmp/motion-server-predata-fe092331-ce535cf6-20261002-epoch8/predata-tuple.json",
+      "bytes": 41722,
+      "sha256": "5bcaa87d3349231591f4c8718e44e41c851f50d17bd3d52ae1c32d4eaca77ec5"
+    },
+    {
+      "path": "/tmp/motion-server-predata-fe092331-ce535cf6-20261002-epoch8/predata-tuple.sha256",
+      "bytes": 85,
+      "sha256": "301ba13dec2e315395b8c706afc0081062c72819da3944730368418a8722bf20"
+    },
+    {
+      "path": "/tmp/motion-server-predata-fe092331-ce535cf6-20261002-epoch8/prepare.mjs",
+      "bytes": 7865,
+      "sha256": "ef193f392ee35fb22132998e458afc95d49573053257f50b28902d1e1ede083a"
+    },
+    {
+      "path": "/tmp/motion-server-predata-fe092331-ce535cf6-20261002-epoch8/preparation-start.json",
+      "bytes": 975,
+      "sha256": "9e44dcf14f280f98569f963d1c6571a3b8f85a1c9af4f1adc6f86602e9f4fcb3"
+    },
+    {
+      "path": "/tmp/motion-server-predata-fe092331-ce535cf6-20261002-epoch8/preparation-execution.json",
+      "bytes": 1065,
+      "sha256": "6d551452b78abef20687483f97c5c0e95ca4e22448a83f3f017ab45672ab68af"
+    },
+    {
+      "path": "/tmp/motion-server-predata-fe092331-ce535cf6-20261002-epoch8/prepare.stdout",
+      "bytes": 646,
+      "sha256": "9e9abac6e32072a7bb86c9b84598031a9e495e910f3257277ad0ec79cb14c7fa"
+    },
+    {
+      "path": "/tmp/motion-server-predata-fe092331-ce535cf6-20261002-epoch8/prepare.stderr",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "path": "/tmp/motion-server-predata-fe092331-ce535cf6-20261002-epoch8/launch-single-series.py",
+      "bytes": 2996,
+      "sha256": "98623d56bf4cda4c7b54bf8734f7bb39a61604deaedfa55678c04b35abe425db"
+    }
+  ],
+  "nativeBinary": {
+    "path": "/tmp/motion-server-predata-fe092331-ce535cf6-20261002-epoch8/native-clock/thread-cpu-clock.node",
+    "bytes": 16192,
+    "sha256": "21bb3221b35523770ee025546c5e4fadb8bd7a64627a65147bd23ca48ac6c76a"
+  },
+  "sourceFreeze": {
+    "path": "/tmp/motion-qualified-fe092331-20261002/PRIMARY-PACKET.json",
+    "bytes": 7130,
+    "sha256": "4184a52ea58d4f3b27e7cd4c571425c51efda578f1a283b2aab396dd0659e29e"
+  },
+  "currentChecksManifest": {
+    "path": "/tmp/motion-profile-current-gates-fe092331-20261002/receipt.json",
+    "bytes": 7262,
+    "sha256": "26138e2b9c80ab254ab047f28c231db6db763a6b6cdd4f61a138dbf9ee8a834e"
+  },
+  "currentActualPackages": [
+    {
+      "path": "/tmp/motion-server-baseline-prepared-20261001-independent/baseline.tgz",
+      "bytes": 560519,
+      "sha256": "3787bfcc0b9b4302d826984cefc29a0a5ff7142d60a52d721c8d2f1397125470"
+    },
+    {
+      "path": "/tmp/motion-profile-current-gates-fe092331-20261002/candidate-pnpm.tgz",
+      "bytes": 562051,
+      "sha256": "b41708c31e122da9ae46a558f0c5f447195f36ca19c9b0fe6c19954887d790e4"
+    },
+    {
+      "path": "/tmp/motion-profile-current-gates-fe092331-20261002/labpics-motion-0.3.0.tgz",
+      "bytes": 560040,
+      "sha256": "54482b3da5ae3e530e9f25f29b91471b1ff95cf2d8212735a0eeb71002d6fba7"
+    }
+  ],
+  "plannedActualOutput": "/tmp/motion-server-series-fe092331-ce535cf6-20261002-epoch8",
+  "actualOutputAbsent": true,
+  "observationsCurrentEpoch": 0,
+  "scope": "Metadata-only successor8; prior7 never launched. Historical5 preparation refusal and6 incomplete baseline warmup preserved. No grant/no SUT invocation here."
+}

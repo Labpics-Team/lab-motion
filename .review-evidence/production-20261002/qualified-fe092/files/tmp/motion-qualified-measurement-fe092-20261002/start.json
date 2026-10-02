@@ -1,0 +1,11 @@
+{
+  "startUtc": "2026-10-02T03:32:15.349634+00:00",
+  "sourceHead": "fe092331360837fd7f63d71a4b7f867ba849ebd4",
+  "sourceTree": "285e30e36db32f2fdc9ae442327f6b3396dcf254",
+  "base": "f6476ae990254f606faf97f80afe41965bec2fb2",
+  "scope": "source/primary-only independent measurement/tests/native ABI CI coverage",
+  "cpu": 2,
+  "heavy": 0,
+  "queued": 0,
+  "freshRuntime": false
+}

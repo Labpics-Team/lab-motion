@@ -1,0 +1,23 @@
+import { readFileSync, writeFileSync } from 'node:fs';
+import { createRequire } from 'node:module';
+import { createHash } from 'node:crypto';
+import assert from 'node:assert/strict';
+const root='/workspace/lab-motion', out='/tmp/motion-admission-granularity-20261002';
+const ts=createRequire(root+'/package.json')('typescript');
+const old=readFileSync(out+'/before.test.ts','utf8'), current=readFileSync(root+'/test/server-profile-contract.test.ts','utf8');
+const parse=src=>ts.createSourceFile('owner.ts',src,ts.ScriptTarget.Latest,true);
+function cases(src) { const result=[]; const visit=n=>{if(ts.isCallExpression(n)&&n.expression.getText()==='it'&&ts.isStringLiteral(n.arguments[0]))result.push({name:n.arguments[0].text,body:n.arguments[1]?.body,timeout:n.arguments[2]?.getText()});ts.forEachChild(n,visit);};visit(parse(src));return result; }
+const oldCase=cases(old).find(x=>x.name==='завершённый public admission отвергает четыре независимых reviewer counterexamples');
+const names=['полный healthy admission создаёт и проверяет весь зарегистрированный N','полная история отвергает calibration до завершения A/A и 2×work','полная история отвергает замену противоположного порядка пар','полная история отвергает потерянный failure union','полная история отвергает подмену имени positive','полная история отвергает подмену финального raw digest'];
+const next=cases(current).filter(x=>names.includes(x.name));
+assert.deepEqual(next.map(x=>x.name),names); assert(next.every(x=>x.timeout===oldCase.timeout));
+const statements=next.flatMap(x=>Array.from(x.body.statements, s=>s.getText()));
+const conserved=Array.from(oldCase.body.statements).slice(1).map(s=>s.getText());
+for(const statement of conserved)assert(statements.includes(statement),'removed/rewritten original statement: '+statement);
+const callback=s=>s.slice(s.indexOf('function chain('),s.indexOf('// Два набора fault cases'));
+assert.equal(callback(current),callback(old));
+const setup=s=>s.slice(s.indexOf('function healthyAdmission('),s.indexOf("describe('серверный PROFILE: потеря полей при CPU RLE запрещена'"));
+assert.equal(setup(current),setup(old));
+assert(!readFileSync(root+'/vitest.config.ts','utf8').match(/shuffle|concurrent|sequence|beforeAll/));
+const result={sourceBeforeSha256:createHash('sha256').update(old).digest('hex'),sourceAfterSha256:createHash('sha256').update(current).digest('hex'),originalCallback:oldCase.body.getText(),newCases:next.map(x=>({name:x.name,timeout:x.timeout,body:x.body.getText()})),conservedOriginalStatements:conserved,fullHealthySetupAndChainLiteralUnchanged:true,beforeAllAdded:false,semanticScope:'Six individually bounded laws, with healthy full-N construction+hash+Artifact+Journal inside first timed case; all five existing faults keep original operations/assertions. Not a speed claim or aggregate-30s PASS.'};
+writeFileSync(out+'/conservation-result.json',JSON.stringify(result,null,2)+'\n',{flag:'wx'});console.log(JSON.stringify({cases:next.length,conservedStatements:conserved.length,timeout:oldCase.timeout}));

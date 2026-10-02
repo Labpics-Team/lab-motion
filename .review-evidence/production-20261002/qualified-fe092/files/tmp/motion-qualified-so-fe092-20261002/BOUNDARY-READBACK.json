@@ -1,0 +1,771 @@
+{
+  "checkedUtc": "2026-10-02T03:48:15.143653+00:00",
+  "scope": "Independent static conservation and raw artifact readback only, no new SUT/runtime/build/suites",
+  "setupByteIdentical": true,
+  "chainByteIdentical": true,
+  "legacyConservedStatements": [
+    {
+      "statement": "expect(validateServerArtifact(artifact).verdict).toBe('PASS');",
+      "presentLiteral": true
+    },
+    {
+      "statement": "expect(validateServerJournal(artifact, history.records)).toHaveProperty('journalFinalDigest');",
+      "presentLiteral": true
+    },
+    {
+      "statement": "const earlyCalibration = events.filter((event) => event.type !== 'calibration');",
+      "presentLiteral": true
+    },
+    {
+      "statement": "earlyCalibration.splice(earlyCalibration.findIndex((event) => event.type === 'N-frozen-before-calibration-and-AB') + 1, 0,\n      { type: 'calibration', value: artifact.calibration });",
+      "presentLiteral": true
+    },
+    {
+      "statement": "expect(() => validateServerJournal(artifact, chain(earlyCalibration, history))).toThrow(/до завершения/);",
+      "presentLiteral": true
+    },
+    {
+      "statement": "const alwaysLeft = [...events];",
+      "presentLiteral": true
+    },
+    {
+      "statement": "const firstOpposite = alwaysLeft.findIndex((event) => event.type === 'sample' && event.value.participant === 'right');",
+      "presentLiteral": true
+    },
+    {
+      "statement": "[alwaysLeft[firstOpposite], alwaysLeft[firstOpposite + 1]] = [alwaysLeft[firstOpposite + 1], alwaysLeft[firstOpposite]];",
+      "presentLiteral": true
+    },
+    {
+      "statement": "expect(() => validateServerJournal(artifact, chain(alwaysLeft, history))).toThrow(/порядок/);",
+      "presentLiteral": true
+    },
+    {
+      "statement": "const ignoredFailure = [...events.slice(0, -1), { type: 'failure', value: { stage: 'ab', error: { message: 'retained reviewer failure' } } }, events.at(-1)];",
+      "presentLiteral": true
+    },
+    {
+      "statement": "expect(() => validateServerJournal(artifact, chain(ignoredFailure, history))).toThrow(/failures/);",
+      "presentLiteral": true
+    },
+    {
+      "statement": "const wrongPositive = { ...artifact, positive: { ...artifact.positive, name: 'aa' } };",
+      "presentLiteral": true
+    },
+    {
+      "statement": "expect(() => validateServerArtifact(wrongPositive)).toThrow(/имя стадии/);",
+      "presentLiteral": true
+    },
+    {
+      "statement": "const wrongFinish = [...events.slice(0, -1), { type: 'finished', value: { verdict: 'PASS', digest: 'b'.repeat(64) } }];",
+      "presentLiteral": true
+    },
+    {
+      "statement": "expect(() => validateServerJournal(artifact, chain(wrongFinish, history))).toThrow(/финальная/);",
+      "presentLiteral": true
+    }
+  ],
+  "oldCallbackTimeoutMs": 30000,
+  "newCaseTimeoutsMs": [
+    30000,
+    30000,
+    30000,
+    30000,
+    30000,
+    30000
+  ],
+  "aggregateLegacy30sClaimPreserved": false,
+  "currentSequentialVitestConfigNoShuffle": true,
+  "prerequisiteGuard": "healthyAdmissionTask?.result?.state must equal pass; outside each negative expect closure",
+  "wholeSixRawFrameworkCases": [
+    {
+      "title": "полный healthy admission создаёт и проверяет весь зарегистрированный N",
+      "status": "passed",
+      "duration": 17380.69844,
+      "failureMessages": []
+    },
+    {
+      "title": "полная история отвергает calibration до завершения A/A и 2×work",
+      "status": "passed",
+      "duration": 2061.677337000001,
+      "failureMessages": []
+    },
+    {
+      "title": "полная история отвергает замену противоположного порядка пар",
+      "status": "passed",
+      "duration": 2114.7815359999986,
+      "failureMessages": []
+    },
+    {
+      "title": "полная история отвергает потерянный failure union",
+      "status": "passed",
+      "duration": 31.44057999999859,
+      "failureMessages": []
+    },
+    {
+      "title": "полная история отвергает подмену имени positive",
+      "status": "passed",
+      "duration": 3.0479579999991984,
+      "failureMessages": []
+    },
+    {
+      "title": "полная история отвергает подмену финального raw digest",
+      "status": "passed",
+      "duration": 2391.195391000001,
+      "failureMessages": []
+    }
+  ],
+  "aggregateSixReportedMs": 23982.841242,
+  "gatesSupplementSha256": "ed166f092eb854a1c8317d835dbe2035f96ae527837a7e7bb1eb9204419895c1",
+  "gatesRefs": [
+    {
+      "path": "/tmp/motion-profile-current-gates-fe092331-20261002/receipt.json",
+      "bytes": 7262,
+      "sha256": "26138e2b9c80ab254ab047f28c231db6db763a6b6cdd4f61a138dbf9ee8a834e",
+      "matches": true,
+      "role": "identity only unless content scope recorded; parsed-results-and-packages.json opaque"
+    },
+    {
+      "path": "/tmp/motion-profile-current-gates-fe092331-20261002/run.py",
+      "bytes": 2983,
+      "sha256": "297f5bb795effeb6ba7d90202d2e57b9b525dfd96c8ab34196b231e5afb7a055",
+      "matches": true,
+      "role": "identity only unless content scope recorded; parsed-results-and-packages.json opaque"
+    },
+    {
+      "path": "/tmp/motion-profile-current-gates-fe092331-20261002/whole.json",
+      "bytes": 2141909,
+      "sha256": "ae5e6b196a1a077b9672171d56782bb9772d25391872c3d44fe652b581519b0f",
+      "matches": true,
+      "role": "identity only unless content scope recorded; parsed-results-and-packages.json opaque"
+    },
+    {
+      "path": "/tmp/motion-profile-current-gates-fe092331-20261002/parsed-results-and-packages.json",
+      "bytes": 111835,
+      "sha256": "c4a729874bc83cb6a44e8e2d6358e2fc35074159593e80515f8693fafd65aac3",
+      "matches": true,
+      "role": "identity only unless content scope recorded; parsed-results-and-packages.json opaque"
+    },
+    {
+      "path": "/tmp/motion-profile-current-gates-fe092331-20261002/actionlint.stdout",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "matches": true,
+      "role": "identity only unless content scope recorded; parsed-results-and-packages.json opaque"
+    },
+    {
+      "path": "/tmp/motion-profile-current-gates-fe092331-20261002/docs-drift.stdout",
+      "bytes": 218,
+      "sha256": "4437b7385139583741ad88edbb67528fedc3fabce8beb61947a5bcc384bad4be",
+      "matches": true,
+      "role": "identity only unless content scope recorded; parsed-results-and-packages.json opaque"
+    },
+    {
+      "path": "/tmp/motion-profile-current-gates-fe092331-20261002/docs-facts.stdout",
+      "bytes": 23,
+      "sha256": "d3b534c5348e15bf96aadf4f5a210761809cc2829415d4fd9015117c41a69d0f",
+      "matches": true,
+      "role": "identity only unless content scope recorded; parsed-results-and-packages.json opaque"
+    },
+    {
+      "path": "/tmp/motion-profile-current-gates-fe092331-20261002/finiteness.stdout",
+      "bytes": 20314,
+      "sha256": "22186f2cca1db0a296867d16604c9e0fa4439e9919bda70f97ff6afa2be16b98",
+      "matches": true,
+      "role": "identity only unless content scope recorded; parsed-results-and-packages.json opaque"
+    },
+    {
+      "path": "/tmp/motion-profile-current-gates-fe092331-20261002/npm-pack.stdout",
+      "bytes": 25,
+      "sha256": "abd90dcb1d334fc0369e0d014da05d72546794877f45ec7e3ffcf4609c70ed1a",
+      "matches": true,
+      "role": "identity only unless content scope recorded; parsed-results-and-packages.json opaque"
+    },
+    {
+      "path": "/tmp/motion-profile-current-gates-fe092331-20261002/pnpm-pack.stdout",
+      "bytes": 8067,
+      "sha256": "8ba6c8a1d1bfc39f55927fde65fea0bcb4a3897f29d2dd85c3f24e690447aa7a",
+      "matches": true,
+      "role": "identity only unless content scope recorded; parsed-results-and-packages.json opaque"
+    },
+    {
+      "path": "/tmp/motion-profile-current-gates-fe092331-20261002/static.stdout",
+      "bytes": 260,
+      "sha256": "573909cff1d43f41082b6f4b1691f00cea86d28c60a3de986037f8119296512c",
+      "matches": true,
+      "role": "identity only unless content scope recorded; parsed-results-and-packages.json opaque"
+    },
+    {
+      "path": "/tmp/motion-profile-current-gates-fe092331-20261002/whole.stdout",
+      "bytes": 139,
+      "sha256": "c2335dbb8d49cac33fa26e27baaa87273a48149bfb73406b1fe953d47f0a3be3",
+      "matches": true,
+      "role": "identity only unless content scope recorded; parsed-results-and-packages.json opaque"
+    },
+    {
+      "path": "/tmp/motion-profile-current-gates-fe092331-20261002/actionlint.stderr",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "matches": true,
+      "role": "identity only unless content scope recorded; parsed-results-and-packages.json opaque"
+    },
+    {
+      "path": "/tmp/motion-profile-current-gates-fe092331-20261002/docs-drift.stderr",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "matches": true,
+      "role": "identity only unless content scope recorded; parsed-results-and-packages.json opaque"
+    },
+    {
+      "path": "/tmp/motion-profile-current-gates-fe092331-20261002/docs-facts.stderr",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "matches": true,
+      "role": "identity only unless content scope recorded; parsed-results-and-packages.json opaque"
+    },
+    {
+      "path": "/tmp/motion-profile-current-gates-fe092331-20261002/finiteness.stderr",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "matches": true,
+      "role": "identity only unless content scope recorded; parsed-results-and-packages.json opaque"
+    },
+    {
+      "path": "/tmp/motion-profile-current-gates-fe092331-20261002/npm-pack.stderr",
+      "bytes": 13684,
+      "sha256": "647bdd0dd86a07af57b39b52396e151394d730774d1a72c8b110ce5caa4824e3",
+      "matches": true,
+      "role": "identity only unless content scope recorded; parsed-results-and-packages.json opaque"
+    },
+    {
+      "path": "/tmp/motion-profile-current-gates-fe092331-20261002/pnpm-pack.stderr",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "matches": true,
+      "role": "identity only unless content scope recorded; parsed-results-and-packages.json opaque"
+    },
+    {
+      "path": "/tmp/motion-profile-current-gates-fe092331-20261002/static.stderr",
+      "bytes": 396,
+      "sha256": "fb87992a36e0405ba8b299d10727870ce8bf9a5fc364397f334f6effcf58b720",
+      "matches": true,
+      "role": "identity only unless content scope recorded; parsed-results-and-packages.json opaque"
+    },
+    {
+      "path": "/tmp/motion-profile-current-gates-fe092331-20261002/whole.stderr",
+      "bytes": 359,
+      "sha256": "8fc2bab2a8ef882281b49e70bd0f237ee30fde252ac0427a7aa94b61e850eff3",
+      "matches": true,
+      "role": "identity only unless content scope recorded; parsed-results-and-packages.json opaque"
+    },
+    {
+      "path": "/tmp/motion-recipes-current-browser-fe092331-20261002/execution.json",
+      "bytes": 3171,
+      "sha256": "ab4d7527d1e2468dff621d1f792435f7684197721f00f1d7d09e6f2b03ca3a00",
+      "matches": true,
+      "role": "identity only unless content scope recorded; parsed-results-and-packages.json opaque"
+    },
+    {
+      "path": "/tmp/motion-recipes-current-browser-fe092331-20261002/run.py",
+      "bytes": 2746,
+      "sha256": "b9517f9664984f731830d849e2d444b377020e54846989347956a60b65d8b6ac",
+      "matches": true,
+      "role": "identity only unless content scope recorded; parsed-results-and-packages.json opaque"
+    },
+    {
+      "path": "/tmp/motion-recipes-current-browser-fe092331-20261002/result.json",
+      "bytes": 166286,
+      "sha256": "8a09834bbe48caffd4bd5b05cd93e5a55a032d7d0cd48ec1e1e22bffa1832188",
+      "matches": true,
+      "role": "identity only unless content scope recorded; parsed-results-and-packages.json opaque"
+    },
+    {
+      "path": "/tmp/motion-recipes-current-browser-fe092331-20261002/scope-recipes.js",
+      "bytes": 1382990,
+      "sha256": "5320f49b7889f455a0792252e44f6069b75638d2d27051e5a25d6504d2f71c5a",
+      "matches": true,
+      "role": "identity only unless content scope recorded; parsed-results-and-packages.json opaque"
+    },
+    {
+      "path": "/tmp/motion-recipes-current-browser-fe092331-20261002/scope-recipes.package.json",
+      "bytes": 1210,
+      "sha256": "df1fd41df0c4b268b24f3c00e7566570d0a360d2643bae955201f4ac417c219d",
+      "matches": true,
+      "role": "identity only unless content scope recorded; parsed-results-and-packages.json opaque"
+    },
+    {
+      "path": "/tmp/motion-recipes-current-browser-fe092331-20261002/stdout.log",
+      "bytes": 397,
+      "sha256": "3134bfa1bd92d7d5d0babaed1307f38bfa4405dc22b060f613d6bd8a40cba297",
+      "matches": true,
+      "role": "identity only unless content scope recorded; parsed-results-and-packages.json opaque"
+    },
+    {
+      "path": "/tmp/motion-recipes-current-browser-fe092331-20261002/stderr.log",
+      "bytes": 1038,
+      "sha256": "d4478546d47ef0d8333f4329ae20756380308917338f02b45016008a41cf48a1",
+      "matches": true,
+      "role": "identity only unless content scope recorded; parsed-results-and-packages.json opaque"
+    },
+    {
+      "path": "/tmp/motion-profile-current-gates-fe092331-20261002/candidate-pnpm.tgz",
+      "bytes": 562051,
+      "sha256": "b41708c31e122da9ae46a558f0c5f447195f36ca19c9b0fe6c19954887d790e4",
+      "matches": true,
+      "role": "identity only unless content scope recorded; parsed-results-and-packages.json opaque"
+    },
+    {
+      "path": "/tmp/motion-profile-current-gates-fe092331-20261002/labpics-motion-0.3.0.tgz",
+      "bytes": 560040,
+      "sha256": "54482b3da5ae3e530e9f25f29b91471b1ff95cf2d8212735a0eeb71002d6fba7",
+      "matches": true,
+      "role": "identity only unless content scope recorded; parsed-results-and-packages.json opaque"
+    },
+    {
+      "path": "/tmp/motion-qualified-fe092331-20261002/PRIMARY-PACKET.json",
+      "bytes": 7130,
+      "sha256": "4184a52ea58d4f3b27e7cd4c571425c51efda578f1a283b2aab396dd0659e29e",
+      "matches": true,
+      "role": "identity only unless content scope recorded; parsed-results-and-packages.json opaque"
+    }
+  ],
+  "packageBoundary": [
+    {
+      "path": "/tmp/motion-profile-current-gates-fe092331-20261002/candidate-pnpm.tgz",
+      "sha256": "b41708c31e122da9ae46a558f0c5f447195f36ca19c9b0fe6c19954887d790e4",
+      "files": 312,
+      "privateOrNativeLeaks": [],
+      "packageJsonSha256": "4ce460a412ed40152bb2bf1e796a284614571a6b6d6a313bce3037885011c709",
+      "sourceOnlyKeys": [
+        "packageManager"
+      ],
+      "changedValues": [],
+      "runtimeContractEqualSource": true
+    },
+    {
+      "path": "/tmp/motion-profile-current-gates-fe092331-20261002/labpics-motion-0.3.0.tgz",
+      "sha256": "54482b3da5ae3e530e9f25f29b91471b1ff95cf2d8212735a0eeb71002d6fba7",
+      "files": 312,
+      "privateOrNativeLeaks": [],
+      "packageJsonSha256": "de278702d9f6843be2b682c27d9cc0d16d552327f77f7a9f07bee0ff6793da52",
+      "sourceOnlyKeys": [],
+      "changedValues": [],
+      "runtimeContractEqualSource": true
+    }
+  ],
+  "freshRecipeBindings": {
+    "recipesSha256": "ba7300424fa8923e822ef55d4ff6f36550e06c476aca80869b02f87259b61645",
+    "bundleSha256": "5320f49b7889f455a0792252e44f6069b75638d2d27051e5a25d6504d2f71c5a",
+    "packageSha256": "54482b3da5ae3e530e9f25f29b91471b1ff95cf2d8212735a0eeb71002d6fba7",
+    "packageManifestSha256": "de278702d9f6843be2b682c27d9cc0d16d552327f77f7a9f07bee0ff6793da52",
+    "bundleContainsNewPriorityAndRemovalCode": true
+  },
+  "browserStylesheetCases": [
+    {
+      "title": "sheet: destroy восстанавливает исходный inline transform (important)",
+      "project": "chromium",
+      "timeout": 30000,
+      "results": [
+        {
+          "status": "passed",
+          "duration": 248,
+          "retry": 0,
+          "errors": [],
+          "startTime": "2026-10-02T03:36:50.632Z"
+        }
+      ]
+    },
+    {
+      "title": "sheet: destroy восстанавливает исходный inline transform (plain)",
+      "project": "chromium",
+      "timeout": 30000,
+      "results": [
+        {
+          "status": "passed",
+          "duration": 242,
+          "retry": 0,
+          "errors": [],
+          "startTime": "2026-10-02T03:36:50.890Z"
+        }
+      ]
+    },
+    {
+      "title": "sheet: destroy восстанавливает исходный inline transform (none)",
+      "project": "chromium",
+      "timeout": 30000,
+      "results": [
+        {
+          "status": "passed",
+          "duration": 260,
+          "retry": 0,
+          "errors": [],
+          "startTime": "2026-10-02T03:36:51.148Z"
+        }
+      ]
+    },
+    {
+      "title": "sheet: destroy восстанавливает исходный inline transform (absent)",
+      "project": "chromium",
+      "timeout": 30000,
+      "results": [
+        {
+          "status": "passed",
+          "duration": 221,
+          "retry": 0,
+          "errors": [],
+          "startTime": "2026-10-02T03:36:51.420Z"
+        }
+      ]
+    },
+    {
+      "title": "pager: destroy восстанавливает исходный inline transform (important)",
+      "project": "chromium",
+      "timeout": 30000,
+      "results": [
+        {
+          "status": "passed",
+          "duration": 204,
+          "retry": 0,
+          "errors": [],
+          "startTime": "2026-10-02T03:36:56.318Z"
+        }
+      ]
+    },
+    {
+      "title": "pager: destroy восстанавливает исходный inline transform (plain)",
+      "project": "chromium",
+      "timeout": 30000,
+      "results": [
+        {
+          "status": "passed",
+          "duration": 210,
+          "retry": 0,
+          "errors": [],
+          "startTime": "2026-10-02T03:36:56.529Z"
+        }
+      ]
+    },
+    {
+      "title": "pager: destroy восстанавливает исходный inline transform (none)",
+      "project": "chromium",
+      "timeout": 30000,
+      "results": [
+        {
+          "status": "passed",
+          "duration": 212,
+          "retry": 0,
+          "errors": [],
+          "startTime": "2026-10-02T03:36:56.747Z"
+        }
+      ]
+    },
+    {
+      "title": "pager: destroy восстанавливает исходный inline transform (absent)",
+      "project": "chromium",
+      "timeout": 30000,
+      "results": [
+        {
+          "status": "passed",
+          "duration": 210,
+          "retry": 0,
+          "errors": [],
+          "startTime": "2026-10-02T03:36:56.967Z"
+        }
+      ]
+    },
+    {
+      "title": "sheet: destroy восстанавливает исходный inline transform (important)",
+      "project": "firefox",
+      "timeout": 30000,
+      "results": [
+        {
+          "status": "passed",
+          "duration": 395,
+          "retry": 0,
+          "errors": [],
+          "startTime": "2026-10-02T03:37:04.287Z"
+        }
+      ]
+    },
+    {
+      "title": "sheet: destroy восстанавливает исходный inline transform (plain)",
+      "project": "firefox",
+      "timeout": 30000,
+      "results": [
+        {
+          "status": "passed",
+          "duration": 408,
+          "retry": 0,
+          "errors": [],
+          "startTime": "2026-10-02T03:37:04.693Z"
+        }
+      ]
+    },
+    {
+      "title": "sheet: destroy восстанавливает исходный inline transform (none)",
+      "project": "firefox",
+      "timeout": 30000,
+      "results": [
+        {
+          "status": "passed",
+          "duration": 370,
+          "retry": 0,
+          "errors": [],
+          "startTime": "2026-10-02T03:37:05.116Z"
+        }
+      ]
+    },
+    {
+      "title": "sheet: destroy восстанавливает исходный inline transform (absent)",
+      "project": "firefox",
+      "timeout": 30000,
+      "results": [
+        {
+          "status": "passed",
+          "duration": 379,
+          "retry": 0,
+          "errors": [],
+          "startTime": "2026-10-02T03:37:05.496Z"
+        }
+      ]
+    },
+    {
+      "title": "pager: destroy восстанавливает исходный inline transform (important)",
+      "project": "firefox",
+      "timeout": 30000,
+      "results": [
+        {
+          "status": "passed",
+          "duration": 361,
+          "retry": 0,
+          "errors": [],
+          "startTime": "2026-10-02T03:37:16.504Z"
+        }
+      ]
+    },
+    {
+      "title": "pager: destroy восстанавливает исходный inline transform (plain)",
+      "project": "firefox",
+      "timeout": 30000,
+      "results": [
+        {
+          "status": "passed",
+          "duration": 399,
+          "retry": 0,
+          "errors": [],
+          "startTime": "2026-10-02T03:37:16.880Z"
+        }
+      ]
+    },
+    {
+      "title": "pager: destroy восстанавливает исходный inline transform (none)",
+      "project": "firefox",
+      "timeout": 30000,
+      "results": [
+        {
+          "status": "passed",
+          "duration": 435,
+          "retry": 0,
+          "errors": [],
+          "startTime": "2026-10-02T03:37:17.287Z"
+        }
+      ]
+    },
+    {
+      "title": "pager: destroy восстанавливает исходный inline transform (absent)",
+      "project": "firefox",
+      "timeout": 30000,
+      "results": [
+        {
+          "status": "passed",
+          "duration": 437,
+          "retry": 0,
+          "errors": [],
+          "startTime": "2026-10-02T03:37:17.732Z"
+        }
+      ]
+    },
+    {
+      "title": "sheet: destroy восстанавливает исходный inline transform (important)",
+      "project": "webkit",
+      "timeout": 30000,
+      "results": [
+        {
+          "status": "passed",
+          "duration": 489,
+          "retry": 0,
+          "errors": [],
+          "startTime": "2026-10-02T03:37:30.908Z"
+        }
+      ]
+    },
+    {
+      "title": "sheet: destroy восстанавливает исходный inline transform (plain)",
+      "project": "webkit",
+      "timeout": 30000,
+      "results": [
+        {
+          "status": "passed",
+          "duration": 488,
+          "retry": 0,
+          "errors": [],
+          "startTime": "2026-10-02T03:37:31.417Z"
+        }
+      ]
+    },
+    {
+      "title": "sheet: destroy восстанавливает исходный inline transform (none)",
+      "project": "webkit",
+      "timeout": 30000,
+      "results": [
+        {
+          "status": "passed",
+          "duration": 497,
+          "retry": 0,
+          "errors": [],
+          "startTime": "2026-10-02T03:37:31.916Z"
+        }
+      ]
+    },
+    {
+      "title": "sheet: destroy восстанавливает исходный inline transform (absent)",
+      "project": "webkit",
+      "timeout": 30000,
+      "results": [
+        {
+          "status": "passed",
+          "duration": 482,
+          "retry": 0,
+          "errors": [],
+          "startTime": "2026-10-02T03:37:32.423Z"
+        }
+      ]
+    },
+    {
+      "title": "pager: destroy восстанавливает исходный inline transform (important)",
+      "project": "webkit",
+      "timeout": 30000,
+      "results": [
+        {
+          "status": "passed",
+          "duration": 453,
+          "retry": 0,
+          "errors": [],
+          "startTime": "2026-10-02T03:37:42.979Z"
+        }
+      ]
+    },
+    {
+      "title": "pager: destroy восстанавливает исходный inline transform (plain)",
+      "project": "webkit",
+      "timeout": 30000,
+      "results": [
+        {
+          "status": "passed",
+          "duration": 435,
+          "retry": 0,
+          "errors": [],
+          "startTime": "2026-10-02T03:37:43.443Z"
+        }
+      ]
+    },
+    {
+      "title": "pager: destroy восстанавливает исходный inline transform (none)",
+      "project": "webkit",
+      "timeout": 30000,
+      "results": [
+        {
+          "status": "passed",
+          "duration": 470,
+          "retry": 0,
+          "errors": [],
+          "startTime": "2026-10-02T03:37:43.887Z"
+        }
+      ]
+    },
+    {
+      "title": "pager: destroy восстанавливает исходный inline transform (absent)",
+      "project": "webkit",
+      "timeout": 30000,
+      "results": [
+        {
+          "status": "passed",
+          "duration": 449,
+          "retry": 0,
+          "errors": [],
+          "startTime": "2026-10-02T03:37:44.365Z"
+        }
+      ]
+    }
+  ],
+  "browserScope": "raw framework entries + independently read recipe assertions + fresh bundle/package bytes; no raw DOM observations attached by fresh cases; no physical/mobile model inference",
+  "nativePermanentControl": {
+    "frozenInputsMatchFinalSource": [
+      {
+        "path": "test/fixtures/server-thread-cpu-clock-check.mjs",
+        "matchesFinalSource": true
+      },
+      {
+        "path": "test/fixtures/server-thread-cpu-clock-host.c",
+        "matchesFinalSource": true
+      },
+      {
+        "path": "bench/profile/server-thread-cpu-clock.mjs",
+        "matchesFinalSource": true
+      },
+      {
+        "path": "bench/profile/server-thread-cpu-clock.c",
+        "matchesFinalSource": true
+      },
+      {
+        "path": ".github/workflows/ci.yml",
+        "matchesFinalSource": true
+      },
+      {
+        "path": "test/ci-workflow-contract.test.ts",
+        "matchesFinalSource": true
+      }
+    ],
+    "fixtureHeaderSaysHead": "f6476ae990254f606faf97f80afe41965bec2fb2",
+    "exactTransferBy6FrozenBytes": true,
+    "node": "v24.19.0",
+    "productionSourceSha256": "4f32f23c2409c3e83943121a587c8d9f5e19af7f308ac987323ff4189ddd14c0",
+    "hostSourceSha256": "15ee4c885cb88c317051a1951030c441b9c78bf105ceb6f21d5ebce6eac3586e",
+    "recomputedReportedCounterDeltaNs": 195011,
+    "zeroRegisteredTimingSamples": true,
+    "rawControlNames": [
+      "actual-api",
+      "worker",
+      "stale",
+      "missing-compiler",
+      "healthy-native",
+      "wrong-clock",
+      "read-errno",
+      "invalid-timespec",
+      "invalid-identity",
+      "seconds-number-loss",
+      "resolution-errno"
+    ],
+    "rawNativeMutantExitCodes": {
+      "healthy-native": 0,
+      "wrong-clock": 1,
+      "read-errno": 1,
+      "invalid-timespec": 1,
+      "invalid-identity": 1,
+      "seconds-number-loss": 1,
+      "resolution-errno": 1
+    },
+    "ownerExecutionExit": 0,
+    "ownerExecutionEndUtc": "2026-10-02T03:21:17.430487+00:00"
+  },
+  "reviewHarnessCorrections": [
+    {
+      "exitCode": 1,
+      "issue": "Initial overly broad exact package.json byte equality rejected legitimate PNPM removal of packageManager; scope corrected to unchanged consumer contracts. No product mutation/finding."
+    }
+  ],
+  "runtimeProbes": 0,
+  "heavy": 0,
+  "queued": 0,
+  "allEND": true
+}

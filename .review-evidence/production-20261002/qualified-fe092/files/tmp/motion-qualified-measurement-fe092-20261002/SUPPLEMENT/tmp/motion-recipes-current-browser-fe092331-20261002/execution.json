@@ -1,0 +1,56 @@
+{
+  "sourceHead": "fe092331360837fd7f63d71a4b7f867ba849ebd4",
+  "argv": [
+    "/tmp/motion-server-toolchain-20261001/bin/pnpm",
+    "exec",
+    "playwright",
+    "test",
+    "browser/compositor-recipes.spec.ts",
+    "--fail-on-flaky-tests",
+    "--reporter=json",
+    "--output=/tmp/motion-recipes-current-browser-fe092331-20261002/artifacts"
+  ],
+  "cwd": "/workspace/lab-motion",
+  "startUtc": "2026-10-02T03:36:46.707193+00:00",
+  "environment": {
+    "PATH": "/tmp/motion-server-toolchain-20261001/bin:/opt/codex/runtimes/codex-primary-runtime/dependencies/node/bin:/home/agent/.local/bin:/opt/codex/runtimes/codex-primary-runtime/dependencies/bin/override:/opt/codex/runtimes/codex-primary-runtime/dependencies/python/bin:/opt/codex/runtimes/codex-primary-runtime/dependencies/node/bin:/opt/codex/runtimes/codex-primary-runtime/dependencies/bin:/opt/codex/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin:/home/agent/.local/bin:/opt/codex/runtimes/codex-primary-runtime/dependencies/bin/fallback",
+    "NODE_PATH": null,
+    "NODE_OPTIONS": null,
+    "CI": "true",
+    "LD_LIBRARY_PATH": "/workspace/lab-motion/scratchpad/browser-deps/root/usr/lib/x86_64-linux-gnu",
+    "PLAYWRIGHT_SKIP_VALIDATE_HOST_REQUIREMENTS": "1",
+    "PLAYWRIGHT_JSON_OUTPUT_FILE": "/tmp/motion-recipes-current-browser-fe092331-20261002/result.json"
+  },
+  "qualification": "Existing stale-ldconfig validation bypass with actual required libraries and all three real engines, original dependency failures retained in immutable prior packets. No executable override/test skip/timeout change. Conformance Playwright1.63, not registered timing Chromium149. Config-owned CI worker1/retries2; flaky tests fail.",
+  "endUtc": "2026-10-02T03:37:55.211081+00:00",
+  "exitCode": 0,
+  "allChildrenJoined": true,
+  "cleanAfter": true,
+  "files": {
+    "/tmp/motion-recipes-current-browser-fe092331-20261002/result.json": {
+      "path": "/tmp/motion-recipes-current-browser-fe092331-20261002/result.json",
+      "bytes": 166286,
+      "sha256": "8a09834bbe48caffd4bd5b05cd93e5a55a032d7d0cd48ec1e1e22bffa1832188"
+    },
+    "/tmp/motion-recipes-current-browser-fe092331-20261002/stdout.log": {
+      "path": "/tmp/motion-recipes-current-browser-fe092331-20261002/stdout.log",
+      "bytes": 397,
+      "sha256": "3134bfa1bd92d7d5d0babaed1307f38bfa4405dc22b060f613d6bd8a40cba297"
+    },
+    "/tmp/motion-recipes-current-browser-fe092331-20261002/stderr.log": {
+      "path": "/tmp/motion-recipes-current-browser-fe092331-20261002/stderr.log",
+      "bytes": 1038,
+      "sha256": "d4478546d47ef0d8333f4329ae20756380308917338f02b45016008a41cf48a1"
+    },
+    "/workspace/lab-motion/browser/.artifacts/scope-recipes.js": {
+      "path": "/workspace/lab-motion/browser/.artifacts/scope-recipes.js",
+      "bytes": 1382990,
+      "sha256": "5320f49b7889f455a0792252e44f6069b75638d2d27051e5a25d6504d2f71c5a"
+    },
+    "/workspace/lab-motion/browser/.artifacts/scope-recipes.package.json": {
+      "path": "/workspace/lab-motion/browser/.artifacts/scope-recipes.package.json",
+      "bytes": 1210,
+      "sha256": "df1fd41df0c4b268b24f3c00e7566570d0a360d2643bae955201f4ac417c219d"
+    }
+  }
+}

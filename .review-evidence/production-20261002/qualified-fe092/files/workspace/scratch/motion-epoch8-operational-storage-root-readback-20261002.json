@@ -1,0 +1,39 @@
+{
+  "at": "2026-10-02T03:53:45.890703+00:00",
+  "input": {
+    "path": "/tmp/motion-server-predata-fe092331-ce535cf6-20261002-epoch8/OPERATIONAL-STORAGE-TRIAGE.json",
+    "bytes": 4720,
+    "sha256": "4b1340baa8f15892b57cb9867721b55aab8092bb8c130ab2ad339bbf0d4eeedd"
+  },
+  "fullReadByRoot": true,
+  "bindings": [
+    {
+      "path": "/workspace/lab-motion/bench/profile/server-profile-runner.mjs",
+      "match": true
+    },
+    {
+      "path": "/workspace/lab-motion/bench/profile/server-profile-contract.mjs",
+      "match": true
+    },
+    {
+      "path": "/workspace/lab-motion/bench/profile/server-profile-registration.mjs",
+      "match": true
+    },
+    {
+      "path": "/workspace/lab-motion/scripts/bench-transform-support.mjs",
+      "match": true
+    },
+    {
+      "path": "/workspace/lab-motion/scripts/bench-support.mjs",
+      "match": true
+    },
+    {
+      "path": "/tmp/motion-server-predata-fe092331-ce535cf6-20261002-epoch8/predata-tuple.json",
+      "match": true
+    }
+  ],
+  "allBindingsMatch": true,
+  "arithmeticMatch": true,
+  "remainingBytes": 598259967,
+  "disposition": "Операционный бюджет достаточен для одного existingCLI с first-failure остановкой и сохранением acquired prefix. Универсальная граница trace widths не утверждается; гигантский synthetic повтор не требуется. Fresh resources/quiet owner checks остаются перед запуском; grant не выдан."
+}

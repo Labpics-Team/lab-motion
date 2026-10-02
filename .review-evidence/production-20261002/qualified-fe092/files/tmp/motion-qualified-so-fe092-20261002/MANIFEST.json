@@ -1,0 +1,85 @@
+{
+  "schema": 1,
+  "capturedAtUtc": "2026-10-02T03:55:35.349673+00:00",
+  "head": "fe092331360837fd7f63d71a4b7f867ba849ebd4",
+  "tree": "285e30e36db32f2fdc9ae442327f6b3396dcf254",
+  "base": "f6476ae990254f606faf97f80afe41965bec2fb2",
+  "axis": "Second-order architecture/compatibility/CI enforcement/recipe stylesheet lifecycle and addedcost/simpler remedies",
+  "verdict": "PASS",
+  "blockingFindings": 0,
+  "outputs": [
+    {
+      "path": "/tmp/motion-qualified-so-fe092-20261002/BOUNDARY-READBACK.json",
+      "bytes": 27085,
+      "sha256": "706c8581df27e09f0c6af2c1123f0385268332905e66a21062d9c1f2040e5132"
+    },
+    {
+      "path": "/tmp/motion-qualified-so-fe092-20261002/IDENTITY.json",
+      "bytes": 137080,
+      "sha256": "bd5f4cea5f776e5c8a751b428a58f808d0c11080054470a412d2eb25f012d56a"
+    },
+    {
+      "path": "/tmp/motion-qualified-so-fe092-20261002/READSET.json",
+      "bytes": 42064,
+      "sha256": "09bfa6fdecaf66f52afc6ae051d70f8edb0ae63e41cb6240eb739878869dc513"
+    },
+    {
+      "path": "/tmp/motion-qualified-so-fe092-20261002/REPORT.md",
+      "bytes": 22096,
+      "sha256": "ec16f2c7cfb96a7ea52d4e719f89e4e089a7536b425da4a153c202ba9ca430b7"
+    },
+    {
+      "path": "/tmp/motion-qualified-so-fe092-20261002/TERMINAL.json",
+      "bytes": 920,
+      "sha256": "e04891c613658b83ccecd8925bb1769bdbda40c21ec422da057e432f56bb2362"
+    },
+    {
+      "path": "/tmp/motion-qualified-so-fe092-20261002/source/.github/workflows/ci.yml",
+      "bytes": 11569,
+      "sha256": "9a8f5c8f37b8a939e534c5afa08bae5213db73ec2484fb5c397b22de3ee599d8"
+    },
+    {
+      "path": "/tmp/motion-qualified-so-fe092-20261002/source/browser/compositor-recipes.spec.ts",
+      "bytes": 26057,
+      "sha256": "e0baa661fbeb83770e8035708ecde292e7e7ad38502b6d745d3ebb3726edaecc"
+    },
+    {
+      "path": "/tmp/motion-qualified-so-fe092-20261002/source/docs/recipes.md",
+      "bytes": 58035,
+      "sha256": "ba7300424fa8923e822ef55d4ff6f36550e06c476aca80869b02f87259b61645"
+    },
+    {
+      "path": "/tmp/motion-qualified-so-fe092-20261002/source/test/ci-workflow-contract.test.ts",
+      "bytes": 24040,
+      "sha256": "0a0ee8faf5e0c1c647f4944e7e131b34c7e0fc0d850a7f890d498f73a8f31ed9"
+    },
+    {
+      "path": "/tmp/motion-qualified-so-fe092-20261002/source/test/fixtures/server-thread-cpu-clock-check.mjs",
+      "bytes": 8851,
+      "sha256": "d032a5cb9668578b9fbcce986e1cbefa2865fdc17c986742a1274b0e34cb951c"
+    },
+    {
+      "path": "/tmp/motion-qualified-so-fe092-20261002/source/test/fixtures/server-thread-cpu-clock-host.c",
+      "bytes": 1503,
+      "sha256": "15ee4c885cb88c317051a1951030c441b9c78bf105ceb6f21d5ebce6eac3586e"
+    },
+    {
+      "path": "/tmp/motion-qualified-so-fe092-20261002/source/test/server-profile-contract.test.ts",
+      "bytes": 99503,
+      "sha256": "14aa08faad2bf30b1ad355e49b3da86bd5b61d653057ff28bbfa318cce177eb8"
+    }
+  ],
+  "inputPins": {
+    "sourceArchiveSha256": "a91db3d664b91a7e169a49de4794fa7150064f35fe281a6a2b6fec2fd6023709",
+    "diffSha256": "6700f7b29e449eaaace6e386be0a05e18cbfe6891f7b8192b762704fb0872deb",
+    "primarySha256": "4184a52ea58d4f3b27e7cd4c571425c51efda578f1a283b2aab396dd0659e29e",
+    "previousOwnF647ReportSha256": "2c2ca68c1e497196363a1450cd7caef2bf2b30479bc399d4ee23a380b4358829",
+    "freshGatesSupplementSha256": "ed166f092eb854a1c8317d835dbe2035f96ae527837a7e7bb1eb9204419895c1"
+  },
+  "currentOwnRuntime": 0,
+  "actualEndUtc": "2026-10-02T03:55:35.348612+00:00",
+  "allEND": true,
+  "heavy": 0,
+  "queued": 0,
+  "selfHashExcluded": true
+}

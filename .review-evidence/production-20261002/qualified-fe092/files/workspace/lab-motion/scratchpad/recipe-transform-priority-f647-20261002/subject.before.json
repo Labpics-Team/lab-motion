@@ -1,0 +1,50 @@
+{
+  "sourceSha": "f6476ae990254f606faf97f80afe41965bec2fb2",
+  "kind": "frozen-old-actual-tar-fixture; current-doc differs",
+  "currentDocsSha256": "0808d2bde83cdd6d3af74c0e3bd4dd4996d469ff29c56c4937dae05ecccef8f3",
+  "actualFixtureRecipesSha256": "53e241c1aa75f842c173051fd0d8e90da39dc19813867802d33f5c6b513b3fa5",
+  "hashes": {
+    "compositor-recipes.before.spec.ts": "11faf514efd61eba282a197a062147d9c8cdb4f5e4686a8acd9f722231b52e0d",
+    "recipes.before.md": "0808d2bde83cdd6d3af74c0e3bd4dd4996d469ff29c56c4937dae05ecccef8f3",
+    "scope-recipes.before.js": "0cf981af25f70cad91450d763a40723f2fcd7c7d00b6df6838d8afe107415e8d",
+    "scope-recipes.package.before.json": "83560e3d54159b634e6aea3ca9789f38d979621c3479033603da06d87dafe048"
+  },
+  "receipt": {
+    "schema": "scope-recipes-package-v1",
+    "package": {
+      "name": "@labpics/motion",
+      "version": "0.3.0"
+    },
+    "tarball": {
+      "filename": "labpics-motion-0.3.0.tgz",
+      "sha256": "364f9ff8b505191965040eb17059a034e2cb39be5dd0b1468855ca7e9c61c524",
+      "integrity": "sha512-0kZsZPP+ohHVPtspoq09MW1k0Z1loJ16G3n6AET1m4HCJc/kcTiIf8a9xngo/qkruv/D5HhSXuT3leqOmmEH6Q=="
+    },
+    "manifest": {
+      "sha256": "de278702d9f6843be2b682c27d9cc0d16d552327f77f7a9f07bee0ff6793da52",
+      "fileCount": 312
+    },
+    "recipesSha256": "53e241c1aa75f842c173051fd0d8e90da39dc19813867802d33f5c6b513b3fa5",
+    "runtime": {
+      "node": "v24.19.0",
+      "esbuild": "0.28.2"
+    },
+    "motionInputs": [
+      "dist/animate/index.js",
+      "dist/behaviors/reorder/index.js",
+      "dist/compositor/index.js",
+      "dist/decay/index.js",
+      "dist/frame/index.js",
+      "dist/gestures/index.js",
+      "dist/presence/index.js",
+      "dist/projection/index.js",
+      "dist/smart/index.js"
+    ],
+    "bundleSha256": "0cf981af25f70cad91450d763a40723f2fcd7c7d00b6df6838d8afe107415e8d",
+    "ssrHtmlSha256": "68e14d501fd6a56fe445a8cc3377eed78c0298669be9a723a06d7c2ab558142f",
+    "ssrMotionInputs": [
+      "dist/animate/index.js",
+      "dist/frame/index.js"
+    ]
+  }
+}

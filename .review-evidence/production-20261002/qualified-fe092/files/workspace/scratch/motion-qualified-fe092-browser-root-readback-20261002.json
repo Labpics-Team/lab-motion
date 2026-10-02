@@ -1,0 +1,1301 @@
+{
+  "at": "2026-10-02T03:50:35.752155+00:00",
+  "sourceHead": "fe092331360837fd7f63d71a4b7f867ba849ebd4",
+  "tree": "285e30e36db32f2fdc9ae442327f6b3396dcf254",
+  "packet": {
+    "path": "/tmp/motion-profile-current-gates-fe092331-20261002/PRIMARY-GATES-SUPPLEMENT.json",
+    "bytes": 6196,
+    "sha256": "ed166f092eb854a1c8317d835dbe2035f96ae527837a7e7bb1eb9204419895c1"
+  },
+  "refCount": 27,
+  "packageCount": 2,
+  "allBindingsMatch": true,
+  "bindings": [
+    {
+      "path": "/tmp/motion-profile-current-gates-fe092331-20261002/receipt.json",
+      "bytes": 7262,
+      "sha256": "26138e2b9c80ab254ab047f28c231db6db763a6b6cdd4f61a138dbf9ee8a834e",
+      "match": true
+    },
+    {
+      "path": "/tmp/motion-profile-current-gates-fe092331-20261002/run.py",
+      "bytes": 2983,
+      "sha256": "297f5bb795effeb6ba7d90202d2e57b9b525dfd96c8ab34196b231e5afb7a055",
+      "match": true
+    },
+    {
+      "path": "/tmp/motion-profile-current-gates-fe092331-20261002/whole.json",
+      "bytes": 2141909,
+      "sha256": "ae5e6b196a1a077b9672171d56782bb9772d25391872c3d44fe652b581519b0f",
+      "match": true
+    },
+    {
+      "path": "/tmp/motion-profile-current-gates-fe092331-20261002/parsed-results-and-packages.json",
+      "bytes": 111835,
+      "sha256": "c4a729874bc83cb6a44e8e2d6358e2fc35074159593e80515f8693fafd65aac3",
+      "match": true
+    },
+    {
+      "path": "/tmp/motion-profile-current-gates-fe092331-20261002/actionlint.stdout",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "match": true
+    },
+    {
+      "path": "/tmp/motion-profile-current-gates-fe092331-20261002/docs-drift.stdout",
+      "bytes": 218,
+      "sha256": "4437b7385139583741ad88edbb67528fedc3fabce8beb61947a5bcc384bad4be",
+      "match": true
+    },
+    {
+      "path": "/tmp/motion-profile-current-gates-fe092331-20261002/docs-facts.stdout",
+      "bytes": 23,
+      "sha256": "d3b534c5348e15bf96aadf4f5a210761809cc2829415d4fd9015117c41a69d0f",
+      "match": true
+    },
+    {
+      "path": "/tmp/motion-profile-current-gates-fe092331-20261002/finiteness.stdout",
+      "bytes": 20314,
+      "sha256": "22186f2cca1db0a296867d16604c9e0fa4439e9919bda70f97ff6afa2be16b98",
+      "match": true
+    },
+    {
+      "path": "/tmp/motion-profile-current-gates-fe092331-20261002/npm-pack.stdout",
+      "bytes": 25,
+      "sha256": "abd90dcb1d334fc0369e0d014da05d72546794877f45ec7e3ffcf4609c70ed1a",
+      "match": true
+    },
+    {
+      "path": "/tmp/motion-profile-current-gates-fe092331-20261002/pnpm-pack.stdout",
+      "bytes": 8067,
+      "sha256": "8ba6c8a1d1bfc39f55927fde65fea0bcb4a3897f29d2dd85c3f24e690447aa7a",
+      "match": true
+    },
+    {
+      "path": "/tmp/motion-profile-current-gates-fe092331-20261002/static.stdout",
+      "bytes": 260,
+      "sha256": "573909cff1d43f41082b6f4b1691f00cea86d28c60a3de986037f8119296512c",
+      "match": true
+    },
+    {
+      "path": "/tmp/motion-profile-current-gates-fe092331-20261002/whole.stdout",
+      "bytes": 139,
+      "sha256": "c2335dbb8d49cac33fa26e27baaa87273a48149bfb73406b1fe953d47f0a3be3",
+      "match": true
+    },
+    {
+      "path": "/tmp/motion-profile-current-gates-fe092331-20261002/actionlint.stderr",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "match": true
+    },
+    {
+      "path": "/tmp/motion-profile-current-gates-fe092331-20261002/docs-drift.stderr",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "match": true
+    },
+    {
+      "path": "/tmp/motion-profile-current-gates-fe092331-20261002/docs-facts.stderr",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "match": true
+    },
+    {
+      "path": "/tmp/motion-profile-current-gates-fe092331-20261002/finiteness.stderr",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "match": true
+    },
+    {
+      "path": "/tmp/motion-profile-current-gates-fe092331-20261002/npm-pack.stderr",
+      "bytes": 13684,
+      "sha256": "647bdd0dd86a07af57b39b52396e151394d730774d1a72c8b110ce5caa4824e3",
+      "match": true
+    },
+    {
+      "path": "/tmp/motion-profile-current-gates-fe092331-20261002/pnpm-pack.stderr",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "match": true
+    },
+    {
+      "path": "/tmp/motion-profile-current-gates-fe092331-20261002/static.stderr",
+      "bytes": 396,
+      "sha256": "fb87992a36e0405ba8b299d10727870ce8bf9a5fc364397f334f6effcf58b720",
+      "match": true
+    },
+    {
+      "path": "/tmp/motion-profile-current-gates-fe092331-20261002/whole.stderr",
+      "bytes": 359,
+      "sha256": "8fc2bab2a8ef882281b49e70bd0f237ee30fde252ac0427a7aa94b61e850eff3",
+      "match": true
+    },
+    {
+      "path": "/tmp/motion-recipes-current-browser-fe092331-20261002/execution.json",
+      "bytes": 3171,
+      "sha256": "ab4d7527d1e2468dff621d1f792435f7684197721f00f1d7d09e6f2b03ca3a00",
+      "match": true
+    },
+    {
+      "path": "/tmp/motion-recipes-current-browser-fe092331-20261002/run.py",
+      "bytes": 2746,
+      "sha256": "b9517f9664984f731830d849e2d444b377020e54846989347956a60b65d8b6ac",
+      "match": true
+    },
+    {
+      "path": "/tmp/motion-recipes-current-browser-fe092331-20261002/result.json",
+      "bytes": 166286,
+      "sha256": "8a09834bbe48caffd4bd5b05cd93e5a55a032d7d0cd48ec1e1e22bffa1832188",
+      "match": true
+    },
+    {
+      "path": "/tmp/motion-recipes-current-browser-fe092331-20261002/scope-recipes.js",
+      "bytes": 1382990,
+      "sha256": "5320f49b7889f455a0792252e44f6069b75638d2d27051e5a25d6504d2f71c5a",
+      "match": true
+    },
+    {
+      "path": "/tmp/motion-recipes-current-browser-fe092331-20261002/scope-recipes.package.json",
+      "bytes": 1210,
+      "sha256": "df1fd41df0c4b268b24f3c00e7566570d0a360d2643bae955201f4ac417c219d",
+      "match": true
+    },
+    {
+      "path": "/tmp/motion-recipes-current-browser-fe092331-20261002/stdout.log",
+      "bytes": 397,
+      "sha256": "3134bfa1bd92d7d5d0babaed1307f38bfa4405dc22b060f613d6bd8a40cba297",
+      "match": true
+    },
+    {
+      "path": "/tmp/motion-recipes-current-browser-fe092331-20261002/stderr.log",
+      "bytes": 1038,
+      "sha256": "d4478546d47ef0d8333f4329ae20756380308917338f02b45016008a41cf48a1",
+      "match": true
+    },
+    {
+      "path": "/tmp/motion-profile-current-gates-fe092331-20261002/candidate-pnpm.tgz",
+      "bytes": 562051,
+      "sha256": "b41708c31e122da9ae46a558f0c5f447195f36ca19c9b0fe6c19954887d790e4",
+      "match": true
+    },
+    {
+      "path": "/tmp/motion-profile-current-gates-fe092331-20261002/labpics-motion-0.3.0.tgz",
+      "bytes": 560040,
+      "sha256": "54482b3da5ae3e530e9f25f29b91471b1ff95cf2d8212735a0eeb71002d6fba7",
+      "match": true
+    }
+  ],
+  "tests": [
+    {
+      "title": "literal recipes используют manifest и байты фактического npm tarball",
+      "project": "chromium",
+      "durationMs": 203,
+      "retry": 0
+    },
+    {
+      "title": "actual tarball: React SSR → hydration сохраняет DOM, StrictMode cleanup и поздний click",
+      "project": "chromium",
+      "durationMs": 325,
+      "retry": 0
+    },
+    {
+      "title": "sheet: destroy восстанавливает исходный inline transform (important)",
+      "project": "chromium",
+      "durationMs": 248,
+      "retry": 0
+    },
+    {
+      "title": "sheet: destroy восстанавливает исходный inline transform (plain)",
+      "project": "chromium",
+      "durationMs": 242,
+      "retry": 0
+    },
+    {
+      "title": "sheet: destroy восстанавливает исходный inline transform (none)",
+      "project": "chromium",
+      "durationMs": 260,
+      "retry": 0
+    },
+    {
+      "title": "sheet: destroy восстанавливает исходный inline transform (absent)",
+      "project": "chromium",
+      "durationMs": 221,
+      "retry": 0
+    },
+    {
+      "title": "sheet: getter onSelect сохраняет healthy intent до внешнего эффекта",
+      "project": "chromium",
+      "durationMs": 219,
+      "retry": 0
+    },
+    {
+      "title": "sheet: getter onSelect сохраняет destroy intent до внешнего эффекта",
+      "project": "chromium",
+      "durationMs": 208,
+      "retry": 0
+    },
+    {
+      "title": "sheet: getter onSelect сохраняет select intent до внешнего эффекта",
+      "project": "chromium",
+      "durationMs": 236,
+      "retry": 0
+    },
+    {
+      "title": "sheet: destroy восстанавливает прежний focus owner в light",
+      "project": "chromium",
+      "durationMs": 206,
+      "retry": 0
+    },
+    {
+      "title": "sheet: destroy восстанавливает прежний focus owner в shadow",
+      "project": "chromium",
+      "durationMs": 236,
+      "retry": 0
+    },
+    {
+      "title": "sheet: destroy восстанавливает прежний focus owner в nested",
+      "project": "chromium",
+      "durationMs": 213,
+      "retry": 0
+    },
+    {
+      "title": "sheet: destroy восстанавливает прежний focus owner в child-shadow",
+      "project": "chromium",
+      "durationMs": 227,
+      "retry": 0
+    },
+    {
+      "title": "sheet: destroy восстанавливает прежний focus owner в outside-shadow",
+      "project": "chromium",
+      "durationMs": 237,
+      "retry": 0
+    },
+    {
+      "title": "sheet: destroy восстанавливает прежний focus owner в outside-nested",
+      "project": "chromium",
+      "durationMs": 244,
+      "retry": 0
+    },
+    {
+      "title": "sheet: destroy восстанавливает прежний focus owner в parent-shadow",
+      "project": "chromium",
+      "durationMs": 213,
+      "retry": 0
+    },
+    {
+      "title": "sheet: destroy восстанавливает прежний focus owner в closed-shadow",
+      "project": "chromium",
+      "durationMs": 195,
+      "retry": 0
+    },
+    {
+      "title": "sheet: destroy восстанавливает прежний focus owner в parent-closed-shadow",
+      "project": "chromium",
+      "durationMs": 219,
+      "retry": 0
+    },
+    {
+      "title": "sheet: destroy восстанавливает прежний focus owner в ancestor-closed-shadow",
+      "project": "chromium",
+      "durationMs": 192,
+      "retry": 0
+    },
+    {
+      "title": "sheet: none pause сохраняет текущую quiet drag позу",
+      "project": "chromium",
+      "durationMs": 288,
+      "retry": 0
+    },
+    {
+      "title": "sheet: reduced pause сохраняет текущую quiet drag позу",
+      "project": "chromium",
+      "durationMs": 276,
+      "retry": 0
+    },
+    {
+      "title": "sheet: native interruption → live follow → native release; один inert callback",
+      "project": "chromium",
+      "durationMs": 293,
+      "retry": 0
+    },
+    {
+      "title": "sheet: pointercancel не меняет выбранную цель, pause сохраняет позу",
+      "project": "chromium",
+      "durationMs": 287,
+      "retry": 0
+    },
+    {
+      "title": "sheet: no-motion, keyboard, IME и явный resize/reparent",
+      "project": "chromium",
+      "durationMs": 239,
+      "retry": 0
+    },
+    {
+      "title": "sheet: reduced-motion при mount и при смене предпочтения",
+      "project": "chromium",
+      "durationMs": 268,
+      "retry": 0
+    },
+    {
+      "title": "pager: destroy восстанавливает исходный inline transform (important)",
+      "project": "chromium",
+      "durationMs": 204,
+      "retry": 0
+    },
+    {
+      "title": "pager: destroy восстанавливает исходный inline transform (plain)",
+      "project": "chromium",
+      "durationMs": 210,
+      "retry": 0
+    },
+    {
+      "title": "pager: destroy восстанавливает исходный inline transform (none)",
+      "project": "chromium",
+      "durationMs": 212,
+      "retry": 0
+    },
+    {
+      "title": "pager: destroy восстанавливает исходный inline transform (absent)",
+      "project": "chromium",
+      "durationMs": 210,
+      "retry": 0
+    },
+    {
+      "title": "pager: getter onSelect сохраняет healthy intent до внешнего эффекта",
+      "project": "chromium",
+      "durationMs": 208,
+      "retry": 0
+    },
+    {
+      "title": "pager: getter onSelect сохраняет destroy intent до внешнего эффекта",
+      "project": "chromium",
+      "durationMs": 215,
+      "retry": 0
+    },
+    {
+      "title": "pager: getter onSelect сохраняет select intent до внешнего эффекта",
+      "project": "chromium",
+      "durationMs": 196,
+      "retry": 0
+    },
+    {
+      "title": "pager: destroy восстанавливает прежний focus owner в light",
+      "project": "chromium",
+      "durationMs": 192,
+      "retry": 0
+    },
+    {
+      "title": "pager: destroy восстанавливает прежний focus owner в shadow",
+      "project": "chromium",
+      "durationMs": 218,
+      "retry": 0
+    },
+    {
+      "title": "pager: destroy восстанавливает прежний focus owner в nested",
+      "project": "chromium",
+      "durationMs": 232,
+      "retry": 0
+    },
+    {
+      "title": "pager: destroy восстанавливает прежний focus owner в child-shadow",
+      "project": "chromium",
+      "durationMs": 195,
+      "retry": 0
+    },
+    {
+      "title": "pager: destroy восстанавливает прежний focus owner в outside-shadow",
+      "project": "chromium",
+      "durationMs": 207,
+      "retry": 0
+    },
+    {
+      "title": "pager: destroy восстанавливает прежний focus owner в outside-nested",
+      "project": "chromium",
+      "durationMs": 230,
+      "retry": 0
+    },
+    {
+      "title": "pager: destroy восстанавливает прежний focus owner в parent-shadow",
+      "project": "chromium",
+      "durationMs": 209,
+      "retry": 0
+    },
+    {
+      "title": "pager: destroy восстанавливает прежний focus owner в closed-shadow",
+      "project": "chromium",
+      "durationMs": 196,
+      "retry": 0
+    },
+    {
+      "title": "pager: destroy восстанавливает прежний focus owner в parent-closed-shadow",
+      "project": "chromium",
+      "durationMs": 220,
+      "retry": 0
+    },
+    {
+      "title": "pager: destroy восстанавливает прежний focus owner в ancestor-closed-shadow",
+      "project": "chromium",
+      "durationMs": 235,
+      "retry": 0
+    },
+    {
+      "title": "pager: none pause сохраняет текущую quiet drag позу",
+      "project": "chromium",
+      "durationMs": 253,
+      "retry": 0
+    },
+    {
+      "title": "pager: reduced pause сохраняет текущую quiet drag позу",
+      "project": "chromium",
+      "durationMs": 262,
+      "retry": 0
+    },
+    {
+      "title": "pager: native interruption → live follow → native release; один inert callback",
+      "project": "chromium",
+      "durationMs": 293,
+      "retry": 0
+    },
+    {
+      "title": "pager: pointercancel не меняет выбранную цель, pause сохраняет позу",
+      "project": "chromium",
+      "durationMs": 280,
+      "retry": 0
+    },
+    {
+      "title": "pager: no-motion, keyboard, IME и явный resize/reparent",
+      "project": "chromium",
+      "durationMs": 226,
+      "retry": 0
+    },
+    {
+      "title": "pager: reduced-motion при mount и при смене предпочтения",
+      "project": "chromium",
+      "durationMs": 395,
+      "retry": 0
+    },
+    {
+      "title": "literal recipes используют manifest и байты фактического npm tarball",
+      "project": "firefox",
+      "durationMs": 1124,
+      "retry": 0
+    },
+    {
+      "title": "actual tarball: React SSR → hydration сохраняет DOM, StrictMode cleanup и поздний click",
+      "project": "firefox",
+      "durationMs": 578,
+      "retry": 0
+    },
+    {
+      "title": "sheet: destroy восстанавливает исходный inline transform (important)",
+      "project": "firefox",
+      "durationMs": 395,
+      "retry": 0
+    },
+    {
+      "title": "sheet: destroy восстанавливает исходный inline transform (plain)",
+      "project": "firefox",
+      "durationMs": 408,
+      "retry": 0
+    },
+    {
+      "title": "sheet: destroy восстанавливает исходный inline transform (none)",
+      "project": "firefox",
+      "durationMs": 370,
+      "retry": 0
+    },
+    {
+      "title": "sheet: destroy восстанавливает исходный inline transform (absent)",
+      "project": "firefox",
+      "durationMs": 379,
+      "retry": 0
+    },
+    {
+      "title": "sheet: getter onSelect сохраняет healthy intent до внешнего эффекта",
+      "project": "firefox",
+      "durationMs": 420,
+      "retry": 0
+    },
+    {
+      "title": "sheet: getter onSelect сохраняет destroy intent до внешнего эффекта",
+      "project": "firefox",
+      "durationMs": 415,
+      "retry": 0
+    },
+    {
+      "title": "sheet: getter onSelect сохраняет select intent до внешнего эффекта",
+      "project": "firefox",
+      "durationMs": 519,
+      "retry": 0
+    },
+    {
+      "title": "sheet: destroy восстанавливает прежний focus owner в light",
+      "project": "firefox",
+      "durationMs": 1331,
+      "retry": 0
+    },
+    {
+      "title": "sheet: destroy восстанавливает прежний focus owner в shadow",
+      "project": "firefox",
+      "durationMs": 447,
+      "retry": 0
+    },
+    {
+      "title": "sheet: destroy восстанавливает прежний focus owner в nested",
+      "project": "firefox",
+      "durationMs": 396,
+      "retry": 0
+    },
+    {
+      "title": "sheet: destroy восстанавливает прежний focus owner в child-shadow",
+      "project": "firefox",
+      "durationMs": 402,
+      "retry": 0
+    },
+    {
+      "title": "sheet: destroy восстанавливает прежний focus owner в outside-shadow",
+      "project": "firefox",
+      "durationMs": 390,
+      "retry": 0
+    },
+    {
+      "title": "sheet: destroy восстанавливает прежний focus owner в outside-nested",
+      "project": "firefox",
+      "durationMs": 394,
+      "retry": 0
+    },
+    {
+      "title": "sheet: destroy восстанавливает прежний focus owner в parent-shadow",
+      "project": "firefox",
+      "durationMs": 409,
+      "retry": 0
+    },
+    {
+      "title": "sheet: destroy восстанавливает прежний focus owner в closed-shadow",
+      "project": "firefox",
+      "durationMs": 469,
+      "retry": 0
+    },
+    {
+      "title": "sheet: destroy восстанавливает прежний focus owner в parent-closed-shadow",
+      "project": "firefox",
+      "durationMs": 492,
+      "retry": 0
+    },
+    {
+      "title": "sheet: destroy восстанавливает прежний focus owner в ancestor-closed-shadow",
+      "project": "firefox",
+      "durationMs": 440,
+      "retry": 0
+    },
+    {
+      "title": "sheet: none pause сохраняет текущую quiet drag позу",
+      "project": "firefox",
+      "durationMs": 1415,
+      "retry": 0
+    },
+    {
+      "title": "sheet: reduced pause сохраняет текущую quiet drag позу",
+      "project": "firefox",
+      "durationMs": 490,
+      "retry": 0
+    },
+    {
+      "title": "sheet: native interruption → live follow → native release; один inert callback",
+      "project": "firefox",
+      "durationMs": 472,
+      "retry": 0
+    },
+    {
+      "title": "sheet: pointercancel не меняет выбранную цель, pause сохраняет позу",
+      "project": "firefox",
+      "durationMs": 490,
+      "retry": 0
+    },
+    {
+      "title": "sheet: no-motion, keyboard, IME и явный resize/reparent",
+      "project": "firefox",
+      "durationMs": 489,
+      "retry": 0
+    },
+    {
+      "title": "sheet: reduced-motion при mount и при смене предпочтения",
+      "project": "firefox",
+      "durationMs": 538,
+      "retry": 0
+    },
+    {
+      "title": "pager: destroy восстанавливает исходный inline transform (important)",
+      "project": "firefox",
+      "durationMs": 361,
+      "retry": 0
+    },
+    {
+      "title": "pager: destroy восстанавливает исходный inline transform (plain)",
+      "project": "firefox",
+      "durationMs": 399,
+      "retry": 0
+    },
+    {
+      "title": "pager: destroy восстанавливает исходный inline transform (none)",
+      "project": "firefox",
+      "durationMs": 435,
+      "retry": 0
+    },
+    {
+      "title": "pager: destroy восстанавливает исходный inline transform (absent)",
+      "project": "firefox",
+      "durationMs": 437,
+      "retry": 0
+    },
+    {
+      "title": "pager: getter onSelect сохраняет healthy intent до внешнего эффекта",
+      "project": "firefox",
+      "durationMs": 1365,
+      "retry": 0
+    },
+    {
+      "title": "pager: getter onSelect сохраняет destroy intent до внешнего эффекта",
+      "project": "firefox",
+      "durationMs": 431,
+      "retry": 0
+    },
+    {
+      "title": "pager: getter onSelect сохраняет select intent до внешнего эффекта",
+      "project": "firefox",
+      "durationMs": 453,
+      "retry": 0
+    },
+    {
+      "title": "pager: destroy восстанавливает прежний focus owner в light",
+      "project": "firefox",
+      "durationMs": 409,
+      "retry": 0
+    },
+    {
+      "title": "pager: destroy восстанавливает прежний focus owner в shadow",
+      "project": "firefox",
+      "durationMs": 478,
+      "retry": 0
+    },
+    {
+      "title": "pager: destroy восстанавливает прежний focus owner в nested",
+      "project": "firefox",
+      "durationMs": 419,
+      "retry": 0
+    },
+    {
+      "title": "pager: destroy восстанавливает прежний focus owner в child-shadow",
+      "project": "firefox",
+      "durationMs": 476,
+      "retry": 0
+    },
+    {
+      "title": "pager: destroy восстанавливает прежний focus owner в outside-shadow",
+      "project": "firefox",
+      "durationMs": 428,
+      "retry": 0
+    },
+    {
+      "title": "pager: destroy восстанавливает прежний focus owner в outside-nested",
+      "project": "firefox",
+      "durationMs": 436,
+      "retry": 0
+    },
+    {
+      "title": "pager: destroy восстанавливает прежний focus owner в parent-shadow",
+      "project": "firefox",
+      "durationMs": 451,
+      "retry": 0
+    },
+    {
+      "title": "pager: destroy восстанавливает прежний focus owner в closed-shadow",
+      "project": "firefox",
+      "durationMs": 1380,
+      "retry": 0
+    },
+    {
+      "title": "pager: destroy восстанавливает прежний focus owner в parent-closed-shadow",
+      "project": "firefox",
+      "durationMs": 427,
+      "retry": 0
+    },
+    {
+      "title": "pager: destroy восстанавливает прежний focus owner в ancestor-closed-shadow",
+      "project": "firefox",
+      "durationMs": 460,
+      "retry": 0
+    },
+    {
+      "title": "pager: none pause сохраняет текущую quiet drag позу",
+      "project": "firefox",
+      "durationMs": 486,
+      "retry": 0
+    },
+    {
+      "title": "pager: reduced pause сохраняет текущую quiet drag позу",
+      "project": "firefox",
+      "durationMs": 484,
+      "retry": 0
+    },
+    {
+      "title": "pager: native interruption → live follow → native release; один inert callback",
+      "project": "firefox",
+      "durationMs": 494,
+      "retry": 0
+    },
+    {
+      "title": "pager: pointercancel не меняет выбранную цель, pause сохраняет позу",
+      "project": "firefox",
+      "durationMs": 471,
+      "retry": 0
+    },
+    {
+      "title": "pager: no-motion, keyboard, IME и явный resize/reparent",
+      "project": "firefox",
+      "durationMs": 414,
+      "retry": 0
+    },
+    {
+      "title": "pager: reduced-motion при mount и при смене предпочтения",
+      "project": "firefox",
+      "durationMs": 621,
+      "retry": 0
+    },
+    {
+      "title": "literal recipes используют manifest и байты фактического npm tarball",
+      "project": "webkit",
+      "durationMs": 520,
+      "retry": 0
+    },
+    {
+      "title": "actual tarball: React SSR → hydration сохраняет DOM, StrictMode cleanup и поздний click",
+      "project": "webkit",
+      "durationMs": 672,
+      "retry": 0
+    },
+    {
+      "title": "sheet: destroy восстанавливает исходный inline transform (important)",
+      "project": "webkit",
+      "durationMs": 489,
+      "retry": 0
+    },
+    {
+      "title": "sheet: destroy восстанавливает исходный inline transform (plain)",
+      "project": "webkit",
+      "durationMs": 488,
+      "retry": 0
+    },
+    {
+      "title": "sheet: destroy восстанавливает исходный inline transform (none)",
+      "project": "webkit",
+      "durationMs": 497,
+      "retry": 0
+    },
+    {
+      "title": "sheet: destroy восстанавливает исходный inline transform (absent)",
+      "project": "webkit",
+      "durationMs": 482,
+      "retry": 0
+    },
+    {
+      "title": "sheet: getter onSelect сохраняет healthy intent до внешнего эффекта",
+      "project": "webkit",
+      "durationMs": 472,
+      "retry": 0
+    },
+    {
+      "title": "sheet: getter onSelect сохраняет destroy intent до внешнего эффекта",
+      "project": "webkit",
+      "durationMs": 469,
+      "retry": 0
+    },
+    {
+      "title": "sheet: getter onSelect сохраняет select intent до внешнего эффекта",
+      "project": "webkit",
+      "durationMs": 454,
+      "retry": 0
+    },
+    {
+      "title": "sheet: destroy восстанавливает прежний focus owner в light",
+      "project": "webkit",
+      "durationMs": 517,
+      "retry": 0
+    },
+    {
+      "title": "sheet: destroy восстанавливает прежний focus owner в shadow",
+      "project": "webkit",
+      "durationMs": 514,
+      "retry": 0
+    },
+    {
+      "title": "sheet: destroy восстанавливает прежний focus owner в nested",
+      "project": "webkit",
+      "durationMs": 515,
+      "retry": 0
+    },
+    {
+      "title": "sheet: destroy восстанавливает прежний focus owner в child-shadow",
+      "project": "webkit",
+      "durationMs": 486,
+      "retry": 0
+    },
+    {
+      "title": "sheet: destroy восстанавливает прежний focus owner в outside-shadow",
+      "project": "webkit",
+      "durationMs": 477,
+      "retry": 0
+    },
+    {
+      "title": "sheet: destroy восстанавливает прежний focus owner в outside-nested",
+      "project": "webkit",
+      "durationMs": 523,
+      "retry": 0
+    },
+    {
+      "title": "sheet: destroy восстанавливает прежний focus owner в parent-shadow",
+      "project": "webkit",
+      "durationMs": 521,
+      "retry": 0
+    },
+    {
+      "title": "sheet: destroy восстанавливает прежний focus owner в closed-shadow",
+      "project": "webkit",
+      "durationMs": 524,
+      "retry": 0
+    },
+    {
+      "title": "sheet: destroy восстанавливает прежний focus owner в parent-closed-shadow",
+      "project": "webkit",
+      "durationMs": 511,
+      "retry": 0
+    },
+    {
+      "title": "sheet: destroy восстанавливает прежний focus owner в ancestor-closed-shadow",
+      "project": "webkit",
+      "durationMs": 509,
+      "retry": 0
+    },
+    {
+      "title": "sheet: none pause сохраняет текущую quiet drag позу",
+      "project": "webkit",
+      "durationMs": 540,
+      "retry": 0
+    },
+    {
+      "title": "sheet: reduced pause сохраняет текущую quiet drag позу",
+      "project": "webkit",
+      "durationMs": 542,
+      "retry": 0
+    },
+    {
+      "title": "sheet: native interruption → live follow → native release; один inert callback",
+      "project": "webkit",
+      "durationMs": 621,
+      "retry": 0
+    },
+    {
+      "title": "sheet: pointercancel не меняет выбранную цель, pause сохраняет позу",
+      "project": "webkit",
+      "durationMs": 562,
+      "retry": 0
+    },
+    {
+      "title": "sheet: no-motion, keyboard, IME и явный resize/reparent",
+      "project": "webkit",
+      "durationMs": 513,
+      "retry": 0
+    },
+    {
+      "title": "sheet: reduced-motion при mount и при смене предпочтения",
+      "project": "webkit",
+      "durationMs": 611,
+      "retry": 0
+    },
+    {
+      "title": "pager: destroy восстанавливает исходный inline transform (important)",
+      "project": "webkit",
+      "durationMs": 453,
+      "retry": 0
+    },
+    {
+      "title": "pager: destroy восстанавливает исходный inline transform (plain)",
+      "project": "webkit",
+      "durationMs": 435,
+      "retry": 0
+    },
+    {
+      "title": "pager: destroy восстанавливает исходный inline transform (none)",
+      "project": "webkit",
+      "durationMs": 470,
+      "retry": 0
+    },
+    {
+      "title": "pager: destroy восстанавливает исходный inline transform (absent)",
+      "project": "webkit",
+      "durationMs": 449,
+      "retry": 0
+    },
+    {
+      "title": "pager: getter onSelect сохраняет healthy intent до внешнего эффекта",
+      "project": "webkit",
+      "durationMs": 445,
+      "retry": 0
+    },
+    {
+      "title": "pager: getter onSelect сохраняет destroy intent до внешнего эффекта",
+      "project": "webkit",
+      "durationMs": 474,
+      "retry": 0
+    },
+    {
+      "title": "pager: getter onSelect сохраняет select intent до внешнего эффекта",
+      "project": "webkit",
+      "durationMs": 459,
+      "retry": 0
+    },
+    {
+      "title": "pager: destroy восстанавливает прежний focus owner в light",
+      "project": "webkit",
+      "durationMs": 525,
+      "retry": 0
+    },
+    {
+      "title": "pager: destroy восстанавливает прежний focus owner в shadow",
+      "project": "webkit",
+      "durationMs": 509,
+      "retry": 0
+    },
+    {
+      "title": "pager: destroy восстанавливает прежний focus owner в nested",
+      "project": "webkit",
+      "durationMs": 524,
+      "retry": 0
+    },
+    {
+      "title": "pager: destroy восстанавливает прежний focus owner в child-shadow",
+      "project": "webkit",
+      "durationMs": 544,
+      "retry": 0
+    },
+    {
+      "title": "pager: destroy восстанавливает прежний focus owner в outside-shadow",
+      "project": "webkit",
+      "durationMs": 530,
+      "retry": 0
+    },
+    {
+      "title": "pager: destroy восстанавливает прежний focus owner в outside-nested",
+      "project": "webkit",
+      "durationMs": 509,
+      "retry": 0
+    },
+    {
+      "title": "pager: destroy восстанавливает прежний focus owner в parent-shadow",
+      "project": "webkit",
+      "durationMs": 488,
+      "retry": 0
+    },
+    {
+      "title": "pager: destroy восстанавливает прежний focus owner в closed-shadow",
+      "project": "webkit",
+      "durationMs": 498,
+      "retry": 0
+    },
+    {
+      "title": "pager: destroy восстанавливает прежний focus owner в parent-closed-shadow",
+      "project": "webkit",
+      "durationMs": 531,
+      "retry": 0
+    },
+    {
+      "title": "pager: destroy восстанавливает прежний focus owner в ancestor-closed-shadow",
+      "project": "webkit",
+      "durationMs": 506,
+      "retry": 0
+    },
+    {
+      "title": "pager: none pause сохраняет текущую quiet drag позу",
+      "project": "webkit",
+      "durationMs": 626,
+      "retry": 0
+    },
+    {
+      "title": "pager: reduced pause сохраняет текущую quiet drag позу",
+      "project": "webkit",
+      "durationMs": 553,
+      "retry": 0
+    },
+    {
+      "title": "pager: native interruption → live follow → native release; один inert callback",
+      "project": "webkit",
+      "durationMs": 633,
+      "retry": 0
+    },
+    {
+      "title": "pager: pointercancel не меняет выбранную цель, pause сохраняет позу",
+      "project": "webkit",
+      "durationMs": 566,
+      "retry": 0
+    },
+    {
+      "title": "pager: no-motion, keyboard, IME и явный resize/reparent",
+      "project": "webkit",
+      "durationMs": 525,
+      "retry": 0
+    },
+    {
+      "title": "pager: reduced-motion при mount и при смене предпочтения",
+      "project": "webkit",
+      "durationMs": 657,
+      "retry": 0
+    }
+  ],
+  "newRegressionCases": [
+    {
+      "title": "sheet: destroy восстанавливает исходный inline transform (important)",
+      "project": "chromium",
+      "durationMs": 248,
+      "retry": 0
+    },
+    {
+      "title": "sheet: destroy восстанавливает исходный inline transform (plain)",
+      "project": "chromium",
+      "durationMs": 242,
+      "retry": 0
+    },
+    {
+      "title": "sheet: destroy восстанавливает исходный inline transform (none)",
+      "project": "chromium",
+      "durationMs": 260,
+      "retry": 0
+    },
+    {
+      "title": "sheet: destroy восстанавливает исходный inline transform (absent)",
+      "project": "chromium",
+      "durationMs": 221,
+      "retry": 0
+    },
+    {
+      "title": "pager: destroy восстанавливает исходный inline transform (important)",
+      "project": "chromium",
+      "durationMs": 204,
+      "retry": 0
+    },
+    {
+      "title": "pager: destroy восстанавливает исходный inline transform (plain)",
+      "project": "chromium",
+      "durationMs": 210,
+      "retry": 0
+    },
+    {
+      "title": "pager: destroy восстанавливает исходный inline transform (none)",
+      "project": "chromium",
+      "durationMs": 212,
+      "retry": 0
+    },
+    {
+      "title": "pager: destroy восстанавливает исходный inline transform (absent)",
+      "project": "chromium",
+      "durationMs": 210,
+      "retry": 0
+    },
+    {
+      "title": "sheet: destroy восстанавливает исходный inline transform (important)",
+      "project": "firefox",
+      "durationMs": 395,
+      "retry": 0
+    },
+    {
+      "title": "sheet: destroy восстанавливает исходный inline transform (plain)",
+      "project": "firefox",
+      "durationMs": 408,
+      "retry": 0
+    },
+    {
+      "title": "sheet: destroy восстанавливает исходный inline transform (none)",
+      "project": "firefox",
+      "durationMs": 370,
+      "retry": 0
+    },
+    {
+      "title": "sheet: destroy восстанавливает исходный inline transform (absent)",
+      "project": "firefox",
+      "durationMs": 379,
+      "retry": 0
+    },
+    {
+      "title": "pager: destroy восстанавливает исходный inline transform (important)",
+      "project": "firefox",
+      "durationMs": 361,
+      "retry": 0
+    },
+    {
+      "title": "pager: destroy восстанавливает исходный inline transform (plain)",
+      "project": "firefox",
+      "durationMs": 399,
+      "retry": 0
+    },
+    {
+      "title": "pager: destroy восстанавливает исходный inline transform (none)",
+      "project": "firefox",
+      "durationMs": 435,
+      "retry": 0
+    },
+    {
+      "title": "pager: destroy восстанавливает исходный inline transform (absent)",
+      "project": "firefox",
+      "durationMs": 437,
+      "retry": 0
+    },
+    {
+      "title": "sheet: destroy восстанавливает исходный inline transform (important)",
+      "project": "webkit",
+      "durationMs": 489,
+      "retry": 0
+    },
+    {
+      "title": "sheet: destroy восстанавливает исходный inline transform (plain)",
+      "project": "webkit",
+      "durationMs": 488,
+      "retry": 0
+    },
+    {
+      "title": "sheet: destroy восстанавливает исходный inline transform (none)",
+      "project": "webkit",
+      "durationMs": 497,
+      "retry": 0
+    },
+    {
+      "title": "sheet: destroy восстанавливает исходный inline transform (absent)",
+      "project": "webkit",
+      "durationMs": 482,
+      "retry": 0
+    },
+    {
+      "title": "pager: destroy восстанавливает исходный inline transform (important)",
+      "project": "webkit",
+      "durationMs": 453,
+      "retry": 0
+    },
+    {
+      "title": "pager: destroy восстанавливает исходный inline transform (plain)",
+      "project": "webkit",
+      "durationMs": 435,
+      "retry": 0
+    },
+    {
+      "title": "pager: destroy восстанавливает исходный inline transform (none)",
+      "project": "webkit",
+      "durationMs": 470,
+      "retry": 0
+    },
+    {
+      "title": "pager: destroy восстанавливает исходный inline transform (absent)",
+      "project": "webkit",
+      "durationMs": 449,
+      "retry": 0
+    }
+  ],
+  "counts": {
+    "chromium": 48,
+    "firefox": 48,
+    "webkit": 48
+  },
+  "actualPackageReceipt": {
+    "schema": "scope-recipes-package-v1",
+    "package": {
+      "name": "@labpics/motion",
+      "version": "0.3.0"
+    },
+    "tarball": {
+      "filename": "labpics-motion-0.3.0.tgz",
+      "sha256": "54482b3da5ae3e530e9f25f29b91471b1ff95cf2d8212735a0eeb71002d6fba7",
+      "integrity": "sha512-MLTTxLhm6ZOzEiVK6n4aEgK1IZM0EjFPJXMmuk84bQaKStQeJQ9wHBqTSTbVbteprYVPXOmzwzZtk1NqBFXeZw=="
+    },
+    "manifest": {
+      "sha256": "de278702d9f6843be2b682c27d9cc0d16d552327f77f7a9f07bee0ff6793da52",
+      "fileCount": 312
+    },
+    "recipesSha256": "ba7300424fa8923e822ef55d4ff6f36550e06c476aca80869b02f87259b61645",
+    "runtime": {
+      "node": "v24.19.0",
+      "esbuild": "0.28.2"
+    },
+    "motionInputs": [
+      "dist/animate/index.js",
+      "dist/behaviors/reorder/index.js",
+      "dist/compositor/index.js",
+      "dist/decay/index.js",
+      "dist/frame/index.js",
+      "dist/gestures/index.js",
+      "dist/presence/index.js",
+      "dist/projection/index.js",
+      "dist/smart/index.js"
+    ],
+    "bundleSha256": "5320f49b7889f455a0792252e44f6069b75638d2d27051e5a25d6504d2f71c5a",
+    "ssrHtmlSha256": "68e14d501fd6a56fe445a8cc3377eed78c0298669be9a723a06d7c2ab558142f",
+    "ssrMotionInputs": [
+      "dist/animate/index.js",
+      "dist/frame/index.js"
+    ]
+  },
+  "actualExecution": {
+    "sourceHead": "fe092331360837fd7f63d71a4b7f867ba849ebd4",
+    "argv": [
+      "/tmp/motion-server-toolchain-20261001/bin/pnpm",
+      "exec",
+      "playwright",
+      "test",
+      "browser/compositor-recipes.spec.ts",
+      "--fail-on-flaky-tests",
+      "--reporter=json",
+      "--output=/tmp/motion-recipes-current-browser-fe092331-20261002/artifacts"
+    ],
+    "cwd": "/workspace/lab-motion",
+    "startUtc": "2026-10-02T03:36:46.707193+00:00",
+    "environment": {
+      "PATH": "/tmp/motion-server-toolchain-20261001/bin:/opt/codex/runtimes/codex-primary-runtime/dependencies/node/bin:/home/agent/.local/bin:/opt/codex/runtimes/codex-primary-runtime/dependencies/bin/override:/opt/codex/runtimes/codex-primary-runtime/dependencies/python/bin:/opt/codex/runtimes/codex-primary-runtime/dependencies/node/bin:/opt/codex/runtimes/codex-primary-runtime/dependencies/bin:/opt/codex/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin:/home/agent/.local/bin:/opt/codex/runtimes/codex-primary-runtime/dependencies/bin/fallback",
+      "NODE_PATH": null,
+      "NODE_OPTIONS": null,
+      "CI": "true",
+      "LD_LIBRARY_PATH": "/workspace/lab-motion/scratchpad/browser-deps/root/usr/lib/x86_64-linux-gnu",
+      "PLAYWRIGHT_SKIP_VALIDATE_HOST_REQUIREMENTS": "1",
+      "PLAYWRIGHT_JSON_OUTPUT_FILE": "/tmp/motion-recipes-current-browser-fe092331-20261002/result.json"
+    },
+    "qualification": "Existing stale-ldconfig validation bypass with actual required libraries and all three real engines, original dependency failures retained in immutable prior packets. No executable override/test skip/timeout change. Conformance Playwright1.63, not registered timing Chromium149. Config-owned CI worker1/retries2; flaky tests fail.",
+    "endUtc": "2026-10-02T03:37:55.211081+00:00",
+    "exitCode": 0,
+    "allChildrenJoined": true,
+    "cleanAfter": true,
+    "files": {
+      "/tmp/motion-recipes-current-browser-fe092331-20261002/result.json": {
+        "path": "/tmp/motion-recipes-current-browser-fe092331-20261002/result.json",
+        "bytes": 166286,
+        "sha256": "8a09834bbe48caffd4bd5b05cd93e5a55a032d7d0cd48ec1e1e22bffa1832188"
+      },
+      "/tmp/motion-recipes-current-browser-fe092331-20261002/stdout.log": {
+        "path": "/tmp/motion-recipes-current-browser-fe092331-20261002/stdout.log",
+        "bytes": 397,
+        "sha256": "3134bfa1bd92d7d5d0babaed1307f38bfa4405dc22b060f613d6bd8a40cba297"
+      },
+      "/tmp/motion-recipes-current-browser-fe092331-20261002/stderr.log": {
+        "path": "/tmp/motion-recipes-current-browser-fe092331-20261002/stderr.log",
+        "bytes": 1038,
+        "sha256": "d4478546d47ef0d8333f4329ae20756380308917338f02b45016008a41cf48a1"
+      },
+      "/workspace/lab-motion/browser/.artifacts/scope-recipes.js": {
+        "path": "/workspace/lab-motion/browser/.artifacts/scope-recipes.js",
+        "bytes": 1382990,
+        "sha256": "5320f49b7889f455a0792252e44f6069b75638d2d27051e5a25d6504d2f71c5a"
+      },
+      "/workspace/lab-motion/browser/.artifacts/scope-recipes.package.json": {
+        "path": "/workspace/lab-motion/browser/.artifacts/scope-recipes.package.json",
+        "bytes": 1210,
+        "sha256": "df1fd41df0c4b268b24f3c00e7566570d0a360d2643bae955201f4ac417c219d"
+      }
+    }
+  },
+  "scope": "Полное чтение первичных 144 результатов и связей пакета; запусков, измерений скорости и новых проверок SUT нет."
+}
