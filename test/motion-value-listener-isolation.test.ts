@@ -104,9 +104,8 @@ describe('MotionValue: изоляция ошибок слушателей', () =
     expect(second).toHaveBeenCalledTimes(2);
   });
 
-  it('сохраняет listener-ошибку первичной, если перепланирование тоже бросило', () => {
+  it.each([undefined, null, false, 0, '', { source: 'listener' }])('сохраняет listener-ошибку %s первичной, если перепланирование тоже бросило', (listenerFailure) => {
     const queue: Array<(ts?: number) => void> = [];
-    const listenerFailure = { source: 'listener' };
     const schedulerFailure = { source: 'scheduler' };
     let requests = 0;
     let time = 0;
@@ -126,8 +125,10 @@ describe('MotionValue: изоляция ошибок слушателей', () =
     armed = true;
     value.setTarget(100);
 
+    let didThrow = false;
     let thrown: unknown;
-    try { drain(); } catch (error) { thrown = error; }
+    try { drain(); } catch (error) { didThrow = true; thrown = error; }
+    expect(didThrow).toBe(true);
     expect(thrown).toBe(listenerFailure);
     expect(queue).toHaveLength(0);
 
@@ -139,9 +140,8 @@ describe('MotionValue: изоляция ошибок слушателей', () =
     expect(value.value).toBeCloseTo(25, 5);
   });
 
-  it('выбрасывает scheduler-ошибку, если более ранней listener-ошибки нет', () => {
+  it.each([undefined, null, false, 0, '', { source: 'scheduler' }])('выбрасывает scheduler-ошибку %s, если более ранней listener-ошибки нет', (schedulerFailure) => {
     const queue: Array<(ts?: number) => void> = [];
-    const schedulerFailure = { source: 'scheduler' };
     let requests = 0;
     let time = 0;
     const requestFrame = (callback: (ts?: number) => void): number => {
@@ -157,8 +157,10 @@ describe('MotionValue: изоляция ошибок слушателей', () =
     const value = new MotionValue({ initial: 0, spring: SPRING, requestFrame });
     value.setTarget(100);
 
+    let didThrow = false;
     let thrown: unknown;
-    try { drain(); } catch (error) { thrown = error; }
+    try { drain(); } catch (error) { didThrow = true; thrown = error; }
+    expect(didThrow).toBe(true);
     expect(thrown).toBe(schedulerFailure);
 
     value.setTarget(25);

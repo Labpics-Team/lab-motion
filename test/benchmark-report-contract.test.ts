@@ -486,19 +486,25 @@ function freeze25To65(): MotionPoint[] {
 }
 
 describe('schema 10 motion conformance admission', () => {
-  it('публикация требует качества и не позволяет ослабить требования вызывающему', () => {
-    const report = motionFixture();
-    expect(() => validateBenchmarkReportForPublication(report)).not.toThrow();
-    expect(() => validateBenchmarkReportForPublication(fixture())).toThrow(/motion conformance/);
-    report.payload.results['motion-mini'].raw.freeze[0].evidence.blocked = freeze25To65();
-    refreshMotionReport(report);
-    expect(() => validateBenchmarkReportPair(report)).not.toThrow();
-    expect(() => validateBenchmarkReportForPublication({ ...report, motionRequirements: undefined }))
-      .toThrow(/motion-mini\.blocked = fail/);
-    expect(() => validateBenchmarkReportForPublication({
-      ...report, motionRequirements: { baseline: ['lab'], blocked: [] },
-    })).toThrow(/motion-mini\.blocked = fail/);
+  it('публикация принимает отчёт с обязательным качеством движения', () => {
+    expect(() => validateBenchmarkReportForPublication(motionFixture())).not.toThrow();
   });
+
+  it('публикация требует motion conformance', () => {
+    expect(() => validateBenchmarkReportForPublication(fixture())).toThrow(/motion conformance/);
+  });
+
+  it.each([undefined, { baseline: ['lab'], blocked: [] }])(
+    'публикация не позволяет ослабить требования вызывающему (%j)',
+    (motionRequirements) => {
+      const report = motionFixture();
+      report.payload.results['motion-mini'].raw.freeze[0].evidence.blocked = freeze25To65();
+      refreshMotionReport(report);
+      expect(() => validateBenchmarkReportPair(report)).not.toThrow();
+      expect(() => validateBenchmarkReportForPublication({ ...report, motionRequirements }))
+        .toThrow(/motion-mini\.blocked = fail/);
+    },
+  );
 
   it('CI и release reader используют обязательный допуск публикации', () => {
     const reader = readFileSync('scripts/check-docs-facts.mjs', 'utf8');

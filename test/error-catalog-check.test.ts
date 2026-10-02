@@ -180,6 +180,34 @@ ${row('LM001', 'unknown')}
     expect(errors.join('\n')).toMatch(/runtime-escape конструктора/);
   });
 
+  it.each([
+    'Vue.getCurrentScope?.();',
+    'const cleanup = Vue.onScopeDispose;',
+    'Vue?.onScopeDispose(callback);',
+  ])('разрешает статически именованный член namespace: %s', (use) => {
+    const errors = validateErrorCatalog({
+      catalogText: catalog([]),
+      sources: [['src/adapter.ts', `import * as Vue from 'vue'; ${use}`]],
+    });
+    expect(errors).toEqual([]);
+  });
+
+  it.each([
+    'const Constructor = errors.MotionParamError;',
+    "const Constructor = errors['MotionParamError'];",
+    'const Constructor = errors[key];',
+    'const alias = errors; const Constructor = alias[key];',
+    'consume(errors);',
+    'Object.values(errors);',
+    'const { MotionParamError: Constructor } = errors;',
+  ])('сохраняет запрет выноса конструктора или всего namespace: %s', (use) => {
+    const errors = validateErrorCatalog({
+      catalogText: catalog([]),
+      sources: [['src/escape.ts', `import * as errors from './errors.js'; ${use}`]],
+    });
+    expect(errors.join('\n')).toMatch(/runtime-escape конструктора/);
+  });
+
   it('не позволяет computed access к namespace ошибок', () => {
     const errors = validateErrorCatalog({
       catalogText: catalog([]),
@@ -208,6 +236,21 @@ ${row('LM001', 'unknown')}
     expect(errors.join('\n')).toMatch(/runtime-escape конструктора/);
   });
 
+  it.each([
+    ["export { MotionParamError as createError } from './errors.js';", 'createError'],
+    ["import { MotionParamError } from './errors.js'; export default MotionParamError;", 'default'],
+  ])('проверяет владельца alias до статического namespace-доступа: %s', (barrel, member) => {
+    const errors = validateErrorCatalog({
+      catalogText: catalog([]),
+      sources: [
+        ['src/barrel.ts', barrel],
+        ['src/use.ts', `import * as api from './barrel.js'; new api.${member}(runtimeCode);`],
+      ],
+    });
+    expect(errors.some(error => error.startsWith('src/barrel.ts:') &&
+      error.includes('runtime-escape конструктора'))).toBe(true);
+  });
+
   it('не позволяет default re-export конструктора', () => {
     const errors = validateErrorCatalog({
       catalogText: catalog([]),
@@ -231,6 +274,97 @@ ${row('LM001', 'unknown')}
       ]],
     });
     expect(errors.join('\n')).toMatch(/runtime-escape конструктора/);
+  });
+
+  it.each(["'./nested/barrel.js'", '`./nested/barrel.js`'])(
+    'проверяет origin динамического импорта транзитивного barrel: %s', (specifier) => {
+      const errors = validateErrorCatalog({
+        catalogText: catalog([]),
+        sources: [
+          ['src/public.ts', "export { MotionParamError } from './errors.js';"],
+          ['src/nested/barrel.ts', "export * from '../public.js';"],
+          ['src/use.ts', `const errors = await import(${specifier}); new errors[key](runtimeCode);`],
+        ],
+      });
+      expect(errors.some(error => error.startsWith('src/use.ts:') &&
+        error.includes('runtime-escape конструктора'))).toBe(true);
+    },
+  );
+
+  it('разрешает динамический импорт barrel без runtime-конструктора', () => {
+    expect(validateErrorCatalog({
+      catalogText: catalog([]),
+      sources: [
+        ['src/public.ts', "export type { MotionParamError } from './errors.js'; export const value = 1;"],
+        ['src/use.ts', "const api = await import('./public.js'); void api.value;"],
+      ],
+    })).toEqual([]);
+  });
+
+  it.each([
+    "export { MotionParamError } from './errors.js';",
+    "export * from './errors.js';",
+    "import { MotionParamError } from './errors.js'; export { MotionParamError };",
+    'export class MotionParamError extends Error {}',
+  ])('запрещает namespace реэкспорта конструктора: %s', (publicExport) => {
+    const errors = validateErrorCatalog({
+      catalogText: catalog([]),
+      sources: [
+        ['src/public.ts', publicExport],
+        ['src/barrel.ts', "export * as errors from './public.js';"],
+        ['src/use.ts', "import * as api from './barrel.js'; const key = 'MotionParamError' as const; new api.errors[key](runtimeCode);"],
+      ],
+    });
+    expect(errors.some(error => error.startsWith('src/barrel.ts:') &&
+      error.includes('runtime-escape конструктора'))).toBe(true);
+  });
+
+  it.each([false, true])('находит конструктор через транзитивный цикл независимо от порядка файлов: %s', (reverse) => {
+    const sources = [
+      ['src/a.ts', "export * from './b.js'; export * from './public/index.js';"],
+      ['src/b.ts', "export * from './a.js';"],
+      ['src/public/index.ts', "export { MotionParamError } from '../errors.js';"],
+      ['src/barrel.ts', "export * as nested from './b.js';"],
+      ['src/use.ts', "import { nested } from './barrel.js'; new nested[key](runtimeCode);"],
+    ];
+    const errors = validateErrorCatalog({ catalogText: catalog([]), sources: reverse ? sources.reverse() : sources });
+    expect(errors.some(error => error.startsWith('src/barrel.ts:') &&
+      error.includes('runtime-escape конструктора'))).toBe(true);
+  });
+
+  it.each(['export { errors };', 'export { errors as nested };', 'export { errors as default };', 'export default errors;'])(
+    'не освобождает передачу импортированного namespace через export: %s', (exported) => {
+      const errors = validateErrorCatalog({
+        catalogText: catalog([]),
+        sources: [
+          ['src/public.ts', "export { MotionParamError } from './errors.js';"],
+          ['src/barrel.ts', `import * as errors from './public.js'; ${exported}`],
+          ['src/use.ts', "import * as api from './barrel.js'; new api.errors[key](runtimeCode);"],
+        ],
+      });
+      expect(errors.some(error => error.startsWith('src/barrel.ts:') &&
+        error.includes('runtime-escape конструктора'))).toBe(true);
+    },
+  );
+
+  it('сохраняет type-only передачу namespace без runtime-эффекта', () => {
+    expect(validateErrorCatalog({
+      catalogText: catalog([]),
+      sources: [['src/types.ts', "import * as errors from './errors.js'; export type { errors }; export { type errors as ErrorTypes }; type Namespace = typeof errors;"]],
+    })).toEqual([]);
+  });
+
+  it('разрешает namespace без runtime-конструктора и type-only реэкспорты', () => {
+    const errors = validateErrorCatalog({
+      catalogText: catalog([]),
+      sources: [
+        ['src/safe.ts', "export type { MotionParamError } from './errors.js'; export const value = 1;"],
+        ['src/safe-star.ts', "export type * from './errors.js'; export * from './safe.js';"],
+        ['src/barrel.ts', "export * as safe from './safe-star.js'; export * as Vue from 'vue'; export type * as errors from './errors.js';"],
+        ['src/use.ts', "import * as api from './barrel.js'; void api.safe.value; api.Vue.getCurrentScope?.();"],
+      ],
+    });
+    expect(errors).toEqual([]);
   });
 
   it('не позволяет Reflect, передачу или наследование конструктора', () => {
