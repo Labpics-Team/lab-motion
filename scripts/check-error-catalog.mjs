@@ -4,7 +4,7 @@
  */
 
 import { existsSync, readFileSync, readdirSync } from 'node:fs';
-import { extname, resolve } from 'node:path';
+import { dirname, extname, resolve } from 'node:path';
 import { pathToFileURL } from 'node:url';
 import ts from 'typescript';
 
@@ -118,7 +118,61 @@ function verifyFactory(node, sourceFile, file) {
   };
 }
 
-function constructorBindings(sourceFile) {
+function isErrorsModule(moduleName) {
+  return /(?:^|\/)errors(?:\.js)?$/.test(moduleName);
+}
+
+function constructorExportOrigins(sources) {
+  const modules = new Map(sources.map(([file, source]) => [resolve(file),
+    ts.createSourceFile(file, source, ts.ScriptTarget.Latest, true)]));
+  const constructorModules = new Set();
+  const reexports = new Map();
+  const targetModule = (file, moduleName) => {
+    if (!moduleName.startsWith('.')) return undefined;
+    const path = resolve(dirname(file), moduleName);
+    return [path, path.replace(/\.jsx?$/, '.ts'), path.replace(/\.jsx?$/, '.tsx'),
+      `${path}.ts`, `${path}.tsx`, resolve(path, 'index.ts'), resolve(path, 'index.tsx')]
+      .find(candidate => modules.has(candidate));
+  };
+  const exportsConstructor = (file, moduleName) => isErrorsModule(moduleName) ||
+    constructorModules.has(targetModule(resolve(file), moduleName));
+
+  for (const [file, sourceFile] of modules) {
+    const dependencies = [];
+    reexports.set(file, dependencies);
+    for (const statement of sourceFile.statements) {
+      if (ts.isClassDeclaration(statement) && statement.name?.text === 'MotionParamError' &&
+        statement.modifiers?.some(modifier => modifier.kind === ts.SyntaxKind.ExportKeyword)) {
+        constructorModules.add(file);
+      }
+      if (!ts.isExportDeclaration(statement) || statement.isTypeOnly) continue;
+      const exported = statement.exportClause;
+      if (exported !== undefined && ts.isNamedExports(exported)) {
+        if (exported.elements.some(element => !element.isTypeOnly &&
+          (element.propertyName ?? element.name).text === 'MotionParamError')) {
+          constructorModules.add(file);
+        }
+      } else if (statement.moduleSpecifier !== undefined && ts.isStringLiteral(statement.moduleSpecifier)) {
+        dependencies.push(statement.moduleSpecifier.text);
+      }
+    }
+  }
+  // Замыкание по runtime-реэкспортам не зависит от порядка файлов и циклов.
+  // Namespace запрещается у первого владельца, который упаковывает конструктор.
+  let changed;
+  do {
+    changed = false;
+    for (const [file, dependencies] of reexports) {
+      if (!constructorModules.has(file) && dependencies.some(moduleName => exportsConstructor(file, moduleName))) {
+        constructorModules.add(file);
+        changed = true;
+      }
+    }
+  } while (changed);
+  return exportsConstructor;
+}
+
+function constructorBindings(sourceFile, exportsConstructor) {
   const bindings = new Set(['MotionParamError']);
   const namespaces = new Set();
   const escapes = [];
@@ -148,7 +202,7 @@ function constructorBindings(sourceFile) {
         const moduleName = ts.isStringLiteral(statement.moduleSpecifier)
           ? statement.moduleSpecifier.text
           : '';
-        if (/(?:^|\/)errors(?:\.js)?$/.test(moduleName)) escapes.push(exported.name);
+        if (exportsConstructor(sourceFile.fileName, moduleName)) escapes.push(exported.name);
         continue;
       }
       if (!ts.isNamedExports(exported)) continue;
@@ -195,6 +249,7 @@ function isTypeReference(node) {
   let current = node;
   while (current.parent !== undefined) {
     current = current.parent;
+    if ((ts.isExportSpecifier(current) || ts.isExportDeclaration(current)) && current.isTypeOnly) return true;
     if (ts.isTypeNode(current) || ts.isInterfaceDeclaration(current)) return true;
     if (ts.isStatement(current) || ts.isSourceFile(current)) return false;
   }
@@ -228,17 +283,17 @@ function isConstructorProperty(node) {
     argument.text === 'MotionParamError';
 }
 
-function isDynamicErrorsImport(node) {
+function isDynamicErrorsImport(node, file, exportsConstructor) {
   if (!ts.isCallExpression(node) || node.expression.kind !== ts.SyntaxKind.ImportKeyword) {
     return false;
   }
   const specifier = node.arguments[0];
   return specifier !== undefined &&
     (ts.isStringLiteral(specifier) || ts.isNoSubstitutionTemplateLiteral(specifier)) &&
-    /(?:^|\/)errors(?:\.js)?$/.test(specifier.text);
+    exportsConstructor(file, specifier.text);
 }
 
-function inspectMotionParamErrorSource(source, file = 'source.ts') {
+function inspectMotionParamErrorSource(source, file = 'source.ts', exportsConstructor = (_file, moduleName) => isErrorsModule(moduleName)) {
   const sourceFile = ts.createSourceFile(
     file,
     source,
@@ -249,7 +304,7 @@ function inspectMotionParamErrorSource(source, file = 'source.ts') {
   const calls = [];
   const errors = [];
   const factories = new Map();
-  const constructorScope = constructorBindings(sourceFile);
+  const constructorScope = constructorBindings(sourceFile, exportsConstructor);
 
   const findFactories = (node) => {
     if (hasFactoryTag(node)) {
@@ -286,7 +341,7 @@ function inspectMotionParamErrorSource(source, file = 'source.ts') {
   for (const node of constructorScope.escapes) escape(node);
   const visit = (node) => {
     if (innerConstructions.has(node)) return;
-    if (isDynamicErrorsImport(node)) {
+    if (isDynamicErrorsImport(node, sourceFile.fileName, exportsConstructor)) {
       escape(node);
       return;
     }
@@ -306,7 +361,11 @@ function inspectMotionParamErrorSource(source, file = 'source.ts') {
       return;
     }
     if (ts.isIdentifier(node) && constructorScope.namespaces.has(node.text)) {
-      if (!isImportExportReference(node) && !isTypeReference(node)) escape(node);
+      // Именованный член эквивалентен named import. Вынос всего namespace
+      // (включая export) и computed-доступ могут скрыть конструктор ошибки.
+      const namedMember = ts.isPropertyAccessExpression(node.parent) &&
+        node.parent.expression === node && node.parent.name.text !== 'MotionParamError';
+      if (!namedMember && !ts.isNamespaceImport(node.parent) && !isTypeReference(node)) escape(node);
       return;
     }
     if (ts.isIdentifier(node) && constructorScope.bindings.has(node.text)) {
@@ -355,9 +414,10 @@ export function validateErrorCatalog({ catalogText, sources }) {
   const catalog = parseErrorCatalog(catalogText);
   const errors = [...catalog.errors];
   const uses = new Set();
+  const exportsConstructor = constructorExportOrigins(sources);
 
   for (const [file, source] of sources) {
-    const inspected = inspectMotionParamErrorSource(source, file);
+    const inspected = inspectMotionParamErrorSource(source, file, exportsConstructor);
     errors.push(...inspected.errors);
     for (const call of inspected.calls) {
       const at = `${call.file}:${call.line}`;

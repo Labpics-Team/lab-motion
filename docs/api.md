@@ -190,6 +190,11 @@ Peer-фреймворк ставит потребитель; все биндин
 | `…/lit` | `MotionController` (ReactiveController), `LabMotionSpringElement` |
 | `…/wc` | Vanilla web-component `<lab-spring>` без зависимостей — путь для Astro/Stencil/HTML-first стеков |
 
+В Vue 3.2+ `useSpring` и `useMotionValue` освобождают движение при остановке
+текущего `effectScope`, включая scope компонента. В Vue 3.0/3.1 уборка происходит
+при unmount. Для `useMotionValue` вне scope нужно явно вызвать `destroy()`;
+`useSpring` вызывается внутри scope или `setup()` компонента.
+
 ## Ошибки
 
 ```typescript
