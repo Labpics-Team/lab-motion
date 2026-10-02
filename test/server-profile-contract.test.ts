@@ -4,6 +4,7 @@ import os from 'node:os';
 import path from 'node:path';
 import { createContext, runInContext } from 'node:vm';
 import { createHash } from 'node:crypto';
+import { isDeepStrictEqual } from 'node:util';
 import { SERVER_PROFILE, planServerSampleSize, serverProfileDigest, serverTailPolicy, verifyServerProfile } from '../bench/profile/server-profile-registration.mjs';
 import { serverCalibrationVerdict, serverCellPairs, serverFamilyIntervals, serverMetricCells, serverOrders,
   compactServerCpuEvidence, expandServerCpuEvidence, compactServerSemanticEvidence, serverArtifactChunks, serverArtifactDigest, serverBrowserClockBounds, serverBrowserSemanticClockErrorMs, serverOrderStatisticBounds, serverResourceReasons,
@@ -414,6 +415,11 @@ describe('серверный PROFILE: clock/progress falsifiers', () => {
   });
   it('stock C producer делает2warmups, actual2×work и сохраняет поздний prefix без выдуманного CPU endpoint', async () => {
     const scene = SERVER_PROFILE.engineScenes.find((scene) => scene.workload === 'stock-c')!;
+    // Каждый вызов проверяется; Vitest оформляет только несовпадение значений.
+    const same = (actual: unknown, expected: unknown): void => {
+      if (!Object.is(actual, expected)) expect(actual).toBe(expected);
+    };
+    const expectedSpring = { mass: 1, stiffness: 170, damping: 26 };
     let constructors = 0, destroys = 0, failAt = Infinity, cpuNs = 0n;
     const cpu = vi.spyOn(threadCpuClock, 'readServerThreadCpuEndpoint').mockImplementation(() =>
       syntheticNativeEndpoint(cpuNs += 2_000_000_000n, { clock: 'CLOCK_THREAD_CPUTIME_ID', pid: process.pid, tid: process.pid }));
@@ -423,12 +429,14 @@ describe('серверный PROFILE: clock/progress falsifiers', () => {
       private index: number;
       constructor(options: any) {
         this.index = constructors++; this.options = options;
-        expect(options.initial).toBe(0); expect(options.spring).toEqual({ mass: 1, stiffness: 170, damping: 26 });
-        expect(Object.hasOwn(options, 'clamp')).toBe(false);
+        same(options.initial, 0);
+        const spring = options.spring;
+        if (!isDeepStrictEqual(spring, expectedSpring)) expect(spring).toEqual(expectedSpring);
+        same(Object.hasOwn(options, 'clamp'), false);
       }
       onChange(changed: (value: number) => unknown) { this.changed = changed; changed(0); }
       setTarget(target: number) {
-        expect(target).toBe(100);
+        same(target, 100);
         let count = 0;
         const frame = () => { this.changed(++count === 47 ? 100 : count); if (count < 47) this.options.requestFrame(frame); };
         this.options.requestFrame(frame);
