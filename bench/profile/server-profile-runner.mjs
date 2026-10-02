@@ -14,6 +14,7 @@ import { compactStockMotionValueOutcomes, deriveRealmTimerStep, PRODUCTION_ADAPT
 import { assertCheckoutUnchanged, assertFileHashesUnchanged, assertInstalledPackageTreesUnchanged,
   hashFileTree, prepareBenchmarkCheckout, sha256File } from '../compare/provenance.mjs';
 import { SERVER_PROFILE, planServerSampleSize, serverProfileDigest } from './server-profile-registration.mjs';
+import { prepareServerThreadCpuClock, readServerThreadCpuEndpoint } from './server-thread-cpu-clock.mjs';
 import { compactServerSemanticEvidence, serverBrowserSemanticClockErrorMs, serverCalibrationVerdict, serverCellPairs,
   serverFamilyIntervals, serverOrders, serverResourceReasons, validateServerBrowserSample, validateServerEngineSample, verifyServerClockRegistration, writeServerArtifact } from './server-profile-contract.mjs';
 
@@ -22,6 +23,7 @@ const BENCH = path.join(ROOT, 'bench/compare');
 const requireBench = createRequire(path.join(BENCH, 'package.json'));
 const HARNESS_FILES = ['bench/profile/server-profile-registration.mjs', 'bench/profile/server-profile-contract.mjs',
   'bench/profile/server-profile-runner.mjs', 'bench/profile/server-profile-retention.mjs',
+  'bench/profile/server-thread-cpu-clock.mjs', ...Object.keys(SERVER_PROFILE.clockError.nativeSourceFiles),
   'scripts/bench-transform-support.mjs', 'scripts/bench-support.mjs', 'scripts/bench.mjs', 'bench/compare/bench.mjs',
   'bench/compare/methodology.mjs', 'bench/compare/provenance.mjs'];
 const ENTRIES = ['lab', ...SERVER_PROFILE.comparators];
@@ -35,7 +37,9 @@ function preserveRawNumbers(value) {
 }
 
 function errorRecord(error) {
+  const code = error == null ? undefined : Object.getOwnPropertyDescriptor(error, 'code')?.value;
   return { name: error?.name ?? typeof error, message: String(error?.message ?? error),
+    ...(typeof code === 'string' ? { code } : {}),
     ...(error?.errors ? { errors: error.errors.map(errorRecord) } : {}),
     ...(error?.raw ? { raw: preserveRawNumbers(error.raw) } : {}), ...(error?.timerEvidence ? { timerEvidence: preserveRawNumbers(error.timerEvidence) } : {}) };
 }
@@ -151,15 +155,22 @@ function buildAdapter(id, consumerRoot, esbuild, out) {
 }
 
 function threadCpuNs(reads) {
-  const usage = process.threadCpuUsage();
-  const acquired = { sequence: reads.length, userUs: usage.user, systemUs: usage.system, valueNs: null };
+  const endpoint = readServerThreadCpuEndpoint();
+  const acquired = { sequence: reads.length, ...endpoint };
   reads.push(acquired);
-  if (![usage.user, usage.system].every((value) => Number.isSafeInteger(value) && value >= 0)) {
-    throw new Error('server profile: unsafe thread CPU counter вне clock model');
+  if (acquired.clock !== 'CLOCK_THREAD_CPUTIME_ID' || acquired.pid !== process.pid || acquired.tid !== process.pid ||
+      typeof acquired.seconds !== 'string' || !/^(0|[1-9]\d*)$/.test(acquired.seconds) ||
+      !Number.isSafeInteger(acquired.nanoseconds) || acquired.nanoseconds < 0 || acquired.nanoseconds >= 1_000_000_000) {
+    throw Object.assign(new Error('server profile: unsafe native scheduled CPU endpoint вне clock model'), { raw: acquired });
   }
-  const valueNs = (BigInt(usage.user) + BigInt(usage.system)) * 1000n;
-  acquired.valueNs = String(valueNs);
+  const valueNs = BigInt(acquired.seconds) * 1_000_000_000n + BigInt(acquired.nanoseconds);
+  if (acquired.valueNs !== String(valueNs)) throw Object.assign(new Error('server profile: native CPU value не пересчитывается из sec/nsec'), { raw: acquired });
   return valueNs;
+}
+
+function sampleCpuClock(raw) {
+  const endpoint = raw[0]?.raw?.cpuReads?.[0];
+  return { clock: endpoint?.clock, pid: endpoint?.pid, tid: endpoint?.tid };
 }
 
 export async function measureServerEngine(animate, scene, workMultiplier = 1) {
@@ -186,6 +197,7 @@ export async function measureServerEngine(animate, scene, workMultiplier = 1) {
       meanFrameNs: aggregate((sample) => sample.frameNs.reduce((a, b) => a + b, 0) / sample.frameNs.length),
       cancelDrainNs: aggregate((sample) => sample.cancelDrainNs), semantic: raw.every((sample) => sample.semantic.valid),
       repetitions: SERVER_PROFILE.repetitions, workMultiplier, denominator: SERVER_PROFILE.denominator,
+      cpuClock: sampleCpuClock(raw),
       contextSwitchObservation: { before: contextBefore, after: contextSwitches(), scope: 'Node process; timing использует только CPU текущего потока' },
       allocationObservation: { before, after: process.memoryUsage(), scope: 'пакет + независимый oracle + harness; allocator/GC не разложены' }, raw };
     validateServerEngineSample(sampleResult, scene, workMultiplier);
@@ -242,6 +254,7 @@ export async function measureServerStockC(MotionValue, scene, workMultiplier = 1
     sampleResult = { operationNs: raw.reduce((sum, result) => sum + result.operationNs, 0) / SERVER_PROFILE.repetitions,
       semantic: true, repetitions: SERVER_PROFILE.repetitions, workMultiplier, denominator: SERVER_PROFILE.denominator,
       cpuScope: SERVER_PROFILE.stockCpuScope, warmup, raw,
+      cpuClock: sampleCpuClock(raw),
       contextSwitchObservation: { before: contextBefore, after: contextSwitches(), scope: 'Node process; CPU только текущего потока' },
       allocationObservation: { before, after: process.memoryUsage(), scope: 'whole macro + recorder + oracle + harness; retained отдельно' } };
     validateServerEngineSample(sampleResult, scene, workMultiplier);
@@ -476,9 +489,10 @@ export async function runServerProfile({ baseline, candidate, browser: browserNa
   const artifact = { schema: 1, protocol: SERVER_PROFILE, registration: null, registrationDigest: null,
     verdict: 'UNPROVEN', failures: [], warmup: [], gc: [], stages: [],
     jitObservation: { status: 'UNPROVEN', reason: 'GC events наблюдаются; точная JIT attribution требует отдельного intrusive trace и не подменяется гипотезой' } };
-  let browser, origin, observer;
+  let browser, origin, observer, engineClock;
   let prepared = {}, roots = {}, harness = {}, packages = {};
   const verify = () => {
+    engineClock?.assertUnchanged();
     if (artifact.registration) {
       const current = captureServerLoad(), registered = artifact.registration.machine.identity;
       if (current.affinity !== registered.affinity || current.cpuMax !== registered.cgroupCpuMax) {
@@ -501,6 +515,8 @@ export async function runServerProfile({ baseline, candidate, browser: browserNa
     if (browserName !== SERVER_PROFILE.clockError.browser) throw new Error('server profile: clock model этого browser пока UNPROVEN');
     roots = { baseline: realpathSync(baseline), candidate: realpathSync(candidate) };
     if (roots.baseline === roots.candidate) throw new Error('server profile: baseline/candidate требуют разных checkout');
+    engineClock = prepareServerThreadCpuClock({ directory: out });
+    artifact.engineClockPreparation = engineClock.metadata;
     const machine = captureServerMachine();
     const esbuild = requireBench('esbuild'); const playwright = requireBench('playwright');
     const browserType = playwright[browserName];
@@ -530,7 +546,7 @@ export async function runServerProfile({ baseline, candidate, browser: browserNa
       candidateSamplesObservedScope: SERVER_PROFILE.candidateSamplesObservedScope,
       clockModelDigest: serverProfileDigest(SERVER_PROFILE.clockError),
       registeredAt: new Date().toISOString(), browser: browserName, browserVersion: browser.version(), browserExecutableSha256, browserTree,
-      machine, provenance: prepared, packages, transitivePackages: Object.fromEntries(closure), harness,
+      machine, engineClock: engineClock.metadata, provenance: prepared, packages, transitivePackages: Object.fromEntries(closure), harness,
       allocationScope: 'observational heap + GC; retained отдельным процессом после timing' };
     verifyServerClockRegistration(artifact.registration);
     artifact.registrationDigest = serverProfileDigest(artifact.registration);
@@ -588,15 +604,15 @@ export async function runServerProfile({ baseline, candidate, browser: browserNa
     };
     artifact.warmup = await runStage('warmup', SERVER_PROFILE.warmupRuns);
     artifact.pilot = await runStage('pilot', SERVER_PROFILE.pilotRuns);
-    artifact.samplePlan = planServerSampleSize(serverCellPairs(artifact.pilot, SERVER_PROFILE.pilotRuns, 'pilot'));
+    artifact.samplePlan = planServerSampleSize(serverCellPairs(artifact.pilot, SERVER_PROFILE.pilotRuns, 'pilot', artifact.registration.engineClock));
     artifact.frozenPlanDigest = serverProfileDigest({ registrationDigest: artifact.registrationDigest, samplePlan: artifact.samplePlan });
     journal('N-frozen-before-calibration-and-AB', { samplePlan: artifact.samplePlan, digest: artifact.frozenPlanDigest });
     // При N выше ресурсного предела A/A и 2×work всё равно сохраняются как
     // диагностика. Admission останется UNPROVEN из-за недостаточной мощности.
     artifact.aa = await runStage('aa', artifact.samplePlan.runs);
     artifact.positive = await runStage('positive', artifact.samplePlan.runs);
-    const aa = serverFamilyIntervals(serverCellPairs(artifact.aa, artifact.samplePlan.runs, 'aa'));
-    const positiveControl = serverFamilyIntervals(serverCellPairs(artifact.positive, artifact.samplePlan.runs, 'positive'));
+    const aa = serverFamilyIntervals(serverCellPairs(artifact.aa, artifact.samplePlan.runs, 'aa', artifact.registration.engineClock));
+    const positiveControl = serverFamilyIntervals(serverCellPairs(artifact.positive, artifact.samplePlan.runs, 'positive', artifact.registration.engineClock));
     const calibrated = serverCalibrationVerdict(aa, positiveControl, artifact.samplePlan);
     calibrated.reasons.push(...serverResourceReasons([artifact.warmup, artifact.pilot, artifact.aa, artifact.positive], artifact.registration.machine.identity));
     calibrated.verdict = calibrated.reasons.length ? 'UNPROVEN' : 'PASS';
@@ -608,7 +624,7 @@ export async function runServerProfile({ baseline, candidate, browser: browserNa
     artifact.rawControls.candidate = await measureBrowserRawControls(browser, origin, adapters.candidate, out, 'candidate');
     journal('raw-controls-candidate-after-calibration', artifact.rawControls.candidate);
     artifact.ab = await runStage('ab', artifact.samplePlan.runs);
-    artifact.comparison = serverFamilyIntervals(serverCellPairs(artifact.ab, artifact.samplePlan.runs, 'ab'));
+    artifact.comparison = serverFamilyIntervals(serverCellPairs(artifact.ab, artifact.samplePlan.runs, 'ab', artifact.registration.engineClock));
     const abResourceReasons = serverResourceReasons([artifact.ab], artifact.registration.machine.identity);
     if (abResourceReasons.length) throw new Error(`server profile: условия A/B нарушены: ${abResourceReasons.join('; ')}`);
     artifact.comparators = [];

@@ -7,12 +7,21 @@ import { createHash } from 'node:crypto';
 import { SERVER_PROFILE, planServerSampleSize, serverProfileDigest, serverTailPolicy, verifyServerProfile } from '../bench/profile/server-profile-registration.mjs';
 import { serverCalibrationVerdict, serverCellPairs, serverFamilyIntervals, serverMetricCells, serverOrders,
   compactServerSemanticEvidence, serverArtifactChunks, serverArtifactDigest, serverBrowserClockBounds, serverBrowserSemanticClockErrorMs, serverOrderStatisticBounds, serverResourceReasons,
-  parseServerJsonBytes, parseServerJournalBytes, validateServerArtifact, validateServerBrowserSample, validateServerEngineSample, validateServerJournal, writeServerArtifact } from '../bench/profile/server-profile-contract.mjs';
+  parseServerJsonBytes, parseServerJournalBytes, validateServerArtifact, validateServerBrowserSample, validateServerEngineSample, validateServerJournal,
+  verifyServerClockRegistration, writeServerArtifact } from '../bench/profile/server-profile-contract.mjs';
 import { compactStockMotionValueOutcomes, deriveRealmTimerStep, evaluateStartSemanticEvidence, validateStockMotionValueBatch } from '../bench/compare/methodology.mjs';
 import { measureServerBrowser, measureServerEngine } from '../bench/profile/server-profile-runner.mjs';
+import * as threadCpuClock from '../bench/profile/server-thread-cpu-clock.mjs';
 
 const hash = 'a'.repeat(64);
 const clone = <T>(value: T): T => structuredClone(value);
+const syntheticCpuIdentity = { clock: 'CLOCK_THREAD_CPUTIME_ID', pid: 12345, tid: 12345 };
+function syntheticNativeEndpoint(ns: bigint, identity = syntheticCpuIdentity) {
+  return { ...identity, seconds: String(ns / 1_000_000_000n), nanoseconds: Number(ns % 1_000_000_000n), valueNs: String(ns) };
+}
+function nativeCpuEndpoint(read: any, identity = syntheticCpuIdentity) {
+  return { sequence: read.sequence, ...syntheticNativeEndpoint(BigInt(read.valueNs), identity) };
+}
 function pairs(runs = SERVER_PROFILE.minRuns, ratio = 1) {
   return serverMetricCells().map(({ id }) => ({ id, left: Array(runs).fill(100), right: Array(runs).fill(100 * ratio),
     leftBounds: Array.from({ length: runs }, () => ({ low: 100, high: 100 })),
@@ -35,7 +44,7 @@ function normalMotion(scene: any) {
 }
 
 // Независимые explicit linear vectors, не solver/formatter/expectedValues SUT.
-function engineRaw(scene: any) {
+function engineRaw(scene: any, repetition = 0) {
   const render = ([x, y, scaleX, scaleY, rotate, skewX, skewY]: number[]) =>
     `translate(${x}px, ${y}px) scaleX(${scaleX}) scaleY(${scaleY}) rotate(${rotate}deg) skew(${skewX}deg, ${skewY}deg)`;
   const live = scene.lifecycle === 'live';
@@ -57,10 +66,10 @@ function engineRaw(scene: any) {
   const clockReads = [{ metric: 'operationNs', frame: null }, ...offsets.map((_, frame) => ({ metric: 'frameNs', frame })),
     { metric: 'cancelDrainNs', frame: null }].flatMap(({ metric, frame }, interval) => ['before', 'after'].map((edge, half) => ({
       sequence: interval * 2 + half, metric, frame, edge,
-      valueNs: String(10_000_000 + interval * 2_000_000 + (half ? metric === 'cancelDrainNs' ? 500_000 : 1_000_000 : 0)) })));
+      valueNs: String(10_000_000 + repetition * 100_000_000 + interval * 2_000_000 + (half ? metric === 'cancelDrainNs' ? 500_000 : 1_000_000 : 0)) })));
   return { operationNs: 1_000_000, frameNs: Array(6).fill(1_000_000), cancelDrainNs: 500_000,
     raw: { schemaVersion: 1, case: { count: scene.count, lifecycle: scene.lifecycle, channels: scene.channels }, clockReads,
-      cpuReads: clockReads.map((read) => ({ sequence: read.sequence, userUs: Number(read.valueNs) / 1000, systemUs: 0, valueNs: read.valueNs })),
+      cpuReads: clockReads.map((read) => nativeCpuEndpoint(read)),
       timeline: { clockOriginMs: 1_000_000, setupOffsetsMs: setupOffsets, frameOffsetsMs: offsets, successorBaseMs: base, steps },
       targetTraces: { encoding: 'runs', count: scene.count, runs: [{ from: 0, count: scene.count,
         trace: { value: values.at(-1), setup, setupWrites: setup.map(() => 1), values, writes: values.map(() => 1), outsideWrites: 0, events } }] } },
@@ -69,13 +78,14 @@ function engineRaw(scene: any) {
       targetTraceHashes: { encoding: 'repeat', count: scene.count, value: createHash('sha256').update(JSON.stringify(values)).digest('hex') } } };
 }
 
-function stockRaw(scene: any, multiplier = 1, timed = true) {
+function stockRaw(scene: any, multiplier = 1, timed = true, repetition = 0) {
   const calls = scene.callsPerRepetition * multiplier;
   const clockReads = timed ? ['before', 'after'].map((edge, sequence) => ({ sequence, metric: 'operationNs', frame: null, edge,
-    valueNs: String(10_000_000 + sequence * scene.callsPerRepetition * multiplier * 1_000_000) })) : [];
+    valueNs: String(10_000_000 + repetition * (10_000_000 + scene.callsPerRepetition * multiplier * 1_000_000) +
+      sequence * scene.callsPerRepetition * multiplier * 1_000_000) })) : [];
   return { operationNs: timed ? 1_000_000 * multiplier : null, raw: { schemaVersion: 1, scene: scene.id,
     phase: timed ? 'timed' : 'warmup', calls, completed: calls, denominator: scene.callsPerRepetition,
-    clockReads, cpuReads: clockReads.map((read) => ({ sequence: read.sequence, userUs: Number(read.valueNs) / 1000, systemUs: 0, valueNs: read.valueNs })),
+    clockReads, cpuReads: clockReads.map((read) => nativeCpuEndpoint(read)),
     outcomes: { encoding: 'runs', count: calls, runs: [{ from: 0, count: calls, value: 100, frames: 47 }] } } };
 }
 
@@ -90,11 +100,11 @@ function stage(name = 'aa', runs = 2) {
         let extra: any = {};
         if (kind === 'engine') {
           if ((scene as any).workload === 'stock-c') {
-            raw = Array.from({ length: SERVER_PROFILE.repetitions }, () => stockRaw(scene, multiplier));
+            raw = Array.from({ length: SERVER_PROFILE.repetitions }, (_, repetition) => stockRaw(scene, multiplier, true, repetition));
             extra = { operationNs: 1_000_000 * multiplier, cpuScope: SERVER_PROFILE.stockCpuScope,
               warmup: Array.from({ length: (scene as any).warmupBatches }, () => stockRaw(scene, 1, false)) };
           } else {
-            raw = Array.from({ length: SERVER_PROFILE.repetitions * multiplier }, () => engineRaw(scene));
+            raw = Array.from({ length: SERVER_PROFILE.repetitions * multiplier }, (_, repetition) => engineRaw(scene, repetition));
             extra = { operationNs: 1_000_000 * multiplier, meanFrameNs: 1_000_000 * multiplier, cancelDrainNs: 500_000 * multiplier };
           }
         } else {
@@ -119,7 +129,8 @@ function stage(name = 'aa', runs = 2) {
             endpoints: Array(count).fill(SERVER_PROFILE.toPx), controlCancelMs: 0.5, controlCancelWitness: cancellation(count), warmup: [raw[0]],
             semanticEvidence: normalMotion(scene), monotonicHostUpperNs: '1000000000000', clockModelDigest: serverProfileDigest(SERVER_PROFILE.clockError) };
         }
-        samples[id] = { raw, ...extra, semantic: true, workMultiplier: multiplier, repetitions: SERVER_PROFILE.repetitions, denominator: SERVER_PROFILE.denominator };
+        samples[id] = { raw, ...extra, semantic: true, workMultiplier: multiplier, repetitions: SERVER_PROFILE.repetitions, denominator: SERVER_PROFILE.denominator,
+          ...(kind === 'engine' ? { cpuClock: { ...syntheticCpuIdentity } } : {}) };
       }
       rows.push({ kind, scene: scene.id, run, order: serverOrders(runs)[run], samples });
     }
@@ -148,6 +159,12 @@ function registeredRefusal() {
     clockModelDigest: serverProfileDigest(SERVER_PROFILE.clockError), browserTree: { sha256: hash, files: 1 },
     provenance: { baseline: provenance, candidate: { ...provenance, revision: 'b'.repeat(40) } },
     machine: { identity: machineIdentity, sha256: serverProfileDigest(machineIdentity) },
+    engineClock: { schema: 1, ...syntheticCpuIdentity, napiVersion: 8,
+      node: { version: SERVER_PROFILE.clockError.nodeVersion, executableSha256: SERVER_PROFILE.clockError.nodeExecutableSha256 },
+      nativeBinary: { path: '/synthetic/thread-cpu.node', bytes: 1, sha256: hash }, nativeSources: clone(SERVER_PROFILE.clockError.nativeSourceFiles),
+      nativeSourceDigest: serverProfileDigest(Object.fromEntries(Object.entries(SERVER_PROFILE.clockError.nativeSourceFiles).sort(([a], [b]) => a < b ? -1 : a > b ? 1 : 0))),
+      compiler: { path: '/synthetic/cc', version: 'synthetic compiler', binarySha256: hash, flags: ['-shared', '-fPIC', '-DNAPI_VERSION=8'] },
+      libc: { path: '/synthetic/libc.so', sha256: hash }, nominalResolutionNs: '1', nominalResolutionIsNotErrorCertificate: true },
     harness: Object.fromEntries(Array.from({ length: 6 }, (_, i) => [String(i), { sha256: hash }])),
     packages: Object.fromEntries(['baseline', 'candidate', ...SERVER_PROFILE.comparators.filter((x) => x !== 'waapi-ctl')].map((name) => [name, clone(consumer)])),
     transitivePackages: { one: consumer, two: consumer, three: consumer } };
@@ -337,7 +354,7 @@ describe('серверный PROFILE: clock/progress falsifiers', () => {
     expect(saved.runs.map((run: any) => run.from)).toEqual([0, 2, 3, 4, 5, 6]);
   });
   it.each(['mixed-frames', 'mixed-endpoints', 'missing-operation', 'wrong-divisor', 'missing-warmup', 'missing-cpu-read',
-    'coherent-off-grid-cpu', 'aggregate-only-drift'])('stock C raw отвергает %s с правильными aggregates', (fault) => {
+    'coherent-timespec-mismatch', 'aggregate-only-drift'])('stock C raw отвергает %s с правильными aggregates', (fault) => {
     const scene = SERVER_PROFILE.engineScenes.find((scene) => scene.workload === 'stock-c')!;
     const sample = stage().rows.find((row) => row.scene === scene.id)!.samples.left;
     validateServerEngineSample(sample, scene);
@@ -348,7 +365,7 @@ describe('серверный PROFILE: clock/progress falsifiers', () => {
     if (fault === 'wrong-divisor') raw.raw.denominator = 4000;
     if (fault === 'missing-warmup') sample.warmup.pop();
     if (fault === 'missing-cpu-read') raw.raw.cpuReads.pop();
-    if (fault === 'coherent-off-grid-cpu') {
+    if (fault === 'coherent-timespec-mismatch') {
       raw.raw.clockReads[1].valueNs = String(BigInt(raw.raw.clockReads[1].valueNs) + 1n);
       raw.raw.cpuReads[1].valueNs = raw.raw.clockReads[1].valueNs;
       raw.operationNs += 1 / 2000;
@@ -359,8 +376,9 @@ describe('серверный PROFILE: clock/progress falsifiers', () => {
   });
   it('stock C producer делает2warmups, actual2×work и сохраняет поздний prefix без выдуманного CPU endpoint', async () => {
     const scene = SERVER_PROFILE.engineScenes.find((scene) => scene.workload === 'stock-c')!;
-    let constructors = 0, destroys = 0, failAt = Infinity, userUs = 0;
-    const cpu = vi.spyOn(process, 'threadCpuUsage').mockImplementation(() => ({ user: userUs += 2_000_000, system: 0 }));
+    let constructors = 0, destroys = 0, failAt = Infinity, cpuNs = 0n;
+    const cpu = vi.spyOn(threadCpuClock, 'readServerThreadCpuEndpoint').mockImplementation(() =>
+      syntheticNativeEndpoint(cpuNs += 2_000_000_000n, { clock: 'CLOCK_THREAD_CPUTIME_ID', pid: process.pid, tid: process.pid }));
     class ObservedMotionValue {
       private readonly options: any;
       private changed: (value: number) => unknown = () => {};
@@ -425,8 +443,9 @@ describe('серверный PROFILE: clock/progress falsifiers', () => {
   });
   it('настоящий engine owner сохраняет controlled CPU endpoints на успехе и позднем отказе', async () => {
     const { animate } = await import('../src/animate/index.js');
-    let userUs = 0;
-    const cpu = vi.spyOn(process, 'threadCpuUsage').mockImplementation(() => ({ user: userUs += 1000, system: 0 }));
+    let cpuNs = 0n;
+    const cpu = vi.spyOn(threadCpuClock, 'readServerThreadCpuEndpoint').mockImplementation(() =>
+      syntheticNativeEndpoint(cpuNs += 1_000_000n, { clock: 'CLOCK_THREAD_CPUTIME_ID', pid: process.pid, tid: process.pid }));
     const scene = SERVER_PROFILE.engineScenes[1];
     try {
       const success = await measureServerEngine(animate, scene);
@@ -435,7 +454,7 @@ describe('серверный PROFILE: clock/progress falsifiers', () => {
         expect(measured.raw.clockReads).toHaveLength(16); expect(measured.raw.cpuReads).toHaveLength(16);
         measured.raw.clockReads.forEach((read: any, sequence: number) => {
           expect(measured.raw.cpuReads[sequence].valueNs).toBe(read.valueNs);
-          expect(String((BigInt(measured.raw.cpuReads[sequence].userUs) + BigInt(measured.raw.cpuReads[sequence].systemUs)) * 1000n)).toBe(read.valueNs);
+          expect(String(BigInt(measured.raw.cpuReads[sequence].seconds) * 1_000_000_000n + BigInt(measured.raw.cpuReads[sequence].nanoseconds))).toBe(read.valueNs);
         });
       }
       validateServerEngineSample(success, scene);
@@ -458,7 +477,7 @@ describe('серверный PROFILE: clock/progress falsifiers', () => {
       expect(cpu).toHaveBeenCalledTimes(15);
     } finally { cpu.mockRestore(); }
   });
-  it.each(['missing-read', 'read-order', 'impossible-ns', 'coherent-impossible-ns', 'missing-cpu-field', 'backward-cpu-component',
+  it.each(['missing-read', 'read-order', 'impossible-ns', 'coherent-impossible-ns', 'missing-cpu-field', 'backward-native-counter',
     'last-target-coordinate', 'missing-target-identity', 'hash-only-drift'])('engine raw lineage отвергает %s при semantic:true', (fault) => {
     const scene = SERVER_PROFILE.engineScenes[1];
     const sample: any = stage().rows.find((row) => row.scene === scene.id)!.samples.left;
@@ -474,10 +493,12 @@ describe('серверный PROFILE: clock/progress falsifiers', () => {
       }
       sample.operationNs = sample.raw.reduce((sum: number, raw: any) => sum + raw.operationNs, 0) / sample.repetitions;
     }
-    if (fault === 'missing-cpu-field') delete lineage.cpuReads[1].userUs;
-    if (fault === 'backward-cpu-component') {
-      lineage.cpuReads[1].userUs = lineage.cpuReads[0].userUs - 1;
-      lineage.cpuReads[1].systemUs = Number(lineage.cpuReads[1].valueNs) / 1000 - lineage.cpuReads[1].userUs;
+    if (fault === 'missing-cpu-field') delete lineage.cpuReads[1].seconds;
+    if (fault === 'backward-native-counter') {
+      lineage.clockReads[2].valueNs = String(BigInt(lineage.clockReads[1].valueNs) - 1n);
+      lineage.cpuReads[2] = nativeCpuEndpoint(lineage.clockReads[2]);
+      measured.frameNs[0] = Number(BigInt(lineage.clockReads[3].valueNs) - BigInt(lineage.clockReads[2].valueNs));
+      sample.meanFrameNs = sample.raw.reduce((sum: number, raw: any) => sum + raw.frameNs.reduce((a: number, b: number) => a + b, 0) / raw.frameNs.length, 0) / sample.repetitions;
     }
     if (fault === 'last-target-coordinate') {
       const first = lineage.targetTraces.runs[0], last = clone(first.trace);
@@ -1118,4 +1139,111 @@ describe('PROFILE: ресурсный контракт проверяется д
       expect(Number.isSafeInteger(failure.raw.resource.cpuStat[key]) && failure.raw.resource.cpuStat[key] >= 0).toBe(false);
       expect(fixture.hashBinary).not.toHaveBeenCalled();
     });
+});
+
+describe('серверный PROFILE: native scheduled CPU endpoints', () => {
+  const scene = SERVER_PROFILE.engineScenes[1];
+  const nativeSample = () => {
+    const sample: any = stage().rows.find((row) => row.scene === scene.id)!.samples.left;
+    sample.cpuClock = { ...syntheticCpuIdentity };
+    for (const measured of sample.raw) measured.raw.cpuReads = measured.raw.clockReads.map((read: any) => nativeCpuEndpoint(read));
+    return sample;
+  };
+  it('принимает полные native timespec и main-thread IDs без user/system fields', () => {
+    const sample = nativeSample();
+    expect(() => validateServerEngineSample(sample, scene)).not.toThrow();
+  });
+  it('старые Node user/system counters не становятся native clock после переименования', () => {
+    const sample = nativeSample();
+    for (const measured of sample.raw) measured.raw.cpuReads = measured.raw.clockReads.map((read: any) => ({
+      sequence: read.sequence, ...syntheticCpuIdentity, userUs: Number(read.valueNs) / 1000, systemUs: 0, valueNs: read.valueNs }));
+    expect(() => validateServerEngineSample(sample, scene)).toThrow(/CPU|native|timespec/);
+  });
+  it.each(['missing-sample-identity', 'wrong-clock', 'wrong-endpoint-clock', 'missing-seconds', 'negative-seconds', 'noncanonical-seconds', 'overflow-seconds',
+    'fractional-nanoseconds', 'negative-nanoseconds', 'negative-zero-nanoseconds', 'overflow-nanoseconds', 'missing-native-read', 'value-mismatch',
+    'clock-read-mismatch', 'wrong-sequence', 'wrong-pid', 'wrong-tid', 'worker-thread', 'later-repetition-identity', 'later-repetition-backwards'])
+  ('отвергает %s при coherent semantic:true', (fault) => {
+    const sample = nativeSample(), lineage = sample.raw[0].raw, read = lineage.cpuReads[1];
+    expect(() => validateServerEngineSample(sample, scene)).not.toThrow();
+    if (fault === 'missing-sample-identity') delete sample.cpuClock;
+    if (fault === 'wrong-clock') sample.cpuClock.clock = 'process.threadCpuUsage';
+    if (fault === 'wrong-endpoint-clock') read.clock = 'CLOCK_PROCESS_CPUTIME_ID';
+    if (fault === 'missing-seconds') delete read.seconds;
+    if (fault === 'negative-seconds') read.seconds = '-1';
+    if (fault === 'noncanonical-seconds') read.seconds = '00';
+    if (fault === 'overflow-seconds') read.seconds = '9223372036854775808';
+    if (fault === 'fractional-nanoseconds') read.nanoseconds += 0.5;
+    if (fault === 'negative-nanoseconds') read.nanoseconds = -1;
+    if (fault === 'negative-zero-nanoseconds') read.nanoseconds = -0;
+    if (fault === 'overflow-nanoseconds') read.nanoseconds = 1_000_000_000;
+    if (fault === 'missing-native-read') lineage.cpuReads.pop();
+    if (fault === 'value-mismatch') read.valueNs = String(BigInt(read.valueNs) + 1n);
+    if (fault === 'clock-read-mismatch') lineage.clockReads[1].valueNs = String(BigInt(read.valueNs) + 1n);
+    if (fault === 'wrong-sequence') read.sequence = 0;
+    if (fault === 'wrong-pid') read.pid++;
+    if (fault === 'wrong-tid') read.tid++;
+    if (fault === 'worker-thread') {
+      sample.cpuClock.tid++;
+      for (const measured of sample.raw) for (const value of measured.raw.cpuReads) value.tid = sample.cpuClock.tid;
+    }
+    if (fault === 'later-repetition-identity') for (const value of sample.raw[1].raw.cpuReads) { value.pid++; value.tid++; }
+    if (fault === 'later-repetition-backwards') {
+      const later = sample.raw[1].raw;
+      for (const value of later.clockReads) value.valueNs = String(BigInt(value.valueNs) - 100_000_000n);
+      later.cpuReads = later.clockReads.map((value: any) => nativeCpuEndpoint(value));
+    }
+    expect(() => validateServerEngineSample(sample, scene)).toThrow(/CPU|native|timespec|lineage/);
+  });
+  it('exact seconds выше2^53 не проходят через Number', () => {
+    const sample = nativeSample(), shift = 9_007_199_254_740_993n * 1_000_000_000n;
+    for (const measured of sample.raw) {
+      for (const value of measured.raw.clockReads) value.valueNs = String(BigInt(value.valueNs) + shift);
+      measured.raw.cpuReads = measured.raw.clockReads.map((value: any) => nativeCpuEndpoint(value));
+    }
+    expect(sample.raw[0].raw.cpuReads[0].seconds).toBe('9007199254740993');
+    expect(() => validateServerEngineSample(sample, scene)).not.toThrow();
+  });
+  it('native1ns timespec изменение сохраняется и не требует старой user/system grid', () => {
+    const sample = nativeSample(), measured = sample.raw[0];
+    measured.raw.clockReads[1].valueNs = '11000001';
+    measured.raw.cpuReads[1] = nativeCpuEndpoint(measured.raw.clockReads[1]);
+    measured.operationNs = 1_000_001;
+    sample.operationNs = 1_000_000.125;
+    expect(() => validateServerEngineSample(sample, scene)).not.toThrow();
+    expect(SERVER_PROFILE.clockError.engineCounterOutwardPaddingNs).toBe(2000);
+  });
+  it('same-object mutation main-thread metadata проверяется заново', () => {
+    const current = stage();
+    const cell = serverCellPairs(current, 2, 'aa', syntheticCpuIdentity).find((cell) => cell.scene === scene.id)!;
+    expect(cell.left[0]).toBe(1_000_000);
+    const sample = current.rows.find((row) => row.scene === scene.id)!.samples.left;
+    sample.cpuClock.pid++; sample.cpuClock.tid++;
+    for (const measured of sample.raw) for (const value of measured.raw.cpuReads) { value.pid++; value.tid++; }
+    expect(() => serverCellPairs(current, 2, 'aa', syntheticCpuIdentity)).toThrow(/зарегистрированным main-thread/);
+  });
+  it.each(['missing-clock', 'wrong-clock', 'worker-thread', 'node', 'napi', 'source', 'header', 'source-digest',
+    'native-binary', 'compiler', 'compiler-flags', 'libc', 'missing-nominal', 'physical-certificate'])
+  ('native registration отвергает %s до samples', (fault) => {
+    const registration: any = registeredRefusal().registration;
+    expect(() => verifyServerClockRegistration(registration)).not.toThrow();
+    const clock = registration.engineClock;
+    if (fault === 'missing-clock') delete registration.engineClock;
+    if (fault === 'wrong-clock') clock.clock = 'process.threadCpuUsage';
+    if (fault === 'worker-thread') clock.tid++;
+    if (fault === 'node') clock.node.executableSha256 = hash;
+    if (fault === 'napi') clock.napiVersion = 9;
+    if (fault === 'source' || fault === 'header') {
+      const key = fault === 'source' ? 'bench/profile/server-thread-cpu-clock.c' : 'bench/profile/native-clock/include/node_api.h';
+      clock.nativeSources[key] = hash;
+      clock.nativeSourceDigest = serverProfileDigest(Object.fromEntries(Object.entries(clock.nativeSources).sort(([a], [b]) => a < b ? -1 : a > b ? 1 : 0)));
+    }
+    if (fault === 'source-digest') clock.nativeSourceDigest = hash;
+    if (fault === 'native-binary') delete clock.nativeBinary.sha256;
+    if (fault === 'compiler') delete clock.compiler.binarySha256;
+    if (fault === 'compiler-flags') clock.compiler.flags = [];
+    if (fault === 'libc') delete clock.libc.sha256;
+    if (fault === 'missing-nominal') delete clock.nominalResolutionNs;
+    if (fault === 'physical-certificate') clock.nominalResolutionIsNotErrorCertificate = false;
+    expect(() => verifyServerClockRegistration(registration)).toThrow(/CPU|native/);
+  });
 });

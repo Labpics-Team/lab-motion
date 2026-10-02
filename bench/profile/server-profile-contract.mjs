@@ -156,6 +156,27 @@ export function verifyServerClockRegistration(registration) {
     'Node binary/platform не сертифицированы clock model');
   for (const provenance of Object.values(registration.provenance ?? {})) invariant(provenance.environment?.node === model.nodeVersion &&
     provenance.environment.nodeExecutableSha256 === model.nodeExecutableSha256, 'source toolchain не совпадает с clock model');
+  const clock = registration.engineClock;
+  verifyThreadCpuIdentity(clock);
+  invariant(clock.schema === 1 && clock.napiVersion === 8 && clock.node?.version === model.nodeVersion &&
+    clock.node.executableSha256 === model.nodeExecutableSha256, 'native CPU clock не соответствует Node/NAPI');
+  invariant(isDeepStrictEqual(clock.nativeSources, model.nativeSourceFiles) &&
+    clock.nativeSourceDigest === serverProfileDigest(Object.fromEntries(Object.entries(clock.nativeSources).sort(([a], [b]) => a < b ? -1 : a > b ? 1 : 0))),
+  'native CPU clock source/header qualification не совпадает с регистрацией');
+  invariant(typeof clock.nativeBinary?.path === 'string' && clock.nativeBinary.path.length > 0 &&
+    Number.isSafeInteger(clock.nativeBinary.bytes) && clock.nativeBinary.bytes > 0 && SHA256.test(clock.nativeBinary.sha256),
+  'неполное native CPU binary qualification');
+  invariant(typeof clock.compiler?.path === 'string' && clock.compiler.path.length > 0 &&
+    typeof clock.compiler.version === 'string' && clock.compiler.version.length > 0 && SHA256.test(clock.compiler.binarySha256) &&
+    Array.isArray(clock.compiler.flags) && clock.compiler.flags.length > 0 && clock.compiler.flags.every((flag) => typeof flag === 'string' && flag.length > 0) &&
+    typeof clock.libc?.path === 'string' && clock.libc.path.length > 0 && SHA256.test(clock.libc.sha256), 'неполное native CPU compiler/libc qualification');
+  invariant(typeof clock.nominalResolutionNs === 'string' && /^[1-9]\d*$/.test(clock.nominalResolutionNs) &&
+    clock.nominalResolutionIsNotErrorCertificate === true, 'nominal CPU resolution ошибочно выдана за error certificate');
+}
+
+function verifyThreadCpuIdentity(identity) {
+  invariant(identity?.clock === SERVER_PROFILE.clockError.engineClock && Number.isSafeInteger(identity.pid) && identity.pid > 0 &&
+    Number.isSafeInteger(identity.tid) && identity.tid === identity.pid, 'невалидная native CPU clock main-thread identity');
 }
 
 export function serverOrders(runs, seed = SERVER_PROFILE.seed) {
@@ -173,8 +194,9 @@ export function serverMetricCells() {
 
 // Кадры/повторы остаются в raw. Admission использует один нормированный batch
 // на run; независимая порядковая статистика использует среднее двух runs блока.
-export function serverCellPairs(stage, runs, expectedStage) {
+export function serverCellPairs(stage, runs, expectedStage, registeredClock) {
   invariant(['warmup', 'pilot', 'aa', 'positive', 'ab'].includes(expectedStage) && stage?.name === expectedStage, 'имя стадии не соответствует владельцу artifact');
+  if (registeredClock !== undefined) verifyThreadCpuIdentity(registeredClock);
   invariant(stage?.rows?.length === runs * (SERVER_PROFILE.engineScenes.length + SERVER_PROFILE.browserScenes.length), 'неполная серия измерений');
   const expectedOrders = serverOrders(runs);
   const seen = new Set();
@@ -193,13 +215,13 @@ export function serverCellPairs(stage, runs, expectedStage) {
     invariant(rows.length === runs, 'потеряна сцена');
     invariant(rows.every((row) => row.kind === cell.kind), 'подменён вид сцены');
     const read = Object.fromEntries(IDS.map((id) => [id, rows.map((row) => readServerSample(row.samples[id], cell,
-      expectedStage === 'positive' && id === 'right' ? 2 : 1, validationCache, validateTransform))]));
+      expectedStage === 'positive' && id === 'right' ? 2 : 1, validationCache, validateTransform, registeredClock))]));
     return { ...cell, left: read.left.map((row) => row.value), right: read.right.map((row) => row.value),
       leftBounds: read.left.map((row) => row.bounds), rightBounds: read.right.map((row) => row.bounds) };
   });
 }
 
-function readServerSample(sample, cell, workMultiplier, validationCache = new WeakMap(), validateTransform = validateTransformLifecycleSample) {
+function readServerSample(sample, cell, workMultiplier, validationCache = new WeakMap(), validateTransform = validateTransformLifecycleSample, registeredClock) {
       const stockScene = cell.kind === 'engine' && SERVER_PROFILE.engineScenes.find((scene) => scene.id === cell.scene && scene.workload === 'stock-c');
       invariant(sample?.semantic === true && positive(sample[cell.metric]), `${cell.id}: неверный sample или semantics`);
       invariant(sample.workMultiplier === workMultiplier, 'подменён знаменатель положительного контроля');
@@ -208,7 +230,11 @@ function readServerSample(sample, cell, workMultiplier, validationCache = new We
       const validationKey = `${cell.kind}:${cell.scene}:${workMultiplier}`;
       if (!validationCache.get(sample)?.has(validationKey)) {
       if (cell.kind === 'engine') {
+        verifyThreadCpuIdentity(sample.cpuClock);
+        if (registeredClock) invariant(sample.cpuClock.clock === registeredClock.clock && sample.cpuClock.pid === registeredClock.pid &&
+          sample.cpuClock.tid === registeredClock.tid, 'native CPU sample не связан с зарегистрированным main-thread');
         const scene = SERVER_PROFILE.engineScenes.find((scene) => scene.id === cell.scene);
+        let previousCpuNs = -1n;
         if (stockScene) {
           invariant(sample.cpuScope === SERVER_PROFILE.stockCpuScope && Array.isArray(sample.warmup) && sample.warmup.length === scene.warmupBatches,
             'stock C потерял canonical warmup или CPU scope');
@@ -217,14 +243,14 @@ function readServerSample(sample, cell, workMultiplier, validationCache = new We
         for (const raw of sample.raw) {
           if (stockScene) {
             validateStockMotionValueBatch(raw, scene, workMultiplier);
-            validateThreadCpuFields(raw.raw.cpuReads, raw.raw.clockReads);
+            previousCpuNs = validateThreadCpuFields(raw.raw.cpuReads, raw.raw.clockReads, sample.cpuClock, previousCpuNs);
             continue;
           }
           invariant(Array.isArray(raw.frameNs) && raw.frameNs.length === TRANSFORM_PAIR_PROFILE.frameOffsetsMs.length &&
             raw.frameNs.every((x) => Number.isSafeInteger(x) && x >= 0) && Number.isSafeInteger(raw.operationNs) && raw.operationNs >= 0 &&
             Number.isSafeInteger(raw.cancelDrainNs) && raw.cancelDrainNs >= 0, 'потеряны frame samples или safe CPU counter');
           validateTransform(raw, scene);
-          validateThreadCpuFields(raw.raw.cpuReads, raw.raw.clockReads);
+          previousCpuNs = validateThreadCpuFields(raw.raw.cpuReads, raw.raw.clockReads, sample.cpuClock, previousCpuNs);
           const semantic = raw.semantic;
           invariant(semantic?.valid === true && semantic.targets === scene.count && semantic.frames === raw.frameNs.length &&
             semantic.finished === true && semantic.pending === 0 && semantic.onCompleteCalls === 0 &&
@@ -262,28 +288,31 @@ function readServerSample(sample, cell, workMultiplier, validationCache = new We
       const pointwise = sample.raw.map((raw) => {
         if (stockScene) {
           const durationNs = Number(BigInt(raw.raw.clockReads[1].valueNs) - BigInt(raw.raw.clockReads[0].valueNs));
-          return meanBounds([errorBounds(durationNs, SERVER_PROFILE.clockError.engineIntervalUncertaintyNs)], stockScene.callsPerRepetition);
+          return meanBounds([errorBounds(durationNs, SERVER_PROFILE.clockError.engineCounterOutwardPaddingNs)], stockScene.callsPerRepetition);
         }
         if (cell.kind === 'engine') return cell.metric === 'meanFrameNs'
-          ? meanBounds(raw.frameNs.map((value) => errorBounds(value, SERVER_PROFILE.clockError.engineIntervalUncertaintyNs)), raw.frameNs.length)
-          : errorBounds(raw[cell.metric], SERVER_PROFILE.clockError.engineIntervalUncertaintyNs);
+          ? meanBounds(raw.frameNs.map((value) => errorBounds(value, SERVER_PROFILE.clockError.engineCounterOutwardPaddingNs)), raw.frameNs.length)
+          : errorBounds(raw[cell.metric], SERVER_PROFILE.clockError.engineCounterOutwardPaddingNs);
         const interval = serverBrowserClockBounds(cell.metric === 'startMs' ? raw.startClock : raw.cancelClock, sample.monotonicHostUpperNs);
         return meanBounds([interval], SERVER_PROFILE.browserBatchCalls);
       });
       return { value: sample[cell.metric], bounds: meanBounds(pointwise, sample.repetitions) };
 }
 
-function validateThreadCpuFields(cpuReads, clockReads) {
+function validateThreadCpuFields(cpuReads, clockReads, identity, previous = -1n) {
   invariant(Array.isArray(cpuReads) && cpuReads.length === clockReads.length, 'потеряны actual thread CPU fields');
   for (let sequence = 0; sequence < cpuReads.length; sequence++) {
     const read = cpuReads[sequence];
-    invariant(read?.sequence === sequence && Number.isSafeInteger(read.userUs) && read.userUs >= 0 &&
-      Number.isSafeInteger(read.systemUs) && read.systemUs >= 0, 'невалидные user/system CPU fields');
-    const valueNs = String((BigInt(read.userUs) + BigInt(read.systemUs)) * 1000n);
-    invariant(read.valueNs === valueNs && clockReads[sequence].valueNs === valueNs, 'CPU endpoint не пересчитывается из user/system');
-    if (sequence > 0) invariant(read.userUs >= cpuReads[sequence - 1].userUs && read.systemUs >= cpuReads[sequence - 1].systemUs,
-      'user/system CPU fields идут назад');
+    invariant(read?.sequence === sequence && read.clock === identity.clock && read.pid === identity.pid && read.tid === identity.tid &&
+      typeof read.seconds === 'string' && /^(0|[1-9]\d*)$/.test(read.seconds) && read.seconds.length <= 19 &&
+      BigInt(read.seconds) <= 9_223_372_036_854_775_807n && Number.isSafeInteger(read.nanoseconds) && read.nanoseconds >= 0 && !Object.is(read.nanoseconds, -0) &&
+      read.nanoseconds < 1_000_000_000, 'невалидные native CPU timespec/identity/sequence fields');
+    const valueNs = BigInt(read.seconds) * 1_000_000_000n + BigInt(read.nanoseconds);
+    invariant(read.valueNs === String(valueNs) && clockReads[sequence].valueNs === read.valueNs, 'native CPU endpoint не пересчитывается из timespec');
+    invariant(valueNs >= previous, 'native CPU endpoints идут назад');
+    previous = valueNs;
   }
+  return previous;
 }
 
 export function validateServerBrowserSample(sample, scene, workMultiplier = 1) {
@@ -533,6 +562,15 @@ export function validateServerArtifact(artifact) {
   invariant(SHA256.test(artifact.registration.browserTree?.sha256) && Number.isSafeInteger(artifact.registration.browserTree?.files) &&
     artifact.registration.browserTree.files > 0, 'потерян browser tree hash');
   verifyServerClockRegistration(artifact.registration);
+  // Привязка identity охватывает также завершённый префикс отказавшей стадии.
+  for (const name of ['warmup', 'pilot', 'aa', 'positive', 'ab']) for (const row of artifact[name]?.rows ?? []) {
+    if (row.kind !== 'engine') continue;
+    for (const sample of Object.values(row.samples ?? {})) {
+      verifyThreadCpuIdentity(sample.cpuClock);
+      invariant(sample.cpuClock.clock === artifact.registration.engineClock.clock && sample.cpuClock.pid === artifact.registration.engineClock.pid &&
+        sample.cpuClock.tid === artifact.registration.engineClock.tid, 'native CPU stage sample не связан с зарегистрированным main-thread');
+    }
+  }
   invariant(Object.keys(artifact.registration.harness ?? {}).length >= 6 && Object.values(artifact.registration.harness).every((x) => SHA256.test(x.sha256)), 'неполное harness provenance');
   for (const id of SERVER_PROFILE.comparators.filter((id) => !id.startsWith('waapi'))) invariant(SHA256.test(artifact.registration.packages[id]?.treeSha256) &&
     SHA256.test(artifact.registration.packages[id]?.tarballSha256), 'потерян comparator package');
@@ -554,11 +592,11 @@ export function validateServerArtifact(artifact) {
       Math.abs(control.reduced.x - SERVER_PROFILE.toPx) <= 2 && control.reduced.rafRequests === 0 && control.reduced.activeWaapi === 0,
     'потерян raw no-motion/reduced-motion control');
   }
-  const pilotPairs = serverCellPairs(artifact.pilot, SERVER_PROFILE.pilotRuns, 'pilot');
+  const pilotPairs = serverCellPairs(artifact.pilot, SERVER_PROFILE.pilotRuns, 'pilot', artifact.registration.engineClock);
   invariant(isDeepStrictEqual(artifact.samplePlan, planServerSampleSize(pilotPairs)), 'N не воспроизводится из baseline-only pilot');
   invariant(artifact.frozenPlanDigest === serverProfileDigest({ registrationDigest: artifact.registrationDigest, samplePlan: artifact.samplePlan }), 'не закреплён N до A/A и A/B');
-  const aa = serverFamilyIntervals(serverCellPairs(artifact.aa, artifact.samplePlan.runs, 'aa'));
-  const positiveControl = serverFamilyIntervals(serverCellPairs(artifact.positive, artifact.samplePlan.runs, 'positive'));
+  const aa = serverFamilyIntervals(serverCellPairs(artifact.aa, artifact.samplePlan.runs, 'aa', artifact.registration.engineClock));
+  const positiveControl = serverFamilyIntervals(serverCellPairs(artifact.positive, artifact.samplePlan.runs, 'positive', artifact.registration.engineClock));
   const calibration = serverCalibrationVerdict(aa, positiveControl, artifact.samplePlan);
   calibration.reasons.push(...serverResourceReasons([artifact.warmup, artifact.pilot, artifact.aa, artifact.positive], artifact.registration.machine.identity));
   calibration.verdict = calibration.reasons.length ? 'UNPROVEN' : 'PASS';
@@ -577,7 +615,7 @@ export function validateServerArtifact(artifact) {
     invariant(artifact.verdict === 'UNPROVEN', 'частичный A/B объявлен успехом');
     return { verification: 'partial-samples-refused', verdict: 'UNPROVEN' };
   }
-  const ab = serverFamilyIntervals(serverCellPairs(artifact.ab, artifact.samplePlan.runs, 'ab'));
+  const ab = serverFamilyIntervals(serverCellPairs(artifact.ab, artifact.samplePlan.runs, 'ab', artifact.registration.engineClock));
   const resourceReasons = serverResourceReasons([artifact.ab], artifact.registration.machine.identity);
   invariant(resourceReasons.length === 0 || (artifact.verdict === 'UNPROVEN' && artifact.failures.length > 0), 'условия A/B нарушены, отказ потерян');
   if (artifact.failures.length > 0) {

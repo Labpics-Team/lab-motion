@@ -1,19 +1,19 @@
 # Серверная клетка PROFILE-01
 
-Профиль даёт воспроизводимое измерение CPU потока Node и публичного API браузера
-на закреплённом Linux-сервере. Он дополняет существующий `bench/compare`, использует
-его production-адаптеры, изолированный origin, provenance и парные порядки.
-Физические Android/iOS, энергия, GPU и экран 60/120 Гц остаются `UNPROVEN`.
+Роль: справка (Diátaxis).
 
-## Запуск
+Профиль измеряет сообщённое Linux время исполнения потока Node и стоимость
+публичного API браузера. Он использует существующие владельцы `bench/compare`.
+Физические Android/iOS, экран60/120Гц, GPU и энергия остаются `UNPROVEN`.
 
-Нужны закреплённые Node 24.19.0, Linux 6.18.44, Chromium 149.0.7827.55 и
-фактический `pnpm@11.11.0` в `PATH`, зависимости root и `bench/compare` из
-frozen lock. SHA256 executable входят в зарегистрированную clock model.
-Иная версия или binary дают отказ до samples. Clock model Firefox/WebKit здесь
-`UNPROVEN`; функциональные проверки этих движков независимы. Baseline — clean checkout
-`0b6f537e148b7dadadfb9e3ce7c446d014975958`; candidate также должен быть clean.
-Хост на время pilot, A/A, positive и A/B освобождается от параллельных suites.
+## Подготовка и запуск
+
+Нужны Linux6.18.44/x64, Node24.19.0, Chromium149.0.7827.55 и `pnpm@11.11.0`
+первым в `PATH`, зависимости root и `bench/compare` из frozen lock, C11 compiler
+и Linux libc. Binary и source hashes проверяются до samples. Firefox/WebKit
+здесь не имеют зарегистрированной clock model; их функциональные проверки отдельны.
+Baseline — clean `0b6f537e148b7dadadfb9e3ce7c446d014975958`, candidate также clean.
+Во время pilot, A/A, positive и A/B на хосте не запускают параллельные suites.
 
 ```sh
 taskset -c 0 node bench/profile/server-profile-runner.mjs \
@@ -21,241 +21,96 @@ taskset -c 0 node bench/profile/server-profile-runner.mjs \
   --browser chromium --out /outside/checkout/server-chromium-registration-1
 ```
 
-Каталог результата должен отсутствовать. Заново использовать его нельзя.
-Смена условий или метода требует новой регистрации с сохранением старого отказа;
-повтор той же серии ради зелёного результата запрещён.
+Каталог результата должен отсутствовать. Повтор серии ради GREEN запрещён.
+Смена метода требует новой регистрации с сохранением старого raw и отказа.
+Пакеты baseline/candidate, comparators и их dependency closure сначала упаковываются;
+потребители используют actual tarballs, а не исходники или workspace imports.
 
-Пакеты baseline, candidate и vendor dependency closure сначала упаковываются с
-отключёнными publish scripts. Адаптеры и engine импортируют извлечённые consumer
-архивы. В регистрацию до samples входят exact source SHA, package/lock inputs,
-runtime, harness/adapter hashes, весь browser tree, toolchain, CPU affinity,
-ядро ОС, лимиты cgroup, viewport/DPR и все знаменатели. Регистрируются три engine
-сцены: 100 scalar live retarget, 1000 targets × 7 transform channels fresh и одна
-whole-stock-C `MotionValue` cell через существующий `scripts/bench-support.mjs`.
-Первые две используют `animate`, stock C импортирует `MotionValue` из actual packed
-main entry. Одна stock C операция содержит constructor0, default bounded spring
-{mass:1, stiffness:170, damping:26}, onChange, setTarget100, прежний synchronous
-drain47, destroy и return100. Factory и две исходные warmup batches по2000 операций
-находятся вне CPU. Затем восемь зарегистрированных reps содержат2000 actual calls
-каждая; positive содержит4000, но divisor остаётся2000. Сохраняются последние
-значения и frame counts каждой операции; mean47 или checksum100 не являются oracle.
-Preallocated stores и `getFrameCount` внутри CPU одинаковы обеим ролям; RLE и
-проверка outcomes идут после CPU. Это whole macro с минимальным recorder overhead,
-без per-frame p99 или100-channel заявления. Две legacy engine сцены не упрощаются.
+## Сцены и знаменатели
 
-Новая stock C регистрация возникла после exploratory штатного wall benchmark:
-1 октября 14:53/14:54 UTC опубликованные baseline median7.2k ns и candidate8.3k ns уже известны.
-Это причина включить ранее непокрытый default bounded hot loop, не registered CPU
-приёмка. Оба исходных stdout/command/execution сохранены, а SHA stdout и helper
-semantic receipt закреплены в `exploratoryPrehistory`. `candidateSamplesObserved:false`
-относится только к моменту регистрации текущего CPU/API protocol epoch; оно не
-утверждает, что candidate раньше вообще не наблюдался. Новые N и CI выводятся до
-candidate CPU data из baseline-only pilot; порог1.05, MDE5% и power0.8 неизменны.
-Browser S2/S3 измеряют start/cancel общего transform API; они не доказывают
-семантику reorder/list или две продуктовые семьи M-05. Длительность этого нового
-узкого API-профиля — 128 мс, 100/200 targets, stagger 0/5 мс. Его числа не
-подменяют прежние canonical 1200 мс или их guards; стоимость генерации артефакта
-может зависеть от duration. Все участники получают одинаковые параметры.
+Семейство содержит11 клеток: две legacy engine сцены ×3 метрики, stock C ×1,
+две browser сцены ×2. Полные параметры задаёт `SERVER_PROFILE` в
+[server-profile-registration.mjs](../bench/profile/server-profile-registration.mjs).
 
-Перед timing существующий `runSemanticStartCheck` снимает три промежуточных CSS
-матрицы одного нормального вызова с теми же targets/duration/stagger/to и
-проверяет всю топологию через общий oracle. Серверная registration дополнительно
-требует fresh0→300: перед каждым API start наблюдаются CSS координаты всех
-fresh targets, сразу после возврата — те же targets; обе границы каждого окна
-и acquired prefixes сохраняются даже при отказе. До API все позиции должны
-соответствовать0 в прежнем CSS допуске. Общая фаза не может отрабатывать distance
-до document publication clock, наблюдаемого при API start, с учётом clock/CSS errors. Поэтому мгновенный
-скачок0→75px с последующим tween225px/96мс не подменяет полный300px/128мс.
-Сразу после onset вызывается один rAF существующего владельца: сохраняются
-его timestamp, полное CSS окно и document clock первой публикации всех targets.
-Она обязана сохранять fresh0 в прежнем0,5px допуске; acquired zero frame связывает
-нижнюю границу общей фазы. Старый document clock и поздний slope сами по себе
-не различают первый quarter jump. Если первая публикация уже ненулевая,
-неполна или не разрешает этот origin — отказ, без подбора phase margin.
-Та же фаза связывает первую публикацию с тремя прежними checkpoints;
-дополнительное наблюдение находится за границами timed API costs.
-Канонические1200мс сохраняют прежний относительный phase oracle; дополнительный
-контроль свежего начала относится к явно зарегистрированному серверному control.
-Каждая onset/checkpoint группа сохраняет обе границы CSS read window и
-document timeline до/после чтения; checkpoint также сохраняет actual rAF timestamp.
-В Chromium149 PageAnimator закрепляет document AnimationClock на кадре;
-AnimationClock сохраняет его в одном rendering/task; CSS recalc использует
-этот clock для animation timing. Каждая группа обязана наблюдать одно и то же
-значение document clock до/после CSS, согласованное с perf chronology, а в
-checkpoint — также с rAF. Сразу после API CSS может сохранять публикацию
-предшествующего кадра: wall chronology доказывает порядок API/чтений, а
-phase constraint этой позиции использует приобретённый clock публикации.
-Иначе ноль, который ещё не обновился в первом кадре, ошибочно требует новую
-фазу от времени исполнения getter. Document clock до/после синхронного API
-в одном task обязан совпадать; с ним связан origin свежего движения. Timestamp
-первого rAF может предшествовать wall времени API, когда callback исполняется
-позже начала кадра. Числа этих двух domains не подменяют друг друга.
-Perf interval сокращает общий origin; сопоставление document frame с API perf
-включает три coarsened timestamps: frame, now и origin. Его semantic envelope
-выводится как округлённые вверх 1,5 прежнего двухточечного clock envelope,
-включая консервативные девять ULP. API-cost bounds сохраняют прежнюю формулу.
-Нет clock qualification, значение изменилось или clocks противоречат друг другу — отказ.
-Все позиции связывает одна фаза
-линейного движения с зарегистрированной duration; нулевые и завершённые позиции
-дают односторонние ограничения той же фазы. Для каждого S2 target, а в S3 для
-leading target, нужна разрешающая пара промежуточных наблюдений: весь диапазон
-возможного перемещения между наблюдаемыми стабильными document frames обязан лежать внутри наблюдаемой
-разности координат ± прежние 2 × 0,5 px. Пересечения широких диапазонов
-недостаточно. Общая постоянная фаза сокращается; прежняя stagger topology также
-проверяется. Controls различают duration 64/128/256 мс и нелинейную форму; три
-конечных checkpoints не доказывают все возможные функции между наблюдениями.
-S2 checkpoints назначаются на 0,25/0,5/0,625 duration, S3 — на 0,2/0,5/0,8
-меньшего из duration и delay span. Поздний завершённый checkpoint допускается
-после разрешающей пары. Единственная промежуточная позиция, насыщение всех
-checkpoints или широкие окна, не разрешившие скорость, дают UNPROVEN/отказ,
-включая случаи здорового движения. Допуск не расширяется из-за неопределённости.
-Время исполнения CSS getter сохраняется как chronology и не выдаётся за
-продвижение опубликованного состояния кадра. Этот oracle проверяет видимое CSS;
-он не приписывает JS API внутренний native clock или GPU выполнение. Канонические
-1200мс сохраняют прежний oracle по perf/read окнам. Endpoint300 без промежуточного
-движения не принимается. Каждая timed серия содержит восемь batches:
-32 настоящих вызова под одной парой clock reads для start и другой для cancel.
-Positive выполняет 64 вызова; знаменатель остаётся 32. DOM allocation и наблюдения
-находятся за границами этих интервалов; стоимость цикла и управления owners
-включена. После start сохраняются первые targets всех owners до отмены: окно
-чтения обязано предшествовать линейному endpoint с учётом clock uncertainty.
-Позиции ограничены displacement от свежего нуля за верхнюю границу этого
-сохранённого clock интервала и прежним CSS допуском. Это обнаруживает также
-stateful snap и начальный скачок в timed path. Полный normal-motion trace
-относится к отдельному контрольному вызову; конечный набор controls не доказывает
-все возможные stateful поведения. После cancel наблюдаются все 32/64 группы.
+| Сцена | Полезная работа | Знаменатель |
+| --- | --- | --- |
+| `scalar-live-100` |100 живых scalar retargets; start/frame/cancel-drain |8 повторов |
+| `transform-fresh-1000` |1000 свежих targets ×7 transform channels |8 повторов |
+| `motion-value-default-stock-c` |штатные constructor0/onChange/setTarget100/drain47/destroy/return100 |8 batches по2000 операций |
+| S2/S3 |start/cancel:100/200 targets, stagger0/5ms, duration128ms, endpoint300px |8 batches по32 вызова |
 
-## Разрешимость и допуск
+Stock C использует main-entry `MotionValue`, прежнюю default bounded spring
+`{mass:1,stiffness:170,damping:26}` и существующий `scripts/bench-support.mjs`.
+Factory и две warmup batches по2000 находятся вне CPU. Каждая операция сохраняет
+свои47 frames и endpoint100; среднее47 или checksum100 не заменяет oracle.
+Positive делает4000 stock C операций или64 browser вызова; divisor остаётся2000/32.
+Recorder включён одинаково обеим ролям; RLE и oracle выполняются после CPU.
+Канонические1200ms guards независимы; S2/S3 не доказывают reorder/list и семьиM-05.
 
-Baseline-only pilot содержит восемь runs. Единственной независимой единицей
-является блок двух противоположных порядков; восемь внутренних повторов и кадры
-не увеличивают число независимых наблюдений. До калибровки сохраняется N из
-парного log-contrast, MDE 5% и мощности 0,8. Tail заранее задаёт минимум 292 runs
-(146 независимых блоков). При N выше ресурсного предела 1024
-диагностические controls сохраняются, а admission остаётся `UNPROVEN`.
-Эта приближённая формула планирует средний контраст и не обещает мощности tail.
+## Регистрация и допуск
 
-Одна A/A серия того же build должна удержать двустороннюю полосу
-`1/1.05…1.05`; deliberate 2×actual work должен дать нижнюю границу p50 >1,5.
-Порядковые интервалы строятся из средних двух runs каждого блока. p50/p95 относятся
-к распределению этой средней стоимости блока, а не кадров или отдельных API-вызовов.
-Точная биномиальная масса считается в BigInt для q=1/2,19/20. Bonferroni по
-11 клеткам × 2 квантилям × 2 участникам × 2 tails даёт alpha каждого tail=1/1760.
-При145 блоках upper p95 ещё не ограничен;146 — первый допустимый размер.
-Семейное 95% покрытие условно на независимые одинаково распределённые блоки
-закреплённой клетки. Protected p95 upper остаётся ≤1,05.
-Негодная calibration сохраняет `UNPROVEN` и не запускает A/B.
+До первого sample закрепляются source/package/toolchain/browser/harness identity,
+CPU affinity/quota, native getter, clocks, workload и правила остановки.
+Один baseline-only pilot планирует N до candidate samples. A/A и настоящая2×work
+проверяют разрешимость; A/B начинается только после PASS calibration.
+N292…1024 содержит146…512 независимых paired blocks противоположного порядка.
+p50/p95 относятся к среднему блока, а не отдельному вызову, frame p99 или FPS.
+Точные биномиальные интервалы используют family-wise95% и alpha-per-tail1/1760.
+Protected p95 upper≤1.05, MDE5%, power0.8, counts, seed и старые budgets сохраняются.
+Неразрешимость, ошибка или превышение ресурса дают `UNPROVEN`, без добора к GREEN.
 
-До/после каждого парного блока сохраняются настоящие affinity, cpu.max, loadavg,
-cpu.stat и его DELTA. Cumulative историческое throttling не считается текущим.
-Изменение affinity/quota или ненулевая delta nr_throttled/throttled_usec запрещает
-admission. Каждый snapshot сравнивается с identity зарегистрированной machine,
-в том числе при стабильной смене CPU/quota между блоками; final provenance также
-проверяет эти условия. Все samples сохраняются, post-hoc удаления и добора нет. Пять разрешённых
-CPU не означают пять доступных полных ядер при cgroup quota четырёх CPU.
+Resource controls снимают все6 safe counters `cpu.stat` и `cpu.max` до samples,
+затем до/после каждого блока. Affinity/quota связаны с зарегистрированной machine;
+throttling delta должна быть0. Исторические counters не принимаются за текущую delta.
+Ранее известный exploratory stock wall7.2k→8.3k ns указан в `exploratoryPrehistory`;
+`candidateSamplesObserved:false` относится только к текущему protocol epoch.
 
-Engine clock — `process.threadCpuUsage`: user+system CPU текущего потока,
-с отдельными start/retarget, средним frame и cancel/drain. В timing остаются
-микрозадачи исполнителя; самостоятельная проверка oracle находится за границей
-этих интервалов. Переключения потоков и ожидание не выдаются за engine CPU.
-Browser clock — изолированный realm-local `performance.now`; возвращаемые
-интервалы — elapsed API, они включают вмешательство scheduler/GC. Холодный import,
-warm start, endpoint и cancel сохраняются раздельно. После normal-motion control
-следующий endpoint-вызов называется `control`, а не холодным start.
+## Часы и полезный исход
 
-Observed quantum из before/after probes является control, а не доказательством
-погрешности. В pinned Chromium isolated TimeClamper округляет как вверх, так и
-вниз в пределах 5us; Linux TimeTicks сначала отбрасывает меньше 1us. Интервал
-получает консервативную погрешность двух endpoints `2×(5+1)=12us`. В raw остаются
-обе timestamp reads, а не только их разность. Дополнительно учитываются
-binary64 conversions(now/origin), обе subtraction для reads и subtraction
-интервала. Общий Linux CLOCK_MONOTONIC upper bound снимается Node hrtime после
-browser reads; counters≥2^42ms и несовместимые readings запрещены. Модель
-предполагает общий monotonic clock без namespace/clock overrides и соответствие
-закреплённых binaries приведённому upstream source.
+Engine использует частный NAPI getter `CLOCK_THREAD_CPUTIME_ID`: Linux-reported
+scheduled-runtime main-thread. Сохраняются seconds строкой, nanoseconds∈[0,10^9),
+sequence, PID/TID и valueNs. Потребитель заново выводит `seconds*10^9+nanoseconds`
+через BigInt, сверяет clockReads, identity и отсутствие обратного счётчика.
+Native C/четыре официальных NAPI header, binary, Node, compiler/version/flags и libc
+регистрируются до работы. Pure import не требует compiler/native binary.
 
-Linux `getrusage(RUSAGE_THREAD)` отбрасывает дробную microsecond отдельно для
-user/system; ошибка разности их суммы ограничена 2us. Node поля должны быть safe
-integers и переводятся в BigInt по отдельности. Эти engine интервалы, включая
-каждый frame, получают pointwise bounds. Browser interval делится только на
-base 32. Усреднение repeats/runs не уменьшает worst-case clock error как
-независимый noise: наружное округление распространяется через все суммы,
-деления, средние блока и ratios. Exact order-statistics owner берёт lower ranks
-из pointwise lower observations, upper ranks из upper observations. Нулевой
-lower bound не даёт ограниченного ratio. A/A, 2×work и NI используют уже эти
-границы; при недостаточном разрешении остаётся честный отказ. p95 относится к
-распределению средней цены двух runs, каждый из восьми batches/32, а не
-индивидуальному вызову, frame p99 или FPS.
+Прежние2µs остаются консервативным наружным расширением reported counter;
+это не физическая точность и не вывод из nominal `clock_getres`.
+Getter overhead включён и не вычитается. Прежний RUSAGE/Node clock дал устаревший
+runtime на известной работе; его исходники, warmup plateaus и отказ сохранены.
+Актуальная Linux цепь — `cpu_clock_sample(CPUCLOCK_SCHED)`→`task_sched_runtime`;
+source pins находятся в `SERVER_PROFILE.clockError`.
 
-Первичные clock sources с версиями и SHA256 закреплены в
-`SERVER_PROFILE.clockError.sources`: Chromium149 `time_clamper.{cc,h}`,
-`performance.cc`, `time_now_posix.cc`; Node24.19 `node_process_methods.cc` и
-vendored libuv; Linux6.18.44 `kernel/sys.c`, `kernel/time/time.c`.
+Browser использует isolated realm-local `performance.now`: elapsed API с scheduler/GC.
+Обе clock reads и binary64 погрешность входят в pointwise bounds до CI;
+усреднение не уменьшает worst-case clock envelope. DOM allocation вне start,
+start/retarget/frame/cancel-drain и heap наблюдаются в своих областях.
+Normal-motion control сохраняет fresh0→300 onset, первую CSS0 публикацию,
+три checkpoints, terminal и document/rAF/perf chronology. Неопределённое окно
+не доказывает правильную длительность. После cancel все attached targets
+неподвижны и без WAAPI два rAF. Swallowed vendor exceptions adapter не наблюдает.
+Подробные oracles принадлежат [methodology.mjs](../bench/compare/methodology.mjs)
+и [bench-transform-support.mjs](../scripts/bench-transform-support.mjs).
 
-После каждого browser cancel attached targets остаются в DOM для самостоятельной
-проверки: нет WAAPI и transform каждого target неизменен два последующих rAF.
-`cancelMs` измеряет синхронный API; `cancelDrainMs` сохраняет наблюдаемый elapsed
-до этого checkpoint, включая два rAF, DOM oracle и harness callback. Он не
-приписывается чистому CPU пакета. Успешный return без этой неподвижности даёт отказ.
-Нормализованные existing adapters уже ловят vendor cancel exceptions. Профиль
-сохраняет ошибки measurement и наблюдаемое нарушение семантики; он не может
-восстановить уже swallowed underlying exceptions или доказать отсутствие эффекта
-после более долгого незарегистрированного окна.
+## Результат и независимая проверка
 
-Heap/GC — наблюдения пакета, oracle и harness, без ложной точной атрибуции.
-Forced GC применяется только после timing в отдельном retention-процессе.
-Перед обоими heap snapshots процесс завершает текущий host turn через
-`setImmediate`, затем выполняет два GC: один Promise checkpoint в pinned Node
-сохраняет temporary WeakRef keepalive и не доказывает retained heap. Actual packed
-stock C control сохранил все 64 полезных исхода 47 frames/endpoint 100; у candidate
-64 targets были живы в том же job и 0 после host turn. Это уточнение границы
-наблюдения, а не точная атрибуция памяти или стоимость GC внутри CPU interval.
-Отрицательные retained heap delta сохраняются; отношения с нулевым/отрицательным
-знаменателем не вычисляются. Статические byte и численные guards принадлежат
-прежним владельцам и этим профилем не ослабляются.
-
-## Проверка и хранение результата
-
-Все warmup/pilot/control/A/B samples, ошибки и частичные отказы сохраняются в
-`journal.ndjson` с цепью digest; итог — `server-profile.json` и внешний
-`server-profile.sha256`. Журнал проверяет фактический порядок регистрации,
-замораживания N, завершения controls, фактического порядка и допуска A/B. Имя
-positive привязано к владельцу artifact, одиночная работа не заменяет 2×work.
-Failure union и финальный digest связываются с журналом. Успешный engine raw
-хранит все 16 clock endpoints вместе с actual user/system полями, ordered
-scheduler times и lossless target CSS/write traces. Существующий lifecycle owner
-пересчитывает интервалы из BigInt endpoints, координаты из independent linear
-oracle и trace hashes из сохранённых строк. Микросекундные user/system fields
-связываются с каждым endpoint по sequence; невозможный ns interval не допускается.
-Engine failure хранит точный приобретённый prefix тех же данных, все
-operation/frame интервалы, открытую границу cancel, семантику до и после cleanup
-и original causes. Browser failure сохраняет
-acquired batch clocks, начатых/отменённых owners и partial semantic checkpoints;
-нечисловые приобретённые значения отмечаются явно. Cleanup failure не заменяет
-первую ошибку. Итоговые метрики пересчитываются из raw; пропущенный
-участник, смена знаменателя, invalid oracle или clock evidence отвергаются.
-Одинаковые target trace hashes упаковываются lossless как count+hash; расширенная
-длина обязана совпадать с числом targets сцены. То же lossless count+value применяется
-к одинаковым CSS координатам cancel witness. Остальные координаты и normal-motion
-позиции сохраняются lossless RLE; expanded длина каждой группы проверяется до
-прежнего semantic oracle. Timing samples не сокращаются. Итоговый compact JSON
-пишется по элементам массивов с потоковым digest: полный raw не обязан помещаться
-в одну строку V8. В верхних `rows` элемент содержит один run; элемент `comparators`
-содержит всю серию своего comparator и должен целиком помещаться в строку V8.
-Зарегистрированный формат проверен отдельным carrier-контролем при N = 1024;
-он не даёт общей гарантии для произвольно больших элементов массива.
-Журнал и внешний digest связывают точные записанные bytes.
-Consumer также разбирает JSON по полным values и journal по records; общий
-artifact или journal не преобразуется в одну строку V8. Native JSON.parse
-сохраняет значения каждого chunk, Unicode/escapes и численное округление.
+Каталог хранит `server-profile.json`, внешний `server-profile.sha256`,
+`journal.ndjson`, raw controls, packages, adapters и native qualification.
+Все samples и приобретённые failure prefixes сохраняются; нет pruning по исходу.
+Журнал связывает preregistration→N→calibration→A/B, порядок участников и failure union.
+Декодер поддерживает max-N carrier; lossless RLE/gzip не меняют расширенные данные.
 
 ```sh
 node bench/profile/server-profile-contract.mjs \
   --raw /outside/checkout/server-chromium-registration-1/server-profile.json \
-  --digest <sha256-из-независимой-квитанции> \
+  --digest '<64 hex из независимо сохранённого server-profile.sha256>' \
   --journal /outside/checkout/server-chromium-registration-1/journal.ndjson
 ```
 
-Архив результата хранит JSON, журнал, consumer tarballs и собранные адаптеры.
-Срок жизни временного CI artifact не считается durable retention. При сохранённом
-отказе валидатор сообщает проверку отказа; это не admission и не product GO.
+Admission принадлежит [server-profile-contract.mjs](../bench/profile/server-profile-contract.mjs).
+Forced GC разрешён только отдельному retention child после timing: host turn через
+`setImmediate`, затем два GC у каждого heap snapshot; stock C делает2×2000 warmups
+и8×2000 проверенных операций. Отрицательные heap deltas сохраняются. Это наблюдение
+пакета/oracle/harness, не точная атрибуция утечки или стоимость GC внутри CPU.
+Исторические версии протокола и все FAIL epochs остаются в исходных архивах;
+новые результаты не распространяются на другой method/source/package tuple.
